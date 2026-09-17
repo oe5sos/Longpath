@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/instruments/NeedleInstrument.cpp  (NereusSDR)
+// src/gui/instruments/NeedleInstrument.cpp  (Longpath)
 // =================================================================
 // Siehe NeedleInstrument.h. Fast alles Sichtbare kommt aus
 // InstrumentPainter; hier stehen Zeiger, Nachlaufzeiger und die

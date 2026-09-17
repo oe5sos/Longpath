@@ -1,4 +1,4 @@
-// no-port-check: NereusSDR-original CI gate for init-burst byte-for-byte parity.
+// no-port-check: Longpath-original CI gate for init-burst byte-for-byte parity.
 //
 // Phase 3J-1 Task 4.3: compares TciProtocol::buildInitBurst() against the
 // captured (synthetic for now) golden file at

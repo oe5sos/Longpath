@@ -1,12 +1,12 @@
 #pragma once
 
-// no-port-check: AetherSDR-derived NereusSDR file; Thetis cmaster.cs /
+// no-port-check: AetherSDR-derived Longpath file; Thetis cmaster.cs /
 // audio.cs references in inline cites are behavioral source-first cites
 // for sample sizes / timing / mix coefficient parity only, not Thetis
 // logic ports.
 
 // =================================================================
-// src/core/AudioEngine.h  (NereusSDR)
+// src/core/AudioEngine.h  (Longpath)
 // =================================================================
 //
 // Source attribution (AetherSDR — GPLv3):
@@ -17,10 +17,10 @@
 //
 //   This file is a port or structural derivative of AetherSDR source.
 //   AetherSDR is licensed under the GNU General Public License v3.
-//   NereusSDR is also GPLv3. Attribution follows GPLv3 §5 requirements.
+//   Longpath is also GPLv3. Attribution follows GPLv3 §5 requirements.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-16 — Ported/adapted in C++20/Qt6 for NereusSDR by
 //                 J.J. Boyd (KG4VCF), with AI-assisted transformation
 //                 via Anthropic Claude Code.
@@ -145,7 +145,7 @@ class Resampler;
 class RadioModel;
 class SliceModel;
 
-// Audio engine for NereusSDR (Phase 3O VAX).
+// Audio engine for Longpath (Phase 3O VAX).
 //
 // Owns one IAudioBus per routable endpoint:
 //   - m_speakersBus: the master mix goes here.
@@ -1116,8 +1116,8 @@ private:
     // have two of.
     MicSpectrum m_txSiphonRing;
     // Default 0.5f — mirrors the fixed coefficient used in Thetis audio.cs
-    // for the aaudio mix path; NereusSDR exposes this as user-adjustable
-    // volume (pre-code review §4.4). Not a port; AudioEngine is NereusSDR-native.
+    // for the aaudio mix path; Longpath exposes this as user-adjustable
+    // volume (pre-code review §4.4). Not a port; AudioEngine is Longpath-native.
     std::atomic<float> m_txMonitorVolume{0.5f};
 
     // Sub-Phase 9 Task 9.2a — per-channel VAX rx gain / mute and master

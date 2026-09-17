@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/applets/VaxApplet.h  (NereusSDR)
+// src/gui/applets/VaxApplet.h  (Longpath)
 // =================================================================
 //
 // Ported from AetherSDR source:
@@ -8,23 +8,23 @@
 //
 // AetherSDR is licensed under the GNU General Public License v3; see
 // https://github.com/ten9876/AetherSDR for the contributor list and
-// project-level LICENSE. NereusSDR is also GPLv3. AetherSDR source
+// project-level LICENSE. Longpath is also GPLv3. AetherSDR source
 // files carry no per-file GPL header; attribution is at project level
 // per AetherSDR convention.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-20 — Ported/adapted in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via
 //                 Anthropic Claude Code. Phase 3O Sub-Phase 9 Task 9.2b.
 //                 Renamed DaxApplet → VaxApplet, `dax*` identifiers →
-//                 `vax*`, and adapted to NereusSDR's `AppletWidget` base
+//                 `vax*`, and adapted to Longpath's `AppletWidget` base
 //                 (AetherSDR's DaxApplet inherits QWidget directly and
 //                 uses its own parent-applet frame). Wires slider →
 //                 AudioEngine::setVaxRxGain / setVaxMuted / setVaxTxGain
 //                 (Task 9.2a) and reads AudioEngine::vaxRxLevel /
 //                 vaxTxLevel via a 50 ms poll timer. Per-channel device
-//                 label is platform-hardcoded on Mac/Linux ("NereusSDR
+//                 label is platform-hardcoded on Mac/Linux ("Longpath
 //                 VAX N") and read from AppSettings on Windows (BYO
 //                 cables). Tags label mirrors AetherSDR's slice-letter
 //                 convention, listening to SliceModel::vaxChannelChanged.

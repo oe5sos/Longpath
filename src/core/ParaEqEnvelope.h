@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/ParaEqEnvelope.h  (NereusSDR)
+// src/core/ParaEqEnvelope.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
@@ -7,7 +7,7 @@
 //   Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-30 — Reimplemented in C++20/Qt6 for NereusSDR by
 //                 J.J. Boyd (KG4VCF), with AI-assisted transformation
 //                 via Anthropic Claude Code.
@@ -15,7 +15,7 @@
 //                 envelope helper mirroring Thetis Common.cs
 //                 Compress_gzip / Decompress_gzip [v2.10.3.13],
 //                 byte-identical so parametric-EQ JSON blobs
-//                 round-trip across Thetis <-> NereusSDR profile
+//                 round-trip across Thetis <-> Longpath profile
 //                 storage.
 // =================================================================
 
@@ -76,13 +76,13 @@ namespace Longpath {
 // The Thetis ucParametricEq UserControl serializes its band/preamp
 // state as Newtonsoft JSON, then wraps that JSON in a gzip+base64url
 // envelope before stuffing it into the TXProfile CFCParaEQData /
-// TXParaEQData columns.  NereusSDR's ParametricEqWidget produces
+// TXParaEQData columns.  Longpath's ParametricEqWidget produces
 // Thetis-compatible JSON via saveToJson(); this helper applies the
 // same envelope so:
 //
-//   1. NereusSDR can round-trip its own blobs through MicProfileManager.
+//   1. Longpath can round-trip its own blobs through MicProfileManager.
 //   2. Thetis-saved profile blobs decode cleanly when imported.
-//   3. NereusSDR-saved blobs decode cleanly if exported back into Thetis.
+//   3. Longpath-saved blobs decode cleanly if exported back into Thetis.
 //
 // The output is byte-identical to Thetis's encoder for the same input
 // (modulo the gzip header mtime field — gzip permits mtime=0 and
@@ -103,7 +103,7 @@ QString encode(const QString& payload);
 //
 // Returns std::nullopt on any failure (corrupt base64, bad gzip header,
 // truncated stream, inflate data error, etc.) — Thetis's version raises
-// on bad-length base64 and on GZipStream errors; NereusSDR collapses
+// on bad-length base64 and on GZipStream errors; Longpath collapses
 // all failure modes to nullopt so callers don't need to distinguish.
 //
 // From Thetis Common.cs:1764-1790 [v2.10.3.13].

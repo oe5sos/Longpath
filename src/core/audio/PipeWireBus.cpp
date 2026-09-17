@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/audio/PipeWireBus.cpp  (NereusSDR)
+// src/core/audio/PipeWireBus.cpp  (Longpath)
 //   Copyright (C) 2026 J.J. Boyd (KG4VCF) — GPLv2-or-later.
 //   2026-04-24 — created. AI-assisted via Claude Code.
 // =================================================================
@@ -13,7 +13,7 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU General Public License for more details.
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-24  J.J. Boyd (KG4VCF) — created for Phase 3O Task 12.
 // =================================================================
 #ifdef LONGPATH_HAVE_PIPEWIRE

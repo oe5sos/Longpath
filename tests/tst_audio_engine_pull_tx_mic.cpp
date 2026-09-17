@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_audio_engine_pull_tx_mic.cpp  (NereusSDR)
+// tests/tst_audio_engine_pull_tx_mic.cpp  (Longpath)
 // =================================================================
 //
 // Exercises AudioEngine::pullTxMic — Phase 3M-1b Task E.1.

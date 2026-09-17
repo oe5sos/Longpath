@@ -1,6 +1,6 @@
 // no-port-check: test-only — Thetis file names appear only in source-cite
 // comments that document which upstream line each assertion verifies.
-// No Thetis logic is ported here; this file is NereusSDR-original.
+// No Thetis logic is ported here; this file is Longpath-original.
 //
 // Cross-thread safety tests for StepAttenuatorController → RadioConnection
 // pushes (v0.4.1 hotfix).

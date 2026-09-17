@@ -4,7 +4,7 @@
 //   Project Files/Source/Console/clsAudioRecordPlayback.cs, original licence
 //   from Thetis source is included below
 //
-// Thetis v2.10.3.15 (@852bf0e). Diese Datei ist NereusSDR/Longpath-original
+// Thetis v2.10.3.15 (@852bf0e). Diese Datei ist Longpath/Longpath-original
 // und uebernimmt KEINEN C#-Code; sie leitet Verhalten und Feldauswahl aus
 // der oben genannten Quelle ab. Der Kopf steht hier trotzdem vollstaendig,
 // weil die Herkunftstabelle sie fuehrt und weil eine Nennung mehr niemandem
@@ -52,14 +52,14 @@ mw0lge@grange-lane.co.uk
 
 
 // no-port-check: Nennt Thetis PlayFileViaPCAudio (clsAudioRecordPlayback.cs) als Vorbild
-// fuer den zweiten Wiedergabeweg; NereusSDR-original. Siehe
+// fuer den zweiten Wiedergabeweg; Longpath-original. Siehe
 // THETIS-PROVENANCE.md, Art 'reference'.
 
 // =================================================================
-// src/core/audio/WavPlayer.h  (NereusSDR)
+// src/core/audio/WavPlayer.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // Eine WAV-Datei ueber die Lautsprecher anhoeren.
 //
@@ -90,7 +90,7 @@ mw0lge@grange-lane.co.uk
 // Standard-Ausgabegeraet und sonst nirgendwohin.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-19 — Original fuer NereusSDR von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
 // =================================================================

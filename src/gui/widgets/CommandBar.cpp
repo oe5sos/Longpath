@@ -1,12 +1,12 @@
 // =================================================================
-// src/gui/widgets/CommandBar.cpp  (NereusSDR)
+// src/gui/widgets/CommandBar.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. See CommandBar.h for what this is and why the
+// Longpath-original. See CommandBar.h for what this is and why the
 // band and filter groups are deliberately absent.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-15 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

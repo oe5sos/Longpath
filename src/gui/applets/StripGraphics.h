@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/gui/applets/StripGraphics.h  (NereusSDR)
+// src/gui/applets/StripGraphics.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. Draws over DSP ported from AetherSDR
+// Longpath-original. Draws over DSP ported from AetherSDR
 // (https://github.com/aethersdr/AetherSDR, GPLv3, primary author
 // Jeremy [KK7GWY]); the curve is computed from ClientEq's own
 // analytic magnitude function, so what is drawn is what the filter
@@ -31,7 +31,7 @@
 // own beyond what they are told. Neither can transmit.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-08 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================
@@ -229,7 +229,7 @@ private:
     // ticks to settle.
     //
     // Both the rate and the mechanism are AetherSDR's, and this is the
-    // NereusSDR-side note recording where they came from.
+    // Longpath-side note recording where they came from.
     static constexpr double kBallSmoothAlpha = 0.30;
     static constexpr int    kBallTimerMs     = 33;   // ~30 Hz
 

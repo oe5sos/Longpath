@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/PaTelemetryScaling.cpp  (NereusSDR)
+// src/core/PaTelemetryScaling.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis [v2.10.3.13+501e3f51]:
@@ -10,7 +10,7 @@
 // CLAUDE.md "Byte-for-byte headers and multi-file attribution".
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-03 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -98,7 +98,7 @@ struct PaFwdTriplet {
 // coupling factor than the default ANAN-100 coupler.
 //
 // Inline upstream attribution preserved verbatim:
-//   :25007  case HPSDRModel.ANAN_G1: //N1GP G1 added   (NereusSDR has no G1 enum)
+//   :25007  case HPSDRModel.ANAN_G1: //N1GP G1 added   (Longpath has no G1 enum)
 //   :25081  case HPSDRModel.ANAN_G2E: //N1GP G2E added
 //   :25083  case HPSDRModel.ANAN_G2_1K:             // !K will need different scaling
 //   :25084  case HPSDRModel.REDPITAYA: //DH1KLM
@@ -192,7 +192,7 @@ double scaleFwdPowerWatts(HPSDRModel model, quint16 raw) noexcept
 // computeRefPower at console.cs:24993 emits the corresponding REV-side
 // `volts` to SetupForm.textRevVoltage with the same formula shape.
 //
-// NereusSDR exposes a single FWD-side curve here (the most common
+// Longpath exposes a single FWD-side curve here (the most common
 // case).  See the header docstring for the design note explaining why
 // REV-side gets the same FWD-offset table — the per-board offset
 // difference is below the f2 UI display resolution.
@@ -297,7 +297,7 @@ float scaleExciterPowerMw(HPSDRModel model, quint16 raw) noexcept
     case HPSDRModel::ANAN200D:
         // TODO [anan200d-port]: Thetis uses computeOrionExciterPower (different
         // breakpoints) for ANAN200D (console.cs:26000 [v2.10.3.15]).
-        // NereusSDR doesn't model ANAN200D distinctly yet; fall through to
+        // Longpath doesn't model ANAN200D distinctly yet; fall through to
         // computeOrionMkIIExciterPower as a conservative placeholder.
         [[fallthrough]];
     case HPSDRModel::ORIONMKII:

@@ -1,5 +1,5 @@
-// NereusSDR-original infrastructure — no Thetis source ported here.
-// No upstream attribution required (NereusSDR FilterDisplayItem high-res test).
+// Longpath-original infrastructure — no Thetis source ported here.
+// No upstream attribution required (Longpath FilterDisplayItem high-res test).
 //
 // Design note (Task 4.4):
 //   FilterDisplayItem::setHighResolution(bool) / highResolution() control whether

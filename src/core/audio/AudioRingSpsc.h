@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/audio/AudioRingSpsc.h  (NereusSDR)
+// src/core/audio/AudioRingSpsc.h  (Longpath)
 // =================================================================
 //   Copyright (C) 2026 J.J. Boyd (KG4VCF) - GPLv2-or-later.
 //   2026-04-23 - created. AI-assisted via Anthropic Claude Code.

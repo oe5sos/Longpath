@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/accessories/AlexController.cpp  (NereusSDR)
+// src/core/accessories/AlexController.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -9,11 +9,11 @@
 //    setRxAnt / setRxOnlyAnt / setTxAnt per-band setters)
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-20 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                (KG4VCF), with AI-assisted transformation via Anthropic
 //                Claude Code. Replaces Phase 3I Alex stubs. Per-MAC
-//                persistence via AppSettings. NereusSDR spin: 14 bands
+//                persistence via AppSettings. Longpath spin: 14 bands
 //                (Band160m–XVTR) vs Thetis's 12 (B160M–B6M); extra
 //                GEN/WWV/XVTR slots default to Ant 1. Block-TX safety
 //                (blockTxAnt2/3) added as NereusSDR-native UI contract
@@ -66,7 +66,7 @@ AlexController::AlexController(QObject* parent) : QObject(parent)
 }
 
 // ── Per-ADC BPF mode mutators + recompute ──────────────────────────────────
-// NereusSDR-original; no Thetis port.
+// Longpath-original; no Thetis port.
 
 AlexController::BpfMode AlexController::bpfMode(int adc) const
 {
@@ -127,7 +127,7 @@ void AlexController::recomputeBpf(int adc)
         // Auto mode: inspect slice bands on this ADC.
         // 0 bands -> idle/filtered; 1 band -> Filtered at that band;
         // 2+ distinct bands -> BYPASS (multi-band attenuation trade-off).
-        // Phase 3F Task 13 — NereusSDR-original; no Thetis port.
+        // Phase 3F Task 13 — Longpath-original; no Thetis port.
         std::set<Band> uniqueBands;
         for (Band b : m_slicesPerAdc[adc]) {
             if (b != Band::Count) { uniqueBands.insert(b); }
@@ -229,7 +229,7 @@ bool AlexController::blockTxAnt3() const { return m_blockTxAnt3; }
 // radAlexT2_*.Checked band back to radAlexT1_*. Without the retroactive
 // sweep the flag is a write-time guard only — existing per-band
 // txAnt=2 values keep firing on transmit until the user re-picks.
-// Flagged by Codex review on PR #116 (NereusSDR bench pass 2026-04-22).
+// Flagged by Codex review on PR #116 (Longpath bench pass 2026-04-22).
 void AlexController::setBlockTxAnt2(bool on)
 {
     if (m_blockTxAnt2 == on) { return; }
@@ -345,8 +345,8 @@ void AlexController::setUseTxAntForRx(bool on)
     emit useTxAntForRxChanged(on);
 }
 
-// NereusSDR-native — not a Thetis port. Thetis passes xvtr as a method
-// parameter to UpdateAlexAntSelection; NereusSDR stores it as session
+// Longpath-native — not a Thetis port. Thetis passes xvtr as a method
+// parameter to UpdateAlexAntSelection; Longpath stores it as session
 // state so signal-driven composition can re-fire on toggle. Not persisted.
 void AlexController::setXvtrActive(bool on)
 {

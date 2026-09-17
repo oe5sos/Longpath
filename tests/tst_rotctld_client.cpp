@@ -7,7 +7,7 @@
 //   p        → "<az>\n<el>\n"
 //   P az el  → "RPRT 0\n"   (or a configured error)
 //   S        → "RPRT 0\n"
-// no-port-check: NereusSDR-original.
+// no-port-check: Longpath-original.
 
 #include <QtTest/QtTest>
 #include <QTcpServer>

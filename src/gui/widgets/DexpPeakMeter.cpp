@@ -1,15 +1,15 @@
 // =================================================================
-// src/gui/widgets/DexpPeakMeter.cpp  (NereusSDR)
+// src/gui/widgets/DexpPeakMeter.cpp  (Longpath)
 // =================================================================
 //
-// no-port-check: NereusSDR-original Qt6 paint impl.  Thetis uses
+// no-port-check: Longpath-original Qt6 paint impl.  Thetis uses
 // System.Drawing.Graphics; this is a fresh Qt6/QPainter
 // implementation of the same visual recipe (LimeGreen peak fill +
 // red threshold marker + above-threshold red overlay).  The Thetis
 // excerpts below are commentary so the next maintainer can audit
 // the visual fidelity, not ported code.
 //
-// NereusSDR-native paint impl mirroring Thetis picVOX_Paint /
+// Longpath-native paint impl mirroring Thetis picVOX_Paint /
 // picNoiseGate_Paint visual behavior.  See header for full
 // attribution + modification history.
 //
@@ -50,7 +50,7 @@
 //   2. If threshold_x < signal_x, red overlay from threshold_x+1
 //      to signal_x (overwrites the green segment above-threshold).
 // The only differences are domain mapping (dB vs linear) and the
-// MOX gate.  NereusSDR delegates BOTH of those to the caller via
+// MOX gate.  Longpath delegates BOTH of those to the caller via
 // the normalized 0..1 setters, so this widget is pure "draw a
 // peak strip" with no radio-state coupling.
 //
@@ -130,7 +130,7 @@ void DexpPeakMeter::paintEvent(QPaintEvent*)
     const int W = width();
     const int H = height();
 
-    // Background + 1 px border (matches NereusSDR slider track styling).
+    // Background + 1 px border (matches Longpath slider track styling).
     p.fillRect(rect(), kBg);
     p.setPen(kBorder);
     p.drawRect(rect().adjusted(0, 0, -1, -1));
@@ -169,7 +169,7 @@ void DexpPeakMeter::paintEvent(QPaintEvent*)
     // sits right at the edge).  No direct Thetis equivalent — the
     // C# paint relies on the slider thumb landing right next to the
     // strip to imply the threshold position.  Adding an explicit line
-    // is a NereusSDR-original UX nudge so the threshold position is
+    // is a Longpath-original UX nudge so the threshold position is
     // unambiguous when the strip is read in isolation.
     p.setPen(kRedThreshLine);
     p.drawLine(thresholdX, 0, thresholdX, H - 1);

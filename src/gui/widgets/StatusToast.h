@@ -1,8 +1,8 @@
 // =================================================================
-// src/gui/widgets/StatusToast.h  (NereusSDR)
+// src/gui/widgets/StatusToast.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original; no upstream port. Non-blocking notification
+// Longpath-original; no upstream port. Non-blocking notification
 // toast for transient operator messages.
 //
 // Replaces QStatusBar::showMessage for every notification in
@@ -18,12 +18,12 @@
 // instead of being dropped.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-07-30 Created in C++20/Qt6 for NereusSDR by J.J. Boyd (KG4VCF),
 //              with AI-assisted transformation via Anthropic Claude Code.
 // =================================================================
 //
-// no-port-check: NereusSDR-original
+// no-port-check: Longpath-original
 
 #pragma once
 

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - DxccColorProvider: integrator that combines
+// Longpath - DxccColorProvider: integrator that combines
 // CtyDatParser + DxccWorkedStatus + AdifParser to resolve a spot
 // (callsign + freqMhz + mode) to a 4-tier QColor (NewDxcc /
 // NewBand / NewMode / Worked) plus an Unknown sentinel.
@@ -9,10 +9,10 @@
 // AetherSDR is (C) its contributors and is licensed GPL-3.0-or-later
 // (see https://github.com/ten9876/AetherSDR/blob/main/LICENSE).
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-11  J.J. Boyd / KG4VCF  Phase 3J-2 Task C4. Initial port.
 //                                    AetherSDR's "AetherSDR" namespace
-//                                    becomes "NereusSDR". Constructor
+//                                    becomes "Longpath". Constructor
 //                                    spins up the AdifParser worker
 //                                    thread, wires queued
 //                                    finished/openFailed signals,

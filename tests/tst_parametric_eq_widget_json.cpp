@@ -1,8 +1,8 @@
 // =================================================================
-// tests/tst_parametric_eq_widget_json.cpp  (NereusSDR)
+// tests/tst_parametric_eq_widget_json.cpp  (Longpath)
 // =================================================================
 //
-// no-port-check: NereusSDR-original test file.  Cites for the JSON
+// no-port-check: Longpath-original test file.  Cites for the JSON
 // marshal logic under test live in ParametricEqWidget.cpp /
 // ucParametricEq.cs:1460-1573 [v2.10.3.13].
 // =================================================================

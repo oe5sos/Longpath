@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/applets/AppletFloatingWindow.cpp  (NereusSDR)
+// src/gui/applets/AppletFloatingWindow.cpp  (Longpath)
 // =================================================================
 // Siehe AppletFloatingWindow.h für Zweck, Eigentum und Geometrie.
 // =================================================================

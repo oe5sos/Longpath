@@ -1,11 +1,11 @@
 // =================================================================
-// src/gui/setup/HardwareDdcRoutingPage.cpp  (NereusSDR)
+// src/gui/setup/HardwareDdcRoutingPage.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original; no upstream port. See header for scope notes.
+// Longpath-original; no upstream port. See header for scope notes.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-27 Created in C++20/Qt6 for NereusSDR by J.J. Boyd (KG4VCF),
 //              with AI-assisted transformation via Anthropic Claude Code.
 //   2026-05-27 Phase 3F closeout (Sub-Epic E Tasks 8-10): replaced stub

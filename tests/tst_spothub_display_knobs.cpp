@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// no-port-check: NereusSDR-original test file. SpectrumWidget itself
-// is a NereusSDR port of AetherSDR's spectrum renderer, but the
-// `loadSpotDisplaySettings` helper exercised here is a NereusSDR
+// no-port-check: Longpath-original test file. SpectrumWidget itself
+// is a Longpath port of AetherSDR's spectrum renderer, but the
+// `loadSpotDisplaySettings` helper exercised here is a Longpath
 // addition introduced by Phase 3J-2 + 3R M2.
 //
-// NereusSDR - Phase 3J-2 + 3R M2: SpotHub Display tab knobs end-to-end.
+// Longpath - Phase 3J-2 + 3R M2: SpotHub Display tab knobs end-to-end.
 //
 // SpotHubDialog F4 (commit on 2026-05-11) wires every Display tab knob
 // to AppSettings on construction (knob seeded from key) and on change
@@ -30,7 +30,7 @@
 // push loop into a single SpectrumWidget method that AppSettings drives
 // directly. MainWindow's slot is now a one-liner around that call.
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-11  J.J. Boyd / KG4VCF  Phase 3J-2 + 3R M2 initial commit.
 //                                    AI tooling: Anthropic Claude Code.
 

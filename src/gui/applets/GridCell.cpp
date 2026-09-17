@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/applets/GridCell.cpp  (NereusSDR)
+// src/gui/applets/GridCell.cpp  (Longpath)
 // =================================================================
 // Siehe GridCell.h — ein Feld ist ein Behaelter, kein Widget.
 // =================================================================

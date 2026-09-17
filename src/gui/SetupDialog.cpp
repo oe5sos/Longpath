@@ -1,13 +1,13 @@
 // =================================================================
-// src/gui/SetupDialog.cpp  (NereusSDR)
+// src/gui/SetupDialog.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original Qt6 navigation shell for the Settings dialog.
+// Longpath-original Qt6 navigation shell for the Settings dialog.
 // Independently implemented from Thetis Setup Form interface design;
 // no direct C# port. Inline cites to Thetis files indicate per-SKU
 // behaviour rules consulted while implementing visibility wiring.
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-03 — PA calibration safety hotfix Phase 8 (#167): rewired
 //                 the Setup → PA category to be always-built, with
 //                 per-SKU visibility driven by BoardCapabilities and
@@ -495,7 +495,7 @@ void SetupDialog::buildTree()
     // (setup.designer.cs:47366-47371 [v2.10.3.13]). Three sub-pages:
     //   - PA Gain         → Thetis tpGainByBand (Phase 6+7 live editor)
     //   - Watt Meter      → Thetis tpWattMeter (cal spinboxes — Phase 3)
-    //   - PA Values       → NereusSDR-spin live telemetry page (Phase 4)
+    //   - PA Values       → Longpath-spin live telemetry page (Phase 4)
     //
     // Phase 8 of #167 — the PA category and 3 sub-pages are now ALWAYS
     // built. Per-SKU visibility is driven dynamically via
@@ -534,7 +534,7 @@ void SetupDialog::buildTree()
         // conflict-free; the connect lands here once both pages exist.
         // Mirrors Thetis btnResetPAValues_Click (setup.cs:16346-16357
         // [v2.10.3.13+501e3f51]) — Thetis blanks the textbox text directly
-        // from the same panel; NereusSDR fans out to a peer page since the
+        // from the same panel; Longpath fans out to a peer page since the
         // PA Values readout was promoted to its own dedicated page.
         //
         // #272 / #301: this is the one connect() in the dialog that spans two
@@ -846,7 +846,7 @@ void SetupDialog::buildTree()
 //
 // From Thetis comboRadioModel_SelectedIndexChanged
 // (setup.cs:19812-20310 [v2.10.3.13+501e3f51]) — per-SKU PA tab visibility.
-// Thetis swaps dozens of controls per HPSDRModel; NereusSDR collapses
+// Thetis swaps dozens of controls per HPSDRModel; Longpath collapses
 // the decisions into BoardCapabilities and surfaces the equivalent
 // visibility here.
 

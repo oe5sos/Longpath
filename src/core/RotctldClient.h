@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/core/RotctldClient.h  (NereusSDR)
+// src/core/RotctldClient.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // Hamlib's rotctld, over TCP. The protocol is line-based text:
 //
@@ -21,7 +21,7 @@
 // a crossed reply is a position read as an error code or the reverse.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
 //   2026-08-10 — Reply watchdog: an outstanding command that never gets

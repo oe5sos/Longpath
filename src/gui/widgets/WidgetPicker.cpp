@@ -1,11 +1,11 @@
 // =================================================================
-// src/gui/widgets/WidgetPicker.cpp  (NereusSDR)
+// src/gui/widgets/WidgetPicker.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. See WidgetPicker.h.
+// Longpath-original. See WidgetPicker.h.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-15 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 //   2026-08-15 — Kategorien, Suche, Karten statt flacher Hakenliste.

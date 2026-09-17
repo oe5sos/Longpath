@@ -1,6 +1,6 @@
-// no-port-check: NereusSDR-original test file. Exercises new ConnectFailure
+// no-port-check: Longpath-original test file. Exercises new ConnectFailure
 // enum and connectFailed() signal added in Phase 3Q Task 3. No Thetis logic
-// is ported here; the tested infrastructure is NereusSDR-original.
+// is ported here; the tested infrastructure is Longpath-original.
 
 #include <QtTest/QtTest>
 #include <QSignalSpy>

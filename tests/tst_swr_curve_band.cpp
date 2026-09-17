@@ -1,6 +1,6 @@
-// tests/tst_swr_curve_band.cpp  (NereusSDR)
+// tests/tst_swr_curve_band.cpp  (Longpath)
 //
-// NereusSDR-original. No Thetis port.
+// Longpath-original. No Thetis port.
 //
 // ── The window that stayed on the previous band ──────────────────────
 //

@@ -1,4 +1,4 @@
-// no-port-check: NereusSDR-original driver class.  Thetis pumps pscc()
+// no-port-check: Longpath-original driver class.  Thetis pumps pscc()
 // from inside ChannelMaster.dll's xrouter → InboundBlock(id=1) chain
 // (Project Files/Source/ChannelMaster/router.c:71-108 +
 // sync.c:44-67 [v2.10.3.15]).  ChannelMaster receives multi-stream
@@ -27,7 +27,7 @@
 //     connection layer migrates to the paired signal.
 //
 // =================================================================
-// src/core/PsccPump.h  (NereusSDR)
+// src/core/PsccPump.h  (Longpath)
 // =================================================================
 //
 // PsccPump — the missing pscc() driver for PureSignal.
@@ -47,7 +47,7 @@
 // `data[ps_rx_idx]` selected from the array.  cmaster.cs:533-534
 // configures `ps_rx_idx=0, ps_tx_idx=1` for "all current models".
 //
-// In NereusSDR, the OpenHPSDR P2 network layer delivers each DDC's
+// In Longpath, the OpenHPSDR P2 network layer delivers each DDC's
 // I/Q as a separate stream (RadioConnection::iqDataReceived(ddcIndex,
 // samples)) — one UDP port per DDC.  PsccPump subscribes to that
 // stream, buffers DDC0 (PS-feedback per cmaster.cs convention) and
@@ -82,7 +82,7 @@
 // machine — trivially cheap on main thread.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-06 — Created by J.J. Boyd (KG4VCF) for Phase 3M-4
 //                 Task 17 chunk C — closed the calcc-feed gap that
 //                 prevented PureSignal from working end-to-end.  AI-

@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/HpsdrModel.h  (NereusSDR)
+// src/core/HpsdrModel.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -14,7 +14,7 @@
 //   Reid Campbell (MI0BOT) — HermesLite 2 enum mappings (preserved via
 //     inline markers on HPSDRModel::HERMESLITE and HPSDRHW::HermesLite)
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -127,7 +127,7 @@ enum class HPSDRHW : int {
     // 7..9 reserved — DO NOT REUSE (Thetis wire format compares these ints)
     Saturn     =  10,  // ANAN-G2: added G8NJJ [Thetis network.h:423 / enums.cs:397]
     SaturnMKII =  11,  // ANAN-G2 MkII board revision
-    // NereusSDR-original SKU slots — NOT on the Thetis wire; integers chosen
+    // Longpath-original SKU slots — NOT on the Thetis wire; integers chosen
     // above the Thetis-defined range (0-11) and below Unknown(999).
     HermesLiteRxOnly = 12, // HL2 RX-only kit (no TX driver). Phase 3M-0.
     // Not an OpenHPSDR board at all — SunSDR2's own native wire protocol
@@ -138,12 +138,12 @@ enum class HPSDRHW : int {
     // docs/architecture/2026-08-24-sunsdr-native-driver-design.md and
     // docs/architecture/2026-08-26-sunsdr-connection-plan.md §Phase A.
     SunSdr2Qrp       = 13, // SunSDR2 QRP, native driver (no ExpertSDR2)
-    // 14..19 available for future NereusSDR-original SKU slots.
+    // 14..19 available for future Longpath-original SKU slots.
     // From Thetis network.h:425 [v2.10.3.15] //N1GP G2E added (HermesC10)
     // -- same tagged enum block also carries //MI0BOT at :422 (HermesLite,
     // see above) and G8NJJ at :423 (Saturn, see above)
     HermesC10        = 20, // ANAN-G2E (formerly G1) single-ADC HERMES-class RX + OrionMKII TX
-    // NereusSDR-native; relocated from 20 to 21 on 2026-05-21 (G2E port) to free Thetis byte 20.
+    // Longpath-native; relocated from 20 to 21 on 2026-05-21 (G2E port) to free Thetis byte 20.
     // See docs/architecture/2026-05-21-anan-g2e-port-design.md §4 for rationale.
     Andromeda        = 21, // Andromeda console (Ganymede PA trip). Phase 3M-0.
     Unknown    = 999

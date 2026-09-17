@@ -1,4 +1,4 @@
-# NereusSDR test suite. Opt-in via -DLONGPATH_BUILD_TESTS=ON.
+# Longpath test suite. Opt-in via -DLONGPATH_BUILD_TESTS=ON.
 #
 # Test targets compile against LongpathObjs (the OBJECT library that backs
 # the main executable) so behavior under test is byte-identical to shipped
@@ -272,10 +272,10 @@ longpath_add_test(tst_noise_floor_estimator)
 longpath_add_test(tst_noise_floor_tracker)
 longpath_add_test(tst_clarity_controller)
 
-# ── Task 2.10: per-band NF-estimate priming (NereusSDR-original) ─────────
+# ── Task 2.10: per-band NF-estimate priming (Longpath-original) ─────────
 longpath_add_test(tst_per_band_nf_priming)
 
-# ── Task 2.11: Clarity + NF-aware grid coexistence (NereusSDR-original) ────
+# ── Task 2.11: Clarity + NF-aware grid coexistence (Longpath-original) ────
 longpath_add_test(tst_clarity_nf_grid_coexistence)
 
 # ── Phase 3I radio-connector tests ────────────────────────────────────────
@@ -328,7 +328,7 @@ longpath_add_test(tst_tx_channel_ps_setters)
 # WdspEngine owns one instance, opened during initialize() (or via
 # openPsFeedbackChannelForTesting() in the test path) at channel id 5 per
 # the wdsp-integration.md §11.1 documented design.
-# Source: NereusSDR-original wrapper.  No Thetis source; Thetis manages
+# Source: Longpath-original wrapper.  No Thetis source; Thetis manages
 #         WDSP channels via ChannelMaster.dll (see ps_sync_stub.c).
 longpath_add_test(tst_ps_feedback_channel)
 
@@ -401,7 +401,7 @@ longpath_add_test(tst_setup_deltas)
 # Replaces NyiOverlay::markNyi scaffolding in two applets with live wiring to
 # the PureSignal coordinator (Task 7).
 #
-# PureSignalApplet (NereusSDR-native quick-access surface):
+# PureSignalApplet (Longpath-native quick-access surface):
 #   7 buttons (Calibrate / Auto / Save / Restore / 2-Tone) + 2 gauges (FB /
 #   Correction) + 3 LEDs (Cal / Run / Fbk) + 3 info labels (Iterations /
 #   Feedback dB / Correction dB).  Right-click on every control emits
@@ -659,7 +659,7 @@ longpath_add_test(tst_pa_profile)
 # reconnect preserves stored profiles, per-MAC isolation, save overwrites
 # without re-emitting profileListChanged, delete + last-profile guard,
 # setActiveProfile non-existent returns false, active-profile-on-connect
-# 3-case logic (NereusSDR-spin), regenerateFactoryDefaults restores factory
+# 3-case logic (Longpath-spin), regenerateFactoryDefaults restores factory
 # but leaves customs alone, activeProfile() accessor.
 longpath_add_test(tst_pa_profile_manager)
 
@@ -954,7 +954,7 @@ longpath_add_test(tst_transmit_model_vox_properties)
 longpath_add_test(tst_transmit_model_dexp)
 
 # ── Phase 3M-1b C.4: TransmitModel anti-VOX properties ─────────────────────
-# Verifies defaults (antiVoxGainDb=0 NereusSDR-original), round-trip setters,
+# Verifies defaults (antiVoxGainDb=0 Longpath-original), round-trip setters,
 # signal emission, idempotent guard, and range clamping for antiVoxGainDb
 # [−60,60].  3M-3a-iv post-bench refactor (Option A) dropped the antiVoxSourceVax
 # coverage alongside the property itself.
@@ -1001,7 +1001,7 @@ longpath_add_test(tst_transmit_model_line_in_gain_user_dig_out)
 # Verifies defaults, round-trip setters + signals, idempotent guards, and
 # range clamping for: TwoToneFreq1 / TwoToneFreq2 / TwoToneLevel /
 # TwoTonePower / TwoToneFreq2Delay / TwoToneInvert / TwoTonePulsed.
-# Defaults follow option C: NereusSDR-original safer numerics for Level/Power
+# Defaults follow option C: Longpath-original safer numerics for Level/Power
 # (-6 dB / 50%); Thetis-Designer-aligned for Invert (true) and ranges.
 # Source: setup.Designer.cs:61920-62136 [v2.10.3.13] (Designer init values
 # for the 7 controls); setup.cs:11019-11200 (handler context).
@@ -1037,7 +1037,7 @@ longpath_add_test(tst_transmit_model_pa_scaffold)
 #   - K2GX regression (CRITICAL, ship-blocking) — ANAN-8000DLE 80m at 100/200W
 #   - sliderWatts <= 0 short-circuit returns 0.0
 #   - HL2 sentinel (gbb >= 99.5) — linear fallback at 80m, dBm math at 6m
-#   - NereusSDR Bypass profile (all-100.0f) hits the same linear fallback
+#   - Longpath Bypass profile (all-100.0f) hits the same linear fallback
 #   - Safety ceiling matrix: every (HPSDRModel, Band) at radio's spec'd max
 #     watts produces audio_volume <= 1.0; tightest cell ANAN-8000D B10M @ 200W
 #   - Out-of-range Band hits sentinel via PaProfile::getGainForBand 1000-fallback
@@ -1102,7 +1102,7 @@ target_compile_definitions(tst_radio_model_drive_path PRIVATE LONGPATH_BUILD_TES
 longpath_add_test(tst_mic_profile_manager)
 
 # ── Phase 3R Task K1: MicProfileManager "RADE" factory preset ──
-# Verifies the NereusSDR-native "RADE" factory profile is seeded on
+# Verifies the Longpath-native "RADE" factory profile is seeded on
 # first launch and that its EQ-off / Leveler-on / ALC-off /
 # CFC-CESSB-PhRot-off bypass philosophy applies cleanly to the
 # TransmitModel via setActiveProfile.
@@ -1148,7 +1148,7 @@ longpath_add_test(tst_mic_profile_manager_dexp_round_trip)
 # ParametricEqWidget JSON for storage in TXProfile blobs (TXParaEQData /
 # CFCParaEQData).  Mirrors Thetis Common.cs Compress_gzip /
 # Decompress_gzip [v2.10.3.13] byte-for-byte (modulo gzip mtime) so
-# Thetis-produced blobs decode cleanly into NereusSDR.  Covers ASCII +
+# Thetis-produced blobs decode cleanly into Longpath.  Covers ASCII +
 # Unicode round-trip, multi-chunk inflate (10+KB JSON), Thetis fixture
 # decode (Python-pinned, mtime=0), invalid base64 / non-gzip / truncated
 # stream all returning std::nullopt.
@@ -1638,7 +1638,7 @@ target_compile_definitions(tst_rxapplet_antenna_buttons PRIVATE LONGPATH_BUILD_T
 # Verifies that AlexAdcState struct, BpfMode enum, and BpfEffective enum
 # exist as nested public types on AlexController, with correct default
 # initialization. Tasks 12-13 add the state members and recomputeBpf logic.
-# NereusSDR-original: no Thetis port.
+# Longpath-original: no Thetis port.
 longpath_add_test(tst_alex_controller_per_adc_bpf)
 
 # ── Phase 3F: per-ADC BPF decision reaches the wire (CT1IQI, PR #293) ─────────
@@ -1646,7 +1646,7 @@ longpath_add_test(tst_alex_controller_per_adc_bpf)
 #         slice set, grouped by the ADC each slice's stream sits on.
 # Half 2: the resulting per-ADC decision composes the Alex0 / Alex1 HPF bytes
 #         instead of the last-retuned receiver's frequency.
-# NereusSDR-original: no Thetis port.
+# Longpath-original: no Thetis port.
 longpath_add_test(tst_alex_per_adc_bpf_wire)
 
 # ── Phase 3F: an effective-BPF change pushes on its OWN trigger ───────────────
@@ -1658,7 +1658,7 @@ longpath_add_test(tst_alex_per_adc_bpf_wire)
 # until the next VFO nudge. Thetis pushes from the setter with no deferral
 # (console.cs:18793-18806 AlexHPFBypass [v2.10.3.15]).
 # Also locks the re-entrancy guard: one band-crossing retune, one push.
-# NereusSDR-original: no Thetis port.
+# Longpath-original: no Thetis port.
 longpath_add_test(tst_alex_bpf_policy_push)
 
 # ── RF-safety: the Alex TX low-pass is selected from the TRANSMIT frequency ───
@@ -1667,7 +1667,7 @@ longpath_add_test(tst_alex_bpf_policy_push)
 # the TX low-pass tracked whichever DDC was retuned last. Thetis keeps two
 # masks and routes writes by intent (ChannelMaster/netInterface.c:682-726
 # SetAlexLPFBits(bits, isTX, isMox) [v2.10.3.15]).
-# NereusSDR-original: no Thetis port.
+# Longpath-original: no Thetis port.
 longpath_add_test(tst_alex_tx_lpf_source)
 
 # ── Which frequency selects the Protocol 1 Alex low-pass (bank 10 C4) ────────
@@ -1675,13 +1675,13 @@ longpath_add_test(tst_alex_tx_lpf_source)
 # from prbpfilter -- the Alex0 struct (networkproto1.c:587-590 [v2.10.3.15];
 # mi0bot's HL2 loop does the same at :1085-1088 [v2.10.3.14-beta1]). Alex0 is
 # written by the `isMox || !isTX` arm of SetAlexLPFBits, so the byte carries the
-# transmit selection while keyed and the RECEIVE selection while not. NereusSDR
+# transmit selection while keyed and the RECEIVE selection while not. Longpath
 # wrote it only from setTxFrequency and emitted it in both states, so with the
 # transmitter bound to one slice and the operator listening on another the
 # receiver sat behind the transmit band's low-pass. Also locks which receive
 # frequency wins: UpdateAlexTXFilter takes the higher of the two on a board
 # whose RX2 shares the Alex chain (console.cs:15487-15498 [v2.10.3.15]).
-# NereusSDR-original: no Thetis port.
+# Longpath-original: no Thetis port.
 longpath_add_test(tst_p1_alex_lpf_word_source)
 
 # Regression test for the 2026-08-26 band/mode persistence race (OE5SOS
@@ -1696,7 +1696,7 @@ longpath_add_test(tst_radio_model_band_save_uses_slice_frequency)
 # setReceiverFrequency, where the same lock swallowed it. Confirmed on a live
 # HL2 2026-07-31: a 40 m to 60 m press gave outcome=NewStream then a dropped
 # emit with ddcLocked=true, leaving the Alex high-pass and the receive
-# low-pass on the previous band. NereusSDR-original: no Thetis port.
+# low-pass on the previous band. Longpath-original: no Thetis port.
 longpath_add_test(tst_band_change_retunes_ddc_in_ctun)
 
 # ── RF-safety companion: the transmit frequency comes from the TX-bound slice ─
@@ -1704,7 +1704,7 @@ longpath_add_test(tst_band_change_retunes_ddc_in_ctun)
 # from the slice bound to the transmitter, not from whichever slice happens to
 # be active. Thetis guards its VFO A arm with !chkVFOBTX.Checked for the same
 # reason (console.cs:31889-31893 [v2.10.3.15]).
-# NereusSDR-original: no Thetis port.
+# Longpath-original: no Thetis port.
 longpath_add_test(tst_tx_frequency_follows_tx_slice)
 
 # ── Phase 3F Sub-Epic B Task 17: AlexController event-matrix coverage ─────────
@@ -1712,12 +1712,12 @@ longpath_add_test(tst_tx_frequency_follows_tx_slice)
 #   - cross-band retune emits bpfStateChanged
 #   - same-band retune is idempotent (no spurious emit)
 #   - wideband active overrides operator ForceBand mode
-# NereusSDR-original: no Thetis port.
+# Longpath-original: no Thetis port.
 longpath_add_test(tst_alex_controller_event_matrix)
 
 # ── Phase 3F Sub-Epic C Task 1: TxSliceArbiter skeleton ─────────────────────
 # Skeleton smoke test: default stable binding is unbound. Full handoff coverage
-# lands in Task 3. NereusSDR-original: no Thetis port.
+# lands in Task 3. Longpath-original: no Thetis port.
 longpath_add_test(tst_tx_slice_arbiter)
 
 # ── The single-TX invariant, end to end through RadioModel ──────────────────
@@ -1726,7 +1726,7 @@ longpath_add_test(tst_tx_slice_arbiter)
 # every slice unflagged and silently disabled every consumer that asks which
 # slice transmits. Pins: exactly one slice flagged from the first addSlice,
 # across add / remove / handoff, and SliceConfig::txBound reaching the codec.
-# NereusSDR-original: no Thetis port (Thetis has a fixed VFO A/B TX model).
+# Longpath-original: no Thetis port (Thetis has a fixed VFO A/B TX model).
 longpath_add_test(tst_tx_slice_binding_invariant)
 
 # ── Phase 3F Sub-Epic D Task 1+2: PanadapterApplet skeleton + slice assoc ──
@@ -1745,7 +1745,7 @@ longpath_add_test(tst_panadapter_stack_layouts)
 
 # ── Phase 3F Sub-Epic E Task 1: SpectrumStatusOverlay widget ────────────────
 # Top-right per-pan overlay widget for the Phase 3F multi-slice UI atlas.
-# NereusSDR-original (no upstream port). See
+# Longpath-original (no upstream port). See
 # docs/architecture/2026-05-26-phase3f-sub-epic-e-ui-atlas-plan.md Task 1.
 longpath_add_test(tst_spectrum_status_overlay)
 
@@ -1759,7 +1759,7 @@ longpath_add_test(tst_spectrum_status_overlay)
 # per-chain contract (a filtered chain's pan stays dark while another chain
 # is wide), the single-slice no-regression case, and the per-cause reason
 # strings fixed by design doc §16.4.4.
-# NereusSDR-original: no upstream port.
+# Longpath-original: no upstream port.
 longpath_add_test(tst_pan_wide_badge)
 
 # ── Phase 3F: the per-pan status overlay paints its own slice's state ───────
@@ -1774,7 +1774,7 @@ longpath_add_test(tst_pan_wide_badge)
 # chain through the SAME RadioModel::sliceChainIndex the WIDE badge uses --
 # including the stable-slice-id case a positional lookup gets wrong after a
 # mid-list removal.
-# NereusSDR-original: no upstream port.
+# Longpath-original: no upstream port.
 longpath_add_test(tst_pan_status_overlay)
 
 # ── Phase 3F Sub-Epic E Task 3: per-pan status-overlay badge clicks ─────────
@@ -1785,7 +1785,7 @@ longpath_add_test(tst_pan_status_overlay)
 # Covers reachability (every pan, including ones a layout switch creates),
 # target (the clicked pan's chain, not slice 0's), and the slice-ID to
 # list-POSITION conversion the TX handoff needs.
-# NereusSDR-original: no upstream port.
+# Longpath-original: no upstream port.
 longpath_add_test(tst_pan_badge_click_wiring)
 
 # ── 2026-07-28 bench regression: click-to-tune always tuned flag A ──────────
@@ -1801,18 +1801,18 @@ longpath_add_test(tst_pan_badge_click_wiring)
 # to list-POSITION conversion the activation wires need after a mid-list
 # removal, and the migration invariant that no pan keeps pointing at a slice
 # it no longer hosts.
-# NereusSDR-original: no upstream port.
+# Longpath-original: no upstream port.
 longpath_add_test(tst_pan_active_slice_sync)
 
 # ── Phase 3F Sub-Epic D Task 7: FFTRouter receiver-to-pan fan-out ───────────
-# NereusSDR-original core class. One receiver (DDC) fans out to N pans
+# Longpath-original core class. One receiver (DDC) fans out to N pans
 # (different zoom levels of the same I/Q data) per AetherSDR overlay model.
 # Test covers basic subscription topology (single, multi-pan-per-receiver,
 # remove).
 longpath_add_test(tst_fft_router_fanout)
 
 # ── Phase 3F Sub-Epic I Task 2: SliceStreamAllocator placement policy ──────
-# NereusSDR-original pure-policy class. Decides whether a slice shares an
+# Longpath-original pure-policy class. Decides whether a slice shares an
 # active DDC stream's window (shift offset only) or claims a free DDC.
 # Window-fit rule ports the strict inequality from Thetis
 # console.cs:31913-31925 [v2.10.3.15]; promoting to a free DDC instead of
@@ -2024,7 +2024,7 @@ target_compile_definitions(tst_pa_values_page_gap_fill PRIVATE LONGPATH_BUILD_TE
 #   - profile combo (comboPAProfile) + 4 lifecycle buttons
 #     (New / Copy / Delete / Reset Defaults)
 #   - 14-band gain spinbox grid (nud160M..nudVHF13)
-#   - 14x9 drive-step adjust spinbox matrix (panelAdjustGain — NereusSDR
+#   - 14x9 drive-step adjust spinbox matrix (panelAdjustGain — Longpath
 #     densification: Thetis ships only the row for the selected band)
 #   - per-band max-power column (nudMaxPowerForBandPA + chkUsePowerOnDrvTunPA)
 #   - warning icon + label (pbPAProfileWarning + lblPAProfileWarning)
@@ -2161,7 +2161,7 @@ longpath_add_test(tst_waterfall_threshold_persistence)
 
 # ── Task 2.9: NF-aware grid + Copy button + NoiseFloorEstimator::prime() ─────
 # Thetis source: console.cs:46074-46086 [v2.10.3.13] GridMinFollowsNFRX1 /
-# tmrAutoAGC_Tick NF grid block. NereusSDR-original: global panadapter default.
+# tmrAutoAGC_Tick NF grid block. Longpath-original: global panadapter default.
 # Tests: offset_shifts_grid_min, maintain_delta, disabled_no_change, deadband
 # suppression + allow at 2dB, positive offset, prime() store + update + no
 # interference with estimate().
@@ -2248,7 +2248,7 @@ longpath_add_test(tst_radio_connection_watchdog)
 # 2 tests: emitsTypedFailureOnUnreachable (RFC 5737 black-hole, 2s connect
 # watchdog must fire ConnectFailure::Timeout) and noFailureOnIntentionalDisconnect
 # (disconnect() before watchdog fires must not emit connectFailed).
-# NereusSDR-original infrastructure; no Thetis attribution needed.
+# Longpath-original infrastructure; no Thetis attribution needed.
 longpath_add_test(tst_radio_connection_failure)
 
 # ── Phase 3M-1a Task E.1: TX virtual interface on RadioConnection ──────────
@@ -2465,7 +2465,7 @@ longpath_add_test(tst_tx_applet_rf_power_per_band)
 #   bidirectional sync (setMicGainDb / micGainDbChanged), mic-mute state
 #   (micMuteChanged fires; default micMute==true), idempotency / no-feedback-loop,
 #   and clamping to kMicGainDbMin/Max.
-# NereusSDR-native UI (no Thetis cite stamps required for the applet layer).
+# Longpath-native UI (no Thetis cite stamps required for the applet layer).
 longpath_add_test(tst_phone_applet_mic_gain)
 
 # ── Phase 3M-1b (new): PhoneCwApplet Mic Level Gauge dB conversion ───────────
@@ -2473,7 +2473,7 @@ longpath_add_test(tst_phone_applet_mic_gain)
 # AudioEngine::pcMicInputLevel() polling timer that drives m_levelGauge.
 # Tests: silence/sub-floor/exact-threshold → -40 dB floor; 0.1f → -20 dB;
 # 0.5f → -6 dB; 1.0f → 0 dB; NaN/Inf → floor; above FS → +10 ceiling.
-# NereusSDR-native UI (no Thetis cite stamps required for the applet layer).
+# Longpath-native UI (no Thetis cite stamps required for the applet layer).
 longpath_add_test(tst_phone_applet_mic_level_gauge)
 
 # ── Phase 3M-1b J.2 → 3M-3a-iii Task 16: VOX toggle (model-layer) ───────────
@@ -2487,7 +2487,7 @@ longpath_add_test(tst_phone_applet_mic_level_gauge)
 # (The VoxSettingsPopup-specific cases were dropped in 3M-3a-iii Task 16
 # alongside the popup widget itself — VOX settings now live in
 # Setup → Transmit → DEXP/VOX, exercised by tst_dexp_vox_setup_page.)
-# NereusSDR-native UI (no Thetis cite stamps required for the applet layer).
+# Longpath-native UI (no Thetis cite stamps required for the applet layer).
 longpath_add_test(tst_tx_applet_vox_toggle)
 
 # ── Phase 3M-3a-i Batch 2 Task F + 3M-3a-ii cleanup: TxApplet LEV/EQ/CFC ────
@@ -2536,7 +2536,7 @@ longpath_add_test(tst_tx_eq_dialog)
 # TransmitModel, bidirectional binding (UI → model and model → UI) for
 # all 32 controls (profile combo + 5 buttons + 2 globals + 30 band spins),
 # echo guard, profile-bank Save/Reset path.  Layout mirrors Thetis
-# frmCFCConfig.{cs,Designer.cs} [v2.10.3.13] with NereusSDR-spin 10-row
+# frmCFCConfig.{cs,Designer.cs} [v2.10.3.13] with Longpath-spin 10-row
 # grid replacing the selected-band + edit-pane.
 longpath_add_test(tst_tx_cfc_dialog)
 
@@ -2550,7 +2550,7 @@ longpath_add_test(tst_tx_cfc_dialog)
 #   micSource default Pc, micSourceChanged fires with Radio/Pc values (badge
 #   text contracts "PC mic"/"Radio mic"), idempotency guards.
 # Closes Phase J (all 3 J tasks landed).
-# NereusSDR-native UI (no Thetis cite stamps required for the applet layer).
+# Longpath-native UI (no Thetis cite stamps required for the applet layer).
 longpath_add_test(tst_tx_applet_mon)
 
 # ── Phase 3M-1a H.4: PowerPage wiring — Max Power, per-band Tune Power, ATT-on-TX ──
@@ -2594,7 +2594,7 @@ longpath_add_test(tst_transmit_setup_tx_inhibit)
 longpath_add_test(tst_transmit_setup_block_tx)
 
 # ── Phase 3M-3a-i Batch 5 Task E: SpeechProcessorPage TX dashboard ───────────
-# Verifies the NereusSDR-spin Speech Processor page builds without crashing,
+# Verifies the Longpath-spin Speech Processor page builds without crashing,
 # the TX EQ + Leveler status labels read from + react to TransmitModel signals,
 # the active-profile label tracks MicProfileManager::activeProfileChanged, the
 # ALC row is statically labelled "always-on", and the cross-link buttons emit
@@ -2647,14 +2647,14 @@ longpath_add_test(tst_general_setup_hardware_config)
 # Verifies setReceiveOnlyVisible(bool) works correctly and that the constructor
 # reads initial caps (hidden for standard boards, visible for RX-only SKUs like
 # HermesLiteRxOnly).  Cite: Thetis setup.designer.cs:8535-8544 [v2.10.3.13]
-# (Visible=false default); BoardCapabilities::isRxOnlySku (NereusSDR-original).
+# (Visible=false default); BoardCapabilities::isRxOnlySku (Longpath-original).
 # LONGPATH_BUILD_TESTS required for RadioModel::setBoardForTest.
 longpath_add_test(tst_general_options_page_rx_only)
 target_compile_definitions(tst_general_options_page_rx_only PRIVATE LONGPATH_BUILD_TESTS)
 
 # ── Phase 3M-0 Task 13: Options group box on Setup → General ─────────────────
 # Verifies grpGeneralOptions has chkPreventTXonDifferentBandToRX per
-# Thetis setup.designer.cs:9050-9059 [v2.10.3.13]. Tooltip NereusSDR-original
+# Thetis setup.designer.cs:9050-9059 [v2.10.3.13]. Tooltip Longpath-original
 # (Thetis has no tooltip on this control). Default unchecked.
 longpath_add_test(tst_general_setup_options)
 
@@ -2733,7 +2733,7 @@ longpath_add_test(tst_phase3m0_persistence_audit)
 
 # ── Phase 3Q Task 1: ConnectionState enum + RadioModel state exposure ─────────
 # 3 tests: initial state Disconnected, signal on transition, no signal for
-# redundant transition. NereusSDR-original (no upstream port).
+# redundant transition. Longpath-original (no upstream port).
 longpath_add_test(tst_connection_state)
 
 # ── Phase 3Q Task 2: RadioDiscovery::probeAddress() unicast probe ─────────────
@@ -2762,14 +2762,14 @@ longpath_add_test(tst_add_custom_radio_dialog)
 # ── Phase 3Q Task 5: ConnectionPanel state pills — threshold logic ─────────────
 # 4 tests: online < 60s, stale 60s-5min, offline > 5min, offline when never seen.
 # Exercises statePillForLastSeen() static method — pure function, no radio required.
-# NereusSDR-original; no Thetis attribution needed.
+# Longpath-original; no Thetis attribution needed.
 longpath_add_test(tst_connection_panel_state_pills)
 
 # ── Phase 3Q Task 12: AppSettings::migrateRadioKey — synthetic → real-MAC ────
 # 6 tests: core migration (name+autoConnect), pinToMac preserved, same-key no-op,
 # absent-key no-op, IP+port preserved, no orphan keys after migration.
 # Uses QTemporaryDir for full isolation; QTEST_APPLESS_MAIN (no QApplication).
-# NereusSDR-original; no Thetis attribution needed.
+# Longpath-original; no Thetis attribution needed.
 longpath_add_test(tst_app_settings_migration)
 
 # ── Phase 3J-1 closeout Item 7 (2026-05-12): arbitrary-key persistence ───────
@@ -2808,7 +2808,7 @@ longpath_add_test(tst_app_settings_corruption)
 # 5 tests: retired keys removed on v<3 → v3 migration, idempotency, fresh-install
 # (no version key), no-op when already at v3, version-zero path.
 # Uses QTemporaryDir for full isolation; QTEST_APPLESS_MAIN (no QApplication).
-# NereusSDR-original; no Thetis attribution needed.
+# Longpath-original; no Thetis attribution needed.
 longpath_add_test(tst_settings_migration_v0_3_0)
 
 # ── Phase 3M-1a Task B.1: PttMode enum (Thetis PTTMode port) ─────────────────
@@ -2862,7 +2862,7 @@ longpath_add_test(tst_mox_controller_phase_signals)
 #   emits manualMoxChanged(true) and pttModeChanged(Manual) each exactly once;
 # setTune(false) releases MOX, clears isManualMox (but NOT pttMode — F.1 resets it),
 #   emits manualMoxChanged(false) exactly once;
-# NereusSDR ordering: flags set BEFORE setMox(true) so phase-signal subscribers
+# Longpath ordering: flags set BEFORE setMox(true) so phase-signal subscribers
 #   see m_manualMox=true at txAboutToBegin time; flag cleared AFTER setMox(false)
 #   so m_manualMox stays true during TX→RX phase signals (txAboutToEnd etc.);
 # Idempotent guard: setTune(true) twice → manualMoxChanged fires only once;
@@ -3012,7 +3012,7 @@ longpath_add_test(tst_wdsp_engine_tx_channel)
 # ── Phase 3M-3a-iii Task 20: WdspEngine DEXP DSP-instance lifecycle ──────────
 # The bench-failing fix: before Task 20, pdexp[1] was permanently nullptr
 # after createTxChannel because create_dexp had never been ported into
-# NereusSDR's TX-init path.  Every SetDEXP* setter and the SendCBPushDexpVox
+# Longpath's TX-init path.  Every SetDEXP* setter and the SendCBPushDexpVox
 # callback registration silently no-op'd via their pdexp[id] null guards;
 # VOX-keying never engaged MOX because xdexp() never ran.
 # Verifies:
@@ -3054,7 +3054,7 @@ longpath_add_test(tst_wdsp_engine_board_init)
 #   - destroy on a never-created id is a safe no-op;
 #   - the RadeChannel is parented to the WdspEngine so QObject ownership
 #     cleans up correctly on engine destruction.
-# RADE is a NereusSDR-native channel type with no Thetis equivalent;
+# RADE is a Longpath-native channel type with no Thetis equivalent;
 # this test pins the C++-side lifecycle only and does not call into WDSP.
 longpath_add_test(tst_wdsp_engine_rade_lifecycle)
 
@@ -3289,10 +3289,10 @@ target_compile_definitions(tst_tx_channel_real_mic_router PRIVATE LONGPATH_BUILD
 # ── Phase 3R K-bench: TxChannel RADE_U/L -> USB/LSB mapping ──────────────
 # Reproducer for user-reported "RADE-U + MOX = no RF" symptom from
 # bench-test session.  WDSP's SetTXAMode only accepts modes 0..11
-# (LSB..DRM); RADE_U=12 / RADE_L=13 are NereusSDR-native dispatch values
+# (LSB..DRM); RADE_U=12 / RADE_L=13 are Longpath-native dispatch values
 # that must be mapped to USB/LSB before reaching the WDSP modulator.
 # Test seam lastWdspTxModeForTest() returns the mapped value; the carry
-# m_mode preserves the original RADE_U/L for NereusSDR-side dispatch.
+# m_mode preserves the original RADE_U/L for Longpath-side dispatch.
 # 6 test cases:
 #   radeUpperMapsToUsb
 #   radeLowerMapsToLsb
@@ -3941,7 +3941,7 @@ target_compile_definitions(tst_p1_mic_boost_wire PRIVATE LONGPATH_BUILD_TESTS)
 #   9.  Codec path (Saturn/ANAN-G2): same behaviour.
 #  10.  Byte 51 (line_in gain) unaffected by setMicBoost.
 # Source: deskhpsdr/src/new_protocol.c:1484-1486 [@120188f].
-# First deskhpsdr port in NereusSDR — DESKHPSDR-PROVENANCE.md updated.
+# First deskhpsdr port in Longpath — DESKHPSDR-PROVENANCE.md updated.
 longpath_add_test(tst_p2_mic_boost_wire)
 target_compile_definitions(tst_p2_mic_boost_wire PRIVATE LONGPATH_BUILD_TESTS)
 
@@ -4608,7 +4608,7 @@ longpath_add_test(tst_window_functions)
 # returns plain sampleRate / fftSize (legacy * 2 bug removed).
 longpath_add_test(tst_fft_size_slider)
 
-# Phase 2-polish-3 -- auto-zoom FFT math.  NereusSDR-original (Thetis does
+# Phase 2-polish-3 -- auto-zoom FFT math.  Longpath-original (Thetis does
 # not auto-replan on zoom).  Verifies setFftSizeBaseline round-trip +
 # rejection rules, and exercises the bandwidthChangeRequested lambda's
 # formula via an inline copy: targetSize = baseline * sampleRate / bwHz,
@@ -5240,7 +5240,7 @@ longpath_add_test(tst_radio_connection_factory_sunsdr)
 #    ANZEIGEN, keine Schalter. Besonders Lautstaerke und Stumm -- ohne
 #    sie haette das Programm weder das eine noch das andere, weil die
 #    „TitleBar master volume", auf die der alte Kommentar verwies, in
-#    NereusSDR nie gebaut wurde --
+#    Longpath nie gebaut wurde --
 longpath_add_test(tst_rx_applet_inherited)
 
 # -- Die Quellenliste der Instrumente und die Kennlinie der
@@ -5434,7 +5434,7 @@ longpath_add_test(tst_tx_channel_post_gen_tone_mag)
 
 # ── Issue #175 Task 3: TransmitModel::txPostGenToneMag property + signal ──────
 # 4 tests: default value (1.0 non-HL2 sentinel), round-trip setter+getter,
-# signal emission, and dedupe-on-equal guard (NereusSDR setter convention).
+# signal emission, and dedupe-on-equal guard (Longpath setter convention).
 # Wired to TxChannel::setPostGenToneMag in Task 10.
 # Source: mi0bot-Thetis console.cs:47666 [v2.10.3.13-beta2].
 longpath_add_test(tst_transmit_model_tx_post_gen_tone_mag)
@@ -5756,14 +5756,14 @@ longpath_add_test(tst_pota_client)
 longpath_add_test(tst_sota_client)
 
 # ── SpotHub POTA improvement pass: PotaParkInfoClient JSON parser ───────────
-# NereusSDR-native, no upstream equivalent (operator-requested follow-up,
+# Longpath-native, no upstream equivalent (operator-requested follow-up,
 # 2026-08-27). Pins the contract that PotaParkInfoClient parses
 # api.pota.app/park/{reference} JSON responses. 3 tests:
 # parsesParkInfoResponse, rejectsMalformedJson, rejectsResponseWithoutReference.
 longpath_add_test(tst_pota_park_info_client)
 
 # ── SpotHub POTA improvement pass: PotaAlertsClient JSON parser ─────────────
-# NereusSDR-native, no upstream equivalent (operator-requested follow-up,
+# Longpath-native, no upstream equivalent (operator-requested follow-up,
 # 2026-08-27). Pins the contract that PotaAlertsClient parses
 # api.pota.app/activation JSON responses. 3 tests: parsesAlertsResponse,
 # rejectsMalformedJson, skipsRowsMissingActivatorOrReference.
@@ -5796,7 +5796,7 @@ longpath_add_test(tst_wsjtx_decoder)
 # Socket.IO v4 framing used by qso.freedv.org. 7 tests cover the Engine.IO
 # Open handshake + view-only auth payload, Ping/Pong reply, Socket.IO
 # Connect ACK transitioning to connected, and the four data events that
-# drive the station model and (via NereusSDR dual-feed) the spot stream:
+# drive the station model and (via Longpath dual-feed) the spot stream:
 # new_connection -> stationAdded, freq_change -> stationUpdated +
 # spotReceived, rx_report -> spotReceived, remove_connection ->
 # stationRemoved. Hybrid source: wire protocol from freedv-gui
@@ -5969,7 +5969,7 @@ longpath_add_test(tst_freedv_station_model)
 # ringBufferDropsOldest (250 adds with maxSize=200 leaves CALL50..CALL249),
 # clearEmits (cleared signal fires + decodes() empty),
 # addsFromMultipleSources (rade_text + WSJT-X coexist preserving order).
-# Source: NEW NereusSDR-native model. No upstream equivalent.
+# Source: NEW Longpath-native model. No upstream equivalent.
 # Distinguishes "what my radio just heard" from network/cluster spots
 # in SpotModel. Per design doc Phase D Task D4 + Section 2 (three-model
 # split). Fourth task of Phase D (Models).
@@ -5988,7 +5988,7 @@ longpath_add_test(tst_rx_decode_model)
 #   setSnrDbNoEmitOnNaNToNaN - NaN -> NaN is a no-op (no emission)
 #   setSnrDbEmitOnNaNToValue - NaN -> 5.0 emits (signal-acquired event)
 #   setSnrDbEmitOnValueToNaN - 5.0 -> NaN emits (signal-lost event)
-# Source: NEW NereusSDR-native extension to SliceModel. No upstream
+# Source: NEW Longpath-native extension to SliceModel. No upstream
 # equivalent. Per design doc Phase D Task D5 + Phase L Task L1.
 # Fifth task of Phase D (Models).
 longpath_add_test(tst_slice_model_snr)
@@ -5997,7 +5997,7 @@ longpath_add_test(tst_slice_model_snr)
 # Pins the SliceModel::modeName / modeFromName round-trip for the new
 # DSPMode::RADE_U = 12 and DSPMode::RADE_L = 13 values, plus the
 # legacy "RADE" singular string migration to RADE_U.  RADE is a
-# NereusSDR-native extension to the WDSP-derived DSPMode enum (WDSP
+# Longpath-native extension to the WDSP-derived DSPMode enum (WDSP
 # has no knowledge of RADE); the values signal that the slice's
 # signal chain runs through the RadeChannel from I1-I3 instead of
 # WDSP's RxChannel.  Like USB/LSB, RADE has upper/lower sideband
@@ -6066,7 +6066,7 @@ longpath_add_test(tst_spot_overlay_render)
 # Pins the contract that SpotHubDialog (the AetherSDR DxClusterDialog
 # port) constructs successfully when handed all 7 spot-ingest clients
 # + SpotModel + DxccColorProvider, that its top-level QTabWidget
-# exposes exactly 10 tabs (post-3J-2 NereusSDR-native Settings tab at
+# exposes exactly 10 tabs (post-3J-2 Longpath-native Settings tab at
 # index 0 plus the 9 AetherSDR upstream tabs), that the tab labels
 # appear in the documented order, that each per-source tab carries the
 # uniform template (F2), and that the Spot List tab hosts the merged
@@ -6079,7 +6079,7 @@ longpath_add_test(tst_spot_overlay_render)
 #           spotListSourcePillTogglesProxyFilter,
 #           doubleClickOnSpotRowEmitsTuneRequested
 # Source: AetherSDR src/gui/DxClusterDialog.{h,cpp} [@0cd4559]; Display
-# tab content lands in F4. Settings tab is NereusSDR-native (no
+# tab content lands in F4. Settings tab is Longpath-native (no
 # upstream); see tst_spothub_settings_tab for its content contract.
 longpath_add_test(tst_spothub_dialog_smoke)
 
@@ -6094,9 +6094,9 @@ longpath_add_test(tst_spothub_dialog_smoke)
 # identity-status label (green when identity is set / yellow warning
 # when missing), and the per-source tabs falling back to User/Callsign
 # when their per-source key is empty.
-# Source: NereusSDR-native. AetherSDR upstream scatters identity
+# Source: Longpath-native. AetherSDR upstream scatters identity
 # fields across each per-source tab with no central entry point;
-# the Settings tab is a NereusSDR UX correction.
+# the Settings tab is a Longpath UX correction.
 longpath_add_test(tst_spothub_settings_tab)
 
 # ── Phase 3J-2 Task G1: FreeDVReporterDialog shell + 14-col table ─────────
@@ -6132,9 +6132,9 @@ longpath_add_test(tst_freedv_reporter_dialog)
 #                            pota, spotCollector, freeDvReporter,
 #                            pskReporter
 #   freeDv station model (1): stationAdded -> stationCount round-trip
-# Source: NereusSDR-native. The plan task is Phase 3J-2 H2; AetherSDR's
+# Source: Longpath-native. The plan task is Phase 3J-2 H2; AetherSDR's
 # upstream RadioModel applies spot status only via TCI parsing, not
-# per-client adapter slots, so the wiring shape is NereusSDR-specific.
+# per-client adapter slots, so the wiring shape is Longpath-specific.
 longpath_add_test(tst_radio_model_spot_wiring)
 
 # ── Phase 3J-2 Task H1: Tools menu Spot Hub + FreeDV Reporter wiring ───────
@@ -6151,7 +6151,7 @@ longpath_add_test(tst_radio_model_spot_wiring)
 # messageSendRequested, tuneRequested) carry the right argument shape
 # for MainWindow's open-slot lambda. End-to-end menu wiring is
 # verified by the manual bench-test matrix.
-# Source: NereusSDR-native test pattern; ports are at H2.
+# Source: Longpath-native test pattern; ports are at H2.
 longpath_add_test(tst_mainwindow_tools_spot_hub)
 
 # ── Phase 3J-2 + 3R M1: spot-system AppSettings round-trip ─────────────────
@@ -6166,8 +6166,8 @@ longpath_add_test(tst_mainwindow_tools_spot_hub)
 # their documented defaults. The legacyMinutesKeyFallback test pins the
 # DxClusterSpotLifetime -> DxClusterSpotLifetimeSec * 60 migration the
 # SpotHubDialog F4 Display tab implements at SpotHubDialog.cpp:1727-1730.
-# Source: NereusSDR-native test file; AppSettings is the Thetis
-# database.cs port, but the keys exercised here are all NereusSDR
+# Source: Longpath-native test file; AppSettings is the Thetis
+# database.cs port, but the keys exercised here are all Longpath
 # additions for Phase 3J-2 + 3R.
 longpath_add_test(tst_spot_settings_round_trip)
 
@@ -6190,7 +6190,7 @@ longpath_add_test(tst_spot_settings_round_trip)
 #   loadSpotDisplaySettingsDefaultsShowSpotsTrue
 #   loadSpotDisplaySettingsAppliesAllNumericKnobs
 #   loadSpotDisplaySettingsAppliesColors
-# Source: NereusSDR-native; the consumer hook is M2-local. SpotHubDialog
+# Source: Longpath-native; the consumer hook is M2-local. SpotHubDialog
 # F4 producer side is already pinned by tst_spothub_dialog_smoke.
 longpath_add_test(tst_spothub_display_knobs)
 
@@ -6212,8 +6212,8 @@ longpath_add_test(tst_spothub_display_knobs)
 #   freeDvReporterAutoConnectFalseDoesNotFire / IsNonDestructive
 #   pskReporterAutoStartTrueIsNoOp (PSK Reporter is send-only;
 #     auto-start has no meaningful action.)
-# Source: NereusSDR-native. The clients themselves are AetherSDR ports,
-# but the restore driver is a NereusSDR addition for Phase 3J-2 + 3R M3.
+# Source: Longpath-native. The clients themselves are AetherSDR ports,
+# but the restore driver is a Longpath addition for Phase 3J-2 + 3R M3.
 longpath_add_test(tst_spot_auto_start)
 
 # ── Phase 3R Task I1: RadeChannel skeleton (hybrid port) ───────────────────
@@ -6289,7 +6289,7 @@ longpath_add_test(tst_rade_text)
 #                                        payload to bare callsign.
 #   wiringWithNullChannelIsNoOp          Null channel / null slice
 #                                        arguments do not crash.
-# Source: NereusSDR-native test pattern; no upstream port. The slot
+# Source: Longpath-native test pattern; no upstream port. The slot
 # contract under test was established by the I5 plan spec.
 longpath_add_test(tst_rade_channel_model_wiring)
 
@@ -6325,7 +6325,7 @@ longpath_add_test(tst_pgxl_connection_parse)
 longpath_add_test(tst_tgxl_connection_parse)
 
 # Pins the UDP parser for LanDiscovery (4O3A PowerGeniusXL / TeragenXL
-# announcements on ports 9008 / 9010). NereusSDR-native FlexRadio regex
+# announcements on ports 9008 / 9010). Longpath-native FlexRadio regex
 # parsing. Tests: valid-announcement capture, malformed-line rejection,
 # deduplication by serial.
 longpath_add_test(tst_lan_discovery_regex)
@@ -6386,8 +6386,8 @@ longpath_add_test(tst_pgxl_connection_reconnect)
 longpath_add_test(tst_connection_diagnostics)
 
 # ── Phase 3P-II Phase 4 (Advanced UI + helpers) ───────────────────────────
-# Three NereusSDR-native helper classes with ring-buffer / JSON persistence.
-# No upstream port; headers follow NereusSDR-native LanDiscovery.h style.
+# Three Longpath-native helper classes with ring-buffer / JSON persistence.
+# No upstream port; headers follow Longpath-native LanDiscovery.h style.
 
 # Task 75: FaultLog ring buffer.
 # AppSettings key: PGXL_FaultHistory / TGXL_FaultHistory (JSON arrays).
@@ -6560,7 +6560,7 @@ longpath_add_test(tst_rfkit_page_master_gate)
 #   Task 4: sliceLetter (QChar, default 'A') - per-slice letter ID for badge color
 #   Task 5: chainIndex  (int,   default 0)   - which Alex chain (ADC) hosts slice DDC
 #   Task 6: ddcIndex    (int,   default -1)  - codec-assigned DDC index; -1=unassigned
-# Source: NereusSDR-original (no Thetis upstream).
+# Source: Longpath-original (no Thetis upstream).
 # Design: docs/architecture/2026-05-26-phase3f-multi-pan-multi-slice-design.md §3.
 longpath_add_test(tst_slice_model_phase3f_properties)
 
@@ -6568,14 +6568,14 @@ longpath_add_test(tst_slice_model_phase3f_properties)
 # Returns 1 when disconnected (safe single-slice default); returns
 # BoardCapabilities.maxSlices for the current SKU when connected.
 # Design: docs/architecture/2026-05-26-phase3f-multi-pan-multi-slice-design.md §2.
-# Source: NereusSDR-original (no Thetis upstream).
+# Source: Longpath-original (no Thetis upstream).
 longpath_add_test(tst_radio_model_max_slices)
 
 # Phase 3F Sub-Epic A Task 12: SettingsSchemaVersion v5 -> v6 migration.
 # v6 is additive only (no key renames). Migration block is intentionally empty;
 # the version bump itself is the only observable change.
 # 2 tests: v5_to_v6_bumps_version_key, v6_to_v6_is_noop.
-# Source: NereusSDR-original (no Thetis upstream).
+# Source: Longpath-original (no Thetis upstream).
 # Design: docs/architecture/2026-05-26-phase3f-multi-pan-multi-slice-design.md §12.
 longpath_add_test(tst_settings_schema_v6_migration)
 
@@ -6589,14 +6589,14 @@ longpath_add_test(tst_settings_schema_v9_dbrange)
 # Phase 3F Sub-Epic B Task 1: SliceConfig + DdcAssignment shared structs.
 # 2 tests: slice_config_struct_has_required_fields,
 #          ddc_assignment_struct_has_required_fields.
-# Source: NereusSDR-original (structs derived from Thetis UpdateDDCs output shape).
+# Source: Longpath-original (structs derived from Thetis UpdateDDCs output shape).
 # Design: docs/architecture/2026-05-26-phase3f-sub-epic-b-codec-chain-plan.md Task 1.
 longpath_add_test(tst_codec_5_slice_assignment)
 
 # Phase 3F Sub-Epic B Task 15: P2RadioConnection::applyDdcAssignment slot.
 # 1 test: apply_ddc_assignment_populates_rx_state.
 # Verifies the CmdRx per-DDC region is non-zero after a DdcAssignment is applied.
-# Source: NereusSDR-original (bridge slot, no Thetis upstream).
+# Source: Longpath-original (bridge slot, no Thetis upstream).
 # Design: docs/architecture/2026-05-26-phase3f-sub-epic-b-codec-chain-plan.md Task 15.
 longpath_add_test(tst_p2_radio_connection_apply_ddc_assignment)
 
@@ -6607,7 +6607,7 @@ longpath_add_test(tst_p2_radio_connection_apply_ddc_assignment)
 # frozen against). Section 2 runs the reported two-slice ANAN-G2 scenario end
 # to end through RadioModel, plus an unrelated rebuildHardwareMapping and a
 # single-slice regression guard.
-# Source: NereusSDR-original. Ownership established from Thetis
+# Source: Longpath-original. Ownership established from Thetis
 # console.cs:8537 + ChannelMaster/netInterface.c:1229-1236 [v2.10.3.15];
 # no upstream logic ported.
 longpath_add_test(tst_p2_ddc_mask_ownership)
@@ -6618,7 +6618,7 @@ longpath_add_test(tst_p2_ddc_mask_ownership)
 # from the GUI thread, tearing m_rx[] and writing the UDP socket off-thread
 # on every VFO tick. The connection is parked on a stopped QThread so a
 # direct call is distinguishable from a queued QMetaCallEvent.
-# Source: NereusSDR-original (marshalling glue, no Thetis upstream).
+# Source: Longpath-original (marshalling glue, no Thetis upstream).
 longpath_add_test(tst_p2_ddc_assignment_marshalling)
 
 # ── Phase 3F Sub-Epic I closeout: wideband enable crosses to the conn thread ─
@@ -6632,7 +6632,7 @@ longpath_add_test(tst_p2_ddc_assignment_marshalling)
 # applyDdcAssignment in tst_p2_ddc_assignment_marshalling; same technique, the
 # connection is parked on a stopped QThread so a direct call is
 # distinguishable from a queued QMetaCallEvent.
-# Source: NereusSDR-original (marshalling glue, no Thetis upstream).
+# Source: Longpath-original (marshalling glue, no Thetis upstream).
 longpath_add_test(tst_p2_wideband_marshalling)
 
 # Codex review, PR #293: the wideband state of a chain is an OR across the
@@ -6711,8 +6711,8 @@ longpath_add_test(tst_status_toast_preserves_bottom_bar)
 # 2 tests: addSliceOnPan_exists_and_is_callable (cap enforcement after
 # the first successful add), removeSlice_refuses_to_remove_last_slice
 # (last-slice guard).  Pattern adapted from AetherSDR MainWindow.cpp:6849-6859
-# (+RX button handler) to NereusSDR's RadioModel + SliceModel hub.
-# Source: NereusSDR-original (AetherSDR-pattern port, no Thetis upstream).
+# (+RX button handler) to Longpath's RadioModel + SliceModel hub.
+# Source: Longpath-original (AetherSDR-pattern port, no Thetis upstream).
 # Design: docs/architecture/2026-05-26-phase3f-sub-epic-c-tx-arbiter-lifecycle-plan.md Task 7.
 longpath_add_test(tst_radio_model_slice_lifecycle)
 
@@ -6723,7 +6723,7 @@ longpath_add_test(tst_radio_model_slice_lifecycle)
 # bits independent. Validates both P2RadioConnection::setWidebandEnabled
 # plumbing and the buf[23] write in composeCmdGeneralLegacy +
 # P2CodecOrionMkII::composeCmdGeneral (via CodecContext::p2WbEnableMask).
-# Source: NereusSDR-original test driving a Thetis-cited port.
+# Source: Longpath-original test driving a Thetis-cited port.
 # Design: docs/architecture/2026-05-26-phase3f-sub-epic-f-wideband-plan.md Task 1.
 longpath_add_test(tst_p2_wideband_enable_byte)
 
@@ -6733,14 +6733,14 @@ longpath_add_test(tst_p2_wideband_enable_byte)
 # sequence-error recovery: zero-pad the remainder of the partial frame,
 # emit it, then reset to wait for the next seq=0 packet
 # (network.c:591-597 [v2.10.3.15]).
-# Source: NereusSDR-original test for a NereusSDR-original class with
+# Source: Longpath-original test for a Longpath-original class with
 # Thetis-equivalent behaviour.
 # Design: docs/architecture/2026-05-26-phase3f-sub-epic-f-wideband-plan.md Task 2.
 longpath_add_test(tst_wideband_frame_accumulator)
 
 # Phase 3F Sub-Epic F Task 4: WidebandFftEngine wraps an FFTW3 16384-pt
 # real-to-complex plan. Output is 8192 dBm-style bins (N/2+1 less DC).
-# Source: NereusSDR-original test for a NereusSDR-original class.
+# Source: Longpath-original test for a Longpath-original class.
 # Design: docs/architecture/2026-05-26-phase3f-sub-epic-f-wideband-plan.md Task 4.
 longpath_add_test(tst_wideband_fft_engine)
 
@@ -6753,7 +6753,7 @@ longpath_add_test(tst_rx_channel_ext_div_wrappers)
 # Phase 3F Sub-Epic G Task 2: per-band diversity persistence on SliceModel.
 # Round-trip phase/gain/fine-null through saveToSettings/restoreFromSettings
 # under the existing Slice<N>/Band<key>/ prefix.
-# Source: NereusSDR-original test infrastructure.
+# Source: Longpath-original test infrastructure.
 # Design: docs/architecture/2026-05-26-phase3f-sub-epic-g-diversity-plan.md Task 2.
 longpath_add_test(tst_diversity_dialog_persistence)
 
@@ -6765,7 +6765,7 @@ longpath_add_test(tst_diversity_dialog_persistence)
 # before it range-checks anything and the usual kTestChannel = 99 convention
 # would read out of bounds (third_party/wdsp/src/comm.h:110 sizes rxa at
 # MAX_CHANNELS = 32).
-# Source: NereusSDR-original test infrastructure.
+# Source: Longpath-original test infrastructure.
 # Design: docs/architecture/2026-07-28-tunable-notch-filter-design.md
 #         sections 6.2 and 11.1.
 longpath_add_test(tst_rxchannel_notch_wrappers)
@@ -6818,7 +6818,7 @@ longpath_add_test(tst_notch_sideband_shift)
 # saveToSettings itself), key pruning on a shrink, whole-list-replacement
 # semantics, and that clear() emits notchesReset() even when already empty
 # (the fan-out's reconcile trigger).
-# Source: NereusSDR-original persistence (Thetis packs these into a single
+# Source: Longpath-original persistence (Thetis packs these into a single
 # mnotchdb string at console.cs:3034-3035, 4763-4764 [v2.10.3.15]; flat keys
 # avoid its locale-sensitive double.Parse).
 # Design: docs/architecture/2026-07-28-tunable-notch-filter-design.md
@@ -6834,7 +6834,7 @@ longpath_add_test(tst_notch_persistence)
 # reconnect; that a slice added after a live notch add inherits the set; and
 # that add / edit / remove / reset / master-enable / auto-increase all fan
 # out to every live channel.
-# Source: NereusSDR-original test infrastructure.  Behaviour ported from
+# Source: Longpath-original test infrastructure.  Behaviour ported from
 # Thetis console.cs:40271-40273 [v2.10.3.15] (fixed three-id fan-out) and
 # WDSP RXA.c:85-93 + nbp.c:190, 223, 499 (inert-by-default notch database).
 # Design: docs/architecture/2026-07-28-tunable-notch-filter-design.md
@@ -6952,7 +6952,7 @@ longpath_add_test(tst_pan_menu_routing)
 #   - MainWindow's TNF indicator stylesheet / tooltip / accelerator statics,
 #     the menu-action two-way sync, and the reject notice (section 10.2: the
 #     chord is fixed because no shortcut-assignment subsystem exists).
-# Source: NereusSDR-original test; surfaces fixed by
+# Source: Longpath-original test; surfaces fixed by
 # docs/architecture/2026-07-28-tunable-notch-filter-design.md sections 7.5,
 # 9 and 10.2.
 longpath_add_test(tst_tnf_ui_wiring)
@@ -6964,7 +6964,7 @@ longpath_add_test(tst_tnf_ui_wiring)
 # Also covers the dent geometry (20 Hz fudge, WDSP minimum-width clamp),
 # the second explicit waterfall-plane call, and the MOX / master-TNF-off /
 # per-notch-inactive suppression gates.
-# Source: NereusSDR-original test infrastructure.
+# Source: Longpath-original test infrastructure.
 # Design: docs/architecture/2026-07-28-tunable-notch-filter-design.md
 #         section 8.3 + section 11.
 longpath_add_test(tst_notch_visual_does_not_perturb_noise_floor_or_maxbin)
@@ -6973,7 +6973,7 @@ longpath_add_test(tst_notch_visual_does_not_perturb_noise_floor_or_maxbin)
 # Aggregate "all_tests" target  (2026-05-26 KG4VCF dev-loop fix, from PR #291)
 # --------------------------------------------------------------------------
 # All individual tst_* executables are EXCLUDE_FROM_ALL so a routine
-# `cmake --build build` builds only the main NereusSDR app (seconds,
+# `cmake --build build` builds only the main Longpath app (seconds,
 # not minutes).  When the operator -- or CI, or pre-merge -- needs to
 # build the full test suite, they invoke:
 #

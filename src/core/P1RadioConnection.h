@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/P1RadioConnection.h  (NereusSDR)
+// src/core/P1RadioConnection.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -7,7 +7,7 @@
 //   Project Files/Source/Console/HPSDR/NetworkIO.cs (upstream has no top-of-file header — project-level LICENSE applies)
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -437,7 +437,7 @@ private:
 
     // hl2CheckBandwidthMonitor — drives the HermesLiteBandwidthMonitor tick.
     //   When m_bwMonitor is wired, delegates to m_bwMonitor->tick() which runs
-    //   the upstream compute_bps() algorithm and the NereusSDR throttle-detection
+    //   the upstream compute_bps() algorithm and the Longpath throttle-detection
     //   layer.  When m_bwMonitor is null (non-HL2 or test seam without RadioModel),
     //   falls back to the legacy sequence-gap heuristic.
     //   Source: mi0bot bandwidth_monitor.{c,h} (MW0LGE) [@c26a8a4]
@@ -475,7 +475,7 @@ private:
     bool        m_userInitiatedDisconnect{false};
 
     // --- Reconnect state machine (§3.6) ---
-    // Timing constants are NereusSDR policy (documented in design doc §3.6),
+    // Timing constants are Longpath policy (documented in design doc §3.6),
     // not ported from Thetis.
     QDateTime   m_lastEp6At;                                    // UTC timestamp of last good ep6 frame
     bool        m_firstEp6Logged{false};                        // diagnostic: log once on first EP6 arrival per session
@@ -841,11 +841,11 @@ private:
     //
     // Distinct from `m_adcCtrl` above: that field carries the P2-side
     // cntrl1/cntrl2 from UpdateDDCs (Thetis prn->rx[i].rx_adc fields).
-    // Before 2026-05-17 NereusSDR P1 codecs conflated the two — surfaced
+    // Before 2026-05-17 Longpath P1 codecs conflated the two — surfaced
     // while diagnosing issue #263, fixed by this struct + the codec
     // bank-4 read switching to ctx.p1AdcCntrl.
     //
-    // Default 0 is the NereusSDR-side practical default: matches wire
+    // Default 0 is the Longpath-side practical default: matches wire
     // bytes observed on a working Thetis-driven ANAN-10E on 2026-05-09.
     // Thetis fresh-install defaults to 4; we override based on board
     // adcCount at connect time (applyBoardQuirks sets 4 for 2-ADC SKUs,

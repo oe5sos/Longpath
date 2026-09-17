@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// no-port-check: NereusSDR-native file. See RadeText.h for the full
+// no-port-check: Longpath-native file. See RadeText.h for the full
 // rationale for using third_party/rade's native EOO callsign API
 // instead of porting freedv-gui's rade_text.c.
 //
 // =================================================================
-// src/core/RadeText.cpp  (NereusSDR)
+// src/core/RadeText.cpp  (Longpath)
 // =================================================================
 //
 // See RadeText.h for the upstream-license posture and the rationale
@@ -13,9 +13,9 @@
 // porting freedv-gui's rade_text.c verbatim.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-11  J.J. Boyd / KG4VCF  Phase 3R Task I4. Initial
-//                 implementation. NereusSDR-native wrapper around
+//                 implementation. Longpath-native wrapper around
 //                 the third_party/rade callsign-over-EOO API
 //                 (rade_tx_set_eoo_callsign / rade_rx_get_eoo_callsign,
 //                 declared in third_party/rade/src/rade_api.h:120-145

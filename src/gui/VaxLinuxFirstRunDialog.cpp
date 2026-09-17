@@ -1,8 +1,8 @@
 // =================================================================
-// src/gui/VaxLinuxFirstRunDialog.cpp  (NereusSDR)
+// src/gui/VaxLinuxFirstRunDialog.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original file — no Thetis port; no attribution-registry row.
+// Longpath-original file — no Thetis port; no attribution-registry row.
 //
 // See VaxLinuxFirstRunDialog.h for the class overview.
 //
@@ -25,7 +25,7 @@
 //  You should have received a copy of the GNU General Public License
 //  along with this program. If not, see <https://www.gnu.org/licenses/>.
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-24 — Written by J.J. Boyd (KG4VCF), with AI-assisted
 //                transformation via Anthropic Claude Code.
 // =================================================================

@@ -1,4 +1,4 @@
-// no-port-check: NereusSDR-original helper that prints the current
+// no-port-check: Longpath-original helper that prints the current
 // buildInitBurst() output to stdout, for one-shot regeneration of the
 // synthetic golden at tests/data/tci/init_burst_anan_g2_rx1.txt.
 //

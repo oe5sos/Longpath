@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_applet_detach.cpp  (NereusSDR)
+// tests/tst_applet_detach.cpp  (Longpath)
 // =================================================================
 //
 // Ein Applet aus der Spalte in ein eigenes Fenster — und zurück.
@@ -32,7 +32,7 @@
 // je nach Schreibtisch mal wahr und mal nicht.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-16 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 //   2026-08-17 — Ziehen-zum-Ablösen wieder entfernt; die Schwellen-

@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/gui/styles/ThemeQss.h  (NereusSDR)
+// src/gui/styles/ThemeQss.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // ── Why a substitution and not a refactor ────────────────────────────
 //
@@ -56,7 +56,7 @@
 // after.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-15 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

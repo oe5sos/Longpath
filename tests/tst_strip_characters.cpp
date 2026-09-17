@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_strip_characters.cpp  (NereusSDR)
+// tests/tst_strip_characters.cpp  (Longpath)
 // =================================================================
 //
 // A character is a claim: "this one is gentler than that one". Nothing
@@ -12,10 +12,10 @@
 // that Contest compresses harder than Balanced is the thing the operator
 // is actually promised.
 //
-// no-port-check: NereusSDR-original.
+// no-port-check: Longpath-original.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-09 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

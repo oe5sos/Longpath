@@ -1,8 +1,8 @@
 // =================================================================
-// tests/tst_mox_controller_timers.cpp  (NereusSDR)
+// tests/tst_mox_controller_timers.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original test. No Thetis port at this layer.
+// Longpath-original test. No Thetis port at this layer.
 //
 // Verifies the 6 QTimer chains added in Phase 3M-1a Task B.3:
 //   - Default timer intervals match Thetis [v2.10.3.13] constants.
@@ -23,7 +23,7 @@
 //      the timers actually fire after real elapsed time.
 // =================================================================
 
-// no-port-check: NereusSDR-original test file.
+// no-port-check: Longpath-original test file.
 
 #include <QtTest/QtTest>
 #include <QSignalSpy>

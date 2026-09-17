@@ -1,4 +1,4 @@
-// tests/tst_calibration_controller.cpp  (NereusSDR)
+// tests/tst_calibration_controller.cpp  (Longpath)
 //
 // TDD tests for CalibrationController (Phase 3P-G commit 1).
 // no-port-check: test file — no Thetis attribution required.

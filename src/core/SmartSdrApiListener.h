@@ -1,13 +1,13 @@
 // =================================================================
-// src/core/SmartSdrApiListener.h  (NereusSDR)
+// src/core/SmartSdrApiListener.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-native class. No upstream port. Wire format reverse-engineered
+// Longpath-native class. No upstream port. Wire format reverse-engineered
 // from FLEX-8600 v4.2.18.41174 SmartSDR TCP session
 // (captures/flex-pgxl-tgxl-capture_00001_20260519173452.pcapng, stream 2).
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-19 - Implemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -24,7 +24,7 @@
 namespace Longpath {
 
 // Minimal SmartSDR API server on TCP 4992 so that FlexRadio-aware accessories
-// (PGXL, TGXL) can pull slice / transmit / band state from NereusSDR after
+// (PGXL, TGXL) can pull slice / transmit / band state from Longpath after
 // pairing via the UDP 4992 discovery beacon.
 //
 // Wire format (from FLEX-8600 capture stream 2):
@@ -79,7 +79,7 @@ public:
     void setSliceFrequencyHz(int sliceId, qint64 freqHz);
     void setSliceMode(int sliceId, const QString& mode);
     void setTxActive(bool active);
-    // Local TUN state. When NereusSDR engages its CW tune carrier
+    // Local TUN state. When Longpath engages its CW tune carrier
     // (RadioModel::setTune(true) -> gen1 PostGen tone on-air), call
     // setTuneActive(true) so the listener's outbound `transmit` S-frame
     // carries tune=1. TGXL reads that key and starts its relay sweep
@@ -143,7 +143,7 @@ signals:
     //   -> C<n>|transmit tune off -> tuneRequested(false) -> setTune(false)
     //
     // ends up actually engaging the carrier instead of being ACKed-and-
-    // dropped. NereusSDR-native: AetherSDR has no equivalent because the
+    // dropped. Longpath-native: AetherSDR has no equivalent because the
     // real FlexRadio handles this internally.
     void tuneRequested(bool on);
 
@@ -181,7 +181,7 @@ signals:
     //                                          as the PGXL amp handle)
     //
     // This is how TGXL auto-standbys PGXL during its own autotune cycle
-    // -- and the path NereusSDR was previously missing. We emit this
+    // -- and the path Longpath was previously missing. We emit this
     // signal whenever we receive an `amplifier set` from a client;
     // RadioModel listens, matches the handle against the right amp
     // connection, and forwards the command.
@@ -291,7 +291,7 @@ private:
     // handle used as tx_client_handle= in every PTT_REQUESTED / TRANSMITTING /
     // UNKEY_REQUESTED / READY S-frame. Generated once per start() so it is
     // stable for the listener's lifetime and distinct from every amp's banner
-    // handle. NereusSDR equivalent of the SmartSDR-Win PC client's 0x66B137B7
+    // handle. Longpath equivalent of the SmartSDR-Win PC client's 0x66B137B7
     // in the canonical pcap (flex-tgxl-direct-CONTROL.pcapng @ T+167.678).
     QString m_localClientHandle;
 

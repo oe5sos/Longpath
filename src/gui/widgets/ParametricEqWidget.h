@@ -1,7 +1,7 @@
 #pragma once
 
 // =================================================================
-// src/gui/widgets/ParametricEqWidget.h  (NereusSDR)
+// src/gui/widgets/ParametricEqWidget.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
@@ -11,7 +11,7 @@
 //   Samphire dual-licensing.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-30 — Reimplemented in C++20/Qt6 for NereusSDR by
 //                 J.J. Boyd (KG4VCF), with AI-assisted transformation
 //                 via Anthropic Claude Code.  Phase 3M-3a-ii follow-up

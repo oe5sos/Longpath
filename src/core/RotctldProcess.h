@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/core/RotctldProcess.h  (NereusSDR)
+// src/core/RotctldProcess.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // Starts Hamlib's rotctld so the operator does not have to.
 //
@@ -23,7 +23,7 @@
 // is already running.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
 //   2026-09-16 — Takes a free port when the preferred one is held (a

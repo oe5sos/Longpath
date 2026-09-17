@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/AppSettings.h  (NereusSDR)
+// src/core/AppSettings.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -7,7 +7,7 @@
 //   AetherSDR src/core/AppSettings.{h,cpp} — AetherSDR has no per-file headers; project-level GPLv3 and contributor list per About dialog per https://github.com/ten9876/AetherSDR
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-18 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -156,7 +156,7 @@ public:
     QVariant stationValue(const QString& key, const QVariant& defaultValue = {}) const;
     void setStationValue(const QString& key, const QVariant& val);
 
-    // Station name (defaults to "NereusSDR").
+    // Station name (defaults to "Longpath").
     QString stationName() const;
     void setStationName(const QString& name);
 
@@ -201,7 +201,7 @@ public:
     bool    recoveredFromBackup() const    { return m_recoveredFromBackup; }
 
     // ------------------------------------------------------------------
-    // Profile support (Issue #100) — multiple concurrent NereusSDR
+    // Profile support (Issue #100) — multiple concurrent Longpath
     // instances against different radios. A profile name scopes the
     // settings file (and the log dir, in main.cpp) to a per-profile
     // subdirectory so two instances don't clobber each other's XML.
@@ -368,11 +368,11 @@ public:
     //   PGXL_TxAnt         string "ANT1"  TX antenna name passed to flexradioPair.
     //   PGXL_FlexRadioSerial string ""   (default: derived from MAC; format XXXX-XXXX-XXXX-XXXX)
     //                                     Override when the auto-derived serial collides with
-    //                                     another NereusSDR installation on the same PGXL.
+    //                                     another Longpath installation on the same PGXL.
     //   PGXL_BroadcastDiscovery string "True"       Toggle the 1 Hz UDP 4992 SmartSDR-format
     //                                               discovery beacon. PGXL/TGXL listen for these
     //                                               to populate their FlexRadio dropdown.
-    //   PGXL_BroadcastNickname  string "NereusSDR"  Nickname shown in PGXL UI.
+    //   PGXL_BroadcastNickname  string "Longpath"  Nickname shown in PGXL UI.
     //   PGXL_DiscoveryModel     string "FLEX-6400"  Model string in the SmartSDR discovery beacon;
     //                                               must match a real Flex model for PGXL to
     //                                               accept the broadcast and populate its dropdown.
@@ -453,7 +453,7 @@ public:
     // for every saved radio whose boardType is HermesLite. Removes the global
     // key after migration. Idempotent (no-op if global key absent).
     //
-    // Why per-MAC: NereusSDR scopes radio-specific settings under
+    // Why per-MAC: Longpath scopes radio-specific settings under
     // hardware/<mac>/ to support multi-radio installations from a single
     // settings file. Thetis (mi0bot) achieves the same effective semantic
     // by swapping DB files per radio (database.cs:11237 ImportDatabase

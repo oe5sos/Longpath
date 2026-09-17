@@ -1,7 +1,7 @@
 #pragma once
 
 // =================================================================
-// src/gui/WaterfallHistoryBuffer.h  (NereusSDR)
+// src/gui/WaterfallHistoryBuffer.h  (Longpath)
 // =================================================================
 //
 // Source attribution (AetherSDR — GPLv3):
@@ -12,12 +12,12 @@
 //
 //   Port of AetherSDR `src/gui/WaterfallHistoryBuffer.{h,cpp}`
 //   (AetherSDR 31b29583). AetherSDR is licensed under the GNU General
-//   Public License v3. NereusSDR is also GPLv3. Attribution follows
+//   Public License v3. Longpath is also GPLv3. Attribution follows
 //   GPLv3 §5 requirements.
 //
 // ── Warum Intensität und nicht Farbe ─────────────────────────────────
 //
-// NereusSDR hielt die Wasserfall-Historie als fertiges RGB32-Bild. Eine
+// Longpath hielt die Wasserfall-Historie als fertiges RGB32-Bild. Eine
 // RGB-Zeile ist ein Ergebnis: man kann sie anzeigen und sonst nichts.
 // Nicht umfärben, nicht umrechnen, nicht befragen.
 //
@@ -42,7 +42,7 @@
 // erreicht. Ein nie beschriebener Block kostet einen leeren QByteArray.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-15 — Ported in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

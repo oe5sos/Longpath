@@ -6,7 +6,7 @@
 // factor typed wrong is not a crash: it is a notch that is a thousand
 // times too eager or does nothing at all, which reads as "ANF is
 // useless on this radio" rather than as a bug.
-// no-port-check: NereusSDR-original; the WDSP call signatures and the
+// no-port-check: Longpath-original; the WDSP call signatures and the
 // defaults are attributed to Thetis in RxChannel.h.
 
 #include <QtTest/QtTest>

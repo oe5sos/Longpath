@@ -1,8 +1,8 @@
-// no-port-check: NereusSDR-original unit-test file.  The "console.cs"
+// no-port-check: Longpath-original unit-test file.  The "console.cs"
 // references below are cite comments documenting which Thetis lines each
 // assertion verifies; no Thetis logic is ported in this test file.
 // =================================================================
-// tests/tst_transmit_model_tune_power.cpp  (NereusSDR)
+// tests/tst_transmit_model_tune_power.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for TransmitModel::tunePowerByBand[14] per-MAC persistence.
@@ -13,7 +13,7 @@
 //   console.cs:12094 [v2.10.3.13]  — declaration of tunePower_by_band int[]
 //   console.cs:1819-1820 [v2.10.3.13] — initialisation to 50W per band
 //   console.cs:3087-3091 [v2.10.3.13] — save (pipe-delimited in Thetis;
-//     NereusSDR uses per-band scalar keys)
+//     Longpath uses per-band scalar keys)
 //   console.cs:4904-4910 [v2.10.3.13] — restore
 // =================================================================
 
@@ -35,7 +35,7 @@ private slots:
 
     // ── Default: all bands return 50W ────────────────────────────────────
 
-    // Named for fifty because that is what Thetis fills in. NereusSDR
+    // Named for fifty because that is what Thetis fills in. Longpath
     // lowered it to one on 2026-08-14 — see
     // TransmitModel::kDefaultTunePowerW for the measurements behind it.
     // Compared against the constant, not a literal: the whole reason the

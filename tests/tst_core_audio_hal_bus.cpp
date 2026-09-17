@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_core_audio_hal_bus.cpp  (NereusSDR)
+// tests/tst_core_audio_hal_bus.cpp  (Longpath)
 // =================================================================
 //
 // Exercises CoreAudioHalBus — Phase 3O VAX Sub-Phase 5.3.

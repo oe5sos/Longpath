@@ -1,4 +1,4 @@
-// no-port-check: NereusSDR-original integration test. The string "Thetis"
+// no-port-check: Longpath-original integration test. The string "Thetis"
 // only appears as Sweep B / TCI-protocol context in comments below; no logic
 // ported from TCIServer.cs.
 //

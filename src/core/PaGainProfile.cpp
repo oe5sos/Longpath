@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/PaGainProfile.cpp  (NereusSDR)
+// src/core/PaGainProfile.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -14,14 +14,14 @@
 //   original licence from mi0bot-Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-03 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code. Phase 1 Agent 1A of issue #167 PA-cal
-//                 safety hotfix. NereusSDR-specific divergence: the
-//                 NereusSDR Band enum has 14 + 13 SWL slots vs Thetis's
+//                 safety hotfix. Longpath-specific divergence: the
+//                 Longpath Band enum has 14 + 13 SWL slots vs Thetis's
 //                 11 HF + 14 VHF (B160M..B6M, VHF0..VHF13). Only the 11
-//                 HF slots map across; NereusSDR GEN/WWV/XVTR and the SWL
+//                 HF slots map across; Longpath GEN/WWV/XVTR and the SWL
 //                 bands return the 100.0f sentinel (Thetis loop init at
 //                 clsHardwareSpecific.cs:466 — "100 is no output power").
 //                 Downstream `TransmitModel::computeAudioVolume` short-
@@ -125,16 +125,16 @@ namespace {
 //   // max them out, these gains are PA attenuations, so 100 is no output power
 constexpr float kPaGainSentinel = 100.0f;
 
-// Per-band HF gain rows. Each row holds 11 floats indexed by NereusSDR
+// Per-band HF gain rows. Each row holds 11 floats indexed by Longpath
 // `Band` ordinal positions Band160m..Band6m (0..10). The corresponding
 // Thetis enum slots are B160M, B80M, B60M, B40M, B30M, B20M, B17M, B15M,
 // B12M, B10M, B6M.
 //
-// NereusSDR has no equivalent for Thetis's VHF0..VHF13 slots (they were
+// Longpath has no equivalent for Thetis's VHF0..VHF13 slots (they were
 // for transverter sub-bands above 6m); those values are dropped here. The
 // upstream switch-statement assigns identical values to VHF0..VHF13 within
 // each model row, so dropping them loses no per-band specificity — and
-// NereusSDR's single XVTR slot returns the 100.0f sentinel anyway.
+// Longpath's single XVTR slot returns the 100.0f sentinel anyway.
 struct HfRow {
     float band160m;
     float band80m;
@@ -257,8 +257,8 @@ constexpr HfRow kHermesliteRow = {
     100.0f, 100.0f, 100.0f, 100.0f, 100.0f, 38.8f
 };
 
-// Look up an HfRow column by NereusSDR Band. Returns the sentinel for any
-// non-HF band (NereusSDR-specific GEN/WWV/XVTR/SWL slots — no Thetis
+// Look up an HfRow column by Longpath Band. Returns the sentinel for any
+// non-HF band (Longpath-specific GEN/WWV/XVTR/SWL slots — no Thetis
 // equivalent in the gain table).
 constexpr float lookupHfBand(const HfRow& row, Band band) noexcept {
     switch (band) {
@@ -273,7 +273,7 @@ constexpr float lookupHfBand(const HfRow& row, Band band) noexcept {
         case Band::Band12m:  return row.band12m;
         case Band::Band10m:  return row.band10m;
         case Band::Band6m:   return row.band6m;
-        // NereusSDR-specific slots — no Thetis equivalent.
+        // Longpath-specific slots — no Thetis equivalent.
         case Band::GEN:
         case Band::WWV:
         case Band::XVTR:
@@ -293,7 +293,7 @@ constexpr float lookupHfBand(const HfRow& row, Band band) noexcept {
         case Band::Band11m:
             return kPaGainSentinel;
         case Band::Count:
-            // `Count` is not a real band; NereusSDR-internal sentinel.
+            // `Count` is not a real band; Longpath-internal sentinel.
             return kPaGainSentinel;
     }
     // Defensive fallback — unreachable because every enumerator above is
@@ -416,8 +416,8 @@ float defaultPaGainsForBand(HPSDRModel model, Band band) noexcept {
 // 100.0f (band not handled by any switch case) means NO output power —
 // the dBm kernel's `target_dbm -= 100` produces audio_volume ≈ 0.
 //
-// NereusSDR previously returned kPaGainSentinel (100.0f) here and combined
-// with a NereusSDR-original `gbb >= 99.5 → linear identity sliderWatts/100`
+// Longpath previously returned kPaGainSentinel (100.0f) here and combined
+// with a Longpath-original `gbb >= 99.5 → linear identity sliderWatts/100`
 // short-circuit in TransmitModel::computeAudioVolume.  That short-circuit
 // inverted the Thetis semantic ("100 = no output") into "100 = full output"
 // and made any user picking the Bypass profile emit wire byte 255 at

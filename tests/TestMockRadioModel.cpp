@@ -1,5 +1,5 @@
-// tests/TestMockRadioModel.cpp  (NereusSDR)
-// NereusSDR-original test helper — no Thetis upstream port.
+// tests/TestMockRadioModel.cpp  (Longpath)
+// Longpath-original test helper — no Thetis upstream port.
 //
 // Provides the moc-generated vtable for TestMockRadioModel (which inherits
 // QObject). Qt's AutoMoc requires a dedicated .cpp to anchor the moc output

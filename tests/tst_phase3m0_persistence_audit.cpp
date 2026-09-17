@@ -4,7 +4,7 @@
 // introduced by Tasks 9-13.
 //
 // Uses AppSettings(filePath) direct constructor + QTemporaryDir for full
-// isolation from the sandbox singleton. No Thetis port — NereusSDR-internal
+// isolation from the sandbox singleton. No Thetis port — Longpath-internal
 // correctness check.
 //
 // Key coverage:
@@ -16,7 +16,7 @@
 //   Task 13 — PreventTxOnDifferentBandToRx                                (1 key)
 //                                                              Total:      15 keys
 //
-// NereusSDR-original (not a Thetis port). No Thetis license header required.
+// Longpath-original (not a Thetis port). No Thetis license header required.
 
 #include <QtTest/QtTest>
 #include <QTemporaryDir>

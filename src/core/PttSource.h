@@ -1,15 +1,15 @@
 // =================================================================
-// src/core/PttSource.h  (NereusSDR)
+// src/core/PttSource.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. Tracks which source asserted the most recent
+// Longpath-original. Tracks which source asserted the most recent
 // PTT/MOX state change. Phase 3P-H Diagnostics → Radio Status page
 // surfaces this for users.
 //
 // No Thetis port at this layer.
 // =================================================================
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-20 — Original implementation for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted implementation via
 //                 Anthropic Claude Code.

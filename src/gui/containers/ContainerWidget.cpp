@@ -1,12 +1,12 @@
 // =================================================================
-// src/gui/containers/ContainerWidget.cpp  (NereusSDR)
+// src/gui/containers/ContainerWidget.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/ucMeter.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -1302,7 +1302,7 @@ bool ContainerWidget::deserialize(const QString& data)
     if (p.size() > 21) { setContainerHidesWhenRxNotUsed(p[21].toLower() == QStringLiteral("true")); }
     if (p.size() > 22) { setHiddenByMacro(p[22].toLower() == QStringLiteral("true")); }
 
-    // Field 23: NereusSDR DockMode extension
+    // Field 23: Longpath DockMode extension
     if (p.size() > 23) {
         setDockMode(dockModeFromString(p[23]));
     } else {

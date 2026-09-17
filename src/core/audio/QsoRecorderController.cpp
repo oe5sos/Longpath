@@ -1,11 +1,11 @@
 // =================================================================
-// src/core/audio/QsoRecorderController.cpp  (NereusSDR)
+// src/core/audio/QsoRecorderController.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. Begruendung steht im Header.
+// Longpath-original. Begruendung steht im Header.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-19 — Original fuer NereusSDR von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
 //   2026-09-02 — Speicherplatz-Wache statt Dauer-Deckel, von Martin

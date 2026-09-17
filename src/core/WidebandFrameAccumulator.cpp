@@ -1,13 +1,13 @@
 // =================================================================
-// src/core/WidebandFrameAccumulator.cpp  (NereusSDR)
+// src/core/WidebandFrameAccumulator.cpp  (Longpath)
 // =================================================================
 //
-// no-port-check: NereusSDR-original. See WidebandFrameAccumulator.h
+// no-port-check: Longpath-original. See WidebandFrameAccumulator.h
 // for context. State machine + sample decode behaviour port-cited
 // to Thetis network.c [v2.10.3.15] inline below.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-27  J.J. Boyd / KG4VCF  Phase 3F Sub-Epic F Task 2.
 //                                    AI-assisted transformation via
 //                                    Anthropic Claude Code.

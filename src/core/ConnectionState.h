@@ -1,5 +1,5 @@
-// src/core/ConnectionState.h  (NereusSDR)
-// NereusSDR-original — no Thetis upstream port.
+// src/core/ConnectionState.h  (Longpath)
+// Longpath-original — no Thetis upstream port.
 #pragma once
 
 #include <QMetaType>

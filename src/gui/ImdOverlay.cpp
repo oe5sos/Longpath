@@ -1,13 +1,13 @@
-// no-port-check: NereusSDR-original IMD-overlay class implementing the
+// no-port-check: Longpath-original IMD-overlay class implementing the
 // Thetis algorithm verbatim.  See header file for full provenance.
 //
 // =================================================================
-// src/gui/ImdOverlay.cpp  (NereusSDR)
+// src/gui/ImdOverlay.cpp  (Longpath)
 // =================================================================
 //
 // Two-tone IMD measurement overlay implementation.
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-06 — Created by J.J. Boyd (KG4VCF) for Phase 3M-4
 //                 PureSignal Task 12, with AI-assisted source-first
 //                 protocol via Anthropic Claude Code.
@@ -41,7 +41,7 @@ ImdOverlay::ImdOverlay(QObject* parent)
 //   dbm_max            -> dbmMax
 //   dbm_max_xpos       -> dbmMaxXpos
 //   dbm_min_xpos       -> dbmMinXpos
-//   dbm_max_ypos       -> dbmMaxYpos (NereusSDR drops Y plumbing here;
+//   dbm_max_ypos       -> dbmMaxYpos (Longpath drops Y plumbing here;
 //                         caller maps bin -> pixel via grid_max /
 //                         dbmToPixel; we leave yPixel = 0)
 //   look_for_max       -> lookForMax
@@ -64,7 +64,7 @@ std::vector<Maximum> ImdOverlay::detectPeaks(
     // Thetis tracks dbm_min_xpos (display.cs:5215) but doesn't read it
     // for IMD measurement — only dbm_min itself enters the state-machine
     // condition (display.cs:5310 max > dbm_min + trigger_delta).  Drop
-    // the unused xpos in NereusSDR but keep the comment to record parity.
+    // the unused xpos in Longpath but keep the comment to record parity.
     float dbmMin = std::numeric_limits<float>::infinity();
     float dbmMax = -std::numeric_limits<float>::infinity();
     int   dbmMaxXpos = 0;

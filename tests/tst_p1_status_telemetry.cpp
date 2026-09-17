@@ -1,7 +1,7 @@
 // no-port-check: test harness citing Thetis networkproto1.c offsets as the
 // behavioural spec it asserts against; contains no ported logic of its own.
 // =================================================================
-// tests/tst_p1_status_telemetry.cpp  (NereusSDR)
+// tests/tst_p1_status_telemetry.cpp  (Longpath)
 // =================================================================
 //
 // Phase 3P-H Task 4: verifies P1RadioConnection::parseEp6Frame() extracts
@@ -19,7 +19,7 @@
 // paTelemetryUpdated() signal carries the expected uint16 values.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-21 — Original implementation for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted authoring via Anthropic
 //                 Claude Code.

@@ -1,7 +1,7 @@
 // src/gui/applets/AppletPanelWidget.h
 
 // =================================================================
-// src/gui/applets/AppletPanelWidget.h  (NereusSDR)
+// src/gui/applets/AppletPanelWidget.h  (Longpath)
 // =================================================================
 //
 // Source attribution (AetherSDR — GPLv3):
@@ -12,10 +12,10 @@
 //
 //   This file is a port or structural derivative of AetherSDR source.
 //   AetherSDR is licensed under the GNU General Public License v3.
-//   NereusSDR is also GPLv3. Attribution follows GPLv3 §5 requirements.
+//   Longpath is also GPLv3. Attribution follows GPLv3 §5 requirements.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-16 — Ported/adapted in C++20/Qt6 for NereusSDR by
 //                 J.J. Boyd (KG4VCF), with AI-assisted transformation
 //                 via Anthropic Claude Code.
@@ -79,7 +79,7 @@ public:
 
     // Toggle visibility of an already-added applet without removing it
     // from the layout. Preserves stack position when re-shown. No-op for
-    // null or unknown applets. NereusSDR-original (no Thetis equivalent).
+    // null or unknown applets. Longpath-original (no Thetis equivalent).
     void setAppletVisible(AppletWidget* applet, bool visible);
 
     // Install a menu on the panel's top-right ☰ button. Until this is
@@ -160,7 +160,7 @@ signals:
     // IMMER in einem Umsortieren. Das Ablösen läuft über die
     // Andockarten des ContainerWidget — ein bewusster, einzelner Pfad.
     //
-    // NereusSDR macht es genauso: Ziehen bleibt auf das Umsortieren
+    // Longpath macht es genauso: Ziehen bleibt auf das Umsortieren
     // innerhalb der Spalte beschränkt, wo kein Fensterwechsel
     // stattfindet. Bequemlichkeit später, wenn der Pfad nachweislich
     // hält.

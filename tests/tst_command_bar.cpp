@@ -1,6 +1,6 @@
-// tests/tst_command_bar.cpp  (NereusSDR)
+// tests/tst_command_bar.cpp  (Longpath)
 //
-// NereusSDR-original. No Thetis port.
+// Longpath-original. No Thetis port.
 //
 // ── Die Kopfleiste ───────────────────────────────────────────────────
 //

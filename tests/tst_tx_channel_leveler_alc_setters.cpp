@@ -25,7 +25,7 @@ warren@wpratt.com
 */
 
 // =================================================================
-// tests/tst_tx_channel_leveler_alc_setters.cpp  (NereusSDR)
+// tests/tst_tx_channel_leveler_alc_setters.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for the 5 TX Leveler / ALC wrappers added in Phase 3M-3a-i
@@ -46,7 +46,7 @@ warren@wpratt.com
 // undefined builds exercise the stub path.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-29 — New test for Phase 3M-3a-i Task B-2: 5 TX Leveler/ALC
 //                 wrapper setters (Run / Top / Decay for Leveler;
 //                 MaxGain / Decay for ALC) + Stage::Leveler/Stage::Alc
@@ -54,7 +54,7 @@ warren@wpratt.com
 //                 AI-assisted implementation via Anthropic Claude Code.
 // =================================================================
 
-// no-port-check: NereusSDR-original test file. All Thetis source cites are
+// no-port-check: Longpath-original test file. All Thetis source cites are
 // in TxChannel.h/cpp.
 
 #include <QtTest/QtTest>

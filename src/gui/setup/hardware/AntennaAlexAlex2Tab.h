@@ -1,14 +1,14 @@
 #pragma once
 
 // =================================================================
-// src/gui/setup/hardware/AntennaAlexAlex2Tab.h  (NereusSDR)
+// src/gui/setup/hardware/AntennaAlexAlex2Tab.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
 //   Project Files/Source/Console/setup.designer.cs (~lines 25539-26857, tpAlex2FilterControl)
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-20 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                (KG4VCF), with AI-assisted transformation via Anthropic
 //                Claude Code. Sub-sub-tab under Hardware → Antenna/ALEX.

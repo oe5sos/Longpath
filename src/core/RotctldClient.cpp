@@ -1,11 +1,11 @@
 // =================================================================
-// src/core/RotctldClient.cpp  (NereusSDR)
+// src/core/RotctldClient.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original — see RotctldClient.h.
+// Longpath-original — see RotctldClient.h.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
 //   2026-08-10 — Reply watchdog + elevation kept; see RotctldClient.h.

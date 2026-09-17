@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - LanScanDialog: modeless dialog that drives a LanDiscovery
+// Longpath - LanScanDialog: modeless dialog that drives a LanDiscovery
 // instance and shows discovered 4O3A peripheral devices in a 6-column
 // table. Double-clicking a row emits deviceSelected(ip, port) and closes
 // the dialog, filling the Host and Port fields in the PeripheralsPage row
 // that launched the scan.
 //
-// NereusSDR-native (no upstream). Design reference:
+// Longpath-native (no upstream). Design reference:
 // docs/architecture/2026-05-18-pgxl-tgxl-and-analog-smeter-plan.md
 // section 5.3 (LAN scan UX).
 //

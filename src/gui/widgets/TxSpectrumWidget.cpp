@@ -1,12 +1,12 @@
 // =================================================================
-// src/gui/widgets/TxSpectrumWidget.cpp  (NereusSDR)
+// src/gui/widgets/TxSpectrumWidget.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. See TxSpectrumWidget.h for why this is the one
+// Longpath-original. See TxSpectrumWidget.h for why this is the one
 // measurement in the channel strip that is about somebody else.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-11 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

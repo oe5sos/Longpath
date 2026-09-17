@@ -1,11 +1,11 @@
 // =================================================================
-// src/gui/LayoutProfiles.cpp  (NereusSDR)
+// src/gui/LayoutProfiles.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. See LayoutProfiles.h.
+// Longpath-original. See LayoutProfiles.h.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-15 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

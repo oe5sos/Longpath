@@ -1,7 +1,7 @@
 #pragma once
 
 // =================================================================
-// src/core/RxChannel.h  (NereusSDR)
+// src/core/RxChannel.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -12,7 +12,7 @@
 //   Project Files/Source/ChannelMaster/cmaster.c, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -277,7 +277,7 @@ public:
     void setMode(DSPMode mode);
 
     // Translate a slice-facing DSPMode to the value that WDSP's SetRXAMode
-    // should receive. RADE_U / RADE_L are NereusSDR-native (WdspTypes.h
+    // should receive. RADE_U / RADE_L are Longpath-native (WdspTypes.h
     // :159-186); WDSP has no knowledge of them. The Phase 3R K-bench RX
     // pipeline runs WDSP as the demod front-end in RADE modes so RADE_U
     // -> USB and RADE_L -> LSB. All other modes pass through unchanged.
@@ -400,7 +400,7 @@ public:
     // WDSP NR stage.  Defaults match Thetis radio.cs / RXA.c byte-for-byte.
 
     // NR1 — LMS Adaptive Noise Reduction (Thetis: WDSP anr.c, Warren Pratt NR0V)
-    // Gain/leakage stored in UI units; NereusSDR setters apply the same
+    // Gain/leakage stored in UI units; Longpath setters apply the same
     // scaling Thetis setup.cs:8545-8550 applies before the WDSP call:
     //   WDSP gain    = 1e-6 * gainUiValue   (Thetis udLMSNRgain  → SetRXAANRVals)
     //   WDSP leakage = 1e-3 * leakUiValue   (Thetis udLMSNRLeak  → SetRXAANRVals)
@@ -653,7 +653,7 @@ public:
     double afGain() const { return m_afGain.load(); }
     void setAfGain(double gain);  // gain ∈ [0.0, 1.0], clamped
 
-    // Audio pan: NereusSDR range -1.0..+1.0 (0.0 = center).
+    // Audio pan: Longpath range -1.0..+1.0 (0.0 = center).
     // Converted to WDSP 0.0..1.0 via wdsp_pan = (pan + 1.0) / 2.0.
     // From Thetis Project Files/Source/Console/radio.cs:1386-1403
     //   Thetis default pan = 0.5f (center in 0..1 scale)
@@ -827,7 +827,7 @@ public:
     ///   Requires HAVE_WDSP and HAVE_FFTW3.  Returns an empty vector when
     ///   either is absent or when nPoints <= 0.
     ///
-    /// NereusSDR-original — no Thetis source ported; algorithm is generic.
+    /// Longpath-original — no Thetis source ported; algorithm is generic.
     QVector<float> filterResponseMagnitudes(int nPoints) const;
 
     // --- State snapshot / restore (Task 1.2) ---

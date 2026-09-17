@@ -1,7 +1,7 @@
-// no-port-check: NereusSDR-original unit-test file.  Thetis cite comments
+// no-port-check: Longpath-original unit-test file.  Thetis cite comments
 // document upstream sources; no Thetis logic ported in this test file.
 // =================================================================
-// tests/tst_applet_ps_wiring.cpp  (NereusSDR)
+// tests/tst_applet_ps_wiring.cpp  (Longpath)
 // =================================================================
 //
 // Phase 3M-4 Task 13 — applet wiring tests for PureSignalApplet and the
@@ -34,11 +34,11 @@
 // real TxChannel (so getPSInfo / setPSControl no-ops are safe).  The
 // coordinator pointer is injected into the applets via setPureSignal().
 //
-// Source: NereusSDR-original.  See PureSignalApplet.h + TxApplet.h for
+// Source: Longpath-original.  See PureSignalApplet.h + TxApplet.h for
 // Thetis cite map.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-06 — New test file for Phase 3M-4 Task 13: applet wiring.
 //                 J.J. Boyd (KG4VCF), with AI-assisted implementation
 //                 via Anthropic Claude Code.

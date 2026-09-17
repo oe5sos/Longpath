@@ -12,7 +12,7 @@ PORT_DATE = "2026-04-16"
 
 HEADER_TEMPLATE = """\
 // =================================================================
-// {filename}  (NereusSDR)
+// {filename}  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
@@ -45,7 +45,7 @@ HEADER_TEMPLATE = """\
 //   rights granted to recipients under the GNU GPL.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   {port_date} — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code. Structural template follows AetherSDR

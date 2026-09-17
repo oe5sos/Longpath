@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_iq_recorder.cpp  (NereusSDR)
+// tests/tst_iq_recorder.cpp  (Longpath)
 // =================================================================
 //
 // Rohes I/Q aufzeichnen — vor WDSP, keine Demodulation.
@@ -10,12 +10,12 @@
 // IqRecorder.h).
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-25 — Original fuer NereusSDR/Longpath von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
 // =================================================================
 
-// no-port-check: NereusSDR-original test file.
+// no-port-check: Longpath-original test file.
 
 #include <QtTest>
 #include <QTemporaryDir>

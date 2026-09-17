@@ -43,20 +43,20 @@
 //============================================================================================//
 //
 // =================================================================
-// src/core/dsp/Notch.h  (NereusSDR)
+// src/core/dsp/Notch.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis Project Files/Source/Console/radio.cs [v2.10.3.15]
 // (commit 3759d096), class MNotch at radio.cs:4328-4360.
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-07-29  J.J. Boyd / KG4VCF  TNF Task 2. The three-field shape
 //                 (FCenter / FWidth / Active) is carried over from
 //                 MNotch as centerHz / widthHz / active. MNotch's logic
 //                 is deliberately NOT ported: Parse / ToString exist to
-//                 fit Thetis's key-value database and NereusSDR persists
+//                 fit Thetis's key-value database and Longpath persists
 //                 flat AppSettings keys instead (design section 5.5),
-//                 and CompareTo has no NereusSDR caller. The `id` field
+//                 and CompareTo has no Longpath caller. The `id` field
 //                 has no Thetis counterpart; Thetis identifies a notch
 //                 by its position in MNotchDB, which is why every Thetis
 //                 mutation loses the operator's selection and recovers
@@ -81,8 +81,8 @@ namespace Longpath {
 /// **Field-set provenance.** centerHz / widthHz / active correspond to the three
 /// fields of Thetis's MNotch class in radio.cs (FCenter / FWidth / Active). None
 /// of MNotch's logic is carried over: its Parse / ToString round-trip exists to
-/// fit Thetis's key-value database and NereusSDR persists flat AppSettings keys
-/// instead, and its CompareTo has no NereusSDR caller. `id` has no Thetis
+/// fit Thetis's key-value database and Longpath persists flat AppSettings keys
+/// instead, and its CompareTo has no Longpath caller. `id` has no Thetis
 /// counterpart at all; Thetis identifies a notch by its position in MNotchDB,
 /// which is why every Thetis mutation loses the operator's selection and has to
 /// recover it by searching for matching field values.

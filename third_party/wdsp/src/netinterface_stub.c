@@ -59,7 +59,7 @@ boydsoftprez@gmail.com
 // this file and replace it with byte-for-byte ports of the originals.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-22 — NereusSDR-original glue stub created by J.J. Boyd
 //                 (KG4VCF) during ANAN-G2E port Phase B4'/B5', with
 //                 AI-assisted implementation via Anthropic Claude Code

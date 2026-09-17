@@ -1,9 +1,9 @@
-// no-port-check: NereusSDR-original test fixture. References to Thetis
+// no-port-check: Longpath-original test fixture. References to Thetis
 // files in comments are upstream-comparison citations (documenting that
 // upstream does NOT board-gate the sidetone control), not a port.
 //
 // =================================================================
-// tests/tst_board_capability_flag_wiring.cpp  (NereusSDR)
+// tests/tst_board_capability_flag_wiring.cpp  (Longpath)
 // =================================================================
 //
 // Verifies that BoardCapabilities flags whose previous status was
@@ -22,11 +22,11 @@
 //   for those tasks appends their cases without touching the §4.1
 //   region).
 //
-// Source: NereusSDR-internal extension. AutoAttMode::Adaptive is a
-// NereusSDR-original feature (not Thetis-derived); the
+// Source: Longpath-internal extension. AutoAttMode::Adaptive is a
+// Longpath-original feature (not Thetis-derived); the
 // hasStepAttenuatorCal flag was added to BoardCapabilities.h with the
 // intent of gating per-step cal-table support, and the closest
-// runtime consumer in NereusSDR is the Adaptive cal mode that
+// runtime consumer in Longpath is the Adaptive cal mode that
 // depends on per-step calibration. Thetis setup.cs has no
 // "step attenuator cal" page (grepped: no
 // 'StepAttenuator.*Cal|adaptive.*att|AdaptAtt' matches in setup.cs
@@ -36,7 +36,7 @@
 // per-step calibration.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-02 — Implemented for NereusSDR by J.J. Boyd (KG4VCF),
 //                with AI-assisted transformation via Anthropic
 //                Claude Code.
@@ -205,7 +205,7 @@ private slots:
     // Thetis does NOT board-gate the sidetone control — chkSideTones,
     // chkDSPKeyerSidetone (HW), chkDSPKeyerSidetone_software (SW) are
     // mutually-exclusive checkboxes that are always visible.  This
-    // gate is therefore NereusSDR-specific use of the populated flag,
+    // gate is therefore Longpath-specific use of the populated flag,
     // not a port of an upstream gate.
 
     // Case 1: Default — before any setHasSidetoneGenerator() call, the
@@ -262,7 +262,7 @@ private slots:
     // [v2.10.3.13+501e3f51]) is the OC Control / Hermes Ctrl tab — hosts the
     // OC matrix itself, not separate user_dig_out pin checkboxes. user_dig_out
     // is set in firmware via networkproto1.c bank 11 C3, but Thetis does NOT
-    // expose UI checkboxes for those 4 bits. This is a NereusSDR-specific
+    // expose UI checkboxes for those 4 bits. This is a Longpath-specific
     // audit-gap closure UI, not a port of an upstream control.
     //
     // Persistence: TransmitModel::persistOne already scopes per-MAC under

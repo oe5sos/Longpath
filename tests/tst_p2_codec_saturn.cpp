@@ -100,7 +100,7 @@ private slots:
     // Thetis groups HPSDRModel.ANAN_G2 and ANAN_G2_1K into the SAME
     // UpdateDDCs switch case as the OrionMkII family (console.cs:8220-8303
     // [v2.10.3.15]), so there is no Saturn-specific DDC assignment to have.
-    // NereusSDR nonetheless carried a hand-copied Saturn override for three
+    // Longpath nonetheless carried a hand-copied Saturn override for three
     // months; when antenna-driven ADC routing was added to the parent on
     // 2026-07-26 the copy silently kept the old behaviour, and the feature
     // was dead on the one radio it was written for.

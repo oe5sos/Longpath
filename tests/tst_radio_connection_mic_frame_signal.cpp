@@ -1,4 +1,4 @@
-// no-port-check: NereusSDR-original test file. No Thetis logic is ported here.
+// no-port-check: Longpath-original test file. No Thetis logic is ported here.
 // Tests the RadioConnection::micFrameDecoded Qt signal added in 3M-1b F.4.
 //
 // micFrameDecoded (F.4) carries a raw const float* pointer and follows the
@@ -20,7 +20,7 @@
 // Plan: 3M-1b F.4. Pre-code review §6.4.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-27 — New test for Phase 3M-1b Task F.4: verify micFrameDecoded
 //                 signal exists and fires with correct frame count.
 //                 J.J. Boyd (KG4VCF), with AI-assisted implementation via

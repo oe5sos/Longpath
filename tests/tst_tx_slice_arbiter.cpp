@@ -1,7 +1,7 @@
 // =================================================================
-// tests/tst_tx_slice_arbiter.cpp  (NereusSDR)
+// tests/tst_tx_slice_arbiter.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure.
+// no-port-check: Longpath-original test infrastructure.
 //
 // Phase 3F Sub-Epic C: TxSliceArbiter single-TX invariant.
 // See docs/architecture/2026-05-26-phase3f-multi-pan-multi-slice-design.md §6.

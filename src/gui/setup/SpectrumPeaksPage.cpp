@@ -1,18 +1,18 @@
 // =================================================================
-// src/gui/setup/SpectrumPeaksPage.cpp  (NereusSDR)
+// src/gui/setup/SpectrumPeaksPage.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/display.cs, original licence from Thetis source is included below
 //
-// NereusSDR-original page structure.  Constants and property defaults
+// Longpath-original page structure.  Constants and property defaults
 // reference Thetis display.cs:
 //   display.cs:4395-4419  ShowPeakBlobs / NumberOfPeakBlobs [v2.10.3.13]
 //   display.cs:4593-4714  BlobPeakHold / BlobPeakHoldMS / BlobPeakHoldDrop / PeakBlobFall [v2.10.3.13]
 //   display.cs:8434-8435  m_bDX2_PeakBlob = OrangeRed, m_bDX2_PeakBlobText = Chartreuse [v2.10.3.13]
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-01 — Skeleton created in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -125,7 +125,7 @@ SpectrumPeaksPage::SpectrumPeaksPage(RadioModel* model, QWidget* parent)
     m_aphOnTx->setChecked(
         s.value(QStringLiteral("DisplayActivePeakHoldOnTx"), QStringLiteral("False")).toString()
         == QStringLiteral("True"));
-    // NereusSDR-original — distinct trace colour. Default gold (#FFD700FF)
+    // Longpath-original — distinct trace colour. Default gold (#FFD700FF)
     // contrasts against typical clarity-blue spectrum and pure-white
     // Smooth-Defaults data line. Persisted format is "#RRGGBBAA".
     m_aphColor->setColor(ColorSwatchButton::colorFromHex(
@@ -134,7 +134,7 @@ SpectrumPeaksPage::SpectrumPeaksPage(RadioModel* model, QWidget* parent)
 
     // Peak Blobs
     // Thetis Display.cs:4395 [v2.10.3.13] ships m_bPeakBlobMaximums = true.
-    // NereusSDR deviation: default OFF so first-launch is a clean panadapter.
+    // Longpath deviation: default OFF so first-launch is a clean panadapter.
     m_blobEnable->setChecked(
         s.value(QStringLiteral("DisplayPeakBlobsEnabled"), QStringLiteral("False")).toString()
         == QStringLiteral("True"));

@@ -1,7 +1,7 @@
 #pragma once
 
 // =================================================================
-// src/gui/widgets/DspQuickPopups.h  (NereusSDR)
+// src/gui/widgets/DspQuickPopups.h  (Longpath)
 // =================================================================
 //
 //
@@ -13,7 +13,7 @@
 //   chkNR2PostProc_enable_rx1 und die Entsprechungen fuer NR3/NR4).
 //
 // Aufbau und Anordnung folgen AetherSDR MainWindow.cpp:7980-8324
-// [@0cd4559] (ten9876/AetherSDR, GPLv3; NereusSDR ist ebenfalls GPLv3).
+// [@0cd4559] (ten9876/AetherSDR, GPLv3; Longpath ist ebenfalls GPLv3).
 //
 //
 // ── Der Schnellregler-Rechtsklick ────────────────────────────────────
@@ -43,7 +43,7 @@
 // muss sie nicht ein zweites Mal schreiben.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-18 — Aus VfoWidget.cpp herausgeloest, damit sie deren
 //                 Loeschung ueberleben. Inhalt unveraendert
 //                 uebernommen. Martin Fischer, AI-assisted via

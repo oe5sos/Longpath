@@ -1,9 +1,9 @@
-// no-port-check: NereusSDR-original wrapper class.  Thetis manages WDSP
+// no-port-check: Longpath-original wrapper class.  Thetis manages WDSP
 // channels via ChannelMaster.dll — there is no Thetis equivalent of this
 // Qt6/C++ host-side wrapper.  See third_party/wdsp/src/ps_sync_stub.c.
 //
 // =================================================================
-// src/core/PsFeedbackChannel.cpp  (NereusSDR)
+// src/core/PsFeedbackChannel.cpp  (Longpath)
 // =================================================================
 //
 // Implementation of the PureSignal feedback RX channel wrapper.  See
@@ -12,10 +12,10 @@
 // per cmaster.cs:533 [v2.10.3.13].
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-06 — Created by J.J. Boyd (KG4VCF) for Phase 3M-4 PureSignal
 //                 (Task 4), with AI-assisted source-first protocol via
-//                 Anthropic Claude Code.  NereusSDR-original wrapper.
+//                 Anthropic Claude Code.  Longpath-original wrapper.
 // =================================================================
 
 #include "PsFeedbackChannel.h"

@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/containers/ContainerSettingsDialog.cpp  (NereusSDR)
+// src/gui/containers/ContainerSettingsDialog.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -7,7 +7,7 @@
 //   Project Files/Source/Console/MeterManager.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -661,7 +661,7 @@ void ContainerSettingsDialog::appendPresetRow(const QString& presetName)
 
     if (!group) { return; }
 
-    // Thetis-parity stack layout with a NereusSDR pixel floor.
+    // Thetis-parity stack layout with a Longpath pixel floor.
     //
     // Composite presets (ANAN MM, CrossNeedle, etc.) are authored
     // at their Thetis-nominal normalized size directly by the
@@ -678,7 +678,7 @@ void ContainerSettingsDialog::appendPresetRow(const QString& presetName)
     //             (anything with itemHeight() > 0.30)
     //
     // then re-lays every stacked item. Thetis `_fHeight=0.05` from
-    // MeterManager.cs:21266 + a NereusSDR pixel floor so rows stay
+    // MeterManager.cs:21266 + a Longpath pixel floor so rows stay
     // readable in tight containers. Rows past widgetH clip
     // naturally at the container bottom — Thetis Default
     // Multimeter parity.

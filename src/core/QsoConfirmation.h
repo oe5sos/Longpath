@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/core/QsoConfirmation.h  (NereusSDR)
+// src/core/QsoConfirmation.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // Is this contact confirmed, and by whom?
 //
@@ -33,7 +33,7 @@
 // count built on that is a claim you cannot back up.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-09 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

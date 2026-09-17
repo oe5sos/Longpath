@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/gui/applets/FrequencyApplet.h  (NereusSDR)
+// src/gui/applets/FrequencyApplet.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // Die Fassung um FrequencyInstrument — dieselbe Rolle, die
 // InstrumentApplet fuer Zeiger und Balken spielt. Getrennt davon, weil
@@ -17,7 +17,7 @@
 // setForm() ist die Stelle, an der er andocken wird.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-17 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

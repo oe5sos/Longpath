@@ -2,7 +2,7 @@
 // src/core/CredentialStore.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original — see CredentialStore.h for provenance and for
+// Longpath-original — see CredentialStore.h for provenance and for
 // the reasoning behind the CLI-based keychain access.
 //
 // =================================================================

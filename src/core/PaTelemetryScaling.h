@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/PaTelemetryScaling.h  (NereusSDR)
+// src/core/PaTelemetryScaling.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis [v2.10.3.13+501e3f51]:
@@ -10,7 +10,7 @@
 // CLAUDE.md "Byte-for-byte headers and multi-file attribution".
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-03 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -146,7 +146,7 @@ quint16 tabledFwdZero(HPSDRModel model) noexcept;
 /// which produces a ~2.4 mV difference at the UI label. That is below
 /// the 0.01 V (`f2` formatting) display resolution Thetis uses for
 /// these readouts (console.cs:25068 / :25002), so a single FWD-side
-/// curve is the chosen NereusSDR API surface.
+/// curve is the chosen Longpath API surface.
 ///
 /// From Thetis console.cs:25060 [v2.10.3.13] — `volts` value computed
 /// inside computeAlexFwdPower (the same value Thetis writes to

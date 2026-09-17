@@ -1,12 +1,12 @@
 // =================================================================
-// tests/tst_meter_item_bar.cpp  (NereusSDR)
+// tests/tst_meter_item_bar.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/MeterManager.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -128,7 +128,7 @@ private slots:
     void historyDuration_default_matches_thetis_4000ms()
     {
         // Thetis addSMeterBar / AddADCMaxMag both set HistoryDuration = 4000
-        // (MeterManager.cs:21539, 21633). Use that as the NereusSDR default.
+        // (MeterManager.cs:21539, 21633). Use that as the Longpath default.
         BarItem b;
         QCOMPARE(b.historyDurationMs(), 4000);
     }
@@ -237,7 +237,7 @@ private slots:
     {
         // Thetis clsBarItem.BarStyle enum (MeterManager.cs:19927-19934)
         // has None, Line, SolidFilled, GradientFilled, Segments. addSMeterBar
-        // uses BarStyle.Line (MeterManager.cs:21546). NereusSDR already has
+        // uses BarStyle.Line (MeterManager.cs:21546). Longpath already has
         // Filled + Edge; A4 adds Line.
         BarItem b;
         b.setBarStyle(BarItem::BarStyle::Line);

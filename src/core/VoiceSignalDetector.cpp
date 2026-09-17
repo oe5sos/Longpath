@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/VoiceSignalDetector.cpp  (NereusSDR)
+// src/core/VoiceSignalDetector.cpp  (Longpath)
 // =================================================================
 //
 // Ported from AetherSDR (https://github.com/aethersdr/AetherSDR),
@@ -17,7 +17,7 @@
 // SignalClassifier steht im Header.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-19 — Ported to NereusSDR by Martin Fischer, AI-assisted via
 //                 Anthropic Claude (Cowork).
 // =================================================================

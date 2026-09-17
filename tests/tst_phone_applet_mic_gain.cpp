@@ -1,4 +1,4 @@
-// no-port-check: test-only — exercises NereusSDR-native PhoneCwApplet Mic Gain wiring.
+// no-port-check: test-only — exercises Longpath-native PhoneCwApplet Mic Gain wiring.
 // Phase 3M-1b (relocated from tst_tx_applet_mic_gain.cpp; J.1 slider moved to Phone).
 //
 // The Mic Gain slider was relocated from TxApplet (Row 3b J.1) to
@@ -44,7 +44,7 @@ private slots:
     void setMicGainDb_clampsToRange();
 };
 
-// 1. Default value — micGainDb() == -6 (NereusSDR safety default, plan §0 row 11).
+// 1. Default value — micGainDb() == -6 (Longpath safety default, plan §0 row 11).
 void TestPhoneAppletMicGain::micGainDb_defaultIsMinusSix()
 {
     TransmitModel tx;

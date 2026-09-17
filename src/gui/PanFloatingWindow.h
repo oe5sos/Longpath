@@ -1,4 +1,4 @@
-// no-port-check: AetherSDR-derived NereusSDR file. Top-level QWidget
+// no-port-check: AetherSDR-derived Longpath file. Top-level QWidget
 // wrapper for detaching a PanadapterApplet to a second monitor is adapted
 // structurally from AetherSDR src/gui/PanFloatingWindow.{h,cpp} [@0cd4559].
 // Registered in docs/attribution/aethersdr-reconciliation.md.
@@ -6,7 +6,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // =================================================================
-// src/gui/PanFloatingWindow.h  (NereusSDR)
+// src/gui/PanFloatingWindow.h  (Longpath)
 // =================================================================
 //
 // Ported (structurally) from AetherSDR src/gui/PanFloatingWindow.{h,cpp}
@@ -16,7 +16,7 @@
 //       and About dialog for the live contributor list)
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-27  J.J. Boyd / KG4VCF  Phase 3F Sub-Epic D Task 8.
 //                                    Top-level multi-monitor detach
 //                                    window ported structurally from

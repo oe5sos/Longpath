@@ -1,7 +1,7 @@
 // no-port-check: inline Thetis cite on line 43 records default-value origin only;
 //                this test is independently implemented — not a port of MeterManager.cs.
 // =================================================================
-// tests/tst_multimeter_timing.cpp  (NereusSDR)
+// tests/tst_multimeter_timing.cpp  (Longpath)
 // =================================================================
 //
 // Task 3.1 — MultimeterPage + configurable MeterPoller tests.
@@ -10,12 +10,12 @@
 // averageWindow round-trip accessors added to MeterPoller for the
 // Display → Multimeter setup page.
 //
-// No Thetis port — tests NereusSDR-native accessors.
+// No Thetis port — tests Longpath-native accessors.
 //
 // Uses QTEST_APPLESS_MAIN (no QApplication, WDSP-free, pure data logic).
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-01 — Created in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.

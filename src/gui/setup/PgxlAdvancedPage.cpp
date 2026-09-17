@@ -1,8 +1,8 @@
 // =================================================================
-// src/gui/setup/PgxlAdvancedPage.cpp  (NereusSDR)
+// src/gui/setup/PgxlAdvancedPage.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-native Setup -> Network -> PGXL Advanced page.
+// Longpath-native Setup -> Network -> PGXL Advanced page.
 //
 // Phase 3P-II Phase 4 Tasks 78-84.
 //

@@ -1,4 +1,4 @@
-// tests/tst_pa_calibration_group.cpp  (NereusSDR)
+// tests/tst_pa_calibration_group.cpp  (Longpath)
 //
 // TDD tests for PaCalibrationGroup widget — Section 3.3 of the P1 full-
 // parity epic. See docs/architecture/2026-05-02-p1-full-parity-plan.md §3.3.
@@ -102,7 +102,7 @@ void TstPaCalibrationGroup::populate_hermeslite_uses_anan10_intervals()
     // with ANAN10/ANAN10E for PA cal: same ud10PA1W..ud10PA10W spinbox
     // set, same 1 W intervals, same 10 W max. So when the widget is
     // populated for HL2 it must render the Anan10 way: labels "1 W" through
-    // "10 W". Earlier NereusSDR placeholder used a separate HermesLite
+    // "10 W". Earlier Longpath placeholder used a separate HermesLite
     // class (0.5 W intervals / 5 W max); dropped 2026-05-02 after upstream
     // verification.
     CalibrationController ctrl;

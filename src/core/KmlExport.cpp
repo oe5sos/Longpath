@@ -1,11 +1,11 @@
 // =================================================================
-// src/core/KmlExport.cpp  (NereusSDR)
+// src/core/KmlExport.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original — see KmlExport.h.
+// Longpath-original — see KmlExport.h.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-10 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
 // =================================================================

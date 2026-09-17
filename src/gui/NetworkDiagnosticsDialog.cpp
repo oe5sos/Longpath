@@ -1,6 +1,6 @@
 // src/gui/NetworkDiagnosticsDialog.cpp
 // =================================================================
-// src/gui/NetworkDiagnosticsDialog.cpp  (NereusSDR)
+// src/gui/NetworkDiagnosticsDialog.cpp  (Longpath)
 // =================================================================
 //
 //  Copyright (C) 2026 J.J. Boyd (KG4VCF)
@@ -19,9 +19,9 @@
 //  along with this program; if not, write to the Free Software
 //  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-30 — Created for Phase 3Q sub-PR-3 (shell-chrome redesign).
-//                NereusSDR-original code (no Thetis port; no upstream
+//                Longpath-original code (no Thetis port; no upstream
 //                attribution required). J.J. Boyd (KG4VCF), with
 //                AI-assisted implementation via Anthropic Claude Code.
 // =================================================================

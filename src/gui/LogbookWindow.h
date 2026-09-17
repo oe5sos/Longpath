@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/gui/LogbookWindow.h  (NereusSDR)
+// src/gui/LogbookWindow.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. Thetis has no logbook at all.
+// Longpath-original. Thetis has no logbook at all.
 //
 // The dock panel shows the last twelve contacts, which is enough to
 // confirm a write went through and nothing more. This is the log you
@@ -16,7 +16,7 @@
 // truth waiting to disagree.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
 //   2026-08-10 — Statistics view (per band / mode / year, unique calls

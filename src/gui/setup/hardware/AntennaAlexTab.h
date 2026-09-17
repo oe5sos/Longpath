@@ -1,7 +1,7 @@
 #pragma once
 
 // =================================================================
-// src/gui/setup/hardware/AntennaAlexTab.h  (NereusSDR)
+// src/gui/setup/hardware/AntennaAlexTab.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
@@ -9,7 +9,7 @@
 //   Project Files/Source/Console/setup.designer.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -99,7 +99,7 @@ signals:
     void settingChanged(const QString& key, const QVariant& value);
 
     // Phase 3M-4 Task 11: pass-through for AntennaAlexAlex1Tab::hpfBypassOnPsChanged.
-    // RadioModel/SetupDialog routes this to PureSignal::setHpfBypassOnPs (NereusSDR-
+    // RadioModel/SetupDialog routes this to PureSignal::setHpfBypassOnPs (Longpath-
     // original setter that mirrors Thetis console.DisableHPFonPS path).
     // From Thetis setup.cs:29274-29292 [v2.10.3.13].
     void hpfBypassOnPsChanged(bool checked);

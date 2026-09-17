@@ -1,6 +1,6 @@
 // no-port-check: test-only — deskhpsdr and Thetis file names appear only in
 // source-cite comments that document which upstream line each assertion verifies.
-// No Thetis or deskhpsdr logic is ported here; this file is NereusSDR-original.
+// No Thetis or deskhpsdr logic is ported here; this file is Longpath-original.
 //
 // Wire-byte snapshot tests for P2RadioConnection::setTxDrive() (3M-1a Task E.7).
 //
@@ -17,11 +17,11 @@
 //     high_priority_buffer_to_radio[345] = power & 0xFF;
 //
 // Out-of-band gate:
-//   NereusSDR applies the same gate at compose time using bandFromFrequency().
+//   Longpath applies the same gate at compose time using bandFromFrequency().
 //   If the TX frequency maps to Band::GEN or Band::WWV (outside ham bands),
 //   byte 345 is zeroed regardless of the stored driveLevel.
 //   BandPlanGuard does not zero driveLevel upstream; the gate is in compose.
-//   tx_out_of_band_allowed is not yet wired in NereusSDR.
+//   tx_out_of_band_allowed is not yet wired in Longpath.
 //
 // Test coverage:
 //   1.  Default state: byte 345 = 0.
@@ -153,7 +153,7 @@ private slots:
     // byte 345 regardless of driveLevel.
     // Source: deskhpsdr/src/new_protocol.c:864,876 [@120188f]
     //   int power = 0; ... high_priority_buffer_to_radio[345] = power & 0xFF;
-    // NereusSDR translation: txBand == WWV → power = 0.
+    // Longpath translation: txBand == WWV → power = 0.
     void outOfBandGate_genBandFreq_driveZeroed() {
         P2RadioConnection conn;
         conn.setBoardForTest(HPSDRHW::OrionMKII);

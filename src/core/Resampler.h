@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // =================================================================
-// src/core/Resampler.h  (NereusSDR)
+// src/core/Resampler.h  (Longpath)
 // =================================================================
 //
-// NereusSDR - High-quality sample rate converter wrapper around
+// Longpath - High-quality sample rate converter wrapper around
 // r8brain-free-src's CDSPResampler24 (MIT). One instance handles
 // one fixed source-to-destination rate ratio; create separate
 // instances for upsample and downsample paths.
@@ -14,7 +14,7 @@
 // License (upstream):
 //   - AetherSDR has no per-file copyright header, so per
 //     docs/attribution/HOW-TO-PORT.md rule 6 we cite the project URL
-//     and primary author at NereusSDR block level rather than copying
+//     and primary author at Longpath block level rather than copying
 //     a verbatim header that does not exist:
 //       Copyright (C) 2024-2026  Jeremy (KK7GWY) / AetherSDR contributors
 //         - per https://github.com/ten9876/AetherSDR (GPLv3; see
@@ -23,11 +23,11 @@
 //     license; see third_party/r8brain/LICENSE.txt.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-11  J.J. Boyd / KG4VCF  Phase 3R Task I2a. Full port of
 //                 AetherSDR src/core/Resampler.{h,cpp} [@0cd4559].
 //                 Replaces the 17-line I1 stub. Namespace renamed
-//                 AetherSDR -> NereusSDR; otherwise byte-for-byte.
+//                 AetherSDR -> Longpath; otherwise byte-for-byte.
 //                 AI tooling: Anthropic Claude Code.
 // =================================================================
 
@@ -83,7 +83,7 @@ public:
     double dstRate() const { return m_dstRate; }
 
 private:
-    // NereusSDR-original (2026-09-13, code review): clamps every
+    // Longpath-original (2026-09-13, code review): clamps every
     // process*() entry point's sample count to m_maxBlockSamples before
     // it reaches m_inBuf/m_resampler. m_inBuf.reserve(maxBlockSamples)
     // in the constructor only avoids reallocation within that capacity

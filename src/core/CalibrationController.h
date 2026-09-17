@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/CalibrationController.h  (NereusSDR)
+// src/core/CalibrationController.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -14,7 +14,7 @@
 //     21022-21086), original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-20 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.

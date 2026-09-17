@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_pipewire_stream_integration.cpp  (NereusSDR)
+// tests/tst_pipewire_stream_integration.cpp  (Longpath)
 // Author: J.J. Boyd (KG4VCF), AI-assisted via Claude Code. 2026-04-24.
 // =================================================================
 #ifdef LONGPATH_HAVE_PIPEWIRE

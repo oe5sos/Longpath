@@ -1,15 +1,15 @@
 // =================================================================
-// src/gui/widgets/MasterOutputWidget.cpp  (NereusSDR)
+// src/gui/widgets/MasterOutputWidget.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original widget. See MasterOutputWidget.h for the full
+// Longpath-original widget. See MasterOutputWidget.h for the full
 // attribution block. Styling references AetherSDR
 // `src/gui/TitleBar.cpp:172-215`; the structure here is original to
-// NereusSDR because this widget isolates JUST the master-output
+// Longpath because this widget isolates JUST the master-output
 // triad from AetherSDR's monolithic TitleBar.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-20 — Written by J.J. Boyd (KG4VCF), with AI-assisted
 //                transformation via Anthropic Claude Code.
 //                Phase 3O Sub-Phase 10 Task 10b.

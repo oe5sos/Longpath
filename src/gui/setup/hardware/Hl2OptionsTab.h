@@ -1,7 +1,7 @@
 #pragma once
 
 // =================================================================
-// src/gui/setup/hardware/Hl2OptionsTab.h  (NereusSDR)
+// src/gui/setup/hardware/Hl2OptionsTab.h  (Longpath)
 // =================================================================
 //
 // Ported from mi0bot-Thetis source:
@@ -35,11 +35,11 @@
 // persists, with a `qCWarning` flagging the missing wire emission.
 //
 // Bus 0 surface in I2C Control is **also** deferred per design §4 —
-// today only bus 1 is wired in NereusSDR's I2cTxn path.  Rendered as a
+// today only bus 1 is wired in Longpath's I2cTxn path.  Rendered as a
 // disabled radio with tooltip pointing to the deferral.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-30 — New for Phase 3L HL2 Filter visibility brainstorm.
 //                Phase 3L commit #9.  Closes the "no place to map LPF/HPF
 //                or see bank state like in Thetis" gap from the design

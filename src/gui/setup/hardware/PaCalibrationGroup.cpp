@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/setup/hardware/PaCalibrationGroup.cpp  (NereusSDR)
+// src/gui/setup/hardware/PaCalibrationGroup.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -13,7 +13,7 @@
 //      original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-02 -- Original implementation. Per-board PA forward-power
 //                  cal-point spinbox group; populates ud{10|100|200}PA{N}W
 //                  equivalent based on PaCalBoardClass. Section 3.3 of

@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/core/antenna/Feedline.h  (NereusSDR)
+// src/core/antenna/Feedline.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // Taking the coax back out of the measurement.
 //
@@ -56,7 +56,7 @@
 // are a starting point to be edited, not a specification.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-10 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

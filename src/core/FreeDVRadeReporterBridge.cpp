@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - FreeDVRadeReporterBridge implementation. Drives the
+// Longpath - FreeDVRadeReporterBridge implementation. Drives the
 // Path B (RADE sync-only, empty-callsign) rx_report upload. Path A
 // (callsign-decoded via EOO) is already driven by
 // RadioModel::onRadeTextDecoded.
@@ -50,7 +50,7 @@
 //
 // ==========================================================================
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-15  J.J. Boyd / KG4VCF  Phase 3R-bridge. New port -
 //                 Path B (RADE sync-only) rx_report upload. AI
 //                 tooling assistance for the Qt6 plumbing; DSP/
@@ -141,12 +141,12 @@ void FreeDVRadeReporterBridge::tickForTest()
 //   FREEDV_MODE_RADE active (here: m_synced + caller sets synced only
 //                            while in RADE mode)
 //   syncState               (m_synced)
-//   freq > 0                (NereusSDR-side: caller wires freq via
+//   freq > 0                (Longpath-side: caller wires freq via
 //                            FreeDVReporterClient::setFrequency which
 //                            already gates on > 0; bridge does not
 //                            re-check)
 //   !txState                (m_txActive)
-//   !g_playFileFromRadio    (NereusSDR has no equivalent recording
+//   !g_playFileFromRadio    (Longpath has no equivalent recording
 //                            playback feature; gate omitted)
 void FreeDVRadeReporterBridge::onTick()
 {

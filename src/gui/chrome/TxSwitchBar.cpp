@@ -1,4 +1,4 @@
-// no-port-check: NereusSDR-original. Kein Upstream-Port.
+// no-port-check: Longpath-original. Kein Upstream-Port.
 
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "gui/chrome/TxSwitchBar.h"

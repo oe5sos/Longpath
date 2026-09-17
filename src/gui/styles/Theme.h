@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/gui/styles/Theme.h  (NereusSDR)
+// src/gui/styles/Theme.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // ── Technik Nereus, Design du ────────────────────────────────────────
 //
@@ -45,7 +45,7 @@
 // noch keine Rolle hat, und es sind derzeit 162 davon.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-15 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

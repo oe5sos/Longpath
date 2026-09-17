@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // =================================================================
-// src/core/audio/RadeTxFilters.cpp  (NereusSDR)
+// src/core/audio/RadeTxFilters.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR - DSP helpers for the RADE TX path.  See RadeTxFilters.h
+// Longpath - DSP helpers for the RADE TX path.  See RadeTxFilters.h
 // for the full attribution block and design narrative.
 //
 // =================================================================
 
-// no-port-check: NereusSDR-original implementation.  HPF coefficient
+// no-port-check: Longpath-original implementation.  HPF coefficient
 // derivation cites Robert Bristow-Johnson's "Audio EQ Cookbook" (the
 // canonical reference for digital biquad design); the cookbook is in
 // the public domain.  r8brain CDSPResampler24 is vendored at

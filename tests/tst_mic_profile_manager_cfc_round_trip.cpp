@@ -1,6 +1,6 @@
-// no-port-check: NereusSDR-original unit-test file.
+// no-port-check: Longpath-original unit-test file.
 // =================================================================
-// tests/tst_mic_profile_manager_cfc_round_trip.cpp  (NereusSDR)
+// tests/tst_mic_profile_manager_cfc_round_trip.cpp  (Longpath)
 // =================================================================
 //
 // Phase 3M-3a-ii Batch 4 — round-trip tests for the 41 new
@@ -212,7 +212,7 @@ private slots:
             {QStringLiteral("SSB 3.0k CFC"),     QStringLiteral("1")},  // database.cs:8707
             {QStringLiteral("SSB 3.3k CFC"),     QStringLiteral("1")},  // database.cs:8936
             {QStringLiteral("AM 10k CFC"),       QStringLiteral("1")},  // database.cs:9165
-            // Phase 3R K1 NereusSDR-native "RADE" preset inherits the
+            // Phase 3R K1 Longpath-native "RADE" preset inherits the
             // default CompanderLevel=2 (defaultProfileValues at
             // MicProfileManager.cpp:1141 — database.cs:4580 baseline).
             {QStringLiteral("RADE"),             QStringLiteral("2")},
@@ -241,7 +241,7 @@ private slots:
             "ESSB", "HC4-5", "HC4-5+CPDR", "PR40+W2IHY", "PR40+W2IHY+CPDR",
             "PR781+EQ", "PR781+EQ+CPDR", "SSB 2.8k CFC", "SSB 3.0k CFC",
             "SSB 3.3k CFC", "AM 10k CFC",
-            // Phase 3R K1 NereusSDR-native RADE preset.
+            // Phase 3R K1 Longpath-native RADE preset.
             "RADE",
         };
         QCOMPARE(kProfiles.size(), 22);
@@ -256,7 +256,7 @@ private slots:
     // — see database.cs:4724/4725/4732/4733 baseline + per-profile mirror
     // rows at 4954/4955/4962/4963 (Default DX), 5185/.../5193/5194 (Digi
     // 1K@1500), and so on for the 17 non-CFC profile blocks.  Phase 3R K1
-    // adds the NereusSDR-native RADE preset (also CFC-off by design).
+    // adds the Longpath-native RADE preset (also CFC-off by design).
     void factory_cfcScalars_inheritDefaultsFor18NonCfcProfiles()
     {
         MicProfileManager mgr;
@@ -269,7 +269,7 @@ private slots:
             "Conventional", "D-104", "D-104+CPDR", "D-104+EQ", "DX / Contest",
             "ESSB", "HC4-5", "HC4-5+CPDR", "PR40+W2IHY", "PR40+W2IHY+CPDR",
             "PR781+EQ", "PR781+EQ+CPDR",
-            // Phase 3R K1 NereusSDR-native RADE preset (CFC bypassed).
+            // Phase 3R K1 Longpath-native RADE preset (CFC bypassed).
             "RADE",
         };
         QCOMPARE(kNonCfc.size(), 18);

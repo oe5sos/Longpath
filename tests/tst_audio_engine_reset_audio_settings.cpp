@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_audio_engine_reset_audio_settings.cpp  (NereusSDR)
+// tests/tst_audio_engine_reset_audio_settings.cpp  (Longpath)
 // =================================================================
 //
 // Exercises AudioEngine::resetAudioSettings() — Sub-Phase 12 Task 12.4.

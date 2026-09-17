@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_rxchannel_audio_panel.cpp  (NereusSDR)
+// tests/tst_rxchannel_audio_panel.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -7,7 +7,7 @@
 //   Project Files/Source/Console/radio.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -145,21 +145,21 @@ private slots:
     // (Q_UNUSED path). We verify the conversion math independently.
 
     void panConversionCenterIsHalf() {
-        // NereusSDR 0.0 → WDSP 0.5 (center)
+        // Longpath 0.0 → WDSP 0.5 (center)
         const double nereusCenter = 0.0;
         const double wdspPan = (nereusCenter + 1.0) / 2.0;
         QCOMPARE(wdspPan, 0.5);
     }
 
     void panConversionFullLeftIsZero() {
-        // NereusSDR -1.0 → WDSP 0.0 (full left)
+        // Longpath -1.0 → WDSP 0.0 (full left)
         const double nereusLeft = -1.0;
         const double wdspPan = (nereusLeft + 1.0) / 2.0;
         QCOMPARE(wdspPan, 0.0);
     }
 
     void panConversionFullRightIsOne() {
-        // NereusSDR +1.0 → WDSP 1.0 (full right)
+        // Longpath +1.0 → WDSP 1.0 (full right)
         const double nereusRight = 1.0;
         const double wdspPan = (nereusRight + 1.0) / 2.0;
         QCOMPARE(wdspPan, 1.0);

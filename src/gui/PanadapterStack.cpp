@@ -1,4 +1,4 @@
-// no-port-check: AetherSDR-derived NereusSDR file. Pan layout manager
+// no-port-check: AetherSDR-derived Longpath file. Pan layout manager
 // (5-template QSplitter tree, active-pan tracking, float-pan signal) is
 // adapted structurally from AetherSDR src/gui/PanadapterStack.{h,cpp}
 // [@0cd4559]. Registered in
@@ -7,7 +7,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // =================================================================
-// src/gui/PanadapterStack.cpp  (NereusSDR)
+// src/gui/PanadapterStack.cpp  (Longpath)
 // =================================================================
 //
 // Ported (structurally) from AetherSDR src/gui/PanadapterStack.{h,cpp}
@@ -16,7 +16,7 @@
 //       per https://github.com/ten9876/AetherSDR (GPLv3; see LICENSE
 //       and About dialog for the live contributor list)
 //
-// See PanadapterStack.h for full Modification history (NereusSDR).
+// See PanadapterStack.h for full Modification history (Longpath).
 // =================================================================
 
 #include "gui/PanadapterStack.h"
@@ -132,7 +132,7 @@ void PanadapterStack::applyLayout(const QString& layoutId, const QStringList& pa
     // Retire orphan pans not referenced by the new layout. Without this,
     // switching from a layout that uses "pan-0" to one keyed on different ids
     // (e.g. "p0..p3" in 2x2 tests) would leak the prior pans into m_pans and
-    // distort count(). NereusSDR-specific addition; AetherSDR's layout swap
+    // distort count(). Longpath-specific addition; AetherSDR's layout swap
     // assumes the caller passes the canonical id set.
     const QSet<QString> wanted(panIds.constBegin(), panIds.constEnd());
     const QList<QString> existing = m_pans.keys();

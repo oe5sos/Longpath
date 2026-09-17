@@ -1,8 +1,8 @@
 // =================================================================
-// src/gui/setup/DeviceCard.cpp  (NereusSDR)
+// src/gui/setup/DeviceCard.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original Setup → Audio → Devices card widget.
+// Longpath-original Setup → Audio → Devices card widget.
 // See DeviceCard.h for the full header.
 //
 // Sub-Phase 12 Task 12.2 (2026-04-20): Written by J.J. Boyd (KG4VCF),

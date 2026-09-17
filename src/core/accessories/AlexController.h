@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/accessories/AlexController.h  (NereusSDR)
+// src/core/accessories/AlexController.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -9,11 +9,11 @@
 //    setRxAnt / setRxOnlyAnt / setTxAnt per-band setters)
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-20 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                (KG4VCF), with AI-assisted transformation via Anthropic
 //                Claude Code. Replaces Phase 3I Alex stubs. Per-MAC
-//                persistence via AppSettings. NereusSDR spin: 14 bands
+//                persistence via AppSettings. Longpath spin: 14 bands
 //                (Band160m–XVTR) vs Thetis's 12 (B160M–B6M); extra
 //                GEN/WWV/XVTR slots default to Ant 1. Block-TX safety
 //                (blockTxAnt2/3) added as NereusSDR-native UI contract
@@ -59,10 +59,10 @@ namespace Longpath {
 // Source: HPSDR/Alex.cs:30-106 [@501e3f5]
 //
 // Thetis stores 12-band arrays indexed as (int)band - (int)Band.B160M.
-// NereusSDR uses Band::Count=14 bands (adds GEN/WWV/XVTR); those slots
+// Longpath uses Band::Count=14 bands (adds GEN/WWV/XVTR); those slots
 // default to Ant 1 like all bands.
 //
-// Block-TX toggles (blockTxAnt2 / blockTxAnt3) are a NereusSDR addition —
+// Block-TX toggles (blockTxAnt2 / blockTxAnt3) are a Longpath addition —
 // safety guards for the Antenna Control UI: antenna ports wired RX-only
 // should not accept TX assignments.
 class AlexController : public QObject {
@@ -72,7 +72,7 @@ public:
     explicit AlexController(QObject* parent = nullptr);
 
     // ── Phase 3F: per-ADC BPF state types ────────────────────────────────────
-    // NereusSDR-original; no Thetis port.
+    // Longpath-original; no Thetis port.
     // Per docs/architecture/2026-05-26-phase3f-multi-pan-multi-slice-design.md §4.
 
     /// Operator preference for BPF state on this ADC.
@@ -98,7 +98,7 @@ public:
     };
 
     // ── Per-ADC BPF mode mutators + recompute ────────────────────────────────
-    // NereusSDR-original; no Thetis port.
+    // Longpath-original; no Thetis port.
 
     BpfMode bpfMode(int adc) const;
     void    setBpfMode(int adc, BpfMode mode);
@@ -127,7 +127,7 @@ public:
     void setRxOnlyAnt(Band band, int ant);
 
     // ── Block-TX safety ──────────────────────────────────────────────────────
-    // NereusSDR UI contract: when true, setTxAnt() rejects assignment to that port.
+    // Longpath UI contract: when true, setTxAnt() rejects assignment to that port.
     bool blockTxAnt2() const;
     bool blockTxAnt3() const;
     void setBlockTxAnt2(bool on);
@@ -140,7 +140,7 @@ public:
 
     // ── TX-bypass routing flags ──────────────────────────────────────────────
     // Ported from Thetis HPSDR/Alex.cs:61-66 [v2.10.3.13 @501e3f5].
-    // Thetis declares these as `public static bool` on the Alex class; NereusSDR
+    // Thetis declares these as `public static bool` on the Alex class; Longpath
     // scopes them per-instance so per-radio state is preserved.
     //
     // Mutual-exclusion trio (rxOutOnTx / ext1OutOnTx / ext2OutOnTx): setting any
@@ -152,8 +152,8 @@ public:
     //   Source: setup.cs:17568-17570 chkDisableRXOut_CheckedChanged.
     // useTxAntForRx (Thetis: TRxAnt) — when true, RX path uses TxAnt[band]
     //   instead of RxAnt[band]. Source: Alex.cs:363-364.
-    // xvtrActive — NereusSDR-native session flag. Not in Thetis (Thetis
-    //   passes `xvtr` as a method parameter; NereusSDR stores it as state
+    // xvtrActive — Longpath-native session flag. Not in Thetis (Thetis
+    //   passes `xvtr` as a method parameter; Longpath stores it as state
     //   for signal-driven reapply). Not persisted.
     bool rxOutOnTx() const;
     bool ext1OutOnTx() const;
@@ -190,7 +190,7 @@ signals:
 
 private:
     // From Thetis HPSDR/Alex.cs:56-58 [@501e3f5] — Thetis uses 12 bands
-    // (B160M..B6M); NereusSDR uses 14 (adds GEN/WWV/XVTR).
+    // (B160M..B6M); Longpath uses 14 (adds GEN/WWV/XVTR).
     //
     // Alex antenna routing applies to HF amateur + GEN/WWV/XVTR only.
     // The Phase 3L Band enum extension (Band::SwlFirst..SwlLast =

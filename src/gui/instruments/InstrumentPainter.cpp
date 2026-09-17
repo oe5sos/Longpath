@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/instruments/InstrumentPainter.cpp  (NereusSDR)
+// src/gui/instruments/InstrumentPainter.cpp  (Longpath)
 // =================================================================
 // Siehe InstrumentPainter.h — die drei Mittel, an einer Stelle.
 // =================================================================

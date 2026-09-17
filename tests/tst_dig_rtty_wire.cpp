@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_dig_rtty_wire.cpp  (NereusSDR)
+// tests/tst_dig_rtty_wire.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -9,7 +9,7 @@
 //   Project Files/Source/Console/setup.designer.cs (upstream has no top-of-file header — project-level LICENSE applies)
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -199,7 +199,7 @@ private slots:
         // From Thetis console.cs:14672 — DIGLClickTuneOffset default 0 Hz
         // Upstream inline attribution preserved verbatim:
         //   :14669  //reset preset filter's center frequency - W4TME
-        // (NereusSDR defaults diglOffsetHz to 0 per SliceModel; Thetis's
+        // (Longpath defaults diglOffsetHz to 0 per SliceModel; Thetis's
         // digl_click_tune_offset default is 2210 but that governs filter
         // preset centering, not the demodulation shift we model here.)
         SliceModel s;

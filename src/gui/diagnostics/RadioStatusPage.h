@@ -1,17 +1,17 @@
 // =================================================================
-// src/gui/diagnostics/RadioStatusPage.h  (NereusSDR)
+// src/gui/diagnostics/RadioStatusPage.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. Diagnostics → Radio Status dashboard.
+// Longpath-original. Diagnostics → Radio Status dashboard.
 // Thetis surfaces these readouts piecemeal across Front Console /
-// PA Settings / main meter / etc. NereusSDR consolidates them into
+// PA Settings / main meter / etc. Longpath consolidates them into
 // a single tab backed by Phase 3P-H Task 1 models (RadioStatus,
 // SettingsHygiene) + Phase 3P-E HermesLiteBandwidthMonitor.
 //
 // No direct Thetis port at this layer; data shapes ported in Task 1.
 // =================================================================
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-20 — Original implementation for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted implementation via
 //                 Anthropic Claude Code.

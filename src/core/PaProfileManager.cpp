@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/PaProfileManager.cpp  (NereusSDR)
+// src/core/PaProfileManager.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -8,7 +8,7 @@
 //   original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-03 — Original implementation for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted implementation via
 //                 Anthropic Claude Code. Phase 2 Agent 2B of issue #167.
@@ -61,7 +61,7 @@
 // Richard Samphire can be reached by email at :  mw0lge@grange-lane.co.uk                    //
 //============================================================================================//
 
-// no-port-check: NereusSDR-original file; Thetis-derived handler logic
+// no-port-check: Longpath-original file; Thetis-derived handler logic
 // is cited inline below.
 
 #include "PaProfileManager.h"
@@ -131,7 +131,7 @@ const char* modelEnumName(HPSDRModel m) noexcept
 QString defaultProfileNameForModel(HPSDRModel model)
 {
     // Thetis setup.cs:23309 [v2.10.3.13] — "Default - " + model.ToString()
-    // (C# enum.ToString() yields the enum name). NereusSDR uses the same
+    // (C# enum.ToString() yields the enum name). Longpath uses the same
     // name format so manifest entries can be cross-referenced byte-for-byte
     // with Thetis-formatted profile names.
     return QStringLiteral("Default - ") +
@@ -195,7 +195,7 @@ void PaProfileManager::load(HPSDRModel connectedModel)
         // First-launch seed.
         // From Thetis setup.cs:23295-23316 [v2.10.3.13] — initPAProfiles
         // builds one "Default - <model>" entry per HPSDRModel.LAST iteration
-        // plus one "Bypass" profile. NereusSDR persists each profile blob
+        // plus one "Bypass" profile. Longpath persists each profile blob
         // under hardware/<mac>/pa/profile/<name> as its dataToString() form.
         const QStringList factoryNames = factoryProfileNames();
         for (const QString& name : factoryNames) {
@@ -218,7 +218,7 @@ void PaProfileManager::load(HPSDRModel connectedModel)
         // Reconnect path. Stored profiles win over factory defaults.
         // From Thetis setup.cs:1920-1959 [v2.10.3.13] — RecoverPAProfiles
         // reads the persisted blobs into _PAProfiles, replacing any
-        // factory defaults with the same name. NereusSDR does the same:
+        // factory defaults with the same name. Longpath does the same:
         // pull each profile blob from AppSettings into the in-memory cache.
         m_profiles.clear();
         for (const QString& name : names) {
@@ -261,7 +261,7 @@ void PaProfileManager::load(HPSDRModel connectedModel)
         }
     }
 
-    // Active-profile-on-connect (NereusSDR-spin):
+    // Active-profile-on-connect (Longpath-spin):
     //   1. Stored active in manifest AND visible under current connectedModel?
     //      Use it.  Visible = NOT a factory-default for some other model.
     //   2. Else if "Default - <connectedModel>" exists, use it.
@@ -606,7 +606,7 @@ void PaProfileManager::seedFactoryProfile(const QString& name,
     // canonical PaGainProfile values via ResetGainDefaultsForModel.
     PaProfile p(name, modelForDefaults, /*isFactoryDefault=*/true);
 
-    // NereusSDR-spin: the Bypass profile must use the all-100.0f sentinel
+    // Longpath-spin: the Bypass profile must use the all-100.0f sentinel
     // row from `bypassPaGainsForBand` (PaGainProfile.h), NOT the
     // HPSDRModel::FIRST row from `defaultPaGainsForBand` (which Thetis
     // groups with HERMES at 41.x dB). The 100.0f sentinel triggers the
@@ -629,7 +629,7 @@ QStringList PaProfileManager::factoryProfileNames()
     // From Thetis setup.cs:23394 [v2.10.3.15] — initPAProfiles loops
     // for (int n = 0; n < (int)HPSDRModel.LAST; n++) and adds one
     // "Default - <model>" per iteration, then appends one "Bypass" entry.
-    // NereusSDR walks the same enum range (HPSDR=0 .. LAST exclusive) and
+    // Longpath walks the same enum range (HPSDR=0 .. LAST exclusive) and
     // appends Bypass at the end — manifest order matches Thetis combo order.
     // Using < LAST (not <= REDPITAYA) means future SKU additions auto-include.
     QStringList out;

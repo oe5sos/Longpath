@@ -1,12 +1,12 @@
 // =================================================================
-// src/core/audio/PcMicSource.cpp  (NereusSDR)
+// src/core/audio/PcMicSource.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original file. See PcMicSource.h for design rationale and
+// Longpath-original file. See PcMicSource.h for design rationale and
 // license block. Plan: 3M-1b F.1.
 // =================================================================
 
-// no-port-check: NereusSDR-original file; no Thetis logic ported here.
+// no-port-check: Longpath-original file; no Thetis logic ported here.
 
 #include "core/audio/PcMicSource.h"
 #include "core/AudioEngine.h"

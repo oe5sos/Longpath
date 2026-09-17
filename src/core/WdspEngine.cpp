@@ -1,19 +1,19 @@
 // =================================================================
-// src/core/WdspEngine.cpp  (NereusSDR)
+// src/core/WdspEngine.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/ChannelMaster/cmaster.c, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
 //   2026-05-03 — Phase 3M-3a-iii Task 20 by J.J. Boyd (KG4VCF):
 //                 createTxChannel now ports cmaster.c:130-157 [v2.10.3.13]
 //                 create_dexp call (the 26-arg DEXP DSP-instance allocation
-//                 that was missing from NereusSDR's TX-init path until
+//                 that was missing from Longpath's TX-init path until
 //                 today), and destroyTxChannel ports the matching
 //                 cmaster.c:267 [v2.10.3.13] destroy_dexp call.
 //                 Bench-confirmed VOX-keying failure root cause: pdexp[1]
@@ -658,7 +658,7 @@ void WdspEngine::setExternalDiversityApiForTest(
 // Phase 3R Task J2: RadeChannel lifecycle.
 // ─────────────────────────────────────────────────────────────────────────
 //
-// RadeChannel is a NereusSDR-native wrapper around third_party/rade (the
+// RadeChannel is a Longpath-native wrapper around third_party/rade (the
 // librade neural codec).  It is NOT a WDSP channel - no OpenChannel /
 // CloseChannel calls, no m_initialized requirement.  The methods below
 // are structurally parallel to createRxChannel / destroyRxChannel /
@@ -814,8 +814,8 @@ qint64 WdspEngine::rebuildRxChannel(int channelId, const ChannelConfig& cfg)
 //
 // Source-first port of the RX path inside ChannelMaster/cmaster.c::
 // SetXcmInrate at lines 453-507 [v2.10.3.13].  The relevant excerpt
-// (NereusSDR ports the WDSP-channel calls; ANB/NOB/Siphon/IVAC are
-// either NereusSDR-original infrastructure or covered by separate ports):
+// (Longpath ports the WDSP-channel calls; ANB/NOB/Siphon/IVAC are
+// either Longpath-original infrastructure or covered by separate ports):
 //
 //   case 0:  // receiver
 //       SetRCVRANBBuffsize  (0, rx, pcm->xcm_insize[in_id]);  // anb size
@@ -828,11 +828,11 @@ qint64 WdspEngine::rebuildRxChannel(int channelId, const ChannelConfig& cfg)
 //       }
 //       SetIVACiqSizeAndRate (rx, pcm->xcm_insize[in_id], pcm->xcm_inrate[in_id]);
 //
-// NereusSDR scope here:
+// Longpath scope here:
 //   * SetInputSamplerate / SetInputBuffsize on the channel — full port.
 //   * ANB / NOB rate-and-size — deferred (NbFamily currently re-seeds these
 //     at construction; live propagation requires per-instance setters).
-//   * Siphon / IVAC — NereusSDR uses different display + VAC paths.
+//   * Siphon / IVAC — Longpath uses different display + VAC paths.
 // ---------------------------------------------------------------------------
 
 bool WdspEngine::setRxChannelRate(int channelId, int newRateHz)
@@ -1036,7 +1036,7 @@ TxChannel* WdspEngine::createTxChannel(int channelId,
 
     // ── Phase 3M-3a-iii Task 20: create_dexp (DEXP DSP instance) ────────────
     //
-    // Until 2026-05-03 NereusSDR omitted this call entirely.  Symptom:
+    // Until 2026-05-03 Longpath omitted this call entirely.  Symptom:
     // pdexp[m_channelId] was permanently nullptr, every SetDEXP* setter
     // and the SendCBPushDexpVox callback registration silently no-op'd
     // via their null guards (see TxChannel::registerVoxCallback at
@@ -1050,7 +1050,7 @@ TxChannel* WdspEngine::createTxChannel(int channelId,
     // [v2.10.3.13] passes the SAME `pcm->in[in_id]` buffer to both the
     // `in` and `out` parameters of create_dexp — DEXP runs in-place on
     // ChannelMaster's mic ring buffer, and the same buffer is then read
-    // by fexchange0 at cmaster.c:389 (chain-inserted).  NereusSDR
+    // by fexchange0 at cmaster.c:389 (chain-inserted).  Longpath
     // separates the two: m_dexpBuffers[id] is a private buffer used
     // ONLY by the DEXP detector, and TxWorkerThread's m_in is the
     // separate buffer that fexchange0 reads.  TxWorkerThread::
@@ -1093,10 +1093,10 @@ TxChannel* WdspEngine::createTxChannel(int channelId,
     // From Thetis ChannelMaster cmaster.c:130-157 [v2.10.3.13] — verbatim
     // create_dexp call site.  Every argument matches the upstream value;
     // the only deviations are:
-    //   - id        : NereusSDR's WDSP channel id (1) instead of Thetis's
+    //   - id        : Longpath's WDSP channel id (1) instead of Thetis's
     //                 transmitter index (0) — they happen to coincide for
     //                 single-RX layouts but the semantics differ slightly
-    //   - in / out  : NereusSDR's private dexpBuf (parallel-only — see
+    //   - in / out  : Longpath's private dexpBuf (parallel-only — see
     //                 buffer architecture comment above) instead of
     //                 Thetis's pcm->in[in_id] (chain-inserted)
     //   - pushvox   : nullptr — TxChannel::registerVoxCallback registers
@@ -1124,7 +1124,7 @@ TxChannel* WdspEngine::createTxChannel(int channelId,
         // DEVIATION from Thetis cmaster.c:149 [v2.10.3.13] which passes 1
         // ("VOX initially set to ON"). Thetis relies on its CMSetTXAVoxRun
         // init pump firing SetDEXPRunVox(0) BEFORE the audio thread starts
-        // processing mic data (Audio.VOXEnabled defaults false). NereusSDR's
+        // processing mic data (Audio.VOXEnabled defaults false). Longpath's
         // MoxController only fires voxRunRequested on state CHANGES; at
         // startup voxEnabled=false equals m_lastVoxRunGated=false so no
         // emit happens, and a Thetis-faithful run_vox=1 boot value would
@@ -1538,14 +1538,14 @@ double WdspEngine::getRxaSignalPeak(int channel) const
 //
 // Originally wrapped Thetis's C ::SetupDetectMaxBin which requires a WDSP
 // analyzer display channel (CreateAnalyzer + SetAnalyzer + Spectrum buffer
-// feed).  NereusSDR's FFTEngine uses raw FFTW3 directly and does not wire
+// feed).  Longpath's FFTEngine uses raw FFTW3 directly and does not wire
 // the WDSP analyzer subsystem.  Wiring the analyzer pipeline is a
 // follow-up epic; for now the algorithm runs against FFTEngine's existing
 // dBm bins via onSpectrumBinsForMaxBin slot.  Operator-visible behavior
 // matches the Thetis spec; the underlying DSP plumbing diverges.
 //
 // 'ss' and 'LO' Thetis arguments are accepted for API compatibility but
-// unused in NereusSDR (Thetis multi-stream / multi-LO does not apply).
+// unused in Longpath (Thetis multi-stream / multi-LO does not apply).
 //
 // Thetis call site at Console/console.cs:51150 [@501e3f5]:
 //   WDSP.SetupDetectMaxBin(enabled ? 1 : 0, disp, 0, 0, sample_rate,
@@ -1578,7 +1578,7 @@ void WdspEngine::setupMaxBinDetector(int disp, int ss, int LO,
 //
 // Algorithm ported from Thetis wdsp/analyzer.c:830 [@501e3f5] -- returns
 // dmb_max_dB (the slow-release smoothed max).
-// NereusSDR-native: state lives in m_maxBinDetectors[disp] rather than
+// Longpath-native: state lives in m_maxBinDetectors[disp] rather than
 // the WDSP pdisp[] array; see setupMaxBinDetector for the full rationale.
 //
 // Returns -400.0 sentinel when disp is out of range, the detector is not
@@ -1638,7 +1638,7 @@ void WdspEngine::setMaxBinDbmFromSpectrum(int disp, double dbm)
 //   dmb_max_dB = 10.0 * mlog10(a->scale * dmb_max);
 //   if (dmb_max_dB > a->dmb_max_dB) a->dmb_max_dB = dmb_max_dB;
 //
-// NereusSDR adaptations (not guessing -- explicit divergences):
+// Longpath adaptations (not guessing -- explicit divergences):
 //   1. binsDbm is already in dBm (FFTEngine applied 10*log10(scale*mag)),
 //      so the magnitude scan and 10*log10 step are replaced by a direct
 //      max-dBm scan over the window.
@@ -1666,11 +1666,11 @@ void WdspEngine::onSpectrumBinsForMaxBin(int receiverId, const QVector<float>& b
     //   firstBin = clamp(N/2 + round((fLow  + sliceOffsetHz) / binSpacing), 0, N-1)
     //   lastBin  = clamp(N/2 + round((fHigh + sliceOffsetHz) / binSpacing), 0, N-1)
     //
-    // NereusSDR-only sliceOffsetHz term: with CTUN on (default), the
+    // Longpath-only sliceOffsetHz term: with CTUN on (default), the
     // user's slice does NOT match DDC center.  FFTEngine bins are in
     // DDC baseband, so we shift the scan window by (sliceFreq - ddcCenter)
     // to land on the user's tuned signal.  See setMaxBinSliceOffsetHz
-    // for the architectural rationale (NereusSDR taps FFTEngine ahead of
+    // for the architectural rationale (Longpath taps FFTEngine ahead of
     // the WDSP shift, where Thetis's analyzer is fed post-shift).
     const double binSpacing  = d.rate / static_cast<double>(N);
     const int    half        = N / 2;

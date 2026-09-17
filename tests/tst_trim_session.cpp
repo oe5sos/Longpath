@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_trim_session.cpp  (NereusSDR)
+// tests/tst_trim_session.cpp  (Longpath)
 // =================================================================
 //
 // AntennaTrim assumes f ∝ 1/L, which is true of an antenna in free
@@ -19,10 +19,10 @@
 //
 // Numbers computed in Python before the C++ was written.
 //
-// no-port-check: NereusSDR-original.
+// no-port-check: Longpath-original.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-10 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

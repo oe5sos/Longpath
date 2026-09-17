@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/applets/eq/StripEqPanel.cpp  (NereusSDR)
+// src/gui/applets/eq/StripEqPanel.cpp  (Longpath)
 // =================================================================
 //
 // Ported from AetherSDR (https://github.com/aethersdr/AetherSDR),
@@ -17,13 +17,13 @@
 // port of the same upstream, so the pair are back together.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-09 — Ported to NereusSDR by Martin Fischer, AI-assisted via
 //                 Anthropic Claude (Cowork). Namespace AetherSDR →
-//                 NereusSDR; include paths rebased onto
+//                 Longpath; include paths rebased onto
 //                 core/strip/ and gui/applets/eq/. Behaviour unchanged.
 //   2026-08-11 — Undo/Redo buttons + Ctrl+Z / Ctrl+Shift+Z shortcuts
-//                 added (NereusSDR-original, backed by EqHistory/EqHost);
+//                 added (Longpath-original, backed by EqHistory/EqHost);
 //                 three copies of the row-button stylesheet folded into
 //                 kRowButtonStyle. By Martin Fischer, AI-assisted via
 //                 Anthropic Claude (Cowork).
@@ -64,12 +64,12 @@ namespace {
 // ── The theme seam ───────────────────────────────────────────────────
 //
 // AetherSDR resolves {{color.x}} tokens through a ThemeManager that
-// NereusSDR does not have. Rather than rewriting the ported stylesheet
+// Longpath does not have. Rather than rewriting the ported stylesheet
 // strings — which would make this file stop being comparable against
 // upstream — the strings are left exactly as they were and the four
 // tokens they use are resolved here.
 //
-// Three of the four are byte-identical to NereusSDR's own constants,
+// Three of the four are byte-identical to Longpath's own constants,
 // for the same reason the painting colours were: the palettes share an
 // ancestor.
 //
@@ -80,7 +80,7 @@ namespace {
 //                                  was kept as a literal on the grounds
 //                                  that it sits between two tokens; the
 //                                  instruction is that everything looks
-//                                  like NereusSDR, and a few percent of
+//                                  like Longpath, and a few percent of
 //                                  luminance is the whole difference)
 void applyThemed(QWidget* w, QString sheet)
 {
@@ -201,7 +201,7 @@ StripEqPanel::StripEqPanel(EqHost* engine, QWidget* parent)
     // anywhere on it starts a window move.  Stored as a QWidget* in the
     // header to avoid leaking the inline class — cast at use sites.
     // AetherSDR shows this panel as a floating frameless window with
-    // its own draggable title bar. NereusSDR embeds it in a tab, so
+    // its own draggable title bar. Longpath embeds it in a tab, so
     // there is no window to drag and no title to carry — the tab
     // already says which stage this is.
     QWidget* titleBar = nullptr;
@@ -387,7 +387,7 @@ StripEqPanel::StripEqPanel(EqHost* engine, QWidget* parent)
             ClientEq* eq = (m_path == ClientEqApplet::Path::Rx)
                 ? m_audio->clientEqRx() : m_audio->clientEqTx();
             if (!eq) return;
-            // NereusSDR's layout, not ClientEq's ten — fourteen, with
+            // Longpath's layout, not ClientEq's ten — fourteen, with
             // seven spare handles through the voice range. One table in
             // core/strip/EqBandLayout.h, shared with the three starting
             // points, so reset and the presets cannot come to disagree

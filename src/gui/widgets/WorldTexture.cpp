@@ -1,11 +1,11 @@
 // =================================================================
-// src/gui/widgets/WorldTexture.cpp  (NereusSDR)
+// src/gui/widgets/WorldTexture.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original — see WorldTexture.h.
+// Longpath-original — see WorldTexture.h.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
 //   2026-09-02 — Photo style (Muted/NightWash/Crisp) added, von Martin
@@ -55,7 +55,7 @@ StyledCache& styledCache()
 // (Drehpunkt bei Mittelgrau) -- dieselbe Reihenfolge wie CSS' eigenes
 // filter: brightness() vor contrast(), weil genau diese Werte am
 // gezeigten Entwurf (Blue-Marble-Entwuerfe, 2026-09-02) abgenommen
-// wurden. Kein Thetis-Bezug: reine NereusSDR-Bildoberflaeche, editoriell
+// wurden. Kein Thetis-Bezug: reine Longpath-Bildoberflaeche, editoriell
 // gewaehlt, nicht gemessen.
 struct Curve {
     bool   grey;

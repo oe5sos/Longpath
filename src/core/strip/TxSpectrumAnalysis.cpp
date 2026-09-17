@@ -1,13 +1,13 @@
 // =================================================================
-// src/core/strip/TxSpectrumAnalysis.cpp  (NereusSDR)
+// src/core/strip/TxSpectrumAnalysis.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. See TxSpectrumAnalysis.h for why the I channel
+// Longpath-original. See TxSpectrumAnalysis.h for why the I channel
 // alone is the right spectrum and why the edges are found by scanning
 // inward.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-09 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

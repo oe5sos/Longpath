@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_legacy_iq_tap_is_stream_zero.cpp  (NereusSDR)
+// tests/tst_legacy_iq_tap_is_stream_zero.cpp  (Longpath)
 // =================================================================
 //
 // no-port-check: NereusSDR-original. The two-tap fork is a NereusSDR

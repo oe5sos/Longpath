@@ -1,6 +1,6 @@
 #pragma once
 
-// no-port-check: NereusSDR/Longpath-original RadioConnection subclass.
+// no-port-check: Longpath/Longpath-original RadioConnection subclass.
 // Wire framing comes from src/core/sunsdr/SunSdrProtocol.h (ported from
 // ArtemisSDR, see that file's header and
 // docs/attribution/ARTEMISSDR-PROVENANCE.md) — nothing in THIS file is
@@ -9,7 +9,7 @@
 // already established.
 
 // =================================================================
-// src/core/SunSdrRadioConnection.h  (NereusSDR/Longpath)
+// src/core/SunSdrRadioConnection.h  (Longpath)
 // =================================================================
 //
 // A third `RadioConnection` subclass, alongside P1RadioConnection and
@@ -65,7 +65,7 @@
 // — this connection cannot transmit and does not claim to.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-26 — Original for NereusSDR/Longpath by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 //   2026-08-26 — Minimal RX-start sequence wired into connectToRadio()

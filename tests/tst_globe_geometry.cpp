@@ -2,7 +2,7 @@
 // the sun is overhead (which draws the terminator) and where the great
 // circle runs (which draws the path). Both are static so the geometry is
 // checkable without constructing a widget.
-// no-port-check: NereusSDR-original.
+// no-port-check: Longpath-original.
 
 #include <QtTest/QtTest>
 #include <QDateTime>

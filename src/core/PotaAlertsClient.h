@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - POTA (Parks On The Air) scheduled-activations ("Alerts")
+// Longpath - POTA (Parks On The Air) scheduled-activations ("Alerts")
 // client
 //
-// NereusSDR-native, no upstream equivalent (operator-requested
+// Longpath-native, no upstream equivalent (operator-requested
 // follow-up to the SpotHub POTA improvement pass, 2026-08-27).
 // Sibling of PotaClient/PotaParkInfoClient: where PotaClient polls
 // live activator spots and PotaParkInfoClient looks up one park on
@@ -19,7 +19,7 @@
 // panadapter overlay, no shared table) -- a manual "Refresh" plus a
 // fetch on tab-open is enough. See SpotHubDialog::buildAlertsTab().
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-27  AI (Anthropic Claude Code)  Initial version.
 
 #pragma once

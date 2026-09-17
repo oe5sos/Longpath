@@ -1,13 +1,13 @@
 #pragma once
 
 // =================================================================
-// src/gui/setup/AudioVaxPage.h  (NereusSDR)
+// src/gui/setup/AudioVaxPage.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original Setup → Audio → VAX page.
+// Longpath-original Setup → Audio → VAX page.
 // No Thetis port, no attribution headers required (per memory:
 // feedback_source_first_ui_vs_dsp — Qt widgets in Setup pages are
-// NereusSDR-native).
+// Longpath-native).
 //
 // Sub-Phase 12 Task 12.3 (2026-04-20): Four VAX channel cards (1–4)
 // + TX row + Auto-detect QMenu picker. Full 7-row DeviceCard form on
@@ -30,7 +30,7 @@
 // Design spec: docs/architecture/2026-04-23-linux-audio-pipewire-plan.md
 // §9.2, §10.
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-20 — Written by J.J. Boyd (KG4VCF), with AI-assisted
 //                transformation via Anthropic Claude Code.
 //   2026-04-24 — Task 21 rebuild: spec §9.2 layout, NodeDescription

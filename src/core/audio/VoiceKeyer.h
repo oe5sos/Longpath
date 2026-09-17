@@ -4,7 +4,7 @@
 //   Project Files/Source/Console/clsAudioRecordPlayback.cs, original licence
 //   from Thetis source is included below
 //
-// Thetis v2.10.3.15 (@852bf0e). Diese Datei ist NereusSDR/Longpath-original
+// Thetis v2.10.3.15 (@852bf0e). Diese Datei ist Longpath/Longpath-original
 // und uebernimmt KEINEN C#-Code; sie leitet Verhalten und Feldauswahl aus
 // der oben genannten Quelle ab. Der Kopf steht hier trotzdem vollstaendig,
 // weil die Herkunftstabelle sie fuehrt und weil eine Nennung mehr niemandem
@@ -52,14 +52,14 @@ mw0lge@grange-lane.co.uk
 
 
 // no-port-check: Nennt Thetis clsAudioRecordPlayback.cs (MW0LGE) als Verhaltensquelle fuer
-// den Sprachspeicher; NereusSDR-original, kein Zeilenport. Siehe
+// den Sprachspeicher; Longpath-original, kein Zeilenport. Siehe
 // THETIS-PROVENANCE.md, Art 'reference'.
 
 // =================================================================
-// src/core/audio/VoiceKeyer.h  (NereusSDR)
+// src/core/audio/VoiceKeyer.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original, im Verhalten an Thetis angelehnt
+// Longpath-original, im Verhalten an Thetis angelehnt
 // (clsAudioRecordPlayback.cs, MW0LGE — insbesondere MoxOnPlayback und
 // die Trennung von Aufnahmequelle und Wiedergabeweg).
 //
@@ -98,7 +98,7 @@ mw0lge@grange-lane.co.uk
 // Fehler darin sendet.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-19 — Original fuer NereusSDR von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
 // =================================================================

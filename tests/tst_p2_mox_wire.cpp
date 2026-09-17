@@ -1,6 +1,6 @@
 // no-port-check: test-only — deskhpsdr and Thetis file names appear only in
 // source-cite comments that document which upstream line each assertion verifies.
-// No Thetis or deskhpsdr logic is ported here; this file is NereusSDR-original.
+// No Thetis or deskhpsdr logic is ported here; this file is Longpath-original.
 //
 // Wire-byte snapshot tests for P2RadioConnection::setMox() (3M-1a Task E.7).
 //

@@ -11,7 +11,7 @@
 // Source-first context: Thetis splits persistent user thresholds
 // (waterfall_low/high_threshold, display.cs:2522-2548 [v2.10.3.13]) from
 // runtime AGC state (_RX1waterfallPreviousMinValue) and renders into
-// per-draw locals at display.cs:6575-6594 [v2.10.3.13]. NereusSDR
+// per-draw locals at display.cs:6575-6594 [v2.10.3.13]. Longpath
 // previously collapsed both roles into m_wfLow/HighThreshold, so AGC /
 // Clarity / "Use spectrum min/max" silently overwrote the user's saved
 // values; the next scheduleSettingsSave() debounce persisted the

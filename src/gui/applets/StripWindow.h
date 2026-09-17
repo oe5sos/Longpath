@@ -1,14 +1,14 @@
 #pragma once
 
 // =================================================================
-// src/gui/applets/StripWindow.h  (NereusSDR)
+// src/gui/applets/StripWindow.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original, over DSP ported from AetherSDR
+// Longpath-original, over DSP ported from AetherSDR
 // (https://github.com/aethersdr/AetherSDR, GPLv3, primary author
 // Jeremy [KK7GWY]). AetherSDR's own window is AetherialAudioStrip
 // plus nine Strip*Panel classes wired through its AudioEngine;
-// NereusSDR's transmit audio does not pass through an AudioEngine, so
+// Longpath's transmit audio does not pass through an AudioEngine, so
 // the window is written here against StripChain directly. The control
 // sets and their ranges come from the ported stage headers.
 //
@@ -38,7 +38,7 @@
 // Nothing here can transmit.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-08 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

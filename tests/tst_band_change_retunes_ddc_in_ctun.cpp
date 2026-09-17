@@ -1,4 +1,4 @@
-// no-port-check: NereusSDR-original test infrastructure. No upstream port.
+// no-port-check: Longpath-original test infrastructure. No upstream port.
 //
 // =================================================================
 // A band change must retune the DDC even while CTUN holds it.

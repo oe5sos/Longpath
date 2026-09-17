@@ -1,15 +1,15 @@
 #pragma once
 
 // =================================================================
-// src/gui/applets/AppletVisibilityController.h  (NereusSDR)
+// src/gui/applets/AppletVisibilityController.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. No Thetis equivalent — Thetis exposes
+// Longpath-original. No Thetis equivalent — Thetis exposes
 // container-level show/hide via setup checkboxes, not per-applet
 // toggles. AetherSDR has no equivalent.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-10 — Created in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via
 //                 Anthropic Claude Code. Backs the Containers >

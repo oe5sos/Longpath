@@ -1,21 +1,21 @@
 // =================================================================
-// tests/tst_tx_applet_mic_source_badge.cpp  (NereusSDR)
+// tests/tst_tx_applet_mic_source_badge.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original test file. No Thetis port at this layer.
+// Longpath-original test file. No Thetis port at this layer.
 //
 // Verifies the TxApplet mic-source badge text for all three MicSource
 // values: Pc -> "PC mic", Radio -> "Radio mic", Vax -> "VAX". Covers
 // both the live micSourceChanged path and the syncFromModel path.
 // =================================================================
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-10 - Original test for NereusSDR by J.J. Boyd (KG4VCF),
 //                 with AI-assisted implementation via Anthropic Claude
 //                 Code.
 // =================================================================
 
-// no-port-check: NereusSDR-original test file.
+// no-port-check: Longpath-original test file.
 
 #include <QtTest/QtTest>
 #include <QLabel>

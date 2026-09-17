@@ -1,12 +1,12 @@
 // =================================================================
-// src/core/strip/MicSpectrum.cpp  (NereusSDR)
+// src/core/strip/MicSpectrum.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. See MicSpectrum.h for why the audio thread does
+// Longpath-original. See MicSpectrum.h for why the audio thread does
 // nothing here but copy.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-08 — Created in C++20 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

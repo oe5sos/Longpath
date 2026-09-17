@@ -519,7 +519,7 @@ private slots:
         // an empirical override forcing cfg.cntrl1=0 because working
         // Thetis on a friend's ANAN-10E (HermesII) was observed sending
         // 0 on bank-4 C1 during PS-MOX. The override was patching the
-        // wrong layer — NereusSDR P1 codecs used to read cfg.cntrl1 as
+        // wrong layer — Longpath P1 codecs used to read cfg.cntrl1 as
         // the bank-4 wire byte, which conflated UpdateDDCs's cntrl1 with
         // the separate Thetis P1_adc_cntrl global. After the 2026-05-17
         // port-fidelity refactor the P1 wire byte comes from

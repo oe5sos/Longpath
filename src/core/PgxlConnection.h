@@ -1,14 +1,14 @@
 // =================================================================
-// src/core/PgxlConnection.h  (NereusSDR)
+// src/core/PgxlConnection.h  (Longpath)
 // =================================================================
 // Source attribution (AetherSDR, GPLv3):
 //   Copyright (C) 2024-2026  Jeremy (KK7GWY) / AetherSDR contributors
 //       per https://github.com/ten9876/AetherSDR (GPLv3)
 //   This file is a port or structural derivative of AetherSDR source.
 //   AetherSDR is licensed under the GNU General Public License v3.
-//   NereusSDR is also GPLv3. Attribution follows GPLv3 section 5 requirements.
+//   Longpath is also GPLv3. Attribution follows GPLv3 section 5 requirements.
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-18  Ported in C++20/Qt6 for NereusSDR by J.J. Boyd (KG4VCF),
 //                 with AI-assisted transformation via Anthropic Claude Code.
 //                 Layout from AetherSDR src/core/PgxlConnection.{h,cpp} [@0cd4559].
@@ -64,7 +64,7 @@ public slots:
     void disconnect();
     quint32 sendCommand(const QString& cmd);
 
-    // Tier 2 NereusSDR-native command surface.
+    // Tier 2 Longpath-native command surface.
     // From FlexRadio PowerGenius Ethernet API wiki spec (see design §6.4).
     quint32 amplifierCreate(const QString& ourSerial,
                             const QString& ourModel = "Longpath",

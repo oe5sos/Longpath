@@ -1,7 +1,7 @@
 #pragma once
 
 // =================================================================
-// src/gui/setup/PaSetupPages.h  (NereusSDR)
+// src/gui/setup/PaSetupPages.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
@@ -12,7 +12,7 @@
 // [v2.10.3.13]) which hosts a tab control with two sub-tabs:
 //   - tpGainByBand → PaGainByBandPage (placeholder for Phase 3M-3)
 //   - tpWattMeter  → PaWattMeterPage  (placeholder for Phase 3)
-// NereusSDR adds a third NereusSDR-spin page (PaValuesPage) for a richer
+// Longpath adds a third page of its own (PaValuesPage) for a richer
 // always-visible diagnostic readout — Thetis ships its panelPAValues block
 // (setup.designer.cs:51155-51177 [v2.10.3.13]) inside the Watt Meter tab.
 //
@@ -22,7 +22,7 @@
 // Phase 4 binds PaValuesPage to RadioStatus signals.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-02 — Original implementation.  PA top-level category for
 //                 Setup IA reshape Phase 2.  AI-assisted transformation
 //                 via Anthropic Claude Code.
@@ -53,7 +53,7 @@
 //                 [v2.10.3.13]): profile combo, 4 lifecycle buttons
 //                 (New / Copy / Delete / Reset Defaults), 14-band gain
 //                 spinbox grid (nud160M..nudVHF13), 14x9 drive-step
-//                 adjust matrix (NereusSDR-spin densification — Thetis
+//                 adjust matrix (Longpath-spin densification — Thetis
 //                 ships only the row for the selected band), per-band
 //                 max-power column (nudMaxPowerForBandPA +
 //                 chkUsePowerOnDrvTunPA), warning icon + label
@@ -238,7 +238,7 @@ public:
     /// Mirrors the implicit state ladder Thetis CalibratePAGain executes
     /// inline at console.cs:10228-10387 [v2.10.3.13].  Promoted to an
     /// explicit enum here so the per-step settle-tune-read-write loop is
-    /// driven by Qt timers + telemetry signals (matches NereusSDR's
+    /// driven by Qt timers + telemetry signals (matches Longpath's
     /// non-blocking GUI thread; Thetis blocks on Thread.Sleep).
     ///
     /// Transitions:
@@ -387,7 +387,7 @@ private slots:
     /// 15698 [v2.10.3.13]) for the panel-toggle side, plus
     /// btnPAGainCalibration_Click (setup.cs:9743-9809 [v2.10.3.13]) and
     /// CalibratePAGain (console.cs:10228-10387 [v2.10.3.13]) for the
-    /// state-machine side.  Thetis spawns a worker thread; NereusSDR
+    /// state-machine side.  Thetis spawns a worker thread; Longpath
     /// drives the same logic from the GUI thread via QTimer + signal
     /// dispatch so the audio callback / WDSP threads are never blocked.
     void onAutoCalibrateToggled(bool checked);
@@ -424,7 +424,7 @@ private:
     /// then write -diff_dBm into active profile's adjust matrix at
     /// (band, driveStep).
     /// From Thetis console.cs:10319-10336 [v2.10.3.13] (the
-    /// `if (Math.Abs(watts - target) > 2)` branch).  NereusSDR maps to
+    /// `if (Math.Abs(watts - target) > 2)` branch).  Longpath maps to
     /// PaProfile::setAdjust because the adjust matrix is the per-step
     /// finetune column; Thetis uses setBypassGain on the base row.
     void writeAutoCalGainAdjust(Band band, int driveStep, double observedWatts);
@@ -527,7 +527,7 @@ private:
     // ── Phase 7 of #167: auto-cal sweep state machine ────────────────────
     AutoCalState m_autoCalState{AutoCalState::Idle};
     /// QTimer driving the per-step settle delay (Thetis on_time = 2500 ms;
-    /// NereusSDR uses a shorter 200 ms default since the radio's TX FIFO
+    /// Longpath uses a shorter 200 ms default since the radio's TX FIFO
     /// is much faster than the Thetis WinForms loop).  Timer is
     /// instantiated lazily on the first sweep start.
     QTimer*       m_autoCalSettleTimer{nullptr};
@@ -569,7 +569,7 @@ private:
 //   * chkPAValues  — "Show PA Values page" checkbox.  In Thetis this gates
 //                    the embedded panelPAValues block's visibility
 //                    (setup.cs:16340-16343 chkPAValues_CheckedChanged
-//                    [v2.10.3.13]).  In NereusSDR the readout block is
+//                    [v2.10.3.13]).  In Longpath the readout block is
 //                    promoted to a dedicated PaValuesPage, so the toggle
 //                    persists a visibility hint to AppSettings under
 //                    "display/showPaValuesPage" (default "True").  The
@@ -580,7 +580,7 @@ private:
 //                    can subscribe and reset its peak/min tracking state.
 //                    Thetis btnResetPAValues_Click at setup.cs:16346-16357
 //                    [v2.10.3.13] blanks the readout text fields directly;
-//                    NereusSDR splits the controller (this page) from the
+//                    Longpath splits the controller (this page) from the
 //                    state owner (PaValuesPage) via a signal.
 // ---------------------------------------------------------------------------
 class PaWattMeterPage : public SetupPage {
@@ -615,10 +615,10 @@ private:
 };
 
 // ---------------------------------------------------------------------------
-// PA > PA Values  (NereusSDR-spin)
+// PA > PA Values  (Longpath-spin)
 // No direct Thetis page-level equivalent — Thetis ships panelPAValues
 // (setup.designer.cs:51155-51177 [v2.10.3.13]) embedded inside the Watt
-// Meter tab.  NereusSDR promotes this readout to a dedicated page so the
+// Meter tab.  Longpath promotes this readout to a dedicated page so the
 // live telemetry can be enriched (raw + calibrated FWD/REV, SWR, PA current,
 // PA voltage, PA temperature, ADC overload state, drive byte) without
 // crowding the cal-point editor.  Phase 4 binds this page to RadioStatus
@@ -661,7 +661,7 @@ public slots:
     /// reset action clears tracked peaks on both sibling pages.
     ///
     /// From Thetis btnResetPAValues_Click setup.cs:16346-16357 [v2.10.3.13]
-    /// — Thetis clears the textbox text strings; NereusSDR's spin tracks
+    /// — Thetis clears the textbox text strings; Longpath's spin tracks
     /// running peak/min and resets those to current.
     void resetPaValues();
 

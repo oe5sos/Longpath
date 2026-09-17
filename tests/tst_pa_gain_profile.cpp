@@ -10,7 +10,7 @@
 //   - HL2 row from mi0bot clsHardwareSpecific.cs:769-797 [v2.10.3.13-beta2].
 //   - bypassPaGainsForBand(band) is the all-100.0f sentinel profile used
 //     by the "Bypass" factory entry in PaProfileManager.
-//   - NereusSDR-specific Band slots (GEN, WWV, XVTR, SWL bands) fall through
+//   - Longpath-specific Band slots (GEN, WWV, XVTR, SWL bands) fall through
 //     to the 100.0f sentinel — Thetis has no equivalent for those bands in
 //     the gain table, and the HL2 sentinel short-circuit handles them
 //     downstream in TransmitModel::computeAudioVolume.
@@ -259,14 +259,14 @@ private slots:
         QCOMPARE(defaultPaGainsForBand(HPSDRModel::ANAN_G2E, Band::Band12m),  47.9f);
         QCOMPARE(defaultPaGainsForBand(HPSDRModel::ANAN_G2E, Band::Band10m),  46.5f);
         QCOMPARE(defaultPaGainsForBand(HPSDRModel::ANAN_G2E, Band::Band6m),   44.6f);
-        // NereusSDR has no VHF0-VHF13 slots — XVTR returns sentinel.
+        // Longpath has no VHF0-VHF13 slots — XVTR returns sentinel.
         QCOMPARE(defaultPaGainsForBand(HPSDRModel::ANAN_G2E, Band::XVTR), 100.0f);
     }
 
     // ── Bypass profile uses the Hermes 41.x dB row ────────────────────────
     //
-    // Issue #202 deep-fix: previously NereusSDR returned the all-100.0f
-    // sentinel for Bypass (paired with a NereusSDR-original `gbb >= 99.5`
+    // Issue #202 deep-fix: previously Longpath returned the all-100.0f
+    // sentinel for Bypass (paired with a Longpath-original `gbb >= 99.5`
     // linear-identity short-circuit in computeAudioVolume).  That combination
     // inverted the Thetis semantic ("100 = no output power",
     // clsHardwareSpecific.cs:463-466 [v2.10.3.13]) into "Bypass = full
@@ -300,7 +300,7 @@ private slots:
         QCOMPARE(bypassPaGainsForBand(Band::XVTR), 100.0f);
     }
 
-    // ── NereusSDR-specific Band slots (GEN/WWV/XVTR) ──────────────────────
+    // ── Longpath-specific Band slots (GEN/WWV/XVTR) ──────────────────────
     // No equivalent exists in the Thetis gain table; return the 100.0f
     // sentinel.  With the gbb>=99.5 short-circuit removed (#202), the
     // canonical Thetis dBm kernel runs and gbb=100 produces audio_volume

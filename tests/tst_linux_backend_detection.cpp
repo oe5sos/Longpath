@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_linux_backend_detection.cpp  (NereusSDR)
+// tests/tst_linux_backend_detection.cpp  (Longpath)
 // =================================================================
 // Author: J.J. Boyd (KG4VCF), AI-assisted via Anthropic Claude Code.
 // 2026-04-23

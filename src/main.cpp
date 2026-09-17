@@ -142,7 +142,7 @@ static void messageHandler(QtMsgType type, const QMessageLogContext& ctx, const 
 // re-parse properly inside main() once the app is built (for --help / error
 // diagnostics).
 //
-// Issue #100 — multiple NereusSDR instances against different radios.
+// Issue #100 — multiple Longpath instances against different radios.
 static QString extractProfileFromArgv(int argc, char* argv[])
 {
     for (int i = 1; i < argc; ++i) {
@@ -320,7 +320,7 @@ int main(int argc, char* argv[])
     logStartupHardwareInventory();
 
     // Fusion style as a clean cross-platform base, then layer the
-    // NereusSDR dark palette + minimal baseline QSS on top so every
+    // Longpath dark palette + minimal baseline QSS on top so every
     // widget (including ones without their own stylesheet) renders
     // with the dark theme. Without this, Linux/Ubuntu Yaru leaks
     // light-grey backgrounds and orange Highlight through into popups,

@@ -1,7 +1,7 @@
 #pragma once
 
 // =================================================================
-// src/gui/applets/TxApplet.h  (NereusSDR)
+// src/gui/applets/TxApplet.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -13,7 +13,7 @@
 // block below).
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-16 — Ported/adapted in C++20/Qt6 for NereusSDR by
 //                 J.J. Boyd (KG4VCF), with AI-assisted transformation
 //                 via Anthropic Claude Code.
@@ -141,7 +141,7 @@
 //
 //   Layout pattern from AetherSDR `src/gui/TxApplet.{h,cpp}`.
 //   AetherSDR is licensed under the GNU General Public License v3.
-//   NereusSDR is also GPLv3. Attribution follows GPLv3 §5 requirements.
+//   Longpath is also GPLv3. Attribution follows GPLv3 §5 requirements.
 // =================================================================
 
 #include "AppletWidget.h"

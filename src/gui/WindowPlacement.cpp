@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/WindowPlacement.cpp  (NereusSDR)
+// src/gui/WindowPlacement.cpp  (Longpath)
 // =================================================================
 // Siehe WindowPlacement.h für Herkunft und die zwei bekannten
 // Schwächen, die hier bewusst unverändert bleiben.

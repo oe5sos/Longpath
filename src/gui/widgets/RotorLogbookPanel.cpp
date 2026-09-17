@@ -1,11 +1,11 @@
 // =================================================================
-// src/gui/widgets/RotorLogbookPanel.cpp  (NereusSDR)
+// src/gui/widgets/RotorLogbookPanel.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original — see RotorLogbookPanel.h.
+// Longpath-original — see RotorLogbookPanel.h.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
 //   2026-08-10 — workSpot() entry point for "Turn rotor to <call>" from

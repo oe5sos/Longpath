@@ -22,7 +22,7 @@
 //   clearActionRemovesEntry      - Clear action removes the stored entry
 //   menuOpensTgxlAdvanced        - action 0 emits navigationRequested("tgxlAdvanced")
 //
-// NereusSDR-native test; Phase 3P-II Phase 4 Task 89.
+// Longpath-native test; Phase 3P-II Phase 4 Task 89.
 
 #include <QtTest>
 #include <QMenu>

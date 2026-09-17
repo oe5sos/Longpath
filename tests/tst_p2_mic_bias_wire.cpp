@@ -1,6 +1,6 @@
 // no-port-check: test-only — deskhpsdr file names appear only in source-cite
 // comments that document which upstream line each assertion verifies.
-// No deskhpsdr logic is ported here; this file is NereusSDR-original.
+// No deskhpsdr logic is ported here; this file is Longpath-original.
 //
 // Wire-byte snapshot tests for P2RadioConnection::setMicBias() (3M-1b Task G.4).
 //

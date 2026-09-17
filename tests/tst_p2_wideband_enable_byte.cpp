@@ -1,7 +1,7 @@
 // =================================================================
-// tests/tst_p2_wideband_enable_byte.cpp  (NereusSDR)
+// tests/tst_p2_wideband_enable_byte.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure.
+// no-port-check: Longpath-original test infrastructure.
 //
 // Phase 3F Sub-Epic F Task 1: P2 composeCmdGeneral writes packetbuf[23]
 // wideband per-ADC enable mask per Thetis network.c:879 [v2.10.3.15].

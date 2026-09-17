@@ -19,7 +19,7 @@
  */
 
 // =================================================================
-// src/core/codec/P2CodecHermes.h  (NereusSDR)
+// src/core/codec/P2CodecHermes.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources (multi-source) [v2.10.3.15 / 3759d09]:
@@ -31,7 +31,7 @@
 //     (GetDDC() P2 Hermes-class branch — rx1=0, rx2=1)
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-07-25 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                (KG4VCF), with AI-assisted transformation via Anthropic
 //                Claude Code. Phase 3F Sub-Epic I Task 7c. Extends
@@ -137,7 +137,7 @@ namespace Longpath {
 //   console.cs:8220-8303 [v2.10.3.15]  UpdateDDCs() 2-ADC:  DDCEnable = DDC2
 //   console.cs:8387-8459 [v2.10.3.15]  UpdateDDCs() Hermes: DDCEnable = DDC0
 //
-// NereusSDR mirrors that split with a separate codec rather than a conditional
+// Longpath mirrors that split with a separate codec rather than a conditional
 // inside the 2-ADC codec. Everything else about the P2 wire dialect is shared,
 // so only applyDdcAssignment() is overridden:
 //

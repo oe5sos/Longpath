@@ -1,4 +1,4 @@
-// tests/tst_pa_values_page_gap_fill.cpp  (NereusSDR)
+// tests/tst_pa_values_page_gap_fill.cpp  (Longpath)
 //
 // PA calibration safety hotfix — Phase 5 Agent 5B of issue #167.
 // no-port-check: test fixture — no Thetis attribution required.

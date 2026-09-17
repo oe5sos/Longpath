@@ -1,8 +1,8 @@
 // =================================================================
-// src/gui/setup/AudioAdvancedPage.cpp  (NereusSDR)
+// src/gui/setup/AudioAdvancedPage.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original Setup → Audio → Advanced page.
+// Longpath-original Setup → Audio → Advanced page.
 // See AudioAdvancedPage.h for the full header.
 //
 // Sub-Phase 12 Task 12.4 (2026-04-20): Written by J.J. Boyd (KG4VCF),

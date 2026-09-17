@@ -1,5 +1,5 @@
-// tests/tst_tci_matrix_runner.cpp  (NereusSDR)
-// NereusSDR-original — no Thetis upstream port.
+// tests/tst_tci_matrix_runner.cpp  (Longpath)
+// Longpath-original — no Thetis upstream port.
 //
 // TCI verification matrix runner.
 //

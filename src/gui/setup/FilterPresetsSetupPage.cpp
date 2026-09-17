@@ -1,11 +1,11 @@
 // =================================================================
-// src/gui/setup/FilterPresetsSetupPage.cpp  (NereusSDR)
+// src/gui/setup/FilterPresetsSetupPage.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original file. See FilterPresetsSetupPage.h for header.
+// Longpath-original file. See FilterPresetsSetupPage.h for header.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-02 — Original implementation for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted authoring via Anthropic
 //                 Claude Code (Stage C2 filter preset editor).

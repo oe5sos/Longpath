@@ -2,7 +2,7 @@
 // for ENB sanity ranges and combo item ordering, no logic ported.
 //
 // =================================================================
-// tests/tst_window_functions.cpp  (NereusSDR)
+// tests/tst_window_functions.cpp  (Longpath)
 // =================================================================
 //
 // Phase 2 -- exercise every WindowFunction enum value through
@@ -27,7 +27,7 @@
 //   BH-7T       ~ 2.31
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-06 -- Created in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                  (KG4VCF), with AI-assisted transformation via
 //                  Anthropic Claude Code.
@@ -130,7 +130,7 @@ private slots:
     }
 
     // Kaiser at PiAlpha=14.0 (Thetis default per specHPSDR.cs:145
-    // [v2.10.3.13]) has ENB ~ 2.16 with NereusSDR's Numerical-Recipes
+    // [v2.10.3.13]) has ENB ~ 2.16 with Longpath's Numerical-Recipes
     // bessi0 polynomial.  Range mirrors Harris 1978 + Heinzel 2002
     // tabulations for alpha ~ 4.5 (PiAlpha / pi).
     void kaiser_default_pi_alpha_finite_enb()

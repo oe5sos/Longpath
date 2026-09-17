@@ -1,7 +1,7 @@
-// no-port-check: NereusSDR/Longpath-original test file.
+// no-port-check: Longpath/Longpath-original test file.
 
 // =================================================================
-// tests/tst_playback_radio_connection.cpp  (NereusSDR/Longpath)
+// tests/tst_playback_radio_connection.cpp  (Longpath)
 // =================================================================
 //
 // Phase 3M-C (docs/architecture/phase3m-recording-plan.md).
@@ -20,7 +20,7 @@
 //   C.4 end-of-file behaviour — Stop (default) vs. Loop.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-26 — Original for NereusSDR/Longpath by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

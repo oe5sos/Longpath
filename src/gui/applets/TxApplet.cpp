@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/applets/TxApplet.cpp  (NereusSDR)
+// src/gui/applets/TxApplet.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -11,7 +11,7 @@
 // block below).
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-16 — Ported/adapted in C++20/Qt6 for NereusSDR by
 //                 J.J. Boyd (KG4VCF), with AI-assisted transformation
 //                 via Anthropic Claude Code.
@@ -120,7 +120,7 @@
 //
 //   Layout pattern from AetherSDR `src/gui/TxApplet.{h,cpp}`.
 //   AetherSDR is licensed under the GNU General Public License v3.
-//   NereusSDR is also GPLv3. Attribution follows GPLv3 §5 requirements.
+//   Longpath is also GPLv3. Attribution follows GPLv3 §5 requirements.
 // =================================================================
 
 // TxApplet — TX control panel.
@@ -704,7 +704,7 @@ void TxApplet::showFinePopup()
 // wireControls: called once after buildUI(). Attaches signal/slot connections
 // between the four wired controls and the model layer.
 //
-// Pattern follows the NereusSDR "GUI↔Model sync, no feedback loops" rule:
+// Pattern follows the Longpath "GUI↔Model sync, no feedback loops" rule:
 //   - Use QSignalBlocker (or m_updatingFromModel) to prevent echo loops.
 //   - Model setters emit signals → RadioConnection sends protocol commands.
 //   - UI state changes → model setters → emit back to update other UI.
@@ -916,8 +916,8 @@ void TxApplet::wireControls()
         // value persists per-band but the math kernel
         // (TransmitModel::setPowerUsingTargetDbm txMode 1) only consults
         // tunePowerForBand when m_tuneDrivePowerSource == TuneSlider.
-        // NereusSDR-spin: Thetis exposes _tuneDrivePowerSource via a
-        // separate Setup combo; NereusSDR follows last-touched-slider-wins
+        // Longpath-spin: Thetis exposes _tuneDrivePowerSource via a
+        // separate Setup combo; Longpath follows last-touched-slider-wins
         // UX so users don't need to know the enum exists.
         tx.setTuneDrivePowerSource(DrivePowerSource::TuneSlider);
     });

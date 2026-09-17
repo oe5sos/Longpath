@@ -1,12 +1,12 @@
 // =================================================================
-// src/gui/applets/PhoneCwApplet.cpp  (NereusSDR)
+// src/gui/applets/PhoneCwApplet.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/setup.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -1214,12 +1214,12 @@ void PhoneCwApplet::pollDexpMeters()
     //
     // Gate on (MOX OR voxEnabled).  Thetis gates `UpdateNoiseGate` strictly
     // on `_mox` (console.cs:25351 [v2.10.3.13]), so the noise-gate strip is
-    // dead in RX.  NereusSDR extends the gate to also include voxEnabled
+    // dead in RX.  Longpath extends the gate to also include voxEnabled
     // because Task 18's continuous-pump mode keeps real mic data flowing
     // through the WDSP TX pipeline whenever VOX is engaged - so showing
     // the live envelope is honest about what the DSP is actually doing.
     // In pure RX (no MOX, no VOX), match Thetis: hold the meter at zero.
-    // Threshold marker is unconditional (NereusSDR-spin) so users can
+    // Threshold marker is unconditional (Longpath-spin) so users can
     // pre-position it before keying.  Bench feedback 2026-05-04.
     const bool moxOn       = m_model->moxController()
                                  ? m_model->moxController()->isMox()

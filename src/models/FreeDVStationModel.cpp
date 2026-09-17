@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 //
-// NereusSDR - FreeDVStationModel: live station map keyed by Socket.IO sid.
+// Longpath - FreeDVStationModel: live station map keyed by Socket.IO sid.
 // Implementation.
 //
 // Ported from freedv-gui src/gui/dialogs/freedv_reporter.cpp:2312-2410
@@ -15,13 +15,13 @@
 // `freedv_reporter.cpp` files have no per-file Copyright header, so the
 // project root header applies. LGPL is upgrade-compatible to GPLv2-or-later
 // when linked into a GPL work (LGPL section 3 conversion clause), which is
-// the model NereusSDR uses.
+// the model Longpath uses.
 //
 // Copyright (C) 2026 NereusSDR contributors.
 // Distance / heading math: derived from freedv-gui source (LGPLv2.1+,
 // copyright the freedv-gui contributors / FreeDV project).
 //
-// Modification history (NereusSDR)
+// Modification history (Longpath)
 //   2026-05-11  J.J. Boyd / KG4VCF  Phase 3J-2 Task D3. Initial create.
 //                                    Translation of freedv-gui's wxString-
 //                                    based grid-square parser into a
@@ -197,7 +197,7 @@ double calculateBearingInDegrees(const QString& gridSquare1, const QString& grid
     return RadiansToDegrees(radians);
 }
 
-// NereusSDR addition (2026-08-07): the inverse of
+// Longpath addition (2026-08-07): the inverse of
 // calculateLatLonFromGridSquare, so callers holding raw coordinates can
 // reuse the grid-based distance/bearing helpers instead of growing a
 // second haversine.
@@ -236,7 +236,7 @@ QString gridSquareFromLatLon(double lat, double lon)
     return out;
 }
 
-// NereusSDR addition (2026-08-07): the callers of the helpers above
+// Longpath addition (2026-08-07): the callers of the helpers above
 // need a cheap "is this even a locator" check before spending the
 // maths, and the answer belongs next to the parser that defines it.
 bool isValidGridSquare(const QString& gridSquare)

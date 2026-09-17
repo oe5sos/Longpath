@@ -1,5 +1,5 @@
-// tests/tst_tci_server_lifecycle.cpp  (NereusSDR)
-// NereusSDR-original — no Thetis upstream port in this file.
+// tests/tst_tci_server_lifecycle.cpp  (Longpath)
+// Longpath-original — no Thetis upstream port in this file.
 //
 // Phase 3J-1 Task 2.1: TciServer + TciClientSession skeleton.
 // Covers the connect/disconnect lifecycle contract:

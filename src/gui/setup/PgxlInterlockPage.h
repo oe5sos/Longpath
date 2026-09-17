@@ -1,8 +1,8 @@
 // =================================================================
-// src/gui/setup/PgxlInterlockPage.h  (NereusSDR)
+// src/gui/setup/PgxlInterlockPage.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-native Setup -> Transmit -> PGXL Interlock page.
+// Longpath-native Setup -> Transmit -> PGXL Interlock page.
 //
 // Three controls that configure TxInterlockPolicy:
 //   1. Mode combo (Disabled / Warn / Block)

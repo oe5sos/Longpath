@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/applets/GridCellWidget.cpp  (NereusSDR)
+// src/gui/applets/GridCellWidget.cpp  (Longpath)
 // =================================================================
 // Siehe GridCellWidget.h — Kopfleiste plus N Inhalte.
 //

@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_audio_engine_master_mute.cpp  (NereusSDR)
+// tests/tst_audio_engine_master_mute.cpp  (Longpath)
 // =================================================================
 //
 // Exercises AudioEngine's master-mute API — Phase 3O Sub-Phase 10

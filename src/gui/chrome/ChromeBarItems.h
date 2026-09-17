@@ -1,4 +1,4 @@
-// no-port-check: NereusSDR-original. No upstream port. The banner's fold
+// no-port-check: Longpath-original. No upstream port. The banner's fold
 // ladder composition, extracted from buildStatusBar so it can be tested
 // without constructing MainWindow.
 

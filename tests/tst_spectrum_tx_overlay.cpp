@@ -1,6 +1,6 @@
-// no-port-check: NereusSDR-original unit-test file.
+// no-port-check: Longpath-original unit-test file.
 // =================================================================
-// tests/tst_spectrum_tx_overlay.cpp  (NereusSDR)
+// tests/tst_spectrum_tx_overlay.cpp  (Longpath)
 // =================================================================
 //
 // TDD for Plan 4 Task 7+8 (D9) — TX filter overlay palette + paint.
@@ -35,7 +35,7 @@
 // tests call the helper directly via a thin public test-seam accessor.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-02 — Original implementation for NereusSDR by J.J. Boyd
 //                (KG4VCF), with AI-assisted authoring via Anthropic
 //                Claude Code (Plan 4 D9).

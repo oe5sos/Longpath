@@ -1,7 +1,7 @@
 // Verify LogEntry ADIF serialisation and the QRZ logbook response
 // parsing — in particular that a duplicate counts as success and that
 // UTC conversion happens on the way out.
-// no-port-check: NereusSDR-original — Thetis has no logbook.
+// no-port-check: Longpath-original — Thetis has no logbook.
 
 #include <QtTest/QtTest>
 #include <QTimeZone>

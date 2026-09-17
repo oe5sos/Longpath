@@ -1,7 +1,7 @@
 // =================================================================
-// tests/tst_rx_dsp_worker_multi_slice.cpp  (NereusSDR)
+// tests/tst_rx_dsp_worker_multi_slice.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure.
+// no-port-check: Longpath-original test infrastructure.
 //
 // Phase 3F Sub-Epic I Task 4: per-stream accumulation, per-slice fan-out.
 // =================================================================

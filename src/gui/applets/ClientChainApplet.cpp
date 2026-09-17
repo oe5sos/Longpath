@@ -1,11 +1,11 @@
 // =================================================================
-// src/gui/applets/ClientChainApplet.cpp  (NereusSDR)
+// src/gui/applets/ClientChainApplet.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original — per-client TCI connection detail applet.
+// Longpath-original — per-client TCI connection detail applet.
 //
 // This file contains no ported Thetis logic; it is a new UI surface
-// built to NereusSDR design conventions (Template C, plain English
+// built to Longpath design conventions (Template C, plain English
 // Qt strings, AppSettings persistence, StyleConstants palette).
 //
 // Pattern-matches TciApplet (Phase 21, commit 0b615a7) for style
@@ -13,7 +13,7 @@
 // same StyleConstants color palette, same showEvent/hideEvent guard.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-10 — Phase 3J-1 Task 22.1 by J.J. Boyd (KG4VCF);
 //                AI-assisted transformation via Anthropic Claude Code.
 //                Per-client rows with TX badge, peer + User-Agent,
@@ -389,7 +389,7 @@ void ClientChainApplet::rebuildRows()
     // second teardown reads a half-destroyed QTextDocument's HarfBuzz
     // buffer and SIGSEGVs in hb_buffer_destroy.  Crash report:
     //   /Users/j.j.boyd/Library/Logs/DiagnosticReports/
-    //     NereusSDR-2026-05-23-130427.ips
+    //     Longpath-2026-05-23-130427.ips
     if (m_rebuildInProgress) {
         return;
     }

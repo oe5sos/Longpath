@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// no-port-check: NereusSDR-original test file. The spot ingest clients
+// no-port-check: Longpath-original test file. The spot ingest clients
 // are AetherSDR ports, but the restore-on-launch driver pinned here
-// is a NereusSDR addition (Phase 3J-2 + 3R M3).
+// is a Longpath addition (Phase 3J-2 + 3R M3).
 //
-// NereusSDR - Phase 3J-2 + 3R M3: spot-client auto-connect / auto-start
+// Longpath - Phase 3J-2 + 3R M3: spot-client auto-connect / auto-start
 // state restore on launch.
 //
 // SpotHubDialog F2 persists each per-source AutoConnect / AutoStart flag
@@ -35,7 +35,7 @@
 //     auto-start is set; pin that restoreSpotClientAutoStartState is a
 //     no-op for PSK Reporter regardless of the AutoStart flag.
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-11  J.J. Boyd / KG4VCF  Phase 3J-2 + 3R M3 initial commit.
 //                                    AI tooling: Anthropic Claude Code.
 

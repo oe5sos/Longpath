@@ -1,9 +1,9 @@
 // =================================================================
-// src/core/audio/MasterMixer.h  (NereusSDR)
+// src/core/audio/MasterMixer.h  (Longpath)
 // =================================================================
 //
 // Phase 3O per-slice mute / volume / pan mixer. Per-slice gain, pan,
-// mute and the anti-click ramp are NereusSDR-original; the ring +
+// mute and the anti-click ramp are Longpath-original; the ring +
 // barrier structure is derived from Thetis, see below.
 //
 // Phase 3F: reworked from a single shared accumulator into per-slice
@@ -28,12 +28,12 @@
 // because they are design decisions rather than translation slips:
 //
 //  1. No dedicated mixer thread. Thetis needs one because its producers
-//     run on different threads. Every NereusSDR producer is already
+//     run on different threads. Every Longpath producer is already
 //     serialised on the single RxDspWorker DSP thread, so the drain runs
 //     inline and skips a thread handoff.
 //
 //  2. No per-stream resamplers. Thetis resamples inside the mixer
-//     because its streams can arrive at different rates. NereusSDR sizes
+//     because its streams can arrive at different rates. Longpath sizes
 //     each stream's DSP block with bufferSizeForRate(), which scales the
 //     input size linearly with the sample rate, so every stream emits one
 //     64-frame 48 kHz block per period whatever its DDC rate. Cadences
@@ -90,7 +90,7 @@
 //     (per-producer ring + readiness barrier + one summed output)
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-07-27 -- Per-slice mute / volume / pan mixer reworked from a
 //                 single shared accumulator into per-slice rings behind
 //                 a readiness barrier, so N slices produce ONE mixed
@@ -98,7 +98,7 @@
 //                 + barrier + single-summed-output STRUCTURE is Warren
 //                 Pratt's from aamix.c; the per-slice gain / pan / mute
 //                 semantics and the anti-click gain ramp are
-//                 NereusSDR-original. Three divergences from the
+//                 Longpath-original. Three divergences from the
 //                 upstream structure are argued in MasterMixer.h.
 //                 Authored by J.J. Boyd (KG4VCF), with AI-assisted
 //                 transformation via Anthropic Claude Code.

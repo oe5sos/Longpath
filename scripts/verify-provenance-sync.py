@@ -28,7 +28,7 @@ DERIVATION_MARKERS = ["Ported from Thetis", "From Thetis"]
 
 # Per-file escape hatch — mirrors scripts/check-new-ports.py. Files that
 # genuinely cite Thetis without being ports (e.g. test fixtures asserting
-# parity with a Thetis value, NereusSDR-original POD aggregators with a
+# parity with a Thetis value, Longpath-original POD aggregators with a
 # single default-value reference) can declare themselves exempt with
 # `// no-port-check: <reason>` in the first 120 lines.
 NO_PORT_CHECK_MARKER = "no-port-check:"
@@ -146,7 +146,7 @@ def parse_provenance_paths():
         second_is_path = second_cell.startswith("src/") or second_cell.startswith("tests/")
 
         if first_is_path:
-            # Derivative-table row: NereusSDR file in column 0 — regardless
+            # Derivative-table row: Longpath file in column 0 — regardless
             # of which section it is (mis)placed under.
             candidate = first_cell.replace("`", "").strip()
             if not candidate:
@@ -176,7 +176,7 @@ def parse_provenance_paths():
             declared.add(candidate)
             path_linenos.setdefault(candidate, lineno)
         elif in_independent_section and second_is_path:
-            # "Independently implemented" row: NereusSDR file in column 1.
+            # "Independently implemented" row: Longpath file in column 1.
             candidate = second_cell.replace("`", "").strip()
             if candidate:
                 independent.add(candidate)

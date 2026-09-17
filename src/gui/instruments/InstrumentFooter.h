@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/gui/instruments/InstrumentFooter.h  (NereusSDR)
+// src/gui/instruments/InstrumentFooter.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // ── Eine Fusszeile für beide Instrumente ─────────────────────────────
 //
@@ -22,7 +22,7 @@
 //   rechts  der Wert, gross und in Messwertfarbe
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-17 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

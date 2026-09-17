@@ -1,7 +1,7 @@
 // src/gui/StyleConstants.h
 
 // =================================================================
-// src/gui/StyleConstants.h  (NereusSDR)
+// src/gui/StyleConstants.h  (Longpath)
 // =================================================================
 //
 // Source attribution (AetherSDR — GPLv3):
@@ -12,10 +12,10 @@
 //
 //   This file is a port or structural derivative of AetherSDR source.
 //   AetherSDR is licensed under the GNU General Public License v3.
-//   NereusSDR is also GPLv3. Attribution follows GPLv3 §5 requirements.
+//   Longpath is also GPLv3. Attribution follows GPLv3 §5 requirements.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-16 — Ported/adapted in C++20/Qt6 for NereusSDR by
 //                 J.J. Boyd (KG4VCF), with AI-assisted transformation
 //                 via Anthropic Claude Code.
@@ -134,7 +134,7 @@ constexpr double kCapsTracking = 0.18;
 
 constexpr auto kTextScale       = "#7e7e85";
 constexpr auto kTextInactive    = "#58585e";
-// NereusSDR-original — used in 5+ places for AGC-T / pan / similar labels;
+// Longpath-original — used in 5+ places for AGC-T / pan / similar labels;
 // sits between kTextSecondary (#8090a0) and kTextScale (#607080).
 constexpr auto kLabelMid        = "#828288";
 constexpr auto kAccent          = "#4a7ba8";
@@ -392,9 +392,9 @@ constexpr auto kSpectrumGridText  = "#9aa0a8";  // Frequenz- und dBm-Skala
 // low-pass slopes, which are shapes rather than bumps and should not
 // compete for attention with the shaping bands in the middle.
 //
-// Four of the eight are NereusSDR's existing accents. Three are new
+// Four of the eight are Longpath's existing accents. Three are new
 // (2026-08-11): the palette needs six distinguishable hues between the
-// greys and NereusSDR only had four, so a coral, a blue and a violet
+// greys and Longpath only had four, so a coral, a blue and a violet
 // were added, spaced to stay apart on #0a0a18 and chosen to sit with
 // the accents rather than beside them.
 constexpr auto kEqBand0 = "#8090a0";   // grey — kTextSecondary, HP slot
@@ -650,7 +650,7 @@ inline QString blueCheckedStyle()
 // Eingerastet, aber leise: dunkler Grund, Akzentrand, heller Text.
 //
 // War bis zum 2026-09-02 ein Einzelstueck am MON-Knopf der TxApplet
-// ("NereusSDR-original one-off — do NOT snap to kBlueBg"). Seit dem
+// ("Longpath-original one-off — do NOT snap to kBlueBg"). Seit dem
 // Umbau des TX-Feldes ist es die Bauform fuer ALLE Zustandsschalter
 // dort: VOX, MON, LEV, EQ, CFC, PS-A. Der Grund steht im Hausstil —
 // Farbe bedeckt hoechstens zwei Prozent, also darf im Feld genau eine
@@ -704,7 +704,7 @@ inline QString redCheckedStyle()
 
 // DSP toggle — brighter green than the kGreenBg action buttons.
 // Used by VfoWidget DSP tab and SpectrumOverlayPanel DSP toggles.
-// Source: NereusSDR-original. Distinct semantic from action-button
+// Source: Longpath-original. Distinct semantic from action-button
 // "checked" state because DSP toggles communicate "feature on" not
 // "action engaged."
 constexpr auto kDspToggleBg     = "#1b3527";
@@ -1069,7 +1069,7 @@ inline void applyDarkPageStyle(QWidget* w)
 // ── TX / RX filter overlay palette ────────────────────────────────────────────
 // Plan 4 D9 (Cluster E).  Used by SpectrumWidget::drawTxFilterOverlay() and
 // SpectrumWidget::drawTxFilterWaterfallColumn().
-// Colours are NereusSDR-original; no Thetis upstream equivalent (Thetis uses
+// Colours are Longpath-original; no Thetis upstream equivalent (Thetis uses
 // hard-coded GDI+ brushes without named constants).
 
 // TX filter overlay — translucent orange.

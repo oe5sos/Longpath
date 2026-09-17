@@ -1,6 +1,6 @@
 // no-port-check: test-only — Thetis file names (networkproto1.c) appear only
 // in source-cite comments that document which upstream line each assertion
-// verifies. No Thetis logic is ported here; this file is NereusSDR-original.
+// verifies. No Thetis logic is ported here; this file is Longpath-original.
 #include <QtTest/QtTest>
 #include "core/P1RadioConnection.h"
 #include "core/HpsdrModel.h"
@@ -306,7 +306,7 @@ private slots:
         // [v2.10.3.13-beta2] but that is an off-by-one upstream bug
         // (wire encoding `31 - userDb` produces wire = -1 at userDb=32
         // which 6-bit-masks to 0x3F, the LNA-gain wraparound region).
-        // NereusSDR caps at +31 per maintainer approval (issue #175).
+        // Longpath caps at +31 per maintainer approval (issue #175).
         P1RadioConnection conn;
         conn.init();
         conn.setBoardForTest(HPSDRHW::HermesLite);

@@ -1,14 +1,14 @@
 #pragma once
 
 // =================================================================
-// src/models/RadioModel.h  (NereusSDR)
+// src/models/RadioModel.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/console.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -299,7 +299,7 @@ public:
     AlexController&       alexControllerMutable()       { return m_alexController; }
 
     // ── Phase 3F: per-panadapter RX preselector bypass state (WIDE badge) ────
-    // NereusSDR-original; no upstream port. Design doc
+    // Longpath-original; no upstream port. Design doc
     // 2026-05-26-phase3f-multi-pan-multi-slice-design.md §16.4.
     //
     // WIDE means one thing: the RX preselector chain feeding this pan is
@@ -961,7 +961,7 @@ public:
     // must fail safely rather than substituting listening/UI state.
     SliceModel* txBoundSlice() const;
 
-    // Phase 3F Sub-Epic D Task 13: NereusSDR-original FFT fan-out router.
+    // Phase 3F Sub-Epic D Task 13: Longpath-original FFT fan-out router.
     // Wires receiverId -> N pans so a single DDC FFT pipeline can feed
     // multiple zoom levels of the same I/Q data. MainWindow registers
     // pan-to-receiver mappings on sliceAdded; the per-receiver FFTEngine
@@ -1242,7 +1242,7 @@ public:
     // per-source feed needs a per-source gate.  Codex review, PR #291.
     bool isRfKitInOperate() const;
 
-    // Phase 3P-II Task 86: TxInterlockPolicy -- NereusSDR-native TX gate.
+    // Phase 3P-II Task 86: TxInterlockPolicy -- Longpath-native TX gate.
     // Constructed once in the ctor (Qt parent-ownership). Non-null from
     // construction time. Shared with PgxlInterlockPage (non-owning read/write)
     // and MoxController (non-owning gate via setInterlockPolicy).
@@ -1301,7 +1301,7 @@ public:
     // (when step-att enabled) and preamp_offset[mode] (when disabled).
     //
     // RXCalibrationOffset (console.cs:21022) sums per-radio meter cal +
-    // XVTR + 6m offsets.  NereusSDR currently applies only the per-radio
+    // XVTR + 6m offsets.  Longpath currently applies only the per-radio
     // meter cal (defaults from rxMeterCalOffsetDefaultFor() and the user
     // override AppSettings key RX1_MeterCalOffsetDb); XVTR/6m offsets
     // ride a future XVTR/transverter epic.
@@ -1865,7 +1865,7 @@ public slots:
     //
     // Meter mode save/restore: Thetis saves current_meter_tx_mode and
     // restores it on TUN-off (console.cs:30011-30015 [v2.10.3.13]).
-    // NereusSDR's MeterModel does not yet expose a TX-mode selector (that
+    // Longpath's MeterModel does not yet expose a TX-mode selector (that
     // is H.3 territory); this method saves and restores m_transmitModel.power()
     // as the "slider power" position instead.  The full meter-mode lock
     // (switch to FORWARD_POWER display) is deferred to H.3 or 3M-1b when
@@ -1881,7 +1881,7 @@ public slots:
     // Cite: Thetis console.cs:29978-30157 [v2.10.3.13] — chkTUN_CheckedChanged.
     void setTune(bool on);
 
-    // TGXL autotune orchestration (NereusSDR-native, no Thetis source).
+    // TGXL autotune orchestration (Longpath-native, no Thetis source).
     //
     // Bench-driven on 2026-05-20: TGXL refuses to run its relay sweep when
     // PGXL is in OPERATE -- the amp is amplifying the radio's tune carrier
@@ -1948,7 +1948,7 @@ public slots:
     Q_INVOKABLE bool mox() const;
 
     /// Set VFO frequency for receiver `rx`, channel `chan` (0=A, 1=B).
-    /// NereusSDR has one frequency per slice; `chan==1` (VFO B) is silently
+    /// Longpath has one frequency per slice; `chan==1` (VFO B) is silently
     /// ignored because the second VFO concept maps to a separate slice, not
     /// to a per-slice secondary frequency.
     /// From Thetis TCIServer.cs:3719-3793 [v2.10.3.13] — handleVfo, set path.
@@ -1993,7 +1993,7 @@ public slots:
     // model side).  Stubs are explicitly labeled "stub until <feature> lands".
 
     // VFO lock — routes to SliceModel::locked.  TCI carries two-chan-per-rx
-    // semantics from Thetis (VFOALock + VFOBLock); NereusSDR collapses them
+    // semantics from Thetis (VFOALock + VFOBLock); Longpath collapses them
     // because per-slice VFO B isn't modeled.  Both chan==0 and chan==1
     // read/write the same slice-level locked flag.
     Q_INVOKABLE void setVfoLock(int rx, int chan, bool locked);
@@ -2036,7 +2036,7 @@ public slots:
 
     // RIT / XIT — routes to SliceModel::ritEnabled/ritHz/xitEnabled/xitHz on
     // the active slice.  Thetis treats these as radio-global (single VFO
-    // pair); NereusSDR collapses to active-slice for symmetry with mode/mox.
+    // pair); Longpath collapses to active-slice for symmetry with mode/mox.
     Q_INVOKABLE void setRitEnable(bool on);
     Q_INVOKABLE bool ritEnable() const;
     Q_INVOKABLE void setRitOffset(int hz);
@@ -2116,7 +2116,7 @@ public slots:
 
     // ── Volume (linear int) ──────────────────────────────────────────────
     // setAfLinear: TCI sends 0..32767; we store and let the audio path read.
-    // monLinear: TX monitor volume; same range.  These are NereusSDR-global
+    // monLinear: TX monitor volume; same range.  These are Longpath-global
     // (not per-slice) -- matches Thetis console.cs handleAFVolume.
     Q_INVOKABLE void setAfLinear(int v);
     Q_INVOKABLE int  afLinear() const;
@@ -2167,21 +2167,21 @@ public slots:
     // RadioModel state instead of emitting the Phase 4 Task 4.2 hardcoded
     // placeholders.  Each shim is a thin Q_INVOKABLE wrapper over existing
     // state or trivial derivation -- no new member variables, no behavior
-    // changes.  Architectural divergences (where NereusSDR's storage model
+    // changes.  Architectural divergences (where Longpath's storage model
     // differs from Thetis Console) are documented in each shim header AND
     // mirrored in the TciProtocol.cpp call site so reviewers see the same
     // story from both sides.
 
     /// "RX2 enabled" -- derived from connectionActiveRxCount >= 2.
     /// Thetis console.cs:37278 [v2.10.3.15] backs RX2Enabled with the
-    /// rx2_enabled member (chkRX2.Checked).  NereusSDR uses the active-
+    /// rx2_enabled member (chkRX2.Checked).  Longpath uses the active-
     /// receiver count (set by RadioModel::setActiveRxCountLive) as the
     /// authoritative source.
     Q_INVOKABLE bool rx2Enabled() const;
 
     /// TX monitor enable -- forwards to TransmitModel::monEnabled().
     /// Thetis console.cs:18656-18663 [v2.10.3.15] -- MON = chkMON.Checked.
-    /// NereusSDR's m_transmitModel.m_monEnabled defaults false and is never
+    /// Longpath's m_transmitModel.m_monEnabled defaults false and is never
     /// persisted (safety: MON loads OFF always, matching Thetis audio.cs:406).
     Q_INVOKABLE bool monEnabled() const;
 
@@ -2198,7 +2198,7 @@ public slots:
     /// Architectural divergence from Thetis console.cs:19799-19803
     /// [v2.10.3.15] PowerOn = chkPower.Checked.  In Thetis PowerOn and
     /// connection state are SEPARATE concepts: a user can "power off" the
-    /// radio while remaining connected.  NereusSDR has no such mode -- the
+    /// radio while remaining connected.  Longpath has no such mode -- the
     /// connection IS the power switch.  TCI clients see powerOn = true
     /// while connected, false while disconnected (no "soft off" state).
     Q_INVOKABLE bool powerOn() const;
@@ -2207,7 +2207,7 @@ public slots:
     ///
     /// Architectural divergence from Thetis console.cs:14693-14749
     /// [v2.10.3.15] DIGLClickTuneOffset (radio-global private member,
-    /// default 2210 Hz).  NereusSDR stores per-slice on SliceModel
+    /// default 2210 Hz).  Longpath stores per-slice on SliceModel
     /// (m_diglOffsetHz, default 0 Hz per SliceModel.h:928).  For TCI we
     /// expose the active slice's value as the radio's "current" DIGL
     /// offset; falls back to 0 when no slice is active (pre-connect probe).
@@ -2215,9 +2215,9 @@ public slots:
 
     /// DIGU click-tune offset -- active slice's diguOffsetHz.
     ///
-    /// Same Thetis-vs-NereusSDR divergence as diglOffset.  Thetis
+    /// Same Thetis-vs-Longpath divergence as diglOffset.  Thetis
     /// console.cs:14658-14691 [v2.10.3.15] -- DIGUClickTuneOffset
-    /// (radio-global, default 1500 Hz).  NereusSDR per-slice
+    /// (radio-global, default 1500 Hz).  Longpath per-slice
     /// (m_diguOffsetHz, default 0 Hz per SliceModel.h:929).
     Q_INVOKABLE int diguOffset() const;
 
@@ -2461,7 +2461,7 @@ signals:
     // Emitted when setTune(true) is called but the power-on guard fires
     // (radio not connected / audio engine not active).
     // Cite: Thetis console.cs:29983-29991 [v2.10.3.13] — MessageBox "Power must be on".
-    // NereusSDR equivalent: emit signal; UI reacts with a toast or status bar message.
+    // Longpath equivalent: emit signal; UI reacts with a toast or status bar message.
     // Subscribers should uncheck the TUN button and display `reason` to the user.
     void tuneRefused(const QString& reason);
 
@@ -2479,7 +2479,7 @@ signals:
     // selects QueuedConnection for TxChannel::requestFilterChange, which runs
     // the slot on TxWorkerThread where the debounce timer is live.
     //
-    // NereusSDR-original glue (no Thetis equivalent needed).
+    // Longpath-original glue (no Thetis equivalent needed).
     void txFilterRequest(int audioLowHz, int audioHighHz, Longpath::DSPMode mode);
 
     // ── Phase 3R Task I5: RadeChannel slot-graph re-emit signals ─────────────
@@ -2589,7 +2589,7 @@ private slots:
     // <Source>SpotLifetimeSec / <Source>SpotColor key family.
     //
     // The WSJT-X adapter is special: it also pushes to RxDecodeModel so the
-    // "what my radio just heard" feed tracks live decodes (NereusSDR design;
+    // "what my radio just heard" feed tracks live decodes (Longpath design;
     // freedv-gui has no equivalent feed). WsjtxClient does not have a
     // separate decodeReceived signal; the single spotReceived signal is the
     // source for both sinks.
@@ -2612,7 +2612,7 @@ private slots:
     // Phase 3P-II Task 62: runs the amplifierCreate + flexradioPair +
     // enableKeepalive sequence once PgxlConnection reports connected.
     // Reads PGXL_PairAttempt / PGXL_FlexAmpSlice / PGXL_TxAnt / PGXL_AntMap
-    // from AppSettings. Serial is "NereusSDR-<macAddress>".
+    // from AppSettings. Serial is "Longpath-<macAddress>".
     void onPgxlConnected();
 
     // Phase 3P-II Phase 4 Task 96: auto-recall TGXL tune memory when the
@@ -2804,7 +2804,7 @@ private:
     // Cite: Thetis console.cs:30106-30148 [v2.10.3.13] — chkTUN_CheckedChanged
     // TUN-off branch.  Thetis runs the equivalent block AFTER
     // chkMOX.Checked = false (which is synchronous and blocks ~30 ms inside
-    // chkMOX_CheckedChanged2) and AFTER `await Task.Delay(100)`.  In NereusSDR
+    // chkMOX_CheckedChanged2) and AFTER `await Task.Delay(100)`.  In Longpath
     // this method is invoked from a QTimer::singleShot(m_tuneOffSettleMs)
     // chained off MoxController::rxReady, so the same total ~130 ms gap
     // separates the user's click from gen1 going off.
@@ -2867,7 +2867,7 @@ public:
     // Source-of-truth: Thetis SetTXFilters at console.cs:8091 +
     // CurrentDSPMode setter at radio.cs:2670-2696 [v2.10.3.13], wired
     // into the mode-change handler at console.cs:33937 [v2.10.3.13].
-    // The MOX-engage trigger is NereusSDR's belt-and-suspenders re-seed
+    // The MOX-engage trigger is Longpath's belt-and-suspenders re-seed
     // (Thetis seeds at mode-change only; we additionally re-seed at
     // MOX-engage so prior TUN-state desync cannot starve SSB MOX).
     void pushTxModeAndBandpass();
@@ -2881,7 +2881,7 @@ public:
     // it) and the per-slice flags are folded across slicesOnStream(st).
     // Indexing by slice handed two co-hosted slices two different DDCs,
     // contradicting the sharing model they were bound under.
-    // NereusSDR-original; no Thetis equivalent (Thetis builds UpdateDDCs
+    // Longpath-original; no Thetis equivalent (Thetis builds UpdateDDCs
     // inputs inline in console.cs:8186-8538 [v2.10.3.15]).
     std::array<Longpath::SliceConfig, 5> buildStreamConfigsForCodec() const;
 
@@ -3020,7 +3020,7 @@ public:
     ///     slice bound to it.
     ///
     /// This is ChannelMaster's SetXcmInrate, split across the two objects
-    /// NereusSDR keeps the state in:
+    /// Longpath keeps the state in:
     ///   From Thetis cmaster.c:461,473-475 [v2.10.3.15]
     ///     pcm->xcm_insize[in_id] = getbuffsize (rate);
     ///     for (i = 0; i < pcm->cmSubRCVR; i++) {
@@ -3528,7 +3528,7 @@ private:
     //
     // Per-slice stub state for DSP toggles SliceModel doesn't yet expose
     // as Q_PROPERTYs: rxCtun / rxEnable.  Sized to the max RX count
-    // NereusSDR supports today (4 for the four-DDC SKUs); the setter clamps
+    // Longpath supports today (4 for the four-DDC SKUs); the setter clamps
     // the index so an out-of-range slice silently no-ops.
     // rxNf left this set in TNF section 6.4: it is the global notch master
     // enable and now reads and writes NotchModel::globalEnabled.
@@ -3853,7 +3853,7 @@ private:
     bool m_hasAmplifier{false};
     bool m_ampOperate{false};
 
-    // TGXL autotune orchestration state (NereusSDR-native).
+    // TGXL autotune orchestration state (Longpath-native).
     // Event-driven flow (mirrors the FlexAPI interlock handshake pattern):
     //   1. startTgxlAutotune() snapshots PGXL state into m_pgxlSavedOperate
     //      and sets m_tgxlAutotuneInProgress + m_pgxlStandbyPending
@@ -3888,7 +3888,7 @@ private:
     void continueTgxlAutotuneAfterStandby();
     void sendTgxlAutotuneCmd();
 
-    // RF-flow gate state (NereusSDR-native, deck item #3).
+    // RF-flow gate state (Longpath-native, deck item #3).
     //
     // When MoxController::txReady fires (rfDelay elapsed, radio ready to
     // TX), we normally call TxChannel::setRunning(true) which causes the
@@ -3923,7 +3923,7 @@ private:
     // grant handler.
     bool m_txReadyReceived{false};
 
-    // Phase 3P-II Task 86: TxInterlockPolicy -- NereusSDR-native TX gate.
+    // Phase 3P-II Task 86: TxInterlockPolicy -- Longpath-native TX gate.
     // Qt parent-ownership (parent=this); non-null from construction time.
     TxInterlockPolicy* m_txInterlockPolicy{nullptr};
 
@@ -3946,7 +3946,7 @@ private:
     // FlexRadio UDP 4992 discovery beacon. Owned by RadioModel (Qt parent=this).
     // Constructed once in the ctor; configured and started in connectToRadio()
     // once m_lastRadioInfo.macAddress is known; stopped in teardownConnection().
-    // Allows PGXL/TGXL to auto-discover NereusSDR in their FlexRadio dropdown
+    // Allows PGXL/TGXL to auto-discover Longpath in their FlexRadio dropdown
     // without any manual IP entry.
     class FlexRadioDiscoveryBroadcaster* m_flexBroadcaster{nullptr};
 

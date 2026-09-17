@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_qso_confirmation.cpp  (NereusSDR)
+// tests/tst_qso_confirmation.cpp  (Longpath)
 // =================================================================
 //
 // The tempting implementation is "if the field is not empty, it is
@@ -9,10 +9,10 @@
 // So most of these tests are about the values that are NOT
 // confirmations.
 //
-// no-port-check: NereusSDR-original.
+// no-port-check: Longpath-original.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-09 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

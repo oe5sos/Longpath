@@ -1,6 +1,6 @@
 // no-port-check: test-only — Thetis file names appear only in source-cite
 // comments that document which upstream line each assertion verifies.
-// No Thetis logic is ported here; this file is NereusSDR-original.
+// No Thetis logic is ported here; this file is Longpath-original.
 //
 // Wire-byte snapshot tests for the Phase 3M-4 Task 17 P1 follow-up:
 //
@@ -166,7 +166,7 @@ private slots:
     //   NetworkIO.SetADC_cntrl1(cntrl1);  → prn->rx[0..3].rx_adc (P2 wire)
     //   NetworkIO.SetADC_cntrl2(cntrl2);  → prn->rx[4..6].rx_adc (P2 wire)
     //
-    // NereusSDR P1RadioConnection retains m_adcCtrl as the absorbed
+    // Longpath P1RadioConnection retains m_adcCtrl as the absorbed
     // cntrl1+cntrl2 value for any P2-side consumer that reads it (no
     // such consumer exists on P1 today; the field is preserved for
     // symmetry and to allow PS-state-machine assertions). On the P1

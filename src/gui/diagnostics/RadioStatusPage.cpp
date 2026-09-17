@@ -1,17 +1,17 @@
 // =================================================================
-// src/gui/diagnostics/RadioStatusPage.cpp  (NereusSDR)
+// src/gui/diagnostics/RadioStatusPage.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. Diagnostics → Radio Status dashboard.
+// Longpath-original. Diagnostics → Radio Status dashboard.
 // Thetis surfaces these readouts piecemeal across Front Console /
-// PA Settings / main meter / etc. NereusSDR consolidates them into
+// PA Settings / main meter / etc. Longpath consolidates them into
 // a single tab backed by Phase 3P-H Task 1 models (RadioStatus,
 // SettingsHygiene) + Phase 3P-E HermesLiteBandwidthMonitor.
 //
 // No direct Thetis port at this layer; data shapes ported in Task 1.
 // =================================================================
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-20 — Original implementation for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted implementation via
 //                 Anthropic Claude Code.
@@ -42,30 +42,30 @@
 namespace Longpath {
 
 // ── bar meter limit constants ──────────────────────────────────────────────
-// PA temp bar: 0–75°C (NereusSDR-original safe operating range for
+// PA temp bar: 0–75°C (Longpath-original safe operating range for
 // HL2/ANAN PA stages; no Thetis source for this specific limit value).
-// no-port-check: NereusSDR-original constant.
+// no-port-check: Longpath-original constant.
 static constexpr int kPaTempMaxC  = 75;
 
 // PA current bar: 0–25 A
-// no-port-check: NereusSDR-original constant.
+// no-port-check: Longpath-original constant.
 static constexpr int kPaCurrentMax10 = 250;  // stored as ×10 for integer bar
 
 // Forward power bar: 0–200 W
-// no-port-check: NereusSDR-original constant.
+// no-port-check: Longpath-original constant.
 static constexpr int kFwdPowerMaxW = 200;
 
 // SWR bar: 1–3:1 (integer ×10 for 1.0..3.0)
-// no-port-check: NereusSDR-original constant.
+// no-port-check: Longpath-original constant.
 static constexpr int kSwrBarMin10 = 10;
 static constexpr int kSwrBarMax10 = 30;
 
 // BW poll interval: 250 ms for live rate updates
-// no-port-check: NereusSDR-original constant.
+// no-port-check: Longpath-original constant.
 static constexpr int kBwPollMs = 250;
 
 // Uptime timer interval: 1000 ms
-// no-port-check: NereusSDR-original constant.
+// no-port-check: Longpath-original constant.
 static constexpr int kUptimeIntervalMs = 1000;
 
 static QString cardStyle()

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - FreeDVReporterClient implementation.
+// Longpath - FreeDVReporterClient implementation.
 //
 // Ported from freedv-gui src/reporting/FreeDVReporter.cpp [@77e793a].
 //   Wire-protocol logic, Socket.IO event names, JSON field shapes,
@@ -60,7 +60,7 @@
 //  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // =========================================================================
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-10  J.J. Boyd / KG4VCF  Phase 3J-2 Task B5. See
 //                                    FreeDVReporterClient.h for the full
 //                                    attribution block. Implementation
@@ -78,17 +78,17 @@
 //                                    onRxReport spot synthesis
 //                                    (`emitSpotFromFreqChange` /
 //                                    `emitSpotFromRxReport`) is a
-//                                    NereusSDR architectural decision
+//                                    Longpath architectural decision
 //                                    per design doc Section 4 Flow 2;
 //                                    the spot field mapping mirrors
 //                                    AetherSDR FreeDvClient.cpp
 //                                    :233-370 [@0cd4559]. Logging
-//                                    routes through NereusSDR's
+//                                    routes through Longpath's
 //                                    `lcSpots` category instead of
 //                                    AetherSDR's `lcDxCluster`; log
 //                                    file path uses Qt's
 //                                    AppConfigLocation (already lands
-//                                    under `NereusSDR/`) instead of
+//                                    under `Longpath/`) instead of
 //                                    AetherSDR's GenericConfigLocation
 //                                    + "AetherSDR/freedv.log". AI
 //                                    tooling: Anthropic Claude Code.
@@ -166,7 +166,7 @@ void FreeDVReporterClient::setServerUrl(const QString& url)
 
 QString FreeDVReporterClient::logFilePath() const
 {
-    // Qt's AppConfigLocation already lands under "NereusSDR/" when
+    // Qt's AppConfigLocation already lands under "Longpath/" when
     // QCoreApplication::organizationName / applicationName are set
     // (mirrors SpotCollectorClient / PotaClient / DxClusterClient /
     // WsjtxClient B1-B4 ports).
@@ -295,10 +295,10 @@ void FreeDVReporterClient::sendRxReport(const QString& callsign,
     //
     // Two upstream callers (freedv-gui main.cpp:1959-1996 [@77e793a]):
     //   - Path A: callsign decoded from RADE EOO text channel ->
-    //     `(callsign, "RADEV1", snr)`. NereusSDR drives this from
+    //     `(callsign, "RADEV1", snr)`. Longpath drives this from
     //     RadioModel::onRadeTextDecoded.
     //   - Path B: RADE has sync but no callsign yet -> empty callsign
-    //     `("", "RADEV1", snr)` every ~1 s while synced. NereusSDR
+    //     `("", "RADEV1", snr)` every ~1 s while synced. Longpath
     //     drives this from FreeDVRadeReporterBridge.
     //
     // Upstream addReceiveRecord does NOT reject empty callsigns
@@ -405,7 +405,7 @@ void FreeDVReporterClient::onWsDisconnected()
 
     // Auto-reconnect with exponential backoff.
     // From AetherSDR src/core/FreeDvClient.cpp:107-113 [@0cd4559] — original
-    // pattern is `1 << m_reconnectAttempts`. NereusSDR fix: clamp shift count
+    // pattern is `1 << m_reconnectAttempts`. Longpath fix: clamp shift count
     // to avoid signed-int UB. The backoff saturates at MaxReconnectDelayMs
     // well before 30 attempts, so capping has no behavioral effect on a
     // healthy connection.
@@ -496,7 +496,7 @@ void FreeDVReporterClient::handleEngineIO(const QString& raw)
         //                                      "version":..., "rx_only":bool,
         //                                      "os":..., "protocol_version":2}
         //
-        // Phase 3R K-bench (bench feedback): the NereusSDR FreeDV
+        // Phase 3R K-bench (bench feedback): the Longpath FreeDV
         // Reporter client originally shipped view-only with the
         // comment "reporter mode is a 3M-x follow-up". That meant our
         // station never appeared on qso.freedv.org. This commit
@@ -512,11 +512,11 @@ void FreeDVReporterClient::handleEngineIO(const QString& raw)
             auth["version"] = m_version.isEmpty()
                                   ? QStringLiteral("Longpath")
                                   : m_version;
-            // rx_only: NereusSDR can TX RADE per Phase 3R K-bench, so
+            // rx_only: Longpath can TX RADE per Phase 3R K-bench, so
             // default to false. Future enhancement: expose this as a
             // user setting (e.g. for SWL-only ops).
             auth["rx_only"] = false;
-            // os: NereusSDR is cross-platform; report the host OS so
+            // os: Longpath is cross-platform; report the host OS so
             // other operators can see what we're running.
 #if defined(Q_OS_MACOS)
             auth["os"] = QStringLiteral("macOS");
@@ -706,7 +706,7 @@ void FreeDVReporterClient::onFreqChange(const QJsonObject& data)
 
     emit stationUpdated(sid, info);
 
-    // NereusSDR dual-feed: also synthesize a DxSpot.
+    // Longpath dual-feed: also synthesize a DxSpot.
     emitSpotFromFreqChange(sid);
 }
 
@@ -790,7 +790,7 @@ void FreeDVReporterClient::onRxReport(const QJsonObject& data)
         emit stationUpdated(sid, info);
     }
 
-    // NereusSDR dual-feed: synthesize a DxSpot for the reported
+    // Longpath dual-feed: synthesize a DxSpot for the reported
     // transmitter.
     emitSpotFromRxReport(data);
 }
@@ -942,7 +942,7 @@ void FreeDVReporterClient::onBulkUpdate(const QJsonArray& pairs)
 
 // ── Dual-feed spot synthesis ────────────────────────────────────────────
 //
-// Dual-feed: NereusSDR architectural decision per design doc Section 4
+// Dual-feed: Longpath architectural decision per design doc Section 4
 // Flow 2. freedv-gui's onFrequencyChange / onRxReport update the
 // station map only. AetherSDR's FreeDvClient also synthesizes a DxSpot
 // for the panadapter overlay. We do both: the station map drives

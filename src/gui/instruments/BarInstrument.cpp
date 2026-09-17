@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/instruments/BarInstrument.cpp  (NereusSDR)
+// src/gui/instruments/BarInstrument.cpp  (Longpath)
 // =================================================================
 // Siehe BarInstrument.h.
 // =================================================================

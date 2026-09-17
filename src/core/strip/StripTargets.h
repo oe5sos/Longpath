@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/core/strip/StripTargets.h  (NereusSDR)
+// src/core/strip/StripTargets.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // What a voice should look like, for the job it is doing.
 //
@@ -25,7 +25,7 @@
 // they were.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-08 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

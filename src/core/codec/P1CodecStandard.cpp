@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/codec/P1CodecStandard.cpp  (NereusSDR)
+// src/core/codec/P1CodecStandard.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -7,7 +7,7 @@
 //   original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-20 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                (KG4VCF), with AI-assisted transformation via Anthropic
 //                Claude Code. Lifted from P1RadioConnection::composeCcForBank
@@ -61,7 +61,7 @@ void P1CodecStandard::composeCcForBank(int bank, const CodecContext& ctx,
         //   case 1: C0 |= 2;  → final C0 = XmitBit | 0x02.
         //
         // Frequency banks DO carry the MOX bit (XmitBit) — Thetis sets it on
-        // every bank's C0 base.  Prior NereusSDR comment claimed otherwise; that
+        // every bank's C0 base.  Prior Longpath comment claimed otherwise; that
         // claim was wrong.  Matches HL2 codec (P1CodecHl2.cpp:85) which already
         // emits C0base | 0x02 here.
         case 1: {
@@ -81,7 +81,7 @@ void P1CodecStandard::composeCcForBank(int bank, const CodecContext& ctx,
         //   case 3: C0 |= 6;  → final C0 = XmitBit | 0x06.
         //
         // Frequency banks DO carry the MOX bit (XmitBit) — Thetis sets it on
-        // every bank's C0 base.  Prior NereusSDR comment claimed otherwise; that
+        // every bank's C0 base.  Prior Longpath comment claimed otherwise; that
         // claim was wrong.  Matches HL2 codec (P1CodecHl2.cpp:107,119) which
         // already emits C0base | <addr> here.
         case 2: case 3: {
@@ -170,7 +170,7 @@ void P1CodecStandard::composeCcForBank(int bank, const CodecContext& ctx,
         // Unused DDCs get TX freq as a safe default.
         //
         // Frequency banks DO carry the MOX bit (XmitBit) — Thetis sets it on
-        // every bank's C0 base.  Prior NereusSDR comment claimed otherwise; that
+        // every bank's C0 base.  Prior Longpath comment claimed otherwise; that
         // claim was wrong.  Matches HL2 codec (P1CodecHl2.cpp:155) which already
         // emits C0base | kRxC0Addr[bank - 5] here.
         case 5: case 6: case 7: case 8: case 9: {
@@ -224,7 +224,7 @@ void P1CodecStandard::composeCcForBank(int bank, const CodecContext& ctx,
         // this is the parity propagation to P1CodecStandard.
         //
         // BPF2 (HL2's secondary BPF board / Hermes-class HPF2) state isn't
-        // tracked in NereusSDR yet — emit C1 = 0 (no BPF2 routing) until
+        // tracked in Longpath yet — emit C1 = 0 (no BPF2 routing) until
         // BPF2 support lands.  xvtr_enable is also not yet plumbed —
         // emit 0.  Only the ps_run bit is wired here; that's what the
         // FPGA needs for PS feedback to engage.
@@ -768,13 +768,13 @@ PsDdcConfig P1CodecStandard::psDdcConfigHermesIIClass(
             // `P1_adc_cntrl` global instead (networkproto1.c:519-520
             // [v2.10.3.13]), which is set only by SetADC_cntrl_P1
             // (netInterface.c:992-996) — independent of UpdateDDCs.
-            // NereusSDR carries the P1 wire value via
+            // Longpath carries the P1 wire value via
             // P1RadioConnection::m_p1AdcCntrl → CodecContext::p1AdcCntrl,
             // with a board-aware default (0 for 1-ADC, 4 for 2-ADC) set
             // in applyBoardQuirks(). See CodecContext.h::p1AdcCntrl for
             // the full conflation history.
             //
-            // Before 2026-05-17, NereusSDR P1 codecs read this cfg.cntrl1
+            // Before 2026-05-17, Longpath P1 codecs read this cfg.cntrl1
             // on the wire (a port-fidelity bug). A 2026-05-09 empirical
             // override forced cfg.cntrl1=0 here because observed Thetis
             // wire on a friend's ANAN-10E was 0; the override is no

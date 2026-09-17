@@ -1,12 +1,12 @@
 // =================================================================
-// src/core/strip/EqLoudness.cpp  (NereusSDR)
+// src/core/strip/EqLoudness.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. See EqLoudness.h for why louder always sounds
+// Longpath-original. See EqLoudness.h for why louder always sounds
 // better and what follows from that.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-08 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

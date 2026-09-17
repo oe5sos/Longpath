@@ -1,8 +1,8 @@
-// no-port-check: prueft eine NereusSDR-eigene Betriebsart (RADE) im
+// no-port-check: prueft eine Longpath-eigene Betriebsart (RADE) im
 // Betriebsartenwaehler. Kein uebernommener Code.
 
 // =================================================================
-// tests/tst_mode_menu_rade.cpp  (NereusSDR)
+// tests/tst_mode_menu_rade.cpp  (Longpath)
 // =================================================================
 //
 // RADE ist eine Betriebsart wie jede andere und muss im Waehler
@@ -14,7 +14,7 @@
 // Der Test prueefte den Betriebsartenwaehler der VFO-Flagge. Die ist
 // ersatzlos geloescht; der Waehler steht in der RxApplet, und dort
 // gab es RADE schon (RxApplet.cpp:428-435, „the canonical Thetis 11 +
-// NereusSDR-native RADE-U / RADE-L from Phase 3R Task J1").
+// Longpath-native RADE-U / RADE-L from Phase 3R Task J1").
 //
 // Die vier Faelle zum Reiter-Schild der Flagge („Mode"-Reiter zeigt
 // die aktive Betriebsart, Farbchip wird lila bei RADE) sind
@@ -23,7 +23,7 @@
 // Waehler selbst.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-11 — Created for Phase 3R L3 (VFO flag mode combo).
 //   2026-08-18 — Auf die RxApplet umgehaengt, nachdem die VFO-Flagge
 //                 geloescht wurde. Martin Fischer, AI-assisted via

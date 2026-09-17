@@ -1,7 +1,7 @@
 // =================================================================
-// tests/tst_audio_engine_tap_teardown_race.cpp  (NereusSDR)
+// tests/tst_audio_engine_tap_teardown_race.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test file.
+// no-port-check: Longpath-original test file.
 //
 // DER FALL, DER STILL FALSCH WIRD (2026-09-06 code review, gefunden waehrend
 // des Baus des nativen RTTY-Decoders): AudioEngine::setQsoTap / setAsrTap /

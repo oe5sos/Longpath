@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_qso_recorder_controller.cpp  (NereusSDR)
+// tests/tst_qso_recorder_controller.cpp  (Longpath)
 // =================================================================
 //
 // Was die Abgriffe mit der Aufnahme verbindet.
@@ -23,7 +23,7 @@
 // seither nur noch das echt hereingekommene zaehlt.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-19 — Original fuer NereusSDR von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
 //   2026-09-02 — An das streamende QsoRecorder angepasst (zeitlich
@@ -31,7 +31,7 @@
 //                 Anthropic Claude (Cowork).
 // =================================================================
 
-// no-port-check: NereusSDR-original test file.
+// no-port-check: Longpath-original test file.
 
 #include <QtTest>
 #include <QSignalSpy>

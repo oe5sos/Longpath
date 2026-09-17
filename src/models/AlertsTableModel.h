@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - AlertsTableModel: QAbstractTableModel wrapping a
+// Longpath - AlertsTableModel: QAbstractTableModel wrapping a
 // QVector<PotaAlert> for the SpotHub Alerts tab.
 //
-// NereusSDR-native, no upstream equivalent (operator-requested
+// Longpath-native, no upstream equivalent (operator-requested
 // follow-up to the SpotHub POTA improvement pass, 2026-08-27).
 // Unlike SpotTableModel (a bounded, ever-growing ring fed by live
 // spot signals), this model is replaced wholesale on every
@@ -11,7 +11,7 @@
 // the complete current state of scheduled activations, there is
 // nothing to dedup or age out incrementally.
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-27  AI (Anthropic Claude Code)  Initial version.
 
 #pragma once

@@ -7,12 +7,12 @@
 //
 // AetherSDR is licensed under the GNU General Public License v3; see
 // https://github.com/ten9876/AetherSDR for the contributor list and
-// project-level LICENSE. NereusSDR is also GPLv3. AetherSDR source
+// project-level LICENSE. Longpath is also GPLv3. AetherSDR source
 // files carry no per-file GPL header; attribution is at project level
 // per AetherSDR convention.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-19 — Ported/adapted in C++20 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via
 //                 Anthropic Claude Code. Rebranded DAX → VAX: device
@@ -29,9 +29,9 @@
 // for sending TX audio to the radio.
 //
 // Each device reads/writes PCM audio via a POSIX shared memory ring buffer shared
-// with NereusSDR's VirtualAudioBridge.
+// with Longpath's VirtualAudioBridge.
 //
-// Format: stereo float32, 48 kHz. NereusSDR uses 48 kHz (not AetherSDR's 24 kHz)
+// Format: stereo float32, 48 kHz. Longpath uses 48 kHz (not AetherSDR's 24 kHz)
 // to align with Thetis DSP rate conventions.
 
 #include <aspl/Driver.hpp>
@@ -55,7 +55,7 @@
 #include <cmath>
 #include <cerrno>
 
-// ── Diagnostic logging (NereusSDR debug build, 2026-05-06) ──────────────────
+// ── Diagnostic logging (Longpath debug build, 2026-05-06) ──────────────────
 //
 // Plugin runs inside coreaudiod and has no stdout/stderr; route diagnostics to
 // the macOS unified log. Subsystem "com.nereussdr.vax" matches the bundle id;
@@ -215,11 +215,11 @@ private:
             //
             // macOS POSIX shm has an edge case where the plugin's cached
             // mapping can become disconnected from the live shm — confirmed
-            // in the field when NereusSDR is killed and relaunched while
+            // in the field when Longpath is killed and relaunched while
             // the plugin host (coreaudiod helper) is still alive.  After
             // the producer process churn the kernel object the plugin
             // mapped at attach-time can be recycled, leaving m_shmBlock
-            // pointing at memory that the new NereusSDR instance does
+            // pointing at memory that the new Longpath instance does
             // not write to.  Symptom: plugin's writePos is frozen at a
             // large historical value while the live shm's writePos is
             // advancing — both processes have shm_open'd the same name
@@ -242,12 +242,12 @@ private:
 
             // Drop the cached mapping so the attach path below runs
             // unconditionally.  Skip the m_lastRetry throttle since we
-            // know NereusSDR was up the moment we last read from this
+            // know Longpath was up the moment we last read from this
             // name — there is no startup race to wait out here.
             unmapShm();
         } else {
             // Initial-attach throttle: avoid hammering shm_open during the
-            // first-startup race when NereusSDR hasn't created the segment
+            // first-startup race when Longpath hasn't created the segment
             // yet.  Only applies on first attach (m_shmBlock was already
             // null on entry), not on staleness re-attach above.
             auto now = std::chrono::steady_clock::now();
@@ -400,7 +400,7 @@ private:
         if (m_shmBlock != nullptr) {
             // Periodic stale-mmap check (added 2026-05-06, eager-borg-d64bed).
             // Same rationale as VaxRxHandler::ensureShm — macOS can disconnect
-            // the cached mapping from the live shm when NereusSDR restarts;
+            // the cached mapping from the live shm when Longpath restarts;
             // periodic re-attach keeps writes flowing without manual
             // intervention.
             if (++m_validateCounter < kReattachIntervalCalls) {

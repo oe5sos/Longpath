@@ -59,7 +59,7 @@ It uses a non modified version of rmnoise and implements a ringbuffer to handle 
 
 //
 // =============================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-23 — Imported byte-for-byte from Thetis v2.10.3.13 @ 501e3f51.
 //                No algorithmic changes. Linked against rnnoise BSD-3
 //                (third_party/rnnoise/) at WDSP build time.

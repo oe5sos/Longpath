@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/setup/hardware/AntennaAlexAntennaControlTab.cpp  (NereusSDR)
+// src/gui/setup/hardware/AntennaAlexAntennaControlTab.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -7,7 +7,7 @@
 //     grpAlexAntCtrl + panelAlexTXAntControl + panelAlexRXAntControl)
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-20 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                (KG4VCF), with AI-assisted transformation via Anthropic
 //                Claude Code. Sub-sub-tab under Hardware → Antenna/ALEX.
@@ -140,7 +140,7 @@ AntennaAlexAntennaControlTab::AntennaAlexAntennaControlTab(RadioModel* model, QW
     buildTxBypassStrip(outerLayout);
 
     // Row 4: Antenna conflict policy (Phase 3F Sub-Epic E Tasks 11-13).
-    // NereusSDR-original; persisted operator preference for how add-slice
+    // Longpath-original; persisted operator preference for how add-slice
     // antenna conflicts are resolved. Consumer wire-up (RadioModel) lands
     // when the antenna-auto-switch pipeline is built.
     buildConflictPolicyGroup(outerLayout);
@@ -164,8 +164,8 @@ AntennaAlexAntennaControlTab::AntennaAlexAntennaControlTab(RadioModel* model, QW
 // Source: Thetis grpAlexAntCtrl — chkAlexBlockTxAnt2 / chkAlexBlockTxAnt3
 // (setup.designer.cs:5981-6001) [@501e3f5]
 //
-// NereusSDR addition: these Block-TX flags are not in Thetis's setup designer;
-// they map to AlexController::blockTxAnt2/3 (Phase 3P-F Task 1 NereusSDR spin).
+// Longpath addition: these Block-TX flags are not in Thetis's setup designer;
+// they map to AlexController::blockTxAnt2/3 (Phase 3P-F Task 1 Longpath spin).
 
 void AntennaAlexAntennaControlTab::buildBlockTxStrip(QVBoxLayout* outerLayout)
 {
@@ -538,7 +538,7 @@ void AntennaAlexAntennaControlTab::buildTxBypassStrip(QVBoxLayout* outerLayout)
 
 // ── buildConflictPolicyGroup ─────────────────────────────────────────────────
 //
-// NereusSDR-original (Phase 3F Sub-Epic E Tasks 11-13). No upstream port.
+// Longpath-original (Phase 3F Sub-Epic E Tasks 11-13). No upstream port.
 // Persists a tri-state operator preference for how add-slice antenna
 // conflicts are resolved against a slice already using the same chain.
 //
@@ -629,7 +629,7 @@ void AntennaAlexAntennaControlTab::applySkuProfile()
     if (m_chkExt1OutOnTx)   { m_chkExt1OutOnTx->setVisible(profile.hasExt1OutOnTx); }
     if (m_chkExt2OutOnTx)   { m_chkExt2OutOnTx->setVisible(profile.hasExt2OutOnTx); }
     if (m_chkRxOutOverride) { m_chkRxOutOverride->setVisible(profile.hasRxBypassUi); }
-    // useTxAntForRx is always visible — it's a NereusSDR-native control that
+    // useTxAntForRx is always visible — it's a Longpath-native control that
     // maps to Thetis Alex.cs:66 TRxAnt (no per-SKU visibility override in Thetis).
 
     // Per-SKU EXT1/EXT2-on-TX button text — From Thetis setup.cs:19928-19929

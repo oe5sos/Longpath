@@ -1,10 +1,10 @@
 // =================================================================
-// tests/tst_pan_wide_badge.cpp  (NereusSDR)
+// tests/tst_pan_wide_badge.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure. Nothing here
+// no-port-check: Longpath-original test infrastructure. Nothing here
 // is a port; the operator-facing strings under test are fixed by
 // docs/architecture/2026-05-26-phase3f-multi-pan-multi-slice-design.md
-// §16.4.4, which is a NereusSDR design document.
+// §16.4.4, which is a Longpath design document.
 //
 // Phase 3F: the WIDE badge must light on every panadapter fed by a
 // bypassed RX preselector chain, and on no others.

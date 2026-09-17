@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/gui/applets/BandwidthFilterApplet.h  (NereusSDR)
+// src/gui/applets/BandwidthFilterApplet.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original, nach der Vorlage des Betreibers (Zeus Link
+// Longpath-original, nach der Vorlage des Betreibers (Zeus Link
 // „BANDWIDTH FILTER", 2026-08-20). Rechenregeln aus Thetis, siehe
 // SliceModel::widthToEdges und ::defaultFilterCenter.
 //
@@ -32,7 +32,7 @@
 // SliceModel::widthToEdges, nicht hier.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-20 — Original fuer NereusSDR von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
 // =================================================================

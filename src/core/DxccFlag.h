@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/core/DxccFlag.h  (NereusSDR)
+// src/core/DxccFlag.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // A DXCC entity is not a country. Alaska, Hawaii and the continental
 // United States are three entities under one flag; Sardinia is a
@@ -19,7 +19,7 @@
 // to be bundled or licensed and the system font renders them.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
 // =================================================================

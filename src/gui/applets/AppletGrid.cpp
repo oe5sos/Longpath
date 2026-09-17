@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/applets/AppletGrid.cpp  (NereusSDR)
+// src/gui/applets/AppletGrid.cpp  (Longpath)
 // =================================================================
 // Siehe AppletGrid.h — Schritt 1 des freien Rasters.
 // =================================================================

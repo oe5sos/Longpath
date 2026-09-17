@@ -1,13 +1,13 @@
 #pragma once
 
 // =================================================================
-// src/gui/widgets/VaxChannelSelector.h  (NereusSDR)
+// src/gui/widgets/VaxChannelSelector.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original file — no Thetis port; no attribution-registry row.
+// Longpath-original file — no Thetis port; no attribution-registry row.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-19 — Written by J.J. Boyd (KG4VCF), with AI-assisted
 //                transformation via Anthropic Claude Code.
 // =================================================================

@@ -1,8 +1,8 @@
 // =================================================================
-// src/core/TxInterlockPolicy.cpp  (NereusSDR)
+// src/core/TxInterlockPolicy.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-native TX interlock policy. See TxInterlockPolicy.h for
+// Longpath-native TX interlock policy. See TxInterlockPolicy.h for
 // full design notes.
 //
 // AI tooling: Anthropic Claude Code.

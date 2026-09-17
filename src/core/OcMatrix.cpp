@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/OcMatrix.cpp  (NereusSDR)
+// src/core/OcMatrix.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -9,7 +9,7 @@
 //    TX pin action mapping, TXPinActions enum)
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-20 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                (KG4VCF), with AI-assisted transformation via Anthropic
 //                Claude Code. Per-MAC persistence via AppSettings;
@@ -103,7 +103,7 @@ quint8 OcMatrix::maskFor(Band band, bool tx) const
 }
 
 // From Thetis HPSDR/Penny.cs:94-100 [@501e3f5] setTXPinAction
-// (group parameter collapsed; NereusSDR tracks one action per pin)
+// (group parameter collapsed; Longpath tracks one action per pin)
 OcMatrix::TXPinAction OcMatrix::pinAction(int pin) const
 {
     if (pin < 0 || pin >= kPinCount) { return TXPinAction::MoxTuneTwoTone; }

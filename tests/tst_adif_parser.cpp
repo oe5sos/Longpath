@@ -5,7 +5,7 @@
 // ADIF log. They are well-known callsigns used as test inputs,
 // not ported callsigns. Precedent: B2-B6, C1.
 //
-// NereusSDR - AdifParser tests
+// Longpath - AdifParser tests
 //
 // Phase 3J-2 Task C2. Pins the contract that AdifParser parses an
 // ADIF (Amateur Data Interchange Format) log file into a vector

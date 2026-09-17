@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/applets/TunerApplet.cpp  (NereusSDR)
+// src/gui/applets/TunerApplet.cpp  (Longpath)
 // =================================================================
 //
 // Source attribution (AetherSDR -- GPLv3):
@@ -10,10 +10,10 @@
 //
 //   This file is a port or structural derivative of AetherSDR source.
 //   AetherSDR is licensed under the GNU General Public License v3.
-//   NereusSDR is also GPLv3. Attribution follows GPLv3 ss.5 requirements.
+//   Longpath is also GPLv3. Attribution follows GPLv3 ss.5 requirements.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-18  Ported/adapted in C++20/Qt6 for NereusSDR by
 //                 J.J. Boyd (KG4VCF), with AI-assisted transformation
 //                 via Anthropic Claude Code.
@@ -172,7 +172,7 @@ void TunerApplet::buildUI()
     // tuningChanged lambda only drops the carrier we put up, never the
     // operator's manual TUN.
     //
-    // NereusSDR-native; no AetherSDR equivalent (AetherSDR routes through
+    // Longpath-native; no AetherSDR equivalent (AetherSDR routes through
     // a real FlexRadio that handles the carrier internally).
     connect(m_tuneBtn, &QPushButton::clicked, this, [this]() {
         if (!m_tunerModel) { return; }
@@ -373,7 +373,7 @@ void TunerApplet::setTunerModel(TunerModel* model)
     // Tuning state: red button + "TUNING..." + post-tune SWR flash.
     // From AetherSDR src/gui/TunerApplet.cpp:setTunerModel() tuningChanged [@0cd4559]
     //
-    // NereusSDR adds carrier orchestration here:
+    // Longpath adds carrier orchestration here:
     //   * on tuning=1 from a TGXL hardware TUNE press (operator pushed the
     //     button on the device) we engage the local tune-carrier so TGXL
     //     sees RF and doesn't abort with "low RF power". When the TUNE

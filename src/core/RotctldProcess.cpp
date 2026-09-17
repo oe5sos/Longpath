@@ -1,11 +1,11 @@
 // =================================================================
-// src/core/RotctldProcess.cpp  (NereusSDR)
+// src/core/RotctldProcess.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original — see RotctldProcess.h.
+// Longpath-original — see RotctldProcess.h.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
 // =================================================================
@@ -109,7 +109,7 @@ QStringList RotctldProcess::arguments(int hamlibModel, const QString& device,
     // rotator that anyone on the network can turn is a rotator that
     // will eventually be turned by someone else. An operator who wants
     // it reachable from another machine can run rotctld themselves and
-    // point NereusSDR at it — that is a decision worth making
+    // point Longpath at it — that is a decision worth making
     // deliberately.
     args << QStringLiteral("-T") << QStringLiteral("127.0.0.1")
          << QStringLiteral("-t") << QString::number(listenPort);

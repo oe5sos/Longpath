@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/PaProfile.cpp  (NereusSDR)
+// src/core/PaProfile.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
@@ -7,7 +7,7 @@
 //   original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-03 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code. Phase 2 Agent 2A of issue #167.
@@ -275,7 +275,7 @@ void PaProfile::copySettings(const PaProfile& other) {
 //       SetGainForBand((Band)n, pa_default_gains[n]);
 //   }
 //
-// NereusSDR deviation: the per-model gain row comes from the free function
+// Longpath deviation: the per-model gain row comes from the free function
 // `defaultPaGainsForBand(model, band)` (PaGainProfile.h, Phase 1A) rather
 // than a flat float[] indexed by Band int. Behaviour-equivalent.
 void PaProfile::resetGainDefaultsForModel(HPSDRModel m) {
@@ -359,7 +359,7 @@ float PaProfile::lerp(float a, float b, float frac) noexcept {
 
 // ── dataToString ───────────────────────────────────────────────────────────
 //
-// From Thetis setup.cs:23884-23913 [v2.10.3.13] — DataToString. NereusSDR
+// From Thetis setup.cs:23884-23913 [v2.10.3.13] — DataToString. Longpath
 // uses the 14-band layout instead of Thetis's 42-band; total field count
 // 171 (vs Thetis 423/507).
 QString PaProfile::dataToString() const {
@@ -404,7 +404,7 @@ QString PaProfile::dataToString() const {
 
 // ── dataFromString ─────────────────────────────────────────────────────────
 //
-// From Thetis setup.cs:23835-23883 [v2.10.3.13] — DataFromString. NereusSDR
+// From Thetis setup.cs:23835-23883 [v2.10.3.13] — DataFromString. Longpath
 // Upstream tags preserved: //MW0LGE (from cited setup.cs:23838) [v2.10.3.15]
 // uses the 14-band layout exclusively; we accept exactly kSerializedFieldCount
 // (171) fields. Thetis tolerates 45 / 423 / 507-field inputs as legacy

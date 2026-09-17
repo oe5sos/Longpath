@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_mainwindow_status_bar_safety.cpp  (NereusSDR)
+// tests/tst_mainwindow_status_bar_safety.cpp  (Longpath)
 // =================================================================
 //
 // no-port-check: widget-level construction / accessor test for the TX

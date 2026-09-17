@@ -1,6 +1,6 @@
-// no-port-check: NereusSDR-original unit-test file.
+// no-port-check: Longpath-original unit-test file.
 // =================================================================
-// tests/tst_rade_tx_filters.cpp  (NereusSDR)
+// tests/tst_rade_tx_filters.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for the RADE TX DSP helpers (Phase 3R Task K3):
@@ -37,7 +37,7 @@
 //
 // =================================================================
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-11 — Phase 3R Task K3: initial test file. NereusSDR-native.
 //                 J.J. Boyd (KG4VCF), with AI-assisted implementation
 //                 via Anthropic Claude Code.

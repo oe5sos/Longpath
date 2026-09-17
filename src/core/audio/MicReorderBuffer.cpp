@@ -1,12 +1,12 @@
 // =================================================================
-// src/core/audio/MicReorderBuffer.cpp  (NereusSDR)
+// src/core/audio/MicReorderBuffer.cpp  (Longpath)
 // =================================================================
 //
 // See MicReorderBuffer.h for the design rationale (speculative
 // zero-latency reordering; remote-bench measurement 2026-08-11).
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-11 — Created for the remote-bench mic reordering fix by
 //                 Ralph Martin Fischer (OE5SOS), AI-assisted
 //                 implementation via Anthropic Claude (Cowork).

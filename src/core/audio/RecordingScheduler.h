@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/core/audio/RecordingScheduler.h  (NereusSDR)
+// src/core/audio/RecordingScheduler.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. No Thetis equivalent to port from.
+// Longpath-original. No Thetis equivalent to port from.
 //
 // Thetis's own scheduler (Memory/MemoryForm.cs SCHEDULER(), design doc
 // docs/architecture/phase3m-recording-design.md §3, §8) is a
@@ -41,7 +41,7 @@
 // still holding.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-26 — Original for NereusSDR/Longpath by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

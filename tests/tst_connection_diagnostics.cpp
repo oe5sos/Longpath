@@ -1,10 +1,10 @@
 // =================================================================
-// tests/tst_connection_diagnostics.cpp  (NereusSDR)
+// tests/tst_connection_diagnostics.cpp  (Longpath)
 // =================================================================
-// NereusSDR-native test. No AetherSDR equivalent; ConnectionDiagnostics
-// is a NereusSDR-native class per design doc §4.6.
+// Longpath-native test. No AetherSDR equivalent; ConnectionDiagnostics
+// is a Longpath-native class per design doc §4.6.
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-19  Created by J.J. Boyd (KG4VCF), with AI-assisted
 //                 transformation via Anthropic Claude Code.
 //                 Tests: tracksFrameCount, countsReconnectsFromSignal,

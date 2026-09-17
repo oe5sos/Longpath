@@ -1,12 +1,12 @@
 // =================================================================
-// src/gui/setup/DspSetupPages.cpp  (NereusSDR)
+// src/gui/setup/DspSetupPages.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/setup.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -1776,7 +1776,7 @@ NbSnbSetupPage::NbSnbSetupPage(RadioModel* model, QWidget* parent)
     // and SetEXTNOBMode writes pnob[id] (Thetis wdsp/nob.c:376-423 +
     // wdsp/nobII.c:658-663 [v2.10.3.15]), the single ANB / NOB members of
     // struct _rcvr (cmaster.h:74-82). Two receivers sharing one DDC window
-    // therefore cannot have independent blankers, so NereusSDR mirrors these
+    // therefore cannot have independent blankers, so Longpath mirrors these
     // across co-hosted slices rather than pretending otherwise. Saying so here
     // beats letting the operator discover it by watching another receiver's
     // settings move.
@@ -1870,7 +1870,7 @@ NbSnbSetupPage::NbSnbSetupPage(RadioModel* model, QWidget* parent)
     // The other half of the same story, and the reason the NB1 note above is
     // worth stating: SNB genuinely IS per receiver. SetRXASNBA* writes
     // rxa[channel].snba (Thetis wdsp/snb.c:621-670 [v2.10.3.15]), one per WDSP
-    // channel, and NereusSDR gives every slice its own channel.
+    // channel, and Longpath gives every slice its own channel.
     {
         auto* snbNote = new QLabel(
             tr("Applies to the selected receiver only."));
@@ -1907,7 +1907,7 @@ NbSnbSetupPage::NbSnbSetupPage(RadioModel* model, QWidget* parent)
     });
 
     // SNB Output Bandwidth — NOT in Thetis Setup page. Thetis sets it
-    // automatically per mode in rxa.cs:112-124. Kept as a NereusSDR-native
+    // automatically per mode in rxa.cs:112-124. Kept as a Longpath-native
     // global override.
     QSlider* snbOutBw = addIntSlider(snbLay, tr("Output Bandwidth"),
         100, 96000,
@@ -1986,7 +1986,7 @@ CwSetupPage::CwSetupPage(RadioModel* model, QWidget* parent)
     // chkSideTones / chkDSPKeyerSidetone[_software]):  Thetis does NOT
     // board-gate its sidetone controls — they're always visible and
     // mutually-exclusive via the toggle logic at setup.cs:8823-8854.
-    // This visibility gate is NereusSDR-specific use of the populated
+    // This visibility gate is Longpath-specific use of the populated
     // hasSidetoneGenerator flag, not a port of an upstream gate.
     m_sidetoneRow = new QWidget;
     auto* sidetoneRowLay = new QHBoxLayout(m_sidetoneRow);
@@ -2092,7 +2092,7 @@ bool CwSetupPage::sidetoneRowVisibleForTest() const
 // 47710-47711 [v2.10.3.13-beta2]), not on the DSP/AM tab.  NOTE: the
 // Thetis DSP/AM tab DOES host a different TX-side group, grpAMTX (Tx
 // USB/LSB/DSB sideband select radios), at mi0bot setup.designer.cs:
-// 40200, 40326-40336 [v2.10.3.13-beta2].  NereusSDR is missing this
+// 40200, 40326-40336 [v2.10.3.13-beta2].  Longpath is missing this
 // group entirely; tracked as a separate follow-up issue, not this PR.
 //
 AmSamSetupPage::AmSamSetupPage(RadioModel* model, QWidget* parent)
@@ -2463,7 +2463,7 @@ MnfSetupPage::MnfSetupPage(RadioModel* model, QWidget* parent)
     : SetupPage("TNF", model, parent)
 {
     // Thetis captions this group "Multi Notch Filter" and names the tab
-    // MNF (setup.designer.cs:44165, :44141 [v2.10.3.15]). NereusSDR says TNF
+    // MNF (setup.designer.cs:44165, :44141 [v2.10.3.15]). Longpath says TNF
     // everywhere instead (maintainer decision, 2026-08-02): Thetis is itself
     // split, MNF on the Setup tab and chkTNF on the console, and carrying
     // that split through meant the same feature had two names on screen at
@@ -2551,7 +2551,7 @@ MnfSetupPage::MnfSetupPage(RadioModel* model, QWidget* parent)
     // ── Minimum notch width ──────────────────────────────────────────────────
     // Narrowest notch the current bandpass can realise: WDSP min_notch_width
     // (third_party/wdsp/src/nbp.c:82-96), read through RXANBPGetMinNotchWidth
-    // (nbp.c:594). NereusSDR-original control; Thetis pushes the same value
+    // (nbp.c:594). Longpath-original control; Thetis pushes the same value
     // out of UpdateMinimumNotchWidthRX (console.cs:48787-48818 [v2.10.3.15])
     // to its notch popup rather than to the Setup tab.
     m_minWidthLbl = new QLabel(QStringLiteral("--"), mnfGrp);
@@ -2579,7 +2579,7 @@ MnfSetupPage::MnfSetupPage(RadioModel* model, QWidget* parent)
 
     // Thetis fans the flag straight to three fixed channel ids from the Setup
     // form (setup.cs:17925-17931 [v2.10.3.15], chkMNFAutoIncrease_CheckedChanged
-    // → WDSP.RXANBPSetAutoIncrease ×3). NereusSDR routes it through NotchModel
+    // → WDSP.RXANBPSetAutoIncrease ×3). Longpath routes it through NotchModel
     // so RadioModel's fan-out reaches every open slice channel instead.
     connect(m_autoIncreaseChk, &QCheckBox::toggled, nm, &NotchModel::setAutoIncrease);
     connect(nm, &NotchModel::autoIncreaseChanged, m_autoIncreaseChk, [this](bool on) {
@@ -2605,7 +2605,7 @@ MnfSetupPage::MnfSetupPage(RadioModel* model, QWidget* parent)
 
     // From Thetis setup.cs:24376-24380 [v2.10.3.15] —
     // chkVisualNotch_CheckedChanged sets Display.ShowVisualNotch AND
-    // MiniSpec.ShowVisualNotch. NereusSDR has no mini-spectrum surface, so
+    // MiniSpec.ShowVisualNotch. Longpath has no mini-spectrum surface, so
     // only the panadapter half is ported; the fan-out to every pan hangs off
     // NotchModel::visualEnabledChanged rather than off this widget.
     connect(m_visualNotchChk, &QCheckBox::toggled, nm, &NotchModel::setVisualEnabled);
@@ -2848,7 +2848,7 @@ void MnfSetupPage::refreshMinNotchWidth()
     }
 
     // Thetis surfaces this per-RX (console.cs:48787-48818,
-    // UpdateMinimumNotchWidthRX [v2.10.3.15]). NereusSDR's notch list is
+    // UpdateMinimumNotchWidthRX [v2.10.3.15]). Longpath's notch list is
     // global, so the readout follows the active slice's channel and falls
     // back to the first pooled channel before any slice exists.
     const int sliceIndex = rm->activeSlice() ? rm->activeSlice()->sliceIndex()

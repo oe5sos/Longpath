@@ -1,11 +1,11 @@
 // =================================================================
-// src/core/TxAudioRecorder.cpp  (NereusSDR)
+// src/core/TxAudioRecorder.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original — see TxAudioRecorder.h.
+// Longpath-original — see TxAudioRecorder.h.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
 // =================================================================

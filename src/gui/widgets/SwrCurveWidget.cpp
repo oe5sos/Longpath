@@ -1,12 +1,12 @@
 // =================================================================
-// src/gui/widgets/SwrCurveWidget.cpp  (NereusSDR)
+// src/gui/widgets/SwrCurveWidget.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. See SwrCurveWidget.h for why the three band
+// Longpath-original. See SwrCurveWidget.h for why the three band
 // verticals are the whole point.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-10 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

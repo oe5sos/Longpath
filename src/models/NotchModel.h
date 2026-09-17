@@ -1,5 +1,5 @@
 // =================================================================
-// src/models/NotchModel.h  (NereusSDR)
+// src/models/NotchModel.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources [v2.10.3.15] (commit 3759d096):
@@ -22,17 +22,17 @@
 //
 //   AetherSDR has no per-file copyright header, so per
 //   docs/attribution/HOW-TO-PORT.md rule 6 the project URL and primary
-//   author are cited at NereusSDR block level rather than copying a
+//   author are cited at Longpath block level rather than copying a
 //   verbatim header that does not exist. The stable-id notch-store shape
 //   is a port of AetherSDR src/models/TnfModel.{h,cpp} [@c6481cbf].
 //   AetherSDR is licensed under the GNU General Public License v3 or
-//   later. NereusSDR is also GPLv3. Attribution follows GPLv3 section 5
+//   later. Longpath is also GPLv3. Attribution follows GPLv3 section 5
 //   requirements.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-01  J.J. Boyd / KG4VCF  TNF (tunable notch filter) Task 3.
-//                 Reimplemented in C++20/Qt6 for NereusSDR, with
+//                 Reimplemented in C++20/Qt6 for Longpath, with
 //                 AI-assisted transformation via Anthropic Claude Code.
 //                 Thetis's index-is-identity MNotchDB gains a stable
 //                 monotonic `id` (the AetherSDR TnfModel addition), which
@@ -156,7 +156,7 @@ namespace Longpath {
 /// Canonical store for operator-placed notches (TNF).
 ///
 /// Global and slice-agnostic: Thetis fans one notch set to three fixed WDSP
-/// channel ids (console.cs:40271-40273 [v2.10.3.15]); NereusSDR fans it to
+/// channel ids (console.cs:40271-40273 [v2.10.3.15]); Longpath fans it to
 /// every live RxChannel. The list is an ORDERED QList and its position IS the
 /// WDSP notch index; every mutation keeps the two in lockstep (design
 /// section 5.2).
@@ -204,7 +204,7 @@ public:
 
     // Thetis constrains the notch centre to min_freq..max_freq
     // (console.cs:40256-40257 and :40076-40077 [v2.10.3.15], where
-    // max_freq = 61.44 at console.cs:15552 [v2.10.3.15]). NereusSDR has no
+    // max_freq = 61.44 at console.cs:15552 [v2.10.3.15]). Longpath has no
     // radio frequency-range capability field yet (design section 5.4), so the
     // notch constrain reuses the bounds VfoWidget already clamps operator
     // frequency entry to.

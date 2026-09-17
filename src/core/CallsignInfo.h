@@ -1,7 +1,7 @@
 #pragma once
 
 // =================================================================
-// src/core/CallsignInfo.h  (NereusSDR)
+// src/core/CallsignInfo.h  (Longpath)
 // =================================================================
 //
 // Source attribution (AetherSDR — GPLv3):
@@ -13,14 +13,14 @@
 //   This file is a port of AetherSDR `src/core/CallsignInfo.h` and the
 //   Callsigns:: helpers from `src/core/CallsignUtils.h` [@3a1f59e].
 //   AetherSDR is licensed under the GNU General Public License v3.
-//   NereusSDR is also GPLv3. Attribution follows GPLv3 §5 requirements.
+//   Longpath is also GPLv3. Attribution follows GPLv3 §5 requirements.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-07 — Ported to NereusSDR by Martin Fischer, AI-assisted via
 //                 Anthropic Claude (Cowork). Namespace AetherSDR →
-//                 NereusSDR. AetherSDR's JSON cache round-trip and its
-//                 cty.dat prefix-fallback fields are omitted: NereusSDR
+//                 Longpath. AetherSDR's JSON cache round-trip and its
+//                 cty.dat prefix-fallback fields are omitted: Longpath
 //                 reads cty.dat through CtyDatParser instead, and there
 //                 is no lookup cache here yet.
 // =================================================================

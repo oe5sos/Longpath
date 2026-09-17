@@ -1,10 +1,10 @@
 // =================================================================
-// tests/tst_tx_interlock_policy.cpp  (NereusSDR)
+// tests/tst_tx_interlock_policy.cpp  (Longpath)
 // =================================================================
-// NereusSDR-native test. No AetherSDR equivalent; TxInterlockPolicy is a
-// NereusSDR-native class per design doc §4.9.
+// Longpath-native test. No AetherSDR equivalent; TxInterlockPolicy is a
+// Longpath-native class per design doc §4.9.
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-19  Created by J.J. Boyd (KG4VCF), with AI-assisted
 //                 transformation via Anthropic Claude Code.
 //                 Tests: disabledAlwaysAllows, blockDeniesWhenAmpStandby,

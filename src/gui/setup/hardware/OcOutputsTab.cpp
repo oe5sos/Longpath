@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/setup/hardware/OcOutputsTab.cpp  (NereusSDR)
+// src/gui/setup/hardware/OcOutputsTab.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
@@ -7,7 +7,7 @@
 //   tpOCSWLControl (tcOCOutputs container tab pages)
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Initial placeholder stub. J.J. Boyd (KG4VCF).
 //   2026-04-20 — Refactored into parent QTabWidget hosting two sub-sub-tabs:
 //                HF (OcOutputsHfTab — full RX/TX matrix + actions + USB BCD
@@ -101,7 +101,7 @@ OcOutputsTab::OcOutputsTab(RadioModel* model, QWidget* parent)
     // OC Control / Hermes Ctrl tab that hosts the OC matrix; it does NOT
     // expose per-bit User Dig Out checkboxes upstream — those bits ship
     // out via networkproto1.c bank 11 C3 but with no UI surface in Thetis.
-    // This minimal 4-checkbox UI closes the NereusSDR audit gap (hasPennyLane
+    // This minimal 4-checkbox UI closes the Longpath audit gap (hasPennyLane
     // populated on every HPSDR board but previously had zero consumers); a
     // richer per-pin "OC pin function" combo-box matrix is left as a future
     // task if/when bench testing identifies a real user need.

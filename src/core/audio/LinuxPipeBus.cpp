@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/audio/LinuxPipeBus.cpp  (NereusSDR)
+// src/core/audio/LinuxPipeBus.cpp  (Longpath)
 // =================================================================
 //
 // Ported from AetherSDR source:
@@ -7,15 +7,15 @@
 //
 // AetherSDR is licensed under the GNU General Public License v3; see
 // https://github.com/ten9876/AetherSDR for the contributor list and
-// project-level LICENSE. NereusSDR is also GPLv3. AetherSDR source
+// project-level LICENSE. Longpath is also GPLv3. AetherSDR source
 // files carry no per-file GPL header; attribution is at project level
 // per AetherSDR convention.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-19 — Ported/adapted in C++20 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
-//                 Claude Code. Adapted to NereusSDR IAudioBus contract:
+//                 Claude Code. Adapted to Longpath IAudioBus contract:
 //                 monolithic PipeWireAudioBridge decomposed into per-endpoint
 //                 LinuxPipeBus instances (Role enum for Vax1..4 / TxInput),
 //                 QObject/signals dropped in favour of atomic metering,
@@ -194,7 +194,7 @@ bool LinuxPipeBus::open(const AudioFormat& format) {
     // is what we need to unload in close().
     QStringList pactlArgs;
     if (isProducer()) {
-        // Role::Vax1..4 — pipe-source: NereusSDR writes, apps (WSJT-X etc.) read.
+        // Role::Vax1..4 — pipe-source: Longpath writes, apps (WSJT-X etc.) read.
         const int vaxNum = static_cast<int>(m_role);
         const QString sourceName = QStringLiteral("longpath-vax-%1").arg(vaxNum);
         const QString sourceDesc = QStringLiteral("Longpath VAX %1").arg(vaxNum);
@@ -209,7 +209,7 @@ bool LinuxPipeBus::open(const AudioFormat& format) {
             QStringLiteral("channels=2"),
         };
     } else {
-        // Role::TxInput — pipe-sink: apps write TX audio, NereusSDR reads.
+        // Role::TxInput — pipe-sink: apps write TX audio, Longpath reads.
         // Small pipe_size (~1024 bytes at 48 kHz stereo float32 ≈ 2.7ms)
         // keeps TX latency low for digital modes like FT8/FT4.
         pactlArgs = {

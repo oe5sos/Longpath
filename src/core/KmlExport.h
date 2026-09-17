@@ -1,13 +1,13 @@
 #pragma once
 
 // =================================================================
-// src/core/KmlExport.h  (NereusSDR)
+// src/core/KmlExport.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // The logbook as a KML document, for Google Earth. The native map
-// answers questions inside NereusSDR; this answers "show me my log on
+// answers questions inside Longpath; this answers "show me my log on
 // the best imagery there is", which is Google's, and Google Earth is
 // the only way to it — the imagery cannot be embedded here.
 //
@@ -24,7 +24,7 @@
 //     name, QTH, locator, band, mode, reports, distance, bearing.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-10 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
 // =================================================================

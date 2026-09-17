@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_container_grab_handle.cpp  (NereusSDR)
+// tests/tst_container_grab_handle.cpp  (Longpath)
 // =================================================================
 //
 // Der Griff, an dem ein geloester Container haengt.
@@ -24,12 +24,12 @@
 // herausfinden muss.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-19 — Original fuer NereusSDR von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
 // =================================================================
 
-// no-port-check: NereusSDR-original test file.
+// no-port-check: Longpath-original test file.
 
 #include <QtTest>
 #include <QLabel>

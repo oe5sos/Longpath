@@ -1,8 +1,8 @@
 // =================================================================
-// tests/tst_mox_controller_multicast_signals.cpp  (NereusSDR)
+// tests/tst_mox_controller_multicast_signals.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original test. No Thetis port at this layer.
+// Longpath-original test. No Thetis port at this layer.
 //
 // Verifies the multicast Pre/Post MOX state-change signals added in
 // Phase 3M-1c chunks C.2 / C.3 / C.4:
@@ -27,7 +27,7 @@
 // observer plug-in points (PS form, TCI server, MeterPoller, recorder…).
 // =================================================================
 
-// no-port-check: NereusSDR-original test file.
+// no-port-check: Longpath-original test file.
 
 #include <QtTest/QtTest>
 #include <QSignalSpy>

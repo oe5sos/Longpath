@@ -1,8 +1,8 @@
 // =================================================================
-// src/gui/setup/PgxlInterlockPage.cpp  (NereusSDR)
+// src/gui/setup/PgxlInterlockPage.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-native Setup -> Transmit -> PGXL Interlock page.
+// Longpath-native Setup -> Transmit -> PGXL Interlock page.
 // See PgxlInterlockPage.h for full design notes.
 //
 // AI tooling: Anthropic Claude Code.

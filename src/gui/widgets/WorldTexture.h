@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/gui/widgets/WorldTexture.h  (NereusSDR)
+// src/gui/widgets/WorldTexture.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // One decoded copy of the operator's world image, shared by everything
 // that draws the Earth.
@@ -34,7 +34,7 @@
 // von der Auswahl nichts weiter.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
 //   2026-09-02 — Photo style (Muted/NightWash/Crisp) added, von Martin

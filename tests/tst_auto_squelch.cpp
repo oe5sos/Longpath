@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_auto_squelch.cpp  (NereusSDR)
+// tests/tst_auto_squelch.cpp  (Longpath)
 // =================================================================
 //
 // Die Squelch-Automatik: Schwelle = Rauschboden + Abstand.
@@ -12,12 +12,12 @@
 // dieselbe Entscheidung wie bei tst_squelch_line und tst_tune_guide.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-19 — Original fuer NereusSDR von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
 // =================================================================
 
-// no-port-check: NereusSDR-original test file.
+// no-port-check: Longpath-original test file.
 
 #include <QtTest>
 #include <QSignalSpy>

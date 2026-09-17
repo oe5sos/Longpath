@@ -1,15 +1,15 @@
 // =================================================================
-// src/gui/applets/TciApplet.cpp  (NereusSDR)
+// src/gui/applets/TciApplet.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original — TCI status applet for Container #0 stack.
+// Longpath-original — TCI status applet for Container #0 stack.
 //
 // This file contains no ported Thetis logic; it is a new UI surface
-// built to NereusSDR design conventions (Template C, plain English
+// built to Longpath design conventions (Template C, plain English
 // Qt strings, AppSettings persistence, StyleConstants palette).
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-10 — Phase 3J-1 Task 21.1 by J.J. Boyd (KG4VCF);
 //                AI-assisted transformation via Anthropic Claude Code.
 //                Header row (status dot + label + port + client count

@@ -1,6 +1,6 @@
-// tests/tst_theme_filter.cpp  (NereusSDR)
+// tests/tst_theme_filter.cpp  (Longpath)
 //
-// NereusSDR-original. No Thetis port.
+// Longpath-original. No Thetis port.
 //
 // ── Der Download-Fall, wörtlich ──────────────────────────────────────
 //

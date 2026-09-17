@@ -1,8 +1,8 @@
 // =================================================================
-// src/core/SliceStreamAllocator.cpp  (NereusSDR)
+// src/core/SliceStreamAllocator.cpp  (Longpath)
 // =================================================================
 //
-// no-port-check: NereusSDR-original. See SliceStreamAllocator.h for
+// no-port-check: Longpath-original. See SliceStreamAllocator.h for
 // the full rationale and Modification history block.
 //
 // =================================================================

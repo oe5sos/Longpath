@@ -1,7 +1,7 @@
 #pragma once
 
 // =================================================================
-// src/core/SignalHistoryStore.h  (NereusSDR)
+// src/core/SignalHistoryStore.h  (Longpath)
 // =================================================================
 //
 // Ported from AetherSDR (https://github.com/aethersdr/AetherSDR),
@@ -51,7 +51,7 @@
 // Alle Zeitkonstanten und Schwellen sind unveraendert uebernommen.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-19 — Ported to NereusSDR by Martin Fischer, AI-assisted via
 //                 Anthropic Claude (Cowork).
 // =================================================================

@@ -1,7 +1,7 @@
-// no-port-check: NereusSDR-original unit-test file.  All Thetis source cites
+// no-port-check: Longpath-original unit-test file.  All Thetis source cites
 // are in TransmitModel.h/cpp.
 // =================================================================
-// tests/tst_transmit_model_eq_lev_alc.cpp  (NereusSDR)
+// tests/tst_transmit_model_eq_lev_alc.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for TransmitModel TX EQ + Leveler + ALC properties added in
@@ -307,7 +307,7 @@ private slots:
 
     void setTxEqPreamp_aboveMax_clamps()
     {
-        // NereusSDR clamp [-12, 15] (matches Thetis spinbox precedent —
+        // Longpath clamp [-12, 15] (matches Thetis spinbox precedent —
         // udTXEQ pre-amp slider; tighter than the unbounded TXEQPreamp int).
         TransmitModel t;
         t.setTxEqPreamp(999);

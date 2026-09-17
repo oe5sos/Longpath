@@ -1,6 +1,6 @@
-// no-port-check: NereusSDR-original unit-test file.
+// no-port-check: Longpath-original unit-test file.
 // =================================================================
-// tests/tst_tx_bandwidth_persistence.cpp  (NereusSDR)
+// tests/tst_tx_bandwidth_persistence.cpp  (Longpath)
 // =================================================================
 //
 // TDD for Plan 4 Task 2 (D1) — FilterLow/FilterHigh schema additions.
@@ -17,7 +17,7 @@
 // don't collide with factory profiles or other test suites.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-02 — Original implementation for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted authoring via Anthropic
 //                 Claude Code (Plan 4 Cluster A).

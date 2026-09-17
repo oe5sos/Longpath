@@ -1,7 +1,7 @@
 // tst_radio_model_3m1b_ownership.cpp
 //
-// no-port-check: Test file exercises NereusSDR API; no C# is translated here.
-// NereusSDR-original integration glue (Phase 3M-1b Task L.1) — strategy-pattern
+// no-port-check: Test file exercises Longpath API; no C# is translated here.
+// Longpath-original integration glue (Phase 3M-1b Task L.1) — strategy-pattern
 // mic sources and composite router owned by RadioModel.  Phase 3M-1c TX pump
 // architecture redesign extends this with TxWorkerThread ownership cases.
 //

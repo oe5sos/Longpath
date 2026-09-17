@@ -1,7 +1,7 @@
-// no-port-check: NereusSDR-original unit-test file.  RADE channel-swap
-// is a NereusSDR-native extension; no Thetis equivalent.
+// no-port-check: Longpath-original unit-test file.  RADE channel-swap
+// is a Longpath-native extension; no Thetis equivalent.
 // =================================================================
-// tests/tst_slice_model_rade_swap.cpp  (NereusSDR)
+// tests/tst_slice_model_rade_swap.cpp  (Longpath)
 // =================================================================
 //
 // Phase 3R Task J3 + K-bench unit tests: SliceModel::setDspMode
@@ -60,7 +60,7 @@
 //   9. wdspModeForMapsRadeToSsb
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-11 - New test file for Phase 3R Task J3.  J.J. Boyd
 //                 (KG4VCF), with AI-assisted implementation via
 //                 Anthropic Claude Code.

@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/setup/hardware/Hl2OptionsTab.cpp  (NereusSDR)
+// src/gui/setup/hardware/Hl2OptionsTab.cpp  (Longpath)
 // =================================================================
 //
 // Ported from mi0bot-Thetis source:
@@ -10,7 +10,7 @@
 // See Hl2OptionsTab.h for the full design + scope rationale.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-30 — New for Phase 3L HL2 Filter visibility brainstorm.
 //                Phase 3L commit #9.  Three group boxes:
 //                Hermes Lite Options + I2C Control + I/O Pin State.
@@ -294,7 +294,7 @@ void Hl2OptionsTab::buildI2cControl(QWidget* parent)
     grid->addWidget(m_chkI2cEnable, row, 0, 1, 4);
     ++row;
 
-    // Bus radio — bus 0 deferred per design §4 (no NereusSDR I2cTxn path
+    // Bus radio — bus 0 deferred per design §4 (no Longpath I2cTxn path
     // for bus 0 today), so render as disabled with explanatory tooltip.
     grid->addWidget(new QLabel(tr("Bus:"), parent), row, 0);
     auto* bus0 = new QCheckBox(tr("0 (deferred)"), parent);

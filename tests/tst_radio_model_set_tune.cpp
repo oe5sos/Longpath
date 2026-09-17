@@ -1,6 +1,6 @@
 // tst_radio_model_set_tune.cpp
 //
-// no-port-check: Test file exercises NereusSDR API; Thetis behavior is
+// no-port-check: Test file exercises Longpath API; Thetis behavior is
 // cited in RadioModel.cpp via pre-code review §3.2/§3.3 and
 // Thetis console.cs:29978-30157 [v2.10.3.13] — no C# is translated here.
 //
@@ -397,7 +397,7 @@ private slots:
     // We verify via the MockConnection::txDriveLog.
     // tunePowerForBand defaults to TransmitModel::kDefaultTunePowerW for
 // all bands. Thetis uses 50 (console.cs:1819-1820 [v2.10.3.13]);
-// NereusSDR lowered it to 1 on 2026-08-14 — see the constant.
+// Longpath lowered it to 1 on 2026-08-14 — see the constant.
     void tuneOnPushesTunePower()
     {
         RadioModel model;

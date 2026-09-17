@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_audio_engine_speakers_live_reconfig.cpp  (NereusSDR)
+// tests/tst_audio_engine_speakers_live_reconfig.cpp  (Longpath)
 // =================================================================
 //
 // Exercises AudioEngine live-reconfig safety for the speakers bus —

@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/PerfMonitor.cpp  (NereusSDR-native)
+// src/core/PerfMonitor.cpp  (Longpath-native)
 // =================================================================
 // 2026-05-26  J.J. Boyd (KG4VCF), AI-assisted via Anthropic Claude.
 // See PerfMonitor.h for design rationale.

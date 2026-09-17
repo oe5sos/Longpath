@@ -1,8 +1,8 @@
 // =================================================================
-// src/core/LanDiscovery.cpp  (NereusSDR)
+// src/core/LanDiscovery.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-native UDP listener for PowerGeniusXL / TeragenXL
+// Longpath-native UDP listener for PowerGeniusXL / TeragenXL
 // announcements on ports 9008 and 9010. Parses device model,
 // IP address, version, serial, and nickname using the official
 // FlexRadio regex. Deduplicates by serial number before emitting

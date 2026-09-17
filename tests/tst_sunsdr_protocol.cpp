@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_sunsdr_protocol.cpp  (NereusSDR)
+// tests/tst_sunsdr_protocol.cpp  (Longpath)
 // =================================================================
 //
 // SunSDR2 wire framing — tested against REAL captured bytes, not just
@@ -14,12 +14,12 @@
 // tonight: the bytes already came from reality once.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-25 — Original for NereusSDR/Longpath by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================
 
-// no-port-check: NereusSDR-original test file. Fixture byte sequences
+// no-port-check: Longpath-original test file. Fixture byte sequences
 // are captured wire data (see file header), not ported code.
 
 #include <QtTest>

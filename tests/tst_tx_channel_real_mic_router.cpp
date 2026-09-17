@@ -25,7 +25,7 @@ warren@wpratt.com
 */
 
 // =================================================================
-// tests/tst_tx_channel_real_mic_router.cpp  (NereusSDR)
+// tests/tst_tx_channel_real_mic_router.cpp  (Longpath)
 // =================================================================
 //
 // No Thetis code is ported in this test file. The test exercises:
@@ -58,7 +58,7 @@ warren@wpratt.com
 // Thetis source cites.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-27 — New test for Phase 3M-1b Task D.1: verify real TxMicRouter
 //                 drives fexchange2 with Q=0.  Test seam (tickForTest /
 //                 inIForTest / inQForTest) added to TxChannel.h under
@@ -71,7 +71,7 @@ warren@wpratt.com
 //                 J.J. Boyd (KG4VCF), AI-assisted via Anthropic Claude Code.
 // =================================================================
 
-// no-port-check: NereusSDR-original test file. All Thetis source cites are
+// no-port-check: Longpath-original test file. All Thetis source cites are
 // in TxChannel.h/cpp. LONGPATH_BUILD_TESTS must be defined (see CMakeLists.txt).
 
 #include <QtTest/QtTest>

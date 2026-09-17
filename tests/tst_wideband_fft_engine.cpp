@@ -1,7 +1,7 @@
 // =================================================================
-// tests/tst_wideband_fft_engine.cpp  (NereusSDR)
+// tests/tst_wideband_fft_engine.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure.
+// no-port-check: Longpath-original test infrastructure.
 //
 // Phase 3F Sub-Epic F Task 4: WidebandFftEngine wraps an FFTW3
 // 16384-point real-to-complex plan. Output: 8192 dBm-style bins

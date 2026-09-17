@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // =================================================================
-// src/core/RadeChannel.h  (NereusSDR)
+// src/core/RadeChannel.h  (Longpath)
 // =================================================================
 //
-// NereusSDR - RadeChannel: host-side wrapper around the RADE (Radio
+// Longpath - RadeChannel: host-side wrapper around the RADE (Radio
 // Autoencoder) v1 codec for FreeDV digital voice on OpenHPSDR radios.
 //
 // Ported from two upstreams (hybrid port):
@@ -31,7 +31,7 @@
 // License (upstream):
 //   - AetherSDR has no per-file copyright header, so per
 //     docs/attribution/HOW-TO-PORT.md rule 6 we cite the project URL
-//     and primary author at NereusSDR block level rather than copying
+//     and primary author at Longpath block level rather than copying
 //     a verbatim header that does not exist:
 //       Copyright (C) 2024-2026  Jeremy (KK7GWY) / AetherSDR contributors
 //         - per https://github.com/ten9876/AetherSDR (GPLv3; see
@@ -48,7 +48,7 @@
 //
 // LGPL is upgrade-compatible to GPL-3 (LGPL section 3 conversion
 // clause); the BSD-2-Clause file-header carve-out is GPL-compatible
-// by its own terms. NereusSDR ships under GPLv3.
+// by its own terms. Longpath ships under GPLv3.
 //
 // --- From freedv-gui/src/pipeline/RADEReceiveStep.h ---
 // --- From freedv-gui/src/pipeline/RADEReceiveStep.cpp ---
@@ -92,7 +92,7 @@
 //=========================================================================
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-11  J.J. Boyd / KG4VCF  Phase 3R Task I1. Initial skeleton
 //                 port. Hybrid sourcing: class layout / Q_OBJECT shape
 //                 / signal-slot surface / member ownership / dtor
@@ -101,7 +101,7 @@
 //                 into (rade_open call shape, LPCNet feature extractor,
 //                 FARGAN vocoder warm-up, embedded rade_text channel)
 //                 from freedv-gui src/pipeline/RADE{Receive,Transmit}
-//                 Step.{h,cpp} [@77e793a]. NereusSDR divergences vs
+//                 Step.{h,cpp} [@77e793a]. Longpath divergences vs
 //                 AetherSDR: start() takes a model-path argument (the
 //                 OpenHPSDR client must load the user-selected .f32
 //                 model file rather than hard-coding "dummy" the way
@@ -134,7 +134,7 @@
 //                 (feedTxAudio body) [@0cd4559] cross-checked against
 //                 freedv-gui src/pipeline/RADETransmitStep.cpp
 //                 :216-247 (restartVocoder / reset) [@77e793a].
-//                 NereusSDR divergence vs AetherSDR: txEncode accepts
+//                 Longpath divergence vs AetherSDR: txEncode accepts
 //                 16 kHz mono int16 speech samples directly (the
 //                 WdspEngine TX pump already feeds 16 kHz mono per the
 //                 plan), so AetherSDR's 24 kHz stereo float -> 16 kHz
@@ -178,7 +178,7 @@ struct LPCNetEncState;
 
 namespace Longpath {
 
-// Forward declarations for the NereusSDR-native helpers RadeChannel
+// Forward declarations for the Longpath-native helpers RadeChannel
 // owns by unique_ptr. The full type definitions live in Resampler.h
 // and RadeText.h; RadeChannel.cpp includes them so the unique_ptr
 // destructors resolve.
@@ -205,7 +205,7 @@ class RadeText;
 //                                           isActive() back to false.
 //
 // Signals follow the AetherSDR surface (syncChanged / snrChanged /
-// freqOffsetChanged) plus the NereusSDR-specific rxTextDecoded
+// freqOffsetChanged) plus the Longpath-specific rxTextDecoded
 // signal that I4 will hook up to the embedded rade_text channel.
 class RadeChannel : public QObject {
     Q_OBJECT
@@ -292,7 +292,7 @@ private:
     // in unique_ptr<void, FarganDeleter> without dragging the opus
     // FARGAN header into the include surface. The operator() resolves
     // to `delete static_cast<FARGANState*>(p)` in RadeChannel.cpp where
-    // fargan.h is included. NereusSDR-only refactor of AetherSDR's
+    // fargan.h is included. Longpath-only refactor of AetherSDR's
     // raw-void* pattern at RADEEngine.h:8-12 [@0cd4559] to comply with
     // the project's "no raw new/delete" rule (CLAUDE.md).
     struct FarganDeleter {
@@ -328,11 +328,11 @@ private:
 
     // Resampler chain. The AetherSDR client owns four resamplers
     // (24kHz<->8kHz for the modem leg and 24kHz<->16kHz for the
-    // LPCNet/FARGAN leg). NereusSDR's TX-side input is 16 kHz mono
+    // LPCNet/FARGAN leg). Longpath's TX-side input is 16 kHz mono
     // (per txEncode's contract), but the RX-side output is still
     // 24 kHz stereo for the speaker bus, so we keep the full set.
     //
-    // NereusSDR divergence: AetherSDR takes stereo DAX audio and
+    // Longpath divergence: AetherSDR takes stereo DAX audio and
     // averages L+R into a single mono leg via processStereoToMono
     // before feeding RADE_COMP with imag=0. Our processIq receives
     // I/Q from the OpenHPSDR DDC, which is already complex baseband,

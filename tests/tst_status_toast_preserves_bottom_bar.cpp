@@ -1,9 +1,9 @@
 // =================================================================
-// tests/tst_status_toast_preserves_bottom_bar.cpp  (NereusSDR)
+// tests/tst_status_toast_preserves_bottom_bar.cpp  (Longpath)
 // =================================================================
 //
-// no-port-check: NereusSDR-original. StatusToast has no upstream; the
-// behaviour under test is a Qt contract plus a NereusSDR decision.
+// no-port-check: Longpath-original. StatusToast has no upstream; the
+// behaviour under test is a Qt contract plus a Longpath decision.
 //
 // Bench report 2026-07-30 (JJ, KG4VCF): pressing TUNE with PureSignal
 // active replaced the entire bottom bar with a single line of text for

@@ -1,7 +1,7 @@
 // src/gui/RelayBar.cpp
 
 // =================================================================
-// src/gui/RelayBar.cpp  (NereusSDR)
+// src/gui/RelayBar.cpp  (Longpath)
 // =================================================================
 //
 // Source attribution (AetherSDR, GPLv3):
@@ -12,10 +12,10 @@
 //
 //   This file is a port or structural derivative of AetherSDR source.
 //   AetherSDR is licensed under the GNU General Public License v3.
-//   NereusSDR is also GPLv3. Attribution follows GPLv3 §5 requirements.
+//   Longpath is also GPLv3. Attribution follows GPLv3 §5 requirements.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-18  Extracted RelayBar widget from AetherSDR
 //                 src/gui/HGauge.h (inner class) into standalone
 //                 NereusSDR widget by J.J. Boyd (KG4VCF), with

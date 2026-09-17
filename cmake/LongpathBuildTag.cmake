@@ -35,7 +35,7 @@ set(_tag "${LONGPATH_OVERRIDE}")
 if(NOT _tag AND LONGPATH_GIT_EXECUTABLE)
     # Release gate. release.yml checks out `ref: <tag>`, so HEAD sits exactly
     # on a tag there and nowhere else. Release artifacts keep the clean
-    # "NereusSDR 0.5.2" title and get no tag, dirty tree or not: a release
+    # "Longpath 0.5.2" title and get no tag, dirty tree or not: a release
     # build must never acquire a suffix just because a workflow step touched
     # a tracked file before the compile.
     execute_process(

@@ -1,8 +1,8 @@
 // =================================================================
-// src/gui/setup/AudioBackendStrip.cpp  (NereusSDR)
+// src/gui/setup/AudioBackendStrip.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original diagnostic strip shown at the top of each
+// Longpath-original diagnostic strip shown at the top of each
 // Setup → Audio sub-page.
 // See AudioBackendStrip.h for the full header.
 //

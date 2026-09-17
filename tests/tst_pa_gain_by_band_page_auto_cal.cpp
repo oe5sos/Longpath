@@ -1,4 +1,4 @@
-// tests/tst_pa_gain_by_band_page_auto_cal.cpp  (NereusSDR)
+// tests/tst_pa_gain_by_band_page_auto_cal.cpp  (Longpath)
 //
 // Phase 7 of issue #167 PA-cal safety hotfix.
 // no-port-check: test fixture — no Thetis attribution required.
@@ -13,7 +13,7 @@
 //   * HF-only band loop (B160M..B6M; VHF skipped — Thetis sweep does not
 //     iterate VHF; gain table for VHF must be set manually).
 //   * For each band: engage MOX/TUNE, settle, read alex_fwd, compute
-//     diff_dBm, write into PaProfile via setBypassGain (NereusSDR maps to
+//     diff_dBm, write into PaProfile via setBypassGain (Longpath maps to
 //     setAdjust on the per-step matrix, plus setGainForBand on the base
 //     row when step == 0 since drive 10% is closest to "calibrate base").
 //   * Halts on cancel (chkAutoPACalibrate unchecked) or when observed

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - SpotCollectorClient DX-line parser tests
+// Longpath - SpotCollectorClient DX-line parser tests
 //
 // Phase 3J-2 Task B1. Pins the contract that SpotCollectorClient parses
 // the standard DXLab "DX de" UDP line format and tags RBN-suffixed

@@ -1,5 +1,5 @@
 // =================================================================
-// src/models/NotchModel.cpp  (NereusSDR)
+// src/models/NotchModel.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources [v2.10.3.15] (commit 3759d096):
@@ -22,17 +22,17 @@
 //
 //   AetherSDR has no per-file copyright header, so per
 //   docs/attribution/HOW-TO-PORT.md rule 6 the project URL and primary
-//   author are cited at NereusSDR block level rather than copying a
+//   author are cited at Longpath block level rather than copying a
 //   verbatim header that does not exist. The stable-id notch-store shape
 //   is a port of AetherSDR src/models/TnfModel.{h,cpp} [@c6481cbf].
 //   AetherSDR is licensed under the GNU General Public License v3 or
-//   later. NereusSDR is also GPLv3. Attribution follows GPLv3 section 5
+//   later. Longpath is also GPLv3. Attribution follows GPLv3 section 5
 //   requirements.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-01  J.J. Boyd / KG4VCF  TNF (tunable notch filter) Task 3.
-//                 Reimplemented in C++20/Qt6 for NereusSDR, with
+//                 Reimplemented in C++20/Qt6 for Longpath, with
 //                 AI-assisted transformation via Anthropic Claude Code.
 //                 Thetis's index-is-identity MNotchDB gains a stable
 //                 monotonic `id` (the AetherSDR TnfModel addition), which
@@ -237,7 +237,7 @@ QList<Notch> NotchModel::notchesInBandwidth(double centreHz,
 //MW0LGE return first notch found that surrounds a given frequency in the given bandwidth
 // From Thetis radio.cs:4297-4325 [v2.10.3.15],
 // MNotchDB.NotchThatSurroundsFrequencyInBW.
-// Upstream materialises NotchesInBW() and walks the copy. NereusSDR folds
+// Upstream materialises NotchesInBW() and walks the copy. Longpath folds
 // the same predicate into one pass over m_notches so the returned pointer
 // stays valid; iteration order is identical because NotchesInBW preserves
 // list order.
@@ -281,7 +281,7 @@ const Notch* NotchModel::notchSurrounding(double centreHz, int lowHz,
 //
 // The Thetis CW-pitch term is deliberately absent (design section 1.2):
 // upstream TNFAdd's +cw_pitch and AddNotch's -cw_pitch cancel, and
-// NereusSDR keeps the CW pitch in the filter passband rather than on the
+// Longpath keeps the CW pitch in the filter passband rather than on the
 // DDC, so this shift alone is already correct.
 int NotchModel::notchSidebandShift(int filterLowHz, int filterHighHz)
 {
@@ -547,7 +547,7 @@ void NotchModel::setAutoIncrease(bool on)
 }
 
 // Thetis's equivalent operator switch is the chkVisualNotch checkbox on the
-// Display settings page, which drives its display layer directly. NereusSDR
+// Display settings page, which drives its display layer directly. Longpath
 // keeps the flag on the model and lets SpectrumWidget observe it; the
 // checkbox and its upstream cite live on the settings page.
 void NotchModel::setVisualEnabled(bool on)

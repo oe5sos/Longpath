@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - SpotHub dialog: see SpotHubDialog.h for the full
+// Longpath - SpotHub dialog: see SpotHubDialog.h for the full
 // port-citation header and the F1 / F2 / F3 / F4 task breakdown.
 //
 // Ported from AetherSDR src/gui/DxClusterDialog.cpp [@0cd4559]
 // (F2 ships per-source tab content; F3 Spot List and F4 Display
 // remain stubs).
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-11  J.J. Boyd / KG4VCF  Phase 3J-2 Task F1. Initial
 //                                    shell port; see header for full
 //                                    notes. AI tooling: Anthropic
@@ -24,7 +24,7 @@
 //                                    port verbatim from upstream
 //                                    `DxClusterDialog.cpp:637-1596
 //                                    [@0cd4559]`; PSK Reporter is
-//                                    NereusSDR-native and uses the
+//                                    Longpath-native and uses the
 //                                    same uniform shape with
 //                                    callsign + grid identity
 //                                    inputs. AppSettings keys and
@@ -48,7 +48,7 @@
 //                                    spotReceived(DxSpot) into the
 //                                    table model so the merged
 //                                    8-column view sees all sources.
-//                                    NereusSDR divergences from
+//                                    Longpath divergences from
 //                                    upstream: (1) band filters
 //                                    become checkable QPushButton
 //                                    "pills" instead of upstream
@@ -66,7 +66,7 @@
 //                                    SpotBandFilter_<band> for band
 //                                    pills; new SpotSourceFilter_
 //                                    <source> for source pills
-//                                    (NereusSDR-native). AI tooling:
+//                                    (Longpath-native). AI tooling:
 //                                    Anthropic Claude Code.
 //   2026-05-11  J.J. Boyd / KG4VCF  Phase 3J-2 Task F4. Display tab
 //                                    content. Folds AetherSDR's
@@ -214,7 +214,7 @@ constexpr const char* kCmdEditStyle =
     "QLineEdit { background: #1a1a2a; color: #c8d8e8; "
     "border: 1px solid #203040; padding: 3px; font-family: monospace; }";
 
-// F3 (NereusSDR-native). Pill buttons for the band + source filter
+// F3 (Longpath-native). Pill buttons for the band + source filter
 // rows on the Spot List tab. Checked = pill lit (cyan accent), filter
 // passes that band/source. Unchecked = dim, filter hides it.
 constexpr const char* kFilterPillStyle =
@@ -246,14 +246,14 @@ QString swatchStyle(const QColor& c) {
 } // namespace
 
 // From AetherSDR src/gui/DxClusterDialog.cpp:230-273 [@0cd4559].
-// NereusSDR divergence: AetherSDR upstream takes a trailing
-// `RadioModel* radioModel` argument; NereusSDR replaces it with the
+// Longpath divergence: AetherSDR upstream takes a trailing
+// `RadioModel* radioModel` argument; Longpath replaces it with the
 // TCI-keyed `SpotModel* spots` (Phase 3J-2 Task D1). Routing of
 // `tuneRequested(double)` into the active RadioModel happens in
 // MainWindow when the dialog is instantiated. Replaces upstream's
 // HAVE_WEBSOCKETS-gated FreeDvClient with the always-built
-// FreeDVReporterClient (NereusSDR Task B5). Adds a PSK Reporter
-// tab between FreeDV and Spot List (NereusSDR-only). The pane
+// FreeDVReporterClient (Longpath Task B5). Adds a PSK Reporter
+// tab between FreeDV and Spot List (Longpath-only). The pane
 // stylesheet (panel border + tab colors) follows upstream verbatim.
 SpotHubDialog::SpotHubDialog(DxClusterClient* clusterClient,
                              DxClusterClient* rbnClient,
@@ -296,11 +296,11 @@ SpotHubDialog::SpotHubDialog(DxClusterClient* clusterClient,
         "QTabBar::tab:selected { background: #0f0f1a; color: #4a7ba8; border-bottom: none; }"));
 
     // Tab order matches AetherSDR upstream
-    // (src/gui/DxClusterDialog.cpp:262-271). NereusSDR adds the PSK
+    // (src/gui/DxClusterDialog.cpp:262-271). Longpath adds the PSK
     // Reporter tab between FreeDV and Spot List (Task F2 wires its
-    // content). FreeDV tab is unconditional in NereusSDR; upstream
+    // content). FreeDV tab is unconditional in Longpath; upstream
     // gated it on HAVE_WEBSOCKETS.
-    // Post-3J-2 UX fix: a NereusSDR-native Settings tab takes the
+    // Post-3J-2 UX fix: a Longpath-native Settings tab takes the
     // first position so the operator enters callsign + grid + FreeDV
     // status message once and Save propagates to every per-source
     // legacy key plus the canonical User/* keys.
@@ -354,14 +354,14 @@ void SpotHubDialog::restoreGeometryState()
     if (!st.isEmpty()) { restoreGeometry(st); }
 }
 
-// NereusSDR-native (no AetherSDR upstream). Post-3J-2 UX fix: the
+// Longpath-native (no AetherSDR upstream). Post-3J-2 UX fix: the
 // Settings tab takes the first position in the dialog and provides
 // one place for the operator to enter callsign + Maidenhead grid +
 // FreeDV status message. The Save button:
 //
 //   1. Validates: callsign non-empty, grid is 4 or 6 chars.
 //   2. Writes canonical keys: User/Callsign, User/GridSquare,
-//      FreeDvReporter/Message. These are what every NereusSDR module
+//      FreeDvReporter/Message. These are what every Longpath module
 //      that needs operator identity reads first.
 //   3. Propagates to legacy per-source keys for backward compat:
 //      DxClusterCallsign, RbnCallsign, PskReporterCallsign,
@@ -593,7 +593,7 @@ void SpotHubDialog::buildSettingsTab(QTabWidget* tabs)
         // station model never learns our grid.
         emit identitySaved(call, gridSquare, message);
 
-        // NereusSDR-native (2026-08-27, operator-requested follow-up):
+        // Longpath-native (2026-08-27, operator-requested follow-up):
         // same fix, same reason, for the Spot List's Dist/Brg columns.
         if (m_spotTableModel) {
             m_spotTableModel->setOurGridSquare(gridSquare);
@@ -667,7 +667,7 @@ void SpotHubDialog::buildSettingsTab(QTabWidget* tabs)
 // command input row. AetherSDR's per-source stylesheets, AppSettings
 // key names, default server (`dxc.nc7j.com:7300`), and signal
 // emission (`connectRequested(host, port, call)` /
-// `disconnectRequested`) preserved verbatim. NereusSDR addition:
+// `disconnectRequested`) preserved verbatim. Longpath addition:
 // objectName() on every test-relevant widget so smoke tests can
 // locate them via findChild().
 void SpotHubDialog::buildClusterTab(QTabWidget* tabs)
@@ -890,7 +890,7 @@ void SpotHubDialog::buildClusterTab(QTabWidget* tabs)
 // spinbox row. Defaults to `telnet.reversebeacon.net:7000` and falls
 // back to the cluster callsign when the RBN callsign is empty.
 // Signals: `rbnConnectRequested(host, port, call)` /
-// `rbnDisconnectRequested`. NereusSDR addition: objectName() on
+// `rbnDisconnectRequested`. Longpath addition: objectName() on
 // every test-relevant widget.
 void SpotHubDialog::buildRbnTab(QTabWidget* tabs)
 {
@@ -1127,7 +1127,7 @@ void SpotHubDialog::buildRbnTab(QTabWidget* tabs)
 // button + spot filter checkboxes (CQ / CQ POTA / Calling Me) with
 // inline color pickers + Default color picker + spot-life slider +
 // raw-event console. Signals: `wsjtxStartRequested(addr, port)` /
-// `wsjtxStopRequested`. NereusSDR addition: objectName() on every
+// `wsjtxStopRequested`. Longpath addition: objectName() on every
 // test-relevant widget.
 void SpotHubDialog::buildWsjtxTab(QTabWidget* tabs)
 {
@@ -1417,7 +1417,7 @@ void SpotHubDialog::buildWsjtxTab(QTabWidget* tabs)
 // SpotCollector tab: UDP port spinbox + help text + auto-start
 // toggle + start/stop button + status label + raw-event console.
 // Signals: `spotCollectorStartRequested(port)` /
-// `spotCollectorStopRequested`. NereusSDR addition: objectName() on
+// `spotCollectorStopRequested`. Longpath addition: objectName() on
 // every test-relevant widget.
 void SpotHubDialog::buildSpotCollectorTab(QTabWidget* tabs)
 {
@@ -1548,7 +1548,7 @@ void SpotHubDialog::buildSpotCollectorTab(QTabWidget* tabs)
 // POTA tab: HTTP polling-interval spinbox + auto-start toggle +
 // start/stop button + status label + raw-event console + spot
 // color picker. Signals: `potaStartRequested(interval)` /
-// `potaStopRequested`. NereusSDR addition: objectName() on every
+// `potaStopRequested`. Longpath addition: objectName() on every
 // test-relevant widget.
 void SpotHubDialog::buildPotaTab(QTabWidget* tabs)
 {
@@ -1700,7 +1700,7 @@ void SpotHubDialog::buildPotaTab(QTabWidget* tabs)
     tabs->addTab(page, "POTA");
 }
 
-// NereusSDR-native (2026-09-03, no upstream equivalent -- see
+// Longpath-native (2026-09-03, no upstream equivalent -- see
 // SotaClient.h). Same shape as buildPotaTab() above; the one behaviour
 // difference the operator sees is the poll interval floor: SOTA's own
 // published guidance is at most one request per 60 seconds, and
@@ -1855,7 +1855,7 @@ void SpotHubDialog::buildSotaTab(QTabWidget* tabs)
     tabs->addTab(page, "SOTA");
 }
 
-// NereusSDR-native (2026-08-27, operator-requested follow-up, no
+// Longpath-native (2026-08-27, operator-requested follow-up, no
 // upstream equivalent). Alerts tab: POTA's "Scheduled Activations" --
 // future/planned activations, distinct from the live Spot List.
 // Endpoint verified live before writing this (api.pota.app/activation,
@@ -1953,12 +1953,12 @@ void SpotHubDialog::refreshAlerts()
 // From AetherSDR src/gui/DxClusterDialog.cpp:1482-1596 [@0cd4559].
 // FreeDV tab: server label (qso.freedv.org, WebSocket) + auto-start
 // toggle + start/stop button + status label + raw-event console +
-// spot color picker. NereusSDR divergence from upstream: AetherSDR
-// gates the entire builder on HAVE_WEBSOCKETS; NereusSDR builds
+// spot color picker. Longpath divergence from upstream: AetherSDR
+// gates the entire builder on HAVE_WEBSOCKETS; Longpath builds
 // unconditionally because `FreeDVReporterClient` (Task B5) is a
 // native QWebSocket + nlohmann::json port rather than an optional
 // dependency. Signals: `freedvStartRequested` / `freedvStopRequested`.
-// NereusSDR addition: objectName() on every test-relevant widget.
+// Longpath addition: objectName() on every test-relevant widget.
 void SpotHubDialog::buildFreeDvTab(QTabWidget* tabs)
 {
     auto* page = new QWidget;
@@ -2170,9 +2170,9 @@ void SpotHubDialog::buildFreeDvTab(QTabWidget* tabs)
         prefsLayout->addWidget(pskChk);
 
         // Direction display 3-way combo, mirroring freedv-gui's
-        // reportingDirectionAsCardinal toggle. NereusSDR exposes a
+        // reportingDirectionAsCardinal toggle. Longpath exposes a
         // 3-way choice because the existing "045° NE" combined form
-        // was a NereusSDR-native compromise; the upstream is binary.
+        // was a Longpath-native compromise; the upstream is binary.
         auto* dirRow = new QHBoxLayout;
         dirRow->setSpacing(4);
         auto* dirLabel = new QLabel("Heading display:");
@@ -2297,16 +2297,16 @@ void SpotHubDialog::buildFreeDvTab(QTabWidget* tabs)
     tabs->addTab(page, "FreeDV");
 }
 
-// NereusSDR-native, no upstream. AetherSDR has no PSK Reporter tab.
+// Longpath-native, no upstream. AetherSDR has no PSK Reporter tab.
 // PSK Reporter is a UDP/IPFIX reporting service for digital-mode
-// activity; NereusSDR ships the `PskReporterClient` (Phase 3J-2
+// activity; Longpath ships the `PskReporterClient` (Phase 3J-2
 // Task B6, ported from `freedv-gui src/reporting/pskreporter.cpp`).
 // Tab follows the F2 uniform template: identity fields (callsign +
 // grid) + auto-start toggle + start/stop button + status label +
 // raw-event console. Default server is `report.pskreporter.info:4739`
 // (matches PskReporterClient default). Signals:
 // `pskStartRequested` / `pskStopRequested`. PSK Reporter is
-// primarily a write-only flow (NereusSDR sends decodes to the
+// primarily a write-only flow (Longpath sends decodes to the
 // pool); the console shows queued / sent record counts so users
 // can confirm reports are flowing.
 void SpotHubDialog::buildPskTab(QTabWidget* tabs)
@@ -2480,7 +2480,7 @@ void SpotHubDialog::buildPskTab(QTabWidget* tabs)
 }
 
 // From AetherSDR src/gui/DxClusterDialog.cpp:1599-1717 [@0cd4559]
-// + NereusSDR Task F3 extensions documented below.
+// + Longpath Task F3 extensions documented below.
 //
 // Spot List tab: hosts the merged 8-column QTableView bound to a
 // BandFilterProxy wrapped around a SpotTableModel that aggregates
@@ -2489,24 +2489,24 @@ void SpotHubDialog::buildPskTab(QTabWidget* tabs)
 // Double-click on any row emits tuneRequested(double) for MainWindow
 // to forward to the active slice.
 //
-// NereusSDR divergences from upstream:
+// Longpath divergences from upstream:
 //   (1) Upstream uses 11 QCheckBox band filters (160m..6m). F3
 //       widens to 12 (adds 2m) and turns each filter into a
 //       checkable QPushButton "pill" so the row matches the
 //       SpotHub dialog's pill aesthetic.
 //   (2) Upstream filters bands only. F3 adds a second pill row for
 //       sources (7 pills mapping to the 7 ingest clients) driving
-//       BandFilterProxy::setSourceVisible (NereusSDR-native
+//       BandFilterProxy::setSourceVisible (Longpath-native
 //       extension to the proxy, see BandFilterProxy.{h,cpp}).
 //   (3) Upstream's spotModel/proxyModel/spotTable lived on the
-//       dialog as Cluster-tab-scoped members. In NereusSDR they
+//       dialog as Cluster-tab-scoped members. In Longpath they
 //       are populated by every client (Cluster + RBN + WSJT-X +
 //       SpotCollector + POTA + FreeDV + PSK Reporter) so the Spot
 //       List shows the cross-source merge. spotReceived(DxSpot)
 //       signals from all seven clients land here.
 //   (4) AppSettings keys preserved verbatim for bands
 //       (SpotBandFilter_<band>) and added for sources
-//       (SpotSourceFilter_<source>; NereusSDR-native).
+//       (SpotSourceFilter_<source>; Longpath-native).
 void SpotHubDialog::buildSpotListTab(QTabWidget* tabs)
 {
     auto* page = new QWidget;
@@ -2524,7 +2524,7 @@ void SpotHubDialog::buildSpotListTab(QTabWidget* tabs)
     m_spotProxyModel->setObjectName("spotListProxyModel");
     if (m_spotTableModel) {
         m_spotProxyModel->setSourceModel(m_spotTableModel);
-        // NereusSDR-native (2026-08-27, operator-requested follow-up):
+        // Longpath-native (2026-08-27, operator-requested follow-up):
         // seed Dist/Brg from the identity already saved in the
         // Settings tab; kept in sync afterward by the identitySaved
         // handler above.
@@ -2534,7 +2534,7 @@ void SpotHubDialog::buildSpotListTab(QTabWidget* tabs)
     m_spotProxyModel->setSortRole(Qt::UserRole);
 
     // ── Band pill row ───────────────────────────────────────────────
-    // NereusSDR-native: pill row replaces upstream's
+    // Longpath-native: pill row replaces upstream's
     // DxClusterDialog.cpp:1605-1641 checkbox row. 12 pills (upstream
     // had 11, plus 2m).
     auto* bandRow = new QHBoxLayout;
@@ -2548,7 +2548,7 @@ void SpotHubDialog::buildSpotListTab(QTabWidget* tabs)
         "160m", "80m", "60m", "40m", "30m", "20m",
         "17m", "15m", "12m", "10m", "6m", "2m"
     };
-    // NereusSDR-native (2026-08-27, operator-requested follow-up):
+    // Longpath-native (2026-08-27, operator-requested follow-up):
     // solo-click. A plain click on a band pill now isolates the Spot
     // List to that one band (all others hidden); clicking the same,
     // already-soloed pill again restores every band to visible. This
@@ -2596,7 +2596,7 @@ void SpotHubDialog::buildSpotListTab(QTabWidget* tabs)
     layout->addLayout(bandRow);
 
     // ── Source pill row ─────────────────────────────────────────────
-    // NereusSDR-native (no upstream equivalent). 7 pills mapping to
+    // Longpath-native (no upstream equivalent). 7 pills mapping to
     // the 7 ingest clients. Each pill's text is the short label
     // (DX / RBN / JT / COL / POT / FDR / PSK); the filter value is
     // the upstream source string emitted by the client (Cluster /
@@ -2643,7 +2643,7 @@ void SpotHubDialog::buildSpotListTab(QTabWidget* tabs)
     layout->addLayout(srcRow);
 
     // ── Entity filter + Watchlist row ────────────────────────────────
-    // NereusSDR-native (2026-08-26, no upstream equivalent). Entity
+    // Longpath-native (2026-08-26, no upstream equivalent). Entity
     // filter is a checkable menu, not a fixed pill row, because
     // DxSpot::entity values (POTA/SOTA location prefixes like "US",
     // "DE", "OE") are open-ended and only discovered as spots arrive
@@ -2667,7 +2667,7 @@ void SpotHubDialog::buildSpotListTab(QTabWidget* tabs)
         "QToolButton:hover { border-color: #c8d8e8; }");
     m_entityFilterMenu = new QMenu(m_entityFilterBtn);
     m_entityFilterBtn->setMenu(m_entityFilterMenu);
-    // NereusSDR-native (2026-08-27, operator-requested follow-up,
+    // Longpath-native (2026-08-27, operator-requested follow-up,
     // pattern taken from SOTAwatch3's Mode Filter "Clear"/"Alle" pair):
     // quick all/none actions ahead of the dynamically-added per-entity
     // ones. Just flips each existing action's checked state -- the
@@ -2691,7 +2691,7 @@ void SpotHubDialog::buildSpotListTab(QTabWidget* tabs)
     }
     watchRow->addWidget(m_entityFilterBtn);
 
-    // NereusSDR-native (2026-08-27, operator-requested follow-up):
+    // Longpath-native (2026-08-27, operator-requested follow-up):
     // mode filter, same dynamic-menu treatment as the entity filter
     // above (modes are open-ended in practice -- extractMode()
     // recognizes 20 tokens -- so a fixed pill row doesn't fit; the
@@ -2750,7 +2750,7 @@ void SpotHubDialog::buildSpotListTab(QTabWidget* tabs)
     });
     watchRow->addWidget(m_watchlistSoundBtn);
 
-    // NereusSDR-native (2026-08-27, operator-requested follow-up):
+    // Longpath-native (2026-08-27, operator-requested follow-up):
     // speaks the matched call via macOS's `say` command. See the
     // member declaration in SpotHubDialog.h for why this is macOS-only
     // rather than a new Qt6::TextToSpeech dependency.
@@ -2811,7 +2811,7 @@ void SpotHubDialog::buildSpotListTab(QTabWidget* tabs)
     }
 
     // ── Free-text search row ────────────────────────────────────────
-    // NereusSDR-native (2026-08-27, operator-requested follow-up,
+    // Longpath-native (2026-08-27, operator-requested follow-up,
     // pattern taken from SOTAwatch3's "FILTER..." box). Live substring
     // search across DxCall / Reference / Comment / Spotter, loose and
     // ephemeral by design -- complements rather than replaces the
@@ -2896,7 +2896,7 @@ void SpotHubDialog::buildSpotListTab(QTabWidget* tabs)
         const double freq = m_spotTableModel->freqAtRow(srcIdx.row());
         if (call.isEmpty()) { return; }
 
-        // NereusSDR-native (2026-08-27, operator-requested follow-up):
+        // Longpath-native (2026-08-27, operator-requested follow-up):
         // "Park Info" entry, only offered for POTA rows (the lookup
         // hits api.pota.app/park/{ref}, which wouldn't resolve a SOTA
         // summit reference even once SOTA support lands).
@@ -2913,7 +2913,7 @@ void SpotHubDialog::buildSpotListTab(QTabWidget* tabs)
             QStringLiteral("Tune to %1").arg(call));
         QAction* rotor = menu.addAction(
             QStringLiteral("Turn rotor to %1").arg(call));
-        // NereusSDR-native (2026-08-27, operator-requested follow-up):
+        // Longpath-native (2026-08-27, operator-requested follow-up):
         // "Log QSO" via the existing takeSpot() path -- prefills the
         // Rotor/Log panel for the operator to confirm, never writes a
         // log entry by itself (a spot is someone ELSE having heard the
@@ -2994,7 +2994,7 @@ void SpotHubDialog::buildSpotListTab(QTabWidget* tabs)
         countLabel->setText(QString("%1 spots").arg(m_spotTableModel->rowCount()));
     });
 
-    // NereusSDR-native (2026-08-26): populate the entity filter menu as
+    // Longpath-native (2026-08-26): populate the entity filter menu as
     // new entities are seen, and check newly-arrived spots against the
     // watchlist for an audible alert. Row highlighting itself needs no
     // wiring here -- it's computed live by SpotTableModel's
@@ -3040,7 +3040,7 @@ void SpotHubDialog::buildSpotListTab(QTabWidget* tabs)
     tabs->addTab(page, "Spot List");
 }
 
-// NereusSDR-native (2026-08-26, no upstream equivalent). Adds a
+// Longpath-native (2026-08-26, no upstream equivalent). Adds a
 // checkable action for `entity` to the Spot List tab's entity filter
 // menu the first time that entity is seen, defaulting to the
 // AppSettings-persisted visibility (or visible, if never set before).
@@ -3071,7 +3071,7 @@ void SpotHubDialog::ensureEntityFilterAction(const QString& entity)
     m_entityFilterActions.insert(entity, action);
 }
 
-// NereusSDR-native (2026-08-27, operator-requested follow-up). Mirrors
+// Longpath-native (2026-08-27, operator-requested follow-up). Mirrors
 // ensureEntityFilterAction() but populates the mode filter menu.
 void SpotHubDialog::ensureModeFilterAction(const QString& mode)
 {
@@ -3099,7 +3099,7 @@ void SpotHubDialog::ensureModeFilterAction(const QString& mode)
     m_modeFilterActions.insert(mode, action);
 }
 
-// NereusSDR-native (2026-08-26/27, no upstream equivalent). Alerts on
+// Longpath-native (2026-08-26/27, no upstream equivalent). Alerts on
 // the first spot in the newly-inserted row range [first, last] that
 // matches a watchlist term (exact, case-insensitive, against DxCall or
 // Reference): beeps if the sound toggle is on, speaks the call aloud
@@ -3147,7 +3147,7 @@ void SpotHubDialog::checkNewSpotsForWatchlistMatch(int first, int last)
     }
 }
 
-// NereusSDR-native (2026-08-27, operator-requested follow-up, pattern
+// Longpath-native (2026-08-27, operator-requested follow-up, pattern
 // taken from the community sota-oriented sota2voice tool). Hands the
 // matched call (plus reference, if any) to macOS's built-in `say`
 // command. Detached, non-blocking -- speech synthesis can take a
@@ -3169,7 +3169,7 @@ void SpotHubDialog::speakWatchlistMatch(const QString& call, const QString& refe
 #endif
 }
 
-// NereusSDR-native (2026-08-27, operator-requested follow-up). Lazily
+// Longpath-native (2026-08-27, operator-requested follow-up). Lazily
 // creates the park-info client + dialog on first use, then reuses
 // both across every subsequent lookup (a fresh QNetworkAccessManager
 // and QDialog per click would be wasteful and would leave orphan
@@ -3191,7 +3191,7 @@ void SpotHubDialog::requestParkInfo(const QString& reference)
     m_parkInfoClient->fetchParkInfo(reference);
 }
 
-// Display tab - F4. Two-column layout. LEFT (NereusSDR-native): 8
+// Display tab - F4. Two-column layout. LEFT (Longpath-native): 8
 // live stat blocks driven by SpotTableModel + DxccColorProvider
 // counts, with a red "Clear All Spots" button at the bottom that
 // calls SpotModel::clear() and emits spotsClearedAll(). RIGHT
@@ -3212,7 +3212,7 @@ void SpotHubDialog::buildDisplayTab(QTabWidget* tabs)
     auto& s = AppSettings::instance();
 
     // ── LEFT column: stat blocks + Clear All Spots ────────────────
-    // NereusSDR-native: upstream's standalone dialog had a single
+    // Longpath-native: upstream's standalone dialog had a single
     // "Total Spots" line at `SpotSettingsDialog.cpp:272-276
     // [@0cd4559]`. The Display tab expands this to 8 stat blocks
     // reading live from SpotTableModel + DxccColorProvider so the
@@ -3651,7 +3651,7 @@ void SpotHubDialog::buildDisplayTab(QTabWidget* tabs)
 
     root->addLayout(rightCol, 1);
 
-    // ── Live stat refresh wiring (NereusSDR-native) ───────────────
+    // ── Live stat refresh wiring (Longpath-native) ───────────────
     // Refresh the LEFT-column stat blocks whenever the table model
     // emits a row change or the DxccColorProvider finishes an
     // import. The unique-callsign count is computed by walking the

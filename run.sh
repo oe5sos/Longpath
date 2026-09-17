@@ -1,6 +1,6 @@
 #!/bin/bash
 # =================================================================
-# run.sh  (NereusSDR)
+# run.sh  (Longpath)
 # =================================================================
 #
 # Build the working tree and run exactly that binary.
@@ -10,7 +10,7 @@
 #
 #   1. Reading a binary that had not been rebuilt, and concluding a
 #      change had not worked.
-#   2. Launching the installed NereusSDR.app instead of the one just
+#   2. Launching the installed Longpath.app instead of the one just
 #      built, and concluding the same.
 #   3. Leaving the previous instance running, so the terminal swallowed
 #      the next command and nothing happened at all.
@@ -20,7 +20,7 @@
 # whichever copy Launch Services prefers.
 #
 # =================================================================
-# Modification history (NereusSDR):
+# Modification history (Longpath):
 #   2026-08-07 — Created for NereusSDR, AI-assisted via Anthropic
 #                 Claude (Cowork), operator Martin Fischer.
 # =================================================================

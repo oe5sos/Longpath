@@ -1,8 +1,8 @@
 // =================================================================
-// src/gui/widgets/DexpPeakMeter.h  (NereusSDR)
+// src/gui/widgets/DexpPeakMeter.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-native widget — DEXP / VOX live peak-meter strip.
+// Longpath-native widget — DEXP / VOX live peak-meter strip.
 // Mirrors Thetis picVOX_Paint / picNoiseGate_Paint draw behavior
 // (console.cs:28949-28960 / :28972-28981 [v2.10.3.13]) but is a
 // fresh Qt6/QPainter implementation (Thetis uses
@@ -16,13 +16,13 @@
 // picVOX_Paint:28958-28959 verbatim).
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-03 — Phase 3M-3a-iii Task 13: Created by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via
 //                 Anthropic Claude Code.
 // =================================================================
 
-// no-port-check: NereusSDR-original Qt6 widget.  Thetis paints with
+// no-port-check: Longpath-original Qt6 widget.  Thetis paints with
 // System.Drawing.Graphics (no direct port possible); only the visual
 // recipe is mirrored, and the cite-to-Thetis lines above are
 // commentary, not ported code.

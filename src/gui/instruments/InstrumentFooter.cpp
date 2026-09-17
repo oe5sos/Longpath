@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/instruments/InstrumentFooter.cpp  (NereusSDR)
+// src/gui/instruments/InstrumentFooter.cpp  (Longpath)
 // =================================================================
 // Siehe InstrumentFooter.h — eine Fusszeile für beide Instrumente.
 // =================================================================

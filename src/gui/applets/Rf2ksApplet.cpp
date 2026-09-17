@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/applets/Rf2ksApplet.cpp  (NereusSDR-native)
+// src/gui/applets/Rf2ksApplet.cpp  (Longpath-native)
 // =================================================================
 //   2026-05-24  J.J. Boyd (KG4VCF), AI-assisted via Anthropic Claude.
 //   Layout patterns from src/gui/applets/AmpApplet.{h,cpp} (which is

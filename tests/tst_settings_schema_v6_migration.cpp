@@ -1,7 +1,7 @@
 // =================================================================
-// tests/tst_settings_schema_v6_migration.cpp  (NereusSDR)
+// tests/tst_settings_schema_v6_migration.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure.
+// no-port-check: Longpath-original test infrastructure.
 //
 // Phase 3F Sub-Epic A Task 12: verify SettingsSchemaVersion v5 -> v6
 // migration. v6 is additive only (no key renames), so the migration is

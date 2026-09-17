@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/setup/hardware/CalibrationTab.cpp  (NereusSDR)
+// src/gui/setup/hardware/CalibrationTab.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -18,7 +18,7 @@
 //      original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 -- Original PaCalibrationTab implementation.
 //   2026-04-20 -- Renamed PaCalibrationTab -> CalibrationTab; expanded to 5
 //                  group boxes matching Thetis General -> Calibration 1:1;

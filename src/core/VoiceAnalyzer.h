@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/core/VoiceAnalyzer.h  (NereusSDR)
+// src/core/VoiceAnalyzer.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // Listen to a recording of the operator's voice and say what to change.
 //
@@ -34,7 +34,7 @@
 //                   so rather than quietly reporting nonsense.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
 // =================================================================

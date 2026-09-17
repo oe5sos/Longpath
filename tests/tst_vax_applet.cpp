@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_vax_applet.cpp  (NereusSDR)
+// tests/tst_vax_applet.cpp  (Longpath)
 // =================================================================
 //
 // Smoke tests for VaxApplet — Phase 3O Sub-Phase 9 Task 9.2b.

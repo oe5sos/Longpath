@@ -1,7 +1,7 @@
 // =================================================================
-// tests/tst_notch_hit_test.cpp  (NereusSDR)
+// tests/tst_notch_hit_test.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure.
+// no-port-check: Longpath-original test infrastructure.
 //
 // Tunable Notch Filter (TNF).
 // Design: docs/architecture/2026-07-28-tunable-notch-filter-design.md

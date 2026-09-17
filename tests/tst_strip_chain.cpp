@@ -10,7 +10,7 @@
 // that is "off" but still costs a hundredth of a decibel turns every
 // A/B comparison into a lie, and turns "I'll just switch it off to
 // check" into an experiment that no longer controls anything.
-// no-port-check: NereusSDR-original.
+// no-port-check: Longpath-original.
 
 #include <QtTest/QtTest>
 

@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_audio_vax_page_auto_detect.cpp  (NereusSDR)
+// tests/tst_audio_vax_page_auto_detect.cpp  (Longpath)
 // =================================================================
 //
 // Sub-Phase 12 Task 12.3 — VaxChannelCard + AudioVaxPage unit coverage.

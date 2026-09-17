@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// no-port-check: NereusSDR-original unit-test file.
+// no-port-check: Longpath-original unit-test file.
 // =================================================================
-// tests/tst_rade_tx_pump.cpp  (NereusSDR)
+// tests/tst_rade_tx_pump.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for the RADE TX end-to-end wiring (Phase 3R K-bench):
@@ -20,9 +20,9 @@
 //
 // =================================================================
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-11  J.J. Boyd / KG4VCF  Phase 3R K-bench follow-up:
-//                 initial test file. NereusSDR-native. Pins the
+//                 initial test file. Longpath-native. Pins the
 //                 contracts the K2-K4 scaffolding deferred until
 //                 the RADE TX pump was fully wired. AI tooling:
 //                 Anthropic Claude Code.

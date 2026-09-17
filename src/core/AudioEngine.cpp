@@ -1,10 +1,10 @@
-// no-port-check: AetherSDR-derived NereusSDR file; Thetis cmaster.cs /
+// no-port-check: AetherSDR-derived Longpath file; Thetis cmaster.cs /
 // audio.cs references in inline cites are behavioral source-first cites
 // for sample sizes / timing / mix coefficient parity only, not Thetis
 // logic ports.
 
 // =================================================================
-// src/core/AudioEngine.cpp  (NereusSDR)
+// src/core/AudioEngine.cpp  (Longpath)
 // =================================================================
 //
 // Source attribution (AetherSDR — GPLv3):
@@ -15,10 +15,10 @@
 //
 //   This file is a port or structural derivative of AetherSDR source.
 //   AetherSDR is licensed under the GNU General Public License v3.
-//   NereusSDR is also GPLv3. Attribution follows GPLv3 §5 requirements.
+//   Longpath is also GPLv3. Attribution follows GPLv3 §5 requirements.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-16 — Ported/adapted in C++20/Qt6 for NereusSDR by
 //                 J.J. Boyd (KG4VCF), with AI-assisted transformation
 //                 via Anthropic Claude Code.
@@ -147,7 +147,7 @@ namespace Longpath {
 
 namespace {
 
-// Translate a NereusSDR AudioDeviceConfig into the IAudioBus AudioFormat
+// Translate a Longpath AudioDeviceConfig into the IAudioBus AudioFormat
 // contract. Float32 stereo is the canonical DSP format; channels is kept
 // cfg-overridable but the single live path is stereo today.
 AudioFormat toAudioFormat(const AudioDeviceConfig& cfg)
@@ -1686,7 +1686,7 @@ int AudioEngine::pullVaxTxMic(float* dst, int n)
     const int gotFrames = static_cast<int>(gotBytes / kVaxTxBytesPerFrame);
     const float* src = reinterpret_cast<const float*>(scratch.data());
 
-    // Stereo → mono via 0.5 * (L + R).  Apps writing to "NereusSDR
+    // Stereo → mono via 0.5 * (L + R).  Apps writing to "Longpath
     // TX" send stereo (FreeDV/WSJT-X usually mirror to both channels);
     // averaging is the conservative downmix that preserves level when
     // both channels carry the same content and avoids one-sided clipping

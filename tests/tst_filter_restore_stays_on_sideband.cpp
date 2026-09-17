@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_filter_restore_stays_on_sideband.cpp  (NereusSDR)
+// tests/tst_filter_restore_stays_on_sideband.cpp  (Longpath)
 // =================================================================
 //
 // Ein gespeicherter Durchlass, der bei LSB/USB ueber den Traeger reicht,
@@ -14,12 +14,12 @@
 // und jedem Bandwechsel zurueck.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-09-17 — Original fuer NereusSDR von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
 // =================================================================
 
-// no-port-check: NereusSDR-original test file.
+// no-port-check: Longpath-original test file.
 
 #include <QtTest/QtTest>
 

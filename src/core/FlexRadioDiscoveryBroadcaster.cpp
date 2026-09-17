@@ -1,14 +1,14 @@
 // =================================================================
-// src/core/FlexRadioDiscoveryBroadcaster.cpp  (NereusSDR)
+// src/core/FlexRadioDiscoveryBroadcaster.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original: no Thetis or AetherSDR upstream.
+// Longpath-original: no Thetis or AetherSDR upstream.
 // Wire format reverse-engineered from FLEX-8600 v4.2.18.41174 discovery
 // beacon captured 2026-05-19
 // (captures/flex-pgxl-tgxl-capture_00001_20260519173452.pcapng).
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-19 - Implemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -304,7 +304,7 @@ QByteArray FlexRadioDiscoveryBroadcaster::buildBeacon(
                                     ? QStringLiteral("0000-0000-0000-0000")
                                     : m_serial;
     // PGXL likely validates that version is in Flex's 4-part X.Y.Z.NNNNN format
-    // (real radios send e.g. 4.2.18.41174). NereusSDR's actual app version
+    // (real radios send e.g. 4.2.18.41174). Longpath's actual app version
     // (0.5.1) is 3-part and looks non-Flex. Use a Flex-shaped placeholder so
     // PGXL accepts the beacon. Operator can override via setVersion().
     const QString versionStr  = m_version.isEmpty()

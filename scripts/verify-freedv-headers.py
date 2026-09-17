@@ -16,7 +16,7 @@ freedv-gui-derived file will carry:
   2. "freedv-gui"                   - upstream identity
   3. "Copyright"                    - every cited LGPL/BSD source carries one
   4. "License"                      - matches LGPL or BSD-2-Clause headers
-  5. "Modification history (NereusSDR)" - anchors the per-file mod block
+  5. "Modification history (Longpath)" - anchors the per-file mod block
 
 Files under `docs/attribution/` themselves are exempt (they document
 the templates, they are not themselves derived source).
@@ -50,7 +50,7 @@ MARKERS = [
     "freedv-gui",
     "Copyright",
     "License",
-    ("Modification history (NereusSDR)", "Modification history (Longpath)"),
+    ("Modification history (Longpath)", "Modification history (NereusSDR)"),
 ]
 
 # Header must appear within this many lines of top of file
@@ -110,7 +110,10 @@ def parse_provenance(text: str):
 def check_required_markers(path: Path, markers):
     head = "\n".join(
         path.read_text(errors="replace").splitlines()[:HEADER_WINDOW])
-    return [m for m in markers if m not in head]
+    # A tuple lists alternatives; any one of them satisfies the marker.
+    def present(m):
+        return any(alt in head for alt in m) if isinstance(m, tuple) else m in head
+    return [m for m in markers if not present(m)]
 
 
 def check_orphan_pair(rel: str, listed) -> Optional[str]:

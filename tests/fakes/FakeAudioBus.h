@@ -1,5 +1,5 @@
 // =================================================================
-// tests/fakes/FakeAudioBus.h  (NereusSDR)
+// tests/fakes/FakeAudioBus.h  (Longpath)
 // =================================================================
 //
 // Minimal IAudioBus stub for unit tests. Captures every push() into a
@@ -7,7 +7,7 @@
 // Counts pushes, and lets the test toggle isOpen() to exercise the
 // "bus exists but isn't open" branch in AudioEngine::rxBlockReady.
 //
-// NereusSDR-original test fake — no ported logic, no Thetis attribution
+// Longpath-original test fake — no ported logic, no Thetis attribution
 // needed.
 // =================================================================
 

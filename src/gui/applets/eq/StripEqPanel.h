@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/applets/eq/StripEqPanel.h  (NereusSDR)
+// src/gui/applets/eq/StripEqPanel.h  (Longpath)
 // =================================================================
 //
 // Ported from AetherSDR (https://github.com/aethersdr/AetherSDR),
@@ -17,13 +17,13 @@
 // port of the same upstream, so the pair are back together.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-09 — Ported to NereusSDR by Martin Fischer, AI-assisted via
 //                 Anthropic Claude (Cowork). Namespace AetherSDR →
-//                 NereusSDR; include paths rebased onto
+//                 Longpath; include paths rebased onto
 //                 core/strip/ and gui/applets/eq/. Behaviour unchanged.
 //   2026-08-11 — Undo/Redo members + afterHistoryStep()/
-//                 refreshHistoryButtons() added (NereusSDR-original,
+//                 refreshHistoryButtons() added (Longpath-original,
 //                 backed by EqHistory/EqHost). By Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

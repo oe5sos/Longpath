@@ -1,16 +1,16 @@
-// no-port-check: AetherSDR-derived NereusSDR file.  Transport lifecycle
+// no-port-check: AetherSDR-derived Longpath file.  Transport lifecycle
 // (start/stop/onNewConnection/onClientDisconnected) is adapted from
-// AetherSDR src/core/TciServer.{h,cpp} [@0cd4559]; NereusSDR diverges in
+// AetherSDR src/core/TciServer.{h,cpp} [@0cd4559]; Longpath diverges in
 // bind address, double-start contract, signal set, and client table type.
 // Registered in docs/attribution/aethersdr-reconciliation.md.
 
-// src/core/TciServer.cpp  (NereusSDR)
-// NereusSDR-original — TCI WebSocket server implementation.
+// src/core/TciServer.cpp  (Longpath)
+// Longpath-original — TCI WebSocket server implementation.
 //
 // Transport pattern ported from AetherSDR src/core/TciServer.{h,cpp} [@0cd4559].
 // Per-client field set condensed from Thetis TCIServer.cs:684-790 [v2.10.3.13].
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-10 — Phase 3J-1 Task 2.1 by J.J. Boyd (KG4VCF);
 //                AI-assisted transformation via Anthropic Claude Code.
 
@@ -93,7 +93,7 @@ TciServer::TciServer(RadioModel* model, QObject* parent)
     // WSJT-X / JTDX / Hamlib's TCI driver gate TCI-audio mode on the server
     // identifier — they enable TCI audio ONLY when the server advertises as
     // ExpertSDR3 protocol + SunSDR2PRO device.  An unknown identifier
-    // (Thetis / NereusSDR) makes WSJT-X fall back to non-TCI audio: the
+    // (Thetis / Longpath) makes WSJT-X fall back to non-TCI audio: the
     // radio keys via the trx command but WSJT-X never streams TX_AUDIO_STREAM
     // binary frames, and sends `trx:0,true;` (no `,tci` suffix) because it
     // never entered TCI-audio mode.
@@ -220,7 +220,7 @@ TciServer::TciServer(RadioModel* model, QObject* parent)
         //
         // From Thetis TCIServer.cs:5444-5512 [v2.10.3.13] — the sendRXAudioStream
         // loop reads samples, resamples, encodes, and calls sendBinaryFrame.
-        // NereusSDR replicates this per drain-tick rather than in a dedicated thread.
+        // Longpath replicates this per drain-tick rather than in a dedicated thread.
         for (auto cit = clientsSnapshot.begin(); cit != clientsSnapshot.end(); ++cit) {
             QWebSocket* ws = cit.key();
             const auto& session  = cit.value();
@@ -315,7 +315,7 @@ TciServer::TciServer(RadioModel* model, QObject* parent)
     // creates a System.Threading.Timer(RxSensorsTimerCallback, null, 0, intervalMs)
     // when enabled is true.
     //
-    // NereusSDR equivalent: a QTimer on the main thread. Default interval 200 ms
+    // Longpath equivalent: a QTimer on the main thread. Default interval 200 ms
     // matches Thetis clsTCISensorManager._rxIntervalMs (TCIServer.cs:491 [v2.10.3.13]).
     // Timer is started in start() and stopped in stop() so it fires only when the
     // server is running.
@@ -343,7 +343,7 @@ TciServer::TciServer(RadioModel* model, QObject* parent)
         // console.cs:46824 [v2.10.3.13] which adds `+ offset` to every
         // CalculateRXMeter(SIGNAL_STRENGTH/AVG_SIGNAL_STRENGTH) read in
         // the MultiMeter2UpdateRX1 loop (which also feeds TCIServer
-        // sensors via Display.tciRX1Sig).  Without this, NereusSDR's TCI
+        // sensors via Display.tciRX1Sig).  Without this, Longpath's TCI
         // clients would see raw ADC dBFS while the GUI shows antenna dBm.
         double rx1Dbm = -140.0;
         if (m_model) {
@@ -412,7 +412,7 @@ TciServer::TciServer(RadioModel* model, QObject* parent)
     // creates a System.Threading.Timer(TxSensorsTimerCallback, null, 0, intervalMs)
     // when enabled is true.
     //
-    // NereusSDR equivalent: a QTimer on the main thread. Default interval 200 ms
+    // Longpath equivalent: a QTimer on the main thread. Default interval 200 ms
     // matches Thetis clsTCISensorManager._txIntervalMs (TCIServer.cs:492 [v2.10.3.13]).
     // Timer is started in start() and stopped in stop(). Phase 24+ gates on MOX
     // state (m_txAudioActiveClient / RadioModel::moxChanged).
@@ -439,7 +439,7 @@ TciServer::TciServer(RadioModel* model, QObject* parent)
         //   mic level:   WDSP TXA MicAvg (dBm convention matches RX side)
         //   fwd watts:   RadioStatus::forwardPowerWatts (from PA-meter loop)
         //   peak watts:  RadioStatus::forwardPowerWatts (no separate peak
-        //                tracker in NereusSDR yet; emit current = peak)
+        //                tracker in Longpath yet; emit current = peak)
         //   SWR:         RadioStatus::swrRatio (1.0 minimum)
         // From Thetis cmaster/dsp.cs:999-1029 [v2.10.3.13] CalculateTXMeter
         // (TXA_MIC_AV) and console.cs PA-meter loop powerChanged.
@@ -760,7 +760,7 @@ void TciServer::wireSliceForBroadcast(SliceModel* slice, int sliceId)
     // ── DSP mode (modulation: line) ─────────────────────────────────────────
     // Source: Thetis ModeChangedHandlers (implicit via Console.RX1DSPMode/
     // RX2DSPMode setter side effects); the TCI server re-reads via sendMode.
-    // NereusSDR fires SliceModel::dspModeChanged directly; we re-read via
+    // Longpath fires SliceModel::dspModeChanged directly; we re-read via
     // SliceModel::modeName for the canonical uppercase string used by TCI.
     connect(slice, &SliceModel::dspModeChanged, this,
             [this, sliceId](Longpath::DSPMode mode) {
@@ -833,7 +833,7 @@ void TciServer::wireSliceForBroadcast(SliceModel* slice, int sliceId)
     // ── Lock (lock: + vfo_lock: lines) ──────────────────────────────────────
     // Source: Thetis VfoALockChangedHandlers + VfoBLockChangedHandlers at
     // TCIServer.cs:6766-6767 [v2.10.3.15] routed to OnVfoALockChanged /
-    // OnVfoBLockChanged.  NereusSDR collapses per-channel lock onto the slice;
+    // OnVfoBLockChanged.  Longpath collapses per-channel lock onto the slice;
     // emit both the lock:rx form and the vfo_lock:rx,chan cross-product so
     // clients tracking either format see the change.
     connect(slice, &SliceModel::lockedChanged, this,
@@ -850,7 +850,7 @@ void TciServer::wireSliceForBroadcast(SliceModel* slice, int sliceId)
 
     // ── Mute (rx_mute: line) ────────────────────────────────────────────────
     // Source: Thetis MuteChangedHandlers at TCIServer.cs:6743 [v2.10.3.15]
-    // routed to OnMuteChanged; NereusSDR's per-slice mute flows through
+    // routed to OnMuteChanged; Longpath's per-slice mute flows through
     // SliceModel::mutedChanged.
     connect(slice, &SliceModel::mutedChanged, this,
             [this, sliceId](bool on) {
@@ -863,7 +863,7 @@ void TciServer::wireSliceForBroadcast(SliceModel* slice, int sliceId)
     // ── RIT enable / offset ─────────────────────────────────────────────────
     // Source: Thetis RITChangedHandlers + RITValueChangedHandlers at
     // TCIServer.cs:6753 + 6755 [v2.10.3.15] routed to OnRITChanged /
-    // OnRITValueChanged.  Thetis treats RIT as radio-global; NereusSDR
+    // OnRITValueChanged.  Thetis treats RIT as radio-global; Longpath
     // SliceModel exposes ritEnabledChanged / ritHzChanged per slice.  The
     // RadioModel::ritEnable() / ritOffset() Q_INVOKABLE shims return the
     // active-slice value, so a per-slice signal emits a single notification
@@ -902,7 +902,7 @@ void TciServer::wireSliceForBroadcast(SliceModel* slice, int sliceId)
     // Source: Thetis BalanceChangedHandlers at TCIServer.cs:6747 [v2.10.3.15]
     // routed to OnBalanceChanged.  Thetis emits two frames per slice (chan 0
     // and chan 1) via sendRxBalance at TCIServer.cs:2187-2191 [v2.10.3.13]
-    // with the 40.0 - (pan * 0.8) transform.  NereusSDR's audioPan is already
+    // with the 40.0 - (pan * 0.8) transform.  Longpath's audioPan is already
     // F2 dB in TCI space (mock + production parity); emit both channels.
     connect(slice, &SliceModel::audioPanChanged, this,
             [this, sliceId](double pan) {
@@ -915,7 +915,7 @@ void TciServer::wireSliceForBroadcast(SliceModel* slice, int sliceId)
 
     // ── NB (Noise Blanker) -- rx_nb_enable ─────────────────────────────────
     // Source: Thetis NBChangedHandlers at TCIServer.cs:6760 [v2.10.3.15]
-    // routed to OnNbChanged.  NereusSDR's nbModeChanged carries a NbMode enum
+    // routed to OnNbChanged.  Longpath's nbModeChanged carries a NbMode enum
     // (None / NB / NB2 / SNB); any non-None mode reports "enabled" to TCI per
     // sendRxNbEnable at TCIServer.cs:1901-1905 [v2.10.3.13].  Production
     // SliceModel exposes the enum directly; treat None as off.
@@ -985,7 +985,7 @@ void TciServer::wireSliceForBroadcast(SliceModel* slice, int sliceId)
     // ── ANF (Automatic Notch) -- rx_anf_enable, own signal ─────────────────
     // Source: Thetis ANFChangedHandlers at TCIServer.cs:6761 [v2.10.3.15]
     // routed to OnAnfChanged.  Upstream subscribes to ANF separately from NR
-    // because they are separate console controls; NereusSDR matched that
+    // because they are separate console controls; Longpath matched that
     // shape in Sub-Epic J Task 1 by giving ANF its own SliceModel property,
     // but the broadcast wiring was left hanging off activeNrChanged, which
     // that same change stopped firing on a pure ANF toggle.  So flipping ANF
@@ -1012,7 +1012,7 @@ void TciServer::wireSliceForBroadcast(SliceModel* slice, int sliceId)
     // Mapping: TCI receiver N -> slice id N, the convention documented at
     // TciProtocol::buildInitialRadioStateLines and used by every per-rx shim
     // in RadioModel.cpp.  Both channel slots of the receiver are emitted
-    // because NereusSDR has no sub-receiver model, so one SliceModel::afGain
+    // because Longpath has no sub-receiver model, so one SliceModel::afGain
     // stands in for both -- the same collapse the init burst applies, and the
     // same one Thetis itself applies to RX2 (sendRxVolume(1, 1, rx2vol) reuses
     // rx2vol, TCIServer.cs:2557 [v2.10.3.15], because there is no RX2-sub
@@ -1058,7 +1058,7 @@ void TciServer::wireSliceForBroadcast(SliceModel* slice, int sliceId)
     // Source: Thetis DIGLOffsetChangedHandlers + DIGUOffsetChangedHandlers at
     // TCIServer.cs:6772-6773 [v2.10.3.15].  Thetis treats these as radio-
     // global (DIGLClickTuneOffset / DIGUClickTuneOffset Console properties);
-    // NereusSDR stores per-slice on SliceModel.  Broadcast only the active
+    // Longpath stores per-slice on SliceModel.  Broadcast only the active
     // slice's change to match the init-burst active-slice semantic; per-slice
     // changes on the inactive slice are silently dropped (operator only sees
     // one DIGL value at a time in UI).
@@ -1141,7 +1141,7 @@ void TciServer::hookGlobalBroadcasts()
 
     // ── TUNE (tune: line) ──────────────────────────────────────────────────
     // Source: Thetis TuneChangedHandlers at TCIServer.cs:6737 [v2.10.3.15]
-    // routed to OnTuneChanged -> sendTune.  NereusSDR's TUN state lives on
+    // routed to OnTuneChanged -> sendTune.  Longpath's TUN state lives on
     // TransmitModel as the m_tune bool + tuneChanged signal (mirrors Thetis
     // chkTUN.Checked at console.cs:18677-18684 [v2.10.3.15]).
     connect(&m_model->transmitModel(), &TransmitModel::tuneChanged, this,
@@ -1193,7 +1193,7 @@ void TciServer::hookGlobalBroadcasts()
     // touched the master slider after connect.  The live per-rx source is a
     // separate event upstream -- console.RXGainChangedHandlers routed to
     // OnRxAfGainChanged (TCIServer.cs:6780 + 7722-7733 [v2.10.3.15]) -- whose
-    // NereusSDR analog is the afGainChanged connect in wireSliceForBroadcast.
+    // Longpath analog is the afGainChanged connect in wireSliceForBroadcast.
     if (auto* audio = m_model->audioEngine()) {
         connect(audio, &AudioEngine::volumeChanged, this,
                 [this](float volume) {
@@ -1210,7 +1210,7 @@ void TciServer::hookGlobalBroadcasts()
     // ── HW sample rate (iq_samplerate: + audio_samplerate: implicit) ───────
     // Source: Thetis HWSampleRateChangedHandlers at TCIServer.cs:6739
     // [v2.10.3.15] routed to OnHWSampleRateChanged.  Thetis emits
-    // sendIQSampleRate + the IF limits update.  NereusSDR fires
+    // sendIQSampleRate + the IF limits update.  Longpath fires
     // RadioModel::wireSampleRateChanged with a double.
     connect(m_model, &RadioModel::wireSampleRateChanged, this,
             [this](double rateHz) {
@@ -1227,7 +1227,7 @@ void TciServer::hookGlobalBroadcasts()
 
     // ── Power (start; / stop; line) ────────────────────────────────────────
     // Source: Thetis PowerChangeHanders at TCIServer.cs:6735 [v2.10.3.15]
-    // routed to OnPowerChangeHander -> sendStartStop.  NereusSDR collapses
+    // routed to OnPowerChangeHander -> sendStartStop.  Longpath collapses
     // Power-on and connection-up into a single concept; emit start; on
     // connect, stop; on disconnect.  Architectural divergence already
     // documented in RadioModel::powerOn() shim and the buildInitialRadioState
@@ -1288,7 +1288,7 @@ TciServer::~TciServer()
 // ── start() ─────────────────────────────────────────────────────────────────
 //
 // From AetherSDR src/core/TciServer.cpp:159-181 [@0cd4559] — transport pattern.
-// NereusSDR diverges from AetherSDR in two ways:
+// Longpath diverges from AetherSDR in two ways:
 //   1. Bind address: default QHostAddress::LocalHost, but the
 //      bindAddress overload accepts any valid address (Phase 3J-1 closeout
 //      Item 1).  The Setup → CAT/Network/TCI bind-interface dropdown
@@ -1298,7 +1298,7 @@ TciServer::~TciServer()
 //      the new dropdown.
 //   2. double-start contract: return false + log warning (AetherSDR returns
 //      m_server->isListening(), treating double-start as idempotent-true).
-//      NereusSDR rejects double-start so the caller can detect misuse early.
+//      Longpath rejects double-start so the caller can detect misuse early.
 
 bool TciServer::start(quint16 port)
 {
@@ -1361,7 +1361,7 @@ bool TciServer::start(const QHostAddress& bindAddress, quint16 port)
     // Phase 19: start sensor broadcast timers.
     // From Thetis: RxSensorsTimerCallback / TxSensorsTimerCallback are started
     // by setRxSensorsEnabled / setTxSensorsEnabled per-listener
-    // (TCIServer.cs:2566, 2581 [v2.10.3.13]).  NereusSDR uses server-wide
+    // (TCIServer.cs:2566, 2581 [v2.10.3.13]).  Longpath uses server-wide
     // timers that check per-client rxSensorsEnabled / txSensorsEnabled flags
     // on each tick — simpler with the Qt architecture.
     m_rxSensorTimer->start();
@@ -1391,7 +1391,7 @@ bool TciServer::start(const QHostAddress& bindAddress, quint16 port)
 // ── stop() ───────────────────────────────────────────────────────────────────
 //
 // From AetherSDR src/core/TciServer.cpp:184-207 [@0cd4559] — disconnect-and-
-// cleanup loop pattern.  NereusSDR uses QHash iteration instead of QList.
+// cleanup loop pattern.  Longpath uses QHash iteration instead of QList.
 
 void TciServer::stop()
 {
@@ -1498,7 +1498,7 @@ void TciServer::onNewConnection()
         // QWebSocket::setMaxAllowedIncomingMessageSize is per-socket;
         // QWebSocketServer has no equivalent in this Qt6 version.
         //
-        // NereusSDR-original (Thetis hand-rolls RFC 6455 framing with no cap;
+        // Longpath-original (Thetis hand-rolls RFC 6455 framing with no cap;
         // we're 127.0.0.1-only but a misbehaving local process can still send).
         static constexpr quint64 kMaxIncomingMessageBytes = 2u * 1024u * 1024u;  // 2 MiB
         ws->setMaxAllowedIncomingMessageSize(kMaxIncomingMessageBytes);
@@ -1701,7 +1701,7 @@ QWebSocket* TciServer::activeTxAudioClient() const
 //
 // From Thetis TCIServer.cs — audio_start handler stores the rx in
 // m_audioStreamEnabled (a HashSet<int>) and instantiates a Resampler from
-// its m_rxAudioResamplers Dictionary [v2.10.3.13]. NereusSDR maps this to
+// its m_rxAudioResamplers Dictionary [v2.10.3.13]. Longpath maps this to
 // create_resampleFV (the void*-opaque exported wrapper in resample.c:342-344
 // [WDSP TAPR v1.29]) which calls create_resampleF(run=1, size=0, in=0, out=0,
 // in_rate, out_rate).  The size=0/null buffers are fine because xresampleFV
@@ -1787,7 +1787,7 @@ void TciServer::cleanupResamplers(std::shared_ptr<TciClientSession>& session)
 //
 // Until 2026-07-28 this was written in "From Thetis" cite grammar
 // naming RxChannel.cpp, which claimed Thetis provenance for a
-// NereusSDR-original file. Thetis has no such file. Rewritten as a
+// Longpath-original file. Thetis has no such file. Rewritten as a
 // plain internal cross-reference so it neither overclaims upstream
 // attribution nor gets resolved against the Thetis clone. Deliberately
 // avoids repeating the old file:line form, which the author-tag
@@ -1858,7 +1858,7 @@ void TciServer::onTextMessageReceived(const QString& msg)
     //
     // From Thetis TCIServer.cs:4406-4440 [v2.10.3.13] — audio_start / audio_stop
     // parse the rx index and update m_audioStreamEnabled per-listener.
-    // NereusSDR mirrors: parse rx from stripped command, delegate to
+    // Longpath mirrors: parse rx from stripped command, delegate to
     // handleAudioSubscribe / handleAudioUnsubscribe which manage the QHash.
     {
         QString trimmed = msg.trimmed();
@@ -2146,7 +2146,7 @@ void TciServer::onTextMessageReceived(const QString& msg)
         //   else m_server.ReleaseActiveTxAudioListener(this);
         //   m_tciPttActive = wantsActiveTciPtt && ownsActiveTciPtt;
         //
-        // NereusSDR simplification: TryAcquire/Release runs directly in the
+        // Longpath simplification: TryAcquire/Release runs directly in the
         // main-thread slot; no per-listener thread lock needed because all
         // WebSocket callbacks run on the same Qt event loop.
         {
@@ -2384,7 +2384,7 @@ void TciServer::onBinaryMessageReceived(const QByteArray& data)
     // ── Push to TX audio ring ─────────────────────────────────────────────────
     //
     // Thetis enqueues a TCIQueuedTxAudio (with bounded drop-oldest) at
-    // TCIServer.cs:5687-5702 [v2.10.3.13].  NereusSDR pushes raw decoded
+    // TCIServer.cs:5687-5702 [v2.10.3.13].  Longpath pushes raw decoded
     // float bytes into a server-wide SPSC ring.  Drop behaviour: tryPushCopy
     // drops the newest bytes on overflow (partial write) — the ring's natural
     // behaviour matches Thetis's oldest-drop semantics for practical purposes

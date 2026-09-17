@@ -1,5 +1,5 @@
 // =================================================================
-// src/models/RadioModel.cpp  (NereusSDR)
+// src/models/RadioModel.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -11,7 +11,7 @@
 //   Project Files/Source/ChannelMaster/cmaster.c, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -335,7 +335,7 @@ warren@wpratt.com
 #include "core/Resampler.h"
 
 // FlexRadio UDP 4992 discovery beacon. Owned by RadioModel; configured
-// and started on radio connect so PGXL/TGXL auto-discover NereusSDR.
+// and started on radio connect so PGXL/TGXL auto-discover Longpath.
 #include "core/FlexRadioDiscoveryBroadcaster.h"
 
 // Passive SmartSDR API listener on TCP 4992. Bench-recon stub: logs every
@@ -491,7 +491,7 @@ double scalePaVolts(quint16 adcRaw, HPSDRModel model)
 //   if (amps < 0) amps = 0;
 //
 // _amp_voff and _amp_sens are user-tunable in Thetis Setup → PA Calibration;
-// NereusSDR will surface them through CalibrationController in a follow-up
+// Longpath will surface them through CalibrationController in a follow-up
 // (Phase 3P-G already lays the groundwork).  Defaults match Thetis 360/120.
 double scalePaAmps(quint16 adcRaw, HPSDRModel model)
 {
@@ -525,7 +525,7 @@ double scalePaAmps(quint16 adcRaw, HPSDRModel model)
 // register into setPaTemperature() in Phase H Task 5.
 double scalePaTemperatureCelsius(quint16 /*adcRaw*/, HPSDRModel /*model*/)
 {
-    // no-port-check: NereusSDR-original placeholder — see comment above.
+    // no-port-check: Longpath-original placeholder — see comment above.
     return 0.0;
 }
 
@@ -853,7 +853,7 @@ RadioModel::RadioModel(QObject* parent)
         }
     });
 
-    // Phase 3F Sub-Epic D Task 13: FFT fan-out router. NereusSDR-original
+    // Phase 3F Sub-Epic D Task 13: FFT fan-out router. Longpath-original
     // class (AetherSDR has no equivalent because it's a thin Flex API
     // client; we own the FFT pipeline locally). MainWindow registers
     // pan-to-receiver mappings in the sliceAdded handler; the per-
@@ -1008,7 +1008,7 @@ RadioModel::RadioModel(QObject* parent)
     // chain (TransmitModel::antiVoxSourceVaxChanged →
     // MoxController::setAntiVoxSourceVax → antiVoxSourceWhatRequested) entirely.
     // Thetis chkAntiVoxSource (RX vs VAC at cmaster.cs:912-943 [v2.10.3.13])
-    // does not map to NereusSDR's architecture: VAX is a digital-mode app bus
+    // does not map to Longpath's architecture: VAX is a digital-mode app bus
     // with no mic-feedback path, so the audio output device is the only valid
     // anti-VOX cancellation reference.  See commit message and DexpVoxPage
     // info-row for the architectural rationale.
@@ -1225,7 +1225,7 @@ RadioModel::RadioModel(QObject* parent)
     // first-connected MAC's hardware/<mac>/peripherals/ scope and sets
     // PeripheralsMigrationDone="True" so subsequent launches skip.
 
-    // Phase 3P-II Task 86: TxInterlockPolicy -- NereusSDR-native TX gate.
+    // Phase 3P-II Task 86: TxInterlockPolicy -- Longpath-native TX gate.
     // Loads persisted mode/grace/SWR-gate values from AppSettings in its ctor.
     // Non-null from this point; shared (non-owning) with PgxlInterlockPage
     // and MoxController (wired below after m_moxController construction).
@@ -1248,7 +1248,7 @@ RadioModel::RadioModel(QObject* parent)
     // FlexRadio UDP 4992 discovery beacon.
     // Constructed once; configured in connectToRadio() once the radio MAC is
     // known; stopped in teardownConnection(). Allows PGXL/TGXL to auto-discover
-    // NereusSDR in their "FlexRadio" dropdown without any manual IP entry.
+    // Longpath in their "FlexRadio" dropdown without any manual IP entry.
     // Wire format reverse-engineered from a FLEX-8600 beacon captured 2026-05-19
     // (captures/flex-pgxl-tgxl-capture_00001_20260519173452.pcapng).
     m_flexBroadcaster = new FlexRadioDiscoveryBroadcaster(this);
@@ -1347,7 +1347,7 @@ RadioModel::RadioModel(QObject* parent)
 
     // Mirror local TUN / MOX state into the listener's outbound `transmit`
     // S-frame so TGXL's bandA-tracker AND its tune-detector see what we're
-    // doing. Specifically: when the operator clicks the NereusSDR app TUNE
+    // doing. Specifically: when the operator clicks the Longpath app TUNE
     // button (TunerApplet or TxApplet), MoxController fires
     // manualMoxChanged(true) at the end of the TUN-on walk -- we propagate
     // that to the listener as tune=1 in the next S-frame burst. TGXL reads
@@ -1524,7 +1524,7 @@ RadioModel::RadioModel(QObject* parent)
         // PGXL during its own autotune cycle in the real FlexRadio setup
         // (e.g. flex-tgxl-direct-CONTROL.pcapng @T+172.201: TGXL sends
         // "amplifier set 0x22E8213A operate=0", FLEX forwards to PGXL :9008
-        // "operate=0"). Without this proxy, NereusSDR was missing the
+        // "operate=0"). Without this proxy, Longpath was missing the
         // mechanism real FLEX uses for amp-to-amp orchestration, forcing
         // us into the buggier startTgxlAutotune workaround.
         connect(m_smartSdrListener, &SmartSdrApiListener::amplifierSetRequested,
@@ -2150,7 +2150,7 @@ RadioModel::RadioModel(QObject* parent)
     //       // NetworkIO.SetOutputPower.
     //       Audio.RadioVolume = Audio.RadioVolume;  // self-assign re-emits
     //   }
-    // The NereusSDR cache (m_lastAudioVolume, updated inside pumpAudioVolume)
+    // The Longpath cache (m_lastAudioVolume, updated inside pumpAudioVolume)
     // stands in for Thetis's `radio_volume` backing field.
     connect(&m_transmitModel, &TransmitModel::swrProtectFactorChanged,
             this, [this](float /*factor*/) {
@@ -2295,7 +2295,7 @@ RadioModel::~RadioModel()
 // tokens (CW / SSB / USB / LSB / AM / FM / FT8 / FT4 / JS8 / RTTY / PSK /
 // PSK31 / PSK63 / OLIVIA / JT65 / JT9 / SAM / NFM / DIGU / DIGL). When the
 // client already supplied DxSpot::source (which it does for all seven
-// clients in NereusSDR), the per-source label trumps the comment heuristic
+// clients in Longpath), the per-source label trumps the comment heuristic
 // for the kvs `source` key.
 //
 // The kvs map is the canonical TCI shape; the in-house adapter writes
@@ -2308,7 +2308,7 @@ namespace {
 // is taken from the DxSpot rather than the slot, because the FreeDV
 // Reporter dual-feed (FreeDVReporterClient.h:124-128 [@77e793a-derived])
 // synthesizes spots whose source field is already pre-stamped, and the
-// DxClusterClient port (DxClusterClient.h:36-44, NereusSDR addition)
+// DxClusterClient port (DxClusterClient.h:36-44, Longpath addition)
 // promotes "Cluster" to "RBN" when the spotter callsign carries the
 // -# suffix.
 QMap<QString, QString> kvsFromSpot(const Longpath::DxSpot& spot,
@@ -2500,8 +2500,8 @@ void RadioModel::onPskReporterSpotReceived(const DxSpot& spot)
 // constructor (RadioModel.cpp:936-953); the restore here only needs to
 // flip the WebSocket on. PSK Reporter is send-only; restore is a no-op.
 //
-// NereusSDR-original. AetherSDR splits this work between MainWindow's
-// startup and per-source dialog handlers; the NereusSDR shape consolidates
+// Longpath-original. AetherSDR splits this work between MainWindow's
+// startup and per-source dialog handlers; the Longpath shape consolidates
 // the read-and-start loop onto RadioModel so MainWindow's startup path
 // stays a single call site.
 void RadioModel::restoreSpotClientAutoStartState()
@@ -3147,7 +3147,7 @@ const BoardCapabilities& RadioModel::boardCapabilities() const
 // BoardCapabilities row has not yet been populated for that SKU (Task 1-3),
 // which should be treated as "at least one slice".
 //
-// NereusSDR-original — no Thetis upstream.
+// Longpath-original — no Thetis upstream.
 // Design: docs/architecture/2026-05-26-phase3f-multi-pan-multi-slice-design.md §2.
 int RadioModel::maxSlices() const
 {
@@ -3175,7 +3175,7 @@ int RadioModel::maxSlices() const
 // (clsHardwareSpecific.cs:395-411 port) unless the user has saved an
 // override via the AppSettings key "RX1_MeterCalOffsetDb" (matches Thetis
 // RX1MeterCalOffset at console.cs:21051).  The Thetis Multimeter Setup
-// page exposes the override; in NereusSDR 0.4.x the page hosts the same
+// page exposes the override; in Longpath 0.4.x the page hosts the same
 // key but the UI control is queued behind the 4O3A Settings refactor
 // (planned next).  Power users can edit the key directly today.
 double RadioModel::rxMeterOffsetDb() const
@@ -3199,7 +3199,7 @@ double RadioModel::rxMeterOffsetDb() const
     // require the StepAttenuatorController; if absent (no radio yet) the
     // chain reduces to the cal_offset alone.  From Thetis console.cs:20991:
     //   if (_ignore_attenuator_offset) return 0.0f;
-    // The "ignore" toggle is not exposed in NereusSDR (Thetis Setup-only,
+    // The "ignore" toggle is not exposed in Longpath (Thetis Setup-only,
     // dormant in modern builds), so we always include the preamp term.
     float preampOffset = 0.0f;
     if (m_stepAttController) {
@@ -3221,7 +3221,7 @@ double RadioModel::rxMeterOffsetDb() const
 
 // ── Phase 3F Sub-Epic I: DDC stream pool ────────────────────────────────────
 //
-// NereusSDR-original glue over SliceStreamAllocator. Thetis has no
+// Longpath-original glue over SliceStreamAllocator. Thetis has no
 // equivalent because it hard-codes RX1 -> DDC2 and RX2 -> DDC3; the pool
 // concept exists here so every user DDC the SKU exposes is reachable.
 
@@ -3338,7 +3338,7 @@ void RadioModel::openRxChannelPool(int poolSize, int inputBufferSize,
 // SetChannelState(..., 0, 0)). The sub-receiver path does the same at
 // console.cs:36577-36583 / :36616.
 //
-// NereusSDR's equivalent of "this receiver now exists" is a slice binding to a
+// Longpath's equivalent of "this receiver now exists" is a slice binding to a
 // stream: before the bind the slice is not in RxDspWorker's stream -> slices
 // map, so no samples reach its channel; after it, every chunk on that stream
 // is fanned to it. So bind is where the channel is switched on, and unbind is
@@ -3437,7 +3437,7 @@ void RadioModel::activateSliceChannel(SliceModel* slice)
 //     WDSP.RXANBPAddNotch(WDSP.id(0, 1), nNumberofExistingNotches, fFreqHZ, fWidth, true);
 //     WDSP.RXANBPAddNotch(WDSP.id(2, 0), nNumberofExistingNotches, fFreqHZ, fWidth, true);
 //
-// NereusSDR's slice count is dynamic post-3F, so we walk slices() instead of
+// Longpath's slice count is dynamic post-3F, so we walk slices() instead of
 // naming three ids; the WDSP RX channel id is the slice index (Sub-Epic I
 // invariant).
 //
@@ -5420,7 +5420,7 @@ void RadioModel::wireRadeChannel(int sliceId, RadeChannel* channel,
     // 196-200 [@77e793a]: take ONLY the real component of rade_tx's
     // output and treat it as audio. freedv-gui hands it to the
     // soundcard; the radio's external SSB modulator does USB/LSB.
-    // NereusSDR's analogue is the WDSP TXA modulator (in USB or LSB
+    // Longpath's analogue is the WDSP TXA modulator (in USB or LSB
     // mode per TxChannel::setTxMode's RADE_U/L -> USB/LSB mapping).
     //
     // Pipeline:
@@ -5642,7 +5642,7 @@ void RadioModel::onRadeTextDecoded(int sliceId, const QString& callsign,
     }
 
     // 2026-05-12 bench fix: source-first port from freedv-gui.  Drop
-    // the prior NereusSDR-specific FreeDvReporter/ReportToPsk gate
+    // the prior Longpath-specific FreeDvReporter/ReportToPsk gate
     // (which double-gated the cross-feed even when the user had
     // started PSK Reporter explicitly).  Match freedv-gui main.cpp:
     // 1959-1966 [@77e793a] which feeds every decode to every reporter
@@ -5930,7 +5930,7 @@ void RadioModel::onBandButtonClicked(Band band)
         return;
     }
 
-    // Order: freq before mode. NereusSDR-specific — frequencyChanged
+    // Order: freq before mode. Longpath-specific — frequencyChanged
     // triggers the per-band Alex/antenna update before mode-dependent
     // filter bandwidth applies. Note Thetis SetBand applies mode first
     // then freq (console.cs:5886/5911 [v2.10.3.13]); both orderings
@@ -5950,7 +5950,7 @@ int RadioModel::addPanadapter()
     m_panadapters.append(pan);
 
     // PanadapterModel::bandChanged fires when the pan center crosses a band
-    // boundary. In NereusSDR's design m_lastBand tracks the VFO, not the pan
+    // boundary. In Longpath's design m_lastBand tracks the VFO, not the pan
     // (see comment on the frequencyChanged lambda in wireSliceSignals), so
     // there is nothing to do here on a pan-centered crossing — per-band saves
     // flow from the VFO path and the coalesced scheduleSettingsSave() timer.
@@ -6535,7 +6535,7 @@ void RadioModel::connectToRadio(const RadioInfo& info)
                 rxCh->setFmsqThresh(m_activeSlice->fmsqThresh());
                 // Audio panel initial push
                 // Mute: From Thetis dsp.cs:393-394 — panel runs by default (unmuted)
-                // Pan: From Thetis radio.cs:1386 — pan = 0.5f (center); NereusSDR 0.0 center
+                // Pan: From Thetis radio.cs:1386 — pan = 0.5f (center); Longpath 0.0 center
                 // Binaural: From Thetis radio.cs:1145 — bin_on = false (dual-mono)
                 rxCh->setMuted(m_activeSlice->muted());
                 rxCh->setAudioPan(m_activeSlice->audioPan());
@@ -7335,7 +7335,7 @@ void RadioModel::connectToRadio(const RadioInfo& info)
             // wired by cmaster.cs:1125 [v2.10.3.13]
             //   `SendCBPushVox(0, PushVoxDel)`.
             // Thetis sets `Audio.VOXActive` and lets the PollPTT loop
-            // notice on its next tick; NereusSDR uses direct signal-driven
+            // notice on its next tick; Longpath uses direct signal-driven
             // engagement (no polling).
             connect(m_txChannel, &TxChannel::voxActiveChanged,
                     m_moxController, &MoxController::onVoxActive);
@@ -7369,7 +7369,7 @@ void RadioModel::connectToRadio(const RadioInfo& info)
             // (HPSDR EP6 audio cadence drives ChannelMaster, not MOX);
             // Audio.VOXEnabled in audio.cs:168-192 [v2.10.3.13] only
             // flips DEXP's run_vox flag via cmaster.CMSetTXAVoxRun(0).
-            // NereusSDR's TxWorkerThread + m_running gate is a power-saving
+            // Longpath's TxWorkerThread + m_running gate is a power-saving
             // departure from Thetis (no pumping when neither MOX nor VOX
             // is in play); this connect restores Thetis-equivalent VOX
             // detection while keeping power saving everywhere else.
@@ -7410,7 +7410,7 @@ void RadioModel::connectToRadio(const RadioInfo& info)
             // antiVoxSourceWhatRequested no-op lambda that previously sat
             // here for 3F multi-pan source mux.  Thetis chkAntiVoxSource
             // (RX vs VAC at cmaster.cs:912-943 [v2.10.3.13]) does not map
-            // to NereusSDR's architecture; see commit message and
+            // to Longpath's architecture; see commit message and
             // DexpVoxPage info-row for the architectural rationale.
 
             // ── 3M-3 — TransmitModel → TxChannel TX processing chain wiring ─────
@@ -7438,7 +7438,7 @@ void RadioModel::connectToRadio(const RadioInfo& info)
             // pushes Lev_MaxGain=15 / ALC_MaximumGain=3 / EQ shape / etc. into
             // WDSP via the cmaster setters.  The "WDSP boot defaults stick
             // until the user moves a slider" policy that originally lived here
-            // (path b — passive on initial state) was a NereusSDR-original
+            // (path b — passive on initial state) was a Longpath-original
             // safety stance that broke persisted-state restoration: a user
             // who toggled TXEQ on, set a custom band shape, restarted, would
             // see TXEQ ON in the UI while WDSP silently ran with EQ off and
@@ -7458,7 +7458,7 @@ void RadioModel::connectToRadio(const RadioInfo& info)
             // can't be relied on alone.
             //
             // Consent for the on-boot ALC bump (0 dB WDSP boot → 3 dB Thetis
-            // default) is captured at "user is running NereusSDR with the
+            // default) is captured at "user is running Longpath with the
             // shipped Default profile" — same consent model Thetis itself
             // uses.  Users who want WDSP boot defaults can save a profile
             // with ALC_MaximumGain=0 and activate it.
@@ -7469,7 +7469,7 @@ void RadioModel::connectToRadio(const RadioInfo& info)
             // (preamp + 10 band gains) and resets band centers to the fixed
             // 32/63/.../16k Hz.  SetTXAEQProfile takes a custom F[] vector
             // alongside G[] and is the only path that respects user-tuned
-            // band frequencies.  NereusSDR exposes BOTH band gains AND band
+            // band frequencies.  Longpath exposes BOTH band gains AND band
             // freqs as user-tunable, so we go through the Profile path on
             // every EQ change — the Graph10 wrapper stays available for a
             // future "reset to default freqs" UX.
@@ -7938,7 +7938,7 @@ void RadioModel::connectToRadio(const RadioInfo& info)
             // accumulator + bench-fix-A pumpMic timer + bench-fix-B
             // TxChannel silence-drive timer chain.  Mirrors Thetis's
             // `cm_main` worker-thread pattern (cmbuffs.c:151-168
-            // [v2.10.3.13]) with NereusSDR's WDSP-r2-ring-divisibility
+            // [v2.10.3.13]) with Longpath's WDSP-r2-ring-divisibility
             // 256-sample block size end-to-end.
             //
             // Lifecycle (this block):
@@ -8268,7 +8268,7 @@ void RadioModel::connectToRadio(const RadioInfo& info)
             // + CurrentDSPMode setter at radio.cs:2670-2696 [v2.10.3.13];
             // Thetis seeds at mode-change (console.cs:33937) + at
             // chkPower → txtVFOAFreq_LostFocus path indirectly via the
-            // SetupTxFilters() preamble.  NereusSDR consolidates into
+            // SetupTxFilters() preamble.  Longpath consolidates into
             // one helper called at three triggers (this is trigger #1 of 3).
             pushTxModeAndBandpass();
 
@@ -8288,7 +8288,7 @@ void RadioModel::connectToRadio(const RadioInfo& info)
             // false).  Same bug class as sub-bug 2 above — Thetis does
             // not need an explicit seed because chkPower / txtVFOAFreq_
             // LostFocus already drove the chain at construction time on
-            // managed-thread startup; NereusSDR's Qt signal model means
+            // managed-thread startup; Longpath's Qt signal model means
             // the construction-time setPower(default) emit is dropped
             // because connection / paProfile aren't ready yet.
             //
@@ -8406,7 +8406,7 @@ void RadioModel::connectToRadio(const RadioInfo& info)
     //
     // Thetis stores per-DDC ADC selection in a separate 14-bit global
     // (console.cs:15120 [v2.10.3.13]) edited via Setup form's
-    // radP1DDC*ADC* radio buttons. NereusSDR P1RadioConnection mirrors
+    // radP1DDC*ADC* radio buttons. Longpath P1RadioConnection mirrors
     // this in m_p1AdcCntrl; applyBoardQuirks() seeds a sensible board
     // default (HL2 / 2-ADC → 4, Hermes / HermesII → 0). If the user
     // (or the future Setup → Hardware → P1 ADC Routing page) has
@@ -8545,7 +8545,7 @@ void RadioModel::connectToRadio(const RadioInfo& info)
     });
 
     // Configure and start the FlexRadio UDP 4992 discovery beacon so PGXL/TGXL
-    // can auto-discover NereusSDR in their FlexRadio dropdown. The serial is
+    // can auto-discover Longpath in their FlexRadio dropdown. The serial is
     // derived from the radio MAC via the same SHA-256 path used in
     // onPgxlConnected(); both call derivedFlexSerial() so the values match.
     if (m_flexBroadcaster) {
@@ -9001,7 +9001,7 @@ void RadioModel::wireConnectionSignals(int wdspInSize)
     //       NetworkIO.SetMicPTT(Convert.ToInt32(value));
     //   }
     // The MicPTTDisabled property setter pushes to NetworkIO unconditionally,
-    // so the radio sees every UI flip.  NereusSDR mirrors that via a queued
+    // so the radio sees every UI flip.  Longpath mirrors that via a queued
     // signal/slot bind here, and primes once below.
     connectMicPttDisabledSignal();
 
@@ -9699,7 +9699,7 @@ double RadioModel::composedShiftHz(const SliceModel* slice,
     // DIG offset per mode. Thetis console.cs:14659 (DIGUClickTuneOffset,
     // default 1500) and :14694 (DIGLClickTuneOffset, default 2210)
     // [v2.10.3.15]. Both are int offsets in Hz; Thetis uses per-mode filter
-    // re-centering internally, but NereusSDR implements DIG offset as an
+    // re-centering internally, but Longpath implements DIG offset as an
     // additive shift on the same setShiftFrequency path as RIT.
     if (slice->dspMode() == DSPMode::DIGL) {
         offset += static_cast<double>(slice->diglOffsetHz());
@@ -10647,7 +10647,7 @@ void RadioModel::wireSliceSignals(SliceModel* slice)
     // DIG offset: per-mode click-tune demodulation offset for DIGL/DIGU.
     // From Thetis console.cs:14659 (DIGUClickTuneOffset) and :14694
     // (DIGLClickTuneOffset) [v2.10.3.15]. Both are int offsets in Hz; Thetis
-    // uses per-mode filter re-centering internally, but NereusSDR implements
+    // uses per-mode filter re-centering internally, but Longpath implements
     // DIG offset as an additive shift on the same setShiftFrequency path as
     // RIT.
     //
@@ -10677,7 +10677,7 @@ void RadioModel::wireSliceSignals(SliceModel* slice)
     //
     // RTTY uses two audio tones: mark (freq1 = 2295 Hz) and space (freq0 = 2125 Hz).
     // From Thetis radio.cs:2024-2060 — rx_dolly_freq0/freq1 are stored and fed to
-    // SetRXAmpeakFilFreq (the IIR audio peak filter / "dolly" filter). NereusSDR
+    // SetRXAmpeakFilFreq (the IIR audio peak filter / "dolly" filter). Longpath
     // does not yet implement the ampeak dolly filter (it is not in RxChannel),
     // so the mark/shift values are used to compute a bandpass window that covers
     // both tones:
@@ -10732,7 +10732,7 @@ void RadioModel::wireSliceSignals(SliceModel* slice)
     //
     // [2.10.3.5]MW0LGE wave recorder volume normalise  [original inline tag
     //   from radio.cs:1091; the wave_file_writer branch is intentionally
-    //   not ported here. NereusSDR has no WaveThing recorder module yet,
+    //   not ported here. Longpath has no WaveThing recorder module yet,
     //   so there is no RecordGain to mirror. Tag preserved verbatim per
     //   CLAUDE.md inline-comment-preservation rule; restore the branch
     //   when the recorder lands.]
@@ -11143,7 +11143,7 @@ void RadioModel::applyAlexAntennaForBand(Band band, bool isTx)
     //G8NJJ
     //
     // MW0LGE_21k9d only set bits if different — Alex.cs:394-413
-    // (deduplication guard) also deferred: NereusSDR connection layer
+    // (deduplication guard) also deferred: Longpath connection layer
     // can suppress redundant wire writes if needed, but we always compose
     // here for correctness.
 
@@ -11202,7 +11202,7 @@ void RadioModel::applyAlexAntennaForBand(Band band, bool isTx)
 //              else setAlex1HPF(rx2_dds_freq_mhz);
 //          }
 //
-// NereusSDR DIVERGES on (2): the Auto policy bypasses instead of widening.
+// Longpath DIVERGES on (2): the Auto policy bypasses instead of widening.
 // Rationale, per design doc §4 and the reporter's own description of the
 // hardware:
 //   - Thetis's widening is only sound on a high-pass ladder, where a lower
@@ -11214,7 +11214,7 @@ void RadioModel::applyAlexAntennaForBand(Band band, bool isTx)
 //     band-pass, widening would leave the higher slice attenuated, which is
 //     the reported bug again by another route. Bypass is correct under either
 //     reading of the hardware.
-//   - Thetis tops out at two receivers on two chains. NereusSDR puts up to
+//   - Thetis tops out at two receivers on two chains. Longpath puts up to
 //     five slices on two chains, so "two receivers, two filters" does not
 //     cover the case where three slices share one ADC across three bands.
 // Operators who prefer a filtered chain over a wide one keep BpfMode::
@@ -11279,7 +11279,7 @@ void RadioModel::republishAlexAdcSlices()
     // Thetis cannot be ported here: it has no bypass-on-multi-band concept at
     // all, and its diversity is two receivers on two chains where the chain
     // count and the receiver count are the same number. It never faces five
-    // slices over two chains, so it never had to answer this. NereusSDR-
+    // slices over two chains, so it never had to answer this. Longpath-
     // original policy, stated per the reporter's requirement.
     const bool diversityPair = diversityActive() && chainCount >= 2;
 
@@ -11311,7 +11311,7 @@ void RadioModel::republishAlexAdcSlices()
     // them here, exactly as already happens for Alex boards sharing one
     // Saturn BPF1 selection (the 20/17/15m case in the comment below).
     //
-    // NereusSDR-original (2026-08-01): the confirmed bug is that
+    // Longpath-original (2026-08-01): the confirmed bug is that
     // AlexController correctly enters BYPASS for these already-compatible
     // pairs because this grouping step, not AlexController itself, was
     // comparing the wrong filter identity.
@@ -11455,7 +11455,7 @@ void RadioModel::republishAlexAdcSlices()
 // ---------------------------------------------------------------------------
 // panBypassState — Phase 3F. Resolve the WIDE badge for one panadapter.
 //
-// NereusSDR-original; no upstream port. Thetis has no per-pan bypass
+// Longpath-original; no upstream port. Thetis has no per-pan bypass
 // indicator because it has no multi-pan layout: its single wideband-window
 // bypass is reported by the window itself (console.cs:43545-43566
 // [v2.10.3.15]). The routing below is the multi-pan generalisation, per
@@ -12145,7 +12145,7 @@ void RadioModel::applyClaritySmoothDefaults()
     sw->setFillColor(QColor(0xff, 0xff, 0xff, 230));
 
     // 5. Pan fill OFF — trace renders as a thin line, not a filled curve.
-    //    NereusSDR's default is fill-on; turn it off to match the reference.
+    //    Longpath's default is fill-on; turn it off to match the reference.
     sw->setPanFillEnabled(false);
 
     // 6. Waterfall AGC — tracks band conditions automatically. With AGC on,
@@ -12461,7 +12461,7 @@ void RadioModel::onConnectionStateChanged(ConnectionState state)
 //   }
 // — note `f` is the audio_volume * 1.02 already.  SWR foldback (`_swr_protect`)
 // multiplies the wire byte HERE, NOT the IQ scalar.  This is the opposite of
-// what the prior NereusSDR code did (it placed swrProtect on the IQ scalar).
+// what the prior Longpath code did (it placed swrProtect on the IQ scalar).
 // The earlier "MW0LGE-canonical topology" comment was a misreading of the
 // upstream source — Thetis's `Audio.HighSWRScale` (the IQ-side multiplier in
 // cmaster.cs:1117) is set to 1.0 once at console.cs:29194 [v2.10.3.13] and
@@ -12687,7 +12687,7 @@ void RadioModel::setTune(bool on)
     //   - SetPowerUsingTargetDBM full dBm-target logic (3M-3a)
     //   - ATU async tune, NetworkIO.SetUserOut*, Apollo auto-tune (deferred)
     //   - UI BackColor changes (H.3 territory)
-    //   - Meter TX mode lock/restore: NereusSDR's MeterModel has no TX-mode
+    //   - Meter TX mode lock/restore: Longpath's MeterModel has no TX-mode
     //     selector yet; this is deferred to H.3 / 3M-1b when MeterModel gains
     //     a setTxDisplayMode() setter.  The save/restore slots remain below
     //     as named comments so the H.3 author knows exactly where to plug in.
@@ -12872,7 +12872,7 @@ void RadioModel::setTune(bool on)
                 //       Audio.RadioVolume = 0.0;
                 //       if (chkTUN.Checked) radio.GetDSPTX(0).TXPostGenRun = 0;
                 //   }
-                // setTuneTone(false, ...) maps to TXPostGenRun=0 in NereusSDR's
+                // setTuneTone(false, ...) maps to TXPostGenRun=0 in Longpath's
                 // TxChannel wrapper (sets the run flag while leaving freq/mag).
                 //
                 // NOT applied on the HL2. Bench-caught 2026-08-01 on a live
@@ -13008,7 +13008,7 @@ void RadioModel::setTune(bool on)
         // gen1's output never enters a running TXA chain and there is no
         // filter-ringing transient.
         //
-        // NereusSDR's MoxController is timer-based (non-blocking).  We latch
+        // Longpath's MoxController is timer-based (non-blocking).  We latch
         // m_pendingTuneOff and let the rxReady → settle-timer slot wired in
         // the constructor invoke completeTuneOff() at T+30+m_tuneOffSettleMs ms.
         // Until then, the rest of the TUN-off work (gen1 off, mode restore,
@@ -13153,7 +13153,7 @@ bool RadioModel::mox() const
 
 void RadioModel::setVfoHz(int rx, int chan, qint64 hz)
 {
-    // NereusSDR has one frequency per slice.  VFO B (chan==1) maps to a
+    // Longpath has one frequency per slice.  VFO B (chan==1) maps to a
     // separate slice in this model, so per-slice VFO B writes are silently
     // ignored — TCI clients that drive VFO B should target a second slice.
     if (chan != 0) {
@@ -13220,7 +13220,7 @@ bool RadioModel::split(int rx) const
 // store-and-return until their underlying feature lands (rxBin/rxApf/etc.).
 //
 // All slice-indexed shims sanity-check sliceById(rx) and silently no-op on
-// out-of-range so a misbehaving client can't crash NereusSDR.  Getters
+// out-of-range so a misbehaving client can't crash Longpath.  Getters
 // return sensible defaults (false / 0 / "" / 0.0) when the slice doesn't
 // exist, matching the TestMockRadioModel convention.
 // ---------------------------------------------------------------------------
@@ -13510,7 +13510,7 @@ bool RadioModel::rxAnf(int rx) const
 
 // BIN: Thetis's binaural toggle is per receiver, handleRxBinEnable at
 // TCIServer.cs:1854-1869 [v2.10.3.15] -- consoleThreadSafe.SetBin(rx + 1,
-// enabled) on the set path, GetBin(rx + 1) on the query path.  NereusSDR's
+// enabled) on the set path, GetBin(rx + 1) on the query path.  Longpath's
 // analog is SliceModel::binauralEnabled, which RadioModel already wires to
 // RxChannel::setBinauralEnabled in the per-slice connect block above.
 //
@@ -13530,7 +13530,7 @@ bool RadioModel::rxBin(int rx) const
 
 // APF: also per receiver upstream, handleRxApfEnable at TCIServer.cs:1870-1894
 // [v2.10.3.15] -- SetupForm.RX1APFEnable / RX2APFEnable.  Thetis holds the
-// state on the Setup form and bails when that form is null; NereusSDR keeps it
+// state on the Setup form and bails when that form is null; Longpath keeps it
 // on the slice (SliceModel::apfEnabled, wired to RxChannel::setApfEnabled), so
 // there is no equivalent null-form gate to port.  Same stub-to-real routing as
 // BIN above.
@@ -13611,7 +13611,7 @@ int RadioModel::afGain(int rx) const
 // caches defaulted to 0, so a fresh real-client connect saw "volume:-60.0;"
 // (muted) and "rx_volume:0,0,-60.00;" -- bench-bogus.  Thetis reads
 // consoleThreadSafe.AF / TXAF for the same fields (TCIServer.cs:2652+2655
-// [v2.10.3.15]), which are the actual UI slider positions.  NereusSDR's
+// [v2.10.3.15]), which are the actual UI slider positions.  Longpath's
 // equivalents:
 //   AF        -> AudioEngine::volume() (float [0..1]) scaled to int [0..100]
 //   TXAF/MON  -> TransmitModel::monitorVolume() (float [0..1]) same scale
@@ -13651,7 +13651,7 @@ int  RadioModel::monLinear() const
 //
 // Review P1 #1 fix (2026-05-22): prefer the live connection sample rate.
 // Thetis reads consoleThreadSafe.SampleRateRX1 via getPublishedIQSampleRate
-// (TCIServer.cs:2642 [v2.10.3.15]).  NereusSDR exposes the same via
+// (TCIServer.cs:2642 [v2.10.3.15]).  Longpath exposes the same via
 // connectionSampleRateHz().  Falls back to the cached m_tciIqSampleRate
 // only when no connection is active (matches Thetis behaviour: pre-
 // connect probes see whatever the user/setup defaults left in the field).
@@ -13736,7 +13736,7 @@ bool RadioModel::tune() const
 }
 
 // powerOn -- From Thetis PowerOn at console.cs:19799-19803 [v2.10.3.15].
-// Architectural divergence: NereusSDR has no separate Power button, so
+// Architectural divergence: Longpath has no separate Power button, so
 // connection IS power.  TCI clients see powerOn = isConnected().
 bool RadioModel::powerOn() const
 {
@@ -13744,7 +13744,7 @@ bool RadioModel::powerOn() const
 }
 
 // diglOffset -- From Thetis DIGLClickTuneOffset at console.cs:14693
-// [v2.10.3.15].  Architectural divergence: per-slice in NereusSDR; expose
+// [v2.10.3.15].  Architectural divergence: per-slice in Longpath; expose
 // active slice value (falls back to 0 when no active slice -- e.g. pre-
 // connect TCI client probe).
 int RadioModel::diglOffset() const
@@ -14094,7 +14094,7 @@ QString RadioModel::connectionSampleRateText() const
 // Sample-rate live-apply coordinator.  Implements the 7-step sequence
 // described in the design doc (thetis-display-dsp-parity-design.md §5C).
 //
-// NereusSDR-original infrastructure — no Thetis source ported here.
+// Longpath-original infrastructure — no Thetis source ported here.
 // The P1 restart pattern mirrors the onReconnectTimeout() sequence in
 // P1RadioConnection (itself ported from networkproto1.c SendStopToMetis /
 // SendStartToMetis [v2.10.3.13]).
@@ -14177,7 +14177,7 @@ qint64 RadioModel::setSampleRateLive(int newRateHz,
 
     // ── Step 4: Stop radio data flow ──────────────────────────────────────
     // Thetis setup.cs:7020-7022 (P2 EnableRx) / 7092 (P1 SendStopToMetis)
-    // [v2.10.3.13].  In NereusSDR the stop+set-rate+start cycle is wrapped
+    // [v2.10.3.13].  In Longpath the stop+set-rate+start cycle is wrapped
     // by P1RadioConnection::restartStreamWithRate (P1) or atomic-rate-update
     // inside RadioConnection::setSampleRate (P2).  Both paths are queued
     // to the connection thread; we wait below for inflight packets to drain.
@@ -14337,7 +14337,7 @@ qint64 RadioModel::setSampleRateLive(int newRateHz,
 //   which re-encodes the DDC enable bits in the next CmdRx packet.  No
 //   additional stop/start cycle is needed on P2.
 //
-// NereusSDR-original infrastructure — no Thetis source ported here.
+// Longpath-original infrastructure — no Thetis source ported here.
 // Mirrors setSampleRateLive() (Task 1.6) in structure.
 // ---------------------------------------------------------------------------
 qint64 RadioModel::setActiveRxCountLive(int newCount)
@@ -14500,7 +14500,7 @@ qint64 RadioModel::setActiveRxCountLive(int newCount)
 // No-op guard: returns immediately if WDSP is not initialized or no
 // RxChannel exists (e.g., disconnected, during teardown).
 //
-// NereusSDR-original infrastructure — no Thetis source ported here.
+// Longpath-original infrastructure — no Thetis source ported here.
 // ---------------------------------------------------------------------------
 void RadioModel::rebuildDspOptionsForMode(DSPMode forMode)
 {
@@ -14692,7 +14692,7 @@ QString RadioModel::derivedFlexSerial(const QString& mac) const
 {
     // Phase 3P-II bench-discovered: PGXL's FlexRadio tab expects a 16-digit
     // dashed serial in 4-4-4-4 groups (e.g. 2923-1104-6600-8823). The earlier
-    // "NereusSDR-<mac>" format was silently dropped by PGXL's regex validator.
+    // "Longpath-<mac>" format was silently dropped by PGXL's regex validator.
     // SHA-256 the MAC + a salt, take 8 bytes -> 64-bit number -> mod 10^16 ->
     // dash-format. Deterministic per (host + radio MAC) install. Operator can
     // override via PGXL_FlexRadioSerial AppSettings key when a collision is
@@ -14746,11 +14746,11 @@ void RadioModel::onPgxlConnected()
     const QString antMap = s.value(QStringLiteral("PGXL_AntMap"),
                                    QStringLiteral("ANT1:PORTA,ANT2:PORTB")).toString();
     // 2026-05-21 bench-confirmed: PGXL native protocol (TCP 9008) rejects
-    // model=NereusSDR with error 50000015 (parse/validation) and closes the
+    // model=Longpath with error 50000015 (parse/validation) and closes the
     // socket, producing a tight reconnect loop on RadioModel's PgxlConnection.
     // Canonical FLEX-8600 pcap (flex-tgxl-direct-CONTROL.pcapng @ T+206)
     // advertises model="FLEX-8600M". PGXL whitelists known FlexRadio model
-    // strings; "NereusSDR" is not on that list. Claim FLEX-8600M (the closest
+    // strings; "Longpath" is not on that list. Claim FLEX-8600M (the closest
     // multi-slice match for our P1/P2 support surface) so PGXL accepts the
     // pairing handshake. Override via PGXL_PairModel for future SKU work.
     const QString pgxlPairModel = s.value(QStringLiteral("PGXL_PairModel"),
@@ -15025,7 +15025,7 @@ void RadioModel::onSliceBandChanged(SliceModel* source, Longpath::Band band)
 std::array<Longpath::SliceConfig, 5>
 RadioModel::buildStreamConfigsForCodec() const
 {
-    // NereusSDR-original: assembles the input array the codec's
+    // Longpath-original: assembles the input array the codec's
     // applyDdcAssignment() needs. No Thetis equivalent; Thetis builds
     // UpdateDDCs inputs inline in console.cs:8186-8538 [v2.10.3.15].
     //
@@ -15101,7 +15101,7 @@ Longpath::CodecContext RadioModel::currentCodecContext() const
     // rx_adc_ctrl2 = 0 (console.cs:15135), and setup.cs:16934 [v2.10.3.15]
     // states what the 4 encodes: "bits 3 & 2 set to 01 => DDC1 to ADC1".
     //
-    // NereusSDR never assigned this on Protocol 2 -- P2RadioConnection's
+    // Longpath never assigned this on Protocol 2 -- P2RadioConnection's
     // buildCodecContext does not touch it, and this function builds a bare
     // CodecContext rather than calling that -- so the codecs' `a.adcCtrl1 =
     // ctx.adcCtrl & 0xff` faithfully copied a zero. The visible consequence
@@ -15533,7 +15533,7 @@ bool RadioModel::widebandActiveForChain(int chainIdx) const
 
 std::optional<Longpath::DdcAssignment> RadioModel::computeDdcAssignment() const
 {
-    // NereusSDR-original glue. No Thetis equivalent at this abstraction layer.
+    // Longpath-original glue. No Thetis equivalent at this abstraction layer.
     const Longpath::CodecContext ctx = currentCodecContext();
 
     const std::array<Longpath::SliceConfig, 5> streams = buildStreamConfigsForCodec();

@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_applet_to_canvas.cpp  (NereusSDR)
+// tests/tst_applet_to_canvas.cpp  (Longpath)
 // =================================================================
 //
 // Ein Applet verlaesst den Stapel und wird eine frei bewegliche
@@ -21,12 +21,12 @@
 // Ohne Bildschirm und ohne Funkgeraet.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-20 — Original fuer NereusSDR von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
 // =================================================================
 
-// no-port-check: NereusSDR-original test file.
+// no-port-check: Longpath-original test file.
 
 #include <QtTest>
 #include <QSplitter>

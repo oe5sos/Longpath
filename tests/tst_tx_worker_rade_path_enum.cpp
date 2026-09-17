@@ -1,6 +1,6 @@
-// no-port-check: NereusSDR-original unit-test file.
+// no-port-check: Longpath-original unit-test file.
 // =================================================================
-// tests/tst_tx_worker_rade_path_enum.cpp  (NereusSDR)
+// tests/tst_tx_worker_rade_path_enum.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for TxWorkerThread::TxPath enum + currentTxPath
@@ -23,7 +23,7 @@
 //
 // =================================================================
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-11 — Phase 3R Task K2: initial test file. NereusSDR-native.
 //                 J.J. Boyd (KG4VCF), with AI-assisted implementation
 //                 via Anthropic Claude Code.

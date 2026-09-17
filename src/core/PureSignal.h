@@ -1,7 +1,7 @@
-// no-port-check: NereusSDR-original wrapper class.  Thetis manages
+// no-port-check: Longpath-original wrapper class.  Thetis manages
 // PureSignal via a Form (PSForm) directly bound to a static `puresignal`
 // helper class on the WDSP P/Invoke side; there is no separate "PureSignal
-// coordinator" in Thetis — the form IS the coordinator.  NereusSDR splits
+// coordinator" in Thetis — the form IS the coordinator.  Longpath splits
 // the host-side coordination (cal lifecycle, MOX integration, polling, save
 // /restore, two-tone wiring) into this class so the UI surfaces (PsForm,
 // PureSignalApplet, TxApplet [PS-A], PsaIndicatorWidget) can subscribe to
@@ -20,7 +20,7 @@
 //     > 90, FeedbackColourLevel range thresholds).
 //
 // =================================================================
-// src/core/PureSignal.h  (NereusSDR)
+// src/core/PureSignal.h  (Longpath)
 // =================================================================
 //
 // PureSignal coordinator: cal lifecycle + MOX integration + auto-attention
@@ -45,7 +45,7 @@
 //   - console.cs:43703            (ForcePureSignalAutoCalDisable)
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-06 — Created by J.J. Boyd (KG4VCF) for Phase 3M-4 Task 7
 //                 PureSignal coordinator, with AI-assisted source-first
 //                 protocol via Anthropic Claude Code.
@@ -232,7 +232,7 @@ public:
     // ── Two-tone integration ───────────────────────────────────────────────
     //
     // PsForm.cs btnPSTwoToneGen_Click [v2.10.3.13] toggles
-    // SetupForm.TTgenrun.  In NereusSDR the TwoToneController owns the
+    // SetupForm.TTgenrun.  In Longpath the TwoToneController owns the
     // activation / deactivation orchestrator (PSForm.cs route is just a
     // pass-through to console.SetupForm.TTgenrun).  PureSignal::setTwoToneOn
     // forwards to TwoToneController::setActive when wired; otherwise
@@ -477,14 +477,14 @@ public:
     //
     // From Thetis AmpView.cs:371-392 [v2.10.3.13] — the unsafe { fixed }
     // block inside timer1_Tick that pins the seven managed double[] arrays
-    // and forwards their addresses into puresignal.GetPSDisp.  NereusSDR
+    // and forwards their addresses into puresignal.GetPSDisp.  Longpath
     // doesn't need GC pinning (raw double* are passed by AmpViewWindow),
     // so the wrapper is the simple pass-through below.
     //
     // Inline tag preservation (per CLAUDE.md §"Inline comment preservation"):
     // upstream AmpView.cs:397 carries
     //   //disp_data(); // MW0LGE [2.9.0.8] changed to an add once, update points method.
-    // — explanatory tag for a refactor that NereusSDR follows by structure
+    // — explanatory tag for a refactor that Longpath follows by structure
     // (we never had the pre-refactor disp_data path).
     bool fillAmpViewBuffers(double* x,  double* ym, double* yc, double* ys,
                             double* cm, double* cc, double* cs);
@@ -556,7 +556,7 @@ signals:
     // correctionPeakChanged carries the calcc HW peak (TxChannel::getPSHWPeak)
     // when it differs from the prior poll by more than 0.001.  Subscribers
     // map the raw [0..1] envelope into the 0..100 PureSignalApplet correction
-    // gauge.  Source: NereusSDR-native — Thetis exposes the value via the
+    // gauge.  Source: Longpath-native — Thetis exposes the value via the
     // PSpeak text box (PSForm.cs:792-803 PSpeak_TextChanged [v2.10.3.13]) but
     // not as a coordinated signal; we add the signal seam here so the Phase
     // 3M-4 applet can bind without polling its own timer.

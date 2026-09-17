@@ -1,7 +1,7 @@
 #pragma once
 
 // =================================================================
-// src/gui/spectrum/SpectrumAvenger.h  (NereusSDR)
+// src/gui/spectrum/SpectrumAvenger.h  (Longpath)
 // =================================================================
 //
 // Ported from WDSP source:
@@ -26,7 +26,7 @@
 //   Original WDSP source license preserved in SpectrumAvenger.cpp.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-05 — Created in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via
 //                 Anthropic Claude Code.
@@ -116,7 +116,7 @@ public:
     ///                  used by modes 1 + 3)
     ///   scale        — overall power-domain scale factor (Thetis
     ///                  applies window-power-gain compensation
-    ///                  here; NereusSDR can pass 1.0 if FFTEngine
+    ///                  here; Longpath can pass 1.0 if FFTEngine
     ///                  already normalised)
     ///   correction   — per-pixel correction factor (Thetis sub-band
     ///                  gain compensation; pass empty for no

@@ -231,7 +231,7 @@ private slots:
     // -----------------------------------------------------------------------
     // Phase 3M-0 Task 1: isRxOnlySku + canDriveGanymede SKU capability flags
     //
-    // isRxOnlySku: NereusSDR-original flag — Thetis treats RX-only purely as
+    // isRxOnlySku: Longpath-original flag — Thetis treats RX-only purely as
     //   a user toggle (chkGeneralRXOnly, console.cs:15283-15307 [v2.10.3.13]);
     //   we add this so SKUs without TX drivers are hard-blocked regardless of
     //   user settings.
@@ -326,7 +326,7 @@ private slots:
     void hasVoltsAmps_perSkuGrouping()
     {
         // From Thetis clsHardwareSpecific.cs:245-264 [v2.10.3.15] //N1GP G2E added
-        // HasVolts/HasAmps true SKUs (NereusSDR board mapping)
+        // HasVolts/HasAmps true SKUs (Longpath board mapping)
         QVERIFY(BoardCapsTable::forBoard(HPSDRHW::OrionMKII).hasPaVoltsTelemetry);  // ANAN7000D/8000D/AnvelinaPro3
         QVERIFY(BoardCapsTable::forBoard(HPSDRHW::OrionMKII).hasPaAmpsTelemetry);
         QVERIFY(BoardCapsTable::forBoard(HPSDRHW::Saturn).hasPaVoltsTelemetry);     // ANAN-G2/G2_1K

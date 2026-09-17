@@ -1,12 +1,12 @@
 // =================================================================
-// src/gui/meters/SpacerItem.cpp  (NereusSDR)
+// src/gui/meters/SpacerItem.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/MeterManager.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -75,7 +75,7 @@ SpacerItem::SpacerItem(QObject* parent)
 //   :35007  //[2.10.3.5]MW0LGE note these are reverse RGB, we normally expect BGRA #289
 // Thetis renders colour1 (RX) or colour2 (TX) depending on MOX state,
 // with a half-second cross-fade when MOX toggles.
-// NereusSDR simplifies: if colours differ, show vertical linear gradient
+// Longpath simplifies: if colours differ, show vertical linear gradient
 // (colour1 top, colour2 bottom); otherwise solid fill with colour1.
 // The padding field is preserved for serialization parity with Thetis
 // (Thetis uses it for spacing in automatic layout, not for rendering).

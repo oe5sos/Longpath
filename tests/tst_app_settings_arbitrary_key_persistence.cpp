@@ -1,9 +1,9 @@
-// no-port-check: NereusSDR-original regression test.
+// no-port-check: Longpath-original regression test.
 //
 // Phase 3J-1 closeout Item 7 (2026-05-12): pins the contract that
 // AppSettings does NOT purge top-level keys on save/reload, regardless
 // of whether the key matches any "known schema".  The user's memory
-// note "NereusSDR purges unknown keys on save" turned out to be
+// note "Longpath purges unknown keys on save" turned out to be
 // inaccurate -- audit of AppSettings::load / save / setValue / remove
 // found zero code paths that filter top-level keys.  This test prevents
 // any future change from accidentally introducing one.
@@ -34,7 +34,7 @@ private slots:
         QVERIFY(tmp.isValid());
         const QString path = tmp.filePath(QStringLiteral("NereusSDR.settings"));
 
-        // Cycle 1: set a key that no NereusSDR code path knows about.
+        // Cycle 1: set a key that no Longpath code path knows about.
         {
             AppSettings s(path);
             s.setValue(QStringLiteral("ArbitraryUserKey_42"),

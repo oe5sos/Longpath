@@ -1,8 +1,8 @@
-// no-port-check: NereusSDR-original unit-test file.  The Thetis references
+// no-port-check: Longpath-original unit-test file.  The Thetis references
 // below are cite comments documenting which upstream lines each assertion
 // verifies; no Thetis logic is ported in this test file.
 // =================================================================
-// tests/tst_transmit_model_vox_properties.cpp  (NereusSDR)
+// tests/tst_transmit_model_vox_properties.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for TransmitModel VOX properties (4x):
@@ -19,7 +19,7 @@
 //     setup.cs:4865-4876 [v2.10.3.13]     — VOXHangTime mapped to udDEXPHold;
 //     setup.designer.cs:45005-45024 [v2.10.3.13] — udDEXPHold.Minimum=1,
 //       udDEXPHold.Maximum=2000, udDEXPHold.Value=500 ms.
-//   phase3m-1b-thetis-pre-code-review.md §8.5 — NereusSDR VOX property mapping.
+//   phase3m-1b-thetis-pre-code-review.md §8.5 — Longpath VOX property mapping.
 // =================================================================
 
 #include <QtTest/QtTest>
@@ -44,9 +44,9 @@ private slots:
     }
 
     void default_voxThresholdDb_isMinusForty() {
-        // NereusSDR-original default -40 dB (plan §8.5).
+        // Longpath-original default -40 dB (plan §8.5).
         // Thetis ptbVOX default is -20 (console.Designer.cs:6024 [v2.10.3.13]:
-        //   ptbVOX.Value = -20), but NereusSDR uses -40 as a more conservative
+        //   ptbVOX.Value = -20), but Longpath uses -40 as a more conservative
         // starting point.  Phase L.2 wires persistence; initial value is -40.
         TransmitModel t;
         QCOMPARE(t.voxThresholdDb(), -40);
@@ -61,7 +61,7 @@ private slots:
     }
 
     void default_voxHangTimeMs_is500() {
-        // NereusSDR-original default 500 ms (plan §8.5).
+        // Longpath-original default 500 ms (plan §8.5).
         // Matches Thetis udDEXPHold.Value = 500 ms per
         //   setup.designer.cs:45020-45024 [v2.10.3.13].
         TransmitModel t;
@@ -183,7 +183,7 @@ private slots:
     // RANGE CLAMPING
     // (ptbVOX: Minimum=-80, Maximum=0 per console.Designer.cs:6018-6019 [v2.10.3.13])
     // (udDEXPHold: Minimum=1, Maximum=2000 per setup.designer.cs:45010-45008 [v2.10.3.13])
-    // (voxGainScalar: [0.0f, 100.0f] NereusSDR sane upper guard; Thetis unguarded)
+    // (voxGainScalar: [0.0f, 100.0f] Longpath sane upper guard; Thetis unguarded)
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
     void voxThresholdDb_clampBelowMin() {
@@ -242,14 +242,14 @@ private slots:
     }
 
     void voxGainScalar_clampBelowMin() {
-        // kVoxGainScalarMin = 0.0f (NereusSDR sane guard).
+        // kVoxGainScalarMin = 0.0f (Longpath sane guard).
         TransmitModel t;
         t.setVoxGainScalar(-5.0f);
         QVERIFY(qFuzzyCompare(t.voxGainScalar(), TransmitModel::kVoxGainScalarMin));
     }
 
     void voxGainScalar_clampAboveMax() {
-        // kVoxGainScalarMax = 100.0f (NereusSDR sane guard).
+        // kVoxGainScalarMax = 100.0f (Longpath sane guard).
         TransmitModel t;
         t.setVoxGainScalar(999.0f);
         QVERIFY(qFuzzyCompare(t.voxGainScalar(), TransmitModel::kVoxGainScalarMax));
@@ -302,7 +302,7 @@ private slots:
     }
 
     void constants_voxGainScalar_expectedValues() {
-        // NereusSDR sane guard: [0.0f, 100.0f]; Thetis has no explicit clamp.
+        // Longpath sane guard: [0.0f, 100.0f]; Thetis has no explicit clamp.
         QVERIFY(qFuzzyCompare(TransmitModel::kVoxGainScalarMin, 0.0f));
         QVERIFY(qFuzzyCompare(TransmitModel::kVoxGainScalarMax, 100.0f));
     }

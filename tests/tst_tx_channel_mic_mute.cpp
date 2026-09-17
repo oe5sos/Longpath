@@ -51,7 +51,7 @@ warren@wpratt.com
 */
 
 // =================================================================
-// tests/tst_tx_channel_mic_mute.cpp  (NereusSDR)
+// tests/tst_tx_channel_mic_mute.cpp  (Longpath)
 // =================================================================
 //
 // No Thetis code is directly ported in this test file.  The test exercises:
@@ -94,14 +94,14 @@ warren@wpratt.com
 // when that define is set.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-27 — New test for Phase 3M-1b Task D.6: TxChannel mic-mute path
 //                 (setMicPreamp / recomputeTxAPanelGain1).
 //                 J.J. Boyd (KG4VCF), with AI-assisted implementation via
 //                 Anthropic Claude Code.
 // =================================================================
 
-// no-port-check: NereusSDR-original test file. All Thetis source cites are
+// no-port-check: Longpath-original test file. All Thetis source cites are
 // in TxChannel.h/cpp.
 
 #define LONGPATH_BUILD_TESTS 1

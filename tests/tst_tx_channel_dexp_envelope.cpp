@@ -1,7 +1,7 @@
-// no-port-check: NereusSDR-original unit-test file. Thetis cite comments
+// no-port-check: Longpath-original unit-test file. Thetis cite comments
 // document upstream sources; no Thetis logic ported in this test file.
 // =================================================================
-// tests/tst_tx_channel_dexp_envelope.cpp  (NereusSDR)
+// tests/tst_tx_channel_dexp_envelope.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for TxChannel DEXP envelope/timing setters (Phase 3M-3a-iii).
@@ -19,7 +19,7 @@
 //   - Idempotent guard: second identical call is observable as the stored value.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-03 - New test file for Phase 3M-3a-iii Tasks 1-2: DEXP master-
 //                 enable, detector-tau, attack-time, release-time wrappers.
 //                 J.J. Boyd (KG4VCF), with AI-assisted implementation via

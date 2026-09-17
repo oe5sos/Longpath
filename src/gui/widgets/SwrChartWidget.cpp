@@ -1,11 +1,11 @@
 // =================================================================
-// src/gui/widgets/SwrChartWidget.cpp  (NereusSDR)
+// src/gui/widgets/SwrChartWidget.cpp  (Longpath)
 // =================================================================
 //
 // See SwrChartWidget.h.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-13 — Created by Ralph Martin Fischer (OE5SOS),
 //                 AI-assisted implementation via Anthropic Claude
 //                 (Cowork).

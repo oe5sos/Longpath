@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/instruments/FrequencyInstrument.cpp  (NereusSDR)
+// src/gui/instruments/FrequencyInstrument.cpp  (Longpath)
 // =================================================================
 // Siehe FrequencyInstrument.h.
 // =================================================================

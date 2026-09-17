@@ -1,8 +1,8 @@
 // =================================================================
-// tests/tst_master_mixer_cadence.cpp  (NereusSDR)
+// tests/tst_master_mixer_cadence.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // The offline cadence simulation that found the TX-monitor crackle,
 // pinned down as a regression test.
@@ -36,7 +36,7 @@
 // a seam the fades failed to mask.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-11 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

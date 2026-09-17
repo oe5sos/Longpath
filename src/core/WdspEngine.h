@@ -1,7 +1,7 @@
 #pragma once
 
 // =================================================================
-// src/core/WdspEngine.h  (NereusSDR)
+// src/core/WdspEngine.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -9,7 +9,7 @@
 //   Project Files/Source/ChannelMaster/cmaster.c, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -212,7 +212,7 @@ public:
     // receivers the connected radio actually has, so the TX id is a fixed
     // constant rather than something that moves per radio.
     //
-    // NereusSDR's radio structure is one WDSP channel per slice with no
+    // Longpath's radio structure is one WDSP channel per slice with no
     // sub-receivers, i.e. cmSubRCVR = 1, cmRCVR = kMaxSliceChannels,
     // cmXMTR = 1.  Substituting into chid() gives:
     //   rx:  ch_id = 1 * slice + 0             = slice
@@ -330,7 +330,7 @@ public:
     // --- Per-board ChannelMaster-layer WDSP calls (Phase B4'/B5') ---
     //
     // These wrap ChannelMaster-exported symbols that Thetis calls at connect
-    // time from clsHardwareSpecific.cs:85-191 [v2.10.3.15].  In NereusSDR,
+    // time from clsHardwareSpecific.cs:85-191 [v2.10.3.15].  In Longpath,
     // the symbols resolve to glue stubs in netinterface_stub.c until the
     // ChannelMaster module is ported.
     //
@@ -425,7 +425,7 @@ public:
     // Create a TX channel with the given parameters.
     //
     // Channel ID convention: pass kTxChannelId.  Thetis uses
-    // `chid(inid(1, 0), 0)`; with NereusSDR's radio structure
+    // `chid(inid(1, 0), 0)`; with Longpath's radio structure
     // (CMsubrcvr=1, CMrcvr=kMaxSliceChannels) that resolves to
     // kMaxSliceChannels.  C# equivalent: `WDSP.id(1, 0)` —
     // dsp.cs:926-944 [v2.10.3.15] case 2 returns `CMsubrcvr * CMrcvr`.
@@ -474,7 +474,7 @@ public:
     // Sits immediately above the TX channel.  PureSignal feedback has no
     // WDSP-channel analogue upstream (Thetis runs it inside the TX
     // channel via SetPSFeedbackRate(txch, ps_rate), cmaster.cs:539
-    // [v2.10.3.15]), so this is a NereusSDR extension.  Upstream's
+    // [v2.10.3.15]), so this is a Longpath extension.  Upstream's
     // closest concept is a "special stream", and those are numbered after
     // the transmitters — From Thetis ChannelMaster/cmsetup.c:86-89
     // [v2.10.3.15]: `sp0id(stream) = stream - pcm->cmRCVR - pcm->cmXMTR`.
@@ -576,7 +576,7 @@ public:
     // has never processed a display frame.
     //
     // Algorithm ported from Thetis wdsp/analyzer.c:830 [@501e3f5].
-    // NereusSDR-native: runs against FFTEngine dBm bins; see
+    // Longpath-native: runs against FFTEngine dBm bins; see
     // setupMaxBinDetector docstring for the full rationale.
     double getMaxBinDbm(int displayChannel) const;
 
@@ -594,9 +594,9 @@ public:
     // either side moves.  Defaults to 0; thread-safe via the same
     // m_maxBinDetectors store as setupMaxBinDetector / getMaxBinDbm.
     //
-    // NereusSDR-only API: Thetis's WDSP analyzer subsystem (CreateAnalyzer
+    // Longpath-only API: Thetis's WDSP analyzer subsystem (CreateAnalyzer
     // + SetAnalyzer + Spectrum) is fed by the SHIFTED WDSP channel so its
-    // analyzer DC is always the slice DC.  NereusSDR taps FFTEngine ahead
+    // analyzer DC is always the slice DC.  Longpath taps FFTEngine ahead
     // of the WDSP shift, so we apply the shift in our MaxBin scan.
     void setMaxBinSliceOffsetHz(int displayChannel, double sliceOffsetHz);
 
@@ -607,7 +607,7 @@ public slots:
     // Algorithm ported from Thetis wdsp/analyzer.c:800-822 [@501e3f5]:
     // scan for max in configured [firstBin, lastBin] window; apply
     // slow-release smoothing (decay = exp(-1/(tau*fps))), fast peak attack.
-    // NereusSDR-native: binsDbm already in dBm so no magnitude-to-dB step.
+    // Longpath-native: binsDbm already in dBm so no magnitude-to-dB step.
     //
     // 2026-05-22 bench fix: this path now serves as the fallback source
     // for MaxBin. The primary source is setMaxBinDbmFromSpectrum below,
@@ -697,11 +697,11 @@ private:
     // destroyTxChannel's erase() runs the unique_ptr destructor automatically.
     std::map<int, std::unique_ptr<TxChannel>> m_txChannels;
 
-    // NereusSDR-native strongest-bin-in-passband detector state.
+    // Longpath-native strongest-bin-in-passband detector state.
     //
     // Algorithm from Thetis wdsp/analyzer.c:688-830 [@501e3f5]; implemented
     // here because the WDSP analyzer pipeline (CreateAnalyzer + SetAnalyzer
-    // + Spectrum buffer feed) is not wired in NereusSDR -- FFTEngine uses raw
+    // + Spectrum buffer feed) is not wired in Longpath -- FFTEngine uses raw
     // FFTW3 directly.  The public API (setupMaxBinDetector / getMaxBinDbm)
     // preserves the Thetis names; the implementation runs the same scan +
     // slow-release smoothing on the dBm bins emitted by FFTEngine::fftReady
@@ -731,7 +731,7 @@ private:
     // ChannelMaster's pcm->in[in_id] buffer at cmaster.c:285 [v2.10.3.13]
     // (allocated for every TX-stream slot, passed to BOTH create_dexp's
     // `in` and `out` parameters at cmaster.c:134-135 [v2.10.3.13]) — but
-    // NereusSDR uses a parallel-only architecture, so this buffer is
+    // Longpath uses a parallel-only architecture, so this buffer is
     // private to the DEXP detector and never feeds the fexchange0 audio
     // path (TxWorkerThread::m_in is a separate buffer that fexchange0
     // reads).  TxWorkerThread::dispatchOneBlock copies a snapshot of m_in

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 //
-// NereusSDR - LogEntry ADIF serialisation. See LogEntry.h.
+// Longpath - LogEntry ADIF serialisation. See LogEntry.h.
 //
 // Copyright (C) 2026 NereusSDR contributors.
 //
-// Modification history (NereusSDR)
+// Modification history (Longpath)
 //   2026-08-07  Martin Fischer  Initial create. AI tooling: Anthropic
 //                               Claude (Cowork).
 //   2026-08-10  Martin Fischer  ADIF lengths in UTF-8 bytes, not
@@ -44,7 +44,7 @@ void field(QString& out, const QString& name, const QString& value)
 }
 
 // The same, but without the trim and without dropping an empty value.
-// Used for fields NereusSDR does not model: those are somebody else's
+// Used for fields Longpath does not model: those are somebody else's
 // data and go back out exactly as they came in, including a legal
 // zero-length one.
 void rawField(QString& out, const QString& name, const QString& value)

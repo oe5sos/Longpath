@@ -1,12 +1,12 @@
 // =================================================================
-// src/gui/setup/GeneralOptionsPage.cpp  (NereusSDR)
+// src/gui/setup/GeneralOptionsPage.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/setup.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -97,7 +97,7 @@ QComboBox* makeModeCombo(QWidget* parent)
     cmb->addItem(QStringLiteral("Classic"));
     cmb->addItem(QStringLiteral("Adaptive"));
     cmb->setFixedWidth(100);
-    // NereusSDR native — Classic mirrors Thetis bump+stack, Adaptive adds
+    // Longpath native — Classic mirrors Thetis bump+stack, Adaptive adds
     // 1 dB/tick attack with hold/decay and per-band floor memory.
     cmb->setToolTip(QStringLiteral(
         "Classic: bump ATT on red overload, stack-based undo.\n"
@@ -137,7 +137,7 @@ GeneralOptionsPage::GeneralOptionsPage(RadioModel* model, QWidget* parent)
     // Hidden by default (see buildHardwareConfigGroup); shown only for RX-only
     // SKUs (HL2-RX, etc.).  Named slot mirrors HardwarePage::onCurrentRadioChanged.
     // Cite: Thetis setup.designer.cs:8535-8544 [v2.10.3.13] (Visible=false default);
-    //       BoardCapabilities::isRxOnlySku (NereusSDR-original).
+    //       BoardCapabilities::isRxOnlySku (Longpath-original).
     if (model) {
         // Initial state: apply caps of the already-connected radio (if any).
         setReceiveOnlyVisible(model->boardCapabilities().isRxOnlySku);
@@ -176,7 +176,7 @@ GeneralOptionsPage::GeneralOptionsPage(RadioModel* model, QWidget* parent)
 // constructor can show/hide the RX-only checkbox without direct access to
 // the private m_chkGeneralRXOnly member.
 // Cite: Thetis setup.designer.cs:8535-8544 [v2.10.3.13] (Visible=false default);
-//       BoardCapabilities::isRxOnlySku (NereusSDR-original).
+//       BoardCapabilities::isRxOnlySku (Longpath-original).
 
 void GeneralOptionsPage::setReceiveOnlyVisible(bool visible)
 {
@@ -337,7 +337,7 @@ void GeneralOptionsPage::buildHardwareConfigGroup()
 //
 // Phase 3M-4 Task 11 also folds in two PureSignal Info Bar checkboxes that
 // Thetis hosts on a separate "Info Bar (below spectrum)" groupBoxTS23 inside
-// tpOptions2 (setup.designer.cs:10567-10632 [v2.10.3.13]).  NereusSDR's
+// tpOptions2 (setup.designer.cs:10567-10632 [v2.10.3.13]).  Longpath's
 // shallower Setup IA puts them in the existing General Options group.
 // ---------------------------------------------------------------------------
 
@@ -349,7 +349,7 @@ void GeneralOptionsPage::buildOptionsGroup()
     vbox->setSpacing(6);
 
     // From Thetis setup.designer.cs:9050-9059 [v2.10.3.13]
-    // Note: tooltip is NereusSDR-original — Thetis has no tooltip on this control.
+    // Note: tooltip is Longpath-original — Thetis has no tooltip on this control.
     m_chkPreventTXonDifferentBandToRX = new QCheckBox(
         tr("Prevent TX'ing on a different band to the RX band"), group);
     m_chkPreventTXonDifferentBandToRX->setObjectName(QStringLiteral("chkPreventTXonDifferentBandToRX"));
@@ -369,9 +369,9 @@ void GeneralOptionsPage::buildOptionsGroup()
     // From Thetis setup.designer.cs:10567-10597 [v2.10.3.13] chkHideFeebackLevel:
     //   "Hide feedback level number" (designer text), tooltip: "Hide the
     //   feedback level from the info bar".  Thetis preserves the typo
-    //   "Feeback" in the objectName — NereusSDR uses corrected spelling
+    //   "Feeback" in the objectName — Longpath uses corrected spelling
     //   in user-visible text, source-cite preserves the typo for traceability.
-    // The "Mirror of FB-label right-click" tooltip cue is NereusSDR-original
+    // The "Mirror of FB-label right-click" tooltip cue is Longpath-original
     // (Thetis has no banner-click hook explanation in tooltip).
     m_chkHideFeedback = new QCheckBox(tr("Hide feedback level"), group);
     m_chkHideFeedback->setObjectName(QStringLiteral("chkHideFeedbackLevel"));
@@ -390,7 +390,7 @@ void GeneralOptionsPage::buildOptionsGroup()
 
     // From Thetis setup.designer.cs:10619-10630 [v2.10.3.13] chkSwapREDBluePSAColours:
     //   "Swap red and blue PS-A feeback" (designer text — typo preserved
-    //   here as a source-cite reference; NereusSDR uses corrected spelling
+    //   here as a source-cite reference; Longpath uses corrected spelling
     //   "feedback colours" in the user-visible text).
     m_chkSwapRedBlue = new QCheckBox(
         tr("Swap red and blue PS-A feedback colours"), group);
@@ -539,7 +539,7 @@ void GeneralOptionsPage::buildStepAttGroup()
     // From Thetis setup.cs:15765-15772 [v2.10.3.13] udHermesStepAttenuator
     // Data_ValueChanged → console.RX1AttenuatorData. (The model-gated
     // Maximum=61 branch at setup.cs:15773-15786 lives in BoardCapsTable
-    // ::stepAttMaxDb in NereusSDR.)
+    // ::stepAttMaxDb in Longpath.)
     connect(m_spnRx1StepAttValue, &QSpinBox::valueChanged, this, [this](int dB) {
         if (m_ctrl) {
             m_ctrl->setAttenuation(dB, 0);

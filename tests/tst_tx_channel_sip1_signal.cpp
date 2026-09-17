@@ -25,7 +25,7 @@ warren@wpratt.com
 */
 
 // =================================================================
-// tests/tst_tx_channel_sip1_signal.cpp  (NereusSDR)
+// tests/tst_tx_channel_sip1_signal.cpp  (Longpath)
 // =================================================================
 //
 // No Thetis code is ported in this test file. The test exercises:
@@ -69,7 +69,7 @@ warren@wpratt.com
 // Thetis source cites.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-27 — New test for Phase 3M-1b Task D.5: verify sip1OutputReady
 //                 signal fires after each driveOneTxBlock() cycle with the
 //                 correct frame count. J.J. Boyd (KG4VCF), with AI-assisted
@@ -79,7 +79,7 @@ warren@wpratt.com
 //                 samples directly.  J.J. Boyd (KG4VCF), AI-assisted.
 // =================================================================
 
-// no-port-check: NereusSDR-original test file. All Thetis source cites are
+// no-port-check: Longpath-original test file. All Thetis source cites are
 // in TxChannel.h/cpp. LONGPATH_BUILD_TESTS must be defined (see CMakeLists.txt).
 
 #include <QtTest/QtTest>

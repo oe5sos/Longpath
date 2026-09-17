@@ -1,6 +1,6 @@
-// no-port-check: NereusSDR-original. AetherSDR is a thin FlexRadio API client
+// no-port-check: Longpath-original. AetherSDR is a thin FlexRadio API client
 // whose RadioModel::removePanadapter just sends "display pan remove" and lets
-// the radio decide what happens to the slices; NereusSDR owns slice and DDC
+// the radio decide what happens to the slices; Longpath owns slice and DDC
 // allocation locally, so the workflow shape ports but the mechanics do not.
 //
 // Codex review, PR #293, P1. Shrinking the pan layout deleted the omitted

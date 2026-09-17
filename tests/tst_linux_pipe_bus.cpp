@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_linux_pipe_bus.cpp  (NereusSDR)
+// tests/tst_linux_pipe_bus.cpp  (Longpath)
 // =================================================================
 //
 // Exercises LinuxPipeBus — Phase 3O VAX Sub-Phase 6 Task 6.1.

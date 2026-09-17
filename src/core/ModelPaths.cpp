@@ -1,13 +1,13 @@
 // =================================================================
-// src/core/ModelPaths.cpp  (NereusSDR)
+// src/core/ModelPaths.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original (no Thetis equivalent — Thetis bundles rnnoise
-// as a DLL and loads it via P/Invoke; NereusSDR resolves the .bin
+// Longpath-original (no Thetis equivalent — Thetis bundles rnnoise
+// as a DLL and loads it via P/Invoke; Longpath resolves the .bin
 // file path at runtime across platform install layouts).
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-23 — Written for NereusSDR by J.J. Boyd (KG4VCF),
 //                 with AI-assisted development via Anthropic Claude Code.
 //   2026-04-23 — Added rnnoiseDefaultSmallBin() and dfnrModelTarball()

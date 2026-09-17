@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/applets/eq/ClientEqCurveWidget.cpp  (NereusSDR)
+// src/gui/applets/eq/ClientEqCurveWidget.cpp  (Longpath)
 // =================================================================
 //
 // Ported from AetherSDR (https://github.com/aethersdr/AetherSDR),
@@ -17,10 +17,10 @@
 // port of the same upstream, so the pair are back together.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-09 — Ported to NereusSDR by Martin Fischer, AI-assisted via
 //                 Anthropic Claude (Cowork). Namespace AetherSDR →
-//                 NereusSDR; include paths rebased onto
+//                 Longpath; include paths rebased onto
 //                 core/strip/ and gui/applets/eq/. Behaviour unchanged.
 // =================================================================
 
@@ -78,30 +78,30 @@ QString freqLabel(float hz)
     return QString::number(static_cast<int>(std::round(hz)));
 }
 
-// ── Colours: NereusSDR's, and they already were ──────────────────────
+// ── Colours: Longpath's, and they already were ──────────────────────
 //
-// The bench asked for AetherSDR's equaliser functions with NereusSDR's
+// The bench asked for AetherSDR's equaliser functions with Longpath's
 // colours kept. That turned out to be almost free: seven of the nine
-// colours this widget uses are byte-identical to NereusSDR's own style
-// tokens, because NereusSDR's palette descends from AetherSDR in the
+// colours this widget uses are byte-identical to Longpath's own style
+// tokens, because Longpath's palette descends from AetherSDR in the
 // first place (see docs/attribution/aethersdr-reconciliation.md). They
 // are now written as those tokens rather than as literals, so they
-// follow NereusSDR if it ever repaints.
+// follow Longpath if it ever repaints.
 //
 // Two were left as literals in that pass — #556070 for a scale label
 // and #0f0f1a for a handle outline — on the reasoning that a colour
 // chosen to sit between two others stops working when snapped to one of
 // them. Sound reasoning, and it did not survive the instruction that
-// everything is to look like NereusSDR. They are kTextScale and
+// everything is to look like Longpath. They are kTextScale and
 // kPanelBg now; the difference is a few percent of luminance.
 //
 // Everything else here — the band palette, the analyser gradient, the
 // peak line, the mode strip — now comes from EqPalette, which is one
-// table mapping AetherSDR's colours onto NereusSDR's. See that header
+// table mapping AetherSDR's colours onto Longpath's. See that header
 // for why the mapping lives in one place rather than in five borrowed
 // files. (2026-08-11)
-// NereusSDR's, from EqPalette. AetherSDR's eight were a Logic-Pro
-// rainbow; these are NereusSDR's four accents plus a coral, a blue and
+// Longpath's, from EqPalette. AetherSDR's eight were a Logic-Pro
+// rainbow; these are Longpath's four accents plus a coral, a blue and
 // a violet added for the purpose, spaced to stay apart on #0a0a18.
 const std::array<QColor, 8>& kPalette = EqPalette::bands();
 

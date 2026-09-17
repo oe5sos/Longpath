@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/MemoryLock.h  (NereusSDR-native)
+// src/core/MemoryLock.h  (Longpath-native)
 // =================================================================
 // 2026-05-26  J.J. Boyd (KG4VCF), AI-assisted via Anthropic Claude.
 //

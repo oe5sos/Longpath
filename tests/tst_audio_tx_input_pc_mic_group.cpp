@@ -1,4 +1,4 @@
-// tests/tst_audio_tx_input_pc_mic_group.cpp  (NereusSDR)
+// tests/tst_audio_tx_input_pc_mic_group.cpp  (Longpath)
 //
 // Phase 3M-1b Task I.2 — AudioTxInputPage PC Mic group box +
 // TransmitModel PC Mic session-state properties.

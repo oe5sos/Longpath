@@ -1,14 +1,14 @@
 #pragma once
 
 // =================================================================
-// src/models/RxDspWorker.h  (NereusSDR)
+// src/models/RxDspWorker.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/console.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -327,7 +327,7 @@ signals:
     // Payload: (outSize_complexSamples, outRate_Hz).
     //
     // From Thetis ChannelMaster cmaster.c:159-175 [v2.10.3.13]: aamix is
-    // configured with audio_outsize / audio_outrate, which in NereusSDR's
+    // configured with audio_outsize / audio_outrate, which in Longpath's
     // single-RX path correspond to RxDspWorker::outSize and the post-
     // decimation panel rate.
     void bufferSizesChanged(int outSize, double outRate);

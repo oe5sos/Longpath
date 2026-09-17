@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/gui/widgets/QsoDetailPane.h  (NereusSDR)
+// src/gui/widgets/QsoDetailPane.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // Everything about one logged contact that the table has no room for.
 //
@@ -43,7 +43,7 @@
 // does not.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-10 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

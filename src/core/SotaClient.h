@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - SOTA (Summits On The Air) HTTPS spot poller
+// Longpath - SOTA (Summits On The Air) HTTPS spot poller
 //
-// NereusSDR-original. Neither Thetis nor AetherSDR has a SOTA spot
+// Longpath-original. Neither Thetis nor AetherSDR has a SOTA spot
 // client -- Thetis has no logbook/spot system at all, and AetherSDR's
 // DxSpot::reference/entity/grid fields were extended for POTA with SOTA
 // explicitly noted as "scoped but not yet connected" (see DxSpot.h,
@@ -22,7 +22,7 @@
 // spinbox range); this class enforces SOTA's 60 s explicitly, because
 // nothing else in the codebase does it for me.
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-09-03  AI (Anthropic Claude Code)  Original, operator-directed
 //               follow-up to the SOTA/POTA logbook work earlier the same
 //               session.

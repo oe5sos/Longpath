@@ -1,13 +1,13 @@
 #pragma once
 
 // =================================================================
-// src/gui/setup/DeviceCard.h  (NereusSDR)
+// src/gui/setup/DeviceCard.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original Setup → Audio → Devices card widget.
+// Longpath-original Setup → Audio → Devices card widget.
 // No Thetis port, no attribution headers required (per memory:
 // feedback_source_first_ui_vs_dsp — Qt widgets in Setup pages are
-// NereusSDR-native).
+// Longpath-native).
 //
 // Sub-Phase 12 Task 12.2 (2026-04-20): QGroupBox subclass parameterized
 // by settings-prefix + role enum (Output/Input). 7-row form per

@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/gui/applets/AppletFloatingWindow.h  (NereusSDR)
+// src/gui/applets/AppletFloatingWindow.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // ── Ein Applet als eigenes Fenster ───────────────────────────────────
 //
@@ -21,7 +21,7 @@
 //
 // Die Klasse ist an ContainerWidget gewachsen: takeOwner() nimmt einen
 // ContainerWidget*, die Einklapp-Kopplung hängt an dessen
-// minimisedChanged, und der Fenstertitel lautet „NereusSDR Meter
+// minimisedChanged, und der Fenstertitel lautet „Longpath Meter
 // [12345]". Ein Applet ist kein Meter. Was WIEDERVERWENDET wird, ist
 // der Teil, der es verdient: ensureOnVisibleScreen() aus
 // gui/WindowPlacement.h — derselbe Rumpf, der den Fall „der Monitor ist
@@ -43,7 +43,7 @@
 // StripEqPanel und ContainerWidget::endDrag().
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-16 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

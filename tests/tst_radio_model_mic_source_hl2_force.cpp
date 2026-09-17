@@ -1,6 +1,6 @@
-// no-port-check: NereusSDR-original unit-test file.
+// no-port-check: Longpath-original unit-test file.
 // =================================================================
-// tests/tst_radio_model_mic_source_hl2_force.cpp  (NereusSDR)
+// tests/tst_radio_model_mic_source_hl2_force.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for Phase 3M-1b Task L.3:
@@ -29,7 +29,7 @@
 // simulateConnectLoadForTest, simulateDisconnectForTest).
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-28 — Original test for NereusSDR by J.J. Boyd (KG4VCF),
 //                 with AI-assisted implementation via Anthropic Claude Code.
 // =================================================================

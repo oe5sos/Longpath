@@ -1,13 +1,13 @@
 // =================================================================
-// src/core/NoiseFloorEstimator.cpp  (NereusSDR)
+// src/core/NoiseFloorEstimator.cpp  (Longpath)
 // =================================================================
 //
 // Independently implemented from NoiseFloorEstimator.h interface.
-// This .cpp implements NereusSDR's percentile-based noise-floor
+// This .cpp implements Longpath's percentile-based noise-floor
 // estimator, which deliberately replaces (does not port) Thetis's
 // processNoiseFloor algorithm in display.cs:5866. The .h carries the
 // Thetis citation for contrast; this implementation is original
-// NereusSDR work licensed under GPLv3.
+// Longpath work licensed under GPLv3.
 // =================================================================
 
 #include "NoiseFloorEstimator.h"
@@ -46,7 +46,7 @@ float NoiseFloorEstimator::estimate(const QVector<float>& bins)
 
 void NoiseFloorEstimator::prime(double initialDb)
 {
-    // NereusSDR-original — no Thetis equivalent.
+    // Longpath-original — no Thetis equivalent.
     // Seed the estimator with a known noise-floor value so that the next
     // ClarityController poll cycle starts from this floor rather than
     // performing a cold-start ramp from an uninitialised state.

@@ -1,7 +1,7 @@
 // =================================================================
-// tests/tst_notch_channel_sync.cpp  (NereusSDR)
+// tests/tst_notch_channel_sync.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure. Thetis and WDSP
+// no-port-check: Longpath-original test infrastructure. Thetis and WDSP
 // file names appear in comments to document what each push forwards to; no
 // upstream logic is ported into this file.
 //

@@ -1,6 +1,6 @@
-// tests/tst_spectrum_dbm_range_clamp.cpp  (NereusSDR)
+// tests/tst_spectrum_dbm_range_clamp.cpp  (Longpath)
 //
-// NereusSDR-original. No Thetis port.
+// Longpath-original. No Thetis port.
 //
 // ── Eine Spanne, die auf null zulaufen konnte ────────────────────────
 //

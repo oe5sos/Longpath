@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_active_peak_hold.cpp  (NereusSDR)
+// tests/tst_active_peak_hold.cpp  (Longpath)
 // =================================================================
 //
 // Task 2.5 — ActivePeakHoldTrace unit tests.
@@ -8,7 +8,7 @@
 //   Project Files/Source/Console/display.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-01 — Created in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.

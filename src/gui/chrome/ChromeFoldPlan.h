@@ -1,4 +1,4 @@
-// no-port-check: NereusSDR-original. No upstream port. Pure fold math
+// no-port-check: Longpath-original. No upstream port. Pure fold math
 // for the bottom-banner layout authority; see
 // docs/architecture/2026-08-02-bottom-banner-and-pan-menu-design.md §5.
 

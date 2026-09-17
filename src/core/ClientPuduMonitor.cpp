@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/ClientPuduMonitor.cpp  (NereusSDR)
+// src/core/ClientPuduMonitor.cpp  (Longpath)
 // =================================================================
 //
 // Ported from AetherSDR (https://github.com/aethersdr/AetherSDR),
@@ -11,7 +11,7 @@
 // upstream's logic line for line.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-11 — Ported to NereusSDR by Martin Fischer, AI-assisted
 //                 via Anthropic Claude (Cowork).
 // =================================================================
@@ -234,7 +234,7 @@ void ClientPuduMonitor::startPlayback()
 
     // ── Format ladder (divergence 1) ───────────────────────────────
     // AetherSDR builds this via its AudioDeviceNegotiator factory;
-    // NereusSDR has no such subsystem, so the ladder is spelled out:
+    // Longpath has no such subsystem, so the ladder is spelled out:
     // Int16@24k (zero-resample fast path), Int16@48k, Float@48k, then
     // the device's own preferred format.  Same policy as upstream in
     // the part that matters: every rung is tried with a REAL

@@ -1,8 +1,8 @@
 // =================================================================
-// src/core/SmartSdrApiListener.cpp  (NereusSDR)
+// src/core/SmartSdrApiListener.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-native class. No upstream port.
+// Longpath-native class. No upstream port.
 //
 // Wire format reverse-engineered from FLEX-8600 v4.2.18.41174 SmartSDR
 // TCP session 2 in
@@ -508,7 +508,7 @@ void SmartSdrApiListener::onPttAckTimeout()
     // Source: https://github.com/flexradio/smartsdr-api-docs/wiki/TCPIP-interlock
     //         https://github.com/jeffu231/Flexlib/blob/master/FlexLib/Radio.cs#L7440
     //
-    // Bench reality: amps in NereusSDR's test setup reconnect frequently
+    // Bench reality: amps in Longpath's test setup reconnect frequently
     // (~14 s cycles for TGXL). An amp that disconnects DURING our 500 ms
     // ACK wait is gone, not blocking. The wiki's "amp blocking transmit"
     // semantic only applies when the amp is connected and refusing to ACK.
@@ -1196,7 +1196,7 @@ QString SmartSdrApiListener::initiatingAmpName(const QString& wireSource) const
     // 2026-05-21 4o3a-lan-ptt-pcap-divergence.md §8 C2:
     // - source=TUNE: name of the amp that sent `transmit tune on`.
     //   Falls back to first TunerGeniusXL-class amp when the operator
-    //   pressed TUNE locally (NereusSDR UI button) and no remote amp
+    //   pressed TUNE locally (Longpath UI button) and no remote amp
     //   recorded itself as initiator. Bench-confirmed 2026-05-21: without
     //   this fallback local TUNE emits reason= empty on PTT_REQUESTED
     //   instead of canonical reason=AMP:TG, matching pcap T+167.678.

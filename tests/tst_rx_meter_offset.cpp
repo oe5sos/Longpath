@@ -171,7 +171,7 @@ void TestRxMeterOffset::factoryCalOffset_everyModelReturnsAThetisDefinedValue()
 {
     // Invariant guard for the next SKU that lands.  Thetis
     // RXMeterCalbrationOffsetDefaults can only ever yield one of three
-    // values, so every model NereusSDR knows about must hit one of them.
+    // values, so every model Longpath knows about must hit one of them.
     // A new HPSDRModel enumerator that silently picks up a fabricated
     // number (or a compiler-default 0.0f) fails here even if nobody
     // remembers to add a per-SKU case above.

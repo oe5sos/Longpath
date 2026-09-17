@@ -1,8 +1,8 @@
 // =================================================================
-// tests/tst_radio_model_pa_cal_routing.cpp  (NereusSDR)
+// tests/tst_radio_model_pa_cal_routing.cpp  (Longpath)
 // =================================================================
 //
-// no-port-check: NereusSDR-original test file.  The Thetis citation
+// no-port-check: Longpath-original test file.  The Thetis citation
 // below documents which upstream behaviour is exercised; no C# is
 // translated in this file.
 //
@@ -12,7 +12,7 @@
 // watts reading through CalibrationController::calibratedFwdPowerWatts()
 // before publishing to RadioStatus.  Thetis applies CalibratedPAPower as
 // a piecewise-linear remap of the raw ADC-derived watts to the user-
-// calibrated watts; NereusSDR mirrors this in the per-sample
+// calibrated watts; Longpath mirrors this in the per-sample
 // paTelemetryUpdated handler installed by RadioModel::wireConnectionSignals.
 //
 // Coverage:

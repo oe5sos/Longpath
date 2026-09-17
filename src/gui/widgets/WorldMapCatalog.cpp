@@ -1,11 +1,11 @@
 // =================================================================
-// src/gui/widgets/WorldMapCatalog.cpp  (NereusSDR)
+// src/gui/widgets/WorldMapCatalog.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. Siehe WorldMapCatalog.h.
+// Longpath-original. Siehe WorldMapCatalog.h.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-15 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
 // =================================================================

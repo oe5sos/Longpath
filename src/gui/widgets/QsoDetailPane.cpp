@@ -1,12 +1,12 @@
 // =================================================================
-// src/gui/widgets/QsoDetailPane.cpp  (NereusSDR)
+// src/gui/widgets/QsoDetailPane.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. See QsoDetailPane.h for why the network is only
+// Longpath-original. See QsoDetailPane.h for why the network is only
 // touched on request.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-10 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

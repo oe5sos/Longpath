@@ -1,7 +1,7 @@
 // =================================================================
-// tests/tst_radio_model_slice_lifecycle.cpp  (NereusSDR)
+// tests/tst_radio_model_slice_lifecycle.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure.
+// no-port-check: Longpath-original test infrastructure.
 //
 // Phase 3F Sub-Epic C Task 7: RadioModel slice lifecycle.
 // See docs/architecture/2026-05-26-phase3f-sub-epic-c-tx-arbiter-lifecycle-plan.md

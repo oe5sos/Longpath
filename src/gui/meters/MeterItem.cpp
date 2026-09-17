@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/meters/MeterItem.cpp  (NereusSDR)
+// src/gui/meters/MeterItem.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -7,7 +7,7 @@
 //   Project Files/Source/Console/console.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -150,7 +150,7 @@ QString readingName(int bindingId)
         case MeterBinding::TxLeveler:      return QStringLiteral("Leveler");
         case MeterBinding::TxLevelerGain:  return QStringLiteral("Leveler Gain");
         // Thetis has no ReadingName for ALC_GAIN specifically; ALC_G is
-        // "ALC Compression". NereusSDR splits these two signals into
+        // "ALC Compression". Longpath splits these two signals into
         // separate bindings so we use the natural label for ALC Gain.
         case MeterBinding::TxAlcGain:      return QStringLiteral("ALC Gain");
         case MeterBinding::TxAlcGroup:     return QStringLiteral("ALC Group");
@@ -268,7 +268,7 @@ bool MeterItem::deserialize(const QString& data)
 //   m_h       = m_slotLocalH * slotHNorm
 //
 // The caller is responsible for choosing slotHeightPx — in the
-// normal NereusSDR path that's
+// normal Longpath path that's
 // `max(kNormalRowHNorm * widgetHeightPx, kMinRowPx)` (Thetis's
 // `_fHeight = 0.05f` with a pixel floor so rows stay readable when
 // the container is unusually small). bandTop is derived per-reflow
@@ -909,7 +909,7 @@ void ScaleItem::paint(QPainter& p, int widgetW, int widgetH)
 
     // Phase B2 — ShowType centered title.
     // From Thetis MeterManager.cs:31879-31886. Thetis draws the title
-    // above the scale rect in the container background area. NereusSDR
+    // above the scale rect in the container background area. Longpath
     // draws it inside the top ~25% of the ScaleItem's own rect so the
     // item owns its title space; presets leave room at the top when
     // building the row (Phase D1).
@@ -931,7 +931,7 @@ void ScaleItem::paint(QPainter& p, int widgetW, int widgetH)
     }
 
     // Phase B3 — if the scale is in GeneralScale mode, render the
-    // two-tone Thetis-style baseline + ticks instead of the NereusSDR
+    // two-tone Thetis-style baseline + ticks instead of the Longpath
     // evenly-spaced renderer below. Ported from MeterManager.cs:32338-32423
     // generalScale(). Text labels (per-tick numeric values) are drawn
     // using the existing QFontMetrics-based positioning; colours come
@@ -983,7 +983,7 @@ void ScaleItem::paint(QPainter& p, int widgetW, int widgetH)
         // Short-row guard: when ShowType eats the top third of the rect
         // and the rect is under ~40 px, shrink the tick row by half so
         // the major-tick tops don't collide with the title text.
-        // NereusSDR-original polish — Thetis renders its title outside
+        // Longpath-original polish — Thetis renders its title outside
         // the scale rect so doesn't hit this case.
         const float tickScale =
             (m_showType && rh < 40.0f) ? 0.5f : 1.0f;

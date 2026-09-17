@@ -1,7 +1,7 @@
 // =================================================================
-// tests/tst_audio_engine_multi_slice_mix.cpp  (NereusSDR)
+// tests/tst_audio_engine_multi_slice_mix.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure.
+// no-port-check: Longpath-original test infrastructure.
 //
 // Phase 3F Sub-Epic I closeout, defect C1: secondary slices produced no
 // audio.

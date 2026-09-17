@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/safety/BandPlanGuard.h  (NereusSDR)
+// src/core/safety/BandPlanGuard.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis [v2.10.3.13 @501e3f5]:
@@ -12,7 +12,7 @@
 // CLAUDE.md "Byte-for-byte headers and multi-file attribution".
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-25 — Ported to C++20/Qt6 for NereusSDR by J.J. Boyd
 //                (KG4VCF), with AI-assisted transformation via
 //                Anthropic Claude Code.
@@ -179,7 +179,7 @@ public:
                        bool preventDifferentBand) const noexcept;
 
     // -----------------------------------------------------------------------
-    // 3M-1b SSB-mode allow-list (NereusSDR-native, no Thetis port cite needed)
+    // 3M-1b SSB-mode allow-list (Longpath-native, no Thetis port cite needed)
     // -----------------------------------------------------------------------
 
     /// Returns true if \p mode is allowed to TX in the current 3M-1b scope.

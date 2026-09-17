@@ -1,6 +1,6 @@
-// tests/tst_band_tables_agree.cpp  (NereusSDR)
+// tests/tst_band_tables_agree.cpp  (Longpath)
 //
-// NereusSDR-original. No Thetis port — this is about a disagreement
+// Longpath-original. No Thetis port — this is about a disagreement
 // between a ported table and one of ours.
 //
 // ── Two band tables, and only one of them gates the transmitter ──────

@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - AdifParser: ADIF (.adi / .adif) amateur-radio log parser.
+// Longpath - AdifParser: ADIF (.adi / .adif) amateur-radio log parser.
 //
 // Ported from AetherSDR src/core/AdifParser.cpp [@0cd4559].
 // AetherSDR is (C) its contributors and is licensed GPL-3.0-or-later
 // (see https://github.com/ten9876/AetherSDR/blob/main/LICENSE).
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-10  J.J. Boyd / KG4VCF  Phase 3J-2 Task C2. Initial port.
 //                                    AetherSDR's "AetherSDR" namespace
-//                                    becomes "NereusSDR". Public API
+//                                    becomes "Longpath". Public API
 //                                    (parseFile, parseFileAsync) and
 //                                    internal helpers (extractField,
 //                                    normaliseMode, freqToBand,
@@ -26,7 +26,7 @@
 //                                    PSK31 / PSK63 / RTTY -> DATA),
 //                                    3-attempt open retry with
 //                                    500ms backoff on async path.
-//                                    NereusSDR addition:
+//                                    Longpath addition:
 //                                    parseBytesForTest() public
 //                                    test seam (precedent: B1-B5)
 //                                    that delegates to the private
@@ -209,7 +209,7 @@ QVector<QsoRecord> AdifParser::parseFile(const QString& path)
     return parse(f.readAll());
 }
 
-// NereusSDR-only: pass-through test seam delegating to private parse().
+// Longpath-only: pass-through test seam delegating to private parse().
 // Precedent: B1 / B2 / B3 / B5 introduced equivalent *ForTest() seams
 // against their respective parsers.
 QVector<QsoRecord> AdifParser::parseBytesForTest(const QByteArray& data)

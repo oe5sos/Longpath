@@ -1,7 +1,7 @@
 #pragma once
 
 // =================================================================
-// src/gui/setup/FourO3APage.h  (NereusSDR)
+// src/gui/setup/FourO3APage.h  (Longpath)
 // =================================================================
 //
 // 4O3A integration setup page.  Settings -> CAT & Network -> 4O3A.
@@ -19,7 +19,7 @@
 // Its Connection State block duplicated the FlexAPI status row on the
 // General tab and the per-peer status labels on the PGXL/TGXL tabs;
 // its Disconnect/Reconnect Log added no actionable bench information
-// beyond what the rolling NereusSDR log file already records.
+// beyond what the rolling Longpath log file already records.
 //
 // Master toggle behaviour:
 //   When OFF (default on first run):
@@ -32,12 +32,12 @@
 //     - Detail tabs become interactive.
 //     - State persisted via AppSettings key "FourO3A_Enabled".
 //
-// NereusSDR-original page (no Thetis upstream).  Replaces the standalone
+// Longpath-original page (no Thetis upstream).  Replaces the standalone
 // "Peripherals", "PGXL Advanced", and "TGXL Advanced" tree entries that
 // previously sat side-by-side under CAT & Network.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-21 -- Created in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted implementation via
 //                 Anthropic Claude Code.

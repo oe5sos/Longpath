@@ -12,7 +12,7 @@
 //
 // These tests are about the mapping, so they use waterfallColor
 // directly and reproduce the AGC's composition arithmetic alongside it.
-// no-port-check: the guards are NereusSDR-original; the underlying
+// no-port-check: the guards are Longpath-original; the underlying
 // Thetis formula is unchanged and attributed in SpectrumWidget.cpp.
 
 #include <QtTest/QtTest>

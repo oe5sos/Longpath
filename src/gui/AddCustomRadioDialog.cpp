@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/AddCustomRadioDialog.cpp  (NereusSDR)
+// src/gui/AddCustomRadioDialog.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -7,7 +7,7 @@
 //   Project Files/Source/Console/frmAddCustomRadio.Designer.cs (upstream has no top-of-file header — project-level LICENSE applies)
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -229,7 +229,7 @@ void AddCustomRadioDialog::buildUi()
 
     // --- Explanatory label ---
     // Thetis frmAddCustomRadio.Designer.cs:24 — labelTS1 bold Courier New 9.75pt,
-    // multi-line warning text (resource string). NereusSDR uses a plain label.
+    // multi-line warning text (resource string). Longpath uses a plain label.
     auto* infoLabel = new QLabel(this);
     infoLabel->setText(
         QStringLiteral(
@@ -248,14 +248,14 @@ void AddCustomRadioDialog::buildUi()
     form->setSpacing(8);
     form->setContentsMargins(10, 14, 10, 10);
 
-    // Name — NereusSDR addition (friendly label for the saved entry)
+    // Name — Longpath addition (friendly label for the saved entry)
     m_nameEdit = new QLineEdit(this);
     m_nameEdit->setPlaceholderText(QStringLiteral("e.g. Remote ANAN-G2 (VPN)"));
     m_nameEdit->setStyleSheet(kFieldStyle);
     form->addRow(QStringLiteral("Name:"), m_nameEdit);
 
     // IP — from Thetis txtSpecificRadio default "192.168.0.155:1024" (Designer.cs:64)
-    // NereusSDR splits it into separate IP and Port fields.
+    // Longpath splits it into separate IP and Port fields.
     m_ipEdit = new QLineEdit(this);
     m_ipEdit->setPlaceholderText(QStringLiteral("192.168.0.155"));
     m_ipEdit->setStyleSheet(kFieldStyle);
@@ -288,7 +288,7 @@ void AddCustomRadioDialog::buildUi()
         "(50001) is always used, regardless of this value."));
     form->addRow(QStringLiteral("Port:"), m_portSpin);
 
-    // MAC — optional; NereusSDR addition to enable Pin-to-MAC.
+    // MAC — optional; Longpath addition to enable Pin-to-MAC.
     m_macEdit = new QLineEdit(this);
     m_macEdit->setPlaceholderText(QStringLiteral("AA:BB:CC:DD:EE:FF  (optional)"));
     m_macEdit->setStyleSheet(kFieldStyle);

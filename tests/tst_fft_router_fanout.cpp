@@ -1,7 +1,7 @@
 // =================================================================
-// tests/tst_fft_router_fanout.cpp  (NereusSDR)
+// tests/tst_fft_router_fanout.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure.
+// no-port-check: Longpath-original test infrastructure.
 //
 // Phase 3F Sub-Epic D Task 7: FFTRouter receiver-to-pan fan-out.
 // =================================================================

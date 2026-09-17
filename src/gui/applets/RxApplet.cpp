@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/applets/RxApplet.cpp  (NereusSDR)
+// src/gui/applets/RxApplet.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -8,7 +8,7 @@
 //   Project Files/Source/Console/setup.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -286,7 +286,7 @@ void RxApplet::buildUi()
         // Control 2: Lock button (checkable, 20×20, emoji 🔓/🔒)
         // Live in S2.9 — wired to SliceModel::setLocked (client-side guard).
         // Checked color: #4488ff.
-        // §A2 one-off: #4488ff is NereusSDR-original "live blue" (lock + RX-ant accents).
+        // §A2 one-off: #4488ff is Longpath-original "live blue" (lock + RX-ant accents).
         // Not the same as kBlueBg (#0070c0) or kAccent (#00b4d8). Flagged for B7/B3 review.
         m_lockBtn = new QPushButton(QString::fromUtf8("\xF0\x9F\x94\x93"), this); // 🔓
         m_lockBtn->setCheckable(true);
@@ -309,7 +309,7 @@ void RxApplet::buildUi()
 
         // Control 3: RX antenna button (flat, color #4488ff, transparent bg)
         // From AetherSDR RxApplet.cpp lines 270-289
-        // §A2 one-off: #4488ff/"#66aaff" are NereusSDR-original "live blue" accent.
+        // §A2 one-off: #4488ff/"#66aaff" are Longpath-original "live blue" accent.
         // Not kAccent (#00b4d8). Flagged for B7/B3 review.
         m_rxAntBtn = new QPushButton(QStringLiteral("ANT1"), this);
         m_rxAntBtn->setObjectName(QStringLiteral("m_rxAntBtn"));
@@ -423,7 +423,7 @@ void RxApplet::buildUi()
         m_modeCombo = new QComboBox(this);
         m_modeCombo->setFixedHeight(20);
         // Mode list mirrors the MainWindow Mode menu (MainWindow.cpp
-        // 2960) -- the canonical Thetis 11 + NereusSDR-native RADE-U /
+        // 2960) -- the canonical Thetis 11 + Longpath-native RADE-U /
         // RADE-L from Phase 3R Task J1.  Both spellings use a hyphen
         // (SliceModel::modeName returns "RADE-U" / "RADE-L"), so combo
         // text must match for modeFromName round-trip to work.
@@ -578,7 +578,7 @@ void RxApplet::buildUi()
     // surfaces" und „AF gain slider removed: TitleBar master volume +
     // VfoWidget per-slice AF control are the canonical 2 surfaces".
     // Beide nannten eine KOPFLEISTE MIT HAUPTLAUTSTAERKE, die es in
-    // NereusSDR nie gegeben hat — ein aus AetherSDR mitgewanderter
+    // Longpath nie gegeben hat — ein aus AetherSDR mitgewanderter
     // Satz. Faktisch war die Flagge die einzige Flaeche; mit ihrem
     // Wegfall haette das Programm weder Lautstaerke noch Stumm gehabt.
     // Beide stehen jetzt hier, siehe buildInheritedRows().
@@ -775,7 +775,7 @@ void RxApplet::buildUi()
         // §A2 one-offs for AUTO badge (inactive state):
         // #18181a = near-black bg (darker than kDisabledBg #1a1a2a — no blue tint).
         // #445 / #556 = very dim purple-gray border/text (3-digit shorthands, off-palette).
-        // #adff2f = lime-green hover accent (active-AUTO color, NereusSDR-original).
+        // #adff2f = lime-green hover accent (active-AUTO color, Longpath-original).
         // None of these map cleanly to a canonical constant; all kept as one-offs.
         m_agcAutoLabel = new QPushButton(QStringLiteral("AUTO"), m_agcTContainer);
         m_agcAutoLabel->setStyleSheet(
@@ -810,7 +810,7 @@ void RxApplet::buildUi()
 
         // Second row: info sub-line (hidden by default)
         m_agcInfoLabel = new QLabel(m_agcTContainer);
-        // §A2 one-off: #33aa33 is NereusSDR-original AGC-info green (one location).
+        // §A2 one-off: #33aa33 is Longpath-original AGC-info green (one location).
         // Not in StyleConstants; distinct from kGreenBg/kGreenText. Kept as one-off.
         m_agcInfoLabel->setStyleSheet(QStringLiteral("color: #6fa384; font-size: 9px; padding: 0 2px;"));
         m_agcInfoLabel->hide();
@@ -1062,21 +1062,21 @@ void RxApplet::buildUi()
     }
 
     // ── Tooltips ──────────────────────────────────────────────────────────
-    // NereusSDR native — no Thetis per-slice badge equivalent
+    // Longpath native — no Thetis per-slice badge equivalent
     m_sliceBadge->setToolTip(QStringLiteral("Slice identifier"));
     // From Thetis console.resx:5787 — chkVFOLock.ToolTip
     m_lockBtn->setToolTip(QStringLiteral("Keeps the VFO from changing while in the middle of a QSO."));
     // From Thetis console.resx:8277 — chkRxAnt.ToolTip
     m_rxAntBtn->setToolTip(QStringLiteral("Toggles receive antenna between RX and TX antennas for RX1"));
-    // NereusSDR native — no single Thetis TX-antenna tooltip
+    // Longpath native — no single Thetis TX-antenna tooltip
     m_txAntBtn->setToolTip(QStringLiteral("Select the transmit antenna port"));
-    // NereusSDR native — filter width label, no Thetis equivalent control
+    // Longpath native — filter width label, no Thetis equivalent control
     m_filterWidthLbl->setToolTip(QStringLiteral("Current filter passband width"));
-    // NereusSDR native — Thetis uses discrete radio buttons per mode
+    // Longpath native — Thetis uses discrete radio buttons per mode
     m_modeCombo->setToolTip(QStringLiteral("Select operating mode"));
     // m_muteBtn und m_afSlider sind 2026-08-18 zurueckgekommen — die
     // Kopfleiste mit Hauptlautstaerke, auf die die alten Kommentare
-    // hier verwiesen, hat es in NereusSDR nie gegeben. Ihre Hinweise
+    // hier verwiesen, hat es in Longpath nie gegeben. Ihre Hinweise
     // stehen bei ihrem Aufbau in buildInheritedRows().
     wireInheritedRows();
     // From Thetis console.resx:4554 — comboAGC.ToolTip
@@ -1163,7 +1163,7 @@ void RxApplet::setSliceIndex(int idx)
 
 // Phase 3F (Bug 3): rebuild the per-slice tab row to mirror the live slice
 // list. Workflow ported from AetherSDR RxApplet::updateSliceButtons
-// (RxApplet.cpp:1434 [@6a142807]); NereusSDR drops the Multi-Flex
+// (RxApplet.cpp:1434 [@6a142807]); Longpath drops the Multi-Flex
 // foreign/empty slot model (we own the radio directly) and renders one tab
 // per existing slice, the active one checked. The tab's button-group id is
 // the slice's actual sliceIndex() (NOT the list position), because
@@ -1596,16 +1596,16 @@ void RxApplet::connectSlice(SliceModel* s)
         // Helper: pick label text for the current (stepOn, autoOn) tuple.
         //
         // Inspired by mi0bot-Thetis console.cs:21342-21365 [v2.10.3.13-beta2]
-        // AutoAttRX1 setter (HL2-only A-ATT label).  NereusSDR widens the
+        // AutoAttRX1 setter (HL2-only A-ATT label).  Longpath widens the
         // flip to all boards because StepAttenuatorController auto-att is
         // universal (not HL2-gated like mi0bot's is).  Without the widen,
         // non-HL2 users with auto-att enabled would have the same blind
         // spot issue #174 reported on HL2.
         //
         // Preserves "ATT" for preamp-combo mode (stepOn=false), which is
-        // the existing NereusSDR convention across all boards.  mi0bot
+        // the existing Longpath convention across all boards.  mi0bot
         // pins HL2 into the step-att label family even in preamp mode,
-        // but in NereusSDR HL2 users can flip to preamp mode via the
+        // but in Longpath HL2 users can flip to preamp mode via the
         // step-att toggle, so we keep "ATT" reachable on every board.
         auto attLabelText = [](bool stepOn, bool autoOn) {
             if (!stepOn) {
@@ -1705,7 +1705,7 @@ void RxApplet::updateAgcAutoVisuals(bool autoOn, float noiseFloorDbm, double off
     if (autoOn) {
         // AUTO badge → bright green (active) — only the button illuminates
         // §A2 one-offs: #1b3527 (dark green bg), #adff2f (lime border+text), #1b3527 (hover).
-        // NereusSDR-original active-AUTO palette; not in StyleConstants.
+        // Longpath-original active-AUTO palette; not in StyleConstants.
         if (m_agcAutoLabel) {
             m_agcAutoLabel->setStyleSheet(
                 QStringLiteral("QPushButton { background: #1b3527; border: 1px solid #c2924f;"  // §A2 one-off

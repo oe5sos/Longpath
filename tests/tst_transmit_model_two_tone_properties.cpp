@@ -1,8 +1,8 @@
-// no-port-check: NereusSDR-original unit-test file.  Thetis cite comments
+// no-port-check: Longpath-original unit-test file.  Thetis cite comments
 // below identify which upstream lines each assertion verifies; no Thetis
 // logic is ported in this test file.
 // =================================================================
-// tests/tst_transmit_model_two_tone_properties.cpp  (NereusSDR)
+// tests/tst_transmit_model_two_tone_properties.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for TransmitModel two-tone test properties (7x), Phase 3M-1c B.2:
@@ -25,14 +25,14 @@
 //   setup.Designer.cs:61643-61653 [v2.10.3.13]  — chkPulsed_TwoTone
 //     Checked default=false (no Checked= line in Designer)
 //
-// Pre-code review §2.3 + design spec §4.4 — NereusSDR-original safer
+// Pre-code review §2.3 + design spec §4.4 — Longpath-original safer
 // numeric defaults: TwoToneLevel=-6 dB; ranges and TwoToneInvert default
 // match Thetis Designer per option C decision.
 //
 // 2026-05-23 update: TwoTonePower default reverted from 50% to 10% per
 // Thetis setup.designer.cs:62236 [v2.10.3.13] udTwoToneLevel.DefaultValue=10
 // (bench-fix tail of the G2E PureSignal landing).  The earlier 50%
-// NereusSDR-original was a 5x over-drive on the first Two-tone press
+// Longpath-original was a 5x over-drive on the first Two-tone press
 // relative to the Thetis baseline.
 // =================================================================
 
@@ -66,7 +66,7 @@ private slots:
     void default_twoToneLevel_isZero() {
         // From Thetis setup.Designer.cs:61994-62003 [v2.10.3.13]
         // udTwoToneLevel: Maximum=0, Minimum=-96, Value=0.
-        // Phase 3M-4 Task 17: previously NereusSDR-original -6 dB which
+        // Phase 3M-4 Task 17: previously Longpath-original -6 dB which
         // under-drove the 2-tone envelope and starved calcc LCOLLECT.
         // Restored Thetis-faithful 0 dB so PureSignal calibration
         // converges out-of-the-box on bench.

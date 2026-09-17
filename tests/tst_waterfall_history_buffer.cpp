@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_waterfall_history_buffer.cpp  (NereusSDR)
+// tests/tst_waterfall_history_buffer.cpp  (Longpath)
 // =================================================================
 //
 // Der Intensitätsspeicher hinter dem Wasserfall. Schritt 1 von
@@ -18,7 +18,7 @@
 //     zweite Zeile im Puffer, und die Historie wäre immer leer.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-15 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

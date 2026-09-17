@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/RadioDiscovery.cpp  (NereusSDR)
+// src/core/RadioDiscovery.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
@@ -11,7 +11,7 @@
 //   Reid Campbell (MI0BOT) — HermesLite 2 board-ID 6 discovery mapping
 //     (preserved via inline marker on case 6 branch in parseDiscoveryReply)
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -564,7 +564,7 @@ bool RadioDiscovery::parseP2Reply(const QByteArray& bytes, const QHostAddress& s
 // ---------------------------------------------------------------------------
 
 // Byte 4 of the P1 discovery frame. Thetis leaves the whole tail zeroed
-// (clsRadioDiscovery.cs:1301-1309 buildDiscoveryPacketP1); NereusSDR sets a
+// (clsRadioDiscovery.cs:1301-1309 buildDiscoveryPacketP1); Longpath sets a
 // non-zero pad here deliberately.
 //
 // Why: a P1 discovery probe is broadcast to UDP 1024, which is also the P2

@@ -1,8 +1,8 @@
 // =================================================================
-// tests/tst_tx_mic_source.cpp  (NereusSDR)
+// tests/tst_tx_mic_source.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original test file.  Exercises TxMicSource — the Thetis
+// Longpath-original test file.  Exercises TxMicSource — the Thetis
 // Inbound/cm_main port at src/core/audio/TxMicSource.{h,cpp}.
 //
 // Test surface:
@@ -21,13 +21,13 @@
 //
 // =================================================================
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-29 — New test for Phase 3M-1c TX pump architecture redesign v3
 //                 by J.J. Boyd (KG4VCF), with AI-assisted implementation
 //                 via Anthropic Claude Code.
 // =================================================================
 
-// no-port-check: NereusSDR-original test file.  No Thetis logic ported.
+// no-port-check: Longpath-original test file.  No Thetis logic ported.
 
 #include <QtTest/QtTest>
 #include <QObject>

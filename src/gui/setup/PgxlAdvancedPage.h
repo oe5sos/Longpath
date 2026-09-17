@@ -1,8 +1,8 @@
 // =================================================================
-// src/gui/setup/PgxlAdvancedPage.h  (NereusSDR)
+// src/gui/setup/PgxlAdvancedPage.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-native Setup -> Network -> PGXL Advanced page.
+// Longpath-native Setup -> Network -> PGXL Advanced page.
 // Six-section scrolling page for Power Genius XL device management:
 //   5.6.1 Identity & Status
 //   5.6.2 Hardware (requires Save & Reboot)

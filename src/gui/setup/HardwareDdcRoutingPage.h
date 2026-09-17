@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/gui/setup/HardwareDdcRoutingPage.h  (NereusSDR)
+// src/gui/setup/HardwareDdcRoutingPage.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original; no upstream port. Setup -> Hardware -> DDC
+// Longpath-original; no upstream port. Setup -> Hardware -> DDC
 // Routing page (power-user override of automatic codec-driven DDC
 // assignment). Phase 3F Sub-Epic E Tasks 8-10.
 //
@@ -17,7 +17,7 @@
 // as a follow-up; today the page is round-trip-correct.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-27 Created in C++20/Qt6 for NereusSDR by J.J. Boyd (KG4VCF),
 //              with AI-assisted transformation via Anthropic Claude Code.
 //   2026-05-27 Phase 3F closeout (Sub-Epic E Tasks 8-10): replaced

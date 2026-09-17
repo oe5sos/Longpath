@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/setup/MultimeterPage.cpp  (NereusSDR)
+// src/gui/setup/MultimeterPage.cpp  (Longpath)
 // =================================================================
 //
 // Task 3.1 — Display → Multimeter setup page implementation.
@@ -9,7 +9,7 @@
 //   Project Files/Source/Console/console.cs (S-meter / dBm / µV unit-mode)
 // Original licence from Thetis source is included below.
 //
-// NereusSDR-original page structure.  Default values and AppSettings key names
+// Longpath-original page structure.  Default values and AppSettings key names
 // derived from Thetis Display→General Multimeter group per design Section 3A.
 //
 // Source cites:
@@ -28,7 +28,7 @@
 //   MultimeterSignalHistoryDurationMs = 60000 — 60 s default [v2.10.3.13]
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-01 — Skeleton created in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.

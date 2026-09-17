@@ -1,13 +1,13 @@
-// no-port-check: NereusSDR-original. No upstream port. See header.
+// no-port-check: Longpath-original. No upstream port. See header.
 
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // =================================================================
-// src/gui/widgets/SpectrumStatusOverlay.cpp  (NereusSDR)
+// src/gui/widgets/SpectrumStatusOverlay.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original; no upstream port. See header for full
-// Modification history (NereusSDR).
+// Longpath-original; no upstream port. See header for full
+// Modification history (Longpath).
 // =================================================================
 
 #include "gui/widgets/SpectrumStatusOverlay.h"

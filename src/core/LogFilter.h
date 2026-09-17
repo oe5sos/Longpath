@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/core/LogFilter.h  (NereusSDR)
+// src/core/LogFilter.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // Which contacts the logbook is currently showing.
 //
@@ -19,7 +19,7 @@
 // boxes expects to see.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
 // =================================================================

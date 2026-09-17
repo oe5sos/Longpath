@@ -1,8 +1,8 @@
 // =================================================================
-// tests/tst_dexp_peak_meter.cpp  (NereusSDR)
+// tests/tst_dexp_peak_meter.cpp  (Longpath)
 // =================================================================
 //
-// no-port-check: NereusSDR-original unit-test file.  Cites for the
+// no-port-check: Longpath-original unit-test file.  Cites for the
 // paint behavior under test live in DexpPeakMeter.cpp.
 //
 // Phase 3M-3a-iii Task 13 — Unit tests for DexpPeakMeter widget.

@@ -1,7 +1,7 @@
 #pragma once
 
 // =================================================================
-// src/core/ClientPuduMonitor.h  (NereusSDR)
+// src/core/ClientPuduMonitor.h  (Longpath)
 // =================================================================
 //
 // Ported from AetherSDR (https://github.com/aethersdr/AetherSDR),
@@ -36,16 +36,16 @@
 //      public, but nothing drives it yet; playback prefers the system
 //      default output exactly as upstream does when unrouted.
 //
-// The capture format is upstream's: int16 stereo 24 kHz. NereusSDR's
+// The capture format is upstream's: int16 stereo 24 kHz. Longpath's
 // post-strip tap is float mono 48 kHz; the FEEDING side converts (see
 // MainWindow's adapter lambda), so this file stays comparable against
 // its upstream.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-11 — Ported to NereusSDR by Martin Fischer, AI-assisted
 //                 via Anthropic Claude (Cowork). Namespace AetherSDR →
-//                 NereusSDR; includes rebased; divergences 1-3 above.
+//                 Longpath; includes rebased; divergences 1-3 above.
 // =================================================================
 
 #include <QAudio>

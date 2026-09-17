@@ -3,7 +3,7 @@
 // Drawn without that split, a path from Japan to California streaks all
 // the way back across the map — the single most recognisable way a
 // world map looks broken.
-// no-port-check: NereusSDR-original.
+// no-port-check: Longpath-original.
 
 #include <QtTest/QtTest>
 

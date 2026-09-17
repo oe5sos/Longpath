@@ -1,12 +1,12 @@
 // =================================================================
-// src/core/strip/StripTargets.cpp  (NereusSDR)
+// src/core/strip/StripTargets.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. See StripTargets.h for why the target is a
+// Longpath-original. See StripTargets.h for why the target is a
 // named choice rather than a constant.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-08 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

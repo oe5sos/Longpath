@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/core/strip/EqBandLayout.h  (NereusSDR)
+// src/core/strip/EqBandLayout.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // Where the equaliser handles sit, and how many there are.
 //
@@ -43,7 +43,7 @@
 // slot before touching anything has been given a worse tool.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-11 — Created in C++20 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

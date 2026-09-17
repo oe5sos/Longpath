@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/gui/widgets/BandwidthFilterPane.h  (NereusSDR)
+// src/gui/widgets/BandwidthFilterPane.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original, nach der Vorlage des Betreibers (Zeus Link
+// Longpath-original, nach der Vorlage des Betreibers (Zeus Link
 // „BANDWIDTH FILTER", Bildschirmfoto vom 2026-08-20). Die Regeln
 // hinter den Zahlen kommen aus Thetis, siehe SliceModel::widthToEdges
 // und ::constrainFilter.
@@ -45,7 +45,7 @@
 // die beim naechsten Umbau auseinanderlaeuft.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-20 — Original fuer NereusSDR von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
 //   2026-09-17 — Neu gezeichnet in der Richtung "Glas & Tiefe"

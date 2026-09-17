@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_audio_engine_tx_monitor_block.cpp  (NereusSDR)
+// tests/tst_audio_engine_tx_monitor_block.cpp  (Longpath)
 // =================================================================
 //
 // Exercises AudioEngine::txMonitorBlockReady — the audio-thread consumer

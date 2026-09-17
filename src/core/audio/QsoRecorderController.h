@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/core/audio/QsoRecorderController.h  (NereusSDR)
+// src/core/audio/QsoRecorderController.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // Was die beiden Abgriffe mit der Aufnahme verbindet.
 //
@@ -54,7 +54,7 @@
 // eines .NET-UserControls) ist Longpath-original.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-19 — Original fuer NereusSDR von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
 //   2026-09-02 — Speicherplatz-Wache statt Dauer-Deckel, von Martin

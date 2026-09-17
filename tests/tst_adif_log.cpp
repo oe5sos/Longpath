@@ -2,7 +2,7 @@
 // ADIF file differs from the one we write: other programs' extension
 // tags, four-digit times, values containing the bracket that a naive
 // parser splits on, and a last record with no terminator.
-// no-port-check: NereusSDR-original.
+// no-port-check: Longpath-original.
 
 #include <QtTest/QtTest>
 #include <QRegularExpression>

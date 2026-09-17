@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/gui/applets/AppletKeys.h  (NereusSDR)
+// src/gui/applets/AppletKeys.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // ── EINE Kennung, nicht zwei ─────────────────────────────────────────
 //
@@ -52,7 +52,7 @@
 // wie bei Migration v9.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-18 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

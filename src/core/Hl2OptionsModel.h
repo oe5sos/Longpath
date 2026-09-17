@@ -1,7 +1,7 @@
 #pragma once
 
 // =================================================================
-// src/core/Hl2OptionsModel.h  (NereusSDR)
+// src/core/Hl2OptionsModel.h  (Longpath)
 // =================================================================
 //
 // Ported from mi0bot-Thetis source:
@@ -31,7 +31,7 @@
 // the persisted state and emits a Qt signal — wire emission is a TODO.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-30 — New for Phase 3L HL2 Filter visibility brainstorm.
 //                Phase 3L commit #9 — Hl2OptionsTab.
 //                J.J. Boyd (KG4VCF), with AI-assisted transformation

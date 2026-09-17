@@ -25,7 +25,7 @@ warren@wpratt.com
 */
 
 // =================================================================
-// tests/tst_tx_channel_post_gen_tone_mag.cpp  (NereusSDR)
+// tests/tst_tx_channel_post_gen_tone_mag.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for TxChannel::setPostGenToneMag wrapper added in
@@ -59,13 +59,13 @@ warren@wpratt.com
 //   setPostGenToneMag_acceptsBounds      — boundary values 0.0 and 1.0
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-04 — New test for Issue #175 Task 2: TxChannel::setPostGenToneMag
 //                 WDSP wrapper (round-trip store/retrieve). J.J. Boyd (KG4VCF),
 //                 with AI-assisted implementation via Anthropic Claude Code.
 // =================================================================
 
-// no-port-check: NereusSDR-original test file. All mi0bot-Thetis source
+// no-port-check: Longpath-original test file. All mi0bot-Thetis source
 // cites are in TxChannel.h/cpp.
 
 #include <QtTest/QtTest>

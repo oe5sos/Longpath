@@ -1,7 +1,7 @@
 // =================================================================
-// tests/tst_fft_engine_pool.cpp  (NereusSDR)
+// tests/tst_fft_engine_pool.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure.
+// no-port-check: Longpath-original test infrastructure.
 //
 // Phase 3F Sub-Epic I Task 8-9: per-stream FFT dispatch topology.
 // =================================================================

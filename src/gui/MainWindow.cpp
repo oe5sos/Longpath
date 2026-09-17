@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/MainWindow.cpp  (NereusSDR)
+// src/gui/MainWindow.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -10,7 +10,7 @@
 //   Project Files/Source/Console/radio.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -690,8 +690,8 @@ MainWindow::MainWindow(QWidget* parent)
                 // Earlier revisions passed these reversed, which made the ▲/▼
                 // glyphs read in radio perspective rather than the client's.
                 // Spec §Affordances reads the segment from the operator's
-                // (client's) point of view: ▲ = NereusSDR uploading to radio
-                // (commands), ▼ = radio downloading to NereusSDR (I/Q).
+                // (client's) point of view: ▲ = Longpath uploading to radio
+                // (commands), ▼ = radio downloading to Longpath (I/Q).
                 seg->setRates(conn->rxByteRate(1000), conn->txByteRate(1000));
             }
         });
@@ -1124,7 +1124,7 @@ SpectrumWidget* MainWindow::activeSpectrumWidget() const
 // panadapter from the slice's panKey(), falling back to the active pan when
 // the key is empty (Slice A pre-seed) or the pan was removed.
 // Ported from AetherSDR MainWindow::spectrumForSlice (MainWindow.cpp:14856
-// [@6a142807]); AetherSDR uses s->panId() (a string), NereusSDR uses
+// [@6a142807]); AetherSDR uses s->panId() (a string), Longpath uses
 // s->panKey().
 SpectrumWidget* MainWindow::spectrumForSlice(SliceModel* s) const
 {
@@ -1566,7 +1566,7 @@ void MainWindow::detachApplet(AppletWidget* applet, int dockIndex,
     // Rückruf des alten QRhi feuert später gegen freigegebenen Zustand
     // (AetherSDR #2495; #4319 dieselbe Familie auf D3D11). AetherSDR
     // räumt deshalb vor JEDEM Reparent alle QRhiWidget-Kinder ab
-    // (prepareRhiChildrenForReparent), und NereusSDR macht in
+    // (prepareRhiChildrenForReparent), und Longpath macht in
     // ContainerManager mit extractMeterItems/installFreshMeter das
     // Gleiche für die Meter-Container.
     //
@@ -3657,7 +3657,7 @@ void MainWindow::buildUI()
     // that was compiled, not the one that was current at the last configure.
     // Der Name der Anwendung, nicht der des Vorgaengers. Der
     // Betreiber hat am 2026-08-20 zu Recht reklamiert, dass hier
-    // noch „NereusSDR" stand, obwohl das Programm laengst Longpath
+    // noch der alte Name stand, obwohl das Programm laengst Longpath
     // heisst — alle Urhebervermerke der Vorlagen bleiben davon
     // unberuehrt und stehen weiterhin im Ueber-Dialog.
     QString title = QStringLiteral("Longpath %1").arg(LONGPATH_VERSION);
@@ -4876,7 +4876,7 @@ void MainWindow::buildUI()
 
     // Sub-epic E: flush the rewind ring buffer when the radio disconnects so
     // a new session starts with a clean history. AetherSDR's clearDisplay()
-    // did this implicitly; NereusSDR has no equivalent single-call reset, so
+    // did this implicitly; Longpath has no equivalent single-call reset, so
     // we plumb the connection-state signal through here. See
     // docs/architecture/phase3g-rx-epic-e-waterfall-scrollback-plan.md task 4.
     connect(m_radioModel, &RadioModel::connectionStateChanged, activeSpectrumWidget(),
@@ -4983,9 +4983,9 @@ void MainWindow::buildUI()
         // MoxController::moxChanged(rx, oldMox, newMox) → VfoDisplayItem
         // setTransmitting on every VfoDisplayItem hosted by the app.  The rx
         // semantic (Thetis console.cs:29677 [v2.10.3.13]) is:
-        //   rx==1  → VFO-A (TX comes off VFO-A in 3M-1; default in NereusSDR)
+        //   rx==1  → VFO-A (TX comes off VFO-A in 3M-1; default in Longpath)
         //   rx==2  → VFO-B (only when RX2 enabled AND VFOBTX — neither
-        //                    plumbed in NereusSDR today)
+        //                    plumbed in Longpath today)
         //
         // Lookup strategy: walk every container's MeterWidget and update
         // every VfoDisplayItem found.  This is coarse but correct for 3M-1
@@ -5053,10 +5053,10 @@ void MainWindow::buildUI()
         nfTracker->feed(binsDbm, kFrameIntervalMs);
     });
 
-    // Max Bin detector: feed FFTEngine dBm bins into WdspEngine's NereusSDR-native
+    // Max Bin detector: feed FFTEngine dBm bins into WdspEngine's Longpath-native
     // Max Bin pipeline.  See WdspEngine::setupMaxBinDetector for the algorithm
     // cite and the divergence rationale (WDSP analyzer not wired; FFTEngine
-    // uses raw FFTW3 directly; NereusSDR runs the same Thetis algorithm against
+    // uses raw FFTW3 directly; Longpath runs the same Thetis algorithm against
     // the dBm bins emitted here).
     //
     // Algorithm from Thetis wdsp/analyzer.c:800-822 [@501e3f5].
@@ -5146,7 +5146,7 @@ void MainWindow::buildUI()
     });
 
     // Clarity → SpectrumWidget NF-aware grid (Task 2.9).
-    // NereusSDR-original — no Thetis equivalent.
+    // Longpath-original — no Thetis equivalent.
     // noiseFloorChanged fires after EWMA smoothing but before the deadband
     // gate so the grid tracks the floor at every cadence tick.
     connect(m_clarityController, &ClarityController::noiseFloorChanged,
@@ -5196,7 +5196,7 @@ void MainWindow::buildUI()
     }
 
     // Task 2.10: per-band NF priming — settle detector.
-    // NereusSDR-original — no Thetis equivalent.
+    // Longpath-original — no Thetis equivalent.
     //
     // On each noiseFloorChanged tick, keep a 2-second sliding window of NF
     // samples. When variance drops below 1 dB for a sustained window of ≥30
@@ -5255,7 +5255,7 @@ void MainWindow::buildUI()
                 const float variance = sqSum / static_cast<float>(settle->history.size());
 
                 if (variance < 1.0f) {
-                    // NereusSDR-original — no Thetis equivalent.
+                    // Longpath-original — no Thetis equivalent.
                     // NF settled within 1 dB variance over 2s; save for this band.
                     settle->bandNfEstimate[settle->currentBand] = nf;
                     AppSettings::instance().setValue(
@@ -5267,7 +5267,7 @@ void MainWindow::buildUI()
         });
 
         // Task 2.10: band-change → prime ClarityController EWMA with stored NF.
-        // NereusSDR-original — no Thetis equivalent.
+        // Longpath-original — no Thetis equivalent.
         //
         // Bug fix 2026-09-07: used to connect to PanadapterModel::
         // bandChanged (dead, see above); ClarityController tracks a
@@ -5303,7 +5303,7 @@ void MainWindow::buildUI()
                 settle->currentBand = newBand;
                 settle->history.clear();  // fresh settle window for the new band
 
-                // NereusSDR-original — no Thetis equivalent.
+                // Longpath-original — no Thetis equivalent.
                 // Prime estimator with last-seen NF for this band to eliminate
                 // cold-start visual jump after band change.
                 const float storedNF = settle->bandNfEstimate.value(
@@ -5683,7 +5683,7 @@ void MainWindow::buildUI()
     }
 
     // Wire: zoom changes -> auto-replan FFT size to maintain constant
-    // bins-per-pixel across zoom levels.  NereusSDR-original (Thetis
+    // bins-per-pixel across zoom levels.  Longpath-original (Thetis
     // does not auto-replan on zoom; the user manually picks FFT size).
     //
     // Math: the slider's "FFT size at full DDC bandwidth" baseline
@@ -7006,7 +7006,7 @@ void MainWindow::populateDefaultMeter()
     }
 
     // ── Applet visibility controller (Containers > Applets + ☰ menus) ──
-    // NereusSDR-original. Backs the show/hide menu surfaces.
+    // Longpath-original. Backs the show/hide menu surfaces.
     //
     // Registered applets get a checkable menu entry in Containers > Applets
     // AND in the right-side panel's ☰ banner menu. Add new entries here as
@@ -9434,12 +9434,12 @@ void MainWindow::buildMenuBar()
     // =========================================================================
     QMenu* modeMenu = menuBar()->addMenu(QStringLiteral("&Mode"));
 
-    // 12 Thetis-faithful modes + the NereusSDR-native RADE-U / RADE-L
+    // 12 Thetis-faithful modes + the Longpath-native RADE-U / RADE-L
     // entries (Phase 3R L3).  Display order: LSB, USB, DSB, CWL, CWU,
     // AM, SAM, FM, DIGL, DIGU, DRM, SPEC, RADE-U, RADE-L.  Maps to
     // DSPMode enum values from WdspTypes.h.
     // From Thetis dsp.cs DSPMode enum — enum values used directly, not indices.
-    // RADE-U / RADE-L are NereusSDR-native entries (DSPMode::RADE_U = 12,
+    // RADE-U / RADE-L are Longpath-native entries (DSPMode::RADE_U = 12,
     // DSPMode::RADE_L = 13; not WDSP modes; routes the slice through
     // RadeChannel).  Like USB/LSB, RADE has upper/lower sideband
     // variants with mirrored 1700 Hz passbands.
@@ -10516,7 +10516,7 @@ void MainWindow::buildStatusBar()
     //
     // Phase 3M-4 bench-fix: visibility is gated on
     //   caps.hasPureSignal && pureSignal->isAutoCalEnabled()
-    // (NereusSDR-specific UX: hide the banner unless the user has
+    // (Longpath-specific UX: hide the banner unless the user has
     // explicitly armed PS-A; reduces clutter for non-PS workflows on
     // PS-capable boards).  updatePsaIndicatorVisibility() centralises the
     // condition; called from autoCalEnabledChanged + connection-state +
@@ -10566,7 +10566,7 @@ void MainWindow::buildStatusBar()
     hbox->addStretch(1);
 
     // ── Center section: STATION — radio-name anchor (Sub-PR-7 G.1) ───────────
-    // The old cyan "STATION: NereusSDR" box is replaced by a StationBlock that
+    // The old cyan "STATION: Longpath" box is replaced by a StationBlock that
     // shows the connected radio's name. Click → opens ConnectionPanel. Right-
     // click → Disconnect / Edit radio… / Forget radio. Disconnected appearance:
     // dashed-red border + italic "Click to connect" placeholder.
@@ -13103,7 +13103,7 @@ void MainWindow::showSupportDialog()
 //   psform.Show();
 //   psform.Focus();
 //
-// NereusSDR mirrors via raise()+activateWindow() instead of Focus().
+// Longpath mirrors via raise()+activateWindow() instead of Focus().
 void MainWindow::openPureSignalDialog()
 {
     if (!m_psForm) {
@@ -14050,10 +14050,10 @@ void MainWindow::openAntennaWindow()
 //   - MainWindow owns the ClientPuduMonitor;
 //   - the strip surface hosts two buttons and three state setters;
 //   - muteRxRequested gates the live RX feed for the whole
-//     record→auto-play cycle (NereusSDR's gate is
+//     record→auto-play cycle (Longpath's gate is
 //     AudioEngine::setRxMutedForMonitor — one call, idempotent);
 //   - recordingStopped auto-starts playback.
-// NereusSDR-specific: the capture feed. Upstream's engine pushes int16
+// Longpath-specific: the capture feed. Upstream's engine pushes int16
 // stereo 24 kHz from its client chain tail; here the TX worker's
 // post-strip tap delivers float mono 48 kHz, so the feed lambda
 // converts (average adjacent samples → 24 kHz, duplicate L=R) before
@@ -14321,7 +14321,7 @@ void MainWindow::openSpotHub()
                         panel->workSpot(dxCall);
                     }
                 });
-        // NereusSDR-native (2026-08-27, operator-requested follow-up):
+        // Longpath-native (2026-08-27, operator-requested follow-up):
         // Spot List right-click → "Take Spot: <call>". Same takeSpot()
         // path as the panadapter's spotLogRequested double-click above
         // -- prefills the panel for the operator to review and log
@@ -14339,7 +14339,7 @@ void MainWindow::openSpotHub()
         // pulls the new values back out and pushes them into the spot
         // overlay setters in one go. Mirrors AetherSDR's refreshSpots
         // lambda (src/models/RadioModel.cpp [@0cd4559]) but the
-        // NereusSDR shape lives on the widget so the test seam is local
+        // Longpath shape lives on the widget so the test seam is local
         // (see tst_spothub_display_knobs).
         connect(m_spotHubDialog.data(), &SpotHubDialog::settingsChanged,
                 this, [this] {
@@ -15288,7 +15288,7 @@ void MainWindow::openConnectionPanelOnLaunch()
 // every launch regardless of whether the dialog shows, so uninstall +
 // reinstall of the same cable doesn't flag it as "new" forever.
 //
-// NereusSDR-original; no Thetis equivalent.
+// Longpath-original; no Thetis equivalent.
 void MainWindow::checkVaxFirstRun()
 {
     auto& s = AppSettings::instance();

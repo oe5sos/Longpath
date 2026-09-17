@@ -25,7 +25,7 @@ warren@wpratt.com
 */
 
 // =================================================================
-// tests/tst_tx_channel_tx_post_gen_setters.cpp  (NereusSDR)
+// tests/tst_tx_channel_tx_post_gen_setters.cpp  (Longpath)
 // =================================================================
 //
 // No Thetis code is directly ported in this test file.  The test exercises
@@ -63,7 +63,7 @@ warren@wpratt.com
 //
 // These wrappers are simple pass-throughs to the underlying WDSP C API.
 // The C# Thetis property surface exposes each Freq1/Freq2 / Mag1/Mag2 as a
-// separate setter, but the WDSP function takes both at once.  NereusSDR
+// separate setter, but the WDSP function takes both at once.  Longpath
 // caches the partner value internally so each setX1 / setX2 wrapper can
 // individually invoke the combined WDSP call (matching radio.cs:3697-4032
 // [v2.10.3.13]).
@@ -80,7 +80,7 @@ warren@wpratt.com
 //
 //   2. Edge values: 0.0, large, negative.  WDSP itself does not pre-validate
 //      (e.g. negative duty-cycle or transition is meaningless but not flagged
-//      by SetTXAPostGenTTPulseDutyCycle / Transition).  NereusSDR mirrors
+//      by SetTXAPostGenTTPulseDutyCycle / Transition).  Longpath mirrors
 //      this — no pre-validation in the wrappers.
 //
 //   3. Toggle / round-trip patterns confirm internal cache state (freq1/freq2
@@ -92,14 +92,14 @@ warren@wpratt.com
 // Pre-code review reference: Phase 3M-1c E.2-E.6 plan.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-28 — New test for Phase 3M-1c Tasks E.2-E.6: 12 TXA PostGen
 //                 wrapper setters (mode / continuous TT freq+mag / pulsed TT
 //                 freq+mag / pulse profile / run).  J.J. Boyd (KG4VCF), with
 //                 AI-assisted implementation via Anthropic Claude Code.
 // =================================================================
 
-// no-port-check: NereusSDR-original test file. All Thetis source cites are
+// no-port-check: Longpath-original test file. All Thetis source cites are
 // in TxChannel.h/cpp.
 
 #include <QtTest/QtTest>

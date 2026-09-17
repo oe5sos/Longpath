@@ -1,4 +1,4 @@
-// no-port-check: NereusSDR-original tests for hermes-filter-debug Bug 2.
+// no-port-check: Longpath-original tests for hermes-filter-debug Bug 2.
 //
 // Hl2IoBoardTab N2ADR-toggle behavioural tests:
 //   * onN2adrToggled emits settingChanged("n2adrFilter", ...) — required so

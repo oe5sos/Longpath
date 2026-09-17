@@ -33,6 +33,9 @@ und trägt das alles — sie steht hier nicht mehr als eigene Baustelle.
 | 11 | Sichern, ohne auf das Beenden zu warten: Autosave jede Minute bei Änderung, Tageskopien `Longpath.settings.<JJJJ-MM-TT>` (14 bleiben) | f1f5dd53 |
 | 12 | Mitschrift: Whisper-Dienst aus Longpath heraus starten (Setup → Spracherkennung → „Dienst auf diesem Rechner", Automatik beim Einschalten), Applet im Glas-Look; läuft der Dienst schon (Login-Dienst), wird er benutzt statt verdoppelt | 19903b6f |
 | 13 | `LONGPATH_CONFIG_DIR`: eigener Konfigurationsordner für eine Prüf-Instanz — die Sandbox mit `HOME=` las auf macOS trotzdem die echten Einstellungen (und meldete sich mit dem Rufzeichen am Cluster an) | b7edab81 |
+| 14 | „Nereus" verschwindet, Teil 1 — alles Sichtbare: Log-Kategorien `longpath.*`, Log-Dateien `longpath-*.log`, TCI-Servername, Schlüsselbund mit Umzug, VAX-Geräte „Longpath VAX n"/„Longpath TX" (Plug-in + Erkennung beider Namen), Exporte (ADIF/Cabrillo/KML), Kennungen nach außen, Menüs/Dialoge; Nebenfund: fünf tote `NereusSDR--`-Stylesheets (Fußleisten-Abzeichen ohne Hintergrund seit 20.08.) | 2ea2aa00 |
+| 15 | Teil 2 — Bau-Namen (`LONGPATH_*`, `longpath_add_test`), ADIF-Feld `APP_LONGPATH_QRZUP` (altes wird gelesen), CLAUDE.md-Kopf, HOW-TO-PORT, HAUSSTIL, STYLEGUIDE | 2217cca5 |
+| 16 | Teil 3 — Kopfzeilen („Modification history (Longpath)", `(Longpath)`, „Longpath-original") und Kommentare in ~1 570 Dateien; Herkunft, datierte Historienzeilen und Übergangs-Erkennungen bleiben | *(dieser Commit)* |
 
 Werkzeuge, die dabei entstanden sind und bleiben: `tst_filter_pane_sheet`
 (Bandfilter-Fläche in Betriebsgröße), `tst_tx_entwurf_sheet` mit
@@ -49,29 +52,33 @@ N0CALL, Cluster-Automatik aus>` und `LONGPATH_AUTOMATION=1` (`dumpTree`,
 
 ### B · „Nereus" verschwindet  *(Betreiber, 17.09.: „wir haben kein nereus … weg damit")*
 
-Sichtbar zuerst, dann der Rest:
+Erledigt in drei Commits (Tabelle 14–16). Was noch aussteht:
 
-1. **Audiogeräte** „NereusSDR VAX 1–4" / „NereusSDR TX" → „Longpath VAX
-   1–4" / „Longpath TX". Die Namen vergibt das HAL-Plug-in
-   (`hal-plugin/LongpathVAX.cpp`, `Info.plist`); die App erkennt sie
-   per Muster (`VirtualCableDetector`, PipeWire/Linux-Bus, VAX-Seiten).
-   Beides ändern, das alte Muster als Übergang weiter erkennen. Das
-   Plug-in muss danach neu installiert werden (`/Library/Audio/Plug-Ins/HAL`,
-   braucht das Betreiber-Passwort), und WSJT-X/fldigi brauchen einmal
-   das neue Gerät in ihren Audioeinstellungen.
-2. **TCI-Kennung** „NereusSDR-TCI" → „Longpath-TCI" (`TciServer.cpp`).
-3. **Schlüsselbund** „NereusSDR: …" → „Longpath: …" mit Lesen des alten
-   Eintrags als Rückweg (`CredentialStore.cpp`), sonst sind gespeicherte
-   Zugangsdaten weg.
-4. **Log-Kategorien** `nereus.*` → `longpath.*` (`LogCategories.cpp`,
-   30 Stellen) — das sind die Präfixe im Terminal-Log.
-5. **Texte in Dialogen** (VAX-Ersteinrichtung, Audio-Setup, Über,
-   Support-Bundle, Diagnose).
-6. **Dokumente und Kommentare**: `HAUSSTIL.md` („NereusSDR — Hausstil"),
-   `CLAUDE.md`, die Kopfzeilen „Modification history (NereusSDR)" in
-   ~200 Dateien. Nicht sichtbar im Programm, aber sichtbar beim Lesen.
-7. **Ordnername** `~/Longpath/NereusSDR` → zuletzt, weil Bau- und
-   Startbefehl daran hängen; mit neuem Befehl im selben Schritt.
+7. **Ordnername** `~/Longpath/NereusSDR` → `~/Longpath/Longpath`. Nicht
+   nachts gemacht: Bau- und Startbefehl, der Worktree
+   (`.git/worktrees/…` mit absoluten Pfaden), Launch-Agents und die
+   zweite Session hängen daran. Wenn du es willst, in einem Zug:
+
+   ```bash
+   cd ~/Longpath && mv NereusSDR Longpath && cd Longpath && git worktree repair && git worktree list
+   ```
+
+   Danach lautet der Befehl `cd ~/Longpath/Longpath && ./build.sh && ./run.sh`.
+   Vorher Longpath beenden und `~/Library/LaunchAgents/at.oe5sos.longpath.plist`
+   auf den Pfad prüfen.
+8. **HAL-Plug-in (VAX)**: auf diesem Rechner ist keines installiert, es
+   gibt also nichts zu ersetzen. Wenn VAX-Geräte gewünscht sind:
+   ```bash
+   cd ~/Longpath/NereusSDR && cmake -S hal-plugin -B build-hal -DCMAKE_BUILD_TYPE=RelWithDebInfo && cmake --build build-hal && sudo cmake --install build-hal && sudo killall coreaudiod
+   ```
+
+   (braucht das Passwort) — die Geräte heißen dann „Longpath VAX 1–4"
+   und „Longpath TX". Prüfung vorab ohne Passwort: `cmake --build build-hal`
+   allein baut `build-hal/LongpathVAX.driver`.
+
+Was bewusst bleibt, steht in `CLAUDE.md` oben (Herkunft/Copyright,
+datierte Historienzeilen, Übergangs-Erkennungen, datierte Dokumente
+unter `docs/architecture/`).
 
 ### C · Übrige Applets, zweite Runde
 Qt-Standard-Comboboxen (USB, Preset, Profile, Rate, Buffer, Baud) und
@@ -109,6 +116,9 @@ nachziehen, siehe Notiz vom 05.09.).
 
 - **Sprache** (E): Englisch oder Deutsch.
 - **ConnectionPanel committen** (D).
-- **Passwort für das HAL-Plug-in** (B1), wenn es so weit ist — den
-  Befehl gebe ich dann.
+- **Ordnername** (B7): willst du `~/Longpath/Longpath`? Befehl steht
+  oben; ich mache es nicht ungefragt, weil dein Terminal und die zweite
+  Session daran hängen.
+- **HAL-Plug-in** (B8): nur, wenn du VAX-Geräte willst — Befehl oben,
+  braucht das Passwort.
 - **Ein Foto mit Funkgerät** (H), sobald das ANVELINA wieder da ist.

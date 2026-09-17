@@ -1,10 +1,10 @@
 // =================================================================
-// src/core/audio/RadioMicSource.h  (NereusSDR)
+// src/core/audio/RadioMicSource.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original file. No Thetis logic ported here — Thetis bakes
+// Longpath-original file. No Thetis logic ported here — Thetis bakes
 // mic-source selection directly into audio.cs rather than using the
-// strategy pattern. RadioMicSource is a NereusSDR-native implementation
+// strategy pattern. RadioMicSource is a Longpath-native implementation
 // of TxMicRouter that drains a lock-free SPSC ring fed by
 // RadioConnection::micFrameDecoded (added in 3M-1b Task F.4).
 //
@@ -27,13 +27,13 @@
 // 02110-1301, USA.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-27 — Original implementation for NereusSDR by J.J. Boyd
 //                 (KG4VCF), Phase 3M-1b Task F.2, with AI-assisted
 //                 implementation via Anthropic Claude Code.
 // =================================================================
 
-// no-port-check: NereusSDR-original file; no Thetis logic ported here.
+// no-port-check: Longpath-original file; no Thetis logic ported here.
 
 #pragma once
 

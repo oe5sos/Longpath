@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_two_tone_controller.cpp  (NereusSDR)
+// tests/tst_two_tone_controller.cpp  (Longpath)
 // =================================================================
 //
 // Phase 3M-1c chunk I (I.1-I.5) — TwoToneController activation handler.
@@ -33,7 +33,7 @@
 //
 // =================================================================
 
-// no-port-check: NereusSDR-original test file. All Thetis source cites are
+// no-port-check: Longpath-original test file. All Thetis source cites are
 // in TwoToneController.h/cpp.
 
 #include <QtTest/QtTest>

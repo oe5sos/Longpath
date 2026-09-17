@@ -1,4 +1,4 @@
-// tests/tst_general_setup_hardware_config.cpp  (NereusSDR)
+// tests/tst_general_setup_hardware_config.cpp  (Longpath)
 //
 // Phase 3M-0 Task 12 — Hardware Configuration group box on Setup → General.
 // no-port-check: test fixture — no Thetis attribution required.

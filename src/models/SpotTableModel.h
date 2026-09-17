@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - SpotTableModel: QAbstractTableModel wrapping a bounded
+// Longpath - SpotTableModel: QAbstractTableModel wrapping a bounded
 // QVector<DxSpot> with 8 columns (Time, Freq, DxCall, Comment, Spotter,
 // Band, Mode, Source). Newest spot at row 0; bounded at 500 (default).
 // addSpot / addSpots / clear / setMaxSpots / freqAtRow API. Used by the
@@ -11,10 +11,10 @@
 // AetherSDR is (C) its contributors and is licensed GPL-3.0-or-later
 // (see https://github.com/ten9876/AetherSDR/blob/main/LICENSE).
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-11  J.J. Boyd / KG4VCF  Phase 3J-2 Task D2. Initial port.
 //                                    AetherSDR's "AetherSDR" namespace
-//                                    becomes "NereusSDR". Both
+//                                    becomes "Longpath". Both
 //                                    SpotTableModel and BandFilterProxy
 //                                    lived inline in AetherSDR's
 //                                    DxClusterDialog.h:33-75 (with
@@ -112,14 +112,14 @@ public:
     void setMaxSpots(int max) { m_maxSpots = max; }
     double freqAtRow(int row) const;
 
-    // NereusSDR-native watchlist highlight (see modification history
+    // Longpath-native watchlist highlight (see modification history
     // above). `terms` is matched case-insensitively against each row's
     // DxCall and Reference; an invalid `color` (default) disables
     // highlighting even if terms are set.
     void setWatchTerms(const QStringList& terms);
     void setWatchColor(const QColor& color) { m_watchColor = color; }
 
-    // NereusSDR-native (2026-08-27). The operator's own Maidenhead
+    // Longpath-native (2026-08-27). The operator's own Maidenhead
     // locator ("User/GridSquare" in AppSettings), needed to compute
     // ColDistance/ColBearing. Empty (the default) means those columns
     // stay blank. Set once from AppSettings when the Spot List tab is

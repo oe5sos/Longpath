@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_instrument_spine.cpp  (NereusSDR)
+// tests/tst_instrument_spine.cpp  (Longpath)
 // =================================================================
 //
 // Die Geometrie der Instrumente — der Teil, den man rechnen kann.
@@ -13,7 +13,7 @@
 // ist.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-17 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

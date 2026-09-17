@@ -1,7 +1,7 @@
 #pragma once
 
 // =================================================================
-// src/gui/meters/MeterItem.h  (NereusSDR)
+// src/gui/meters/MeterItem.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -9,7 +9,7 @@
 //   Project Files/Source/Console/console.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -242,7 +242,7 @@ public:
 public:
     // --- Stacked-row metadata (runtime only, not serialized) ---
     //
-    // Thetis-parity stack model with a NereusSDR pixel floor.
+    // Thetis-parity stack model with a Longpath pixel floor.
     // When m_stackSlot >= 0 the item is part of a bar-row stack.
     // At every MeterWidget reflow the outer m_y/m_h are recomputed
     // from:
@@ -384,8 +384,8 @@ public:
     enum class Orientation { Horizontal, Vertical };
     // From Thetis clsBarItem.BarStyle (MeterManager.cs:19927-19934):
     //   None, Line, SolidFilled, GradientFilled, Segments.
-    // NereusSDR maps SolidFilled -> Filled for back-compat with pre-A4
-    // presets and adds Line. Edge is a NereusSDR extension (mapped from
+    // Longpath maps SolidFilled -> Filled for back-compat with pre-A4
+    // presets and adds Line. Edge is a Longpath extension (mapped from
     // Thetis console.cs edge meters).
     enum class BarStyle { Filled, Edge, Line };
 
@@ -464,7 +464,7 @@ public:
     /// Used on TX-end transitions: a single setValue(0) only decays one
     /// tick (e.g. 60 → 54 with decayRatio=0.1) so the bar appears stuck
     /// after un-key. clearSmoothing(0.0) snaps it.
-    /// NereusSDR-original safety/UX: bench-reported #167 follow-up where
+    /// Longpath-original safety/UX: bench-reported #167 follow-up where
     /// Power and SWR bars stayed at the last sample after MOX-off.
     void clearSmoothing(double v) {
         m_value          = v;
@@ -649,7 +649,7 @@ public:
     // scaleStyle() == GeneralScale, paint() draws a two-tone horizontal
     // baseline split at centrePerc with major+minor ticks extending
     // upward from the baseline, matching Thetis exactly. The default
-    // ScaleStyle::Linear leaves the pre-B3 NereusSDR evenly-spaced tick
+    // ScaleStyle::Linear leaves the pre-B3 Longpath evenly-spaced tick
     // renderer untouched, so existing Filled presets don't regress.
     //
     // Opt in by calling setScaleStyle(GeneralScale) and configuring

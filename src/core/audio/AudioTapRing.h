@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/core/audio/AudioTapRing.h  (NereusSDR)
+// src/core/audio/AudioTapRing.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // Ein Abgriff vom Audio-Faden zum Hauptfaden, ohne Schloss und ohne
 // Speicheranforderung.
@@ -43,7 +43,7 @@
 // Aufnahme ist das Schlimmste, was hier passieren kann.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-19 — Original fuer NereusSDR von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
 // =================================================================

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 //
-// NereusSDR - tst_rade_applet: RadeApplet UI contract (Phase 3R L2).
+// Longpath - tst_rade_applet: RadeApplet UI contract (Phase 3R L2).
 //
-// NEW NereusSDR-native UI applet. No upstream equivalent. Pins the
+// NEW Longpath-native UI applet. No upstream equivalent. Pins the
 // contract that the RadeApplet:
 // * Constructs cleanly against a real RadioModel.
 // * Populates its profile combo from MicProfileManager::profileNames().

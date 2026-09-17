@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - DX cluster telnet client (DX Spider / AR-Cluster / CC-Cluster)
+// Longpath - DX cluster telnet client (DX Spider / AR-Cluster / CC-Cluster)
 //
 // Ported from AetherSDR src/core/DxClusterClient.h [@0cd4559].
 // AetherSDR is (C) its contributors and is licensed GPL-3.0-or-later
 // (see https://github.com/ten9876/AetherSDR/blob/main/LICENSE).
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-10  J.J. Boyd / KG4VCF  Phase 3J-2 Task B3. Initial port.
 //                                    AetherSDR's "AetherSDR" namespace
-//                                    becomes "NereusSDR". DxSpot include
+//                                    becomes "Longpath". DxSpot include
 //                                    moved to the extracted DxSpot.h
 //                                    (Phase 3J-2 Task B1) instead of
 //                                    redefining DxSpot inline (upstream
@@ -18,7 +18,7 @@
 //                                    ("longpath.spots") instead of upstream
 //                                    AetherSDR's lcDxCluster. Log file
 //                                    path uses Qt's AppConfigLocation
-//                                    (already lands under NereusSDR/)
+//                                    (already lands under Longpath/)
 //                                    instead of upstream's
 //                                    GenericConfigLocation +
 //                                    "AetherSDR/dxcluster.log". Added
@@ -30,7 +30,7 @@
 //                                    prompt detector, and telnet IAC
 //                                    stripper without instantiating a
 //                                    QTcpSocket or simulating a telnet
-//                                    server. NereusSDR addition: source-
+//                                    server. Longpath addition: source-
 //                                    label assignment in parseDxSpotLine
 //                                    defaults to "Cluster" and promotes
 //                                    to "RBN" when the spotter callsign
@@ -115,7 +115,7 @@ private:
     void handleLine(const QString& line);
     void stripTelnetIAC();
 
-    // NereusSDR addition: pure form of stripTelnetIAC() that operates on
+    // Longpath addition: pure form of stripTelnetIAC() that operates on
     // an externally-supplied buffer. The instance method stripTelnetIAC()
     // is a thin wrapper that calls this on m_readBuffer. Existing as a
     // standalone helper makes the algorithm unit-testable without a live

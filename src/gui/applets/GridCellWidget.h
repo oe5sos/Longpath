@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/gui/applets/GridCellWidget.h  (NereusSDR)
+// src/gui/applets/GridCellWidget.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // ── Das Feld auf dem Schirm ──────────────────────────────────────────
 //
@@ -39,7 +39,7 @@
 // Schliessen — sind Schritt 3 und stehen hier noch nicht.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-18 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

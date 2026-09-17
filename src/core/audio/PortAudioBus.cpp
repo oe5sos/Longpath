@@ -1,9 +1,9 @@
 // =================================================================
-// src/core/audio/PortAudioBus.cpp  (NereusSDR)
+// src/core/audio/PortAudioBus.cpp  (Longpath)
 // =================================================================
-// See PortAudioBus.h for contract. NereusSDR-original.
+// See PortAudioBus.h for contract. Longpath-original.
 //
-// no-port-check: This file is NereusSDR-original (PortAudio v19.7.0
+// no-port-check: This file is Longpath-original (PortAudio v19.7.0
 // backend for the IAudioBus interface).  An inline comment in open()
 // references Thetis ChannelMaster/ivac.c:311-340 [v2.10.3.15] for
 // PHILOSOPHICAL context only (Thetis uses paWinWasapiExclusive on
@@ -59,14 +59,14 @@ PaDeviceIndex resolveDevice(const PortAudioConfig& inCfg,
 
     // macOS / Linux: when resolving a CAPTURE default and the user hasn't
     // pinned a specific device, default-input enumeration is unreliable
-    // because virtual capture devices (Teams Audio, Zoom, NereusSDR/AetherSDR
+    // because virtual capture devices (Teams Audio, Zoom, Longpath/AetherSDR
     // VAX, Splashtop, BlackHole, etc.) often appear as the system default
     // and silently deliver zero samples. Prefer a real hardware mic by name.
     PortAudioConfig effectiveCfg = inCfg;
     // Capture-only: positive name marker for hardware mics. Used to prefer
     // the actual hardware microphone over any virtual device that may
     // appear in the system enumeration (Teams Audio, ZoomAudioDevice,
-    // BlackHole, NereusSDR/AetherSDR VAX/DAX, Splashtop, etc.). The
+    // BlackHole, Longpath/AetherSDR VAX/DAX, Splashtop, etc.). The
     // virtual-mic landscape is too varied to enumerate every vendor in
     // a deny-list, so we match the hardware naming convention instead.
     const auto isHardwareMicName = [](const QString& name) -> bool {

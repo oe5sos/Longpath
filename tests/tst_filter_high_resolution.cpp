@@ -1,5 +1,5 @@
-// NereusSDR-original infrastructure — no Thetis source ported here.
-// No upstream attribution required (NereusSDR filter-response test).
+// Longpath-original infrastructure — no Thetis source ported here.
+// No upstream attribution required (Longpath filter-response test).
 //
 // Design note (Task 1.5):
 //   RxChannel::filterResponseMagnitudes(nPoints) synthesizes the FIR bandpass

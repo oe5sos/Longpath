@@ -1,11 +1,11 @@
 // =================================================================
-// src/gui/AntennaPopupBuilder.cpp  (NereusSDR)
+// src/gui/AntennaPopupBuilder.cpp  (Longpath)
 // =================================================================
 //
-// no-port-check: NereusSDR-original file. See AntennaPopupBuilder.h.
+// no-port-check: Longpath-original file. See AntennaPopupBuilder.h.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-02 — Written for NereusSDR by J.J. Boyd (KG4VCF), with
 //                AI-assisted implementation via Anthropic Claude Code.
 //                Per docs/superpowers/plans/2026-05-01-ui-polish-cross-surface.md §B3.

@@ -1,4 +1,4 @@
-// no-port-check: AetherSDR-derived NereusSDR file. Pan layout manager
+// no-port-check: AetherSDR-derived Longpath file. Pan layout manager
 // (9-template QSplitter tree, active-pan tracking, float-pan signal) is
 // adapted structurally from AetherSDR src/gui/PanadapterStack.{h,cpp}
 // [@0cd4559]. Registered in
@@ -7,7 +7,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // =================================================================
-// src/gui/PanadapterStack.h  (NereusSDR)
+// src/gui/PanadapterStack.h  (Longpath)
 // =================================================================
 //
 // Ported (structurally) from AetherSDR src/gui/PanadapterStack.{h,cpp}
@@ -17,7 +17,7 @@
 //       and About dialog for the live contributor list)
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-27  J.J. Boyd / KG4VCF  Phase 3F Sub-Epic D Task 3.
 //                                    Layout manager skeleton ported
 //                                    structurally from AetherSDR
@@ -29,7 +29,7 @@
 //                                    applyLayout / floatPanadapter /
 //                                    rebuildSplitters stubbed for
 //                                    Tasks 4-8. AetherSDR ships 12
-//                                    templates; NereusSDR uses 5
+//                                    templates; Longpath uses 5
 //                                    (1 / 2v / 2h / 12h / 2x2) per
 //                                    Phase 3F design. AI-assisted
 //                                    transformation via Anthropic

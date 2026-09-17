@@ -1,7 +1,7 @@
 // =================================================================
 // tests/tst_notch_visual_does_not_perturb_noise_floor_or_maxbin.cpp
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure. Upstream file
+// no-port-check: Longpath-original test infrastructure. Upstream file
 // and line references in the comments below are context for a reviewer;
 // the ported logic itself lives in src/gui/SpectrumWidget.cpp, which
 // carries its own verbatim upstream header and PROVENANCE row.
@@ -15,7 +15,7 @@
 //   * processNoiseFloor() and peakDbmInSlicePassband() read a pristine,
 //     UNDENTED copy of the spectrum pixels. A display preference must
 //     not silently move the noise-floor estimate or the analog S-Meter's
-//     MaxBin reading. That is the NereusSDR-only hazard section 8.3
+//     MaxBin reading. That is the Longpath-only hazard section 8.3
 //     names: Thetis reads MaxBin from WDSP upstream of its display code,
 //     so a Thetis visual notch structurally cannot move its meter, and
 //     ours would.
@@ -39,9 +39,9 @@
 // likewise already pinned by tests/tst_mnf_setup_page.cpp.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-02  J.J. Boyd / KG4VCF  TNF Task 10. Original test for
-//                                    NereusSDR with AI-assisted
+//                                    Longpath with AI-assisted
 //                                    authoring via Anthropic Claude Code.
 // =================================================================
 
@@ -274,7 +274,7 @@ private slots:
         w.setVisualNotchEnabled(true);
         feed(w, 1);
 
-        // NereusSDR keeps the waterfall pixels in their own array, so denting
+        // Longpath keeps the waterfall pixels in their own array, so denting
         // the spectrum plane does not reach them: this is a second explicit
         // call, matching the second modifyDataForNotches call upstream.
         QCOMPARE(w.wfRenderedPixels().size(), cleanWf.size());

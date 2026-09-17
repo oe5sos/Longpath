@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_network_diagnostics_dialog.cpp  (NereusSDR)
+// tests/tst_network_diagnostics_dialog.cpp  (Longpath)
 // =================================================================
 //
 //  Copyright (C) 2026 J.J. Boyd (KG4VCF)
@@ -9,7 +9,7 @@
 //  as published by the Free Software Foundation; either version 2
 //  of the License, or (at your option) any later version.
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-30 — Created for Phase 3Q sub-PR-3 (NetworkDiagnosticsDialog).
 //                NereusSDR-original tests. J.J. Boyd (KG4VCF), with
 //                AI-assisted implementation via Anthropic Claude Code.

@@ -1,6 +1,6 @@
 // tst_radio_model_g1_wiring.cpp
 //
-// no-port-check: Test file exercises NereusSDR API; Thetis behavior is
+// no-port-check: Test file exercises Longpath API; Thetis behavior is
 // cited in RadioModel.cpp via pre-code review §1.6 / §2.5 and master
 // design §5.1.1 — no C# is translated here.
 //

@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/core/CloudlogUploader.h  (NereusSDR)
+// src/core/CloudlogUploader.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // Cloudlog and its fork Wavelog take the same JSON QSO endpoint, so one
 // class covers both. The operator supplies the base URL of their own
@@ -21,7 +21,7 @@
 // support bundles.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
 // =================================================================

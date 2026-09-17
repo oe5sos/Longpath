@@ -1,7 +1,7 @@
 // =================================================================
-// tests/tst_settings_schema_v9_dbrange.cpp  (NereusSDR)
+// tests/tst_settings_schema_v9_dbrange.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure.
+// no-port-check: Longpath-original test infrastructure.
 //
 // SettingsSchemaVersion v8 -> v9: der dargestellte dB-Bereich wird von
 // -48/-116 auf -30/-190 geweitet.

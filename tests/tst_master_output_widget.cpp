@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_master_output_widget.cpp  (NereusSDR)
+// tests/tst_master_output_widget.cpp  (Longpath)
 // =================================================================
 //
 // Exercises MasterOutputWidget — the menu-bar composite widget

@@ -1,7 +1,7 @@
-// no-port-check: NereusSDR-original unit-test file. Thetis cite comments
+// no-port-check: Longpath-original unit-test file. Thetis cite comments
 // document upstream sources; no Thetis logic ported in this test file.
 // =================================================================
-// tests/tst_tx_channel_pushvox_callback.cpp  (NereusSDR)
+// tests/tst_tx_channel_pushvox_callback.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for TxChannel DEXP pushvox callback bridge (Phase 3M-3a-iii
@@ -32,7 +32,7 @@
 // invokes it synchronously.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-04 - New test file for Phase 3M-3a-iii Task 17 (bench fix):
 //                 verifies the WDSP DEXP pushvox callback bridge correctly
 //                 routes threshold-crossing events into the voxActiveChanged

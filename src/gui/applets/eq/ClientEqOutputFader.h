@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/applets/eq/ClientEqOutputFader.h  (NereusSDR)
+// src/gui/applets/eq/ClientEqOutputFader.h  (Longpath)
 // =================================================================
 //
 // Ported from AetherSDR (https://github.com/aethersdr/AetherSDR),
@@ -17,10 +17,10 @@
 // port of the same upstream, so the pair are back together.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-09 — Ported to NereusSDR by Martin Fischer, AI-assisted via
 //                 Anthropic Claude (Cowork). Namespace AetherSDR →
-//                 NereusSDR; include paths rebased onto
+//                 Longpath; include paths rebased onto
 //                 core/strip/ and gui/applets/eq/. Behaviour unchanged.
 // =================================================================
 

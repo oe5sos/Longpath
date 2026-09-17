@@ -1,14 +1,14 @@
-// no-port-check: NereusSDR-original unit-test file. Thetis cite comments
+// no-port-check: Longpath-original unit-test file. Thetis cite comments
 // document upstream sources; no Thetis logic ported in this test file.
 // =================================================================
-// tests/tst_wdsp_engine_dexp_init.cpp  (NereusSDR)
+// tests/tst_wdsp_engine_dexp_init.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for Phase 3M-3a-iii Task 20: WdspEngine create_dexp /
 // destroy_dexp lifecycle.  Verifies the bench-failing fix:
 //
 //   Before Task 20: pdexp[1] was permanently nullptr after createTxChannel
-//   because create_dexp had never been ported into NereusSDR's TX-init
+//   because create_dexp had never been ported into Longpath's TX-init
 //   path.  Every SetDEXP* setter and the SendCBPushDexpVox callback
 //   registration silently no-op'd via their pdexp[id] null guards.
 //   Bench-confirmed by JJ on ANAN-G2: VOX-keying never engaged MOX
@@ -54,7 +54,7 @@
 // for the exact semantics.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-03 - New test file for Phase 3M-3a-iii Task 20: WdspEngine
 //                 DEXP DSP-instance lifecycle.  J.J. Boyd (KG4VCF), with
 //                 AI-assisted implementation via Anthropic Claude Code.
@@ -86,7 +86,7 @@ using namespace Longpath;
 
 // Channel ID convention (matches tst_wdsp_engine_tx_channel.cpp):
 //   TX channel: WDSP.id(1, 0) = CMsubrcvr * CMrcvr = 1 * 1 = 1
-//   (dsp.cs:926-944 case 2, with NereusSDR CMsubrcvr=CMrcvr=1)
+//   (dsp.cs:926-944 case 2, with Longpath CMsubrcvr=CMrcvr=1)
 static constexpr int kTxChannelId = 1;
 
 class TstWdspEngineDexpInit : public QObject {

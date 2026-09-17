@@ -25,7 +25,7 @@ warren@wpratt.com
 */
 
 // =================================================================
-// tests/tst_tx_channel_production_loop.cpp  (NereusSDR)
+// tests/tst_tx_channel_production_loop.cpp  (Longpath)
 // =================================================================
 //
 // No Thetis code is ported in this test file. The production loop logic
@@ -35,7 +35,7 @@ warren@wpratt.com
 // Attribution for ported constants lives in TxChannel.h/cpp.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-26 — New test for Phase 3M-1a Task G.1 (TX I/Q production
 //                 loop bench fix). J.J. Boyd (KG4VCF), with AI-assisted
 //                 implementation via Anthropic Claude Code.
@@ -47,7 +47,7 @@ warren@wpratt.com
 //                 transformation via Anthropic Claude Code.
 // =================================================================
 
-// no-port-check: NereusSDR-original test file. Exercises the production
+// no-port-check: Longpath-original test file. Exercises the production
 // loop interface; all Thetis source cites are in TxChannel.h/cpp.
 
 #include <QtTest/QtTest>

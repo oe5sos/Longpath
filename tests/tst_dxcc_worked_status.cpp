@@ -3,7 +3,7 @@
 // no-port-check: Real DXCC entity prefixes (K, JA, VK, G, DL) used as
 // fixtures to exercise the worked-status state machine. Precedent: C1, C2.
 //
-// NereusSDR - DxccWorkedStatus tests
+// Longpath - DxccWorkedStatus tests
 //
 // Phase 3J-2 Task C3. Pins the contract that DxccWorkedStatus tracks
 // per-entity / per-band / per-modeGroup worked status from a vector

@@ -1,16 +1,16 @@
 // =================================================================
-// src/core/SliceStreamAllocator.h  (NereusSDR)
+// src/core/SliceStreamAllocator.h  (Longpath)
 // =================================================================
 //
-// no-port-check: NereusSDR-original policy class. The window-fit rule
+// no-port-check: Longpath-original policy class. The window-fit rule
 // ports Thetis console.cs:31913-31925 [v2.10.3.15]; the stream topology
 // mirrors ChannelMaster cmaster.h:75-82 (one _rcvr drives cmMAXSubRcvr
 // channels off one I/Q input). Thetis has no equivalent allocator
-// because it hard-codes RX1 -> DDC2 and RX2 -> DDC3; NereusSDR
+// because it hard-codes RX1 -> DDC2 and RX2 -> DDC3; Longpath
 // allocates across every user DDC the SKU has.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-07-24  J.J. Boyd / KG4VCF  Phase 3F Sub-Epic I Task 2.
 //                                    Slice-to-DDC-stream placement
 //                                    policy. AI-assisted transformation

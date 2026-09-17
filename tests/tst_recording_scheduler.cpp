@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_recording_scheduler.cpp  (NereusSDR)
+// tests/tst_recording_scheduler.cpp  (Longpath)
 // =================================================================
 //
 // Zeitgesteuerte Aufnahme: eine persistente Liste von (Startzeit,
@@ -15,12 +15,12 @@
 // eine leere Ausgangslage zu verlassen.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-26 — Original for NereusSDR/Longpath by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================
 
-// no-port-check: NereusSDR-original test file.
+// no-port-check: Longpath-original test file.
 
 #include <QtTest>
 

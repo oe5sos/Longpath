@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/gui/SetupDialog.h  (NereusSDR)
+// src/gui/SetupDialog.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original Qt6 navigation shell for the Settings dialog.
+// Longpath-original Qt6 navigation shell for the Settings dialog.
 // Independently implemented from Thetis Setup Form interface design;
 // no direct C# port. See SetupDialog.cpp for inline citations to
 // Thetis behavior rules consulted during implementation.

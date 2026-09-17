@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - DssRenderer (3D stacked-trace surface) tests
+// Longpath - DssRenderer (3D stacked-trace surface) tests
 //
 // Pins the contract DssRenderer.h documents: strength = clamp((dbm -
 // floorDbm) / rangeDb, 0, 1) drives ridge height, the front row's baseline

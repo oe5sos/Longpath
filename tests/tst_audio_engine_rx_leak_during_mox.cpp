@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_audio_engine_rx_leak_during_mox.cpp  (NereusSDR)
+// tests/tst_audio_engine_rx_leak_during_mox.cpp  (Longpath)
 // =================================================================
 //
 // Exercises AudioEngine E.4: RX-leak-during-MOX fold via activeSlice

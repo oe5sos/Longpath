@@ -1,15 +1,15 @@
-// no-port-check: NereusSDR-original TDD test for the volume math from
+// no-port-check: Longpath-original TDD test for the volume math from
 // Thetis TCIServer.cs:4110-4132 [v2.10.3.13].
 //
-// tests/tst_tci_volume_db.cpp  (NereusSDR)
-// NereusSDR-original — unit tests for TciVolume.h pure math helpers.
+// tests/tst_tci_volume_db.cpp  (Longpath)
+// Longpath-original — unit tests for TciVolume.h pure math helpers.
 //
 // Note: this is a test-impl bundle. Both TciVolume.h and this test file
 // land in the same commit. The functions are simple enough that a TDD
 // red-stage is not needed; the test-then-impl bundle is noted in the
 // commit message per Phase 10 plan.
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-10 — Phase 3J-1 Task 10 by J.J. Boyd (KG4VCF);
 //                AI-assisted transformation via Anthropic Claude Code.
 

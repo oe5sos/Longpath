@@ -61,7 +61,7 @@ def parse_provenance_tables() -> list[dict]:
     rows = []
     text = PROVENANCE.read_text()
 
-    # We care about tables where column 1 is a NereusSDR file path.
+    # We care about tables where column 1 is a Longpath file path.
     # The mi0bot table header contains "mi0bot source" instead of "Thetis source".
     # The "Independently implemented" table has the path in column 2 —
     # those rows must be skipped.
@@ -248,7 +248,7 @@ def extract_source_header(source_path: Path) -> list[str]:
 
 
 # =================================================================
-# NereusSDR port block generation
+# Longpath port block generation
 # =================================================================
 
 def build_longpath_blocks(longpath_rel: str,
@@ -276,7 +276,7 @@ def build_longpath_blocks(longpath_rel: str,
             lines.append(f"//   {src} (upstream has no top-of-file header — project-level LICENSE applies)")
     lines.append("//")
     lines.append(width)
-    lines.append("// Modification history (NereusSDR):")
+    lines.append("// Modification history (Longpath):")
     # Wrap to match Richie's FFTEngine.cpp reference exactly:
     #   //   YYYY-MM-DD — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
     #   //                 (CALLSIGN), with AI-assisted transformation via Anthropic
@@ -302,10 +302,10 @@ def build_no_header_note(source_rel: str) -> list[str]:
 
 
 # =================================================================
-# NereusSDR file editing
+# Longpath file editing
 # =================================================================
 
-# Sentinel comment block width matched by our NereusSDR port-citation block
+# Sentinel comment block width matched by our Longpath port-citation block
 _WIDE = "// ================================================================="
 
 

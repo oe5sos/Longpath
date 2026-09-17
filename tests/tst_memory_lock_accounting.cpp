@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_memory_lock_accounting.cpp  (NereusSDR-native)
+// tests/tst_memory_lock_accounting.cpp  (Longpath-native)
 // =================================================================
 // 2026-07-27  J.J. Boyd (KG4VCF), AI-assisted via Anthropic Claude.
 //

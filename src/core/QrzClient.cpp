@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/QrzClient.cpp  (NereusSDR)
+// src/core/QrzClient.cpp  (Longpath)
 // =================================================================
 //
 // Source attribution (AetherSDR — GPLv3):
@@ -10,11 +10,11 @@
 //
 //   This file is a port of AetherSDR `src/core/QrzClient.cpp`
 //   [@3a1f59e]. AetherSDR is licensed under the GNU General Public
-//   License v3. NereusSDR is also GPLv3. Attribution follows GPLv3 §5
+//   License v3. Longpath is also GPLv3. Attribution follows GPLv3 §5
 //   requirements.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-07 — Ported to NereusSDR by Martin Fischer, AI-assisted via
 //                 Anthropic Claude (Cowork). See QrzClient.h.
 // =================================================================

@@ -7,7 +7,7 @@
 // steht da, damit die Suche nicht ein zweites Mal gemacht wird.
 
 // =================================================================
-// src/gui/instruments/ReadingSource.cpp  (NereusSDR)
+// src/gui/instruments/ReadingSource.cpp  (Longpath)
 // =================================================================
 // Siehe ReadingSource.h — eine Liste, nicht eine zweite.
 // =================================================================

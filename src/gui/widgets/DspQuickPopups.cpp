@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/widgets/DspQuickPopups.cpp  (NereusSDR)
+// src/gui/widgets/DspQuickPopups.cpp  (Longpath)
 // =================================================================
 // Siehe DspQuickPopups.h — der Schnellregler-Rechtsklick.
 //
@@ -11,7 +11,7 @@
 //   chkNR2PostProc_enable_rx1 und die Entsprechungen fuer NR3/NR4).
 //
 // Aufbau und Anordnung folgen AetherSDR MainWindow.cpp:7980-8324
-// [@0cd4559] (ten9876/AetherSDR, GPLv3; NereusSDR ist ebenfalls GPLv3).
+// [@0cd4559] (ten9876/AetherSDR, GPLv3; Longpath ist ebenfalls GPLv3).
 //
 //
 // Inhalt am 2026-08-18 unveraendert aus VfoWidget.cpp:3252-3533
@@ -25,7 +25,7 @@
 // die Herkunft der Bereiche und Vorgaben und gehoeren zum Port.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-23 — Als sieben private Methoden in VfoWidget.cpp
 //                 entstanden (Sub-epic C-1 Task 15), J.J. Boyd
 //                 (KG4VCF), AI-assisted via Anthropic Claude Code.

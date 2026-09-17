@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - PotaParkInfoClient JSON parser tests
+// Longpath - PotaParkInfoClient JSON parser tests
 //
-// NereusSDR-native (operator-requested follow-up, 2026-08-27). Pins
+// Longpath-native (operator-requested follow-up, 2026-08-27). Pins
 // the contract that PotaParkInfoClient parses api.pota.app/park/{ref}
 // JSON responses. Fixture is a trimmed but verbatim copy of the real
 // response fetched live for US-4558 (Continental Divide Trail) during

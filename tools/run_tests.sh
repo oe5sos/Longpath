@@ -37,7 +37,7 @@
 #   tools/run_tests.sh --serial     nacheinander (wenn GUI-Tests zicken)
 #   tools/run_tests.sh -- --verbose Rest an ctest durchreichen
 #
-# Modification history (NereusSDR):
+# Modification history (Longpath):
 #   2026-08-08 — Created for NereusSDR by Martin Fischer, AI-assisted
 #                 via Anthropic Claude (Cowork).
 #   2026-08-15 — Parallel laufen lassen; mit Filter nur die passenden

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - PskReporterClient: PSK Reporter IPFIX protocol client.
+// Longpath - PskReporterClient: PSK Reporter IPFIX protocol client.
 //
 // Ported from freedv-gui src/reporting/pskreporter.{h,cpp} [@77e793a].
 //   Wire-protocol logic (rxFormatHeader / txFormatHeader template
@@ -53,7 +53,7 @@
 //  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // =========================================================================
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-10  J.J. Boyd / KG4VCF  Phase 3J-2 Task B6. Initial port.
 //                                    Replaces freedv-gui's POSIX socket /
 //                                    detached std::thread with Qt6's
@@ -99,7 +99,7 @@ namespace Longpath {
 //     network from the radio's perspective), so receive is gated on a
 //     locally-bound listener. The shape is in place so we can drive
 //     it from canned datagrams in tests and from any future relay
-//     protocol that delivers PSK Reporter records to NereusSDR.
+//     protocol that delivers PSK Reporter records to Longpath.
 class PskReporterClient : public QObject {
     Q_OBJECT
 
@@ -142,7 +142,7 @@ public:
     // PSK Reporter's IPFIX server (report.pskreporter.info:4739)
     // accepts datagrams at most every 5 minutes per reporter; more
     // frequent transmissions get silently dropped.  freedv-gui
-    // hardcodes 5 minutes; NereusSDR exposes it as a named constant
+    // hardcodes 5 minutes; Longpath exposes it as a named constant
     // so the Start button can use the upstream cadence verbatim.
     static constexpr int kReportingIntervalSec = 300;
 

@@ -1,11 +1,11 @@
 // =================================================================
-// src/gui/widgets/SwrSweepPanel.cpp  (NereusSDR)
+// src/gui/widgets/SwrSweepPanel.cpp  (Longpath)
 // =================================================================
 //
 // See SwrSweepPanel.h.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-13 — Created by Ralph Martin Fischer (OE5SOS),
 //                 AI-assisted implementation via Anthropic Claude
 //                 (Cowork).

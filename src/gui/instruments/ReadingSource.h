@@ -3,16 +3,16 @@
 // no-port-check: nennt MeterManager.cs nur als Fundort des woertlichen
 // readingName()-Ports, der in MeterItem.cpp lebt und dort registriert
 // ist. Diese Datei uebernimmt nichts aus Thetis -- die Beschriftungen
-// stammen aus BaseItemEditor.cpp (NereusSDR-original), die Teilung aus
-// den Entwuerfen des Betreibers, und die Skalen aus dem NereusSDR-Baum
+// stammen aus BaseItemEditor.cpp (Longpath-original), die Teilung aus
+// den Entwuerfen des Betreibers, und die Skalen aus dem Longpath-Baum
 // mit Herkunftsangabe je Zahl. Die Erwaehnung steht da, damit niemand
 // hier eine zweite Namensliste anlegt.
 
 // =================================================================
-// src/gui/instruments/ReadingSource.h  (NereusSDR)
+// src/gui/instruments/ReadingSource.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // ── Eine Liste, nicht eine zweite ────────────────────────────────────
 //
@@ -51,7 +51,7 @@
 // aus wie eine Messung.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-17 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

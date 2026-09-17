@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_audio_engine_vax_gain.cpp  (NereusSDR)
+// tests/tst_audio_engine_vax_gain.cpp  (Longpath)
 // =================================================================
 //
 // Exercises AudioEngine's per-channel VAX rx-gain / mute / tx-gain

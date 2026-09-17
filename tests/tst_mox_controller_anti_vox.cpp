@@ -1,8 +1,8 @@
 // =================================================================
-// tests/tst_mox_controller_anti_vox.cpp  (NereusSDR)
+// tests/tst_mox_controller_anti_vox.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original test. No Thetis logic is ported in this test
+// Longpath-original test. No Thetis logic is ported in this test
 // file. The test exercises:
 //   - MoxController::setVoxHangTime(int ms)              — H.3 Phase 3M-1b
 //   - MoxController::setAntiVoxGain(int dB)              — H.3 Phase 3M-1b
@@ -13,7 +13,7 @@
 // (formerly §C) and the antiVoxSourceWhatRequested signal tests have
 // been removed alongside the slot+signal in MoxController.  Thetis
 // chkAntiVoxSource (RX vs VAC at cmaster.cs:912-943 [v2.10.3.13]) does
-// not map to NereusSDR's architecture; see the architectural-divergence
+// not map to Longpath's architecture; see the architectural-divergence
 // section in docs/architecture/phase3m-3a-iv-antivox-feed-design.md §18.
 //
 // Source references (for traceability):
@@ -32,7 +32,7 @@
 //   Anti-VOX gain linear = pow(10.0, dB / 20.0)   ← /20.0 voltage scaling
 // =================================================================
 
-// no-port-check: NereusSDR-original test file — no upstream Thetis port.
+// no-port-check: Longpath-original test file — no upstream Thetis port.
 
 #include <QtTest/QtTest>
 #include <QSignalSpy>
@@ -236,7 +236,7 @@ private slots:
     // 3M-3a-iv post-bench refactor (Option A) removed the
     // setAntiVoxSourceVax slot, the antiVoxSourceWhatRequested signal, and
     // their associated state.  Thetis chkAntiVoxSource (RX vs VAC at
-    // cmaster.cs:912-943 [v2.10.3.13]) does not map to NereusSDR's
+    // cmaster.cs:912-943 [v2.10.3.13]) does not map to Longpath's
     // architecture; see commit message and DexpVoxPage info-row for the
     // architectural rationale.  All §C test cases dropped.
     // ════════════════════════════════════════════════════════════════════════

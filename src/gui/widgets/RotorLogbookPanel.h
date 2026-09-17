@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/gui/widgets/RotorLogbookPanel.h  (NereusSDR)
+// src/gui/widgets/RotorLogbookPanel.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. Thetis has neither a rotator display nor a
+// Longpath-original. Thetis has neither a rotator display nor a
 // logbook; AetherSDR's callsign card is lookup-only.
 //
 // Extracted from MainWindow::openRotorDial(), where the same UI had
@@ -14,7 +14,7 @@
 // docked rather than living in a window of its own.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
 // =================================================================

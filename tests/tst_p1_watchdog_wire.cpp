@@ -1,7 +1,7 @@
 // no-port-check: test-only -- HL2 firmware file names and deskhpsdr source
 // paths appear only in source-cite comments that document which upstream line
 // each assertion verifies.  No Thetis or deskhpsdr logic is ported here;
-// this file is NereusSDR-original.
+// this file is Longpath-original.
 //
 // Wire-byte snapshot tests for the RUNSTOP packet watchdog bit (3M-1a Task E.5).
 //
@@ -26,7 +26,7 @@
 // deskhpsdr reference (deskhpsdr/src/old_protocol.c:3811 [@120188f]):
 //   buffer[3] = command;  // 0x01 start or 0x00 stop -- bit 7 never set
 //   deskhpsdr has no user-configurable watchdog disable.  It implicitly keeps
-//   bit 7 = 0 (watchdog enabled) on every RUNSTOP packet.  NereusSDR matches
+//   bit 7 = 0 (watchdog enabled) on every RUNSTOP packet.  Longpath matches
 //   this as the default (m_watchdogEnabled{true} -> bit 7 = 0).
 //
 // Thetis call-site (setup.cs:17986 [v2.10.3.13]):

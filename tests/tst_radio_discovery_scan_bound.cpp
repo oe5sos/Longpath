@@ -1,7 +1,7 @@
 // no-port-check: quiet-poll deadline safety net, added 2026-09-09 while
 // investigating a CI-only (Linux, GitHub Actions) 120s GUI-test timeout in
 // RadioDiscovery's NIC-walk (docs/architecture/2026-09-09-ci-discovery-hang-
-// investigation.md). NereusSDR-original defensive addition, not itself a
+// investigation.md). Longpath-original defensive addition, not itself a
 // port: Thetis's clsRadioDiscovery.cs (its own quiet-poll while loop,
 // `Project Files/Source/Console/HPSDR/clsRadioDiscovery.cs:964-976`) has no
 // deadline either and is likewise vulnerable to a sustained-readable

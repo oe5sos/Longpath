@@ -6,7 +6,7 @@
 // Skala stehen.
 
 // =================================================================
-// tests/tst_instrument_menu.cpp  (NereusSDR)
+// tests/tst_instrument_menu.cpp  (Longpath)
 // =================================================================
 //
 // Das Rechtsklickmenü der Instrumente — die eine Stelle, an der ein
@@ -22,7 +22,7 @@
 // Der Test haelt fest, dass das Menue aus der EINEN Liste kommt.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-18 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

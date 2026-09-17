@@ -1,4 +1,4 @@
-// tests/tst_transmit_setup_block_tx.cpp  (NereusSDR)
+// tests/tst_transmit_setup_block_tx.cpp  (Longpath)
 //
 // Phase 3M-0 Task 11 — Disable HF PA group box on Setup → Transmit.
 // no-port-check: test fixture — no Thetis attribution required.

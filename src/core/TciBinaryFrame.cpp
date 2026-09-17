@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/TciBinaryFrame.cpp  (NereusSDR)
+// src/core/TciBinaryFrame.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
@@ -7,7 +7,7 @@
 //   original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-10 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                (KG4VCF), with AI-assisted transformation via
 //                Anthropic Claude Code.

@@ -1,12 +1,12 @@
 // =================================================================
-// tests/tst_antenna_labels.cpp  (NereusSDR)
+// tests/tst_antenna_labels.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/setup.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-22 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code. Phase 3P-I-b T2: delegator test for

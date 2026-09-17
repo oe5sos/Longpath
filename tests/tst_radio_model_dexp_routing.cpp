@@ -1,7 +1,7 @@
-// no-port-check: NereusSDR-original unit-test file.  All Thetis source cites
+// no-port-check: Longpath-original unit-test file.  All Thetis source cites
 // are in TransmitModel.h/cpp / TxChannel.h / RadioModel.cpp.
 // =================================================================
-// tests/tst_radio_model_dexp_routing.cpp  (NereusSDR)
+// tests/tst_radio_model_dexp_routing.cpp  (Longpath)
 // =================================================================
 //
 // Phase 3M-3a-iii Task 12 — TransmitModel → TxChannel routing tests

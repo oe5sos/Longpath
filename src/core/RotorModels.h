@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/core/RotorModels.h  (NereusSDR)
+// src/core/RotorModels.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // The rotator controllers an operator is likely to own, by name, with
 // the Hamlib model number each one needs.
@@ -31,7 +31,7 @@
 // (github.com/Hamlib/Hamlib/wiki/Supported-Rotators, read 2026-08-07).
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
 //   2026-08-10 — GS-232A note now explains the network form of the

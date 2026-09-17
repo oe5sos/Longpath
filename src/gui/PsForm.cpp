@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/PsForm.cpp  (NereusSDR)
+// src/gui/PsForm.cpp  (Longpath)
 // =================================================================
 //
 // Implementation of PsForm modeless dialog.  See PsForm.h for the
@@ -11,7 +11,7 @@
 // original licences from Thetis source are included below.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-06 — Phase 3M-4 Task 8: created by J.J. Boyd (KG4VCF),
 //                 with AI-assisted transformation via Anthropic Claude
 //                 Code.
@@ -87,7 +87,7 @@ namespace Longpath {
 
 // ─────────────────────────────────────────────────────────────────────────
 // Layout constants — derived from PSForm.designer.cs [v2.10.3.13].
-// The Thetis dialog uses absolute positioning; NereusSDR uses
+// The Thetis dialog uses absolute positioning; Longpath uses
 // QGridLayout in zoned bands that mirror the Thetis x/y zones.
 // ─────────────────────────────────────────────────────────────────────────
 
@@ -248,7 +248,7 @@ void PsForm::buildUi()
 
     // From PSForm.designer.cs:835-844 pbWarningSetPk [v2.10.3.13] — hidden
     // by default, shown when current SetPk drifts from psDefaultPeak.
-    // NereusSDR uses a QLabel with a "!" glyph stand-in until artwork
+    // Longpath uses a QLabel with a "!" glyph stand-in until artwork
     // import lands.
     m_lblWarningSetPk = new QLabel(QStringLiteral("⚠"), this);
     m_lblWarningSetPk->setObjectName(QStringLiteral("pbWarningSetPk"));
@@ -516,7 +516,7 @@ void PsForm::buildUi()
 //   Column 2: GetPk / SetPk labels + GetPSpeak / txtPSpeak text boxes
 //   Bottom:   checkLoopback (left) + btnDefaultPeaks (right)
 //
-// NereusSDR uses QGridLayout to mirror the 3-column zone layout.
+// Longpath uses QGridLayout to mirror the 3-column zone layout.
 // ─────────────────────────────────────────────────────────────────────────
 
 QGroupBox* PsForm::buildCalibrationInfoGroup(QWidget* parent)
@@ -866,7 +866,7 @@ void PsForm::onAmpViewClicked()
     // Lazy-construct on first click; reuse the singleton on subsequent
     // clicks.  The dialog is parented to PsForm so it survives PsForm
     // close/reopen.  AmpView.cs FormClosed [v2.10.3.13] sets PSForm.ampv
-    // to null so a new instance is created next time; NereusSDR keeps
+    // to null so a new instance is created next time; Longpath keeps
     // the dialog alive (hide-on-close) — matches the TxEqDialog +
     // PsForm singleton pattern.
     if (!m_ampView) {
@@ -1131,7 +1131,7 @@ void PsForm::onCalibrationCountChanged(int count)
     // buildCalibrationInfoGroup() but never bound to any data source —
     // they sat at their initial "0" placeholder text even while calcc
     // was actively cycling.  JJ noticed during a side-by-side Thetis vs
-    // NereusSDR PS bench run that Thetis's labels updated while ours
+    // Longpath PS bench run that Thetis's labels updated while ours
     // were stuck.  Reading PureSignal::infoAt(i) here is safe because
     // calibrationCountChanged fires AFTER pollTimerTick's m_info update
     // (see PureSignal.cpp:1033 + 1287).
@@ -1213,7 +1213,7 @@ void PsForm::closeEvent(QCloseEvent* event)
     // From Thetis PSForm.cs:418-422 PSForm_Closing [v2.10.3.13]:
     //   e.Cancel = true;
     //   Common.SaveForm(this, "PureSignal");
-    // NereusSDR mirrors via hide() so the singleton survives across opens.
+    // Longpath mirrors via hide() so the singleton survives across opens.
     AppSettings::instance().setValue(
         QLatin1String(kGeometrySettingsKey),
         QString::fromLatin1(saveGeometry().toBase64()));

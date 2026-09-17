@@ -25,7 +25,7 @@ warren@wpratt.com
 */
 
 // =================================================================
-// tests/tst_tx_channel_cfc_cpdr_cessb_setters.cpp  (NereusSDR)
+// tests/tst_tx_channel_cfc_cpdr_cessb_setters.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for the 9 TX CFC + CPDR + CESSB wrappers added in Phase
@@ -59,7 +59,7 @@ warren@wpratt.com
 // touching WDSP.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-30 — New test for Phase 3M-3a-ii Task B-3: 9 TX CFC/CPDR/CESSB
 //                 wrapper setters + Stage::CfComp / Stage::Compressor /
 //                 Stage::OsCtrl setStageRunning regression.  J.J. Boyd
@@ -79,7 +79,7 @@ warren@wpratt.com
 //                 transformation via Anthropic Claude Code.
 // =================================================================
 
-// no-port-check: NereusSDR-original test file. All Thetis source cites are
+// no-port-check: Longpath-original test file. All Thetis source cites are
 // in TxChannel.h/cpp.
 
 #include <QtTest/QtTest>

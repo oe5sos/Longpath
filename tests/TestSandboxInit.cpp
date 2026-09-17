@@ -26,7 +26,7 @@
 // $XDG_CONFIG_HOME/qttest (Linux), ~/Library/Preferences/qttest
 // (macOS), or %LOCALAPPDATA%\qttest (Windows). The sandbox is shared
 // across all test binaries in a run but is completely isolated from
-// the real NereusSDR install.
+// the real Longpath install.
 //
 // This file has no public symbols. It is linked into every test
 // target by longpath_add_test() in tests/CMakeLists.txt.

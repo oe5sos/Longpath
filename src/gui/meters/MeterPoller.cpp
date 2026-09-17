@@ -1,12 +1,12 @@
 // =================================================================
-// src/gui/meters/MeterPoller.cpp  (NereusSDR)
+// src/gui/meters/MeterPoller.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/MeterManager.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -80,7 +80,7 @@ mw0lge@grange-lane.co.uk
 // WDSP GetTXAMeter — lock-free TX meter read.
 // From Thetis dsp.cs:390-391 [v2.10.3.13]:
 //   [DllImport("wdsp.dll")] extern double GetTXAMeter(int channel, txaMeterType meter);
-// NereusSDR declaration in src/core/wdsp_api.h.
+// Longpath declaration in src/core/wdsp_api.h.
 #ifdef HAVE_WDSP
 #include "core/wdsp_api.h"
 #endif
@@ -191,7 +191,7 @@ void MeterPoller::setRxOffsetSource(std::function<double()> source)
 // H.2 (Phase 3M-1a): switch poll set on MOX engage/release.
 // Porting from Thetis dsp.cs:995-1050 [v2.10.3.13] CalculateTXMeter dispatch:
 //   the switch on MeterType selects TX vs RX meter reads.
-// NereusSDR translates the dispatch to a bool flag set at MOX boundary.
+// Longpath translates the dispatch to a bool flag set at MOX boundary.
 void MeterPoller::setInTx(bool isTx)
 {
     if (m_inTx == isTx) {

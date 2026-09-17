@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - AdifParser: ADIF (.adi / .adif) amateur-radio log parser.
+// Longpath - AdifParser: ADIF (.adi / .adif) amateur-radio log parser.
 //
 // Ported from AetherSDR src/core/AdifParser.h [@0cd4559].
 // AetherSDR is (C) its contributors and is licensed GPL-3.0-or-later
 // (see https://github.com/ten9876/AetherSDR/blob/main/LICENSE).
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-10  J.J. Boyd / KG4VCF  Phase 3J-2 Task C2. Initial port.
 //                                    AetherSDR's "AetherSDR" namespace
-//                                    becomes "NereusSDR". QsoRecord
+//                                    becomes "Longpath". QsoRecord
 //                                    field layout (callsign, band,
 //                                    modeGroup, dxccPrefix) and the
 //                                    public surface (static
@@ -64,7 +64,7 @@ public:
     // thread).  Emits finished() when done.
     Q_INVOKABLE void parseFileAsync(const QString& path);
 
-    // NereusSDR test seam (not in upstream). Parses an in-memory ADIF
+    // Longpath test seam (not in upstream). Parses an in-memory ADIF
     // byte buffer directly so unit tests can exercise the parser
     // without a QFile round-trip. Precedent: B1-B5 added similar
     // *ForTest seams.

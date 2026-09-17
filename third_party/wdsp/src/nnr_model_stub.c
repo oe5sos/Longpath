@@ -61,7 +61,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 // extraction record and checksum).
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-09-14 — NereusSDR-original glue stub created during the WDSP 2.10
 //                 NNR port, with AI-assisted implementation via Anthropic
 //                 Claude Code. Keeps the ~34 MB of generated model-weight

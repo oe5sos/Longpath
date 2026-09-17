@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/gui/VaxFirstRunDialog.h  (NereusSDR)
+// src/gui/VaxFirstRunDialog.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original file — no Thetis port; no attribution-registry row.
+// Longpath-original file — no Thetis port; no attribution-registry row.
 //
 // Modal first-run assistant that walks the user through VAX channel
 // setup. Five scenarios (Windows with/without 3rd-party cables, macOS
@@ -16,7 +16,7 @@
 // in Task 11b + Sub-Phase 12 respectively.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-20 — Written by J.J. Boyd (KG4VCF), with AI-assisted
 //                transformation via Anthropic Claude Code.
 // =================================================================

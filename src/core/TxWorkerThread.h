@@ -1,15 +1,15 @@
 // =================================================================
-// src/core/TxWorkerThread.h  (NereusSDR)
+// src/core/TxWorkerThread.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original file.  QThread that drives the TX DSP pump off
+// Longpath-original file.  QThread that drives the TX DSP pump off
 // the main thread, mirroring Thetis's `cm_main` worker-thread loop
 // from Project Files/Source/ChannelMaster/cmbuffs.c:151-168
 // [v2.10.3.13] one-to-one.
 //
 // =================================================================
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-29 — Original implementation for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted implementation via
 //                 Anthropic Claude Code.  Phase 3M-1c TX pump
@@ -21,7 +21,7 @@
 //                 docs/architecture/phase3m-1c-tx-pump-architecture-plan.md
 // =================================================================
 
-// no-port-check: NereusSDR-original file.  The Thetis cmbuffs.c /
+// no-port-check: Longpath-original file.  The Thetis cmbuffs.c /
 // cmaster.c citations identify the architectural pattern this class
 // mirrors (worker thread + semaphore-wake + uniform block size); no
 // Thetis logic is line-for-line ported here (the CMB primitives
@@ -62,7 +62,7 @@ class StripChain;
 //       }
 //   }
 //
-// NereusSDR mapping:
+// Longpath mapping:
 //   WaitForSingleObject     <==>  m_micSource->waitForBlock(-1)
 //   cmdata                  <==>  m_micSource->drainBlock(m_in.data())
 //   xcmaster (TX branch)    <==>  m_txChannel->driveOneTxBlockFromInterleaved
@@ -204,7 +204,7 @@ signals:
     /// dull and pumped regardless of what the strip did; AetherSDR's
     /// monitor records its client chain's own output for exactly this
     /// reason (ClientPuduMonitor @31b29583), and this is that tap in
-    /// NereusSDR's geometry.
+    /// Longpath's geometry.
     ///
     /// preStripAudioReady:  the I channel as the mic delivered it,
     ///                      before the strip touched it (mono, mic

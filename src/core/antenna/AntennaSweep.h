@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/core/antenna/AntennaSweep.h  (NereusSDR)
+// src/core/antenna/AntennaSweep.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // What a measured sweep says about the antenna.
 //
@@ -49,7 +49,7 @@
 // between the two samples that straddle it.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-10 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

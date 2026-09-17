@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/audio/LinuxAudioBackend.cpp  (NereusSDR)
+// src/core/audio/LinuxAudioBackend.cpp  (Longpath)
 // =================================================================
 //  Copyright (C) 2026 J.J. Boyd (KG4VCF)
 //
@@ -8,7 +8,7 @@
 //  as published by the Free Software Foundation; either version 2
 //  of the License, or (at your option) any later version.
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-23 — Created for the Linux PipeWire-native bridge.
 //                J.J. Boyd (KG4VCF), AI-assisted via Anthropic
 //                Claude Code.

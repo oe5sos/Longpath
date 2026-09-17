@@ -2,7 +2,7 @@
 // a KML wrong quietly: coordinate order (longitude first), band
 // folders, timestamps for the time slider, HTML escaping in what came
 // from the log, and honest counting of what could not be placed.
-// no-port-check: NereusSDR-original.
+// no-port-check: Longpath-original.
 
 #include <QtTest/QtTest>
 #include <QTimeZone>

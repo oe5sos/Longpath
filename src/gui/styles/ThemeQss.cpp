@@ -1,12 +1,12 @@
 // =================================================================
-// src/gui/styles/ThemeQss.cpp  (NereusSDR)
+// src/gui/styles/ThemeQss.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. See ThemeQss.h for why this exists and Theme.h
+// Longpath-original. See ThemeQss.h for why this exists and Theme.h
 // for the layer it belongs to.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-15 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 //   2026-08-15 — Rollen ergänzt; die Tabelle fragt jetzt Theme, damit

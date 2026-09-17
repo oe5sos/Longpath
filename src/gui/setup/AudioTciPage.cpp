@@ -1,12 +1,12 @@
-// no-port-check: NereusSDR-original UI file. AppSettings key names and
+// no-port-check: Longpath-original UI file. AppSettings key names and
 // defaults cross-referenced against design doc Section 2.7 and the
 // TciProtocol.h inventory. No Thetis code is translated here.
 
 // =================================================================
-// src/gui/setup/AudioTciPage.cpp  (NereusSDR)
+// src/gui/setup/AudioTciPage.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original Setup -> Audio -> TCI page.
+// Longpath-original Setup -> Audio -> TCI page.
 // See AudioTciPage.h for the full header and design notes.
 //
 // Phase 24 Task 24.2 (2026-05-10): Written by J.J. Boyd (KG4VCF),

@@ -1,15 +1,15 @@
-// no-port-check: NereusSDR-original driver class.  See PsccPump.h
+// no-port-check: Longpath-original driver class.  See PsccPump.h
 // header for the architectural narrative.
 //
 // =================================================================
-// src/core/PsccPump.cpp  (NereusSDR)
+// src/core/PsccPump.cpp  (Longpath)
 // =================================================================
 //
 // Implementation of the pscc() driver.  See PsccPump.h for the
 // upstream cite map and threading model.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-06 — Created by J.J. Boyd (KG4VCF) for Phase 3M-4
 //                 Task 17 chunk C, with AI-assisted source-first
 //                 protocol via Anthropic Claude Code.
@@ -243,7 +243,7 @@ void PsccPump::tryPump()
     //        data[ps_tx_idx],     // index 1 per cmaster.cs:534
     //        data[ps_rx_idx]);    // index 0 per cmaster.cs:533
     //
-    // ChannelMaster's xrouter pre-builds paired pointers; NereusSDR's
+    // ChannelMaster's xrouter pre-builds paired pointers; Longpath's
     // independent UDP-per-DDC path means we have to pair them here.
     const int needed = m_blockSize * 2;   // interleaved I/Q
 

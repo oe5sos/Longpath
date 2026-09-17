@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - POTA scheduled-activations client (implementation)
+// Longpath - POTA scheduled-activations client (implementation)
 //
-// NereusSDR-native, no upstream equivalent. See PotaAlertsClient.h.
+// Longpath-native, no upstream equivalent. See PotaAlertsClient.h.
 
 #include "PotaAlertsClient.h"
 #include "LogCategories.h"

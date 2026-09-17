@@ -1,14 +1,14 @@
 #pragma once
 
 // =================================================================
-// src/gui/meters/MeterWidget.h  (NereusSDR)
+// src/gui/meters/MeterWidget.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/MeterManager.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -111,7 +111,7 @@ public:
     QString serializeItems() const;
     bool deserializeItems(const QString& data);
 
-    // Thetis-parity stack layout with a NereusSDR pixel floor
+    // Thetis-parity stack layout with a Longpath pixel floor
     // (Phase 3G-9 post-revert).
     //
     // reflowStackedItems() is called on every resize. It computes a

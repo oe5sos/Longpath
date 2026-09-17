@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_coupler_zero.cpp  (NereusSDR)
+// tests/tst_coupler_zero.cpp  (Longpath)
 // =================================================================
 //
 // The zero of a directional coupler, measured instead of tabled.
@@ -16,10 +16,10 @@
 // and pinned downward by a single dropout. Both were real risks in the
 // first draft; the settle guard and the percentile are the answers.
 //
-// no-port-check: NereusSDR-original.
+// no-port-check: Longpath-original.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-14 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

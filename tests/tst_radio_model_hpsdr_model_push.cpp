@@ -1,8 +1,8 @@
-// no-port-check: NereusSDR-original unit-test file.  No upstream logic
+// no-port-check: Longpath-original unit-test file.  No upstream logic
 // is ported in this file.  The Thetis cite below documents the
 // behavioural contract under test.
 // =================================================================
-// tests/tst_radio_model_hpsdr_model_push.cpp  (NereusSDR)
+// tests/tst_radio_model_hpsdr_model_push.cpp  (Longpath)
 // =================================================================
 //
 // v0.4.1 hotfix regression test — RadioModel must push the connected
@@ -101,7 +101,7 @@ private slots:
     //   if (radDDC1ADC1.Checked) val += 1 << 2; // bits 3 & 2 set to 01 => DDC1 to ADC1
     // so 4 is "DDC1 on ADC1, everything else ADC0".
     //
-    // On Protocol 2 NereusSDR never seeded it. Both halves of the diversity
+    // On Protocol 2 Longpath never seeded it. Both halves of the diversity
     // DDC0/DDC1 sync pair therefore sat on ADC0 -- one physical input
     // sampled twice, which is not diversity. Two consumers read the seed
     // (the codec context on the Phase 3F path, ReceiverManager's shadow on
@@ -118,7 +118,7 @@ private slots:
 
     // A 1-ADC board must never be told to use ADC1. Thetis leaves the global
     // at 4 and relies on each 1-ADC UpdateDDCs branch hardcoding cntrl1
-    // (console.cs:8399 / 8443 / 8455 [v2.10.3.15]); NereusSDR gates at the
+    // (console.cs:8399 / 8443 / 8455 [v2.10.3.15]); Longpath gates at the
     // seed so the value never enters the context at all.
     void applyHpsdrModel_seedsZeroOnOneAdcBoards() {
         RadioModel model;

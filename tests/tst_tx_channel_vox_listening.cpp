@@ -1,7 +1,7 @@
-// no-port-check: NereusSDR-original unit-test file. Thetis cite comments
+// no-port-check: Longpath-original unit-test file. Thetis cite comments
 // document upstream sources; no Thetis logic ported in this test file.
 // =================================================================
-// tests/tst_tx_channel_vox_listening.cpp  (NereusSDR)
+// tests/tst_tx_channel_vox_listening.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for TxChannel::setVoxListening() pump gate (Phase 3M-3a-iii
@@ -26,7 +26,7 @@
 //       other.  The whole point of the bench fix.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-04 - New test file for Phase 3M-3a-iii Task 18 (bench fix):
 //                 verifies the VOX-listening pump gate flag round-trips
 //                 correctly and is independent of m_running.  J.J. Boyd

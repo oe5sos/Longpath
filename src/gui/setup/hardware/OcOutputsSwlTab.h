@@ -1,7 +1,7 @@
 #pragma once
 
 // =================================================================
-// src/gui/setup/hardware/OcOutputsSwlTab.h  (NereusSDR)
+// src/gui/setup/hardware/OcOutputsSwlTab.h  (Longpath)
 // =================================================================
 //
 // Ported from mi0bot-Thetis source:
@@ -31,7 +31,7 @@
 //     pin actions are global in OcMatrix, edited from the HF tab)
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-30 — New for Phase 3L HL2 Filter visibility brainstorm.
 //                Replaces OcOutputsTab.cpp:90-102 QLabel stub
 //                ("SWL band plan — coming in a follow-up commit") that

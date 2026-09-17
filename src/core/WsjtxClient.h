@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - WSJT-X UDP multicast client (binary protocol)
+// Longpath - WSJT-X UDP multicast client (binary protocol)
 //
 // Ported from AetherSDR src/core/WsjtxClient.h [@0cd4559].
 // AetherSDR is (C) its contributors and is licensed GPL-3.0-or-later
 // (see https://github.com/ten9876/AetherSDR/blob/main/LICENSE).
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-10  J.J. Boyd / KG4VCF  Phase 3J-2 Task B4. Initial port.
 //                                    AetherSDR's "AetherSDR" namespace
-//                                    becomes "NereusSDR". DxSpot include
+//                                    becomes "Longpath". DxSpot include
 //                                    moved to the extracted DxSpot.h
 //                                    (Phase 3J-2 Task B1) instead of
 //                                    upstream's transitive include from
@@ -18,7 +18,7 @@
 //                                    instead of upstream AetherSDR's
 //                                    lcDxCluster. Log file path uses Qt's
 //                                    AppConfigLocation (already lands
-//                                    under NereusSDR/) instead of
+//                                    under Longpath/) instead of
 //                                    upstream's GenericConfigLocation +
 //                                    "AetherSDR/wsjtx.log". Added three
 //                                    public test seams

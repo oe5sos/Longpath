@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/core/HamlibInstaller.h  (NereusSDR)
+// src/core/HamlibInstaller.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // Find Hamlib, say what is there, and install it if the operator asks.
 //
@@ -38,7 +38,7 @@
 // as a broken cable rather than as a wrong number.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-08 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
 // =================================================================

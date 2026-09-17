@@ -1,12 +1,12 @@
 // =================================================================
-// src/models/PanadapterModel.cpp  (NereusSDR)
+// src/models/PanadapterModel.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/console.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -111,7 +111,7 @@ constexpr int kDefaultGridStep    = 10;  // NereusSDR divergence (§10).
 QString gridMaxKey(Band b)      { return QStringLiteral("DisplayGridMax_") + bandKeyName(b); }
 QString gridMinKey(Band b)      { return QStringLiteral("DisplayGridMin_") + bandKeyName(b); }
 QString clarityFloorKey(Band b) { return QStringLiteral("ClarityFloor_")   + bandKeyName(b); }
-// NereusSDR-original — no Thetis equivalent.
+// Longpath-original — no Thetis equivalent.
 QString bandNFKey(Band b)       { return QStringLiteral("DisplayBandNFEstimate_") + bandKeyName(b); }
 
 } // namespace
@@ -251,13 +251,13 @@ void PanadapterModel::setClarityFloor(Band b, float floor)
     saveBandGridToSettings(b);
 }
 
-// NereusSDR-original — no Thetis equivalent.
+// Longpath-original — no Thetis equivalent.
 float PanadapterModel::bandNFEstimate(Band b) const
 {
     return m_perBandGrid.value(b).bandNFEstimate;
 }
 
-// NereusSDR-original — no Thetis equivalent.
+// Longpath-original — no Thetis equivalent.
 void PanadapterModel::setBandNFEstimate(Band b, float nf)
 {
     BandGridSettings& slot = m_perBandGrid[b];
@@ -304,7 +304,7 @@ void PanadapterModel::loadPerBandGridFromSettings()
         if (maxV.isValid())  { slot.dbMax          = maxV.toInt();   }
         if (minV.isValid())  { slot.dbMin          = minV.toInt();   }
         if (cfV.isValid())   { slot.clarityFloor   = cfV.toFloat();  }
-        // NereusSDR-original — no Thetis equivalent.
+        // Longpath-original — no Thetis equivalent.
         // Load per-band NF estimates persisted from previous sessions for priming.
         if (nfV.isValid())   { slot.bandNFEstimate = nfV.toFloat();  }
         m_perBandGrid.insert(b, slot);

@@ -1,12 +1,12 @@
 // =================================================================
-// src/core/strip/StripSettings.cpp  (NereusSDR)
+// src/core/strip/StripSettings.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. See StripSettings.h for what persists and what
+// Longpath-original. See StripSettings.h for what persists and what
 // deliberately does not.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-08 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

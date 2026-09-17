@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_wav_recorder_controller.cpp  (NereusSDR)
+// tests/tst_wav_recorder_controller.cpp  (Longpath)
 // =================================================================
 //
 // Was den Audio-Abgriff mit der "off the air"-Aufnahme verbindet.
@@ -9,12 +9,12 @@
 // Zwischenspeicher, genau wie es der Audio-Faden tut.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-25 — Original fuer NereusSDR/Longpath von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
 // =================================================================
 
-// no-port-check: NereusSDR-original test file.
+// no-port-check: Longpath-original test file.
 
 #include <QtTest>
 #include <QSignalSpy>

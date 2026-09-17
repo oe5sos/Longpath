@@ -1,4 +1,4 @@
-// tests/tst_setup_dialog_pa_reset_wiring.cpp  (NereusSDR)
+// tests/tst_setup_dialog_pa_reset_wiring.cpp  (Longpath)
 //
 // Phase 9 of issue #167 — Final integration: cross-page wiring between
 // PaWattMeterPage::resetPaValuesRequested (Phase 5A) and
@@ -7,7 +7,7 @@
 // Agents 5A and 5B could land in parallel without touching the same
 // SetupDialog source.
 //
-// no-port-check: test fixture exercising the NereusSDR-original
+// no-port-check: test fixture exercising the Longpath-original
 // SetupDialog cross-wire. Cite to Thetis btnResetPAValues_Click
 // (setup.cs:16346-16357 [v2.10.3.13]) is documentary only — the
 // production connect() carries the inline citation.

@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_qso_recorder.cpp  (NereusSDR)
+// tests/tst_qso_recorder.cpp  (Longpath)
 // =================================================================
 //
 // Ein QSO aufnehmen: was ankommt UND was man selbst sagt.
@@ -22,7 +22,7 @@
 // geschriebenen Datei, was ohnehin die eigentliche Behauptung ist.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-19 — Original fuer NereusSDR von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
 //   2026-09-02 — An das streamende QsoRecorder angepasst (zeitlich
@@ -30,7 +30,7 @@
 //                 Anthropic Claude (Cowork).
 // =================================================================
 
-// no-port-check: NereusSDR-original test file.
+// no-port-check: Longpath-original test file.
 
 #include <QtTest>
 #include <QTemporaryDir>

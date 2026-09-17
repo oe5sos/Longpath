@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - POTA park-info lookup client (implementation)
+// Longpath - POTA park-info lookup client (implementation)
 //
-// NereusSDR-native, no upstream equivalent. See PotaParkInfoClient.h.
+// Longpath-native, no upstream equivalent. See PotaParkInfoClient.h.
 
 #include "PotaParkInfoClient.h"
 #include "LogCategories.h"

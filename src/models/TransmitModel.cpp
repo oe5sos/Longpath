@@ -1,5 +1,5 @@
 // =================================================================
-// src/models/TransmitModel.cpp  (NereusSDR)
+// src/models/TransmitModel.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
@@ -12,7 +12,7 @@
 //   original licence from mi0bot-Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-26 — tunePowerByBand[14] + per-MAC persistence (G.3, Phase 3M-1a)
 //                 ported by J.J. Boyd (KG4VCF), with AI-assisted transformation
 //                 via Anthropic Claude Code.
@@ -64,7 +64,7 @@
 //                 AntiVox_Source_VAX persistence read/write.  Existing
 //                 user settings carrying this key will leave it as an
 //                 orphan in AppSettings; ignored on load (no migration).
-//                 NereusSDR-architectural divergence from Thetis
+//                 Longpath-architectural divergence from Thetis
 //                 chkAntiVoxSource at setup.designer.cs:44646-44657
 //                 [v2.10.3.13]; see commit message for rationale.
 //                 J.J. Boyd (KG4VCF), AI-assisted via Anthropic Claude Code.
@@ -177,11 +177,11 @@
 // Migrated to VS2026 - 18/12/25 MW0LGE v2.10.3.12
 
 // =================================================================
-// Modification history (NereusSDR) — continued:
+// Modification history (Longpath) — continued:
 //   2026-05-02 — filterLow / filterHigh properties + filterChanged signal
 //                 + filterDisplayText + per-MAC persistence under
 //                 hardware/<mac>/tx/FilterLow and FilterHigh.
-//                 NereusSDR-original (Plan 4 Cluster A, Task 2/D1).
+//                 Longpath-original (Plan 4 Cluster A, Task 2/D1).
 //                 J.J. Boyd (KG4VCF), AI-assisted via Anthropic Claude Code.
 //   2026-05-03 — Phase 3 Agent 3A of issue #167 (PA-cal hotfix scaffolding):
 //                 m_powerByBand[14] (default 50 W; per-band normal-mode
@@ -201,7 +201,7 @@
 //   2026-05-03 — Phase 3 Agent 3B of issue #167: computeAudioVolume()
 //                 math kernel — faithful port of Thetis SetPowerUsingTargetDBM
 //                 dBm-target math (console.cs:46720-46751 [v2.10.3.13])
-//                 with two NereusSDR-original safety short-circuits
+//                 with two Longpath-original safety short-circuits
 //                 (sliderWatts <= 0 → 0.0; gbb >= 99.5 → linear fallback).
 //                 Pure function: no state mutation, no signal emission.
 //                 J.J. Boyd (KG4VCF), AI-assisted via Anthropic Claude Code.
@@ -228,7 +228,7 @@
 //                 setTunePowerForBand (line 475).  load() per-band clamp
 //                 also polymorphs.  Closes a code-review gap where a
 //                 Fixed-mode value of 100 stored on a non-HL2 radio
-//                 would survive HL2 reconnect.  Multi-source NereusSDR
+//                 would survive HL2 reconnect.  Multi-source Longpath
 //                 block above + appended mi0bot console.cs verbatim
 //                 header below complete the GPL attribution.
 //                 J.J. Boyd (KG4VCF), AI-assisted via Anthropic Claude
@@ -251,7 +251,7 @@ namespace {
 // From Thetis console.cs:12094 [v2.10.3.13]: int[] tunePower_by_band sized
 // to (int)Band.LAST, which equals 14 for the Thetis Band enum.
 //
-// Phase 3L Note: NereusSDR's Band enum was extended to include 13 SWL bands
+// Phase 3L Note: Longpath's Band enum was extended to include 13 SWL bands
 // (Band::SwlFirst..SwlLast) for HL2 N2ADR Filter pin assignments — but TX
 // tune power is HF amateur only.  SWL bands inherit the closest ham-band
 // value implicitly (no separate per-SWL persistence).
@@ -312,7 +312,7 @@ TransmitModel::TransmitModel(QObject* parent)
     //
     // ── One watt, not fifty ──────────────────────────────────────────
     //
-    // Thetis fills every band with 50 W and NereusSDR copied it. 2026-08-14,
+    // Thetis fills every band with 50 W and Longpath copied it. 2026-08-14,
     // OE5SOS: "bitte ändere auf tune min 1 Watt, nicht 50."
     //
     // The value is per band and persisted per radio, so this default only
@@ -432,7 +432,7 @@ void TransmitModel::setMicGainDb(int dB)
 {
     // Clamp to range per Thetis console.cs:19151-19171 [v2.10.3.13].
     // Thetis runtime defaults: mic_gain_min = -40, mic_gain_max = 10.
-    // NereusSDR model range [-50, 70] per plan §C.1.
+    // Longpath model range [-50, 70] per plan §C.1.
     const int clamped = std::clamp(dB, kMicGainDbMin, kMicGainDbMax);
     if (clamped == m_micGainDb) { return; }  // idempotent guard
 
@@ -516,7 +516,7 @@ void TransmitModel::setLineInBoost(double dB)
 void TransmitModel::setMicTipRing(bool tipIsMic)
 {
     if (tipIsMic == m_micTipRing) { return; }  // idempotent guard
-    // NereusSDR model stores intuitive polarity (true = Tip is mic).
+    // Longpath model stores intuitive polarity (true = Tip is mic).
     // Wire-bit polarity inversion at RadioConnection::setMicTipRing (Phase G).
     // Thetis setup.cs:16463-16468 [v2.10.3.13]:
     //   if (radOrionMicTip.Checked) NetworkIO.SetMicTipRing(0);
@@ -591,11 +591,11 @@ int TransmitModel::tunePowerForBand(Band band) const
 
 void TransmitModel::setTunePowerForBand(Band band, int watts)
 {
-    // NereusSDR-original: per-band tune-power memory.
+    // Longpath-original: per-band tune-power memory.
     //
     // Thetis (both ramdor and mi0bot) stores a single global tune_power; we
     // extend it to per-band so the operator does not have to readjust on
-    // band change.  Mirrors NereusSDR's existing per-band power_by_band[]
+    // band change.  Mirrors Longpath's existing per-band power_by_band[]
     // pattern.
     //
     // Clamp range polymorphs on the connected radio model (#175 Task 6):
@@ -722,7 +722,7 @@ bool TransmitModel::pureSignalActive() const noexcept
     //   if (new_pwr != _lastPower && chkFWCATUBypass.Checked && _forceATTwhenPowerChangesWhenPSAon) ...
     // setPowerUsingTargetDbm uses chkFWCATUBypass.Checked as the predicate
     // (active when PS-A is enabled).  The Thetis predicate is "PS-A
-    // enabled" (UI-state); NereusSDR uses "calcc has corrections in
+    // enabled" (UI-state); Longpath uses "calcc has corrections in
     // flight" (PSForm.cs:1100-1102 [v2.10.3.13] CorrectionsBeingApplied
     // == _info[14] == 1) which is the runtime equivalent: only when
     // calcc has a valid correction set does the safety lift to 31 dB
@@ -765,9 +765,9 @@ bool TransmitModel::pureSignalActive() const noexcept
 //   1. sliderWatts <= 0 returns 0.0 exactly.  Matches Thetis's
 //      console.cs:46749-46751 branch:
 //          if (new_pwr == 0) { Audio.RadioVolume = 0.0; ... }
-//      Including negatives in the same branch is a NereusSDR-original safety
+//      Including negatives in the same branch is a Longpath-original safety
 //      addition — Thetis's `int new_pwr` came from a clamped slider so
-//      negatives weren't reachable upstream; in NereusSDR computeAudioVolume
+//      negatives weren't reachable upstream; in Longpath computeAudioVolume
 //      can be called from tests + external callers, so failing-loud-zero is
 //      the safe behavior.
 //
@@ -778,7 +778,7 @@ bool TransmitModel::pureSignalActive() const noexcept
 //      vs. analog PA gain compensation).  Non-HL2 paths fall through to
 //      the canonical Thetis dBm kernel below.
 //
-// Removed in #202 deep-fix: a NereusSDR-original `gbb >= 99.5 → linear
+// Removed in #202 deep-fix: a Longpath-original `gbb >= 99.5 → linear
 // identity sliderWatts/100` short-circuit.  It inverted the Thetis semantic
 // "100 = no output power" (clsHardwareSpecific.cs:463-466 [v2.10.3.13])
 // into "100 = full output", which made the Bypass profile and any
@@ -804,7 +804,7 @@ double TransmitModel::computeAudioVolume(const PaProfile& profile,
                                          HPSDRModel model) const noexcept
 {
     // From Thetis console.cs:46749-46751 [v2.10.3.13] — sliderWatts == 0 path.
-    // Negative slider → also returns 0 (NereusSDR-original safety).
+    // Negative slider → also returns 0 (Longpath-original safety).
     if (sliderWatts <= 0) {
         return 0.0;
     }
@@ -820,7 +820,7 @@ double TransmitModel::computeAudioVolume(const PaProfile& profile,
     // Branch order: HL2 path runs BEFORE the gbb >= 99.5 sentinel.  On HL2
     // HF bands gbb=100 (sentinel value), but mi0bot uses
     // (hl2Power * gbb/100) / 93.75 directly — the sentinel was a
-    // NereusSDR-original linear fallback for radios with no PA-gain
+    // Longpath-original linear fallback for radios with no PA-gain
     // compensation; mi0bot has explicit HL2 math.  Without this ordering,
     // HL2 HF bands would short-circuit into the legacy path and never use
     // mi0bot's formula.
@@ -845,7 +845,7 @@ double TransmitModel::computeAudioVolume(const PaProfile& profile,
     // essentially zero output, which is the correct semantic for the
     // "this band is not handled by my PA gain row" case.
     //
-    // A previous NereusSDR-original short-circuit
+    // A previous Longpath-original short-circuit
     //   if (gbb >= 99.5f) return std::clamp(sliderWatts / 100.0, 0.0, 1.0);
     // inverted that semantic to "100 = full output (linear identity)".
     // That made the Bypass profile (kPaGainSentinel = 100.0f every band) and
@@ -928,7 +928,7 @@ void TransmitModel::setTxPostGenToneMag(double mag)
     //   SetTXAPostGenToneMag(0, postGenToneMag);
     // HL2 sub-step DSP audio-gain modulation.  Range 0.4..0.9999 on HL2
     // sub-step path; 1.0 = no modulation (default, non-HL2 path).
-    // dedupe; matches NereusSDR setter convention
+    // dedupe; matches Longpath setter convention
     if (m_txPostGenToneMag == mag) { return; }
     m_txPostGenToneMag = mag;
     emit txPostGenToneMagChanged(mag);
@@ -969,7 +969,7 @@ void TransmitModel::setStepAttenuatorController(StepAttenuatorController* ctrl)
 // "10 W tune" land on the wire even if the PWR/TUN sliders disagree.
 //
 // XVTR translation: Thetis at console.cs:46711-46716 + 46724-46728 retunes
-// to the LO band before computing gbb.  NereusSDR has only one XVTR slot
+// to the LO band before computing gbb.  Longpath has only one XVTR slot
 // — the sentinel fallback in computeAudioVolume catches Band::XVTR via
 // PaProfile::getGainForBand returning 1000 (Phase 3B short-circuit).  Full
 // XVTR LO-band translation is deferred per plan §"Open follow-ups".
@@ -1172,7 +1172,7 @@ TransmitModel::TxPowerResult TransmitModel::setPowerUsingTargetDbm(
     //   if (new_pwr == 0) { Audio.RadioVolume = 0.0; ... }
     //   else { ... Audio.RadioVolume = (double)Math.Min((target_volts / 0.8), 1.0); }
     //
-    // NereusSDR-equivalent: emit audioVolumeChanged so RadioModel can pump
+    // Longpath-equivalent: emit audioVolumeChanged so RadioModel can pump
     // the value to TxChannel (iq_gain) + RadioConnection (wire_byte).
     // computeAudioVolume already returns 0.0 for sliderWatts <= 0 (Phase
     // 3B short-circuit), so the same emit handles both branches uniformly.
@@ -1196,13 +1196,13 @@ void TransmitModel::load()
         return;
     }
     // Cite: console.cs:4904-4910 [v2.10.3.13] — Thetis pipe-delimited restore.
-    // NereusSDR uses per-band scalar keys matching the AlexController pattern.
+    // Longpath uses per-band scalar keys matching the AlexController pattern.
     //
     // Author-tag preservation (CLAUDE.md GPL rule): the upstream restore loop
     // at console.cs:4906 [v2.10.3.13] carries
     //   if (list.Length != (int)Band.LAST) continue; //[2.10.3.5]MW0LGE
     // This is a length-mismatch guard against the pipe-delimited string format.
-    // The NereusSDR scalar-key path doesn't have a list-length to check (each
+    // The Longpath scalar-key path doesn't have a list-length to check (each
     // band's value is read independently with its own default), so the guard
     // has no direct equivalent.  The author tag is preserved here per the
     // CLAUDE.md byte-for-byte rule:
@@ -1262,7 +1262,7 @@ void TransmitModel::save()
         return;
     }
     // Cite: console.cs:3087-3091 [v2.10.3.13] — Thetis pipe-delimited save.
-    // NereusSDR uses per-band scalar keys matching the AlexController pattern.
+    // Longpath uses per-band scalar keys matching the AlexController pattern.
     //
     // Like AlexController::save(), this method only writes to the in-memory
     // AppSettings map; it does NOT call AppSettings::save() (full XML flush).
@@ -1281,7 +1281,7 @@ void TransmitModel::save()
 
 // ── Per-MAC mic/VOX/MON persistence (3M-1b L.2) ─────────────────────────────
 //
-// NereusSDR-native persistence glue.  Key namespace: hardware/<mac>/tx/<key>.
+// Longpath-native persistence glue.  Key namespace: hardware/<mac>/tx/<key>.
 //
 // Three properties are intentionally excluded (per plan §0 rows 8 and 9):
 //   - voxEnabled  → always loads false  (safety: VOX always starts OFF)
@@ -1293,7 +1293,7 @@ void TransmitModel::save()
 //   persistOne() no-ops when m_persistMac is empty (before loadFromSettings).
 //
 // All boolean properties are stored as "True"/"False" per the AppSettings
-// convention (same as every other NereusSDR boolean persistence site).
+// convention (same as every other Longpath boolean persistence site).
 // Numeric properties (int, double, float) are stored as decimal strings.
 // MicSource is stored as "Pc" / "Radio" to match the enum naming.
 
@@ -1435,7 +1435,7 @@ void TransmitModel::loadFromSettings(const QString& mac)
                 QStringLiteral("True")).toString() == QLatin1String("True"));
 
     // ── Anti-VOX properties ───────────────────────────────────────────────
-    // antiVoxGainDb: default 0 (NereusSDR-original safe starting point)
+    // antiVoxGainDb: default 0 (Longpath-original safe starting point)
     const int antiVoxGainDb = s.value(pfx + QLatin1String("AntiVox_Gain"),
                                        QStringLiteral("0")).toInt();
     setAntiVoxGainDb(antiVoxGainDb);
@@ -1456,7 +1456,7 @@ void TransmitModel::loadFromSettings(const QString& mac)
     // paSettingsBypass: default false (D4: ANAN-G2E port).
     // From Thetis setup.cs:19921 [v2.10.3.15] //N1GP G2E added —
     //   chkBypassANANPASettings.Visible = true (visibility only; no default
-    //   .Checked= in Thetis v2.10.3.15, so NereusSDR defaults to false).
+    //   .Checked= in Thetis v2.10.3.15, so Longpath defaults to false).
     const bool paSettingsBypass = s.value(pfx + QLatin1String("PaSettingsBypass"),
                                            QStringLiteral("False")).toString()
                                      == QLatin1String("True");
@@ -1469,7 +1469,7 @@ void TransmitModel::loadFromSettings(const QString& mac)
     setMonitorVolume(monitorVolume);
 
     // ── Mic source ────────────────────────────────────────────────────────
-    // micSource: default Pc (NereusSDR-native; always safe and available).
+    // micSource: default Pc (Longpath-native; always safe and available).
     //
     // Lookup order (eager-borg-d64bed, 2026-05-06):
     //   1. Per-MAC key (hardware/<mac>/tx/Mic_Source) — explicit choice for
@@ -1520,7 +1520,7 @@ void TransmitModel::loadFromSettings(const QString& mac)
     // ── Two-tone test properties (3M-1c B.2) ──────────────────────────────
     // Defaults per design spec §4.4 (option C):
     //   Freq1=700, Freq2=1900 — match Thetis Designer + btnTwoToneF_defaults.
-    //   Level=-6, Power=50    — NereusSDR-original safer (Designer 0/10).
+    //   Level=-6, Power=50    — Longpath-original safer (Designer 0/10).
     //   Freq2Delay=0          — match Thetis Designer.
     //   Invert=true           — Designer chkInvertTones.Checked = true.
     //   Pulsed=false          — Designer (no Checked= line).
@@ -1663,7 +1663,7 @@ void TransmitModel::loadFromSettings(const QString& mac)
                         QStringLiteral("False")).toString() == QLatin1String("True"));
 
     // ── TX filter bandwidth (Plan 4 D1) ───────────────────────────────────
-    // Defaults 100/2900 — USB voice typical SSB (NereusSDR-original, Plan 4
+    // Defaults 100/2900 — USB voice typical SSB (Longpath-original, Plan 4
     // spec §Task 2).
     setFilterLow(s.value(pfx + QLatin1String("FilterLow"),
                           QStringLiteral("100")).toInt());
@@ -1726,7 +1726,7 @@ void TransmitModel::loadFromSettings(const QString& mac)
         s.value(pfx + QLatin1String("TuneDrivePowerOrigin"),
                 QStringLiteral("DriveSlider")).toString()));
     // m_tunePower: persisted per-MAC under FixedTunePower.
-    // Default 10 W (NereusSDR-original safer; Thetis Designer ships 0).
+    // Default 10 W (Longpath-original safer; Thetis Designer ships 0).
     setTunePower(s.value(pfx + QLatin1String("FixedTunePower"),
                           QStringLiteral("10")).toInt());
 }
@@ -1933,7 +1933,7 @@ void TransmitModel::persistToSettings(const QString& mac) const
 //
 // 3M-3a-iv post-bench refactor (Option A): setAntiVoxSourceVax(bool) and the
 // antiVoxSourceVaxChanged signal have been removed.  Thetis chkAntiVoxSource
-// (RX vs VAC at audio.cs:446-454 [v2.10.3.13]) does not map to NereusSDR's
+// (RX vs VAC at audio.cs:446-454 [v2.10.3.13]) does not map to Longpath's
 // architecture: VAX is a digital-mode app bus with no mic-feedback path, so
 // the audio output device is the only valid anti-VOX cancellation reference.
 // See commit message and DexpVoxPage info-row for the architectural rationale.
@@ -2009,7 +2009,7 @@ void TransmitModel::setAntiVoxRun(bool run)
 // From Thetis setup.cs:19921 [v2.10.3.15] //N1GP G2E added:
 //   chkBypassANANPASettings.Visible = true;  (in ANAN_G2E case)
 // Thetis has no CheckedChanged handler in v2.10.3.15 — the checkbox is
-// UI-only, its state serialised generically.  NereusSDR persists it explicitly.
+// UI-only, its state serialised generically.  Longpath persists it explicitly.
 // ─────────────────────────────────────────────────────────────────────────────
 void TransmitModel::setPaSettingsBypass(bool bypass)
 {
@@ -2026,7 +2026,7 @@ void TransmitModel::setPaSettingsBypass(bool bypass)
 //   private bool mon = false;
 // Porting from Thetis audio.cs:417 [v2.10.3.13]:
 //   cmaster.SetAAudioMixVol((void*)0, 0, WDSP.id(1, 0), 0.5);
-//   The 0.5 literal is a fixed mix coefficient that NereusSDR repurposes as
+//   The 0.5 literal is a fixed mix coefficient that Longpath repurposes as
 //   the user-volume default for monitorVolume.
 //
 // AudioEngine integration (setTxMonitorEnabled / setTxMonitorVolume) deferred
@@ -2105,7 +2105,7 @@ void TransmitModel::setVoxThresholdDb(int dB)
 
 void TransmitModel::setVoxGainScalar(float scalar)
 {
-    // NereusSDR sane guard [0.0f, 100.0f]; Thetis Audio.VOXGain has no explicit
+    // Longpath sane guard [0.0f, 100.0f]; Thetis Audio.VOXGain has no explicit
     // clamp (audio.cs:194-202 [v2.10.3.13]).  0.0f disables mic-boost scaling;
     // 100.0f is an extreme upper bound that avoids silent float overflow.
     const float clamped = std::clamp(scalar, kVoxGainScalarMin, kVoxGainScalarMax);
@@ -2407,7 +2407,7 @@ void TransmitModel::setTwoTonePulsed(bool on)
 // ── Two-tone drive-power source (3M-1c B.3) ────────────────────────────────
 //
 // Porting from Thetis console.cs:46576-46597 [v2.10.3.13] (TwoToneDrivePowerOrigin
-// property — Thetis console-side; NereusSDR puts it on TransmitModel).  Phase I
+// property — Thetis console-side; Longpath puts it on TransmitModel).  Phase I
 // (two-tone activation handler) consumes this to decide power-source behaviour
 // per setup.cs:11111-11119.  AppSettings key: "TwoToneDrivePowerOrigin".
 
@@ -2422,7 +2422,7 @@ void TransmitModel::setTwoToneDrivePowerSource(DrivePowerSource source)
 
 // ── Mic source (3M-1b I.1) ────────────────────────────────────────────────────
 //
-// NereusSDR-native property: Thetis bakes mic-source selection into audio.cs
+// Longpath-native property: Thetis bakes mic-source selection into audio.cs
 // directly rather than a strategy enum.  This property drives
 // AudioTxInputPage (Setup → Audio → TX Input) and will be consumed by
 // CompositeTxMicRouter::setActiveSource() in Phase F.3.
@@ -2497,7 +2497,7 @@ void TransmitModel::toggleVaxSource(bool on)
 
 // ── Mic source lock guard (3M-1b L.3) ────────────────────────────────────────
 //
-// NereusSDR-native.  RadioModel::connectToRadio() calls
+// Longpath-native.  RadioModel::connectToRadio() calls
 //   setMicSourceLocked(!boardCapabilities().hasMicJack)
 // after loadFromSettings() so the lock is active for the lifetime of the HL2
 // connection.  teardownConnection() calls setMicSourceLocked(false) to release
@@ -2521,7 +2521,7 @@ void TransmitModel::setMicSourceLocked(bool lock)
 
 // ── PC Mic session state (3M-1b I.2) ─────────────────────────────────────────
 //
-// NereusSDR-native transient session-state properties for the PC Mic
+// Longpath-native transient session-state properties for the PC Mic
 // configuration group (Setup → Audio → TX Input → PC Mic group box).
 //
 // All three setters are idempotent (no signal emitted on unchanged value).
@@ -2588,7 +2588,7 @@ void TransmitModel::setTxEqEnabled(bool on)
 
 void TransmitModel::setTxEqPreamp(int dB)
 {
-    // NereusSDR clamp [-12, 15] dB (Thetis EQ preamp slider precedent).
+    // Longpath clamp [-12, 15] dB (Thetis EQ preamp slider precedent).
     const int clamped = std::clamp(dB, kTxEqPreampDbMin, kTxEqPreampDbMax);
     if (clamped == m_txEqPreamp) { return; }
     m_txEqPreamp = clamped;
@@ -2945,7 +2945,7 @@ void TransmitModel::setCessbOn(bool on)
 
 // ── TX filter bandwidth (Plan 4 D1) ─────────────────────────────────────────
 //
-// NereusSDR-original properties.  FilterLow/FilterHigh are the DSP bandpass
+// Longpath-original properties.  FilterLow/FilterHigh are the DSP bandpass
 // filter edges (Hz) that will be fed to WDSP SetTXABandpassFreqs in Plan 4
 // D8.  Defaults 100/2900 match the USB voice typical SSB range — the same
 // values Thetis ships for the "Default" USB profile row in database.cs

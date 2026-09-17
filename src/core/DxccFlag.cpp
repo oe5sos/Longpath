@@ -1,12 +1,12 @@
 // =================================================================
-// src/core/DxccFlag.cpp  (NereusSDR)
+// src/core/DxccFlag.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original — see DxccFlag.h for why this is curated rather
+// Longpath-original — see DxccFlag.h for why this is curated rather
 // than derived.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
 // =================================================================

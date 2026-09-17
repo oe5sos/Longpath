@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/audio/MasterMixer.cpp  (NereusSDR)
+// src/core/audio/MasterMixer.cpp  (Longpath)
 // =================================================================
 // See MasterMixer.h for contract, and for the Thetis ChannelMaster
 // structure this follows plus the three divergences from it.
@@ -10,7 +10,7 @@
 //     (per-producer ring + readiness barrier + one summed output)
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-07-27 -- Per-slice mute / volume / pan mixer reworked from a
 //                 single shared accumulator into per-slice rings behind
 //                 a readiness barrier, so N slices produce ONE mixed
@@ -18,7 +18,7 @@
 //                 + barrier + single-summed-output STRUCTURE is Warren
 //                 Pratt's from aamix.c; the per-slice gain / pan / mute
 //                 semantics and the anti-click gain ramp are
-//                 NereusSDR-original. Three divergences from the
+//                 Longpath-original. Three divergences from the
 //                 upstream structure are argued in MasterMixer.h.
 //                 Authored by J.J. Boyd (KG4VCF), with AI-assisted
 //                 transformation via Anthropic Claude Code.

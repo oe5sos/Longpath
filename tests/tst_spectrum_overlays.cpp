@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_spectrum_overlays.cpp  (NereusSDR)
+// tests/tst_spectrum_overlays.cpp  (Longpath)
 // =================================================================
 //
 // Task 2.3 — Spectrum Defaults overlay group + decimation wire-up.
@@ -10,7 +10,7 @@
 //   Project Files/Source/Console/console.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-01 — Ported in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.

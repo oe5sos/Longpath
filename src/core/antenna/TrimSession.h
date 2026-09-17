@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/core/antenna/TrimSession.h  (NereusSDR)
+// src/core/antenna/TrimSession.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // Learning how this antenna actually behaves, from the last two
 // measurements.
@@ -50,7 +50,7 @@
 // least familiar.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-10 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

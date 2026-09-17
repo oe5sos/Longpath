@@ -1,17 +1,17 @@
 #pragma once
 
 // =================================================================
-// src/gui/widgets/RotorDialWidget.h  (NereusSDR)
+// src/gui/widgets/RotorDialWidget.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. Thetis has no rotator control. The project's
+// Longpath-original. Thetis has no rotator control. The project's
 // existing `gui/meters/RotatorItem` is a meter-container *item* that
 // draws one heading inside the MeterWidget scene graph; this is a
 // standalone two-needle instrument (target + actual) with its own
 // interaction, so it is a sibling rather than a reuse.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
 //                 Step 1 of the QRZ logbook work: display only, no

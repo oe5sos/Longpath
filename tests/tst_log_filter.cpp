@@ -4,7 +4,7 @@
 // "no results" reads as "I never worked that", not as "the filter is
 // wrong". So each rule gets pinned separately, including the ones that
 // look too obvious to test — those are the ones a later tidy-up breaks.
-// no-port-check: NereusSDR-original.
+// no-port-check: Longpath-original.
 
 #include <QtTest/QtTest>
 #include <QTimeZone>

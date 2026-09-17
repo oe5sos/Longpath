@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - POTA (Parks On The Air) HTTPS spot poller
+// Longpath - POTA (Parks On The Air) HTTPS spot poller
 //
 // Ported from AetherSDR src/core/PotaClient.h [@0cd4559].
 // AetherSDR is (C) its contributors and is licensed GPL-3.0-or-later
 // (see https://github.com/ten9876/AetherSDR/blob/main/LICENSE).
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-10  J.J. Boyd / KG4VCF  Phase 3J-2 Task B2. Initial port.
 //                                    AetherSDR's "AetherSDR" namespace
-//                                    becomes "NereusSDR". `DxSpot` include
+//                                    becomes "Longpath". `DxSpot` include
 //                                    moved to the extracted DxSpot.h
 //                                    (Phase 3J-2 Task B1) instead of
 //                                    AetherSDR's DxClusterClient.h. The
@@ -17,8 +17,8 @@
 //                                    lcSpots ("longpath.spots") instead of
 //                                    AetherSDR's lcDxCluster. The log file
 //                                    path uses Qt's AppConfigLocation
-//                                    (already lands under NereusSDR/) under
-//                                    NereusSDR/pota.log instead of
+//                                    (already lands under Longpath/) under
+//                                    Longpath/pota.log instead of
 //                                    AetherSDR's GenericConfigLocation +
 //                                    "AetherSDR/pota.log". Added public
 //                                    parseJsonForTest() seam returning the

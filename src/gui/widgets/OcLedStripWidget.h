@@ -1,7 +1,7 @@
 #pragma once
 
 // =================================================================
-// src/gui/widgets/OcLedStripWidget.h  (NereusSDR)
+// src/gui/widgets/OcLedStripWidget.h  (Longpath)
 // =================================================================
 //
 // Ported from mi0bot-Thetis source:
@@ -15,7 +15,7 @@
 // (Bits + DisplayBits properties, plus optional click-to-toggle).
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-30 — New for Phase 3L HL2 Filter visibility brainstorm.
 //                Reusable extraction of the inline LED strip from
 //                Hl2IoBoardTab status bar (Hl2IoBoardTab.cpp:321-330).

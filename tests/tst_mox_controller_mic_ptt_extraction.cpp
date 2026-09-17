@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_mox_controller_mic_ptt_extraction.cpp  (NereusSDR)
+// tests/tst_mox_controller_mic_ptt_extraction.cpp  (Longpath)
 // =================================================================
 //
 // Phase 3M-1b Task H.5: verifies end-to-end mic_ptt extraction from P1/P2
@@ -32,12 +32,12 @@
 //   Pre-code review §8.2 (vox_ptt dispatch context; mic_ptt bit-layout).
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-28 — Phase 3M-1b Task H.5 — J.J. Boyd (KG4VCF),
 //                with AI-assisted authoring via Anthropic Claude Code.
 // =================================================================
 
-// no-port-check: NereusSDR-original test file — no upstream Thetis port.
+// no-port-check: Longpath-original test file — no upstream Thetis port.
 
 #include <QtTest/QtTest>
 #include <QSignalSpy>
@@ -89,7 +89,7 @@ QByteArray makeEp6Frame(quint8 c0Sub0, quint8 c0Sub1)
 // raw[4] (ReadBufp[0]) set or cleared per the ptt argument.
 //
 // Source: Thetis network.c:531 [v2.10.3.13]: memcpy(bufp, readbuf+4, 56)
-//   → ReadBufp[0] = raw[4] in NereusSDR.
+//   → ReadBufp[0] = raw[4] in Longpath.
 // network.c:689 [v2.10.3.13]:
 //   prn->ptt_in = prn->ReadBufp[0] & 0x1;
 // ──────────────────────────────────────────────────────────────────────────
@@ -231,7 +231,7 @@ private slots:
     // Source: Thetis network.c:686-689 [v2.10.3.13]:
     //   //Byte 0 - Bit [0] - PTT  1 = active, 0 = inactive
     //   prn->ptt_in = prn->ReadBufp[0] & 0x1;
-    // ReadBufp[0] = raw[4] in NereusSDR (4-byte seq prefix, then
+    // ReadBufp[0] = raw[4] in Longpath (4-byte seq prefix, then
     // memcpy(bufp, readbuf+4, 56) per network.c:531 [v2.10.3.13]).
     // ════════════════════════════════════════════════════════════════════════
 

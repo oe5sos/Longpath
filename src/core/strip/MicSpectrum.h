@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/core/strip/MicSpectrum.h  (NereusSDR)
+// src/core/strip/MicSpectrum.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // The last two seconds of microphone, so the equaliser can be drawn
 // over the voice it is shaping.
@@ -29,7 +29,7 @@
 // would be a fault.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-08 — Created in C++20 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

@@ -1,6 +1,6 @@
-// tests/tst_flatmap_station_marker.cpp  (NereusSDR)
+// tests/tst_flatmap_station_marker.cpp  (Longpath)
 //
-// NereusSDR-original. No Thetis port.
+// Longpath-original. No Thetis port.
 //
 // ── Der eigene Standort als Bild ─────────────────────────────────────
 //

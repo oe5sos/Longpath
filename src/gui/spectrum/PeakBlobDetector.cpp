@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/spectrum/PeakBlobDetector.cpp  (NereusSDR)
+// src/gui/spectrum/PeakBlobDetector.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
@@ -13,7 +13,7 @@
 //       entry.max_dBm -= m_dBmPerSecondPeakBlobFall / (float)m_nFps;
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-01 — Created in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via
 //                 Anthropic Claude Code.
@@ -147,7 +147,7 @@ int PeakBlobDetector::isOccupied(int nX) const
 }
 
 // From Thetis Display.cs:4456-4518 [v2.10.3.13] processMaximums().
-// Verbatim port (with NereusSDR field names):
+// Verbatim port (with Longpath field names):
 //   - If a slot is occupied near nX:
 //       if dbm >= entry.max_dBm: update entry + bubble-up
 //       (else: do nothing)

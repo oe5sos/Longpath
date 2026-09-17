@@ -1,8 +1,8 @@
 // =================================================================
-// tests/tst_phone_applet_vax_toggle.cpp  (NereusSDR)
+// tests/tst_phone_applet_vax_toggle.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original test file. No Thetis port at this layer.
+// Longpath-original test file. No Thetis port at this layer.
 //
 // Verifies the PhoneCwApplet VAX button:
 //   click_setsVax              - left-click toggles MicSource to Vax
@@ -12,13 +12,13 @@
 //   nyiMark_absent             - the NyiOverlay mark removed
 // =================================================================
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-10 - Original test for NereusSDR by J.J. Boyd (KG4VCF),
 //                 with AI-assisted implementation via Anthropic Claude
 //                 Code.
 // =================================================================
 
-// no-port-check: NereusSDR-original test file.
+// no-port-check: Longpath-original test file.
 
 #include <QtTest/QtTest>
 #include <QPushButton>

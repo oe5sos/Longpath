@@ -1,5 +1,5 @@
-// NereusSDR-original test — no Thetis source ported here.
-// No upstream attribution required (NereusSDR impulse cache persistence test).
+// Longpath-original test — no Thetis source ported here.
+// No upstream attribution required (Longpath impulse cache persistence test).
 //
 // Tests for Task 4.3: Filter Impulse Cache toggle AppSettings persistence.
 //

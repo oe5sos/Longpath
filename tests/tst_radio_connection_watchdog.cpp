@@ -1,6 +1,6 @@
 // no-port-check: test fixture asserting setWatchdogEnabled() state-tracking
 // on P1RadioConnection and P2RadioConnection. No Thetis logic is ported here;
-// this file is NereusSDR-original. The API mirrors NetworkIOImports.cs:197-198
+// this file is Longpath-original. The API mirrors NetworkIOImports.cs:197-198
 // [v2.10.3.13] (DllImport SetWatchdogTimer) at the concept level only.
 //
 // Wire-format assertions (RUNSTOP byte pkt[3] bit 7) are in

@@ -1,10 +1,10 @@
 // =================================================================
-// src/core/audio/PcMicSource.h  (NereusSDR)
+// src/core/audio/PcMicSource.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original file. No Thetis logic ported here — Thetis bakes
+// Longpath-original file. No Thetis logic ported here — Thetis bakes
 // mic-source selection directly into audio.cs rather than using the
-// strategy pattern. PcMicSource is a NereusSDR-native thin shim that
+// strategy pattern. PcMicSource is a Longpath-native thin shim that
 // implements the TxMicRouter interface by dispatching to
 // AudioEngine::pullTxMic (added in Phase 3M-1b Task E.1).
 //
@@ -27,13 +27,13 @@
 // 02110-1301, USA.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-27 — Original implementation for NereusSDR by J.J. Boyd
 //                 (KG4VCF), Phase 3M-1b Task F.1, with AI-assisted
 //                 implementation via Anthropic Claude Code.
 // =================================================================
 
-// no-port-check: NereusSDR-original file; no Thetis logic ported here.
+// no-port-check: Longpath-original file; no Thetis logic ported here.
 
 #pragma once
 

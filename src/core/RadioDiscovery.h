@@ -1,14 +1,14 @@
 #pragma once
 
 // =================================================================
-// src/core/RadioDiscovery.h  (NereusSDR)
+// src/core/RadioDiscovery.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   HPSDR/clsRadioDiscovery.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -201,7 +201,7 @@ public:
 
     // Post-disconnect quiet period (2026-07-27, ANAN-G2E lockup).
     //
-    // Wire captures show NereusSDR fires a broadcast discovery burst 7-15 ms
+    // Wire captures show Longpath fires a broadcast discovery burst 7-15 ms
     // after sending run=0 (disconnect reopens the ConnectionPanel, whose ctor
     // auto-scans) and both observed G2E lockups happened inside that window,
     // while Thetis goes completely silent after its stop frame and never
@@ -323,7 +323,7 @@ private:
     // not-readable advances the quiet counter by one.
     //
     // Until 2026-09-09 a readable poll reset the counter to 0 instead
-    // (NereusSDR-original drift from the 2026-04-12 port, not a deliberate
+    // (Longpath-original drift from the 2026-04-12 port, not a deliberate
     // divergence — see docs/architecture/2026-09-09-ci-discovery-hang-
     // investigation.md for how it was found and confirmed unintentional).
     // That made a single bursty reply push the natural give-up point out by

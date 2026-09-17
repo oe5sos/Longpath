@@ -1,9 +1,9 @@
 // =================================================================
-// tests/tst_pan_display_settings_inherit.cpp  (NereusSDR)
+// tests/tst_pan_display_settings_inherit.cpp  (Longpath)
 // =================================================================
 //
-// no-port-check: NereusSDR-original. Per-pan display settings keys are a
-// NereusSDR construct (AetherSDR pattern: "DisplayGridMax" for pan 0,
+// no-port-check: Longpath-original. Per-pan display settings keys are a
+// Longpath construct (AetherSDR pattern: "DisplayGridMax" for pan 0,
 // "DisplayGridMax_1" for pan 1). Thetis has a fixed RX1/RX2 pair with
 // hand-written RX2 duplicates of some settings and no per-pan scheme to
 // port.

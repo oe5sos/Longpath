@@ -1,8 +1,8 @@
 // =================================================================
-// src/core/PttMode.h  (NereusSDR)
+// src/core/PttMode.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original file. The PTTMode enum values and their integer
+// Longpath-original file. The PTTMode enum values and their integer
 // assignments are derived from Thetis:
 //   enums.cs:346-359 [v2.10.3.13] — PTTMode enum (FIRST=-1, NONE=0,
 //   MANUAL=1, MIC=2, CW=3, X2=4, CAT=5, VOX=6, SPACE=7, TCI=8, LAST=9)
@@ -10,19 +10,19 @@
 // Upstream file has no per-member inline attribution tags in this region.
 //
 // Disambiguation: PttSource (src/core/PttSource.h) is a separate,
-// NereusSDR-native enum that tracks which UI surface triggered the most
+// Longpath-native enum that tracks which UI surface triggered the most
 // recent PTT/MOX event (Diagnostics page). PttMode is the radio-level
 // mode used by MoxController and mirrors the Thetis PTTMode state machine.
 // Both enums coexist; neither is a superset of the other.
 // =================================================================
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-25 — Original implementation for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted implementation via
 //                 Anthropic Claude Code.
 // =================================================================
 
-// no-port-check: NereusSDR-original file; Thetis-derived enum values
+// no-port-check: Longpath-original file; Thetis-derived enum values
 // cited inline below.
 
 #pragma once

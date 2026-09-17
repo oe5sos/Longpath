@@ -5,7 +5,7 @@
 // with the reason buried in a process they never asked to start. It is
 // built by a static function so it can be checked without Hamlib being
 // installed, which is also the state most CI machines are in.
-// no-port-check: NereusSDR-original. Hamlib model numbers are quoted
+// no-port-check: Longpath-original. Hamlib model numbers are quoted
 // from the Hamlib wiki and attributed in RotorModels.h.
 
 #include <QtTest/QtTest>

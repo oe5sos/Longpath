@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_eq_history.cpp  (NereusSDR)
+// tests/tst_eq_history.cpp  (Longpath)
 // =================================================================
 //
 // Undo is a promise about the past, and the ways it breaks are all
@@ -14,10 +14,10 @@
 // changed nothing is not a step, and redo is available exactly when it
 // should be.
 //
-// no-port-check: NereusSDR-original.
+// no-port-check: Longpath-original.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-11 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

@@ -1,7 +1,7 @@
 // =================================================================
-// tests/tst_connection_panel_state_pills.cpp  (NereusSDR)
+// tests/tst_connection_panel_state_pills.cpp  (Longpath)
 // =================================================================
-// NereusSDR-original — no Thetis source ported here; no attribution
+// Longpath-original — no Thetis source ported here; no attribution
 // markers required.
 // =================================================================
 

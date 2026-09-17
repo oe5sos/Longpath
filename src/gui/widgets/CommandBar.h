@@ -1,14 +1,14 @@
 #pragma once
 
 // =================================================================
-// src/gui/widgets/CommandBar.h  (NereusSDR)
+// src/gui/widgets/CommandBar.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // ── Die Kopfleiste ───────────────────────────────────────────────────
 //
-// Der größte Einzelunterschied zwischen NereusSDR und der Vorlage des
+// Der größte Einzelunterschied zwischen Longpath und der Vorlage des
 // Betreibers. Bei Zeus liegen MODE, FILTER, BAND, FAVORITES, STEP und
 // FRONT-END als beschriftete Pillengruppen quer über das Fenster; hier
 // stand bisher links eine Spalte senkrechter Knöpfe und der Rest
@@ -49,7 +49,7 @@
 // entscheiden muss.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-15 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

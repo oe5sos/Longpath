@@ -1,6 +1,6 @@
-// no-port-check: NereusSDR-original unit-test file.
+// no-port-check: Longpath-original unit-test file.
 // =================================================================
-// tests/tst_mic_profile_manager_para_eq_round_trip.cpp  (NereusSDR)
+// tests/tst_mic_profile_manager_para_eq_round_trip.cpp  (Longpath)
 // =================================================================
 //
 // Phase 3M-3a-ii follow-up Batch 6 — round-trip tests for the new

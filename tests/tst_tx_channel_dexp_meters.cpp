@@ -1,7 +1,7 @@
-// no-port-check: NereusSDR-original unit-test file. Thetis cite comments
+// no-port-check: Longpath-original unit-test file. Thetis cite comments
 // document upstream sources; no Thetis logic ported in this test file.
 // =================================================================
-// tests/tst_tx_channel_dexp_meters.cpp  (NereusSDR)
+// tests/tst_tx_channel_dexp_meters.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for TxChannel DEXP meter readers (Phase 3M-3a-iii Task 6).
@@ -39,7 +39,7 @@
 //   4. getTxMicMeterDb_callableMultipleTimes_noCrash      - 20 successive reads
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-03 - New test file for Phase 3M-3a-iii Task 6: TxChannel DEXP
 //                 meter readers (getDexpPeakSignal / getTxMicMeterDb).
 //                 J.J. Boyd (KG4VCF), with AI-assisted implementation via

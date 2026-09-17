@@ -98,7 +98,7 @@ AETHER_FILES = [
 FREEDV_CALLSIGNS = ["VK5DGR", "K6AQ", "KD0EAG", "NH6Z", "N2ADR"]
 # Distinctive freedv-gui source filenames. Same precaution as
 # AETHER_FILES: limited to bases unlikely to false-positive against
-# NereusSDR-original code. Full-tree-only and gated on a "freedv-gui"
+# Longpath-original code. Full-tree-only and gated on a "freedv-gui"
 # sibling marker (see RE_FREEDV_FILE_NEAR_MARKER).
 FREEDV_FILES = [
     "RADEReceiveStep", "RADETransmitStep", "rade_text", "FreeDVReporter",
@@ -107,7 +107,7 @@ FREEDV_FILES = [
 ]
 
 # Distinctive Thetis source filenames. Limited to bases that are unlikely
-# to false-positive against NereusSDR-original code (e.g. "Setup" alone
+# to false-positive against Longpath-original code (e.g. "Setup" alone
 # would over-trigger; "setup.cs" with the .cs extension is specific to
 # the C# upstream).
 THETIS_FILES = [
@@ -129,7 +129,7 @@ RE_SOURCE_COMMENT = re.compile(
     r"//\s*(Source|From|Ported from)\s*[:\-]?\s*.*\b(thetis|MeterManager|console\.cs|cmaster\.cs|bandwidth_monitor|IoBoardHl2)\b",
     re.IGNORECASE,
 )
-# AetherSDR tells (full-tree only). AETHER_FILE names overlap with NereusSDR's
+# AetherSDR tells (full-tree only). AETHER_FILE names overlap with Longpath's
 # own class names (`RadioModel`, `SliceModel`, `AudioEngine`, …), so the bare
 # filename match would fire on every downstream user. Require the word
 # "AetherSDR" on the same line.

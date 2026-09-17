@@ -1,7 +1,7 @@
 // =================================================================
-// tests/tst_notch_tune_frequency.cpp  (NereusSDR)
+// tests/tst_notch_tune_frequency.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure.
+// no-port-check: Longpath-original test infrastructure.
 //
 // Tunable Notch Filter, Task 1. Covers
 // docs/architecture/2026-07-28-tunable-notch-filter-design.md section 4:

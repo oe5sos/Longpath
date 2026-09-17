@@ -1,12 +1,12 @@
 // =================================================================
-// src/gui/meters/MeterWidget.cpp  (NereusSDR)
+// src/gui/meters/MeterWidget.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/MeterManager.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -396,7 +396,7 @@ void MeterWidget::reflowStackedItems()
     // so N stacked rows always fill the available space under the
     // composite band. Thetis uses a fixed 5% per row because its
     // meter containers are fixed-aspect (MeterManager.cs:21266) —
-    // NereusSDR's containers are freely resizable, so a fixed 5%
+    // Longpath's containers are freely resizable, so a fixed 5%
     // would leave an empty gap below the stack whenever the user
     // sizes the container larger than N × 5%. A 24px pixel floor
     // keeps rows readable when the container is small enough that

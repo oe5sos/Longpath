@@ -1,12 +1,12 @@
 // =================================================================
-// src/core/antenna/AntennaSweep.cpp  (NereusSDR)
+// src/core/antenna/AntennaSweep.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. See AntennaSweep.h for why resonance and the
+// Longpath-original. See AntennaSweep.h for why resonance and the
 // SWR minimum are reported separately.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-10 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

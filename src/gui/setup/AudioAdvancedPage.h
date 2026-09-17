@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/gui/setup/AudioAdvancedPage.h  (NereusSDR)
+// src/gui/setup/AudioAdvancedPage.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original Setup → Audio → Advanced page.
+// Longpath-original Setup → Audio → Advanced page.
 // No Thetis port; no attribution-registry row required.
 //
 // Sub-Phase 12 Task 12.4 (2026-04-20): Written by J.J. Boyd (KG4VCF),

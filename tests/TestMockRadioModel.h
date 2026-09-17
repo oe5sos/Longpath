@@ -1,10 +1,10 @@
-// no-port-check: NereusSDR-original test helper. Thetis cites in method
+// no-port-check: Longpath-original test helper. Thetis cites in method
 // comments below describe which Thetis handler each accessor models (for
 // reader orientation), not ported logic — all accessor bodies are trivially
-// NereusSDR-native array reads/writes with bounds checks.
+// Longpath-native array reads/writes with bounds checks.
 
-// tests/TestMockRadioModel.h  (NereusSDR)
-// NereusSDR-original test helper — no Thetis upstream port.
+// tests/TestMockRadioModel.h  (Longpath)
+// Longpath-original test helper — no Thetis upstream port.
 //
 // Minimal in-process mock for TciProtocol tests. Inherits QObject so tests
 // can pass `&mock` directly to TciProtocol (no reinterpret_cast hazard).
@@ -452,7 +452,7 @@ public:
     // From Thetis TCIServer.cs:4413-4450 [v2.10.3.13] — handleRXEnable.
     // rx_enable set: rx==0 always on; rx==1 sets RX2Enabled.
     // rx_enable query: rx==0 → !MOX; rx==1 → RX2Enabled && !MOX.
-    // NereusSDR simplification: MOX-gating deferred to Phase 17; stored directly.
+    // Longpath simplification: MOX-gating deferred to Phase 17; stored directly.
     Q_INVOKABLE void setRxEnable(int slice, bool on)
     {
         if (slice >= 0 && slice < 2) { m_rxEnable[slice] = on; }
@@ -488,7 +488,7 @@ public:
     // From Thetis TCIServer.cs:4748-4752 [v2.10.3.13] — handleTXProfiles.
     // tx_profiles_ex query (1-arg path): returns CSV list of profiles.
     // sendTXProfiles at TCIServer.cs:4721-4731 [v2.10.3.13]: comma-joined.
-    // NereusSDR stub: always returns {"Default"} (MicProfileManager integration deferred).
+    // Longpath stub: always returns {"Default"} (MicProfileManager integration deferred).
     Q_INVOKABLE QStringList txProfilesList() const
     {
         return QStringList{QStringLiteral("Default")};
@@ -556,7 +556,7 @@ public:
 
     // diglOffset -- From Thetis DIGLClickTuneOffset at console.cs:14693
     // [v2.10.3.15] (Thetis radio-global default 2210 Hz; mock default 0 to
-    // match NereusSDR SliceModel default and avoid surprising the golden).
+    // match Longpath SliceModel default and avoid surprising the golden).
     Q_INVOKABLE void setDiglOffset(int hz) { m_diglOffset = hz; }
     Q_INVOKABLE int  diglOffset() const    { return m_diglOffset; }
 

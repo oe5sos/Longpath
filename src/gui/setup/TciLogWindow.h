@@ -1,7 +1,7 @@
 #pragma once
 
 // =================================================================
-// src/gui/setup/TciLogWindow.h  (NereusSDR)
+// src/gui/setup/TciLogWindow.h  (Longpath)
 // =================================================================
 //
 // Phase 3J-1 closeout Item 2 (2026-05-12): TCI server message log
@@ -12,13 +12,13 @@
 // Source-first reads:
 //   - Thetis Setup.cs:22562-22566 [v2.10.3.13] -- btnShowLog_Click
 //     opens console.ShowTCILog().  Thetis routes through Console, so
-//     the window outlives the Setup form; NereusSDR mirrors that with
+//     the window outlives the Setup form; Longpath mirrors that with
 //     MainWindow ownership.
 //
-// NereusSDR-original Qt6 implementation: no direct C# UI port.  The
+// Longpath-original Qt6 implementation: no direct C# UI port.  The
 // widget choices (QPlainTextEdit with maximum-block trimming for fast
 // append, QCheckBox/QComboBox/QPushButton from the existing Setup-page
-// palette) are NereusSDR-native per CLAUDE.md
+// palette) are Longpath-native per CLAUDE.md
 // feedback_source_first_ui_vs_dsp.md.
 // =================================================================
 

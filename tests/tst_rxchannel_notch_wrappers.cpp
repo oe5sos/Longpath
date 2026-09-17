@@ -1,7 +1,7 @@
 // =================================================================
-// tests/tst_rxchannel_notch_wrappers.cpp  (NereusSDR)
+// tests/tst_rxchannel_notch_wrappers.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure. Thetis and WDSP
+// no-port-check: Longpath-original test infrastructure. Thetis and WDSP
 // file names appear in comments to document what each wrapper forwards to;
 // no upstream logic is ported into this file.
 //

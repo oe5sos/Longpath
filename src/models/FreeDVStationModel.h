@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 //
-// NereusSDR - FreeDVStationModel: live station map keyed by Socket.IO sid.
+// Longpath - FreeDVStationModel: live station map keyed by Socket.IO sid.
 //
 // Modeled on freedv-gui src/gui/dialogs/freedv_reporter.h::ReporterData
 // [@77e793a] (the dialog's internal stations map). Drives the standalone
@@ -20,7 +20,7 @@
 // `freedv_reporter.cpp` files have no per-file Copyright header, so the
 // project root header applies. LGPL is upgrade-compatible to GPLv2-or-later
 // when linked into a GPL work (LGPL section 3 conversion clause), which is
-// the model NereusSDR uses.
+// the model Longpath uses.
 //
 // Ported from freedv-gui src/gui/dialogs/freedv_reporter.h:367-417
 // (`ReporterData` per-station inner struct shape) and
@@ -33,7 +33,7 @@
 // Distance / heading math: derived from freedv-gui source (LGPLv2.1+,
 // copyright the freedv-gui contributors / FreeDV project).
 //
-// Modification history (NereusSDR)
+// Modification history (Longpath)
 //   2026-05-11  J.J. Boyd / KG4VCF  Phase 3J-2 Task D3. Initial create.
 //                                    NEW model with no AetherSDR
 //                                    equivalent. Holds QHash<QString sid,

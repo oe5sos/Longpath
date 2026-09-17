@@ -2,7 +2,7 @@
 // cty.dat positive-west longitude convention is flipped to positive
 // east on read, and that gridSquareFromLatLon round-trips.
 // no-port-check: CtyDatParser ported from AetherSDR (attributed in the
-// file); the lat/lon capture and the grid encoder are NereusSDR
+// file); the lat/lon capture and the grid encoder are Longpath
 // additions.
 
 #include <QtTest/QtTest>

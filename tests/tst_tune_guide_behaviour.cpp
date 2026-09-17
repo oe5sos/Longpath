@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_tune_guide_behaviour.cpp  (NereusSDR)
+// tests/tst_tune_guide_behaviour.cpp  (Longpath)
 // =================================================================
 //
 // Die Abstimmhilfe unter echter Maus.
@@ -15,12 +15,12 @@
 // pruefen zusaetzlich, ob man die Linie SIEHT — und das kann kein Test.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-19 — Original fuer NereusSDR von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
 // =================================================================
 
-// no-port-check: NereusSDR-original test file.
+// no-port-check: Longpath-original test file.
 
 #include <QtTest>
 #include <QMouseEvent>

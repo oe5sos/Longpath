@@ -1,8 +1,8 @@
-// no-port-check: NereusSDR-original unit-test file.  The Thetis references
+// no-port-check: Longpath-original unit-test file.  The Thetis references
 // below are cite comments documenting which upstream lines each assertion
 // verifies; no Thetis logic is ported in this test file.
 // =================================================================
-// tests/tst_transmit_model_dexp.cpp  (NereusSDR)
+// tests/tst_transmit_model_dexp.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for TransmitModel DEXP properties (11 total, Phase 3M-3a-iii

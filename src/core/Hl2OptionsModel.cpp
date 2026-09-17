@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/Hl2OptionsModel.cpp  (NereusSDR)
+// src/core/Hl2OptionsModel.cpp  (Longpath)
 // =================================================================
 //
 // Ported from mi0bot-Thetis source:
@@ -10,7 +10,7 @@
 // See Hl2OptionsModel.h for the full design + scope rationale.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-30 — New for Phase 3L HL2 Filter visibility brainstorm.
 //                J.J. Boyd (KG4VCF), with AI-assisted transformation
 //                via Anthropic Claude Code.

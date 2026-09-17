@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_nr_backends_process_audio.cpp  (NereusSDR)
+// tests/tst_nr_backends_process_audio.cpp  (Longpath)
 // =================================================================
 //
 // Jede Rauschminderung im NR-Menue laeuft hier wirklich mit Audio
@@ -29,12 +29,12 @@
 // seit demselben Tag nur noch im Menue, wenn der Bau sie hat.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-09-17 — Original fuer NereusSDR von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
 // =================================================================
 
-// no-port-check: NereusSDR-original test file.
+// no-port-check: Longpath-original test file.
 
 #include <QtTest/QtTest>
 #include <QDir>

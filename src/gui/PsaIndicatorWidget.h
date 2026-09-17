@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/PsaIndicatorWidget.h  (NereusSDR)
+// src/gui/PsaIndicatorWidget.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -11,7 +11,7 @@
 // original licences from Thetis source are included below.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-06 — Phase 3M-4 Task 10: created by J.J. Boyd (KG4VCF),
 //                 with AI-assisted transformation via Anthropic Claude
 //                 Code.  Source-first 1:1 port of the Thetis bottom-
@@ -245,7 +245,7 @@ private:
 
     // State (mirrors ucInfoBar.cs members from lines 802-806 + 1186
     // [v2.10.3.13]).  Phase 3M-4 bench-fix Round 2 dropped the
-    // NereusSDR-only `m_correcting` field — Thetis ucInfoBar has only
+    // Longpath-only `m_correcting` field — Thetis ucInfoBar has only
     // 5 PS state fields and the Lime/SeaGreen split is decided purely
     // by `_bCorrectionsBeingApplied` (ucInfoBar.cs:856-865 [v2.10.3.13]).
     // The FB-label background colour is recomputed locally from

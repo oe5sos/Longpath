@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/HardwareProfile.cpp  (NereusSDR)
+// src/core/HardwareProfile.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -12,7 +12,7 @@
 //   Laurence Barker (G8NJJ) — ANAN-G2 / Saturn capability note (preserved
 //     via inline marker on HPSDRModel::ANAN_G2_1K branch in profileForModel)
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.

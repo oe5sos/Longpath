@@ -1,5 +1,5 @@
 // =================================================================
-// src/models/SliceModel.cpp  (NereusSDR)
+// src/models/SliceModel.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -7,7 +7,7 @@
 //   Project Files/Source/Console/display.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -228,7 +228,7 @@ void SliceModel::setDspMode(DSPMode mode)
 
     // ── Phase 3R J3 + K-bench: RADE channel-additive lifecycle ────────────
     //
-    // RADE_U / RADE_L are NereusSDR-native DSPModes (J1).  Original J3
+    // RADE_U / RADE_L are Longpath-native DSPModes (J1).  Original J3
     // design destroyed the WDSP RxChannel and replaced it with a
     // RadeChannel on entry into RADE.  K-bench reframed the RX pipeline
     // (RxDspWorker.cpp:160-191) so RADE is now ADDITIVE rather than
@@ -926,7 +926,7 @@ void SliceModel::setRfGain(int gain)
     // console.designer.cs:3708-3709 [v2.10.3.15]: ptbRF.Minimum = -20,
     // ptbRF.Maximum = 120 -- the same bounds TCIServer.cs handleAgcGain
     // clamps to and RxChannel::readBackAgcTop already applies. The earlier
-    // 0..100 here was a NereusSDR-original guess that silently narrowed
+    // 0..100 here was a Longpath-original guess that silently narrowed
     // both the TCI agc_gain path and the AGC-threshold readback mirror.
     gain = std::clamp(gain, -20, 120);
     if (m_rfGain != gain) {
@@ -1818,7 +1818,7 @@ void SliceModel::setSnbK2(double v)
 }
 
 // No Thetis Setup control for this one: Thetis picks SNB output bandwidth per
-// mode at rxa.cs:112-124. The range is NereusSDR's own native override,
+// mode at rxa.cs:112-124. The range is Longpath's own native override,
 // unchanged from the slider it replaces.
 void SliceModel::setSnbOutputBandwidthHz(int v)
 {
@@ -1942,7 +1942,7 @@ std::pair<int, int> SliceModel::defaultFilterForMode(DSPMode mode)
     // Phase 3J-1 closeout Item 6 (2026-05-12): read CW pitch from
     // AppSettings instead of hardcoding 600.  Operator-configurable in
     // Thetis (Setup → Keyboard / DSP → CW pitch slider; default 600 Hz);
-    // the dedicated NereusSDR setter lands with Phase 3M-2 CW TX, but the
+    // the dedicated Longpath setter lands with Phase 3M-2 CW TX, but the
     // read path needs to be in place now so the filter center moves with
     // the setting once that UI ships.  Range matches Thetis udCWPitch
     // (Setup.designer.cs CW pitch up-down: 100..2000 Hz).
@@ -2209,7 +2209,7 @@ QString SliceModel::modeName(DSPMode mode)
     case DSPMode::DIGL: return QStringLiteral("DIGL");
     case DSPMode::SAM:  return QStringLiteral("SAM");
     case DSPMode::DRM:  return QStringLiteral("DRM");
-    // Phase 3R Task J1.  NereusSDR-native; not WDSP modes.  Split
+    // Phase 3R Task J1.  Longpath-native; not WDSP modes.  Split
     // into upper/lower sidebands like USB/LSB.
     case DSPMode::RADE_U: return QStringLiteral("RADE-U");
     case DSPMode::RADE_L: return QStringLiteral("RADE-L");
@@ -2231,7 +2231,7 @@ DSPMode SliceModel::modeFromName(const QString& name)
     if (name == QLatin1String("DIGL")) return DSPMode::DIGL;
     if (name == QLatin1String("SAM"))  return DSPMode::SAM;
     if (name == QLatin1String("DRM"))  return DSPMode::DRM;
-    // Phase 3R Task J1.  NereusSDR-native; not WDSP modes.
+    // Phase 3R Task J1.  Longpath-native; not WDSP modes.
     if (name == QLatin1String("RADE-U")) return DSPMode::RADE_U;
     if (name == QLatin1String("RADE-L")) return DSPMode::RADE_L;
     // Legacy migration: pre-fix builds persisted the singular "RADE"
@@ -2344,12 +2344,12 @@ void SliceModel::saveToSettings(Band band)
 
     // Phase 3F: per-slice DDC sample rate, persisted per-band so each band
     // can independently remember its preferred rate (e.g. 192 kHz on 40m,
-    // 1536 kHz on 10m for a wider pan). NereusSDR-original (no Thetis cite).
+    // 1536 kHz on 10m for a wider pan). Longpath-original (no Thetis cite).
     s.setValue(bp + QStringLiteral("SampleRate"), m_sampleRateHz);
 
     // Phase 3F Sub-Epic G Task 2: per-band diversity tuning. The 8-memory
     // slots (T3) + direction-finding fields (T11) join this block when they
-    // ship. NereusSDR-original schema (Thetis persists diversity globally
+    // ship. Longpath-original schema (Thetis persists diversity globally
     // in DSP.console.dsp / Diversity.cs; we scope per-band per-slice so
     // operators can keep distinct DF setups across bands).
     s.setValue(bp + QStringLiteral("DiversityPhaseDeg"), m_diversityPhaseDeg);
@@ -2949,7 +2949,7 @@ void SliceModel::setVaxChannel(int ch)
     emit vaxChannelChanged(ch);
 }
 
-// ── Phase 3J-2 Task D5: per-slice live SNR (NereusSDR-native) ──
+// ── Phase 3J-2 Task D5: per-slice live SNR (Longpath-native) ──
 //
 // Emits snrDbChanged only on actual value change:
 //   NaN    -> NaN              : no emission (signal stays absent)

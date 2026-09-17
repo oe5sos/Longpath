@@ -1,4 +1,4 @@
-// tests/tst_pa_gain_by_band_page_editor.cpp  (NereusSDR)
+// tests/tst_pa_gain_by_band_page_editor.cpp  (Longpath)
 //
 // Phase 6 of issue #167 PA-cal safety hotfix.
 // no-port-check: test fixture — no Thetis attribution required.
@@ -11,7 +11,7 @@
 //   - profile combo (comboPAProfile)
 //   - 4 lifecycle buttons (New / Copy / Delete / Reset Defaults)
 //   - 14-band gain spinbox grid (nud160M..nudVHF13)
-//   - 14x9 drive-step adjust spinbox matrix (panelAdjustGain — NereusSDR
+//   - 14x9 drive-step adjust spinbox matrix (panelAdjustGain — Longpath
 //     densification: Thetis ships only the row for the selected band)
 //   - per-band max-power column (nudMaxPowerForBandPA + chkUsePowerOnDrvTunPA)
 //   - warning icon + label (pbPAProfileWarning + lblPAProfileWarning)
@@ -529,7 +529,7 @@ void TstPaGainByBandPageEditor::warning_label_visible_when_profile_diverges()
 //     hard-clamps every nud<Band>M / nudVHF<n> spinbox at minimum 38.8 dB
 //     and maximum 100.0 dB (setup.designer.cs:48537-48546 [v2.10.3.13] for
 //     nudVHF1, with 24 sibling sites configured identically). The
-//     pre-#199 NereusSDR port used minimum 0.0, which let users enter
+//     pre-#199 Longpath port used minimum 0.0, which let users enter
 //     values where computeAudioVolume saturates the drive byte at 1.0 with
 //     no further effect on RF power output (funsutton field report:
 //     ANAN-10E 80m, value 30.8 produced same RF as 38.8).

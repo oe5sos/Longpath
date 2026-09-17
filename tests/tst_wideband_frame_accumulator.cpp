@@ -1,7 +1,7 @@
 // =================================================================
-// tests/tst_wideband_frame_accumulator.cpp  (NereusSDR)
+// tests/tst_wideband_frame_accumulator.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure.
+// no-port-check: Longpath-original test infrastructure.
 //
 // Phase 3F Sub-Epic F Task 2: WidebandFrameAccumulator assembles
 // 32-packet wideband ADC frames (32 x 512 = 16384 floats) and

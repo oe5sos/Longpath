@@ -1,4 +1,4 @@
-// no-port-check: NereusSDR-original struct; the doc comment below names Thetis
+// no-port-check: Longpath-original struct; the doc comment below names Thetis
 // source files only to explain the default-value provenance, not to port code.
 #pragma once
 

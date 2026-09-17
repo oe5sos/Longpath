@@ -1,8 +1,8 @@
 // =================================================================
-// tests/tst_mox_controller_ptt_source_dispatch.cpp  (NereusSDR)
+// tests/tst_mox_controller_ptt_source_dispatch.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original test. No Thetis logic is ported in this test
+// Longpath-original test. No Thetis logic is ported in this test
 // file. The test exercises:
 //   - MoxController::onMicPttFromRadio(bool)  — H.4 Phase 3M-1b
 //   - MoxController::onCatPtt(bool)           — H.4 Phase 3M-1b
@@ -36,7 +36,7 @@
 //     the precedent in tst_mox_controller_anti_vox.cpp §C.2 (H.3).
 // =================================================================
 
-// no-port-check: NereusSDR-original test file — no upstream Thetis port.
+// no-port-check: Longpath-original test file — no upstream Thetis port.
 
 #include <QtTest/QtTest>
 #include <QSignalSpy>

@@ -1,12 +1,12 @@
 // =================================================================
-// src/core/antenna/TrimSession.cpp  (NereusSDR)
+// src/core/antenna/TrimSession.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. See TrimSession.h for why the textbook exponent
+// Longpath-original. See TrimSession.h for why the textbook exponent
 // is not good enough and when this refuses to replace it.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-10 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

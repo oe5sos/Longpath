@@ -1,7 +1,7 @@
-// no-port-check: NereusSDR-original test file.  All Thetis source cites
+// no-port-check: Longpath-original test file.  All Thetis source cites
 // for the underlying TransmitModel properties live in TransmitModel.h.
 // =================================================================
-// tests/tst_tx_applet_lev_eq_cfc.cpp  (NereusSDR)
+// tests/tst_tx_applet_lev_eq_cfc.cpp  (Longpath)
 // =================================================================
 //
 // Phase 3M-3a-i Batch 2 (Task F) — TxApplet LEV / EQ / PROC quick toggles.

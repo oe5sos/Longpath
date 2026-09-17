@@ -19,7 +19,7 @@
  */
 
 // =================================================================
-// src/core/codec/P2CodecOrionMkII.h  (NereusSDR)
+// src/core/codec/P2CodecOrionMkII.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources (multi-source) [v2.10.3.13]:
@@ -30,7 +30,7 @@
 //     8211-8295, Hermes-class 8378-8449, HermesII-class 8451-8521)
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-20 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                (KG4VCF), with AI-assisted transformation via Anthropic
 //                Claude Code. Lifted from P2RadioConnection inline compose

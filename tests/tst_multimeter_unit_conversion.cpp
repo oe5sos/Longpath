@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_multimeter_unit_conversion.cpp  (NereusSDR)
+// tests/tst_multimeter_unit_conversion.cpp  (Longpath)
 // no-port-check: task 3.2 test file; references Thetis only for formula verification
 // =================================================================
 //
@@ -13,7 +13,7 @@
 //   SignalTextItem::setUnitMode() sync — verifies Units enum stays in
 //   lockstep with the broadcast MeterUnit.
 //
-// Independently implemented from NereusSDR-native unit-conversion helpers.
+// Independently implemented from Longpath-native unit-conversion helpers.
 // S-meter reference: IARU R1/R2/R3 Technical Recommendation T.001,
 //   S9 = -73 dBm at HF, 6 dB per S unit.
 // µV reference: 50 Ω terminated input; formula verified against Thetis
@@ -22,7 +22,7 @@
 // Uses QTEST_APPLESS_MAIN (no QApplication, WDSP-free, pure data logic).
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-01 — Created in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.

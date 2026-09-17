@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_audio_engine_vax_tee.cpp  (NereusSDR)
+// tests/tst_audio_engine_vax_tee.cpp  (Longpath)
 // =================================================================
 //
 // Exercises AudioEngine's RX → VAX bus tee logic — Phase 3O Sub-Phase 8.5.

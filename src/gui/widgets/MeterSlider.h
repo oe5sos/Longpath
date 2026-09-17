@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/widgets/MeterSlider.h  (NereusSDR)
+// src/gui/widgets/MeterSlider.h  (Longpath)
 // =================================================================
 //
 // Ported from AetherSDR source:
@@ -7,15 +7,15 @@
 //
 // AetherSDR is licensed under the GNU General Public License v3; see
 // https://github.com/ten9876/AetherSDR for the contributor list and
-// project-level LICENSE. NereusSDR is also GPLv3. AetherSDR source
+// project-level LICENSE. Longpath is also GPLv3. AetherSDR source
 // files carry no per-file GPL header; attribution is at project level
 // per AetherSDR convention.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-19 — Ported/adapted in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via
-//                 Anthropic Claude Code. Rewrapped in the NereusSDR
+//                 Anthropic Claude Code. Rewrapped in the Longpath
 //                 namespace; logic/visuals preserved verbatim from the
 //                 AetherSDR source. Dependency of VaxApplet (Phase 3O
 //                 Sub-Phase 9, Task 9.2).

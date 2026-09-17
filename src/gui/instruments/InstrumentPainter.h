@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/gui/instruments/InstrumentPainter.h  (NereusSDR)
+// src/gui/instruments/InstrumentPainter.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // ── Die drei Mittel, an einer Stelle ─────────────────────────────────
 //
@@ -29,7 +29,7 @@
 // .cpp, mit der Zeile, aus der sie kommen.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-17 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

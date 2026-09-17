@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - Park Info dialog (implementation). See ParkInfoDialog.h.
+// Longpath - Park Info dialog (implementation). See ParkInfoDialog.h.
 //
-// NereusSDR-native, no upstream equivalent.
+// Longpath-native, no upstream equivalent.
 
 #include "ParkInfoDialog.h"
 

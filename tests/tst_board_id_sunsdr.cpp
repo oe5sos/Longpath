@@ -1,23 +1,23 @@
-// no-port-check: NereusSDR/Longpath-original test file.
+// no-port-check: Longpath/Longpath-original test file.
 
 // =================================================================
-// tests/tst_board_id_sunsdr.cpp  (NereusSDR/Longpath)
+// tests/tst_board_id_sunsdr.cpp  (Longpath)
 // =================================================================
 //
 // Plan doc task A.2: docs/architecture/2026-08-26-sunsdr-connection-plan.md
 // §2 Phase A — "new id is distinct, doesn't collide with reserved slots".
-// HpsdrModel.h:141 documents 14..19 as reserved for future NereusSDR-
+// HpsdrModel.h:141 documents 14..19 as reserved for future Longpath-
 // original SKU slots and HermesC10=20 was deliberately relocated off of
 // 20 on 2026-05-21 to keep clear of the Thetis wire range (0-11) — see
 // that file's own comments. SunSdr2Qrp=13 sits below the reserved gap by
-// design (it was the next free NereusSDR-original slot after
+// design (it was the next free Longpath-original slot after
 // HermesLiteRxOnly=12, not inside 14..19). This file pins that fact so a
 // future SKU addition into 14..19 can't silently collide with it, and
 // confirms the value also reaches BoardCapsTable::forBoard() correctly
 // rather than falling through to the kUnknown fallback row.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-26 — Original for NereusSDR/Longpath by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

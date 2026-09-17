@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/applets/DvkApplet.cpp  (NereusSDR)
+// src/gui/applets/DvkApplet.cpp  (Longpath)
 // =================================================================
 //
 // Source attribution (AetherSDR — GPLv3):
@@ -10,16 +10,16 @@
 //
 //   This file is a port or structural derivative of AetherSDR source.
 //   AetherSDR is licensed under the GNU General Public License v3.
-//   NereusSDR is also GPLv3. Attribution follows GPLv3 §5 requirements.
+//   Longpath is also GPLv3. Attribution follows GPLv3 §5 requirements.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-18 — Ported/adapted in C++20/Qt6 for NereusSDR by
 //                 J.J. Boyd (KG4VCF), with AI-assisted transformation
 //                 via Anthropic Claude Code.
 //                 Port of AetherSDR `src/gui/DvkPanel.{h,cpp}` (DVK F-key
 //                 slot grid + record/play controls). Renamed to
-//                 DvkApplet in NereusSDR. All controls NYI.
+//                 DvkApplet in Longpath. All controls NYI.
 // =================================================================
 
 #include "DvkApplet.h"

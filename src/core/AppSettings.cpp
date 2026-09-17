@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/AppSettings.cpp  (NereusSDR)
+// src/core/AppSettings.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -7,7 +7,7 @@
 //   AetherSDR src/core/AppSettings.{h,cpp} — AetherSDR has no per-file headers; project-level GPLv3 and contributor list per About dialog per https://github.com/ten9876/AetherSDR
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-18 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -1336,7 +1336,7 @@ void AppSettings::ensureSettingsAtVersion(int currentVersion)
     // Thetis's Display → DSP Options page exposes separate RX and TX combos
     // for buffer size and filter size on every mode that has TX (Phone, FM,
     // Digital — CW TX is firmware-handled per Thetis console.cs:38891-38897
-    // [v2.10.3.13]).  NereusSDR collapsed those into single <Mode> keys
+    // [v2.10.3.13]).  Longpath collapsed those into single <Mode> keys
     // shared between RX and TX channels.  This migration splits them back:
     //
     //   DspOptionsBufferSize<Mode>   → <Mode>Rx + <Mode>Tx (preserved value)

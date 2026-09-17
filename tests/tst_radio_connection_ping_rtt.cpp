@@ -1,5 +1,5 @@
 // no-port-check: test-only — exercises RadioConnection::pingRttMeasured signal.
-// No Thetis logic is ported here; NereusSDR-original.
+// No Thetis logic is ported here; Longpath-original.
 #include <QtTest/QtTest>
 #include <QSignalSpy>
 #include "core/RadioConnection.h"

@@ -1,11 +1,11 @@
 // =================================================================
-// src/gui/widgets/BandwidthFilterPane.cpp  (NereusSDR)
+// src/gui/widgets/BandwidthFilterPane.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. Begruendung steht im Header.
+// Longpath-original. Begruendung steht im Header.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-20 — Original fuer NereusSDR von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
 // =================================================================

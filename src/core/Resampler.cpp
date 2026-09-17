@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // =================================================================
-// src/core/Resampler.cpp  (NereusSDR)
+// src/core/Resampler.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR - Resampler implementation. Wraps r8b::CDSPResampler24
+// Longpath - Resampler implementation. Wraps r8b::CDSPResampler24
 // for float32 <-> double conversion with optional stereo<->mono
 // convenience helpers.
 //
@@ -13,7 +13,7 @@
 // License (upstream): see Resampler.h for the full attribution block.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-11  J.J. Boyd / KG4VCF  Phase 3R Task I2a. Full port of
 //                 AetherSDR src/core/Resampler.cpp [@0cd4559].
 //                 Namespace renamed AetherSDR -> NereusSDR; the
@@ -66,7 +66,7 @@ QByteArray Resampler::process(const float* in, int numSamples)
     return result;
 }
 
-// NereusSDR-original: non-allocating variant of process() for use inside
+// Longpath-original: non-allocating variant of process() for use inside
 // real-time audio callbacks (e.g. PortAudioBus paCallback).  Same math
 // as process() but writes into a caller-provided float buffer instead
 // of returning a QByteArray.  See Resampler.h for the rationale.

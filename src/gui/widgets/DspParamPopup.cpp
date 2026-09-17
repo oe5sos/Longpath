@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/widgets/DspParamPopup.cpp  (NereusSDR)
+// src/gui/widgets/DspParamPopup.cpp  (Longpath)
 // =================================================================
 //
 // Ported from AetherSDR src/gui/DspParamPopup.cpp @ 0cd4559.
@@ -7,9 +7,9 @@
 // (GPLv3 per https://github.com/ten9876/AetherSDR).
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-23 — Imported from AetherSDR. Namespace changed from
-//                AetherSDR to NereusSDR; otherwise byte-for-byte.
+//                AetherSDR to Longpath; otherwise byte-for-byte.
 //                Authored by J.J. Boyd (KG4VCF) with AI-assisted
 //                review via Anthropic Claude Code.
 // =================================================================

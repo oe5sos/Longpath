@@ -1,14 +1,14 @@
 #pragma once
 
 // =================================================================
-// src/core/mmio/MmioEndpoint.h  (NereusSDR)
+// src/core/mmio/MmioEndpoint.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/MeterManager.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -71,7 +71,7 @@ class ITransportWorker;
 // subsystem; variables are discovered by parsing incoming payloads,
 // not pre-configured.
 //
-// Matches Thetis's `clsMMIO` from MeterManager.cs but NereusSDR uses
+// Matches Thetis's `clsMMIO` from MeterManager.cs but Longpath uses
 // a QHash + QReadWriteLock instead of Thetis's ConcurrentDictionary.
 // Reads are read-locked (MeterPoller hot path); writes are
 // write-locked (called from the worker thread on every parsed batch).
@@ -80,7 +80,7 @@ class MmioEndpoint : public QObject {
 
 public:
     // Transport kind. Thetis splits TCP into listener (accepts
-    // inbound) and client (dials outbound) — NereusSDR follows suit.
+    // inbound) and client (dials outbound) — Longpath follows suit.
     enum class Transport {
         UdpListener = 0,
         TcpListener = 1,

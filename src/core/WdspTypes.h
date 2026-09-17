@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/WdspTypes.h  (NereusSDR)
+// src/core/WdspTypes.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -8,7 +8,7 @@
 //   Project Files/Source/Console/console.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -156,7 +156,7 @@ namespace Longpath {
 // Demodulation mode. Values match WDSP's internal mode enum.
 // From Thetis dsp.cs DSPMode
 //
-// NereusSDR-native extension: RADE_U = 12 and RADE_L = 13 are NOT WDSP
+// Longpath-native extension: RADE_U = 12 and RADE_L = 13 are NOT WDSP
 // modes.  WDSP has no knowledge of RADE; the values signal that the
 // slice's signal chain runs through the RADE neural codec (RadeChannel
 // from Phase 3R I1-I3) instead of WDSP's RxChannel.  Phase 3R Task J3
@@ -178,7 +178,7 @@ enum class DSPMode : int {
     DIGL = 9,
     SAM  = 10,
     DRM  = 11,
-    // Phase 3R Task J1.  NereusSDR-native extension; not WDSP modes.
+    // Phase 3R Task J1.  Longpath-native extension; not WDSP modes.
     // RADE_U / RADE_L are sideband variants of the FreeDV RADE neural
     // codec; split from a single "RADE" value after bench testing
     // revealed the codec needs upper/lower variants like USB/LSB.
@@ -251,7 +251,7 @@ enum class NbMode : int { Off = 0, NB = 1, NB2 = 2 };
 
 // From Thetis console.cs:43297-43450 [v2.10.3.13] — SelectNR() enforces
 // at-most-one-NR-per-channel by setting all 4 RXANR*Run flags atomically.
-// NereusSDR extends the set with 3 post-WDSP external filters (DFNR/BNR/MNR)
+// Longpath extends the set with 3 post-WDSP external filters (DFNR/BNR/MNR)
 // that don't exist in Thetis.
 enum class NrSlot : int {
     Off  = 0,

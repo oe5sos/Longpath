@@ -1,7 +1,7 @@
 // =================================================================
-// tests/tst_alex_per_adc_bpf_wire.cpp  (NereusSDR)
+// tests/tst_alex_per_adc_bpf_wire.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure. Expected wire
+// no-port-check: Longpath-original test infrastructure. Expected wire
 // values are cited to Thetis in comments, but nothing here is a port.
 //
 // Phase 3F: the per-ADC BPF decision must (a) be fed from the live slice

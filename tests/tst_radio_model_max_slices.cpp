@@ -1,7 +1,7 @@
 // =================================================================
-// tests/tst_radio_model_max_slices.cpp  (NereusSDR)
+// tests/tst_radio_model_max_slices.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure.
+// no-port-check: Longpath-original test infrastructure.
 //
 // Phase 3F Sub-Epic A Task 11: verify RadioModel::maxSlices() exposes
 // the connected SKU's slice cap. Disconnected returns 1 (single-slice fallback).

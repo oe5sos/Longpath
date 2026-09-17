@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/MemoryPressure.h  (NereusSDR-native)
+// src/core/MemoryPressure.h  (Longpath-native)
 // =================================================================
 // 2026-05-26  J.J. Boyd (KG4VCF), AI-assisted via Anthropic Claude.
 //

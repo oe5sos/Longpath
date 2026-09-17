@@ -1,8 +1,8 @@
-// tests/tst_virtual_cable_detector.cpp (NereusSDR)
+// tests/tst_virtual_cable_detector.cpp  (Longpath)
 // Unit tests for VirtualCableDetector: matchProduct() product-regex hook
 // (Sub-Phase 7), plus filterThirdParty / fingerprintCsv / diffNewCables
 // helpers used by the MainWindow first-run hook (Sub-Phase 11 Task 11b).
-// NereusSDR-original; no Thetis/AetherSDR port.
+// Longpath-original; no Thetis/AetherSDR port.
 #include <QtTest/QtTest>
 #include "core/audio/VirtualCableDetector.h"
 

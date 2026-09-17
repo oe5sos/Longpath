@@ -1,7 +1,7 @@
 // =================================================================
-// tests/tst_p2_ddc_mask_ownership.cpp  (NereusSDR)
+// tests/tst_p2_ddc_mask_ownership.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure. Thetis file
+// no-port-check: Longpath-original test infrastructure. Thetis file
 //   names appear only inside source-cite comments documenting which
 //   upstream line each assertion pins. No Thetis logic is ported here.
 //

@@ -6,7 +6,7 @@
 // They are test fixtures, not ported callsigns. See B2 (commit
 // f43582e) for precedent.
 //
-// NereusSDR - DxClusterClient telnet parser tests
+// Longpath - DxClusterClient telnet parser tests
 //
 // Phase 3J-2 Task B3. Pins the contract that DxClusterClient parses
 // the standard DX cluster "DX de" telnet format, detects multi-flavor

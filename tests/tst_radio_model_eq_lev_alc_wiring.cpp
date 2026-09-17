@@ -1,7 +1,7 @@
-// no-port-check: NereusSDR-original unit-test file.  All Thetis source cites
+// no-port-check: Longpath-original unit-test file.  All Thetis source cites
 // are in TransmitModel.h/cpp / RadioModel.cpp.
 // =================================================================
-// tests/tst_radio_model_eq_lev_alc_wiring.cpp  (NereusSDR)
+// tests/tst_radio_model_eq_lev_alc_wiring.cpp  (Longpath)
 // =================================================================
 //
 // Phase 3M-3a-i Batch 2 — Task 1 wiring tests.

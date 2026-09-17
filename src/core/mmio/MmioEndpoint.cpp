@@ -1,12 +1,12 @@
 // =================================================================
-// src/core/mmio/MmioEndpoint.cpp  (NereusSDR)
+// src/core/mmio/MmioEndpoint.cpp  (Longpath)
 // =================================================================
 //
 // Independently implemented from MmioEndpoint.h interface.
 // The .h declares the Thetis-derived clsMMIO payload-format enum
 // (cited per MeterManager.cs in PROVENANCE). This .cpp is pure Qt
 // QObject lifecycle scaffolding around that enum — no MeterManager
-// logic, no Samphire-authored algorithm. Original NereusSDR work
+// logic, no Samphire-authored algorithm. Original Longpath work
 // licensed under GPLv3.
 // =================================================================
 

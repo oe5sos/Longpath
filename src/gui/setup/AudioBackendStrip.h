@@ -1,12 +1,12 @@
 #pragma once
 
 // =================================================================
-// src/gui/setup/AudioBackendStrip.h  (NereusSDR)
+// src/gui/setup/AudioBackendStrip.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original diagnostic strip widget shown at the top of
+// Longpath-original diagnostic strip widget shown at the top of
 // each Setup → Audio sub-page. No Thetis port, no attribution
-// headers required (Qt widgets in Setup pages are NereusSDR-native).
+// headers required (Qt widgets in Setup pages are Longpath-native).
 //
 // Task 17 (ubuntu-dev, 2026-04-24): Standalone widget displaying
 // the detected Linux audio backend name (PipeWire / Pactl / None),
@@ -29,7 +29,7 @@
 //  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 //  GNU General Public License for more details.
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-24 — Written by J.J. Boyd (KG4VCF), with AI-assisted
 //                transformation via Anthropic Claude Code.
 // =================================================================

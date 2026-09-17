@@ -1,7 +1,7 @@
 // =================================================================
-// tests/tst_stream_pool_binding.cpp  (NereusSDR)
+// tests/tst_stream_pool_binding.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure.
+// no-port-check: Longpath-original test infrastructure.
 //
 // Phase 3F Sub-Epic I Tasks 5-6: stream pool + slice binding.
 // Phase 3F Sub-Epic I Task 7b: per-stream DDC assignment + routing.

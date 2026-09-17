@@ -1,12 +1,12 @@
 // =================================================================
-// src/gui/diagnostics/DiagnosticsPhaseHPages.cpp  (NereusSDR)
+// src/gui/diagnostics/DiagnosticsPhaseHPages.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. Implementation for the four sibling Diagnostics
+// Longpath-original. Implementation for the four sibling Diagnostics
 // sub-tabs added in Phase 3P-H. See header for scope.
 // =================================================================
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-20 — Original implementation for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted implementation via
 //                 Anthropic Claude Code.

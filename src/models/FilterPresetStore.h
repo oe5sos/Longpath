@@ -1,17 +1,17 @@
-// no-port-check: NereusSDR-original file; Thetis console.cs references are
+// no-port-check: Longpath-original file; Thetis console.cs references are
 //   doc comments only — actual default values are delegated to
 //   SliceModel::presetsForMode which already carries full attribution.
 // =================================================================
-// src/models/FilterPresetStore.h  (NereusSDR)
+// src/models/FilterPresetStore.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original file. Filter preset defaults are delegated to
+// Longpath-original file. Filter preset defaults are delegated to
 // SliceModel::presetsForMode (ported from Thetis console.cs:5180-5575
 // [v2.10.3.13] — InitFilterPresets). This class adds a user-override
 // layer + AppSettings persistence on top.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-02 — Original implementation for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted authoring via Anthropic
 //                 Claude Code (Stage C2 filter preset editor).

@@ -1,7 +1,7 @@
 // =================================================================
-// tests/tst_route_probe.cpp  (NereusSDR)
+// tests/tst_route_probe.cpp  (Longpath)
 // =================================================================
-// NereusSDR-native test.  No upstream source file ported.
+// Longpath-native test.  No upstream source file ported.
 //
 // Verifies the contract of src/core/RouteProbe.cpp's
 // probeLocalAddressFor() helper, which PgxlConnection, TgxlConnection,
@@ -14,7 +14,7 @@
 // rather than any specific local IP, so the suite passes on any CI
 // host with or without an internet connection.
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-26 -- Authored by J.J. Boyd (KG4VCF), with AI-assisted
 //                 transformation via Anthropic Claude Code.
 // =================================================================

@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/AmpViewWindow.cpp  (NereusSDR)
+// src/gui/AmpViewWindow.cpp  (Longpath)
 // =================================================================
 //
 // Implementation of the AmpViewWindow modeless dialog.  See
@@ -11,7 +11,7 @@
 // original licences from Thetis source are included below.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-06 — Phase 3M-4 Task 9: created by J.J. Boyd (KG4VCF),
 //                 with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -351,7 +351,7 @@ void AmpViewWindow::pollChartUpdate()
     //                      re-init under certain conditions
     //   AmpView.cs:259  // MW0LGE [2.9.0.8] kept for code record  (the dead
     //                      pre-refactor disp_data path retained as upstream
-    //                      reference; NereusSDR doesn't ship the dead path)
+    //                      reference; Longpath doesn't ship the dead path)
     //   AmpView.cs:397  //disp_data(); // MW0LGE [2.9.0.8] changed to an add
     //                      once, update points method.  (the line that
     //                      replaces the call inside timer1_Tick)

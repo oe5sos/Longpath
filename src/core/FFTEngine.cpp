@@ -1,12 +1,12 @@
 // =================================================================
-// src/core/FFTEngine.cpp  (NereusSDR)
+// src/core/FFTEngine.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/display.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -160,7 +160,7 @@ void FFTEngine::setFftSizeOffsetDb(double db)
     m_fftSizeOffsetDb.store(db);
 }
 
-// FFT-size baseline (NereusSDR-original).  Same validity check as
+// FFT-size baseline (Longpath-original).  Same validity check as
 // setFftSize: powers of two in [1024, kMaxFftSize].  Unlike setFftSize,
 // this does NOT trigger a replan -- it's pure state for the auto-zoom
 // lambda to read.  Set by the DisplaySetupPages slider handler alongside
@@ -370,7 +370,7 @@ void FFTEngine::computeWindow()
     // All 7 cases mirror WDSP analyzer.c:52-173 [v2.10.3.13] new_window()
     // switch ordering exactly (case 0 = Rectangular ... case 6 = BH-7T).
     // WDSP normalises the window in-place by inv_coherent_gain at line 79
-    // / 95 / 113 / 128 / 144 / 168; NereusSDR keeps the raw window and
+    // / 95 / 113 / 128 / 144 / 168; Longpath keeps the raw window and
     // applies the gain compensation post-FFT via m_dbmOffset (computed
     // below from sum), so coefficient values here are the bare
     // mathematical definitions without WDSP's normalisation step.
@@ -408,7 +408,7 @@ void FFTEngine::computeWindow()
         // From WDSP analyzer.c:100-116 [v2.10.3.13] case 3 -- 5-term flat-top
         // (note: WDSP's flat-top uses the .21557895 / .41663158 / .277263158
         // / .083578947 / .006947368 normalised coefficients, which differ
-        // from the un-normalised set NereusSDR previously shipped).
+        // from the un-normalised set Longpath previously shipped).
         for (int i = 0; i < size; ++i) {
             const double a = arg0 * static_cast<double>(i);
             m_window[i] = static_cast<float>(

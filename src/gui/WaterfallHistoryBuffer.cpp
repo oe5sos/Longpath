@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/WaterfallHistoryBuffer.cpp  (NereusSDR)
+// src/gui/WaterfallHistoryBuffer.cpp  (Longpath)
 // =================================================================
 //
 // Source attribution (AetherSDR — GPLv3):
@@ -12,7 +12,7 @@
 //   intensity rather than colour.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-15 — Ported in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

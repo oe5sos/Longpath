@@ -51,7 +51,7 @@ warren@wpratt.com
 */
 
 // =================================================================
-// tests/tst_tx_channel_vox_anti_vox.cpp  (NereusSDR)
+// tests/tst_tx_channel_vox_anti_vox.cpp  (Longpath)
 // =================================================================
 //
 // No Thetis code is directly ported in this test file.  The test exercises:
@@ -86,7 +86,7 @@ warren@wpratt.com
 // that define is set.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-27 — New test for Phase 3M-1b Task D.3: VOX/anti-VOX WDSP
 //                 wrappers (setVoxRun / setVoxAttackThreshold /
 //                 setVoxHangTime / setAntiVoxRun / setAntiVoxGain).
@@ -94,7 +94,7 @@ warren@wpratt.com
 //                 Anthropic Claude Code.
 // =================================================================
 
-// no-port-check: NereusSDR-original test file. All Thetis source cites are
+// no-port-check: Longpath-original test file. All Thetis source cites are
 // in TxChannel.h/cpp.
 
 #define LONGPATH_BUILD_TESTS 1

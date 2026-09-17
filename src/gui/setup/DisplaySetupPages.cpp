@@ -1,12 +1,12 @@
 // =================================================================
-// src/gui/setup/DisplaySetupPages.cpp  (NereusSDR)
+// src/gui/setup/DisplaySetupPages.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/display.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -457,7 +457,7 @@ void SpectrumDefaultsPage::buildUI()
 
     // Stylesheet for sunken numeric readouts.  Thetis uses Bisque
     // (System.Drawing.Color.Bisque, RGB(255, 228, 196)) on a light
-    // WinForms background.  NereusSDR's dark theme inverts the contrast:
+    // WinForms background.  Longpath's dark theme inverts the contrast:
     // recessed dark inset with cyan-accent text reads as "live data
     // cell" against the page's slightly-lighter group background.
     // Token sources:
@@ -559,7 +559,7 @@ void SpectrumDefaultsPage::buildUI()
     fftGrid->addWidget(windowPrefix,  3, 0);
     fftGrid->addWidget(m_windowCombo, 3, 1, 1, 3);  // span cols 1-3
 
-    // Row 4: Hz/bin Target — NereusSDR-original auto-zoom override (Option
+    // Row 4: Hz/bin Target — Longpath-original auto-zoom override (Option
     // 3, 2026-05-08).  0 = off (bins-in-window default behaviour: FFT
     // replans on zoom to keep ~baseline bins in the visible window, Hz/bin
     // varies).  > 0 = lock Hz/bin at the given value regardless of zoom
@@ -644,7 +644,7 @@ void SpectrumDefaultsPage::buildUI()
                          : QStringLiteral("0.000"));
         }
 
-        // Mirror to on-spectrum overlay (NereusSDR-original; the
+        // Mirror to on-spectrum overlay (Longpath-original; the
         // overlay toggle gates the spectrum-corner readout).
         if (m_binWidthReadout && sw) {
             const double bw = sw->binWidthHz();
@@ -704,7 +704,7 @@ void SpectrumDefaultsPage::buildUI()
     }
 
     // Legacy "Averaging" combo (None / Weighted / Logarithmic / Time Window)
-    // was a NereusSDR-only UI duplicate that pre-dated the Thetis-faithful
+    // was a Longpath-only UI duplicate that pre-dated the Thetis-faithful
     // split below. Its setAverageMode() calls write only to m_averageMode
     // which the renderer no longer reads — m_spectrumAveraging drives the
     // actual smoothing. Combo removed to stop confusing users with two
@@ -873,7 +873,7 @@ void SpectrumDefaultsPage::buildUI()
     calForm->addRow(QStringLiteral("Cal Offset:"), m_calOffsetSpin);
 
     m_peakHoldToggle = new QCheckBox(QStringLiteral("Peak hold"), calGroup);
-    // NereusSDR extension — no Thetis equivalent
+    // Longpath extension — no Thetis equivalent
     m_peakHoldToggle->setToolTip(QStringLiteral("When enabled, the highest signal level seen at each frequency bin is held on the display."));
     connect(m_peakHoldToggle, &QCheckBox::toggled, this, [this](bool on) {
         if (auto* w = model() ? model()->spectrumWidget() : nullptr) {
@@ -887,7 +887,7 @@ void SpectrumDefaultsPage::buildUI()
     m_peakHoldDelaySpin->setSingleStep(100);
     m_peakHoldDelaySpin->setSuffix(QStringLiteral(" ms"));
     m_peakHoldDelaySpin->setValue(2000);
-    // NereusSDR extension — no Thetis equivalent
+    // Longpath extension — no Thetis equivalent
     m_peakHoldDelaySpin->setToolTip(QStringLiteral("Time in milliseconds before a held peak begins to decay back toward the live trace."));
     connect(m_peakHoldDelaySpin, qOverload<int>(&QSpinBox::valueChanged),
             this, [this](int v) {
@@ -1251,7 +1251,7 @@ void SpectrumDefaultsPage::buildUI()
         overlayForm->addRow(QString(), row);
     }
 
-    // NF colour pickers — Thetis display.cs:2316/2329 + NereusSDR fast-attack.
+    // NF colour pickers — Thetis display.cs:2316/2329 + Longpath fast-attack.
     {
         m_nfLineColorBtn = new ColorSwatchButton(Qt::red, overlayGroup);
         m_nfLineColorBtn->setToolTip(QStringLiteral(
@@ -2058,7 +2058,7 @@ void WaterfallDefaultsPage::buildUI()
     dispForm->addRow(QStringLiteral("Color Scheme:"), m_colorSchemeCombo);
 
     // Legacy "WF Averaging" combo (None / Weighted / Logarithmic / Time Window)
-    // was a NereusSDR-only UI duplicate. Its setWfAverageMode() calls write
+    // was a Longpath-only UI duplicate. Its setWfAverageMode() calls write
     // only to m_wfAverageMode which the renderer consults only when the new
     // m_waterfallAveraging is None — i.e. it's a fallback path with no
     // independent UI value. Combo removed; the legacy enum + setter survive
@@ -2225,7 +2225,7 @@ void WaterfallDefaultsPage::buildUI()
     m_timestampPosCombo = new QComboBox(timeGroup);
     m_timestampPosCombo->addItems({QStringLiteral("None"), QStringLiteral("Left"),
                                    QStringLiteral("Right")});
-    // NereusSDR extension — no Thetis equivalent
+    // Longpath extension — no Thetis equivalent
     m_timestampPosCombo->setToolTip(QStringLiteral("Position of the time stamp drawn on each waterfall row. None disables timestamps; Left and Right place them at the respective edge."));
     connect(m_timestampPosCombo, qOverload<int>(&QComboBox::currentIndexChanged),
             this, [this](int i) {
@@ -2239,7 +2239,7 @@ void WaterfallDefaultsPage::buildUI()
 
     m_timestampModeCombo = new QComboBox(timeGroup);
     m_timestampModeCombo->addItems({QStringLiteral("UTC"), QStringLiteral("Local")});
-    // NereusSDR extension — no Thetis equivalent
+    // Longpath extension — no Thetis equivalent
     m_timestampModeCombo->setToolTip(QStringLiteral("Time zone used for waterfall timestamps. UTC uses Coordinated Universal Time; Local uses the system clock time zone."));
     connect(m_timestampModeCombo, qOverload<int>(&QComboBox::currentIndexChanged),
             this, [this](int i) {
@@ -2561,7 +2561,7 @@ void GridScalesPage::buildUI()
 
     // --- Section: Noise-Floor Tracking (Task 2.9) ---
     // From Thetis setup.cs:24202-24213 [v2.10.3.13] chkAdjustGridMinToNFRX1
-    // — RX1 scope dropped; NereusSDR applies as global panadapter default
+    // — RX1 scope dropped; Longpath applies as global panadapter default
     //   with per-pan override via ContainerSettings dialog (3G-6 pattern).
     auto* nfGroup = new QGroupBox(QStringLiteral("Noise-Floor Tracking"), this);
     auto* nfForm  = new QFormLayout(nfGroup);

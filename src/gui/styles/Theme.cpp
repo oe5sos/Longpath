@@ -1,11 +1,11 @@
 // =================================================================
-// src/gui/styles/Theme.cpp  (NereusSDR)
+// src/gui/styles/Theme.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. See Theme.h for why this exists.
+// Longpath-original. See Theme.h for why this exists.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-15 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

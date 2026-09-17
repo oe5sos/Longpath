@@ -2,7 +2,7 @@
 // outside FreeDVStationModel.cpp: locator validation, distance and
 // bearing against known real-world pairs.
 // no-port-check: maths ported from freedv-gui, attributed in
-// core/Maidenhead.h; only the validator is NereusSDR-original.
+// core/Maidenhead.h; only the validator is Longpath-original.
 
 #include <QtTest/QtTest>
 #include "core/Maidenhead.h"

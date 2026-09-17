@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/OcMatrix.h  (NereusSDR)
+// src/core/OcMatrix.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -9,7 +9,7 @@
 //    TX pin action mapping, TXPinActions enum)
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-20 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                (KG4VCF), with AI-assisted transformation via Anthropic
 //                Claude Code. Per-MAC persistence via AppSettings;
@@ -90,7 +90,7 @@ public:
 
     // ── TX pin action mapping ───────────────────────────────────────────────
     // From Thetis HPSDR/Penny.cs:94-100 [@501e3f5] setTXPinAction
-    // (group dimension collapsed: NereusSDR tracks one action per pin)
+    // (group dimension collapsed: Longpath tracks one action per pin)
     TXPinAction pinAction(int pin) const;
     void        setPinAction(int pin, TXPinAction action);
 

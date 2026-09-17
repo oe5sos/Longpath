@@ -1,8 +1,8 @@
-// src/gui/styles/AppTheme.h (NereusSDR)
+// src/gui/styles/AppTheme.h  (Longpath)
 //
 // Application-wide dark-theme bootstrap. Installs a QPalette + minimal
 // baseline QSS on the QApplication so every widget — even ones that
-// don't carry their own stylesheet — picks up the NereusSDR dark theme
+// don't carry their own stylesheet — picks up the Longpath dark theme
 // instead of falling through to the host platform's Fusion defaults.
 //
 // Why this exists:

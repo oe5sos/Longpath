@@ -7,7 +7,7 @@
 
 namespace Longpath {
 
-// Logging categories for NereusSDR.
+// Logging categories for Longpath.
 // Usage: qCDebug(lcDiscovery) << "message";
 Q_DECLARE_LOGGING_CATEGORY(lcDiscovery)
 

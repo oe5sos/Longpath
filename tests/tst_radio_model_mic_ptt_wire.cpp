@@ -1,8 +1,8 @@
-// no-port-check: NereusSDR-original unit-test file. The Thetis cite
+// no-port-check: Longpath-original unit-test file. The Thetis cite
 // comments below document which upstream lines each assertion verifies;
 // no upstream logic is ported in this file.
 // =================================================================
-// tests/tst_radio_model_mic_ptt_wire.cpp  (NereusSDR)
+// tests/tst_radio_model_mic_ptt_wire.cpp  (Longpath)
 // =================================================================
 //
 // Issue #182 regression coverage — verifies that toggling

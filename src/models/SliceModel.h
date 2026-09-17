@@ -1,7 +1,7 @@
 #pragma once
 
 // =================================================================
-// src/models/SliceModel.h  (NereusSDR)
+// src/models/SliceModel.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -10,7 +10,7 @@
 //   Project Files/Source/Console/setup.designer.cs (upstream has no top-of-file header — project-level LICENSE applies)
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -151,7 +151,7 @@ inline constexpr int kStageOneStepLadderSize =
     static_cast<int>(sizeof(kStageOneStepLadder) / sizeof(kStageOneStepLadder[0]));
 
 // Represents a single receiver slice.
-// In NereusSDR, slices are a client-side abstraction — the radio has
+// In Longpath, slices are a client-side abstraction — the radio has
 // no concept of slices. Each slice owns a WDSP channel for independent
 // DSP processing.
 //
@@ -370,7 +370,7 @@ class SliceModel : public QObject {
     //
     // The SNB three are genuinely independent per slice: SetRXASNBA* writes
     // rxa[channel].snba (wdsp/snb.c:621-670 [v2.10.3.15]), one per WDSP
-    // channel, and NereusSDR gives every slice its own channel.
+    // channel, and Longpath gives every slice its own channel.
     Q_PROPERTY(int    nb1Threshold    READ nb1Threshold    WRITE setNb1Threshold    NOTIFY nb1ThresholdChanged)
     Q_PROPERTY(double nb1TransitionMs READ nb1TransitionMs WRITE setNb1TransitionMs NOTIFY nb1TransitionMsChanged)
     Q_PROPERTY(double nb1LeadMs       READ nb1LeadMs       WRITE setNb1LeadMs       NOTIFY nb1LeadMsChanged)
@@ -392,7 +392,7 @@ class SliceModel : public QObject {
     Q_PROPERTY(int    rttyMarkHz      READ rttyMarkHz      WRITE setRttyMarkHz      NOTIFY rttyMarkHzChanged)
     Q_PROPERTY(int    rttyShiftHz     READ rttyShiftHz     WRITE setRttyShiftHz     NOTIFY rttyShiftHzChanged)
 
-    // ── Phase 3J-2 Task D5: per-slice live SNR (NereusSDR-native) ──
+    // ── Phase 3J-2 Task D5: per-slice live SNR (Longpath-native) ──
     // NaN means "no SNR available" (mode without SNR estimate, or no
     // decode in flight). RadeChannel populates this when slice mode is
     // RADE; future digital modes wire the same setSnrDb slot. VfoWidget
@@ -682,7 +682,7 @@ public:
     // slice's VfoWidget. setPanKey emits panKeyChanged so MainWindow can
     // migrate the flag (remove from the old pan, re-add on the new one),
     // mirroring AetherSDR's SliceModel::panId() string + panIdChanged.
-    // (AetherSDR uses the name "panId" for its string; NereusSDR keeps its
+    // (AetherSDR uses the name "panId" for its string; Longpath keeps its
     // existing int panId and names the string panKey to avoid the clash.)
     QString panKey() const { return m_panKey; }
     void setPanKey(const QString& key);
@@ -1114,7 +1114,7 @@ public:
     int vaxChannel() const { return m_vaxChannel.load(std::memory_order_acquire); }
     void setVaxChannel(int ch);
 
-    // ── Phase 3J-2 Task D5: per-slice live SNR (NereusSDR-native) ──
+    // ── Phase 3J-2 Task D5: per-slice live SNR (Longpath-native) ──
     // NaN sentinel means "no SNR available." setSnrDb() emits
     // snrDbChanged only on actual change: NaN -> NaN is a no-op,
     // numeric -> identical-numeric is a no-op, NaN -> numeric and
@@ -1278,7 +1278,7 @@ signals:
     // ── Phase 3O VAX routing ──────────────────────────────────────────────────
     void vaxChannelChanged(int ch);
 
-    // ── Phase 3J-2 Task D5: live SNR (NereusSDR-native) ──
+    // ── Phase 3J-2 Task D5: live SNR (Longpath-native) ──
     void snrDbChanged(double db);
 
     // ── 2026-05-11 bench: RADE speaker callsign ──
@@ -1462,7 +1462,7 @@ private:
     // udDSPSNBThresh2=20.0 (setup.designer.cs grpDSPNB:44399-44604 +
     // grpDSPSNB:44280-44398 [v2.10.3.13]). SNB output bandwidth has no Thetis
     // Setup control (Thetis sets it per mode at rxa.cs:112-124); 6000 Hz is
-    // NereusSDR's existing native default for that override.
+    // Longpath's existing native default for that override.
     int    m_nb1Threshold{30};
     double m_nb1TransitionMs{0.01};
     double m_nb1LeadMs{0.01};
@@ -1489,7 +1489,7 @@ private:
     // ── Phase 3O VAX routing ──────────────────────────────────────────────────
     std::atomic<int> m_vaxChannel{0};  // 0=Off, 1..4=VAX N. Atomic for audio-thread-safe reads.
 
-    // ── Phase 3J-2 Task D5: live SNR (NereusSDR-native) ──
+    // ── Phase 3J-2 Task D5: live SNR (Longpath-native) ──
     // Default NaN means "no SNR available." Populated by RadeChannel
     // (Phase R) when slice mode is RADE; future digital modes wire the
     // same setSnrDb slot.

@@ -1,4 +1,4 @@
-// no-port-check: NereusSDR-original. No upstream port. Merges the PA
+// no-port-check: Longpath-original. No upstream port. Merges the PA
 // telemetry stack with the CPU metric into one two-row tile; see
 // docs/architecture/2026-08-02-bottom-banner-and-pan-menu-design.md §4.3.
 

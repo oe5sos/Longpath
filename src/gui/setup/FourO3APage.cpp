@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/setup/FourO3APage.cpp  (NereusSDR)
+// src/gui/setup/FourO3APage.cpp  (Longpath)
 // =================================================================
 //
 // See FourO3APage.h for the design overview.  Implementation notes:
@@ -18,7 +18,7 @@
 //     unchanged.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-21 -- Created in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted implementation via
 //                 Anthropic Claude Code.
@@ -75,7 +75,7 @@ FourO3APage::FourO3APage(RadioModel* model, QWidget* parent)
     // 2026-05-22 menu cleanup: Diagnostics tab removed. Connection
     // State duplicated the General tab's FlexAPI status row and the
     // per-peer labels on PGXL/TGXL tabs; Disconnect/Reconnect Log
-    // duplicated the rolling NereusSDR log file. Both removed for
+    // duplicated the rolling Longpath log file. Both removed for
     // bench-driven simplification (operator can read the log file or
     // PGXL/TGXL detail tabs for the same data).
 

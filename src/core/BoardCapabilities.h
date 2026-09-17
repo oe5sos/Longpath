@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/BoardCapabilities.h  (NereusSDR)
+// src/core/BoardCapabilities.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -10,7 +10,7 @@
 //   Project Files/Source/ChannelMaster/network.h, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -417,7 +417,7 @@ struct BoardCapabilities {
     bool hasRxBypassRelay    {false};
     int  rxOnlyAntennaCount  {0};
 
-    // Phase 3M-0 Task 1: SKU-level safety flags (NereusSDR-original).
+    // Phase 3M-0 Task 1: SKU-level safety flags (Longpath-original).
     //
     // isRxOnlySku: True iff this SKU ships without TX hardware (Hermes Lite 2
     //   RX-only kits, etc.). Thetis treats RX-only purely as a user toggle
@@ -476,7 +476,7 @@ struct BoardCapabilities {
     // True for Hermes / Atlas / Orion / ANAN family + Saturn G2.
     // False for HermesLite 2 (no radio-side mic input).
     //
-    // Source: NereusSDR-original; derived from Thetis Setup->Audio->Primary
+    // Source: Longpath-original; derived from Thetis Setup->Audio->Primary
     // per-board panel visibility:
     //   panelSaturnMicInput  (setup.designer.cs:8613 [v2.10.3.13])
     //   panelOrionMic        (setup.designer.cs:8661 [v2.10.3.13])
@@ -501,7 +501,7 @@ struct BoardCapabilities {
     // in the grpBoxMic settings group (setup.designer.cs:46808-46866
     // [v2.10.3.13]; spinbox widget range: Min -96..0, Max 1..70).
     //
-    // NereusSDR uses the Thetis runtime defaults (-40/+10) for all known
+    // Longpath uses the Thetis runtime defaults (-40/+10) for all known
     // boards, and the TransmitModel fallback (-50/+70) for Unknown.
     // The slider default is coded in TransmitModel::kMicGainDbMin/Max.
     //

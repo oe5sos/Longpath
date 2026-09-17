@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - FreeDVStation: per-sid live state from qso.freedv.org
+// Longpath - FreeDVStation: per-sid live state from qso.freedv.org
 //
 // Ported from freedv-gui src/gui/dialogs/freedv_reporter.h:367-417
 // (the wxWidgets `ReporterData` inner struct) [@77e793a], restructured
@@ -12,11 +12,11 @@
 // (`freedv-gui/COPYING`); the specific `freedv_reporter.h` file has no
 // per-file Copyright header, so the project root header applies. LGPL
 // is upgrade-compatible to GPL-3 when linked into a GPLv3 work (LGPL
-// §3 conversion clause), which is the model NereusSDR uses.
+// §3 conversion clause), which is the model Longpath uses.
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-10  J.J. Boyd / KG4VCF  Phase 3J-2 Task B5. Created the
-//                                    NereusSDR per-sid station struct
+//                                    Longpath per-sid station struct
 //                                    by porting the field list of
 //                                    freedv-gui's wx-flavoured
 //                                    `ReporterData` (freedv_reporter.h

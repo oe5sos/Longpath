@@ -57,7 +57,7 @@ https://github.com/lucianodato/libspecbleach
 
 //
 // =============================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-23 — Imported byte-for-byte from Thetis v2.10.3.13 @ 501e3f51.
 //                No algorithmic changes. Linked against libspecbleach LGPL-2.1
 //                (third_party/libspecbleach/) at WDSP build time.

@@ -1,5 +1,5 @@
-// tests/tst_tci_dispatch_seam.cpp  (NereusSDR)
-// NereusSDR-original — no Thetis upstream port in this file.
+// tests/tst_tci_dispatch_seam.cpp  (Longpath)
+// Longpath-original — no Thetis upstream port in this file.
 //
 // Phase 3J-1 Task 3.1: TciProtocol dispatch seam.
 // Verifies:
