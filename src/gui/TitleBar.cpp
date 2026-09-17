@@ -641,7 +641,11 @@ TitleBar::TitleBar(AudioEngine* audio, QWidget* parent)
         return QIcon(pm);
     };
 
-    QIcon bulbIcon = makeBulbIcon(QColor(Style::kAmberText), QColor(Style::kAmberBorder));
+    // Grau, nicht Bernstein: der Knopf ist Inventar ("Wunsch melden"),
+    // kein Messwert und kein Zustand -- er war die einzige gesaettigte
+    // Flaeche in der Kopfleiste (Foto vom 2026-09-17). Glas & Tiefe:
+    // ein erhabener Knopf wie jeder andere, die Birne als Zeichnung.
+    QIcon bulbIcon = makeBulbIcon(QColor(Style::kTextSecondary), QColor(Style::kTextScale));
 
     m_featureBtn = new QPushButton(this);
     m_featureBtn->setObjectName(QStringLiteral("featureButton"));
@@ -650,12 +654,8 @@ TitleBar::TitleBar(AudioEngine* audio, QWidget* parent)
     m_featureBtn->setFixedSize(28, 28);
     m_featureBtn->setToolTip(QStringLiteral("Submit a feature request or bug report"));
     m_featureBtn->setAccessibleName(QStringLiteral("Feature request"));
-    // NereusSDR-original — amber dark for the 💡 feature-request button.
-    // One-off; no palette promotion warranted per §A2 design intent.
-    m_featureBtn->setStyleSheet(QStringLiteral(
-        "QPushButton { background: #33280f; border: 1px solid #6b5426; "
-        "border-radius: 6px; padding: 0; }"
-        "QPushButton:hover { background: #33280f; border-color: #6b5426; }"));
+    m_featureBtn->setStyleSheet(Style::buttonBaseStyle()
+                                + QStringLiteral("QPushButton { padding: 0; }"));
     connect(m_featureBtn, &QPushButton::clicked,
             this, &TitleBar::featureRequestClicked);
     m_hbox->addWidget(m_featureBtn);

@@ -28,9 +28,12 @@
 #include <QLabel>
 #include <QMenu>
 #include <QPoint>
+#include <QIcon>
+#include <QPainter>
 #include <QPushButton>
 #include <QSignalBlocker>
 #include <QSlider>
+#include "gui/StyleConstants.h"
 
 namespace Longpath {
 
@@ -41,28 +44,44 @@ static const char* kSpeakerBtnStyle =
     "QPushButton { background: transparent; border: none; font-size: 16px; padding: 0; }"
     "QPushButton:checked { opacity: 0.4; }";
 
-// Horizontal volume slider — copies AetherSDR TitleBar.cpp:195-198
-// palette verbatim: #1a2a3a groove, #00b4d8 handle + sub-page fill.
-static const char* kSliderStyle =
-    "QSlider::groove:horizontal { background: #1a2a3a; height: 4px; border-radius: 2px; }"
-    "QSlider::handle:horizontal { background: #4a7ba8; width: 10px; margin: -3px 0; border-radius: 5px; }"
-    "QSlider::sub-page:horizontal { background: #4a7ba8; border-radius: 2px; }";
+// Regler und Wertchip: dieselben Bauteile wie ueberall (Glas & Tiefe,
+// 2026-09-17) — versenkte Rinne, erhabener Griff mit Akzentrand,
+// Zahl im Glaschip. Hier standen die AetherSDR-Toene woertlich
+// (#1a2a3a-Rinne, blaue Kugel, blaue Fuellung, blaustichiger Chip):
+// in der Kopfleiste der einzige Regler, der noch nach Qt aussah, und
+// ein blauer Balken mehr in einer Zeile, die ohnehin zu viel Blau trug.
 
-// Inset value readout — STYLEGUIDE.md line 137 "Inset Value Display".
-static const char* kDbLabelStyle =
-    "QLabel {"
-    "  font-size: 11px;"
-    "  background: #0a0a18;"
-    "  border: 1px solid #1e2e3e;"
-    "  border-radius: 6px;"
-    "  padding: 1px 2px;"
-    "  color: #8aa8c0;"
-    "}";
-
-// UTF-8 encodings of the two speaker glyphs — kept as raw escape
-// bytes to match the AetherSDR source style (no <QChar> fuss).
-static const char* kSpeakerOn  = "\xF0\x9F\x94\x8A";  // 🔊 U+1F50A
-static const char* kSpeakerOff = "\xF0\x9F\x94\x87";  // 🔇 U+1F507
+// Der Lautsprecher als Zeichnung, nicht als Farb-Emoji (🔊/🔇):
+// das Emoji war in der Kopfleiste die einzige bunte Figur und sah bei
+// jeder Schriftart anders aus. Ein Trapez, zwei Boegen — stumm: ein
+// Strich quer durch. Grau wie die Beschriftung; gemalt gross, Qt
+// rechnet auf jede Dichte herunter.
+static QIcon speakerIcon(bool muted)
+{
+    constexpr int sz = 64;
+    QPixmap pm(sz, sz);
+    pm.fill(Qt::transparent);
+    QPainter p(&pm);
+    p.setRenderHint(QPainter::Antialiasing);
+    const QColor ink(muted ? Style::kTextInactive : Style::kTextSecondary);
+    p.setPen(Qt::NoPen);
+    p.setBrush(ink);
+    QPolygonF horn;
+    horn << QPointF(10, 24) << QPointF(22, 24) << QPointF(36, 12)
+         << QPointF(36, 52) << QPointF(22, 40) << QPointF(10, 40);
+    p.drawPolygon(horn);
+    p.setBrush(Qt::NoBrush);
+    p.setPen(QPen(ink, 4.0, Qt::SolidLine, Qt::RoundCap));
+    if (muted) {
+        p.drawLine(QPointF(42, 24), QPointF(56, 40));
+        p.drawLine(QPointF(56, 24), QPointF(42, 40));
+    } else {
+        p.drawArc(QRectF(30, 20, 20, 24), -60 * 16, 120 * 16);
+        p.drawArc(QRectF(26, 10, 36, 44), -60 * 16, 120 * 16);
+    }
+    p.end();
+    return QIcon(pm);
+}
 
 MasterOutputWidget::MasterOutputWidget(AudioEngine* audio, QWidget* parent)
     : QWidget(parent)
@@ -89,8 +108,9 @@ MasterOutputWidget::MasterOutputWidget(AudioEngine* audio, QWidget* parent)
     m_currentDeviceName = savedDevice;
 
     // ── Speaker button ─────────────────────────────────────────────────────
-    m_speakerBtn = new QPushButton(
-        QString::fromUtf8(savedMuted ? kSpeakerOff : kSpeakerOn), this);
+    m_speakerBtn = new QPushButton(this);
+    m_speakerBtn->setIcon(speakerIcon(savedMuted));
+    m_speakerBtn->setIconSize(QSize(18, 18));
     m_speakerBtn->setObjectName(QStringLiteral("speakerBtn"));
     m_speakerBtn->setFixedSize(20, 20);
     m_speakerBtn->setCheckable(true);
@@ -110,7 +130,7 @@ MasterOutputWidget::MasterOutputWidget(AudioEngine* audio, QWidget* parent)
     m_slider->setRange(0, 100);
     m_slider->setFixedWidth(100);
     m_slider->setFixedHeight(16);
-    m_slider->setStyleSheet(QLatin1String(kSliderStyle));
+    m_slider->setStyleSheet(Style::sliderHStyle());
     m_slider->setAccessibleName(QStringLiteral("Master volume"));
     m_slider->setAccessibleDescription(
         QStringLiteral("Master output volume level, 0 to 100 percent"));
@@ -124,7 +144,7 @@ MasterOutputWidget::MasterOutputWidget(AudioEngine* audio, QWidget* parent)
     m_dbLabel->setObjectName(QStringLiteral("dbLabel"));
     m_dbLabel->setFixedWidth(22);
     m_dbLabel->setAlignment(Qt::AlignCenter);
-    m_dbLabel->setStyleSheet(QLatin1String(kDbLabelStyle));
+    m_dbLabel->setStyleSheet(Style::insetValueStyle());
     layout->addWidget(m_dbLabel);
 
     // ── Seed the engine with the saved values BEFORE wiring widget→model ──
@@ -174,7 +194,7 @@ MasterOutputWidget::MasterOutputWidget(AudioEngine* audio, QWidget* parent)
         if (m_updatingFromModel) {
             return;
         }
-        m_speakerBtn->setText(QString::fromUtf8(muted ? kSpeakerOff : kSpeakerOn));
+        m_speakerBtn->setIcon(speakerIcon(muted));
         if (m_audio) {
             m_audio->setMasterMuted(muted);
         }
@@ -283,7 +303,7 @@ void MasterOutputWidget::onAudioEngineMasterMutedChanged(bool m)
     {
         QSignalBlocker blocker(m_speakerBtn);
         m_speakerBtn->setChecked(m);
-        m_speakerBtn->setText(QString::fromUtf8(m ? kSpeakerOff : kSpeakerOn));
+        m_speakerBtn->setIcon(speakerIcon(m));
     }
     m_updatingFromModel = false;
 }
