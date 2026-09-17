@@ -235,27 +235,7 @@ constexpr const char* kFilterPillStyle =
     "}"
     "QPushButton:hover { border-color: #c8d8e8; }";
 
-constexpr const char* kSpotTableStyle =
-    "QTableView {"
-    "  background: #0a0a14;"
-    "  alternate-background-color: #0a0a18;"
-    "  color: #c8d8e8;"
-    "  gridline-color: #1a2a3a;"
-    "  border: 1px solid #203040;"
-    "  font-size: 11px;"
-    "}"
-    "QTableView::item:selected {"
-    "  background: #204060;"
-    "  color: #cfe2f5;"
-    "}"
-    "QHeaderView::section {"
-    "  background: #1a1a2a;"
-    "  color: #4a7ba8;"
-    "  border: 1px solid #203040;"
-    "  padding: 3px 6px;"
-    "  font-weight: bold;"
-    "  font-size: 11px;"
-    "}";
+// Der Tabellenstil ist seit dem 2026-09-17 zentral: Style::tableStyle().
 
 QString swatchStyle(const QColor& c) {
     return QString(
@@ -1925,7 +1905,10 @@ void SpotHubDialog::buildAlertsTab(QTabWidget* tabs)
     m_alertsTable->verticalHeader()->setVisible(false);
     m_alertsTable->verticalHeader()->setDefaultSectionSize(20);
     m_alertsTable->horizontalHeader()->setStretchLastSection(true);
-    m_alertsTable->setStyleSheet(kSpotTableStyle);
+    m_alertsTable->setStyleSheet(Style::tableStyle());   // Glas & Tiefe, 2026-09-17
+    m_alertsTable->setFont([this] { QFont f = font(); f.setPixelSize(Style::kFontSmall); return f; }());
+    m_alertsTable->horizontalHeader()->setFont(Style::capsFont(font(), 8));
+    m_alertsTable->horizontalHeader()->setHighlightSections(false);
     m_alertsTable->setColumnWidth(AlertsTableModel::ColActivator, 90);
     m_alertsTable->setColumnWidth(AlertsTableModel::ColReference, 70);
     m_alertsTable->setColumnWidth(AlertsTableModel::ColName, 220);
@@ -2864,7 +2847,10 @@ void SpotHubDialog::buildSpotListTab(QTabWidget* tabs)
     m_spotTable->verticalHeader()->setVisible(false);
     m_spotTable->verticalHeader()->setDefaultSectionSize(20);
     m_spotTable->horizontalHeader()->setStretchLastSection(true);
-    m_spotTable->setStyleSheet(kSpotTableStyle);
+    m_spotTable->setStyleSheet(Style::tableStyle());   // Glas & Tiefe, 2026-09-17
+    m_spotTable->setFont([this] { QFont f = font(); f.setPixelSize(Style::kFontSmall); return f; }());
+    m_spotTable->horizontalHeader()->setFont(Style::capsFont(font(), 8));
+    m_spotTable->horizontalHeader()->setHighlightSections(false);
 
     m_spotTable->setColumnWidth(SpotTableModel::ColTime, 50);
     m_spotTable->setColumnWidth(SpotTableModel::ColFreq, 80);

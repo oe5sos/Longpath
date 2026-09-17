@@ -53,6 +53,7 @@ mw0lge@grange-lane.co.uk
 //============================================================================================//
 
 #include "NeedleScalePwrItemEditor.h"
+#include "gui/StyleConstants.h"
 #include "gui/styles/ThemeQss.h"
 #include "../../meters/MeterItem.h"
 #include "../../meters/NeedleScalePwrItem.h"
@@ -89,18 +90,7 @@ constexpr const char* kComboStyle =
     "  selection-background-color: #4a7ba8; selection-color: #ffffff;"
     "}";
 
-constexpr const char* kTableStyle =
-    "QTableWidget {"
-    "  background: #0a0a18; color: #c8d8e8;"
-    "  border: 1px solid #1e2e3e; gridline-color: #1e2e3e;"
-    "}"
-    "QTableWidget::item:selected {"
-    "  background: #4a7ba8; color: #0a0a18;"
-    "}"
-    "QHeaderView::section {"
-    "  background: #1a2a38; color: #8aa8c0; font-size: 11px;"
-    "  border: 1px solid #1e2e3e; padding: 2px;"
-    "}";
+// Der Tabellenstil ist seit dem 2026-09-17 zentral: Style::tableStyle().
 
 constexpr const char* kBtnStyle =
     "QPushButton {"
@@ -378,7 +368,9 @@ void NeedleScalePwrItemEditor::buildTypeSpecific()
 
     // ---- Calibration table ----
     m_calTable = new QTableWidget(0, 3, this);
-    m_calTable->setStyleSheet(kTableStyle);
+    m_calTable->setStyleSheet(Style::tableStyle());   // Glas & Tiefe, 2026-09-17
+    m_calTable->horizontalHeader()->setFont(Style::capsFont(font(), 8));
+    m_calTable->horizontalHeader()->setHighlightSections(false);
     m_calTable->setHorizontalHeaderLabels({
         QStringLiteral("Value"),
         QStringLiteral("Norm X"),

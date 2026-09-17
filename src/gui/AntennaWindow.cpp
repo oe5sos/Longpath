@@ -649,16 +649,13 @@ void AntennaWindow::buildUi()
     m_bandTable->setSelectionMode(QAbstractItemView::NoSelection);
     m_bandTable->setFocusPolicy(Qt::NoFocus);
     m_bandTable->horizontalHeader()->setStretchLastSection(true);
-    m_bandTable->setStyleSheet(QStringLiteral(
-        "QTableWidget { background: %1; color: %2; border: 1px solid %3;"
-        "  gridline-color: %3; font-size: 11px; }"
-        "QHeaderView::section { background: %4; color: %5; border: none;"
-        "  border-bottom: 1px solid %3; padding: 2px 6px; font-size: 9px; }"
-    ).arg(QLatin1String(Style::kInsetBg),
-          QLatin1String(Style::kTextPrimary),
-          QLatin1String(Style::kBorderSubtle),
-          QLatin1String(Style::kButtonBg),
-          QLatin1String(Style::kTextScale)));
+    // Glas & Tiefe (2026-09-17): der zentrale Tabellenstil — versenkt,
+    // Kopf als Versalzeile ohne Kaesten, Auswahl gedeckt. Schriften per
+    // setFont, nicht im Stylesheet (Groesse kaskadiert sonst in den Kopf).
+    m_bandTable->setStyleSheet(Style::tableStyle());
+    m_bandTable->setFont([this] { QFont f = font(); f.setPixelSize(Style::kFontSmall); return f; }());
+    m_bandTable->horizontalHeader()->setFont(Style::capsFont(font(), 8));
+    m_bandTable->horizontalHeader()->setHighlightSections(false);
     m_bandTable->setVisible(false);
     // ── Out of the retired holder ────────────────────────────────────
     //

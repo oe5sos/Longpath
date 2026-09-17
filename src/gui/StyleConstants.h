@@ -775,6 +775,11 @@ inline QString tableStyle()
         "  border-top-color: %4; border-bottom-color: %5;"
         "  border-radius: %6px; gridline-color: %7; outline: none;"
         "  selection-background-color: %8; selection-color: %9;"
+        // Zebra eine Spur heller als der Grund. Ohne diese Zeile nimmt
+        // eine Tabelle mit setAlternatingRowColors(true) die Palette —
+        // und die ist hell: auf dem Logbuch-Blatt vom 2026-09-17 stand
+        // jede zweite Zeile WEISS.
+        "  alternate-background-color: %12;"
         "}"
         "QTableView::item, QTableWidget::item, QTreeView::item, QListView::item {"
         "  padding: 2px 3px; border: none; }"
@@ -796,7 +801,8 @@ inline QString tableStyle()
           hexRole(kGlassSelBot),
           hexRole(kGlassSelText))
      .arg(hexRole(kGlassSelTop),
-          hexRole(kTextScale));
+          hexRole(kTextScale),
+          hexRole(kGlassPanelBot));
 }
 
 /// Ein Zahlenfeld hinter Glas (Glas & Tiefe, 2026-09-17): schwarz,

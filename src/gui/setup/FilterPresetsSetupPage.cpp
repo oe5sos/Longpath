@@ -12,6 +12,7 @@
 // =================================================================
 
 #include "FilterPresetsSetupPage.h"
+#include "gui/StyleConstants.h"
 #include "gui/styles/ThemeQss.h"
 #include "models/FilterPresetStore.h"
 #include "models/SliceModel.h"
@@ -109,13 +110,9 @@ void FilterPresetsSetupPage::buildUi()
         QStringLiteral("Width (Hz)"),
         QStringLiteral("Reorder")
     });
-    m_table->setStyleSheet(Style::themed(
-        QStringLiteral("QTableWidget { background: #1a1a2a; color: #c8d8e8; "
-                       "  gridline-color: #304050; border: 1px solid #304050; }"
-                       "QTableWidget::item { padding: 2px 4px; }"
-                       "QTableWidget::item:selected { background: #204060; }"
-                       "QHeaderView::section { background: #1a1a2a; color: #8aa8c0; "
-                       "  border: 1px solid #304050; padding: 4px; }")));
+    m_table->setStyleSheet(Style::tableStyle());   // Glas & Tiefe, 2026-09-17
+    m_table->horizontalHeader()->setFont(Style::capsFont(font(), 8));
+    m_table->horizontalHeader()->setHighlightSections(false);
     m_table->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_table->setSelectionMode(QAbstractItemView::SingleSelection);
     m_table->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Fixed);

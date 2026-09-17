@@ -292,19 +292,13 @@ void LogbookWindow::buildUi()
     m_table->horizontalHeader()->setSortIndicator(m_sortColumn, m_sortOrder);
     m_table->horizontalHeader()->setSectionsMovable(true);
     m_table->horizontalHeader()->setContextMenuPolicy(Qt::CustomContextMenu);
-    m_table->setStyleSheet(QStringLiteral(
-        "QTableWidget { background: %1; alternate-background-color: %4;"
-        "  color: %2; border: 1px solid %3; gridline-color: %3;"
-        "  font-size: 11px; }"
-        "QTableWidget::item:selected { background: %6; color: %2; }"
-        "QHeaderView::section { background: %4; color: %5; border: none;"
-        "  border-bottom: 1px solid %3; padding: 3px 6px; font-size: 11px; }"
-    ).arg(QString::fromLatin1(Style::kInsetBg),
-          QString::fromLatin1(Style::kTextPrimary),
-          QString::fromLatin1(Style::kBorderSubtle),
-          QString::fromLatin1(Style::kButtonBg),
-          QString::fromLatin1(Style::kTextSecondary),
-          QString::fromLatin1(Style::kAccent)));
+    // Glas & Tiefe (2026-09-17): der zentrale Tabellenstil — versenkt,
+    // Kopf als Versalzeile ohne Kaesten, Auswahl gedeckt. Schriften per
+    // setFont, nicht im Stylesheet (Groesse kaskadiert sonst in den Kopf).
+    m_table->setStyleSheet(Style::tableStyle());
+    m_table->setFont([this] { QFont f = font(); f.setPixelSize(Style::kFontSmall); return f; }());
+    m_table->horizontalHeader()->setFont(Style::capsFont(font(), 8));
+    m_table->horizontalHeader()->setHighlightSections(false);
 
     // ── Table beside a detail pane (L1, 2026-08-10) ──────────────────
     //

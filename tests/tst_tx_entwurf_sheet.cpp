@@ -11,6 +11,8 @@
 // Wege heraus.
 
 #include <QtTest>
+#include <QDir>
+#include <QFile>
 #include <functional>
 #include <QComboBox>
 #include <QGridLayout>
@@ -26,6 +28,7 @@
 #include "gui/applets/TxApplet.h"
 #include "gui/widgets/CommandBar.h"
 #include "gui/applets/AppletFloatingWindow.h"
+#include "gui/LogbookWindow.h"
 #include "gui/applets/AppletGrid.h"
 #include "gui/applets/GridCellWidget.h"
 #include "models/RadioModel.h"
@@ -773,6 +776,35 @@ private slots:
             QVERIFY2(img.save(aus), qPrintable(aus));
             qInfo().noquote() << "Blatt:" << aus;
         }
+    }
+
+    // Das Logbuchfenster mit dem Logbuch des Betreibers-Sandkastens (oder
+    // leer): der zentrale Tabellenstil an einer Tabelle mit vielen
+    // Spalten, damit ein zu breiter Versal-Kopf hier auffiele und nicht
+    // erst bei ihm.
+    void logbuch()
+    {
+        const QString adif = QDir::temp().filePath(QStringLiteral("blatt-logbook.adi"));
+        {
+            QFile f(adif);
+            QVERIFY(f.open(QIODevice::WriteOnly | QIODevice::Truncate));
+            f.write("<ADIF_VER:5>3.1.4<EOH>\n"
+                    "<CALL:6>OE5AOO<QSO_DATE:8>20260917<TIME_ON:4>1047<BAND:3>20m<MODE:3>USB<FREQ:6>14.225<RST_SENT:2>59<RST_RCVD:2>59<EOR>\n"
+                    "<CALL:5>F5LIW<QSO_DATE:8>20260916<TIME_ON:4>2230<BAND:3>80m<MODE:3>SSB<FREQ:5>3.770<RST_SENT:2>59<RST_RCVD:2>57<EOR>\n"
+                    "<CALL:4>YP8T<QSO_DATE:8>20260916<TIME_ON:4>2229<BAND:3>80m<MODE:3>SSB<FREQ:5>3.729<RST_SENT:2>59<RST_RCVD:2>59<EOR>\n");
+        }
+        LogbookWindow win(adif);
+        win.resize(1130, 420);
+        win.setAttribute(Qt::WA_DontShowOnScreen);
+        win.show();
+        QCoreApplication::processEvents();
+        QImage img(win.size() * 2, QImage::Format_ARGB32);
+        img.setDevicePixelRatio(2.0);
+        img.fill(QColor(Style::kAppBg));
+        win.render(&img);
+        const QString aus = QStringLiteral("/tmp/logbuch_gebaut.png");
+        QVERIFY2(img.save(aus), qPrintable(aus));
+        qInfo().noquote() << "Blatt:" << aus;
     }
 
     // Das gebaute Feld, mit denselben drei Betriebsfaellen.
