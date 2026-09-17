@@ -390,22 +390,22 @@ private slots:
     // ── 12c. nativeHalLabelForCable (option-2 Mac/Linux info row) ───────────
     // Pure label builder used by onAutoDetectClicked() on Mac/Linux to
     // render the disabled "native (bound automatically)" row for each
-    // detected NereusSdrVax device. Assertions keep the label contract
+    // detected LongpathVax device. Assertions keep the label contract
     // stable so the UI doesn't silently regress when the string changes.
     void nativeHalLabel_containsDeviceNameAndVendor()
     {
         const DetectedCable cable{
-            VirtualCableProduct::NereusSdrVax,
-            QStringLiteral("NereusSDR VAX 1"),
+            VirtualCableProduct::LongpathVax,
+            QStringLiteral("Longpath VAX 1"),
             /*isInput=*/true, 0};
 
         const QString label = VaxChannelCard::nativeHalLabelForCable(cable);
 
-        QVERIFY2(label.contains(QStringLiteral("NereusSDR VAX 1")),
+        QVERIFY2(label.contains(QStringLiteral("Longpath VAX 1")),
                  qPrintable(QStringLiteral(
                      "Expected label to contain the device name; got: %1")
                      .arg(label)));
-        QVERIFY2(label.contains(QStringLiteral("NereusSDR")),
+        QVERIFY2(label.contains(QStringLiteral("Longpath")),
                  "Expected vendor name in native HAL label");
         QVERIFY2(label.contains(QStringLiteral("bound automatically"),
                                 Qt::CaseInsensitive),
@@ -415,7 +415,7 @@ private slots:
     // ── 12d. Binding-status banner reflects current state ──────────────────
     // The persistent status banner must always answer "what is this channel
     // bound to?" without requiring the user to open any menu. Cases:
-    //   - empty deviceName on Mac/Linux → "Bound: Native HAL · NereusSDR VAX N"
+    //   - empty deviceName on Mac/Linux → "Bound: Native HAL · Longpath VAX N"
     //   - non-empty deviceName → "Bound: <name>"
     void statusLabel_reflectsNativeHalWhenUnbound()
     {
@@ -433,7 +433,7 @@ private slots:
         QLabel* statusLabel = findStatusBanner(card);
         QVERIFY2(statusLabel, "Expected a binding-status label on VaxChannelCard");
         QVERIFY2(statusLabel->text().contains(
-                     QStringLiteral("NereusSDR VAX 2")),
+                     QStringLiteral("Longpath VAX 2")),
                  qPrintable(QStringLiteral(
                      "Expected status to name the channel's native HAL device;"
                      " got: %1").arg(statusLabel->text())));

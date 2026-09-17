@@ -11,7 +11,7 @@
 //      the HAL plugin's shm_open path).
 //   2. Producer round-trip — push() on a Vax1 instance writes to the ring;
 //      raw mmap from the test side reads back the same bytes.
-//   3. Consumer round-trip — test writes known samples to /nereussdr-vax-tx;
+//   3. Consumer round-trip — test writes known samples to /longpath-vax-tx;
 //      CoreAudioHalBus(TxInput)::pull() returns them.
 //   4. Role policing — push() returns -1 on TxInput; pull() returns -1 on
 //      Vax1..4.
@@ -38,17 +38,17 @@ using namespace Longpath;
 
 namespace {
 
-constexpr const char* kVax1Path    = "/nereussdr-vax-1";
-constexpr const char* kVax2Path    = "/nereussdr-vax-2";
-constexpr const char* kTxInputPath = "/nereussdr-vax-tx";
+constexpr const char* kVax1Path    = "/longpath-vax-1";
+constexpr const char* kVax2Path    = "/longpath-vax-2";
+constexpr const char* kTxInputPath = "/longpath-vax-tx";
 
 // Unlink every VAX shm name the tests touch so a previous crash / run
 // doesn't leak stale data into the next one.
 void unlinkAllVaxSegments() {
     ::shm_unlink(kVax1Path);
     ::shm_unlink(kVax2Path);
-    ::shm_unlink("/nereussdr-vax-3");
-    ::shm_unlink("/nereussdr-vax-4");
+    ::shm_unlink("/longpath-vax-3");
+    ::shm_unlink("/longpath-vax-4");
     ::shm_unlink(kTxInputPath);
 }
 
