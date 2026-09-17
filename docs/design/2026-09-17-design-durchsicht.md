@@ -87,3 +87,36 @@ B3, B7, B8.
    sichtbaren Strings.
 5. **G2 Panelköpfe, G3 Blau-Summe, G4 Verbindungsdialog** — je ein Blatt.
 6. G5–G7 nebenbei, wenn das jeweilige Applet ohnehin angefasst wird.
+
+---
+
+## 4. Nachtrag, Abend: Richtung gewählt und angefangen
+
+Die vier Bandfilter-Blätter aus Abschnitt 1 hat der Betreiber abgelehnt
+(„gefällt keines") — Feinschliff war nicht gefragt. Auf die Frage „was
+kannst du generell beim Rendering anbieten, komplett Longpath" gab es
+vier Richtungen als Skizzen desselben Ausschnitts (Knopfreihe ·
+Bandfilter · TX-Feld): **1 Zeus-Disziplin · 2 Haarlinie/leicht · 3 Glas
+& Tiefe · 4 Analog-warm/Phosphor.** Gewählt: **3**.
+
+Was „Glas & Tiefe" konkret ist, steht als Abschnitt in
+`StyleConstants.h` (`kGlass*`): Flächen versenkt (Schwarz, Innenschatten
+oben, Lichtkante), Knöpfe erhaben (Verlauf, Lichtkante, dunkle
+Unterkante), Zahlen in Glaschips, Kurven mit Hof, Auswahl als gedeckter
+Blauverlauf.
+
+**Gebaut (Zweig `design/glas-und-tiefe`, zwei Commits):**
+
+| Schritt | Bauteil | Stand |
+| --- | --- | --- |
+| 1 | `BandwidthFilterPane` neu gezeichnet, Achse auf runden Frequenzen (B1), Zellen/Feinskala weg (B2/B3), neutrale Graus (B4), Radius (B5), Monospace (B6), RX-Kapsel grau (B7) | fertig, Blatt + grab |
+| 1 | `BandwidthFilterApplet` Bedienzeile: Versalzeilen, Glasfelder ohne Pfeile (B8) | fertig, grab |
+| 1 | `GridCellWidget`: Titel versal mit Laufweite (G2, erster Teil) | fertig |
+| 2 | `HGauge` Vorlauf/SWR versenkt, Bernstein-Verlauf, Mono-Zahl (G7 z. T.) | fertig, Blatt |
+| 2 | Regler (`sliderHStyle`), Wertchips (`insetValueStyle`), Messingtaste, Knöpfe app-weit mit Licht/Schattenkante | fertig |
+| 2 | `CommandBar` Pillen erhaben, Auswahl gedeckt (G3, erster Teil) | fertig, Blatt |
+
+**Offen, in dieser Reihenfolge:** Panel-Flächen selbst (Verlauf, Radius,
+Schatten — braucht einen Zellabstand > 0 im `AppletGrid`, heute 0, also
+ein Blatt vorher); T1/T2 Fußleiste; Verbindungsdialog (G4); Sprache
+(G1); Frequenz-Applet/S-Meter (G5); Wasserfall-Palette (G6).
