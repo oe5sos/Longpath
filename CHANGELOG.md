@@ -4,6 +4,19 @@
 
 ### Added
 
+- **Nativer CW-Decoder** (View > Containers > Applets, sichtbar nur in
+  CWL/CWU): decodiert Morse direkt aus dem Empfangston, mit Ton-
+  Einrastung (±125 Hz um den Mithoerton, `TON: ◀ 600 Hz ▶`),
+  Gebegeschwindigkeit in WPM, SNR-Balken und Tonkapsel. Der Kern ist ein
+  Port des GPL-lizenzierten Zeus Station Engine (Goertzel-Bank, adaptive
+  Schwelle, Punktlaengen-Schaetzer, Morse-Zustandsmaschine; KB2UKA/N9WAR,
+  @8970f2d) -- zwei dokumentierte Abweichungen im Timing, die der
+  Pruefstand mit synthetischem Morse fand (Pausenschwellen 2,0/5,0 statt
+  3,0/5,5 Punktlaengen, WPM aus Ton- und Pausencluster). Gleicher Bau
+  wie der RTTY-Decoder: eigener Audio-Abgriff, eigenes Applet, dieselbe
+  Sichtbarkeitsachse. `docs/architecture/2026-09-17-cw-decoder.md`.
+  Live am Funkgeraet noch nicht geprueft.
+
 - **Start-Protokoll nennt jetzt Betriebssystem, CPU-Architektur,
   Kernzahl, Qt-Laufzeitversion und RAM (macOS).** Von einer
   AetherSDR-Sichtung angestossen; reines Protokoll, keine Oberflaeche.
@@ -77,6 +90,24 @@
   Einstiegspunkt -- ⚙ dort haette nur einen Ausschnitt gezeigt.
 
 ### Fixed
+
+- **PureSignal-Verzoegerungsleitung (WDSP `delay.c`) las bei zu grossem
+  Amp-Delay ausserhalb ihres Rings.** Das Feld im PureSignal-Dialog
+  erlaubt bis 25 000 000 ns; der Ring fasst 1024 ganze Samples, bei
+  192 kHz TX-Rate also 5,3 ms. Darueber rechnete `SetDelayValue` einen
+  Startindex jenseits des Rings aus, und `xdelay()` faltet den Leseindex
+  nur einmal zurueck -- die Ausgabe war Speicher hinter der Zuteilung
+  (im Test: Stille, im Betrieb Muell oder Absturz), und die zurueck-
+  gemeldete "tatsaechliche" Verzoegerung log. Jetzt klemmt
+  `set_delay_value_unlocked()` die Phasenzahl auf das, was der Ring hat,
+  `SetPSTXDelay` gibt den realisierten Wert zurueck (der Dialog zeigt ihn
+  an), und der Impuls kommt am Ende des Rings heraus statt nirgends.
+  Portiert aus dem GPL-lizenzierten Zeus Station Engine (v2.0.19,
+  `native/wdsp/delay.c`, KB2UKA/N9WAR), erster Eintrag in
+  `docs/attribution/ZEUS-PROVENANCE.md`; Fund aus dem WDSP-Fork-Inventar
+  (`docs/design/2026-09-17-zeus-wdsp-fork-inventar.md`). Vier
+  Regressionstests in `tst_wdsp_delay_clamp` (gegen das alte `delay.c`
+  scheitern drei davon).
 
 - **Drei weitere Tabellen-/Baum-Aufbauten koennten dieselbe
   Qt-Accessibility-Explosion ausloesen wie das Logbuch und die

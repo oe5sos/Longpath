@@ -304,6 +304,11 @@ nereus_add_test(tst_puresignal_caps)
 # Source: Thetis wdsp/calcc.c:891-1132 [v2.10.3.13] @501e3f51.
 nereus_add_test(tst_wdsp_ps_smoke)
 
+# -- The PureSignal amp-delay line (WDSP delay.c): a delay the ring
+#    cannot hold is clamped and reported, not read from beyond the
+#    allocation. Clamp ported from the Zeus station engine, 2026-09-17 --
+nereus_add_test(tst_wdsp_delay_clamp)
+
 # ── Phase 3M-4 Task 3: TxChannel PureSignal API wrappers (22 functions) ──
 # Smoke tests for the 22 PS API wrappers added in Task 3:
 #   19 calcc setters/readers (setPSRunCal, setPSMox, setPSReset, setPSMancal,
@@ -900,6 +905,12 @@ nereus_add_test(tst_dev_automation_server)
 nereus_add_test(tst_rtty_decoder)
 nereus_add_test(tst_rtty_decoder_sensitivity)
 nereus_add_test(tst_rtty_decoder_applet)
+
+# -- The native CW decoder (ported from the Zeus station engine,
+#    2026-09-17): synthetic Morse at three speeds, off-pitch tracking,
+#    noise alone, a weak signal, reset, and the stereo->mono wrapper --
+nereus_add_test(tst_cw_decoder)
+nereus_add_test(tst_cw_decoder_applet)
 
 # ── Phase 3O Sub-Phase 11 Task 11a: VaxFirstRunDialog ────────────────────
 nereus_add_test(tst_vax_first_run_dialog)

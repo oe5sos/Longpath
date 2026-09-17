@@ -217,6 +217,10 @@ public:
     std::atomic<AudioTapRing*> m_rttyTap{nullptr};
     std::atomic<int>           m_rttyTapSlice{-1};
 
+    // Fuenfter Abgriff, fuer den nativen CW-Decoder (2026-09-17).
+    std::atomic<AudioTapRing*> m_cwTap{nullptr};
+    std::atomic<int>           m_cwTapSlice{-1};
+
     // Non-owning back-pointer so rxBlockReady can look up the active
     // SliceModel to read mute / VAX-channel state. Null is safe (unit
     // tests that construct AudioEngine without a RadioModel): rxBlockReady
@@ -456,6 +460,24 @@ public:
     /// Tonfaden. `ring` gehoert dem Aufrufer und muss laenger leben als
     /// der Abgriff; zum Abschalten nullptr uebergeben.
     void setRttyTap(AudioTapRing* ring, int sliceId);
+
+    /// ── Fuenfter Abgriff, fuer den nativen CW-Decoder (2026-09-17) ──
+    ///
+    /// Derselbe Bau wie die vier anderen, wieder ein EIGENER Ring: der
+    /// CW-Decoder soll neben dem RTTY-Decoder, der Aufnahme und ASR
+    /// laufen koennen, ohne sich beim Lesen zu stoeren.
+    ///
+    /// Design doc: docs/architecture/2026-09-17-cw-decoder.md.
+    ///
+    /// Kein Signal, kein Schloss, keine Speicheranforderung im
+    /// Tonfaden. `ring` gehoert dem Aufrufer und muss laenger leben als
+    /// der Abgriff; zum Abschalten nullptr uebergeben.
+    void setCwTap(AudioTapRing* ring, int sliceId);
+
+    /// Test seam (2026-09-17): which slice the CW tap is bound to, -1
+    /// when unbound. Lets tst_cw_decoder_applet check that the applet
+    /// unbinds when its slice goes away without reaching into the ring.
+    int cwTapSliceForTest() const { return m_cwTapSlice.load(std::memory_order_acquire); }
 
     void rxBlockReady(int sliceId, const float* samples, int frames);
 
@@ -1024,13 +1046,14 @@ private:
     // gate) stops the ENTIRE mix pipeline for every slice, which is fine
     // for the rare full-slice teardown it guards but would glitch every
     // other slice's audio each time an operator merely stops a QSO
-    // recording, ASR, WAV capture, or the RTTY decoder.
+    // recording, ASR, WAV capture, or the RTTY or CW decoder.
     std::atomic<unsigned> m_qsoTapBusy{0};
     std::atomic<unsigned> m_asrTapBusy{0};
     std::atomic<unsigned> m_wavRecordTapBusy{0};
     std::atomic<unsigned> m_rttyTapBusy{0};
+    std::atomic<unsigned> m_cwTapBusy{0};
 
-    // Test-only seam for the four counters above (2026-09-06). Fires on
+    // Test-only seam for the five counters above (2026-09-06). Fires on
     // the audio thread from inside writeToTapIfCurrent (AudioEngine.cpp),
     // after the matching busy counter has been incremented and the tap
     // pointer loaded, immediately before tap->write() runs — i.e. inside
