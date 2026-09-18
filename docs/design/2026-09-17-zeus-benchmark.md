@@ -138,7 +138,7 @@ Legende: ✅ gleichwertig oder besser · ⚠️ teilweise / anders · ❌ fehlt 
 | Bandplan-Regionen IARU R1/R2/R3, US-FCC-Klassen, EI, G (`BandPlans/*.json`) | `BandPlanGuard` (Region 1) ✅ | ✅ für uns |
 | Transmit-Timeout, SWR-Schutz | `SwrProtectionController` ✅ | ✅ |
 | Offline-Betrieb innerhalb der 24-h-Autorisierung (Abo) | — | — |
-| **Einstellungs-Backup/Profile-Export** (`UnifiedDatabaseBackup`, `PrefsProfileExport`), Layout als portable `.zeus-layout`-Datei teilen | Profile ✅, **kein Layout-Export** | ⚠️ klein |
+| **Einstellungs-Backup/Profile-Export** (`UnifiedDatabaseBackup`, `PrefsProfileExport`), Layout als portable `.zeus-layout`-Datei teilen | Profile ✅, Layout-Export/-Import als JSON seit 2026-08-30 ✅ (`LayoutProfiles::exportToJson`, Profile-Menü „Export…"; am 17.09. übersehen) — **kein Einstellungs-Backup** als eine Datei | ⚠️ klein (nur das Backup) |
 | Onboarding-Zustand (`OnboardingEndpoints`) | nur VAX-Erststart-Dialog | ⚠️ |
 | Windows-Firewall ohne Prompt, ASIO, Virtual-Cable-Katalog | `VirtualCableDetector` ✅, PortAudio | ✅ |
 
@@ -311,9 +311,14 @@ RTTY, Automation, Kiwi kamen von dort); **deskHPSDR** für den WDSP-2.1-Sync
 | 4 | **Logbuch-Kennzahlen + Awards** (Bänder/Modi/Aktivität/Top-Länder, DXCC/WAS/Grid-Zähler aus dem eigenen Log) | Woche | Sichtbarster Unterschied im Logbuch; Daten haben wir |
 | 5 | **RX-Leveler** (Zeus' Design: Beweis-gebunden, ADC-Veto) | Tage | Löst „AGC hebt Rauschen an" — Betriebsnutzen |
 | 6 | **AU-Effekte** in der TX-Kette (Teil 1 Mitnahme 1) | Woche+ | Die eine Funktionslücke, die Bediener nennen |
-| 7 | Globale Hotkeys · Frequenzspeicher · RX-Profile · Layout-Export · SNR im S-Meter · Roger-Beep · serieller PTT | je Tag | Kleinkram, der Zeus „fertig" wirken lässt |
+| 7 | Globale Hotkeys · Frequenzspeicher · RX-Profile · Einstellungs-Backup · SNR im S-Meter · Roger-Beep · serieller PTT | je Tag | Kleinkram, der Zeus „fertig" wirken lässt (Layout-Export gibt es seit 30.08., am 17.09. übersehen) |
 | 8 | **Release-Kadenz**: 0.6.3 raus, dann Notizen je Release wie Zeus | — | Der Maßstab, der am meisten zählt und nichts kostet |
 | 9 | Fernbedienung (Web/Uhr), FT8 nativ, Satelliten, APRS, Winlink, Chat | Monate | Bewusst nicht jetzt; FT8/APRS/Winlink sind Zeus' Produktstrategie |
+
+**Stand 18.09.:** 3 (CW-Decoder, #17), 4 (Kennzahlen + Awards, #19) und
+5 (RX-Leveler, #18) sind gebaut; 1, 2 und „SNR im S-Meter" sind
+Gestaltung/Layout, 6, Roger-Beep und serieller PTT berühren den Sendezweig,
+Hotkeys die Bedienung — alle vier warten auf eine Entscheidung.
 
 Was ich nicht übernehmen würde, auch nicht als Maßstab: Abo-Gating, Store,
 ZeusChat, GodsEye-Kameras/Schiffe/Flugzeuge, Ultra-Auflösungsfilter.
