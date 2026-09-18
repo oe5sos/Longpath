@@ -120,6 +120,7 @@
 #include "core/NbFamily.h"
 #include "core/SampleRateCatalog.h"
 #include "core/WdspTypes.h"
+#include "core/audio/RxAudioLeveler.h"
 
 #include <QHash>
 #include <QList>
@@ -370,6 +371,16 @@ class SliceModel : public QObject {
     Q_PROPERTY(bool   apfEnabled      READ apfEnabled      WRITE setApfEnabled      NOTIFY apfEnabledChanged)
     Q_PROPERTY(int    apfTuneHz       READ apfTuneHz       WRITE setApfTuneHz       NOTIFY apfTuneHzChanged)
     Q_PROPERTY(bool   binauralEnabled READ binauralEnabled WRITE setBinauralEnabled NOTIFY binauralEnabledChanged)
+    // RX audio leveler (Zeus "RX LVLR" port, 2026-09-18): on/off plus the
+    // Custom profile; Auto uses the upstream constants. Persisted per slice
+    // (not per band -- it is a loudness preference, not a band setting).
+    Q_PROPERTY(bool   levelerEnabled  READ levelerEnabled  WRITE setLevelerEnabled  NOTIFY levelerEnabledChanged)
+    Q_PROPERTY(bool   levelerCustom   READ levelerCustom   WRITE setLevelerCustom   NOTIFY levelerConfigChanged)
+    Q_PROPERTY(double levelerTargetDb READ levelerTargetDb WRITE setLevelerTargetDb NOTIFY levelerConfigChanged)
+    Q_PROPERTY(double levelerMaxBoostDb READ levelerMaxBoostDb WRITE setLevelerMaxBoostDb NOTIFY levelerConfigChanged)
+    Q_PROPERTY(int    levelerAttackMs READ levelerAttackMs WRITE setLevelerAttackMs NOTIFY levelerConfigChanged)
+    Q_PROPERTY(int    levelerReleaseMs READ levelerReleaseMs WRITE setLevelerReleaseMs NOTIFY levelerConfigChanged)
+    Q_PROPERTY(int    levelerHangMs   READ levelerHangMs   WRITE setLevelerHangMs   NOTIFY levelerConfigChanged)
     Q_PROPERTY(int    fmCtcssMode     READ fmCtcssMode     WRITE setFmCtcssMode     NOTIFY fmCtcssModeChanged)
     Q_PROPERTY(double fmCtcssValueHz  READ fmCtcssValueHz  WRITE setFmCtcssValueHz  NOTIFY fmCtcssValueHzChanged)
     Q_PROPERTY(int    fmOffsetHz      READ fmOffsetHz      WRITE setFmOffsetHz      NOTIFY fmOffsetHzChanged)
@@ -945,6 +956,25 @@ public:
     bool   binauralEnabled() const { return m_binauralEnabled; }
     void   setBinauralEnabled(bool v);
 
+    // ---- RX audio leveler ----
+    bool   levelerEnabled() const { return m_levelerEnabled; }
+    void   setLevelerEnabled(bool on);
+    bool   levelerCustom() const { return m_levelerConfig.mode == RxLevelerConfig::Mode::Custom; }
+    void   setLevelerCustom(bool custom);
+    double levelerTargetDb() const { return m_levelerConfig.targetRmsDb; }
+    void   setLevelerTargetDb(double dB);
+    double levelerMaxBoostDb() const { return m_levelerConfig.maxBoostDb; }
+    void   setLevelerMaxBoostDb(double dB);
+    int    levelerAttackMs() const { return m_levelerConfig.attackMs; }
+    void   setLevelerAttackMs(int ms);
+    int    levelerReleaseMs() const { return m_levelerConfig.releaseMs; }
+    void   setLevelerReleaseMs(int ms);
+    int    levelerHangMs() const { return m_levelerConfig.hangMs; }
+    void   setLevelerHangMs(int ms);
+    // The whole profile, normalised, as RxChannel takes it.
+    RxLevelerConfig levelerConfig() const { return m_levelerConfig; }
+    void   setLevelerConfig(const RxLevelerConfig& cfg);
+
     int    fmCtcssMode()     const { return m_fmCtcssMode; }
     void   setFmCtcssMode(int mode);
 
@@ -1213,6 +1243,8 @@ signals:
     void apfEnabledChanged(bool v);
     void apfTuneHzChanged(int hz);
     void binauralEnabledChanged(bool v);
+    void levelerEnabledChanged(bool on);
+    void levelerConfigChanged();
     void fmCtcssModeChanged(int mode);
     void fmCtcssValueHzChanged(double hz);
     void fmOffsetHzChanged(int hz);
@@ -1411,6 +1443,10 @@ private:
     bool   m_apfEnabled{false};       // Neutral default — feature off at start
     int    m_apfTuneHz{0};            // Neutral default — zero tune offset
     bool   m_binauralEnabled{false};  // Neutral default — feature off at start
+    // RX audio leveler: off by default (Zeus.Contracts/Dtos.cs:1213
+    // [@8970f2d] RxLevelerEnabled = false) with the Auto profile.
+    bool            m_levelerEnabled{false};
+    RxLevelerConfig m_levelerConfig{};
     int    m_fmCtcssMode{0};          // Neutral default — Off (0 = disabled)
     double m_fmCtcssValueHz{100.0};   // From Thetis console.cs:40500 — ctcss_freq = 100.0; radio.cs:2899 — ctcss_freq_hz = 100.0
     int      m_fmOffsetHz{0};           // Neutral default — zero offset

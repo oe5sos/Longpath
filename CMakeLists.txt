@@ -581,6 +581,7 @@ set(CORE_SOURCES
     src/core/FFTEngine.cpp
     src/core/NoiseFloorEstimator.cpp
     src/core/NoiseFloorTracker.cpp
+    src/core/InPassbandSnrEstimator.cpp
     src/core/ClarityController.cpp
     src/core/StepAttenuatorController.cpp
     src/core/CalibrationController.cpp
@@ -633,6 +634,7 @@ set(CORE_SOURCES
     src/core/VoiceSignalDetector.cpp
     src/core/SignalHistoryStore.cpp
     src/core/audio/AudioTapRing.cpp
+    src/core/audio/RxAudioLeveler.cpp
     src/core/audio/QsoRecorderController.cpp
     src/core/audio/WavFile.cpp
     src/core/audio/WavPlayer.cpp
@@ -711,6 +713,7 @@ endif()
 set(MODEL_SOURCES
     src/models/RadioModel.cpp
     src/models/RxDspWorker.cpp
+    src/models/PassbandSnrTracker.cpp
     src/models/Band.cpp
     src/models/BandDefaults.cpp
     src/models/BandPlanManager.cpp

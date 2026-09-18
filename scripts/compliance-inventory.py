@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -23,6 +24,7 @@ REPO = Path(__file__).resolve().parent.parent
 
 THETIS_PROVENANCE = REPO / "docs" / "attribution" / "THETIS-PROVENANCE.md"
 AETHER_RECONCILIATION = REPO / "docs" / "attribution" / "aethersdr-reconciliation.md"
+ZEUS_PROVENANCE = REPO / "docs" / "attribution" / "ZEUS-PROVENANCE.md"
 
 
 def _git_tracked_files() -> list[str]:
@@ -89,8 +91,36 @@ def _aethersdr_bucket_a_paths(md_path: Path) -> set[str]:
     return paths
 
 
+def _zeus_port_paths(md_path: Path) -> set[str]:
+    """Rows of ZEUS-PROVENANCE.md whose derivation type is `port` or
+    `verbatim` (column 4). `reference` rows are Longpath-original files
+    that only consulted Zeus and stay in their ordinary class. The first
+    column may name a pair as `src/x/Foo.{h,cpp}`; both files are
+    returned."""
+    if not md_path.exists():
+        return set()
+    paths: set[str] = set()
+    for line in md_path.read_text(encoding="utf-8").splitlines():
+        if not line.startswith("| "):
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if len(cells) < 4 or cells[3] not in ("port", "verbatim"):
+            continue
+        first = cells[0].strip("`")
+        if not first.startswith(("src/", "tests/", "third_party/")):
+            continue
+        m = re.match(r"^(.*)\{([^}]*)\}$", first)
+        if m:
+            for ext in m.group(2).split(","):
+                paths.add(m.group(1) + ext.strip())
+        else:
+            paths.add(first)
+    return paths
+
+
 THETIS_PORTS = _paths_from_table(THETIS_PROVENANCE)
 AETHER_PORTS = _aethersdr_bucket_a_paths(AETHER_RECONCILIATION)
+ZEUS_PORTS = _zeus_port_paths(ZEUS_PROVENANCE)
 
 
 def classify(path: str) -> str:
@@ -104,6 +134,8 @@ def classify(path: str) -> str:
         return "thetis-port"
     if path in AETHER_PORTS:
         return "aethersdr-port"
+    if path in ZEUS_PORTS:
+        return "zeus-port"
     if path.startswith("docs/attribution/"):
         return "attribution-doc"
     if path.startswith("docs/"):
@@ -135,6 +167,9 @@ REQUIRED_MARKERS: dict[str, list] = {
         "General Public License", MOD_HISTORY_MARKER,
     ],
     "aethersdr-port": ["AetherSDR", MOD_HISTORY_MARKER],
+    # Zeus station-engine ports (docs/attribution/ZEUS-PROVENANCE.md):
+    # the header names the upstream, its licence and carries a history block.
+    "zeus-port": ["Zeus station engine", "GPL-2.0-or-later", MOD_HISTORY_MARKER],
     "wdsp-vendored": ["Copyright (C)", "General Public License"],
     # The following classes carry no merge-gated marker requirement; the
     # inventory records them without flagging missing markers.

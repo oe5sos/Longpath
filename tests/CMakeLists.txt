@@ -309,6 +309,15 @@ nereus_add_test(tst_wdsp_ps_smoke)
 #    allocation. Clamp ported from the Zeus station engine, 2026-09-17 --
 nereus_add_test(tst_wdsp_delay_clamp)
 
+# -- RX audio leveler + in-passband SNR estimator (ported from the Zeus
+#    station engine, 2026-09-18): fail-closed boost, cut/peak guard,
+#    release-to-unity, block-rate scaling, evidence FSM; the estimator on
+#    synthetic dB/Hz spectra; the tracker end to end into a WDSP channel --
+nereus_add_test(tst_rx_audio_leveler)
+nereus_add_test(tst_in_passband_snr_estimator)
+nereus_add_test(tst_passband_snr_tracker)
+nereus_add_test(tst_rx_leveler_ui)
+
 # ── Phase 3M-4 Task 3: TxChannel PureSignal API wrappers (22 functions) ──
 # Smoke tests for the 22 PS API wrappers added in Task 3:
 #   19 calcc setters/readers (setPSRunCal, setPSMox, setPSReset, setPSMancal,

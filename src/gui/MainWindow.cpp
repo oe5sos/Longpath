@@ -303,6 +303,7 @@ warren@wpratt.com
 #include "core/StepAttenuatorController.h"
 #include "core/MoxController.h"  // 3M-1a G.1: F.2 connect (hardwareFlipped → onMoxHardwareFlipped)
 #include "core/NoiseFloorTracker.h"
+#include "models/PassbandSnrTracker.h"
 #include "core/BoardCapabilities.h"
 #include "core/TxSliceArbiter.h"  // Phase 3F Sub-Epic C Task 9: TX-handoff routing
 #include "models/PanadapterModel.h"
@@ -2400,6 +2401,21 @@ FFTEngine* MainWindow::createFftEngineForStream(int streamIndex)
         static constexpr float kFrameIntervalMs = 33.0f;
         nf->feed(binsDbm, kFrameIntervalMs);
     });
+
+    // The RX leveler's evidence: every stream's linear frame goes to the
+    // one PassbandSnrTracker, which averages it (WDSP avenger arithmetic)
+    // and, at 5 Hz, runs the in-passband SNR estimator for each slice on
+    // the stream. Same delivery as the noise-floor feed above; the tracker
+    // decides per slice whether anyone is listening.
+    if (m_radioModel && m_radioModel->passbandSnrTracker()) {
+        PassbandSnrTracker* snr = m_radioModel->passbandSnrTracker();
+        connect(engine, &FFTEngine::fftReadyLinear, snr,
+                [snr, engine, streamIndex](int, const QVector<float>& binsLinear,
+                                           double windowEnb, double dbmOffset) {
+            snr->feedFrame(streamIndex, binsLinear, windowEnb, dbmOffset,
+                           engine->sampleRate(), RxChannel::levelerClockMs());
+        });
+    }
 
     m_fftEngines.insert(streamIndex, engine);
     return engine;

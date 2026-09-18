@@ -1766,6 +1766,66 @@ void SliceModel::setBinauralEnabled(bool v)
     }
 }
 
+// ---- RX audio leveler ----
+
+void SliceModel::setLevelerEnabled(bool on)
+{
+    if (m_levelerEnabled != on) {
+        m_levelerEnabled = on;
+        emit levelerEnabledChanged(on);
+    }
+}
+
+void SliceModel::setLevelerConfig(const RxLevelerConfig& cfg)
+{
+    const RxLevelerConfig n = RxLevelerConfig::normalized(cfg);
+    if (m_levelerConfig == n) { return; }
+    m_levelerConfig = n;
+    emit levelerConfigChanged();
+}
+
+void SliceModel::setLevelerCustom(bool custom)
+{
+    RxLevelerConfig c = m_levelerConfig;
+    c.mode = custom ? RxLevelerConfig::Mode::Custom : RxLevelerConfig::Mode::Auto;
+    setLevelerConfig(c);
+}
+
+void SliceModel::setLevelerTargetDb(double dB)
+{
+    RxLevelerConfig c = m_levelerConfig;
+    c.targetRmsDb = dB;
+    setLevelerConfig(c);
+}
+
+void SliceModel::setLevelerMaxBoostDb(double dB)
+{
+    RxLevelerConfig c = m_levelerConfig;
+    c.maxBoostDb = dB;
+    setLevelerConfig(c);
+}
+
+void SliceModel::setLevelerAttackMs(int ms)
+{
+    RxLevelerConfig c = m_levelerConfig;
+    c.attackMs = ms;
+    setLevelerConfig(c);
+}
+
+void SliceModel::setLevelerReleaseMs(int ms)
+{
+    RxLevelerConfig c = m_levelerConfig;
+    c.releaseMs = ms;
+    setLevelerConfig(c);
+}
+
+void SliceModel::setLevelerHangMs(int ms)
+{
+    RxLevelerConfig c = m_levelerConfig;
+    c.hangMs = ms;
+    setLevelerConfig(c);
+}
+
 void SliceModel::setFmCtcssMode(int mode)
 {
     if (m_fmCtcssMode != mode) {
@@ -2316,6 +2376,14 @@ void SliceModel::saveToSettings(Band band)
 
     s.setValue(sp + QStringLiteral("SnbEnabled"), boolStr(m_snbEnabled));
     s.setValue(sp + QStringLiteral("AnfEnabled"), boolStr(m_anfEnabled));
+    // RX audio leveler (per slice, band-independent)
+    s.setValue(sp + QStringLiteral("LevelerEnabled"),    boolStr(m_levelerEnabled));
+    s.setValue(sp + QStringLiteral("LevelerCustom"),     boolStr(levelerCustom()));
+    s.setValue(sp + QStringLiteral("LevelerTargetDb"),   m_levelerConfig.targetRmsDb);
+    s.setValue(sp + QStringLiteral("LevelerMaxBoostDb"), m_levelerConfig.maxBoostDb);
+    s.setValue(sp + QStringLiteral("LevelerAttackMs"),   m_levelerConfig.attackMs);
+    s.setValue(sp + QStringLiteral("LevelerReleaseMs"),  m_levelerConfig.releaseMs);
+    s.setValue(sp + QStringLiteral("LevelerHangMs"),     m_levelerConfig.hangMs);
     // NB1 / NB2 / SNB detailed tuning. Per slice per band like everything
     // else here, even though NB1 and NB2 behave as stream-shared while two
     // slices are co-hosted: the mirror lives in RadioModel and only applies
@@ -2597,6 +2665,33 @@ void SliceModel::restoreFromSettings(Band band)
     }
     if (s.contains(sp + QStringLiteral("AnfEnabled"))) {
         setAnfEnabled(s.value(sp + QStringLiteral("AnfEnabled")).toString() == QLatin1String("True"));
+    }
+    // RX audio leveler
+    if (s.contains(sp + QStringLiteral("LevelerEnabled"))) {
+        setLevelerEnabled(s.value(sp + QStringLiteral("LevelerEnabled")).toString() == QLatin1String("True"));
+    }
+    {
+        RxLevelerConfig c = m_levelerConfig;
+        if (s.contains(sp + QStringLiteral("LevelerCustom"))) {
+            c.mode = (s.value(sp + QStringLiteral("LevelerCustom")).toString() == QLatin1String("True"))
+                ? RxLevelerConfig::Mode::Custom : RxLevelerConfig::Mode::Auto;
+        }
+        if (s.contains(sp + QStringLiteral("LevelerTargetDb"))) {
+            c.targetRmsDb = s.value(sp + QStringLiteral("LevelerTargetDb")).toDouble();
+        }
+        if (s.contains(sp + QStringLiteral("LevelerMaxBoostDb"))) {
+            c.maxBoostDb = s.value(sp + QStringLiteral("LevelerMaxBoostDb")).toDouble();
+        }
+        if (s.contains(sp + QStringLiteral("LevelerAttackMs"))) {
+            c.attackMs = s.value(sp + QStringLiteral("LevelerAttackMs")).toInt();
+        }
+        if (s.contains(sp + QStringLiteral("LevelerReleaseMs"))) {
+            c.releaseMs = s.value(sp + QStringLiteral("LevelerReleaseMs")).toInt();
+        }
+        if (s.contains(sp + QStringLiteral("LevelerHangMs"))) {
+            c.hangMs = s.value(sp + QStringLiteral("LevelerHangMs")).toInt();
+        }
+        setLevelerConfig(c);
     }
 
     // NB1 / NB2 / SNB detailed tuning, with a one-way migration off the old

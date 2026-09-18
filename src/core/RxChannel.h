@@ -201,6 +201,7 @@ warren@wpratt.com
 #include "dsp/ChannelConfig.h"
 #include "dsp/Notch.h"
 #include "dsp/RxChannelState.h"
+#include "audio/RxAudioLeveler.h"
 
 #ifdef HAVE_DFNR
 #include "DeepFilterFilter.h"
@@ -214,6 +215,7 @@ warren@wpratt.com
 #include <QObject>
 
 #include <atomic>
+#include <cstdint>
 #include <cstring>
 #include <memory>
 
@@ -862,6 +864,28 @@ public:
     bool isActive() const { return m_active.load(); }
     void setActive(bool active);
 
+    // --- RX audio leveler (post-WDSP, ported from the Zeus station engine) ---
+    //
+    // Runs at the end of processIq() on outI/outQ, after every NR stage and
+    // before the TCI audio tap, so every sink hears the same audio (Zeus
+    // levels its whole RX bus). Off by default; off means bypassed once any
+    // positive makeup has been released -- see applyRxLeveler(). The boost
+    // permission (setLevelerEvidence) is written by PassbandSnrTracker on
+    // the main thread at 5 Hz and read on the DSP thread; the evidence is
+    // only honoured while younger than RxAudioLeveler::kEvidenceMaxAgeMs.
+    void setLevelerEnabled(bool on);
+    bool levelerEnabled() const { return m_levelerEnabled.load(std::memory_order_acquire); }
+    void setLevelerConfig(const RxLevelerConfig& cfg);
+    RxLevelerConfig levelerConfig() const;
+    void setLevelerEvidence(bool rfSignalResolved, bool adcOverloadRisk, int64_t evidenceMs);
+    // Gain that reached the last block (dB), for a readout; 0 while bypassed.
+    double levelerAppliedGainDb() const { return m_levelerAppliedGainDb.load(std::memory_order_relaxed); }
+    // The leveler pass itself, public so a test can drive it on a synthetic
+    // block without WDSP. Longpath rule: bypass when disabled and idle.
+    void applyRxLeveler(float* left, float* right, int frames);
+    // Monotonic milliseconds shared by the writer (tracker) and reader.
+    static int64_t levelerClockMs();
+
     // --- Audio processing (called from audio thread) ---
 
     // Process I/Q samples through the WDSP RX chain.
@@ -999,6 +1023,24 @@ private:
     // From Thetis radio.cs:1145-1162 — bin_on = false
     std::atomic<bool> m_binauralEnabled{false};
     std::atomic<bool> m_active{false};
+
+    // RX audio leveler. Parameters are atomics written on the main thread
+    // and read per block on the DSP thread (a torn read across the six
+    // config fields yields a valid, normalised value for each). The
+    // leveler state itself is DSP-thread only.
+    std::atomic<bool>    m_levelerEnabled{false};
+    std::atomic<int>     m_levelerMode{static_cast<int>(RxLevelerConfig::Mode::Auto)};
+    std::atomic<double>  m_levelerTargetRmsDb{RxLevelerConfig::kDefaultTargetRmsDb};
+    std::atomic<double>  m_levelerMaxBoostDb{RxLevelerConfig::kDefaultMaxBoostDb};
+    std::atomic<int>     m_levelerAttackMs{RxLevelerConfig::kDefaultAttackMs};
+    std::atomic<int>     m_levelerReleaseMs{RxLevelerConfig::kDefaultReleaseMs};
+    std::atomic<int>     m_levelerHangMs{RxLevelerConfig::kDefaultHangMs};
+    std::atomic<bool>    m_levelerRfResolved{false};
+    std::atomic<bool>    m_levelerAdcRisk{true};
+    std::atomic<int64_t> m_levelerEvidenceMs{INT64_MIN};
+    std::atomic<double>  m_levelerAppliedGainDb{0.0};
+    RxAudioLeveler       m_leveler;          // DSP thread only
+    int64_t              m_levelerLastLogMs{INT64_MIN}; // DSP thread only
 
     // AGC advanced parameters — atomic for thread-safe reads from audio thread
     // Defaults from Thetis Project Files/Source/Console/radio.cs:1037-1124
