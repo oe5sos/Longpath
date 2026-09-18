@@ -451,8 +451,16 @@ void RxApplet::buildUi()
     // ── Two-column area ───────────────────────────────────────────────────
     // From AetherSDR RxApplet.cpp lines 443-878
     // left:right stretch = 2:3 (same as AetherSDR)
-    auto* columns = new QHBoxLayout;
-    columns->setSpacing(4);
+    // Die zwei Spalten liegen in einem QBoxLayout, dessen Richtung
+    // resizeEvent() umschaltet: unter kStackColumnsBelowPx stehen sie
+    // untereinander (2026-09-18). In der 268 px breiten Applet-Spalte
+    // des Betreibers hatte die rechte Spalte 156 px, und MUTE/BIN,
+    // NB/SNB/APF und der AGC-Regler lagen uebereinander — dieselbe
+    // Falle wie beim Bandfilter, dieselbe Loesung (Umbruch statt
+    // Quetschen).
+    m_columns = new QBoxLayout(QBoxLayout::LeftToRight);
+    m_columns->setSpacing(4);
+    auto* columns = m_columns;
 
     // ── Left column ───────────────────────────────────────────────────────
     auto* leftCol = new QVBoxLayout;
@@ -744,7 +752,7 @@ void RxApplet::buildUi()
         m_agcCombo->addItem(QStringLiteral("Slow"), static_cast<int>(AGCMode::Slow));
         m_agcCombo->addItem(QStringLiteral("Med"),  static_cast<int>(AGCMode::Med));
         m_agcCombo->addItem(QStringLiteral("Fast"), static_cast<int>(AGCMode::Fast));
-        m_agcCombo->setFixedWidth(52);
+        m_agcCombo->setFixedWidth(64);   // 52 zeigte "Me" statt "Med" mit dem Glas-Auswahlfeld (Polsterung 8 + Pfeil 18)
         m_agcCombo->setFixedHeight(20);
         applyComboStyle(m_agcCombo);
 
@@ -992,6 +1000,7 @@ void RxApplet::buildUi()
 
     columns->addLayout(rightCol, 3);
     root->addLayout(columns);
+    applyColumnDirection();
 
     // Phase 3P-B Task 10: ADC OVL badge row + RX1 preamp toggle.
     //
@@ -2068,6 +2077,33 @@ void RxApplet::syncInheritedFromSlice()
     if (m_snbBtn)    { m_snbBtn->setChecked(m_slice->snbEnabled()); }
     if (m_apfBtn)    { m_apfBtn->setChecked(m_slice->apfEnabled()); }
     if (m_apfSlider) { m_apfSlider->setValue(m_slice->apfTuneHz()); }
+}
+
+
+// ── Spalten nebeneinander oder untereinander ─────────────────────────
+//
+// Unter kStackColumnsBelowPx (die Applet-Spalte des Betreibers ist
+// 268 px breit) stehen die beiden Spalten untereinander; darueber
+// nebeneinander im Verhaeltnis 2:3 wie bei AetherSDR.
+void RxApplet::resizeEvent(QResizeEvent* e)
+{
+    AppletWidget::resizeEvent(e);
+    applyColumnDirection();
+}
+
+void RxApplet::applyColumnDirection()
+{
+    if (!m_columns) { return; }
+    const bool stacked = width() < kStackColumnsBelowPx;
+    const QBoxLayout::Direction want = stacked ? QBoxLayout::TopToBottom
+                                               : QBoxLayout::LeftToRight;
+    if (m_columns->direction() == want) { return; }
+    m_columns->setDirection(want);
+    // Untereinander bekommt keine Spalte "Stretch" — sonst zoege die
+    // rechte (3) die Reihen der linken auseinander.
+    for (int i = 0; i < m_columns->count(); ++i) {
+        m_columns->setStretch(i, stacked ? 0 : (i == 0 ? 2 : 3));
+    }
 }
 
 } // namespace Longpath

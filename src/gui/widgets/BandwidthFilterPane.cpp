@@ -668,6 +668,12 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
             while (every * gap < widest + 10) { ++every; }
         }
     }
+    // Das Hineinschieben am Rand kann eine Zahl auf ihre Nachbarin
+    // schieben (268 px breit: "14.22014.222", Blatt vom 2026-09-18).
+    // Darum merkt sich die Schleife den rechten Rand der zuletzt
+    // gezeichneten Zahl; was darueber laege, entfaellt — eine Zahl
+    // weniger ist besser als zwei ineinander.
+    int lastRight = -1000;
     for (int i = 0; i < marks.size(); ++i) {
         if (i % every != 0) { continue; }
         const int hz = marks[i];
@@ -677,6 +683,8 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
         int left = x - tw / 2;
         if (left < 1) { left = 1; }
         if (left + tw > width() - 1) { left = width() - 1 - tw; }
+        if (left < lastRight + 4) { continue; }
+        lastRight = left + tw;
         p.setPen(faint);
         p.drawText(QRect(left, height() - kPadBottom + 2, tw, 13),
                    Qt::AlignCenter, t);

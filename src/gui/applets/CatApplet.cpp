@@ -43,9 +43,17 @@ static QLabel* makeLed(const QString& name, QWidget* parent)
     auto* led = new QLabel(name, parent);
     led->setFixedSize(24, 14);
     led->setAlignment(Qt::AlignCenter);
-    led->setStyleSheet(Style::themed(QStringLiteral(
-        "QLabel { background: #405060; color: #c8d8e8; border-radius: 6px;"
-        " font-size: 9px; font-weight: bold; }")));
+    // Ein Glaschip (versenkt, Lichtkante unten) statt der flachen
+    // Kapsel in Grau — Glas & Tiefe, Applets zweite Runde (2026-09-18).
+    led->setStyleSheet(QStringLiteral(
+        "QLabel { background: %1; color: %2; border: 1px solid %3;"
+        " border-top-color: %4; border-bottom-color: %5; border-radius: 6px;"
+        " font-size: 9px; font-weight: bold; }")
+        .arg(Style::sunkenFill(Style::kInsetBg, 8, 4),
+             Style::hexRole(Style::kTextSecondary),
+             Style::hexRole(Style::kBorder),
+             QLatin1String(Style::kGlassShade),
+             QLatin1String(Style::kGlassLight)));
     return led;
 }
 

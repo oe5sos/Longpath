@@ -127,6 +127,8 @@
 #include "gui/widgets/TriBtn.h"
 #include "models/Band.h"
 
+#include <QBoxLayout>
+#include <QResizeEvent>
 #include <QList>
 #include <QPushButton>
 #include <QStringList>
@@ -257,9 +259,17 @@ signals:
     void openNrSetupRequested(Longpath::NrSlot slot);
     void openNbSetupRequested();
 
+protected:
+    void resizeEvent(QResizeEvent* e) override;
+
 private:
     void buildUi();
     void connectSlice(SliceModel* s);
+    void applyColumnDirection();
+
+    /// Unterhalb dieser Breite stehen die zwei Spalten untereinander.
+    static constexpr int kStackColumnsBelowPx = 420;
+    QBoxLayout* m_columns{nullptr};
     void disconnectSlice(SliceModel* s);
     void updateFilterLabel();
 

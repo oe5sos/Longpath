@@ -179,11 +179,17 @@ QLabel* AppletWidget::insetValue(const QString& text, int w)
 
 QFrame* AppletWidget::divider()
 {
+    // Eine Rille statt Qt's HLine (2026-09-18): Fusion malte die
+    // "Sunken"-Linie aus der Palette hell — auf dem CAT-Blatt ein
+    // weisser Strich. Jetzt zwei Pixel wie jede Kante im Haus:
+    // oben Schatten, unten Licht.
     auto* line = new QFrame(this);
-    line->setFrameShape(QFrame::HLine);
-    line->setFrameShadow(QFrame::Sunken);
+    line->setFrameShape(QFrame::NoFrame);
     line->setFixedHeight(2);
-    line->setStyleSheet(QStringLiteral("QFrame { color: %1; }").arg(Style::kInsetBorder));
+    line->setStyleSheet(QStringLiteral(
+        "QFrame { border: none; background: qlineargradient(x1:0, y1:0, x2:0, y2:1,"
+        " stop:0 %1, stop:0.5 %1, stop:0.51 %2, stop:1 %2); }")
+        .arg(QLatin1String(Style::kGlassShade), QLatin1String(Style::kGlassLight)));
     return line;
 }
 

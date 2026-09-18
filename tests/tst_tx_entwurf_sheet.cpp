@@ -973,6 +973,35 @@ private slots:
         launcher.stop();
     }
 
+    // Das RX-Applet in der Breite der Applet-Spalte des Betreibers
+    // (268 px): die Spalten muessen untereinander stehen, nichts darf
+    // sich ueberlagern. Dazu einmal breit (560) zum Vergleich.
+    void rxSchmal()
+    {
+        applyAppBaselineQss(*qApp);
+        RadioModel modell;
+        SliceModel* slice = modell.sliceById(0);
+        if (!slice) { slice = modell.sliceById(modell.addSlice()); }
+        for (int w : {268, 560}) {
+            auto* applet = new RxApplet(slice, &modell);
+            AppletFloatingWindow win(applet, QStringLiteral("RX"), 0);
+            win.setAttribute(Qt::WA_DontShowOnScreen);
+            win.show();
+            QCoreApplication::processEvents();
+            win.resize(w, win.sizeHint().height());
+            QCoreApplication::processEvents();
+            win.resize(w, qMin(win.sizeHint().height(), 900));
+            QCoreApplication::processEvents();
+            QImage img(win.size() * 2, QImage::Format_ARGB32);
+            img.setDevicePixelRatio(2.0);
+            img.fill(QColor(Style::kAppBg));
+            win.render(&img);
+            const QString aus = QStringLiteral("/tmp/rx_%1.png").arg(w);
+            QVERIFY2(img.save(aus), qPrintable(aus));
+            qInfo().noquote() << "Blatt:" << aus << win.size();
+        }
+    }
+
     // Der Formularstil (Roadmap C/F, 2026-09-18): die App-Basislinie
     // allein — kein Widget hier hat ein eigenes Stylesheet. So sieht
     // jede Setup-Seite aus, die nichts weiter tut, und jedes Applet-
