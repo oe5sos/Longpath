@@ -78,6 +78,28 @@
 
 ### Fixed
 
+- **Ein einziger NaN- oder Unendlich-Wert in der TX-Kanalzug-Kette
+  (Audio Channel Strip) vergiftete bisher alles dahinter -- jetzt wird
+  er je Stufe abgefangen.** Nachgewiesen am unveraenderten Limiter: ein
+  +inf-Sample, und alle 100 folgenden sauberen Bloecke kamen als NaN
+  heraus (die Huellkurve bleibt bei unendlich stehen); dahinter haetten
+  WDSPs TXA-Kette, PureSignal und die Wandlung in Draht-Integer den
+  Wert geerbt -- Vollausschlag-Muell auf dem Band. `StripChain::
+  processMono` prueft den Block jetzt einmal am Eingang (nicht-endliche
+  Mikrofon-Samples werden Stille) und nach jeder eingeschalteten Stufe:
+  liefert eine Stufe Nicht-Endliches, wird fuer diesen Block der
+  Eingangsblock der Stufe wiederhergestellt (dasselbe Ergebnis wie ihr
+  Bypass-Schalter, bit-exakt) und die Stufe zurueckgesetzt, damit der
+  Wert nicht in Verzoegerungsleitung oder Huellkurve sitzen bleibt. Je
+  Quelle (Eingang, acht Stufen) ein Zaehler; die TX-Pumpe meldet eine
+  wachsende Zahl hoechstens alle 5 s mit der schuldigen Stufe im Log
+  (`nereus.tx.worker`). Kein Speicher, kein Schloss auf dem Audio-Faden
+  (Schnappschuss ist Teil des Objekts). Angestossen vom Zeus-Engine-
+  Inventar (`docs/design/2026-09-17-zeus-plugin-system-inventar.md`,
+  Mitnahme 3): Zeus repariert nach jedem Ketten-Slot; hier geht mehr,
+  weil die Stufen unsere eigenen sind. Fuenf Regressionstests in
+  `tst_strip_chain`.
+
 - **Drei weitere Tabellen-/Baum-Aufbauten koennten dieselbe
   Qt-Accessibility-Explosion ausloesen wie das Logbuch und die
   KiwiSDR-Empfaengerliste (b5e9b915, e913abe6) -- jetzt ebenfalls

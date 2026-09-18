@@ -505,6 +505,14 @@ private:
     StripChain*        m_stripChain{nullptr};
     std::vector<float> m_stripBuf;
 
+    // The strip's non-finite guard (2026-09-17) counts the blocks in
+    // which it caught a NaN or an infinity; this remembers how many of
+    // them have been reported, so a growing count is logged at most
+    // every 5 s with the stage that did it, and a steady one is not
+    // logged at all. Worker thread only.
+    quint32 m_stripNonFiniteReported{0};
+    qint64  m_stripNonFiniteReportMs{0};
+
     // Anti-VOX run gate (3M-3a-iv).  Mirrors the most-recent
     // setAntiVoxRun(bool) call.  Read with acquire in
     // onAntiVoxBlockReady (DSP thread) and again in

@@ -9,6 +9,7 @@
 // Modification history (NereusSDR):
 //   2026-08-08 — Created in C++20 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
+//   2026-09-17 — Non-finite guard around every stage; see the header.
 // =================================================================
 
 #include "core/strip/StripChain.h"
@@ -18,9 +19,34 @@
 
 namespace Longpath {
 
+namespace {
+
+bool allFinite(const float* s, int n) noexcept
+{
+    for (int i = 0; i < n; ++i) {
+        if (!std::isfinite(s[i])) { return false; }
+    }
+    return true;
+}
+
+// Silence in place of every sample that is not a number. Returns
+// whether there was one. Used for the input, where there is nothing
+// to restore, and for a block too large for the snapshot.
+bool zeroNonFinite(float* s, int n) noexcept
+{
+    bool any = false;
+    for (int i = 0; i < n; ++i) {
+        if (!std::isfinite(s[i])) { s[i] = 0.0f; any = true; }
+    }
+    return any;
+}
+
+} // namespace
+
 StripChain::StripChain()
 {
     for (auto& f : m_stageOn) { f.store(false, std::memory_order_relaxed); }
+    for (auto& c : m_nonFiniteBlocks) { c.store(0, std::memory_order_relaxed); }
 }
 
 void StripChain::prepare(double sampleRate)
@@ -115,6 +141,16 @@ void StripChain::processMono(float* samples, int frames) noexcept
     }
     if (samples == nullptr || frames <= 0) { return; }
 
+    // The input first. The microphone path — CoreAudio, PortAudio,
+    // the VAX bus another program writes into, a TCI client — is not
+    // ours to vouch for, and a NaN that gets past here would be fed
+    // to the gate's envelope and every delay line after it. Silence
+    // for the offending samples, and the block is counted.
+    if (zeroNonFinite(samples, frames)) {
+        m_nonFiniteInputBlocks.fetch_add(1, std::memory_order_relaxed);
+        m_nonFiniteTotal.fetch_add(1, std::memory_order_relaxed);
+    }
+
     auto peakDb = [](const float* s, int n) {
         float p = 0.0f;
         for (int i = 0; i < n; ++i) { p = std::max(p, std::fabs(s[i])); }
@@ -126,25 +162,72 @@ void StripChain::processMono(float* samples, int frames) noexcept
     // two always agree. Skipping the call as well is not redundant: a
     // stage that is off should cost nothing, and going through it
     // anyway would rest the guarantee on eight separate bypasses being
-    // bit-exact rather than on not calling them.
-    constexpr int kMono = 1;
-
-    if (stageEnabled(Stage::Gate))  { m_gate.process(samples, frames, kMono); }
-    if (stageEnabled(Stage::Eq))    { m_eq.process(samples, frames, kMono); }
-    if (stageEnabled(Stage::DeEss)) { m_deEss.process(samples, frames, kMono); }
-    if (stageEnabled(Stage::Comp))  { m_comp.process(samples, frames, kMono); }
-    if (stageEnabled(Stage::Tube))  { m_tube.process(samples, frames, kMono); }
-    if (stageEnabled(Stage::Pudu))  { m_pudu.process(samples, frames, kMono); }
-    if (stageEnabled(Stage::Reverb)) { m_reverb.process(samples, frames, kMono); }
+    // bit-exact rather than on not calling them. runStage() does the
+    // skip, and wraps each call in the non-finite guard.
+    runStage(Stage::Gate,   m_gate,   samples, frames);
+    runStage(Stage::Eq,     m_eq,     samples, frames);
+    runStage(Stage::DeEss,  m_deEss,  samples, frames);
+    runStage(Stage::Comp,   m_comp,   samples, frames);
+    runStage(Stage::Tube,   m_tube,   samples, frames);
+    runStage(Stage::Pudu,   m_pudu,   samples, frames);
+    runStage(Stage::Reverb, m_reverb, samples, frames);
     // Last, and for a reason: a brickwall that anything runs after is
     // not a brickwall. Everything above can add gain — the tube, the
     // exciter, the compressor's make-up — and this is what stops the
     // sum reaching the modulator hotter than it should.
-    if (stageEnabled(Stage::Limiter)) {
-        m_limiter.process(samples, frames, kMono);
-    }
+    runStage(Stage::Limiter, m_limiter, samples, frames);
 
     m_outPeakDb.store(peakDb(samples, frames), std::memory_order_relaxed);
+}
+
+template <typename S>
+void StripChain::runStage(Stage which, S& stage, float* samples,
+                          int frames) noexcept
+{
+    if (!stageEnabled(which)) { return; }
+
+    // Keep what the stage is about to be handed. A copy of 64 floats
+    // per enabled stage is the price of being able to say "that block
+    // never happened" afterwards, and it is a small one.
+    const bool canRestore = frames <= kSnapshotFrames;
+    if (canRestore) { std::copy_n(samples, frames, m_snapshot.data()); }
+
+    constexpr int kMono = 1;
+    stage.process(samples, frames, kMono);
+    if (allFinite(samples, frames)) { return; }
+
+    // The stage turned finite input into something that is not a
+    // number. Its parameters have not changed — a NaN in a setting, a
+    // division that went wrong for this block — so the honest thing
+    // is what the operator's own bypass switch would have done: hand
+    // on the block as it arrived. And reset the stage, because the
+    // value that came out of it is very likely sitting in its delay
+    // line or its envelope, waiting for the next block.
+    if (canRestore) { std::copy_n(m_snapshot.data(), frames, samples); }
+    else            { zeroNonFinite(samples, frames); }
+    stage.reset();
+
+    m_nonFiniteBlocks[static_cast<size_t>(which)].fetch_add(
+        1, std::memory_order_relaxed);
+    m_nonFiniteTotal.fetch_add(1, std::memory_order_relaxed);
+}
+
+uint32_t StripChain::nonFiniteBlocks(Stage s) const noexcept
+{
+    const int i = static_cast<int>(s);
+    if (i < 0 || i >= kStageCount) { return 0; }
+    return m_nonFiniteBlocks[static_cast<size_t>(i)].load(
+        std::memory_order_relaxed);
+}
+
+uint32_t StripChain::nonFiniteInputBlocks() const noexcept
+{
+    return m_nonFiniteInputBlocks.load(std::memory_order_relaxed);
+}
+
+uint32_t StripChain::nonFiniteBlocksTotal() const noexcept
+{
+    return m_nonFiniteTotal.load(std::memory_order_relaxed);
 }
 
 float StripChain::inputPeakDb() const noexcept
