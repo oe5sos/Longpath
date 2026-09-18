@@ -246,6 +246,7 @@ warren@wpratt.com
 */
 
 #include "RadioModel.h"
+#include "PassbandSnrTracker.h"
 #include "BandDefaults.h"
 #include "RxDspWorker.h"
 #include "core/FFTEngine.h"
@@ -548,6 +549,14 @@ RadioModel::RadioModel(QObject* parent)
     // treats a null as a safe no-op (tests that build AudioEngine
     // standalone).
     m_audioEngine->setRadioModel(this);
+
+    // RX leveler evidence: one tracker for every stream and slice. It reads
+    // each slice's ADC peak meter through its own channel and writes the
+    // boost permission back into that channel's atomics.
+    m_passbandSnrTracker = new PassbandSnrTracker(this);
+    m_passbandSnrTracker->setChannelResolver([this](int sliceIndex) -> RxChannel* {
+        return m_wdspEngine ? m_wdspEngine->rxChannel(sliceIndex) : nullptr;
+    });
 
     // Sprachspeicher: Ordner neben die Einstellungsdatei legen und
     // laden. Neben die Einstellungen und nicht in den Programmordner —
@@ -2203,6 +2212,19 @@ RadioModel::RadioModel(QObject* parent)
         // un-keying is what restores them.
         connect(m_moxController, &MoxController::moxStateChanged, this,
                 [this](bool) { refreshDdcAssignmentForRadioState(); });
+
+        // The passband SNR estimator restarts its acquisition across every
+        // keyed interval (Zeus InPassbandSnrEstimator.Update: "the first
+        // post-MOX frame can never reuse a pre-TX noise estimate"). Keyed
+        // from the start of the walk, cleared at its end.
+        connect(m_moxController, &MoxController::moxChanging, this,
+                [this](int, bool, bool newMox) {
+            if (m_passbandSnrTracker && newMox) { m_passbandSnrTracker->setKeyed(true); }
+        });
+        connect(m_moxController, &MoxController::moxStateChanged, this,
+                [this](bool on) {
+            if (m_passbandSnrTracker) { m_passbandSnrTracker->setKeyed(on); }
+        });
 
         // ── The MOX audio gate, which had never been connected ───────────
         //
@@ -5186,6 +5208,9 @@ void RadioModel::removeSlice(int sliceId)
 
     // Phase 3F Sub-Epic C Task 7: deleteLater() rather than delete to keep
     // any in-flight queued signals targeting this slice safe.
+    if (m_passbandSnrTracker) {
+        m_passbandSnrTracker->unbindSlice(sliceId);
+    }
     slice->deleteLater();
     emit sliceRemoved(sliceId);
 }
@@ -6489,6 +6514,9 @@ void RadioModel::connectToRadio(const RadioInfo& info)
                 rxCh->setMuted(m_activeSlice->muted());
                 rxCh->setAudioPan(m_activeSlice->audioPan());
                 rxCh->setBinauralEnabled(m_activeSlice->binauralEnabled());
+                // RX audio leveler: off unless the slice's settings say so.
+                rxCh->setLevelerConfig(m_activeSlice->levelerConfig());
+                rxCh->setLevelerEnabled(m_activeSlice->levelerEnabled());
                 // AF Gain: route the slice slider through the WDSP RX panel
                 // (SetRXAPanelGain1) — Thetis radio.cs:1077-1107 [v2.10.3.14]
                 // RXOutputGain pattern — instead of multiplying it onto the
@@ -10538,6 +10566,31 @@ void RadioModel::wireSliceSignals(SliceModel* slice)
         }
         scheduleSettingsSave();
     });
+
+    // RX audio leveler (Zeus "RX LVLR" port, 2026-09-18). Both the on/off
+    // and the profile go straight to the slice's own channel; the boost
+    // permission arrives separately from PassbandSnrTracker. The current
+    // values are pushed now as well: restoreFromSettings ran before this
+    // channel existed, so the change signals it fired had nowhere to go.
+    connect(slice, &SliceModel::levelerEnabledChanged, this, [this, slice](bool on) {
+        if (RxChannel* rxCh = m_wdspEngine->rxChannel(slice->sliceIndex())) {
+            rxCh->setLevelerEnabled(on);
+        }
+        scheduleSettingsSave();
+    });
+    connect(slice, &SliceModel::levelerConfigChanged, this, [this, slice]() {
+        if (RxChannel* rxCh = m_wdspEngine->rxChannel(slice->sliceIndex())) {
+            rxCh->setLevelerConfig(slice->levelerConfig());
+        }
+        scheduleSettingsSave();
+    });
+    if (RxChannel* rxCh = m_wdspEngine->rxChannel(slice->sliceIndex())) {
+        rxCh->setLevelerConfig(slice->levelerConfig());
+        rxCh->setLevelerEnabled(slice->levelerEnabled());
+    }
+    if (m_passbandSnrTracker) {
+        m_passbandSnrTracker->bindSlice(slice);
+    }
 
     // RIT + DIG offset → WDSP shift frequency
     //

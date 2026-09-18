@@ -135,6 +135,7 @@ class AudioEngine;
 class WdspEngine;
 class RxDspWorker;
 class NoiseFloorTracker;
+class PassbandSnrTracker;
 // Phase 3F Sub-Epic F Task 5: per-ADC wideband FFT engine. Forward decl
 // here; included in RadioModel.cpp so we don't pull fftw3.h into every
 // translation unit that touches RadioModel.h.
@@ -895,6 +896,11 @@ public:
     void setStepAttController(class StepAttenuatorController* c);
     NoiseFloorTracker* noiseFloorTracker() const { return m_noiseFloorTracker; }
     void setNoiseFloorTracker(NoiseFloorTracker* t) { m_noiseFloorTracker = t; }
+
+    /// The in-passband SNR tracker behind the RX leveler's boost permission
+    /// (and, later, an SNR readout). One per radio, owned here; MainWindow
+    /// feeds it every stream's linear FFT frame.
+    PassbandSnrTracker* passbandSnrTracker() const { return m_passbandSnrTracker; }
 
     /// Register the tracker measuring one DDC stream's band.
     ///
@@ -3412,6 +3418,7 @@ private:
     // From Thetis v2.10.3.13 console.cs:46057 — tmrAutoAGC (500ms interval)
     QTimer* m_autoAgcTimer{nullptr};
     NoiseFloorTracker* m_noiseFloorTracker{nullptr};
+    PassbandSnrTracker* m_passbandSnrTracker{nullptr};
     QMap<int, NoiseFloorTracker*> m_streamNoiseFloors;
     // Task 3.1 view hook — non-owning, set by MainWindow.
     class MeterPoller*      m_meterPoller{nullptr};

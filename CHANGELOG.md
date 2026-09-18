@@ -4,6 +4,20 @@
 
 ### Added
 
+- **RX-Leveler** (`LVL` in der Lautstaerke-Reihe des RX-Applets,
+  Rechtsklick: Profil Auto/Eigene): gleicht die empfundene Lautheit nach
+  der ganzen WDSP-Kette aus. Absenken ist bedingungslos (laute Ankunft
+  wird im selben Block abgefangen, Peak-Wache, Softlimiter); Anheben nur,
+  solange ein Passband-SNR-Schaetzer aus dem Spektrum ein Signal im
+  Durchlassbereich belegt und der ADC nicht nahe der Uebersteuerung
+  ist -- Rauschen allein wird nie angehoben. Port aus dem GPL-lizenzierten
+  Zeus Station Engine (`ApplyRxAudioLeveler` + `InPassbandSnrEstimator`,
+  KB2UKA/N9WAR, @8970f2d), je Slice, aus in der Vorgabe. Vier
+  dokumentierte Abweichungen (Stereo-Paar, Blockraten-Skalierung,
+  Gegenpruefung aus demselben Spektrum, „aus heisst aus" mit Ausblenden).
+  `docs/architecture/2026-09-18-rx-leveler.md`. Live am Funkgeraet noch
+  nicht geprueft.
+
 - **Start-Protokoll nennt jetzt Betriebssystem, CPU-Architektur,
   Kernzahl, Qt-Laufzeitversion und RAM (macOS).** Von einer
   AetherSDR-Sichtung angestossen; reines Protokoll, keine Oberflaeche.

@@ -334,6 +334,9 @@ private:
     QLabel*      m_afLabel     = nullptr;
     QPushButton* m_muteBtn     = nullptr;
     QPushButton* m_binBtn      = nullptr;
+    // LVL: der RX-Leveler (Zeus "RX LVLR"-Port, 2026-09-18). Rechtsklick
+    // oeffnet das Profil (Auto/Eigene) als Schnellregler.
+    QPushButton* m_levelerBtn  = nullptr;
 
     // Die sieben Rauschminderungen. Gegenseitig ausschliessend ueber
     // SliceModel::setActiveNr — genau EINE laeuft, oder keine.

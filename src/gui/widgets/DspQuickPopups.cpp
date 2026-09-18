@@ -82,7 +82,10 @@
 
 #include "gui/widgets/DspQuickPopups.h"
 
+#include "core/audio/RxAudioLeveler.h"
 #include "gui/widgets/DspParamPopup.h"
+
+#include <cmath>
 #include "models/SliceModel.h"
 
 #include <QCoreApplication>
@@ -395,6 +398,72 @@ void showMnrPopup(QWidget* parent, SliceModel* m_slice,
 }
 
 } // namespace
+
+// RX-Leveler (Zeus "RX LVLR"-Port, 2026-09-18). Bereiche und Vorgaben:
+// From Zeus station-engine Zeus.Contracts/Dtos.cs:878-892 [@8970f2d]
+//   MinTargetRmsDb -30 .. MaxTargetRmsDb -6, Default -18
+//   MinBoostDb 0 .. MaxBoostLimitDb 24, Default 24
+//   AttackMs 20..2000 (400), ReleaseMs 20..5000 (150), HangMs 0..2000 (600)
+// Die Werte gelten nur im Modus „Eigene"; „Auto" nimmt die festen
+// Konstanten des Levelers (RxAudioLeveler.h). Longpath-original glue;
+// no-port-check: die portierte Logik steht in core/audio/RxAudioLeveler.
+void showRxLeveler(QWidget* parent, SliceModel* slice, const QPoint& globalPos)
+{
+    if (!slice) { return; }
+    auto* p = new DspParamPopup(parent);
+
+    p->addRadioGroup(QStringLiteral("Modus"),
+                     {QStringLiteral("Auto"), QStringLiteral("Eigene")},
+                     slice->levelerCustom() ? 1 : 0,
+                     [slice](int v) { if (slice) slice->setLevelerCustom(v == 1); });
+    p->addSlider(QStringLiteral("Ziel"),
+                 static_cast<int>(RxLevelerConfig::kMinTargetRmsDb),
+                 static_cast<int>(RxLevelerConfig::kMaxTargetRmsDb),
+                 static_cast<int>(std::lround(slice->levelerTargetDb())),
+                 [](int v) { return QStringLiteral("%1 dBFS").arg(v); },
+                 [slice](int v) { if (slice) slice->setLevelerTargetDb(v); },
+                 QStringLiteral("Lautheit, auf die der Leveler das Empfangs-Audio "
+                                "einregelt (Effektivwert). Nur im Modus \u201eEigene\u201c."),
+                 static_cast<int>(RxLevelerConfig::kDefaultTargetRmsDb));
+    p->addSlider(QStringLiteral("Anhebung"),
+                 static_cast<int>(RxLevelerConfig::kMinBoostDb),
+                 static_cast<int>(RxLevelerConfig::kMaxBoostLimitDb),
+                 static_cast<int>(std::lround(slice->levelerMaxBoostDb())),
+                 [](int v) { return QStringLiteral("%1 dB").arg(v); },
+                 [slice](int v) { if (slice) slice->setLevelerMaxBoostDb(v); },
+                 QStringLiteral("Hoechste Anhebung. Angehoben wird nur, solange das "
+                                "Spektrum ein Signal im Durchlassbereich belegt; "
+                                "abgesenkt wird immer."),
+                 static_cast<int>(RxLevelerConfig::kDefaultMaxBoostDb));
+    p->addSlider(QStringLiteral("Attack"),
+                 RxLevelerConfig::kMinAttackMs, RxLevelerConfig::kMaxAttackMs,
+                 slice->levelerAttackMs(),
+                 [](int v) { return QStringLiteral("%1 ms").arg(v); },
+                 [slice](int v) { if (slice) slice->setLevelerAttackMs(v); },
+                 QStringLiteral("Zeit fuer die volle Anhebung."),
+                 RxLevelerConfig::kDefaultAttackMs);
+    p->addSlider(QStringLiteral("Release"),
+                 RxLevelerConfig::kMinReleaseMs, RxLevelerConfig::kMaxReleaseMs,
+                 slice->levelerReleaseMs(),
+                 [](int v) { return QStringLiteral("%1 ms").arg(v); },
+                 [slice](int v) { if (slice) slice->setLevelerReleaseMs(v); },
+                 QStringLiteral("Zeit fuer den Abbau von 24 dB. Ein Pegelsprung "
+                                "wird davon unabhaengig sofort abgefangen."),
+                 RxLevelerConfig::kDefaultReleaseMs);
+    p->addSlider(QStringLiteral("Hang"),
+                 RxLevelerConfig::kMinHangMs, RxLevelerConfig::kMaxHangMs,
+                 slice->levelerHangMs(),
+                 [](int v) { return QStringLiteral("%1 ms").arg(v); },
+                 [slice](int v) { if (slice) slice->setLevelerHangMs(v); },
+                 QStringLiteral("Wie lange eine Sprechpause die gefundene "
+                                "Verstaerkung behaelt, bevor sie abgebaut wird."),
+                 RxLevelerConfig::kDefaultHangMs);
+    p->finalize(/*onMore=*/nullptr,
+                /*onReset=*/[slice]() {
+                    if (slice) { slice->setLevelerConfig(RxLevelerConfig{}); }
+                });
+    p->showAt(globalPos);
+}
 
 void showFor(QWidget* parent, SliceModel* slice, NrSlot slot,
              const QPoint& globalPos,

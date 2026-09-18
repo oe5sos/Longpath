@@ -1413,6 +1413,7 @@ void RxApplet::connectSlice(SliceModel* s)
     connect(s, &SliceModel::afGainChanged,          this, refresh);
     connect(s, &SliceModel::mutedChanged,           this, refresh);
     connect(s, &SliceModel::binauralEnabledChanged, this, refresh);
+    connect(s, &SliceModel::levelerEnabledChanged,  this, refresh);
 
     // Mode change → update combo + filter grid + passband widget
     connect(s, &SliceModel::dspModeChanged, this, [this](DSPMode mode) {
@@ -1892,6 +1893,24 @@ void RxApplet::buildInheritedRows(QVBoxLayout* col)
             "Binaural audio — spreads the passband across the stereo image"));
         row->addWidget(m_binBtn);
 
+        // RX-Leveler: Lautheit nach der ganzen WDSP-Kette nachregeln. Der
+        // AGC haelt das Signal, kann aber Rauschen nicht von schwacher
+        // Sprache unterscheiden; der Leveler hebt nur an, solange das
+        // Spektrum ein Signal im Durchlassbereich belegt, und faengt
+        // laute Ankuenfte im selben Block ab. Rechtsklick: Profil.
+        m_levelerBtn = greenToggle(QStringLiteral("LVL"), 40, 20);
+        m_levelerBtn->setToolTip(QStringLiteral(
+            "RX-Leveler — gleicht die Lautheit nach dem AGC aus: hebt schwache "
+            "Stationen an, solange das Spektrum ein Signal im Durchlassbereich "
+            "zeigt, und faengt laute Ankuenfte sofort ab. Rechtsklick: Profil."));
+        m_levelerBtn->setContextMenuPolicy(Qt::CustomContextMenu);
+        connect(m_levelerBtn, &QWidget::customContextMenuRequested, this,
+                [this](const QPoint& pos) {
+            if (!m_slice) { return; }
+            DspQuickPopup::showRxLeveler(this, m_slice, m_levelerBtn->mapToGlobal(pos));
+        });
+        row->addWidget(m_levelerBtn);
+
         col->addLayout(row);
     }
 
@@ -1995,6 +2014,10 @@ void RxApplet::wireInheritedRows()
         if (m_updatingFromModel || !m_slice) { return; }
         m_slice->setBinauralEnabled(on);
     });
+    connect(m_levelerBtn, &QPushButton::toggled, this, [this](bool on) {
+        if (m_updatingFromModel || !m_slice) { return; }
+        m_slice->setLevelerEnabled(on);
+    });
 
     // Rauschminderung — gegenseitig ausschliessend. Ein zweiter Klick
     // auf den laufenden schaltet ihn ab; das ist der einzige Weg zu
@@ -2050,6 +2073,7 @@ void RxApplet::syncInheritedFromSlice()
     if (m_afLabel)  { m_afLabel->setText(QString::number(m_slice->afGain())); }
     if (m_muteBtn)  { m_muteBtn->setChecked(m_slice->muted()); }
     if (m_binBtn)   { m_binBtn->setChecked(m_slice->binauralEnabled()); }
+    if (m_levelerBtn) { m_levelerBtn->setChecked(m_slice->levelerEnabled()); }
 
     if (m_anfBtn) { m_anfBtn->setChecked(m_slice->anfEnabled()); }
 

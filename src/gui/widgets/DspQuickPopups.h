@@ -118,5 +118,11 @@ void showFor(QWidget* parent, SliceModel* slice, NrSlot slot,
              const QPoint& globalPos,
              const std::function<void()>& onMore = {});
 
+/// Der Rechtsklick auf den LVL-Knopf: Auto/Eigene, Ziel, maximale
+/// Anhebung, Attack, Release, Hang -- Zeus' RX-Leveler-Profil
+/// (Zeus.Contracts/Dtos.cs:862-893 [@8970f2d]) in Longpaths
+/// Schnellregler-Idiom. Kein „Mehr…": es gibt keine Einstellungsseite.
+void showRxLeveler(QWidget* parent, SliceModel* slice, const QPoint& globalPos);
+
 } // namespace DspQuickPopup
 } // namespace Longpath

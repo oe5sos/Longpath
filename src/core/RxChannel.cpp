@@ -272,6 +272,7 @@ extern "C" {
 #include <fftw3.h>       // fftw_plan_dft_1d, fftw_execute, fftw_alloc_complex, etc.
 #endif
 
+#include <chrono>
 #include <cmath>
 
 namespace Longpath {
@@ -1888,6 +1889,12 @@ void RxChannel::processIq(float* inI, float* inQ,
     }
 #endif
 
+    // RX audio leveler (Zeus "RX LVLR" port, 2026-09-18): the last stage
+    // before the taps, so speaker, VAX, TCI and the decoder taps all hear
+    // the same levelled audio -- Zeus levels its whole RX bus
+    // (DspPipelineService.cs:9660-9690 [@8970f2d]). A no-op while off.
+    applyRxLeveler(outI, outQ, postCount);
+
     // Phase 3J-1 Task 16.2 — TCI audio tap.
     // Emit post-DSP stereo audio for any TCI clients subscribed via the
     // TciServer audio binary pipeline (Phase 16 Task 16.3). This fires
@@ -1911,6 +1918,130 @@ void RxChannel::processIq(float* inI, float* inQ,
     std::memset(outI, 0, sampleCount * sizeof(float));
     std::memset(outQ, 0, sampleCount * sizeof(float));
 #endif
+}
+
+// ---------------------------------------------------------------------------
+// RX audio leveler (ported from the Zeus station engine, see
+// core/audio/RxAudioLeveler.h)
+// ---------------------------------------------------------------------------
+
+int64_t RxChannel::levelerClockMs()
+{
+    // Zeus stamps evidence with Environment.TickCount64; a monotonic
+    // millisecond clock is the same thing here.
+    using namespace std::chrono;
+    return duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
+}
+
+void RxChannel::setLevelerEnabled(bool on)
+{
+    m_levelerEnabled.store(on, std::memory_order_release);
+}
+
+void RxChannel::setLevelerConfig(const RxLevelerConfig& cfg)
+{
+    const RxLevelerConfig n = RxLevelerConfig::normalized(cfg);
+    m_levelerMode.store(static_cast<int>(n.mode), std::memory_order_relaxed);
+    m_levelerTargetRmsDb.store(n.targetRmsDb, std::memory_order_relaxed);
+    m_levelerMaxBoostDb.store(n.maxBoostDb, std::memory_order_relaxed);
+    m_levelerAttackMs.store(n.attackMs, std::memory_order_relaxed);
+    m_levelerReleaseMs.store(n.releaseMs, std::memory_order_relaxed);
+    m_levelerHangMs.store(n.hangMs, std::memory_order_release);
+}
+
+RxLevelerConfig RxChannel::levelerConfig() const
+{
+    RxLevelerConfig c;
+    c.mode = static_cast<RxLevelerConfig::Mode>(m_levelerMode.load(std::memory_order_acquire));
+    c.targetRmsDb = m_levelerTargetRmsDb.load(std::memory_order_relaxed);
+    c.maxBoostDb  = m_levelerMaxBoostDb.load(std::memory_order_relaxed);
+    c.attackMs    = m_levelerAttackMs.load(std::memory_order_relaxed);
+    c.releaseMs   = m_levelerReleaseMs.load(std::memory_order_relaxed);
+    c.hangMs      = m_levelerHangMs.load(std::memory_order_relaxed);
+    return c;
+}
+
+void RxChannel::setLevelerEvidence(bool rfSignalResolved, bool adcOverloadRisk,
+                                   int64_t evidenceMs)
+{
+    m_levelerRfResolved.store(rfSignalResolved, std::memory_order_relaxed);
+    m_levelerAdcRisk.store(adcOverloadRisk, std::memory_order_relaxed);
+    m_levelerEvidenceMs.store(evidenceMs, std::memory_order_release);
+}
+
+void RxChannel::applyRxLeveler(float* left, float* right, int frames)
+{
+    const bool enabled = m_levelerEnabled.load(std::memory_order_acquire);
+    // Longpath rule (Zeus keeps its cut + soft limiter running while "off";
+    // Longpath's existing audio path must be untouched while the leveler
+    // is off): bypass entirely, except while positive makeup is still
+    // being released to unity after a switch-off, so the operator hears a
+    // fade instead of a step. A held cut ends at this block boundary.
+    {
+        const RxAudioLevelerState& st = m_leveler.state();
+        const bool holdingMakeup = st.releaseToUnity || st.gainDb > 0.0 || st.appliedGainDb > 0.0;
+        if (!enabled && !holdingMakeup) {
+            return;
+        }
+    }
+    if (frames <= 0 || left == nullptr) { return; }
+
+    // From Zeus station-engine Station.Engine.Hosting/DspPipelineService.cs:9660-9690 [@8970f2d]
+    //   bool loudnessBoostAllowed = RxConstantLoudnessBoostAllowed(Environment.TickCount64);
+    //   ... rfSignalResolved: loudnessBoostAllowed, adcOverloadRisk: !loudnessBoostAllowed,
+    //       levelReferenceOffsetDb: appliedAfDb
+    // RxConstantLoudnessBoostAllowed (:10358-10364): evidence current AND
+    // resolved AND no ADC risk.
+    const int64_t nowMs = levelerClockMs();
+    const int64_t evidenceMs = m_levelerEvidenceMs.load(std::memory_order_acquire);
+    const bool boostAllowed =
+        RxAudioLeveler::evidenceIsCurrent(evidenceMs, nowMs)
+        && m_levelerRfResolved.load(std::memory_order_relaxed)
+        && !m_levelerAdcRisk.load(std::memory_order_relaxed);
+
+    RxAudioLeveler::Inputs in;
+    in.enabled = enabled;
+    in.rfSignalResolved = boostAllowed;
+    in.adcOverloadRisk = !boostAllowed;
+    // The operator AF control precedes this stage. Shift the reference by
+    // the same requested dB so constant-loudness makeup preserves AF
+    // changes 1:1 instead of cancelling them. (Longpath's AF is the WDSP
+    // panel gain 0..1, so the offset is <= 0 dB.)
+    in.levelReferenceOffsetDb =
+        20.0 * std::log10(std::max(m_afGain.load(std::memory_order_relaxed), 1.0e-9));
+    in.config = levelerConfig();
+
+    m_leveler.process(left, right, frames, in);
+
+    const RxAudioLevelerState& st = m_leveler.state();
+    const bool stillReleasing = st.releaseToUnity || st.gainDb > 0.0 || st.appliedGainDb > 0.0;
+    if (!enabled && !stillReleasing) {
+        // Released: forget the controller so the next enable starts clean
+        // and the next block is a true bypass.
+        m_leveler.reset();
+        m_levelerAppliedGainDb.store(0.0, std::memory_order_relaxed);
+        return;
+    }
+    m_levelerAppliedGainDb.store(st.appliedGainDb, std::memory_order_relaxed);
+
+    // Bench trace, once a second, only with QT_LOGGING_RULES="nereus.dsp.debug=true":
+    // the same numbers Zeus publishes as its leveler diagnostics.
+    if (nowMs - m_levelerLastLogMs >= 1000 && lcDsp().isDebugEnabled()) {
+        m_levelerLastLogMs = nowMs;
+        qCDebug(lcDsp).noquote()
+            << QStringLiteral("RX leveler ch%1: applied %2 dB desired %3 dB in %4 dBFS "
+                              "out %5 dBFS boost %6 (resolved %7 adcRisk %8 age %9 ms) limited %10")
+                   .arg(m_channelId)
+                   .arg(st.appliedGainDb, 0, 'f', 1)
+                   .arg(st.desiredGainDb, 0, 'f', 1)
+                   .arg(st.inputRmsDbfs, 0, 'f', 1)
+                   .arg(st.outputRmsDbfs, 0, 'f', 1)
+                   .arg(boostAllowed ? QStringLiteral("yes") : QStringLiteral("no"))
+                   .arg(m_levelerRfResolved.load(std::memory_order_relaxed))
+                   .arg(m_levelerAdcRisk.load(std::memory_order_relaxed))
+                   .arg(evidenceMs == INT64_MIN ? -1 : (nowMs - evidenceMs))
+                   .arg(st.outputLimitSampleCount);
+    }
 }
 
 // ---------------------------------------------------------------------------
