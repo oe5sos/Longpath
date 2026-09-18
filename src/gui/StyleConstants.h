@@ -34,6 +34,7 @@
 #include "styles/ThemeQss.h"
 
 #include <QFont>
+#include <QPainter>
 
 namespace Longpath::Style {
 
@@ -437,6 +438,69 @@ constexpr auto kGlassLight       = "rgba(255, 255, 255, 18)";   // dieselbe Kant
 constexpr auto kGlassShade       = "rgba(0, 0, 0, 160)";
 constexpr int  kGlassChipRadius  = 7;
 constexpr int  kGlassPanelRadius = 10;
+
+// ── Mal-Helfer fuer Zeichenflaechen (QPainter) ───────────────────────
+//
+// Dieselben Bauformen wie die Stylesheets, fuer Widgets, die selbst
+// malen (Bandfilter, Panadapter-Chrom, Instrumente). Alphas sind
+// Zahlen, keine Farben; ein echter Weichzeichner kostet bei zwanzig
+// Bildern je Sekunde zu viel, vier Linien geben denselben Eindruck.
+
+/// Innenschatten oben plus Lichtkante — fuer eine VERSENKTE Flaeche.
+inline void paintInsetTop(QPainter& p, const QRect& r)
+{
+    static const int kShade[] = {kGlassShadeAlpha, 70, 40, 18};
+    for (int i = 0; i < 4; ++i) {
+        p.setPen(QColor(0, 0, 0, kShade[i]));
+        p.drawLine(r.left(), r.top() + 1 + i, r.right(), r.top() + 1 + i);
+    }
+    p.setPen(QColor(255, 255, 255, kGlassLightAlpha));
+    p.drawLine(r.left(), r.top(), r.right(), r.top());
+}
+
+/// Ein Glaschip: schwarz, feiner Rahmen, Lichtkante oben innen, ein
+/// Hauch Schatten darunter. Fuer Zahlen, die man liest, nicht drueckt.
+inline void paintGlassChip(QPainter& p, const QRect& box, int radius)
+{
+    p.save();
+    p.setRenderHint(QPainter::Antialiasing, true);
+    p.setPen(QColor(role("border", kBorder)));
+    p.setBrush(QColor(0, 0, 0));
+    p.drawRoundedRect(box, radius, radius);
+    p.setClipRect(box.adjusted(1, 1, -1, -1));
+    p.setRenderHint(QPainter::Antialiasing, false);
+    p.setPen(QColor(255, 255, 255, kGlassLightAlpha));
+    p.drawLine(box.left() + 1, box.top() + 1, box.right() - 1, box.top() + 1);
+    p.setPen(QColor(0, 0, 0, 90));
+    p.drawLine(box.left() + 1, box.top() + 2, box.right() - 1, box.top() + 2);
+    p.restore();
+}
+
+/// Ein ERHABENER Chip wie ein Knopf: Verlauf, Lichtkante oben, dunkle
+/// Kante unten. `pressed` kippt den Verlauf (eingerastet/gedrueckt).
+inline void paintRaisedChip(QPainter& p, const QRect& box, int radius,
+                            bool pressed = false)
+{
+    p.save();
+    p.setRenderHint(QPainter::Antialiasing, true);
+    QLinearGradient g(box.topLeft(), box.bottomLeft());
+    const QColor top(role("glass-btn-top", kGlassBtnTop));
+    const QColor bot(role("glass-btn-bot", kGlassBtnBot));
+    g.setColorAt(0.0, pressed ? bot : top);
+    g.setColorAt(1.0, pressed ? top : bot);
+    p.setBrush(g);
+    p.setPen(QColor(role("border", kBorder)));
+    p.drawRoundedRect(box, radius, radius);
+    p.setClipRect(box.adjusted(1, 1, -1, -1));
+    p.setRenderHint(QPainter::Antialiasing, false);
+    p.setPen(pressed ? QColor(0, 0, 0, kGlassShadeAlpha)
+                     : QColor(255, 255, 255, kGlassLightAlpha));
+    p.drawLine(box.left() + 1, box.top() + 1, box.right() - 1, box.top() + 1);
+    p.setPen(pressed ? QColor(255, 255, 255, kGlassLightAlpha)
+                     : QColor(0, 0, 0, kGlassShadeAlpha));
+    p.drawLine(box.left() + 1, box.bottom() - 1, box.right() - 1, box.bottom() - 1);
+    p.restore();
+}
 
 // Disabled
 constexpr auto kDisabledBg      = "#141417";

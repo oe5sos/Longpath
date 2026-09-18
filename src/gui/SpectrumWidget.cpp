@@ -5039,22 +5039,29 @@ void SpectrumWidget::drawDbmScale(QPainter& p, const QRect& specRect)
     const int arrowTop = specRect.top() + 2;
     const int arrowBot = specRect.top() + kDbmArrowH - 2;
 
-    p.setPen(Qt::NoPen);
-    p.setBrush(QColor(Style::kAccent));
-
-    // Up arrow (▲) — left side
-    QPolygon upTri;
-    upTri << QPoint(upCx - 5, arrowBot)
-          << QPoint(upCx + 5, arrowBot)
-          << QPoint(upCx,     arrowTop);
-    p.drawPolygon(upTri);
-
-    // Down arrow (▼) — right side
-    QPolygon dnTri;
-    dnTri << QPoint(dnCx - 5, arrowTop)
-          << QPoint(dnCx + 5, arrowTop)
-          << QPoint(dnCx,     arrowBot);
-    p.drawPolygon(dnTri);
+    // Glas & Tiefe (2026-09-18): zwei erhabene Chips mit kleinem Pfeil
+    // statt zweier grosser Dreiecke in Akzentblau — sie sind Knoepfe
+    // (Bereich hoch/runter), und ein Knopf ist im Haus erhaben und
+    // leise. Blau bleibt fuer die Auswahl.
+    {
+        const int chipH = arrowBot - arrowTop + 4;
+        const int chipW = halfW - 3;
+        const QRect upBox(upCx - chipW / 2, arrowTop - 2, chipW, chipH);
+        const QRect dnBox(dnCx - chipW / 2, arrowTop - 2, chipW, chipH);
+        Style::paintRaisedChip(p, upBox, 5);
+        Style::paintRaisedChip(p, dnBox, 5);
+        p.setRenderHint(QPainter::Antialiasing, true);
+        p.setPen(Qt::NoPen);
+        p.setBrush(QColor(Style::role("text-secondary", Style::kTextSecondary)));
+        const int cy = (arrowTop + arrowBot) / 2;
+        QPolygon upTri;
+        upTri << QPoint(upCx - 4, cy + 3) << QPoint(upCx + 4, cy + 3) << QPoint(upCx, cy - 3);
+        p.drawPolygon(upTri);
+        QPolygon dnTri;
+        dnTri << QPoint(dnCx - 4, cy - 3) << QPoint(dnCx + 4, cy - 3) << QPoint(dnCx, cy + 3);
+        p.drawPolygon(dnTri);
+        p.setRenderHint(QPainter::Antialiasing, false);
+    }
 
     // ── dBm labels ───────────────────────────────────────────────────────
     QFont f = p.font();
@@ -5208,17 +5215,24 @@ void SpectrumWidget::drawTimeScale(QPainter& p, const QRect& wfRect)
     // Zeitstreifen schon ab, die zusaetzliche Linie war ueberfluessig.
     //
     // LIVE button — grey when live, bright red when paused.
+    // Glas & Tiefe (2026-09-18): ein erhabener Chip wie jeder Knopf;
+    // angehalten bleibt Rot — das ist eine Warnung, kein Zustand.
     const QRect liveRect = waterfallLiveButtonRect(wfRect);
-    p.setPen(QColor(0x40, 0x50, 0x60));
-    p.setBrush(m_wfLive ? QColor(Style::kTextInactive)
-                        : QColor(Style::kTxRed));  // bright red when paused
-    p.drawRoundedRect(liveRect, 3, 3);
+    if (m_wfLive) {
+        Style::paintRaisedChip(p, liveRect, 6);
+    } else {
+        p.setRenderHint(QPainter::Antialiasing, true);
+        p.setPen(QColor(Style::kRedBorder));
+        p.setBrush(QColor(Style::kTxRed));
+        p.drawRoundedRect(liveRect, 6, 6);
+        p.setRenderHint(QPainter::Antialiasing, false);
+    }
 
     QFont liveFont = p.font();
     liveFont.setPointSize(7);
     liveFont.setBold(true);
     p.setFont(liveFont);
-    p.setPen(m_wfLive ? QColor(Style::kTitleText) : Qt::white);
+    p.setPen(m_wfLive ? QColor(Style::role("text-secondary", Style::kTextSecondary)) : Qt::white);
     p.drawText(liveRect, Qt::AlignCenter, QStringLiteral("LIVE"));
 
     // Tick labels along the strip.
@@ -11764,9 +11778,15 @@ void SpectrumWidget::setVfoFrequency(double hz)
     }
 
     // Update off-screen indicator state (both modes)
+    //
+    // 0 Hz ist keine Frequenz, sondern "kein Geraet": ohne Verbindung
+    // zeigte der Zeiger "◀ 0.0000" am linken Rand — eine Null, die wie
+    // eine Messung aussieht (HAUSSTIL Regel 7, 2026-09-18).
     double leftEdge = m_centerHz - m_bandwidthHz / 2.0;
     double rightEdge = m_centerHz + m_bandwidthHz / 2.0;
-    if (hz < leftEdge) {
+    if (hz <= 0.0) {
+        m_vfoOffScreen = VfoOffScreen::None;
+    } else if (hz < leftEdge) {
         m_vfoOffScreen = VfoOffScreen::Left;
     } else if (hz > rightEdge) {
         m_vfoOffScreen = VfoOffScreen::Right;

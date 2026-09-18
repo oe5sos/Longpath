@@ -268,38 +268,11 @@ BandwidthFilterPane::Zone BandwidthFilterPane::zoneAt(int x) const
 
 namespace {
 
-// Innenschatten oben plus Lichtkante: vier Linien von dunkel nach
-// durchsichtig, darueber eine helle. Ein echter Weichzeichner kostet
-// im QPainter bei zwanzig Bildern je Sekunde zu viel; die Linien geben
-// denselben Eindruck, und ihre Alphas sind Zahlen, keine Farben.
-void paintInsetTop(QPainter& p, const QRect& r)
-{
-    static const int kShade[] = {Style::kGlassShadeAlpha, 70, 40, 18};
-    for (int i = 0; i < 4; ++i) {
-        p.setPen(QColor(0, 0, 0, kShade[i]));
-        p.drawLine(r.left(), r.top() + 1 + i, r.right(), r.top() + 1 + i);
-    }
-    p.setPen(QColor(255, 255, 255, Style::kGlassLightAlpha));
-    p.drawLine(r.left(), r.top(), r.right(), r.top());
-}
-
-// Ein Glaschip: schwarz, feiner Rahmen, Lichtkante oben innen, ein
-// Hauch Schatten darunter. Fuer Zahlen, die man liest, nicht drueckt.
-void paintGlassChip(QPainter& p, const QRect& box, int radius)
-{
-    p.save();
-    p.setRenderHint(QPainter::Antialiasing, true);
-    p.setPen(QColor(Style::role("border", Style::kBorder)));
-    p.setBrush(QColor(0, 0, 0));
-    p.drawRoundedRect(box, radius, radius);
-    p.setClipRect(box.adjusted(1, 1, -1, -1));
-    p.setRenderHint(QPainter::Antialiasing, false);
-    p.setPen(QColor(255, 255, 255, Style::kGlassLightAlpha));
-    p.drawLine(box.left() + 1, box.top() + 1, box.right() - 1, box.top() + 1);
-    p.setPen(QColor(0, 0, 0, 90));
-    p.drawLine(box.left() + 1, box.top() + 2, box.right() - 1, box.top() + 2);
-    p.restore();
-}
+// Die Mal-Helfer (paintInsetTop, paintGlassChip) liegen seit dem
+// 2026-09-18 in StyleConstants.h — der Panadapter-Chrom braucht sie
+// auch.
+using Style::paintInsetTop;
+using Style::paintGlassChip;
 
 } // namespace
 
