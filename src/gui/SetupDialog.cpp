@@ -50,6 +50,7 @@
 
 #include "SetupDialog.h"
 #include "gui/styles/ThemeQss.h"
+#include "gui/StyleConstants.h"
 #include "SetupPage.h"
 #include "core/BoardCapabilities.h"
 #include "core/PureSignal.h"
@@ -166,18 +167,27 @@ SetupDialog::SetupDialog(RadioModel* model, QWidget* parent)
     // ── Splitter: tree navigation | stacked pages ─────────────────────────────
     auto* splitter = new QSplitter(Qt::Horizontal, this);
     splitter->setHandleWidth(1);
-    splitter->setStyleSheet(Style::themed("QSplitter::handle { background: #304050; }"));
+    splitter->setStyleSheet(QStringLiteral("QSplitter::handle { background: %1; }")
+                                .arg(Style::hexRole(Style::kBorder)));
 
     // Tree navigation
     m_tree = new QTreeWidget;
     m_tree->setHeaderHidden(true);
     m_tree->setIndentation(16);
     m_tree->setFixedWidth(200);
-    m_tree->setStyleSheet(Style::themed(
-        "QTreeWidget { background: #1a1a2a; color: #c8d8e8; border: none; "
-        "font-size: 13px; selection-background-color: #4a7ba8; }"
-        "QTreeWidget::item { padding: 4px 8px; }"
-        "QTreeWidget::item:hover { background: #1a2a3a; }"));
+    // Die Seitenliste (Glas & Tiefe, 2026-09-18): Panelgrund, die
+    // gewaehlte Seite im gedeckten Auswahlblau wie jede Auswahl im
+    // Haus — nicht mehr die flache Akzentfarbe.
+    m_tree->setStyleSheet(QStringLiteral(
+        "QTreeWidget { background: %1; color: %2; border: none; outline: none;"
+        "  font-size: 13px; }"
+        "QTreeWidget::item { padding: 5px 8px; border-radius: 6px; }"
+        "QTreeWidget::item:hover { background: %3; }"
+        "QTreeWidget::item:selected { background: %4; color: %5; }")
+        .arg(Style::hexRole(Style::kPanelBg), Style::hexRole(Style::kTextPrimary),
+             Style::hexRole(Style::kButtonBg),
+             Style::hexRole(Style::kGlassSelBot), Style::hexRole(Style::kGlassSelText))
+        + QLatin1String(Style::kScrollBarStyle));
 
     // Stacked widget for page content
     m_stack = new QStackedWidget;

@@ -45,6 +45,7 @@
 #include "gui/applets/TciApplet.h"
 #include "gui/applets/AsrApplet.h"
 #include "gui/setup/AsrPage.h"
+#include "gui/SetupDialog.h"
 #include "gui/setup/DspSetupPages.h"
 #include "gui/setup/FilterPresetsSetupPage.h"
 #include "gui/setup/SpectrumPeaksPage.h"
@@ -1066,6 +1067,25 @@ private slots:
         page.render(&img);
         QVERIFY(img.save(QStringLiteral("/tmp/formular.png")));
         qInfo().noquote() << "Blatt: /tmp/formular.png" << page.size();
+    }
+
+    // Der ganze Setup-Dialog mit Seitenliste, wie er sich oeffnet.
+    void setupdialog()
+    {
+        applyAppBaselineQss(*qApp);
+        RadioModel modell;
+        SetupDialog dlg(&modell);
+        dlg.setAttribute(Qt::WA_DontShowOnScreen);
+        dlg.resize(980, 680);
+        dlg.show();
+        QCoreApplication::processEvents();
+        QTest::qWait(200);
+        QImage img(dlg.size() * 2, QImage::Format_ARGB32);
+        img.setDevicePixelRatio(2.0);
+        img.fill(QColor(Style::kAppBg));
+        dlg.render(&img);
+        QVERIFY(img.save(QStringLiteral("/tmp/setup_dialog.png")));
+        qInfo().noquote() << "Blatt: /tmp/setup_dialog.png" << dlg.size();
     }
 
     // Setup-Seiten (Roadmap F): jede als Blatt, mit der App-Basislinie
