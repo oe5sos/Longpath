@@ -2251,6 +2251,9 @@ void RotorLogbookPanel::openLogbookWindow()
         // and without this the map draws nothing for them.
         if (m_radio) {
             if (DxccColorProvider* dxcc = m_radio->dxccColorProvider()) {
+                // The Kennzahlen need the same table: entity per contact
+                // for the country list and the DXCC / continent / zone counts.
+                m_logWindow->setCtyDat(&dxcc->ctyDat());
                 m_logWindow->setPositionFallback(
                     [dxcc](const QString& call, double& lat, double& lon) {
                         const QString prefix =

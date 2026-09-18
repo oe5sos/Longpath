@@ -581,6 +581,7 @@ set(CORE_SOURCES
     src/core/FFTEngine.cpp
     src/core/NoiseFloorEstimator.cpp
     src/core/NoiseFloorTracker.cpp
+    src/core/LogbookStats.cpp
     src/core/ClarityController.cpp
     src/core/StepAttenuatorController.cpp
     src/core/CalibrationController.cpp
@@ -825,6 +826,7 @@ set(GUI_SOURCES
     src/gui/widgets/SwrSweepPanel.cpp
     src/gui/widgets/QsoDetailPane.h
     src/gui/widgets/QsoDetailPane.cpp
+    src/gui/widgets/LogbookStatsWidget.cpp
     src/gui/widgets/ScrollableLabel.cpp
     src/gui/widgets/StationPhoto.h
     src/gui/widgets/StationPhoto.cpp
