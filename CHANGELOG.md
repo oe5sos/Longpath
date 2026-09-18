@@ -4,6 +4,16 @@
 
 ### Added
 
+- **Logbuch-Kennzahlen + Awards** (Logbuch > Stats…): sechs Kacheln
+  statt des Textfensters -- Log (Gesamt, Rufzeichen, erste/letzte,
+  7/30/365 Tage, bestaetigt, Weitester), Baender und Modi als Balken mit
+  Bestaetigt-Anteil, Aktivitaet der letzten 26 Wochen, Top-Laender mit
+  Flagge, Awards: DXCC gearbeitet/bestaetigt (von 340, auch je Band),
+  WAS (von 50), Grids, Kontinente, CQ-Zonen. Ueber der gefilterten
+  Ansicht, folgt dem Filter, solange der Dialog offen ist. Entitaeten
+  aus cty.dat (Sizilien & Co. in ihre DXCC-Entitaet gefaltet), sonst das
+  ADIF-Feld DXCC. `docs/architecture/2026-09-18-logbook-stats.md`.
+
 - **Start-Protokoll nennt jetzt Betriebssystem, CPU-Architektur,
   Kernzahl, Qt-Laufzeitversion und RAM (macOS).** Von einer
   AetherSDR-Sichtung angestossen; reines Protokoll, keine Oberflaeche.
