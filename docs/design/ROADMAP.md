@@ -38,6 +38,9 @@ und trägt das alles — sie steht hier nicht mehr als eigene Baustelle.
 | 16 | Teil 3 — Kopfzeilen („Modification history (Longpath)", `(Longpath)`, „Longpath-original") und Kommentare in ~1 570 Dateien; Herkunft, datierte Historienzeilen und Übergangs-Erkennungen bleiben | 355f2f17 |
 | 17 | Formularstil (C): eine Definition für Auswahlfelder (erhaben), Häkchen/Wahlpunkte (versenkt), Glasfelder, Rinnen waagrecht/senkrecht (EQ), Gruppen, Knöpfe, Bildlaufleisten — auch als App-Basislinie, damit Ungestyltes im Haus-Look erscheint; AGC-T-Regler und DSP-Popup auf die Haus-Rinne | 8e3d0da2 |
 | 18 | Setup-Dialog, erster Gang (F): Haus-Reiter (`kTabStyle`), DSP-Seiten, SpectrumPeaks, FilterPresets, Transmit, Display, VAX, Mitschrift, AudioAdvanced, DeviceCard, Container-Editoren auf die Bausteine; Ratsche 1 477 → 1 230 | af9466d2 |
+| 19 | Applets, zweite Runde (C): RX-Applet bricht unter 420 px um (Spalten untereinander), Achse ohne Randkollision, CAT-Glaschips, Rille statt heller HLine | 846aa3af |
+| 20 | Setup, zweiter Gang (F): Seitenliste mit gedeckter Auswahl, Zeilenschalter mit ON/OFF statt textloser Knöpfe, Label-Spalte 210 px mit Umbruch | 59b1a616 |
+| 21 | Panadapter-Chrom (G): dBm-Pfeile und LIVE als erhabene Chips, CH-Tag als Glaschip, kein „◀ 0.0000" ohne Gerät; zentrale Mal-Helfer `Style::paint*Chip` | 88689c3e |
 
 Werkzeuge, die dabei entstanden sind und bleiben: `tst_filter_pane_sheet`
 (Bandfilter-Fläche in Betriebsgröße), `tst_tx_entwurf_sheet` mit
@@ -83,11 +86,9 @@ Was bewusst bleibt, steht in `CLAUDE.md` oben (Herkunft/Copyright,
 datierte Historienzeilen, Übergangs-Erkennungen, datierte Dokumente
 unter `docs/architecture/`).
 
-### C · Übrige Applets, zweite Runde  *(Formularstil erledigt, 18.09.)*
-Der App-weite Formularstil steht (Tabelle 17). Offen aus den Blättern:
-RX-Applet unter ~300 px Breite überlappt (MUTE/BIN, NB/SNB/APF, AGC-T)
-— Umbruch oder Mindestbreite wie beim Bandfilter; CAT-Kapseln sind
-noch flache Kapseln; „Me…"-Auswahlfeld (AGC-Modus) zu schmal.
+### C · Übrige Applets, zweite Runde  *(erledigt, 18.09.)*
+Formularstil (17), Umbruch/Achse/CAT-Chips/Rille (19). Was bleibt, ist
+Feinschliff am Gerät.
 
 ### D · Verbindungsdialog
 Der erste Bildschirm, den jeder sieht: Versalzeilen statt
@@ -101,17 +102,18 @@ MOX, VOX, BW, S-Meter sind ohnehin englisch) oder Deutsch durchgehend.
 Danach eine Durchsicht aller sichtbaren Texte („Bandwidth Filter" neben
 „Frequenz", „Leistung" neben „Tune", „Mitschrift", „Leeren").
 
-### F · Setup-Dialog  *(erster Gang erledigt, 18.09.)*
-Reiter, Gruppen, Felder, Regler, Wahlpunkte auf den Bausteinen
-(Tabelle 18; Blatt `tst_tx_entwurf_sheet setup`). Offen: Seiten mit
-eigener Palette in Labels/Pillen (DeviceCard-Pillen, AudioVax-Badge,
-Hardware-Tabs über HardwarePage), `SetupPage.cpp` selbst (Titelzeile,
-Scrollfläche über themed), Dialograhmen/Seitenliste des `SetupDialog`,
-ConnectionPanel (wartet auf D).
+### F · Setup-Dialog  *(zwei Gänge erledigt, 18.09.)*
+Tabelle 18 und 20; Blätter `tst_tx_entwurf_sheet setup|setupdialog`.
+Offen: DeviceCard-Pillen, AudioVax-Badge, HardwarePage-Reiter (nutzt
+noch keinen `kTabStyle`), Seitentitel als Versalzeile — Kleinigkeiten,
+die man am Gerät entscheidet.
 
-### G · Panadapter-Kopf, Overlay, Wasserfall-Palette
-Die Pillen CH 0/TX, die dBm-Pfeile, das Rechtsklick-Menü; eine
-Hausstil-Palette für den Wasserfall als wählbare Vorgabe (kein Zwang).
+### G · Panadapter-Kopf, Overlay, Wasserfall-Palette  *(erster Gang erledigt, 18.09.)*
+Tabelle 21. Eine Hausstil-Palette gibt es schon: „Gedämpft" (seit
+15.08., folgt dem Theme) — als Vorgabe wählbar unter Setup → Display →
+Color Scheme. Offen, weil nur mit Signal beurteilbar: der orange
+Bandbalken („ALL"), das Rechtsklick-Menü, die Overlay-Knöpfe links
+unten im Wasserfall.
 
 ### H · Live am Gerät, dann Release
 Bandfilter mit Kurve, TX-Feld beim Senden, Fußleiste mit zwei Ketten —
