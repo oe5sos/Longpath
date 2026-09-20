@@ -218,6 +218,17 @@ und Linux (x86_64 und aarch64), alle GPG-signiert.
   aus cty.dat (Sizilien & Co. in ihre DXCC-Entitaet gefaltet), sonst das
   ADIF-Feld DXCC. `docs/architecture/2026-09-18-logbook-stats.md`.
 
+- **Frequenzspeicher** (Tools > Memories…, Memory Quick Save / Quick
+  Restore): Thetis' Memory-Fenster portiert -- Gruppe, Frequenz, Name,
+  Modus, Abstimmschritt, FM-Repeater/CTCSS, Leistung, Filter, AGC, AGC-T
+  je Speicherplatz; Add/Copy/Delete/Select, Zellen im Grid editierbar.
+  Die Datei ist Thetis' `memory.xml` in seinem Format (mit
+  `memory_bak.xml` als Rueckfall), neben der Einstellungsdatei -- eine
+  Thetis-Speicherliste laesst sich hineinkopieren. Quick Save/Restore
+  merkt sich Frequenz, Modus und Filter wie die Frontplattenknoepfe.
+  `docs/architecture/2026-09-20-memories.md`. Live am Funkgeraet noch
+  nicht geprueft.
+
 - **Start-Protokoll nennt jetzt Betriebssystem, CPU-Architektur,
   Kernzahl, Qt-Laufzeitversion und RAM (macOS).** Von einer
   AetherSDR-Sichtung angestossen; reines Protokoll, keine Oberflaeche.

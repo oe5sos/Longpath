@@ -313,6 +313,13 @@ longpath_add_test(tst_logbook_stats_widget)
 #    cannot hold is bounded and reported, not read from beyond the
 #    allocation. NereusSDR-original bound, 2026-09-20 --
 longpath_add_test(tst_wdsp_delay_clamp)
+nereus_add_test(tst_wdsp_delay_clamp)
+# -- Frequency memories (Thetis Memory/MemoryRecord.cs + MemoryList.cs +
+#    MemoryForm.cs, console.cs RecallMemory / quick memory, 2026-09-20):
+#    memory.xml round trip against a Thetis sample, backup fallback, the
+#    table model, capture/recall on the active slice, the dialog --
+nereus_add_test(tst_memory_list)
+nereus_add_test(tst_memory_dialog)
 
 # ── Phase 3M-4 Task 3: TxChannel PureSignal API wrappers (22 functions) ──
 # Smoke tests for the 22 PS API wrappers added in Task 3:
