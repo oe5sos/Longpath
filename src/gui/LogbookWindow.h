@@ -112,6 +112,10 @@ public:
     // machines with no QRZ account, where the pane simply says so.
     void setQrzClient(QrzClient* qrz);
 
+    // cty.dat for the Kennzahlen (entity per contact, DXCC / continent /
+    // zone). Optional: without it the ADIF DXCC field is all there is.
+    void setCtyDat(const class CtyDatParser* cty) { m_cty = cty; }
+
 signals:
     // ── Point the beam at a contact ──────────────────────────────────
     //
@@ -261,6 +265,10 @@ private:
     // One map window, reused, so a second click raises the existing one
     // instead of stacking copies of the same picture.
     class QsoMapWindow* m_map{nullptr};
+    const class CtyDatParser* m_cty{nullptr};
+    class QDialog* m_statsDialog{nullptr};
+    class LogbookStatsWidget* m_statsView{nullptr};
+    void refreshStatsView();
     PositionFallback m_fallback;
 
     // Outstanding uploads for the current batch, so the summary can be

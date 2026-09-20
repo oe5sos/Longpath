@@ -11,6 +11,8 @@
 // =================================================================
 
 #include "LogbookWindow.h"
+#include "core/LogbookStats.h"
+#include "gui/widgets/LogbookStatsWidget.h"
 
 #include "core/AdifLog.h"
 #include "core/BeamHeading.h"
@@ -45,6 +47,7 @@
 #include <QLineEdit>
 #include <QMessageBox>
 #include <QPlainTextEdit>
+#include <QScrollArea>
 #include <QPushButton>
 #include <QSet>
 #include <QSignalBlocker>
@@ -988,6 +991,9 @@ void LogbookWindow::refreshTable()
 
 void LogbookWindow::updateStats()
 {
+    // The Kennzahlen dialog follows the same view as this status line.
+    refreshStatsView();
+
     QSet<QString> calls;
     QSet<QString> bands;
     QSet<QString> modes;
@@ -1695,99 +1701,51 @@ void LogbookWindow::exportCabrillo()
 
 void LogbookWindow::showStatistics()
 {
-    // Over the filtered view, same as every export here: filter to one
-    // year or one band and the numbers answer for exactly that.
-    QHash<QString, int> perBand, perMode, perYear;
-    QSet<QString> calls, squares;
-    double longest = 0.0;
-    QString longestCall;
-    int total = 0;
-
-    for (int i : m_visible) {
-        const LogEntry& e = m_all.at(i);
-        ++total;
-        ++perBand[e.band.trimmed().isEmpty()
-                      ? QStringLiteral("?") : e.band.trimmed().toLower()];
-        ++perMode[e.mode.trimmed().isEmpty()
-                      ? QStringLiteral("?") : e.mode.trimmed().toUpper()];
-        const QDateTime u = e.timeOn.toUTC();
-        if (u.isValid()) {
-            ++perYear[u.toString(QStringLiteral("yyyy"))];
-        }
-        calls.insert(e.call.trimmed().toUpper());
-        if (e.gridSquare.trimmed().size() >= 4) {
-            squares.insert(e.gridSquare.trimmed().toUpper().left(4));
-        }
-        if (e.distanceKm > longest) {
-            longest = e.distanceKm;
-            longestCall = e.call;
-        }
+    // The Kennzahlen view (2026-09-18, benchmark item 4): six tiles over
+    // the filtered view -- same rule as every export here: filter to one
+    // year or one band and the numbers answer for exactly that. One
+    // modeless dialog, reused, refreshed whenever the log or the filter
+    // changes while it is open.
+    if (!m_statsDialog) {
+        m_statsDialog = new QDialog(this);
+        m_statsDialog->setWindowTitle(QStringLiteral("Logbook statistics"));
+        m_statsDialog->setModal(false);
+        m_statsDialog->resize(900, 560);
+        m_statsDialog->setStyleSheet(QStringLiteral("QDialog { background: %1; }")
+                                         .arg(QLatin1String(Style::kAppBg)));
+        auto* lay = new QVBoxLayout(m_statsDialog);
+        lay->setContentsMargins(0, 0, 0, 0);
+        auto* scroll = new QScrollArea(m_statsDialog);
+        scroll->setWidgetResizable(true);
+        scroll->setFrameShape(QFrame::NoFrame);
+        scroll->setStyleSheet(QStringLiteral("QScrollArea { background: %1; border: none; }")
+                                  .arg(QLatin1String(Style::kAppBg)));
+        m_statsView = new LogbookStatsWidget(scroll);
+        scroll->setWidget(m_statsView);
+        lay->addWidget(scroll, 1);
+        auto* closeBtn = new QPushButton(QStringLiteral("Close"), m_statsDialog);
+        closeBtn->setStyleSheet(Style::buttonBaseStyle());
+        connect(closeBtn, &QPushButton::clicked, m_statsDialog, &QDialog::hide);
+        auto* foot = new QHBoxLayout;
+        foot->setContentsMargins(10, 4, 10, 10);
+        foot->addStretch(1);
+        foot->addWidget(closeBtn);
+        lay->addLayout(foot);
     }
+    m_statsDialog->show();
+    m_statsDialog->raise();
+    m_statsDialog->activateWindow();
+    refreshStatsView();   // after show(): it only works on a visible dialog
+}
 
-    auto section = [](const QString& title, QHash<QString, int> counts,
-                      bool byBand) {
-        QStringList keys = counts.keys();
-        if (byBand) {
-            std::sort(keys.begin(), keys.end(),
-                      [](const QString& a, const QString& b) {
-                return AdifLog::bandSortKeyMHz(a)
-                     < AdifLog::bandSortKeyMHz(b);
-            });
-        } else {
-            std::sort(keys.begin(), keys.end());
-        }
-        int max = 1;
-        for (const QString& k : keys) { max = std::max(max, counts[k]); }
-        QString out = title + QLatin1Char('\n');
-        for (const QString& k : keys) {
-            const int n = counts[k];
-            const int bar = std::max(1, n * 28 / max);
-            out += QStringLiteral("  %1 %2 %3\n")
-                .arg(k, -6)
-                .arg(QString(bar, QChar(0x2588)))
-                .arg(n);
-        }
-        return out;
-    };
-
-    QString text;
-    text += QStringLiteral("%1 contacts · %2 unique calls · %3 grid "
-                           "squares\n")
-        .arg(total).arg(calls.size()).arg(squares.size());
-    if (longest > 0.0) {
-        text += QStringLiteral("furthest: %1 km (%2)\n")
-            .arg(longest, 0, 'f', 0).arg(longestCall);
-    }
-    text += QLatin1Char('\n');
-    text += section(QStringLiteral("By band"), perBand, true);
-    text += QLatin1Char('\n');
-    text += section(QStringLiteral("By mode"), perMode, false);
-    text += QLatin1Char('\n');
-    text += section(QStringLiteral("By year"), perYear, false);
-
-    QDialog dlg(this);
-    dlg.setWindowTitle(QStringLiteral("Logbook statistics"));
-    dlg.resize(420, 480);
-    auto* lay = new QVBoxLayout(&dlg);
-    auto* view = new QPlainTextEdit(&dlg);
-    view->setReadOnly(true);
-    view->setPlainText(text);
-    QFont mono(QStringLiteral("Menlo"));
-    mono.setStyleHint(QFont::Monospace);
-    mono.setPixelSize(13);
-    view->setFont(mono);
-    view->setStyleSheet(QStringLiteral(
-        "QPlainTextEdit { background: %1; color: %2; border: 1px solid "
-        "%3; }")
-        .arg(QString::fromLatin1(Style::kInsetBg),
-             QString::fromLatin1(Style::kTextPrimary),
-             QString::fromLatin1(Style::kBorderSubtle)));
-    lay->addWidget(view);
-    auto* closeBtn = new QPushButton(QStringLiteral("Close"), &dlg);
-    closeBtn->setStyleSheet(Style::buttonBaseStyle());
-    connect(closeBtn, &QPushButton::clicked, &dlg, &QDialog::accept);
-    lay->addWidget(closeBtn, 0, Qt::AlignRight);
-    dlg.exec();
+void LogbookWindow::refreshStatsView()
+{
+    if (!m_statsView || !m_statsDialog || !m_statsDialog->isVisible()) { return; }
+    QVector<LogEntry> shown;
+    shown.reserve(m_visible.size());
+    for (int i : m_visible) { shown.push_back(m_all.at(i)); }
+    m_statsView->setStats(LogbookStats::compute(shown, m_cty,
+                                                QDateTime::currentDateTimeUtc()));
 }
 
 } // namespace Longpath
