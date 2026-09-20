@@ -85,6 +85,8 @@ mw0lge@grange-lane.co.uk
 
 namespace Longpath {
 
+class AppSettings;
+
 // From Thetis clsDBMan.cs:129-143 [@852bf0e]
 //   public class BackupFileInfo
 //   {
@@ -159,6 +161,17 @@ public:
     // From Thetis clsDBMan.cs:1929-2010 [@852bf0e] pruneForGFS. Returns
     // how many automatic copies were removed. `now` is a test seam.
     int pruneForGfs(const QDateTime& now = QDateTime::currentDateTime());
+
+    // The automatic copies. From Thetis clsDBMan.cs:370-380 [@852bf0e]
+    // (LoadDB: `if (di.BackupOnStartup) TakeBackup(Guid.Empty, "Startup", true);`
+    // before DB.Init()) and clsDBMan.cs:541-557 (Shutdown:
+    // `if (di.BackupOnShutdown) TakeBackup(Guid.Empty, "Shutdown", true);`).
+    // Reads the BackupOnStartup / BackupOnShutdown / PruneBackups switches
+    // from `settings` ("True"/"False"), copies its file when the switch
+    // for `which` ("Startup" or "Shutdown") is on. Returns the copy's
+    // path, empty when nothing was copied. No flush: at start-up the file
+    // on disk IS the state, at shut-down the final save() just ran.
+    static QString takeAutomaticBackupIfWanted(AppSettings& settings, const QString& which);
 
     // From Thetis clsDBMan.cs:1333-1351 [@852bf0e] createUniqueFilename
     static QString createUniqueFilename(const QString& directoryPath,

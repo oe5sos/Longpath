@@ -14834,18 +14834,7 @@ void MainWindow::takeShutdownBackupIfWanted()
     // A restore is pending: the file on disk is the restored one, not
     // this session's state -- nothing to copy.
     if (s.saveInhibited()) { return; }
-    if (s.value(QStringLiteral("BackupOnShutdown"), QStringLiteral("False")).toString()
-        != QLatin1String("True")) {
-        return;
-    }
-    SettingsBackup backup(s.filePath());
-    backup.setPruneEnabled(
-        s.value(QStringLiteral("PruneBackups"), QStringLiteral("False")).toString()
-        == QLatin1String("True"));
-    QString err;
-    if (backup.takeBackup(QStringLiteral("Shutdown"), true, &err).isEmpty()) {
-        qWarning() << "[SettingsBackup] shutdown backup failed:" << err;
-    }
+    SettingsBackup::takeAutomaticBackupIfWanted(s, QStringLiteral("Shutdown"));
 }
 
 void MainWindow::showAudioDiagnoseDialog()

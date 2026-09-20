@@ -55,6 +55,7 @@ mw0lge@grange-lane.co.uk
 // Richard Samphire can be reached by email at :  mw0lge@grange-lane.co.uk                    //
 //============================================================================================//
 #include "core/SettingsBackup.h"
+#include "core/AppSettings.h"
 #include "core/LogCategories.h"
 
 #include <QDir>
@@ -488,6 +489,24 @@ bool SettingsBackup::restore(const QString& filePath, QString* error)
     }
     qCInfo(lcSettingsBackup) << "restored" << filePath << "over" << m_settingsFilePath;
     return true;
+}
+
+QString SettingsBackup::takeAutomaticBackupIfWanted(AppSettings& settings, const QString& which)
+{
+    const QString key = QStringLiteral("BackupOn") + which;   // BackupOnStartup / BackupOnShutdown
+    if (settings.value(key, QStringLiteral("False")).toString() != QLatin1String("True")) {
+        return {};
+    }
+    SettingsBackup backup(settings.filePath());
+    backup.setPruneEnabled(
+        settings.value(QStringLiteral("PruneBackups"), QStringLiteral("False")).toString()
+        == QLatin1String("True"));
+    QString err;
+    const QString path = backup.takeBackup(which, true, &err);
+    if (path.isEmpty()) {
+        qCWarning(lcSettingsBackup) << which << "backup failed:" << err;
+    }
+    return path;
 }
 
 bool SettingsBackup::isPrunable(const SettingsBackupInfo& info)

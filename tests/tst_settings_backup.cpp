@@ -76,6 +76,7 @@ mw0lge@grange-lane.co.uk
 #include <QJsonObject>
 #include <QTemporaryDir>
 
+#include "core/AppSettings.h"
 #include "core/SettingsBackup.h"
 
 using namespace Longpath;
@@ -411,6 +412,36 @@ private slots:
         QVERIFY(QFileInfo::exists(a));
         QVERIFY(!QFileInfo::exists(a2));
         QVERIFY(QFileInfo::exists(c));
+    }
+
+    // From Thetis clsDBMan.cs:370-380 and 541-557 [@852bf0e]: the
+    // automatic copies follow the switches, off by default.
+    void automaticCopiesFollowTheSwitches()
+    {
+        Rig rig;
+        AppSettings settings(rig.settingsPath);
+        settings.load();
+        settings.save();
+
+        QVERIFY(SettingsBackup::takeAutomaticBackupIfWanted(settings, QStringLiteral("Startup")).isEmpty());
+        QVERIFY(SettingsBackup::takeAutomaticBackupIfWanted(settings, QStringLiteral("Shutdown")).isEmpty());
+        QVERIFY(!QDir(rig.backupsDir()).exists());
+
+        settings.setValue(QStringLiteral("BackupOnStartup"), QStringLiteral("True"));
+        const QString startup = SettingsBackup::takeAutomaticBackupIfWanted(settings, QStringLiteral("Startup"));
+        QVERIFY(!startup.isEmpty());
+        QVERIFY(SettingsBackup::takeAutomaticBackupIfWanted(settings, QStringLiteral("Shutdown")).isEmpty());
+        SettingsBackup b(rig.settingsPath);
+        QList<SettingsBackupInfo> list = b.orderedBackups();
+        QCOMPARE(list.size(), 1);
+        QCOMPARE(list.first().description, QStringLiteral("Startup"));
+        QVERIFY(list.first().automatic);
+
+        settings.setValue(QStringLiteral("BackupOnShutdown"), QStringLiteral("True"));
+        QVERIFY(!SettingsBackup::takeAutomaticBackupIfWanted(settings, QStringLiteral("Shutdown")).isEmpty());
+        list = b.orderedBackups();
+        QCOMPARE(list.size(), 2);
+        QCOMPARE(list.first().description, QStringLiteral("Shutdown"));
     }
 
     void weekOfYearIsIso()
