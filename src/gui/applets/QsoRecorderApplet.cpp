@@ -437,11 +437,10 @@ void QsoRecorderApplet::onRecordClicked()
         // gilt dieselbe Pruefung wie bei Thetis auch hier — die
         // laufende Wache ist QsoRecorderController::checkDiskSpace().
         if (!QsoRecorderController::hasEnoughDiskSpace(recordingFolder())) {
-            QMessageBox::warning(this, QStringLiteral("QSO Recorder"),
-                QStringLiteral(
+            warnWithoutBlocking(QStringLiteral(
                     "Not enough free disk space to start recording "
                     "(less than %1% free).")
-                    .arg(QsoRecorderController::kFreeSpacePercentFloor));
+                    .arg(QsoRecorderController::freeSpacePercentFloor()));
             return;
         }
 
@@ -476,12 +475,26 @@ void QsoRecorderApplet::onRecordClicked()
 
         QString err;
         if (!rec.start(path, info, &err)) {
-            QMessageBox::warning(this, QStringLiteral("QSO Recorder"),
+            warnWithoutBlocking(
                 QStringLiteral("Could not start recording: %1").arg(err));
             return;
         }
     }
     refreshState();
+}
+
+// A warning that does not stop the event loop. QMessageBox::warning()
+// runs a nested loop until the box is dismissed; behind the Record button
+// that turned every automated press into a hang (CI, 2026-09-18) and would
+// do the same to the automation bridge. open() shows the same box, window-
+// modal, and returns.
+void QsoRecorderApplet::warnWithoutBlocking(const QString& text)
+{
+    auto* box = new QMessageBox(QMessageBox::Warning,
+                                QStringLiteral("QSO Recorder"), text,
+                                QMessageBox::Ok, this);
+    box->setAttribute(Qt::WA_DeleteOnClose);
+    box->open();
 }
 
 void QsoRecorderApplet::refreshState()

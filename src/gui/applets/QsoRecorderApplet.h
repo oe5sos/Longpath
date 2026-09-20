@@ -113,6 +113,7 @@ public:
 private:
     void buildUI();
     void refreshState();
+    void warnWithoutBlocking(const QString& text);
     void refreshList();
     void onRecordClicked();
 

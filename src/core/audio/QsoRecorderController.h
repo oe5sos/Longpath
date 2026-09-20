@@ -91,6 +91,14 @@ public:
     static constexpr int kFreeSpacePercentFloor = 10;
     static constexpr int kSpaceCheckMs          = 2000;
 
+    // The floor hasEnoughDiskSpace() actually applies: kFreeSpacePercentFloor
+    // unless a test lowered it. GitHub's macOS runners sit below 10 % free,
+    // so without this seam every test that presses Record met the
+    // "not enough disk space" box instead of a recording (2026-09-18,
+    // tst_qso_recorder_applet timed out at 120 s on CI, 0.3 s locally).
+    static int  freeSpacePercentFloor();
+    static void setFreeSpacePercentFloorForTest(int percent);   // < 0 restores
+
     explicit QsoRecorderController(QObject* parent = nullptr);
     ~QsoRecorderController() override;
 

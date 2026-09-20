@@ -30,6 +30,7 @@
 #include <QPushButton>
 #include <vector>
 
+#include "core/audio/QsoRecorderController.h"
 #include "gui/applets/QsoRecorderApplet.h"
 #include "models/RadioModel.h"
 
@@ -65,6 +66,18 @@ class TestQsoRecorderApplet : public QObject
     Q_OBJECT
 
 private slots:
+    // Der Plattenplatz-Schutz gilt fuer die Werkbank des Betreibers, nicht
+    // fuer den Pruefstand: GitHubs macOS-Laeufer haben unter 10 % frei,
+    // und dann nimmt der Knopf nicht auf, sondern warnt (2026-09-18:
+    // 120 s Timeout auf CI, 0,3 s hier).
+    void initTestCase()
+    {
+        QsoRecorderController::setFreeSpacePercentFloorForTest(0);
+    }
+    void cleanupTestCase()
+    {
+        QsoRecorderController::setFreeSpacePercentFloorForTest(-1);
+    }
 
     // BEIDE Spuren muessen da sein. Eine gemeinsame Anzeige laesst
     // Stille nicht von „Mikrofon aus" unterscheiden — das ist der ganze

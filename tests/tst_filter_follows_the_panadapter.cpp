@@ -261,24 +261,65 @@ private slots:
 
         // Der Kurvenzug ist warm getoent; der Rest ist Grau und Blau.
         int topMost = img.height();
+        int topX = -1;
+        QColor topColor;
         for (int y = 0; y < img.height(); ++y) {
             for (int x = 4; x < img.width() - 60; x += 2) {
                 const QColor c = img.pixelColor(x, y);
                 if (c.red() > c.blue() + 24 && c.red() > 90) {
                     topMost = qMin(topMost, y);
+                    topX = x;
+                    topColor = c;
                     break;
                 }
             }
             if (topMost < img.height()) { break; }
         }
         const double frac = double(topMost) / img.height();
-        qInfo() << "Hoechster Kurvenpunkt bei" << (frac * 100.0) << "% Hoehe";
+        // The same scan again, but only below the label band (the RX1
+        // badge and the width box live in the top 30 px): where the
+        // curve itself reaches. Linux CI (2026-09-20) found a warm pixel
+        // at (12, 6) -- inside the badge -- while the curve was fine.
+        int topMostPlot = img.height();
+        for (int y = 40; y < img.height(); ++y) {
+            for (int x = 4; x < img.width() - 60; x += 2) {
+                const QColor c = img.pixelColor(x, y);
+                if (c.red() > c.blue() + 24 && c.red() > 90) {
+                    topMostPlot = qMin(topMostPlot, y);
+                    break;
+                }
+            }
+            if (topMostPlot < img.height()) { break; }
+        }
+        qInfo() << "Hoechster Kurvenpunkt bei" << (frac * 100.0) << "% Hoehe"
+                << "-- erster warmer Bildpunkt" << topX << topMost
+                << topColor.name() << "Schrift" << pane.font().family()
+                << pane.font().pointSizeF() << pane.font().pixelSize()
+                << "-- unterhalb des Etiketts ab" << (100.0 * topMostPlot / img.height()) << "%"
+                << "Etikett-Pixel (12,6)" << img.pixelColor(12, 6).name()
+                << "(12,10)" << img.pixelColor(12, 10).name()
+                << "(6,6)" << img.pixelColor(6, 6).name();
+        // Zum Nachsehen ohne Bildschirm (Linux-CI): das Bild als PNG.
+        const QString grabDir = qEnvironmentVariable("LONGPATH_GRAB_DIR");
+        if (!grabDir.isEmpty()) {
+            img.save(grabDir + QStringLiteral("/longpath-grab-BandwidthFilterPane-noise.png"));
+        }
 
-        QVERIFY2(frac > 0.62,
+        // Gemessen wird die KURVE, nicht das Etikett: die Suche gilt ab
+        // 40 px, unterhalb der RX1-Marke und des Breitenkaestchens (die
+        // Kurve selbst kann nie hoeher als r.top()+30 liegen). Auf dem
+        // Linux-Laeufer rendert FreeType die Schrift mit Subpixel-
+        // Kantenglaettung, und ein Farbsaum an einer Glyphenkante der Marke
+        // ist "warm" im Sinne dieser Suche -- (12, 6), #b09e7a, 2026-09-20.
+        // Auf dem Mac (Graustufen-Glaettung) gab es den Saum nicht, und so
+        // fiel der Test nur auf Linux, mit einer Kurve, die dort genauso am
+        // Boden liegt.
+        const double fracPlot = double(topMostPlot) / img.height();
+        QVERIFY2(fracPlot > 0.62,
                  qPrintable(QStringLiteral(
                      "Ohne Signal steigt die Kurve bis auf %1 %% der "
                      "Hoehe — sie gehoert an den Boden")
-                     .arg(frac * 100.0, 0, 'f', 1)));
+                     .arg(fracPlot * 100.0, 0, 'f', 1)));
     }
 
     void theSignalShowsUpInThePane()

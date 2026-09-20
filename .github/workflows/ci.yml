@@ -699,6 +699,11 @@ jobs:
             # the watchdog isn't the target's parent process, so ptrace
             # scope (YAMA) would otherwise refuse to attach.
             mkdir -p /tmp/hang-diagnostics
+            # Tests that render a widget write it as a PNG here when asked
+            # (LONGPATH_GRAB_DIR, see tst_filter_follows_the_panadapter) --
+            # the only way to look at a Linux-only rendering difference
+            # without a Linux machine. Uploaded with the hang diagnostics.
+            export LONGPATH_GRAB_DIR=/tmp/hang-diagnostics
             hang_watchdog() {
               declare -A seen
               while true; do
@@ -750,10 +755,10 @@ jobs:
       # ------------------------------------------------------------------
       # PR artifact upload
       # ------------------------------------------------------------------
-      # Linux is sharded — every shard rebuilds the same main app, so
-      # only shard 0 uploads the artifact to keep the PR's artifact
-      # list clean.  macOS / Windows always upload (matrix.shard is
-      # empty for them, treated as 0 by the comparison).
+      # Linux and macOS are sharded — every shard rebuilds the same
+      # main app, so only shard 0 uploads the artifact to keep the PR's
+      # artifact list clean.  Windows always uploads (matrix.shard is
+      # empty there, treated as 0 by the comparison).
       - name: Locate built binary
         if: github.event_name == 'pull_request' && (matrix.shard == 0 || matrix.shard == '')
         id: locate
@@ -771,7 +776,14 @@ jobs:
         with:
           # Strip the shard suffix from the artifact name so the Linux
           # binary appears as "Linux x64" not "Linux x64 (1/4)".
-          name: Longpath-pr${{ github.event.number }}-${{ runner.os == 'Linux' && 'Linux x64' || matrix.name }}
+          #
+          # macOS too: "macOS Apple Silicon (1/2)" has a "/" which
+          # upload-artifact rejects ("The artifact name is not valid").
+          # Hidden since the macOS shards arrived on 2026-08-09, because
+          # this step only runs after a green test step and macOS shard
+          # 0 never had one until PR #20 — its first all-green run went
+          # red on exactly this line.
+          name: Longpath-pr${{ github.event.number }}-${{ runner.os == 'Linux' && 'Linux x64' || runner.os == 'macOS' && 'macOS Apple Silicon' || matrix.name }}
           path: ${{ steps.locate.outputs.binary }}
           retention-days: 7
           if-no-files-found: warn

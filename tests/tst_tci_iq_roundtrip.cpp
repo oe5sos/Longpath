@@ -70,8 +70,11 @@ void TestTciIqRoundtrip::iq_start_subscribes_then_frames_arrive()
     // and inserts 0 into session->iqStreamEnabled.
     client.sendTextMessage(QStringLiteral("iq_start:0;"));
 
-    // Allow subscription to register across the loopback socket + event loop.
-    QTest::qWait(50);
+    // Wait for the subscription to register across the loopback socket +
+    // event loop -- polled, because a fixed 50 ms is not enough on a loaded
+    // CI runner (macOS, 2026-09-18: injected IQ met no subscriber yet and
+    // was discarded, "expected >=1 binary frame").
+    QTRY_COMPARE_WITH_TIMEOUT(server.activeIqSubscriberCount(0), 1, 5000);
 
     // Inject synthetic IQ: 1024 complex samples (I=0.5, Q=0.3).
     // With IQSwap=True the wire will carry (Q=0.3, I=0.5).
@@ -83,13 +86,10 @@ void TestTciIqRoundtrip::iq_start_subscribes_then_frames_arrive()
     }
     server.injectRawIqForTest(iqData);
 
-    // Give the slot time to run and sendBinaryMessage to fire.
-    QTest::qWait(100);
-
-    // Assert: at least one binary frame arrived.
-    QVERIFY2(binarySpy.count() >= 1,
+    // Give the slot time to run and sendBinaryMessage to fire (polled).
+    QTRY_VERIFY2_WITH_TIMEOUT(binarySpy.count() >= 1,
              qPrintable(QStringLiteral("Expected ≥1 IQ binary frame, got %1")
-                            .arg(binarySpy.count())));
+                            .arg(binarySpy.count())), 5000);
 
     // Decode and verify the first frame header.
     //
@@ -158,14 +158,11 @@ void TestTciIqRoundtrip::iq_stop_early_out_no_frames()
     client.open(QUrl(QStringLiteral("ws://127.0.0.1:%1").arg(server.port())));
     QVERIFY(clientConnected.wait(2000));
 
-    // Subscribe, then immediately unsubscribe.
+    // Subscribe, then unsubscribe -- each step awaited on the server side.
     client.sendTextMessage(QStringLiteral("iq_start:0;"));
-    QTest::qWait(50);
+    QTRY_COMPARE_WITH_TIMEOUT(server.activeIqSubscriberCount(0), 1, 5000);
     client.sendTextMessage(QStringLiteral("iq_stop:0;"));
-    QTest::qWait(50);
-
-    // Verify subscription is gone.
-    QCOMPARE(server.activeIqSubscriberCount(0), 0);
+    QTRY_COMPARE_WITH_TIMEOUT(server.activeIqSubscriberCount(0), 0, 5000);
 
     // Inject IQ — should be silently discarded (wantsIQStream returns false).
     QVector<float> iqData(2048, 0.1f);
@@ -203,7 +200,7 @@ void TestTciIqRoundtrip::iq_swap_flag_swaps_i_q_pairs()
     client.open(QUrl(QStringLiteral("ws://127.0.0.1:%1").arg(server.port())));
     QVERIFY(clientConnected.wait(2000));
     client.sendTextMessage(QStringLiteral("iq_start:0;"));
-    QTest::qWait(50);
+    QTRY_COMPARE_WITH_TIMEOUT(server.activeIqSubscriberCount(0), 1, 5000);
 
     // 16 complex samples with I=0.7, Q=0.2.
     QVector<float> iqData;
@@ -213,10 +210,8 @@ void TestTciIqRoundtrip::iq_swap_flag_swaps_i_q_pairs()
         iqData.append(0.2f);   // Q
     }
     server.injectRawIqForTest(iqData);
-    QTest::qWait(100);
-
-    QVERIFY2(binarySpy.count() >= 1,
-             "IQSwap=False: expected ≥1 binary frame");
+    QTRY_VERIFY2_WITH_TIMEOUT(binarySpy.count() >= 1,
+             "IQSwap=False: expected ≥1 binary frame", 5000);
 
     const QByteArray frame = binarySpy.at(0).at(0).toByteArray();
     QVERIFY(frame.size() > 64);
@@ -263,11 +258,9 @@ void TestTciIqRoundtrip::always_stream_iq_overrides_subscription()
 
     QVector<float> iqData(2048, 0.1f);
     server.injectRawIqForTest(iqData);
-    QTest::qWait(100);
-
-    QVERIFY2(binarySpy.count() >= 1,
+    QTRY_VERIFY2_WITH_TIMEOUT(binarySpy.count() >= 1,
              "AlwaysStreamIQ override failed — client should receive IQ frames "
-             "without an explicit iq_start subscription");
+             "without an explicit iq_start subscription", 5000);
 
     // Restore defaults for cleanliness.
     AppSettings::instance().setValue(QStringLiteral("TciAlwaysStreamIq"), QStringLiteral("False"));

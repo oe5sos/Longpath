@@ -11,6 +11,7 @@
 #ifdef HAVE_WEBSOCKETS
 
 #include <QtTest>
+#include <QElapsedTimer>
 #include <QSignalSpy>
 #include <QWebSocket>
 #include "core/TciServer.h"
@@ -41,11 +42,23 @@ void TestTciSilentErrorInvariant::unknown_command_produces_no_outbound_traffic()
     // session send queue by TciServer::onNewConnection. The silent-error
     // invariant applies to UNKNOWN COMMANDS specifically, NOT to the
     // normal post-connect greeting.
-    QTest::qWait(200);  // generous for ~98 small text frames over loopback
-    const int initBurstCount = clientTextSpy.count();
-    QVERIFY2(initBurstCount > 0,
-             qPrintable(QStringLiteral("Expected init burst to deliver >=1 line, got %1")
-                            .arg(initBurstCount)));
+    // Wait until the burst has gone quiet, not for a fixed 200 ms: on a
+    // loaded CI runner the tail of the burst arrived AFTER the spy was
+    // cleared and counted as a response to the unknown command (macOS,
+    // 2026-09-17). Quiet = no new text frame for 300 ms, bounded at 10 s.
+    {
+        QElapsedTimer clock;
+        clock.start();
+        int seen = -1;
+        while (clock.elapsed() < 10000) {
+            const int before = clientTextSpy.count();
+            QTest::qWait(300);
+            if (before > 0 && clientTextSpy.count() == before) { seen = before; break; }
+        }
+        QVERIFY2(seen > 0,
+                 qPrintable(QStringLiteral("Expected the init burst to deliver >=1 line and go quiet, got %1")
+                                .arg(clientTextSpy.count())));
+    }
     clientTextSpy.clear();
 
     // Send an obviously-unknown command. Per design doc §4.1 / Sweep B:
