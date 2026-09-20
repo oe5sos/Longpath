@@ -1563,8 +1563,8 @@ void TxApplet::setPowerScale(int maxWatts, bool hasAmplifier)
         return;
     }
 
-    // Code review, 2026-09-13 (Zeus SDR changelog comparison -- their
-    // 2.0.16 fixed "TX stage meters kept the stock 120W scale" with a
+    // Code review, 2026-09-13 (changelog comparison with another
+    // client -- their 2.0.16 fixed "TX stage meters kept the stock 120W scale" with a
     // lower-power amp configured): maxWatts used to be silently dropped
     // here (Q_UNUSED), so ANY amplifier snapped this gauge to the fixed
     // 2kW scale below regardless of its actual rating. That was

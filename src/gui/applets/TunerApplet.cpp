@@ -522,7 +522,8 @@ void TunerApplet::setPowerScale(int maxWatts, bool hasAmplifier)
 {
     // From AetherSDR src/gui/TunerApplet.cpp:setPowerScale [@0cd4559]
     if (hasAmplifier) {
-        // Code review, 2026-09-13 (Zeus SDR changelog comparison): same
+        // Code review, 2026-09-13 (changelog comparison with another
+        // client): same
         // fix as TxApplet::setPowerScale, kept in lockstep with it per
         // this function's own "damit die Anzeigen nicht auseinander-
         // laufen" contract. maxWatts<=0 (PGXL, RF-Kit/RF2K-S -- both
