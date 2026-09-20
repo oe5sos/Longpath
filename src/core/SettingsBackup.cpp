@@ -388,9 +388,9 @@ void SettingsBackup::removeBackups(const QStringList& filePaths)
 {
     const QString dir = QDir(backupDir()).absolutePath();
     for (const QString& filePath : filePaths) {
-        // Longpath: only files inside the backups folder are removed
-        // through this door, whatever the dialog hands over.
-        if (!QFileInfo(filePath).absolutePath().startsWith(dir)) {
+        // Longpath: only files directly inside the backups folder are
+        // removed through this door, whatever the dialog hands over.
+        if (QFileInfo(filePath).absolutePath() != dir) {
             qCWarning(lcSettingsBackup) << "refusing to remove outside backups:" << filePath;
             continue;
         }

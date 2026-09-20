@@ -92,9 +92,11 @@ struct Rig {
         writeSettings(QStringLiteral("<Settings><A>1</A></Settings>"));
     }
 
-    void writeSettings(const QString& text) const
+    void writeSettings(const QString& text) const { write(settingsPath, text); }
+
+    static void write(const QString& path, const QString& text)
     {
-        QFile f(settingsPath);
+        QFile f(path);
         QVERIFY(f.open(QIODevice::WriteOnly | QIODevice::Truncate));
         f.write(text.toUtf8());
     }
@@ -252,7 +254,13 @@ private slots:
         const QString c = rig.plant(1700000002, QStringLiteral("c"), false);
         SettingsBackup b(rig.settingsPath);
 
-        b.removeBackups({a, rig.settingsPath});
+        // A sibling folder whose name merely starts with "backups" is
+        // outside too.
+        QDir().mkpath(rig.backupsDir() + QStringLiteral("2"));
+        const QString sibling = rig.backupsDir() + QStringLiteral("2/settings_backup_1700000001.xml");
+        Rig::write(sibling, QStringLiteral("<Settings/>"));
+        b.removeBackups({a, rig.settingsPath, sibling});
+        QVERIFY(QFileInfo::exists(sibling));
         QVERIFY(!QFileInfo::exists(a));
         QVERIFY(!QFileInfo::exists(SettingsBackup::sidecarPath(a)));
         QVERIFY(QFileInfo::exists(c));
