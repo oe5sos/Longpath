@@ -5,7 +5,7 @@
 // Die Kopfleiste des Panadapters.
 //
 // Der Panadapter war die einzige Flaeche ohne Kopf, obwohl jede Applet
-// daneben einen hat — im Zeus-Bild steht dort „PANADAPTER · 13.139312
+// daneben einen hat — im Bild der Vorlage steht dort „PANADAPTER · 13.139312
 // MHz". Dieser Test haelt zwei Dinge fest, die beim naechsten Umbau
 // leicht verlorengehen:
 //

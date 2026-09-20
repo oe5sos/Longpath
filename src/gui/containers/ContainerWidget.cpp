@@ -182,8 +182,8 @@ void ContainerWidget::buildUI()
     //
     // Als GELBER STRICH, nicht als sechs graue Punkte: der Betreiber am
     // 2026-08-19 zum ersten Entwurf — „die 6 punkte vor dem titel
-    // koennten farbe benoetigen oder wie bei zeus der gelbe strich".
-    // Zeus Link setzt denselben Strich, und ein Grauton auf grauem
+    // koennten farbe benoetigen oder wie bei [der Vorlage] der gelbe strich".
+    // Die Vorlage setzt denselben Strich, und ein Grauton auf grauem
     // Grund war ohnehin genau die Zurueckhaltung, die den Hinweis
     // unsichtbar gemacht hat.
     //

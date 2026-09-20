@@ -315,8 +315,8 @@ QWidget* AppletPanelWidget::wrapWithTitleBar(QWidget* child, const QString& titl
     //
     // War „⋮⋮" in kTextScale — grau auf grau. Der Betreiber hat am
     // 2026-08-19 zum Container-Kopf gesagt: „die 6 punkte vor dem titel
-    // koennten farbe benoetigen oder wie bei zeus der gelbe strich."
-    // Dasselbe gilt hier: Zeus Link setzt vor JEDEN Fensternamen
+    // koennten farbe benoetigen oder wie bei [der Vorlage] der gelbe strich."
+    // Dasselbe gilt hier: die Vorlage setzt vor JEDEN Fensternamen
     // denselben bernsteinfarbenen Strich (Bildschirmvideo 2026-08-20,
     // sichtbar an PANADAPTER, FREQUENCY·VFO und S-METER).
     auto* grip = new QLabel(titleBar);
@@ -351,7 +351,7 @@ QWidget* AppletPanelWidget::wrapWithTitleBar(QWidget* child, const QString& titl
     // kann alles x beliebig verschieben! das geht bei uns nicht!" —
     // weil ein Weg, den man nicht sieht, kein Weg ist.
     //
-    // Zeus Link setzt beides sichtbar in jede Fensterleiste
+    // Die Vorlage setzt beides sichtbar in jede Fensterleiste
     // (Bildschirmvideo 2026-08-20: Schloss und ✕ rechts in JEDEM
     // Fensterkopf). Hier dasselbe.
     //

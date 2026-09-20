@@ -4,7 +4,7 @@
 **Quelle:** `../Thetis` @ `v2.10.3.15-5-g852bf0e`,
 `Project Files/Source/Console/FilterForm.cs` (969 Zeilen)
 **Anlass:** „vielleicht kannst du mal schauen, welche möglichkeiten es
-für einen band filter gibt, halte dich an zeus" — notiert als Todo ohne
+für einen band filter gibt, halte dich an [der Vorlage]" — notiert als Todo ohne
 Eile.
 
 **Dies ist ein Vorschlag, nichts davon ist gebaut.** Eine neue

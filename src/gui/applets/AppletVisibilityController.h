@@ -38,8 +38,8 @@ public:
 
     // ── Kategorie und Schlagwoerter ──────────────────────────────────
     //
-    // Vorlage des Betreibers, 2026-08-15: der „Add Panel"-Dialog bei
-    // Zeus hat Kategorien in einer Spalte links (SPECTRUM, VFO, METERS,
+    // Vorlage des Betreibers, 2026-08-15: der „Add Panel"-Dialog in
+    // der Vorlage hat Kategorien in einer Spalte links (SPECTRUM, VFO, METERS,
     // DSP, LOG, TOOLS, …) und unter jedem Namen eine Schlagwortzeile:
     //
     //     TX Stage Meters

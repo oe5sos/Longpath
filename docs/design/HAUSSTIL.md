@@ -1,7 +1,8 @@
 # NereusSDR — Hausstil
 
-Verbindlich für jede sichtbare Änderung. Vorbild ist **Zeus Link** —
-nicht dessen Palette, sondern dessen Disziplin.
+Verbindlich für jede sichtbare Änderung. Vorbild ist **die Vorlage** (das Vergleichsprogramm, das
+OE5SOS im August 2026 in Bildschirmfotos gezeigt hat) — nicht deren Palette,
+sondern deren Disziplin.
 
 Stehende Anweisung, OE5SOS, 2026-08-15:
 
@@ -11,7 +12,7 @@ Stehende Anweisung, OE5SOS, 2026-08-15:
 Ein Feature ist also erst fertig, wenn es in dieser Sprache herauskommt —
 nicht, wenn es funktioniert.
 
-Gerendert zum Ansehen: [`zeus-hausstil.html`](zeus-hausstil.html).
+Gerendert zum Ansehen: [`hausstil-2026-08.html`](hausstil-2026-08.html).
 
 ---
 

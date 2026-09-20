@@ -1670,7 +1670,7 @@ public:
     /// Daten da sind.
     ///
     /// Gebaut fuer den Bandfilter (2026-08-22): der soll das Signal im
-    /// Durchlass zeigen, wie es Zeus Link tut. Statt Abbildung und
+    /// Durchlass zeigen, wie es die Vorlage tut. Statt Abbildung und
     /// Kalibrierung ein zweites Mal zu bauen — mit der Aussicht, dass
     /// beide auseinanderlaufen — fragt der Bandfilter hier nach. Diese
     /// Klasse hat die Bins, die DDC-Mitte, die Abtastrate und den

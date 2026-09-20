@@ -68,13 +68,13 @@ PanadapterApplet::PanadapterApplet(const QString& panId, QWidget* parent)
 
     // ── Kopfleiste ────────────────────────────────────────────────────
     //
-    // Zeus setzt ueber den Panadapter eine Zeile mit Punkt, Namen und
+    // Die Vorlage setzt ueber den Panadapter eine Zeile mit Punkt, Namen und
     // laufender Mittenfrequenz. Die fehlte hier ganz: der Panadapter
     // war die einzige Flaeche ohne Kopf, obwohl jede Applet daneben
     // einen hat.
     //
-    // ABSICHTLICH OHNE die Zoom- und Geschwindigkeitsregler, die Zeus
-    // dort ebenfalls zeigt. Zeus hat keine Overlay-Leiste; wir haben
+    // ABSICHTLICH OHNE die Zoom- und Geschwindigkeitsregler, die die Vorlage
+    // dort ebenfalls zeigt. Die Vorlage hat keine Overlay-Leiste; wir haben
     // eine, und sie traegt beide Regler bereits. Sie hier zu
     // wiederholen waere genau die Doppelung, die an diesem Tag zweimal
     // aufgeraeumt wurde.
@@ -90,7 +90,7 @@ PanadapterApplet::PanadapterApplet(const QString& panId, QWidget* parent)
     headLay->setContentsMargins(5, 0, 3, 0);
     headLay->setSpacing(6);
 
-    // Der gelbe Strich wie bei Zeus Link und wie im Container-Kopf.
+    // Der gelbe Strich wie in der Vorlage und wie im Container-Kopf.
     m_grip = new QLabel(head);
     m_grip->setFixedWidth(3);
     m_grip->setStyleSheet(QStringLiteral(

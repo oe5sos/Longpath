@@ -4,20 +4,20 @@
 // derselben Grundlage (Entwurf B3).
 //
 // Anlass, 2026-08-23: "schaut schon besser aus, welche arten hast du
-// noch, wenn das die basis ist. Zeus hat einen übergang im
+// noch, wenn das die basis ist. Die Vorlage hat einen übergang im
 // hintergrund, schaut oder wirkt teilweise wie 3d. versuche weitere
 // möglichkeiten zu übermitteln."
 //
 // Der Hinweis auf den Uebergang IM HINTERGRUND ist der wichtigste:
 // bisher lag alle Plastik in den Segmenten selbst, der Trog war eine
-// flache Flaeche. Zeus arbeitet genau andersherum — sein Trog traegt
+// flache Flaeche. Die Vorlage arbeitet genau andersherum — ihr Trog traegt
 // einen Schimmer, und die Striche stehen darin.
 //
 // Die sechs sind absichtlich UNTERSCHIEDLICH, nicht abgestuft. Es geht
 // nicht darum, wieviel, sondern woher:
 //
 //   D1  Schimmer quer  — der Trog ist in der Mitte heller als an den
-//                        Enden. Das ist Zeus' Griff.
+//                        Enden. Das ist der Griff der Vorlage.
 //   D2  Glaskante      — ein Lichtreflex ueber der oberen Haelfte des
 //                        ganzen Trogs, wie auf einer Scheibe davor.
 //   D3  Schlagschatten — die Striche werfen einen Schatten nach unten
@@ -133,7 +133,7 @@ void drawRow(QPainter& p, const QRectF& box, const RowSpec& r, int depth)
     p.setPen(Qt::NoPen);
     switch (depth) {
     case ShimmerAcross: {
-        // Zeus' Griff: quer heller in der Mitte. Der Trog bekommt damit
+        // Der Griff der Vorlage: quer heller in der Mitte. Der Trog bekommt damit
         // eine Achse, ohne dass irgendwo eine Kante entsteht.
         QLinearGradient g(bar.left(), 0, bar.right(), 0);
         g.setColorAt(0.00, QColor("#0a0a0f"));
@@ -414,7 +414,7 @@ private slots:
             QStringLiteral("D6_kette_zonenfarbe"),
         };
         const QStringList titles = {
-            QStringLiteral("D1 · Schimmer quer — der Trog ist in der Mitte heller (Zeus' Griff)"),
+            QStringLiteral("D1 · Schimmer quer — der Trog ist in der Mitte heller (der Griff der Vorlage)"),
             QStringLiteral("D2 · Glaskante — Lichtreflex ueber der oberen Haelfte"),
             QStringLiteral("D3 · Schlagschatten — die Striche stehen VOR dem Trog"),
             QStringLiteral("D4 · Zonengrund — die kritische Zone ist schon im leeren Trog da"),
@@ -477,7 +477,7 @@ private slots:
             {QStringLiteral("schlecht  ·  2,90"),    2.90,  25.0},
         };
         const QStringList titles = {
-            QStringLiteral("D1 · Schimmer quer (Zeus)"),
+            QStringLiteral("D1 · Schimmer quer (nach der Vorlage)"),
             QStringLiteral("D2 · Glaskante"),
             QStringLiteral("D3 · Schlagschatten"),
             QStringLiteral("D4 · Zonengrund"),

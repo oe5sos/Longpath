@@ -61,7 +61,7 @@ TxSwitch::TxSwitch(Kind kind, RadioModel* model, QWidget* parent)
     // Knopf".
     const bool isRf = (kind == Kind::Mox || kind == Kind::Tune);
 
-    // ── Zuschnitt wie bei Zeus (2026-08-20) ──────────────────────────
+    // ── Zuschnitt wie in der Vorlage (2026-08-20) ──────────────────────────
     //
     // Vorlage ist der Bildschirm des Betreibers: dort stehen MOX, VOX,
     // TUNE und PS als GROSSER, GESPERRTER TEXT ohne Rahmen, mit einem
@@ -95,7 +95,7 @@ TxSwitch::TxSwitch(Kind kind, RadioModel* model, QWidget* parent)
 
     // Der Punkt davor. Er traegt denselben Zustand ein zweites Mal —
     // Farbe UND Fuellung — damit man ihn auch im Augenwinkel sieht,
-    // ohne den Text zu lesen. Zeus macht es genauso.
+    // ohne den Text zu lesen. Die Vorlage macht es genauso.
     m_dot = new QLabel(QStringLiteral("\u25CF"), this);
     m_dot->setFixedWidth(11);
     m_dot->setAlignment(Qt::AlignCenter);

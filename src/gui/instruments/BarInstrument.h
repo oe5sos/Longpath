@@ -79,7 +79,7 @@ public:
     /// erreicht und nicht nur die gerade sichtbare.
     // ── Segmentierte Form ────────────────────────────────────────────
     //
-    // Der Betreiber, 2026-08-20, mit einem Bildschirmfoto aus Zeus:
+    // Der Betreiber, 2026-08-20, mit einem Bildschirmfoto der Vorlage:
     // das S-Meter als Kette einzelner Felder. Der Balken war bis dahin
     // ein durchgehender Verlauf.
     //
@@ -99,7 +99,7 @@ public:
     // woelbt sich dem Auge entgegen, statt sich einzugraben. Sie ist
     // UNABHAENGIG von der Segmentierung — beides laesst sich
     // kombinieren, und die Kette in der Roehre ist die Fassung, die
-    // Zeus am naechsten kommt.
+    // der Vorlage am naechsten kommt.
     //
     // Wie die Segmentierung steht die Wahl im Rechtsklickmenue und
     // wird dort gemerkt.

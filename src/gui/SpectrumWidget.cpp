@@ -8787,7 +8787,7 @@ void SpectrumWidget::mousePressEvent(QMouseEvent* event)
         // ── Skala ziehen = ANSICHT verschieben (2026-08-22) ──────────
         //
         // Hier stand AetherSDRs Bandbreiten-Zug (Skala ziehen aendert
-        // den Zoom). Der Betreiber will die Zeus-Aufteilung, und sie
+        // den Zoom). Der Betreiber will die Aufteilung der Vorlage, und sie
         // ist die bessere: Zoom liegt bereits auf −/+, dem Rad und den
         // S/B-Knoepfen — die Skala ist damit frei fuer das, was ihr
         // Aussehen verspricht: anfassen und die Ansicht schieben.

@@ -51,7 +51,7 @@ public:
 
     // ── Der eigene Standort als Bild statt als Punkt ─────────────────
     //
-    // 2026-08-15, nach einer Vorlage des Betreibers: bei Zeus ist der
+    // 2026-08-15, nach einer Vorlage des Betreibers: in der Vorlage ist der
     // eigene Standort kein Punkt und keine Nadel, sondern ein rundes
     // Foto der Station mit einem Ring und dem Rufzeichen darunter.
     //

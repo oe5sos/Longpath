@@ -4,7 +4,7 @@
 //
 // Die Durchlassflaeche auf echter Frequenzachse.
 //
-// Vorlage: Zeus Link „BANDWIDTH FILTER" (Bildschirmfoto des
+// Vorlage: „BANDWIDTH FILTER" der Vorlage (Bildschirmfoto des
 // Betreibers, 2026-08-20). Der Gewinn gegenueber dem alten
 // FilterPassbandWidget ist die ACHSE: dort ein festes Trapez ohne
 // Frequenzbezug, hier eine Skala, auf der 13.137 MHz steht.

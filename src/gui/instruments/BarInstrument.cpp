@@ -265,7 +265,7 @@ void BarInstrument::paintOne(QPainter& p, const QRectF& area,
             Instrument::paintValueEdge(p, spine, f, col);
         }
 
-        // Die Spitze, wie bei Zeus: ein heller Strich, der stehen
+        // Die Spitze, wie in der Vorlage: ein heller Strich, der stehen
         // bleibt und langsam zurueckfaellt. Nur wenn sie ueberhaupt
         // vor dem Wert liegt — sonst zeichnete sie eine zweite Kante
         // auf die erste.

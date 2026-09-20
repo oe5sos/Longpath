@@ -1183,7 +1183,7 @@ QString MainWindow::canonicalAppletKey(const QString& key) const
 // rechts, Rotor unten. Ein Stapel hat keine Positionen, nur eine
 // Reihenfolge. Da hilft kein Knopf.
 //
-// Zeus Link legt jedes Fenster als KACHEL mit eigener Position auf eine
+// Die Vorlage legt jedes Fenster als KACHEL mit eigener Position auf eine
 // freie Flaeche (Bildschirmvideo 2026-08-20: neues Layout = leere
 // Flaeche, Fenster einzeln hinzugefuegt, frei geschoben, an den Ecken
 // gezogen, aneinander geschnappt).
@@ -1372,7 +1372,7 @@ void MainWindow::moveAppletToCanvas(AppletWidget* applet)
 
     // ── Fenster hierher holen ────────────────────────────────────
     //
-    // Zeus fasst Fenster durch Ziehen-und-Fallenlassen zu Reitern
+    // Die Vorlage fasst Fenster durch Ziehen-und-Fallenlassen zu Reitern
     // zusammen. Das ist die schoenere Geste und der riskantere Weg:
     // ein Wurf ueber Fenstergrenzen mit QRhiWidgets darin ist genau
     // die Stelle, an der AetherSDR abstuerzte (#2495, #4319) — und
@@ -1477,8 +1477,8 @@ void MainWindow::returnAppletFromCanvas(const QString& id)
 // unabhaengig von der Reihenfolge im Baum. Die Kacheln hingen als
 // Kinder derselben Flaeche und lagen damit hinter dem Panadapter.
 //
-// Das ist keine Frage von mehr Muehe. Es ist strukturell. Zeus Link
-// kann in-Fenster-Kacheln, weil Zeus im BROWSER laeuft und seine
+// Das ist keine Frage von mehr Muehe. Es ist strukturell. Die Vorlage
+// kann in-Fenster-Kacheln, weil sie im BROWSER laeuft und ihre
 // „Fenster" DOM-Elemente sind; dort gibt es keine nativen Geschwister.
 //
 // AetherSDR ist gegen dieselbe Wand gelaufen und hat dieselbe Antwort
@@ -4066,7 +4066,7 @@ void MainWindow::buildUI()
     //
     // ── Kommandoleiste über allem ────────────────────────────────────
     //
-    // Zeus setzt MODE und STEP als Pillenreihe an den oberen Rand, über
+    // Die Vorlage setzt MODE und STEP als Pillenreihe an den oberen Rand, über
     // die ganze Breite. Deshalb ist das zentrale Widget jetzt eine
     // Säule: Leiste oben, Splitter darunter. Der Splitter bleibt sonst
     // unangetastet — alle 900 Zeilen darunter kennen ihn unverändert.
@@ -4088,7 +4088,7 @@ void MainWindow::buildUI()
     });
     auto* centre = new QWidget(this);
 
-    // Profilschiene ganz links über die volle Höhe, wie bei Zeus.
+    // Profilschiene ganz links über die volle Höhe, wie in der Vorlage.
     // Daneben die Säule aus Kommandoleiste und Splitter.
     m_layoutProfiles = new LayoutProfiles(this);
     m_profileRail = new ProfileRail(m_layoutProfiles, centre);
@@ -6537,7 +6537,7 @@ void MainWindow::populateDefaultMeter()
     // BandwidthFilterApplet — die Durchlassflaeche (2026-08-20).
     //
     // Eine Flaeche je Empfaenger auf ECHTER Frequenzachse, nach der
-    // Vorlage des Betreibers (Zeus Link „BANDWIDTH FILTER"). Die
+    // Vorlage des Betreibers („BANDWIDTH FILTER" der Vorlage). Die
     // Rechenregeln dahinter kommen aus Thetis und sitzen im Modell
     // (SliceModel::widthToEdges), damit sie auch fuer CAT und Tastatur
     // gelten.
@@ -6550,7 +6550,7 @@ void MainWindow::populateDefaultMeter()
 
     // ── Das Signal in den Bandfilter ────────────────────────────────
     //
-    // Der Betreiber am 2026-08-22, nach einer Vorfuehrung von Zeus
+    // Der Betreiber am 2026-08-22, nach einer Vorfuehrung der Vorlage
     // Link: "er sollte mir ja auch das signal zeigen" und "genau wo
     // ich im panadapter bin soll auch der bandwith filter sein."
     //
@@ -6956,7 +6956,7 @@ void MainWindow::populateDefaultMeter()
     // vorgegeben, weil der Betreiber sagte, beim Start solle alles leer
     // sein. FALSCH, und am selben Tag zurueckgenommen.
     //
-    // Das Bildschirmvideo zeigt, was er meint: in Zeus Link legt das
+    // Das Bildschirmvideo zeigt, was er meint: in der Vorlage legt das
     // Plus in der linken Leiste ein NEUES LAYOUT an, und DAS ist leer —
     // das vorhandene behaelt seine Fenster. Genau das gibt es bei uns
     // seit dem 2026-08-15, auf seine eigene Ansage hin, im
@@ -6965,7 +6965,7 @@ void MainWindow::populateDefaultMeter()
     //
     // Eine globale Vorgabe waere etwas anderes gewesen: sie haette
     // jede frische Installation mit einer leeren Flaeche begruesst,
-    // auch die von jemandem, der nie ein Layout anlegt. Zeus tut das
+    // auch die von jemandem, der nie ein Layout anlegt. Die Vorlage tut das
     // nicht — dort steht beim ersten Start das Layout „D" mit Fenstern
     // darin.
     //
@@ -7261,7 +7261,7 @@ void MainWindow::populateDefaultMeter()
     //
     // VERSCHIEBEN geht bei diesen beiden nicht, und das ist kein
     // Versäumnis: die Knopfleiste liegt über dem Panadapter und gehört
-    // dorthin, die Statuszeile ist die Statuszeile. Bei Zeus ist es
+    // dorthin, die Statuszeile ist die Statuszeile. In der Vorlage ist es
     // genauso. Ein- und Ausblenden ist hier die ganze Bedienung.
     m_appletVis->registerApplet(QString::fromLatin1(kChromeOverlayId),
                                 QStringLiteral("Knopfleiste am Spektrum"),
@@ -7328,7 +7328,7 @@ void MainWindow::populateDefaultMeter()
     // ── DAS PLUS ─────────────────────────────────────────────────────
     //
     // Auf Ansage des Betreibers (2026-08-20): „danach soll ich mit plus
-    // jedes windows adden können und verschieben" — wie bei Zeus Link.
+    // jedes windows adden können und verschieben" — wie in der Vorlage.
     //
     // AddWidgetButton und der Auswähler dahinter (WidgetPicker, 433
     // Zeilen mit Kategorien, Suchfeld und Karten, gebaut am 2026-08-15
@@ -7437,7 +7437,7 @@ void MainWindow::populateDefaultMeter()
         // beweglich, aber es ist nicht, was der Betreiber meint: „es
         // muss alles auf den mm verschoben werden koennen. jedes
         // window! jeder panel, ueberall" — gemeint sind Kacheln INNEN,
-        // wie bei Zeus Link, nicht ein Schwarm einzelner Fenster.
+        // wie in der Vorlage, nicht ein Schwarm einzelner Fenster.
         //
         // detachApplet bleibt: es haengt am Rechtsklick-Menue und an
         // der Wiederherstellung gespeicherter Fenster.
@@ -8799,7 +8799,7 @@ void MainWindow::buildMenuBar()
     //
     // 2026-08-19, auf Ansage des Betreibers: „jedes Fenster sollte man
     // frei ändern können in der Größe. beim Panadapter sehe ich keine
-    // Möglichkeit" — und als Zielbild Zeus Link, wo der Panadapter ein
+    // Möglichkeit" — und als Zielbild die Vorlage, wo der Panadapter ein
     // mittleres Feld ist und andere Fenster darunter liegen.
     //
     // Die Ursache war nicht ein fehlender Griff, sondern seine RICHTUNG:
@@ -10137,7 +10137,7 @@ void MainWindow::buildStatusBar()
 
     // ── Gruppentrenner: ein duenner Strich, kein Punkt ───────────────
     //
-    // Zeus setzt zwischen die Gruppen der unteren Leiste einen
+    // Die Vorlage setzt zwischen die Gruppen der unteren Leiste einen
     // senkrechten Haarstrich. Wir hatten ein „ · " in 22 Punkt — das
     // liest sich als Satzzeichen und traegt kein Gewicht; zwischen
     // zwanzig kleinen Pillen sah man ueberhaupt nicht mehr, wo eine
@@ -10329,7 +10329,7 @@ void MainWindow::buildStatusBar()
     m_txVoxSwitch  = new TxSwitch(TxSwitch::Kind::Vox,  m_radioModel, barWidget);
     m_txTuneSwitch = new TxSwitch(TxSwitch::Kind::Tune, m_radioModel, barWidget);
     m_txPsSwitch   = new TxSwitch(TxSwitch::Kind::Ps,   m_radioModel, barWidget);
-    // Reihenfolge im Bild wie bei Zeus: MOX VOX TUNE PS. Die Faltung
+    // Reihenfolge im Bild wie in der Vorlage: MOX VOX TUNE PS. Die Faltung
     // laeuft andersherum (PS zuerst), das ist Absicht — die Stelle im
     // Bild und die Wichtigkeit sind zwei verschiedene Ordnungen.
     hbox->addWidget(m_txMoxSwitch);

@@ -4,8 +4,8 @@
 // src/gui/applets/BandwidthFilterApplet.h  (NereusSDR)
 // =================================================================
 //
-// NereusSDR-original, nach der Vorlage des Betreibers (Zeus Link
-// „BANDWIDTH FILTER", 2026-08-20). Rechenregeln aus Thetis, siehe
+// NereusSDR-original, nach der Vorlage des Betreibers („BANDWIDTH
+// FILTER" der Vorlage, 2026-08-20). Rechenregeln aus Thetis, siehe
 // SliceModel::widthToEdges und ::defaultFilterCenter.
 //
 // Die Durchlassflaeche, eine je Empfaenger, plus die Zahlen.

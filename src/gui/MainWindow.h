@@ -1675,7 +1675,7 @@ private:
     CloudlogUploader*    m_cloudlogUploader{nullptr};
     AdifNetworkUploader* m_localLogUploader{nullptr};
 
-    // Kopfleiste im Zeus-Zuschnitt und das Plus an ihrem rechten Ende.
+    // Kopfleiste im Zuschnitt der Vorlage und das Plus an ihrem rechten Ende.
     // Das Plus entsteht erst, wenn m_appletVis alle Kategorien kennt —
     // deshalb zwei Zeiger und nicht einer.
     class CommandBar* m_commandBar{nullptr};

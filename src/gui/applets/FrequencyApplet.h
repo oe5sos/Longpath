@@ -63,7 +63,7 @@ public:
     // Beide Zeilen sind EINZELN schaltbar, nicht als Paar: wer nur das
     // SWR will, soll nicht die Leistung mitnehmen muessen.
     /// Die Kachelreihe ueber der Ziffernanzeige, nach der Vorlage des
-    /// Betreibers vom 2026-08-23 (Bildschirmfoto Zeus Link).
+    /// Betreibers vom 2026-08-23 (Bildschirmfoto der Vorlage).
     void setShowTiles(bool on);
     bool showsTiles() const { return m_showTiles; }
 

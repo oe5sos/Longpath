@@ -39,7 +39,7 @@ struct Fassung {
 
 const Fassung kFassungen[] = {
     {"FLACH", "ruhig, fast ohne Tiefe",        5, 3,  8,  6,  4},
-    {"WEICH", "wie heute — nah an Zeus",       7, 4, 10, 16, 10},
+    {"WEICH", "wie heute — nah an der Vorlage",       7, 4, 10, 16, 10},
     {"TIEF",  "deutlich plastisch",            9, 6, 14, 26, 18},
 };
 

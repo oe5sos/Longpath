@@ -96,7 +96,7 @@ CommandBar::CommandBar(QWidget* parent) : QWidget(parent)
     //
     // Ganz links, weil das Band die groebste Wahl ist: erst das Band,
     // dann Betriebsart, Filter, Schrittweite. Dieselbe Reihenfolge wie
-    // bei Zeus und Thetis.
+    // in der Vorlage und bei Thetis.
     buildBandGroup(row);
     buildModeGroup(row);
     buildFilterGroup(row);

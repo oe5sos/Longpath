@@ -586,7 +586,7 @@ void StripDynamicsCurve::paintEvent(QPaintEvent*)
     //
     // "You sometimes cannot tell what you are looking at" — and the
     // reason was that I left the axes unlabelled on purpose, reasoning
-    // that Zeus does. AetherSDR, the thing actually named as the
+    // that the reference client does. AetherSDR, the thing actually named as the
     // reference, labels them: majors every 12 dB on BOTH axes, minors
     // every 12 dB in between, unity dashed. That turns two anonymous
     // directions into decibels, and it is the single change that makes

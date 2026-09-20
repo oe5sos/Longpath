@@ -26,7 +26,7 @@ namespace {
 
 constexpr int kBarHeight  = 22;
 constexpr int kGripSize   = 16;
-// Der gelbe Strich links in der Leiste. Zeus setzt dort eine warme
+// Der gelbe Strich links in der Leiste. Die Vorlage setzt dort eine warme
 // Marke; sie sagt „hier anfassen". Wir nehmen denselben Ton, nicht den
 // kuehlen Akzent — der Akzent gehoert den Bedienelementen, diese Marke
 // gehoert dem Fenster.

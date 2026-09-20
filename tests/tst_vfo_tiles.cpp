@@ -4,7 +4,7 @@
 // den aktiven — und wechselt ihn auf Klick.
 //
 // Anlass, 2026-08-23: "weiters sollte die frequenz auch ein eigenes
-// widget sein, wie hier am foto" (Bildschirmfoto Zeus Link, Kacheln
+// widget sein, wie hier am foto" (Bildschirmfoto der Vorlage, Kacheln
 // ueber der Ziffernanzeige).
 //
 // Gemessen wird der TEXT der Kacheln und der Zustand des Modells

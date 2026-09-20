@@ -4,8 +4,8 @@
 // src/gui/widgets/BandwidthFilterPane.h  (NereusSDR)
 // =================================================================
 //
-// NereusSDR-original, nach der Vorlage des Betreibers (Zeus Link
-// „BANDWIDTH FILTER", Bildschirmfoto vom 2026-08-20). Die Regeln
+// NereusSDR-original, nach der Vorlage des Betreibers („BANDWIDTH
+// FILTER" der Vorlage, Bildschirmfoto vom 2026-08-20). Die Regeln
 // hinter den Zahlen kommen aus Thetis, siehe SliceModel::widthToEdges
 // und ::constrainFilter.
 //
@@ -96,7 +96,7 @@ public:
     /// Der Spektrumausschnitt hinter dem Durchlass, in dBm, von der
     /// linken bis zur rechten Kante der angezeigten Spanne.
     ///
-    /// Vorbild ist Zeus Link (vorgefuehrt am 2026-08-22): dort zeigt
+    /// Vorbild ist die Vorlage (vorgefuehrt am 2026-08-22): dort zeigt
     /// der Bandfilter das ECHTE Signal, und erst dadurch sieht man,
     /// ob die Kante an der richtigen Stelle sitzt. AetherSDR hat das
     /// nicht — sein FilterPassbandWidget ist ein reiner Kanteneditor.

@@ -146,7 +146,7 @@ bool FramelessResizer::eventFilter(QObject* obj, QEvent* ev)
     // ── Verriegelt? Dann Finger weg ──────────────────────────────────────
     //
     // Longpath-Zusatz (2026-08-20): der Betreiber wollte ein Schloss in
-    // jedem Fensterkopf, wie bei Zeus — „das schloss fehlt dann zum
+    // jedem Fensterkopf, wie in der Vorlage — „das schloss fehlt dann zum
     // fixieren". Ein verriegeltes Fenster laesst sich weder ziehen noch
     // in der Groesse aendern.
     //

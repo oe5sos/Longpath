@@ -274,7 +274,7 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
 
     // ── Das Signal ──────────────────────────────────────────────────
     //
-    // Vorbild Zeus Link, vorgefuehrt am 2026-08-22: der Bandfilter
+    // Vorbild: die Vorlage, vorgefuehrt am 2026-08-22: der Bandfilter
     // zeigt dort das ECHTE Spektrum, und erst dadurch sieht man, ob
     // die Kante an der richtigen Stelle sitzt. Ohne Kurve ist das
     // Fenster ein Zahlenformular.
@@ -292,7 +292,7 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
         // ── FESTER Massstab ueber dem Rauschflur ────────────────────
         //
         // Der Betreiber am 2026-08-23, mit drei Bildern von OpenHPSDR
-        // Zeus: "wo kein signal ist, ist die linie am boden" und
+        // Die Vorlage: "wo kein signal ist, ist die linie am boden" und
         // "wenn kein signal ist, linie bei 0, auch bei den
         // sprechpausen".
         //
@@ -364,7 +364,7 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
         //
         // Drei waagrechte Linien mit dBm-Marke. Ohne sie ist die Kurve
         // eine Form ohne Massstab: man sieht, DASS da etwas ist, aber
-        // nicht, wie stark. Zeus zeigt an derselben Stelle einen
+        // nicht, wie stark. Die Vorlage zeigt an derselben Stelle einen
         // Pegelwert im Durchlass.
         {
             QFont tiny = font();
@@ -387,7 +387,7 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
 
         // ── Nur der Durchlass ist GEFUELLT ──────────────────────────
         //
-        // Vorbild OpenHPSDR Zeus 2.0, vom Betreiber am 2026-08-22
+        // Vorbild: die Vorlage, vom Betreiber am 2026-08-22
         // gezeigt: dort ist die Kurve INNERHALB des Filters flaechig
         // gefuellt, ausserhalb nur eine duenne Linie. Das ist der
         // Griff, der das Fenster lesbar macht — man sieht auf einen
@@ -523,7 +523,7 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
 
         // ── Was liegt DRIN? Ablage und Pegel ────────────────────────
         //
-        // OpenHPSDR Zeus zeigt unter dem Durchlass eine Reihe Zellen:
+        // Die Vorlage zeigt unter dem Durchlass eine Reihe Zellen:
         // "+324 / 14dB", "+777 / 11dB", "+1.5k / 12dB". Das ist die
         // Antwort auf die Frage, fuer die man dieses Fenster aufmacht —
         // welche Anteile kommen durch, und wie stark.
@@ -735,7 +735,7 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
         // Unten an der jeweiligen Kante ist ohnehin der bessere Platz:
         // die Zahl steht dort, wo sie gilt, und muss nicht sagen,
         // wozu sie gehoert.
-        // Oben AN DEN KANTEN, wie bei OpenHPSDR Zeus — dort steht
+        // Oben AN DEN KANTEN, wie in der Vorlage — dort steht
         // "LOW CUT +100 Hz" links und "HIGH CUT +2.44 kHz" rechts vom
         // Breitenkaestchen. Unten ist kein Platz mehr: dort stehen
         // jetzt die Anteilszellen.

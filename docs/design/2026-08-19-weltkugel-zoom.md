@@ -93,9 +93,9 @@ bereits zwischen ihnen um.
   mit einer kurzen Überblendung.
 * **Aufwand:** klein. **Mein Vorschlag als nächster Schritt.**
 
-### C. Kachel-Streaming wie Zeus Link *(mittel bis groß, Entscheidung nötig)*
+### C. Kachel-Streaming wie die Vorlage *(mittel bis groß, Entscheidung nötig)*
 
-Zeus zeigt in seiner Panadapter-Kachel eine Leaflet-Karte mit
+Die Vorlage zeigt in ihrer Panadapter-Kachel eine Leaflet-Karte mit
 Esri-Satellitenbild und OpenFreeMap. Das ist der echte
 Google-Earth-Weg.
 

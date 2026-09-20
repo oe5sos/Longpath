@@ -86,7 +86,7 @@ public:
 
     // ── Balken: durchgehend oder Segmente ────────────────────────────
     //
-    // Zeus zeigt das S-Meter als Kette einzelner Felder; der Betreiber
+    // Die Vorlage zeigt das S-Meter als Kette einzelner Felder; der Betreiber
     // hat das am 2026-08-20 mit einem Bildschirmfoto verlangt. Beides
     // bleibt — Segmente liest man als Menge, der Verlauf zeigt kleine
     // Aenderungen genauer.

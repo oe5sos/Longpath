@@ -28,14 +28,14 @@ AetherSDR, was wir nicht können?
 Zeile. Das ist ein halber Tag Lesearbeit und danach eine Liste, an der
 man Wochen abarbeiten kann — statt eines Klons, der beides halb ist.
 
-## 2 · Logbuch nach Zeus-Vorbild
+## 2 · Logbuch nach der Vorlage
 
-**Gesagt:** „zeus hat auch ein tolles logbook"
+**Gesagt:** „[die Vorlage] hat auch ein tolles logbook"
 
 **Was es bei uns gibt:** der Branch heißt `feature/rotor-logbook`, es
 gibt `QsoDetailPane`, `AdifParser`, `DxccWorkedStatus`. Also Teile.
 
-**Was zu klären ist, bevor irgendetwas gebaut wird:** Zeus' Logbuch ist
+**Was zu klären ist, bevor irgendetwas gebaut wird:** Das Logbuch der Vorlage ist
 im Bild nicht zu sehen — es liegt hinter einem der Symbole der linken
 Leiste. Ohne ein Bild davon würde ich raten. **Ein Foto genügt.**
 
@@ -86,7 +86,7 @@ Alles andere braucht ein Bild oder eine Antwort.
 
 ---
 
-**Nachtrag 2026-08-18, 23:xx:** Das Foto des Zeus-Logbuchs kommt erst in
+**Nachtrag 2026-08-18, 23:xx:** Das Foto des Logbuchs der Vorlage kommt erst in
 den nächsten Tagen. Punkt 2 bleibt bis dahin unberührt — die Teile, die
 es bei uns gibt (`QsoDetailPane`, `AdifParser`, `DxccWorkedStatus`),
 werden gesichtet, aber nichts daran gebaut. Ein Logbuch nach Vermutung

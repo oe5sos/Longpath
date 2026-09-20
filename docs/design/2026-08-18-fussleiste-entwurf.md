@@ -9,9 +9,9 @@ S-Meter).
 
 ## Der Unterschied, um den es geht
 
-Zeus stellt unten **Bedienung** hin. Wir stellen **Zustand** hin.
+Die Vorlage stellt unten **Bedienung** hin. Wir stellen **Zustand** hin.
 
-| | Zeus Link | NereusSDR heute |
+| | Die Vorlage | NereusSDR heute |
 | --- | --- | --- |
 | Schalter | MOX · VOX · TUNE · PS · Mute · CTUN · SPLIT · RIT · DUP · SA · ZOOM | — |
 | Anzeigen | MIC-Pegel, dBFS, RADIO, Chat | CAT · TCI · CPU · PA · OVERLOAD · A/TX/LSB/2.9k/NR1/ANT1 |
@@ -40,8 +40,8 @@ Jeder neue Schalter braucht darum drei Dinge, nicht eines:
 
 ### A — Nur die vier Sendeschalter
 
-`MOX · VOX · TUNE · PS` wandern nach unten. Sie sind der Kern von Zeus'
-Leiste, sie gehören zusammen, und sie sind die einzigen, die man im
+`MOX · VOX · TUNE · PS` wandern nach unten. Sie sind der Kern der
+Leiste der Vorlage, sie gehören zusammen, und sie sind die einzigen, die man im
 Betrieb *ohne hinzusehen* treffen will.
 
 In der TxApplet bleiben sie — aber als **Anzeige**, nicht als Schalter?
@@ -53,7 +53,7 @@ Zustandsfarbe (aus, aktiv, kalibrierend), die es unten noch nicht gibt.
 
 ### B — A plus die vier VFO-Schalter
 
-Zusätzlich `CTUN · SPLIT · RIT · DUP`. Das ist die Hälfte von Zeus.
+Zusätzlich `CTUN · SPLIT · RIT · DUP`. Das ist die Hälfte der Vorlage.
 
 Diese vier sind heute **Anzeigen** in der unteren Leiste (RIT als Pille,
 Rung 11/12). Sie zu Schaltern zu machen ist der kleinere Eingriff, weil
@@ -64,7 +64,7 @@ Schalter ist, muss anders aussehen als eine, die nur meldet.
 gegen „Pille, die meldet". Ohne die Regel wird jede Anzeige irgendwann
 versehentlich anklickbar.
 
-### C — Zeus vollständig
+### C — Die Vorlage vollständig
 
 Zusätzlich `Mute · SA · ZOOM`. Damit ist die untere Leiste die
 Hauptbedienfläche und die Applets werden zu Einstellflächen.
@@ -75,7 +75,7 @@ kein Leistenumbau mehr, das ist die Frage, wofür die Applets da sind.
 ## Was in jedem Fall bleibt
 
 `CAT · TCI · CPU · PA · OVERLOAD` und die Slice-Kennung. Das sind
-Zustände ohne Schalter, und Zeus hat für sie eigene Orte (die linke
+Zustände ohne Schalter, und die Vorlage hat für sie eigene Orte (die linke
 Leiste, die Kopfzeile). Sie nach oben zu verschieben wäre ein zweiter
 Umbau und gehört nicht in denselben Schritt.
 

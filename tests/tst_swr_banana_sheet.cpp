@@ -292,19 +292,19 @@ void drawBanana(QPainter& p, const QRectF& box, double value,
 }
 
 
-// ── Der Balken, nach Zeus Link ──────────────────────────────────────
+// ── Der Balken, nach der Vorlage ──────────────────────────────────────
 //
-// Der Betreiber am 2026-08-23, mit einem Bild seines Zeus-S-Meters:
+// Der Betreiber am 2026-08-23, mit einem Bild des S-Meters der Vorlage:
 //   "generell wollte ich auch bei beiden zeigern die möglichkeit
 //    haben, diese auf einen balken jeweils als option wechseln zu
-//    können ... zeus hat einen tollen"
+//    können ... [die Vorlage] hat einen tollen"
 //   "ab 3 SWR rot, ab 2,5 orange, .... schöner übergang, 3d optik
 //    vielleicht leicht. halte dich aber an unser design."
 //
-// Zeus zeichnet eine Kette schmaler Segmente, darunter eine Skala mit
+// Die Vorlage zeichnet eine Kette schmaler Segmente, darunter eine Skala mit
 // Marken, rechts die Zahl gross, links die Wortmarke. Genau das steht
 // hier — aber in UNSEREN Farben und mit unserer Mulde, nicht in
-// Zeus' Blau.
+// Blau der Vorlage.
 //
 // ── Zur Skala, und warum sie bis 3,5 geht ───────────────────────────
 //
@@ -316,7 +316,7 @@ void drawBanana(QPainter& p, const QRectF& box, double value,
 // style 0 — Segmente
 // style 1 — durchgehend, mit Verlauf (weichster Uebergang)
 // style 2 — Segmente mit Spitzenhaltung
-void drawZeusBar(QPainter& p, const QRectF& box, double value, double peak,
+void drawReferenceBar(QPainter& p, const QRectF& box, double value, double peak,
                  double vmin, double vmax,
                  double orangeAt, double redAt,
                  const QString& caption, const QStringList& tickText,
@@ -362,7 +362,7 @@ void drawZeusBar(QPainter& p, const QRectF& box, double value, double peak,
         return danger();
     };
 
-    // ── Die Mulde, 1:1 nach Zeus ────────────────────────────────────
+    // ── Die Mulde, nach der Vorlage ────────────────────────────────────
     //
     // Der Betreiber am 2026-08-23: "form einmal ok, aber das design 1:1
     // grundsätzlich übernehmen."
@@ -401,8 +401,8 @@ void drawZeusBar(QPainter& p, const QRectF& box, double value, double peak,
         p.drawRoundedRect(QRectF(fill.left(), fill.top(),
                                  fill.width(), fill.height() * 0.5), 1.5, 1.5);
     } else {
-        // Segmente, wie bei Zeus.
-        // Zeus setzt viele SCHMALE Segmente mit haarfeinem Spalt —
+        // Segmente, wie in der Vorlage.
+        // Die Vorlage setzt viele SCHMALE Segmente mit haarfeinem Spalt —
         // auf seinem Bild sind es rund vierzig auf 370 Punkten Breite.
         const int    N   = 40;
         const double gap = 1.0;
@@ -414,7 +414,7 @@ void drawZeusBar(QPainter& p, const QRectF& box, double value, double peak,
                              sw, bar.height() - 2.0);
             QColor c = colourAt(tc);
             if (!lit) {
-                // Bei Zeus sind die unbeleuchteten Segmente deutlich
+                // In der Vorlage sind die unbeleuchteten Segmente deutlich
                 // HELLER, als ich sie zuerst hatte: ein mittleres Grau,
                 // das die ganze Kette sichtbar macht, auch wenn der
                 // Ausschlag klein ist. Auf seinem Bild steht der Wert
@@ -469,7 +469,7 @@ void drawZeusBar(QPainter& p, const QRectF& box, double value, double peak,
     p.drawText(QRectF(box.left(), bar.top(), labelW - 4, bar.height()),
                Qt::AlignLeft | Qt::AlignVCenter, caption);
 
-    // Zahl rechts, gross — bei Zeus die auffaelligste Stelle der Zeile.
+    // Zahl rechts, gross — in der Vorlage die auffaelligste Stelle der Zeile.
     QFont nf = p.font();
     nf.setPointSizeF(13.5);
     nf.setBold(true);
@@ -499,7 +499,7 @@ void drawZeusBar(QPainter& p, const QRectF& box, double value, double peak,
 //    aber designart die gleiche wie bestehend. sprich beide vereint,
 //    design usw. gleich, form anders."
 //
-// Also: oben Zeus' Balken, unverfaelscht. Darunter GENAU derselbe
+// Also: oben der Balken der Vorlage, unverfaelscht. Darunter GENAU derselbe
 // Balken — dieselben Segmente, dieselben Farben, dieselbe Skala — nur
 // auf einen flachen Bogen gelegt.
 //
@@ -510,7 +510,7 @@ void drawZeusBar(QPainter& p, const QRectF& box, double value, double peak,
 //
 // sagFactor steuert, wie stark sie sich woelbt. Flach war ausdruecklich
 // gewuenscht ("eine flache kurve").
-void drawZeusBanana(QPainter& p, const QRectF& box, double value, double peak,
+void drawReferenceBanana(QPainter& p, const QRectF& box, double value, double peak,
                     double vmin, double vmax,
                     double orangeAt, double redAt,
                     const QString& caption, const QStringList& tickText,
@@ -680,7 +680,7 @@ void drawZeusBanana(QPainter& p, const QRectF& box, double value, double peak,
 
 // Ein Entwurf in wirklicher Groesse.
 //
-// Oben Zeus' Balken fuer die STEHWELLE, darunter dieselbe Kette als
+// Oben der Balken der Vorlage fuer die STEHWELLE, darunter dieselbe Kette als
 // Banane fuer das SWR. Die Entwuerfe unterscheiden sich nur in
 // Kleinigkeiten — Woelbung, Segmente gegen Verlauf, Spitzenhaltung.
 QImage draft(int variant, double swr, double pwr)
@@ -695,16 +695,16 @@ QImage draft(int variant, double swr, double pwr)
     const QRectF top(6, 12,          kW - 12, 46);
     const QRectF bot(6, 12 + 58.0,   kW - 12, 52);
 
-    // Die Skala der Stehwelle laeuft wie bei Zeus in Leistung; das SWR
+    // Die Skala der Stehwelle laeuft wie in der Vorlage in Leistung; das SWR
     // hat seine eigene.
     const QStringList pwrTicks = {"0", "25", "50", "75", "100"};
     const QVector<double> pwrVals = {0.0, 25.0, 50.0, 75.0, 100.0};
     const QStringList swrTicks = {"1", "1.5", "2", "2.5", "3", "3.5"};
     const QVector<double> swrVals = {1.0, 1.5, 2.0, 2.5, 3.0, 3.5};
 
-    // Die Stehwelle oben: Zeus 1:1, Segmente, keine Ausnahme.
+    // Die Stehwelle oben nach der Vorlage: Segmente, keine Ausnahme.
     auto stehwelle = [&](int style) {
-        drawZeusBar(p, top, pwr, pwr + 8.0, 0.0, 120.0, 95.0, 110.0,
+        drawReferenceBar(p, top, pwr, pwr + 8.0, 0.0, 120.0, 95.0, 110.0,
                     QStringLiteral("PWR"), pwrTicks, pwrVals, 0,
                     QStringLiteral("W"), style);
     };
@@ -712,27 +712,27 @@ QImage draft(int variant, double swr, double pwr)
     switch (variant) {
     case 0:   // A — flache Banane, Segmente
         stehwelle(0);
-        drawZeusBanana(p, bot, swr, swr + 0.2, 1.0, 3.5, 2.5, 3.0,
+        drawReferenceBanana(p, bot, swr, swr + 0.2, 1.0, 3.5, 2.5, 3.0,
                        QStringLiteral("SWR"), swrTicks, swrVals, 2, 0, 0.22);
         break;
     case 1:   // B — deutlichere Woelbung
         stehwelle(0);
-        drawZeusBanana(p, bot, swr, swr + 0.2, 1.0, 3.5, 2.5, 3.0,
+        drawReferenceBanana(p, bot, swr, swr + 0.2, 1.0, 3.5, 2.5, 3.0,
                        QStringLiteral("SWR"), swrTicks, swrVals, 2, 0, 0.42);
         break;
     case 2:   // C — Banane durchgehend statt Segmente
         stehwelle(0);
-        drawZeusBanana(p, bot, swr, swr + 0.2, 1.0, 3.5, 2.5, 3.0,
+        drawReferenceBanana(p, bot, swr, swr + 0.2, 1.0, 3.5, 2.5, 3.0,
                        QStringLiteral("SWR"), swrTicks, swrVals, 2, 1, 0.22);
         break;
     case 3:   // D — mit Spitzenhaltung in beiden Zeilen
         stehwelle(2);
-        drawZeusBanana(p, bot, swr, swr + 0.25, 1.0, 3.5, 2.5, 3.0,
+        drawReferenceBanana(p, bot, swr, swr + 0.25, 1.0, 3.5, 2.5, 3.0,
                        QStringLiteral("SWR"), swrTicks, swrVals, 2, 2, 0.22);
         break;
     case 4:   // E — beide durchgehend (weichster Uebergang)
         stehwelle(1);
-        drawZeusBanana(p, bot, swr, swr + 0.2, 1.0, 3.5, 2.5, 3.0,
+        drawReferenceBanana(p, bot, swr, swr + 0.2, 1.0, 3.5, 2.5, 3.0,
                        QStringLiteral("SWR"), swrTicks, swrVals, 2, 1, 0.30);
         break;
     default:

@@ -48,14 +48,14 @@ is NereusSDR-original: macOS login keychain through the `security` CLI,
 session-memory everywhere else, with `isPersistent()` so the UI can say
 which of the two it got.
 
-## ZeusSDR — design inspiration, no code and no data
+## A proprietary SDR client — design inspiration, no code and no data
 
-The channel strip's equaliser picture was shown ZeusSDR's CFC editor as
-a reference: numbered knots, two curves on one plot with a legend, a
-numeric table under the graph, named preset buttons, a filled area under
+The channel strip's equaliser picture was shown a proprietary SDR
+client's CFC editor as a reference: numbered knots, two curves on one
+plot with a legend, a numeric table under the graph, named preset buttons, a filled area under
 the curve. Those patterns influenced the layout here.
 
-ZeusSDR is not open source and its licence is unknown to this project.
+That client is not open source and its licence is unknown to this project.
 So the line drawn is:
 
 **Taken:** the shape of the interaction. Numbering the knots, putting
@@ -186,7 +186,7 @@ unity gain and switched off. AetherSDR's DSP is unaffected and the three
 presets sound exactly as they did.
 | `src/gui/FramelessMoveHelper.h` | `src/gui/FramelessMoveHelper.h` | `31b29583` | 2026-08-20 | Nur Namensraum geaendert. Fenster an der Titelleiste ziehen; auf macOS bewusst OHNE startSystemMove (manuell mit grabMouse). |
 | `src/gui/FramelessResizer.{h,cpp}` | `src/gui/FramelessResizer.{h,cpp}` | `31b29583` | 2026-08-20 | Nur Namensraum geaendert. Groessenaenderung an allen Kanten und Ecken eines rahmenlosen Fensters, Filter auf dem QWindow statt im Widgetbaum. |
-| `src/gui/FloatingContainerWindow.{h,cpp}` | `src/gui/WindowChrome.{h,cpp}` | `31b29583` | 2026-08-20 | Strukturell nachgebaut, nicht uebersetzt: eigene Titelleiste als Ziehgriff plus sichtbarer Anfasser unten rechts. Longpath-eigene Zutaten: der gelbe Zeus-Streifen links, der Andock-Knopf, und WA_NativeWindow auf dem Anfasser (macOS-Notwendigkeit wegen des nativen QRhi-Panadapters). |
+| `src/gui/FloatingContainerWindow.{h,cpp}` | `src/gui/WindowChrome.{h,cpp}` | `31b29583` | 2026-08-20 | Strukturell nachgebaut, nicht uebersetzt: eigene Titelleiste als Ziehgriff plus sichtbarer Anfasser unten rechts. Longpath-eigene Zutaten: der gelbe Streifen links (nach der Vorlage), der Andock-Knopf, und WA_NativeWindow auf dem Anfasser (macOS-Notwendigkeit wegen des nativen QRhi-Panadapters). |
 
 ## 3D stacked-trace spectrum surface ("3DSS")
 

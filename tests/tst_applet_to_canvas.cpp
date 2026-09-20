@@ -203,7 +203,7 @@ private slots:
 
     // ── Reiter: mehrere Fenster in einer Kachel ──────────────────────
     //
-    // Vorbild ist Zeus' „Multi Panel" (Bildschirmvideo 2026-08-20:
+    // Vorbild ist das „Multi Panel" der Vorlage (Bildschirmvideo 2026-08-20:
     // FREQUENCY·VFO und S-METER teilen einen Rahmen).
     //
     // Der Punkt, der still falsch wird: die Reiterleiste darf bei EINEM

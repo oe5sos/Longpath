@@ -11,7 +11,7 @@
 // hier.
 //
 // Die Probedatei ist absichtlich KEINE selbstgeschriebene: sie ist ein
-// Ausdruck aus Zeus, mit dessen Kopfzeile, dessen Feldreihenfolge und
+// Ausdruck aus einem fremden Logprogramm, mit dessen Kopfzeile, dessen Feldreihenfolge und
 // dessen Eigenheiten. Eine selbstgebaute Datei prueft nur, ob wir
 // lesen koennen, was wir selbst schreiben.
 
@@ -31,15 +31,15 @@ using namespace Longpath;
 
 namespace {
 
-/// Ein Ausdruck aus Zeus 1.1.0, Feld fuer Feld wie das Programm ihn
+/// Ein Ausdruck aus einem fremden Logprogramm (Version 1.1.0), Feld fuer Feld wie es ihn
 /// schreibt — samt der Kopfzeile ohne fuehrendes Zeichen und den
 /// Feldlaengen in spitzen Klammern.
-QByteArray zeusExport()
+QByteArray foreignExport()
 {
     return QByteArray(
-        "ADIF Export from Zeus\n"
+        "ADIF Export from Fremdlog\n"
         "<ADIF_VER:5>3.1.4\n"
-        "<PROGRAMID:4>Zeus\n"
+        "<PROGRAMID:8>Fremdlog\n"
         "<PROGRAMVERSION:5>1.1.0\n"
         "<EOH>\n"
         "\n"
@@ -94,15 +94,15 @@ class TstLogbookImport : public QObject
 private slots:
     /// Der ganze Weg: leeres Logbuch, fremde Datei, drei Verbindungen
     /// drin — und beim naechsten Oeffnen immer noch drin.
-    void aZeusExportLandsInTheLog()
+    void aForeignExportLandsInTheLog()
     {
         QTemporaryDir tmp;
         QVERIFY(tmp.isValid());
         const QDir dir(tmp.path());
 
         const QString logPath = dir.filePath(QStringLiteral("mein-log.adi"));
-        const QString adif = writeTemp(dir, QStringLiteral("zeus.adi"),
-                                       zeusExport());
+        const QString adif = writeTemp(dir, QStringLiteral("fremd.adi"),
+                                       foreignExport());
         QVERIFY(!adif.isEmpty());
 
         LogbookWindow w(logPath);
@@ -139,7 +139,7 @@ private slots:
         const QDir dir(tmp.path());
         const QString logPath = dir.filePath(QStringLiteral("l.adi"));
         const QString adif = writeTemp(dir, QStringLiteral("z.adi"),
-                                       zeusExport());
+                                       foreignExport());
 
         LogbookWindow w(logPath);
         w.setOperatorHooks([](const QString&) { return true; },
@@ -171,7 +171,7 @@ private slots:
     /// Zweimal dieselbe Datei darf das Logbuch nicht verdoppeln.
     ///
     /// Das ist kein erfundener Fall: im Download-Ordner des Betreibers
-    /// liegen fuenf Zeus-Ausdrucke, von denen drei Byte fuer Byte
+    /// liegen fuenf Ausdrucke desselben Logprogramms, von denen drei Byte fuer Byte
     /// gleich sind.
     void importingTwiceDoesNotDouble()
     {
@@ -179,8 +179,8 @@ private slots:
         QVERIFY(tmp.isValid());
         const QDir dir(tmp.path());
         const QString logPath = dir.filePath(QStringLiteral("l.adi"));
-        const QString a = writeTemp(dir, QStringLiteral("a.adi"), zeusExport());
-        const QString b = writeTemp(dir, QStringLiteral("b.adi"), zeusExport());
+        const QString a = writeTemp(dir, QStringLiteral("a.adi"), foreignExport());
+        const QString b = writeTemp(dir, QStringLiteral("b.adi"), foreignExport());
 
         LogbookWindow w(logPath);
         QStringList said;

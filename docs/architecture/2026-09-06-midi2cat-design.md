@@ -10,7 +10,7 @@ der Port wäre — die Entscheidung, ob und wann gebaut wird, ist offen (siehe
 ## Woher das kommt
 
 Midi2Cat stand als "reale, nennenswerte Lücke" auf der Backlog-Liste aus
-einer früheren AetherSDR/Zeus-Recherche, mit einer groben Hausnummer
+einer früheren AetherSDR-Recherche, mit einer groben Hausnummer
 "~6700 Zeilen" aus einem oberflächlichen Blick auf den `Midi2Cat/`-Ordner
 allein. Diese Recherche liest den vollständigen Thetis-Quellbaum
 (`../Thetis/Project Files/Source/Midi2Cat/` + `Console/Midi2CatCommands.cs`)

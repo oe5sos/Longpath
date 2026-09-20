@@ -70,7 +70,7 @@ void paintTrough(QPainter& p, const Spine& s,
 // einzugraben.
 //
 // Der Betreiber hat sie am 2026-08-23 aus sechs Tiefenbehandlungen
-// gewaehlt ("D5") — nachdem er an Zeus Link bemerkt hatte: "Zeus hat
+// gewaehlt ("D5") — nachdem er an der Vorlage bemerkt hatte: "[die Vorlage] hat
 // einen übergang im hintergrund, schaut oder wirkt teilweise wie 3d."
 //
 // Nur auf einer Geraden. Auf einem Bogen laeuft der Querverlauf nicht
@@ -85,7 +85,7 @@ void paintFade(QPainter& p, const Spine& s, double f, const QColor& c);
 
 // ── Segmente statt Verlauf ───────────────────────────────────────────
 //
-// Der Betreiber, 2026-08-20, mit einem Bildschirmfoto aus Zeus: das
+// Der Betreiber, 2026-08-20, mit einem Bildschirmfoto der Vorlage: das
 // S-Meter als Kette einzelner Felder statt als durchgehender Balken.
 //
 // Der Unterschied ist nicht nur Zierde. Segmente liest man als MENGE —

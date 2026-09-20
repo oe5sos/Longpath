@@ -9,7 +9,7 @@
 // ── Die Kopfleiste ───────────────────────────────────────────────────
 //
 // Der größte Einzelunterschied zwischen NereusSDR und der Vorlage des
-// Betreibers. Bei Zeus liegen MODE, FILTER, BAND, FAVORITES, STEP und
+// Betreibers. In der Vorlage liegen MODE, FILTER, BAND, FAVORITES, STEP und
 // FRONT-END als beschriftete Pillengruppen quer über das Fenster; hier
 // stand bisher links eine Spalte senkrechter Knöpfe und der Rest
 // verteilt in den Panels.

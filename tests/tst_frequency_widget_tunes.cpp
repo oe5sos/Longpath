@@ -6,7 +6,7 @@
 // Der Betreiber am 2026-08-22: "für frequenz bitte auch ein eigenes
 // widget bauen". Es GIBT eines (FrequencyApplet mit
 // FrequencyInstrument), samt Ziffernrad und Eingabefeld — wie das
-// grosse Frequenzfeld bei OpenHPSDR Zeus ("CLICK TO TYPE · WHEEL ON A
+// grosse Frequenzfeld in der Vorlage ("CLICK TO TYPE · WHEEL ON A
 // DIGIT").
 //
 // Heute war allerdings mehrfach etwas verdrahtet und trotzdem tot:

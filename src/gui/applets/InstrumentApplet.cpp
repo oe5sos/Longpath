@@ -340,7 +340,7 @@ QMenu* InstrumentApplet::buildContextMenu(QWidget* parent)
     // Nur wenn der Balken auch gezeigt wird: ein Untermenue, das den
     // Zeiger nicht betrifft, gehoert nicht in dessen Menue. Der
     // Betreiber hat die Segmentform am 2026-08-20 mit einem
-    // Bildschirmfoto aus Zeus verlangt.
+    // Bildschirmfoto der Vorlage verlangt.
     if (m_form == Form::Bar && m_bar) {
         auto* styleMenu = menu->addMenu(tr("Balken"));
         auto* styleGroup = new QActionGroup(menu);
