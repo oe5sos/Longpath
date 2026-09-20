@@ -304,9 +304,12 @@ void TestFreeDVReporterDialog::highlightClearsAfterSixSeconds() {
     model->onStationUpdated("sid-fade", s);
     QVERIFY(dlg->rowHighlightColorForTest("sid-fade").isValid());
 
-    QTest::qWait(120);
-    QColor bg = dlg->rowHighlightColorForTest("sid-fade");
-    QVERIFY(!bg.isValid());
+    // Not a fixed wait: on a loaded CI runner QTest::qWait(120) can return
+    // right after a long descheduling gap without having processed the
+    // timer that fell due inside it (macOS runners, 2026-09-18, two runs
+    // in a row). Poll until the highlight is gone; the 50 ms timer makes
+    // this instant when the machine is idle.
+    QTRY_VERIFY_WITH_TIMEOUT(!dlg->rowHighlightColorForTest("sid-fade").isValid(), 5000);
 
     delete dlg;
     delete model;
@@ -998,10 +1001,9 @@ void TestFreeDVReporterDialog::idleSweepRemovesStationsOlderThanThreshold() {
 
     QCOMPARE(table->model()->rowCount(), 2);
 
-    // Let the sweep timer fire at least once.
-    QTest::qWait(50);
-
-    QCOMPARE(table->model()->rowCount(), 1);
+    // Let the sweep timer fire at least once -- polled, not a fixed wait
+    // (same CI-load reasoning as highlightClearsAfterSixSeconds).
+    QTRY_COMPARE_WITH_TIMEOUT(table->model()->rowCount(), 1, 5000);
     QCOMPARE(table->model()->index(0, 0).data().toString(), QStringLiteral("K1FRESH"));
 
     delete dlg;

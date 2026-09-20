@@ -133,12 +133,27 @@ void QsoRecorderController::drainNow() { drain(); }
 //
 // Independently implemented from Thetis clsAudioRecordPlayback.cs --
 // see QsoRecorderController.h for what carried over and what didn't.
+namespace {
+int s_freeSpaceFloorOverride = -1;
+} // namespace
+
+int QsoRecorderController::freeSpacePercentFloor()
+{
+    return s_freeSpaceFloorOverride >= 0 ? s_freeSpaceFloorOverride
+                                         : kFreeSpacePercentFloor;
+}
+
+void QsoRecorderController::setFreeSpacePercentFloorForTest(int percent)
+{
+    s_freeSpaceFloorOverride = percent;
+}
+
 bool QsoRecorderController::hasEnoughDiskSpace(const QString& forPath)
 {
     const QStorageInfo disk(QFileInfo(forPath).absolutePath());
     if (!disk.isValid() || disk.bytesTotal() <= 0) { return true; }
     const qint64 percentFree = (disk.bytesAvailable() * 100) / disk.bytesTotal();
-    return percentFree >= kFreeSpacePercentFloor;
+    return percentFree >= freeSpacePercentFloor();
 }
 
 void QsoRecorderController::checkDiskSpace()

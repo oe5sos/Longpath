@@ -412,6 +412,21 @@ constexpr auto kSpectrumTrace     = "#c2924f";  // Kurve und Füllung
 constexpr auto kSpectrumGrid      = "#8a8f96";  // Gitterlinien (Alpha im Code)
 constexpr auto kSpectrumGridText  = "#9aa0a8";  // Frequenz- und dBm-Skala
 
+// Die Kurve im Bandfilter-Fenster (BandwidthFilterPane, Rolle „trace").
+// Ein eigener, gedämpfterer Bernstein als kSpectrumTrace, am 2026-08-23
+// gegen OpenHPSDR-Bilder eingestellt und im Malcode noch aufgehellt und
+// gesättigt. Bis zur Stildrift-Prüfung vom 2026-09-18 stand der Wert
+// namenlos als Vorgabe hinter dem Rollennamen; ob er in kSpectrumTrace
+// aufgeht, ist eine Gestaltungsentscheidung, keine hier.
+constexpr auto kFilterPaneTrace   = "#c8a06a";
+
+// Die Vorgabe des Beobachtungslisten-Lichts im Spot-Hub
+// (AppSettings "SpotWatchlistColor"). Noch das abgeschaffte Türkis aus
+// HAUSSTIL.md („Blau = anfassbar. Warm = gemessen."); als Vorgabewert
+// benannt, damit die Stildrift-Prüfung ihn sieht — welcher Ton es
+// stattdessen wird, entscheidet der Betreiber beim nächsten Aufräumen.
+constexpr auto kSpotWatchlightDefault = "#00b4d8";
+
 // Gauge Fill Zones
 // ── Telling one equaliser band from another ──────────────────────────
 //

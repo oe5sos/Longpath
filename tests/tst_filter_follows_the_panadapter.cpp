@@ -261,18 +261,30 @@ private slots:
 
         // Der Kurvenzug ist warm getoent; der Rest ist Grau und Blau.
         int topMost = img.height();
+        int topX = -1;
+        QColor topColor;
         for (int y = 0; y < img.height(); ++y) {
             for (int x = 4; x < img.width() - 60; x += 2) {
                 const QColor c = img.pixelColor(x, y);
                 if (c.red() > c.blue() + 24 && c.red() > 90) {
                     topMost = qMin(topMost, y);
+                    topX = x;
+                    topColor = c;
                     break;
                 }
             }
             if (topMost < img.height()) { break; }
         }
         const double frac = double(topMost) / img.height();
-        qInfo() << "Hoechster Kurvenpunkt bei" << (frac * 100.0) << "% Hoehe";
+        qInfo() << "Hoechster Kurvenpunkt bei" << (frac * 100.0) << "% Hoehe"
+                << "-- erster warmer Bildpunkt" << topX << topMost
+                << topColor.name() << "Schrift" << pane.font().family()
+                << pane.font().pointSizeF() << pane.font().pixelSize();
+        // Zum Nachsehen ohne Bildschirm (Linux-CI): das Bild als PNG.
+        const QString grabDir = qEnvironmentVariable("LONGPATH_GRAB_DIR");
+        if (!grabDir.isEmpty()) {
+            img.save(grabDir + QStringLiteral("/longpath-grab-BandwidthFilterPane-noise.png"));
+        }
 
         QVERIFY2(frac > 0.62,
                  qPrintable(QStringLiteral(

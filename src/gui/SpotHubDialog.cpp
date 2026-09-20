@@ -2792,7 +2792,7 @@ void SpotHubDialog::buildSpotListTab(QTabWidget* tabs)
     });
     watchRow->addWidget(m_watchlistSpeakBtn);
 
-    QColor watchColor(s.value("SpotWatchlistColor", "#00b4d8").toString());
+    QColor watchColor(s.value("SpotWatchlistColor", Style::kSpotWatchlightDefault).toString());
     m_watchlistColorBtn = new QPushButton;
     m_watchlistColorBtn->setObjectName("spotListWatchlistColorBtn");
     m_watchlistColorBtn->setFixedSize(18, 18);
@@ -2800,7 +2800,7 @@ void SpotHubDialog::buildSpotListTab(QTabWidget* tabs)
     m_watchlistColorBtn->setStyleSheet(swatchStyle(watchColor));
     connect(m_watchlistColorBtn, &QPushButton::clicked, this, [this] {
         QColor c = QColorDialog::getColor(
-            QColor(AppSettings::instance().value("SpotWatchlistColor", "#00b4d8").toString()),
+            QColor(AppSettings::instance().value("SpotWatchlistColor", Style::kSpotWatchlightDefault).toString()),
             this, "Watchlist Highlight Color");
         if (c.isValid()) {
             m_watchlistColorBtn->setStyleSheet(swatchStyle(c));

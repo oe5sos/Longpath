@@ -399,7 +399,7 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
         const int xlF = qBound(r.left(), hzToX(m_low),  r.right());
         const int xhF = qBound(r.left(), hzToX(m_high), r.right());
 
-        QColor traceLine(Style::role("trace", "#c8a06a"));
+        QColor traceLine(Style::role("trace", Style::kFilterPaneTrace));
         // Die Vorlage traegt ein deutlich kraeftigeres Bernstein als
         // unser gedaempftes #c8a06a. Ohne diesen Schritt bleibt die
         // Kurve neben dem tuerkisen Durchlass blass.
