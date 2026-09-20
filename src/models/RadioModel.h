@@ -156,6 +156,7 @@ class CompositeTxMicRouter;
 // 3M-1c L.1 / L.2: forward declarations for the MicProfileManager bank
 // (chunk F) + the TwoToneController activation orchestrator (chunk I).
 class MicProfileManager;
+class RxProfileManager;
 class TwoToneController;
 class SwrSweepController;
 // 3M-4 Task 7: PureSignal coordinator (cal lifecycle, MOX integration,
@@ -974,6 +975,10 @@ public:
     // TxProfileSetupPage (J.3 ctor).  Non-owning; lifetime is RadioModel's
     // lifetime.  See header §3M-1c L.1 for the construction + connect flow.
     MicProfileManager* micProfileManager() const { return m_micProfileMgr; }
+
+    // Receive profiles (AGC / NR / NB / ANF / squelch of a slice under a
+    // name), global rather than per MAC. Non-owning; RadioModel's lifetime.
+    RxProfileManager* rxProfileManager() const { return m_rxProfileMgr; }
 
     // Phase 4 Agent 4A of issue #167: expose PaProfileManager so the future
     // PaGainByBandPage (Phase 6 Agent 6A) and tests can hand the per-MAC
@@ -3639,6 +3644,7 @@ private:
     // connectToRadio(); setMacAddress("") is called in teardownConnection so
     // mutators silently no-op while no radio is selected.
     MicProfileManager* m_micProfileMgr{nullptr};
+    RxProfileManager*  m_rxProfileMgr{nullptr};
 
     // Phase 4 Agent 4A of issue #167 — PaProfileManager.  QObject child of
     // RadioModel; mirrors m_micProfileMgr lifecycle exactly.  Constructed

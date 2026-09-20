@@ -190,6 +190,12 @@ public:
     // Attach to a different slice (or nullptr to detach).
     void setSlice(SliceModel* slice);
 
+    // The gear in the title bar opens the receive-profile sheet
+    // (RxProfilePopup): AGC / NR / NB / ANF / squelch of this slice
+    // under a name, loaded again with one click.
+    bool hasExtendedSettings() const override { return true; }
+    void openExtendedSettings() override;
+
     // Set the slice letter badge (0=A, 1=B, 2=C, 3=D)
     void setSliceIndex(int idx);
 

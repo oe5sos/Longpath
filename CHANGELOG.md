@@ -218,6 +218,13 @@ und Linux (x86_64 und aarch64), alle GPG-signiert.
   aus cty.dat (Sizilien & Co. in ihre DXCC-Entitaet gefaltet), sonst das
   ADIF-Feld DXCC. `docs/architecture/2026-09-18-logbook-stats.md`.
 
+- **RX-Profile (Zahnrad des RX-Applets)**: die Empfangsverarbeitung
+  einer Scheibe -- AGC, Rauschminderung samt Parametern aller Plaetze,
+  Autonotch, Stoeraustaster, Rauschsperre, APF, binaural -- unter einem
+  Namen speichern und mit einem Klick wieder laden (Load / Save / Delete
+  / Save As). Frequenz, Modus und Filter bleiben aussen vor, das ist die
+  Sache der Frequenzspeicher. Profile gelten geraeteuebergreifend.
+
 - **Start-Protokoll nennt jetzt Betriebssystem, CPU-Architektur,
   Kernzahl, Qt-Laufzeitversion und RAM (macOS).** Von einer
   AetherSDR-Sichtung angestossen; reines Protokoll, keine Oberflaeche.

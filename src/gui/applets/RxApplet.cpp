@@ -117,6 +117,8 @@
 //============================================================================================//
 
 #include "RxApplet.h"
+#include "gui/widgets/RxProfilePopup.h"
+#include "core/RxProfileManager.h"
 #include "gui/styles/ThemeQss.h"
 
 #include <QGuiApplication>
@@ -1159,6 +1161,16 @@ void RxApplet::applyModeVisibility(DSPMode mode)
         m_rttyContainer->setVisible(mode == DSPMode::DIGL);
         if (mode == DSPMode::DIGL) { m_rttyContainer->syncFromSlice(); }
     }
+}
+
+void RxApplet::openExtendedSettings()
+{
+    if (!m_model || !m_model->rxProfileManager()) { return; }
+    // A fresh sheet each time: Qt::Popup closes on a click beside it and
+    // WA_DeleteOnClose takes it away; the profiles live in the manager.
+    auto* popup = new RxProfilePopup(m_model->rxProfileManager(), m_slice, this);
+    popup->setAttribute(Qt::WA_DeleteOnClose);
+    popup->showBelow(this);
 }
 
 void RxApplet::setSliceIndex(int idx)
