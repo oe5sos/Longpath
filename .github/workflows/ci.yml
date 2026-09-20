@@ -699,6 +699,11 @@ jobs:
             # the watchdog isn't the target's parent process, so ptrace
             # scope (YAMA) would otherwise refuse to attach.
             mkdir -p /tmp/hang-diagnostics
+            # Tests that render a widget write it as a PNG here when asked
+            # (LONGPATH_GRAB_DIR, see tst_filter_follows_the_panadapter) --
+            # the only way to look at a Linux-only rendering difference
+            # without a Linux machine. Uploaded with the hang diagnostics.
+            export LONGPATH_GRAB_DIR=/tmp/hang-diagnostics
             hang_watchdog() {
               declare -A seen
               while true; do
