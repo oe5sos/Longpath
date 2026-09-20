@@ -10,10 +10,10 @@
 // confirmed, the confirmation read the way QsoConfirmation reads it
 // (card, LoTW or eQSL, Y or V; R is a request, not a confirmation).
 //
-// Benchmark, not source: Zeus's logbook workspace shows tiles for Log /
-// Bänder / Modi / Aktivität (26 Wochen) / Top-Länder / Awards
-// (DXCC · WAS · Grids). Its client is proprietary and its GPL engine
-// only carries the DTOs, so nothing here is ported; the choice of what
+// Benchmark, not source: the reference client's logbook workspace shows
+// tiles for Log / Bänder / Modi / Aktivität (26 Wochen) / Top-Länder /
+// Awards (DXCC · WAS · Grids). That client is proprietary, so nothing
+// here is ported; the choice of what
 // to count follows what the tiles show and what the awards require.
 //
 // DXCC entities are keyed by cty.dat's primary prefix, the same key

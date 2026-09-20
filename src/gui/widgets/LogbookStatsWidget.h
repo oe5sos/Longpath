@@ -8,7 +8,7 @@
 // Awards (DXCC · WAS · Grids · continents · CQ zones). Replaces the
 // monospace text dump behind the logbook's "Stats…" button.
 //
-// Benchmark: Zeus's logbook workspace shows the same six tiles; the
+// Benchmark: the reference client's logbook workspace shows the same six tiles; the
 // numbers here come from core/LogbookStats, nothing is ported. The
 // tiles follow the QsoDetailPane idiom (panel background, caption in
 // the scale colour, monospace for numbers); the bar charts are two

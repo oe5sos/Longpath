@@ -1,17 +1,16 @@
 # Logbuch-Kennzahlen + Awards
 
 **Stand:** 18. September 2026
-**Anlass:** Punkt 4 der Benchmark-Liste in
-[docs/design/2026-09-17-zeus-benchmark.md](../design/2026-09-17-zeus-benchmark.md)
-— „Sichtbarster Unterschied im Logbuch; Daten haben wir". Zeus' Logbuch-
-Arbeitsplatz zeigt Kacheln für Log / Bänder / Modi / Aktivität (26 Wochen)
+**Anlass:** Punkt 4 der Benchmark-Liste vom 2026-09-17 (Vergleich mit
+der Vorlage, einem proprietären SDR-Client)
+— „Sichtbarster Unterschied im Logbuch; Daten haben wir". Der Logbuch-
+Arbeitsplatz der Vorlage zeigt Kacheln für Log / Bänder / Modi / Aktivität (26 Wochen)
 / Top-Länder / Awards (DXCC · WAS · Grids). Longpaths „Stats…" war ein
 Monospace-Textfenster mit drei Balkenlisten.
 
-**Maßstab, keine Quelle:** Zeus' Logbuch-Client ist proprietär, sein
-GPL-Engine trägt nur die DTOs (`Zeus.Contracts/LogDtos.cs`,
-`Zeus.Plugins.Contracts/Extensions/LogbookTypes.cs`) — keine Zählung,
-keine Award-Logik. Nichts ist portiert; die Wahl, *was* gezählt wird,
+**Maßstab, keine Quelle:** Der Logbuch-Client der Vorlage ist proprietär;
+es gibt dort nichts Offenes mit Zählung oder Award-Logik. Nichts ist
+portiert; die Wahl, *was* gezählt wird,
 folgt den Kacheln und den Award-Regeln (ARRL DXCC, ARRL WAS).
 
 ## Was gebaut wurde

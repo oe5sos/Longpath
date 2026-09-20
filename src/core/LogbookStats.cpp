@@ -3,8 +3,8 @@
 // =================================================================
 //
 // Longpath-original; see LogbookStats.h.
-// no-port-check: Longpath-original, nothing ported (Zeus is the
-// benchmark for what to show, its logbook client is closed).
+// no-port-check: Longpath-original, nothing ported (the reference
+// client is the benchmark for what to show; it is closed source).
 //
 // =================================================================
 // Modification history (Longpath):
