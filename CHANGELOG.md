@@ -134,6 +134,21 @@
   reparieren; hier geht mehr, weil die Stufen unsere eigenen sind. Fuenf Regressionstests in
   `tst_strip_chain`.
 
+- **PureSignal-Verzoegerungsleitung (WDSP `delay.c`) las bei zu grossem
+  Amp-Delay ausserhalb ihres Rings.** Das Feld im PureSignal-Dialog
+  erlaubt bis 25 000 000 ns; der Ring fasst 1024 ganze Samples, bei
+  192 kHz TX-Rate also 5,3 ms. Darueber rechnete `SetDelayValue` einen
+  Startindex jenseits des Rings aus, und `xdelay()` faltet den Leseindex
+  nur einmal zurueck -- die Ausgabe war Speicher hinter der Zuteilung
+  (im Test: Stille, im Betrieb Muell oder Absturz), und die zurueck-
+  gemeldete "tatsaechliche" Verzoegerung log. Jetzt wird die Anfrage
+  vor der unveraenderten Upstream-Rechnung auf die laengste
+  realisierbare Verzoegerung begrenzt, `SetPSTXDelay` gibt den
+  realisierten Wert zurueck (der Dialog zeigt ihn an), und der Impuls
+  kommt am Ende des Rings heraus statt nirgends. Eigene Korrektur; vier
+  Regressionstests in `tst_wdsp_delay_clamp` (gegen das alte `delay.c`
+  scheitern drei davon).
+
 - **Drei weitere Tabellen-/Baum-Aufbauten koennten dieselbe
   Qt-Accessibility-Explosion ausloesen wie das Logbuch und die
   KiwiSDR-Empfaengerliste (b5e9b915, e913abe6) -- jetzt ebenfalls
