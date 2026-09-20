@@ -44,10 +44,9 @@
 //   2026-09-17 — Non-finite guard: a NaN or an infinity, from the
 //                 microphone or from a stage, is caught per stage, the
 //                 stage is bypassed for that block and reset, and the
-//                 event is counted. Prompted by the Zeus station-engine
-//                 inventory (docs/design/2026-09-17-zeus-plugin-system-
-//                 inventar.md, Mitnahme 3): Zeus repairs after every
-//                 chain slot; we can do better because we own the stages.
+//                 event is counted. Prompted by a review of other audio
+//                 chains (2026-09-17) that repair after every chain slot;
+//                 we can do better because we own the stages.
 // =================================================================
 
 #include "core/strip/ClientComp.h"

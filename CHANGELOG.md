@@ -129,10 +129,9 @@
   Quelle (Eingang, acht Stufen) ein Zaehler; die TX-Pumpe meldet eine
   wachsende Zahl hoechstens alle 5 s mit der schuldigen Stufe im Log
   (`nereus.tx.worker`). Kein Speicher, kein Schloss auf dem Audio-Faden
-  (Schnappschuss ist Teil des Objekts). Angestossen vom Zeus-Engine-
-  Inventar (`docs/design/2026-09-17-zeus-plugin-system-inventar.md`,
-  Mitnahme 3): Zeus repariert nach jedem Ketten-Slot; hier geht mehr,
-  weil die Stufen unsere eigenen sind. Fuenf Regressionstests in
+  (Schnappschuss ist Teil des Objekts). Angestossen von der Durchsicht
+  fremder Audio-Ketten (2026-09-17), die nach jedem Ketten-Slot
+  reparieren; hier geht mehr, weil die Stufen unsere eigenen sind. Fuenf Regressionstests in
   `tst_strip_chain`.
 
 - **Drei weitere Tabellen-/Baum-Aufbauten koennten dieselbe
