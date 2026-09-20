@@ -305,11 +305,21 @@ private slots:
             img.save(grabDir + QStringLiteral("/longpath-grab-BandwidthFilterPane-noise.png"));
         }
 
-        QVERIFY2(frac > 0.62,
+        // Gemessen wird die KURVE, nicht das Etikett: die Suche gilt ab
+        // 40 px, unterhalb der RX1-Marke und des Breitenkaestchens (die
+        // Kurve selbst kann nie hoeher als r.top()+30 liegen). Auf dem
+        // Linux-Laeufer rendert FreeType die Schrift mit Subpixel-
+        // Kantenglaettung, und ein Farbsaum an einer Glyphenkante der Marke
+        // ist "warm" im Sinne dieser Suche -- (12, 6), #b09e7a, 2026-09-20.
+        // Auf dem Mac (Graustufen-Glaettung) gab es den Saum nicht, und so
+        // fiel der Test nur auf Linux, mit einer Kurve, die dort genauso am
+        // Boden liegt.
+        const double fracPlot = double(topMostPlot) / img.height();
+        QVERIFY2(fracPlot > 0.62,
                  qPrintable(QStringLiteral(
                      "Ohne Signal steigt die Kurve bis auf %1 %% der "
                      "Hoehe — sie gehoert an den Boden")
-                     .arg(frac * 100.0, 0, 'f', 1)));
+                     .arg(fracPlot * 100.0, 0, 'f', 1)));
     }
 
     void theSignalShowsUpInThePane()
