@@ -109,6 +109,7 @@
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <QtTest/QtTest>
+#include <QFile>
 #include <QPushButton>
 #include <QTableView>
 
@@ -139,12 +140,26 @@ struct Rig {
 
     Rig()
     {
+        // A clean sandbox: RadioModel restores memory.xml from the settings
+        // folder on construction, and the dialog writes it back; neither
+        // may leak into the next test binary sharing the QStandardPaths
+        // test sandbox.
         radio = std::make_unique<RadioModel>();
+        QFile::remove(MemoryList::filePath(radio->memoriesDir()));
+        QFile::remove(MemoryList::backupPath(radio->memoriesDir()));
         radio->memories()->clear();
         slice = radio->activeSlice();
         if (!slice) {
             const int id = radio->addSlice();
             slice = radio->sliceById(id);
+        }
+    }
+
+    ~Rig()
+    {
+        if (radio) {
+            QFile::remove(MemoryList::filePath(radio->memoriesDir()));
+            QFile::remove(MemoryList::backupPath(radio->memoriesDir()));
         }
     }
 };
