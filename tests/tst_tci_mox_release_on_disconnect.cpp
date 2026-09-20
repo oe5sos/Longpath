@@ -3,8 +3,8 @@
 //
 // A TCI client that keys the radio (trx:N,true) and then goes away — WSJT-X
 // crashing mid-over, a remote client losing its link — must not leave the
-// transmitter keyed. Thetis has exactly that gap; the Zeus station engine
-// closes it with a transmit lease and a heartbeat. TciServer's version
+// transmitter keyed. Thetis has exactly that gap; other station servers
+// close it with a transmit lease and a heartbeat. TciServer's version
 // (2026-09-17): remember who keyed, and unkey when that socket vanishes.
 //
 // The first three tests run without a RadioModel (server(nullptr), the same

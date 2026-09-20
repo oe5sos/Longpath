@@ -84,7 +84,7 @@
   blieb gesetzt, wenn der Client, der `trx:0,true;` geschickt hatte
   (WSJT-X, ein Fernclient), abstuerzte oder die Verbindung verlor -- bis
   der Bediener oder eine andere PTT-Quelle ihn loeste. Thetis hat dieselbe
-  Luecke; das Zeus Station Engine schliesst sie mit Sende-Lease und
+  Luecke; andere Stationsserver schliessen sie mit Sende-Lease und
   Herzschlag. Kleinste Form derselben Regel: der Server merkt sich den
   Socket hinter jedem `trx:N,true` (mit oder ohne `,tci`), vergisst ihn bei
   `trx:N,false` desselben Clients und sobald MOX aus irgendeiner Quelle
@@ -97,8 +97,8 @@
   angepingt; nach drei unbeantworteten Pings wird MOX geloest (ein
   eingefrorenes Programm haelt seinen Socket, ein Disconnect kaeme nie),
   der Socket bleibt offen. Warnung im Log (`nereus.tci`), Signal
-  `moxReleasedOnClientLoss(peer)`. Fund aus dem Zeus-Protokoll-Inventar
-  (`docs/design/2026-09-17-zeus-stationsprotokoll-inventar.md` par. 3.1);
+  `moxReleasedOnClientLoss(peer)`. Fund bei der Durchsicht fremder
+  Stationsprotokolle (2026-09-17);
   sieben Regressionstests in `tst_tci_mox_release_on_disconnect`, zwei
   mit echtem RadioModel, einer mit einem rohen TCP-Client, der die
   WebSocket-Hand schuettelt, tastet und dann nichts mehr beantwortet.

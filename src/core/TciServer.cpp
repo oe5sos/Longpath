@@ -19,8 +19,7 @@
 //                vanished while MOX was on; a keyed-client watchdog pings
 //                the owner every second and releases MOX after three
 //                unanswered pings (hung client, socket still open).
-//                NereusSDR-original; see TciServer.h and docs/design/
-//                2026-09-17-zeus-stationsprotokoll-inventar.md §3.1.
+//                NereusSDR-original; see TciServer.h.
 
 #ifdef HAVE_WEBSOCKETS
 
@@ -1636,7 +1635,7 @@ void TciServer::onClientDisconnected()
     // then vanished — WSJT-X crashed mid-over, a remote client lost its
     // link — must not leave the transmitter keyed until the operator
     // notices. Thetis has this gap (ClientDisconnectedHandler only refreshes
-    // stream state); Zeus's station engine closes it with a transmit lease
+    // stream state); other station servers close it with a transmit lease
     // and a heartbeat. This is the smallest version of that rule: if the
     // socket that last sent trx:N,true is the one going away and MOX is
     // still on, unkey. Only ever unkeys — it can never key.

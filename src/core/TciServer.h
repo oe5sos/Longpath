@@ -29,9 +29,8 @@
 //                equivalent — Thetis's ClientDisconnectedHandler only
 //                refreshes stream state). The server remembers which client
 //                keyed the radio through `trx:N,true` and unkeys it when
-//                that client's socket goes away. Prompted by the Zeus
-//                station-engine inventory (docs/design/2026-09-17-zeus-
-//                stationsprotokoll-inventar.md §3.1), where transmit is a
+//                that client's socket goes away. Prompted by a review of
+//                other station protocols (2026-09-17), where transmit is a
 //                lease with a heartbeat; this is the smallest version of
 //                the same rule. Martin Fischer, AI-assisted via Anthropic
 //                Claude.
