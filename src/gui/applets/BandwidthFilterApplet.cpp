@@ -323,7 +323,7 @@ void BandwidthFilterApplet::buildUI()
         connect(m_spanBtn, &QPushButton::clicked, this, [this]() {
             // ── AUTO zuerst, dann die festen Stufen ─────────────────
             //
-            // Der Betreiber am 2026-08-22 nach der Zeus-Vorfuehrung:
+            // Der Betreiber am 2026-08-22 nach der Vorfuehrung der Vorlage:
             // "der bandfilter sollte auch genau den bereich zeigen,
             // den man ausgewählt hat" — und gleich dazu: "kann auch
             // danach ein größerer bereich sein".
@@ -497,7 +497,7 @@ void BandwidthFilterApplet::refreshPane(int i)
 
     // ── AUTO: die Spanne folgt der gewaehlten Breite ────────────────
     //
-    // Zeus zeigt bei 2,9 kHz Filter rund 10 kHz Fenster — der Durchlass
+    // Die Vorlage zeigt bei 2,9 kHz Filter rund 10 kHz Fenster — der Durchlass
     // fuellt also etwa ein Drittel und hat Umgebung, in der man sieht,
     // ob das Signal daneben liegt. Faktor 3,4, untere Grenze 2 kHz
     // (sonst wird CW zur Briefmarke), obere 40 kHz wie die feste
@@ -513,8 +513,8 @@ void BandwidthFilterApplet::refreshPane(int i)
         // Breite durchdreht, sieht das ganze Bild wandern. Genau das
         // Zittern.
         //
-        // Die Vorlage macht es anders, und man sieht es auf seinen
-        // Bildern: bei OpenHPSDR blieb die Achse auf 14.158-14.168
+        // Die Vorlage macht es anders, und man sieht es auf ihren
+        // Bildern: dort blieb die Achse auf 14.158-14.168
         // stehen, WAEHREND der Filter von 2,4 auf 3,3 kHz wechselte.
         // Die Spanne haengt dort an der Groessenklasse, nicht am
         // genauen Wert.

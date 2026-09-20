@@ -14,7 +14,7 @@
 //    zweites Profil oder auch ein drittes anzulegen, welches ich mir
 //    selbst wieder individuell gestalten kann."
 //
-// Bei Zeus sind das runde Abzeichen am linken Rand — ein Buchstabe je
+// In der Vorlage sind das runde Abzeichen am linken Rand — ein Buchstabe je
 // Arbeitsfläche, darunter ein gestricheltes Plus. Genau so hier.
 //
 // ── Warum ein Buchstabe und nicht der Name ───────────────────────────

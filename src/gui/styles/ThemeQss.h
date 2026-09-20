@@ -9,7 +9,7 @@
 // ── Why a substitution and not a refactor ────────────────────────────
 //
 // 2026-08-15. The operator asked to move the whole interface toward the
-// Zeus house style, starting with the palette. The obvious first step
+// reference client's house style, starting with the palette. The obvious first step
 // was "pull every hex literal into StyleConstants.h, then change one
 // file". I estimated thirty files. Counted, it is:
 //

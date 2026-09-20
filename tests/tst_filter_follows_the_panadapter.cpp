@@ -2,7 +2,7 @@
 //
 // Der Bandfilter steht dort, wo der Panadapter steht.
 //
-// Der Betreiber am 2026-08-22, nach einer Vorfuehrung von Zeus Link:
+// Der Betreiber am 2026-08-22, nach einer Vorfuehrung der Vorlage:
 // "und der filter sollte natürlich genau dort sein, wo auch ich
 // panadapter bin. er sollte mir ja auch das signal zeigen" und
 // "genau wo ich im panadapter bin soll auch der bandwith filter sein."
@@ -67,10 +67,10 @@ private slots:
     {
         // Der Betreiber am 2026-08-22: "der bandfilter sollte auch
         // genau den bereich zeigen, den man ausgewählt hat, siehe
-        // zeus" — und dazu: "kann auch danach ein größerer bereich
+        // [der Vorlage]" — und dazu: "kann auch danach ein größerer bereich
         // sein".
         //
-        // Zeus zeigt bei 2,9 kHz Filter rund 10 kHz Fenster. Also
+        // Die Vorlage zeigt bei 2,9 kHz Filter rund 10 kHz Fenster. Also
         // folgt die Spanne der Wahl, mit Umgebung drumherum.
         RadioModel model;
         BandwidthFilterApplet applet(&model);
@@ -226,7 +226,7 @@ private slots:
     void withoutSignalTheLineSitsAtTheBottom()
     {
         // Der Betreiber am 2026-08-23, mit drei Bildern von OpenHPSDR
-        // Zeus: "wo kein signal ist, ist die linie am boden" und
+        // Die Vorlage: "wo kein signal ist, ist die linie am boden" und
         // "wenn kein signal ist, linie bei 0, auch bei den
         // sprechpausen".
         //
@@ -325,7 +325,7 @@ private slots:
     void theSignalShowsUpInThePane()
     {
         // "er sollte mir ja auch das signal zeigen" (Betreiber,
-        // 2026-08-22, nach einer Vorfuehrung von Zeus Link).
+        // 2026-08-22, nach einer Vorfuehrung der Vorlage).
         //
         // Gemessen wird am BILD, nicht an einer Fahne: gezaehlt werden
         // Punkte, die weder Grund noch Raster sind — ohne Kurve gibt

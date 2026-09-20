@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // WERKZEUG, keine Pruefung: die WAAGRECHTE Fassung der
-// Stehwellenanzeige, Layout 1:1 nach Zeus Link.
+// Stehwellenanzeige, Layout nach der Vorlage.
 //
 // Anlass, 2026-08-23: "bitte mache die horizontalen entwürfe wie bei
-// zeus" — nachdem davor schon galt: "das design 1:1 grundsätzlich
-// übernehmen."
+// [der Vorlage]" — nachdem davor schon galt, das Design der Vorlage
+// grundsätzlich zu übernehmen.
 //
 // ── Was ich aus seinem Bild abgelesen habe ──────────────────────────
 //
-// Zeus' S-METER ist eine Zeile aus fuenf Spalten, und jede hat eine
+// Das S-METER der Vorlage ist eine Zeile aus fuenf Spalten, und jede hat eine
 // Aufgabe:
 //
 //   1. Wortmarke links ("RX"), darunter kleiner die EINHEIT ("dBm").
@@ -58,7 +58,7 @@ QColor scaleInk() { return QColor(Style::kTextScale); }
 QColor danger()   { return QColor("#c85a5a"); }
 QColor warn()     { return QColor("#d4a23c"); }
 QColor good()     { return QColor("#4caf6a"); }
-QColor amber()    { return QColor("#e0a44a"); }   // Zeus' Bernstein
+QColor amber()    { return QColor("#e0a44a"); }   // Bernstein der Vorlage
 
 QColor mix(const QColor& a, const QColor& b, double k)
 {
@@ -80,17 +80,17 @@ struct RowSpec {
     int     decimals;
     QStringList tickText;
     QVector<double> tickVal;
-    QString subLabelA;   // Zusatzzeile links  (bei Zeus "AVG")
+    QString subLabelA;   // Zusatzzeile links  (in der Vorlage "AVG")
     QString subValueA;
-    QString subLabelB;   // Zusatzzeile rechts (bei Zeus "SNR")
+    QString subLabelB;   // Zusatzzeile rechts (in der Vorlage "SNR")
     QString subValueB;
 };
 
 // style 0 — Segmente als Bloecke, unsere Farben (gruen/orange/rot)
-// style 1 — Segmente als DUENNE Striche, Zeus' Strichoptik
-// style 2 — wie 0, aber Bernstein statt Gruen (Zeus' Farbe 1:1)
+// style 1 — Segmente als DUENNE Striche, Strichoptik der Vorlage
+// style 2 — wie 0, aber Bernstein statt Gruen (Farbe der Vorlage)
 // style 3 — durchgehend mit Verlauf
-void drawZeusRow(QPainter& p, const QRectF& box, const RowSpec& r,
+void drawReferenceRow(QPainter& p, const QRectF& box, const RowSpec& r,
                  int style, bool withSubline, bool withMarker)
 {
     const double labelW = 30.0;
@@ -122,7 +122,7 @@ void drawZeusRow(QPainter& p, const QRectF& box, const RowSpec& r,
         return danger();
     };
 
-    // Die Mulde: flach und dunkel, ohne Rundung. So macht es Zeus.
+    // Die Mulde: flach und dunkel, ohne Rundung. So macht es die Vorlage.
     p.setPen(Qt::NoPen);
     p.setBrush(QColor("#101016"));
     p.drawRect(bar);
@@ -147,7 +147,7 @@ void drawZeusRow(QPainter& p, const QRectF& box, const RowSpec& r,
         p.drawRect(QRectF(fill.left(), fill.top(),
                           fill.width(), fill.height() * 0.5));
     } else {
-        // Die Kette. style 1 nimmt Zeus' Strichoptik: schmaler Strich,
+        // Die Kette. style 1 nimmt die Strichoptik der Vorlage: schmaler Strich,
         // breiter Spalt — dadurch bleibt der unbeleuchtete Teil ein
         // ablesbarer Massstab und wird nicht zur grauen Flaeche.
         const double segW = (style == 1) ? 2.0 : 3.4;
@@ -177,7 +177,7 @@ void drawZeusRow(QPainter& p, const QRectF& box, const RowSpec& r,
         }
     }
 
-    // Die helle Marke — bei Zeus steht sie um S9. Hier auf der
+    // Die helle Marke — in der Vorlage steht sie um S9. Hier auf der
     // Orangeschwelle: die Stelle, ab der es der Betreiber wissen will.
     if (withMarker) {
         const double x = bar.left() + 1.0 + (bar.width() - 2.0) * tOrange;
@@ -193,7 +193,7 @@ void drawZeusRow(QPainter& p, const QRectF& box, const RowSpec& r,
     }
 
     // Skala unter dem Balken. Marken jenseits der Schwelle in ihrer
-    // Zonenfarbe — genau das tut Zeus mit seinen +10/+20/+40/+60.
+    // Zonenfarbe — genau das tut die Vorlage mit ihren +10/+20/+40/+60.
     QFont f = p.font();
     f.setPointSizeF(5.5);
     p.setFont(f);
@@ -208,7 +208,7 @@ void drawZeusRow(QPainter& p, const QRectF& box, const RowSpec& r,
                    Qt::AlignHCenter | Qt::AlignTop, r.tickText.value(i));
     }
 
-    // Wortmarke links, Einheit klein darunter — Zeus' "RX" ueber "dBm".
+    // Wortmarke links, Einheit klein darunter — in der Vorlage "RX" ueber "dBm".
     {
         QFont lf = p.font();
         lf.setPointSizeF(7.0);
@@ -252,7 +252,7 @@ void drawZeusRow(QPainter& p, const QRectF& box, const RowSpec& r,
                    Qt::AlignLeft | Qt::AlignVCenter, r.unit);
     }
 
-    // Die Zusatzzeile: zwei Spalten wie Zeus' AVG/SNR — Wortmarke in
+    // Die Zusatzzeile: zwei Spalten wie AVG/SNR der Vorlage — Wortmarke in
     // Bernstein, Wert grau daneben.
     if (withSubline) {
         const double y = scale.bottom() + 1.0;
@@ -316,7 +316,7 @@ QImage draft(int variant, double swr, double pwr)
     QPainter p(&img);
     p.setRenderHint(QPainter::Antialiasing, true);
 
-    // Der Kasten drumherum — bei Zeus ein schwach abgesetztes Feld mit
+    // Der Kasten drumherum — in der Vorlage ein schwach abgesetztes Feld mit
     // feiner Kante, nicht der blanke Grund.
     const QRectF panel(2, 2, kW - 4, kH - 4);
     p.setPen(Qt::NoPen);
@@ -327,25 +327,25 @@ QImage draft(int variant, double swr, double pwr)
     p.drawRoundedRect(panel, 3, 3);
 
     switch (variant) {
-    case 0:   // A — Zeus-Aufteilung voll, mit Zusatzzeile
-        drawZeusRow(p, QRectF(8,  6, kW - 16, 40), pwrRow(pwr), 0, true, true);
-        drawZeusRow(p, QRectF(8, 50, kW - 16, 40), swrRow(swr), 0, true, true);
+    case 0:   // A — Aufteilung der Vorlage, voll, mit Zusatzzeile
+        drawReferenceRow(p, QRectF(8,  6, kW - 16, 40), pwrRow(pwr), 0, true, true);
+        drawReferenceRow(p, QRectF(8, 50, kW - 16, 40), swrRow(swr), 0, true, true);
         break;
-    case 1:   // B — Zeus' Strichoptik
-        drawZeusRow(p, QRectF(8,  6, kW - 16, 40), pwrRow(pwr), 1, true, true);
-        drawZeusRow(p, QRectF(8, 50, kW - 16, 40), swrRow(swr), 1, true, true);
+    case 1:   // B — Strichoptik der Vorlage
+        drawReferenceRow(p, QRectF(8,  6, kW - 16, 40), pwrRow(pwr), 1, true, true);
+        drawReferenceRow(p, QRectF(8, 50, kW - 16, 40), swrRow(swr), 1, true, true);
         break;
-    case 2:   // C — Zeus' Bernstein statt Gruen
-        drawZeusRow(p, QRectF(8,  6, kW - 16, 40), pwrRow(pwr), 2, true, true);
-        drawZeusRow(p, QRectF(8, 50, kW - 16, 40), swrRow(swr), 2, true, true);
+    case 2:   // C — Bernstein der Vorlage statt Gruen
+        drawReferenceRow(p, QRectF(8,  6, kW - 16, 40), pwrRow(pwr), 2, true, true);
+        drawReferenceRow(p, QRectF(8, 50, kW - 16, 40), swrRow(swr), 2, true, true);
         break;
     case 3:   // D — ohne Zusatzzeile: knapper, dafuer hoehere Balken
-        drawZeusRow(p, QRectF(8, 10, kW - 16, 36), pwrRow(pwr), 0, false, true);
-        drawZeusRow(p, QRectF(8, 52, kW - 16, 36), swrRow(swr), 0, false, true);
+        drawReferenceRow(p, QRectF(8, 10, kW - 16, 36), pwrRow(pwr), 0, false, true);
+        drawReferenceRow(p, QRectF(8, 52, kW - 16, 36), swrRow(swr), 0, false, true);
         break;
     case 4:   // E — durchgehend statt Kette
-        drawZeusRow(p, QRectF(8,  6, kW - 16, 40), pwrRow(pwr), 3, true, true);
-        drawZeusRow(p, QRectF(8, 50, kW - 16, 40), swrRow(swr), 3, true, true);
+        drawReferenceRow(p, QRectF(8,  6, kW - 16, 40), pwrRow(pwr), 3, true, true);
+        drawReferenceRow(p, QRectF(8, 50, kW - 16, 40), swrRow(swr), 3, true, true);
         break;
     default:
         break;
@@ -369,8 +369,8 @@ private slots:
             {QStringLiteral("schlecht  ·  2,90"),    2.90,  25.0},
         };
         const QStringList titles = {
-            QStringLiteral("A · Zeus-Aufteilung voll"),
-            QStringLiteral("B · Zeus-Strichoptik"),
+            QStringLiteral("A · Aufteilung der Vorlage, voll"),
+            QStringLiteral("B · Strichoptik der Vorlage"),
             QStringLiteral("C · Bernstein statt Gruen"),
             QStringLiteral("D · ohne Zusatzzeile"),
             QStringLiteral("E · durchgehend"),

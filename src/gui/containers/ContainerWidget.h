@@ -276,7 +276,7 @@ public:
 
     // ── Mehrere Fenster in einer Kachel ──────────────────────────────
     //
-    // Vorbild: Zeus Link fasst Fenster zu REITERN zusammen — im
+    // Vorbild: die Vorlage fasst Fenster zu REITERN zusammen — im
     // Bildschirmvideo vom 2026-08-20 teilen FREQUENCY·VFO und S-METER
     // einen Rahmen, jeder Reiter mit eigenem ↗ und ✕. In deren
     // „ADD PANEL"-Liste heisst das „Multi Panel".

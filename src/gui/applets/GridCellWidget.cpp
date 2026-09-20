@@ -38,8 +38,8 @@ GridCellWidget::GridCellWidget(const QString& id, QWidget* parent)
     m_titleLayout->setContentsMargins(2, 0, 4, 0);
     m_titleLayout->setSpacing(4);
 
-    // Die gelbe Anfassmarke, wie an den eigenen Fenstern und wie bei
-    // Zeus. Sie sagt „hier anfassen" — ein Kopf ohne diese Marke sieht
+    // Die gelbe Anfassmarke, wie an den eigenen Fenstern und wie in
+    // der Vorlage. Sie sagt „hier anfassen" — ein Kopf ohne diese Marke sieht
     // aus wie einer, den man nicht anfassen kann.
     auto* stripe = new QLabel(m_titleBar);
     stripe->setFixedWidth(3);
@@ -102,7 +102,7 @@ GridCellWidget::GridCellWidget(const QString& id, QWidget* parent)
 
 // Die beiden Knoepfe rechts in der Kopfleiste.
 //
-// Zeus Link setzt sie sichtbar in JEDEN Fensterkopf. Ein Weg, den man
+// Die Vorlage setzt sie sichtbar in JEDEN Fensterkopf. Ein Weg, den man
 // nicht sieht, ist kein Weg — das hat uns dieses Vorhaben achtmal
 // gezeigt, zuletzt hier: der Ablöseknopf existierte seit dem
 // 2026-08-19 im Quelltext, aber in einer Kopfleiste, die kein Applet

@@ -18,7 +18,7 @@
 //
 //   „Sodass man je nach Band oder je nach Modus andere Ansichten hat."
 //
-// Bei Zeus sind das die runden Abzeichen links in der Schiene — D, W,
+// In der Vorlage sind das die runden Abzeichen links in der Schiene — D, W,
 // A, L — mit einem gestrichelten Plus darunter. Jedes ist eine
 // Arbeitsfläche.
 //

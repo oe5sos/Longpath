@@ -38,7 +38,7 @@
 // ihren Namen zu kennen. Ein Suchfeld über Titeln findet nur das, was
 // man ohnehin schon gefunden hätte.
 //
-// ── Zwei Ebenen, wie bei Zeus ────────────────────────────────────────
+// ── Zwei Ebenen, wie in der Vorlage ────────────────────────────────────────
 //
 // Der Controller kennt zwei Achsen, und die Vorlage benutzt beide:
 // „Features" entscheidet, was es überhaupt gibt, „Add Panel"
@@ -135,7 +135,7 @@ private:
 };
 
 /// Das Plus. Ein Knopf mit gestricheltem Rand, der den Dialog aufklappt
-/// — bei Zeus sitzt er unten in der Seitenschiene.
+/// — in der Vorlage sitzt er unten in der Seitenschiene.
 class AddWidgetButton : public QWidget {
     Q_OBJECT
 public:

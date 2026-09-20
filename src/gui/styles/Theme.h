@@ -141,13 +141,13 @@ public:
 
     // ── Form, nicht Farbe ────────────────────────────────────────────
     //
-    // Der Betreiber, 2026-08-21, zu Zeus: „das design hat teilweise
+    // Der Betreiber, 2026-08-21, zur Vorlage: „das design hat teilweise
     // mehr stil ... die uebergaenge im hintergrund bei den widget
     // wirken sehr gut." Und danach, auf die Frage, wie das waehlbar
     // werden soll: „b" — also die Themendatei um Form-Regler
     // erweitern, statt nur weitere Farbschemata anzubieten.
     //
-    // Der Grund steht in der Frage selbst: was ihm an Zeus gefaellt,
+    // Der Grund steht in der Frage selbst: was ihm an der Vorlage gefaellt,
     // sind KEINE Farben. Es sind Verlaufstiefe, Polsterung,
     // Eckenradius — wie plastisch eine Flaeche wirkt. Ein Thema, das
     // nur Farben tauschen kann, kann genau das nicht.

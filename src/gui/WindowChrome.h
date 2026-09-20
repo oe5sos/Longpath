@@ -23,7 +23,7 @@
 //               verlangt, dass sich JEDES Fenster an der eigenen oberen
 //               Leiste in alle vier Richtungen schieben und unten rechts
 //               in x und y groesser und kleiner ziehen laesst — so wie
-//               bei Zeus und AetherSDR.
+//               in der Vorlage und bei AetherSDR.
 // =================================================================
 
 #pragma once
@@ -43,9 +43,9 @@ namespace Longpath {
 // Fenster dem Zeiger — nach rechts, nach links, hinauf und hinunter,
 // ohne Anschlag.
 //
-// Links steht ein farbiger Strich. Das ist keine Zierde: bei Zeus
+// Links steht ein farbiger Strich. Das ist keine Zierde: in der Vorlage
 // markiert er, wo man anfassen darf, und der Betreiber hat ihn
-// ausdruecklich als Vorbild genannt („oder wie bei zeus der gelbe
+// ausdruecklich als Vorbild genannt („oder wie bei [der Vorlage] der gelbe
 // strich"). Ein Fenster ohne diese Marke sieht aus wie eines, das man
 // nicht anfassen kann.
 class WindowTitleBar : public QWidget {
@@ -58,7 +58,7 @@ public:
     // ── Das Schloss ──────────────────────────────────────────────────
     //
     // Der Betreiber, 2026-08-20, nachdem der abgeloeste Panadapter
-    // endlich schwebte: „das schloss fehlt dann zum fixieren". Zeus
+    // endlich schwebte: „das schloss fehlt dann zum fixieren". Die Vorlage
     // setzt in jeden Fensterkopf ein Schloss; ein verriegeltes Fenster
     // bleibt, wo es steht, und behaelt seine Groesse.
     //

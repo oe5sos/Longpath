@@ -4,7 +4,7 @@
 Warum das Skript existiert
 --------------------------
 
-Am 2026-08-15 sollte die Palette Richtung Zeus verschoben werden. Der
+Am 2026-08-15 sollte die Palette Richtung der Vorlage verschoben werden. Der
 erste Schritt schien mechanisch: Hex-Literale durch die Konstanten aus
 ``src/gui/StyleConstants.h`` ersetzen. Geschätzt waren dreißig Dateien.
 

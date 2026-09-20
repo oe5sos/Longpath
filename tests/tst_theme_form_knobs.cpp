@@ -2,7 +2,7 @@
 //
 // Die Themendatei kann jetzt FORM, nicht nur Farbe.
 //
-// Der Betreiber, 2026-08-21, zu Zeus: „das design hat teilweise mehr
+// Der Betreiber, 2026-08-21, zur Vorlage: „das design hat teilweise mehr
 // stil ... die uebergaenge im hintergrund bei den widget wirken sehr
 // gut." Auf die Frage, wie das waehlbar werden soll, wählte er „b":
 // die Themendatei erweitern statt nur weitere Farbschemata anbieten.

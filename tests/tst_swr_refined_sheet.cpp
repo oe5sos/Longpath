@@ -3,20 +3,20 @@
 // WERKZEUG, keine Pruefung: Entwurf B, veredelt.
 //
 // Anlass, 2026-08-23: der Betreiber hat aus dem waagrechten Blatt
-// Entwurf B gewaehlt — Zeus' Strichoptik — und dazu gesagt:
+// Entwurf B gewaehlt — Strichoptik der Vorlage — und dazu gesagt:
 //   "b - aber bitte moderner, stilvoller, schaut zu einfach aus.
-//    halte dich an zeus und an unsere instrumente"
+//    halte dich an [der Vorlage] und an unsere instrumente"
 //
 // ── Woher die Veredelung kommt ──────────────────────────────────────
 //
 // Nicht aus neuen Einfaellen, sondern aus zwei Quellen, die es schon
 // gibt:
 //
-// Von ZEUS bleibt, was seine Anzeige ausmacht: die schmale Kette mit
+// Von der VORLAGE bleibt, was ihre Anzeige ausmacht: die schmale Kette mit
 // sichtbarem Spalt, die Skala, die ihre kritische Zone selbst
 // einfaerbt, die grosse Zahl rechts mit kleiner Einheit daneben.
 //
-// Von UNSEREN Instrumenten kommt das, was Zeus fehlt und was unsere
+// Von UNSEREN Instrumenten kommt das, was der Vorlage fehlt und was unsere
 // Zeigerwerke seit dem 2026-08-22 tragen (NeedleInstrument,
 // InstrumentPainter): ein SCHEIN hinter dem Ausschlag, eine vertiefte
 // Mulde statt einer aufgemalten Flaeche, gesperrte Wortmarken.
@@ -167,7 +167,7 @@ void drawRow(QPainter& p, const QRectF& box, const RowSpec& r, int level)
                    bar.bottomRight() + QPointF(-1, -1));
     }
 
-    // ── Die Kette, in Zeus' Strichoptik ─────────────────────────────
+    // ── Die Kette, in der Strichoptik der Vorlage ─────────────────────────────
     const double segW = 2.0;
     const double gap  = 2.6;
     const int    N    = int((bar.width() - 2.0) / (segW + gap));

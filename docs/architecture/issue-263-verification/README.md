@@ -5,7 +5,7 @@
 >
 > Reporter: nubbyless (issue #263). Symptom: NereusSDR detects the
 > radio, shows "Connected" for a few seconds, then disconnects.
-> Works fine in Thetis and ZeusSDR.
+> Works fine in Thetis and [another client].
 >
 > Root cause: `P2RadioConnection::connectToRadio` and
 > `P2CodecOrionMkII::applyPureSignalDdcConfig` only carried the

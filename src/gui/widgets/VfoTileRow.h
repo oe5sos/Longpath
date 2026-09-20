@@ -8,7 +8,7 @@
 //
 // ── Die Kachelreihe ueber der Frequenz ──────────────────────────────
 //
-// Der Betreiber am 2026-08-23, mit einem Bildschirmfoto von Zeus Link:
+// Der Betreiber am 2026-08-23, mit einem Bildschirmfoto der Vorlage:
 // "weiters sollte die frequenz auch ein eigenes widget sein, wie hier
 // am foto."
 //
@@ -23,7 +23,7 @@
 //
 // ── Was hier NICHT ist ──────────────────────────────────────────────
 //
-// Zeus hat zusaetzlich eine Kachel "MULTI RX". Was sie bei ihm genau
+// Die Vorlage hat zusaetzlich eine Kachel "MULTI RX". Was sie dort genau
 // schaltet, ist von aussen nicht zu erkennen, und eine Kachel zu
 // bauen, deren Wirkung man raet, waere schlechter als keine. Sie
 // fehlt darum, bis der Betreiber sie vorfuehrt.

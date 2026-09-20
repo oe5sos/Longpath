@@ -74,7 +74,7 @@ private slots:
         // ("bandwechsel sollte auch mit buttons möglich sein, am
         // besten in der leiste oben") und ganz vorne, weil das Band
         // die groebste Wahl ist: erst das Band, dann Betriebsart,
-        // Filter, Schrittweite. OpenHPSDR Zeus ordnet es genauso.
+        // Filter, Schrittweite. Die Vorlage ordnet es genauso.
         CommandBar bar;
         const QStringList g = bar.groups();
         QCOMPARE(g.size(), 5);

@@ -124,7 +124,7 @@ private:
 
 // ── One picture per stage, each answering one question ───────────────
 //
-// Modelled on how Zeus lays out a channel strip, and on the reason it
+// Modelled on how the reference client lays out a channel strip, and on the reason it
 // works: every stage gets a small picture that answers exactly one
 // question about that stage, with a live dot showing where the signal
 // is on it right now. A static curve is a manual page. The dot is what

@@ -76,7 +76,7 @@ void SystemTile::setCpuPercent(double percent)
 //
 // Die Zahl zeigt in der Vorgabe die GANZE MASCHINE, nicht Longpath —
 // so macht es Thetis, und so steht es im Code. Auf dem Rechner liefen
-// zu der Zeit ausser Longpath auch Zeus Link, OpenHPSDR, ein Browser
+// zu der Zeit ausser Longpath auch ein zweiter SDR-Client, OpenHPSDR, ein Browser
 // und meine eigenen Uebersetzungslaeufe mit acht Faeden. Die 97 %
 // waren mit einiger Wahrscheinlichkeit ich selbst.
 //

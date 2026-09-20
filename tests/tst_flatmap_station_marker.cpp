@@ -4,7 +4,7 @@
 //
 // ── Der eigene Standort als Bild ─────────────────────────────────────
 //
-// Vorlage des Betreibers, 2026-08-15: bei Zeus ist der eigene Standort
+// Vorlage des Betreibers, 2026-08-15: in der Vorlage ist der eigene Standort
 // auf der Weltkarte kein Punkt und keine Nadel, sondern ein rundes Foto
 // der Station mit Ring und Rufzeichen darunter.
 //

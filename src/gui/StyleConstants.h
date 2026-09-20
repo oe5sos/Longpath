@@ -39,10 +39,10 @@ namespace Longpath::Style {
 
 // ── Entblaut, 2026-08-15 ──────────────────────────────────────────────
 //
-// „nach zeus sieht das aber nicht aus" — OE5SOS, mit einem Screenshot,
+// „nach [der Vorlage] sieht das aber nicht aus" — OE5SOS, mit einem Screenshot,
 // auf dem dreißig Knöpfe einen leuchtend blauen Rahmen tragen: 5K, 4.4K,
-// SQL, RIT, XIT, TUNE, MOX, VOX, MON, LEV, EQ, CFC, 2-Tone, PS-A. Bei
-// Zeus ist ein inaktiver Knopf fast unsichtbar; sichtbar ist der eine,
+// SQL, RIT, XIT, TUNE, MOX, VOX, MON, LEV, EQ, CFC, 2-Tone, PS-A. In
+// der Vorlage ist ein inaktiver Knopf fast unsichtbar; sichtbar ist der eine,
 // der an ist.
 //
 // Die Ursache war kBorder = #205070 — ein kräftiges Blau als Rahmen für
@@ -225,12 +225,12 @@ constexpr auto kBluePulseDim    = "#254a72";
 constexpr auto kQuietTone       = "#4a5a52";
 // ── Der aktive Zustand ───────────────────────────────────────────────
 //
-// Der Betreiber, 2026-08-21, zu Zeus: „das design hat teilweise mehr
+// Der Betreiber, 2026-08-21, zur Vorlage: „das design hat teilweise mehr
 // stil ... ich glaube die farblichen verlaeufe machen es."
 //
 // Die Verlaeufe waren es nicht — die stehen seit zwei Tagen drin und
 // sind nachgemessen. Gemessen wurde stattdessen die SAETTIGUNG des
-// aktiven Knopfes: bei uns 65 Prozent, bei Zeus 100. Das alte #254a72
+// aktiven Knopfes: bei uns 65 Prozent, in der Vorlage 100. Das alte #254a72
 // hatte 39 Prozent Saettigung im Farbwert selbst; es sagte nicht „das
 // hier ist an", sondern „das hier ist irgendwie anders".
 //
@@ -487,12 +487,12 @@ constexpr auto kStatusSep       = "#2c2c31";
 // Shared Stylesheet Fragments
 // ── Flaechen mit Verlauf statt flacher Fuellung ──────────────────────
 //
-// Der Betreiber, 2026-08-21, mit einem Bildschirmfoto aus Zeus: „die
+// Der Betreiber, 2026-08-21, mit einem Bildschirmfoto der Vorlage: „die
 // uebergaenge im hintergrund bei den widget wirken sehr gut" — und
 // nach dem Entwurfsblatt: „sehe keinen unterschied beim den pdf.
-// mache es wie bei zeus."
+// mache es wie bei [der Vorlage]."
 //
-// Der Unterschied ist benennbar: bei Zeus ist keine Flaeche eine
+// Der Unterschied ist benennbar: in der Vorlage ist keine Flaeche eine
 // Farbe, sondern ein Verlauf von oben nach unten, mit einer helleren
 // Oberkante. Das Auge liest das als Licht von oben und damit als
 // Flaeche mit DICKE — ein Stueck Blech statt eines Rechtecks. Bei uns
@@ -612,7 +612,7 @@ inline QString buttonBaseStyle()
         "QPushButton {"
         // Polsterung 4/10 statt 2/4 und 7 statt 6 Punkt Eckenradius.
         // Klingt nach nichts und ist der halbe Eindruck von Ruhe: die
-        // Knopfreihen bei Zeus wirken nicht ruhiger, weil dort weniger
+        // Knopfreihen in der Vorlage wirken nicht ruhiger, weil dort weniger
         // steht, sondern weil um jedes Ding mehr Luft ist.
         "  background: %1; border: 1px solid %2; border-radius: %6px;"
         "  color: %3; font-size: 11px; font-weight: bold;"

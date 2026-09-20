@@ -2,12 +2,12 @@
 
 Antwort auf „jedes Fenster sollte man frei ändern können in der Größe.
 beim Panadapter sehe ich keine Möglichkeit" und „so sollte der Baukasten
-funktionieren" (Betreiber, 2026-08-19, mit Bildschirmaufnahme von **Zeus
-Link** als Vorbild).
+funktionieren" (Betreiber, 2026-08-19, mit Bildschirmaufnahme
+der **Vorlage** als Vorbild).
 
 ## Was das Vorbild tut
 
-Aus der Aufnahme abgelesen (nicht aus dem Quelltext — Zeus Link ist
+Aus der Aufnahme abgelesen (nicht aus dem Quelltext — die Vorlage ist
 fremde Software, hier zählt nur, was der Betreiber sieht und will):
 
 1. **Arbeitsflächen.** Linke Randleiste mit Symbolen, `+` legt eine neue
