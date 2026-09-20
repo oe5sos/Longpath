@@ -554,6 +554,9 @@ private slots:
     // both dialogs are single-instance for the lifetime of MainWindow.
     void openSpotHub();
     void openFreeDVReporter();
+    // File > Settings Backups... -- the backups half of Thetis's Database
+    // Manager (SettingsBackupDialog). Same lazy, single-instance pattern.
+    void openSettingsBackups();
     /// Task B4 (bottom-banner + pan-menu epic): +PAN icon click handler.
     /// Also the View > Pan Layout… (Ctrl+L) menu action's target. Gated on
     /// m_radioModel->isConnected(); opens PanLayoutDialog sized to
@@ -1117,6 +1120,12 @@ private:
     QIODevice*    m_puduCaptureIo{nullptr};
     QByteArray    m_puduRawTake;
     QPointer<FreeDVReporterDialog> m_freeDVReporterDialog;
+    QPointer<class SettingsBackupDialog> m_settingsBackupDialog;
+    // The "Backup on shut-down" copy (Thetis DBMan.Shutdown()) is taken
+    // right after the final AppSettings::save(); two shutdown paths save
+    // (closeEvent and aboutToQuit), one copy is enough.
+    void takeShutdownBackupIfWanted();
+    bool m_shutdownBackupDone{false};
 
     // Status bar widgets (double-height AetherSDR design, 46px)
     //

@@ -2,6 +2,7 @@
 #include "gui/styles/AppTheme.h"
 #include "gui/styles/Theme.h"
 #include "core/AppSettings.h"
+#include "core/SettingsBackup.h"
 #include "core/AudioDeviceConfig.h"
 #include "core/BuildIdentity.h"
 #include "core/MacMicPermission.h"
@@ -350,6 +351,26 @@ int main(int argc, char* argv[])
 
     // Load XML settings
     Longpath::AppSettings::instance().load();
+
+    // "Backup on start-up" (Thetis DBMan.LoadDB, clsDBMan.cs:370-380
+    // [@852bf0e]: the copy is taken BEFORE DB.Init(), i.e. of the file
+    // as the previous session left it). Here: after load() so the flag
+    // is known, before the migrations below so the copy is still that
+    // file. Off unless switched on in File > Settings Backups.
+    {
+        Longpath::AppSettings& s = Longpath::AppSettings::instance();
+        if (s.value(QStringLiteral("BackupOnStartup"), QStringLiteral("False")).toString()
+            == QLatin1String("True")) {
+            Longpath::SettingsBackup backup(s.filePath());
+            backup.setPruneEnabled(
+                s.value(QStringLiteral("PruneBackups"), QStringLiteral("False")).toString()
+                == QLatin1String("True"));
+            QString err;
+            if (backup.takeBackup(QStringLiteral("Startup"), true, &err).isEmpty()) {
+                qWarning() << "[SettingsBackup] startup backup failed:" << err;
+            }
+        }
+    }
 
     // Phase 3O schema migration — must run before any AppSettings reads.
     Longpath::AppSettings::migrateVaxSchemaV1ToV2();

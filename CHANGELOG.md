@@ -218,6 +218,16 @@ und Linux (x86_64 und aarch64), alle GPG-signiert.
   aus cty.dat (Sizilien & Co. in ihre DXCC-Entitaet gefaltet), sonst das
   ADIF-Feld DXCC. `docs/architecture/2026-09-18-logbook-stats.md`.
 
+- **Einstellungs-Backup (File > Settings Backups...)** -- die Backup-
+  Haelfte von Thetis' Datenbank-Manager (clsDBMan.cs / frmDBMan.cs):
+  Kopien der Einstellungsdatei in `backups/` mit Beschreibung, Liste
+  mit Zeit und Alter, Wiederherstellen (Sicherheitskopie „Before
+  restore", dann Beenden ohne Speichern), Umbenennen, Exportieren,
+  Entfernen, Ordner oeffnen; auf Wunsch automatische Kopien beim Start
+  und beim Beenden mit Thetis' Grossvater-Vater-Sohn-Ausduennung (7 Tage
+  alles, dann je Woche/Monat/Jahr eine; nur automatische Kopien werden
+  geloescht). Alles aus, bis es eingeschaltet wird -- wie bei Thetis.
+
 - **Start-Protokoll nennt jetzt Betriebssystem, CPU-Architektur,
   Kernzahl, Qt-Laufzeitversion und RAM (macOS).** Von einer
   AetherSDR-Sichtung angestossen; reines Protokoll, keine Oberflaeche.
