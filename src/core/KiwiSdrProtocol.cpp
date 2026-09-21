@@ -27,6 +27,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 namespace Longpath::KiwiSdrProtocol {
 namespace {
@@ -1802,6 +1803,39 @@ QString convertDbmToSUnits(float dbm)
         0,
         9);
     return QStringLiteral("S%1").arg(sValue);
+}
+
+
+// After AetherSDR src/core/KiwiSdrProtocol.cpp [@6701ffbc] (#5536): the
+// scale is the server's, not a constant.
+double waterfallStartFixedPointScale(int zoomMax)
+{
+    constexpr int kWaterfallWidthBins = 1024;   // KiwiSDR WF_WIDTH
+    return static_cast<double>(kWaterfallWidthBins << std::clamp(zoomMax, 0, 20));
+}
+
+quint32 waterfallStartFixedPoint(double fullLowMhz, double fullBandwidthMhz,
+                                 double rowLowMhz, double fixedPointScale)
+{
+    const double requested = fullBandwidthMhz > 0.0 && fixedPointScale > 0.0
+        ? ((rowLowMhz - fullLowMhz) / fullBandwidthMhz) * fixedPointScale
+        : 0.0;
+    return static_cast<quint32>(std::clamp(
+        std::isfinite(requested) ? std::round(requested) : 0.0,
+        0.0,
+        std::min(std::max(fixedPointScale - 1.0, 0.0),
+                 static_cast<double>(std::numeric_limits<quint32>::max()))));
+}
+
+double waterfallStartFixedPointToLowMhz(double fullLowMhz,
+                                        double fullBandwidthMhz,
+                                        quint32 start, double fixedPointScale)
+{
+    if (fixedPointScale <= 0.0) {
+        return fullLowMhz;
+    }
+    return fullLowMhz
+        + (static_cast<double>(start) / fixedPointScale) * fullBandwidthMhz;
 }
 
 } // namespace Longpath::KiwiSdrProtocol

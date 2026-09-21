@@ -195,6 +195,7 @@ private:
     void sendTrackedSliceToServer();
     void sendReceiverControlsToServer();
     void sendWaterfallViewToServer();
+    int effectiveWaterfallZoomCap() const;
     void sendWaterfallDisplayAdjustmentsToServer();
     QString kiwiIdentityCallsign() const;
     QString identityDiagnosticText() const;
@@ -362,7 +363,12 @@ private:
     int m_waterfallRequestZoom{0};
     double m_waterfallRequestLowMhz{0.0};
     double m_waterfallRequestHighMhz{0.0};
+    // zoom_max = the server's MAX_ZOOM (start fixed-point scale WF_WIDTH <<
+    // zoom_max); zoom_cap = the ceiling on the zoom we may request. Both 14
+    // until the server says otherwise (AetherSDR #5536/#5655).
+    int m_waterfallZoomMax{14};
     int m_waterfallZoomCap{14};
+    bool m_waterfallZoomCapFromServer{false};
     int m_waterfallFftBins{1024};
     float m_waterfallMinDbm{-110.0f};
     float m_waterfallMaxDbm{-10.0f};

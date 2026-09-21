@@ -361,6 +361,22 @@ MeterReading computeRelativeAudioLevel(const float* samples, int sampleCount);
 MeterReading computeRelativeWaterfallLevel(const QVector<float>& bins);
 QString convertDbmToSUnits(float dbm);
 
+
+// Waterfall start fixed-point scale, per server: WF_WIDTH (1024) << the
+// server's advertised zoom_max (RaspSDR rx/rx_waterfall.cpp: HZperStart =
+// ui_srate / (WF_WIDTH << MAX_ZOOM)). Not a universal constant -- a KiwiSDR
+// (zoom_max = 14) uses 2^24, a Web-888 (zoom_max = 11) uses 2^21. A start
+// encoded on the wrong scale is clamped by the server to
+// MAX_START(z) = (WF_WIDTH << zoom_max) - (WF_WIDTH << (zoom_max - z)),
+// pinning the waterfall at the band edge. zoomMax is clamped to [0, 20].
+// After AetherSDR src/core/KiwiSdrProtocol.{h,cpp} [@6701ffbc] (#5536).
+double waterfallStartFixedPointScale(int zoomMax);
+quint32 waterfallStartFixedPoint(double fullLowMhz, double fullBandwidthMhz,
+                                 double rowLowMhz, double fixedPointScale);
+double waterfallStartFixedPointToLowMhz(double fullLowMhz,
+                                        double fullBandwidthMhz,
+                                        quint32 start, double fixedPointScale);
+
 } // namespace Longpath::KiwiSdrProtocol
 
 Q_DECLARE_METATYPE(Longpath::KiwiSdrProtocol::MeterReading)

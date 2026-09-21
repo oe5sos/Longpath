@@ -221,9 +221,9 @@ file, the ASR backend, and a handful of others already carry a complete
 never given a row here. No header content changed; this is registration
 only.
 
-| `src/core/KiwiSdrClient.h`, `.cpp` | `src/core/KiwiSdrClient.{h,cpp}` | `31b29583` | 2026-08-23 | KiwiSDR client connection (Stufe 2). Namespace change, include paths rebased; KiwiSDR wire protocol itself credited to John Seamons (ZL/KF6VO), kiwisdr.com. |
+| `src/core/KiwiSdrClient.h`, `.cpp` | `src/core/KiwiSdrClient.{h,cpp}` | `31b29583` | 2026-08-23 | KiwiSDR client connection (Stufe 2). Namespace change, include paths rebased; KiwiSDR wire protocol itself credited to John Seamons (ZL/KF6VO), kiwisdr.com. 2026-09-21 [@6701ffbc, @4a70e2b4] (#5536/#5655): waterfall start scale from the server's `zoom_max` (`m_waterfallZoomMax`), `zoom_cap` only as the request ceiling (`effectiveWaterfallZoomCap()`); the local 2^24 helpers moved to KiwiSdrProtocol. |
 | `src/core/KiwiSdrManager.h`, `.cpp` | `src/core/KiwiSdrManager.{h,cpp}` | `31b29583` | 2026-08-23 | Namespace change only. |
-| `src/core/KiwiSdrProtocol.h`, `.cpp` | `src/core/KiwiSdrProtocol.{h,cpp}` | `31b29583` | 2026-08-23 | Namespace change only. |
+| `src/core/KiwiSdrProtocol.h`, `.cpp` | `src/core/KiwiSdrProtocol.{h,cpp}` | `31b29583` | 2026-08-23 | Namespace change only. 2026-09-21 [@6701ffbc]: `waterfallStartFixedPointScale` / `waterfallStartFixedPoint` / `waterfallStartFixedPointToLowMhz` -- the scale is `1024 << zoom_max`, not a constant. |
 | `src/core/KiwiSdrCredentialStore.h`, `.cpp` | `src/core/KiwiSdrCredentialStore.{h,cpp}` | `31b29583` | 2026-08-23 | Namespace change only. |
 | `src/core/KiwiSdrRedirectPolicy.h`, `.cpp` | `src/core/KiwiSdrRedirectPolicy.{h,cpp}` | `31b29583` | 2026-08-23 | Namespace change only. |
 | `src/core/KiwiSdrTxMutePolicy.h` | `src/core/KiwiSdrTxMutePolicy.h` | `31b29583` | 2026-08-23 | Namespace change only. |
