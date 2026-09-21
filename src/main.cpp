@@ -1,4 +1,5 @@
 #include "gui/MainWindow.h"
+#include "gui/AuxiliaryWindowLeveler.h"
 #include "gui/styles/AppTheme.h"
 #include "gui/styles/Theme.h"
 #include "core/AppSettings.h"
@@ -343,6 +344,11 @@ int main(int argc, char* argv[])
     // kommt und von diesem Theme nie gehört hat.
     //
     app.installEventFilter(new Longpath::Style::ThemeFilter(&app));
+
+    // Nebenfenster (Channel Strip, Logbuch, Setup, Meldungen ...) auf die
+    // Ebene der schwebenden Paletten heben, sonst gehen sie auf macOS
+    // hinter ihnen auf -- siehe AuxiliaryWindowLeveler.h.
+    app.installEventFilter(new Longpath::AuxiliaryWindowLeveler(&app));
 
     // Register custom metatypes for cross-thread signal/slot connections.
     qRegisterMetaType<Longpath::RadioConnectionError>();

@@ -73,4 +73,27 @@ void enableFullScreenAuxiliaryBehavior(QWidget* widget)
     }
 }
 
+void setPaletteWindowLevel(QWidget* widget, bool floating)
+{
+    if (!widget) { return; }
+    // Dieselbe Offscreen-Falle wie oben: kein Cocoa, kein NSView.
+    if (QGuiApplication::platformName() != QLatin1String("cocoa")) { return; }
+    widget->winId();
+    QWindow* qw = widget->windowHandle();
+    if (!qw) { return; }
+    NSView* view = (__bridge NSView*)reinterpret_cast<void*>(qw->winId());
+    if (!view) { return; }
+    NSWindow* nsWindow = view.window;
+    if (!nsWindow) { return; }
+    // Paletten (Qt::Tool) liegen bei Qt auf NSFloatingWindowLevel; ein
+    // Fenster derselben Ebene laesst sich per orderFront ueber sie heben.
+    nsWindow.level = floating ? NSFloatingWindowLevel : NSNormalWindowLevel;
+    if (floating) {
+        // Im nativen Vollbild dem Hauptfenster in dessen Space folgen,
+        // statt macOS zum Space-Wechsel zu zwingen -- wie die Paletten.
+        nsWindow.collectionBehavior = nsWindow.collectionBehavior
+            | NSWindowCollectionBehaviorFullScreenAuxiliary;
+    }
+}
+
 } // namespace Longpath

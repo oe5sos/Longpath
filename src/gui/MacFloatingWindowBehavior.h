@@ -46,6 +46,19 @@
 // muss hier zuverlässig definiert sein, unabhängig davon, in welcher
 // Reihenfolge der Aufrufer seine eigenen Includes setzt (in
 // MacFloatingWindowBehavior.mm z.B. VOR <QWidget>).
+//
+// Betreiber 2026-09-21, dritter Fall dieser Art (nach dem Antennenfenster
+// am 2026-09-01): "wenn ich ein Channel Strip oder etwas anderes aufmache,
+// ist es im Hintergrund" -- jedes gewoehnliche Fenster (QDialog,
+// Logbuch, Setup, auch ein QMessageBox) liegt auf der NORMALEN Ebene und
+// damit unter den NSPanels der Paletten, egal wie oft raise() gerufen
+// wird. setPaletteWindowLevel() hebt ein solches Fenster auf dieselbe
+// Ebene wie die Paletten (NSFloatingWindowLevel) und gibt ihm dieselbe
+// FullScreenAuxiliary-Sammelregel; mit floating=false faellt es auf die
+// normale Ebene zurueck. Den Wechsel beim (De-)Aktivieren der App macht
+// AuxiliaryWindowLeveler -- ein NSWindow kennt kein hidesOnDeactivate,
+// und ein Fenster auf der schwebenden Ebene stuende sonst ueber jeder
+// anderen App (genau der Fehler von 2026-08-31, siehe oben).
 #include <QtGlobal>
 
 class QWidget;
@@ -53,9 +66,11 @@ class QWidget;
 #ifdef Q_OS_MAC
 namespace Longpath {
 void enableFullScreenAuxiliaryBehavior(QWidget* window);
+void setPaletteWindowLevel(QWidget* window, bool floating);
 }
 #else
 namespace Longpath {
 inline void enableFullScreenAuxiliaryBehavior(QWidget*) {}
+inline void setPaletteWindowLevel(QWidget*, bool) {}
 }
 #endif

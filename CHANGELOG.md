@@ -128,6 +128,17 @@ Programm, das der Betreiber taeglich benutzte.
 - **Fussleiste: "ON AIR" passte unter Linux nicht in seinen Platz** --
   78 Punkte waren am Mac gemessen, die Linux-Schrift braucht 81; jetzt
   84.
+### Fixed
+
+- **Nebenfenster gehen nicht mehr hinter den schwebenden Paletten auf.**
+  Channel Strip, Logbuch, Setup, Spot-Hub, Meldungen -- jedes Fenster,
+  das aus dem Hauptfenster heraus aufgeht, lag auf macOS auf der normalen
+  Fensterebene, die schwebenden Paletten (Panadapter, Rotor/Log,
+  Bandbreitenfilter ...) als NSPanels darueber; raise() half nicht. Ein
+  App-weiter Filter hebt jedes solche Fenster beim Anzeigen auf die Ebene
+  der Paletten (das zuletzt gezeigte steht vorne) und senkt es wieder,
+  sobald Longpath nicht die aktive App ist -- sonst stuende es ueber
+  jedem anderen Programm. Andere Plattformen unveraendert.
 
 ## [0.6.3] - 2026-09-21
 
