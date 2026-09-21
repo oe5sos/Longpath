@@ -1445,6 +1445,12 @@ public:
     // a fake RadioConnection. Production transitions go through the
     // private setConnectionState() called from connection signals.
     void setConnectionStateForTest(ConnectionState s) { setConnectionState(s); }
+    // Stands in for the connectToRadio() write of the wire rate / RX count
+    // so a test can replay the state sequence around it without a radio.
+    void setConnectionRateForTest(int rateHz, int activeRxCount) {
+        m_connectionSampleRateHz = rateHz;
+        m_connectionActiveRxCount = activeRxCount;
+    }
 
     // Test-only: walk the FULL Connected/Disconnected handler so tests
     // can drive the peripherals lifecycle (applyPeripheralsForCurrentMac

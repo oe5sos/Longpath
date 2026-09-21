@@ -2255,6 +2255,14 @@ nereus_add_test(tst_radio_connection_watchdog)
 # NereusSDR-original infrastructure; no Thetis attribution needed.
 nereus_add_test(tst_radio_connection_failure)
 
+# -- Werkbank gegen den HPSDR-Simulator (hpsdrsim): laeuft nur mit
+#    LONGPATH_HPSDRSIM=host:port, sonst QSKIP. Discovery → Verbindung →
+#    Empfangsstrom → Abstimmen → Trennen, dazu das Simulator-Protokoll --
+nereus_add_test(tst_hpsdr_sim_workbench)
+# -- dieselbe Werkbank mit echtem MainWindow: Bildschirmfotos nach
+#    LONGPATH_GRAB_DIR, sonst wie oben (QSKIP ohne LONGPATH_HPSDRSIM) --
+nereus_add_test(tst_hpsdr_sim_gui_workbench)
+
 # ── Phase 3M-1a Task E.1: TX virtual interface on RadioConnection ──────────
 # 16 tests assert:
 #   - sendTxIq() is callable on P1 + P2 without crash (stub bodies; wire

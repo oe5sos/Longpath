@@ -26,6 +26,16 @@
   Warnungen; Rot bleibt dem Senden vorbehalten. Als `moos.json` neben
   `kreide`, `flach`, `tief` mitgeliefert.
 
+- **Werkbank gegen den HPSDR-Simulator** (`tst_hpsdr_sim_workbench`,
+  `tst_hpsdr_sim_gui_workbench`): faehrt Longpaths eigenen Verbindungsweg
+  gegen `hpsdrsim` (DL1YCF, GPL — Messgeraet, keine Quelle) als Hermes,
+  Hermes-Lite 1 oder 2: Discovery, Verbinden, Empfang, Abstimmen,
+  Ratenwechsel, TUNE ein/aus, Trennen — und liest hinterher das
+  Simulator-Protokoll: 14,2 MHz, neue Rate und PTT=1 muessen angekommen
+  sein, der letzte PTT-Stand muss 0 sein. Die Fenster-Variante legt vier
+  Bildschirmfotos ab. Beide ueberspringen sich ohne `LONGPATH_HPSDRSIM`.
+  Anleitung: `docs/development/hpsdr-simulator-workbench.md`.
+
 - **Sync QRZ** im Logbuchfenster: holt das eigene QRZ-Logbuch ab
   (seitenweise, 250 je Anfrage, ueber den Logbuch-Schluessel aus
   Tools > QRZ) und fuehrt es wie einen Datei-Import zusammen — dort
@@ -120,6 +130,20 @@
   Einstiegspunkt -- ⚙ dort haette nur einen Ausschnitt gezeigt.
 
 ### Fixed
+
+- **Abtastrate und Empfaengerzahl der Verbindung gingen beim Verbinden
+  verloren.** `connectToRadio()` speicherte beide, dann meldete der
+  Verbindungsfaden eine Ereignisrunde spaeter Probing und Connecting — und
+  `setConnectionState()` loeschte bei jedem Zustand ausser Connected. Die
+  ganze Sitzung ueber stand die Rate auf 0 und `rx2Enabled()` auf falsch,
+  bis der Betreiber die Rate von Hand wechselte: Netzwerkdiagnose zeigte
+  „—", TCI meldete `iq_samplerate` aus dem Cache. Nur Disconnected loescht
+  jetzt. Gefunden an der Simulator-Werkbank mit dem Hermes-Lite 2.
+
+- **Die Achse des Filterbilds im RX-Applet folgte dem VFO nicht.** Sie wurde
+  nur beim Binden der Scheibe gesetzt; nach dem Abstimmen auf 40 m stand
+  dort weiter 14.221…14.229. Dasselbe Loch wie am 2026-08-22 im
+  Bandfilter-Applet, jetzt auch hier geschlossen.
 
 - **Eine im Setup gewaehlte Palette ueberlebt jetzt den Neustart.**
   `main.cpp` wandte die gemerkte Wahl (`ActiveTheme`) VOR dem Laden der
