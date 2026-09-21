@@ -99,6 +99,14 @@ private:
 private slots:
     void aReleaseAndRebuildDoesNotShowRawMemory()
     {
+#ifndef NEREUS_GPU_SPECTRUM
+        // CPU-Renderpfad (GPU_SPECTRUM=OFF): keine GPU-Textur, kein
+        // releaseResources(), kein Framebuffer — der Fehler, den dieser
+        // Test festnagelt, kann hier nicht entstehen. Ohne diesen Zweig
+        // uebersetzte die Datei mit dem Gate aus nicht (grabFramebuffer
+        // fehlt) und blockierte den ARM-Release-Bau, 2026-09-21.
+        QSKIP("CPU-Renderpfad: keine GPU-Textur, deren Neubefuellung zu pruefen waere.");
+#else
         SpectrumWidget w;
         w.resize(1000, 600);
         w.setDdcCenterFrequency(7'100'000.0);
@@ -170,6 +178,7 @@ private slots:
                      "das der Betreiber am 2026-08-22 geschickt hat.")
                      .arg(after * 100.0, 0, 'f', 1)
                      .arg(before * 100.0, 0, 'f', 1)));
+#endif
     }
 };
 

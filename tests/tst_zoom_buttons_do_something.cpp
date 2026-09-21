@@ -313,12 +313,19 @@ private slots:
         // Longpath-Fehler, siehe tst_spectrum_trace_visible.cpp fuer
         // dieselbe Diagnose. Laeuft unter einem echten Fenstersystem
         // mit echter GPU (z.B. cocoa) unveraendert durch.
+        //
+        // CPU-Renderpfad (GPU_SPECTRUM=OFF, 2026-09-21): dort ist das
+        // Widget ein QPainter-QWidget, QWidget::grab() liefert das Bild
+        // auch offscreen — der Schwarzbild-Check laeuft also gerade
+        // dort, wo er ohne GPU am ehesten gebraucht wird.
+#ifdef NEREUS_GPU_SPECTRUM
         if (QGuiApplication::platformName() == QLatin1String("offscreen")) {
             QSKIP("Kein echtes QRhi-Backend unter der Offscreen-Plattform -- "
                   "grabFramebuffer() kann hier nichts Aussagekraeftiges "
                   "liefern. Laeuft unter einem echten Fenstersystem mit "
                   "echter GPU (z.B. cocoa) unveraendert durch.");
         }
+#endif
 
         QVERIFY(m_sw);
         m_sw->setSampleRate(384000.0);
@@ -342,7 +349,11 @@ private slots:
                          "%1 hinterlaesst die Mitte bei %2 Hz")
                          .arg(name).arg(m_sw->centerFrequency())));
             // Und das Bild muss noch etwas zeigen, nicht nur Schwarz.
+#ifdef NEREUS_GPU_SPECTRUM
             const QImage img = m_sw->grabFramebuffer();
+#else
+            const QImage img = m_sw->grab().toImage();
+#endif
             int lit = 0;
             for (int y = 0; y < img.height(); y += 4) {
                 for (int x = 0; x < img.width(); x += 4) {
