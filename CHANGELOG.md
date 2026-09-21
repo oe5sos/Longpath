@@ -128,6 +128,15 @@ Programm, das der Betreiber taeglich benutzte.
 - **Fussleiste: "ON AIR" passte unter Linux nicht in seinen Platz** --
   78 Punkte waren am Mac gemessen, die Linux-Schrift braucht 81; jetzt
   84.
+### Fixed
+
+- **KiwiSDR-Wasserfall auf Servern mit anderem `zoom_max`** (Web-888,
+  RaspSDR: 11 statt 14): der Start-Offset wurde fest auf der
+  2^24-Skala kodiert, der Server klemmte ihn an die Bandkante -- der
+  Ausschnitt stimmte nicht. Der Massstab ist jetzt `1024 << zoom_max`
+  des Servers, `zoom_cap` bleibt allein die Obergrenze der angefragten
+  Zoomstufe (AetherSDR #5536/#5655). Echte KiwiSDR (zoom_max 14) sind
+  unveraendert.
 
 ## [0.6.3] - 2026-09-21
 
@@ -348,13 +357,6 @@ und Linux (x86_64 und aarch64), alle GPG-signiert.
   einem Wechsel im Setup neu gesetzt; jede Malstelle fragt `hexRole()`;
   die Rollennamen stimmen. Aufgefallen mit „Moos": auf Anthrazit sieht
   man, was auf Fast-Schwarz nie auffiel.
-- **KiwiSDR-Wasserfall auf Servern mit anderem `zoom_max`** (Web-888,
-  RaspSDR: 11 statt 14): der Start-Offset wurde fest auf der
-  2^24-Skala kodiert, der Server klemmte ihn an die Bandkante -- der
-  Ausschnitt stimmte nicht. Der Massstab ist jetzt `1024 << zoom_max`
-  des Servers, `zoom_cap` bleibt allein die Obergrenze der angefragten
-  Zoomstufe (AetherSDR #5536/#5655). Echte KiwiSDR (zoom_max 14) sind
-  unveraendert.
 
 - **Ein TCI-Client, der den Sender getastet hat und dann verschwindet,
   laesst ihn nicht mehr getastet zurueck.** Bisher gab
