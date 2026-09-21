@@ -55,6 +55,7 @@ warren@wpratt.com
 #include "WdspEngine.h"
 #include "RxChannel.h"
 
+#include <algorithm>
 #include <cmath>
 #include "TxChannel.h"
 #include "PsFeedbackChannel.h"
@@ -399,6 +400,24 @@ RxChannel* WdspEngine::createRxChannel(int channelId,
     }
 
 #ifdef HAVE_WDSP
+    // WDSPs Eingangsring (iobuffs.c, create_iobuffs) ist DSP_MULT (2) mal
+    // max(in_size, dsp_size) gross, und fexchange2 prueft den Umbruch nur
+    // auf Gleichheit: `if ((r1_inidx += in_size) == active_buffsize)`.
+    // Teilt in_size die Ringgroesse nicht, schreibt der Block, der ueber
+    // das Ende reicht, hinter den Puffer -- Heap-Korruption, auf dem
+    // Linux-Runner ein SIGSEGV (tst_nr_backends_process_audio mit 238,
+    // 2026-09-21). Die App oeffnet mit bufferSizeForRate (64 je 48 kHz),
+    // das teilt 8192 immer; alles andere wird hier abgewiesen, ehe es
+    // still korrumpiert.
+    {
+        const int ringSize = 2 * std::max(inputBufferSize, dspBufferSize);
+        if (inputBufferSize <= 0 || dspBufferSize <= 0 || ringSize % inputBufferSize != 0) {
+            qCWarning(lcDsp) << "Cannot create channel" << channelId << ": input buffer size"
+                             << inputBufferSize << "does not divide the WDSP input ring of"
+                             << ringSize << "samples (dsp size" << dspBufferSize << ")";
+            return nullptr;
+        }
+    }
     // From Thetis cmaster.c:72-86 [v2.10.3.13] (create_rcvr OpenChannel call)
     OpenChannel(
         channelId,

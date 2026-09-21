@@ -241,13 +241,17 @@ public:
     // Returns the new RxChannel (owned by WdspEngine) or nullptr on failure.
     // channelId: WDSP channel number (0-31). Must be unique.
     //
-    // Default parameters match our P2 DDC configuration:
-    //   inputBufferSize=238 (one P2 packet), dspBufferSize=4096,
-    //   all rates=48000 (no resampling needed)
+    // Default parameters: inputBufferSize=64 (bufferSizeForRate(48000),
+    // what RadioModel opens with at 48 kHz), dspBufferSize=4096, all
+    // rates=48000 (no resampling needed). Bis zum 2026-09-21 stand hier
+    // 238 ("one P2 packet") -- das teilt WDSPs Eingangsring (2 * 4096)
+    // nicht, und fexchange2 schrieb ab dem 35. Block hinter den Puffer
+    // (siehe createRxChannel in WdspEngine.cpp, das solche Groessen jetzt
+    // abweist).
     //
     // From Thetis cmaster.c:72-86 [v2.10.3.13] (OpenChannel call in create_rcvr)
     RxChannel* createRxChannel(int channelId,
-                               int inputBufferSize = 238,
+                               int inputBufferSize = 64,
                                int dspBufferSize = 4096,
                                int inputSampleRate = 48000,
                                int dspSampleRate = 48000,

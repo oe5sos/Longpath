@@ -17,8 +17,8 @@
 // createRxChannel, m_initialized ueber Freundschaft wie in
 // tst_notch_tune_frequency), Modell laden, wo eines gebraucht wird
 // (NR3: rnnoise Default_large.bin, NNR: wdsp_nnr_0/1.bin), Minderung
-// einschalten, 400 Bloecke zu 238 Abtastwerten Rauschen+Ton
-// hindurchschieben (rund zwei Sekunden bei 48 kHz), dann: nichts
+// einschalten, gut tausend Bloecke zu 64 Abtastwerten Rauschen+Ton
+// hindurchschieben (rund anderthalb Sekunden bei 48 kHz), dann: nichts
 // abgestuerzt, Ausgabe endlich (kein NaN/Inf), Ausgabe nicht ueberall
 // null.
 //
@@ -45,6 +45,7 @@
 #include <vector>
 
 #include "core/RxChannel.h"
+#include "core/SampleRateCatalog.h"
 #include "core/WdspEngine.h"
 #include "core/WdspTypes.h"
 #include "core/ModelPaths.h"
@@ -58,8 +59,18 @@ class TstNrBackendsProcessAudio : public QObject {
     Q_OBJECT
 
 private:
-    static constexpr int kChunk      = 238;     // ein P2-Paket
-    static constexpr int kIterations = 300;     // ~1,5 s bei 48 kHz
+    // Die Blockgroesse, mit der die App selbst den Kanal oeffnet
+    // (RadioModel: bufferSizeForRate, 64 bei 48 kHz) -- nicht die 238
+    // eines P2-Pakets, die hier bis zum 2026-09-21 standen: WDSPs
+    // Eingangsring ist DSP_MULT * dsp_size = 8192 Werte gross und prueft
+    // den Umbruch nur auf GLEICHHEIT (iobuffs.c, fexchange2: `r1_inidx +=
+    // in_size` == active_buffsize). 238 teilt 8192 nicht, der 35. Block
+    // schrieb 138 Werte hinter das Ende -- am Mac unbemerkt in Heap-Luft,
+    // unter Guard Malloc und auf dem Linux-Runner (glibc, Seitengrenze)
+    // ein SIGSEGV in fexchange2. Die Blockgroesse MUSS den Ring teilen;
+    // WdspEngine::createRxChannel weist andere seit heute ab.
+    static constexpr int kChunk      = bufferSizeForRate(48000);
+    static constexpr int kIterations = 1100;    // ~1,5 s bei 48 kHz
     static constexpr int kChannelId  = 0;
 
     // ── Im Takt der Abtastrate, nicht so schnell wie moeglich ────────
@@ -74,7 +85,7 @@ private:
     // (ctest -j4) ab Block ~290 NaN zurueck — in NR1 UND NR2, also
     // nicht die Minderung, sondern der ueberholte Ring. Im Betrieb
     // taktet das Funkgeraet den Aufrufer auf 48 kHz; genau das tut die
-    // Pause hier: 238 Abtastwerte sind 4,96 ms.
+    // Pause hier: 64 Abtastwerte sind 1,33 ms.
     static constexpr int kBlockPeriodUs = 1000000 * kChunk / 48000;
 
     // Modelle aus dem Quellbaum, unabhaengig davon, wo das Testprogramm
