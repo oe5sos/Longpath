@@ -128,6 +128,24 @@ Programm, das der Betreiber taeglich benutzte.
 - **Fussleiste: "ON AIR" passte unter Linux nicht in seinen Platz** --
   78 Punkte waren am Mac gemessen, die Linux-Schrift braucht 81; jetzt
   84.
+### Fixed
+
+- **Ein KiwiSDR folgt jetzt der zugeordneten Scheibe** -- Frequenz,
+  Betriebsart, Filter und Panadapter gehen bei jeder Aenderung an den
+  Empfaenger. Bisher wurde er genau einmal abgestimmt, bei der Zuordnung,
+  und blieb dann stehen, egal was der Bediener drehte (die Nachfuehrung
+  war aus AetherSDR portiert, aber nie angeschlossen). Ausserdem bekommt
+  er die CW-Tonhoehe der Scheibe statt 0, womit der Traeger bisher auf
+  0 Hz und damit ausserhalb jedes CW-Durchlasses lag.
+
+- **CW ueber einen KiwiSDR war unhoerbar: der Durchlass wurde zweimal um
+  die Tonhoehe verschoben.** Longpaths CW-Filter sitzen auf der Tonhoehe
+  (Thetis: 500 Hz bei 650 Hz Pitch = 400..900), das Kiwi-Abstimmkommando
+  rechnet die Tonhoehe aber selbst dazu -- der Kiwi bekam 1050..1550, der
+  Ton bei 650 Hz lag daneben. Der nachgefuehrte CW-Durchlass wird jetzt
+  vorher traegersymmetrisch gemacht (-250..+250), der Kiwi landet bei
+  400..900 mit dem BFO um die Tonhoehe versetzt. Live an DK0WCY gefunden
+  (Tonhoehe pendelte sich danach bei 648 Hz ein).
 
 ## [0.6.3] - 2026-09-21
 
@@ -348,22 +366,6 @@ und Linux (x86_64 und aarch64), alle GPG-signiert.
   einem Wechsel im Setup neu gesetzt; jede Malstelle fragt `hexRole()`;
   die Rollennamen stimmen. Aufgefallen mit „Moos": auf Anthrazit sieht
   man, was auf Fast-Schwarz nie auffiel.
-- **Ein KiwiSDR folgt jetzt der zugeordneten Scheibe** -- Frequenz,
-  Betriebsart, Filter und Panadapter gehen bei jeder Aenderung an den
-  Empfaenger. Bisher wurde er genau einmal abgestimmt, bei der Zuordnung,
-  und blieb dann stehen, egal was der Bediener drehte (die Nachfuehrung
-  war aus AetherSDR portiert, aber nie angeschlossen). Ausserdem bekommt
-  er die CW-Tonhoehe der Scheibe statt 0, womit der Traeger bisher auf
-  0 Hz und damit ausserhalb jedes CW-Durchlasses lag.
-
-- **CW ueber einen KiwiSDR war unhoerbar: der Durchlass wurde zweimal um
-  die Tonhoehe verschoben.** Longpaths CW-Filter sitzen auf der Tonhoehe
-  (Thetis: 500 Hz bei 650 Hz Pitch = 400..900), das Kiwi-Abstimmkommando
-  rechnet die Tonhoehe aber selbst dazu -- der Kiwi bekam 1050..1550, der
-  Ton bei 650 Hz lag daneben. Der nachgefuehrte CW-Durchlass wird jetzt
-  vorher traegersymmetrisch gemacht (-250..+250), der Kiwi landet bei
-  400..900 mit dem BFO um die Tonhoehe versetzt. Live an DK0WCY gefunden
-  (Tonhoehe pendelte sich danach bei 648 Hz ein).
 
 - **Ein TCI-Client, der den Sender getastet hat und dann verschwindet,
   laesst ihn nicht mehr getastet zurueck.** Bisher gab
