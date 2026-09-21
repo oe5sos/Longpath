@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Der macOS-Installer (.pkg) hiess noch „NereusSDR".** Titel,
+  Willkommensseite, Paketauswahl und Paketkennungen sagen jetzt
+  Longpath (`at.oe5sos.longpath`, wie das Programmpaket selbst); das
+  Deinstallationsskript zeigte auf den alten Treibernamen und haette
+  den Treiber gar nicht gefunden. Ebenso der VAX-Erststarthinweis
+  („Longpath ships …", `LongpathVAX.driver`), die ADIF-Kopfzeile
+  (`PROGRAMID` Longpath), die Kennung beim FreeDV-Reporter und der
+  Vorgabename beim PGXL-Rundruf. Die vom System registrierten
+  Geraetenamen „NereusSDR VAX N" bleiben, wie in CLAUDE.md begruendet.
+
 ## [0.6.3] - 2026-09-21
 
 Die erste Veroeffentlichung seit 0.6.1 — alles, was seit den drei

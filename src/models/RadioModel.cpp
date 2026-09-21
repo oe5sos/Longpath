@@ -1867,7 +1867,7 @@ RadioModel::RadioModel(QObject* parent)
                 QString()).toString(),
         s.value(QStringLiteral("FreeDvReporter/Message"),
                 QString()).toString(),
-        QStringLiteral("NereusSDR ") + QStringLiteral(NEREUSSDR_VERSION));
+        QStringLiteral("Longpath ") + QStringLiteral(NEREUSSDR_VERSION));
     {
         const QString serverUrl = s.value(
             QStringLiteral("FreeDvReporter/ServerUrl"),
@@ -1895,7 +1895,7 @@ RadioModel::RadioModel(QObject* parent)
                 QString()).toString(),
         s.value(QStringLiteral("PskReporter/GridSquare"),
                 QString()).toString(),
-        QStringLiteral("NereusSDR ") + QStringLiteral(NEREUSSDR_VERSION));
+        QStringLiteral("Longpath ") + QStringLiteral(NEREUSSDR_VERSION));
 
     // Per-source adapter slots. Auto-connection (sender + receiver both on
     // the main thread) gives DirectConnection, so the spot lands in
@@ -2633,7 +2633,7 @@ void RadioModel::restoreSpotClientAutoStartState()
             const QString message =
                 s.value(QStringLiteral("FreeDvReporter/Message")).toString();
             const QString versionStr =
-                QStringLiteral("NereusSDR ")
+                QStringLiteral("Longpath ")
                     + QStringLiteral(NEREUSSDR_VERSION);
             qCInfo(lcDsp)
                 << "FreeDVReporter: starting connection with identity"
@@ -2663,7 +2663,7 @@ void RadioModel::restoreSpotClientAutoStartState()
         if (pskGrid.isEmpty()) pskGrid = userGrid;
         if (!pskCall.isEmpty()) {
             m_pskReporter->setIdentity(pskCall, pskGrid,
-                                       QStringLiteral("NereusSDR ") + QStringLiteral(NEREUSSDR_VERSION));
+                                       QStringLiteral("Longpath ") + QStringLiteral(NEREUSSDR_VERSION));
             if (isTrue(QStringLiteral("PskReporterAutoStart"))) {
                 m_pskReporter->setAutoSendIntervalSec(
                     PskReporterClient::kReportingIntervalSec);
@@ -8541,7 +8541,7 @@ void RadioModel::connectToRadio(const RadioInfo& info)
                      QStringLiteral("NEREUS")).toString());
         m_flexBroadcaster->setNickname(
             as.value(QStringLiteral("PGXL_BroadcastNickname"),
-                     QStringLiteral("NereusSDR")).toString());
+                     QStringLiteral("Longpath")).toString());
         m_flexBroadcaster->setModel(
             as.value(QStringLiteral("PGXL_DiscoveryModel"),
                      QStringLiteral("FLEX-6400")).toString());

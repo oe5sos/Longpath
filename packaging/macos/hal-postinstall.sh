@@ -1,5 +1,5 @@
 #!/bin/bash
-# NereusSDR VAX HAL plugin — postinstall
+# Longpath VAX HAL plugin — postinstall
 # On macOS 14.4+, launchctl kickstart of com.apple.audio.coreaudiod
 # returns "Operation not permitted"; fall back to killall.
 
