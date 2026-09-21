@@ -14,6 +14,7 @@
 
 #include "core/AppSettings.h"
 #include "gui/StyleConstants.h"
+#include "gui/styles/ThemeQss.h"
 
 #include <QMouseEvent>
 #include <QMenu>
@@ -55,7 +56,8 @@ namespace {
 // Das Ziel bleibt im Akzentblau: es ist keine Messung, sondern eine
 // Vorgabe, und der Unterschied zwischen „wo sie steht" und „wo sie
 // hin soll" ist genau der, den man auf einen Blick lesen will.
-const QColor kBackground(Style::kPanelBg);      // #0a0a18
+// Als Funktion, nicht Konstante: der Grund folgt der Palette.
+QColor backgroundColor() { return QColor(Style::hexRole(Style::kPanelBg)); }
 const QColor kActual    (Style::kAmberText);    // where it is — gemessen
 const QColor kTarget    (Style::kAccent);       // where it should go
 const QColor kTurning   (Style::kAmberText);    // in motion
@@ -616,7 +618,7 @@ void RotorDialWidget::paintEvent(QPaintEvent*)
 void RotorDialWidget::paintFace(QPainter& p)
 {
     if (m_shape == Shape::Tape) {
-        if (!m_bare) { p.fillRect(faceRect(), kBackground); }
+        if (!m_bare) { p.fillRect(faceRect(), backgroundColor()); }
         paintTape(p);
         return;
     }
@@ -626,7 +628,7 @@ void RotorDialWidget::paintFace(QPainter& p)
     // m_bare: die Rose soll mit dem Panadapter EINS sein, nicht als
     // Kasten davor liegen. Also kein Grund und weiter unten keine
     // Ablesung — nur Ring, Teilung, Zeiger und Ziel.
-    if (!m_bare) { p.fillRect(faceRect(), kBackground); }
+    if (!m_bare) { p.fillRect(faceRect(), backgroundColor()); }
 
     // Faint accent wash from below so the face is not dead flat. Kept
     // subtle and in the app's accent hue rather than a warm lamp — the

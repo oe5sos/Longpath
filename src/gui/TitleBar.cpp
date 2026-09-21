@@ -341,7 +341,7 @@ void ConnectionSegment::paintEvent(QPaintEvent*)
 
     // Background
     p.setPen(Qt::NoPen);
-    p.setBrush(QColor("#08080a"));
+    p.setBrush(QColor(Style::hexRole(Style::kAppBg)));   // war das rohe #08080a
     p.drawRoundedRect(rect(), 3, 3);
 
     p.setFont(QFont(QStringLiteral("SF Mono"), 10, QFont::DemiBold));

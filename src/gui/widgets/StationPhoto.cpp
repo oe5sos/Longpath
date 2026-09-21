@@ -14,6 +14,7 @@
 #include "gui/widgets/StationPhoto.h"
 
 #include "gui/StyleConstants.h"
+#include "gui/styles/ThemeQss.h"
 
 #include <QCryptographicHash>
 #include <QDir>
@@ -161,7 +162,7 @@ void StationPhoto::paintEvent(QPaintEvent*)
 
     const QRectF r = QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5);
     p.setPen(QPen(QColor(Style::kInsetBorder), 1.0));
-    p.setBrush(QColor(Style::kInsetBg));
+    p.setBrush(QColor(Style::hexRole(Style::kInsetBg)));
     p.drawRoundedRect(r, 4.0, 4.0);
 
     if (m_havePhoto && !m_pixmap.isNull()) {

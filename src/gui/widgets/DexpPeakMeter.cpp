@@ -59,6 +59,7 @@
 #include "DexpPeakMeter.h"
 
 #include "gui/StyleConstants.h"
+#include "gui/styles/ThemeQss.h"
 
 #include <QPaintEvent>
 #include <QPainter>
@@ -85,7 +86,9 @@ namespace {
 // constexpr faellt damit weg: QColor laesst sich nicht constexpr aus
 // einer Zeichenkette bauen. Der Preis ist ein Funktionsaufruf je
 // Zeichenvorgang bei einem Widget von 8 px Hoehe — kein Preis.
-const QColor kBg            {QString::fromLatin1(Style::kInsetBg)};
+// kBg als Funktion: der Grund folgt der Palette, eine Dateikonstante
+// wuerde beim Laden einmal gebaut und die Palette nie mehr sehen.
+QColor bgColor() { return QColor(Style::hexRole(Style::kInsetBg)); }
 const QColor kBorder        {QString::fromLatin1(Style::kBorder)};
 // Aussteuerung ist gemessen, nicht ein Zustand: Bernstein statt
 // Signalgruen. Siehe die Notiz in VfoStyles.h.
@@ -131,7 +134,7 @@ void DexpPeakMeter::paintEvent(QPaintEvent*)
     const int H = height();
 
     // Background + 1 px border (matches NereusSDR slider track styling).
-    p.fillRect(rect(), kBg);
+    p.fillRect(rect(), bgColor());
     p.setPen(kBorder);
     p.drawRect(rect().adjusted(0, 0, -1, -1));
 

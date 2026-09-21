@@ -30,6 +30,7 @@
 #include <QFont>
 #include <QPainter>
 #include "gui/StyleConstants.h"
+#include "gui/styles/ThemeQss.h"
 
 namespace Longpath {
 
@@ -97,11 +98,11 @@ void LayoutThumbnail::paintEvent(QPaintEvent*)
     p.setRenderHint(QPainter::Antialiasing);
 
     QColor bg = m_current ? QColor(Style::kBlueBorder) : QColor(0x1a, 0x2a, 0x3a);
-    if (!m_enabled) { bg = QColor(Style::kPanadapterBg); }
+    if (!m_enabled) { bg = QColor(Style::hexRole(Style::kPanadapterBg)); }
     p.fillRect(rect(), bg);
 
     QColor border = m_current ? QColor(0x00, 0xb4, 0xd8) : QColor(0x30, 0x40, 0x50);
-    if (!m_enabled) { border = QColor(Style::kBadgeInfoBg); }
+    if (!m_enabled) { border = QColor(Style::hexRole(Style::kBadgeInfoBg)); }
     p.setPen(QPen(border, m_current ? 2 : 1));
     p.drawRoundedRect(rect().adjusted(1, 1, -1, -1), 4, 4);
 

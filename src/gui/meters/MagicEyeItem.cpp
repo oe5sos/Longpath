@@ -63,6 +63,7 @@ mw0lge@grange-lane.co.uk
 #include <algorithm>
 #include <cmath>
 #include "gui/StyleConstants.h"
+#include "gui/styles/ThemeQss.h"
 
 namespace Longpath {
 
@@ -116,7 +117,7 @@ void MagicEyeItem::paint(QPainter& p, int widgetW, int widgetH)
     p.setRenderHint(QPainter::Antialiasing, true);
 
     // Step 3: dark background circle
-    p.setBrush(QColor(Style::kStatusBarBg));
+    p.setBrush(QColor(Style::hexRole(Style::kStatusBarBg)));
     p.setPen(Qt::NoPen);
     p.drawEllipse(eyeRect);
 

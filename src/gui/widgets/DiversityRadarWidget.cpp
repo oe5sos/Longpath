@@ -76,6 +76,7 @@
 #include <algorithm>
 #include <cmath>
 #include "gui/StyleConstants.h"
+#include "gui/styles/ThemeQss.h"
 
 namespace Longpath {
 
@@ -180,7 +181,7 @@ void DiversityRadarWidget::paintEvent(QPaintEvent* /*event*/)
     // Backdrop radial gradient (NereusSDR-original chrome).
     QRadialGradient bg(c, r);
     bg.setColorAt(0.0, QColor(Style::kBlueBg));
-    bg.setColorAt(1.0, QColor(Style::kBadgeInfoBg));
+    bg.setColorAt(1.0, QColor(Style::hexRole(Style::kBadgeInfoBg)));
     p.setBrush(bg);
     p.setPen(QPen(QColor(Style::kDspToggleText), 1.0));
     p.drawEllipse(c, r, r);

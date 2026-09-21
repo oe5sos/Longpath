@@ -251,7 +251,7 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
     // den Eingabefeldern — versenkt, nicht aufgelegt.
     QLinearGradient bg(0, 0, 0, height());
     bg.setColorAt(0.0, QColor(Style::role("inset-bg-top", Style::kInsetBgTop)));
-    bg.setColorAt(1.0, QColor(Style::role("inset-bg", Style::kInsetBg)));
+    bg.setColorAt(1.0, QColor(Style::role("inset", Style::kInsetBg)));
     p.fillRect(rect(), bg);
 
     // Kein Rahmenkasten mehr.

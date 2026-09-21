@@ -19,6 +19,7 @@
 #include "core/AppSettings.h"
 #include "gui/ColorSwatchButton.h"
 #include "gui/StyleConstants.h"
+#include "gui/styles/ThemeQss.h"
 #include "gui/styles/PopupMenuStyle.h"
 
 #include <QDateTime>
@@ -222,7 +223,7 @@ void GlobeWidget::rebuildSyntheticMask()
     constexpr int kW = 720;
     constexpr int kH = 360;
     m_syntheticMask = QImage(kW, kH, QImage::Format_RGB32);
-    m_syntheticMask.fill(QColor(Style::kAppBg));
+    m_syntheticMask.fill(QColor(Style::hexRole(Style::kAppBg)));
 
     // Parallel boolean gate for renderSphere()'s per-pixel lighting
     // floor (see there) -- no antialiasing here, a land/ocean test
@@ -939,7 +940,7 @@ void GlobeWidget::paintEvent(QPaintEvent*)
 {
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing);
-    p.fillRect(rect(), QColor(Style::kPanelBg));
+    p.fillRect(rect(), QColor(Style::hexRole(Style::kPanelBg)));
 
     if (m_frameDirty || m_frame.size() != size()) { renderSphere(); }
 
@@ -1166,7 +1167,7 @@ void GlobeWidget::paintEvent(QPaintEvent*)
     {
         const QRectF plus  = zoomButtonRect(true);
         const QRectF minus = zoomButtonRect(false);
-        const QColor face(Style::kPanelBg);
+        const QColor face(Style::hexRole(Style::kPanelBg));
         const QColor edge(Style::kBorderSubtle);
         const QColor text(Style::kTextSecondary);
 

@@ -92,7 +92,7 @@ void HGauge::paintEvent(QPaintEvent*)
     // Grautoene, und der leere Balken verschwand. Derselbe Befund wie auf
     // Startup & Preferences.
     p.setPen(QColor(Style::role("border", Style::kBorder)));
-    p.setBrush(QColor(Style::role("inset-bg", Style::kInsetBg)));
+    p.setBrush(QColor(Style::role("inset", Style::kInsetBg)));
     p.drawRoundedRect(barX, barY, barW, barH, 2, 2);
 
     if (m_max <= m_min) { return; }
@@ -212,7 +212,7 @@ void HGauge::paintReadout(QPainter& p)
 
     if (barW > 8) {
         p.setPen(QColor(Style::role("border", Style::kBorder)));
-        p.setBrush(QColor(Style::role("inset-bg", Style::kInsetBg)));
+        p.setBrush(QColor(Style::role("inset", Style::kInsetBg)));
         p.drawRoundedRect(x, barY, barW, barH, 2, 2);
 
         const double range = m_max - m_min;
@@ -254,7 +254,7 @@ void HGauge::paintReadout(QPainter& p)
     p.setFont(f);
     p.setPen(QColor(ueber ? Style::role("danger", Style::kGaugeDanger)
                           : (leer ? Style::role("text-inactive", Style::kTextInactive)
-                                  : Style::role("text-primary", Style::kTextPrimary))));
+                                  : Style::role("text", Style::kTextPrimary))));
     p.drawText(QRect(w - zahlW, 0, zahlW, h),
                Qt::AlignRight | Qt::AlignVCenter, zahl);
 }

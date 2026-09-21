@@ -57,7 +57,7 @@ AsrApplet::AsrApplet(RadioModel* model, QWidget* parent)
     m_text->setStyleSheet(QStringLiteral(
         "QPlainTextEdit { background: %1; border: 1px solid %2; "
         "border-radius: 3px; color: %3; font-size: 11px; padding: 4px; }")
-        .arg(Style::role("inset-bg", Style::kInsetBg),
+        .arg(Style::role("inset", Style::kInsetBg),
              Style::role("border", Style::kBorder),
              Style::role("text", Style::kTextPrimary)));
     m_text->setMinimumHeight(90);

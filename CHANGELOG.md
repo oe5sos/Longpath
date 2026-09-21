@@ -117,6 +117,19 @@
   Der Block steht jetzt nach `AppSettings::load()` und weiterhin vor dem
   Hauptfenster. Aufgefallen beim Einbau von „Moos".
 
+- **Schwarze Flaechen in jeder Palette ausser der eingebauten.** Menueleiste
+  und Fenstergrund kamen aus der QPalette, die `applyDarkPalette` einmal beim
+  Start ohne Theme setzte; 30 Malstellen (Karte, Kugel, SWR-Kurve,
+  TX-Spektrum, Relais-Leiste, Layout-Vorschau, Kiwi-Wasserfall, …) und das
+  rohe `#08080a` der Titelleiste griffen an der Palette vorbei zur
+  Konstante; `HGauge`, `AsrApplet` und `BandwidthFilterPane` fragten die
+  Rolle „inset-bg", die es nicht gibt (sie heisst „inset"), `HGauge`
+  ausserdem „text-primary" statt „text". Jetzt laufen QPalette und
+  Grund-Stylesheet durch das Theme und werden nach dem Laden und nach
+  einem Wechsel im Setup neu gesetzt; jede Malstelle fragt `hexRole()`;
+  die Rollennamen stimmen. Aufgefallen mit „Moos": auf Anthrazit sieht
+  man, was auf Fast-Schwarz nie auffiel.
+
 - **Ein TCI-Client, der den Sender getastet hat und dann verschwindet,
   laesst ihn nicht mehr getastet zurueck.** Bisher gab
   `TciServer::onClientDisconnected()` nur den TX-Audio-Mutex frei; MOX

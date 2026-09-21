@@ -410,6 +410,11 @@ int main(int argc, char* argv[])
                   qPrintable(Longpath::Style::Theme::searchPaths().join(
                       QStringLiteral(", "))));
         }
+        // Die QPalette und das Grund-Stylesheet wurden oben mit der
+        // eingebauten Palette gesetzt — jetzt noch einmal, damit
+        // Menueleiste, Fensterhintergrund und Tooltips die Datei tragen.
+        Longpath::applyDarkPalette(app);
+        Longpath::applyAppBaselineQss(app);
     }
 
     // Restore logging category toggles from settings
