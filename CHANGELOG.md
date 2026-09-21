@@ -214,7 +214,8 @@ und Linux (x86_64 und aarch64), alle GPG-signiert.
   Unsichere Zeichen erscheinen gedaempft, Rauschen wird gar nicht erst
   gezeigt. Decoder ist ggmorse (MIT, unveraendert vendort), der Wrapper
   ein Port aus AetherSDR -- der Ersatz fuer den am 20.09.
-  zurueckgezogenen ersten Anlauf.
+  zurueckgezogenen ersten Anlauf. Live ueber einen KiwiSDR an der
+  DRA5-Bake (5,195 MHz, 15 WPM) bestaetigt.
 
 - **Logbuch-Kennzahlen + Awards** (Logbuch > Stats…): sechs Kacheln
   statt des Textfensters -- Log (Gesamt, Rufzeichen, erste/letzte,

@@ -64,15 +64,27 @@ AetherSDR-Ports sind seit Monaten Praxis, `AETHERSDR-PORTS.md`).
   Kostenschwelle/Umbrüche/Konfidenzton, Statuszeile/Kapsel folgen den
   Locks, CW-Pitch-Einstellung, Scheibe entfernt/umgebunden, PNG-Grab.
 
-**Live** am Radio (CWL, Signal auf dem Band) noch nicht geprüft; das Bild
-oben ist aus dem Prüfstand gerendert. Ein Livetest über öffentliche
-KiwiSDRs (DK0WCY, 10,144 MHz, Vormittag des 21.09.) brachte keinen
-sauberen Bakentext — das Signal war an keinem der erreichbaren
-Empfänger stark genug (30 m: nahe Empfänger in der toten Zone, ferne
-zu schwach; 80 m außerhalb des Bakenfahrplans). Der Versuch war
-trotzdem ergiebig: er fand den doppelt verschobenen CW-Durchlass des
-KiwiSDR-Pfads (eigener PR) und die Notwendigkeit der Kostenschwelle
-(Punkt 5 oben).
+**Live geprüft (21.09., 06:55 UTC) über einen öffentlichen KiwiSDR** in
+Norddeutschland (`kiwisdr.dl0hgn`, 5,195 MHz CWU, DRA5-Bake bei
+Scheggerott, 15 WPM) — der ganze Weg KiwiSdrClient → 24 kHz Stereo-Float →
+CwDecoder, Tonhöhe 648 Hz, 65 von 67 Textstücken unter der
+Kostenschwelle 0,35:
+
+```
+I ERUPTIVE MAMAT == INDEX 19 SEP = R 11 1AGNA NA FLUX 1O1 1G MJ T1
+BOULDER A 9 9 KIEL A 5 ?  IEHE ?IE DRA5
+```
+
+(„MAGNETIC" und „FLUX 101" mit Aussetzern — die Bake war nicht laut,
+der Rest wortgetreu, „DRA5" sauber.) Vorher, auf 10,144/14,100 MHz an
+sechs Empfängern: nur Rauschtext, weil dort kein Signal im Durchlass
+war — DCF77 (77,5 kHz) als Gegenprobe stand exakt bei 650,8 Hz, 33 dB
+über dem Grund, also stimmte Abstimmung und Tonweg. Dieser Versuch fand
+außerdem den doppelt verschobenen CW-Durchlass des KiwiSDR-Pfads und die
+fehlende Nachführung (eigener PR) und die Notwendigkeit der
+Kostenschwelle (Punkt 5 oben). Am eigenen Radio (ANAN, 48-kHz-Abgriff
+wie RTTY) noch nicht gehört; der Abgriff ist derselbe Weg, den der
+RTTY-Decoder täglich nimmt.
 
 ## Bekanntes
 
