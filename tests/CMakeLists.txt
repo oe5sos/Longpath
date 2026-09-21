@@ -4865,6 +4865,9 @@ longpath_add_test(tst_tci_probe_reads_header)
 longpath_add_test(tst_tci_binary_frame_roundtrip)
 longpath_add_test(tst_asr_end_to_end)
 longpath_add_test(tst_asr_against_live_server)
+# 2026-09-21: Help > Check for Updates... -- Release-JSON, Version, Paket,
+# SHA256SUMS, Startpruefung, Zielpfad, Neustart-Helfer, DMG-Einspielen (macOS).
+longpath_add_test(tst_update_checker)
 
 longpath_add_test(tst_filter_follows_the_panadapter)
 longpath_add_test(tst_filter_pane_sheet)

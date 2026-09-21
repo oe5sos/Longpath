@@ -552,6 +552,8 @@ set(CORE_SOURCES
     src/core/KiwiSdrProtocol.cpp
     src/core/KiwiSdrClient.cpp
     src/core/KiwiPublicDirectory.cpp
+    src/core/UpdateChecker.cpp
+    src/core/UpdateInstaller.cpp
     src/core/KiwiSdrRedirectPolicy.cpp
     src/core/KiwiSdrCredentialStore.cpp
     src/core/KiwiSdrManager.cpp
@@ -807,6 +809,7 @@ set(GUI_SOURCES
     src/gui/FramelessResizer.cpp
     src/gui/WindowChrome.cpp
     src/gui/ToolWindow.cpp
+    src/gui/UpdateDialog.cpp
     src/gui/widgets/FilterPresetEditDialog.cpp
     src/gui/widgets/GuardedComboBox.h
     src/gui/widgets/GuardedSlider.h

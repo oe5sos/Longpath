@@ -205,7 +205,11 @@ int main(int argc, char* argv[])
 
     QApplication app(argc, argv);
     app.setApplicationName("Longpath");
-    app.setApplicationVersion(LONGPATH_VERSION);
+    // LONGPATH_PRETEND_VERSION: nur fuer Pruefstaende des Updaters (Help >
+    // Check for Updates...) -- laesst einen Bau aelter aussehen, als er
+    // ist, damit sich der Weg Herunterladen/Pruefen/Einspielen ohne eine
+    // echte neue Veroeffentlichung durchspielen laesst.
+    app.setApplicationVersion(qEnvironmentVariable("LONGPATH_PRETEND_VERSION", QStringLiteral(LONGPATH_VERSION)));
     app.setOrganizationName("Longpath");
     app.setWindowIcon(QIcon(":/icons/Longpath.png"));
 

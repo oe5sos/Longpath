@@ -267,6 +267,8 @@ warren@wpratt.com
 #include "gui/LayoutProfiles.h"
 #include "gui/widgets/WorldTexture.h"
 #include "applets/StripWindow.h"
+#include "UpdateDialog.h"
+#include "core/UpdateChecker.h"
 #include "widgets/RotorLogbookPanel.h"
 #include "widgets/RotorDialWidget.h"
 #include "gui/ToolWindow.h"
@@ -6602,6 +6604,10 @@ void MainWindow::populateDefaultMeter()
     panel->addApplet(m_kiwiWaterfallPanel);
     wireKiwiSdr();
 
+    // Stille Pruefung auf eine neuere Veroeffentlichung (UpdateDialog.h);
+    // laeuft 20 s nach dem Start, hoechstens einmal je 20 h, offline still.
+    scheduleStartupUpdateCheck();
+
     // BandwidthFilterApplet — die Durchlassflaeche (2026-08-20).
     //
     // Eine Flaeche je Empfaenger auf ECHTER Frequenzachse, nach der
@@ -10015,6 +10021,14 @@ void MainWindow::buildMenuBar()
 
     helpMenu->addSeparator();
 #endif
+
+    // Betreiber 2026-09-21: "unter Help moechte ich den automatischen
+    // Downloader/Installer der neuersten Version. Ein Klick, Installation
+    // automatisch." -- UpdateDialog.h.
+    helpMenu->addAction(QStringLiteral("Check for &Updates…"), this,
+                        &MainWindow::openUpdateDialog);
+
+    helpMenu->addSeparator();
 
     helpMenu->addAction(QStringLiteral("&About Longpath"), this, [this]() {
         AboutDialog dlg(this);
@@ -14281,6 +14295,58 @@ void MainWindow::openChannelStrip()
     m_stripWindow->show();
     m_stripWindow->raise();
     m_stripWindow->activateWindow();
+}
+
+void MainWindow::openUpdateDialog()
+{
+    if (!m_updateDialog) {
+        m_updateDialog = new UpdateDialog(QCoreApplication::applicationVersion(), this);
+        m_updateDialog->setAttribute(Qt::WA_DeleteOnClose, false);
+        connect(m_updateDialog.data(), &UpdateDialog::restartRequested, this, [this]() {
+            // Der Neustart-Helfer wartet auf unser Ende; ein normales
+            // close() laeuft durch den Beenden-Weg (Profil sichern usw.).
+            close();
+        });
+    }
+    m_updateDialog->checkNow();
+    m_updateDialog->show();
+    m_updateDialog->raise();
+    m_updateDialog->activateWindow();
+}
+
+// Stille Pruefung beim Start: nur wenn der Haken gesetzt ist und die
+// letzte Pruefung aelter als 20 h ist; offline passiert nichts. Eine
+// neuere Version oeffnet den Dialog, sonst bleibt es still.
+void MainWindow::scheduleStartupUpdateCheck()
+{
+    auto& s = AppSettings::instance();
+    const bool enabled = s.value(UpdateDialog::startupCheckKey(), QStringLiteral("True")).toString()
+                         == QStringLiteral("True");
+    const QDateTime last = QDateTime::fromString(
+        s.value(UpdateDialog::lastCheckKey(), QString()).toString(), Qt::ISODate);
+    if (!UpdateDialog::startupCheckDue(enabled, last, QDateTime::currentDateTimeUtc())) { return; }
+    // Ein Testbau (leere Version) hat nichts zu vergleichen.
+    if (UpdateChecker::numericVersion(QCoreApplication::applicationVersion()).isEmpty()) { return; }
+    QTimer::singleShot(20000, this, [this]() {
+        auto* checker = new UpdateChecker(QCoreApplication::applicationVersion(), this);
+        connect(checker, &UpdateChecker::latestKnown, this,
+                [this, checker](const ReleaseInfo& release, bool newer) {
+            checker->deleteLater();
+            AppSettings::instance().setValue(UpdateDialog::lastCheckKey(),
+                                             QDateTime::currentDateTimeUtc().toString(Qt::ISODate));
+            if (!newer) { return; }
+            if (!m_updateDialog) {
+                m_updateDialog = new UpdateDialog(QCoreApplication::applicationVersion(), this);
+                m_updateDialog->setAttribute(Qt::WA_DeleteOnClose, false);
+                connect(m_updateDialog.data(), &UpdateDialog::restartRequested, this, [this]() { close(); });
+            }
+            m_updateDialog->showRelease(release, true);
+            m_updateDialog->show();
+            m_updateDialog->raise();
+        });
+        connect(checker, &UpdateChecker::checkFailed, checker, &QObject::deleteLater);
+        checker->checkLatest();
+    });
 }
 
 void MainWindow::openRotorSetup()

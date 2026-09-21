@@ -1018,6 +1018,12 @@ private:
     // modeless dialog instance owned by the TxApplet.
     void wireSetupDialog(class SetupDialog* dialog);
 
+    // Help > Check for Updates... und die stille Startpruefung
+    // (UpdateDialog.h). Betreiber 2026-09-21: "ein Klick, Installation
+    // automatisch".
+    void openUpdateDialog();
+    void scheduleStartupUpdateCheck();
+
     // KiwiSDR — siehe MainWindow_KiwiSdr.cpp.
     void wireKiwiSdr();
     void refreshKiwiSdrAppletReceivers();
@@ -1489,6 +1495,7 @@ private:
     // MainWindow_KiwiSdr.cpp; was dort NOCH NICHT steht, ist am Kopf
     // jener Datei aufgezaehlt.
     class KiwiSdrManager* m_kiwiSdrManager{nullptr};
+    QPointer<class UpdateDialog> m_updateDialog;
 
     // ── SunSDR (TCI-Client, 2026-08-24) ──────────────────────────────
     //

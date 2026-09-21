@@ -128,6 +128,20 @@ Programm, das der Betreiber taeglich benutzte.
 - **Fussleiste: "ON AIR" passte unter Linux nicht in seinen Platz** --
   78 Punkte waren am Mac gemessen, die Linux-Schrift braucht 81; jetzt
   84.
+### Added
+
+- **Help > Check for Updates…** -- ein Klick, Installation automatisch.
+  Fragt die neueste Veroeffentlichung bei GitHub ab, zeigt Version und
+  Notizen, laedt das Paket fuer diese Maschine (macOS Apple Silicon /
+  Intel als DMG, Windows-Installer, Linux-AppImage), prueft es gegen
+  SHA256SUMS.txt derselben Veroeffentlichung, spielt es ein (macOS: an
+  die Stelle des laufenden Programms, ohne Kennwort) und startet
+  Longpath mit denselben Argumenten neu. Dazu eine stille Pruefung beim
+  Start (Haken im Dialog, hoechstens einmal je 20 h): gibt es eine
+  neuere Version, geht der Dialog von selbst auf. Keine GPG-Pruefung
+  im Programm (kein gpg auf einem stock-macOS); die Pruefsumme ueber
+  GitHubs HTTPS sichert den Download. Menue: "About Longpath" statt
+  des alten Namens.
 
 ## [0.6.3] - 2026-09-21
 
