@@ -5110,6 +5110,8 @@ longpath_add_test(tst_flat_map_flyto)
 longpath_add_test(tst_qso_map_flyto_window)
 # -- Satelliten ueber dem Horizont auf der Karte + Stempel im Detailpaneel --
 longpath_add_test(tst_qso_map_satellites)
+# -- Logbuch-Werkzeugleiste bricht um statt das Fenster breit zu halten --
+longpath_add_test(tst_logbook_toolbar_wraps)
 
 # -- Die Kopfleiste. Prueft, was Arithmetik hergibt: genau eine Pille je
 #    Gruppe an, sie folgt dem Modell statt dem Klick, und beim Wechsel

@@ -1052,6 +1052,7 @@ set(GUI_SOURCES
     src/gui/widgets/GlobeWidget.cpp
     src/gui/widgets/FlatMapWidget.cpp
     src/gui/widgets/GibsTileLayer.cpp
+    src/gui/widgets/FlowLayout.cpp
     src/gui/widgets/WorldMapCatalog.cpp
     src/gui/widgets/WorldTexture.cpp
     src/gui/LogbookWindow.cpp
