@@ -5630,6 +5630,13 @@ endif()
 if(Qt6WebSockets_FOUND)
     nereus_add_test(tst_tci_tx_mutex)
     target_link_libraries(tst_tci_tx_mutex PRIVATE Qt6::WebSockets)
+
+    # -- A TCI client that keyed the radio and then vanished must not leave
+    #    it keyed (2026-09-17): ownership bookkeeping without a model, and
+    #    the radio actually unkeyed with one -- including the case that
+    #    must NOT unkey (the operator keyed after the client let go) --
+    nereus_add_test(tst_tci_mox_release_on_disconnect)
+    target_link_libraries(tst_tci_mox_release_on_disconnect PRIVATE Qt6::WebSockets)
 endif()
 
 # ── Phase 3J-1 Task 1.1: TCI verification matrix runner ──────────────────────
