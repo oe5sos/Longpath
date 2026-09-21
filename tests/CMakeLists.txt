@@ -4755,6 +4755,11 @@ nereus_add_test(tst_theme_form_knobs)
 nereus_add_test(tst_surface_gradients)
 nereus_add_test(tst_stilblatt)
 nereus_add_test(tst_logbook_import)
+
+# -- Sync QRZ (2026-09-21): der Abholer (Antwort-Parser, Blaettern gegen
+#    einen HTTP-Mock) und das Zusammenfuehren im Logbuchfenster ohne Netz --
+nereus_add_test(tst_qrz_logbook_fetcher)
+nereus_add_test(tst_logbook_qrz_sync)
 nereus_add_test(tst_overlay_render_is_harmless)
 nereus_add_test(tst_quit_leaves_no_pending_deletes)
 nereus_add_test(tst_notch_removable_offline)
