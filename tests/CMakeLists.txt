@@ -884,6 +884,15 @@ longpath_add_test(tst_filter_restore_stays_on_sideband)
 
 # ── 2026-09-17: jede Rauschminderung laeuft wirklich mit Audio durch einen WDSP-Kanal ──
 longpath_add_test(tst_nr_backends_process_audio)
+# Der Pruefstand taktet den Kanal wie das Funkgeraet (238 Werte je
+# 4,96 ms); WDSPs Eingangsring hat keine Ueberlaufpruefung (iobuffs.c).
+# Unter "ctest -j" auf dem Linux-Runner (PR #42, 2026-09-21) kam der
+# wdspmain-Thread nicht mehr an die Reihe, der Ring lief ueber, und
+# fexchange2 stuerzte mit SIGSEGV ab -- Echtzeit braucht die Maschine
+# fuer sich. Wie tst_notch_removable_offline: RUN_SERIAL.
+if(TEST tst_nr_backends_process_audio)
+    set_tests_properties(tst_nr_backends_process_audio PROPERTIES RUN_SERIAL TRUE)
+endif()
 
 # ── Step attenuator / ADC overload detection ─────────────────────────────
 longpath_add_test(tst_step_attenuator_controller)
