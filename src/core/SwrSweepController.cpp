@@ -18,6 +18,9 @@
 //   2026-08-13 — Created by Ralph Martin Fischer (OE5SOS),
 //                 AI-assisted implementation via Anthropic Claude
 //                 (Cowork).
+//   2026-09-21 — beginMeasure() emits measureWindowOpened(index) once
+//                 the dwell timer is armed. Martin Fischer, AI-assisted
+//                 via Anthropic Claude.
 // =================================================================
 
 #include "SwrSweepController.h"
@@ -552,6 +555,7 @@ void SwrSweepController::beginMeasure()
     m_accRevRawPeak = 0;
     m_state  = State::Measuring;
     m_stepTimer.start(m_plan.dwellMs);
+    emit measureWindowOpened(m_index);
 }
 
 void SwrSweepController::ingestTelemetry(double fwdW, double revW,
