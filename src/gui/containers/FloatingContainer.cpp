@@ -1,12 +1,12 @@
 // =================================================================
-// src/gui/containers/FloatingContainer.cpp  (NereusSDR)
+// src/gui/containers/FloatingContainer.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/frmMeterDisplay.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -251,7 +251,7 @@ void FloatingContainer::updateTitle()
     uint hash = qHash(m_id) % 100000;
     // ── Umbenannt am 2026-08-23, mit einer Folge ────────────────────
     //
-    // Hier stand "NereusSDR Meter [...]". Das Programm heisst seit dem
+    // Hier stand "Longpath Meter [...]". Das Programm heisst seit dem
     // 2026-08-20 Longpath, und ein Fenstertitel mit dem alten Namen
     // steht sichtbar auf dem Bildschirm.
     //

@@ -214,7 +214,7 @@ void setExternalDiversityRunning(int id, bool running);
 void destroyExternalDiversity(int id);
 ```
 
-Track created/running state for the two WDSP slots. `shutdown()` and the destructor stop then destroy every created slot. Use a test-only function-pointer table under `NEREUS_BUILD_TESTS`; production defaults call the real C API.
+Track created/running state for the two WDSP slots. `shutdown()` and the destructor stop then destroy every created slot. Use a test-only function-pointer table under `LONGPATH_BUILD_TESTS`; production defaults call the real C API.
 
 Remove the `RxChannel::setExtDiv*` wrappers: an RX channel ID is not an external-diversity ID and must never index `pdiv`.
 
@@ -317,10 +317,10 @@ git diff --stat
 git add src/models/RadioModel.* src/models/RxDspWorker.* src/core/PureSignal.h \
   src/core/P2RadioConnection.* src/core/WdspEngine.* src/core/RxChannel.* \
   src/core/wdsp_api.h tests
-NEREUS_THETIS_DIR=/Users/j.j.boyd/Thetis \
-NEREUS_MI0BOT_DIR=/Users/j.j.boyd/mi0bot-Thetis \
-NEREUS_DESKHPSDR_DIR=/Users/j.j.boyd/deskhpsdr \
-NEREUS_FREEDV_DIR=/Users/j.j.boyd/freedv-gui \
+LONGPATH_THETIS_DIR=/Users/j.j.boyd/Thetis \
+LONGPATH_MI0BOT_DIR=/Users/j.j.boyd/mi0bot-Thetis \
+LONGPATH_DESKHPSDR_DIR=/Users/j.j.boyd/deskhpsdr \
+LONGPATH_FREEDV_DIR=/Users/j.j.boyd/freedv-gui \
 git commit -S -m "fix(protocol): unify P2 assignment and diversity lifecycle"
 git log --show-signature -1
 ```

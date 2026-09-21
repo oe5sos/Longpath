@@ -19,7 +19,7 @@
 - **Do not run the full test suite between tasks.** Build and run the single named target per task. `ctest -L core` once at the end of Task 4, full suite once at the end of Task 6. See [docs/development/fast-test-loop.md](../../development/fast-test-loop.md).
 - **Branch:** `fix/hl2-two-slice-cap`, worktree `.claude/worktrees/hl2-two-slice`, based on `feature/phase3f-sub-epic-a-foundation` (PR #293). Do not rebase onto `main`; these fields do not exist there.
 - **Do not merge, and do not post anything to GitHub.** Maintainer sign-off is required (design doc §10).
-- **Pre-commit hooks run automatically.** If a commit needs the Thetis path, prefix with `NEREUS_THETIS_DIR=/Users/j.j.boyd/Thetis`.
+- **Pre-commit hooks run automatically.** If a commit needs the Thetis path, prefix with `LONGPATH_THETIS_DIR=/Users/j.j.boyd/Thetis`.
 
 ## Build Commands
 
@@ -724,7 +724,7 @@ QTEST_MAIN(TestP1Hl2Rx2Wiring)
 Register the test in `tests/CMakeLists.txt` next to the other P1 entries, in alphabetical position near line 637:
 
 ```cmake
-nereus_add_test(tst_p1_hl2_rx2_wiring)
+longpath_add_test(tst_p1_hl2_rx2_wiring)
 ```
 
 - [ ] **Step 2: Run test to verify it fails**

@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_p2_status_telemetry.cpp  (NereusSDR)
+// tests/tst_p2_status_telemetry.cpp  (Longpath)
 // =================================================================
 //
 // Phase 3P-H Task 4: verifies P2RadioConnection::processHighPriorityStatus()
@@ -13,11 +13,11 @@
 //   bytes 51-52 → user_adc1     (AIN4 PA Amps)
 //   bytes 53-54 → user_adc0     (AIN3 PA Volts)
 //
-// NereusSDR keeps the 4-byte sequence prefix in the QByteArray, so the
+// Longpath keeps the 4-byte sequence prefix in the QByteArray, so the
 // effective offset in the buffer is N+4.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-21 — Original implementation for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted authoring via Anthropic
 //                 Claude Code.
@@ -35,7 +35,7 @@ namespace {
 
 // Build a 60-byte High-Priority status packet with the given big-endian
 // 16-bit values placed at the Thetis ReadBufp offsets (shifted by +4 to
-// account for NereusSDR's leading sequence-number prefix).
+// account for Longpath's leading sequence-number prefix).
 QByteArray makeHighPriorityPacket(quint16 exciter, quint16 fwd, quint16 rev,
                                   quint16 supply,
                                   quint16 userAdc1, quint16 userAdc0)

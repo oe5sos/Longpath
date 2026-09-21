@@ -1,4 +1,4 @@
-// no-port-check: AetherSDR-derived NereusSDR file. Top-level QWidget
+// no-port-check: AetherSDR-derived Longpath file. Top-level QWidget
 // wrapper for detaching a PanadapterApplet to a second monitor is adapted
 // structurally from AetherSDR src/gui/PanFloatingWindow.{h,cpp} [@0cd4559].
 // Registered in docs/attribution/aethersdr-reconciliation.md.
@@ -6,7 +6,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // =================================================================
-// src/gui/PanFloatingWindow.cpp  (NereusSDR)
+// src/gui/PanFloatingWindow.cpp  (Longpath)
 // =================================================================
 //
 // Ported (structurally) from AetherSDR src/gui/PanFloatingWindow.{h,cpp}
@@ -15,7 +15,7 @@
 //       per https://github.com/ten9876/AetherSDR (GPLv3; see LICENSE
 //       and About dialog for the live contributor list)
 //
-// See PanFloatingWindow.h for full Modification history (NereusSDR).
+// See PanFloatingWindow.h for full Modification history (Longpath).
 // =================================================================
 
 #include "gui/PanFloatingWindow.h"
@@ -77,8 +77,10 @@ PanFloatingWindow::PanFloatingWindow(PanadapterApplet* applet, QWidget* parent)
     m_titleBar = new WindowTitleBar(
         QStringLiteral("Panadapter %1").arg(applet ? applet->panId()
                                                    : QString()), this);
+    // × und Pfeil docken beide DIREKT an -- nicht ueber close(), denn
+    // ein QCloseEvent dockt seit dem 2026-09-17 nie mehr (closeEvent()).
     connect(m_titleBar, &WindowTitleBar::closeRequested,
-            this, &QWidget::close);
+            this, &PanFloatingWindow::requestDock);
     connect(m_titleBar, &WindowTitleBar::dockRequested,
             this, &PanFloatingWindow::requestDock);
     // Je Panadapter ein eigener Schluessel: zwei festgestellte Fenster
@@ -195,11 +197,17 @@ void PanFloatingWindow::closeEvent(QCloseEvent* event)
         return;
     }
 
-    // Sonst: NICHT schliessen, sondern zurueckdocken. Das Ignorieren
-    // ist Absicht (Aether ebenso) — wer das Fenster schliesst UND
-    // gleichzeitig zurueckhaengt, laesst zwei Abbauten um dasselbe
-    // Widget rennen.
-    requestDock();
+    // Sonst: weder schliessen noch andocken. Bis zum 2026-09-17 stand
+    // hier requestDock() (AetherSDR-Erbe: Schliessen heisst andocken).
+    // Der ×-Knopf laeuft aber ueber die Titelleiste direkt nach
+    // requestDock(), nicht ueber close(); ein QCloseEvent kommt an
+    // dieses rahmenlose Fenster nur vom System -- beim Beenden ueber
+    // Dock/Apfelmenue, dessen Reihenfolge Qt nicht garantiert (die
+    // Sperre oben ist dann noch nicht gesetzt), oder als macOS-
+    // Nebeneffekt eines Space-/Vollbild-Wechsels (die Diagnose oben
+    // wurde genau dafuer eingebaut). Beides darf das Profil nicht
+    // umschreiben. Volle Begruendung in
+    // AppletFloatingWindow::closeEvent().
     event->ignore();
 }
 

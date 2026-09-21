@@ -1,12 +1,12 @@
 // =================================================================
-// src/gui/setup/hardware/AntennaAlexAlex2Tab.cpp  (NereusSDR)
+// src/gui/setup/hardware/AntennaAlexAlex2Tab.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
 //   Project Files/Source/Console/setup.designer.cs (~lines 25539-26857, tpAlex2FilterControl)
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-20 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                (KG4VCF), with AI-assisted transformation via Anthropic
 //                Claude Code. Sub-sub-tab under Hardware → Antenna/ALEX.
@@ -590,7 +590,7 @@ void AntennaAlexAlex2Tab::onMasterCheckChanged(bool checked, const QString& sett
 
 // ── Test seam ─────────────────────────────────────────────────────────────────
 
-// Always compiled — NEREUS_BUILD_TESTS is set on NereusSDRObjs globally.
+// Always compiled — LONGPATH_BUILD_TESTS is set on NereusSDRObjs globally.
 // Returns whether the status bar reflects an "Active" (hasAlex2=true) board.
 bool AntennaAlexAlex2Tab::isAlex2Active() const
 {

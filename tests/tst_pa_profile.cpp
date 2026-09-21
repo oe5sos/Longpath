@@ -41,7 +41,7 @@ private slots:
     // ── 1. Construct + ResetGainDefaultsForModel ─────────────────────────
     // Thetis PAProfile constructor (setup.cs:23786-23810 [v2.10.3.13])
     // calls ResetGainDefaultsForModel(model) which loads from
-    // HardwareSpecific.DefaultPAGainsForBands. NereusSDR ports this through
+    // HardwareSpecific.DefaultPAGainsForBands. Longpath ports this through
     // defaultPaGainsForBand. ANAN-8000DLE 80m factory value is 50.5f
     // (clsHardwareSpecific.cs:656-666 [v2.10.3.13]).
     void construct_resets_gain_defaults_for_model() {
@@ -150,7 +150,7 @@ private slots:
     // Thetis setup.cs:23964-24003 [v2.10.3.13] — every setter early-returns
     // on `(int)b <= (int)Band.FIRST || (int)b >= (int)Band.LAST` and
     // SetAdjust additionally on `stepIndex < 0 || stepIndex > 8`.
-    // NereusSDR's analog: any Band index >= kBandCount (i.e. SWL bands 14..26)
+    // Longpath's analog: any Band index >= kBandCount (i.e. SWL bands 14..26)
     // is silently ignored.
     void set_gain_for_band_out_of_range_no_ops() {
         PaProfile p(QStringLiteral("p"), HPSDRModel::ANAN8000D, true);
@@ -169,7 +169,7 @@ private slots:
     // XVTR is the last in-range slot (index 13 of [0, 14)).  After
     // construction with HPSDRModel::ANAN8000D, `defaultPaGainsForBand`
     // returns 100.0f for XVTR (no Thetis equivalent in the gain table —
-    // PaGainProfile's NereusSDR-spin sentinel for non-HF slots).  The
+    // PaGainProfile's Longpath-spin sentinel for non-HF slots).  The
     // getter must NOT trip the 1000-sentinel branch.
     void get_gain_for_band_xvtr_in_range_no_sentinel() {
         PaProfile p(QStringLiteral("p"), HPSDRModel::ANAN8000D, true);
@@ -230,7 +230,7 @@ private slots:
     }
 
     // ── 7. Round-trip serialization ──────────────────────────────────────
-    // NereusSDR-canonical 14-band layout: 1 (base64 name) + 1 (model int) +
+    // Longpath-canonical 14-band layout: 1 (base64 name) + 1 (model int) +
     // 1 (default bool) + 14 (gains) + 14*9 (adjusts) + 14*2 (max-power
     // pairs) = 3 + 14 + 126 + 28 = 171 fields.
     void data_to_string_field_count_is_171() {

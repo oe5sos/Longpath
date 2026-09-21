@@ -7,7 +7,7 @@
 // doesn't. The refusal test is the important one: this class runs a
 // command on the operator's machine, and the whole design rests on that
 // command never being able to ask for administrator rights.
-// no-port-check: NereusSDR-original.
+// no-port-check: Longpath-original.
 
 #include <QtTest/QtTest>
 

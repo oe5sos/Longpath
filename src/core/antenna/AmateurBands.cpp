@@ -1,12 +1,12 @@
 // =================================================================
-// src/core/antenna/AmateurBands.cpp  (NereusSDR)
+// src/core/antenna/AmateurBands.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. See AmateurBands.h — this is a band plan, not a
+// Longpath-original. See AmateurBands.h — this is a band plan, not a
 // licence, and the region is a setting for that reason.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-10 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

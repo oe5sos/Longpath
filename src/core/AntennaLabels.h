@@ -1,11 +1,11 @@
-// src/core/AntennaLabels.h (NereusSDR)
+// src/core/AntennaLabels.h  (Longpath)
 //
 // Single source for the "ANT1/ANT2/ANT3" label list. Replaces 10+
 // hardcoded QStringList{"ANT1","ANT2","ANT3"} sites across the UI.
 // Returns an empty list when the connected board has no Alex (HL2,
 // Atlas), so UI callers can `setVisible(!labels.isEmpty())`.
 //
-// no-port-check: NereusSDR-original file. The reference to networkproto1.c
+// no-port-check: Longpath-original file. The reference to networkproto1.c
 // below is a documentation reference to the wire-encoding spec, not ported
 // logic. All logic in this file is independently implemented.
 //

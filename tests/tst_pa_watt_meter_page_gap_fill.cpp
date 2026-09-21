@@ -1,4 +1,4 @@
-// tests/tst_pa_watt_meter_page_gap_fill.cpp  (NereusSDR)
+// tests/tst_pa_watt_meter_page_gap_fill.cpp  (Longpath)
 //
 // Phase 5 Agent 5A of issue #167 — PaWattMeterPage gap fill.
 // no-port-check: test fixture — no Thetis attribution required.
@@ -58,7 +58,7 @@ private slots:
 // 1. With a fresh AppSettings (cleared in cleanup()), the page must default
 //    "Show PA Values page" to checked. This matches the Thetis startup
 //    behaviour where panelPAValues is gated on chkPAValues whose default
-//    state in NereusSDR is "always show the readout page" so users don't
+//    state in Longpath is "always show the readout page" so users don't
 //    have to dig through Setup to find their PA telemetry.
 // ---------------------------------------------------------------------------
 void TstPaWattMeterPageGapFill::showPaValuesCheckbox_defaultsToTrue_onFirstRun()

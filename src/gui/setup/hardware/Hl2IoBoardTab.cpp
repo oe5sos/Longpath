@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/setup/hardware/Hl2IoBoardTab.cpp  (NereusSDR)
+// src/gui/setup/hardware/Hl2IoBoardTab.cpp  (Longpath)
 // =================================================================
 //
 // Ported from mi0bot-Thetis sources:
@@ -9,15 +9,15 @@
 //     state machine driving register state; subscribed via IoBoardHl2 model)
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Phase 3I placeholder (GPIO combos only).
 //   2026-04-20 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                (KG4VCF), with AI-assisted transformation via Anthropic
 //                Claude Code. Replaces Phase 3I empty placeholder; surfaces
 //                IoBoardHl2 + HermesLiteBandwidthMonitor state for HL2
-//                diagnostics. NereusSDR spin: register state table + I2C
+//                diagnostics. Longpath spin: register state table + I2C
 //                transaction log + state-machine viz + bandwidth mini are
-//                pure NereusSDR diagnostic surfaces (mi0bot doesn't expose
+//                pure Longpath diagnostic surfaces (mi0bot doesn't expose
 //                them in the Thetis UI).
 // =================================================================
 //
@@ -663,7 +663,8 @@ void Hl2IoBoardTab::updateOcIndicator(quint8 ocByte, int bandIdx, bool mox)
         if (!m_ocPinLeds[i]) { continue; }
         const bool on = (ocByte & (1u << i)) != 0;
         m_ocPinLeds[i]->setStyleSheet(Style::themed(
-            on ? QStringLiteral("QFrame { background: #6fa384; border: 1px solid #80ff80; border-radius: 6px; }")
+            on ? QStringLiteral("QFrame { background: #6fa384; border: 1px solid %1; border-radius: 6px; }")
+                     .arg(QLatin1String(Style::kDspToggleText))
                : QStringLiteral("QFrame { background: #222; border: 1px solid #555; border-radius: 6px; }")));
     }
 }
@@ -773,7 +774,7 @@ void Hl2IoBoardTab::updateBwDisplay()
 QString Hl2IoBoardTab::decodeRegister(IoBoardHl2::Register reg, quint8 value) const
 {
     // Human-readable decoding for the principal registers.
-    // NereusSDR diagnostic surface — no upstream UI equivalent.
+    // Longpath diagnostic surface — no upstream UI equivalent.
     switch (reg) {
     case IoBoardHl2::Register::HardwareVersion:
         if (value == IoBoardHl2::kHardwareVersion1) {
@@ -930,7 +931,7 @@ void Hl2IoBoardTab::onRegisterPollTick()
 //               that match the N2ADR filter wiring (10 ham + 13 SWL).
 //   case false: clear all chkPenOC* checkboxes.
 //
-// NereusSDR mirrors that exactly: this checkbox is the single source of
+// Longpath mirrors that exactly: this checkbox is the single source of
 // truth for N2ADR.  Toggling on populates the shared OcMatrix with the
 // per-band pattern; toggling off wipes it.  No separate "apply preset"
 // step.  The per-band write table lives in N2adrPreset so that this
@@ -942,7 +943,7 @@ void Hl2IoBoardTab::onRegisterPollTick()
 // through onTabSettingChanged() → setHardwareValue(mac, ...) so the value
 // lands at hardware/<mac>/hl2IoBoard/n2adrFilter.  Mirrors Thetis's
 // effective per-radio semantic (each Thetis DB file ≈ one radio,
-// database.cs:64 [@c26a8a4]) within NereusSDR's multi-radio settings model.
+// database.cs:64 [@c26a8a4]) within Longpath's multi-radio settings model.
 void Hl2IoBoardTab::onN2adrToggled(bool checked)
 {
     emit settingChanged(QStringLiteral("n2adrFilter"),

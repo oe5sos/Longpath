@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/applets/AppletKeys.cpp  (NereusSDR)
+// src/gui/applets/AppletKeys.cpp  (Longpath)
 // =================================================================
 // Siehe AppletKeys.h — eine Kennung, nicht zwei.
 // =================================================================

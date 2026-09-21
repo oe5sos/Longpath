@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_mainwindow_tools_spot_hub.cpp  (NereusSDR)
+// tests/tst_mainwindow_tools_spot_hub.cpp  (Longpath)
 // =================================================================
 //
 // Phase 3J-2 Task H1: verifies the Tools menu wiring contracts for
@@ -28,14 +28,14 @@
 //      FreeDVReporterClient + SliceModel.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-11  J.J. Boyd / KG4VCF  Phase 3J-2 Task H1. Original
-//                                    implementation for NereusSDR
+//                                    implementation for Longpath
 //                                    with AI-assisted authoring via
 //                                    Anthropic Claude Code.
 // =================================================================
 
-// no-port-check: NereusSDR-original test file.
+// no-port-check: Longpath-original test file.
 
 #include <QtTest/QtTest>
 #include <QSignalSpy>

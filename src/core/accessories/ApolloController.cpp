@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/accessories/ApolloController.cpp  (NereusSDR)
+// src/core/accessories/ApolloController.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -10,7 +10,7 @@
 //   (ApolloPresent property, ApolloTunerEnabled property)
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-20 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                (KG4VCF), with AI-assisted transformation via Anthropic
 //                Claude Code. Models the Apollo PA + ATU + LPF accessory

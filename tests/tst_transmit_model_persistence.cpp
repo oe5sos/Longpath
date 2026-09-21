@@ -1,6 +1,6 @@
-// no-port-check: NereusSDR-original unit-test file.
+// no-port-check: Longpath-original unit-test file.
 // =================================================================
-// tests/tst_transmit_model_persistence.cpp  (NereusSDR)
+// tests/tst_transmit_model_persistence.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for TransmitModel::loadFromSettings(mac) /
@@ -113,7 +113,7 @@ private slots:
     {
         TransmitModel t;
         t.loadFromSettings(kMacA);
-        // Default -40 — NereusSDR-original conservative starting point
+        // Default -40 — Longpath-original conservative starting point
         QCOMPARE(t.voxThresholdDb(), -40);
     }
 
@@ -137,7 +137,7 @@ private slots:
     {
         TransmitModel t;
         t.loadFromSettings(kMacA);
-        // Default 0 — NereusSDR-original safe starting point
+        // Default 0 — Longpath-original safe starting point
         QCOMPARE(t.antiVoxGainDb(), 0);
     }
 
@@ -156,7 +156,7 @@ private slots:
     {
         TransmitModel t;
         t.loadFromSettings(kMacA);
-        // Default Pc — NereusSDR-native; always safe and available
+        // Default Pc — Longpath-native; always safe and available
         QCOMPARE(t.micSource(), MicSource::Pc);
     }
 
@@ -191,7 +191,7 @@ private slots:
     {
         TransmitModel t;
         t.loadFromSettings(kMacA);
-        // NereusSDR-original (Thetis Designer = 10 %).
+        // Longpath-original (Thetis Designer = 10 %).
         QCOMPARE(t.twoTonePower(), 50);
     }
 

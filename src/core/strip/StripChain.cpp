@@ -1,12 +1,12 @@
 // =================================================================
-// src/core/strip/StripChain.cpp  (NereusSDR)
+// src/core/strip/StripChain.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. See StripChain.h for the order, the two rules
+// Longpath-original. See StripChain.h for the order, the two rules
 // and why the runner is ours rather than ported.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-08 — Created in C++20 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 //   2026-09-17 — Non-finite guard around every stage; see the header.

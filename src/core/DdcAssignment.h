@@ -1,11 +1,11 @@
 // =================================================================
-// src/core/DdcAssignment.h  (NereusSDR)
+// src/core/DdcAssignment.h  (Longpath)
 // =================================================================
 //
-// no-port-check: NereusSDR-original aggregator struct. Field names and
+// no-port-check: Longpath-original aggregator struct. Field names and
 //   field-level comments cite Thetis console.cs UpdateDDCs for semantic
 //   context only; this file contains no ported logic, no ported constants,
-//   and no ported algorithms. It is a NereusSDR-native data structure whose
+//   and no ported algorithms. It is a Longpath-native data structure whose
 //   shape is informed by Thetis UpdateDDCs output conventions. No PROVENANCE
 //   row is needed.
 //
@@ -13,7 +13,7 @@
 //   Project Files/Source/Console/console.cs (UpdateDDCs output state)
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-27. Created in C++20/Qt6 for NereusSDR by J.J. Boyd (KG4VCF),
 //               with AI-assisted transformation via Anthropic Claude Code.
 //               Extension of existing PsDdcConfig (Phase 3M-4) to carry

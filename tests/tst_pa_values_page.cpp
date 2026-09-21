@@ -1,4 +1,4 @@
-// tests/tst_pa_values_page.cpp  (NereusSDR)
+// tests/tst_pa_values_page.cpp  (Longpath)
 //
 // Setup IA reshape Phase 4 — live PA Values page.
 // no-port-check: test fixture — no Thetis attribution required.

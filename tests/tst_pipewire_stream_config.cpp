@@ -1,8 +1,8 @@
 // =================================================================
-// tests/tst_pipewire_stream_config.cpp  (NereusSDR)
+// tests/tst_pipewire_stream_config.cpp  (Longpath)
 // Author: J.J. Boyd (KG4VCF), AI-assisted via Claude Code. 2026-04-23.
 // =================================================================
-#ifdef NEREUS_HAVE_PIPEWIRE
+#ifdef LONGPATH_HAVE_PIPEWIRE
 
 #include <QtTest/QtTest>
 #include <pipewire/pipewire.h>
@@ -20,7 +20,7 @@ private slots:
 
     void outputVirtualSource_setsCoreKeys() {
         StreamConfig cfg;
-        cfg.nodeName        = QStringLiteral("nereussdr.vax-1");
+        cfg.nodeName        = QStringLiteral("longpath.vax-1");
         cfg.nodeDescription = QStringLiteral("NereusSDR VAX 1");
         cfg.direction       = StreamConfig::Output;
         cfg.mediaClass      = QStringLiteral("Audio/Source");
@@ -45,7 +45,7 @@ private slots:
 
     void inputConsumer_setsCaptureCategory() {
         StreamConfig cfg;
-        cfg.nodeName = QStringLiteral("nereussdr.tx-input");
+        cfg.nodeName = QStringLiteral("longpath.tx-input");
         cfg.nodeDescription = QStringLiteral("NereusSDR TX input");
         cfg.direction = StreamConfig::Input;
         cfg.mediaClass = QStringLiteral("Stream/Input/Audio");
@@ -59,7 +59,7 @@ private slots:
 
     void targetNodeName_setsTargetObject() {
         StreamConfig cfg;
-        cfg.nodeName = QStringLiteral("nereussdr.rx-primary");
+        cfg.nodeName = QStringLiteral("longpath.rx-primary");
         cfg.nodeDescription = QStringLiteral("NereusSDR Primary");
         cfg.direction = StreamConfig::Output;
         cfg.mediaClass = QStringLiteral("Stream/Output/Audio");

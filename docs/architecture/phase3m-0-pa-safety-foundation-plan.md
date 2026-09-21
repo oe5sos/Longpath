@@ -6,7 +6,7 @@
 
 **Architecture:** 8 cohesive components. New `src/core/safety/` directory with three controllers (Swr / TxInhibit / BandPlanGuard) owned by `RadioModel`. New `src/models/RadioModel::paTripped()` live state distinct from `BoardCapabilities` capability flags. New `RadioConnection::setWatchdogEnabled(bool)` API. New Setup → Transmit + Setup → General sections. Existing 3P-H telemetry signals routed into `MeterPoller` cache. Static "HIGH SWR" + 6 px red border overlay added to `SpectrumWidget`. Everything observable but inactive until 3M-1a fires the first MOX.
 
-**Tech Stack:** C++20, Qt6 (Widgets / Test), CMake + Ninja, ctest. Test framework is `QtTest` via the existing `nereus_add_test()` helper in `tests/CMakeLists.txt`. All commits GPG-signed (per `feedback_gpg_sign_commits`). All Thetis cites carry version stamp `[v2.10.3.13]` or `[@501e3f51]` (per `feedback_inline_cite_versioning`). User-visible strings stay plain English; cites in inline source comments only (per `feedback_no_cites_in_user_strings`).
+**Tech Stack:** C++20, Qt6 (Widgets / Test), CMake + Ninja, ctest. Test framework is `QtTest` via the existing `longpath_add_test()` helper in `tests/CMakeLists.txt`. All commits GPG-signed (per `feedback_gpg_sign_commits`). All Thetis cites carry version stamp `[v2.10.3.13]` or `[@501e3f51]` (per `feedback_inline_cite_versioning`). User-visible strings stay plain English; cites in inline source comments only (per `feedback_no_cites_in_user_strings`).
 
 **Source-of-truth design doc:** `docs/architecture/phase3m-tx-epic-master-design.md` — Section 4 covers 3M-0. Pre-code Thetis review for 3M-0 closed 2026-04-25; this plan implements the corrected design.
 
@@ -63,7 +63,7 @@ cd ../wt-3m-0
 
 Run:
 ```bash
-cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DNEREUS_BUILD_TESTS=ON
+cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DLONGPATH_BUILD_TESTS=ON
 cmake --build build -j$(nproc)
 cd build && ctest --output-on-failure
 ```
@@ -349,7 +349,7 @@ QTEST_GUILESS_MAIN(TestBandPlanGuard)
 Add near the bottom of the file (in the same style as the other recent tests):
 ```cmake
 # ── Phase 3M-0 BandPlanGuard ───────────────────────────────────────
-nereus_add_test(tst_band_plan_guard)
+longpath_add_test(tst_band_plan_guard)
 ```
 
 - [ ] **Step 2.3: Build; expect failure for missing header**
@@ -813,7 +813,7 @@ QTEST_GUILESS_MAIN(TestSwrProtectionController)
 
 Add to `tests/CMakeLists.txt`:
 ```cmake
-nereus_add_test(tst_swr_protection_controller)
+longpath_add_test(tst_swr_protection_controller)
 ```
 
 - [ ] **Step 3.2: Build; expect failure for missing header**
@@ -1208,7 +1208,7 @@ QTEST_MAIN(TestTxInhibitMonitor)
 
 Add to `tests/CMakeLists.txt`:
 ```cmake
-nereus_add_test(tst_tx_inhibit_monitor)
+longpath_add_test(tst_tx_inhibit_monitor)
 ```
 
 - [ ] **Step 4.2: Build; expect failure for missing header**
@@ -1942,7 +1942,7 @@ QTEST_MAIN(TestTransmitSetupTxInhibit)
 
 Add to `tests/CMakeLists.txt`:
 ```cmake
-nereus_add_test(tst_transmit_setup_tx_inhibit)
+longpath_add_test(tst_transmit_setup_tx_inhibit)
 ```
 
 - [ ] **Step 10.2: Build; verify failure**
@@ -2082,7 +2082,7 @@ QTEST_MAIN(TestTransmitSetupBlockTx)
 
 Add to `tests/CMakeLists.txt`:
 ```cmake
-nereus_add_test(tst_transmit_setup_block_tx)
+longpath_add_test(tst_transmit_setup_block_tx)
 ```
 
 - [ ] **Step 11.2: Build; expect failure**
@@ -2267,7 +2267,7 @@ QTEST_MAIN(TestGeneralSetupHardwareConfig)
 
 Add to `tests/CMakeLists.txt`:
 ```cmake
-nereus_add_test(tst_general_setup_hardware_config)
+longpath_add_test(tst_general_setup_hardware_config)
 ```
 
 - [ ] **Step 12.2: Build; verify failure**
@@ -2422,7 +2422,7 @@ QTEST_MAIN(TestGeneralSetupOptions)
 
 Add to `tests/CMakeLists.txt`:
 ```cmake
-nereus_add_test(tst_general_setup_options)
+longpath_add_test(tst_general_setup_options)
 ```
 
 - [ ] **Step 13.2: Build; verify failure**

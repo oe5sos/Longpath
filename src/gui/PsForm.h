@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/PsForm.h  (NereusSDR)
+// src/gui/PsForm.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -8,7 +8,7 @@
 // original licences from Thetis source are included below.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-06 — Phase 3M-4 Task 8: created by J.J. Boyd (KG4VCF),
 //                 with AI-assisted transformation via Anthropic Claude
 //                 Code.  Source-first 1:1 port of the Thetis modeless

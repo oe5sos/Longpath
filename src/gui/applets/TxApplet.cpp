@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/applets/TxApplet.cpp  (NereusSDR)
+// src/gui/applets/TxApplet.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -11,7 +11,7 @@
 // block below).
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-16 — Ported/adapted in C++20/Qt6 for NereusSDR by
 //                 J.J. Boyd (KG4VCF), with AI-assisted transformation
 //                 via Anthropic Claude Code.
@@ -120,7 +120,7 @@
 //
 //   Layout pattern from AetherSDR `src/gui/TxApplet.{h,cpp}`.
 //   AetherSDR is licensed under the GNU General Public License v3.
-//   NereusSDR is also GPLv3. Attribution follows GPLv3 §5 requirements.
+//   Longpath is also GPLv3. Attribution follows GPLv3 §5 requirements.
 // =================================================================
 
 // TxApplet — TX control panel.
@@ -198,6 +198,12 @@
 
 namespace Longpath {
 
+namespace {
+// Breite der Beschriftungsspalte im Messblock (Vorlauf, SWR, Leistung,
+// Tune): eine Zahl fuer alle vier, damit die Rinnen buendig stehen.
+constexpr int kTxLabelW = 62;
+} // namespace
+
 TxApplet::TxApplet(RadioModel* model, QWidget* parent)
     : AppletWidget(model, parent)
 {
@@ -239,7 +245,9 @@ void TxApplet::buildUI()
     outer->setSpacing(0);
 
     auto* body = new QWidget(this);
-    body->setStyleSheet(QStringLiteral("background: %1;").arg(Style::kPanelBg));
+    // Durchsichtig (Glas & Tiefe, 2026-09-17): die Platte mit ihrem
+    // Verlauf malt das Fenster bzw. die Zelle, nicht das Applet.
+    body->setStyleSheet(QStringLiteral("background: transparent;"));
     auto* vbox = new QVBoxLayout(body);
     vbox->setContentsMargins(6, 5, 6, 5);
     vbox->setSpacing(5);
@@ -275,6 +283,11 @@ void TxApplet::buildUI()
     // sichtbarer Span.
     auto* fwdGauge = new HGauge(this);
     fwdGauge->setTitle(QStringLiteral("VORLAUF"));
+    // 62, nicht 52: die Versalzeile mit Laufweite (Glas & Tiefe,
+    // 2026-09-17) braucht fuer "VORLAUF" rund 58 Punkte — bei 52 stand
+    // "VORLAUI" auf dem Blatt. Dieselbe Breite wie die Reglerzeilen
+    // darunter, damit Rinnen und Regler buendig beginnen.
+    fwdGauge->setLabelWidth(kTxLabelW);
     fwdGauge->setReadout(true, 1, QStringLiteral("W"));
     fwdGauge->setAccessibleName(QStringLiteral("Forward power gauge"));
     m_fwdPowerGauge = fwdGauge;
@@ -291,6 +304,7 @@ void TxApplet::buildUI()
     swrGauge->setYellowStart(2.0);
     swrGauge->setRedStart(2.5);
     swrGauge->setTitle(QStringLiteral("SWR"));
+    swrGauge->setLabelWidth(kTxLabelW);
     swrGauge->setReadout(true, 1);
     swrGauge->setAccessibleName(QStringLiteral("SWR gauge"));
     m_swrGauge = swrGauge;
@@ -306,7 +320,7 @@ void TxApplet::buildUI()
 
         m_rfPowerValue = new QLabel(QStringLiteral("100"), this);
         auto* row = sliderRow(QStringLiteral("Leistung"), m_rfPowerSlider,
-                              m_rfPowerValue, 54);
+                              m_rfPowerValue, kTxLabelW);
         // Auf dem HL2 steht hier „-7.5 dB" statt einer nackten Zahl —
         // die 36 Punkt aus sliderRow() schneiden das ab.
         m_rfPowerValue->setFixedWidth(46);
@@ -325,7 +339,7 @@ void TxApplet::buildUI()
 
         m_tunePwrValue = new QLabel(QStringLiteral("10"), this);
         auto* row = sliderRow(QStringLiteral("Tune"), m_tunePwrSlider,
-                              m_tunePwrValue, 54);
+                              m_tunePwrValue, kTxLabelW);
         m_tunePwrValue->setFixedWidth(46);
         m_tunePwrSlider->setFixedHeight(16);
         mess->addLayout(row);
@@ -690,7 +704,7 @@ void TxApplet::showFinePopup()
 // wireControls: called once after buildUI(). Attaches signal/slot connections
 // between the four wired controls and the model layer.
 //
-// Pattern follows the NereusSDR "GUI↔Model sync, no feedback loops" rule:
+// Pattern follows the Longpath "GUI↔Model sync, no feedback loops" rule:
 //   - Use QSignalBlocker (or m_updatingFromModel) to prevent echo loops.
 //   - Model setters emit signals → RadioConnection sends protocol commands.
 //   - UI state changes → model setters → emit back to update other UI.
@@ -902,8 +916,8 @@ void TxApplet::wireControls()
         // value persists per-band but the math kernel
         // (TransmitModel::setPowerUsingTargetDbm txMode 1) only consults
         // tunePowerForBand when m_tuneDrivePowerSource == TuneSlider.
-        // NereusSDR-spin: Thetis exposes _tuneDrivePowerSource via a
-        // separate Setup combo; NereusSDR follows last-touched-slider-wins
+        // Longpath-spin: Thetis exposes _tuneDrivePowerSource via a
+        // separate Setup combo; Longpath follows last-touched-slider-wins
         // UX so users don't need to know the enum exists.
         tx.setTuneDrivePowerSource(DrivePowerSource::TuneSlider);
     });
@@ -988,17 +1002,12 @@ void TxApplet::wireControls()
     // Phase 3M-1b K.2: update MOX button tooltip when DSP mode changes.
     // For modes that are deferred to a later phase (CW → 3M-2, AM/FM → 3M-3)
     // the tooltip explains why MOX won't engage, matching the moxRejected reason.
-    // Wired here (wireControls) rather than syncFromModel because the active
-    // slice can change after construction.
-    if (m_model) {
-        if (SliceModel* slice = m_model->activeSlice()) {
-            // Wire the active slice's dspModeChanged to onMoxModeChanged.
-            connect(slice, &SliceModel::dspModeChanged,
-                    this, &TxApplet::onMoxModeChanged);
-            // Set initial tooltip from current mode.
-            onMoxModeChanged(slice->dspMode());
-        }
-    }
+    // 2026-09-13 code review fix: this used to connect once, here, to
+    // whichever slice was active at construction time (there usually is
+    // none yet -- TxApplet is built before any slice exists -- and even
+    // when one did exist, switching the active slice afterward left this
+    // wired to the old one). Moved into rebindActiveSlice(), called once
+    // below and again by MainWindow on every RadioModel::activeSliceChanged.
 
     // ── 4b. VOX row wiring (3M-3a-iii bench polish 2026-05-04) ────────────────
     //
@@ -1268,15 +1277,6 @@ void TxApplet::wireControls()
     //             m_updatingFromModel guard prevents echo loops.
     // Model → UI: TransmitModel::filterChanged(int,int) → QSignalBlocker on
     //             both spinboxes, then setValue + refresh status label.
-    // Status label refresh helper (shared by filterChanged and dspModeChanged).
-    auto refreshFilterStatus = [this]() {
-        if (!m_txFilterStatusLabel || !m_model) { return; }
-        SliceModel* slice = m_model->activeSlice();
-        const DSPMode mode = slice ? slice->dspMode() : DSPMode::USB;
-        m_txFilterStatusLabel->setText(
-            m_model->transmitModel().filterDisplayText(mode));
-    };
-
     if (m_txFilterLowSpin) {
         connect(m_txFilterLowSpin, QOverload<int>::of(&QSpinBox::valueChanged),
                 this, [this](int v) {
@@ -1294,7 +1294,7 @@ void TxApplet::wireControls()
 
     // Model → spinboxes + status label on filterChanged.
     connect(&tx, &TransmitModel::filterChanged,
-            this, [this, refreshFilterStatus](int low, int high) {
+            this, [this](int low, int high) {
         m_updatingFromModel = true;
         if (m_txFilterLowSpin) {
             QSignalBlocker bLo(m_txFilterLowSpin);
@@ -1305,19 +1305,13 @@ void TxApplet::wireControls()
             m_txFilterHighSpin->setValue(high);
         }
         m_updatingFromModel = false;
-        refreshFilterStatus();
+        refreshTxFilterStatusLabel();
     });
 
-    // Status label refresh on DSP mode change (symmetric ↔ asymmetric format).
-    // Piggybacks on the same active-slice connect block used by K.2 above.
-    if (SliceModel* slice = m_model->activeSlice()) {
-        connect(slice, &SliceModel::dspModeChanged,
-                this, [refreshFilterStatus](DSPMode) {
-            refreshFilterStatus();
-        });
-        // Set initial status label text.
-        refreshFilterStatus();
-    }
+    // Status label refresh on DSP mode change (symmetric ↔ asymmetric format)
+    // is handled by rebindActiveSlice() (called once below, and again by
+    // MainWindow on every RadioModel::activeSliceChanged) -- see its
+    // 2026-09-13 code review comment on the header declaration.
 
     // ── Phase 3M-1c J.2 ─ 2-TONE button wiring ───────────────────────────────
     // toggled → TwoToneController::setActive.  Echo-guarded.
@@ -1372,7 +1366,52 @@ void TxApplet::wireControls()
     }
 
     // ── Initial sync from model ──────────────────────────────────────────────
+    rebindActiveSlice();
     syncFromModel();
+}
+
+// 2026-09-13 code review fix: re-binds the MOX-tooltip (K.2) and TX-filter-
+// status-label connections to whichever slice is now RadioModel's active
+// slice, and immediately resyncs both from it. Previously these connected
+// once, in wireControls(), to whichever slice happened to be active at
+// TxApplet construction time -- which in practice was none at all (TxApplet
+// is built in MainWindow::buildUI(), before any slice exists), so neither
+// ever fired for the life of the app. Call this from wireControls() (once,
+// at construction) and from MainWindow on every RadioModel::activeSliceChanged.
+void TxApplet::rebindActiveSlice()
+{
+    if (m_activeSliceModeConn) {
+        QObject::disconnect(m_activeSliceModeConn);
+        m_activeSliceModeConn = {};
+    }
+    if (m_activeSliceFilterConn) {
+        QObject::disconnect(m_activeSliceFilterConn);
+        m_activeSliceFilterConn = {};
+    }
+    if (!m_model) { return; }
+    SliceModel* slice = m_model->activeSlice();
+    if (!slice) { return; }
+
+    m_activeSliceModeConn = connect(slice, &SliceModel::dspModeChanged,
+                                    this, &TxApplet::onMoxModeChanged);
+    onMoxModeChanged(slice->dspMode());
+
+    m_activeSliceFilterConn = connect(slice, &SliceModel::dspModeChanged,
+                                       this, [this](DSPMode) {
+        refreshTxFilterStatusLabel();
+    });
+    refreshTxFilterStatusLabel();
+}
+
+// Status label refresh helper (shared by TransmitModel::filterChanged and
+// the active slice's dspModeChanged via rebindActiveSlice()).
+void TxApplet::refreshTxFilterStatusLabel()
+{
+    if (!m_txFilterStatusLabel || !m_model) { return; }
+    SliceModel* slice = m_model->activeSlice();
+    const DSPMode mode = slice ? slice->dspMode() : DSPMode::USB;
+    m_txFilterStatusLabel->setText(
+        m_model->transmitModel().filterDisplayText(mode));
 }
 
 void TxApplet::syncFromModel()
@@ -1524,10 +1563,38 @@ void TxApplet::setPowerScale(int maxWatts, bool hasAmplifier)
         return;
     }
 
+    // Code review, 2026-09-13 (changelog comparison with another
+    // client -- their 2.0.16 fixed "TX stage meters kept the stock 120W scale" with a
+    // lower-power amp configured): maxWatts used to be silently dropped
+    // here (Q_UNUSED), so ANY amplifier snapped this gauge to the fixed
+    // 2kW scale below regardless of its actual rating. That was
+    // harmless in practice because both amps this class currently wires
+    // up (PGXL, RF-Kit/RF2K-S) genuinely ARE ~2kW-class -- but the next
+    // lower-power amp integration would have silently inherited the
+    // wrong scale instead of getting its own. A caller that knows the
+    // real rating now gets a scale proportional to it (same shape as
+    // rescaleFwdGaugeForModel's per-SKU scale below); maxWatts<=0 keeps
+    // today's exact fixed 2kW behaviour for PGXL/RF-Kit call sites,
+    // which still legitimately pass 0.
+    if (maxWatts > 0) {
+        const double red = static_cast<double>(maxWatts);
+        const double top = red * 1.2;
+        m_fwdPowerGauge->setRange(0.0, top);
+        m_fwdPowerGauge->setRedStart(red);
+        m_fwdPowerGauge->setYellowStart(red);
+        auto fmt = [maxWatts](double v) {
+            return (maxWatts <= 10) ? QString::number(v, 'f', 1)
+                                    : QString::number(qRound(v));
+        };
+        m_fwdPowerGauge->setTickLabels({
+            fmt(0.0), fmt(red / 3.0), fmt(2.0 * red / 3.0), fmt(red), fmt(top),
+        });
+        return;
+    }
+
     // Wortgleich mit TunerApplet::setPowerScale — dieselben Zahlen fuer
     // dieselbe Sache, damit die Anzeigen nicht auseinanderlaufen.
     // Ursprung: AetherSDR src/gui/TunerApplet.cpp:setPowerScale [@0cd4559].
-    Q_UNUSED(maxWatts);
     m_fwdPowerGauge->setRange(0.0, 2000.0);
     m_fwdPowerGauge->setYellowStart(1500.0);
     m_fwdPowerGauge->setRedStart(1500.0);

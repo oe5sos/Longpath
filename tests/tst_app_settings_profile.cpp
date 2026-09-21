@@ -1,6 +1,6 @@
 // Issue #100 — multi-instance support via --profile CLI flag.
 //
-// Two instances of NereusSDR connected to different radios need isolated
+// Two instances of Longpath connected to different radios need isolated
 // settings + log directories. AppSettings exposes static path resolvers
 // so main.cpp can thread a profile name in from QCommandLineParser
 // without coupling the singleton's constructor to CLI parsing.

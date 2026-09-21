@@ -69,7 +69,7 @@ Scaled to the full suite:
 | Run warm | ~22s |
 
 The 526-vs-519 gap means seven `tst_*.cpp` files exist but are not registered
-with `nereus_add_test()`. Worth auditing separately; they are either dead or
+with `longpath_add_test()`. Worth auditing separately; they are either dead or
 accidentally unregistered.
 
 ### 2.3 The two costs, separated
@@ -245,7 +245,7 @@ Split `NereusSDRObjs` into subsystem libraries, built **shared**:
    `models` -> `gui` hook).
 3. Split into `nereus_common`, `nereus_core`, `nereus_models`, `nereus_gui`,
    and likely `nereus_protocol`.
-4. Extend `nereus_add_test(name LIBS ...)` so each test declares what it
+4. Extend `longpath_add_test(name LIBS ...)` so each test declares what it
    links.
 
 Building these **shared** rather than as object libraries is what collapses
@@ -360,7 +360,7 @@ selective form, on the `AppSettings` singleton grounds in §5.
 | Phase 1 dependency untangling touches ~12 upward includes across layers | Land as its own PR, no behavior change, full suite green before and after |
 | Shared libraries lose dead-stripping, raising per-process resident memory | Measure after Phase 1; tests are short-lived, app unaffected (single process) |
 | Shared libraries need rpath and symbol-visibility work on macOS/Windows | Standard Qt practice; verify all three CI platforms before merge |
-| Phase 1 interacts with the LTO option added in `6ed89682` | Per-library IPO property; verify `-DNEREUSSDR_ENABLE_LTO=ON` release path still builds |
+| Phase 1 interacts with the LTO option added in `6ed89682` | Per-library IPO property; verify `-DLONGPATH_ENABLE_LTO=ON` release path still builds |
 | Phase 2 could skip a genuinely affected test if the graph is wrong | Failed-last-run tests always re-run; CI always runs the full suite |
 | Phase 3 cross-test pollution via `AppSettings` | Only singleton-free tests are merged; `TestSandboxInit` retained |
 

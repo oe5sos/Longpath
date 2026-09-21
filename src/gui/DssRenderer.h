@@ -1,7 +1,7 @@
 #pragma once
 
 // =================================================================
-// src/gui/DssRenderer.h  (NereusSDR)
+// src/gui/DssRenderer.h  (Longpath)
 // =================================================================
 //
 // Source attribution (AetherSDR — GPLv3):
@@ -12,7 +12,7 @@
 //
 //   Ported from AetherSDR `src/gui/DssRenderer.{h,cpp}` (AetherSDR
 //   31b29583). AetherSDR is licensed under the GNU General Public
-//   License v3. NereusSDR is also GPLv3. Attribution follows GPLv3 §5
+//   License v3. Longpath is also GPLv3. Attribution follows GPLv3 §5
 //   requirements.
 //
 // ── Was hier NICHT mitkam ─────────────────────────────────────────────
@@ -20,11 +20,11 @@
 // AetherSDRs DssRenderer traegt zusaetzlich: die GPU-Mesh-Zubehoer
 // (rowDataRing/headRing/generation() usw. fuer einen QRhi-Hoehenkarten-
 // Shader), die "supplemental"-Kanaele fuer FLEX-eigene Wasserfall-
-// Kacheln, die von der FFT-Ansicht abweichen (NereusSDR hat keine
+// Kacheln, die von der FFT-Ansicht abweichen (Longpath hat keine
 // solche native Kachel-Quelle), Umprojektion beim Schwenken/Zoomen
 // (reprojectFrequencyFrame — hier faengt ein Bandwechsel die Historie
 // stattdessen einfach neu ein) und eine eigene tiefe Scrollback-Historie
-// (die laeuft in NereusSDR ueber WaterfallHistoryBuffer). Das ist Absicht
+// (die laeuft in Longpath ueber WaterfallHistoryBuffer). Das ist Absicht
 // fuer die erste, CPU-gemalte Fassung: ein QImage durch die bestehende
 // Overlay-Pipeline zeichnen braucht keinen neuen Shader. Ein GPU-
 // Hoehenkarten-Pfad kann spaeter denselben Ringpuffer weiterverwenden.
@@ -45,9 +45,9 @@
 // gemessen 7-10 ms je Bild statt 0,6-1,3 s. Siehe DssRenderer.cpp.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-09-03 — Ported (reduced scope, CPU-only) in C++20/Qt6 for
-//                 NereusSDR by Martin Fischer (OE5SOS), AI-assisted via
+//                 Longpath by Martin Fischer (OE5SOS), AI-assisted via
 //                 Anthropic Claude Code.
 //   2026-09-03 — rebuild() rasterises directly (horizon algorithm, crest
 //                 anti-aliasing as coverage) instead of QPainter polygons;

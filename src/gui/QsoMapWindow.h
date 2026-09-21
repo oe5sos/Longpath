@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/gui/QsoMapWindow.h  (NereusSDR)
+// src/gui/QsoMapWindow.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // Where the contacts in a period actually were. Two views of the same
 // data because they answer different questions: the globe shows the
@@ -18,7 +18,7 @@
 // is worse than no map.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
 //   2026-08-10 — Band and mode filter pills, a station card for a

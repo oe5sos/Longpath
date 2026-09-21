@@ -1,7 +1,7 @@
 // tst_per_band_nf_priming.cpp
 //
 // no-port-check: Test file references no Thetis source; this is a
-// NereusSDR-original enhancement (Task 2.10, per-band NF-estimate priming).
+// Longpath-original enhancement (Task 2.10, per-band NF-estimate priming).
 //
 // Verifies three invariants:
 //
@@ -89,7 +89,7 @@ private slots:
 
     void persistence_round_trip_40m()
     {
-        // NereusSDR-original — no Thetis equivalent.
+        // Longpath-original — no Thetis equivalent.
         // Write in one instance, read in a fresh instance.
         {
             PanadapterModel pan;

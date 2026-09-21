@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/PsaIndicatorWidget.cpp  (NereusSDR)
+// src/gui/PsaIndicatorWidget.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -11,7 +11,7 @@
 // original licences from Thetis source are included below.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-06 — Phase 3M-4 Task 10: created by J.J. Boyd (KG4VCF),
 //                 with AI-assisted transformation via Anthropic Claude
 //                 Code.  See PsaIndicatorWidget.h for the full
@@ -334,7 +334,7 @@ void PsaIndicatorWidget::setPsEnabled(bool on)
         //   if (!_psEnabled) setPSboolsToFalse();
         // setPSboolsToFalse (ucInfoBar.cs:562-567 [v2.10.3.13]) clears
         // _bCalibrationAttemptsChanged + _bCorrectionsBeingApplied +
-        // _bFeedbackLevelOk.  m_correcting was a NereusSDR-only field
+        // _bFeedbackLevelOk.  m_correcting was a Longpath-only field
         // dropped in Round 2.
         m_correctionsApplied      = false;
         m_calChangedSinceLastDraw = false;
@@ -408,7 +408,7 @@ void PsaIndicatorWidget::psInfo(int level, bool feedbackLevelOk,
     // Two parameters Thetis stores but updatePSDisplay() does not read:
     //   - _bFeedbackLevelOk: kept for API parity, no widget effect.
     //   - _feedbackColour:  Thetis's updatePSDisplay applies this
-    //     directly to lblFB.BackColor.  NereusSDR derives the colour
+    //     directly to lblFB.BackColor.  Longpath derives the colour
     //     locally via computeFeedbackColour() from m_feedbackLevel +
     //     m_invertRedBlue and the two agree by construction (the
     //     coordinator emits the colour computed from its own
@@ -588,7 +588,7 @@ void PsaIndicatorWidget::updateDisplay()
         //   }
         // The Lime/SeaGreen split is decided purely by
         // _bCorrectionsBeingApplied — Thetis has no separate "Correcting"
-        // sub-flag.  Phase 3M-4 bench-fix Round 2 dropped NereusSDR's
+        // sub-flag.  Phase 3M-4 bench-fix Round 2 dropped Longpath's
         // earlier nested m_correcting branch (a phantom flag that mirrored
         // the puresignal helper's `Correcting` derived property at
         // PSForm.cs:1106-1108 [v2.10.3.13], but that property is consumed

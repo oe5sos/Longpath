@@ -1,4 +1,4 @@
-// no-port-check: NereusSDR-original test for the Phase 3J-1 closeout
+// no-port-check: Longpath-original test for the Phase 3J-1 closeout
 // Item 3 Q_INVOKABLE long-tail shims.  Each test invokes a shim via the
 // same QMetaObject::invokeMethod path TciProtocol uses in production,
 // then verifies the underlying model state (SliceModel Q_PROPERTY or

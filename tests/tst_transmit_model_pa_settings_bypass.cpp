@@ -1,8 +1,8 @@
-// no-port-check: NereusSDR-original unit-test file.  The Thetis reference
+// no-port-check: Longpath-original unit-test file.  The Thetis reference
 // below is a cite comment documenting which upstream line each assertion
 // verifies; no Thetis logic is ported in this test file.
 // =================================================================
-// tests/tst_transmit_model_pa_settings_bypass.cpp  (NereusSDR)
+// tests/tst_transmit_model_pa_settings_bypass.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for TransmitModel::paSettingsBypass (D4).
@@ -14,7 +14,7 @@
 //   setup.cs:19921 [v2.10.3.15] — chkBypassANANPASettings.Visible = true
 //   setup.designer.cs:49237-49245 [v2.10.3.15] — tooltip "BP PA"
 //
-// NereusSDR persistence: AppSettings key "PaSettingsBypass" under the
+// Longpath persistence: AppSettings key "PaSettingsBypass" under the
 // per-MAC hardware/<mac>/tx/ prefix, matching the TransmitModel pattern
 // established by antiVoxRun (3M-3a-iv).
 // =================================================================

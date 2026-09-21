@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/NbFamily.cpp  (NereusSDR)
+// src/core/NbFamily.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -13,7 +13,7 @@
 // file creates and destroys.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-22 — NbFamily lifecycle + tuning implementation.
 //                Authored by J.J. Boyd (KG4VCF), with AI-assisted
 //                transformation via Anthropic Claude Code.

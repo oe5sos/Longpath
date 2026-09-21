@@ -1,6 +1,6 @@
-// src/core/audio/VirtualCableDetector.h (NereusSDR)
+// src/core/audio/VirtualCableDetector.h (Longpath)
 // Detects known Windows virtual-audio-cable products by regex-matching OS
-// device name strings. NereusSDR-original; no Thetis/AetherSDR port.
+// device name strings. Longpath-original; no Thetis/AetherSDR port.
 #pragma once
 #include <QString>
 #include <QVector>
@@ -16,7 +16,7 @@ enum class VirtualCableProduct {
     Voicemeeter,
     Dante,
     FlexRadioDax,
-    NereusSdrVax,  // reserved for future NereusSDR-owned Windows driver
+    LongpathVax,   // our own devices ("Longpath VAX N"; "NereusSDR VAX N" before 2026-09-17)
 };
 
 struct DetectedCable {
@@ -34,19 +34,19 @@ public:
     // Enumerates OS audio devices via PortAudio and returns matches.
     static QVector<DetectedCable> scan();
 
-    // Test-friendly pure filter — drops NereusSdrVax entries from an
+    // Test-friendly pure filter — drops LongpathVax entries from an
     // arbitrary DetectedCable vector. Used by scanThirdPartyOnly() and
     // exposed as a seam so unit tests can exercise the filter without
     // standing up a PortAudio enumeration. Exposed as a public static
-    // helper (not gated behind NEREUS_BUILD_TESTS like AudioEngine::*ForTest
+    // helper (not gated behind LONGPATH_BUILD_TESTS like AudioEngine::*ForTest
     // seams) because it has no hidden invariants: it's a pure function on
     // its input with no side effects, so external callers can't violate
     // any class state by using it.
     static QVector<DetectedCable> filterThirdParty(const QVector<DetectedCable>& all);
 
-    // Same as scan() but drops NereusSdrVax entries. Windows first-run path
+    // Same as scan() but drops LongpathVax entries. Windows first-run path
     // calls this to surface only user-installable 3rd-party cables; the
-    // NereusSdrVax enum is reserved for a future NereusSDR-owned driver and
+    // LongpathVax enum is reserved for a future Longpath-owned driver and
     // must not be offered to the user as a binding target.
     static QVector<DetectedCable> scanThirdPartyOnly();
 

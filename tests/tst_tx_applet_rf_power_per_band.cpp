@@ -1,8 +1,8 @@
-// no-port-check: NereusSDR-original test file.  Cite comments below point
+// no-port-check: Longpath-original test file.  Cite comments below point
 // at Thetis lines that the asserted wiring mirrors; no Thetis logic is
 // ported in this test file.
 // =================================================================
-// tests/tst_tx_applet_rf_power_per_band.cpp  (NereusSDR)
+// tests/tst_tx_applet_rf_power_per_band.cpp  (Longpath)
 // =================================================================
 //
 // Regression tests for RF Power per-band persistence wiring.

@@ -1,12 +1,12 @@
 // =================================================================
-// src/gui/styles/ThemeQss.cpp  (NereusSDR)
+// src/gui/styles/ThemeQss.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. See ThemeQss.h for why this exists and Theme.h
+// Longpath-original. See ThemeQss.h for why this exists and Theme.h
 // for the layer it belongs to.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-15 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 //   2026-08-15 — Rollen ergänzt; die Tabelle fragt jetzt Theme, damit
@@ -26,8 +26,8 @@ namespace {
 
 // ── Die Tabelle ──────────────────────────────────────────────────────
 //
-// Links die Rolle, in der Mitte was der Nereus-Quelltext hinschreibt,
-// rechts was Nereus heute daraus malt. Eine Theme-Datei kann jede Rolle
+// Links die Rolle, in der Mitte was der Quelltext hinschreibt,
+// rechts was das Programm heute daraus malt. Eine Theme-Datei kann jede Rolle
 // überschreiben; wo sie schweigt, gilt die rechte Spalte.
 //
 // Eine Konstante ohne Zeile ist eine Farbe, die kein Theme je erreicht.
@@ -124,7 +124,7 @@ const QVector<ThemeEntry>& table()
 
         // Abzeichen — eigene Abstufung, siehe StyleConstants.h.
         // Der mittlere Wert ist hier derselbe wie der Zielwert: diese
-        // Rollen sind neu (2026-08-17) und haben keine Nereus-Vorgeschichte,
+        // Rollen sind neu (2026-08-17) und haben keine Vorgeschichte im Quelltext,
         // aus der etwas zu ersetzen waere.
         { "badge-info-bg",     "#161e27", Style::kBadgeInfoBg },
         { "badge-ok-bg",       "#212b27", Style::kBadgeOkBg },

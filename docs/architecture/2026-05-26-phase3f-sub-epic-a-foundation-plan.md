@@ -6,7 +6,7 @@
 
 **Architecture:** Additive-only changes to `BoardCapabilities` (new fields: `maxSlices`, `widebandAdcs`), `SliceModel` (7 new Q_PROPERTYs with per-band persistence), `RadioModel` (new `maxSlices()` accessor + slice-list skeleton), `AppSettings` (schema v6 migration). `WdspEngine` is already N-channel-capable via `std::map<int, std::unique_ptr<RxChannel>>`, no growth required. No existing field is renamed or removed.
 
-**Tech Stack:** C++20, Qt6 (Q_PROPERTY + signals/slots, QObject, QSignalSpy for tests), QtTest framework, CMake (via `nereus_add_test()` macro), AppSettings XML persistence.
+**Tech Stack:** C++20, Qt6 (Q_PROPERTY + signals/slots, QObject, QSignalSpy for tests), QtTest framework, CMake (via `longpath_add_test()` macro), AppSettings XML persistence.
 
 **Parent design:** [docs/architecture/2026-05-26-phase3f-multi-pan-multi-slice-design.md](2026-05-26-phase3f-multi-pan-multi-slice-design.md)
 
@@ -41,7 +41,7 @@
 
 ### CMake registration
 
-Each new test file added to `tests/CMakeLists.txt` via the existing `nereus_add_test(<name>)` macro pattern. No new build dependencies.
+Each new test file added to `tests/CMakeLists.txt` via the existing `longpath_add_test(<name>)` macro pattern. No new build dependencies.
 
 ---
 
@@ -95,10 +95,10 @@ QTEST_MAIN(TestBoardCapabilitiesPhase3F)
 
 - [ ] **Step 2: Register the test in CMake**
 
-Edit `tests/CMakeLists.txt`. Find any existing `nereus_add_test(tst_board_capabilities` line; if none, add a new line in the alphabetical/categorical position:
+Edit `tests/CMakeLists.txt`. Find any existing `longpath_add_test(tst_board_capabilities` line; if none, add a new line in the alphabetical/categorical position:
 
 ```cmake
-nereus_add_test(tst_board_capabilities_phase3f)
+longpath_add_test(tst_board_capabilities_phase3f)
 ```
 
 - [ ] **Step 3: Run test to verify it fails (compile error)**
@@ -428,7 +428,7 @@ QTEST_MAIN(TestSliceModelPhase3FProperties)
 
 Edit `tests/CMakeLists.txt`:
 ```cmake
-nereus_add_test(tst_slice_model_phase3f_properties)
+longpath_add_test(tst_slice_model_phase3f_properties)
 ```
 
 - [ ] **Step 3: Run test to verify it fails (compile error)**
@@ -1030,7 +1030,7 @@ QTEST_MAIN(TestRadioModelMaxSlices)
 
 Edit `tests/CMakeLists.txt`:
 ```cmake
-nereus_add_test(tst_radio_model_max_slices)
+longpath_add_test(tst_radio_model_max_slices)
 ```
 
 ```bash
@@ -1146,7 +1146,7 @@ QTEST_MAIN(TestSettingsSchemaV6Migration)
 
 `tests/CMakeLists.txt`:
 ```cmake
-nereus_add_test(tst_settings_schema_v6_migration)
+longpath_add_test(tst_settings_schema_v6_migration)
 ```
 
 ```bash
@@ -1343,7 +1343,7 @@ Ready for **Sub-Epic B (Codec + Chain)** to begin.
 ## References
 
 - Design doc: `docs/architecture/2026-05-26-phase3f-multi-pan-multi-slice-design.md`
-- Test framework: QtTest with `nereus_add_test()` CMake macro (see `tests/CMakeLists.txt`)
+- Test framework: QtTest with `longpath_add_test()` CMake macro (see `tests/CMakeLists.txt`)
 - Existing test pattern: `tests/tst_active_rx_count_live_apply.cpp`
 - BoardCapabilities current struct: `src/core/BoardCapabilities.h:221+`
 - SliceModel current Q_PROPERTY block: `src/models/SliceModel.h:163-205`

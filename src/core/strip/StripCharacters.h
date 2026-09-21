@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/core/strip/StripCharacters.h  (NereusSDR)
+// src/core/strip/StripCharacters.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // A named starting point for each stage, and a sentence saying what it
 // is for.
@@ -43,7 +43,7 @@
 // because a preset with a cost hidden inside it is a trap.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-09 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

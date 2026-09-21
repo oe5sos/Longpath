@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/applets/AppletGrid.cpp  (NereusSDR)
+// src/gui/applets/AppletGrid.cpp  (Longpath)
 // =================================================================
 // Siehe AppletGrid.h — Schritt 1 des freien Rasters.
 // =================================================================
@@ -16,12 +16,12 @@
 namespace Longpath {
 
 namespace {
-/// Abstand zwischen zwei FELDERN. Im Zielbild 9 px; Schritt 1 laesst
+/// Abstand zwischen zwei FELDERN. Im Zielbild 9 px; Schritt 1 liess
 /// ihn auf 0, weil die Applets bisher ohne Abstand untereinander
-/// standen und „sichtbar aendert sich nichts" die Zusicherung ist.
-/// Der Abstand kommt mit Schritt 2, wenn es wirklich mehrere Spalten
-/// gibt und ein Feld auch als Feld zu erkennen sein muss.
-constexpr int kCellGap = 0;
+/// standen. Seit "Glas & Tiefe" (2026-09-17) ist jede Zelle eine
+/// Platte mit Rahmen und Verlauf, und eine Platte braucht Luft um
+/// sich, sonst ist sie nur ein Strich zwischen zwei Flaechen.
+constexpr int kCellGap = 6;
 } // namespace
 
 AppletGrid::AppletGrid(QWidget* parent)

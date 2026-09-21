@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/widgets/OcLedStripWidget.cpp  (NereusSDR)
+// src/gui/widgets/OcLedStripWidget.cpp  (Longpath)
 // =================================================================
 //
 // Ported from mi0bot-Thetis source:
@@ -9,7 +9,7 @@
 // See OcLedStripWidget.h for the full design + scope rationale.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-30 — New for Phase 3L HL2 Filter visibility brainstorm.
 //                Reusable extraction of inline status-bar LED strip.
 //                J.J. Boyd (KG4VCF), with AI-assisted transformation
@@ -55,6 +55,7 @@
 //============================================================================================//
 
 #include "OcLedStripWidget.h"
+#include "gui/StyleConstants.h"
 #include "gui/styles/ThemeQss.h"
 
 #include <QHBoxLayout>
@@ -126,8 +127,8 @@ void OcLedStripWidget::refreshLedColors()
     for (int i = 0; i < static_cast<int>(m_leds.size()); ++i) {
         const bool on = (m_bits >> i) & 0x01;
         m_leds[i]->setStyleSheet(Style::themed(on
-            ? QStringLiteral("QFrame { background: #6fa384; border: 1px solid #80ff80; "
-                             "border-radius: 6px; }")
+            ? QStringLiteral("QFrame { background: #6fa384; border: 1px solid %1; "
+                             "border-radius: 6px; }").arg(QLatin1String(Style::kDspToggleText))
             : QStringLiteral("QFrame { background: #222; border: 1px solid #555; "
                              "border-radius: 6px; }")));
     }

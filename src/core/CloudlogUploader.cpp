@@ -1,11 +1,11 @@
 // =================================================================
-// src/core/CloudlogUploader.cpp  (NereusSDR)
+// src/core/CloudlogUploader.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original — see CloudlogUploader.h.
+// Longpath-original — see CloudlogUploader.h.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
 // =================================================================

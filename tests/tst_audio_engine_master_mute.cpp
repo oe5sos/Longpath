@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_audio_engine_master_mute.cpp  (NereusSDR)
+// tests/tst_audio_engine_master_mute.cpp  (Longpath)
 // =================================================================
 //
 // Exercises AudioEngine's master-mute API — Phase 3O Sub-Phase 10
@@ -9,7 +9,7 @@
 // contract scenario for the setMasterMuted / masterMuted /
 // masterMutedChanged trio added in Sub-Phase 10.
 //
-// Uses FakeAudioBus injected via the NEREUS_BUILD_TESTS-only
+// Uses FakeAudioBus injected via the LONGPATH_BUILD_TESTS-only
 // AudioEngine::setVaxBusForTest / setSpeakersBusForTest seam so the
 // test doesn't need a real CoreAudioHalBus / LinuxPipeBus / PortAudio
 // backend. Cross-platform. Modeled on tst_audio_engine_vax_tee.cpp.

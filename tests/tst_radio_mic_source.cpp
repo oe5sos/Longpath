@@ -1,8 +1,8 @@
 // =================================================================
-// tests/tst_radio_mic_source.cpp  (NereusSDR)
+// tests/tst_radio_mic_source.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original test file. No Thetis port at this layer.
+// Longpath-original test file. No Thetis port at this layer.
 //
 // Exercises RadioMicSource — the TxMicRouter implementation that drains
 // a lock-free SPSC ring fed by RadioConnection::micFrameDecoded
@@ -21,13 +21,13 @@
 // Plan: 3M-1b F.2. Master design §5.2.1.
 // =================================================================
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-27 — Original test for NereusSDR by J.J. Boyd (KG4VCF),
 //                 Phase 3M-1b Task F.2, with AI-assisted implementation
 //                 via Anthropic Claude Code.
 // =================================================================
 
-// no-port-check: NereusSDR-original test file.
+// no-port-check: Longpath-original test file.
 
 #include <QtTest/QtTest>
 

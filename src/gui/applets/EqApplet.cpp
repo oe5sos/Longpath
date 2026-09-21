@@ -4,7 +4,7 @@
 // All controls NYI — wired in Phase 3I-3 (TX Processing).
 
 // =================================================================
-// src/gui/applets/EqApplet.cpp  (NereusSDR)
+// src/gui/applets/EqApplet.cpp  (Longpath)
 // =================================================================
 //
 // Source attribution (AetherSDR — GPLv3):
@@ -15,10 +15,10 @@
 //
 //   This file is a port or structural derivative of AetherSDR source.
 //   AetherSDR is licensed under the GNU General Public License v3.
-//   NereusSDR is also GPLv3. Attribution follows GPLv3 §5 requirements.
+//   Longpath is also GPLv3. Attribution follows GPLv3 §5 requirements.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-16 — Ported/adapted in C++20/Qt6 for NereusSDR by
 //                 J.J. Boyd (KG4VCF), with AI-assisted transformation
 //                 via Anthropic Claude Code.
@@ -98,7 +98,7 @@ static const QString kBtnBase =
 
 static const QString kGreenActive =
     "QPushButton:checked { background-color: #006040; color: #00ff88; "
-    "border: 1px solid #00a060; }";
+    "border: 1px solid " + QString::fromLatin1(Style::kGreenBorder) + "; }";
 
 static const QString kBlueActive =
     "QPushButton:checked { background-color: #4a7ba8; color: #ffffff; "

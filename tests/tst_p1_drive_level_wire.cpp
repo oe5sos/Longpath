@@ -1,6 +1,6 @@
 // no-port-check: test-only — Thetis and mi0bot file names appear only in
 // source-cite comments that document which upstream line each assertion
-// verifies.  No upstream logic is ported here; this file is NereusSDR-original.
+// verifies.  No upstream logic is ported here; this file is Longpath-original.
 //
 // Wire-byte snapshot tests for P1RadioConnection::setTxDrive() — drive
 // level lands in bank 10 C1 byte (0..255).

@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_mic_reorder_buffer.cpp  (NereusSDR)
+// tests/tst_mic_reorder_buffer.cpp  (Longpath)
 // =================================================================
 //
 // Pins the MicReorderBuffer contract (remote-bench fix 2026-08-11):
@@ -10,7 +10,7 @@
 // arrivals, stream restarts, and the 2^32 wrap.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-11 — Created by Ralph Martin Fischer (OE5SOS),
 //                 AI-assisted implementation via Anthropic Claude
 //                 (Cowork).

@@ -1,9 +1,9 @@
-// no-port-check: NereusSDR-original unit-test file.  VfoDisplayItem is an
-// AetherSDR-pattern + NereusSDR-native widget (3G-8); the TX-state colour
-// swap is NereusSDR-original UX (no Thetis port).  The Phase 3M-1c chunk
+// no-port-check: Longpath-original unit-test file.  VfoDisplayItem is an
+// AetherSDR-pattern + Longpath-native widget (3G-8); the TX-state colour
+// swap is Longpath-original UX (no Thetis port).  The Phase 3M-1c chunk
 // G test surface is documented in pre-code review §1 + plan §G.
 // =================================================================
-// tests/tst_vfo_display_item_tx_badge.cpp  (NereusSDR)
+// tests/tst_vfo_display_item_tx_badge.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for VfoDisplayItem TX-state colour swap (Phase 3M-1c G.1)

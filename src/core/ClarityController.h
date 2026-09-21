@@ -1,12 +1,12 @@
 // =================================================================
-// src/core/ClarityController.h  (NereusSDR)
+// src/core/ClarityController.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/display.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -131,7 +131,7 @@ signals:
     // waterfallThresholdsChanged). Used by NF-aware grid (Task 2.9) and
     // per-band NF priming (Task 2.10) which need the running floor at
     // full cadence rather than the deadband-throttled threshold stream.
-    // NereusSDR-original — no Thetis equivalent.
+    // Longpath-original — no Thetis equivalent.
     void noiseFloorChanged(float nfDbm);
 
     // Status badge feed for SpectrumOverlayPanel. Green when active, amber

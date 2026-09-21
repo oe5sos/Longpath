@@ -1,13 +1,13 @@
 // src/gui/SpectrumOverlayPanel.h
 // Left overlay button strip for SpectrumWidget.
 // Ported from AetherSDR SpectrumOverlayMenu — same visual style, adapted
-// for NereusSDR's OpenHPSDR/Thetis feature set.
+// for Longpath's OpenHPSDR/Thetis feature set.
 //
 // 8 buttons (68×22px, stacked vertically) + 4 flyout sub-panels.
 // Positioned via move() as a child of the spectrum widget.
 
 // =================================================================
-// src/gui/SpectrumOverlayPanel.h  (NereusSDR)
+// src/gui/SpectrumOverlayPanel.h  (Longpath)
 // =================================================================
 //
 // Source attribution (AetherSDR — GPLv3):
@@ -18,10 +18,10 @@
 //
 //   This file is a port or structural derivative of AetherSDR source.
 //   AetherSDR is licensed under the GNU General Public License v3.
-//   NereusSDR is also GPLv3. Attribution follows GPLv3 §5 requirements.
+//   Longpath is also GPLv3. Attribution follows GPLv3 §5 requirements.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-16 — Ported/adapted in C++20/Qt6 for NereusSDR by
 //                 J.J. Boyd (KG4VCF), with AI-assisted transformation
 //                 via Anthropic Claude Code.

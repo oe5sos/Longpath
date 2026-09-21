@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_wav_recorder.cpp  (NereusSDR)
+// tests/tst_wav_recorder.cpp  (Longpath)
 // =================================================================
 //
 // "Off the air"-Aufnahme: nur was ankommt, keine eigene Stimme.
@@ -10,12 +10,12 @@
 // WavRecorder.h), nicht erst bei stop().
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-25 — Original fuer NereusSDR/Longpath von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
 // =================================================================
 
-// no-port-check: NereusSDR-original test file.
+// no-port-check: Longpath-original test file.
 
 #include <QtTest>
 #include <QTemporaryDir>

@@ -1,11 +1,11 @@
 // =================================================================
-// tests/tst_pgxl_connection_ping.cpp  (NereusSDR)
+// tests/tst_pgxl_connection_ping.cpp  (Longpath)
 // =================================================================
-// NereusSDR-native test. No AetherSDR equivalent (ping RTT measurement
-// is a NereusSDR Tier 2 addition per design doc §2 and §6.4).
+// Longpath-native test. No AetherSDR equivalent (ping RTT measurement
+// is a Longpath Tier 2 addition per design doc §2 and §6.4).
 // Wire format from FlexRadio PowerGenius Ethernet API wiki spec.
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-19  Created by J.J. Boyd (KG4VCF), with AI-assisted
 //                 transformation via Anthropic Claude Code.
 //                 Tests: ping emits pongReceived on R-frame reply;

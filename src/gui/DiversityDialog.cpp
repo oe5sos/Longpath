@@ -1,6 +1,6 @@
 // src/gui/DiversityDialog.cpp
 // =================================================================
-// src/gui/DiversityDialog.cpp  (NereusSDR)
+// src/gui/DiversityDialog.cpp  (Longpath)
 // =================================================================
 //
 //  Copyright (C) 2026 J.J. Boyd (KG4VCF)
@@ -19,7 +19,7 @@
 //  along with this program; if not, write to the Free Software
 //  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-27 — Created for Phase 3F Sub-Epic G Task 4 (simplified,
 //                bench-minimum). NereusSDR-original code. J.J. Boyd
 //                (KG4VCF), with AI-assisted implementation via

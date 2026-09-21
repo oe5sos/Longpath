@@ -1,9 +1,9 @@
-// no-port-check: NereusSDR-original unit-test file. No Thetis logic
+// no-port-check: Longpath-original unit-test file. No Thetis logic
 // ported in this test file; DSPMode::RADE_U / RADE_L are
-// NereusSDR-native extensions to the WDSP-derived DSPMode enum
+// Longpath-native extensions to the WDSP-derived DSPMode enum
 // (RADE is not a WDSP mode).
 // =================================================================
-// tests/tst_dspmode_rade.cpp  (NereusSDR)
+// tests/tst_dspmode_rade.cpp  (Longpath)
 // =================================================================
 //
 // Phase 3R Task J1 unit tests: DSPMode::RADE_U and DSPMode::RADE_L
@@ -20,7 +20,7 @@
 //      per-MAC slice modes do not break on upgrade.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-11 - New test file for Phase 3R Task J1.  J.J. Boyd
 //                 (KG4VCF), with AI-assisted implementation via
 //                 Anthropic Claude Code.

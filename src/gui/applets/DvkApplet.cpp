@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/applets/DvkApplet.cpp  (NereusSDR)
+// src/gui/applets/DvkApplet.cpp  (Longpath)
 // =================================================================
 //
 // Source attribution (AetherSDR — GPLv3):
@@ -10,16 +10,16 @@
 //
 //   This file is a port or structural derivative of AetherSDR source.
 //   AetherSDR is licensed under the GNU General Public License v3.
-//   NereusSDR is also GPLv3. Attribution follows GPLv3 §5 requirements.
+//   Longpath is also GPLv3. Attribution follows GPLv3 §5 requirements.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-18 — Ported/adapted in C++20/Qt6 for NereusSDR by
 //                 J.J. Boyd (KG4VCF), with AI-assisted transformation
 //                 via Anthropic Claude Code.
 //                 Port of AetherSDR `src/gui/DvkPanel.{h,cpp}` (DVK F-key
 //                 slot grid + record/play controls). Renamed to
-//                 DvkApplet in NereusSDR. All controls NYI.
+//                 DvkApplet in Longpath. All controls NYI.
 // =================================================================
 
 #include "DvkApplet.h"
@@ -272,10 +272,12 @@ void DvkApplet::buildUI()
         m_slotLen[i] = new QLabel(m_slotRow[i]);
         m_slotLen[i]->setFixedWidth(42);
         m_slotLen[i]->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
-        QFont lenFont = m_slotLen[i]->font();
-        lenFont.setStyleHint(QFont::Monospace);
-        lenFont.setPointSizeF(lenFont.pointSizeF() - 1.0);
-        m_slotLen[i]->setFont(lenFont);
+        // Monospace auf der Schriftleiter (9 px, eine Stufe unter der
+        // Applet-Schrift). Hier stand `pointSizeF() - 1.0` — die
+        // Applet-Schrift ist aber in PIXELN gesetzt (AppletWidget), da
+        // liefert pointSizeF() -1, und Qt warnte beim Start zehnmal
+        // "Point size <= 0 (-2.000000)", einmal je Platz.
+        m_slotLen[i]->setFont(Style::monoFont(m_slotLen[i]->font(), Style::kFontCaption));
         m_slotLen[i]->setStyleSheet(QStringLiteral("QLabel { color: %1; }")
                                         .arg(QLatin1String(Style::kTextScale)));
         row->addWidget(m_slotLen[i]);

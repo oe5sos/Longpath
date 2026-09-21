@@ -831,7 +831,7 @@ In `tests/CMakeLists.txt`, add at the end:
 
 ```cmake
 # Step attenuator controller (hysteresis, auto-att)
-nereus_add_test(tst_step_attenuator_controller)
+longpath_add_test(tst_step_attenuator_controller)
 ```
 
 - [ ] **Step 5: Build and run tests**

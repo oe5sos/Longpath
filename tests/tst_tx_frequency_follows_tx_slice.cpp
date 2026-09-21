@@ -1,7 +1,7 @@
 // =================================================================
-// tests/tst_tx_frequency_follows_tx_slice.cpp  (NereusSDR)
+// tests/tst_tx_frequency_follows_tx_slice.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure. Expected
+// no-port-check: Longpath-original test infrastructure. Expected
 // behaviour is cited to Thetis in comments, but nothing here is a port.
 //
 // RF-SAFETY, companion to tst_alex_tx_lpf_source.cpp.

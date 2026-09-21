@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/instruments/InstrumentFooter.cpp  (NereusSDR)
+// src/gui/instruments/InstrumentFooter.cpp  (Longpath)
 // =================================================================
 // Siehe InstrumentFooter.h — eine Fusszeile für beide Instrumente.
 // =================================================================
@@ -73,8 +73,13 @@ void InstrumentFooter::setPeakAndLimit(const QString& peakText,
                                        const QString& limitText)
 {
     QStringList parts;
-    if (!peakText.isEmpty())  { parts << QStringLiteral("Spitze %1").arg(peakText); }
-    if (!limitText.isEmpty()) { parts << QStringLiteral("Grenze %1").arg(limitText); }
+    // PK und LIM statt "Spitze" und "Grenze": die Ueberschrift darueber
+    // ist Thetis-woertlich englisch ("RX: Signal Avg"), und "SIGNAL AVE
+    // · Spitze S9" in einer Zeile war zwei Sprachen in einem Feld (Foto
+    // vom 2026-09-17). Die Kuerzel sind die des Hausstils (Pegel: "MIC"
+    // oben, "PK" darunter) und in beiden Sprachen lesbar.
+    if (!peakText.isEmpty())  { parts << QStringLiteral("PK %1").arg(peakText); }
+    if (!limitText.isEmpty()) { parts << QStringLiteral("LIM %1").arg(limitText); }
     m_middle->setText(parts.join(QStringLiteral(" · ")));
 }
 

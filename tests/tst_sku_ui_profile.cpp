@@ -1,12 +1,12 @@
 // =================================================================
-// tests/tst_sku_ui_profile.cpp  (NereusSDR)
+// tests/tst_sku_ui_profile.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/setup.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-22 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code. Phase 3P-I-b T1: per-SKU label + flag
@@ -153,14 +153,14 @@ private slots:
         QVERIFY(!p.hasRxBypassUi);
     }
 
-    // Three independently-coded NereusSDR-native cases (no Thetis switch
+    // Three independently-coded Longpath-native cases (no Thetis switch
     // entry in the 19832-20405 block). Each deserves its own regression
     // pin — they're the cases most likely to drift if someone edits the
     // fallback policy.
 
     void hpsdr_native_fallback() {
         // HPSDR (pre-ANAN Atlas) has no Thetis antenna-overlay case;
-        // NereusSDR-native default per SkuUiProfile.cpp:74-83.
+        // Longpath-native default per SkuUiProfile.cpp:74-83.
         const auto p = skuUiProfileFor(HPSDRModel::HPSDR);
         QCOMPARE(p.rxOnlyLabels[0], QStringLiteral("RX1"));  // struct default
         QVERIFY(p.hasExt1OutOnTx);
@@ -171,7 +171,7 @@ private slots:
     }
 
     void orionmkii_native_grouping() {
-        // ORIONMKII has no explicit Thetis case; NereusSDR groups with
+        // ORIONMKII has no explicit Thetis case; Longpath groups with
         // ANAN100 family per SkuUiProfile.cpp:117-131.
         const auto p = skuUiProfileFor(HPSDRModel::ORIONMKII);
         QCOMPARE(p.rxOnlyLabels[0], QStringLiteral("EXT2"));

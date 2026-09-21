@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_spectrum_overlay_panel.cpp  (NereusSDR)
+// tests/tst_spectrum_overlay_panel.cpp  (Longpath)
 // =================================================================
 //
 // Smoke tests for SpectrumOverlayPanel::setRadioModel() — Phase 3O

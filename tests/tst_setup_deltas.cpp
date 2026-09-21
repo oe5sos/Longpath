@@ -1,7 +1,7 @@
-// no-port-check: NereusSDR-original unit-test file.  Thetis cite comments
+// no-port-check: Longpath-original unit-test file.  Thetis cite comments
 // document upstream sources; no Thetis logic ported in this test file.
 // =================================================================
-// tests/tst_setup_deltas.cpp  (NereusSDR)
+// tests/tst_setup_deltas.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for the Phase 3M-4 Task 11 Setup-page deltas:
@@ -15,7 +15,7 @@
 //   (2) GeneralOptionsPage "Options" group gains "Hide feedback level"
 //       checkbox — chkHideFeebackLevel from Thetis setup.designer.cs:10571
 //       [v2.10.3.13] (Thetis typo "Feeback" preserved in source-cite,
-//       NereusSDR uses corrected spelling).  Drives PureSignal::
+//       Longpath uses corrected spelling).  Drives PureSignal::
 //       setHideFeedback when wired by SetupDialog.
 //
 //   (3) GeneralOptionsPage "Options" group gains "Swap red and blue
@@ -25,7 +25,7 @@
 // Both new checkboxes persist via AppSettings.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-06 — New test file for Phase 3M-4 Task 11: Setup deltas.
 //                 J.J. Boyd (KG4VCF), with AI-assisted implementation
 //                 via Anthropic Claude Code.

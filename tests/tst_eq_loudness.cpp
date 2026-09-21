@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_eq_loudness.cpp  (NereusSDR)
+// tests/tst_eq_loudness.cpp  (Longpath)
 // =================================================================
 //
 // Loudness matching is the difference between an A/B comparison and a
@@ -15,10 +15,10 @@
 // nothing, a constant gain reports itself, and a boost where a voice
 // has energy counts for more than the same boost where it has none.
 //
-// no-port-check: NereusSDR-original.
+// no-port-check: Longpath-original.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-08 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

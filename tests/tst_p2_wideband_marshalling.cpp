@@ -1,7 +1,7 @@
 // =================================================================
-// tests/tst_p2_wideband_marshalling.cpp  (NereusSDR)
+// tests/tst_p2_wideband_marshalling.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure. Thetis file
+// no-port-check: Longpath-original test infrastructure. Thetis file
 //   names appear only inside source-cite comments documenting which
 //   upstream line each constant comes from. No Thetis logic is ported.
 //

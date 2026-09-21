@@ -1,4 +1,4 @@
-// no-port-check: NereusSDR-original regression test.
+// no-port-check: Longpath-original regression test.
 //
 // Phase 3J-1 closeout Item 4 (2026-05-12): pins per-(band, mode)
 // filter persistence on SliceModel.  When the user adjusts the filter

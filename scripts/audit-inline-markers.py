@@ -52,7 +52,7 @@ MARKERS = {
 
 
 def parse_provenance_rows(text: str):
-    """Yield (nereus_rel, source_cell, line_ranges_cell) for each row."""
+    """Yield (longpath_rel, source_cell, line_ranges_cell) for each row."""
     out = []
     for raw in text.splitlines():
         line = raw.strip()

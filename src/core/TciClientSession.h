@@ -1,15 +1,15 @@
-// no-port-check: NereusSDR-original struct condensing Thetis TCIServer.cs:684-790
+// no-port-check: Longpath-original struct condensing Thetis TCIServer.cs:684-790
 // [v2.10.3.13] field semantics into a Qt6-native layout.  The inline cites are
-// traceability markers — the struct body is NereusSDR-original C++ code;
+// traceability markers — the struct body is Longpath-original C++ code;
 // Thetis threading/locking/queue primitives are replaced by Qt6 signal/slot.
 // Copyright notice for the upstream field semantics is in the Upstream reference
 // block below.
 
-// src/core/TciClientSession.h  (NereusSDR)
-// NereusSDR-original — per-client session state for the TCI WebSocket server.
+// src/core/TciClientSession.h  (Longpath)
+// Longpath-original — per-client session state for the TCI WebSocket server.
 //
 // This struct condenses the 49-field TCPIPtciSocketListener class from Thetis
-// to ~14 fields that NereusSDR's architecture actually requires.  See the
+// to ~14 fields that Longpath's architecture actually requires.  See the
 // divergence note below.
 //
 // Fields ported from Thetis TCIServer.cs:684-790 [v2.10.3.13] are cited
@@ -23,7 +23,7 @@
 //   https://github.com/ramdor/Thetis
 //   Copyright (C) 2020-2025 Richard Samphire MW0LGE
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-10 — Phase 3J-1 Task 2.1 by J.J. Boyd (KG4VCF);
 //                AI-assisted transformation via Anthropic Claude Code.
 
@@ -41,7 +41,7 @@ class QWebSocket;
 
 namespace Longpath {
 
-// ── Architectural divergence: Thetis 49 fields → NereusSDR 14 fields ────────
+// ── Architectural divergence: Thetis 49 fields → Longpath 14 fields ────────
 //
 // Thetis TCPIPtciSocketListener (TCIServer.cs:684-790 [v2.10.3.13]) holds:
 //   - 4 per-client threads (listener / sender / VFO-drain / one-shot timers)
@@ -52,7 +52,7 @@ namespace Longpath {
 //   - Stopwatch + Timer pairs for VFO throttle, centre throttle, TX freq
 //   - Per-channel resampler state Dictionaries
 //
-// NereusSDR replaces all threading + locking + queue primitives with:
+// Longpath replaces all threading + locking + queue primitives with:
 //   - Qt6 QWebSocket signal/slot — the event loop IS the listener thread
 //   - Phase 14 TciSendQueue — a lock-free per-client output queue whose
 //     drain runs on the TCI event loop, replacing the sender thread +
@@ -62,7 +62,7 @@ namespace Longpath {
 //   - Phase 16 per-client Resampler* QHash — a QHash<int, Resampler*> added
 //     to this struct at that phase, replacing m_rxAudioResamplers
 //
-// Fields retained below are the subset that NereusSDR's Phase 2–13 logic
+// Fields retained below are the subset that Longpath's Phase 2–13 logic
 // actively reads or writes.  All other Thetis fields are either not-needed
 // (their functionality disappears with the Qt6 architecture) or deferred to
 // the phase that uses them.
@@ -129,7 +129,7 @@ struct TciClientSession {
     // Coalesced-key map (Thetis m_outboundCoalescedFrames) is Phase 15.
     TciSendQueue sendQueue{1024};   // 1024 frames per priority bucket
 
-    // ── ClientChainApplet display state (NereusSDR-original) ────────────────
+    // ── ClientChainApplet display state (Longpath-original) ────────────────
     // No Thetis equivalent — drives the per-client row in the future
     // ClientChainApplet (Phase 13).
     QString lastCommand;
@@ -151,7 +151,7 @@ struct TciClientSession {
     // From Thetis TCIServer.cs:684-790 [v2.10.3.13] — per-listener
     // m_sensorManager.RxSensorsEnabled / TxSensorsEnabled flags.
     //
-    // NereusSDR flattens clsTCISensorManager's per-listener state into two
+    // Longpath flattens clsTCISensorManager's per-listener state into two
     // bools + interval fields on the session struct. TciServer intercepts
     // rx_sensors_enable:true[,intervalMs]; / tx_sensors_enable:true|false[,intervalMs];
     // commands to toggle these flags before passing to TciProtocol dispatch.

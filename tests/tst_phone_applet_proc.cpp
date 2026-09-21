@@ -1,7 +1,7 @@
-// no-port-check: NereusSDR-original test file.  All Thetis source cites
+// no-port-check: Longpath-original test file.  All Thetis source cites
 // for the underlying TransmitModel properties live in TransmitModel.h.
 // =================================================================
-// tests/tst_phone_applet_proc.cpp  (NereusSDR)
+// tests/tst_phone_applet_proc.cpp  (Longpath)
 // =================================================================
 //
 // Phase 3M-3a-ii post-bench cleanup — PhoneCwApplet PROC button + slider.

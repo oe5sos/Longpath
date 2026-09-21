@@ -1,7 +1,7 @@
 #pragma once
 
 // =================================================================
-// src/gui/widgets/GuardedComboBox.h  (NereusSDR)
+// src/gui/widgets/GuardedComboBox.h  (Longpath)
 // =================================================================
 //
 // Source attribution (AetherSDR — GPLv3):
@@ -12,10 +12,10 @@
 //
 //   This file is a port or structural derivative of AetherSDR source.
 //   AetherSDR is licensed under the GNU General Public License v3.
-//   NereusSDR is also GPLv3. Attribution follows GPLv3 §5 requirements.
+//   Longpath is also GPLv3. Attribution follows GPLv3 §5 requirements.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-16 — Ported/adapted in C++20/Qt6 for NereusSDR by
 //                 J.J. Boyd (KG4VCF), with AI-assisted transformation
 //                 via Anthropic Claude Code.
@@ -23,7 +23,7 @@
 //                 `src/gui/GuardedSlider.h:56-79`.
 // =================================================================
 
-// NereusSDR native widget; Qt skeleton pattern informed by AetherSDR
+// Longpath native widget; Qt skeleton pattern informed by AetherSDR
 // GuardedSlider.h (GuardedComboBox class, lines ~56-76).
 // AetherSDR rationale preserved below; issue numbers stripped.
 //

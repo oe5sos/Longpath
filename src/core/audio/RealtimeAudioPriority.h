@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/audio/RealtimeAudioPriority.h  (NereusSDR-native)
+// src/core/audio/RealtimeAudioPriority.h  (Longpath-native)
 // =================================================================
 // 2026-05-25  J.J. Boyd (KG4VCF), AI-assisted via Anthropic Claude.
 //

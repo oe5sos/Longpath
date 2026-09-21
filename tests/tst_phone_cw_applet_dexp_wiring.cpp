@@ -1,9 +1,9 @@
-// no-port-check: NereusSDR-original test file.  All Thetis source cites for
+// no-port-check: Longpath-original test file.  All Thetis source cites for
 // the underlying TransmitModel properties live in TransmitModel.h, and the
 // FAITHFUL Thetis decorative-slider quirk for ptbNoiseGate is documented
 // inline inside PhoneCwApplet::wireControls().
 // =================================================================
-// tests/tst_phone_cw_applet_dexp_wiring.cpp  (NereusSDR)
+// tests/tst_phone_cw_applet_dexp_wiring.cpp  (Longpath)
 // =================================================================
 //
 // Phase 3M-3a-iii Task 15 — PhoneCwApplet DEXP (#11) row wiring.

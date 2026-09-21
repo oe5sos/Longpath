@@ -1,7 +1,7 @@
-// no-port-check: NereusSDR-original test file.  All Thetis source cites for
+// no-port-check: Longpath-original test file.  All Thetis source cites for
 // the underlying TransmitModel properties live in TransmitModel.h.
 // =================================================================
-// tests/tst_tx_applet_vox_relocated.cpp  (NereusSDR)
+// tests/tst_tx_applet_vox_relocated.cpp  (Longpath)
 // =================================================================
 //
 // Phase 3M-3a-iii bench polish (2026-05-04) — TxApplet VOX row wiring.

@@ -1,4 +1,4 @@
-// no-port-check: NereusSDR-original TDD tests for TciSendQueue.
+// no-port-check: Longpath-original TDD tests for TciSendQueue.
 // Phase 3J-1 Task 14.1 — three tests:
 //   1. Drain order: Urgent before Binary before Control, FIFO within each tier.
 //   2. Bounded overflow: oldest frame is dropped when capacity is exceeded.
@@ -52,7 +52,7 @@ void TestTciPriorityQueues::drain_order_urgent_first_then_binary_then_control()
 //
 // Push 5 frames into a capacity-3 Control queue.  Expect 2 drops (c0, c1)
 // and the last 3 frames survive (c2, c3, c4) in FIFO order.
-// The oldest-drop semantics are NereusSDR-original (Thetis queues are
+// The oldest-drop semantics are Longpath-original (Thetis queues are
 // unbounded at TCIServer.cs:769-771 [v2.10.3.13]).
 void TestTciPriorityQueues::bounded_overflow_drops_oldest()
 {

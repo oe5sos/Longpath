@@ -1,13 +1,13 @@
-// no-port-check: NereusSDR-original. No upstream port. See header.
+// no-port-check: Longpath-original. No upstream port. See header.
 
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // =================================================================
-// src/gui/widgets/SpectrumStatusOverlay.cpp  (NereusSDR)
+// src/gui/widgets/SpectrumStatusOverlay.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original; no upstream port. See header for full
-// Modification history (NereusSDR).
+// Longpath-original; no upstream port. See header for full
+// Modification history (Longpath).
 // =================================================================
 
 #include "gui/widgets/SpectrumStatusOverlay.h"
@@ -147,7 +147,7 @@ void SpectrumStatusOverlay::paintEvent(QPaintEvent*)
     // Background panel: rgba(20, 30, 45, 240) with subtle border.
     p.setBrush(QColor(0x0c, 0x0c, 0x0e, 240));
     p.setPen(QColor(Style::kBorder));
-    p.drawRoundedRect(rect().adjusted(0, 0, -1, -1), 3, 3);
+    p.drawRoundedRect(rect().adjusted(0, 0, -1, -1), 6, 6);   // nie Radius 3
 
     int x = kLeftMargin;
     const int y = (height() - kBadgeSize) / 2;
@@ -165,10 +165,9 @@ void SpectrumStatusOverlay::paintEvent(QPaintEvent*)
     // obvious source for a tooltip or a compact mode if either is wanted
     // later. Only the painting is gone.
 
-    // CH tag (always visible).
-    p.setBrush(QColor(0x1a, 0x2a, 0x3a));
-    p.setPen(QColor(0x30, 0x40, 0x50));
-    p.drawRoundedRect(x, y + 1, kChTagWidth, 14, 2, 2);
+    // CH tag (always visible) — ein Glaschip (2026-09-18), wie die
+    // Zahlenchips im Bandfilter: gelesen, nicht gedrueckt.
+    Style::paintGlassChip(p, QRect(x, y + 1, kChTagWidth, 14), 5);
     p.setPen(QColor(Style::kTitleText));
     p.setFont(QFont(QStringLiteral("monospace"), 9, QFont::Bold));
     p.drawText(QRect(x, y + 1, kChTagWidth, 14), Qt::AlignCenter,

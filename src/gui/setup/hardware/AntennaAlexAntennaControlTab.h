@@ -1,7 +1,7 @@
 #pragma once
 
 // =================================================================
-// src/gui/setup/hardware/AntennaAlexAntennaControlTab.h  (NereusSDR)
+// src/gui/setup/hardware/AntennaAlexAntennaControlTab.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -9,7 +9,7 @@
 //     grpAlexAntCtrl + panelAlexTXAntControl + panelAlexRXAntControl)
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-20 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                (KG4VCF), with AI-assisted transformation via Anthropic
 //                Claude Code. Sub-sub-tab under Hardware → Antenna/ALEX.
@@ -116,7 +116,7 @@ struct RadioInfo;
 // AlexController setters directly; antennaChanged/blockTxChanged signals
 // push model state back to the UI.
 //
-// NereusSDR spin: 14 bands (Band160m … XVTR) vs Thetis's 12.
+// Longpath spin: 14 bands (Band160m … XVTR) vs Thetis's 12.
 class AntennaAlexAntennaControlTab : public QWidget {
     Q_OBJECT
 

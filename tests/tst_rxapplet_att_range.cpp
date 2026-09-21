@@ -34,7 +34,7 @@ private slots:
     // upper bound to +32 at console.cs:11043 [v2.10.3.13-beta2] but that
     // is an off-by-one upstream bug (wire encoding `31 - userDb` produces
     // wire = -1 at userDb=32 → 6-bit-masks to LNA-gain wraparound region).
-    // NereusSDR caps at +31 per maintainer approval (issue #175).
+    // Longpath caps at +31 per maintainer approval (issue #175).
     void hl2_slider_max_is_signed_range()
     {
         RadioModel model;

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // =================================================================
-// src/core/audio/RadeTxFilters.h  (NereusSDR)
+// src/core/audio/RadeTxFilters.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original file.  DSP helpers for the RADE TX path:
+// Longpath-original file.  DSP helpers for the RADE TX path:
 //
 //   * RadeTxHpf80   80 Hz Butterworth HPF biquad (direct-form II
 //                    transposed) for mic conditioning before the
@@ -24,9 +24,9 @@
 //
 // =================================================================
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-11  J.J. Boyd / KG4VCF  Phase 3R Task K3. Initial
-//                 implementation. NereusSDR-native; HPF coefficient
+//                 implementation. Longpath-native; HPF coefficient
 //                 derivation cites Robert Bristow-Johnson's "Audio
 //                 EQ Cookbook" (the canonical reference for digital
 //                 biquad design).  r8brain integration follows the

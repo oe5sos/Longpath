@@ -1,13 +1,13 @@
-// no-port-check: NereusSDR-original file; Thetis console.cs reference is an
+// no-port-check: Longpath-original file; Thetis console.cs reference is an
 //   inline comment giving context for spinbox range only, not ported logic.
 // =================================================================
-// src/gui/widgets/FilterPresetEditDialog.cpp  (NereusSDR)
+// src/gui/widgets/FilterPresetEditDialog.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original file. See FilterPresetEditDialog.h for header.
+// Longpath-original file. See FilterPresetEditDialog.h for header.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-02 — Original implementation for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted authoring via Anthropic
 //                 Claude Code (Stage C2 filter preset editor).

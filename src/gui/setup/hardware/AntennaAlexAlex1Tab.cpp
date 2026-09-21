@@ -1,12 +1,12 @@
 // =================================================================
-// src/gui/setup/hardware/AntennaAlexAlex1Tab.cpp  (NereusSDR)
+// src/gui/setup/hardware/AntennaAlexAlex1Tab.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
 //   Project Files/Source/Console/setup.designer.cs (~lines 23385-25538, tpAlexFilterControl)
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-20 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                (KG4VCF), with AI-assisted transformation via Anthropic
 //                Claude Code. Sub-sub-tab under Hardware → Antenna/ALEX.
@@ -539,7 +539,7 @@ AntennaAlexAlex1Tab::AntennaAlexAlex1Tab(RadioModel* model, QWidget* parent)
     // ── Column 3: Saturn BPF1 Bands ───────────────────────────────────────────
     // Source: spec §7; same band-edge shape as Alex HPF.
     // Gated on Saturn / SaturnMKII board — hide for all other boards.
-    // Note: Thetis shows BPF1 always; NereusSDR gates on capability per spec.
+    // Note: Thetis shows BPF1 always; Longpath gates on capability per spec.
     m_bpf1Group = new QGroupBox(tr("Saturn BPF1 Bands"), content);
     auto* bpf1VBox = new QVBoxLayout(m_bpf1Group);
     bpf1VBox->setContentsMargins(8, 8, 8, 8);
@@ -946,7 +946,7 @@ void AntennaAlexAlex1Tab::onMasterCheckChanged(bool checked, const QString& sett
 
 // ── Test seam ─────────────────────────────────────────────────────────────────
 
-// Always compiled — NEREUS_BUILD_TESTS is set on NereusSDRObjs globally.
+// Always compiled — LONGPATH_BUILD_TESTS is set on NereusSDRObjs globally.
 // Used by tst_alex1_filters_tab to verify the Saturn/non-Saturn capability gate.
 // isVisible() returns false if the widget itself is not shown (e.g. in tests
 // where no parent window is displayed). Use !isHidden() which reflects only

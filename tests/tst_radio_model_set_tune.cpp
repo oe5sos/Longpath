@@ -1,6 +1,6 @@
 // tst_radio_model_set_tune.cpp
 //
-// no-port-check: Test file exercises NereusSDR API; Thetis behavior is
+// no-port-check: Test file exercises Longpath API; Thetis behavior is
 // cited in RadioModel.cpp via pre-code review §3.2/§3.3 and
 // Thetis console.cs:29978-30157 [v2.10.3.13] — no C# is translated here.
 //
@@ -45,7 +45,7 @@ using namespace Longpath;
 // ── isLsbFamily reference copy (test seam) ───────────────────────────────────
 // G.4 fixup: isLsbFamily() is a file-scope static in RadioModel.cpp and cannot
 // be linked from the test binary (NereusSDRObjs is not compiled with
-// NEREUS_BUILD_TESTS).  We maintain an independent reference copy here that
+// LONGPATH_BUILD_TESTS).  We maintain an independent reference copy here that
 // mirrors the production logic exactly.  A mismatch between this copy and
 // RadioModel.cpp will be caught by test 18 failing on the observable behaviors
 // of setTune (AM/FM/DIGL/DIGU mode-swap / no-swap tests 16-17 verify the
@@ -397,7 +397,7 @@ private slots:
     // We verify via the MockConnection::txDriveLog.
     // tunePowerForBand defaults to TransmitModel::kDefaultTunePowerW for
 // all bands. Thetis uses 50 (console.cs:1819-1820 [v2.10.3.13]);
-// NereusSDR lowered it to 1 on 2026-08-14 — see the constant.
+// Longpath lowered it to 1 on 2026-08-14 — see the constant.
     void tuneOnPushesTunePower()
     {
         RadioModel model;

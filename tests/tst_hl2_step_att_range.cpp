@@ -1,4 +1,4 @@
-// no-port-check: NereusSDR-original tests for hermes-filter-debug Bug 1.
+// no-port-check: Longpath-original tests for hermes-filter-debug Bug 1.
 //
 // HL2 step-attenuator UI range:
 //   * StepAttenuatorController defaults to 0..31; setMin/Max round-trip works.

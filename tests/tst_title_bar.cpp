@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_title_bar.cpp  (NereusSDR)
+// tests/tst_title_bar.cpp  (Longpath)
 // =================================================================
 //
 // Smoke tests for TitleBar — the 32 px host strip that holds the

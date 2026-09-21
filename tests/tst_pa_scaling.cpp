@@ -3,7 +3,7 @@
 // citation in the docstring, not a derivation claim. The ported functions
 // themselves are registered in THETIS-PROVENANCE.md.
 // =================================================================
-// tests/tst_pa_scaling.cpp  (NereusSDR)
+// tests/tst_pa_scaling.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for Longpath::safety::paScalingFor() and

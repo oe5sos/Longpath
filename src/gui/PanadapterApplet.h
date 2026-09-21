@@ -1,6 +1,6 @@
-// no-port-check: AetherSDR-derived NereusSDR file. Per-pan container
+// no-port-check: AetherSDR-derived Longpath file. Per-pan container
 // (SpectrumWidget host, slice association) is adapted structurally from
-// AetherSDR src/gui/PanadapterApplet.{h,cpp} [@0cd4559]. NereusSDR
+// AetherSDR src/gui/PanadapterApplet.{h,cpp} [@0cd4559]. Longpath
 // preserves the existing single-output-device + per-slice pan from its
 // own audio model. Registered in
 // docs/attribution/aethersdr-reconciliation.md.
@@ -8,7 +8,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // =================================================================
-// src/gui/PanadapterApplet.h  (NereusSDR)
+// src/gui/PanadapterApplet.h  (Longpath)
 // =================================================================
 //
 // Ported (structurally) from AetherSDR src/gui/PanadapterApplet.{h,cpp}
@@ -18,14 +18,14 @@
 //       and About dialog for the live contributor list)
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-27  J.J. Boyd / KG4VCF  Phase 3F Sub-Epic D Task 1.
 //                                    Per-pan container skeleton ported
 //                                    structurally from AetherSDR
 //                                    src/gui/PanadapterApplet.{h,cpp}
 //                                    [@0cd4559]. Hosts one SpectrumWidget
 //                                    + tracks associated slices for
-//                                    overlay rendering. NereusSDR
+//                                    overlay rendering. Longpath
 //                                    preserves the existing single-
 //                                    output-device + per-slice pan from
 //                                    its own audio model; wideband-
@@ -161,7 +161,7 @@ public:
     /// exec()-ing it, so a test can find + trigger() its actions without a
     /// live nested event loop. Mirrors
     /// AmpApplet::buildContextMenuForTesting().
-    /// NereusSDR-native test seam.
+    /// Longpath-native test seam.
     QMenu* buildContextMenuForTesting() { return buildContextMenu(this); }
 
     /// Dasselbe fuer das Zahnrad-Menue: eine Pruefung soll die

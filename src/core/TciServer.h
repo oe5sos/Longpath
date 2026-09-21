@@ -1,20 +1,20 @@
-// no-port-check: AetherSDR-derived NereusSDR file.  Transport lifecycle
+// no-port-check: AetherSDR-derived Longpath file.  Transport lifecycle
 // (start/stop/onNewConnection/onClientDisconnected) is adapted from
-// AetherSDR src/core/TciServer.{h,cpp} [@0cd4559]; NereusSDR diverges in
+// AetherSDR src/core/TciServer.{h,cpp} [@0cd4559]; Longpath diverges in
 // bind address, double-start contract, signal set, and client table type.
 // Registered in docs/attribution/aethersdr-reconciliation.md.
 
-// src/core/TciServer.h  (NereusSDR)
-// NereusSDR-original — TCI WebSocket server.
+// src/core/TciServer.h  (Longpath)
+// Longpath-original — TCI WebSocket server.
 //
 // Transport pattern ported from AetherSDR src/core/TciServer.{h,cpp} [@0cd4559].
 // Per-client field set condensed from Thetis TCIServer.cs:684-790 [v2.10.3.13]
-// (49 Thetis fields → 14 NereusSDR fields; see TciClientSession.h for the
+// (49 Thetis fields → 14 Longpath fields; see TciClientSession.h for the
 // detailed divergence rationale).
 //
-// Key NereusSDR divergences from AetherSDR:
+// Key Longpath divergences from AetherSDR:
 //   - Bind address: QHostAddress::LocalHost (AetherSDR binds to Any).
-//     Per design doc Q7 lock-in — TCI is a local-process IPC bus in NereusSDR.
+//     Per design doc Q7 lock-in — TCI is a local-process IPC bus in Longpath.
 //   - double-start contract: returns false + logs warning (AetherSDR returns
 //     true, treating double-start as idempotent).
 //   - Signals: finer-grained clientConnected / clientDisconnected carrying
@@ -22,7 +22,7 @@
 //   - Client table: QHash<QWebSocket*, shared_ptr<TciClientSession>> instead of
 //     QList<ClientState> — O(1) lookup by socket pointer in disconnect handler.
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-10 — Phase 3J-1 Task 2.1 by J.J. Boyd (KG4VCF);
 //                AI-assisted transformation via Anthropic Claude Code.
 //   2026-09-17 — MOX release on client loss (NereusSDR-original, no Thetis
@@ -70,7 +70,7 @@ class TciProtocol;
 //   isRunning()  — true between a successful start() and the next stop().
 //
 // Threading: all methods must be called from the thread that owns this object
-// (the main GUI thread in the current NereusSDR architecture).  QWebSocket
+// (the main GUI thread in the current Longpath architecture).  QWebSocket
 // callbacks fire on the same thread via the Qt event loop.
 class TciServer : public QObject {
     Q_OBJECT
@@ -298,7 +298,7 @@ private slots:
     // Mirrors Thetis TCIServer.cs:6730-6790 [v2.10.3.15]: TCIServer subscribes
     // to ~40 Console events (FilterChangedHandlers, NRChangedHandlers,
     // VfoALockChangedHandlers, ...) and routes each to OnXxxChanged which
-    // calls sendXxx.  NereusSDR per-slice signals route through SliceModel.
+    // calls sendXxx.  Longpath per-slice signals route through SliceModel.
     //
     // wireSliceForBroadcast handles the per-slice signal-to-frame mapping.
     // Bench bug fix 2026-05-22: without this, operator-side VFO/mode/filter
@@ -365,7 +365,7 @@ private:
     // from each client's TciSendQueue in priority order (Urgent > Binary >
     // Control), capped at kDrainMaxPerTick frames per client per tick.
     // Mirrors Thetis's per-client sender thread + AutoResetEvent (WaitOne 20ms)
-    // at TCIServer.cs:1754-1795 [v2.10.3.13]; NereusSDR uses a single shared
+    // at TCIServer.cs:1754-1795 [v2.10.3.13]; Longpath uses a single shared
     // timer on the event loop instead of per-client threads.
     QTimer* m_drainTimer{nullptr};
 
@@ -541,7 +541,7 @@ private:
     // setTxSensorsEnabled create System.Threading.Timer instances for their
     // respective callbacks.
     //
-    // NereusSDR uses QTimers owned by TciServer (main-thread event loop).
+    // Longpath uses QTimers owned by TciServer (main-thread event loop).
     // Default interval 200 ms matches Thetis clsTCISensorManager._rxIntervalMs
     // / _txIntervalMs defaults (TCIServer.cs:491-492 [v2.10.3.13]).
     //
@@ -591,9 +591,9 @@ private:
     // Matches the RX m_audioRing capacity so the same reasoning applies:
     // well above the drain headroom required against typical event-loop jitter.
     //
-    // Phase 17 NereusSDR-original — Thetis keeps per-client m_txAudioQueue
+    // Phase 17 Longpath-original — Thetis keeps per-client m_txAudioQueue
     // (Queue<TCIQueuedTxAudio>) at TCIServer.cs:762-764 [v2.10.3.13].
-    // NereusSDR uses a server-wide SPSC ring because only one client can
+    // Longpath uses a server-wide SPSC ring because only one client can
     // own the TX mutex at a time.
     AudioRingSpsc<131072> m_txAudioRing;
 };

@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/gui/applets/GridCell.h  (NereusSDR)
+// src/gui/applets/GridCell.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // ── Ein Feld ist ein BEHAELTER, kein Widget ──────────────────────────
 //
@@ -42,7 +42,7 @@
 // (Siehe AppletKeys.h fuer die Kennungssorten der Applets selbst.)
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-18 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

@@ -1,10 +1,10 @@
-// no-port-check: NereusSDR-original test for issue #174 verification.
+// no-port-check: Longpath-original test for issue #174 verification.
 //
 // Issue #174 (HL2 user): toggling Setup → General → Options →
 // "Auto Attenuate RX1 Enable" must flip the RxApplet label from
 // "S-ATT" to "A-ATT" so the user sees that auto-attenuate is armed.
 // Inspired by mi0bot-Thetis console.cs:21342-21365 [v2.10.3.13-beta2]
-// AutoAttRX1 property (HL2-only there).  NereusSDR widens to all
+// AutoAttRX1 property (HL2-only there).  Longpath widens to all
 // boards because StepAttenuatorController auto-att is universal —
 // non-HL2 users had the same blind-spot bug.
 //
@@ -102,7 +102,7 @@ private slots:
     // Issue #174 widen: non-HL2 boards also flip to "A-ATT".  We
     // intentionally diverge from mi0bot's HL2-only gate because
     // StepAttenuatorController auto-att is available on every board in
-    // NereusSDR — so every board has the same label-feedback need.
+    // Longpath — so every board has the same label-feedback need.
     void hermes_auto_on_shows_a_att()
     {
         RadioModel model;

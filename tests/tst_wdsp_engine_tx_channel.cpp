@@ -1,12 +1,12 @@
 // =================================================================
-// tests/tst_wdsp_engine_tx_channel.cpp  (NereusSDR)
+// tests/tst_wdsp_engine_tx_channel.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/ChannelMaster/cmaster.c, original licence below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-25 — New test for Phase 3M-1a Task C.1: WdspEngine TX channel
 //                 API (createTxChannel / destroyTxChannel / txChannel).
 //                 J.J. Boyd (KG4VCF), with AI-assisted implementation via
@@ -57,7 +57,7 @@ using namespace Longpath;
 // Channel ID convention (Thetis cmaster.c / dsp.cs [v2.10.3.13]):
 //   RX channel 0: WDSP.id(0, 0) = 0 (rx0, subrx0)
 //   TX channel  : WDSP.id(1, 0) = CMsubrcvr * CMrcvr
-//     (dsp.cs:926-944 case 2 [v2.10.3.15]).  Phase 3F: NereusSDR's radio
+//     (dsp.cs:926-944 case 2 [v2.10.3.15]).  Phase 3F: Longpath's radio
 //     structure is CMsubrcvr=1, CMrcvr=WdspEngine::kMaxSliceChannels, so
 //     the TX id is kMaxSliceChannels rather than the old 1.  The literal
 //     is gone on purpose: tst_wdsp_channel_id_map owns the numbering.
@@ -100,7 +100,7 @@ private slots:
     }
 
     void txDspBufferSizeIs2048() {
-        // 3M-1a r2-ring fix (2026-04-27): NereusSDR uses dsp_size=2048
+        // 3M-1a r2-ring fix (2026-04-27): Longpath uses dsp_size=2048
         // (deskhpsdr/src/transmitter.c:1072 [@120188f]) instead of Thetis's
         // hardcoded 4096 (cmaster.c:180 [v2.10.3.13]).  Two reasons:
         //   1. WDSP iobuffs.c:577 wraps r2_outidx with `==` not modulo —
@@ -240,7 +240,7 @@ private slots:
     // breaks moveToThread.
     //
     // We use the test-only friend access (WdspEngine.h, gated on
-    // NEREUS_BUILD_TESTS) to set m_initialized = true synchronously, bypassing
+    // LONGPATH_BUILD_TESTS) to set m_initialized = true synchronously, bypassing
     // the async wisdom path which would otherwise need a running event loop
     // and a real WDSP wisdom file to complete.
     void createdTxChannelHasNoQtParentForThreadAffinity() {

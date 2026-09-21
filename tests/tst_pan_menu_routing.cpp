@@ -1,7 +1,7 @@
 // no-port-check: AetherSDR-derived behaviour; see PanLayoutDialog.h.
 
 // =================================================================
-// tests/tst_pan_menu_routing.cpp  (NereusSDR)
+// tests/tst_pan_menu_routing.cpp  (Longpath)
 // =================================================================
 //
 // Task B4 (bottom-banner + pan-menu epic): the status-bar "+PAN" text pill

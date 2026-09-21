@@ -1,8 +1,8 @@
-// no-port-check: NereusSDR-original unit-test file.  The Thetis cite
+// no-port-check: Longpath-original unit-test file.  The Thetis cite
 // comments below identify which upstream lines each assertion verifies;
 // no Thetis logic is ported in this test file.
 // =================================================================
-// tests/tst_transmit_model_two_tone_drive_origin.cpp  (NereusSDR)
+// tests/tst_transmit_model_two_tone_drive_origin.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for TransmitModel TwoToneDrivePowerOrigin enum property,
@@ -14,7 +14,7 @@
 //   console.cs:46553 [v2.10.3.13] — _2ToneDrivePowerSource = DRIVE_SLIDER
 //     (default).
 //   console.cs:46576-46597 [v2.10.3.13] — TwoToneDrivePowerOrigin property
-//     (Thetis console-side; NereusSDR puts it on TransmitModel).
+//     (Thetis console-side; Longpath puts it on TransmitModel).
 //   setup.cs:11111-11119 [v2.10.3.13] — Fixed-mode behaviour: save
 //     console.PWR before MOX, override with new_pwr, restore on stop.
 //   setup.cs:22850-22878 [v2.10.3.13] — Setup UI radio buttons:

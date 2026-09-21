@@ -1,12 +1,12 @@
 // =================================================================
-// src/gui/widgets/FilterPresetEditDialog.h  (NereusSDR)
+// src/gui/widgets/FilterPresetEditDialog.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original file. Modal dialog for editing a single filter
+// Longpath-original file. Modal dialog for editing a single filter
 // preset (name + low + high) via right-click on a filter button.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-02 — Original implementation for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted authoring via Anthropic
 //                 Claude Code (Stage C2 filter preset editor).

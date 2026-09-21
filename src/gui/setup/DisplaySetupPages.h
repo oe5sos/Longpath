@@ -1,14 +1,14 @@
 #pragma once
 
 // =================================================================
-// src/gui/setup/DisplaySetupPages.h  (NereusSDR)
+// src/gui/setup/DisplaySetupPages.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/setup.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -124,7 +124,7 @@ private:
     // "Bin Width (Hz)" prefix label.  Mirrors Thetis lblDisplayBinWidth at
     // setup.designer.cs:35010-35021 [v2.10.3.13].  Distinct from
     // m_binWidthReadout (Overlays group, gates the on-spectrum corner
-    // overlay -- a NereusSDR-original control).
+    // overlay -- a Longpath-original control).
     QLabel*    m_binWidthLabel{nullptr};
     // Window combo: 7 Thetis-faithful items (Rectangular / Blackman-Harris
     // 4T / Hann / Flat-Top / Hamming / Kaiser / Blackman-Harris 7T) per
@@ -311,7 +311,7 @@ private:
 
     // Section: Noise-Floor Tracking (Task 2.9)
     // From Thetis setup.cs:24202-24213 [v2.10.3.13] chkAdjustGridMinToNFRX1.
-    // RX1 scope dropped; NereusSDR applies as global panadapter default.
+    // RX1 scope dropped; Longpath applies as global panadapter default.
     QCheckBox*   m_adjustGridMinToNF{nullptr};  // DisplayAdjustGridMinToNoiseFloor
     QSpinBox*    m_nfOffsetGridFollow{nullptr}; // DisplayNFOffsetGridFollow (dB, -60..+60)
     QCheckBox*   m_maintainNFAdjustDelta{nullptr}; // DisplayMaintainNFAdjustDelta

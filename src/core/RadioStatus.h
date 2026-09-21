@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/RadioStatus.h  (NereusSDR)
+// src/core/RadioStatus.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -7,7 +7,7 @@
 //   Project Files/Source/Console/HPSDR/NetworkIOImports.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-20 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via
 //                 Anthropic Claude Code.
@@ -102,7 +102,7 @@ namespace Longpath {
 //     double Er = ScaledVoltage(adc_rev);
 //     swr = (Ef + Er) / (Ef - Er);
 //
-//   NereusSDR's setters receive watts (already scaled) rather than raw ADC
+//   Longpath's setters receive watts (already scaled) rather than raw ADC
 //   counts; the ARRL formula (equivalent form) is used:
 //     rho = sqrt(refl/fwd);  swr = (1 + rho) / (1 - rho)
 //   clamped to [1.0, 99.0].
@@ -186,7 +186,7 @@ private:
     static double computeSwr(double fwd, double refl);
 
     // Maximum PTT history ring size.
-    // no-port-check: NereusSDR-original constant.
+    // no-port-check: Longpath-original constant.
     static constexpr int kMaxPttHistory = 8;
 };
 

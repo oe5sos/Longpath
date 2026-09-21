@@ -1,14 +1,14 @@
 #pragma once
 
 // =================================================================
-// src/gui/meters/MeterWidget.h  (NereusSDR)
+// src/gui/meters/MeterWidget.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/MeterManager.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -59,7 +59,7 @@ mw0lge@grange-lane.co.uk
 #include <QImage>
 #include <QVector>
 
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
 #include <QRhiWidget>
 #include <rhi/qrhi.h>
 using MeterBaseClass = QRhiWidget;
@@ -111,7 +111,7 @@ public:
     QString serializeItems() const;
     bool deserializeItems(const QString& data);
 
-    // Thetis-parity stack layout with a NereusSDR pixel floor
+    // Thetis-parity stack layout with a Longpath pixel floor
     // (Phase 3G-9 post-revert).
     //
     // reflowStackedItems() is called on every resize. It computes a
@@ -127,7 +127,7 @@ public:
     void inferStackFromGeometry();
 
 protected:
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     void initialize(QRhiCommandBuffer* cb) override;
     void render(QRhiCommandBuffer* cb) override;
     void releaseResources() override;
@@ -158,7 +158,7 @@ private:
     // but QHash matches the rest of the file.
     QHash<int, double> m_lastBindingValue;
 
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     bool m_rhiInitialized{false};
 
     void initBackgroundPipeline();

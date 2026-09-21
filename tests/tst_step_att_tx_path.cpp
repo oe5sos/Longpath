@@ -1,12 +1,12 @@
 // =================================================================
-// tests/tst_step_att_tx_path.cpp  (NereusSDR)
+// tests/tst_step_att_tx_path.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/console.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-26 — Implemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted implementation via Anthropic
 //                 Claude Code.
@@ -66,7 +66,7 @@
 
 // Migrated to VS2026 - 18/12/25 MW0LGE v2.10.3.12
 
-// no-port-check: Test file exercises NereusSDR API; the Thetis logic
+// no-port-check: Test file exercises Longpath API; the Thetis logic
 // being tested is cited in StepAttenuatorController.cpp via inline cites
 // referencing console.cs:29546-29576 [v2.10.3.13]. No C# is translated here.
 

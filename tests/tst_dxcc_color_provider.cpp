@@ -4,7 +4,7 @@
 // fixtures to exercise the 4-tier color-resolution chain. Precedent:
 // B2-B6, C1-C3.
 //
-// NereusSDR - DxccColorProvider tests
+// Longpath - DxccColorProvider tests
 //
 // Phase 3J-2 Task C4. Pins the contract that DxccColorProvider
 // integrates CtyDatParser + DxccWorkedStatus + AdifParser to resolve

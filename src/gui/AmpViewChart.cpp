@@ -1,11 +1,11 @@
-// no-port-check: NereusSDR-original Qt6 chart widget.  See header for
+// no-port-check: Longpath-original Qt6 chart widget.  See header for
 // the rationale.  Series semantics mapped from AmpView.cs [v2.10.3.13].
 //
 // =================================================================
-// src/gui/AmpViewChart.cpp  (NereusSDR)
+// src/gui/AmpViewChart.cpp  (Longpath)
 // =================================================================
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-06 — Phase 3M-4 Task 9 created by J.J. Boyd (KG4VCF),
 //                 with AI-assisted transformation via Anthropic
 //                 Claude Code.

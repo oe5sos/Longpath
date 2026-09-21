@@ -1,8 +1,8 @@
-// no-port-check: NereusSDR-original unit-test file.  The Thetis cite
+// no-port-check: Longpath-original unit-test file.  The Thetis cite
 // comments below document which upstream lines each assertion verifies;
 // no upstream logic is ported in this file.
 // =================================================================
-// tests/tst_radio_model_drive_path.cpp  (NereusSDR)
+// tests/tst_radio_model_drive_path.cpp  (Longpath)
 // =================================================================
 //
 // Phase 4 Agent 4A of issue #167 — wire-byte / IQ-scalar topology +

@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR — bandplan manager
+// Longpath — bandplan manager
 //
 // Ported from AetherSDR src/models/BandPlanManager.h [@0cd4559].
 // AetherSDR is © its contributors and is licensed GPL-3.0-or-later.
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-25  J.J. Boyd <jj@skyrunner.net>  Initial port for Phase 3G RX
 //                                              Epic sub-epic D. Renamed to
 //                                              NereusSDR namespace; reuses

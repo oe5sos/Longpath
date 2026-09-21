@@ -1,10 +1,10 @@
 // =================================================================
-// tests/tst_pan_status_overlay.cpp  (NereusSDR)
+// tests/tst_pan_status_overlay.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure. Nothing here
+// no-port-check: Longpath-original test infrastructure. Nothing here
 // is a port; the surfaces under test are fixed by
 // docs/architecture/2026-05-26-phase3f-sub-epic-e-ui-atlas-plan.md
-// Task 2, which is a NereusSDR design document.
+// Task 2, which is a Longpath design document.
 //
 // Phase 3F: the per-pan status overlay must paint the state of the
 // slice that pan is actually showing.

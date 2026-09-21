@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/core/QrzLogbookUploader.h  (NereusSDR)
+// src/core/QrzLogbookUploader.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // IMPORTANT — this is NOT the XML lookup service. QRZ runs two separate
 // interfaces with separate credentials:
@@ -20,7 +20,7 @@
 // separate settings rather than one "QRZ credentials" blob.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
 // =================================================================

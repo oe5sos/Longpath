@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/gui/applets/eq/EqHistory.h  (NereusSDR)
+// src/gui/applets/eq/EqHistory.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // Undo for the equaliser.
 //
@@ -50,7 +50,7 @@
 // button that sometimes does nothing is one nobody trusts.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-11 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/core/CouplerZero.h  (NereusSDR)
+// src/core/CouplerZero.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // Where a directional coupler's ADC sits when nothing is being
 // transmitted — measured on the radio in front of you, rather than
@@ -21,7 +21,7 @@
 // belong in a per-board table: refvoltage and bridge_volt. The third,
 // adc_cal_offset, is not. It is the count the ADC reads with no drive
 // — a zero — and it varies with the individual board, its temperature
-// and its age. Thetis carries a table of them and NereusSDR inherited
+// and its age. Thetis carries a table of them and Longpath inherited
 // it: 3, 6, 16, 18, 28, 32 counts depending on the model.
 //
 // A tabled zero is wrong in both directions and neither is harmless.
@@ -68,7 +68,7 @@
 // table at all.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-14 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

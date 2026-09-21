@@ -705,7 +705,7 @@ worker-thread + matching-block-size architecture.
   and report BLOCKED.
 - Tests baseline: 236/236 passing.
 - Required env var before every commit:
-  `export NEREUS_THETIS_DIR=/Users/j.j.boyd/Thetis`
+  `export LONGPATH_THETIS_DIR=/Users/j.j.boyd/Thetis`
 
 ## Context — read before starting
 

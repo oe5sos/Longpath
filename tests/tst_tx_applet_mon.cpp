@@ -1,4 +1,4 @@
-// no-port-check: test-only — exercises NereusSDR-native TxApplet MON toggle +
+// no-port-check: test-only — exercises Longpath-native TxApplet MON toggle +
 // monitor volume slider + mic-source badge wiring (Phase 3M-1b J.3).
 //
 // TxApplet inserts:

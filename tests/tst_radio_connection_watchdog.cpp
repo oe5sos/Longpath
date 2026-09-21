@@ -1,10 +1,10 @@
 // no-port-check: test fixture asserting setWatchdogEnabled() state-tracking
 // on P1RadioConnection and P2RadioConnection. No Thetis logic is ported here;
-// this file is NereusSDR-original. The API mirrors NetworkIOImports.cs:197-198
+// this file is Longpath-original. The API mirrors NetworkIOImports.cs:197-198
 // [v2.10.3.13] (DllImport SetWatchdogTimer) at the concept level only.
 //
 // Wire-format assertions (RUNSTOP byte pkt[3] bit 7) are in
-// tst_p1_watchdog_wire.cpp (3M-1a Task E.5, NEREUS_BUILD_TESTS gated).
+// tst_p1_watchdog_wire.cpp (3M-1a Task E.5, LONGPATH_BUILD_TESTS gated).
 //
 // Default state changed from false to true in 3M-1a Task E.5 — see
 // RadioConnection.h m_watchdogEnabled comment for rationale (HL2 firmware

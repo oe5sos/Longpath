@@ -1,6 +1,6 @@
 // no-port-check: test-only — deskhpsdr file names appear only in source-cite
 // comments that document which upstream line each assertion verifies.
-// No deskhpsdr logic is ported here; this file is NereusSDR-original.
+// No deskhpsdr logic is ported here; this file is Longpath-original.
 //
 // Wire-byte snapshot tests for P2RadioConnection::setLineIn() (3M-1b Task G.2).
 //
@@ -28,7 +28,7 @@
 //   byte 51: line_in gain
 //   bytes 57-59: TX step attenuators
 //
-// Test seam: composeCmdTxForTest() in P2RadioConnection.h (NEREUS_BUILD_TESTS)
+// Test seam: composeCmdTxForTest() in P2RadioConnection.h (LONGPATH_BUILD_TESTS)
 // exposes the CmdTx buffer composition without needing a live socket.
 #include <QtTest/QtTest>
 #include "core/P2RadioConnection.h"

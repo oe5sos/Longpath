@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_radio_model_status_wiring.cpp  (NereusSDR)
+// tests/tst_radio_model_status_wiring.cpp  (Longpath)
 // =================================================================
 //
 // Phase 3P-H Task 4: verifies that RadioModel correctly owns and exposes
@@ -21,13 +21,13 @@
 //      on each Connected transition.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-21 — Original implementation for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted authoring via Anthropic
 //                 Claude Code.
 // =================================================================
 
-// no-port-check: NereusSDR-original test file.
+// no-port-check: Longpath-original test file.
 
 #include <QtTest/QtTest>
 #include <QSignalSpy>

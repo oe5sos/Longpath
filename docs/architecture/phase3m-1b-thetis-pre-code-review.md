@@ -36,7 +36,7 @@ memory:
   is given at first use and abbreviated thereafter when context is unambiguous.
 
 The pre-commit verifier `scripts/verify-inline-tag-preservation.py` requires
-`NEREUS_THETIS_DIR=/Users/j.j.boyd/Thetis` set in the shell during commits. Set
+`LONGPATH_THETIS_DIR=/Users/j.j.boyd/Thetis` set in the shell during commits. Set
 this once per session at the top of every shell that will commit.
 
 ### 0.3 Brainstorm-locked decisions (already taken)
@@ -1335,7 +1335,7 @@ TxApplet — recommend Setup-only and add to TxApplet later if reported.
 ### 12.2 PortAudio backend default per OS
 
 **Recommend:** macOS = CoreAudio, Linux = PipeWire (when
-`NEREUS_HAVE_PIPEWIRE`) with PulseAudio fallback, Windows = WASAPI shared.
+`LONGPATH_HAVE_PIPEWIRE`) with PulseAudio fallback, Windows = WASAPI shared.
 
 **Why:** Matches AudioEngine 3O VAX behaviour and modern OS conventions.
 
@@ -1546,7 +1546,7 @@ Per-task discipline (rigid TDD):
 **Inline cite stamp:** `[v2.10.3.13]` (Thetis tag) or `[@<shortsha>]` when no
 tagged release applies. The verifier script
 (`scripts/verify-inline-tag-preservation.py`) runs in the pre-commit hook
-chain — `NEREUS_THETIS_DIR=/Users/j.j.boyd/Thetis` must be set in the shell
+chain — `LONGPATH_THETIS_DIR=/Users/j.j.boyd/Thetis` must be set in the shell
 before each commit.
 
 **Bench-test gate:** HL2 first (lower stakes), then G2, BEFORE PR opens. PR

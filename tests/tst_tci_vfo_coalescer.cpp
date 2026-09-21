@@ -1,4 +1,4 @@
-// no-port-check: NereusSDR-original TDD test for TciVfoCoalescer.
+// no-port-check: Longpath-original TDD test for TciVfoCoalescer.
 // Phase 3J-1 Task 15.1.
 //
 // Verifies:

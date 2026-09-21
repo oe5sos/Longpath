@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/setup/hardware/CalibrationTab.h  (NereusSDR)
+// src/gui/setup/hardware/CalibrationTab.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -18,7 +18,7 @@
 //      original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 -- Original PaCalibrationTab implementation.
 //   2026-04-20 -- Renamed PaCalibrationTab -> CalibrationTab; expanded to 5
 //                  group boxes matching Thetis General -> Calibration 1:1;
@@ -158,7 +158,7 @@ struct BoardCapabilities;
 // Setup IA reshape Phase 3A (2026-05-02) migrated the per-board PA forward-
 // power cal spinbox group out to PA → Watt Meter (PaWattMeterPage); see
 // docs/architecture/2026-05-02-p1-full-parity-plan.md Setup IA reshape Phase 3A.
-// Phase 3B (2026-05-02) relabelled Group 5 from the NereusSDR-original
+// Phase 3B (2026-05-02) relabelled Group 5 from the Longpath-original
 // "PA Current (A) calculation" to the Thetis-faithful "Volts/Amps Calibration"
 // (groupBoxTS27) and renamed m_paSensSpin/m_paOffsetSpin/m_paDefaultBtn to
 // m_ampSensSpin/m_ampVoffSpin/m_ampDefaultBtn for upstream-naming consistency.
@@ -174,7 +174,7 @@ public:
     void populate(const RadioInfo& info, const BoardCapabilities& caps);
     void restoreSettings(const QMap<QString, QVariant>& settings);
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     // Test seam: counts QGroupBox children of the main layout.
     int groupBoxCountForTest() const;
 #endif
@@ -222,7 +222,7 @@ private:
     // Source: Thetis setup.designer.cs:11672-11677 (groupBoxTS27 contents:
     //         chkLogVoltsAmps + btnAmpDefault + udAmpSens + udAmpVoff)
     //         + console.cs:24893 _amp_voff = 360.0f default [v2.10.3.13]
-    // Field-by-field mapping (NereusSDR <-> Thetis):
+    // Field-by-field mapping (Longpath <-> Thetis):
     //   m_ampSensSpin       <-> udAmpSens
     //   m_ampVoffSpin       <-> udAmpVoff   (default 360.0f per console.cs:24893)
     //   m_ampDefaultBtn     <-> btnAmpDefault

@@ -1,7 +1,7 @@
-// no-port-check: NereusSDR-original unit-test file. Thetis cite comments
+// no-port-check: Longpath-original unit-test file. Thetis cite comments
 // document upstream sources; no Thetis logic ported in this test file.
 // =================================================================
-// tests/tst_tx_channel_ps_setters.cpp  (NereusSDR)
+// tests/tst_tx_channel_ps_setters.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for the 22 TxChannel PureSignal API wrappers added in Phase
@@ -50,7 +50,7 @@
 //         Thetis cmaster.cs:143-147 [v2.10.3.13].
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-06 — New test file for Phase 3M-4 Task 3: 22 TX PureSignal API
 //                 wrapper smoke tests.  J.J. Boyd (KG4VCF), with AI-assisted
 //                 implementation via Anthropic Claude Code.

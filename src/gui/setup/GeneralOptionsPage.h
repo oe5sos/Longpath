@@ -1,12 +1,12 @@
 // =================================================================
-// src/gui/setup/GeneralOptionsPage.h  (NereusSDR)
+// src/gui/setup/GeneralOptionsPage.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/setup.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -83,7 +83,7 @@ public:
     /// Called by the constructor on initial connect and by currentRadioChanged
     /// so reconnects to a different radio (e.g. full-TX board after an HL2-RX)
     /// update visibility correctly.  BoardCapabilities::isRxOnlySku
-    /// (NereusSDR-original) is the authoritative source.
+    /// (Longpath-original) is the authoritative source.
     void setReceiveOnlyVisible(bool visible);
 
 signals:
@@ -145,7 +145,7 @@ private:
     // Mirror of Thetis groupBoxTS23 ("Info Bar (below spectrum)") controls
     // chkHideFeebackLevel + chkSwapREDBluePSAColours on tpOptions2
     // (setup.designer.cs:10560-10632 [v2.10.3.13]).  Thetis places these
-    // on a dedicated Info Bar groupbox; NereusSDR's IA folds them into the
+    // on a dedicated Info Bar groupbox; Longpath's IA folds them into the
     // existing General Options group to keep the Setup tree shallow.
     QCheckBox* m_chkHideFeedback{nullptr};
     QCheckBox* m_chkSwapRedBlue{nullptr};

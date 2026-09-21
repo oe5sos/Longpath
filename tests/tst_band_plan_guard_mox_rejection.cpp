@@ -1,8 +1,8 @@
 // =================================================================
-// tests/tst_band_plan_guard_mox_rejection.cpp  (NereusSDR)
+// tests/tst_band_plan_guard_mox_rejection.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original test. No Thetis port at this layer.
+// Longpath-original test. No Thetis port at this layer.
 // Phase 3M-1b Task K.2: MoxController::setMox(true) rejection path.
 //
 // Covers:
@@ -32,14 +32,14 @@
 //  20.  SPEC → not-supported tooltip.
 // =================================================================
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-28 — Original test for NereusSDR by J.J. Boyd (KG4VCF),
 //                 with AI-assisted implementation via Anthropic Claude Code.
 //                 Task: Phase 3M-1b Task K.2 — MOX rejection signal +
 //                 status-bar toast + TxApplet tooltip override. Closes Phase K.
 // =================================================================
 
-// no-port-check: NereusSDR-original test file.
+// no-port-check: Longpath-original test file.
 
 #include <QtTest/QtTest>
 #include <QCoreApplication>

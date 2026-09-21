@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 //
-// NereusSDR - tst_slice_model_snr: SliceModel snrDb Q_PROPERTY contract.
+// Longpath - tst_slice_model_snr: SliceModel snrDb Q_PROPERTY contract.
 //
-// NEW NereusSDR-native extension to SliceModel. No upstream equivalent.
+// NEW Longpath-native extension to SliceModel. No upstream equivalent.
 // RadeChannel will populate snrDb when slice mode is RADE; future
 // digital modes wire the same setSnrDb slot. VfoWidget (Phase L1)
 // binds snrDbChanged to paint the SNR row in the flag.

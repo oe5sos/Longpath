@@ -106,13 +106,13 @@ open build/NereusSDR.app
 sleep 3
 
 # Screenshot
-mkdir -p /tmp/nereus_dbg/3g6
-screencapture -x /tmp/nereus_dbg/3g6/block-N-main.png
+mkdir -p /tmp/longpath_dbg/3g6
+screencapture -x /tmp/longpath_dbg/3g6/block-N-main.png
 
 # Read screenshots with Read tool
 ```
 
-Archive screenshots per block under `/tmp/nereus_dbg/3g6/block-N-*.png`.
+Archive screenshots per block under `/tmp/longpath_dbg/3g6/block-N-*.png`.
 
 ## Acceptance criteria
 

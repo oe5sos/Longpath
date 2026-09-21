@@ -1,8 +1,8 @@
 // =================================================================
-// src/core/AudioDeviceConfig.cpp  (NereusSDR)
+// src/core/AudioDeviceConfig.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. See AudioDeviceConfig.h for the full header.
+// Longpath-original. See AudioDeviceConfig.h for the full header.
 //
 // Sub-Phase 12 Task 12.2 (2026-04-20): implements loadFromSettings /
 // saveToSettings helpers for the 10-field AppSettings round-trip

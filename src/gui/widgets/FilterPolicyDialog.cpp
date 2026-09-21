@@ -1,19 +1,19 @@
 // =================================================================
-// src/gui/widgets/FilterPolicyDialog.cpp  (NereusSDR)
+// src/gui/widgets/FilterPolicyDialog.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original; no upstream port. Per Phase 3F UI atlas plan
+// Longpath-original; no upstream port. Per Phase 3F UI atlas plan
 // (docs/architecture/2026-05-26-phase3f-sub-epic-e-ui-atlas-plan.md
 // Task 3). HPF checkbox is scaffolded; binding to AlexController HPF
 // state lands in Sub-Epic G diversity polish.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-27 Created in C++20/Qt6 for NereusSDR by J.J. Boyd (KG4VCF),
 //              with AI-assisted transformation via Anthropic Claude Code.
 // =================================================================
 //
-// no-port-check: NereusSDR-original
+// no-port-check: Longpath-original
 
 #include "gui/widgets/FilterPolicyDialog.h"
 

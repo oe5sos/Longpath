@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/core/WorkedBefore.h  (NereusSDR)
+// src/core/WorkedBefore.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // "Have I had this one before, and does it count for anything?"
 //
@@ -25,7 +25,7 @@
 // depend on the spot-colouring stack.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
 // =================================================================

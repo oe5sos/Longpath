@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_rx_applet_inherited.cpp  (NereusSDR)
+// tests/tst_rx_applet_inherited.cpp  (Longpath)
 // =================================================================
 //
 // Was die RxApplet von der VFO-Flagge geerbt hat.
@@ -22,13 +22,13 @@
 //   „AF gain slider removed: TitleBar master volume + VfoWidget
 //    per-slice AF control are the canonical 2 surfaces."
 //
-// Diese Kopfleiste mit Hauptlautstaerke gibt es in NereusSDR NICHT —
+// Diese Kopfleiste mit Hauptlautstaerke gibt es in Longpath NICHT —
 // ein aus AetherSDR mitgewanderter Satz, der eine Flaeche benennt, die
 // nie gebaut wurde. Ohne die Flagge haette das Programm keine
 // Lautstaerke und keine Stummschaltung gehabt.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-18 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

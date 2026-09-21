@@ -1,4 +1,4 @@
-// tst_smoke.cpp — proves NereusSDR test infrastructure links and runs.
+// tst_smoke.cpp — proves Longpath test infrastructure links and runs.
 // Replace once real tests exist; this exists so commit 1 (test scaffolding)
 // has something to verify the build wiring.
 

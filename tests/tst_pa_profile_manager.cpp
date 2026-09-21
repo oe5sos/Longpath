@@ -1,6 +1,6 @@
-// no-port-check: NereusSDR-original unit-test file.
+// no-port-check: Longpath-original unit-test file.
 // =================================================================
-// tests/tst_pa_profile_manager.cpp  (NereusSDR)
+// tests/tst_pa_profile_manager.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for PaProfileManager (Phase 2 Agent 2B of issue #167).
@@ -69,8 +69,8 @@ private slots:
     //
     // From Thetis setup.cs:23295-23316 [v2.10.3.13] initPAProfiles — seeds
     // one "Default - <model>" entry per HPSDRModel.LAST iteration plus one
-    // "Bypass" profile. NereusSDR seeds on first connect via load(connectedModel),
-    // and the active profile is "Default - <connectedModel>" (NereusSDR-spin
+    // "Bypass" profile. Longpath seeds on first connect via load(connectedModel),
+    // and the active profile is "Default - <connectedModel>" (Longpath-spin
     // enhancement: Thetis just defaulted to combo index 0).
     void firstLaunch_seedsAllFactoryProfiles()
     {
@@ -149,7 +149,7 @@ private slots:
     //
     // From Thetis setup.cs:1920-1959 [v2.10.3.13] RecoverPAProfiles —
     // stored profiles WIN over factory defaults at deserialization time,
-    // so future Thetis-table updates don't overwrite user edits. NereusSDR
+    // so future Thetis-table updates don't overwrite user edits. Longpath
     // mirrors this: subsequent load() calls don't re-seed.
     void reconnect_preservesStoredProfiles()
     {
@@ -356,7 +356,7 @@ private slots:
     // Test 7: Active-profile-on-connect logic (3 sub-cases)
     // =========================================================================
     //
-    // NereusSDR-spin enhancement over Thetis:
+    // Longpath-spin enhancement over Thetis:
     //   a) Stored active exists and is in manifest -> restore it
     //   b) Stored active is a deleted name -> fall back to Default-<connectedModel>
     //   c) No stored active -> fall back to Default-<connectedModel>

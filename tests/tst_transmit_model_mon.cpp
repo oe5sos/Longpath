@@ -1,8 +1,8 @@
-// no-port-check: NereusSDR-original unit-test file.  The Thetis references
+// no-port-check: Longpath-original unit-test file.  The Thetis references
 // below are cite comments documenting which upstream lines each assertion
 // verifies; no Thetis logic is ported in this test file.
 // =================================================================
-// tests/tst_transmit_model_mon.cpp  (NereusSDR)
+// tests/tst_transmit_model_mon.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for TransmitModel MON properties (2x):
@@ -47,7 +47,7 @@ private slots:
     void default_monitorVolume_isPointFive() {
         // Matches Thetis audio.cs:417 [v2.10.3.13] literal mix coefficient:
         //   cmaster.SetAAudioMixVol((void*)0, 0, WDSP.id(1, 0), 0.5);
-        // NereusSDR repurposes the 0.5 literal as the user-visible volume default.
+        // Longpath repurposes the 0.5 literal as the user-visible volume default.
         TransmitModel t;
         QCOMPARE(t.monitorVolume(), 0.5f);
     }

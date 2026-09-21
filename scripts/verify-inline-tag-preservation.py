@@ -35,9 +35,9 @@ Usage:
 Exit code 0 iff no findings (strict) or always 0 in audit mode.
 
 Configuration:
-    NEREUS_THETIS_DIR:      override ../Thetis path
-    NEREUS_MI0BOT_DIR:      override ../mi0bot-Thetis path
-    NEREUS_FREEDV_DIR:      override ../freedv-gui path
+    LONGPATH_THETIS_DIR:      override ../Thetis path
+    LONGPATH_MI0BOT_DIR:      override ../mi0bot-Thetis path
+    LONGPATH_FREEDV_DIR:      override ../freedv-gui path
 """
 from __future__ import annotations
 
@@ -78,9 +78,9 @@ def discover_sibling(name: str) -> Path:
 
 
 THETIS_DIR = Path(os.environ.get(
-    "NEREUS_THETIS_DIR", discover_sibling("Thetis"))).expanduser()
+    "LONGPATH_THETIS_DIR", discover_sibling("Thetis"))).expanduser()
 MI0BOT_DIR = Path(os.environ.get(
-    "NEREUS_MI0BOT_DIR", discover_sibling("mi0bot-Thetis"))).expanduser()
+    "LONGPATH_MI0BOT_DIR", discover_sibling("mi0bot-Thetis"))).expanduser()
 
 # ---------------------------------------------------------------------
 # Per-version ramdor checkouts
@@ -109,7 +109,7 @@ MI0BOT_DIR = Path(os.environ.get(
 # Keyed by both the release tag and its short SHA, since either grammar is
 # legal in a stamp (`[v2.10.3.15]` or `[@3759d09]`).
 THETIS_V21015_DIR = Path(os.environ.get(
-    "NEREUS_THETIS_V21015_DIR",
+    "LONGPATH_THETIS_V21015_DIR",
     discover_sibling("Thetis-v2.10.3.15"))).expanduser()
 
 THETIS_VERSION_DIRS = {
@@ -122,9 +122,9 @@ THETIS_VERSION_DIRS = {
 # resolver can look it up in THETIS_VERSION_DIRS.
 RE_STAMP = re.compile(r"\[\s*(?:v(?P<ver>\d+(?:\.\d+)+)|@(?P<sha>[0-9a-f]{7,40}))")
 DESKHPSDR_DIR = Path(os.environ.get(
-    "NEREUS_DESKHPSDR_DIR", discover_sibling("deskhpsdr"))).expanduser()
+    "LONGPATH_DESKHPSDR_DIR", discover_sibling("deskhpsdr"))).expanduser()
 FREEDV_DIR = Path(os.environ.get(
-    "NEREUS_FREEDV_DIR", discover_sibling("freedv-gui"))).expanduser()
+    "LONGPATH_FREEDV_DIR", discover_sibling("freedv-gui"))).expanduser()
 
 # Cite detectors. We scan for the upstream filename + line token; the
 # stamp presence is verified by the sibling verify-inline-cites.py
@@ -736,7 +736,7 @@ def main() -> int:
 
     if not THETIS_DIR.is_dir():
         print(f"FATAL: ramdor Thetis not found at {THETIS_DIR}", file=sys.stderr)
-        print("Set NEREUS_THETIS_DIR or clone to ../Thetis", file=sys.stderr)
+        print("Set LONGPATH_THETIS_DIR or clone to ../Thetis", file=sys.stderr)
         return 2
 
     # mi0bot is the authoritative upstream for HL2 ports, so a missing
@@ -746,7 +746,7 @@ def main() -> int:
     if not MI0BOT_DIR.is_dir():
         print(f"WARN: mi0bot-Thetis not found at {MI0BOT_DIR}. Every "
               f"`// From mi0bot ...` cite will emit upstream-not-found "
-              f"instead of being verified. Set NEREUS_MI0BOT_DIR or clone "
+              f"instead of being verified. Set LONGPATH_MI0BOT_DIR or clone "
               f"to a sibling directory.", file=sys.stderr)
 
     # Per-version ramdor checkouts. Absent means the cites stamped for that
@@ -758,7 +758,7 @@ def main() -> int:
         if not path.is_dir():
             print(f"WARN: Thetis v{ver} not found at {path}. Every cite "
                   f"stamped [v{ver}] will emit upstream-not-found instead "
-                  f"of being verified. Set NEREUS_THETIS_V21015_DIR or "
+                  f"of being verified. Set LONGPATH_THETIS_V21015_DIR or "
                   f"clone to a sibling directory.", file=sys.stderr)
 
     # deskhpsdr is optional for now — warn if absent so local runs without
@@ -767,7 +767,7 @@ def main() -> int:
         print(f"WARN: deskhpsdr not found (searched {DESKHPSDR_DIR} and "
               f"sibling directories). deskhpsdr cite checks will "
               f"emit upstream-not-found warnings rather than hard-failing. "
-              f"Set NEREUS_DESKHPSDR_DIR or clone to a sibling directory.",
+              f"Set LONGPATH_DESKHPSDR_DIR or clone to a sibling directory.",
               file=sys.stderr)
 
     # freedv-gui, same treatment as deskhpsdr.
@@ -775,7 +775,7 @@ def main() -> int:
         print(f"WARN: freedv-gui not found (searched {FREEDV_DIR} and "
               f"sibling directories). freedv-gui cite checks will "
               f"emit upstream-not-found warnings rather than hard-failing. "
-              f"Set NEREUS_FREEDV_DIR or clone to a sibling directory.",
+              f"Set LONGPATH_FREEDV_DIR or clone to a sibling directory.",
               file=sys.stderr)
 
     if args.unstamped:

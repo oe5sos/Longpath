@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/setup/PaSetupPages.cpp  (NereusSDR)
+// src/gui/setup/PaSetupPages.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
@@ -10,7 +10,7 @@
 // citations for each child page.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-02 — Original implementation.  PA top-level category for
 //                 Setup IA reshape Phase 2.  AI-assisted transformation
 //                 via Anthropic Claude Code.
@@ -47,7 +47,7 @@
 //                 PaProfileManager (Phase 2B) — auto-persist on every
 //                 spinbox edit; profile lifecycle (New / Copy / Delete /
 //                 Reset Defaults) driven by the manager. Test seams
-//                 exposed via NEREUS_BUILD_TESTS so the dialog flows
+//                 exposed via LONGPATH_BUILD_TESTS so the dialog flows
 //                 (QInputDialog / QMessageBox) can be bypassed in
 //                 ctest. Authored by J.J. Boyd (KG4VCF) with
 //                 AI-assisted implementation via Anthropic Claude Code.
@@ -173,8 +173,8 @@
 #include "core/PaTelemetryScaling.h"
 #include "core/RadioConnection.h"
 #include "core/RadioStatus.h"
-#include "gui/StyleConstants.h"
 #include "gui/setup/hardware/PaCalibrationGroup.h"
+#include "gui/StyleConstants.h"
 #include "gui/widgets/MetricLabel.h"
 #include "models/Band.h"
 #include "models/RadioModel.h"
@@ -468,7 +468,7 @@ PaGainByBandPage::PaGainByBandPage(RadioModel* model, QWidget* parent)
     m_warningIcon->setVisible(false);
     warningRow->addWidget(m_warningIcon);
 
-    // NereusSDR-spin: m_warningLabel is repurposed as a per-band gain divergence
+    // Longpath-spin: m_warningLabel is repurposed as a per-band gain divergence
     // indicator. Thetis lblPAProfileWarning ships verbatim 5-line red text
     // describing TX-Profile / PA-Profile recovery linkage
     // (setup.designer.cs:47487-47499 [v2.10.3.13]) which is a 3M-4 PureSignal
@@ -493,7 +493,7 @@ PaGainByBandPage::PaGainByBandPage(RadioModel* model, QWidget* parent)
         "to it yet — tracked for parity only."));
     // From Thetis chkPANewCal Visible=false default at setup.designer.cs:47417
     // [v2.10.3.13]; Thetis Ctrl+Alt+A keyhandler (setup.cs:12490-12498) unhides
-    // it. NereusSDR has no live behaviour wired to NewCal mode (deferred to
+    // it. Longpath has no live behaviour wired to NewCal mode (deferred to
     // 3M-4 PureSignal calibration overhaul); hide by default to avoid shipping
     // an inert toggle.
     m_newCalCheck->setVisible(false);
@@ -510,7 +510,7 @@ PaGainByBandPage::PaGainByBandPage(RadioModel* model, QWidget* parent)
     grid->setVerticalSpacing(2);
 
     // Header row.  From Thetis grpGainByBandPA layout (setup.designer.cs:
-    // 47420-47525 [v2.10.3.13]) — labels are NereusSDR-original (Thetis
+    // 47420-47525 [v2.10.3.13]) — labels are Longpath-original (Thetis
     // pre-renders headers via lblDriveHeader + per-step lblPAAdjustNN labels;
     // we use a plain QGridLayout header row).
     //
@@ -538,7 +538,7 @@ PaGainByBandPage::PaGainByBandPage(RadioModel* model, QWidget* parent)
     grid->addWidget(hdrUse, row, kColUseMaxPower);
     ++row;
 
-    // NereusSDR-spin: 14 per-band columns expand chkUsePowerOnDrvTunPA +
+    // Longpath-spin: 14 per-band columns expand chkUsePowerOnDrvTunPA +
     // nudMaxPowerForBandPA which Thetis renders as a single shared row pivoting
     // on _adjustingBand (setup.cs:24142-24173 + setup.designer.cs:47515-47568
     // [v2.10.3.13]). Step + decimals matched to Thetis precision.
@@ -574,9 +574,9 @@ PaGainByBandPage::PaGainByBandPage(RadioModel* model, QWidget* parent)
         grid->addWidget(m_gainSpins[n], row, kColGain);
         wireGainSpin(m_gainSpins[n], band);
 
-        // Per-band drive-step adjust matrix — NereusSDR-spin densification.
+        // Per-band drive-step adjust matrix — Longpath-spin densification.
         // From Thetis panelAdjustGain [v2.10.3.13] (Thetis ships only the
-        // row for the currently-selected band; NereusSDR exposes all 14 x 9
+        // row for the currently-selected band; Longpath exposes all 14 x 9
         // cells so the user does not have to scrub through bands to see
         // their full per-step compensation table).
         for (int step = 0; step < kColAdjustCount; ++step) {
@@ -621,7 +621,7 @@ PaGainByBandPage::PaGainByBandPage(RadioModel* model, QWidget* parent)
     // setup.designer.cs:49094-49119 [v2.10.3.13]: target watts spinbox
     // (udPACalPower), Calibrate button (here: Cancel — Phase 7 starts the
     // sweep on checkbox toggle, not on button click, since Thetis runs
-    // the state machine on a worker thread; NereusSDR drives it from the
+    // the state machine on a worker thread; Longpath drives it from the
     // GUI thread via QTimer).
     m_autoCalibrateCheck = new QCheckBox(
         QStringLiteral("Auto-Calibrate (sweep)"), this);
@@ -632,7 +632,7 @@ PaGainByBandPage::PaGainByBandPage(RadioModel* model, QWidget* parent)
     contentLayout()->insertWidget(contentLayout()->count() - 1,
                                    m_autoCalibrateCheck);
 
-    // NereusSDR-spin: m_autoCalPanel ships 4 of Thetis's 17 panelAutoPACalibrate
+    // Longpath-spin: m_autoCalPanel ships 4 of Thetis's 17 panelAutoPACalibrate
     // sub-controls. Per-band selectors (chkPA160..chkPA6), radPACalAllBands /
     // radPACalSelBands, chkBypassANANPASettings, and explicit btnPAGainCalibration
     // are deferred follow-ups (see pa-calibration-hotfix.md §6 + remediation
@@ -756,7 +756,7 @@ PaGainByBandPage::PaGainByBandPage(RadioModel* model, QWidget* parent)
 
     // ── chkBypassANANPASettings ↔ TransmitModel::paSettingsBypass (D4) ───
     // From Thetis setup.cs:19921 [v2.10.3.15] //N1GP G2E added.
-    // Thetis has no CheckedChanged handler; NereusSDR wires the checkbox
+    // Thetis has no CheckedChanged handler; Longpath wires the checkbox
     // state to TransmitModel::paSettingsBypass for persistence.
     TransmitModel& tx = model->transmitModel();
     if (m_bypassPaSettingsCheck) {
@@ -770,10 +770,10 @@ PaGainByBandPage::PaGainByBandPage(RadioModel* model, QWidget* parent)
                 });
     }
 
-    // ── NereusSDR-original: per-SKU informational warning labels ─────────────
+    // ── Longpath-original: per-SKU informational warning labels ─────────────
     //
     // 3 labels with no Thetis equivalent. Driven by BoardCapabilities
-    // (NereusSDR-spin collapse of comboRadioModel_SelectedIndexChanged
+    // (Longpath-spin collapse of comboRadioModel_SelectedIndexChanged
     // setup.cs:19812-20310 [v2.10.3.13]). Visibility toggled by
     // applyCapabilityVisibility(...).
     //
@@ -838,7 +838,7 @@ PaGainByBandPage::PaGainByBandPage(RadioModel* model, QWidget* parent)
 // From Thetis comboRadioModel_SelectedIndexChanged (setup.cs:19812-20310
 // [v2.10.3.13+501e3f51]) — per-SKU PA tab visibility. Thetis swaps dozens
 // of controls (chkApolloPresent / chkAlexPresent / labelATTOnTX /
-// chkAutoPACalibrate / etc.) per HPSDRModel; NereusSDR collapses those
+// chkAutoPACalibrate / etc.) per HPSDRModel; Longpath collapses those
 // decisions into BoardCapabilities flags and surfaces the equivalent
 // per-page visibility decisions here.
 void PaGainByBandPage::applyCapabilityVisibility(const BoardCapabilities& caps)
@@ -931,7 +931,7 @@ void PaGainByBandPage::applyCapabilityVisibility(const BoardCapabilities& caps)
     // (Field caps.hasStepAttenuatorCal is still consulted by other components.)
 }
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
 // Phase 8 (#167) test seams.
 //
 // isPaEditorEnabledForTest: returns whether the editor surface is enabled.
@@ -1109,7 +1109,7 @@ void PaGainByBandPage::onNewProfile()
     QString name;
     bool accepted = false;
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     if (m_hasPendingProfileNameForTest) {
         name = m_pendingProfileNameForTest;
         accepted = !name.isEmpty();
@@ -1149,7 +1149,7 @@ void PaGainByBandPage::onCopyProfile()
     QString name;
     bool accepted = false;
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     if (m_hasPendingProfileNameForTest) {
         name = m_pendingProfileNameForTest;
         accepted = !name.isEmpty();
@@ -1189,7 +1189,7 @@ void PaGainByBandPage::onDeleteProfile()
     // Mirrors Thetis btnDeletePAProfile_Click (setup.cs:22998-23025 [v2.10.3.13]).
     bool confirmed = false;
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     if (m_hasDeleteConfirmForTest) {
         confirmed = m_deleteConfirmForTest;
         m_hasDeleteConfirmForTest = false;
@@ -1212,7 +1212,7 @@ void PaGainByBandPage::onDeleteProfile()
         // verbatim Thetis precedent string used by MicProfileManager.
         // Test seam: skip the modal so headless tests don't block on
         // a dialog that requires a user click.
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
         if (m_suppressLastProfileWarningForTest) { return; }
 #endif
         QMessageBox::information(
@@ -1250,7 +1250,7 @@ void PaGainByBandPage::onResetDefaults()
     // Mirrors Thetis btnResetPAProfile_Click (setup.cs:23161+ [v2.10.3.13]).
     bool confirmed = false;
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     if (m_hasResetConfirmForTest) {
         confirmed = m_resetConfirmForTest;
         m_hasResetConfirmForTest = false;
@@ -1333,7 +1333,7 @@ void PaGainByBandPage::onUseMaxPowerToggled(Band band, bool use)
 // + chkAutoPACalibrate_CheckedChanged at setup.cs:15683-15698 [v2.10.3.13]
 // (panel toggle) + btnPAGainCalibration_Click at setup.cs:9743-9809
 // [v2.10.3.13] (sweep start).  Thetis runs the loop on a dedicated worker
-// thread (Thread.Sleep blocks the main UI); NereusSDR drives the same
+// thread (Thread.Sleep blocks the main UI); Longpath drives the same
 // logic from the GUI thread via QTimer dispatch + RadioStatus signal so
 // the audio callback / WDSP threads are never blocked.
 //
@@ -1371,7 +1371,7 @@ bool isAutoCalBand(Band b) noexcept
 // Default per-band max-watts ceiling per HPSDRModel for the safety check.
 // From Thetis console.cs:10270 [v2.10.3.13]:
 //   int[] max_pwr = { 100, 100, 100, 100, 100, 100, 100, 100, 75, 75, 75 };
-// NereusSDR uses 200 W on HF for ANAN8000D-class radios (matches the
+// Longpath uses 200 W on HF for ANAN8000D-class radios (matches the
 // PaProfile factory max-power column from clsHardwareSpecific.cs), 100 W
 // otherwise.  6m falls to 75 W (per Thetis, plus 8000DLE bench tests).
 double defaultMaxWattsForModelBand(HPSDRModel model, Band band) noexcept
@@ -1394,7 +1394,7 @@ double wattsToDbm(double watts) noexcept
 }
 
 // Settle delay between drive-step changes (ms).  Thetis on_time = 2500 ms;
-// NereusSDR uses 200 ms because (a) the user has already TUNE'd into a
+// Longpath uses 200 ms because (a) the user has already TUNE'd into a
 // dummy load, so the radio's settled before the sweep starts, and (b)
 // the QTimer + GUI thread responsiveness makes a faster cadence feasible.
 // Tests can drive readings synchronously via simulateBandFwdReadingForTest.
@@ -1505,7 +1505,7 @@ void PaGainByBandPage::cancelAutoCal()
 {
     // Mirrors Thetis CalibratePAGain end-label cleanup at console.cs:10352-
     // 10377 [v2.10.3.13]: stop MOX, restore exciter signal, close progress.
-    // NereusSDR's variant is simpler since the GUI thread holds the state.
+    // Longpath's variant is simpler since the GUI thread holds the state.
     if (m_autoCalSettleTimer && m_autoCalSettleTimer->isActive()) {
         m_autoCalSettleTimer->stop();
     }
@@ -1617,7 +1617,7 @@ bool PaGainByBandPage::autoCalSafetyCheck(double observedWatts, Band band) const
 {
     // Mirrors the safety-margin Thetis applies via the max_pwr[] check
     // implicitly in console.cs:10289 ptbPWR.Value = Math.Min(...).
-    // NereusSDR makes the safety check explicit: observed > band_max * 1.1
+    // Longpath makes the safety check explicit: observed > band_max * 1.1
     // aborts the sweep.
     const double ceiling = autoCalBandMaxWatts(band) * 1.1;
     return observedWatts <= ceiling;
@@ -1638,7 +1638,7 @@ void PaGainByBandPage::writeAutoCalGainAdjust(Band band, int driveStep,
     //       SetupForm.SetBypassGain(bands[i], g + diff_dBm);
     //   }
     //
-    // NereusSDR maps to PaProfile::setAdjust because the per-step adjust
+    // Longpath maps to PaProfile::setAdjust because the per-step adjust
     // matrix is the per-drive-level finetune (as opposed to setBypassGain
     // which writes the base row only).  This matches the Phase 7 brief's
     // intent: "iterates HF bands x drive levels, writes new gain values
@@ -1735,7 +1735,7 @@ double PaGainByBandPage::autoCalBandMaxWatts(Band band) const
     return defaultMaxWattsForModelBand(m_connectedModel, band);
 }
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
 
 void PaGainByBandPage::simulateBandFwdReadingForTest(Band band, int driveStep,
                                                      double watts)
@@ -1781,7 +1781,7 @@ void PaGainByBandPage::completeAutoCalForTest()
     }
 }
 
-#endif  // NEREUS_BUILD_TESTS
+#endif  // LONGPATH_BUILD_TESTS
 
 // ── Wiring helpers ───────────────────────────────────────────────────────────
 
@@ -1818,7 +1818,7 @@ void PaGainByBandPage::wireUseMaxCheck(QCheckBox* check, Band band)
             });
 }
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
 QDoubleSpinBox* PaGainByBandPage::gainSpinForTest(Band b) const
 {
     const int idx = static_cast<int>(b);
@@ -1863,7 +1863,7 @@ QCheckBox* PaGainByBandPage::useMaxPowerCheckForTest(Band b) const
 //                           user prefers a leaner Setup tree.  Maps to
 //                           Thetis chkPAValues_CheckedChanged
 //                           (setup.cs:16340-16343 [v2.10.3.13]) which
-//                           toggles panelPAValues.Visible inline; NereusSDR
+//                           toggles panelPAValues.Visible inline; Longpath
 //                           replaces the inline panel with a separate page
 //                           plus a settings hint.
 //   * btnResetPAValues   — "Reset PA Values" button; emits
@@ -1871,7 +1871,7 @@ QCheckBox* PaGainByBandPage::useMaxPowerCheckForTest(Band b) const
 //                           the peak/min reset slot.  Maps to Thetis
 //                           btnResetPAValues_Click (setup.cs:16346-16357
 //                           [v2.10.3.13]) which blanks readout text fields
-//                           directly; NereusSDR splits controller (this
+//                           directly; Longpath splits controller (this
 //                           page) from state owner (PaValuesPage) via a
 //                           Qt signal.
 //
@@ -1938,7 +1938,7 @@ PaWattMeterPage::PaWattMeterPage(RadioModel* model, QWidget* parent)
     // ── chkPAValues "Show PA Values page" toggle ────────────────────────────
     // From Thetis chkPAValues setup.designer.cs:51155-51177 [v2.10.3.13]
     // + setup.cs:16340-16343 toggle.  Thetis flips panelPAValues.Visible
-    // inline; NereusSDR persists the visibility hint to AppSettings under
+    // inline; Longpath persists the visibility hint to AppSettings under
     // "display/showPaValuesPage" (default "True") so the dedicated
     // PaValuesPage / SetupDialog navigation can honor it.
     m_showPaValuesCheck = new QCheckBox(tr("Show PA Values page"), this);
@@ -1963,7 +1963,7 @@ PaWattMeterPage::PaWattMeterPage(RadioModel* model, QWidget* parent)
     // ── btnResetPAValues "Reset PA Values" button ───────────────────────────
     // From Thetis btnResetPAValues setup.designer.cs:51155-51177 [v2.10.3.13]
     // + setup.cs:16346-16357 click handler.  Thetis blanks readout text
-    // directly on click; NereusSDR emits resetPaValuesRequested so the
+    // directly on click; Longpath emits resetPaValuesRequested so the
     // separate PaValuesPage (Phase 5B) can subscribe and clear its
     // peak/min tracking.
     m_resetPaValuesButton = new QPushButton(tr("Reset PA Values"), this);
@@ -2004,7 +2004,7 @@ void PaWattMeterPage::applyCapabilityVisibility(const BoardCapabilities& caps)
     }
 }
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
 bool PaWattMeterPage::showPaValuesCheckedForTest() const
 {
     return m_showPaValuesCheck && m_showPaValuesCheck->isChecked();
@@ -2020,7 +2020,7 @@ void PaWattMeterPage::clickResetPaValuesForTest()
 
 // ── PaValuesPage ─────────────────────────────────────────────────────────────
 //
-// NereusSDR-spin: Thetis embeds panelPAValues (setup.designer.cs:51155-51177
+// Longpath-spin: Thetis embeds panelPAValues (setup.designer.cs:51155-51177
 // [v2.10.3.13]) inside its Watt Meter tab — a 11-field readout block (calibrated
 // FWD power, raw FWD power, REV power, SWR, DC volts, drive power, drive-FWD
 // ADC, FWD ADC, REV ADC, FWD voltage, REV voltage) plus a Reset button gated
@@ -2043,7 +2043,7 @@ void PaWattMeterPage::clickResetPaValuesForTest()
 //     (Phase 1 Agent 1B; Thetis textPAFwdPower).
 //   * Drive (W)          — slider position from TransmitModel::power().
 //                          Thetis textDrivePower shows averaged exciter
-//                          drive (mW) — NereusSDR uses the slider in W
+//                          drive (mW) — Longpath uses the slider in W
 //                          since it's already what the user just set.
 //   * FWD voltage (V)    — PaTelemetryScaling::scaleFwdRevVoltage
 //                          (Thetis textFwdVoltage).
@@ -2100,7 +2100,7 @@ PaValuesPage::PaValuesPage(RadioModel* model, QWidget* parent)
                                            QStringLiteral("1.00"), powerGroup);
     // Phase 5B (#167) — Drive label, populated from TransmitModel::power().
     // From Thetis panelPAValues textDrivePower setup.designer.cs:51155-51177
-    // [v2.10.3.13] — Thetis renders averaged exciter drive in mW; NereusSDR
+    // [v2.10.3.13] — Thetis renders averaged exciter drive in mW; Longpath
     // uses the slider position in W (it's already what the user just set
     // and the slider 0..100 maps directly to watts on most boards).
     m_driveLabel         = new MetricLabel(QStringLiteral("Drive"),
@@ -2153,7 +2153,7 @@ PaValuesPage::PaValuesPage(RadioModel* model, QWidget* parent)
 
     // ── Reset Peak/Min button ────────────────────────────────────────────
     // Mirrors Thetis btnResetPAValues setup.cs:16346-16357 [v2.10.3.13].
-    // Thetis clears the textbox text strings; NereusSDR's spin tracks
+    // Thetis clears the textbox text strings; Longpath's spin tracks
     // running peak/min and resets those to the current value (more useful
     // than blanking the display since the live value is still meaningful).
     auto* resetRow    = new QWidget(this);
@@ -2351,7 +2351,7 @@ PaValuesPage::PaValuesPage(RadioModel* model, QWidget* parent)
 // From Thetis comboRadioModel_SelectedIndexChanged (setup.cs:19812-20310
 // [v2.10.3.13+501e3f51]) — per-SKU PA tab visibility. Thetis embeds
 // panelPAValues inside the Watt Meter tab and gates it on chkPAValues
-// (setup.cs:16342 [v2.10.3.13]). NereusSDR promotes the readout to a
+// (setup.cs:16342 [v2.10.3.13]). Longpath promotes the readout to a
 // dedicated page; per-SKU visibility hides every MetricLabel + every
 // QGroupBox child when caps.hasPaProfile=false. SetupDialog also hides
 // the parent PA category when caps.isRxOnlySku, so this method only
@@ -2405,7 +2405,7 @@ void PaValuesPage::applyCapabilityVisibility(const BoardCapabilities& caps)
 }
 
 // Mirrors Thetis btnResetPAValues_Click semantic at setup.cs:16346-16357
-// [v2.10.3.13].  Thetis simply blanks the textbox text strings; NereusSDR's
+// [v2.10.3.13].  Thetis simply blanks the textbox text strings; Longpath's
 // spin tracks running peak/min and resets each tracker to its current value
 // (so the live readout stays meaningful while history clears).
 // ---------------------------------------------------------------------------
@@ -2503,7 +2503,7 @@ QString PaValuesPage::formatPaTempWithPeakMin(double currentC,
     return formatWithPeakMin(convert(currentC), convertedPm, unitSuffix, 1);
 }
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
 QString PaValuesPage::fwdCalibratedTextForTest() const
 {
     return m_fwdCalibratedLabel ? m_fwdCalibratedLabel->value() : QString();

@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - DX cluster telnet client (implementation)
+// Longpath - DX cluster telnet client (implementation)
 //
 // Ported from AetherSDR src/core/DxClusterClient.cpp [@0cd4559].
 // AetherSDR is (C) its contributors and is licensed GPL-3.0-or-later
 // (see https://github.com/ten9876/AetherSDR/blob/main/LICENSE).
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-10  J.J. Boyd / KG4VCF  Phase 3J-2 Task B3. Initial port.
 //                                    See DxClusterClient.h for full
-//                                    attribution notes. NereusSDR
+//                                    attribution notes. Longpath
 //                                    refactor: stripTelnetIAC() is split
 //                                    into a pure
 //                                    stripTelnetIACBuffer(QByteArray&)
@@ -17,7 +17,7 @@
 //                                    that calls it on m_readBuffer, so
 //                                    the public stripTelnetIACForTest
 //                                    seam can exercise the algorithm
-//                                    without a live socket. NereusSDR
+//                                    without a live socket. Longpath
 //                                    addition: parseDxSpotLine() now
 //                                    assigns spot.source = "Cluster" by
 //                                    default and promotes to "RBN" when
@@ -75,11 +75,11 @@ DxClusterClient::~DxClusterClient()
 
 // From AetherSDR src/core/DxClusterClient.cpp:36-40 [@0cd4559]
 //
-// NereusSDR uses Qt's AppConfigLocation (which already lands under
-// "NereusSDR/" when QCoreApplication::organizationName/applicationName
+// Longpath uses Qt's AppConfigLocation (which already lands under
+// "Longpath/" when QCoreApplication::organizationName/applicationName
 // are set) instead of AetherSDR's GenericConfigLocation +
 // "AetherSDR/...". This keeps the file co-located with the rest of
-// NereusSDR's per-user state, mirroring the SpotCollectorClient (B1)
+// Longpath's per-user state, mirroring the SpotCollectorClient (B1)
 // and PotaClient (B2) ports.
 QString DxClusterClient::logFilePath() const
 {
@@ -180,7 +180,7 @@ void DxClusterClient::onDisconnected()
 
     if (!m_intentionalDisconnect) {
         // From AetherSDR src/core/DxClusterClient.cpp:124-128 [@0cd4559] — original
-        // pattern is `1 << m_reconnectAttempts`. NereusSDR fix: clamp shift count
+        // pattern is `1 << m_reconnectAttempts`. Longpath fix: clamp shift count
         // to avoid signed-int UB. The backoff saturates at MaxReconnectDelayMs
         // well before 30 attempts, so capping has no behavioral effect on a
         // healthy connection.
@@ -215,7 +215,7 @@ void DxClusterClient::onReconnectTimer()
 
 // From AetherSDR src/core/DxClusterClient.cpp:149-160 [@0cd4559]
 //
-// NereusSDR refactor: pure form takes the buffer to operate on as an
+// Longpath refactor: pure form takes the buffer to operate on as an
 // argument so the public stripTelnetIACForTest() seam can exercise the
 // algorithm without a live socket. The instance method below is a thin
 // wrapper that calls this on m_readBuffer. Algorithm (skip 0xFF + 2
@@ -330,10 +330,10 @@ bool DxClusterClient::isLoginPrompt(const QString& line) const
 // Standard format: DX de W3LPL:     14025.0  JA1ABC       CW big signal       1824Z
 // Z is the terminator — ignore any trailing chars (some nodes append BEL/NUL)
 //
-// NereusSDR divergence (source-label assignment moved into the parser):
+// Longpath divergence (source-label assignment moved into the parser):
 // upstream AetherSDR left spot.source unset. The calling site set it
 // based on which connection (DX cluster vs. RBN) emitted the spot.
-// NereusSDR moves the source assignment into parseDxSpotLine() so unit
+// Longpath moves the source assignment into parseDxSpotLine() so unit
 // tests that exercise the parser directly (without a live socket) see a
 // fully-populated DxSpot, and so a single class instance can serve both
 // the DX cluster and RBN connections (RadioModel will instantiate two
@@ -395,7 +395,7 @@ bool DxClusterClient::parseDxSpotLine(const QString& line, DxSpot& spot) const
         return false;
     }
 
-    // NereusSDR addition: source-label assignment.
+    // Longpath addition: source-label assignment.
     spot.source = QStringLiteral("Cluster");
     if (spot.spotterCall.startsWith(QStringLiteral("RBN-"), Qt::CaseInsensitive)
         || spot.spotterCall.endsWith(QStringLiteral("-#"))) {

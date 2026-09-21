@@ -1,12 +1,12 @@
 // =================================================================
-// src/core/StepAttenuatorController.cpp  (NereusSDR)
+// src/core/StepAttenuatorController.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/console.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -400,7 +400,7 @@ void StepAttenuatorController::setAttOnTxValue(int dB)
             conn->setTxStepAttenuation(dBcopy); //[2.10.3.6]MW0LGE att_fixes
         });
     }
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     if (m_attOnTxEnabled) {
         m_lastTxStepAttDb = dB;
     }
@@ -460,7 +460,7 @@ void StepAttenuatorController::restoreRxPreampMode()
 //          (radio.GetDSPTX(0).CurrentDSPMode == DSPMode.CWL ||
 //           radio.GetDSPTX(0).CurrentDSPMode == DSPMode.CWU)) txAtt = 31;
 //
-// NereusSDR mapping:
+// Longpath mapping:
 //   !chkFWCATUBypass.Checked  ≡  !m_psActive  (PS-A not active)
 //   _forceATTwhenPSAoff        ≡  m_forceAttWhenPsOff
 //   isPsOff                    ≡  !m_psActive  (passed by caller)
@@ -505,7 +505,7 @@ void StepAttenuatorController::onMoxHardwareFlipped(bool isTx)
                     conn->setTxStepAttenuation(0); //[2.10.3.6]MW0LGE att_fixes
                 });
             }
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
             m_lastTxStepAttDb = 0;
 #endif
             return;
@@ -543,7 +543,7 @@ void StepAttenuatorController::onMoxHardwareFlipped(bool isTx)
             // Mirrors mi0bot console.cs:29960-30002 [v2.10.3.13-beta2]
             // updateAttNudsCombos() — Thetis swaps a separate udTXStepAttData
             // spinbox over udRX1StepAttData during MOX (same screen position,
-            // different control).  NereusSDR has a single bound spinbox so
+            // different control).  Longpath has a single bound spinbox so
             // we update m_attDb + emit instead.  User-visible result is
             // identical: "the spinbox jumped to 31 during TX".
             //
@@ -571,7 +571,7 @@ void StepAttenuatorController::onMoxHardwareFlipped(bool isTx)
                     conn->setTxStepAttenuation(txAtt); //[2.10.3.6]MW0LGE att_fixes
                 });
             }
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
             m_lastTxStepAttDb = txAtt;
 #endif
         }
@@ -593,7 +593,7 @@ void StepAttenuatorController::onMoxHardwareFlipped(bool isTx)
                     conn->setTxStepAttenuation(0); //[2.10.3.6]MW0LGE att_fixes
                 });
             }
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
             m_lastTxStepAttDb = 0;
 #endif
 
@@ -805,7 +805,7 @@ void StepAttenuatorController::applyClassicUndo()
     setAutoAttApplied(false);
 }
 
-// --- Adaptive auto-att (NereusSDR extension) ---
+// --- Adaptive auto-att (Longpath extension) ---
 
 void StepAttenuatorController::applyAdaptiveAutoAtt(int adc)
 {

@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/ParaEqEnvelope.cpp  (NereusSDR)
+// src/core/ParaEqEnvelope.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
@@ -7,7 +7,7 @@
 //   Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-30 — Reimplemented in C++20/Qt6 for NereusSDR by
 //                 J.J. Boyd (KG4VCF), with AI-assisted transformation
 //                 via Anthropic Claude Code.

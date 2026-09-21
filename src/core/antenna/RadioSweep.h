@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/core/antenna/RadioSweep.h  (NereusSDR)
+// src/core/antenna/RadioSweep.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // Turn a sweep the radio measured into the same Sweep the file half of
 // the antenna window analyses.
@@ -53,7 +53,7 @@
 // measurement is needed, which is what the .s1p half is for.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-14 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

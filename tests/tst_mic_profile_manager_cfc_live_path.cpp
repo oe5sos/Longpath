@@ -1,6 +1,6 @@
-// no-port-check: NereusSDR-original unit-test file.
+// no-port-check: Longpath-original unit-test file.
 // =================================================================
-// tests/tst_mic_profile_manager_cfc_live_path.cpp  (NereusSDR)
+// tests/tst_mic_profile_manager_cfc_live_path.cpp  (Longpath)
 // =================================================================
 //
 // Phase 3M-3a-ii Batch 4.5 — live-path round-trip tests for the 41

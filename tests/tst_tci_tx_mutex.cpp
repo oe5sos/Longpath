@@ -1,5 +1,5 @@
-// tests/tst_tci_tx_mutex.cpp  (NereusSDR)
-// no-port-check: NereusSDR-original integration test for the Phase 17 TX
+// tests/tst_tci_tx_mutex.cpp  (Longpath)
+// no-port-check: Longpath-original integration test for the Phase 17 TX
 // audio single-client mutex.
 //
 // Verifies:

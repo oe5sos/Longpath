@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/applets/DigitalApplet.cpp  (NereusSDR)
+// src/gui/applets/DigitalApplet.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -7,7 +7,7 @@
 //   Project Files/Source/Console/console.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-18 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -183,7 +183,7 @@ void DigitalApplet::buildUI()
 
         m_vac1Btn = greenToggle(QStringLiteral("VAC 1"));
         m_vac1Btn->setCheckable(true);
-        m_vac1Btn->setFixedWidth(50);
+        m_vac1Btn->setMinimumWidth(50);   // nie schmaler als der Text (Blatt 2026-09-17: "/AC 1")
         row->addWidget(m_vac1Btn);
 
         m_vac1DevCombo = new QComboBox(this);
@@ -203,7 +203,7 @@ void DigitalApplet::buildUI()
 
         m_vac2Btn = greenToggle(QStringLiteral("VAC 2"));
         m_vac2Btn->setCheckable(true);
-        m_vac2Btn->setFixedWidth(50);
+        m_vac2Btn->setMinimumWidth(50);
         row->addWidget(m_vac2Btn);
 
         m_vac2DevCombo = new QComboBox(this);

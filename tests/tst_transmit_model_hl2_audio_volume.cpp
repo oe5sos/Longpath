@@ -1,8 +1,8 @@
-// no-port-check: NereusSDR-original unit-test file.  The mi0bot-Thetis
+// no-port-check: Longpath-original unit-test file.  The mi0bot-Thetis
 // references below are cite comments documenting which upstream lines each
 // assertion verifies; no Thetis logic is ported in this test file.
 // =================================================================
-// tests/tst_transmit_model_hl2_audio_volume.cpp  (NereusSDR)
+// tests/tst_transmit_model_hl2_audio_volume.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for TransmitModel::computeAudioVolume — HL2 audio-volume formula.
@@ -103,7 +103,7 @@ private slots:
     // kernel (console.cs:46720-46758 [v2.10.3.13]).  Concretely: assert
     // the result differs from what the HL2 formula would have returned.
     //
-    // Issue #202 deep-fix: a previous NereusSDR-original short-circuit
+    // Issue #202 deep-fix: a previous Longpath-original short-circuit
     //   if (gbb >= 99.5f) return clamp(sliderWatts/100.0, 0, 1);
     // was removed because it inverted the Thetis semantic "100 = no output
     // power" (clsHardwareSpecific.cs:463-466 [v2.10.3.13]) into "100 =

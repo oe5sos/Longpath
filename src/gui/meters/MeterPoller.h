@@ -1,14 +1,14 @@
 #pragma once
 
 // =================================================================
-// src/gui/meters/MeterPoller.h  (NereusSDR)
+// src/gui/meters/MeterPoller.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/MeterManager.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -309,8 +309,8 @@ private:
     // (MainWindow.cpp:4696). Der Prüfmodus hat deshalb seinen EIGENEN
     // Zeitgeber und hängt nicht an m_timer.
     //
-    // Aus, sofern nicht ausdrücklich verlangt: NEREUS_METER_DEMO=1.
-    // Dasselbe Muster wie NEREUS_WF_DEBUG in SpectrumWidget — „ein
+    // Aus, sofern nicht ausdrücklich verlangt: LONGPATH_METER_DEMO=1.
+    // Dasselbe Muster wie LONGPATH_WF_DEBUG in SpectrumWidget — „ein
     // Diagnosemittel, das im Normalbetrieb etwas kostet, ist ein
     // Diagnosemittel, das gelöscht wird".
     //

@@ -4,7 +4,7 @@
 // frequency (14.250 MHz) used as fixtures to exercise the TCI-keyed
 // applySpotStatus() dispatch. Precedent: B1-B5, C1-C4.
 //
-// NereusSDR - SpotModel tests
+// Longpath - SpotModel tests
 //
 // Phase 3J-2 Task D1. Pins the contract that SpotModel is a
 // QMap<int, SpotData> sink keyed by monotonic spot index, with a

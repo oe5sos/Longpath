@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/setup/DspOptionsPage.cpp  (NereusSDR)
+// src/gui/setup/DspOptionsPage.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
@@ -19,7 +19,7 @@
 //     comboDSPDigTXBuf.Items   = same
 //     comboDSPFMRXBuf.Items    = same
 //     comboDSPFMTXBuf.Items    = same
-//   NereusSDR collapses RX/TX to per-mode; Task 4.2 fans out to both channels.
+//   Longpath collapses RX/TX to per-mode; Task 4.2 fans out to both channels.
 //
 //   Filter size Items (verified from setup.Designer.cs:37596-37605 [v2.10.3.13]):
 //     comboDSPPhoneRXFiltSize.Items = "1024","2048","4096","8192","16384"
@@ -31,7 +31,7 @@
 //     Note: CW has RX only — no comboDSPCWTXFiltType in Thetis.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-01 — Ported in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via
 //                 Anthropic Claude Code.
@@ -92,8 +92,8 @@
 #include "core/WdspEngine.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
-#include "gui/StyleConstants.h"
 #include "gui/containers/ContainerManager.h"
+#include "gui/StyleConstants.h"
 #include "gui/meters/FilterDisplayItem.h"
 #include "gui/meters/MeterItem.h"
 
@@ -203,7 +203,7 @@ DspOptionsPage::DspOptionsPage(RadioModel* model, QWidget* parent)
 // comboMode is the representative DSPMode for the group (e.g. DSPMode::USB for
 // the Phone group). The actual comparison uses modeGroupMatches() below.
 //
-// NereusSDR-original — design Section 4B.
+// Longpath-original — design Section 4B.
 
 namespace {
 
@@ -478,7 +478,7 @@ void DspOptionsPage::buildUI()
         tr("Persist impulse cache to disk between sessions"), cacheGroup);
     m_cacheImpulseSaveRestore->setToolTip(
         tr("Save the impulse cache to disk on shutdown and reload on next launch. "
-           "Eliminates the first-rebuild cost after restarting NereusSDR. "
+           "Eliminates the first-rebuild cost after restarting Longpath. "
            "Warning: the cache file can become very large. "
            "Takes effect on the next radio connect or channel rebuild."));
 
@@ -642,14 +642,14 @@ void DspOptionsPage::buildUI()
 //   pbWarningFilterSize.Visible = filterSizeDifferentRX || filterSizeDifferentTX;
 //   pbWarningBufferType.Visible = filterTypeDifferentRX || filterTypeDifferentTX;
 //
-// NereusSDR mapping:
+// Longpath mapping:
 //   RX side: 4 combos (phone, cw, dig, fm) — exact 4-way Thetis RX check.
-//   TX side: NereusSDR collapses RX+TX to per-mode combos, so we re-use the
+//   TX side: Longpath collapses RX+TX to per-mode combos, so we re-use the
 //            same 3 combos phone/dig/fm for the TX-side check (CW has no TX
 //            buffer combo in Thetis — Thetis omits CW from the TX set).
 //   For filter type: Thetis checks the type for each direction separately
 //            (phone_rx, fm_rx, cw_rx, dig_rx vs phone_tx, fm_tx, dig_tx).
-//            NereusSDR has separate PhoneRx/PhoneTx/CwRx/DigRx/DigTx/FmRx/FmTx
+//            Longpath has separate PhoneRx/PhoneTx/CwRx/DigRx/DigTx/FmRx/FmTx
 //            combos — we apply the same all-equal test across those sets.
 
 // static

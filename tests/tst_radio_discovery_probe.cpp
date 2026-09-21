@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_radio_discovery_probe.cpp  (NereusSDR)
+// tests/tst_radio_discovery_probe.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
@@ -11,7 +11,7 @@
 //   Reid Campbell (MI0BOT) — HermesLite 2 board-ID 6 parity test coverage
 //     (preserved via inline marker on HPSDRHW::HermesLite QCOMPARE assertion)
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-27 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code. Phase 3Q-2: unicast probe path tests.

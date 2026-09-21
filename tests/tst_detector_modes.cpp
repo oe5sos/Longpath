@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_detector_modes.cpp  (NereusSDR)
+// tests/tst_detector_modes.cpp  (Longpath)
 // =================================================================
 //
 // Task 2.1 — Detector + Averaging split (handwave fix from 3G-8).
@@ -9,7 +9,7 @@
 //   Project Files/Source/Console/HPSDR/specHPSDR.cs:302-321, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-01 — Ported in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.

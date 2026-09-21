@@ -121,13 +121,13 @@ def classify(path: str) -> str:
 
 # A marker entry is normally a single required substring. It can also be a
 # tuple of alternatives, any one of which satisfies the requirement -- used
-# below for "Modification history (NereusSDR)" vs "Modification history
+# below for "Modification history (Longpath)" vs "Modification history
 # (Longpath)": the project renamed 2026-08-20, and per CLAUDE.md this is
 # intentional, not stale drift (mirrors the same fix in
 # scripts/verify-thetis-headers.py).
 MOD_HISTORY_MARKER = (
-    "Modification history (NereusSDR)",
     "Modification history (Longpath)",
+    "Modification history (NereusSDR)",   # Kopfzeilen von vor dem 2026-09-17
 )
 
 # Required header markers per classification. Empty list = advisory-only.

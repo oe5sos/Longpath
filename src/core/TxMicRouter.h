@@ -1,11 +1,11 @@
 // =================================================================
-// src/core/TxMicRouter.h  (NereusSDR)
+// src/core/TxMicRouter.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original file. Defines the TxMicRouter strategy interface
+// Longpath-original file. Defines the TxMicRouter strategy interface
 // and the NullMicSource concrete stub used by the 3M-1a TUNE path.
 //
-// This is a NereusSDR-native design with no direct Thetis equivalent.
+// This is a Longpath-native design with no direct Thetis equivalent.
 // Thetis bakes mic-source selection directly into audio.cs rather than
 // using the strategy pattern. The split here follows the master design
 // §5.1.1 (3M-1a components) and §5.2.1 (3M-1b concrete sources).
@@ -17,13 +17,13 @@
 //   (3M-1b — Mic + SSB Voice mic-source plumbing)
 // =================================================================
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-25 — Original implementation for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted implementation via
 //                 Anthropic Claude Code.
 // =================================================================
 
-// no-port-check: NereusSDR-original file; no Thetis logic ported here.
+// no-port-check: Longpath-original file; no Thetis logic ported here.
 
 #pragma once
 

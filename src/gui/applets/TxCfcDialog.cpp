@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/applets/TxCfcDialog.cpp  (NereusSDR)
+// src/gui/applets/TxCfcDialog.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
@@ -19,7 +19,7 @@
 // timer all match the Thetis behavior.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-30 — Phase 3M-3a-ii Batch 6 (Task A): created by
 //                 J.J. Boyd (KG4VCF), with AI-assisted transformation
 //                 via Anthropic Claude Code.
@@ -653,7 +653,7 @@ void TxCfcDialog::seedWidgetsFromTransmitModel()
     // dialog default is 0..4000 Hz (frmCFCConfig.cs:89-99 [v2.10.3.13])
     // but the TXProfile defaults extend to 10000 Hz — Thetis only honors
     // those when a saved profile loads via ConfigData (cs:509-575).  For
-    // NereusSDR the TM IS the source of truth on construction so we
+    // Longpath the TM IS the source of truth on construction so we
     // expand the envelope to cover whatever's in TM, then push the
     // resulting min/max into the Low/High spinboxes.
     const double seedMinHz = std::min(kDefaultMinHz, minFreqInTm);
@@ -755,9 +755,9 @@ void TxCfcDialog::updateEditRowFromSelection(int index)
 
 // ─────────────────────────────────────────────────────────────────────
 // Push current widget state back into TransmitModel.  This is the
-// NereusSDR equivalent of Thetis's setCFCProfile WDSP-direct push:
+// Longpath equivalent of Thetis's setCFCProfile WDSP-direct push:
 // frmCFCConfig.cs:333-392 [v2.10.3.13] writes through to WDSP, but
-// NereusSDR routes everything through TransmitModel which dispatches
+// Longpath routes everything through TransmitModel which dispatches
 // to TxChannel via its existing per-property change handlers (wired in
 // 3M-3a-ii Batch 2 via RadioModel).
 // ─────────────────────────────────────────────────────────────────────
@@ -862,7 +862,7 @@ void TxCfcDialog::onLogScaleToggled(bool on)
 
 // From Thetis frmCFCConfig.cs:451-456 [v2.10.3.13] — btnResetComp_Click.
 //
-// Note: NereusSDR's ParametricEqWidget does not expose a public ResetPoints()
+// Note: Longpath's ParametricEqWidget does not expose a public ResetPoints()
 // (Thetis ucParametricEq.cs:1041-1046).  The same effect is achieved by
 // re-seeding via setPointsData with the default flat profile (gain=0, q=4)
 // across the current frequency span.  See Task 5 review for the

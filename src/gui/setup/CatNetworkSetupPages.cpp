@@ -1,12 +1,12 @@
-// no-port-check: NereusSDR-original UI file. The "// From Thetis" inline
+// no-port-check: Longpath-original UI file. The "// From Thetis" inline
 // comments below are design cross-references documenting where AppSettings
 // key names and default values were verified against the Thetis control
 // inventory (setup.designer.cs / TCIServer.cs). No Thetis code is
 // translated here; all AppSettings keys are attributed in TciProtocol.h.
 
 #include "CatNetworkSetupPages.h"
-#include "gui/StyleConstants.h"
 #include "gui/LanScanDialog.h"
+#include "gui/StyleConstants.h"
 #include "core/AppSettings.h"
 #include "models/RadioModel.h"
 
@@ -28,7 +28,7 @@
 #include <QPushButton>
 #include <QLoggingCategory>
 
-Q_LOGGING_CATEGORY(lcPeripherals, "nereus.peripherals")
+Q_LOGGING_CATEGORY(lcPeripherals, "longpath.peripherals")
 
 namespace Longpath {
 
@@ -181,7 +181,7 @@ void CatTciServerPage::buildServerGroup()
     // `txtTCIServerBindIPPort` (which uses a free-text "IP:port" field
     // accepting any valid IPv4/IPv6 via `IPAddress.TryParse`).  UX
     // diverges per CLAUDE.md feedback_source_first_ui_vs_dsp.md — Qt
-    // widgets are NereusSDR-native; a dropdown with validated, NIC-aware
+    // widgets are Longpath-native; a dropdown with validated, NIC-aware
     // choices is the better UX for our platform.
     m_bindAddressCombo = new QComboBox(group);
     m_bindAddressCombo->setStyleSheet(QString::fromLatin1(Style::kComboStyle));

@@ -1,12 +1,12 @@
 // =================================================================
-// src/core/HamlibInstaller.cpp  (NereusSDR)
+// src/core/HamlibInstaller.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. See HamlibInstaller.h for what this will and
+// Longpath-original. See HamlibInstaller.h for what this will and
 // will not run, and why.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-08 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
 // =================================================================

@@ -1,8 +1,8 @@
 // =================================================================
-// src/core/TuneMemoryStore.cpp  (NereusSDR)
+// src/core/TuneMemoryStore.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-native per-(antenna, band) cache of TGXL relay positions.
+// Longpath-native per-(antenna, band) cache of TGXL relay positions.
 // See TuneMemoryStore.h for full design notes.
 //
 // AI tooling: Anthropic Claude Code.

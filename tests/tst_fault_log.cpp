@@ -1,10 +1,10 @@
 // =================================================================
-// tests/tst_fault_log.cpp  (NereusSDR)
+// tests/tst_fault_log.cpp  (Longpath)
 // =================================================================
-// NereusSDR-native test. No AetherSDR equivalent; FaultLog is a
-// NereusSDR-native class per design doc §4.7.
+// Longpath-native test. No AetherSDR equivalent; FaultLog is a
+// Longpath-native class per design doc §4.7.
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-19  Created by J.J. Boyd (KG4VCF), with AI-assisted
 //                 transformation via Anthropic Claude Code.
 //                 Tests: ringBufferKeepsNewestTen, likelyCauseSwrTrip,

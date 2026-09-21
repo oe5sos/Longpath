@@ -78,17 +78,17 @@ endif()
 #
 # These apply only to Release / RelWithDebInfo; Debug builds stay
 # unoptimised so single-step debugging still works.
-option(NEREUSSDR_AGGRESSIVE_OPT "Use -O3 (instead of -O2) for release builds" ON)
+option(LONGPATH_AGGRESSIVE_OPT "Use -O3 (instead of -O2) for release builds" ON)
 # 2026-05-26 KG4VCF: LTO default flipped to OFF.  With LTO enabled on
 # the shared LongpathObjs object library, every test binary (526 of
 # them) inherits the LTO bitcode and triggers a multi-minute LTO link
 # of its own.  Net effect on a clean build: 1+ hour, load avg 250+,
 # unusable while building.  Per-target IPO=FALSE on tests doesn't
 # undo the bitcode embed.  Default LTO off makes dev builds fast;
-# release artifacts can opt in via `cmake -DNEREUSSDR_ENABLE_LTO=ON`.
-option(NEREUSSDR_ENABLE_LTO     "Enable link-time optimization (slow build; release artifacts only)" OFF)
+# release artifacts can opt in via `cmake -DLONGPATH_ENABLE_LTO=ON`.
+option(LONGPATH_ENABLE_LTO     "Enable link-time optimization (slow build; release artifacts only)" OFF)
 
-if(NEREUSSDR_AGGRESSIVE_OPT)
+if(LONGPATH_AGGRESSIVE_OPT)
     if(CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
         # Replace any pre-existing -O2 with -O3 so RelWithDebInfo gets
         # the upgrade (CMake's default for RelWithDebInfo on most
@@ -105,7 +105,7 @@ if(NEREUSSDR_AGGRESSIVE_OPT)
     endif()
 endif()
 
-if(NEREUSSDR_ENABLE_LTO)
+if(LONGPATH_ENABLE_LTO)
     include(CheckIPOSupported)
     check_ipo_supported(RESULT _lto_ok OUTPUT _lto_err)
     if(_lto_ok)
@@ -118,7 +118,7 @@ if(NEREUSSDR_ENABLE_LTO)
         # link would then trigger a multi-minute LTO pass.  Net effect
         # of the old global setting on a clean build: ~1 hour, load
         # avg 250+, dev-loop unusable while building.
-        set(NEREUSSDR_LTO_AVAILABLE TRUE)
+        set(LONGPATH_LTO_AVAILABLE TRUE)
         message(STATUS "Longpath: link-time optimization enabled (main app only)")
     else()
         message(WARNING "Longpath: LTO requested but unsupported -- ${_lto_err}")
@@ -142,7 +142,7 @@ find_package(Qt6 REQUIRED COMPONENTS
 # macOS x86_64 build with `qtwebsockets` missing from the install-qt-action
 # modules list; CMake's QUIET find_package silently left HAVE_WEBSOCKETS
 # undefined and the resulting binary disabled both features at runtime with
-# only a warning in the log. Mirroring the v0.1.1 NEREUS_GPU_SPECTRUM lesson
+# only a warning in the log. Mirroring the v0.1.1 LONGPATH_GPU_SPECTRUM lesson
 # (see release.yml Configure step): if a feature is mandatory, the build
 # system has to refuse to configure without it.
 
@@ -341,7 +341,7 @@ endif()
 
 # --------------------------------------------------------------------------
 # libpipewire-0.3 — optional native Linux audio bridge (Phase 3O PipeWire).
-# Detection-only here; actual PipeWire sources land behind NEREUS_HAVE_PIPEWIRE
+# Detection-only here; actual PipeWire sources land behind LONGPATH_HAVE_PIPEWIRE
 # in follow-up tasks. If the dev package is absent the Linux audio path stays
 # on the existing pactl / LinuxPipeBus FIFO route.
 # --------------------------------------------------------------------------
@@ -402,7 +402,7 @@ endif()
 # History: v0.1.1 shipped a Windows installer that silently disabled
 # GPU spectrum because this block used `message(STATUS)` fallbacks when
 # the private-module detection failed, and the shipping pipeline never
-# explicitly requested -DNEREUS_GPU_SPECTRUM=ON. Users saw a blank
+# explicitly requested -DLONGPATH_GPU_SPECTRUM=ON. Users saw a blank
 # spectrum area and no log line from SpectrumWidget::initialize().
 #
 # The check now does three things differently:
@@ -414,28 +414,28 @@ endif()
 #   3. Promotes the fallback to FATAL_ERROR when the caller opted in
 #      to GPU spectrum (the default) — silently shipping a CPU-only
 #      binary is the exact footgun that caused v0.1.1. Users who
-#      genuinely want the CPU path must pass -DNEREUS_GPU_SPECTRUM=OFF
+#      genuinely want the CPU path must pass -DLONGPATH_GPU_SPECTRUM=OFF
 #      explicitly to acknowledge it.
 # --------------------------------------------------------------------------
-option(NEREUS_GPU_SPECTRUM "Enable GPU-accelerated spectrum/waterfall via QRhi (requires Qt 6.7+ with ShaderTools and Gui private headers)" ON)
+option(LONGPATH_GPU_SPECTRUM "Enable GPU-accelerated spectrum/waterfall via QRhi (requires Qt 6.7+ with ShaderTools and Gui private headers)" ON)
 
 # Remember whether the caller requested it before any auto-disable, so
 # we can produce a hard failure if we can't honor the request.
-set(_nereus_gpu_spectrum_requested ${NEREUS_GPU_SPECTRUM})
-set(_nereus_gpu_fail_reason "")
+set(_longpath_gpu_spectrum_requested ${LONGPATH_GPU_SPECTRUM})
+set(_longpath_gpu_fail_reason "")
 
 # Defined here, before any branch, so that every later use is against a
 # variable that certainly exists. An undefined variable in an if() is
 # false, which would have made a missing definition look exactly like a
 # missing ShaderTools — the same silent skip this is guarding against.
-set(_nereus_have_shadertools FALSE)
-set(_nereus_have_guiprivate  FALSE)
+set(_longpath_have_shadertools FALSE)
+set(_longpath_have_guiprivate  FALSE)
 
-if(NEREUS_GPU_SPECTRUM)
+if(LONGPATH_GPU_SPECTRUM)
     if(Qt6_VERSION VERSION_LESS "6.7")
-        set(_nereus_gpu_fail_reason
+        set(_longpath_gpu_fail_reason
             "Qt ${Qt6_VERSION} is older than 6.7 (QRhiWidget requires 6.7+)")
-        set(NEREUS_GPU_SPECTRUM OFF)
+        set(LONGPATH_GPU_SPECTRUM OFF)
     else()
         # Ask CMake to locate the private modules. QUIET so we can emit
         # a single, context-rich failure message below instead of
@@ -448,23 +448,23 @@ if(NEREUS_GPU_SPECTRUM)
         # set even though the Qt6::GuiPrivate target exists, which is
         # what silently broke v0.1.1.
         if(Qt6ShaderTools_FOUND OR TARGET Qt6::ShaderTools)
-            set(_nereus_have_shadertools TRUE)
+            set(_longpath_have_shadertools TRUE)
         endif()
         if(Qt6GuiPrivate_FOUND OR TARGET Qt6::GuiPrivate)
-            set(_nereus_have_guiprivate TRUE)
+            set(_longpath_have_guiprivate TRUE)
         endif()
 
-        if(_nereus_have_shadertools AND _nereus_have_guiprivate)
+        if(_longpath_have_shadertools AND _longpath_have_guiprivate)
             message(STATUS "QRhi support enabled — GPU spectrum/waterfall active")
         else()
-            set(_nereus_gpu_fail_reason "Qt6 private modules missing:")
-            if(NOT _nereus_have_shadertools)
-                string(APPEND _nereus_gpu_fail_reason " ShaderTools")
+            set(_longpath_gpu_fail_reason "Qt6 private modules missing:")
+            if(NOT _longpath_have_shadertools)
+                string(APPEND _longpath_gpu_fail_reason " ShaderTools")
             endif()
-            if(NOT _nereus_have_guiprivate)
-                string(APPEND _nereus_gpu_fail_reason " GuiPrivate")
+            if(NOT _longpath_have_guiprivate)
+                string(APPEND _longpath_gpu_fail_reason " GuiPrivate")
             endif()
-            set(NEREUS_GPU_SPECTRUM OFF)
+            set(LONGPATH_GPU_SPECTRUM OFF)
         endif()
     endif()
 endif()
@@ -472,10 +472,10 @@ endif()
 # Fail loudly if the caller asked for GPU spectrum and we couldn't
 # deliver it. This prevents a repeat of the v0.1.1 silent-CPU-fallback
 # shipping incident.
-if(_nereus_gpu_spectrum_requested AND NOT NEREUS_GPU_SPECTRUM)
+if(_longpath_gpu_spectrum_requested AND NOT LONGPATH_GPU_SPECTRUM)
     message(FATAL_ERROR
-        "NEREUS_GPU_SPECTRUM was requested but cannot be enabled.\n"
-        "Reason: ${_nereus_gpu_fail_reason}\n"
+        "LONGPATH_GPU_SPECTRUM was requested but cannot be enabled.\n"
+        "Reason: ${_longpath_gpu_fail_reason}\n"
         "Fix options:\n"
         "  - Ubuntu/Debian (25.10+ splits ShaderTools into its own package):\n"
         "      sudo apt install qt6-base-private-dev qt6-shadertools-dev\n"
@@ -489,7 +489,7 @@ if(_nereus_gpu_spectrum_requested AND NOT NEREUS_GPU_SPECTRUM)
         "  - Local dev (Qt online installer): check 'Qt Shader Tools'; private "
         "headers ship with the base Qt module.\n"
         "  - To build without GPU spectrum (CPU-only fallback), re-run cmake "
-        "with -DNEREUS_GPU_SPECTRUM=OFF.")
+        "with -DLONGPATH_GPU_SPECTRUM=OFF.")
 endif()
 
 # --------------------------------------------------------------------------
@@ -888,6 +888,7 @@ set(GUI_SOURCES
     src/asr/AsrSegmenter.cpp
     src/asr/AsrService.cpp
     src/asr/RemoteAsrBackend.cpp
+    src/asr/WhisperServerLauncher.cpp
     src/gui/MainWindow_KiwiSdr.cpp
     src/gui/MainWindow_Asr.cpp
     src/gui/MainWindow_SunSdr.cpp
@@ -1208,7 +1209,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 endif()
 
 # 2026-05-26 KG4VCF: parallel LTO-enabled object library, ONLY built
-# when NEREUSSDR_ENABLE_LTO=ON.  Same sources as LongpathObjs above,
+# when LONGPATH_ENABLE_LTO=ON.  Same sources as LongpathObjs above,
 # but compiled with LTO bitcode so the main Longpath app's link can
 # do cross-translation-unit optimization.  Tests continue to link the
 # plain LongpathObjs (no bitcode), so test link times stay fast.
@@ -1216,7 +1217,7 @@ endif()
 # This is more work to build a release artifact (sources compile
 # twice) but it keeps the dev loop fast while preserving the LTO perf
 # benefit for shipped binaries.
-if(NEREUSSDR_LTO_AVAILABLE)
+if(LONGPATH_LTO_AVAILABLE)
     add_library(LongpathObjs_LTO OBJECT
         ${CORE_SOURCES}
         ${MODEL_SOURCES}
@@ -1251,9 +1252,9 @@ add_executable(Longpath src/main.cpp ${APP_ICON_SOURCES})
 #
 # Theme::searchPaths() kennt beide Orte.
 if(APPLE)
-    set(_nereus_theme_dest "$<TARGET_BUNDLE_CONTENT_DIR:Longpath>/Resources/themes")
+    set(_longpath_theme_dest "$<TARGET_BUNDLE_CONTENT_DIR:Longpath>/Resources/themes")
 else()
-    set(_nereus_theme_dest "$<TARGET_FILE_DIR:Longpath>/themes")
+    set(_longpath_theme_dest "$<TARGET_FILE_DIR:Longpath>/themes")
 endif()
 
 # ── Mitgelieferte Farbpaletten ───────────────────────────────────────
@@ -1267,15 +1268,15 @@ endif()
 # Theme::available()).
 add_custom_command(TARGET Longpath POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory
-            "${_nereus_theme_dest}"
+            "${_longpath_theme_dest}"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${CMAKE_SOURCE_DIR}/resources/themes/kreide.json"
             "${CMAKE_SOURCE_DIR}/resources/themes/flach.json"
             "${CMAKE_SOURCE_DIR}/resources/themes/tief.json"
             "${CMAKE_SOURCE_DIR}/resources/themes/moos.json"
-            "${_nereus_theme_dest}/"
+            "${_longpath_theme_dest}/"
     COMMENT "Farbpaletten mitliefern")
-if(NEREUSSDR_LTO_AVAILABLE)
+if(LONGPATH_LTO_AVAILABLE)
     # Main app + its OBJECT-lib link both get LTO when enabled.  The
     # IPO property on the executable arranges -flto on the link line;
     # the IPO property on LongpathObjs_LTO above puts -flto on every
@@ -1316,9 +1317,9 @@ set_target_properties(Longpath PROPERTIES
 # Set succeeds when the key already exists from a prior build; falls
 # through to Add on the first build (when the key is absent).
 if(APPLE)
-    set(_nereus_mic_desc "${MACOSX_BUNDLE_MIC_USAGE}")
+    set(_longpath_mic_desc "${MACOSX_BUNDLE_MIC_USAGE}")
     add_custom_command(TARGET Longpath POST_BUILD
-        COMMAND /bin/sh -c "/usr/libexec/PlistBuddy -c \"Set :NSMicrophoneUsageDescription '${_nereus_mic_desc}'\" \"$<TARGET_BUNDLE_CONTENT_DIR:Longpath>/Info.plist\" 2>/dev/null || /usr/libexec/PlistBuddy -c \"Add :NSMicrophoneUsageDescription string '${_nereus_mic_desc}'\" \"$<TARGET_BUNDLE_CONTENT_DIR:Longpath>/Info.plist\""
+        COMMAND /bin/sh -c "/usr/libexec/PlistBuddy -c \"Set :NSMicrophoneUsageDescription '${_longpath_mic_desc}'\" \"$<TARGET_BUNDLE_CONTENT_DIR:Longpath>/Info.plist\" 2>/dev/null || /usr/libexec/PlistBuddy -c \"Add :NSMicrophoneUsageDescription string '${_longpath_mic_desc}'\" \"$<TARGET_BUNDLE_CONTENT_DIR:Longpath>/Info.plist\""
         COMMAND codesign --force --sign - "$<TARGET_BUNDLE_DIR:Longpath>"
         COMMENT "Inject NSMicrophoneUsageDescription + re-sign bundle (mic-permission gate)"
         VERBATIM
@@ -1393,13 +1394,13 @@ if(FFTW3_FOUND)
 endif()
 
 # libpipewire-0.3 — gated by the pkg_check_modules block above. Only links on
-# Linux when the dev package is present; NEREUS_HAVE_PIPEWIRE lets follow-up
+# Linux when the dev package is present; LONGPATH_HAVE_PIPEWIRE lets follow-up
 # PipeWire sources compile conditionally.
 if(PIPEWIRE_FOUND)
     target_link_libraries(LongpathObjs PUBLIC ${PIPEWIRE_LIBRARIES})
     target_include_directories(LongpathObjs PUBLIC ${PIPEWIRE_INCLUDE_DIRS})
     target_compile_options(LongpathObjs PUBLIC ${PIPEWIRE_CFLAGS_OTHER})
-    target_compile_definitions(LongpathObjs PUBLIC NEREUS_HAVE_PIPEWIRE)
+    target_compile_definitions(LongpathObjs PUBLIC LONGPATH_HAVE_PIPEWIRE)
     target_sources(LongpathObjs PRIVATE
         src/core/audio/PipeWireThreadLoop.cpp
         src/core/audio/PipeWireStream.cpp
@@ -1609,9 +1610,9 @@ endif()
 target_link_libraries(LongpathObjs PRIVATE portaudio_static)
 target_include_directories(LongpathObjs PUBLIC ${portaudio_SOURCE_DIR}/include)
 
-if(NEREUS_GPU_SPECTRUM)
+if(LONGPATH_GPU_SPECTRUM)
     target_link_libraries(LongpathObjs PUBLIC Qt6::GuiPrivate)
-    target_compile_definitions(LongpathObjs PUBLIC NEREUS_GPU_SPECTRUM)
+    target_compile_definitions(LongpathObjs PUBLIC LONGPATH_GPU_SPECTRUM)
 
     # NOTE: this must use the SAME test as the gate at the top of this
     # file, and for a long time it did not.
@@ -1620,7 +1621,7 @@ if(NEREUS_GPU_SPECTRUM)
     # precisely because Qt's private-module exports have shipped layouts
     # where the target exists and the _FOUND variable is never set. This
     # block tested only _FOUND. In that layout the gate passes, no
-    # FATAL_ERROR fires, NEREUS_GPU_SPECTRUM stays ON and is defined —
+    # FATAL_ERROR fires, LONGPATH_GPU_SPECTRUM stays ON and is defined —
     # and then the shaders are silently skipped. The result is a full GPU
     # build with zero shaders embedded, no warning anywhere, and a
     # waterfall that draws whatever undefined GPU memory holds.
@@ -1628,8 +1629,8 @@ if(NEREUS_GPU_SPECTRUM)
     # That is the v0.1.1 footgun rebuilt out of an inconsistent copy of
     # its own fix. One variable, set once at the gate, is the only way
     # these two places cannot drift apart again.
-    if(_nereus_have_shadertools)
-        qt_add_shaders(LongpathObjs "nereus_shaders"
+    if(_longpath_have_shadertools)
+        qt_add_shaders(LongpathObjs "longpath_shaders"
             PREFIX "/shaders"
             FILES
                 resources/shaders/waterfall.vert
@@ -1640,7 +1641,7 @@ if(NEREUS_GPU_SPECTRUM)
                 resources/shaders/overlay.frag
         )
 
-        qt_add_shaders(LongpathObjs "nereus_meter_shaders"
+        qt_add_shaders(LongpathObjs "longpath_meter_shaders"
             PREFIX "/shaders"
             FILES
                 resources/shaders/meter_textured.vert
@@ -1674,11 +1675,11 @@ endif()
 # build was observed advertising a sha five commits stale. The script writes
 # build/generated/LongpathBuildTag.h only when the text changes, so the extra
 # build step costs one git call and recompiles nothing on a no-op build.
-set(NEREUSSDR_BUILD_TAG "" CACHE STRING
+set(LONGPATH_BUILD_TAG "" CACHE STRING
     "Text appended to the window title identifying a non-release build. Auto-derived from git when empty; set to a single space to force it off.")
 
-set(NEREUS_BUILD_TAG_HEADER "${CMAKE_BINARY_DIR}/generated/LongpathBuildTag.h")
-set(NEREUS_BUILD_TAG_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/cmake/LongpathBuildTag.cmake")
+set(LONGPATH_BUILD_TAG_HEADER "${CMAKE_BINARY_DIR}/generated/LongpathBuildTag.h")
+set(LONGPATH_BUILD_TAG_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/cmake/LongpathBuildTag.cmake")
 
 # Resolve git once here rather than in the script, which would repeat the
 # find_program on every build. Copied into a local rather than clearing
@@ -1686,33 +1687,33 @@ set(NEREUS_BUILD_TAG_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/cmake/LongpathBuildTag.
 # shadow of it would be inherited by add_subdirectory(tests) and
 # add_subdirectory(hal-plugin) below.
 find_package(Git QUIET)
-set(NEREUS_BUILD_TAG_GIT "")
+set(LONGPATH_BUILD_TAG_GIT "")
 if(GIT_FOUND)
-    set(NEREUS_BUILD_TAG_GIT "${GIT_EXECUTABLE}")
+    set(LONGPATH_BUILD_TAG_GIT "${GIT_EXECUTABLE}")
 endif()
 
-set(NEREUS_BUILD_TAG_ARGS
-    "-DNEREUS_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
-    "-DNEREUS_OUTPUT=${NEREUS_BUILD_TAG_HEADER}"
-    "-DNEREUS_OVERRIDE=${NEREUSSDR_BUILD_TAG}"
-    "-DNEREUS_GIT_EXECUTABLE=${NEREUS_BUILD_TAG_GIT}")
+set(LONGPATH_BUILD_TAG_ARGS
+    "-DLONGPATH_REPO_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
+    "-DLONGPATH_OUTPUT=${LONGPATH_BUILD_TAG_HEADER}"
+    "-DLONGPATH_OVERRIDE=${LONGPATH_BUILD_TAG}"
+    "-DLONGPATH_GIT_EXECUTABLE=${LONGPATH_BUILD_TAG_GIT}")
 
 # Configure-time run: the header has to exist before the first compile (and
 # before AUTOMOC scans main.cpp), and this is where the one-line smoke-vs-
 # release status message comes from.
 execute_process(
-    COMMAND "${CMAKE_COMMAND}" ${NEREUS_BUILD_TAG_ARGS} -DNEREUS_ANNOUNCE=ON
-            -P "${NEREUS_BUILD_TAG_SCRIPT}")
+    COMMAND "${CMAKE_COMMAND}" ${LONGPATH_BUILD_TAG_ARGS} -DLONGPATH_ANNOUNCE=ON
+            -P "${LONGPATH_BUILD_TAG_SCRIPT}")
 
 # Build-time run: always out of date on purpose, so the tag tracks HEAD
 # without needing a re-configure.
-add_custom_target(nereus_build_tag ALL
-    COMMAND "${CMAKE_COMMAND}" ${NEREUS_BUILD_TAG_ARGS}
-            -P "${NEREUS_BUILD_TAG_SCRIPT}"
-    BYPRODUCTS "${NEREUS_BUILD_TAG_HEADER}"
+add_custom_target(longpath_build_tag ALL
+    COMMAND "${CMAKE_COMMAND}" ${LONGPATH_BUILD_TAG_ARGS}
+            -P "${LONGPATH_BUILD_TAG_SCRIPT}"
+    BYPRODUCTS "${LONGPATH_BUILD_TAG_HEADER}"
     COMMENT "Re-deriving the smoke-build tag"
     VERBATIM)
-add_dependencies(Longpath nereus_build_tag)
+add_dependencies(Longpath longpath_build_tag)
 
 # Deliberately PRIVATE to the executable, and deliberately consumed only by
 # src/main.cpp. Every one of the ~450 test executables links LongpathObjs,
@@ -1726,7 +1727,7 @@ target_include_directories(Longpath PRIVATE "${CMAKE_BINARY_DIR}/generated")
 # Version define
 # --------------------------------------------------------------------------
 target_compile_definitions(LongpathObjs PUBLIC
-    NEREUSSDR_VERSION="${PROJECT_VERSION}"
+    LONGPATH_VERSION="${PROJECT_VERSION}"
 )
 
 # --------------------------------------------------------------------------
@@ -1743,13 +1744,13 @@ else()
 endif()
 
 # --------------------------------------------------------------------------
-# Precompiled header (NEREUS_USE_PCH=ON by default)
+# Precompiled header (LONGPATH_USE_PCH=ON by default)
 #
 # CI bake-off (ubuntu-24.04, 4 vCPU, 451 test executables) showed Linux
 # spending ~33m in the build step vs ~6m on macOS / ~12m on Windows.
 # Most of that is repeated parsing of Qt6 + STL headers across the
 # LongpathObjs translation units AND across every test target that
-# REUSE_FROMs this PCH (see tests/CMakeLists.txt nereus_add_test()).
+# REUSE_FROMs this PCH (see tests/CMakeLists.txt longpath_add_test()).
 #
 # Keep the list conservative: only headers used by the vast majority of
 # TUs. Adding rarely-used headers slows incremental builds because every
@@ -1761,7 +1762,7 @@ endif()
 # may have lower hit rates on incremental until ~/.config/ccache/ccache.conf
 # matches CI.
 # --------------------------------------------------------------------------
-option(NEREUS_USE_PCH "Use precompiled headers to speed up builds" ON)
+option(LONGPATH_USE_PCH "Use precompiled headers to speed up builds" ON)
 # Phase 3J-1 closeout follow-up (2026-05-13): exclude Objective-C++ (.mm)
 # translation units from the PCH.  The PCH is generated as plain C++; an
 # Objective-C++ TU that tries to reuse it errors out with "Objective-C was
@@ -1775,7 +1776,7 @@ if(APPLE)
     set_source_files_properties(src/gui/MacFloatingWindowBehavior.mm
         PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 endif()
-if(NEREUS_USE_PCH)
+if(LONGPATH_USE_PCH)
     target_precompile_headers(LongpathObjs PRIVATE
         # Qt6 core (every model + worker TU)
         <QObject>
@@ -1834,14 +1835,14 @@ install(FILES LICENSE LICENSE-DUAL-LICENSING
         COMPONENT licenses)
 
 # --------------------------------------------------------------------------
-# Tests (Qt6::Test). Opt-in via -DNEREUS_BUILD_TESTS=ON.
+# Tests (Qt6::Test). Opt-in via -DLONGPATH_BUILD_TESTS=ON.
 # --------------------------------------------------------------------------
-option(NEREUS_BUILD_TESTS "Build Longpath test suite" OFF)
-if(NEREUS_BUILD_TESTS)
+option(LONGPATH_BUILD_TESTS "Build Longpath test suite" OFF)
+if(LONGPATH_BUILD_TESTS)
     # Propagate the define to the object library so test-guard blocks
     # (e.g. isTabVisibleForTest) are compiled into LongpathObjs and
     # therefore available for linking into test executables.
-    target_compile_definitions(LongpathObjs PUBLIC NEREUS_BUILD_TESTS)
+    target_compile_definitions(LongpathObjs PUBLIC LONGPATH_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
 endif()
@@ -1857,8 +1858,8 @@ endif()
 # 2026-04-19-vax-design.md §8.1. Enable here only when you want the
 # driver target wired into the main configure for IDE integration.
 # --------------------------------------------------------------------------
-option(NEREUSSDR_BUILD_HAL_PLUGIN "Build macOS CoreAudio HAL Audio Server plug-in" OFF)
-if(APPLE AND NEREUSSDR_BUILD_HAL_PLUGIN)
+option(LONGPATH_BUILD_HAL_PLUGIN "Build macOS CoreAudio HAL Audio Server plug-in" OFF)
+if(APPLE AND LONGPATH_BUILD_HAL_PLUGIN)
     add_subdirectory(hal-plugin)
 endif()
 

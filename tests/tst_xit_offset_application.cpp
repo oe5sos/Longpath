@@ -1,9 +1,9 @@
 // tst_xit_offset_application.cpp
 //
-// no-port-check: NereusSDR-original test file. All Thetis XIT source cites
+// no-port-check: Longpath-original test file. All Thetis XIT source cites
 // are in RadioModel.cpp / SliceModel.cpp.
 // =================================================================
-// tests/tst_xit_offset_application.cpp  (NereusSDR)
+// tests/tst_xit_offset_application.cpp  (Longpath)
 // =================================================================
 //
 // B6 (Task 16) — TDD: verifies that RadioModel::wireSliceSignals() applies
@@ -23,7 +23,7 @@
 //   - Captured txFreqHz values asserted.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-02 — Original implementation for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted authoring via Anthropic
 //                 Claude Code (B6 cluster).

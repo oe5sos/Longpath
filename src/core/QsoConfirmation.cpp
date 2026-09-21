@@ -1,12 +1,12 @@
 // =================================================================
-// src/core/QsoConfirmation.cpp  (NereusSDR)
+// src/core/QsoConfirmation.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. See QsoConfirmation.h for why "non-empty means
+// Longpath-original. See QsoConfirmation.h for why "non-empty means
 // confirmed" is the wrong shortcut.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-09 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

@@ -1,7 +1,7 @@
 #pragma once
 
 // =================================================================
-// src/gui/applets/RxApplet.h  (NereusSDR)
+// src/gui/applets/RxApplet.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -10,7 +10,7 @@
 //   Project Files/Source/Console/setup.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -127,6 +127,8 @@
 #include "gui/widgets/TriBtn.h"
 #include "models/Band.h"
 
+#include <QBoxLayout>
+#include <QResizeEvent>
 #include <QList>
 #include <QPushButton>
 #include <QStringList>
@@ -196,7 +198,7 @@ public:
     // badge suffices). Clicking a tab emits sliceActivationRequested.
     // Workflow ported from AetherSDR RxApplet::updateSliceButtons
     // (RxApplet.cpp:1434 [@6a142807]); the Multi-Flex foreign-slot model is
-    // dropped (NereusSDR owns the radio directly, no shared-client slots).
+    // dropped (Longpath owns the radio directly, no shared-client slots).
     void updateSliceButtons(const QVector<SliceModel*>& slices,
                             int activeSliceIndex);
 
@@ -215,7 +217,7 @@ public slots:
     // Called by MainWindow on currentRadioChanged after setBoardCapabilities.
     void setHpsdrSku(Longpath::HPSDRModel sku);
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
 public:
     // Test-only: returns current step-att spinbox maximum (for range assertions).
     // Phase 3P-A Task 15.
@@ -257,9 +259,17 @@ signals:
     void openNrSetupRequested(Longpath::NrSlot slot);
     void openNbSetupRequested();
 
+protected:
+    void resizeEvent(QResizeEvent* e) override;
+
 private:
     void buildUi();
     void connectSlice(SliceModel* s);
+    void applyColumnDirection();
+
+    /// Unterhalb dieser Breite stehen die zwei Spalten untereinander.
+    static constexpr int kStackColumnsBelowPx = 420;
+    QBoxLayout* m_columns{nullptr};
     void disconnectSlice(SliceModel* s);
     void updateFilterLabel();
 
@@ -327,7 +337,7 @@ private:
     // Zaehlung uebersehen hatte. In RxApplet.cpp stand dazu:
     //   „AF gain slider removed: TitleBar master volume + VfoWidget
     //    per-slice AF control are the canonical 2 surfaces."
-    // Diese Kopfleiste mit Hauptlautstaerke GIBT ES IN NereusSDR NICHT
+    // Diese Kopfleiste mit Hauptlautstaerke GIBT ES IN Longpath NICHT
     // — ein aus AetherSDR mitgewanderter Satz. Ohne die Flagge haette
     // das Programm keine Lautstaerke und keine Stummschaltung gehabt.
     QSlider*     m_afSlider    = nullptr;

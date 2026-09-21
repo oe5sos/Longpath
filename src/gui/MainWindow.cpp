@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/MainWindow.cpp  (NereusSDR)
+// src/gui/MainWindow.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -10,7 +10,7 @@
 //   Project Files/Source/Console/radio.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -497,8 +497,18 @@ warren@wpratt.com
 namespace Longpath {
 
 namespace {
+
+// Die Kettenanzeige (CH 0 / CH 1) in der Fussleiste ist seit dem Wunsch
+// des Betreibers ("bitte weg") abgeschafft — die Pille im Panadapter-
+// Kopf zeigt den Kettenzustand. Beide Haelften haengen an dieser einen
+// Zahl, damit nie wieder nur eine davon zurueckkommt.
+constexpr bool kChainIndicatorsInBottomBar = false;
+
+// Wie oft der Stand gesichert wird, wenn sich etwas geaendert hat.
+// Eine Minute: hoechstens so viel geht bei Stromausfall verloren.
+constexpr int kSettingsAutosaveMs = 60 * 1000;
 // First-run/rescan wants the "relevant" virtual cables for the current
-// platform — 3rd-party cables on Windows (BYO), our own NereusSdrVax
+// platform — 3rd-party cables on Windows (BYO), our own LongpathVax
 // entries on Mac/Linux (native HAL plugin / pipe-source). Centralising
 // the platform split here keeps checkVaxFirstRun() focused on
 // scenario-selection + dialog wiring.
@@ -509,7 +519,7 @@ QVector<DetectedCable> detectedForFirstRun()
 #else
     QVector<DetectedCable> out;
     for (const auto& c : VirtualCableDetector::scan()) {
-        if (c.product == VirtualCableProduct::NereusSdrVax) {
+        if (c.product == VirtualCableProduct::LongpathVax) {
             out.push_back(c);
         }
     }
@@ -681,8 +691,8 @@ MainWindow::MainWindow(QWidget* parent)
                 // Earlier revisions passed these reversed, which made the ▲/▼
                 // glyphs read in radio perspective rather than the client's.
                 // Spec §Affordances reads the segment from the operator's
-                // (client's) point of view: ▲ = NereusSDR uploading to radio
-                // (commands), ▼ = radio downloading to NereusSDR (I/Q).
+                // (client's) point of view: ▲ = Longpath uploading to radio
+                // (commands), ▼ = radio downloading to Longpath (I/Q).
                 seg->setRates(conn->rxByteRate(1000), conn->txByteRate(1000));
             }
         });
@@ -1054,6 +1064,33 @@ MainWindow::MainWindow(QWidget* parent)
         AppSettings::instance().save();
         qWarning() << "[ProfileSaveOnQuit:aboutToQuit] AppSettings::save() done";
     });
+
+    // ── Sichern, ohne auf das Beenden zu warten (2026-09-17) ─────────
+    //
+    // Betreiber: "wichtig ist, dass sich das programm immer automatisch
+    // sichert. sollte ein stromausfall oder sonstiges sein, sollte man
+    // immer auf die daten zurueck greifen koennen!"
+    //
+    // Bisher schrieben nur closeEvent/aboutToQuit den ganzen Stand auf
+    // die Platte, dazu einzelne Schreiber mit eigenem 500-ms-Aufschub
+    // (LayoutProfiles, RadioModel::scheduleSettingsSave). Alles andere
+    // -- ein setValue() ohne eigenen Aufschub -- lebte bis zum Beenden
+    // im Speicher, und ein Stromausfall kennt kein closeEvent. Jetzt:
+    // jede Minute nachsehen, ob seit dem letzten Schreiben etwas gesetzt
+    // wurde (AppSettings::isDirty), und dann alles sichern, samt
+    // Fenstergeometrie. Im Ruhezustand kostet das nichts (dirty bleibt
+    // falsch); eine volle Sicherung sind wenige Millisekunden XML plus
+    // ein fsync. AppSettings legt dabei die Tageskopie an.
+    auto* autosave = new QTimer(this);
+    autosave->setObjectName(QStringLiteral("settingsAutosave"));
+    autosave->setInterval(kSettingsAutosaveMs);
+    connect(autosave, &QTimer::timeout, this, [this]() {
+        if (!AppSettings::instance().isDirty()) { return; }
+        saveMainWindowGeometry();
+        AppSettings::instance().save();
+        qInfo() << "[Autosave] Einstellungen gesichert";
+    });
+    autosave->start();
 }
 
 MainWindow::~MainWindow()
@@ -1088,7 +1125,7 @@ SpectrumWidget* MainWindow::activeSpectrumWidget() const
 // panadapter from the slice's panKey(), falling back to the active pan when
 // the key is empty (Slice A pre-seed) or the pan was removed.
 // Ported from AetherSDR MainWindow::spectrumForSlice (MainWindow.cpp:14856
-// [@6a142807]); AetherSDR uses s->panId() (a string), NereusSDR uses
+// [@6a142807]); AetherSDR uses s->panId() (a string), Longpath uses
 // s->panKey().
 SpectrumWidget* MainWindow::spectrumForSlice(SliceModel* s) const
 {
@@ -1530,7 +1567,7 @@ void MainWindow::detachApplet(AppletWidget* applet, int dockIndex,
     // Rückruf des alten QRhi feuert später gegen freigegebenen Zustand
     // (AetherSDR #2495; #4319 dieselbe Familie auf D3D11). AetherSDR
     // räumt deshalb vor JEDEM Reparent alle QRhiWidget-Kinder ab
-    // (prepareRhiChildrenForReparent), und NereusSDR macht in
+    // (prepareRhiChildrenForReparent), und Longpath macht in
     // ContainerManager mit extractMeterItems/installFreshMeter das
     // Gleiche für die Meter-Container.
     //
@@ -1542,7 +1579,7 @@ void MainWindow::detachApplet(AppletWidget* applet, int dockIndex,
     // benennt, statt eines Sturzes in fremdem Code.
     //
     // inherits() statt findChild<QRhiWidget*>(): der Kopf steht hinter
-    // NEREUS_GPU_SPECTRUM, und eine Sicherung, die im falschen Aufbau
+    // LONGPATH_GPU_SPECTRUM, und eine Sicherung, die im falschen Aufbau
     // wegfällt, ist keine.
     for (const QWidget* child : applet->findChildren<QWidget*>()) {
         if (child && child->inherits("QRhiWidget")) {
@@ -3621,10 +3658,10 @@ void MainWindow::buildUI()
     // that was compiled, not the one that was current at the last configure.
     // Der Name der Anwendung, nicht der des Vorgaengers. Der
     // Betreiber hat am 2026-08-20 zu Recht reklamiert, dass hier
-    // noch „NereusSDR" stand, obwohl das Programm laengst Longpath
+    // noch der alte Name stand, obwohl das Programm laengst Longpath
     // heisst — alle Urhebervermerke der Vorlagen bleiben davon
     // unberuehrt und stehen weiterhin im Ueber-Dialog.
-    QString title = QStringLiteral("Longpath %1").arg(NEREUSSDR_VERSION);
+    QString title = QStringLiteral("Longpath %1").arg(LONGPATH_VERSION);
 
     const QString buildTag = BuildIdentity::buildTag();
     if (!buildTag.isEmpty()) {
@@ -4204,12 +4241,28 @@ void MainWindow::buildUI()
     // Registered with m_chromeBar at rung 4 (design §6); the >=2 fact is
     // reported via setItemAvailable, not a direct setVisible call, per
     // ChromeBarController::setItemAvailable's own doc comment.
+    //
+    // ── CH 1 bleibt aus, seit CH 0 aus ist (2026-09-17) ─────────────
+    //
+    // Der Betreiber hat die Kettenanzeige aus der Fussleiste genommen
+    // ("40m kannst du auch loeschen. daneben sind ganz links noch
+    // zeichen, bitte weg" — siehe die Ausblende-Liste nach
+    // registerChromeBarItems: bar.chain0 ist nicht verfuegbar, an seine
+    // Stelle trat die Pille im Panadapter-Kopf). CH 1 hing aber weiter
+    // an DIESEM Gatter und kam zurueck, sobald ein Zwei-Ketten-Geraet
+    // verbunden war: auf seinem Foto vom 2026-09-17 stand links unten
+    // "CH 1 / 20m (idle)" — die zweite Kette eines ANVELINA PRO 3, ohne
+    // die erste, mit dem zuletzt geschalteten Band eines anderen Tages.
+    // Nachgestellt in tst_real_status_bar_chain_indicators. Eine
+    // Anzeige, die als Ganzes abgeschafft ist, darf nicht zur Haelfte
+    // wiederkommen: CH 1 folgt CH 0.
     auto updateChain1Visibility = [this]() {
         if (!m_chain1IndicatorWidget) { return; }
         const auto caps = m_radioModel->boardCapabilities();
         if (m_chromeBar && m_chromeBarWidget) {
             m_chromeBar->setItemAvailable(m_chain1IndicatorWidget,
-                                          caps.rxFilterChainCount >= 2);
+                                          kChainIndicatorsInBottomBar
+                                              && caps.rxFilterChainCount >= 2);
             m_chromeBar->relayout(m_chromeBarWidget->width());
         }
     };
@@ -4824,7 +4877,7 @@ void MainWindow::buildUI()
 
     // Sub-epic E: flush the rewind ring buffer when the radio disconnects so
     // a new session starts with a clean history. AetherSDR's clearDisplay()
-    // did this implicitly; NereusSDR has no equivalent single-call reset, so
+    // did this implicitly; Longpath has no equivalent single-call reset, so
     // we plumb the connection-state signal through here. See
     // docs/architecture/phase3g-rx-epic-e-waterfall-scrollback-plan.md task 4.
     connect(m_radioModel, &RadioModel::connectionStateChanged, activeSpectrumWidget(),
@@ -4931,9 +4984,9 @@ void MainWindow::buildUI()
         // MoxController::moxChanged(rx, oldMox, newMox) → VfoDisplayItem
         // setTransmitting on every VfoDisplayItem hosted by the app.  The rx
         // semantic (Thetis console.cs:29677 [v2.10.3.13]) is:
-        //   rx==1  → VFO-A (TX comes off VFO-A in 3M-1; default in NereusSDR)
+        //   rx==1  → VFO-A (TX comes off VFO-A in 3M-1; default in Longpath)
         //   rx==2  → VFO-B (only when RX2 enabled AND VFOBTX — neither
-        //                    plumbed in NereusSDR today)
+        //                    plumbed in Longpath today)
         //
         // Lookup strategy: walk every container's MeterWidget and update
         // every VfoDisplayItem found.  This is coarse but correct for 3M-1
@@ -5001,10 +5054,10 @@ void MainWindow::buildUI()
         nfTracker->feed(binsDbm, kFrameIntervalMs);
     });
 
-    // Max Bin detector: feed FFTEngine dBm bins into WdspEngine's NereusSDR-native
+    // Max Bin detector: feed FFTEngine dBm bins into WdspEngine's Longpath-native
     // Max Bin pipeline.  See WdspEngine::setupMaxBinDetector for the algorithm
     // cite and the divergence rationale (WDSP analyzer not wired; FFTEngine
-    // uses raw FFTW3 directly; NereusSDR runs the same Thetis algorithm against
+    // uses raw FFTW3 directly; Longpath runs the same Thetis algorithm against
     // the dBm bins emitted here).
     //
     // Algorithm from Thetis wdsp/analyzer.c:800-822 [@501e3f5].
@@ -5094,7 +5147,7 @@ void MainWindow::buildUI()
     });
 
     // Clarity → SpectrumWidget NF-aware grid (Task 2.9).
-    // NereusSDR-original — no Thetis equivalent.
+    // Longpath-original — no Thetis equivalent.
     // noiseFloorChanged fires after EWMA smoothing but before the deadband
     // gate so the grid tracks the floor at every cadence tick.
     connect(m_clarityController, &ClarityController::noiseFloorChanged,
@@ -5144,7 +5197,7 @@ void MainWindow::buildUI()
     }
 
     // Task 2.10: per-band NF priming — settle detector.
-    // NereusSDR-original — no Thetis equivalent.
+    // Longpath-original — no Thetis equivalent.
     //
     // On each noiseFloorChanged tick, keep a 2-second sliding window of NF
     // samples. When variance drops below 1 dB for a sustained window of ≥30
@@ -5203,7 +5256,7 @@ void MainWindow::buildUI()
                 const float variance = sqSum / static_cast<float>(settle->history.size());
 
                 if (variance < 1.0f) {
-                    // NereusSDR-original — no Thetis equivalent.
+                    // Longpath-original — no Thetis equivalent.
                     // NF settled within 1 dB variance over 2s; save for this band.
                     settle->bandNfEstimate[settle->currentBand] = nf;
                     AppSettings::instance().setValue(
@@ -5215,7 +5268,7 @@ void MainWindow::buildUI()
         });
 
         // Task 2.10: band-change → prime ClarityController EWMA with stored NF.
-        // NereusSDR-original — no Thetis equivalent.
+        // Longpath-original — no Thetis equivalent.
         //
         // Bug fix 2026-09-07: used to connect to PanadapterModel::
         // bandChanged (dead, see above); ClarityController tracks a
@@ -5251,7 +5304,7 @@ void MainWindow::buildUI()
                 settle->currentBand = newBand;
                 settle->history.clear();  // fresh settle window for the new band
 
-                // NereusSDR-original — no Thetis equivalent.
+                // Longpath-original — no Thetis equivalent.
                 // Prime estimator with last-seen NF for this band to eliminate
                 // cold-start visual jump after band change.
                 const float storedNF = settle->bandNfEstimate.value(
@@ -5631,7 +5684,7 @@ void MainWindow::buildUI()
     }
 
     // Wire: zoom changes -> auto-replan FFT size to maintain constant
-    // bins-per-pixel across zoom levels.  NereusSDR-original (Thetis
+    // bins-per-pixel across zoom levels.  Longpath-original (Thetis
     // does not auto-replan on zoom; the user manually picks FFT size).
     //
     // Math: the slider's "FFT size at full DDC bandwidth" baseline
@@ -5792,6 +5845,9 @@ void MainWindow::buildUI()
         // wireSliceToSpectrum). rebindRttyRadeAvailability() deckt auch
         // hier den Null-Fall ab.
         rebindRttyRadeAvailability(slice);
+        // 2026-09-13 code review fix: same bug class, same fix shape --
+        // see rebindTunerAppletBand()'s own doc comment.
+        rebindTunerAppletBand(slice);
         if (!slice) { return; }
         // Phase 3F Sub-Epic J Task 11: RadioModel::rxChannelForSlice()
         // replaces the direct wdspEngine()->rxChannel() reach.
@@ -5804,6 +5860,7 @@ void MainWindow::buildUI()
     // auf ihrem Vorgabewert statt auf dem, was das Gerät tut.
     if (m_commandBar) { m_commandBar->attach(m_radioModel->activeSlice()); }
     rebindRttyRadeAvailability(m_radioModel->activeSlice());
+    rebindTunerAppletBand(m_radioModel->activeSlice());
 
     // H.2 (Phase 3M-1a): wire MoxController::moxStateChanged → MeterPoller::setInTx.
     // Switches the poll set between RX meters (TX off) and TX meters (TX on).
@@ -6356,6 +6413,16 @@ void MainWindow::populateDefaultMeter()
     auto* txApplet = new TxApplet(m_radioModel, nullptr);
     m_txApplet = txApplet;
     panel->addApplet(txApplet);
+
+    // 2026-09-13 code review fix: TxApplet's MOX-tooltip and TX-filter-
+    // status-label bindings are only ever made against whichever slice is
+    // active AT THE TIME rebindActiveSlice() runs (once at construction,
+    // above, when there is usually no active slice yet) -- mirrors how
+    // m_rxApplet is re-bound via RxApplet::setSlice() a few lines above.
+    if (m_radioModel) {
+        connect(m_radioModel, &RadioModel::activeSliceChanged, txApplet,
+                [txApplet](int) { txApplet->rebindActiveSlice(); });
+    }
 
     // ── 3M-1c Phase L: hand TxApplet the controllers it needs ──────────────
     //
@@ -6940,7 +7007,7 @@ void MainWindow::populateDefaultMeter()
     }
 
     // ── Applet visibility controller (Containers > Applets + ☰ menus) ──
-    // NereusSDR-original. Backs the show/hide menu surfaces.
+    // Longpath-original. Backs the show/hide menu surfaces.
     //
     // Registered applets get a checkable menu entry in Containers > Applets
     // AND in the right-side panel's ☰ banner menu. Add new entries here as
@@ -9031,7 +9098,16 @@ void MainWindow::buildMenuBar()
             { "NR&2",   Slot::NR2,  false },
             { "NR&3",   Slot::NR3,  false },
             { "NR&4",   Slot::NR4,  false },
-            { "&DFNR",  Slot::DFNR, false },
+            // DFNR nur, wenn die DeepFilterNet-Bibliothek im Bau ist —
+            // dieselbe Regel wie fuer MNR/BNR darunter; bisher stand es
+            // immer da und tat ohne HAVE_DFNR nichts (2026-09-17).
+            { "&DFNR",  Slot::DFNR,
+#ifdef HAVE_DFNR
+                false
+#else
+                true
+#endif
+            },
             { "&MNR",   Slot::MNR,
 #ifdef HAVE_MNR
                 false
@@ -9046,6 +9122,11 @@ void MainWindow::buildMenuBar()
                 true
 #endif
             },
+            // NNR (WDSP 2.10) kam am 2026-09-14 in die Befehlsleiste, aber
+            // nicht hierher — mit aktivem NNR zeigte dieses Menue keinen
+            // Haken. Am Ende, weil der Abgleich unten ueber die Reihenfolge
+            // geht.
+            { "N&NR",   Slot::NNR,  false },
         };
         for (const auto& nr : nrSlots) {
             Slot slot = nr.slot;
@@ -9222,6 +9303,7 @@ void MainWindow::buildMenuBar()
             Longpath::NrSlot::NR2,  Longpath::NrSlot::NR3,
             Longpath::NrSlot::NR4,  Longpath::NrSlot::DFNR,
             Longpath::NrSlot::MNR,  Longpath::NrSlot::BNR,
+            Longpath::NrSlot::NNR,
         };
         auto syncNr = [this, nrOrder](Longpath::NrSlot slot) {
             QList<QAction*> acts = m_nrGroup->actions();
@@ -9353,12 +9435,12 @@ void MainWindow::buildMenuBar()
     // =========================================================================
     QMenu* modeMenu = menuBar()->addMenu(QStringLiteral("&Mode"));
 
-    // 12 Thetis-faithful modes + the NereusSDR-native RADE-U / RADE-L
+    // 12 Thetis-faithful modes + the Longpath-native RADE-U / RADE-L
     // entries (Phase 3R L3).  Display order: LSB, USB, DSB, CWL, CWU,
     // AM, SAM, FM, DIGL, DIGU, DRM, SPEC, RADE-U, RADE-L.  Maps to
     // DSPMode enum values from WdspTypes.h.
     // From Thetis dsp.cs DSPMode enum — enum values used directly, not indices.
-    // RADE-U / RADE-L are NereusSDR-native entries (DSPMode::RADE_U = 12,
+    // RADE-U / RADE-L are Longpath-native entries (DSPMode::RADE_U = 12,
     // DSPMode::RADE_L = 13; not WDSP modes; routes the slice through
     // RadeChannel).  Like USB/LSB, RADE has upper/lower sideband
     // variants with mirrored 1700 Hz passbands.
@@ -9906,7 +9988,7 @@ void MainWindow::buildMenuBar()
         gettingStartedAction->setToolTip(QStringLiteral("NYI — Phase X"));
     }
     {
-        QAction* helpAction = helpMenu->addAction(QStringLiteral("&NereusSDR Help"));
+        QAction* helpAction = helpMenu->addAction(QStringLiteral("&Longpath Help"));
         helpAction->setEnabled(false);
         helpAction->setToolTip(QStringLiteral("NYI — Phase X"));
     }
@@ -9934,7 +10016,7 @@ void MainWindow::buildMenuBar()
     helpMenu->addSeparator();
 #endif
 
-    helpMenu->addAction(QStringLiteral("&About NereusSDR"), this, [this]() {
+    helpMenu->addAction(QStringLiteral("&About Longpath"), this, [this]() {
         AboutDialog dlg(this);
         dlg.exec();
     });
@@ -10435,7 +10517,7 @@ void MainWindow::buildStatusBar()
     //
     // Phase 3M-4 bench-fix: visibility is gated on
     //   caps.hasPureSignal && pureSignal->isAutoCalEnabled()
-    // (NereusSDR-specific UX: hide the banner unless the user has
+    // (Longpath-specific UX: hide the banner unless the user has
     // explicitly armed PS-A; reduces clutter for non-PS workflows on
     // PS-capable boards).  updatePsaIndicatorVisibility() centralises the
     // condition; called from autoCalEnabledChanged + connection-state +
@@ -10485,7 +10567,7 @@ void MainWindow::buildStatusBar()
     hbox->addStretch(1);
 
     // ── Center section: STATION — radio-name anchor (Sub-PR-7 G.1) ───────────
-    // The old cyan "STATION: NereusSDR" box is replaced by a StationBlock that
+    // The old cyan "STATION: Longpath" box is replaced by a StationBlock that
     // shows the connected radio's name. Click → opens ConnectionPanel. Right-
     // click → Disconnect / Edit radio… / Forget radio. Disconnected appearance:
     // dashed-red border + italic "Click to connect" placeholder.
@@ -10958,7 +11040,7 @@ void MainWindow::buildStatusBar()
     // The alarm gets a slot sized to its own content, not to its
     // neighbours. PA and TX stay narrow and learnable by position.
     addSlot(m_adcOvlBadge, kOverloadSlotWidthPx);
-    addSlot(m_txStatusBadge);
+    addSlot(m_txStatusBadge, kTxSlotWidthPx);
     hbox->addWidget(m_safetyGroup);
 
     // Wire TX badge to MoxController. MoxController lives on m_radioModel;
@@ -11107,6 +11189,7 @@ void MainWindow::buildStatusBar()
     for (QWidget* w : {static_cast<QWidget*>(bar.bandStackLabel),
                        static_cast<QWidget*>(bar.panButton),
                        static_cast<QWidget*>(bar.chain0),
+                       static_cast<QWidget*>(bar.chain1),   // folgt CH 0, siehe updateChain1Visibility
                        static_cast<QWidget*>(bar.rxDashRow)}) {
         if (w) { m_chromeBar->setItemAvailable(w, false); }
     }
@@ -11576,6 +11659,21 @@ void MainWindow::setVoltsAmpsVisible(bool visible)
 void MainWindow::wireSetupDialog(SetupDialog* dialog)
 {
     if (!dialog) { return; }
+
+    // ── Vor die schwebenden Fenster, nicht dahinter ──────────────────
+    //
+    // Der Betreiber am 2026-09-17: "ich wollte auf settings gehen,
+    // fenster öffnet sich jedoch im hintergrund." Dieselbe Ursache wie
+    // beim Antennenfenster am 2026-09-01 (siehe dort): die schwebenden
+    // Werkzeugfenster (Panadapter, Rotor/Log, Bandfilter, Applets) sind
+    // Qt::Tool — auf macOS NSPanels auf einer HOEHEREN Ebene als ein
+    // gewoehnlicher QDialog; raise() hebt nur innerhalb der eigenen
+    // Ebene. Also dieselbe Ebene und dasselbe Space-Verhalten wie sie.
+    // Alle dreizehn Stellen, die einen SetupDialog anlegen, laufen
+    // durch diese Funktion — darum hier, nicht dreizehnmal.
+    dialog->setWindowFlag(Qt::Tool, true);
+    enableFullScreenAuxiliaryBehavior(dialog);
+
     if (m_txApplet) {
         connect(dialog, &SetupDialog::cfcDialogRequested,
                 m_txApplet, &TxApplet::requestOpenCfcDialog);
@@ -11731,6 +11829,25 @@ void MainWindow::rebindRttyRadeAvailability(SliceModel* slice)
     applyForMode(slice->dspMode());
 
     m_rttyRadeLinks << connect(slice, &SliceModel::dspModeChanged, this, applyForMode);
+}
+
+void MainWindow::rebindTunerAppletBand(SliceModel* slice)
+{
+    // Same idiom as rebindRttyRadeAvailability() just above, same bug
+    // class: wireSliceToSpectrum() used to wire this once, to whichever
+    // slice existed at slice-0-added time (Phase 3P-II review fix C1),
+    // never re-bound on a later active-slice change. Bench-found via
+    // code review 2026-09-13.
+    disconnect(m_tunerAppletBandConn);
+    m_tunerAppletBandConn = {};
+
+    if (!m_tunerApplet || !slice) { return; }
+
+    m_tunerAppletBandConn = connect(slice, &SliceModel::bandChanged,
+                                     m_tunerApplet, &TunerApplet::setBand);
+    // Seed with the slice's current band immediately -- bandChanged only
+    // fires on a later band crossing, not on this initial snapshot.
+    m_tunerApplet->setBand(bandFromFrequency(slice->frequency()));
 }
 
 void MainWindow::wireSliceToSpectrum()
@@ -12269,16 +12386,14 @@ void MainWindow::wireSliceToSpectrum()
         }
     });
 
-    // Phase 3P-II review fix C1: keep TunerApplet m_currentBand in sync so
-    // right-click Save/Recall/Clear actions always address the actual current
-    // (antenna, band) slot rather than the Band::Band20m default.
-    if (m_tunerApplet) {
-        connect(slice, &SliceModel::bandChanged,
-                m_tunerApplet, &TunerApplet::setBand);
-        // Seed with the slice's current band so the first context-menu open
-        // before any band crossing is already correct.
-        m_tunerApplet->setBand(bandFromFrequency(slice->frequency()));
-    }
+    // Phase 3P-II review fix C1 / 2026-09-13 code review fix: keep
+    // TunerApplet's band tracking in sync so right-click Save/Recall/Clear
+    // actions always address the actual active slice's (antenna, band)
+    // slot. Moved into rebindTunerAppletBand() -- called here for the
+    // first slice, and again by the activeSliceChanged handler whenever
+    // the active slice changes identity (this call site alone only ever
+    // wired slice 0, forever; see that method's doc comment).
+    rebindTunerAppletBand(slice);
 }
 
 // ── CPU usage source toggle ──────────────────────────────────────────────────
@@ -12990,7 +13105,7 @@ void MainWindow::showSupportDialog()
 //   psform.Show();
 //   psform.Focus();
 //
-// NereusSDR mirrors via raise()+activateWindow() instead of Focus().
+// Longpath mirrors via raise()+activateWindow() instead of Focus().
 void MainWindow::openPureSignalDialog()
 {
     if (!m_psForm) {
@@ -13946,10 +14061,10 @@ void MainWindow::openAntennaWindow()
 //   - MainWindow owns the ClientPuduMonitor;
 //   - the strip surface hosts two buttons and three state setters;
 //   - muteRxRequested gates the live RX feed for the whole
-//     record→auto-play cycle (NereusSDR's gate is
+//     record→auto-play cycle (Longpath's gate is
 //     AudioEngine::setRxMutedForMonitor — one call, idempotent);
 //   - recordingStopped auto-starts playback.
-// NereusSDR-specific: the capture feed. Upstream's engine pushes int16
+// Longpath-specific: the capture feed. Upstream's engine pushes int16
 // stereo 24 kHz from its client chain tail; here the TX worker's
 // post-strip tap delivers float mono 48 kHz, so the feed lambda
 // converts (average adjacent samples → 24 kHz, duplicate L=R) before
@@ -14217,7 +14332,7 @@ void MainWindow::openSpotHub()
                         panel->workSpot(dxCall);
                     }
                 });
-        // NereusSDR-native (2026-08-27, operator-requested follow-up):
+        // Longpath-native (2026-08-27, operator-requested follow-up):
         // Spot List right-click → "Take Spot: <call>". Same takeSpot()
         // path as the panadapter's spotLogRequested double-click above
         // -- prefills the panel for the operator to review and log
@@ -14235,7 +14350,7 @@ void MainWindow::openSpotHub()
         // pulls the new values back out and pushes them into the spot
         // overlay setters in one go. Mirrors AetherSDR's refreshSpots
         // lambda (src/models/RadioModel.cpp [@0cd4559]) but the
-        // NereusSDR shape lives on the widget so the test seam is local
+        // Longpath shape lives on the widget so the test seam is local
         // (see tst_spothub_display_knobs).
         connect(m_spotHubDialog.data(), &SpotHubDialog::settingsChanged,
                 this, [this] {
@@ -14363,8 +14478,8 @@ void MainWindow::openSpotHub()
                         // fields.  pskreporter.cpp:148-169 [@77e793a].
                         psk->setIdentity(
                             call, grid,
-                            QStringLiteral("NereusSDR ") +
-                                QStringLiteral(NEREUSSDR_VERSION));
+                            QStringLiteral("Longpath ") +
+                                QStringLiteral(LONGPATH_VERSION));
                         psk->setAutoSendIntervalSec(
                             PskReporterClient::kReportingIntervalSec);
                     });
@@ -15184,7 +15299,7 @@ void MainWindow::openConnectionPanelOnLaunch()
 // every launch regardless of whether the dialog shows, so uninstall +
 // reinstall of the same cable doesn't flag it as "new" forever.
 //
-// NereusSDR-original; no Thetis equivalent.
+// Longpath-original; no Thetis equivalent.
 void MainWindow::checkVaxFirstRun()
 {
     auto& s = AppSettings::instance();
@@ -15576,7 +15691,7 @@ void MainWindow::showFeatureRequestDialog()
     // Version check gate — warn if not on latest release before filing
     auto* nam = new QNetworkAccessManager(this);
     QNetworkRequest req(QUrl(QStringLiteral(
-        "https://api.github.com/repos/boydsoftprez/NereusSDR/releases/latest")));
+        "https://api.github.com/repos/oe5sos/Longpath/releases/latest")));
     req.setHeader(QNetworkRequest::UserAgentHeader, QStringLiteral("Longpath"));
     auto* reply = nam->get(req);
     connect(reply, &QNetworkReply::finished, this, [this, reply, nam] {
@@ -15617,13 +15732,13 @@ void MainWindow::showFeatureRequestDialogImpl()
     static const QString kPrompt = QStringLiteral(
         "IMPORTANT — before doing anything else, fetch the complete list of open\n"
         "issues by reading pages sequentially until you get fewer than 100 results:\n"
-        "  Page 1: https://github.com/boydsoftprez/NereusSDR/issues?state=open&per_page=100&page=1\n"
-        "  Page 2: https://github.com/boydsoftprez/NereusSDR/issues?state=open&per_page=100&page=2\n"
+        "  Page 1: https://github.com/oe5sos/Longpath/issues?state=open&per_page=100&page=1\n"
+        "  Page 2: https://github.com/oe5sos/Longpath/issues?state=open&per_page=100&page=2\n"
         "  ... continue until a page returns fewer than 100 issues.\n"
         "Do NOT rely on cached or training data for the issue list.\n\n"
         "Also fetch CLAUDE.md fresh (do not use cached versions):\n"
-        "  https://raw.githubusercontent.com/boydsoftprez/NereusSDR/main/CLAUDE.md\n\n"
-        "I want to report an issue or request a feature for NereusSDR, a cross-platform\n"
+        "  https://raw.githubusercontent.com/oe5sos/Longpath/main/CLAUDE.md\n\n"
+        "I want to report an issue or request a feature for Longpath, a cross-platform\n"
         "Qt6/C++20 SDR console for OpenHPSDR radios (ANAN, Hermes Lite 2, etc.). It uses\n"
         "the OpenHPSDR Protocol 1 and Protocol 2 over UDP, with client-side DSP via WDSP.\n\n"
         "DUPLICATE CHECK — this is mandatory. Search the fetched issue list for keywords\n"
@@ -15641,7 +15756,7 @@ void MainWindow::showFeatureRequestDialogImpl()
         "3. ## Why — what problem it solves\n"
         "4. ## How Other Clients Do It — how Thetis, PowerSDR, SparkSDR, etc. handle this\n"
         "5. ## Suggested Behavior — specific UX: what the user clicks, sees, what happens.\n"
-        "   Reference NereusSDR UI elements (AppletPanel, RxApplet, TxApplet, SetupDialog, etc.)\n"
+        "   Reference Longpath UI elements (AppletPanel, RxApplet, TxApplet, SetupDialog, etc.)\n"
         "6. ## Protocol Hints — relevant OpenHPSDR commands, or \"Unknown — needs research\"\n"
         "7. ## Acceptance Criteria — 3-5 bullet points defining done vs not-done\n\n"
         "FOR BUG REPORTS include:\n"
@@ -15741,7 +15856,7 @@ void MainWindow::showFeatureRequestDialogImpl()
         "QPushButton:hover { background: #4a7ba8; }")));
     connect(submitBtn, &QPushButton::clicked, dlg, [dlg] {
         QDesktopServices::openUrl(QUrl(QStringLiteral(
-            "https://github.com/boydsoftprez/NereusSDR/issues/new?template=feature_request.yml")));
+            "https://github.com/oe5sos/Longpath/issues/new?template=feature_request.yml")));
         QTimer::singleShot(500, dlg, &QDialog::close);
     });
     btnRow2->addWidget(submitBtn);
@@ -15769,7 +15884,7 @@ void MainWindow::showFeatureRequestDialogImpl()
              QLatin1String(Style::kButtonAltHover)));
     connect(bugBtn, &QPushButton::clicked, dlg, [dlg] {
         QDesktopServices::openUrl(QUrl(QStringLiteral(
-            "https://github.com/boydsoftprez/NereusSDR/issues/new?template=bug_report.yml")));
+            "https://github.com/oe5sos/Longpath/issues/new?template=bug_report.yml")));
         QTimer::singleShot(500, dlg, &QDialog::close);
     });
     btnRow2->addWidget(bugBtn);

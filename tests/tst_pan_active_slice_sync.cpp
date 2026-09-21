@@ -1,10 +1,10 @@
 // =================================================================
-// tests/tst_pan_active_slice_sync.cpp  (NereusSDR)
+// tests/tst_pan_active_slice_sync.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure. Nothing here
+// no-port-check: Longpath-original test infrastructure. Nothing here
 // is a port; the surfaces under test are fixed by
 // docs/architecture/2026-05-26-phase3f-multi-pan-multi-slice-design.md
-// §3 (Slice / Pan binding), which is a NereusSDR design document.
+// §3 (Slice / Pan binding), which is a Longpath design document.
 //
 // Bench report, two slices on one pan, 2026-07-28: "when I click to tune
 // it always tunes flag A, not the last selected."

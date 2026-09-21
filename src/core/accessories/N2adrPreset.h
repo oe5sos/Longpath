@@ -1,7 +1,7 @@
 #pragma once
 
 // =================================================================
-// src/core/accessories/N2adrPreset.h  (NereusSDR)
+// src/core/accessories/N2adrPreset.h  (Longpath)
 // =================================================================
 //
 // Ported from mi0bot-Thetis source:
@@ -17,7 +17,7 @@
 // upstream resyncs only touch one place.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-30 — Extracted from Hl2IoBoardTab.cpp:950-995 + RadioModel.cpp
 //                :1077-1111 to centralise the per-band write table.  Adds
 //                the 13 SWL bands × pin-7 RX entries (mi0bot setup.cs

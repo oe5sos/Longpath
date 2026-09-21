@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_spot_double_click.cpp  (NereusSDR)
+// tests/tst_spot_double_click.cpp  (Longpath)
 // =================================================================
 //
 // Doppelklick auf ein gespottetes Rufzeichen im Panadapter.
@@ -19,12 +19,12 @@
 // cty.dat; das steht in der Bank-Matrix.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-19 — Original fuer NereusSDR von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
 // =================================================================
 
-// no-port-check: NereusSDR-original test file.
+// no-port-check: Longpath-original test file.
 
 #include <QtTest>
 #include <QImage>

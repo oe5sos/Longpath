@@ -88,7 +88,7 @@ before plan-writing.
 `[@501e3f51]` for Thetis post-tag commits; `[@120188f]` for deskhpsdr
 post-tag; `[v2.10.3.13-beta2]` or `[@c26a8a4]` for mi0bot-Thetis. Verifier
 `scripts/verify-inline-tag-preservation.py` runs in pre-commit hook chain
-— `NEREUS_THETIS_DIR=/Users/j.j.boyd/Thetis` must be set in shell before
+— `LONGPATH_THETIS_DIR=/Users/j.j.boyd/Thetis` must be set in shell before
 each commit.
 
 **Bench-test gate:** Manual matrix rows are NOT blocking PR open (3M-1c

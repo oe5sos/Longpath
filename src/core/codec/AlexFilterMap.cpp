@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/codec/AlexFilterMap.cpp  (NereusSDR)
+// src/core/codec/AlexFilterMap.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -8,7 +8,7 @@
 //   original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-20 — Lifted from P2RadioConnection::computeAlexHpf/Lpf
 //                (which had ported the same console.cs logic) into a
 //                shared header so P1RadioConnection can call it too.
@@ -155,13 +155,13 @@ quint8 computeBpf1(double freqMhz)
 //         }
 //     }
 //
-// Board coverage note (NereusSDR divergence, deliberate):
-//   Thetis names OrionMKII / Saturn / HermesC10.  NereusSDR additionally
+// Board coverage note (Longpath divergence, deliberate):
+//   Thetis names OrionMKII / Saturn / HermesC10.  Longpath additionally
 //   routes SaturnMKII here.  Thetis carries SaturnMKII as an enum slot only:
 //   enums.cs:399 [v2.10.3.15] "SaturnMKII = 11,  // ANAN-G2: MKII board?" and
 //   ChannelMaster/network.h:424 [v2.10.3.15] are its ONLY two occurrences in
 //   the entire upstream tree, with no behaviour attached anywhere.  It is an
-//   ANAN-G2 board revision (NereusSDR maps it to HPSDRModel::ANAN_G2 at
+//   ANAN-G2 board revision (Longpath maps it to HPSDRModel::ANAN_G2 at
 //   P2RadioConnection.h:825), so it physically carries the G2 band-pass bank;
 //   routing it to the legacy high-pass ladder would reintroduce the very
 //   defect this function exists to fix.  SettingsHygiene.cpp already

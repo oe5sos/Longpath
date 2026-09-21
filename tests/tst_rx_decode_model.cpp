@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 //
-// NereusSDR - tst_rx_decode_model: bounded ring buffer of local decodes
+// Longpath - tst_rx_decode_model: bounded ring buffer of local decodes
 // from MY radio's receivers (rade_text + WSJT-X UDP).
 //
-// NEW NereusSDR-native model. No upstream equivalent. Test fixtures
+// NEW Longpath-native model. No upstream equivalent. Test fixtures
 // reference plausible callsigns and SNRs as fixtures (no DXCC entity
 // porting required).
 

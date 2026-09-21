@@ -1,6 +1,6 @@
 // no-port-check: test-only. Thetis file names appear only in source-cite
 // comments that document which upstream line each assertion verifies.
-// No Thetis logic is ported here; this file is NereusSDR-original.
+// No Thetis logic is ported here; this file is Longpath-original.
 //
 // =================================================================
 // Which frequency selects the Protocol 1 Alex low-pass (bank 10 C4).
@@ -300,7 +300,7 @@ private slots:
     // ── The HL2 path composes through its own codec ─────────────────────
     //
     // mi0bot's HL2 loop emits the same prbpfilter struct
-    // (networkproto1.c:1085-1088 [v2.10.3.14-beta1]), and NereusSDR routes
+    // (networkproto1.c:1085-1088 [v2.10.3.14-beta1]), and Longpath routes
     // the HL2 through P1CodecHl2 rather than P1CodecStandard, so the byte
     // has to be right on both composition paths.
     void hl2Codec_alsoSwapsTheByteOnTheMoxEdge()
@@ -439,7 +439,7 @@ private slots:
         QTest::newRow("Saturn")           << int(HPSDRHW::Saturn)     << true;
         // true:  inherited from the ANAN-G2 board revision it describes.
         QTest::newRow("SaturnMKII")       << int(HPSDRHW::SaturnMKII) << true;
-        // true:  derived from kSaturn; NereusSDR judgement, no upstream row.
+        // true:  derived from kSaturn; Longpath judgement, no upstream row.
         QTest::newRow("Andromeda")        << int(HPSDRHW::Andromeda)  << true;
     }
 

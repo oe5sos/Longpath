@@ -1,8 +1,8 @@
 // =================================================================
-// src/core/TxInterlockPolicy.h  (NereusSDR)
+// src/core/TxInterlockPolicy.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-native operator-toggled policy that gates TX based on PGXL
+// Longpath-native operator-toggled policy that gates TX based on PGXL
 // amplifier state. Hooked into MoxController::onTxRequested.
 //
 // Three modes:

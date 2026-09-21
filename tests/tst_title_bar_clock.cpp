@@ -1,6 +1,6 @@
-// no-port-check: NereusSDR-original. No upstream port.
+// no-port-check: Longpath-original. No upstream port.
 // =================================================================
-// tests/tst_title_bar_clock.cpp  (NereusSDR)
+// tests/tst_title_bar_clock.cpp  (Longpath)
 // =================================================================
 //
 // Task A7 (bottom-banner cleanup): TitleBar::utcText() smoke tests.

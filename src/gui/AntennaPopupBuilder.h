@@ -1,15 +1,15 @@
 // =================================================================
-// src/gui/AntennaPopupBuilder.h  (NereusSDR)
+// src/gui/AntennaPopupBuilder.h  (Longpath)
 // =================================================================
 //
-// no-port-check: NereusSDR-original file. Consolidates capability-gated
+// no-port-check: Longpath-original file. Consolidates capability-gated
 // antenna popup menu construction. Logic derived from existing per-widget
 // ad-hoc constructors in VfoWidget.cpp and RxApplet.cpp; no direct Thetis
 // port. BoardCapabilities and SkuUiProfile flags come from Thetis ports in
 // their respective files.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-02 — Written for NereusSDR by J.J. Boyd (KG4VCF), with
 //                AI-assisted implementation via Anthropic Claude Code.
 //                Per docs/superpowers/plans/2026-05-01-ui-polish-cross-surface.md §B3.

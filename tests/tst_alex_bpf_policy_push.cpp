@@ -1,7 +1,7 @@
 // =================================================================
-// tests/tst_alex_bpf_policy_push.cpp  (NereusSDR)
+// tests/tst_alex_bpf_policy_push.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure. Expected wire
+// no-port-check: Longpath-original test infrastructure. Expected wire
 // values are cited to Thetis in comments, but nothing here is a port.
 //
 // Phase 3F: an effective-BPF change must reach the wire on its OWN

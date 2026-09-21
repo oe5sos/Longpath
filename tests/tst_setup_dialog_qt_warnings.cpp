@@ -1,4 +1,4 @@
-// tests/tst_setup_dialog_qt_warnings.cpp  (NereusSDR)
+// tests/tst_setup_dialog_qt_warnings.cpp  (Longpath)
 //
 // Regression test for #272 — the May 16 W4ORS BSOD report flagged two Qt
 // runtime warnings firing during SetupDialog construction:
@@ -17,7 +17,7 @@
 // SetupDialog-construction-time freeze investigation, so closing them out
 // makes future repro logs easier to read.
 //
-// no-port-check: this is a NereusSDR-original UI test fixture; the cited
+// no-port-check: this is a Longpath-original UI test fixture; the cited
 // Thetis files are referenced in the production source comments and not
 // here.
 //

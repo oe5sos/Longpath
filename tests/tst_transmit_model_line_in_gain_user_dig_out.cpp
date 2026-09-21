@@ -1,8 +1,8 @@
-// no-port-check: NereusSDR-original unit-test file.  The Thetis source
+// no-port-check: Longpath-original unit-test file.  The Thetis source
 // citations below are cite comments documenting which upstream lines each
 // assertion verifies; no Thetis logic is ported in this test file.
 // =================================================================
-// tests/tst_transmit_model_line_in_gain_user_dig_out.cpp  (NereusSDR)
+// tests/tst_transmit_model_line_in_gain_user_dig_out.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for TransmitModel::lineInGain + userDigOut Q_PROPERTYs (Task 2.4

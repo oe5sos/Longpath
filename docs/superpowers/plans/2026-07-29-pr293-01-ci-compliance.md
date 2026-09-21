@@ -67,10 +67,10 @@ Keep `PR293_PIN_ROOT` available for every compliance command in this plan and Pl
 - [ ] **Step 1: Run the exact inline-tag checker against the pinned trees**
 
 ```bash
-NEREUS_THETIS_DIR="$PR293_PIN_ROOT/Thetis" \
-NEREUS_MI0BOT_DIR="$PR293_PIN_ROOT/mi0bot-Thetis" \
-NEREUS_DESKHPSDR_DIR=/Users/j.j.boyd/deskhpsdr \
-NEREUS_FREEDV_DIR="$PR293_PIN_ROOT/freedv-gui" \
+LONGPATH_THETIS_DIR="$PR293_PIN_ROOT/Thetis" \
+LONGPATH_MI0BOT_DIR="$PR293_PIN_ROOT/mi0bot-Thetis" \
+LONGPATH_DESKHPSDR_DIR=/Users/j.j.boyd/deskhpsdr \
+LONGPATH_FREEDV_DIR="$PR293_PIN_ROOT/freedv-gui" \
 python3 scripts/verify-inline-tag-preservation.py
 ```
 
@@ -79,10 +79,10 @@ Expected before repair: non-zero exit with confirmed missing-tag findings. Save 
 - [ ] **Step 2: Run every repository provenance hook against the same pins**
 
 ```bash
-NEREUS_THETIS_DIR="$PR293_PIN_ROOT/Thetis" \
-NEREUS_MI0BOT_DIR="$PR293_PIN_ROOT/mi0bot-Thetis" \
-NEREUS_DESKHPSDR_DIR=/Users/j.j.boyd/deskhpsdr \
-NEREUS_FREEDV_DIR="$PR293_PIN_ROOT/freedv-gui" \
+LONGPATH_THETIS_DIR="$PR293_PIN_ROOT/Thetis" \
+LONGPATH_MI0BOT_DIR="$PR293_PIN_ROOT/mi0bot-Thetis" \
+LONGPATH_DESKHPSDR_DIR=/Users/j.j.boyd/deskhpsdr \
+LONGPATH_FREEDV_DIR="$PR293_PIN_ROOT/freedv-gui" \
 pre-commit run --all-files
 ```
 
@@ -108,10 +108,10 @@ Apply comment-only edits to the confirmed files. Preserve existing line citation
 - [ ] **Step 3: Prove the inline-tag checker is green**
 
 ```bash
-NEREUS_THETIS_DIR="$PR293_PIN_ROOT/Thetis" \
-NEREUS_MI0BOT_DIR="$PR293_PIN_ROOT/mi0bot-Thetis" \
-NEREUS_DESKHPSDR_DIR=/Users/j.j.boyd/deskhpsdr \
-NEREUS_FREEDV_DIR="$PR293_PIN_ROOT/freedv-gui" \
+LONGPATH_THETIS_DIR="$PR293_PIN_ROOT/Thetis" \
+LONGPATH_MI0BOT_DIR="$PR293_PIN_ROOT/mi0bot-Thetis" \
+LONGPATH_DESKHPSDR_DIR=/Users/j.j.boyd/deskhpsdr \
+LONGPATH_FREEDV_DIR="$PR293_PIN_ROOT/freedv-gui" \
 python3 scripts/verify-inline-tag-preservation.py
 ```
 
@@ -152,10 +152,10 @@ Expected: both targets build successfully.
 - [ ] **Step 1: Run the complete pinned pre-commit suite**
 
 ```bash
-NEREUS_THETIS_DIR="$PR293_PIN_ROOT/Thetis" \
-NEREUS_MI0BOT_DIR="$PR293_PIN_ROOT/mi0bot-Thetis" \
-NEREUS_DESKHPSDR_DIR=/Users/j.j.boyd/deskhpsdr \
-NEREUS_FREEDV_DIR="$PR293_PIN_ROOT/freedv-gui" \
+LONGPATH_THETIS_DIR="$PR293_PIN_ROOT/Thetis" \
+LONGPATH_MI0BOT_DIR="$PR293_PIN_ROOT/mi0bot-Thetis" \
+LONGPATH_DESKHPSDR_DIR=/Users/j.j.boyd/deskhpsdr \
+LONGPATH_FREEDV_DIR="$PR293_PIN_ROOT/freedv-gui" \
 pre-commit run --all-files
 ```
 
@@ -174,10 +174,10 @@ git diff -- src/gui/MainWindow.cpp src/models/RadioModel.cpp src/core/RadioConne
 git add src/gui/MainWindow.cpp src/models/RadioModel.cpp src/core/RadioConnection.h \
   src/core/P2RadioConnection.cpp src/core/codec tests/tst_alex_per_adc_bpf_wire.cpp \
   tests/tst_codec_5_slice_assignment.cpp
-NEREUS_THETIS_DIR="$PR293_PIN_ROOT/Thetis" \
-NEREUS_MI0BOT_DIR="$PR293_PIN_ROOT/mi0bot-Thetis" \
-NEREUS_DESKHPSDR_DIR=/Users/j.j.boyd/deskhpsdr \
-NEREUS_FREEDV_DIR="$PR293_PIN_ROOT/freedv-gui" \
+LONGPATH_THETIS_DIR="$PR293_PIN_ROOT/Thetis" \
+LONGPATH_MI0BOT_DIR="$PR293_PIN_ROOT/mi0bot-Thetis" \
+LONGPATH_DESKHPSDR_DIR=/Users/j.j.boyd/deskhpsdr \
+LONGPATH_FREEDV_DIR="$PR293_PIN_ROOT/freedv-gui" \
 git commit -S -m "fix(compliance): preserve pinned upstream provenance"
 git log --show-signature -1
 ```

@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_audio_engine_reset_audio_settings.cpp  (NereusSDR)
+// tests/tst_audio_engine_reset_audio_settings.cpp  (Longpath)
 // =================================================================
 //
 // Exercises AudioEngine::resetAudioSettings() — Sub-Phase 12 Task 12.4.
@@ -11,7 +11,7 @@
 // Also verifies signal emission: speakersConfigChanged, vaxConfigChanged
 // (channels 1–4), and audioSettingsReset.
 //
-// Uses NEREUS_BUILD_TESTS seam for fake bus injection so the test
+// Uses LONGPATH_BUILD_TESTS seam for fake bus injection so the test
 // does not require a real PortAudio or CoreAudio backend.
 //
 // Cross-platform. No radioModel required (AudioEngine standalone

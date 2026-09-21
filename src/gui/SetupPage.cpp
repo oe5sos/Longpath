@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/SetupPage.cpp  (NereusSDR)
+// src/gui/SetupPage.cpp  (Longpath)
 // =================================================================
 //
 // Source attribution (AetherSDR — GPLv3):
@@ -10,10 +10,10 @@
 //
 //   This file is a port or structural derivative of AetherSDR source.
 //   AetherSDR is licensed under the GNU General Public License v3.
-//   NereusSDR is also GPLv3. Attribution follows GPLv3 §5 requirements.
+//   Longpath is also GPLv3. Attribution follows GPLv3 §5 requirements.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-16 — Ported/adapted in C++20/Qt6 for NereusSDR by
 //                 J.J. Boyd (KG4VCF), with AI-assisted transformation
 //                 via Anthropic Claude Code.
@@ -31,11 +31,7 @@
 namespace Longpath {
 
 // Shared style strings — mirror AetherSDR RadioSetupDialog constants
-static const QString kGroupStyle =
-    "QGroupBox { border: 1px solid #304050; border-radius: 6px; "
-    "margin-top: 8px; padding-top: 12px; font-weight: bold; color: #8aa8c0; }"
-    "QGroupBox::title { subcontrol-origin: margin; left: 10px; "
-    "padding: 0 4px; }";
+static const QString kGroupStyle = QLatin1String(Style::kGroupBoxStyle);   // Hausplatte (2026-09-18)
 
 static const QString kLabelStyle =
     "QLabel { color: #c8d8e8; font-size: 13px; }";
@@ -174,11 +170,13 @@ QPushButton* SetupPage::addLabeledButton(const QString& label, const QString& bu
 {
     auto* btn = new QPushButton(buttonText);
     btn->setAutoDefault(false);
-    QLayout* target = m_activeSectionLayout ? m_activeSectionLayout : m_contentLayout;
-    addLabeledToggle(target, label, btn);  // reuse row layout
-    // Re-style as a plain button (not a toggle)
-    btn->setCheckable(false);
     btn->setStyleSheet(Style::kButtonStyle);
+    btn->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    QLayout* target = m_activeSectionLayout ? m_activeSectionLayout : m_contentLayout;
+    // Eigene Zeile, nicht ueber addLabeledToggle: der setzt seit dem
+    // 2026-09-18 ON/OFF als Text und haette "Regenerate" ueberschrieben.
+    auto* row = makeLabeledRow(target, label, btn);
+    row->addStretch(1);
     return btn;
 }
 
@@ -208,7 +206,11 @@ QHBoxLayout* SetupPage::makeLabeledRow(QLayout* parent, const QString& labelText
 
     auto* label = new QLabel(labelText);
     label->setStyleSheet(kLabelStyle);
-    label->setFixedWidth(150);
+    // 150 px schnitten "Restore last frequency on connect" ab (Blatt
+    // 2026-09-18); breiter und mit Umbruch, damit die Spalte der
+    // Bedienelemente auf jeder Seite an derselben Stelle beginnt.
+    label->setFixedWidth(210);
+    label->setWordWrap(true);
     row->addWidget(label);
     row->addWidget(control, 1);
 
@@ -259,13 +261,24 @@ QHBoxLayout* SetupPage::addLabeledSlider(QLayout* parent, const QString& label,
 QHBoxLayout* SetupPage::addLabeledToggle(QLayout* parent, const QString& label, QPushButton* toggle)
 {
     toggle->setCheckable(true);
-    toggle->setStyleSheet(Style::themed(
-        "QPushButton { background: #1a2a3a; border: 1px solid #304050; "
-        "border-radius: 6px; color: #c8d8e8; font-size: 11px; font-weight: bold; "
-        "padding: 3px 10px; }"
-        "QPushButton:checked { background: #2c5c44; color: #6fa384; "
-        "border: 1px solid #20a040; }"));
-    return makeLabeledRow(parent, label, toggle);
+    // Ein Schalter sagt, was er ist (2026-09-18): bis dahin ein textloser
+    // Knopf ueber die ganze Zeile, an/aus nur an der Farbe erkennbar.
+    // Jetzt "ON"/"OFF", schmal, leise eingerastet wie die Zustands-
+    // schalter im TX-Feld (quietCheckedStyle) — kein Gruen, Farbe ist
+    // im Haus fuer Messwerte und die Sendetaste reserviert.
+    toggle->setStyleSheet(QLatin1String(Style::kButtonStyle)
+                          + QStringLiteral("QPushButton { font-size: 11px; font-weight: bold;"
+                                           " padding: 3px 10px; min-width: 44px; }")
+                          + Style::quietCheckedStyle());
+    toggle->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    auto relabel = [toggle](bool on) {
+        toggle->setText(on ? QStringLiteral("ON") : QStringLiteral("OFF"));
+    };
+    relabel(toggle->isChecked());
+    QObject::connect(toggle, &QPushButton::toggled, toggle, relabel);
+    auto* row = makeLabeledRow(parent, label, toggle);
+    row->addStretch(1);
+    return row;
 }
 
 QHBoxLayout* SetupPage::addLabeledSpinner(QLayout* parent, const QString& label, QSpinBox* spinner)

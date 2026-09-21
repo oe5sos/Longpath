@@ -1,8 +1,8 @@
 // =================================================================
-// tests/tst_radio_model_hl2_temp_routing.cpp  (NereusSDR)
+// tests/tst_radio_model_hl2_temp_routing.cpp  (Longpath)
 // =================================================================
 //
-// no-port-check: NereusSDR-original test file.  The Thetis citation
+// no-port-check: Longpath-original test file.  The Thetis citation
 // below documents which upstream behaviour is exercised; no C# is
 // translated in this file.  The math kernel under test
 // (Longpath::scaleHermesLiteTempCelsius) is registered in
@@ -102,7 +102,7 @@ private slots:
     // ── 3. Non-HL2 board applies Thetis OrionMKII piecewise curve ───────────
     // Saturn (ANAN_G2 family) routes raw exciter ADC counts through
     // scaleExciterPowerMw() → computeOrionMkIIExciterPower(), NOT a raw
-    // passthrough.  The pre-F1 NereusSDR behaviour of publishing raw counts
+    // passthrough.  The pre-F1 Longpath behaviour of publishing raw counts
     // as milliwatts was a bug; Thetis ALWAYS scales through the piecewise
     // curve for the ANAN_G2 / OrionMKII family.
     //

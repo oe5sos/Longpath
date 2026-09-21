@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/applets/VaxApplet.cpp  (NereusSDR)
+// src/gui/applets/VaxApplet.cpp  (Longpath)
 // =================================================================
 //
 // Ported from AetherSDR source:
@@ -8,12 +8,12 @@
 //
 // AetherSDR is licensed under the GNU General Public License v3; see
 // https://github.com/ten9876/AetherSDR for the contributor list and
-// project-level LICENSE. NereusSDR is also GPLv3. AetherSDR source
+// project-level LICENSE. Longpath is also GPLv3. AetherSDR source
 // files carry no per-file GPL header; attribution is at project level
 // per AetherSDR convention.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-20 — Ported/adapted in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via
 //                 Anthropic Claude Code. Phase 3O Sub-Phase 9 Task 9.2b.
@@ -79,7 +79,7 @@ static inline QString vaxButtonStyle()
 }
 
 // Slice letters A..H by sliceId — matches AetherSDR DaxApplet.cpp:159.
-// NereusSDR tops out at 8 slices (same as AetherSDR) so a static 8-char
+// Longpath tops out at 8 slices (same as AetherSDR) so a static 8-char
 // array suffices.
 constexpr char kSliceLetters[] = "ABCDEFGH";
 
@@ -307,8 +307,8 @@ void VaxApplet::connectSliceTagsTracking()
     // Wire new slices as they come online. RadioModel::sliceAdded carries
     // the new slice's index; dereference through slices() to get the pointer.
     // Differs from AetherSDR DaxApplet.cpp:150 (which receives the SliceModel*
-    // directly) because NereusSDR's RadioModel::sliceAdded(int) surface
-    // (confirmed in RadioModel.h) matches the NereusSDR signal convention.
+    // directly) because Longpath's RadioModel::sliceAdded(int) surface
+    // (confirmed in RadioModel.h) matches the Longpath signal convention.
     //
     // Lifetime: connections to individual SliceModel instances via
     // Qt::AutoConnection are auto-severed when the SliceModel is destroyed
@@ -369,7 +369,7 @@ void VaxApplet::updateTagsLabels()
             continue;
         }
         // Use sliceIndex() as the letter source; AetherSDR uses sliceId()
-        // which is the same concept in NereusSDR (0-based per-radio index).
+        // which is the same concept in Longpath (0-based per-radio index).
         const int idx = s->sliceIndex();
         if (idx < 0 || idx >= kMaxLetterIndex) {
             continue;
@@ -424,7 +424,7 @@ QString VaxApplet::deviceLabelFor(int channel) const
 #else
     // macOS CoreAudioHalBus + Linux LinuxPipeBus register the virtual
     // device under this exact name — see AudioEngine::makeVaxBus.
-    return QStringLiteral("NereusSDR VAX %1").arg(channel);
+    return QStringLiteral("Longpath VAX %1").arg(channel);
 #endif
 }
 

@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/NbFamily.h  (NereusSDR)
+// src/core/NbFamily.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -10,7 +10,7 @@
 //   Project Files/Source/wdsp/nob.h, nobII.h, snb.h (Warren Pratt, NR0V)
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-22 — New NereusSDR facade class for the NB / NB2 / SNB
 //                family. The WDSP C functions it wraps retain their
 //                Warren Pratt / Richard Samphire copyrights verbatim
@@ -253,7 +253,7 @@ public:
     // of Thetis cmaster.c:464-470 SetXcmInrate [v2.10.3.13] case 0 receiver:
     //   SetRCVRANBBuffsize / SetRCVRANBSamplerate / SetRCVRNOBBuffsize /
     //   SetRCVRNOBSamplerate.
-    // NereusSDR created NB via create_anbEXT/create_nobEXT so the matching
+    // Longpath created NB via create_anbEXT/create_nobEXT so the matching
     // EXT-keyed setters are equivalent (nob.c:249 vs nob.c:366 both do
     // a->samplerate=rate; initBlanker(a); — identical bodies).
     // Without this propagation, NB stays configured for the original rate

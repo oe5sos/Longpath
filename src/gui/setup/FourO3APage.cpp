@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/setup/FourO3APage.cpp  (NereusSDR)
+// src/gui/setup/FourO3APage.cpp  (Longpath)
 // =================================================================
 //
 // See FourO3APage.h for the design overview.  Implementation notes:
@@ -18,7 +18,7 @@
 //     unchanged.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-21 -- Created in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted implementation via
 //                 Anthropic Claude Code.
@@ -26,6 +26,7 @@
 
 #include "FourO3APage.h"
 #include "gui/styles/ThemeQss.h"
+#include "gui/StyleConstants.h"
 
 #include "CatNetworkSetupPages.h"   // PeripheralsPage
 #include "PgxlInterlockPage.h"
@@ -74,7 +75,7 @@ FourO3APage::FourO3APage(RadioModel* model, QWidget* parent)
     // 2026-05-22 menu cleanup: Diagnostics tab removed. Connection
     // State duplicated the General tab's FlexAPI status row and the
     // per-peer labels on PGXL/TGXL tabs; Disconnect/Reconnect Log
-    // duplicated the rolling NereusSDR log file. Both removed for
+    // duplicated the rolling Longpath log file. Both removed for
     // bench-driven simplification (operator can read the log file or
     // PGXL/TGXL detail tabs for the same data).
 
@@ -128,7 +129,7 @@ QWidget* FourO3APage::buildGeneralTab()
     m_masterToggle->setToolTip(
         tr("Gates the FlexAPI listener on TCP 4992 and the PGXL / TGXL "
            "auto-connect paths.  Off by default; turn on only when you "
-           "want NereusSDR to expose itself to 4O3A amps and tuners on "
+           "want Longpath to expose itself to 4O3A amps and tuners on "
            "your local network."));
     m_masterToggle->setChecked(m_model && m_model->fourO3AEnabled());
     connect(m_masterToggle, &QCheckBox::toggled,
@@ -263,7 +264,7 @@ void FourO3APage::refreshFlexApiStatus()
         m_flexApiStatusLabel->setText(
             tr("Status: \xE2\x97\x8F Listening on TCP 4992"));
         m_flexApiStatusLabel->setStyleSheet(
-            QStringLiteral("color: #4CAF50;"));  // green
+            QStringLiteral("color: %1;").arg(QLatin1String(Style::kGreenText)));  // green
     } else {
         const bool gateOn = m_model && m_model->fourO3AEnabled();
         if (gateOn) {
@@ -272,7 +273,7 @@ void FourO3APage::refreshFlexApiStatus()
             m_flexApiStatusLabel->setText(
                 tr("Status: \xE2\x97\x8F TCP 4992 bind failed"));
             m_flexApiStatusLabel->setStyleSheet(Style::themed(
-                QStringLiteral("color: #cc2222;")));  // red
+                QStringLiteral("color: %1;").arg(QLatin1String(Style::kTxRed))));  // red
         } else {
             m_flexApiStatusLabel->setText(
                 tr("Status: \xE2\x97\x8B Disabled "

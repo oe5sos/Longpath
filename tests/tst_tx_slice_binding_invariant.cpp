@@ -1,7 +1,7 @@
 // =================================================================
-// tests/tst_tx_slice_binding_invariant.cpp  (NereusSDR)
+// tests/tst_tx_slice_binding_invariant.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure. Thetis has no
+// no-port-check: Longpath-original test infrastructure. Thetis has no
 // N-slice arbiter (it has a fixed VFO A / VFO B transmit model), so the
 // behaviour asserted here is governed by
 // docs/architecture/2026-05-26-phase3f-multi-pan-multi-slice-design.md §6

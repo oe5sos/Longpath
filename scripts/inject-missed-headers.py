@@ -55,7 +55,7 @@ def make_header(filename, sources, contributors, has_samphire):
         f"{GPL_BLOCK}\n"
         f"//{samphire_section}\n"
         f"// =================================================================\n"
-        f"// Modification history (NereusSDR):\n"
+        f"// Modification history (Longpath):\n"
         f"//   {PORT_DATE} — Synthesized in C++20/Qt6 for NereusSDR by J.J. Boyd\n"
         f"//                 (KG4VCF), with AI-assisted transformation via Anthropic\n"
         f"//                 Claude Code. Combines logic from the Thetis sources\n"

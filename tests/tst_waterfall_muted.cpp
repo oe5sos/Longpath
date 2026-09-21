@@ -1,6 +1,6 @@
-// tests/tst_waterfall_muted.cpp  (NereusSDR)
+// tests/tst_waterfall_muted.cpp  (Longpath)
 //
-// NereusSDR-original. No Thetis port.
+// Longpath-original. No Thetis port.
 //
 // ── Die groesste Farbflaeche im Programm ─────────────────────────────
 //

@@ -54,7 +54,7 @@ boydsoftprez@gmail.com
 // real `Project Files/Source/ChannelMaster/txgain.c` byte-for-byte port.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-03 — NereusSDR-original glue stub created by J.J. Boyd
 //                 (KG4VCF) during issue #167 Phase 1 Agent 1C, with
 //                 AI-assisted implementation via Anthropic Claude Code.

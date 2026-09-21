@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_radio_model_spot_wiring.cpp  (NereusSDR)
+// tests/tst_radio_model_spot_wiring.cpp  (Longpath)
 // =================================================================
 //
 // Phase 3J-2 Task H2: verifies that RadioModel owns the seven spot
@@ -15,13 +15,13 @@
 // RadioModel constructor (no live radio required).
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-11 - Original implementation for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted authoring via Anthropic
 //                 Claude Code.
 // =================================================================
 
-// no-port-check: NereusSDR-original test file.
+// no-port-check: Longpath-original test file.
 
 #include <QtTest/QtTest>
 #include <QSignalSpy>
@@ -170,7 +170,7 @@ private slots:
 
         // WsjtxClient never emits a separate decodeReceived; the
         // single spotReceived signal also feeds the RxDecodeModel
-        // (NereusSDR design: WSJT-X data is "what my radio just
+        // (Longpath design: WSJT-X data is "what my radio just
         // heard"). The adapter slot pushes to both sinks.
         emit model.wsjtx()->spotReceived(
             makeSpot(QStringLiteral("WSJT-X"), QStringLiteral("VK6APH")));

@@ -175,10 +175,10 @@ git add src/core/Rf2ksConnection.* src/core/TciServer.cpp \
   tests/tst_rf2ks_connection_reconnect.cpp tests/tst_rf2ks_connection_poll.cpp \
   tests/tst_rf2ks_connection_control.cpp tests/tst_tci_init_burst_live_state.cpp \
   tests/tst_tci_dispatch_seam.cpp
-NEREUS_THETIS_DIR=/Users/j.j.boyd/Thetis \
-NEREUS_MI0BOT_DIR=/Users/j.j.boyd/mi0bot-Thetis \
-NEREUS_DESKHPSDR_DIR=/Users/j.j.boyd/deskhpsdr \
-NEREUS_FREEDV_DIR=/Users/j.j.boyd/freedv-gui \
+LONGPATH_THETIS_DIR=/Users/j.j.boyd/Thetis \
+LONGPATH_MI0BOT_DIR=/Users/j.j.boyd/mi0bot-Thetis \
+LONGPATH_DESKHPSDR_DIR=/Users/j.j.boyd/deskhpsdr \
+LONGPATH_FREEDV_DIR=/Users/j.j.boyd/freedv-gui \
 git commit -S -m "fix(integrations): harden RF2KS and TCI lifecycles"
 git log --show-signature -1
 ```
@@ -245,10 +245,10 @@ Expected: zero failures and zero "Not Run".
 - [ ] **Step 3: Run compliance against the exact CI pins from Plan 01**
 
 ```bash
-NEREUS_THETIS_DIR="$PR293_PIN_ROOT/Thetis" \
-NEREUS_MI0BOT_DIR="$PR293_PIN_ROOT/mi0bot-Thetis" \
-NEREUS_DESKHPSDR_DIR=/Users/j.j.boyd/deskhpsdr \
-NEREUS_FREEDV_DIR="$PR293_PIN_ROOT/freedv-gui" \
+LONGPATH_THETIS_DIR="$PR293_PIN_ROOT/Thetis" \
+LONGPATH_MI0BOT_DIR="$PR293_PIN_ROOT/mi0bot-Thetis" \
+LONGPATH_DESKHPSDR_DIR=/Users/j.j.boyd/deskhpsdr \
+LONGPATH_FREEDV_DIR="$PR293_PIN_ROOT/freedv-gui" \
 pre-commit run --all-files
 ```
 
@@ -262,7 +262,7 @@ Expected: every hook passes.
 PR293_SMOKE_BUILD="$(mktemp -d /tmp/nereus-pr293-smoke-build.XXXXXX)"
 cmake -S . -B "$PR293_SMOKE_BUILD" \
   -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-  -DNEREUS_BUILD_TESTS=OFF
+  -DLONGPATH_BUILD_TESTS=OFF
 ```
 
 - [ ] **Step 2: Build the application from scratch**

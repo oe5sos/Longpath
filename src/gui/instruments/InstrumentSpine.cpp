@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/instruments/InstrumentSpine.cpp  (NereusSDR)
+// src/gui/instruments/InstrumentSpine.cpp  (Longpath)
 // =================================================================
 // Siehe InstrumentSpine.h — die Geometrie zweimal, die Mittel einmal.
 //

@@ -1,7 +1,7 @@
 // =================================================================
-// tests/tst_slice_model_phase3f_properties.cpp  (NereusSDR)
+// tests/tst_slice_model_phase3f_properties.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure.
+// no-port-check: Longpath-original test infrastructure.
 //
 // Phase 3F Sub-Epic A Tasks 4-11: verify SliceModel gains 7 new
 // Q_PROPERTYs per
@@ -282,7 +282,7 @@ private slots:
     // Defaults are Thetis's, carried over from the global AppSettings keys
     // this page used to write: udDSPNB=30, udDSPNBTransition / Lead / Lag
     // =0.01 ms, comboDSPNOBmode=0, udDSPSNBThresh1=8.0, udDSPSNBThresh2=20.0
-    // (setup.designer.cs grpDSPNB + grpDSPSNB [v2.10.3.13]), and NereusSDR's
+    // (setup.designer.cs grpDSPNB + grpDSPSNB [v2.10.3.13]), and Longpath's
     // own 6000 Hz SNB output bandwidth.
     void nb_and_snb_tuning_defaults_match_thetis()
     {

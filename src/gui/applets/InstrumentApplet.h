@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/gui/applets/InstrumentApplet.h  (NereusSDR)
+// src/gui/applets/InstrumentApplet.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // ── Die Fassung um die beiden Instrumente ────────────────────────────
 //
@@ -34,7 +34,7 @@
 // jedes andere Messwerkzeug (ReadingSource → MeterBinding).
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-17 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

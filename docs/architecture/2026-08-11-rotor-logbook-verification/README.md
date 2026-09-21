@@ -82,7 +82,7 @@ logbook rows that need them.
    **RESOLVED same evening**: root cause was the dynamic-overlay
    texture being partial-uploaded after a recreate, drawing undefined
    Metal memory (magenta) OVER a healthy waterfall. Found via the
-   NEREUS_WF_DEBUG=2 green-fill discriminator; fixed with a one-shot
+   LONGPATH_WF_DEBUG=2 green-fill discriminator; fixed with a one-shot
    full upload after every texture (re)create
    (`m_ovDynNeedsFullUpload`). Bench-confirmed on the live app.
 2. **Spot menu → "Turn rotor" did nothing on pan-0** — root-caused and

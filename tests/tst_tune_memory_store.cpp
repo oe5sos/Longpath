@@ -1,10 +1,10 @@
 // =================================================================
-// tests/tst_tune_memory_store.cpp  (NereusSDR)
+// tests/tst_tune_memory_store.cpp  (Longpath)
 // =================================================================
-// NereusSDR-native test. No AetherSDR equivalent; TuneMemoryStore is a
-// NereusSDR-native class per design doc §4.8.
+// Longpath-native test. No AetherSDR equivalent; TuneMemoryStore is a
+// Longpath-native class per design doc §4.8.
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-19  Created by J.J. Boyd (KG4VCF), with AI-assisted
 //                 transformation via Anthropic Claude Code.
 //                 Tests: recallReturnsStoredValue, clearRemovesEntry,

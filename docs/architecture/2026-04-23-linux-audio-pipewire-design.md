@@ -811,7 +811,7 @@ if(PIPEWIRE_FOUND)
     target_link_libraries(NereusSDR PRIVATE ${PIPEWIRE_LIBRARIES})
     target_include_directories(NereusSDR PRIVATE ${PIPEWIRE_INCLUDE_DIRS})
     target_compile_options(NereusSDR PRIVATE ${PIPEWIRE_CFLAGS_OTHER})
-    target_compile_definitions(NereusSDR PRIVATE NEREUS_HAVE_PIPEWIRE)
+    target_compile_definitions(NereusSDR PRIVATE LONGPATH_HAVE_PIPEWIRE)
     message(STATUS "PipeWire ${PIPEWIRE_VERSION} — native Linux audio enabled")
 else()
     message(STATUS "libpipewire-0.3 not found — Linux audio limited to pactl path")
@@ -820,7 +820,7 @@ endif()
 
 - Builds without libpipewire-0.3-dev still compile and run — they
   just behave as if detection always returned Pactl or None.
-- All PipeWire C++ code lives behind `#ifdef NEREUS_HAVE_PIPEWIRE`
+- All PipeWire C++ code lives behind `#ifdef LONGPATH_HAVE_PIPEWIRE`
   so macOS/Windows builds are unaffected.
 - The AppImage CI workflow has libpipewire-0.3-dev installed, so
   every release AppImage is PipeWire-capable.

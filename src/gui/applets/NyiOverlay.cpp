@@ -1,4 +1,5 @@
 #include "NyiOverlay.h"
+#include "gui/StyleConstants.h"
 #include "gui/styles/ThemeQss.h"
 
 namespace Longpath {
@@ -8,8 +9,9 @@ NyiOverlay::NyiOverlay(const QString& phaseHint, QWidget* parent)
 {
     setStyleSheet(Style::themed(QStringLiteral(
         "QLabel { background: #33280f; color: #ffb800;"
-        " border: 1px solid #604000; border-radius: 6px;"
-        " padding: 0px 3px; font-size: 9px; font-weight: bold; }")));
+        " border: 1px solid %1; border-radius: 6px;"
+        " padding: 0px 3px; font-size: 9px; font-weight: bold; }")
+        .arg(QLatin1String(Style::kAmberBorder))));
     setToolTip(QStringLiteral("Not Yet Implemented — Available in %1").arg(phaseHint));
     setFixedSize(fontMetrics().horizontalAdvance(QStringLiteral("NYI")) + 8, 14);
     raise();

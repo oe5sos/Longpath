@@ -1,11 +1,11 @@
 // =================================================================
-// src/core/audio/RadioMicSource.cpp  (NereusSDR)
+// src/core/audio/RadioMicSource.cpp  (Longpath)
 // =================================================================
-// See RadioMicSource.h for contract. NereusSDR-original.
+// See RadioMicSource.h for contract. Longpath-original.
 // Plan: 3M-1b F.2. Master design §5.2.1.
 // =================================================================
 
-// no-port-check: NereusSDR-original file; no Thetis logic ported here.
+// no-port-check: Longpath-original file; no Thetis logic ported here.
 
 #include "core/audio/RadioMicSource.h"
 #include "core/RadioConnection.h"
@@ -109,10 +109,10 @@ int RadioMicSource::pullSamples(float* dst, int n)
 }
 
 // ---------------------------------------------------------------------------
-// Test seams (NEREUS_BUILD_TESTS only)
+// Test seams (LONGPATH_BUILD_TESTS only)
 // ---------------------------------------------------------------------------
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
 int RadioMicSource::ringFillForTest() const
 {
     const unsigned int w = m_writeIdx.load(std::memory_order_acquire);

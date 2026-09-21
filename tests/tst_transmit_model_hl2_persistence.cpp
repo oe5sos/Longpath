@@ -1,8 +1,8 @@
-// no-port-check: NereusSDR-original unit-test file.  The "console.cs"
+// no-port-check: Longpath-original unit-test file.  The "console.cs"
 // references below are cite comments documenting which Thetis lines each
 // assertion verifies; no Thetis logic is ported in this test file.
 // =================================================================
-// tests/tst_transmit_model_hl2_persistence.cpp  (NereusSDR)
+// tests/tst_transmit_model_hl2_persistence.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for TransmitModel polymorphic per-band tune-power clamp.

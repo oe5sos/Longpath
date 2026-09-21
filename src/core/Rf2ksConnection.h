@@ -1,7 +1,7 @@
 // =================================================================
-// src/core/Rf2ksConnection.h  (NereusSDR)
+// src/core/Rf2ksConnection.h  (Longpath)
 // =================================================================
-// NereusSDR-native. No upstream port.
+// Longpath-native. No upstream port.
 //   2026-05-24  Initial implementation for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code. Patterns mirror src/core/PgxlConnection.{h,cpp}

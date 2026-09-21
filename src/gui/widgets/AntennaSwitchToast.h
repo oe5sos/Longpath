@@ -1,8 +1,8 @@
 // =================================================================
-// src/gui/widgets/AntennaSwitchToast.h  (NereusSDR)
+// src/gui/widgets/AntennaSwitchToast.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original; no upstream port. Non-blocking bottom-right
+// Longpath-original; no upstream port. Non-blocking bottom-right
 // toast widget for antenna auto-switch notification (Phase 3F
 // multi-pan UI). See Phase 3F design doc section 5 (antenna conflict
 // policy) and
@@ -16,12 +16,12 @@
 // string, position it, show() it, listen for undoRequested().
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-27 Created in C++20/Qt6 for NereusSDR by J.J. Boyd (KG4VCF),
 //              with AI-assisted transformation via Anthropic Claude Code.
 // =================================================================
 //
-// no-port-check: NereusSDR-original
+// no-port-check: Longpath-original
 
 #pragma once
 

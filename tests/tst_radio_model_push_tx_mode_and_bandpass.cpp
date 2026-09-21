@@ -1,4 +1,4 @@
-// no-port-check: NereusSDR-original test for the pushTxModeAndBandpass
+// no-port-check: Longpath-original test for the pushTxModeAndBandpass
 // helper.  The TXA.c reference below is a Thetis source-of-truth cite
 // for design context (the WDSP defaults that make the bug visible),
 // not a port — no Thetis code is translated in this file.

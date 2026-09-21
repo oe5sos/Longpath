@@ -1,14 +1,14 @@
 #pragma once
 
 // =================================================================
-// src/gui/setup/hardware/AntennaAlexAlex2Tab.h  (NereusSDR)
+// src/gui/setup/hardware/AntennaAlexAlex2Tab.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
 //   Project Files/Source/Console/setup.designer.cs (~lines 25539-26857, tpAlex2FilterControl)
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-20 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                (KG4VCF), with AI-assisted transformation via Anthropic
 //                Claude Code. Sub-sub-tab under Hardware → Antenna/ALEX.
@@ -132,7 +132,7 @@ public:
     void restoreSettings(const QString& macAddress);
 
     // Test seam — returns whether the "Active" status is showing (hasAlex2=true).
-    // Always compiled (NEREUS_BUILD_TESTS is set on NereusSDRObjs globally).
+    // Always compiled (LONGPATH_BUILD_TESTS is set on NereusSDRObjs globally).
     bool isAlex2Active() const;
 
     // Phase 3P-H Task 5a — LED test seams.

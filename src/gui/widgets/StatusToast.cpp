@@ -1,16 +1,16 @@
 // =================================================================
-// src/gui/widgets/StatusToast.cpp  (NereusSDR)
+// src/gui/widgets/StatusToast.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original; no upstream port. See header for description.
+// Longpath-original; no upstream port. See header for description.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-07-30 Created in C++20/Qt6 for NereusSDR by J.J. Boyd (KG4VCF),
 //              with AI-assisted transformation via Anthropic Claude Code.
 // =================================================================
 //
-// no-port-check: NereusSDR-original
+// no-port-check: Longpath-original
 
 #include "gui/widgets/StatusToast.h"
 

@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/widgets/DiversityRadarWidget.cpp  (NereusSDR)
+// src/gui/widgets/DiversityRadarWidget.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
@@ -8,11 +8,11 @@
 //
 // Scope of port: see DiversityRadarWidget.h.  CalcVrms is the only
 // piece of CalcVrms-equivalent math; the rest of the file is
-// NereusSDR-original Qt6 paint structured around the picRadar_Paint
+// Longpath-original Qt6 paint structured around the picRadar_Paint
 // background/axes shell from Thetis.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-27 — Reimplemented in C++20/Qt6 for NereusSDR by
 //                 J.J. Boyd (KG4VCF), with AI-assisted transformation
 //                 via Anthropic Claude Code.  Phase 3F Sub-Epic G
@@ -178,7 +178,7 @@ void DiversityRadarWidget::paintEvent(QPaintEvent* /*event*/)
     const QPointF c(width() * 0.5, height() * 0.5);
     const double  r = (side - 4) * 0.5;
 
-    // Backdrop radial gradient (NereusSDR-original chrome).
+    // Backdrop radial gradient (Longpath-original chrome).
     QRadialGradient bg(c, r);
     bg.setColorAt(0.0, QColor(Style::kBlueBg));
     bg.setColorAt(1.0, QColor(Style::hexRole(Style::kBadgeInfoBg)));
@@ -220,7 +220,7 @@ void DiversityRadarWidget::paintEvent(QPaintEvent* /*event*/)
     p.drawLine(QPointF(c.x() - r, c.y()), QPointF(c.x() + r, c.y()));
     p.drawLine(QPointF(c.x(), c.y() - r), QPointF(c.x(), c.y() + r));
 
-    // Compass labels (NereusSDR-original chrome).
+    // Compass labels (Longpath-original chrome).
     QFont labelFont = Style::monoFont(p.font(), 11);
     labelFont.setPointSizeF(p.font().pointSizeF() * 0.85);
     p.setFont(labelFont);

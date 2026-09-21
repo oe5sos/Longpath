@@ -57,7 +57,7 @@ https://github.com/lucianodato/libspecbleach
 
 //
 // =============================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-23 — Imported byte-for-byte from Thetis v2.10.3.13 @ 501e3f51.
 //                No algorithmic changes. Linked against libspecbleach LGPL-2.1
 //                (third_party/libspecbleach/) at WDSP build time.
@@ -171,9 +171,10 @@ void SetRXASBNRRun (int channel, int run)
 	SBNR a = rxa[channel].sbnr.p;
 	if (a->run != run)
 	{
-		RXAbp1Check (channel, rxa[channel].amd.p->run, rxa[channel].snba.p->run, 
+		RXAbp1Check (channel, rxa[channel].amd.p->run, rxa[channel].snba.p->run,
                              rxa[channel].emnr.p->run, rxa[channel].anf.p->run, rxa[channel].anr.p->run,
-                             rxa[channel].rnnr.p->run, run);
+                             rxa[channel].rnnr.p->run, run,
+                             getRun_nnr (rxa[channel].nnr.p));
 		EnterCriticalSection (&ch[channel].csDSP);
 		a->run = run;
 		RXAbp1Set (channel);

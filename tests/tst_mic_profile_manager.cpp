@@ -1,6 +1,6 @@
-// no-port-check: NereusSDR-original unit-test file.
+// no-port-check: Longpath-original unit-test file.
 // =================================================================
-// tests/tst_mic_profile_manager.cpp  (NereusSDR)
+// tests/tst_mic_profile_manager.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for MicProfileManager (Phase 3M-1c chunk F).
@@ -72,7 +72,7 @@ private slots:
         // Default + 20 Thetis factory profiles ported from
         // database.cs:AddTXProfileTable [v2.10.3.13] (Default DX +
         // 19 entries from the bIndcludeExtraProfiles block) + the
-        // NereusSDR-native "RADE" preset (Phase 3R K1) = 22.
+        // Longpath-native "RADE" preset (Phase 3R K1) = 22.
         QCOMPARE(names.size(), 22);
         // Default remains the active profile so existing-user first-run
         // behaviour is unchanged.

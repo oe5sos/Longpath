@@ -1,5 +1,5 @@
 // =================================================================
-// src/models/TransmitModel.h  (NereusSDR)
+// src/models/TransmitModel.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
@@ -118,7 +118,7 @@
 
 // Migrated to VS2026 - 18/12/25 MW0LGE v2.10.3.12
 
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-26 — tunePowerByBand[14] + per-MAC persistence (G.3, Phase 3M-1a)
 //                 ported by J.J. Boyd (KG4VCF), with AI-assisted transformation
 //                 via Anthropic Claude Code.
@@ -148,7 +148,7 @@
 //                 TwoToneFreq2 / TwoToneLevel / TwoTonePower /
 //                 TwoToneFreq2Delay / TwoToneInvert / TwoTonePulsed (7x).
 //                 Defaults follow option C — Thetis Designer for Freq1/Freq2/
-//                 Invert and ranges, NereusSDR-original safer for Level/Power.
+//                 Invert and ranges, Longpath-original safer for Level/Power.
 //                 J.J. Boyd (KG4VCF), AI-assisted via Anthropic Claude Code.
 //   2026-04-28 — DrivePowerSource enum + TwoToneDrivePowerSource property
 //                 (B.3, Phase 3M-1c): full 3-value enum (DriveSlider /
@@ -164,7 +164,7 @@
 //                 J.J. Boyd (KG4VCF), AI-assisted via Anthropic Claude Code.
 //   2026-05-02 — filterLow / filterHigh + filterChanged signal +
 //                 filterDisplayText helper + per-MAC persistence.
-//                 NereusSDR-original (Plan 4 Cluster A, Task 2/D1).
+//                 Longpath-original (Plan 4 Cluster A, Task 2/D1).
 //                 J.J. Boyd (KG4VCF), AI-assisted via Anthropic Claude Code.
 //   2026-05-03 — Phase 3 Agent 3A of issue #167 (PA-cal hotfix scaffolding):
 //                 m_powerByBand[14] (default 50 W; per-band normal-mode
@@ -184,7 +184,7 @@
 //   2026-05-03 — Phase 3 Agent 3B of issue #167: computeAudioVolume()
 //                 math kernel — faithful port of Thetis SetPowerUsingTargetDBM
 //                 dBm-target math (console.cs:46720-46751 [v2.10.3.13])
-//                 with two NereusSDR-original safety short-circuits:
+//                 with two Longpath-original safety short-circuits:
 //                 sliderWatts <= 0 returns 0.0; gbb >= 99.5 returns
 //                 clamp(sliderWatts/100, 0, 1) linear fallback for HL2
 //                 PA-bypass / Bypass profile / out-of-range Band. Pure
@@ -221,13 +221,13 @@
 //                 AI-assisted via Anthropic Claude Code.
 //   2026-05-04 — Issue #175 review fix: declares the global Fixed-mode
 //                 setTunePower clamp now polymorphs (impl in .cpp).
-//                 Multi-source NereusSDR header block above + appended
+//                 Multi-source Longpath header block above + appended
 //                 mi0bot console.cs verbatim header below complete the
 //                 GPL attribution.  J.J. Boyd (KG4VCF), AI-assisted via
 //                 Anthropic Claude Code.
 //   2026-05-07 — Phase 3M-3a-iv post-bench refactor (Option A): dropped
 //                 antiVoxSourceVax property + setter + signal + member +
-//                 persistence (NereusSDR-architectural divergence from
+//                 persistence (Longpath-architectural divergence from
 //                 Thetis chkAntiVoxSource at setup.designer.cs:44646-44657
 //                 [v2.10.3.13]).  VAX is a digital-mode app bus with no
 //                 mic-feedback path, so the audio output device is the only
@@ -379,7 +379,7 @@ public:
     //     tunePower_by_band = new int[(int)Band.LAST];
     //     for (int i = 0; i < (int)Band.LAST; i++) tunePower_by_band[i] = 50;
     //
-    // NereusSDR uses scalar per-band AppSettings keys instead of Thetis's
+    // Longpath uses scalar per-band AppSettings keys instead of Thetis's
     // pipe-delimited string (console.cs:3087-3091 save, :4904-4910 restore).
 
     /// Tune power, in watts, for a band the operator has never set.
@@ -517,7 +517,7 @@ public:
 
     /// _lastPower sentinel for the ATT-on-TX gate.  Mirrors Thetis
     /// `private float _lastPower = -1;` (console.cs:29292 [v2.10.3.13]).
-    /// NereusSDR uses int (the slider is int [0, 100]); the -1 sentinel
+    /// Longpath uses int (the slider is int [0, 100]); the -1 sentinel
     /// is preserved.  Phase 3C's setPowerUsingTargetDbm reads + writes
     /// this; rarely called externally.  Runtime-only — NOT persisted.
     int  lastPower() const noexcept { return m_lastPower; }
@@ -525,7 +525,7 @@ public:
 
     /// PureSignal-active predicate.  Reads the live PureSignal coordinator
     /// (3M-4 Task 7) when wired via setPureSignal(); falls back to the
-    /// test-seam override (NEREUS_BUILD_TESTS only) for unit tests that
+    /// test-seam override (LONGPATH_BUILD_TESTS only) for unit tests that
     /// don't construct a full RadioModel + PureSignal.  When neither is
     /// set, returns false (matches Phase 3A pre-3M-4 behaviour: gate
     /// dormant but present).
@@ -557,13 +557,13 @@ public:
     ///
     /// Three short-circuits (in evaluation order):
     ///   1. sliderWatts <= 0 -> returns 0.0 (Thetis console.cs:46749-46751).
-    ///   2. gbb >= 99.5      -> NereusSDR-original deviation: returns
+    ///   2. gbb >= 99.5      -> Longpath-original deviation: returns
     ///                          clamp(sliderWatts / 100.0, 0, 1) linear
     ///                          fallback.  Catches HL2 PA-bypass HF bands
     ///                          (gbb=100 sentinel per mi0bot
     ///                          clsHardwareSpecific.cs:484
     ///                          [v2.10.3.13-beta2] "100 is no output
-    ///                          power"), the NereusSDR Bypass profile,
+    ///                          power"), the Longpath Bypass profile,
     ///                          AND out-of-range Bands (PaProfile::
     ///                          getGainForBand sentinel = 1000).
     ///                          Preserves pre-v0.3.2 transmit behavior on
@@ -635,7 +635,7 @@ public:
     // Range clamped to [0, 100].  Persisted per-MAC under
     // hardware/<mac>/tx/FixedTunePower.
     //
-    // Default 10 W (NereusSDR-original safer default; Thetis Designer
+    // Default 10 W (Longpath-original safer default; Thetis Designer
     // defaults to 0 which is non-functional).
     int  tunePower() const noexcept { return m_tunePower; }
     void setTunePower(int watts);
@@ -704,7 +704,7 @@ public:
     ///   3. Emits audioVolumeChanged(audio_volume) signal so RadioModel
     ///      call sites can pump it to TxChannel + RadioConnection.
     ///
-    /// XVTR translation NOT ported (NereusSDR has only one XVTR slot;
+    /// XVTR translation NOT ported (Longpath has only one XVTR slot;
     /// sentinel fallback in computeAudioVolume catches that case).
     ///
     /// Caller composes:
@@ -725,7 +725,7 @@ public:
     /// Restore all per-band tune-power values from AppSettings under the
     /// current MAC scope.  No-op when no MAC has been set.
     /// Cite: console.cs:4904-4910 [v2.10.3.13] — Thetis pipe-delimited
-    /// format; NereusSDR uses per-band scalar keys.
+    /// format; Longpath uses per-band scalar keys.
     void load();
 
     /// Flush all per-band tune-power values to AppSettings under the
@@ -735,7 +735,7 @@ public:
 
     // ── Per-MAC mic/VOX/MON persistence (3M-1b L.2) ──────────────────────
     //
-    // NereusSDR-native persistence glue.  Persists 15 mic/VOX/MON properties
+    // Longpath-native persistence glue.  Persists 15 mic/VOX/MON properties
     // under hardware/<mac>/tx/<key>.  Three properties are intentionally
     // excluded (per plan §0 rows 8/9):
     //   - voxEnabled  → always loads false (safety: VOX always starts OFF)
@@ -784,7 +784,7 @@ public:
     // chkMicMute-gated zero-fill is C.2's responsibility (micMute property
     // and mute-zeroing logic arrive in C.2).
     //
-    // Default -6 dB is a NereusSDR-original safety addition (not from
+    // Default -6 dB is a Longpath-original safety addition (not from
     // Thetis — Thetis defaults vary by board).  Conservative starting
     // point against ALC overdrive at 100 W PA per plan §0 row 11.
     //
@@ -796,7 +796,7 @@ public:
     // Range clamped to kMicGainDbMin / kMicGainDbMax.
     // Thetis console.cs:19151-19171 [v2.10.3.13] shows mic_gain_min = -40
     // and mic_gain_max = 10 as runtime defaults, but setup.designer.cs shows
-    // the spinboxes allow Minimum = -96, Maximum = 70.  The NereusSDR model
+    // the spinboxes allow Minimum = -96, Maximum = 70.  The Longpath model
     // uses [-50, 70] as a conservative fixed range per plan §C.1.
     //
     // TODO [3M-1b L.x]: read range from BoardCapabilities once per-board
@@ -812,7 +812,7 @@ public:
     // Hardcoded range per plan §C.1.
     // Thetis console.cs:19151-19171 [v2.10.3.13]: mic_gain_min = -40 /
     // mic_gain_max = 10 are runtime defaults; setup.designer.cs shows the
-    // spinboxes allow down to -96 and up to 70.  NereusSDR uses [-50, 70].
+    // spinboxes allow down to -96 and up to 70.  Longpath uses [-50, 70].
     static constexpr int kMicGainDbMin = -50;
     static constexpr int kMicGainDbMax =  70;
 
@@ -866,15 +866,15 @@ public:
     ///   (decoded from C# decimal int[4] format).
     double lineInBoost() const noexcept { return m_lineInBoost; }
 
-    /// Mic jack tip/ring polarity.  TRUE = Tip is mic (NereusSDR intuitive).
-    /// NereusSDR-original semantic; wire-bit polarity inversion happens at
+    /// Mic jack tip/ring polarity.  TRUE = Tip is mic (Longpath intuitive).
+    /// Longpath-original semantic; wire-bit polarity inversion happens at
     /// RadioConnection::setMicTipRing (Phase G).
     /// Thetis default: radOrionMicTip.Checked = true (setup.designer.cs:8683
     /// [v2.10.3.13]) → Tip selected by default.
     bool micTipRing() const noexcept { return m_micTipRing; }
 
     /// Mic jack bias voltage enable.
-    /// NereusSDR-original: FALSE = bias off by default (safe default for
+    /// Longpath-original: FALSE = bias off by default (safe default for
     /// dynamic microphones that don't need phantom power).
     /// Thetis default: radOrionBiasOff.Checked = true (setup.designer.cs:8779
     /// [v2.10.3.13]) → bias off by default.
@@ -928,7 +928,7 @@ public:
     // Porting from Thetis setup.designer.cs:44699-44728 [v2.10.3.13]:
     //   udAntiVoxGain.Minimum = decimal{60,0,0,-2147483648} = -60
     //   udAntiVoxGain.Maximum = decimal{60,0,0,0}           = +60
-    //   (DecimalPlaces=1; display unit is x0.1 dB; NereusSDR stores as int dB.)
+    //   (DecimalPlaces=1; display unit is x0.1 dB; Longpath stores as int dB.)
     //
     // Porting from Thetis setup.cs:18986-18989 [v2.10.3.13]:
     //   cmaster.SetAntiVOXGain(0, Math.Pow(10.0, (double)udAntiVoxGain.Value / 20.0));
@@ -940,13 +940,13 @@ public:
     // (antiVoxSourceVax) and its associated plumbing have been removed.
     // Thetis chkAntiVoxSource at setup.designer.cs:44646-44657 [v2.10.3.13]
     // selects between RX and VAC as the anti-VOX cancellation reference;
-    // that choice does not map to NereusSDR's architecture, where VAX is
+    // that choice does not map to Longpath's architecture, where VAX is
     // a digital-mode app bus with no mic-feedback path and the audio output
     // device is therefore the only valid anti-VOX source.  See commit message
     // and DexpVoxPage info-row for the architectural rationale.
 
     /// Anti-VOX gain in dB.  Clamped to [kAntiVoxGainDbMin, kAntiVoxGainDbMax].
-    /// Default 0 dB -- NereusSDR-original safe starting point.
+    /// Default 0 dB -- Longpath-original safe starting point.
     /// (Thetis udAntiVoxGain designer default is 1.0 dB per
     ///  setup.designer.cs:44723-44727 [v2.10.3.13]: Value = decimal{10,0,0,0}
     ///  with DecimalPlaces=1.)
@@ -959,7 +959,7 @@ public:
     // From Thetis setup.designer.cs:44708-44717 [v2.10.3.13]:
     //   udAntiVoxGain.Minimum = decimal{60,0,0,-2147483648} = -60
     //   udAntiVoxGain.Maximum = decimal{60,0,0,0}           = +60
-    //   (DecimalPlaces=1; display unit is x0.1 dB; NereusSDR stores as int dB.)
+    //   (DecimalPlaces=1; display unit is x0.1 dB; Longpath stores as int dB.)
     static constexpr int kAntiVoxGainDbMin = -60;
     static constexpr int kAntiVoxGainDbMax =  60;
 
@@ -1008,7 +1008,7 @@ public:
     //
     // 3M-3a-iv post-bench refactor (Option A): chkAntiVoxSource (the source
     // toggle in Thetis) has been removed entirely; this run flag is now the
-    // only anti-VOX user toggle in NereusSDR.  See commit message for the
+    // only anti-VOX user toggle in Longpath.  See commit message for the
     // architectural rationale.
 
     Q_PROPERTY(bool antiVoxRun READ antiVoxRun WRITE setAntiVoxRun
@@ -1027,10 +1027,10 @@ public:
     //
     // Thetis ground-truth: chkBypassANANPASettings is a UI-only declaration in
     // Thetis v2.10.3.15 — no _CheckedChanged handler dispatches any behavior
-    // when the checkbox is toggled.  NereusSDR mirrors this exactly: the
+    // when the checkbox is toggled.  Longpath mirrors this exactly: the
     // checkbox surface + this property + AppSettings persistence are all wired,
     // but no consumer currently alters PA gain dispatch when toggled.  If a
-    // future Thetis release adds the dispatch, NereusSDR should match.
+    // future Thetis release adds the dispatch, Longpath should match.
     //
     // false (default) = use the board-specific PA calibration table (normal
     //   operation for all SKUs, including G2E out of the box).
@@ -1055,7 +1055,7 @@ public:
     //
     // Porting from Thetis audio.cs:417 [v2.10.3.13]:
     //   cmaster.SetAAudioMixVol((void*)0, 0, WDSP.id(1, 0), 0.5);
-    //   The 0.5 literal is a fixed mix coefficient in Thetis; NereusSDR
+    //   The 0.5 literal is a fixed mix coefficient in Thetis; Longpath
     //   repurposes it as the user-volume default for the monitorVolume property.
     //
     // monEnabled does NOT persist — plan §0 row 9: safety, loads OFF at
@@ -1118,7 +1118,7 @@ public:
     // AppSettings persistence arrives in Phase L.2; voxEnabled does NOT persist
     // (safety: VOX always loads OFF — plan §0 row 8).
     //
-    // voxGainScalar: Thetis has no explicit clamp on VOXGain; NereusSDR adds a
+    // voxGainScalar: Thetis has no explicit clamp on VOXGain; Longpath adds a
     // sane guard [0.0f, 100.0f].  A scalar of 0.0 disables the mic-boost
     // scaling effect; 100.0 is an extreme upper bound that avoids silent
     // overflow.  Callers should use values in [0.0f, 10.0f] for normal use.
@@ -1134,7 +1134,7 @@ public:
     bool voxEnabled() const noexcept { return m_voxEnabled; }
 
     /// VOX detection threshold in dB.  Clamped to [kVoxThresholdDbMin, kVoxThresholdDbMax].
-    /// Default −40 dB (NereusSDR-original conservative starting point; Thetis
+    /// Default −40 dB (Longpath-original conservative starting point; Thetis
     /// ptbVOX.Value defaults to −20 per console.Designer.cs:6024 [v2.10.3.13]).
     ///
     /// Range from console.Designer.cs:6018-6019 [v2.10.3.13]:
@@ -1150,13 +1150,13 @@ public:
     /// From Thetis audio.cs:194 [v2.10.3.13]:
     ///   private static float vox_gain = 1.0f;
     ///
-    /// Thetis has no explicit clamp on VOXGain.  NereusSDR adds a sane upper
+    /// Thetis has no explicit clamp on VOXGain.  Longpath adds a sane upper
     /// guard of 100.0f to prevent silent float overflow.
     float voxGainScalar() const noexcept { return m_voxGainScalar; }
 
     /// VOX hang time in milliseconds: delay from signal-drop to gain recovery.
     /// Clamped to [kVoxHangTimeMsMin, kVoxHangTimeMsMax].
-    /// Default 500 ms (NereusSDR-original; matches Thetis udDEXPHold.Value=500
+    /// Default 500 ms (Longpath-original; matches Thetis udDEXPHold.Value=500
     /// per setup.designer.cs:45020-45024 [v2.10.3.13]).
     ///
     /// Full DEXP knob set (attack, release, hysteresis, expansion ratio) lives
@@ -1173,7 +1173,7 @@ public:
     static constexpr int kVoxThresholdDbMax =   0;
 
     // VOX gain scalar range constants.
-    // NereusSDR sane guard; Thetis Audio.VOXGain has no explicit clamp.
+    // Longpath sane guard; Thetis Audio.VOXGain has no explicit clamp.
     static constexpr float kVoxGainScalarMin =   0.0f;
     static constexpr float kVoxGainScalarMax = 100.0f;
 
@@ -1352,7 +1352,7 @@ public:
 
     // ── Mic source (3M-1b I.1) ────────────────────────────────────────────────
     //
-    // NereusSDR-native property — Thetis bakes mic-source selection directly
+    // Longpath-native property — Thetis bakes mic-source selection directly
     // into audio.cs rather than using the strategy pattern.  This property
     // drives AudioTxInputPage (Setup → Audio → TX Input) and is consumed by
     // CompositeTxMicRouter::setActiveSource() once that wiring lands in F.3.
@@ -1369,7 +1369,7 @@ public:
 
     // ── PC Mic session state (3M-1b I.2) ─────────────────────────────────────
     //
-    // NereusSDR-native transient session state for the PC Mic configuration
+    // Longpath-native transient session state for the PC Mic configuration
     // group (Setup → Audio → TX Input → PC Mic group box).
     //
     // These three properties survive Setup dialog close/reopen within the
@@ -1413,7 +1413,7 @@ public:
     // Default values follow option C (JJ 2026-04-28):
     //   - Freq1 (700 Hz) / Freq2 (1900 Hz) — match Thetis Designer
     //     + btnTwoToneF_defaults preset (setup.cs:34226-34227 [v2.10.3.13]).
-    //   - Level (-6 dB) / Power (50 %) — NereusSDR-original safer defaults
+    //   - Level (-6 dB) / Power (50 %) — Longpath-original safer defaults
     //     (Thetis Designer ships 0 dB / 10 %).
     //   - Freq2Delay (0 ms) — matches Thetis Designer
     //     (setup.Designer.cs:61943-61947 [v2.10.3.13]).
@@ -1438,7 +1438,7 @@ public:
     /// Two-tone test magnitude (dB).  Used in setup.cs:11056 [v2.10.3.13]:
     ///   ttmag1 = ttmag2 = 0.49999 * pow(10, level / 20)
     /// Default 0 dB (matches Thetis Designer udTwoToneLevel.Value = 0).
-    /// PR #212 follow-up bench: an earlier NereusSDR-original default of
+    /// PR #212 follow-up bench: an earlier Longpath-original default of
     /// -6 dB halved the 2-tone envelope (peak 0.5 vs 1.0) which starved
     /// calcc LCOLLECT bin filling on HL2 — psHWPeak=0.233 expects peak
     /// envelope to reach ~0.234, but at -6 dB it tops out at ~0.117 →
@@ -1452,7 +1452,7 @@ public:
 
     /// TX power (%) used during the two-tone test when
     /// DrivePowerSource::Fixed (Phase B.3 enum) is active.
-    /// NereusSDR default 50 % (Thetis Designer udTestIMDPower.Value = 10 %).
+    /// Longpath default 50 % (Thetis Designer udTestIMDPower.Value = 10 %).
     int twoTonePower() const noexcept { return m_twoTonePower; }
 
     /// Delay (ms) before Freq2 magnitude is applied during a two-tone run.
@@ -1694,7 +1694,7 @@ public:
     // ALC Decay: 1..50 ms (udDSPALCDecay:38845-38866).
     static constexpr int kTxAlcDecayMsMin        =    1;
     static constexpr int kTxAlcDecayMsMax        =   50;
-    // EQ preamp: NereusSDR clamp [-12, 15] dB (matches Thetis EQ preamp slider
+    // EQ preamp: Longpath clamp [-12, 15] dB (matches Thetis EQ preamp slider
     // precedent — eqx.cs:btnReset preset clears preamp to 0; spinbox accepts
     // ±dB but no formal Designer Min/Max is exposed for the integer column).
     static constexpr int kTxEqPreampDbMin        =  -12;
@@ -1758,12 +1758,12 @@ public slots:
 
     // ── TX filter bandwidth (Plan 4 D1) ────────────────────────────────────
     //
-    // NereusSDR-native properties. FilterLow/FilterHigh represent the
+    // Longpath-native properties. FilterLow/FilterHigh represent the
     // DSP bandpass filter edges (Hz) fed to WDSP SetTXABandpassFreqs (Plan 4
     // D8). Values are per-profile — MicProfileManager bundles them under
     // "FilterLow" / "FilterHigh" keys added in Plan 4 Cluster A.
     //
-    // Defaults 100/2900 — USB voice typical SSB (NereusSDR-original; see Plan
+    // Defaults 100/2900 — USB voice typical SSB (Longpath-original; see Plan
     // 4 spec §Task 2). Per-profile activation overrides via MicProfileManager.
     //
     // Swap-on-commit invariant: if setFilterLow(hz) is called with hz >
@@ -1857,7 +1857,7 @@ public slots:
 
     // ── Mic source lock guard (3M-1b L.3) ────────────────────────────────────
     //
-    // NereusSDR-native. When lock is true, setMicSource(MicSource::Radio)
+    // Longpath-native. When lock is true, setMicSource(MicSource::Radio)
     // silently coerces to MicSource::Pc.  This is the model-side complement
     // of the UI-side lock (AudioTxInputPage disables the Radio Mic radio button
     // when BoardCapabilities::hasMicJack == false).
@@ -1937,7 +1937,7 @@ public slots:
     // ── PA settings bypass setter (D4: ANAN-G2E port) ───────────────────────
     // From Thetis setup.cs:19921 [v2.10.3.15] //N1GP G2E added.
     // Thetis has no CheckedChanged handler (chkBypassANANPASettings is UI-only
-    // in v2.10.3.15); NereusSDR wires the state explicitly for persistence.
+    // in v2.10.3.15); Longpath wires the state explicitly for persistence.
     void setPaSettingsBypass(bool bypass);
 
     // ── MON setters (3M-1b C.5) ──────────────────────────────────────────────
@@ -2124,7 +2124,7 @@ private:
     int m_power{100};
 
     // ── TX filter bandwidth (Plan 4 D1) ────────────────────────────────────
-    // Defaults 100/2900 — USB voice typical SSB (NereusSDR-original, Plan 4
+    // Defaults 100/2900 — USB voice typical SSB (Longpath-original, Plan 4
     // spec §Task 2). Persisted under hardware/<mac>/tx/FilterLow and FilterHigh.
     int m_filterLow{100};
     int m_filterHigh{2900};
@@ -2142,10 +2142,10 @@ private:
     // HL2 sub-step DSP modulation (#175 Task 4).
     HPSDRModel m_hpsdrModel{HPSDRModel::FIRST};
 
-    // Per-band tune power storage.  NereusSDR-original per-band extension:
+    // Per-band tune power storage.  Longpath-original per-band extension:
     // Thetis console.cs:12094 [v2.10.3.13] declares a flat tunePower_by_band[]
     // but persists/restores it as a pipe-delimited block (console.cs:3087-3091
-    // save, :4904-4910 restore) — NereusSDR uses scalar per-band AppSettings
+    // save, :4904-4910 restore) — Longpath uses scalar per-band AppSettings
     // keys instead.  Clamp ceiling polymorphs by SKU in setTunePowerForBand
     // (#175 Task 6); Thetis has no equivalent polymorphic clamp.
     // Initialised to 50W per band in the constructor
@@ -2183,7 +2183,7 @@ private:
     //   private DrivePowerSource _tuneDrivePowerSource = DRIVE_SLIDER;
     DrivePowerSource m_tuneDrivePowerSource{DrivePowerSource::DriveSlider};
     // Fixed tune power slot.  Mirrors Thetis tune_power (console.cs:17229
-    // [v2.10.3.13]).  Default 10 W (NereusSDR-original safer; Thetis
+    // [v2.10.3.13]).  Default 10 W (Longpath-original safer; Thetis
     // Designer ships 0).
     int  m_tunePower{10};
     // HL2 sub-step DSP audio-gain modulation parameter (#175 Task 3).
@@ -2202,17 +2202,17 @@ private:
     // ATT-on-TX-on-power-change gate inside setPowerUsingTargetDbm uses
     // this to decide whether the safety force-31-dB lift fires.  When
     // null (pre-connect or post-teardown), pureSignalActive() falls back
-    // to the test seam (NEREUS_BUILD_TESTS) or returns false (production).
+    // to the test seam (LONGPATH_BUILD_TESTS) or returns false (production).
     PureSignal* m_pureSignal{nullptr};
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     // Test seam (Phase 3C) — overrides pureSignalActive() return when set.
     // Phase 3A's predicate returns false unconditionally; this seam lets
     // tests flip it to true to exercise the ATT-on-TX gate without the
     // 3M-4 PureSignal feedback DDC wiring in place.  The seam is
     // intentionally a tri-state (-1 = no override; 0 = false; 1 = true)
     // so the default unset state preserves Phase 3A semantics in
-    // production-style code paths that compile in NEREUS_BUILD_TESTS
+    // production-style code paths that compile in LONGPATH_BUILD_TESTS
     // mode (e.g. a unit test that doesn't care about PS state).
 public:
     void setPureSignalActiveForTest(bool on) noexcept {
@@ -2239,7 +2239,7 @@ private:
 
     // ── Mic gain (3M-1b C.1) ──────────────────────────────────────────────
     // From Thetis console.cs:28805-28817 [v2.10.3.13] (setAudioMicGain).
-    // Default -6 dB per plan §0 row 11 (NereusSDR safety addition).
+    // Default -6 dB per plan §0 row 11 (Longpath safety addition).
     // m_micPreampLinear is derived: pow(10, m_micGainDb / 20.0).
     int    m_micGainDb       = -6;
     // pow(10, -6/20) ≈ 0.501187233627272
@@ -2339,7 +2339,7 @@ private:
     bool   m_dexpSideChannelFilterEnabled  = true;
 
     // ── Mic source (3M-1b I.1 + L.3) ───────────────────────────────────
-    // NereusSDR-native. Default Pc (always available; Radio is opt-in).
+    // Longpath-native. Default Pc (always available; Radio is opt-in).
     // m_micSourceLocked: L.3 HL2 force. When true, setMicSource(Radio)
     // silently coerces to Pc.  Runtime capability constraint; not persisted.
     MicSource m_micSource{MicSource::Pc};
@@ -2347,7 +2347,7 @@ private:
     MicSource m_previousNonVaxMicSource{MicSource::Pc};
 
     // ── PC Mic session state (3M-1b I.2) ─────────────────────────────────
-    // NereusSDR-native transient session state. AppSettings persistence
+    // Longpath-native transient session state. AppSettings persistence
     // deferred to Phase L.2. Survives Setup dialog close/reopen in session.
     int     m_pcMicHostApiIndex  = -1;      // -1 = OS default (PA resolves)
     QString m_pcMicDeviceName;              // empty = default device for host API
@@ -2359,7 +2359,7 @@ private:
     int    m_twoToneFreq2      =  1900;   // Designer + Defaults preset
     // From Thetis setup.Designer.cs:61994-62003 [v2.10.3.13] udTwoToneLevel:
     //   Maximum = 0, Minimum = -96, Value = 0.
-    // Phase 3M-4 Task 17 (2026-05-06): previously NereusSDR-original -6 dB
+    // Phase 3M-4 Task 17 (2026-05-06): previously Longpath-original -6 dB
     // which under-drove the 2-tone envelope by 6 dB.  Result on bench:
     // pscc() saw txEnvMax=0.306 instead of Thetis's ~0.6+, calcc LCOLLECT
     // never filled past bin 2-3 (out of 16), state machine stuck.
@@ -2368,7 +2368,7 @@ private:
     // phase3m-4-handoff-bench-debug.md "Round 2 / Task 17 status".
     double m_twoToneLevel      =   0.0;
     // ANAN-G2E bench-fix 2026-05-23 (JJ Boyd): default fixed from
-    // NereusSDR-original 50 to Thetis source-first 10.  From Thetis
+    // Longpath-original 50 to Thetis source-first 10.  From Thetis
     // setup.designer.cs:62236 [v2.10.3.13]:
     //   this.udTestIMDPower.Value = new decimal(new int[] { 10, 0, 0, 0 });
     // and console.cs:22920 [v2.10.3.13]:

@@ -1,4 +1,4 @@
-// tests/tst_audio_tx_input_page_skeleton.cpp  (NereusSDR)
+// tests/tst_audio_tx_input_page_skeleton.cpp  (Longpath)
 //
 // Phase 3M-1b Task I.1 — AudioTxInputPage skeleton + TransmitModel::micSource
 //

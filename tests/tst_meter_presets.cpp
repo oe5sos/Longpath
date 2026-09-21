@@ -1,12 +1,12 @@
 // =================================================================
-// tests/tst_meter_presets.cpp  (NereusSDR)
+// tests/tst_meter_presets.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/MeterManager.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -191,7 +191,7 @@ private slots:
         //   cs.ZOrder = 3
         // Plus the renderScale dispatch at MeterManager.cs:31911-31916
         // uses generalScale(6, 3, -1, 60, 2, 20, ..., 0.5f, true, true)
-        // for SIGNAL_STRENGTH — we port that to the NereusSDR
+        // for SIGNAL_STRENGTH — we port that to the Longpath
         // GeneralScale params exactly.
         ItemGroup* g = ItemGroup::createSMeterBarPreset(
             MeterBinding::SignalPeak, QStringLiteral("S-Meter"), nullptr);

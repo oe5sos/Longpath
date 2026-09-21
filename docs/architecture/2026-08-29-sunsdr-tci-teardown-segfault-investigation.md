@@ -112,12 +112,12 @@ target — not to test executables (`tests/CMakeLists.txt`). A
 Debug-configured test build would therefore fail to link at all
 (undefined `__asan_*` symbols): the sanitizer support existed on paper
 but was never actually usable for tests. Fixed in
-`tests/CMakeLists.txt`'s `nereus_add_test()` function, mirroring the
+`tests/CMakeLists.txt`'s `longpath_add_test()` function, mirroring the
 same Debug-only gate. To reuse this for a future investigation:
 
 ```
 cmake -S . -B build-asan -G Ninja -DCMAKE_BUILD_TYPE=Debug \
-    -DCMAKE_PREFIX_PATH="$(brew --prefix qt)" -DNEREUS_BUILD_TESTS=ON
+    -DCMAKE_PREFIX_PATH="$(brew --prefix qt)" -DLONGPATH_BUILD_TESTS=ON
 cmake --build build-asan --target <test_name> -j <n>
 ASAN_OPTIONS=detect_leaks=0:halt_on_error=0 ./build-asan/tests/<test_name>
 ```

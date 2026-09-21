@@ -25,7 +25,7 @@ warren@wpratt.com
 */
 
 // =================================================================
-// tests/tst_tx_channel_running.cpp  (NereusSDR)
+// tests/tst_tx_channel_running.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -42,7 +42,7 @@ warren@wpratt.com
 // Ported from Thetis wdsp/cfir.c:233-238 [v2.10.3.13]
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-26 — New test for Phase 3M-1a Task C.4: TxChannel::setRunning()
 //                 (channel state + 3M-1a active-stage activation) and
 //                 setStageRunning(Stage, bool). J.J. Boyd (KG4VCF), with
@@ -148,7 +148,7 @@ private slots:
     //
     // Calling setRunning(true) twice must be safe (no double-init or crash).
     // Thetis does not gate the SetChannelState call on whether the channel is
-    // already in the target state — it calls it unconditionally.  NereusSDR
+    // already in the target state — it calls it unconditionally.  Longpath
     // matches this: SetChannelState itself checks ch[channel].state internally
     // (wdsp/channel.c:265 [v2.10.3.13]: if (ch[channel].state != state) ...).
 

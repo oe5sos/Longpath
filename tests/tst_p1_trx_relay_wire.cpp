@@ -1,7 +1,7 @@
 // no-port-check: test-only — deskhpsdr file names and control.v appear
 // only in source-cite comments that document which upstream line each assertion
 // verifies.  No Thetis or deskhpsdr logic is ported here; this file is
-// NereusSDR-original.
+// Longpath-original.
 //
 // Wire-byte snapshot tests for P1RadioConnection::setTrxRelay() (3M-1a Task E.4).
 //

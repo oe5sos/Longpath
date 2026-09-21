@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/core/strip/TxSpectrumAnalysis.h  (NereusSDR)
+// src/core/strip/TxSpectrumAnalysis.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // What actually goes out, as opposed to what goes in.
 //
@@ -49,7 +49,7 @@
 // band.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-09 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

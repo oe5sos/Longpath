@@ -1,6 +1,6 @@
 #pragma once
 
-// no-port-check: NereusSDR/Longpath-original RadioConnection subclass.
+// no-port-check: Longpath/Longpath-original RadioConnection subclass.
 // No Thetis precedent exists for this pattern — see the design doc's
 // own §6/§7.3 finding ("No precedent exists for this pattern... nobody
 // has built a RadioConnection subclass that isn't discovery-driven").
@@ -9,7 +9,7 @@
 // original architecture, not a port.
 
 // =================================================================
-// src/core/PlaybackRadioConnection.h  (NereusSDR/Longpath)
+// src/core/PlaybackRadioConnection.h  (Longpath)
 // =================================================================
 //
 // A file-backed `RadioConnection` — Phase 3M-C, "Option A" from the
@@ -41,7 +41,7 @@
 // a recording has no transmitter to key.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-26 — Original for NereusSDR/Longpath by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

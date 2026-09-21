@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/VoiceSignalDetector.cpp  (NereusSDR)
+// src/core/VoiceSignalDetector.cpp  (Longpath)
 // =================================================================
 //
 // Ported from AetherSDR (https://github.com/aethersdr/AetherSDR),
@@ -17,7 +17,7 @@
 // SignalClassifier steht im Header.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-19 — Ported to NereusSDR by Martin Fischer, AI-assisted via
 //                 Anthropic Claude (Cowork).
 // =================================================================
@@ -33,7 +33,7 @@ namespace Longpath {
 
 // AetherSDR fuehrt diese Kategorie zentral in LogManager.h; bei uns ist
 // sie oertlich, wie in QrzClient.cpp.
-namespace { Q_LOGGING_CATEGORY(lcSHistory, "nereus.shistory") }
+namespace { Q_LOGGING_CATEGORY(lcSHistory, "longpath.shistory") }
 
 namespace {
     // Minimum width for a detected region to be considered a voice signal.

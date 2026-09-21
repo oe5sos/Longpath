@@ -1,14 +1,14 @@
 #pragma once
 
 // =================================================================
-// src/gui/ConnectionPanel.h  (NereusSDR)
+// src/gui/ConnectionPanel.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/ucRadioList.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -84,7 +84,7 @@ class RadioModel;
 // Porting note: Thetis ucRadioList.cs is a custom-painted card list showing
 // 4 info lines per radio. clsDiscoveredRadioPicker.cs shows a DataGridView
 // with columns: Hardware, IP, Base Port, Mac Address, Protocol, Version.
-// NereusSDR uses QTableWidget with 8 columns per plan §5.2, combining both
+// Longpath uses QTableWidget with 8 columns per plan §5.2, combining both
 // Thetis source patterns.
 //
 // Column layout (Task 5 — 3Q polish):

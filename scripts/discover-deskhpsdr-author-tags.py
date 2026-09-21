@@ -60,7 +60,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 DESKHPSDR_DIR = Path(os.environ.get(
-    "NEREUS_DESKHPSDR_DIR",
+    "LONGPATH_DESKHPSDR_DIR",
     # Standard sibling relative to each worktree depth:
     #   worktree at .worktrees/<branch>/ → ../../../deskhpsdr
     #   main checkout                    → ../deskhpsdr
@@ -295,7 +295,7 @@ def main() -> int:
         if found is None:
             print(f"FATAL: deskhpsdr not found at {deskhpsdr_dir}",
                   file=sys.stderr)
-            print("Set NEREUS_DESKHPSDR_DIR or ensure deskhpsdr is cloned",
+            print("Set LONGPATH_DESKHPSDR_DIR or ensure deskhpsdr is cloned",
                   file=sys.stderr)
             return 2
         deskhpsdr_dir = found

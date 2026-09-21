@@ -1,9 +1,9 @@
 // =================================================================
-// tests/tst_rf2ks_connection_lifecycle.cpp  (NereusSDR)
+// tests/tst_rf2ks_connection_lifecycle.cpp  (Longpath)
 // =================================================================
-// NereusSDR-native test. No upstream source file ported.
+// Longpath-native test. No upstream source file ported.
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-07-27 -- Authored by J.J. Boyd (KG4VCF), with AI-assisted
 //                 transformation via Anthropic Claude Code.
 //                 Covers the Codex review findings on PR #291 that the

@@ -1,23 +1,23 @@
-// no-port-check: NereusSDR-original priority send queue. Three internal
+// no-port-check: Longpath-original priority send queue. Three internal
 // FIFO queues (Urgent / Binary / Control) drained in priority order with
 // bounded-depth oldest-drop on each. Pattern condensed from Thetis's
 // 3-queue model at TCIServer.cs:769-774 [v2.10.3.13] (queue declarations)
 // and TCIServer.cs:1645-1679 [v2.10.3.13] (tryDequeueNextOutboundFrameLocked
 // drain order: Urgent, Binary, Control, then coalesced). The Thetis queues
-// are unbounded; the bounded-depth oldest-drop semantics are a NereusSDR-
+// are unbounded; the bounded-depth oldest-drop semantics are a Longpath-
 // original safety addition to prevent unbounded memory growth under
 // backpressure. The Thetis coalesced-key map (m_outboundCoalescedOrder /
 // m_outboundCoalescedFrames) is implemented separately in Phase 15
 // (TciVfoCoalescer); Phase 14 handles only the three priority queues.
 //
-// src/core/TciSendQueue.h  (NereusSDR)
-// NereusSDR-original — per-client TCI outbound priority send queue.
+// src/core/TciSendQueue.h  (Longpath)
+// Longpath-original — per-client TCI outbound priority send queue.
 //
 // Upstream reference: Thetis TCIServer.cs:769-774 + 1645-1679 [v2.10.3.13]
 //   https://github.com/ramdor/Thetis
 //   Copyright (C) 2020-2025 Richard Samphire MW0LGE
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-10 — Phase 3J-1 Task 14.1 by J.J. Boyd (KG4VCF);
 //                AI-assisted transformation via Anthropic Claude Code.
 
@@ -54,7 +54,7 @@ public:
     explicit TciSendQueue(int capacityPerQueue = 1024);
 
     // Push a frame onto the named priority queue. If the target queue is at
-    // capacity the OLDEST frame is dropped (NereusSDR-original safety
+    // capacity the OLDEST frame is dropped (Longpath-original safety
     // behavior; Thetis queues are unbounded). Thread-safe.
     void push(Priority priority, const QString& frame);
 

@@ -1,12 +1,12 @@
-// no-port-check: NereusSDR-original unit-test file.
+// no-port-check: Longpath-original unit-test file.
 // =================================================================
-// tests/tst_mic_profile_rade.cpp  (NereusSDR)
+// tests/tst_mic_profile_rade.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for the "RADE" factory MicProfileManager preset
 // (Phase 3R Task K1).
 //
-// RADE is the NereusSDR-native digital voice mode driven by the
+// RADE is the Longpath-native digital voice mode driven by the
 // vendored RADE neural codec (third_party/rade), wired up in Phase
 // 3R Tasks I1-J4.  Because RADE bypasses the WDSP USB/LSB modulator,
 // most of the TXA chain (CFC / CESSB / Phase Rotator / ALC) is
@@ -23,7 +23,7 @@
 //
 // =================================================================
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-11 — Phase 3R Task K1: initial test file. NereusSDR-native;
 //                 no Thetis upstream (RADE was not a Thetis mode).
 //                 J.J. Boyd (KG4VCF), with AI-assisted implementation
@@ -89,7 +89,7 @@ private slots:
     }
 
     // The Leveler stays on because freedv-gui's RADE TX pipeline runs
-    // a WebRTC AGC at -9 dBFS target.  NereusSDR's Lev_MaxGain (dB)
+    // a WebRTC AGC at -9 dBFS target.  Longpath's Lev_MaxGain (dB)
     // and Lev_Decay (ms) are the closest equivalent parameters.
     void radeProfileHasLevelerOn()
     {

@@ -79,7 +79,7 @@ QTEST_MAIN(TestTxSliceArbiter)
 #include "tst_tx_slice_arbiter.moc"
 ```
 
-Register: `nereus_add_test(tst_tx_slice_arbiter)` in `tests/CMakeLists.txt`.
+Register: `longpath_add_test(tst_tx_slice_arbiter)` in `tests/CMakeLists.txt`.
 
 - [ ] **Step 2: Run + verify failure (compile error)**
 
@@ -603,7 +603,7 @@ QTEST_MAIN(TestRadioModelSliceLifecycle)
 #include "tst_radio_model_slice_lifecycle.moc"
 ```
 
-Register: `nereus_add_test(tst_radio_model_slice_lifecycle)`.
+Register: `longpath_add_test(tst_radio_model_slice_lifecycle)`.
 
 - [ ] **Step 2: Add to RadioModel.h**
 
@@ -778,7 +778,7 @@ signals:
     /// MainWindow forwards to RadioModel::txSliceArbiter()->requestHandoff().
     void txHandoffRequested(int sliceIndex);
 
-#ifdef NEREUSSDR_TESTING
+#ifdef LONGPATH_TESTING
 public:
     void simulateTxBadgeClick() { onTxBadgeClicked(); }
 #endif
@@ -938,7 +938,7 @@ Operator-visible changes:
 
 Discovered during implementation:
 - `MoxController::setMox(false)` is synchronous in the Qt event-loop sense; no async wait needed
-- The VfoWidget `simulateTxBadgeClick()` test seam needs `NEREUSSDR_TESTING` build flag (verify pattern in existing tests)
+- The VfoWidget `simulateTxBadgeClick()` test seam needs `LONGPATH_TESTING` build flag (verify pattern in existing tests)
 
 Sub-Epic D (Pan layouts + multi-pan UI) can now begin: `PanadapterStack`, `PanadapterApplet`, `FFTRouter`, `+RX` button on `SpectrumOverlayPanel`.
 ```

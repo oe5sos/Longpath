@@ -1,8 +1,8 @@
 // =================================================================
-// src/core/MicProfileManager.cpp  (NereusSDR)
+// src/core/MicProfileManager.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original file. The mic-profile-bank API is a port of the
+// Longpath-original file. The mic-profile-bank API is a port of the
 // Thetis comboTXProfile / Setup → TX Profile editor flow:
 //   setup.cs:9505-9543 [v2.10.3.13] — comboTXProfileName_SelectedIndexChanged
 //   setup.cs:9545-9612 [v2.10.3.13] — btnTXProfileSave_Click
@@ -10,7 +10,7 @@
 //
 // =================================================================
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-28 — Original implementation for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted implementation via
 //                 Anthropic Claude Code.
@@ -24,7 +24,7 @@
 //                 block, lines 4545-9354 [v2.10.3.13]).
 // =================================================================
 
-// no-port-check: NereusSDR-original file; Thetis-derived handler logic
+// no-port-check: Longpath-original file; Thetis-derived handler logic
 // is cited inline below.
 
 #include "MicProfileManager.h"
@@ -205,7 +205,7 @@ const QStringList& liveKeyList()
         // CESSB (1) — database.cs:4689 [v2.10.3.13].
         QStringLiteral("CESSB_On"),
         // ── Plan 4 D1 — TX filter bandwidth (2 keys) ───────────────────────
-        // NereusSDR-original. Defaults 100/2900 (USB voice typical SSB).
+        // Longpath-original. Defaults 100/2900 (USB voice typical SSB).
         QStringLiteral("FilterLow"),
         QStringLiteral("FilterHigh"),
         // ── 3M-3a-iii Tasks 7-10 — DEXP downward-expander (11 keys) ────────
@@ -260,7 +260,7 @@ const QStringList& liveKeyList()
 // In Thetis the "extra profiles" group (Digi 1K@1500 onward) is gated
 // by the bIndcludeExtraProfiles flag, which is true for the seed
 // table "TXProfileDef" at database.cs:241 [v2.10.3.13] (this is the
-// pristine factory set users restore from).  NereusSDR ships ALL
+// pristine factory set users restore from).  Longpath ships ALL
 // factory profiles on every fresh install so users have the same
 // bank Thetis users would see after a "restore defaults" — keeping
 // the userland parity invariant from
@@ -287,7 +287,7 @@ struct FactoryProfile {
 
 // Helper: build the full 22-key EQ portion for a factory profile.  All 21
 // Thetis factory profiles set TXEQ1..10 + TxEqFreq1..10 explicitly in
-// database.cs, so we must encode every value byte-for-byte (NereusSDR's
+// database.cs, so we must encode every value byte-for-byte (Longpath's
 // defaultProfileValues() uses WDSP defaults like {-12,-12,-12,-1,1,4,9,
 // 12,-10,-10} which DIVERGE from the Thetis row defaults).
 //
@@ -718,8 +718,8 @@ const std::vector<FactoryProfile>& factoryProfiles()
             {QStringLiteral("CFCPostEqGain"),       QStringLiteral("-8")},    // database.cs:9317
         });
 
-    // ── Phase 3R Task K1: "RADE" NereusSDR-native preset ──────────────
-    // RADE is the NereusSDR-native digital voice mode driven by the
+    // ── Phase 3R Task K1: "RADE" Longpath-native preset ──────────────
+    // RADE is the Longpath-native digital voice mode driven by the
     // vendored RADE neural codec (third_party/rade, wired up across
     // Phase 3R Tasks I1-J4).  Because RADE bypasses the WDSP USB/LSB
     // modulator, most of the TXA chain (CFC / CESSB / Phase Rotator /
@@ -727,7 +727,7 @@ const std::vector<FactoryProfile>& factoryProfiles()
     // philosophy:
     //   * EQ off, all 10 bands flat at 0 dB.
     //   * Leveler ON at the same Lev_MaxGain=15 dB / Lev_Decay=100 ms
-    //     defaultProfileValues() ships (closest NereusSDR equivalent
+    //     defaultProfileValues() ships (closest Longpath equivalent
     //     to freedv-gui's WebRTC AGC -9 dBFS / 5 ms attack / 100 ms
     //     release; see Phase 3R K1 plan for the rationale).
     //   * ALC OFF (ALC_MaximumGain=0): RADE skips the USB/LSB
@@ -735,7 +735,7 @@ const std::vector<FactoryProfile>& factoryProfiles()
     //   * CFC / CESSB / Phase Rotator: all off (already off by
     //     defaultProfileValues, listed here for documentation).
     //
-    // NereusSDR-native; no Thetis equivalent (RADE was not a Thetis
+    // Longpath-native; no Thetis equivalent (RADE was not a Thetis
     // mode).  Leveler / ALC bypass philosophy sourced from freedv-gui
     // src/pipeline/RADETransmitStep.cpp [@77e793a].
     static const QHash<QString, QVariant> kRadeOverrides = mergeOverrides(
@@ -782,7 +782,7 @@ const std::vector<FactoryProfile>& factoryProfiles()
         {QStringLiteral("SSB 3.0k CFC"),      kSsb30CfcOverrides},
         {QStringLiteral("SSB 3.3k CFC"),      kSsb33CfcOverrides},
         {QStringLiteral("AM 10k CFC"),        kAm10kCfcOverrides},
-        // Phase 3R Task K1: NereusSDR-native RADE preset (TXA chain bypass).
+        // Phase 3R Task K1: Longpath-native RADE preset (TXA chain bypass).
         {QStringLiteral("RADE"),              kRadeOverrides},
     };
     return kProfiles;
@@ -1185,7 +1185,7 @@ QHash<QString, QVariant> MicProfileManager::defaultProfileValues()
     out.insert(QStringLiteral("CESSB_On"), QStringLiteral("False"));                 // database.cs:4689
 
     // ── Plan 4 D1 — TX filter bandwidth (2 keys) ─────────────────────────
-    // NereusSDR-original defaults: 100/2900 Hz (USB voice typical SSB).
+    // Longpath-original defaults: 100/2900 Hz (USB voice typical SSB).
     // Per Plan 4 spec §Task 2 (docs/superpowers/plans/2026-05-01-tx-bandwidth.md).
     out.insert(QStringLiteral("FilterLow"),  QStringLiteral("100"));   // Plan 4 D1 — USB voice SSB default
     out.insert(QStringLiteral("FilterHigh"), QStringLiteral("2900"));  // Plan 4 D1 — USB voice SSB default

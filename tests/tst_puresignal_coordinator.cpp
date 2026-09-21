@@ -1,7 +1,7 @@
-// no-port-check: NereusSDR-original unit-test file.  Thetis cite comments
+// no-port-check: Longpath-original unit-test file.  Thetis cite comments
 // document upstream sources; no Thetis logic ported in this test file.
 // =================================================================
-// tests/tst_puresignal_coordinator.cpp  (NereusSDR)
+// tests/tst_puresignal_coordinator.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for the Phase 3M-4 Task 7 PureSignal coordinator class.
@@ -35,10 +35,10 @@
 //   9. Auto-attention state machine transitions Monitor → SetNewValues →
 //      RestoreOperation → Monitor.
 //
-// Source: NereusSDR-original.  See PureSignal.h for the Thetis cite map.
+// Source: Longpath-original.  See PureSignal.h for the Thetis cite map.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-06 — New test file for Phase 3M-4 Task 7: PureSignal
 //                 coordinator unit tests.  J.J. Boyd (KG4VCF), with
 //                 AI-assisted implementation via Anthropic Claude Code.
@@ -243,7 +243,7 @@ private slots:
 
     void pollTimerTick_whenEnabled_runsWithoutCrash()
     {
-        // With NEREUS_BUILD_TESTS the bare TxChannel doesn't have a live
+        // With LONGPATH_BUILD_TESTS the bare TxChannel doesn't have a live
         // calcc engine, so getPSInfo returns silently (rsmpin null-guard
         // in TxChannel::getPSInfo).  pollTimerTick walks the cmd-state
         // machine but all info[] values stay 0.  The test verifies the
@@ -451,7 +451,7 @@ private slots:
     //
     // i.e. when the auto-att tick advances to SetNewValues, it force-enables
     // the ATT-on-TX master toggle so subsequent setAttOnTxValue calls
-    // actually push to hardware.  NereusSDR mirrors this directly via
+    // actually push to hardware.  Longpath mirrors this directly via
     // m_stepAtt->setAttOnTxEnabled(true) at the equivalent point in the
     // Monitor → SetNewValues transition.
     void autoAttentionTick_forceEnablesAttOnTxMaster()
@@ -534,7 +534,7 @@ private slots:
     // Inline tag preserved: //MI0BOT (HL2-only NeedToRecalibrate variant
     // attribution at PSForm.cs:1144).
     //
-    // NereusSDR uses StepAttenuatorController::minAttenuation() (per-board
+    // Longpath uses StepAttenuatorController::minAttenuation() (per-board
     // floor — 0 for legacy boards, -28 for HL2) to unify both Thetis
     // branches into one predicate.  HL2 with currentAtt=-15 (in the [-28,
     // -1] range) and fbLevel=100 should TRIGGER recal — Thetis legacy
@@ -699,7 +699,7 @@ private slots:
         //   if (_autocal_enabled)
         //       if (puresignal.HasInfoChanged)
         //           console.InfoBarFeedbackLevel(...);
-        // psInfoChanged is the NereusSDR analogue, gated identically.
+        // psInfoChanged is the Longpath analogue, gated identically.
         TxChannel tx(kTxChannelId);
         PureSignal ps(nullptr, &tx, nullptr, nullptr, nullptr, nullptr);
         ps.setAutoCalEnabled(true);
@@ -802,7 +802,7 @@ private slots:
 
     // ── PR #212 codex-fix A: HL2 psSampleRate=0 sentinel resolution ─────────
     //
-    // kHermesLite.psSampleRate = 0 is a NereusSDR sentinel meaning "use
+    // kHermesLite.psSampleRate = 0 is a Longpath sentinel meaning "use
     // rx1_rate at the codec/DDC layer per mi0bot console.cs:8472-8488
     // [v2.10.3.13-beta2]".  It is NOT a valid value for the calcc feedback
     // clock — calcc.c:1069 [v2.10.3.13] stores `a->rate = rate;` and uses
@@ -901,7 +901,7 @@ private slots:
     // HL2 board membership.
     //
     // We OBSERVE deltaDb via the post-tick newAtten = oldAtten + deltaDb
-    // computation at SetNewValues (PSForm.cs:786-790, NereusSDR
+    // computation at SetNewValues (PSForm.cs:786-790, Longpath
     // PureSignal.cpp:1208-1212).  oldAtten=0 + deltaDb=-100 → newAtten=-100
     // (clamped to minAtt=-28 in HL2 case via the existing minAttenuation
     // unification).  oldAtten=0 + deltaDb=-10 → newAtten=-10 (HL2 fix).
@@ -1656,7 +1656,7 @@ private slots:
         //   _ints = 16; _spi = 256;
         //   btnPSSave.Enabled = btnPSRestore.Enabled = true;
         // The Thetis switch has a default that mirrors case 0 verbatim.
-        // Out-of-range index in NereusSDR must reach the same behaviour.
+        // Out-of-range index in Longpath must reach the same behaviour.
         TxChannel tx(kTxChannelId);
         PureSignal ps(nullptr, &tx, nullptr, nullptr, nullptr, nullptr);
 
@@ -1672,7 +1672,7 @@ private slots:
     void setTintIndex_emitsSaveRestoreEnabledChanged_onTransitions()
     {
         // The combo handler unconditionally writes btnPSSave/Restore.Enabled
-        // for each case.  Wire the equivalent NereusSDR signal so subscribers
+        // for each case.  Wire the equivalent Longpath signal so subscribers
         // (PsForm) can react.  Default state must come from initial value;
         // we test transitions: 0 → 1 (true → false), 1 → 0 (false → true).
         TxChannel tx(kTxChannelId);

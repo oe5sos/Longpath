@@ -1,9 +1,9 @@
 // =================================================================
-// tests/tst_vax_first_run_dialog.cpp  (NereusSDR)
+// tests/tst_vax_first_run_dialog.cpp  (Longpath)
 // =================================================================
 //
 // Phase 3O Sub-Phase 11 Task 11a — widget-level coverage for the
-// first-run VAX setup dialog. The dialog itself is NereusSDR-original
+// first-run VAX setup dialog. The dialog itself is Longpath-original
 // (no Thetis port); see src/gui/VaxFirstRunDialog.{h,cpp}.
 //
 // Coverage:
@@ -358,7 +358,7 @@ private slots:
     {
         QVector<DetectedCable> payload;
         for (int slot = 1; slot <= 4; ++slot) {
-            payload.push_back({VirtualCableProduct::NereusSdrVax,
+            payload.push_back({VirtualCableProduct::LongpathVax,
                                QStringLiteral("NereusSDR VAX %1").arg(slot),
                                /*isInput=*/true, 0});
         }

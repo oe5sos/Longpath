@@ -1,6 +1,6 @@
 // src/gui/NetworkDiagnosticsDialog.cpp
 // =================================================================
-// src/gui/NetworkDiagnosticsDialog.cpp  (NereusSDR)
+// src/gui/NetworkDiagnosticsDialog.cpp  (Longpath)
 // =================================================================
 //
 //  Copyright (C) 2026 J.J. Boyd (KG4VCF)
@@ -19,9 +19,9 @@
 //  along with this program; if not, write to the Free Software
 //  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-30 — Created for Phase 3Q sub-PR-3 (shell-chrome redesign).
-//                NereusSDR-original code (no Thetis port; no upstream
+//                Longpath-original code (no Thetis port; no upstream
 //                attribution required). J.J. Boyd (KG4VCF), with
 //                AI-assisted implementation via Anthropic Claude Code.
 // =================================================================
@@ -407,7 +407,8 @@ void NetworkDiagnosticsDialog::refresh()
         const bool connected = m_model && m_model->isConnected();
         m_statusLabel->setText(
             connected
-                ? QStringLiteral("<span style='color:#5fff8a;'>&#x25cf; Connected</span>")
+                ? QStringLiteral("<span style='color:%1;'>&#x25cf; Connected</span>")
+                      .arg(QLatin1String(Style::kGreenText))
                 : QStringLiteral("<span style='color:#c25a5c;'>&#x25cf; Disconnected</span>"));
         m_statusLabel->setTextFormat(Qt::RichText);
     }

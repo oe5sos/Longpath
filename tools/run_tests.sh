@@ -9,7 +9,7 @@
 # That is not a reason to delay it. A test that has never executed is a
 # comment with punctuation.
 #
-# Tests are opt-in (-DNEREUS_BUILD_TESTS=ON) so the normal build stays
+# Tests are opt-in (-DLONGPATH_BUILD_TESTS=ON) so the normal build stays
 # fast; this script turns them on in a separate build directory so it
 # cannot disturb the one ./run.sh uses.
 #
@@ -37,7 +37,7 @@
 #   tools/run_tests.sh --serial     nacheinander (wenn GUI-Tests zicken)
 #   tools/run_tests.sh -- --verbose Rest an ctest durchreichen
 #
-# Modification history (NereusSDR):
+# Modification history (Longpath):
 #   2026-08-08 — Created for NereusSDR by Martin Fischer, AI-assisted
 #                 via Anthropic Claude (Cowork).
 #   2026-08-15 — Parallel laufen lassen; mit Filter nur die passenden
@@ -71,11 +71,11 @@ JOBS="$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4)"
 # aller Regel unproblematisch, aber wenn einer wegen Fokus oder
 # Fensterexposition zickt, ist --serial die Antwort — und dann ist es
 # eine Flake und kein Fehler, was zu wissen mehr wert ist als die Zeit.
-TEST_JOBS="${NEREUS_TEST_JOBS:-$JOBS}"
+TEST_JOBS="${LONGPATH_TEST_JOBS:-$JOBS}"
 [[ $SERIAL -eq 1 ]] && TEST_JOBS=1
 
 echo "── configure ─────────────────────────────────────────────────"
-cmake -S . -B "$BUILD" -G Ninja -DNEREUS_BUILD_TESTS=ON || exit 1
+cmake -S . -B "$BUILD" -G Ninja -DLONGPATH_BUILD_TESTS=ON || exit 1
 
 echo
 echo "── build ─────────────────────────────────────────────────────"
@@ -85,13 +85,13 @@ echo "── build ────────────────────�
 # gebaut. Bei einer Ein-Datei-Änderung war das Kompilieren dessen, was
 # gar nicht laufen sollte, der größere Teil der Wartezeit.
 #
-# Die Zielnamen stehen in tests/CMakeLists.txt als nereus_add_test(...).
+# Die Zielnamen stehen in tests/CMakeLists.txt als longpath_add_test(...).
 TARGETS=()
 if [[ -n "$FILTER" ]]; then
     while IFS= read -r t; do
         [[ -n "$t" ]] && TARGETS+=("$t")
-    done < <(grep -oE 'nereus_add_test\([A-Za-z0-9_]+\)' tests/CMakeLists.txt \
-             | sed -E 's/nereus_add_test\((.*)\)/\1/' \
+    done < <(grep -oE 'longpath_add_test\([A-Za-z0-9_]+\)' tests/CMakeLists.txt \
+             | sed -E 's/longpath_add_test\((.*)\)/\1/' \
              | grep -E "$FILTER" || true)
 fi
 

@@ -1,4 +1,4 @@
-// no-port-check: test-only — exercises NereusSDR-native VOX toggle wiring.
+// no-port-check: test-only — exercises Longpath-native VOX toggle wiring.
 // Phase 3M-1b J.2; updated 3M-3a-iii Task 16 (commit dropping the duplicate
 // TxApplet VOX surface + VoxSettingsPopup widget).
 //

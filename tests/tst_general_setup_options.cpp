@@ -1,11 +1,11 @@
-// tests/tst_general_setup_options.cpp  (NereusSDR)
+// tests/tst_general_setup_options.cpp  (Longpath)
 //
 // Phase 3M-0 Task 13 — Options group box on Setup → General.
 // no-port-check: test fixture — no Thetis attribution required.
 //
 // Verifies grpGeneralOptions contains chkPreventTXonDifferentBandToRX per
 // Thetis setup.designer.cs:9050-9059 [v2.10.3.13].
-// Note: tooltip is NereusSDR-original — Thetis has no tooltip on this control.
+// Note: tooltip is Longpath-original — Thetis has no tooltip on this control.
 
 #include <QtTest>
 #include <QGroupBox>
@@ -32,7 +32,7 @@ void TestGeneralSetupOptions::preventTxOnDifferentBand_present_unchecked()
     QVERIFY2(chk, "chkPreventTXonDifferentBandToRX not found");
     QCOMPARE(chk->text(), QString("Prevent TX'ing on a different band to the RX band"));
     QCOMPARE(chk->isChecked(), false);
-    // Tooltip is NereusSDR-original — Thetis has no tooltip on this control.
+    // Tooltip is Longpath-original — Thetis has no tooltip on this control.
     QVERIFY2(!chk->toolTip().isEmpty(), "chkPreventTXonDifferentBandToRX must have a tooltip");
 }
 

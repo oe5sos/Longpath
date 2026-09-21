@@ -1,8 +1,8 @@
 // =================================================================
-// tests/tst_pipewire_stream_integration.cpp  (NereusSDR)
+// tests/tst_pipewire_stream_integration.cpp  (Longpath)
 // Author: J.J. Boyd (KG4VCF), AI-assisted via Claude Code. 2026-04-24.
 // =================================================================
-#ifdef NEREUS_HAVE_PIPEWIRE
+#ifdef LONGPATH_HAVE_PIPEWIRE
 #include <QtTest/QtTest>
 #include "core/audio/PipeWireThreadLoop.h"
 #include "core/audio/PipeWireStream.h"
@@ -28,7 +28,7 @@ private slots:
         }
 
         StreamConfig cfg;
-        cfg.nodeName        = QStringLiteral("nereussdr.integration-test");
+        cfg.nodeName        = QStringLiteral("longpath.integration-test");
         cfg.nodeDescription = QStringLiteral("Integration test");
         cfg.direction       = StreamConfig::Output;
         cfg.mediaClass      = QStringLiteral("Stream/Output/Audio");

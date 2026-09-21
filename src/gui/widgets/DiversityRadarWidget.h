@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/widgets/DiversityRadarWidget.h  (NereusSDR)
+// src/gui/widgets/DiversityRadarWidget.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
@@ -13,14 +13,14 @@
 // getControlHandlePoint placement helper
 // (DiversityForm.cs:1610-1632 [v2.10.3.15]).  Upstream Thetis
 // defines CalcVrms but its callsite in picRadar_Paint is commented
-// out (DiversityForm.cs:1564-1580 [v2.10.3.15]); NereusSDR
+// out (DiversityForm.cs:1564-1580 [v2.10.3.15]); Longpath
 // uncomments and uses it to render the antenna lobe.  Visual
 // chrome (radial gradient backdrop, compass labels, dashed range
 // rings, translucent cyan lobe fill, centre dot, yellow steering
-// handle) is NereusSDR-original Qt6 paint.
+// handle) is Longpath-original Qt6 paint.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-27 — Reimplemented in C++20/Qt6 for NereusSDR by
 //                 J.J. Boyd (KG4VCF), with AI-assisted transformation
 //                 via Anthropic Claude Code.  Phase 3F Sub-Epic G

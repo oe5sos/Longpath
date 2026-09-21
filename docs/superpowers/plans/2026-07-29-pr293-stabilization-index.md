@@ -65,10 +65,10 @@ ctest --test-dir build -R '^tst_master_mixer$' --output-on-failure
 - Do not bypass hooks. Supply all four upstream source roots when committing:
 
 ```bash
-NEREUS_THETIS_DIR=/Users/j.j.boyd/Thetis \
-NEREUS_MI0BOT_DIR=/Users/j.j.boyd/mi0bot-Thetis \
-NEREUS_DESKHPSDR_DIR=/Users/j.j.boyd/deskhpsdr \
-NEREUS_FREEDV_DIR=/Users/j.j.boyd/freedv-gui \
+LONGPATH_THETIS_DIR=/Users/j.j.boyd/Thetis \
+LONGPATH_MI0BOT_DIR=/Users/j.j.boyd/mi0bot-Thetis \
+LONGPATH_DESKHPSDR_DIR=/Users/j.j.boyd/deskhpsdr \
+LONGPATH_FREEDV_DIR=/Users/j.j.boyd/freedv-gui \
 git commit -S
 ```
 

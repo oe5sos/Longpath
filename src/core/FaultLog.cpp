@@ -1,8 +1,8 @@
 // =================================================================
-// src/core/FaultLog.cpp  (NereusSDR)
+// src/core/FaultLog.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-native ring buffer of the last 10 fault events per device.
+// Longpath-native ring buffer of the last 10 fault events per device.
 // See FaultLog.h for full design notes.
 //
 // AI tooling: Anthropic Claude Code.

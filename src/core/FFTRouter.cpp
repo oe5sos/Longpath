@@ -1,8 +1,8 @@
 // =================================================================
-// src/core/FFTRouter.cpp  (NereusSDR)
+// src/core/FFTRouter.cpp  (Longpath)
 // =================================================================
 //
-// no-port-check: NereusSDR-original. See FFTRouter.h for full rationale
+// no-port-check: Longpath-original. See FFTRouter.h for full rationale
 // and the Modification history block.
 //
 // =================================================================

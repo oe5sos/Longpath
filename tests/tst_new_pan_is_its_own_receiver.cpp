@@ -1,8 +1,8 @@
 // =================================================================
-// tests/tst_new_pan_is_its_own_receiver.cpp  (NereusSDR)
+// tests/tst_new_pan_is_its_own_receiver.cpp  (Longpath)
 // =================================================================
 //
-// no-port-check: NereusSDR-original. Multi-pan slice-to-DDC placement is
+// no-port-check: Longpath-original. Multi-pan slice-to-DDC placement is
 // a Phase 3F concept; Thetis has a fixed RX1/RX2 pair and no allocator to
 // port from.
 //

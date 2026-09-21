@@ -42,7 +42,7 @@
 Build directory lives at `build/`. Standard build:
 
 ```bash
-cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DNEREUS_BUILD_TESTS=ON
+cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DLONGPATH_BUILD_TESTS=ON
 cmake --build build -j
 ```
 
@@ -365,7 +365,7 @@ Edit `tests/CMakeLists.txt`. Find the block around line 70 where `tst_hardware_p
 
 ```cmake
 # SampleRateCatalog — PR #35
-nereus_add_test(tst_sample_rate_catalog)
+longpath_add_test(tst_sample_rate_catalog)
 ```
 
 - [ ] **Step 3: Verify the test fails to link (SampleRateCatalog.cpp doesn't exist yet)**

@@ -1,12 +1,12 @@
 // =================================================================
-// src/gui/meters/ItemGroup.cpp  (NereusSDR)
+// src/gui/meters/ItemGroup.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/MeterManager.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -772,7 +772,7 @@ ItemGroup* ItemGroup::createPowerSwrPreset(const QString& name, QObject* parent)
 //   clsScaleItem z=3 ShowType=true            — centered red title via
 //       readingName(bindingId)
 //
-// NereusSDR collapses Thetis's dual-BarItem (separate _PK + _AV bars
+// Longpath collapses Thetis's dual-BarItem (separate _PK + _AV bars
 // chained via PostDrawItem) into a single BarItem whose ShowPeakValue
 // + m_peakValue tracking provides the same visual effect: one bar
 // shows the live average, one marker holds the decaying peak.
@@ -835,7 +835,7 @@ ItemGroup* ItemGroup::buildBarRow(int bindingId,
     group->addItem(bar);
 
     // z=3 Scale with ShowType centered title + linear tick layout
-    // (Thetis line 23381-23388). Falls through to the NereusSDR
+    // (Thetis line 23381-23388). Falls through to the Longpath
     // Linear scale renderer since each bar row uses a linear tick
     // layout — GeneralScale's two-tone is reserved for the S-Meter
     // preset where lowStart/highEnd are asymmetric.
@@ -1176,7 +1176,7 @@ ItemGroup* ItemGroup::createAnanMMPreset(QObject* parent)
     // they hide in RX and in TX groups other than 1. Thetis's nspi has
     // no filter of its own (MeterManager.cs:22647+), but the ANANMM
     // port previously rendered the pwr labels over the S-meter scale
-    // in RX — this is the deliberate NereusSDR fix for that overlap.
+    // in RX — this is the deliberate Longpath fix for that overlap.
     pwrScale->setOnlyWhenTx(true);
     pwrScale->setDisplayGroup(1);
     // Same calibration as power needle

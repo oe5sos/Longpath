@@ -1,4 +1,4 @@
-// tests/tst_general_options_page_step_att_init.cpp  (NereusSDR)
+// tests/tst_general_options_page_step_att_init.cpp  (Longpath)
 //
 // no-port-check: test fixture — no Thetis attribution required.
 //

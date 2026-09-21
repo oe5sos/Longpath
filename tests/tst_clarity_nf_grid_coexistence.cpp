@@ -14,7 +14,7 @@
 // Running both simultaneously is safe because they are independent
 // transformations. This test verifies the safety contract.
 //
-// no-port-check: NereusSDR-original test; no Thetis equivalent.
+// no-port-check: Longpath-original test; no Thetis equivalent.
 
 #include <QtTest/QtTest>
 #include <QSignalSpy>

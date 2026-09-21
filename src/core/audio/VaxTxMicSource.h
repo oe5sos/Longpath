@@ -1,10 +1,10 @@
 // =================================================================
-// src/core/audio/VaxTxMicSource.h  (NereusSDR)
+// src/core/audio/VaxTxMicSource.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original file. No Thetis logic ported here — Thetis has
+// Longpath-original file. No Thetis logic ported here — Thetis has
 // VAC/IVAC for this role and uses a fundamentally different pipeline
-// (named pipes + SetupForm). VaxTxMicSource is a NereusSDR-native
+// (named pipes + SetupForm). VaxTxMicSource is a Longpath-native
 // thin shim that implements the TxMicRouter interface by dispatching
 // to AudioEngine::pullVaxTxMic, the accessor that drains the VAX TX
 // shared-memory bus.
@@ -32,7 +32,7 @@
 // 02110-1301, USA.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-06 — Original implementation for NereusSDR by J.J. Boyd
 //                 (KG4VCF), VAX TX → mic-source wiring, with
 //                 AI-assisted implementation via Anthropic Claude
@@ -43,7 +43,7 @@
 //                 m_vaxTxBus / mic lives — Sub-Phase 9").
 // =================================================================
 
-// no-port-check: NereusSDR-original file; no Thetis logic ported here.
+// no-port-check: Longpath-original file; no Thetis logic ported here.
 
 #pragma once
 

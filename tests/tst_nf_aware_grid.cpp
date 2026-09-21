@@ -1,5 +1,5 @@
 // no-port-check: unit tests for Task 2.9 NF-aware grid + NoiseFloorEstimator::prime().
-// NereusSDR-original — no Thetis upstream for the grid tracking logic.
+// Longpath-original — no Thetis upstream for the grid tracking logic.
 // Thetis source reference: console.cs:46074-46086 [v2.10.3.13] GridMinFollowsNFRX1.
 //
 // Tests verify:
@@ -141,7 +141,7 @@ private slots:
 
     void prime_stores_seeded_value()
     {
-        // NereusSDR-original — no Thetis equivalent.
+        // Longpath-original — no Thetis equivalent.
         // prime() seeds the estimator so Task 2.10 per-band priming works.
         NoiseFloorEstimator est;
         QVERIFY(!est.hasPrimedValue());  // starts empty

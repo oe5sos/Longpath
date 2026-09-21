@@ -1,8 +1,8 @@
 // =================================================================
-// tests/tst_restored_sample_rate_reaches_the_ddc.cpp  (NereusSDR)
+// tests/tst_restored_sample_rate_reaches_the_ddc.cpp  (Longpath)
 // =================================================================
 //
-// no-port-check: NereusSDR-original. Per-slice per-band sample rate is a
+// no-port-check: Longpath-original. Per-slice per-band sample rate is a
 // Phase 3F concept with no Thetis equivalent: Thetis carries one rate for
 // the whole radio in C&C bank 0.
 //

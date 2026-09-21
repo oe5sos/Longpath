@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/MemoryPressure.cpp  (NereusSDR-native)
+// src/core/MemoryPressure.cpp  (Longpath-native)
 // =================================================================
 // 2026-05-26  J.J. Boyd (KG4VCF), AI-assisted via Anthropic Claude.
 // See MemoryPressure.h for design rationale.

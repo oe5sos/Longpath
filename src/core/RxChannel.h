@@ -1,7 +1,7 @@
 #pragma once
 
 // =================================================================
-// src/core/RxChannel.h  (NereusSDR)
+// src/core/RxChannel.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -12,7 +12,7 @@
 //   Project Files/Source/ChannelMaster/cmaster.c, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -277,7 +277,7 @@ public:
     void setMode(DSPMode mode);
 
     // Translate a slice-facing DSPMode to the value that WDSP's SetRXAMode
-    // should receive. RADE_U / RADE_L are NereusSDR-native (WdspTypes.h
+    // should receive. RADE_U / RADE_L are Longpath-native (WdspTypes.h
     // :159-186); WDSP has no knowledge of them. The Phase 3R K-bench RX
     // pipeline runs WDSP as the demod front-end in RADE modes so RADE_U
     // -> USB and RADE_L -> LSB. All other modes pass through unchanged.
@@ -400,7 +400,7 @@ public:
     // WDSP NR stage.  Defaults match Thetis radio.cs / RXA.c byte-for-byte.
 
     // NR1 — LMS Adaptive Noise Reduction (Thetis: WDSP anr.c, Warren Pratt NR0V)
-    // Gain/leakage stored in UI units; NereusSDR setters apply the same
+    // Gain/leakage stored in UI units; Longpath setters apply the same
     // scaling Thetis setup.cs:8545-8550 applies before the WDSP call:
     //   WDSP gain    = 1e-6 * gainUiValue   (Thetis udLMSNRgain  → SetRXAANRVals)
     //   WDSP leakage = 1e-3 * leakUiValue   (Thetis udLMSNRLeak  → SetRXAANRVals)
@@ -474,6 +474,24 @@ public:
         NrPosition position          = NrPosition::PostAgc;
     };
 
+    // NNR — Neural Noise Reduction (WDSP 2.10 nnr.c, Warren Pratt NR0V).
+    // No Thetis precedent — new upstream algorithm. Defaults match WDSP's
+    // own internal defaults: RXA.c's create_nnr() call (mask floor, position)
+    // and nnet.c's create_nnet_slot()/NNET_TAU_DEFAULT/NNET_GMAX_DB (tau,
+    // max gain, zero attack/release meaning "use the model's own smoothing").
+    struct NnrTuning {
+        NrPosition position = NrPosition::PostAgc;  // RXA.c create_nnr() position=1
+        int    model        = 0;      // slot 0 (small) or 1 (large)
+        double maskFloorDb  = -25.0;  // RXA.c create_nnr() mask_floor
+        double alpha        = 1.0;
+        double alphaKneeDb  = 10.0;
+        double tauSeconds   = 2.0;    // nnet.c NNET_TAU_DEFAULT
+        double maxGainDb    = 12.0;   // nnet.c NNET_GMAX_DB
+        double attackMs     = 0.0;
+        double releaseMs    = 0.0;
+        // Note: NNR model files are global (SetNNRModelPathSlot), not per-channel.
+    };
+
     // ----- NR API (Sub-epic C-1) -----
     // New unified NR surface.  Coexists with legacy setEmnrEnabled /
     // setNrEnabled stubs until Task 12 finishes the SliceModel cutover.
@@ -483,6 +501,7 @@ public:
     void setEmnrTuning (const Nr2Tuning& t);
     void setRnnrTuning (const Nr3Tuning& t);
     void setSbnrTuning (const Nr4Tuning& t);
+    void setNnrTuning  (const NnrTuning& t);
 
     // Per-knob convenience setters (single WDSP call each).
     // Gain/leakage are in raw WDSP domain (caller is responsible for 1e-6/1e-3 scaling).
@@ -530,6 +549,17 @@ public:
     void setSbnrNoiseRescale        (double dB);
     void setSbnrPostFilterThreshold (double dB);
     void setSbnrAlgo                (SbnrAlgo a);
+
+    // NNR per-knob setters.
+    void setNnrPosition   (NrPosition p);
+    void setNnrModel      (int slot);        // 0 or 1; per-channel model selector
+    void setNnrMaskFloor  (double floorDb);
+    void setNnrAlpha      (double alpha);
+    void setNnrAlphaKnee  (double kneeDb);
+    void setNnrTau        (double tauSeconds);
+    void setNnrMaxGain    (double gainDb);
+    void setNnrSmooth     (double attackMs, double releaseMs);
+    NnrTuning nnrTuning() const { return m_nnrTuning; }
 
     // Central mode dispatch — flip SetRXA*Run flags so exactly 0 or 1 is on.
     // Byte-for-byte from Thetis console.cs:43297-43450 SelectNR() [v2.10.3.13].
@@ -623,7 +653,7 @@ public:
     double afGain() const { return m_afGain.load(); }
     void setAfGain(double gain);  // gain ∈ [0.0, 1.0], clamped
 
-    // Audio pan: NereusSDR range -1.0..+1.0 (0.0 = center).
+    // Audio pan: Longpath range -1.0..+1.0 (0.0 = center).
     // Converted to WDSP 0.0..1.0 via wdsp_pan = (pan + 1.0) / 2.0.
     // From Thetis Project Files/Source/Console/radio.cs:1386-1403
     //   Thetis default pan = 0.5f (center in 0..1 scale)
@@ -797,7 +827,7 @@ public:
     ///   Requires HAVE_WDSP and HAVE_FFTW3.  Returns an empty vector when
     ///   either is absent or when nPoints <= 0.
     ///
-    /// NereusSDR-original — no Thetis source ported; algorithm is generic.
+    /// Longpath-original — no Thetis source ported; algorithm is generic.
     QVector<float> filterResponseMagnitudes(int nPoints) const;
 
     // --- State snapshot / restore (Task 1.2) ---
@@ -1030,6 +1060,7 @@ private:
     Nr2Tuning m_nr2Tuning;
     Nr3Tuning m_nr3Tuning;
     Nr4Tuning m_nr4Tuning;
+    NnrTuning m_nnrTuning;
 
     // Post-WDSP filter "on" flags.  Filter instances (DeepFilterFilter,
     // NvidiaBnrFilter, MacNRFilter) land in Tasks 9-11; these atomics exist now

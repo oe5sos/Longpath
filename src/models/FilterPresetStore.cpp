@@ -1,14 +1,14 @@
-// no-port-check: NereusSDR-original file; Thetis console.cs references are
+// no-port-check: Longpath-original file; Thetis console.cs references are
 //   inline doc comments only — logic delegates to SliceModel::presetsForMode
 //   which already carries full Thetis attribution.
 // =================================================================
-// src/models/FilterPresetStore.cpp  (NereusSDR)
+// src/models/FilterPresetStore.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original file. See FilterPresetStore.h for full header.
+// Longpath-original file. See FilterPresetStore.h for full header.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-02 — Original implementation for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted authoring via Anthropic
 //                 Claude Code (Stage C2 filter preset editor).

@@ -1,7 +1,7 @@
 // =================================================================
-// tests/tst_alex_controller_event_matrix.cpp  (NereusSDR)
+// tests/tst_alex_controller_event_matrix.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure.
+// no-port-check: Longpath-original test infrastructure.
 //
 // Phase 3F Sub-Epic B Task 17: AlexController event trigger matrix
 // coverage per docs/architecture/2026-05-26-phase3f-multi-pan-multi-slice-design.md §10.

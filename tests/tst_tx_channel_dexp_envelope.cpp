@@ -1,7 +1,7 @@
-// no-port-check: NereusSDR-original unit-test file. Thetis cite comments
+// no-port-check: Longpath-original unit-test file. Thetis cite comments
 // document upstream sources; no Thetis logic ported in this test file.
 // =================================================================
-// tests/tst_tx_channel_dexp_envelope.cpp  (NereusSDR)
+// tests/tst_tx_channel_dexp_envelope.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for TxChannel DEXP envelope/timing setters (Phase 3M-3a-iii).
@@ -13,20 +13,20 @@
 //   setup.Designer.cs:45027-45055 [v2.10.3.13] - udDEXPAttack 2..100 ms default 2.
 //   setup.Designer.cs:44967-44995 [v2.10.3.13] - udDEXPRelease 2..1000 ms default 100.
 //
-// Tests verify (NEREUS_BUILD_TESTS test-seam accessors required):
+// Tests verify (LONGPATH_BUILD_TESTS test-seam accessors required):
 //   - First call stores the value (NaN sentinel fires on doubles).
 //   - Round-trip / clamp at the wrapper boundary (Thetis ranges).
 //   - Idempotent guard: second identical call is observable as the stored value.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-03 - New test file for Phase 3M-3a-iii Tasks 1-2: DEXP master-
 //                 enable, detector-tau, attack-time, release-time wrappers.
 //                 J.J. Boyd (KG4VCF), with AI-assisted implementation via
 //                 Anthropic Claude Code.
 // =================================================================
 
-#define NEREUS_BUILD_TESTS 1
+#define LONGPATH_BUILD_TESTS 1
 
 #include <QtTest/QtTest>
 #include <cmath>   // std::isnan

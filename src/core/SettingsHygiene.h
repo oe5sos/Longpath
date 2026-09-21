@@ -1,8 +1,8 @@
 // =================================================================
-// src/core/SettingsHygiene.h  (NereusSDR)
+// src/core/SettingsHygiene.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. Validates persisted AppSettings (stored under
+// Longpath-original. Validates persisted AppSettings (stored under
 // hardware/<mac>/...) against the connected board's BoardCapabilities.
 // Surfaces mismatches (e.g. persisted S-ATT value exceeds board range)
 // as a QVector<Issue> that the Diagnostics → Radio Status page can
@@ -11,7 +11,7 @@
 // No Thetis port at this layer.
 // =================================================================
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-20 — Original implementation for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted implementation via
 //                 Anthropic Claude Code.
@@ -78,23 +78,23 @@ private:
     // ── Individual validation rules ────────────────────────────────────────
 
     // S-ATT: persisted attenuator dB value exceeds caps.attenuator.maxDb.
-    // no-port-check: NereusSDR-original rule.
+    // no-port-check: Longpath-original rule.
     void checkStepAtt(const QString& mac, const BoardCapabilities& caps);
 
     // Saturn BPF1 settings persisted for a non-Saturn board.
-    // no-port-check: NereusSDR-original rule.
+    // no-port-check: Longpath-original rule.
     void checkSaturnBpf1(const QString& mac, const BoardCapabilities& caps);
 
     // N2ADR filter enabled but board is not HL2.
-    // no-port-check: NereusSDR-original rule.
+    // no-port-check: Longpath-original rule.
     void checkN2adrFilter(const QString& mac, const BoardCapabilities& caps);
 
     // Apollo settings persisted but caps.hasApollo = false.
-    // no-port-check: NereusSDR-original rule.
+    // no-port-check: Longpath-original rule.
     void checkApolloSettings(const QString& mac, const BoardCapabilities& caps);
 
     // Per-band Alex TX antenna unset (any band has no TX antenna assigned).
-    // no-port-check: NereusSDR-original rule.
+    // no-port-check: Longpath-original rule.
     void checkAlexAntenna(const QString& mac, const BoardCapabilities& caps);
 
     // Helper: emit a Warning that a persisted dB value exceeds the board range.

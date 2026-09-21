@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // =================================================================
-// src/core/KiwiSdrProtocol.{h,cpp}  (NereusSDR / Longpath)
+// src/core/KiwiSdrProtocol.{h,cpp}  (Longpath)
 // =================================================================
 //
 // Ported from AetherSDR src/core/KiwiSdrProtocol.{h,cpp} [@31b29583].
@@ -12,7 +12,7 @@
 // Das KiwiSDR-Protokoll selbst stammt von John Seamons (ZL/KF6VO),
 // http://kiwisdr.com — hier nachgebildet, nicht kopiert.
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-23 — Portiert auf Wunsch des Betreibers ("kiwi bitte
 //                nachtschicht"). Namensraum AetherSDR -> Longpath,
 //                sonst zeichengetreu: dieses Protokoll spricht mit

@@ -1,7 +1,7 @@
 // =================================================================
-// tests/tst_master_mixer.cpp  (NereusSDR)
+// tests/tst_master_mixer.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure. The Thetis
+// no-port-check: Longpath-original test infrastructure. The Thetis
 // aamix.c citations below are rationale, not ported code: they record
 // WHY the barrier waits without a timeout and why a slice leaves the mix
 // only when told to, so that a future reader does not reintroduce the

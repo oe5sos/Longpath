@@ -1,14 +1,14 @@
 // =================================================================
-// tests/tst_pc_mic_source.cpp  (NereusSDR)
+// tests/tst_pc_mic_source.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original test file. No Thetis port at this layer.
+// Longpath-original test file. No Thetis port at this layer.
 //
 // Exercises PcMicSource — the TxMicRouter implementation that taps
 // AudioEngine::pullTxMic (Phase 3M-1b Task F.1).
 //
 // Strategy: inject a FakeAudioBus into AudioEngine's TX-input slot via
-// the NEREUS_BUILD_TESTS seam setTxInputBusForTest, then verify that
+// the LONGPATH_BUILD_TESTS seam setTxInputBusForTest, then verify that
 // PcMicSource::pullSamples correctly dispatches to AudioEngine::pullTxMic
 // and returns the same sample count and values. This approach exercises
 // the full dispatch chain end-to-end rather than just a mock — matching
@@ -17,13 +17,13 @@
 // Pre-code review cite: §0.3 + §12.7 (PcMicSource arch lock).
 // =================================================================
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-27 — Original test for NereusSDR by J.J. Boyd (KG4VCF),
 //                 Phase 3M-1b Task F.1, with AI-assisted implementation
 //                 via Anthropic Claude Code.
 // =================================================================
 
-// no-port-check: NereusSDR-original test file.
+// no-port-check: Longpath-original test file.
 
 #include <QtTest/QtTest>
 

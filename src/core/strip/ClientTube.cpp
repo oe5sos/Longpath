@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/strip/ClientTube.cpp  (NereusSDR)
+// src/core/strip/ClientTube.cpp  (Longpath)
 // =================================================================
 //
 // Ported from AetherSDR (https://github.com/aethersdr/AetherSDR),
@@ -18,10 +18,10 @@
 // reason for taking them first.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-08 — Ported to NereusSDR by Martin Fischer, AI-assisted via
 //                 Anthropic Claude (Cowork). Namespace AetherSDR →
-//                 NereusSDR; include paths rebased onto core/strip/.
+//                 Longpath; include paths rebased onto core/strip/.
 //                 DSP unchanged.
 //   2026-08-09 — shape() split into a public static shapeAt(x, bias,
 //                 model) so the editor draws the curve the DSP runs

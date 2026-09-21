@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/audio/CoreAudioHalBus.cpp  (NereusSDR)
+// src/core/audio/CoreAudioHalBus.cpp  (Longpath)
 // =================================================================
 //
 // Ported from AetherSDR source:
@@ -7,15 +7,15 @@
 //
 // AetherSDR is licensed under the GNU General Public License v3; see
 // https://github.com/ten9876/AetherSDR for the contributor list and
-// project-level LICENSE. NereusSDR is also GPLv3. AetherSDR source
+// project-level LICENSE. Longpath is also GPLv3. AetherSDR source
 // files carry no per-file GPL header; attribution is at project level
 // per AetherSDR convention.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-19 — Ported/adapted in C++20 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
-//                 Claude Code. Adapted to NereusSDR IAudioBus contract:
+//                 Claude Code. Adapted to Longpath IAudioBus contract:
 //                 monolithic VirtualAudioBridge decomposed into per-endpoint
 //                 CoreAudioHalBus instances (Role enum for Vax1..4 / TxInput),
 //                 QObject/signals dropped in favor of atomic metering,
@@ -48,11 +48,11 @@ namespace {
 
 // Agreed shm-name table (Task 5.1 D7). Stored as string literals so the .h
 // can hand out a `const char*` without owning a QString or QByteArray.
-constexpr const char* kShmNameVax1   = "/nereussdr-vax-1";
-constexpr const char* kShmNameVax2   = "/nereussdr-vax-2";
-constexpr const char* kShmNameVax3   = "/nereussdr-vax-3";
-constexpr const char* kShmNameVax4   = "/nereussdr-vax-4";
-constexpr const char* kShmNameTxIn   = "/nereussdr-vax-tx";
+constexpr const char* kShmNameVax1   = "/longpath-vax-1";
+constexpr const char* kShmNameVax2   = "/longpath-vax-2";
+constexpr const char* kShmNameVax3   = "/longpath-vax-3";
+constexpr const char* kShmNameVax4   = "/longpath-vax-4";
+constexpr const char* kShmNameTxIn   = "/longpath-vax-tx";
 
 const char* shmNameForRole(CoreAudioHalBus::Role role) {
     switch (role) {

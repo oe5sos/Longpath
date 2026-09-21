@@ -1,12 +1,12 @@
 // =================================================================
-// src/core/SkuUiProfile.cpp  (NereusSDR)
+// src/core/SkuUiProfile.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/setup.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-22 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -74,7 +74,7 @@ SkuUiProfile skuUiProfileFor(HPSDRModel sku)
     case HPSDRModel::HPSDR:
         // HPSDR (pre-ANAN Atlas/Penelope) has no explicit case in the Thetis
         // setup.cs:19832-20405 antenna-overlay switch — it falls through and
-        // the panel renders with default-initialized fields. NereusSDR-native
+        // the panel renders with default-initialized fields. Longpath-native
         // fallback: treat as classic Alex with all TX-bypass options visible,
         // matching HERMES (setup.cs:19832-19861) except hasRxBypassUi=true
         // (hypothetical hardware — user can disable in UI if not present).
@@ -123,7 +123,7 @@ SkuUiProfile skuUiProfileFor(HPSDRModel sku)
     case HPSDRModel::ORIONMKII:
         // ORIONMKII has no explicit case in the Thetis setup.cs:19832-20405
         // antenna-overlay switch — it falls through with panel defaults.
-        // NereusSDR-native grouping: mirrors the ANAN100-family EXT2/EXT1/XVTR
+        // Longpath-native grouping: mirrors the ANAN100-family EXT2/EXT1/XVTR
         // labels and classic-Alex checkbox set because ORIONMKII predates the
         // BPS-port generation (7000D+) and shares the EXT-prefixed wiring.
         p.hasExt1OutOnTx = true;   // setup.cs:6270-6271 (default else branch)

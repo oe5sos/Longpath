@@ -1,12 +1,12 @@
 // =================================================================
-// tests/tst_pgxl_connection_save.cpp  (NereusSDR)
+// tests/tst_pgxl_connection_save.cpp  (Longpath)
 // =================================================================
-// NereusSDR-native test. No AetherSDR equivalent (Tier 2 command surface
-// is NereusSDR-only per design doc section 2 and 6.4).
+// Longpath-native test. No AetherSDR equivalent (Tier 2 command surface
+// is Longpath-only per design doc section 2 and 6.4).
 // Wire format from FlexRadio PowerGenius Ethernet API wiki spec:
 //   "save" -> R<seq>|0|saving -> amp acknowledges then reboots.
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-19  Created by J.J. Boyd (KG4VCF), with AI-assisted
 //                 transformation via Anthropic Claude Code.
 //                 Tests: save command frame, saveAcknowledged signal on

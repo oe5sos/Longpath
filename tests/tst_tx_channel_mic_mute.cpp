@@ -51,7 +51,7 @@ warren@wpratt.com
 */
 
 // =================================================================
-// tests/tst_tx_channel_mic_mute.cpp  (NereusSDR)
+// tests/tst_tx_channel_mic_mute.cpp  (Longpath)
 // =================================================================
 //
 // No Thetis code is directly ported in this test file.  The test exercises:
@@ -72,7 +72,7 @@ warren@wpratt.com
 //                                 → MicPreamp = 0.0
 //   D.6's setMicPreamp(0.0) maps exactly to the mute=true (Checked==false) path.
 //
-// Tests verify (NEREUS_BUILD_TESTS test-seam accessor required):
+// Tests verify (LONGPATH_BUILD_TESTS test-seam accessor required):
 //   1. First call with a non-zero value stores the value (NaN sentinel fires).
 //   2. Zero value (mute case) stores 0.0 correctly (NaN guard passes for 0.0).
 //   3. Round-trip: set A, then B → accessor returns B.
@@ -89,22 +89,22 @@ warren@wpratt.com
 //
 // Total test cases: 8
 //
-// Requires NEREUS_BUILD_TESTS (set by CMakeLists target tst_tx_channel_mic_mute).
+// Requires LONGPATH_BUILD_TESTS (set by CMakeLists target tst_tx_channel_mic_mute).
 // Test-seam accessor (lastMicPreampForTest) is compiled into TxChannel only
 // when that define is set.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-27 — New test for Phase 3M-1b Task D.6: TxChannel mic-mute path
 //                 (setMicPreamp / recomputeTxAPanelGain1).
 //                 J.J. Boyd (KG4VCF), with AI-assisted implementation via
 //                 Anthropic Claude Code.
 // =================================================================
 
-// no-port-check: NereusSDR-original test file. All Thetis source cites are
+// no-port-check: Longpath-original test file. All Thetis source cites are
 // in TxChannel.h/cpp.
 
-#define NEREUS_BUILD_TESTS 1
+#define LONGPATH_BUILD_TESTS 1
 
 #include <QtTest/QtTest>
 #include <cmath>   // std::isnan

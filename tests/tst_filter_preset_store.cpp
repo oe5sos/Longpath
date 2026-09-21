@@ -1,9 +1,9 @@
 // tst_filter_preset_store.cpp
 //
-// no-port-check: NereusSDR-original test file. All Thetis filter-preset
+// no-port-check: Longpath-original test file. All Thetis filter-preset
 // source cites are in SliceModel.cpp (console.cs:5180-5575 [v2.10.3.13]).
 // =================================================================
-// tests/tst_filter_preset_store.cpp  (NereusSDR)
+// tests/tst_filter_preset_store.cpp  (Longpath)
 // =================================================================
 //
 // Stage C2 (Task TDD) — verifies FilterPresetStore:
@@ -18,7 +18,7 @@
 // Isolation: uses AppSettings::clear() in initTestCase/init/cleanup so that
 // filter overrides written here cannot bleed into other tests.
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-02 — Original implementation for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted authoring via Anthropic
 //                 Claude Code (Stage C2 filter preset editor).

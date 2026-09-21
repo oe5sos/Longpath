@@ -1,4 +1,4 @@
-// tests/tst_transmit_setup_tx_inhibit.cpp  (NereusSDR)
+// tests/tst_transmit_setup_tx_inhibit.cpp  (Longpath)
 //
 // Phase 3M-0 Task 10 — External TX Inhibit group box on Setup → Transmit.
 // no-port-check: test fixture — no Thetis attribution required.

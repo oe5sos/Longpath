@@ -1,11 +1,11 @@
 // =================================================================
-// src/gui/widgets/SwrSweepPanel.cpp  (NereusSDR)
+// src/gui/widgets/SwrSweepPanel.cpp  (Longpath)
 // =================================================================
 //
 // See SwrSweepPanel.h.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-13 — Created by Ralph Martin Fischer (OE5SOS),
 //                 AI-assisted implementation via Anthropic Claude
 //                 (Cowork).
@@ -637,7 +637,7 @@ void SwrSweepPanel::refreshTunePowerLabel()
     m_powerLabel->setToolTip(QStringLiteral(
         "Die Leistung, mit der der Sweep sendet — dieselbe, die TUNE "
         "benutzt.\n\n"
-        "Welcher Regler das ist, steht in Klammern: NereusSDR kennt "
+        "Welcher Regler das ist, steht in Klammern: Longpath kennt "
         "drei Quellen für die Tune-Leistung (RF-Power-Regler, "
         "Tune-Pwr-Regler, fester Wert aus dem Setup), und in der "
         "Voreinstellung ist es der RF-Power-Regler — der Tune-Pwr-"

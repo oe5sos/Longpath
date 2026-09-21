@@ -196,10 +196,11 @@ void HGauge::paintReadout(QPainter& p)
     const int h = height();
     const bool ueber = (m_value >= m_redStart);
 
-    QFont f = p.font();
-    f.setPixelSize(Style::kFontCaption);
-    f.setBold(false);
-    p.setFont(f);
+    // Glas & Tiefe (2026-09-17): Beschriftung als Versalzeile, die
+    // Rinne VERSENKT (Innenschatten oben, Lichtkante unten), die
+    // Fuellung ein Verlauf von gedaempft nach voll, die Zahl in
+    // Monospace (Regel 4) — dieselbe Bauart wie im Bandfilter.
+    p.setFont(Style::capsFont(font(), Style::kFontCaption));
     p.setPen(QColor(Style::role("text-scale", Style::kTextScale)));
     p.drawText(QRect(0, 0, m_labelWidth, h),
                Qt::AlignLeft | Qt::AlignVCenter, m_title);
@@ -211,9 +212,16 @@ void HGauge::paintReadout(QPainter& p)
     const int barY = (h - barH) / 2;
 
     if (barW > 8) {
+        p.setRenderHint(QPainter::Antialiasing, true);
         p.setPen(QColor(Style::role("border", Style::kBorder)));
-        p.setBrush(QColor(Style::role("inset", Style::kInsetBg)));
-        p.drawRoundedRect(x, barY, barW, barH, 2, 2);
+        p.setBrush(QColor(0, 0, 0));
+        p.drawRoundedRect(QRectF(x, barY, barW, barH), barH / 2.0, barH / 2.0);
+        p.setRenderHint(QPainter::Antialiasing, false);
+        // Innenschatten oben, Lichtkante unten — in der Rinne.
+        p.setPen(QColor(0, 0, 0, Style::kGlassShadeAlpha));
+        p.drawLine(x + 3, barY + 1, x + barW - 4, barY + 1);
+        p.setPen(QColor(255, 255, 255, Style::kGlassLightAlpha));
+        p.drawLine(x + 3, barY + barH - 1, x + barW - 4, barY + barH - 1);
 
         const double range = m_max - m_min;
         if (range > 0.0) {
@@ -226,22 +234,40 @@ void HGauge::paintReadout(QPainter& p)
                 const int redX    = static_cast<int>(redNorm * (barW - 2));
                 p.setPen(Qt::NoPen);
 
-                const int normalEnd = qMin(fill, yellowX);
-                if (normalEnd > 0) {
-                    p.setBrush(QColor(Style::role("measured-dim", Style::kAmberDim)));
-                    p.drawRoundedRect(x + 1, barY + 1, normalEnd, barH - 2, 1, 1);
+                // Gemessen: Bernstein, als Verlauf von gedaempft (links)
+                // nach voll (an der Warnschwelle). Die Pille geht ueber die
+                // GANZE Fuellung; Warn- und Gefahrenzone liegen als
+                // Rechtecke darueber — so entsteht am Zonenwechsel keine
+                // Stufe zwischen rundem Ende und eckigem Anfang.
+                {
+                    QLinearGradient g(x + 1, 0, x + 1 + qMax(1, yellowX), 0);
+                    g.setColorAt(0.0, QColor(Style::role("measured-dim", Style::kAmberDim)));
+                    g.setColorAt(1.0, QColor(Style::role("measured", Style::kAmberText)));
+                    p.setBrush(g);
+                    p.setRenderHint(QPainter::Antialiasing, true);
+                    p.drawRoundedRect(QRectF(x + 1, barY + 1, fill, barH - 2),
+                                      (barH - 2) / 2.0, (barH - 2) / 2.0);
+                    p.setRenderHint(QPainter::Antialiasing, false);
                 }
                 if (fill > yellowX) {
                     const int warnEnd = qMin(fill, redX) - yellowX;
                     if (warnEnd > 0) {
+                        // Zweite Helligkeit DERSELBEN Groesse, kein
+                        // zweiter Farbbegriff — wie ab S9 beim Pegel.
                         p.setBrush(QColor(Style::role("measured", Style::kAmberText)));
                         p.drawRect(x + 1 + yellowX, barY + 1, warnEnd, barH - 2);
                     }
                 }
                 if (fill > redX) {
+                    // Ab hier ist es keine Messung mehr, sondern eine
+                    // Warnung. Bleibt kraeftig (CLAUDE.local.md: das
+                    // SWR-Rot wird nicht entsaettigt).
                     p.setBrush(QColor(Style::role("danger", Style::kGaugeDanger)));
                     p.drawRect(x + 1 + redX, barY + 1, fill - redX, barH - 2);
                 }
+                // Lichtkante auf der Fuellung: das Glas liegt darueber.
+                p.setPen(QColor(255, 255, 255, Style::kGlassLightAlpha));
+                p.drawLine(x + 3, barY + 1, x + 1 + fill - 2, barY + 1);
             }
         }
     }
@@ -249,9 +275,7 @@ void HGauge::paintReadout(QPainter& p)
     const QString zahl = readoutText(m_value, m_min, m_readoutDecimals,
                                      m_readoutUnit);
     const bool leer = (m_value <= m_min);
-    f.setPixelSize(Style::kFontBody);
-    f.setBold(true);
-    p.setFont(f);
+    p.setFont(Style::monoFont(font(), Style::kFontBody));
     p.setPen(QColor(ueber ? Style::role("danger", Style::kGaugeDanger)
                           : (leer ? Style::role("text-inactive", Style::kTextInactive)
                                   : Style::role("text", Style::kTextPrimary))));

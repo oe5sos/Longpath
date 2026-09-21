@@ -7,12 +7,12 @@
 //
 // AetherSDR is licensed under the GNU General Public License v3; see
 // https://github.com/ten9876/AetherSDR for the contributor list and
-// project-level LICENSE. NereusSDR is also GPLv3. AetherSDR source
+// project-level LICENSE. Longpath is also GPLv3. AetherSDR source
 // files carry no per-file GPL header; attribution is at project level
 // per AetherSDR convention.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-19 — Ported/adapted in C++20 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via
 //                 Anthropic Claude Code. Rebranded DAX → VAX: device
@@ -29,9 +29,9 @@
 // for sending TX audio to the radio.
 //
 // Each device reads/writes PCM audio via a POSIX shared memory ring buffer shared
-// with NereusSDR's VirtualAudioBridge.
+// with Longpath's VirtualAudioBridge.
 //
-// Format: stereo float32, 48 kHz. NereusSDR uses 48 kHz (not AetherSDR's 24 kHz)
+// Format: stereo float32, 48 kHz. Longpath uses 48 kHz (not AetherSDR's 24 kHz)
 // to align with Thetis DSP rate conventions.
 
 #include <aspl/Driver.hpp>
@@ -55,7 +55,7 @@
 #include <cmath>
 #include <cerrno>
 
-// ── Diagnostic logging (NereusSDR debug build, 2026-05-06) ──────────────────
+// ── Diagnostic logging (Longpath debug build, 2026-05-06) ──────────────────
 //
 // Plugin runs inside coreaudiod and has no stdout/stderr; route diagnostics to
 // the macOS unified log. Subsystem "com.nereussdr.vax" matches the bundle id;
@@ -67,7 +67,7 @@
 // Per-callback logs are rate-limited so they do not flood the unified log on
 // the audio realtime thread (~94 Hz callback rate).
 #include <os/log.h>
-static os_log_t s_log = os_log_create("com.nereussdr.vax", "plugin");
+static os_log_t s_log = os_log_create("at.oe5sos.longpath.vax", "plugin");
 
 // ── Shared memory layout — must match src/core/audio/CoreAudioHalBus.h
 //    (Sub-Phase 5.3; not yet landed). Any field change here requires the
@@ -215,11 +215,11 @@ private:
             //
             // macOS POSIX shm has an edge case where the plugin's cached
             // mapping can become disconnected from the live shm — confirmed
-            // in the field when NereusSDR is killed and relaunched while
+            // in the field when Longpath is killed and relaunched while
             // the plugin host (coreaudiod helper) is still alive.  After
             // the producer process churn the kernel object the plugin
             // mapped at attach-time can be recycled, leaving m_shmBlock
-            // pointing at memory that the new NereusSDR instance does
+            // pointing at memory that the new Longpath instance does
             // not write to.  Symptom: plugin's writePos is frozen at a
             // large historical value while the live shm's writePos is
             // advancing — both processes have shm_open'd the same name
@@ -242,12 +242,12 @@ private:
 
             // Drop the cached mapping so the attach path below runs
             // unconditionally.  Skip the m_lastRetry throttle since we
-            // know NereusSDR was up the moment we last read from this
+            // know Longpath was up the moment we last read from this
             // name — there is no startup race to wait out here.
             unmapShm();
         } else {
             // Initial-attach throttle: avoid hammering shm_open during the
-            // first-startup race when NereusSDR hasn't created the segment
+            // first-startup race when Longpath hasn't created the segment
             // yet.  Only applies on first attach (m_shmBlock was already
             // null on entry), not on staleness re-attach above.
             auto now = std::chrono::steady_clock::now();
@@ -256,7 +256,7 @@ private:
         }
 
         char name[64];
-        snprintf(name, sizeof(name), "/nereussdr-vax-%d", m_channel);
+        snprintf(name, sizeof(name), "/longpath-vax-%d", m_channel);
 
         int fd = shm_open(name, O_RDWR, 0666);
         if (fd < 0) {
@@ -400,7 +400,7 @@ private:
         if (m_shmBlock != nullptr) {
             // Periodic stale-mmap check (added 2026-05-06, eager-borg-d64bed).
             // Same rationale as VaxRxHandler::ensureShm — macOS can disconnect
-            // the cached mapping from the live shm when NereusSDR restarts;
+            // the cached mapping from the live shm when Longpath restarts;
             // periodic re-attach keeps writes flowing without manual
             // intervention.
             if (++m_validateCounter < kReattachIntervalCalls) {
@@ -420,10 +420,10 @@ private:
             m_lastRetry = now;
         }
 
-        int fd = shm_open("/nereussdr-vax-tx", O_RDWR, 0666);
+        int fd = shm_open("/longpath-vax-tx", O_RDWR, 0666);
         if (fd < 0) {
             os_log_error(s_log,
-                         "VaxTx shm_open(/nereussdr-vax-tx, O_RDWR) FAILED errno=%{public}d (%{public}s)",
+                         "VaxTx shm_open(/longpath-vax-tx, O_RDWR) FAILED errno=%{public}d (%{public}s)",
                          errno, strerror(errno));
             return false;
         }
@@ -431,7 +431,7 @@ private:
         struct stat st;
         if (fstat(fd, &st) != 0) {
             os_log_error(s_log,
-                         "VaxTx fstat(/nereussdr-vax-tx) FAILED errno=%{public}d (%{public}s)",
+                         "VaxTx fstat(/longpath-vax-tx) FAILED errno=%{public}d (%{public}s)",
                          errno, strerror(errno));
             ::close(fd);
             return false;
@@ -451,7 +451,7 @@ private:
 
         if (ptr == MAP_FAILED) {
             os_log_error(s_log,
-                         "VaxTx mmap(/nereussdr-vax-tx) FAILED errno=%{public}d (%{public}s)",
+                         "VaxTx mmap(/longpath-vax-tx) FAILED errno=%{public}d (%{public}s)",
                          errno, strerror(errno));
             return false;
         }
@@ -462,7 +462,7 @@ private:
         const auto rpInit = m_shmBlock->readPos.load(std::memory_order_relaxed);
         const auto actInit = m_shmBlock->active.load(std::memory_order_relaxed);
         os_log(s_log,
-               "VaxTx shm ATTACHED: name=/nereussdr-vax-tx ino=%{public}llu size=%{public}lld ptr=%{public}p initial wp=%{public}u rp=%{public}u active=%{public}u",
+               "VaxTx shm ATTACHED: name=/longpath-vax-tx ino=%{public}llu size=%{public}lld ptr=%{public}p initial wp=%{public}u rp=%{public}u active=%{public}u",
                static_cast<unsigned long long>(st.st_ino),
                static_cast<long long>(st.st_size),
                ptr,
@@ -521,18 +521,18 @@ public:
         // 4 VAX RX input devices (radio → apps receive audio)
         for (int ch = 1; ch <= 4; ++ch) {
             char name[64];
-            snprintf(name, sizeof(name), "NereusSDR VAX %d", ch);
+            snprintf(name, sizeof(name), "Longpath VAX %d", ch);
 
             char uid[64];
-            snprintf(uid, sizeof(uid), "com.nereussdr.vax.rx.%d", ch);
+            snprintf(uid, sizeof(uid), "at.oe5sos.longpath.vax.rx.%d", ch);
 
             auto handler = std::make_shared<VaxRxHandler>(ch);
 
             aspl::DeviceParameters devParams;
             devParams.Name         = name;
-            devParams.Manufacturer = "NereusSDR";
+            devParams.Manufacturer = "Longpath";
             devParams.DeviceUID    = uid;
-            devParams.ModelUID     = "com.nereussdr.vax";
+            devParams.ModelUID     = "at.oe5sos.longpath.vax";
             devParams.SampleRate   = 48000;
             devParams.ChannelCount = 2;
             devParams.EnableMixing = true;
@@ -557,10 +557,10 @@ public:
             auto txHandler = std::make_shared<VaxTxHandler>();
 
             aspl::DeviceParameters txParams;
-            txParams.Name         = "NereusSDR TX";
-            txParams.Manufacturer = "NereusSDR";
-            txParams.DeviceUID    = "com.nereussdr.vax.tx";
-            txParams.ModelUID     = "com.nereussdr.vax";
+            txParams.Name         = "Longpath TX";
+            txParams.Manufacturer = "Longpath";
+            txParams.DeviceUID    = "at.oe5sos.longpath.vax.tx";
+            txParams.ModelUID     = "at.oe5sos.longpath.vax";
             txParams.SampleRate   = 48000;
             txParams.ChannelCount = 2;
             txParams.EnableMixing = true;

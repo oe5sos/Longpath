@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_squelch_line.cpp  (NereusSDR)
+// tests/tst_squelch_line.cpp  (Longpath)
 // =================================================================
 //
 // Die Squelch-Linie im Panadapter.
@@ -13,12 +13,12 @@
 // Entscheidung wie beim ruhenden Zeiger (tst_instrument_no_reading).
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-19 — Original fuer NereusSDR von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
 // =================================================================
 
-// no-port-check: NereusSDR-original test file.
+// no-port-check: Longpath-original test file.
 
 #include <QtTest>
 

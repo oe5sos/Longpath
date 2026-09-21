@@ -1,12 +1,12 @@
 // =================================================================
-// tests/tst_step_att_on_tx_value.cpp  (NereusSDR)
+// tests/tst_step_att_on_tx_value.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/setup.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-03 — Implemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted implementation via Anthropic
 //                 Claude Code.
@@ -66,7 +66,7 @@
 
 // Migrated to VS2026 - 18/12/25 MW0LGE v2.10.3.12
 
-// no-port-check: Test file exercises NereusSDR API; the Thetis logic
+// no-port-check: Test file exercises Longpath API; the Thetis logic
 // being tested is cited in StepAttenuatorController.cpp via inline cites
 // referencing setup.cs:3988-4017 [v2.10.3.13] (mi0bot HL2 range fork) and
 // console.cs:46740-46748 [v2.10.3.13]. No C# is translated here.
@@ -118,7 +118,7 @@ private slots:
     //   if (HPSDRModel.HERMESLITE) { if (value < -28) value = -28; }
     //   else { if (value < 0) value = 0; }
     //
-    // NereusSDR controller exposes [m_minAttDb, m_maxAttDb] as the bounds; HL2
+    // Longpath controller exposes [m_minAttDb, m_maxAttDb] as the bounds; HL2
     // boards register min=-28 / max=32 via setMin/MaxAttenuation in the
     // connect path (P1 full parity §4.1).  This test uses the HL2 bounds so
     // the negative path can be exercised; legacy boards keep min=0.

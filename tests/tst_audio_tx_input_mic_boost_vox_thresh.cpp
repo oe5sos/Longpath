@@ -1,4 +1,4 @@
-// tests/tst_audio_tx_input_mic_boost_vox_thresh.cpp  (NereusSDR)
+// tests/tst_audio_tx_input_mic_boost_vox_thresh.cpp  (Longpath)
 //
 // Phase 3M-1b Task I.5 — Integration: chk20dbMicBoost → VOX threshold scaling.
 //

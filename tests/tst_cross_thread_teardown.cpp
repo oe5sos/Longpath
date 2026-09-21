@@ -151,7 +151,7 @@ private slots:
 };
 
 // Sandbox is enabled by tests/TestSandboxInit.cpp's global static
-// constructor (linked in by nereus_add_test), so we can use QTEST_MAIN
+// constructor (linked in by longpath_add_test), so we can use QTEST_MAIN
 // like the other tests and trust that AppSettings::instance() resolves
 // to a sandbox path.
 QTEST_MAIN(TestCrossThreadTeardown)

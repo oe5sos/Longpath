@@ -72,7 +72,7 @@ QTEST_MAIN(TestPanadapterAppletSliceAssoc)
 #include "tst_panadapter_applet_slice_assoc.moc"
 ```
 
-Register: `nereus_add_test(tst_panadapter_applet_slice_assoc)`.
+Register: `longpath_add_test(tst_panadapter_applet_slice_assoc)`.
 
 - [ ] **Step 2: Run + verify failure**
 

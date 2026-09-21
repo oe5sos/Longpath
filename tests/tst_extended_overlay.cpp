@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_extended_overlay.cpp  (NereusSDR)
+// tests/tst_extended_overlay.cpp  (Longpath)
 // =================================================================
 //
 // Die Verlaengerung von Mittellinie, Filterkanten und Durchlassflaeche
@@ -15,12 +15,12 @@
 // genau der Fehler, den er fangen soll.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-19 — Original fuer NereusSDR von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
 // =================================================================
 
-// no-port-check: NereusSDR-original test file.
+// no-port-check: Longpath-original test file.
 
 #include <QtTest>
 

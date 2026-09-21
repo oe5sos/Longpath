@@ -1,11 +1,11 @@
 // =================================================================
-// tests/tst_smart_sdr_api_listener_ptt_chain.cpp  (NereusSDR)
+// tests/tst_smart_sdr_api_listener_ptt_chain.cpp  (Longpath)
 // =================================================================
-// NereusSDR-native test. No upstream port. Covers C1 to C6 from the
+// Longpath-native test. No upstream port. Covers C1 to C6 from the
 // approved design doc docs/architecture/4o3a-lan-ptt-pcap-divergence.md
 // (commit 559890a2).
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-21  Created by J.J. Boyd (KG4VCF), with AI-assisted
 //                 transformation via Anthropic Claude Code.
 //                 Smoke test (Task 0 foundation).
@@ -282,7 +282,7 @@ void SmartSdrApiListenerPttChainTest::c2_pttRequestedIsOneFrameWithCanonicalFiel
              qPrintable(QStringLiteral("expected empty amplifier= in: ") + frame));
 }
 
-// C2 follow-up: when the operator presses TUNE in the local NereusSDR UI
+// C2 follow-up: when the operator presses TUNE in the local Longpath UI
 // (NOT a remote TGXL hardware button press), no `transmit tune on` command
 // arrives on the wire to populate m_lastTuneInitiator. The PTT_REQUESTED
 // frame must still carry reason=AMP:<TGXL-name> via the

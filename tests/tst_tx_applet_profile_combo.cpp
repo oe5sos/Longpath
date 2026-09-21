@@ -1,8 +1,8 @@
-// tests/tst_tx_applet_profile_combo.cpp  (NereusSDR)
+// tests/tst_tx_applet_profile_combo.cpp  (Longpath)
 //
 // Phase 3M-1c chunk J (J.1 + J.2) — TxApplet TX-Profile combo + 2-TONE button.
 //
-// no-port-check: NereusSDR-original test file.  Inline Thetis cites for the
+// no-port-check: Longpath-original test file.  Inline Thetis cites for the
 // behaviours we mirror live in TxApplet.cpp / TxApplet.h.
 //
 // J.1 — TxApplet TX-Profile combo coverage:
@@ -165,7 +165,7 @@ private slots:
         QApplication::processEvents();
 
         // After 3M-3a-i Batch 4 (A.2): first launch seeds Default + 20
-        // factory profiles. Phase 3R K1 added the "RADE" NereusSDR-native
+        // factory profiles. Phase 3R K1 added the "RADE" Longpath-native
         // preset = 22 combo entries.
         const int initialCount = applet.profileCombo()->count();
         QCOMPARE(initialCount, 22);

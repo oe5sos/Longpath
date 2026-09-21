@@ -1,12 +1,12 @@
 // =================================================================
-// src/core/ClarityController.cpp  (NereusSDR)
+// src/core/ClarityController.cpp  (Longpath)
 // =================================================================
 //
 // Independently implemented from ClarityController.h interface.
 // The .h cites Thetis display.cs:5866 (processNoiseFloor) as the
-// lineage that NereusSDR's percentile-based estimator deliberately
+// lineage that Longpath's percentile-based estimator deliberately
 // REPLACES, not ports. This .cpp is the percentile-based estimator —
-// original NereusSDR work licensed under GPLv3.
+// original Longpath work licensed under GPLv3.
 // =================================================================
 
 #include "ClarityController.h"
@@ -137,7 +137,7 @@ void ClarityController::feedBins(const QVector<float>& bins, qint64 nowMs)
 
     // Emit the smoothed floor before the deadband gate so NF-aware grid
     // and per-band NF priming (Tasks 2.9/2.10) receive every cadence tick.
-    // NereusSDR-original — no Thetis equivalent.
+    // Longpath-original — no Thetis equivalent.
     emit noiseFloorChanged(smoothed);
 
     // Deadband gate: suppress emission when floor hasn't drifted enough.

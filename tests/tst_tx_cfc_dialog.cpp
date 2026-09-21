@@ -1,8 +1,8 @@
-// no-port-check: NereusSDR-original test file.  All Thetis source cites
+// no-port-check: Longpath-original test file.  All Thetis source cites
 // for the underlying TransmitModel CFC properties live in TransmitModel.h
 // and the dialog source itself.
 // =================================================================
-// tests/tst_tx_cfc_dialog.cpp  (NereusSDR)
+// tests/tst_tx_cfc_dialog.cpp  (Longpath)
 // =================================================================
 //
 // Phase 3M-3a-ii follow-up sub-PR Batch 8 — TxCfcDialog

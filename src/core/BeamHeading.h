@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/core/BeamHeading.h  (NereusSDR)
+// src/core/BeamHeading.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // Which way to point, and how far the rotor has to travel to get there.
 //
@@ -32,7 +32,7 @@
 // answer says how far it will actually turn.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-09 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

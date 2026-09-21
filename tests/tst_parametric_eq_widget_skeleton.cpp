@@ -1,8 +1,8 @@
 // =================================================================
-// tests/tst_parametric_eq_widget_skeleton.cpp  (NereusSDR)
+// tests/tst_parametric_eq_widget_skeleton.cpp  (Longpath)
 // =================================================================
 //
-// no-port-check: NereusSDR-original test file. The widget under test
+// no-port-check: Longpath-original test file. The widget under test
 // (ParametricEqWidget) ports Thetis ucParametricEq.cs; cites live in
 // the widget header.  This file just exercises the Qt API surface.
 // =================================================================

@@ -1,10 +1,10 @@
-// no-port-check: NereusSDR-original priority send queue implementation.
+// no-port-check: Longpath-original priority send queue implementation.
 // See TciSendQueue.h for the full cite chain and design rationale.
 //
-// src/core/TciSendQueue.cpp  (NereusSDR)
-// NereusSDR-original — per-client TCI outbound priority send queue.
+// src/core/TciSendQueue.cpp  (Longpath)
+// Longpath-original — per-client TCI outbound priority send queue.
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-10 — Phase 3J-1 Task 14.1 by J.J. Boyd (KG4VCF);
 //                AI-assisted transformation via Anthropic Claude Code.
 
@@ -32,7 +32,7 @@ void TciSendQueue::push(Priority priority, const QString& frame)
     if (!target) { return; }
 
     // Bounded depth + oldest-drop. Thetis queues are unbounded
-    // (TCIServer.cs:769-771 [v2.10.3.13]); NereusSDR caps each queue to
+    // (TCIServer.cs:769-771 [v2.10.3.13]); Longpath caps each queue to
     // prevent unbounded memory growth under backpressure. When the queue is
     // full, the front (oldest) frame is discarded before the new one is
     // appended — mirroring the bounded-oldest-drop contract described in the

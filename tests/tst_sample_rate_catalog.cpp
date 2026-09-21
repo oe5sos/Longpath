@@ -1,9 +1,9 @@
 // =================================================================
-// tests/tst_sample_rate_catalog.cpp  (NereusSDR)
+// tests/tst_sample_rate_catalog.cpp  (Longpath)
 // =================================================================
 //
 // Independently implemented from setup.cs — this test file exercises
-// NereusSDR's SampleRateCatalog API; Thetis has no equivalent test
+// Longpath's SampleRateCatalog API; Thetis has no equivalent test
 // suite, so no upstream header is preserved. The constants asserted
 // here are documented in the SampleRateCatalog header's verbatim cite.
 // =================================================================
@@ -54,7 +54,7 @@ private slots:
     }
 
     // mi0bot setup.cs:849-851 [v2.10.3.13] — HermesLite 2 also qualifies
-    // for the extra 384k rate on P1.  Pre-fix, NereusSDR only honoured the
+    // for the extra 384k rate on P1.  Pre-fix, Longpath only honoured the
     // RedPitaya branch and silently dropped HL2's 384k.
     void p1_hermes_lite_gets_extra_384()
     {

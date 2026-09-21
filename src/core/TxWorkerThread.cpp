@@ -1,15 +1,15 @@
 // =================================================================
-// src/core/TxWorkerThread.cpp  (NereusSDR)
+// src/core/TxWorkerThread.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original file.  See TxWorkerThread.h for the full
+// Longpath-original file.  See TxWorkerThread.h for the full
 // attribution block + design notes.  Phase 3M-1c TX pump
 // architecture redesign v3 — semaphore-driven worker loop sourced
 // from radio mic frames via TxMicSource.  Plan:
 //   docs/architecture/phase3m-1c-tx-pump-architecture-plan.md
 // =================================================================
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-29 — Phase 3M-1c TX pump redesign v3 — semaphore-wake
 //                 loop replaces v2's QTimer-driven polling.  J.J. Boyd
 //                 (KG4VCF), with AI-assisted implementation via
@@ -89,7 +89,7 @@
 //                 via Anthropic Claude Code.
 // =================================================================
 
-// no-port-check: NereusSDR-original file.  The Thetis cmbuffs.c /
+// no-port-check: Longpath-original file.  The Thetis cmbuffs.c /
 // cmaster.c citations identify the architectural pattern this class
 // mirrors (worker-thread + semaphore-wake + uniform block size); no
 // Thetis logic is line-for-line ported here.
@@ -111,7 +111,7 @@
 #include <chrono>
 #include <cmath>
 
-Q_LOGGING_CATEGORY(lcTxWorker, "nereus.tx.worker")
+Q_LOGGING_CATEGORY(lcTxWorker, "longpath.tx.worker")
 
 namespace Longpath {
 
@@ -306,7 +306,7 @@ void TxWorkerThread::run()
     //       xcmaster(id);
     //   }
     //
-    // Note: Thetis's `a->run` flag is NereusSDR's m_micSource->isRunning().
+    // Note: Thetis's `a->run` flag is Longpath's m_micSource->isRunning().
     // The poison release in TxMicSource::stop() wakes us out of
     // waitForBlock; we then re-check isRunning and exit cleanly.
     //
@@ -377,7 +377,7 @@ void TxWorkerThread::run()
     // Thetis itself doesn't need this — its cm_main is a native pthread
     // (no Qt event loop), and its setters drop straight into WDSP via
     // P/Invoke regardless of which managed thread is calling.
-    // NereusSDR's setters are Qt slots dispatched via signals, so we
+    // Longpath's setters are Qt slots dispatched via signals, so we
     // have to give the worker an event pump.
     // 2026-05-25 KG4VCF bench fix: elevate the TX DSP thread to real-time
     // audio scheduling, parity with RxDspWorker::onThreadStarted.  Runs on
@@ -542,7 +542,7 @@ void TxWorkerThread::dispatchOneBlock()
         // it. freedv-gui's RADETransmitStep.cpp:196-200 [@77e793a] takes
         // ONLY the real component of rade_tx's RADE_COMP output and
         // feeds it as mono audio; the radio's hardware SSB modulator
-        // handles USB/LSB. NereusSDR's equivalent: WDSP's TXA modulator
+        // handles USB/LSB. Longpath's equivalent: WDSP's TXA modulator
         // (in USB or LSB mode per TxChannel::setTxMode's RADE_U/L ->
         // USB/LSB mapping).
         //
@@ -629,7 +629,7 @@ void TxWorkerThread::dispatchOneBlock()
         // means WDSP would level the RADE modem signal itself —
         // destroying the modem's amplitude characteristics. The K1
         // RADE profile must therefore disable WDSP TXA Leveler;
-        // NereusSDR-side leveling here is the substitute.
+        // Longpath-side leveling here is the substitute.
         {
             // Step A: apply linear mic gain (m_micGainDb dB -> linear).
             const int gainDb = m_radeMicGainDb.load(std::memory_order_relaxed);
@@ -793,7 +793,7 @@ void TxWorkerThread::dispatchOneBlock()
 
     // PC mic override — mirrors Thetis cmaster.c:379 [v2.10.3.13]:
     //   asioIN(pcm->in[stream]);
-    // ASIO is the OS-mic source; in NereusSDR this is the PortAudio /
+    // ASIO is the OS-mic source; in Longpath this is the PortAudio /
     // QAudio bus owned by AudioEngine.  When the user has selected
     // MicSource::Pc AND the bus is open, AudioEngine::isPcMicOverrideActive
     // returns true and we splice PC mic samples into m_in's I channel,
@@ -935,7 +935,7 @@ void TxWorkerThread::dispatchOneBlock()
     // VOX-keying entry point (TxChannel::s_pushVoxCallback emits
     // voxActiveChanged → MoxController::onVoxActive).
     //
-    // NereusSDR's DEXP buffer architecture is parallel-only (see
+    // Longpath's DEXP buffer architecture is parallel-only (see
     // WdspEngine.cpp create_dexp callsite for the full narrative): the
     // copy + xdexp here drive the detector for VOX-keying purposes only;
     // the DEXP module's audio-domain output is not chained into m_in,
@@ -1084,7 +1084,7 @@ void TxWorkerThread::dispatchOneBlock()
     m_txChannel->driveOneTxBlockFromInterleaved(m_in.data());
 }
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
 void TxWorkerThread::tickForTest()
 {
     if (m_micSource == nullptr || m_txChannel == nullptr) {
@@ -1279,7 +1279,7 @@ void TxWorkerThread::setCurrentTxPath(TxPath path)
     m_currentTxPath.store(path, std::memory_order_release);
 }
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
 TxWorkerThread::TxPath TxWorkerThread::currentTxPathForTest() const
 {
     return m_currentTxPath.load(std::memory_order_acquire);

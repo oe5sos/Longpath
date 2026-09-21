@@ -1,12 +1,12 @@
 // =================================================================
-// src/gui/meters/RotatorItem.cpp  (NereusSDR)
+// src/gui/meters/RotatorItem.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/MeterManager.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -119,7 +119,7 @@ void RotatorItem::setValue(double v)
 
     float adjustmentSpeed = 0.2f * std::abs(difference);
 
-    // NereusSDR fix (2026-08-10): upstream's snap condition
+    // Longpath fix (2026-08-10): upstream's snap condition
     // (|difference| < adjustmentSpeed, i.e. |d| < 0.2*|d|) can never be
     // true for a non-zero difference, so the needle approached the target
     // geometrically but never landed on it. Snap once we are within half
@@ -142,7 +142,7 @@ void RotatorItem::setValue(double v)
 // Elevation smoothing — mirrors the azimuth smoothing in setValue(), but
 // without angular wrap (elevation is a bounded 0-90° quantity, not modular).
 //
-// NereusSDR fix (2026-08-10): previously this was an inline setter that
+// Longpath fix (2026-08-10): previously this was an inline setter that
 // only stored m_elevation, while paintHeading() renders m_smoothedEle —
 // which nothing ever updated, so the elevation needle was stuck at 0°.
 // ---------------------------------------------------------------------------
@@ -536,7 +536,7 @@ void RotatorItem::paintHeading(QPainter& p, const QRect& compassRect)
             cy_ele = static_cast<float>(compassRect.top()) + h / 2.0f;
         }
 
-        // NereusSDR fix (2026-08-10): clamp instead of fmod — fmod mapped a
+        // Longpath fix (2026-08-10): clamp instead of fmod — fmod mapped a
         // legitimate 90° (zenith) reading back to 0°.
         const float degrees_ele = std::clamp(std::abs(m_smoothedEle), 0.0f, 90.0f);
 

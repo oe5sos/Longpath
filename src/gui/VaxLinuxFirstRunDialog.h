@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/gui/VaxLinuxFirstRunDialog.h  (NereusSDR)
+// src/gui/VaxLinuxFirstRunDialog.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original file — no Thetis port; no attribution-registry row.
+// Longpath-original file — no Thetis port; no attribution-registry row.
 //
 // Modal dialog shown on first launch (or from Help → Diagnose audio
 // backend, Task 19) when Linux audio detection returns None — i.e. no
@@ -32,7 +32,7 @@
 //  You should have received a copy of the GNU General Public License
 //  along with this program. If not, see <https://www.gnu.org/licenses/>.
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-24 — Written by J.J. Boyd (KG4VCF), with AI-assisted
 //                transformation via Anthropic Claude Code.
 // =================================================================

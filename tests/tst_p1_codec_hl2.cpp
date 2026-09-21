@@ -49,7 +49,7 @@ private slots:
     // From mi0bot networkproto1.c:1099-1100 [v2.10.3.13-beta2]:
     //   if (XmitBit) C4 = (prn->adc[0].tx_step_attn & 0b00111111) | 0b01000000;
     // The (31 - userDb) inversion is applied upstream in mi0bot at
-    // console.cs:10658 [v2.10.3.13-beta2]; NereusSDR applies it at the codec
+    // console.cs:10658 [v2.10.3.13-beta2]; Longpath applies it at the codec
     // (matching the RX-path branch below).
     //
     // ATT-on-TX-disabled default: StepAttenuatorController emits
@@ -418,7 +418,7 @@ private slots:
 
     // ── Approved deviation from mi0bot, 2026-07-31 ──────────────────────
     // mi0bot announces nddc = 4 unconditionally for the HL2
-    // (console.cs:8412-8413 [v2.10.3.13-beta2]). NereusSDR announces 2 when
+    // (console.cs:8412-8413 [v2.10.3.13-beta2]). Longpath announces 2 when
     // PureSignal is off, halving the ep6 datagram rate: about 23 Mbit/s
     // rather than 44 at 192 kHz. PureSignal needs four DDCs (DDC0+DDC1 as
     // the sync pair, DDC2 feedback, DDC3 TX monitor, console.cs:8757-8762

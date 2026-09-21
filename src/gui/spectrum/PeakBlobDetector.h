@@ -1,19 +1,19 @@
 #pragma once
 
 // =================================================================
-// src/gui/spectrum/PeakBlobDetector.h  (NereusSDR)
+// src/gui/spectrum/PeakBlobDetector.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/display.cs, original licence from
 //   Thetis source is included below.
 //
-// NereusSDR C++ translation of the top-N peak detector and hold/decay
+// Longpath C++ translation of the top-N peak detector and hold/decay
 // state machine described in Thetis Display.cs:4395-4714, 5453-5508
 // [v2.10.3.13].
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-01 — Created in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via
 //                 Anthropic Claude Code.

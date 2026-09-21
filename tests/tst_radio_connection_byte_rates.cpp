@@ -1,5 +1,5 @@
 // no-port-check: test-only — exercises RadioConnection base-class rolling-window
-// byte-rate counters. No Thetis logic is ported here; NereusSDR-original.
+// byte-rate counters. No Thetis logic is ported here; Longpath-original.
 #include <QtTest/QtTest>
 #include "core/RadioConnection.h"
 

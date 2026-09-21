@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/core/SolarTimes.h  (NereusSDR)
+// src/core/SolarTimes.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. Thetis has no solar model; the FreeDV station
+// Longpath-original. Thetis has no solar model; the FreeDV station
 // code carries locator maths but nothing about the sun.
 //
 // Sunrise, sunset and current sun elevation for a point on the Earth.
@@ -22,7 +22,7 @@
 // rather than against remembered almanac times.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
 // =================================================================

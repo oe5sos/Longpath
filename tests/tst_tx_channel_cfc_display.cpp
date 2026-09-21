@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_tx_channel_cfc_display.cpp  (NereusSDR)
+// tests/tst_tx_channel_cfc_display.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for the TxChannel::getCfcDisplayCompression wrapper added in
@@ -13,14 +13,14 @@
 // integration-tested via the dialog (Tasks 8 + 9) rather than mocked here.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-30 — New test for Phase 3M-3a-ii follow-up Batch 7:
 //                 TxChannel::getCfcDisplayCompression validation arms +
 //                 constant pinning.  J.J. Boyd (KG4VCF), with AI-assisted
 //                 implementation via Anthropic Claude Code.
 // =================================================================
 
-// no-port-check: NereusSDR-original test file. All Thetis source cites are
+// no-port-check: Longpath-original test file. All Thetis source cites are
 // in TxChannel.h/cpp.
 
 #include <QtTest/QtTest>

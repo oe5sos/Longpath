@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_filter_constrain.cpp  (NereusSDR)
+// tests/tst_filter_constrain.cpp  (Longpath)
 // =================================================================
 //
 // Die Filterkanten duerfen nicht ueberall hin.
@@ -29,12 +29,12 @@
 // schmaler — und das faellt beim Hoeren auf, nicht beim Lesen.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-20 — Original fuer NereusSDR von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
 // =================================================================
 
-// no-port-check: NereusSDR-original test file.
+// no-port-check: Longpath-original test file.
 
 #include <QtTest>
 

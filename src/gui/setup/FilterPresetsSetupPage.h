@@ -1,14 +1,14 @@
 // =================================================================
-// src/gui/setup/FilterPresetsSetupPage.h  (NereusSDR)
+// src/gui/setup/FilterPresetsSetupPage.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original file. Setup → DSP → Filter Presets page:
+// Longpath-original file. Setup → DSP → Filter Presets page:
 // lets users edit the name, low, and high cutoffs of every preset
 // slot (F1..F10) for each DSP mode, reorder them, and reset to
 // Thetis verbatim defaults.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-02 — Original implementation for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted authoring via Anthropic
 //                 Claude Code (Stage C2 filter preset editor).

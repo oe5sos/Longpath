@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_device_card.cpp  (NereusSDR)
+// tests/tst_device_card.cpp  (Longpath)
 // =================================================================
 //
 // Exercises DeviceCard widget — Sub-Phase 12 Task 12.2 Step 4.

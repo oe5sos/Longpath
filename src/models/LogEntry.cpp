@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 //
-// NereusSDR - LogEntry ADIF serialisation. See LogEntry.h.
+// Longpath - LogEntry ADIF serialisation. See LogEntry.h.
 //
 // Copyright (C) 2026 NereusSDR contributors.
 //
-// Modification history (NereusSDR)
+// Modification history (Longpath)
 //   2026-08-07  Martin Fischer  Initial create. AI tooling: Anthropic
 //                               Claude (Cowork).
 //   2026-08-10  Martin Fischer  ADIF lengths in UTF-8 bytes, not
@@ -44,7 +44,7 @@ void field(QString& out, const QString& name, const QString& value)
 }
 
 // The same, but without the trim and without dropping an empty value.
-// Used for fields NereusSDR does not model: those are somebody else's
+// Used for fields Longpath does not model: those are somebody else's
 // data and go back out exactly as they came in, including a legal
 // zero-length one.
 void rawField(QString& out, const QString& name, const QString& value)
@@ -66,7 +66,7 @@ bool LogEntry::modelsAdifField(const QString& upperName)
         QStringLiteral("MY_GRIDSQUARE"), QStringLiteral("NAME"),
         QStringLiteral("QTH"),           QStringLiteral("COUNTRY"),
         QStringLiteral("COMMENT"),       QStringLiteral("TX_PWR"),
-        QStringLiteral("APP_NEREUS_QRZUP"),
+        QStringLiteral("APP_LONGPATH_QRZUP"), QStringLiteral("APP_NEREUS_QRZUP"),
         QStringLiteral("MY_SOTA_REF"),   QStringLiteral("SOTA_REF"),
         // MY_SIG/MY_SIG_INFO/SIG/SIG_INFO are deliberately NOT here.
         // They are ADIF's generic Special Interest Activity pair, not a
@@ -127,7 +127,7 @@ QString LogEntry::toAdifRecord() const
         // does not define. Other programs must pass it through
         // untouched, so a log that goes out to Log4OM and comes back
         // still knows what has been uploaded.
-        field(r, QStringLiteral("APP_NEREUS_QRZUP"), QStringLiteral("Y"));
+        field(r, QStringLiteral("APP_LONGPATH_QRZUP"), QStringLiteral("Y"));
     }
     if (txPowerW > 0.0) {
         field(r, QStringLiteral("TX_PWR"), QString::number(txPowerW, 'f', 0));

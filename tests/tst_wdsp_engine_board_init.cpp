@@ -1,7 +1,7 @@
-// no-port-check: NereusSDR-original unit-test file. Thetis cite comments
+// no-port-check: Longpath-original unit-test file. Thetis cite comments
 // document upstream sources; no Thetis logic ported in this test file.
 // =================================================================
-// tests/tst_wdsp_engine_board_init.cpp  (NereusSDR)
+// tests/tst_wdsp_engine_board_init.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for Phase B4'/B5': WdspEngine::setAdcSupply() and
@@ -24,10 +24,10 @@
 //   ChannelMaster/txgain.c:164       — SetADCSupply implementation
 //   ChannelMaster/netInterface.c:1409 — LRAudioSwap implementation
 //   Console/clsHardwareSpecific.cs:85-191 — per-SKU call sites
-//   third_party/wdsp/src/netinterface_stub.c — NereusSDR glue stubs
+//   third_party/wdsp/src/netinterface_stub.c — Longpath glue stubs
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-22 - New test file for Phase B4'/B5': per-board WDSP wrappers.
 //                 J.J. Boyd (KG4VCF), with AI-assisted implementation via
 //                 Anthropic Claude Code (claude-sonnet-4-6).
@@ -45,7 +45,7 @@ class TstWdspEngineBoardInit : public QObject {
 private slots:
     // ── Test 1: setAdcSupply sentinel zero skip ──────────────────────────────
     // From Thetis clsHardwareSpecific.cs:85-191 [v2.10.3.15]: all current SKUs
-    // set adcSupplyVoltage to 33 or 50; 0 is a NereusSDR sentinel meaning
+    // set adcSupplyVoltage to 33 or 50; 0 is a Longpath sentinel meaning
     // "not set — leave WDSP default unchanged".  WdspEngine::setAdcSupply
     // must not forward a 0 to the stub (that would overwrite WDSP's default
     // adc_supply with 0, which is wrong for every known board).

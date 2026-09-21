@@ -1,11 +1,11 @@
 // =================================================================
-// src/gui/styles/Theme.cpp  (NereusSDR)
+// src/gui/styles/Theme.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. See Theme.h for why this exists.
+// Longpath-original. See Theme.h for why this exists.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-15 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================
@@ -48,7 +48,7 @@ std::atomic<quint64> g_applied{0};
 ///
 /// A property rather than a member: the filter is one object watching
 /// every widget, and re-entrancy is per widget, not global.
-constexpr const char* kBusy = "nereusThemeBusy";
+constexpr const char* kBusy = "longpathThemeBusy";
 
 } // namespace
 
@@ -75,10 +75,10 @@ QStringList Theme::searchPaths()
 {
     QStringList out;
 
-    // 1. NEREUS_THEME_DIR schlägt alles. Ein Test braucht einen Ort, den
+    // 1. LONGPATH_THEME_DIR schlägt alles. Ein Test braucht einen Ort, den
     //    er kontrolliert, und wer zwei Themes vergleichen will, braucht
     //    einen Schalter, der keine Datei verschiebt.
-    const QByteArray env = qgetenv("NEREUS_THEME_DIR");
+    const QByteArray env = qgetenv("LONGPATH_THEME_DIR");
     if (!env.isEmpty()) {
         out << QString::fromLocal8Bit(env);
     }

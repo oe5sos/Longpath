@@ -1,4 +1,4 @@
-// src/gui/styles/PopupMenuStyle.h (NereusSDR)
+// src/gui/styles/PopupMenuStyle.h  (Longpath)
 //
 // Universal dark-palette QMenu stylesheet — applied to every antenna
 // popup menu (VFO Flag, RxApplet, SpectrumOverlayPanel, meter items,

@@ -76,7 +76,7 @@ private:
     // Anlauf sie nicht wiederholt:
     //
     //   1. "Die Wasserfall-Textur wird nicht gefuellt."
-    //      Nein. Mit NEREUS_WF_DEBUG=1: Vollupload 964x328 in die
+    //      Nein. Mit LONGPATH_WF_DEBUG=1: Vollupload 964x328 in die
     //      Textur 964x328, Bild dunkel (#08080a). Nachweislich gefuellt.
     //   2. "Der Wasserfall zeichnet den Schrott."
     //      Nein. Zeichnung abgeschaltet -> Bild identisch, Punkt fuer

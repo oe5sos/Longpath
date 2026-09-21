@@ -1,12 +1,12 @@
 // =================================================================
-// src/models/RxDspWorker.cpp  (NereusSDR)
+// src/models/RxDspWorker.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/console.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -197,7 +197,7 @@ void RxDspWorker::setExternalDiversityRoute(
         return;
     }
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     if (m_externalDiversityRouteHookForTest) {
         m_externalDiversityRouteHookForTest(
             true, route.targetSliceId,
@@ -217,7 +217,7 @@ void RxDspWorker::clearExternalDiversityRoute()
     m_externalDiversityChunkSize = 0;
     m_externalDiversityMaxQueuedSamples = 0;
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     if (oldRoute.active() && m_externalDiversityRouteHookForTest) {
         m_externalDiversityRouteHookForTest(
             false, oldRoute.targetSliceId,
@@ -288,7 +288,7 @@ void RxDspWorker::feedExternalDiversityTarget(int samples)
                 m_externalDiversityOutputInterleaved[2 * sample + 1]);
     }
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     if (m_externalDiversityOutputHookForTest) {
         m_externalDiversityOutputHookForTest(
             m_externalDiversityRoute.targetSliceId,
@@ -463,7 +463,7 @@ void RxDspWorker::setRadeChannel(RadeChannel* channel)
     }
 
     // Lifecycle tracer (off by default; enable with
-    // QT_LOGGING_RULES="nereus.dsp.debug=true").
+    // QT_LOGGING_RULES="longpath.dsp.debug=true").
     qCDebug(lcDsp).noquote() << QString("RxDspWorker::setRadeChannel(%1)")
                                     .arg(reinterpret_cast<quintptr>(channel),
                                          0, 16);
@@ -656,7 +656,7 @@ void RxDspWorker::processIqBatch(int receiverIndex,
                 // by setting real=audio, imag=0 — it's an audio-domain
                 // demodulator, not a baseband one.
                 //
-                // Earlier NereusSDR attempts fed the raw DDC I/Q directly
+                // Earlier Longpath attempts fed the raw DDC I/Q directly
                 // and the codec never synced because the input format was
                 // wrong. This fork now uses outI (WDSP's decoded audio,
                 // 48 kHz dual-mono) → downsample to 24 kHz → interleave
@@ -679,7 +679,7 @@ void RxDspWorker::processIqBatch(int receiverIndex,
                         ? m_radeChannel.load(std::memory_order_acquire)
                         : nullptr;
                 // One-shot tracer (off by default; enable with
-                // QT_LOGGING_RULES="nereus.dsp.debug=true") to confirm
+                // QT_LOGGING_RULES="longpath.dsp.debug=true") to confirm
                 // the RADE RX fork is reaching the codec during bench
                 // shakedown.
                 static int s_rxRadeDiagCount = 0;

@@ -1,6 +1,6 @@
 #pragma once
 
-// no-port-check: NereusSDR/Longpath-original. Cites facts from
+// no-port-check: Longpath/Longpath-original. Cites facts from
 // ArtemisSDR's sunsdr.c (TX pacing cadence, empty-ring-repeats-last-
 // packet behavior) the same way SunSdrRadioConnection.{h,cpp} already
 // cite ArtemisSDR facts elsewhere in this driver — no ArtemisSDR C code
@@ -11,7 +11,7 @@
 // file's own comments point back to.
 
 // =================================================================
-// src/core/sunsdr/SunSdrTxPacer.h  (NereusSDR/Longpath)
+// src/core/sunsdr/SunSdrTxPacer.h  (Longpath)
 // =================================================================
 //
 // Step 3 of the SunSDR2 QRP TX-chain plan (operator-approved, 6 steps
@@ -74,7 +74,7 @@
 // and anything socket-shaped (Step 6).
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-09-02 — Original for NereusSDR/Longpath by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork). Step 3 of
 //                 the operator-approved 6-step SunSDR2 QRP TX-chain

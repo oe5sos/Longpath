@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 //
-// NereusSDR - RxDecodeModel: bounded ring buffer of recent local
+// Longpath - RxDecodeModel: bounded ring buffer of recent local
 // decodes from MY radio's receivers (rade_text + WSJT-X UDP).
 //
-// NEW NereusSDR-native model. No upstream equivalent. Distinguishes
+// NEW Longpath-native model. No upstream equivalent. Distinguishes
 // "what my radio just heard" from "what spots are flowing in from
 // cluster/network sources" (which live in SpotModel).
 //
-// Modification history (NereusSDR)
+// Modification history (Longpath)
 //   Created 2026-05-11 by JJ Boyd / KG4VCF
 //   AI tooling: Claude Code
 

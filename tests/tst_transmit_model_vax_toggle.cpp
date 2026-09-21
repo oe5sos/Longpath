@@ -1,8 +1,8 @@
 // =================================================================
-// tests/tst_transmit_model_vax_toggle.cpp  (NereusSDR)
+// tests/tst_transmit_model_vax_toggle.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original test file. No Thetis port at this layer.
+// Longpath-original test file. No Thetis port at this layer.
 //
 // Verifies the PhoneCwApplet VAX-button toggle plumbing on
 // TransmitModel: previous non-VAX source tracking, toggleVaxSource
@@ -20,13 +20,13 @@
 //   persistence_preconnectFallback       - missing per-MAC falls back to preconnect
 // =================================================================
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-10 - Original test for NereusSDR by J.J. Boyd (KG4VCF),
 //                 with AI-assisted implementation via Anthropic Claude
 //                 Code.
 // =================================================================
 
-// no-port-check: NereusSDR-original test file.
+// no-port-check: Longpath-original test file.
 
 #include <QtTest/QtTest>
 

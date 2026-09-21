@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 //
-// NereusSDR - FreeDVReporterDialog: standalone window listing every
+// Longpath - FreeDVReporterDialog: standalone window listing every
 // connected qso.freedv.org station in a sortable 14-column table.
 // Implementation.
 //
@@ -37,7 +37,7 @@
 //
 // ==========================================================================
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-11  J.J. Boyd / KG4VCF  Phase 3J-2 Task G1. Initial shell
 //                                    port. Implementation. AI tooling:
 //                                    Anthropic Claude Code.
@@ -125,10 +125,10 @@ namespace Longpath {
 // Msg background: #E58BE5 ported verbatim from freedv-gui
 //   src/config/ReportingConfiguration.cpp:95 [@77e793a]
 //   (default value of freedvReporterMsgRowBackgroundColor).
-// RX background: NereusSDR-architectural divergence. Upstream uses
+// RX background: Longpath-architectural divergence. Upstream uses
 //   #379baf (cyan-blue, more blue than green) as the default
 //   value of freedvReporterRxRowBackgroundColor
-//   (ReportingConfiguration.cpp:93 [@77e793a]). NereusSDR picks
+//   (ReportingConfiguration.cpp:93 [@77e793a]). Longpath picks
 //   a green-dominant tone here so the dialog visually distinguishes
 //   "actively decoding a callsign right now" (green) from
 //   "transmitting" (red); G3 will surface the upstream color knobs
@@ -191,7 +191,7 @@ static constexpr int kColoringRecheckMs = 1'000;
 // drawn from freedv-gui's createColumn_ switch (freedv_reporter.cpp
 // :75-182 [@77e793a]) and the corresponding GetValue() switch
 // (freedv_reporter.cpp:3087-3146 [@77e793a]); the QAbstractTableModel
-// shape itself is NereusSDR-native since wxDataViewModel is wx-specific.
+// shape itself is Longpath-native since wxDataViewModel is wx-specific.
 // =====================================================================
 class FreeDVReporterTableModel : public QAbstractTableModel {
 public:
@@ -275,7 +275,7 @@ public:
 
         if (role == Qt::DisplayRole) {
             // From freedv-gui freedv_reporter.cpp:3087-3146 [@77e793a]
-            // (GetValue switch). NereusSDR formats the per-cell strings
+            // (GetValue switch). Longpath formats the per-cell strings
             // up front here instead of caching them on the row struct
             // the way upstream does (freedv-gui refreshes `freqString`
             // / `snr` / `heading` on the ReporterData record itself).
@@ -421,10 +421,10 @@ private:
         return QLocale::system().toString(mhz, 'f', 4);
     }
 
-    // SNR rendering. NereusSDR-architectural divergence from upstream:
+    // SNR rendering. Longpath-architectural divergence from upstream:
     // upstream calls wxNumberFormatter::ToString(snr, 1) which yields
     // "12.0" / "-99.0" / etc (freedv_reporter.cpp:3692 [@77e793a]);
-    // NereusSDR renders the integer with a forced sign prefix and
+    // Longpath renders the integer with a forced sign prefix and
     // shows " - " for the unknown-SNR sentinel (-99) so the column
     // stays narrow at 60 px minimum width. G3 will surface this as a
     // per-radio formatter setting if upstream parity is requested.
@@ -440,7 +440,7 @@ private:
 
     // From freedv-gui freedv_reporter.cpp:3358-3363 [@77e793a]
     // (refreshAllRows distance/heading string assembly). Upstream uses
-    // wxNumberFormatter::ToString(distance, 0); NereusSDR matches that.
+    // wxNumberFormatter::ToString(distance, 0); Longpath matches that.
     static QString formatDistance(double distanceKm) {
         if (distanceKm <= 0.0) {
             return QStringLiteral(" - ");
@@ -459,7 +459,7 @@ private:
     // From freedv-gui freedv_reporter.cpp:3196-3210 [@77e793a]
     // (refreshAllRows heading string). Upstream renders either
     // GetCardinalDirection_(headingVal) or ToString(headingVal, 0) per
-    // user setting reportingDirectionAsCardinal. NereusSDR pre-stamps
+    // user setting reportingDirectionAsCardinal. Longpath pre-stamps
     // the cardinal in FreeDVStationModel (Task D3 followup) and renders
     // "045 NE" combining both forms; when no grid is available the
     // upstream `parent_->UNKNOWN_STR` path produces " - ".
@@ -501,7 +501,7 @@ private:
     // From freedv-gui freedv_reporter.cpp:2308 [@77e793a] (`return
     // parent_->UNKNOWN_STR`) - upstream formats datestamps via the
     // makeValidTime_() helper, which calls wxDateTime::Format("%x %X")
-    // by default; NereusSDR renders local time with HH:mm:ss per the
+    // by default; Longpath renders local time with HH:mm:ss per the
     // G1 task spec ("upstream wxDateTime::Format("%H:%M:%S")"). The
     // wider %x %X format lands in G3 once the kHz/MHz toggle exposes
     // the format setting.
@@ -524,7 +524,7 @@ private:
 // QTimer can clear it after kDefaultHighlightClearMs) and queried by
 // the delegate at paint time.
 //
-// The delegate is a NereusSDR-architectural divergence from upstream's
+// The delegate is a Longpath-architectural divergence from upstream's
 // approach (upstream stamps `backgroundColor` directly onto the
 // `ReporterData` row struct and the wxDataViewCtrl renderer reads it
 // off the row; freedv_reporter.cpp:3026 [@77e793a]). Keeping the
@@ -601,7 +601,7 @@ private:
 // (col 5 EditRole, raw quint64 Hz) does not fall inside the band the
 // user picked in m_bandFilter.
 //
-// NereusSDR-architectural divergence from upstream. freedv-gui sets
+// Longpath-architectural divergence from upstream. freedv-gui sets
 // `reportData->isVisible = false` on each per-sid record and re-emits
 // row-changed events into the wxDataViewModel (freedv_reporter.cpp
 // :3215-3217 [@77e793a]). Qt's MV separation lets us drop the
@@ -647,9 +647,9 @@ public:
 protected:
     // Qt 6.13 deprecated invalidateFilter() in favor of
     // beginFilterChange() / endFilterChange(Direction::Rows). Both APIs
-    // exist in Qt 6.10+. NereusSDR has no explicit Qt minimum in
+    // exist in Qt 6.10+. Longpath has no explicit Qt minimum in
     // CMakeLists.txt, so we keep a fallback to invalidateFilter on
-    // older Qt builds. NereusSDR-only compat shim; not an upstream port.
+    // older Qt builds. Longpath-only compat shim; not an upstream port.
     void invalidateFilterCompat() {
 #if QT_VERSION >= QT_VERSION_CHECK(6, 10, 0)
         beginFilterChange();
@@ -721,9 +721,9 @@ public:
 protected:
     // Qt 6.13 deprecated invalidateFilter() in favor of
     // beginFilterChange() / endFilterChange(Direction::Rows). Both APIs
-    // exist in Qt 6.10+. NereusSDR has no explicit Qt minimum in
+    // exist in Qt 6.10+. Longpath has no explicit Qt minimum in
     // CMakeLists.txt, so we keep a fallback to invalidateFilter on
-    // older Qt builds. NereusSDR-only compat shim; not an upstream port.
+    // older Qt builds. Longpath-only compat shim; not an upstream port.
     void invalidateFilterCompat() {
 #if QT_VERSION >= QT_VERSION_CHECK(6, 10, 0)
         beginFilterChange();
@@ -1152,7 +1152,7 @@ void FreeDVReporterDialog::buildBottomBar() {
     m_bandFilter->setObjectName(QStringLiteral("bandFilterCombo"));
     // Band list per task spec: "All" + 12 ham bands. Upstream's combo
     //   has 13 entries too (freedv_reporter.cpp:324-338 [@77e793a]) but
-    //   collapses 6m+ into ">= 6 m" + "Other". NereusSDR surfaces 6m
+    //   collapses 6m+ into ">= 6 m" + "Other". Longpath surfaces 6m
     //   and 2m explicitly since the radios in our target list (HL2,
     //   ANAN-G2) both reach those bands natively.
     static const char* const kBandNames[] = {
@@ -1245,7 +1245,7 @@ void FreeDVReporterDialog::buildBottomBar() {
     m_closeButton->setObjectName(QStringLiteral("closeButton"));
     m_closeButton->setDefault(true);
     // Upstream labels this button "Close" with wxID_OK
-    //   (freedv_reporter.cpp:306 [@77e793a]); NereusSDR uses "OK" per
+    //   (freedv_reporter.cpp:306 [@77e793a]); Longpath uses "OK" per
     //   the task spec since both names map to the same close() action.
     connect(m_closeButton, &QPushButton::clicked, this, &QWidget::close);
     row1->addWidget(m_closeButton);
@@ -1681,12 +1681,12 @@ void FreeDVReporterDialog::refreshMessageDropdown(const QStringList& msgs) {
 //   Idle longer than  - 30 min / 1 hour / 2 hours / Never
 //
 // Ported from freedv-gui freedv_reporter.cpp:391-448 [@77e793a]
-//   (wxMenuBar construction). NereusSDR-architectural divergences:
+//   (wxMenuBar construction). Longpath-architectural divergences:
 //   1. Upstream nests "Idle more than (minutes)..." as a submenu of the
 //      Filter menu (:431); the task spec promotes it to a top-level menu.
 //   2. Upstream's Filter menu only contains the idle submenu plus
 //      column-filter wiring driven from the column-header right-click.
-//      NereusSDR mirrors the column right-click but also exposes a
+//      Longpath mirrors the column right-click but also exposes a
 //      Filter menu with 14 per-column submenus so menu users (no mouse,
 //      keyboard-only) have the same access.
 //   3. Upstream offers Disabled / 30 / 60 / 90 / 120 / Custom for the
@@ -1718,7 +1718,7 @@ const char* const kColumnDisplayNames[kFreeDVReporterColumnCount] = {
 
 // Comparison-operator labels for the Filter submenus. From
 // freedv-gui freedv_reporter.cpp:1729-1736 [@77e793a]
-//   (opItems[] array). NereusSDR keeps the same ordering and labels.
+//   (opItems[] array). Longpath keeps the same ordering and labels.
 struct OperatorEntry {
     int op;
     const char* label;
@@ -2075,7 +2075,7 @@ void FreeDVReporterDialog::onRowDoubleClicked(const QModelIndex& proxyIdx) {
     }
     // From freedv-gui freedv_reporter.cpp:1463-1477 [@77e793a]
     //   (OnItemDoubleClick -> rigFrequencyController->setFrequency).
-    //   NereusSDR emits tuneRequested instead of QSY broadcast - the
+    //   Longpath emits tuneRequested instead of QSY broadcast - the
     //   task spec calls out that double-click is a local tune only.
     emit tuneRequested(freqHz);
 }
@@ -2085,7 +2085,7 @@ void FreeDVReporterDialog::onIdleSweepTick() {
         return;
     }
     // From freedv-gui freedv_reporter.cpp:2581-2601 [@77e793a]
-    //   (isFiltered_ idle-time check). NereusSDR walks the model's
+    //   (isFiltered_ idle-time check). Longpath walks the model's
     //   QHash<sid, FreeDVStation> snapshot and calls onStationRemoved
     //   for each station that has not updated within the threshold;
     //   that path mirrors the wire-level remove_connection event.
@@ -2097,7 +2097,7 @@ void FreeDVReporterDialog::onIdleSweepTick() {
         const FreeDVStation& s = it.value();
         // Pick the most recent activity timestamp.
         //   Upstream uses lastTxDate if valid, else connectTime
-        //   (freedv_reporter.cpp:2590-2597 [@77e793a]). NereusSDR uses
+        //   (freedv_reporter.cpp:2590-2597 [@77e793a]). Longpath uses
         //   lastUpdate because that's what the FreeDVReporterClient
         //   stamps on every event (D2 client port).
         const QDateTime ref = s.lastUpdate.isValid()

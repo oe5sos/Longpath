@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/codec/IP1Codec.h  (NereusSDR)
+// src/core/codec/IP1Codec.h  (Longpath)
 // =================================================================
 //
 // Per-board codec interface for the Protocol 1 EP2 C&C bank compose
@@ -12,7 +12,7 @@
 // P1RadioConnection owns std::unique_ptr<IP1Codec> chosen at connect
 // time from m_hardwareProfile.model (see applyBoardQuirks()).
 //
-// NereusSDR-original. No Thetis port; no PROVENANCE row.
+// Longpath-original. No Thetis port; no PROVENANCE row.
 // Independently implemented from Protocol 1 interface design.
 // =================================================================
 

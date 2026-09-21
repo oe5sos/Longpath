@@ -1,11 +1,11 @@
 // =================================================================
-// src/gui/setup/FilterPresetsSetupPage.cpp  (NereusSDR)
+// src/gui/setup/FilterPresetsSetupPage.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original file. See FilterPresetsSetupPage.h for header.
+// Longpath-original file. See FilterPresetsSetupPage.h for header.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-02 — Original implementation for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted authoring via Anthropic
 //                 Claude Code (Stage C2 filter preset editor).
@@ -13,6 +13,7 @@
 
 #include "FilterPresetsSetupPage.h"
 #include "gui/styles/ThemeQss.h"
+#include "gui/StyleConstants.h"
 #include "models/FilterPresetStore.h"
 #include "models/SliceModel.h"
 
@@ -67,11 +68,7 @@ void FilterPresetsSetupPage::buildUi()
     modeLbl->setStyleSheet(Style::themed(QStringLiteral("color: #c8d8e8;")));
 
     m_modeCombo = new QComboBox(modeBox);
-    m_modeCombo->setStyleSheet(Style::themed(
-        QStringLiteral("QComboBox { background: #1a1a2a; color: #c8d8e8; "
-                       "border: 1px solid #304050; border-radius: 6px; padding: 2px 6px; }"
-                       "QComboBox::drop-down { background: #1a2a3a; }"
-                       "QComboBox QAbstractItemView { background: #1a1a2a; color: #c8d8e8; }")));
+    m_modeCombo->setStyleSheet(QLatin1String(Style::kComboStyle));   // Haus-Auswahlfeld
 
     // Populate with all DSPMode values in enum order.
     static const DSPMode kModes[] = {
@@ -109,13 +106,9 @@ void FilterPresetsSetupPage::buildUi()
         QStringLiteral("Width (Hz)"),
         QStringLiteral("Reorder")
     });
-    m_table->setStyleSheet(Style::themed(
-        QStringLiteral("QTableWidget { background: #1a1a2a; color: #c8d8e8; "
-                       "  gridline-color: #304050; border: 1px solid #304050; }"
-                       "QTableWidget::item { padding: 2px 4px; }"
-                       "QTableWidget::item:selected { background: #204060; }"
-                       "QHeaderView::section { background: #1a1a2a; color: #8aa8c0; "
-                       "  border: 1px solid #304050; padding: 4px; }")));
+    m_table->setStyleSheet(Style::tableStyle());   // Glas & Tiefe, 2026-09-17
+    m_table->horizontalHeader()->setFont(Style::capsFont(font(), 8));
+    m_table->horizontalHeader()->setHighlightSections(false);
     m_table->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_table->setSelectionMode(QAbstractItemView::SingleSelection);
     m_table->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Fixed);
@@ -140,11 +133,7 @@ void FilterPresetsSetupPage::buildUi()
     actRow->setContentsMargins(0, 0, 0, 0);
     actRow->setSpacing(8);
 
-    static const QString kBtnStyle = QStringLiteral(
-        "QPushButton { background: #203040; color: #c8d8e8; border: 1px solid #304050; "
-        "  border-radius: 6px; padding: 4px 10px; }"
-        "QPushButton:hover { background: #204060; }"
-        "QPushButton:pressed { background: #1a2a3a; }");
+    static const QString kBtnStyle = QLatin1String(Style::kButtonStyle);   // Hausknopf
 
     auto* resetRowBtn  = new QPushButton(QStringLiteral("Reset Selected Row"), actBox);
     auto* resetModeBtn = new QPushButton(QStringLiteral("Reset All Rows for This Mode"), actBox);
@@ -230,9 +219,8 @@ void FilterPresetsSetupPage::populateTable()
         // Col 1: name (editable QLineEdit)
         auto* nameEdit = new QLineEdit(p.name, m_table);
         nameEdit->setMaxLength(32);
-        nameEdit->setStyleSheet(Style::themed(QStringLiteral(
-            "QLineEdit { background: #1a1a2a; color: #c8d8e8; "
-            "border: 1px solid #304050; border-radius: 6px; padding: 1px 3px; }")));
+        nameEdit->setStyleSheet(Style::formFieldStyle()
+                                + QStringLiteral("QLineEdit { padding: 1px 3px; }"));   // Glasfeld, eng in der Zeile
         // Connect editing to live persist
         const int row = i;
         connect(nameEdit, &QLineEdit::editingFinished, this, [this, row] {
@@ -245,10 +233,8 @@ void FilterPresetsSetupPage::populateTable()
         lowSpin->setRange(-10000, 10000);
         lowSpin->setValue(p.low);
         lowSpin->setSuffix(QStringLiteral(" Hz"));
-        lowSpin->setStyleSheet(Style::themed(QStringLiteral(
-            "QSpinBox { background: #1a1a2a; color: #c8d8e8; "
-            "border: 1px solid #304050; border-radius: 2px; padding: 1px; }"
-            "QSpinBox::up-button, QSpinBox::down-button { background: #1a2a3a; width: 14px; }")));
+        lowSpin->setStyleSheet(Style::formFieldStyle()
+                               + QStringLiteral("QSpinBox { padding: 1px 3px; }"));
         connect(lowSpin, &QSpinBox::editingFinished, this, [this, row] {
             commitTableRow(row);
         });
@@ -277,11 +263,8 @@ void FilterPresetsSetupPage::populateTable()
         reorderLayout->setContentsMargins(2, 1, 2, 1);
         reorderLayout->setSpacing(2);
 
-        static const QString kArrowStyle = QStringLiteral(
-            "QPushButton { background: #203040; color: #c8d8e8; border: 1px solid #304050; "
-            "  border-radius: 6px; padding: 0px 4px; font-size: 11px; }"
-            "QPushButton:hover { background: #204060; }"
-            "QPushButton:disabled { color: #405060; border-color: #1a1a2a; }");
+        static const QString kArrowStyle = QLatin1String(Style::kButtonStyle)
+            + QStringLiteral("QPushButton { padding: 0px 4px; font-size: 11px; }");
 
         if (i > 0) {
             auto* upBtn = new QPushButton(QStringLiteral("↑"), reorderWidget);

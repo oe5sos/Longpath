@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - LanScanDialog implementation.
+// Longpath - LanScanDialog implementation.
 //
-// NereusSDR-native (no upstream). Design reference:
+// Longpath-native (no upstream). Design reference:
 // docs/architecture/2026-05-18-pgxl-tgxl-and-analog-smeter-plan.md
 // section 5.3 (LAN scan UX).
 //

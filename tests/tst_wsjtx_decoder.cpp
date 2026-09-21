@@ -6,7 +6,7 @@
 // fixtures, not ported callsigns. Precedent: B2 (commit f43582e),
 // B3 (commit 9aa4202).
 //
-// NereusSDR - WsjtxClient binary protocol parser tests
+// Longpath - WsjtxClient binary protocol parser tests
 //
 // Phase 3J-2 Task B4. Pins the contract that WsjtxClient parses
 // big-endian QDataStream Status (type 1) + Decode (type 2) messages

@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/MacNRFilter.cpp  (NereusSDR)
+// src/core/MacNRFilter.cpp  (Longpath)
 // =================================================================
 //
 // Ported from AetherSDR src/core/MacNRFilter.{h,cpp} [@0cd4559].
@@ -7,10 +7,10 @@
 // (GPLv3 per https://github.com/ten9876/AetherSDR).
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-23 — Imported from AetherSDR and MODIFIED for 48 kHz
 //                stereo float native operation. AetherSDR's MNR ran
-//                at 24 kHz natively; NereusSDR's post-fexchange2
+//                at 24 kHz natively; Longpath's post-fexchange2
 //                audio path is 48 kHz so we:
 //                  * LOG2N 9 → 10 (FFT size 512 → 1024)
 //                  * H 256 → 512  (hop size doubles with FFT size)

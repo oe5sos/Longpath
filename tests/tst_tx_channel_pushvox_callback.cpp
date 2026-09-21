@@ -1,7 +1,7 @@
-// no-port-check: NereusSDR-original unit-test file. Thetis cite comments
+// no-port-check: Longpath-original unit-test file. Thetis cite comments
 // document upstream sources; no Thetis logic ported in this test file.
 // =================================================================
-// tests/tst_tx_channel_pushvox_callback.cpp  (NereusSDR)
+// tests/tst_tx_channel_pushvox_callback.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for TxChannel DEXP pushvox callback bridge (Phase 3M-3a-iii
@@ -25,14 +25,14 @@
 //       (defensive guard for stale or cross-talk callbacks).
 //
 // Test seam: TxChannel::invokePushVoxForTest is exposed under
-// NEREUS_BUILD_TESTS and forwards directly to the static
+// LONGPATH_BUILD_TESTS and forwards directly to the static
 // s_pushVoxCallback bridge.  WDSP normally invokes the bridge from
 // inside `xdexp` on the audio worker thread; tests cannot easily drive
 // that path without a live mic stream + DEXP detector, so the seam
 // invokes it synchronously.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-04 - New test file for Phase 3M-3a-iii Task 17 (bench fix):
 //                 verifies the WDSP DEXP pushvox callback bridge correctly
 //                 routes threshold-crossing events into the voxActiveChanged
@@ -42,7 +42,7 @@
 //                 Claude Code.
 // =================================================================
 
-#define NEREUS_BUILD_TESTS 1
+#define LONGPATH_BUILD_TESTS 1
 
 #include <QtTest/QtTest>
 #include <QSignalSpy>

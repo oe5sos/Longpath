@@ -236,4 +236,18 @@ if (sem_destroy((sem_t *)hObject) < 0) {
 return 0;
 }
 
+// POSIX stand-in for upstream utilities.c's dprintf() (WDSP 2.10,
+// utilities.c:587-597), which formats into a buffer and sends it to the
+// Visual Studio Output window via OutputDebugStringA() — a Win32-only sink
+// with no POSIX equivalent. NereusSDR's own utilities.c is still at v1.29
+// and never gained that function; this prints to stderr instead, the usual
+// POSIX destination for unstructured debug tracing. Invoked via the
+// `dprintf` macro in linux_port.h, never called directly under this name.
+void wdsp_dprintf(const char *format, ...) {
+  va_list args;
+  va_start(args, format);
+  vfprintf(stderr, format, args);
+  va_end(args);
+}
+
 #endif

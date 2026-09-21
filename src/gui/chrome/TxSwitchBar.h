@@ -1,11 +1,11 @@
 #pragma once
 
-// no-port-check: NereusSDR-original. Kein Upstream-Port.
+// no-port-check: Longpath-original. Kein Upstream-Port.
 
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // =================================================================
-// src/gui/chrome/TxSwitchBar.h  (NereusSDR)
+// src/gui/chrome/TxSwitchBar.h  (Longpath)
 // =================================================================
 //
 // Die vier Sendeschalter in der unteren Leiste: MOX, VOX, TUNE, PS.
@@ -23,7 +23,7 @@
 // schnelle Griff ohne Blickwechsel war dem Betreiber mehr wert.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-18 — Original fuer NereusSDR von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
 // =================================================================

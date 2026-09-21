@@ -39,6 +39,9 @@
 
 #include <QtTest>
 #include <QScreen>
+#include <QSignalSpy>
+#include <QCloseEvent>
+#include <QPushButton>
 
 #include "gui/applets/AppletFloatingWindow.h"
 #include "gui/WindowChrome.h"
@@ -233,6 +236,83 @@ private slots:
                  "nach links ziehen muss schmaler machen");
         QVERIFY2(smaller.height() < before.height(),
                  "nach oben ziehen muss niedriger machen");
+    }
+
+    // Der Betreiber am 2026-09-17: "man sollte auch immer das fenster
+    // auf die volle größe anpassen können, geht aber so nicht." Ein
+    // Klick auf ⤢ fuellt den nutzbaren Schirm, der zweite stellt Lage
+    // und Groesse wieder her; festgestellt tut der Knopf nichts.
+    void theZoomButtonFillsTheScreenAndComesBack()
+    {
+        RadioModel model;
+        model.addSlice();
+        auto* rx = new RxApplet(model.slices().value(0), &model);
+        AppletFloatingWindow win(rx, QStringLiteral("Rx"), 0, nullptr);
+        win.setMinimumSize(200, 120);
+        if (rx) { rx->setMinimumSize(0, 0); }
+        win.move(120, 90);
+        win.resize(600, 400);
+        win.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&win));
+
+        auto* bar = win.findChild<WindowTitleBar*>();
+        QVERIFY(bar);
+        QPushButton* zoom = nullptr;
+        for (QPushButton* b : bar->findChildren<QPushButton*>()) {
+            if (b->text() == QStringLiteral("⤢")) { zoom = b; break; }
+        }
+        QVERIFY2(zoom && zoom->isVisible(), "ein ⤢ muss in der Leiste stehen");
+
+        const QRect before = win.geometry();
+        QTest::mouseClick(zoom, Qt::LeftButton);
+        QVERIFY(bar->isZoomed());
+        const QRect avail = win.screen()->availableGeometry();
+        QVERIFY2(win.width() >= avail.width() - 2 && win.height() >= avail.height() - 2,
+                 qPrintable(QStringLiteral("nach ⤢ nur %1x%2 statt %3x%4")
+                     .arg(win.width()).arg(win.height())
+                     .arg(avail.width()).arg(avail.height())));
+
+        QTest::mouseClick(zoom, Qt::LeftButton);
+        QVERIFY(!bar->isZoomed());
+        QCOMPARE(win.geometry().size(), before.size());
+
+        // Festgestellt: der Knopf ist aus.
+        bar->setLocked(true);
+        QVERIFY(!zoom->isEnabled());
+        bar->toggleZoom();
+        QVERIFY2(!bar->isZoomed(), "festgestellt heisst festgestellt");
+    }
+
+    // Der Betreiber am 2026-09-17: "profile bleiben wieder nicht
+    // automatisch gespeichert!!!!!" Ein Schliess-EREIGNIS (vom System:
+    // Beenden ueber Dock/Apfelmenue, Space-Wechsel) darf das Fenster
+    // nicht andocken -- sonst schrumpft das Profil bei jedem Beenden um
+    // die Fenster, deren closeEvent vor dem des Hauptfensters kam. Nur
+    // der Andock-Pfeil und das × der Titelleiste docken.
+    void aSystemCloseEventDoesNotDock()
+    {
+        RadioModel model;
+        model.addSlice();
+        auto* rx = new RxApplet(model.slices().value(0), &model);
+        AppletFloatingWindow win(rx, QStringLiteral("Rx"), 0, nullptr);
+        win.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&win));
+
+        QSignalSpy docks(&win, &AppletFloatingWindow::dockRequested);
+        QCloseEvent ev;
+        QApplication::sendEvent(&win, &ev);
+        QCOMPARE(docks.count(), 0);
+        QVERIFY2(ev.isAccepted(), "beim Beenden muss das Fenster gehen duerfen");
+
+        // × und Pfeil in der Leiste docken weiterhin -- der Pfeil erst
+        // nach der Schutzfrist gegen den Doppel-Klick (kDockGuardMs).
+        auto* bar = win.findChild<WindowTitleBar*>();
+        QVERIFY(bar);
+        emit bar->closeRequested();
+        QCOMPARE(docks.count(), 1);
+        QTest::qWait(700);
+        emit bar->dockRequested();
+        QCOMPARE(docks.count(), 2);
     }
 };
 

@@ -249,7 +249,7 @@ void StatusBadge::applyStyle()
     // cleanly when stacked into a vertical pair by RxDashboard's medium-
     // width layout. The vertical padding bump lives in the constructor.
     setStyleSheet(QStringLiteral(
-        "NereusSDR--StatusBadge { background: %1; border-radius: 6px; }"
+        "Longpath--StatusBadge { background: %1; border-radius: 6px; }"
         "QLabel { color: %2; font-family: 'SF Mono', Menlo, monospace;"
         " font-size: 13px; font-weight: 600; line-height: 1.4; }"
     ).arg(bg, fg));

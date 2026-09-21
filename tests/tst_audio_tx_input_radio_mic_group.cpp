@@ -1,4 +1,4 @@
-// tests/tst_audio_tx_input_radio_mic_group.cpp  (NereusSDR)
+// tests/tst_audio_tx_input_radio_mic_group.cpp  (Longpath)
 //
 // Phase 3M-1b Task I.3 — Radio Mic settings group with per-family layout.
 //

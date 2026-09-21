@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/applets/TxCfcDialog.h  (NereusSDR)
+// src/gui/applets/TxCfcDialog.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
@@ -22,7 +22,7 @@
 //     Reset Comp / Reset EQ buttons, OG CFC Guide LinkLabel.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-30 — Phase 3M-3a-ii Batch 6 (Task A): created by
 //                 J.J. Boyd (KG4VCF), with AI-assisted transformation
 //                 via Anthropic Claude Code.  Modeless lazy-singleton

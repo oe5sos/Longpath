@@ -1,7 +1,7 @@
 // tst_radio_model_3m1b_ownership.cpp
 //
-// no-port-check: Test file exercises NereusSDR API; no C# is translated here.
-// NereusSDR-original integration glue (Phase 3M-1b Task L.1) — strategy-pattern
+// no-port-check: Test file exercises Longpath API; no C# is translated here.
+// Longpath-original integration glue (Phase 3M-1b Task L.1) — strategy-pattern
 // mic sources and composite router owned by RadioModel.  Phase 3M-1c TX pump
 // architecture redesign extends this with TxWorkerThread ownership cases.
 //
@@ -59,7 +59,7 @@
 // redesign §5.5 (TxWorkerThread construct/destroy on connect/teardown).
 // Pre-code review §0.3 + master design §5.2.4.
 
-// NEREUS_BUILD_TESTS is defined in CMakeLists.txt for this target, which
+// LONGPATH_BUILD_TESTS is defined in CMakeLists.txt for this target, which
 // unlocks the test seams used below (pcMicSourceForTest, etc.).
 
 #include <QtTest/QtTest>

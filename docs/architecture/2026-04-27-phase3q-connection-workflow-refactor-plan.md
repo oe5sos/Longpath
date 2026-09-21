@@ -6,7 +6,7 @@
 
 **Architecture:** A single `ConnectionState` machine (`Disconnected → Probing → Connecting → Connected → LinkLost`) lives on `RadioModel`. Two triggers feed it: broadcast scan (existing) and a new `RadioDiscovery::probeAddress()` unicast probe. UI components (TitleBar segment, modal `ConnectionPanel`, rebuilt Add Radio dialog with model-aware SKU picker, status-bar verbose strip, spectrum disconnect overlay, reworked Radio menu) all observe `RadioModel::connectionState()` and `RadioConnection::frameReceived()` rather than duplicating state.
 
-**Tech Stack:** C++20, Qt 6 (Widgets, Network, Test), CMake + Ninja, FFTW3, WDSP. Tests via Qt Test (`QTest::qExec`, `QSignalSpy`, `QCOMPARE`, `QVERIFY`) registered via `nereus_add_test()` in `tests/CMakeLists.txt`. Fake-radio pattern from `tests/fakes/P1FakeRadio.{h,cpp}` for probe/connect tests.
+**Tech Stack:** C++20, Qt 6 (Widgets, Network, Test), CMake + Ninja, FFTW3, WDSP. Tests via Qt Test (`QTest::qExec`, `QSignalSpy`, `QCOMPARE`, `QVERIFY`) registered via `longpath_add_test()` in `tests/CMakeLists.txt`. Fake-radio pattern from `tests/fakes/P1FakeRadio.{h,cpp}` for probe/connect tests.
 
 **Design spec:** [`docs/architecture/2026-04-26-connection-workflow-refactor-design.md`](2026-04-26-connection-workflow-refactor-design.md) (committed as `1cdf8b3`).
 
@@ -110,10 +110,10 @@ QTEST_MAIN(TstConnectionState)
 #include "tst_connection_state.moc"
 ```
 
-Add to `tests/CMakeLists.txt` near other `nereus_add_test()` calls:
+Add to `tests/CMakeLists.txt` near other `longpath_add_test()` calls:
 
 ```cmake
-nereus_add_test(tst_connection_state)
+longpath_add_test(tst_connection_state)
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -336,7 +336,7 @@ QTEST_MAIN(TstRadioDiscoveryProbe)
 Add to `tests/CMakeLists.txt`:
 
 ```cmake
-nereus_add_test(tst_radio_discovery_probe)
+longpath_add_test(tst_radio_discovery_probe)
 target_link_libraries(tst_radio_discovery_probe PRIVATE Qt6::Network)
 ```
 
@@ -661,7 +661,7 @@ QTEST_MAIN(TstAddCustomRadioDialog)
 Register in `tests/CMakeLists.txt`:
 
 ```cmake
-nereus_add_test(tst_add_custom_radio_dialog)
+longpath_add_test(tst_add_custom_radio_dialog)
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -975,7 +975,7 @@ QTEST_MAIN(TstConnectionPanelStatePills)
 Register in `tests/CMakeLists.txt`:
 
 ```cmake
-nereus_add_test(tst_connection_panel_state_pills)
+longpath_add_test(tst_connection_panel_state_pills)
 ```
 
 - [ ] **Step 2: Run test to verify it fails**

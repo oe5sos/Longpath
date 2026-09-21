@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/setup/DspOptionsPage.h  (NereusSDR)
+// src/gui/setup/DspOptionsPage.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
@@ -10,7 +10,7 @@
 // Thetis version: v2.10.3.13 (git commit 501e3f5)
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-01 — Ported in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via
 //                 Anthropic Claude Code.
@@ -82,7 +82,7 @@ namespace Longpath {
 //
 // Group 1 — Buffer Size (IQcomp): 4 combos (Phone/CW/Digital/FM)
 //   From Thetis setup.Designer.cs grpDSPBufferSize [v2.10.3.13].
-//   Each combo has RX and TX in Thetis; NereusSDR collapses to per-mode
+//   Each combo has RX and TX in Thetis; Longpath collapses to per-mode
 //   (Task 4.2 applies the same value to both RX and TX channels).
 //
 // Group 2 — Filter Size (taps): 4 combos (Phone/CW/Digital/FM)
@@ -193,7 +193,7 @@ private:
     //   bufferSizeDifferentTX  = !(phone==fm && fm==dig)              (3-way TX; no CW TX)
     //   filterSizeDifferentTX  = !(phone==fm && fm==dig)
     //   filterTypeDifferentTX  = !(phone==fm && fm==dig)
-    // NereusSDR collapses RX+TX to per-mode combos; RX maps to the 4 mode combos,
+    // Longpath collapses RX+TX to per-mode combos; RX maps to the 4 mode combos,
     // TX maps to the 3 TX-capable mode combos (phone/dig/fm — no CW TX buf in Thetis).
     void recomputeWarnings();
 };

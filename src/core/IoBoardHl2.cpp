@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/IoBoardHl2.cpp  (NereusSDR)
+// src/core/IoBoardHl2.cpp  (Longpath)
 // =================================================================
 //
 // Ported from mi0bot/OpenHPSDR-Thetis sources:
@@ -17,7 +17,7 @@
 //       REG_FREQUENCY/REG_RF_INPUTS/REG_ANTENNA writes + reads
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-20 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                (KG4VCF), with AI-assisted transformation via Anthropic
 //                Claude Code. Closes Phase 3I-T12 deferred work

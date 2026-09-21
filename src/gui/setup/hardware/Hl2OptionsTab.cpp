@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/setup/hardware/Hl2OptionsTab.cpp  (NereusSDR)
+// src/gui/setup/hardware/Hl2OptionsTab.cpp  (Longpath)
 // =================================================================
 //
 // Ported from mi0bot-Thetis source:
@@ -10,7 +10,7 @@
 // See Hl2OptionsTab.h for the full design + scope rationale.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-30 — New for Phase 3L HL2 Filter visibility brainstorm.
 //                Phase 3L commit #9.  Three group boxes:
 //                Hermes Lite Options + I2C Control + I/O Pin State.
@@ -79,7 +79,7 @@
 namespace Longpath {
 
 namespace {
-Q_LOGGING_CATEGORY(lcHl2Options, "nereus.hl2.options")
+Q_LOGGING_CATEGORY(lcHl2Options, "longpath.hl2.options")
 
 // Small helper for hex-displayed integer spinboxes.
 QSpinBox* makeHexSpin(QWidget* parent, int min, int max, int initial, int width = 56)
@@ -294,13 +294,13 @@ void Hl2OptionsTab::buildI2cControl(QWidget* parent)
     grid->addWidget(m_chkI2cEnable, row, 0, 1, 4);
     ++row;
 
-    // Bus radio — bus 0 deferred per design §4 (no NereusSDR I2cTxn path
+    // Bus radio — bus 0 deferred per design §4 (no Longpath I2cTxn path
     // for bus 0 today), so render as disabled with explanatory tooltip.
     grid->addWidget(new QLabel(tr("Bus:"), parent), row, 0);
     auto* bus0 = new QCheckBox(tr("0 (deferred)"), parent);
     bus0->setEnabled(false);
     bus0->setToolTip(tr(
-        "Bus 0 surface deferred to a Phase 3L follow-up — NereusSDR's "
+        "Bus 0 surface deferred to a Phase 3L follow-up — Longpath's "
         "I2cTxn pipeline currently emits bus 1 only.  See "
         "docs/architecture/phase3l-hl2-visibility-design.md §4."));
     grid->addWidget(bus0, row, 1);
@@ -569,7 +569,7 @@ void Hl2OptionsTab::onIoBoardOcByteChanged(quint8 ocByte, int /*bandIdx*/, bool 
     if (m_outputStrip) { m_outputStrip->setBits(ocByte); }
 }
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
 bool Hl2OptionsTab::swapAudioChannelsCheckedForTest() const
 {
     return m_chkSwapAudio && m_chkSwapAudio->isChecked();

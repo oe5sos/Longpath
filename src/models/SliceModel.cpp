@@ -1,5 +1,5 @@
 // =================================================================
-// src/models/SliceModel.cpp  (NereusSDR)
+// src/models/SliceModel.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -7,7 +7,7 @@
 //   Project Files/Source/Console/display.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -228,7 +228,7 @@ void SliceModel::setDspMode(DSPMode mode)
 
     // ── Phase 3R J3 + K-bench: RADE channel-additive lifecycle ────────────
     //
-    // RADE_U / RADE_L are NereusSDR-native DSPModes (J1).  Original J3
+    // RADE_U / RADE_L are Longpath-native DSPModes (J1).  Original J3
     // design destroyed the WDSP RxChannel and replaced it with a
     // RadeChannel on entry into RADE.  K-bench reframed the RX pipeline
     // (RxDspWorker.cpp:160-191) so RADE is now ADDITIVE rather than
@@ -388,6 +388,19 @@ void SliceModel::setDspMode(DSPMode mode)
             s.contains(newPrefix + QStringLiteral("FilterHigh"))) {
             low  = s.value(newPrefix + QStringLiteral("FilterLow")).toInt();
             high = s.value(newPrefix + QStringLiteral("FilterHigh")).toInt();
+            // Dieselbe Wache wie in restoreBandState(): ein gespeicherter
+            // Durchlass, der bei LSB/USB ueber den Traeger reicht, ist
+            // kein Wunsch des Bedienenden, sondern ein Rest des
+            // Bandfilter-Fehlers vom 2026-09-17 -- Vorgabe statt Muell.
+            if (filterCrossesCarrier(low, high, mode)) {
+                qCWarning(lcDsp) << "Persisted filter" << low << high
+                                 << "crosses the carrier for"
+                                 << SliceModel::modeName(mode)
+                                 << "-- using the mode default instead";
+                auto pair = defaultFilterForMode(mode);
+                low  = pair.first;
+                high = pair.second;
+            }
         } else {
             // From Thetis console.cs:5180-5575 — InitFilterPresets, F5 per mode
             auto pair = defaultFilterForMode(mode);
@@ -555,6 +568,24 @@ bool SliceModel::constrainFilter(int& low, int& high, DSPMode mode,
     }
 
     return (low != originalLow) || (high != originalHigh);
+}
+
+bool SliceModel::filterCrossesCarrier(int low, int high, DSPMode mode)
+{
+    switch (mode) {
+    case DSPMode::LSB:
+    case DSPMode::CWL:
+    case DSPMode::DIGL:
+    case DSPMode::RADE_L:
+        return high > 0;
+    case DSPMode::USB:
+    case DSPMode::CWU:
+    case DSPMode::DIGU:
+    case DSPMode::RADE_U:
+        return low < 0;
+    default:
+        return false;
+    }
 }
 
 // ── Breite und Lage rechnen mit ──────────────────────────────────────
@@ -895,7 +926,7 @@ void SliceModel::setRfGain(int gain)
     // console.designer.cs:3708-3709 [v2.10.3.15]: ptbRF.Minimum = -20,
     // ptbRF.Maximum = 120 -- the same bounds TCIServer.cs handleAgcGain
     // clamps to and RxChannel::readBackAgcTop already applies. The earlier
-    // 0..100 here was a NereusSDR-original guess that silently narrowed
+    // 0..100 here was a Longpath-original guess that silently narrowed
     // both the TCI agc_gain path and the AGC-threshold readback mirror.
     gain = std::clamp(gain, -20, 120);
     if (m_rfGain != gain) {
@@ -1581,6 +1612,62 @@ void SliceModel::setNr4Algo(Longpath::SbnrAlgo v)
     emit nr4AlgoChanged(v);
 }
 
+// NNR
+void SliceModel::setNnrPosition(Longpath::NrPosition p)
+{
+    if (m_nnrPosition == p) { return; }
+    m_nnrPosition = p;
+    emit nnrPositionChanged(p);
+}
+void SliceModel::setNnrModel(int v)
+{
+    if (m_nnrModel == v) { return; }
+    m_nnrModel = v;
+    emit nnrModelChanged(v);
+}
+void SliceModel::setNnrMaskFloor(double v)
+{
+    if (m_nnrMaskFloor == v) { return; }
+    m_nnrMaskFloor = v;
+    emit nnrMaskFloorChanged(v);
+}
+void SliceModel::setNnrAlpha(double v)
+{
+    if (m_nnrAlpha == v) { return; }
+    m_nnrAlpha = v;
+    emit nnrAlphaChanged(v);
+}
+void SliceModel::setNnrAlphaKnee(double v)
+{
+    if (m_nnrAlphaKnee == v) { return; }
+    m_nnrAlphaKnee = v;
+    emit nnrAlphaKneeChanged(v);
+}
+void SliceModel::setNnrTau(double v)
+{
+    if (m_nnrTau == v) { return; }
+    m_nnrTau = v;
+    emit nnrTauChanged(v);
+}
+void SliceModel::setNnrMaxGain(double v)
+{
+    if (m_nnrMaxGain == v) { return; }
+    m_nnrMaxGain = v;
+    emit nnrMaxGainChanged(v);
+}
+void SliceModel::setNnrAttackMs(double v)
+{
+    if (m_nnrAttackMs == v) { return; }
+    m_nnrAttackMs = v;
+    emit nnrAttackMsChanged(v);
+}
+void SliceModel::setNnrReleaseMs(double v)
+{
+    if (m_nnrReleaseMs == v) { return; }
+    m_nnrReleaseMs = v;
+    emit nnrReleaseMsChanged(v);
+}
+
 // DFNR
 void SliceModel::setDfnrAttenLimit(double v)
 {
@@ -1731,7 +1818,7 @@ void SliceModel::setSnbK2(double v)
 }
 
 // No Thetis Setup control for this one: Thetis picks SNB output bandwidth per
-// mode at rxa.cs:112-124. The range is NereusSDR's own native override,
+// mode at rxa.cs:112-124. The range is Longpath's own native override,
 // unchanged from the slider it replaces.
 void SliceModel::setSnbOutputBandwidthHz(int v)
 {
@@ -1855,7 +1942,7 @@ std::pair<int, int> SliceModel::defaultFilterForMode(DSPMode mode)
     // Phase 3J-1 closeout Item 6 (2026-05-12): read CW pitch from
     // AppSettings instead of hardcoding 600.  Operator-configurable in
     // Thetis (Setup → Keyboard / DSP → CW pitch slider; default 600 Hz);
-    // the dedicated NereusSDR setter lands with Phase 3M-2 CW TX, but the
+    // the dedicated Longpath setter lands with Phase 3M-2 CW TX, but the
     // read path needs to be in place now so the filter center moves with
     // the setting once that UI ships.  Range matches Thetis udCWPitch
     // (Setup.designer.cs CW pitch up-down: 100..2000 Hz).
@@ -2122,7 +2209,7 @@ QString SliceModel::modeName(DSPMode mode)
     case DSPMode::DIGL: return QStringLiteral("DIGL");
     case DSPMode::SAM:  return QStringLiteral("SAM");
     case DSPMode::DRM:  return QStringLiteral("DRM");
-    // Phase 3R Task J1.  NereusSDR-native; not WDSP modes.  Split
+    // Phase 3R Task J1.  Longpath-native; not WDSP modes.  Split
     // into upper/lower sidebands like USB/LSB.
     case DSPMode::RADE_U: return QStringLiteral("RADE-U");
     case DSPMode::RADE_L: return QStringLiteral("RADE-L");
@@ -2144,7 +2231,7 @@ DSPMode SliceModel::modeFromName(const QString& name)
     if (name == QLatin1String("DIGL")) return DSPMode::DIGL;
     if (name == QLatin1String("SAM"))  return DSPMode::SAM;
     if (name == QLatin1String("DRM"))  return DSPMode::DRM;
-    // Phase 3R Task J1.  NereusSDR-native; not WDSP modes.
+    // Phase 3R Task J1.  Longpath-native; not WDSP modes.
     if (name == QLatin1String("RADE-U")) return DSPMode::RADE_U;
     if (name == QLatin1String("RADE-L")) return DSPMode::RADE_L;
     // Legacy migration: pre-fix builds persisted the singular "RADE"
@@ -2257,12 +2344,12 @@ void SliceModel::saveToSettings(Band band)
 
     // Phase 3F: per-slice DDC sample rate, persisted per-band so each band
     // can independently remember its preferred rate (e.g. 192 kHz on 40m,
-    // 1536 kHz on 10m for a wider pan). NereusSDR-original (no Thetis cite).
+    // 1536 kHz on 10m for a wider pan). Longpath-original (no Thetis cite).
     s.setValue(bp + QStringLiteral("SampleRate"), m_sampleRateHz);
 
     // Phase 3F Sub-Epic G Task 2: per-band diversity tuning. The 8-memory
     // slots (T3) + direction-finding fields (T11) join this block when they
-    // ship. NereusSDR-original schema (Thetis persists diversity globally
+    // ship. Longpath-original schema (Thetis persists diversity globally
     // in DSP.console.dsp / Diversity.cs; we scope per-band per-slice so
     // operators can keep distinct DF setups across bands).
     s.setValue(bp + QStringLiteral("DiversityPhaseDeg"), m_diversityPhaseDeg);
@@ -2302,6 +2389,16 @@ void SliceModel::saveToSettings(Band band)
     s.setValue(sp + QStringLiteral("Nr4Rescale"),      m_nr4Rescale);
     s.setValue(sp + QStringLiteral("Nr4PostThresh"),   m_nr4PostThresh);
     s.setValue(sp + QStringLiteral("Nr4Algo"),         static_cast<int>(m_nr4Algo));
+    // NNR
+    s.setValue(sp + QStringLiteral("NnrPosition"),  static_cast<int>(m_nnrPosition));
+    s.setValue(sp + QStringLiteral("NnrModel"),     m_nnrModel);
+    s.setValue(sp + QStringLiteral("NnrMaskFloor"), m_nnrMaskFloor);
+    s.setValue(sp + QStringLiteral("NnrAlpha"),     m_nnrAlpha);
+    s.setValue(sp + QStringLiteral("NnrAlphaKnee"), m_nnrAlphaKnee);
+    s.setValue(sp + QStringLiteral("NnrTau"),       m_nnrTau);
+    s.setValue(sp + QStringLiteral("NnrMaxGain"),   m_nnrMaxGain);
+    s.setValue(sp + QStringLiteral("NnrAttackMs"),  m_nnrAttackMs);
+    s.setValue(sp + QStringLiteral("NnrReleaseMs"), m_nnrReleaseMs);
     // DFNR
     s.setValue(sp + QStringLiteral("DfnrAttenLimit"),     m_dfnrAttenLimit);
     s.setValue(sp + QStringLiteral("DfnrPostFilterBeta"), m_dfnrPostFilterBeta);
@@ -2420,15 +2517,39 @@ void SliceModel::restoreFromSettings(Band band)
     // before reaching this restore block, so it reflects the destination
     // mode for the band restore.
     {
+        // ── Wache gegen einen Durchlass auf dem falschen Seitenband ──
+        //
+        // Der Betreiber am 2026-09-17: "hört sich auf 40 meter
+        // katastrophal an" -- in den Einstellungen stand fuer 40 m LSB
+        // ein Durchlass von -100 … +2900 Hz, entstanden aus dem LOW/
+        // WIDTH-Fehler des Bandfilters (BandwidthFilterApplet, sidebandOf).
+        // Der Fehler ist behoben, aber der gespeicherte Wert kaeme bei
+        // jedem Bandwechsel und jedem Start wieder: "wieder das gleiche".
+        // Ein Durchlass, der bei einer einseitigen Betriebsart ueber den
+        // Traeger reicht, ist kein Wunsch, den jemand gespeichert haben
+        // wollte -- dieselbe Art Wache wie fuer DspMode/AgcMode hier
+        // daneben: Vorgabe der Betriebsart statt des kaputten Werts.
+        auto restoreFilter = [this](int low, int high) {
+            if (filterCrossesCarrier(low, high, m_dspMode)) {
+                qCWarning(lcDsp) << "Persisted filter" << low << high
+                                 << "crosses the carrier for"
+                                 << SliceModel::modeName(m_dspMode)
+                                 << "-- using the mode default instead";
+                const auto pair = defaultFilterForMode(m_dspMode);
+                low  = pair.first;
+                high = pair.second;
+            }
+            setFilter(low, high);
+        };
         const QString bmp = bandModePrefix(m_sliceIndex, band, m_dspMode);
         if (s.contains(bmp + QStringLiteral("FilterLow")) &&
             s.contains(bmp + QStringLiteral("FilterHigh"))) {
-            setFilter(s.value(bmp + QStringLiteral("FilterLow")).toInt(),
-                      s.value(bmp + QStringLiteral("FilterHigh")).toInt());
+            restoreFilter(s.value(bmp + QStringLiteral("FilterLow")).toInt(),
+                          s.value(bmp + QStringLiteral("FilterHigh")).toInt());
         } else if (s.contains(bp + QStringLiteral("FilterLow")) &&
                    s.contains(bp + QStringLiteral("FilterHigh"))) {
-            setFilter(s.value(bp + QStringLiteral("FilterLow")).toInt(),
-                      s.value(bp + QStringLiteral("FilterHigh")).toInt());
+            restoreFilter(s.value(bp + QStringLiteral("FilterLow")).toInt(),
+                          s.value(bp + QStringLiteral("FilterHigh")).toInt());
         }
     }
     if (s.contains(bp + QStringLiteral("AgcMode"))) {
@@ -2561,6 +2682,34 @@ void SliceModel::restoreFromSettings(Band band)
     }
     if (s.contains(sp + QStringLiteral("Nr4Algo"))) {
         setNr4Algo(static_cast<Longpath::SbnrAlgo>(s.value(sp + QStringLiteral("Nr4Algo")).toInt()));
+    }
+    // NNR
+    if (s.contains(sp + QStringLiteral("NnrPosition"))) {
+        setNnrPosition(static_cast<Longpath::NrPosition>(s.value(sp + QStringLiteral("NnrPosition")).toInt()));
+    }
+    if (s.contains(sp + QStringLiteral("NnrModel"))) {
+        setNnrModel(s.value(sp + QStringLiteral("NnrModel")).toInt());
+    }
+    if (s.contains(sp + QStringLiteral("NnrMaskFloor"))) {
+        setNnrMaskFloor(s.value(sp + QStringLiteral("NnrMaskFloor")).toDouble());
+    }
+    if (s.contains(sp + QStringLiteral("NnrAlpha"))) {
+        setNnrAlpha(s.value(sp + QStringLiteral("NnrAlpha")).toDouble());
+    }
+    if (s.contains(sp + QStringLiteral("NnrAlphaKnee"))) {
+        setNnrAlphaKnee(s.value(sp + QStringLiteral("NnrAlphaKnee")).toDouble());
+    }
+    if (s.contains(sp + QStringLiteral("NnrTau"))) {
+        setNnrTau(s.value(sp + QStringLiteral("NnrTau")).toDouble());
+    }
+    if (s.contains(sp + QStringLiteral("NnrMaxGain"))) {
+        setNnrMaxGain(s.value(sp + QStringLiteral("NnrMaxGain")).toDouble());
+    }
+    if (s.contains(sp + QStringLiteral("NnrAttackMs"))) {
+        setNnrAttackMs(s.value(sp + QStringLiteral("NnrAttackMs")).toDouble());
+    }
+    if (s.contains(sp + QStringLiteral("NnrReleaseMs"))) {
+        setNnrReleaseMs(s.value(sp + QStringLiteral("NnrReleaseMs")).toDouble());
     }
     // DFNR
     if (s.contains(sp + QStringLiteral("DfnrAttenLimit"))) {
@@ -2800,7 +2949,7 @@ void SliceModel::setVaxChannel(int ch)
     emit vaxChannelChanged(ch);
 }
 
-// ── Phase 3J-2 Task D5: per-slice live SNR (NereusSDR-native) ──
+// ── Phase 3J-2 Task D5: per-slice live SNR (Longpath-native) ──
 //
 // Emits snrDbChanged only on actual value change:
 //   NaN    -> NaN              : no emission (signal stays absent)

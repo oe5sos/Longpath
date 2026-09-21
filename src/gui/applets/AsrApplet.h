@@ -31,7 +31,7 @@
 
 #include <QPointer>
 
-class QCheckBox;
+class QPushButton;
 class QLabel;
 class QPlainTextEdit;
 
@@ -67,7 +67,7 @@ private:
 
     QPointer<AsrService> m_service;
     QPlainTextEdit* m_text{nullptr};
-    QCheckBox*      m_enable{nullptr};
+    QPushButton*    m_enable{nullptr};
     QLabel*         m_status{nullptr};
 };
 

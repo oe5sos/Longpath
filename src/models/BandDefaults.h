@@ -1,5 +1,5 @@
 // =================================================================
-// src/models/BandDefaults.h  (NereusSDR)
+// src/models/BandDefaults.h  (Longpath)
 // =================================================================
 //
 // Seed lookup table for per-band default freq + demod mode used on the
@@ -13,12 +13,12 @@
 //
 // Policy: single-entry seed picks the first LSB/USB entry from Thetis's
 // multi-entry stack, not index 0 (which is CW for most bands). This is
-// a deliberate NereusSDR UI choice that matches the #118 reporter's
+// a deliberate Longpath UI choice that matches the #118 reporter's
 // expectation of SSB on first click. Frequencies are verbatim from
 // Thetis (source-first on constants).
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-23 — New file for NereusSDR by J.J. Boyd (KG4VCF), with
 //                 AI-assisted transformation via Anthropic Claude Code.
 // =================================================================

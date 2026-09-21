@@ -93,7 +93,7 @@ KiwiPublicReceiverPicker::KiwiPublicReceiverPicker(QWidget* parent)
 
     m_status = new QLabel(tr("Loading public receivers…"));
     m_status->setStyleSheet(QStringLiteral("QLabel { color: %1; }")
-        .arg(QString::fromLatin1(Style::kTextScale)));
+                                .arg(QLatin1String(Style::kTextSecondary)));
     outer->addWidget(m_status);
 
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);

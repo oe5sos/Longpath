@@ -1,17 +1,17 @@
 #pragma once
 
 // =================================================================
-// src/core/CredentialStore.h  (NereusSDR)
+// src/core/CredentialStore.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. AetherSDR routes secrets to the OS keychain via
+// Longpath-original. AetherSDR routes secrets to the OS keychain via
 // QtKeychain (`src/core/AppSettings.h` [@3a1f59e], "they divert to
-// QtKeychain / the session vault"); NereusSDR has no such dependency
+// QtKeychain / the session vault"); Longpath has no such dependency
 // and no credential storage of any kind, so this is the smallest thing
 // that is not "write the password into the settings XML".
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
 //                 Added for the QRZ XML login.

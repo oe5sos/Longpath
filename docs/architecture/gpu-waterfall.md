@@ -251,11 +251,11 @@ future option for exact Thetis-compatible spectrum display.
 ### Architecture
 
 SpectrumWidget inherits from QRhiWidget when GPU rendering is enabled
-(`NEREUS_GPU_SPECTRUM` define), falling back to QWidget with QPainter
+(`LONGPATH_GPU_SPECTRUM` define), falling back to QWidget with QPainter
 otherwise. This follows AetherSDR's conditional compilation pattern.
 
 ```cpp
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
 #include <QRhiWidget>
 #include <rhi/qrhi.h>
 #define SPECTRUM_BASE_CLASS QRhiWidget
@@ -299,7 +299,7 @@ divider. Default is 40% spectrum, 60% waterfall.
 #include <QImage>
 #include <QColor>
 
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
 #include <QRhiWidget>
 #include <rhi/qrhi.h>
 #define SPECTRUM_BASE_CLASS QRhiWidget
@@ -507,7 +507,7 @@ signals:
     void tnfPermanentRequested(int id, bool permanent);
 
 protected:
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     void initialize(QRhiCommandBuffer* cb) override;
     void render(QRhiCommandBuffer* cb) override;
     void releaseResources() override;
@@ -614,7 +614,7 @@ private:
     SpectrumOverlayMenu* m_overlayMenu{nullptr};
     QMap<int, VfoWidget*> m_vfoWidgets;
 
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     bool m_rhiInitialized{false};
 
     // ---- Waterfall GPU resources ----
@@ -656,7 +656,7 @@ private:
 #endif
 
     void markOverlayDirty() {
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
         m_overlayStaticDirty = true;
 #endif
         update();
@@ -1547,7 +1547,7 @@ pipelines, samplers). This ensures:
 
 ### CPU Fallback Path
 
-When `NEREUS_GPU_SPECTRUM` is not defined, SpectrumWidget falls back to
+When `LONGPATH_GPU_SPECTRUM` is not defined, SpectrumWidget falls back to
 QPainter rendering in `paintEvent()`. The waterfall uses a QImage ring
 buffer drawn directly via `QPainter::drawImage()`. This path is functional
 but significantly slower (typically 15-20 FPS at 4096 FFT) and serves as
@@ -1565,7 +1565,7 @@ a compatibility fallback for systems without GPU support.
 | FFT size control | Radio-side (`display pan set fps/average`) | Client-side (per-pan FFTEngine config) |
 | Display BW change | Radio command | Client-side (re-window FFT output) |
 | Max FFT bins | 8192 (`kMaxFftBins`) | 16384 (`kMaxFftBins`) |
-| Shader define | `AETHER_GPU_SPECTRUM` | `NEREUS_GPU_SPECTRUM` |
+| Shader define | `AETHER_GPU_SPECTRUM` | `LONGPATH_GPU_SPECTRUM` |
 | Sample rate source | Radio VITA-49 context packets | OpenHPSDR C&C configuration |
 | Waterfall blanker | Client-side (impulse detection) | Same pattern, adapted |
 | Noise floor auto | Radio `display pan set` + client auto-black | Client-only auto-black |

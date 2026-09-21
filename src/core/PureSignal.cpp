@@ -1,8 +1,8 @@
-// no-port-check: NereusSDR-original wrapper class.  See PureSignal.h
+// no-port-check: Longpath-original wrapper class.  See PureSignal.h
 // header banner for the rationale.
 //
 // =================================================================
-// src/core/PureSignal.cpp  (NereusSDR)
+// src/core/PureSignal.cpp  (Longpath)
 // =================================================================
 //
 // Implementation of PureSignal coordinator — see PureSignal.h for the
@@ -11,7 +11,7 @@
 // verify the upstream linkage.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-06 — Created by J.J. Boyd (KG4VCF) for Phase 3M-4 Task 7
 //                 PureSignal coordinator, with AI-assisted source-first
 //                 protocol via Anthropic Claude Code.
@@ -38,7 +38,7 @@ namespace Longpath {
 // 100 ms cadence — same as Thetis's PSForm thread loop (PSForm.cs:154-186
 // [v2.10.3.13] PSLoop runs timer1code every 10 ms when _power and counts
 // 10 cycles between timer2code calls; net is one timer1 per 10 ms and one
-// timer2 per ~100 ms).  NereusSDR uses 100 ms for both — the Thetis 10 ms
+// timer2 per ~100 ms).  Longpath uses 100 ms for both — the Thetis 10 ms
 // timer1 cadence was for fine-grained _GetPSpeakval polling on a label;
 // for Q_PROPERTY signal updates 100 ms is enough and avoids a hot timer
 // on the main thread.  AmpView (Task 9) does its own faster polling for
@@ -271,7 +271,7 @@ void PureSignal::singleCalibrate()
     //   //-W2PA Adds capability for CAT control via console
     //   public void SingleCalrun() { btnPSCalibrate_Click(...); }
     // — same body, exposed for CAT clients.  We collapse both into this
-    // entry point since NereusSDR's CAT layer reaches PureSignal directly.
+    // entry point since Longpath's CAT layer reaches PureSignal directly.
     if (m_singleCalON) {
         m_singleCalON = false;
         return;
@@ -303,7 +303,7 @@ void PureSignal::setPsEnabledWithFanOut(bool on)
     //
     // The PSEnabled property setter at PSForm.cs:235-269 [v2.10.3.13] is the
     // fan-out itself — it calls UpdateDDCs / SetPureSignal / SendHighPriority
-    // / setPSRunCal.  In NereusSDR the calcc-side setPSRunCal is already
+    // / setPSRunCal.  In Longpath the calcc-side setPSRunCal is already
     // wired inline at each cmd-state case (see pollTimerTick); the radio /
     // DDC / step-attenuator side moves to subscribers of psEnabledChanged
     // (RadioModel::wireConnectionSignals).
@@ -521,7 +521,7 @@ void PureSignal::setTwoToneOn(bool on)
     // From Thetis PSForm.cs:508-522 btnPSTwoToneGen_Click [v2.10.3.13]:
     //   if (_ttgenON == false) { ...; _ttgenON = true; console.SetupForm.TTgenrun = true; }
     //   else                   { ...; _ttgenON = false; console.SetupForm.TTgenrun = false; }
-    // In NereusSDR the TwoToneController owns the activation orchestrator
+    // In Longpath the TwoToneController owns the activation orchestrator
     // (chunk I); here we forward setActive(on) when wired.
     if (m_twoTone) {
         m_twoTone->setActive(on);
@@ -915,14 +915,14 @@ void PureSignal::applyBoardCapabilities(const BoardCapabilities& caps)
 //
 // From Thetis AmpView.cs:371-392 [v2.10.3.13] — the unsafe { fixed } block
 // inside timer1_Tick that pins seven managed double[] arrays and forwards
-// their addresses into puresignal.GetPSDisp.  NereusSDR doesn't need GC
+// their addresses into puresignal.GetPSDisp.  Longpath doesn't need GC
 // pinning so the wrapper is a simple pass-through to TxChannel::getPSDisp
 // (which holds the WDSP boundary).
 //
 // Inline tag preservation (per CLAUDE.md §"Inline comment preservation"):
 // upstream AmpView.cs:397 carries
 //   //disp_data(); // MW0LGE [2.9.0.8] changed to an add once, update points method.
-// — explanatory tag for a refactor; NereusSDR follows the post-refactor
+// — explanatory tag for a refactor; Longpath follows the post-refactor
 // init-once / update-points path by structure (no pre-refactor disp_data
 // path ever existed in this port).
 
@@ -974,7 +974,7 @@ void PureSignal::onMoxChanged(bool mox)
     // and the first auto-att fire would read info[4] from BEFORE the
     // post-MOX PSCC pump has had time to fill its buffer — producing
     // the same stale-data 31 dB ATT slam observed on the G2E bench at
-    // 11:58:03.570.  Cite: NereusSDR-only divergence (Thetis's parallel
+    // 11:58:03.570.  Cite: Longpath-only divergence (Thetis's parallel
     // CalibrationAttemptsChanged gate uses _info[5] vs _oldInfo[5]
     // which is auto-synced every timer1 tick — see setAutoCalEnabled
     // header for the full story).
@@ -1035,7 +1035,7 @@ void PureSignal::processNewInfo(const int newInfo[16])
     //   4) FeedbackColourLevel — apply or fade away.
     //   5) Run cmd-state machine.
     //
-    // NereusSDR splits the UI updates out (Q_PROPERTY + signals) but the
+    // Longpath splits the UI updates out (Q_PROPERTY + signals) but the
     // info[] read + flag derivation + cmd-state machine port verbatim.
 
     // Step 2: HasInfoChanged check.  Per Thetis PSForm.cs:1086-1095, the
@@ -1182,7 +1182,7 @@ void PureSignal::processNewInfo(const int newInfo[16])
     //               puresignal.FeedbackColourLevel);
     //   }
     // Fan-out goes through console.InfoBarFeedbackLevel → infoBar.PSInfo
-    // (console.cs:2307-2313 [v2.10.3.13]).  In NereusSDR the equivalent is
+    // (console.cs:2307-2313 [v2.10.3.13]).  In Longpath the equivalent is
     // PureSignal::psInfoChanged → PsaIndicatorWidget::psInfo.  Per
     // PSForm.cs:1113-1115 [v2.10.3.13]:
     //   public static bool IsFeedbackLevelOK
@@ -1605,7 +1605,7 @@ void PureSignal::autoAttentionTick()
         // i.e. setting AutoAttenuate=true when console.ATTOnTX is false
         // force-enables the ATT-on-TX master toggle.
         //
-        // Mapping in NereusSDR:
+        // Mapping in Longpath:
         //   console.ATTOnTX  ≡  m_stepAtt->attOnTxEnabled()
         //   AutoAttenuate=true setter side-effect on console.ATTOnTX
         //                    ≡  m_stepAtt->setAttOnTxEnabled(true)
@@ -1777,7 +1777,7 @@ void PureSignal::autoAttentionTick()
                 << " → " << newAtten << " dB (deltaDb=" << m_deltaDb << ")";
             m_stepAtt->setAttOnTxValue(newAtten);
             // The Thetis Thread.Sleep(100) for QuickAttenuate is omitted
-            // — NereusSDR doesn't block the main thread.  The next
+            // — Longpath doesn't block the main thread.  The next
             // RestoreOperation tick fires 100 ms later anyway.
         }
         break;

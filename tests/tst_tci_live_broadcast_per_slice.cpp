@@ -1,4 +1,4 @@
-// no-port-check: NereusSDR-original test infrastructure.  The Thetis
+// no-port-check: Longpath-original test infrastructure.  The Thetis
 // citations below are rationale for the wire behaviour being asserted, not
 // ported code.
 //

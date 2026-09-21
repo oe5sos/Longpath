@@ -1,8 +1,8 @@
 // =================================================================
-// src/core/LanDiscovery.cpp  (NereusSDR)
+// src/core/LanDiscovery.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-native UDP listener for PowerGeniusXL / TeragenXL
+// Longpath-native UDP listener for PowerGeniusXL / TeragenXL
 // announcements on ports 9008 and 9010. Parses device model,
 // IP address, version, serial, and nickname using the official
 // FlexRadio regex. Deduplicates by serial number before emitting
@@ -20,7 +20,7 @@
 
 namespace Longpath {
 
-Q_LOGGING_CATEGORY(lcLan, "nereus.lan")
+Q_LOGGING_CATEGORY(lcLan, "longpath.lan")
 
 LanDiscovery::LanDiscovery(QObject* parent) : QObject(parent) {
     connect(&m_sock9008, &QUdpSocket::readyRead, this, &LanDiscovery::on9008Ready);

@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/setup/hardware/CalibrationTab.cpp  (NereusSDR)
+// src/gui/setup/hardware/CalibrationTab.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -18,7 +18,7 @@
 //      original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 -- Original PaCalibrationTab implementation.
 //   2026-04-20 -- Renamed PaCalibrationTab -> CalibrationTab; expanded to 5
 //                  group boxes matching Thetis General -> Calibration 1:1;
@@ -145,7 +145,7 @@
 #include <QSignalBlocker>
 #include <QVBoxLayout>
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
 #include <QLayout>
 #endif
 
@@ -595,7 +595,7 @@ void CalibrationTab::restoreSettings(const QMap<QString, QVariant>& /*settings*/
 
 // -- groupBoxCountForTest ------------------------------------------------------
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
 int CalibrationTab::groupBoxCountForTest() const
 {
     int count = 0;

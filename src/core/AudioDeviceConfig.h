@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/core/AudioDeviceConfig.h  (NereusSDR)
+// src/core/AudioDeviceConfig.h  (Longpath)
 // =================================================================
 //
-// Phase 3O VAX per-endpoint audio device configuration. NereusSDR-
+// Phase 3O VAX per-endpoint audio device configuration. Longpath-
 // original. Carried into AudioEngine setSpeakersConfig / setTxInputConfig
 // / setVaxConfig, internally translated into a backend-specific
 // PortAudioConfig (or CoreAudioHalBus / LinuxPipeBus config in

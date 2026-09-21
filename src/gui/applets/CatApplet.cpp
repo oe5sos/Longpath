@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/applets/CatApplet.cpp  (NereusSDR)
+// src/gui/applets/CatApplet.cpp  (Longpath)
 // =================================================================
 //
 // Source attribution (AetherSDR — GPLv3):
@@ -10,10 +10,10 @@
 //
 //   This file is a port or structural derivative of AetherSDR source.
 //   AetherSDR is licensed under the GNU General Public License v3.
-//   NereusSDR is also GPLv3. Attribution follows GPLv3 §5 requirements.
+//   Longpath is also GPLv3. Attribution follows GPLv3 §5 requirements.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-18 — Ported/adapted in C++20/Qt6 for NereusSDR by
 //                 J.J. Boyd (KG4VCF), with AI-assisted transformation
 //                 via Anthropic Claude Code.
@@ -43,9 +43,17 @@ static QLabel* makeLed(const QString& name, QWidget* parent)
     auto* led = new QLabel(name, parent);
     led->setFixedSize(24, 14);
     led->setAlignment(Qt::AlignCenter);
-    led->setStyleSheet(Style::themed(QStringLiteral(
-        "QLabel { background: #405060; color: #c8d8e8; border-radius: 6px;"
-        " font-size: 9px; font-weight: bold; }")));
+    // Ein Glaschip (versenkt, Lichtkante unten) statt der flachen
+    // Kapsel in Grau — Glas & Tiefe, Applets zweite Runde (2026-09-18).
+    led->setStyleSheet(QStringLiteral(
+        "QLabel { background: %1; color: %2; border: 1px solid %3;"
+        " border-top-color: %4; border-bottom-color: %5; border-radius: 6px;"
+        " font-size: 9px; font-weight: bold; }")
+        .arg(Style::sunkenFill(Style::kInsetBg, 8, 4),
+             Style::hexRole(Style::kTextSecondary),
+             Style::hexRole(Style::kBorder),
+             QLatin1String(Style::kGlassShade),
+             QLatin1String(Style::kGlassLight)));
     return led;
 }
 

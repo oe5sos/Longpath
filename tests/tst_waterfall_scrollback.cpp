@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // NereusSDR — Copyright (C) 2026 JJ Boyd / KG4VCF
 //
-// Sub-epic E: waterfall scrollback unit tests. NereusSDR-original.
+// Sub-epic E: waterfall scrollback unit tests. Longpath-original.
 
 #include <QtTest/QtTest>
 #include <QImage>

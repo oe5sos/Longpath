@@ -7,7 +7,7 @@
 #include <vector>
 
 // =================================================================
-// src/gui/DssRenderer.cpp  (NereusSDR)
+// src/gui/DssRenderer.cpp  (Longpath)
 // =================================================================
 // Ported from AetherSDR `src/gui/DssRenderer.cpp` (AetherSDR 31b29583),
 // reduced scope — see the header for what was left out and why.
@@ -35,7 +35,7 @@
 // front to back; they are collected and blended at the end in painter's
 // order (see PartialCrest in the header).
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-09-03 — Ported in C++20/Qt6 for NereusSDR by Martin Fischer
 //                 (OE5SOS), AI-assisted via Anthropic Claude Code.
 //   2026-09-03 — rebuild(): QPainter polygon/line painting replaced by a

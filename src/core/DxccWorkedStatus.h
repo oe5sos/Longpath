@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - DxccWorkedStatus: per-entity / per-band / per-modeGroup
+// Longpath - DxccWorkedStatus: per-entity / per-band / per-modeGroup
 // worked-status tracker fed from AdifParser output.
 //
 // Ported from AetherSDR src/core/DxccWorkedStatus.h [@0cd4559].
 // AetherSDR is (C) its contributors and is licensed GPL-3.0-or-later
 // (see https://github.com/ten9876/AetherSDR/blob/main/LICENSE).
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-11  J.J. Boyd / KG4VCF  Phase 3J-2 Task C3. Initial port.
 //                                    AetherSDR's "AetherSDR" namespace
-//                                    becomes "NereusSDR". DxccStatus
+//                                    becomes "Longpath". DxccStatus
 //                                    enum (NewDxcc / NewBand /
 //                                    NewMode / Worked / Unknown) and
 //                                    the public surface (load,

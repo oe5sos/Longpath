@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/AmpViewWindow.h  (NereusSDR)
+// src/gui/AmpViewWindow.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -8,7 +8,7 @@
 // original licences from Thetis source are included below.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-06 — Phase 3M-4 Task 9: created by J.J. Boyd (KG4VCF),
 //                 with AI-assisted transformation via Anthropic Claude
 //                 Code.  Source-first 1:1 port of the Thetis modeless
@@ -21,7 +21,7 @@
 //                 calcc.c:1058 [v2.10.3.13]).  4 toolbar checkboxes
 //                 at exact Thetis x positions (chkAVShowGain @ 7,378
 //                 / chkAVPhaseZoom @ 242,378 / chkAVLowRes @ 404,378
-//                 / chkStayOnTop @ 490,378).  Render uses NereusSDR-
+//                 / chkStayOnTop @ 490,378).  Render uses Longpath-
 //                 native AmpViewChart custom QPainter widget instead
 //                 of the upstream System.Windows.Forms.DataVisuali-
 //                 zation chart (no QtCharts dependency added — design
@@ -98,7 +98,7 @@ class RadioModel;
 //   AmpView.cs:397  // MW0LGE [2.9.0.8]  changed to an add once, update
 //                      points method  (refactor inside timer1_Tick)
 // All four refactor MW0LGE tags concern the same chart-points-init pattern;
-// NereusSDR follows the post-refactor structure verbatim.
+// Longpath follows the post-refactor structure verbatim.
 //
 // Layout (mirrors Thetis AmpView.Designer.cs:209-229 [v2.10.3.13]):
 //

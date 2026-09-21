@@ -1,4 +1,4 @@
-// no-port-check: NereusSDR-original test fixture; cites Thetis source for
+// no-port-check: Longpath-original test fixture; cites Thetis source for
 // expected wire bit behavior but does not port any Thetis code.
 //
 // P1 full-parity Task 1.4 — codec-level XmitBit-on-frequency-banks test.

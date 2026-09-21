@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/spectrum/SpectrumAvenger.cpp  (NereusSDR)
+// src/gui/spectrum/SpectrumAvenger.cpp  (Longpath)
 // =================================================================
 //
 // Ported from WDSP source:
@@ -16,7 +16,7 @@
 // SpectrumAvenger.h.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-05 — Created in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via
 //                 Anthropic Claude Code.
@@ -72,7 +72,7 @@ inline double tenLog10(double x)
 
 // Helper: returns correction[i] if the array is non-empty, else 1.0.
 // Matches Thetis cd[i] argument when no per-pixel compensation is
-// desired (NereusSDR call shape — we don't implement Thetis
+// desired (Longpath call shape — we don't implement Thetis
 // sub-band-segment gain compensation).
 inline double cd(const QVector<double>& correction, int i)
 {

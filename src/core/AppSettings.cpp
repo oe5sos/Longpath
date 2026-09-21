@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/AppSettings.cpp  (NereusSDR)
+// src/core/AppSettings.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -7,7 +7,7 @@
 //   AetherSDR src/core/AppSettings.{h,cpp} — AetherSDR has no per-file headers; project-level GPLv3 and contributor list per About dialog per https://github.com/ten9876/AetherSDR
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-18 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -62,6 +62,7 @@
 
 #include "AppSettings.h"
 
+#include <QDate>
 #include <QDateTime>
 #include <QDir>
 #include <QFile>
@@ -199,6 +200,24 @@ QString AppSettings::resolveConfigDir(const QString& profile)
     // path on macOS (~/Library/Preferences) when test mode is OFF,
     // so production behavior is unchanged — only test isolation
     // gets fixed.
+    // ── LONGPATH_CONFIG_DIR: ein anderer Ordner fuer diesen Lauf ─────
+    //
+    // 2026-09-17: eine zweite Instanz "zum Nachsehen" (Automatisierungs-
+    // bruecke, LONGPATH_AUTOMATION) wurde mit HOME=<Sandbox> gestartet —
+    // und las trotzdem die echten Einstellungen des Betreibers, weil
+    // QStandardPaths auf macOS den Home-Ordner nicht aus $HOME nimmt.
+    // Sie meldete sich mit seinem Rufzeichen am DX-Cluster an (und warf
+    // damit seine eigene Sitzung hinaus) und schrieb beim Beenden in
+    // seine Datei zurueck. Darum hier ein ausdruecklicher Ausweg: ist
+    // die Variable gesetzt, ist DAS der Konfigurationsordner, ohne
+    // Uebernahme aus NereusSDR-Zeiten und ohne Blick in ~/Library.
+    const QString override = qEnvironmentVariable("LONGPATH_CONFIG_DIR").trimmed();
+    if (!override.isEmpty()) {
+        return isValidProfileName(profile)
+                   ? override + QStringLiteral("/profiles/") + profile
+                   : override;
+    }
+
     const QString base = QStandardPaths::writableLocation(
                              QStandardPaths::GenericConfigLocation);
     const QString root = base + QStringLiteral("/") + appFolderName();
@@ -709,6 +728,8 @@ void AppSettings::save()
     // that's the exact failure mode reported in issue #241 (NTFS journal
     // rollback over a non-atomic write left the user with no recovery
     // path at all).
+    rotateDailyBackup();
+
     if (QFileInfo::exists(m_filePath)) {
         const QString bakPath    = m_filePath + QStringLiteral(".bak");
         const QString bakTmpPath = m_filePath + QStringLiteral(".bak.tmp");
@@ -781,6 +802,47 @@ void AppSettings::save()
 
     QFile::setPermissions(m_filePath,
                           QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+    m_dirty = false;
+}
+
+// ── Tageskopie ──────────────────────────────────────────────────────
+//
+// Vor dem ersten Schreiben eines Tages wird die noch unveraenderte Datei
+// als "<Datei>.<JJJJ-MM-TT>" abgelegt; existiert die Kopie fuer heute
+// schon, passiert nichts. Aeltere als kDailyBackupsToKeep fallen weg.
+// Handkopien des Betreibers ("…settings.vor-…") haben kein Datumsmuster
+// und bleiben unberuehrt.
+QStringList AppSettings::dailyBackups() const
+{
+    const QFileInfo fi(m_filePath);
+    QDir dir(fi.absolutePath());
+    // "\?" statt "?": vier Fragezeichen am Stueck enthalten "??-", das
+    // der Compiler als Trigraph anmeckert (-Wtrigraphs), auch wenn er
+    // ihn seit C++17 nicht mehr ersetzt.
+    const QString pattern = fi.fileName() + QStringLiteral(".\?\?\?\?-\?\?-\?\?");
+    QStringList names = dir.entryList({pattern}, QDir::Files, QDir::Name);
+    static const QRegularExpression rx(QStringLiteral("\\.\\d{4}-\\d{2}-\\d{2}$"));
+    QStringList out;
+    for (const QString& n : names) {
+        if (rx.match(n).hasMatch()) { out << dir.absoluteFilePath(n); }
+    }
+    return out;   // QDir::Name sortiert die ISO-Daten chronologisch
+}
+
+void AppSettings::rotateDailyBackup()
+{
+    if (!QFileInfo::exists(m_filePath)) { return; }
+    const QString today = QDate::currentDate().toString(QStringLiteral("yyyy-MM-dd"));
+    const QString todayPath = m_filePath + QLatin1Char('.') + today;
+    if (!QFileInfo::exists(todayPath)) {
+        if (!QFile::copy(m_filePath, todayPath)) {
+            qWarning() << "AppSettings: Tageskopie nicht angelegt:" << todayPath;
+        }
+    }
+    QStringList backups = dailyBackups();
+    while (backups.size() > kDailyBackupsToKeep) {
+        QFile::remove(backups.takeFirst());
+    }
 }
 
 QVariant AppSettings::value(const QString& key, const QVariant& defaultValue) const
@@ -794,12 +856,16 @@ QVariant AppSettings::value(const QString& key, const QVariant& defaultValue) co
 
 void AppSettings::setValue(const QString& key, const QVariant& val)
 {
-    m_settings.insert(key, val.toString());
+    const QString str = val.toString();
+    auto it = m_settings.find(key);
+    if (it != m_settings.end() && it.value() == str) { return; }   // nichts Neues
+    m_settings.insert(key, str);
+    m_dirty = true;
 }
 
 void AppSettings::remove(const QString& key)
 {
-    m_settings.remove(key);
+    if (m_settings.remove(key) > 0) { m_dirty = true; }
 }
 
 bool AppSettings::contains(const QString& key) const
@@ -1242,7 +1308,7 @@ void AppSettings::ensureSettingsAtVersion(int currentVersion)
 
     // v0 → v3 migration (covers v0.2.x → v0.3.0)
     if (storedVersion < 3 && currentVersion >= 3) {
-        qDebug() << "Migrating settings to schema v3 (NereusSDR v0.3.0)";
+        qDebug() << "Migrating settings to schema v3 (v0.3.0)";
 
         // Retire keys whose semantics changed in v0.3.0:
         remove(QStringLiteral("DisplayAverageMode"));           // split into Detector + Averaging (Task 2.1)
@@ -1270,7 +1336,7 @@ void AppSettings::ensureSettingsAtVersion(int currentVersion)
     // Thetis's Display → DSP Options page exposes separate RX and TX combos
     // for buffer size and filter size on every mode that has TX (Phone, FM,
     // Digital — CW TX is firmware-handled per Thetis console.cs:38891-38897
-    // [v2.10.3.13]).  NereusSDR collapsed those into single <Mode> keys
+    // [v2.10.3.13]).  Longpath collapsed those into single <Mode> keys
     // shared between RX and TX channels.  This migration splits them back:
     //
     //   DspOptionsBufferSize<Mode>   → <Mode>Rx + <Mode>Tx (preserved value)

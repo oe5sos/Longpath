@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - DXLab SpotCollector UDP listener (implementation)
+// Longpath - DXLab SpotCollector UDP listener (implementation)
 //
 // Ported from AetherSDR src/core/SpotCollectorClient.cpp [@0cd4559].
 // AetherSDR is (C) its contributors and is licensed GPL-3.0-or-later
 // (see https://github.com/ten9876/AetherSDR/blob/main/LICENSE).
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-10  J.J. Boyd / KG4VCF  Phase 3J-2 Task B1. Initial port.
 //                                    See SpotCollectorClient.h for full
-//                                    attribution notes. NereusSDR
+//                                    attribution notes. Longpath
 //                                    addition: source-label promotion to
 //                                    "RBN" when the spotter callsign has
 //                                    a "-#" suffix or "RBN-" prefix
@@ -47,11 +47,11 @@ SpotCollectorClient::~SpotCollectorClient()
 }
 
 // From AetherSDR SpotCollectorClient.cpp:27-31 [@0cd4559]
-// NereusSDR uses Qt's AppConfigLocation (which already lands under
-// "NereusSDR/" when QCoreApplication::organizationName/applicationName
+// Longpath uses Qt's AppConfigLocation (which already lands under
+// "Longpath/" when QCoreApplication::organizationName/applicationName
 // are set) instead of AetherSDR's GenericConfigLocation +
 // "AetherSDR/...". This keeps the file co-located with the rest of
-// NereusSDR's per-user state.
+// Longpath's per-user state.
 QString SpotCollectorClient::logFilePath() const
 {
     return QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation)
@@ -139,9 +139,9 @@ void SpotCollectorClient::onReadyRead()
 //
 // Standard format: DX de W3LPL:     14025.0  JA1ABC       CW big signal       1824Z
 //
-// NereusSDR divergence (source-label assignment moved into the parser):
+// Longpath divergence (source-label assignment moved into the parser):
 // upstream AetherSDR sets spot.source = "SpotCollector" in
-// onReadyRead() after the parser returns. NereusSDR moves the source
+// onReadyRead() after the parser returns. Longpath moves the source
 // assignment into parseDxSpotLine() so unit tests that exercise the
 // parser directly (without a live UDP socket) see a fully-populated
 // DxSpot. The default label is still "SpotCollector"; the parser also
@@ -174,7 +174,7 @@ bool SpotCollectorClient::parseDxSpotLine(const QString& line, DxSpot& spot) con
         return false;
     }
 
-    // NereusSDR addition: source-label assignment.
+    // Longpath addition: source-label assignment.
     spot.source = QStringLiteral("SpotCollector");
     if (spot.spotterCall.endsWith(QStringLiteral("-#"))
         || spot.spotterCall.startsWith(QStringLiteral("RBN-"))) {

@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/spectrum/WaterfallTicker.h  (NereusSDR-native)
+// src/gui/spectrum/WaterfallTicker.h  (Longpath-native)
 // =================================================================
 // 2026-05-25  J.J. Boyd (KG4VCF), AI-assisted via Anthropic Claude.
 //

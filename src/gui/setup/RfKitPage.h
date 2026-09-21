@@ -1,7 +1,7 @@
 #pragma once
 
 // =================================================================
-// src/gui/setup/RfKitPage.h  (NereusSDR-native)
+// src/gui/setup/RfKitPage.h  (Longpath-native)
 // =================================================================
 //
 // RF-Kit integration setup page.  Settings -> RF-Kit.
@@ -22,10 +22,10 @@
 //     - State persisted via AppSettings key "RfKit_Enabled".
 //
 // Pattern mirrors src/gui/setup/FourO3APage.{h,cpp}.
-// NereusSDR-original page (no Thetis upstream).
+// Longpath-original page (no Thetis upstream).
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-24 -- Created in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted implementation via
 //                 Anthropic Claude Code.

@@ -25,7 +25,7 @@ warren@wpratt.com
 */
 
 // =================================================================
-// tests/tst_tx_channel_pipeline.cpp  (NereusSDR)
+// tests/tst_tx_channel_pipeline.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
@@ -34,7 +34,7 @@ warren@wpratt.com
 // Ported from Thetis wdsp/TXA.c:31-479 [v2.10.3.13]
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-25 — New test for Phase 3M-1a Task C.2: TxChannel 31-stage TXA
 //                 pipeline skeleton. J.J. Boyd (KG4VCF), with AI-assisted
 //                 implementation via Anthropic Claude Code.

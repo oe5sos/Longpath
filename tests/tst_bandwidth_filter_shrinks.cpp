@@ -73,12 +73,16 @@ private slots:
                      .arg(win.width())));
     }
 
-    void theWordLabelsGiveWayFirst()
+    void theButtonGroupsWrapFirst()
     {
-        // Wenn es eng wird, fallen die Wortmarken weg, nicht die
-        // Zahlen. Die Einheit steht im Feld selbst ("2900 Hz"), und
-        // die Reihenfolge tief/breit/hoch ist dieselbe wie im Bild
-        // darueber — die Marken sind Beschriftung, keine Information.
+        // Wenn es eng wird, rutschen die Knopfgruppen (Memory, Span) in
+        // eine zweite Reihe — die Zahlenfelder bleiben, und ihre
+        // Versalzeilen ("LOW", "WIDTH", "HIGH") bleiben mit ihnen: neun
+        // Punkte hoch, sie kosten keine Breite. Bis zum 2026-09-17
+        // wichen stattdessen die fetten Wortmarken NEBEN den Feldern;
+        // seit dem Umbau auf "Glas & Tiefe" steht jede Bedienung in
+        // einer benannten Gruppe (Hausstil Regel 1), und eine
+        // Ueberschrift, die bei Enge verschwindet, waere keine.
         RadioModel model;
         BandwidthFilterApplet applet(&model);
         applet.resize(800, 260);
@@ -86,23 +90,34 @@ private slots:
         QVERIFY(QTest::qWaitForWindowExposed(&applet));
         for (int i = 0; i < 4; ++i) { QCoreApplication::processEvents(); }
 
-        auto lowLabelVisible = [&]() {
+        auto lowLabel = [&]() -> QLabel* {
             for (QLabel* l : applet.findChildren<QLabel*>()) {
-                if (l->text() == QStringLiteral("LOW")) {
-                    return l->isVisible();
-                }
+                if (l->text() == QStringLiteral("Low")) { return l; }
             }
-            return false;
+            return nullptr;
         };
-        QVERIFY2(lowLabelVisible(), "Breit fehlt die Marke schon");
+        auto* memory = applet.findChild<QWidget*>(QStringLiteral("bwFilterMemoryGroup"));
+        auto* lowBox = applet.findChild<QWidget*>(QStringLiteral("bwFilterLow"));
+        QVERIFY(lowLabel());
+        QVERIFY(memory);
+        QVERIFY(lowBox);
+        QVERIFY2(lowLabel()->isVisible(), "Breit fehlt die Ueberschrift schon");
+        // Breit: Memory steht in derselben Reihe wie die Felder.
+        const int yWide = memory->mapTo(&applet, QPoint(0, 0)).y();
+        const int yBoxWide = lowBox->mapTo(&applet, QPoint(0, 0)).y();
+        QVERIFY2(qAbs(yWide - yBoxWide) < 30, "Breit steht Memory nicht neben den Feldern");
 
         applet.resize(360, 260);
         for (int i = 0; i < 6; ++i) { QCoreApplication::processEvents(); }
         QTest::qWait(50);
         qInfo() << "Breite nach dem Verkleinern:" << applet.width();
-        QVERIFY2(!lowLabelVisible(),
-                 "Eng steht die Wortmarke noch da und draengt die "
-                 "Zahlenfelder aus dem Bild");
+        QVERIFY2(lowLabel()->isVisible(),
+                 "Eng ist die Ueberschrift weg — eine Gruppe ohne Namen");
+        const int yNarrow = memory->mapTo(&applet, QPoint(0, 0)).y();
+        const int yBoxNarrow = lowBox->mapTo(&applet, QPoint(0, 0)).y();
+        QVERIFY2(yNarrow > yBoxNarrow + 20,
+                 "Eng steht Memory noch neben den Feldern und draengt "
+                 "sie aus dem Bild");
     }
 };
 

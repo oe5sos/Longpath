@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/applets/AppletFloatingWindow.cpp  (NereusSDR)
+// src/gui/applets/AppletFloatingWindow.cpp  (Longpath)
 // =================================================================
 // Siehe AppletFloatingWindow.h für Zweck, Eigentum und Geometrie.
 // =================================================================
@@ -15,6 +15,8 @@
 #include "gui/applets/AppletWidget.h"
 
 #include <QCloseEvent>
+#include <QDebug>
+#include <QPainter>
 #include <QMoveEvent>
 #include <QResizeEvent>
 #include <QTimer>
@@ -38,8 +40,21 @@ AppletFloatingWindow::AppletFloatingWindow(AppletWidget* applet,
 {
     setWindowTitle(applet ? applet->appletTitle()
                           : QStringLiteral("Longpath"));
-    setStyleSheet(QStringLiteral("AppletFloatingWindow { background: %1; }")
-                      .arg(Style::kPanelBg));
+    // Glas & Tiefe (2026-09-17): die Platte ist ein Verlauf, oben hell,
+    // unten dunkel, mit feinem Rahmen. Die Applets darin sind
+    // durchsichtig (ihre Boedies setzen kein kPanelBg mehr), sonst
+    // deckte ein flaches Grau den Verlauf wieder zu. WA_StyledBackground
+    // ausdruecklich: ein blosses QWidget malt seinen Stylesheet-Grund
+    // sonst nicht selbst, und bisher war es der opake Body, der ihn
+    // vortaeuschte.
+    // Der Grund wird in paintEvent() gemalt, nicht per Stylesheet: der
+    // alte Selektor "AppletFloatingWindow { … }" hat NIE gegriffen
+    // (Klasse im Namensraum) — was man als Fenstergrund sah, war der
+    // opake Body des Applets — und auch ein objectName-Selektor blieb
+    // an diesem rahmenlosen Top-Level-Fenster auf dem Werkzeug-Blatt
+    // (tst_tx_entwurf_sheet platte) ohne Wirkung. Ein eigenes
+    // paintEvent ist an keiner Selektor-Feinheit interessiert.
+    setObjectName(QStringLiteral("appletFloatingWindow"));
     m_createdAt.start();
 
     auto* lay = new QVBoxLayout(this);
@@ -50,8 +65,13 @@ AppletFloatingWindow::AppletFloatingWindow(AppletWidget* applet,
     // wir gleich abschalten, und ist der Griff fuer das ganze Fenster.
     m_titleBar = new WindowTitleBar(
         applet ? applet->appletTitle() : QStringLiteral("Longpath"), this);
-    connect(m_titleBar, &WindowTitleBar::closeRequested,
-            this, &QWidget::close);
+    // × heisst andocken -- DIREKT, nicht ueber close(): seit dem
+    // 2026-09-17 dockt ein QCloseEvent nie mehr (siehe closeEvent()),
+    // weil es nur noch vom System kommt. Der Knopf ist die Absicht des
+    // Bedienenden und geht denselben Weg wie der Pfeil.
+    connect(m_titleBar, &WindowTitleBar::closeRequested, this, [this]() {
+        emit dockRequested(appletId());
+    });
     connect(m_titleBar, &WindowTitleBar::dockRequested, this, [this]() {
         // ── Der Knopf, der zufaellig genau dort landet ────────────────
         //
@@ -105,7 +125,15 @@ AppletFloatingWindow::AppletFloatingWindow(AppletWidget* applet,
         m_scroll->setFrameShape(QFrame::NoFrame);
         m_scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
         m_scroll->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+        // Durchsichtig, samt Viewport: sonst deckt der Rollbereich die
+        // Platte (paintEvent) mit seinem Palettengrund zu. Auf dem
+        // Werkzeug-Blatt war das Fenster deshalb hell, obwohl Verlauf
+        // und Rahmen laengst gemalt wurden — sie lagen DARUNTER.
+        m_scroll->setStyleSheet(QStringLiteral(
+            "QScrollArea { background: transparent; border: none; }"));
+        m_scroll->viewport()->setAutoFillBackground(false);
         m_scroll->setWidget(applet);
+        applet->setAutoFillBackground(false);
         lay->addWidget(m_scroll);
     }
     setMinimumWidth(Style::kAppletPanelW);
@@ -212,20 +240,47 @@ AppletWidget* AppletFloatingWindow::releaseApplet()
 
 void AppletFloatingWindow::closeEvent(QCloseEvent* ev)
 {
-    // Schliessen HEISST andocken. Ein Applet, das man wegklickt und das
-    // danach nirgends mehr auftaucht, ist verloren — es hat, anders als
-    // ein Werkzeugfenster, keinen eigenen Menüeintrag zum Wiederholen.
-    // Die Sichtbarkeit regelt der AppletVisibilityController, und der
-    // sagt zu diesem Applet weiterhin „sichtbar".
+    // ── Ein Schliess-EREIGNIS dockt NIE an ──────────────────────────
     //
-    // Vor dem Andocken durchschreiben: der Zug, dem sofort das
+    // Der Betreiber am 2026-09-17, zum wiederholten Mal: "profile
+    // bleiben wieder nicht automatisch gespeichert!!!!!" Die Logs des
+    // Tages: gestartet mit 6 schwebenden Applets, beim Beenden 4
+    // gesichert; gestartet mit 4, beim Beenden 1 -- und zwischendrin
+    // kein Profilwechsel, kein Andock-Klick, nichts.
+    //
+    // Hier stand "Schliessen HEISST andocken" (emit dockRequested).
+    // Das war fuer den ×-Knopf gedacht -- der geht aber laengst
+    // ueber WindowTitleBar::closeRequested direkt an dockRequested
+    // und NICHT ueber close(). Ein QCloseEvent erreicht dieses
+    // rahmenlose Fenster nur noch vom SYSTEM: beim Beenden ueber Dock
+    // oder Apfelmenue (closeAllWindows) oder als macOS-Nebenwirkung
+    // eines Vollbild-/Space-Wechsels. Und Qt garantiert nicht, dass
+    // MainWindow::closeEvent (setzt m_shuttingDown, nimmt das Profil
+    // auf) VOR diesen Ereignissen laeuft -- siehe die Quit-Aktion in
+    // MainWindow (2026-08-30, "habe ich gemacht, leider nein"). Kam
+    // ein schwebendes Fenster zuerst dran, dockte es sich an, rief
+    // captureIntoCurrent()+save() und die Aufnahme beim Beenden sah
+    // ein Applet weniger. Je nach Reihenfolge ein anderes: genau das
+    // Schrumpfen von Sitzung zu Sitzung.
+    //
+    // Darum: annehmen, nie andocken. Beim Beenden stirbt das Fenster
+    // ohnehin mit dem Programm, und das Profil behaelt es als
+    // schwebend -- das ist der Stand, den der Betreiber gesehen hat.
+    // Ein System-Schliessen mitten im Betrieb (falls es das gibt)
+    // versteckt das Fenster nur; es bleibt in m_floatingApplets, das
+    // Profil bleibt richtig, und der Auswaehler (+) zeigt es wieder.
+    // Die Zeile darunter sagt im Log, wann und woher es kam.
+    qWarning() << "[AppletFloatClose]" << appletId()
+               << "spontaneous=" << ev->spontaneous()
+               << "-- nicht angedockt, siehe closeEvent()";
+
+    // Vor dem Weggehen durchschreiben: der Zug, dem sofort das
     // Schliessen folgt, darf nicht in der Wartezeit hängen bleiben.
     if (m_settleTimer && m_settleTimer->isActive()) {
         m_settleTimer->stop();
         emit geometrySettled(appletId());
     }
     ev->accept();
-    emit dockRequested(appletId());
 }
 
 void AppletFloatingWindow::moveEvent(QMoveEvent* ev)
@@ -242,6 +297,21 @@ void AppletFloatingWindow::resizeEvent(QResizeEvent* ev)
 {
     QWidget::resizeEvent(ev);
     scheduleGeometryReport();
+}
+
+void AppletFloatingWindow::paintEvent(QPaintEvent*)
+{
+    // Glas & Tiefe (2026-09-17): die Platte — Verlauf von oben hell
+    // nach unten dunkel, feiner Rahmen. Dieselbe Platte wie eine
+    // gedockte Zelle (GridCellWidget); die Applets darin sind
+    // durchsichtig, damit sie durchscheint.
+    QPainter p(this);
+    QLinearGradient g(0, 0, 0, height());
+    g.setColorAt(0.0, QColor(Style::hexRole(Style::kGlassPanelTop)));
+    g.setColorAt(1.0, QColor(Style::hexRole(Style::kGlassPanelBot)));
+    p.fillRect(rect(), g);
+    p.setPen(QColor(Style::hexRole(Style::kBorderSubtle)));
+    p.drawRect(rect().adjusted(0, 0, -1, -1));
 }
 
 void AppletFloatingWindow::scheduleGeometryReport()

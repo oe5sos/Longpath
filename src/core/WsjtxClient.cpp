@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - WSJT-X UDP multicast client (implementation)
+// Longpath - WSJT-X UDP multicast client (implementation)
 //
 // Ported from AetherSDR src/core/WsjtxClient.cpp [@0cd4559].
 // AetherSDR is (C) its contributors and is licensed GPL-3.0-or-later
 // (see https://github.com/ten9876/AetherSDR/blob/main/LICENSE).
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-10  J.J. Boyd / KG4VCF  Phase 3J-2 Task B4. Initial port.
 //                                    See WsjtxClient.h for full
 //                                    attribution notes. Binary protocol
@@ -59,11 +59,11 @@ WsjtxClient::~WsjtxClient()
 
 // From AetherSDR src/core/WsjtxClient.cpp:27-31 [@0cd4559]
 //
-// NereusSDR uses Qt's AppConfigLocation (which already lands under
-// "NereusSDR/" when QCoreApplication::organizationName/applicationName
+// Longpath uses Qt's AppConfigLocation (which already lands under
+// "Longpath/" when QCoreApplication::organizationName/applicationName
 // are set) instead of AetherSDR's GenericConfigLocation +
 // "AetherSDR/...". This keeps the file co-located with the rest of
-// NereusSDR's per-user state, mirroring the SpotCollectorClient (B1),
+// Longpath's per-user state, mirroring the SpotCollectorClient (B1),
 // PotaClient (B2), and DxClusterClient (B3) ports.
 QString WsjtxClient::logFilePath() const
 {

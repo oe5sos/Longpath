@@ -1,12 +1,12 @@
 // =================================================================
-// src/gui/applets/StripGraphics.cpp  (NereusSDR)
+// src/gui/applets/StripGraphics.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. See StripGraphics.h for why these two pictures
+// Longpath-original. See StripGraphics.h for why these two pictures
 // and not more.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-08 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

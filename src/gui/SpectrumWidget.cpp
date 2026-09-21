@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/SpectrumWidget.cpp  (NereusSDR)
+// src/gui/SpectrumWidget.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -7,7 +7,7 @@
 //   Project Files/Source/Console/console.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -145,7 +145,7 @@
 // new QThread(this) und &QThread::finished brauchen den vollständigen
 // Typ; der Header führt bei m_waterfallTickerThread nur einen Zeiger.
 // Übersetzt hat es bisher allein der vorkompilierte Header — mit
-// -DNEREUS_USE_PCH=OFF, laut CMakeLists.txt:1590 die Einstellung für
+// -DLONGPATH_USE_PCH=OFF, laut CMakeLists.txt:1590 die Einstellung für
 // genau eine Header-Hygiene-Prüfung, fiel diese Datei um.
 #include <QThread>
 #include <QToolTip>
@@ -172,7 +172,7 @@
 #include <QFile>
 #include <QLibraryInfo>
 
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
 #include <rhi/qshader.h>
 #endif
 
@@ -184,6 +184,24 @@
 #include <QTimer>
 
 namespace Longpath {
+
+namespace {
+
+// ── Die Bandbreite ueber Wasserfall und 3D-Flaeche ───────────────────
+//
+// Hell, nicht tuerkis. Die Benutzerfarbe der Saeule (m_rxFilterColor,
+// Vorgabe Tuerkis mit Alpha 80) ist fuer das schwarze 2D-Spektrum
+// gemacht; auf dem bunten Wasserfall und auf der blauen 3D-Flaeche geht
+// sie unter — der Betreiber am 2026-09-17: "ich sehe meine bandbreite im
+// unteren bild nicht von oben bis unten." die Vorlage (live angesehen am
+// selben Tag) legt dort eine weissliche, durchscheinende Saeule mit
+// duennen Kanten quer durch Spektrum und Wasserfall; hell steht auf
+// jeder Farbe. Leicht blaeulich, damit es zur Sprache des Hauses passt
+// (Blau ist anfassbar — die Kanten zieht man).
+const QColor kPassbandWash(0xdc, 0xe6, 0xf0, 60);
+const QColor kPassbandEdgeLight(0xdc, 0xe6, 0xf0, 165);
+
+} // namespace
 
 // ── Flächen, Gitter und Rahmen kommen aus dem Theme ──────────────────
 //
@@ -513,7 +531,7 @@ SpectrumWidget::SpectrumWidget(QWidget* parent)
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     setAutoFillBackground(false);
 
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     // Platform-specific QRhi backend selection.
     // Tastenbedienung braucht Fokus. ClickFocus, nicht StrongFocus:
     // wer ins Spektrum klickt, will dort auch mit den Pfeiltasten
@@ -689,11 +707,11 @@ SpectrumWidget::SpectrumWidget(QWidget* parent)
     // overlay is toggled on (setShowPerfOverlay).
     //
     // Unter dem Wächter, weil m_perfPollTimer im
-    // NEREUS_GPU_SPECTRUM-Block des Headers steht und die Überlagerung
+    // LONGPATH_GPU_SPECTRUM-Block des Headers steht und die Überlagerung
     // selbst (paintEvent, im GPU-Zweig) ohne ihn gar nicht gemalt wird.
     // Ohne GPU-Pfad entsteht der Timer also nicht, statt einmal je
     // Sekunde für eine Anzeige zu messen, die es nicht gibt.
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     m_perfPollTimer = new QTimer(this);
     m_perfPollTimer->setInterval(1000);
     connect(m_perfPollTimer, &QTimer::timeout, this, [this]() {
@@ -755,7 +773,7 @@ SpectrumWidget::SpectrumWidget(QWidget* parent)
             setShowPerfOverlay(true);
         }
     }
-#endif  // NEREUS_GPU_SPECTRUM — Perf-Überlagerung
+#endif  // LONGPATH_GPU_SPECTRUM — Perf-Überlagerung
 
     // Phase 3Q-8: child label for the disconnect overlay. Composites in both
     // CPU and GPU paint paths (QRhi early-returns from paintEvent so a QPainter
@@ -1048,14 +1066,14 @@ void SpectrumWidget::loadSettings()
         if (aphOn) {
             m_activePeakHold.setEnabled(true);
         }
-        // NereusSDR-original — distinct peak trace colour so it stays visible
+        // Longpath-original — distinct peak trace colour so it stays visible
         // when the data-line colour is changed (e.g. Smooth Defaults paints
         // the live trace pure white). Default gold (#FFD700FF).
         m_activePeakHoldColor = ColorSwatchButton::colorFromHex(
             s.value(QStringLiteral("DisplayActivePeakHoldColor"),
                     QStringLiteral("#c2924fFF")).toString());
 
-        // Peak Blobs — NereusSDR ships disabled by default (deviation from
+        // Peak Blobs — Longpath ships disabled by default (deviation from
         // Thetis Display.cs:4395 [v2.10.3.13] m_bPeakBlobMaximums = true).
         const bool blobOn = s.value(QStringLiteral("DisplayPeakBlobsEnabled"),
                                     QStringLiteral("False")).toString() == QStringLiteral("True");
@@ -1300,7 +1318,7 @@ void SpectrumWidget::loadSettings()
 
     // Task 2.9: NF-aware grid settings.
     // From Thetis setup.cs:24202-24213 [v2.10.3.13] chkAdjustGridMinToNFRX1.
-    // RX1 scope dropped; NereusSDR applies as global panadapter default.
+    // RX1 scope dropped; Longpath applies as global panadapter default.
     m_adjustGridMinToNF = s.value(QStringLiteral("DisplayAdjustGridMinToNoiseFloor"),
                                   QStringLiteral("False")).toString() == QStringLiteral("True");
     m_nfOffsetGridFollow = s.value(QStringLiteral("DisplayNFOffsetGridFollow"),
@@ -1483,7 +1501,7 @@ void SpectrumWidget::saveSettings()
 
     // Task 2.9: NF-aware grid settings.
     // From Thetis setup.cs:24202-24213 [v2.10.3.13] chkAdjustGridMinToNFRX1.
-    // RX1 scope dropped; NereusSDR applies as global panadapter default.
+    // RX1 scope dropped; Longpath applies as global panadapter default.
     s.setValue(QStringLiteral("DisplayAdjustGridMinToNoiseFloor"),
                m_adjustGridMinToNF ? QStringLiteral("True") : QStringLiteral("False"));
     s.setValue(QStringLiteral("DisplayNFOffsetGridFollow"),
@@ -1511,7 +1529,7 @@ void SpectrumWidget::setFrequencyRange(double centerHz, double bandwidthHz)
 
     // ── Sub-epic E: detect large shifts (band jumps) for history-clear ─
     // From AetherSDR SpectrumWidget.cpp:1042-1062 [@0cd4559]
-    //   adapter: NereusSDR uses Hz throughout; threshold expressed as a
+    //   adapter: Longpath uses Hz throughout; threshold expressed as a
     //   fraction of the new half-bandwidth, same as upstream.
     const double oldCenterHz    = m_centerHz;
     const double oldBandwidthHz = m_bandwidthHz;
@@ -1526,7 +1544,7 @@ void SpectrumWidget::setFrequencyRange(double centerHz, double bandwidthHz)
         // From AetherSDR SpectrumWidget.cpp:1051 [@0cd4559]
         reprojectWaterfall(oldCenterHz, oldBandwidthHz, newCenterHz, newBandwidthHz);
 
-        // ── NereusSDR divergence: clear history on largeShift to keep the
+        // ── Longpath divergence: clear history on largeShift to keep the
         //    rewind window coherent with the current band. See plan
         //    §authoring-time #3.
         clearWaterfallHistory();
@@ -1539,7 +1557,7 @@ void SpectrumWidget::setFrequencyRange(double centerHz, double bandwidthHz)
     m_centerHz = centerHz;
     m_bandwidthHz = bandwidthHz;
     updateVfoPositions();
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     // Band-plan strip depends on m_centerHz/m_bandwidthHz — invalidate the
     // static overlay so the strip repositions correctly on freq/zoom changes.
     markOverlayDirty();
@@ -1602,7 +1620,7 @@ void SpectrumWidget::setFilterOffset(int lowHz, int highHz)
 {
     m_filterLowHz = lowHz;
     m_filterHighHz = highHz;
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     markOverlayDirty();
 #else
     update();
@@ -1732,7 +1750,7 @@ void SpectrumWidget::setAverageMode(AverageMode m)
 
 // ---- Task 2.1: Detector + Averaging split setters ----
 // Ported from Thetis specHPSDR.cs:302-415 [v2.10.3.13].
-// RX1 scope dropped — NereusSDR applies as global panadapter default
+// RX1 scope dropped — Longpath applies as global panadapter default
 // with per-pan override via ContainerSettings dialog (3G-6 pattern).
 
 void SpectrumWidget::setSpectrumDetector(SpectrumDetector d)
@@ -1775,7 +1793,7 @@ void SpectrumWidget::setWaterfallAveraging(SpectrumAveraging a)
 // Static helper: apply the detector bin-reduction policy.
 // Reduces the input FFT bin vector to outputBins display pixels.
 // From Thetis specHPSDR.cs DetTypePan / DetTypeWF integer codes [v2.10.3.13]
-// mapped to detector descriptions. NereusSDR performs bin reduction in
+// mapped to detector descriptions. Longpath performs bin reduction in
 // software since it owns the FFTW3 spectrum computation (not the WDSP
 // analyzer's SetDisplayDetectorMode DLL path).
 //
@@ -1965,7 +1983,7 @@ void SpectrumWidget::setActivePeakHoldEnabled(bool on)
     // Force GPU overlay rebuild now — the per-frame nudge in updateSpectrum()
     // only fires once spectrum frames arrive, leaving a stale overlay between
     // the toggle and the next frame.  markOverlayDirty() is guarded for
-    // CPU-only builds (Linux without NEREUS_GPU_SPECTRUM).
+    // CPU-only builds (Linux without LONGPATH_GPU_SPECTRUM).
     markOverlayDirty();
 }
 
@@ -2295,7 +2313,7 @@ void SpectrumWidget::setNoiseFloorFastAttack(bool on)
 // m_nfLerpAverage (smoothed).  Mirrors the per-pixel accumulator that lives
 // in Thetis's render loop at display.cs:5253-5258 (averageSum += 10^(dB/10),
 // averageCount++ when max_copy < currentAverage), folded into one helper here
-// because NereusSDR's renderer doesn't share the averaging loop.
+// because Longpath's renderer doesn't share the averaging loop.
 void SpectrumWidget::processNoiseFloor()
 {
     // The noise floor is a MEASUREMENT, so it reads the undented pixels
@@ -2385,7 +2403,7 @@ void SpectrumWidget::processNoiseFloor()
 
 // ---- NF-aware grid (Task 2.9) ----
 // From Thetis setup.cs:24202-24213 [v2.10.3.13]
-// — RX1 scope dropped; NereusSDR applies as global panadapter default
+// — RX1 scope dropped; Longpath applies as global panadapter default
 //   with per-pan override via ContainerSettings dialog (3G-6 pattern).
 
 void SpectrumWidget::setAdjustGridMinToNoiseFloor(bool on)
@@ -2418,7 +2436,7 @@ void SpectrumWidget::setMaintainNFAdjustDelta(bool on)
 //       SetupForm.DisplayGridMin = setPoint;
 //       if (_maintainNFAdjustDeltaRX1) SetupForm.DisplayGridMax = setPoint + fDelta;
 //   }
-// NereusSDR adaptation: offset is added rather than subtracted (default 0 vs Thetis
+// Longpath adaptation: offset is added rather than subtracted (default 0 vs Thetis
 // default +5); semantically equivalent when user enters a negative offset value.
 void SpectrumWidget::onNoiseFloorChanged(float nfDbm)
 {
@@ -2557,7 +2575,7 @@ void SpectrumWidget::setPeakValueColor(const QColor& c)
 
 // drawTextOverlay — renders text at a corner of specRect with a semi-transparent
 // background chip. Shared helper for NF, peak, and bin-width overlays.
-// NereusSDR-native (Thetis uses separate per-feature draw calls in DX2D renderer).
+// Longpath-native (Thetis uses separate per-feature draw calls in DX2D renderer).
 void SpectrumWidget::drawTextOverlay(QPainter& p, const QRect& specRect,
                                      OverlayPosition pos, const QString& text,
                                      const QColor& color)
@@ -2664,7 +2682,7 @@ void SpectrumWidget::setWaterfallStopOnTx(bool on)
     scheduleSettingsSave();
 }
 
-// Issue #230 fix: Clarity is a NereusSDR-only override modeled on
+// Issue #230 fix: Clarity is a Longpath-only override modeled on
 // Thetis's AGC pattern at display.cs:6584 [v2.10.3.13], where the AGC
 // running-min is a runtime field (_RX1waterfallPreviousMinValue) that
 // flows into per-render locals — never the persisted user fields.
@@ -2853,7 +2871,7 @@ void SpectrumWidget::setShowFps(bool on)
 
 void SpectrumWidget::setShowPerfOverlay(bool on)
 {
-#ifndef NEREUS_GPU_SPECTRUM
+#ifndef LONGPATH_GPU_SPECTRUM
     // Ohne GPU-Pfad gibt es nichts einzuschalten: die Überlagerung wird
     // im GPU-Zweig von paintEvent gemalt, und der ist nicht übersetzt.
     // Ein stiller Nichtstuer statt eines Wächters an der Aufrufstelle
@@ -2880,7 +2898,7 @@ void SpectrumWidget::setShowPerfOverlay(bool on)
         QStringLiteral("ShowPerfOverlay"),
         on ? QStringLiteral("True") : QStringLiteral("False"));
     markOverlayDirty();
-#endif  // NEREUS_GPU_SPECTRUM
+#endif  // LONGPATH_GPU_SPECTRUM
 }
 
 void SpectrumWidget::setCursorFreqVisible(bool on)
@@ -3361,14 +3379,14 @@ void SpectrumWidget::updateSpectrumLinear(int receiverId,
     // Visual notch, waterfall plane.  Thetis re-runs modifyDataForNotches on
     // the waterfall array after `data = current_waterfall_data` (:6567), under
     // the same MOX gate - display.cs:6579-6586 [v2.10.3.15].  A second
-    // explicit call here because NereusSDR keeps the waterfall pixels in
+    // explicit call here because Longpath keeps the waterfall pixels in
     // their own array, so denting the spectrum plane above does not reach
     // them.
     //
     // No undented waterfall copy: upstream needs one for its per-frame
     // waterfall minimum (dataCopy at display.cs:6741, :6833, :6915, :6954,
     // :7163, :7369, each carrying //[2.10.3]MW0LGE use non notched data), and
-    // NereusSDR has no such tracker - m_wfLowThreshold is a persisted user
+    // Longpath has no such tracker - m_wfLowThreshold is a persisted user
     // setting, and pushWaterfallRow is the only consumer of
     // m_wfRenderedPixels.
     if (visualNotchWillDent()) {
@@ -3471,9 +3489,14 @@ void SpectrumWidget::updateSpectrumLinear(int receiverId,
     // does the proper fix (static/dynamic layer split: chrome cached
     // on state change, dynamic overlays in a smaller spectrum-area
     // texture rebuilt every frame).
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
+    // Mode3D: die Bandbreite liegt dort in dieser Schicht
+    // (paintPassbandOverSurface) und muss mit der Flaeche Schritt
+    // halten — ohne diesen Zweig wuerde sie ohne Peak-Hold/Blobs/
+    // Rauschflur nie neu gemalt.
     if (m_activePeakHold.enabled() || m_peakBlobs.enabled()
-        || m_showNoiseFloor) {
+        || m_showNoiseFloor
+        || m_renderMode == SpectrumRenderMode::Mode3D) {
         const qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
         // 2026-05-26 KG4VCF dual-layer overlay split: peak-hold trace
         // + peak blobs + noise-floor line/text live in their own GPU
@@ -3531,7 +3554,7 @@ void SpectrumWidget::updateSpectrumLinear(int receiverId,
 // return -400 sentinel.
 double SpectrumWidget::peakDbmInSlicePassband() const
 {
-    // Deliberate NereusSDR-specific divergence from the dent-in-place rule
+    // Deliberate Longpath-specific divergence from the dent-in-place rule
     // (design section 8.3, decision recorded 2026-07-28): this feeds
     // WdspEngine's MaxBin detector and therefore the analog S-Meter. Thetis
     // reads MaxBin from WDSP upstream of its display code (console.cs:46959,
@@ -3709,7 +3732,7 @@ void SpectrumWidget::applyResizeSettled()
     // Recreate waterfall image at new size
     int w = width();
     int h = height();
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     // GPU mode: waterfall clips at strip border (strip is in overlay on right edge)
     int wfW = w - effectiveStripW();
 #else
@@ -3721,7 +3744,7 @@ void SpectrumWidget::applyResizeSettled()
         m_waterfall = QImage(wfW, wfH, QImage::Format_RGB32);
         m_waterfall.fill(m_wfBgFillColor);
         m_wfWriteRow = 0;
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
         m_wfTexFullUpload = true;
 #endif
         // Sub-epic E: schedule history-image rebuild so the ring buffer's
@@ -3745,7 +3768,7 @@ void SpectrumWidget::applyResizeSettled()
 
 void SpectrumWidget::paintEvent(QPaintEvent* event)
 {
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     // GPU mode: render() handles everything via QRhi.
     // Do NOT use QPainter on QRhiWidget — it doesn't support paintEngine.
     SpectrumBaseClass::paintEvent(event);
@@ -3882,7 +3905,7 @@ void SpectrumWidget::paintEvent(QPaintEvent* event)
     }
 
     // ShowNoiseFloor -- render NF horizontal line + corner text overlay.
-    // Both visuals share m_showNoiseFloor in NereusSDR; Thetis splits this
+    // Both visuals share m_showNoiseFloor in Longpath; Thetis splits this
     // into ShowRX1NoiseFloor (line) + m_bShowNoiseFloorDBM (text), but
     // they're typically toggled together and a single flag matches the
     // existing Setup → Display → Spectrum Defaults checkbox.
@@ -4212,7 +4235,7 @@ void SpectrumWidget::paintPeakBlobs(QPainter& p, const QRect& specRect)
         // where m_objEllipse is `new SharpDX.Direct2D1.Ellipse(Vector2.Zero, 5f, 5f)`
         // (radius 5 DIPs) and DrawEllipse defaults to 1px stroke.
         //
-        // NereusSDR uses radius 3 (not 5) because Qt6/QPainter on HiDPI
+        // Longpath uses radius 3 (not 5) because Qt6/QPainter on HiDPI
         // (Retina/2x) scales drawEllipse by devicePixelRatio, while Direct2D
         // on Thetis's typical Windows 1x-DPI display does not. Radius 3 in
         // logical pixels yields a visual size matching Thetis's 5-radius
@@ -4319,7 +4342,7 @@ void SpectrumWidget::paintNoiseFloorOverlay(QPainter& p, const QRect& specRect)
     // Width 2.  Solid (no dash).  Only visible when actual != lerp.  Thetis
     // gates this on m_bShowNoiseFloorDBM (the text flag) — we honour the
     // same gate via m_showNoiseFloor since both controls collapse to one
-    // toggle in NereusSDR.
+    // toggle in Longpath.
     if (yPActual != yPLerp) {
         QPen connectorPen(lineCol, 2);
         connectorPen.setCapStyle(Qt::FlatCap);
@@ -4392,7 +4415,7 @@ void SpectrumWidget::drawWaterfallChrome(QPainter& p, const QRect& wfRect)
     // dim overlay matches that visual effect on GPU where the waterfall
     // texture is drawn at full alpha by the m_wfPipeline and the
     // overlay texture is layered on top.
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     const int op = qBound(0, m_wfOpacity, 100);
     if (op < 100) {
         const int dimAlpha = 255 - static_cast<int>(255.0 * op / 100.0);
@@ -4439,7 +4462,7 @@ void SpectrumWidget::drawWaterfallChrome(QPainter& p, const QRect& wfRect)
         }
     }
 
-    // Timestamp overlay on waterfall (NereusSDR extensions W8/W9).
+    // Timestamp overlay on waterfall (Longpath extensions W8/W9).
     if (m_wfTimestampPos != TimestampPosition::None) {
         const QDateTime now = (m_wfTimestampMode == TimestampMode::UTC)
                               ? QDateTime::currentDateTimeUtc()
@@ -4466,7 +4489,7 @@ void SpectrumWidget::drawWaterfallChrome(QPainter& p, const QRect& wfRect)
 // Ausschnitt), die Zwischenhaltung nach Groesse und die
 // Deckkraft-Rechnung 1 - opacity/100.
 //
-// NereusSDR-Abweichung: die Einstellungen laufen ueber AppSettings mit
+// Longpath-Abweichung: die Einstellungen laufen ueber AppSettings mit
 // PascalCase-Schluesseln statt AetherSDRs settingsKey()-Praefix, weil
 // unser Panadapter nicht je Empfaenger persistiert.
 
@@ -5016,22 +5039,29 @@ void SpectrumWidget::drawDbmScale(QPainter& p, const QRect& specRect)
     const int arrowTop = specRect.top() + 2;
     const int arrowBot = specRect.top() + kDbmArrowH - 2;
 
-    p.setPen(Qt::NoPen);
-    p.setBrush(QColor(Style::kAccent));
-
-    // Up arrow (▲) — left side
-    QPolygon upTri;
-    upTri << QPoint(upCx - 5, arrowBot)
-          << QPoint(upCx + 5, arrowBot)
-          << QPoint(upCx,     arrowTop);
-    p.drawPolygon(upTri);
-
-    // Down arrow (▼) — right side
-    QPolygon dnTri;
-    dnTri << QPoint(dnCx - 5, arrowTop)
-          << QPoint(dnCx + 5, arrowTop)
-          << QPoint(dnCx,     arrowBot);
-    p.drawPolygon(dnTri);
+    // Glas & Tiefe (2026-09-18): zwei erhabene Chips mit kleinem Pfeil
+    // statt zweier grosser Dreiecke in Akzentblau — sie sind Knoepfe
+    // (Bereich hoch/runter), und ein Knopf ist im Haus erhaben und
+    // leise. Blau bleibt fuer die Auswahl.
+    {
+        const int chipH = arrowBot - arrowTop + 4;
+        const int chipW = halfW - 3;
+        const QRect upBox(upCx - chipW / 2, arrowTop - 2, chipW, chipH);
+        const QRect dnBox(dnCx - chipW / 2, arrowTop - 2, chipW, chipH);
+        Style::paintRaisedChip(p, upBox, 5);
+        Style::paintRaisedChip(p, dnBox, 5);
+        p.setRenderHint(QPainter::Antialiasing, true);
+        p.setPen(Qt::NoPen);
+        p.setBrush(QColor(Style::role("text-secondary", Style::kTextSecondary)));
+        const int cy = (arrowTop + arrowBot) / 2;
+        QPolygon upTri;
+        upTri << QPoint(upCx - 4, cy + 3) << QPoint(upCx + 4, cy + 3) << QPoint(upCx, cy - 3);
+        p.drawPolygon(upTri);
+        QPolygon dnTri;
+        dnTri << QPoint(dnCx - 4, cy - 3) << QPoint(dnCx + 4, cy - 3) << QPoint(dnCx, cy + 3);
+        p.drawPolygon(dnTri);
+        p.setRenderHint(QPainter::Antialiasing, false);
+    }
 
     // ── dBm labels ───────────────────────────────────────────────────────
     QFont f = p.font();
@@ -5168,7 +5198,7 @@ void SpectrumWidget::drawBandPlan(QPainter& p, const QRect& specRect)
 
 // ─── Time scale + LIVE button (sub-epic E) ─────────────────────────────
 // From AetherSDR SpectrumWidget.cpp:4929-4994 [@0cd4559]
-//   adapter: NereusSDR computes msPerRow directly from m_wfUpdatePeriodMs
+//   adapter: Longpath computes msPerRow directly from m_wfUpdatePeriodMs
 //   instead of AetherSDR's calibrated m_wfMsPerRow (we have no radio
 //   tile clock to calibrate against).
 
@@ -5185,17 +5215,24 @@ void SpectrumWidget::drawTimeScale(QPainter& p, const QRect& wfRect)
     // Zeitstreifen schon ab, die zusaetzliche Linie war ueberfluessig.
     //
     // LIVE button — grey when live, bright red when paused.
+    // Glas & Tiefe (2026-09-18): ein erhabener Chip wie jeder Knopf;
+    // angehalten bleibt Rot — das ist eine Warnung, kein Zustand.
     const QRect liveRect = waterfallLiveButtonRect(wfRect);
-    p.setPen(QColor(0x40, 0x50, 0x60));
-    p.setBrush(m_wfLive ? QColor(Style::kTextInactive)
-                        : QColor(Style::kTxRed));  // bright red when paused
-    p.drawRoundedRect(liveRect, 3, 3);
+    if (m_wfLive) {
+        Style::paintRaisedChip(p, liveRect, 6);
+    } else {
+        p.setRenderHint(QPainter::Antialiasing, true);
+        p.setPen(QColor(Style::kRedBorder));
+        p.setBrush(QColor(Style::kTxRed));
+        p.drawRoundedRect(liveRect, 6, 6);
+        p.setRenderHint(QPainter::Antialiasing, false);
+    }
 
     QFont liveFont = p.font();
     liveFont.setPointSize(7);
     liveFont.setBold(true);
     p.setFont(liveFont);
-    p.setPen(m_wfLive ? QColor(Style::kTitleText) : Qt::white);
+    p.setPen(m_wfLive ? QColor(Style::role("text-secondary", Style::kTextSecondary)) : Qt::white);
     p.drawText(liveRect, Qt::AlignCenter, QStringLiteral("LIVE"));
 
     // Tick labels along the strip.
@@ -5489,7 +5526,7 @@ void SpectrumWidget::rebuildWaterfallViewport()
     // `m_wfTexFullUpload = true`); m_wfLastUploadedRow alone leaves the
     // bottom scanline stale because the incremental loop exits before
     // uploading row texH-1.
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     m_wfTexFullUpload = true;
     m_wfLastUploadedRow = -1;
 #endif
@@ -5528,7 +5565,7 @@ QRect SpectrumWidget::waterfallTimeScaleRect(const QRect& wfRect) const
 }
 
 // From AetherSDR SpectrumWidget.cpp:728-735 [@0cd4559]
-//   adapter: NereusSDR uses kFreqScaleH = 28 (vs AetherSDR's 20),
+//   adapter: Longpath uses kFreqScaleH = 28 (vs AetherSDR's 20),
 //   button Y inset adjusted accordingly.
 QRect SpectrumWidget::waterfallLiveButtonRect(const QRect& wfRect) const
 {
@@ -5546,7 +5583,7 @@ QRect SpectrumWidget::waterfallLiveButtonRect(const QRect& wfRect) const
 }
 
 // Sub-epic E — flush ring buffer + force live. Called from clearDisplay()
-// and from setFrequencyRange's largeShift branch (NereusSDR divergence;
+// and from setFrequencyRange's largeShift branch (Longpath divergence;
 // see plan §authoring-time #3).
 void SpectrumWidget::clearWaterfallHistory()
 {
@@ -5627,7 +5664,7 @@ void SpectrumWidget::recomputeExtendedMode()
 }
 
 // From AetherSDR SpectrumWidget.cpp:951-1000 [@0cd4559]
-//   adapter: NereusSDR uses Hz throughout (upstream uses MHz). Both the
+//   adapter: Longpath uses Hz throughout (upstream uses MHz). Both the
 //   live waterfall ring buffer and the long-history ring buffer are
 //   reprojected so a small pan/zoom preserves the visible content.
 void SpectrumWidget::reprojectWaterfall(double oldCenterHz, double oldBandwidthHz,
@@ -5711,7 +5748,7 @@ void SpectrumWidget::reprojectWaterfall(double oldCenterHz, double oldBandwidthH
     // review): m_wfTexFullUpload routes the GPU upload through the full
     // path, m_wfLastUploadedRow = -1 forces every scanline to be re-sent.
     // Skipping either leaves the bottom row stale on the next frame.
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     m_wfLastUploadedRow = -1;
     m_wfTexFullUpload   = true;
 #endif
@@ -5724,7 +5761,7 @@ void SpectrumWidget::reprojectWaterfall(double oldCenterHz, double oldBandwidthH
 // persistent user fields stay untouched — exactly the bug that
 // caused issue #230 before this split landed.
 //
-// In NereusSDR, "locals" become member fields (m_wfActiveLow/High) so
+// In Longpath, "locals" become member fields (m_wfActiveLow/High) so
 // external runtime layers (Clarity, between-row signal updates) can
 // stick a value that survives until the next row push.  AGC's
 // running-envelope state (m_wfAgcRunMin/Max) is the equivalent of
@@ -5831,7 +5868,7 @@ void SpectrumWidget::composeWaterfallActiveThresholds(const QVector<float>& wfPi
     // wires that flag via setWaterfallGainsIfLinkedToSpectrum
     // (console.cs:9094-9108 [v2.10.3.13]) — the grid-change handler
     // calls the persistent property setter once per grid change, not
-    // per render frame.  NereusSDR's port lives in setDbmRange() +
+    // per render frame.  Longpath's port lives in setDbmRange() +
     // setWfUseSpectrumMinMax().  Per-frame mutation here was the
     // issue #230 source.
 
@@ -6019,7 +6056,7 @@ void SpectrumWidget::pushWaterfallRow(const QVector<float>& wfPixelsDbm)
 
     // ── Sub-epic E: mirror the just-written row into the history ring ───
     // From AetherSDR SpectrumWidget.cpp:2808-2812 [@0cd4559]
-    //   adapter: NereusSDR has a single FFT-derived path (no native tile
+    //   adapter: Longpath has a single FFT-derived path (no native tile
     //   path), so we always use QDateTime::currentMSecsSinceEpoch().
     {
         const qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
@@ -6304,6 +6341,33 @@ void SpectrumWidget::drawSliceMarker(QPainter& p, const QRect& specRect,
     const int specBottomClipped = specRect.bottom() - bandPlanH;
     const int specHeightClipped = std::max(0, specBottomClipped - specRect.top());
 
+    // ── Im 3D-Modus gehoert der Spektrum-Teil NICHT hierher ──────────
+    //
+    // Der Betreiber am 2026-09-17, mit Bildschirmfoto im 3D-Modus:
+    // "ich sehe meine bandbreite im unteren bild nicht von oben bis
+    // unten." Zwei Ursachen, beide hier:
+    //
+    //   1. Diese Funktion malt in die STATISCHE Chrome-Schicht, und die
+    //      liegt seit dem 2026-08-22 absichtlich UNTER der Kurve („die
+    //      Rasterzellen muessen HINTER den Signalspitzen liegen"). Im
+    //      2D-Modus ist die Kurve durchsichtig genug, die Saeule scheint
+    //      durch. Die 3D-Flaeche (DssRenderer) ist aber DECKEND — sie
+    //      verdeckt Saeule, Kanten und Mittellinie vollstaendig, im
+    //      Spektrum blieb nur das Dreieck oben uebrig.
+    //   2. Die Farbe: Tuerkis mit Alpha 80 auf schwarzem Grund ist eine
+    //      Saeule; Tuerkis auf der blauen 3D-Flaeche und auf dem bunten
+    //      Wasserfall ist nichts.
+    //
+    // Deshalb: im 3D-Modus malt paintPassbandOverSurface() den
+    // Spektrum-Teil in die DYNAMISCHE Schicht, die als letzte ueber die
+    // Flaeche kommt — hier bleibt dann nur der Wasserfall-Teil. Und der
+    // Wasserfall bekommt eine HELLE Tuenche statt der Benutzerfarbe: so
+    // macht es die Vorlage (vom 2026-09-17, live angesehen), und hell
+    // steht auf jeder Wasserfallfarbe, tuerkis nur auf schwarz. Die
+    // Benutzerfarbe (Setup > Display) gilt weiter fuer die Saeule im
+    // 2D-Spektrum, wo sie sichtbar ist.
+    const bool overSurface = (m_renderMode == SpectrumRenderMode::Mode3D);
+
     // Plan 4 follow-up (option A): MOX-gate the RX passband fill so it
     // disappears during TX/TUNE.  The TX filter overlay (drawTxFilterOverlay)
     // takes over in that state — gives the user a clear visual swap between
@@ -6311,32 +6375,36 @@ void SpectrumWidget::drawSliceMarker(QPainter& p, const QRect& specRect,
     if (!m_moxOverlay) {
         // Spectrum passband fill — Plan 4 D9b: user-pickable m_rxFilterColor.
         // Previously hardcoded AetherSDR cyan alpha=35/25; now single user colour.
-        if (specHeightClipped > 0) {
+        if (specHeightClipped > 0 && !overSurface) {
             p.fillRect(xLo, specRect.top(), fW, specHeightClipped, m_rxFilterColor);
         }
 
-        // Waterfall passband fill — Plan 4 D9b: same user-pickable colour.
+        // Waterfall passband fill — hell, siehe oben.
         // Ab 2026-08-19 abschaltbar (m_extendedPassband, Vorgabe ein):
         // AetherSDRs setExtendedPassband, dort mit Vorgabe AUS. Wir haben
         // die Verlaengerung seit je unbedingt gemalt, also bleibt sie die
         // Vorgabe — der Schalter fuegt nur die Moeglichkeit hinzu.
         if (m_extendedPassband) {
-            p.fillRect(xLo, wfRect.top(), fW, wfRect.height(), m_rxFilterColor);
+            p.fillRect(xLo, wfRect.top(), fW, wfRect.height(), kPassbandWash);
         }
     }
 
     // Filter edge lines — from AetherSDR line 3237: slice color, alpha=130
     // Clip the spectrum-side edge to specBottomClipped so the line stops at
     // the bandplan strip's top edge.
-    p.setPen(QPen(QColor(kSliceR, kSliceG, kSliceB, 130), 1));
-    p.drawLine(xLo, specRect.top(), xLo, specBottomClipped);
-    p.drawLine(xHi, specRect.top(), xHi, specBottomClipped);
+    if (!overSurface) {
+        p.setPen(QPen(QColor(kSliceR, kSliceG, kSliceB, 130), 1));
+        p.drawLine(xLo, specRect.top(), xLo, specBottomClipped);
+        p.drawLine(xHi, specRect.top(), xHi, specBottomClipped);
+    }
     // Die Wasserfall-Haelfte der Kanten haengt am selben Schalter wie die
     // Mittellinie: bei AetherSDR enden die Kanten immer am Spektrum, und
     // nur die Frequenzlinie hat den Schalter. Ein dritter Schalter fuer
     // die Kanten allein waere eine Einstellung, die niemand sucht — Kante
-    // und Linie gehoeren zum selben Bild.
+    // und Linie gehoeren zum selben Bild. Hell wie die Tuenche, aus
+    // demselben Grund.
     if (m_extendedFrequencyLine) {
+        p.setPen(QPen(kPassbandEdgeLight, 1));
         p.drawLine(xLo, wfRect.top(), xLo, wfRect.bottom());
         p.drawLine(xHi, wfRect.top(), xHi, wfRect.bottom());
     }
@@ -6348,8 +6416,14 @@ void SpectrumWidget::drawSliceMarker(QPainter& p, const QRect& specRect,
     // Port aus AetherSDR: drawFrequencyLine malt immer im Spektrum und nur
     // bei m_extendedFrequencyLine auch im Wasserfall
     // (SpectrumWidget.cpp:16843-16848 [@0cd4559]).
-    p.drawLine(vfoX, specRect.top(), vfoX,
-               m_extendedFrequencyLine ? wfRect.bottom() : specBottomClipped);
+    // Im 3D-Modus nur der Wasserfall-Teil; das Spektrum uebernimmt
+    // paintPassbandOverSurface().
+    if (!overSurface) {
+        p.drawLine(vfoX, specRect.top(), vfoX,
+                   m_extendedFrequencyLine ? wfRect.bottom() : specBottomClipped);
+    } else if (m_extendedFrequencyLine) {
+        p.drawLine(vfoX, wfRect.top(), vfoX, wfRect.bottom());
+    }
 
     // VFO triangle marker — from AetherSDR line 3285-3293
     // Drawn below any VFO flag widget that may be positioned at the top.
@@ -6380,6 +6454,66 @@ void SpectrumWidget::drawSliceMarker(QPainter& p, const QRect& specRect,
             << QPoint(vfoX + kTriHalf, triTop)
             << QPoint(vfoX, triTop + kTriH);
         p.drawPolygon(tri);
+    }
+}
+
+// ---- Die Bandbreite UEBER der 3D-Flaeche ----
+//
+// Gegenstueck zu drawSliceMarker fuer den 3D-Modus: derselbe Spektrum-
+// Teil (Saeule, Kanten, Mittellinie, Dreieck), aber in die dynamische
+// Schicht gemalt, die als letzte ueber die deckende DSS-Flaeche kommt —
+// siehe die Begruendung in drawSliceMarker. Hell statt tuerkis, weil
+// die Flaeche blau ist. Der Wasserfall-Teil bleibt in drawSliceMarker.
+void SpectrumWidget::paintPassbandOverSurface(QPainter& p, const QRect& specRect)
+{
+    if (m_renderMode != SpectrumRenderMode::Mode3D) { return; }
+
+    const int bandPlanH = (m_bandPlanMgr && m_bandPlanFontSize > 0)
+                          ? (m_bandPlanFontSize + 4) : 0;
+    const int specBottomClipped = specRect.bottom() - bandPlanH;
+    const int specHeightClipped = std::max(0, specBottomClipped - specRect.top());
+    if (specHeightClipped <= 0) { return; }
+
+    for (const SliceMarkerGeometry& g : sliceMarkerGeometry()) {
+        const int vfoX = hzToX(g.centreHz, specRect);
+        int xLo = hzToX(g.centreHz + g.filterLowHz, specRect);
+        int xHi = hzToX(g.centreHz + g.filterHighHz, specRect);
+        if (xLo > xHi) { std::swap(xLo, xHi); }
+        const int fW = xHi - xLo;
+
+        // MOX-Sperre wie im 2D-Zweig: waehrend TX/TUNE zeigt
+        // drawTxFilterOverlay das Sendeband, nicht wir den Empfang.
+        if (!m_moxOverlay) {
+            p.fillRect(xLo, specRect.top(), fW, specHeightClipped, kPassbandWash);
+        }
+        p.setPen(QPen(kPassbandEdgeLight, 1));
+        p.drawLine(xLo, specRect.top(), xLo, specBottomClipped);
+        p.drawLine(xHi, specRect.top(), xHi, specBottomClipped);
+
+        // Mittellinie: dieselbe Breitenregel wie im 2D-Zweig (schmal,
+        // wenn eine Kante naeher als 4 px liegt — CW), hell statt tuerkis.
+        const qreal vfoLineW =
+            (std::abs(vfoX - xLo) <= 4 || std::abs(vfoX - xHi) <= 4) ? 1.0 : 2.0;
+        QColor vfoLine(kPassbandEdgeLight);
+        vfoLine.setAlpha(230);
+        p.setPen(QPen(vfoLine, vfoLineW));
+        p.drawLine(vfoX, specRect.top(), vfoX, specBottomClipped);
+
+        // Das Dreieck oben, wie im 2D-Zweig (ohne Flaggen-Zweig: im
+        // 3D-Modus gibt es keine Flagge, an die es sich haengen koennte).
+        if (vfoX >= specRect.left() && vfoX <= specRect.right()) {
+            static constexpr int kTriHalf = 6;
+            static constexpr int kTriH = 10;
+            static constexpr int kSliceR = 0x00, kSliceG = 0xd4, kSliceB = 0xff;
+            const int triTop = specRect.top();
+            p.setPen(Qt::NoPen);
+            p.setBrush(QColor(kSliceR, kSliceG, kSliceB));
+            QPolygon tri;
+            tri << QPoint(vfoX - kTriHalf, triTop)
+                << QPoint(vfoX + kTriHalf, triTop)
+                << QPoint(vfoX, triTop + kTriH);
+            p.drawPolygon(tri);
+        }
     }
 }
 
@@ -6517,7 +6651,7 @@ void SpectrumWidget::setHighSwrOverlay(bool active, bool foldback) noexcept
 //       }
 //     }
 //   }
-// NereusSDR translation: track state flag, markOverlayDirty() to trigger
+// Longpath translation: track state flag, markOverlayDirty() to trigger
 // the border repaint on the next paint pass.
 
 void SpectrumWidget::setDisplayFps(int fps)
@@ -6624,7 +6758,7 @@ void SpectrumWidget::setDisplayDuplex(bool on)
     // From Thetis console.cs:15363-15369 [v2.10.3.13]:
     //   private bool _display_duplex = false;
     //   public bool DisplayDuplex { get; set; }
-    // NereusSDR defaults this to true since the panadapter stays live
+    // Longpath defaults this to true since the panadapter stays live
     // during MOX (see SpectrumWidget header note).  Setter is provided for
     // a potential future Setup checkbox.
     if (m_displayDuplex == on) {
@@ -6638,7 +6772,7 @@ void SpectrumWidget::setDisplayDuplex(bool on)
 // Upstream tags preserved: //MW0LGE (from cited upstream lines) [v2.10.3.15]
 //   if (!local_mox) fOffset += rx1_preamp_offset;
 // The RX cal offset is only added in RX mode; during TX, the TX path uses
-// its own calibration. NereusSDR models this by storing the TX ATT offset
+// its own calibration. Longpath models this by storing the TX ATT offset
 // and applying it as an additional shift in paintEvent when m_moxOverlay.
 void SpectrumWidget::setTxAttenuatorOffsetDb(float offsetDb)
 {
@@ -6672,7 +6806,7 @@ void SpectrumWidget::setTxFilterVisible(bool on)
 // a panadapter overlay repaint.  Waterfall column repaint is MOX-gated at the
 // call site (see drawTxFilterWaterfallColumn).
 //
-// Source: NereusSDR-original.  IQ-space conversion follows
+// Source: Longpath-original.  IQ-space conversion follows
 //   deskhpsdr/transmitter.c:2136-2186 [@120188f]
 // which is the same mapping used by TxChannel::applyTxFilterForMode
 // (TxChannel.cpp:1047-1078).
@@ -6947,7 +7081,7 @@ void SpectrumWidget::drawNotchMarkers(QPainter& p, const QRect& specRect)
     };
 
     for (const NotchMarker& n : m_notchMarkers) {
-        // NereusSDR coordinate mapping: hzToX(double hz, QRect) takes Hz.
+        // Longpath coordinate mapping: hzToX(double hz, QRect) takes Hz.
         // AetherSDR upstream uses mhzToX(freqMhz) at :13522-13523; multiply
         // by 1e6, exactly as drawSpotMarkers already does.
         const double centreHz = n.freqMhz * 1.0e6;
@@ -7000,8 +7134,8 @@ void SpectrumWidget::drawNotchMarkers(QPainter& p, const QRect& specRect)
 // ---------------------------------------------------------------------------
 // Spot overlay setter + render + cluster popup (Phase 3J-2 Task E1).
 // Port of AetherSDR src/gui/SpectrumWidget.cpp:4303-4672 [@0cd4559].
-// Algorithm preserved verbatim. NereusSDR divergences are local to the
-// coordinate helpers (NereusSDR uses hzToX(double hz, QRect) over Hz-units
+// Algorithm preserved verbatim. Longpath divergences are local to the
+// coordinate helpers (Longpath uses hzToX(double hz, QRect) over Hz-units
 // and m_centerHz / m_bandwidthHz; AetherSDR's mhzToX(mhz) uses MHz units
 // and m_centerMhz / m_bandwidthMhz). Visibility test and tick / label /
 // cluster geometry mirror upstream byte-for-byte.
@@ -7178,9 +7312,9 @@ int SpectrumWidget::signalHistoryLifetimeSeconds() const
 // to this method so the live overlay tracks the dialog. Defaults
 // duplicate the F4 read-side at SpotHubDialog.cpp:1714-1730.
 //
-// NereusSDR-original. AetherSDR splits these reads across a freestanding
+// Longpath-original. AetherSDR splits these reads across a freestanding
 // SpotSettingsDialog and a refreshSpots() lambda on MainWindow; the
-// NereusSDR shape collapses both into a single helper on the consumer
+// Longpath shape collapses both into a single helper on the consumer
 // widget, called once on construction (when MainWindow wires the panel)
 // and again whenever the dialog raises settingsChanged.
 void SpectrumWidget::loadSpotDisplaySettings()
@@ -7340,7 +7474,7 @@ void SpectrumWidget::drawSpotMarkers(QPainter& p, const QRect& specRect)
             continue;
         }
 
-        // NereusSDR coordinate mapping: hzToX(double hz, QRect) takes Hz.
+        // Longpath coordinate mapping: hzToX(double hz, QRect) takes Hz.
         // AetherSDR upstream uses mhzToX(spot.freqMhz). Multiply by 1e6.
         const int x = hzToX(spot.freqMhz * 1.0e6, specRect);
         if (x < 0 || x > width()) continue;
@@ -7530,7 +7664,7 @@ void SpectrumWidget::showSpotClusterPopup(const SpotCluster& cluster, const QPoi
         }
         auto* action = menu->addAction(text);
         connect(action, &QAction::triggered, this, [this, spot] {
-            // NereusSDR signal contract: frequencyClicked(double hz).
+            // Longpath signal contract: frequencyClicked(double hz).
             // AetherSDR emits MHz; multiply by 1e6 to match the Hz signature.
             const double freqHz = spot.freqMhz * 1.0e6;
             emit frequencyClicked(freqHz);
@@ -7555,7 +7689,7 @@ void SpectrumWidget::showSpotClusterPopup(const SpotCluster& cluster, const QPoi
 // main paint sequence regardless of MOX state — Thetis shows the TX filter
 // band on the spectrum even in RX mode to hint where TX will land).
 //
-// Source: NereusSDR-original rendering.  IQ-space mapping per
+// Source: Longpath-original rendering.  IQ-space mapping per
 //   deskhpsdr/transmitter.c:2136-2186 [@120188f].
 // ---------------------------------------------------------------------------
 void SpectrumWidget::drawTxFilterOverlay(QPainter& p, const QRect& specRect)
@@ -7736,7 +7870,7 @@ void SpectrumWidget::drawImdOverlay(QPainter& p, const QRect& specRect)
     //   rr.RadiusX = 14f; rr.RadiusY = 14f;
     // _two_tone_readings_X_offset starts at 50 (display.cs:4948 [v2.10.3.13]).
     // Thetis adjusts the X offset to dodge IMD5 markers (display.cs:5584-5585);
-    // NereusSDR keeps the simple fixed-50 placement for now.
+    // Longpath keeps the simple fixed-50 placement for now.
     constexpr int kBoxX = 50;
     constexpr int kBoxY = 50;
     constexpr int kBoxW = 260;
@@ -7749,7 +7883,7 @@ void SpectrumWidget::drawImdOverlay(QPainter& p, const QRect& specRect)
     p.drawRoundedRect(box, kBoxR, kBoxR);
 
     // From Thetis display.cs:5683-5687 [v2.10.3.13] DrawText calls.
-    // 4 columns: "dBm dBc frequency" header (NereusSDR drops the freq
+    // 4 columns: "dBm dBc frequency" header (Longpath drops the freq
     // column for now — that requires hz_per_pixel + DDC center plumbing
     // which the current mockup doesn't model), then label/val1/val2.
     const auto t = m_imdOverlay->formatReadout();
@@ -7786,7 +7920,7 @@ void SpectrumWidget::drawImdOverlay(QPainter& p, const QRect& specRect)
 // Only called when m_showTxFilterOnRxWaterfall && m_moxOverlay.
 // Same IQ-space mapping as drawTxFilterOverlay.
 //
-// Source: NereusSDR-original rendering.  IQ-space mapping per
+// Source: Longpath-original rendering.  IQ-space mapping per
 //   deskhpsdr/transmitter.c:2136-2186 [@120188f].
 // ---------------------------------------------------------------------------
 void SpectrumWidget::drawTxFilterWaterfallColumn(QPainter& p, const QRect& wfRect)
@@ -7863,7 +7997,7 @@ void SpectrumWidget::paintHighSwrOverlay(QPainter& p)
 // tx_band_edge_pen [display.cs:1955], tx_grid_zero_pen [display.cs:2053]).
 // tx_band_edge_color = Color.Red  [display.cs:1955 v2.10.3.13]
 //
-// NereusSDR 3M-1a draws a border tint only.  Full grid re-colouring
+// Longpath 3M-1a draws a border tint only.  Full grid re-colouring
 // (switching grid pens to TX reds) is deferred to Phase 3M-3.
 // Phase 3M-1a H.1.
 void SpectrumWidget::paintMoxOverlay(QPainter& p)
@@ -7958,7 +8092,7 @@ bool SpectrumWidget::eventFilter(QObject* obj, QEvent* ev)
 // a non-GPU build can be verified before flipping.
 static int specHFromHeight(int widgetH, float spectrumFrac, int chromeH)
 {
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     const int contentH = widgetH - chromeH;
     return static_cast<int>(contentH * spectrumFrac);
 #else
@@ -7980,12 +8114,12 @@ static int specHFromHeight(int widgetH, float spectrumFrac, int chromeH)
 // zwei Orte, an denen sie auseinanderlaufen; hier ist es die dritte
 // Wiederholung desselben Musters an einem Tag.
 // From AetherSDR SpectrumWidget.cpp:2264-2306 + 1857-1871 + 7138-7156
-// [@0cd4559] — verbatim wo moeglich; NEREUS_GPU_SPECTRUM statt
+// [@0cd4559] — verbatim wo moeglich; LONGPATH_GPU_SPECTRUM statt
 // AETHER_GPU_SPECTRUM, und der Frequency-Preview-Zweig entfaellt, weil
-// NereusSDR dieses Feature (noch) nicht traegt.
+// Longpath dieses Feature (noch) nicht traegt.
 void SpectrumWidget::prepareForTopLevelChange()
 {
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     // QRhiWidget registers a cleanup callback with the current top-level
     // backing-store QRhi. Direct splitter/floating-window reparenting can miss
     // Qt's internal notification, leaving the old QRhi with a stale callback;
@@ -7999,7 +8133,7 @@ void SpectrumWidget::prepareForTopLevelChange()
 
 void SpectrumWidget::resetGpuResources()
 {
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     // On macOS/Windows, the GPU surface doesn't survive reparenting — tear
     // down old pipelines so initialize() rebuilds them for the new window.
     // On Linux (OpenGL), a simple update() is sufficient (#1240).
@@ -8024,7 +8158,7 @@ void SpectrumWidget::prepareForShutdown()
     setUpdatesEnabled(false);
     hide();
 
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     releaseResources();
 #ifdef Q_OS_MAC
     // Drop the native child window while its parent backing store is still
@@ -8038,7 +8172,7 @@ void SpectrumWidget::prepareForShutdown()
 
 void SpectrumWidget::applyNativeWindowIsolationPolicy()
 {
-#if defined(NEREUS_GPU_SPECTRUM) && defined(Q_OS_MAC)
+#if defined(LONGPATH_GPU_SPECTRUM) && defined(Q_OS_MAC)
     // Order matters: block ancestor promotion *before* requesting the native
     // window, so realizing the leaf's NSView can't drag its QWidget tree
     // native (redundant window-sized Core Animation backing stores, #4339).
@@ -8298,7 +8432,7 @@ void SpectrumWidget::buildNotchContextMenu(int id, QMenu& menu)
     //
     // Thetis has no preset list at all (it uses the udMNFWidth spinner) and
     // its own widths are 200 and 100, both at or above the floor, so this
-    // list is a NereusSDR addition and this clamp is what makes it honest.
+    // list is a Longpath addition and this clamp is what makes it honest.
     // To go genuinely narrower, raise nc: 8192 gives 50 Hz, 16384 gives 25,
     // at proportional filter cost on every channel.
     const int minWidthHz = static_cast<int>(std::ceil(m_notchMinWidthHz));
@@ -8506,7 +8640,7 @@ void SpectrumWidget::mousePressEvent(QMouseEvent* event)
         // highlighted:
         // if we have a notch highlighted, then all other right click is ignored
         //   [original comment from console.cs:49615, guarding the return at
-        //   console.cs:49616 [v2.10.3.15]].  NereusSDR fills that suppressed
+        //   console.cs:49616 [v2.10.3.15]].  Longpath fills that suppressed
         //   slot with AetherSDR's notch menu rather than doing nothing.
         if (my < specH && mx <= specRect.right()) {
             const int hitNotch = notchAtPixel(mx, specRect);
@@ -8625,6 +8759,8 @@ void SpectrumWidget::mousePressEvent(QMouseEvent* event)
                     this, [this](int v) { m_wfColorGain = v; update(); scheduleSettingsSave(); });
             connect(m_overlayMenu, &SpectrumOverlayMenu::wfBlackLevelChanged,
                     this, [this](int v) { m_wfBlackLevel = v; update(); scheduleSettingsSave(); });
+            connect(m_overlayMenu, &SpectrumOverlayMenu::wfUpdatePeriodChanged,
+                    this, [this](int ms) { setWfUpdatePeriodMs(ms); });
             connect(m_overlayMenu, &SpectrumOverlayMenu::wfColorSchemeChanged,
                     this, [this](int v) { m_wfColorScheme = static_cast<WfColorScheme>(v); update(); scheduleSettingsSave(); });
             connect(m_overlayMenu, &SpectrumOverlayMenu::fillAlphaChanged,
@@ -8650,6 +8786,7 @@ void SpectrumWidget::mousePressEvent(QMouseEvent* event)
                                   static_cast<int>(m_wfColorScheme),
                                   m_fillAlpha, m_panFill, false,
                                   m_refLevel, m_dynamicRange, m_ctunEnabled);
+        m_overlayMenu->setWfUpdatePeriodMs(m_wfUpdatePeriodMs);
         // The frequency under the cursor, captured at popup time: the
         // popup outlives the press, and by the time the button is clicked
         // the pointer has moved onto the popup itself.
@@ -8696,7 +8833,7 @@ void SpectrumWidget::mousePressEvent(QMouseEvent* event)
         const QPoint pos(mx, my);
         for (const auto& hr : m_spotClickRects) {
             if (hr.rect.contains(pos)) {
-                // NereusSDR signal contract: frequencyClicked(double hz).
+                // Longpath signal contract: frequencyClicked(double hz).
                 // AetherSDR emits MHz; multiply by 1e6 to match Hz signature.
                 emit frequencyClicked(hr.freqMhz * 1.0e6);
                 // Notify the radio that a spot was clicked (#341)
@@ -8809,7 +8946,7 @@ void SpectrumWidget::mousePressEvent(QMouseEvent* event)
     // 3b. Notch (TNF) grab.  Thetis runs its notch block first inside
     // case MouseButtons.Left:, ahead of every filter drag, so a notch
     // marker sitting on a filter edge still drags as a notch.  The dBm
-    // strip / divider / freq-scale rows above are NereusSDR chrome outside
+    // strip / divider / freq-scale rows above are Longpath chrome outside
     // the spectrum plot and keep their existing precedence, so the notch
     // test is guarded on my < specH.
     //
@@ -9191,7 +9328,7 @@ void SpectrumWidget::mouseMoveEvent(QMouseEvent* event)
             emit centerChanged(m_centerHz);
         }
         updateVfoPositions();
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
         markOverlayDirty();
 #else
         update();
@@ -9203,7 +9340,7 @@ void SpectrumWidget::mouseMoveEvent(QMouseEvent* event)
         // Resize spectrum/waterfall split
         float frac = static_cast<float>(my) / h;
         m_spectrumFrac = std::clamp(frac, 0.10f, 0.90f);
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
         markOverlayDirty();
 #else
         update();
@@ -9251,7 +9388,7 @@ void SpectrumWidget::mouseMoveEvent(QMouseEvent* event)
         m_centerHz += deltaHz;
         emit centerChanged(m_centerHz);
         updateVfoPositions();
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
         markOverlayDirty();
 #else
         update();
@@ -9412,7 +9549,7 @@ void SpectrumWidget::mouseMoveEvent(QMouseEvent* event)
             if (n) {
                 // AetherSDR renders this in a styled QLabel popup
                 // (m_tnfHoverPopup, src/gui/SpectrumWidget.cpp:13591-13646
-                // [@c6481cbf]); NereusSDR routes the same frequency +
+                // [@c6481cbf]); Longpath routes the same frequency +
                 // width readout through QToolTip, the path the spot
                 // overlay above already uses.
                 QToolTip::showText(event->globalPosition().toPoint(),
@@ -9470,7 +9607,7 @@ void SpectrumWidget::mouseMoveEvent(QMouseEvent* event)
         }
     }
 
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     markOverlayDirty();
 #else
     update();
@@ -9860,7 +9997,7 @@ void SpectrumWidget::wheelEvent(QWheelEvent* event)
         emit centerChanged(m_centerHz);
         emit bandwidthChangeRequested(newBw);
         updateVfoPositions();
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
         markOverlayDirty();
 #endif
     } else if (event->modifiers() & Qt::ShiftModifier) {
@@ -9885,7 +10022,7 @@ void SpectrumWidget::wheelEvent(QWheelEvent* event)
 // Ported from AetherSDR SpectrumWidget GPU pipeline
 // ============================================================================
 
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
 
 // Fullscreen quad: position (x,y) + texcoord (u,v)
 // From AetherSDR SpectrumWidget.cpp:1779
@@ -10307,7 +10444,7 @@ void SpectrumWidget::initialize(QRhiCommandBuffer* cb)
                         << m_wfGpuTexW << "x" << m_wfGpuTexH
                         << "— the texture will never be written and will"
                         << "show undefined GPU memory.";
-        } else if (qEnvironmentVariableIntValue("NEREUS_WF_DEBUG") > 0) {
+        } else if (qEnvironmentVariableIntValue("LONGPATH_WF_DEBUG") > 0) {
             qDebug() << "SpectrumWidget: waterfall seeded"
                      << seed.width() << "x" << seed.height()
                      << "fmt" << int(seed.format())
@@ -10378,10 +10515,10 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
     // the upload and the sampler. One pixel value decides which half to
     // look in, and no amount of further reading will.
     //
-    // Off unless asked for: NEREUS_WF_DEBUG=1. A diagnostic that costs a
+    // Off unless asked for: LONGPATH_WF_DEBUG=1. A diagnostic that costs a
     // qDebug per frame in normal use is a diagnostic that gets deleted.
     static const int kWfDebugLevel =
-        qEnvironmentVariableIntValue("NEREUS_WF_DEBUG");
+        qEnvironmentVariableIntValue("LONGPATH_WF_DEBUG");
     static const bool kWfDebug = kWfDebugLevel > 0;
 
     // Level 2: the one-shot discriminator. Fill the CPU image solid
@@ -10389,7 +10526,7 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
     // the entire upload→texture→sampler→quad chain end to end, which
     // pins the fault in the image's CONTENT (and convicts the
     // single-pixel probe below of under-sampling); a screen that stays
-    // magenta convicts the chain. One run with NEREUS_WF_DEBUG=2
+    // magenta convicts the chain. One run with LONGPATH_WF_DEBUG=2
     // answers what four theories could not.
     if (kWfDebugLevel >= 2 && !m_waterfall.isNull()) {
         m_waterfall.fill(QColor(Style::kGreenText));
@@ -10432,7 +10569,7 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
             // FRESH OBJECTS, not an in-place recreate (2026-08-11).
             //
             // The sixth and final theory, and the one the evidence
-            // finally allows: with NEREUS_WF_DEBUG=2 the CPU image was
+            // finally allows: with LONGPATH_WF_DEBUG=2 the CPU image was
             // force-filled solid green and full-uploaded EVERY frame —
             // recorded into the same submitted batch whose other
             // resources demonstrably work — and the screen stayed
@@ -10701,7 +10838,7 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
             // drawTnfMarkers likewise precedes drawSpotMarkers in the
             // frequency-plane painter.  Missing THIS call site while
             // having the CPU one is a silent GPU-only regression, since
-            // NEREUS_GPU_SPECTRUM is the shipping path.
+            // LONGPATH_GPU_SPECTRUM is the shipping path.
             drawNotchMarkers(p, notchSpecRect());
             // Phase 3J-2 Task E1: spot overlay before VFO marker so labels
             // sit below the slice marker chrome. Mirrors the CPU paintEvent
@@ -11024,6 +11161,9 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
                 }
             }
             paintNoiseFloorOverlay(pd, specRect);
+            // Im 3D-Modus die Bandbreite UEBER die Flaeche — siehe
+            // drawSliceMarker fuer den Grund.
+            paintPassbandOverSurface(pd, specRect);
 
             // Reuse PerfMonitor's ovly metric for the *dynamic* rebuild
             // cost since that's now the per-frame variable; chrome
@@ -11604,7 +11744,7 @@ void SpectrumWidget::releaseResources()
 
 }
 
-#endif // NEREUS_GPU_SPECTRUM
+#endif // LONGPATH_GPU_SPECTRUM
 
 // ============================================================================
 // VFO Flag Widget Hosting (AetherSDR pattern)
@@ -11638,9 +11778,15 @@ void SpectrumWidget::setVfoFrequency(double hz)
     }
 
     // Update off-screen indicator state (both modes)
+    //
+    // 0 Hz ist keine Frequenz, sondern "kein Geraet": ohne Verbindung
+    // zeigte der Zeiger "◀ 0.0000" am linken Rand — eine Null, die wie
+    // eine Messung aussieht (HAUSSTIL Regel 7, 2026-09-18).
     double leftEdge = m_centerHz - m_bandwidthHz / 2.0;
     double rightEdge = m_centerHz + m_bandwidthHz / 2.0;
-    if (hz < leftEdge) {
+    if (hz <= 0.0) {
+        m_vfoOffScreen = VfoOffScreen::None;
+    } else if (hz < leftEdge) {
         m_vfoOffScreen = VfoOffScreen::Left;
     } else if (hz > rightEdge) {
         m_vfoOffScreen = VfoOffScreen::Right;
@@ -11649,7 +11795,7 @@ void SpectrumWidget::setVfoFrequency(double hz)
     }
 
     updateVfoPositions();
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     markOverlayDirty();
 #else
     update();
@@ -11662,7 +11808,7 @@ void SpectrumWidget::recenterOnVfo()
     m_vfoOffScreen = VfoOffScreen::None;
     emit centerChanged(m_centerHz);
     updateVfoPositions();
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     markOverlayDirty();
 #else
     update();

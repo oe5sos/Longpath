@@ -1,11 +1,11 @@
 // =================================================================
-// src/core/AdifLog.cpp  (NereusSDR)
+// src/core/AdifLog.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original — see AdifLog.h.
+// Longpath-original — see AdifLog.h.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
 //   2026-08-10 — Two fixes, AI-assisted via Anthropic Claude (Cowork),
@@ -240,7 +240,8 @@ QVector<LogEntry> parse(const QByteArray& bytes)
         else if (key == QLatin1String("COMMENT"))       { cur.comment = value; }
         else if (key == QLatin1String("FREQ"))          { cur.freqMHz = value.toDouble(); }
         else if (key == QLatin1String("TX_PWR"))        { cur.txPowerW = value.toDouble(); }
-        else if (key == QLatin1String("APP_NEREUS_QRZUP")) {
+        else if (key == QLatin1String("APP_LONGPATH_QRZUP")
+                 || key == QLatin1String("APP_NEREUS_QRZUP")) {   // geschrieben vor 2026-09-17
             cur.uploadedToQrz = value.trimmed().compare(QLatin1String("Y"),
                                     Qt::CaseInsensitive) == 0;
         }
@@ -310,7 +311,7 @@ bool write(const QString& path, const QVector<LogEntry>& entries,
 
     QTextStream out(&f);
     out << "Longpath logbook\n"
-        << "<ADIF_VER:5>3.1.4 <PROGRAMID:9>NereusSDR <EOH>\n";
+        << "<ADIF_VER:5>3.1.4 <PROGRAMID:8>Longpath <EOH>\n";
     for (const LogEntry& e : entries) {
         out << e.toAdifRecord() << "\n";
     }

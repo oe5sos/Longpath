@@ -1,8 +1,8 @@
 // =================================================================
-// src/gui/setup/TgxlAdvancedPage.cpp  (NereusSDR)
+// src/gui/setup/TgxlAdvancedPage.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-native Setup -> Network -> TGXL Advanced page.
+// Longpath-native Setup -> Network -> TGXL Advanced page.
 //
 // Phase 3P-II Phase 4 Task 85.
 //

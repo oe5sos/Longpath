@@ -1,12 +1,12 @@
 // =================================================================
-// src/core/antenna/Feedline.cpp  (NereusSDR)
+// src/core/antenna/Feedline.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. See Feedline.h for what a length of coax does
+// Longpath-original. See Feedline.h for what a length of coax does
 // to a measurement, and for the estimation trick that did not work.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-10 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

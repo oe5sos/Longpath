@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - SpotModel: TCI-keyed spot sink. QMap<int, SpotData> keyed
+// Longpath - SpotModel: TCI-keyed spot sink. QMap<int, SpotData> keyed
 // by monotonic spot index. The TCI-keyed applySpotStatus() update API
 // recognises 12 keys (callsign, rx_freq, tx_freq, mode, color,
 // background_color, source, spotter_callsign, comment, timestamp,
@@ -11,10 +11,10 @@
 // AetherSDR is (C) its contributors and is licensed GPL-3.0-or-later
 // (see https://github.com/ten9876/AetherSDR/blob/main/LICENSE).
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-11  J.J. Boyd / KG4VCF  Phase 3J-2 Task D1. Initial port.
 //                                    AetherSDR's "AetherSDR" namespace
-//                                    becomes "NereusSDR". SpotData
+//                                    becomes "Longpath". SpotData
 //                                    struct (14 fields: index,
 //                                    callsign, rxFreqMhz, txFreqMhz,
 //                                    mode, color, backgroundColor,

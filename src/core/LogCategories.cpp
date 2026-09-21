@@ -10,21 +10,21 @@
 namespace Longpath {
 
 // --- Category Definitions ---
-Q_LOGGING_CATEGORY(lcDiscovery,  "nereus.discovery")
-Q_LOGGING_CATEGORY(lcConnection, "nereus.connection")
-Q_LOGGING_CATEGORY(lcKiwiSdr, "nereus.kiwisdr")
-Q_LOGGING_CATEGORY(lcKiwiSdrAudio, "nereus.kiwi.sdr.audio")
-Q_LOGGING_CATEGORY(lcProtocol,   "nereus.protocol")
-Q_LOGGING_CATEGORY(lcReceiver,   "nereus.receiver")
-Q_LOGGING_CATEGORY(lcAudio,      "nereus.audio",  QtInfoMsg)
-Q_LOGGING_CATEGORY(lcDsp,        "nereus.dsp",    QtInfoMsg)
-Q_LOGGING_CATEGORY(lcSpectrum,   "nereus.spectrum", QtInfoMsg)
-Q_LOGGING_CATEGORY(lcContainer,  "nereus.container")
-Q_LOGGING_CATEGORY(lcMeter,      "nereus.meter")
-Q_LOGGING_CATEGORY(lcMmio,       "nereus.mmio")
-Q_LOGGING_CATEGORY(lcTci,        "nereus.tci")
-Q_LOGGING_CATEGORY(lcSpots,      "nereus.spots")
-Q_LOGGING_CATEGORY(lcAutomation, "nereus.automation")
+Q_LOGGING_CATEGORY(lcDiscovery,  "longpath.discovery")
+Q_LOGGING_CATEGORY(lcConnection, "longpath.connection")
+Q_LOGGING_CATEGORY(lcKiwiSdr, "longpath.kiwisdr")
+Q_LOGGING_CATEGORY(lcKiwiSdrAudio, "longpath.kiwi.sdr.audio")
+Q_LOGGING_CATEGORY(lcProtocol,   "longpath.protocol")
+Q_LOGGING_CATEGORY(lcReceiver,   "longpath.receiver")
+Q_LOGGING_CATEGORY(lcAudio,      "longpath.audio",  QtInfoMsg)
+Q_LOGGING_CATEGORY(lcDsp,        "longpath.dsp",    QtInfoMsg)
+Q_LOGGING_CATEGORY(lcSpectrum,   "longpath.spectrum", QtInfoMsg)
+Q_LOGGING_CATEGORY(lcContainer,  "longpath.container")
+Q_LOGGING_CATEGORY(lcMeter,      "longpath.meter")
+Q_LOGGING_CATEGORY(lcMmio,       "longpath.mmio")
+Q_LOGGING_CATEGORY(lcTci,        "longpath.tci")
+Q_LOGGING_CATEGORY(lcSpots,      "longpath.spots")
+Q_LOGGING_CATEGORY(lcAutomation, "longpath.automation")
 
 // --- LogManager ---
 
@@ -39,31 +39,31 @@ LogManager::LogManager()
     // Register all categories with metadata
     // Discovery and Connection enabled by default so first-time users see activity
     m_categories = {
-        { QStringLiteral("nereus.discovery"),  QStringLiteral("Discovery"),
+        { QStringLiteral("longpath.discovery"),  QStringLiteral("Discovery"),
           QStringLiteral("UDP radio discovery broadcasts and responses"), true },
-        { QStringLiteral("nereus.connection"), QStringLiteral("Connection"),
+        { QStringLiteral("longpath.connection"), QStringLiteral("Connection"),
           QStringLiteral("Radio connection lifecycle, state changes, reconnect"), true },
-        { QStringLiteral("nereus.protocol"),   QStringLiteral("Protocol"),
+        { QStringLiteral("longpath.protocol"),   QStringLiteral("Protocol"),
           QStringLiteral("P1/P2 packet framing, I/Q data parsing, sequence tracking"), false },
-        { QStringLiteral("nereus.receiver"),   QStringLiteral("Receiver"),
+        { QStringLiteral("longpath.receiver"),   QStringLiteral("Receiver"),
           QStringLiteral("Receiver lifecycle, hardware DDC mapping, I/Q routing"), false },
-        { QStringLiteral("nereus.audio"),      QStringLiteral("Audio"),
+        { QStringLiteral("longpath.audio"),      QStringLiteral("Audio"),
           QStringLiteral("Audio device negotiation, I/Q-to-audio pipeline"), false },
-        { QStringLiteral("nereus.dsp"),        QStringLiteral("DSP"),
+        { QStringLiteral("longpath.dsp"),        QStringLiteral("DSP"),
           QStringLiteral("WDSP channel processing, demodulation, FFT"), false },
-        { QStringLiteral("nereus.spectrum"),   QStringLiteral("Spectrum"),
+        { QStringLiteral("longpath.spectrum"),   QStringLiteral("Spectrum"),
           QStringLiteral("FFT engine, spectrum display, waterfall rendering"), false },
-        { QStringLiteral("nereus.container"), QStringLiteral("Container"),
+        { QStringLiteral("longpath.container"), QStringLiteral("Container"),
           QStringLiteral("Container dock/float/resize, lifecycle, persistence"), false },
-        { QStringLiteral("nereus.meter"),    QStringLiteral("Meter"),
+        { QStringLiteral("longpath.meter"),    QStringLiteral("Meter"),
           QStringLiteral("Meter widget rendering, polling, and item lifecycle"), false },
-        { QStringLiteral("nereus.mmio"),     QStringLiteral("MMIO"),
+        { QStringLiteral("longpath.mmio"),     QStringLiteral("MMIO"),
           QStringLiteral("Multi-Meter I/O endpoints, transports, parsers"), false },
-        { QStringLiteral("nereus.tci"),     QStringLiteral("TCI"),
+        { QStringLiteral("longpath.tci"),     QStringLiteral("TCI"),
           QStringLiteral("TCI WebSocket server, command dispatch, client lifecycle"), false },
-        { QStringLiteral("nereus.spots"),    QStringLiteral("Spots"),
+        { QStringLiteral("longpath.spots"),    QStringLiteral("Spots"),
           QStringLiteral("DX spot ingest (cluster, RBN, SpotCollector, WSJT-X)"), false },
-        { QStringLiteral("nereus.automation"), QStringLiteral("Automation"),
+        { QStringLiteral("longpath.automation"), QStringLiteral("Automation"),
           QStringLiteral("Dev automation bridge (LONGPATH_AUTOMATION) -- widget-tree dump, screen capture"), false },
     };
 }
@@ -114,8 +114,8 @@ void LogManager::setAllEnabled(bool on)
 void LogManager::applyFilterRules()
 {
     QStringList rules;
-    // Default: disable all debug output for nereus.*
-    rules << QStringLiteral("nereus.*.debug=false");
+    // Default: disable all debug output for longpath.*
+    rules << QStringLiteral("longpath.*.debug=false");
 
     // Enable specific categories
     for (const auto& cat : m_categories) {
@@ -140,12 +140,13 @@ QString LogManager::logFilePath() const
 {
     // Find the most recent log file
     QDir dir(logDirPath());
-    QStringList logs = dir.entryList({QStringLiteral("nereussdr-*.log")},
-                                     QDir::Files, QDir::Name);
+    QStringList logs = dir.entryList({QStringLiteral("longpath-*.log"),
+                                      QStringLiteral("nereussdr-*.log")},   // vor 2026-09-17
+                                     QDir::Files, QDir::Time);
     if (logs.isEmpty()) {
         return {};
     }
-    return dir.absoluteFilePath(logs.last());
+    return dir.absoluteFilePath(logs.first());
 }
 
 qint64 LogManager::logFileSize() const

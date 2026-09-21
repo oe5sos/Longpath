@@ -1,12 +1,12 @@
 // =================================================================
-// src/gui/widgets/QsoDetailPane.cpp  (NereusSDR)
+// src/gui/widgets/QsoDetailPane.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. See QsoDetailPane.h for why the network is only
+// Longpath-original. See QsoDetailPane.h for why the network is only
 // touched on request.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-10 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================
@@ -145,7 +145,7 @@ void QsoDetailPane::buildUi()
 {
     // By object name, not by class name. A Qt stylesheet type selector
     // matches the metaobject name, which for a class inside a namespace
-    // is "NereusSDR--QsoDetailPane" — write the plain class name and
+    // is "Longpath--QsoDetailPane" — write the plain class name and
     // the rule silently matches nothing, which is the kind of bug that
     // looks like a theming preference.
     setObjectName(QStringLiteral("qsoDetailPane"));
@@ -650,7 +650,7 @@ void QsoDetailPane::refreshExtras()
 
     int shown = 0;
     for (const auto& kv : m_entry.extras) {
-        // APP_NEREUS_QRZUP is ours and already has a column. Showing it
+        // APP_LONGPATH_QRZUP is ours and already has a column. Showing it
         // here as well would be the same fact twice, in two notations.
         if (LogEntry::modelsAdifField(kv.first.toUpper())) { continue; }
         if (kv.second.trimmed().isEmpty()) { continue; }

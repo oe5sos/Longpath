@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - FreeDVReporterClient: Engine.IO/Socket.IO WebSocket
+// Longpath - FreeDVReporterClient: Engine.IO/Socket.IO WebSocket
 // client for qso.freedv.org. Dual-feed: drives both FreeDVStationModel
 // (rich 14-field live state) and SpotModel (one-shot spot stream).
 //
@@ -62,7 +62,7 @@
 //  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // =========================================================================
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-10  J.J. Boyd / KG4VCF  Phase 3J-2 Task B5. Initial port.
 //                                    Replaces AetherSDR's "lacking"
 //                                    FreeDvClient with a freedv-gui-
@@ -73,11 +73,11 @@
 //                                    behaviour (emit BOTH stationUpdated
 //                                    and spotReceived from
 //                                    onFreqChange / onRxReport) is a
-//                                    NereusSDR architectural decision
+//                                    Longpath architectural decision
 //                                    per design doc Section 4 Flow 2 -
 //                                    freedv-gui's onFrequencyChange
 //                                    updates only the station map; the
-//                                    NereusSDR client also synthesizes
+//                                    Longpath client also synthesizes
 //                                    a DxSpot for the panadapter
 //                                    overlay. Test seam wrappers
 //                                    (handleEngineIOForTest /
@@ -116,14 +116,14 @@ namespace Longpath {
 // FreeDV Reporter Engine.IO / Socket.IO client.
 //
 // Wire-protocol behavior is byte-for-byte from freedv-gui. The handful
-// of NereusSDR-side decisions are:
+// of Longpath-side decisions are:
 //   - View-only auth always (we are a spot-consumer, not a reporter
 //     pushing TX/RX state). That maps to freedv-gui's
 //     `isValidForReporting() == false` connect_() branch
 //     (FreeDVReporter.cpp:295-298 [@77e793a]).
 //   - Dual-feed: every freq_change / rx_report event ALSO synthesizes
 //     a DxSpot for the SpotModel pipeline (panadapter overlay).
-//     freedv-gui never produces spots; this is NereusSDR's
+//     freedv-gui never produces spots; this is Longpath's
 //     architectural decision per the Phase 3J-2 design doc Section 4
 //     Flow 2.
 class FreeDVReporterClient : public QObject {
@@ -154,7 +154,7 @@ public:
     // From freedv-gui src/reporting/FreeDVReporter.cpp:653-668 + 670-686 [@77e793a]
     // emit freq_change / tx_report Socket.IO events so the
     // reporter server lists our station's current freq and TX state.
-    // Without these, NereusSDR shows as connected but never broadcasts
+    // Without these, Longpath shows as connected but never broadcasts
     // its operating frequency or transmit indicator — user bench-
     // reported 2026-05-11.
     void setFrequency(quint64 freqHz);
@@ -187,7 +187,7 @@ public:
 
     QString logFilePath() const;
 
-    // Test seams: NEREUS_TESTING-gated wrappers around private wire-
+    // Test seams: LONGPATH_TESTING-gated wrappers around private wire-
     // protocol methods. Production callers go through the QWebSocket
     // signal pipeline (`onWsTextMessage` -> `handleEngineIO` ->
     // `handleSocketIO`); tests bypass the socket and drive the parsers
@@ -217,7 +217,7 @@ signals:
     void stationUpdated(const QString& sid, const Longpath::FreeDVStation& info);
     void stationRemoved(const QString& sid);
 
-    // Spot signal (drives SpotModel via adapter; NereusSDR dual-feed)
+    // Spot signal (drives SpotModel via adapter; Longpath dual-feed)
     void spotReceived(const Longpath::DxSpot& spot);
 
     // Debug stream
@@ -250,7 +250,7 @@ private:
     void onConnectionSuccessful(const QJsonObject& data);
     void onBulkUpdate(const QJsonArray& pairs);
 
-    // Spot synthesis (NereusSDR dual-feed; not present upstream).
+    // Spot synthesis (Longpath dual-feed; not present upstream).
     void emitSpotFromFreqChange(const QString& sid);
     void emitSpotFromRxReport(const QJsonObject& data);
 

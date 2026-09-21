@@ -1,8 +1,8 @@
 // =================================================================
-// src/core/ConnectionDiagnostics.cpp  (NereusSDR)
+// src/core/ConnectionDiagnostics.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-native lightweight QObject that aggregates runtime
+// Longpath-native lightweight QObject that aggregates runtime
 // connection metrics from a bound PgxlConnection or TgxlConnection.
 //
 // Design reference:

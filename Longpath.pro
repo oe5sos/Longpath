@@ -2129,7 +2129,7 @@ SOURCES += build/qrc_resources.cpp \
            third_party/r8brain/r8bbase.cpp \
            third_party/rnnoise/rnnoise_model_init.c \
            build/CMakeFiles/LongpathObjs.dir/cmake_pch.hxx.cxx \
-           build/tests/nereus_test_sandbox_autogen/mocs_compilation.cpp \
+           build/tests/longpath_test_sandbox_autogen/mocs_compilation.cpp \
            build/tests/tst_about_dialog_autogen/mocs_compilation.cpp \
            build/tests/tst_active_peak_hold_autogen/mocs_compilation.cpp \
            build/tests/tst_active_rx_count_live_apply_autogen/mocs_compilation.cpp \
@@ -2858,7 +2858,7 @@ SOURCES += build/qrc_resources.cpp \
            build/tests/tst_wsjtx_decoder_autogen/mocs_compilation.cpp \
            build/tests/tst_xit_offset_application_autogen/mocs_compilation.cpp \
            build-tests/CMakeFiles/NereusSDRObjs.dir/cmake_pch.hxx.cxx \
-           build-tests/tests/nereus_test_sandbox_autogen/mocs_compilation.cpp \
+           build-tests/tests/longpath_test_sandbox_autogen/mocs_compilation.cpp \
            build-tests/tests/tst_about_dialog_autogen/mocs_compilation.cpp \
            build-tests/tests/tst_active_peak_hold_autogen/mocs_compilation.cpp \
            build-tests/tests/tst_active_rx_count_live_apply_autogen/mocs_compilation.cpp \

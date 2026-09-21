@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/core/strip/EqLoudness.h  (NereusSDR)
+// src/core/strip/EqLoudness.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // Louder always sounds better, and that is the problem.
 //
@@ -51,7 +51,7 @@
 // opposite reason.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-08 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

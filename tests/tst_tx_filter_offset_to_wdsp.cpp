@@ -1,6 +1,6 @@
-// no-port-check: NereusSDR-original unit-test file.
+// no-port-check: Longpath-original unit-test file.
 // =================================================================
-// tests/tst_tx_filter_offset_to_wdsp.cpp  (NereusSDR)
+// tests/tst_tx_filter_offset_to_wdsp.cpp  (Longpath)
 // =================================================================
 //
 // TDD for Plan 4 Task 6 (D8) — TX filter debounce + per-mode IQ-space mapping.
@@ -17,12 +17,12 @@
 //   8. dsbModeSymmetric — DSB audio [100, 2900] → IQ [-2900, +2900].
 //   9. cwlMappingMatchesLsb — CWL audio [100, 2900] → IQ [-2900, -100].
 //
-// Per-mode IQ-space mapping source (NereusSDR-original glue, same mapping as
+// Per-mode IQ-space mapping source (Longpath-original glue, same mapping as
 // TxChannel::setTuneTone() TUN bandpass at TxChannel.cpp:505-528):
 //   deskhpsdr/src/transmitter.c:2136-2186 [@120188f]
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-02 — Original implementation for NereusSDR by J.J. Boyd
 //                (KG4VCF), with AI-assisted authoring via Anthropic
 //                Claude Code (Plan 4 D8).

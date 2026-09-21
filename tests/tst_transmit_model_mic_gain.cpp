@@ -1,8 +1,8 @@
-// no-port-check: NereusSDR-original unit-test file.  The "console.cs"
+// no-port-check: Longpath-original unit-test file.  The "console.cs"
 // references below are cite comments documenting which Thetis lines each
 // assertion verifies; no Thetis logic is ported in this test file.
 // =================================================================
-// tests/tst_transmit_model_mic_gain.cpp  (NereusSDR)
+// tests/tst_transmit_model_mic_gain.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for TransmitModel::micGainDb + derived micPreampLinear.
@@ -15,7 +15,7 @@
 //   console.cs:19151-19171 [v2.10.3.13] — mic_gain_min (-40) / mic_gain_max (10)
 //     private int mic_gain_min = -40;  private int mic_gain_max = 10;
 //     (Note: plan §C.1 specifies kMicGainDbMin=-50 / kMicGainDbMax=70 as the
-//     NereusSDR model range; setup.designer.cs shows the spin boxes allow
+//     Longpath model range; setup.designer.cs shows the spin boxes allow
 //     -96..0 for min and 1..70 for max — the model uses a conservative subset.)
 // =================================================================
 
@@ -32,7 +32,7 @@ private slots:
     // ── Default value ───────────────────────────────────────────────────────
 
     void defaultMicGainDb() {
-        // Default -6 dB per plan §0 row 11 (NereusSDR-original safety addition).
+        // Default -6 dB per plan §0 row 11 (Longpath-original safety addition).
         TransmitModel t;
         QCOMPARE(t.micGainDb(), -6);
     }

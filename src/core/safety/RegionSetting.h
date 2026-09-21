@@ -1,7 +1,7 @@
 #pragma once
 
 // =================================================================
-// src/core/safety/RegionSetting.h  (NereusSDR)
+// src/core/safety/RegionSetting.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -15,7 +15,7 @@
 // Einstellung auf der Platte steht, und ein Vertauschen zweier Namen
 // verschoebe stillschweigend das Band eines Bedieners.
 //
-// Der Rest dieser Datei ist NereusSDR-original: Thetis hat keinen
+// Der Rest dieser Datei ist Longpath-original: Thetis hat keinen
 // BandPlanGuard und keine aufgeloeste Region als eigenen Typ.
 //
 // Zur fehlenden Kopfzeile: setup.designer.cs ist eine erzeugte
@@ -35,12 +35,12 @@
 // Datei. Die Partnerdatei loest beides, ohne etwas zu erfinden.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-14 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 //   2026-08-17 — Attribution nachgetragen (Ported-from-Block +
 //                 PROVENANCE-Zeile). Die Datei nannte sich
-//                 „NereusSDR-original", waehrend sie eine woertlich
+//                 „Longpath-original", waehrend sie eine woertlich
 //                 uebernommene Liste fuehrte; scripts/check-new-ports.py
 //                 ist darauf seit dem Anlegen fehlgeschlagen.
 //                 Martin Fischer, AI-assisted via Anthropic Claude.
@@ -138,7 +138,7 @@
 // operator says where he is.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-14 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

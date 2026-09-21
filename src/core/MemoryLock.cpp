@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/MemoryLock.cpp  (NereusSDR-native)
+// src/core/MemoryLock.cpp  (Longpath-native)
 // =================================================================
 // 2026-05-26  J.J. Boyd (KG4VCF), AI-assisted via Anthropic Claude.
 // See MemoryLock.h for design rationale.
@@ -23,7 +23,7 @@
 #include <unistd.h>
 #endif
 
-Q_LOGGING_CATEGORY(lcMemLock, "nereus.memlock")
+Q_LOGGING_CATEGORY(lcMemLock, "longpath.memlock")
 
 namespace Longpath {
 

@@ -1,8 +1,8 @@
 // no-port-check: test fixture asserts HermesLiteBandwidthMonitor — upstream
-// byte-rate compute_bps() port + NereusSDR throttle-detection layer.
+// byte-rate compute_bps() port + Longpath throttle-detection layer.
 //
 // The upstream bandwidth_monitor.{c,h} (mi0bot/MW0LGE [@c26a8a4]) does NOT
-// implement throttle detection. Throttle detection is a NereusSDR addition.
+// implement throttle detection. Throttle detection is a Longpath addition.
 // These tests cover both the byte-rate port and the throttle state machine.
 #include <QtTest/QtTest>
 #include <QSignalSpy>

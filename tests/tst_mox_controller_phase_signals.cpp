@@ -1,8 +1,8 @@
 // =================================================================
-// tests/tst_mox_controller_phase_signals.cpp  (NereusSDR)
+// tests/tst_mox_controller_phase_signals.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original test. No Thetis port at this layer.
+// Longpath-original test. No Thetis port at this layer.
 //
 // Verifies the 6 phase signals added in Phase 3M-1a Task B.4:
 //   txAboutToBegin()        — RX→TX entry
@@ -21,7 +21,7 @@
 // See pre-code review §1.4 for emit point rationale.
 // =================================================================
 
-// no-port-check: NereusSDR-original test file.
+// no-port-check: Longpath-original test file.
 
 #include <QtTest/QtTest>
 #include <QSignalSpy>

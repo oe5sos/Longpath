@@ -1,4 +1,4 @@
-// no-port-check: NereusSDR-original test. Cites Thetis only to anchor the
+// no-port-check: Longpath-original test. Cites Thetis only to anchor the
 // wire byte the assertions read.
 //
 // Codex review, PR #293. Two defects in the widebandExtensionRequestedChanged
@@ -277,7 +277,7 @@ private slots:
     //
     // Fixed in the table rather than by adding a second gate in front of it,
     // and pinned as an invariant over every board rather than as two per-SKU
-    // assertions, so the next row added cannot reintroduce it. NereusSDR has
+    // assertions, so the next row added cannot reintroduce it. Longpath has
     // no Protocol 1 wideband receive path: the only wire push is a
     // P2RadioConnection cast, so any P1 board claiming wideband ADCs buys a
     // bypassed preselector and no stream.

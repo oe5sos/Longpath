@@ -1,6 +1,6 @@
 // no-port-check: test-only — Thetis file names appear only in source-cite
 // comments that document which upstream line each assertion verifies.
-// No Thetis logic is ported here; this file is NereusSDR-original.
+// No Thetis logic is ported here; this file is Longpath-original.
 //
 // Phase 3M-4 mi0bot audit follow-up: per-board PS DDC pair verification.
 //

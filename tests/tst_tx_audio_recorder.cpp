@@ -4,7 +4,7 @@
 // wrong numbers but dropouts and corruption: an allocation mid-callback,
 // a buffer that wraps and silently eats the start of a recording, a
 // clamp that turns the loudest moment into a click.
-// no-port-check: NereusSDR-original. The idea is AetherSDR's
+// no-port-check: Longpath-original. The idea is AetherSDR's
 // ClientPuduMonitor; no code is shared, and the attribution is in
 // TxAudioRecorder.h.
 

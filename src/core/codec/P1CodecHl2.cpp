@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/codec/P1CodecHl2.cpp  (NereusSDR)
+// src/core/codec/P1CodecHl2.cpp  (Longpath)
 // =================================================================
 //
 // Ported from mi0bot-Thetis sources:
@@ -7,7 +7,7 @@
 //   (WriteMainLoop_HL2)
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-20 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                (KG4VCF), with AI-assisted transformation via Anthropic
 //                Claude Code. HL2-only codec; mirrors mi0bot's
@@ -211,7 +211,7 @@ void P1CodecHl2::composeCcForBank(int bank, const CodecContext& ctx,
         // C2 bit 3 = HL2 PA-enable (repurposed `ApolloTuner` slot per mi0bot).
         // mi0bot routes DisablePA() on HL2 through EnableApolloTuner(!bit), so
         // the bit follows tx[0].pa polarity inverted: PA enabled ⇒ bit set,
-        // PA disabled ⇒ bit cleared.  We emit bit set always — NereusSDR has
+        // PA disabled ⇒ bit cleared.  We emit bit set always — Longpath has
         // no user-facing "Disable PA" wiring for HL2 yet, and PA-enabled is
         // the only state in which TUNE / MOX produce RF.  Without this bit,
         // the HL2 FPGA sees MOX asserted with PA-not-enabled and the T/R
@@ -298,7 +298,7 @@ void P1CodecHl2::composeCcForBank(int bank, const CodecContext& ctx,
                 // — higher wire value = more attenuation — so mi0bot performs
                 // the (31 - userDb) flip before storing into the buffer.
                 //
-                // NereusSDR architecture stores the user's raw signed dB in
+                // Longpath architecture stores the user's raw signed dB in
                 // m_txStepAttn (set via P1RadioConnection::setTxStepAttenuation
                 // — no inversion).  We perform the (31 - userDb) inversion
                 // at the codec — same pattern as the RX-path branch
@@ -386,7 +386,7 @@ void P1CodecHl2::composeCcForBank(int bank, const CodecContext& ctx,
         // BOTH bank 11 and bank 16 carry the bit; without bank 16, calcc state
         // machine stalls at LCOLLECT with txEnvMax == rxEnvMax.
         //
-        // BPF2 (HL2's secondary BPF board) state isn't tracked in NereusSDR
+        // BPF2 (HL2's secondary BPF board) state isn't tracked in Longpath
         // yet — emit C1 = 0 (no BPF2 routing) until BPF2 support lands.
         // xvtr_enable is also not yet plumbed — emit 0.  Only the ps_run bit
         // is wired; that's what HL2 firmware needs for PS to engage.
@@ -560,7 +560,7 @@ PsDdcConfig P1CodecHl2::applyPureSignalDdcConfig(
     // mi0bot sets P1_rxcount = 4 unconditionally here
     // (console.cs:8412-8413 [v2.10.3.13-beta2]), in every MOX, diversity and
     // PureSignal state and at every sample rate. This is NOT a port. It is a
-    // NereusSDR-original divergence justified by the link budget, approved by
+    // Longpath-original divergence justified by the link budget, approved by
     // the maintainer on 2026-07-31 conditional on bench verification.
     //
     // p1RxCount becomes the wire C4 field, ((activeRxCount - 1) & 0x0F) << 3,
@@ -782,7 +782,7 @@ PsDdcConfig P1CodecHl2::applyPureSignalDdcConfig(
 //           }
 //       }
 //
-// NereusSDR architectural note:
+// Longpath architectural note:
 //   Streams 0 and 1 map to DDC0 and DDC1, per the mi0bot rx2_enabled blocks
 //   restored below (console.cs:8425-8429 and :8453-8457 [v2.10.3.13-beta2]).
 //   Streams 2-4 are never assigned: no arm of the mi0bot HERMESLITE case

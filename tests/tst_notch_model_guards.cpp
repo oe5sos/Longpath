@@ -1,7 +1,7 @@
 // =================================================================
-// tests/tst_notch_model_guards.cpp  (NereusSDR)
+// tests/tst_notch_model_guards.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure.
+// no-port-check: Longpath-original test infrastructure.
 //
 // TNF section 5.4: NotchModel's ported guards. Add path in this file's
 // first half, edit path in the second.

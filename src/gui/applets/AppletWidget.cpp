@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/applets/AppletWidget.cpp  (NereusSDR)
+// src/gui/applets/AppletWidget.cpp  (Longpath)
 // =================================================================
 //
 // Source attribution (AetherSDR — GPLv3):
@@ -10,10 +10,10 @@
 //
 //   This file is a port or structural derivative of AetherSDR source.
 //   AetherSDR is licensed under the GNU General Public License v3.
-//   NereusSDR is also GPLv3. Attribution follows GPLv3 §5 requirements.
+//   Longpath is also GPLv3. Attribution follows GPLv3 §5 requirements.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-18 — Implemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -21,7 +21,7 @@
 //                 and toggle-button helpers extracted from the AetherSDR
 //                 `src/gui/AppletPanel.{h,cpp}` styling pattern (already
 //                 registered for AppletPanelWidget in Bucket A); this base
-//                 class hoists that styling up so every NereusSDR applet
+//                 class hoists that styling up so every Longpath applet
 //                 (Cat/Cwx/Dvk/Tuner/Eq/Fm/Tx/Rx/PhoneCw/Diversity/Digital/
 //                 PureSignal) inherits identical visuals without
 //                 duplicating the code.
@@ -119,7 +119,10 @@ QHBoxLayout* AppletWidget::sliderRow(const QString& labelText,
     row->addWidget(slider, 1);
 
     if (valueLabel) {
-        valueLabel->setFixedWidth(36);
+        // Mindestbreite, nicht feste Breite: der Wertchip ist seit dem
+        // 2026-09-17 Monospace und breiter — "50 dB" stand als "50 d"
+        // auf dem Phone/CW-Blatt. Waechst mit seinem Text.
+        valueLabel->setMinimumWidth(36);
         valueLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
         valueLabel->setStyleSheet(Style::insetValueStyle());
         row->addWidget(valueLabel);
@@ -133,7 +136,14 @@ QPushButton* AppletWidget::styledButton(const QString& text, int w, int h)
     auto* btn = new QPushButton(text, this);
     btn->setCheckable(true);
     btn->setFixedHeight(h);
-    if (w > 0) { btn->setFixedWidth(w); }
+    // Nie schmaler als sein Text: die gewuenschte Breite ist ein
+    // Mindestmass. Auf den Applet-Blaettern vom 2026-09-17 standen
+    // "MUTI", "ROC", "DEXP" ohne Anfang und "/AC 1" — feste Breiten aus
+    // der Zeit vor der breiteren Knopfpolsterung des Hausstils.
+    if (w > 0) {
+        btn->ensurePolished();
+        btn->setFixedWidth(qMax(w, btn->sizeHint().width()));
+    }
     return btn;
 }
 
@@ -169,11 +179,17 @@ QLabel* AppletWidget::insetValue(const QString& text, int w)
 
 QFrame* AppletWidget::divider()
 {
+    // Eine Rille statt Qt's HLine (2026-09-18): Fusion malte die
+    // "Sunken"-Linie aus der Palette hell — auf dem CAT-Blatt ein
+    // weisser Strich. Jetzt zwei Pixel wie jede Kante im Haus:
+    // oben Schatten, unten Licht.
     auto* line = new QFrame(this);
-    line->setFrameShape(QFrame::HLine);
-    line->setFrameShadow(QFrame::Sunken);
+    line->setFrameShape(QFrame::NoFrame);
     line->setFixedHeight(2);
-    line->setStyleSheet(QStringLiteral("QFrame { color: %1; }").arg(Style::kInsetBorder));
+    line->setStyleSheet(QStringLiteral(
+        "QFrame { border: none; background: qlineargradient(x1:0, y1:0, x2:0, y2:1,"
+        " stop:0 %1, stop:0.5 %1, stop:0.51 %2, stop:1 %2); }")
+        .arg(QLatin1String(Style::kGlassShade), QLatin1String(Style::kGlassLight)));
     return line;
 }
 

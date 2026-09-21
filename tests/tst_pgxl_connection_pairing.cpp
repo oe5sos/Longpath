@@ -1,11 +1,11 @@
 // =================================================================
-// tests/tst_pgxl_connection_pairing.cpp  (NereusSDR)
+// tests/tst_pgxl_connection_pairing.cpp  (Longpath)
 // =================================================================
-// NereusSDR-native test. No AetherSDR equivalent (Tier 2 command surface
-// is NereusSDR-only per design doc §2 and §6.4).
+// Longpath-native test. No AetherSDR equivalent (Tier 2 command surface
+// is Longpath-only per design doc §2 and §6.4).
 // Wire formats from FlexRadio PowerGenius Ethernet API wiki spec.
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-19  Created by J.J. Boyd (KG4VCF), with AI-assisted
 //                 transformation via Anthropic Claude Code.
 //                 Tests: amplifierCreate frame format, flexradioPair
@@ -26,12 +26,12 @@ private slots:
 void PgxlConnectionPairingTest::amplifierCreateEmitsExpectedFrame() {
     Longpath::PgxlConnection conn;
     QSignalSpy frameSpy(&conn, &Longpath::PgxlConnection::testFrameWrittenForTesting);
-    conn.amplifierCreate("NereusSDR-AA:BB:CC", "NereusSDR", "ANT1:PORTA,ANT2:PORTB");
+    conn.amplifierCreate("Longpath-AA:BB:CC", "Longpath", "ANT1:PORTA,ANT2:PORTB");
     QCOMPARE(frameSpy.count(), 1);
     QString frame = frameSpy.takeFirst().at(0).toString();
     QVERIFY(frame.contains("amplifier create"));
-    QVERIFY(frame.contains("model=NereusSDR"));
-    QVERIFY(frame.contains("serial_num=NereusSDR-AA:BB:CC"));
+    QVERIFY(frame.contains("model=Longpath"));
+    QVERIFY(frame.contains("serial_num=Longpath-AA:BB:CC"));
     QVERIFY(frame.contains("ant=ANT1:PORTA,ANT2:PORTB"));
 }
 

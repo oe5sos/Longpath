@@ -1,4 +1,4 @@
-// no-port-check: DiagnosticsSetupPages is independently implemented (NereusSDR-native
+// no-port-check: DiagnosticsSetupPages is independently implemented (Longpath-native
 // Qt6 UI scaffolding); no Thetis C# logic is ported here.
 #pragma once
 

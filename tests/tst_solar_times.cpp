@@ -4,7 +4,7 @@
 // formulas, computed independently, not from a remembered almanac — an
 // almanac time misremembered by ten minutes would have quietly set the
 // tolerance ten minutes too wide.
-// no-port-check: NereusSDR-original.
+// no-port-check: Longpath-original.
 
 #include <QtTest/QtTest>
 #include <QTimeZone>

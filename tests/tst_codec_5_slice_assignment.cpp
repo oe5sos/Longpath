@@ -1,7 +1,7 @@
 // =================================================================
-// tests/tst_codec_5_slice_assignment.cpp  (NereusSDR)
+// tests/tst_codec_5_slice_assignment.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure.
+// no-port-check: Longpath-original test infrastructure.
 //
 // Phase 3F Sub-Epic B Tasks 1-7: verify per-board codec emits correct
 // multi-slice DDC assignments per design §4. Byte-faithful for the
@@ -243,12 +243,12 @@ private slots:
 
     // ── Task 6: 3-slice + 5-slice coverage ───────────────────────────────────
     //
-    // Verifies the NereusSDR-extension path that fills Thetis's idle DDC4-6
+    // Verifies the Longpath-extension path that fills Thetis's idle DDC4-6
     // slots for Slices C, D, E on Saturn-class (7-DDC) hardware.
     // The kStreamToDdc[] table in Task 4's loop maps:
-    //   Slice C (index 2) -> DDC4  [NereusSDR extension; idle in Thetis UpdateDDCs]
-    //   Slice D (index 3) -> DDC5  [NereusSDR extension]
-    //   Slice E (index 4) -> DDC6  [NereusSDR extension]
+    //   Slice C (index 2) -> DDC4  [Longpath extension; idle in Thetis UpdateDDCs]
+    //   Slice D (index 3) -> DDC5  [Longpath extension]
+    //   Slice E (index 4) -> DDC6  [Longpath extension]
 
     void saturn_3_slice_no_ps_no_div_enables_ddc2_3_4()
     {
@@ -315,7 +315,7 @@ private slots:
     {
         // From Thetis console.cs:8220-8303 [v2.10.3.15]: ORIONMKII / G2-class
         // 5-slice: DDC2 through DDC6 all enabled (idle Thetis slots 4-6 filled
-        // by NereusSDR extension; Thetis fills only DDC2 + DDC3 for rx1/rx2).
+        // by Longpath extension; Thetis fills only DDC2 + DDC3 for rx1/rx2).
         P2CodecOrionMkII codec;
         CodecContext ctx{};
         std::array<SliceConfig, 5> slices{};
@@ -651,7 +651,7 @@ private slots:
     //
     // versus the 2-ADC branch at console.cs:8556-8608 [v2.10.3.15] which puts
     // rx1 = 2, rx2 = 3.  Thetis keeps the two families in separate switch
-    // cases; NereusSDR keeps them in separate codecs.
+    // cases; Longpath keeps them in separate codecs.
     //
     // Inline author tags from the cited source region
     // (CLAUDE.md inline-comment-preservation rule):
@@ -914,7 +914,7 @@ private slots:
     //   00 = ADC0, 01 = ADC1, 10 = ADC2 (PS feedback)
     // console.cs:15117-15131 decodes it as `mask = 3 << (ddc * 2)`.
     //
-    // The POLICY (antenna decides the chain) is NereusSDR-original: Thetis
+    // The POLICY (antenna decides the chain) is Longpath-original: Thetis
     // exposes the map as a manual Setup control and never derives it.
     void slices_on_main_antennas_all_stay_on_adc0()
     {
@@ -1101,7 +1101,7 @@ private slots:
     // encodes: `if (radDDC1ADC1.Checked) val += 1 << 2;` with the comment
     // "bits 3 & 2 set to 01 => DDC1 to ADC1". So 4 means DDC0 on ADC0 and
     // DDC1 on ADC1 -- the two physical inputs a diversity pair has to
-    // combine. NereusSDR never seeded CodecContext::adcCtrl on Protocol 2,
+    // combine. Longpath never seeded CodecContext::adcCtrl on Protocol 2,
     // so the pair sat on ADC0 twice and diversity combined one antenna with
     // itself.
     void diversity_pair_straddles_both_adcs_when_seeded_thetis_default()
@@ -1134,7 +1134,7 @@ private slots:
     // A 1-ADC board must never be handed an ADC1 selector. Thetis leaves
     // rx_adc_ctrl1 at 4 globally and relies on each 1-ADC UpdateDDCs branch
     // hardcoding cntrl1 (console.cs:8399 / 8443 / 8455 [v2.10.3.15]);
-    // NereusSDR gates at the seed instead, so the wrong value never enters
+    // Longpath gates at the seed instead, so the wrong value never enters
     // the context in the first place.
     void one_adc_board_seeds_no_second_chain()
     {

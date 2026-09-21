@@ -1,21 +1,21 @@
-// tests/tst_theme_filter.cpp  (NereusSDR)
+// tests/tst_theme_filter.cpp  (Longpath)
 //
-// NereusSDR-original. No Thetis port.
+// Longpath-original. No Thetis port.
 //
 // ── Der Download-Fall, wörtlich ──────────────────────────────────────
 //
 // OE5SOS, 2026-08-15:
 //
-//   „Es werden immer Änderungen von Nereus kommen, die ich dann
-//    downloade und die sich dann automatisch meiner Farben und meinem
-//    Design anpassen sollen."
+//   Es werden immer technische Änderungen kommen, die er dann
+//   herunterlädt und die sich automatisch seinen Farben und seinem
+//   Design anpassen sollen.
 //
 // Das ist der Test dafür. Ein Widget, das von diesem Theme nie gehört
-// hat, mit Nereus-Farben im Stylesheet, wird in die Anwendung gehängt —
+// hat, mit Quelltext-Farben im Stylesheet, wird in die Anwendung gehängt —
 // und muss hinterher die Farben des Betreibers tragen, ohne dass
 // irgendjemand es angefasst hat.
 //
-// Wenn dieser Test durchläuft, ist „Technik Nereus, Design ich" keine
+// Wenn dieser Test durchläuft, ist „Technik vom Programm, Design vom Betreiber" keine
 // Absicht mehr, sondern eine Eigenschaft des Programms.
 
 #include <QtTest>
@@ -73,7 +73,7 @@ private slots:
                                  "\"text\": \"#abcdef\""));
 
         // So sieht ein Widget aus, das mit dem nächsten Download kommt:
-        // Nereus-Farben, ausgeschrieben, kein Wissen über ein Theme.
+        // Quelltext-Farben, ausgeschrieben, kein Wissen über ein Theme.
         QWidget w;
         w.setStyleSheet(QStringLiteral(
             "QWidget { color: #c8d8e8; border: 1px solid #205070; }"));
@@ -90,7 +90,7 @@ private slots:
                  qPrintable(QStringLiteral(
                      "die Textfarbe folgt dem Theme nicht:\n%1").arg(after)));
         QVERIFY2(!after.contains(QStringLiteral("#205070")),
-                 "die Nereus-Farbe steht noch drin");
+                 "die Quelltext-Farbe steht noch drin");
     }
 
     void aChildWidgetIsCaughtToo()
@@ -129,7 +129,7 @@ private slots:
                  qPrintable(w.styleSheet()));
     }
 
-    // ── Ohne Theme-Datei gilt trotzdem die Nereus-Palette ────────────
+    // ── Ohne Theme-Datei gilt trotzdem die Quelltext-Palette ────────────
     //
     // Dieser Test behauptete zuerst „kein Theme, keine Änderung". Das
     // stimmte genau so lange, wie die Tabelle die Identität war, und
@@ -141,8 +141,8 @@ private slots:
     // jedes Widget mit ausgeschriebenem Literal in der alten Palette
     // stehen — und das sind 2000 Stellen.
     //
-    // Was ohne Theme gilt, ist also nicht „nichts", sondern „Nereus".
-    void withoutAThemeTheNereusPaletteStillApplies()
+    // Was ohne Theme gilt, ist also nicht „nichts", sondern „der Quelltext".
+    void withoutAThemeTheSourcePaletteStillApplies()
     {
         Style::Theme::instance().clear();
 

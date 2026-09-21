@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/IoBoardHl2.h  (NereusSDR)
+// src/core/IoBoardHl2.h  (Longpath)
 // =================================================================
 //
 // Ported from mi0bot/OpenHPSDR-Thetis sources:
@@ -17,7 +17,7 @@
 //       REG_FREQUENCY/REG_RF_INPUTS/REG_ANTENNA writes + reads
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-20 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                (KG4VCF), with AI-assisted transformation via Anthropic
 //                Claude Code. Closes Phase 3I-T12 deferred work
@@ -172,7 +172,7 @@ public:
 
     // Upstream i2c_control bitfield per mi0bot network.h:120-124 [@c26a8a4].
     // These describe the GLOBAL bits mi0bot keeps on prn->i2c (ctrl_read,
-    // ctrl_request, ctrl_error, ctrl_read_available). NereusSDR moves
+    // ctrl_request, ctrl_error, ctrl_read_available). Longpath moves
     // ctrl_read / ctrl_request to per-txn flags (I2cTxn::isRead /
     // needsResponse) and ctrl_read_available to I2cReadResponse::available.
     // Kept here as wire-format reference values; not used for queue-entry
@@ -191,7 +191,7 @@ public:
     // prn->i2c struct (ctrl_read / ctrl_request) and are set by I2CReadInitiate
     // / I2CWriteInitiate.  The wire encoder reads the globals at compose time.
     //
-    // NereusSDR moves the flags onto the queue entry so multiple back-to-back
+    // Longpath moves the flags onto the queue entry so multiple back-to-back
     // transactions (e.g. the HW-version probe + firmware-version reads) can
     // each carry their own intent without stomping global state.  The wire
     // encoder still emits exactly the same bytes — it just sources the flags
@@ -245,7 +245,7 @@ public:
     // ── Pending-read FIFO ──
     // Mi0bot tracks one in-flight read at a time (IoBoardHl2.cs:142-143
     // `lastReadRequest`) because I2CReadInitiate refuses new reads while one
-    // is pending. NereusSDR allows multiple reads to be queued back-to-back
+    // is pending. Longpath allows multiple reads to be queued back-to-back
     // (the HL2 firmware processes I2C in queue order and responses arrive in
     // the same order), so we mirror the queue with a parallel FIFO of
     // pending reads — each codec dequeue of a read txn pushes a record;

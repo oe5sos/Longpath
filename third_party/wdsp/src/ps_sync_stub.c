@@ -57,7 +57,7 @@ boydsoftprez@gmail.com
 // real `Project Files/Source/ChannelMaster/sync.c` byte-for-byte port.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-06 — NereusSDR-original glue stub created by J.J. Boyd
 //                 (KG4VCF) during Phase 3M-4 Task 3, with AI-assisted
 //                 implementation via Anthropic Claude Code.  Implements

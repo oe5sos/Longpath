@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/HermesLiteBandwidthMonitor.cpp  (NereusSDR)
+// src/core/HermesLiteBandwidthMonitor.cpp  (Longpath)
 // =================================================================
 //
 // Ported from mi0bot-Thetis sources:
@@ -7,7 +7,7 @@
 //   Project Files/Source/ChannelMaster/bandwidth_monitor.c
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-20 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                (KG4VCF), with AI-assisted transformation via Anthropic
 //                Claude Code. Closes Phase 3I-T12 deferred work
@@ -222,13 +222,13 @@ double HermesLiteBandwidthMonitor::computeBps(std::atomic<int64_t>& totalBytes,
 //    (Mirrors what the upstream caller would do: call GetInboundBps() +
 //    GetOutboundBps() on a poll timer and compare against thresholds.)
 //
-// 2. Run NereusSDR's throttle-detection state machine:
+// 2. Run Longpath's throttle-detection state machine:
 //    - ep6 ingress rate drops to ~0 while ep2 egress is active → silent tick
 //    - kThrottleTickThreshold consecutive silent ticks → throttle asserted
 //    - any tick where ep6 ingress is active → clear throttle + silent counter
 //
 // Source: mi0bot bandwidth_monitor.c:115-123 GetInboundBps/GetOutboundBps [@c26a8a4]
-// Throttle state machine: NereusSDR design — no upstream equivalent.
+// Throttle state machine: Longpath design — no upstream equivalent.
 // ---------------------------------------------------------------------------
 void HermesLiteBandwidthMonitor::tick()
 {
@@ -238,7 +238,7 @@ void HermesLiteBandwidthMonitor::tick()
     const double ep6Bps = computeBps(m_inTotalBytes,  m_inLastBytes,  m_inLastMs,  m_inLastBps);
     const double ep2Bps = computeBps(m_outTotalBytes, m_outLastBytes, m_outLastMs, m_outLastBps);
 
-    // Throttle detection — NereusSDR layer (no upstream equivalent).
+    // Throttle detection — Longpath layer (no upstream equivalent).
     // ep6 silent: ingress rate below 1 byte/sec (0 frames delivered this tick).
     // ep2 active: egress rate above 1 byte/sec (host is still sending commands).
     const bool ep6Silent = (ep6Bps < 1.0);
@@ -296,7 +296,7 @@ void HermesLiteBandwidthMonitor::reset()
     m_inLastBps  = 0.0;
     m_outLastBps = 0.0;
 
-    // NereusSDR throttle state (no upstream equivalent).
+    // Longpath throttle state (no upstream equivalent).
     m_silentTicks       = 0;
     m_throttleEventCount = 0;
     if (m_throttled) {

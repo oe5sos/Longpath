@@ -1,4 +1,4 @@
-// no-port-check: AetherSDR-derived NereusSDR file. Painted pan-layout
+// no-port-check: AetherSDR-derived Longpath file. Painted pan-layout
 // preview tile, structurally from AetherSDR PanLayoutDialog.cpp
 // LayoutThumbnail [@c6481cb]. Registered in
 // docs/attribution/aethersdr-contributor-index.md.
@@ -6,7 +6,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // =================================================================
-// src/gui/widgets/LayoutThumbnail.h  (NereusSDR)
+// src/gui/widgets/LayoutThumbnail.h  (Longpath)
 // =================================================================
 //
 // Ported (structurally) from AetherSDR PanLayoutDialog.cpp [@c6481cb].
@@ -18,7 +18,7 @@
 // citation per docs/attribution/HOW-TO-PORT.md rule 6.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-02  J.J. Boyd / KG4VCF  Bottom-banner + pan-menu epic.
 //                                    Nine layouts rather than
 //                                    AetherSDR's twelve; see design
@@ -43,7 +43,7 @@ struct PanLayoutGeometry {
     QVector<int> rows;
 };
 
-/// Every layout NereusSDR ships, Single first.
+/// Every layout Longpath ships, Single first.
 ///
 /// AetherSDR ships twelve, up to eight pans. The three largest are omitted
 /// because no supported board's independent-pan ceiling

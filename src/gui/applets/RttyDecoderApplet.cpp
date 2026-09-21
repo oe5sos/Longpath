@@ -127,7 +127,8 @@ RttyDecoderApplet::~RttyDecoderApplet()
 void RttyDecoderApplet::buildUI()
 {
     auto* root = new QVBoxLayout(this);
-    root->addWidget(appletTitleBar(QStringLiteral("RTTY DECODER")));
+    // Kein eigener Kopf: Zelle bzw. Fenster tragen ihn (auf dem Blatt
+    // vom 2026-09-17 stand "RTTY DECODER" zweimal uebereinander).
 
     // -- Row 1: status ---------------------------------------------------
     auto* statusRow = new QHBoxLayout();
@@ -146,9 +147,13 @@ void RttyDecoderApplet::buildUI()
     m_lockCapsule = new QLabel(QStringLiteral("KEIN LOCK"), this);
     m_lockCapsule->setAlignment(Qt::AlignCenter);
     m_lockCapsule->setFixedHeight(20);
+    // Schrift per setFont auf der Leiter (9 px versal), nicht als
+    // "font-size: 10px" im Stylesheet — die drei Stellen hier waren die
+    // letzten Groessen ausserhalb der Leiter (Drift-Ratsche).
+    m_lockCapsule->setFont(Style::capsFont(font(), Style::kFontCaption));
     m_lockCapsule->setStyleSheet(QStringLiteral(
         "QLabel { background: %1; color: %2; border: 1px solid %3;"
-        " border-radius: 10px; padding: 0 10px; font-size: 9px; }")
+        " border-radius: 10px; padding: 0 10px; }")
         .arg(Style::kBadgeOffBg, Style::kTextTertiary, Style::kBorder));
     statusRow->addWidget(m_lockCapsule);
     root->addLayout(statusRow);
@@ -341,13 +346,13 @@ void RttyDecoderApplet::onStatsUpdated(float markLevel, float spaceLevel, float 
         m_lockCapsule->setText(QStringLiteral("LOCK"));
         m_lockCapsule->setStyleSheet(QStringLiteral(
             "QLabel { background: %1; color: %2; border: 1px solid %3;"
-            " border-radius: 10px; padding: 0 10px; font-size: 9px; }")
+            " border-radius: 10px; padding: 0 10px; }")
             .arg(Style::kGreenBg, Style::kGreenText, Style::kGreenBorder));
     } else {
         m_lockCapsule->setText(QStringLiteral("KEIN LOCK"));
         m_lockCapsule->setStyleSheet(QStringLiteral(
             "QLabel { background: %1; color: %2; border: 1px solid %3;"
-            " border-radius: 10px; padding: 0 10px; font-size: 9px; }")
+            " border-radius: 10px; padding: 0 10px; }")
             .arg(Style::kBadgeOffBg, Style::kTextTertiary, Style::kBorder));
     }
 }

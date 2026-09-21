@@ -1,8 +1,8 @@
-// no-port-check: unit tests for NereusSDR-original auto-zoom math;
+// no-port-check: unit tests for Longpath-original auto-zoom math;
 // no Thetis logic ported (auto-zoom has no Thetis equivalent).
 //
 // =================================================================
-// tests/tst_auto_zoom_fft.cpp  (NereusSDR)
+// tests/tst_auto_zoom_fft.cpp  (Longpath)
 // =================================================================
 //
 // Phase 2-polish-3 -- exercise the auto-zoom math that scales FFT
@@ -25,7 +25,7 @@
 // kept in sync.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-06 -- Created in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                  (KG4VCF), with AI-assisted transformation via
 //                  Anthropic Claude Code.
@@ -48,7 +48,7 @@ struct AutoZoomResult {
     bool replanned;  // true when ratio fell outside hysteresis band
 };
 
-// Auto-zoom cap (NereusSDR-original): bounds the buffer-fill pause on
+// Auto-zoom cap (Longpath-original): bounds the buffer-fill pause on
 // every replan to ~85 ms at 768 kHz DDC.  Slider may go higher manually
 // (up to FFTEngine::kMaxFftSize=262144); auto-zoom won't push above the
 // cap unless the slider already did.

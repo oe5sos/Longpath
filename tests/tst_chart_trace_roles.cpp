@@ -1,6 +1,6 @@
-// tests/tst_chart_trace_roles.cpp  (NereusSDR)
+// tests/tst_chart_trace_roles.cpp  (Longpath)
 //
-// NereusSDR-original. No Thetis port.
+// Longpath-original. No Thetis port.
 //
 // ── Der Notbehelf darf nie zum Einsatz kommen ────────────────────────
 //

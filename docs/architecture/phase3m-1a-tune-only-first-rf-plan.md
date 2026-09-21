@@ -24,7 +24,7 @@ Three decisions from the planning conversation, all baked into this plan:
 2. **Risk mitigation = no extra gate.** Trust 3M-0's safety nets
    (`SwrProtectionController`, `BandPlanGuard`, `TxInhibitMonitor`,
    PA Status badge, status-bar TX Inhibit indicator). No
-   `NEREUS_ENABLE_TX` compile flag. No first-launch acknowledgment
+   `LONGPATH_ENABLE_TX` compile flag. No first-launch acknowledgment
    dialog. Per `feedback_dont_ask_to_stop`, JJ has full bench oversight
    and will stop if anything looks off.
 3. **Bench-test cadence = pre-merge gate.** Branch implementation runs
@@ -66,7 +66,7 @@ Three decisions from the planning conversation, all baked into this plan:
 **Inline cite stamp:** `[v2.10.3.13]` (Thetis tag) or `[@<shortsha>]`
 when no tagged release applies. The verifier script
 (`scripts/verify-inline-tag-preservation.py`) runs in the pre-commit
-hook chain — `NEREUS_THETIS_DIR=/Users/j.j.boyd/Thetis` must be set in
+hook chain — `LONGPATH_THETIS_DIR=/Users/j.j.boyd/Thetis` must be set in
 the shell before each commit.
 
 **Codex review patterns to watch (from PR #139):**

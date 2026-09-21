@@ -1,6 +1,6 @@
-// no-port-check: NereusSDR-original unit-test file.
+// no-port-check: Longpath-original unit-test file.
 // =================================================================
-// tests/tst_para_eq_envelope.cpp  (NereusSDR)
+// tests/tst_para_eq_envelope.cpp  (Longpath)
 // =================================================================
 //
 // Phase 3M-3a-ii follow-up Batch 6 — gzip+base64url envelope tests.
@@ -17,7 +17,7 @@
 //                                                 path so a Thetis-
 //                                                 produced blob is
 //                                                 indistinguishable from
-//                                                 a NereusSDR-produced
+//                                                 a Longpath-produced
 //                                                 one once we decode it.
 //   §6  Invalid base64                         — nullopt
 //   §7  Valid base64, non-gzip bytes           — nullopt
@@ -81,7 +81,7 @@ private slots:
     // From Thetis Common.cs:1747 + :1766 [v2.10.3.13]:
     //   "if (string.IsNullOrEmpty(...)) return null;"
     //
-    // NereusSDR collapses .NET null -> empty QString on encode and
+    // Longpath collapses .NET null -> empty QString on encode and
     // -> nullopt on decode (decode's empty input is NOT a valid blob).
     // =========================================================================
 
@@ -141,7 +141,7 @@ private slots:
     // pinned to mtime=0 (matches what zlib's deflateInit2 emits and what
     // .NET's GZipStream typically emits).  The decode path is fully
     // independent of the encode side — it just inflates whatever it gets
-    // — so this test verifies that NereusSDR can read a Thetis-produced
+    // — so this test verifies that Longpath can read a Thetis-produced
     // blob even if our own encode side ever drifts to a different
     // compression level / mtime / OS byte.
     //
@@ -170,7 +170,7 @@ private slots:
     // §6  Invalid base64 input -> nullopt
     //
     // Thetis raises FormatException on bad-length base64 and lets the
-    // GZipStream constructor raise on bad gzip headers.  NereusSDR
+    // GZipStream constructor raise on bad gzip headers.  Longpath
     // collapses both to nullopt — callers don't need to distinguish
     // because in both cases the right move is "treat as empty profile".
     //

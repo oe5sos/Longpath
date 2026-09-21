@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 //
-// tst_puresignal_caps.cpp (NereusSDR)
+// tst_puresignal_caps.cpp  (Longpath)
 //
 // Phase 3M-4 PureSignal port — Task 1: BoardCapabilities (psDefaultPeak +
 // psSampleRate).  Verifies the per-board PureSignal hardware-default peak
@@ -30,11 +30,11 @@
 //   [v2.10.3.13-beta2]: "HL2 can work at a high sample rate", uses
 //   Rate[0]=rx1_rate during PS).
 //
-// HL2 hasPureSignal: currently false in NereusSDR's caps table (Phase 3M-4
+// HL2 hasPureSignal: currently false in Longpath's caps table (Phase 3M-4
 // PureSignal coordinator wires HL2 in a follow-up task).  This test only
 // asserts the cap-field values (forward-compat populated), not the gate.
 //
-// no-port-check: this is a NereusSDR-original test fixture asserting cap
+// no-port-check: this is a Longpath-original test fixture asserting cap
 // fields against Thetis source rules; not itself a port of any Thetis file.
 
 #include <QtTest>

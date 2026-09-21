@@ -1,11 +1,11 @@
 // =================================================================
-// src/gui/applets/BandwidthFilterApplet.cpp  (NereusSDR)
+// src/gui/applets/BandwidthFilterApplet.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. Begruendung steht im Header.
+// Longpath-original. Begruendung steht im Header.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-20 — Original fuer NereusSDR von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
 // =================================================================
@@ -27,6 +27,7 @@
 #include <QVBoxLayout>
 
 #include <algorithm>
+#include <cmath>
 
 namespace Longpath {
 
@@ -42,6 +43,75 @@ QColor accentFor(int index)
     case 1:  return QColor(Style::kGreenText);   // gruen
     case 2:  return QColor(Style::kAmberText);   // bernstein
     default: return QColor(Style::kTextSecondary);
+    }
+}
+
+// ── LOW und HIGH sind AUDIO-Begriffe ────────────────────────────────
+//
+// Der Betreiber am 2026-09-17, auf 40 m LSB: "100 - 3000 ergibt
+// 2900?!?!?" — und davor: "hört sich auf 40 meter katastrophal an".
+//
+// Was passiert war: die Felder zeigten seit dem 2026-09-03 die
+// BETRAEGE der inneren Kanten (filterLow, filterHigh), und die sind
+// bei LSB beide negativ: filterLow = -2950 ist die FERNE Kante
+// (Audio-Hochschnitt), filterHigh = -150 die NAHE (Audio-Tiefschnitt).
+// Im Feld "LOW" stand darum 2950 und in "HIGH" 150 — genau verkehrt
+// zu dem, was jeder Funker unter Low Cut und High Cut versteht. Wer
+// dann "LOW 100" tippte, setzte in Wahrheit die FERNE Kante auf -100,
+// und WIDTH 3000 zaehlte von dort nach OBEN: -100 … +2900, quer ueber
+// den Traeger auf das falsche Seitenband. Bei USB fiel das nicht auf,
+// weil dort innere Zaehlrichtung und Audiorichtung zusammenfallen —
+// "20 meter passt".
+//
+// Deshalb hier die eine Uebersetzung, an der alles andere haengt:
+//
+//   LOW  = die Kante NAHE am Traeger   (Audio-Tiefschnitt)
+//   HIGH = die Kante FERN vom Traeger  (Audio-Hochschnitt)
+//
+// fuer beide Seitenbaender. Bei USB ist das filterLow/filterHigh, bei
+// LSB umgekehrt |filterHigh|/|filterLow|. Zweiseitige Betriebsarten
+// (AM/SAM/FM/DSB/SPEC/DRM) behalten LOW = negative, HIGH = positive
+// Kante — dort gibt es kein "nah" und "fern".
+//
+// Das Vorzeichen bleibt weiterhin unsichtbar ("minus darf nie",
+// 2026-09-03) — es steckt jetzt in der Betriebsart, nicht im Feld.
+enum class Sideband { Lower, Upper, Both };
+
+Sideband sidebandOf(DSPMode mode)
+{
+    switch (mode) {
+    case DSPMode::LSB:
+    case DSPMode::CWL:
+    case DSPMode::DIGL:
+    case DSPMode::RADE_L:
+        return Sideband::Lower;
+    case DSPMode::USB:
+    case DSPMode::CWU:
+    case DSPMode::DIGU:
+    case DSPMode::RADE_U:
+        return Sideband::Upper;
+    default:
+        return Sideband::Both;
+    }
+}
+
+/// Die nahe Kante (Audio-Tiefschnitt) als Betrag.
+int nearEdgeHz(const SliceModel* s)
+{
+    switch (sidebandOf(s->dspMode())) {
+    case Sideband::Lower: return qAbs(s->filterHigh());
+    case Sideband::Upper: return qAbs(s->filterLow());
+    default:              return qAbs(s->filterLow());
+    }
+}
+
+/// Die ferne Kante (Audio-Hochschnitt) als Betrag.
+int farEdgeHz(const SliceModel* s)
+{
+    switch (sidebandOf(s->dspMode())) {
+    case Sideband::Lower: return qAbs(s->filterLow());
+    case Sideband::Upper: return qAbs(s->filterHigh());
+    default:              return qAbs(s->filterHigh());
     }
 }
 
@@ -83,18 +153,36 @@ void BandwidthFilterApplet::buildUI()
     // ── Die Zahlen ───────────────────────────────────────────────────
     //
     // Sie gelten fuer die AKTIVE Scheibe. Eine Zeile je Empfaenger
-    // waere ehrlicher, aber bei vier Scheiben unlesbar; die
-    // Beschriftung sagt, welche gemeint ist.
+    // waere ehrlicher, aber bei vier Scheiben unlesbar; die Kapsel
+    // in der Flaeche ("RX1 · LSB") sagt, welche gemeint ist.
+    //
+    // Glas & Tiefe (2026-09-17, Stilblatt 3): jede Bedienung steht in
+    // einer benannten Gruppe — eine Versalzeile UEBER dem Feld, nicht
+    // ein fettes Wort daneben (Hausstil Regel 1). Die Zahlen sitzen in
+    // Glasfeldern ohne Pfeile, Monospace (Regel 4). Die Betriebsart
+    // stand hier links als Label; sie steht jetzt in der Kapsel der
+    // Flaeche, wo sie zur Kurve gehoert.
     {
         auto* row = new QHBoxLayout;
-        row->setSpacing(6);
+        row->setSpacing(22);
 
-        auto label = [&](const QString& t) {
+        auto caps = [&](const QString& t) {
             auto* l = new QLabel(t, body);
-            l->setStyleSheet(QStringLiteral(
-                "QLabel { color: %1; font-size: 11px; font-weight: bold; }")
+            l->setFont(Style::capsFont(body->font(), Style::kFontCaption));
+            l->setStyleSheet(QStringLiteral("QLabel { color: %1; }")
                 .arg(QLatin1String(Style::kTextScale)));
             return l;
+        };
+
+        // Eine Gruppe: Versalzeile, darunter das Ding selbst.
+        auto group = [&](const QString& title, QWidget* content) {
+            auto* w = new QWidget(body);
+            auto* v = new QVBoxLayout(w);
+            v->setContentsMargins(0, 0, 0, 0);
+            v->setSpacing(3);
+            v->addWidget(caps(title));
+            v->addWidget(content);
+            return w;
         };
 
         auto box = [&](int lo, int hi) {
@@ -102,29 +190,20 @@ void BandwidthFilterApplet::buildUI()
             sb->setRange(lo, hi);
             sb->setSingleStep(50);
             sb->setSuffix(QStringLiteral(" Hz"));
+            sb->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+            sb->setButtonSymbols(QAbstractSpinBox::NoButtons);
             // Nachgiebig statt fest: 92 Punkte sind die Wunschbreite,
-            // 62 die Schmerzgrenze. Vorher war es setFixedWidth(92) —
-            // damit hatte die Bedienzeile einen harten Boden von rund
-            // 700 Punkten, und wer das Fenster kleiner zog, bekam
-            // einen Rollbalken statt eines kleineren Inhalts.
-            sb->setMinimumWidth(62);
+            // 74 die Schmerzgrenze (siehe Umbruch in resizeEvent) — bei 62
+            // stand auf dem 540-Punkte-Blatt "2900 H" ohne z. Monospace
+            // 11 (kFontSmall), nicht 13: "2900 Hz" braucht so 46 Punkte
+            // plus Polsterung und passt in die Schmerzgrenze.
+            sb->setMinimumWidth(74);
             sb->setMaximumWidth(92);
             sb->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
-            sb->setStyleSheet(Style::spinBoxStyle());
+            sb->setFont(Style::monoFont(body->font(), Style::kFontSmall));
+            sb->setStyleSheet(Style::glassFieldStyle());
             sb->setKeyboardTracking(false);   // erst bei Enter/Verlassen
             return sb;
-        };
-
-        m_modeLbl = new QLabel(QStringLiteral("—"), body);
-        m_modeLbl->setStyleSheet(QStringLiteral(
-            "QLabel { color: %1; font-size: 11px; font-weight: bold; }")
-            .arg(QLatin1String(Style::kTextPrimary)));
-        row->addWidget(m_modeLbl);
-
-        auto addShrinkableLabel = [&](const QString& t) {
-            QLabel* l = label(t);
-            m_shrinkableLabels.append(l);
-            row->addWidget(l);
         };
 
         // Betreiber 2026-09-03, mit Nachdruck: "minus darf nie!!!!!" —
@@ -136,10 +215,9 @@ void BandwidthFilterApplet::buildUI()
         // intern erhalten (siehe die beiden valueChanged-Anschluesse
         // unten) und wird beim Zurueckschreiben ins Modell wieder
         // angelegt.
-        addShrinkableLabel(QStringLiteral("LOW"));
         m_lowBox = box(0, SliceModel::kMaxFilterWidthHz);
         m_lowBox->setObjectName(QStringLiteral("bwFilterLow"));
-        row->addWidget(m_lowBox);
+        row->addWidget(group(QStringLiteral("Low"), m_lowBox));
 
         // Betreiber 2026-09-03: "bandbreite solle von 50-3000 sein" /
         // "Ende zwischen 2700 bis 3000 standard, maximum 8000 (10000)
@@ -154,19 +232,17 @@ void BandwidthFilterApplet::buildUI()
         // den breitesten ueberhaupt erreichbaren Fall (beide Kanten am
         // Anschlag) und liegt fuer SSB/CW in der Praxis laengst
         // innerhalb der 10000, die der Betreiber nannte.
-        addShrinkableLabel(QStringLiteral("WIDTH"));
         m_widthBox = box(50, 2 * SliceModel::kMaxFilterWidthHz);
         m_widthBox->setObjectName(QStringLiteral("bwFilterWidth"));
         m_widthBox->setToolTip(QStringLiteral(
-            "Type a width and the edges land where this mode wants them: "
-            "CW centred on the sidetone, SSB anchored at the default low "
-            "cut, AM symmetric around zero."));
-        row->addWidget(m_widthBox);
+            "Type a width: SSB keeps the edge you set last and moves the "
+            "other (LOW 100 + 3000 = HIGH 3100, on either sideband), CW "
+            "stays centred on the sidetone, AM symmetric around zero."));
+        row->addWidget(group(QStringLiteral("Width"), m_widthBox));
 
-        addShrinkableLabel(QStringLiteral("HIGH"));
         m_highBox = box(0, SliceModel::kMaxFilterWidthHz);
         m_highBox->setObjectName(QStringLiteral("bwFilterHigh"));
-        row->addWidget(m_highBox);
+        row->addWidget(group(QStringLiteral("High"), m_highBox));
 
         // ── VAR1 und VAR2 ────────────────────────────────────────
         //
@@ -177,12 +253,16 @@ void BandwidthFilterApplet::buildUI()
         //
         // Ein Klick holt zurueck, ein Rechtsklick legt ab. Ein leerer
         // Platz sagt das auch, statt still nichts zu tun.
+        auto* memRow = new QWidget(body);
+        auto* memLay = new QHBoxLayout(memRow);
+        memLay->setContentsMargins(0, 0, 0, 0);
+        memLay->setSpacing(5);
         for (int i = 0; i < SliceModel::kVarSlots; ++i) {
             QPushButton* b = styledButton(
-                QStringLiteral("VAR %1").arg(i + 1), 56);
+                QStringLiteral("VAR %1").arg(i + 1), 56, 26);
             b->setContextMenuPolicy(Qt::CustomContextMenu);
             m_varBtns.append(b);
-            row->addWidget(b);
+            memLay->addWidget(b);
 
             connect(b, &QPushButton::clicked, this, [this, i]() {
                 if (SliceModel* s = activeSlice()) { s->recallVarFilter(i); }
@@ -195,18 +275,23 @@ void BandwidthFilterApplet::buildUI()
             });
         }
 
-        m_resetBtn = styledButton(QStringLiteral("↺ Centre"), 78);
+        m_resetBtn = styledButton(QStringLiteral("↺ Centre"), 78, 26);
         m_resetBtn->setToolTip(QStringLiteral(
             "Put the passband back where this mode wants it — on the "
             "sidetone for CW, at the default low cut for SSB."));
-        row->addWidget(m_resetBtn);
+        memLay->addWidget(m_resetBtn);
+        m_memoryGroup = group(QStringLiteral("Memory"), memRow);
+        m_memoryGroup->setObjectName(QStringLiteral("bwFilterMemoryGroup"));
+        row->addWidget(m_memoryGroup);
 
         row->addStretch(1);
 
-        m_spanBtn = styledButton(QStringLiteral("AUTO"), 62);
+        m_spanBtn = styledButton(QStringLiteral("AUTO"), 62, 26);
         m_spanBtn->setToolTip(QStringLiteral(
             "How much band the panes show. Click to cycle."));
-        row->addWidget(m_spanBtn);
+        m_spanGroup = group(QStringLiteral("Span"), m_spanBtn);
+        m_spanGroup->setObjectName(QStringLiteral("bwFilterSpanGroup"));
+        row->addWidget(m_spanGroup);
 
         m_ctrlRow = row;
         col->addLayout(row);
@@ -214,7 +299,7 @@ void BandwidthFilterApplet::buildUI()
         // Zweite Reihe, zunaechst leer. Sie fuellt sich erst, wenn es
         // eng wird (resizeEvent) — breit bleibt alles wie bisher.
         m_ctrlRow2 = new QHBoxLayout;
-        m_ctrlRow2->setSpacing(6);
+        m_ctrlRow2->setSpacing(22);
         col->addLayout(m_ctrlRow2);
     }
 
@@ -245,66 +330,75 @@ void BandwidthFilterApplet::buildUI()
             SliceModel* s = activeSlice();
             if (!s) { return; }
             m_lastEditedEdge = LastEditedEdge::Low;
-            const int prev = s->filterLow();
-            const bool negative = prev != 0 ? (prev < 0) : (s->filterHigh() <= 0);
-            s->setFilterLow(negative ? -v : v);
+            switch (sidebandOf(s->dspMode())) {
+            case Sideband::Lower: s->setFilterHigh(-v); break;   // nahe Kante
+            case Sideband::Upper: s->setFilterLow(v);   break;   // nahe Kante
+            default: {
+                // Zweiseitig: LOW ist die negative Kante. Nur wenn sie
+                // zufaellig exakt auf 0 stand, entscheidet die andere
+                // Kante ueber die Seite.
+                const int prev = s->filterLow();
+                const bool negative = prev != 0 ? (prev < 0) : (s->filterHigh() <= 0);
+                s->setFilterLow(negative ? -v : v);
+                break;
+            }
+            }
         });
         connect(m_highBox, &QSpinBox::valueChanged, this, [this](int v) {
             if (m_updatingFromModel) { return; }
             SliceModel* s = activeSlice();
             if (!s) { return; }
             m_lastEditedEdge = LastEditedEdge::High;
-            const int prev = s->filterHigh();
-            const bool negative = prev != 0 ? (prev < 0) : (s->filterLow() < 0);
-            s->setFilterHigh(negative ? -v : v);
+            switch (sidebandOf(s->dspMode())) {
+            case Sideband::Lower: s->setFilterLow(-v);  break;   // ferne Kante
+            case Sideband::Upper: s->setFilterHigh(v);  break;   // ferne Kante
+            default: {
+                const int prev = s->filterHigh();
+                const bool negative = prev != 0 ? (prev < 0) : (s->filterLow() < 0);
+                s->setFilterHigh(negative ? -v : v);
+                break;
+            }
+            }
         });
         connect(m_widthBox, &QSpinBox::valueChanged, this, [this](int v) {
             if (m_updatingFromModel) { return; }
             SliceModel* s = activeSlice();
             if (!s) { return; }
-            // Betreiber 2026-09-03, mit Nachdruck, nach einem konkreten
-            // Nachvollzug: LOW auf 50 gesetzt, WIDTH auf 5000 gesetzt,
-            // "dann erscheint bei LOW automatisch 5150" -- die Regel je
-            // Betriebsart steckte bislang in SliceModel::setFilterWidth()
-            // (widthToEdges()), das LSB/USB immer am VORGABEWERT der
-            // Betriebsart verankert (z.B. -150 Hz fuer LSB), unabhaengig
-            // davon, was gerade von Hand in LOW/HIGH stand -- die Kante,
-            // die der Bedienende zuletzt selbst gesetzt hatte, ging dabei
-            // stillschweigend verloren. Hier stattdessen: GENAU DIE Kante
-            // (m_lastEditedEdge) bleibt stehen, nur die andere folgt der
-            // neuen Breite.
+            // Betreiber 2026-09-03: "ich muss beide Werte frei eingeben
+            // koennen" — die Kante, die zuletzt von Hand gesetzt wurde,
+            // bleibt stehen, die andere folgt der Breite. Seit dem
+            // 2026-09-17 in AUDIO-Begriffen (siehe sidebandOf): LOW ist
+            // die nahe Kante, HIGH die ferne, bei beiden Seitenbaendern.
             //
-            // NUR fuer LSB/USB/RADE_L/RADE_U -- widthToEdges() selbst
-            // behandelt CWL/CWU/DIGL/DIGU anders (Mitte bleibt stehen,
-            // beide Kanten wandern gemeinsam, SliceModel.cpp:633-640),
-            // weil dort der Mithoerton in der Mitte sitzt, keine Kante
-            // ein fester Ankerpunkt ist. Codereview 2026-09-03 (gefunden,
-            // nicht gemeldet): eine fruehere Fassung dieses switch zaehlte
-            // CWL/CWU/DIGL/DIGU faelschlich zu LSB/USB und verankerte dort
-            // eine Kante -- tst_bandwidth_filter_applet.cpp faengt genau
-            // das ab ("bei CW muss die Mitte auf dem Mithoerton
-            // stehenbleiben"). Symmetrische Betriebsarten (AM/SAM/FM/DSB)
-            // und alles Kuenftige behalten ebenfalls die bisherige,
-            // Mitten-erhaltende Regel -- dort ist "welche Kante zuletzt"
-            // keine sinnvolle Frage, beide Kanten gehoeren untrennbar zur
-            // Mitte.
+            //   LOW zuletzt:  HIGH = LOW + WIDTH      (100 + 3000 = 3100)
+            //   HIGH zuletzt: LOW  = HIGH - WIDTH; reicht das unter den
+            //                 Traeger, bleibt LOW bei 0 und HIGH wird
+            //                 die Breite — nie ueber den Traeger hinweg.
+            //
+            // NUR fuer LSB/USB/RADE_L/RADE_U. CWL/CWU/DIGL/DIGU halten
+            // die Mitte (Mithoerton bzw. Click-Tune-Versatz,
+            // SliceModel::widthToEdges), die zweiseitigen Betriebsarten
+            // ebenso — dort ist "welche Kante zuletzt" keine Frage.
             switch (s->dspMode()) {
             case DSPMode::LSB:
             case DSPMode::RADE_L:
-                if (m_lastEditedEdge == LastEditedEdge::Low) {
-                    s->setFilter(s->filterLow(), s->filterLow() + v);
-                } else {
-                    s->setFilter(s->filterHigh() - v, s->filterHigh());
-                }
-                break;
             case DSPMode::USB:
-            case DSPMode::RADE_U:
-                if (m_lastEditedEdge == LastEditedEdge::High) {
-                    s->setFilter(s->filterHigh() - v, s->filterHigh());
+            case DSPMode::RADE_U: {
+                int nearHz = nearEdgeHz(s);
+                int farHz  = farEdgeHz(s);
+                if (m_lastEditedEdge == LastEditedEdge::Low) {
+                    farHz = nearHz + v;
                 } else {
-                    s->setFilter(s->filterLow(), s->filterLow() + v);
+                    nearHz = farHz - v;
+                    if (nearHz < 0) { nearHz = 0; farHz = v; }
+                }
+                if (sidebandOf(s->dspMode()) == Sideband::Lower) {
+                    s->setFilter(-farHz, -nearHz);
+                } else {
+                    s->setFilter(nearHz, farHz);
                 }
                 break;
+            }
             default:
                 s->setFilterWidth(v);
                 break;
@@ -447,10 +541,13 @@ void BandwidthFilterApplet::wirePane(BandwidthFilterPane* pane, int sliceIndex)
             const int prevHigh = s->filterHigh();
             const int lowDelta = qAbs(low - prevLow);
             const int highDelta = qAbs(high - prevHigh);
+            // In FELD-Begriffen (LOW = nahe Kante): bei LSB ist die
+            // innere Low-Kante die ferne, also das HIGH-Feld.
+            const bool lower = sidebandOf(s->dspMode()) == Sideband::Lower;
             if (lowDelta > highDelta) {
-                m_lastEditedEdge = LastEditedEdge::Low;
+                m_lastEditedEdge = lower ? LastEditedEdge::High : LastEditedEdge::Low;
             } else if (highDelta > lowDelta) {
-                m_lastEditedEdge = LastEditedEdge::High;
+                m_lastEditedEdge = lower ? LastEditedEdge::Low : LastEditedEdge::High;
             }
             s->setFilterByHand(low, high);
         }
@@ -484,14 +581,18 @@ void BandwidthFilterApplet::refreshPane(int i)
 {
     if (i < 0 || i >= m_panes.size()) { return; }
     BandwidthFilterPane* pane = m_panes.at(i);
-    pane->setLabel(QStringLiteral("RX%1").arg(i + 1));
 
     SliceModel* s = sliceAt(i);
     if (!s) {
         // Kein Empfaenger dahinter: die Flaeche steht da und sagt es.
+        pane->setLabel(QStringLiteral("RX%1").arg(i + 1));
         pane->setHasFrequency(false);
         return;
     }
+    // Die Kapsel traegt die Betriebsart mit: sie gehoert zur Kurve,
+    // nicht in die Bedienzeile (Glas & Tiefe, 2026-09-17).
+    pane->setLabel(QStringLiteral("RX%1 · %2").arg(i + 1)
+                       .arg(SliceModel::modeName(s->dspMode())));
 
     pane->setFilter(s->filterLow(), s->filterHigh());
 
@@ -570,36 +671,45 @@ void BandwidthFilterApplet::refreshVarButtons()
     }
 }
 
-// Welche Kante SliceModel::widthToEdges() fuer diese Betriebsart als
-// Anker behandelt (High fuer die LSB-Familie: high=-defaultLowCut(),
-// low folgt; Low fuer die USB-Familie: low=defaultLowCut(), high
-// folgt -- SliceModel.cpp widthToEdges()). Nur fuer die beiden
-// Betriebsartfamilien sinnvoll, die der WIDTH-Anschluss unten selbst
-// unterscheidet; fuer alles andere (AM/FM/SAM/DSB/SPEC/DRM) ist der
-// Rueckgabewert bedeutungslos, weil jener Zweig m_lastEditedEdge gar
-// nicht befragt.
+// Welche FELD-Kante als Anker gilt, solange der Bedienende noch keine
+// selbst gesetzt hat: die nahe (LOW). So rechnet auch
+// SliceModel::widthToEdges — LSB verankert high=-defaultLowCut(), USB
+// low=defaultLowCut(), beides die nahe Kante. Fuer alles andere
+// (CW/DIG/AM/FM/...) fragt der WIDTH-Anschluss den Wert nicht ab.
 BandwidthFilterApplet::LastEditedEdge
 BandwidthFilterApplet::naturalAnchorEdge(DSPMode mode)
 {
-    // Muss mit dem switch im m_widthBox-Anschluss uebereinstimmen: nur
-    // LSB/RADE_L und USB/RADE_U fragen m_lastEditedEdge dort ueberhaupt
-    // ab (CWL/CWU/DIGL/DIGU/AM/FM/... nehmen den Mitten-erhaltenden
-    // Standardpfad und ignorieren diesen Wert) -- der Rueckgabewert fuer
-    // alles andere ist ohne Wirkung, bleibt hier aber auf High (die
-    // LSB-Seite) als harmlose Vorgabe.
-    switch (mode) {
-    case DSPMode::USB:
-    case DSPMode::RADE_U:
-        return LastEditedEdge::Low;
-    default:
-        return LastEditedEdge::High;
-    }
+    Q_UNUSED(mode);
+    return LastEditedEdge::Low;
 }
 
 void BandwidthFilterApplet::refreshNumbers()
 {
     SliceModel* s = activeSlice();
-    if (!s || !m_lowBox) { return; }
+    if (!m_lowBox) { return; }
+
+    // ── Ohne Scheibe: ein Strich, keine Null ────────────────────────
+    //
+    // Hausstil Regel 7: "Unbekannt ist ein Strich, keine Null — eine
+    // Null sieht aus wie eine Messung." Ohne Funkgeraet standen hier
+    // "0 Hz / 50 Hz / 0 Hz" (die Feldminima), als waere das ein
+    // eingestellter Durchlass. QSpinBox zeigt am Minimum den
+    // specialValueText; der wird hier gesetzt und mit der ersten
+    // Scheibe wieder geloescht, damit ein echtes "0 Hz" (AM, LOW) nicht
+    // als Strich erscheint.
+    for (QSpinBox* sb : {m_lowBox, m_widthBox, m_highBox}) {
+        sb->setSpecialValueText(s ? QString() : QStringLiteral("\u2014\u2014"));
+        sb->setEnabled(s != nullptr);
+    }
+    if (!s) {
+        const QSignalBlocker b1(m_lowBox);
+        const QSignalBlocker b2(m_highBox);
+        const QSignalBlocker b3(m_widthBox);
+        m_lowBox->setValue(m_lowBox->minimum());
+        m_widthBox->setValue(m_widthBox->minimum());
+        m_highBox->setValue(m_highBox->minimum());
+        return;
+    }
 
     // Scheibe oder Betriebsart seit dem letzten Mal gewechselt? Dann ist
     // m_lastEditedEdge die Auskunft einer ANDEREN Scheibe/Betriebsart und
@@ -621,12 +731,12 @@ void BandwidthFilterApplet::refreshNumbers()
     const QSignalBlocker b2(m_highBox);
     const QSignalBlocker b3(m_widthBox);
 
-    // qAbs(): siehe die Anschluesse oben und cutLabel() in
-    // BandwidthFilterPane.cpp -- "minus darf nie!!!!!" gilt fuer jede
-    // Anzeige dieser Kanten, nicht nur die schwebende Beschriftung im
-    // Bild.
-    m_lowBox->setValue(qAbs(s->filterLow()));
-    m_highBox->setValue(qAbs(s->filterHigh()));
+    // Audio-Begriffe, siehe sidebandOf(): LOW = nahe Kante, HIGH = ferne
+    // Kante — bei LSB also |filterHigh| und |filterLow|. Betraege, weil
+    // "minus darf nie!!!!!" (2026-09-03) fuer jede Anzeige dieser Kanten
+    // gilt, nicht nur die schwebende Beschriftung im Bild.
+    m_lowBox->setValue(nearEdgeHz(s));
+    m_highBox->setValue(farEdgeHz(s));
     // qAbs() hier ebenso: SliceModel::filterWidth() ist ein einfaches
     // filterHigh()-filterLow(), das negativ wird, sobald LOW zahlenmaessig
     // kleiner als HIGH steht (z.B. LOW=50, HIGH=150 bei LSB -- ungewoehnlich,
@@ -635,7 +745,6 @@ void BandwidthFilterApplet::refreshNumbers()
     // qAbs() kappt QSpinBox::setValue() den negativen Wert stillschweigend
     // auf das Feldminimum (50) -- eine Zahl, die nichts Echtes mehr zeigt.
     m_widthBox->setValue(qAbs(s->filterWidth()));
-    m_modeLbl->setText(SliceModel::modeName(s->dspMode()));
 
     m_updatingFromModel = false;
     refreshVarButtons();
@@ -699,7 +808,33 @@ void BandwidthFilterApplet::setSpectrumSource(SpectrumSource src)
                 // nimmt je Eimer das MAXIMUM, ein Traeger bleibt also
                 // in voller Hoehe stehen, nur eben als eine Zacke
                 // statt als sechs.
-                const int pts = qBound(48, pane->width() / 12, 200);
+                //
+                // ── Zwoelf BILDSCHIRMpunkte, nicht zwoelf Qt-Punkte ──
+                //
+                // Der Betreiber am 2026-09-17: "der bandfilter könnte
+                // noch genauer und besser sein."
+                //
+                // Die zwoelf waren von seinen OpenHPSDR-Bildern
+                // abgezaehlt — Bildschirmpunkte. `pane->width()` zaehlt
+                // aber Qt-Punkte, und auf seinem Retina-Schirm ist
+                // jeder davon zwei Bildschirmpunkte. Unsere
+                // Stuetzstellen lagen also doppelt so weit auseinander
+                // wie die der Vorlage: 51 Stueck auf 620 Qt-Punkten,
+                // eine je 196 Hz bei 10 kHz Spanne — ein Sprechsignal
+                // von 2,8 kHz bestand aus vierzehn Punkten. Jetzt in
+                // Bildschirmpunkten gerechnet: derselbe Abstand wie in
+                // der Vorlage, auf Retina doppelt so viele Stellen,
+                // auf einem 1:1-Schirm unveraendert. Dieselbe
+                // Korrektur, die der Panadapter am 2026-08-26 fuer
+                // seine Abtastbreite bekommen hat (displayWidth in
+                // Geraetepunkten, SpectrumWidget::pushSpectrum).
+                //
+                // Untergrenze 64 statt 48, Obergrenze 400 statt 200 —
+                // die alten Deckel waren fuer die halbe Dichte gesetzt.
+                const qreal dpr = pane->devicePixelRatioF();
+                const int pts = qBound(
+                    64, static_cast<int>(std::lround(pane->width() * dpr / 12.0)),
+                    400);
                 pane->setTrace(
                     m_spectrumSource(i, f - half, f + half, pts));
             }
@@ -720,30 +855,24 @@ void BandwidthFilterApplet::resizeEvent(QResizeEvent* event)
     AppletWidget::resizeEvent(event);
     if (!m_ctrlRow || !m_ctrlRow2) { return; }
 
-    // Erste Stufe: die Wortmarken. Sie sind Beschriftung, keine
-    // Information — die Einheit steht im Feld selbst ("2900 Hz"), und
-    // die Reihenfolge tief/breit/hoch ist dieselbe wie im Bild
-    // darueber.
-    const bool roomy = width() >= 470;
-    for (QLabel* l : m_shrinkableLabels) {
-        if (l) { l->setVisible(roomy); }
-    }
-
-    // Zweite Stufe: die Knopfgruppe rutscht in eine eigene Reihe.
-    //
-    // Ohne sie blieb ein harter Boden von rund 600 Punkten, und
+    // Eng: die Knopfgruppen (Memory, Span) rutschen in eine eigene
+    // Reihe. Ohne das blieb ein harter Boden von rund 600 Punkten, und
     // darunter schnitt ein Rollbalken den Inhalt ab, statt ihn zu
     // verkleinern — genau der Befund des Betreibers ("vor allem
     // verkleinert!"). Breit bleibt alles, wie es war: umgebrochen
-    // wird erst unterhalb der Schwelle.
-    const bool wrap = width() < 470;
+    // wird erst unterhalb der Schwelle. Die Versalzeilen ueber den
+    // Feldern bleiben immer — sie sind neun Punkte hoch und kosten
+    // keine Breite.
+    // 600, nicht 470: mit den Glasfeldern (74 Punkte Schmerzgrenze) und
+    // den Versalzeilen ist die eine Reihe breiter geworden; auf dem
+    // 540-Punkte-Blatt vom 2026-09-17 stand "↺ Cen" ohne Ende.
+    const bool wrap = width() < 600;
     if (wrap == m_ctrlWrapped) { return; }
     m_ctrlWrapped = wrap;
 
     QList<QWidget*> movers;
-    for (QPushButton* b : m_varBtns) { if (b) { movers.append(b); } }
-    if (m_resetBtn) { movers.append(m_resetBtn); }
-    if (m_spanBtn)  { movers.append(m_spanBtn); }
+    if (m_memoryGroup) { movers.append(m_memoryGroup); }
+    if (m_spanGroup)   { movers.append(m_spanGroup); }
 
     for (QWidget* wgt : movers) {
         if (wrap) {

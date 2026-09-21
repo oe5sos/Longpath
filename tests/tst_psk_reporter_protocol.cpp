@@ -6,7 +6,7 @@
 // ported user data. Precedent: B2 (commit f43582e), B3 (commit
 // 9aa4202), B4 (commit fce661fd), B5 (commit d5faab1).
 //
-// NereusSDR - PskReporterClient IPFIX protocol tests
+// Longpath - PskReporterClient IPFIX protocol tests
 //
 // Phase 3J-2 Task B6. Pins the wire-protocol contract that
 // PskReporterClient implements the IPFIX (RFC 5101) v0.1 framing used

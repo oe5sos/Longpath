@@ -1,12 +1,12 @@
 // =================================================================
-// src/core/NoiseFloorEstimator.h  (NereusSDR)
+// src/core/NoiseFloorEstimator.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/display.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -83,7 +83,7 @@ public:
     // Seed the estimator with a known noise-floor value. Used by per-band NF
     // priming (Task 2.10) to eliminate the cold-start visual jump on band
     // change. Stores the value so the next estimate() call is pre-seeded.
-    // NereusSDR-original — no Thetis equivalent.
+    // Longpath-original — no Thetis equivalent.
     void prime(double initialDb);
 
     // Last primed value (qQNaN if never primed). Checked by callers that

@@ -1,6 +1,6 @@
-// tests/tst_layout_profiles.cpp  (NereusSDR)
+// tests/tst_layout_profiles.cpp  (Longpath)
 //
-// NereusSDR-original. No Thetis port.
+// Longpath-original. No Thetis port.
 //
 // ── Mehrere Ansichten ────────────────────────────────────────────────
 //

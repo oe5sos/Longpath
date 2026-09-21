@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_filter_width_rules.cpp  (NereusSDR)
+// tests/tst_filter_width_rules.cpp  (Longpath)
 // =================================================================
 //
 // Eine Breite eintippen und die Kanten setzen sich RICHTIG.
@@ -24,12 +24,12 @@
 //      Einengen plötzlich weg ist.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-20 — Original fuer NereusSDR von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
 // =================================================================
 
-// no-port-check: NereusSDR-original test file.
+// no-port-check: Longpath-original test file.
 
 #include <QtTest>
 

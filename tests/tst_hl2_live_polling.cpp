@@ -33,7 +33,7 @@ private slots:
     void register_poll_interval_is_40ms()
     {
         RadioModel model;
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
         model.setBoardForTest(HPSDRHW::HermesLite);
 #endif
         Hl2IoBoardTab tab(&model);
@@ -46,7 +46,7 @@ private slots:
     void register_poll_updates_cell_from_model()
     {
         RadioModel model;
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
         model.setBoardForTest(HPSDRHW::HermesLite);
 #endif
         Hl2IoBoardTab tab(&model);
@@ -71,7 +71,7 @@ private slots:
     void bandwidth_display_reflects_monitor_rate()
     {
         RadioModel model;
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
         model.setBoardForTest(HPSDRHW::HermesLite);
 #endif
         Hl2IoBoardTab tab(&model);
@@ -93,7 +93,7 @@ private slots:
     void throttle_event_count_propagates_on_poll()
     {
         RadioModel model;
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
         model.setBoardForTest(HPSDRHW::HermesLite);
 #endif
         Hl2IoBoardTab tab(&model);

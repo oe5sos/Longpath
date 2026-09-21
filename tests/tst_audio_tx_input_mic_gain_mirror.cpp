@@ -1,4 +1,4 @@
-// tests/tst_audio_tx_input_mic_gain_mirror.cpp  (NereusSDR)
+// tests/tst_audio_tx_input_mic_gain_mirror.cpp  (Longpath)
 //
 // Phase 3M-1b Task I.4 — Per-board mic gain slider range on AudioTxInputPage.
 //

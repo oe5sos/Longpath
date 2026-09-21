@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/codec/CodecContext.h  (NereusSDR)
+// src/core/codec/CodecContext.h  (Longpath)
 // =================================================================
 //
 // POD aggregating the live state every IP1Codec subclass needs to
@@ -7,10 +7,10 @@
 // member variables to make codec subclasses pure functions of
 // {ctx × bank} — trivially unit-testable without a live socket.
 //
-// NereusSDR-original. No Thetis port; no PROVENANCE row.
+// Longpath-original. No Thetis port; no PROVENANCE row.
 // Independently implemented from Protocol 1 interface design.
 //
-// no-port-check: NereusSDR-original aggregator. Field-level comments may
+// no-port-check: Longpath-original aggregator. Field-level comments may
 //   cite Thetis for default-value origins (e.g. create_rnet defaults from
 //   netInterface.c:1416) without making the file a port.
 // =================================================================
@@ -301,7 +301,7 @@ struct CodecContext {
     bool    p1LineIn{false};
 
     // P1 mic-jack Tip/Ring polarity — bank 11 (C0=0x14) C1 bit 4 (0x10), INVERTED.
-    // NereusSDR convention: true = Tip is mic (intuitive).
+    // Longpath convention: true = Tip is mic (intuitive).
     // POLARITY INVERSION: wire bit is written as !p1MicTipRing.
     //   p1MicTipRing = true  → Tip is mic  → wire bit 4 = 0
     //   p1MicTipRing = false → Tip is BIAS → wire bit 4 = 1
@@ -403,12 +403,12 @@ struct CodecContext {
     // OC output byte (bank 0 C2). Phase D will drive this from OcMatrix.
     quint8  ocByte{0};
 
-    // ADC-to-DDC routing — historical NereusSDR field that absorbs the
+    // ADC-to-DDC routing — historical Longpath field that absorbs the
     // P2 cntrl1 + cntrl2 bytes from `UpdateDDCs` (Thetis console.cs:8531
     // `NetworkIO.SetADC_cntrl1` / 8532 `SetADC_cntrl2` [v2.10.3.13]).
     // On P2 it correctly drives the per-DDC ADC-assign bytes (CmdRx bytes
     // 17/23/29/35) via composeCmdRx. NOT used by the P1 wire (see
-    // `p1AdcCntrl` below): NereusSDR P1 codecs used to read this for
+    // `p1AdcCntrl` below): Longpath P1 codecs used to read this for
     // bank 4 C1/C2 too, which conflated UpdateDDCs's cntrl1 with the
     // separate `P1_adc_cntrl` Thetis global — a real port-fidelity bug
     // surfaced while diagnosing #263. The P1 codecs now read
@@ -502,21 +502,21 @@ struct CodecContext {
 ///
 /// Why it matters: the diversity DDC0/DDC1 sync pair has to straddle both
 /// physical inputs. Left at 0 the pair sits on ADC0 twice, which is one
-/// antenna combined with itself and no diversity at all. NereusSDR shipped
+/// antenna combined with itself and no diversity at all. Longpath shipped
 /// that way on Protocol 2 because nothing ever assigned `adcCtrl`.
 ///
 /// Why this gates on ADC count when Thetis does not: upstream keeps the 4 in
 /// one global and lets each board's UpdateDDCs branch decide whether to read
 /// it. The 1-ADC branches never do, hardcoding cntrl1 instead
 /// (console.cs:8399 / 8443 / 8455 [v2.10.3.15]), so the global is harmless
-/// there. NereusSDR has more than one consumer of the seed, so gating at the
+/// there. Longpath has more than one consumer of the seed, so gating at the
 /// source is the cheaper invariant: a 1-ADC board is never handed an ADC1
 /// selector in the first place. Same shape as the Protocol 1 seed at
 /// P1RadioConnection.cpp applyBoardQuirks().
 constexpr quint16 defaultRxAdcCtrl(int adcCount) noexcept
 {
     // Low byte = rx_adc_ctrl1, high byte = rx_adc_ctrl2 (0 upstream, and
-    // NereusSDR has no control that would move DDC4-7 off ADC0 either).
+    // Longpath has no control that would move DDC4-7 off ADC0 either).
     return (adcCount >= 2) ? quint16(0x0004) : quint16(0x0000);
 }
 
@@ -568,7 +568,7 @@ struct PsDdcConfig {
     //   SetPSTxIdx(0, 1);   // ps_tx_idx points to data[1]
     // Those constants refer to STREAM indices in the InboundBlock data**
     // array (always 0/1 because twist() always pairs into data[0]+data[1]).
-    // NereusSDR's PsccPump consumes raw per-DDC streams from
+    // Longpath's PsccPump consumes raw per-DDC streams from
     // RadioConnection::iqDataReceived(ddcIndex, samples) so it needs the
     // actual DDC indices, which depend on the per-board read-loop dispatch.
     //

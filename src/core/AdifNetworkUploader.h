@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/core/AdifNetworkUploader.h  (NereusSDR)
+// src/core/AdifNetworkUploader.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // Hands an ADIF record to a logger running on the network — Log4OM and
 // DXKeeper both have an "ADIF message" listener, as do several contest
@@ -22,7 +22,7 @@
 // be worse than useless: the operator would stop checking.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
 // =================================================================

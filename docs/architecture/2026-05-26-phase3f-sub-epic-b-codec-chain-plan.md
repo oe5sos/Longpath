@@ -119,7 +119,7 @@ QTEST_MAIN(TestCodec5SliceAssignment)
 
 `tests/CMakeLists.txt`:
 ```cmake
-nereus_add_test(tst_codec_5_slice_assignment)
+longpath_add_test(tst_codec_5_slice_assignment)
 ```
 
 ```bash
@@ -998,7 +998,7 @@ QTEST_MAIN(TestAlexControllerPerAdcBpf)
 #include "tst_alex_controller_per_adc_bpf.moc"
 ```
 
-Register: `nereus_add_test(tst_alex_controller_per_adc_bpf)` in `tests/CMakeLists.txt`.
+Register: `longpath_add_test(tst_alex_controller_per_adc_bpf)` in `tests/CMakeLists.txt`.
 
 - [ ] **Step 2: Run test to verify failure (compile error)**
 
@@ -1385,7 +1385,7 @@ QTEST_MAIN(TestP2RadioConnectionApplyDdcAssignment)
 #include "tst_p2_radio_connection_apply_ddc_assignment.moc"
 ```
 
-Register: `nereus_add_test(tst_p2_radio_connection_apply_ddc_assignment)`.
+Register: `longpath_add_test(tst_p2_radio_connection_apply_ddc_assignment)`.
 
 - [ ] **Step 2: Run test to verify failure**
 
@@ -1595,7 +1595,7 @@ QTEST_MAIN(TestAlexControllerEventMatrix)
 #include "tst_alex_controller_event_matrix.moc"
 ```
 
-Register: `nereus_add_test(tst_alex_controller_event_matrix)`.
+Register: `longpath_add_test(tst_alex_controller_event_matrix)`.
 
 - [ ] **Step 2: Run + verify pass**
 

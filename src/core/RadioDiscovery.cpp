@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/RadioDiscovery.cpp  (NereusSDR)
+// src/core/RadioDiscovery.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
@@ -11,7 +11,7 @@
 //   Reid Campbell (MI0BOT) — HermesLite 2 board-ID 6 discovery mapping
 //     (preserved via inline marker on case 6 branch in parseDiscoveryReply)
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -206,7 +206,7 @@ qint64 crossProcessHoldoffRemainingMs()
     return remainingNs > 0 ? remainingNs / 1000000 : 0;
 }
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
 // Test-only: zero the shared segment so a leftover deadline from one test
 // binary run's earlier test function doesn't leak into a later one via
 // std::max(local, crossProcess) in holdOffRemainingMs(). Mirrors
@@ -334,7 +334,7 @@ qint64 RadioDiscovery::holdOffRemainingMs() const
     return std::max(localRemaining, crossProcessHoldoffRemainingMs());
 }
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
 void RadioDiscovery::clearHoldOffForTest()
 {
     s_scanHoldOff = QDeadlineTimer();
@@ -564,7 +564,7 @@ bool RadioDiscovery::parseP2Reply(const QByteArray& bytes, const QHostAddress& s
 // ---------------------------------------------------------------------------
 
 // Byte 4 of the P1 discovery frame. Thetis leaves the whole tail zeroed
-// (clsRadioDiscovery.cs:1301-1309 buildDiscoveryPacketP1); NereusSDR sets a
+// (clsRadioDiscovery.cs:1301-1309 buildDiscoveryPacketP1); Longpath sets a
 // non-zero pad here deliberately.
 //
 // Why: a P1 discovery probe is broadcast to UDP 1024, which is also the P2
@@ -647,8 +647,12 @@ RadioDiscovery::QuietPollOutcome RadioDiscovery::quietPollAttempt(
             quietPolls++;
             continue;
         }
-        // Reset quiet counter on activity — replies may be bursty
-        quietPolls = 0;
+        // From Thetis clsRadioDiscovery.cs:964-976 [@852bf0e]: the
+        // readable branch never touches quietPolls — only the not-readable
+        // branch above does quietPolls++. A reply leaves the counter frozen
+        // at its prior value rather than resetting it to 0, so occasional
+        // (non-continuous) bursty replies don't push the natural
+        // give-up point back out any further than upstream does.
 
         while (sock.hasPendingDatagrams()) {
             QHostAddress senderAddr;

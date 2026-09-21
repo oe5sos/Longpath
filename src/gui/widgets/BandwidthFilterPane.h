@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/gui/widgets/BandwidthFilterPane.h  (NereusSDR)
+// src/gui/widgets/BandwidthFilterPane.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original, nach der Vorlage des Betreibers („BANDWIDTH
+// Longpath-original, nach der Vorlage des Betreibers („BANDWIDTH
 // FILTER" der Vorlage, Bildschirmfoto vom 2026-08-20). Die Regeln
 // hinter den Zahlen kommen aus Thetis, siehe SliceModel::widthToEdges
 // und ::constrainFilter.
@@ -45,9 +45,11 @@
 // die beim naechsten Umbau auseinanderlaeuft.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-20 — Original fuer NereusSDR von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
+//   2026-09-17 — Neu gezeichnet in der Richtung "Glas & Tiefe"
+//                 (Stilblatt 3), Achse auf runden Frequenzen.
 // =================================================================
 
 #include <QColor>
@@ -62,6 +64,7 @@ class BandwidthFilterPane : public QWidget
 
 public:
     explicit BandwidthFilterPane(QWidget* parent = nullptr);
+
 
     // Beschriftung links oben, „RX1" / „RX2".
     void setLabel(const QString& text);
@@ -102,6 +105,15 @@ public:
     /// nicht — sein FilterPassbandWidget ist ein reiner Kanteneditor.
     /// Nachgesehen, bevor gebaut wurde.
     void setTrace(const QVector<float>& dbm);
+
+    /// Die Wunschhoehe. Ohne sie richtete sich ein frisch abgeloestes
+    /// Fenster nur nach der Mindesthoehe (84) und der 160-Punkte-
+    /// Untergrenze des Fensters — davon gingen Kopfzeile und Achse ab,
+    /// und fuer 40 dB Kurve blieben rund 25 Punkte: das "flach", das
+    /// der Betreiber am 2026-09-17 fotografiert hat. 140 Punkte geben
+    /// der Kurve etwa 80, ein Sprechsignal 20 dB ueber dem Flur steht
+    /// dann 40 Punkte hoch. Kleiner ziehen darf man weiterhin.
+    QSize sizeHint() const override;
 
 signals:
     // Beim Ziehen einer Kante. Die Breite darf sich aendern.

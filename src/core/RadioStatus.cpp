@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/RadioStatus.cpp  (NereusSDR)
+// src/core/RadioStatus.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -7,7 +7,7 @@
 //   Project Files/Source/Console/HPSDR/NetworkIOImports.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-20 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via
 //                 Anthropic Claude Code.
@@ -200,7 +200,7 @@ double RadioStatus::computeSwr(double fwd, double refl)
     // From Thetis console.cs:6644 [@501e3f5]: both zero → 1.0
     if (fwd <= 0.0 && refl <= 0.0) { return 1.0; }
 
-    // NereusSDR-original safety: forward-power noise floor.  Below 0.5 W
+    // Longpath-original safety: forward-power noise floor.  Below 0.5 W
     // SWR is meaningless (no meaningful drive on the line, sqrt(refl/0)
     // → infinity).  HL2 specifically can have refl > 0 with fwd = 0
     // during MOX-on/MOX-off transitions, which would trip the

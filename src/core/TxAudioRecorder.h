@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/core/TxAudioRecorder.h  (NereusSDR)
+// src/core/TxAudioRecorder.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. The idea is AetherSDR's — its channel-strip
+// Longpath-original. The idea is AetherSDR's — its channel-strip
 // monitor (src/core/ClientPuduMonitor.{h,cpp} @3a1f59e, GPLv3, same
 // licence as this project) captures post-DSP transmit audio and plays
 // it back so the operator can hear their own processing without keying.
@@ -25,7 +25,7 @@
 // feed() runs on the audio thread, where an allocation is a dropout.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
 // =================================================================

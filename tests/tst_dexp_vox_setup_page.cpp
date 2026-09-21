@@ -1,8 +1,8 @@
-// tests/tst_dexp_vox_setup_page.cpp  (NereusSDR)
+// tests/tst_dexp_vox_setup_page.cpp  (Longpath)
 //
 // Phase 3M-3a-iii Task 14 — DexpVoxPage full implementation.
 //
-// no-port-check: NereusSDR-original test file.  DexpVoxPage mirrors
+// no-port-check: Longpath-original test file.  DexpVoxPage mirrors
 // Thetis tpDSPVOXDE layout 1:1 (setup.designer.cs:44763-45260
 // [v2.10.3.13]).  All control names match the Thetis Designer
 // (chkVOXEnable, chkDEXPEnable, udDEXPThreshold, udDEXPHysteresisRatio,
@@ -85,7 +85,7 @@ private slots:
     // Defaults all sourced from Thetis setup.designer.cs [v2.10.3.13]:
     //   voxEnabled               = false  (audio.cs:167 — vox always loads OFF)
     //   dexpEnabled              = false
-    //   voxThresholdDb           = -40    (NereusSDR default; Thetis -20 — see TM.h:1576)
+    //   voxThresholdDb           = -40    (Longpath default; Thetis -20 — see TM.h:1576)
     //   dexpHysteresisRatioDb    = 2.0    (line 44869-44873)
     //   dexpExpansionRatioDb     = 10.0   (line 44900-44904)
     //   dexpAttackTimeMs         = 2.0    (line 45050-45054)
@@ -342,18 +342,18 @@ private slots:
     // Layout order (matching Thetis Y-coord ordering at
     // setup.designer.cs:44650 / 44666 / 44707 / 44744 [v2.10.3.13]):
     //   Y=19  chkAntiVoxEnable     ("Anti-VOX Enable")
-    //   Y=41  [Source info row]    NereusSDR-spin replacing chkAntiVoxSource
+    //   Y=41  [Source info row]    Longpath-spin replacing chkAntiVoxSource
     //   Y=71  udAntiVoxGain        ("Gain (dB)")
     //   Y=96  udAntiVoxTau         ("Tau (ms)")  -- existing
     //
     // 3M-3a-iv post-bench refactor (Option A): the Y=41 chkAntiVoxSource
     // checkbox has been replaced with a static info-row label.  Thetis
     // chkAntiVoxSource (RX vs VAC at setup.designer.cs:44646-44657
-    // [v2.10.3.13]) does not map to NereusSDR's architecture (VAX is a
+    // [v2.10.3.13]) does not map to Longpath's architecture (VAX is a
     // digital-mode app bus with no mic-feedback path).
     //
     // Defaults verified against Thetis chkAntiVoxEnable (initially unchecked
-    // -- no Checked= setter), udAntiVoxGain (Value=10 -- but NereusSDR-original
+    // -- no Checked= setter), udAntiVoxGain (Value=10 -- but Longpath-original
     // divergence retains shipped default 0; see TransmitModel C.4 comment).
 
     void enableCheckbox_defaultUnchecked()
@@ -417,7 +417,7 @@ private slots:
 
     void sourceInfoRow_existsAndShowsExpectedText()
     {
-        // NereusSDR-original info row replaces Thetis chkAntiVoxSource
+        // Longpath-original info row replaces Thetis chkAntiVoxSource
         // (setup.designer.cs:44646-44657 [v2.10.3.13]) per the 3M-3a-iv
         // post-bench Option A refactor.  Anti-VOX always references the
         // audio output device(s) — VAX is a digital-mode app bus with no
@@ -472,7 +472,7 @@ private slots:
 
     void gainSpinbox_defaultZero()
     {
-        // NereusSDR-original divergence: int default 0 (vs Thetis decimal 10).
+        // Longpath-original divergence: int default 0 (vs Thetis decimal 10).
         RadioModel model;
         DexpVoxPage page(&model);
         page.show();

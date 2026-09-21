@@ -1,8 +1,8 @@
-// tests/tst_cfc_setup_page.cpp  (NereusSDR)
+// tests/tst_cfc_setup_page.cpp  (Longpath)
 //
 // Phase 3M-3a-ii Batch 5 (Task E) — CfcSetupPage full implementation.
 //
-// no-port-check: NereusSDR-original test file.  CfcSetupPage mirrors
+// no-port-check: Longpath-original test file.  CfcSetupPage mirrors
 // Thetis tpDSPCFC layout 1:1 (setup.Designer.cs:46162-46280 [v2.10.3.13]
 // for grpPhRot; remaining groups follow TransmitModel kCfc* schema added
 // in Batch 2).  All control names match the Thetis Designer (chkPHROTEnable,

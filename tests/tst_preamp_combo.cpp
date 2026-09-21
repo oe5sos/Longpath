@@ -129,7 +129,7 @@ private slots:
     //   case HPSDRModel.ANVELINAPRO3:
     //       // case HPSDRModel.REDPITAYA: // DH1KLM: removed for compatibility reasons
     //       comboPreamp.Items.AddRange(anan100d_preamp_settings);
-    // NereusSDR dispatches by HPSDRHW; HermesC10 is the board for ANAN_G2E.
+    // Longpath dispatches by HPSDRHW; HermesC10 is the board for ANAN_G2E.
     void hermes_c10_anan_g2e_four_items()
     {
         auto items = BoardCapsTable::preampItemsForBoard(HPSDRHW::HermesC10, /*alexPresent=*/false);

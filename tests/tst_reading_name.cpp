@@ -1,12 +1,12 @@
 // =================================================================
-// tests/tst_reading_name.cpp  (NereusSDR)
+// tests/tst_reading_name.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/MeterManager.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -105,7 +105,7 @@ private slots:
     void unknown_binding_returns_empty()
     {
         // Thetis falls through to reading.ToString() for unmapped values.
-        // NereusSDR returns an empty string instead — the render pass
+        // Longpath returns an empty string instead — the render pass
         // skips empty titles.
         QCOMPARE(readingName(-1),    QString());
         QCOMPARE(readingName(99999), QString());

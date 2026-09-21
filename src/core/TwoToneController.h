@@ -1,8 +1,8 @@
 // =================================================================
-// src/core/TwoToneController.h  (NereusSDR)
+// src/core/TwoToneController.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original file. The two-tone IMD-test activation flow is a
+// Longpath-original file. The two-tone IMD-test activation flow is a
 // faithful port of the Thetis chkTestIMD_CheckedChanged handler:
 //   setup.cs:11040-11191 [v2.10.3.13] — chkTestIMD_CheckedChanged
 //   setup.cs:34409-34418 [v2.10.3.13] — setupTwoTonePulse() pulse profile
@@ -22,7 +22,7 @@
 //
 // =================================================================
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-29 — Original implementation for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted implementation via
 //                 Anthropic Claude Code.
@@ -45,7 +45,7 @@
 //                 AI-assisted implementation via Anthropic Claude Code.
 // =================================================================
 
-// no-port-check: NereusSDR-original file; Thetis-derived activation
+// no-port-check: Longpath-original file; Thetis-derived activation
 // flow is cited inline below.
 
 #pragma once
@@ -93,7 +93,7 @@ class TxChannel;
 //              ...
 //              await Task.Delay(300);
 //          }
-//      NereusSDR has no published "isTuneToneActive()" getter on TxChannel,
+//      Longpath has no published "isTuneToneActive()" getter on TxChannel,
 //      so the TUN auto-stop path is currently a TODO no-op (left as a
 //      DONE_WITH_CONCERNS flag for follow-up).
 //
@@ -123,7 +123,7 @@ class TxChannel;
 //        DriveSlider → no override (use current PWR slider).
 //        TuneSlider  → no override (use current TUN slider).
 //      From setup.cs:11109-11120 [v2.10.3.13].
-//      NereusSDR deviation: Thetis's SetPowerUsingTargetDBM helper does
+//      Longpath deviation: Thetis's SetPowerUsingTargetDBM helper does
 //      not yet exist here; we use twoTonePower() directly as the override
 //      value for Fixed mode.  See I.1 step 7 note.
 //
@@ -175,7 +175,7 @@ public:
     static constexpr int    kPulsePercentDefault    = 25;
     static constexpr int    kPulseRampMsDefault     = 9;
 
-    // ── Settle delay constants (NereusSDR ms; from Thetis Task.Delay
+    // ── Settle delay constants (Longpath ms; from Thetis Task.Delay
     //     await values). ────────────────────────────────────────────────────
     //
     // From Thetis setup.cs:11076 / 11152 [v2.10.3.13]:

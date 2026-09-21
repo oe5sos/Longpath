@@ -1,8 +1,8 @@
 // =================================================================
-// tests/tst_connected_pushes_ddc_assignment.cpp  (NereusSDR)
+// tests/tst_connected_pushes_ddc_assignment.cpp  (Longpath)
 // =================================================================
 //
-// no-port-check: NereusSDR-original. Pins the close of the 2026-08-11
+// no-port-check: Longpath-original. Pins the close of the 2026-08-11
 // remote-bench MOX-rate investigation.
 //
 // The restore path moves the stream allocator to the persisted
@@ -26,7 +26,7 @@
 // Remove the requestDdcAssignment() call and this fails with 192000.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-11 — Created by Ralph Martin Fischer (OE5SOS),
 //                 AI-assisted implementation via Anthropic Claude
 //                 (Cowork).

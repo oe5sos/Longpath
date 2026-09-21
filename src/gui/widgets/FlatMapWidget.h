@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/gui/widgets/FlatMapWidget.h  (NereusSDR)
+// src/gui/widgets/FlatMapWidget.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // Equirectangular world map: every contact visible at once, which is
 // the one thing the globe cannot do. Half the Earth is always facing
@@ -17,7 +17,7 @@
 // would cost more than it buys.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
 //   2026-08-10 — Maidenhead grid overlay (fields, then squares as the

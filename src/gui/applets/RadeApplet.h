@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 //
-// NereusSDR - RadeApplet: RADE-mode control + status applet.
+// Longpath - RadeApplet: RADE-mode control + status applet.
 //
-// NEW NereusSDR-native applet, no upstream Thetis equivalent.  RADE is
+// NEW Longpath-native applet, no upstream Thetis equivalent.  RADE is
 // the FreeDV RADE neural voice codec port (Phase 3R); the channel
 // itself lives in src/core/RadeChannel.{h,cpp} (Tasks I1-I3).  This
 // applet surfaces the RadeChannel control + status to the user when
 // the active slice's mode is DSPMode::RADE_U or DSPMode::RADE_L.
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-11 - Created for Phase 3R Task L2 by J.J. Boyd (KG4VCF),
 //                with AI-assisted implementation via Anthropic Claude
 //                Code.  Structural pattern follows PhoneCwApplet
-//                (NereusSDR PhoneCwApplet, GPLv2).
+//                (Longpath PhoneCwApplet, GPLv2).
 
 #pragma once
 

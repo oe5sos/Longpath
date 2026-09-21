@@ -1,4 +1,4 @@
-// no-port-check: NereusSDR-original wiring test, no ported logic.
+// no-port-check: Longpath-original wiring test, no ported logic.
 #include <QtTest/QtTest>
 #include <QSignalSpy>
 

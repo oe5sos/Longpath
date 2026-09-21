@@ -1549,7 +1549,7 @@ In `CMakeLists.txt`: bundle name `AetherSDRDAX.driver → NereusSDRVAX.driver`, 
 - [ ] **Step 4: Add hal-plugin as optional subdir in top-level CMakeLists.txt**
 
 ```cmake
-if(APPLE AND NEREUSSDR_BUILD_HAL_PLUGIN)
+if(APPLE AND LONGPATH_BUILD_HAL_PLUGIN)
     add_subdirectory(hal-plugin)
 endif()
 ```

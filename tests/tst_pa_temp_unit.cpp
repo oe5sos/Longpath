@@ -1,9 +1,9 @@
 // =================================================================
-// tests/tst_pa_temp_unit.cpp  (NereusSDR)
+// tests/tst_pa_temp_unit.cpp  (Longpath)
 // =================================================================
 //
-// no-port-check: NereusSDR-original test file. PaTempUnit is a
-// NereusSDR-native UX module (mi0bot-Thetis only formats °C; the
+// no-port-check: Longpath-original test file. PaTempUnit is a
+// Longpath-native UX module (mi0bot-Thetis only formats °C; the
 // click-to-toggle preference does not exist upstream).
 //
 // Verifies:

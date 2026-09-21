@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/setup/TransmitSetupPages.cpp  (NereusSDR)
+// src/gui/setup/TransmitSetupPages.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
@@ -51,7 +51,7 @@
 // Richard Samphire can be reached by email at :  mw0lge@grange-lane.co.uk                    //
 //============================================================================================//
 
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -63,7 +63,7 @@
 //                 ATTOnTX checkbox wired to StepAttenuatorController::setAttOnTxEnabled;
 //                 ForceATTwhenPSAoff wired to StepAttenuatorController::setForceAttWhenPsOff.
 //   2026-04-29 — Phase 3M-3a-i Batch 5 (Task E): SpeechProcessorPage rewrite
-//                 as a NereusSDR-spin TX dashboard — strips the Compressor /
+//                 as a Longpath-spin TX dashboard — strips the Compressor /
 //                 Phase Rotator / CFC NYI stubs (those controls live on
 //                 Setup → DSP → CFC and Setup → DSP → AGC/ALC per the
 //                 IA decision) and replaces them with an Active Profile
@@ -157,8 +157,8 @@
 // =================================================================
 #include "TransmitSetupPages.h"
 #include "gui/styles/ThemeQss.h"
-#include "gui/StyleConstants.h"
 #include "core/AppSettings.h"
+#include "gui/StyleConstants.h"
 #include "core/MicProfileManager.h"
 #include "models/RadioModel.h"
 #include "models/TransmitModel.h"
@@ -220,7 +220,7 @@ void PowerPage::buildUI()
     }
 
     // TODO(future): Thetis Transmit tab also has these groups not yet
-    // covered by NereusSDR. Tracked separately from this PR; pre-existing
+    // covered by Longpath. Tracked separately from this PR; pre-existing
     // gaps, not introduced by the IA reshape.
     //   - chkPulsedTune + grpPulsedTune (pulsed tune mode)
     //   - chkRecoverPAProfileFromTXProfile (TX↔PA profile linkage)
@@ -244,7 +244,7 @@ void PowerPage::buildUI()
 //     From Thetis console.cs:4822 [v2.10.3.13] TXF power setter.
 //  2. chkATTOnTX → StepAttenuatorController::setAttOnTxEnabled(bool)
 //     From Thetis setup.designer.cs:5926-5939 [v2.10.3.13] + setup.cs:15452-15455.
-//     NereusSDR places this on the Power page (tpAlexAntCtrl in Thetis).
+//     Longpath places this on the Power page (tpAlexAntCtrl in Thetis).
 //  3. chkForceATTwhenPSAoff → StepAttenuatorController::setForceAttWhenPsOff(bool)
 //     From Thetis setup.designer.cs:5660-5671 [v2.10.3.13] + setup.cs:24264-24268.
 //     //MW0LGE [2.9.0.7] added  [original inline comment from console.cs:29285]
@@ -448,7 +448,7 @@ void PowerPage::buildTuneGroup()
     // DONE_WITH_CONCERNS [anan-g2e F6]: Thetis console.cs:14868-14882 [v2.10.3.15]
     // conditionally inserts "Ref Pwr" for ANAN_G2E and OrionMKII family
     // (//N1GP G2E added at console.cs:14873, //DH1KLM at console.cs:14876).
-    // NereusSDR instead includes "Ref Pwr" statically for all boards above
+    // Longpath instead includes "Ref Pwr" statically for all boards above
     // (matched from mi0bot-Thetis setup.designer.cs:47933-47938). When a full
     // comboMeterTXMode port arrives, this combo should gain per-board gating so
     // low-power boards (no on-board PA directional coupler) hide "Ref Pwr".
@@ -832,14 +832,14 @@ void TxProfilesPage::buildUI()
     info->setStyleSheet(Style::themed(QStringLiteral(
         "QLabel { color: #c4c4c9; font-style: italic; "
         " background: #1a2a3a; border: 1px solid #203040; "
-        " border-radius: 6px; padding: 12px; }")));
+        " border-radius: 10px; padding: 12px; }")));
     contentLayout()->addWidget(info);
 
     contentLayout()->addStretch();
 }
 
 // ---------------------------------------------------------------------------
-// SpeechProcessorPage — TX dashboard (NereusSDR-spin)
+// SpeechProcessorPage — TX dashboard (Longpath-spin)
 //
 // No direct Thetis equivalent.  This page summarises every WDSP TXA speech-
 // chain stage (txa[ch] members in `wdsp/TXA.c:create_txa` [v2.10.3.13]:
@@ -913,11 +913,7 @@ void SpeechProcessorPage::buildActiveProfileSection()
     m_manageProfileBtn->setToolTip(QStringLiteral(
         "Open the TX EQ editor (Tools → TX Equalizer) — the profile combo "
         "and Save / Save As / Delete buttons live there."));
-    m_manageProfileBtn->setStyleSheet(Style::themed(QStringLiteral(
-        "QPushButton { background: #1a2a3a; border: 1px solid #304050;"
-        "  border-radius: 6px; color: #c8d8e8; font-size: 13px; padding: 3px 10px; }"
-        "QPushButton:hover { background: #203040; }"
-        "QPushButton:pressed { background: #4a7ba8; color: #0f0f1a; }")));
+    m_manageProfileBtn->setStyleSheet(QLatin1String(Style::kButtonStyle));   // Hausknopf
 
     row->addWidget(nameLabel);
     row->addWidget(m_activeProfileLabel, 1);
@@ -1002,12 +998,8 @@ QLabel* SpeechProcessorPage::addStageRow(QGridLayout* grid, int row,
     btn->setObjectName(QStringLiteral("btn_") + stageName);
     btn->setAutoDefault(false);
     btn->setToolTip(buttonTooltip);
-    btn->setStyleSheet(Style::themed(QStringLiteral(
-        "QPushButton { background: #1a2a3a; border: 1px solid #304050;"
-        "  border-radius: 6px; color: #c8d8e8; font-size: 11px; padding: 2px 8px; }"
-        "QPushButton:hover:enabled { background: #203040; }"
-        "QPushButton:pressed:enabled { background: #4a7ba8; color: #0f0f1a; }"
-        "QPushButton:disabled { color: #607080; border: 1px solid #203040; }")));
+    btn->setStyleSheet(QLatin1String(Style::kButtonStyle)
+                       + QStringLiteral("QPushButton { font-size: 11px; padding: 2px 8px; }"));   // Hausknopf, klein
 
     if (linkPage.isEmpty()) {
         // Future-phase placeholder — visible-but-disabled.
@@ -1469,7 +1461,7 @@ DexpVoxPage::DexpVoxPage(RadioModel* model, QWidget* parent)
         "Time from high to low gain of downward expander"));
 
     // udDEXPThreshold — range -80..0 default -20 — line 44907-44935
-    // (NereusSDR ships voxThresholdDb default -40 per TM.h:1576; the runtime
+    // (Longpath ships voxThresholdDb default -40 per TM.h:1576; the runtime
     // value is what reaches the spinbox, range matches Thetis verbatim.)
     m_udDEXPThreshold = new QSpinBox;
     m_udDEXPThreshold->setObjectName(QStringLiteral("udDEXPThreshold"));
@@ -1700,11 +1692,11 @@ DexpVoxPage::DexpVoxPage(RadioModel* model, QWidget* parent)
         "Enable prevention measures for RX audio tripping VOX"));
     m_chkAntiVoxEnable->setChecked(tx.antiVoxRun());
 
-    // NereusSDR-original info row replacing Thetis chkAntiVoxSource
+    // Longpath-original info row replacing Thetis chkAntiVoxSource
     // (setup.designer.cs:44646-44657 [v2.10.3.13]).  See commit message for
     // architectural rationale: Thetis chkAntiVoxSource selects between RX
     // and VAC as the anti-VOX cancellation reference; that choice does not
-    // map to NereusSDR's architecture, where VAX is a digital-mode app bus
+    // map to Longpath's architecture, where VAX is a digital-mode app bus
     // with no mic-feedback path and the audio output device is the only
     // valid source.
     auto* antiVoxSourceInfo = new QLabel(
@@ -1716,15 +1708,15 @@ DexpVoxPage::DexpVoxPage(RadioModel* model, QWidget* parent)
         "VOX through the local mic.  VAX is intentionally not subject to anti-VOX\n"
         "treatment because VAX feeds digital-mode apps (no mic-feedback path).\n"
         "\n"
-        "NereusSDR-original divergence from Thetis chkAntiVoxSource\n"
+        "Longpath-original divergence from Thetis chkAntiVoxSource\n"
         "(setup.designer.cs:44646-44657 [v2.10.3.13]): Thetis selects between RX\n"
-        "and VAC; in NereusSDR, the audio output device is the only valid\n"
+        "and VAC; in Longpath, the audio output device is the only valid\n"
         "cancellation reference."));
 
     // udAntiVoxGain — Y=71 in Thetis Designer.  Range -60..60 from
     // setup.designer.cs:44708-44717 [v2.10.3.13].
     //
-    // NereusSDR-original divergence (already shipped in 3M-1b H.3): TM uses
+    // Longpath-original divergence (already shipped in 3M-1b H.3): TM uses
     // int dB rather than Thetis decimal-with-0.1-step (Increment={1,0,0,65536}
     // = 0.1, DecimalPlaces=1).  Default 0 dB rather than Thetis Value=10
     // (setup.designer.cs:44723-44727 [v2.10.3.13]: Value={10,0,0,0}).  Both
@@ -1752,7 +1744,7 @@ DexpVoxPage::DexpVoxPage(RadioModel* model, QWidget* parent)
     m_udAntiVoxTau->setToolTip(QStringLiteral(
         "Time-constant used in smoothing Anti-VOX data"));
 
-    // Stack: Enable checkbox, info row (NereusSDR-spin replacing
+    // Stack: Enable checkbox, info row (Longpath-spin replacing
     // Thetis chkAntiVoxSource — see info row block above), then 2 labelled
     // spinbox rows.
     antiVoxLay->addWidget(m_chkAntiVoxEnable);
@@ -1931,7 +1923,7 @@ DexpVoxPage::DexpVoxPage(RadioModel* model, QWidget* parent)
 
     // 3M-3a-iv post-bench refactor (Option A): chkAntiVoxSource <-> antiVoxSourceVax
     // bidirectional bindings removed.  Thetis source-toggle does not map to
-    // NereusSDR's architecture (see info-row block earlier in this method
+    // Longpath's architecture (see info-row block earlier in this method
     // and commit message for rationale).
 
     // udAntiVoxGain <-> antiVoxGainDb (Anti-VOX sensitivity in dB).

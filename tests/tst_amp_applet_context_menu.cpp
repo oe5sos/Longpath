@@ -20,7 +20,7 @@
 //   disconnectActionEmitsToggle    - triggering the Disconnect action emits connectionToggleRequested()
 //   copyDiagnosticsActionEmitsSignal - triggering the copy action emits diagnosticsCopyRequested()
 //
-// NereusSDR-native test; Phase 3P-II Phase 4 Task 88.
+// Longpath-native test; Phase 3P-II Phase 4 Task 88.
 
 #include <QtTest>
 #include <QMenu>

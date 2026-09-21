@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/gui/widgets/WorldMapCatalog.h  (NereusSDR)
+// src/gui/widgets/WorldMapCatalog.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // Die Weltbilder, die der Betreiber selbst hinlegt.
 //
@@ -49,7 +49,7 @@
 // erst als Bild bemerkt hat.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-15 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
 // =================================================================

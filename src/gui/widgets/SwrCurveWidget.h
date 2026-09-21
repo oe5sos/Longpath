@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/gui/widgets/SwrCurveWidget.h  (NereusSDR)
+// src/gui/widgets/SwrCurveWidget.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // The SWR across a measured sweep, drawn against the band it is for.
 //
@@ -51,7 +51,7 @@
 // magnified into noise.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-10 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

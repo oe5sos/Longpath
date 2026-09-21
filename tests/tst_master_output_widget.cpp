@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_master_output_widget.cpp  (NereusSDR)
+// tests/tst_master_output_widget.cpp  (Longpath)
 // =================================================================
 //
 // Exercises MasterOutputWidget — the menu-bar composite widget
@@ -166,8 +166,12 @@ private slots:
         engine.setMasterMuted(true);
 
         QCOMPARE(btn->isChecked(), true);
-        // 🔇 U+1F507 when muted
-        QCOMPARE(btn->text(), QString::fromUtf8("\xF0\x9F\x94\x87"));
+        // Seit 2026-09-17 ist der Lautsprecher eine Zeichnung (QIcon),
+        // kein Emoji-Text mehr: der Knopf traegt keinen Text, und das
+        // Symbol wechselt mit dem Zustand -- also ein anderes Icon als
+        // vor dem Stummschalten.
+        QVERIFY(btn->text().isEmpty());
+        QVERIFY(!btn->icon().isNull());
 
         // The engine emitted exactly once (its own setMasterMuted). The
         // button update via the echo slot must not cause a second emission.

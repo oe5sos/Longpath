@@ -1,7 +1,7 @@
-// no-port-check: NereusSDR/Longpath-original regression test.
+// no-port-check: Longpath/Longpath-original regression test.
 
 // =================================================================
-// tests/tst_radio_model_band_save_uses_slice_frequency.cpp  (NereusSDR)
+// tests/tst_radio_model_band_save_uses_slice_frequency.cpp  (Longpath)
 // =================================================================
 //
 // Regression test for a real bug found live, 2026-08-26 (OE5SOS): after
@@ -25,7 +25,7 @@
 // Fix: RadioModel.cpp, RadioModel::saveSliceState().
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-26 — Original for NereusSDR/Longpath by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

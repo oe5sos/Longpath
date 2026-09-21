@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/setup/RfKitPage.cpp  (NereusSDR-native)
+// src/gui/setup/RfKitPage.cpp  (Longpath-native)
 // =================================================================
 //
 // See RfKitPage.h for the design overview.  Implementation notes:
@@ -14,7 +14,7 @@
 //   - Pattern mirrors FourO3APage.{h,cpp}.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-24 -- Created in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted implementation via
 //                 Anthropic Claude Code.
@@ -196,7 +196,7 @@ QWidget* RfKitPage::buildRf2ksTab()
     auto* labelsFm  = new QFormLayout(labelsBox);
     auto* note      = new QLabel(tr(
         "RF2K-S firmware does not expose antenna names via REST. "
-        "Labels are stored locally in NereusSDR."), labelsBox);
+        "Labels are stored locally in Longpath."), labelsBox);
     note->setWordWrap(true);
     note->setStyleSheet(Style::themed(QStringLiteral("color:#8899aa; font-size:11px;")));
     labelsFm->addRow(note);

@@ -1,4 +1,4 @@
-// no-port-check: NereusSDR-original test for the sliceStateRestored
+// no-port-check: Longpath-original test for the sliceStateRestored
 // emit contract on RadioModel::loadSliceState.  The console.cs reference
 // in the body comment is a Thetis source-of-truth cite for design
 // context, not a port — no Thetis code is translated in this file.

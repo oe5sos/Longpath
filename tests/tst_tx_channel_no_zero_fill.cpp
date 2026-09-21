@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_tx_channel_no_zero_fill.cpp  (NereusSDR)
+// tests/tst_tx_channel_no_zero_fill.cpp  (Longpath)
 // =================================================================
 //
 // No Thetis code is ported in this test file. The test exercises:
@@ -38,14 +38,14 @@
 // Attribution for ported constants lives in TxChannel.h/cpp.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-28 — New test for Phase 3M-1c Task E.1: verify the partial-read
 //                 zero-fill workaround is gone in the push-driven model.
 //                 J.J. Boyd (KG4VCF), with AI-assisted implementation via
 //                 Anthropic Claude Code.
 // =================================================================
 
-// no-port-check: NereusSDR-original test file. NEREUS_BUILD_TESTS must be
+// no-port-check: Longpath-original test file. LONGPATH_BUILD_TESTS must be
 // defined (see CMakeLists.txt).
 
 #include <QtTest/QtTest>

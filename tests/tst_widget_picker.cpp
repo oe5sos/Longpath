@@ -1,6 +1,6 @@
-// tests/tst_widget_picker.cpp  (NereusSDR)
+// tests/tst_widget_picker.cpp  (Longpath)
 //
-// NereusSDR-original. No Thetis port.
+// Longpath-original. No Thetis port.
 //
 // ── Das Plus ─────────────────────────────────────────────────────────
 //

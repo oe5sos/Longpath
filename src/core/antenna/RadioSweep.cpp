@@ -1,12 +1,12 @@
 // =================================================================
-// src/core/antenna/RadioSweep.cpp  (NereusSDR)
+// src/core/antenna/RadioSweep.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. See RadioSweep.h for what survives the trip from
+// Longpath-original. See RadioSweep.h for what survives the trip from
 // a directional coupler to a Sweep, and what cannot.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-14 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

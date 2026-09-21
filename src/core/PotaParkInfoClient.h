@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - POTA (Parks On The Air) park-info lookup client
+// Longpath - POTA (Parks On The Air) park-info lookup client
 //
-// NereusSDR-native, no upstream equivalent (neither Thetis nor
+// Longpath-native, no upstream equivalent (neither Thetis nor
 // AetherSDR have a POTA integration at all -- see PotaClient.h). This
 // is a sibling of PotaClient: where PotaClient polls
 // https://api.pota.app/spot/activator continuously for live
@@ -14,7 +14,7 @@
 // reference (US-4558) before writing this, same diligence as
 // PotaClient's spot endpoint.
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-27  AI (Anthropic Claude Code)  Initial version.
 
 #pragma once

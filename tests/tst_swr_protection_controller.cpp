@@ -36,7 +36,7 @@ private slots:
     void tuneBypass_sliderAt70_bypasses();
     void tuneBypass_sliderAt71_doesNotBypass();
 
-    // ── Measurement mode (NereusSDR-original) ──────────────────────────
+    // ── Measurement mode (Longpath-original) ──────────────────────────
     void measurementMode_highSwrAtSweepPower_noFoldback();
     void measurementMode_stillReportsTheSwr();
     void measurementMode_aboveCeiling_protectsNormally();
@@ -346,7 +346,7 @@ void TestSwrProtectionController::tuneBypass_sliderAt71_doesNotBypass()
 
 // ── Measurement mode ─────────────────────────────────────────────────
 //
-// NereusSDR-original, no Thetis counterpart: Thetis has no band sweep,
+// Longpath-original, no Thetis counterpart: Thetis has no band sweep,
 // so it never had to distinguish "the antenna is bad" from "I am
 // currently measuring how bad the antenna is".
 //

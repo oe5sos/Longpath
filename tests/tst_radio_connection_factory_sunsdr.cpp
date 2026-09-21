@@ -1,7 +1,7 @@
-// no-port-check: NereusSDR/Longpath-original test file.
+// no-port-check: Longpath/Longpath-original test file.
 
 // =================================================================
-// tests/tst_radio_connection_factory_sunsdr.cpp  (NereusSDR/Longpath)
+// tests/tst_radio_connection_factory_sunsdr.cpp  (Longpath)
 // =================================================================
 //
 // Plan doc task A.3: docs/architecture/2026-08-26-sunsdr-connection-plan.md
@@ -15,7 +15,7 @@
 // a baseline, not just the new SunSdr case in isolation.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-26 — Original for NereusSDR/Longpath by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

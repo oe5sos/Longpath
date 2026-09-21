@@ -340,7 +340,7 @@ required for this phase.
   `verify-thetis-headers.py`, `check-new-ports.py` (diff + full-tree),
   `verify-inline-cites.py`, `compliance-inventory.py`,
   `verify-inline-tag-preservation.py`. All must pass.
-- **Environment:** `NEREUS_THETIS_DIR=/Users/j.j.boyd/Thetis` set in
+- **Environment:** `LONGPATH_THETIS_DIR=/Users/j.j.boyd/Thetis` set in
   shell before each commit.
 
 ---

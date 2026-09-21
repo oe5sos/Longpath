@@ -7,7 +7,7 @@
 //
 // The DXCC prefix resolver is injected, so these run without cty.dat
 // and the award logic is tested rather than the prefix table.
-// no-port-check: NereusSDR-original.
+// no-port-check: Longpath-original.
 
 #include <QtTest/QtTest>
 #include <QTimeZone>

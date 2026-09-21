@@ -1,5 +1,5 @@
-// tests/tst_tci_iq_roundtrip.cpp  (NereusSDR)
-// no-port-check: NereusSDR-original integration test for the IQ binary
+// tests/tst_tci_iq_roundtrip.cpp  (Longpath)
+// no-port-check: Longpath-original integration test for the IQ binary
 // stream pipeline.  Validates: synthetic I/Q injection → wantsIQStream
 // per-client subscription gating → IQSwap flag honored → TciBinaryFrame
 // encode → QWebSocket sendBinaryMessage → client decodes streamType=0.

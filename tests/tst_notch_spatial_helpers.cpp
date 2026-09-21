@@ -1,7 +1,7 @@
 // =================================================================
-// tests/tst_notch_spatial_helpers.cpp  (NereusSDR)
+// tests/tst_notch_spatial_helpers.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure.
+// no-port-check: Longpath-original test infrastructure.
 //
 // TNF section 5.3: the MNotchDB spatial helpers ported from Thetis
 // radio.cs. notchesInBandwidth uses INCLUSIVE edge overlap

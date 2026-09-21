@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/setup/hardware/OcOutputsSwlTab.cpp  (NereusSDR)
+// src/gui/setup/hardware/OcOutputsSwlTab.cpp  (Longpath)
 // =================================================================
 //
 // Ported from mi0bot-Thetis source:
@@ -11,7 +11,7 @@
 // See OcOutputsSwlTab.h for the full design + scope rationale.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-30 — New for Phase 3L HL2 Filter visibility.  Replaces
 //                Phase 3P-D Task 2 placeholder QLabel.
 //                J.J. Boyd (KG4VCF), with AI-assisted transformation

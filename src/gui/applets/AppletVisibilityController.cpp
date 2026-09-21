@@ -1,8 +1,8 @@
 // =================================================================
-// src/gui/applets/AppletVisibilityController.cpp  (NereusSDR)
+// src/gui/applets/AppletVisibilityController.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. See header for attribution.
+// Longpath-original. See header for attribution.
 //
 // =================================================================
 

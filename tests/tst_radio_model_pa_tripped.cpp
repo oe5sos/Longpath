@@ -1,6 +1,6 @@
 // tst_radio_model_pa_tripped.cpp
 //
-// no-port-check: Test file exercises NereusSDR API; Thetis behavior is
+// no-port-check: Test file exercises Longpath API; Thetis behavior is
 // cited in RadioModel.cpp — no C# is translated here.
 //
 // Unit tests for RadioModel::paTripped() live state and the Ganymede PA

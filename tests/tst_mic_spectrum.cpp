@@ -4,7 +4,7 @@
 // without a lock, so the two things worth pinning are the ones that
 // would be invisible if wrong: the snapshot must be in time order, and
 // it must never claim more than it has.
-// no-port-check: NereusSDR-original.
+// no-port-check: Longpath-original.
 
 #include <QtTest/QtTest>
 

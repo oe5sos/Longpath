@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// no-port-check: NereusSDR-original test file. SpotHubDialog itself is
+// no-port-check: Longpath-original test file. SpotHubDialog itself is
 // an AetherSDR port (DxClusterDialog [@0cd4559]), but the central
-// "Settings" tab pinned here is a NereusSDR addition. Upstream has no
+// "Settings" tab pinned here is a Longpath addition. Upstream has no
 // equivalent: AetherSDR scatters callsign + grid identity fields across
 // each per-source tab.
 //
-// NereusSDR - SpotHubDialog Settings tab (operator identity).
+// Longpath - SpotHubDialog Settings tab (operator identity).
 //
 // User-reported UX bug (2026-05-11): each spot client needed callsign +
 // grid, but the inputs were scattered across the Cluster / RBN / PSK
@@ -29,7 +29,7 @@
 //   * Per-source tabs (Cluster / RBN / PSK Reporter) fall back to
 //     User/Callsign when their per-source key is empty.
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-11  J.J. Boyd / KG4VCF  Initial commit. AI tooling:
 //                                    Anthropic Claude Code.
 

@@ -51,7 +51,7 @@ warren@wpratt.com
 */
 
 // =================================================================
-// src/core/TxChannel.cpp  (NereusSDR)
+// src/core/TxChannel.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -64,7 +64,7 @@ warren@wpratt.com
 // Ported from Thetis wdsp/cmaster.c:177-190 [v2.10.3.13]
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-25 — TxChannel C++ wrapper implemented by J.J. Boyd (KG4VCF)
 //                 during 3M-1a Task C.2, with AI-assisted transformation
 //                 via Anthropic Claude Code.
@@ -167,7 +167,7 @@ warren@wpratt.com
 //   2026-05-02 — Plan 4 D8: requestFilterChange / applyPendingFilter /
 //                 applyTxFilterForMode implemented by J.J. Boyd (KG4VCF).
 //                 50 ms debounce QTimer wired in constructor.  Per-mode
-//                 IQ-space mapping is NereusSDR-original glue identical
+//                 IQ-space mapping is Longpath-original glue identical
 //                 to the TUN bandpass logic at setTuneTone():505-528,
 //                 cited from deskhpsdr/transmitter.c:2136-2186 [@120188f].
 //                 The TUN path at lines 520-528 is untouched.
@@ -180,7 +180,7 @@ warren@wpratt.com
 //                 setMicPreamp / D.3 / D.6 pattern.  WDSP entry-point
 //                 forward-declaration colocated with the existing
 //                 GetTXACFCOMPDisplayCompression block; the underlying
-//                 SetTXFixedGain symbol lives in NereusSDR's bundled
+//                 SetTXFixedGain symbol lives in Longpath's bundled
 //                 third_party/wdsp/src/txgain_stub.c glue file (issue #167
 //                 Phase 1) until a future phase ports the full Thetis
 //                 ChannelMaster TXGAIN pcm storage.  RadioModel call-site
@@ -197,7 +197,7 @@ warren@wpratt.com
 //                 null-guard pattern as the existing setVox* / DEXP
 //                 setters.  Critical correctness fix — without this, the
 //                 entire DEXP feature was a no-op shell because the
-//                 create_dexp call had never been ported into NereusSDR's
+//                 create_dexp call had never been ported into Longpath's
 //                 createTxChannel.  See the WdspEngine.cpp comment block
 //                 at the create_dexp callsite for the full root-cause /
 //                 buffer-architecture narrative.  AI-assisted transformation
@@ -402,7 +402,7 @@ namespace Longpath {
 //
 // s_pushVoxCallback is the C-callable bridge that WDSP fires from inside
 // `xdexp` (wdsp/dexp.c:330,339 [v2.10.3.13]) on the audio worker thread
-// (TxWorkerThread for NereusSDR).  Looks up the instance via the channel
+// (TxWorkerThread for Longpath).  Looks up the instance via the channel
 // id passed by WDSP and emits voxActiveChanged — RadioModel routes that
 // signal into MoxController::onVoxActive (Qt::AutoConnection promotes to
 // QueuedConnection across threads).
@@ -414,7 +414,7 @@ namespace Longpath {
 // ---------------------------------------------------------------------------
 TxChannel* TxChannel::s_voxKeyInstance = nullptr;
 
-void NEREUS_STDCALL TxChannel::s_pushVoxCallback(int id, int active)
+void LONGPATH_STDCALL TxChannel::s_pushVoxCallback(int id, int active)
 {
     TxChannel* inst = s_voxKeyInstance;
     if (inst == nullptr || inst->m_channelId != id) {
@@ -542,7 +542,7 @@ TxChannel::~TxChannel()
 //
 // The registration is safe to issue here because Thetis create_xmtr
 // (cmaster.c:130-157 [v2.10.3.13]) calls create_dexp BEFORE OpenChannel
-// returns, and NereusSDR's WdspEngine::createTxChannel mirrors that order
+// returns, and Longpath's WdspEngine::createTxChannel mirrors that order
 // (OpenChannel(type=1) constructs the full TXA pipeline including DEXP
 // before this constructor runs).  pdexp[m_channelId] is therefore non-null
 // at this point — the same invariant the existing setVoxRun / setDexpRun
@@ -558,7 +558,7 @@ TxChannel::~TxChannel()
 //
 // Cite: Thetis cmaster.cs:1125 [v2.10.3.13] — analogous registration
 // against the ChannelMaster wrapper VOX (`SendCBPushVox(0, PushVoxDel)`).
-// NereusSDR has no ChannelMaster shim, so the registration goes against
+// Longpath has no ChannelMaster shim, so the registration goes against
 // WDSP's DEXP pushvox directly (wdsp/dexp.c:399-403 [v2.10.3.13]).
 // ---------------------------------------------------------------------------
 void TxChannel::registerVoxCallback()
@@ -666,7 +666,7 @@ void TxChannel::setDexpBuffer(double* dexpBuf, std::size_t sizeDoubles)
 // Mirrors Thetis cmaster.c:388 [v2.10.3.13] xdexp(tx) call BEFORE
 // fexchange0 at cmaster.c:389.
 //
-// Buffer architecture is PARALLEL-ONLY in NereusSDR (see WdspEngine.cpp
+// Buffer architecture is PARALLEL-ONLY in Longpath (see WdspEngine.cpp
 // create_dexp callsite for the full narrative): the block is copied
 // byte-for-byte into the WdspEngine-owned per-channel DEXP buffer, then
 // xdexp() runs.  The DEXP module's output is discarded — only the
@@ -926,7 +926,7 @@ bool TxChannel::stageRunning(Stage s) const
 //   radio.GetDSPTX(0).TXPostGenToneMag = MAX_TONE_MAG; // console.cs:30039
 //   radio.GetDSPTX(0).TXPostGenRun    = 1;             // console.cs:30040
 //
-// NereusSDR translation: the sign-flip is the caller's responsibility (G.4
+// Longpath translation: the sign-flip is the caller's responsibility (G.4
 // TUNE function port computes ±cw_pitch and passes it as freqHz).  The call
 // order is preserved verbatim: freq → mode → mag → run.
 //
@@ -1007,7 +1007,7 @@ void TxChannel::setTuneTone(bool on, double freqHz, double magnitude)
 // cmaster.cs:522-527 [v2.10.3.13]:
 //   WDSP.SetTXACFIRRun(txch, false);   // P1 (USB protocol)
 //   WDSP.SetTXACFIRRun(txch, true);    // P2
-// NereusSDR activates cfir unconditionally in 3M-1a; P1/P2 gating is deferred
+// Longpath activates cfir unconditionally in 3M-1a; P1/P2 gating is deferred
 // to 3M-1b when the active protocol is exposed through TxChannel.
 //
 // Stages NOT activated here:
@@ -1112,7 +1112,7 @@ void TxChannel::setRunning(bool on)
 // ChannelMaster wrapper is driven by HPSDR EP6 Tx audio cadence, not by
 // MOX state).  Audio.VOXEnabled in audio.cs:168-192 [v2.10.3.13] only
 // flips DEXP's run_vox flag via cmaster.CMSetTXAVoxRun(0); it does not
-// touch the channel state.  NereusSDR's TxWorkerThread + m_running gate
+// touch the channel state.  Longpath's TxWorkerThread + m_running gate
 // is a power-saving departure from Thetis (no pumping when neither MOX
 // nor VOX is in play).  This setter restores Thetis-equivalent VOX
 // detection while keeping power saving everywhere else.
@@ -1495,13 +1495,13 @@ void TxChannel::setTxMode(DSPMode mode)
 {
     m_mode = mode;  // carry — always updated regardless of WDSP state
 
-    // Phase 3R K-bench: RADE_U / RADE_L are NereusSDR-native dispatch
+    // Phase 3R K-bench: RADE_U / RADE_L are Longpath-native dispatch
     // modes (DSPMode::RADE_U = 12, RADE_L = 13). WDSP's SetTXAMode only
     // accepts the original Thetis-derived modes (LSB=0 .. DRM=11);
     // passing 12 or 13 leaves the WDSP modulator stage in an invalid
     // state and produces no I/Q output. Per the source-first reframe
     // (freedv-gui treats RADE as audio + radio's external SSB modulator
-    // handles USB/LSB), NereusSDR must map RADE_U -> USB and RADE_L ->
+    // handles USB/LSB), Longpath must map RADE_U -> USB and RADE_L ->
     // LSB before calling SetTXAMode so the WDSP modulator runs as if
     // for ordinary SSB voice. RadeChannel-generated audio is then fed
     // into the same TXA mic-input path.
@@ -1548,8 +1548,8 @@ void TxChannel::setTxMode(DSPMode mode)
 //       ...
 //   }
 //
-// NereusSDR translation: no change-detection guard (Thetis checks low != dsp
-// or high != dsp; NereusSDR's callers are responsible for avoiding unnecessary
+// Longpath translation: no change-detection guard (Thetis checks low != dsp
+// or high != dsp; Longpath's callers are responsible for avoiding unnecessary
 // calls, so we call WDSP unconditionally — simpler and correct for 3M-1b
 // where the same filter values may be set at channel-start to ensure the
 // bandpass is correct regardless of prior state).
@@ -1580,7 +1580,7 @@ void TxChannel::setTxBandpass(int lowHz, int highHz)
 // ---------------------------------------------------------------------------
 // requestFilterChange()
 //
-// Plan 4 D8 — NereusSDR-original glue that wires TransmitModel::filterChanged
+// Plan 4 D8 — Longpath-original glue that wires TransmitModel::filterChanged
 // into the WDSP bandpass via a 50 ms debounce.
 //
 // Stores the pending audio-space values and (re)starts the single-shot debounce
@@ -1622,7 +1622,7 @@ void TxChannel::applyPendingFilter()
 // ---------------------------------------------------------------------------
 // applyTxFilterForMode()
 //
-// NereusSDR-original glue: maps audio-space Hz to IQ-space (signed) per mode,
+// Longpath-original glue: maps audio-space Hz to IQ-space (signed) per mode,
 // emits txFilterApplied, then calls setTxBandpass.
 //
 // Per-mode IQ-space sign convention from deskhpsdr/transmitter.c:2136-2186
@@ -1740,7 +1740,7 @@ void TxChannel::setVoxRun(bool run)
     // Thetis create_xmtr (cmaster.c:130-157 [v2.10.3.13]) calls
     // create_dexp BEFORE OpenChannel, so pdexp[i] is non-null whenever
     // rsmpin.p is non-null.  Task 20 (commit 109c09e) ports create_dexp
-    // into NereusSDR's WdspEngine::createTxChannel so pdexp[i] is now
+    // into Longpath's WdspEngine::createTxChannel so pdexp[i] is now
     // non-null in production; the guard remains for unit-test builds
     // that don't drive WdspEngine::initialize().
     if (pdexp[m_channelId] == nullptr) return;
@@ -1803,7 +1803,7 @@ void TxChannel::setVoxAttackThreshold(double thresh)
 // Callers pass seconds.  Thetis converts ms → s at the callsite:
 //   cmaster.SetDEXPHoldTime(0, (double)udDEXPHold.Value / 1000.0)
 //   — Thetis setup.cs:18899 [v2.10.3.13]
-// NereusSDR callers are responsible for the same conversion.
+// Longpath callers are responsible for the same conversion.
 //
 // Idempotent guard: NaN-aware first-call sentinel (same pattern as
 // setVoxAttackThreshold above).
@@ -1962,7 +1962,7 @@ void TxChannel::setAntiVoxRate(double rate)
 //     cmaster.SetAntiVOXDetectorTau(0, (double)udAntiVoxTau.Value / 1000.0);
 //   — Thetis setup.cs:18995 [v2.10.3.13]
 // This wrapper takes seconds directly; the ms->s conversion lives at the
-// Setup page handler in NereusSDR (mirroring Thetis), not here.
+// Setup page handler in Longpath (mirroring Thetis), not here.
 //
 // Non-positive tau is rejected with a qCWarning; calc_antivox would
 // produce NaN.
@@ -2018,7 +2018,7 @@ void TxChannel::setAntiVoxDetectorTau(double seconds)
 // stable antivox_data buffer because cs_update inside dexp.c serialises
 // the memcpy from antivox_data into the detector path.
 //
-// In NereusSDR the equivalent of Thetis ChannelMaster aamix is
+// In Longpath the equivalent of Thetis ChannelMaster aamix is
 // AudioEngine::m_antiVoxMix, a second MasterMixer instance fed by every
 // audible slice (Phase 3F Sub-Epic J Task 9, mirroring cmaster.c:371-372
 // [v2.10.3.15]).  Its drained block reaches this method through
@@ -2071,11 +2071,11 @@ void TxChannel::sendAntiVoxData(const float* interleaved, int nsamples)
 // hazard across the thread boundary.  The float* view is reconstructed inside
 // the slot body via reinterpret_cast<const float*>(bytes.constData()).
 //
-// Phase 3J-1 Task 17.1 — NereusSDR-original entry point.
+// Phase 3J-1 Task 17.1 — Longpath-original entry point.
 //
 // Thetis dequeues TCIQueuedTxAudio in a separate thread and writes to the
 // WDSP ring via TryDequeueTxAudio (TCIServer.cs:5586-5600 [v2.10.3.13]).
-// NereusSDR consolidates this into a single call that accumulates and drains
+// Longpath consolidates this into a single call that accumulates and drains
 // in the same drain tick where the data arrived.
 //
 // `interleavedStereoBytes` — raw float bytes: L0,R0,L1,R1,... (ch==2) or
@@ -2337,7 +2337,7 @@ void TxChannel::setDexpRun(bool run)
 //       cmaster.SetDEXPDetectorTau(0, (double)udDEXPDetTau.Value / 1000.0);
 //   }
 //
-// NereusSDR follows the same idiom: callers pass milliseconds for symmetry
+// Longpath follows the same idiom: callers pass milliseconds for symmetry
 // with setVoxHangTime's seconds API would have been wrong here — Thetis
 // exposes ms in the spinbox (udDEXPDetTau Min=1 Max=100, default 20 per
 // setup.Designer.cs:45078-45093 [v2.10.3.13]) and divides by 1000 just
@@ -2876,7 +2876,7 @@ void TxChannel::setMicRouter(TxMicRouter* router)
 //
 // Block-size invariant matches Thetis cmaster.c:460-487 [v2.10.3.13]:
 //   r1_outsize == xcm_insize == in_size
-// — a single uniform block size end-to-end.  NereusSDR uses 256 (rather
+// — a single uniform block size end-to-end.  Longpath uses 256 (rather
 // than Thetis's 64) due to the WDSP r2-ring divisibility constraint
 // (2048 % 256 == 0).
 //
@@ -2976,7 +2976,7 @@ void TxChannel::driveOneTxBlockFromInterleaved(const double* interleavedIn)
     //   "DEXP code runs continuously so it can be used to trigger VOX also."
     // In Thetis the TXA pipeline pumps continuously regardless of MOX
     // (HPSDR EP6 audio cadence drives ChannelMaster, not MOX state); MOX
-    // gates radio-write at the connection layer.  NereusSDR mirrors that
+    // gates radio-write at the connection layer.  Longpath mirrors that
     // via the two-gate split here.
     const bool actualRunning = m_running.load(std::memory_order_acquire);
     const bool voxListening  = m_voxListening.load(std::memory_order_acquire);
@@ -3137,7 +3137,7 @@ void TxChannel::driveOneTxBlockFromInterleaved(const double* interleavedIn)
 // setMicPreamp()
 //
 // Set the mic preamp linear scalar, then push it to WDSP via
-// recomputeTxAPanelGain1().  This is the NereusSDR translation of
+// recomputeTxAPanelGain1().  This is the Longpath translation of
 // Audio.MicPreamp in Thetis (audio.cs:216-243 [v2.10.3.13]), which calls
 // CMSetTXAPanelGain1 → SetTXAPanelGain1 every time the property is set.
 //
@@ -3415,7 +3415,7 @@ double TxChannel::getTxMicMeterDb() const noexcept
 //
 // The C# Thetis property surface exposes Freq1/Freq2 / Mag1/Mag2 as separate
 // setters, but the underlying WDSP C API combines both into single calls.
-// NereusSDR caches the partner value internally (m_postGen*Cache fields)
+// Longpath caches the partner value internally (m_postGen*Cache fields)
 // so each individual setX1 / setX2 wrapper can invoke the combined WDSP
 // call with both fields — matching Thetis radio.cs:3697-4032 [v2.10.3.13]
 // `tx_postgen_tt_freq1_dsp` / `_freq2_dsp` / etc. cache fields.
@@ -4446,7 +4446,7 @@ qint64 TxChannel::rebuild(WdspEngine& engine, const ChannelConfig& cfg)
 // Filter size and filter type share the same per-mode keys as RxChannel
 // (DspOptionsFilterSize<Mode> / DspOptionsFilterType<Mode>Tx).
 //
-// NereusSDR-original — no Thetis source ported; the per-mode key naming
+// Longpath-original — no Thetis source ported; the per-mode key naming
 // mirrors the DspOptionsPage AppSettings keys (design Section 4B).
 
 namespace {
@@ -4575,7 +4575,7 @@ qint64 TxChannel::onModeChanged(DSPMode newMode)
 // imported by C# via P/Invoke at cmaster.cs:273-274 [v2.10.3.13]:
 //   [DllImport("ChannelMaster.dll", EntryPoint = "SetTXFixedGain", ...)]
 //   public static extern void SetTXFixedGain(int id, double Igain, double Qgain);
-// NereusSDR's bundled wdsp library provides the same symbol via a NereusSDR-
+// Longpath's bundled wdsp library provides the same symbol via a Longpath-
 // original glue stub at third_party/wdsp/src/txgain_stub.c (issue #167
 // Phase 1) — the real per-channel pcm storage that Thetis's
 // ChannelMaster owns is deferred to a future ChannelMaster-port phase.

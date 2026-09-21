@@ -1,7 +1,7 @@
 // =================================================================
-// tests/tst_slice_stream_allocator.cpp  (NereusSDR)
+// tests/tst_slice_stream_allocator.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original. The window-fit rule ports Thetis
+// no-port-check: Longpath-original. The window-fit rule ports Thetis
 // console.cs:31920 [v2.10.3.15]; the promote-instead-of-disable
 // behaviour is a documented divergence (design doc §3).
 //

@@ -1,6 +1,6 @@
 #!/bin/bash
 # =================================================================
-# build.sh  (NereusSDR)
+# build.sh  (Longpath)
 # =================================================================
 #
 # Build, and do nothing else.
@@ -29,7 +29,7 @@
 #         ./build.sh --quiet  exit status only, for scripts
 #
 # =================================================================
-# Modification history (NereusSDR):
+# Modification history (Longpath):
 #   2026-08-11 — Created for NereusSDR, AI-assisted via Anthropic
 #                 Claude (Cowork), operator Martin Fischer.
 # =================================================================
@@ -38,7 +38,7 @@ set -uo pipefail
 
 cd "$(dirname "$0")"
 
-LOG=/tmp/nereus-build.log
+LOG=/tmp/longpath-build.log
 QUIET=0
 [ "${1:-}" = "--quiet" ] && QUIET=1
 

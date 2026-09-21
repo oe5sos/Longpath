@@ -1,13 +1,13 @@
 // =================================================================
-// src/core/ModelPaths.cpp  (NereusSDR)
+// src/core/ModelPaths.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original (no Thetis equivalent — Thetis bundles rnnoise
-// as a DLL and loads it via P/Invoke; NereusSDR resolves the .bin
+// Longpath-original (no Thetis equivalent — Thetis bundles rnnoise
+// as a DLL and loads it via P/Invoke; Longpath resolves the .bin
 // file path at runtime across platform install layouts).
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-23 — Written for NereusSDR by J.J. Boyd (KG4VCF),
 //                 with AI-assisted development via Anthropic Claude Code.
 //   2026-04-23 — Added rnnoiseDefaultSmallBin() and dfnrModelTarball()
@@ -73,7 +73,9 @@ QString probeModel(const QString& subdir, const QString& filename)
     //    The third_party/<libname>/models/ path is relative to the repo root.
     const QString libname = (subdir == QStringLiteral("dfnet3"))
         ? QStringLiteral("deepfilter")
-        : QStringLiteral("rnnoise");
+        : (subdir == QStringLiteral("nnr"))
+            ? QStringLiteral("wdsp")
+            : QStringLiteral("rnnoise");
     for (const char* rel : {
              "/../third_party/",
              "/../../third_party/",
@@ -103,6 +105,16 @@ QString rnnoiseDefaultSmallBin()
 QString dfnrModelTarball()
 {
     return probeModel(QStringLiteral("dfnet3"), QStringLiteral("DeepFilterNet3_onnx.tar.gz"));
+}
+
+QString nnrModel0Bin()
+{
+    return probeModel(QStringLiteral("nnr"), QStringLiteral("wdsp_nnr_0.bin"));
+}
+
+QString nnrModel1Bin()
+{
+    return probeModel(QStringLiteral("nnr"), QStringLiteral("wdsp_nnr_1.bin"));
 }
 
 } // namespace Longpath::ModelPaths

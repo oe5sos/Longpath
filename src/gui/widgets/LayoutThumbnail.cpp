@@ -1,4 +1,4 @@
-// no-port-check: AetherSDR-derived NereusSDR file. Painted pan-layout
+// no-port-check: AetherSDR-derived Longpath file. Painted pan-layout
 // preview tile, structurally from AetherSDR PanLayoutDialog.cpp
 // LayoutThumbnail [@c6481cb]. Registered in
 // docs/attribution/aethersdr-contributor-index.md.
@@ -6,7 +6,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // =================================================================
-// src/gui/widgets/LayoutThumbnail.cpp  (NereusSDR)
+// src/gui/widgets/LayoutThumbnail.cpp  (Longpath)
 // =================================================================
 //
 // Ported (structurally) from AetherSDR PanLayoutDialog.cpp [@c6481cb].
@@ -18,7 +18,7 @@
 // citation per docs/attribution/HOW-TO-PORT.md rule 6.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-02  J.J. Boyd / KG4VCF  Bottom-banner + pan-menu epic.
 //                                    Nine layouts rather than
 //                                    AetherSDR's twelve; see design
@@ -34,7 +34,7 @@
 
 namespace Longpath {
 
-// Nine layouts, Single first. AetherSDR orders Single last; NereusSDR leads
+// Nine layouts, Single first. AetherSDR orders Single last; Longpath leads
 // with it because it is where an operator starts and returns.
 const QVector<PanLayoutGeometry> kPanLayouts = {
     {QStringLiteral("1"),   QStringLiteral("Single"),        1, {1}},

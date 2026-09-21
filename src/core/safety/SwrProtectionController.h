@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/safety/SwrProtectionController.h  (NereusSDR)
+// src/core/safety/SwrProtectionController.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis [v2.10.3.13 @501e3f5]:
@@ -10,7 +10,7 @@
 // CLAUDE.md "Byte-for-byte headers and multi-file attribution".
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-25 — Ported to C++20/Qt6 for NereusSDR by J.J. Boyd
 //                (KG4VCF), with AI-assisted transformation via
 //                Anthropic Claude Code.
@@ -154,7 +154,7 @@ public:
     /// Cite: console.cs:26020-26057 [v2.10.3.13] (tunePowerSliderValue).
     void setTunePowerSliderValue(int value) noexcept;
 
-    // ── Measurement mode (NereusSDR-original, not in Thetis) ───────────────
+    // ── Measurement mode (Longpath-original, not in Thetis) ───────────────
     //
     // The SWR sweep deliberately walks the transmitter across a whole
     // band at a few watts, into whatever mismatch the antenna has at

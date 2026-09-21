@@ -133,14 +133,14 @@ QString sliceBadgeStyle(int colorIdx, bool assigned)
     const QString color = sliceColor(colorIdx).name();
     if (assigned) {
         return QStringLiteral(
-            "QLabel { background: %1; color: #000000; border: 1px solid %1; "
+            "QLabel { background: %1; color: %2; border: 1px solid %1; "
             "border-radius: 3px; font-weight: bold; font-size: 9px; padding: 0; }")
             .arg(color);
     }
     return QStringLiteral(
-        "QLabel { background: %1; color: %2; border: 1px solid %2; "
+        "QLabel { background: %2; color: %1; border: 1px solid %1; "
         "border-radius: 3px; font-weight: bold; font-size: 9px; padding: 0; }")
-        .arg(QString::fromLatin1(Style::kButtonBg), color);
+        .arg(color, QLatin1String(Style::kButtonHover));
 }
 
 QString sliceLetterOf(SliceModel* slice)

@@ -1,7 +1,7 @@
 #pragma once
 
 // =================================================================
-// src/gui/applets/TxApplet.h  (NereusSDR)
+// src/gui/applets/TxApplet.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -13,7 +13,7 @@
 // block below).
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-16 — Ported/adapted in C++20/Qt6 for NereusSDR by
 //                 J.J. Boyd (KG4VCF), with AI-assisted transformation
 //                 via Anthropic Claude Code.
@@ -141,7 +141,7 @@
 //
 //   Layout pattern from AetherSDR `src/gui/TxApplet.{h,cpp}`.
 //   AetherSDR is licensed under the GNU General Public License v3.
-//   NereusSDR is also GPLv3. Attribution follows GPLv3 §5 requirements.
+//   Longpath is also GPLv3. Attribution follows GPLv3 §5 requirements.
 // =================================================================
 
 #include "AppletWidget.h"
@@ -229,6 +229,18 @@ public:
     // Phase 3M-1a H.3.
     void setCurrentBand(Band band);
 
+    // Code review, 2026-09-13: the MOX-tooltip (K.2) and TX-filter-status-
+    // label connections to SliceModel::dspModeChanged were only ever made
+    // once, in wireControls(), against whichever slice m_model->activeSlice()
+    // returned at construction time -- never re-bound when the operator
+    // switches the active slice (RadioModel::activeSliceChanged), so both
+    // stayed wired to the wrong (or, since TxApplet is built before any
+    // slice exists, no) slice for the rest of the session. Call this
+    // whenever the active slice changes; MainWindow does so on
+    // RadioModel::activeSliceChanged, mirroring how it already re-binds
+    // RxApplet via RxApplet::setSlice().
+    void rebindActiveSlice();
+
     // Rescale the RF Pwr HGauge ticks + redzone for the connected SKU's
     // PA ceiling.  Called from currentRadioChanged subscriber wired in
     // wireControls().  HPSDRModel::FIRST is a safe sentinel default
@@ -300,7 +312,7 @@ public slots:
 public:
 
     // ── Test accessors ──────────────────────────────────────────────────────
-    // Always-on (no NEREUS_BUILD_TESTS guard) — same convention as
+    // Always-on (no LONGPATH_BUILD_TESTS guard) — same convention as
     // TestTwoTonePage (matches AudioTxInputPage / RxApplet patterns).
     QComboBox*   profileCombo()      const { return m_profileCombo; }
     QPushButton* twoToneButton()     const { return m_twoToneBtn; }
@@ -380,6 +392,11 @@ private:
     // K.2: slot called when SliceModel::dspModeChanged fires (via RadioModel).
     // Updates m_moxBtn->setToolTip(tooltipForMode(mode)).
     void onMoxModeChanged(DSPMode mode);
+    // Promoted out of wireControls()'s local lambda (2026-09-13) so
+    // rebindActiveSlice() can call it too. Reads m_model->activeSlice()
+    // fresh each call -- shared by TransmitModel::filterChanged and the
+    // active slice's dspModeChanged (symmetric vs. asymmetric format).
+    void refreshTxFilterStatusLabel();
 
     // Canonical TX band derived from the active slice's frequency.  This
     // is the band the radio actually transmits on (RadioModel.cpp:903-905
@@ -496,6 +513,11 @@ private:
     // symmetric.  Orange tint (#ffaa70) matches the future Style::kTxFilterOverlayLabel
     // constant (Cluster E will add it to StyleConstants.h).
     QLabel*      m_txFilterStatusLabel{nullptr};
+    // Live connections to whichever slice is currently active, re-made by
+    // rebindActiveSlice() on every RadioModel::activeSliceChanged so they
+    // never point at a stale slice (2026-09-13 code review fix).
+    QMetaObject::Connection m_activeSliceModeConn;
+    QMetaObject::Connection m_activeSliceFilterConn;
 
     // 10. SWR protection LED (wired to SwrProtectionController::highSwrChanged)
     QLabel*      m_swrProtLed = nullptr;

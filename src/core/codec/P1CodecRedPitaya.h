@@ -1,12 +1,12 @@
 // =================================================================
-// src/core/codec/P1CodecRedPitaya.h  (NereusSDR)
+// src/core/codec/P1CodecRedPitaya.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
 //   Project Files/Source/ChannelMaster/networkproto1.c:606-616 (bank 12 ADC1 carve-out)
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-20 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                (KG4VCF), with AI-assisted transformation via Anthropic
 //                Claude Code. Extends P1CodecStandard by overriding

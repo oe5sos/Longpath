@@ -6,7 +6,7 @@
 // answer. The decisions are pure functions for exactly that reason:
 // each can be checked against a measurement whose right answer is
 // known, rather than by listening to the result and hoping.
-// no-port-check: NereusSDR-original.
+// no-port-check: Longpath-original.
 
 #include <QtTest/QtTest>
 

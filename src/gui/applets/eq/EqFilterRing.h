@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/gui/applets/eq/EqFilterRing.h  (NereusSDR)
+// src/gui/applets/eq/EqFilterRing.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // One ring of filter types, and one function that changes a band onto
 // one of them.
@@ -39,7 +39,7 @@
 // not a trade worth making.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-11 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/setup/TciLogWindow.cpp  (NereusSDR)
+// src/gui/setup/TciLogWindow.cpp  (Longpath)
 // =================================================================
 //
 // Phase 3J-1 closeout Item 2 (2026-05-12): see header for design notes.
@@ -121,7 +121,7 @@ void TciLogWindow::buildUI()
     mono.setStyleHint(QFont::TypeWriter);
     mono.setPointSize(10);
     m_logView->setFont(mono);
-    // Dark-theme styling to match the rest of NereusSDR's setup dialogs.
+    // Dark-theme styling to match the rest of Longpath's setup dialogs.
     m_logView->setStyleSheet(QStringLiteral(
         "QPlainTextEdit {"
         "  background-color: #18181a;"

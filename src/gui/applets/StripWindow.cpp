@@ -1,12 +1,12 @@
 // =================================================================
-// src/gui/applets/StripWindow.cpp  (NereusSDR)
+// src/gui/applets/StripWindow.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. See StripWindow.h for the layout rule and for
+// Longpath-original. See StripWindow.h for the layout rule and for
 // what is ported and what is not.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-08 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================
@@ -587,7 +587,7 @@ QWidget* StripWindow::buildEqPanel()
     // ── AetherSDR's equaliser, whole ─────────────────────────────────
     //
     // Asked for at the bench: "delete what is here and take AetherSDR's".
-    // What stood here before was roughly 700 lines of NereusSDR-original
+    // What stood here before was roughly 700 lines of Longpath-original
     // interface — the fifteen-second take recorder, editable target
     // curves with A/B slots, loudness-matched bypass, match-EQ from a
     // WAV, band solo, the numeric table, the folding sections. All of it
@@ -601,7 +601,7 @@ QWidget* StripWindow::buildEqPanel()
     // EqHost is the seam. See gui/applets/eq/EqHost.h — the ported
     // widgets talk to an AudioEngine with five methods on it, and rather
     // than editing five borrowed files to reach into StripChain, the
-    // five names are presented over NereusSDR's own parts. The borrowed
+    // five names are presented over Longpath's own parts. The borrowed
     // code stays byte-comparable against upstream.
     if (!m_eqHost) {
         m_eqHost = std::make_unique<EqHost>(chain());

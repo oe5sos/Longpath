@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - SpotModel: TCI-keyed spot sink implementation.
+// Longpath - SpotModel: TCI-keyed spot sink implementation.
 //
 // Ported from AetherSDR src/models/SpotModel.cpp [@0cd4559].
 // AetherSDR is (C) its contributors and is licensed GPL-3.0-or-later
 // (see https://github.com/ten9876/AetherSDR/blob/main/LICENSE).
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-17  J.J. Boyd / KG4VCF  Issue #263 fix.  dedupIndexFor
 //                                    no longer uses a fixed 60 s window
 //                                    (which expired long before the
@@ -24,7 +24,7 @@
 //                                    AI tooling: Anthropic Claude Code.
 //   2026-05-11  J.J. Boyd / KG4VCF  Phase 3J-2 Task D1. Initial port.
 //                                    AetherSDR's "AetherSDR" namespace
-//                                    becomes "NereusSDR". applySpotStatus
+//                                    becomes "Longpath". applySpotStatus
 //                                    isNew detection (first call for a
 //                                    given index sets addedMs and emits
 //                                    spotAdded; subsequent calls emit

@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/gui/instruments/FrequencyInstrument.h  (NereusSDR)
+// src/gui/instruments/FrequencyInstrument.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // ── Die Frequenz in der Handschrift der Instrumente ──────────────────
 //
@@ -47,7 +47,7 @@
 // Bandkante wie das Rad auf der Flagge.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-17 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

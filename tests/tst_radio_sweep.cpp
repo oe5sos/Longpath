@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_radio_sweep.cpp  (NereusSDR)
+// tests/tst_radio_sweep.cpp  (Longpath)
 // =================================================================
 //
 // Turning a radio's SWR sweep into the Sweep the analysis half of the
@@ -15,10 +15,10 @@
 // curve that looked like an ideal antenna, and 51 discarded points
 // reported as 51 measurements.
 //
-// no-port-check: NereusSDR-original.
+// no-port-check: Longpath-original.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-14 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

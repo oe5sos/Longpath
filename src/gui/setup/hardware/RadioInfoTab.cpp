@@ -1,12 +1,12 @@
 // =================================================================
-// src/gui/setup/hardware/RadioInfoTab.cpp  (NereusSDR)
+// src/gui/setup/hardware/RadioInfoTab.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/setup.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -58,6 +58,7 @@
 //============================================================================================//
 
 #include "RadioInfoTab.h"
+#include "gui/StyleConstants.h"
 #include "gui/styles/ThemeQss.h"
 
 #include "core/AppSettings.h"
@@ -162,8 +163,9 @@ RadioInfoTab::RadioInfoTab(RadioModel* model, QWidget* parent)
     m_reconnectBanner = new QFrame(this);
     m_reconnectBanner->setFrameShape(QFrame::StyledPanel);
     m_reconnectBanner->setStyleSheet(Style::themed(QStringLiteral(
-        "QFrame { background-color: #33280f; border: 1px solid #906000; "
-        "border-radius: 6px; padding: 4px; }")));
+        "QFrame { background-color: #33280f; border: 1px solid %1; "
+        "border-radius: 6px; padding: 4px; }")
+        .arg(QLatin1String(Style::kAmberBorder))));
     auto* bannerLayout = new QHBoxLayout(m_reconnectBanner);
     bannerLayout->setContentsMargins(6, 4, 6, 4);
     m_reconnectBannerLabel = new QLabel(m_reconnectBanner);

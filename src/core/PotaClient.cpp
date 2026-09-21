@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - POTA (Parks On The Air) HTTPS spot poller (implementation)
+// Longpath - POTA (Parks On The Air) HTTPS spot poller (implementation)
 //
 // Ported from AetherSDR src/core/PotaClient.cpp [@0cd4559].
 // AetherSDR is (C) its contributors and is licensed GPL-3.0-or-later
 // (see https://github.com/ten9876/AetherSDR/blob/main/LICENSE).
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-10  J.J. Boyd / KG4VCF  Phase 3J-2 Task B2. Initial port.
 //                                    See PotaClient.h for full attribution
-//                                    notes. NereusSDR refactor: the parse
+//                                    notes. Longpath refactor: the parse
 //                                    + dedup body of upstream onPollTimer()
 //                                    is split into a pure
 //                                    parseAndCollect(QByteArray) helper
@@ -54,11 +54,11 @@ PotaClient::~PotaClient()
 }
 
 // From AetherSDR src/core/PotaClient.cpp:31-35 [@0cd4559]
-// NereusSDR uses Qt's AppConfigLocation (which already lands under
-// "NereusSDR/" when QCoreApplication::organizationName/applicationName
+// Longpath uses Qt's AppConfigLocation (which already lands under
+// "Longpath/" when QCoreApplication::organizationName/applicationName
 // are set) instead of AetherSDR's GenericConfigLocation +
 // "AetherSDR/...". This keeps the file co-located with the rest of
-// NereusSDR's per-user state, mirroring the SpotCollectorClient port
+// Longpath's per-user state, mirroring the SpotCollectorClient port
 // from Task B1.
 QString PotaClient::logFilePath() const
 {
@@ -106,8 +106,8 @@ void PotaClient::stopPolling()
 
 // From AetherSDR src/core/PotaClient.cpp:90-155 [@0cd4559]
 //
-// NereusSDR refactor: upstream did the parse + dedup + emit + log work
-// inline in the QNetworkReply::finished lambda. NereusSDR splits the
+// Longpath refactor: upstream did the parse + dedup + emit + log work
+// inline in the QNetworkReply::finished lambda. Longpath splits the
 // pure data-transformation core into parseAndCollect() so the public
 // parseJsonForTest() seam can exercise the parser + dedup set without
 // instantiating a QNetworkAccessManager or simulating an HTTPS round-
@@ -154,7 +154,7 @@ QVector<DxSpot> PotaClient::parseAndCollect(const QByteArray& data)
         }
         spot.color = potaColor;
 
-        // NereusSDR-native (2026-08-26, no upstream equivalent): the
+        // Longpath-native (2026-08-26, no upstream equivalent): the
         // reference now gets its own structured field instead of being
         // flattened into `comment` -- see DxSpot.h. `entity` is the
         // reference's location prefix ("US-4558" -> "US"), mirroring
@@ -162,7 +162,7 @@ QVector<DxSpot> PotaClient::parseAndCollect(const QByteArray& data)
         QString ref  = obj.value("reference").toString();
         spot.reference = ref;
         spot.entity = ref.section('-', 0, 0);
-        // NereusSDR-native (2026-08-27, operator-requested follow-up):
+        // Longpath-native (2026-08-27, operator-requested follow-up):
         // grid6 is more precise than grid4 and is present on every
         // live spot already -- no extra lookup needed for distance/
         // bearing (see DxSpot.h).
@@ -203,7 +203,7 @@ QVector<DxSpot> PotaClient::parseAndCollect(const QByteArray& data)
 
 // From AetherSDR src/core/PotaClient.cpp:69-159 [@0cd4559]
 //
-// NereusSDR refactor: parse + dedup body extracted into
+// Longpath refactor: parse + dedup body extracted into
 // parseAndCollect() above. This slot now handles HTTP, logging, and
 // signal emission only. Order of side-effects (log line per spot, then
 // rawLineReceived, then spotReceived, then pollComplete at end) is
@@ -241,7 +241,7 @@ void PotaClient::onPollTimer()
 
         for (const DxSpot& spot : newSpots) {
             // Reconstruct the log line using the same format upstream
-            // emitted: HH:mm  call  freq_kHz  ref  mode. NereusSDR-native
+            // emitted: HH:mm  call  freq_kHz  ref  mode. Longpath-native
             // (2026-08-26): `spot.comment` no longer carries the
             // reference (it now lives in spot.reference -- see
             // parseAndCollect above), so it's added back explicitly here

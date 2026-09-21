@@ -1,4 +1,4 @@
-// no-port-check: test-only — NereusSDR-original.  Inline doc comments
+// no-port-check: test-only — Longpath-original.  Inline doc comments
 // cite Thetis source filenames as pointers to the upstream behaviour
 // each assertion verifies; no Thetis logic is reproduced here.
 //

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - BandFilterProxy implementation. setBandVisible toggles
+// Longpath - BandFilterProxy implementation. setBandVisible toggles
 // QSet<QString> membership; filterAcceptsRow reads SpotTableModel::ColBand
 // DisplayRole to compare against m_hiddenBands.
 //
@@ -8,10 +8,10 @@
 // AetherSDR is (C) its contributors and is licensed GPL-3.0-or-later
 // (see https://github.com/ten9876/AetherSDR/blob/main/LICENSE).
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-11  J.J. Boyd / KG4VCF  Phase 3J-2 Task D2. Initial port.
 //                                    AetherSDR's "AetherSDR" namespace
-//                                    becomes "NereusSDR". Implementation
+//                                    becomes "Longpath". Implementation
 //                                    extracted from
 //                                    DxClusterDialog.cpp:208-226 verbatim:
 //                                    setBandVisible (toggles QSet
@@ -57,7 +57,7 @@ void BandFilterProxy::setBandVisible(const QString& band, bool visible)
     invalidateFilterCompat();
 }
 
-// NereusSDR Task F3 extension. Mirrors setBandVisible but populates
+// Longpath Task F3 extension. Mirrors setBandVisible but populates
 // m_hiddenSources. The Spot List tab toggles this from 7 source pills
 // (Cluster / RBN / WSJT-X / SpotCollector / POTA / FreeDV / PSK).
 void BandFilterProxy::setSourceVisible(const QString& source, bool visible)
@@ -69,7 +69,7 @@ void BandFilterProxy::setSourceVisible(const QString& source, bool visible)
     invalidateFilterCompat();
 }
 
-// NereusSDR-native (2026-08-26). Mirrors setSourceVisible but populates
+// Longpath-native (2026-08-26). Mirrors setSourceVisible but populates
 // m_hiddenEntities. The Spot List tab toggles this from a dynamically
 // built checkable menu (entities are open-ended, unlike the fixed
 // band/source lists).
@@ -82,7 +82,7 @@ void BandFilterProxy::setEntityVisible(const QString& entity, bool visible)
     invalidateFilterCompat();
 }
 
-// NereusSDR-native (2026-08-27). Mirrors setEntityVisible but populates
+// Longpath-native (2026-08-27). Mirrors setEntityVisible but populates
 // m_hiddenModes. The Spot List tab toggles this from a dynamically
 // built checkable menu (modes are open-ended in practice, same
 // treatment as entity).
@@ -95,7 +95,7 @@ void BandFilterProxy::setModeVisible(const QString& mode, bool visible)
     invalidateFilterCompat();
 }
 
-// NereusSDR-native (2026-08-27). Unlike the hidden-set predicates
+// Longpath-native (2026-08-27). Unlike the hidden-set predicates
 // above, this is a single substring value, not a toggle set -- see
 // BandFilterProxy.h for the ORed-columns / non-persisted rationale.
 void BandFilterProxy::setSearchText(const QString& text)
@@ -105,8 +105,8 @@ void BandFilterProxy::setSearchText(const QString& text)
 }
 
 // From AetherSDR src/gui/DxClusterDialog.cpp:217-226 [@0cd4559] +
-// NereusSDR Task F3 source-filter extension. AetherSDR upstream
-// only checks the band predicate; NereusSDR additionally applies the
+// Longpath Task F3 source-filter extension. AetherSDR upstream
+// only checks the band predicate; Longpath additionally applies the
 // source predicate with AND semantics (a row must pass BOTH the band
 // and source filters to be visible). Empty band / source strings
 // always show (unknown values, matches upstream convention).
@@ -126,7 +126,7 @@ bool BandFilterProxy::filterAcceptsRow(int sourceRow, const QModelIndex& sourceP
         if (!source.isEmpty() && m_hiddenSources.contains(source))
             return false;
     }
-    // NereusSDR-native (2026-08-26): third predicate over ColEntity,
+    // Longpath-native (2026-08-26): third predicate over ColEntity,
     // same AND semantics and same "empty always shows" convention as
     // band/source above.
     if (!m_hiddenEntities.isEmpty()) {
@@ -135,7 +135,7 @@ bool BandFilterProxy::filterAcceptsRow(int sourceRow, const QModelIndex& sourceP
         if (!entity.isEmpty() && m_hiddenEntities.contains(entity))
             return false;
     }
-    // NereusSDR-native (2026-08-27): fourth predicate over ColMode,
+    // Longpath-native (2026-08-27): fourth predicate over ColMode,
     // same AND semantics and "empty always shows" convention.
     if (!m_hiddenModes.isEmpty()) {
         auto idx = sourceModel()->index(sourceRow, SpotTableModel::ColMode, sourceParent);
@@ -143,7 +143,7 @@ bool BandFilterProxy::filterAcceptsRow(int sourceRow, const QModelIndex& sourceP
         if (!mode.isEmpty() && m_hiddenModes.contains(mode))
             return false;
     }
-    // NereusSDR-native (2026-08-27): free-text quick search, ORed
+    // Longpath-native (2026-08-27): free-text quick search, ORed
     // across DxCall / Reference / Comment / Spotter rather than ANDed
     // like the predicates above -- a row matches if ANY of these
     // columns contains the search text.

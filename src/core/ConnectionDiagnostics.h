@@ -1,8 +1,8 @@
 // =================================================================
-// src/core/ConnectionDiagnostics.h  (NereusSDR)
+// src/core/ConnectionDiagnostics.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-native lightweight QObject that aggregates runtime
+// Longpath-native lightweight QObject that aggregates runtime
 // connection metrics from a bound PgxlConnection or TgxlConnection.
 // Intended consumer: Setup -> <Device> Advanced page (Phase 4).
 //

@@ -1,7 +1,7 @@
 #pragma once
 
 // =================================================================
-// src/core/P2RadioConnection.h  (NereusSDR)
+// src/core/P2RadioConnection.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -38,7 +38,7 @@
 */
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -228,7 +228,7 @@ public:
     // Upstream inline attribution preserved verbatim (console.cs:8559):
     //   case HPSDRHW.Saturn:        // ANAN-G2, G21K    (G8NJJ)
     //
-    // Defaults to 2 for unknown / future boards (matches the prior NereusSDR
+    // Defaults to 2 for unknown / future boards (matches the prior Longpath
     // hardcode and is the right answer for every modern Apache Labs P2 SKU).
     static int primaryRxDdcForBoard(HPSDRHW board) noexcept;
 
@@ -371,7 +371,7 @@ private:
     void selectCodec();
     CodecContext buildCodecContext() const;
 
-    // Legacy compose paths — preserved for the NEREUS_USE_LEGACY_P2_CODEC rollback flag.
+    // Legacy compose paths — preserved for the LONGPATH_USE_LEGACY_P2_CODEC rollback flag.
     void composeCmdGeneralLegacy     (char buf[60])   const;
     void composeCmdHighPriorityLegacy(char buf[1444]) const;
     void composeCmdRxLegacy          (char buf[1444]) const;
@@ -513,7 +513,7 @@ private:
 
     // Mid-session link-loss detection. Mirrors P1RadioConnection's
     // m_lastEp6At / onWatchdogTick silence check (P1RadioConnection.h:480,
-    // P1RadioConnection.cpp:2744-2802) — NereusSDR design doc §3.6. Like
+    // P1RadioConnection.cpp:2744-2802) — Longpath design doc §3.6. Like
     // the P1 mechanism, this is a Longpath-original robustness addition,
     // not a Thetis port: Thetis's own network.c watchdog (prn->wdt) is
     // disabled by default and, even when enabled, only zero-fills audio
@@ -716,7 +716,7 @@ private:
     //   - deskhpsdr reference: TXIQRINGBUFLEN 97920 (85 msec ring) — we remain leaner
     //     than deskhpsdr while fixing the overflow.
     //   Source: deskhpsdr/src/new_protocol.c:186 [@120188f]
-    //     TXIQRINGBUFLEN 97920  (85 msec; NereusSDR uses a leaner in-memory float ring)
+    //     TXIQRINGBUFLEN 97920  (85 msec; Longpath uses a leaner in-memory float ring)
     //
     // SPSC ring buffer — audio thread (sendTxIq) writes, connection thread
     // (m_txIqTimer lambda) reads.  Same atomic-ordering discipline as P1:
@@ -748,7 +748,7 @@ private:
     //
     // Thetis comparison: network.c:1259-1297 sendOutbound is producer-
     // paced (no QTimer, no ring), so the equivalent failure mode does
-    // not exist upstream.  This cushion is a NereusSDR-specific patch
+    // not exist upstream.  This cushion is a Longpath-specific patch
     // for our QTimer-paced consumer divergence.
     std::atomic<bool> m_txIqPrimePending{false};
 
@@ -943,7 +943,7 @@ private:
     std::array<QVector<float>, kMaxDdc> m_iqBuffers;
     int m_totalIqPackets{0};
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
 public:
     // Test-only helpers — allow unit tests to inject board state without a live radio.
     void setBoardForTest(HPSDRHW board) {

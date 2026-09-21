@@ -1,10 +1,10 @@
-// tests/tst_speech_processor_page.cpp  (NereusSDR)
+// tests/tst_speech_processor_page.cpp  (Longpath)
 //
 // Phase 3M-3a-i Batch 5 (Task E) — SpeechProcessorPage TX dashboard.
 // Phase 3M-3a-ii Batch 5 (Task E) — Phrot / CFC / CESSB live bindings.
 //
-// no-port-check: NereusSDR-original test file.  SpeechProcessorPage is a
-// NereusSDR-spin (no direct Thetis equivalent) — see the header comment in
+// no-port-check: Longpath-original test file.  SpeechProcessorPage is a
+// Longpath-spin (no direct Thetis equivalent) — see the header comment in
 // TransmitSetupPages.h "Speech Processor — TX dashboard" for the WDSP TXA
 // stage references.
 //

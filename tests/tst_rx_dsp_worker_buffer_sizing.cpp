@@ -1,6 +1,6 @@
 // tests/tst_rx_dsp_worker_buffer_sizing.cpp
 //
-// no-port-check: NereusSDR-original test. The setup.cs reference below is
+// no-port-check: Longpath-original test. The setup.cs reference below is
 // contextual only (explains the bug's history), not a derivation. Thetis
 // has no equivalent unit test for the fexchange2 input-sizing contract.
 //

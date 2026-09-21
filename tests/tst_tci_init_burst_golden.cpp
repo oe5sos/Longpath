@@ -1,4 +1,4 @@
-// no-port-check: NereusSDR-original CI gate for init-burst byte-for-byte parity.
+// no-port-check: Longpath-original CI gate for init-burst byte-for-byte parity.
 //
 // Phase 3J-1 Task 4.3: compares TciProtocol::buildInitBurst() against the
 // captured (synthetic for now) golden file at
@@ -55,7 +55,7 @@ void TestTciInitBurstGolden::pinAppSettingsToGoldenCaptureConditions()
 
 QStringList TestTciInitBurstGolden::loadGolden()
 {
-    QFile f(QStringLiteral(NEREUS_TEST_DATA_DIR "/tci/init_burst_anan_g2_rx1.txt"));
+    QFile f(QStringLiteral(LONGPATH_TEST_DATA_DIR "/tci/init_burst_anan_g2_rx1.txt"));
     if (!f.open(QIODevice::ReadOnly)) {
         return {};
     }

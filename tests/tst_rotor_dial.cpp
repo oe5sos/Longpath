@@ -1,7 +1,7 @@
 // Verify RotorDialWidget travel maths: shortest arc, the wrap across
 // north, and the end-stop rule that makes the long way the only legal
 // one. Plus state transitions and click-to-aim.
-// no-port-check: NereusSDR-original — Thetis has no rotator control.
+// no-port-check: Longpath-original — Thetis has no rotator control.
 
 #include <QApplication>
 #include <QMouseEvent>

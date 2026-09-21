@@ -1,19 +1,19 @@
-// no-port-check: NereusSDR-original AppSettings validator.  Registered as
-// NereusSDR-native in docs/attribution/THETIS-PROVENANCE.md.  The single
+// no-port-check: Longpath-original AppSettings validator.  Registered as
+// Longpath-native in docs/attribution/THETIS-PROVENANCE.md.  The single
 // inline upstream reference further down (BPF1-algorithm board family
 // check for HermesC10 / ANAN-G2E) is a parity citation, not a port of
 // upstream logic into this file.  Author tags preserved verbatim at the
 // citation line.
 //
 // =================================================================
-// src/core/SettingsHygiene.cpp  (NereusSDR)
+// src/core/SettingsHygiene.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. Validates persisted AppSettings against the
+// Longpath-original. Validates persisted AppSettings against the
 // connected board's BoardCapabilities. No Thetis port at this layer.
 // =================================================================
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-20 — Original implementation for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted implementation via
 //                 Anthropic Claude Code.
@@ -201,7 +201,7 @@ void SettingsHygiene::checkSaturnBpf1(const QString& mac,
     }
     if (!anyBpf1KeyExists) { return; }
 
-    // no-port-check: NereusSDR-original rule.
+    // no-port-check: Longpath-original rule.
     Issue issue;
     issue.severity = Severity::Info;
     issue.key      = QStringLiteral("hardware/%1/alex/bpf1").arg(mac);
@@ -229,7 +229,7 @@ void SettingsHygiene::checkN2adrFilter(const QString& mac,
                     QStringLiteral("True"));
     if (!enabled) { return; }
 
-    // no-port-check: NereusSDR-original rule.
+    // no-port-check: Longpath-original rule.
     Issue issue;
     issue.severity = Severity::Warning;
     issue.key      = key;
@@ -256,7 +256,7 @@ void SettingsHygiene::checkApolloSettings(const QString& mac,
                     QStringLiteral("True"));
     if (!enabled) { return; }
 
-    // no-port-check: NereusSDR-original rule.
+    // no-port-check: Longpath-original rule.
     Issue issue;
     issue.severity = Severity::Warning;
     issue.key      = key;
@@ -299,7 +299,7 @@ void SettingsHygiene::checkAlexAntenna(const QString& mac,
         QStringLiteral("hardware/%1/alex/antenna/20m/tx").arg(mac);
     if (s.contains(txKey)) { return; }  // 20m TX is set — OK
 
-    // no-port-check: NereusSDR-original rule.
+    // no-port-check: Longpath-original rule.
     Issue issue;
     issue.severity = Severity::Info;
     issue.key      = QStringLiteral("hardware/%1/alex/antenna").arg(mac);

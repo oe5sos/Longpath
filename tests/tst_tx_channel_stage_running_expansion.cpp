@@ -25,7 +25,7 @@ warren@wpratt.com
 */
 
 // =================================================================
-// tests/tst_tx_channel_stage_running_expansion.cpp  (NereusSDR)
+// tests/tst_tx_channel_stage_running_expansion.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -47,7 +47,7 @@ warren@wpratt.com
 // Ported from Thetis wdsp/fmmod.c:42-65  [v2.10.3.13] — no public SetTXAfmModRun
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-27 — New test for Phase 3M-1b Task D.4:
 //                 TxChannel::setStageRunning() expansion to Panel/MicMeter/
 //                 AlcMeter/AmMod/FmMod. J.J. Boyd (KG4VCF), with AI-assisted

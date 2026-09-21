@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_applet_panel_below.cpp  (NereusSDR)
+// tests/tst_applet_panel_below.cpp  (Longpath)
 // =================================================================
 //
 // Die Applet-Leiste unter dem Panadapter statt daneben.
@@ -15,12 +15,12 @@
 // tauschen, Groessen neu setzen. Faellt hier etwas, faellt es dort auch.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-19 — Original fuer NereusSDR von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
 // =================================================================
 
-// no-port-check: NereusSDR-original test file.
+// no-port-check: Longpath-original test file.
 
 #include <QtTest>
 #include <QSplitter>

@@ -12,13 +12,13 @@
 #include "core/DevAutomationServer.h"
 
 // Generated into the build tree by cmake/LongpathBuildTag.cmake, once per
-// build, so NEREUSSDR_BUILD_TAG names the commit actually being compiled
+// build, so LONGPATH_BUILD_TAG names the commit actually being compiled
 // instead of whatever HEAD happened to be at the last cmake configure.
 //
 // This is the only translation unit that includes it, and that is on
 // purpose: it is compiled into the application target alone, so a new commit
 // rebuilds this file and relinks this binary, and leaves the test suite (which
-// links the NereusSDRObjs object library) untouched. See CMakeLists.txt
+// links the LongpathObjs object library) untouched. See CMakeLists.txt
 // section "Build tag" and src/core/BuildIdentity.h.
 #include "LongpathBuildTag.h"
 
@@ -142,7 +142,7 @@ static void messageHandler(QtMsgType type, const QMessageLogContext& ctx, const 
 // re-parse properly inside main() once the app is built (for --help / error
 // diagnostics).
 //
-// Issue #100 — multiple NereusSDR instances against different radios.
+// Issue #100 — multiple Longpath instances against different radios.
 static QString extractProfileFromArgv(int argc, char* argv[])
 {
     for (int i = 1; i < argc; ++i) {
@@ -164,7 +164,7 @@ int main(int argc, char* argv[])
     // window title from it. Empty on release artifacts, in which case the
     // title stays exactly as it was.
     Longpath::BuildIdentity::setBuildTag(
-        QString::fromUtf8(NEREUSSDR_BUILD_TAG));
+        QString::fromUtf8(LONGPATH_BUILD_TAG));
 
     // Resolve profile name first — downstream path lookups (AppSettings,
     // log dir, pre-QApplication UI scale read) all consult it.
@@ -205,7 +205,7 @@ int main(int argc, char* argv[])
 
     QApplication app(argc, argv);
     app.setApplicationName("Longpath");
-    app.setApplicationVersion(NEREUSSDR_VERSION);
+    app.setApplicationVersion(LONGPATH_VERSION);
     app.setOrganizationName("Longpath");
     app.setWindowIcon(QIcon(":/icons/Longpath.png"));
 
@@ -280,21 +280,27 @@ int main(int argc, char* argv[])
         parser.process(app);
     }
 
-    // Set up file logging in ~/.config/NereusSDR/ (or the profile's
-    // isolated config dir when --profile is set).
+    // Set up file logging in the config dir (or the profile's isolated
+    // config dir when --profile is set).
     const QString logDir = Longpath::AppSettings::resolveConfigDir(activeProfile);
     QDir().mkpath(logDir);
 
     const QString timestamp = QDateTime::currentDateTime().toString("yyyyMMdd-HHmmss");
-    const QString logPath = logDir + "/nereussdr-" + timestamp + ".log";
+    const QString logPath = logDir + "/longpath-" + timestamp + ".log";
 
-    // Prune old log files (keep newest 4 + the one we're about to create = 5)
+    // Prune old log files (keep newest 4 + the one we're about to create = 5).
+    // "nereussdr-*" are the files this program wrote before 2026-09-17;
+    // they age out the same way instead of lingering forever.
     {
         QDir dir(logDir);
-        QStringList logs = dir.entryList({"nereussdr-*.log"}, QDir::Files, QDir::Name);
+        // By age, oldest first — by name, every "longpath-*" would sort
+        // before every "nereussdr-*" and the newest files would go first.
+        QStringList logs = dir.entryList({"longpath-*.log", "nereussdr-*.log"},
+                                         QDir::Files, QDir::Time | QDir::Reversed);
         while (logs.size() >= 5) {
             dir.remove(logs.takeFirst());
         }
+        QFile::remove(logDir + "/nereussdr.log");   // der alte Verweis
     }
 
     s_logFile = new QFile(logPath);
@@ -302,7 +308,7 @@ int main(int argc, char* argv[])
         s_logFile->setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner);
         qInstallMessageHandler(messageHandler);
 
-        const QString symlink = logDir + "/nereussdr.log";
+        const QString symlink = logDir + "/longpath.log";
         QFile::remove(symlink);
         QFile::link(logPath, symlink);
     } else {
@@ -314,7 +320,7 @@ int main(int argc, char* argv[])
     logStartupHardwareInventory();
 
     // Fusion style as a clean cross-platform base, then layer the
-    // NereusSDR dark palette + minimal baseline QSS on top so every
+    // Longpath dark palette + minimal baseline QSS on top so every
     // widget (including ones without their own stylesheet) renders
     // with the dark theme. Without this, Linux/Ubuntu Yaru leaks
     // light-grey backgrounds and orange Highlight through into popups,
@@ -323,12 +329,12 @@ int main(int argc, char* argv[])
     Longpath::applyDarkPalette(app);
     Longpath::applyAppBaselineQss(app);
 
-    // ── Technik Nereus, Design der Betreiber ─────────────────────────
+    // ── Technik aus dem Quelltext, Design vom Betreiber ─────────────────────────
     //
     // Die persönliche Palette liegt als JSON neben den Einstellungen,
     // nicht im Quellbaum — sie überlebt damit jeden Download. Keine
     // Datei ist der Normalfall und kein Fehler; dann gilt die
-    // Nereus-Palette aus StyleConstants.h.
+    // Palette aus StyleConstants.h.
     //
     // Der Filter ist der eine Einhängepunkt statt vierhundert
     // eingewickelter setStyleSheet-Aufrufe: Qt schickt QEvent::Polish

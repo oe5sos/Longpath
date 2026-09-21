@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// no-port-check: NereusSDR-original test file. AppSettings is a port
+// no-port-check: Longpath-original test file. AppSettings is a port
 // of Thetis database.cs persistence semantics, but the *keys* exercised
-// here are entirely NereusSDR-specific: they belong to the Phase 3J-2
+// here are entirely Longpath-specific: they belong to the Phase 3J-2
 // spot system (B-phase ingest clients, F-phase SpotHubDialog,
 // G-phase FreeDV Reporter dialog, H-phase RadioModel adapter slots)
 // plus Phase 3R RADE wrapper. No upstream cite belongs on the assertions
 // themselves.
 //
-// NereusSDR - Phase 3J-2 + 3R M1: spot-system settings round-trip.
+// Longpath - Phase 3J-2 + 3R M1: spot-system settings round-trip.
 //
 // Pins the contract that every AppSettings key the spot system writes
 // or reads can survive a round-trip through the singleton, and that
@@ -35,7 +35,7 @@
 //     path SpotHubDialog F4 already implements at
 //     `SpotHubDialog.cpp:1727-1730`.
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-11  J.J. Boyd / KG4VCF  Phase 3J-2 + 3R M1 initial commit.
 //                                    AI tooling: Anthropic Claude Code.
 
@@ -48,7 +48,7 @@ using namespace Longpath;
 namespace {
 
 // Helper: fresh AppSettings sandbox. TestSandboxInit (linked auto by
-// nereus_add_test) ensures QStandardPaths::setTestModeEnabled(true) is
+// longpath_add_test) ensures QStandardPaths::setTestModeEnabled(true) is
 // active, so this is harmless to real user state.
 AppSettings& testSettings()
 {

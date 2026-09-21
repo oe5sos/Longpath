@@ -1,12 +1,12 @@
 // =================================================================
-// src/core/StepAttenuatorController.h  (NereusSDR)
+// src/core/StepAttenuatorController.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/console.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -175,8 +175,8 @@ public:
     //     defence-in-depth (the mode-coerce above already prevents reach,
     //     but if a stale state slips through, this is a safety net).
     //
-    // Source: NereusSDR-internal extension. AutoAttMode::Adaptive is a
-    // NereusSDR feature, not Thetis-derived; the hasStepAttenuatorCal flag
+    // Source: Longpath-internal extension. AutoAttMode::Adaptive is a
+    // Longpath feature, not Thetis-derived; the hasStepAttenuatorCal flag
     // was added to BoardCapabilities to gate per-step cal-table support,
     // and we use it here to gate the Adaptive cal mode that depends on
     // per-step calibration data.  See plan
@@ -388,7 +388,7 @@ private:
     static constexpr int kDefaultMaxAttDb = 31;
     static constexpr int kDefaultMinAttDb = 0;
     // Tick interval (ms) — Thetis pollOverloadSyncSeqErr ~400ms,
-    // NereusSDR uses 100ms for snappier response.
+    // Longpath uses 100ms for snappier response.
     static constexpr int kTickIntervalMs = 100;
 
     // Push a new ATT value to hardware + emit signal.  Used by auto-att
@@ -489,7 +489,7 @@ private:
     //   private int[] tx_step_attenuator_by_band;
     // Thetis default: 31 dB per band (console.cs:1810 [v2.10.3.13]):
     //   setTXstepAttenuatorForBand((Band)i, 31);
-    // NereusSDR default: 0 (no TX ATT until user configures it).
+    // Longpath default: 0 (no TX ATT until user configures it).
     // Per-band TX ATT spans HF amateur + GEN/WWV/XVTR only.  SWL bands
     // (Band::SwlFirst..SwlLast, Phase 3L extension) inherit ham-band
     // values — the HL2 ATT chip is a single hardware register regardless
@@ -523,7 +523,7 @@ private:
     // Mirrors Thetis behavior — mi0bot console.cs:29960-30002
     // [v2.10.3.13-beta2] updateAttNudsCombos() swaps a separate
     // udTXStepAttData spinbox over udRX1StepAttData during MOX, and restores
-    // the RX-time spinbox on un-key.  NereusSDR has a single S-ATT spinbox
+    // the RX-time spinbox on un-key.  Longpath has a single S-ATT spinbox
     // bound to attenuationChanged, so we emit the TX value into m_attDb +
     // attenuationChanged on RX→TX, then restore on TX→RX.  User-visible
     // result is identical: "the spinbox jumped to 31 during TX".
@@ -576,7 +576,7 @@ private:
 private slots:
     void onDdcMappingChanged();
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
 public:
     // Test seams — expose internal TX-path state for white-box unit tests.
     PreampMode savedPreampModeForTest() const noexcept { return m_savedPreampMode; }

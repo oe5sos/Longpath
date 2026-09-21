@@ -161,7 +161,7 @@ The audio-engine foundations needed for live-edit (Q1) do not currently exist on
 
 **Tests added in Step 0:**
 - `AudioDeviceConfigRoundtripTest` — round-trip save → load preserves every field.
-- `AudioEngineSpeakersLiveReconfigTest` — call `setSpeakersConfig` from main thread while `rxBlockReady` simulates DSP-thread traffic; verify no crash, no use-after-free (use `NEREUS_BUILD_TESTS` test seam).
+- `AudioEngineSpeakersLiveReconfigTest` — call `setSpeakersConfig` from main thread while `rxBlockReady` simulates DSP-thread traffic; verify no crash, no use-after-free (use `LONGPATH_BUILD_TESTS` test seam).
 - `MasterOutputWidgetSignalRefreshTest` — `emit speakersConfigChanged(cfg)` → widget's device label updates within a 50 ms timeout.
 
 ---
@@ -201,7 +201,7 @@ New test files created by Sub-Phase 12:
 - `tests/AudioVaxPageAutoDetectTest.cpp` (12.3) — verifies `QMenu` populates correctly from mock `VirtualCableDetector::scan()` result.
 - `tests/AudioEngineResetAudioSettingsTest.cpp` (12.4) — verifies the clear-vs-preserve boundary per §2.5 above.
 
-All test seams live behind `NEREUS_BUILD_TESTS` per existing `AudioEngine` convention.
+All test seams live behind `LONGPATH_BUILD_TESTS` per existing `AudioEngine` convention.
 
 ---
 

@@ -1,25 +1,25 @@
-// no-port-check: NereusSDR-original unit-test file. Thetis cite comments
+// no-port-check: Longpath-original unit-test file. Thetis cite comments
 // document upstream sources; no Thetis logic ported in this test file.
 // =================================================================
-// tests/tst_wdsp_engine_max_bin.cpp  (NereusSDR)
+// tests/tst_wdsp_engine_max_bin.cpp  (Longpath)
 // =================================================================
 //
 // Tests for WdspEngine Max Bin detector (Phase 3P-II + crash-fix):
 //   WdspEngine::getRxaSignalAverage (Task 31, RXA_S_AV wrapper)
-//   WdspEngine::setupMaxBinDetector (Task 32, NereusSDR-native algorithm)
-//   WdspEngine::getMaxBinDbm        (Task 32, NereusSDR-native algorithm)
-//   WdspEngine::onSpectrumBinsForMaxBin (crash-fix slot, NereusSDR-native)
+//   WdspEngine::setupMaxBinDetector (Task 32, Longpath-native algorithm)
+//   WdspEngine::getMaxBinDbm        (Task 32, Longpath-native algorithm)
+//   WdspEngine::onSpectrumBinsForMaxBin (crash-fix slot, Longpath-native)
 //
 // Background: the original Tasks 31-32 implementation called the WDSP
 // ::SetupDetectMaxBin / ::GetDetectMaxBin C functions, which require a live
-// pdisp[disp] pointer allocated by ::CreateAnalyzer.  NereusSDR's FFTEngine
+// pdisp[disp] pointer allocated by ::CreateAnalyzer.  Longpath's FFTEngine
 // uses raw FFTW3 directly and never calls CreateAnalyzer, so pdisp[0] is
 // always null.  The result was a SIGSEGV inside SetupDetectMaxBin+16
 // triggered by the filterChanged -> QTimer::singleShot(100) lambda in
 // MainWindow.cpp wireSliceToSpectrum().
 //
 // Fix (Option C): the public API names are preserved; the implementation
-// is now NereusSDR-native state (WdspEngine::MaxBinDetector), fed by
+// is now Longpath-native state (WdspEngine::MaxBinDetector), fed by
 // FFTEngine::fftReady via onSpectrumBinsForMaxBin.  The Thetis algorithm
 // (scan + slow-release smoothing) runs unchanged against FFTEngine's dBm bins.
 //
@@ -35,13 +35,13 @@
 //   Thetis wdsp/analyzer.c:1442 [@501e3f5]       - developer example (default values)
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-19 - New test file for Phase 3P-II Phase 2 Tasks 31-32:
 //                WdspEngine MaxBin detector wrappers smoke test.
 //                J.J. Boyd (KG4VCF), with AI-assisted implementation
 //                via Anthropic Claude Code.
 //   2026-05-19 - Crash-fix (Option C): replaced WDSP-dependent paths
-//                with NereusSDR-native MaxBinDetector algorithm tests.
+//                with Longpath-native MaxBinDetector algorithm tests.
 //                Extended to cover findsMaxInPassbandWindow,
 //                smoothsTowardSteadyState (was decaysWithoutNewPeaks
 //                before per-bin averaging replaced output drift),
@@ -89,7 +89,7 @@ private slots:
     // Algorithm from Thetis wdsp/analyzer.c:688-756 [@501e3f5] (calc_dmb)
     void setupMaxBinDetector_doesNotCrash() {
         WdspEngine engine;
-        // No m_initialized requirement for the NereusSDR-native path.
+        // No m_initialized requirement for the Longpath-native path.
         engine.setupMaxBinDetector(0);  // defaults: rate=192000, fLow=-3000, fHigh=-300, tau=0.5, fps=60
         QVERIFY(true);
     }
@@ -215,7 +215,7 @@ private slots:
     // to [0, N-1].  The entire array is effectively scanned; the global max wins.
     //
     // From Thetis wdsp/analyzer.c:688-756 [@501e3f5] (calc_dmb):
-    //   NereusSDR uses qBound(0, half + round(f/binSpacing), N-1).
+    //   Longpath uses qBound(0, half + round(f/binSpacing), N-1).
     void clampsBinRangeToArrayBounds() {
         WdspEngine engine;
         engine.setupMaxBinDetector(0, 0, 0, 192000.0,
@@ -236,7 +236,7 @@ private slots:
 
     // ── Test 7: sliceOffsetHz shifts the scan window (CTUN-on case) ──────────
     //
-    // FFTEngine bins are emitted in DDC baseband.  With CTUN on (NereusSDR's
+    // FFTEngine bins are emitted in DDC baseband.  With CTUN on (Longpath's
     // default), the user's tuned slice does NOT sit at DDC center.  Without
     // applying the sliceOffsetHz term to the scan window, MaxBin always
     // points at DDC center bins (noise floor) and never tracks the signal

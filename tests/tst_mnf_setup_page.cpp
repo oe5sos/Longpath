@@ -1,9 +1,9 @@
 // =================================================================
-// tests/tst_mnf_setup_page.cpp  (NereusSDR)
+// tests/tst_mnf_setup_page.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure. Thetis control
+// no-port-check: Longpath-original test infrastructure. Thetis control
 // names appear so the assertions document which upstream widget each
-// NereusSDR control stands in for; no upstream logic is ported here.
+// Longpath control stands in for; no upstream logic is ported here.
 //
 // Tunable Notch Filter, Task 9: Setup -> DSP -> MNF, filling in the page
 // that already existed as a disabled placeholder.
@@ -497,7 +497,7 @@ private slots:
         RadioModel model;
         WdspEngine* engine = model.wdspEngine();
         QVERIFY(engine);
-        engine->m_initialized = true;   // friend access (NEREUS_BUILD_TESTS)
+        engine->m_initialized = true;   // friend access (LONGPATH_BUILD_TESTS)
 
         RxChannel* ch = engine->createRxChannel(WdspEngine::kFirstSliceChannelId,
                                                 /*inputBufferSize*/ 238,
@@ -545,7 +545,7 @@ private slots:
         RadioModel model;
         WdspEngine* engine = model.wdspEngine();
         QVERIFY(engine);
-        engine->m_initialized = true;   // friend access (NEREUS_BUILD_TESTS)
+        engine->m_initialized = true;   // friend access (LONGPATH_BUILD_TESTS)
 
         RxChannel* ch = engine->createRxChannel(WdspEngine::kFirstSliceChannelId,
                                                 238, 4096, 48000, 48000, 48000);

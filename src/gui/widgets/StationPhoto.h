@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/gui/widgets/StationPhoto.h  (NereusSDR)
+// src/gui/widgets/StationPhoto.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // The portrait a callsign database has for a station, with the rules
 // that make fetching one safe.
@@ -39,7 +39,7 @@
 // sentence.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-10 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork). The
 //                 fetching, caching and https rules are lifted from

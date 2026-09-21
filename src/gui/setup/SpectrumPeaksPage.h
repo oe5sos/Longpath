@@ -1,18 +1,18 @@
 #pragma once
 
 // =================================================================
-// src/gui/setup/SpectrumPeaksPage.h  (NereusSDR)
+// src/gui/setup/SpectrumPeaksPage.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/display.cs, original licence from Thetis source is included below
 //
-// NereusSDR-original page structure.  Constants and property defaults
+// Longpath-original page structure.  Constants and property defaults
 // reference Thetis display.cs:4395-4714 (peak blob / spectral peak hold).
 // Rendering logic deferred to Tasks 2.5 / 2.6.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-01 — Skeleton created in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -95,7 +95,7 @@ private:
     void buildUI();
 
     // Active Peak Hold group (5 ctrls — full impl in Task 2.5)
-    // + 1 NereusSDR-original colour picker so the trace stays visible when
+    // + 1 Longpath-original colour picker so the trace stays visible when
     // the data-line colour is changed (e.g. Smooth Defaults sets it white).
     QGroupBox*         m_aphGroup{nullptr};
     QCheckBox*         m_aphEnable{nullptr};

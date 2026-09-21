@@ -1,6 +1,6 @@
 // no-port-check: test-only — Thetis file names appear only in source-cite
 // comments that document which upstream line each assertion verifies.
-// No Thetis logic is ported here; this file is NereusSDR-original.
+// No Thetis logic is ported here; this file is Longpath-original.
 //
 // Bank-16 puresignal_run wire-byte test for the non-HL2 P1 codec family
 // (Hermes / ANAN-10 / ANAN-10E / ANAN-100 / ANAN-100B / AnvelinaPro3).
@@ -32,7 +32,7 @@
 //       C2 = (xvtr_enable & 1) | ((prn->puresignal_run & 1) << 6);
 //       C3 = 0;
 //       C4 = 0;
-// (BPF2 / xvtr_enable not yet plumbed in NereusSDR — emit 0; only ps_run
+// (BPF2 / xvtr_enable not yet plumbed in Longpath — emit 0; only ps_run
 //  is wired here.)
 
 #include <QtTest/QtTest>

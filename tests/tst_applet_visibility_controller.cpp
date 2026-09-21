@@ -1,5 +1,5 @@
 // Verify AppletVisibilityController state, persistence, and signal emission.
-// no-port-check: NereusSDR-original — no Thetis source.
+// no-port-check: Longpath-original — no Thetis source.
 
 #include <QtTest/QtTest>
 #include <QSignalSpy>

@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/core/strip/TargetFromFile.h  (NereusSDR)
+// src/core/strip/TargetFromFile.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // "I want to sound like that."
 //
@@ -33,7 +33,7 @@
 // silently from a misparsed header is worse than no target at all.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-08 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

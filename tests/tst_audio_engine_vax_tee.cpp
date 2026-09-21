@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_audio_engine_vax_tee.cpp  (NereusSDR)
+// tests/tst_audio_engine_vax_tee.cpp  (Longpath)
 // =================================================================
 //
 // Exercises AudioEngine's RX → VAX bus tee logic — Phase 3O Sub-Phase 8.5.
@@ -7,7 +7,7 @@
 // Coverage: see private-slot test methods below — each verifies one
 // routing-contract scenario.
 //
-// Uses FakeAudioBus injected via the NEREUS_BUILD_TESTS-only
+// Uses FakeAudioBus injected via the LONGPATH_BUILD_TESTS-only
 // AudioEngine::setVaxBusForTest / setSpeakersBusForTest seam, so the
 // test doesn't need a real CoreAudioHalBus / LinuxPipeBus / PortAudio
 // backend. Cross-platform.

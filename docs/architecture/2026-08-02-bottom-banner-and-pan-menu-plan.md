@@ -15,7 +15,7 @@ exactly one visible set. Part B extends the existing AetherSDR-derived
 `PanLayoutDialog` with painted layout thumbnails and per-board capacity
 gating, and adds four new layouts to `PanadapterStack`.
 
-**Tech Stack:** C++20, Qt6 (Widgets, Test), CMake + Ninja, `nereus_add_test()`
+**Tech Stack:** C++20, Qt6 (Widgets, Test), CMake + Ninja, `longpath_add_test()`
 harness, `AppSettings` (never `QSettings`).
 
 **Design spec:** `docs/architecture/2026-08-02-bottom-banner-and-pan-menu-design.md`
@@ -220,7 +220,7 @@ QTEST_MAIN(TstChromeFoldPlan)
 Add to `tests/CMakeLists.txt`, near the other GUI-widget registrations:
 
 ```cmake
-nereus_add_test(tst_chrome_fold_plan)
+longpath_add_test(tst_chrome_fold_plan)
 ```
 
 Run:
@@ -543,7 +543,7 @@ QTEST_MAIN(TstChromeBarController)
 
 - [ ] **Step 2: Register and run to verify it fails**
 
-Add `nereus_add_test(tst_chrome_bar_controller)` to `tests/CMakeLists.txt`.
+Add `longpath_add_test(tst_chrome_bar_controller)` to `tests/CMakeLists.txt`.
 
 ```bash
 cmake --build build --target tst_chrome_bar_controller
@@ -862,7 +862,7 @@ QTEST_MAIN(TstSystemTile)
 
 - [ ] **Step 2: Register and run to verify it fails**
 
-Add `nereus_add_test(tst_system_tile)` to `tests/CMakeLists.txt`.
+Add `longpath_add_test(tst_system_tile)` to `tests/CMakeLists.txt`.
 
 ```bash
 cmake --build build --target tst_system_tile
@@ -1181,7 +1181,7 @@ QTEST_MAIN(TstStationBlock)
 
 - [ ] **Step 2: Register if new, then run to verify it fails**
 
-If you created the file, add `nereus_add_test(tst_station_block)` to
+If you created the file, add `longpath_add_test(tst_station_block)` to
 `tests/CMakeLists.txt`.
 
 ```bash
@@ -1783,7 +1783,7 @@ QTEST_MAIN(TstTitleBarClock)
 
 - [ ] **Step 2: Register and run to verify it fails**
 
-Add `nereus_add_test(tst_title_bar_clock)` to `tests/CMakeLists.txt`.
+Add `longpath_add_test(tst_title_bar_clock)` to `tests/CMakeLists.txt`.
 
 ```bash
 cmake --build build --target tst_title_bar_clock
@@ -2087,7 +2087,7 @@ QTEST_MAIN(TstChromeBarItems)
 
 - [ ] **Step 2: Register and run to verify it fails**
 
-Add `nereus_add_test(tst_chrome_bar_items)` to `tests/CMakeLists.txt`.
+Add `longpath_add_test(tst_chrome_bar_items)` to `tests/CMakeLists.txt`.
 
 ```bash
 cmake --build build --target tst_chrome_bar_items
@@ -2814,7 +2814,7 @@ QTEST_MAIN(TstLayoutThumbnail)
 
 - [ ] **Step 2: Register and run to verify it fails**
 
-Add `nereus_add_test(tst_layout_thumbnail)` to `tests/CMakeLists.txt`.
+Add `longpath_add_test(tst_layout_thumbnail)` to `tests/CMakeLists.txt`.
 
 ```bash
 cmake --build build --target tst_layout_thumbnail
@@ -3137,7 +3137,7 @@ QTEST_MAIN(TstPanLayoutDialogGating)
 
 - [ ] **Step 2: Register and run to verify it fails**
 
-Add `nereus_add_test(tst_pan_layout_dialog_gating)` to `tests/CMakeLists.txt`.
+Add `longpath_add_test(tst_pan_layout_dialog_gating)` to `tests/CMakeLists.txt`.
 
 ```bash
 cmake --build build --target tst_pan_layout_dialog_gating
@@ -3445,7 +3445,7 @@ QTEST_MAIN(TstPanMenuRouting)
 
 - [ ] **Step 2: Register and run to verify it fails**
 
-Add `nereus_add_test(tst_pan_menu_routing)` to `tests/CMakeLists.txt`.
+Add `longpath_add_test(tst_pan_menu_routing)` to `tests/CMakeLists.txt`.
 
 ```bash
 cmake --build build --target tst_pan_menu_routing

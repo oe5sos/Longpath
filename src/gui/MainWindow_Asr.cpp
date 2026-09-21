@@ -34,6 +34,7 @@
 
 #include "asr/AsrService.h"
 #include "asr/RemoteAsrBackend.h"
+#include "asr/WhisperServerLauncher.h"
 #include "core/AppSettings.h"
 #include "core/AudioEngine.h"
 #include "core/LogCategories.h"
@@ -94,6 +95,26 @@ void MainWindow::setAsrEnabled(bool on)
     if (!m_asrService) {
         m_asrService = new AsrService(this);
         if (m_asrApplet) { m_asrApplet->setService(m_asrService); }
+    }
+
+    // ── Den Dienst selbst starten (2026-09-17) ───────────────────────
+    //
+    // Betreiber: "ein Startknopf fuer den Dienst aus Longpath heraus,
+    // damit du das Terminal nicht brauchst" — "ja bitte". Zeigt die
+    // Adresse auf diesen Rechner und ist der Automatikstart nicht
+    // abgeschaltet, wird whisper-server als Kindprozess gestartet, wenn
+    // er nicht schon laeuft. Ob er antwortet, sagt danach das Backend;
+    // scheitert der Start (kein Programm, kein Modell), steht der Grund
+    // im Applet.
+    const bool autoStart = st.value(QStringLiteral("AsrAutoStartServer"),
+                                    QStringLiteral("True")).toString()
+                               .compare(QStringLiteral("True"), Qt::CaseInsensitive) == 0;
+    if (autoStart && WhisperServerLauncher::endpointIsLocal(url)) {
+        auto& launcher = WhisperServerLauncher::instance();
+        if (launcher.state() != WhisperServerLauncher::State::Running
+            && launcher.state() != WhisperServerLauncher::State::Starting) {
+            launcher.start(WhisperServerLauncher::configFromSettings());
+        }
     }
 
     RemoteAsrConfig cfg;

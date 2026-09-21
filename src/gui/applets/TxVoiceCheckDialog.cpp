@@ -1,12 +1,12 @@
 // =================================================================
-// src/gui/applets/TxVoiceCheckDialog.cpp  (NereusSDR)
+// src/gui/applets/TxVoiceCheckDialog.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. See the header for the shape and for why the
+// Longpath-original. See the header for the shape and for why the
 // measurement is taken where it is.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-08 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
 // =================================================================
@@ -892,7 +892,7 @@ void TxVoiceCheckDialog::saveRecording()
     if (!m_recorder.hasRecording()) { return; }
     const QString path = QFileDialog::getSaveFileName(
         this, QStringLiteral("Save recording"),
-        QStringLiteral("nereus-voice.wav"),
+        QStringLiteral("longpath-voice.wav"),
         QStringLiteral("WAV (*.wav)"));
     if (path.isEmpty()) { return; }
 

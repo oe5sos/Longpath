@@ -1,7 +1,7 @@
 #pragma once
 
 // =================================================================
-// src/core/strip/ClientGate.h  (NereusSDR)
+// src/core/strip/ClientGate.h  (Longpath)
 // =================================================================
 //
 // Ported from AetherSDR (https://github.com/aethersdr/AetherSDR),
@@ -20,10 +20,10 @@
 // reason for taking them first.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-08 — Ported to NereusSDR by Martin Fischer, AI-assisted via
 //                 Anthropic Claude (Cowork). Namespace AetherSDR →
-//                 NereusSDR; include paths rebased onto core/strip/.
+//                 Longpath; include paths rebased onto core/strip/.
 //                 DSP unchanged.
 // =================================================================
 

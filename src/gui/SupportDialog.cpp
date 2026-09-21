@@ -343,7 +343,7 @@ void SupportDialog::onCreateBundle()
     msgBox.setText(QStringLiteral("Support bundle saved to:\n%1").arg(path));
     msgBox.setInformativeText(QStringLiteral(
         "Attach this file when filing a bug report at\n"
-        "github.com/boydsoftprez/NereusSDR/issues"));
+        "github.com/oe5sos/Longpath/issues"));
     // §D: #0f0f1a = kAppBg, #c8d8e8 = kTextPrimary, #304050 = kOverlayBorder.
     // §D exception: #405060 — button border; off-palette (matches dialog theme above).
     msgBox.setStyleSheet(Style::themed(
@@ -363,7 +363,7 @@ void SupportDialog::onCreateBundle()
         SupportBundle::openBundleFolder();
     } else if (msgBox.clickedButton() == issueBtn) {
         QDesktopServices::openUrl(
-            QUrl(QStringLiteral("https://github.com/boydsoftprez/NereusSDR/issues/new")));
+            QUrl(QStringLiteral("https://github.com/oe5sos/Longpath/issues/new")));
         SupportBundle::openBundleFolder();
     }
 }

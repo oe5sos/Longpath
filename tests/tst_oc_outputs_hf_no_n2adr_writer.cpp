@@ -1,4 +1,4 @@
-// no-port-check: NereusSDR-original test for issue #174 cleanup.
+// no-port-check: Longpath-original test for issue #174 cleanup.
 //
 // Issue #174: the OcOutputsHfTab "N2ADR Filter (HERCULES)" checkbox was
 // removed because it wrote to a global "hardware/oc/n2adrFilter" key

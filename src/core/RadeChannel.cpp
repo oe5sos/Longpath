@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // =================================================================
-// src/core/RadeChannel.cpp  (NereusSDR)
+// src/core/RadeChannel.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR - RadeChannel implementation. I1 shipped lifecycle
+// Longpath - RadeChannel implementation. I1 shipped lifecycle
 // skeleton; I2 fills in the RX path (24 kHz I/Q -> 8 kHz RADE_COMP ->
 // rade_rx -> features -> FARGAN -> 16 kHz mono speech -> 24 kHz stereo
 // output bus + syncChanged / snrChanged emission). I3 will fill in
@@ -32,7 +32,7 @@
 // License (upstream):
 //   - AetherSDR has no per-file copyright header, so per
 //     docs/attribution/HOW-TO-PORT.md rule 6 we cite the project URL
-//     and primary author at NereusSDR block level rather than copying
+//     and primary author at Longpath block level rather than copying
 //     a verbatim header that does not exist:
 //       Copyright (C) 2024-2026  Jeremy (KK7GWY) / AetherSDR contributors
 //         - per https://github.com/ten9876/AetherSDR (GPLv3; see
@@ -83,7 +83,7 @@
 //=========================================================================
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-11  J.J. Boyd / KG4VCF  Phase 3R Task I1. See
 //                 RadeChannel.h for the full attribution block.
 //                 Skeleton implementation: lifecycle bodies
@@ -107,24 +107,24 @@
 //                 [@0cd4559]. stop() unwinds in reverse, ported from
 //                 RADEEngine.cpp:80-106. processIq() ports the
 //                 feedRxAudio body at RADEEngine.cpp:200-303 with the
-//                 NereusSDR-architectural divergence noted in
+//                 Longpath-architectural divergence noted in
 //                 RadeChannel.h's mod-history: AetherSDR's
 //                 processStereoToMono(L,R)+imag=0 path is replaced
 //                 with parallel processing of the I leg through
 //                 m_down24to8 and the Q leg through m_down24to8Q,
-//                 because NereusSDR's input is already complex
+//                 because Longpath's input is already complex
 //                 baseband from the OpenHPSDR DDC. Cross-checked
 //                 against freedv-gui RADEReceiveStep::execute
 //                 (src/pipeline/RADEReceiveStep.cpp:175-310
 //                 [@77e793a]); freedv-gui's freq_shift_coh step is
-//                 not needed because NereusSDR's DDC delivers
+//                 not needed because Longpath's DDC delivers
 //                 baseband directly. txEncode / resetTx slot bodies
 //                 remain TODO-marked for I3.
 //                 AI tooling: Anthropic Claude Code.
 //   2026-05-11  J.J. Boyd / KG4VCF  Phase 3R Task I3. TX path body
 //                 lands. txEncode() ports the feedTxAudio body at
 //                 AetherSDR src/core/RADEEngine.cpp:134-198 [@0cd4559]
-//                 with one NereusSDR-architectural divergence: the
+//                 with one Longpath-architectural divergence: the
 //                 input is already 16 kHz mono int16 (the WdspEngine
 //                 TX pump feeds mic samples at that rate per the
 //                 plan), so AetherSDR's 24 kHz stereo float -> 16 kHz
@@ -159,7 +159,7 @@
 #include <cstring>
 #include <vector>
 
-// Pull in the NereusSDR-native helper definitions so the
+// Pull in the Longpath-native helper definitions so the
 // std::unique_ptr<Resampler> and std::unique_ptr<RadeText> members
 // can be destroyed. They are forward-declared in RadeChannel.h to
 // keep the freedv-gui / opus include surface out of every callsite.
@@ -172,14 +172,14 @@ extern "C" {
 #include "fargan.h"
 }
 
-Q_LOGGING_CATEGORY(lcRade, "nereus.rade")
+Q_LOGGING_CATEGORY(lcRade, "longpath.rade")
 
 namespace Longpath {
 
 // Custom deleter for the opaque FARGANState handle held by
 // std::unique_ptr<void, FarganDeleter> on RadeChannel. Resolves the
 // FARGANState type at the cpp-side include scope so the opus header
-// does not bleed into RadeChannel.h. NereusSDR-only refactor of
+// does not bleed into RadeChannel.h. Longpath-only refactor of
 // AetherSDR's raw-void* m_fargan pattern at RADEEngine.h:8-12 [@0cd4559]
 // to comply with the project's "no raw new/delete" rule (CLAUDE.md).
 void RadeChannel::FarganDeleter::operator()(void* p) const noexcept {
@@ -229,7 +229,7 @@ RadeChannel::~RadeChannel()
 //   resampler chain. Cleanup-on-failure unwinds in reverse so a
 //   partially-initialised wrapper does not leak.
 //
-//   NereusSDR divergences vs AetherSDR:
+//   Longpath divergences vs AetherSDR:
 //     1. The model_file argument is honored. AetherSDR hard-codes
 //        rade_open("dummy", ...). We pass through the caller's path
 //        unless it matches kDummyModelSentinel, in which case we
@@ -293,7 +293,7 @@ bool RadeChannel::start(const QString& modelPath)
     m_farganWarmedUp = false;
 
     // From AetherSDR src/core/RADEEngine.cpp:58-61 [@0cd4559] plus
-    // NereusSDR-architectural addition m_down24to8Q.
+    // Longpath-architectural addition m_down24to8Q.
     //
     // 2026-05-12 (PR #238 follow-up): maxBlockSamples bumped from the
     // 4096 default to 16384 because r8brain's CDSPResampler24 pre-
@@ -400,7 +400,7 @@ bool RadeChannel::isSynced() const
     return m_synced;
 }
 
-// NereusSDR-native hook: sideband selection for RADE_U / RADE_L.
+// Longpath-native hook: sideband selection for RADE_U / RADE_L.
 // Stored on the channel at the v0.5.0 sideband-split fix-up; not yet
 // consumed by the I/Q routing layer.  K-bench follow-up will wire the
 // stored value into any future spectral mirroring at the TX modulator
@@ -437,7 +437,7 @@ int RadeChannel::txFeatureAccumSizeForTest() const
 // Pipeline:
 //   1. Deinterleave 24 kHz interleaved I/Q float input.
 //   2. Downsample I leg via m_down24to8 and Q leg via m_down24to8Q
-//      in parallel (NereusSDR divergence; AetherSDR averages L+R
+//      in parallel (Longpath divergence; AetherSDR averages L+R
 //      stereo PCM to mono and sets imag=0).
 //   3. Interleave I and Q outputs into RADE_COMP samples and append
 //      to m_rxAccum.
@@ -526,7 +526,7 @@ void RadeChannel::processIq(const QByteArray& iqSamples)
     // Step 3: assemble RADE_COMP samples (I leg -> real, Q leg ->
     // imag) and append to the RX accumulator. From AetherSDR
     // src/core/RADEEngine.cpp:217-223 [@0cd4559] with the
-    // NereusSDR-architectural Q-from-imag-leg divergence.
+    // Longpath-architectural Q-from-imag-leg divergence.
     {
         const auto* iSamples = reinterpret_cast<const float*>(iOut8k.constData());
         const auto* qSamples = reinterpret_cast<const float*>(qOut8k.constData());
@@ -611,7 +611,7 @@ void RadeChannel::processIq(const QByteArray& iqSamples)
     // chunk's byte size so the downstream speaker bus stays paced.
     // From AetherSDR src/core/RADEEngine.cpp:279-288 [@0cd4559].
     //
-    // NereusSDR divergence: AetherSDR uses the input PCM byte count
+    // Longpath divergence: AetherSDR uses the input PCM byte count
     // (int16 stereo); our input is float32 I/Q. To preserve the
     // pacing semantics we compute the equivalent float32 stereo
     // output byte count for the same frame count.
@@ -623,7 +623,7 @@ void RadeChannel::processIq(const QByteArray& iqSamples)
     }
     // Note: AetherSDR emits a silence pad when the output accumulator
     // is short. We choose NOT to emit a silence pad on the no-sync
-    // case because NereusSDR's audio engine is timer-driven and a
+    // case because Longpath's audio engine is timer-driven and a
     // missing chunk does not stall the speaker bus; emitting silence
     // would just clobber whatever non-RADE audio is also feeding the
     // bus. If a future caller needs deterministic pacing, expose a
@@ -671,7 +671,7 @@ void RadeChannel::processIq(const QByteArray& iqSamples)
 // src/pipeline/RADETransmitStep.cpp:150-260 [@77e793a].
 //
 // Pipeline:
-//   1. NereusSDR divergence vs AetherSDR: input is already 16 kHz mono
+//   1. Longpath divergence vs AetherSDR: input is already 16 kHz mono
 //      int16 per the wrapper's contract (the WdspEngine TX pump feeds
 //      mic samples at 16 kHz mono). AetherSDR's :139-152 step that
 //      downmixes 24 kHz stereo float -> 16 kHz mono int16 is therefore
@@ -712,7 +712,7 @@ void RadeChannel::txEncode(const QByteArray& speechSamples)
     }
 
     // Step 1: append the int16 mono 16 kHz input straight into the
-    // TX accumulator. NereusSDR divergence vs AetherSDR (which
+    // TX accumulator. Longpath divergence vs AetherSDR (which
     // converts 24 kHz stereo float -> 16 kHz mono int16 at :139-152);
     // our input is already in the LPCNet-ready format.
     m_txAccum.append(speechSamples);

@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - PgxlSaveRebootDialog: confirmation modal for PGXL save & reboot.
+// Longpath - PgxlSaveRebootDialog: confirmation modal for PGXL save & reboot.
 //
 // Presents a modal dialog explaining the reboot sequence and asks the user
 // to confirm before sending the save command to the Power Genius XL device.
 // On accept, returns QDialog::Accepted; on reject or cancel, QDialog::Rejected.
 //
-// NereusSDR-native (no upstream). Design reference:
+// Longpath-native (no upstream). Design reference:
 // docs/architecture/2026-05-18-pgxl-tgxl-and-analog-smeter-design.md
 // section 5.6 footer.
 //
@@ -34,7 +34,7 @@ PgxlSaveRebootDialog::PgxlSaveRebootDialog(QWidget* parent)
     auto* msg = new QLabel(
         QStringLiteral("Sending `save` will persist your configuration to "
                        "flash and reboot the PGXL. The amplifier will be "
-                       "offline for approximately 20 seconds. NereusSDR will "
+                       "offline for approximately 20 seconds. Longpath will "
                        "auto-reconnect when it returns. Do not transmit "
                        "during reboot."),
         this);

@@ -1,4 +1,4 @@
-// tests/tst_pa_watt_meter_page.cpp  (NereusSDR)
+// tests/tst_pa_watt_meter_page.cpp  (Longpath)
 //
 // Setup IA reshape Phase 3A — PaCalibrationGroup migrated from Hardware →
 // Calibration tab to PA → Watt Meter page.

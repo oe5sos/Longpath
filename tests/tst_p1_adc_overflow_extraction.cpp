@@ -1,7 +1,7 @@
 // no-port-check: test harness citing Thetis networkproto1.c offsets as the
 // behavioural spec it asserts against; contains no ported logic of its own.
 // =================================================================
-// tests/tst_p1_adc_overflow_extraction.cpp  (NereusSDR)
+// tests/tst_p1_adc_overflow_extraction.cpp  (Longpath)
 // =================================================================
 //
 // Regression tests for issue #176 — the P1 EP6 status-frame parser was
@@ -40,7 +40,7 @@
 //   - PTT + OVL set together      → both signals fire independently
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-04 — Issue #176 regression — J.J. Boyd (KG4VCF),
 //                 with AI-assisted authoring via Anthropic Claude Code.
 // =================================================================

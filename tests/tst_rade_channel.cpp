@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - tst_rade_channel: tests for the Phase 3R RadeChannel wrapper.
+// Longpath - tst_rade_channel: tests for the Phase 3R RadeChannel wrapper.
 //
 // I1 skeleton contracts (lifecycle only):
 //
