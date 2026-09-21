@@ -1,0 +1,11 @@
+name: "Longpath CodeQL"
+
+# Vendored and fetched third-party code stays byte-identical to its
+# upstream (docs/attribution/*-PROVENANCE.md), so a finding in it is not
+# ours to fix here and would only fail every PR that vendors a library
+# (ggmorse tripped seven integer-multiplication-cast-to-long warnings on
+# PR #30). build/ holds the FetchContent checkouts (PortAudio, Opus,
+# RNNoise) for the same reason.
+paths-ignore:
+  - third_party
+  - build

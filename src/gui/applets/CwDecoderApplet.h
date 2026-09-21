@@ -26,7 +26,10 @@
 //                 follows the slice's CW pitch (SliceModel, Thetis-
 //                 sourced) with +/- 150 Hz around it, the way AetherSDR's
 //                 setKnownParameters pads a known pitch; the operator
-//                 does not set a second pitch here.
+//                 does not set a second pitch here. The cost gate keeps
+//                 AetherSDR's default (0.70) without the sensitivity
+//                 slider, and confidence dims the text instead of
+//                 colouring it green/yellow/orange/red.
 // =================================================================
 
 #pragma once

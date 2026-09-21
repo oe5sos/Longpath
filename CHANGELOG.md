@@ -211,9 +211,10 @@ und Linux (x86_64 und aarch64), alle GPG-signiert.
   und CWU): dekodiert Morse direkt aus dem Empfangston, ohne fldigi.
   Tonhoehe und Tempo werden erkannt und koennen festgehalten werden
   (LOCK Hz / LOCK WPM); das Suchband folgt dem eingestellten CW-Pitch.
-  Decoder ist ggmorse (MIT, unveraendert vendort), der Wrapper ein Port
-  aus AetherSDR -- der Ersatz fuer den am 20.09. zurueckgezogenen
-  ersten Anlauf.
+  Unsichere Zeichen erscheinen gedaempft, Rauschen wird gar nicht erst
+  gezeigt. Decoder ist ggmorse (MIT, unveraendert vendort), der Wrapper
+  ein Port aus AetherSDR -- der Ersatz fuer den am 20.09.
+  zurueckgezogenen ersten Anlauf.
 
 - **Logbuch-Kennzahlen + Awards** (Logbuch > Stats…): sechs Kacheln
   statt des Textfensters -- Log (Gesamt, Rufzeichen, erste/letzte,

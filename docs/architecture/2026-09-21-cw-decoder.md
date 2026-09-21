@@ -37,6 +37,20 @@ AetherSDR-Ports sind seit Monaten Praxis, `AETHERSDR-PORTS.md`).
 4. **Tonband aus dem CW-Pitch der Einstellungen**, nicht aus einem
    eigenen Regler: der Betreiber stellt seine Tonhöhe einmal ein
    (Setup), der Decoder sucht ± 150 Hz darum.
+5. **Kostenschwelle fest auf AetherSDRs Vorgabe (0,70), ohne
+   Empfindlichkeitsregler.** ggmorse liefert zu jedem Textstück eine
+   Kostenfunktion (Abweichung der Punkt-/Strich-/Pausenlängen vom
+   Ideal; unter 1,0 gilt als „dekodiert"). Bandrauschen dekodiert als
+   zufällige Buchstaben mit Kosten nahe 1 — ohne Schwelle füllt sich
+   das Fenster auf einer leeren CW-Frequenz mit Müll (im Livetest über
+   einen KiwiSDR: 60 % aller Stücke ≥ 0,70, fast alle ≥ 0,35). Der
+   Regler ist Bedienoberfläche, also Martins Entscheidung.
+6. **Konfidenz als Textton, nicht als Ampel.** AetherSDR färbt nach
+   Kosten grün/gelb/orange/rot; Longpath hält Rot für Warnungen frei
+   (Gestaltungsregel) und dämpft stattdessen: < 0,15 Primärtext,
+   < 0,35 Sekundärtext, sonst Tertiärtext. Zeilenumbrüche, die ggmorse
+   bei jedem Tonhöhenwechsel setzt, werden wie bei AetherSDR zu
+   Leerzeichen.
 
 ## Prüfstände
 
@@ -46,12 +60,19 @@ AetherSDR-Ports sind seit Monaten Praxis, `AETHERSDR-PORTS.md`).
   nichts; der Ring wirft das Älteste weg statt zu wachsen; `stop()` joint
   den Worker und löscht die nicht gesperrten Schätzwerte (gesperrte
   bleiben).
-* `tests/tst_cw_decoder_applet.cpp` (5): Text landet und bleibt gedeckelt,
-  Statuszeile/Kapsel folgen den Locks, CW-Pitch-Einstellung, Scheibe
-  entfernt/umgebunden, PNG-Grab.
+* `tests/tst_cw_decoder_applet.cpp` (6): Text landet und bleibt gedeckelt,
+  Kostenschwelle/Umbrüche/Konfidenzton, Statuszeile/Kapsel folgen den
+  Locks, CW-Pitch-Einstellung, Scheibe entfernt/umgebunden, PNG-Grab.
 
 **Live** am Radio (CWL, Signal auf dem Band) noch nicht geprüft; das Bild
-oben ist aus dem Prüfstand gerendert.
+oben ist aus dem Prüfstand gerendert. Ein Livetest über öffentliche
+KiwiSDRs (DK0WCY, 10,144 MHz, Vormittag des 21.09.) brachte keinen
+sauberen Bakentext — das Signal war an keinem der erreichbaren
+Empfänger stark genug (30 m: nahe Empfänger in der toten Zone, ferne
+zu schwach; 80 m außerhalb des Bakenfahrplans). Der Versuch war
+trotzdem ergiebig: er fand den doppelt verschobenen CW-Durchlass des
+KiwiSDR-Pfads (eigener PR) und die Notwendigkeit der Kostenschwelle
+(Punkt 5 oben).
 
 ## Bekanntes
 

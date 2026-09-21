@@ -26,6 +26,7 @@
 #include <QLabel>
 #include <QPlainTextEdit>
 #include <QPushButton>
+#include <QTextCharFormat>
 #include <QTimer>
 #include <QVBoxLayout>
 
@@ -46,6 +47,19 @@ constexpr int kMaxCharCount = 4000;
 // pads a known pitch by 150 Hz either side (setKnownParameters); the
 // floor of 100 Hz is ggmorse's own lower bound of usefulness.
 constexpr int kPitchPadHz = 150;
+// AetherSDR's default sensitivity (PanadapterApplet m_cwCostThreshold
+// 0.70): a decode whose ggmorse cost is at or above this is dropped.
+// ggmorse's own "is decoding" line is 1.0, and band noise decodes as
+// random letters at a cost near it -- without the gate an idle CW slice
+// fills the transcript with garbage (seen live over a KiwiSDR,
+// 2026-09-21). AetherSDR exposes the threshold as a slider; Longpath
+// keeps the default fixed until the operator asks for the knob.
+constexpr float kCostThreshold = 0.70f;
+// AetherSDR's confidence bands (cost < 0.15 green, < 0.35 yellow, < 0.60
+// orange, else red). Longpath keeps red for warnings and dims uncertain
+// copy instead: primary / secondary / tertiary text tone.
+constexpr float kCostSure = 0.15f;
+constexpr float kCostFair = 0.35f;
 } // namespace
 
 CwDecoderApplet::CwDecoderApplet(RadioModel* model, QWidget* parent)
@@ -211,14 +225,24 @@ void CwDecoderApplet::syncFromModel()
 
 void CwDecoderApplet::onTextDecoded(const QString& text, float cost)
 {
-    Q_UNUSED(cost);
+    if (cost >= kCostThreshold) { return; }
+    // ggmorse starts a new line on every pitch change; AetherSDR turns
+    // them into spaces so the copy flows as one line (appendCwText).
+    QString clean = text;
+    clean.replace(QLatin1Char('\n'), QLatin1Char(' '));
+
+    QTextCharFormat fmt;
+    fmt.setForeground(QColor(QLatin1String(
+        cost < kCostSure ? Style::kTextPrimary
+        : cost < kCostFair ? Style::kTextSecondary
+        : Style::kTextTertiary)));
     auto cursor = m_textOutput->textCursor();
     cursor.movePosition(QTextCursor::End);
-    cursor.insertText(text);
+    cursor.insertText(clean, fmt);
     m_textOutput->setTextCursor(cursor);
     m_textOutput->ensureCursorVisible();
 
-    m_charCount += text.size();
+    m_charCount += clean.size();
     if (m_charCount > kMaxCharCount) {
         // By character count, not by line: CW text has no line breaks.
         const int excess = m_charCount - kMaxCharCount;

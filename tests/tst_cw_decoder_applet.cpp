@@ -4,6 +4,8 @@
 //
 // Longpath-original test. CwDecoderApplet over a RadioModel:
 //   * decoded text lands in the transcript and stays capped
+//   * the cost gate drops noise decodes, newlines flow as spaces, and
+//     the confidence shows as the text tone
 //   * the stats line and the capsule follow the decoder (lock toggles)
 //   * the pitch band follows the operator's CW pitch (AppSettings CWPitch)
 //   * a removed bound slice unbinds the applet (tap released)
@@ -24,6 +26,7 @@
 #include "core/AppSettings.h"
 #include "core/AudioEngine.h"
 #include "core/CwDecoder.h"
+#include "gui/StyleConstants.h"
 #include "gui/applets/CwDecoderApplet.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
@@ -56,6 +59,34 @@ private slots:
         QVERIFY(applet.textForTest()->toPlainText().size() <= 4000);
         QVERIFY(applet.textForTest()->toPlainText().endsWith(QString(100, QLatin1Char('V'))));
         QVERIFY(!applet.textForTest()->toPlainText().contains(QStringLiteral("CQ TEST")));
+    }
+
+    void costGateNewlinesAndConfidenceTone()
+    {
+        RadioModel radio;
+        CwDecoderApplet applet(&radio);
+        // cost >= 0.70 (AetherSDR's default gate) never reaches the text;
+        // ggmorse's newlines flow as spaces.
+        QMetaObject::invokeMethod(&applet, "onTextDecoded", Qt::DirectConnection,
+                                  Q_ARG(QString, QStringLiteral("?E5H")), Q_ARG(float, 0.95f));
+        QCOMPARE(applet.textForTest()->toPlainText(), QString());
+        QMetaObject::invokeMethod(&applet, "onTextDecoded", Qt::DirectConnection,
+                                  Q_ARG(QString, QStringLiteral("AB\n")), Q_ARG(float, 0.10f));
+        QMetaObject::invokeMethod(&applet, "onTextDecoded", Qt::DirectConnection,
+                                  Q_ARG(QString, QStringLiteral("CD")), Q_ARG(float, 0.25f));
+        QMetaObject::invokeMethod(&applet, "onTextDecoded", Qt::DirectConnection,
+                                  Q_ARG(QString, QStringLiteral("EF")), Q_ARG(float, 0.60f));
+        QCOMPARE(applet.textForTest()->toPlainText(), QStringLiteral("AB CDEF"));
+
+        // Confidence by tone: sure = primary, fair = secondary, else tertiary.
+        auto toneAt = [&](int pos) {
+            QTextCursor c(applet.textForTest()->document());
+            c.setPosition(pos + 1);   // charFormat() is the format of the char before
+            return c.charFormat().foreground().color().name();
+        };
+        QCOMPARE(toneAt(0), QColor(QLatin1String(Style::kTextPrimary)).name());
+        QCOMPARE(toneAt(3), QColor(QLatin1String(Style::kTextSecondary)).name());
+        QCOMPARE(toneAt(5), QColor(QLatin1String(Style::kTextTertiary)).name());
     }
 
     void statsAndCapsuleFollowTheDecoder()
@@ -125,7 +156,7 @@ private slots:
         QMetaObject::invokeMethod(&applet, "onStatsUpdated", Qt::DirectConnection,
                                   Q_ARG(float, 700.0f), Q_ARG(float, 24.0f));
         QMetaObject::invokeMethod(&applet, "onTextDecoded", Qt::DirectConnection,
-                                  Q_ARG(QString, QStringLiteral("CQ CQ DE OE5SOS OE5SOS K ")), Q_ARG(float, 0.2f));
+                                  Q_ARG(QString, QStringLiteral("CQ CQ DE OE5SOS OE5SOS K ")), Q_ARG(float, 0.1f));
         QMetaObject::invokeMethod(&applet, "onTextDecoded", Qt::DirectConnection,
                                   Q_ARG(QString, QStringLiteral("OE5SOS DE DL1ABC UR 599 599 TU")), Q_ARG(float, 0.3f));
         // A lock re-reads the decoder's own estimate (0 here, no audio), so
