@@ -32,6 +32,7 @@
 #include <QGridLayout>
 #include <QGroupBox>
 #include <QFrame>
+#include <QDateTime>
 #include <QLabel>
 #include <QPushButton>
 #include <QProgressBar>
@@ -105,7 +106,11 @@ RadioStatusPage::RadioStatusPage(RadioModel* model, QWidget* parent)
     auto* outer = new QVBoxLayout();
     outer->setSpacing(6);
     outer->setContentsMargins(6, 6, 6, 6);
-    contentLayout()->addLayout(outer);
+    // SetupPage's content layout ends in a stretch; appended AFTER it with
+    // stretch 0, the whole page sat at the bottom under a blank half
+    // screen (HL2 simulator bench, 2026-09-21). Insert before the stretch
+    // and let the cards take the height.
+    contentLayout()->insertLayout(contentLayout()->count() - 1, outer, /*stretch=*/1);
 
     // ── Top status bar ────────────────────────────────────────────────────
     auto* statusBar = new QFrame(this);
@@ -121,13 +126,12 @@ RadioStatusPage::RadioStatusPage(RadioModel* model, QWidget* parent)
     buildStatusBar(statusBar);
     outer->addWidget(statusBar);
 
-    // ── Scroll area for cards ─────────────────────────────────────────────
-    auto* scroll = new QScrollArea(this);
-    scroll->setWidgetResizable(true);
-    scroll->setFrameShape(QFrame::NoFrame);
-    scroll->setStyleSheet(QStringLiteral("QScrollArea { background: transparent; }"));
-
-    auto* cardsContainer = new QWidget;
+    // ── Cards ─────────────────────────────────────────────────────────────
+    // SetupPage already scrolls its content; a second QScrollArea in here
+    // nested two scrollers and squeezed the cards into a strip of their
+    // own size hint with a blank page below (HL2 simulator bench,
+    // 2026-09-21). The cards go straight into the page.
+    auto* cardsContainer = new QWidget(this);
     cardsContainer->setStyleSheet(QStringLiteral("QWidget { background: transparent; }"));
     auto* cardsLayout = new QVBoxLayout(cardsContainer);
     cardsLayout->setSpacing(6);
@@ -171,8 +175,7 @@ RadioStatusPage::RadioStatusPage(RadioModel* model, QWidget* parent)
     cardsLayout->addLayout(botRow);
     cardsLayout->addStretch();
 
-    scroll->setWidget(cardsContainer);
-    outer->addWidget(scroll);
+    outer->addWidget(cardsContainer, 1);
 
     // ── Wire signals if model present ─────────────────────────────────────
     if (m_model) {
@@ -200,9 +203,17 @@ RadioStatusPage::RadioStatusPage(RadioModel* model, QWidget* parent)
         connect(&sh, &SettingsHygiene::issuesChanged,
                 this, &RadioStatusPage::onIssuesChanged);
 
-        // Populate initial state
+        // Populate initial state — also the values RadioStatus already
+        // holds. The slots above only run on CHANGE; a temperature that
+        // stood at 31.5 °C since connect never fired again once this page
+        // opened, so the card showed „0.0 °C" while the status bar showed
+        // the real value (HL2 simulator bench, 2026-09-21).
         onIssuesChanged();
-        refreshPttPills();
+        onPaTemperatureChanged(rs.paTemperatureCelsius());
+        onPaCurrentChanged(rs.paCurrentAmps());
+        onPowerChanged(rs.forwardPowerWatts(), rs.reflectedPowerWatts(), rs.swrRatio());
+        onPttChanged();
+        onUptimeTick();
     }
 
     // ── Uptime timer ──────────────────────────────────────────────────────
@@ -730,7 +741,8 @@ void RadioStatusPage::onPttChanged()
     m_pttHistoryList->clear();
     const auto events = rs.recentPttEvents();
     for (const auto& ev : events) {
-        const QString ts = QStringLiteral("[%1]").arg(ev.timestampMs / 1000);
+        const QString ts = QDateTime::fromMSecsSinceEpoch(ev.timestampMs)
+                               .toString(QStringLiteral("[HH:mm:ss]"));
         const QString action = ev.isStart ? QStringLiteral("TX start") : QStringLiteral("TX end");
         m_pttHistoryList->addItem(QStringLiteral("%1 %2 (%3)")
             .arg(ts, action, pttSourceLabel(ev.source)));
@@ -745,6 +757,15 @@ void RadioStatusPage::onIssuesChanged()
 
 void RadioStatusPage::onUptimeTick()
 {
+    // The connection's own clock, not the page's: m_connectClock started
+    // when this page was built, so „Uptime" restarted at 00:00 every time
+    // the dialog opened (HL2 simulator bench, 2026-09-21). RadioModel
+    // keeps the real start; the page clock stays as the fallback without
+    // a model.
+    if (m_model) {
+        m_uptimeLabel->setText(m_model->connectionUptimeText());
+        return;
+    }
     qint64 elapsedMs = m_connectClock.elapsed();
     int totalSec = static_cast<int>(elapsedMs / 1000);
     int min = totalSec / 60;

@@ -1885,6 +1885,9 @@ nereus_add_test(tst_penny_lane_controller)
 # ── Phase 3P-H Task 1: RadioStatus + SettingsHygiene + PttSource models ──────
 nereus_add_test(tst_ptt_source)
 nereus_add_test(tst_radio_status)
+# -- RadioStatus erfaehrt vom Senden ueber MoxController::moxStateChanged
+#    (bis 2026-09-21 rief das niemand; Diagnoseseite blieb bei „RX (idle)") --
+nereus_add_test(tst_radio_status_follows_mox)
 nereus_add_test(tst_settings_hygiene)
 
 # ── Phase 3P-H Task 4: status-packet parsing + RadioModel ownership ──────────

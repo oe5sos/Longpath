@@ -1489,6 +1489,37 @@ RadioModel::RadioModel(QObject* parent)
             m_txReadyReceived = false;
         });
 
+        // RadioStatus lernt den Sendezustand — bis 2026-09-21 rief niemand
+        // setActivePttSource()/setTransmitting(), die Diagnoseseite
+        // „Radio Status" zeigte deshalb bei jedem Senden „— W" und
+        // „RX (idle)", die PTT-Quelle blieb „none" und die Ereignisliste
+        // leer (Simulator-Werkbank, HL2). Quelle der Wahrheit ist der
+        // MoxController (siehe inTx im Telemetriepfad); die PTT-Quelle
+        // ergibt sich aus TUNE/2-Ton am Modell und sonst aus dem
+        // Thetis-PTTMode, den der Controller mitfuehrt.
+        connect(m_moxController, &MoxController::moxStateChanged,
+                this, [this](bool on) {
+            if (!on) {
+                m_radioStatus.setTransmitting(false);
+                return;
+            }
+            PttSource src = PttSource::Mox;
+            if (m_isTuning || m_transmitModel.isTune()) {
+                src = PttSource::Tune;
+            } else if (m_transmitModel.isTwoToneActive()) {
+                src = PttSource::TwoTone;
+            } else {
+                switch (m_moxController->pttMode()) {
+                    case PttMode::Mic: src = PttSource::MicPtt; break;
+                    case PttMode::Cat: src = PttSource::Cat;    break;
+                    case PttMode::Vox: src = PttSource::Vox;    break;
+                    case PttMode::Cw:  src = PttSource::Cw;     break;
+                    default:           src = PttSource::Mox;    break;
+                }
+            }
+            m_radioStatus.setActivePttSource(src);
+        });
+
         // Interlock-blocked: log only, do NOT roll back MOX.
         //
         // Bench reality 14:53:30 on 2026-05-20: the spec-literal "block on

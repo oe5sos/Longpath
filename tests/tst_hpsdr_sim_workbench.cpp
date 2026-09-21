@@ -18,21 +18,32 @@
 // PTT, HL2-Bits) — das ist der Teil, den kein Signal-Spy sieht.
 //
 // Stationen der Werkbank: Discovery → Verbinden → Empfangsstrom →
-// Frequenz → Abtastrate → TUNE ein/aus (PTT am Simulator) → Trennen.
+// Frequenz → S9-Referenzton (der Simulator legt -73 dBm auf 14,100 MHz)
+// → Daempfungsglied/LNA (Stufe ueber den StepAttenuatorController wie
+// im Hauptfenster) → Abtastrate → TUNE ein/aus (PTT, Vorwaertsleistung
+// aus der Telemetrie, RadioStatus) → TUNE ueber den Tune-Regler
+// (HL2-Sonderweg) → MOX mit PC-Mikrofon → zweiter Empfaenger → Trennen.
 // Am Ende muss der Simulator PTT=0 gesehen haben — ein Traeger, der
 // nach dem Trennen weiterlaeuft, ist der eine Fehler, den kein
 // Hardware-Test verzeiht.
 //
-// Mit LONGPATH_HPSDRSIM_NO_TX=1 bleibt die TUNE-Station aus (fuer
+// Mit LONGPATH_HPSDRSIM_NO_TX=1 bleiben TUNE und MOX aus (fuer
 // Simulator-Varianten ohne Sendezweig).
 
 #include <QtTest>
 
+#include "core/BoardCapabilities.h"
 #include "core/ConnectionState.h"
 #include "core/HpsdrModel.h"
+#include "core/PttSource.h"
 #include "core/RadioDiscovery.h"
+#include "core/RadioStatus.h"
+#include "core/StepAttenuatorController.h"
+#include "core/WdspEngine.h"
+#include "models/Band.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
+#include "models/TransmitModel.h"
 
 #include <QFile>
 #include <QHostAddress>
@@ -42,6 +53,26 @@
 #include <algorithm>
 
 using namespace Longpath;
+
+namespace {
+
+// Mittelwert des S-Meters ueber ein paar Ablesungen: WDSP-Rohwert (dBm am
+// Eingang) und der Wert, den die Anzeige zeigt (Rohwert + Offset aus
+// Kalibrierung und Daempfungsglied, wie rxMeterOffsetDb() ihn liefert).
+struct MeterReading { double rawDbm{-200.0}; double shownDbm{-200.0}; };
+
+MeterReading readMeter(Longpath::RadioModel& model, int samples = 8)
+{
+    double raw = 0.0;
+    for (int i = 0; i < samples; ++i) {
+        QTest::qWait(120);
+        raw += model.wdspEngine()->getRxaSignalAverage(0);
+    }
+    raw /= samples;
+    return { raw, raw + model.rxMeterOffsetDb() };
+}
+
+} // namespace
 
 class TstHpsdrSimWorkbench : public QObject { Q_OBJECT
 private slots:
@@ -69,6 +100,11 @@ private slots:
 
         // ── 2. Verbinden ─────────────────────────────────────────────
         RadioModel model;
+        // Das Daempfungsglied laeuft wie im Hauptfenster ueber den
+        // StepAttenuatorController (MainWindow.cpp: Anlegen im Konstruktor,
+        // Verbindung + Grenzen nach dem Verbinden).
+        StepAttenuatorController att;
+        model.setStepAttController(&att);
         QSignalSpy state(&model, &RadioModel::connectionStateChanged);
         QSignalSpy iq(&model, &RadioModel::rawIqData);
         model.connectToRadio(info);
@@ -78,6 +114,15 @@ private slots:
         qInfo() << "STATE" << int(model.connectionState()) << "transitions" << state.count();
         QVERIFY2(model.connectionState() == ConnectionState::Connected,
                  "Verbindung kam nicht zustande (siehe STATE oben)");
+        att.setRadioConnection(model.connection());
+        {
+            const auto& caps = BoardCapsTable::forBoard(info.boardType);
+            att.setMaxAttenuation(caps.attenuator.maxDb);
+            att.setIsHpsdrBoard(info.boardType == HPSDRHW::Atlas);
+            qInfo() << "ATT caps present" << caps.attenuator.present
+                    << "min" << caps.attenuator.minDb << "max" << caps.attenuator.maxDb
+                    << "controller dB" << att.attenuatorDb() << "stepAtt" << att.stepAttEnabled();
+        }
 
         // ── 3. Empfangsstrom ─────────────────────────────────────────
         QTRY_VERIFY_WITH_TIMEOUT(iq.count() >= 20, 10000);
@@ -95,6 +140,46 @@ private slots:
         qInfo() << "FREQ before" << before << "after" << s->frequency()
                 << "dspMode" << int(s->dspMode());
         QCOMPARE(int(s->frequency()), 14'200'000);
+
+        // ── 4a. S9-Referenzton und Daempfungsglied ──────────────────
+        // hpsdrsim legt einen -73-dBm-Traeger (S9) auf 14,100 MHz und
+        // -150 dBm/Hz Rauschen darunter. Auf 14,200 MHz ist nur Rauschen:
+        // das ist der Rauschflur in der Filterbreite. Dann der Ton — er
+        // muss deutlich darueber liegen. Dann +10 dB Daempfung: der
+        // Rohwert faellt um ~10 dB, die ANZEIGE (mit Offset) bleibt, so
+        // wie Thetis es macht (RXOffset = Daempfung + Kalibrierung).
+        const MeterReading floorAt142 = readMeter(model);
+        // 1 kHz unter dem Ton: in USB liegt der Traeger dann mitten im
+        // Durchlass (100…2900 Hz), nicht auf der Filterkante bei 0 Hz.
+        s->setFrequency(14'099'000.0);
+        QTest::qWait(1500);   // AGC/Mittelung einschwingen lassen
+        const MeterReading toneAt0 = readMeter(model);
+        qInfo() << "METER floor@14.200" << floorAt142.rawDbm << "shown" << floorAt142.shownDbm
+                << "| tone@14.099+1k" << toneAt0.rawDbm << "shown" << toneAt0.shownDbm
+                << "offset" << model.rxMeterOffsetDb();
+        QVERIFY2(toneAt0.rawDbm > floorAt142.rawDbm + 20.0,
+                 qPrintable(QStringLiteral("Der S9-Ton auf 14,100 MHz ist nicht zu sehen: "
+                                           "Ton %1 dBm, Flur %2 dBm")
+                            .arg(toneAt0.rawDbm).arg(floorAt142.rawDbm)));
+
+        const int attBefore = att.attenuatorDb();
+        att.setAttenuation(attBefore + 10);
+        QTest::qWait(1500);
+        const MeterReading toneAt10 = readMeter(model);
+        qInfo() << "METER att" << attBefore << "->" << att.attenuatorDb()
+                << "| tone raw" << toneAt10.rawDbm << "shown" << toneAt10.shownDbm
+                << "offset" << model.rxMeterOffsetDb();
+        const double rawDrop = toneAt0.rawDbm - toneAt10.rawDbm;
+        QVERIFY2(rawDrop > 7.0 && rawDrop < 13.0,
+                 qPrintable(QStringLiteral("+10 dB Daempfung senkten den Rohwert um %1 dB").arg(rawDrop)));
+        const double shownDrift = toneAt0.shownDbm - toneAt10.shownDbm;
+        QVERIFY2(qAbs(shownDrift) < 3.0,
+                 qPrintable(QStringLiteral("Die Anzeige wanderte um %1 dB, obwohl der Offset "
+                                           "die Daempfung ausgleichen muss").arg(shownDrift)));
+        att.setAttenuation(attBefore);
+        QTest::qWait(300);
+        s->setFrequency(14'200'000.0);
+        QTest::qWait(300);
 
         // ── 4b. Abtastrate ───────────────────────────────────────────
         // Der HPSDR-Weg kennt eine Rate fuer alle Stroeme; wir nehmen die
@@ -121,18 +206,114 @@ private slots:
         // ── 4c. TUNE ein/aus — PTT am Simulator ──────────────────────
         const bool noTx = qEnvironmentVariableIsSet("LONGPATH_HPSDRSIM_NO_TX");
         bool tuned = false;
+        bool moxed = false;
         if (!noTx) {
             QSignalSpy refused(&model, &RadioModel::tuneRefused);
+            QSignalSpy vol(&model.transmitModel(), &TransmitModel::audioVolumeChanged);
+            auto lastVol = [&vol]() { return vol.isEmpty() ? -1.0 : vol.last().first().toDouble(); };
+            qInfo() << "POWER slider" << model.transmitModel().power()
+                    << "tune W" << model.transmitModel().tunePowerForBand(bandFromFrequency(s->frequency()))
+                    << "audioVolume before" << lastVol();
             model.setTune(true);
             QTest::qWait(1200);
+            qInfo() << "POWER at TUNE: audioVolume" << lastVol() << "changes" << vol.count();
+            // Der Simulator rechnet aus dem Sende-IQ eine Vorwaertsleistung
+            // und schickt sie als Telemetrie zurueck; RadioStatus muss sie
+            // fuer dieses Board richtig auslesen (HL2 legt die Werte anders
+            // als Hermes/ANAN).
+            const RadioStatus& rs = model.radioStatus();
             qInfo() << "TUNE on: isTune" << model.isTune() << "mox" << model.mox()
-                    << "refused" << (refused.isEmpty() ? QString() : refused.first().first().toString());
+                    << "refused" << (refused.isEmpty() ? QString() : refused.first().first().toString())
+                    << "| fwd W" << rs.forwardPowerWatts() << "refl W" << rs.reflectedPowerWatts()
+                    << "swr" << rs.swrRatio() << "PA C" << rs.paTemperatureCelsius()
+                    << "tx?" << rs.isTransmitting();
             tuned = model.isTune();
+            const double fwdAtTune = rs.forwardPowerWatts();
+            QVERIFY2(fwdAtTune > 0.0,
+                     "Bei TUNE kam keine Vorwaertsleistung aus der Telemetrie an");
+            QVERIFY2(rs.isTransmitting() && rs.activePttSource() == PttSource::Tune,
+                     qPrintable(QStringLiteral("RadioStatus weiss nichts vom TUNE: tx=%1 Quelle=%2")
+                                .arg(rs.isTransmitting()).arg(pttSourceLabel(rs.activePttSource()))));
             model.setTune(false);
             QTRY_VERIFY_WITH_TIMEOUT(!model.mox(), 8000);
             QTest::qWait(400);
-            qInfo() << "TUNE off: isTune" << model.isTune() << "mox" << model.mox();
+            qInfo() << "TUNE off: isTune" << model.isTune() << "mox" << model.mox()
+                    << "fwd W" << rs.forwardPowerWatts() << "tx?" << rs.isTransmitting();
             QVERIFY2(!model.isTune(), "TUNE liess sich nicht wieder ausschalten");
+            QVERIFY2(!rs.isTransmitting(), "RadioStatus meldet nach TUNE-aus noch: sendet");
+            const double fwdAtDriveSlider = fwdAtTune;
+
+            // ── 4c'. TUNE ueber den Tune-Regler (HL2-Sonderweg) ──────
+            // Voreinstellung wie in Thetis/mi0bot: TUNE nimmt den
+            // Drive-Regler (console.cs:46561). Stellt man im Setup „Use
+            // Tune Slider" ein, traegt beim HL2 der Ton selbst den Pegel
+            // (TXPostGenToneMag, mi0bot: „HL2 only has 15 step output
+            // attenuator"), der Drive-Byte geht auf 0. Der Simulator
+            // bildet die 16 Stufen des HL2 nach — die Leistung muss
+            // deutlich unter der vom Drive-Regler liegen.
+            model.transmitModel().setTuneDrivePowerSource(DrivePowerSource::TuneSlider);
+            model.setTune(true);
+            QTest::qWait(1200);
+            const double fwdAtTuneSlider = rs.forwardPowerWatts();
+            qInfo() << "TUNE(Tune-Regler) on: tune W"
+                    << model.transmitModel().tunePowerForBand(bandFromFrequency(s->frequency()))
+                    << "toneMag" << model.transmitModel().txPostGenToneMag()
+                    << "audioVolume" << lastVol()
+                    << "| fwd W" << fwdAtTuneSlider << "(Drive-Regler:" << fwdAtDriveSlider << ")";
+            model.setTune(false);
+            QTRY_VERIFY_WITH_TIMEOUT(!model.mox(), 8000);
+            QTest::qWait(400);
+            model.transmitModel().setTuneDrivePowerSource(DrivePowerSource::DriveSlider);
+            // (Der Simulator kennt die 16 Stufen nur als -hermeslite2; sein
+            // -hermeslite rechnet Drive 0 linear zu 0 W — deshalb nur die
+            // obere Schranke.)
+            if (info.boardType == HPSDRHW::HermesLite) {
+                QVERIFY2(fwdAtTuneSlider < 0.3 * fwdAtDriveSlider,
+                         qPrintable(QStringLiteral("HL2-TUNE ueber den Tune-Regler (1 W) gab %1 W, "
+                                                   "ueber den Drive-Regler (100 %) %2 W")
+                                    .arg(fwdAtTuneSlider).arg(fwdAtDriveSlider)));
+            }
+
+            // ── 4d. MOX mit PC-Mikrofon ──────────────────────────────
+            // Der HL2 hat keine Mikrofonbuchse; Longpath nimmt das
+            // PC-Mikrofon. MOX muss PTT setzen und den normalen
+            // Sendepegel (nicht den TUNE-Pegel) auf den Draht legen.
+            model.setMox(true);
+            QTRY_VERIFY_WITH_TIMEOUT(model.mox(), 5000);
+            QTest::qWait(1000);
+            qInfo() << "POWER at MOX: audioVolume" << lastVol() << "changes" << vol.count()
+                    << "| fwd W" << rs.forwardPowerWatts();
+            qInfo() << "MOX on: mox" << model.mox() << "micSource" << int(model.transmitModel().micSource())
+                    << "micLocked" << model.transmitModel().isMicSourceLocked()
+                    << "tx?" << rs.isTransmitting();
+            moxed = model.mox();
+            QVERIFY2(rs.isTransmitting() && rs.activePttSource() == PttSource::Mox,
+                     qPrintable(QStringLiteral("RadioStatus weiss nichts vom MOX: tx=%1 Quelle=%2")
+                                .arg(rs.isTransmitting()).arg(pttSourceLabel(rs.activePttSource()))));
+            model.setMox(false);
+            QTRY_VERIFY_WITH_TIMEOUT(!model.mox(), 8000);
+            QTest::qWait(400);
+            qInfo() << "MOX off: mox" << model.mox();
+        }
+
+        // ── 4e. Zweiter Empfaenger ───────────────────────────────────
+        // Ein zweiter Empfaenger heisst am Draht ein weiterer DDC mit
+        // eigener Frequenz. Der Simulator zeigt RECEIVERS und RX FREQn.
+        const int slicesBefore = model.slices().size();
+        const int secondId = model.addSlice();
+        QTest::qWait(600);
+        SliceModel* s2 = model.sliceById(secondId);
+        qInfo() << "SLICE2 id" << secondId << "slices" << slicesBefore << "->" << model.slices().size()
+                << "stream" << (s2 ? s2->streamIndex() : -99)
+                << "rx2Enabled" << model.rx2Enabled()
+                << "activeRx" << model.connectionActiveRxCount();
+        if (s2) {
+            s2->setFrequency(7'050'000.0);
+            QTest::qWait(800);
+            qInfo() << "SLICE2 freq" << s2->frequency() << "stream" << s2->streamIndex();
+            model.removeSlice(secondId);
+            QTest::qWait(400);
+            qInfo() << "SLICE2 removed, slices" << model.slices().size();
         }
 
         // ── 5. Trennen ───────────────────────────────────────────────
@@ -184,6 +365,19 @@ private slots:
                     QVERIFY2(all.contains(QStringLiteral("PTT= 00000001")),
                              "TUNE war an, aber der Simulator sah nie PTT=1");
                 }
+                if (moxed) {
+                    // Drei getrennte Sendephasen (TUNE, TUNE ueber den
+                    // Tune-Regler, MOX) → PTT muss mehrfach auf 1 gegangen sein.
+                    QVERIFY2(all.count(QStringLiteral("PTT= 00000001")) >= 3,
+                             "MOX war an, aber der Simulator sah dafuer kein weiteres PTT=1");
+                }
+                // Daempfungsglied: die Stufe muss den Draht erreicht haben.
+                QVERIFY2(all.contains(QStringLiteral("ATT")),
+                         "Der Simulator sah nie eine Daempfungs-Einstellung");
+                // Zweiter Empfaenger: seine Frequenz muss auf einem
+                // eigenen DDC angekommen sein.
+                QVERIFY2(all.contains(QStringLiteral("7050000")),
+                         "Die Frequenz des zweiten Empfaengers (7,05 MHz) kam beim Simulator nie an");
                 if (!lastPtt.isEmpty()) {
                     QVERIFY2(lastPtt.contains(QStringLiteral("PTT= 00000000")),
                              qPrintable(QStringLiteral("Letzter PTT-Stand am Simulator ist nicht 0: %1").arg(lastPtt)));

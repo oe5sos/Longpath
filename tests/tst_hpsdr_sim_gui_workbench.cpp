@@ -21,6 +21,7 @@
 #include "core/HpsdrModel.h"
 #include "core/RadioDiscovery.h"
 #include "gui/MainWindow.h"
+#include "gui/SetupDialog.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
 
@@ -28,6 +29,7 @@
 #include <QHostAddress>
 #include <QPainter>
 #include <QSignalSpy>
+#include <QTabWidget>
 #ifdef NEREUS_GPU_SPECTRUM
 #include <QRhiWidget>
 #endif
@@ -124,6 +126,56 @@ private slots:
             s->setFrequency(7'100'000.0);
             QTest::qWait(1500);
             saveGrab(mw, QStringLiteral("03-40m"));
+        }
+
+        // ── Setup → Hardware: die Reiter, die es nur fuer dieses Board gibt
+        {
+            auto* dlg = new SetupDialog(model, mw);
+            dlg->resize(1100, 760);
+            dlg->selectPage(QStringLiteral("Hardware Config"));
+            dlg->show();
+            QVERIFY(QTest::qWaitForWindowExposed(dlg, 10000));
+            QTest::qWait(600);
+            QStringList tabs;
+            for (QTabWidget* tw : dlg->findChildren<QTabWidget*>()) {
+                for (int i = 0; i < tw->count(); ++i) {
+                    if (tw->isTabVisible(i)) { tabs << tw->tabText(i); }
+                }
+            }
+            qInfo().noquote() << "HARDWARE TABS" << tabs.join(QStringLiteral(" | "));
+            saveGrab(dlg, QStringLiteral("05-setup-hardware"));
+            // Den HL2-Reiter zeigen, damit man sieht, was dort steht.
+            for (QTabWidget* tw : dlg->findChildren<QTabWidget*>()) {
+                for (int i = tw->count() - 1; i >= 0; --i) {
+                    if (tw->isTabVisible(i) && tw->tabText(i).contains(QLatin1String("HL2"))) {
+                        tw->setCurrentIndex(i);
+                        QTest::qWait(400);
+                        saveGrab(dlg, QStringLiteral("06-setup-hardware-hl2"));
+                        break;
+                    }
+                }
+            }
+            dlg->close();
+            dlg->deleteLater();
+        }
+
+        // ── TUNE mit offener Diagnoseseite „Radio Status" ─────────────
+        if (!qEnvironmentVariableIsSet("LONGPATH_HPSDRSIM_NO_TX")) {
+            auto* dlg = new SetupDialog(model, mw);
+            dlg->resize(1100, 760);
+            dlg->selectPage(QStringLiteral("Radio Status"));
+            dlg->show();
+            QVERIFY(QTest::qWaitForWindowExposed(dlg, 10000));
+            model->setTune(true);
+            QTest::qWait(1500);
+            saveGrab(mw, QStringLiteral("07-tune"));
+            saveGrab(dlg, QStringLiteral("08-radio-status-bei-tune"));
+            model->setTune(false);
+            QTRY_VERIFY_WITH_TIMEOUT(!model->mox(), 8000);
+            QTest::qWait(600);
+            saveGrab(dlg, QStringLiteral("09-radio-status-nach-tune"));
+            dlg->close();
+            dlg->deleteLater();
         }
 
         // ── Trennen ──────────────────────────────────────────────────
