@@ -1064,6 +1064,7 @@ set(GUI_SOURCES
     src/core/CredentialStore.cpp
     src/core/QrzClient.cpp
     src/core/QrzLogbookUploader.cpp
+    src/core/QrzLogbookFetcher.cpp
     src/core/CloudlogUploader.cpp
     src/core/AdifNetworkUploader.cpp
     src/core/RotctldClient.cpp

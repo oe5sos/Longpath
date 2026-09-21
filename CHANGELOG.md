@@ -26,6 +26,17 @@
   Warnungen; Rot bleibt dem Senden vorbehalten. Als `moos.json` neben
   `kreide`, `flach`, `tief` mitgeliefert.
 
+- **Sync QRZ** im Logbuchfenster: holt das eigene QRZ-Logbuch ab
+  (seitenweise, 250 je Anfrage, ueber den Logbuch-Schluessel aus
+  Tools > QRZ) und fuehrt es wie einen Datei-Import zusammen — dort
+  geloggte Verbindungen kommen dazu, Bestaetigungen und die QRZ-Kennung
+  (`APP_QRZLOG_LOGID`) fuellen sich an vorhandenen Kontakten, nichts
+  Sichtbares wird ueberschrieben; getroffene Kontakte gelten danach als
+  bei QRZ vorhanden, der Upload schickt sie nicht noch einmal.
+  Sicherung und Rueckfrage wie beim Import. Pruefstaende
+  `tst_qrz_logbook_fetcher` (Antwort-Parser, Blaettern gegen einen
+  HTTP-Mock) und `tst_logbook_qrz_sync`.
+
 - **Logbuch-Kennzahlen + Awards** (Logbuch > Stats…): sechs Kacheln
   statt des Textfensters -- Log (Gesamt, Rufzeichen, erste/letzte,
   7/30/365 Tage, bestaetigt, Weitester), Baender und Modi als Balken mit

@@ -30,6 +30,10 @@
 //                 window always reopened at Qt's default QDialog(parent)
 //                 placement with no memory of where it was left.
 //                 AI-assisted via Anthropic Claude, operator Martin Fischer.
+//   2026-09-21 — QRZ-Logbuch abholen (syncFromQrz): FETCH ueber den
+//                 Schluessel des Uploaders, Zusammenfuehren wie ein
+//                 Datei-Import (importEntries). Martin Fischer,
+//                 AI-assisted via Anthropic Claude.
 // =================================================================
 
 #include "core/CallsignCache.h"
@@ -60,6 +64,8 @@ namespace Longpath {
 class QrzClient;
 class QsoDetailPane;
 class QsoUploader;
+class QrzLogbookUploader;
+class QrzLogbookFetcher;
 
 class LogbookWindow : public QDialog {
     Q_OBJECT
@@ -178,6 +184,19 @@ public:
     /// Der Dialog ruft das hier auf; Tests koennen es direkt aufrufen.
     void importAdifFile(const QString& path);
 
+    // ── QRZ-Logbuch abholen ─────────────────────────────────────────
+    //
+    // Der Weg zurueck: was im QRZ-Logbuch steht — dort geloggte
+    // Verbindungen, Bestaetigungen, die QRZ-Kennung je Kontakt — kommt
+    // hier ins Log, ueber denselben Zusammenfuehr-Weg wie eine Datei:
+    // Neues wird ergaenzt, Fehlendes an vorhandenen Kontakten gefuellt,
+    // nichts Sichtbares ueberschrieben. Der Schluessel ist der des
+    // Uploaders (ein Logbuch, ein Schluessel).
+    void setQrzLogbookUploader(QrzLogbookUploader* uploader);
+    void syncFromQrz();
+    /// Der Kern ohne Netz, fuer Tests: ADIF-Text wie von QRZ geliefert.
+    void mergeQrzAdifForTest(const QString& adif) { mergeFetchedEntries(adif); }
+
     /// Wie viele Verbindungen das Logbuch gerade fuehrt. Nur fuer Tests.
     int entryCountForTesting() const { return m_all.size(); }
 
@@ -191,6 +210,16 @@ public:
 private:
     bool askOperator(const QString& question);
     void tellOperator(const QString& message);
+
+    /// Zusammenfuehren mit Rueckfrage, Sicherung, Speichern, Bericht.
+    /// `source` steht im Satz („that file", „your QRZ logbook");
+    /// `fromQrz` markiert getroffene Kontakte als bei QRZ vorhanden.
+    void importEntries(const QVector<LogEntry>& incoming,
+                       const QString& source, bool fromQrz);
+    void mergeFetchedEntries(const QString& adif);
+    QrzLogbookUploader* m_qrzUploader{nullptr};
+    QrzLogbookFetcher*  m_qrzFetcher{nullptr};
+    QPushButton*        m_syncBtn{nullptr};
 
     std::function<bool(const QString&)> m_ask;
     std::function<void(const QString&)> m_tell;

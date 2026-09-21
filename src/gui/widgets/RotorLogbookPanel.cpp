@@ -2207,6 +2207,8 @@ void RotorLogbookPanel::openLogbookWindow()
         // rather than a second client: one session key, one queue, and
         // one place the credentials live.
         m_logWindow->setQrzClient(m_qrz);
+        // Derselbe Logbuch-Schluessel fuer den Weg zurueck (Sync QRZ).
+        m_logWindow->setQrzLogbookUploader(m_uploader);
         connect(m_logWindow, &LogbookWindow::logChanged,
                 this, &RotorLogbookPanel::refreshRecentList);
 

@@ -8,6 +8,9 @@
 // Modification history (NereusSDR):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
+//   2026-09-21 — Sync QRZ: das QRZ-Logbuch abholen und wie einen Import
+//                 zusammenfuehren; getroffene Kontakte gelten als bei QRZ
+//                 vorhanden. Martin Fischer, AI-assisted via Anthropic Claude.
 // =================================================================
 
 #include "LogbookWindow.h"
@@ -19,6 +22,8 @@
 #include "core/QsoConfirmation.h"
 #include "core/AppSettings.h"
 #include "core/CallsignInfo.h"
+#include "core/QrzLogbookFetcher.h"
+#include "core/QrzLogbookUploader.h"
 #include "core/QsoUploader.h"
 #include "gui/QsoMapWindow.h"
 #include "gui/StyleConstants.h"
@@ -201,6 +206,12 @@ void LogbookWindow::buildUi()
     auto* importBtn = new QPushButton(QStringLiteral("Import…"), this);
     importBtn->setToolTip(QStringLiteral(
         "Merge an ADIF file into this log, skipping contacts it already has"));
+    m_syncBtn = new QPushButton(QStringLiteral("Sync QRZ"), this);
+    m_syncBtn->setToolTip(QStringLiteral(
+        "Fetch your QRZ logbook and merge it into this log: contacts "
+        "logged there are added, confirmations and QRZ log ids fill in, "
+        "nothing you can see and edit here is overwritten. Needs the "
+        "logbook key from Tools > QRZ."));
     auto* adifBtn = new QPushButton(QStringLiteral("Export ADIF…"), this);
     auto* csvBtn  = new QPushButton(QStringLiteral("Export CSV…"), this);
     auto* cabrBtn = new QPushButton(QStringLiteral("Cabrillo…"), this);
@@ -213,7 +224,7 @@ void LogbookWindow::buildUi()
         "Contacts per band, mode and year, unique calls and squares, "
         "furthest DX — for whatever the filters currently show"));
     for (QPushButton* b : {m_editBtn, m_deleteBtn, m_uploadBtn, mapBtn,
-                           statsBtn, importBtn, adifBtn, csvBtn, cabrBtn}) {
+                           statsBtn, importBtn, m_syncBtn, adifBtn, csvBtn, cabrBtn}) {
         b->setStyleSheet(Style::buttonBaseStyle());
         top->addWidget(b);
     }
@@ -225,6 +236,8 @@ void LogbookWindow::buildUi()
             this, &LogbookWindow::exportCabrillo);
     connect(importBtn, &QPushButton::clicked,
             this, &LogbookWindow::importAdif);
+    connect(m_syncBtn, &QPushButton::clicked,
+            this, &LogbookWindow::syncFromQrz);
 
     connect(m_uploadBtn, &QPushButton::clicked, this, [this]() {
         if (m_uploaders.isEmpty()) {
@@ -1470,27 +1483,58 @@ void LogbookWindow::importAdifFile(const QString& path)
         return;
     }
 
-    const AdifLog::MergeResult r = AdifLog::merge(m_all, incoming);
+    importEntries(incoming, QStringLiteral("that file"), /*fromQrz*/ false);
+}
+
+void LogbookWindow::importEntries(const QVector<LogEntry>& incoming,
+                                  const QString& source, bool fromQrz)
+{
+    AdifLog::MergeResult r = AdifLog::merge(m_all, incoming);
+
+    // Was aus dem QRZ-Logbuch kommt, IST im QRZ-Logbuch — der Upload
+    // braucht es nicht mehr zu schicken. uploadedToQrz ist kein Feld,
+    // das der Betreiber sieht und pflegt, also darf es hier gesetzt
+    // werden, auch an Kontakten, die er schon hatte.
+    int markedQrz = 0;
+    if (fromQrz) {
+        QHash<QString, QVector<const LogEntry*>> byCall;
+        for (const LogEntry& in : incoming) {
+            byCall[in.call.trimmed().toUpper()].append(&in);
+        }
+        for (LogEntry& e : r.merged) {
+            if (e.uploadedToQrz) { continue; }
+            const auto it = byCall.constFind(e.call.trimmed().toUpper());
+            if (it == byCall.constEnd()) { continue; }
+            for (const LogEntry* in : it.value()) {
+                if (AdifLog::isSameQso(e, *in)) { e.uploadedToQrz = true; ++markedQrz; break; }
+            }
+        }
+    }
 
     // "Nothing new" is not the same as "nothing to do". A confirmation
     // report from LoTW or eQSL is a file of contacts you already have,
     // and the whole point of importing it is the fields it carries that
     // your copies do not. Bailing out on added == 0 threw those away
     // and told the operator everything was fine.
-    if (r.added == 0 && r.enriched == 0) {
+    if (r.added == 0 && r.enriched == 0 && markedQrz == 0) {
         tellOperator(
-            QStringLiteral("All %1 contacts in that file are already in "
+            QStringLiteral("All %1 contacts in %2 are already in "
                            "your log, and none of them carried anything "
                            "your copies were missing. Nothing to do.")
-                .arg(incoming.size()));
+                .arg(incoming.size()).arg(source));
         return;
     }
 
     QString question =
-        QStringLiteral("%1 contacts in the file.\n\n"
+        QStringLiteral("%1 contacts in %4.\n\n"
                        "%2 are new and will be added.\n"
                        "%3 are already in your log.\n")
-            .arg(incoming.size()).arg(r.added).arg(r.skipped);
+            .arg(incoming.size()).arg(r.added).arg(r.skipped).arg(source);
+    if (markedQrz > 0) {
+        question += QStringLiteral(
+            "\n%1 of yours will be marked as present in your QRZ logbook, "
+            "so Upload will not send them again.\n").arg(markedQrz);
+    }
     if (r.enriched > 0) {
         question += QStringLiteral(
             "\nOf those, %1 carry fields your copies do not have — "
@@ -1531,6 +1575,10 @@ void LogbookWindow::importAdifFile(const QString& path)
     if (r.enriched > 0) {
         done += QStringLiteral("\nFilled in missing fields on %1 of them.")
                     .arg(r.enriched);
+    }
+    if (markedQrz > 0) {
+        done += QStringLiteral("\nMarked %1 as present in your QRZ logbook.")
+                    .arg(markedQrz);
     }
     if (!backup.isEmpty()) {
         done += QStringLiteral("\n\nBackup: %1").arg(backup);
@@ -1757,6 +1805,74 @@ void LogbookWindow::refreshStatsView()
     for (int i : m_visible) { shown.push_back(m_all.at(i)); }
     m_statsView->setStats(LogbookStats::compute(shown, m_cty,
                                                 QDateTime::currentDateTimeUtc()));
+}
+
+
+// ── QRZ-Logbuch abholen ──────────────────────────────────────────────
+
+void LogbookWindow::setQrzLogbookUploader(QrzLogbookUploader* uploader)
+{
+    m_qrzUploader = uploader;
+}
+
+void LogbookWindow::syncFromQrz()
+{
+    const QString key = m_qrzUploader ? m_qrzUploader->apiKey() : QString();
+    if (key.trimmed().isEmpty()) {
+        tellOperator(QStringLiteral(
+            "No QRZ logbook key yet.\n\nAdd it under Tools > QRZ — it is the "
+            "logbook access key from your QRZ logbook's settings page, not "
+            "your QRZ password."));
+        return;
+    }
+    if (!m_qrzFetcher) {
+        m_qrzFetcher = new QrzLogbookFetcher(this);
+        connect(m_qrzFetcher, &QrzLogbookFetcher::progress, this,
+                [this](int records, int page) {
+            if (m_syncBtn) {
+                m_syncBtn->setText(QStringLiteral("Syncing… %1 (page %2)")
+                                       .arg(records).arg(page));
+            }
+        });
+        connect(m_qrzFetcher, &QrzLogbookFetcher::finished, this,
+                [this](bool ok, const QString& adif, int records, const QString& error) {
+            if (m_syncBtn) {
+                m_syncBtn->setEnabled(true);
+                m_syncBtn->setText(QStringLiteral("Sync QRZ"));
+            }
+            if (!ok) {
+                tellOperator(QStringLiteral("Couldn't fetch your QRZ logbook:\n%1")
+                                 .arg(error));
+                return;
+            }
+            if (records == 0 || adif.trimmed().isEmpty()) {
+                tellOperator(QStringLiteral("Your QRZ logbook is empty — nothing to merge."));
+                return;
+            }
+            mergeFetchedEntries(adif);
+        });
+    }
+    if (m_qrzFetcher->isBusy()) { return; }
+    m_qrzFetcher->setApiKey(key);
+    if (m_syncBtn) {
+        m_syncBtn->setEnabled(false);
+        m_syncBtn->setText(QStringLiteral("Syncing…"));
+    }
+    m_qrzFetcher->fetchAll();
+}
+
+void LogbookWindow::mergeFetchedEntries(const QString& adif)
+{
+    QVector<LogEntry> incoming = AdifLog::parse(adif);
+    if (incoming.isEmpty()) {
+        tellOperator(QStringLiteral(
+            "QRZ sent data, but no contacts could be read from it."));
+        return;
+    }
+    // Aus dem QRZ-Logbuch kommt, was dort steht — die Markierung
+    // „hochgeladen" gilt fuer jeden dieser Datensaetze.
+    for (LogEntry& e : incoming) { e.uploadedToQrz = true; }
+    importEntries(incoming, QStringLiteral("your QRZ logbook"), /*fromQrz*/ true);
 }
 
 } // namespace Longpath
