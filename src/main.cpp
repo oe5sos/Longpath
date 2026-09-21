@@ -336,29 +336,6 @@ int main(int argc, char* argv[])
     // auch an eines, das erst mit einem späteren Download in den Baum
     // kommt und von diesem Theme nie gehört hat.
     //
-    // Vor dem Hauptfenster, damit das erste Zeichnen schon stimmt.
-    // Siehe gui/styles/Theme.h und docs/design/ROADMAP.md.
-    {
-        Longpath::Style::Theme& theme = Longpath::Style::Theme::instance();
-        // printf-Form statt Stream: qInfo() << … braucht QDebug, und ein
-        // Header, der nur über QApplication mitkommt, ist ein Bruch, der
-        // erst bei jemand anderem auffällt.
-        // applyStoredChoice statt loadUserTheme: seit 2026-08-20 gibt es
-        // eine Auswahl (Setup -> Appearance -> Colors & Theme). Ohne
-        // gemerkte Wahl faellt sie auf loadUserTheme() zurueck, damit
-        // bestehende Installationen ihre Datei behalten.
-        if (theme.applyStoredChoice()) {
-            qInfo("Theme: %s aus %s",
-                  qPrintable(theme.name()), qPrintable(theme.loadedFrom()));
-        } else {
-            // Kein Fund ist der Normalfall, aber die Suchpfade gehören
-            // ins Log: „warum greift meine Datei nicht" ist sonst eine
-            // Fehlersuche ohne Anhaltspunkt.
-            qInfo("Kein Theme gefunden. Gesucht in: %s",
-                  qPrintable(Longpath::Style::Theme::searchPaths().join(
-                      QStringLiteral(", "))));
-        }
-    }
     app.installEventFilter(new Longpath::Style::ThemeFilter(&app));
 
     // Register custom metatypes for cross-thread signal/slot connections.
@@ -397,6 +374,43 @@ int main(int argc, char* argv[])
     // Vorgabewert steht — 47 Hz je Bin waren weniger Messwerte als das
     // Fenster Pixel hat.
     Longpath::AppSettings::instance().ensureSettingsAtVersion(9);
+
+    // ── Die gemerkte Palette, NACH dem Laden der Einstellungen ───────
+    //
+    // Bis 2026-09-21 stand dieser Block vor AppSettings::load(). value()
+    // liest aber nur die schon geladene Tabelle — die war leer, also war
+    // „ActiveTheme" beim Start immer leer, und jede im Setup gewaehlte
+    // Palette galt genau bis zum naechsten Start. Aufgefallen beim
+    // Einbau von „Moos": das Programm kam in der Nachtpalette hoch,
+    // obwohl die Datei den Merker trug.
+    //
+    // Der ThemeFilter oben ist davon unabhaengig: er fragt das Theme
+    // erst beim Polieren jedes Widgets, und das erste Widget entsteht
+    // unten mit dem Hauptfenster.
+    //
+    // Vor dem Hauptfenster, damit das erste Zeichnen schon stimmt.
+    // Siehe gui/styles/Theme.h und docs/design/ROADMAP.md.
+    {
+        Longpath::Style::Theme& theme = Longpath::Style::Theme::instance();
+        // printf-Form statt Stream: qInfo() << … braucht QDebug, und ein
+        // Header, der nur über QApplication mitkommt, ist ein Bruch, der
+        // erst bei jemand anderem auffällt.
+        // applyStoredChoice statt loadUserTheme: seit 2026-08-20 gibt es
+        // eine Auswahl (Setup -> Appearance -> Colors & Theme). Ohne
+        // gemerkte Wahl faellt sie auf loadUserTheme() zurueck, damit
+        // bestehende Installationen ihre Datei behalten.
+        if (theme.applyStoredChoice()) {
+            qInfo("Theme: %s aus %s",
+                  qPrintable(theme.name()), qPrintable(theme.loadedFrom()));
+        } else {
+            // Kein Fund ist der Normalfall, aber die Suchpfade gehören
+            // ins Log: „warum greift meine Datei nicht" ist sonst eine
+            // Fehlersuche ohne Anhaltspunkt.
+            qInfo("Kein Theme gefunden. Gesucht in: %s",
+                  qPrintable(Longpath::Style::Theme::searchPaths().join(
+                      QStringLiteral(", "))));
+        }
+    }
 
     // Restore logging category toggles from settings
     Longpath::LogManager::instance().loadSettings();

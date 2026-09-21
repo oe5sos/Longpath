@@ -19,6 +19,13 @@
   `tst_qso_map_flyto_window` (mit `LONGPATH_GRAB_DIR` auch mit echten
   Kacheln als Bild).
 
+- **Palette „Moos"** (Setup → Appearance → Colors & Theme): Anthrazit mit
+  Gruen und Bernstein, nach einem Blatt des Betreibers vom 2026-09-21 —
+  kuehles Grau-Anthrazit als Grund, Flaechen eine Stufe heller, gedecktes
+  Gruen fuer Auswahl und Bestaetigung, Bernstein fuer Messwerte und
+  Warnungen; Rot bleibt dem Senden vorbehalten. Als `moos.json` neben
+  `kreide`, `flach`, `tief` mitgeliefert.
+
 - **Logbuch-Kennzahlen + Awards** (Logbuch > Stats…): sechs Kacheln
   statt des Textfensters -- Log (Gesamt, Rufzeichen, erste/letzte,
   7/30/365 Tage, bestaetigt, Weitester), Baender und Modi als Balken mit
@@ -102,6 +109,13 @@
   Einstiegspunkt -- ⚙ dort haette nur einen Ausschnitt gezeigt.
 
 ### Fixed
+
+- **Eine im Setup gewaehlte Palette ueberlebt jetzt den Neustart.**
+  `main.cpp` wandte die gemerkte Wahl (`ActiveTheme`) VOR dem Laden der
+  Einstellungen an — die Tabelle war leer, also kam das Programm seit der
+  Auswahl vom 2026-08-20 bei jedem Start in der eingebauten Palette hoch.
+  Der Block steht jetzt nach `AppSettings::load()` und weiterhin vor dem
+  Hauptfenster. Aufgefallen beim Einbau von „Moos".
 
 - **Ein TCI-Client, der den Sender getastet hat und dann verschwindet,
   laesst ihn nicht mehr getastet zurueck.** Bisher gab
