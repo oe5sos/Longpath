@@ -1431,8 +1431,21 @@ void KiwiSdrClient::sendTrackedSliceToServer()
 
     const double freqKhz = m_trackedFrequencyMhz * 1000.0;
     const QString mode = kiwiMode();
-    const int lowCutHz = kiwiLowCutHz();
-    const int highCutHz = kiwiHighCutHz();
+    int lowCutHz = kiwiLowCutHz();
+    int highCutHz = kiwiHighCutHz();
+    const bool cwLowerSideband =
+        m_trackedMode.trimmed().compare(QStringLiteral("CWL"), Qt::CaseInsensitive) == 0;
+    // A TRACKED CW passband is the slice's, pitch-centred (Thetis); the
+    // fallback in kiwiLowCutHz()/kiwiHighCutHz() is already carrier-
+    // symmetric. formatSoundTuneCommand() adds the pitch shift itself, so
+    // take it out of the tracked numbers first (2026-09-21, see
+    // KiwiSdrProtocol::carrierSymmetricCwPassband).
+    if (mode == QStringLiteral("cw") && m_trackedFilterLowHz < m_trackedFilterHighHz) {
+        const auto symmetric = KiwiSdrProtocol::carrierSymmetricCwPassband(
+            lowCutHz, highCutHz, m_trackedCwPitchHz, cwLowerSideband);
+        lowCutHz = symmetric.first;
+        highCutHz = symmetric.second;
+    }
     if (lowCutHz >= highCutHz) {
         qCWarning(lcKiwiSdr).noquote()
             << "KiwiSDR refusing invalid passband"
@@ -1443,8 +1456,6 @@ void KiwiSdrClient::sendTrackedSliceToServer()
             << "high_cut=" << highCutHz;
         return;
     }
-    const bool cwLowerSideband =
-        m_trackedMode.trimmed().compare(QStringLiteral("CWL"), Qt::CaseInsensitive) == 0;
     // Nyquist of the negotiated sound-stream rate, not the ~12 kHz default —
     // the Kiwi renegotiates m_soundSampleRateHz per connection (8-48 kHz).
     const int maxAudioBandwidthHz =

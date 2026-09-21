@@ -348,6 +348,14 @@ und Linux (x86_64 und aarch64), alle GPG-signiert.
   einem Wechsel im Setup neu gesetzt; jede Malstelle fragt `hexRole()`;
   die Rollennamen stimmen. Aufgefallen mit „Moos": auf Anthrazit sieht
   man, was auf Fast-Schwarz nie auffiel.
+- **CW ueber einen KiwiSDR war unhoerbar: der Durchlass wurde zweimal um
+  die Tonhoehe verschoben.** Longpaths CW-Filter sitzen auf der Tonhoehe
+  (Thetis: 500 Hz bei 650 Hz Pitch = 400..900), das Kiwi-Abstimmkommando
+  rechnet die Tonhoehe aber selbst dazu -- der Kiwi bekam 1050..1550, der
+  Ton bei 650 Hz lag daneben. Der nachgefuehrte CW-Durchlass wird jetzt
+  vorher traegersymmetrisch gemacht (-250..+250), der Kiwi landet bei
+  400..900 mit dem BFO um die Tonhoehe versetzt. Live an DK0WCY gefunden
+  (Tonhoehe pendelte sich danach bei 648 Hz ein).
 
 - **Ein TCI-Client, der den Sender getastet hat und dann verschwindet,
   laesst ihn nicht mehr getastet zurueck.** Bisher gab
