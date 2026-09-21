@@ -40,7 +40,13 @@ EXPECTED = {
     # module remains un-ported.  Stub carries a GPL-2-or-later header
     # matching the rest of the WDSP tree, so the census classification is
     # correct; only the expected count needed adjustment.
-    "gpl2-or-later": 135,
+    # 135 -> 143 (2026-09-21, PR #42): the NNR port (WDSP 2.10) brought
+    # nnet.c/.h, nnet_profile.h, nnio.c/.h, nnr.c/.h -- seven files with
+    # Warren Pratt's own GPL-2-or-later header -- and nnr_model_stub.c, the
+    # Longpath-original stand-in for the generated weight arrays, whose
+    # licence block now leads the file (it had been pushed past this
+    # script's 2000-character window by the explanatory comment above it).
+    "gpl2-or-later": 143,
     "copyright-no-permission-block": 0,
     "no-header": 10,
 }
