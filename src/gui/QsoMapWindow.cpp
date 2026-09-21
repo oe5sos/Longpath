@@ -22,6 +22,7 @@
 #include "core/Maidenhead.h"
 #include "gui/StyleConstants.h"
 #include "gui/widgets/FlatMapWidget.h"
+#include "gui/widgets/FlowLayout.h"
 #include "gui/widgets/GibsTileLayer.h"
 #include "core/sat/SatelliteService.h"
 #include "gui/widgets/GlobeWidget.h"
@@ -130,8 +131,9 @@ void QsoMapWindow::buildUi()
     col->setContentsMargins(10, 10, 10, 10);
     col->setSpacing(8);
 
-    auto* bar = new QHBoxLayout;
-    bar->setSpacing(6);
+    // Umbruch-Leiste wie im Logbuchfenster: zwanzig Elemente in einer
+    // Zeile hielten das Fenster ueber 1300 px breit (2026-09-21).
+    auto* bar = new FlowLayout(nullptr, 6, 6);
 
     auto caption = [this](const QString& t) {
         auto* l = new QLabel(t, this);
@@ -140,19 +142,30 @@ void QsoMapWindow::buildUi()
         return l;
     };
 
+    // Beschriftung und Feld als ein Element, damit der Umbruch sie nicht
+    // trennt; beide Daten zusammen, ein Bereich ist ein Bereich.
     QLabel* fromCap = caption(QStringLiteral("FROM"));
-    bar->addWidget(fromCap);
     m_from = new QDateEdit(QDate::currentDate().addDays(-30), this);
     m_from->setCalendarPopup(true);
     m_from->setDisplayFormat(QStringLiteral("yyyy-MM-dd"));
-    bar->addWidget(m_from);
+    m_from->setFixedWidth(118);
 
     QLabel* toCap = caption(QStringLiteral("TO"));
-    bar->addWidget(toCap);
     m_to = new QDateEdit(QDate::currentDate(), this);
     m_to->setCalendarPopup(true);
     m_to->setDisplayFormat(QStringLiteral("yyyy-MM-dd"));
-    bar->addWidget(m_to);
+    m_to->setFixedWidth(118);
+    {
+        auto* box = new QWidget(this);
+        auto* h = new QHBoxLayout(box);
+        h->setContentsMargins(0, 0, 0, 0);
+        h->setSpacing(4);
+        h->addWidget(fromCap);
+        h->addWidget(m_from);
+        h->addWidget(toCap);
+        h->addWidget(m_to);
+        bar->addWidget(box);
+    }
     m_rangeControls << fromCap << m_from << toCap << m_to;
 
     // Quick ranges, because typing two dates to answer "what did I work
@@ -174,7 +187,6 @@ void QsoMapWindow::buildUi()
     auto* bgCap = new QLabel(QStringLiteral("KARTE"), this);
     bgCap->setStyleSheet(QStringLiteral("color: %1; font-size: 9px;")
                              .arg(QString::fromLatin1(Style::kTextScale)));
-    bar->addWidget(bgCap);
 
     m_background = new QComboBox(this);
     m_background->setMinimumWidth(150);
@@ -192,7 +204,15 @@ void QsoMapWindow::buildUi()
     reloadBackgroundList();
     connect(m_background, QOverload<int>::of(&QComboBox::activated),
             this, &QsoMapWindow::applyBackgroundChoice);
-    bar->addWidget(m_background);
+    {
+        auto* box = new QWidget(this);
+        auto* h = new QHBoxLayout(box);
+        h->setContentsMargins(0, 0, 0, 0);
+        h->setSpacing(4);
+        h->addWidget(bgCap);
+        h->addWidget(m_background);
+        bar->addWidget(box);
+    }
 
     // ── Zu einer Station fliegen ─────────────────────────────────────
     //
@@ -212,7 +232,7 @@ void QsoMapWindow::buildUi()
     connect(m_callEdit, &QLineEdit::returnPressed, this,
             [this]() { lookupAndFly(m_callEdit->text()); });
 
-    bar->addStretch(1);
+    bar->addStretch();
 
     m_onlySelected = new QCheckBox(QStringLiteral("Only marked"), this);
     m_onlySelected->setEnabled(false);

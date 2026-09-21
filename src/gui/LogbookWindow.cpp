@@ -26,6 +26,7 @@
 #include "core/QrzLogbookUploader.h"
 #include "core/QsoUploader.h"
 #include "gui/QsoMapWindow.h"
+#include "gui/widgets/FlowLayout.h"
 #include "gui/StyleConstants.h"
 #include "gui/widgets/QsoDetailPane.h"
 
@@ -184,15 +185,19 @@ void LogbookWindow::buildUi()
     col->setContentsMargins(10, 10, 10, 10);
     col->setSpacing(8);
 
-    // Search
-    auto* top = new QHBoxLayout;
-    top->setSpacing(6);
+    // Search + Werkzeugleiste. Ein FlowLayout, kein QHBoxLayout: elf
+    // Elemente nebeneinander machten das Fenster ueber 1000 px breit
+    // und liessen es nicht schmaler ziehen — die Leiste bricht jetzt in
+    // eine zweite Zeile um (Betreiber, 2026-09-21). Das Suchfeld nimmt,
+    // was in seiner Zeile uebrig bleibt.
+    auto* top = new FlowLayout(nullptr, 6, 6);
     m_search = new QLineEdit(this);
     m_search->setPlaceholderText(
         QStringLiteral("Search call, name, QTH, country, grid or comment"));
     m_search->setClearButtonEnabled(true);
     m_search->setStyleSheet(Style::lineEditStyle());
-    top->addWidget(m_search, 1);
+    m_search->setMinimumWidth(220);
+    top->addWidget(m_search);
 
     m_editBtn   = new QPushButton(QStringLiteral("Edit…"), this);
     m_deleteBtn = new QPushButton(QStringLiteral("Delete"), this);
@@ -339,10 +344,22 @@ void LogbookWindow::buildUi()
     m_split->setChildrenCollapsible(true);
     m_split->addWidget(m_table);
 
-    m_detail = new QsoDetailPane(m_split);
-    m_detail->setMinimumWidth(230);
+    // Das Detailpaneel in einem Rollbereich: wird das Fenster niedriger
+    // als Foto, Kopf, Peilung und Knoepfe zusammen, rollt es, statt dass
+    // die Abschnitte uebereinanderrutschen (gesehen beim Verkleinern
+    // auf 420 × 500, 2026-09-21). Waagrecht rollt nichts — das Paneel
+    // nimmt die Breite des Rollbereichs.
+    m_detail = new QsoDetailPane;
     m_detail->setCache(&m_callCache);
-    m_split->addWidget(m_detail);
+    auto* detailScroll = new QScrollArea(m_split);
+    detailScroll->setWidgetResizable(true);
+    detailScroll->setFrameShape(QFrame::NoFrame);
+    detailScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    detailScroll->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    detailScroll->setStyleSheet(QStringLiteral("QScrollArea { background: transparent; }"));
+    detailScroll->setMinimumWidth(230);
+    detailScroll->setWidget(m_detail);
+    m_split->addWidget(detailScroll);
     m_split->setStretchFactor(0, 1);
     m_split->setStretchFactor(1, 0);
     col->addWidget(m_split, 1);
@@ -479,8 +496,9 @@ void LogbookWindow::buildUi()
 
 void LogbookWindow::buildFilterBar(QVBoxLayout* col)
 {
-    auto* row = new QHBoxLayout;
-    row->setSpacing(6);
+    // Dieselbe Umbruch-Leiste wie oben; „Clear" bleibt rechts, solange
+    // die Zeile es hergibt.
+    auto* row = new FlowLayout(nullptr, 6, 6);
 
     auto caption = [this](const QString& t) {
         auto* l = new QLabel(t, this);
@@ -488,32 +506,40 @@ void LogbookWindow::buildFilterBar(QVBoxLayout* col)
                              .arg(QString::fromLatin1(Style::kTextScale)));
         return l;
     };
+    // Beschriftung und Feld als EIN Element, damit der Umbruch sie nie
+    // trennt — „BAND" allein am Zeilenende, das Feld in der naechsten,
+    // liest niemand.
+    auto pair = [this, &row](QLabel* label, QWidget* field, QWidget* second = nullptr) {
+        auto* box = new QWidget(this);
+        auto* h = new QHBoxLayout(box);
+        h->setContentsMargins(0, 0, 0, 0);
+        h->setSpacing(4);
+        h->addWidget(label);
+        h->addWidget(field);
+        if (second) { h->addWidget(second); }
+        row->addWidget(box);
+    };
 
-    row->addWidget(caption(QStringLiteral("BAND")));
     m_bandBox = new QComboBox(this);
     m_bandBox->setMinimumWidth(80);
-    row->addWidget(m_bandBox);
+    pair(caption(QStringLiteral("BAND")), m_bandBox);
 
-    row->addWidget(caption(QStringLiteral("MODE")));
     m_modeBox = new QComboBox(this);
     m_modeBox->setMinimumWidth(80);
-    row->addWidget(m_modeBox);
+    pair(caption(QStringLiteral("MODE")), m_modeBox);
 
-    row->addWidget(caption(QStringLiteral("GRID")));
     m_gridEdit = new QLineEdit(this);
     m_gridEdit->setPlaceholderText(QStringLiteral("JN, JN67, JN67VV"));
     m_gridEdit->setToolTip(QStringLiteral(
         "Matches from the start, so two characters find a whole field"));
-    m_gridEdit->setMaximumWidth(120);
-    row->addWidget(m_gridEdit);
+    m_gridEdit->setFixedWidth(92);
+    pair(caption(QStringLiteral("GRID")), m_gridEdit);
 
-    row->addWidget(caption(QStringLiteral("COUNTRY")));
     m_countryEdit = new QLineEdit(this);
     m_countryEdit->setPlaceholderText(QStringLiteral("part of the name"));
-    m_countryEdit->setMaximumWidth(140);
-    row->addWidget(m_countryEdit);
+    m_countryEdit->setFixedWidth(100);
+    pair(caption(QStringLiteral("COUNTRY")), m_countryEdit);
 
-    row->addWidget(caption(QStringLiteral("ACTIVATION")));
     m_activationBox = new QComboBox(this);
     m_activationBox->setMinimumWidth(100);
     m_activationBox->setToolTip(QStringLiteral(
@@ -521,7 +547,7 @@ void LogbookWindow::buildFilterBar(QVBoxLayout* col)
         "Pick one to see just that activation — Export ADIF exports "
         "what is filtered, so this is also how one activation leaves "
         "as its own file."));
-    row->addWidget(m_activationBox);
+    pair(caption(QStringLiteral("ACTIVATION")), m_activationBox);
 
     // Off by default. A live date range would hide contacts the moment
     // the window opened, and an empty log reads as an empty log.
@@ -544,21 +570,32 @@ void LogbookWindow::buildFilterBar(QVBoxLayout* col)
     m_useDates = new QCheckBox(QStringLiteral("Dates"), this);
     m_useDates->setStyleSheet(QStringLiteral("QCheckBox { color: %1; }")
                                   .arg(QString::fromLatin1(Style::kTextPrimary)));
-    row->addWidget(m_useDates);
 
     m_fromDate = new QDateEdit(QDate::currentDate().addYears(-1), this);
     m_fromDate->setCalendarPopup(true);
     m_fromDate->setDisplayFormat(QStringLiteral("yyyy-MM-dd"));
     m_fromDate->setEnabled(false);
-    row->addWidget(m_fromDate);
+    m_fromDate->setFixedWidth(118);
 
     m_toDate = new QDateEdit(QDate::currentDate(), this);
     m_toDate->setCalendarPopup(true);
     m_toDate->setDisplayFormat(QStringLiteral("yyyy-MM-dd"));
     m_toDate->setEnabled(false);
-    row->addWidget(m_toDate);
+    m_toDate->setFixedWidth(118);
+    // Haken und beide Daten als ein Element: ein Datumsbereich, der auf
+    // zwei Zeilen zerfaellt, ist keiner mehr.
+    {
+        auto* box = new QWidget(this);
+        auto* h = new QHBoxLayout(box);
+        h->setContentsMargins(0, 0, 0, 0);
+        h->setSpacing(6);
+        h->addWidget(m_useDates);
+        h->addWidget(m_fromDate);
+        h->addWidget(m_toDate);
+        row->addWidget(box);
+    }
 
-    row->addStretch(1);
+    row->addStretch();
 
     m_clearBtn = new QPushButton(QStringLiteral("Clear"), this);
     m_clearBtn->setStyleSheet(Style::buttonBaseStyle());
