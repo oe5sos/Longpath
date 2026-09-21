@@ -23,6 +23,9 @@
 //   2026-08-13 — Created by Ralph Martin Fischer (OE5SOS),
 //                 AI-assisted implementation via Anthropic Claude
 //                 (Cowork).
+//   2026-09-21 — pumpUntilFinished() feeds one sample synchronously on
+//                 measureWindowOpened(); see the note there. Martin
+//                 Fischer, AI-assisted via Anthropic Claude.
 // =================================================================
 
 #include <QtTest/QtTest>
@@ -113,19 +116,43 @@ struct Harness {
     // Zusicherung — die Meldung zeigte auf die falsche Stelle, was der
     // Grund ist, warum dieser Fehlschlag zwei Runden lang raetselhaft
     // blieb.
+    //
+    // ── Warum eine Probe direkt beim Oeffnen des Messfensters ────────
+    //
+    // 2026-09-21 (CI, macOS-Laeufer): 20 von 21 Punkten gueltig. Der
+    // Settle-Timer (1 ms) und der Dwell-Timer (5 ms) eines Punktes
+    // koennen in EINEM gestockten qWait(2) beide ablaufen — das Fenster
+    // geht auf und wieder zu, bevor die Schleife unten je eine Probe
+    // eingespeist hat, und closePoint() sieht m_accN == 0. Kein Fehler
+    // im Controller, ein Wettlauf des Pruefstands mit dem Event-Loop.
+    //
+    // Darum meldet der Controller das Oeffnen des Fensters
+    // (measureWindowOpened), und der Pruefstand antwortet SYNCHRON mit
+    // einer Probe, noch im selben Aufruf. Danach kann der Dwell-Timer
+    // so spaet feuern, wie er will — ein Wert ist drin. Die Schleife
+    // unten bleibt: sie liefert die weiteren Proben, die eine echte
+    // Messung ausmachen, nur haengt die Gueltigkeit nicht mehr daran.
     void pumpUntilFinished(const FakeDipole& dipole,
                            int timeoutMs = kPumpTimeoutMs)
     {
-        QSignalSpy fin(&ctl, &SwrSweepController::sweepFinished);
-        QElapsedTimer t;
-        t.start();
-        while (fin.isEmpty() && t.elapsed() < timeoutMs) {
+        const auto feed = [this, &dipole]() {
             double fwd = 0.0;
             double rev = 0.0;
             dipole.wattsAt(static_cast<double>(currentFreq), fwd, rev);
             ctl.ingestTelemetry(fwd, rev);
+        };
+        const QMetaObject::Connection onOpen = QObject::connect(
+            &ctl, &SwrSweepController::measureWindowOpened, &ctl,
+            [feed](int) { feed(); });
+
+        QSignalSpy fin(&ctl, &SwrSweepController::sweepFinished);
+        QElapsedTimer t;
+        t.start();
+        while (fin.isEmpty() && t.elapsed() < timeoutMs) {
+            feed();
             QTest::qWait(2);
         }
+        QObject::disconnect(onOpen);
         QVERIFY2(!fin.isEmpty(),
                  "sweepFinished kam nicht — Zeitlimit abgelaufen, nicht "
                  "die eigentliche Zusicherung");

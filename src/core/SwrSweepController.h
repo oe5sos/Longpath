@@ -21,6 +21,12 @@
 //                 borrowed constant had a cite but no attribution, which
 //                 scripts/check-new-ports.py had been failing on.
 //                 Martin Fischer, AI-assisted via Anthropic Claude.
+//   2026-09-21 — measureWindowOpened(index) signal: the dwell window
+//                 of a point announces itself the moment it opens, so a
+//                 caller (the test bench above all) can feed telemetry
+//                 into it synchronously instead of racing the dwell
+//                 timer through the event loop. No behaviour change.
+//                 Martin Fischer, AI-assisted via Anthropic Claude.
 // =================================================================
 
 //=================================================================
@@ -553,6 +559,10 @@ public:
 signals:
     void sweepStarted(const Longpath::SwrSweepPlan& plan);
     void pointReady(int index, quint64 freqHz, double swr, double fwdW);
+    /// The dwell window of point `index` has just opened: telemetry
+    /// handed to ingestTelemetry() from now until closePoint() counts
+    /// towards that point. Emitted synchronously from beginMeasure().
+    void measureWindowOpened(int index);
     void progressChanged(int done, int total);
     void sweepFinished(const Longpath::SwrSweepResult& result);
     /// Human-readable refusal / abort reason for the status line.
