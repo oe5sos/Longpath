@@ -48,11 +48,11 @@ namespace {
 
 // Agreed shm-name table (Task 5.1 D7). Stored as string literals so the .h
 // can hand out a `const char*` without owning a QString or QByteArray.
-constexpr const char* kShmNameVax1   = "/nereussdr-vax-1";
-constexpr const char* kShmNameVax2   = "/nereussdr-vax-2";
-constexpr const char* kShmNameVax3   = "/nereussdr-vax-3";
-constexpr const char* kShmNameVax4   = "/nereussdr-vax-4";
-constexpr const char* kShmNameTxIn   = "/nereussdr-vax-tx";
+constexpr const char* kShmNameVax1   = "/longpath-vax-1";
+constexpr const char* kShmNameVax2   = "/longpath-vax-2";
+constexpr const char* kShmNameVax3   = "/longpath-vax-3";
+constexpr const char* kShmNameVax4   = "/longpath-vax-4";
+constexpr const char* kShmNameTxIn   = "/longpath-vax-tx";
 
 const char* shmNameForRole(CoreAudioHalBus::Role role) {
     switch (role) {
@@ -63,6 +63,27 @@ const char* shmNameForRole(CoreAudioHalBus::Role role) {
         case CoreAudioHalBus::Role::TxInput: return kShmNameTxIn;
     }
     return kShmNameVax1;
+}
+
+// Die Namen, unter denen der Treiber bis 0.6.3 (Bundle "NereusSDR VAX")
+// seine Bloecke anlegt. Ein Programm, das per DMG aktualisiert wurde,
+// trifft noch auf diesen Treiber -- die .pkg-Installation bringt den
+// neuen. Beim Oeffnen wird erst der neue Name versucht, dann dieser.
+constexpr const char* kLegacyShmNameVax1 = "/nereussdr-vax-1";
+constexpr const char* kLegacyShmNameVax2 = "/nereussdr-vax-2";
+constexpr const char* kLegacyShmNameVax3 = "/nereussdr-vax-3";
+constexpr const char* kLegacyShmNameVax4 = "/nereussdr-vax-4";
+constexpr const char* kLegacyShmNameTxIn = "/nereussdr-vax-tx";
+
+const char* legacyShmNameForRole(CoreAudioHalBus::Role role) {
+    switch (role) {
+        case CoreAudioHalBus::Role::Vax1:    return kLegacyShmNameVax1;
+        case CoreAudioHalBus::Role::Vax2:    return kLegacyShmNameVax2;
+        case CoreAudioHalBus::Role::Vax3:    return kLegacyShmNameVax3;
+        case CoreAudioHalBus::Role::Vax4:    return kLegacyShmNameVax4;
+        case CoreAudioHalBus::Role::TxInput: return kLegacyShmNameTxIn;
+    }
+    return kLegacyShmNameVax1;
 }
 
 // Backlog guards for the TX drain path — ported verbatim from
@@ -111,6 +132,18 @@ bool CoreAudioHalBus::open(const AudioFormat& format) {
     // already have it mapped. If that fails, create it at the canonical size.
     int fd = ::shm_open(m_shmName, O_RDWR, 0666);
     bool created = false;
+    if (fd < 0) {
+        // Noch der alte Treiber (bis 0.6.3) im System? Dann dessen Block
+        // nehmen -- der Name ist der einzige Unterschied.
+        const char* legacy = legacyShmNameForRole(m_role);
+        const int legacyFd = ::shm_open(legacy, O_RDWR, 0666);
+        if (legacyFd >= 0) {
+            qCInfo(lcAudio) << "CoreAudioHalBus: using the pre-0.6.4 driver's block"
+                            << legacy;
+            m_shmName = legacy;
+            fd = legacyFd;
+        }
+    }
     if (fd < 0) {
         fd = ::shm_open(m_shmName, O_CREAT | O_RDWR, 0666);
         if (fd < 0) {

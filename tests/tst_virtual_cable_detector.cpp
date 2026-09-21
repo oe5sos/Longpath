@@ -11,7 +11,7 @@ using namespace Longpath;
 namespace {
 
 // Builds a DetectedCable with only the fields the helpers under test
-// care about. product differentiates NereusSdrVax from 3rd-party; the
+// care about. product differentiates LongpathVax from 3rd-party; the
 // fingerprint/diff helpers hash deviceName only.
 DetectedCable makeCable(VirtualCableProduct p, const QString& name)
 {
@@ -49,8 +49,12 @@ private slots:
                 == VirtualCableProduct::FlexRadioDax);
     }
     void detectsReservedNereusVax() {
+        QVERIFY(VirtualCableDetector::matchProduct("Longpath VAX 1")
+                == VirtualCableProduct::LongpathVax);
+        // Der Treiber bis 0.6.3 meldet sich noch mit dem alten Namen --
+        // ein per DMG aktualisiertes Programm trifft ihn an.
         QVERIFY(VirtualCableDetector::matchProduct("NereusSDR VAX 1")
-                == VirtualCableProduct::NereusSdrVax);
+                == VirtualCableProduct::LongpathVax);
     }
     void unknownDeviceIsNone() {
         QVERIFY(VirtualCableDetector::matchProduct("Realtek HD Audio Output")
@@ -84,13 +88,13 @@ private slots:
         QVERIFY(VirtualCableDetector::vendorDisplayName(VirtualCableProduct::None).isEmpty());
     }
 
-    // ── filterThirdParty() — drops NereusSdrVax entries ────────────────
+    // ── filterThirdParty() — drops LongpathVax entries ────────────────
     void filterThirdPartyKeepsVendors() {
         QVector<DetectedCable> all;
         all.push_back(makeCable(VirtualCableProduct::VbCableA, "CABLE-A Input"));
-        all.push_back(makeCable(VirtualCableProduct::NereusSdrVax, "NereusSDR VAX 1"));
+        all.push_back(makeCable(VirtualCableProduct::LongpathVax, "Longpath VAX 1"));
         all.push_back(makeCable(VirtualCableProduct::Voicemeeter, "VoiceMeeter Input"));
-        all.push_back(makeCable(VirtualCableProduct::NereusSdrVax, "NereusSDR VAX 2"));
+        all.push_back(makeCable(VirtualCableProduct::LongpathVax, "Longpath VAX 2"));
 
         const auto filtered = VirtualCableDetector::filterThirdParty(all);
         QCOMPARE(filtered.size(), 2);
@@ -104,8 +108,8 @@ private slots:
     }
     void filterThirdPartyAllNereusIsEmpty() {
         QVector<DetectedCable> all;
-        all.push_back(makeCable(VirtualCableProduct::NereusSdrVax, "NereusSDR VAX 1"));
-        all.push_back(makeCable(VirtualCableProduct::NereusSdrVax, "NereusSDR VAX 2"));
+        all.push_back(makeCable(VirtualCableProduct::LongpathVax, "Longpath VAX 1"));
+        all.push_back(makeCable(VirtualCableProduct::LongpathVax, "Longpath VAX 2"));
         const auto filtered = VirtualCableDetector::filterThirdParty(all);
         QVERIFY(filtered.isEmpty());
     }

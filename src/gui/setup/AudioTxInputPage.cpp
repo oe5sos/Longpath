@@ -318,9 +318,9 @@ void AudioTxInputPage::buildPage(bool hasMicJack, HPSDRHW hw)
     m_radioMicBtn = new QRadioButton(QStringLiteral("Radio Mic"), srcGrp);
     m_vaxMicBtn   = new QRadioButton(QStringLiteral("VAX TX (virtual device)"), srcGrp);
     m_vaxMicBtn->setToolTip(QStringLiteral(
-        "Use audio routed to the \"NereusSDR TX\" CoreAudio device by a "
+        "Use audio routed to the \"Longpath TX\" CoreAudio device by a "
         "3rd-party app (FreeDV, WSJT-X, etc.) as the TX mic input. "
-        "Pulled from /nereussdr-vax-tx shared memory."));
+        "Pulled from /longpath-vax-tx shared memory."));
 
     m_buttonGroup = new QButtonGroup(this);
     m_buttonGroup->addButton(m_pcMicBtn,    static_cast<int>(MicSource::Pc));

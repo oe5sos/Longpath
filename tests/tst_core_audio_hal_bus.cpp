@@ -11,7 +11,7 @@
 //      the HAL plugin's shm_open path).
 //   2. Producer round-trip — push() on a Vax1 instance writes to the ring;
 //      raw mmap from the test side reads back the same bytes.
-//   3. Consumer round-trip — test writes known samples to /nereussdr-vax-tx;
+//   3. Consumer round-trip — test writes known samples to /longpath-vax-tx;
 //      CoreAudioHalBus(TxInput)::pull() returns them.
 //   4. Role policing — push() returns -1 on TxInput; pull() returns -1 on
 //      Vax1..4.
@@ -38,17 +38,17 @@ using namespace Longpath;
 
 namespace {
 
-constexpr const char* kVax1Path    = "/nereussdr-vax-1";
-constexpr const char* kVax2Path    = "/nereussdr-vax-2";
-constexpr const char* kTxInputPath = "/nereussdr-vax-tx";
+constexpr const char* kVax1Path    = "/longpath-vax-1";
+constexpr const char* kVax2Path    = "/longpath-vax-2";
+constexpr const char* kTxInputPath = "/longpath-vax-tx";
 
 // Unlink every VAX shm name the tests touch so a previous crash / run
 // doesn't leak stale data into the next one.
 void unlinkAllVaxSegments() {
     ::shm_unlink(kVax1Path);
     ::shm_unlink(kVax2Path);
-    ::shm_unlink("/nereussdr-vax-3");
-    ::shm_unlink("/nereussdr-vax-4");
+    ::shm_unlink("/longpath-vax-3");
+    ::shm_unlink("/longpath-vax-4");
     ::shm_unlink(kTxInputPath);
 }
 
@@ -81,8 +81,10 @@ private slots:
 
         // A consumer (the HAL plugin, or a second test fd) should be able
         // to open the same segment read-only. If this fails, push() could
-        // never reach the plugin.
-        int fd = ::shm_open(kVax1Path, O_RDONLY, 0666);
+        // never reach the plugin. bus.shmName(), nicht der Literal: auf
+        // einem Rechner mit dem Treiber bis 0.6.3 nimmt der Bus dessen
+        // Block (/nereussdr-vax-1) -- das ist Absicht, nicht Fehler.
+        int fd = ::shm_open(bus.shmName(), O_RDONLY, 0666);
         QVERIFY2(fd >= 0, "shm_open after bus.open() should return a valid fd");
 
         struct stat st{};
@@ -103,7 +105,7 @@ private slots:
         QVERIFY2(bus.open(fmt), qPrintable(bus.errorString()));
 
         // Open the same segment from the test side (simulating the plugin).
-        int fd = ::shm_open(kVax1Path, O_RDWR, 0666);
+        int fd = ::shm_open(bus.shmName(), O_RDWR, 0666);
         QVERIFY(fd >= 0);
         void* ptr = ::mmap(nullptr, sizeof(VaxShmBlock),
                            PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
@@ -144,7 +146,7 @@ private slots:
 
         // Map the same segment from the test side and write samples into
         // the ring as if the HAL plugin had done so.
-        int fd = ::shm_open(kTxInputPath, O_RDWR, 0666);
+        int fd = ::shm_open(bus.shmName(), O_RDWR, 0666);
         QVERIFY(fd >= 0);
         void* ptr = ::mmap(nullptr, sizeof(VaxShmBlock),
                            PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);

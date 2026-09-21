@@ -41,20 +41,19 @@ constexpr int kSecurityTimeoutMs = 5000;
 // operator can find and delete it without going through this app.
 QString serviceName(const QString& key)
 {
-    // ── Der alte Name bleibt, und das ist Absicht ───────────────────
-    //
-    // Das Programm heisst seit dem 2026-08-20 Longpath, aber DIES ist
-    // der Dienstname im Schluesselbund, also der SUCHSCHLUESSEL fuer
-    // alles, was dort schon liegt — QRZ-Zugang, SpotHub und was sonst
-    // gespeichert wurde.
-    //
-    // Wer ihn umbenennt, macht vorhandene Zugangsdaten unauffindbar.
-    // Nicht kaputt, nur unerreichbar: sie liegen weiter im
-    // Schluesselbund und niemand findet sie. Am 2026-08-23 war das in
-    // einem Durchgang ueber alle Meldungstexte fast passiert.
-    //
-    // Wenn das je geaendert wird, dann MIT Umzug: unter dem alten
-    // Namen lesen, unter dem neuen schreiben, alten Eintrag loeschen.
+    // Betreiber 2026-09-21: der Dienstname heisst jetzt Longpath. Das
+    // ist der SUCHSCHLUESSEL fuer alles, was im Schluesselbund liegt --
+    // QRZ-Zugang, SpotHub und was sonst gespeichert wurde -- darum
+    // gibt es den Umzug in retrieve(): unter dem alten Namen lesen,
+    // unter dem neuen schreiben, alten Eintrag loeschen. Genau so, wie
+    // es hier seit dem 2026-08-23 als Bedingung fuer die Umbenennung
+    // stand.
+    return QStringLiteral("Longpath: %1").arg(key);
+}
+
+// Der Dienstname bis 0.6.3 -- nur noch fuer den Umzug.
+QString legacyServiceName(const QString& key)
+{
     return QStringLiteral("NereusSDR: %1").arg(key);
 }
 
@@ -135,6 +134,24 @@ QString CredentialStore::retrieve(const QString& key, const QString& account)
         }, &out)) {
         return out;
     }
+    // Umzug: liegt der Eintrag noch unter dem alten Dienstnamen, unter
+    // dem neuen ablegen und den alten loeschen -- einmal, beim ersten
+    // Zugriff nach der Umbenennung.
+    if (runSecurity({
+            QStringLiteral("find-generic-password"),
+            QStringLiteral("-s"), legacyServiceName(key),
+            QStringLiteral("-a"), account,
+            QStringLiteral("-w"),
+        }, &out)) {
+        if (store(key, account, out)) {
+            runSecurity({
+                QStringLiteral("delete-generic-password"),
+                QStringLiteral("-s"), legacyServiceName(key),
+                QStringLiteral("-a"), account,
+            });
+        }
+        return out;
+    }
     // Fall through to the session copy: the keychain may be locked, or
     // the operator may have denied access this once.
 #endif
@@ -145,6 +162,12 @@ bool CredentialStore::erase(const QString& key, const QString& account)
 {
     sessionVault().remove(vaultKey(key, account));
 #ifdef Q_OS_MACOS
+    // Auch ein etwaiger alter Eintrag geht -- "vergessen" soll beides.
+    runSecurity({
+        QStringLiteral("delete-generic-password"),
+        QStringLiteral("-s"), legacyServiceName(key),
+        QStringLiteral("-a"), account,
+    });
     return runSecurity({
         QStringLiteral("delete-generic-password"),
         QStringLiteral("-s"), serviceName(key),

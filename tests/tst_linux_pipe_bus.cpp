@@ -55,11 +55,11 @@ bool pactlAvailable()
 // doesn't leave stale FIFOs that would confuse the next run.
 void unlinkAllVaxFifos()
 {
-    ::unlink("/tmp/nereussdr-vax-1.pipe");
-    ::unlink("/tmp/nereussdr-vax-2.pipe");
-    ::unlink("/tmp/nereussdr-vax-3.pipe");
-    ::unlink("/tmp/nereussdr-vax-4.pipe");
-    ::unlink("/tmp/nereussdr-vax-tx.pipe");
+    ::unlink("/tmp/longpath-vax-1.pipe");
+    ::unlink("/tmp/longpath-vax-2.pipe");
+    ::unlink("/tmp/longpath-vax-3.pipe");
+    ::unlink("/tmp/longpath-vax-4.pipe");
+    ::unlink("/tmp/longpath-vax-tx.pipe");
 }
 
 } // namespace
@@ -97,8 +97,8 @@ private slots:
 
         // The FIFO should exist on the filesystem after open().
         struct stat st{};
-        const int rc = ::stat("/tmp/nereussdr-vax-1.pipe", &st);
-        QVERIFY2(rc == 0, "FIFO /tmp/nereussdr-vax-1.pipe should exist after open()");
+        const int rc = ::stat("/tmp/longpath-vax-1.pipe", &st);
+        QVERIFY2(rc == 0, "FIFO /tmp/longpath-vax-1.pipe should exist after open()");
         QVERIFY2(S_ISFIFO(st.st_mode), "path should be a named FIFO (S_ISFIFO)");
 
         bus.close();
@@ -106,7 +106,7 @@ private slots:
 
         // After close() the FIFO should be unlinked.
         struct stat st2{};
-        QVERIFY2(::stat("/tmp/nereussdr-vax-1.pipe", &st2) != 0,
+        QVERIFY2(::stat("/tmp/longpath-vax-1.pipe", &st2) != 0,
                  "FIFO should be unlinked after close()");
     }
 
@@ -200,7 +200,7 @@ private slots:
         // Write some float32 stereo data directly to the FIFO from the test
         // side (simulating a TX audio app that opened the sink).
         // We open the FIFO for writing (non-blocking) ourselves.
-        const int wrFd = ::open("/tmp/nereussdr-vax-tx.pipe", O_WRONLY | O_NONBLOCK);
+        const int wrFd = ::open("/tmp/longpath-vax-tx.pipe", O_WRONLY | O_NONBLOCK);
         if (wrFd < 0) {
             // If FIFO has no reader yet (race with pactl opening the write end),
             // skip gracefully — this is a known timing sensitivity.
@@ -341,7 +341,7 @@ private slots:
 
         // Write non-zero float32 stereo samples directly to the TX FIFO,
         // simulating a TX audio app writing into the PulseAudio sink.
-        const int wrFd = ::open("/tmp/nereussdr-vax-tx.pipe", O_WRONLY | O_NONBLOCK);
+        const int wrFd = ::open("/tmp/longpath-vax-tx.pipe", O_WRONLY | O_NONBLOCK);
         if (wrFd < 0) {
             QSKIP("Could not open TX FIFO for writing — pactl module may not have opened its end yet");
         }

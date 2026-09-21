@@ -56,7 +56,7 @@ class VaxTxMicSource;
 ///          Requires hasMicJack == true (not available on HL2).
 /// Vax   — Audio routed to "NereusSDR TX" virtual device by a 3rd-
 ///          party app (FreeDV, WSJT-X, etc.).  Pulled from
-///          /nereussdr-vax-tx shared memory by the HAL plugin →
+///          /longpath-vax-tx shared memory by the HAL plugin →
 ///          CoreAudioHalBus → VaxTxMicSource.  Requires the VAX TX
 ///          mic source to have been registered via setVaxSource()
 ///          (called by RadioModel after engine start). If the VAX
@@ -66,7 +66,7 @@ class VaxTxMicSource;
 enum class MicSource : int {
     Pc    = 0,  ///< PC microphone (host audio device)
     Radio = 1,  ///< Radio mic-jack input via P1/P2 mic-frame stream
-    Vax   = 2,  ///< VAX TX virtual device (3rd-party app → /nereussdr-vax-tx)
+    Vax   = 2,  ///< VAX TX virtual device (3rd-party app → /longpath-vax-tx)
 };
 
 /// CompositeTxMicRouter — selector that holds PcMicSource + RadioMicSource

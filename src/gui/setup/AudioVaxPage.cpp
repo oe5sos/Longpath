@@ -141,20 +141,20 @@ static const char* kEnableChkStyle =
 QString nativeHalLabelForCableImpl(const DetectedCable& cable)
 {
     return QStringLiteral(
-               "►  %1 · NereusSDR · native (bound automatically)")
+               "►  %1 · Longpath · native (bound automatically)")
         .arg(cable.deviceName);
 }
 
 // Default node description for a channel (spec §10).
 QString defaultNodeDescription(int channel)
 {
-    return QStringLiteral("NereusSDR VAX %1").arg(channel);
+    return QStringLiteral("Longpath VAX %1").arg(channel);
 }
 
 // PipeWire node name for a channel — the string consumer apps use.
 QString pipeWireNodeName(int channel)
 {
-    return QStringLiteral("nereussdr.vax-%1").arg(channel);
+    return QStringLiteral("longpath.vax-%1").arg(channel);
 }
 
 } // namespace
@@ -534,7 +534,7 @@ void VaxChannelCard::updateBadge()
         } else {
 #if defined(Q_OS_MAC) || defined(Q_OS_LINUX)
             const QString nativeName =
-                QStringLiteral("NereusSDR VAX %1").arg(m_channel);
+                QStringLiteral("Longpath VAX %1").arg(m_channel);
             if (hasDevice) {
                 // BYO override path.
                 if (!m_busOpen) {
@@ -706,7 +706,7 @@ void VaxChannelCard::onAutoDetectClicked()
 #if defined(Q_OS_MAC) || defined(Q_OS_LINUX)
     int nativeHalCount = 0;
     for (const DetectedCable& cable : cables) {
-        if (cable.product != VirtualCableProduct::NereusSdrVax) {
+        if (cable.product != VirtualCableProduct::LongpathVax) {
             continue;
         }
         QAction* act = menu.addAction(nativeHalLabelForCable(cable));
@@ -736,7 +736,7 @@ void VaxChannelCard::onAutoDetectClicked()
         bool hasAny = false;
         for (const DetectedCable& cable : cables) {
 #if defined(Q_OS_MAC) || defined(Q_OS_LINUX)
-            if (cable.product == VirtualCableProduct::NereusSdrVax) {
+            if (cable.product == VirtualCableProduct::LongpathVax) {
                 continue;
             }
 #endif

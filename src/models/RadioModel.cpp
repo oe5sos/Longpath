@@ -8538,7 +8538,7 @@ void RadioModel::connectToRadio(const RadioInfo& info)
         m_flexBroadcaster->setVersion(QStringLiteral(NEREUSSDR_VERSION));
         m_flexBroadcaster->setCallsign(
             as.value(QStringLiteral("StationCallsign"),
-                     QStringLiteral("NEREUS")).toString());
+                     QStringLiteral("LONGPATH")).toString());
         m_flexBroadcaster->setNickname(
             as.value(QStringLiteral("PGXL_BroadcastNickname"),
                      QStringLiteral("Longpath")).toString());

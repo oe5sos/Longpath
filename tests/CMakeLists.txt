@@ -3837,8 +3837,8 @@ target_compile_definitions(tst_pc_mic_source PRIVATE NEREUS_BUILD_TESTS)
 # injected via the setVaxTxBusForTest seam.
 #
 # Closes the long-standing TODO at AudioEngine.cpp:306 (Sub-Phase 9
-# VAX TX consumer) — the path 3rd-party-app audio → "NereusSDR TX"
-# CoreAudio device → /nereussdr-vax-tx shm → CompositeTxMicRouter →
+# VAX TX consumer) — the path 3rd-party-app audio → "Longpath TX"
+# CoreAudio device → /longpath-vax-tx shm → CompositeTxMicRouter →
 # TxChannel → VOX.
 nereus_add_test(tst_vax_tx_mic_source)
 target_compile_definitions(tst_vax_tx_mic_source PRIVATE NEREUS_BUILD_TESTS)
@@ -4830,6 +4830,9 @@ nereus_add_test(tst_kiwi_tx_mute)
 # Schranke (nie eine echte, DDC-gebundene Scheibe fuettern/steuern),
 # hier fuer KiwiSDR nachgezogen. Siehe Kommentarkopf der Testdatei.
 nereus_add_test(tst_kiwi_sdr_safety_gate)
+# 2026-09-21: Schluesselbund-Dienstname "Longpath: <key>" mit Umzug vom
+# alten Namen -- live nur mit LONGPATH_KEYCHAIN_LIVE=1 (echter Schluesselbund).
+nereus_add_test(tst_credential_store_migration)
 nereus_add_test(tst_sunsdr_audio_feed)
 nereus_add_test(tst_sunsdr_is_reachable)
 nereus_add_test(tst_compact_bar_draws)

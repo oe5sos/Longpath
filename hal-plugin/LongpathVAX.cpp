@@ -67,7 +67,7 @@
 // Per-callback logs are rate-limited so they do not flood the unified log on
 // the audio realtime thread (~94 Hz callback rate).
 #include <os/log.h>
-static os_log_t s_log = os_log_create("com.nereussdr.vax", "plugin");
+static os_log_t s_log = os_log_create("at.oe5sos.longpath.vax", "plugin");
 
 // ── Shared memory layout — must match src/core/audio/CoreAudioHalBus.h
 //    (Sub-Phase 5.3; not yet landed). Any field change here requires the
@@ -256,7 +256,7 @@ private:
         }
 
         char name[64];
-        snprintf(name, sizeof(name), "/nereussdr-vax-%d", m_channel);
+        snprintf(name, sizeof(name), "/longpath-vax-%d", m_channel);
 
         int fd = shm_open(name, O_RDWR, 0666);
         if (fd < 0) {
@@ -420,10 +420,10 @@ private:
             m_lastRetry = now;
         }
 
-        int fd = shm_open("/nereussdr-vax-tx", O_RDWR, 0666);
+        int fd = shm_open("/longpath-vax-tx", O_RDWR, 0666);
         if (fd < 0) {
             os_log_error(s_log,
-                         "VaxTx shm_open(/nereussdr-vax-tx, O_RDWR) FAILED errno=%{public}d (%{public}s)",
+                         "VaxTx shm_open(/longpath-vax-tx, O_RDWR) FAILED errno=%{public}d (%{public}s)",
                          errno, strerror(errno));
             return false;
         }
@@ -431,7 +431,7 @@ private:
         struct stat st;
         if (fstat(fd, &st) != 0) {
             os_log_error(s_log,
-                         "VaxTx fstat(/nereussdr-vax-tx) FAILED errno=%{public}d (%{public}s)",
+                         "VaxTx fstat(/longpath-vax-tx) FAILED errno=%{public}d (%{public}s)",
                          errno, strerror(errno));
             ::close(fd);
             return false;
@@ -451,7 +451,7 @@ private:
 
         if (ptr == MAP_FAILED) {
             os_log_error(s_log,
-                         "VaxTx mmap(/nereussdr-vax-tx) FAILED errno=%{public}d (%{public}s)",
+                         "VaxTx mmap(/longpath-vax-tx) FAILED errno=%{public}d (%{public}s)",
                          errno, strerror(errno));
             return false;
         }
@@ -462,7 +462,7 @@ private:
         const auto rpInit = m_shmBlock->readPos.load(std::memory_order_relaxed);
         const auto actInit = m_shmBlock->active.load(std::memory_order_relaxed);
         os_log(s_log,
-               "VaxTx shm ATTACHED: name=/nereussdr-vax-tx ino=%{public}llu size=%{public}lld ptr=%{public}p initial wp=%{public}u rp=%{public}u active=%{public}u",
+               "VaxTx shm ATTACHED: name=/longpath-vax-tx ino=%{public}llu size=%{public}lld ptr=%{public}p initial wp=%{public}u rp=%{public}u active=%{public}u",
                static_cast<unsigned long long>(st.st_ino),
                static_cast<long long>(st.st_size),
                ptr,
@@ -521,18 +521,18 @@ public:
         // 4 VAX RX input devices (radio → apps receive audio)
         for (int ch = 1; ch <= 4; ++ch) {
             char name[64];
-            snprintf(name, sizeof(name), "NereusSDR VAX %d", ch);
+            snprintf(name, sizeof(name), "Longpath VAX %d", ch);
 
             char uid[64];
-            snprintf(uid, sizeof(uid), "com.nereussdr.vax.rx.%d", ch);
+            snprintf(uid, sizeof(uid), "at.oe5sos.longpath.vax.rx.%d", ch);
 
             auto handler = std::make_shared<VaxRxHandler>(ch);
 
             aspl::DeviceParameters devParams;
             devParams.Name         = name;
-            devParams.Manufacturer = "NereusSDR";
+            devParams.Manufacturer = "Longpath";
             devParams.DeviceUID    = uid;
-            devParams.ModelUID     = "com.nereussdr.vax";
+            devParams.ModelUID     = "at.oe5sos.longpath.vax";
             devParams.SampleRate   = 48000;
             devParams.ChannelCount = 2;
             devParams.EnableMixing = true;
@@ -557,10 +557,10 @@ public:
             auto txHandler = std::make_shared<VaxTxHandler>();
 
             aspl::DeviceParameters txParams;
-            txParams.Name         = "NereusSDR TX";
-            txParams.Manufacturer = "NereusSDR";
-            txParams.DeviceUID    = "com.nereussdr.vax.tx";
-            txParams.ModelUID     = "com.nereussdr.vax";
+            txParams.Name         = "Longpath TX";
+            txParams.Manufacturer = "Longpath";
+            txParams.DeviceUID    = "at.oe5sos.longpath.vax.tx";
+            txParams.ModelUID     = "at.oe5sos.longpath.vax";
             txParams.SampleRate   = 48000;
             txParams.ChannelCount = 2;
             txParams.EnableMixing = true;

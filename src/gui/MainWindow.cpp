@@ -498,7 +498,7 @@ namespace Longpath {
 
 namespace {
 // First-run/rescan wants the "relevant" virtual cables for the current
-// platform — 3rd-party cables on Windows (BYO), our own NereusSdrVax
+// platform — 3rd-party cables on Windows (BYO), our own LongpathVax
 // entries on Mac/Linux (native HAL plugin / pipe-source). Centralising
 // the platform split here keeps checkVaxFirstRun() focused on
 // scenario-selection + dialog wiring.
@@ -509,7 +509,7 @@ QVector<DetectedCable> detectedForFirstRun()
 #else
     QVector<DetectedCable> out;
     for (const auto& c : VirtualCableDetector::scan()) {
-        if (c.product == VirtualCableProduct::NereusSdrVax) {
+        if (c.product == VirtualCableProduct::LongpathVax) {
             out.push_back(c);
         }
     }

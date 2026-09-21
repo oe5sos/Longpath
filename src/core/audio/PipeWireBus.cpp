@@ -56,14 +56,14 @@ StreamConfig PipeWireBus::configFor(Role role,
         case Role::Vax4: {
             const int n = int(role) - int(Role::Vax1) + 1;
             cfg.nodeName = nodeName.isEmpty()
-                ? QStringLiteral("nereussdr.vax-%1").arg(n)
+                ? QStringLiteral("longpath.vax-%1").arg(n)
                 : nodeName;
             // Read the persisted NodeDescription so that AudioVaxPage's Rename
             // button takes effect on the actual PipeWire node metadata, not just
             // the UI label. Falls back to the default "NereusSDR VAX N" when
             // the key has not been set.
             const QString defaultDesc =
-                QStringLiteral("NereusSDR VAX %1").arg(n);
+                QStringLiteral("Longpath VAX %1").arg(n);
             cfg.nodeDescription = Longpath::AppSettings::instance()
                 .value(QStringLiteral("Audio/Vax%1/NodeDescription").arg(n),
                        defaultDesc)
@@ -75,32 +75,32 @@ StreamConfig PipeWireBus::configFor(Role role,
             break;
         }
         case Role::TxInput:
-            cfg.nodeName        = nodeName.isEmpty() ? QStringLiteral("nereussdr.tx-input") : nodeName;
-            cfg.nodeDescription = QStringLiteral("NereusSDR TX input");
+            cfg.nodeName        = nodeName.isEmpty() ? QStringLiteral("longpath.tx-input") : nodeName;
+            cfg.nodeDescription = QStringLiteral("Longpath TX input");
             cfg.direction       = StreamConfig::Input;
             cfg.mediaClass      = QStringLiteral("Stream/Input/Audio");
             cfg.mediaRole       = QStringLiteral("Phone");
             cfg.quantum         = 256;
             break;
         case Role::Primary:
-            cfg.nodeName        = nodeName.isEmpty() ? QStringLiteral("nereussdr.rx-primary") : nodeName;
-            cfg.nodeDescription = QStringLiteral("NereusSDR Primary Output");
+            cfg.nodeName        = nodeName.isEmpty() ? QStringLiteral("longpath.rx-primary") : nodeName;
+            cfg.nodeDescription = QStringLiteral("Longpath Primary Output");
             cfg.direction       = StreamConfig::Output;
             cfg.mediaClass      = QStringLiteral("Stream/Output/Audio");
             cfg.mediaRole       = QStringLiteral("Music");
             cfg.quantum         = 512;
             break;
         case Role::Sidetone:
-            cfg.nodeName        = nodeName.isEmpty() ? QStringLiteral("nereussdr.cw-sidetone") : nodeName;
-            cfg.nodeDescription = QStringLiteral("NereusSDR CW Sidetone");
+            cfg.nodeName        = nodeName.isEmpty() ? QStringLiteral("longpath.cw-sidetone") : nodeName;
+            cfg.nodeDescription = QStringLiteral("Longpath CW Sidetone");
             cfg.direction       = StreamConfig::Output;
             cfg.mediaClass      = QStringLiteral("Stream/Output/Audio");
             cfg.mediaRole       = QStringLiteral("Communication");
             cfg.quantum         = 128;
             break;
         case Role::Monitor:
-            cfg.nodeName        = nodeName.isEmpty() ? QStringLiteral("nereussdr.tx-monitor") : nodeName;
-            cfg.nodeDescription = QStringLiteral("NereusSDR TX Monitor");
+            cfg.nodeName        = nodeName.isEmpty() ? QStringLiteral("longpath.tx-monitor") : nodeName;
+            cfg.nodeDescription = QStringLiteral("Longpath TX Monitor");
             cfg.direction       = StreamConfig::Output;
             cfg.mediaClass      = QStringLiteral("Stream/Output/Audio");
             cfg.mediaRole       = QStringLiteral("Communication");
@@ -110,8 +110,8 @@ StreamConfig PipeWireBus::configFor(Role role,
             // PerSlice is a target-keyed alias for Primary. The caller supplies
             // targetOverride to pin routing to a specific sink. nodeNameOverride
             // distinguishes multiple per-slice instances (e.g. "nereus-slice-1").
-            cfg.nodeName        = nodeName.isEmpty() ? QStringLiteral("nereussdr.rx-primary") : nodeName;
-            cfg.nodeDescription = QStringLiteral("NereusSDR Primary Output");
+            cfg.nodeName        = nodeName.isEmpty() ? QStringLiteral("longpath.rx-primary") : nodeName;
+            cfg.nodeDescription = QStringLiteral("Longpath Primary Output");
             cfg.direction       = StreamConfig::Output;
             cfg.mediaClass      = QStringLiteral("Stream/Output/Audio");
             cfg.mediaRole       = QStringLiteral("Music");

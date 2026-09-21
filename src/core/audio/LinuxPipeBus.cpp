@@ -56,11 +56,11 @@ namespace {
 //
 // Note: path suffix differs from CoreAudioHalBus shm names (/nereussdr-vax-tx
 // shm vs /tmp/nereussdr-vax-tx.pipe FIFO). Do not cross-wire.
-constexpr const char* kPipePathVax1   = "/tmp/nereussdr-vax-1.pipe";
-constexpr const char* kPipePathVax2   = "/tmp/nereussdr-vax-2.pipe";
-constexpr const char* kPipePathVax3   = "/tmp/nereussdr-vax-3.pipe";
-constexpr const char* kPipePathVax4   = "/tmp/nereussdr-vax-4.pipe";
-constexpr const char* kPipePathTxIn   = "/tmp/nereussdr-vax-tx.pipe";
+constexpr const char* kPipePathVax1   = "/tmp/longpath-vax-1.pipe";
+constexpr const char* kPipePathVax2   = "/tmp/longpath-vax-2.pipe";
+constexpr const char* kPipePathVax3   = "/tmp/longpath-vax-3.pipe";
+constexpr const char* kPipePathVax4   = "/tmp/longpath-vax-4.pipe";
+constexpr const char* kPipePathTxIn   = "/tmp/longpath-vax-tx.pipe";
 
 const char* pipePathForRole(LinuxPipeBus::Role role) {
     switch (role) {
@@ -114,7 +114,7 @@ static void doCleanupStaleModules()
 
     const QByteArray output = proc.readAllStandardOutput();
     for (const auto& line : output.split('\n')) {
-        if (line.contains("nereussdr-")) {
+        if (line.contains("longpath-")) {
             const auto parts = line.split('\t');
             if (!parts.isEmpty()) {
                 QProcess::execute(QStringLiteral("pactl"),
@@ -196,8 +196,8 @@ bool LinuxPipeBus::open(const AudioFormat& format) {
     if (isProducer()) {
         // Role::Vax1..4 — pipe-source: NereusSDR writes, apps (WSJT-X etc.) read.
         const int vaxNum = static_cast<int>(m_role);
-        const QString sourceName = QStringLiteral("nereussdr-vax-%1").arg(vaxNum);
-        const QString sourceDesc = QStringLiteral("NereusSDR VAX %1").arg(vaxNum);
+        const QString sourceName = QStringLiteral("longpath-vax-%1").arg(vaxNum);
+        const QString sourceDesc = QStringLiteral("Longpath VAX %1").arg(vaxNum);
         pactlArgs = {
             QStringLiteral("load-module"),
             QStringLiteral("module-pipe-source"),
@@ -216,8 +216,8 @@ bool LinuxPipeBus::open(const AudioFormat& format) {
             QStringLiteral("load-module"),
             QStringLiteral("module-pipe-sink"),
             QStringLiteral("file=%1").arg(QString::fromUtf8(m_pipePath)),
-            QStringLiteral("sink_name=nereussdr-vax-tx"),
-            QStringLiteral("sink_properties=device.description=\"NereusSDR TX\""),
+            QStringLiteral("sink_name=longpath-vax-tx"),
+            QStringLiteral("sink_properties=device.description=\"Longpath TX\""),
             QStringLiteral("format=float32le"),
             QStringLiteral("rate=48000"),
             QStringLiteral("channels=2"),

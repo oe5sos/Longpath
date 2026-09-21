@@ -26,12 +26,12 @@ private slots:
 void PgxlConnectionPairingTest::amplifierCreateEmitsExpectedFrame() {
     Longpath::PgxlConnection conn;
     QSignalSpy frameSpy(&conn, &Longpath::PgxlConnection::testFrameWrittenForTesting);
-    conn.amplifierCreate("NereusSDR-AA:BB:CC", "NereusSDR", "ANT1:PORTA,ANT2:PORTB");
+    conn.amplifierCreate("Longpath-AA:BB:CC", "Longpath", "ANT1:PORTA,ANT2:PORTB");
     QCOMPARE(frameSpy.count(), 1);
     QString frame = frameSpy.takeFirst().at(0).toString();
     QVERIFY(frame.contains("amplifier create"));
-    QVERIFY(frame.contains("model=NereusSDR"));
-    QVERIFY(frame.contains("serial_num=NereusSDR-AA:BB:CC"));
+    QVERIFY(frame.contains("model=Longpath"));
+    QVERIFY(frame.contains("serial_num=Longpath-AA:BB:CC"));
     QVERIFY(frame.contains("ant=ANT1:PORTA,ANT2:PORTB"));
 }
 

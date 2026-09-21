@@ -424,7 +424,7 @@ QString VaxApplet::deviceLabelFor(int channel) const
 #else
     // macOS CoreAudioHalBus + Linux LinuxPipeBus register the virtual
     // device under this exact name — see AudioEngine::makeVaxBus.
-    return QStringLiteral("NereusSDR VAX %1").arg(channel);
+    return QStringLiteral("Longpath VAX %1").arg(channel);
 #endif
 }
 

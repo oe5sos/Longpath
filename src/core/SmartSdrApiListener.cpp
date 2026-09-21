@@ -760,8 +760,8 @@ void SmartSdrApiListener::dispatchLine(QTcpSocket* sock, const QString& line)
         // PGXL uses `info` to fetch radio identity. Pad enough fields that
         // PGXL's parser sees a complete payload.
         body = QStringLiteral(
-            "model=NereusSDR callsign=NEREUS nickname=NereusSDR "
-            "name=NereusSDR options= "
+            "model=Longpath callsign=LONGPATH nickname=Longpath "
+            "name=Longpath options= "
             "atu_present=0 gps=Not Present "
             "ip=0.0.0.0 mac=00:00:00:00:00:00 ");
     } else if (cmd.startsWith(QStringLiteral("version"))) {

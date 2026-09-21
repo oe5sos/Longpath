@@ -225,8 +225,8 @@ QString productDisplayName(VirtualCableProduct p)
             return QStringLiteral("Dante");
         case VirtualCableProduct::FlexRadioDax:
             return QStringLiteral("FlexRadio DAX");
-        case VirtualCableProduct::NereusSdrVax:
-            return QStringLiteral("NereusSDR VAX");
+        case VirtualCableProduct::LongpathVax:
+            return QStringLiteral("Longpath VAX");
         case VirtualCableProduct::None:
         default:
             return QStringLiteral("virtual cable");
@@ -690,7 +690,7 @@ void VaxFirstRunDialog::buildBodyMacNative(QVBoxLayout* bodyLayout)
     // doesn't lie on broken installs.
     std::array<bool, 4> slotDetected{false, false, false, false};
     for (const auto& cable : m_detected) {
-        if (cable.product != VirtualCableProduct::NereusSdrVax) {
+        if (cable.product != VirtualCableProduct::LongpathVax) {
             continue;
         }
         // Device name matches "NereusSDR VAX <digit>" (enforced by the
@@ -757,9 +757,9 @@ void VaxFirstRunDialog::buildBodyMacNative(QVBoxLayout* bodyLayout)
         QString deviceLine;
         if (slot == 1) {
             deviceLine = QStringLiteral(
-                "NereusSDR VAX 1 \u00a0\u2022\u00a0 NereusSDR TX");
+                "Longpath VAX 1 \u00a0\u2022\u00a0 Longpath TX");
         } else {
-            deviceLine = QStringLiteral("NereusSDR VAX %1").arg(slot);
+            deviceLine = QStringLiteral("Longpath VAX %1").arg(slot);
         }
         if (slotDetected[slot - 1]) {
             listLayout->addWidget(makeDetRow(
@@ -794,7 +794,7 @@ void VaxFirstRunDialog::buildBodyMacNative(QVBoxLayout* bodyLayout)
         "<span style='color:%1;font-weight:bold'>How it works on macOS:</span>"
         " Longpath installed a CoreAudio HAL plugin during setup."
         " Open WSJT-X, pick"
-        " <span style='color:%1;font-weight:bold'>\"NereusSDR VAX 1\"</span>"
+        " <span style='color:%1;font-weight:bold'>\"Longpath VAX 1\"</span>"
         " as the audio device. Set RX1's VAX button to"
         " <span style='color:%1;font-weight:bold'>1</span> on the VFO flag."
         " Done.")
@@ -830,7 +830,7 @@ void VaxFirstRunDialog::buildBodyLinuxNative(QVBoxLayout* bodyLayout)
     for (int slot = 1; slot <= 4; ++slot) {
         listLayout->addWidget(makeDetRow(
             slot,
-            QStringLiteral("NereusSDR VAX %1").arg(slot),
+            QStringLiteral("Longpath VAX %1").arg(slot),
             QStringLiteral("PipeWire module-pipe-source \u2022 native"),
             QStringLiteral("Ready"), pillNewStyle(),
             QString(), listFrame));
@@ -850,7 +850,7 @@ void VaxFirstRunDialog::buildBodyLinuxNative(QVBoxLayout* bodyLayout)
         " Longpath dynamically loads PipeWire pipe modules at startup."
         " They unload when you quit the app. Works on both PipeWire and"
         " PulseAudio (via <code>pipewire-pulse</code> compat). In WSJT-X,"
-        " pick <span style='color:%1;font-weight:bold'>\"NereusSDR VAX 1\"</span>"
+        " pick <span style='color:%1;font-weight:bold'>\"Longpath VAX 1\"</span>"
         " from the audio device list.")
         .arg(Style::kTextPrimary));
     explainLabel->setStyleSheet(QStringLiteral(

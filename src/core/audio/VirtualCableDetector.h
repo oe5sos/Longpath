@@ -16,7 +16,7 @@ enum class VirtualCableProduct {
     Voicemeeter,
     Dante,
     FlexRadioDax,
-    NereusSdrVax,  // reserved for future NereusSDR-owned Windows driver
+    LongpathVax,  // reserved for future NereusSDR-owned Windows driver
 };
 
 struct DetectedCable {
@@ -34,7 +34,7 @@ public:
     // Enumerates OS audio devices via PortAudio and returns matches.
     static QVector<DetectedCable> scan();
 
-    // Test-friendly pure filter — drops NereusSdrVax entries from an
+    // Test-friendly pure filter — drops LongpathVax entries from an
     // arbitrary DetectedCable vector. Used by scanThirdPartyOnly() and
     // exposed as a seam so unit tests can exercise the filter without
     // standing up a PortAudio enumeration. Exposed as a public static
@@ -44,9 +44,9 @@ public:
     // any class state by using it.
     static QVector<DetectedCable> filterThirdParty(const QVector<DetectedCable>& all);
 
-    // Same as scan() but drops NereusSdrVax entries. Windows first-run path
+    // Same as scan() but drops LongpathVax entries. Windows first-run path
     // calls this to surface only user-installable 3rd-party cables; the
-    // NereusSdrVax enum is reserved for a future NereusSDR-owned driver and
+    // LongpathVax enum is reserved for a future NereusSDR-owned driver and
     // must not be offered to the user as a binding target.
     static QVector<DetectedCable> scanThirdPartyOnly();
 

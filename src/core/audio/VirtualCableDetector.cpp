@@ -29,13 +29,13 @@ QString hashDeviceName(const QString& name)
 
 VirtualCableProduct VirtualCableDetector::matchProduct(const QString& n) {
     // Rule order is load-bearing:
-    //   - NereusSdrVax first (reserved prefix must not be shadowed by CABLE rules)
+    //   - LongpathVax first (reserved prefix must not be shadowed by CABLE rules)
     //   - CABLE-A/B/C/D before CABLE (or the base rule shadows the variants)
     //   - VbHiFiCable before CABLE (name contains "Hi-Fi Cable", not "CABLE ")
     // Rules are function-local statics — QRegularExpression constructed once
     // on first call (thread-safe per C++11).
     static const struct { QRegularExpression re; VirtualCableProduct p; } rules[] = {
-        { QRegularExpression("^NereusSDR VAX \\d$"),                              VirtualCableProduct::NereusSdrVax },
+        { QRegularExpression("^(Longpath|NereusSDR) VAX \\d$"),                              VirtualCableProduct::LongpathVax },
         { QRegularExpression("^CABLE-A ",  QRegularExpression::CaseInsensitiveOption), VirtualCableProduct::VbCableA },
         { QRegularExpression("^CABLE-B ",  QRegularExpression::CaseInsensitiveOption), VirtualCableProduct::VbCableB },
         { QRegularExpression("^CABLE-C ",  QRegularExpression::CaseInsensitiveOption), VirtualCableProduct::VbCableC },
@@ -66,7 +66,7 @@ QString VirtualCableDetector::vendorDisplayName(VirtualCableProduct p) {
         case VirtualCableProduct::Voicemeeter:    return QStringLiteral("Voicemeeter");
         case VirtualCableProduct::Dante:          return QStringLiteral("Dante");
         case VirtualCableProduct::FlexRadioDax:   return QStringLiteral("FlexRadio DAX");
-        case VirtualCableProduct::NereusSdrVax:   return QStringLiteral("NereusSDR");
+        case VirtualCableProduct::LongpathVax:   return QStringLiteral("Longpath");
         case VirtualCableProduct::None:           return QString();
     }
     return QString();
@@ -117,7 +117,7 @@ QVector<DetectedCable> VirtualCableDetector::filterThirdParty(
     QVector<DetectedCable> out;
     out.reserve(all.size());
     for (const auto& c : all) {
-        if (c.product != VirtualCableProduct::NereusSdrVax) {
+        if (c.product != VirtualCableProduct::LongpathVax) {
             out.push_back(c);
         }
     }

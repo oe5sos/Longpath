@@ -358,8 +358,8 @@ private slots:
     {
         QVector<DetectedCable> payload;
         for (int slot = 1; slot <= 4; ++slot) {
-            payload.push_back({VirtualCableProduct::NereusSdrVax,
-                               QStringLiteral("NereusSDR VAX %1").arg(slot),
+            payload.push_back({VirtualCableProduct::LongpathVax,
+                               QStringLiteral("Longpath VAX %1").arg(slot),
                                /*isInput=*/true, 0});
         }
 

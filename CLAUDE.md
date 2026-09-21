@@ -18,18 +18,19 @@
 > | --- | --- |
 > | Repo-Ordnername `NereusSDR` auf der Platte | nie umbenannt, nur der Inhalt — rein kosmetisch, keine Funktion daran geknüpft |
 > | Build-interne Namen (`nereus_add_test`, `NEREUS_TEST_SHARDS`, `NEREUS_BUILD_TESTS`, Log-Kategorien wie `nereus.tci`) | Entwickler-intern, kein Aushängeschild, keine Außenwirkung |
-> | Schlüsselbund-Diensteintrag (`CredentialStore` "NereusSDR: %1") | macOS Keychain sucht Einträge über den exakten Dienstnamen — ein blindes Umbenennen würde jedem Nutzer die gespeicherten Zugangsdaten verlieren |
-> | TCI-Serveridentität (`TciServer` meldet sich als "NereusSDR-TCI") | andere Software (WSJT-X u.a.) identifiziert uns über diesen String |
-> | VAX-Gerätenamen ("NereusSDR VAX N") | vom Betriebssystem als Audiogerät registrierte Namen; andere Apps binden sich daran |
+> | Kompatibilitäts-Rückfälle (alter Schlüsselbund-Dienstname `NereusSDR: %1`, alte VAX-Gerätenamen `NereusSDR VAX N`, alte Shared-Memory-Blöcke `/nereussdr-vax-*`, XML-Wurzel `NereusSDR`, alter Konfigurationsordner) | nur noch zum ERKENNEN des Alten — Umzug bzw. Rückfall, nicht Aushängeschild |
 >
-> **Es gab bereits einen Versuch**, alles per Suchen-und-Ersetzen auf
-> „Longpath" umzustellen — bewusst wieder verworfen, weil er genau
-> diese drei externen Bindungen (Schlüsselbund, TCI-Identität,
-> VAX-Gerätenamen) gebrochen hätte. Eine Umstellung dieser Strings
-> braucht eine echte Übergangslösung (alten Namen weiter erkennen,
-> neuen zusätzlich anbieten), kein Textersatz. Bis das ansteht, ist das
-> Nebeneinander beabsichtigt — nicht nachträglich aufräumen, ohne die
-> Migration mitzudenken.
+> **Die drei externen Bindungen wurden am 2026-09-21 auf Betreiberwunsch
+> umgestellt** („bitte ändern"), jede mit Übergang statt Textersatz:
+> Schlüsselbund → Dienstname `Longpath: %1`, `CredentialStore::retrieve`
+> zieht einen Eintrag unter dem alten Namen beim ersten Zugriff um;
+> TCI-Server meldet sich als `Longpath-TCI`; VAX-Geräte heißen
+> `Longpath VAX N` / `Longpath TX` (HAL-Plugin `at.oe5sos.longpath.vax`,
+> Blöcke `/longpath-vax-*`), der `VirtualCableDetector` erkennt weiter
+> den alten Namen und `CoreAudioHalBus` öffnet den alten Block, wenn nur
+> der Treiber bis 0.6.3 installiert ist (DMG-Update ohne .pkg). Dieselben
+> Regeln gelten für jede weitere Umstellung: alten Namen weiter erkennen,
+> neuen anbieten, Migration mitdenken.
 
 
 ## Project Goal

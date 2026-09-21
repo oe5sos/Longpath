@@ -1325,7 +1325,7 @@ bool TciServer::start(const QHostAddress& bindAddress, quint16 port)
         // deren gespeicherte Einstellungen — der Nutzer sieht dort
         // dann ein unbekanntes Geraet. Ein kosmetischer Gewinn ist das
         // nicht wert. (2026-08-23, beinahe blind mitgeaendert.)
-        QStringLiteral("NereusSDR-TCI"),
+        QStringLiteral("Longpath-TCI"),
         QWebSocketServer::NonSecureMode, this);
 
     // From AetherSDR src/core/TciServer.cpp:168-174 [@0cd4559] — listen + error path.

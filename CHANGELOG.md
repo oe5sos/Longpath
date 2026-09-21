@@ -11,8 +11,19 @@
   den Treiber gar nicht gefunden. Ebenso der VAX-Erststarthinweis
   („Longpath ships …", `LongpathVAX.driver`), die ADIF-Kopfzeile
   (`PROGRAMID` Longpath), die Kennung beim FreeDV-Reporter und der
-  Vorgabename beim PGXL-Rundruf. Die vom System registrierten
-  Geraetenamen „NereusSDR VAX N" bleiben, wie in CLAUDE.md begruendet.
+  Vorgabename beim PGXL-Rundruf.
+
+- **Die letzten aeusseren Kennungen heissen Longpath** (Betreiber:
+  „bitte aendern"), jede mit Uebergang: die VAX-Audiogeraete heissen
+  „Longpath VAX 1–4" und „Longpath TX" (HAL-Plugin
+  `at.oe5sos.longpath.vax`; ein Programm, das nur per DMG aktualisiert
+  wurde und noch den Treiber bis 0.6.3 vorfindet, erkennt dessen Namen
+  und benutzt dessen Bloecke weiter -- digitale Programme wie WSJT-X
+  muessen nach dem .pkg-Update einmal das neue Geraet waehlen); der
+  TCI-Server meldet sich als „Longpath-TCI"; Zugangsdaten liegen im
+  Schluesselbund unter „Longpath: …" und ziehen beim ersten Zugriff
+  vom alten Dienstnamen um; PGXL/TGXL sehen `model=Longpath`; die
+  PipeWire-Knoten unter Linux heissen `longpath.*`.
 
 ## [0.6.3] - 2026-09-21
 
