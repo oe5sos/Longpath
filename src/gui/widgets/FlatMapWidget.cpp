@@ -14,6 +14,7 @@
 // =================================================================
 
 #include "FlatMapWidget.h"
+#include "GibsTileLayer.h"
 #include "WorldTexture.h"
 
 #include "core/SolarTimes.h"
@@ -21,10 +22,12 @@
 #include "gui/styles/ThemeQss.h"   // Style::role() — Malcode hat kein Stylesheet
 
 #include <QDateTime>
+#include <QEasingCurve>
 #include <QFontMetrics>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
+#include <QVariantAnimation>
 #include <QWheelEvent>
 
 #include <algorithm>
@@ -169,7 +172,7 @@ void FlatMapWidget::refreshTexture()
 void FlatMapWidget::zoomBy(double factor)
 {
     const double before = m_zoom;
-    m_zoom = std::clamp(m_zoom * factor, 1.0, 12.0);
+    m_zoom = std::clamp(m_zoom * factor, 1.0, maxZoom());
     if (qFuzzyCompare(before, m_zoom)) { return; }
 
     // Keep the centre of the view where it is. Zooming from a button
@@ -383,6 +386,13 @@ void FlatMapWidget::paintEvent(QPaintEvent*)
         p.fillRect(r, QColor(Style::role("map-ocean", "#1a3a58")));
     }
 
+    // Luftbild ueber dem Weltbild, sobald hineingezoomt ist. Die Nacht
+    // kommt danach, damit sie auch die Kacheln abdunkelt.
+    m_imageryPainted = false;
+    if (m_imagery && m_showImagery && m_zoom >= kImageryFromZoom) {
+        m_imageryPainted = paintImagery(p, r);
+    }
+
     if (m_showTerminator) {
         if (m_nightDirty || m_night.isNull()) { buildNightOverlay(); }
         p.drawImage(r, m_night);
@@ -398,8 +408,13 @@ void FlatMapWidget::paintEvent(QPaintEvent*)
     // Nicht abschaltbar, solange das Bild gewaehlt ist: wo die Herkunft
     // einen Vermerk verlangt, ist er Bedingung der Nutzung und keine
     // Anzeigeoption.
-    if (!tex.isNull()) {
-        const QString credit = WorldTexture::requiredAttribution();
+    {
+        QString credit = tex.isNull() ? QString() : WorldTexture::requiredAttribution();
+        if (m_imageryPainted) {
+            credit = credit.isEmpty()
+                ? GibsTileLayer::attribution()
+                : GibsTileLayer::attribution() + QStringLiteral("  ·  ") + credit;
+        }
         if (!credit.isEmpty()) {
             QFont f = p.font();
             f.setPixelSize(9);
@@ -532,6 +547,10 @@ void FlatMapWidget::paintEvent(QPaintEvent*)
             }
         }
     }
+
+    // Die gesuchte Station vor dem eigenen Standort: der Grosskreis
+    // endet unter dem Foto, nicht darueber.
+    paintFocusStation(p);
 
     if (m_hasHome) {
         const QPointF s = project(m_homeLat, m_homeLon);
@@ -831,7 +850,7 @@ void FlatMapWidget::wheelEvent(QWheelEvent* e)
     if (qFuzzyIsNull(steps)) { QWidget::wheelEvent(e); return; }
 
     const double before = m_zoom;
-    m_zoom = std::clamp(m_zoom * std::pow(1.15, steps), 1.0, 12.0);
+    m_zoom = std::clamp(m_zoom * std::pow(1.15, steps), 1.0, maxZoom());
 
     // Am unteren Anschlag weiter herausdrehen heisst: der Betreiber will
     // MEHR sehen, als eine flache Weltkarte zeigen kann. Das kann nur die
@@ -852,6 +871,276 @@ void FlatMapWidget::wheelEvent(QWheelEvent* e)
         update();
     }
     e->accept();
+}
+
+} // namespace Longpath
+
+namespace Longpath {
+
+// ── Luftbild ────────────────────────────────────────────────────────
+
+void FlatMapWidget::setImagery(GibsTileLayer* layer)
+{
+    if (m_imagery == layer) { return; }
+    if (m_imagery) { disconnect(m_imagery, nullptr, this, nullptr); }
+    m_imagery = layer;
+    if (m_imagery) {
+        connect(m_imagery, &GibsTileLayer::tileReady,
+                this, qOverload<>(&QWidget::update));
+    }
+    update();
+}
+
+void FlatMapWidget::setShowImagery(bool on)
+{
+    if (m_showImagery == on) { return; }
+    m_showImagery = on;
+    // Ohne Luftbild endet der Zoom wieder bei 12x — wer weiter drin war,
+    // kommt zurueck, statt in einem verwaschenen Weltbild zu stehen.
+    if (m_zoom > maxZoom()) {
+        double lat = 0.0, lon = 0.0;
+        const bool had = viewCentre(lat, lon);
+        m_zoom = maxZoom();
+        if (had) { centreOn(lat, lon); }
+    }
+    update();
+}
+
+double FlatMapWidget::degPerPixel() const
+{
+    const QRectF r = mapRect();
+    return r.width() > 0.0 ? 360.0 / r.width() : 1.0;
+}
+
+double FlatMapWidget::zoomForDegPerPixel(double degPerPx) const
+{
+    if (!(degPerPx > 0.0)) { return 1.0; }
+    // Bei Zoom 1 ist die Karte so breit wie eingepasst; degPerPixel()
+    // liefert den Wert fuer den aktuellen Zoom, also zurueckrechnen.
+    const double fitDegPerPx = degPerPixel() * m_zoom;
+    return std::max(1.0, fitDegPerPx / degPerPx);
+}
+
+double FlatMapWidget::maxZoom() const
+{
+    if (!(m_imagery && m_showImagery)) { return 12.0; }
+    // Bis ein Kachelbildpunkt der feinsten Stufe einen Bildschirmpunkt
+    // fuellt — darueber wuerde nur noch aufgeblasen.
+    return std::max(12.0, zoomForDegPerPixel(
+        GibsTileLayer::degPerPixel(GibsTileLayer::kLandsatMax)));
+}
+
+bool FlatMapWidget::paintImagery(QPainter& p, const QRectF& r)
+{
+    // Der sichtbare Ausschnitt in Grad: Fenster mit Karte schneiden.
+    const QRectF vis = r.intersected(QRectF(rect()));
+    if (vis.isEmpty()) { return false; }
+    const double lonMin = (vis.left()  - r.left()) / r.width() * 360.0 - 180.0;
+    const double lonMax = (vis.right() - r.left()) / r.width() * 360.0 - 180.0;
+    const double latMax = 90.0 - (vis.top()    - r.top()) / r.height() * 180.0;
+    const double latMin = 90.0 - (vis.bottom() - r.top()) / r.height() * 180.0;
+
+    const int level = GibsTileLayer::levelForDegPerPixel(360.0 / r.width());
+    const QVector<GibsTileLayer::TileId> wanted =
+        GibsTileLayer::tilesFor(level, lonMin, lonMax, latMin, latMax);
+    if (wanted.isEmpty()) { return false; }
+
+    // Eine Kachel zeichnen: ihr Stueck, das auf der Karte liegt, an die
+    // projizierte Stelle. Kacheln am Rand ragen ueber die Karte hinaus;
+    // davon wird nur der Teil innerhalb gezeichnet.
+    auto drawTile = [&](const GibsTileLayer::TileId& id, const QImage& img,
+                        const QRectF& clipDeg) {
+        const QRectF b = GibsTileLayer::tileBoundsDeg(id);   // x=lon, y=Nordkante, h nach Sueden
+        const double left   = std::max(b.left(), clipDeg.left());
+        const double right  = std::min(b.left() + b.width(), clipDeg.right());
+        const double top    = std::min(b.top(), clipDeg.top());          // Nord
+        const double bottom = std::max(b.top() - b.height(), clipDeg.bottom()); // Sued
+        if (right <= left || top <= bottom) { return; }
+        const QRectF src((left - b.left()) / b.width() * img.width(),
+                         (b.top() - top) / b.height() * img.height(),
+                         (right - left) / b.width() * img.width(),
+                         (top - bottom) / b.height() * img.height());
+        const QPointF tl = project(top, left);
+        const QPointF br = project(bottom, right);
+        p.drawImage(QRectF(tl, br), img, src);
+    };
+
+    // clipDeg: left/right = Laenge, top = Nord, bottom = Sued.
+    auto clipFor = [&](const QRectF& tileDeg) {
+        QRectF c; c.setLeft(std::max(tileDeg.left(), -180.0));
+        c.setRight(std::min(tileDeg.left() + tileDeg.width(), 180.0));
+        c.setTop(std::min(tileDeg.top(), 90.0));
+        c.setBottom(std::max(tileDeg.top() - tileDeg.height(), -90.0));
+        return c;
+    };
+
+    bool any = false;
+    for (const GibsTileLayer::TileId& id : wanted) {
+        const QImage img = m_imagery->tile(id);
+        const QRectF want = GibsTileLayer::tileBoundsDeg(id);
+        if (!img.isNull()) {
+            drawTile(id, img, clipFor(want));
+            any = true;
+            continue;
+        }
+        // Noch nicht da: eine groebere Kachel, die diese Stelle deckt,
+        // aus dem Speicher — nur so weit hinauf, wie es noch Bild ist.
+        const double cLon = want.left() + want.width() / 2.0;
+        const double cLat = want.top()  - want.height() / 2.0;
+        for (int lv = id.level - 1; lv >= std::max(0, id.level - 4); --lv) {
+            const QVector<GibsTileLayer::TileId> parents =
+                GibsTileLayer::tilesFor(lv, cLon, cLon + 1e-6, cLat - 1e-6, cLat);
+            if (parents.isEmpty()) { break; }
+            const QImage parent = m_imagery->cached(parents.first());
+            if (parent.isNull()) { continue; }
+            drawTile(parents.first(), parent, clipFor(want));
+            any = true;
+            break;
+        }
+    }
+    return any;
+}
+
+// ── Hinflug ─────────────────────────────────────────────────────────
+
+double FlatMapWidget::flightZoomAt(double t, double z0, double z1)
+{
+    t = std::clamp(t, 0.0, 1.0);
+    const double l0 = std::log(std::max(1.0, z0));
+    const double l1 = std::log(std::max(1.0, z1));
+    const QEasingCurve ease(QEasingCurve::InOutCubic);
+    const double s = ease.valueForProgress(t);
+    // Der Bogen: bis zu vier Stufen (e^1.4 ~ 4x) heraus, aber nie unter
+    // Zoom 1 und nie weiter, als der naehere der beiden Enden erlaubt.
+    const double dip = std::clamp(std::min(l0, l1) - std::log(1.0), 0.0, 1.4);
+    constexpr double kPi = 3.14159265358979323846;
+    const double l = l0 + (l1 - l0) * s - dip * std::sin(kPi * t);
+    return std::exp(std::max(0.0, l));
+}
+
+void FlatMapWidget::setView(double lat, double lon, double zoom)
+{
+    m_zoom = std::clamp(zoom, 1.0, maxZoom());
+    centreOn(lat, lon);
+}
+
+bool FlatMapWidget::viewCentre(double& lat, double& lon) const
+{
+    return unproject(QPointF(width() / 2.0, height() / 2.0), lat, lon);
+}
+
+bool FlatMapWidget::isFlying() const
+{
+    return m_flight && m_flight->state() == QAbstractAnimation::Running;
+}
+
+void FlatMapWidget::flyTo(double lat, double lon, double targetZoom, int durationMs)
+{
+    lat = std::clamp(lat, -90.0, 90.0);
+    lon = norm180(lon);
+    if (m_flight) { m_flight->stop(); }
+
+    if (durationMs <= 0) {
+        setView(lat, lon, targetZoom);
+        emit flightFinished();
+        return;
+    }
+
+    if (!viewCentre(m_flyLat0, m_flyLon0)) { m_flyLat0 = 0.0; m_flyLon0 = 0.0; }
+    m_flyZ0 = m_zoom;
+    m_flyLat1 = lat;
+    m_flyLon1 = lon;
+    m_flyZ1 = std::clamp(targetZoom, 1.0, maxZoom());
+    // Der kuerzere Weg um die Datumsgrenze: -170 nach +170 sind 20 Grad,
+    // nicht 340.
+    if (m_flyLon1 - m_flyLon0 > 180.0)  { m_flyLon0 += 360.0; }
+    if (m_flyLon0 - m_flyLon1 > 180.0)  { m_flyLon1 += 360.0; }
+
+    if (!m_flight) {
+        m_flight = new QVariantAnimation(this);
+        connect(m_flight, &QVariantAnimation::valueChanged, this,
+                [this](const QVariant& v) {
+            const double t = v.toDouble();
+            const QEasingCurve ease(QEasingCurve::InOutCubic);
+            const double s = ease.valueForProgress(t);
+            const double lat = m_flyLat0 + (m_flyLat1 - m_flyLat0) * s;
+            const double lon = m_flyLon0 + (m_flyLon1 - m_flyLon0) * s;
+            setView(lat, norm180(lon), flightZoomAt(t, m_flyZ0, m_flyZ1));
+        });
+        connect(m_flight, &QVariantAnimation::finished, this, [this]() {
+            setView(m_flyLat1, norm180(m_flyLon1), m_flyZ1);
+            emit flightFinished();
+        });
+    }
+    m_flight->setStartValue(0.0);
+    m_flight->setEndValue(1.0);
+    m_flight->setDuration(durationMs);
+    m_flight->setEasingCurve(QEasingCurve::Linear);   // die Kurve sitzt oben
+    m_flight->start();
+}
+
+// ── Zielstation ─────────────────────────────────────────────────────
+
+void FlatMapWidget::setFocusStation(const QString& call, double lat, double lon)
+{
+    m_hasFocus  = true;
+    m_focusCall = call.trimmed().toUpper();
+    m_focusLat  = std::clamp(lat, -90.0, 90.0);
+    m_focusLon  = norm180(lon);
+    update();
+}
+
+void FlatMapWidget::clearFocusStation()
+{
+    if (!m_hasFocus) { return; }
+    m_hasFocus = false;
+    m_focusCall.clear();
+    update();
+}
+
+void FlatMapWidget::paintFocusStation(QPainter& p)
+{
+    if (!m_hasFocus) { return; }
+    const QColor amber(Style::kAmberText);
+
+    if (m_hasHome) {
+        const QVector<QPointF> samples =
+            greatCircleSamples(m_homeLat, m_homeLon, m_focusLat, m_focusLon, 96);
+        for (const QVector<QPointF>& run : splitAtAntimeridian(samples)) {
+            if (run.size() < 2) { continue; }
+            QPolygonF poly;
+            poly.reserve(run.size());
+            for (const QPointF& s : run) { poly << project(s.y(), s.x()); }
+            p.setOpacity(0.9);
+            p.setPen(QPen(amber, 2.0));
+            p.drawPolyline(poly);
+        }
+        p.setOpacity(1.0);
+    }
+
+    const QPointF s = project(m_focusLat, m_focusLon);
+    p.setPen(QPen(amber, 2.0));
+    p.setBrush(Qt::NoBrush);
+    p.drawEllipse(s, 9.0, 9.0);
+    p.setBrush(amber);
+    p.setPen(Qt::NoPen);
+    p.drawEllipse(s, 3.0, 3.0);
+
+    if (!m_focusCall.isEmpty()) {
+        QFont f = p.font();
+        f.setPixelSize(11);
+        f.setBold(true);
+        p.setFont(f);
+        const QFontMetrics fm(f);
+        const int tw = fm.horizontalAdvance(m_focusCall);
+        const QRectF box(s.x() - tw / 2.0 - 5.0, s.y() + 13.0, tw + 10.0, fm.height() + 4.0);
+        QColor bg(Style::kAppBg);
+        bg.setAlpha(190);
+        p.setBrush(bg);
+        p.drawRoundedRect(box, 3.0, 3.0);
+        p.setPen(amber);
+        p.drawText(box, Qt::AlignCenter, m_focusCall);
+    }
 }
 
 } // namespace Longpath

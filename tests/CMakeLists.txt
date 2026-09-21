@@ -5070,6 +5070,12 @@ nereus_add_test(tst_waterfall_muted)
 #    runde Maske, einmal geschnitten und behalten --
 nereus_add_test(tst_flatmap_station_marker)
 
+# -- Luftbild und Hinflug (2026-09-21): das GIBS-Raster in EPSG:4326 ohne
+#    Netz, der Flug der flachen Karte, die Zielstation mit Grosskreis --
+nereus_add_test(tst_gibs_tile_geometry)
+nereus_add_test(tst_flat_map_flyto)
+nereus_add_test(tst_qso_map_flyto_window)
+
 # -- Die Kopfleiste. Prueft, was Arithmetik hergibt: genau eine Pille je
 #    Gruppe an, sie folgt dem Modell statt dem Klick, und beim Wechsel
 #    der Empfangskette laesst sie die alte los --

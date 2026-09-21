@@ -29,6 +29,12 @@
 //                 offer 60 m to an operator who has never used it and
 //                 omit whatever oddity they have. AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
+//   2026-09-21 — Luftbild (NASA GIBS) unter der flachen Karte, ein
+//                 Rufzeichenfeld, das per QRZ-Lookup den Ort findet und
+//                 die Karte dorthin fliegt (flyToStation), und der
+//                 Anschluss aus dem Logbuch: wer dort eine Station
+//                 nachschlaegt, sieht sie hier landen. Martin Fischer,
+//                 AI-assisted via Anthropic Claude.
 // =================================================================
 
 #include "models/LogEntry.h"
@@ -48,11 +54,14 @@ class QStackedWidget;
 
 class QComboBox;
 class QEvent;
+class QLineEdit;
 
 namespace Longpath {
 
 class FlatMapWidget;
+class GibsTileLayer;
 class GlobeWidget;
+class QrzClient;
 
 class QsoMapWindow : public QDialog {
     Q_OBJECT
@@ -94,6 +103,23 @@ public:
     using PositionFallback =
         std::function<bool(const QString& call, double& lat, double& lon)>;
     void setPositionFallback(PositionFallback fn);
+
+    // ── Hinflug zu einer Station ─────────────────────────────────────
+    //
+    // Der Ort einer Station, aus dem QRZ-Lookup oder dem Locator: die
+    // flache Karte fliegt dorthin, zeichnet den Grosskreis vom eigenen
+    // Standort und zeigt die Station als Ring mit Rufzeichen. Aufrufbar
+    // von aussen (das Logbuch schlaegt eine Station nach) und aus dem
+    // eigenen Rufzeichenfeld.
+    void flyToStation(const QString& call, double lat, double lon,
+                      const QString& caption = QString());
+    /// Fuer den Lookup aus dem eigenen Rufzeichenfeld.
+    void setQrzClient(QrzClient* qrz);
+    /// Der geteilte Kachelspeicher, fuer Tests und Einstellungen.
+    GibsTileLayer* imagery() const { return m_tiles; }
+    FlatMapWidget* flatMapForTest() const { return m_flat; }
+    /// Ein Rufzeichen so behandeln, als waere es im Feld eingegeben.
+    void lookupAndFly(const QString& call);
 
 protected:
     void closeEvent(QCloseEvent*) override;
@@ -148,6 +174,11 @@ private:
     QDateEdit*   m_to{nullptr};
     QCheckBox*   m_paths{nullptr};
     QCheckBox*   m_grid{nullptr};
+    QCheckBox*   m_imagery{nullptr};
+    QLineEdit*   m_callEdit{nullptr};
+    GibsTileLayer* m_tiles{nullptr};
+    QrzClient*   m_qrz{nullptr};
+    QString      m_pendingCall;   // Lookup unterwegs fuer dieses Rufzeichen
     QCheckBox*   m_onlySelected{nullptr};
     QLabel*      m_summary{nullptr};
     QLabel*      m_info{nullptr};        // station card / grid answer

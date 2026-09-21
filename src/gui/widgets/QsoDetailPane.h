@@ -103,6 +103,10 @@ public:
 
 signals:
     void turnRotorRequested(double bearingDeg, const QString& call);
+    /// Ein Lookup hat die Station verortet (QRZ-Koordinaten oder
+    /// Locator). Die Karte fliegt dorthin, wenn sie offen ist.
+    void stationLocated(const QString& call, double lat, double lon,
+                        const QString& caption);
     void editRequested();
 
 private:

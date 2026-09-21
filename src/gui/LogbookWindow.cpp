@@ -163,7 +163,9 @@ void LogbookWindow::restoreSplitState()
 
 void LogbookWindow::setQrzClient(QrzClient* qrz)
 {
+    m_qrz = qrz;
     if (m_detail) { m_detail->setQrzClient(qrz); }
+    if (m_map)    { m_map->setQrzClient(qrz); }
 }
 
 // ── UI ──────────────────────────────────────────────────────────────
@@ -1369,7 +1371,16 @@ void LogbookWindow::setPositionFallback(PositionFallback fn)
 
 void LogbookWindow::openMap()
 {
-    if (!m_map) { m_map = new QsoMapWindow(this); }
+    if (!m_map) {
+        m_map = new QsoMapWindow(this);
+        m_map->setQrzClient(m_qrz);
+        // Eine Station, die der Betreiber im Logbuch nachschlaegt, landet
+        // auf der offenen Karte — der Flug ist der Sinn der Karte.
+        connect(m_detail, &QsoDetailPane::stationLocated, m_map,
+                [this](const QString& call, double lat, double lon, const QString& caption) {
+            if (m_map && m_map->isVisible()) { m_map->flyToStation(call, lat, lon, caption); }
+        });
+    }
     m_map->setPositionFallback(m_fallback);
 
     // Home comes from whichever contact recorded it most recently. The
