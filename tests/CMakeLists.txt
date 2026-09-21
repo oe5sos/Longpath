@@ -4830,6 +4830,9 @@ nereus_add_test(tst_kiwi_tx_mute)
 # Schranke (nie eine echte, DDC-gebundene Scheibe fuettern/steuern),
 # hier fuer KiwiSDR nachgezogen. Siehe Kommentarkopf der Testdatei.
 nereus_add_test(tst_kiwi_sdr_safety_gate)
+# 2026-09-21: "Logbuch laesst sich nicht sehr verkleinern" -- FlowLayout
+# fuer Knopf- und Filterzeile, Mindestbreite vom Splitter statt 1107 px.
+nereus_add_test(tst_logbook_window_shrinks)
 nereus_add_test(tst_sunsdr_audio_feed)
 nereus_add_test(tst_sunsdr_is_reachable)
 nereus_add_test(tst_compact_bar_draws)

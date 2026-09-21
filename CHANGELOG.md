@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Das Logbuchfenster laesst sich wieder klein ziehen.** Knopf- und
+  Filterzeile lagen in Zeilen-Layouts, die die Summe ihrer Elemente als
+  Mindestbreite verlangten -- 1107 px fuer das ganze Fenster. Beide
+  Zeilen brechen jetzt um, sobald es eng wird (Beschriftung und Feld
+  bleiben dabei zusammen); bei der gewohnten Breite sieht es aus wie
+  vorher. Mindestbreite jetzt die der Tabelle mit Detailspalte.
+
 ## [0.6.3] - 2026-09-21
 
 Die erste Veroeffentlichung seit 0.6.1 — alles, was seit den drei

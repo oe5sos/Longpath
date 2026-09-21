@@ -807,6 +807,7 @@ set(GUI_SOURCES
     src/gui/FramelessResizer.cpp
     src/gui/WindowChrome.cpp
     src/gui/ToolWindow.cpp
+    src/gui/widgets/FlowLayout.cpp
     src/gui/widgets/FilterPresetEditDialog.cpp
     src/gui/widgets/GuardedComboBox.h
     src/gui/widgets/GuardedSlider.h

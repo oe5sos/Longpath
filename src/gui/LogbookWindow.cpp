@@ -27,6 +27,7 @@
 #include "core/QsoUploader.h"
 #include "gui/QsoMapWindow.h"
 #include "gui/StyleConstants.h"
+#include "gui/widgets/FlowLayout.h"
 #include "gui/widgets/QsoDetailPane.h"
 
 #include <QSplitter>
@@ -184,15 +185,20 @@ void LogbookWindow::buildUi()
     col->setContentsMargins(10, 10, 10, 10);
     col->setSpacing(8);
 
-    // Search
-    auto* top = new QHBoxLayout;
-    top->setSpacing(6);
+    // Search + Knoepfe. Betreiber 2026-09-21: "Logbuch laesst sich nicht
+    // sehr verkleinern" -- ein QHBoxLayout mit elf Elementen zwang dem
+    // Fenster 831 px Mindestbreite auf (die Filterzeile darunter 1087).
+    // FlowLayout bricht um, sobald es eng wird; bei genuegend Breite
+    // sieht es aus wie vorher, nur dehnt sich das Suchfeld nicht mehr
+    // ueber den Rest der Zeile.
+    auto* top = new FlowLayout(nullptr, 0, 6, 6);
     m_search = new QLineEdit(this);
     m_search->setPlaceholderText(
         QStringLiteral("Search call, name, QTH, country, grid or comment"));
     m_search->setClearButtonEnabled(true);
     m_search->setStyleSheet(Style::lineEditStyle());
-    top->addWidget(m_search, 1);
+    m_search->setFixedWidth(300);
+    top->addWidget(m_search);
 
     m_editBtn   = new QPushButton(QStringLiteral("Edit…"), this);
     m_deleteBtn = new QPushButton(QStringLiteral("Delete"), this);
@@ -479,8 +485,8 @@ void LogbookWindow::buildUi()
 
 void LogbookWindow::buildFilterBar(QVBoxLayout* col)
 {
-    auto* row = new QHBoxLayout;
-    row->setSpacing(6);
+    // Umbrechend, aus demselben Grund wie die Knopfzeile (siehe buildUi).
+    auto* row = new FlowLayout(nullptr, 0, 6, 6);
 
     auto caption = [this](const QString& t) {
         auto* l = new QLabel(t, this);
@@ -489,31 +495,49 @@ void LogbookWindow::buildFilterBar(QVBoxLayout* col)
         return l;
     };
 
-    row->addWidget(caption(QStringLiteral("BAND")));
+    auto* m_bandBoxPair = new QHBoxLayout;
+    m_bandBoxPair->setSpacing(6);
+    m_bandBoxPair->addWidget(caption(QStringLiteral("BAND")));
     m_bandBox = new QComboBox(this);
     m_bandBox->setMinimumWidth(80);
-    row->addWidget(m_bandBox);
+    m_bandBoxPair->addWidget(m_bandBox);
+    row->addLayout(m_bandBoxPair);   // Beschriftung und Feld bleiben beim Umbruch zusammen
 
-    row->addWidget(caption(QStringLiteral("MODE")));
+    auto* m_modeBoxPair = new QHBoxLayout;
+    m_modeBoxPair->setSpacing(6);
+    m_modeBoxPair->addWidget(caption(QStringLiteral("MODE")));
     m_modeBox = new QComboBox(this);
     m_modeBox->setMinimumWidth(80);
-    row->addWidget(m_modeBox);
+    m_modeBoxPair->addWidget(m_modeBox);
+    row->addLayout(m_modeBoxPair);   // Beschriftung und Feld bleiben beim Umbruch zusammen
 
-    row->addWidget(caption(QStringLiteral("GRID")));
+    auto* m_gridEditPair = new QHBoxLayout;
+    m_gridEditPair->setSpacing(6);
+    m_gridEditPair->addWidget(caption(QStringLiteral("GRID")));
     m_gridEdit = new QLineEdit(this);
+    // Nicht unter eine lesbare Breite schieben lassen -- lieber umbrechen.
+    m_gridEdit->setMinimumWidth(64);
     m_gridEdit->setPlaceholderText(QStringLiteral("JN, JN67, JN67VV"));
     m_gridEdit->setToolTip(QStringLiteral(
         "Matches from the start, so two characters find a whole field"));
     m_gridEdit->setMaximumWidth(120);
-    row->addWidget(m_gridEdit);
+    m_gridEditPair->addWidget(m_gridEdit);
+    row->addLayout(m_gridEditPair);   // Beschriftung und Feld bleiben beim Umbruch zusammen
 
-    row->addWidget(caption(QStringLiteral("COUNTRY")));
+    auto* m_countryEditPair = new QHBoxLayout;
+    m_countryEditPair->setSpacing(6);
+    m_countryEditPair->addWidget(caption(QStringLiteral("COUNTRY")));
     m_countryEdit = new QLineEdit(this);
+    // Nicht unter eine lesbare Breite schieben lassen -- lieber umbrechen.
+    m_countryEdit->setMinimumWidth(90);
     m_countryEdit->setPlaceholderText(QStringLiteral("part of the name"));
     m_countryEdit->setMaximumWidth(140);
-    row->addWidget(m_countryEdit);
+    m_countryEditPair->addWidget(m_countryEdit);
+    row->addLayout(m_countryEditPair);   // Beschriftung und Feld bleiben beim Umbruch zusammen
 
-    row->addWidget(caption(QStringLiteral("ACTIVATION")));
+    auto* m_activationBoxPair = new QHBoxLayout;
+    m_activationBoxPair->setSpacing(6);
+    m_activationBoxPair->addWidget(caption(QStringLiteral("ACTIVATION")));
     m_activationBox = new QComboBox(this);
     m_activationBox->setMinimumWidth(100);
     m_activationBox->setToolTip(QStringLiteral(
@@ -521,7 +545,8 @@ void LogbookWindow::buildFilterBar(QVBoxLayout* col)
         "Pick one to see just that activation — Export ADIF exports "
         "what is filtered, so this is also how one activation leaves "
         "as its own file."));
-    row->addWidget(m_activationBox);
+    m_activationBoxPair->addWidget(m_activationBox);
+    row->addLayout(m_activationBoxPair);   // Beschriftung und Feld bleiben beim Umbruch zusammen
 
     // Off by default. A live date range would hide contacts the moment
     // the window opened, and an empty log reads as an empty log.
@@ -558,7 +583,6 @@ void LogbookWindow::buildFilterBar(QVBoxLayout* col)
     m_toDate->setEnabled(false);
     row->addWidget(m_toDate);
 
-    row->addStretch(1);
 
     m_clearBtn = new QPushButton(QStringLiteral("Clear"), this);
     m_clearBtn->setStyleSheet(Style::buttonBaseStyle());
