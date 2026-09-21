@@ -116,6 +116,7 @@ mw0lge@grange-lane.co.uk
 #include <algorithm>
 #include <cmath>
 #include "gui/StyleConstants.h"
+#include "gui/styles/ThemeQss.h"
 
 namespace Longpath {
 
@@ -345,7 +346,7 @@ void SignalTextItem::paint(QPainter& p, int widgetW, int widgetH)
                         const int g = static_cast<int>(0xff * (1.0f - t));
                         p.fillRect(segRect, QColor(r, g, 0xff - r));
                     } else {
-                        p.fillRect(segRect, QColor(Style::kBadgeInfoBg));
+                        p.fillRect(segRect, QColor(Style::hexRole(Style::kBadgeInfoBg)));
                     }
                 }
                 break;

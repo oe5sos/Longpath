@@ -19,6 +19,13 @@
   `tst_qso_map_flyto_window` (mit `LONGPATH_GRAB_DIR` auch mit echten
   Kacheln als Bild).
 
+- **Palette „Moos"** (Setup → Appearance → Colors & Theme): Anthrazit mit
+  Gruen und Bernstein, nach einem Blatt des Betreibers vom 2026-09-21 —
+  kuehles Grau-Anthrazit als Grund, Flaechen eine Stufe heller, gedecktes
+  Gruen fuer Auswahl und Bestaetigung, Bernstein fuer Messwerte und
+  Warnungen; Rot bleibt dem Senden vorbehalten. Als `moos.json` neben
+  `kreide`, `flach`, `tief` mitgeliefert.
+
 - **Logbuch-Kennzahlen + Awards** (Logbuch > Stats…): sechs Kacheln
   statt des Textfensters -- Log (Gesamt, Rufzeichen, erste/letzte,
   7/30/365 Tage, bestaetigt, Weitester), Baender und Modi als Balken mit
@@ -102,6 +109,26 @@
   Einstiegspunkt -- ⚙ dort haette nur einen Ausschnitt gezeigt.
 
 ### Fixed
+
+- **Eine im Setup gewaehlte Palette ueberlebt jetzt den Neustart.**
+  `main.cpp` wandte die gemerkte Wahl (`ActiveTheme`) VOR dem Laden der
+  Einstellungen an — die Tabelle war leer, also kam das Programm seit der
+  Auswahl vom 2026-08-20 bei jedem Start in der eingebauten Palette hoch.
+  Der Block steht jetzt nach `AppSettings::load()` und weiterhin vor dem
+  Hauptfenster. Aufgefallen beim Einbau von „Moos".
+
+- **Schwarze Flaechen in jeder Palette ausser der eingebauten.** Menueleiste
+  und Fenstergrund kamen aus der QPalette, die `applyDarkPalette` einmal beim
+  Start ohne Theme setzte; 30 Malstellen (Karte, Kugel, SWR-Kurve,
+  TX-Spektrum, Relais-Leiste, Layout-Vorschau, Kiwi-Wasserfall, …) und das
+  rohe `#08080a` der Titelleiste griffen an der Palette vorbei zur
+  Konstante; `HGauge`, `AsrApplet` und `BandwidthFilterPane` fragten die
+  Rolle „inset-bg", die es nicht gibt (sie heisst „inset"), `HGauge`
+  ausserdem „text-primary" statt „text". Jetzt laufen QPalette und
+  Grund-Stylesheet durch das Theme und werden nach dem Laden und nach
+  einem Wechsel im Setup neu gesetzt; jede Malstelle fragt `hexRole()`;
+  die Rollennamen stimmen. Aufgefallen mit „Moos": auf Anthrazit sieht
+  man, was auf Fast-Schwarz nie auffiel.
 
 - **Ein TCI-Client, der den Sender getastet hat und dann verschwindet,
   laesst ihn nicht mehr getastet zurueck.** Bisher gab

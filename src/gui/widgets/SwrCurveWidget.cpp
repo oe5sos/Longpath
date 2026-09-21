@@ -771,7 +771,7 @@ void SwrCurveWidget::paintEvent(QPaintEvent*)
 {
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing);
-    p.fillRect(rect(), QColor(Style::kPanelBg));
+    p.fillRect(rect(), QColor(Style::hexRole(Style::kPanelBg)));
 
     // ── Stepping back without disappearing ───────────────────────────
     //
@@ -826,7 +826,7 @@ void SwrCurveWidget::paintEvent(QPaintEvent*)
     const QRectF plot(m_plotL, m_plotT, m_plotR - m_plotL, m_plotB - m_plotT);
 
     p.setPen(QPen(kGrid(), 1));
-    p.setBrush(QColor(Style::kInsetBg));
+    p.setBrush(QColor(Style::hexRole(Style::kInsetBg)));
     p.drawRect(plot);
 
     if (m_sweep.isEmpty() || plot.width() < 20 || plot.height() < 20) {
@@ -1269,7 +1269,7 @@ void SwrCurveWidget::paintEvent(QPaintEvent*)
         double by = markerY - th - 8.0;
         if (by < m_plotT) { by = markerY + 8.0; }
 
-        QColor box(Style::kPanelBg);
+        QColor box(Style::hexRole(Style::kPanelBg));
         box.setAlpha(235);
         p.setPen(QPen(kGrid(), 1));
         p.setBrush(box);
@@ -1305,7 +1305,7 @@ void SwrCurveWidget::paintEvent(QPaintEvent*)
         const QRectF cap(m_plotR - tw - 24.0, m_plotT + 8.0,
                          tw + 16.0, th + 7.0);
 
-        QColor bg(Style::kPanelBg);
+        QColor bg(Style::hexRole(Style::kPanelBg));
         bg.setAlpha(238);      // legible over whatever curve runs under it
         p.setBrush(bg);
         p.setPen(QPen(QColor(Style::role("text-scale", Style::kTextScale)),

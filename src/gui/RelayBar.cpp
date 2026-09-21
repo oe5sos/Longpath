@@ -24,6 +24,7 @@
 
 #include "RelayBar.h"
 #include "StyleConstants.h"
+#include "gui/styles/ThemeQss.h"
 
 #include <QPainter>
 #include <QWheelEvent>
@@ -103,7 +104,7 @@ void RelayBar::paintEvent(QPaintEvent*)
     p.drawText(0, barY + barH / 2 + fmLabel.ascent() / 2, m_label);
 
     // Bar background
-    p.fillRect(barX, barY, barW, barH, QColor(Style::kPanelBg));
+    p.fillRect(barX, barY, barW, barH, QColor(Style::hexRole(Style::kPanelBg)));
     p.setPen(QColor("#203040"));
     p.drawRect(barX, barY, barW - 1, barH - 1);
 

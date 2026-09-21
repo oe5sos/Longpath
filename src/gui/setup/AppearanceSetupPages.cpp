@@ -1,6 +1,7 @@
 #include "AppearanceSetupPages.h"
 #include "gui/styles/ThemeQss.h"
 #include <QApplication>
+#include "gui/styles/AppTheme.h"
 #include "gui/styles/Theme.h"
 #include "gui/ColorSwatchButton.h"
 #include "gui/SpectrumWidget.h"
@@ -104,6 +105,11 @@ void ColorsThemePage::buildUI()
                               .arg(Style::Theme::instance().loadedFrom())
                         : QStringLiteral("Eingebaute Palette"));
             }
+            // QPalette und Grund-Stylesheet kennen keinen Filter: neu
+            // setzen, sonst bleiben Menueleiste und Fenstergrund in der
+            // alten Palette (2026-09-21).
+            applyDarkPalette(*qApp);
+            applyAppBaselineQss(*qApp);
             // Was schon gezeichnet ist, bekommt kein Polish mehr. Den
             // Anstoss geben: Stylesheet neu setzen loest den Filter aus.
             for (QWidget* w : QApplication::allWidgets()) {

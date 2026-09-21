@@ -4926,7 +4926,7 @@ void SpectrumWidget::drawTuneGuide(QPainter& p, const QRect& specRect)
 // ---- Frequency scale bar ----
 void SpectrumWidget::drawFreqScale(QPainter& p, const QRect& r)
 {
-    p.fillRect(r, QColor(Style::kBadgeInfoBg));
+    p.fillRect(r, QColor(Style::hexRole(Style::kBadgeInfoBg)));
 
     // Phase 3G-8 commit 5: Off alignment suppresses labels entirely.
     if (m_freqLabelAlign == FreqLabelAlign::Off) {

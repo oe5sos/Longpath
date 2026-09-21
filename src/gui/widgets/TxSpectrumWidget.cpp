@@ -15,6 +15,7 @@
 
 #include "core/strip/MicSpectrum.h"
 #include "gui/StyleConstants.h"
+#include "gui/styles/ThemeQss.h"
 
 #include <QPainter>
 #include <QPolygonF>
@@ -188,7 +189,7 @@ void TxSpectrumWidget::paintEvent(QPaintEvent*)
 {
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing);
-    p.fillRect(rect(), QColor(Style::kPanelBg));
+    p.fillRect(rect(), QColor(Style::hexRole(Style::kPanelBg)));
 
     m_plotL = 40.0;
     m_plotR = width() - 12.0;
@@ -197,7 +198,7 @@ void TxSpectrumWidget::paintEvent(QPaintEvent*)
     const QRectF plot(m_plotL, m_plotT, m_plotR - m_plotL, m_plotB - m_plotT);
 
     p.setPen(QPen(kGrid, 1));
-    p.setBrush(QColor(Style::kInsetBg));
+    p.setBrush(QColor(Style::hexRole(Style::kInsetBg)));
     p.drawRect(plot);
 
     QFont small = p.font();

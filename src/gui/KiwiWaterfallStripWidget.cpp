@@ -8,6 +8,7 @@
 #include "gui/KiwiWaterfallStripWidget.h"
 
 #include "gui/StyleConstants.h"
+#include "gui/styles/ThemeQss.h"
 
 #include <QHBoxLayout>
 #include <QLabel>
@@ -66,7 +67,7 @@ KiwiWaterfallStripWidget::KiwiWaterfallStripWidget(const QString& profileId,
     layout->addStretch(1);
 
     m_history = QImage(1, kHistoryRows, QImage::Format_RGB32);
-    m_history.fill(QColor(Style::kAppBg));
+    m_history.fill(QColor(Style::hexRole(Style::kAppBg)));
 }
 
 void KiwiWaterfallStripWidget::setDisplayName(const QString& name)
@@ -82,7 +83,7 @@ void KiwiWaterfallStripWidget::pushRow(const QVector<float>& binsDbm)
 
     if (m_history.width() != binsDbm.size()) {
         m_history = QImage(binsDbm.size(), kHistoryRows, QImage::Format_RGB32);
-        m_history.fill(QColor(Style::kAppBg));
+        m_history.fill(QColor(Style::hexRole(Style::kAppBg)));
     } else {
         // Scroll the existing buffer down by one row IN PLACE instead of
         // allocating a brand-new kHistoryRows-tall QImage on every incoming
@@ -100,7 +101,7 @@ void KiwiWaterfallStripWidget::pushRow(const QVector<float>& binsDbm)
                      static_cast<size_t>(bytesPerLine) * (kHistoryRows - 1));
     }
 
-    const QColor floor(Style::kAppBg);
+    const QColor floor(Style::hexRole(Style::kAppBg));
     const QColor peak(Style::kSpectrumTrace);
     float maxDbm = kMinDbm;
     for (int x = 0; x < binsDbm.size(); ++x) {
@@ -120,7 +121,7 @@ void KiwiWaterfallStripWidget::pushRow(const QVector<float>& binsDbm)
 
 void KiwiWaterfallStripWidget::reset()
 {
-    m_history.fill(QColor(Style::kAppBg));
+    m_history.fill(QColor(Style::hexRole(Style::kAppBg)));
     m_peakLabel->setText(QStringLiteral("—"));
     update();
 }

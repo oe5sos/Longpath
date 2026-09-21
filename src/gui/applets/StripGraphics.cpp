@@ -357,8 +357,8 @@ namespace {
 // stylesheet, because these widgets paint themselves.
 void drawInset(QPainter& p, const QRect& r)
 {
-    p.fillRect(r, QColor(Style::kPanadapterBg));
-    p.setPen(QPen(QColor(Style::kBadgeInfoBg), 1));
+    p.fillRect(r, QColor(Style::hexRole(Style::kPanadapterBg)));
+    p.setPen(QPen(QColor(Style::hexRole(Style::kBadgeInfoBg)), 1));
     p.drawRect(r);
     p.setPen(QPen(QColor(0, 0, 0, 190), 1));
     p.drawLine(r.left() + 1, r.top() + 1, r.right() - 1, r.top() + 1);

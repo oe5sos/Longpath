@@ -372,7 +372,7 @@ void FlatMapWidget::paintEvent(QPaintEvent*)
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing);
     p.setRenderHint(QPainter::SmoothPixmapTransform);
-    p.fillRect(rect(), QColor(Style::kAppBg));
+    p.fillRect(rect(), QColor(Style::hexRole(Style::kAppBg)));
 
     const QRectF r = mapRect();
 
@@ -425,7 +425,7 @@ void FlatMapWidget::paintEvent(QPaintEvent*)
             const int y  = height() - 6;
             // Dunkle Unterlegung: der Vermerk muss auf hellem Eis
             // genauso lesbar sein wie auf dunklem Ozean.
-            QColor box(Style::kAppBg);
+            QColor box(Style::hexRole(Style::kAppBg));
             box.setAlpha(170);
             p.setPen(Qt::NoPen);
             p.setBrush(box);
@@ -612,7 +612,7 @@ void FlatMapWidget::paintEvent(QPaintEvent*)
         const int tw = bfm.horizontalAdvance(caption);
         const QRectF plate(s.x() - tw / 2.0 - 5.0, captionTop,
                            tw + 10.0, bfm.height() + 3.0);
-        QColor plateBg(Style::kAppBg);
+        QColor plateBg(Style::hexRole(Style::kAppBg));
         plateBg.setAlpha(215);
         p.setPen(QPen(ring, 1.0));
         p.setBrush(plateBg);

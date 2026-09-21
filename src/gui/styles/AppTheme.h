@@ -29,6 +29,7 @@
 #include <QStringLiteral>
 
 #include "../StyleConstants.h"
+#include "ThemeQss.h"
 
 namespace Longpath {
 
@@ -40,7 +41,11 @@ inline void applyDarkPalette(QApplication& app)
 {
     QPalette p = app.palette();
 
-    auto c = [](const char* hex) { return QColor(QString::fromLatin1(hex)); };
+    // Durch das Theme: hexRole() liefert, was die Palette fuer diesen
+    // Nereus-Wert will — ohne Theme den Wert selbst. Der Aufruf ist
+    // also vor UND nach dem Laden einer Palette richtig; main.cpp ruft
+    // ihn nach dem Laden noch einmal (2026-09-21).
+    auto c = [](const char* hex) { return QColor(Style::hexRole(hex)); };
 
     const QColor appBg        = c(Style::kAppBg);          // #0f0f1a
     const QColor panelBg      = c(Style::kPanelBg);        // #0a0a18
@@ -104,7 +109,7 @@ inline void applyDarkPalette(QApplication& app)
 // only fills the gap when nothing more specific applies.
 inline void applyAppBaselineQss(QApplication& app)
 {
-    app.setStyleSheet(QStringLiteral(
+    app.setStyleSheet(Style::themed(QStringLiteral(
         "QToolTip {"
         "  color: %1; background: %2; border: 1px solid %3;"
         "  padding: 3px; border-radius: 6px;"
@@ -139,7 +144,7 @@ inline void applyAppBaselineQss(QApplication& app)
           QString::fromLatin1(Style::kButtonBg),
           QString::fromLatin1(Style::kBorder),
           QString::fromLatin1(Style::kTitleText),
-          QString::fromLatin1(Style::kTextInactive)));
+          QString::fromLatin1(Style::kTextInactive))));
 }
 
 } // namespace Longpath

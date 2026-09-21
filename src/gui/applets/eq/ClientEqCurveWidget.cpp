@@ -27,6 +27,7 @@
 #include "gui/applets/eq/ClientEqCurveWidget.h"
 #include "core/strip/ClientEq.h"
 #include "gui/StyleConstants.h"
+#include "gui/styles/ThemeQss.h"
 #include "gui/applets/eq/EqPalette.h"
 
 #include <QPainter>
@@ -445,7 +446,7 @@ float ClientEqCurveWidget::yToDb(float y) const
 void ClientEqCurveWidget::drawBackground(QPainter& p, const QRect& r) const
 {
     // Background/grid/filter guides/labels stay behind the live analyzer.
-    p.fillRect(r, QColor(QString::fromLatin1(Style::kPanelBg)));
+    p.fillRect(r, QColor(Style::hexRole(Style::kPanelBg)));
 
     // Minor grid — dB lines at ±6, ±12 dB.
     {

@@ -231,7 +231,7 @@ void SwrChartWidget::paintEvent(QPaintEvent* /*ev*/)
 
     // Background.
     p.fillRect(rect(), QColor(0x0f, 0x0f, 0x1a));
-    p.fillRect(plot, QColor(Style::kBadgeInfoBg));
+    p.fillRect(plot, QColor(Style::hexRole(Style::kBadgeInfoBg)));
 
     const double yMin = 1.0;
     auto yFor = [&](double swr) -> int {
