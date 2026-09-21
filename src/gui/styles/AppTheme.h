@@ -160,7 +160,7 @@ inline void applyAppBaselineQss(QApplication& app)
         + Style::sliderHStyle()
         + Style::sliderVStyle()
         + QLatin1String(Style::kButtonStyle)   // ohne font-size: Setup-Knoepfe erben ihre Schrift
-        + QLatin1String(Style::kScrollBarStyle));
+        + QLatin1String(Style::kScrollBarStyle)));   // themed(): Palettenrollen auch im Formularstil
 }
 
 } // namespace Longpath
