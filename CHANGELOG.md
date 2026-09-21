@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-09-21
+
+Die erste Veroeffentlichung seit 0.6.1 — alles, was seit den drei
+Testbauten (rc1 bis rc3, Anfang September) auf `main` gelandet ist:
+die QSO-Karte, die zu einer Station fliegt (NASA-GIBS-Luftbild,
+Grosskreis), die Palette „Moos", Sync QRZ und die Logbuch-Kennzahlen,
+der RTTY-Decoder, das fluessige 3D-Spektrum, der ⚙-Knopf in den Applets,
+die Werkbank gegen den HPSDR-Simulator — und darunter die Reparaturen,
+die dabei aufgefallen sind (Sende-Status der Diagnoseseite, verlorene
+Abtastrate beim Verbinden, Filterachse im RX-Applet, die Palette, die
+den Neustart nicht ueberlebte, PureSignal-Verzoegerungsleitung, NaN in
+der Sendekette). Pakete fuer macOS (Apple Silicon und Intel), Windows
+und Linux (x86_64 und aarch64), alle GPG-signiert.
+
 ### Added
 
 - **Die QSO-Karte fliegt zu einer Station.** Ein Rufzeichen ins neue
