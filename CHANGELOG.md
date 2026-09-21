@@ -141,7 +141,9 @@ Programm, das der Betreiber taeglich benutzte.
   neuere Version, geht der Dialog von selbst auf. Keine GPG-Pruefung
   im Programm (kein gpg auf einem stock-macOS); die Pruefsumme ueber
   GitHubs HTTPS sichert den Download. Menue: "About Longpath" statt
-  des alten Namens.
+  des alten Namens. Und die Version steht jetzt immer in der Kopfzeile
+  neben dem Namen -- auf einem Release-Bau stand dort bisher nichts,
+  und im Vollbild fehlt der Fenstertitel.
 
 ## [0.6.3] - 2026-09-21
 

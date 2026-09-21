@@ -52,6 +52,9 @@
 //   2026-08-02 — Task A7 (bottom-banner cleanup): single-row UTC clock,
 //                 inserted after MasterOutputWidget and before the 💡
 //                 feature-request button. See TitleBar.h for rationale.
+//   2026-09-21 — Longpath: die Version steht immer neben dem Namen
+//                 (Betreiber: "die Version sollte man auch sehen!"),
+//                 der Bau-Tag nur bei Entwicklungsbauten dahinter.
 // =================================================================
 
 #include "TitleBar.h"
@@ -536,21 +539,29 @@ TitleBar::TitleBar(AudioEngine* audio, QWidget* parent)
     appName->setAlignment(Qt::AlignCenter);
     m_hbox->addWidget(appName);
 
-    // Build identity, beside the name.
+    // Version and build identity, beside the name.
     //
-    // It is already in the window title, but the window title is not
+    // They are already in the window title, but the window title is not
     // visible full screen — and this session lost time twice to the
     // question "is that the build we just made or the installed copy".
-    // A branch@sha you can read at a glance settles it, and on a
-    // release build the tag is empty so nothing shows.
+    // A branch@sha you can read at a glance settles it. Betreiber
+    // 2026-09-21 ("die Version sollte man auch sehen!"): on a release
+    // build the tag is empty and nothing showed at all -- the version
+    // now stands here always, the tag joins it on a development build.
+    QString identity = QStringLiteral(NEREUSSDR_VERSION);
     const QString tag = BuildIdentity::buildTag();
     if (!tag.isEmpty()) {
-        auto* build = new QLabel(tag, this);
+        identity += QStringLiteral(" · %1").arg(tag);
+    }
+    {
+        auto* build = new QLabel(identity, this);
+        build->setObjectName(QStringLiteral("titleBarVersion"));
         build->setStyleSheet(QStringLiteral(
             "QLabel { color: %1; font-size: 11px; }")
             .arg(QLatin1String(Style::kTextScale)));
-        build->setToolTip(QStringLiteral(
-            "Branch and commit this binary was built from"));
+        build->setToolTip(tag.isEmpty()
+            ? QStringLiteral("Longpath version")
+            : QStringLiteral("Version, branch and commit this binary was built from"));
         m_hbox->addSpacing(6);
         m_hbox->addWidget(build);
     }

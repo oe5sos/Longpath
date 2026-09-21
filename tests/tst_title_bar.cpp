@@ -23,6 +23,7 @@
 // Design spec: docs/architecture/2026-04-19-vax-design.md §6.3 + §7.3.
 // =================================================================
 
+#include <QLabel>
 #include <QtTest/QtTest>
 #include <QMenu>
 #include <QMenuBar>
@@ -46,6 +47,20 @@ private slots:
         AudioEngine engine;
         TitleBar bar(&engine);
         QVERIFY(bar.masterOutput() != nullptr);
+    }
+
+    // ── 1b. Die Version steht immer neben dem Namen (2026-09-21) ────────────
+    // Auf einem Release-Bau ist der Bau-Tag leer; vorher stand dann gar
+    // nichts da, und im Vollbild fehlt der Fenstertitel.
+
+    void versionIsAlwaysVisible() {
+        AudioEngine engine;
+        TitleBar bar(&engine);
+        auto* label = bar.findChild<QLabel*>(QStringLiteral("titleBarVersion"));
+        QVERIFY(label);
+        QVERIFY(label->text().startsWith(QStringLiteral(NEREUSSDR_VERSION)));
+        // Ohne Bau-Tag (Pruefstand: main() setzt keinen) nur die Version.
+        QCOMPARE(label->text(), QStringLiteral(NEREUSSDR_VERSION));
     }
 
     // ── 2. setMenuBar re-parents the menu bar into the strip ──────────────
