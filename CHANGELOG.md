@@ -165,6 +165,18 @@ und Linux (x86_64 und aarch64), alle GPG-signiert.
 
 ### Fixed
 
+- **Das Logbuchfenster laesst sich jetzt schmal ziehen.** Elf Knoepfe und
+  das Suchfeld in einer Zeile, darunter sieben Filter — beides hielt das
+  Fenster ueber 1000 px breit („hier duerfte eine Mindestgroesse
+  eingestellt sein", Betreiber 2026-09-21). Beide Leisten brechen jetzt
+  um wie Text (eigenes `FlowLayout`): bei voller Breite eine Zeile wie
+  bisher, schmaler zwei oder drei; Beschriftung und Feld bleiben
+  zusammen, der Datumsbereich auch, „Clear" bleibt rechts. Mindestbreite
+  334 statt ueber 1000 px. Das Detailpaneel rollt, wenn das Fenster
+  niedriger wird, statt dass seine Abschnitte uebereinanderrutschen.
+  Dieselbe Leiste im Kartenfenster (317 statt ueber 1300 px).
+  Pruefstand `tst_logbook_toolbar_wraps`.
+
 - **Die Diagnoseseite „Radio Status" wusste nichts vom Senden.** Kein
   Produktionscode rief je `RadioStatus::setActivePttSource()` oder
   `setTransmitting()` — die Seite zeigte bei jedem Senden „— W",
