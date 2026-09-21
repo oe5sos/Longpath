@@ -83,8 +83,8 @@ def test_plan_doc_classified_as_docs():
 def test_classifications_are_from_known_set():
     ALLOWED = {
         "thetis-port", "aethersdr-port", "mi0bot-port", "wdsp-vendored",
-        "fftw3-vendored", "nereussdr-original", "attribution-doc", "docs",
-        "test", "resource", "packaging",
+        "fftw3-vendored", "sgp4-vendored", "nereussdr-original",
+        "attribution-doc", "docs", "test", "resource", "packaging",
     }
     inventory = _inventory_json()
     unknown = {r["classification"] for r in inventory} - ALLOWED
@@ -97,3 +97,14 @@ def test_json_schema_stable():
     for row in inventory:
         assert set(row.keys()) >= {"path", "classification", "missing_markers"}
         assert isinstance(row["missing_markers"], list)
+
+
+def test_sgp4_is_classified_as_vendored():
+    """third_party/sgp4/ (Vallado's SGP4 via python-sgp4, MIT) is its own
+    bucket with the marker requirement "vallado" — see SGP4-PROVENANCE.md."""
+    inventory = _inventory_json()
+    sgp4 = [r for r in inventory if r["path"].startswith("third_party/sgp4/")]
+    assert sgp4, "no third_party/sgp4/ rows in the inventory"
+    assert {r["classification"] for r in sgp4} == {"sgp4-vendored"}
+    for r in sgp4:
+        assert not r["missing_markers"], f"{r['path']} missing {r['missing_markers']}"
