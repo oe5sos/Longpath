@@ -2266,6 +2266,13 @@ nereus_add_test(tst_hpsdr_sim_workbench)
 #    LONGPATH_GRAB_DIR, sonst wie oben (QSKIP ohne LONGPATH_HPSDRSIM) --
 nereus_add_test(tst_hpsdr_sim_gui_workbench)
 
+# -- Satelliten in Sicht: TLE-Satz, Vallado-Pruefvektor, Beobachter-
+#    geometrie, ISS-Plausibilitaet, Stempeltext --
+nereus_add_test(tst_satellite_tracker)
+# -- TLE-Speicher (nachgespielter CelesTrak, Datei, Alter, Fehlerseite) +
+#    ADIF-Rundweg des Stempels --
+nereus_add_test(tst_tle_store)
+
 # ── Phase 3M-1a Task E.1: TX virtual interface on RadioConnection ──────────
 # 16 tests assert:
 #   - sendTxIq() is callable on P1 + P2 without crash (stub bodies; wire
@@ -5091,6 +5098,8 @@ nereus_add_test(tst_flatmap_station_marker)
 nereus_add_test(tst_gibs_tile_geometry)
 nereus_add_test(tst_flat_map_flyto)
 nereus_add_test(tst_qso_map_flyto_window)
+# -- Satelliten ueber dem Horizont auf der Karte + Stempel im Detailpaneel --
+nereus_add_test(tst_qso_map_satellites)
 
 # -- Die Kopfleiste. Prueft, was Arithmetik hergibt: genau eine Pille je
 #    Gruppe an, sie folgt dem Modell statt dem Klick, und beim Wechsel

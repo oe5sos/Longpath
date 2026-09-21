@@ -91,6 +91,21 @@ public:
     void setPoints(const QVector<MapPoint>& points);
     void setShowPointPaths(bool on);
 
+    // Satelliten ueber dem Horizont des Betreibers: Dreieck ueber dem
+    // Subsatellitenpunkt, ein Stueck ueber der Oberflaeche gehoben
+    // (Hoehe relativ zum Erdradius, gedeckelt), Name und Elevation
+    // daneben. Dieselbe Liste wie bei FlatMapWidget::setSatellites.
+    struct SatelliteMarker {
+        QString name;
+        double  lat{0.0};
+        double  lon{0.0};
+        double  elevationDeg{0.0};
+        double  altitudeKm{0.0};
+    };
+    void setSatellites(const QVector<SatelliteMarker>& sats);
+    void setShowSatellites(bool on);
+    int  satellitesPainted() const { return m_satellitesPainted; }
+
     // Turn the globe so the given bearing from home faces the viewer.
     // Animated — the point is to see which way the path swings.
     void lookAlongBearing(double deg);
@@ -276,6 +291,9 @@ private:
     double m_beamSpread{5.0};
 
     QVector<MapPoint> m_points;
+    QVector<SatelliteMarker> m_satellites;
+    bool m_showSatellites{true};
+    int  m_satellitesPainted{0};
     bool m_showPointPaths{true};
     bool m_showAtmosphere{false};
 

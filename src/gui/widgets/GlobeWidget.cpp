@@ -275,6 +275,19 @@ void GlobeWidget::clearTarget()
     update();
 }
 
+void GlobeWidget::setSatellites(const QVector<SatelliteMarker>& sats)
+{
+    m_satellites = sats;
+    update();
+}
+
+void GlobeWidget::setShowSatellites(bool on)
+{
+    if (m_showSatellites == on) { return; }
+    m_showSatellites = on;
+    update();
+}
+
 void GlobeWidget::setPoints(const QVector<MapPoint>& points)
 {
     m_points = points;
@@ -1141,6 +1154,38 @@ void GlobeWidget::paintEvent(QPaintEvent*)
     }
     if (m_hasTarget) {
         marker(m_targetLat, m_targetLon, QColor(Style::kAccent), QString{});
+    }
+
+    // Satelliten: gehoben gezeichnet, damit ein Punkt kurz hinter dem
+    // Rand noch sichtbar ist (derselbe Grund, aus dem die Boegen gehoben
+    // werden). 400 km LEO → 6 % Erdradius; ein geostationaerer Satellit
+    // wuerde mit 5,6 Erdradien aus dem Fenster fliegen, deshalb gedeckelt.
+    m_satellitesPainted = 0;
+    if (m_showSatellites) {
+        const QColor ink(Style::kAccent);
+        QFont f = p.font();
+        f.setPixelSize(9);
+        f.setBold(true);
+        p.setFont(f);
+        for (const SatelliteMarker& s : m_satellites) {
+            const double lift = std::clamp(s.altitudeKm / 6378.0, 0.03, 0.25);
+            QPointF c;
+            if (!projectAlt(s.lat, s.lon, lift, c)) { continue; }
+            QPointF foot;
+            if (project(s.lat, s.lon, foot)) {
+                p.setPen(QPen(ink, 1.0, Qt::DotLine));
+                p.drawLine(foot, c);
+            }
+            QPolygonF tri;
+            tri << c + QPointF(0.0, -5.0) << c + QPointF(4.5, 3.5) << c + QPointF(-4.5, 3.5);
+            p.setPen(QPen(QColor(Style::kAppBg), 1.2));
+            p.setBrush(ink);
+            p.drawPolygon(tri);
+            p.setPen(ink);
+            p.drawText(c + QPointF(8, 3),
+                       QStringLiteral("%1 %2°").arg(s.name).arg(qRound(s.elevationDeg)));
+            ++m_satellitesPainted;
+        }
     }
 
     if (untextured) {

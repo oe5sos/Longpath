@@ -23,12 +23,14 @@
 #include "gui/StyleConstants.h"
 #include "gui/widgets/FlatMapWidget.h"
 #include "gui/widgets/GibsTileLayer.h"
+#include "core/sat/SatelliteService.h"
 #include "gui/widgets/GlobeWidget.h"
 #include "core/QrzClient.h"
 #include "gui/widgets/StationPhoto.h"
 #include "core/CallsignCache.h"
 
 #include <QCheckBox>
+#include <QTimer>
 #include <QComboBox>
 #include <QStandardItemModel>
 #include "gui/widgets/WorldMapCatalog.h"
@@ -247,6 +249,24 @@ void QsoMapWindow::buildUi()
     m_imagery->setStyleSheet(QStringLiteral("QCheckBox { color: %1; }")
                                  .arg(QString::fromLatin1(Style::kTextPrimary)));
     bar->addWidget(m_imagery);
+
+    // Satelliten ueber dem Horizont, als Dreiecke auf der flachen Karte.
+    // Voreingestellt an; ohne Bahndaten (kein Netz, noch nie geholt)
+    // zeichnet die Schicht schlicht nichts.
+    m_satellites = new QCheckBox(QStringLiteral("Satellites"), this);
+    m_satellites->setChecked(true);
+    m_satellites->setToolTip(QStringLiteral(
+        "Amateur satellites above your horizon right now: sub-satellite "
+        "point, name and elevation, refreshed every 10 s (orbital elements "
+        "from CelesTrak, fetched once a day)."));
+    m_satellites->setStyleSheet(QStringLiteral("QCheckBox { color: %1; }")
+                                    .arg(QString::fromLatin1(Style::kTextPrimary)));
+    bar->addWidget(m_satellites);
+    connect(m_satellites, &QCheckBox::toggled, this, [this](bool on) {
+        m_flat->setShowSatellites(on);
+        m_globe->setShowSatellites(on);
+        if (on) { refreshSatellites(); }
+    });
 
     auto* earthBtn = new QPushButton(QStringLiteral("Google Earth…"), this);
     earthBtn->setStyleSheet(Style::buttonBaseStyle());
@@ -971,6 +991,46 @@ void QsoMapWindow::applyBackgroundChoice(int index)
 namespace Longpath {
 
 // ── Hinflug zu einer Station ────────────────────────────────────────
+
+void QsoMapWindow::setSatellites(SatelliteService* svc)
+{
+    if (m_satService == svc) { return; }
+    if (m_satService) { disconnect(m_satService, nullptr, this, nullptr); }
+    m_satService = svc;
+    if (!m_satTimer) {
+        m_satTimer = new QTimer(this);
+        m_satTimer->setInterval(10 * 1000);
+        connect(m_satTimer, &QTimer::timeout, this, &QsoMapWindow::refreshSatellites);
+    }
+    if (!m_satService) {
+        m_satTimer->stop();
+        m_flat->setSatellites({});
+        m_globe->setSatellites({});
+        return;
+    }
+    connect(m_satService, &SatelliteService::catalogChanged,
+            this, &QsoMapWindow::refreshSatellites);
+    m_satTimer->start();
+    refreshSatellites();
+}
+
+void QsoMapWindow::refreshSatellites()
+{
+    if (!m_satService || !m_flat) { return; }
+    QVector<FlatMapWidget::SatelliteMarker> flat;
+    QVector<GlobeWidget::SatelliteMarker>   globe;
+    if (m_satellites && m_satellites->isChecked()) {
+        const auto sights = m_satService->inView(QDateTime::currentDateTimeUtc(), m_homeGrid, 0.0);
+        flat.reserve(sights.size());
+        globe.reserve(sights.size());
+        for (const SatelliteSight& s : sights) {
+            flat.push_back({s.name, s.subLatDeg, s.subLonDeg, s.elevationDeg});
+            globe.push_back({s.name, s.subLatDeg, s.subLonDeg, s.elevationDeg, s.altitudeKm});
+        }
+    }
+    m_flat->setSatellites(flat);
+    m_globe->setSatellites(globe);
+}
 
 void QsoMapWindow::setQrzClient(QrzClient* qrz)
 {

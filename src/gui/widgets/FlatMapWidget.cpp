@@ -551,6 +551,7 @@ void FlatMapWidget::paintEvent(QPaintEvent*)
     // Die gesuchte Station vor dem eigenen Standort: der Grosskreis
     // endet unter dem Foto, nicht darueber.
     paintFocusStation(p);
+    paintSatellites(p);
 
     if (m_hasHome) {
         const QPointF s = project(m_homeLat, m_homeLon);
@@ -1096,6 +1097,54 @@ void FlatMapWidget::clearFocusStation()
     m_hasFocus = false;
     m_focusCall.clear();
     update();
+}
+
+void FlatMapWidget::setSatellites(const QVector<SatelliteMarker>& sats)
+{
+    m_satellites = sats;
+    update();
+}
+
+void FlatMapWidget::setShowSatellites(bool on)
+{
+    if (m_showSatellites == on) { return; }
+    m_showSatellites = on;
+    update();
+}
+
+void FlatMapWidget::paintSatellites(QPainter& p)
+{
+    m_satellitesPainted = 0;
+    if (!m_showSatellites || m_satellites.isEmpty()) { return; }
+    const QColor ink(Style::kAccent);
+    QFont f = p.font();
+    f.setPixelSize(9);
+    f.setBold(true);
+    p.setFont(f);
+    const QFontMetrics fm(f);
+    for (const SatelliteMarker& s : m_satellites) {
+        const QPointF c = project(s.lat, s.lon);
+        if (!rect().adjusted(-20, -20, 20, 20).contains(c.toPoint())) { continue; }
+        // Dreieck mit der Spitze nach oben — nicht der Kreis der
+        // Stationen, nicht der Ring der Zielstation.
+        QPolygonF tri;
+        tri << c + QPointF(0.0, -6.0) << c + QPointF(5.5, 4.0) << c + QPointF(-5.5, 4.0);
+        p.setPen(QPen(QColor(Style::kAppBg), 1.5));
+        p.setBrush(ink);
+        p.drawPolygon(tri);
+        const QString text = QStringLiteral("%1 %2°").arg(s.name).arg(qRound(s.elevationDeg));
+        const int tw = fm.horizontalAdvance(text);
+        const QRectF box(c.x() + 8.0, c.y() - fm.height() / 2.0 - 1.0, tw + 8.0, fm.height() + 2.0);
+        QColor bg(Style::kAppBg);
+        bg.setAlpha(170);
+        p.setPen(Qt::NoPen);
+        p.setBrush(bg);
+        p.drawRoundedRect(box, 3.0, 3.0);
+        p.setPen(ink);
+        p.drawText(box, Qt::AlignVCenter | Qt::AlignLeft | Qt::TextSingleLine,
+                   QStringLiteral(" ") + text);
+        ++m_satellitesPainted;
+    }
 }
 
 void FlatMapWidget::paintFocusStation(QPainter& p)

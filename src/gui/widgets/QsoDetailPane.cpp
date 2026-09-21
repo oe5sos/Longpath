@@ -655,7 +655,12 @@ void QsoDetailPane::refreshExtras()
         if (LogEntry::modelsAdifField(kv.first.toUpper())) { continue; }
         if (kv.second.trimmed().isEmpty()) { continue; }
 
-        auto* k = new QLabel(kv.first, m_extrasBox);
+        // Unser eigener Stempel bekommt einen lesbaren Namen; jedes
+        // fremde APP_-Feld bleibt, wie es heisst.
+        const QString label = (kv.first.toUpper() == QLatin1String("APP_LONGPATH_SATS"))
+                                  ? QStringLiteral("Satellites in view")
+                                  : kv.first;
+        auto* k = new QLabel(label, m_extrasBox);
         k->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
                              .arg(QLatin1String(Style::kTextScale)));
         auto* v = new QLabel(kv.second, m_extrasBox);

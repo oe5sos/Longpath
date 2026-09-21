@@ -277,6 +277,7 @@ warren@wpratt.com
 #include "core/QrzClient.h"
 #include "gui/AntennaWindow.h"
 #include "core/QrzLogbookUploader.h"
+#include "core/sat/SatelliteService.h"
 #include "core/CloudlogUploader.h"
 #include "core/AdifNetworkUploader.h"
 
@@ -13048,6 +13049,13 @@ void MainWindow::ensureQrzUploader()
                                   QStringLiteral("logbook")));
 }
 
+void MainWindow::ensureSatellites()
+{
+    if (m_satellites) { return; }
+    m_satellites = new SatelliteService(this);
+    m_satellites->start();
+}
+
 void MainWindow::ensureExtraUploaders()
 {
     if (!m_cloudlogUploader) {
@@ -13411,6 +13419,8 @@ RotorLogbookPanel* MainWindow::ensureRotorPanel()
         // are for sending contacts on afterwards from the logbook
         // window, where the operator can see what is being sent where.
         panel->setUploadTargets(qsoUploaders());
+        ensureSatellites();
+        panel->setSatellites(m_satellites);
         m_rotorPanel = panel;
         m_rotorDock->setWidget(panel);
         addDockWidget(Qt::RightDockWidgetArea, m_rotorDock);

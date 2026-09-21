@@ -158,6 +158,22 @@ public:
     void clearFocusStation();
     QString focusStation() const { return m_focusCall; }
 
+    // ── Satelliten ueber dem Horizont ────────────────────────────────
+    //
+    // Subsatellitenpunkte der Satelliten, die der Betreiber gerade sehen
+    // kann: ein Dreieck mit Namen und Elevation. Kommt aus dem
+    // SatelliteService ueber das Kartenfenster; die Karte zeichnet nur.
+    struct SatelliteMarker {
+        QString name;
+        double  lat{0.0};
+        double  lon{0.0};
+        double  elevationDeg{0.0};
+    };
+    void setSatellites(const QVector<SatelliteMarker>& sats);
+    void setShowSatellites(bool on);
+    bool showSatellites() const { return m_showSatellites; }
+    int  satellitesPainted() const { return m_satellitesPainted; }
+
     QSize sizeHint() const override { return {900, 460}; }
 
     // ── Pure geometry, exposed for tests ─────────────────────────────
@@ -219,6 +235,7 @@ private:
     void setView(double lat, double lon, double zoom);
     bool paintImagery(QPainter& p, const QRectF& r);
     void paintFocusStation(QPainter& p);
+    void paintSatellites(QPainter& p);
 
     QVector<MapPoint> m_points;
     double m_homeLat{0.0}, m_homeLon{0.0};
@@ -253,6 +270,10 @@ private:
 
     bool    m_hasFocus{false};
     QString m_focusCall;
+
+    QVector<SatelliteMarker> m_satellites;
+    bool m_showSatellites{true};
+    int  m_satellitesPainted{0};
     double  m_focusLat{0.0}, m_focusLon{0.0};
     bool    m_dragging{false};
     // A press is a click until it moves. Distinguishing by distance

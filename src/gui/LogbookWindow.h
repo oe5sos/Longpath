@@ -117,6 +117,9 @@ public:
     // contact. Not owned, and optional: the logbook is opened on
     // machines with no QRZ account, where the pane simply says so.
     void setQrzClient(QrzClient* qrz);
+    /// Satelliten ueber dem Horizont auf der Karte; der Dienst gehoert
+    /// dem Hauptfenster, hier nur weitergereicht.
+    void setSatellites(class SatelliteService* svc);
 
     // cty.dat for the Kennzahlen (entity per contact, DXCC / continent /
     // zone). Optional: without it the ADIF DXCC field is all there is.
@@ -295,6 +298,7 @@ private:
     // instead of stacking copies of the same picture.
     class QsoMapWindow* m_map{nullptr};
     class QrzClient*    m_qrz{nullptr};   // fuer das Kartenfenster, das spaeter entsteht
+    class SatelliteService* m_satellites{nullptr};   // dito
     const class CtyDatParser* m_cty{nullptr};
     class QDialog* m_statsDialog{nullptr};
     class LogbookStatsWidget* m_statsView{nullptr};

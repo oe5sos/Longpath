@@ -1065,6 +1065,9 @@ set(GUI_SOURCES
     src/core/QrzClient.cpp
     src/core/QrzLogbookUploader.cpp
     src/core/QrzLogbookFetcher.cpp
+    src/core/sat/SatelliteTracker.cpp
+    src/core/sat/TleStore.cpp
+    src/core/sat/SatelliteService.cpp
     src/core/CloudlogUploader.cpp
     src/core/AdifNetworkUploader.cpp
     src/core/RotctldClient.cpp
@@ -1474,6 +1477,13 @@ endif()
 # --------------------------------------------------------------------------
 add_subdirectory(third_party/r8brain)
 target_link_libraries(LongpathObjs PUBLIC r8brain)
+
+# --------------------------------------------------------------------------
+# SGP4/SDP4 (Vallado reference, MIT via python-sgp4) — satellites in view
+# at QSO time and on the map. See docs/attribution/SGP4-PROVENANCE.md.
+# --------------------------------------------------------------------------
+add_subdirectory(third_party/sgp4)
+target_link_libraries(LongpathObjs PUBLIC sgp4)
 
 # --------------------------------------------------------------------------
 # DeepFilterNet3 DFNR — pre-built neural noise reduction library (MIT/Apache-2.0)
