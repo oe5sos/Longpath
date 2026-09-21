@@ -98,6 +98,8 @@ def classify(path: str) -> str:
         return "wdsp-vendored"
     if path.startswith("third_party/fftw3/"):
         return "fftw3-vendored"
+    if path.startswith("third_party/sgp4/"):
+        return "sgp4-vendored"
     if path in THETIS_PORTS:
         # Future refinement: split mi0bot-port vs thetis-port by inspecting
         # the PROVENANCE variant cell. For now, "thetis-port" covers both.
@@ -139,6 +141,9 @@ REQUIRED_MARKERS: dict[str, list] = {
     # The following classes carry no merge-gated marker requirement; the
     # inventory records them without flagging missing markers.
     "fftw3-vendored": [],
+    # Vallado's reference SGP4 (MIT via python-sgp4); every source file
+    # names its author in the head. See SGP4-PROVENANCE.md.
+    "sgp4-vendored": ["vallado"],
     "nereussdr-original": [],
     "attribution-doc": [],
     "docs": [],

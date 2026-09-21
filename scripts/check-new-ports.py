@@ -183,7 +183,11 @@ RE_FREEDV_CITE = re.compile(
 
 
 def run(cmd):
-    return subprocess.run(cmd, capture_output=True, text=True, cwd=REPO)
+    # errors="replace": a vendored file may carry Latin-1 bytes in its
+    # comments (Vallado's SGP4.cpp does); a git diff over it must not
+    # abort the whole check with UnicodeDecodeError.
+    return subprocess.run(cmd, capture_output=True, text=True, cwd=REPO,
+                          encoding="utf-8", errors="replace")
 
 
 def diffed_files():

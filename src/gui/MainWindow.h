@@ -709,6 +709,10 @@ private:
     // Logbook: one appended ADIF file, plus the QRZ logbook uploader
     // (a different service and credential from the XML lookup).
     void ensureQrzUploader();
+    // Satelliten in Sicht: ein Dienst fuer Stempel (Logbuch-Panel) und
+    // Kartenschicht (Logbuchfenster). Beim ersten Bedarf angelegt; er
+    // liest die TLE-Datei und holt bei Bedarf einmal am Tag von CelesTrak.
+    void ensureSatellites();
     // Cloudlog/Wavelog and the local-logger socket. Separate from the
     // QRZ pair because they are separate services with separate
     // credentials, and one "logging settings" blob would invite mixing
@@ -1672,6 +1676,7 @@ private:
     // same place as the first rather than beside it.
     AntennaWindow*       m_antennaWindow{nullptr};
     QrzLogbookUploader*  m_qrzUploader{nullptr};
+    class SatelliteService* m_satellites{nullptr};
     CloudlogUploader*    m_cloudlogUploader{nullptr};
     AdifNetworkUploader* m_localLogUploader{nullptr};
 

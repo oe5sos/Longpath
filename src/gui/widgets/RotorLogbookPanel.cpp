@@ -39,6 +39,7 @@
 #include "core/RotorModels.h"
 #include "core/SolarTimes.h"
 #include "gui/LogbookWindow.h"
+#include "core/sat/SatelliteService.h"
 #include "gui/StyleConstants.h"
 #include "gui/widgets/StationPhoto.h"
 #include "models/Band.h"
@@ -1953,7 +1954,32 @@ LogEntry RotorLogbookPanel::buildEntry() const
         e.distanceKm = calculateDistanceKm(e.myGridSquare, e.gridSquare);
         e.bearingDeg = calculateBearingInDegrees(e.myGridSquare, e.gridSquare);
     }
+    stampSatellites(e);
     return e;
+}
+
+// Welche Satelliten standen zum QSO-Zeitpunkt ueber dem eigenen Horizont?
+// Beim Loggen gerechnet, mit den Bahndaten von jetzt — spaeter liesse
+// sich das nicht mehr nachholen, ein TLE taugt nur Tage. Nichts in Sicht
+// oder kein Standort: kein Feld.
+void RotorLogbookPanel::stampSatellites(LogEntry& e) const
+{
+    if (!m_satellites || !m_satellites->hasCatalog()) { return; }
+    for (const auto& kv : e.extras) {
+        if (kv.first == SatelliteService::stampField()) { return; }   // schon gestempelt
+    }
+    const QString text = m_satellites->stamp(e.timeOn.isValid() ? e.timeOn
+                                                                 : QDateTime::currentDateTimeUtc(),
+                                             e.myGridSquare);
+    if (!text.isEmpty()) {
+        e.extras.append(qMakePair(SatelliteService::stampField(), text));
+    }
+}
+
+void RotorLogbookPanel::setSatellites(SatelliteService* svc)
+{
+    m_satellites = svc;
+    if (m_logWindow) { m_logWindow->setSatellites(svc); }
 }
 
 bool RotorLogbookPanel::appendToLogFile(const LogEntry& entry, QString* error)
@@ -2064,6 +2090,7 @@ void RotorLogbookPanel::logExternalQso(const LogEntry& entry)
         e.bearingDeg =
             calculateBearingInDegrees(e.myGridSquare, e.gridSquare);
     }
+    stampSatellites(e);
 
     // Silently skip duplicates instead of asking: WSJT-X re-sends its
     // message when its own log is edited, and a dialog popping up mid
@@ -2207,6 +2234,7 @@ void RotorLogbookPanel::openLogbookWindow()
         // rather than a second client: one session key, one queue, and
         // one place the credentials live.
         m_logWindow->setQrzClient(m_qrz);
+        m_logWindow->setSatellites(m_satellites);
         // Derselbe Logbuch-Schluessel fuer den Weg zurueck (Sync QRZ).
         m_logWindow->setQrzLogbookUploader(m_uploader);
         connect(m_logWindow, &LogbookWindow::logChanged,

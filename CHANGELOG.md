@@ -40,6 +40,22 @@ und Linux (x86_64 und aarch64), alle GPG-signiert.
   Warnungen; Rot bleibt dem Senden vorbehalten. Als `moos.json` neben
   `kreide`, `flach`, `tief` mitgeliefert.
 
+- **Satelliten in Sicht.** Beim Loggen bekommt jeder Eintrag die
+  Amateurfunksatelliten mitgeschrieben, die zum QSO-Zeitpunkt ueber dem
+  eigenen Horizont standen — ADIF-Feld `APP_LONGPATH_SATS`, etwa
+  „ES'HAIL 2 el 34° az 164° · SO-50 el 7° az 279°"; das Detailpaneel
+  zeigt es als „Satellites in view". Auf der QSO-Karte (Kugel und flache
+  Karte) stehen die Satelliten als Dreiecke ueber ihrem Subsatelliten-
+  punkt mit Name und Elevation, alle 10 s neu, Haken „Satellites". Die
+  Bahndaten (TLE, Gruppe „amateur") kommen von CelesTrak, einmal am Tag,
+  und liegen als Datei unter `<AppData>/tle/`; ohne Netz gilt die letzte.
+  Gerechnet wird mit Vallados SGP4/SDP4 (`third_party/sgp4`, MIT via
+  python-sgp4, `docs/attribution/SGP4-PROVENANCE.md`), alles darum —
+  TLE-Satz, Beobachtergeometrie, Stempel, Karte — ist Longpath-eigen.
+  Gegen die Referenz (Satellit 00005 zur Epoche) und live gegen QO-100
+  von JN67UT (33,9° Elevation, 163,9° Azimut) geprueft. Pruefstaende
+  `tst_satellite_tracker`, `tst_tle_store`, `tst_qso_map_satellites`.
+
 - **Werkbank gegen den HPSDR-Simulator** (`tst_hpsdr_sim_workbench`,
   `tst_hpsdr_sim_gui_workbench`): faehrt Longpaths eigenen Verbindungsweg
   gegen `hpsdrsim` (DL1YCF, GPL — Messgeraet, keine Quelle) als Hermes,

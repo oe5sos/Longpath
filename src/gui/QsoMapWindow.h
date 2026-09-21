@@ -41,6 +41,7 @@
 
 #include <QDialog>
 #include <QSet>
+#include <QTimer>
 #include <QVector>
 
 #include <functional>
@@ -62,6 +63,7 @@ class FlatMapWidget;
 class GibsTileLayer;
 class GlobeWidget;
 class QrzClient;
+class SatelliteService;
 
 class QsoMapWindow : public QDialog {
     Q_OBJECT
@@ -121,6 +123,12 @@ public:
     /// Ein Rufzeichen so behandeln, als waere es im Feld eingegeben.
     void lookupAndFly(const QString& call);
 
+    /// Satelliten ueber dem Horizont als Schicht auf der flachen Karte:
+    /// Subsatellitenpunkt, Name, Elevation; alle 10 s neu gerechnet.
+    /// Der Dienst gehoert dem Hauptfenster.
+    void setSatellites(class SatelliteService* svc);
+    void refreshSatellites();
+
 protected:
     void closeEvent(QCloseEvent*) override;
     void keyPressEvent(QKeyEvent*) override;
@@ -177,6 +185,9 @@ private:
     QCheckBox*   m_imagery{nullptr};
     QLineEdit*   m_callEdit{nullptr};
     GibsTileLayer* m_tiles{nullptr};
+    QCheckBox*     m_satellites{nullptr};
+    SatelliteService* m_satService{nullptr};
+    QTimer*        m_satTimer{nullptr};
     QrzClient*   m_qrz{nullptr};
     QString      m_pendingCall;   // Lookup unterwegs fuer dieses Rufzeichen
     QCheckBox*   m_onlySelected{nullptr};

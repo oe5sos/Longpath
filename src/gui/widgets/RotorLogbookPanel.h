@@ -83,6 +83,14 @@ public:
     // to the constructor.
     void setUploadTargets(const QVector<QsoUploader*>& targets);
 
+    /// Satelliten in Sicht: beim Loggen wird der Eintrag mit den
+    /// Satelliten gestempelt, die zum QSO-Zeitpunkt ueber dem eigenen
+    /// Horizont standen (ADIF APP_LONGPATH_SATS); das Logbuchfenster
+    /// bekommt den Dienst fuer die Karte weitergereicht.
+    void setSatellites(class SatelliteService* svc);
+    /// Der Eintrag, wie „Log" ihn schreiben wuerde — fuer Pruefstaende.
+    LogEntry buildEntryForTest() const { return buildEntry(); }
+
     // Open the logbook window. Public so the Tools menu can reach it
     // without the operator having to find the dock first — but still
     // the panel's window, so there is only ever one of them over one
@@ -232,9 +240,11 @@ private:
                             const QString& label);
     bool appendToLogFile(const LogEntry& entry, QString* error);
     LogEntry buildEntry() const;
+    void stampSatellites(LogEntry& e) const;
 
     RadioModel*         m_radio{nullptr};
     QrzClient*          m_qrz{nullptr};
+    class SatelliteService* m_satellites{nullptr};
     QrzLogbookUploader* m_uploader{nullptr};
 
     RotorDialWidget* m_dial{nullptr};

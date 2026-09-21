@@ -1382,11 +1382,18 @@ void LogbookWindow::setPositionFallback(PositionFallback fn)
     if (m_map) { m_map->setPositionFallback(m_fallback); }
 }
 
+void LogbookWindow::setSatellites(SatelliteService* svc)
+{
+    m_satellites = svc;
+    if (m_map) { m_map->setSatellites(svc); }
+}
+
 void LogbookWindow::openMap()
 {
     if (!m_map) {
         m_map = new QsoMapWindow(this);
         m_map->setQrzClient(m_qrz);
+        m_map->setSatellites(m_satellites);
         // Eine Station, die der Betreiber im Logbuch nachschlaegt, landet
         // auf der offenen Karte — der Flug ist der Sinn der Karte.
         connect(m_detail, &QsoDetailPane::stationLocated, m_map,

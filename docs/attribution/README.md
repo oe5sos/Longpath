@@ -25,5 +25,6 @@ is compatible with Thetis's GPLv2-or-later terms.
 ## Per-component provenance
 
 - [WDSP-PROVENANCE.md](WDSP-PROVENANCE.md) — WDSP v1.29 vendored at `third_party/wdsp/`
+- [SGP4-PROVENANCE.md](SGP4-PROVENANCE.md) — Vallado's SGP4/SDP4 reference propagator (MIT via python-sgp4) vendored at `third_party/sgp4/`
 - [FFTW3-PROVENANCE.md](FFTW3-PROVENANCE.md) — FFTW3 3.3.5 binaries vendored at `third_party/fftw3/` (Windows only)
 - [THETIS-PROVENANCE.md](THETIS-PROVENANCE.md) — NereusSDR files derived from Thetis
