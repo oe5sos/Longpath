@@ -30,6 +30,15 @@ using namespace Longpath;
 class TstSpectrumTraceVisible : public QObject { Q_OBJECT
 private slots:
     void theTraceIsActuallyVisibleOnTheFramebuffer() {
+#ifndef NEREUS_GPU_SPECTRUM
+        // CPU-Renderpfad (GPU_SPECTRUM=OFF): SpectrumWidget ist hier ein
+        // QWidget mit QPainter, es gibt keinen Framebuffer und keine
+        // Zeichenreihenfolge von Overlay-Quad und Kurve — genau das, was
+        // dieser Test misst. Ohne diesen Zweig uebersetzte die Datei mit
+        // dem Gate aus nicht (grabFramebuffer fehlt) und blockierte den
+        // ARM-Release-Bau, 2026-09-21.
+        QSKIP("CPU-Renderpfad: kein GPU-Framebuffer, den man greifen koennte.");
+#else
         SpectrumWidget w;
         w.resize(1000, 600);
         // Die DDC-Abbildung MUSS zur Pan-Sicht passen, sonst greift
@@ -103,6 +112,7 @@ private slots:
                      "Daten flossen. So sah der Betreiber tagelang ein "
                      "leeres Spektrum ueber laufendem Wasserfall.")
                      .arg(cyan)));
+#endif
     }
 };
 QTEST_MAIN(TstSpectrumTraceVisible)

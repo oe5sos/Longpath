@@ -935,3 +935,148 @@ jobs:
 
       - name: ccache stats
         run: ccache --show-stats
+
+  # ────────────────────────────────────────────────────────────────────
+  # CPU-Renderpfad des Spektrums (GPU_SPECTRUM=OFF)
+  #
+  # SpectrumWidget hat zwei Renderpfade. Den GPU-Pfad (QRhi) bauen alle
+  # Jobs oben; den CPU-Pfad hinter dem GPU_SPECTRUM-Gate baute bis heute
+  # KEIN CI-Job — nur der ARM-Linux-Job in release.yml, dessen Ubuntu-Qt
+  # (6.4) kein QRhiWidget kennt. Ein kaputter CPU-Pfad fiel deshalb erst
+  # beim Taggen auf, und weil sign-and-publish alle Bau-Jobs braucht,
+  # entstand von v0.6.2 an kein Release mehr: neun Datenfelder lagen
+  # innerhalb des Gates, ungeschuetzte Zugriffsmethoden lasen sie,
+  # 35 Uebersetzungsfehler, wochenlang unbemerkt (2026-09-04).
+  #
+  # Dieser Job baut App UND Testprogramme mit dem Gate aus und laesst die
+  # Spektrum-/Wasserfall-/Panadapter-Tests im CPU-Modus laufen. Er ist
+  # bewusst kein vierter Test-Shard: die uebrigen Tests aendern sich mit
+  # dem Renderpfad nicht.
+  #
+  # Zwei Schalternamen: der Schalter heisst auf main NEREUS_GPU_SPECTRUM
+  # und wird gerade in LONGPATH_GPU_SPECTRUM umbenannt („Nereus"
+  # verschwindet). Beide zu setzen kostet nur eine CMake-Warnung ueber
+  # die unbenutzte Variable — die Wache darunter prueft im Cache, dass
+  # der jeweils echte Schalter wirklich OFF ist. Sonst baute der Job nach
+  # der Umbenennung still den GPU-Pfad und waere gruen ohne Aussage.
+  # ────────────────────────────────────────────────────────────────────
+  cpu-spectrum:
+    name: Build (CPU spectrum path)
+    runs-on: ubuntu-24.04
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake ninja-build pkg-config g++ mold ccache \
+            libgl1-mesa-dev libfftw3-dev \
+            libasound2-dev libjack-jackd2-dev \
+            libpipewire-0.3-dev \
+            xvfb libxkbcommon-x11-0 libxcb-cursor0 \
+            libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
+            libxcb-randr0 libxcb-render-util0 libxcb-shape0 \
+            libxcb-xinerama0 libxcb-xkb1
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.*'
+          host: linux
+          target: desktop
+          arch: linux_gcc_64
+          modules: 'qtmultimedia qtshadertools qtwebsockets'
+          cache: true
+
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.ccache
+          # Eigener Schluessel wie beim Ship-Bau: das Gate geht in den
+          # Objekt-Hash ein, die Test-Laeufer haetten keine Treffer.
+          key: ccache-cpu-spectrum-${{ github.sha }}
+          restore-keys: |
+            ccache-cpu-spectrum-
+
+      - name: Configure ccache
+        run: |
+          ccache --set-config=sloppiness=pch_defines,time_macros,include_file_mtime,include_file_ctime
+          ccache --set-config=hash_dir=false
+          ccache --set-config=max_size=2G
+          ccache --zero-stats
+
+      - name: Configure (GPU spectrum OFF, tests ON)
+        run: |
+          cmake -B build-cpu -G Ninja \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_EXE_LINKER_FLAGS_INIT=-fuse-ld=mold \
+            -DCMAKE_SHARED_LINKER_FLAGS_INIT=-fuse-ld=mold \
+            -DCMAKE_MODULE_LINKER_FLAGS_INIT=-fuse-ld=mold \
+            -DNEREUS_GPU_SPECTRUM=OFF -DLONGPATH_GPU_SPECTRUM=OFF \
+            -DNEREUS_BUILD_TESTS=ON -DLONGPATH_BUILD_TESTS=ON
+
+      # ── Die Pruefung, die prueft, dass hier geprueft wird ────────────
+      - name: Verify the CPU path is really selected
+        run: |
+          echo "── GPU_SPECTRUM / BUILD_TESTS im Cache ──"
+          grep -E "^(NEREUS|LONGPATH)_(GPU_SPECTRUM|BUILD_TESTS):BOOL" build-cpu/CMakeCache.txt || true
+          if ! grep -qE "^(NEREUS|LONGPATH)_GPU_SPECTRUM:BOOL=OFF$" build-cpu/CMakeCache.txt; then
+            echo "::error::Kein GPU_SPECTRUM-Schalter steht in diesem Bau auf OFF."
+            echo "Dieser Job soll den CPU-Renderpfad bauen. Steht das Gate auf ON,"
+            echo "wiederholt er nur die anderen Jobs und faengt den Fall nicht,"
+            echo "fuer den es ihn gibt. Vermutlich wurde der Schalter umbenannt:"
+            echo "die beiden -D-Namen oben nachziehen."
+            exit 1
+          fi
+          if ! grep -qE "^(NEREUS|LONGPATH)_BUILD_TESTS:BOOL=ON$" build-cpu/CMakeCache.txt; then
+            echo "::error::Die Testprogramme sind in diesem Bau nicht eingeschaltet."
+            exit 1
+          fi
+          # Und der Gegenbeweis: das Gate trennt im Quelltext noch etwas.
+          if ! grep -rqE "^\s*#\s*(if|ifdef|ifndef|elif)\b.*(NEREUS|LONGPATH)_GPU_SPECTRUM" src/; then
+            echo "::error::Kein Praeprozessor-Gate auf GPU_SPECTRUM mehr in src/."
+            echo "Dann gibt es keinen zweiten Renderpfad mehr, und dieser Job ist"
+            echo "gegenstandslos — bitte entfernen statt still weiterlaufen lassen."
+            exit 1
+          fi
+
+      - name: Build the application
+        run: cmake --build build-cpu -j$(nproc)
+
+      - name: Verify the binary exists
+        run: |
+          test -x build-cpu/Longpath
+          ls -la build-cpu/Longpath
+
+      # Nur die Tests, die den Renderpfad beruehren. Alles andere ist
+      # mit dem Gate identisch und laeuft in den Shards oben. Die
+      # Testprogramme sind EXCLUDE_FROM_ALL (tests/CMakeLists.txt), also
+      # werden genau die Ziele gebaut, die ctest fuer das Muster kennt —
+      # nicht `all_tests` mit seinen 500 Links.
+      - name: Build the spectrum, waterfall and panadapter test programs
+        run: |
+          targets=$(ctest --test-dir build-cpu -N -R 'spectrum|waterfall|panadapter' \
+                    | sed -n 's/^ *Test *#[0-9]*: *//p')
+          echo "$targets"
+          n=$(echo "$targets" | grep -c .)
+          if [ "$n" -lt 10 ]; then
+            echo "::error::Nur $n Test(s) passen auf das Muster — ist die Testliste umgezogen?"
+            exit 1
+          fi
+          cmake --build build-cpu -j$(nproc) --target $targets
+
+      - name: Test the spectrum, waterfall and panadapter suites (CPU path)
+        working-directory: build-cpu
+        run: |
+          export QT_QPA_PLATFORM=offscreen
+          xvfb-run -a ctest --output-on-failure \
+            -R 'spectrum|waterfall|panadapter' \
+            --no-tests=error
+
+      - name: ccache stats
+        run: ccache --show-stats
