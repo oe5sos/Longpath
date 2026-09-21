@@ -348,6 +348,12 @@ und Linux (x86_64 und aarch64), alle GPG-signiert.
   einem Wechsel im Setup neu gesetzt; jede Malstelle fragt `hexRole()`;
   die Rollennamen stimmen. Aufgefallen mit „Moos": auf Anthrazit sieht
   man, was auf Fast-Schwarz nie auffiel.
+- **WSJT-X: zwei Instanzen auf einem UDP-Port setzten die Decodes der
+  einen auf das Band der anderen.** Der Client merkte sich EINE
+  Dial-Frequenz fuer alle Instanzen; wer 40 m und 20 m parallel
+  dekodiert (oder WSJT-X neben JTDX), sah falsche Spots. Jetzt je
+  Instanz-ID (Status-Nachricht), Close raeumt auf, ein Decode ohne
+  bekanntes Dial wird verworfen statt geraten (AetherSDR #3595).
 
 - **Ein TCI-Client, der den Sender getastet hat und dann verschwindet,
   laesst ihn nicht mehr getastet zurueck.** Bisher gab
