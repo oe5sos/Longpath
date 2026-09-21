@@ -1106,6 +1106,8 @@ void KiwiSdrManager::assignSliceToProfile(int sliceId, const QString& profileId,
                                     filterHighHz, panId, bandName, cwPitchHz);
             client->setAudioActive(connected);
         });
+        emit sliceTrackingUpdated(sliceId, frequencyMhz, mode, filterLowHz,
+                                  filterHighHz, cwPitchHz);
     }
     connectProfile(profileId);
     emit audioSourceEnabledChanged(profileId, true);
@@ -1159,6 +1161,8 @@ void KiwiSdrManager::updateSliceTracking(int sliceId, double frequencyMhz,
             client->setTrackedSlice(sliceId, frequencyMhz, mode, filterLowHz,
                                     filterHighHz, panId, bandName, cwPitchHz);
         });
+        emit sliceTrackingUpdated(sliceId, frequencyMhz, mode, filterLowHz,
+                                  filterHighHz, cwPitchHz);
     }
 }
 

@@ -348,6 +348,14 @@ und Linux (x86_64 und aarch64), alle GPG-signiert.
   einem Wechsel im Setup neu gesetzt; jede Malstelle fragt `hexRole()`;
   die Rollennamen stimmen. Aufgefallen mit „Moos": auf Anthrazit sieht
   man, was auf Fast-Schwarz nie auffiel.
+- **Ein KiwiSDR folgt jetzt der zugeordneten Scheibe** -- Frequenz,
+  Betriebsart, Filter und Panadapter gehen bei jeder Aenderung an den
+  Empfaenger. Bisher wurde er genau einmal abgestimmt, bei der Zuordnung,
+  und blieb dann stehen, egal was der Bediener drehte (die Nachfuehrung
+  war aus AetherSDR portiert, aber nie angeschlossen). Ausserdem bekommt
+  er die CW-Tonhoehe der Scheibe statt 0, womit der Traeger bisher auf
+  0 Hz und damit ausserhalb jedes CW-Durchlasses lag.
+
 - **CW ueber einen KiwiSDR war unhoerbar: der Durchlass wurde zweimal um
   die Tonhoehe verschoben.** Longpaths CW-Filter sitzen auf der Tonhoehe
   (Thetis: 500 Hz bei 650 Hz Pitch = 400..900), das Kiwi-Abstimmkommando

@@ -10,6 +10,9 @@
 //   2026-08-23 — Portiert (Nachtschicht, Stufe 3: Bedienflaeche).
 //                Namensraum und Kopfdatei-Pfade angepasst, sonst
 //                zeichengetreu.
+//   2026-09-21 — Longpath: Signal sliceTrackingUpdated, damit die
+//                Bruecke im MainWindow (und ihr Pruefstand) sehen, was
+//                dem Kiwi zuletzt nachgefuehrt wurde.
 
 #pragma once
 
@@ -195,6 +198,12 @@ signals:
                                              const QString& detail);
     void profileStreamReset(const QString& id);
     void sliceAssignmentChanged(int sliceId, const QString& profileId);
+    // Longpath (2026-09-21): what the assigned Kiwi was last told to
+    // follow -- on assignment and on every updateSliceTracking(). The
+    // client itself lives on its own thread; this is the observable edge.
+    void sliceTrackingUpdated(int sliceId, double frequencyMhz,
+                              const QString& mode, int filterLowHz,
+                              int filterHighHz, int cwPitchHz);
     void audioSourceEnabledChanged(const QString& id, bool enabled);
     // Emitted when a profile is removed entirely, so the audio engine can free
     // the per-source DSP state (disabling alone only quiesces it — #3668 review).

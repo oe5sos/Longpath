@@ -1023,6 +1023,12 @@ private:
     void refreshKiwiSdrAppletReceivers();
     void addKiwiSdrReceiver(const QString& name, const QString& endpoint);
     void syncKiwiSdrTransmitMute();
+    // Stufe 3b (2026-09-21): der Kiwi folgt der zugeordneten Scheibe --
+    // Frequenz, Betriebsart, Filter, Panadapter. Verdrahtet je Zuordnung
+    // (nicht je Scheibe wie bei Aether, wo jede Scheibe einen Kiwi haben
+    // kann); geloest, sobald die Zuordnung faellt.
+    void rewireKiwiSdrTrackingForSlice(int sliceId, const QString& profileId);
+    void updateKiwiSdrTrackingForSlice(class SliceModel* slice);
     // Sicherheitsschranke (2026-08-24, uebertragen aus der SunSDR-
     // Durchsicht -- siehe docs/architecture/2026-08-24-sunsdr-tci-
     // client-design.md): die EINE Stelle, die "gibt es diese Scheibe
@@ -1489,6 +1495,8 @@ private:
     // MainWindow_KiwiSdr.cpp; was dort NOCH NICHT steht, ist am Kopf
     // jener Datei aufgezaehlt.
     class KiwiSdrManager* m_kiwiSdrManager{nullptr};
+    // Je zugeordneter Scheibe die vier Nachfuehr-Verbindungen (Stufe 3b).
+    QHash<int, QVector<QMetaObject::Connection>> m_kiwiSdrTrackingConnections;
 
     // ── SunSDR (TCI-Client, 2026-08-24) ──────────────────────────────
     //

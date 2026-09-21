@@ -583,6 +583,11 @@ public:
     /// Der Rueckstellknopf springt hierher.
     static int defaultFilterCenter(DSPMode mode, int widthHz);
 
+    /// Die CW-Tonhoehe, auf der die CW-Filter sitzen (AppSettings
+    /// CWPitch, Thetis-Quelle, 100..2000 Hz). Fuer Verbraucher, die den
+    /// Durchlass einer CW-Scheibe deuten muessen (der KiwiSDR-Pfad).
+    static int cwPitchHz();
+
     /// Breite setzen, Mitte behalten (soweit die Betriebsart das
     /// zulaesst). Geht durch setFilter, also durch die Begrenzung.
     void setFilterWidth(int widthHz);
