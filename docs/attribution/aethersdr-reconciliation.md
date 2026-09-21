@@ -1018,6 +1018,27 @@ Space-Pegel, Lock/SNR, Empfindlichkeit).
 | `src/gui/applets/RttyDecoderApplet.h` | `src/gui/PanadapterApplet.cpp` (RTTY control set), `src/gui/RttyDecoderSensitivity.h` [@d58e2b8a] | Structural derivative, not a port: Longpath has no `PanadapterApplet` equivalent, so the widget tree is new code against `AppletWidget`. The control SET (text output, mark/space level meters, lock/SNR status, baud/reverse/sensitivity controls) is carried over from AetherSDR's RTTY panel; mark/shift are read-only here (not duplicated controls) since `RxApplet::RttyMarkShiftContainer` already edits the same Thetis-sourced `SliceModel` fields. | Already present in the file header: "structural derivative of AetherSDR's RTTY panel ... widget tree itself is new Longpath code". |
 | `src/gui/applets/RttyDecoderApplet.cpp` | `src/gui/PanadapterApplet.cpp` (RTTY control set) [@d58e2b8a] | Same as `.h`. Mode-visibility gate (`DSPMode::DIGL` only) matches the existing, documented rule in `RxApplet::applyModeVisibility` ("RTTY -> NUR DIGL") rather than any AetherSDR behavior — Longpath-native, not carried over. | "Same as `.h`." |
 
+## Nachtrag 2026-09-21 — Nativer CW-Decoder (ggmorse)
+
+Vier neue Dateien, dieselbe Sole-source-Lage wie der RTTY-Decoder oben:
+Thetis hat keinen nativen Decoder. `CwDecoder.{h,cpp}` ist eine nah-
+woertliche Uebernahme von AetherSDRs ggmorse-Wrapper (Worker-Faden,
+ein zusammenhaengender Parameter-Schnappschuss, Ring aus Mono-Samples,
+Lock-Semantik, Statistik ueber die Warteschlange), umgesetzt auf
+Longpaths Abgriff-Konvention (48 kHz Stereo-Float rein, Mono-Float an
+ggmorse; AetherSDR wandelt 24 kHz nach int16). `CwDecoderApplet.{h,cpp}`
+ist neuer Longpath-Code gegen `AppletWidget` mit dem Regler-/Anzeigesatz
+aus AetherSDRs CW-Bedienfeld. Die Bibliothek ggmorse (MIT) ist byte-
+identisch vom Original vendort, NICHT aus AetherSDRs gepatchter Kopie
+(`GGMORSE-PROVENANCE.md`).
+
+| NereusSDR file | AetherSDR counterpart | Evidence | Specific mod-history wording |
+|---|---|---|---|
+| `src/core/CwDecoder.h` | `src/core/CwDecoder.h` [@e944ec49] | Header attribution block names the counterpart; worker/ring/lock/stats design carried over, tap-convention and sample-format translation named. | "Created for Longpath by Martin Fischer (OE5SOS), AI-assisted via Anthropic Claude. Replaces nothing: Longpath had no CW decoder after the earlier port from another reference client was withdrawn." |
+| `src/core/CwDecoder.cpp` | `src/core/CwDecoder.cpp` [@e944ec49] | Near-verbatim port: start/stop join, lockPitch/lockSpeed, decodeLoop (parameter snapshot, one frame per decode call, cost-gated takeRxData, queued stats). Inline `// From AetherSDR ... [@e944ec49]` cites per function. | Same as `.h`. |
+| `src/gui/applets/CwDecoderApplet.h` | `src/gui/PanadapterApplet.cpp` (CW decode control set) [@e944ec49] | Structural derivative, not a port: control set carried over, widget tree new against `AppletWidget`. | "The pitch band follows the slice's CW pitch (SliceModel, Thetis-sourced) with +/- 150 Hz around it, the way AetherSDR's setKnownParameters pads a known pitch; the operator does not set a second pitch here." |
+| `src/gui/applets/CwDecoderApplet.cpp` | `src/gui/PanadapterApplet.cpp` (CW decode control set) [@e944ec49] | Same as `.h`. Mode-visibility gate (`DSPMode::CWL`/`CWU`) wired in MainWindow next to the RTTY gate. | Same as `.h`. |
+
 ## Bucket B — False AetherSDR citations (126 files)
 
 Every file below carries the mod-history boilerplate

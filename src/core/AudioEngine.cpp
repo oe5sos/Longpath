@@ -1186,6 +1186,19 @@ void AudioEngine::setRttyTap(AudioTapRing* ring, int sliceId)
     }
 }
 
+void AudioEngine::setCwTap(AudioTapRing* ring, int sliceId)
+{
+    // Reihenfolge wie bei den anderen Abgriffen (siehe setRttyTap).
+    if (ring) {
+        m_cwTapSlice.store(sliceId, std::memory_order_release);
+        m_cwTap.store(ring, std::memory_order_release);
+    } else {
+        m_cwTap.store(nullptr, std::memory_order_seq_cst);
+        m_cwTapSlice.store(-1, std::memory_order_release);
+        waitForTapQuiescence(m_cwTapBusy);
+    }
+}
+
 void AudioEngine::rxBlockReady(int sliceId, const float* samples, int frames)
 {
     if (m_mixAdmissionClosed.load(std::memory_order_acquire)) {
@@ -1409,6 +1422,11 @@ void AudioEngine::rxBlockReady(int sliceId, const float* samples, int frames)
     // eigener Ring, aus demselben Grund wie bei den anderen drei.
     // Design doc: 2026-09-06-rtty-decoder-scoping.md.
     writeToTapIfCurrent(m_rttyTap, m_rttyTapSlice, m_rttyTapBusy, sliceId,
+                        samples, frames, m_tapWriteDelayHookForTest);
+
+    // Der Abgriff fuer den nativen CW-Decoder (2026-09-21): eigener Ring,
+    // derselbe Grund. Design doc: 2026-09-21-cw-decoder.md.
+    writeToTapIfCurrent(m_cwTap, m_cwTapSlice, m_cwTapBusy, sliceId,
                         samples, frames, m_tapWriteDelayHookForTest);
 
     // Flush synchronously on the DSP thread. thread_local scratch so the

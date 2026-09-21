@@ -926,6 +926,11 @@ longpath_add_test(tst_rtty_decoder)
 longpath_add_test(tst_rtty_decoder_sensitivity)
 longpath_add_test(tst_rtty_decoder_applet)
 
+# -- CW decoder (ggmorse wrapper ported from AetherSDR, 2026-09-21):
+#    synthetic keyed CW decodes, estimates, ring bound, stop semantics --
+nereus_add_test(tst_cw_decoder)
+nereus_add_test(tst_cw_decoder_applet)
+
 # ── Phase 3O Sub-Phase 11 Task 11a: VaxFirstRunDialog ────────────────────
 longpath_add_test(tst_vax_first_run_dialog)
 
