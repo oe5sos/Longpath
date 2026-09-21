@@ -124,6 +124,7 @@
 #include "SpectrumOverlayMenu.h"
 #include "ImdOverlay.h"
 #include "spectrum/WaterfallTicker.h"
+#include "spectrum/WaterfallTimeMarkers.h"
 #include "ColorSwatchButton.h"
 #include "core/AppSettings.h"
 #include "core/audio/RealtimeAudioPriority.h"
@@ -177,6 +178,7 @@
 #endif
 
 #include <algorithm>
+#include <climits>
 #include <cmath>
 #include <cstddef>
 #include <cstring>
@@ -1137,6 +1139,10 @@ void SpectrumWidget::loadSettings()
                                   static_cast<int>(TimestampMode::UTC));
     m_wfTimestampMode = static_cast<TimestampMode>(qBound(0, tsModeRaw,
                             static_cast<int>(TimestampMode::Count) - 1));
+    {
+        const int sec = readInt(QStringLiteral("DisplayWfTimeMarkerSec"), 0);
+        m_wfTimeMarkerSec = wfTimeMarkerChoices().contains(sec) ? sec : 0;
+    }
     m_showRxFilterOnWaterfall = readBool(QStringLiteral("DisplayShowRxFilterOnWaterfall"), false);
     // Default True — same rationale as DisplayDrawTxFilter above: the TX
     // overlay should be visible during MOX out of the box.  The waterfall
@@ -1399,6 +1405,7 @@ void SpectrumWidget::saveSettings()
     writeInt(QStringLiteral("DisplayWfAverageMode"), static_cast<int>(m_wfAverageMode));
     writeInt(QStringLiteral("DisplayWfTimestampPos"), static_cast<int>(m_wfTimestampPos));
     writeInt(QStringLiteral("DisplayWfTimestampMode"), static_cast<int>(m_wfTimestampMode));
+    writeInt(QStringLiteral("DisplayWfTimeMarkerSec"), m_wfTimeMarkerSec);
     s.setValue(settingsKey(QStringLiteral("DisplayShowRxFilterOnWaterfall"), m_panIndex),
               m_showRxFilterOnWaterfall ? QStringLiteral("True") : QStringLiteral("False"));
     s.setValue(settingsKey(QStringLiteral("DisplayShowTxFilterOnRxWaterfall"), m_panIndex),
@@ -2804,6 +2811,21 @@ void SpectrumWidget::setWfTimestampMode(TimestampMode m)
 {
     if (m_wfTimestampMode == m) { return; }
     m_wfTimestampMode = m;
+    scheduleSettingsSave();
+    markOverlayDirty();
+}
+
+const QVector<int>& SpectrumWidget::wfTimeMarkerChoices()
+{
+    static const QVector<int> kChoices{0, 15, 30, 60, 300, 600, 900};
+    return kChoices;
+}
+
+void SpectrumWidget::setWfTimeMarkerSeconds(int seconds)
+{
+    if (!wfTimeMarkerChoices().contains(seconds)) { seconds = 0; }
+    if (m_wfTimeMarkerSec == seconds) { return; }
+    m_wfTimeMarkerSec = seconds;
     scheduleSettingsSave();
     markOverlayDirty();
 }
@@ -4478,6 +4500,56 @@ void SpectrumWidget::drawWaterfallChrome(QPainter& p, const QRect& wfRect)
                 ? (wfRect.left() + pad)
                 : (wfRect.right() - textW - pad);
         p.drawText(x, wfRect.top() + 12, stamp);
+    }
+
+    drawWaterfallTimeMarkers(p, wfRect);
+}
+
+// Clock-aligned time markers (idea: AetherSDR #5538). Screen row y of the
+// waterfall shows history age (m_wfHistoryOffsetRows + y); the arithmetic
+// lives in WaterfallTimeMarkers (testable against a fixed clock), this
+// only gathers the visible rows' timestamps and paints.
+void SpectrumWidget::drawWaterfallTimeMarkers(QPainter& p, const QRect& wfRect)
+{
+    if (m_wfTimeMarkerSec <= 0 || wfRect.height() <= 1
+        || !m_waterfallHistory.isConfigured() || m_wfHistoryRowCount <= 0) {
+        return;
+    }
+    const int rows = std::min(wfRect.height(), m_waterfall.height());
+    if (rows < 2) { return; }
+    QVector<qint64> stamps(rows, 0);
+    for (int y = 0; y < rows; ++y) {
+        const int rowIndex = historyRowIndexForAge(m_wfHistoryOffsetRows + y);
+        if (rowIndex >= 0 && rowIndex < m_wfHistoryTimestamps.size()) {
+            stamps[y] = m_wfHistoryTimestamps[rowIndex];
+        }
+    }
+    paintWaterfallTimeMarkers(p, wfRect, stamps);
+}
+
+void SpectrumWidget::paintWaterfallTimeMarkers(QPainter& p, const QRect& wfRect,
+                                               const QVector<qint64>& stamps)
+{
+    const QTimeZone zone = (m_wfTimestampMode == TimestampMode::UTC)
+        ? QTimeZone(QTimeZone::UTC) : QTimeZone(QTimeZone::LocalTime);
+    const QVector<WaterfallTimeMarker> marks = WaterfallTimeMarkers::compute(
+        stamps, m_wfTimeMarkerSec, zone, Style::kFontCaption + 4);
+    if (marks.isEmpty()) { return; }
+
+    QFont f = p.font();
+    f.setPixelSize(Style::kFontCaption);
+    p.setFont(f);
+    const QColor text(Style::kTextScale);
+    QColor line = text;
+    line.setAlpha(110);
+    for (const WaterfallTimeMarker& m : marks) {
+        const int sy = wfRect.top() + m.row;
+        p.setPen(line);
+        p.drawLine(wfRect.left(), sy, wfRect.right(), sy);
+        if (m.labelShown) {
+            p.setPen(text);
+            p.drawText(wfRect.left() + 4, sy - 2, m.label);
+        }
     }
 }
 

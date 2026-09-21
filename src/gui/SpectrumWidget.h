@@ -692,6 +692,23 @@ public:
     void setWfTimestampMode(TimestampMode m);
     TimestampMode wfTimestampMode() const { return m_wfTimestampMode; }
 
+    // Clock-aligned time markers across the waterfall: a thin line with a
+    // time label wherever the rows cross a boundary of `seconds` on the
+    // clock (15 s ... 15 min), 0 = off. Each row carries its own timestamp
+    // (m_wfHistoryTimestamps), so the marks stay pinned to their rows
+    // through scrolling and a paused history. The label follows the
+    // timestamp mode (UTC / Local). Idea from AetherSDR #5538 (2026-09-21).
+    void setWfTimeMarkerSeconds(int seconds);
+    int  wfTimeMarkerSeconds() const { return m_wfTimeMarkerSec; }
+    // The choices the settings page offers, in seconds (0 = off).
+    static const QVector<int>& wfTimeMarkerChoices();
+    // Test seam: paint the markers for a given row-timestamp vector (row 0
+    // = top) into `p`, the way drawWaterfallChrome does for the live rows.
+    void paintWaterfallTimeMarkersForTest(QPainter& p, const QRect& wfRect,
+                                          const QVector<qint64>& stamps) {
+        paintWaterfallTimeMarkers(p, wfRect, stamps);
+    }
+
     // Filter / zero-line overlays on the waterfall.
     // From setup.cs:1048-1052 Display.ShowRXFilterOnWaterfall / ShowTXFilterOnRXWaterfall
     // / ShowRXZeroLineOnWaterfall / ShowTXZeroLineOnWaterfall.
@@ -1966,6 +1983,9 @@ private:
     // image. Called from drawWaterfall() on the QPainter fallback path
     // and from the GPU overlay build step.
     void drawWaterfallChrome(QPainter& p, const QRect& wfRect);
+    void drawWaterfallTimeMarkers(QPainter& p, const QRect& wfRect);
+    void paintWaterfallTimeMarkers(QPainter& p, const QRect& wfRect,
+                                   const QVector<qint64>& stamps);
     void drawFreqScale(QPainter& p, const QRect& r);
     void drawDbmScale(QPainter& p, const QRect& specRect);
     void drawBandPlan(QPainter& p, const QRect& specRect);
@@ -2536,6 +2556,7 @@ private:
 
     TimestampPosition m_wfTimestampPos{TimestampPosition::None};
     TimestampMode     m_wfTimestampMode{TimestampMode::UTC};
+    int               m_wfTimeMarkerSec{0};
 
     bool  m_showRxFilterOnWaterfall{false};
     bool  m_showTxFilterOnRxWaterfall{false};

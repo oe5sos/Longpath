@@ -797,6 +797,7 @@ set(GUI_SOURCES
     src/gui/popup_placement.cpp
     src/gui/SpectrumOverlayMenu.cpp
     src/gui/spectrum/WaterfallTicker.cpp
+    src/gui/spectrum/WaterfallTimeMarkers.cpp
     src/gui/widgets/CenterMarkSlider.h
     src/gui/widgets/DexpPeakMeter.h
     src/gui/widgets/DexpPeakMeter.cpp
