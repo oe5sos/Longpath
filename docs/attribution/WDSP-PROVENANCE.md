@@ -18,6 +18,9 @@ WDSP (Warren Pratt NR0V's DSP library) is vendored in `third_party/wdsp/`.
 | `third_party/wdsp/src/cfcomp.c` | Partial sync to Thetis v2.10.3.13 (commit `501e3f5`) | `../Thetis/Project Files/Source/wdsp/cfcomp.c` | 2026-04-30 |
 | `third_party/wdsp/src/cfcomp.h` | Partial sync to Thetis v2.10.3.13 (commit `501e3f5`) | `../Thetis/Project Files/Source/wdsp/cfcomp.h` | 2026-04-30 |
 | `third_party/wdsp/src/delay.c` | TAPR v1.29 + NereusSDR-original bound on the requested delay (`honourable_delay()`, see the file's modification history); upstream arithmetic unchanged | — (own fix, no upstream source) | 2026-09-20 |
+| `third_party/wdsp/src/linux_port.c` | NereusSDR-original POSIX port file + `wdsp_dprintf()` shim for the NNR port (see "dprintf" below) | — (own shim, no upstream source) | 2026-09-14 |
+| `third_party/wdsp/src/utilities.c` | TAPR v1.29 + `dprintf()` for Windows taken from WDSP 2.10 (`utilities.c:587-597`), see "dprintf" below | `wdsp 2.10/Source/utilities.c` (that function only) | 2026-09-21 |
+| `third_party/wdsp/src/utilities.h` | TAPR v1.29 + the matching `dprintf` declaration under `_WIN32` | `wdsp 2.10/Source/utilities.h` (that declaration only) | 2026-09-21 |
 | `third_party/wdsp/src/calcc.c` | Verbatim vendor of Thetis v2.10.3.13 (commit `501e3f5`) | `../Thetis/Project Files/Source/wdsp/calcc.c` | 2026-05-06 |
 | `third_party/wdsp/src/calcc.h` | Verbatim vendor of Thetis v2.10.3.13 (commit `501e3f5`) | `../Thetis/Project Files/Source/wdsp/calcc.h` | 2026-05-06 |
 | `third_party/wdsp/src/iqc.c` | Verbatim vendor of Thetis v2.10.3.13 (commit `501e3f5`) | `../Thetis/Project Files/Source/wdsp/iqc.c` | 2026-05-06 |
@@ -89,7 +92,13 @@ wdsp_dprintf(__VA_ARGS__)` macro (placed after `<stdio.h>` is already
 fully parsed, so the redirect never corrupts the system header's own
 declaration) plus a `wdsp_dprintf()` implementation that writes to
 `stderr`. No upstream files were altered for this — the macro lives
-entirely in NereusSDR's own POSIX-port file.
+entirely in NereusSDR's own POSIX-port file. On Windows `linux_port.h`
+is not included (`comm.h` takes `Windows.h` there), so the bare name had
+nothing to resolve to and the MinGW link failed on `nnet.c` (2026-09-21,
+PR #42); `utilities.c`/`.h` now carry upstream's own ten-line
+`dprintf()` (WDSP 2.10 `utilities.c:587-597`, `vsnprintf()` +
+`OutputDebugStringA()`) under `#ifdef _WIN32` — the one function of the
+2.10 file taken, the rest of `utilities.c` stays at v1.29.
 
 **Model weights — shipped as external `.bin` files, not compiled-in
 C arrays.** Upstream's `nnr_model_0.c` / `nnr_model_1.c` encode the two
