@@ -30,10 +30,14 @@
   `tst_hpsdr_sim_gui_workbench`): faehrt Longpaths eigenen Verbindungsweg
   gegen `hpsdrsim` (DL1YCF, GPL — Messgeraet, keine Quelle) als Hermes,
   Hermes-Lite 1 oder 2: Discovery, Verbinden, Empfang, Abstimmen,
-  Ratenwechsel, TUNE ein/aus, Trennen — und liest hinterher das
-  Simulator-Protokoll: 14,2 MHz, neue Rate und PTT=1 muessen angekommen
-  sein, der letzte PTT-Stand muss 0 sein. Die Fenster-Variante legt vier
-  Bildschirmfotos ab. Beide ueberspringen sich ohne `LONGPATH_HPSDRSIM`.
+  S9-Referenzton und Daempfungsglied, Ratenwechsel, TUNE ein/aus (mit
+  Vorwaertsleistung aus der Telemetrie), TUNE ueber den Tune-Regler
+  (HL2-Sonderweg), MOX mit PC-Mikrofon, zweiter Empfaenger, Trennen — und
+  liest hinterher das Simulator-Protokoll: Frequenzen, neue Rate,
+  Daempfung und PTT=1 muessen angekommen sein, der letzte PTT-Stand muss
+  0 sein. Die Fenster-Variante legt neun Bildschirmfotos ab (darunter
+  Setup → Hardware mit den HL2-Reitern und die Diagnoseseite waehrend
+  TUNE). Beide ueberspringen sich ohne `LONGPATH_HPSDRSIM`.
   Anleitung: `docs/development/hpsdr-simulator-workbench.md`.
 
 - **Sync QRZ** im Logbuchfenster: holt das eigene QRZ-Logbuch ab
@@ -130,6 +134,17 @@
   Einstiegspunkt -- ⚙ dort haette nur einen Ausschnitt gezeigt.
 
 ### Fixed
+
+- **Die Diagnoseseite „Radio Status" wusste nichts vom Senden.** Kein
+  Produktionscode rief je `RadioStatus::setActivePttSource()` oder
+  `setTransmitting()` — die Seite zeigte bei jedem Senden „— W",
+  „RX (idle)", PTT-Quelle „none" und eine leere Ereignisliste. Jetzt am
+  `MoxController` verdrahtet (Quelle: TUNE, 2-Ton, sonst MOX/Mic/CAT/VOX/
+  CW aus dem PTT-Modus). Dazu die Seite selbst: sie sass unter einer
+  leeren halben Seite am unteren Rand, scrollte doppelt, zeigte
+  „PA Temp 0,0 °C" trotz 31,5 °C in der Statusleiste (nur auf Aenderung
+  gehoert), Zeitstempel als rohe Epochensekunden und eine „Uptime", die
+  mit dem Oeffnen bei 00:00 begann. Gefunden an der Simulator-Werkbank.
 
 - **Abtastrate und Empfaengerzahl der Verbindung gingen beim Verbinden
   verloren.** `connectToRadio()` speicherte beide, dann meldete der
