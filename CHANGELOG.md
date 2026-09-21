@@ -348,6 +348,11 @@ und Linux (x86_64 und aarch64), alle GPG-signiert.
   einem Wechsel im Setup neu gesetzt; jede Malstelle fragt `hexRole()`;
   die Rollennamen stimmen. Aufgefallen mit „Moos": auf Anthrazit sieht
   man, was auf Fast-Schwarz nie auffiel.
+- **QSO-Recorder: zwei Starts in derselben Sekunde loeschten die erste
+  Aufnahme.** Der Dateiname traegt den Sekundenstempel, der Schreiber
+  oeffnete mit Truncate. Der Name wird jetzt atomar beansprucht
+  (NewOnly); ist er vergeben, heisst die neue Aufnahme `_1`, `_2`, ...
+  -- eine Aufnahme geht nie mehr durch eine andere verloren.
 
 - **Ein TCI-Client, der den Sender getastet hat und dann verschwindet,
   laesst ihn nicht mehr getastet zurueck.** Bisher gab

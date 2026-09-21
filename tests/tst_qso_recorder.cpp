@@ -34,6 +34,7 @@
 
 #include <QtTest>
 #include <QTemporaryDir>
+#include <QFileInfo>
 
 #include "core/audio/QsoRecorder.h"
 #include "core/audio/WavFile.h"
@@ -245,6 +246,51 @@ private slots:
         r.stop();
         QVERIFY2(!QFile::exists(p),
                  "eine leere Aufnahme darf keine Datei hinterlassen");
+    }
+
+    // Zwei Starts auf denselben Namen (derselbe Sekundenstempel) loeschen
+    // nicht die erste Aufnahme: der Name wird atomar beansprucht, die
+    // zweite bekommt "_1" (AetherSDR #5644 als Vorbild, 2026-09-21).
+    void aSecondStartNeverOverwritesTheFirst()
+    {
+        const QString p = path(QStringLiteral("qso-20260921-120000.wav"));
+        {
+            QsoRecorder first;
+            QVERIFY(first.start(p, someQso()));
+            const auto rx = rxBlock(200, 0.5f);
+            first.feedRx(rx.constData(), 200);
+            first.stop();
+            QCOMPARE(first.path(), p);
+        }
+        const qint64 firstSize = QFileInfo(p).size();
+        QVERIFY(firstSize > 44);
+
+        QsoRecorder second;
+        QString err;
+        QVERIFY2(second.start(p, someQso(), &err), qPrintable(err));
+        QCOMPARE(second.path(), path(QStringLiteral("qso-20260921-120000_1.wav")));
+        const auto rx = rxBlock(50, 0.25f);
+        second.feedRx(rx.constData(), 50);
+        second.stop();
+        QCOMPARE(QFileInfo(p).size(), firstSize);                    // unangetastet
+        QVERIFY(QFile::exists(path(QStringLiteral("qso-20260921-120000_1.wav"))));
+        QVERIFY(QFile::exists(path(QStringLiteral("qso-20260921-120000_1.json"))));
+
+        // Ein dritter bekommt _2; ein Name ohne Endung zaehlt ebenso.
+        QsoRecorder third;
+        QVERIFY(third.start(p, someQso()));
+        QCOMPARE(third.path(), path(QStringLiteral("qso-20260921-120000_2.wav")));
+        third.clear();
+        QCOMPARE(QsoRecorder::claimUniquePath(path(QStringLiteral("noext"))),
+                 path(QStringLiteral("noext")));
+        QCOMPARE(QsoRecorder::claimUniquePath(path(QStringLiteral("noext"))),
+                 path(QStringLiteral("noext_1")));
+
+        // Ein Ordner, den es nicht gibt, ist ein Fehler, kein Zaehlerlauf.
+        QString err2;
+        QVERIFY(QsoRecorder::claimUniquePath(
+                    m_dir.path() + QStringLiteral("/nirgends/x.wav"), &err2).isEmpty());
+        QVERIFY(!err2.isEmpty());
     }
 
     void clearingStartsOver()
