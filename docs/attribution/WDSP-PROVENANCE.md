@@ -16,6 +16,7 @@ WDSP (Warren Pratt NR0V's DSP library) is vendored in `third_party/wdsp/`.
 | --- | --- | --- | --- |
 | `third_party/wdsp/src/cfcomp.c` | Partial sync to Thetis v2.10.3.13 (commit `501e3f5`) | `../Thetis/Project Files/Source/wdsp/cfcomp.c` | 2026-04-30 |
 | `third_party/wdsp/src/cfcomp.h` | Partial sync to Thetis v2.10.3.13 (commit `501e3f5`) | `../Thetis/Project Files/Source/wdsp/cfcomp.h` | 2026-04-30 |
+| `third_party/wdsp/src/delay.c` | TAPR v1.29 + NereusSDR-original bound on the requested delay (`honourable_delay()`, see the file's modification history); upstream arithmetic unchanged | — (own fix, no upstream source) | 2026-09-20 |
 | `third_party/wdsp/src/calcc.c` | Verbatim vendor of Thetis v2.10.3.13 (commit `501e3f5`) | `../Thetis/Project Files/Source/wdsp/calcc.c` | 2026-05-06 |
 | `third_party/wdsp/src/calcc.h` | Verbatim vendor of Thetis v2.10.3.13 (commit `501e3f5`) | `../Thetis/Project Files/Source/wdsp/calcc.h` | 2026-05-06 |
 | `third_party/wdsp/src/iqc.c` | Verbatim vendor of Thetis v2.10.3.13 (commit `501e3f5`) | `../Thetis/Project Files/Source/wdsp/iqc.c` | 2026-05-06 |
