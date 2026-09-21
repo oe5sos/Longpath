@@ -122,6 +122,38 @@ private slots:
 
         QCOMPARE(spy.count(), 0);
     }
+
+    // ── The stored rate survives Probing/Connecting ─────────────────────────
+    //
+    // connectToRadio() writes the wire rate and the active-RX count, then
+    // the worker thread reports Probing → Connecting → Connected one event-
+    // loop turn later. Until 2026-09-21 every non-Connected state cleared
+    // both fields, so the write was undone before Connected ever arrived:
+    // the model reported rate 0 and rx2Enabled()==false for the whole
+    // session (HL2 simulator bench). The idempotent guard of
+    // setSampleRateLive() is the probe here: it returns 0 exactly when the
+    // requested rate equals the stored one, and -1 otherwise (no radio).
+    void stored_rate_survives_probing_and_connecting()
+    {
+        RadioModel radio;
+        radio.setConnectionRateForTest(192000, 2);
+
+        radio.setConnectionStateForTest(ConnectionState::Probing);
+        radio.setConnectionStateForTest(ConnectionState::Connecting);
+        radio.setConnectionStateForTest(ConnectionState::Connected);
+        QCOMPARE(radio.setSampleRateLive(192000), qint64(0));
+        QVERIFY(radio.rx2Enabled());
+
+        // A lost link may come back; it is not a teardown.
+        radio.setConnectionStateForTest(ConnectionState::LinkLost);
+        QCOMPARE(radio.setSampleRateLive(192000), qint64(0));
+        QVERIFY(radio.rx2Enabled());
+
+        // Only Disconnected clears the pair.
+        radio.setConnectionStateForTest(ConnectionState::Disconnected);
+        QCOMPARE(radio.setSampleRateLive(0), qint64(0));
+        QVERIFY(!radio.rx2Enabled());
+    }
 };
 
 QTEST_MAIN(TestSampleRateLiveApply)

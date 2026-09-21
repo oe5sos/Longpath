@@ -13,6 +13,7 @@
 #include <QtTest>
 
 #include "gui/applets/BandwidthFilterApplet.h"
+#include "gui/applets/RxApplet.h"
 #include "gui/widgets/BandwidthFilterPane.h"
 #include "gui/StyleConstants.h"
 #include "models/RadioModel.h"
@@ -382,6 +383,39 @@ private slots:
                  qPrintable(QStringLiteral(
                      "Kein Signal im Bandfilter: %1 -> %2 Punkte")
                      .arg(before).arg(after)));
+    }
+
+    // Das kleine Filterbild IM RX-APPLET hat dieselbe Achse — und hatte
+    // dasselbe Loch. Auf dem Simulator-Bild vom 2026-09-21 stand es
+    // noch auf 14.221…14.229, waehrend der Panadapter auf 7.100 MHz war:
+    // syncFromModel() setzte die Achse nur beim Binden der Scheibe.
+    void theRxAppletsOwnAxisFollowsTheVfoToo()
+    {
+        RadioModel model;
+        if (model.slices().isEmpty()) { model.addSlice(); }
+        for (int i = 0; i < 4; ++i) { QCoreApplication::processEvents(); }
+        SliceModel* s = model.slices().first();
+        s->setFrequency(14'225'000.0);
+
+        RxApplet applet(s, &model);
+        applet.resize(420, 700);
+        applet.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&applet));
+        for (int i = 0; i < 4; ++i) { QCoreApplication::processEvents(); }
+
+        auto paneFreq = [&]() -> double {
+            const auto panes = applet.findChildren<BandwidthFilterPane*>();
+            return panes.isEmpty() ? -1.0 : panes.first()->vfoFrequency();
+        };
+        QCOMPARE(paneFreq(), 14'225'000.0);
+
+        s->setFrequency(7'100'000.0);
+        for (int i = 0; i < 6; ++i) { QCoreApplication::processEvents(); }
+        QVERIFY2(qFuzzyCompare(paneFreq(), 7'100'000.0),
+                 qPrintable(QStringLiteral(
+                     "Die Achse im RX-Applet steht auf %1 Hz, das Geraet "
+                     "auf 7100000 — das Simulator-Bild vom 2026-09-21")
+                     .arg(paneFreq())));
     }
 };
 

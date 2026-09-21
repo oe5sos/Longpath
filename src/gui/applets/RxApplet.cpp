@@ -1480,6 +1480,16 @@ void RxApplet::connectSlice(SliceModel* s)
         m_filterPassband->setFilter(lo, hi);
     });
 
+    // Die Achse des Filterbilds folgt dem VFO. syncFromModel() setzt sie
+    // nur beim Binden der Scheibe; danach stand sie fest — auf dem
+    // Simulator-Bild vom 2026-09-21 zeigte das RX-Applet noch
+    // 14.221…14.229, waehrend der Panadapter laengst auf 7.100 MHz war.
+    // Dasselbe Loch wie am 2026-08-22 im Bandfilter-Applet, nur hier.
+    connect(s, &SliceModel::frequencyChanged, this, [this](double hz) {
+        m_filterPassband->setVfoFrequency(hz);
+        m_filterPassband->setHasFrequency(hz > 0.0);
+    });
+
     // Antenna changes → update button labels
     connect(s, &SliceModel::rxAntennaChanged, this, [this](const QString& ant) {
         m_rxAntBtn->setText(ant);

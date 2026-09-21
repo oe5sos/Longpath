@@ -12130,6 +12130,16 @@ void RadioModel::setConnectionState(ConnectionState s)
         m_connectionStartedAt = QDateTime::currentDateTime();
     } else {
         m_connectionStartedAt = QDateTime{}; // clear — uptime is meaningless
+    }
+    // Wire rate and active-RX count are written by connectToRadio() BEFORE
+    // the worker thread reports Probing/Connecting (those arrive queued,
+    // one event-loop turn later). Clearing them on every non-Connected
+    // state therefore wiped what connectToRadio had just stored, and the
+    // model reported rate 0 / rx2Enabled()==false for the whole session
+    // until the operator changed the rate by hand (HL2 simulator bench,
+    // 2026-09-21: NetworkDiagnosticsDialog showed "—", TCI iq_samplerate
+    // fell back to the cached default). Only a real teardown clears them.
+    if (s == ConnectionState::Disconnected) {
         m_connectionSampleRateHz = 0;
         m_connectionActiveRxCount = 0;       // Task 1.7: reset on disconnect
     }
