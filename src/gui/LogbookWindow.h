@@ -265,6 +265,7 @@ private:
     // One map window, reused, so a second click raises the existing one
     // instead of stacking copies of the same picture.
     class QsoMapWindow* m_map{nullptr};
+    class QrzClient*    m_qrz{nullptr};   // fuer das Kartenfenster, das spaeter entsteht
     const class CtyDatParser* m_cty{nullptr};
     class QDialog* m_statsDialog{nullptr};
     class LogbookStatsWidget* m_statsView{nullptr};

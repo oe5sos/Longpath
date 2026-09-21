@@ -16,6 +16,7 @@
 #include "core/AppSettings.h"
 #include "core/BeamHeading.h"
 #include "core/CallsignCache.h"
+#include "core/Maidenhead.h"
 #include "core/QrzClient.h"
 #include "core/QsoConfirmation.h"
 #include "gui/StyleConstants.h"
@@ -493,6 +494,30 @@ void QsoDetailPane::requestLookup()
 void QsoDetailPane::applyInfo(const CallsignInfo& info, bool stale)
 {
     m_info = info;
+
+    // Verortet? Dann darf die Karte hinfliegen. QRZ-Koordinaten vor dem
+    // Locator, weil der Locator nur ein Feld von 4-6 Zeichen ist.
+    {
+        double lat = 0.0, lon = 0.0;
+        bool placed = false;
+        if (info.hasLatLon) {
+            lat = info.latitude; lon = info.longitude; placed = true;
+        } else if (isValidGridSquare(info.grid)) {
+            calculateLatLonFromGridSquare(info.grid, lat, lon); placed = true;
+        }
+        if (placed && !stale) {
+            QStringList bits;
+            if (!info.displayName().isEmpty()) { bits << info.displayName().toHtmlEscaped(); }
+            QStringList place;
+            if (!info.city.isEmpty())    { place << info.city.toHtmlEscaped(); }
+            if (!info.country.isEmpty()) { place << info.country.toHtmlEscaped(); }
+            if (!place.isEmpty()) { bits << place.join(QStringLiteral(", ")); }
+            // Das Rufzeichen der Zeile, nicht QRZs Stammrufzeichen: der
+            // Betreiber hat OE5SOS/P gearbeitet, nicht OE5SOS.
+            const QString shown = m_haveEntry ? m_entry.call.trimmed().toUpper() : info.call;
+            emit stationLocated(shown, lat, lon, bits.join(QStringLiteral(" · ")));
+        }
+    }
 
     m_lookupBtn->setEnabled(true);
     m_lookupBtn->setText(stale ? QStringLiteral("Refresh from QRZ")

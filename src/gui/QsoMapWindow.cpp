@@ -22,7 +22,9 @@
 #include "core/Maidenhead.h"
 #include "gui/StyleConstants.h"
 #include "gui/widgets/FlatMapWidget.h"
+#include "gui/widgets/GibsTileLayer.h"
 #include "gui/widgets/GlobeWidget.h"
+#include "core/QrzClient.h"
 #include "gui/widgets/StationPhoto.h"
 #include "core/CallsignCache.h"
 
@@ -40,6 +42,7 @@
 #include <QKeyEvent>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QLineEdit>
 #include <QPushButton>
 #include <QSet>
 #include <QStackedWidget>
@@ -49,6 +52,7 @@
 #include <QVBoxLayout>
 
 #include <algorithm>
+#include <cmath>
 
 namespace Longpath {
 
@@ -188,6 +192,24 @@ void QsoMapWindow::buildUi()
             this, &QsoMapWindow::applyBackgroundChoice);
     bar->addWidget(m_background);
 
+    // ── Zu einer Station fliegen ─────────────────────────────────────
+    //
+    // Ein Rufzeichen, Enter — und die flache Karte fliegt dorthin, wo
+    // QRZ die Station verortet, zeichnet den Grosskreis von zu Hause
+    // und setzt den Ring. Ohne QRZ-Konto bleibt der Locator aus dem
+    // Log oder die Landesmitte.
+    m_callEdit = new QLineEdit(this);
+    m_callEdit->setPlaceholderText(QStringLiteral("Fly to call…"));
+    m_callEdit->setToolTip(QStringLiteral(
+        "Type a callsign and press Enter: the flat map flies to the "
+        "station (QRZ position, else the locator, else the country) and "
+        "draws the path from home."));
+    m_callEdit->setFixedWidth(150);
+    m_callEdit->setClearButtonEnabled(true);
+    bar->addWidget(m_callEdit);
+    connect(m_callEdit, &QLineEdit::returnPressed, this,
+            [this]() { lookupAndFly(m_callEdit->text()); });
+
     bar->addStretch(1);
 
     m_onlySelected = new QCheckBox(QStringLiteral("Only marked"), this);
@@ -212,6 +234,19 @@ void QsoMapWindow::buildUi()
     m_grid->setStyleSheet(QStringLiteral("QCheckBox { color: %1; }")
                               .arg(QString::fromLatin1(Style::kTextPrimary)));
     bar->addWidget(m_grid);
+
+    // Luftbild: Blue Marble und Landsat von NASA GIBS, gezeichnet sobald
+    // die Karte hineingezoomt ist. Voreingestellt an — wer die Karte
+    // aufzieht, will den Ort sehen, nicht ein verwaschenes Weltbild.
+    m_imagery = new QCheckBox(QStringLiteral("Imagery"), this);
+    m_imagery->setChecked(true);
+    m_imagery->setToolTip(QStringLiteral(
+        "Satellite imagery under the flat map once zoomed in (NASA GIBS: "
+        "Blue Marble, Landsat). Fetched from the internet and cached on "
+        "disk; untick to stay offline."));
+    m_imagery->setStyleSheet(QStringLiteral("QCheckBox { color: %1; }")
+                                 .arg(QString::fromLatin1(Style::kTextPrimary)));
+    bar->addWidget(m_imagery);
 
     auto* earthBtn = new QPushButton(QStringLiteral("Google Earth…"), this);
     earthBtn->setStyleSheet(Style::buttonBaseStyle());
@@ -289,6 +324,14 @@ void QsoMapWindow::buildUi()
              QString::fromLatin1(Style::kInsetBg),
              QString::fromLatin1(Style::kBorderSubtle)));
     col->addWidget(m_info);
+
+    m_tiles = new GibsTileLayer(this);
+    m_flat->setImagery(m_tiles);
+    m_flat->setShowImagery(m_imagery->isChecked());
+    connect(m_imagery, &QCheckBox::toggled, this, [this](bool on) {
+        m_tiles->setNetworkEnabled(on);
+        m_flat->setShowImagery(on);
+    });
 
     connect(m_grid, &QCheckBox::toggled, this, [this](bool on) {
         m_flat->setShowGrid(on);
@@ -921,6 +964,141 @@ void QsoMapWindow::applyBackgroundChoice(int index)
     // setPath() prueft die Lesbarkeit und loest bei Erfolg den Geber
     // aus; schlaegt es fehl, bleibt das vorherige Bild stehen.
     WorldTexture::setPath(path);
+}
+
+} // namespace Longpath
+
+namespace Longpath {
+
+// ── Hinflug zu einer Station ────────────────────────────────────────
+
+void QsoMapWindow::setQrzClient(QrzClient* qrz)
+{
+    if (m_qrz == qrz) { return; }
+    if (m_qrz) { disconnect(m_qrz, nullptr, this, nullptr); }
+    m_qrz = qrz;
+    if (!m_qrz) { return; }
+
+    connect(m_qrz, &QrzClient::lookupSucceeded, this,
+            [this](const QString& call, const CallsignInfo& info) {
+        // Nur die Antwort auf DIESES Feld; das Logbuch fragt denselben
+        // Client und meldet seine Treffer ueber flyToStation() selbst.
+        if (m_pendingCall.isEmpty() || call != m_pendingCall) { return; }
+        m_pendingCall.clear();
+        double lat = 0.0, lon = 0.0;
+        if (info.hasLatLon) {
+            lat = info.latitude; lon = info.longitude;
+        } else if (isValidGridSquare(info.grid)) {
+            calculateLatLonFromGridSquare(info.grid, lat, lon);
+        } else if (!(m_fallback && m_fallback(call, lat, lon))) {
+            m_info->setText(QStringLiteral("<b>%1</b> — QRZ has no position for this call")
+                                .arg(call.toHtmlEscaped()));
+            m_info->setVisible(true);
+            return;
+        }
+        QStringList bits;
+        if (!info.displayName().isEmpty()) { bits << info.displayName().toHtmlEscaped(); }
+        QStringList place;
+        if (!info.city.isEmpty())    { place << info.city.toHtmlEscaped(); }
+        if (!info.state.isEmpty())   { place << info.state.toHtmlEscaped(); }
+        if (!info.country.isEmpty()) { place << info.country.toHtmlEscaped(); }
+        if (!place.isEmpty()) { bits << place.join(QStringLiteral(", ")); }
+        if (!info.grid.isEmpty()) { bits << info.grid.toHtmlEscaped(); }
+        flyToStation(call, lat, lon, bits.join(QStringLiteral(" · ")));
+    });
+    connect(m_qrz, &QrzClient::lookupFailed, this,
+            [this](const QString& call, QrzClient::Error, const QString& message) {
+        if (m_pendingCall.isEmpty() || call != m_pendingCall) { return; }
+        m_pendingCall.clear();
+        double lat = 0.0, lon = 0.0;
+        if (m_fallback && m_fallback(call, lat, lon)) {
+            flyToStation(call, lat, lon, QStringLiteral("country centre — QRZ: %1")
+                                             .arg(message.toHtmlEscaped()));
+            return;
+        }
+        m_info->setText(QStringLiteral("<b>%1</b> — %2")
+                            .arg(call.toHtmlEscaped(), message.toHtmlEscaped()));
+        m_info->setVisible(true);
+    });
+}
+
+void QsoMapWindow::lookupAndFly(const QString& text)
+{
+    const QString call = text.trimmed().toUpper();
+    if (call.isEmpty()) { return; }
+    if (m_callEdit && m_callEdit->text() != call) { m_callEdit->setText(call); }
+
+    // Was das Log schon weiss, braucht kein Netz: der Locator der
+    // letzten Verbindung mit dieser Station.
+    for (const LogEntry& e : m_all) {
+        if (e.call.trimmed().toUpper() == call && isValidGridSquare(e.gridSquare)) {
+            double lat = 0.0, lon = 0.0;
+            calculateLatLonFromGridSquare(e.gridSquare, lat, lon);
+            flyToStation(call, lat, lon, QStringLiteral("from the log · %1")
+                                             .arg(e.gridSquare.toHtmlEscaped()));
+            // QRZ darf es genauer machen, wenn ein Konto da ist.
+            if (m_qrz && m_qrz->hasCredentials()) {
+                m_pendingCall = call;
+                m_qrz->lookup(call);
+            }
+            return;
+        }
+    }
+
+    if (m_qrz && m_qrz->hasCredentials()) {
+        m_pendingCall = call;
+        m_info->setText(QStringLiteral("Looking up <b>%1</b>…").arg(call.toHtmlEscaped()));
+        m_info->setVisible(true);
+        m_qrz->lookup(call);
+        return;
+    }
+
+    double lat = 0.0, lon = 0.0;
+    if (m_fallback && m_fallback(call, lat, lon)) {
+        flyToStation(call, lat, lon, QStringLiteral("country centre — add a QRZ account in Tools for the exact position"));
+        return;
+    }
+    m_info->setText(QStringLiteral("<b>%1</b> — not in the log, and no QRZ account to ask")
+                        .arg(call.toHtmlEscaped()));
+    m_info->setVisible(true);
+}
+
+void QsoMapWindow::flyToStation(const QString& call, double lat, double lon,
+                                const QString& caption)
+{
+    // Der Flug ist eine Sache der flachen Karte; die Kugel kennt ihn
+    // nicht. Also erst umschalten, dann fliegen.
+    if (m_stack->currentIndex() == 0) { m_stack->setCurrentIndex(1); }
+    if (m_viewBtn) { m_viewBtn->setText(QStringLiteral("Globe")); }
+
+    const QString c = call.trimmed().toUpper();
+    m_flat->setFocusStation(c, lat, lon);
+    // ~55 m je Bildpunkt: bei 900 px Breite ein Ausschnitt von 50 km,
+    // in dem man Stadt und Landschaft erkennt und Landsat noch scharf ist.
+    m_flat->flyTo(lat, lon, m_flat->zoomForDegPerPixel(0.0005));
+
+    QString text = QStringLiteral("<b>%1</b>").arg(c.toHtmlEscaped());
+    if (!caption.isEmpty()) { text += QStringLiteral(" — ") + caption; }
+    if (isValidGridSquare(m_homeGrid)) {
+        double hlat = 0.0, hlon = 0.0;
+        calculateLatLonFromGridSquare(m_homeGrid, hlat, hlon);
+        // Entfernung und Peilung ueber den Grosskreis, wie die Karte sie zeichnet.
+        constexpr double kPi = 3.14159265358979323846;
+        const double R = 6371.0;
+        const double p1 = hlat * kPi / 180.0, p2 = lat * kPi / 180.0;
+        const double dl = (lon - hlon) * kPi / 180.0;
+        const double a = std::sin((p2 - p1) / 2) * std::sin((p2 - p1) / 2)
+                       + std::cos(p1) * std::cos(p2) * std::sin(dl / 2) * std::sin(dl / 2);
+        const double km = 2.0 * R * std::asin(std::min(1.0, std::sqrt(a)));
+        const double y = std::sin(dl) * std::cos(p2);
+        const double x = std::cos(p1) * std::sin(p2) - std::sin(p1) * std::cos(p2) * std::cos(dl);
+        double brg = std::atan2(y, x) * 180.0 / kPi;
+        if (brg < 0.0) { brg += 360.0; }
+        text += QStringLiteral(" · %1 km · %2°")
+                    .arg(km, 0, 'f', 0).arg(brg, 0, 'f', 0);
+    }
+    m_info->setText(text);
+    m_info->setVisible(true);
 }
 
 } // namespace Longpath

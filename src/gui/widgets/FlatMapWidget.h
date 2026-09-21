@@ -27,6 +27,12 @@
 //                 click is distinguished from a drag by movement, not
 //                 by timing. AI-assisted via Anthropic Claude (Cowork),
 //                 operator Martin Fischer.
+//   2026-09-21 — Luftbild-Kacheln (GibsTileLayer) unter der Weltkarte,
+//                 sobald hineingezoomt ist; der Zoom reicht dann bis zur
+//                 Kachelaufloesung statt bis 12x. flyTo() fliegt animiert
+//                 auf einen Ort, setFocusStation() zeichnet die Zielstation
+//                 mit Grosskreis vom eigenen Standort. Martin Fischer,
+//                 AI-assisted via Anthropic Claude.
 // =================================================================
 
 #include "MapPoint.h"
@@ -38,7 +44,11 @@
 #include <QVector>
 #include <QWidget>
 
+class QVariantAnimation;
+
 namespace Longpath {
+
+class GibsTileLayer;
 
 class FlatMapWidget : public QWidget {
     Q_OBJECT
@@ -104,6 +114,50 @@ public:
     // Nullmeridian und Aequator.
     void centreOn(double lat, double lon);
 
+    // ── Luftbild ─────────────────────────────────────────────────────
+    //
+    // Die Weltkarte ist ein 5400 px breites Bild; ab etwa 6x Zoom wird
+    // sie weich. Mit einer Kachelschicht geht es weiter: Blue Marble bis
+    // 500 m, Landsat bis 31 m je Bildpunkt. Die Kacheln liegen im
+    // selben naiven Raster wie die Karte (siehe GibsTileLayer.h) und
+    // werden ab kImageryFromZoom ueber das Weltbild gezeichnet.
+    void setImagery(GibsTileLayer* layer);
+    void setShowImagery(bool on);
+    bool showImagery() const { return m_showImagery; }
+    /// Ob im letzten Bild Kacheln gezeichnet wurden (fuer den Vermerk).
+    bool imageryPainted() const { return m_imageryPainted; }
+
+    // Der Zoom endet, wo das Bild endet: bei 12x ohne Luftbild, bei der
+    // Landsat-Aufloesung mit. Ein Zoom ist relativ zur Einpassung, also
+    // haengt die Zahl von der Fensterbreite ab — daher die Umrechnung.
+    double maxZoom() const;
+    double zoomForDegPerPixel(double degPerPx) const;
+    double degPerPixel() const;
+    static constexpr double kImageryFromZoom = 2.0;
+
+    // ── Hinflug ──────────────────────────────────────────────────────
+    //
+    // Nicht springen, fliegen: Mitte und Zoom laufen weich zum Ziel, und
+    // unterwegs geht der Zoom ein Stueck heraus, damit man sieht, wohin
+    // es geht. durationMs <= 0 setzt die Ansicht sofort (Tests).
+    void flyTo(double lat, double lon, double targetZoom, int durationMs = 1600);
+    bool isFlying() const;
+    /// Wo die Fenstermitte gerade liegt. false, wenn neben der Karte.
+    bool viewCentre(double& lat, double& lon) const;
+    /// Der Zoom unterwegs, fuer t in [0, 1]: Logarithmisch zwischen z0
+    /// und z1, mit einem Bogen nach aussen in der Mitte. Statisch, damit
+    /// ein Test die Form pruefen kann, ohne ein Fenster zu zeichnen.
+    static double flightZoomAt(double t, double z0, double z1);
+
+    // ── Zielstation ──────────────────────────────────────────────────
+    //
+    // Der Ort, den der Betreiber gerade sucht: ein Ring mit Rufzeichen
+    // und der Grosskreis vom eigenen Standort. Unabhaengig von den
+    // Logbuchpunkten, denn die Station muss nicht im Log stehen.
+    void setFocusStation(const QString& call, double lat, double lon);
+    void clearFocusStation();
+    QString focusStation() const { return m_focusCall; }
+
     QSize sizeHint() const override { return {900, 460}; }
 
     // ── Pure geometry, exposed for tests ─────────────────────────────
@@ -126,6 +180,8 @@ public:
     static QString gridSquare4(double lat, double lon);
 
 signals:
+    /// Der Hinflug ist am Ziel (auch bei durationMs <= 0).
+    void flightFinished();
     // Der Betreiber zoomt am unteren Anschlag weiter heraus (2026-08-19).
     // Fuer die flache Karte ist bei 1x die ganze Welt zu sehen — weiter
     // heraus gibt es hier nichts, wohl aber auf der KUGEL. Das Fenster
@@ -160,6 +216,9 @@ private:
     void paintGridOverlay(QPainter& p, const QRectF& r);
     // The marker under (or within a few pixels of) a click, or -1.
     int pointAt(const QPointF& pos) const;
+    void setView(double lat, double lon, double zoom);
+    bool paintImagery(QPainter& p, const QRectF& r);
+    void paintFocusStation(QPainter& p);
 
     QVector<MapPoint> m_points;
     double m_homeLat{0.0}, m_homeLon{0.0};
@@ -183,6 +242,18 @@ private:
 
     double  m_zoom{1.0};
     QPointF m_pan{0.0, 0.0};   // pixels
+
+    GibsTileLayer* m_imagery{nullptr};
+    bool m_showImagery{false};
+    bool m_imageryPainted{false};
+
+    QVariantAnimation* m_flight{nullptr};
+    double m_flyLat0{0.0}, m_flyLon0{0.0}, m_flyZ0{1.0};
+    double m_flyLat1{0.0}, m_flyLon1{0.0}, m_flyZ1{1.0};
+
+    bool    m_hasFocus{false};
+    QString m_focusCall;
+    double  m_focusLat{0.0}, m_focusLon{0.0};
     bool    m_dragging{false};
     // A press is a click until it moves. Distinguishing by distance
     // rather than time: a slow deliberate click is still a click.

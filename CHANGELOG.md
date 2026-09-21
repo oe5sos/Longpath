@@ -4,6 +4,21 @@
 
 ### Added
 
+- **Die QSO-Karte fliegt zu einer Station.** Ein Rufzeichen ins neue
+  Feld der Kartenleiste, Enter — die flache Karte fliegt animiert dorthin,
+  wo QRZ die Station verortet (sonst der Locator aus dem Log, sonst die
+  Landesmitte), zeichnet den Grosskreis vom eigenen Standort, setzt einen
+  Ring mit Rufzeichen und nennt Entfernung und Peilung. Wer im Logbuch
+  eine Station nachschlaegt, sieht sie auf der offenen Karte landen.
+  Dazu **Luftbild unter der flachen Karte** (Haken „Imagery", voreingestellt
+  an): Blue Marble und Landsat von NASA GIBS, frei und ohne Schluessel,
+  im selben Raster wie die Karte, sobald hineingezoomt ist; der Zoom
+  reicht damit bis 31 m je Bildpunkt statt 12x. Kacheln liegen im
+  Plattencache, der Vermerk steht unten rechts. Longpath-eigen;
+  Pruefstaende `tst_gibs_tile_geometry`, `tst_flat_map_flyto`,
+  `tst_qso_map_flyto_window` (mit `LONGPATH_GRAB_DIR` auch mit echten
+  Kacheln als Bild).
+
 - **Logbuch-Kennzahlen + Awards** (Logbuch > Stats…): sechs Kacheln
   statt des Textfensters -- Log (Gesamt, Rufzeichen, erste/letzte,
   7/30/365 Tage, bestaetigt, Weitester), Baender und Modi als Balken mit
