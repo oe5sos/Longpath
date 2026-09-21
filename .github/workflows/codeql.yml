@@ -54,7 +54,6 @@ jobs:
         uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
-          config-file: ./.github/codeql/codeql-config.yml
 
       - name: Build
         run: |
@@ -66,3 +65,28 @@ jobs:
         uses: github/codeql-action/analyze@v3
         with:
           category: "/language:${{ matrix.language }}"
+          output: sarif-results
+          upload: failure-only
+
+      # Vendored and fetched third-party code stays byte-identical to its
+      # upstream (docs/attribution/*-PROVENANCE.md), so a finding in it is
+      # not ours to fix here and would only fail every PR that vendors a
+      # library (ggmorse tripped seven integer-multiplication-cast-to-long
+      # warnings on PR #30). A config-file paths-ignore only steers the
+      # extractors of interpreted languages; for C/C++ everything that gets
+      # compiled is analysed, so the results are filtered afterwards --
+      # GitHub's documented route for compiled languages. build/ holds the
+      # FetchContent checkouts (PortAudio, Opus, RNNoise).
+      - name: Drop third-party code from the results
+        uses: advanced-security/filter-sarif@v1
+        with:
+          patterns: |
+            -third_party/**
+            -build/**
+          input: sarif-results/${{ matrix.language }}.sarif
+          output: sarif-results/${{ matrix.language }}.sarif
+
+      - name: Upload the filtered results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: sarif-results/${{ matrix.language }}.sarif
