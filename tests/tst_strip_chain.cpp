@@ -18,6 +18,7 @@
 #include "core/strip/StripSettings.h"
 
 #include <cmath>
+#include <limits>
 #include <vector>
 
 using namespace Longpath;
@@ -68,6 +69,11 @@ private slots:
     void the_whole_chain_stays_finite();
     void every_stage_has_a_name();
     void the_limiter_is_last();
+    void a_nan_at_the_input_becomes_silence_and_is_counted();
+    void a_stage_that_returns_nan_is_bypassed_for_that_block();
+    void a_poisoned_stage_recovers_once_its_setting_is_sane_again();
+    void a_block_too_big_for_the_snapshot_still_comes_out_finite();
+    void a_clean_chain_counts_nothing();
     void every_preset_leaves_the_master_alone();
     void every_preset_names_itself_and_applies();
     void a_user_preset_round_trips();
@@ -186,6 +192,178 @@ void TstStripChain::the_whole_chain_stays_finite()
     QVERIFY2(worst < 8.0f,
              qPrintable(QStringLiteral("the chain reached %1")
                             .arg(double(worst))));
+}
+
+// ── The non-finite guard ─────────────────────────────────────────────
+//
+// Four tests for one promise: whatever goes into the strip, what comes
+// out is a number. The first two are the two places a NaN can enter —
+// the microphone and a stage — and the third is the difference between
+// a guard and a fuse: after the cause is gone the stage works again
+// without anyone restarting anything. The last one is the control.
+//
+// The stage that misbehaves on purpose is the EQ with a master gain of
+// NaN. That is not a contrived value: std::clamp(NaN, lo, hi) returns
+// NaN, so a NaN that arrives from a settings file or a slider reaches
+// the audio thread untouched, and the EQ multiplies every sample by it.
+
+void TstStripChain::a_nan_at_the_input_becomes_silence_and_is_counted()
+{
+    StripChain c;
+    c.prepare(kRate);
+    c.setEnabled(true);
+    for (int i = 0; i < StripChain::kStageCount; ++i) {
+        c.setStageEnabled(static_cast<StripChain::Stage>(i), true);
+    }
+
+    // A few blocks of good voice first so every stage has state to
+    // poison, then one block with a NaN and both infinities in it.
+    for (int b = 0; b < 20; ++b) {
+        std::vector<float> buf = voiceish(kFrames, 0.5f);
+        c.processMono(buf.data(), kFrames);
+    }
+    std::vector<float> bad = voiceish(kFrames, 0.5f);
+    bad[3]  = std::numeric_limits<float>::quiet_NaN();
+    bad[17] = std::numeric_limits<float>::infinity();
+    bad[40] = -std::numeric_limits<float>::infinity();
+    c.processMono(bad.data(), kFrames);
+    QVERIFY2(allFinite(bad), "a non-finite input sample got through");
+
+    QCOMPARE(c.nonFiniteInputBlocks(), 1u);
+    QCOMPARE(c.nonFiniteBlocksTotal(), 1u);
+    for (int i = 0; i < StripChain::kStageCount; ++i) {
+        const auto st = static_cast<StripChain::Stage>(i);
+        QVERIFY2(c.nonFiniteBlocks(st) == 0,
+                 qPrintable(QStringLiteral("%1 was blamed for the input's NaN")
+                                .arg(QLatin1String(StripChain::stageName(st)))));
+    }
+
+    // And the chain is not poisoned: a second of clean voice comes out
+    // finite and audible. Without the guard the limiter's envelope
+    // would have gone to infinity on the +inf sample and every block
+    // after it would be NaN.
+    float worst = 0.0f;
+    for (int b = 0; b < int(kRate / kFrames); ++b) {
+        std::vector<float> buf = voiceish(kFrames, 0.5f);
+        c.processMono(buf.data(), kFrames);
+        QVERIFY2(allFinite(buf), qPrintable(QStringLiteral("block %1 after the NaN").arg(b)));
+        for (float x : buf) { worst = std::max(worst, std::fabs(x)); }
+    }
+    QVERIFY2(worst > 0.01f, "the chain went silent after one bad block");
+    QCOMPARE(c.nonFiniteBlocksTotal(), 1u);
+}
+
+void TstStripChain::a_stage_that_returns_nan_is_bypassed_for_that_block()
+{
+    StripChain c;
+    c.prepare(kRate);
+    c.setEnabled(true);
+    c.setStageEnabled(StripChain::Stage::Eq, true);
+    // One band at 0 dB so the EQ actually runs (it returns early with
+    // no active band); the damage is done by the master gain alone.
+    c.eq().setBand(0, ClientEq::BandParams{});
+    c.eq().setActiveBandCount(1);
+    c.eq().setMasterGain(std::numeric_limits<float>::quiet_NaN());
+
+    const std::vector<float> in = voiceish(kFrames, 0.4f);
+    std::vector<float> out = in;
+    c.processMono(out.data(), kFrames);
+
+    // Bypassed means bypassed: not "finite", not "quiet" — the block
+    // the stage was handed, bit for bit, exactly as the operator's own
+    // bypass switch would have delivered it.
+    QVERIFY2(identical(in, out),
+             "the stage's block was not restored after it returned NaN");
+    QCOMPARE(c.nonFiniteBlocks(StripChain::Stage::Eq), 1u);
+    QCOMPARE(c.nonFiniteInputBlocks(), 0u);
+    QCOMPARE(c.nonFiniteBlocksTotal(), 1u);
+
+    // Every block, while the cause persists — and still bit-exact, so
+    // the operator hears their voice minus the EQ rather than silence.
+    for (int b = 0; b < 9; ++b) {
+        std::vector<float> again = in;
+        c.processMono(again.data(), kFrames);
+        QVERIFY(identical(in, again));
+    }
+    QCOMPARE(c.nonFiniteBlocks(StripChain::Stage::Eq), 10u);
+    QCOMPARE(c.nonFiniteBlocksTotal(), 10u);
+}
+
+void TstStripChain::a_poisoned_stage_recovers_once_its_setting_is_sane_again()
+{
+    StripChain c;
+    c.prepare(kRate);
+    c.setEnabled(true);
+    c.setStageEnabled(StripChain::Stage::Eq, true);
+    ClientEq::BandParams band;
+    band.freqHz = 1400.0f;
+    band.gainDb = 9.0f;
+    c.eq().setBand(0, band);
+    c.eq().setActiveBandCount(1);
+
+    c.eq().setMasterGain(std::numeric_limits<float>::quiet_NaN());
+    for (int b = 0; b < 5; ++b) {
+        std::vector<float> buf = voiceish(kFrames, 0.4f);
+        c.processMono(buf.data(), kFrames);
+        QVERIFY(allFinite(buf));
+    }
+    QCOMPARE(c.nonFiniteBlocks(StripChain::Stage::Eq), 5u);
+
+    // The cause goes away. Nothing is restarted, no stage is toggled.
+    c.eq().setMasterGain(1.0f);
+    const std::vector<float> in = voiceish(kFrames, 0.4f);
+    std::vector<float> out = in;
+    // A few blocks for the EQ's parameter smoothing to arrive at the
+    // +9 dB the band asks for; the last block is the one we read.
+    for (int b = 0; b < 40; ++b) {
+        out = in;
+        c.processMono(out.data(), kFrames);
+    }
+    QVERIFY2(allFinite(out), "still NaN after the setting was repaired");
+    QVERIFY2(!identical(in, out),
+             "the EQ is still being bypassed after its setting was repaired");
+    QCOMPARE(c.nonFiniteBlocks(StripChain::Stage::Eq), 5u);
+}
+
+void TstStripChain::a_block_too_big_for_the_snapshot_still_comes_out_finite()
+{
+    // Nobody calls the strip with more than 64 frames today. If someone
+    // does with more than the snapshot holds, the promise that matters
+    // — finite out — still holds; only the bit-exact bypass is traded
+    // for silence in the bad samples.
+    StripChain c;
+    c.prepare(kRate);
+    c.setEnabled(true);
+    c.setStageEnabled(StripChain::Stage::Eq, true);
+    c.eq().setBand(0, ClientEq::BandParams{});
+    c.eq().setActiveBandCount(1);
+    c.eq().setMasterGain(std::numeric_limits<float>::quiet_NaN());
+
+    constexpr int kBig = 4096;
+    std::vector<float> buf = voiceish(kBig, 0.4f);
+    c.processMono(buf.data(), kBig);
+    QVERIFY(allFinite(buf));
+    QCOMPARE(c.nonFiniteBlocks(StripChain::Stage::Eq), 1u);
+}
+
+void TstStripChain::a_clean_chain_counts_nothing()
+{
+    // The control: everything on, two seconds of hot voice, and not a
+    // single block blamed on anyone. A guard that fires on healthy
+    // audio would be bypassing stages the operator switched on.
+    StripChain c;
+    c.prepare(kRate);
+    c.setEnabled(true);
+    for (int i = 0; i < StripChain::kStageCount; ++i) {
+        c.setStageEnabled(static_cast<StripChain::Stage>(i), true);
+    }
+    c.tube().setDriveDb(18.0f);
+    for (int b = 0; b < int(2.0 * kRate / kFrames); ++b) {
+        std::vector<float> buf = voiceish(kFrames, 0.9f);
+        c.processMono(buf.data(), kFrames);
+    }
+    QCOMPARE(c.nonFiniteBlocksTotal(), 0u);
+    QCOMPARE(c.nonFiniteInputBlocks(), 0u);
 }
 
 void TstStripChain::every_stage_has_a_name()

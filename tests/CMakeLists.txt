@@ -4972,8 +4972,9 @@ nereus_add_test(tst_hamlib_installer)
 #    seconds — plus the gate's documented behaviour --
 nereus_add_test(tst_strip_dsp)
 
-# -- The strip as a whole: order, the master switch, and the promise
-#    that "off" is bit-exact even with all eight stages set up --
+# -- The strip as a whole: order, the master switch, the promise
+#    that "off" is bit-exact even with all eight stages set up, and
+#    the non-finite guard: whatever goes in, numbers come out --
 nereus_add_test(tst_strip_chain)
 
 # -- One voice measurement into a whole chain: the refusals, the four
