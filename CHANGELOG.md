@@ -128,6 +128,15 @@ Programm, das der Betreiber taeglich benutzte.
 - **Fussleiste: "ON AIR" passte unter Linux nicht in seinen Platz** --
   78 Punkte waren am Mac gemessen, die Linux-Schrift braucht 81; jetzt
   84.
+### Added
+
+- **Zeitmarken im Wasserfall** (Setup > Display > Time Markers: aus, 15 s,
+  30 s, 1/5/10/15 min): duenne Linien quer ueber den Wasserfall an den
+  Uhrgrenzen, jede mit der Uhrzeit beschriftet (UTC oder lokal, wie der
+  Zeitstempel). Jede Zeile traegt ihren eigenen Zeitstempel, darum
+  laufen die Marken mit ihren Zeilen mit und stehen in einer
+  angehaltenen Historie still. Aus, bis man es einschaltet. Idee aus
+  AetherSDR v26.9.3.
 
 ## [0.6.3] - 2026-09-21
 
@@ -207,13 +216,6 @@ und Linux (x86_64 und aarch64), alle GPG-signiert.
   Sicherung und Rueckfrage wie beim Import. Pruefstaende
   `tst_qrz_logbook_fetcher` (Antwort-Parser, Blaettern gegen einen
   HTTP-Mock) und `tst_logbook_qrz_sync`.
-- **Zeitmarken im Wasserfall** (Setup > Display > Time Markers: aus, 15 s,
-  30 s, 1/5/10/15 min): duenne Linien quer ueber den Wasserfall an den
-  Uhrgrenzen, jede mit der Uhrzeit beschriftet (UTC oder lokal, wie der
-  Zeitstempel). Jede Zeile traegt ihren eigenen Zeitstempel, darum
-  laufen die Marken mit ihren Zeilen mit und stehen in einer
-  angehaltenen Historie still. Aus, bis man es einschaltet. Idee aus
-  AetherSDR v26.9.3.
 
 - **Logbuch-Kennzahlen + Awards** (Logbuch > Stats…): sechs Kacheln
   statt des Textfensters -- Log (Gesamt, Rufzeichen, erste/letzte,
