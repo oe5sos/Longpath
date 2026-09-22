@@ -711,6 +711,12 @@ void AppSettings::load()
 
 void AppSettings::save()
 {
+    if (m_saveInhibited) {
+        qWarning() << "AppSettings::save() dropped: a restored settings file is "
+                      "waiting for the next start" << m_filePath;
+        return;
+    }
+
     // Ensure directory exists
     QDir().mkpath(QFileInfo(m_filePath).absolutePath());
 

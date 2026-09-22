@@ -2,6 +2,7 @@
 #include "gui/styles/AppTheme.h"
 #include "gui/styles/Theme.h"
 #include "core/AppSettings.h"
+#include "core/SettingsBackup.h"
 #include "core/AudioDeviceConfig.h"
 #include "core/BuildIdentity.h"
 #include "core/MacMicPermission.h"
@@ -350,6 +351,14 @@ int main(int argc, char* argv[])
 
     // Load XML settings
     Longpath::AppSettings::instance().load();
+
+    // Automatic start-up copy of the settings file (File > Settings
+    // Backups, "Backup on start-up"; off unless switched on). After
+    // load() so the switch is known, before the migrations below so the
+    // copy is the file as the previous session left it -- see
+    // SettingsBackup::takeAutomaticBackupIfWanted.
+    Longpath::SettingsBackup::takeAutomaticBackupIfWanted(
+        Longpath::AppSettings::instance(), QStringLiteral("Startup"));
 
     // Phase 3O schema migration — must run before any AppSettings reads.
     Longpath::AppSettings::migrateVaxSchemaV1ToV2();

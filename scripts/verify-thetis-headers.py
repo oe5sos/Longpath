@@ -134,6 +134,8 @@ SAMPHIRE_AUTHORED_SOURCES = {
     "clsRadioDiscovery.cs",
     "DiversityForm.cs",
     "PSForm.cs",
+    "clsDBMan.cs",         # Database Manager, MW0LGE sole author (2026-09-20)
+    "frmDBMan.cs",
 }
 
 # WDSP utility/build files exempt from the copyright-header check. These

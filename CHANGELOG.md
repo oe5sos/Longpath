@@ -22,6 +22,15 @@
   merkt sich Frequenz, Modus und Filter wie die Frontplattenknoepfe.
   `docs/architecture/2026-09-20-memories.md`. Live am Funkgeraet noch
   nicht geprueft.
+- **Einstellungs-Backup (File > Settings Backups...)** -- die Backup-
+  Haelfte von Thetis' Datenbank-Manager (clsDBMan.cs / frmDBMan.cs):
+  Kopien der Einstellungsdatei in `backups/` mit Beschreibung, Liste
+  mit Zeit und Alter, Wiederherstellen (Sicherheitskopie „Before
+  restore", dann Beenden ohne Speichern), Umbenennen, Exportieren,
+  Entfernen, Ordner oeffnen; auf Wunsch automatische Kopien beim Start
+  und beim Beenden mit Thetis' Grossvater-Vater-Sohn-Ausduennung (7 Tage
+  alles, dann je Woche/Monat/Jahr eine; nur automatische Kopien werden
+  geloescht). Alles aus, bis es eingeschaltet wird -- wie bei Thetis.
 
 ### Changed
 

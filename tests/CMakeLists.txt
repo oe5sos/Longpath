@@ -4859,6 +4859,11 @@ longpath_add_test(tst_kiwi_sdr_safety_gate)
 #    table model, capture/recall on the active slice, the dialog --
 longpath_add_test(tst_memory_list)
 longpath_add_test(tst_memory_dialog)
+# -- Settings backups (Thetis clsDBMan.cs / frmDBMan.cs, the backup half
+#    of the Database Manager, 2026-09-20): copy + sidecar, listing,
+#    rename/remove/export/restore, the GFS prune, the dialog --
+longpath_add_test(tst_settings_backup)
+longpath_add_test(tst_settings_backup_dialog)
 longpath_add_test(tst_sunsdr_audio_feed)
 longpath_add_test(tst_sunsdr_is_reachable)
 longpath_add_test(tst_compact_bar_draws)

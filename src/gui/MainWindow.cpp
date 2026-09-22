@@ -325,6 +325,8 @@ warren@wpratt.com
 #include "applets/FrequencyApplet.h"
 #include "applets/InstrumentApplet.h"
 #include "gui/WindowPlacement.h"
+#include "gui/SettingsBackupDialog.h"
+#include "core/SettingsBackup.h"
 #include "applets/AmpApplet.h"
 #include "applets/Rf2ksApplet.h"
 #include "applets/AppletVisibilityController.h"
@@ -1065,6 +1067,7 @@ MainWindow::MainWindow(QWidget* parent)
         saveMainWindowGeometry();
         AppSettings::instance().save();
         qWarning() << "[ProfileSaveOnQuit:aboutToQuit] AppSettings::save() done";
+        takeShutdownBackupIfWanted();
     });
 
     // ── Sichern, ohne auf das Beenden zu warten (2026-09-17) ─────────
@@ -8470,6 +8473,17 @@ void MainWindow::buildMenuBar()
         settingsAction->setToolTip(QStringLiteral("Open application settings"));
     }
 
+    // Thetis puts "Database Manager" under Setup, right after "Setup"
+    // (console.designer.cs:4125-4128 [@852bf0e]); Longpath's Settings
+    // live under File, so the backups follow them here.
+    {
+        QAction* backupsAction = fileMenu->addAction(QStringLiteral("Settings &Backups..."),
+                                                     this, &MainWindow::openSettingsBackups);
+        backupsAction->setMenuRole(QAction::NoRole);
+        backupsAction->setToolTip(QStringLiteral(
+            "Back up, restore and prune copies of the settings file"));
+    }
+
     {
         QMenu* profilesMenu = fileMenu->addMenu(QStringLiteral("&Profiles"));
         QAction* txProfilesAction = profilesMenu->addAction(QStringLiteral("&TX Profiles..."));
@@ -14825,6 +14839,50 @@ void MainWindow::updatePsaIndicatorVisibility()
     }
 }
 
+void MainWindow::openSettingsBackups()
+{
+    if (!m_settingsBackupDialog) {
+        m_settingsBackupDialog = new SettingsBackupDialog(AppSettings::instance().filePath(), this);
+        // After Thetis clsDBMan.cs:975-978 [@852bf0e] MakeActiveDB:
+        //   _frm_dbman.Hide();
+        //   Console.getConsole().Restart = true;
+        //   Console.getConsole().Close();
+        // Longpath closes and does not restart itself (the operator
+        // starts it again); the quit goes the Cmd+Q way, with the
+        // shutdown lock set first, so every floating window follows.
+        connect(m_settingsBackupDialog, &SettingsBackupDialog::restoreCompleted, this, [this]() {
+            if (m_settingsBackupDialog) { m_settingsBackupDialog->hide(); }
+            qWarning() << "[SettingsBackup] restored -- closing without saving";
+            m_shuttingDown = true;
+            qApp->quit();
+        });
+    }
+    m_settingsBackupDialog->refresh();
+    m_settingsBackupDialog->show();
+    m_settingsBackupDialog->raise();
+    m_settingsBackupDialog->activateWindow();
+}
+
+// From Thetis clsDBMan.cs:541-557 [@852bf0e]
+//   public static void Shutdown()
+//   {
+//       ...
+//               if (di.BackupOnShutdown)
+//                   TakeBackup(Guid.Empty, "Shutdown", true);
+//   }
+// called from console.cs:2694-2696 right after DB.Exit() ("close and
+// save database"); here right after the final AppSettings::save().
+void MainWindow::takeShutdownBackupIfWanted()
+{
+    if (m_shutdownBackupDone) { return; }
+    m_shutdownBackupDone = true;
+    AppSettings& s = AppSettings::instance();
+    // A restore is pending: the file on disk is the restored one, not
+    // this session's state -- nothing to copy.
+    if (s.saveInhibited()) { return; }
+    SettingsBackup::takeAutomaticBackupIfWanted(s, QStringLiteral("Shutdown"));
+}
+
 void MainWindow::showAudioDiagnoseDialog()
 {
 #if defined(Q_OS_LINUX)
@@ -15596,6 +15654,7 @@ void MainWindow::closeEvent(QCloseEvent* event)
 
     AppSettings::instance().save();
     qWarning() << "[ProfileSaveOnQuit:closeEvent] AppSettings::save() done";
+    takeShutdownBackupIfWanted();
 
     // ── Schwebende Fenster JETZT abraeumen ───────────────────────────
     //
