@@ -36,6 +36,7 @@
 #include "core/ConnectionState.h"
 #include "core/HpsdrModel.h"
 #include "core/OcMatrix.h"
+#include "core/MoxController.h"
 #include "core/PttSource.h"
 #include "core/RadioDiscovery.h"
 #include "core/RadioStatus.h"
@@ -116,6 +117,14 @@ private slots:
         QVERIFY2(model.connectionState() == ConnectionState::Connected,
                  "Verbindung kam nicht zustande (siehe STATE oben)");
         att.setRadioConnection(model.connection());
+        // Wie im Hauptfenster (MainWindow.cpp): der Daempfungsregler haengt am
+        // MOX. Ohne diese Verbindung bleibt die Sendedaempfung aus — und mit
+        // ihr prueft die Werkbank unten, dass sie wirklich hinausgeht.
+        if (MoxController* mox = model.moxController()) {
+            QObject::connect(mox, &MoxController::hardwareFlipped,
+                             &att, &StepAttenuatorController::onMoxHardwareFlipped,
+                             Qt::QueuedConnection);
+        }
         {
             const auto& caps = BoardCapsTable::forBoard(info.boardType);
             att.setMaxAttenuation(caps.attenuator.maxDb);
@@ -391,6 +400,25 @@ private slots:
                 << "lineGain" << tx.lineInGain()
                 << "| Board zeigt Boost/Line-In:" << showsMicBoost;
 
+        // ── 4h. Sendedaempfung: mit PureSignal AUS sind 31 dB Pflicht ──
+        // Thetis console.cs:29562-29568: ist PureSignal aus, geht beim
+        // Senden die volle Daempfung (31 dB) auf den Rueckfuehr-Wandler —
+        // sonst sieht er die ganze Sendeleistung. Longpath faehrt dieselbe
+        // Regel in StepAttenuatorController::onMoxHardwareFlipped; hier
+        // steht, ob sie auch am Draht ankommt.
+        bool txAttChecked = false;
+        if (!noTx) {
+            qInfo() << "TXATT vor MOX: attOnTx" << att.attOnTxEnabled()
+                    << "psAktiv?" << (model.pureSignal() != nullptr);
+            model.setMox(true);
+            QTRY_VERIFY_WITH_TIMEOUT(model.mox(), 5000);
+            QTest::qWait(900);
+            model.setMox(false);
+            QTRY_VERIFY_WITH_TIMEOUT(!model.mox(), 8000);
+            QTest::qWait(600);
+            txAttChecked = true;
+        }
+
         // ── 5. Trennen ───────────────────────────────────────────────
         tx.setMicBoost(micBoostBefore);
         tx.setLineIn(lineInBefore);
@@ -461,6 +489,17 @@ private slots:
                 // Daempfungsglied: die Stufe muss den Draht erreicht haben.
                 QVERIFY2(all.contains(QStringLiteral("ATT")),
                          "Der Simulator sah nie eine Daempfungs-Einstellung");
+                // Sendedaempfung: der Simulator meldet "HL2 TX ATT" bzw.
+                // "TX ATT". Mit PureSignal aus muessen beim Senden 31 dB
+                // (0x1f) hinausgegangen sein.
+                if (txAttChecked) {
+                    QVERIFY2(all.contains(QStringLiteral("TX ATT= 0000001f")),
+                             qPrintable(QStringLiteral(
+                                 "Beim Senden kamen keine 31 dB Sendedaempfung an, "
+                                 "obwohl PureSignal aus ist. Gesehen:\n%1")
+                                 .arg(seen.filter(QStringLiteral("TX ATT")).join(QLatin1Char('\n')))));
+                }
+
                 // Mikrofonweg: jedes gesetzte Bit muss am Simulator
                 // angekommen sein. Vor dem 2026-09-22 kam KEINES davon an —
                 // die Oberflaeche schrieb ins Modell, und dort endete es.
