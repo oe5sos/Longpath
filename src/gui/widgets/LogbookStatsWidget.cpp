@@ -13,6 +13,8 @@
 
 #include "gui/widgets/LogbookStatsWidget.h"
 
+#include "gui/widgets/FlowLayout.h"
+
 #include "core/DxccFlag.h"
 #include "gui/StyleConstants.h"
 
@@ -140,10 +142,18 @@ LogbookStatsWidget::LogbookStatsWidget(QWidget* parent)
     setStyleSheet(QStringLiteral("#logbookStats { background: %1; }")
                       .arg(QLatin1String(Style::kAppBg)));
 
-    m_grid = new QGridLayout(this);
-    m_grid->setContentsMargins(10, 10, 10, 10);
+    // Zwei Anordnungen fuer dieselben sechs Kacheln: das Raster fuer den
+    // Dialog, die umbrechende Reihe unter der Logtabelle (schmal wird das
+    // Fenster sonst nie — sechs Kacheln nebeneinander sind fast 1000 px).
+    m_outer = new QVBoxLayout(this);
+    m_outer->setContentsMargins(10, 10, 10, 10);
+    m_grid = new QGridLayout;
+    m_grid->setContentsMargins(0, 0, 0, 0);
     m_grid->setHorizontalSpacing(10);
     m_grid->setVerticalSpacing(10);
+    m_flow = new FlowLayout(nullptr, 10, 10);
+    m_outer->addLayout(m_grid);
+    m_outer->addLayout(m_flow);
 
     QVBoxLayout* body = nullptr;
 
@@ -157,21 +167,21 @@ LogbookStatsWidget::LogbookStatsWidget(QWidget* parent)
     m_logLines = valueLine(log);
     body->addWidget(m_logLines);
     body->addStretch(1);
-    m_grid->addWidget(log, 0, 0);
+    m_tiles << log;
 
     // 2 · Bands
     QWidget* bands = makeTile(QStringLiteral("Bands"), body);
     m_bandChart = new StatsBarChart(false, bands);
     body->addWidget(m_bandChart);
     body->addStretch(1);
-    m_grid->addWidget(bands, 0, 1);
+    m_tiles << bands;
 
     // 3 · Modes
     QWidget* modes = makeTile(QStringLiteral("Modes"), body);
     m_modeChart = new StatsBarChart(false, modes);
     body->addWidget(m_modeChart);
     body->addStretch(1);
-    m_grid->addWidget(modes, 0, 2);
+    m_tiles << modes;
 
     // 4 · Activity
     QWidget* activity = makeTile(QStringLiteral("Activity · 26 weeks"), body);
@@ -181,23 +191,23 @@ LogbookStatsWidget::LogbookStatsWidget(QWidget* parent)
     m_weeklyCaption = valueLine(activity);
     body->addWidget(m_weeklyCaption);
     body->addStretch(1);
-    m_grid->addWidget(activity, 1, 0);
+    m_tiles << activity;
 
     // 5 · Top countries
     QWidget* countries = makeTile(QStringLiteral("Top countries"), body);
     m_countries = valueLine(countries);
     body->addWidget(m_countries);
     body->addStretch(1);
-    m_grid->addWidget(countries, 1, 1);
+    m_tiles << countries;
 
     // 6 · Awards
     QWidget* awards = makeTile(QStringLiteral("Awards"), body);
     m_awards = valueLine(awards);
     body->addWidget(m_awards);
     body->addStretch(1);
-    m_grid->addWidget(awards, 1, 2);
+    m_tiles << awards;
 
-    for (int c = 0; c < 3; ++c) { m_grid->setColumnStretch(c, 1); }
+    placeTiles();
     rebuild();
 }
 
@@ -230,6 +240,34 @@ QLabel* LogbookStatsWidget::valueLine(QWidget* parent)
     l->setWordWrap(true);
     l->setTextInteractionFlags(Qt::TextSelectableByMouse);
     return l;
+}
+
+void LogbookStatsWidget::placeTiles()
+{
+    for (QWidget* w : m_tiles) {
+        m_grid->removeWidget(w);
+        m_flow->removeWidget(w);
+    }
+    if (m_singleRow) {
+        for (QWidget* w : m_tiles) {
+            // Was in der Zeile uebrig bleibt, teilen sich die Kacheln.
+            w->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+            m_flow->addWidget(w);
+        }
+    } else {
+        for (int i = 0; i < m_tiles.size(); ++i) {
+            m_tiles.at(i)->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
+            m_grid->addWidget(m_tiles.at(i), i / 3, i % 3);
+        }
+        for (int c = 0; c < 3; ++c) { m_grid->setColumnStretch(c, 1); }
+    }
+}
+
+void LogbookStatsWidget::setSingleRow(bool on)
+{
+    if (m_singleRow == on) { return; }
+    m_singleRow = on;
+    placeTiles();
 }
 
 void LogbookStatsWidget::setStats(const LogbookStats& stats)

@@ -201,14 +201,25 @@ private slots:
         w.reload();
         QCOMPARE(w.entryCountForTesting(), 3);
 
-        QPushButton* stats = button(w, QStringLiteral("Stats…"));
+        // Seit 2026-09-22 ist „Stats" ein Schalter fuer die Reihe unter
+        // der Tabelle; das eigene Fenster kommt ueber „↗" in der Reihe.
+        QPushButton* stats = button(w, QStringLiteral("Stats"));
         QVERIFY2(stats, "kein Stats-Knopf im Logbuchfenster");
-        stats->click();
+        stats->setChecked(true);
+        QVERIFY(w.statsRowForTest()->isVisibleTo(&w));
+        // Der ↗ der Reihe, nicht der der eingebetteten Karte.
+        QPushButton* popOut = button(*w.statsSectionForTest(), QStringLiteral("\u2197"));
+        QVERIFY2(popOut, "kein ↗ in der Kennzahlenreihe");
+        popOut->click();
 
-        LogbookStatsWidget* view = w.findChild<LogbookStatsWidget*>();
+        LogbookStatsWidget* view = nullptr;
+        for (LogbookStatsWidget* v : w.findChildren<LogbookStatsWidget*>()) {
+            if (v != w.statsRowForTest()) { view = v; }
+        }
         QVERIFY2(view, "die Kennzahlen-Ansicht ist nicht entstanden");
         QVERIFY(view->window()->isVisible());
         QCOMPARE(view->totalLabel()->text(), QStringLiteral("3"));
+        QCOMPARE(w.statsRowForTest()->totalLabel()->text(), QStringLiteral("3"));
         // Two DXCC numbers in the file, no cty.dat: two entities, one
         // confirmed (OE5SOS has no DXCC field and counts for none).
         QVERIFY(view->stats().dxccWorked == 1 || view->stats().dxccWorked == 2);

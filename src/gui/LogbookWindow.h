@@ -246,6 +246,16 @@ private:
     int sourceRow(int viewRow) const;
     // Source indices of every selected row, in display order.
     QList<int> selectedSourceRows() const;
+
+public:
+    /// Fuer Pruefstaende: die eingebettete Karte und die Kennzahlenreihe.
+    class QsoMapWindow* mapPanelForTest() const { return m_mapPanel; }
+    class LogbookStatsWidget* statsRowForTest() const { return m_statsRow; }
+    QWidget* statsSectionForTest() const { return m_statsSection; }
+    class QPushButton* mapToggleForTest() const { return m_mapToggle; }
+    class QPushButton* statsToggleForTest() const { return m_statsToggle; }
+
+private:
     bool saveAll();
 
     QString m_path;
@@ -303,6 +313,22 @@ private:
     class QDialog* m_statsDialog{nullptr};
     class LogbookStatsWidget* m_statsView{nullptr};
     void refreshStatsView();
+
+    // ── Eine Seite (2026-09-22) ──────────────────────────────────────
+    //
+    // Karte als Spalte zwischen Tabelle und Detailkarte, Kennzahlen als
+    // Reihe darunter — beides ein- und ausschaltbar, beides folgt dem
+    // Filter der Tabelle. Die Fenster („↗") bleiben daneben bestehen.
+    class QsoMapWindow*       m_mapPanel{nullptr};    // eingebettet, faul angelegt
+    class LogbookStatsWidget* m_statsRow{nullptr};
+    QWidget*                  m_statsSection{nullptr};
+    class QPushButton*        m_mapToggle{nullptr};
+    class QPushButton*        m_statsToggle{nullptr};
+    void setMapPanelShown(bool on);
+    void setStatsRowShown(bool on);
+    void refreshMapPanel();
+    void syncMapPanelSelection();
+    void prepareMap(QsoMapWindow* map);
     PositionFallback m_fallback;
 
     // Outstanding uploads for the current batch, so the summary can be

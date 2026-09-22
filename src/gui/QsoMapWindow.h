@@ -120,6 +120,8 @@ public:
     /// Der geteilte Kachelspeicher, fuer Tests und Einstellungen.
     GibsTileLayer* imagery() const { return m_tiles; }
     FlatMapWidget* flatMapForTest() const { return m_flat; }
+    /// Wie viele Kontakte die Karte beim letzten Aufbau gezeichnet hat.
+    int shownCountForTest() const { return m_lastShown.size(); }
     /// Ein Rufzeichen so behandeln, als waere es im Feld eingegeben.
     void lookupAndFly(const QString& call);
 
@@ -128,6 +130,18 @@ public:
     /// Der Dienst gehoert dem Hauptfenster.
     void setSatellites(class SatelliteService* svc);
     void refreshSatellites();
+
+    // ── Eingebettet im Logbuchfenster ────────────────────────────────
+    //
+    // Als Spalte neben der Logtabelle statt als eigenes Fenster: kein
+    // Datumsbereich und keine Schnellwahl (die Tabelle filtert, die
+    // Karte zeigt, was die Tabelle zeigt), Escape schliesst nichts, und
+    // ein Knopf „↗" bittet um das grosse Fenster. Vor show() rufen.
+    void setEmbedded(bool on);
+    bool isEmbedded() const { return m_embedded; }
+
+signals:
+    void popOutRequested();
 
 protected:
     void closeEvent(QCloseEvent*) override;
@@ -208,6 +222,11 @@ private:
     // while only the selection is shown — a live date field that
     // changes nothing is worse than a disabled one.
     QVector<QWidget*> m_rangeControls;
+    QWidget*          m_rangeBox{nullptr};
+    QWidget*          m_backgroundBox{nullptr};   // KARTE + Auswahl
+    QPushButton*      m_earthBtn{nullptr};
+    QPushButton*      m_popOutBtn{nullptr};
+    bool              m_embedded{false};
 };
 
 } // namespace Longpath
