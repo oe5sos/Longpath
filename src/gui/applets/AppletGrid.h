@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/gui/applets/AppletGrid.h  (NereusSDR)
+// src/gui/applets/AppletGrid.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // ── Schritt 1 des freien Rasters ─────────────────────────────────────
 //
@@ -41,7 +41,7 @@
 // und die Spannweiten in GridCell —, aber niemand ruft sie.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-18 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

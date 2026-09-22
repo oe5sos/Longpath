@@ -1,6 +1,6 @@
-// tests/tst_antenna_window_multiband.cpp  (NereusSDR)
+// tests/tst_antenna_window_multiband.cpp  (Longpath)
 //
-// NereusSDR-original. No Thetis port.
+// Longpath-original. No Thetis port.
 //
 // ── Four tiles describing one of nine bands ──────────────────────────
 //

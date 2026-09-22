@@ -3,7 +3,7 @@
 // Phase 3I Task 21 — data-driven test asserting that each HPSDRHW board type
 // shows the correct set of tabs in HardwarePage.
 //
-// no-port-check: test fixture exercises NereusSDR HardwarePage; cite
+// no-port-check: test fixture exercises Longpath HardwarePage; cite
 // comments to mi0bot setup.cs:20232 are documentary only — the ported
 // logic itself lives in HardwarePage.cpp where the attribution header
 // + PROVENANCE row already cover it.

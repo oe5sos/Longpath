@@ -1,8 +1,8 @@
 // =================================================================
-// src/gui/widgets/TxBoundConfirmDialog.h  (NereusSDR)
+// src/gui/widgets/TxBoundConfirmDialog.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original; no upstream port. Modal dialog shown when
+// Longpath-original; no upstream port. Modal dialog shown when
 // adding a new slice would require re-routing the TX-bound slice's
 // chain to a different antenna (Phase 3F multi-pan UI). See Phase 3F
 // design doc section 5 (antenna conflict policy) and
@@ -15,12 +15,12 @@
 // Sub-Epic E Tasks 8-13.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-27 Created in C++20/Qt6 for NereusSDR by J.J. Boyd (KG4VCF),
 //              with AI-assisted transformation via Anthropic Claude Code.
 // =================================================================
 //
-// no-port-check: NereusSDR-original
+// no-port-check: Longpath-original
 
 #pragma once
 

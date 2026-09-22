@@ -198,7 +198,7 @@ void TestBandPlanGuard::europe40m_outOfBand_returnsFalse()
 //
 // Thetis carries { 5'100'000, 5'500'000 } for Europe — four hundred
 // kilohertz. The WRC-15 Region 1 allocation is 5351.5 to 5366.5 kHz,
-// secondary, fifteen kilohertz, and NereusSDR's own AmateurBands table
+// secondary, fifteen kilohertz, and Longpath's own AmateurBands table
 // has always said exactly that.
 //
 // The two disagreed by a factor of twenty-seven and the permissive one

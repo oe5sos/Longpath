@@ -1,12 +1,12 @@
 // =================================================================
-// tests/tst_step_attenuator_controller.cpp  (NereusSDR)
+// tests/tst_step_attenuator_controller.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/console.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -394,7 +394,7 @@ private slots:
     // Issue #259 regression: enable + value persistence round-trip.
     //
     // Bug surface: user opens Setup → General → Options, sets RX1 Enable
-    // and RX2 Enable to 5 dB, closes Nereus, reopens — both controls
+    // and RX2 Enable to 5 dB, closes Longpath, reopens — both controls
     // revert to unchecked / 0 dB.
     //
     // The fix has two halves; this test covers half-A (controller

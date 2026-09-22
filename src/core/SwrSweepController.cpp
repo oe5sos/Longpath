@@ -7,14 +7,14 @@
 // Lizenzblock und eine PROVENANCE-Zeile. Die zwei Thetis-Erwaehnungen
 // weiter unten sind Prosa UEBER die Bandtabelle des BandPlanGuard,
 // keine Uebernahme.
-// src/core/SwrSweepController.cpp  (NereusSDR)
+// src/core/SwrSweepController.cpp  (Longpath)
 // =================================================================
 //
 // See SwrSweepController.h and the design doc
 // docs/architecture/2026-08-13-swr-sweep-analyzer-design.md.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-13 — Created by Ralph Martin Fischer (OE5SOS),
 //                 AI-assisted implementation via Anthropic Claude
 //                 (Cowork).

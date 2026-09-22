@@ -1,5 +1,5 @@
 // no-port-check: unit tests for Task 2.8 WaterfallDefaultsPage changes.
-// NereusSDR-original — no Thetis upstream.
+// Longpath-original — no Thetis upstream.
 //
 // Tests verify:
 //   1. setWaterfallNFAGCEnabled() / waterfallNFAGCEnabled() round-trip.

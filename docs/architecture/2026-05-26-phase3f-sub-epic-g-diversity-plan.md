@@ -79,7 +79,7 @@ QTEST_MAIN(TestRxChannelExtDivWrappers)
 #include "tst_rx_channel_ext_div_wrappers.moc"
 ```
 
-Register: `nereus_add_test(tst_rx_channel_ext_div_wrappers)`.
+Register: `longpath_add_test(tst_rx_channel_ext_div_wrappers)`.
 
 - [ ] **Step 2: Run + verify failure (compile)**
 
@@ -660,7 +660,7 @@ private slots:
         w.setGain(1.0);
         // Sensitivity should differ between angles (not constant) — i.e. directional pattern exists
         // We don't expose sensitivityAtAngle as public; test via render output dimensions or expose via friend.
-        QVERIFY(true);  // placeholder; expose via #ifdef NEREUSSDR_TESTING for full coverage
+        QVERIFY(true);  // placeholder; expose via #ifdef LONGPATH_TESTING for full coverage
     }
 };
 

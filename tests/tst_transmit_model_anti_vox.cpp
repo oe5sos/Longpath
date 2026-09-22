@@ -1,8 +1,8 @@
-// no-port-check: NereusSDR-original unit-test file.  The Thetis references
+// no-port-check: Longpath-original unit-test file.  The Thetis references
 // below are cite comments documenting which upstream lines each assertion
 // verifies; no Thetis logic is ported in this test file.
 // =================================================================
-// tests/tst_transmit_model_anti_vox.cpp  (NereusSDR)
+// tests/tst_transmit_model_anti_vox.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for TransmitModel anti-VOX properties:
@@ -13,13 +13,13 @@
 // 3M-3a-iv post-bench refactor (Option A): the antiVoxSourceVax property
 // and its tests have been removed.  Thetis chkAntiVoxSource (RX vs VAC
 // at audio.cs:446-454 / setup.designer.cs:44646-44657 [v2.10.3.13]) does
-// not map to NereusSDR's architecture; see the architectural-divergence
+// not map to Longpath's architecture; see the architectural-divergence
 // section in docs/architecture/phase3m-3a-iv-antivox-feed-design.md §18.
 //
 // Source references (cited for traceability; logic ported in TransmitModel.cpp):
 //   setup.designer.cs:44699-44728 [v2.10.3.13]  — udAntiVoxGain:
 //     Minimum = -60, Maximum = 60 (decoded from C# decimal int[4] format;
-//     DecimalPlaces=1 so the display unit is dB×0.1; NereusSDR stores as int dB).
+//     DecimalPlaces=1 so the display unit is dB×0.1; Longpath stores as int dB).
 //   setup.designer.cs:44661-44688 [v2.10.3.13]  — udAntiVoxTau:
 //     Minimum = 1, Maximum = 500, Increment = 1, Value = 20.
 //   setup.cs:18986-18989 [v2.10.3.13]  — udAntiVoxGain_ValueChanged:
@@ -41,10 +41,10 @@ private slots:
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
     void default_antiVoxGainDb_isZero() {
-        // NereusSDR-original default 0 dB (plan §C.4 — safe sane default).
+        // Longpath-original default 0 dB (plan §C.4 — safe sane default).
         // Thetis udAntiVoxGain designer default is 1.0 dB
         // (setup.designer.cs:44723-44727 [v2.10.3.13]: Value = {10,0,0,0}
-        // with DecimalPlaces=1 → 1.0 dB display), but NereusSDR uses 0 dB
+        // with DecimalPlaces=1 → 1.0 dB display), but Longpath uses 0 dB
         // as a conservative starting point.
         TransmitModel t;
         QCOMPARE(t.antiVoxGainDb(), 0);
@@ -169,7 +169,7 @@ private slots:
         // Exact values from setup.designer.cs:44708-44717 [v2.10.3.13]:
         //   udAntiVoxGain.Maximum decoded from decimal{60,0,0,0}  = 60
         //   udAntiVoxGain.Minimum decoded from decimal{60,0,0,-2147483648} = -60
-        // (DecimalPlaces=1, so display unit is ×0.1 dB; NereusSDR stores as int dB
+        // (DecimalPlaces=1, so display unit is ×0.1 dB; Longpath stores as int dB
         //  matching the WDSP SetAntiVOXGain power-of-10 formula in setup.cs:18989.)
         QCOMPARE(TransmitModel::kAntiVoxGainDbMin, -60);
         QCOMPARE(TransmitModel::kAntiVoxGainDbMax,  60);

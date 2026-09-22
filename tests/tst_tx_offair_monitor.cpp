@@ -7,7 +7,7 @@
 // functions in the header and this file checks the truth table rather
 // than the wiring: a test that needed a radio, WDSP and an audio device
 // would not run, and a guarantee nobody checks is not a guarantee.
-// no-port-check: NereusSDR-original.
+// no-port-check: Longpath-original.
 
 #include <QtTest/QtTest>
 

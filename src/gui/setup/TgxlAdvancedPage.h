@@ -1,8 +1,8 @@
 // =================================================================
-// src/gui/setup/TgxlAdvancedPage.h  (NereusSDR)
+// src/gui/setup/TgxlAdvancedPage.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-native Setup -> Network -> TGXL Advanced page.
+// Longpath-native Setup -> Network -> TGXL Advanced page.
 // Six-section scrolling page for Tuner Genius XL device management:
 //   5.7.1 Identity & Status
 //   5.7.2 Antenna Labels (TGXL-specific; no PGXL equivalent)

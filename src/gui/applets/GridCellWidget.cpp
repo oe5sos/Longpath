@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/applets/GridCellWidget.cpp  (NereusSDR)
+// src/gui/applets/GridCellWidget.cpp  (Longpath)
 // =================================================================
 // Siehe GridCellWidget.h — Kopfleiste plus N Inhalte.
 //
@@ -31,6 +31,18 @@ GridCellWidget::GridCellWidget(const QString& id, QWidget* parent)
     root->setContentsMargins(0, 0, 0, 0);
     root->setSpacing(0);
 
+    // Glas & Tiefe (2026-09-17): die Zelle ist eine Platte — Verlauf
+    // von oben hell nach unten dunkel, feiner Rahmen — auf dem
+    // dunkleren Grund der Spalte. Dieselbe Platte wie das schwebende
+    // Fenster (AppletFloatingWindow); die Applets darin sind
+    // durchsichtig.
+    setObjectName(QStringLiteral("gridCell"));
+    setAttribute(Qt::WA_StyledBackground, true);
+    setStyleSheet(QStringLiteral(
+        "QWidget#gridCell { background: %1; border: 1px solid %2; }")
+            .arg(Style::glassPanelFill(),
+                 QString::fromLatin1(Style::kBorderSubtle)));
+
     m_titleBar = new QWidget(this);
     m_titleBar->setStyleSheet(Style::titleBarStyle());
 
@@ -57,10 +69,14 @@ GridCellWidget::GridCellWidget(const QString& id, QWidget* parent)
     m_titleLayout->addWidget(grip);
 
     m_titleLabel = new QLabel(m_titleBar);
+    // Versal mit weiter Laufweite (Hausstil Regel 3, umgesetzt mit der
+    // Richtung "Glas & Tiefe" am 2026-09-17). Die Groesse kommt aus
+    // capsFont, nicht aus dem Stylesheet — dort gewinnt sie sonst
+    // gegen jedes setFont darunter (HAUSSTIL.md, die Falle).
+    m_titleLabel->setFont(Style::capsFont(m_titleBar->font(), Style::kFontCaption));
     m_titleLabel->setStyleSheet(QStringLiteral(
-        "QLabel { color: %1; font-size: 11px; font-weight: bold;"
-        " background: transparent; }"
-    ).arg(Style::kTitleText));
+        "QLabel { color: %1; background: transparent; }"
+    ).arg(Style::kLabelMid));
     m_titleLayout->addWidget(m_titleLabel);
 
     // ── Die Knoepfe DICHT beim Titel, nicht am Rand ──────────────────
@@ -113,10 +129,11 @@ void GridCellWidget::buildCellButtons()
         "QPushButton { background: transparent; border: none;"
         "  color: %1; font-size: 11px; padding: 0; }"
         "QPushButton:hover { background: %2; color: %3;"
-        "  border-radius: 3px; }")
+        "  border-radius: %4px; }")
         .arg(QString::fromLatin1(Style::kTextScale),
              QString::fromLatin1(Style::kButtonHover),
-             QString::fromLatin1(Style::kTextPrimary));
+             QString::fromLatin1(Style::kTextPrimary))
+        .arg(Style::kGlassChipRadius);   // nie Radius 3 (Hausstil)
 
     auto* detach = new QPushButton(QStringLiteral("\u2197"), m_titleBar);
     detach->setFixedSize(16, 14);

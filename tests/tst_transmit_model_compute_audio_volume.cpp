@@ -1,8 +1,8 @@
-// no-port-check: NereusSDR-original unit-test file.  The "console.cs"
+// no-port-check: Longpath-original unit-test file.  The "console.cs"
 // references below are cite comments documenting which Thetis lines each
 // assertion verifies; no Thetis logic is ported in this test file.
 // =================================================================
-// tests/tst_transmit_model_compute_audio_volume.cpp  (NereusSDR)
+// tests/tst_transmit_model_compute_audio_volume.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for TransmitModel::computeAudioVolume (Phase 3 Agent 3B
@@ -14,7 +14,7 @@
 //   - sliderWatts == 0 short-circuit returns 0.0 exactly.
 //   - HL2 sentinel (gbb >= 99.5): linear fallback at 80m (gbb=100), and
 //     the dBm math at 6m (gbb=38.8 — clamps to 1.0 at 100W).
-//   - NereusSDR Bypass profile (all-100.0f sentinel) hits the same
+//   - Longpath Bypass profile (all-100.0f sentinel) hits the same
 //     linear fallback as the HL2 short-circuit.
 //   - Safety ceiling matrix (CRITICAL): every (HPSDRModel, Band) at the
 //     radio's spec'd max watts produces audio_volume <= 1.0 (no
@@ -147,7 +147,7 @@ private slots:
     //   audio_volume = 0.211099 / 0.8                       = 0.263874
     //
     // K2GX field report scenario.  This regression test is ship-blocking —
-    // a NereusSDR build without per-band PA-gain compensation produces
+    // a Longpath build without per-band PA-gain compensation produces
     // audio_volume = 1.0 (full rail) at slider 100 W on this band, which
     // is what made the ANAN-8000DLE deliver >300 W instead of 200 W when
     // K2GX engaged TUNE.
@@ -194,7 +194,7 @@ private slots:
     // §3  gbb=100 sentinel — Thetis "no output power" path
     // =========================================================================
     //
-    // Issue #202 deep-fix: removed a NereusSDR-original `gbb >= 99.5`
+    // Issue #202 deep-fix: removed a Longpath-original `gbb >= 99.5`
     // linear-identity short-circuit.  Thetis (clsHardwareSpecific.cs:463-
     // 466 [v2.10.3.13]) initialises the gain array to 100.0f with the
     // explicit comment: "100 is no output power".  With the short-circuit
@@ -267,7 +267,7 @@ private slots:
     }
 
     // =========================================================================
-    // §5  NereusSDR Bypass profile — Thetis-faithful Hermes 41.x dB row
+    // §5  Longpath Bypass profile — Thetis-faithful Hermes 41.x dB row
     // =========================================================================
     //
     // Issue #202 deep-fix: bypassPaGainsForBand now returns the Hermes 41.x

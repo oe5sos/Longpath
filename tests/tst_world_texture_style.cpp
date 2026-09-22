@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_world_texture_style.cpp  (NereusSDR)
+// tests/tst_world_texture_style.cpp  (Longpath)
 // =================================================================
 //
 // Drei Tonwertkurven fuer ein geladenes Weltbild (WorldTexture.h) --
@@ -8,12 +8,12 @@
 // nicht am echten NASA-Foto.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-09-02 — Original fuer NereusSDR/Longpath von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
 // =================================================================
 
-// no-port-check: NereusSDR-original test file.
+// no-port-check: Longpath-original test file.
 
 #include <QtTest>
 #include <QTemporaryDir>

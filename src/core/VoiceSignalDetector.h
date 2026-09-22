@@ -1,7 +1,7 @@
 #pragma once
 
 // =================================================================
-// src/core/VoiceSignalDetector.h  (NereusSDR)
+// src/core/VoiceSignalDetector.h  (Longpath)
 // =================================================================
 //
 // Ported from AetherSDR (https://github.com/aethersdr/AetherSDR),
@@ -32,10 +32,10 @@
 // die auch beim Vorbild nichts tut, waere Aufwand ohne Wirkung.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-19 — Ported to NereusSDR by Martin Fischer, AI-assisted via
 //                 Anthropic Claude (Cowork). Namespace AetherSDR →
-//                 NereusSDR; LogManager.h → core/LogCategories.h.
+//                 Longpath; LogManager.h → core/LogCategories.h.
 //                 Erkennungslogik, Konstanten und Kommentare unveraendert.
 // =================================================================
 
@@ -86,7 +86,7 @@ QVector<DetectedVoiceSignal> detectVoiceSignals(
 // Format a peak-dBm value as an S-meter label, rounded UP to the next unit.
 // Scale: S9 = -73 dBm, 6 dB/S-unit.  Examples: -85 → "S8", -63 → "S9+10".
 //
-// NereusSDR-Notiz zum Beispiel in der Zeile darueber: „-85 → S8" ist
+// Longpath-Notiz zum Beispiel in der Zeile darueber: „-85 → S8" ist
 // FALSCH, und zwar schon im Vorbild. Auf der genannten Skala liegt S8
 // bei -79 dBm und S7 bei -85; der Code liefert richtig S7, nur sein
 // eigenes Beispiel widerspricht ihm. Der Kommentar bleibt wortgleich

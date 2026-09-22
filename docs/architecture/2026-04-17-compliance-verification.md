@@ -103,8 +103,8 @@ Exit 0. All 171 tracked derived files carry a conforming Thetis header block.
 No tests were found!!!
 ```
 
-Note: the test suite is opt-in via `-DNEREUS_BUILD_TESTS=ON` (CMakeLists.txt line:
-`option(NEREUS_BUILD_TESTS "Build NereusSDR test suite" OFF)`). Tests were not built in this
+Note: the test suite is opt-in via `-DLONGPATH_BUILD_TESTS=ON` (CMakeLists.txt line:
+`option(LONGPATH_BUILD_TESTS "Build NereusSDR test suite" OFF)`). Tests were not built in this
 compliance-only verification pass. This matches the configuration used on the source branch;
 no regressions are introduced. The three pre-existing failing tests referenced in the task
 spec (`tst_container_persistence`, `tst_p1_loopback_connection`,

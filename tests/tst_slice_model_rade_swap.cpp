@@ -1,7 +1,7 @@
-// no-port-check: NereusSDR-original unit-test file.  RADE channel-swap
-// is a NereusSDR-native extension; no Thetis equivalent.
+// no-port-check: Longpath-original unit-test file.  RADE channel-swap
+// is a Longpath-native extension; no Thetis equivalent.
 // =================================================================
-// tests/tst_slice_model_rade_swap.cpp  (NereusSDR)
+// tests/tst_slice_model_rade_swap.cpp  (Longpath)
 // =================================================================
 //
 // Phase 3R Task J3 + K-bench unit tests: SliceModel::setDspMode
@@ -43,7 +43,7 @@
 //   2. Creates a fresh RadeChannel with the new sideband flag.
 //
 // The tests below reach the WdspEngine via the friend-access trick
-// (NEREUS_BUILD_TESTS) to set m_initialized = true synchronously so
+// (LONGPATH_BUILD_TESTS) to set m_initialized = true synchronously so
 // createRxChannel does not error out on its !m_initialized guard.
 // createRadeChannel does NOT require m_initialized (it is pure C++
 // object management, no WDSP-side state).
@@ -60,7 +60,7 @@
 //   9. wdspModeForMapsRadeToSsb
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-11 - New test file for Phase 3R Task J3.  J.J. Boyd
 //                 (KG4VCF), with AI-assisted implementation via
 //                 Anthropic Claude Code.
@@ -107,7 +107,7 @@ class TestSliceModelRadeSwap : public QObject {
         RadioFixture()
         {
             engine = radio.wdspEngine();
-            engine->m_initialized = true;  // friend access (NEREUS_BUILD_TESTS)
+            engine->m_initialized = true;  // friend access (LONGPATH_BUILD_TESTS)
 
             // Seed slice 0 with a default RxChannel so the K-bench
             // contract has a channel to keep alive across mode swaps.

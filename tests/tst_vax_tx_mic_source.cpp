@@ -1,8 +1,8 @@
 // =================================================================
-// tests/tst_vax_tx_mic_source.cpp  (NereusSDR)
+// tests/tst_vax_tx_mic_source.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original test file. Mirrors tst_pc_mic_source.cpp.
+// Longpath-original test file. Mirrors tst_pc_mic_source.cpp.
 //
 // Exercises VaxTxMicSource — the TxMicRouter implementation that
 // taps AudioEngine::pullVaxTxMic. Verifies the dispatch shim
@@ -11,7 +11,7 @@
 // the expected average of L and R channels.
 //
 // Strategy: inject a FakeAudioBus into AudioEngine's VAX-TX slot via
-// the NEREUS_BUILD_TESTS seam setVaxTxBusForTest, then drive
+// the LONGPATH_BUILD_TESTS seam setVaxTxBusForTest, then drive
 // VaxTxMicSource::pullSamples through AudioEngine::pullVaxTxMic and
 // confirm the mono float results.
 //
@@ -20,14 +20,14 @@
 // format throughout, matching the producer side.
 // =================================================================
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-06 — Original test for NereusSDR by J.J. Boyd (KG4VCF),
 //                 VAX TX → mic-source wiring, with AI-assisted
 //                 implementation via Anthropic Claude Code
 //                 (eager-borg-d64bed).
 // =================================================================
 
-// no-port-check: NereusSDR-original test file.
+// no-port-check: Longpath-original test file.
 
 #include <QtTest/QtTest>
 

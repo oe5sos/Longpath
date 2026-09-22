@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/gui/instruments/PeakHold.h  (NereusSDR)
+// src/gui/instruments/PeakHold.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // ── Die Spitze der letzten Sekunden ──────────────────────────────────
 //
@@ -29,7 +29,7 @@
 // verwirrender als eines.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-18 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

@@ -1,11 +1,11 @@
 // =================================================================
-// src/core/audio/RecordingScheduler.cpp  (NereusSDR)
+// src/core/audio/RecordingScheduler.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. Begruendung steht im Header.
+// Longpath-original. Begruendung steht im Header.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-26 — Original for NereusSDR/Longpath by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

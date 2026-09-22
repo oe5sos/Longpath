@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_tx_applet_power_scale.cpp  (NereusSDR)
+// tests/tst_tx_applet_power_scale.cpp  (Longpath)
 // =================================================================
 //
 // Die Leistungsanzeige, wenn ein aeusserer Verstaerker arbeitet.
@@ -26,7 +26,7 @@
 //      falsche Antwort.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-18 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

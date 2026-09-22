@@ -1,8 +1,8 @@
 // =================================================================
-// src/gui/setup/TxProfileSetupPage.cpp  (NereusSDR)
+// src/gui/setup/TxProfileSetupPage.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original Setup → Audio → TX Profile editor page.
+// Longpath-original Setup → Audio → TX Profile editor page.
 // See TxProfileSetupPage.h for the full header + Thetis-semantics cites.
 //
 // Phase 3M-1c chunk J.3 + J.4.
@@ -10,14 +10,14 @@
 // Written by J.J. Boyd (KG4VCF), AI-assisted via Anthropic Claude Code.
 // =================================================================
 
-// no-port-check: NereusSDR-original file; Thetis-derived semantics are
+// no-port-check: Longpath-original file; Thetis-derived semantics are
 // cited inline in the header.
 
 #include "TxProfileSetupPage.h"
 
 #include "core/MicProfileManager.h"
-#include "gui/StyleConstants.h"
 #include "models/RadioModel.h"
+#include "gui/StyleConstants.h"
 #include "models/TransmitModel.h"
 
 #include <QComboBox>

@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/safety/RegionSetting.cpp  (NereusSDR)
+// src/core/safety/RegionSetting.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -10,10 +10,10 @@
 // Reihenfolge aus comboFRSRegion.Items.AddRange
 // (setup.designer.cs:8132-8156 [@852bf0e]). Der Kopf gehoert deshalb
 // hierher und nicht nur an die Deklaration. Alles Uebrige ist
-// NereusSDR-original — siehe RegionSetting.h.
+// Longpath-original — siehe RegionSetting.h.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-14 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

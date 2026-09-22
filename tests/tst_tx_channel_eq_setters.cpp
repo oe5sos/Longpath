@@ -25,7 +25,7 @@ warren@wpratt.com
 */
 
 // =================================================================
-// tests/tst_tx_channel_eq_setters.cpp  (NereusSDR)
+// tests/tst_tx_channel_eq_setters.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for the 6 TX EQ wrappers added in Phase 3M-3a-i Task B-1:
@@ -47,14 +47,14 @@ warren@wpratt.com
 // stub path is exercised.  Either way the wrapper must complete without UB.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-29 — New test for Phase 3M-3a-i Task B-1: 7 TX EQ wrapper
 //                 setters (Run / Graph10 / Profile / Nc / Mp / Ctfmode /
 //                 Wintype). J.J. Boyd (KG4VCF), with AI-assisted
 //                 implementation via Anthropic Claude Code.
 // =================================================================
 
-// no-port-check: NereusSDR-original test file. All Thetis source cites are
+// no-port-check: Longpath-original test file. All Thetis source cites are
 // in TxChannel.h/cpp.
 
 #include <QtTest/QtTest>

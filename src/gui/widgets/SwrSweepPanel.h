@@ -1,8 +1,8 @@
 // =================================================================
-// src/gui/widgets/SwrSweepPanel.h  (NereusSDR)
+// src/gui/widgets/SwrSweepPanel.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. The "Sweep (Radio)" tab of the Antenna window:
+// Longpath-original. The "Sweep (Radio)" tab of the Antenna window:
 // band picker, Start/Stop, progress, the SWR chart, and the trace
 // list. Everything radio-shaped arrives through setBackend() — with
 // no backend the tab explains itself and stays inert, so the file
@@ -11,7 +11,7 @@
 // Design doc: docs/architecture/2026-08-13-swr-sweep-analyzer-design.md
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-13 — Created by Ralph Martin Fischer (OE5SOS),
 //                 AI-assisted implementation via Anthropic Claude
 //                 (Cowork).

@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/gui/instruments/NeedleInstrument.h  (NereusSDR)
+// src/gui/instruments/NeedleInstrument.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // ── Das Zeigerinstrument ─────────────────────────────────────────────
 //
@@ -38,7 +38,7 @@
 // nicht von zwei Absichten abhängt.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-17 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

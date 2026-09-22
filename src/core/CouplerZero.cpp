@@ -1,13 +1,13 @@
 // =================================================================
-// src/core/CouplerZero.cpp  (NereusSDR)
+// src/core/CouplerZero.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. See CouplerZero.h for why the zero is measured
+// Longpath-original. See CouplerZero.h for why the zero is measured
 // rather than tabled, and why it is a low percentile of a window
 // rather than a mean.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-14 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

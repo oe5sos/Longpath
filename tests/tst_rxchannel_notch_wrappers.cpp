@@ -1,7 +1,7 @@
 // =================================================================
-// tests/tst_rxchannel_notch_wrappers.cpp  (NereusSDR)
+// tests/tst_rxchannel_notch_wrappers.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure. Thetis and WDSP
+// no-port-check: Longpath-original test infrastructure. Thetis and WDSP
 // file names appear in comments to document what each wrapper forwards to;
 // no upstream logic is ported into this file.
 //
@@ -78,15 +78,15 @@ class TestRxChannelNotchWrappers : public QObject {
     Q_OBJECT
 
 private:
-    // Primes the engine past its async wisdom load (the NEREUS_BUILD_TESTS
+    // Primes the engine past its async wisdom load (the LONGPATH_BUILD_TESTS
     // friend seam on WdspEngine) and opens one real RX channel, so
     // rxa[kNotchTestChannel].ndb exists. Same pattern as
     // tests/tst_ps_feedback_channel.cpp:72,78.
     RxChannel* openNotchChannel(WdspEngine& engine)
     {
-        engine.m_initialized = true;   // friend access (NEREUS_BUILD_TESTS)
+        engine.m_initialized = true;   // friend access (LONGPATH_BUILD_TESTS)
         return engine.createRxChannel(kNotchTestChannel,
-                                      /*inputBufferSize*/ 238,
+                                      /*inputBufferSize*/ 64,   // teilt den WDSP-Ring, wie bufferSizeForRate(48000)
                                       /*dspBufferSize*/ kDspBufferSize,
                                       /*inputSampleRate*/ kDspSampleRateHz,
                                       /*dspSampleRate*/ kDspSampleRateHz,

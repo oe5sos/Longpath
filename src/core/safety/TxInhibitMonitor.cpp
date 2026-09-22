@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/safety/TxInhibitMonitor.cpp  (NereusSDR)
+// src/core/safety/TxInhibitMonitor.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis [v2.10.3.13 @501e3f5]:
@@ -10,7 +10,7 @@
 // CLAUDE.md "Byte-for-byte headers and multi-file attribution".
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-25 — Ported to C++20/Qt6 for NereusSDR by J.J. Boyd
 //                (KG4VCF), with AI-assisted transformation via
 //                Anthropic Claude Code.
@@ -167,7 +167,7 @@ void TxInhibitMonitor::recompute()
     // DONE_WITH_CONCERNS [anan-g2e F4]: Thetis console.cs:25859-25865 [v2.10.3.15]
     // adds ANAN_G2E to the group that reads bit[2] (getUserI02) in P1, alongside
     // ANAN7000D/8000D/REDPITAYA (G2E is //N1GP G2E added, REDPITAYA is //DH1KLM).
-    // G2E is distinct from G2/G2_1K which use bit[1]. NereusSDR's P1 connection
+    // G2E is distinct from G2/G2_1K which use bit[1]. Longpath's P1 connection
     // does not yet parse user I/O bits from the C1 status byte, so this whole
     // family distinction cannot be wired until P1RadioConnection gains user-IO
     // telemetry parsing. The m_userIoReader callback architecture is ready;

@@ -1,6 +1,6 @@
-# NereusSDR Applet Style Guide
+# Longpath Applet Style Guide
 
-Design language reference for all applet panels in NereusSDR. Every applet
+Design language reference for all applet panels in Longpath. Every applet
 should follow these conventions to maintain visual consistency across the UI.
 
 ---
@@ -160,7 +160,7 @@ All combo boxes **must** use the shared style from `src/gui/ComboStyle.h`:
 #include "ComboStyle.h"
 
 auto* combo = new QComboBox;
-NereusSDR::applyComboStyle(combo);
+Longpath::applyComboStyle(combo);
 ```
 
 ### HGauge (Horizontal Bar Gauge)

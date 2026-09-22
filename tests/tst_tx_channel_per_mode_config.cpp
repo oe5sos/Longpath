@@ -25,7 +25,7 @@ warren@wpratt.com
 */
 
 // =================================================================
-// tests/tst_tx_channel_per_mode_config.cpp  (NereusSDR)
+// tests/tst_tx_channel_per_mode_config.cpp  (Longpath)
 // =================================================================
 //
 // No Thetis code is directly ported in this test file. The test exercises:
@@ -43,7 +43,7 @@ warren@wpratt.com
 //      and other modes (AM/SAM/DSB/CWL/CWU/FM/DRM). The method is a thin
 //      dispatcher; mode-gating is BandPlanGuard's responsibility.
 //   2. setTxBandpass() does not throw for valid, negative-low, and
-//      zero-bandwidth ranges. WDSP does not pre-validate; NereusSDR
+//      zero-bandwidth ranges. WDSP does not pre-validate; Longpath
 //      does not add pre-validation either (Thetis doesn't).
 //   3. setSubAmMode() throws std::logic_error with a non-empty message
 //      for every sub-mode value (0, 1, 2) and out-of-range values (-1, 3).
@@ -55,14 +55,14 @@ warren@wpratt.com
 // crash.  setSubAmMode always throws regardless of HAVE_WDSP.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-27 — New test for Phase 3M-1b Task D.2: per-mode TXA config
 //                 setters (setTxMode / setTxBandpass / setSubAmMode).
 //                 J.J. Boyd (KG4VCF), with AI-assisted implementation via
 //                 Anthropic Claude Code.
 // =================================================================
 
-// no-port-check: NereusSDR-original test file. All Thetis source cites are
+// no-port-check: Longpath-original test file. All Thetis source cites are
 // in TxChannel.h/cpp.
 
 #include <QtTest/QtTest>
@@ -145,7 +145,7 @@ private slots:
     // ── setTxBandpass — valid ranges ─────────────────────────────────────────
     //
     // setTxBandpass() wraps SetTXABandpassFreqs(channelId, low, high).
-    // WDSP accepts any double pair without pre-validation; NereusSDR mirrors
+    // WDSP accepts any double pair without pre-validation; Longpath mirrors
     // this — no pre-validation added (matching Thetis SetTXFilter pattern at
     // radio.cs:2730-2780 [v2.10.3.13]).
     //
@@ -172,7 +172,7 @@ private slots:
     {
         TxChannel ch(kChannelId);
         // LSB IQ-space: low=-2850, high=-150
-        // WDSP does not pre-validate sign convention; NereusSDR doesn't either.
+        // WDSP does not pre-validate sign convention; Longpath doesn't either.
         ch.setTxBandpass(-2850, -150);
         QVERIFY(true);
     }
@@ -181,7 +181,7 @@ private slots:
     {
         TxChannel ch(kChannelId);
         // Degenerate case: zero-bandwidth filter.
-        // WDSP behaviour is undefined but NereusSDR must not crash or throw.
+        // WDSP behaviour is undefined but Longpath must not crash or throw.
         ch.setTxBandpass(0, 0);
         QVERIFY(true);
     }

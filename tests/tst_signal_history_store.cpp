@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_signal_history_store.cpp  (NereusSDR)
+// tests/tst_signal_history_store.cpp  (Longpath)
 // =================================================================
 //
 // Die Zeitverwaltung hinter dem „S-Verlauf".
@@ -14,12 +14,12 @@
 // sind zwei Minuten eine Zahl.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-19 — Original fuer NereusSDR von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
 // =================================================================
 
-// no-port-check: NereusSDR-original test file.
+// no-port-check: Longpath-original test file.
 
 #include <QtTest>
 

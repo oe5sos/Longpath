@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/gui/widgets/ProfileRail.h  (NereusSDR)
+// src/gui/widgets/ProfileRail.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // ── Die Schiene ──────────────────────────────────────────────────────
 //
@@ -38,7 +38,7 @@
 // umspringen lassen.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-15 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

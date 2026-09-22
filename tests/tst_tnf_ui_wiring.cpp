@@ -1,7 +1,7 @@
 // =================================================================
-// tests/tst_tnf_ui_wiring.cpp  (NereusSDR)
+// tests/tst_tnf_ui_wiring.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure. Nothing here is
+// no-port-check: Longpath-original test infrastructure. Nothing here is
 // a port; the surfaces under test are fixed by
 // docs/architecture/2026-07-28-tunable-notch-filter-design.md sections
 // 7.5, 9 (overlay stub retirement) and 10.2 (shortcut scope).

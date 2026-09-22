@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_signal_history_cost.cpp  (NereusSDR)
+// tests/tst_signal_history_cost.cpp  (Longpath)
 // =================================================================
 //
 // Was kostet der Signalerkenner?
@@ -23,12 +23,12 @@
 //    abgeschaltet und schuetzt dann nichts mehr.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-19 — Original fuer NereusSDR von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
 // =================================================================
 
-// no-port-check: NereusSDR-original test file.
+// no-port-check: Longpath-original test file.
 
 #include <QtTest>
 #include <QElapsedTimer>
@@ -89,7 +89,7 @@ private slots:
     // per Vorgabe stumm), die Messung bildet damit den Normalfall ab.
     void initTestCase()
     {
-        QLoggingCategory::setFilterRules(QStringLiteral("nereus.shistory=false"));
+        QLoggingCategory::setFilterRules(QStringLiteral("longpath.shistory=false"));
     }
 
     // Die eigentliche Messung. Der Wert wird ausgegeben, damit er im

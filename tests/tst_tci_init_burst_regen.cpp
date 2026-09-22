@@ -1,4 +1,4 @@
-// no-port-check: NereusSDR-original helper that prints the current
+// no-port-check: Longpath-original helper that prints the current
 // buildInitBurst() output to stdout, for one-shot regeneration of the
 // synthetic golden at tests/data/tci/init_burst_anan_g2_rx1.txt.
 //
@@ -9,7 +9,7 @@
 // and paste the dds:..ready; block back into the golden file (keep the
 // existing # header).
 //
-// Listed in CMakeLists with the same nereus_add_test macro so the file
+// Listed in CMakeLists with the same longpath_add_test macro so the file
 // participates in ctest, but the trivial assertion is intentional -- the
 // real verification lives in tst_tci_init_burst_golden and the new
 // tst_tci_init_burst_live_state.

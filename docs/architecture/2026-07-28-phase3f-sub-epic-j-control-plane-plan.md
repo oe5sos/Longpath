@@ -369,10 +369,10 @@ Add to `tests/CMakeLists.txt` beside the other Phase 3F registrations:
 ```cmake
 # Phase 3F Sub-Epic J Task 3: a control attached to no slice targets the
 # active slice. The DSP menu used to write rxChannel(0) unconditionally.
-nereus_add_test(tst_dsp_menu_active_slice)
+longpath_add_test(tst_dsp_menu_active_slice)
 ```
 
-Run: `cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DNEREUS_BUILD_TESTS=ON && cmake --build build --target tst_dsp_menu_active_slice -j8`
+Run: `cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DLONGPATH_BUILD_TESTS=ON && cmake --build build --target tst_dsp_menu_active_slice -j8`
 Expected: FAIL to compile, `anfEnabled` missing if Task 1 is not merged, or
 FAIL on the assertion if the active-slice accessor names differ.
 
@@ -1044,7 +1044,7 @@ since the cosine table is built for the default length."
 - Consumes: `MasterMixer::setSlewUpFrames(int)` from Task 8,
   `MasterMixer::{accumulate,tryDrain,setSliceStreaming,setSliceGain}`.
 - Produces: `AudioEngine::antiVoxMixForTest() -> MasterMixer&` under
-  `NEREUS_BUILD_TESTS`.
+  `LONGPATH_BUILD_TESTS`.
 
 This is the largest task. Read spec section J10 in full before starting.
 
@@ -1153,10 +1153,10 @@ Add to `tests/CMakeLists.txt`:
 ```cmake
 # Phase 3F Sub-Epic J Task 9: anti-VOX hears every slice, not just slice 0.
 # Membership mirrors the speakers mixer; TX monitor excluded; zero slew.
-nereus_add_test(tst_audio_engine_antivox_mix)
+longpath_add_test(tst_audio_engine_antivox_mix)
 ```
 
-Run: `cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DNEREUS_BUILD_TESTS=ON && cmake --build build --target tst_audio_engine_antivox_mix -j8`
+Run: `cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DLONGPATH_BUILD_TESTS=ON && cmake --build build --target tst_audio_engine_antivox_mix -j8`
 Expected: FAIL to compile, "no member named 'antiVoxMixForTest'"
 
 - [ ] **Step 3: Add the anti-VOX mixer instance**
@@ -1181,7 +1181,7 @@ In `AudioEngine.h`, beside `m_masterMix`:
 and the test seam beside `masterMixForTest()`:
 
 ```cpp
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     MasterMixer& antiVoxMixForTest() { return m_antiVoxMix; }
 #endif
 ```

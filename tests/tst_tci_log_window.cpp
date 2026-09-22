@@ -1,4 +1,4 @@
-// no-port-check: NereusSDR-original test for TciLogWindow append + filter.
+// no-port-check: Longpath-original test for TciLogWindow append + filter.
 //
 // Phase 3J-1 closeout Item 2 (2026-05-12) verification:
 //   - appendEntry adds to the log view

@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/spectrum/SpectrumDetector.cpp  (NereusSDR)
+// src/gui/spectrum/SpectrumDetector.cpp  (Longpath)
 // =================================================================
 //
 // Ported from WDSP source:
@@ -13,13 +13,13 @@
 // the only translation is C++ idiom (std::max, std::sqrt,
 // std::floor, namespace) and float instead of double for our
 // pipeline (precision differences negligible above the -200 dB
-// floor that NereusSDR clips at upstream of this function).
+// floor that Longpath clips at upstream of this function).
 //
 // Original WDSP source license preserved verbatim in the header
 // (SpectrumDetector.h).
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-05 — Created in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via
 //                 Anthropic Claude Code.

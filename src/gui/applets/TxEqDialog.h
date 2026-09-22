@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/applets/TxEqDialog.h  (NereusSDR)
+// src/gui/applets/TxEqDialog.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
@@ -10,7 +10,7 @@
 //
 //   Layout reference: eqform.cs lines 1021-1561 (grpTXEQ control
 //   list, slider/spinbox geometry).  TX-only — Thetis EQForm hosts
-//   both RX and TX EQ in one dialog; NereusSDR splits them and this
+//   both RX and TX EQ in one dialog; Longpath splits them and this
 //   file covers TX only.  RX EQ lives in the EqApplet widget.
 //
 //   Parametric panel reference: eqform.cs:235-2862 (control set in
@@ -19,7 +19,7 @@
 //   property block).
 //
 // Nc / Mp / Ctfmode / Wintype combos: Thetis exposes these via
-// hidden Setup pages, not EQForm.  NereusSDR surfaces them in this
+// hidden Setup pages, not EQForm.  Longpath surfaces them in this
 // dialog as a Thetis-userland-parity-with-our-spin (see
 // docs/architecture — "feedback_thetis_userland_parity") so power
 // users can reach the WDSP filter controls without leaving the EQ
@@ -27,7 +27,7 @@
 // nc=2048, mp=false, ctfmode=0, wintype=0.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-29 — Phase 3M-3a-i Batch 3 (Task A.1): created by
 //                 J.J. Boyd (KG4VCF), with AI-assisted transformation
 //                 via Anthropic Claude Code.  Modeless singleton

@@ -1,6 +1,6 @@
-// tests/tst_theme_qss.cpp  (NereusSDR)
+// tests/tst_theme_qss.cpp  (Longpath)
 //
-// NereusSDR-original. No Thetis port.
+// Longpath-original. No Thetis port.
 //
 // ── The palette cannot move until this is trustworthy ────────────────
 //

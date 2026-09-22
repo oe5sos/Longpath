@@ -1,11 +1,11 @@
 // =================================================================
-// src/core/audio/PipeWireThreadLoop.h  (NereusSDR)
+// src/core/audio/PipeWireThreadLoop.h  (Longpath)
 //   Copyright (C) 2026 J.J. Boyd (KG4VCF) — GPLv2-or-later.
 //   2026-04-23 — created. AI-assisted via Claude Code.
 // =================================================================
 #pragma once
 
-#ifdef NEREUS_HAVE_PIPEWIRE
+#ifdef LONGPATH_HAVE_PIPEWIRE
 
 #include <QString>
 #include <pipewire/pipewire.h>
@@ -42,4 +42,4 @@ private:
 
 }  // namespace Longpath
 
-#endif  // NEREUS_HAVE_PIPEWIRE
+#endif  // LONGPATH_HAVE_PIPEWIRE

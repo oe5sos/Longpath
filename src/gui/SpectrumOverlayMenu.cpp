@@ -21,7 +21,7 @@ void SpectrumOverlayMenu::buildUI()
     layout->setContentsMargins(10, 8, 10, 8);
     layout->setSpacing(4);
 
-    // Dark theme matching NereusSDR STYLEGUIDE
+    // Dark theme matching the STYLEGUIDE
     // QSS Type selectors match QMetaObject::className(), and Qt rewrites
     // namespace `::` as `--`. The bare `SpectrumOverlayMenu` selector
     // never matched `Longpath::SpectrumOverlayMenu`, so the popup
@@ -30,7 +30,7 @@ void SpectrumOverlayMenu::buildUI()
     // gets its dark surface back. Same trap applies to any future
     // top-level QWidget popup in this namespace.
     setStyleSheet(Style::themed(QStringLiteral(
-        "NereusSDR--SpectrumOverlayMenu {"
+        "Longpath--SpectrumOverlayMenu {"
         "  background: #1a2a3a;"
         "  border: 1px solid #205070;"
         "  border-radius: 6px;"
@@ -115,6 +115,26 @@ void SpectrumOverlayMenu::buildUI()
     connect(m_wfBlackSlider, &QSlider::valueChanged, this, [this](int v) {
         m_wfBlackLabel->setText(QString::number(v));
         emit wfBlackLevelChanged(v);
+    });
+
+    // Speed — Zeit je Zeile. Links langsam, rechts schnell, wie man einen
+    // Geschwindigkeitsregler liest; der Wert ist trotzdem die Periode,
+    // weil SpectrumWidget so rechnet.
+    auto* speedRow = new QHBoxLayout;
+    speedRow->addWidget(new QLabel(QStringLiteral("Speed"), this));
+    m_wfSpeedSlider = new QSlider(Qt::Horizontal, this);
+    m_wfSpeedSlider->setRange(10, 500);
+    m_wfSpeedSlider->setInvertedAppearance(true);
+    m_wfSpeedSlider->setToolTip(QStringLiteral(
+        "Waterfall scroll speed — left is slower (more milliseconds per line)"));
+    m_wfSpeedLabel = new QLabel(this);
+    speedRow->addWidget(m_wfSpeedSlider);
+    speedRow->addWidget(m_wfSpeedLabel);
+    layout->addLayout(speedRow);
+
+    connect(m_wfSpeedSlider, &QSlider::valueChanged, this, [this](int v) {
+        m_wfSpeedLabel->setText(QStringLiteral("%1 ms").arg(v));
+        emit wfUpdatePeriodChanged(v);
     });
 
     // --- Spectrum section ---
@@ -251,6 +271,15 @@ void SpectrumOverlayMenu::updateNotchAddLabel()
     }
     m_notchFreqLabel->setText(
         QStringLiteral("%1 MHz").arg(m_notchAddFreqHz / 1.0e6, 0, 'f', 6));
+}
+
+void SpectrumOverlayMenu::setWfUpdatePeriodMs(int ms)
+{
+    if (!m_wfSpeedSlider) { return; }
+    m_wfSpeedSlider->blockSignals(true);
+    m_wfSpeedSlider->setValue(qBound(10, ms, 500));
+    m_wfSpeedLabel->setText(QStringLiteral("%1 ms").arg(qBound(10, ms, 500)));
+    m_wfSpeedSlider->blockSignals(false);
 }
 
 void SpectrumOverlayMenu::setValues(int wfColorGain, int wfBlackLevel, bool autoBlack,

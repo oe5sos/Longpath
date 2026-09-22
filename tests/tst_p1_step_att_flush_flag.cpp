@@ -1,6 +1,6 @@
 // no-port-check: test-only — Thetis file names appear only in source-cite
 // comments that document which upstream line each assertion verifies.
-// No Thetis logic is ported here; this file is NereusSDR-original.
+// No Thetis logic is ported here; this file is Longpath-original.
 //
 // Bank-11 flush-flag parity tests for P1RadioConnection::setAttenuator() +
 // setPreamp() (v0.4.1 hotfix).
@@ -21,7 +21,7 @@
 // [v2.10.3.13] reads `prn->rx[0].preamp` and bank 12 reads
 // `prn->adc[0].rx_step_attn` on every round-robin visit; Thetis has no
 // flush-flag concept because its EP2 pacer rolls all banks on a fixed
-// 380.95 fps schedule.  NereusSDR's flush-flag is a low-latency
+// 380.95 fps schedule.  Longpath's flush-flag is a low-latency
 // optimisation for input-feel-sensitive setters.
 
 #include <QtTest/QtTest>

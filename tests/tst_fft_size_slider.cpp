@@ -2,7 +2,7 @@
 // source for line numbers and value mappings, no logic ported.
 //
 // =================================================================
-// tests/tst_fft_size_slider.cpp  (NereusSDR)
+// tests/tst_fft_size_slider.cpp  (Longpath)
 // =================================================================
 //
 // Phase 2-polish -- exercise FFT-size slider semantics end-to-end
@@ -28,7 +28,7 @@
 //   5. fftSizeOffsetDb default is 0.0 (slider position 0 idle state).
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-06 -- Created in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                  (KG4VCF), with AI-assisted transformation via
 //                  Anthropic Claude Code.

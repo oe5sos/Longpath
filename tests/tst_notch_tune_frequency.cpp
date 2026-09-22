@@ -1,7 +1,7 @@
 // =================================================================
-// tests/tst_notch_tune_frequency.cpp  (NereusSDR)
+// tests/tst_notch_tune_frequency.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure.
+// no-port-check: Longpath-original test infrastructure.
 //
 // Tunable Notch Filter, Task 1. Covers
 // docs/architecture/2026-07-28-tunable-notch-filter-design.md section 4:
@@ -24,7 +24,7 @@
 // RXANBPSetTuneFrequency dereferences rxa[channel].ndb.p before it compares
 // (third_party/wdsp/src/nbp.c:477-479), so the usual kTestChannel = 99
 // never-opened-channel hatch is an out-of-bounds read here, not a no-op.
-// Every slot uses a really opened channel through the NEREUS_BUILD_TESTS
+// Every slot uses a really opened channel through the LONGPATH_BUILD_TESTS
 // friend seam, the pattern at tests/tst_stream_pool_binding.cpp:1018,1033.
 // =================================================================
 #include <QtTest/QtTest>
@@ -70,7 +70,7 @@ private slots:
     void notch_tune_frequency_defaults_to_zero()
     {
         WdspEngine engine;
-        engine.m_initialized = true;   // friend access (NEREUS_BUILD_TESTS)
+        engine.m_initialized = true;   // friend access (LONGPATH_BUILD_TESTS)
         RxChannel* ch = engine.createRxChannel(0, bufferSizeForRate(kRateHz),
                                                4096, kRateHz, 48000, 48000);
         QVERIFY(ch != nullptr);
@@ -148,7 +148,7 @@ private slots:
     {
         RadioModel model;
         WdspEngine* engine = model.wdspEngine();
-        engine->m_initialized = true;   // friend access (NEREUS_BUILD_TESTS)
+        engine->m_initialized = true;   // friend access (LONGPATH_BUILD_TESTS)
 
         model.configureStreamPool(/*userDdcCount*/ 2, /*maxSlices*/ 2, kRateHz);
         // Pool BEFORE the slices. bindSliceToStream is the push site (4.2)
@@ -467,7 +467,7 @@ private slots:
     {
         RadioModel model;
         WdspEngine* engine = model.wdspEngine();
-        engine->m_initialized = true;   // friend access (NEREUS_BUILD_TESTS)
+        engine->m_initialized = true;   // friend access (LONGPATH_BUILD_TESTS)
 
         model.configureStreamPool(/*userDdcCount*/ 2, /*maxSlices*/ 2, kRateHz);
         model.openRxChannelPool(2, bufferSizeForRate(kRateHz), kRateHz);

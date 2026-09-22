@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/P1RadioConnection.cpp  (NereusSDR)
+// src/core/P1RadioConnection.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -13,7 +13,7 @@
 //   Project Files/Source/Console/HPSDR/IoBoardHl2.cs (mi0bot/OpenHPSDR-Thetis fork), original licence from upstream included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -255,7 +255,7 @@ mw0lge@grange-lane.co.uk
 //
 // (mi0bot HL2 fork's IOBoard logic; the C# class wraps closed-source
 // I2C register code in ChannelMaster.dll — only the public API surface
-// has been ported into NereusSDR's P1 path.)
+// has been ported into Longpath's P1 path.)
 
 // Migrated to VS2026 - 18/12/25 MW0LGE v2.10.3.12
 
@@ -652,7 +652,7 @@ void P1RadioConnection::init()
     connect(m_socket, &QUdpSocket::readyRead, this, &P1RadioConnection::onReadyRead);
 
     // Watchdog timer — polls every kWatchdogTickMs ms; started in connectToRadio.
-    // Source: NereusSDR design doc §3.6 — silence detection + reconnect state machine.
+    // Source: Longpath design doc §3.6 — silence detection + reconnect state machine.
     m_watchdogTimer = new QTimer(this);
     m_watchdogTimer->setInterval(kWatchdogTickMs);
     connect(m_watchdogTimer, &QTimer::timeout, this, &P1RadioConnection::onWatchdogTick);
@@ -666,7 +666,7 @@ void P1RadioConnection::init()
     connect(m_ep2PacerTimer, &QTimer::timeout, this, &P1RadioConnection::onEp2PacerTick);
 
     // Reconnect timer — single-shot; fires kReconnectIntervalMs after watchdog trips.
-    // Source: NereusSDR design doc §3.6 — 5-second reconnect interval, max 3 retries.
+    // Source: Longpath design doc §3.6 — 5-second reconnect interval, max 3 retries.
     m_reconnectTimer = new QTimer(this);
     m_reconnectTimer->setSingleShot(true);
     connect(m_reconnectTimer, &QTimer::timeout, this, &P1RadioConnection::onReconnectTimeout);
@@ -743,7 +743,7 @@ void P1RadioConnection::connectToRadio(const RadioInfo& info)
     }
 
     // Reset reconnect state — fresh connection resets the retry counter.
-    // Source: NereusSDR design doc §3.6 — explicit user reconnect clears attempts.
+    // Source: Longpath design doc §3.6 — explicit user reconnect clears attempts.
     m_reconnectAttempts = 0;
     m_lastEp6At = QDateTime();
     m_firstEp6Logged = false;
@@ -845,7 +845,7 @@ void P1RadioConnection::disconnect()
     }
 
     // Clear reconnect state on explicit disconnect.
-    // Source: NereusSDR design doc §3.6 — user reconnect resets the cycle.
+    // Source: Longpath design doc §3.6 — user reconnect resets the cycle.
     m_reconnectAttempts = 0;
     m_lastEp6At = QDateTime();
     m_reconnectedLogged = false;
@@ -1126,7 +1126,7 @@ void P1RadioConnection::decimateMicSamples(const float* in, int n, int factor,
 // [v2.10.3.14].
 //
 // Cite: networkproto1.c WriteMainLoop / MetisReadThreadMainLoop restart
-// pattern [v2.10.3.13] — see onReconnectTimeout for the NereusSDR
+// pattern [v2.10.3.13] — see onReconnectTimeout for the Longpath
 // adaptation of the same sequence.
 // ---------------------------------------------------------------------------
 void P1RadioConnection::restartStreamWithRate(int newSampleRate)
@@ -1468,7 +1468,7 @@ quint8 P1RadioConnection::effectiveAlexLpfBits() const
 // deskhpsdr reference (deskhpsdr/src/old_protocol.c:3811 [@120188f]):
 //   buffer[3] = command;  // no bit-7 OR -- watchdog always enabled (bit 7 = 0)
 //   deskhpsdr has no user-configurable watchdog disable; it never re-sends
-//   RUNSTOP on a watchdog toggle.  NereusSDR matches: state stored here,
+//   RUNSTOP on a watchdog toggle.  Longpath matches: state stored here,
 //   picked up on the next sendMetisStart() / sendMetisStop() call.
 // ---------------------------------------------------------------------------
 void P1RadioConnection::setWatchdogEnabled(bool enabled)
@@ -1794,7 +1794,7 @@ void P1RadioConnection::setLineIn(bool on)
 // setMicTipRing (3M-1b G.3)
 //
 // Selects mic-jack Tip/Ring polarity.
-// NereusSDR parameter convention: tipHot = true → Tip carries the mic signal.
+// Longpath parameter convention: tipHot = true → Tip carries the mic signal.
 //
 // POLARITY INVERSION AT THE WIRE LAYER:
 // Thetis field mic_trs and deskhpsdr field mic_ptt_tip_bias_ring both mean
@@ -2264,9 +2264,9 @@ void P1RadioConnection::setP1AdcCntrl(int bits)
 void P1RadioConnection::selectCodec()
 {
     m_codec.reset();
-    m_useLegacyCodec = (qEnvironmentVariableIntValue("NEREUS_USE_LEGACY_P1_CODEC") == 1);
+    m_useLegacyCodec = (qEnvironmentVariableIntValue("LONGPATH_USE_LEGACY_P1_CODEC") == 1);
     if (m_useLegacyCodec) {
-        qCInfo(lcConnection) << "P1: NEREUS_USE_LEGACY_P1_CODEC=1 — using pre-refactor compose path";
+        qCInfo(lcConnection) << "P1: LONGPATH_USE_LEGACY_P1_CODEC=1 — using pre-refactor compose path";
         return;
     }
     if (!m_caps) {
@@ -2633,7 +2633,7 @@ void P1RadioConnection::onReadyRead()
         // Source: networkproto1.c:319 [v2.10.3.13] — MetisReadThreadMainLoop receives 1032-byte frames
         if (data.size() == 1032) {
             // Update watchdog timestamp on every good ep6 arrival.
-            // Source: NereusSDR design doc §3.6 — successful data resets the retry counter.
+            // Source: Longpath design doc §3.6 — successful data resets the retry counter.
             m_lastEp6At = QDateTime::currentDateTimeUtc();
 
             // Cancel the connect watchdog — first good ep6 means we reached
@@ -2739,7 +2739,7 @@ void P1RadioConnection::onReadyRead()
 // transitions to LinkLost and arms the reconnect timer (Phase 3Q-1).
 // Applies to both Connected (initial silence detection) and Connecting
 // (reconnect attempt timed out — the retry got no response).
-// Source: NereusSDR design doc §3.6.
+// Source: Longpath design doc §3.6.
 // ---------------------------------------------------------------------------
 void P1RadioConnection::onWatchdogTick()
 {
@@ -2752,7 +2752,7 @@ void P1RadioConnection::onWatchdogTick()
     // kEp2PacerIntervalMs.
 
     // HL2 bandwidth monitor — check for LAN PHY throttle on every watchdog tick.
-    // Source: mi0bot bandwidth_monitor.{c,h} — NereusSDR sequence-gap adaptation.
+    // Source: mi0bot bandwidth_monitor.{c,h} — Longpath sequence-gap adaptation.
     if (m_caps && m_caps->hasBandwidthMonitor) {
         hl2CheckBandwidthMonitor();
     }
@@ -2798,7 +2798,7 @@ void P1RadioConnection::onWatchdogTick()
                            QStringLiteral("Radio stopped responding"));
 
         // Arm the reconnect timer for the next retry attempt (or first if from Connected).
-        // Source: NereusSDR design doc §3.6 — 5-second reconnect interval.
+        // Source: Longpath design doc §3.6 — 5-second reconnect interval.
         m_reconnectTimer->start(m_reconnectIntervalMs);
     }
 }
@@ -2853,7 +2853,7 @@ void P1RadioConnection::onEp2PacerTick()
 //
 // Called when the single-shot reconnect timer fires.
 // Implements bounded retries: up to kMaxReconnectAttempts, then stays in LinkLost.
-// Source: NereusSDR design doc §3.6.
+// Source: Longpath design doc §3.6.
 // ---------------------------------------------------------------------------
 void P1RadioConnection::onReconnectTimeout()
 {
@@ -3067,7 +3067,7 @@ void P1RadioConnection::sendMetisStop()
     //
     // deskhpsdr reference (deskhpsdr/src/old_protocol.c:3811 [@120188f]):
     //   buffer[3] = command;  // 0x00 stop -- bit 7 = 0 implicitly
-    //   deskhpsdr doesn't set bit 7 on stop either; NereusSDR emits it
+    //   deskhpsdr doesn't set bit 7 on stop either; Longpath emits it
     //   explicitly so the watchdog state is preserved if the radio re-reads
     //   the last RUNSTOP byte on reconnect.
     const quint8 watchdogBit = m_watchdogEnabled ? quint8(0x00) : quint8(0x80);
@@ -3090,7 +3090,7 @@ void P1RadioConnection::sendCommandFrame()
     // Phase 3P-D follow-up: drive the bank ceiling from the active codec's
     // maxBank() so HL2 (18) and AnvelinaPro3 (17) both emit their full bank
     // range. Standard = 16. The legacy compose path (m_codec == nullptr under
-    // NEREUS_USE_LEGACY_P1_CODEC=1) retains the pre-refactor model-keyed
+    // LONGPATH_USE_LEGACY_P1_CODEC=1) retains the pre-refactor model-keyed
     // constant to preserve the regression-freeze byte-identical guarantee.
     const int maxBank = m_codec
         ? m_codec->maxBank()
@@ -3330,7 +3330,7 @@ void P1RadioConnection::parseEp6Frame(const QByteArray& pkt)
         // Cases 0x00/0x20 carry ADC-overload bits (one per ADC); the
         // `//[2.10.3.13]MW0LGE only cleared by getAndResetADC_Overload(),
         // or'ed with existing state` inline attributions are preserved
-        // verbatim within each case body below.  In NereusSDR the SAC
+        // verbatim within each case body below.  In Longpath the SAC
         // hysteresis state machine (StepAttenuatorController) plays the
         // role of `getAndResetADC_Overload()` — it OR-accumulates every
         // adcOverflow() emission until its 100 ms tick consumes them.
@@ -3638,7 +3638,7 @@ void P1RadioConnection::composeCcForBankLegacy(int bankIdx, quint8 out[5]) const
         //       else
         //           ddc_freq = prn->rx[0].frequency;
         //
-        // NereusSDR mapping:
+        // Longpath mapping:
         //   nddc                    ≡  m_psNDdc (2 by default; 4 once HL2/Hermes
         //                              codec config arrives — disabling override
         //                              for those boards, correct per source).
@@ -3815,12 +3815,12 @@ void P1RadioConnection::composeCcForBankLegacy(int bankIdx, quint8 out[5]) const
 //
 // Phase 3P-A Task 12: delegates to per-board IP1Codec subclass chosen at
 // applyBoardQuirks() time. Falls back to legacy path when:
-//   - NEREUS_USE_LEGACY_P1_CODEC=1 env var is set, or
+//   - LONGPATH_USE_LEGACY_P1_CODEC=1 env var is set, or
 //   - m_codec is null (pre-connect).
 //
 // Regression-freeze gate (Task 16) proved codec and legacy agree byte-for-byte
 // on all non-HL2 boards. Dual-call diagnostic dropped. Legacy path still
-// reachable via NEREUS_USE_LEGACY_P1_CODEC=1 env var until Phase B merges.
+// reachable via LONGPATH_USE_LEGACY_P1_CODEC=1 env var until Phase B merges.
 // ---------------------------------------------------------------------------
 void P1RadioConnection::composeCcForBank(int bankIdx, quint8 out[5]) const
 {
@@ -3941,7 +3941,7 @@ void P1RadioConnection::hl2SendIoBoardInit()
         // Gate the step machine on (retAddr, retSubAddr) matching the
         // expected (deviceAddr, register) for the current step.  Without
         // this gate, unrelated I2C reads (e.g. from the new Hl2OptionsTab
-        // manual R/W tool, or NEREUS_HL2_I2C_SCAN traffic) would advance
+        // manual R/W tool, or LONGPATH_HL2_I2C_SCAN traffic) would advance
         // the probe out of order — false aborts or misleading "init
         // complete" before the intended registers were probed.  Codex P2
         // on PR #157.
@@ -3956,7 +3956,7 @@ void P1RadioConnection::hl2SendIoBoardInit()
     // because no read has fired yet — Idle ignores them.
     hl2ProbeAdvance(/*retAddr=*/0, /*retSubAddr=*/0);
 
-    if (qEnvironmentVariableIntValue("NEREUS_HL2_I2C_SCAN") != 0) {
+    if (qEnvironmentVariableIntValue("LONGPATH_HL2_I2C_SCAN") != 0) {
         requestI2cBusScan();
     }
 }
@@ -4103,7 +4103,7 @@ done:
 //   The original does NOT implement throttle detection; it is a byte-rate
 //   telemetry helper that callers compare against an expected rate.
 //
-// NereusSDR interpretation: use ep6 sequence-gap count as a throttle proxy.
+// Longpath interpretation: use ep6 sequence-gap count as a throttle proxy.
 //   m_epRecvSeqExpected is incremented by parseEp6Frame on every good frame;
 //   if the watchdog fires and m_epRecvSeqExpected has not advanced since the
 //   previous tick the HL2 LAN PHY may be throttling the ep6 stream.
@@ -4121,7 +4121,7 @@ void P1RadioConnection::hl2CheckBandwidthMonitor()
     // The monitor records ep6/ep2 bytes via recordEp6Bytes()/recordEp2Bytes()
     // in onReadyRead()/sendCommandFrame() respectively, then tick() here runs
     // the upstream compute_bps() algorithm (mi0bot bandwidth_monitor.c:86-113
-    // [@c26a8a4]) and the NereusSDR throttle-detection layer.
+    // [@c26a8a4]) and the Longpath throttle-detection layer.
     if (m_bwMonitor) {
         m_bwMonitor->tick();
         // Mirror throttle state into the legacy m_hl2Throttled flag so that
@@ -4146,9 +4146,9 @@ void P1RadioConnection::hl2CheckBandwidthMonitor()
 
     // Fallback: legacy sequence-gap heuristic used when m_bwMonitor is not wired
     // (non-HL2 board or test seam without RadioModel).
-    // Source: NereusSDR design — sequence-gap proxy for byte-rate throttle detect.
+    // Source: Longpath design — sequence-gap proxy for byte-rate throttle detect.
     // The upstream bandwidth_monitor.{c,h} (MW0LGE [@c26a8a4]) is a byte-rate
-    // telemetry helper; throttle detection is a NereusSDR addition.
+    // telemetry helper; throttle detection is a Longpath addition.
     static constexpr int kBwThrottleGapCount = 3;  // NereusSDR heuristic
     static quint32 s_lastSeq = 0;
 

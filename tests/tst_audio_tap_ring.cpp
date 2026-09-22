@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_audio_tap_ring.cpp  (NereusSDR)
+// tests/tst_audio_tap_ring.cpp  (Longpath)
 // =================================================================
 //
 // Der Zwischenspeicher zwischen Audio-Faden und Aufnahme.
@@ -20,12 +20,12 @@
 // sich nicht auf Bestellung), aber er faengt das grobe Versehen.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-19 — Original fuer NereusSDR von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
 // =================================================================
 
-// no-port-check: NereusSDR-original test file.
+// no-port-check: Longpath-original test file.
 
 #include <QtTest>
 #include <thread>

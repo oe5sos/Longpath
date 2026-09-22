@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - BandFilterProxy: QSortFilterProxyModel that hides spots
+// Longpath - BandFilterProxy: QSortFilterProxyModel that hides spots
 // whose band (as reported by SpotTableModel's ColBand DisplayRole) is in
 // the m_hiddenBands set. setBandVisible(band, visible) toggles set
 // membership and reinvalidates the filter. Empty / unknown band always
@@ -10,10 +10,10 @@
 // AetherSDR is (C) its contributors and is licensed GPL-3.0-or-later
 // (see https://github.com/ten9876/AetherSDR/blob/main/LICENSE).
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-11  J.J. Boyd / KG4VCF  Phase 3J-2 Task D2. Initial port.
 //                                    AetherSDR's "AetherSDR" namespace
-//                                    becomes "NereusSDR". Class lived
+//                                    becomes "Longpath". Class lived
 //                                    inline in AetherSDR's
 //                                    DxClusterDialog.h:62-75 (with
 //                                    setBandVisible / filterAcceptsRow
@@ -30,7 +30,7 @@
 //                                    always shows. AI tooling:
 //                                    Anthropic Claude Code.
 //   2026-05-11  J.J. Boyd / KG4VCF  Phase 3J-2 Task F3. Adds source
-//                                    filtering as a NereusSDR-native
+//                                    filtering as a Longpath-native
 //                                    extension (AetherSDR upstream
 //                                    proxies bands only). New public
 //                                    surface: setSourceVisible(source,
@@ -120,22 +120,22 @@ public:
     void setBandVisible(const QString& band, bool visible);
     bool isBandVisible(const QString& band) const { return !m_hiddenBands.contains(band); }
 
-    // NereusSDR Task F3 extension. AetherSDR upstream filters bands
+    // Longpath Task F3 extension. AetherSDR upstream filters bands
     // only; the SpotHub Spot List tab additionally pills by source
     // (Cluster / RBN / WSJT-X / SpotCollector / POTA / FreeDV / PSK).
     void setSourceVisible(const QString& source, bool visible);
     bool isSourceVisible(const QString& source) const { return !m_hiddenSources.contains(source); }
 
-    // NereusSDR-native extension, added alongside the ColReference /
+    // Longpath-native extension, added alongside the ColReference /
     // ColEntity columns (see modification history above).
     void setEntityVisible(const QString& entity, bool visible);
     bool isEntityVisible(const QString& entity) const { return !m_hiddenEntities.contains(entity); }
 
-    // NereusSDR-native extension (2026-08-27), mirrors setEntityVisible.
+    // Longpath-native extension (2026-08-27), mirrors setEntityVisible.
     void setModeVisible(const QString& mode, bool visible);
     bool isModeVisible(const QString& mode) const { return !m_hiddenModes.contains(mode); }
 
-    // NereusSDR-native extension (2026-08-27), see modification history
+    // Longpath-native extension (2026-08-27), see modification history
     // above. Not an exact-match hidden-set like the other predicates --
     // a single substring search across several columns.
     void setSearchText(const QString& text);
@@ -146,9 +146,9 @@ protected:
 
     // Qt 6.13 deprecated invalidateFilter() in favor of
     // beginFilterChange() / endFilterChange(Direction::Rows). Both APIs
-    // exist in Qt 6.10+. NereusSDR has no explicit Qt minimum in
+    // exist in Qt 6.10+. Longpath has no explicit Qt minimum in
     // CMakeLists.txt, so we keep a fallback to invalidateFilter on
-    // older Qt builds. NereusSDR-only compat shim; not an upstream port.
+    // older Qt builds. Longpath-only compat shim; not an upstream port.
     void invalidateFilterCompat() {
 #if QT_VERSION >= QT_VERSION_CHECK(6, 10, 0)
         beginFilterChange();

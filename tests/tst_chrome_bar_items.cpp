@@ -1,4 +1,4 @@
-// no-port-check: NereusSDR-original. No upstream port.
+// no-port-check: Longpath-original. No upstream port.
 #include <QtTest/QtTest>
 #include <QLabel>
 #include <QWidget>

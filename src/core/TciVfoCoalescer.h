@@ -1,4 +1,4 @@
-// no-port-check: NereusSDR-original VFO coalescer. Layer 3 only — outbound
+// no-port-check: Longpath-original VFO coalescer. Layer 3 only — outbound
 // coalesced-map per Thetis TCIServer.cs:1722-1727 [v2.10.3.13]. Layers 1+2
 // (per-event one-shot timer + bounded LinkedList) from Thetis are subsumed
 // by Qt's event loop + the 5ms drain timer in TciServer (Phase 14).
@@ -16,7 +16,7 @@
 //               with oldest-drop.
 //     Layer 3 — m_outboundCoalescedFrames at TCIServer.cs:1722-1727:
 //               outbound-coalesced map keyed by command.
-//   NereusSDR implements Layer 3 only. Layers 1+2 are upstream throttling
+//   Longpath implements Layer 3 only. Layers 1+2 are upstream throttling
 //   that Qt's event loop (which coalesces back-to-back timer callbacks
 //   and signal deliveries) + the 5ms drain timer already approximate.
 

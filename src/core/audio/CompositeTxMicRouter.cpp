@@ -1,13 +1,13 @@
 // =================================================================
-// src/core/audio/CompositeTxMicRouter.cpp  (NereusSDR)
+// src/core/audio/CompositeTxMicRouter.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original file. See CompositeTxMicRouter.h for design notes.
+// Longpath-original file. See CompositeTxMicRouter.h for design notes.
 //
 // Plan: 3M-1b F.3. Pre-code review §0.3 + master design §5.2.1.
 // =================================================================
 
-// no-port-check: NereusSDR-original file; no Thetis logic ported here.
+// no-port-check: Longpath-original file; no Thetis logic ported here.
 
 #include "core/audio/CompositeTxMicRouter.h"
 #include "core/audio/PcMicSource.h"

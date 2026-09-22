@@ -1,11 +1,11 @@
 // =================================================================
-// src/gui/widgets/FlatMapWidget.cpp  (NereusSDR)
+// src/gui/widgets/FlatMapWidget.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original — see FlatMapWidget.h.
+// Longpath-original — see FlatMapWidget.h.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
 //   2026-08-10 — Grid overlay + clickable markers; see FlatMapWidget.h.

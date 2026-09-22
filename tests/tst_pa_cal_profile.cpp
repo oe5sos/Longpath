@@ -79,7 +79,7 @@ private slots:
     void board_class_hermeslite() {
         // Source: mi0bot setup.cs:5463-5466 [v2.10.3.13-beta2 @c26a8a4]
         // HL2 explicitly grouped with ANAN10/ANAN10E for PA cal — uses
-        // ud10PA1W..ud10PA10W (1 W intervals, 10 W max). Earlier NereusSDR
+        // ud10PA1W..ud10PA10W (1 W intervals, 10 W max). Earlier Longpath
         // placeholder (PaCalBoardClass::HermesLite, 0.5 W / 5 W max) was
         // dropped 2026-05-02 after upstream verification.
         // (Production code uses [v2.10.3.13-beta2] only; sha is allowed in
@@ -90,7 +90,7 @@ private slots:
     }
     void board_class_atlas() {
         // HPSDR/Atlas is a discrete-board kit with no integrated PA.
-        // NereusSDR design choice: classify as None so the FWD power UI
+        // Longpath design choice: classify as None so the FWD power UI
         // hides the cal group. Thetis would route this to default 10 W.
         QCOMPARE(paCalBoardClassFor(HPSDRModel::HPSDR), PaCalBoardClass::None);
     }
@@ -296,7 +296,7 @@ private slots:
 
     void interpolate_handles_degenerate_zero_span_gracefully() {
         // Pathological: two adjacent cal points equal. Thetis would yield
-        // Inf or NaN; NereusSDR guards and returns rawWatts unchanged.
+        // Inf or NaN; Longpath guards and returns rawWatts unchanged.
         // (Thetis itself doesn't see this in practice because the spinbox
         // model prevents non-monotonic entries, but we guard defensively.)
         PaCalProfile p = PaCalProfile::defaults(PaCalBoardClass::Anan100);

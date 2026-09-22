@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/gui/widgets/WidgetPicker.h  (NereusSDR)
+// src/gui/widgets/WidgetPicker.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // ── Das Plus ─────────────────────────────────────────────────────────
 //
@@ -48,7 +48,7 @@
 // tut, ist schlimmer als eines, das sagt warum.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-15 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 //   2026-08-15 — Aus der flachen Hakenliste wurde der Dialog aus der

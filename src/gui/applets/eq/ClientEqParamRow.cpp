@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/applets/eq/ClientEqParamRow.cpp  (NereusSDR)
+// src/gui/applets/eq/ClientEqParamRow.cpp  (Longpath)
 // =================================================================
 //
 // Ported from AetherSDR (https://github.com/aethersdr/AetherSDR),
@@ -17,10 +17,10 @@
 // port of the same upstream, so the pair are back together.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-09 — Ported to NereusSDR by Martin Fischer, AI-assisted via
 //                 Anthropic Claude (Cowork). Namespace AetherSDR →
-//                 NereusSDR; include paths rebased onto
+//                 Longpath; include paths rebased onto
 //                 core/strip/ and gui/applets/eq/. Behaviour unchanged.
 // =================================================================
 
@@ -331,7 +331,7 @@ private:
         const QString accentName = accent.name(QColor::HexArgb);
         const QString qColName   = qCol.name(QColor::HexArgb);
         // Text-selection background. Upstream's #0070c0 was the last
-        // AetherSDR literal left in this file; derived from NereusSDR's
+        // AetherSDR literal left in this file; derived from Longpath's
         // accent instead, darkened so the selected digits stay readable
         // rather than being lit from behind.
         const QString selBg = EqPalette::accent().darker(170).name();

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - SOTA HTTPS spot poller (implementation). See SotaClient.h.
+// Longpath - SOTA HTTPS spot poller (implementation). See SotaClient.h.
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-09-03  AI (Anthropic Claude Code)  Original.
 
 #include "SotaClient.h"

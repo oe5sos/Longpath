@@ -1,12 +1,12 @@
 #pragma once
 
 // =================================================================
-// src/gui/widgets/SliceColors.h  (NereusSDR)
+// src/gui/widgets/SliceColors.h  (Longpath)
 // =================================================================
 //
 // Ported from AetherSDR (GPLv3):
 //   src/gui/SliceColors.h [@0cd4559] — die vier Scheibenfarben.
-//   NereusSDR ist ebenfalls GPLv3; Attribution nach GPLv3 §5.
+//   Longpath ist ebenfalls GPLv3; Attribution nach GPLv3 §5.
 //
 // ── Die Farbe einer Scheibe, an einer Stelle ─────────────────────────
 //
@@ -23,7 +23,7 @@
 // mitgenommen — also steht sie jetzt fuer sich.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-18 — Aus VfoWidget herausgeloest, damit sie deren
 //                 Loeschung ueberlebt. Inhalt unveraendert.
 //                 Martin Fischer, AI-assisted via Anthropic Claude

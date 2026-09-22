@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/gui/widgets/TxSpectrumWidget.h  (NereusSDR)
+// src/gui/widgets/TxSpectrumWidget.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // What is actually leaving the transmitter, and how wide it is.
 //
@@ -39,7 +39,7 @@
 // green number stand for the whole transmitter.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-11 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

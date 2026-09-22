@@ -1,8 +1,8 @@
 // =================================================================
-// src/gui/widgets/SwrChartWidget.h  (NereusSDR)
+// src/gui/widgets/SwrChartWidget.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. SWR-over-frequency chart for the radio-as-
+// Longpath-original. SWR-over-frequency chart for the radio-as-
 // antenna-analyzer sweep (design doc
 // docs/architecture/2026-08-13-swr-sweep-analyzer-design.md).
 //
@@ -14,7 +14,7 @@
 // live sweep draws incrementally through appendLivePoint().
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-13 — Created by Ralph Martin Fischer (OE5SOS),
 //                 AI-assisted implementation via Anthropic Claude
 //                 (Cowork).

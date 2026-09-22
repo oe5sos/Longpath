@@ -1,15 +1,15 @@
 // =================================================================
-// src/core/audio/PipeWireThreadLoop.cpp  (NereusSDR)
+// src/core/audio/PipeWireThreadLoop.cpp  (Longpath)
 //   Copyright (C) 2026 J.J. Boyd (KG4VCF) — GPLv2-or-later.
 //   2026-04-23 — created. AI-assisted via Claude Code.
 // =================================================================
-#ifdef NEREUS_HAVE_PIPEWIRE
+#ifdef LONGPATH_HAVE_PIPEWIRE
 #include "core/audio/PipeWireThreadLoop.h"
 
 #include <QLoggingCategory>
 #include <pipewire/pipewire.h>
 
-Q_LOGGING_CATEGORY(lcPw, "nereussdr.pipewire")
+Q_LOGGING_CATEGORY(lcPw, "longpath.pipewire")
 
 namespace Longpath {
 
@@ -43,7 +43,7 @@ PipeWireThreadLoop::~PipeWireThreadLoop()
 
 bool PipeWireThreadLoop::connect()
 {
-    m_loop = pw_thread_loop_new("nereussdr.pw", nullptr);
+    m_loop = pw_thread_loop_new("longpath.pw", nullptr);
     if (!m_loop) {
         qCWarning(lcPw) << "pw_thread_loop_new failed";
         return false;
@@ -79,4 +79,4 @@ bool PipeWireThreadLoop::connect()
 
 }  // namespace Longpath
 
-#endif  // NEREUS_HAVE_PIPEWIRE
+#endif  // LONGPATH_HAVE_PIPEWIRE

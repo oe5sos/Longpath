@@ -1,11 +1,11 @@
 // =================================================================
-// src/core/VoiceAnalyzer.cpp  (NereusSDR)
+// src/core/VoiceAnalyzer.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original — see VoiceAnalyzer.h.
+// Longpath-original — see VoiceAnalyzer.h.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
 // =================================================================

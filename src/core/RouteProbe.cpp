@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/RouteProbe.cpp  (NereusSDR)
+// src/core/RouteProbe.cpp  (Longpath)
 // =================================================================
 // 2026-05-26  J.J. Boyd (KG4VCF), AI-assisted via Anthropic Claude.
 // See RouteProbe.h for design rationale.

@@ -1,12 +1,12 @@
 // =================================================================
-// src/gui/setup/hardware/BandwidthMonitorTab.cpp  (NereusSDR)
+// src/gui/setup/hardware/BandwidthMonitorTab.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/ChannelMaster/bandwidth_monitor.h, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -51,7 +51,7 @@ mw0lge@grange-lane.co.uk
 // Richard Samphire can be reached by email at :  mw0lge@grange-lane.co.uk                    //
 //============================================================================================//
 
-// Developer note (NereusSDR Phase 3I): wires only the static controls
+// Developer note (Longpath Phase 3I): wires only the static controls
 // (throttle threshold, auto-pause toggle); live feed from P1RadioConnection's
 // bandwidth monitor is deferred to Phase 3L / Task 21.
 

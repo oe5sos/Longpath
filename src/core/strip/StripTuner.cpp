@@ -1,12 +1,12 @@
 // =================================================================
-// src/core/strip/StripTuner.cpp  (NereusSDR)
+// src/core/strip/StripTuner.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. See StripTuner.h for what each decision is
+// Longpath-original. See StripTuner.h for what each decision is
 // derived from and what this will not do.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-08 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

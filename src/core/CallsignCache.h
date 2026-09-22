@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/core/CallsignCache.h  (NereusSDR)
+// src/core/CallsignCache.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // What QRZ said about a callsign, kept between runs.
 //
@@ -46,7 +46,7 @@
 // the moment the network cannot replace it.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-10 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

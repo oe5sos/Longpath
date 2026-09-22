@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/core/antenna/Touchstone.h  (NereusSDR)
+// src/core/antenna/Touchstone.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // Reading a one-port sweep out of a Touchstone file.
 //
@@ -48,7 +48,7 @@
 // everywhere, which is the worst kind of wrong.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-10 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

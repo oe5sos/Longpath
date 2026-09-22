@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - FreeDVRadeReporterBridge: drives the RADE "sync-only"
+// Longpath - FreeDVRadeReporterBridge: drives the RADE "sync-only"
 // rx_report upload path (Path B) into FreeDVReporterClient, mirroring
 // freedv-gui's MainFrame::OnTimer behavior. Path A (callsign-decoded
 // via EOO) is already driven by RadioModel::onRadeTextDecoded, which
@@ -58,13 +58,13 @@
 //
 // ==========================================================================
 //
-// --- Modification history (NereusSDR) ---
+// --- Modification history (Longpath) ---
 //
 // 2026-05-15  J.J. Boyd (KG4VCF), with AI tooling assistance
 //   New port. Path B (RADE sync-only) rx_report upload bridge.
 //
-#ifndef NEREUSSDR_CORE_FREEDV_RADE_REPORTER_BRIDGE_H
-#define NEREUSSDR_CORE_FREEDV_RADE_REPORTER_BRIDGE_H
+#ifndef LONGPATH_CORE_FREEDV_RADE_REPORTER_BRIDGE_H
+#define LONGPATH_CORE_FREEDV_RADE_REPORTER_BRIDGE_H
 
 #include <QObject>
 #include <QString>
@@ -153,4 +153,4 @@ private:
 
 } // namespace Longpath
 
-#endif // NEREUSSDR_CORE_FREEDV_RADE_REPORTER_BRIDGE_H
+#endif // LONGPATH_CORE_FREEDV_RADE_REPORTER_BRIDGE_H

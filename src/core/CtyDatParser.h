@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - CtyDatParser: AD1C / K1EA cty.dat country-file parser.
+// Longpath - CtyDatParser: AD1C / K1EA cty.dat country-file parser.
 //
 // Ported from AetherSDR src/core/CtyDatParser.h [@0cd4559].
 // AetherSDR is (C) its contributors and is licensed GPL-3.0-or-later
 // (see https://github.com/ten9876/AetherSDR/blob/main/LICENSE).
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-10  J.J. Boyd / KG4VCF  Phase 3J-2 Task C1. Initial port.
 //                                    AetherSDR's "AetherSDR" namespace
-//                                    becomes "NereusSDR". DxccEntity
+//                                    becomes "Longpath". DxccEntity
 //                                    fields (primaryPrefix, name,
 //                                    continent, cqZone, ituZone) and
 //                                    the public surface (loadFromFile,

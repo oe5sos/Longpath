@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/accessories/PennyLaneController.cpp  (NereusSDR)
+// src/core/accessories/PennyLaneController.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -13,7 +13,7 @@
 // as OcMatrix. This controller wraps OcMatrix and adds the master ext-ctrl toggle.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-20 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                (KG4VCF), with AI-assisted transformation via Anthropic
 //                Claude Code. Thin wrapper: master extCtrlEnabled toggle +

@@ -1,15 +1,15 @@
 #pragma once
 
 // =================================================================
-// src/core/ModelPaths.h  (NereusSDR)
+// src/core/ModelPaths.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original (no Thetis equivalent — Thetis bundles rnnoise
-// as a DLL and loads it via P/Invoke; NereusSDR resolves the .bin
+// Longpath-original (no Thetis equivalent — Thetis bundles rnnoise
+// as a DLL and loads it via P/Invoke; Longpath resolves the .bin
 // file path at runtime across platform install layouts).
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-23 — Written for NereusSDR by J.J. Boyd (KG4VCF),
 //                 with AI-assisted development via Anthropic Claude Code.
 //   2026-04-23 — Added rnnoiseDefaultSmallBin() and dfnrModelTarball()
@@ -50,5 +50,17 @@ QString rnnoiseDefaultSmallBin();
 // Returns empty QString if not found. The caller should warn and
 // disable DFNR in that case.
 QString dfnrModelTarball();
+
+// Path to the bundled NNR (Neural Noise Reduction, WDSP 2.10) model-0
+// weight file. Same probe sequence as rnnoiseDefaultLargeBin(), but under
+// the "nnr" subdir (dev-build fallback resolves to
+// third_party/wdsp/models/wdsp_nnr_0.bin — NNR ships inside the already
+// in-tree wdsp vendor directory, not a separate third_party/ subproject).
+// Returns empty QString if not found.
+QString nnrModel0Bin();
+
+// Path to the bundled NNR model-1 (larger) weight file. Same probe
+// sequence as nnrModel0Bin().
+QString nnrModel1Bin();
 
 } // namespace Longpath::ModelPaths

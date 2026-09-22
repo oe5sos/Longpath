@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_tx_channel_set_tx_fixed_gain.cpp  (NereusSDR)
+// tests/tst_tx_channel_set_tx_fixed_gain.cpp  (Longpath)
 // =================================================================
 //
 // No Thetis code is directly ported in this test file.  The test exercises:
@@ -14,7 +14,7 @@
 //   to the WDSP/ChannelMaster SetTXFixedGain entry point with channel == m_id
 //   (Igain == Qgain == level).
 //
-// Tests verify (NEREUS_BUILD_TESTS test-seam accessor required):
+// Tests verify (LONGPATH_BUILD_TESTS test-seam accessor required):
 //   1. Initial state: m_lastFixedGain initialises to NaN so the first call
 //      (any value) always passes the idempotent guard.
 //   2. First call dispatches: NaN → value stored after setTxFixedGain(0.5).
@@ -33,13 +33,13 @@
 //
 // Total test cases: 7
 //
-// Requires NEREUS_BUILD_TESTS (set by CMakeLists target
+// Requires LONGPATH_BUILD_TESTS (set by CMakeLists target
 // tst_tx_channel_set_tx_fixed_gain).  Test-seam accessor
 // (lastFixedGainForTest) is compiled into TxChannel only when that define
 // is set.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-03 — New test for issue #167 Phase 1 Agent 1C: TxChannel
 //                 setTxFixedGain wrapper (idempotent NaN-aware guard +
 //                 WDSP SetTXFixedGain entry-point pass-through).
@@ -47,10 +47,10 @@
 //                 Anthropic Claude Code.
 // =================================================================
 
-// no-port-check: NereusSDR-original test file. All Thetis source cites are
+// no-port-check: Longpath-original test file. All Thetis source cites are
 // in TxChannel.h/cpp.
 
-#define NEREUS_BUILD_TESTS 1
+#define LONGPATH_BUILD_TESTS 1
 
 #include <QtTest/QtTest>
 #include <cmath>   // std::isnan
@@ -148,7 +148,7 @@ private slots:
     //
     // Thetis applies no clamp at the cmaster layer (cmaster.cs:1115-1119
     // [v2.10.3.13] just calls SetTXFixedGain(0, level, level) directly).
-    // The NereusSDR wrapper matches this behaviour — downstream WDSP/
+    // The Longpath wrapper matches this behaviour — downstream WDSP/
     // ChannelMaster handles any range concerns.
 
     void setTxFixedGain_valueAboveOne_accepted()

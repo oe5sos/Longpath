@@ -7,7 +7,7 @@
 
 namespace Longpath {
 
-// Logging categories for NereusSDR.
+// Logging categories for Longpath.
 // Usage: qCDebug(lcDiscovery) << "message";
 Q_DECLARE_LOGGING_CATEGORY(lcDiscovery)
 
@@ -32,7 +32,7 @@ Q_DECLARE_LOGGING_CATEGORY(lcAutomation)
 
 // Runtime-manageable logging category metadata.
 struct LogCategoryInfo {
-    QString id;            // e.g. "nereus.connection"
+    QString id;            // e.g. "longpath.connection"
     QString label;         // e.g. "Connection"
     QString description;   // e.g. "TCP/UDP command channel, protocol framing"
     bool enabled{false};   // runtime toggle state

@@ -1,14 +1,14 @@
 #pragma once
 
 // =================================================================
-// src/core/FFTEngine.h  (NereusSDR)
+// src/core/FFTEngine.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/display.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -139,7 +139,7 @@ public:
     double fftSizeOffsetDb() const { return m_fftSizeOffsetDb.load(); }
 
     // FFT-size baseline -- the user's slider-set "FFT size at full DDC
-    // bandwidth (bwHz == sampleRate)" choice.  NereusSDR-original auto-zoom
+    // bandwidth (bwHz == sampleRate)" choice.  Longpath-original auto-zoom
     // (no Thetis equivalent) uses this as the target K = baseline /
     // displayWidth bins-per-pixel; on zoom, computes the FFT size needed
     // to maintain the same K and replans accordingly.  Slider handler
@@ -230,7 +230,7 @@ signals:
     // change (oldSize != newSize).  Mirrors Thetis
     // SpectrumSettingsChangedHandlers?.Invoke(rx) at setup.cs:16164
     // [v2.10.3.13] -- Thetis subscribers (chrome / waterfall / AGC panel)
-    // refresh their derived state.  NereusSDR has no subscribers today;
+    // refresh their derived state.  Longpath has no subscribers today;
     // emitted for forward compatibility.
     void spectrumSettingsChanged(int receiverId);
 
@@ -278,7 +278,7 @@ private:
     // FFT size display calibration offset (dB).  Updated by the slider
     // handler to slider.Value * 2 per Thetis setup.cs:16154 [v2.10.3.13].
     std::atomic<double> m_fftSizeOffsetDb{0.0};
-    // User's slider-set FFT size baseline (NereusSDR-original auto-zoom
+    // User's slider-set FFT size baseline (Longpath-original auto-zoom
     // anchor).  Default matches m_fftSize so first-launch behavior is
     // identical to a system without auto-zoom (slider == FFT size).
     std::atomic<int>    m_fftSizeBaseline{kDefaultFftSize};

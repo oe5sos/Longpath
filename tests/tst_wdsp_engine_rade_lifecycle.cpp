@@ -1,9 +1,9 @@
-// no-port-check: NereusSDR-original unit-test file. No Thetis logic
-// ported in this test file; RadeChannel is a NereusSDR-native wrapper
+// no-port-check: Longpath-original unit-test file. No Thetis logic
+// ported in this test file; RadeChannel is a Longpath-native wrapper
 // around third_party/rade (the librade neural codec).  WDSP has no
 // concept of RADE.
 // =================================================================
-// tests/tst_wdsp_engine_rade_lifecycle.cpp  (NereusSDR)
+// tests/tst_wdsp_engine_rade_lifecycle.cpp  (Longpath)
 // =================================================================
 //
 // Phase 3R Task J2 unit tests: WdspEngine::createRadeChannel /
@@ -27,7 +27,7 @@
 // The tests below construct a WdspEngine directly without initialize().
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-11 - New test file for Phase 3R Task J2.  J.J. Boyd
 //                 (KG4VCF), with AI-assisted implementation via
 //                 Anthropic Claude Code.

@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_callsign_cache.cpp  (NereusSDR)
+// tests/tst_callsign_cache.cpp  (Longpath)
 // =================================================================
 //
 // The cache exists so the logbook can show a name and a portrait
@@ -17,10 +17,10 @@
 // coordinate. An entry with no position must not come back claiming
 // Null Island, which is what a naive round-trip through JSON produces.
 //
-// no-port-check: NereusSDR-original.
+// no-port-check: Longpath-original.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-10 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

@@ -1,6 +1,6 @@
-// no-port-check: NereusSDR-original unit-test file.
+// no-port-check: Longpath-original unit-test file.
 // =================================================================
-// tests/tst_radio_model_mic_source_hl2_force.cpp  (NereusSDR)
+// tests/tst_radio_model_mic_source_hl2_force.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for Phase 3M-1b Task L.3:
@@ -24,12 +24,12 @@
 //   7. isMicSourceLocked() reflects hasMicJack.
 //   8. Reconnect from HL2 → non-HL2 — lock released and Radio allowed.
 //
-// NEREUS_BUILD_TESTS is defined in CMakeLists.txt for this target,
+// LONGPATH_BUILD_TESTS is defined in CMakeLists.txt for this target,
 // enabling RadioModel test seams (setCapsHasMicJackForTest,
 // simulateConnectLoadForTest, simulateDisconnectForTest).
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-28 — Original test for NereusSDR by J.J. Boyd (KG4VCF),
 //                 with AI-assisted implementation via Anthropic Claude Code.
 // =================================================================

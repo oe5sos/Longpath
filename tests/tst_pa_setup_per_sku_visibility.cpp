@@ -1,8 +1,8 @@
-// tests/tst_pa_setup_per_sku_visibility.cpp  (NereusSDR)
+// tests/tst_pa_setup_per_sku_visibility.cpp  (Longpath)
 //
 // Phase 8 of issue #167 (PA calibration safety hotfix) — per-SKU visibility
 // matrix for Setup → PA pages.
-// no-port-check: test fixture exercising NereusSDR PaSetupPages /
+// no-port-check: test fixture exercising Longpath PaSetupPages /
 // SetupDialog visibility wiring. Cite comments to Thetis
 // setup.cs:19812 (comboRadioModel_SelectedIndexChanged) are documentary
 // only — the ported logic itself lives in SetupDialog.cpp + PaSetupPages.cpp

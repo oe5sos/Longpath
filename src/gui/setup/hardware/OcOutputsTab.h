@@ -1,7 +1,7 @@
 #pragma once
 
 // =================================================================
-// src/gui/setup/hardware/OcOutputsTab.h  (NereusSDR)
+// src/gui/setup/hardware/OcOutputsTab.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
@@ -9,7 +9,7 @@
 //   tpOCSWLControl (tcOCOutputs container tab pages)
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Initial placeholder stub. J.J. Boyd (KG4VCF).
 //   2026-04-20 — Refactored into parent QTabWidget hosting two sub-sub-tabs:
 //                HF (OcOutputsHfTab — full RX/TX matrix + actions + USB BCD

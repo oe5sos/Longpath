@@ -204,7 +204,7 @@ Modify `src/core/dsp/CMakeLists.txt` (or wherever DSP sources are listed) — ad
 
 - [ ] **Step 4: Build to confirm headers compile**
 
-Run: `cmake --build build -j --target NereusSDR_lib` (or equivalent target)
+Run: `cmake --build build -j --target Longpath_lib` (or equivalent target)
 Expected: PASS, headers parse cleanly.
 
 - [ ] **Step 5: Commit**
@@ -283,7 +283,7 @@ QTEST_MAIN(TestRxChannelRebuild)
 Add to `tests/CMakeLists.txt`:
 ```cmake
 add_executable(tst_rx_channel_rebuild tst_rx_channel_rebuild.cpp)
-target_link_libraries(tst_rx_channel_rebuild PRIVATE NereusSDR_lib Qt6::Test)
+target_link_libraries(tst_rx_channel_rebuild PRIVATE Longpath_lib Qt6::Test)
 add_test(NAME tst_rx_channel_rebuild COMMAND tst_rx_channel_rebuild)
 ```
 
@@ -646,7 +646,7 @@ QTEST_MAIN(TestTxChannelRebuild)
 Add to `tests/CMakeLists.txt`:
 ```cmake
 add_executable(tst_tx_channel_rebuild tst_tx_channel_rebuild.cpp)
-target_link_libraries(tst_tx_channel_rebuild PRIVATE NereusSDR_lib Qt6::Test)
+target_link_libraries(tst_tx_channel_rebuild PRIVATE Longpath_lib Qt6::Test)
 add_test(NAME tst_tx_channel_rebuild COMMAND tst_tx_channel_rebuild)
 ```
 

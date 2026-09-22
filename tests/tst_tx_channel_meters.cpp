@@ -25,7 +25,7 @@ warren@wpratt.com
 */
 
 // =================================================================
-// tests/tst_tx_channel_meters.cpp  (NereusSDR)
+// tests/tst_tx_channel_meters.cpp  (Longpath)
 // =================================================================
 //
 // No Thetis code is directly ported in this test file. The test exercises:
@@ -74,14 +74,14 @@ warren@wpratt.com
 // the null-guard fires correctly and returns the sentinel.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-27 — New test for Phase 3M-1b Task D.7: TxChannel TX meter readouts
 //                 (getTxMicMeter / getAlcMeter live; 4 deferred stubs).
 //                 J.J. Boyd (KG4VCF), with AI-assisted implementation via
 //                 Anthropic Claude Code.
 // =================================================================
 
-// no-port-check: NereusSDR-original test file. All Thetis source cites are
+// no-port-check: Longpath-original test file. All Thetis source cites are
 // in TxChannel.h/cpp and wdsp_api.h.
 
 #include <QtTest/QtTest>

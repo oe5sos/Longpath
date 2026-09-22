@@ -38,7 +38,7 @@
 #   2026-08-15 — Find Qt without being told: qmake -query, then a flat
 #                 include tree, then macOS frameworks (for which a flat
 #                 tree of symlinks is built under .cache/qtinc).
-#                 NEREUS_QTINC still overrides everything.
+#                 LONGPATH_QTINC still overrides everything.
 
 set -u -o pipefail
 
@@ -70,7 +70,7 @@ ROOT="$PWD"
 # The shim lives in .cache/ — already gitignored, and on the same disk
 # as the code, for the reason in the header comment.
 #
-# Order: an explicit NEREUS_QTINC always wins; then a flat tree, which
+# Order: an explicit LONGPATH_QTINC always wins; then a flat tree, which
 # is what Linux and a self-built Qt give; then frameworks.
 
 QTINC=""
@@ -79,11 +79,11 @@ QTINC=""
 #    NOT hold Qt: falling through to auto-detection without a word
 #    would run the check against a Qt the operator did not choose, and
 #    a typo in an exported variable is a hard thing to see afterwards.
-if [ -n "${NEREUS_QTINC:-}" ]; then
-    if [ -d "${NEREUS_QTINC}/QtCore" ]; then
-        QTINC="$NEREUS_QTINC"
+if [ -n "${LONGPATH_QTINC:-}" ]; then
+    if [ -d "${LONGPATH_QTINC}/QtCore" ]; then
+        QTINC="$LONGPATH_QTINC"
     else
-        echo "syntax_check: NEREUS_QTINC=$NEREUS_QTINC has no QtCore —" >&2
+        echo "syntax_check: LONGPATH_QTINC=$LONGPATH_QTINC has no QtCore —" >&2
         echo "  ignoring it and looking for Qt myself." >&2
     fi
 fi
@@ -162,7 +162,7 @@ if [ -z "$QTINC" ] || [ ! -d "$QTINC/QtCore" ]; then
     echo "syntax_check: no Qt headers found." >&2
     echo "  Looked at: qmake -query, /usr/include/qt6," >&2
     echo "  and framework layouts under /opt/homebrew/lib." >&2
-    echo "  Set NEREUS_QTINC to a qtbase include tree to override." >&2
+    echo "  Set LONGPATH_QTINC to a qtbase include tree to override." >&2
     exit 2
 fi
 
@@ -206,8 +206,8 @@ RNNOISE_INC="$(find "$ROOT" -maxdepth 4 -type d -path '*/_deps/rnnoise_upstream-
 SPECBLEACH_INC="$(find "$ROOT" -maxdepth 4 -type d -path '*/_deps/libspecbleach_upstream-src/include' -print -quit 2>/dev/null)"
 
 compile() {
-    # NEREUSSDR_VERSION setzt sonst CMake. Ohne sie scheitert jede Datei,
-    # die QStringLiteral(NEREUSSDR_VERSION) benutzt, mit "expected ')'" --
+    # LONGPATH_VERSION setzt sonst CMake. Ohne sie scheitert jede Datei,
+    # die QStringLiteral(LONGPATH_VERSION) benutzt, mit "expected ')'" --
     # ein Fehler, der wie ein Syntaxfehler aussieht und keiner ist.
     #
     # Die Modulliste unten muss die REQUIRED-Komponenten aus CMakeLists.txt
@@ -216,30 +216,30 @@ compile() {
     # <QAudio> sich nicht -- jede Datei, die core/ClientPuduMonitor.h
     # erreicht (also auch MainWindow.cpp), scheiterte mit einem
     # "file not found", das wie ein Fehler im Code aussah und keiner war.
-    # HAVE_WEBSOCKETS, NEREUS_GPU_SPECTRUM, and HAVE_WDSP: all three
+    # HAVE_WEBSOCKETS, LONGPATH_GPU_SPECTRUM, and HAVE_WDSP: all three
     # unconditional in the real build (CMakeLists.txt: Qt6::WebSockets is
-    # REQUIRED, so HAVE_WEBSOCKETS is always defined; NEREUS_GPU_SPECTRUM
+    # REQUIRED, so HAVE_WEBSOCKETS is always defined; LONGPATH_GPU_SPECTRUM
     # defaults ON; HAVE_WDSP is gated on WDSP_FOUND, which is true whenever
     # third_party/wdsp/src/comm.h exists -- i.e. always, since WDSP is
     # vendored in-tree, not fetched).
     # Missing them here does not fail loudly -- it silently strips every
-    # #ifdef HAVE_WEBSOCKETS / #ifdef NEREUS_GPU_SPECTRUM / #ifdef HAVE_WDSP
+    # #ifdef HAVE_WEBSOCKETS / #ifdef LONGPATH_GPU_SPECTRUM / #ifdef HAVE_WDSP
     # block, so a class body written entirely inside one (TciClient,
     # TciServer, half of SpectrumWidget, wdsp_api.h's real declarations)
     # parses as empty and every use of it downstream reports "incomplete
     # type" / "undeclared identifier" -- errors that look exactly like real
-    # syntax errors and are not (HAVE_WEBSOCKETS/NEREUS_GPU_SPECTRUM found
+    # syntax errors and are not (HAVE_WEBSOCKETS/LONGPATH_GPU_SPECTRUM found
     # 2026-08-24, checking the SunSDR/TCI spectrum-wiring change against a
     # checker run that had never seen these two files build clean;
     # HAVE_WDSP found 2026-08-26, checking a one-line TciServer.cpp fix
     # against wdsp_api.h's GetTXAMeter, a real declaration this script had
     # never actually exercised before).
     #
-    # NEREUS_BUILD_TESTS: same story, found the same day. tools/run_tests.sh
-    # always configures with -DNEREUS_BUILD_TESTS=ON (it's the whole point
+    # LONGPATH_BUILD_TESTS: same story, found the same day. tools/run_tests.sh
+    # always configures with -DLONGPATH_BUILD_TESTS=ON (it's the whole point
     # of that build dir -- tests are opt-in so the normal build stays fast,
     # per CLAUDE.md), so every "...ForTest()" hook gated behind
-    # #ifdef NEREUS_BUILD_TESTS in a production header (P1RadioConnection.h's
+    # #ifdef LONGPATH_BUILD_TESTS in a production header (P1RadioConnection.h's
     # setBoardForTest/captureBank10ForTest, RadioModel's
     # injectConnectionForTest, etc.) is real, reachable code in the build
     # that actually runs the test suite -- just invisible to a checker that
@@ -248,8 +248,8 @@ compile() {
     # script reported 15 "no member named ..." errors for methods that
     # exist and work, because they'd all been silently stripped.
     g++ -std=c++20 -fsyntax-only -fPIC \
-        -DNEREUSSDR_VERSION='"0.0.0-syntaxcheck"' \
-        -DHAVE_WEBSOCKETS -DNEREUS_GPU_SPECTRUM -DHAVE_WDSP -DNEREUS_BUILD_TESTS \
+        -DLONGPATH_VERSION='"0.0.0-syntaxcheck"' \
+        -DHAVE_WEBSOCKETS -DLONGPATH_GPU_SPECTRUM -DHAVE_WDSP -DLONGPATH_BUILD_TESTS \
         -I"$QTINC" -I"$QTINC/QtCore" -I"$QTINC/QtGui" -I"$QTINC/QtWidgets" \
         -I"$QTINC/QtNetwork" -I"$QTINC/QtTest" -I"$QTINC/rhi" \
         -I"$QTINC/QtMultimedia" -I"$QTINC/QtSvg" -I"$QTINC/QtWebSockets" \
@@ -266,7 +266,7 @@ real_errors() {
 # ── Self-test: prove the compiler complains about a broken file ──────
 #
 # Without this the whole script is a very elaborate `echo 0`.
-SELFTEST="$(mktemp /tmp/nereus_selftest_XXXXXX.cpp)"
+SELFTEST="$(mktemp /tmp/longpath_selftest_XXXXXX.cpp)"
 trap 'rm -f "$SELFTEST"' EXIT
 printf 'int deliberately_broken( ;\n' > "$SELFTEST"
 if [ "$(compile "$SELFTEST" | grep -c 'error:')" -eq 0 ]; then

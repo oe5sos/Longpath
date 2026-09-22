@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 //
-// NereusSDR - Maidenhead locator geometry: grid square to lat/lon,
+// Longpath - Maidenhead locator geometry: grid square to lat/lon,
 // great-circle distance, initial bearing.
 //
 // These three helpers already existed as file-scope functions inside an
@@ -20,13 +20,13 @@
 // (`freedv-gui/COPYING`); the specific `freedv_reporter.cpp` file has no
 // per-file Copyright header, so the project root header applies. LGPL is
 // upgrade-compatible to GPLv2-or-later when linked into a GPL work
-// (LGPL section 3 conversion clause), which is the model NereusSDR uses.
+// (LGPL section 3 conversion clause), which is the model Longpath uses.
 //
 // Copyright (C) 2026 NereusSDR contributors.
 // Distance / heading math: derived from freedv-gui source (LGPLv2.1+,
 // copyright the freedv-gui contributors / FreeDV project).
 //
-// Modification history (NereusSDR)
+// Modification history (Longpath)
 //   2026-08-07  Martin Fischer  Declarations hoisted out of
 //                               FreeDVStationModel.cpp so the rotator
 //                               dial can share one implementation.

@@ -1,12 +1,12 @@
 // =================================================================
-// src/core/antenna/AntennaTrim.cpp  (NereusSDR)
+// src/core/antenna/AntennaTrim.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. See AntennaTrim.h for where the model stops
+// Longpath-original. See AntennaTrim.h for where the model stops
 // being true and why shortening is halved.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-10 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

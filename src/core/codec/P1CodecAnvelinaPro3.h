@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/codec/P1CodecAnvelinaPro3.h  (NereusSDR)
+// src/core/codec/P1CodecAnvelinaPro3.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -7,7 +7,7 @@
 //   Project Files/Source/ChannelMaster/networkproto1.c:682 (end_frame gate)
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-20 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                (KG4VCF), with AI-assisted transformation via Anthropic
 //                Claude Code. Extends P1CodecStandard with the bank 17

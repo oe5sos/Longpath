@@ -1,6 +1,6 @@
-// tests/tst_region_setting.cpp  (NereusSDR)
+// tests/tst_region_setting.cpp  (Longpath)
 //
-// NereusSDR-original. No Thetis port — this covers a wiring defect that
+// Longpath-original. No Thetis port — this covers a wiring defect that
 // is ours.
 //
 // ── What went wrong ──────────────────────────────────────────────────

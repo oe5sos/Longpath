@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - tst_resampler: pins the Phase 3R Task I2a Resampler
+// Longpath - tst_resampler: pins the Phase 3R Task I2a Resampler
 // (r8brain wrapper) port from AetherSDR src/core/Resampler.{h,cpp}
 // [@0cd4559].
 //
@@ -97,7 +97,7 @@ private slots:
 // (unsorted)" + SIGABRT inside downsample24kTo8k; the 1:1-rate
 // tests likely also corrupted heap memory but did not happen to
 // trip the sentinel on the macOS / Linux paths that pre-dated CI's
-// NEREUS_BUILD_TESTS=ON gate.
+// LONGPATH_BUILD_TESTS=ON gate.
 //
 // Each Resampler ctor below now explicitly sizes maxBlockSamples to
 // the per-call input size (or larger) so r8brain's allocations fit.

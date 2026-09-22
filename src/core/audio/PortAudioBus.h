@@ -1,9 +1,9 @@
 // =================================================================
-// src/core/audio/PortAudioBus.h  (NereusSDR)
+// src/core/audio/PortAudioBus.h  (Longpath)
 // =================================================================
 //
 // Phase 3O VAX cross-platform IAudioBus backend built on PortAudio
-// v19.7.0. NereusSDR-original.
+// v19.7.0. Longpath-original.
 //
 // Design spec: docs/architecture/2026-04-19-vax-design.md §3.2
 // Plan:        docs/architecture/2026-04-19-phase3o-vax-plan.md (3.2–3.4)

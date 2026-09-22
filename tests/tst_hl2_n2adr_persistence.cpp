@@ -1,4 +1,4 @@
-// no-port-check: NereusSDR-original tests for hermes-filter-debug Bug 2.
+// no-port-check: Longpath-original tests for hermes-filter-debug Bug 2.
 //
 // Covers:
 //   * N2ADR filter "hl2IoBoard/n2adrFilter" round-trip via per-MAC

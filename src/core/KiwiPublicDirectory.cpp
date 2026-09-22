@@ -8,7 +8,7 @@
 // Das KiwiSDR-Protokoll stammt von John Seamons (ZL/KF6VO),
 // http://kiwisdr.com.
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-23 — Portiert (Nachtschicht, Stufe 2: Verbindung).
 //                Namensraum AetherSDR -> Longpath, Kopfdatei-Pfade auf
 //                unsere Ablage. Sonst zeichengetreu — dies spricht mit
@@ -48,13 +48,13 @@ QByteArray KiwiPublicDirectory::userAgent()
     //
     // Aufgefallen ist es erst beim gemeinsamen Lauf aller Bausteine am
     // 2026-08-23 — die Einzelpruefungen sehen die Meldungen nicht an.
-    // Das Programmpaket setzt NEREUSSDR_VERSION (der Name stammt noch
+    // Das Programmpaket setzt LONGPATH_VERSION (der Name stammt noch
     // aus der Zeit vor der Umbenennung, der Wert ist der richtige).
-#ifdef NEREUSSDR_VERSION
-    return QByteArrayLiteral("Longpath/" NEREUSSDR_VERSION
-                             " (+https://github.com/OE5SOS/NereusSDR)");
+#ifdef LONGPATH_VERSION
+    return QByteArrayLiteral("Longpath/" LONGPATH_VERSION
+                             " (+https://github.com/oe5sos/Longpath)");
 #else
-    return QByteArrayLiteral("Longpath (+https://github.com/OE5SOS/NereusSDR)");
+    return QByteArrayLiteral("Longpath (+https://github.com/oe5sos/Longpath)");
 #endif
 }
 

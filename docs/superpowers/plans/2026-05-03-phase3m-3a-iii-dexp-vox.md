@@ -37,7 +37,7 @@
 | `src/gui/widgets/VoxSettingsPopup.h` | Delete | 3M-1b popup widget, retired |
 | `src/gui/widgets/VoxSettingsPopup.cpp` | Delete | Same |
 | `CMakeLists.txt` (or per-dir) | Modify | Drop `VoxSettingsPopup.{h,cpp}` from sources; add `DexpPeakMeter.{h,cpp}` |
-| `tests/CMakeLists.txt` | Modify | Add 7 new `nereus_add_test()` lines |
+| `tests/CMakeLists.txt` | Modify | Add 7 new `longpath_add_test()` lines |
 | `tests/tst_tx_channel_dexp_envelope.cpp` | Create | Tests for 4 envelope/timing setters (Task 1-2) |
 | `tests/tst_tx_channel_dexp_gate.cpp` | Create | Tests for 7 gate/ratio/sidech/lookahead setters (Task 3-5) |
 | `tests/tst_tx_channel_dexp_meters.cpp` | Create | Tests for 2 meter readers (Task 6) |
@@ -123,7 +123,7 @@ VoxSettingsPopup widget (to delete): `src/gui/widgets/VoxSettingsPopup.{h,cpp}`.
 - Create: `tests/tst_tx_channel_dexp_envelope.cpp`
 - Modify: `src/core/TxChannel.h` (add 2 setter declarations + 2 `m_dexp*Last` cache members + 2 `last*ForTest()` accessors)
 - Modify: `src/core/TxChannel.cpp` (implement 2 setters)
-- Modify: `tests/CMakeLists.txt` (add `nereus_add_test(tst_tx_channel_dexp_envelope)`)
+- Modify: `tests/CMakeLists.txt` (add `longpath_add_test(tst_tx_channel_dexp_envelope)`)
 
 **Source cites for this task** (READ before writing):
 - `cmaster.cs:166-167 [v2.10.3.13]` - `SetDEXPRun(int id, bool run)` DllImport
@@ -209,7 +209,7 @@ QTEST_APPLESS_MAIN(TstTxChannelDexpEnvelope)
 - [ ] **Step 2: Add the test to `tests/CMakeLists.txt`** (append at end, alphabetical-ish):
 
 ```cmake
-nereus_add_test(tst_tx_channel_dexp_envelope)
+longpath_add_test(tst_tx_channel_dexp_envelope)
 ```
 
 - [ ] **Step 3: Run test to verify build failure** (test references symbols that don't exist yet):
@@ -552,7 +552,7 @@ QTEST_APPLESS_MAIN(TstTxChannelDexpGate)
 
 Add to `tests/CMakeLists.txt`:
 ```cmake
-nereus_add_test(tst_tx_channel_dexp_gate)
+longpath_add_test(tst_tx_channel_dexp_gate)
 ```
 
 - [ ] **Step 2: Verify build fails:**
@@ -867,7 +867,7 @@ QTEST_APPLESS_MAIN(TstTxChannelDexpMeters)
 
 Add to `tests/CMakeLists.txt`:
 ```cmake
-nereus_add_test(tst_tx_channel_dexp_meters)
+longpath_add_test(tst_tx_channel_dexp_meters)
 ```
 
 - [ ] **Step 2: Verify build fails.**
@@ -1068,7 +1068,7 @@ QTEST_APPLESS_MAIN(TstTransmitModelDexp)
 #include "tst_transmit_model_dexp.moc"
 ```
 
-Add `nereus_add_test(tst_transmit_model_dexp)` to `tests/CMakeLists.txt`.
+Add `longpath_add_test(tst_transmit_model_dexp)` to `tests/CMakeLists.txt`.
 
 - [ ] **Step 2: Verify build fails.**
 
@@ -1457,7 +1457,7 @@ QTEST_MAIN(TstDexpPeakMeter)
 
 (Note: `QTEST_MAIN`, not `QTEST_APPLESS_MAIN` - widget needs a QApplication.)
 
-Add `nereus_add_test(tst_dexp_peak_meter)` to `tests/CMakeLists.txt`.
+Add `longpath_add_test(tst_dexp_peak_meter)` to `tests/CMakeLists.txt`.
 
 - [ ] **Step 2: Verify build fails.**
 

@@ -1,11 +1,11 @@
-// no-port-check: NereusSDR-original TDD test for TciSensorManager wire-format
+// no-port-check: Longpath-original TDD test for TciSensorManager wire-format
 // helpers and interval aggregation ported from Thetis TCIServer.cs:2314-2332,
 // 501-506, 7571-7603 [v2.10.3.13].
 //
-// tests/tst_tci_sensor_formats.cpp  (NereusSDR)
-// NereusSDR-original — unit tests for TciSensorManager static helpers.
+// tests/tst_tci_sensor_formats.cpp  (Longpath)
+// Longpath-original — unit tests for TciSensorManager static helpers.
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-10 — Phase 3J-1 Task 19.1 by J.J. Boyd (KG4VCF);
 //                AI-assisted transformation via Anthropic Claude Code.
 

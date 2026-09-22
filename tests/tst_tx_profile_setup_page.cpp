@@ -1,8 +1,8 @@
-// tests/tst_tx_profile_setup_page.cpp  (NereusSDR)
+// tests/tst_tx_profile_setup_page.cpp  (Longpath)
 //
 // Phase 3M-1c chunk J (J.3 + J.4) — Setup → Audio → TX Profile editor page.
 //
-// no-port-check: NereusSDR-original test file.  Inline Thetis cites for the
+// no-port-check: Longpath-original test file.  Inline Thetis cites for the
 // behaviours we mirror live in TxProfileSetupPage.cpp.
 //
 // J.3 — Editor page coverage:

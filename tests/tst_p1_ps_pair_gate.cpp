@@ -1,9 +1,9 @@
-// no-port-check: NereusSDR-original regression test. The upstream file names
+// no-port-check: Longpath-original regression test. The upstream file names
 // below appear only inside source-cite comments that record where each
 // expected DDC index comes from; no upstream logic is ported here.
 //
 // =================================================================
-// tests/tst_p1_ps_pair_gate.cpp  (NereusSDR)
+// tests/tst_p1_ps_pair_gate.cpp  (Longpath)
 // =================================================================
 //
 // Regression: the PureSignal paired-IQ emit must stay shut during ordinary RX.
@@ -28,7 +28,7 @@
 // mi0bot console.cs:8757-8762 [v2.10.3.13-beta2] GetDDC (psrx = 2, pstx = 3).
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-01: PS pairing gate regression. J.J. Boyd (KG4VCF),
 //               with AI-assisted authoring via Anthropic Claude Code.
 // =================================================================

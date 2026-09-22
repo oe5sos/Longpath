@@ -73,12 +73,12 @@ private slots:
                    QStringLiteral("Tageslicht"), QStringLiteral("#8a5a12"));
         writeTheme(d, QStringLiteral("zzz-warm.json"),
                    QStringLiteral("Werkbank"), QStringLiteral("#7a4c06"));
-        qputenv("NEREUS_THEME_DIR", m_dir.path().toLocal8Bit());
+        qputenv("LONGPATH_THEME_DIR", m_dir.path().toLocal8Bit());
     }
 
     void cleanupTestCase()
     {
-        qunsetenv("NEREUS_THEME_DIR");
+        qunsetenv("LONGPATH_THEME_DIR");
         Style::Theme::instance().clear();
     }
 

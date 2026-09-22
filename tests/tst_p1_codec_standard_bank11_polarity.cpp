@@ -1,4 +1,4 @@
-// no-port-check: NereusSDR-original test fixture; cites Thetis source for
+// no-port-check: Longpath-original test fixture; cites Thetis source for
 // expected wire bit polarity but does not port any Thetis code.
 //
 // P1 full-parity Task 1.1 — codec-level direct polarity test for mic_ptt.

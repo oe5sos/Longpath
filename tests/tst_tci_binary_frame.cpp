@@ -1,11 +1,11 @@
-// no-port-check: NereusSDR-original test file. The Thetis source citations
+// no-port-check: Longpath-original test file. The Thetis source citations
 // in the test bodies are traceability markers that confirm which Thetis
 // lines define the expected byte values being asserted — no Thetis test
 // code is ported here. The production code under test (TciBinaryFrame) is
 // the ported code and carries the full attribution in its own files.
 
-// tests/tst_tci_binary_frame.cpp  (NereusSDR)
-// NereusSDR-original — no Thetis upstream port in this test file.
+// tests/tst_tci_binary_frame.cpp  (Longpath)
+// Longpath-original — no Thetis upstream port in this test file.
 //
 // Phase 3J-1 Task 16.3 (sub-commit a): TciBinaryFrame::buildStreamPayload +
 // TciBinaryFrame::encodeSamples unit tests.
@@ -211,7 +211,7 @@ void TestTciBinaryFrame::int32_full_scale_positive()
     // NOTE: float32(int.MaxValue) = 2147483648.0f (the nearest IEEE-754 single
     // to 2147483647 rounds up to 2^31). So Math.Round(1.0f * int.MaxValue) =
     // 2147483648, which overflows int32 to -2147483648 in C# checked arithmetic.
-    // NereusSDR faithfully replicates this: std::lroundf(1.0f * INT_MAX) = 2^31
+    // Longpath faithfully replicates this: std::lroundf(1.0f * INT_MAX) = 2^31
     // which wraps to INT_MIN on overflow. The test asserts this exact behavior.
     const float input = 1.0f;
     const QByteArray encoded = TciBinaryFrame::encodeSamples(

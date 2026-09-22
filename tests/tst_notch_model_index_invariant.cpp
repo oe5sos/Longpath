@@ -1,7 +1,7 @@
 // =================================================================
-// tests/tst_notch_model_index_invariant.cpp  (NereusSDR)
+// tests/tst_notch_model_index_invariant.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure.
+// no-port-check: Longpath-original test infrastructure.
 //
 // TNF section 5.2: list position IS the WDSP notch index. Verified across
 // add, edit and delete, including deleting from the middle, and verified

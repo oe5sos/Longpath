@@ -43,15 +43,15 @@ of the License, or (at your option) any later version.
 */
 
 // =================================================================
-// src/core/sunsdr/SunSdrProtocol.cpp  (NereusSDR/Longpath)
+// src/core/sunsdr/SunSdrProtocol.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR/Longpath-original encode/decode logic; behaviour ported
+// Longpath/Longpath-original encode/decode logic; behaviour ported
 // from ArtemisSDR as cited in the header. See SunSdrProtocol.h for
 // scope and the QRP-confirmation gate this sits behind.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-25 — Original for NereusSDR/Longpath by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 //   2026-09-02 — TX control-channel pure encoders (MOX 0x06, antenna

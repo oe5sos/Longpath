@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_applet_grid.cpp  (NereusSDR)
+// tests/tst_applet_grid.cpp  (Longpath)
 // =================================================================
 //
 // Schritt 1 des freien Rasters. Entwurf:
@@ -25,7 +25,7 @@
 // gezeigt, was eine Anordnungswanderung still verlieren kann."
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-18 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

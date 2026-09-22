@@ -1,8 +1,8 @@
 // =================================================================
-// tests/tst_p2_mic_frame.cpp  (NereusSDR)
+// tests/tst_p2_mic_frame.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original test file.  Verifies the static
+// Longpath-original test file.  Verifies the static
 // P2RadioConnection::decodeMicFrame132 helper used by the port-1026
 // dispatch path (Phase 3M-1c TX pump v3).
 //
@@ -13,13 +13,13 @@
 //
 // =================================================================
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-29 — New test for Phase 3M-1c TX pump v3 by J.J. Boyd
 //                 (KG4VCF), with AI-assisted implementation via
 //                 Anthropic Claude Code.
 // =================================================================
 
-// no-port-check: NereusSDR-original test file.  No Thetis logic ported.
+// no-port-check: Longpath-original test file.  No Thetis logic ported.
 
 #include <QtTest/QtTest>
 #include <QObject>

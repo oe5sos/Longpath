@@ -1,5 +1,5 @@
 // no-port-check: test fixture cites deskhpsdr/Thetis source for expected
-// values only; no Thetis logic is ported here.  NereusSDR-original test.
+// values only; no Thetis logic is ported here.  Longpath-original test.
 //
 // Wire-byte snapshot tests for P2RadioConnection::sendTxIq() (3M-1a Task E.6).
 //

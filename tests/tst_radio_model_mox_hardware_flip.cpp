@@ -1,6 +1,6 @@
 // tst_radio_model_mox_hardware_flip.cpp
 //
-// no-port-check: Test file exercises NereusSDR API; Thetis behavior is
+// no-port-check: Test file exercises Longpath API; Thetis behavior is
 // cited in RadioModel.cpp via pre-code review §2.3 / §2.5 — no C# is
 // translated here.
 //

@@ -67,7 +67,7 @@ of the License, or (at your option) any later version.
 // be added alongside this file in the same commit.
 
 // =================================================================
-// src/core/sunsdr/SunSdrProtocol.h  (NereusSDR/Longpath)
+// src/core/sunsdr/SunSdrProtocol.h  (Longpath)
 // =================================================================
 //
 // SunSDR2 native wire protocol — the CONFIRMED framing only.
@@ -113,7 +113,7 @@ of the License, or (at your option) any later version.
 // bytes quoted in the design doc without any hardware attached.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-25 — Original for NereusSDR/Longpath by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork). Ported
 //                 from ArtemisSDR sunsdr.c/sunsdr.h

@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/safety/BandPlanGuard.cpp  (NereusSDR)
+// src/core/safety/BandPlanGuard.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis [v2.10.3.13 @501e3f5]:
@@ -12,7 +12,7 @@
 // CLAUDE.md "Byte-for-byte headers and multi-file attribution".
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-25 — Ported to C++20/Qt6 for NereusSDR by J.J. Boyd
 //                (KG4VCF), with AI-assisted transformation via
 //                Anthropic Claude Code.
@@ -422,7 +422,7 @@ bool BandPlanGuard::isValidTxFreq(Region region, std::int64_t freqHz,
     }
 
     // Channelized 60m gating (UK, Japan): per-channel allocations are the
-    // authoritative TX window. NereusSDR-native safety net for the strict
+    // authoritative TX window. Longpath-native safety net for the strict
     // per-channel allocations defined by those regulators. Thetis itself
     // permits TX anywhere in the broad B60M range; we retain channelization
     // for UK / Japan because the regulator-defined allocation IS the channel
@@ -482,7 +482,7 @@ bool BandPlanGuard::isValidTxBand(Band rxBand, Band txBand,
 }
 
 // ---------------------------------------------------------------------------
-// 3M-1b SSB-mode allow-list (NereusSDR-native)
+// 3M-1b SSB-mode allow-list (Longpath-native)
 // ---------------------------------------------------------------------------
 
 bool BandPlanGuard::isModeAllowedForTx(DSPMode mode) const noexcept

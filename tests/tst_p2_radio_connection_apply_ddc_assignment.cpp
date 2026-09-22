@@ -1,7 +1,7 @@
 // =================================================================
-// tests/tst_p2_radio_connection_apply_ddc_assignment.cpp  (NereusSDR)
+// tests/tst_p2_radio_connection_apply_ddc_assignment.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure.
+// no-port-check: Longpath-original test infrastructure.
 //
 // Phase 3F Sub-Epic B Task 15: verify P2RadioConnection accepts a
 // codec-emitted DdcAssignment and writes the corresponding per-DDC
@@ -9,7 +9,7 @@
 //
 // Design: docs/architecture/2026-05-26-phase3f-sub-epic-b-codec-chain-plan.md
 //         Task 15.
-// Source: NereusSDR-original (no Thetis upstream).
+// Source: Longpath-original (no Thetis upstream).
 // =================================================================
 
 #include <QtTest/QtTest>

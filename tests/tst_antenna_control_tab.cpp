@@ -108,7 +108,7 @@ private slots:
         model.alexControllerMutable().setRxOnlyAnt(Band::Band40m, 3);
         QCOMPARE(model.alexController().rxOnlyAnt(Band::Band40m), 3);
         // Phase 3P-I-b T3: default rxOnlyAnt is now 0 ("none selected") per
-        // Thetis Alex.cs:58 — was 1 under the 3P-I-a NereusSDR-native default.
+        // Thetis Alex.cs:58 — was 1 under the 3P-I-a Longpath-native default.
         QCOMPARE(model.alexController().rxOnlyAnt(Band::Band20m), 0);  // unaffected (default)
     }
 };

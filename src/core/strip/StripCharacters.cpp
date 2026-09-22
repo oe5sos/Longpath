@@ -1,13 +1,13 @@
 // =================================================================
-// src/core/strip/StripCharacters.cpp  (NereusSDR)
+// src/core/strip/StripCharacters.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. See StripCharacters.h for why these are
+// Longpath-original. See StripCharacters.h for why these are
 // parameter sets and not algorithms, and why every one of them has to
 // say what it costs.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-09 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

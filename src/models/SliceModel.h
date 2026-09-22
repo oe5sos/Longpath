@@ -1,7 +1,7 @@
 #pragma once
 
 // =================================================================
-// src/models/SliceModel.h  (NereusSDR)
+// src/models/SliceModel.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -10,7 +10,7 @@
 //   Project Files/Source/Console/setup.designer.cs (upstream has no top-of-file header — project-level LICENSE applies)
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -151,7 +151,7 @@ inline constexpr int kStageOneStepLadderSize =
     static_cast<int>(sizeof(kStageOneStepLadder) / sizeof(kStageOneStepLadder[0]));
 
 // Represents a single receiver slice.
-// In NereusSDR, slices are a client-side abstraction — the radio has
+// In Longpath, slices are a client-side abstraction — the radio has
 // no concept of slices. Each slice owns a WDSP channel for independent
 // DSP processing.
 //
@@ -326,6 +326,18 @@ class SliceModel : public QObject {
     Q_PROPERTY(double nr4PostThresh READ nr4PostThresh WRITE setNr4PostThresh NOTIFY nr4PostThreshChanged)
     Q_PROPERTY(Longpath::SbnrAlgo nr4Algo READ nr4Algo WRITE setNr4Algo NOTIFY nr4AlgoChanged)
 
+    // NNR (WDSP 2.10 Neural Noise Reduction) — no Thetis precedent.
+    // Model weight files are GLOBAL (SetNNRModelPathSlot), not per-slice.
+    Q_PROPERTY(Longpath::NrPosition nnrPosition READ nnrPosition WRITE setNnrPosition NOTIFY nnrPositionChanged)
+    Q_PROPERTY(int    nnrModel      READ nnrModel      WRITE setNnrModel      NOTIFY nnrModelChanged)
+    Q_PROPERTY(double nnrMaskFloor  READ nnrMaskFloor  WRITE setNnrMaskFloor  NOTIFY nnrMaskFloorChanged)
+    Q_PROPERTY(double nnrAlpha      READ nnrAlpha      WRITE setNnrAlpha      NOTIFY nnrAlphaChanged)
+    Q_PROPERTY(double nnrAlphaKnee  READ nnrAlphaKnee  WRITE setNnrAlphaKnee  NOTIFY nnrAlphaKneeChanged)
+    Q_PROPERTY(double nnrTau        READ nnrTau        WRITE setNnrTau        NOTIFY nnrTauChanged)
+    Q_PROPERTY(double nnrMaxGain    READ nnrMaxGain    WRITE setNnrMaxGain    NOTIFY nnrMaxGainChanged)
+    Q_PROPERTY(double nnrAttackMs   READ nnrAttackMs   WRITE setNnrAttackMs   NOTIFY nnrAttackMsChanged)
+    Q_PROPERTY(double nnrReleaseMs  READ nnrReleaseMs  WRITE setNnrReleaseMs  NOTIFY nnrReleaseMsChanged)
+
     // DFNR — AttenLimit + PostFilterBeta.
     Q_PROPERTY(double dfnrAttenLimit     READ dfnrAttenLimit     WRITE setDfnrAttenLimit     NOTIFY dfnrAttenLimitChanged)
     Q_PROPERTY(double dfnrPostFilterBeta READ dfnrPostFilterBeta WRITE setDfnrPostFilterBeta NOTIFY dfnrPostFilterBetaChanged)
@@ -358,7 +370,7 @@ class SliceModel : public QObject {
     //
     // The SNB three are genuinely independent per slice: SetRXASNBA* writes
     // rxa[channel].snba (wdsp/snb.c:621-670 [v2.10.3.15]), one per WDSP
-    // channel, and NereusSDR gives every slice its own channel.
+    // channel, and Longpath gives every slice its own channel.
     Q_PROPERTY(int    nb1Threshold    READ nb1Threshold    WRITE setNb1Threshold    NOTIFY nb1ThresholdChanged)
     Q_PROPERTY(double nb1TransitionMs READ nb1TransitionMs WRITE setNb1TransitionMs NOTIFY nb1TransitionMsChanged)
     Q_PROPERTY(double nb1LeadMs       READ nb1LeadMs       WRITE setNb1LeadMs       NOTIFY nb1LeadMsChanged)
@@ -380,7 +392,7 @@ class SliceModel : public QObject {
     Q_PROPERTY(int    rttyMarkHz      READ rttyMarkHz      WRITE setRttyMarkHz      NOTIFY rttyMarkHzChanged)
     Q_PROPERTY(int    rttyShiftHz     READ rttyShiftHz     WRITE setRttyShiftHz     NOTIFY rttyShiftHzChanged)
 
-    // ── Phase 3J-2 Task D5: per-slice live SNR (NereusSDR-native) ──
+    // ── Phase 3J-2 Task D5: per-slice live SNR (Longpath-native) ──
     // NaN means "no SNR available" (mode without SNR estimate, or no
     // decode in flight). RadeChannel populates this when slice mode is
     // RADE; future digital modes wire the same setSnrDb slot. VfoWidget
@@ -473,6 +485,17 @@ public:
     static bool constrainFilter(int& low, int& high, DSPMode mode,
                                 bool filterShift = false,
                                 bool limitToSidebands = false);
+
+    /// Reicht ein Durchlass bei einer EINSEITIGEN Betriebsart (LSB/USB,
+    /// CW, DIG, RADE) ueber den Traeger auf die andere Seite? Bei LSB
+    /// gehoeren beide Kanten unter Null, bei USB ueber Null; ein Filter
+    /// von -100 … +2900 in LSB demoduliert das falsche Seitenband.
+    /// Zweiseitige Betriebsarten (AM/SAM/FM/DSB/SPEC/DRM) kreuzen den
+    /// Traeger absichtlich -- dort immer false. Live darf ein Filter
+    /// weiterhin dorthin gezogen werden (Thetis: limitFiltersToSidebands
+    /// ist Vorgabe AUS); die Frage stellt nur die Wiederherstellung
+    /// gespeicherter Werte, siehe restoreBandState()/setDspMode().
+    static bool filterCrossesCarrier(int low, int high, DSPMode mode);
 
     // From Thetis console.cs:13151 [@852bf0e] —
     // _max_filter_width = 10000.
@@ -659,7 +682,7 @@ public:
     // slice's VfoWidget. setPanKey emits panKeyChanged so MainWindow can
     // migrate the flag (remove from the old pan, re-add on the new one),
     // mirroring AetherSDR's SliceModel::panId() string + panIdChanged.
-    // (AetherSDR uses the name "panId" for its string; NereusSDR keeps its
+    // (AetherSDR uses the name "panId" for its string; Longpath keeps its
     // existing int panId and names the string panKey to avoid the clash.)
     QString panKey() const { return m_panKey; }
     void setPanKey(const QString& key);
@@ -888,6 +911,26 @@ public:
     Longpath::SbnrAlgo nr4Algo() const { return m_nr4Algo; }
     void                setNr4Algo(Longpath::SbnrAlgo v);
 
+    // NNR
+    Longpath::NrPosition nnrPosition() const { return m_nnrPosition; }
+    void   setNnrPosition(Longpath::NrPosition p);
+    int    nnrModel()      const { return m_nnrModel; }
+    void   setNnrModel(int v);
+    double nnrMaskFloor()  const { return m_nnrMaskFloor; }
+    void   setNnrMaskFloor(double v);
+    double nnrAlpha()      const { return m_nnrAlpha; }
+    void   setNnrAlpha(double v);
+    double nnrAlphaKnee()  const { return m_nnrAlphaKnee; }
+    void   setNnrAlphaKnee(double v);
+    double nnrTau()        const { return m_nnrTau; }
+    void   setNnrTau(double v);
+    double nnrMaxGain()    const { return m_nnrMaxGain; }
+    void   setNnrMaxGain(double v);
+    double nnrAttackMs()   const { return m_nnrAttackMs; }
+    void   setNnrAttackMs(double v);
+    double nnrReleaseMs()  const { return m_nnrReleaseMs; }
+    void   setNnrReleaseMs(double v);
+
     // DFNR
     double dfnrAttenLimit()     const { return m_dfnrAttenLimit; }
     void   setDfnrAttenLimit(double v);
@@ -1071,7 +1114,7 @@ public:
     int vaxChannel() const { return m_vaxChannel.load(std::memory_order_acquire); }
     void setVaxChannel(int ch);
 
-    // ── Phase 3J-2 Task D5: per-slice live SNR (NereusSDR-native) ──
+    // ── Phase 3J-2 Task D5: per-slice live SNR (Longpath-native) ──
     // NaN sentinel means "no SNR available." setSnrDb() emits
     // snrDbChanged only on actual change: NaN -> NaN is a no-op,
     // numeric -> identical-numeric is a no-op, NaN -> numeric and
@@ -1191,6 +1234,15 @@ signals:
     void nr4RescaleChanged(double v);
     void nr4PostThreshChanged(double v);
     void nr4AlgoChanged(Longpath::SbnrAlgo v);
+    void nnrPositionChanged(Longpath::NrPosition v);
+    void nnrModelChanged(int v);
+    void nnrMaskFloorChanged(double v);
+    void nnrAlphaChanged(double v);
+    void nnrAlphaKneeChanged(double v);
+    void nnrTauChanged(double v);
+    void nnrMaxGainChanged(double v);
+    void nnrAttackMsChanged(double v);
+    void nnrReleaseMsChanged(double v);
     void dfnrAttenLimitChanged(double v);
     void dfnrPostFilterBetaChanged(double v);
     void bnrStrengthChanged(double v);
@@ -1226,7 +1278,7 @@ signals:
     // ── Phase 3O VAX routing ──────────────────────────────────────────────────
     void vaxChannelChanged(int ch);
 
-    // ── Phase 3J-2 Task D5: live SNR (NereusSDR-native) ──
+    // ── Phase 3J-2 Task D5: live SNR (Longpath-native) ──
     void snrDbChanged(double db);
 
     // ── 2026-05-11 bench: RADE speaker callsign ──
@@ -1375,6 +1427,17 @@ private:
     double m_nr4Rescale    = 2.0;      // setup.cs default
     double m_nr4PostThresh = -10.0;    // setup.cs default
     Longpath::SbnrAlgo m_nr4Algo = Longpath::SbnrAlgo::Algo2;  // setup.cs:34511-34527
+    // NNR — defaults match WDSP's own internal defaults (RXA.c create_nnr(),
+    // nnet.c NNET_TAU_DEFAULT/NNET_GMAX_DB). See RxChannel.h NnrTuning.
+    Longpath::NrPosition m_nnrPosition = Longpath::NrPosition::PostAgc;
+    int    m_nnrModel      = 0;
+    double m_nnrMaskFloor  = -25.0;
+    double m_nnrAlpha      = 1.0;
+    double m_nnrAlphaKnee  = 10.0;
+    double m_nnrTau        = 2.0;
+    double m_nnrMaxGain    = 12.0;
+    double m_nnrAttackMs   = 0.0;
+    double m_nnrReleaseMs  = 0.0;
 
     // DFNR — AetherSDR DeepFilterFilter defaults [@0cd4559] (post-WDSP, not
     // in Thetis). m_attenLimit{100.0f}, m_postFilterBeta{0.0f} verbatim.
@@ -1399,7 +1462,7 @@ private:
     // udDSPSNBThresh2=20.0 (setup.designer.cs grpDSPNB:44399-44604 +
     // grpDSPSNB:44280-44398 [v2.10.3.13]). SNB output bandwidth has no Thetis
     // Setup control (Thetis sets it per mode at rxa.cs:112-124); 6000 Hz is
-    // NereusSDR's existing native default for that override.
+    // Longpath's existing native default for that override.
     int    m_nb1Threshold{30};
     double m_nb1TransitionMs{0.01};
     double m_nb1LeadMs{0.01};
@@ -1426,7 +1489,7 @@ private:
     // ── Phase 3O VAX routing ──────────────────────────────────────────────────
     std::atomic<int> m_vaxChannel{0};  // 0=Off, 1..4=VAX N. Atomic for audio-thread-safe reads.
 
-    // ── Phase 3J-2 Task D5: live SNR (NereusSDR-native) ──
+    // ── Phase 3J-2 Task D5: live SNR (Longpath-native) ──
     // Default NaN means "no SNR available." Populated by RadeChannel
     // (Phase R) when slice mode is RADE; future digital modes wire the
     // same setSnrDb slot.

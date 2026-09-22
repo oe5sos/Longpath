@@ -1,4 +1,4 @@
-// no-port-check: NereusSDR-original test file for AntennaPopupBuilder utility.
+// no-port-check: Longpath-original test file for AntennaPopupBuilder utility.
 //
 // AntennaPopupBuilder consolidates capability-gated antenna popup construction
 // across VfoWidget, RxApplet, and SpectrumOverlayPanel. This test verifies the

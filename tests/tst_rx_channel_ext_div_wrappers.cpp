@@ -1,7 +1,7 @@
 // =================================================================
-// tests/tst_rx_channel_ext_div_wrappers.cpp  (NereusSDR)
+// tests/tst_rx_channel_ext_div_wrappers.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original lifecycle test infrastructure.
+// no-port-check: Longpath-original lifecycle test infrastructure.
 //
 // WDSP external diversity is not an RXA-channel property. It lives in the
 // separate two-slot pdiv[] table in div.c and therefore belongs to the

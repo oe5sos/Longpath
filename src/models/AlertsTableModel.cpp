@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - AlertsTableModel implementation. See AlertsTableModel.h.
+// Longpath - AlertsTableModel implementation. See AlertsTableModel.h.
 //
-// NereusSDR-native, no upstream equivalent.
+// Longpath-native, no upstream equivalent.
 
 #include "AlertsTableModel.h"
 

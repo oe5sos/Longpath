@@ -75,7 +75,7 @@ QTEST_MAIN(TestSpectrumStatusOverlay)
 #include "tst_spectrum_status_overlay.moc"
 ```
 
-Register: `nereus_add_test(tst_spectrum_status_overlay)`.
+Register: `longpath_add_test(tst_spectrum_status_overlay)`.
 
 - [ ] **Step 2: Run + verify failure**
 

@@ -1,8 +1,8 @@
-// no-port-check: NereusSDR-original unit-test file.  All Thetis source
+// no-port-check: Longpath-original unit-test file.  All Thetis source
 // citations below are cite comments documenting which upstream lines each
 // assertion verifies; no Thetis logic is ported in this test file.
 // =================================================================
-// tests/tst_radio_model_puresignal_run_wiring.cpp  (NereusSDR)
+// tests/tst_radio_model_puresignal_run_wiring.cpp  (Longpath)
 // =================================================================
 //
 // Model-to-connection wiring tests for Task 2.5 of the P1 full-parity epic.

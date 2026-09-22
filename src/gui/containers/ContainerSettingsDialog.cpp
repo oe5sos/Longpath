@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/containers/ContainerSettingsDialog.cpp  (NereusSDR)
+// src/gui/containers/ContainerSettingsDialog.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -7,7 +7,7 @@
 //   Project Files/Source/Console/MeterManager.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -226,12 +226,7 @@ const QString kOkBtnStyle = QStringLiteral(
     "QPushButton:hover { background: %1; }")
     .arg(QString::fromLatin1(Style::kBlueText));
 
-constexpr const char* kEditStyle =
-    "background: #0a0a18;"
-    "color: #c8d8e8;"
-    "border: 1px solid #1e2e3e;"
-    "border-radius: 6px;"
-    "padding: 2px 4px;";
+static QString kEditStyle() { return Longpath::Style::formFieldStyle(); }   // seit 2026-09-18 das Glasfeld
 
 constexpr const char* kListStyle =
     "QListWidget {"
@@ -663,7 +658,7 @@ void ContainerSettingsDialog::appendPresetRow(const QString& presetName)
 
     if (!group) { return; }
 
-    // Thetis-parity stack layout with a NereusSDR pixel floor.
+    // Thetis-parity stack layout with a Longpath pixel floor.
     //
     // Composite presets (ANAN MM, CrossNeedle, etc.) are authored
     // at their Thetis-nominal normalized size directly by the
@@ -680,7 +675,7 @@ void ContainerSettingsDialog::appendPresetRow(const QString& presetName)
     //             (anything with itemHeight() > 0.30)
     //
     // then re-lays every stacked item. Thetis `_fHeight=0.05` from
-    // MeterManager.cs:21266 + a NereusSDR pixel floor so rows stay
+    // MeterManager.cs:21266 + a Longpath pixel floor so rows stay
     // readable in tight containers. Rows past widgetH clip
     // naturally at the container bottom — Thetis Default
     // Multimeter parity.
@@ -805,7 +800,7 @@ void ContainerSettingsDialog::buildContainerPropertiesSection(QVBoxLayout* paren
     QLabel* titleLabel = new QLabel(QStringLiteral("Title:"), bar);
     titleLabel->setStyleSheet(kLabelStyle);
     m_titleEdit = new QLineEdit(bar);
-    m_titleEdit->setStyleSheet(kEditStyle);
+    m_titleEdit->setStyleSheet(kEditStyle());
     m_titleEdit->setPlaceholderText(QStringLiteral("Container title..."));
     m_titleEdit->setFixedWidth(140);
 
@@ -1692,7 +1687,7 @@ void ContainerSettingsDialog::onSaveToFile()
     const QString path = QFileDialog::getSaveFileName(this,
         QStringLiteral("Save Container"),
         QString(),
-        QStringLiteral("NereusSDR Container (*.nscontainer);;All Files (*)"));
+        QStringLiteral("Longpath Container (*.nscontainer);;All Files (*)"));
     if (path.isEmpty()) { return; }
 
     // Pipe-delimited container serialize + newline + MeterWidget
@@ -1716,7 +1711,7 @@ void ContainerSettingsDialog::onLoadFromFile()
     const QString path = QFileDialog::getOpenFileName(this,
         QStringLiteral("Load Container"),
         QString(),
-        QStringLiteral("NereusSDR Container (*.nscontainer);;All Files (*)"));
+        QStringLiteral("Longpath Container (*.nscontainer);;All Files (*)"));
     if (path.isEmpty()) { return; }
 
     QFile f(path);

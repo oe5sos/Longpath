@@ -1,8 +1,8 @@
 // =================================================================
-// src/gui/setup/AudioTxInputPage.cpp  (NereusSDR)
+// src/gui/setup/AudioTxInputPage.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original Setup → Audio → TX Input page.
+// Longpath-original Setup → Audio → TX Input page.
 // See AudioTxInputPage.h for the full header.
 //
 // Phase 3M-1b Task I.1 (2026-04-28): Top-level mic-source selector.
@@ -12,7 +12,7 @@
 // Written by J.J. Boyd (KG4VCF), AI-assisted via Anthropic Claude Code.
 // =================================================================
 
-// no-port-check: NereusSDR-original file; no Thetis logic ported here.
+// no-port-check: Longpath-original file; no Thetis logic ported here.
 
 #include "AudioTxInputPage.h"
 
@@ -51,7 +51,7 @@ const QVector<int> AudioTxInputPage::kBufferSizes = {
 // ---------------------------------------------------------------------------
 
 // Returns "N samples (M ms @ 48 kHz)" for the given sample count.
-// Reference sample rate is 48 000 Hz (standard NereusSDR audio rate).
+// Reference sample rate is 48 000 Hz (standard Longpath audio rate).
 /*static*/ QString AudioTxInputPage::latencyString(int samples)
 {
     // latency_ms = samples / 48000.0 * 1000.0
@@ -76,7 +76,7 @@ const QVector<int> AudioTxInputPage::kBufferSizes = {
         }
     }
 #elif defined(Q_OS_LINUX)
-    // Linux: prefer PipeWire if NEREUS_HAVE_PIPEWIRE is defined and enumerable,
+    // Linux: prefer PipeWire if LONGPATH_HAVE_PIPEWIRE is defined and enumerable,
     // else fall back to Pulse.
     for (const auto& api : apis) {
         if (api.name.contains(QLatin1String("PipeWire"), Qt::CaseInsensitive)) {
@@ -318,9 +318,9 @@ void AudioTxInputPage::buildPage(bool hasMicJack, HPSDRHW hw)
     m_radioMicBtn = new QRadioButton(QStringLiteral("Radio Mic"), srcGrp);
     m_vaxMicBtn   = new QRadioButton(QStringLiteral("VAX TX (virtual device)"), srcGrp);
     m_vaxMicBtn->setToolTip(QStringLiteral(
-        "Use audio routed to the \"NereusSDR TX\" CoreAudio device by a "
+        "Use audio routed to the \"Longpath TX\" CoreAudio device by a "
         "3rd-party app (FreeDV, WSJT-X, etc.) as the TX mic input. "
-        "Pulled from /nereussdr-vax-tx shared memory."));
+        "Pulled from /longpath-vax-tx shared memory."));
 
     m_buttonGroup = new QButtonGroup(this);
     m_buttonGroup->addButton(m_pcMicBtn,    static_cast<int>(MicSource::Pc));

@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/widgets/DspParamPopup.cpp  (NereusSDR)
+// src/gui/widgets/DspParamPopup.cpp  (Longpath)
 // =================================================================
 //
 // Ported from AetherSDR src/gui/DspParamPopup.cpp @ 0cd4559.
@@ -7,15 +7,16 @@
 // (GPLv3 per https://github.com/ten9876/AetherSDR).
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-23 — Imported from AetherSDR. Namespace changed from
-//                AetherSDR to NereusSDR; otherwise byte-for-byte.
+//                AetherSDR to Longpath; otherwise byte-for-byte.
 //                Authored by J.J. Boyd (KG4VCF) with AI-assisted
 //                review via Anthropic Claude Code.
 // =================================================================
 
 #include "DspParamPopup.h"
 #include "gui/styles/ThemeQss.h"
+#include "gui/StyleConstants.h"
 #include "GuardedSlider.h"
 
 #include <QVBoxLayout>
@@ -42,11 +43,9 @@ static const QString kPopupStyle = QStringLiteral(
     "  border-radius: 6px; padding: 3px 8px; font-size: 11px; }"
     "QPushButton:hover { background: rgba(0, 112, 192, 180); border: 1px solid #4a7ba8; }");
 
-static const QString kSliderStyle = QStringLiteral(
-    "QSlider::groove:horizontal { height: 4px; background: #304050; border-radius: 2px; }"
-    "QSlider::handle:horizontal { width: 10px; height: 10px; margin: -3px 0;"
-    "  background: #c8d8e8; border-radius: 5px; }"
-    "QSlider::handle:horizontal:hover { background: #4a7ba8; }");
+// 2026-09-18: die Haus-Rinne (versenkt, erhabener Griff) statt einer
+// eigenen Kugel — das Popup ist Teil des RX-Feldes und sieht so aus.
+static QString sliderStyle() { return Longpath::Style::sliderHStyle(); }
 
 DspParamPopup::DspParamPopup(QWidget* parent)
     : QWidget(parent, Qt::Popup | Qt::FramelessWindowHint)
@@ -105,7 +104,7 @@ void DspParamPopup::addSlider(const QString& label, int min, int max, int defaul
     auto* slider = new GuardedSlider(Qt::Horizontal);
     slider->setRange(min, max);
     slider->setValue(defaultVal);
-    slider->setStyleSheet(kSliderStyle);
+    slider->setStyleSheet(sliderStyle());
     if (!tooltip.isEmpty()) slider->setToolTip(tooltip);
     row->addWidget(slider);
 

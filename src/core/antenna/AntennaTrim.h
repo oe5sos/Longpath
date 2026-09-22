@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/core/antenna/AntennaTrim.h  (NereusSDR)
+// src/core/antenna/AntennaTrim.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // How many centimetres, and which way.
 //
@@ -54,7 +54,7 @@
 // Lengthening is not halved: adding wire is reversible.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-10 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

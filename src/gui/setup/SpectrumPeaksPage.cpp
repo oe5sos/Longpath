@@ -1,18 +1,18 @@
 // =================================================================
-// src/gui/setup/SpectrumPeaksPage.cpp  (NereusSDR)
+// src/gui/setup/SpectrumPeaksPage.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/display.cs, original licence from Thetis source is included below
 //
-// NereusSDR-original page structure.  Constants and property defaults
+// Longpath-original page structure.  Constants and property defaults
 // reference Thetis display.cs:
 //   display.cs:4395-4419  ShowPeakBlobs / NumberOfPeakBlobs [v2.10.3.13]
 //   display.cs:4593-4714  BlobPeakHold / BlobPeakHoldMS / BlobPeakHoldDrop / PeakBlobFall [v2.10.3.13]
 //   display.cs:8434-8435  m_bDX2_PeakBlob = OrangeRed, m_bDX2_PeakBlobText = Chartreuse [v2.10.3.13]
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-01 — Skeleton created in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -86,19 +86,11 @@ namespace {
 
 void applyDarkStyle(QWidget* w)
 {
-    w->setStyleSheet(Style::themed(QStringLiteral(
-        "QGroupBox { color: #8090a0; font-size: 11px;"
-        "  border: 1px solid #203040; border-radius: 6px;"
-        "  margin-top: 8px; padding-top: 4px; }"
-        "QGroupBox::title { subcontrol-origin: margin; left: 8px; padding: 0 4px; }"
-        "QLabel { color: #c8d8e8; }"
-        "QSpinBox { background: #1a2a3a; color: #c8d8e8;"
-        "  border: 1px solid #203040; border-radius: 6px; padding: 1px 4px; }"
-        "QCheckBox { color: #c8d8e8; }"
-        "QCheckBox::indicator { width: 14px; height: 14px; background: #1a2a3a;"
-        "  border: 1px solid #203040; border-radius: 2px; }"
-        "QCheckBox::indicator:checked { background: #4a7ba8; border-color: #4a7ba8; }"
-    )));
+    // Hausbausteine (Glas & Tiefe, 2026-09-18) statt einer eigenen Palette.
+    w->setStyleSheet(Style::themed(QStringLiteral("QLabel { color: #c8d8e8; }"))
+                     + QLatin1String(Style::kGroupBoxStyle)
+                     + Style::formFieldStyle()
+                     + QLatin1String(Style::kCheckBoxStyle));
 }
 
 } // anonymous namespace
@@ -125,7 +117,7 @@ SpectrumPeaksPage::SpectrumPeaksPage(RadioModel* model, QWidget* parent)
     m_aphOnTx->setChecked(
         s.value(QStringLiteral("DisplayActivePeakHoldOnTx"), QStringLiteral("False")).toString()
         == QStringLiteral("True"));
-    // NereusSDR-original — distinct trace colour. Default gold (#FFD700FF)
+    // Longpath-original — distinct trace colour. Default gold (#FFD700FF)
     // contrasts against typical clarity-blue spectrum and pure-white
     // Smooth-Defaults data line. Persisted format is "#RRGGBBAA".
     m_aphColor->setColor(ColorSwatchButton::colorFromHex(
@@ -134,7 +126,7 @@ SpectrumPeaksPage::SpectrumPeaksPage(RadioModel* model, QWidget* parent)
 
     // Peak Blobs
     // Thetis Display.cs:4395 [v2.10.3.13] ships m_bPeakBlobMaximums = true.
-    // NereusSDR deviation: default OFF so first-launch is a clean panadapter.
+    // Longpath deviation: default OFF so first-launch is a clean panadapter.
     m_blobEnable->setChecked(
         s.value(QStringLiteral("DisplayPeakBlobsEnabled"), QStringLiteral("False")).toString()
         == QStringLiteral("True"));
@@ -479,10 +471,7 @@ void SpectrumPeaksPage::buildUI()
     m_backBtn = new QPushButton(QStringLiteral("← Spectrum defaults"), this);
     m_backBtn->setToolTip(QStringLiteral(
         "Navigate back to the Spectrum Defaults page."));
-    m_backBtn->setStyleSheet(Style::themed(QStringLiteral(
-        "QPushButton { background: #1a2a3a; color: #8aa8c0; border: 1px solid #203040;"
-        "  border-radius: 6px; padding: 4px 10px; }"
-        "QPushButton:hover { background: #203040; color: #c8d8e8; }")));
+    m_backBtn->setStyleSheet(QLatin1String(Style::kButtonStyle));   // Hausknopf
     connect(m_backBtn, &QPushButton::clicked,
             this, &SpectrumPeaksPage::backToSpectrumDefaultsRequested);
     contentLayout()->addWidget(m_backBtn, 0, Qt::AlignLeft);

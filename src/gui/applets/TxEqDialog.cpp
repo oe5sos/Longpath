@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/applets/TxEqDialog.cpp  (NereusSDR)
+// src/gui/applets/TxEqDialog.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
@@ -18,7 +18,7 @@
 // band — the spinbox is the FREQUENCY of that band's center, NOT a
 // gain mirror.  We keep that semantics verbatim and ALSO add a
 // lightweight gain-spinbox mirror under each gain slider so users
-// can type exact dB values (NereusSDR-spin, common Qt6 idiom).
+// can type exact dB values (Longpath-spin, common Qt6 idiom).
 //
 // Parametric panel (3M-3a-ii follow-up Batch 9):
 //   - chkLegacyEQ checkbox at top toggles between legacy / parametric
@@ -36,15 +36,15 @@
 //     radParaEQ_5/10/18 at eqform.cs:241-275 + 402-600 [v2.10.3.13])
 //
 // Out-of-scope permanently (handled elsewhere):
-//   - RX EQ controls — Thetis EQForm hosts both; NereusSDR splits them.
+//   - RX EQ controls — Thetis EQForm hosts both; Longpath splits them.
 //     The RX EQ widget lives in EqApplet.
 //   - Profile management — Thetis hosts the same profile bank on EQForm;
-//     NereusSDR exposes it on the TxApplet's TX-Profile combo and the
+//     Longpath exposes it on the TxApplet's TX-Profile combo and the
 //     Console / Setup → Audio → TX Profile editor.  Re-introducing a
 //     redundant copy on this dialog would only confuse users.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-29 — Phase 3M-3a-i Batch 3 (Task A.1): created by
 //                 J.J. Boyd (KG4VCF), with AI-assisted transformation
 //                 via Anthropic Claude Code.
@@ -1057,7 +1057,7 @@ void TxEqDialog::onParametricResetClicked()
 {
     if (!m_parametricWidget) { return; }
     // Mirrors btnParaEQReset_Click at eqform.cs:731-740 (calls
-    // ucParametricEq1.SetDefaults).  NereusSDR's ParametricEqWidget keeps
+    // ucParametricEq1.SetDefaults).  Longpath's ParametricEqWidget keeps
     // resetPointsDefault() private (Task 5 review), so we synthesize the
     // flat-default arrays inline and call setPointsData -- same pattern as
     // TxCfcDialog::onResetCompClicked / onResetEqClicked.  setBandCount()
@@ -1232,7 +1232,7 @@ void TxEqDialog::updateEditRowFromSelection()
     // Edit-row spinboxes are enabled only when a band is selected,
     // matching Thetis frmCFCConfig.cs's selected-row-enable pattern
     // (we have no Thetis equivalent in eqform; Thetis leaves the
-    // boxes unconditionally editable).  NereusSDR-spin: gate them
+    // boxes unconditionally editable).  Longpath-spin: gate them
     // so users don't type into spinboxes that have no effect.
     if (m_paraFreqSpin)   m_paraFreqSpin->setEnabled(haveSelection);
     if (m_paraGainSpin)   m_paraGainSpin->setEnabled(haveSelection);

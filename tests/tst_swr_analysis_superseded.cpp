@@ -1,6 +1,6 @@
-// tests/tst_swr_analysis_superseded.cpp  (NereusSDR)
+// tests/tst_swr_analysis_superseded.cpp  (Longpath)
 //
-// NereusSDR-original. No Thetis port.
+// Longpath-original. No Thetis port.
 //
 // ── Two halves of one page, both current, about different bands ──────
 //

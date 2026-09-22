@@ -1,4 +1,4 @@
-// no-port-check: NereusSDR-original regression test for the Phase 3J-1
+// no-port-check: Longpath-original regression test for the Phase 3J-1
 // closeout that replaced the hardcoded init-burst placeholders with live
 // RadioModel reads. Bench bug: an RF-Kit RF2K-S TCI client showed
 // 14.250 MHz while the radio was actually on 40m, because
@@ -121,7 +121,7 @@ void TestTciInitBurstLiveState::vfo_hz_drives_dds_and_vfo_lines()
     QVERIFY2(burst.contains(QStringLiteral("dds:1,21250000;")),
              "dds:1 should carry seeded RX2 VFO (15m)");
 
-    // vfo: per-slice per-channel mirrors VFO A on both channels (NereusSDR
+    // vfo: per-slice per-channel mirrors VFO A on both channels (Longpath
     // collapses VFO B onto the same slice; vfoHz(rx, chan) returns the slice
     // frequency regardless of chan -- see RadioModel.h setVfoHz docs).
     QVERIFY2(burst.contains(QStringLiteral("vfo:0,0,7150000;")),
@@ -577,7 +577,7 @@ void TestTciInitBurstLiveState::cw_macros_match_thetis_null_controller_defaults(
 {
     pinAppSettingsToCaptureConditions();
     TestMockRadioModel mock;
-    // No CwController on NereusSDR yet (3M-2).  Thetis's TCIServer
+    // No CwController on Longpath yet (3M-2).  Thetis's TCIServer
     // GetCwMacrosSpeed / GetCwMacrosDelay / GetCwKeyerSpeed
     // (TCIServer.cs:6950-6973 [v2.10.3.15]) return 30 / 0 / 30 when
     // m_cwController is null.  Our port must match that defaults set

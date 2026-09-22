@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/audio/CoreAudioHalBus.h  (NereusSDR)
+// src/core/audio/CoreAudioHalBus.h  (Longpath)
 // =================================================================
 //
 // Ported from AetherSDR source:
@@ -7,15 +7,15 @@
 //
 // AetherSDR is licensed under the GNU General Public License v3; see
 // https://github.com/ten9876/AetherSDR for the contributor list and
-// project-level LICENSE. NereusSDR is also GPLv3. AetherSDR source
+// project-level LICENSE. Longpath is also GPLv3. AetherSDR source
 // files carry no per-file GPL header; attribution is at project level
 // per AetherSDR convention.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-19 — Ported/adapted in C++20 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
-//                 Claude Code. Adapted to NereusSDR IAudioBus contract:
+//                 Claude Code. Adapted to Longpath IAudioBus contract:
 //                 monolithic VirtualAudioBridge decomposed into per-endpoint
 //                 CoreAudioHalBus instances (Role enum for Vax1..4 / TxInput),
 //                 QObject/signals dropped in favor of atomic metering,
@@ -89,7 +89,7 @@ static_assert(offsetof(VaxShmBlock, ringBuffer)  == 32, "VaxShmBlock.ringBuffer 
 
 // ── CoreAudioHalBus ─────────────────────────────────────────────────────────
 //
-// Per-endpoint IAudioBus implementation bridging NereusSDR's DSP pipeline to
+// Per-endpoint IAudioBus implementation bridging Longpath's DSP pipeline to
 // the macOS CoreAudio HAL plugin (NereusSDRVAX.driver) via POSIX shared memory.
 // One instance per endpoint; the Role enum selects the shm segment and the
 // direction:

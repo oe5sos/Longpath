@@ -11,6 +11,8 @@
 // Wege heraus.
 
 #include <QtTest>
+#include <QDir>
+#include <QFile>
 #include <functional>
 #include <QComboBox>
 #include <QGridLayout>
@@ -24,6 +26,52 @@
 
 #include "gui/HGauge.h"
 #include "gui/applets/TxApplet.h"
+#include "gui/widgets/CommandBar.h"
+#include "gui/applets/AppletFloatingWindow.h"
+#include "gui/LogbookWindow.h"
+#include "gui/applets/RxApplet.h"
+#include "gui/applets/PhoneCwApplet.h"
+#include "gui/applets/VaxApplet.h"
+#include "gui/applets/EqApplet.h"
+#include "gui/applets/KiwiSdrApplet.h"
+#include "gui/applets/PureSignalApplet.h"
+#include "gui/applets/FrequencyApplet.h"
+#include "gui/applets/DigitalApplet.h"
+#include "gui/applets/FmApplet.h"
+#include "gui/applets/CwxApplet.h"
+#include "gui/applets/DiversityApplet.h"
+#include "gui/applets/AmpApplet.h"
+#include "gui/applets/CatApplet.h"
+#include "gui/applets/TciApplet.h"
+#include "gui/applets/AsrApplet.h"
+#include "gui/setup/AsrPage.h"
+#include "gui/SetupDialog.h"
+#include "gui/setup/DspSetupPages.h"
+#include "gui/setup/FilterPresetsSetupPage.h"
+#include "gui/setup/SpectrumPeaksPage.h"
+#include "gui/setup/AudioVaxPage.h"
+#include "gui/setup/TransmitSetupPages.h"
+#include "gui/styles/AppTheme.h"
+#include <QCheckBox>
+#include <QGroupBox>
+#include <QLineEdit>
+#include <QRadioButton>
+#include <QFormLayout>
+#include "asr/WhisperServerLauncher.h"
+#include "gui/applets/DvkApplet.h"
+#include "gui/applets/QsoRecorderApplet.h"
+#include "gui/applets/ClientChainApplet.h"
+#include "gui/applets/RttyDecoderApplet.h"
+#include "gui/applets/TunerApplet.h"
+#include "gui/applets/Rf2ksApplet.h"
+#include "gui/applets/RadeApplet.h"
+#include "gui/applets/BandwidthFilterApplet.h"
+#include "core/TciServer.h"
+#include "core/AudioEngine.h"
+#include "models/SliceModel.h"
+
+#include "gui/applets/AppletGrid.h"
+#include "gui/applets/GridCellWidget.h"
 #include "models/RadioModel.h"
 #include "gui/StyleConstants.h"
 
@@ -701,6 +749,375 @@ private slots:
         for (auto& x : e) {
             const QImage img = blatt(x.f, QString::fromUtf8(x.kopf));
             QVERIFY2(img.save(QString::fromUtf8(x.datei)), x.datei);
+        }
+    }
+
+    // Die Kopfleiste, gebaut: eine Pille je Gruppe eingerastet, damit
+    // man den Auswahlverlauf neben den ruhenden sieht (Glas & Tiefe,
+    // 2026-09-17). Ohne Funkgeraet rastet in der App nichts ein.
+    void kopfleiste()
+    {
+        CommandBar bar;
+        bar.resize(1130, 60);
+        bar.setAttribute(Qt::WA_DontShowOnScreen);
+        bar.show();
+        QCoreApplication::processEvents();
+        const QStringList an{QStringLiteral("40m"), QStringLiteral("LSB"),
+                             QStringLiteral("100 Hz"), QStringLiteral("NR2")};
+        for (QPushButton* b : bar.findChildren<QPushButton*>()) {
+            if (an.contains(b->text())) { b->setChecked(true); }
+        }
+        QCoreApplication::processEvents();
+        QImage img(bar.size() * 2, QImage::Format_ARGB32);
+        img.setDevicePixelRatio(2.0);
+        img.fill(QColor(Style::kAppBg));
+        bar.render(&img);
+        const QString aus = QStringLiteral("/tmp/kopfleiste_gebaut.png");
+        QVERIFY2(img.save(aus), qPrintable(aus));
+        qInfo().noquote() << "Blatt:" << aus;
+    }
+
+    // Die PLATTE (Glas & Tiefe, 2026-09-17): das echte schwebende
+    // Fenster und die echte gedockte Zelle mit demselben TX-Feld darin.
+    // Erst dieses Blatt zeigt, ob der Verlauf der Platte durch das
+    // Applet scheint oder ein opaker Body ihn zudeckt.
+    void platte()
+    {
+        RadioModel modell;
+        {
+            auto* applet = new TxApplet(&modell);
+            AppletFloatingWindow win(applet, QStringLiteral("p"), 0);
+            win.resize(557, 190);
+            win.setAttribute(Qt::WA_DontShowOnScreen);
+            win.show();
+            QCoreApplication::processEvents();
+            QImage img(win.size() * 2, QImage::Format_ARGB32);
+            img.setDevicePixelRatio(2.0);
+            img.fill(QColor(Style::kAppBg));
+            win.render(&img);
+            const QString aus = QStringLiteral("/tmp/platte_fenster.png");
+            QVERIFY2(img.save(aus), qPrintable(aus));
+            qInfo().noquote() << "Blatt:" << aus;
+        }
+        {
+            AppletGrid grid;
+            grid.resize(560, 420);
+            const QString a = grid.addCell(QString());
+            const QString b = grid.addCell(QString());
+            grid.cell(a)->addWidget(new TxApplet(&modell));
+            grid.cell(b)->addWidget(new TxApplet(&modell));
+            grid.setAttribute(Qt::WA_DontShowOnScreen);
+            grid.show();
+            QCoreApplication::processEvents();
+            QImage img(grid.size() * 2, QImage::Format_ARGB32);
+            img.setDevicePixelRatio(2.0);
+            img.fill(QColor(Style::kAppBg));
+            grid.render(&img);
+            const QString aus = QStringLiteral("/tmp/platte_zellen.png");
+            QVERIFY2(img.save(aus), qPrintable(aus));
+            qInfo().noquote() << "Blatt:" << aus;
+        }
+        {
+            // Die Mitschrift gedockt: im Sandbox-Bild vom 18.09. stand
+            // hinter dem Zustandstext ein Balken in #0f0f1a — schwebend
+            // (mitschrift-Blatt) nicht. Hier die Zelle, um es zu sehen.
+            applyAppBaselineQss(*qApp);
+            AppletGrid grid;
+            grid.resize(300, 260);
+            const QString a = grid.addCell(QString());
+            grid.cell(a)->addWidget(new AsrApplet(&modell));
+            grid.setAttribute(Qt::WA_DontShowOnScreen);
+            grid.show();
+            QCoreApplication::processEvents();
+            QImage img(grid.size() * 2, QImage::Format_ARGB32);
+            img.setDevicePixelRatio(2.0);
+            img.fill(QColor(Style::kAppBg));
+            grid.render(&img);
+            QVERIFY(img.save(QStringLiteral("/tmp/platte_mitschrift.png")));
+            qInfo().noquote() << "Blatt: /tmp/platte_mitschrift.png";
+        }
+    }
+
+    // Das Logbuchfenster mit dem Logbuch des Betreibers-Sandkastens (oder
+    // leer): der zentrale Tabellenstil an einer Tabelle mit vielen
+    // Spalten, damit ein zu breiter Versal-Kopf hier auffiele und nicht
+    // erst bei ihm.
+    void logbuch()
+    {
+        const QString adif = QDir::temp().filePath(QStringLiteral("blatt-logbook.adi"));
+        {
+            QFile f(adif);
+            QVERIFY(f.open(QIODevice::WriteOnly | QIODevice::Truncate));
+            f.write("<ADIF_VER:5>3.1.4<EOH>\n"
+                    "<CALL:6>OE5AOO<QSO_DATE:8>20260917<TIME_ON:4>1047<BAND:3>20m<MODE:3>USB<FREQ:6>14.225<RST_SENT:2>59<RST_RCVD:2>59<EOR>\n"
+                    "<CALL:5>F5LIW<QSO_DATE:8>20260916<TIME_ON:4>2230<BAND:3>80m<MODE:3>SSB<FREQ:5>3.770<RST_SENT:2>59<RST_RCVD:2>57<EOR>\n"
+                    "<CALL:4>YP8T<QSO_DATE:8>20260916<TIME_ON:4>2229<BAND:3>80m<MODE:3>SSB<FREQ:5>3.729<RST_SENT:2>59<RST_RCVD:2>59<EOR>\n");
+        }
+        LogbookWindow win(adif);
+        win.resize(1130, 420);
+        win.setAttribute(Qt::WA_DontShowOnScreen);
+        win.show();
+        QCoreApplication::processEvents();
+        QImage img(win.size() * 2, QImage::Format_ARGB32);
+        img.setDevicePixelRatio(2.0);
+        img.fill(QColor(Style::kAppBg));
+        win.render(&img);
+        const QString aus = QStringLiteral("/tmp/logbuch_gebaut.png");
+        QVERIFY2(img.save(aus), qPrintable(aus));
+        qInfo().noquote() << "Blatt:" << aus;
+    }
+
+    // ALLE Applets, je eines in seinem echten schwebenden Fenster, in
+    // der Groesse, die es sich selbst wuenscht (mindestens 420x160): ein
+    // Blatt je Applet, damit man Panel fuer Panel sieht, was vom Look
+    // "Glas & Tiefe" noch fehlt (2026-09-17, Punkt 5 der Runde).
+    void applets()
+    {
+        applyAppBaselineQss(*qApp);   // wie im Programm (main.cpp)
+        RadioModel modell;
+        TciServer tci(&modell);
+        SliceModel* slice = modell.sliceById(0);
+        if (!slice) { slice = modell.sliceById(modell.addSlice()); }
+
+        struct A { const char* name; std::function<AppletWidget*()> bauen; };
+        const A liste[] = {
+            {"Rx",          [&]{ return new RxApplet(slice, &modell); }},
+            {"PhoneCw",     [&]{ return new PhoneCwApplet(&modell); }},
+            {"Vax",         [&]{ return new VaxApplet(&modell, modell.audioEngine()); }},
+            {"Eq",          [&]{ return new EqApplet(&modell); }},
+            {"KiwiSdr",     [&]{ return new KiwiSdrApplet(&modell); }},
+            {"PureSignal",  [&]{ return new PureSignalApplet(&modell); }},
+            {"Frequency",   [&]{ return new FrequencyApplet(&modell); }},
+            {"Digital",     [&]{ return new DigitalApplet(&modell); }},
+            {"Fm",          [&]{ return new FmApplet(&modell); }},
+            {"Cwx",         [&]{ return new CwxApplet(&modell); }},
+            {"Diversity",   [&]{ return new DiversityApplet(&modell); }},
+            {"Amp",         [&]{ return new AmpApplet(&modell); }},
+            {"Cat",         [&]{ return new CatApplet(&modell); }},
+            {"Tci",         [&]{ return new TciApplet(&tci); }},
+            {"Asr",         [&]{ return new AsrApplet(&modell); }},
+            {"Dvk",         [&]{ return new DvkApplet(&modell); }},
+            {"QsoRecorder", [&]{ return new QsoRecorderApplet(&modell); }},
+            {"ClientChain", [&]{ return new ClientChainApplet(&tci); }},
+            {"RttyDecoder", [&]{ return new RttyDecoderApplet(&modell); }},
+            {"Tuner",       [&]{ return new TunerApplet(&modell, modell.tunerModel()); }},
+            {"Rf2ks",       [&]{ return new Rf2ksApplet(&modell); }},
+            {"Rade",        [&]{ return new RadeApplet(&modell); }},
+            {"BwFilter",    [&]{ return new BandwidthFilterApplet(&modell); }},
+        };
+        for (const A& a : liste) {
+            AppletWidget* applet = a.bauen();
+            AppletFloatingWindow win(applet, QString::fromLatin1(a.name), 0);
+            win.setAttribute(Qt::WA_DontShowOnScreen);
+            win.show();
+            QCoreApplication::processEvents();
+            const QSize wish = win.sizeHint().expandedTo(QSize(420, 160));
+            win.resize(qMin(wish.width(), 1130), qMin(wish.height(), 700));
+            QCoreApplication::processEvents();
+            QImage img(win.size() * 2, QImage::Format_ARGB32);
+            img.setDevicePixelRatio(2.0);
+            img.fill(QColor(Style::kAppBg));
+            win.render(&img);
+            const QString aus = QStringLiteral("/tmp/applet_%1.png").arg(QLatin1String(a.name));
+            QVERIFY2(img.save(aus), qPrintable(aus));
+            qInfo().noquote() << "Blatt:" << aus << win.size();
+        }
+    }
+
+    // Die Mitschrift mit dem Dienst-Starter (2026-09-17): das Applet
+    // nach dem Einschalten und die Setup-Seite mit der Gruppe "Dienst
+    // auf diesem Rechner". Der Starter wird wirklich angestossen —
+    // auf dem Rechner des Betreibers antwortet "Extern" (sein Login-
+    // Dienst), ohne whisper-server "Fehler: nicht gefunden". Beides
+    // sind Zustaende, die das Blatt zeigen soll.
+    void mitschrift()
+    {
+        applyAppBaselineQss(*qApp);
+        RadioModel modell;
+        auto& launcher = WhisperServerLauncher::instance();
+        launcher.start(WhisperServerLauncher::configFromSettings());
+        QTest::qWait(300);
+
+        {
+            auto* applet = new AsrApplet(&modell);
+            AppletFloatingWindow win(applet, QStringLiteral("Mitschrift"), 0);
+            win.setAttribute(Qt::WA_DontShowOnScreen);
+            win.show();
+            QCoreApplication::processEvents();
+            win.resize(420, 260);
+            // Der Zustand kommt sonst nur ueber stateChanged an — hier
+            // nachgereicht, wie es das Hauptfenster beim Einschalten tut.
+            emit launcher.stateChanged(launcher.state(), launcher.reason());
+            QCoreApplication::processEvents();
+            QImage img(win.size() * 2, QImage::Format_ARGB32);
+            img.setDevicePixelRatio(2.0);
+            img.fill(QColor(Style::kAppBg));
+            win.render(&img);
+            QVERIFY(img.save(QStringLiteral("/tmp/mitschrift_applet.png")));
+            qInfo().noquote() << "Blatt: /tmp/mitschrift_applet.png" << win.size()
+                              << "Dienst:" << int(launcher.state()) << launcher.reason();
+        }
+        {
+            AsrPage page(&modell);
+            page.setAttribute(Qt::WA_DontShowOnScreen);
+            page.show();
+            QCoreApplication::processEvents();
+            page.resize(720, qMin(page.sizeHint().height() + 20, 900));
+            QCoreApplication::processEvents();
+            QImage img(page.size() * 2, QImage::Format_ARGB32);
+            img.setDevicePixelRatio(2.0);
+            img.fill(QColor(Style::kAppBg));
+            page.render(&img);
+            QVERIFY(img.save(QStringLiteral("/tmp/mitschrift_setup.png")));
+            qInfo().noquote() << "Blatt: /tmp/mitschrift_setup.png" << page.size();
+        }
+        launcher.stop();
+    }
+
+    // Das RX-Applet in der Breite der Applet-Spalte des Betreibers
+    // (268 px): die Spalten muessen untereinander stehen, nichts darf
+    // sich ueberlagern. Dazu einmal breit (560) zum Vergleich.
+    void rxSchmal()
+    {
+        applyAppBaselineQss(*qApp);
+        RadioModel modell;
+        SliceModel* slice = modell.sliceById(0);
+        if (!slice) { slice = modell.sliceById(modell.addSlice()); }
+        for (int w : {268, 560}) {
+            auto* applet = new RxApplet(slice, &modell);
+            AppletFloatingWindow win(applet, QStringLiteral("RX"), 0);
+            win.setAttribute(Qt::WA_DontShowOnScreen);
+            win.show();
+            QCoreApplication::processEvents();
+            win.resize(w, win.sizeHint().height());
+            QCoreApplication::processEvents();
+            win.resize(w, qMin(win.sizeHint().height(), 900));
+            QCoreApplication::processEvents();
+            QImage img(win.size() * 2, QImage::Format_ARGB32);
+            img.setDevicePixelRatio(2.0);
+            img.fill(QColor(Style::kAppBg));
+            win.render(&img);
+            const QString aus = QStringLiteral("/tmp/rx_%1.png").arg(w);
+            QVERIFY2(img.save(aus), qPrintable(aus));
+            qInfo().noquote() << "Blatt:" << aus << win.size();
+        }
+    }
+
+    // Der Formularstil (Roadmap C/F, 2026-09-18): die App-Basislinie
+    // allein — kein Widget hier hat ein eigenes Stylesheet. So sieht
+    // jede Setup-Seite aus, die nichts weiter tut, und jedes Applet-
+    // Auswahlfeld, das applyComboStyle() ruft.
+    void formular()
+    {
+        applyAppBaselineQss(*qApp);
+
+        QWidget page;
+        page.setAttribute(Qt::WA_DontShowOnScreen);
+        page.setStyleSheet(QStringLiteral("QWidget { background: %1; color: %2; }")
+                               .arg(QLatin1String(Style::kAppBg),
+                                    QLatin1String(Style::kTextPrimary)));
+        auto* col = new QVBoxLayout(&page);
+        col->setContentsMargins(16, 14, 16, 14);
+        col->setSpacing(10);
+
+        auto* group = new QGroupBox(QStringLiteral("Erkennung"), &page);
+        auto* form = new QFormLayout(group);
+        form->setHorizontalSpacing(12);
+        form->setVerticalSpacing(8);
+        auto* combo = new QComboBox(group);
+        combo->addItems({QStringLiteral("USB"), QStringLiteral("LSB"), QStringLiteral("CW")});
+        form->addRow(QStringLiteral("Betriebsart:"), combo);
+        auto* edit = new QLineEdit(QStringLiteral("http://127.0.0.1:8080/inference"), group);
+        form->addRow(QStringLiteral("Adresse:"), edit);
+        auto* spin = new QSpinBox(group);
+        spin->setRange(0, 5000); spin->setValue(2850); spin->setSuffix(QStringLiteral(" Hz"));
+        form->addRow(QStringLiteral("Bandbreite:"), spin);
+        auto* slider = new QSlider(Qt::Horizontal, group);
+        slider->setRange(0, 100); slider->setValue(62);
+        form->addRow(QStringLiteral("Pegel:"), slider);
+        col->addWidget(group);
+
+        auto* checks = new QGroupBox(QStringLiteral("Schalter"), &page);
+        auto* row = new QHBoxLayout(checks);
+        auto* c1 = new QCheckBox(QStringLiteral("selbst starten"), checks); c1->setChecked(true);
+        auto* c2 = new QCheckBox(QStringLiteral("Automatik"), checks);
+        auto* c3 = new QCheckBox(QStringLiteral("gesperrt"), checks); c3->setChecked(true); c3->setEnabled(false);
+        auto* r1 = new QRadioButton(QStringLiteral("Deutsch"), checks); r1->setChecked(true);
+        auto* r2 = new QRadioButton(QStringLiteral("Englisch"), checks);
+        for (QWidget* w : std::initializer_list<QWidget*>{c1, c2, c3, r1, r2}) { row->addWidget(w); }
+        row->addStretch(1);
+        col->addWidget(checks);
+
+        auto* buttons = new QHBoxLayout;
+        auto* b1 = new QPushButton(QStringLiteral("Starten"), &page);
+        auto* b2 = new QPushButton(QStringLiteral("Stoppen"), &page); b2->setEnabled(false);
+        auto* b3 = new QPushButton(QStringLiteral("Erreichbarkeit pruefen"), &page);
+        auto* v = new QSlider(Qt::Vertical, &page); v->setRange(-12, 12); v->setValue(3); v->setFixedHeight(70);
+        buttons->addWidget(b1); buttons->addWidget(b2); buttons->addWidget(b3);
+        buttons->addStretch(1); buttons->addWidget(v);
+        col->addLayout(buttons);
+        col->addStretch(1);
+
+        page.resize(560, 330);
+        page.show();
+        QCoreApplication::processEvents();
+        QImage img(page.size() * 2, QImage::Format_ARGB32);
+        img.setDevicePixelRatio(2.0);
+        img.fill(QColor(Style::kAppBg));
+        page.render(&img);
+        QVERIFY(img.save(QStringLiteral("/tmp/formular.png")));
+        qInfo().noquote() << "Blatt: /tmp/formular.png" << page.size();
+    }
+
+    // Der ganze Setup-Dialog mit Seitenliste, wie er sich oeffnet.
+    void setupdialog()
+    {
+        applyAppBaselineQss(*qApp);
+        RadioModel modell;
+        SetupDialog dlg(&modell);
+        dlg.setAttribute(Qt::WA_DontShowOnScreen);
+        dlg.resize(980, 680);
+        dlg.show();
+        QCoreApplication::processEvents();
+        QTest::qWait(200);
+        QImage img(dlg.size() * 2, QImage::Format_ARGB32);
+        img.setDevicePixelRatio(2.0);
+        img.fill(QColor(Style::kAppBg));
+        dlg.render(&img);
+        QVERIFY(img.save(QStringLiteral("/tmp/setup_dialog.png")));
+        qInfo().noquote() << "Blatt: /tmp/setup_dialog.png" << dlg.size();
+    }
+
+    // Setup-Seiten (Roadmap F): jede als Blatt, mit der App-Basislinie
+    // wie im Programm. /tmp/setup_<Name>.png
+    void setup()
+    {
+        applyAppBaselineQss(*qApp);
+        RadioModel modell;
+        struct P { const char* name; std::function<QWidget*()> bauen; };
+        const P liste[] = {
+            {"NrAnf",         [&]{ return new NrAnfSetupPage(&modell); }},
+            {"AgcAlc",        [&]{ return new AgcAlcSetupPage(&modell); }},
+            {"Mnf",           [&]{ return new MnfSetupPage(&modell); }},
+            {"FilterPresets", [&]{ return new FilterPresetsSetupPage(modell.filterPresetStore(), &modell); }},
+            {"SpectrumPeaks", [&]{ return new SpectrumPeaksPage(&modell); }},
+            {"AudioVax",      [&]{ return new AudioVaxPage(&modell); }},
+            {"Power",         [&]{ return new PowerPage(&modell); }},
+        };
+        for (const P& p : liste) {
+            QWidget* page = p.bauen();
+            page->setAttribute(Qt::WA_DontShowOnScreen);
+            page->resize(760, 900);
+            page->show();
+            QCoreApplication::processEvents();
+            QImage img(page->size() * 2, QImage::Format_ARGB32);
+            img.setDevicePixelRatio(2.0);
+            img.fill(QColor(Style::kAppBg));
+            page->render(&img);
+            const QString aus = QStringLiteral("/tmp/setup_%1.png").arg(QLatin1String(p.name));
+            QVERIFY2(img.save(aus), qPrintable(aus));
+            qInfo().noquote() << "Blatt:" << aus;
+            delete page;
         }
     }
 

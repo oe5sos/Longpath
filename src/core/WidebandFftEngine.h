@@ -1,8 +1,8 @@
 // =================================================================
-// src/core/WidebandFftEngine.h  (NereusSDR)
+// src/core/WidebandFftEngine.h  (Longpath)
 // =================================================================
 //
-// no-port-check: NereusSDR-original. FFTW3 real-to-complex 16384-pt
+// no-port-check: Longpath-original. FFTW3 real-to-complex 16384-pt
 // FFT engine for the P2 wideband ADC stream (Phase 3F Sub-Epic F).
 //
 // One instance per ADC. Consumes 16384-sample float frames emitted
@@ -22,9 +22,9 @@
 //   Task 4 for design context.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-27  J.J. Boyd / KG4VCF  Phase 3F Sub-Epic F Task 4.
-//                                    NereusSDR-original 16384-pt
+//                                    Longpath-original 16384-pt
 //                                    real-input FFTW3 r2c engine
 //                                    for the P2 wideband ADC stream.
 //                                    AI-assisted transformation via

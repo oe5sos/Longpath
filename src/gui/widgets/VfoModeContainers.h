@@ -1,7 +1,7 @@
 #pragma once
 
 // =================================================================
-// src/gui/widgets/VfoModeContainers.h  (NereusSDR)
+// src/gui/widgets/VfoModeContainers.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -9,7 +9,7 @@
 //   Project Files/Source/Console/dsp.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -180,7 +180,7 @@ private:
 //
 // Binds to SliceModel: rttyMarkHz (default 2295), rttyShiftHz (default 170).
 // Step constants from AetherSDR VfoWidget.cpp; these are UX choices, not DSP
-// constants, so they are native NereusSDR.
+// constants, so they are native Longpath.
 class RttyMarkShiftContainer : public QWidget {
     Q_OBJECT
 public:

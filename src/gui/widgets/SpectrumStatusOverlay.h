@@ -1,14 +1,14 @@
-// no-port-check: NereusSDR-original. No upstream port. Top-right
+// no-port-check: Longpath-original. No upstream port. Top-right
 // per-pan overlay widget for the Phase 3F multi-slice UI atlas; see
 // docs/architecture/2026-05-26-phase3f-sub-epic-e-ui-atlas-plan.md.
 
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // =================================================================
-// src/gui/widgets/SpectrumStatusOverlay.h  (NereusSDR)
+// src/gui/widgets/SpectrumStatusOverlay.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original; no upstream port. Top-right per-pan overlay
+// Longpath-original; no upstream port. Top-right per-pan overlay
 // widget for Phase 3F multi-slice UI atlas. Paint-based (QPainter,
 // not a QPushButton tree) for performance. Shows the slice letter
 // badge, frequency.kHz + mode text, CH N tag, and optional pills
@@ -17,10 +17,10 @@
 // chainTagClicked signals for parent consumption.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-27  J.J. Boyd / KG4VCF  Phase 3F Sub-Epic E Task 1.
-//                                    Created in C++20/Qt6 for NereusSDR;
-//                                    NereusSDR-original widget, no
+//                                    Created in C++20/Qt6 for Longpath;
+//                                    Longpath-original widget, no
 //                                    upstream port. AI-assisted
 //                                    transformation via Anthropic Claude
 //                                    Code.

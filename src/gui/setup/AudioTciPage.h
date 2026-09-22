@@ -1,13 +1,13 @@
 #pragma once
 
 // =================================================================
-// src/gui/setup/AudioTciPage.h  (NereusSDR)
+// src/gui/setup/AudioTciPage.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original Setup -> Audio -> TCI page.
+// Longpath-original Setup -> Audio -> TCI page.
 // No Thetis port, no attribution headers required (per memory:
 // feedback_source_first_ui_vs_dsp -- Qt widgets in Setup pages are
-// NereusSDR-native).
+// Longpath-native).
 //
 // Phase 24 Task 24.2 (2026-05-10): Flesh out AudioTciPage.
 //   Four group boxes:
@@ -26,7 +26,7 @@
 // Design spec: docs/architecture/2026-04-19-vax-design.md Section 2.7,
 //              Section 10 (AppSettings inventory).
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-10 -- Phase 24 (Task 24.2): written by J.J. Boyd (KG4VCF),
 //                 AI-assisted via Anthropic Claude Code.
 // =================================================================

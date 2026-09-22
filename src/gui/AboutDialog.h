@@ -1,7 +1,7 @@
 #pragma once
 
 // =================================================================
-// src/gui/AboutDialog.h  (NereusSDR)
+// src/gui/AboutDialog.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source (pairs with src/gui/AboutDialog.cpp):
@@ -62,11 +62,11 @@ mw0lge@grange-lane.co.uk
 // --- End Thetis frmAbout.cs verbatim header ---
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Implemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted authoring via Anthropic
 //                 Claude Code. Contributor list, copyright string,
-//                 and §5(d) notice content are NereusSDR-specific.
+//                 and §5(d) notice content are Longpath-specific.
 //   2026-04-18 — Brought lineage forward to full Thetis-roster parity:
 //                 scrollable contributor list reproducing
 //                 Thetis/frmAbout.Designer.cs:57-81 verbatim, Links

@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/setup/hardware/PaCalibrationGroup.h  (NereusSDR)
+// src/gui/setup/hardware/PaCalibrationGroup.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -13,7 +13,7 @@
 //      original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-02 -- Original implementation. Per-board PA forward-power
 //                  cal-point spinbox group; populates ud{10|100|200}PA{N}W
 //                  equivalent based on PaCalBoardClass. Section 3.3 of
@@ -163,7 +163,7 @@ public:
     // connect). Hides the whole group when boardClass == PaCalBoardClass::None.
     void populate(CalibrationController* controller, PaCalBoardClass boardClass);
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     // Test seams.
     int     spinBoxCountForTest() const;            // 0 (None) / 10 (any other)
     QString labelTextForTest(int idx) const;        // idx 1..10 -- e.g. "10 W"

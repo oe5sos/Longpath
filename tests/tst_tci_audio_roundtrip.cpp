@@ -1,5 +1,5 @@
-// tests/tst_tci_audio_roundtrip.cpp  (NereusSDR)
-// no-port-check: NereusSDR-original integration test for the audio binary
+// tests/tst_tci_audio_roundtrip.cpp  (Longpath)
+// no-port-check: Longpath-original integration test for the audio binary
 // RX pipeline.  Validates: synthetic audio injection → AudioRingSpsc → drain
 // timer assembly → resampler (identity at srcRate=48k) → TciBinaryFrame
 // encode → QWebSocket sendBinaryMessage → client receives + decodes.

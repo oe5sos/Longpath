@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - PskReporterClient implementation.
+// Longpath - PskReporterClient implementation.
 //
 // Ported from freedv-gui src/reporting/pskreporter.cpp [@77e793a].
 //   The IPFIX wire format (16-byte header, rxFormatHeader,
@@ -52,7 +52,7 @@
 //  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // =========================================================================
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-10  J.J. Boyd / KG4VCF  Phase 3J-2 Task B6. See
 //                                    PskReporterClient.h for the full
 //                                    attribution block. Implementation
@@ -70,7 +70,7 @@
 //                                    detached thread, Qt event-loop
 //                                    QTimer instead of a manual loop.
 //                                    Parser side (parseDatagramLocked
-//                                    /spotReceived) is a NereusSDR
+//                                    /spotReceived) is a Longpath
 //                                    addition; freedv-gui is send-only.
 //                                    AI tooling: Anthropic Claude Code.
 
@@ -221,7 +221,7 @@ PskReporterClient::PskReporterClient(QObject* parent)
     // From freedv-gui pskreporter.cpp:154-157 [@77e793a]:
     // randomIdentifier_ is a per-instance random uint used as the
     // IPFIX observationDomain. Use QRandomGenerator instead of
-    // std::random_device for Qt parity with the rest of NereusSDR.
+    // std::random_device for Qt parity with the rest of Longpath.
     m_randomIdentifier = QRandomGenerator::system()->generate();
 
     m_autoSendTimer = new QTimer(this);
@@ -485,7 +485,7 @@ QByteArray PskReporterClient::buildDatagramLocked() {
 }
 
 // Parser side. Walk the IPFIX datagram and emit a DxSpot for every
-// sender record we find. This is a NereusSDR addition; freedv-gui's
+// sender record we find. This is a Longpath addition; freedv-gui's
 // pskreporter is send-only.
 QVector<DxSpot> PskReporterClient::parseDatagramLocked(
     const QByteArray& datagram) {

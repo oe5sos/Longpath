@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/AboutDialog.cpp  (NereusSDR)
+// src/gui/AboutDialog.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
@@ -67,11 +67,11 @@ mw0lge@grange-lane.co.uk
 // --- End Thetis frmAbout.cs verbatim header ---
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Implemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted authoring via Anthropic
 //                 Claude Code. Contributor list, copyright string,
-//                 and §5(d) notice content are NereusSDR-specific.
+//                 and §5(d) notice content are Longpath-specific.
 //   2026-04-18 — Expanded contributor section to reproduce the full
 //                 Thetis roster (from frmAbout.Designer.cs:57-81) in a
 //                 scrollable list. Added Links section. Revised licence
@@ -226,11 +226,11 @@ void AboutDialog::buildUI()
 
     // From Thetis Project Files/Source/Console/frmAbout.Designer.cs:57-81 [@501e3f5] —
     // lstContributors .Items.AddRange block, reproduced verbatim in kRoster
-    // below (each entry prefixed with two spaces for NereusSDR presentation
+    // below (each entry prefixed with two spaces for Longpath presentation
     // hierarchy; content after the indent matches byte-for-byte). Thetis
     // frmAbout.cs verbatim header is at top of this file per HOW-TO-PORT.md
     // rule 2; frmAbout.Designer.cs itself has no per-file header.
-    // NereusSDR-scoped contributors are appended after the upstream block,
+    // Longpath-scoped contributors are appended after the upstream block,
     // separated by a blank line.
     auto* contribList = new QListWidget(this);
     contribList->setSelectionMode(QAbstractItemView::NoSelection);
@@ -326,7 +326,7 @@ void AboutDialog::buildUI()
             "NereusSDR releases</a> &nbsp;·&nbsp; "
             "<a href=\"https://github.com/boydsoftprez/NereusSDR/tree/main/docs/attribution\">"
             "docs/attribution</a> &nbsp;·&nbsp; "
-            "<a href=\"https://github.com/boydsoftprez/NereusSDR/issues\">Issues</a><br>"
+            "<a href=\"https://github.com/oe5sos/Longpath/issues\">Issues</a><br>"
             "<a href=\"https://github.com/ramdor/Thetis\">Thetis upstream</a> &nbsp;·&nbsp; "
             "<a href=\"https://github.com/mi0bot/OpenHPSDR-Thetis\">mi0bot fork (HL2)</a> &nbsp;·&nbsp; "
             "<a href=\"https://github.com/ten9876/AetherSDR\">AetherSDR</a><br>"
@@ -408,7 +408,7 @@ void AboutDialog::buildUI()
     // available via the "or later" clause in upstream Thetis source-file
     // headers. Hence the full four-element block below.
     // The copyright line names the principal copyright-holding individuals
-    // whose code appears in the running binary. NereusSDR is a derivative
+    // whose code appears in the running binary. Longpath is a derivative
     // work; the full per-file contributor chain — including inline-mod
     // attributions — is carried in the source tree's file headers and
     // summarized in docs/attribution/ (THETIS-PROVENANCE.md,

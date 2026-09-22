@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 //
-// NereusSDR - tst_tx_channel_rade_mode_mapping
+// Longpath - tst_tx_channel_rade_mode_mapping
 //
 // Pins the Phase 3R K-bench contract: TxChannel::setTxMode maps
 // DSPMode::RADE_U -> DSPMode::USB and DSPMode::RADE_L -> DSPMode::LSB
@@ -9,11 +9,11 @@
 // output, which was the user-reported "no RF on the air" symptom.
 //
 // The test seam lastWdspTxModeForTest() returns the mapped value
-// (not the carry m_mode which preserves RADE_U/L for NereusSDR-side
+// (not the carry m_mode which preserves RADE_U/L for Longpath-side
 // dispatch). USB/LSB/CW/AM/FM/DIGU/DIGL/SAM/DSB/SPEC/DRM pass through
 // unchanged.
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   Created 2026-05-11 by JJ Boyd / KG4VCF.  Reproducer for the
 //   bench-reported "RADE-U + MOX = no RF" symptom from commit
 //   b79f577d's K-bench wire-up.

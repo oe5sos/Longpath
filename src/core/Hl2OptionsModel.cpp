@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/Hl2OptionsModel.cpp  (NereusSDR)
+// src/core/Hl2OptionsModel.cpp  (Longpath)
 // =================================================================
 //
 // Ported from mi0bot-Thetis source:
@@ -10,7 +10,7 @@
 // See Hl2OptionsModel.h for the full design + scope rationale.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-30 — New for Phase 3L HL2 Filter visibility brainstorm.
 //                J.J. Boyd (KG4VCF), with AI-assisted transformation
 //                via Anthropic Claude Code.
@@ -131,7 +131,7 @@ void Hl2OptionsModel::save() const
     s.setHardwareValue(m_mac, QString::fromLatin1(kKeyBandVolts),  boolStr(m_bandVolts));
 }
 
-#define NEREUS_SETTER_BOOL(method, member, signalName) \
+#define LONGPATH_SETTER_BOOL(method, member, signalName) \
 void Hl2OptionsModel::method(bool on)                  \
 {                                                       \
     if (member == on) { return; }                       \
@@ -141,7 +141,7 @@ void Hl2OptionsModel::method(bool on)                  \
     save();                                             \
 }
 
-#define NEREUS_SETTER_INT(method, member, signalName, mn, mx) \
+#define LONGPATH_SETTER_INT(method, member, signalName, mn, mx) \
 void Hl2OptionsModel::method(int v)                            \
 {                                                              \
     const int clamped = qBound(mn, v, mx);                     \
@@ -152,20 +152,20 @@ void Hl2OptionsModel::method(int v)                            \
     save();                                                    \
 }
 
-NEREUS_SETTER_BOOL(setSwapAudioChannels, m_swapAudioChannels, swapAudioChannelsChanged)
-NEREUS_SETTER_BOOL(setCl2Enabled,        m_cl2Enabled,        cl2EnabledChanged)
-NEREUS_SETTER_INT (setCl2FreqMHz,        m_cl2FreqMHz,        cl2FreqMHzChanged,
+LONGPATH_SETTER_BOOL(setSwapAudioChannels, m_swapAudioChannels, swapAudioChannelsChanged)
+LONGPATH_SETTER_BOOL(setCl2Enabled,        m_cl2Enabled,        cl2EnabledChanged)
+LONGPATH_SETTER_INT (setCl2FreqMHz,        m_cl2FreqMHz,        cl2FreqMHzChanged,
                    kCl2FreqMinMHz, kCl2FreqMaxMHz)
-NEREUS_SETTER_BOOL(setExt10MHz,          m_ext10MHz,          ext10MHzChanged)
-NEREUS_SETTER_BOOL(setDisconnectReset,   m_disconnectReset,   disconnectResetChanged)
-NEREUS_SETTER_INT (setPttHangMs,         m_pttHangMs,         pttHangMsChanged,
+LONGPATH_SETTER_BOOL(setExt10MHz,          m_ext10MHz,          ext10MHzChanged)
+LONGPATH_SETTER_BOOL(setDisconnectReset,   m_disconnectReset,   disconnectResetChanged)
+LONGPATH_SETTER_INT (setPttHangMs,         m_pttHangMs,         pttHangMsChanged,
                    kPttHangMinMs, kPttHangMaxMs)
-NEREUS_SETTER_INT (setTxLatencyMs,       m_txLatencyMs,       txLatencyMsChanged,
+LONGPATH_SETTER_INT (setTxLatencyMs,       m_txLatencyMs,       txLatencyMsChanged,
                    kTxLatencyMinMs, kTxLatencyMaxMs)
-NEREUS_SETTER_BOOL(setPsSync,            m_psSync,            psSyncChanged)
-NEREUS_SETTER_BOOL(setBandVolts,         m_bandVolts,         bandVoltsChanged)
+LONGPATH_SETTER_BOOL(setPsSync,            m_psSync,            psSyncChanged)
+LONGPATH_SETTER_BOOL(setBandVolts,         m_bandVolts,         bandVoltsChanged)
 
-#undef NEREUS_SETTER_BOOL
-#undef NEREUS_SETTER_INT
+#undef LONGPATH_SETTER_BOOL
+#undef LONGPATH_SETTER_INT
 
 } // namespace Longpath

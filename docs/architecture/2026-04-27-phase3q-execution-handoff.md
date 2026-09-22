@@ -90,7 +90,7 @@ when each is green and let the user merge.
 - **Language:** C++20, Qt 6 (Widgets, Network, Test). RAII; no raw `new`/`delete`. No `goto`. Atomic for cross-thread DSP — never hold a mutex in the audio callback. `qCWarning(lcCategory)` for errors. Braces on all control flow even single-line.
 - **Naming:** Classes `PascalCase`. Methods/variables `camelCase`. Constants `kPascalCase`. Member variables `m_camelCase`.
 - **Settings:** `AppSettings` (custom XML at `~/.config/NereusSDR/NereusSDR.settings`). **Never** `QSettings`. Keys are PascalCase. Booleans are `"True"` / `"False"` strings.
-- **Tests:** Qt Test framework. Register via `nereus_add_test()` in `tests/CMakeLists.txt`. Patterns from existing `tst_radio_discovery_parse.cpp`, `tst_p1_loopback_connection.cpp`, `tests/fakes/P1FakeRadio.{h,cpp}`.
+- **Tests:** Qt Test framework. Register via `longpath_add_test()` in `tests/CMakeLists.txt`. Patterns from existing `tst_radio_discovery_parse.cpp`, `tst_p1_loopback_connection.cpp`, `tests/fakes/P1FakeRadio.{h,cpp}`.
 - **Commits:** GPG-signed (`git commit -S`). Conventional-commit style. Co-Authored-By trailer required:
 
   ```

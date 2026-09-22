@@ -3,7 +3,7 @@
 // no-port-check: Test wires synthetic FreeDVStationModel fixtures into the
 // dialog; no callsigns or wire payloads are involved.
 //
-// NereusSDR - FreeDVReporterDialog G1 shell smoke tests
+// Longpath - FreeDVReporterDialog G1 shell smoke tests
 //
 // Phase 3J-2 Task G1. Pins the contract that FreeDVReporterDialog (the
 // freedv-gui freedv_reporter.{h,cpp} port) constructs successfully when
@@ -641,7 +641,7 @@ void TestFreeDVReporterDialog::showMenuChecksMatchUpstreamDefaults() {
 
     // Upstream default has all 14 columns visible (the column-visibility
     // vector is filled with `true` for every missing slot, see
-    // freedv_reporter.cpp:251-255 [@77e793a]). NereusSDR mirrors that.
+    // freedv_reporter.cpp:251-255 [@77e793a]). Longpath mirrors that.
     int checkedCount = 0;
     for (QAction* a : showMenu->actions()) {
         if (a->isCheckable() && a->isChecked()) {
@@ -946,7 +946,7 @@ void TestFreeDVReporterDialog::idleLongerThanMenuHasFourExclusiveActions() {
 
     // 4 actions: 30 minutes / 1 hour / 2 hours / Never. From task spec
     // (upstream offers Disabled / 30 / 60 / 90 / 120 / Custom...; the
-    // NereusSDR menu is the trimmed 4-item set with "Never" as the
+    // Longpath menu is the trimmed 4-item set with "Never" as the
     // explicit disabled option).
     QList<QAction*> actions;
     for (QAction* a : idleMenu->actions()) {

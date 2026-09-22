@@ -164,7 +164,7 @@ QTEST_MAIN(TstPureSignalCaps)
 - [ ] Wire test into `tests/CMakeLists.txt`
 
 ```cmake
-nereus_add_test(tst_puresignal_caps tst_puresignal_caps.cpp)
+longpath_add_test(tst_puresignal_caps tst_puresignal_caps.cpp)
 ```
 
 ### Step 1.3: Run test, verify FAIL

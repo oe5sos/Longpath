@@ -1,7 +1,7 @@
 // =================================================================
-// tests/tst_wdsp_channel_id_map.cpp  (NereusSDR)
+// tests/tst_wdsp_channel_id_map.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure.
+// no-port-check: Longpath-original test infrastructure.
 //
 // Phase 3F: pins the WDSP channel-id allocation table.
 //
@@ -30,7 +30,7 @@
 // with cmRCVR = 5 and cmSubRCVR = 2 (From Thetis cmaster.cs:412,419
 // [v2.10.3.15]), cmXMTR = 1 (cmaster.cs:502).
 //
-// NereusSDR's structure is one channel per slice and no sub-receivers:
+// Longpath's structure is one channel per slice and no sub-receivers:
 // cmSubRCVR = 1, cmRCVR = kMaxSliceChannels, cmXMTR = 1.  The same
 // formula then yields ch_id = slice for RX (the Phase 3F "channel id
 // == slice index" invariant, unchanged) and ch_id = kMaxSliceChannels
@@ -75,7 +75,7 @@ private slots:
         QVERIFY(topSliceChannel < WdspEngine::kTxChannelId);
     }
 
-    // PS feedback is a NereusSDR extension (upstream runs PureSignal
+    // PS feedback is a Longpath extension (upstream runs PureSignal
     // feedback inside the TX channel), and upstream numbers its "special"
     // streams after the transmitters — From Thetis
     // ChannelMaster/cmsetup.c:86-89 [v2.10.3.15]:
@@ -118,7 +118,7 @@ private slots:
     {
         RadioModel model;
         WdspEngine* engine = model.wdspEngine();
-        engine->m_initialized = true;   // friend access (NEREUS_BUILD_TESTS)
+        engine->m_initialized = true;   // friend access (LONGPATH_BUILD_TESTS)
 
         const int rateHz = 192000;
         model.openRxChannelPool(WdspEngine::kMaxSliceChannels,

@@ -1,14 +1,14 @@
 #pragma once
 
 // =================================================================
-// src/core/RadioDiscovery.h  (NereusSDR)
+// src/core/RadioDiscovery.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   HPSDR/clsRadioDiscovery.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -201,7 +201,7 @@ public:
 
     // Post-disconnect quiet period (2026-07-27, ANAN-G2E lockup).
     //
-    // Wire captures show NereusSDR fires a broadcast discovery burst 7-15 ms
+    // Wire captures show Longpath fires a broadcast discovery burst 7-15 ms
     // after sending run=0 (disconnect reopens the ConnectionPanel, whose ctor
     // auto-scans) and both observed G2E lockups happened inside that window,
     // while Thetis goes completely silent after its stop frame and never
@@ -235,8 +235,8 @@ public:
     void addSavedMac(const QString& mac) { m_savedMacs.insert(mac); }
     void removeSavedMac(const QString& mac) { m_savedMacs.remove(mac); }
 
-#ifdef NEREUS_BUILD_TESTS
-    // Test-only hooks — only compiled when NEREUS_BUILD_TESTS is defined.
+#ifdef LONGPATH_BUILD_TESTS
+    // Test-only hooks — only compiled when LONGPATH_BUILD_TESTS is defined.
     // Allow unit tests to inject a stale lastSeen entry and trigger the sweep
     // without needing a real UDP scan. Not part of the public API.
     void injectLastSeenForTest(const QString& mac, const RadioInfo& info, qint64 lastSeenMs) {
@@ -316,10 +316,20 @@ private:
     // docs/architecture/2026-09-09-ci-discovery-hang-investigation.md).
     //
     // Polls `sock` up to `pollMs` at a time. A poll that comes back
-    // readable resets the quiet counter to 0 (replies may be bursty — see
-    // scanAllNics()) and every pending datagram is drained and handed to
-    // `onDatagram` in arrival order; a poll that comes back not-readable
-    // advances the quiet counter by one.
+    // readable leaves the quiet counter untouched — matching Thetis
+    // clsRadioDiscovery.cs:964-976 [@852bf0e], where only the not-readable
+    // branch advances it — and every pending datagram is drained and
+    // handed to `onDatagram` in arrival order; a poll that comes back
+    // not-readable advances the quiet counter by one.
+    //
+    // Until 2026-09-09 a readable poll reset the counter to 0 instead
+    // (Longpath-original drift from the 2026-04-12 port, not a deliberate
+    // divergence — see docs/architecture/2026-09-09-ci-discovery-hang-
+    // investigation.md for how it was found and confirmed unintentional).
+    // That made a single bursty reply push the natural give-up point out by
+    // a full extra quietBeforeStop polls; freezing the counter instead
+    // matches upstream exactly and bounds that to one poll no matter when
+    // in the loop the reply arrives.
     //
     // Returns Quiet once quietBeforeStop consecutive not-readable polls are
     // observed — the class header's documented

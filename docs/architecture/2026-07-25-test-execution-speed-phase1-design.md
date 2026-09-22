@@ -174,9 +174,9 @@ fail-loudly-if-missing guard pattern.
 
 ### 4.4 Test-side change
 
-None required. `nereus_add_test()` already does
+None required. `longpath_add_test()` already does
 `target_link_libraries(${name} PRIVATE NereusSDRObjs Qt6::Test)`, which
-works unchanged against a shared target. The `nereus_test_sandbox` OBJECT
+works unchanged against a shared target. The `longpath_test_sandbox` OBJECT
 library added in Phase 0 also works unchanged and must stay an OBJECT
 library for the reasons documented at `tests/CMakeLists.txt`.
 
@@ -191,7 +191,7 @@ library for the reasons documented at `tests/CMakeLists.txt`.
 | macOS bundle signature invalid if dylib signed after sealing | Medium | Sign the dylib first; verify with `codesign --verify --deep --strict`. |
 | linuxdeploy fails to find the library | Medium | Known quirk with a documented workaround (§4.3); prefer an `install()` rule. |
 | Dead-stripping is lost, raising resident memory | Medium | Measure RSS of the running app before and after. The app already loads essentially all of its own code, so the delta should be small, but it is unmeasured. |
-| Interaction with `NEREUSSDR_ENABLE_LTO` | Medium | LTO defaults OFF since `6ed89682`. Verify a `-DNEREUSSDR_ENABLE_LTO=ON` release build still links. |
+| Interaction with `LONGPATH_ENABLE_LTO` | Medium | LTO defaults OFF since `6ed89682`. Verify a `-DLONGPATH_ENABLE_LTO=ON` release build still links. |
 | Static-init order or singleton identity changes | Low | Largely retired by evidence: 512/513 tests pass under dynamic linking. Re-verify on Linux and Windows. |
 | Symbol interposition changes behavior | Low | Single library, no plugin boundary. Consider `-fvisibility=hidden` later as a size and load-time optimization; not part of this change. |
 

@@ -1,10 +1,10 @@
 // tst_imd_overlay.cpp
 //
-// no-port-check: NereusSDR-original test file. All Thetis IMD-overlay
+// no-port-check: Longpath-original test file. All Thetis IMD-overlay
 // source cites are in src/gui/ImdOverlay.{h,cpp} (display.cs:5008,
 // 5210-5316, 5453-5475, 5512-5685, 5725-5760 [v2.10.3.13]).
 // =================================================================
-// tests/tst_imd_overlay.cpp  (NereusSDR)
+// tests/tst_imd_overlay.cpp  (Longpath)
 // =================================================================
 //
 // Phase 3M-4 Task 12 — verifies ImdOverlay:
@@ -24,7 +24,7 @@
 //  12. formatReadout() values use "f2" formatting (2 decimal places).
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-06 — Original implementation for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted authoring via Anthropic
 //                 Claude Code (Phase 3M-4 Task 12 IMD overlay).

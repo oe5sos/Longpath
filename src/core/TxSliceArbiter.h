@@ -1,13 +1,13 @@
 // =================================================================
-// src/core/TxSliceArbiter.h  (NereusSDR)
+// src/core/TxSliceArbiter.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original; no upstream port. Enforces the single-TX-bound-slice
+// Longpath-original; no upstream port. Enforces the single-TX-bound-slice
 // invariant for Phase 3F multi-slice. Design ref:
 // docs/architecture/2026-05-26-phase3f-multi-pan-multi-slice-design.md §6.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-26 Created in C++20/Qt6 for NereusSDR by J.J. Boyd (KG4VCF),
 //              with AI-assisted transformation via Anthropic Claude Code.
 // =================================================================

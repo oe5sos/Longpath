@@ -1,8 +1,8 @@
 // =================================================================
-// src/core/TxSliceArbiter.cpp  (NereusSDR)
+// src/core/TxSliceArbiter.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original; no upstream port. See TxSliceArbiter.h for header
+// Longpath-original; no upstream port. See TxSliceArbiter.h for header
 // notes and design reference.
 //
 // =================================================================

@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/gui/WindowPlacement.h  (NereusSDR)
+// src/gui/WindowPlacement.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // ── Ein Fenster auf einen sichtbaren Schirm holen ────────────────────
 //
@@ -19,7 +19,7 @@
 // Verhalten unverändert; FloatingContainer ruft jetzt hierher.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Ursprung als FloatingContainer::ensureVisiblePosition,
 //                 J.J. Boyd (KG4VCF), AI-assisted via Anthropic Claude.
 //   2026-08-16 — Als freie Funktion herausgezogen, Verhalten

@@ -1,25 +1,25 @@
 // =================================================================
-// src/models/TunerModel.h  (NereusSDR)
+// src/models/TunerModel.h  (Longpath)
 // =================================================================
 // Source attribution (AetherSDR, GPLv3):
 //   Copyright (C) 2024-2026  Jeremy (KK7GWY) / AetherSDR contributors
 //       per https://github.com/ten9876/AetherSDR (GPLv3)
 //   This file is a port or structural derivative of AetherSDR source.
 //   AetherSDR is licensed under the GNU General Public License v3.
-//   NereusSDR is also GPLv3. Attribution follows GPLv3 section 5 requirements.
+//   Longpath is also GPLv3. Attribution follows GPLv3 section 5 requirements.
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-18  Ported in C++20/Qt6 for NereusSDR by J.J. Boyd (KG4VCF),
 //                 with AI-assisted transformation via Anthropic Claude Code.
 //                 Layout from AetherSDR src/models/TunerModel.{h,cpp} [@0cd4559].
-//                 NereusSDR divergences from upstream:
+//                 Longpath divergences from upstream:
 //                   - bindConnection(TgxlConnection*) replaces setDirectConnection
-//                     (NereusSDR does not use SmartSDR handle routing)
+//                     (Longpath does not use SmartSDR handle routing)
 //                   - isPresent() driven by m_present bool (set when model/serial_num
 //                     keys appear in applyStatus) vs upstream handle-based detection
 //                   - commandReady(QString) signal dropped; commands forward directly
 //                     via m_conn->sendCommand() / m_conn->adjustRelay()
-//                   - directConnectionChanged() has no bool argument (NereusSDR)
+//                   - directConnectionChanged() has no bool argument (Longpath)
 //                   - relayChanged() signal added (plan addition over upstream)
 //                   - fwd/swr parsed in applyStatus as raw floats (upstream parses
 //                     them only via stateUpdated/statusUpdated direct-conn lambdas)

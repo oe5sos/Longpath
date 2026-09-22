@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/PaCalProfile.h  (NereusSDR)
+// src/core/PaCalProfile.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -11,7 +11,7 @@
 //   original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-02 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code. First task in Section 3 of the P1 full-
@@ -130,7 +130,7 @@ namespace Longpath {
 
 /// Per-board-class grouping of PA forward-power calibration profiles.
 ///
-/// Each NereusSDR-supported HPSDRModel maps to exactly one PaCalBoardClass,
+/// Each Longpath-supported HPSDRModel maps to exactly one PaCalBoardClass,
 /// determined by which Thetis spinbox-set drives that model's `CalibratedPAPower`
 /// lookup table:
 ///
@@ -147,7 +147,7 @@ namespace Longpath {
 ///                    suppresses the PA-cal group entirely; `interpolate`
 ///                    short-circuits to identity.
 ///
-/// (An earlier NereusSDR placeholder `HermesLite` class with 0.5 W intervals
+/// (An earlier Longpath placeholder `HermesLite` class with 0.5 W intervals
 /// / 5 W max was added by Task 3.1 before the upstream check; it was dropped
 /// 2026-05-02 once mi0bot's grouping was verified. HL2 now routes through
 /// `Anan10` byte-for-byte with mi0bot.)
@@ -191,7 +191,7 @@ enum class PaCalBoardClass {
 ///     ANAN_G2_1K / REDPITAYA         → `Anan100`    (interval 10.0, explicit case //DH1KLM on REDPITAYA)
 ///   - ANAN100 / ANAN100B / ANAN200D /
 ///     HERMES / ORIONMKII             → `Anan100`    (interval 10.0, default branch)
-///   - HPSDR (Atlas/Metis kit)        → `None`       (NereusSDR-internal — Atlas
+///   - HPSDR (Atlas/Metis kit)        → `None`       (Longpath-internal — Atlas
 ///                                                     has no integrated PA; FWD
 ///                                                     power meter is suppressed)
 ///   - FIRST / LAST sentinels         → `None`

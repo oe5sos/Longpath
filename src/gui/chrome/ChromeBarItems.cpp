@@ -1,4 +1,4 @@
-// no-port-check: NereusSDR-original. No upstream port.
+// no-port-check: Longpath-original. No upstream port.
 
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "gui/chrome/ChromeBarItems.h"

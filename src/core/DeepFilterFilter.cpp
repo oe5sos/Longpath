@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/DeepFilterFilter.cpp  (NereusSDR)
+// src/core/DeepFilterFilter.cpp  (Longpath)
 // =================================================================
 //
 // Ported from AetherSDR src/core/DeepFilterFilter.cpp @ 0cd4559.
@@ -7,13 +7,13 @@
 // (GPLv3 per https://github.com/ten9876/AetherSDR).
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-23 — Imported from AetherSDR and MODIFIED for 48 kHz
 //                stereo float native audio. Removed internal r8brain
 //                24↔48 resampler pair (AetherSDR process() used
 //                processStereoToMono + processMonoToStereo because
 //                AetherSDR's audio pipeline runs at 24 kHz).
-//                NereusSDR's post-fexchange2 output is already at
+//                Longpath's post-fexchange2 output is already at
 //                48 kHz stereo float, matching DeepFilterNet3's
 //                native rate — saves 2 resample passes per block.
 //                New process(outL, outR, sampleCount) signature
@@ -110,7 +110,7 @@ void DeepFilterFilter::process(float* outL, float* outR, int sampleCount)
         df_set_post_filter_beta(m_state, m_postFilterBeta.load());
     }
 
-    // NereusSDR is already at 48 kHz stereo float — no resample pass needed
+    // Longpath is already at 48 kHz stereo float — no resample pass needed
     // (removed from AetherSDR's 24kHz-pipeline-targeted wrapper). Mix L+R
     // to mono, feed DeepFilterNet3, write processed mono back to both L and R.
     // Accumulator handles the DFNet3 frame-size quantization.

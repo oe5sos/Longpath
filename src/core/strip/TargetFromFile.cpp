@@ -1,12 +1,12 @@
 // =================================================================
-// src/core/strip/TargetFromFile.cpp  (NereusSDR)
+// src/core/strip/TargetFromFile.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. See TargetFromFile.h for why a recording beats
+// Longpath-original. See TargetFromFile.h for why a recording beats
 // an adjective.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-08 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

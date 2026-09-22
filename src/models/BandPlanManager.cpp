@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR — bandplan manager (implementation)
+// Longpath — bandplan manager (implementation)
 //
 // Ported from AetherSDR src/models/BandPlanManager.cpp [@0cd4559].
 // AetherSDR is © its contributors and is licensed GPL-3.0-or-later.
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-25  J.J. Boyd <jj@skyrunner.net>  Initial port for Phase 3G RX
 //                                              Epic sub-epic D. See
 //                                              BandPlanManager.h for full
@@ -28,7 +28,7 @@
 namespace Longpath {
 
 namespace {
-Q_LOGGING_CATEGORY(lcBandPlan, "nereussdr.bandplan")
+Q_LOGGING_CATEGORY(lcBandPlan, "longpath.bandplan")
 }
 
 BandPlanManager::BandPlanManager(QObject* parent)

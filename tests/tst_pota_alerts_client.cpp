@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - PotaAlertsClient JSON parser tests
+// Longpath - PotaAlertsClient JSON parser tests
 //
-// NereusSDR-native (operator-requested follow-up, 2026-08-27). Pins
+// Longpath-native (operator-requested follow-up, 2026-08-27). Pins
 // the contract that PotaAlertsClient parses api.pota.app/activation
 // JSON responses. Fixture rows are trimmed but verbatim copies of the
 // real response fetched live during development.

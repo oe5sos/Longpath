@@ -6,7 +6,7 @@
 // Precedent: B2 (commit f43582e), B3 (commit 9aa4202), B4 (commit
 // fce661fd).
 //
-// NereusSDR - FreeDVReporterClient Engine.IO / Socket.IO parser tests
+// Longpath - FreeDVReporterClient Engine.IO / Socket.IO parser tests
 //
 // Phase 3J-2 Task B5. Pins the wire-protocol contract that
 // FreeDVReporterClient implements:
@@ -18,7 +18,7 @@
 //   - Socket.IO Event ("2[...]") `new_connection` updates the station
 //     map and emits `stationAdded(sid, info)`.
 //   - Socket.IO Event ("2[...]") `freq_change` updates the station map,
-//     emits `stationUpdated(sid, info)`, AND (NereusSDR dual-feed)
+//     emits `stationUpdated(sid, info)`, AND (Longpath dual-feed)
 //     emits `spotReceived(DxSpot)` synthesized from station state.
 //   - Socket.IO Event ("2[...]") `rx_report` emits `spotReceived(DxSpot)`
 //     for the reported transmitter (its sid, picked up from the
@@ -188,7 +188,7 @@ void TestFreeDVReporterSocketIo::freqChangeEmitsStationUpdatedAndSpot() {
     QCOMPARE(info.frequencyHz, quint64(14236000));
     QCOMPARE(info.callsign, QStringLiteral("K6AQ"));
 
-    // spotReceived: panadapter-overlay feed (NereusSDR dual-feed)
+    // spotReceived: panadapter-overlay feed (Longpath dual-feed)
     QCOMPARE(spotSpy.count(), 1);
     auto spot = spotSpy.first().first().value<DxSpot>();
     QCOMPARE(spot.dxCall, QStringLiteral("K6AQ"));

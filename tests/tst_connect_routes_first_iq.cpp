@@ -1,9 +1,9 @@
 // =================================================================
-// tests/tst_connect_routes_first_iq.cpp  (NereusSDR)
+// tests/tst_connect_routes_first_iq.cpp  (Longpath)
 // =================================================================
 //
-// no-port-check: NereusSDR-original. ReceiverManager activation and the
-// stream pool are NereusSDR constructs with no Thetis equivalent to port
+// no-port-check: Longpath-original. ReceiverManager activation and the
+// stream pool are Longpath constructs with no Thetis equivalent to port
 // from. The DDC numbers asserted here come from the codecs, which are
 // cited to Thetis / mi0bot at their own call sites.
 //

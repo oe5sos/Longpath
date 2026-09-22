@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 //
-// NereusSDR - LogEntry: one logged contact, plus ADIF serialisation.
+// Longpath - LogEntry: one logged contact, plus ADIF serialisation.
 //
-// NereusSDR-original. Thetis has no logbook — it hands QSOs to external
+// Longpath-original. Thetis has no logbook — it hands QSOs to external
 // loggers over CAT/TCI — so there is no upstream to port. Field names
 // mirror their ADIF 3 tags, because that is what every logger, QRZ,
 // Club Log and LoTW all speak; ADIF is therefore also the interchange
@@ -16,7 +16,7 @@
 //
 // Copyright (C) 2026 NereusSDR contributors.
 //
-// Modification history (NereusSDR)
+// Modification history (Longpath)
 //   2026-08-07  Martin Fischer  Initial create. AI tooling: Anthropic
 //                               Claude (Cowork).
 
@@ -69,7 +69,8 @@ struct LogEntry {
 
     // Has this been accepted by the QRZ logbook?
     //
-    // Written as APP_NEREUS_QRZUP. An APP_ prefix is the ADIF-sanctioned
+    // Written as APP_LONGPATH_QRZUP (APP_NEREUS_QRZUP before 2026-09-17,
+    // still read). An APP_ prefix is the ADIF-sanctioned
     // way to record something the standard has no field for, and other
     // programs are required to leave it alone rather than choke on it.
     //
@@ -83,7 +84,7 @@ struct LogEntry {
     //
     // Kept verbatim, in file order, and written back out unchanged.
     //
-    // This is not a nicety. The fields NereusSDR models are the ones it
+    // This is not a nicety. The fields Longpath models are the ones it
     // shows; the ones it does not include QSL_RCVD, QSL_SENT,
     // LOTW_QSL_RCVD, LOTW_QSL_SENT, EQSL_QSL_RCVD, DXCC, CQZ, ITUZ,
     // STATE, CNTY, IOTA, CONTEST_ID, SRX, STX, SAT_NAME, PROP_MODE and

@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_perf_monitor_ring.cpp  (NereusSDR-native)
+// tests/tst_perf_monitor_ring.cpp  (Longpath-native)
 // =================================================================
 // 2026-07-27  J.J. Boyd (KG4VCF), AI-assisted via Anthropic Claude.
 //

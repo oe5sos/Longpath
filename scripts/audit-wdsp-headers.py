@@ -35,12 +35,18 @@ WDSP_SRC = REPO / "third_party" / "wdsp" / "src"
 # Used to flag drift when the census shifts without a docs update.
 EXPECTED = {
     # Bumped 134 -> 135 for third_party/wdsp/src/netinterface_stub.c, the
-    # NereusSDR-original glue stub that exports SetADCSupply + LRAudioSwap
+    # Longpath-original glue stub that exports SetADCSupply + LRAudioSwap
     # against the bundled wdsp_static library while the broader ChannelMaster
     # module remains un-ported.  Stub carries a GPL-2-or-later header
     # matching the rest of the WDSP tree, so the census classification is
     # correct; only the expected count needed adjustment.
-    "gpl2-or-later": 135,
+    # 135 -> 143 (2026-09-21, PR #42): the NNR port (WDSP 2.10) brought
+    # nnet.c/.h, nnet_profile.h, nnio.c/.h, nnr.c/.h -- seven files with
+    # Warren Pratt's own GPL-2-or-later header -- and nnr_model_stub.c, the
+    # Longpath-original stand-in for the generated weight arrays, whose
+    # licence block now leads the file (it had been pushed past this
+    # script's 2000-character window by the explanatory comment above it).
+    "gpl2-or-later": 143,
     "copyright-no-permission-block": 0,
     "no-header": 10,
 }

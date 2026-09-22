@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_frequency_instrument.cpp  (NereusSDR)
+// tests/tst_frequency_instrument.cpp  (Longpath)
 // =================================================================
 //
 // Das Frequenz-Widget BEDIENT, es zeigt nicht nur.
@@ -15,7 +15,7 @@
 // geht statt hier geschrieben zu werden.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-17 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

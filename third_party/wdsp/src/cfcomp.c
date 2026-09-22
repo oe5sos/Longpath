@@ -53,7 +53,7 @@ mw0lge@grange-lane.co.uk - Richard Samphire (c) 2026
 
 //
 // =============================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-30 — Partial sync from Thetis v2.10.3.13 @ 501e3f5 for the
 //                Qg/Qe parametric-EQ tail-mix updates required by the
 //                3M-3a-ii CFC port. No NereusSDR-original algorithmic

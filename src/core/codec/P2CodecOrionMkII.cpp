@@ -19,7 +19,7 @@
  */
 
 // =================================================================
-// src/core/codec/P2CodecOrionMkII.cpp  (NereusSDR)
+// src/core/codec/P2CodecOrionMkII.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources (multi-source) [v2.10.3.13]:
@@ -30,7 +30,7 @@
 //     8211-8295, Hermes-class 8378-8449, HermesII-class 8451-8521)
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-20 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                (KG4VCF), with AI-assisted transformation via Anthropic
 //                Claude Code. Lifted from P2RadioConnection inline compose
@@ -526,7 +526,7 @@ quint32 P2CodecOrionMkII::buildAlex1(const CodecContext& ctx) const
         // this, the Alex2 BPF chain doesn't ground the rx2 port during
         // TX, which can affect the PS feedback path on Mk II BPF boards
         // (G2E is mkiiBpf=true).
-        // NereusSDR-divergence: we don't yet expose a "bpf2_gnd" user
+        // Longpath-divergence: we don't yet expose a "bpf2_gnd" user
         // checkbox.  Hard-coded to true (Thetis default).
         reg |= (1u << 8);   // _rx2_gnd (BPF2 ground during TX)
     }
@@ -1047,8 +1047,8 @@ PsDdcConfig P2CodecOrionMkII::psDdcConfigHermesIIClass(
             // has a 2026-05-09 bench-fix override that sets cfg.cntrl1=0 here
             // because working Thetis on a friend's ANAN-10E (P1) was observed
             // emitting 0 on bank 4 C1, not the source-computed 4.  That P1
-            // override patches a NereusSDR-side conflation: the P1 bank 4 wire
-            // byte in NereusSDR (P1CodecStandard.cpp:142) comes from cfg.cntrl1,
+            // override patches a Longpath-side conflation: the P1 bank 4 wire
+            // byte in Longpath (P1CodecStandard.cpp:142) comes from cfg.cntrl1,
             // but in Thetis the same byte comes from a SEPARATE variable
             // (`P1_adc_cntrl`, networkproto1.c:519 [v2.10.3.13]) set only by
             // SetADC_cntrl_P1 from the Setup form's per-DDC radio buttons,
@@ -1107,9 +1107,9 @@ DdcAssignment P2CodecOrionMkII::applyDdcAssignment(
     // Slice-to-DDC mapping for G2-class (2-ADC, 7 DDCs):
     //   Slice A (index 0) -> DDC2    [Thetis: DDCEnable = DDC2 at line 8244]
     //   Slice B (index 1) -> DDC3    [Thetis: DDCEnable += DDC3 at line 8301]
-    //   Slice C (index 2) -> DDC4    [NereusSDR extension: idle Thetis DDC4 slot]
-    //   Slice D (index 3) -> DDC5    [NereusSDR extension: idle Thetis DDC5 slot]
-    //   Slice E (index 4) -> DDC6    [NereusSDR extension: idle Thetis DDC6 slot]
+    //   Slice C (index 2) -> DDC4    [Longpath extension: idle Thetis DDC4 slot]
+    //   Slice D (index 3) -> DDC5    [Longpath extension: idle Thetis DDC5 slot]
+    //   Slice E (index 4) -> DDC6    [Longpath extension: idle Thetis DDC6 slot]
     // DDC0/DDC1 reserved for PS feedback pair or Diversity sync pair.
     //
     // From Thetis console.cs:8199 [v2.10.3.15]:
@@ -1150,7 +1150,7 @@ DdcAssignment P2CodecOrionMkII::applyDdcAssignment(
     // Populate DDC assignments for active streams.
     // For stream 0 -> DDC2: matches Thetis's rx1 on DDC2.
     // For stream 1 -> DDC3: matches Thetis's rx2_enabled DDC3 addendum.
-    // For streams 2-4 -> DDC4-6: NereusSDR extension into Thetis's idle slots.
+    // For streams 2-4 -> DDC4-6: Longpath extension into Thetis's idle slots.
     for (int i = 0; i < 5; ++i) {
         if (!slices[i].live) { continue; }
         const int ddc = kStreamToDdc[i];
@@ -1166,7 +1166,7 @@ DdcAssignment P2CodecOrionMkII::applyDdcAssignment(
 
         // Phase 3F design doc §16: antenna-driven ADC chain assignment.
         //
-        // NereusSDR-original policy, NOT a Thetis port. Thetis exposes the
+        // Longpath-original policy, NOT a Thetis port. Thetis exposes the
         // DDC->ADC map as a manual Setup control (setup.cs:16935-16944
         // [v2.10.3.15] builds RXADCCtrl1 from radDDCnADCn radio buttons) and
         // never derives it from the antenna. We derive it, because a slice's

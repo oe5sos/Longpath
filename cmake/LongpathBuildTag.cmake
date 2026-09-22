@@ -3,7 +3,7 @@
 # --------------------------------------------------------------------------
 # Run in script mode (cmake -P). It is invoked twice: once while configuring,
 # so the generated header exists before the first compile, and once per build
-# from the nereus_build_tag target, so the tag names the commit that is
+# from the longpath_build_tag target, so the tag names the commit that is
 # actually being compiled.
 #
 # Why the derivation moved out of configure (2026-08-01, KG4VCF): the tag used
@@ -15,11 +15,11 @@
 # the stamp exists to prevent.
 #
 # Inputs, all passed with -D:
-#   NEREUS_SOURCE_DIR      repository to interrogate
-#   NEREUS_OUTPUT          header file to write
-#   NEREUS_OVERRIDE        current value of the NEREUSSDR_BUILD_TAG cache var
-#   NEREUS_GIT_EXECUTABLE  git, resolved once at configure time; may be empty
-#   NEREUS_ANNOUNCE        ON to print the one-line status message
+#   LONGPATH_REPO_DIR      repository to interrogate
+#   LONGPATH_OUTPUT          header file to write
+#   LONGPATH_OVERRIDE        current value of the LONGPATH_BUILD_TAG cache var
+#   LONGPATH_GIT_EXECUTABLE  git, resolved once at configure time; may be empty
+#   LONGPATH_ANNOUNCE        ON to print the one-line status message
 #
 # The header is rewritten only when the tag actually changes, so a no-op
 # rebuild stays a no-op: the script runs, finds the same text, and touches
@@ -27,32 +27,32 @@
 
 cmake_minimum_required(VERSION 3.16)
 
-# An explicit NEREUSSDR_BUILD_TAG wins outright, matching the cache variable's
+# An explicit LONGPATH_BUILD_TAG wins outright, matching the cache variable's
 # documented contract: empty means "derive from git", any non-blank value is
 # used verbatim, and a single space forces the tag off.
-set(_tag "${NEREUS_OVERRIDE}")
+set(_tag "${LONGPATH_OVERRIDE}")
 
-if(NOT _tag AND NEREUS_GIT_EXECUTABLE)
+if(NOT _tag AND LONGPATH_GIT_EXECUTABLE)
     # Release gate. release.yml checks out `ref: <tag>`, so HEAD sits exactly
     # on a tag there and nowhere else. Release artifacts keep the clean
-    # "NereusSDR 0.5.2" title and get no tag, dirty tree or not: a release
+    # "Longpath 0.5.2" title and get no tag, dirty tree or not: a release
     # build must never acquire a suffix just because a workflow step touched
     # a tracked file before the compile.
     execute_process(
-        COMMAND "${NEREUS_GIT_EXECUTABLE}" describe --exact-match --tags HEAD
-        WORKING_DIRECTORY "${NEREUS_SOURCE_DIR}"
+        COMMAND "${LONGPATH_GIT_EXECUTABLE}" describe --exact-match --tags HEAD
+        WORKING_DIRECTORY "${LONGPATH_REPO_DIR}"
         RESULT_VARIABLE _head_is_tagged
         OUTPUT_QUIET ERROR_QUIET)
 
     if(NOT _head_is_tagged EQUAL 0)
         execute_process(
-            COMMAND "${NEREUS_GIT_EXECUTABLE}" rev-parse --abbrev-ref HEAD
-            WORKING_DIRECTORY "${NEREUS_SOURCE_DIR}"
+            COMMAND "${LONGPATH_GIT_EXECUTABLE}" rev-parse --abbrev-ref HEAD
+            WORKING_DIRECTORY "${LONGPATH_REPO_DIR}"
             OUTPUT_VARIABLE _branch
             OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
         execute_process(
-            COMMAND "${NEREUS_GIT_EXECUTABLE}" rev-parse --short HEAD
-            WORKING_DIRECTORY "${NEREUS_SOURCE_DIR}"
+            COMMAND "${LONGPATH_GIT_EXECUTABLE}" rev-parse --short HEAD
+            WORKING_DIRECTORY "${LONGPATH_REPO_DIR}"
             OUTPUT_VARIABLE _sha
             OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
 
@@ -77,8 +77,8 @@ if(NOT _tag AND NEREUS_GIT_EXECUTABLE)
         # `git diff-index --quiet` can. Measured at 15 ms on this repo.
         if(_tag)
             execute_process(
-                COMMAND "${NEREUS_GIT_EXECUTABLE}" status --porcelain --untracked-files=no
-                WORKING_DIRECTORY "${NEREUS_SOURCE_DIR}"
+                COMMAND "${LONGPATH_GIT_EXECUTABLE}" status --porcelain --untracked-files=no
+                WORKING_DIRECTORY "${LONGPATH_REPO_DIR}"
                 OUTPUT_VARIABLE _worktree_changes
                 OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
             if(NOT _worktree_changes STREQUAL "")
@@ -94,7 +94,7 @@ endif()
 
 # Escape for a C string literal. Git allows a backslash-free ref name but not
 # much else that matters here; escaping both is one line of insurance against
-# a hand-set NEREUS_OVERRIDE breaking the compile.
+# a hand-set LONGPATH_OVERRIDE breaking the compile.
 set(_literal "${_tag}")
 string(REPLACE "\\" "\\\\" _literal "${_literal}")
 string(REPLACE "\"" "\\\"" _literal "${_literal}")
@@ -106,20 +106,20 @@ set(_content
 // Empty on release artifacts, which are built from a tag ref.
 #pragma once
 
-#define NEREUSSDR_BUILD_TAG \"${_literal}\"
+#define LONGPATH_BUILD_TAG \"${_literal}\"
 ")
 
 # Write only on change. This is what keeps the always-running build step from
 # dragging a recompile behind it.
 set(_existing "")
-if(EXISTS "${NEREUS_OUTPUT}")
-    file(READ "${NEREUS_OUTPUT}" _existing)
+if(EXISTS "${LONGPATH_OUTPUT}")
+    file(READ "${LONGPATH_OUTPUT}" _existing)
 endif()
 if(NOT _existing STREQUAL _content)
-    file(WRITE "${NEREUS_OUTPUT}" "${_content}")
+    file(WRITE "${LONGPATH_OUTPUT}" "${_content}")
 endif()
 
-if(NEREUS_ANNOUNCE)
+if(LONGPATH_ANNOUNCE)
     if(_tag)
         message(STATUS "NereusSDR: smoke build, title tagged '${_tag}' (re-derived each build)")
     else()

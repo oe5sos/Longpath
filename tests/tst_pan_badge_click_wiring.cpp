@@ -1,10 +1,10 @@
 // =================================================================
-// tests/tst_pan_badge_click_wiring.cpp  (NereusSDR)
+// tests/tst_pan_badge_click_wiring.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure. Nothing here
+// no-port-check: Longpath-original test infrastructure. Nothing here
 // is a port; the surfaces under test are fixed by
 // docs/architecture/2026-05-26-phase3f-sub-epic-e-ui-atlas-plan.md
-// Task 3, which is a NereusSDR design document.
+// Task 3, which is a Longpath design document.
 //
 // Phase 3F: the per-pan status-overlay badges must be clickable on
 // EVERY pan, and each click must act on the pan that was clicked.

@@ -1,11 +1,11 @@
 // =================================================================
-// src/gui/widgets/ProfileRail.cpp  (NereusSDR)
+// src/gui/widgets/ProfileRail.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. See ProfileRail.h.
+// Longpath-original. See ProfileRail.h.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-15 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

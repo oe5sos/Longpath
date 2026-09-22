@@ -1,23 +1,23 @@
 // =================================================================
-// src/core/WidebandFrameAccumulator.h  (NereusSDR)
+// src/core/WidebandFrameAccumulator.h  (Longpath)
 // =================================================================
 //
-// no-port-check: NereusSDR-original. Assembles wideband ADC stream
+// no-port-check: Longpath-original. Assembles wideband ADC stream
 // packets into 32-packet frames. Each packet carries 512 16-bit
 // big-endian samples (1024 bytes payload) and frames carry
 // 32 * 512 = 16384 samples. Thetis-equivalent behaviour
 // (network.c:558-602 [v2.10.3.15]) lives inside the wideband
 // thread plus a per-ADC state struct rather than a reusable
-// class; this NereusSDR-original wrapper folds the same state
+// class; this Longpath-original wrapper folds the same state
 // machine into a Qt object that the P2RadioConnection wideband
 // receive path (Task 3) can drive directly. See
 // docs/architecture/2026-05-26-phase3f-sub-epic-f-wideband-plan.md
 // Task 2 for the design context.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-27  J.J. Boyd / KG4VCF  Phase 3F Sub-Epic F Task 2.
-//                                    NereusSDR-original 32-packet
+//                                    Longpath-original 32-packet
 //                                    wideband ADC frame accumulator
 //                                    with Thetis-faithful sequence
 //                                    error handling (zero-pad

@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/TitleBar.cpp  (NereusSDR)
+// src/gui/TitleBar.cpp  (Longpath)
 // =================================================================
 //
 // Ported from AetherSDR source:
@@ -7,14 +7,14 @@
 //
 // AetherSDR is licensed under the GNU General Public License v3; see
 // https://github.com/ten9876/AetherSDR for the contributor list and
-// project-level LICENSE. NereusSDR is also GPLv3. AetherSDR source
+// project-level LICENSE. Longpath is also GPLv3. AetherSDR source
 // files carry no per-file GPL header; attribution is at project level
 // per docs/attribution/HOW-TO-PORT.md rule 6.
 //
 // Upstream reference: AetherSDR v0.8.16 (2026-04).
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-20 — Ported/adapted in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code. Phase 3O Sub-Phase 10 Task 10c.
@@ -28,7 +28,7 @@
 //                 layout pattern. `setMenuBar()` is a line-for-line port
 //                 of AetherSDR TitleBar.cpp:282-295 (restyle QMenuBar,
 //                 `m_hbox->insertWidget(0, mb)`). App-name label: text
-//                 "AetherSDR" swapped to "NereusSDR", accent colour
+//                 "AetherSDR" swapped to "Longpath", accent colour
 //                 (#00b4d8), font (14 px bold), and QLabel::AlignCenter
 //                 preserved verbatim.
 //                 Design spec: docs/architecture/2026-04-19-vax-design.md
@@ -362,7 +362,7 @@ void ConnectionSegment::paintEvent(QPaintEvent*)
         return;
     }
 
-    // ── 2. ▲ Mbps — NereusSDR → radio (commands; small, kbps territory) ──
+    // ── 2. ▲ Mbps — Longpath → radio (commands; small, kbps territory) ──
     // Reads m_txMbps which is the call-site's "client→radio" byte rate
     // (RadioConnection::txByteRate, recorded per outbound packet at
     // RadioConnection.cpp:1914 [@HEAD]). Client perspective: ▲ = up
@@ -394,7 +394,7 @@ void ConnectionSegment::paintEvent(QPaintEvent*)
     m_lastRttX2 = x + p.fontMetrics().horizontalAdvance(rttText);
     x = m_lastRttX2 + 10;
 
-    // ── 4. ▼ Mbps — radio → NereusSDR (I/Q stream; large, Mbps) ──────────
+    // ── 4. ▼ Mbps — radio → Longpath (I/Q stream; large, Mbps) ──────────
     // Reads m_rxMbps which is the call-site's "radio→client" byte rate
     // (RadioConnection::rxByteRate, recorded per inbound packet at
     // RadioConnection.cpp:1272 [@HEAD]). Client perspective: ▼ = down
@@ -423,7 +423,7 @@ void ConnectionSegment::paintEvent(QPaintEvent*)
     if (m_lossWorstPct >= 0.0 && m_state == ConnectionState::Connected) {
         const double v = m_lossWorstPct;
         QColor c;
-        if (v < 0.01)      { c = QColor(Style::kQuietTone); }   // still, unauffaellig
+        if (v < 0.01)      { c = QColor(Style::kTextInactive); }   // still, unauffaellig
         else if (v < 0.10) { c = QColor("#6fa384"); }
         else if (v < 1.00) { c = QColor(Style::kAmberText); }
         else               { c = QColor(Style::kRedText); }
@@ -528,7 +528,7 @@ TitleBar::TitleBar(AudioEngine* audio, QWidget* parent)
     m_hbox->addStretch(1);
 
     // ── App-name label ─────────────────────────────────────────────────────
-    // From AetherSDR TitleBar.cpp:101-104 — text swapped to "NereusSDR".
+    // From AetherSDR TitleBar.cpp:101-104 — text swapped to "Longpath".
     auto* appName = new QLabel(QStringLiteral("Longpath"), this);
     // App-name label. From AetherSDR TitleBar.cpp:102.
     appName->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 16px; font-weight: bold; }")
@@ -641,7 +641,11 @@ TitleBar::TitleBar(AudioEngine* audio, QWidget* parent)
         return QIcon(pm);
     };
 
-    QIcon bulbIcon = makeBulbIcon(QColor(Style::kAmberText), QColor(Style::kAmberBorder));
+    // Grau, nicht Bernstein: der Knopf ist Inventar ("Wunsch melden"),
+    // kein Messwert und kein Zustand -- er war die einzige gesaettigte
+    // Flaeche in der Kopfleiste (Foto vom 2026-09-17). Glas & Tiefe:
+    // ein erhabener Knopf wie jeder andere, die Birne als Zeichnung.
+    QIcon bulbIcon = makeBulbIcon(QColor(Style::kTextSecondary), QColor(Style::kTextScale));
 
     m_featureBtn = new QPushButton(this);
     m_featureBtn->setObjectName(QStringLiteral("featureButton"));
@@ -650,12 +654,8 @@ TitleBar::TitleBar(AudioEngine* audio, QWidget* parent)
     m_featureBtn->setFixedSize(28, 28);
     m_featureBtn->setToolTip(QStringLiteral("Submit a feature request or bug report"));
     m_featureBtn->setAccessibleName(QStringLiteral("Feature request"));
-    // NereusSDR-original — amber dark for the 💡 feature-request button.
-    // One-off; no palette promotion warranted per §A2 design intent.
-    m_featureBtn->setStyleSheet(QStringLiteral(
-        "QPushButton { background: #33280f; border: 1px solid #6b5426; "
-        "border-radius: 6px; padding: 0; }"
-        "QPushButton:hover { background: #33280f; border-color: #6b5426; }"));
+    m_featureBtn->setStyleSheet(Style::buttonBaseStyle()
+                                + QStringLiteral("QPushButton { padding: 0; }"));
     connect(m_featureBtn, &QPushButton::clicked,
             this, &TitleBar::featureRequestClicked);
     m_hbox->addWidget(m_featureBtn);

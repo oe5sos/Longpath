@@ -1,12 +1,12 @@
 // =================================================================
-// tests/tst_add_custom_radio_dialog.cpp  (NereusSDR)
+// tests/tst_add_custom_radio_dialog.cpp  (Longpath)
 // =================================================================
-// no-port-check: test file is NereusSDR-original; the frmAddCustomRadio.cs
+// no-port-check: test file is Longpath-original; the frmAddCustomRadio.cs
 // reference above is a comment describing what is being tested, not a port.
 //
 // Phase 3Q Task 4 — widget-level coverage for the rebuilt Add Custom
-// Radio dialog. The dialog is a NereusSDR port of Thetis
-// frmAddCustomRadio.cs; this test file itself is NereusSDR-original
+// Radio dialog. The dialog is a Longpath port of Thetis
+// frmAddCustomRadio.cs; this test file itself is Longpath-original
 // (no Thetis attribution markers, no PROVENANCE row needed).
 //
 // Coverage:

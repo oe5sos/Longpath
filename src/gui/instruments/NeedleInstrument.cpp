@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/instruments/NeedleInstrument.cpp  (NereusSDR)
+// src/gui/instruments/NeedleInstrument.cpp  (Longpath)
 // =================================================================
 // Siehe NeedleInstrument.h. Fast alles Sichtbare kommt aus
 // InstrumentPainter; hier stehen Zeiger, Nachlaufzeiger und die
@@ -160,10 +160,7 @@ void NeedleInstrument::refreshFooter()
         return;
     }
 
-    m_footer->setValueText(d->unit.isEmpty()
-                               ? d->text(m_value)
-                               : QStringLiteral("%1 %2")
-                                     .arg(d->text(m_value), d->unit));
+    m_footer->setValueText(d->textWithUnit(m_value));
     m_footer->setValueColour(Instrument::valueColour(*d, m_value));
     m_footer->setPeakAndLimit(
         m_peak.enabled() ? d->text(m_peak.value()) : QStringLiteral("—"),

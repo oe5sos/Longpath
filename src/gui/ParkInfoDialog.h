@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - Park Info dialog: shows the fields fetched by
+// Longpath - Park Info dialog: shows the fields fetched by
 // PotaParkInfoClient for one POTA park reference.
 //
-// NereusSDR-native, no upstream equivalent (operator-requested
+// Longpath-native, no upstream equivalent (operator-requested
 // follow-up to the SpotHub POTA improvement pass, 2026-08-27).
 // Triggered from the Spot List tab's right-click menu ("Park Info:
 // <ref>") whenever the selected row carries a non-empty
@@ -12,7 +12,7 @@
 // click; showLoading()/showInfo()/showError() swap its content in
 // place.
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-27  AI (Anthropic Claude Code)  Initial version.
 
 #pragma once

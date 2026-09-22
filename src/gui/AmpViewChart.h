@@ -1,13 +1,13 @@
-// no-port-check: NereusSDR-original chart widget.  Thetis renders
+// no-port-check: Longpath-original chart widget.  Thetis renders
 // AmpView through System.Windows.Forms.DataVisualization.Charting
-// (a Win32-only managed-chart control); NereusSDR replaces it with a
+// (a Win32-only managed-chart control); Longpath replaces it with a
 // custom QPainter widget per phase3m-4-puresignal-design.md §15 #14.
 // Series semantics, axis ranges, and toggle behaviours are sourced
 // 1:1 from AmpView.cs [v2.10.3.13] — this file is the rendering
 // surface those semantics drive.
 //
 // =================================================================
-// src/gui/AmpViewChart.h  (NereusSDR)
+// src/gui/AmpViewChart.h  (Longpath)
 // =================================================================
 //
 // Custom QPainter chart widget for AmpViewWindow.  5 named series:
@@ -40,10 +40,10 @@
 //   AmpView.cs:123-153  init_data                         → setSeriesData
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-06 — Phase 3M-4 Task 9 created by J.J. Boyd (KG4VCF),
 //                 with AI-assisted transformation via Anthropic
-//                 Claude Code.  NereusSDR-original Qt6 widget.
+//                 Claude Code.  Longpath-original Qt6 widget.
 // =================================================================
 
 #pragma once

@@ -1,10 +1,10 @@
 // no-port-check: unit test for ported logic. The test code itself is
-// NereusSDR-original; the upstream license headers below are carried
+// Longpath-original; the upstream license headers below are carried
 // because the logic under test derives from Thetis display.cs. The
 // production ported file (PeakBlobDetector) is the attributable unit.
 //
 // =================================================================
-// tests/tst_peak_blob_detector.cpp  (NereusSDR)
+// tests/tst_peak_blob_detector.cpp  (Longpath)
 // =================================================================
 //
 // Task 2.6 — PeakBlobDetector unit tests.
@@ -16,7 +16,7 @@
 // Tests run WDSP-free (no QApplication needed for pure data logic).
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-01 — Created in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via
 //                 Anthropic Claude Code.

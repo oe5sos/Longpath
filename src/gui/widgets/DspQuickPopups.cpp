@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/widgets/DspQuickPopups.cpp  (NereusSDR)
+// src/gui/widgets/DspQuickPopups.cpp  (Longpath)
 // =================================================================
 // Siehe DspQuickPopups.h — der Schnellregler-Rechtsklick.
 //
@@ -11,7 +11,7 @@
 //   chkNR2PostProc_enable_rx1 und die Entsprechungen fuer NR3/NR4).
 //
 // Aufbau und Anordnung folgen AetherSDR MainWindow.cpp:7980-8324
-// [@0cd4559] (ten9876/AetherSDR, GPLv3; NereusSDR ist ebenfalls GPLv3).
+// [@0cd4559] (ten9876/AetherSDR, GPLv3; Longpath ist ebenfalls GPLv3).
 //
 //
 // Inhalt am 2026-08-18 unveraendert aus VfoWidget.cpp:3252-3533
@@ -25,7 +25,7 @@
 // die Herkunft der Bereiche und Vorgaben und gehoeren zum Port.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-23 — Als sieben private Methoden in VfoWidget.cpp
 //                 entstanden (Sub-epic C-1 Task 15), J.J. Boyd
 //                 (KG4VCF), AI-assisted via Anthropic Claude Code.
@@ -282,6 +282,41 @@ void showDfnrPopup(QWidget* parent, SliceModel* m_slice,
     p->showAt(globalPos);
 }
 
+void showNnrPopup(QWidget* parent, SliceModel* m_slice,
+                  const QPoint& globalPos,
+                  const std::function<void()>& onMore)
+{
+    if (!m_slice) { return; }
+    auto* p = new DspParamPopup(parent);
+
+    // NNR (Neural Noise Reduction) — WDSP 2.10 nnr.c, Warren Pratt NR0V.
+    // No Thetis precedent — new upstream algorithm. Quick-popup surfaces
+    // the three controls an operator reaches for first (position, which
+    // trained model, and the output floor); the rest of the tuning knobs
+    // (alpha/knee/tau/max gain/smoothing) live on the Setup NNR page,
+    // same split as NR3's model file dialog.
+    p->addRadioGroup(QStringLiteral("Position"),
+                     {QStringLiteral("Pre-AGC"), QStringLiteral("Post-AGC")},
+                     static_cast<int>(m_slice->nnrPosition()),
+                     [m_slice](int v) {
+                         if (m_slice) m_slice->setNnrPosition(static_cast<Longpath::NrPosition>(v));
+                     });
+    p->addRadioGroup(QStringLiteral("Model"),
+                     {QStringLiteral("Small"), QStringLiteral("Large")},
+                     m_slice->nnrModel(),
+                     [m_slice](int v) { if (m_slice) m_slice->setNnrModel(v); });
+    const int maskFloor = static_cast<int>(m_slice->nnrMaskFloor());
+    p->addSlider(QStringLiteral("Mask Floor"), -60, 0, maskFloor,
+                 [](int v) { return QString::number(v) + QStringLiteral(" dB"); },
+                 [m_slice](int v) { if (m_slice) m_slice->setNnrMaskFloor(static_cast<double>(v)); },
+                 tr("Minimum mask magnitude in dB — how far the network is allowed to "
+                    "attenuate a bin. Default -25 dB."),
+                 /*factory=*/-25);
+    // "More Settings…" opens the Setup NNR page (Alpha/Knee/Tau/MaxGain/Smooth).
+    p->finalize(onMore, nullptr);
+    p->showAt(globalPos);
+}
+
 void showBnrPopup(QWidget* parent, SliceModel* m_slice,
                   const QPoint& globalPos,
                   const std::function<void()>& onMore)
@@ -409,6 +444,7 @@ void showFor(QWidget* parent, SliceModel* slice, NrSlot slot,
     case NrSlot::DFNR: showDfnrPopup(parent, slice, globalPos, onMore); break;
     case NrSlot::BNR:  showBnrPopup(parent, slice, globalPos, onMore);  break;
     case NrSlot::MNR:  showMnrPopup(parent, slice, globalPos, onMore);  break;
+    case NrSlot::NNR:  showNnrPopup(parent, slice, globalPos, onMore);  break;
     case NrSlot::Off:  break;   // „keine" hat nichts einzustellen
     }
 }

@@ -23,7 +23,7 @@ OverflowChip::OverflowChip(QWidget* parent) : QWidget(parent)
     setCursor(Qt::WhatsThisCursor);   // hint: hover-for-detail
 
     setStyleSheet(Style::themed(QStringLiteral(
-        "NereusSDR--OverflowChip {"
+        "Longpath--OverflowChip {"
         " background: rgba(64,72,88,46);"
         " border-radius: 6px;"
         "}"

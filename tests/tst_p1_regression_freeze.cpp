@@ -28,7 +28,7 @@ class TestP1RegressionFreeze : public QObject {
     Q_OBJECT
 private slots:
     void allBoardsExceptHl2_byteIdenticalToBaseline() {
-        const QString path = QStringLiteral(NEREUS_TEST_DATA_DIR) + "/p1_baseline_bytes.json";
+        const QString path = QStringLiteral(LONGPATH_TEST_DATA_DIR) + "/p1_baseline_bytes.json";
         QFile f(path);
         QVERIFY2(f.open(QIODevice::ReadOnly),
                  qPrintable(QString("baseline JSON not found at: %1").arg(path)));

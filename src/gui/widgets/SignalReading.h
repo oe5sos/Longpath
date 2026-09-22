@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/gui/widgets/SignalReading.h  (NereusSDR)
+// src/gui/widgets/SignalReading.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // Wann eine Pegelangabe eine Messung ist -- und was dasteht, wenn sie
 // keine ist.
@@ -38,7 +38,7 @@
 // Rechnung, die auf Stille den Logarithmus von Null gebildet hat.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-16 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
 // =================================================================

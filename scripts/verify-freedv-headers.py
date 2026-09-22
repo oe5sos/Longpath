@@ -16,7 +16,7 @@ freedv-gui-derived file will carry:
   2. "freedv-gui"                   - upstream identity
   3. "Copyright"                    - every cited LGPL/BSD source carries one
   4. "License"                      - matches LGPL or BSD-2-Clause headers
-  5. "Modification history (NereusSDR)" - anchors the per-file mod block
+  5. "Modification history (Longpath)" - anchors the per-file mod block
 
 Files under `docs/attribution/` themselves are exempt (they document
 the templates, they are not themselves derived source).
@@ -41,7 +41,7 @@ from typing import Optional
 REPO = Path(__file__).resolve().parent.parent
 PROVENANCE = REPO / "docs" / "attribution" / "FREEDV-GUI-PROVENANCE.md"
 FREEDV_DIR = Path(os.environ.get(
-    "NEREUS_FREEDV_DIR", "/Users/j.j.boyd/freedv-gui")).expanduser()
+    "LONGPATH_FREEDV_DIR", "/Users/j.j.boyd/freedv-gui")).expanduser()
 
 # Required marker set (mirrors verify-thetis-headers.py "thetis" kind
 # but adapted for freedv-gui's LGPL / BSD header text).
@@ -50,7 +50,7 @@ MARKERS = [
     "freedv-gui",
     "Copyright",
     "License",
-    "Modification history (NereusSDR)",
+    ("Modification history (Longpath)", "Modification history (NereusSDR)"),
 ]
 
 # Header must appear within this many lines of top of file
@@ -110,7 +110,10 @@ def parse_provenance(text: str):
 def check_required_markers(path: Path, markers):
     head = "\n".join(
         path.read_text(errors="replace").splitlines()[:HEADER_WINDOW])
-    return [m for m in markers if m not in head]
+    # A tuple lists alternatives; any one of them satisfies the marker.
+    def present(m):
+        return any(alt in head for alt in m) if isinstance(m, tuple) else m in head
+    return [m for m in markers if not present(m)]
 
 
 def check_orphan_pair(rel: str, listed) -> Optional[str]:
@@ -151,7 +154,7 @@ def upstream_present() -> bool:
     """Is a freedv-gui clone reachable on this machine?
 
     SKIP gracefully if absent (matches the pre-commit hook's
-    NEREUS_THETIS_DIR auto-locate behavior). CI sets the env var
+    LONGPATH_THETIS_DIR auto-locate behavior). CI sets the env var
     explicitly so the strict check fires there.
     """
     if FREEDV_DIR.is_dir():
@@ -188,14 +191,14 @@ def main():
         print(f"ERROR: {PROVENANCE} not found", file=sys.stderr)
         return 2
 
-    if not upstream_present() and not os.environ.get("NEREUS_FREEDV_DIR"):
+    if not upstream_present() and not os.environ.get("LONGPATH_FREEDV_DIR"):
         # Local-dev convenience: SKIP if no clone is reachable. CI sets
-        # NEREUS_FREEDV_DIR explicitly so the strict check fires there.
+        # LONGPATH_FREEDV_DIR explicitly so the strict check fires there.
         print(
             "[freedv] SKIPPED (no freedv-gui clone found locally; searched "
             "/Users/j.j.boyd/freedv-gui, ../freedv-gui, ../../freedv-gui, "
             "../../../freedv-gui, ../../../../freedv-gui; "
-            "set NEREUS_FREEDV_DIR to override; CI runs strict)"
+            "set LONGPATH_FREEDV_DIR to override; CI runs strict)"
         )
         return 0
 

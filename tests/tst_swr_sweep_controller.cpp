@@ -1,8 +1,8 @@
 // =================================================================
-// tests/tst_swr_sweep_controller.cpp  (NereusSDR)
+// tests/tst_swr_sweep_controller.cpp  (Longpath)
 // =================================================================
 //
-// no-port-check: NereusSDR-original feature test (Thetis has no SWR
+// no-port-check: Longpath-original feature test (Thetis has no SWR
 // sweep analyzer).
 //
 // The controller's physics enter through ingestTelemetry and leave
@@ -19,7 +19,7 @@
 // tests use.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-13 — Created by Ralph Martin Fischer (OE5SOS),
 //                 AI-assisted implementation via Anthropic Claude
 //                 (Cowork).

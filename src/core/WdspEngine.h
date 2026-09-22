@@ -1,7 +1,7 @@
 #pragma once
 
 // =================================================================
-// src/core/WdspEngine.h  (NereusSDR)
+// src/core/WdspEngine.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -9,7 +9,7 @@
 //   Project Files/Source/ChannelMaster/cmaster.c, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -100,7 +100,7 @@ warren@wpratt.com
 #include <memory>
 #include <vector>
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
 // Forward declaration for test-only friend access (see end of class).  The
 // test class lives in the global namespace because it inherits from QObject
 // in tests/tst_wdsp_engine_tx_channel.cpp without a NereusSDR namespace
@@ -117,6 +117,9 @@ class TestSliceModelRadeSwap;
 // Phase 3R Task L2: same friendship for the RadeApplet UI test which
 // constructs a real RadioModel + RadeChannel fixture.
 class TestRadeApplet;
+// 2026-09-17: same pattern for the NR-backend audio pruefstand, which
+// pushes real audio through every noise-reduction slot on a real channel.
+class TstNrBackendsProcessAudio;
 // Phase 3F Sub-Epic I closeout, defect H1: the per-stream drain-geometry
 // test primes the engine so createRxChannel can seed real RX channels.
 class TestStreamPoolBinding;
@@ -209,7 +212,7 @@ public:
     // receivers the connected radio actually has, so the TX id is a fixed
     // constant rather than something that moves per radio.
     //
-    // NereusSDR's radio structure is one WDSP channel per slice with no
+    // Longpath's radio structure is one WDSP channel per slice with no
     // sub-receivers, i.e. cmSubRCVR = 1, cmRCVR = kMaxSliceChannels,
     // cmXMTR = 1.  Substituting into chid() gives:
     //   rx:  ch_id = 1 * slice + 0             = slice
@@ -238,13 +241,17 @@ public:
     // Returns the new RxChannel (owned by WdspEngine) or nullptr on failure.
     // channelId: WDSP channel number (0-31). Must be unique.
     //
-    // Default parameters match our P2 DDC configuration:
-    //   inputBufferSize=238 (one P2 packet), dspBufferSize=4096,
-    //   all rates=48000 (no resampling needed)
+    // Default parameters: inputBufferSize=64 (bufferSizeForRate(48000),
+    // what RadioModel opens with at 48 kHz), dspBufferSize=4096, all
+    // rates=48000 (no resampling needed). Bis zum 2026-09-21 stand hier
+    // 238 ("one P2 packet") -- das teilt WDSPs Eingangsring (2 * 4096)
+    // nicht, und fexchange2 schrieb ab dem 35. Block hinter den Puffer
+    // (siehe createRxChannel in WdspEngine.cpp, das solche Groessen jetzt
+    // abweist).
     //
     // From Thetis cmaster.c:72-86 [v2.10.3.13] (OpenChannel call in create_rcvr)
     RxChannel* createRxChannel(int channelId,
-                               int inputBufferSize = 238,
+                               int inputBufferSize = 64,
                                int dspBufferSize = 4096,
                                int inputSampleRate = 48000,
                                int dspSampleRate = 48000,
@@ -278,7 +285,7 @@ public:
     void setExternalDiversityRunning(int id, bool running);
     void destroyExternalDiversity(int id);
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     // Injectable C-API table for lifecycle/order tests. Production builds
     // bind the corresponding members to the real WDSP symbols in the
     // constructor and do not expose a replacement seam.
@@ -327,7 +334,7 @@ public:
     // --- Per-board ChannelMaster-layer WDSP calls (Phase B4'/B5') ---
     //
     // These wrap ChannelMaster-exported symbols that Thetis calls at connect
-    // time from clsHardwareSpecific.cs:85-191 [v2.10.3.15].  In NereusSDR,
+    // time from clsHardwareSpecific.cs:85-191 [v2.10.3.15].  In Longpath,
     // the symbols resolve to glue stubs in netinterface_stub.c until the
     // ChannelMaster module is ported.
     //
@@ -422,7 +429,7 @@ public:
     // Create a TX channel with the given parameters.
     //
     // Channel ID convention: pass kTxChannelId.  Thetis uses
-    // `chid(inid(1, 0), 0)`; with NereusSDR's radio structure
+    // `chid(inid(1, 0), 0)`; with Longpath's radio structure
     // (CMsubrcvr=1, CMrcvr=kMaxSliceChannels) that resolves to
     // kMaxSliceChannels.  C# equivalent: `WDSP.id(1, 0)` —
     // dsp.cs:926-944 [v2.10.3.15] case 2 returns `CMsubrcvr * CMrcvr`.
@@ -471,7 +478,7 @@ public:
     // Sits immediately above the TX channel.  PureSignal feedback has no
     // WDSP-channel analogue upstream (Thetis runs it inside the TX
     // channel via SetPSFeedbackRate(txch, ps_rate), cmaster.cs:539
-    // [v2.10.3.15]), so this is a NereusSDR extension.  Upstream's
+    // [v2.10.3.15]), so this is a Longpath extension.  Upstream's
     // closest concept is a "special stream", and those are numbered after
     // the transmitters — From Thetis ChannelMaster/cmsetup.c:86-89
     // [v2.10.3.15]: `sp0id(stream) = stream - pcm->cmRCVR - pcm->cmXMTR`.
@@ -496,7 +503,7 @@ public:
     // tests) has run.
     PsFeedbackChannel* psFeedbackChannel() const;
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     // Test-only helper that synchronously opens the PS feedback channel
     // without going through the async wisdom path.  Mirrors the
     // m_initialized=true friend-access trick from
@@ -573,7 +580,7 @@ public:
     // has never processed a display frame.
     //
     // Algorithm ported from Thetis wdsp/analyzer.c:830 [@501e3f5].
-    // NereusSDR-native: runs against FFTEngine dBm bins; see
+    // Longpath-native: runs against FFTEngine dBm bins; see
     // setupMaxBinDetector docstring for the full rationale.
     double getMaxBinDbm(int displayChannel) const;
 
@@ -591,9 +598,9 @@ public:
     // either side moves.  Defaults to 0; thread-safe via the same
     // m_maxBinDetectors store as setupMaxBinDetector / getMaxBinDbm.
     //
-    // NereusSDR-only API: Thetis's WDSP analyzer subsystem (CreateAnalyzer
+    // Longpath-only API: Thetis's WDSP analyzer subsystem (CreateAnalyzer
     // + SetAnalyzer + Spectrum) is fed by the SHIFTED WDSP channel so its
-    // analyzer DC is always the slice DC.  NereusSDR taps FFTEngine ahead
+    // analyzer DC is always the slice DC.  Longpath taps FFTEngine ahead
     // of the WDSP shift, so we apply the shift in our MaxBin scan.
     void setMaxBinSliceOffsetHz(int displayChannel, double sliceOffsetHz);
 
@@ -604,7 +611,7 @@ public slots:
     // Algorithm ported from Thetis wdsp/analyzer.c:800-822 [@501e3f5]:
     // scan for max in configured [firstBin, lastBin] window; apply
     // slow-release smoothing (decay = exp(-1/(tau*fps))), fast peak attack.
-    // NereusSDR-native: binsDbm already in dBm so no magnitude-to-dB step.
+    // Longpath-native: binsDbm already in dBm so no magnitude-to-dB step.
     //
     // 2026-05-22 bench fix: this path now serves as the fallback source
     // for MaxBin. The primary source is setMaxBinDbmFromSpectrum below,
@@ -632,6 +639,18 @@ signals:
 
 private:
     bool m_initialized{false};
+    // Code review, 2026-09-13: guards initialize() re-entry for the
+    // window between "wisdom thread started" and "m_initialized flips
+    // true" -- m_initialized alone doesn't cover it, since that only
+    // happens in finishInitialization(), which can run up to ~15
+    // minutes after a cold-start wisdom thread was launched. A second
+    // initialize() call landing in that window (e.g. RadioModel::
+    // connectToRadio() re-entered via the Radio-menu reconnect action
+    // while the first call's nested wisdomLoop is still waiting) would
+    // otherwise start a second concurrent QThread running WDSPwisdom()
+    // against the same on-disk wisdom file and the same process-global,
+    // not-thread-safe FFTW planner state.
+    bool m_wisdomInProgress{false};
     QString m_configDir;
 
     // True when wisdom was regenerated this session.
@@ -682,11 +701,11 @@ private:
     // destroyTxChannel's erase() runs the unique_ptr destructor automatically.
     std::map<int, std::unique_ptr<TxChannel>> m_txChannels;
 
-    // NereusSDR-native strongest-bin-in-passband detector state.
+    // Longpath-native strongest-bin-in-passband detector state.
     //
     // Algorithm from Thetis wdsp/analyzer.c:688-830 [@501e3f5]; implemented
     // here because the WDSP analyzer pipeline (CreateAnalyzer + SetAnalyzer
-    // + Spectrum buffer feed) is not wired in NereusSDR -- FFTEngine uses raw
+    // + Spectrum buffer feed) is not wired in Longpath -- FFTEngine uses raw
     // FFTW3 directly.  The public API (setupMaxBinDetector / getMaxBinDbm)
     // preserves the Thetis names; the implementation runs the same scan +
     // slow-release smoothing on the dBm bins emitted by FFTEngine::fftReady
@@ -716,7 +735,7 @@ private:
     // ChannelMaster's pcm->in[in_id] buffer at cmaster.c:285 [v2.10.3.13]
     // (allocated for every TX-stream slot, passed to BOTH create_dexp's
     // `in` and `out` parameters at cmaster.c:134-135 [v2.10.3.13]) — but
-    // NereusSDR uses a parallel-only architecture, so this buffer is
+    // Longpath uses a parallel-only architecture, so this buffer is
     // private to the DEXP detector and never feeds the fexchange0 audio
     // path (TxWorkerThread::m_in is a separate buffer that fexchange0
     // reads).  TxWorkerThread::dispatchOneBlock copies a snapshot of m_in
@@ -736,7 +755,7 @@ private:
 
     // Phase 3M-4 Task 4: PureSignal feedback RX channel.  Single instance
     // per WdspEngine, opened during finishInitialization() (or via the
-    // openPsFeedbackChannelForTesting() helper in NEREUS_BUILD_TESTS
+    // openPsFeedbackChannelForTesting() helper in LONGPATH_BUILD_TESTS
     // builds).  Held as unique_ptr — destruction order matters: the
     // destructor (~WdspEngine via shutdown()) must run CloseChannel(5)
     // BEFORE the unique_ptr destructor erases the wrapper, mirroring the
@@ -746,18 +765,18 @@ private:
     // Open the WDSP-side PS feedback channel (OpenChannel + state=1) and
     // construct the wrapper.  Idempotent — second call returns silently.
     // Called from finishInitialization() in production, or from
-    // openPsFeedbackChannelForTesting() under NEREUS_BUILD_TESTS.
+    // openPsFeedbackChannelForTesting() under LONGPATH_BUILD_TESTS.
     void openPsFeedbackChannel();
 
     // Close the WDSP-side PS feedback channel and destroy the wrapper.
     // Idempotent — called from shutdown() when the engine is torn down.
     void closePsFeedbackChannel();
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     // Test-only friend: lets unit tests bypass async wisdom load by setting
     // m_initialized = true directly so they can exercise createTxChannel /
     // createRxChannel without a running event loop or a real WDSP wisdom
-    // file.  Production builds (without NEREUS_BUILD_TESTS) never see this.
+    // file.  Production builds (without LONGPATH_BUILD_TESTS) never see this.
     friend class ::TestWdspEngineTxChannel;
     // Phase 3M-3a-iii Task 20: same friendship for the create_dexp test.
     friend class ::TstWdspEngineDexpInit;
@@ -792,6 +811,10 @@ private:
     // opens one real RX channel so RXANBPGetMinNotchWidth has an rxa[].nbp0
     // to read.
     friend class ::TestMnfSetupPage;
+    // 2026-09-17: same friendship for the NR-backend audio pruefstand
+    // (tests/tst_nr_backends_process_audio.cpp), which needs really
+    // opened RX channels to run NR1..NR4/NNR/MNR on audio.
+    friend class ::TstNrBackendsProcessAudio;
 #endif
 };
 

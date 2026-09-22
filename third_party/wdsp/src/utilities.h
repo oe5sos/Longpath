@@ -26,6 +26,15 @@ warren@wpratt.com
 
 void *malloc0 (int size);
 
+// dprintf(const char*, ...) -- WDSP 2.10's debug trace, used by nnet.c/nnr.c.
+// Upstream implements it in utilities.c as vsnprintf()+OutputDebugStringA()
+// (utilities.h:84 [wdsp 2.10]); this tree's utilities.c was still at v1.29
+// without it, so the Windows link failed on the merged NNR port (2026-09-21,
+// PR #42). POSIX gets the same name via linux_port.h's macro.
+#ifdef _WIN32
+extern void dprintf (const char* format, ...);
+#endif
+
 extern void print_impulse (const char* filename, int N, double* impulse, int rtype, int pr_mode);
 
 extern void analyze_bandpass_filter (int N, double f_low, double f_high, double samplerate, int wintype, int rtype, double scale);

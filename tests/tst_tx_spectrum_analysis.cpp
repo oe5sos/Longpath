@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_tx_spectrum_analysis.cpp  (NereusSDR)
+// tests/tst_tx_spectrum_analysis.cpp  (Longpath)
 // =================================================================
 //
 // Occupied bandwidth is the one number in the audio tool that is about
@@ -16,10 +16,10 @@
 // two, and wrong in the direction that tells a splattering station it is
 // clean.
 //
-// no-port-check: NereusSDR-original.
+// no-port-check: Longpath-original.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-09 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

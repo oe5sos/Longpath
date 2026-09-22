@@ -1,8 +1,8 @@
 // =================================================================
-// tests/tst_mox_controller_ptt_source_dispatch.cpp  (NereusSDR)
+// tests/tst_mox_controller_ptt_source_dispatch.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original test. No Thetis logic is ported in this test
+// Longpath-original test. No Thetis logic is ported in this test
 // file. The test exercises:
 //   - MoxController::onMicPttFromRadio(bool)  — H.4 Phase 3M-1b
 //   - MoxController::onCatPtt(bool)           — H.4 Phase 3M-1b
@@ -36,7 +36,7 @@
 //     the precedent in tst_mox_controller_anti_vox.cpp §C.2 (H.3).
 // =================================================================
 
-// no-port-check: NereusSDR-original test file — no upstream Thetis port.
+// no-port-check: Longpath-original test file — no upstream Thetis port.
 
 #include <QtTest/QtTest>
 #include <QSignalSpy>
@@ -58,6 +58,13 @@ static void drainEvents()
 {
     QCoreApplication::processEvents();
     QCoreApplication::processEvents(); // two passes: some timers fire on first pass
+    // Third pass, 2026-09-13: MoxController::onMicPttFromRadio(false) now
+    // starts m_micPttReleaseTailTimer (kMicPttReleaseTailMs, 0 via
+    // setTimerIntervals in these tests) instead of calling setMox(false)
+    // directly -- one more single-shot-timer hop before the release walk
+    // below it even starts, on top of the two passes that walk already
+    // needed.
+    QCoreApplication::processEvents();
 }
 
 class TestMoxControllerPttSourceDispatch : public QObject {
@@ -328,7 +335,7 @@ private slots:
     // §F.1 — CW press is rejected: no pttModeChanged, no moxStateChanged
     void cw_press_rejected_noSignals()
     {
-        QLoggingCategory::setFilterRules(QStringLiteral("nereus.dsp=false"));
+        QLoggingCategory::setFilterRules(QStringLiteral("longpath.dsp=false"));
 
         MoxController ctrl;
         makeSync(ctrl);
@@ -350,7 +357,7 @@ private slots:
     // §F.2 — CW release is rejected: no signals regardless of direction
     void cw_release_rejected_noSignals()
     {
-        QLoggingCategory::setFilterRules(QStringLiteral("nereus.dsp=false"));
+        QLoggingCategory::setFilterRules(QStringLiteral("longpath.dsp=false"));
 
         MoxController ctrl;
         makeSync(ctrl);
@@ -372,7 +379,7 @@ private slots:
     // §F.3 — TCI press is rejected: no pttModeChanged, no moxStateChanged
     void tci_press_rejected_noSignals()
     {
-        QLoggingCategory::setFilterRules(QStringLiteral("nereus.dsp=false"));
+        QLoggingCategory::setFilterRules(QStringLiteral("longpath.dsp=false"));
 
         MoxController ctrl;
         makeSync(ctrl);
@@ -394,7 +401,7 @@ private slots:
     // §F.4 — TCI release is rejected: no signals regardless of direction
     void tci_release_rejected_noSignals()
     {
-        QLoggingCategory::setFilterRules(QStringLiteral("nereus.dsp=false"));
+        QLoggingCategory::setFilterRules(QStringLiteral("longpath.dsp=false"));
 
         MoxController ctrl;
         makeSync(ctrl);

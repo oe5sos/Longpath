@@ -1,5 +1,5 @@
 // src/gui/widgets/AdcOverloadBadge.h
-// no-port-check: NereusSDR-original Qt widget. The inline comments
+// no-port-check: Longpath-original Qt widget. The inline comments
 // reference Thetis ucInfoBar.cs / console.cs only as behavioral cites
 // for severity-flag rules (red_warning gate, 2 s auto-hide); no Thetis
 // code is ported here — the widget is a Qt6 QWidget composed of two

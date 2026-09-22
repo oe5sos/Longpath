@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/SampleRateCatalog.h  (NereusSDR)
+// src/core/SampleRateCatalog.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
@@ -16,7 +16,7 @@
 // a separate cmsetup.c port-citation.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.

@@ -1,7 +1,7 @@
-// no-port-check: NereusSDR-original unit-test file.  RADE audio
-// routing is NereusSDR-native; no Thetis equivalent.
+// no-port-check: Longpath-original unit-test file.  RADE audio
+// routing is Longpath-native; no Thetis equivalent.
 // =================================================================
-// tests/tst_audio_engine_rade.cpp  (NereusSDR)
+// tests/tst_audio_engine_rade.cpp  (Longpath)
 // =================================================================
 //
 // Phase 3R Task J4 unit tests: RadeChannel::rxSpeechReady is routed
@@ -28,7 +28,7 @@
 //      FakeAudioBus speakers stand-in.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-11 - New test file for Phase 3R Task J4.  J.J. Boyd
 //                 (KG4VCF), with AI-assisted implementation via
 //                 Anthropic Claude Code.

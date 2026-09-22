@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/audio/RealtimeAudioPriority.cpp  (NereusSDR-native)
+// src/core/audio/RealtimeAudioPriority.cpp  (Longpath-native)
 // =================================================================
 // 2026-05-25  J.J. Boyd (KG4VCF), AI-assisted via Anthropic Claude.
 // See RealtimeAudioPriority.h for design rationale.
@@ -9,7 +9,7 @@
 #include <QtGlobal>
 #include <QLoggingCategory>
 
-Q_LOGGING_CATEGORY(lcRtAudio, "nereussdr.rt_audio")
+Q_LOGGING_CATEGORY(lcRtAudio, "longpath.rt_audio")
 
 namespace Longpath {
 

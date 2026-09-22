@@ -41,7 +41,7 @@
 
 - [ ] **0.4** Baseline build:
   ```bash
-  cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DNEREUS_BUILD_TESTS=ON
+  cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DLONGPATH_BUILD_TESTS=ON
   cmake --build build -j$(sysctl -n hw.ncpu)
   ```
   Expected: zero errors.

@@ -37,7 +37,7 @@
 
 - [ ] **0.4** Baseline build:
   ```bash
-  cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DNEREUS_BUILD_TESTS=ON
+  cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DLONGPATH_BUILD_TESTS=ON
   cmake --build build -j$(sysctl -n hw.ncpu)
   ```
   Expected: zero errors. Warnings acceptable.
@@ -219,7 +219,7 @@ Source: Thetis setup.cs:6230, 6288-6299, HPSDR/Alex.cs:299-413
   } // namespace NereusSDR
   ```
 
-- [ ] **T2.3** Add to `CMakeLists.txt` — locate the `set(NEREUS_CORE_SOURCES ...)` list (grep for `BoardCapabilities.cpp`) and append `src/core/AntennaLabels.cpp` alphabetically before `BoardCapabilities.cpp`.
+- [ ] **T2.3** Add to `CMakeLists.txt` — locate the `set(LONGPATH_CORE_SOURCES ...)` list (grep for `BoardCapabilities.cpp`) and append `src/core/AntennaLabels.cpp` alphabetically before `BoardCapabilities.cpp`.
 
 - [ ] **T2.4** Build:
   ```bash
@@ -445,9 +445,9 @@ networkproto1.c:463-468 [v2.10.3.13 @501e3f5]."
       }
   ```
 
-- [ ] **T6.2** If `m_alex` or `buildAlex0` is private, add a `friend class` declaration in `P2RadioConnection.h` gated by `#ifdef NEREUS_BUILD_TESTS`:
+- [ ] **T6.2** If `m_alex` or `buildAlex0` is private, add a `friend class` declaration in `P2RadioConnection.h` gated by `#ifdef LONGPATH_BUILD_TESTS`:
   ```cpp
-  #ifdef NEREUS_BUILD_TESTS
+  #ifdef LONGPATH_BUILD_TESTS
       friend class TestP2CodecOrionMkII;
   #endif
   ```
@@ -1016,9 +1016,9 @@ without round-tripping through user interaction."
   #include "tst_antenna_routing_model.moc"
   ```
 
-- [ ] **T14.2** The test references four test-only hooks on `RadioModel` that don't exist yet. Add them under `#ifdef NEREUS_BUILD_TESTS` in `RadioModel.h`:
+- [ ] **T14.2** The test references four test-only hooks on `RadioModel` that don't exist yet. Add them under `#ifdef LONGPATH_BUILD_TESTS` in `RadioModel.h`:
   ```cpp
-  #ifdef NEREUS_BUILD_TESTS
+  #ifdef LONGPATH_BUILD_TESTS
   public:
       void injectConnectionForTest(RadioConnection* conn) { m_connection = conn; }
       void setLastBandForTest(NereusSDR::Band b) {
@@ -1044,7 +1044,7 @@ without round-tripping through user interaction."
   ```cpp
   const BoardCapabilities& RadioModel::boardCapabilities() const
   {
-  #ifdef NEREUS_BUILD_TESTS
+  #ifdef LONGPATH_BUILD_TESTS
       if (m_testCapsOverride) {
           static BoardCapabilities overrideCaps{};
           overrideCaps.hasAlex = m_testCapsHasAlex;
@@ -1056,10 +1056,10 @@ without round-tripping through user interaction."
   }
   ```
 
-- [ ] **T14.3** Register in `tests/CMakeLists.txt`. Find another `nereus_add_test(tst_alex_controller)` and add below:
+- [ ] **T14.3** Register in `tests/CMakeLists.txt`. Find another `longpath_add_test(tst_alex_controller)` and add below:
   ```cmake
-  nereus_add_test(tst_antenna_routing_model)
-  target_compile_definitions(tst_antenna_routing_model PRIVATE NEREUS_BUILD_TESTS)
+  longpath_add_test(tst_antenna_routing_model)
+  target_compile_definitions(tst_antenna_routing_model PRIVATE LONGPATH_BUILD_TESTS)
   ```
 
 - [ ] **T14.4** Build + run (must FAIL on first write — no implementation of the mock's override pattern is missing → adjust until green):
@@ -1076,7 +1076,7 @@ without round-tripping through user interaction."
   git commit -m "test: integration test for RadioModel antenna pump (Phase 3P-I-a T14)
 
 Covers T9/T10/T11 triggers + hasAlex=false zero-routing behavior.
-Adds NEREUS_BUILD_TESTS hooks on RadioModel for connection injection."
+Adds LONGPATH_BUILD_TESTS hooks on RadioModel for connection injection."
   ```
 
 ---
@@ -1519,8 +1519,8 @@ Hidden when !caps.hasAlex."
 
 - [ ] **T21.2** Register in `tests/CMakeLists.txt`:
   ```cmake
-  nereus_add_test(tst_ui_capability_gating)
-  target_compile_definitions(tst_ui_capability_gating PRIVATE NEREUS_BUILD_TESTS)
+  longpath_add_test(tst_ui_capability_gating)
+  target_compile_definitions(tst_ui_capability_gating PRIVATE LONGPATH_BUILD_TESTS)
   ```
 
 - [ ] **T21.3** Build + run:
@@ -1568,7 +1568,7 @@ Hidden when !caps.hasAlex."
               // Add more when new antenna QMenu sites land.
           };
 
-          const QString root = QString::fromLatin1(NEREUS_SOURCE_ROOT);
+          const QString root = QString::fromLatin1(LONGPATH_SOURCE_ROOT);
           for (const QString& rel : knownAntennaMenuSites) {
               QFile f(root + "/" + rel);
               QVERIFY2(f.open(QIODevice::ReadOnly | QIODevice::Text),
@@ -1598,9 +1598,9 @@ Hidden when !caps.hasAlex."
 
 - [ ] **T22.2** In `tests/CMakeLists.txt`:
   ```cmake
-  nereus_add_test(tst_popup_style_coverage)
+  longpath_add_test(tst_popup_style_coverage)
   target_compile_definitions(tst_popup_style_coverage PRIVATE
-      NEREUS_SOURCE_ROOT=\"${CMAKE_SOURCE_DIR}\")
+      LONGPATH_SOURCE_ROOT=\"${CMAKE_SOURCE_DIR}\")
   ```
 
 - [ ] **T22.3** Build + run:
@@ -1738,7 +1738,7 @@ Hidden when !caps.hasAlex."
 - [ ] **T25.1** Clean rebuild from scratch to catch stale artifacts:
   ```bash
   rm -rf build
-  cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DNEREUS_BUILD_TESTS=ON
+  cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DLONGPATH_BUILD_TESTS=ON
   cmake --build build -j$(sysctl -n hw.ncpu) 2>&1 | tail -5
   ```
   Expected: clean build.

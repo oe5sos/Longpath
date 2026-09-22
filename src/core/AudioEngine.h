@@ -1,12 +1,12 @@
 #pragma once
 
-// no-port-check: AetherSDR-derived NereusSDR file; Thetis cmaster.cs /
+// no-port-check: AetherSDR-derived Longpath file; Thetis cmaster.cs /
 // audio.cs references in inline cites are behavioral source-first cites
 // for sample sizes / timing / mix coefficient parity only, not Thetis
 // logic ports.
 
 // =================================================================
-// src/core/AudioEngine.h  (NereusSDR)
+// src/core/AudioEngine.h  (Longpath)
 // =================================================================
 //
 // Source attribution (AetherSDR — GPLv3):
@@ -17,10 +17,10 @@
 //
 //   This file is a port or structural derivative of AetherSDR source.
 //   AetherSDR is licensed under the GNU General Public License v3.
-//   NereusSDR is also GPLv3. Attribution follows GPLv3 §5 requirements.
+//   Longpath is also GPLv3. Attribution follows GPLv3 §5 requirements.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-16 — Ported/adapted in C++20/Qt6 for NereusSDR by
 //                 J.J. Boyd (KG4VCF), with AI-assisted transformation
 //                 via Anthropic Claude Code.
@@ -115,7 +115,7 @@
 #  include "core/audio/LinuxAudioBackend.h"
 #endif
 
-#if defined(Q_OS_LINUX) && defined(NEREUS_HAVE_PIPEWIRE)
+#if defined(Q_OS_LINUX) && defined(LONGPATH_HAVE_PIPEWIRE)
 // Forward-declare only — AudioEngine.h must not drag in libpipewire types.
 // The full type is available in AudioEngine.cpp via
 // #include "core/audio/PipeWireThreadLoop.h".
@@ -145,7 +145,7 @@ class Resampler;
 class RadioModel;
 class SliceModel;
 
-// Audio engine for NereusSDR (Phase 3O VAX).
+// Audio engine for Longpath (Phase 3O VAX).
 //
 // Owns one IAudioBus per routable endpoint:
 //   - m_speakersBus: the master mix goes here.
@@ -330,7 +330,7 @@ public:
     // the lazy PortAudio path (creates a default-config PortAudioBus).
     void setVaxEnabled(int channel, bool on);
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     // Test seam — inject a fake IAudioBus into a VAX slot so unit tests
     // can exercise the rxBlockReady tee without standing up a real
     // CoreAudioHalBus/LinuxPipeBus shm/FIFO. channel is 1..4. Takes
@@ -1036,11 +1036,11 @@ private:
     // pointer loaded, immediately before tap->write() runs — i.e. inside
     // the exact window the fix closes. A no-op std::function outside
     // tests (checked, never called), so it costs nothing in production;
-    // the setter that arms it is gated under NEREUS_BUILD_TESTS below
+    // the setter that arms it is gated under LONGPATH_BUILD_TESTS below
     // like every other *ForTest seam in this class.
     std::function<void()> m_tapWriteDelayHookForTest;
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     std::function<void()> m_withdrawalPublishedHookForTest;
 #endif
 
@@ -1116,8 +1116,8 @@ private:
     // have two of.
     MicSpectrum m_txSiphonRing;
     // Default 0.5f — mirrors the fixed coefficient used in Thetis audio.cs
-    // for the aaudio mix path; NereusSDR exposes this as user-adjustable
-    // volume (pre-code review §4.4). Not a port; AudioEngine is NereusSDR-native.
+    // for the aaudio mix path; Longpath exposes this as user-adjustable
+    // volume (pre-code review §4.4). Not a port; AudioEngine is Longpath-native.
     std::atomic<float> m_txMonitorVolume{0.5f};
 
     // Sub-Phase 9 Task 9.2a — per-channel VAX rx gain / mute and master
@@ -1159,7 +1159,7 @@ private:
     LinuxAudioBackend m_linuxBackend = LinuxAudioBackend::None;
 #endif
 
-#if defined(Q_OS_LINUX) && defined(NEREUS_HAVE_PIPEWIRE)
+#if defined(Q_OS_LINUX) && defined(LONGPATH_HAVE_PIPEWIRE)
     // FORWARD CONTRACT #1 — DECLARED LAST. DO NOT MOVE THIS MEMBER EARLIER.
     //
     // C++ destroys class members in REVERSE declaration order. m_pwLoop is

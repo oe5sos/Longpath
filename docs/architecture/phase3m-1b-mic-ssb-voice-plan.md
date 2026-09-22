@@ -46,7 +46,7 @@ plan-writing. Each gets a brief recap here so the plan is self-contained.
 | 3 | PcMicSource architecture (locked in kickoff) | Tap `AudioEngine::pullTxMic(float*, int)` — no duplicate audio stack |
 | 4 | Closed-source mic-jack research | deskhpsdr cross-fork closed both gaps; full P2 byte-50 emission ports cleanly (pre-code §6.3) |
 | 5 | Mic-source UX | Radio buttons on Setup → Audio → TX Input + read-only badge in TxApplet |
-| 6 | PortAudio backend defaults | macOS = CoreAudio; Linux = PipeWire (`NEREUS_HAVE_PIPEWIRE`) → Pulse fallback; Windows = WASAPI shared |
+| 6 | PortAudio backend defaults | macOS = CoreAudio; Linux = PipeWire (`LONGPATH_HAVE_PIPEWIRE`) → Pulse fallback; Windows = WASAPI shared |
 | 7 | Anti-VOX source default | Local-RX (`antiVoxSourceVax = false`; matches Thetis) |
 | 8 | VOX defaults | OFF at startup; threshold/gain/hang-time persist; **enable flag does not persist** |
 | 9 | MON defaults | OFF at startup; volume default `0.5` (matches Thetis literal `cmaster.SetAAudioMixVol(...,0.5)` at `audio.cs:417`) |
@@ -87,7 +87,7 @@ plan-writing. Each gets a brief recap here so the plan is self-contained.
 **Inline cite stamp:** `[v2.10.3.13]` for Thetis tag-aligned values;
 `[@501e3f51]` for Thetis post-tag commits; `[@120188f]` for deskhpsdr
 post-tag commits. Verifier `scripts/verify-inline-tag-preservation.py` runs
-in pre-commit hook chain — `NEREUS_THETIS_DIR=/Users/j.j.boyd/Thetis` must
+in pre-commit hook chain — `LONGPATH_THETIS_DIR=/Users/j.j.boyd/Thetis` must
 be set in the shell before each commit.
 
 **Codex-review patterns to watch (from PR #139 + PR #144):**

@@ -4,7 +4,7 @@
 //   Project Files/Source/Console/clsAudioRecordPlayback.cs, original licence
 //   from Thetis source is included below
 //
-// Thetis v2.10.3.15 (@852bf0e). Diese Datei ist NereusSDR/Longpath-original
+// Thetis v2.10.3.15 (@852bf0e). Diese Datei ist Longpath/Longpath-original
 // und uebernimmt KEINEN C#-Code; sie leitet Verhalten und Feldauswahl aus
 // der oben genannten Quelle ab. Der Kopf steht hier trotzdem vollstaendig,
 // weil die Herkunftstabelle sie fuehrt und weil eine Nennung mehr niemandem
@@ -56,10 +56,10 @@ mw0lge@grange-lane.co.uk
 // uebernommen. Herkunft steht als Zeile 'reference' in THETIS-PROVENANCE.md.
 
 // =================================================================
-// src/core/audio/WavRecorder.h  (NereusSDR)
+// src/core/audio/WavRecorder.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original, im Verhalten an Thetis angelehnt
+// Longpath-original, im Verhalten an Thetis angelehnt
 // (clsAudioRecordPlayback.cs, MW0LGE — AudioRecordRxSource.
 // ReceiverOutputAudio und die JSON-Beschreibung neben der WAV;
 // design doc docs/architecture/phase3m-recording-design.md §3).
@@ -83,11 +83,11 @@ mw0lge@grange-lane.co.uk
 //
 // Das Anschalten des Abgriffs (WavRecorderController) und die
 // Dateibenennung/UI (bewusst offen gelassen — siehe design doc §8 und
-// CLAUDE.local.md "Technik Nereus, Design ich"). Diese Klasse bekommt
+// CLAUDE.local.md: Technik vom Programm, Design vom Betreiber). Diese Klasse bekommt
 // Abtastwerte gereicht und weiss nicht, woher.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-25 — Original fuer NereusSDR/Longpath von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
 // =================================================================

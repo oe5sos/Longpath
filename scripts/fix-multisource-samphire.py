@@ -48,8 +48,8 @@ def fix_file(rel_path: str) -> bool:
     # Insert Samphire block before the Modification history line.
     # The block should go right before:
     # // =================================================================
-    # // Modification history (NereusSDR):
-    mod_marker = "// =================================================================\n// Modification history (NereusSDR):"
+    # // Modification history (Longpath):
+    mod_marker = "// =================================================================\n// Modification history (Longpath):"
 
     if mod_marker not in text:
         print(f"WARN {rel_path} — modification history marker not found")

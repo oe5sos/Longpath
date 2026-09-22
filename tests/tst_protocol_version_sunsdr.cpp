@@ -1,7 +1,7 @@
-// no-port-check: NereusSDR/Longpath-original test file.
+// no-port-check: Longpath/Longpath-original test file.
 
 // =================================================================
-// tests/tst_protocol_version_sunsdr.cpp  (NereusSDR/Longpath)
+// tests/tst_protocol_version_sunsdr.cpp  (Longpath)
 // =================================================================
 //
 // Plan doc task A.1: docs/architecture/2026-08-26-sunsdr-connection-plan.md
@@ -15,7 +15,7 @@
 // tst_hl2_n2adr_persistence.cpp already proves for board-type persistence.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-26 — Original for NereusSDR/Longpath by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/core/audio/IqRecorderController.h  (NereusSDR)
+// src/core/audio/IqRecorderController.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // Was den I/Q-Abgriff mit IqRecorder verbindet — der Gegenpart zu
 // WavRecorderController, aber an einer anderen Stelle angeschlossen.
@@ -36,7 +36,7 @@
 // Design doc: docs/architecture/phase3m-recording-design.md §7.2.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-25 — Original fuer NereusSDR/Longpath von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
 // =================================================================

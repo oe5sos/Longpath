@@ -5,8 +5,8 @@
 #include "gui/styles/Theme.h"
 #include "gui/ColorSwatchButton.h"
 #include "gui/SpectrumWidget.h"
-#include "gui/StyleConstants.h"
 #include "core/AppSettings.h"
+#include "gui/StyleConstants.h"
 #include "models/RadioModel.h"
 
 #include <QVBoxLayout>
@@ -218,7 +218,7 @@ void ColorsThemePage::buildUI()
         QColor(255, 184, 0),
         [](SpectrumWidget* w){ return w->txZeroLineColor(); },
         &SpectrumWidget::setTxZeroLineColor);
-    // NereusSDR Plan 4 D9c-1 — no Thetis equivalent (NereusSDR-original).
+    // Longpath Plan 4 D9c-1 — no Thetis equivalent (Longpath-original).
     m_txZeroLineColorBtn->setToolTip(QStringLiteral(
         "Colour of the TX zero line drawn on the panadapter and waterfall "
         "at the TX centre frequency when transmitting (MOX active)."));

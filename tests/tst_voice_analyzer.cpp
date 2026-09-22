@@ -10,7 +10,7 @@
 // target by boosting will happily add 20 dB to a band where the
 // microphone produces nothing but hiss, and the operator hears the
 // result and concludes the feature is broken.
-// no-port-check: NereusSDR-original.
+// no-port-check: Longpath-original.
 
 #include <QtTest/QtTest>
 

@@ -1,8 +1,8 @@
 // =================================================================
-// tests/tst_tx_mic_router_selector.cpp  (NereusSDR)
+// tests/tst_tx_mic_router_selector.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original test file. No Thetis port at this layer.
+// Longpath-original test file. No Thetis port at this layer.
 //
 // Exercises CompositeTxMicRouter — the strategy-pattern selector that
 // holds PcMicSource + RadioMicSource and dispatches pullSamples based
@@ -21,13 +21,13 @@
 // Plan: 3M-1b F.3.
 // =================================================================
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-27 — Original test for NereusSDR by J.J. Boyd (KG4VCF),
 //                 Phase 3M-1b Task F.3, with AI-assisted implementation
 //                 via Anthropic Claude Code.
 // =================================================================
 
-// no-port-check: NereusSDR-original test file.
+// no-port-check: Longpath-original test file.
 
 #include <QtTest/QtTest>
 

@@ -106,7 +106,7 @@ inline void teardownWorkerThreadedConnection(RadioConnection*& conn,
             // terminate fallback. The lambda may still fire later
             // before the loop exits; the shared_ptr keeps the
             // semaphore alive until then.
-            QLoggingCategory cat("nereus.connection");
+            QLoggingCategory cat("longpath.connection");
             qCWarning(cat).noquote()
                 << "teardownWorker: disconnect dispatch timed out after"
                 << kDispatchTimeoutMs << "ms — forcing thread quit";

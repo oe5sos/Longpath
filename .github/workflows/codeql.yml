@@ -28,7 +28,7 @@ jobs:
         # System libs only. Qt itself comes from install-qt-action below
         # so CodeQL matches ci.yml + release.yml (Qt 6.8.*). Apt qt6-*
         # on ubuntu-24.04 ships Qt 6.4.2, which is too old for
-        # QRhiWidget and used to force -DNEREUS_GPU_SPECTRUM=OFF here;
+        # QRhiWidget and used to force -DLONGPATH_GPU_SPECTRUM=OFF here;
         # aligning Qt versions across all three workflows removes that
         # workaround and stops CodeQL drifting from CI behavior.
         run: |

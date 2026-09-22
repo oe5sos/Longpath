@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/PaCalProfile.cpp  (NereusSDR)
+// src/core/PaCalProfile.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -11,7 +11,7 @@
 //   original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-02 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -138,7 +138,7 @@ PaCalBoardClass paCalBoardClassFor(HPSDRModel model) noexcept {
     switch (model) {
         // Atlas / HPSDR kit — discrete-board family with no integrated PA.
         // FWD power meter has no signal, so calibration is meaningless.
-        // NereusSDR-internal: Thetis would route this to default 10 W
+        // Longpath-internal: Thetis would route this to default 10 W
         // (no `case HPSDRModel.HPSDR` exists in console.cs:6717-6752).
         case HPSDRModel::HPSDR:        return PaCalBoardClass::None;
 
@@ -212,7 +212,7 @@ PaCalBoardClass paCalBoardClassFor(HPSDRModel model) noexcept {
         //
         // Confirmed by mi0bot setup.cs:6432-6435 [v2.10.3.13-beta2] which
         // does `grp10WattMeterTrim.BringToFront()` on the HL2 branch (i.e.
-        // the 10 W meter trim group, not the 100 W). An earlier NereusSDR
+        // the 10 W meter trim group, not the 100 W). An earlier Longpath
         // placeholder used a separate `HermesLite` class (0.5 W intervals
         // / 5 W max) added by Task 3.1; dropped 2026-05-02 after upstream
         // verification.

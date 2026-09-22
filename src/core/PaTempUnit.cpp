@@ -1,9 +1,9 @@
 // =================================================================
-// src/core/PaTempUnit.cpp  (NereusSDR)
+// src/core/PaTempUnit.cpp  (Longpath)
 // =================================================================
 //
-// no-port-check: NereusSDR-original.  See PaTempUnit.h for the full
-// rationale (Thetis hard-codes °C; NereusSDR adds a click-to-toggle
+// no-port-check: Longpath-original.  See PaTempUnit.h for the full
+// rationale (Thetis hard-codes °C; Longpath adds a click-to-toggle
 // preference shared across all PA-temperature surfaces).
 // =================================================================
 

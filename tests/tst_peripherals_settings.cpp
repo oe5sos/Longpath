@@ -1,7 +1,7 @@
 // =================================================================
-// tests/tst_peripherals_settings.cpp  (NereusSDR)
+// tests/tst_peripherals_settings.cpp  (Longpath)
 // =================================================================
-// NereusSDR-native test. No upstream source file ported.
+// Longpath-native test. No upstream source file ported.
 //
 // Verifies the per-radio peripherals settings API introduced by the
 // 2026-05-26 refactor:
@@ -21,7 +21,7 @@
 //   6. MAC-switch isolation: writing to radio A's peripheral scope
 //      doesn't bleed into radio B's.
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-26 -- Authored by J.J. Boyd (KG4VCF), with AI-assisted
 //                 transformation via Anthropic Claude Code.
 // =================================================================

@@ -1,8 +1,8 @@
 // =================================================================
-// tests/tst_p1_mic_decimation.cpp  (NereusSDR)
+// tests/tst_p1_mic_decimation.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original test file. Verifies the mic sample decimation
+// Longpath-original test file. Verifies the mic sample decimation
 // helper P1RadioConnection::decimateMicSamples that downsamples
 // radio-rate mic (sample-rate Hz) to 48 kHz before feeding TxMicSource.
 //
@@ -21,13 +21,13 @@
 //
 // =================================================================
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-01 — New test for HL2 mic decimation by J.J. Boyd
 //                 (KG4VCF), with AI-assisted implementation via
 //                 Anthropic Claude Code.
 // =================================================================
 
-// no-port-check: NereusSDR-original test file. No Thetis logic ported.
+// no-port-check: Longpath-original test file. No Thetis logic ported.
 
 #include <QtTest/QtTest>
 #include <QObject>
@@ -180,7 +180,7 @@ private slots:
     //
     // Thetis netInterface.c:1287-1310 [v2.10.3.14] sets mic_decimation_factor
     // from sampleRate (1/2/4/8 for 48/96/192/384) and immediately resets
-    // mic_decimation_count = 0 (line 1310). NereusSDR mirrors this in
+    // mic_decimation_count = 0 (line 1310). Longpath mirrors this in
     // P1RadioConnection::setSampleRate.
     void sampleRateChange_updatesFactorAndResetsCounter()
     {

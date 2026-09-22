@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 //
-// NereusSDR - RadeApplet implementation (Phase 3R Task L2).
+// Longpath - RadeApplet implementation (Phase 3R Task L2).
 //
-// NereusSDR-native applet; see RadeApplet.h for full design notes.
+// Longpath-native applet; see RadeApplet.h for full design notes.
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-11 - Created for Phase 3R Task L2 by J.J. Boyd (KG4VCF),
 //                with AI-assisted implementation via Anthropic Claude
 //                Code.

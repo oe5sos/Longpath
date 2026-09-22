@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_instrument_no_reading.cpp  (NereusSDR)
+// tests/tst_instrument_no_reading.cpp  (Longpath)
 // =================================================================
 //
 // Ein Instrument ohne Messung darf keine Zahl zeigen.
@@ -19,7 +19,7 @@
 // AUSSIEHT, entscheidet der Blick des Betreibers.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-17 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

@@ -1,7 +1,7 @@
 #pragma once
 
 // =================================================================
-// src/gui/SpectrumWidget.h  (NereusSDR)
+// src/gui/SpectrumWidget.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -10,7 +10,7 @@
 //   Project Files/Source/Console/display.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -185,8 +185,8 @@ QT_END_NAMESPACE
 
 // GPU spectrum: QRhiWidget base class for Metal/Vulkan/D3D12 rendering.
 // CPU fallback: QWidget with QPainter.
-// Note: NEREUS_GPU_SPECTRUM is set in CMakeLists.txt via target_compile_definitions.
-#ifdef NEREUS_GPU_SPECTRUM
+// Note: LONGPATH_GPU_SPECTRUM is set in CMakeLists.txt via target_compile_definitions.
+#ifdef LONGPATH_GPU_SPECTRUM
 #include <QRhiWidget>
 #include <rhi/qrhi.h>
 using SpectrumBaseClass = QRhiWidget;
@@ -246,7 +246,7 @@ enum class SpectrumRenderMode : int {
 
 // Frequency label alignment for the bottom scale bar.
 // From Thetis comboDisplayLabelAlign (setup.designer.cs:34635).
-// Thetis exposes 5 options (Left/Center/Right/Auto/Off); NereusSDR
+// Thetis exposes 5 options (Left/Center/Right/Auto/Off); Longpath
 // Phase 3G-8 commit 5 expands the previous 2-mode implementation to
 // match.
 enum class FreqLabelAlign : int {
@@ -341,7 +341,7 @@ public:
     // capacity-clamp formula in their parallel shim.
     //
     // Originally 4096 (~32 MB at 2000 px wide) — ported from unmerged
-    // AetherSDR PR #1478 [@2bb3b5c]. NereusSDR raised the cap to 16384
+    // AetherSDR PR #1478 [@2bb3b5c]. Longpath raised the cap to 16384
     // (~128 MB at 2000 px wide) post-merge to give ~8 min effective rewind
     // at the default 30 ms refresh and 20+ min at any period ≥ 73 ms.
     // Disk-spool tier deferred to Phase 3M (Recording).
@@ -441,7 +441,7 @@ public:
     // ---- Detector + Averaging split (Task 2.1, handwave fix from 3G-8) ----
     // Ported from Thetis specHPSDR.cs:302-415 [v2.10.3.13] DetTypePan /
     // DetTypeWF / AverageMode / AverageModeWF.
-    // RX1 scope dropped; NereusSDR applies as global panadapter default
+    // RX1 scope dropped; Longpath applies as global panadapter default
     // with per-pan override via ContainerSettings dialog (3G-6 pattern).
 
     // Spectrum (panadapter) detector — bin-reduction policy.
@@ -540,7 +540,7 @@ public:
     void setActivePeakHoldDropDbPerSec(double r);
     void setActivePeakHoldFill(bool on);
     void setActivePeakHoldOnTx(bool on);
-    // NereusSDR-original — Thetis ties the peak trace colour to the data-line
+    // Longpath-original — Thetis ties the peak trace colour to the data-line
     // colour. We expose it separately so the user can keep a distinct peak
     // hold colour even when "Reset to Smooth Defaults" recolours the live
     // trace (which would otherwise hide the peak trace behind a same-coloured
@@ -684,7 +684,7 @@ public:
     void setWfAverageMode(AverageMode m);
     AverageMode wfAverageMode() const { return m_wfAverageMode; }
 
-    // Timestamp overlay (NereusSDR extensions W8/W9).
+    // Timestamp overlay (Longpath extensions W8/W9).
     enum class TimestampPosition : int { None = 0, Left, Right, Count };
     enum class TimestampMode     : int { UTC = 0, Local, Count };
     void setWfTimestampPosition(TimestampPosition p);
@@ -783,7 +783,7 @@ public:
     // Port aus AetherSDR SpectrumWidget (setSquelchLine +
     // drawSquelchLine, dort SpectrumWidget.cpp:4453-4506 [@0cd4559]).
     //
-    // NereusSDR-Abweichung: AetherSDR rechnet aus einer 0..160-Stufe
+    // Longpath-Abweichung: AetherSDR rechnet aus einer 0..160-Stufe
     // (kSqlMinDbm + level), weil FlexRadio den Schwellwert so meldet.
     // Unser SliceModel haelt ihn direkt in dBm (amsqThresh), also faellt
     // die Umrechnung weg — und mit ihr die Frage, was Stufe 0 bedeutet.
@@ -809,7 +809,7 @@ public:
     // die Squelch-Linie darueber: sie hilft beim ABSTIMMEN, und was
     // dauerhaft steht, wird zum Raster.
     //
-    // Zwei NereusSDR-Abweichungen, beide mit Grund:
+    // Zwei Longpath-Abweichungen, beide mit Grund:
     //
     // 1. Keine Weitergabe an Geschwister-Widgets. AetherSDR sucht ueber
     //    window() alle SpectrumWidgets ab, weil dort mehrere
@@ -833,7 +833,7 @@ public:
     // (SpectrumWidget.cpp:4094-4130 [@0cd4559], Wirkung bei :16845 und
     // :16903). Dort zwei Schalter mit Vorgabe AUS.
     //
-    // NereusSDR-Abweichung: Vorgabe EIN. Wir haben Mittellinie,
+    // Longpath-Abweichung: Vorgabe EIN. Wir haben Mittellinie,
     // Filterkanten und Durchlassflaeche seit je unbedingt bis
     // wfRect.bottom() gemalt — das ist der Istzustand, den Betreiber
     // kennen, und eine Vorgabe darf niemandem das Bild umstellen. Der
@@ -857,7 +857,7 @@ public:
     // [@0cd4559]). Die Schwelle folgt dem Rauschboden mit festem
     // Abstand, statt bei jedem Bandwechsel nachgestellt zu werden.
     //
-    // DREI NereusSDR-Abweichungen, alle aus dem hiesigen Baum begruendet:
+    // DREI Longpath-Abweichungen, alle aus dem hiesigen Baum begruendet:
     //
     // 1. KEIN eigener Schaetzer. AetherSDR rechnet in
     //    updateAutoSquelchFromBins einen zweiten Rauschboden aus den
@@ -906,17 +906,17 @@ public:
     //
     // Die Funktion bleibt in beiden Bauarten stehen, nur ihr Rumpf
     // hängt am Wächter — dasselbe Muster wie markOverlayDirty() weiter
-    // unten. m_showPerfOverlay lebt im NEREUS_GPU_SPECTRUM-Block; stand
+    // unten. m_showPerfOverlay lebt im LONGPATH_GPU_SPECTRUM-Block; stand
     // die Zugriffsfunktion davor ausserhalb, übersetzte der CPU-Bau
     // nicht. Das ist keine ausgedachte Lage: CMakeLists.txt:420 macht
-    // den GPU-Pfad zur Option, Zeile 417 nennt -DNEREUS_GPU_SPECTRUM=OFF
+    // den GPU-Pfad zur Option, Zeile 417 nennt -DLONGPATH_GPU_SPECTRUM=OFF
     // als den Weg dorthin, und ab Zeile 434 schaltet CMake ihn von
     // selbst ab, wenn Qt älter als 6.7 ist oder ShaderTools bzw.
     // GuiPrivate fehlen.
     void setShowPerfOverlay(bool on);
     bool showPerfOverlay() const
     {
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
         return m_showPerfOverlay;
 #else
         return false;   // ohne GPU-Pfad wird die Überlagerung nie gemalt
@@ -952,7 +952,7 @@ public:
     QColor gridTextColor() const { return m_gridTextColor; }
     // Plan 4 D9c-1: zero-line color split into separate RX and TX colors.
     // RX default: red (Thetis convention).
-    // TX default: amber (NereusSDR-original — distinguishes during split TX).
+    // TX default: amber (Longpath-original — distinguishes during split TX).
     void setRxZeroLineColor(const QColor& c);
     QColor rxZeroLineColor() const noexcept { return m_rxZeroLineColor; }
 
@@ -985,7 +985,7 @@ public:
     // MHz cursor format is applied to the cursor-hover label in drawCursorInfo.
 
     // OverlayPosition: 4-corner placement for corner-text overlays.
-    // NereusSDR-native enum; Thetis uses fixed positions (e.g. infoBar is top).
+    // Longpath-native enum; Thetis uses fixed positions (e.g. infoBar is top).
     enum class OverlayPosition { TopLeft, TopRight, BottomLeft, BottomRight };
 
     // formatCursorFreq — format a frequency value for the cursor label.
@@ -1030,7 +1030,7 @@ public:
     // NF colour customisation — From Thetis display.cs:2316/2329 [v2.10.3.13]:
     //   noisefloor_color      = Color.Red     (line + box)
     //   noisefloor_color_text = Color.Yellow  (dBm label)
-    // Fast-attack swap colour is NereusSDR-original (Thetis hard-codes gray).
+    // Fast-attack swap colour is Longpath-original (Thetis hard-codes gray).
     void   setNoiseFloorColor(const QColor& c);
     QColor noiseFloorColor() const { return m_noiseFloorColor; }
     void   setNoiseFloorTextColor(const QColor& c);
@@ -1039,7 +1039,7 @@ public:
     QColor noiseFloorFastColor() const { return m_noiseFloorFastColor; }
 
     // NF line width — From Thetis display.cs:2310 [v2.10.3.13]
-    // m_fNoiseFloorLineWidth=1.0f.  Range 1..5 in NereusSDR.
+    // m_fNoiseFloorLineWidth=1.0f.  Range 1..5 in Longpath.
     void  setNoiseFloorLineWidth(float w);
     float noiseFloorLineWidth() const { return m_noiseFloorLineWidth; }
 
@@ -1047,19 +1047,19 @@ public:
     // When enabled, the grid lower bound auto-tracks the live noise floor
     // estimate delivered via onNoiseFloorChanged(). Ported from Thetis
     // console.cs:46074-46086 [v2.10.3.13] GridMinFollowsNFRX1 / tmrAutoAGC_Tick.
-    // RX1 scope dropped; NereusSDR applies as a global panadapter default
+    // RX1 scope dropped; Longpath applies as a global panadapter default
     // with per-pan override via ContainerSettings dialog (3G-6 pattern).
     // From Thetis setup.cs:24202-24213 [v2.10.3.13]
-    // — RX1 scope dropped; NereusSDR applies as global panadapter default
+    // — RX1 scope dropped; Longpath applies as global panadapter default
     //   with per-pan override via ContainerSettings dialog (3G-6 pattern).
     void setAdjustGridMinToNoiseFloor(bool on);
     bool adjustGridMinToNoiseFloor() const { return m_adjustGridMinToNF; }
 
     // Offset added to the NF estimate to compute the new grid min.
     // From Thetis console.cs:46035 _RX1NFoffsetGridFollow = 5f [v2.10.3.13]
-    // — NereusSDR uses a range of -60..+60 with default 0 (see design 2E).
+    // — Longpath uses a range of -60..+60 with default 0 (see design 2E).
     //   Thetis subtracts the offset (setPoint = nf - offset) with default +5;
-    //   NereusSDR adds the offset (proposedMin = nf + offset) with default 0,
+    //   Longpath adds the offset (proposedMin = nf + offset) with default 0,
     //   preserving equivalent semantics when the user enters a negative value.
     void setNFOffsetGridFollow(int db);
     int  nfOffsetGridFollow() const { return m_nfOffsetGridFollow; }
@@ -1085,7 +1085,7 @@ public:
     // From Thetis specHPSDR.cs:291-293 [v2.10.3.13] NormOneHzPan property;
     // wired from setup.cs:18093-18099 chkDispNormalize_CheckedChanged.
     // Note: In Thetis this calls SpecHPSDRDLL.SetDisplayNormOneHz (a WDSP
-    // call); NereusSDR stores the flag and propagates it to FFTEngine when
+    // call); Longpath stores the flag and propagates it to FFTEngine when
     // the WDSP spectrum engine is integrated (Task 5.x).
     void setDispNormalize(bool on);
     bool dispNormalize() const { return m_dispNormalize; }
@@ -1120,7 +1120,7 @@ public:
     // When MOX is active, a red 3 px border is drawn around the spectrum
     // panel indicating TX-mode. Matches Thetis's use of tx_vgrid_pen /
     // tx_band_edge_pen (display.cs:2086, 1955 [v2.10.3.13]) which colour the
-    // grid red during TX. NereusSDR renders a simpler border tint — full
+    // grid red during TX. Longpath renders a simpler border tint — full
     // grid colour recolouring is deferred to 3M-3.
     //
     // setTxAttenuatorOffsetDb: when ATT-on-TX is active (F.2 path) the
@@ -1173,7 +1173,7 @@ public slots:
     //                                      display.cs:304-311 [v2.10.3.13])
     //   setDisplayDuplex(bool)         <- console.cs:15363-15369 [v2.10.3.13]
     //                                      DisplayDuplex; defaults to true in
-    //                                      NereusSDR (panadapter stays live
+    //                                      Longpath (panadapter stays live
     //                                      during MOX, equivalent to Thetis
     //                                      duplex mode).
     //
@@ -1189,7 +1189,7 @@ public slots:
     /// Set the TX filter audio-Hz range.  Triggers a panadapter overlay
     /// repaint (always) and a waterfall column repaint (MOX-gated via
     /// existing m_moxOverlay).
-    /// Source: NereusSDR-original glue; per-mode IQ-space mapping follows
+    /// Source: Longpath-original glue; per-mode IQ-space mapping follows
     /// deskhpsdr/transmitter.c:2136-2186 [@120188f].
     void setTxFilterRange(int audioLowHz, int audioHighHz);
 
@@ -1364,13 +1364,13 @@ public slots:
     // NF-aware grid slot — wired to ClarityController::noiseFloorChanged in MainWindow.
     // From Thetis console.cs:46074-46086 [v2.10.3.13] tmrAutoAGC_Tick NF grid block.
     // Range delta uses std::abs() — abs incase //MW0LGE [2.9.0.7] [original inline comment from console.cs:46081]
-    // NereusSDR-original: global panadapter default, no RX1/RX2 split.
+    // Longpath-original: global panadapter default, no RX1/RX2 split.
     void onNoiseFloorChanged(float nfDbm);
 
     // ── Waterfall scrollback (sub-epic E) ─────────────────────────────────
     // Reset the rewind ring buffer back to empty + live state. Public so
     // MainWindow can wire it to RadioModel::connectionStateChanged when
-    // the radio disconnects (see plan §Task 4 Step 3-4 — NereusSDR has no
+    // the radio disconnects (see plan §Task 4 Step 3-4 — Longpath has no
     // SpectrumWidget::clearDisplay() equivalent, so the flush is plumbed
     // through MainWindow rather than embedded in resizeEvent).
     // From AetherSDR SpectrumWidget.cpp:740-756 [@0cd4559]
@@ -1728,14 +1728,14 @@ public:
     // Overlay-cache seam.  Returns false on a CPU-only build, where there
     // is no cached texture to invalidate.
     bool overlayStaticDirtyForTest() const {
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
         return m_overlayStaticDirty;
 #else
         return false;
 #endif
     }
     void clearOverlayStaticDirtyForTest() {
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
         m_overlayStaticDirty = false;
 #endif
     }
@@ -1876,7 +1876,7 @@ signals:
     void txFilterOverlayPainted(int xLeft, int xRight);
 
 protected:
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     void initialize(QRhiCommandBuffer* cb) override;
     void render(QRhiCommandBuffer* cb) override;
     void releaseResources() override;
@@ -2002,6 +2002,10 @@ private:
     void drawVfoMarker(QPainter& p, const QRect& specRect, const QRect& wfRect);
     void drawSliceMarker(QPainter& p, const QRect& specRect, const QRect& wfRect,
                          const SliceMarkerGeometry& g);
+    /// Der Spektrum-Teil der Bandbreiten-Marke fuer den 3D-Modus, in die
+    /// dynamische Schicht gemalt (ueber der deckenden DSS-Flaeche). Tut
+    /// ausserhalb von Mode3D nichts. Begruendung in drawSliceMarker.
+    void paintPassbandOverSurface(QPainter& p, const QRect& specRect);
     void drawCursorInfo(QPainter& p, const QRect& specRect);
 
     // ---- Spot overlay (Phase 3J-2 Task E1) ----
@@ -2014,7 +2018,7 @@ private:
     //    width = 40 px.
     //  - Vertical dotted tick from spectrum bottom to label.
     //  - Optional background pill with configurable opacity.
-    //  - Click-to-tune via frequencyClicked(hz) signal (NereusSDR Hz units;
+    //  - Click-to-tune via frequencyClicked(hz) signal (Longpath Hz units;
     //    AetherSDR emits MHz, the call site multiplies by 1e6).
     //  - Cluster badge popup menu with formatted spot lines.
     void drawSpotMarkers(QPainter& p, const QRect& specRect);
@@ -2330,7 +2334,7 @@ private:
     // capacity-clamp formula without befriending the class.)
 
     // Runtime-configurable depth; persisted as AppSettings("DisplayWaterfallHistoryMs").
-    // NereusSDR-side enhancement — see plan §authoring-time #1.
+    // Longpath-side enhancement — see plan §authoring-time #1.
     qint64          m_waterfallHistoryMs{kDefaultWaterfallHistoryMs};
 
     // Debounce timer for ensureWaterfallHistory() during rapid resize / slider drag.
@@ -2437,7 +2441,7 @@ private:
     // above; rendered as a distinct pass per Q14.1.
     // From Thetis display.cs m_bActivePeakHold [v2.10.3.13].
     ActivePeakHoldTrace m_activePeakHold;
-    // NereusSDR-original — distinct trace colour so the peak trace stays
+    // Longpath-original — distinct trace colour so the peak trace stays
     // visible even when the data-line colour is changed (e.g. "Reset to
     // Smooth Defaults" sets the data line to white). Default gold for high
     // contrast against the typical clarity-blue palette and against white.
@@ -2820,7 +2824,7 @@ private:
     bool m_showBinWidth{false};
 
     // From Thetis display.cs:2304 [v2.10.3.13] m_bShowNoiseFloorDBM (default true in Thetis;
-    // NereusSDR defaults off so the overlay is opt-in rather than on by default)
+    // Longpath defaults off so the overlay is opt-in rather than on by default)
     bool            m_showNoiseFloor{false};
     OverlayPosition m_noiseFloorPosition{OverlayPosition::BottomLeft};
 
@@ -2830,9 +2834,9 @@ private:
     // Defaults match Thetis exactly so the line is visually distinct from
     // grid text (yellow) and from the spectrum trace.  Made configurable
     // via setNoiseFloorColor / setNoiseFloorTextColor when Setup wires them.
-    // Default line + text colour — NereusSDR-tweaked from Thetis red/yellow
+    // Default line + text colour — Longpath-tweaked from Thetis red/yellow
     // (display.cs:2316/2329 [v2.10.3.13]).  Thetis renders against a
-    // configurable trace colour; NereusSDR's stock spectrum trace is cyan
+    // configurable trace colour; Longpath's stock spectrum trace is cyan
     // (#00E5FF, see m_fillColor), and Thetis-default red dashes blend with
     // both cyan-trace fill and the brown band-plan strip beneath.  Default
     // tweak: bright magenta line + yellow text.  Both still match Thetis
@@ -2845,7 +2849,7 @@ private:
     //   nf_colour      = bFast ? m_bDX2_Gray : m_bDX2_noisefloor;
     //   nf_colour_text = bFast ? m_bDX2_Gray : m_bDX2_noisefloor_text;
     // Lightened from Qt::gray (160,160,164) to #c4c4c9 so the swatch and
-    // the rendered overlay both stand out against NereusSDR's dark UI
+    // the rendered overlay both stand out against Longpath's dark UI
     // background; Thetis renders against a lighter-grey grid backdrop where
     // medium-grey reads fine.
     QColor m_noiseFloorFastColor {0xC8, 0xC8, 0xC8};
@@ -2907,7 +2911,7 @@ private:
     // From Thetis console.cs:46025-46085 [v2.10.3.13] GridMinFollowsNFRX1,
     // _RX1NFoffsetGridFollow, _maintainNFAdjustDeltaRX1.
     // abs() guard on fDelta: abs incase //MW0LGE [2.9.0.7] [original inline comment from console.cs:46081]
-    // NereusSDR-original: applied as global default; RX1-scope dropped.
+    // Longpath-original: applied as global default; RX1-scope dropped.
     bool m_adjustGridMinToNF{false};
     int  m_nfOffsetGridFollow{0};    // dB offset added to NF estimate (default 0)
     bool m_maintainNFAdjustDelta{false};
@@ -2999,7 +3003,7 @@ private:
     // flags below are true.
     bool m_testingIMD{false};            // Display.TestingIMD mirror
     bool m_showIMDMeasurements{false};   // Display.ShowIMDMeasurments mirror
-    // displayduplex defaults to true in NereusSDR — the panadapter stays
+    // displayduplex defaults to true in Longpath — the panadapter stays
     // live during MOX (the trace switches from RX to TX feedback), which
     // is the equivalent of Thetis's "duplex" mode where DisplayDuplex=true
     // routes feedback DDC streams to the RX1 panadapter window.  Wire
@@ -3034,7 +3038,7 @@ private:
     // (backgroundImagePath(), backgroundOpacity(), backgroundBrightness(),
     // backgroundFillColor(), waterfallBackgroundFillColor(),
     // visibleBinCountForTest()). Lagen sie im #ifdef, liess sich Longpath
-    // mit -DNEREUS_GPU_SPECTRUM=OFF ueberhaupt nicht uebersetzen: sechs
+    // mit -DLONGPATH_GPU_SPECTRUM=OFF ueberhaupt nicht uebersetzen: sechs
     // Zugriffe auf Member, die es in dieser Uebersetzung nicht gibt.
     //
     // Genau daran ist der ARM-Linux-Bau von v0.6.3-rc1 gescheitert — dort
@@ -3057,12 +3061,12 @@ private:
     // bleibt, damit ein Vergleich der beiden Baeume nicht an einer
     // Umbenennung scheitert.
     //
-    // Unconditional (not inside #ifdef NEREUS_GPU_SPECTRUM): both the
+    // Unconditional (not inside #ifdef LONGPATH_GPU_SPECTRUM): both the
     // GPU and the CPU-only paint path call paintBackgroundLayer(), and
     // its setters/getters above are declared unconditionally too -- these
     // members were stranded inside the GPU-only block below, which broke
     // every CPU-only build (e.g. release.yml's ubuntu-24.04-arm job,
-    // which sets -DNEREUS_GPU_SPECTRUM=OFF because that runner's Qt is
+    // which sets -DLONGPATH_GPU_SPECTRUM=OFF because that runner's Qt is
     // older than the 6.7 QRhiWidget needs).
     QImage  m_bgImage;
     QImage  m_bgScaled;
@@ -3081,7 +3085,7 @@ private:
     // braeuchten. Ein Bau ohne QRhi meldete darauf 35 Fehler. Gefunden per
     // systematischem Abgleich jedes Members in diesem Block gegen seine
     // echten Verwendungsstellen in SpectrumWidget.cpp, nachdem der
-    // ubuntu-24.04-arm-Bau (-DNEREUS_GPU_SPECTRUM=OFF, aeltere Qt-Version
+    // ubuntu-24.04-arm-Bau (-DLONGPATH_GPU_SPECTRUM=OFF, aeltere Qt-Version
     // ohne QRhiWidget) daran einen Fehler nach dem anderen meldete.
 
     /// Wasserfall-Textur beim naechsten Bild vollstaendig hochladen.
@@ -3105,7 +3109,7 @@ private:
     double m_vfoDragStartHz{0.0};
     double m_vfoDragHzPerPx{0.0};
 
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     bool m_rhiInitialized{false};
 
     // GPU pipeline init helpers
@@ -3237,8 +3241,16 @@ private:
     // other QPainter-drawn chrome re-render on next frame. Safe no-op
     // when the GPU path is disabled.
     void markOverlayDirty() {
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
         m_overlayStaticDirty = true;
+        // Im 3D-Modus liegt die Bandbreite (Saeule, Kanten, Mittellinie)
+        // in der DYNAMISCHEN Schicht ueber der Flaeche
+        // (paintPassbandOverSurface) — was das Chrome veraltet, veraltet
+        // dort auch sie. Ohne diese Zeile wanderte die Saeule beim
+        // Filterziehen erst mit dem naechsten Spektrumbild nach.
+        if (m_renderMode == SpectrumRenderMode::Mode3D) {
+            m_overlayDynamicDirty = true;
+        }
 #endif
         update();
     }

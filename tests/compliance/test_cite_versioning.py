@@ -23,7 +23,7 @@ def load_module():
 
 
 FIXTURE_BAD = """\
-// NereusSDR-native file (not registered — so heuristics can fire).
+// Longpath-native file (not registered — so heuristics can fire).
 // From Thetis console.cs:4821 -- original value 0.98f
 static constexpr float kAgcDecay = 0.98f;
 """

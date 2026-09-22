@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/IAudioBus.h  (NereusSDR)
+// src/core/IAudioBus.h  (Longpath)
 // =================================================================
 //
 // Phase 3O abstract audio bus. Concrete implementations live in

@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/core/AdifLog.h  (NereusSDR)
+// src/core/AdifLog.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. Reading and rewriting the whole logbook file.
+// Longpath-original. Reading and rewriting the whole logbook file.
 //
 // NOT core/AdifParser.h. That one answers "which DXCC entities have I
 // worked on this band" and keeps four fields per contact, because it
@@ -19,7 +19,7 @@
 // half-updated the way an in-place edit could.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
 // =================================================================

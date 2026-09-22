@@ -1,8 +1,8 @@
 // =================================================================
-// src/core/RouteProbe.h  (NereusSDR)
+// src/core/RouteProbe.h  (Longpath)
 // =================================================================
 // 2026-05-26  J.J. Boyd (KG4VCF), AI-assisted via Anthropic Claude.
-// NereusSDR-native; no upstream port.
+// Longpath-native; no upstream port.
 //
 // Shared "which local source IP would the kernel pick to reach this
 // peer" probe.  Used by FlexRadioDiscoveryBroadcaster to choose the

@@ -1,4 +1,4 @@
-// no-port-check: NereusSDR-original test for the design-doc §7 row 1 typo divergence.
+// no-port-check: Longpath-original test for the design-doc §7 row 1 typo divergence.
 // Phase 3J-1 Task 4.2: verify our init burst contains BOTH `if:1,0,...;` AND
 // `if:1,1,...;` (the intended cross-product), where Thetis TCIServer.cs:2374-2375
 // [v2.10.3.13] mistakenly calls sendIF(1,1) twice (copy-paste bug). We emit the
@@ -19,7 +19,7 @@ private slots:
 
 // Asserts that both halves of the intended cross-product are present.
 // Thetis TCIServer.cs:2374-2375 [v2.10.3.13] emits if:1,1 twice;
-// NereusSDR emits if:1,0 + if:1,1 per design doc §7 row 1.
+// Longpath emits if:1,0 + if:1,1 per design doc §7 row 1.
 void TestTciInitBurstTypoDivergence::burst_contains_if_1_0_and_if_1_1()
 {
     TestMockRadioModel mock;

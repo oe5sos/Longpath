@@ -1,12 +1,12 @@
 // =================================================================
-// src/gui/diagnostics/DiagnosticsPhaseHPages.cpp  (NereusSDR)
+// src/gui/diagnostics/DiagnosticsPhaseHPages.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. Implementation for the four sibling Diagnostics
+// Longpath-original. Implementation for the four sibling Diagnostics
 // sub-tabs added in Phase 3P-H. See header for scope.
 // =================================================================
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-20 — Original implementation for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted implementation via
 //                 Anthropic Claude Code.
@@ -245,7 +245,7 @@ void ExportImportConfigPage::onExportAllClicked()
     const QString src = AppSettings::instance().filePath();
     const QString dst = QFileDialog::getSaveFileName(
         this, QStringLiteral("Export Settings"),
-        QStringLiteral("NereusSDR.settings.xml"),
+        QStringLiteral("Longpath.settings.xml"),
         QStringLiteral("XML (*.xml *.settings)"));
     if (dst.isEmpty()) { return; }
     QFile::remove(dst);
@@ -279,7 +279,7 @@ void ExportImportConfigPage::onImportAllClicked()
     }
     QMessageBox::information(
         this, QStringLiteral("Import Complete"),
-        QStringLiteral("Settings imported. Please restart NereusSDR."));
+        QStringLiteral("Settings imported. Please restart Longpath."));
 }
 
 void ExportImportConfigPage::onExportRadioClicked()

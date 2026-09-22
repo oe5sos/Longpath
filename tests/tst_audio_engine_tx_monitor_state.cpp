@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_audio_engine_tx_monitor_state.cpp  (NereusSDR)
+// tests/tst_audio_engine_tx_monitor_state.cpp  (Longpath)
 // =================================================================
 //
 // Exercises AudioEngine's TX monitor (MON) enable + volume state API
@@ -43,7 +43,7 @@ private slots:
     {
         AudioEngine engine;
         // Default mirrors Thetis audio.cs aaudio mix coefficient of 0.5f
-        // (pre-code review §4.4). AudioEngine is NereusSDR-native; not a port.
+        // (pre-code review §4.4). AudioEngine is Longpath-native; not a port.
         QCOMPARE(engine.txMonitorVolume(), 0.5f);
     }
 

@@ -484,7 +484,7 @@ Visual verification (screenshot + `Read` tool inspection) at each of these check
 10. **After menu restructure**: Submenu populates correctly, each submenu entry opens the dialog on the right container.
 11. **End-to-end**: Launch fresh, create ANANMM, edit, save, relaunch, verify persistence.
 
-Screenshots archived under `/tmp/nereus_dbg/3g6-*.png`.
+Screenshots archived under `/tmp/longpath_dbg/3g6-*.png`.
 
 ## Risks & unknowns
 

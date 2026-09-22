@@ -1,11 +1,11 @@
-// no-port-check: NereusSDR-original TciProtocol skeleton — parser ported from
+// no-port-check: Longpath-original TciProtocol skeleton — parser ported from
 // Thetis TCIServer.cs:4900-4924 [v2.10.3.13] (split on first ':', case-insensitive
 // command lookup), dispatch shape from TCIServer.cs:4924-5197 [v2.10.3.13] (two
 // switches: set if parts.Length==2, query if parts.Length==1). Empty handler
 // stubs land Phase 5+. AetherSDR seam pattern reference: TciProtocol.{h,cpp} [@0cd4559].
 
-// src/core/TciProtocol.h  (NereusSDR)
-// NereusSDR-original — TCI command protocol handler.
+// src/core/TciProtocol.h  (Longpath)
+// Longpath-original — TCI command protocol handler.
 //
 // Parser ported from Thetis TCIServer.cs:4900-4924 [v2.10.3.13].
 // Two-switch dispatch shape from Thetis TCIServer.cs:4924-5197 [v2.10.3.13].
@@ -13,7 +13,7 @@
 //
 // This file REPLACES the Phase 1 stub (commit 77d27b3).
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-10 — Phase 3J-1 Task 3.1 by J.J. Boyd (KG4VCF);
 //                AI-assisted transformation via Anthropic Claude Code.
 
@@ -98,7 +98,7 @@ public:
     // to ~40 Console events (FilterChangedHandlers, RX2EnabledChangedHandlers,
     // VfoALockChangedHandlers, NRChangedHandlers, etc.) and routes each to an
     // OnXxxChanged delegate that calls sendXxx (which enqueues the wire frame).
-    // Without this path, NereusSDR TCI clients only see state set BY a TCI
+    // Without this path, Longpath TCI clients only see state set BY a TCI
     // client (the SET path in handleCommand wires the same coalescer + queue);
     // local UI tunes / mode changes never propagate -- bench bug 2026-05-22.
     //
@@ -155,7 +155,7 @@ public:
     // Thetis TCIServer.cs:2512-2552 [v2.10.3.13].
     QStringList buildInitBurst() const;
 
-    // Slice ↔ trx mapping (NereusSDR architectural divergence per design doc §1.2):
+    // Slice ↔ trx mapping (Longpath architectural divergence per design doc §1.2):
     //   Slice A | trx:0,    Slice B | trx:1,    Slice C | trx:2,    Slice D | trx:3
     // Identity mapping in Phase 3; same mapping persists through subsequent phases.
     static int sliceToTrx(int slice);
@@ -320,7 +320,7 @@ private:
     // handleRxBalance at TCIServer.cs:4631-4656 [v2.10.3.13] — 2-arg query, 3-arg set.
     // F2 C-locale float. Balance clamped to [-40.0, 40.0] per TCIServer.cs:4650 [v2.10.3.13].
     // NOTE: Thetis internal pan = (40-bal)/0.8 transform at TCIServer.cs:4644-4652
-    //       [v2.10.3.13] is NOT replicated in Phase 9 stub; NereusSDR stores F2 dB
+    //       [v2.10.3.13] is NOT replicated in Phase 9 stub; Longpath stores F2 dB
     //       directly without the Thetis pan-slider calibration (deferred to Phase 20).
     QString handleRxBalanceCommand(const QStringList& args);
 
@@ -425,7 +425,7 @@ private:
     // From Thetis TCIServer.cs:5019-5041 [v2.10.3.13] — set-switch audio cases.
     // Corrections vs. plan: "audio_stream" → "audio_start"/"audio_stop";
     //   "audio_gain" does not exist in Thetis — the actual case is "volume";
-    //   "line_out_*" do not have NereusSDR equivalents — skipped.
+    //   "line_out_*" do not have Longpath equivalents — skipped.
 
     // From Thetis TCIServer.cs:5019 [v2.10.3.13] — audio_samplerate set case.
     // handleAudioSampleRate at TCIServer.cs:5740-5795 [v2.10.3.13]:

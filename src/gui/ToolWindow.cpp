@@ -17,6 +17,7 @@
 
 #include <QCloseEvent>
 #include <QMoveEvent>
+#include <QPainter>
 #include <QResizeEvent>
 #include <QScreen>
 #include <QVBoxLayout>
@@ -30,15 +31,20 @@ ToolWindow::ToolWindow(QWidget* content, const QString& id,
     , m_id(id)
 {
     setWindowTitle(title);
-    setStyleSheet(QStringLiteral("ToolWindow { background: %1; }")
-                      .arg(QLatin1String(Style::kPanelBg)));
+    // Der Grund wird in paintEvent() gemalt (Glas & Tiefe, 2026-09-17).
+    // Hier stand `ToolWindow { background: … }` — ein Selektor ohne
+    // Namensraum, der nie gegriffen hat; siehe AppletFloatingWindow.
 
     auto* lay = new QVBoxLayout(this);
     lay->setContentsMargins(0, 0, 0, 0);
     lay->setSpacing(0);
 
     m_titleBar = new WindowTitleBar(title, this);
-    connect(m_titleBar, &WindowTitleBar::closeRequested, this, &QWidget::close);
+    // × und Pfeil docken beide DIREKT an -- nicht ueber close(), denn
+    // ein QCloseEvent dockt seit dem 2026-09-17 nie mehr (closeEvent()).
+    connect(m_titleBar, &WindowTitleBar::closeRequested, this, [this]() {
+        emit dockRequested(m_id);
+    });
     connect(m_titleBar, &WindowTitleBar::dockRequested, this, [this]() {
         emit dockRequested(m_id);
     });
@@ -156,8 +162,18 @@ void ToolWindow::closeEvent(QCloseEvent* ev)
         return;
     }
 
+    // Und OHNE gesetzte Sperre ebenso: annehmen, nie andocken. Der
+    // ×-Knopf und der Andock-Pfeil laufen ueber WindowTitleBar direkt
+    // nach dockRequested, nicht ueber close(); ein QCloseEvent kommt
+    // hier nur vom System (Beenden ueber Dock/Apfelmenue, dessen
+    // Reihenfolge Qt nicht garantiert, oder ein Space-/Vollbild-
+    // Nebeneffekt von macOS). Volle Begruendung in
+    // AppletFloatingWindow::closeEvent() (2026-09-17, "profile bleiben
+    // wieder nicht automatisch gespeichert").
+    qWarning() << "[ToolWindowClose]" << m_id
+               << "spontaneous=" << ev->spontaneous()
+               << "-- nicht angedockt, siehe closeEvent()";
     ev->accept();
-    emit dockRequested(m_id);
 }
 
 // Betreiber 2026-08-31: "die ausrichtung des rotors passt nie" -- ohne
@@ -178,6 +194,17 @@ void ToolWindow::resizeEvent(QResizeEvent* ev)
 {
     QWidget::resizeEvent(ev);
     saveGeometryState();
+}
+
+void ToolWindow::paintEvent(QPaintEvent*)
+{
+    QPainter p(this);
+    QLinearGradient g(0, 0, 0, height());
+    g.setColorAt(0.0, QColor(Style::hexRole(Style::kGlassPanelTop)));
+    g.setColorAt(1.0, QColor(Style::hexRole(Style::kGlassPanelBot)));
+    p.fillRect(rect(), g);
+    p.setPen(QColor(Style::hexRole(Style::kBorderSubtle)));
+    p.drawRect(rect().adjusted(0, 0, -1, -1));
 }
 
 } // namespace Longpath

@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_globe_unproject.cpp  (NereusSDR)
+// tests/tst_globe_unproject.cpp  (Longpath)
 // =================================================================
 //
 // Die Rueckrechnung der Kugel: Bildpunkt -> Ort.
@@ -15,12 +15,12 @@
 // werden muss.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-19 — Original fuer NereusSDR von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
 // =================================================================
 
-// no-port-check: NereusSDR-original test file.
+// no-port-check: Longpath-original test file.
 
 #include <QtTest>
 #include <QKeyEvent>

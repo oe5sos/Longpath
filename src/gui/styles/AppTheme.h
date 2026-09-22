@@ -1,8 +1,8 @@
-// src/gui/styles/AppTheme.h (NereusSDR)
+// src/gui/styles/AppTheme.h  (Longpath)
 //
 // Application-wide dark-theme bootstrap. Installs a QPalette + minimal
 // baseline QSS on the QApplication so every widget — even ones that
-// don't carry their own stylesheet — picks up the NereusSDR dark theme
+// don't carry their own stylesheet — picks up the Longpath dark theme
 // instead of falling through to the host platform's Fusion defaults.
 //
 // Why this exists:
@@ -144,7 +144,23 @@ inline void applyAppBaselineQss(QApplication& app)
           QString::fromLatin1(Style::kButtonBg),
           QString::fromLatin1(Style::kBorder),
           QString::fromLatin1(Style::kTitleText),
-          QString::fromLatin1(Style::kTextInactive))));
+          QString::fromLatin1(Style::kTextInactive))
+        // ── Formularstil, Glas & Tiefe (2026-09-18) ─────────────────
+        // Auswahlfelder, Haekchen, Wahlpunkte, Eingabefelder, Rinnen,
+        // Gruppen und Knoepfe bekommen hier ihre Bauform, damit ein
+        // Widget, das nirgends eigens gestylt wird (die halbe Setup-
+        // Seite), trotzdem im Haus-Look erscheint. Seiten- und Widget-
+        // Stylesheets duerfen weiter darueberlegen — sie sagen seit
+        // heute dasselbe (Style::kComboStyle & Co.).
+        + QLatin1String(Style::kComboStyle)
+        + QLatin1String(Style::kCheckBoxStyle)
+        + QLatin1String(Style::kRadioButtonStyle)
+        + QLatin1String(Style::kGroupBoxStyle)
+        + Style::formFieldStyle()
+        + Style::sliderHStyle()
+        + Style::sliderVStyle()
+        + QLatin1String(Style::kButtonStyle)   // ohne font-size: Setup-Knoepfe erben ihre Schrift
+        + QLatin1String(Style::kScrollBarStyle)));   // themed(): Palettenrollen auch im Formularstil
 }
 
 } // namespace Longpath

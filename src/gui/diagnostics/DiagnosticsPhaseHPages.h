@@ -1,8 +1,8 @@
 // =================================================================
-// src/gui/diagnostics/DiagnosticsPhaseHPages.h  (NereusSDR)
+// src/gui/diagnostics/DiagnosticsPhaseHPages.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. Four sibling Diagnostics sub-tabs added in
+// Longpath-original. Four sibling Diagnostics sub-tabs added in
 // Phase 3P-H per spec §13:
 //   - Connection Quality   (60 s history of latency/seq-gap/throttle)
 //   - Settings Validation  (full audit list backed by SettingsHygiene)
@@ -15,7 +15,7 @@
 //
 // =================================================================
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-20 — Original implementation for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted implementation via
 //                 Anthropic Claude Code.

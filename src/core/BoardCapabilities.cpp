@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/BoardCapabilities.cpp  (NereusSDR)
+// src/core/BoardCapabilities.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -12,7 +12,7 @@
 //   Project Files/Source/ChannelMaster/network.h, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -481,7 +481,7 @@ const BoardCapabilities kAngelia = {
     .userDdcCount     = 5,   // Phase 3F Sub-Epic I: Angelia user DDCs = DDC2-6 (design doc §2)
     .widebandAdcs     = 0,   // Phase 3F: P1 board — wideband mechanism differs; deferred to 3F-W
                              // Was 2, which contradicted every other Protocol1 row and this
-                             // row's own .protocol field. NereusSDR has no P1 wideband receive
+                             // row's own .protocol field. Longpath has no P1 wideband receive
                              // path, so advertising ADCs for it let extended view bypass the
                              // Alex preselector for a stream that never arrives, losing receive
                              // filtering for nothing. (Codex review round 5, PR #293.)
@@ -542,7 +542,7 @@ const BoardCapabilities kOrion = {
     .userDdcCount     = 5,   // Phase 3F Sub-Epic I: Orion user DDCs = DDC2-6 (design doc §2)
     .widebandAdcs     = 0,   // Phase 3F: P1 board — wideband mechanism differs; deferred to 3F-W
                              // Was 2, which contradicted every other Protocol1 row and this
-                             // row's own .protocol field. NereusSDR has no P1 wideband receive
+                             // row's own .protocol field. Longpath has no P1 wideband receive
                              // path, so advertising ADCs for it let extended view bypass the
                              // Alex preselector for a stream that never arrives, losing receive
                              // filtering for nothing. (Codex review round 5, PR #293.)
@@ -807,7 +807,7 @@ const BoardCapabilities kHermesC10 = {
 //   produces wire = -1 at userDb=32 which 6-bit-masks to 0x3F, the same
 //   wire value the chip would interpret as max-LNA-gain wraparound, NOT
 //   "32 dB attenuation".  mi0bot's own InitConsole at console.cs:2111
-//   sets Max=31 (chip-correct).  NereusSDR caps at +31 per maintainer
+//   sets Max=31 (chip-correct).  Longpath caps at +31 per maintainer
 //   approval (issue #175 follow-up bench finding).
 // No Alex filters or OC outputs on HL2.
 // hasBandwidthMonitor: HL2 has bandwidth_monitor via IoBoardHl2
@@ -819,11 +819,11 @@ const BoardCapabilities kHermesC10 = {
 // Firmware floor: NONE — both ramdor and mi0bot accept any HL2 firmware version
 //   (NetworkIO.cs:136-143 [v2.10.3.13] guards only `HermesII && CodeVersion < 103`,
 //   no HL2 branch).  Therefore minFirmwareVersion=0 / knownGoodFirmware=0
-//   below are source-first correct: NereusSDR mirrors mi0bot by NOT enforcing
+//   below are source-first correct: Longpath mirrors mi0bot by NOT enforcing
 //   a firmware floor for HL2.  External (non-source) HL2 community
 //   recommendations exist around mi0bot HL2 firmware versions but are
 //   intentionally not encoded here per the source-first rule — recommending
-//   versions the upstream doesn't enforce would be NereusSDR-original gating.
+//   versions the upstream doesn't enforce would be Longpath-original gating.
 //
 // Phase 3P-F Task 2 (accessories):
 //   hasApollo=false — HL2 is not in the RadioModelChanged() switch; no Apollo
@@ -871,7 +871,7 @@ const BoardCapabilities kHermesLite = {
     // (console.cs:11075) produces wire = -1 at userDb=32 which 6-bit-masks
     // to 0x3F, indistinguishable from the LNA-gain wraparound region.
     // mi0bot's own InitConsole at console.cs:2111 sets Max=31 (chip-correct).
-    // NereusSDR honors the chip-correct cap per maintainer approval
+    // Longpath honors the chip-correct cap per maintainer approval
     // (issue #175 follow-up bench finding).
     // Wire conversion `wire = 31 - userDb` lives in P1CodecHl2.cpp; mask=0x3F,
     // enableBit=0x40 (6-bit field per mi0bot WriteMainLoop_HL2 [@c26a8a4]);
@@ -955,11 +955,11 @@ const BoardCapabilities kHermesLite = {
 };
 
 // ─── HermesLiteRxOnly ───────────────────────────────────────────────────────
-// NereusSDR-original SKU slot — Phase 3M-0 Task 1.
+// Longpath-original SKU slot — Phase 3M-0 Task 1.
 // HL2 RX-only kits ship without a TX driver board.  All capabilities match
 // standard HermesLite (kHermesLite) except isRxOnlySku=true.
 // Thetis treats RX-only purely as a user toggle (chkGeneralRXOnly,
-// console.cs:15283-15307 [v2.10.3.13]); NereusSDR adds this SKU-level flag
+// console.cs:15283-15307 [v2.10.3.13]); Longpath adds this SKU-level flag
 // so HL2 RX-only kits are hard-blocked from TX regardless of user settings.
 // Not a Thetis wire-format value — integer 12, above the 0-11 Thetis range.
 const BoardCapabilities kHermesLiteRxOnly = {
@@ -1159,7 +1159,7 @@ const BoardCapabilities kSaturnMKII = {
 };
 
 // ─── Andromeda (Andromeda console family — Ganymede 500W PA) ────────────────
-// NereusSDR-original SKU slot — Phase 3M-0 Task 1.
+// Longpath-original SKU slot — Phase 3M-0 Task 1.
 // The Andromeda console family connects to a Ganymede 500W PA.
 // canDriveGanymede captures the PA-trip capability flag per
 // Andromeda.cs:914-920 [v2.10.3.13].
@@ -1174,10 +1174,10 @@ const BoardCapabilities kAndromeda = {
     // Two driven RX filter chains, derived from kSaturn like the rest of this
     // row. Thetis has no HPSDRHW entry for Andromeda at all (enums.cs:389-402
     // [v2.10.3.15] stops at HermesC10), so console.cs:15435-15443 cannot
-    // answer for it and this is a NereusSDR judgement, not an upstream fact.
+    // answer for it and this is a Longpath judgement, not an upstream fact.
     // Revisit with the rest of the row when Andromeda hardware specs land.
     .rxFilterChainCount = 2,
-    // Derived from kSaturn like the rest of this row, and a NereusSDR
+    // Derived from kSaturn like the rest of this row, and a Longpath
     // judgement rather than an upstream fact for the same reason: Thetis has
     // no HPSDRHW entry for Andromeda, so console.cs:14783-14857 [v2.10.3.15]
     // cannot answer for it. Revisit when Andromeda hardware specs land.
@@ -1202,7 +1202,7 @@ const BoardCapabilities kAndromeda = {
     .canDriveGanymede = true,   // Andromeda console drives Ganymede 500W PA (Andromeda.cs:914-920 [v2.10.3.13])
     .hasPureSignal    = true,
     // Phase 3M-4 Task 1: PureSignal hardware-default peak.
-    // Andromeda is a NereusSDR-original SKU slot — no upstream Thetis HPSDRHW
+    // Andromeda is a Longpath-original SKU slot — no upstream Thetis HPSDRHW
     // enum entry for it.  Thetis clsHardwareSpecific.cs:300-310 PSDefaultPeak
     // [v2.10.3.13] only special-cases HPSDRHW.Saturn (=10) on the P2 branch
     // (returns 0.6121); all other P2 hardware values fall through to the
@@ -1232,7 +1232,7 @@ const BoardCapabilities kAndromeda = {
 // above: most fields here are NOT Thetis facts (Thetis has no concept of
 // this radio whatsoever), they're either confirmed from a real QRP bench
 // capture, confirmed from the ArtemisSDR reference source, or an explicit
-// NereusSDR/Longpath judgement flagged as such — never silently guessed.
+// Longpath judgement flagged as such — never silently guessed.
 //
 // Design doc: docs/architecture/2026-08-24-sunsdr-native-driver-design.md
 // Plan doc:   docs/architecture/2026-08-26-sunsdr-connection-plan.md
@@ -1367,7 +1367,7 @@ const BoardCapabilities kUnknown = {
     // (-40/+10), so a user with an unidentified board still has the widest
     // permissible slider range.
     // From Thetis console.cs:19151-19171 [v2.10.3.13]: defaults are -40/+10;
-    // TransmitModel::kMicGainDbMin/Max = -50/+70 is NereusSDR's outer bound.
+    // TransmitModel::kMicGainDbMin/Max = -50/+70 is Longpath's outer bound.
     .micGainMinDb     = -50,
     .micGainMaxDb     = +70,
     .hasApollo        = false,  // unknown board — all accessories disabled
@@ -1497,7 +1497,7 @@ std::span<const PreampItem> preampItemsForBoard(HPSDRHW hw, bool alexPresent) no
         // ANAN-7000D/8000D/OrionMkII/G2/G2-1K/AnvelinaPro3/G2E: always anan100d.
         // From Thetis console.cs:40871-40879 [v2.10.3.15] //N1GP G2E added:
         //   case HPSDRModel.ANAN_G2E: comboPreamp.Items.AddRange(anan100d_preamp_settings)
-        // NereusSDR dispatches by HPSDRHW; HermesC10 is the board for ANAN_G2E.
+        // Longpath dispatches by HPSDRHW; HermesC10 is the board for ANAN_G2E.
         // Upstream comment preserved verbatim (console.cs:40878):
         //   // case HPSDRModel.REDPITAYA: // DH1KLM: removed for compatibility reasons
         return items(kAnan100d);

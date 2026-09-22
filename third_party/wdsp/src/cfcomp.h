@@ -40,7 +40,7 @@ warren@wpratt.com
 
 //
 // =============================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-30 — Partial sync from Thetis v2.10.3.13 @ 501e3f5 alongside
 //                cfcomp.c for the Qg/Qe parametric-EQ tail-mix updates
 //                required by the 3M-3a-ii CFC port. No NereusSDR-original

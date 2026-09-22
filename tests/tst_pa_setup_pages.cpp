@@ -1,4 +1,4 @@
-// tests/tst_pa_setup_pages.cpp  (NereusSDR)
+// tests/tst_pa_setup_pages.cpp  (Longpath)
 //
 // Setup IA reshape Phase 2 — top-level "PA" category pages.
 // no-port-check: test fixture — no Thetis attribution required.

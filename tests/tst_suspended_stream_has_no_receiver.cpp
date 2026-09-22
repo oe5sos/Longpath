@@ -1,9 +1,9 @@
 // =================================================================
-// tests/tst_suspended_stream_has_no_receiver.cpp  (NereusSDR)
+// tests/tst_suspended_stream_has_no_receiver.cpp  (Longpath)
 // =================================================================
 //
-// no-port-check: NereusSDR-original. ReceiverManager activation is a
-// NereusSDR construct; Thetis has no equivalent bookkeeping layer to
+// no-port-check: Longpath-original. ReceiverManager activation is a
+// Longpath construct; Thetis has no equivalent bookkeeping layer to
 // port from. The DDC numbers asserted here are cited to Thetis.
 //
 // Bench report 2026-07-31 (JJ, KG4VCF): tuning up on slice B, the TUNE

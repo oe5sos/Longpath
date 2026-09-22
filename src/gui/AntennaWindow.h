@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/gui/AntennaWindow.h  (NereusSDR)
+// src/gui/AntennaWindow.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. Thetis has no antenna analyser support.
+// Longpath-original. Thetis has no antenna analyser support.
 //
 // A measured sweep, turned into a length of wire.
 //
@@ -30,7 +30,7 @@
 // two share a coax. That is a problem for the driver, not for this.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-10 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

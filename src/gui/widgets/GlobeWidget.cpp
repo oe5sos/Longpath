@@ -1,11 +1,11 @@
 // =================================================================
-// src/gui/widgets/GlobeWidget.cpp  (NereusSDR)
+// src/gui/widgets/GlobeWidget.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original — see GlobeWidget.h.
+// Longpath-original — see GlobeWidget.h.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
 //   2026-08-10 — Atmosphere rim off by default, behind

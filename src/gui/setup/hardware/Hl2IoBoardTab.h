@@ -1,6 +1,6 @@
 #pragma once
 // =================================================================
-// src/gui/setup/hardware/Hl2IoBoardTab.h  (NereusSDR)
+// src/gui/setup/hardware/Hl2IoBoardTab.h  (Longpath)
 // =================================================================
 //
 // Ported from mi0bot-Thetis sources:
@@ -10,15 +10,15 @@
 //     state machine driving register state; subscribed via IoBoardHl2 model)
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Phase 3I placeholder (GPIO combos only).
 //   2026-04-20 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                (KG4VCF), with AI-assisted transformation via Anthropic
 //                Claude Code. Replaces Phase 3I empty placeholder; surfaces
 //                IoBoardHl2 + HermesLiteBandwidthMonitor state for HL2
-//                diagnostics. NereusSDR spin: register state table + I2C
+//                diagnostics. Longpath spin: register state table + I2C
 //                transaction log + state-machine viz + bandwidth mini are
-//                pure NereusSDR diagnostic surfaces (mi0bot doesn't expose
+//                pure Longpath diagnostic surfaces (mi0bot doesn't expose
 //                them in the Thetis UI).
 //   2026-04-21 — Phase 3P-H Task 5c: added 40 ms register-table poller
 //                (supplements the push-based IoBoardHl2::registerChanged
@@ -117,8 +117,8 @@ struct BoardCapabilities;
 // console.cs:25781-25945 (UpdateIOBoard register surface) [@c26a8a4].
 // Variant mi0bot.
 //
-// NereusSDR spin: register state table + I2C transaction log + state-machine
-// viz + bandwidth monitor mini are pure NereusSDR diagnostic surfaces
+// Longpath spin: register state table + I2C transaction log + state-machine
+// viz + bandwidth monitor mini are pure Longpath diagnostic surfaces
 // (mi0bot does not expose them in the Thetis UI).
 class Hl2IoBoardTab : public QWidget {
     Q_OBJECT

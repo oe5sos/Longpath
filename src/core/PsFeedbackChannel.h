@@ -1,13 +1,13 @@
 #pragma once
 
-// no-port-check: NereusSDR-original wrapper class.  Thetis manages WDSP
+// no-port-check: Longpath-original wrapper class.  Thetis manages WDSP
 // channels via ChannelMaster.dll (Project Files/Source/ChannelMaster/), so
 // there is no Thetis equivalent of this Qt6/C++ host-side wrapper.  See
 // third_party/wdsp/src/ps_sync_stub.c for the routing-symbol stub that
 // satisfies the SetPSRxIdx / SetPSTxIdx ABI surface.
 //
 // =================================================================
-// src/core/PsFeedbackChannel.h  (NereusSDR)
+// src/core/PsFeedbackChannel.h  (Longpath)
 // =================================================================
 //
 // PureSignal feedback RX channel wrapper.  The WDSP calcc autonomous state
@@ -29,16 +29,16 @@
 //
 // NOTE on the "channel id" concept:
 //   In Thetis cmaster.cs:533, `SetPSRxIdx(0, 0)` passes Stream-0 as the
-//   logical PS-stream id, NOT the WDSP channel id.  In NereusSDR, the
+//   logical PS-stream id, NOT the WDSP channel id.  In Longpath, the
 //   PureSignal coordinator (Task 7) calls TxChannel::setPSRxIdx(0, idx)
-//   where idx is THIS WRAPPER's NereusSDR-assigned WDSP channel id.  The
+//   where idx is THIS WRAPPER's Longpath-assigned WDSP channel id.  The
 //   mapping is what PsFeedbackChannel::channelId() exposes.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-06 — Created by J.J. Boyd (KG4VCF) for Phase 3M-4 PureSignal
 //                 (Task 4), with AI-assisted source-first protocol via
-//                 Anthropic Claude Code.  NereusSDR-original wrapper class.
+//                 Anthropic Claude Code.  Longpath-original wrapper class.
 // =================================================================
 
 #include <QObject>

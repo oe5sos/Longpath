@@ -1,6 +1,6 @@
 #pragma once
 
-// no-port-check: NereusSDR-original AppSettings key vocabulary.  Nothing here
+// no-port-check: Longpath-original AppSettings key vocabulary.  Nothing here
 // is derived from upstream code: Thetis persists these band edges in its own
 // SQL database under WinForms control names (udAlex1_5HPFStart and friends),
 // not under path-shaped setting keys, so there is no upstream spelling to
@@ -8,15 +8,15 @@
 // so a reader can find the matching row in the Setup designer.
 
 // =================================================================
-// src/core/AlexSettingsKeys.h  (NereusSDR)
+// src/core/AlexSettingsKeys.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.  The canonical spelling of the Alex filter-bank
+// Longpath-original.  The canonical spelling of the Alex filter-bank
 // AppSettings keys, shared by the Setup tab that writes them and the
 // core-side code that has to find them again.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-07-25: Original implementation for NereusSDR by J.J. Boyd
 //                (KG4VCF), with AI-assisted implementation via
 //                Anthropic Claude Code.  Extracted from the slug table
@@ -39,7 +39,7 @@ namespace Longpath::alexKeys {
 //   alex2/hpf/<slug>/…   Alex-2 high-pass bank   (dual-Alex boards)
 //
 // The slugs are named after the Alex-1 high-pass crossovers because that is
-// the bank NereusSDR shipped first.  On a band-pass board the same slug means
+// the bank Longpath shipped first.  On a band-pass board the same slug means
 // a different filter ("1_5MHz" is the 160m band-pass at 1.5-2.1 MHz, not a
 // 1.5 MHz high-pass), but the storage slot is deliberately shared so edges
 // persisted before the band-pass table existed keep loading.

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - SotaClient JSON parser + dedup tests
+// Longpath - SotaClient JSON parser + dedup tests
 //
 // Same shape as tst_pota_client.cpp: pins the contract that SotaClient
 // parses api2.sota.org.uk/api/spots/... JSON responses and dedups

@@ -1,6 +1,6 @@
 #pragma once
 
-// no-port-check: NereusSDR-original abstract base class. Inline doc comments
+// no-port-check: Longpath-original abstract base class. Inline doc comments
 // reference Thetis source filenames (console.cs / networkproto1.c / network.c)
 // only as pointers to where ported logic lives in the concrete subclasses
 // (P1RadioConnection.cpp, P2RadioConnection.cpp); no upstream code is
@@ -75,7 +75,7 @@ struct AntennaRouting {
 //   From Thetis ChannelMaster/network.c:1040-1050 [v2.10.3.15]
 //   Upstream inline attribution preserved verbatim (console.cs:15441):
 //     HardwareSpecific.Model == HPSDRModel.REDPITAYA) //DH1KLM
-// Before this struct existed NereusSDR derived one HPF value from whichever
+// Before this struct existed Longpath derived one HPF value from whichever
 // receiver was retuned last and put it in both words, so a second slice on a
 // different band made the first one deaf (reported by CT1IQI on PR #293).
 //
@@ -324,7 +324,7 @@ public slots:
 
     /// Hardware mic-jack Tip/Ring polarity selection.
     ///
-    /// NereusSDR parameter convention: `tipHot = true` means Tip carries the
+    /// Longpath parameter convention: `tipHot = true` means Tip carries the
     /// mic signal (the intuitive "tip is mic" meaning).
     ///
     /// POLARITY INVERSION AT THE WIRE LAYER — both upstream sources define
@@ -660,7 +660,7 @@ signals:
     //   Cite: Thetis network.c:686-689 [v2.10.3.13]:
     //     //Byte 0 - Bit [0] - PTT  1 = active, 0 = inactive
     //     prn->ptt_in = prn->ReadBufp[0] & 0x1;
-    //   (ReadBufp points to raw[4] in NereusSDR — after 4-byte seq prefix.)
+    //   (ReadBufp points to raw[4] in Longpath — after 4-byte seq prefix.)
     void micPttFromRadio(bool pressed);
 
     // Radio firmware info received during handshake.

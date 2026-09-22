@@ -1,7 +1,7 @@
 // =================================================================
-// tests/tst_alex_tx_lpf_source.cpp  (NereusSDR)
+// tests/tst_alex_tx_lpf_source.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure. Expected wire
+// no-port-check: Longpath-original test infrastructure. Expected wire
 // values are cited to Thetis in comments, but nothing here is a port.
 //
 // RF-SAFETY. The Alex TX low-pass filter must be selected from the

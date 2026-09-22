@@ -1,8 +1,8 @@
-// no-port-check: NereusSDR-original unit-test file.  The mi0bot-Thetis
+// no-port-check: Longpath-original unit-test file.  The mi0bot-Thetis
 // references below are cite comments documenting which upstream lines each
 // assertion verifies; no Thetis logic is ported in this test file.
 // =================================================================
-// tests/tst_transmit_model_hl2_dbm.cpp  (NereusSDR)
+// tests/tst_transmit_model_hl2_dbm.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for TransmitModel::setPowerUsingTargetDbm — HL2 sub-step DSP
@@ -89,7 +89,7 @@ private slots:
     // Slider 52 -> attenuator regime entry: mag = 0.9999.
     // Formula: (52 - 54) * 2 = -4, but the post-switch
     // ConstrainAValue clamp at console.cs:47704 [v2.10.3.13-beta2] (mirrored
-    // by NereusSDR's outer std::clamp in TransmitModel.cpp) pulls negative
+    // by Longpath's outer std::clamp in TransmitModel.cpp) pulls negative
     // values up to 0.  The formula path is exercised; the asserted post-
     // clamp final value matches mi0bot wire behavior on slider 52.
     // mi0bot console.cs:47670-47672 + 47704 [v2.10.3.13-beta2].

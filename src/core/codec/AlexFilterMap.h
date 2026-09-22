@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/codec/AlexFilterMap.h  (NereusSDR)
+// src/core/codec/AlexFilterMap.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -8,7 +8,7 @@
 //   original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-20 — Lifted from P2RadioConnection::computeAlexHpf/Lpf
 //                (which had ported the same console.cs logic) into a
 //                shared header so P1RadioConnection can call it too.

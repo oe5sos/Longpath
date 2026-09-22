@@ -1,5 +1,5 @@
 // src/gui/widgets/AdcOverloadBadge.cpp
-// no-port-check: NereusSDR-original Qt widget — see header for rationale.
+// no-port-check: Longpath-original Qt widget — see header for rationale.
 #include "AdcOverloadBadge.h"
 
 #include <QLabel>
@@ -96,7 +96,7 @@ void AdcOverloadBadge::applyStyle()
     }
 
     setStyleSheet(QStringLiteral(
-        "NereusSDR--AdcOverloadBadge {"
+        "Longpath--AdcOverloadBadge {"
         " background: %1; border-radius: 6px;"
         "}"
         // Top row: small caps, semi-bold, tight letter-spacing — reads as

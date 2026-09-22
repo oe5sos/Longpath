@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_hpsdr_enums.cpp  (NereusSDR)
+// tests/tst_hpsdr_enums.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -14,7 +14,7 @@
 //   Laurence Barker (G8NJJ) — ANAN-G2 / Saturn enum value parity test
 //     (preserved via inline marker on HPSDRHW::Saturn QCOMPARE assertion)
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.

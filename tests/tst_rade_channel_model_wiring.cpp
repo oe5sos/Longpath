@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - tst_rade_channel_model_wiring: tests for Phase 3R Task I5.
+// Longpath - tst_rade_channel_model_wiring: tests for Phase 3R Task I5.
 //
 // I5 connects the standalone RadeChannel (I1-I4) into the rest of
-// NereusSDR's slot graph:
+// Longpath's slot graph:
 //
 //   RadeChannel::snrChanged(float)
 //     -> RadioModel::onRadeSnrChanged(int sliceId, float snrDb)
@@ -29,9 +29,9 @@
 // (which would require driving the I2/I3 RX/TX pipelines end-to-end).
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-11  J.J. Boyd / KG4VCF  Phase 3R Task I5. Initial test
-//                 file. NereusSDR-native: no upstream port. The slot
+//                 file. Longpath-native: no upstream port. The slot
 //                 contract under test was established by the I5 plan
 //                 spec + the existing I1 RadeChannel signal surface.
 //                 AI tooling: Anthropic Claude Code.

@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/core/audio/WavRecorderController.h  (NereusSDR)
+// src/core/audio/WavRecorderController.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // Was den Audio-Abgriff mit WavRecorder verbindet — der einspurige
 // Gegenpart zu QsoRecorderController (siehe dort fuer die ausfuehrliche
@@ -23,7 +23,7 @@
 // Design doc: docs/architecture/phase3m-recording-design.md §7.1.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-25 — Original fuer NereusSDR/Longpath von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
 // =================================================================

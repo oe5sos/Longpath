@@ -1,14 +1,14 @@
 // =================================================================
-// src/core/PaTempUnit.h  (NereusSDR)
+// src/core/PaTempUnit.h  (Longpath)
 // =================================================================
 //
-// no-port-check: NereusSDR-original.  PA temperature unit selection
+// no-port-check: Longpath-original.  PA temperature unit selection
 // (°C / °F) is not a Thetis behaviour — Thetis hard-codes the °C
 // format string at console.cs:26760 [v2.10.3.13-beta2 @c26a8a4]
 // (`String.Format("{0:#0.0}C", _MKIIHL2Temp)`).
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-08 — Implemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.

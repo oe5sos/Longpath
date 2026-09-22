@@ -1,28 +1,28 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// no-port-check: NereusSDR-native file. The Phase 3R Task I4 review
+// no-port-check: Longpath-native file. The Phase 3R Task I4 review
 // concluded the realistic implementation is a thin Qt6 wrapper around
 // the already-vendored third_party/rade callsign-over-EOO API
 // (rade_tx_set_eoo_callsign / rade_rx_get_eoo_callsign at
 // third_party/rade/src/rade_api.h:120-145 [@b289102]), not a port of
 // freedv-gui's rade_text.c (which transitively pulls in ~1500 lines
-// of codec2 dependencies absent from NereusSDR's tree). The mentions
+// of codec2 dependencies absent from Longpath's tree). The mentions
 // of freedv-gui below are deviation-rationale prose, not source-port
 // claims; see docs/attribution/aethersdr-reconciliation.md Phase 3R
 // Task I4 for the full discussion.
 //
 // =================================================================
-// src/core/RadeText.h  (NereusSDR)
+// src/core/RadeText.h  (Longpath)
 // =================================================================
 //
-// NereusSDR - RadeText: thin Qt6 wrapper around the third_party/rade
+// Longpath - RadeText: thin Qt6 wrapper around the third_party/rade
 // library's native callsign-over-EOO channel.
 //
-// This file is NereusSDR-native code. There is no upstream port: the
+// This file is Longpath-native code. There is no upstream port: the
 // original Phase 3R plan called for a verbatim port of freedv-gui
 // `src/pipeline/rade_text.{h,c}`, but that source pulls in roughly
 // 1500 lines of codec2 dependencies (gp_interleaver, ldpc_codes,
-// mpdecode_core, ofdm_internal, ulog) that are not in the NereusSDR
+// mpdecode_core, ofdm_internal, ulog) that are not in the Longpath
 // tree. The already-vendored RADE library exposes a working
 // callsign-over-EOO channel via
 // `rade_tx_set_eoo_callsign` / `rade_rx_get_eoo_callsign`
@@ -42,10 +42,10 @@
 //
 // The underlying RADE library is BSD-2-Clause licensed (see
 // third_party/rade/LICENSE; Copyright (C) 2026 Peter B Marks).
-// BSD-2-Clause is GPL-compatible; NereusSDR ships under GPLv3.
+// BSD-2-Clause is GPL-compatible; Longpath ships under GPLv3.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-11  J.J. Boyd / KG4VCF  Phase 3R Task I4. NereusSDR-native
 //                 wrapper around the third_party/rade library's
 //                 callsign-over-EOO channel. Replaces the 18-line I1
@@ -55,13 +55,13 @@
 //                 Task I4) concluded that the original plan to port
 //                 freedv-gui's rade_text.c verbatim was not workable
 //                 because that source pulls in roughly 1500 lines of
-//                 codec2 dependencies absent from NereusSDR's tree;
+//                 codec2 dependencies absent from Longpath's tree;
 //                 the vendored third_party/rade library already
 //                 exposes a working callsign-over-EOO surface with no
 //                 extra dependencies, so the wrapper sits on that.
 //                 Public API (setOurCallsign / ourCallsign /
 //                 pushTxCallsign / processRxEooBits / textDecoded
-//                 signal) is NereusSDR-native shape with no upstream
+//                 signal) is Longpath-native shape with no upstream
 //                 counterpart. Wire-up into RadeChannel's processIq /
 //                 txEncode paths is deferred to Phase L per the plan.
 //                 AI tooling: Anthropic Claude Code.

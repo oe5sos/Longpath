@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// tests/tst_wdsp_ps_smoke.cpp (NereusSDR)
+// tests/tst_wdsp_ps_smoke.cpp  (Longpath)
 //
 // Smoke test confirming calcc.c + iqc.c are vendored, compiled into
 // wdsp_static, and exporting their public PS API. Does not exercise

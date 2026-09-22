@@ -1,5 +1,5 @@
-// NereusSDR-original infrastructure — no Thetis source ported here.
-// No upstream attribution required (NereusSDR rebuild round-trip test).
+// Longpath-original infrastructure — no Thetis source ported here.
+// No upstream attribution required (Longpath rebuild round-trip test).
 //
 // Design note (Task 1.4):
 //   Tests exercise captureState/applyState with a TxChannel that is NOT opened

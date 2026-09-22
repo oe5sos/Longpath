@@ -1,12 +1,12 @@
 // =================================================================
-// tests/tst_meter_item_scale.cpp  (NereusSDR)
+// tests/tst_meter_item_scale.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/MeterManager.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -105,7 +105,7 @@ private slots:
     void titleColour_defaults_and_roundtrip()
     {
         // Thetis ShowType draws in scale.FontColourType — the reference
-        // screenshot shows these titles in red. NereusSDR stores that as
+        // screenshot shows these titles in red. Longpath stores that as
         // a settable QColor with a red default to match the screenshot.
         ScaleItem s;
         QCOMPARE(s.titleColour(), QColor(Qt::red));
@@ -294,7 +294,7 @@ private slots:
     void generalScale_Linear_style_does_not_draw_horizontal_baseline()
     {
         // Sanity check the opt-in design — with style=Linear (the
-        // NereusSDR default), no wide horizontal baseline appears at
+        // Longpath default), no wide horizontal baseline appears at
         // y + h*0.85, just the existing evenly-spaced vertical ticks.
         QImage img(200, 100, QImage::Format_ARGB32);
         img.fill(Qt::black);

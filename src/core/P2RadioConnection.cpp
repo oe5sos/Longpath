@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/P2RadioConnection.cpp  (NereusSDR)
+// src/core/P2RadioConnection.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -36,7 +36,7 @@
 */
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -502,7 +502,7 @@ void P2RadioConnection::init()
             QByteArray pkt(buf, sizeof(buf));
             // 3M-1a (2026-04-27): TX I/Q port is base + 5 (= 1029), NOT
             // base + 4 (= 1028; that's the RX-audio port).  Verified by
-            // pcap: NereusSDR was sending all 240-sample TX I/Q packets
+            // pcap: Longpath was sending all 240-sample TX I/Q packets
             // to port 1028 the whole time, which the radio routes to its
             // RX-audio sink and discards — exciter saw zero TX samples,
             // PA stayed silent, no carrier on the SO-239.
@@ -530,10 +530,10 @@ void P2RadioConnection::init()
     //
     // 2026-07-27 (ANAN-G2E lockup): the wheel is now gated on MOX, so it
     // only runs while transmitting.  Rationale, from a TZSP wire capture of
-    // Thetis and NereusSDR against the same ANAN-G2E (analysis in
+    // Thetis and Longpath against the same ANAN-G2E (analysis in
     // captures/g2e-disconnect-NOTES.md):
     //
-    //   command          Thetis            NereusSDR (before)
+    //   command          Thetis            Longpath (before)
     //   CmdHighPriority  1 per session     12.47/s
     //   CmdTx            1 per session     5.11/s
     //   CmdRx            1.28/s bursty     5.70/s
@@ -544,7 +544,7 @@ void P2RadioConnection::init()
     // KeepAliveLoop():1428-1437 (`if (prn->run && prn->wdt) CmdGeneral();`),
     // whose job is feeding the board's ~2 s deadman.
     //
-    // NereusSDR already pushes every state change immediately (11 change-driven
+    // Longpath already pushes every state change immediately (11 change-driven
     // sendCmdHighPriority sites, 4 for CmdRx, 10 for CmdTx), so the wheel was
     // purely additive polling.  The original 3M-1a rationale above is a TX
     // concern ("keep TX state fresh ... never engages the PA"), so it is
@@ -633,7 +633,7 @@ void P2RadioConnection::connectToRadio(const RadioInfo& info)
     // (Hermes / HermesII — ANAN-10E / ANAN-100B running community P2
     // firmware) place RX1 on DDC0 (console.cs:8451-8521 + 8600-8632
     // [v2.10.3.13]).  Picking the wrong DDC means the radio either ignores
-    // the enable bit or streams on a DDC NereusSDR isn't listening to —
+    // the enable bit or streams on a DDC Longpath isn't listening to —
     // either way no I/Q frames arrive, the connect watchdog fires after
     // kConnectTimeoutMs, and the user sees "connects for a few seconds
     // then disconnects" (issue #263).
@@ -826,7 +826,7 @@ void P2RadioConnection::disconnect()
         // Defensive: flush + 20 ms sleep before close so the run=0 frame
         // is actually on the wire before the socket goes away.
         // 2026-07-27: quiesce before the stop frame.  A TZSP capture of a
-        // NereusSDR disconnect showed a CmdRx leaving 4.4 ms ahead of the
+        // Longpath disconnect showed a CmdRx leaving 4.4 ms ahead of the
         // run=0 frame — the last 100 ms heartbeat tick firing between the
         // timer stops above and the send below.  Each CmdRx re-latches
         // EnableRx0_7 and the per-DDC rates in the gateware
@@ -933,7 +933,7 @@ void P2RadioConnection::setTxFrequency(quint64 frequencyHz)
     // (console.cs:32867, the chkVFOBTX arm) else VFO A (console.cs:31891,
     // guarded by `!chkVFOBTX.Checked`), with XIT already folded in
     // (console.cs:31782-31784 `if (chkXIT.Checked) tx_freq += udXIT`) and
-    // RIT deliberately excluded — RIT moves rx_freq only. NereusSDR's
+    // RIT deliberately excluded — RIT moves rx_freq only. Longpath's
     // caller applies the same rule from the TX-bound slice.
     //
     // Unlike the receive path this is NOT gated on MOX: Thetis re-drives
@@ -1591,7 +1591,7 @@ void P2RadioConnection::setLineIn(bool on)
 // setMicTipRing (3M-1b G.3)
 //
 // Selects mic-jack Tip/Ring polarity.
-// NereusSDR parameter convention: tipHot = true → Tip carries the mic signal.
+// Longpath parameter convention: tipHot = true → Tip carries the mic signal.
 //
 // POLARITY INVERSION AT THE WIRE LAYER:
 // deskhpsdr field mic_ptt_tip_bias_ring means "1 = Tip is BIAS/PTT" (i.e.
@@ -2238,9 +2238,9 @@ void P2RadioConnection::onReconnectTimeout()
 void P2RadioConnection::selectCodec()
 {
     m_codec.reset();
-    m_useLegacyP2Codec = (qEnvironmentVariableIntValue("NEREUS_USE_LEGACY_P2_CODEC") == 1);
+    m_useLegacyP2Codec = (qEnvironmentVariableIntValue("LONGPATH_USE_LEGACY_P2_CODEC") == 1);
     if (m_useLegacyP2Codec) {
-        qCInfo(lcConnection) << "P2: NEREUS_USE_LEGACY_P2_CODEC=1 — using pre-refactor compose path";
+        qCInfo(lcConnection) << "P2: LONGPATH_USE_LEGACY_P2_CODEC=1 — using pre-refactor compose path";
         return;
     }
     if (!m_caps) {
@@ -2375,7 +2375,7 @@ bool P2RadioConnection::decodeMicFrame132(const QByteArray& data,
 // at most once per 60 s so a healthy log still proves the audit ran.
 // Counters are per-window, reset at each report.
 //
-// NereusSDR-original diagnostic (no Thetis equivalent: Thetis
+// Longpath-original diagnostic (no Thetis equivalent: Thetis
 // network.c:761-772 [v2.10.3.13] discards the mic seq field).
 // ---------------------------------------------------------------------------
 void P2RadioConnection::auditMicSeq(quint32 seq)
@@ -2588,11 +2588,11 @@ CodecContext P2RadioConnection::buildCodecContext() const
     //   }
     //   high_priority_buffer_to_radio[345] = power & 0xFF;
     //
-    // NereusSDR uses bandFromFrequency() as a fast band-range check.
+    // Longpath uses bandFromFrequency() as a fast band-range check.
     // GEN and WWV map to out-of-ham-band TX frequencies.  BandPlanGuard is
     // a predicate — it does not zero driveLevel upstream — so the gate is
     // applied here at compose time, matching deskhpsdr behaviour.
-    // tx_out_of_band_allowed is not yet wired in NereusSDR; when it is,
+    // tx_out_of_band_allowed is not yet wired in Longpath; when it is,
     // this gate should pass through driveLevel unconditionally.
     //
     // XVTR note: bandFromFrequency() never returns Band::XVTR — it falls
@@ -2733,7 +2733,7 @@ CodecContext P2RadioConnection::buildCodecContext() const
 // composeCmd* wrappers — Phase 3P-B Task 7
 //
 // Each wrapper delegates to the per-board codec (m_codec) unless the
-// NEREUS_USE_LEGACY_P2_CODEC=1 env-var is set (rollback hatch).
+// LONGPATH_USE_LEGACY_P2_CODEC=1 env-var is set (rollback hatch).
 // Legacy compose bodies are preserved as composeCmd*Legacy for one release.
 // ---------------------------------------------------------------------------
 
@@ -2786,7 +2786,7 @@ void P2RadioConnection::composeCmdTx(char buf[60]) const
 }
 
 // ---------------------------------------------------------------------------
-// Legacy compose implementations — preserved for NEREUS_USE_LEGACY_P2_CODEC
+// Legacy compose implementations — preserved for LONGPATH_USE_LEGACY_P2_CODEC
 // rollback hatch. These are byte-for-byte the pre-Task-7 bodies.
 // ---------------------------------------------------------------------------
 
@@ -2895,7 +2895,7 @@ void P2RadioConnection::composeCmdHighPriorityLegacy(char buf[kBufLen]) const
     // Out-of-band TX drive level gate: zero byte 345 when TX frequency is
     // outside a recognised ham band.  BandPlanGuard does not zero driveLevel
     // upstream; gate applied at compose time.  tx_out_of_band_allowed not yet
-    // wired in NereusSDR.
+    // wired in Longpath.
     //
     // XVTR note: bandFromFrequency() never returns Band::XVTR — it falls
     // through to Band::GEN for any unmapped frequency.  Transverter operation
@@ -3289,7 +3289,7 @@ void P2RadioConnection::processIqPacket(const QByteArray& data, int ddcIndex)
     // sample blocks.  After de-interleaving, sync.c:53-58 [v2.10.3.13]
     // calls pscc(channel, sps, data[ps_tx_idx], data[ps_rx_idx]).
     //
-    // For NereusSDR, we emit one iqDataReceived per de-interleaved stream
+    // For Longpath, we emit one iqDataReceived per de-interleaved stream
     // with the appropriate DDC index, so PsccPump and ReceiverManager
     // see the streams as if they had arrived on separate UDP ports.
     int nstreams = 1;
@@ -3487,7 +3487,7 @@ void P2RadioConnection::processHighPriorityStatus(const QByteArray& data)
 
     //[2.10.3.13]MW0LGE adc_overload bits accumulated across status frames; reset-on-read pattern preserved [Thetis network.c:708]
     // From Thetis network.c:695-708 [v2.10.3.13]: ReadBufp[1] is the ADC overload
-    // bitmap.  In NereusSDR raw[], ReadBufp[1] = raw[5] (after 4-byte seq prefix).
+    // bitmap.  In Longpath raw[], ReadBufp[1] = raw[5] (after 4-byte seq prefix).
     // Bit 0=ADC0, Bit 1=ADC1, Bit 2=ADC2 (Thetis network.c:708).
     const quint8 adcOverloadBits = raw[5];
     for (int i = 0; i < 3; ++i) {
@@ -3609,7 +3609,7 @@ quint32 P2RadioConnection::hzToPhaseWord(quint64 freqHz) const
     // Apply frequency correction factor if a CalibrationController is wired.
     // Source: setup.cs:14036-14050 udHPSDRFreqCorrectFactor_ValueChanged:
     //   NetworkIO.FreqCorrectionFactor = (double)udHPSDRFreqCorrectFactor.Value;
-    //   (factor sent from setup to NetworkIO; NereusSDR folds it here instead)
+    //   (factor sent from setup to NetworkIO; Longpath folds it here instead)
     //   [@501e3f5]
     const double factor = m_calController
                           ? m_calController->effectiveFreqCorrectionFactor()

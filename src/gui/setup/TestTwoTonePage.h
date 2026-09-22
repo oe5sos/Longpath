@@ -1,13 +1,13 @@
 #pragma once
 
 // =================================================================
-// src/gui/setup/TestTwoTonePage.h  (NereusSDR)
+// src/gui/setup/TestTwoTonePage.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original Setup → Test → Two-Tone IMD page.
+// Longpath-original Setup → Test → Two-Tone IMD page.
 // No Thetis port, no attribution headers required (per memory:
 // feedback_source_first_ui_vs_dsp — Qt widgets in Setup pages are
-// NereusSDR-native).
+// Longpath-native).
 //
 // Phase 3M-1c Task H (2026-04-29): Setup → Test category + Two-Tone
 // page exposing the 8 TransmitModel two-tone properties (B.2 + B.3):
@@ -48,12 +48,12 @@
 // TXPostGen* setters, restores PWR slider on stop) is Phase I; it does NOT
 // live on this page.
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-29 — H.1/H.2/H.3 written by J.J. Boyd (KG4VCF), with AI-assisted
 //                implementation via Anthropic Claude Code.
 // =================================================================
 
-// no-port-check: NereusSDR-original file; no Thetis logic ported here.
+// no-port-check: Longpath-original file; no Thetis logic ported here.
 
 #include "gui/SetupPage.h"
 
@@ -84,7 +84,7 @@ public:
     ~TestTwoTonePage() override = default;
 
     // Test-introspection accessors (always exposed; pages pattern matches
-    // AudioTxInputPage).  No NEREUS_BUILD_TESTS guard needed.
+    // AudioTxInputPage).  No LONGPATH_BUILD_TESTS guard needed.
     QSpinBox*       freq1Spin()       const { return m_freq1Spin; }
     QSpinBox*       freq2Spin()       const { return m_freq2Spin; }
     QDoubleSpinBox* levelSpin()       const { return m_levelSpin; }

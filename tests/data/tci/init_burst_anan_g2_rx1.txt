@@ -11,7 +11,7 @@
 # Capture conditions (pinned in tests/tst_tci_init_burst_golden.cpp::
 # pinAppSettingsToGoldenCaptureConditions):
 #   AppSettings TciEmulateExpertSDR3Protocol = False  -> protocol:Thetis,2.0;
-#   AppSettings TciEmulateSunSDR2Pro         = False  -> device:NereusSDR;
+#   AppSettings TciEmulateSunSDR2Pro         = False  -> device:Longpath;
 #   AppSettings TciCwluBecomesCw             = False  -> cwl,cwu (no cw suffix)
 #   AppSettings TciSendInitialFrequencyStateOnConnect = True  (bSend=true)
 #   TestMockRadioModel default state (rx2Enabled=false, MOX off, TUN off,

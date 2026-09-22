@@ -1,4 +1,4 @@
-// no-port-check: NereusSDR-original tests for hermes-filter-debug Bug 2.
+// no-port-check: Longpath-original tests for hermes-filter-debug Bug 2.
 //
 // Hl2IoBoardTab N2ADR-toggle behavioural tests:
 //   * onN2adrToggled emits settingChanged("n2adrFilter", ...) — required so
@@ -66,7 +66,7 @@ private slots:
     void toggle_emits_settingChanged_for_per_mac_routing()
     {
         RadioModel model;
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
         model.setBoardForTest(HPSDRHW::HermesLite);
 #endif
         Hl2IoBoardTab tab(&model);
@@ -87,7 +87,7 @@ private slots:
     void toggle_off_emits_false()
     {
         RadioModel model;
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
         model.setBoardForTest(HPSDRHW::HermesLite);
 #endif
         Hl2IoBoardTab tab(&model);
@@ -105,7 +105,7 @@ private slots:
     void toggle_mutates_oc_matrix()
     {
         RadioModel model;
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
         model.setBoardForTest(HPSDRHW::HermesLite);
 #endif
         Hl2IoBoardTab tab(&model);
@@ -135,7 +135,7 @@ private slots:
     void restoreSettings_with_missing_key_does_NOT_wipe_matrix()
     {
         RadioModel model;
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
         model.setBoardForTest(HPSDRHW::HermesLite);
 #endif
         Hl2IoBoardTab tab(&model);
@@ -161,7 +161,7 @@ private slots:
     void restoreSettings_with_true_populates_matrix()
     {
         RadioModel model;
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
         model.setBoardForTest(HPSDRHW::HermesLite);
 #endif
         Hl2IoBoardTab tab(&model);
@@ -183,7 +183,7 @@ private slots:
     void restoreSettings_with_false_wipes_matrix()
     {
         RadioModel model;
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
         model.setBoardForTest(HPSDRHW::HermesLite);
 #endif
         Hl2IoBoardTab tab(&model);
@@ -214,7 +214,7 @@ private slots:
     void restoreSettings_with_missing_key_resets_checkbox_to_default_true()
     {
         RadioModel model;
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
         model.setBoardForTest(HPSDRHW::HermesLite);
 #endif
         Hl2IoBoardTab tab(&model);
@@ -242,7 +242,7 @@ private slots:
     void restoreSettings_does_not_emit_settingChanged()
     {
         RadioModel model;
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
         model.setBoardForTest(HPSDRHW::HermesLite);
 #endif
         Hl2IoBoardTab tab(&model);

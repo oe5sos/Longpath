@@ -1,12 +1,12 @@
 // =================================================================
-// src/models/Band.h  (NereusSDR)
+// src/models/Band.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/console.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -86,7 +86,7 @@ namespace Longpath {
 /// B13M, B11M).  Order within the SWL block matches mi0bot exactly so
 /// per-band iteration produces results consistent with upstream.
 ///
-/// NereusSDR-specific deviation: SWL bands are appended after XVTR
+/// Longpath-specific deviation: SWL bands are appended after XVTR
 /// rather than placed in mi0bot's BLMF-then-SWL slot (which would
 /// require renumbering values 14+ and breaking persisted AppSettings
 /// keys + StepAttenuator per-band arrays).  Existing values 0-13
@@ -153,7 +153,7 @@ QString bandKeyName(Band b);
 /// within a ±5 kHz window.
 ///
 /// Simplified port of Thetis BandByFreq (console.cs:6443) which delegates
-/// to BandStackManager with region-aware ranges. NereusSDR uses
+/// to BandStackManager with region-aware ranges. Longpath uses
 /// IARU Region 2 ham band edges without region variation — sufficient
 /// for auto-selecting the per-band grid slot. User can always override
 /// via direct setBand() if the auto-derived band is wrong.

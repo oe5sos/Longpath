@@ -1,7 +1,7 @@
 // =================================================================
-// tests/tst_board_capabilities_phase3f.cpp  (NereusSDR)
+// tests/tst_board_capabilities_phase3f.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure.
+// no-port-check: Longpath-original test infrastructure.
 //
 // Phase 3F Sub-Epic A Task 1: verify BoardCapabilities gains
 // maxSlices and widebandAdcs fields with correct per-SKU values per
@@ -242,7 +242,7 @@ private slots:
     // Resolving those seven through clsHardwareSpecific.cs:86-190
     // [v2.10.3.15] gives exactly HPSDRHW.OrionMKII and HPSDRHW.Saturn.
     //
-    // SaturnMKII and Andromeda are NereusSDR rows upstream cannot answer for
+    // SaturnMKII and Andromeda are Longpath rows upstream cannot answer for
     // (no HPSDRModel resolves to HPSDRHW.SaturnMKII, and Thetis has no
     // Andromeda HW value at all). Both are Saturn-derived rows for
     // Saturn-class hardware and both dispatch to a codec that antenna-routes

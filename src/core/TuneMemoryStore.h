@@ -1,8 +1,8 @@
 // =================================================================
-// src/core/TuneMemoryStore.h  (NereusSDR)
+// src/core/TuneMemoryStore.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-native per-(antenna, band) cache of TGXL relay positions.
+// Longpath-native per-(antenna, band) cache of TGXL relay positions.
 // Each slot stores the three relay byte values (C1/L/C2) and a timestamp.
 // Slots are persisted as individual JSON objects in AppSettings under
 // TGXL_TuneMemory_Ant<N>_Band<M>.

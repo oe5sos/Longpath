@@ -1,9 +1,9 @@
 // =================================================================
-// tests/tst_rfkit_radiomodel_enabled.cpp  (NereusSDR)
+// tests/tst_rfkit_radiomodel_enabled.cpp  (Longpath)
 // =================================================================
-// NereusSDR-native test. No upstream source file ported.
+// Longpath-native test. No upstream source file ported.
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-24 -- Authored by J.J. Boyd (KG4VCF), with AI-assisted
 //                 transformation via Anthropic Claude Code.
 //   2026-05-26 -- Per-radio peripherals refactor: setRfKitEnabled now

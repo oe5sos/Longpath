@@ -1,4 +1,4 @@
-// no-port-check: NereusSDR-original. No upstream port. Single layout
+// no-port-check: Longpath-original. No upstream port. Single layout
 // authority for the bottom banner; replaces RxDashboard's internal
 // ladder and MainWindow::reapplyRightStripDropPriority. See
 // docs/architecture/2026-08-02-bottom-banner-and-pan-menu-design.md §5.

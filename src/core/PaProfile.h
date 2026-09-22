@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/PaProfile.h  (NereusSDR)
+// src/core/PaProfile.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
@@ -10,7 +10,7 @@
 //   original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-03 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code. Phase 2 Agent 2A of issue #167 PA-cal
@@ -18,8 +18,8 @@
 //                 backing the dBm-target math in TransmitModel
 //                 (Phase 3) and the live editor in PaGainByBandPage
 //                 (Phase 6). Constructor pulls factory rows from
-//                 PaGainProfile (Phase 1A). NereusSDR-canonical 14-band
-//                 layout (Thetis used Band.LAST = 42; NereusSDR has 14
+//                 PaGainProfile (Phase 1A). Longpath-canonical 14-band
+//                 layout (Thetis used Band.LAST = 42; Longpath has 14
 //                 PA-relevant bands — 11 HF + 6m + GEN/WWV/XVTR).
 //   2026-05-03 — Phase 3 Agent 3B of issue #167: getGainForBand()
 //                 out-of-range return restored to Thetis-faithful
@@ -99,18 +99,18 @@ namespace Longpath {
 /// per-band PA gain table eats the dB headroom that the high-gain ANAN-
 /// 8000DLE PA otherwise turns into too-much-output.
 ///
-/// NereusSDR uses a 14-band window (vs Thetis's 42). Indices 0..13 cover
+/// Longpath uses a 14-band window (vs Thetis's 42). Indices 0..13 cover
 /// `Band::Band160m` through `Band::XVTR`; SWL bands (`Band::Band120m` and
 /// later) are silently no-op'd by setters and return safe defaults from
 /// getters. This mirrors Thetis's `(int)b > Band.FIRST && (int)b < Band.LAST`
 /// guard pattern at the boundary of its larger band enum.
 ///
-/// Serialization is NereusSDR-canonical 171-field pipe-delimited format
+/// Serialization is Longpath-canonical 171-field pipe-delimited format
 /// (NOT byte-compatible with Thetis 423/507-field format). One-way Thetis
 /// import is out of scope for this hotfix.
 class PaProfile {
 public:
-    /// Number of NereusSDR bands tracked by PaProfile (160m..6m + GEN/WWV/XVTR).
+    /// Number of Longpath bands tracked by PaProfile (160m..6m + GEN/WWV/XVTR).
     /// SWL bands are outside this window — see `Band` enum (`models/Band.h`).
     static constexpr int kBandCount  = 14;
 
@@ -192,7 +192,7 @@ public:
     /// `ResetGainDefaultsForModel` (setup.cs:24027-24046 [v2.10.3.13]).
     void resetGainDefaultsForModel(HPSDRModel m);
 
-    /// Serialize to NereusSDR-canonical 171-field pipe-delimited string.
+    /// Serialize to Longpath-canonical 171-field pipe-delimited string.
     /// Layout:
     ///   [0]      base64-encoded name
     ///   [1]      model int (HPSDRModel value)
@@ -203,7 +203,7 @@ public:
     ///   [143..170] max-power column (band-major: useFlag, value, useFlag,
     ///              value, ...)
     /// Mirrors Thetis DataToString pattern (setup.cs:23884-23913
-    /// [v2.10.3.13]) but uses NereusSDR's 14-band layout.
+    /// [v2.10.3.13]) but uses Longpath's 14-band layout.
     QString dataToString() const;
 
     /// Deserialize from a `dataToString` blob. Returns true on success.

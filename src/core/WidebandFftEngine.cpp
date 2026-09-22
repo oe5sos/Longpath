@@ -1,8 +1,8 @@
 // =================================================================
-// src/core/WidebandFftEngine.cpp  (NereusSDR)
+// src/core/WidebandFftEngine.cpp  (Longpath)
 // =================================================================
 //
-// no-port-check: NereusSDR-original. See WidebandFftEngine.h for
+// no-port-check: Longpath-original. See WidebandFftEngine.h for
 // design context.
 //
 // =================================================================

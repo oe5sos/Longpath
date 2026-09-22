@@ -5,7 +5,7 @@
 // without a real qso.freedv.org socket. Precedent matches
 // tst_freedv_reporter_socketio.cpp (Phase 3J-2 Task B5).
 //
-// NereusSDR - FreeDVRadeReporterBridge tests
+// Longpath - FreeDVRadeReporterBridge tests
 //
 // Pins the contract that the bridge mirrors the freedv-gui RADE rx_report
 // upload paths from MainFrame::OnTimer:

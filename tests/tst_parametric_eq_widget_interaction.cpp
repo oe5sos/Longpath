@@ -1,8 +1,8 @@
 // =================================================================
-// tests/tst_parametric_eq_widget_interaction.cpp  (NereusSDR)
+// tests/tst_parametric_eq_widget_interaction.cpp  (Longpath)
 // =================================================================
 //
-// no-port-check: NereusSDR-original test file.  Cites for the
+// no-port-check: Longpath-original test file.  Cites for the
 // interaction logic under test live in ParametricEqWidget.cpp.
 // =================================================================
 //

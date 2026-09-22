@@ -1,11 +1,11 @@
-// no-port-check: AetherSDR-derived NereusSDR file. Three-column painted
+// no-port-check: AetherSDR-derived Longpath file. Three-column painted
 // thumbnail grid, structurally from AetherSDR PanLayoutDialog [@c6481cb].
 // Registered in docs/attribution/aethersdr-contributor-index.md:270.
 
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // =================================================================
-// src/gui/PanLayoutDialog.cpp  (NereusSDR)
+// src/gui/PanLayoutDialog.cpp  (Longpath)
 // =================================================================
 //
 // Ported (structurally) from AetherSDR PanLayoutDialog [@c6481cb].
@@ -14,12 +14,12 @@
 //       and About dialog for the live contributor list)
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-27  J.J. Boyd / KG4VCF  Phase 3F Sub-Epic D Task 9.
 //                                    5-tile picker implementation. Uses
 //                                    Style::buttonBaseStyle() so the
 //                                    tiles match every other applet in
-//                                    NereusSDR. AI-assisted
+//                                    Longpath. AI-assisted
 //                                    transformation via Anthropic
 //                                    Claude Code.
 //   2026-08-02  J.J. Boyd / KG4VCF  Bottom-banner + pan-menu epic,

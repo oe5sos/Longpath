@@ -1,18 +1,18 @@
 #pragma once
 
 // =================================================================
-// src/core/strip/StripChain.h  (NereusSDR)
+// src/core/strip/StripChain.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original, over DSP ported from AetherSDR
+// Longpath-original, over DSP ported from AetherSDR
 // (https://github.com/aethersdr/AetherSDR, GPLv3, primary author
 // Jeremy [KK7GWY]). The stage order and the stage set follow
 // AetherSDR's `defaultChain()` in src/core/AudioEngine.cpp at
-// `31b29583`; the runner itself is written for NereusSDR because
+// `31b29583`; the runner itself is written for Longpath because
 // AetherSDR dispatches its chain from inside AudioEngine and
-// NereusSDR's transmit audio does not pass through there.
+// Longpath's transmit audio does not pass through there.
 //
-// The Nereus Audio Channel Strip's stages, in order, as one object
+// The Longpath Audio Channel Strip's stages, in order, as one object
 // that can be handed to the transmit pump.
 //
 //   gate → EQ → de-esser → compressor → tube → PUDU → reverb → limiter
@@ -38,7 +38,7 @@
 // TxChannel::writesToRadio().
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-08 — Created in C++20 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 //   2026-09-17 — Non-finite guard: a NaN or an infinity, from the

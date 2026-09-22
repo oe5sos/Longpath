@@ -1,8 +1,8 @@
 // =================================================================
-// src/gui/setup/AudioAdvancedPage.cpp  (NereusSDR)
+// src/gui/setup/AudioAdvancedPage.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original Setup → Audio → Advanced page.
+// Longpath-original Setup → Audio → Advanced page.
 // See AudioAdvancedPage.h for the full header.
 //
 // Sub-Phase 12 Task 12.4 (2026-04-20): Written by J.J. Boyd (KG4VCF),
@@ -10,6 +10,7 @@
 // =================================================================
 
 #include "AudioAdvancedPage.h"
+#include "gui/StyleConstants.h"
 
 #include "core/AppSettings.h"
 #include "core/AudioEngine.h"
@@ -66,20 +67,7 @@ static const char* kAmberButtonStyle =
     "QPushButton:hover { background: #33280f; border-color: #c2924f; }"
     "QPushButton:pressed { background: #0d0d0f; }";
 
-static const char* kComboStyle =
-    "QComboBox {"
-    "  background: #1a2a3a;"
-    "  border: 1px solid #203040;"
-    "  border-radius: 6px;"
-    "  color: #c8d8e8;"
-    "  padding: 2px 6px;"
-    "}"
-    "QComboBox::drop-down { border: none; }"
-    // 2026-09-08: selection-color ergaenzt -- ohne sie blieb der
-    // ausgewaehlte Eintrag im aufgeklappten Dropdown praktisch
-    // unsichtbar (Betreiber: "immer das ausgewaehlte ist unsichtbar").
-    "QComboBox QAbstractItemView { background: #1a2a3a; color: #c8d8e8; "
-    "  selection-background-color: #203040; selection-color: #ffffff; }";
+static const char* kComboStyle = Longpath::Style::kComboStyle;   // seit 2026-09-18 die Hausdefinition (Glas & Tiefe)
 
 } // namespace
 

@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/applets/InstrumentApplet.cpp  (NereusSDR)
+// src/gui/applets/InstrumentApplet.cpp  (Longpath)
 // =================================================================
 // Siehe InstrumentApplet.h.
 // =================================================================

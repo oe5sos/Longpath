@@ -28,7 +28,7 @@
 | `tests/tst_applet_panel_set_visible.cpp` | CREATE | Panel test: setAppletVisible toggles wrapper visibility while preserving layout index; null-safety |
 | `tests/tst_applet_visibility_menu_wiring.cpp` | CREATE | Wiring test: MainWindow's top-menu Applets actions + banner-menu actions both flip the controller AND mirror each other's checked state |
 | `CMakeLists.txt` | MODIFY | Add `src/gui/applets/AppletVisibilityController.cpp` to source list near existing applet sources (around line 707) |
-| `tests/CMakeLists.txt` | MODIFY | Three `nereus_add_test(...)` registrations for the new test files |
+| `tests/CMakeLists.txt` | MODIFY | Three `longpath_add_test(...)` registrations for the new test files |
 
 ---
 
@@ -163,11 +163,11 @@ QTEST_MAIN(TstAppletPanelSetVisible)
 
 - [ ] **Step 2: Register the test in CMake**
 
-Edit `tests/CMakeLists.txt`. Find the existing `nereus_add_test(tst_applet_panel_gutter)` line (around line ~80; grep for it). Add immediately after:
+Edit `tests/CMakeLists.txt`. Find the existing `longpath_add_test(tst_applet_panel_gutter)` line (around line ~80; grep for it). Add immediately after:
 
 ```cmake
 # -- AppletPanelWidget setAppletVisible: order-preserving show/hide --
-nereus_add_test(tst_applet_panel_set_visible)
+longpath_add_test(tst_applet_panel_set_visible)
 ```
 
 - [ ] **Step 3: Build and run the test to verify it fails**
@@ -370,7 +370,7 @@ In `tests/CMakeLists.txt`, add near the other applet tests:
 
 ```cmake
 # -- AppletVisibilityController: state, persistence, signal emission --
-nereus_add_test(tst_applet_visibility_controller)
+longpath_add_test(tst_applet_visibility_controller)
 ```
 
 - [ ] **Step 3: Build and run — verify failure**
@@ -1203,7 +1203,7 @@ In `tests/CMakeLists.txt`, near the other applet tests:
 
 ```cmake
 # -- Two-way sync between top-menu and banner-menu applet toggles --
-nereus_add_test(tst_applet_visibility_menu_wiring)
+longpath_add_test(tst_applet_visibility_menu_wiring)
 ```
 
 - [ ] **Step 3: Build and run — verify pass**

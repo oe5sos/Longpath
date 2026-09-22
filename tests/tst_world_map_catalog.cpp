@@ -1,6 +1,6 @@
-// tests/tst_world_map_catalog.cpp  (NereusSDR)
+// tests/tst_world_map_catalog.cpp  (Longpath)
 //
-// NereusSDR-original. No Thetis port.
+// Longpath-original. No Thetis port.
 //
 // ── Warum das Seitenverhaeltnis eine Zahl braucht ────────────────────
 //

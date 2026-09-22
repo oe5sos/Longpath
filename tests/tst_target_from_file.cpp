@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_target_from_file.cpp  (NereusSDR)
+// tests/tst_target_from_file.cpp  (Longpath)
 // =================================================================
 //
 // A target taken from a recording is only worth having if the reading
@@ -19,7 +19,7 @@
 // TargetFromFile. Verification is supposed to find things.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-08 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

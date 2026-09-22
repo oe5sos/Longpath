@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // =================================================================
-// src/core/Resampler.cpp  (NereusSDR)
+// src/core/Resampler.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR - Resampler implementation. Wraps r8b::CDSPResampler24
+// Longpath - Resampler implementation. Wraps r8b::CDSPResampler24
 // for float32 <-> double conversion with optional stereo<->mono
 // convenience helpers.
 //
@@ -13,7 +13,7 @@
 // License (upstream): see Resampler.h for the full attribution block.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-11  J.J. Boyd / KG4VCF  Phase 3R Task I2a. Full port of
 //                 AetherSDR src/core/Resampler.cpp [@0cd4559].
 //                 Namespace renamed AetherSDR -> NereusSDR; the
@@ -32,6 +32,7 @@ namespace Longpath {
 Resampler::Resampler(double srcRate, double dstRate, int maxBlockSamples)
     : m_srcRate(srcRate)
     , m_dstRate(dstRate)
+    , m_maxBlockSamples(maxBlockSamples)
     , m_resampler(std::make_unique<r8b::CDSPResampler24>(srcRate, dstRate, maxBlockSamples))
 {
     m_inBuf.reserve(maxBlockSamples);
@@ -44,6 +45,7 @@ Resampler::~Resampler() = default;
 QByteArray Resampler::process(const float* in, int numSamples)
 {
     if (numSamples <= 0) return {};
+    numSamples = clampToCapacity(numSamples);
 
     // Convert float32 -> double
     m_inBuf.resize(numSamples);
@@ -64,7 +66,7 @@ QByteArray Resampler::process(const float* in, int numSamples)
     return result;
 }
 
-// NereusSDR-original: non-allocating variant of process() for use inside
+// Longpath-original: non-allocating variant of process() for use inside
 // real-time audio callbacks (e.g. PortAudioBus paCallback).  Same math
 // as process() but writes into a caller-provided float buffer instead
 // of returning a QByteArray.  See Resampler.h for the rationale.
@@ -75,6 +77,7 @@ int Resampler::processInto(const float* in, int numSamples,
         out == nullptr || outCapacity <= 0) {
         return 0;
     }
+    numSamples = clampToCapacity(numSamples);
 
     // Convert float32 -> double.  m_inBuf was reserved to maxBlockSamples
     // in the constructor; resize() within that capacity is allocation-free.
@@ -104,6 +107,7 @@ int Resampler::processInto(const float* in, int numSamples,
 QByteArray Resampler::processStereoToMono(const float* stereoIn, int numStereoFrames)
 {
     if (numStereoFrames <= 0) return {};
+    numStereoFrames = clampToCapacity(numStereoFrames);
 
     // Downmix stereo -> mono
     m_inBuf.resize(numStereoFrames);
@@ -128,6 +132,7 @@ QByteArray Resampler::processStereoToMono(const float* stereoIn, int numStereoFr
 QByteArray Resampler::processMonoToStereo(const float* monoIn, int numSamples)
 {
     if (numSamples <= 0) return {};
+    numSamples = clampToCapacity(numSamples);
 
     // Convert float32 -> double
     m_inBuf.resize(numSamples);
@@ -155,6 +160,7 @@ QByteArray Resampler::processMonoToStereo(const float* monoIn, int numSamples)
 QByteArray Resampler::processStereoToStereo(const float* stereoIn, int numStereoFrames)
 {
     if (numStereoFrames <= 0) return {};
+    numStereoFrames = clampToCapacity(numStereoFrames);
 
     // Downmix stereo -> mono, resample, duplicate back to stereo
     m_inBuf.resize(numStereoFrames);

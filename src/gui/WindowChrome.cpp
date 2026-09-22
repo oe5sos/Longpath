@@ -15,6 +15,8 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QMouseEvent>
+#include <QScreen>
+#include <QGuiApplication>
 #include <QPainter>
 #include <QPushButton>
 #include <QResizeEvent>
@@ -72,10 +74,14 @@ WindowTitleBar::WindowTitleBar(const QString& title, QWidget* parent)
     lay->addWidget(stripe);
 
     m_label = new QLabel(title, this);
+    // Versal mit weiter Laufweite, wie der Kopf einer gedockten Zelle
+    // (GridCellWidget) — dasselbe Bauteil in zwei Faessungen sah nach
+    // zwei Programmen aus. Groesse per capsFont, nicht im Stylesheet
+    // (HAUSSTIL.md, die Falle).
+    m_label->setFont(Style::capsFont(font(), Style::kFontCaption));
     m_label->setStyleSheet(
-        QStringLiteral("color: %1; font-size: 11px; font-weight: 600;"
-                       " letter-spacing: 0.4px; background: transparent;")
-            .arg(Style::kTextPrimary));
+        QStringLiteral("color: %1; background: transparent;")
+            .arg(Style::kLabelMid));
     lay->addWidget(m_label);
     lay->addStretch();
 
@@ -88,6 +94,21 @@ WindowTitleBar::WindowTitleBar(const QString& title, QWidget* parent)
     connect(m_lockBtn, &QPushButton::toggled,
             this, &WindowTitleBar::setLocked);
     lay->addWidget(m_lockBtn);
+
+    // Volle Groesse / zurueck — Begruendung am toggleZoom() im Header.
+    m_zoomBtn = new QPushButton(QStringLiteral("⤢"), this);
+    m_zoomBtn->setFixedSize(16, 16);
+    m_zoomBtn->setToolTip(QStringLiteral(
+        "Volle Groesse — noch einmal klicken stellt die vorige "
+        "Groesse wieder her"));
+    m_zoomBtn->setCursor(Qt::ArrowCursor);
+    m_zoomBtn->setStyleSheet(
+        QStringLiteral("QPushButton { color: %1; background: transparent;"
+                       " border: none; font-size: 11px; }"
+                       "QPushButton:hover { background: %2; }")
+            .arg(Style::kTextPrimary, Style::kButtonHover));
+    connect(m_zoomBtn, &QPushButton::clicked, this, &WindowTitleBar::toggleZoom);
+    lay->addWidget(m_zoomBtn);
 
     auto* dock = new QPushButton(QStringLiteral("↙"), this);
     dock->setFixedSize(16, 16);
@@ -108,7 +129,8 @@ WindowTitleBar::WindowTitleBar(const QString& title, QWidget* parent)
         QStringLiteral("QPushButton { color: %1; background: transparent;"
                        " border: none; font-size: 11px; }"
                        "QPushButton:hover { background: %2; color: #fff; }")
-            .arg(Style::kTextPrimary, Style::kTxRed));
+            .arg(QLatin1String(Style::kTextPrimary),
+                 QLatin1String(Style::kRedBorder)));
     connect(close, &QPushButton::clicked, this, &WindowTitleBar::closeRequested);
     lay->addWidget(close);
 
@@ -178,6 +200,8 @@ void WindowTitleBar::applyLockVisuals()
                        "QPushButton:hover { background: %1; }")
             .arg(Style::kButtonHover));
     setCursor(m_locked ? Qt::ArrowCursor : Qt::OpenHandCursor);
+    // Festgestellt: auch die volle Groesse ist eine Groessenaenderung.
+    if (m_zoomBtn) { m_zoomBtn->setEnabled(!m_locked); }
 }
 
 void WindowTitleBar::mousePressEvent(QMouseEvent* ev)
@@ -205,6 +229,37 @@ void WindowTitleBar::mouseReleaseEvent(QMouseEvent* ev)
         return;
     }
     QWidget::mouseReleaseEvent(ev);
+}
+
+void WindowTitleBar::toggleZoom()
+{
+    if (m_locked) { return; }
+    QWidget* win = window();
+    if (!win) { return; }
+
+    if (!m_zoomed) {
+        // Den Bildschirm nehmen, auf dem das Fenster gerade steht — nicht
+        // den Hauptschirm: der Rotor/Log schwebt beim Betreiber auf dem
+        // eingebauten, ein zweiter Schirm waere die falsche Flaeche.
+        QScreen* sc = win->screen();
+        if (!sc) { sc = QGuiApplication::primaryScreen(); }
+        if (!sc) { return; }
+        m_geometryBeforeZoom = win->geometry();
+        win->setGeometry(sc->availableGeometry());
+        m_zoomed = true;
+    } else {
+        if (m_geometryBeforeZoom.isValid()) {
+            win->setGeometry(m_geometryBeforeZoom);
+        }
+        m_zoomed = false;
+    }
+    if (m_zoomBtn) {
+        m_zoomBtn->setText(m_zoomed ? QStringLiteral("⤡") : QStringLiteral("⤢"));
+        m_zoomBtn->setToolTip(m_zoomed
+            ? QStringLiteral("Vorige Groesse wiederherstellen")
+            : QStringLiteral("Volle Groesse — noch einmal klicken stellt "
+                             "die vorige Groesse wieder her"));
+    }
 }
 
 void WindowTitleBar::mouseDoubleClickEvent(QMouseEvent* ev)

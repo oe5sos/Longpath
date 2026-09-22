@@ -1,14 +1,14 @@
 #pragma once
 
 // =================================================================
-// src/core/QsoUploader.h  (NereusSDR)
+// src/core/QsoUploader.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. No Thetis or AetherSDR equivalent — Thetis hands
+// Longpath-original. No Thetis or AetherSDR equivalent — Thetis hands
 // QSOs to an external logger, and AetherSDR's QRZ code is lookup-only.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
 // =================================================================

@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/HermesLiteBandwidthMonitor.h  (NereusSDR)
+// src/core/HermesLiteBandwidthMonitor.h  (Longpath)
 // =================================================================
 //
 // Ported from mi0bot-Thetis sources:
@@ -7,7 +7,7 @@
 //   Project Files/Source/ChannelMaster/bandwidth_monitor.c
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-20 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                (KG4VCF), with AI-assisted transformation via Anthropic
 //                Claude Code. Closes Phase 3I-T12 deferred work
@@ -113,7 +113,7 @@ namespace Longpath {
 //
 // The upstream does NOT implement throttle detection — it is a byte-rate
 // telemetry helper that callers compare against an expected rate.
-// NereusSDR adds a throttle-detection layer (ep6-ingress goes silent while
+// Longpath adds a throttle-detection layer (ep6-ingress goes silent while
 // ep2-egress continues) on top of the faithful upstream port.
 //
 // Caller responsibilities:
@@ -137,7 +137,7 @@ class HermesLiteBandwidthMonitor : public QObject {
 public:
     // Number of consecutive silent ticks (ep6 rate ≈ 0 while ep2 active)
     // required to assert the throttle flag.
-    // NereusSDR heuristic — no upstream equivalent (upstream has no throttle).
+    // Longpath heuristic — no upstream equivalent (upstream has no throttle).
     static constexpr int kThrottleTickThreshold = 3;
 
     explicit HermesLiteBandwidthMonitor(QObject* parent = nullptr);
@@ -159,7 +159,7 @@ public:
     double ep6IngressBytesPerSec() const;
     double ep2EgressBytesPerSec() const;
 
-    // NereusSDR throttle state (no upstream equivalent).
+    // Longpath throttle state (no upstream equivalent).
     bool isThrottled() const;
     int  throttleEventCount() const;
 
@@ -170,7 +170,7 @@ public:
 
 signals:
     // Emitted when the throttle state changes.
-    // NereusSDR addition — no upstream equivalent.
+    // Longpath addition — no upstream equivalent.
     void throttledChanged(bool throttled);
 
     // Emitted by tick() with the latest rates for live UI feeds.
@@ -194,7 +194,7 @@ private:
     double m_inLastBps{0.0};
     double m_outLastBps{0.0};
 
-    // NereusSDR throttle state (no upstream equivalent).
+    // Longpath throttle state (no upstream equivalent).
     bool m_throttled{false};
     int  m_silentTicks{0};
     int  m_throttleEventCount{0};

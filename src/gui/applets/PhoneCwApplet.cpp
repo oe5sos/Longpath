@@ -1,12 +1,12 @@
 // =================================================================
-// src/gui/applets/PhoneCwApplet.cpp  (NereusSDR)
+// src/gui/applets/PhoneCwApplet.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/setup.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -322,14 +322,14 @@ void PhoneCwApplet::buildPhonePage(QWidget* page)
         // Phase 3M-1b: shows dB value e.g. "-6 dB".
         m_micLevelLabel = new QLabel(QStringLiteral("-6 dB"), page);
         m_micLevelLabel->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }").arg(Longpath::Style::kTextPrimary));
-        m_micLevelLabel->setFixedWidth(35);
+        m_micLevelLabel->setMinimumWidth(35);
         m_micLevelLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
         row->addWidget(m_micLevelLabel);
 
         // Control 6: +ACC button (green, checkable, fixedWidth 48, fixedHeight 22)
         m_accBtn = new QPushButton(QStringLiteral("+ACC"), page);
         m_accBtn->setCheckable(true);
-        m_accBtn->setFixedWidth(48);
+        m_accBtn->setMinimumWidth(48);   // nie schmaler als der Text (Blatt 2026-09-17: "ACC", "ROC", "DEXF")
         m_accBtn->setFixedHeight(22);
         m_accBtn->setStyleSheet(phoneButtonStyle() + Longpath::Style::greenCheckedStyle());
         m_accBtn->setAccessibleName(QStringLiteral("Accessory mic input"));
@@ -348,7 +348,7 @@ void PhoneCwApplet::buildPhonePage(QWidget* page)
         // TransmitModel::cpdrOn (wired in wireControls()).
         m_procBtn = new QPushButton(QStringLiteral("PROC"), page);
         m_procBtn->setCheckable(true);
-        m_procBtn->setFixedWidth(48);
+        m_procBtn->setMinimumWidth(48);
         m_procBtn->setFixedHeight(22);
         m_procBtn->setStyleSheet(phoneButtonStyle() + Longpath::Style::greenCheckedStyle());
         m_procBtn->setAccessibleName(QStringLiteral("Speech processor"));
@@ -395,7 +395,7 @@ void PhoneCwApplet::buildPhonePage(QWidget* page)
         // Control 9: VAX button (blue, checkable, fixedWidth 48, fixedHeight 22)
         m_vaxBtn = new QPushButton(QStringLiteral("VAX"), page);
         m_vaxBtn->setCheckable(true);
-        m_vaxBtn->setFixedWidth(48);
+        m_vaxBtn->setMinimumWidth(48);
         m_vaxBtn->setFixedHeight(22);
         m_vaxBtn->setStyleSheet(phoneButtonStyle() + Longpath::Style::blueCheckedStyle());
         m_vaxBtn->setAccessibleName(QStringLiteral("VAX digital audio"));
@@ -411,7 +411,7 @@ void PhoneCwApplet::buildPhonePage(QWidget* page)
 
         m_monBtn = new QPushButton(QStringLiteral("MON"), page);
         m_monBtn->setCheckable(true);
-        m_monBtn->setFixedWidth(48);
+        m_monBtn->setMinimumWidth(48);
         m_monBtn->setFixedHeight(22);
         m_monBtn->setStyleSheet(phoneButtonStyle() + Longpath::Style::greenCheckedStyle());
         m_monBtn->setAccessibleName(QStringLiteral("TX monitor"));
@@ -426,7 +426,7 @@ void PhoneCwApplet::buildPhonePage(QWidget* page)
 
         auto* monLabel = new QLabel(QStringLiteral("50"), page);
         monLabel->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }").arg(Longpath::Style::kTextPrimary));
-        monLabel->setFixedWidth(22);
+        monLabel->setMinimumWidth(22);
         monLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
         row->addWidget(monLabel);
 
@@ -454,7 +454,7 @@ void PhoneCwApplet::buildPhonePage(QWidget* page)
 
         m_dexpBtn = new QPushButton(QStringLiteral("DEXP"), page);
         m_dexpBtn->setCheckable(true);
-        m_dexpBtn->setFixedWidth(48);
+        m_dexpBtn->setMinimumWidth(48);
         m_dexpBtn->setFixedHeight(22);
         m_dexpBtn->setStyleSheet(phoneButtonStyle() + Longpath::Style::greenCheckedStyle());
         m_dexpBtn->setAccessibleName(QStringLiteral("Downward expander / noise gate"));
@@ -487,7 +487,7 @@ void PhoneCwApplet::buildPhonePage(QWidget* page)
 
         m_dexpLabel = new QLabel(QStringLiteral("-50 dB"), page);
         m_dexpLabel->setStyleSheet(Longpath::Style::insetValueStyle());
-        m_dexpLabel->setFixedWidth(38);
+        m_dexpLabel->setMinimumWidth(38);   // Monospace-Chip waechst mit ("50 d" auf dem Blatt 2026-09-17)
         m_dexpLabel->setAlignment(Qt::AlignCenter);
         row->addWidget(m_dexpLabel);
 
@@ -519,7 +519,7 @@ void PhoneCwApplet::buildPhonePage(QWidget* page)
 
         m_amCarLabel = new QLabel(QStringLiteral("25"), page);
         m_amCarLabel->setStyleSheet(Longpath::Style::insetValueStyle());
-        m_amCarLabel->setFixedWidth(30);
+        m_amCarLabel->setMinimumWidth(30);
         m_amCarLabel->setAlignment(Qt::AlignCenter);
         row->addWidget(m_amCarLabel);
 
@@ -1214,12 +1214,12 @@ void PhoneCwApplet::pollDexpMeters()
     //
     // Gate on (MOX OR voxEnabled).  Thetis gates `UpdateNoiseGate` strictly
     // on `_mox` (console.cs:25351 [v2.10.3.13]), so the noise-gate strip is
-    // dead in RX.  NereusSDR extends the gate to also include voxEnabled
+    // dead in RX.  Longpath extends the gate to also include voxEnabled
     // because Task 18's continuous-pump mode keeps real mic data flowing
     // through the WDSP TX pipeline whenever VOX is engaged - so showing
     // the live envelope is honest about what the DSP is actually doing.
     // In pure RX (no MOX, no VOX), match Thetis: hold the meter at zero.
-    // Threshold marker is unconditional (NereusSDR-spin) so users can
+    // Threshold marker is unconditional (Longpath-spin) so users can
     // pre-position it before keying.  Bench feedback 2026-05-04.
     const bool moxOn       = m_model->moxController()
                                  ? m_model->moxController()->isMox()

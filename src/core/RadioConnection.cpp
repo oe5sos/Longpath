@@ -1,4 +1,4 @@
-// no-port-check: NereusSDR-original base-class implementation. Inline doc
+// no-port-check: Longpath-original base-class implementation. Inline doc
 // comments reference Thetis source file names (console.cs) only as
 // behavioral source-first cites for formula constants; no Thetis logic is
 // reproduced here. The voltage conversion formulae are independently

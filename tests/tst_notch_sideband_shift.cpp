@@ -1,7 +1,7 @@
 // =================================================================
-// tests/tst_notch_sideband_shift.cpp  (NereusSDR)
+// tests/tst_notch_sideband_shift.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure.
+// no-port-check: Longpath-original test infrastructure.
 //
 // TNF: NotchModel::notchSidebandShift, ported from Thetis
 // console.cs:40281-40307 notchSidebandShift(rx). Table-driven.

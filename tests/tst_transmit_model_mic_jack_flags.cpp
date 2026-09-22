@@ -1,9 +1,9 @@
-// no-port-check: NereusSDR-original unit-test file.  The "console.cs"
+// no-port-check: Longpath-original unit-test file.  The "console.cs"
 // and "setup.designer.cs" references below are cite comments documenting
 // which Thetis lines each assertion verifies; no Thetis logic is ported
 // in this test file.
 // =================================================================
-// tests/tst_transmit_model_mic_jack_flags.cpp  (NereusSDR)
+// tests/tst_transmit_model_mic_jack_flags.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for TransmitModel mic-jack flag properties (8x).
@@ -73,7 +73,7 @@ private slots:
     }
 
     void default_micTipRing_isTrue() {
-        // NereusSDR-original: TRUE = Tip is mic (intuitive).
+        // Longpath-original: TRUE = Tip is mic (intuitive).
         // Thetis radOrionMicTip.Checked = true (setup.designer.cs:8683 [v2.10.3.13]).
         // Wire-bit polarity inversion happens at RadioConnection::setMicTipRing (Phase G).
         TransmitModel t;
@@ -81,7 +81,7 @@ private slots:
     }
 
     void default_micBias_isFalse() {
-        // NereusSDR-original: FALSE = bias off by default.
+        // Longpath-original: FALSE = bias off by default.
         // Thetis radOrionBiasOff.Checked = true (setup.designer.cs:8779 [v2.10.3.13]).
         TransmitModel t;
         QCOMPARE(t.micBias(), false);

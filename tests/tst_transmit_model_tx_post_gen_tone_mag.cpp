@@ -1,8 +1,8 @@
-// no-port-check: NereusSDR-original unit-test file.  The mi0bot-Thetis
+// no-port-check: Longpath-original unit-test file.  The mi0bot-Thetis
 // references below are cite comments documenting which upstream lines each
 // assertion verifies; no Thetis logic is ported in this test file.
 // =================================================================
-// tests/tst_transmit_model_tx_post_gen_tone_mag.cpp  (NereusSDR)
+// tests/tst_transmit_model_tx_post_gen_tone_mag.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for TransmitModel::m_txPostGenToneMag property.
@@ -48,7 +48,7 @@ private slots:
     }
 
     void setterDeduplicates() {
-        // Matches NereusSDR setter convention: dedupe equal values.
+        // Matches Longpath setter convention: dedupe equal values.
         TransmitModel m;
         m.setTxPostGenToneMag(0.5);
         QSignalSpy spy(&m, &TransmitModel::txPostGenToneMagChanged);

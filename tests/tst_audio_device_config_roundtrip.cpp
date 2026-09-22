@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_audio_device_config_roundtrip.cpp  (NereusSDR)
+// tests/tst_audio_device_config_roundtrip.cpp  (Longpath)
 // =================================================================
 //
 // Exercises AudioDeviceConfig::loadFromSettings / saveToSettings

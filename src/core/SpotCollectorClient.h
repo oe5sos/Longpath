@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - DXLab SpotCollector UDP listener
+// Longpath - DXLab SpotCollector UDP listener
 //
 // Ported from AetherSDR src/core/SpotCollectorClient.h [@0cd4559].
 // AetherSDR is (C) its contributors and is licensed GPL-3.0-or-later
 // (see https://github.com/ten9876/AetherSDR/blob/main/LICENSE).
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-10  J.J. Boyd / KG4VCF  Phase 3J-2 Task B1. Initial port.
 //                                    DxSpot extracted to src/core/DxSpot.h
 //                                    so that other spot-ingest clients
@@ -15,13 +15,13 @@
 //                                    parseDxSpotLineForTest() public
 //                                    seam for the parser unit test.
 //                                    AetherSDR's "AetherSDR" namespace
-//                                    becomes "NereusSDR" and the qCDebug
+//                                    becomes "Longpath" and the qCDebug
 //                                    category name routes to lcSpots
-//                                    (NereusSDR's "nereus.spots") instead
+//                                    (Longpath's "longpath.spots") instead
 //                                    of AetherSDR's lcDxCluster. The log
 //                                    file path uses Qt's
 //                                    AppConfigLocation under
-//                                    NereusSDR/spotcollector.log instead
+//                                    Longpath/spotcollector.log instead
 //                                    of AetherSDR's GenericConfigLocation
 //                                    + "AetherSDR/spotcollector.log".
 //                                    AI tooling: Anthropic Claude Code.

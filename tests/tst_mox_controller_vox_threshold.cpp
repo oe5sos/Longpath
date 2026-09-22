@@ -1,8 +1,8 @@
 // =================================================================
-// tests/tst_mox_controller_vox_threshold.cpp  (NereusSDR)
+// tests/tst_mox_controller_vox_threshold.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original test. No Thetis logic is ported in this test
+// Longpath-original test. No Thetis logic is ported in this test
 // file. The test exercises:
 //   - MoxController::setVoxThreshold(int dB)     — H.2 Phase 3M-1b
 //   - MoxController::onMicBoostChanged(bool)     — H.2 Phase 3M-1b
@@ -27,7 +27,7 @@
 //   m_voxGainScalar   = 1.0  (audio.cs:194 [v2.10.3.13]: vox_gain = 1.0f)
 // =================================================================
 
-// no-port-check: NereusSDR-original test file — no upstream Thetis port.
+// no-port-check: Longpath-original test file — no upstream Thetis port.
 
 #include <QtTest/QtTest>
 #include <QSignalSpy>

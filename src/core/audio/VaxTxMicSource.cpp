@@ -1,12 +1,12 @@
 // =================================================================
-// src/core/audio/VaxTxMicSource.cpp  (NereusSDR)
+// src/core/audio/VaxTxMicSource.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original file. See VaxTxMicSource.h for design rationale
+// Longpath-original file. See VaxTxMicSource.h for design rationale
 // and license block.
 // =================================================================
 
-// no-port-check: NereusSDR-original file; no Thetis logic ported here.
+// no-port-check: Longpath-original file; no Thetis logic ported here.
 
 #include "core/audio/VaxTxMicSource.h"
 #include "core/AudioEngine.h"

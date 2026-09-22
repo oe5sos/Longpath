@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - SpotHub dialog: 9-tab strip aggregating six spot-ingest
+// Longpath - SpotHub dialog: 9-tab strip aggregating six spot-ingest
 // clients (Cluster / RBN / WSJT-X / SpotCollector / POTA / FreeDV /
 // PSK Reporter), the cross-source Spot List table, and the Display
 // preferences page.
@@ -10,13 +10,13 @@
 // AetherSDR is (C) its contributors and is licensed GPL-3.0-or-later
 // (see https://github.com/ten9876/AetherSDR/blob/main/LICENSE).
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-11  J.J. Boyd / KG4VCF  Phase 3J-2 Task F1. Initial shell
 //                                    port. Constructor wires the same
 //                                    six client pointers AetherSDR
 //                                    upstream takes, but the trailing
 //                                    `RadioModel* radioModel` argument
-//                                    is replaced with NereusSDR's
+//                                    is replaced with Longpath's
 //                                    `SpotModel* spots` (the
 //                                    TCI-keyed spot sink from Phase
 //                                    3J-2 Task D1); routing of
@@ -33,12 +33,12 @@
 //                                    Replaces upstream's
 //                                    HAVE_WEBSOCKETS-gated FreeDvClient
 //                                    with the always-built
-//                                    FreeDVReporterClient (NereusSDR
+//                                    FreeDVReporterClient (Longpath
 //                                    Task B5) - same Engine.IO /
 //                                    Socket.IO contract, just no
 //                                    compile-time gating. Adds a PSK
 //                                    Reporter tab between FreeDV and
-//                                    Spot List (NereusSDR has the
+//                                    Spot List (Longpath has the
 //                                    PskReporterClient from Phase
 //                                    3J-2 Task B6; AetherSDR upstream
 //                                    has no PSK Reporter tab).
@@ -55,13 +55,13 @@
 //                                    from AetherSDR
 //                                    `DxClusterDialog.cpp:637-1596
 //                                    [@0cd4559]`; PSK Reporter is
-//                                    NereusSDR-native (no upstream)
+//                                    Longpath-native (no upstream)
 //                                    and uses the same uniform shape
 //                                    with `pskCallEdit` /
 //                                    `pskGridEdit` identity inputs.
 //                                    AppSettings keys preserved
 //                                    verbatim except for the
-//                                    NereusSDR-only `PskReporter*`
+//                                    Longpath-only `PskReporter*`
 //                                    family. Member declarations
 //                                    moved from `DxClusterDialog`
 //                                    private section into
@@ -79,7 +79,7 @@
 //                                    spot-count + Clear button +
 //                                    double-click to emit
 //                                    tuneRequested(double).
-//                                    Three NereusSDR divergences:
+//                                    Three Longpath divergences:
 //                                    (1) band filters become
 //                                    QPushButton "pills" (checkable)
 //                                    instead of upstream QCheckBoxes
@@ -176,7 +176,7 @@
 //                                    spectrum spot overlay live.
 //                                    The Clear All Spots button
 //                                    calls SpotModel::clear() and
-//                                    emits spotsClearedAll(). NereusSDR
+//                                    emits spotsClearedAll(). Longpath
 //                                    divergence from upstream: stat
 //                                    blocks LHS replaces upstream's
 //                                    single "Total Spots" label
@@ -187,7 +187,7 @@
 //                                    / NewBands labels read live
 //                                    from the SpotTableModel +
 //                                    DxccColorProvider (Tasks D2 +
-//                                    C4) and are NereusSDR-native.
+//                                    C4) and are Longpath-native.
 //                                    objectName() keys pinned for
 //                                    the smoke-test harness. AI
 //                                    tooling: Anthropic Claude Code.
@@ -241,7 +241,7 @@ class AlertsTableModel;
 // six spot-ingest clients; each source has its own tab with
 // connect/disconnect controls, a status LED, and a per-source
 // console. The Spot List tab shows the merged 8-column table
-// across all sources (NereusSDR SpotTableModel + BandFilterProxy
+// across all sources (Longpath SpotTableModel + BandFilterProxy
 // from Phase 3J-2 Task D2). The Display tab holds DXCC
 // color-coding configuration and global spot rendering toggles.
 //
@@ -318,7 +318,7 @@ signals:
     // maths (prefix → entity centre, QRZ locator) and the rotator link,
     // and MainWindow does the routing.
     void rotorRequested(const QString& dxCall);
-    // NereusSDR-native (2026-08-27, operator-requested follow-up):
+    // Longpath-native (2026-08-27, operator-requested follow-up):
     // Spot List right-click → "Take Spot: <call>" -- mirrors the
     // panadapter double-click's spotLogRequested (SpectrumWidget) /
     // RotorLogbookPanel::takeSpot() path. Prefills the panel's
@@ -357,7 +357,7 @@ private:
     void saveGeometryState();
     void restoreGeometryState();
 
-    // NereusSDR-native Settings tab (first position) for central
+    // Longpath-native Settings tab (first position) for central
     // operator identity. Post-3J-2 UX fix.
     void buildSettingsTab(QTabWidget* tabs);
 
@@ -373,24 +373,24 @@ private:
     void buildSpotListTab(QTabWidget* tabs);
     void buildDisplayTab(QTabWidget* tabs);
 
-    // NereusSDR-native (2026-08-27, operator-requested follow-up):
+    // Longpath-native (2026-08-27, operator-requested follow-up):
     // POTA "Scheduled Activations" tab (SOTA calls the equivalent
     // concept "Announcements"). No upstream equivalent.
     void buildAlertsTab(QTabWidget* tabs);
     void refreshAlerts();
 
-    // NereusSDR-native (2026-08-26, no upstream equivalent). Helpers for
+    // Longpath-native (2026-08-26, no upstream equivalent). Helpers for
     // the Spot List tab's entity filter + watchlist (see
     // buildSpotListTab() and the member declarations below).
     void ensureEntityFilterAction(const QString& entity);
     void ensureModeFilterAction(const QString& mode);
     void checkNewSpotsForWatchlistMatch(int first, int last);
-    // NereusSDR-native (2026-08-27, operator-requested follow-up):
+    // Longpath-native (2026-08-27, operator-requested follow-up):
     // speaks a watchlist match aloud via macOS's `say` command. No-op
     // on other platforms -- see m_watchlistSpeakBtn's declaration.
     void speakWatchlistMatch(const QString& call, const QString& reference);
 
-    // NereusSDR-native (2026-08-27, operator-requested follow-up): Spot
+    // Longpath-native (2026-08-27, operator-requested follow-up): Spot
     // List right-click "Park Info: <ref>" -- lazily creates
     // m_parkInfoClient/m_parkInfoDialog on first use, shows the
     // dialog's loading state immediately, then fires the lookup.
@@ -410,7 +410,7 @@ private:
     SpotTableModel*       m_spotTableModel{nullptr};
     DxccColorProvider*    m_dxccProvider{nullptr};
 
-    // Settings tab (NereusSDR-native, post-3J-2 UX fix). Held so the
+    // Settings tab (Longpath-native, post-3J-2 UX fix). Held so the
     // Save button slot can re-read the QLineEdit text and write to
     // AppSettings + propagate to live FreeDVReporterClient +
     // PskReporterClient identity. The error label surfaces validation
@@ -424,7 +424,7 @@ private:
     QLabel*         m_settingsSavedLabel{nullptr};
     QLabel*         m_settingsCurrentLabel{nullptr};
 
-    // FreeDV tab identity-status label (NereusSDR-native, post-3J-2).
+    // FreeDV tab identity-status label (Longpath-native, post-3J-2).
     // Green when identity is configured; yellow warning when missing
     // and the user needs to visit the Settings tab.
     QLabel*         m_freedvIdentityLabel{nullptr};
@@ -497,7 +497,7 @@ private:
     QLabel*         m_freedvStatusLabel{nullptr};
     QPlainTextEdit* m_freedvConsole{nullptr};
 
-    // PSK Reporter tab (NereusSDR-native, no upstream).
+    // PSK Reporter tab (Longpath-native, no upstream).
     QLineEdit*      m_pskCallEdit{nullptr};
     QLineEdit*      m_pskGridEdit{nullptr};
     QPushButton*    m_pskStartBtn{nullptr};
@@ -506,7 +506,7 @@ private:
     QPlainTextEdit* m_pskConsole{nullptr};
 
     // Spot List tab (F3). From AetherSDR DxClusterDialog.h:200-209
-    // [@0cd4559] but the underlying types come from NereusSDR's
+    // [@0cd4559] but the underlying types come from Longpath's
     // standalone src/models/ port (Task D2) and the SpotTableModel
     // backs all sources rather than just the Cluster tab.
     //
@@ -517,7 +517,7 @@ private:
     BandFilterProxy* m_spotProxyModel{nullptr};
     QTableView*     m_spotTable{nullptr};
 
-    // NereusSDR-native (2026-08-26, no upstream equivalent). Entity
+    // Longpath-native (2026-08-26, no upstream equivalent). Entity
     // filter: a checkable menu populated dynamically as new
     // DxSpot::entity values are seen (entities are open-ended, unlike
     // the fixed band/source pill rows above), and a chaser watchlist
@@ -527,14 +527,14 @@ private:
     QToolButton*    m_entityFilterBtn{nullptr};
     QMenu*          m_entityFilterMenu{nullptr};
     QMap<QString, QAction*> m_entityFilterActions;
-    // NereusSDR-native (2026-08-27, operator-requested follow-up):
+    // Longpath-native (2026-08-27, operator-requested follow-up):
     // Mode filter, same dynamic-menu treatment as the entity filter.
     QToolButton*    m_modeFilterBtn{nullptr};
     QMenu*          m_modeFilterMenu{nullptr};
     QMap<QString, QAction*> m_modeFilterActions;
     QLineEdit*      m_watchlistEdit{nullptr};
     QPushButton*    m_watchlistSoundBtn{nullptr};
-    // NereusSDR-native (2026-08-27, operator-requested follow-up,
+    // Longpath-native (2026-08-27, operator-requested follow-up,
     // pattern taken from the community sota2voice tool): speaks the
     // matched call via macOS's built-in `say` command, alongside (not
     // instead of) the beep toggle. macOS-only by operator decision --
@@ -545,14 +545,14 @@ private:
     QPushButton*    m_watchlistSpeakBtn{nullptr};
     QPushButton*    m_watchlistColorBtn{nullptr};
 
-    // NereusSDR-native (2026-08-27, operator-requested follow-up):
+    // Longpath-native (2026-08-27, operator-requested follow-up):
     // "Park Info" lookup, lazily constructed on first right-click use.
     // A single client/dialog pair is reused across lookups (see
     // requestParkInfo()).
     PotaParkInfoClient* m_parkInfoClient{nullptr};
     ParkInfoDialog*      m_parkInfoDialog{nullptr};
 
-    // NereusSDR-native (2026-08-27, operator-requested follow-up):
+    // Longpath-native (2026-08-27, operator-requested follow-up):
     // Alerts (Scheduled Activations) tab.
     PotaAlertsClient*  m_alertsClient{nullptr};
     AlertsTableModel*  m_alertsModel{nullptr};
@@ -560,7 +560,7 @@ private:
     QLabel*            m_alertsStatusLabel{nullptr};
     QPushButton*       m_alertsRefreshBtn{nullptr};
 
-    // Display tab (F4). LEFT-column stat blocks are NereusSDR-native
+    // Display tab (F4). LEFT-column stat blocks are Longpath-native
     // additions; RIGHT-column knobs port verbatim from AetherSDR
     // src/gui/SpotSettingsDialog.{h,cpp} [@0cd4559]. The stat label
     // pointers are held so the dialog can refresh them when the

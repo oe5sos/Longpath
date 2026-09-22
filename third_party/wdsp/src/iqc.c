@@ -38,7 +38,7 @@ warren@wpratt.com
 */
 
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-06 — Phase 3M-4 Task 2: vendored verbatim from Thetis
 //                v2.10.3.13 @501e3f51 by J.J. Boyd (KG4VCF), with
 //                AI-assisted source-first protocol via Anthropic

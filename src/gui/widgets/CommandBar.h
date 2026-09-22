@@ -1,14 +1,14 @@
 #pragma once
 
 // =================================================================
-// src/gui/widgets/CommandBar.h  (NereusSDR)
+// src/gui/widgets/CommandBar.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // ── Die Kopfleiste ───────────────────────────────────────────────────
 //
-// Der größte Einzelunterschied zwischen NereusSDR und der Vorlage des
+// Der größte Einzelunterschied zwischen Longpath und der Vorlage des
 // Betreibers. In der Vorlage liegen MODE, FILTER, BAND, FAVORITES, STEP und
 // FRONT-END als beschriftete Pillengruppen quer über das Fenster; hier
 // stand bisher links eine Spalte senkrechter Knöpfe und der Rest
@@ -49,7 +49,7 @@
 // entscheiden muss.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-15 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================
@@ -109,6 +109,10 @@ public:
 
     /// Die Beschriftungen einer Gruppe, in Reihenfolge, ohne das „…".
     QStringList pillsIn(const QString& group) const;
+    /// Alle Rauschminderungen, die diese Leiste anbietet — die drei
+    /// vorne UND die im „…". Damit ein Test sagen kann, was NICHT
+    /// angeboten wird (DFNR/BNR ohne HAVE_DFNR/HAVE_BNR, 2026-09-17).
+    QStringList allNrLabels() const;
     /// Die eingeschaltete Pille einer Gruppe, oder leer.
     QString activePill(const QString& group) const;
     /// Eine Pille auslösen, als hätte jemand geklickt.

@@ -56,7 +56,7 @@ void TestSpotTableModel::addSpotIncrementsRowCount() {
 }
 
 void TestSpotTableModel::columnCountIsTen() {
-    // 2026-08-26: was 8 before the NereusSDR-native ColReference /
+    // 2026-08-26: was 8 before the Longpath-native ColReference /
     // ColEntity columns; 2026-08-27: 12 after ColDistance / ColBearing
     // (SpotHub POTA improvement pass) -- see SpotTableModel.h
     // modification history. Test name kept for history's sake even

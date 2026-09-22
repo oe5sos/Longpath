@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/wdsp_api.h  (NereusSDR)
+// src/core/wdsp_api.h  (Longpath)
 // =================================================================
 //
 // This file aggregates C API declarations ported from four Thetis
@@ -17,7 +17,7 @@
 //   Project Files/Source/wdsp/gen.c, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -73,7 +73,7 @@
 //                 during 3M-3a-ii Batch 1.5 — partial WDSP upstream-sync
 //                 of cfcomp.{c,h} from TAPR v1.29 to Thetis v2.10.3.13
 //                 (bundled at third_party/wdsp/src/cfcomp.{c,h}).  The
-//                 NereusSDR C++ wrapper now forwards Qg/Qe (or nullptr per
+//                 Longpath C++ wrapper now forwards Qg/Qe (or nullptr per
 //                 the cfcomp.c:669-682 NULL-skirt semantics) instead of
 //                 dropping them at the linker.  AI-assisted transformation
 //                 via Anthropic Claude Code.
@@ -90,7 +90,7 @@
 //                 bug fix).  Registers the WDSP DEXP threshold-crossing
 //                 callback that drives MOX engagement on mic envelope
 //                 attack/release.  Signature matches wdsp/dexp.c:399-403
-//                 [v2.10.3.13] with a NEREUS_STDCALL macro that maps to
+//                 [v2.10.3.13] with a LONGPATH_STDCALL macro that maps to
 //                 __stdcall on Windows and to nothing on Linux/macOS, mirroring
 //                 WDSP's own linux_port.h:65 shim.  AI-assisted transformation
 //                 via Anthropic Claude Code.
@@ -263,7 +263,7 @@ warren@wpratt.com
 
 #pragma once
 
-// NEREUS_STDCALL — calling-convention shim for WDSP function-pointer
+// LONGPATH_STDCALL — calling-convention shim for WDSP function-pointer
 // callbacks.  Defined OUTSIDE the HAVE_WDSP guard so consumers (TxChannel's
 // pushvox bridge) can declare a portable callback signature in test builds
 // that don't link WDSP.  On Windows the underlying WDSP function pointer
@@ -272,9 +272,9 @@ warren@wpratt.com
 // to nothing, so on those platforms the shim is a no-op and the
 // signature collapses to a plain C function pointer.
 #if defined(_WIN32) || defined(Q_OS_WIN)
-#  define NEREUS_STDCALL __stdcall
+#  define LONGPATH_STDCALL __stdcall
 #else
-#  define NEREUS_STDCALL
+#  define LONGPATH_STDCALL
 #endif
 
 #ifdef HAVE_WDSP
@@ -466,7 +466,7 @@ void SetRXAPanelGain1(int channel, double gain);
 
 // Set stereo pan position. pan=0.0 → full left, pan=0.5 → center, pan=1.0 → full right.
 // WDSP applies sin-law panning: adjusts gain2I/gain2Q via sin(pan*PI).
-// NereusSDR uses -1..+1 range; convert with wdsp_pan = (nereus_pan + 1.0) / 2.0.
+// Longpath uses -1..+1 range; convert with wdsp_pan = (longpath_pan + 1.0) / 2.0.
 // From Thetis Project Files/Source/Console/radio.cs:1386-1403
 //   pan default = 0.5f (center), dsp.cs:402-403 P/Invoke decl
 // WDSP: third_party/wdsp/src/patchpanel.c:159
@@ -619,6 +619,49 @@ void SetRXASBNRnoiseScalingType(int channel, int noise_scaling_type);
 // NR2 and NR3 all had one. Thetis calls this; we did not.
 void SetRXASBNRPosition(int channel, int position);  // 0=pre-AGC, 1=post-AGC
 
+// =====================================================================
+// NNR — Neural Noise Reduction (WDSP nnr.c, Warren Pratt NR0V).
+// New in WDSP 2.10 (wdsp 2.10/Source/nnr.h, nnet.h) — no Thetis precedent;
+// ported straight from the canonical TAPR/OpenHPSDR-wdsp upstream, commit
+// b02d5bac675dd2f33ec2bab2b339f79a597c47dd. See
+// docs/attribution/WDSP-PROVENANCE.md for the NNR vendoring record.
+// =====================================================================
+
+void SetRXANNRRun(int channel, int setit);
+
+void SetRXANNRPosition(int channel, int position);
+
+void SetRXANNRMaskFloor(int channel, double floor_db);
+
+void SetRXANNRcmode(int channel, int cmode);
+
+void SetRXANNRTestMode(int channel, int mode);
+
+void SetRXANNRAlpha(int channel, double alpha);
+
+void SetRXANNRAlphaKnee(int channel, double knee_db);
+
+void SetRXANNRTau(int channel, double tau);
+
+void SetRXANNRMaxGain(int channel, double gmax_db);
+
+void SetRXANNRSmooth(int channel, double att_ms, double rel_ms);
+
+int SetRXANNRModel(int channel, int slot);
+
+int GetRXANNRModel(int channel);
+
+// Global (not per-channel): points model slot 0 or 1 at an external .bin
+// tensor file (nnio.c's "WDSPNN" format). Empty path reverts to the
+// compiled-in fallback for that slot (see nnr_model_stub.c — Longpath
+// ships the real weights as external files instead, so the fallback is a
+// zero-length stub and this must be called before NNR can run).
+// SetNNRModelPath(path) is upstream's slot-0-only convenience; it is
+// equivalent to SetNNRModelPathSlot(0, path).
+void SetNNRModelPathSlot(int slot, const char* path);
+
+void SetNNRModelPath(const char* path);
+
 // ---------------------------------------------------------------------------
 // Spectral noise blanker (snb.h) — From Thetis dsp.cs P/Invoke declarations
 // ---------------------------------------------------------------------------
@@ -629,7 +672,7 @@ void SetRXASNBARun(int channel, int run);
 // SNB tuning — channel-id based setters callable post-create.
 // All declared in WDSP third_party/wdsp/src/snb.c:595-663 [v2.10.3.13].
 // Thetis wires these from setup.cs SNB controls (udSNBK1/K2/OutputBW);
-// NereusSDR wires them from Setup → DSP → NB/SNB → SNB group.
+// Longpath wires them from Setup → DSP → NB/SNB → SNB group.
 void SetRXASNBAovrlp           (int channel, int ovrlp);
 void SetRXASNBAasize           (int channel, int size);
 void SetRXASNBAnpasses         (int channel, int npasses);
@@ -862,7 +905,7 @@ int GetWDSPVersion(void);
 //
 // From Thetis wdsp/gen.c:783-813 [v2.10.3.13].
 // Call-site: console.cs:30031-30040 [v2.10.3.13] — chkTUN_CheckedChanged.
-// Ported by NereusSDR Task C.3 (3M-1a).
+// Ported by Longpath Task C.3 (3M-1a).
 // ---------------------------------------------------------------------------
 
 // From Thetis wdsp/gen.c:784-789 [v2.10.3.13] — txa[ch].gen1.p->run
@@ -890,7 +933,7 @@ void SetTXAPostGenToneFreq(int channel, double freq);
 // Call-sites: setup.cs:11084-11107 (continuous + pulsed common config),
 //             setup.cs:34409-34418 (setupTwoTonePulse — pulse-profile knobs),
 //             setup.cs:11166 (TX-off run=0).
-// Ported by NereusSDR Tasks E.2-E.6 (3M-1c).
+// Ported by Longpath Tasks E.2-E.6 (3M-1c).
 // ---------------------------------------------------------------------------
 
 // Continuous-mode two-tone amplitudes (linear).
@@ -940,7 +983,7 @@ void SetTXAPostGenTTPulseIQout(int channel, int IQout);
 // [v2.10.3.13]), which sets run=1 iff the relevant rates differ.  They are
 // therefore absent from this list.
 //
-// Ported by NereusSDR Task C.4 (3M-1a).
+// Ported by Longpath Task C.4 (3M-1a).
 // ---------------------------------------------------------------------------
 
 // cfir (stage 28): custom CIC FIR filter, used for Protocol 2 output path.
@@ -1098,7 +1141,7 @@ void SetTXABandpassRun(int channel, int run);
 
 // SetTXAMode: configure TXA pipeline for an operating mode (LSB/USB/AM/FM/...).
 // Activates ammod/fmmod/preemph stages per mode and triggers TXASetupBPFilters.
-// Mode integer matches NereusSDR DSPMode enum (LSB=0, USB=1, ..., DRM=11).
+// Mode integer matches Longpath DSPMode enum (LSB=0, USB=1, ..., DRM=11).
 // From Thetis wdsp/TXA.c:753-789 [v2.10.3.13].
 void SetTXAMode(int channel, int mode);
 
@@ -1251,7 +1294,7 @@ void SendAntiVOXData(int id, int nsamples, double* data);
 
 // DEXP lifecycle + per-block driver (Phase 3M-3a-iii Task 20 — bench fix).
 //
-// The DEXP DSP module instantiation that was missing from NereusSDR's
+// The DEXP DSP module instantiation that was missing from Longpath's
 // TX-init path until 2026-05-03.  Without these the entire DEXP feature
 // (every SetDEXP* setter, the pushvox callback registration, the
 // audio-domain expansion, AND the VOX-keying state machine) was a no-op
@@ -1271,12 +1314,12 @@ void SendAntiVOXData(int id, int nsamples, double* data);
 // destroy_dexp() runs from WdspEngine::destroyTxChannel before
 // CloseChannel — mirrors cmaster.c:267 [v2.10.3.13] (destroy_dexp before
 // CloseChannel in destroy_xmtr).  SetDEXPIOBuffers re-points the in/out
-// buffer pair while the DEXP is live; NereusSDR's parallel-only buffer
+// buffer pair while the DEXP is live; Longpath's parallel-only buffer
 // architecture (see WdspEngine.cpp comment at the create_dexp callsite)
 // does not call SetDEXPIOBuffers per block, but the declaration is here
 // for future use should the pipeline switch to chain-inserted DEXP.
 //
-// pushvox parameter on create_dexp: NereusSDR passes nullptr at create
+// pushvox parameter on create_dexp: Longpath passes nullptr at create
 // time; TxChannel::registerVoxCallback (3M-3a-iii Task 17) registers the
 // real callback later via SendCBPushDexpVox.  This avoids ordering
 // problems — registerVoxCallback runs from the TxChannel constructor
@@ -1297,7 +1340,7 @@ void create_dexp(int id, int run_dexp, int size, double* in, double* out, int ra
                  double exp_ratio, double hyst_ratio, double attack_thresh,
                  int nc, int wtype, double lowcut, double highcut,
                  int run_filt, int run_vox, int run_audelay, double audelay,
-                 void (NEREUS_STDCALL *pushvox)(int id, int active),
+                 void (LONGPATH_STDCALL *pushvox)(int id, int active),
                  int antivox_run, int antivox_size, int antivox_rate,
                  double antivox_gain, double antivox_tau);
 void destroy_dexp(int id);
@@ -1316,7 +1359,7 @@ void SetDEXPIOBuffers(int id, double* in, double* out);
 // On Windows the underlying WDSP function pointer carries __stdcall; on
 // Linux/macOS WDSP's linux_port.h:65 shims `#define __stdcall` to nothing,
 // so the callback ABI matches a plain C function pointer there.  The
-// NEREUS_STDCALL macro (defined OUTSIDE the HAVE_WDSP guard, at the
+// LONGPATH_STDCALL macro (defined OUTSIDE the HAVE_WDSP guard, at the
 // bottom of this header) keeps the consumer-side function-pointer
 // signature byte-compatible with the WDSP-side typedef on every
 // platform — and stays available in test builds that don't define
@@ -1331,12 +1374,12 @@ void SetDEXPIOBuffers(int id, double* in, double* out);
 // as `VOX.PushVox(int id, int active) { Audio.VOXActive = (active == 1); }`,
 // registered via cmaster.cs:1125 `SendCBPushVox(0, PushVoxDel)` against the
 // ChannelMaster wrapper VOX (cmaster/vox.c:99-101 — same pushvox semantics
-// at a different point in the pipeline).  NereusSDR has no ChannelMaster
+// at a different point in the pipeline).  Longpath has no ChannelMaster
 // shim layer; we register against WDSP's DEXP pushvox directly and route
 // the callback into MoxController::onVoxActive via a Qt signal — direct
 // signal-driven MOX engagement instead of Thetis's Audio.VOXActive +
 // PollPTT polling loop.
-void SendCBPushDexpVox(int id, void (NEREUS_STDCALL *pushvox)(int id, int active));
+void SendCBPushDexpVox(int id, void (LONGPATH_STDCALL *pushvox)(int id, int active));
 
 // DEXP peak signal readback (Phase 3M-3a-iii Task 6).
 // Returns the live audio peak observed by the DEXP detector.  Output is

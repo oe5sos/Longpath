@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_connection_segment_v2.cpp  (NereusSDR)
+// tests/tst_connection_segment_v2.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for the rebuilt ConnectionSegment (Phase 3Q Sub-PR-4 D.1).

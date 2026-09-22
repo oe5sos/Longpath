@@ -1,12 +1,12 @@
 // =================================================================
-// src/gui/setup/DspSetupPages.cpp  (NereusSDR)
+// src/gui/setup/DspSetupPages.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/setup.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -62,6 +62,7 @@
 
 #include "DspSetupPages.h"
 #include "gui/styles/ThemeQss.h"
+#include "gui/StyleConstants.h"
 
 #include "core/AppSettings.h"
 #include "core/BoardCapabilities.h"
@@ -420,12 +421,7 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
     auto* tabs = new QTabWidget(this);
     m_tabs = tabs;  // remember for selectSubtab()
     tabs->setTabPosition(QTabWidget::North);
-    tabs->setStyleSheet(Style::themed(
-        "QTabWidget::pane { border: 1px solid #304050; background: #0f0f1a; }"
-        "QTabBar::tab { background: #1a2a3a; color: #8aa8c0; padding: 4px 10px; "
-        "               border: 1px solid #304050; border-bottom: none; border-radius: 6px 3px 0 0; }"
-        "QTabBar::tab:selected { background: #0f0f1a; color: #c8d8e8; }"
-        "QTabBar::tab:hover { background: #203040; }"));
+    tabs->setStyleSheet(QLatin1String(Style::kTabStyle));   // Haus-Reiter (Glas & Tiefe, 2026-09-18)
     contentLayout()->setContentsMargins(0, 0, 0, 0);
     // Remove the trailing stretch that SetupPage adds in its ctor
     // (SetupPage.cpp:90 — m_contentLayout->addStretch(1)). That stretch
@@ -468,10 +464,7 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
     // Returns the group's inner QVBoxLayout.
     auto makeGroup = [](QVBoxLayout* parent, const QString& title) -> QVBoxLayout*
     {
-        static const QString kGrpStyle =
-            "QGroupBox { border: 1px solid #304050; border-radius: 6px; "
-            "margin-top: 8px; padding-top: 12px; font-weight: bold; color: #8aa8c0; }"
-            "QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 4px; }";
+        static const QString kGrpStyle = QLatin1String(Style::kGroupBoxStyle);   // Hausplatte
         auto* grp = new QGroupBox(title);
         grp->setStyleSheet(kGrpStyle);
         auto* lay = new QVBoxLayout(grp);
@@ -483,19 +476,8 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
 
     // Shared label/control style constants (mirror SetupPage::makeLabeledRow).
     static const QString kLbl = "QLabel { color: #c8d8e8; font-size: 13px; }";
-    static const QString kCombo =
-        "QComboBox { background: #1a2a3a; border: 1px solid #304050; "
-        "border-radius: 6px; color: #c8d8e8; font-size: 13px; padding: 2px 4px; }"
-        "QComboBox::drop-down { border: none; }"
-        // 2026-09-08: selection-color ergaenzt -- ohne sie blieb der
-        // ausgewaehlte Eintrag im aufgeklappten Dropdown praktisch
-        // unsichtbar (Betreiber: "immer das ausgewaehlte ist unsichtbar").
-        "QComboBox QAbstractItemView { background: #1a2a3a; color: #c8d8e8; "
-        "selection-background-color: #4a7ba8; selection-color: #ffffff; }";
-    static const QString kSlider =
-        "QSlider::groove:horizontal { background: #1a2a3a; height: 4px; border-radius: 2px; }"
-        "QSlider::handle:horizontal { background: #4a7ba8; width: 12px; height: 12px; "
-        "border-radius: 6px; margin: -4px 0; }";
+    static const QString kCombo  = QLatin1String(Style::kComboStyle);    // Hausdefinitionen (Glas & Tiefe)
+    static const QString kSlider = QLatin1String(Style::kSliderStyle);
     static const QString kInfoLbl =
         "QLabel { color: #4a7ba8; font-size: 13px; font-style: italic; }";
 
@@ -535,10 +517,7 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
         auto* slider = new QSlider(Qt::Horizontal);
         slider->setRange(minimum, maximum);
         slider->setValue(defaultValue);
-        slider->setStyleSheet(Style::themed(
-            "QSlider::groove:horizontal { background: #1a2a3a; height: 4px; border-radius: 2px; }"
-            "QSlider::handle:horizontal { background: #4a7ba8; width: 12px; height: 12px; "
-            "border-radius: 6px; margin: -4px 0; }"));
+        slider->setStyleSheet(QLatin1String(Style::kSliderStyle));   // Haus-Rinne
         if (!tooltip.isEmpty()) { slider->setToolTip(tooltip); }
         row->addWidget(slider, /*stretch=*/1);
 
@@ -578,10 +557,7 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
         slider->setRange(static_cast<int>(minimum * scale),
                          static_cast<int>(maximum * scale));
         slider->setValue(static_cast<int>(defaultValue * scale));
-        slider->setStyleSheet(Style::themed(
-            "QSlider::groove:horizontal { background: #1a2a3a; height: 4px; border-radius: 2px; }"
-            "QSlider::handle:horizontal { background: #4a7ba8; width: 12px; height: 12px; "
-            "border-radius: 6px; margin: -4px 0; }"));
+        slider->setStyleSheet(QLatin1String(Style::kSliderStyle));   // Haus-Rinne
         if (!tooltip.isEmpty()) { slider->setToolTip(tooltip); }
         row->addWidget(slider, 1);
 
@@ -607,13 +583,7 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
     {
         auto* preRdo  = new QRadioButton("Pre-AGC");
         auto* postRdo = new QRadioButton("Post-AGC");
-        preRdo->setStyleSheet(Style::themed(
-            "QRadioButton { color: #c8d8e8; font-size: 13px; }"
-            "QRadioButton::indicator { width: 14px; height: 14px; }"
-            "QRadioButton::indicator:unchecked { border: 2px solid #304050; "
-            "border-radius: 7px; background: #1a2a3a; }"
-            "QRadioButton::indicator:checked { border: 2px solid #4a7ba8; "
-            "border-radius: 7px; background: #4a7ba8; }"));
+        preRdo->setStyleSheet(QLatin1String(Style::kRadioButtonStyle));   // Haus-Wahlpunkt
         postRdo->setStyleSheet(preRdo->styleSheet());
         auto* row = new QHBoxLayout;
         row->setSpacing(8);
@@ -824,13 +794,7 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
         {
             for (int i = 0; i < gmLabels.size(); ++i) {
                 auto* rdo = new QRadioButton(gmLabels[i]);
-                rdo->setStyleSheet(Style::themed(
-                    "QRadioButton { color: #c8d8e8; font-size: 13px; }"
-                    "QRadioButton::indicator { width: 14px; height: 14px; }"
-                    "QRadioButton::indicator:unchecked { border: 2px solid #304050; "
-                    "border-radius: 7px; background: #1a2a3a; }"
-                    "QRadioButton::indicator:checked { border: 2px solid #4a7ba8; "
-                    "border-radius: 7px; background: #4a7ba8; }"));
+                rdo->setStyleSheet(QLatin1String(Style::kRadioButtonStyle));   // Haus-Wahlpunkt
                 gmGrp->addWidget(rdo);
                 gmRdos.append(rdo);
             }
@@ -1050,11 +1014,7 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
 
         auto* btnRow = new QHBoxLayout;
         auto* useModelBtn = new QPushButton("Use Model...");
-        useModelBtn->setStyleSheet(Style::themed(
-            "QPushButton { background: #1a2a3a; border: 1px solid #304050; "
-            "border-radius: 6px; color: #c8d8e8; font-size: 13px; padding: 3px 10px; }"
-            "QPushButton:hover { background: #203040; }"
-            "QPushButton:pressed { background: #4a7ba8; color: #0f0f1a; }"));
+        useModelBtn->setStyleSheet(QLatin1String(Style::kButtonStyle));   // Hausknopf
         auto* defBtn = new QPushButton("Default");
         defBtn->setStyleSheet(useModelBtn->styleSheet());
         btnRow->addWidget(useModelBtn);
@@ -1177,13 +1137,7 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
         }
 
         // Algorithm radio — rdoSBNR1/2/3 [v2.10.3.13]
-        const QString rdoStyle =
-            "QRadioButton { color: #c8d8e8; font-size: 13px; }"
-            "QRadioButton::indicator { width: 14px; height: 14px; }"
-            "QRadioButton::indicator:unchecked { border: 2px solid #304050; "
-            "border-radius: 7px; background: #1a2a3a; }"
-            "QRadioButton::indicator:checked { border: 2px solid #4a7ba8; "
-            "border-radius: 7px; background: #4a7ba8; }";
+        const QString rdoStyle = QLatin1String(Style::kRadioButtonStyle);   // Haus-Wahlpunkt
 
         auto* algo1 = new QRadioButton("Algo 1");
         auto* algo2 = new QRadioButton("Algo 2");
@@ -1463,6 +1417,177 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
 #endif
     }
 
+    // ── NNR tab ───────────────────────────────────────────────────────────────
+    // Neural Noise Reduction — WDSP 2.10 nnr.c, Warren Pratt NR0V.
+    // No Thetis precedent — new upstream algorithm, not a port. Defaults and
+    // ranges taken from WDSP's own internal defaults (RXA.c create_nnr(),
+    // nnet.c NNET_TAU_DEFAULT/NNET_GMAX_DB); see RxChannel.h NnrTuning.
+    {
+        auto [tabPage, tabLay] = makeTab(tabs, "NNR");
+        Q_UNUSED(tabPage)
+
+        QVBoxLayout* grpLay = makeGroup(tabLay, "NNR (Neural Noise Reduction)");
+
+        // Position radio
+        auto [preRdo, postRdo] = addPositionRow(grpLay);
+        {
+            const bool isPost = !slice || (slice->nnrPosition() == NrPosition::PostAgc);
+            preRdo->setChecked(!isPost);
+            postRdo->setChecked(isPost);
+        }
+
+        // Model radio — slot 0 (small) / slot 1 (large). Weight files are
+        // GLOBAL (SetNNRModelPathSlot on radio connect), not per-slice —
+        // this only selects which already-loaded slot the channel uses.
+        const QString rdoStyle = QLatin1String(Style::kRadioButtonStyle);   // Haus-Wahlpunkt
+        auto* modelSmall = new QRadioButton("Small");
+        auto* modelLarge = new QRadioButton("Large");
+        modelSmall->setStyleSheet(rdoStyle);
+        modelLarge->setStyleSheet(rdoStyle);
+        (slice && slice->nnrModel() == 1) ? modelLarge->setChecked(true) : modelSmall->setChecked(true);
+        auto* modelRow = new QHBoxLayout;
+        auto* modelLbl = new QLabel("Model");
+        modelLbl->setStyleSheet(kLbl);
+        modelLbl->setFixedWidth(150);
+        modelRow->addWidget(modelLbl);
+        modelRow->addWidget(modelSmall);
+        modelRow->addWidget(modelLarge);
+        modelRow->addStretch(1);
+        grpLay->addLayout(modelRow);
+
+        auto [maskFloor, maskFloorVal, maskFloorScale] = addDoubleSliderRow(grpLay, "Mask Floor",
+            -60.0, 0.0, slice ? slice->nnrMaskFloor() : -25.0,
+            1.0, 0,
+            tr("Minimum mask magnitude in dB — how far the network is allowed "
+               "to attenuate a bin. Range -60 to 0, default -25."),
+            " dB");
+
+        auto [alpha, alphaVal, alphaScale] = addDoubleSliderRow(grpLay, "Alpha",
+            0.0, 4.0, slice ? slice->nnrAlpha() : 1.0,
+            0.1, 1,
+            tr("Output gain exponent applied to the network's mask. Range 0-4, default 1.0."),
+            "");
+
+        auto [alphaKnee, alphaKneeVal, alphaKneeScale] = addDoubleSliderRow(grpLay, "Alpha Knee",
+            0.0, 40.0, slice ? slice->nnrAlphaKnee() : 10.0,
+            1.0, 0,
+            tr("Knee point in dB where the alpha exponent transitions. Range 0-40, default 10."),
+            " dB");
+
+        auto [tau, tauVal, tauScale] = addDoubleSliderRow(grpLay, "Tau",
+            0.05, 30.0, slice ? slice->nnrTau() : 2.0,
+            0.05, 2,
+            tr("Noise-estimate time constant in seconds. Range 0.05-30, default 2.0."),
+            " s");
+
+        auto [maxGain, maxGainVal, maxGainScale] = addDoubleSliderRow(grpLay, "Max Gain",
+            0.0, 24.0, slice ? slice->nnrMaxGain() : 12.0,
+            1.0, 0,
+            tr("Maximum gain the post-filter head may apply, in dB. Range 0-24, default 12."),
+            " dB");
+
+        auto [attackMs, attackMsVal, attackMsScale] = addDoubleSliderRow(grpLay, "Attack",
+            0.0, 500.0, slice ? slice->nnrAttackMs() : 0.0,
+            5.0, 0,
+            tr("Gain-smoothing attack time in ms. 0 uses the model's own smoothing. Range 0-500, default 0."),
+            " ms");
+
+        auto [releaseMs, releaseMsVal, releaseMsScale] = addDoubleSliderRow(grpLay, "Release",
+            0.0, 500.0, slice ? slice->nnrReleaseMs() : 0.0,
+            5.0, 0,
+            tr("Gain-smoothing release time in ms. 0 uses the model's own smoothing. Range 0-500, default 0."),
+            " ms");
+
+        tabLay->addStretch(1);
+
+        // ── Wire NNR controls → SliceModel ───────────────────────────────────
+        if (slice) {
+            connect(preRdo, &QRadioButton::toggled, slice, [slice](bool checked) {
+                if (checked) { slice->setNnrPosition(NrPosition::PreAgc); }
+            });
+            connect(postRdo, &QRadioButton::toggled, slice, [slice](bool checked) {
+                if (checked) { slice->setNnrPosition(NrPosition::PostAgc); }
+            });
+            connect(slice, &SliceModel::nnrPositionChanged, preRdo,
+                    [preRdo, postRdo](NrPosition p) {
+                QSignalBlocker b1(preRdo), b2(postRdo);
+                preRdo->setChecked(p == NrPosition::PreAgc);
+                postRdo->setChecked(p == NrPosition::PostAgc);
+            });
+
+            connect(modelSmall, &QRadioButton::toggled, slice, [slice](bool checked) {
+                if (checked) { slice->setNnrModel(0); }
+            });
+            connect(modelLarge, &QRadioButton::toggled, slice, [slice](bool checked) {
+                if (checked) { slice->setNnrModel(1); }
+            });
+            connect(slice, &SliceModel::nnrModelChanged, modelSmall,
+                    [modelSmall, modelLarge](int v) {
+                QSignalBlocker b1(modelSmall), b2(modelLarge);
+                modelSmall->setChecked(v == 0);
+                modelLarge->setChecked(v == 1);
+            });
+
+            connect(maskFloor, &QSlider::valueChanged, slice, [slice, maskFloorScale](int v) {
+                slice->setNnrMaskFloor(v / maskFloorScale);
+            });
+            connect(slice, &SliceModel::nnrMaskFloorChanged, maskFloor,
+                    [maskFloor, maskFloorScale](double v) {
+                QSignalBlocker b(maskFloor); maskFloor->setValue(static_cast<int>(v * maskFloorScale));
+            });
+
+            connect(alpha, &QSlider::valueChanged, slice, [slice, alphaScale](int v) {
+                slice->setNnrAlpha(v / alphaScale);
+            });
+            connect(slice, &SliceModel::nnrAlphaChanged, alpha,
+                    [alpha, alphaScale](double v) {
+                QSignalBlocker b(alpha); alpha->setValue(static_cast<int>(v * alphaScale));
+            });
+
+            connect(alphaKnee, &QSlider::valueChanged, slice, [slice, alphaKneeScale](int v) {
+                slice->setNnrAlphaKnee(v / alphaKneeScale);
+            });
+            connect(slice, &SliceModel::nnrAlphaKneeChanged, alphaKnee,
+                    [alphaKnee, alphaKneeScale](double v) {
+                QSignalBlocker b(alphaKnee); alphaKnee->setValue(static_cast<int>(v * alphaKneeScale));
+            });
+
+            connect(tau, &QSlider::valueChanged, slice, [slice, tauScale](int v) {
+                slice->setNnrTau(v / tauScale);
+            });
+            connect(slice, &SliceModel::nnrTauChanged, tau,
+                    [tau, tauScale](double v) {
+                QSignalBlocker b(tau); tau->setValue(static_cast<int>(v * tauScale));
+            });
+
+            connect(maxGain, &QSlider::valueChanged, slice, [slice, maxGainScale](int v) {
+                slice->setNnrMaxGain(v / maxGainScale);
+            });
+            connect(slice, &SliceModel::nnrMaxGainChanged, maxGain,
+                    [maxGain, maxGainScale](double v) {
+                QSignalBlocker b(maxGain); maxGain->setValue(static_cast<int>(v * maxGainScale));
+            });
+
+            connect(attackMs, &QSlider::valueChanged, slice, [slice, attackMsScale](int v) {
+                slice->setNnrAttackMs(v / attackMsScale);
+            });
+            connect(slice, &SliceModel::nnrAttackMsChanged, attackMs,
+                    [attackMs, attackMsScale](double v) {
+                QSignalBlocker b(attackMs); attackMs->setValue(static_cast<int>(v * attackMsScale));
+            });
+
+            connect(releaseMs, &QSlider::valueChanged, slice, [slice, releaseMsScale](int v) {
+                slice->setNnrReleaseMs(v / releaseMsScale);
+            });
+            connect(slice, &SliceModel::nnrReleaseMsChanged, releaseMs,
+                    [releaseMs, releaseMsScale](double v) {
+                QSignalBlocker b(releaseMs); releaseMs->setValue(static_cast<int>(v * releaseMsScale));
+            });
+        }
+        Q_UNUSED(maskFloorVal); Q_UNUSED(alphaVal); Q_UNUSED(alphaKneeVal);
+        Q_UNUSED(tauVal); Q_UNUSED(maxGainVal); Q_UNUSED(attackMsVal); Q_UNUSED(releaseMsVal);
+    }
+
     // ── ANF tab ───────────────────────────────────────────────────────────────
     // From Thetis setup.designer.cs — chkDSPANFEnable [v2.10.3.13].
     // Advanced ANF tuning (Taps/Delay/Gain/Leakage) is not yet in SliceModel;
@@ -1598,7 +1723,7 @@ NbSnbSetupPage::NbSnbSetupPage(RadioModel* model, QWidget* parent)
     // and SetEXTNOBMode writes pnob[id] (Thetis wdsp/nob.c:376-423 +
     // wdsp/nobII.c:658-663 [v2.10.3.15]), the single ANB / NOB members of
     // struct _rcvr (cmaster.h:74-82). Two receivers sharing one DDC window
-    // therefore cannot have independent blankers, so NereusSDR mirrors these
+    // therefore cannot have independent blankers, so Longpath mirrors these
     // across co-hosted slices rather than pretending otherwise. Saying so here
     // beats letting the operator discover it by watching another receiver's
     // settings move.
@@ -1692,7 +1817,7 @@ NbSnbSetupPage::NbSnbSetupPage(RadioModel* model, QWidget* parent)
     // The other half of the same story, and the reason the NB1 note above is
     // worth stating: SNB genuinely IS per receiver. SetRXASNBA* writes
     // rxa[channel].snba (Thetis wdsp/snb.c:621-670 [v2.10.3.15]), one per WDSP
-    // channel, and NereusSDR gives every slice its own channel.
+    // channel, and Longpath gives every slice its own channel.
     {
         auto* snbNote = new QLabel(
             tr("Applies to the selected receiver only."));
@@ -1729,7 +1854,7 @@ NbSnbSetupPage::NbSnbSetupPage(RadioModel* model, QWidget* parent)
     });
 
     // SNB Output Bandwidth — NOT in Thetis Setup page. Thetis sets it
-    // automatically per mode in rxa.cs:112-124. Kept as a NereusSDR-native
+    // automatically per mode in rxa.cs:112-124. Kept as a Longpath-native
     // global override.
     QSlider* snbOutBw = addIntSlider(snbLay, tr("Output Bandwidth"),
         100, 96000,
@@ -1808,7 +1933,7 @@ CwSetupPage::CwSetupPage(RadioModel* model, QWidget* parent)
     // chkSideTones / chkDSPKeyerSidetone[_software]):  Thetis does NOT
     // board-gate its sidetone controls — they're always visible and
     // mutually-exclusive via the toggle logic at setup.cs:8823-8854.
-    // This visibility gate is NereusSDR-specific use of the populated
+    // This visibility gate is Longpath-specific use of the populated
     // hasSidetoneGenerator flag, not a port of an upstream gate.
     m_sidetoneRow = new QWidget;
     auto* sidetoneRowLay = new QHBoxLayout(m_sidetoneRow);
@@ -1822,11 +1947,7 @@ CwSetupPage::CwSetupPage(RadioModel* model, QWidget* parent)
         "QLabel { color: #c8d8e8; font-size: 13px; }")));
     auto* sidetoneVol = new QSlider(Qt::Horizontal);
     sidetoneVol->setRange(0, 100);
-    sidetoneVol->setStyleSheet(Style::themed(
-        "QSlider::groove:horizontal { background: #1a2a3a; height: 4px; "
-        "border-radius: 2px; }"
-        "QSlider::handle:horizontal { background: #4a7ba8; width: 12px; "
-        "height: 12px; border-radius: 6px; margin: -4px 0; }"));
+    sidetoneVol->setStyleSheet(QLatin1String(Style::kSliderStyle));   // Haus-Rinne
     sidetoneRowLay->addWidget(sidetoneLbl);
     sidetoneRowLay->addWidget(sidetoneVol, 1);
     timingLay->addWidget(m_sidetoneRow);
@@ -1914,7 +2035,7 @@ bool CwSetupPage::sidetoneRowVisibleForTest() const
 // 47710-47711 [v2.10.3.13-beta2]), not on the DSP/AM tab.  NOTE: the
 // Thetis DSP/AM tab DOES host a different TX-side group, grpAMTX (Tx
 // USB/LSB/DSB sideband select radios), at mi0bot setup.designer.cs:
-// 40200, 40326-40336 [v2.10.3.13-beta2].  NereusSDR is missing this
+// 40200, 40326-40336 [v2.10.3.13-beta2].  Longpath is missing this
 // group entirely; tracked as a separate follow-up issue, not this PR.
 //
 AmSamSetupPage::AmSamSetupPage(RadioModel* model, QWidget* parent)
@@ -2285,7 +2406,7 @@ MnfSetupPage::MnfSetupPage(RadioModel* model, QWidget* parent)
     : SetupPage("TNF", model, parent)
 {
     // Thetis captions this group "Multi Notch Filter" and names the tab
-    // MNF (setup.designer.cs:44165, :44141 [v2.10.3.15]). NereusSDR says TNF
+    // MNF (setup.designer.cs:44165, :44141 [v2.10.3.15]). Longpath says TNF
     // everywhere instead (maintainer decision, 2026-08-02): Thetis is itself
     // split, MNF on the Setup tab and chkTNF on the console, and carrying
     // that split through meant the same feature had two names on screen at
@@ -2313,13 +2434,9 @@ MnfSetupPage::MnfSetupPage(RadioModel* model, QWidget* parent)
         QStringLiteral("Active"),
         QString()
     });
-    m_notchTable->setStyleSheet(Style::themed(QStringLiteral(
-        "QTableWidget { background: #1a1a2a; color: #c8d8e8; "
-        "  gridline-color: #304050; border: 1px solid #304050; }"
-        "QTableWidget::item { padding: 2px 4px; }"
-        "QTableWidget::item:selected { background: #204060; }"
-        "QHeaderView::section { background: #1a1a2a; color: #8aa8c0; "
-        "  border: 1px solid #304050; padding: 4px; }")));
+    m_notchTable->setStyleSheet(Style::tableStyle());   // Glas & Tiefe, 2026-09-17
+    m_notchTable->horizontalHeader()->setFont(Style::capsFont(font(), 8));
+    m_notchTable->horizontalHeader()->setHighlightSections(false);
     m_notchTable->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_notchTable->setSelectionMode(QAbstractItemView::SingleSelection);
     m_notchTable->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
@@ -2334,11 +2451,7 @@ MnfSetupPage::MnfSetupPage(RadioModel* model, QWidget* parent)
     mnfLay->addWidget(m_notchTable);
 
     // ── Add ──────────────────────────────────────────────────────────────────
-    static const QString kMnfButtonStyle = QStringLiteral(
-        "QPushButton { background: #203040; color: #c8d8e8; border: 1px solid #304050; "
-        "  border-radius: 6px; padding: 4px 10px; }"
-        "QPushButton:hover { background: #204060; }"
-        "QPushButton:pressed { background: #1a2a3a; }");
+    static const QString kMnfButtonStyle = QLatin1String(Style::kButtonStyle);   // Hausknopf
 
     m_addBtn = new QPushButton(QStringLiteral("Add"), mnfGrp);
     m_addBtn->setObjectName(QStringLiteral("btnMNFAdd"));
@@ -2377,7 +2490,7 @@ MnfSetupPage::MnfSetupPage(RadioModel* model, QWidget* parent)
     // ── Minimum notch width ──────────────────────────────────────────────────
     // Narrowest notch the current bandpass can realise: WDSP min_notch_width
     // (third_party/wdsp/src/nbp.c:82-96), read through RXANBPGetMinNotchWidth
-    // (nbp.c:594). NereusSDR-original control; Thetis pushes the same value
+    // (nbp.c:594). Longpath-original control; Thetis pushes the same value
     // out of UpdateMinimumNotchWidthRX (console.cs:48787-48818 [v2.10.3.15])
     // to its notch popup rather than to the Setup tab.
     m_minWidthLbl = new QLabel(QStringLiteral("--"), mnfGrp);
@@ -2405,7 +2518,7 @@ MnfSetupPage::MnfSetupPage(RadioModel* model, QWidget* parent)
 
     // Thetis fans the flag straight to three fixed channel ids from the Setup
     // form (setup.cs:17925-17931 [v2.10.3.15], chkMNFAutoIncrease_CheckedChanged
-    // → WDSP.RXANBPSetAutoIncrease ×3). NereusSDR routes it through NotchModel
+    // → WDSP.RXANBPSetAutoIncrease ×3). Longpath routes it through NotchModel
     // so RadioModel's fan-out reaches every open slice channel instead.
     connect(m_autoIncreaseChk, &QCheckBox::toggled, nm, &NotchModel::setAutoIncrease);
     connect(nm, &NotchModel::autoIncreaseChanged, m_autoIncreaseChk, [this](bool on) {
@@ -2431,7 +2544,7 @@ MnfSetupPage::MnfSetupPage(RadioModel* model, QWidget* parent)
 
     // From Thetis setup.cs:24376-24380 [v2.10.3.15] —
     // chkVisualNotch_CheckedChanged sets Display.ShowVisualNotch AND
-    // MiniSpec.ShowVisualNotch. NereusSDR has no mini-spectrum surface, so
+    // MiniSpec.ShowVisualNotch. Longpath has no mini-spectrum surface, so
     // only the panadapter half is ported; the fan-out to every pan hangs off
     // NotchModel::visualEnabledChanged rather than off this widget.
     connect(m_visualNotchChk, &QCheckBox::toggled, nm, &NotchModel::setVisualEnabled);
@@ -2467,15 +2580,10 @@ void MnfSetupPage::rebuildTable()
     RadioModel* rm = model();
     if (!m_notchTable || !rm || !rm->notchModel()) { return; }
 
-    static const QString kMnfEditorStyle = QStringLiteral(
-        "QDoubleSpinBox { background: #1a1a2a; color: #c8d8e8; "
-        "  border: 1px solid #304050; border-radius: 2px; padding: 1px; }"
-        "QDoubleSpinBox::up-button, QDoubleSpinBox::down-button "
-        "  { background: #1a2a3a; width: 14px; }");
-    static const QString kMnfRowButtonStyle = QStringLiteral(
-        "QPushButton { background: #203040; color: #c8d8e8; border: 1px solid #304050; "
-        "  border-radius: 2px; padding: 1px 6px; font-size: 11px; }"
-        "QPushButton:hover { background: #204060; }");
+    static const QString kMnfEditorStyle = Style::formFieldStyle();   // Glasfeld
+    // Der Hausknopf, nur enger gepolstert — er sitzt in einer Tabellenzeile.
+    static const QString kMnfRowButtonStyle = QLatin1String(Style::kButtonStyle)
+        + QStringLiteral("QPushButton { padding: 1px 6px; font-size: 11px; }");
 
     // setRowCount() destroys the outgoing cell widgets; a focused spin box
     // being destroyed emits editingFinished on its way out, so the guard has
@@ -2674,7 +2782,7 @@ void MnfSetupPage::refreshMinNotchWidth()
     }
 
     // Thetis surfaces this per-RX (console.cs:48787-48818,
-    // UpdateMinimumNotchWidthRX [v2.10.3.15]). NereusSDR's notch list is
+    // UpdateMinimumNotchWidthRX [v2.10.3.15]). Longpath's notch list is
     // global, so the readout follows the active slice's channel and falls
     // back to the first pooled channel before any slice exists.
     const int sliceIndex = rm->activeSlice() ? rm->activeSlice()->sliceIndex()
@@ -2727,6 +2835,7 @@ void NrAnfSetupPage::selectSubtab(NrSlot slot)
         case NrSlot::NR4:  target = QStringLiteral("NR4");  break;
         case NrSlot::DFNR: target = QStringLiteral("DFNR"); break;
         case NrSlot::MNR:  target = QStringLiteral("MNR");  break;
+        case NrSlot::NNR:  target = QStringLiteral("NNR");  break;
         case NrSlot::BNR:
         case NrSlot::Off:  return;  // no dedicated sub-tab
     }

@@ -1,11 +1,11 @@
 // =================================================================
-// src/core/audio/AudioTapRing.cpp  (NereusSDR)
+// src/core/audio/AudioTapRing.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. Begruendung steht im Header.
+// Longpath-original. Begruendung steht im Header.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-19 — Original fuer NereusSDR von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
 // =================================================================

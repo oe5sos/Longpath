@@ -1,12 +1,12 @@
 // =================================================================
-// src/gui/meters/MeterWidget.cpp  (NereusSDR)
+// src/gui/meters/MeterWidget.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/MeterManager.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -90,7 +90,7 @@ mw0lge@grange-lane.co.uk
 #include <QMouseEvent>
 #include <QStringList>
 
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
 #include <QFile>
 #include <rhi/qshader.h>
 #endif
@@ -109,7 +109,7 @@ MeterWidget::MeterWidget(QWidget* parent)
     setAutoFillBackground(false);
     setMouseTracking(true);
 
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     // Platform-specific QRhi backend selection.
     // Order matters: setApi() first, then WA_NativeWindow.
     // Mirrors SpectrumWidget.cpp:97-110 -- but that file picked up
@@ -163,7 +163,7 @@ void MeterWidget::addItem(MeterItem* item)
         item->setParent(this);
     }
     m_items.append(item);
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     markOverlayDirty();
     m_bgDirty = true;
 #endif
@@ -173,7 +173,7 @@ void MeterWidget::addItem(MeterItem* item)
 void MeterWidget::removeItem(MeterItem* item)
 {
     if (m_items.removeOne(item)) {
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
         markOverlayDirty();
         m_bgDirty = true;
 #endif
@@ -189,7 +189,7 @@ void MeterWidget::clearItems()
         }
     }
     m_items.clear();
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     markOverlayDirty();
     m_bgDirty = true;
 #endif
@@ -220,7 +220,7 @@ void MeterWidget::updateMeterValue(int bindingId, double value)
             item->setValue(value);
         }
     }
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     markDynamicDirty();
 #else
     update();
@@ -253,7 +253,7 @@ void MeterWidget::rescalePowerMeters(int paMaxWatts)
             }
         }
     }
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     markDynamicDirty();
 #else
     update();
@@ -366,7 +366,7 @@ bool MeterWidget::deserializeItems(const QString& data)
 
 void MeterWidget::paintEvent(QPaintEvent* event)
 {
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     // GPU path: delegate to QRhiWidget base class
     MeterBaseClass::paintEvent(event);
 #else
@@ -381,7 +381,7 @@ void MeterWidget::resizeEvent(QResizeEvent* event)
 {
     MeterBaseClass::resizeEvent(event);
     reflowStackedItems();
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     markOverlayDirty();
     m_bgDirty = true;
 #endif
@@ -396,7 +396,7 @@ void MeterWidget::reflowStackedItems()
     // so N stacked rows always fill the available space under the
     // composite band. Thetis uses a fixed 5% per row because its
     // meter containers are fixed-aspect (MeterManager.cs:21266) —
-    // NereusSDR's containers are freely resizable, so a fixed 5%
+    // Longpath's containers are freely resizable, so a fixed 5%
     // would leave an empty gap below the stack whenever the user
     // sizes the container larger than N × 5%. A 24px pixel floor
     // keeps rows readable when the container is small enough that
@@ -609,7 +609,7 @@ void MeterWidget::setMox(bool mox)
 {
     if (m_mox == mox) { return; }
     m_mox = mox;
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     markOverlayDirty();
     m_bgDirty = true;
 #endif
@@ -620,7 +620,7 @@ void MeterWidget::setDisplayGroup(int group)
 {
     if (m_displayGroup == group) { return; }
     m_displayGroup = group;
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     markOverlayDirty();
     m_bgDirty = true;
 #endif
@@ -632,7 +632,7 @@ void MeterWidget::setDisplayGroup(int group)
 // Mirrors SpectrumWidget.cpp:1257-1765 exactly.
 // ============================================================================
 
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
 
 // Fullscreen quad: position (x,y) + texcoord (u,v)
 // From AetherSDR SpectrumWidget.cpp:1779 / SpectrumWidget.cpp:1266
@@ -1029,6 +1029,6 @@ void MeterWidget::releaseResources()
     m_rhiInitialized = false;
 }
 
-#endif // NEREUS_GPU_SPECTRUM
+#endif // LONGPATH_GPU_SPECTRUM
 
 } // namespace Longpath

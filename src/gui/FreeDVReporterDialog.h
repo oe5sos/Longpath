@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 //
-// NereusSDR - FreeDVReporterDialog: standalone window listing every
+// Longpath - FreeDVReporterDialog: standalone window listing every
 // connected qso.freedv.org station in a sortable 14-column table.
 //
 // Ported from freedv-gui src/gui/dialogs/freedv_reporter.{h,cpp}
-// [@77e793a] - Qt6-native rewrite. NereusSDR re-uses the COLUMN
+// [@77e793a] - Qt6-native rewrite. Longpath re-uses the COLUMN
 // DEFINITIONS, COLUMN ORDER, COLUMN ALIGNMENT, ROW HIGHLIGHT BEHAVIOR,
 // and SNR / FREQUENCY / TIMESTAMP FORMATTING from upstream and
 // implements them with QTableView + a private QAbstractTableModel
@@ -23,7 +23,7 @@
 // `freedv_reporter.cpp` files each carry a per-file Copyright header
 // (Mooneer Salem, GPLv2.1+) reproduced verbatim below. LGPL is upgrade-
 // compatible to GPLv2-or-later when linked into a GPL work (LGPL §3
-// conversion clause), which is the model NereusSDR uses.
+// conversion clause), which is the model Longpath uses.
 //
 // --- From freedv-gui src/gui/dialogs/freedv_reporter.h:1-21 (verbatim header) ---
 //
@@ -48,7 +48,7 @@
 //
 // ==========================================================================
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-11  J.J. Boyd / KG4VCF  Phase 3J-2 Task G1. Initial shell
 //                                    port. Constructor wires the
 //                                    FreeDVStationModel pointer that
@@ -64,7 +64,7 @@
 //                                    RX-green highlight tones come
 //                                    from upstream updateHighlights
 //                                    (freedv_reporter.cpp:1289-1322
-//                                    [@77e793a]); NereusSDR drops the
+//                                    [@77e793a]); Longpath drops the
 //                                    250ms timer / lastRxDate threshold
 //                                    sweep in favor of a per-row QTimer
 //                                    that clears the highlight 6 s
@@ -72,7 +72,7 @@
 //                                    the freedv_reporter_tx_rx_highlight
 //                                    _time radio setting at its default
 //                                    (G3 surfaces this as a user-visible
-//                                    knob). NereusSDR-architectural
+//                                    knob). Longpath-architectural
 //                                    divergences vs freedv-gui:
 //                                    (1) SNR -99 renders as " - " and
 //                                    other SNR values render as a
@@ -115,12 +115,12 @@
 //                                    to FreeDvReporter/IdleTimeout
 //                                    Minutes with 0 = Never. Row
 //                                    context menu and double-click QSY
-//                                    are NereusSDR-architectural
+//                                    are Longpath-architectural
 //                                    divergences vs upstream's
 //                                    hover-driven popup (tempCallsign_
 //                                    state captured by AdjustToolTip
 //                                    at freedv_reporter.cpp:1534-1541
-//                                    [@77e793a]); the NereusSDR
+//                                    [@77e793a]); the Longpath
 //                                    versions resolve the row by
 //                                    QModelIndex passed to
 //                                    customContextMenuRequested /
@@ -141,9 +141,9 @@
 //                                    each row's frequency through
 //                                    Band::bandFromFrequency() and
 //                                    compares to the combo selection.
-//                                    NereusSDR-architectural divergences
+//                                    Longpath-architectural divergences
 //                                    vs freedv-gui:
-//                                    (1) NereusSDR exposes a 13-entry
+//                                    (1) Longpath exposes a 13-entry
 //                                        band filter (All + 12 ham
 //                                        bands), while upstream's
 //                                        wxComboBox is also 13 entries
@@ -206,7 +206,7 @@ struct FreeDVStation;
 
 // Column index constants ported verbatim from
 //   freedv-gui src/gui/dialogs/freedv_reporter.cpp:47-65 [@77e793a].
-// Upstream uses #define; NereusSDR scopes them as constexpr inside an
+// Upstream uses #define; Longpath scopes them as constexpr inside an
 // enum so the column count is a single source of truth.
 enum FreeDVReporterColumn : int {
     kCallsignCol      = 0,

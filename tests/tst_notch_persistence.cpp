@@ -1,7 +1,7 @@
 // =================================================================
-// tests/tst_notch_persistence.cpp  (NereusSDR)
+// tests/tst_notch_persistence.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure.
+// no-port-check: Longpath-original test infrastructure.
 //
 // TNF section 5.5: AppSettings round-trip at global scope
 // (NotchGlobalEnabled, NotchVisualEnabled, NotchAutoIncrease, NotchCount,

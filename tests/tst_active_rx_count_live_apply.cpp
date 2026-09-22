@@ -1,11 +1,11 @@
 // =================================================================
-// tests/tst_active_rx_count_live_apply.cpp  (NereusSDR)
+// tests/tst_active_rx_count_live_apply.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure; the Thetis filename
+// no-port-check: Longpath-original test infrastructure; the Thetis filename
 // reference below is a comment-only provenance note, not a code port.
 //
-// NereusSDR-original infrastructure — no Thetis source ported here.
-// RadioModel::setActiveRxCountLive() is a NereusSDR coordinator; the
+// Longpath-original infrastructure — no Thetis source ported here.
+// RadioModel::setActiveRxCountLive() is a Longpath coordinator; the
 // P1 restart it delegates to mirrors the restartStreamWithRate() pattern
 // (Task 1.6) from P1RadioConnection (itself ported from
 // ChannelMaster/networkproto1.c SendStopToMetis/SendStartToMetis [v2.10.3.13]).

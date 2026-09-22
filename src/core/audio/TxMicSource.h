@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/audio/TxMicSource.h  (NereusSDR)
+// src/core/audio/TxMicSource.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
@@ -35,7 +35,7 @@ warren@wpratt.com
 */
 
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-29 — Initial port for NereusSDR by J.J. Boyd (KG4VCF),
 //                 Phase 3M-1c TX pump architecture redesign v3, with
 //                 AI-assisted implementation via Anthropic Claude

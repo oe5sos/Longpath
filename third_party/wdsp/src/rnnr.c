@@ -59,7 +59,7 @@ It uses a non modified version of rmnoise and implements a ringbuffer to handle 
 
 //
 // =============================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-23 — Imported byte-for-byte from Thetis v2.10.3.13 @ 501e3f51.
 //                No algorithmic changes. Linked against rnnoise BSD-3
 //                (third_party/rnnoise/) at WDSP build time.
@@ -188,9 +188,10 @@ void SetRXARNNRRun (int channel, int run)
 	RNNR a = rxa[channel].rnnr.p;
 	if (a->run != run)
 	{
-		RXAbp1Check (channel, rxa[channel].amd.p->run, rxa[channel].snba.p->run, 
+		RXAbp1Check (channel, rxa[channel].amd.p->run, rxa[channel].snba.p->run,
                              rxa[channel].emnr.p->run, rxa[channel].anf.p->run, rxa[channel].anr.p->run,
-                             run, rxa[channel].sbnr.p->run); // NR3 + NR4 support
+                             run, rxa[channel].sbnr.p->run, // NR3 + NR4 support
+                             getRun_nnr (rxa[channel].nnr.p));
 
 		EnterCriticalSection (&ch[channel].csDSP);
 		a->run = run;

@@ -1,4 +1,4 @@
-// tests/tst_calibration_controller_pa_cal.cpp  (NereusSDR)
+// tests/tst_calibration_controller_pa_cal.cpp  (Longpath)
 //
 // TDD tests for CalibrationController::paCalProfile / setPaCalProfile /
 // setPaCalPoint / calibratedFwdPowerWatts (Section 3.2 of the P1 full-

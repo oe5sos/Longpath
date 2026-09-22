@@ -1,7 +1,7 @@
 // The two parts of a Cloudlog upload that go wrong are the address the
 // operator pasted and the answer the server gave. Both are testable
 // without a server, and neither is the HTTP.
-// no-port-check: NereusSDR-original.
+// no-port-check: Longpath-original.
 
 #include <QtTest/QtTest>
 #include "core/CloudlogUploader.h"

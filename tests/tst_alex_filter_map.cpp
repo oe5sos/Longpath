@@ -1,15 +1,15 @@
 // =================================================================
-// tests/tst_alex_filter_map.cpp  (NereusSDR)
+// tests/tst_alex_filter_map.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/console.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-20 — Exercises AlexFilterMap with expected HPF/LPF
 //                 breakpoint values lifted from console.cs:6830-6942
-//                 and 7168-7234. Authored in C++20/Qt6 for NereusSDR
+//                 and 7168-7234. Authored in C++20/Qt6 for Longpath
 //                 by J.J. Boyd (KG4VCF), with AI-assisted transformation
 //                 via Anthropic Claude Code.
 // =================================================================
@@ -190,7 +190,7 @@ private slots:
     // Upstream inline attribution preserved verbatim (console.cs:6830):
     //    || (HardwareSpecific.Hardware == HPSDRHW.HermesC10))  //N1GP G2E added (HermesC10) //DK1HLM
     //
-    // NereusSDR additionally routes SaturnMKII to the band-pass bank.  Thetis
+    // Longpath additionally routes SaturnMKII to the band-pass bank.  Thetis
     // carries SaturnMKII as an enum slot only (enums.cs:399 [v2.10.3.15],
     // "ANAN-G2: MKII board?") with no behaviour attached anywhere in the tree;
     // it is an ANAN-G2 board revision and therefore physically carries the

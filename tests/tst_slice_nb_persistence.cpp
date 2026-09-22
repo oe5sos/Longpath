@@ -7,7 +7,7 @@
 // parity — NB tuning is global per DSPRX in Thetis, not per-band. Tuning
 // now lives inside NbFamily; only the Off/NB/NB2 mode is per-band.
 //
-// Isolation: TestSandboxInit.cpp (auto-linked by nereus_add_test) calls
+// Isolation: TestSandboxInit.cpp (auto-linked by longpath_add_test) calls
 // QStandardPaths::setTestModeEnabled(true) before main(), redirecting
 // AppSettings to the Qt test sandbox rather than the real user config file.
 

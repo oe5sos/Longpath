@@ -1,7 +1,7 @@
-// no-port-check: NereusSDR-original unit-test file.  Thetis cite comments
+// no-port-check: Longpath-original unit-test file.  Thetis cite comments
 // document upstream sources; no Thetis logic ported in this test file.
 // =================================================================
-// tests/tst_psform.cpp  (NereusSDR)
+// tests/tst_psform.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for the Phase 3M-4 Task 8 PsForm modeless dialog.
@@ -38,10 +38,10 @@
 //   11. The udPSMoxDelay default value is 2.0 per
 //       PSForm.designer.cs:368-372 [v2.10.3.13].
 //
-// Source: NereusSDR-original.  See PsForm.h for the Thetis cite map.
+// Source: Longpath-original.  See PsForm.h for the Thetis cite map.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-06 — New test file for Phase 3M-4 Task 8: PsForm dialog
 //                 unit tests.  J.J. Boyd (KG4VCF), with AI-assisted
 //                 implementation via Anthropic Claude Code.
@@ -194,7 +194,7 @@ private slots:
     //   _advancedON = !_advancedON;
     //   if (_advancedON) ClientSize = 560x60;
     //   else             ClientSize = 560x300;
-    // NereusSDR mirrors via hide/show on the body widget container.
+    // Longpath mirrors via hide/show on the body widget container.
 
     void advancedTogglesBodyVisibility()
     {
@@ -265,7 +265,7 @@ private slots:
     // ── Test 8: Two-tone toggle invokes PureSignal::setTwoToneOn ─────────────
     //
     // From Thetis PSForm.cs:508-522 btnPSTwoToneGen_Click [v2.10.3.13] —
-    // toggles _ttgenON and SetupForm.TTgenrun.  In NereusSDR this routes
+    // toggles _ttgenON and SetupForm.TTgenrun.  In Longpath this routes
     // through PureSignal → TwoToneController.
 
     void twoToneButtonInvokesPureSignalSetTwoToneOn()

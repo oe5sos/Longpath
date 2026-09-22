@@ -1,9 +1,9 @@
-// no-port-check: NereusSDR-original test file. Contains the string "Thetis"
+// no-port-check: Longpath-original test file. Contains the string "Thetis"
 // only as the literal WebSocket ping payload per TCI wire spec, not as a
 // Thetis source port. No logic ported from TCIServer.cs or any upstream file.
 
-// tests/tst_tci_server_ping.cpp  (NereusSDR)
-// NereusSDR-original — no Thetis upstream port in this file.
+// tests/tst_tci_server_ping.cpp  (Longpath)
+// Longpath-original — no Thetis upstream port in this file.
 //
 // Phase 3J-1 Task 2.2: server-driven 20s ping with payload "Thetis".
 // Verifies that after setPingIntervalMs(200), at least 2 pongs arrive

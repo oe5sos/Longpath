@@ -1,21 +1,21 @@
 #pragma once
 
 // =================================================================
-// src/gui/widgets/MasterOutputWidget.h  (NereusSDR)
+// src/gui/widgets/MasterOutputWidget.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original widget. Visual styling draws on AetherSDR
+// Longpath-original widget. Visual styling draws on AetherSDR
 // `src/gui/TitleBar.cpp:172-215` (the master-volume section of
 // AetherSDR's title bar): speaker emoji button with mute glyph flip,
 // horizontal volume slider with the shared #00b4d8 handle/sub-page
 // palette, and an inset percent readout to the right of the slider.
-// The structure here is NereusSDR-original because this widget
+// The structure here is Longpath-original because this widget
 // isolates JUST the master-output triad; AetherSDR's TitleBar
 // combines master + headphones + PC-audio + minimal-mode in one
 // monolithic bar. TitleBar-strip host wiring lands in Task 10c.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-20 — Written by J.J. Boyd (KG4VCF), with AI-assisted
 //                transformation via Anthropic Claude Code. Phase 3O
 //                Sub-Phase 10 Task 10b. Widget layout + mute-glyph

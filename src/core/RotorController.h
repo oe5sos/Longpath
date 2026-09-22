@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/core/RotorController.h  (NereusSDR)
+// src/core/RotorController.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. Thetis drives rotators through an external
+// Longpath-original. Thetis drives rotators through an external
 // program; there is no upstream to port.
 //
 // What a rotator has to be able to tell us, and be told.
@@ -23,7 +23,7 @@
 // a needle showing nothing.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
 // =================================================================

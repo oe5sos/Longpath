@@ -25,7 +25,7 @@ warren@wpratt.com
 */
 
 // =================================================================
-// tests/tst_tx_channel_tune_tone.cpp  (NereusSDR)
+// tests/tst_tx_channel_tune_tone.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -38,7 +38,7 @@ warren@wpratt.com
 // Ported from Thetis wdsp/gen.c:783-813 [v2.10.3.13]
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-25 — New test for Phase 3M-1a Task C.3: TxChannel::setTuneTone()
 //                 PostGen (gen1) wiring. J.J. Boyd (KG4VCF), with AI-assisted
 //                 implementation via Anthropic Claude Code.
@@ -77,7 +77,7 @@ private slots:
     //
     // kMaxToneMag mirrors Thetis MAX_TONE_MAG = 0.99999f widened to double,
     // ~0.99998999641968.  The C# `f` suffix forces float precision first then
-    // widens to double on assignment; NereusSDR uses `0.99999f` to replicate
+    // widens to double on assignment; Longpath uses `0.99999f` to replicate
     // the identical widening and keep the values byte-exact at runtime.
 
     void maxToneMagConstantValue() {
@@ -168,7 +168,7 @@ private slots:
     // ── Sign-handling contract ─────────────────────────────────────────────
     //
     // Thetis passes ±cw_pitch signed directly to TXPostGenToneFreq
-    // (console.cs:30031-30034 [v2.10.3.13]).  NereusSDR must not clamp,
+    // (console.cs:30031-30034 [v2.10.3.13]).  Longpath must not clamp,
     // abs(), or negate the value — the caller is authoritative.
     // These tests document the contract; in the no-WDSP path they verify
     // no crash (WDSP path would verify txa[ch].gen1.p->tone.freq sign).

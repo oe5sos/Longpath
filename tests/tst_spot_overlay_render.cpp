@@ -5,7 +5,7 @@
 // overflow paths can be exercised deterministically without real
 // amateur callsigns. Precedent: B2-B6, C1-C4, D1-D5.
 //
-// NereusSDR - SpectrumWidget spot overlay render tests
+// Longpath - SpectrumWidget spot overlay render tests
 //
 // Phase 3J-2 Task E1. Pins the contract that drawSpotMarkers
 // places spot labels with collision-avoiding multi-level stacking,

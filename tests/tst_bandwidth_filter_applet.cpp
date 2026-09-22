@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_bandwidth_filter_applet.cpp  (NereusSDR)
+// tests/tst_bandwidth_filter_applet.cpp  (Longpath)
 // =================================================================
 //
 // Die Kachel um die Durchlassflaechen.
@@ -13,12 +13,12 @@
 //      eine.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-20 — Original fuer NereusSDR von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
 // =================================================================
 
-// no-port-check: NereusSDR-original test file.
+// no-port-check: Longpath-original test file.
 
 #include <QtTest>
 #include <QSpinBox>
@@ -141,6 +141,96 @@ private slots:
         QCOMPARE(s->filterWidth(),  200);
         QVERIFY2(s->filterCenter() == 600,
                  "bei CW muss die Mitte auf dem Mithoerton stehenbleiben");
+    }
+
+    // ── LOW und HIGH sind Audio-Begriffe, bei beiden Seitenbaendern ──
+    //
+    // Der Betreiber am 2026-09-17, auf 40 m LSB: "100 - 3000 ergibt
+    // 2900?!?!?" und "hört sich auf 40 meter katastrophal an". Die
+    // Felder zeigten die Betraege der INNEREN Kanten, und die stehen
+    // bei LSB verkehrt: LOW zeigte die ferne Kante (2950), HIGH die
+    // nahe (150). Wer "LOW 100" tippte, setzte die ferne Kante auf
+    // -100, und WIDTH 3000 zaehlte von dort nach oben: -100 … +2900,
+    // quer ueber den Traeger. Auf 20 m USB stimmte alles ("50 und 3000
+    // sind 3050"), weil dort innere und Audio-Richtung zusammenfallen.
+
+    void lsbShowsNearEdgeAsLowAndFarEdgeAsHigh()
+    {
+        RadioModel model;
+        model.addSlice();
+        BandwidthFilterApplet a(&model);
+        SliceModel* s = model.activeSlice() ? model.activeSlice()
+                                            : model.slices().first();
+        s->setDspMode(DSPMode::LSB);
+        s->setFilter(-2950, -150);
+
+        QCOMPARE(boxNamed(a, "bwFilterLow")->value(),   150);   // nahe Kante
+        QCOMPARE(boxNamed(a, "bwFilterHigh")->value(),  2950);  // ferne Kante
+        QCOMPARE(boxNamed(a, "bwFilterWidth")->value(), 2800);
+    }
+
+    void lsbLowPlusWidthGivesHighOnTheSameSideband()
+    {
+        // Genau die Eingabe des Betreibers: LOW 100, dann WIDTH 3000.
+        RadioModel model;
+        model.addSlice();
+        BandwidthFilterApplet a(&model);
+        SliceModel* s = model.activeSlice() ? model.activeSlice()
+                                            : model.slices().first();
+        s->setDspMode(DSPMode::LSB);
+        s->setFilter(-2950, -150);
+
+        boxNamed(a, "bwFilterLow")->setValue(100);
+        QCOMPARE(s->filterHigh(), -100);            // die NAHE Kante wanderte
+        QCOMPARE(s->filterLow(),  -2950);           // die ferne blieb
+
+        boxNamed(a, "bwFilterWidth")->setValue(3000);
+        QCOMPARE(s->filterHigh(), -100);
+        QVERIFY2(s->filterLow() == -3100,
+                 qPrintable(QStringLiteral(
+                     "100 + 3000 muss 3100 geben, nicht %1 — und nie ueber "
+                     "den Traeger hinweg").arg(qAbs(s->filterLow()))));
+        QCOMPARE(boxNamed(a, "bwFilterLow")->value(),  100);
+        QCOMPARE(boxNamed(a, "bwFilterHigh")->value(), 3100);
+    }
+
+    void usbLowPlusWidthGivesHigh()
+    {
+        // "20 meter: 50 und 3000 sind 3050" — das muss so bleiben.
+        RadioModel model;
+        model.addSlice();
+        BandwidthFilterApplet a(&model);
+        SliceModel* s = model.activeSlice() ? model.activeSlice()
+                                            : model.slices().first();
+        s->setDspMode(DSPMode::USB);
+        s->setFilter(150, 2950);
+
+        boxNamed(a, "bwFilterLow")->setValue(50);
+        boxNamed(a, "bwFilterWidth")->setValue(3000);
+        QCOMPARE(s->filterLow(),  50);
+        QCOMPARE(s->filterHigh(), 3050);
+    }
+
+    void widthNeverPushesAnSsbFilterAcrossTheCarrier()
+    {
+        // HIGH zuletzt gesetzt, dann eine Breite, die groesser ist als
+        // HIGH: die nahe Kante darf nicht unter den Traeger rutschen.
+        // Sie bleibt bei 0, und die Breite wird von dort aus gehalten.
+        RadioModel model;
+        model.addSlice();
+        BandwidthFilterApplet a(&model);
+        SliceModel* s = model.activeSlice() ? model.activeSlice()
+                                            : model.slices().first();
+        s->setDspMode(DSPMode::LSB);
+        s->setFilter(-2950, -150);
+
+        boxNamed(a, "bwFilterHigh")->setValue(2000);   // ferne Kante
+        QCOMPARE(s->filterLow(), -2000);
+        boxNamed(a, "bwFilterWidth")->setValue(3000);
+        QVERIFY2(s->filterHigh() <= 0 && s->filterLow() <= 0,
+                 "bei LSB muessen beide Kanten unter dem Traeger bleiben");
+        QCOMPARE(s->filterHigh(), 0);
+        QCOMPARE(s->filterLow(),  -3000);
     }
 };
 

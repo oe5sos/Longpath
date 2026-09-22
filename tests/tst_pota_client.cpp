@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - PotaClient JSON parser + dedup tests
+// Longpath - PotaClient JSON parser + dedup tests
 //
 // Phase 3J-2 Task B2. Pins the contract that PotaClient parses
 // api.pota.app/spot/activator JSON responses and dedups across

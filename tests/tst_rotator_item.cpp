@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - RotatorItem smoothing tests
+// Longpath - RotatorItem smoothing tests
 //
 // 2026-08-10 (KG4VCF, AI tooling: Anthropic Claude Code).
 // Pins the contract for the RotatorItem compass smoothing after the

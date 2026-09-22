@@ -1,7 +1,7 @@
 // =================================================================
-// tests/tst_audio_engine_antivox_mix.cpp  (NereusSDR)
+// tests/tst_audio_engine_antivox_mix.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure. Thetis citations
+// no-port-check: Longpath-original test infrastructure. Thetis citations
 // below are rationale for the topology, not ported code.
 //
 // Phase 3F Sub-Epic J Task 9. Anti-VOX was fed only from the stream

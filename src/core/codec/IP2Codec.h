@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/codec/IP2Codec.h  (NereusSDR)
+// src/core/codec/IP2Codec.h  (Longpath)
 // =================================================================
 //
 // Per-board codec interface for the Protocol 2 command-packet compose
@@ -15,7 +15,7 @@
 // P2 uses four fixed-size command packets instead — CmdGeneral (60),
 // CmdHighPriority (1444), CmdRx (1444), CmdTx (60).
 //
-// NereusSDR-original. Independently implemented from IP1Codec.h interface.
+// Longpath-original. Independently implemented from IP1Codec.h interface.
 // No Thetis port; no PROVENANCE row.
 // =================================================================
 

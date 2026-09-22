@@ -1,8 +1,8 @@
 // =================================================================
-// tests/tst_mox_controller_prime_wdsp_state.cpp  (NereusSDR)
+// tests/tst_mox_controller_prime_wdsp_state.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original test. No Thetis logic is ported in this test
+// Longpath-original test. No Thetis logic is ported in this test
 // file. The test exercises:
 //   - MoxController::primeWdspState()
 //
@@ -35,7 +35,7 @@
 // the NaN sentinel into a void receiver.
 // =================================================================
 
-// no-port-check: NereusSDR-original test file -- no upstream Thetis port.
+// no-port-check: Longpath-original test file -- no upstream Thetis port.
 
 #include <QtTest/QtTest>
 #include <QSignalSpy>

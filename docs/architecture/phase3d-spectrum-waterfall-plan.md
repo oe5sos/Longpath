@@ -53,7 +53,7 @@ Logic from: Thetis `display.cs` DrawPanadapterDX2D (line 4970) + DrawWaterfallDX
 
 ### Phase A — CPU fallback (QPainter, get something visible fast)
 
-- Inherit from `QWidget` (no `#ifdef NEREUS_GPU_SPECTRUM` initially)
+- Inherit from `QWidget` (no `#ifdef LONGPATH_GPU_SPECTRUM` initially)
 - Layout: 40% spectrum (top), 60% waterfall (bottom), 20px freq scale, 36px dBm strip, 4px divider
   - Constants from gpu-waterfall.md: `kFreqScaleH=20`, `kDividerH=4`, `kDbmStripW=36`
 - `updateSpectrum(QVector<float> binsDbm)` — exponential smoothing (alpha=0.35), push waterfall row
@@ -65,7 +65,7 @@ Logic from: Thetis `display.cs` DrawPanadapterDX2D (line 4970) + DrawWaterfallDX
 
 ### Phase B — GPU rendering (QRhiWidget)
 
-- Switch base class with `#ifdef NEREUS_GPU_SPECTRUM` → `QRhiWidget`
+- Switch base class with `#ifdef LONGPATH_GPU_SPECTRUM` → `QRhiWidget`
 - 3 GPU pipelines matching AetherSDR exactly:
   1. **Waterfall** — textured quad, ring-buffer texture, `fract(uv.y + rowOffset)` in fragment shader
   2. **Spectrum** — LineStrip (trace) + TriangleStrip (fill), per-vertex RGBA, alpha blending
@@ -206,7 +206,7 @@ Following AetherSDR pattern: `settingsKey(base)` appends `_N` suffix for pan ind
 - Shader prefix: `/shaders`
 
 ```cmake
-if(NEREUS_GPU_SPECTRUM AND Qt6ShaderTools_FOUND)
+if(LONGPATH_GPU_SPECTRUM AND Qt6ShaderTools_FOUND)
     qt_add_shaders(NereusSDR "nereus_shaders"
         PREFIX "/shaders"
         FILES

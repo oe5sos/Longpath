@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_feedline.cpp  (NereusSDR)
+// tests/tst_feedline.cpp  (Longpath)
 // =================================================================
 //
 // A length of coax between the analyser and the antenna does two
@@ -20,10 +20,10 @@
 // Everything expected here was computed in Python first; the numbers in
 // the comments are from that run.
 //
-// no-port-check: NereusSDR-original.
+// no-port-check: Longpath-original.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-10 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

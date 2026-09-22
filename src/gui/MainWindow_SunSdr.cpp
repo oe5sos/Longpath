@@ -409,7 +409,7 @@ void MainWindow::wireSunSdrOutboundControl(SliceModel* slice)
     // (SunSDR/ExpertSDR2) das echte Funkgeraet stumm umstimmen. Seit dem
     // Rueckfall in connectSunSdr() (siehe dort) sollte das hier nie mehr
     // zutreffen -- die Pruefung bleibt trotzdem als zweite, unabhaengige
-    // Schranke stehen. "Technik Nereus, Design ich" ist eine
+    // Schranke stehen. "Technik vom Programm, Design vom Betreiber" ist eine
     // Gestaltungsregel -- diese hier ist keine, sie ist die
     // Sicherheitsgrenze aus CLAUDE.local.md: "Wo Zurueckhaltung und
     // Sicherheit sich widersprechen, gewinnt die Sicherheit."

@@ -1,7 +1,7 @@
 // =================================================================
-// tests/tst_popup_placement.cpp  (NereusSDR)
+// tests/tst_popup_placement.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure.
+// no-port-check: Longpath-original test infrastructure.
 //
 // Phase 3F: a Qt::Popup opened at the cursor has to be clamped onto the
 // screen by hand.

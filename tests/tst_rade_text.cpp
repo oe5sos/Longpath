@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - tst_rade_text: tests for the Phase 3R Task I4 RadeText
+// Longpath - tst_rade_text: tests for the Phase 3R Task I4 RadeText
 // callsign-over-EOO wrapper.
 //
 // RadeText is a thin Qt6 wrapper around the third_party/rade library's

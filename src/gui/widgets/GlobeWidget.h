@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/gui/widgets/GlobeWidget.h  (NereusSDR)
+// src/gui/widgets/GlobeWidget.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. No Thetis or AetherSDR equivalent.
+// Longpath-original. No Thetis or AetherSDR equivalent.
 //
 // Rendered in software with QPainter rather than through the QRhi
 // pipeline the spectrum uses. At the sizes this runs (a 300 px globe is
@@ -14,7 +14,7 @@
 // this way.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
 // =================================================================

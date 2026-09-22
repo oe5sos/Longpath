@@ -26,6 +26,21 @@ warren@wpratt.com
 
 #define _CRT_SECURE_NO_WARNINGS
 #include "comm.h"
+#include <stdarg.h>
+#include <stdio.h>
+
+#ifdef _WIN32
+// See utilities.h -- the WDSP 2.10 debug sink, as upstream has it.
+void dprintf (const char* format, ...)
+{
+	char buffer[1024];
+	va_list args;
+	va_start (args, format);
+	vsnprintf (buffer, sizeof (buffer), format, args);
+	va_end (args);
+	OutputDebugStringA (buffer);
+}
+#endif
 
 /********************************************************************************************************
 *																										*

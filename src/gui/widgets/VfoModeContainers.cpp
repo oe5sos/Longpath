@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/widgets/VfoModeContainers.cpp  (NereusSDR)
+// src/gui/widgets/VfoModeContainers.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -8,7 +8,7 @@
 //   Project Files/Source/Console/radio.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -148,7 +148,7 @@ static constexpr int kCtcssCount = static_cast<int>(sizeof(kCtcssTones) / sizeof
 
 // ── RttyMarkShiftContainer step constants ─────────────────────────────────
 // AetherSDR VfoWidget.cpp uses 25 Hz step for Mark and 5 Hz step for Shift.
-// These are UX choices, not DSP constants — native NereusSDR values.
+// These are UX choices, not DSP constants — native Longpath values.
 static constexpr int kMarkStep  = 25;
 static constexpr int kShiftStep = 5;
 static constexpr int kDigStep   = 10;

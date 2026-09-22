@@ -1,7 +1,7 @@
-// no-port-check: NereusSDR-original unit-test file.  All Thetis source cites
+// no-port-check: Longpath-original unit-test file.  All Thetis source cites
 // are in TransmitModel.h/cpp.
 // =================================================================
-// tests/tst_transmit_model_cfc_cpdr_cessb_phrot.cpp  (NereusSDR)
+// tests/tst_transmit_model_cfc_cpdr_cessb_phrot.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for TransmitModel CFC + CPDR + CESSB + Phase Rotator

@@ -222,7 +222,7 @@ Create `src/gui/meters/MeterWidget.h`:
 #include <QImage>
 #include <QVector>
 
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
 #include <QRhiWidget>
 #include <rhi/qrhi.h>
 using MeterBaseClass = QRhiWidget;
@@ -268,7 +268,7 @@ public:
     bool deserializeItems(const QString& data);
 
 protected:
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     void initialize(QRhiCommandBuffer* cb) override;
     void render(QRhiCommandBuffer* cb) override;
     void releaseResources() override;
@@ -283,7 +283,7 @@ private:
     // --- Item data ---
     QVector<MeterItem*> m_items;
 
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     bool m_rhiInitialized{false};
 
     // GPU pipeline init helpers
@@ -355,7 +355,7 @@ Create `src/gui/meters/MeterWidget.cpp`:
 #include <QPainter>
 #include <QResizeEvent>
 
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
 #include <rhi/qshader.h>
 #include <QFile>
 #endif
@@ -369,7 +369,7 @@ MeterWidget::MeterWidget(QWidget* parent)
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     setAutoFillBackground(false);
 
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     // Platform-specific QRhi backend — mirrors SpectrumWidget.cpp:97-117
 #ifdef Q_OS_MAC
     setApi(QRhiWidget::Api::Metal);
@@ -403,7 +403,7 @@ void MeterWidget::addItem(MeterItem* item)
     }
     item->setParent(this);
     m_items.append(item);
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     m_bgDirty = true;
     markOverlayDirty();
 #endif
@@ -413,7 +413,7 @@ void MeterWidget::addItem(MeterItem* item)
 void MeterWidget::removeItem(MeterItem* item)
 {
     m_items.removeAll(item);
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     m_bgDirty = true;
     markOverlayDirty();
 #endif
@@ -424,7 +424,7 @@ void MeterWidget::clearItems()
 {
     qDeleteAll(m_items);
     m_items.clear();
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     m_bgDirty = true;
     markOverlayDirty();
 #endif
@@ -438,7 +438,7 @@ void MeterWidget::updateMeterValue(int bindingId, double value)
             item->setValue(value);
         }
     }
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     markDynamicDirty();
 #endif
     update();
@@ -447,7 +447,7 @@ void MeterWidget::updateMeterValue(int bindingId, double value)
 void MeterWidget::resizeEvent(QResizeEvent* event)
 {
     MeterBaseClass::resizeEvent(event);
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     m_bgDirty = true;
     markOverlayDirty();
 #endif
@@ -457,7 +457,7 @@ void MeterWidget::resizeEvent(QResizeEvent* event)
 
 void MeterWidget::paintEvent(QPaintEvent* event)
 {
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     // GPU path handles rendering in render()
     MeterBaseClass::paintEvent(event);
     return;
@@ -492,7 +492,7 @@ Append to `src/gui/meters/MeterWidget.cpp`, before the closing `} // namespace`:
 // Mirrors SpectrumWidget.cpp:1257-1765
 // ============================================================================
 
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
 
 // Fullscreen quad: position (x,y) + texcoord (u,v)
 // From SpectrumWidget.cpp:1266 (identical)
@@ -875,7 +875,7 @@ void MeterWidget::releaseResources()
     m_rhiInitialized = false;
 }
 
-#endif // NEREUS_GPU_SPECTRUM
+#endif // LONGPATH_GPU_SPECTRUM
 ```
 
 - [ ] **Step 4: Add MeterWidget to CMakeLists.txt**

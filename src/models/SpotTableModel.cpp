@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// NereusSDR - SpotTableModel implementation. 8-column QAbstractTableModel
+// Longpath - SpotTableModel implementation. 8-column QAbstractTableModel
 // over a bounded QVector<DxSpot>; bandForFreq() maps MHz to band labels
 // using the IARU Region 2 amateur band edges (160m..2m).
 //
@@ -8,10 +8,10 @@
 // AetherSDR is (C) its contributors and is licensed GPL-3.0-or-later
 // (see https://github.com/ten9876/AetherSDR/blob/main/LICENSE).
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-11  J.J. Boyd / KG4VCF  Phase 3J-2 Task D2. Initial port.
 //                                    AetherSDR's "AetherSDR" namespace
-//                                    becomes "NereusSDR". Implementation
+//                                    becomes "Longpath". Implementation
 //                                    extracted from
 //                                    DxClusterDialog.cpp:75-204 verbatim:
 //                                    extractMode (known mode-token set
@@ -90,7 +90,7 @@ QVariant SpotTableModel::data(const QModelIndex& index, int role) const
     }
     if (role == Qt::ForegroundRole) {
         if (index.column() == ColDxCall) {
-            // NereusSDR-native (2026-08-27): the fixed accent color
+            // Longpath-native (2026-08-27): the fixed accent color
             // collides with the default watchlist highlight color
             // (both #00b4d8), making the call sign unreadable in a
             // matched row -- found on first live test. Swap to the
@@ -106,7 +106,7 @@ QVariant SpotTableModel::data(const QModelIndex& index, int role) const
         if (index.column() == ColFreq)
             return QColor(0xe0, 0xd0, 0x60);  // yellow-ish
     }
-    // NereusSDR-native (2026-08-26): watchlist row highlight. Returned
+    // Longpath-native (2026-08-26): watchlist row highlight. Returned
     // for every column of a matching row (the view queries per-cell),
     // so the whole row tints -- not just one field. The color itself
     // is operator-chosen (see SpotTableModel.h); an invalid m_watchColor
@@ -208,7 +208,7 @@ QString SpotTableModel::bandForFreq(double mhz)
     return "";
 }
 
-// NereusSDR-native (2026-08-27).
+// Longpath-native (2026-08-27).
 void SpotTableModel::setOurGridSquare(const QString& grid)
 {
     m_ourGrid = grid;
@@ -218,7 +218,7 @@ void SpotTableModel::setOurGridSquare(const QString& grid)
     }
 }
 
-// NereusSDR-native (2026-08-27). Reuses the exact same haversine
+// Longpath-native (2026-08-27). Reuses the exact same haversine
 // distance/bearing maths FreeDVReporterDialog already uses for
 // station distance/heading (src/core/Maidenhead.h), applied to
 // DxSpot::grid instead of a FreeDV station's grid square. Empty
@@ -263,7 +263,7 @@ QString SpotTableModel::formatBearing(const DxSpot& spot) const
         .arg(kCardinal[idx]);
 }
 
-// NereusSDR-native (2026-08-26). Normalizes to trimmed, non-empty terms
+// Longpath-native (2026-08-26). Normalizes to trimmed, non-empty terms
 // so matchesWatchTerms() doesn't need to re-check per row.
 void SpotTableModel::setWatchTerms(const QStringList& terms)
 {
@@ -277,7 +277,7 @@ void SpotTableModel::setWatchTerms(const QStringList& terms)
         emit dataChanged(index(0, 0), index(rowCount() - 1, ColCount - 1), {Qt::BackgroundRole});
 }
 
-// NereusSDR-native (2026-08-26). Case-insensitive exact match against
+// Longpath-native (2026-08-26). Case-insensitive exact match against
 // DxCall or Reference -- exact rather than substring so a watched call
 // like "OE5" doesn't also light up every "OE5xyz/P" spot.
 bool SpotTableModel::matchesWatchTerms(const DxSpot& spot) const

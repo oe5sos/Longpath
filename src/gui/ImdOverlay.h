@@ -1,16 +1,16 @@
 #pragma once
 
-// no-port-check: NereusSDR-original IMD-overlay class implementing the
+// no-port-check: Longpath-original IMD-overlay class implementing the
 // Thetis two-tone IMD measurement algorithm. The algorithm itself is
 // ported verbatim from Thetis display.cs:5008, 5210-5316, 5453-5475,
 // 5512-5685, 5725-5760 [v2.10.3.13] (see inline cites below); but
 // because Thetis' display.cs is a 24,000+ LOC monolith that mixes
-// rendering with measurement, NereusSDR factors the IMD subset into a
-// dedicated NereusSDR-only class. SpectrumWidget remains the host;
+// rendering with measurement, Longpath factors the IMD subset into a
+// dedicated Longpath-only class. SpectrumWidget remains the host;
 // ImdOverlay is the analytical core.
 //
 // =================================================================
-// src/gui/ImdOverlay.h  (NereusSDR)
+// src/gui/ImdOverlay.h  (Longpath)
 // =================================================================
 //
 // Two-tone IMD measurement overlay — peak detection, IMD3/IMD5
@@ -22,7 +22,7 @@
 //   show_imd_measurements = local_mox && _testing_imd
 //                           && _show_imd_measurements && displayduplex;
 //
-// In NereusSDR these four flags are sourced from:
+// In Longpath these four flags are sourced from:
 //   local_mox            -> MoxController::isMox()
 //   _testing_imd         -> TwoToneController::isActive() (drives
 //                            Display.TestingIMD via PureSignal::
@@ -35,7 +35,7 @@
 //   displayduplex         -> existing SpectrumWidget duplex mode flag
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-06 — Created by J.J. Boyd (KG4VCF) for Phase 3M-4
 //                 PureSignal Task 12, with AI-assisted source-first
 //                 protocol via Anthropic Claude Code.
@@ -54,7 +54,7 @@ namespace Longpath {
 //   public int MaxY_pixel;
 //   public bool Enabled;
 //   public double Time;
-// NereusSDR drops the Time field — peak-blob aging is a carson-branch
+// Longpath drops the Time field — peak-blob aging is a carson-branch
 // concern; IMD measurement is single-frame and doesn't track age.
 struct Maximum {
     float dBm    = 0.0f;

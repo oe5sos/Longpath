@@ -1,14 +1,14 @@
 // =================================================================
-// src/models/TunerModel.cpp  (NereusSDR)
+// src/models/TunerModel.cpp  (Longpath)
 // =================================================================
 // Source attribution (AetherSDR, GPLv3):
 //   Copyright (C) 2024-2026  Jeremy (KK7GWY) / AetherSDR contributors
 //       per https://github.com/ten9876/AetherSDR (GPLv3)
 //   This file is a port or structural derivative of AetherSDR source.
 //   AetherSDR is licensed under the GNU General Public License v3.
-//   NereusSDR is also GPLv3. Attribution follows GPLv3 section 5 requirements.
+//   Longpath is also GPLv3. Attribution follows GPLv3 section 5 requirements.
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-18  Ported in C++20/Qt6 for NereusSDR by J.J. Boyd (KG4VCF),
 //                 with AI-assisted transformation via Anthropic Claude Code.
 //                 Layout from AetherSDR src/models/TunerModel.{h,cpp} [@0cd4559].
@@ -21,7 +21,7 @@
 #include <QDebug>
 #include <cmath>
 
-Q_LOGGING_CATEGORY(lcTunerModel, "nereus.tuner.model")
+Q_LOGGING_CATEGORY(lcTunerModel, "longpath.tuner.model")
 
 namespace Longpath {
 
@@ -33,7 +33,7 @@ TunerModel::TunerModel(QObject* parent)
 // ── Status parsing ──────────────────────────────────────────────────────────
 
 // From AetherSDR src/models/TunerModel.cpp:applyStatus [@0cd4559]
-// NereusSDR additions: presence detection via model/serial_num keys;
+// Longpath additions: presence detection via model/serial_num keys;
 // fwd/swr parsing added directly here (upstream parses these only inside
 // the stateUpdated/statusUpdated lambdas of setDirectConnection).
 void TunerModel::applyStatus(const QMap<QString, QString>& kvs)
@@ -97,7 +97,7 @@ void TunerModel::applyStatus(const QMap<QString, QString>& kvs)
         } else if (key == "fwd") {
             // From AetherSDR src/models/TunerModel.cpp:stateUpdated lambda [@0cd4559]
             // Upstream converts dBm -> watts via pow(10,dBm/10)/1000 inside the
-            // direct-connection lambda.  applyStatus in NereusSDR stores the raw
+            // direct-connection lambda.  applyStatus in Longpath stores the raw
             // float so that tests can drive it directly without a live connection.
             float v = val.toFloat();
             if (m_fwd != v) { m_fwd = v; metersChanged_ = true; }
@@ -113,7 +113,7 @@ void TunerModel::applyStatus(const QMap<QString, QString>& kvs)
     }
 
     // Presence detection: mark present when identity keys arrive.
-    // NereusSDR uses a m_present bool because there is no SmartSDR handle
+    // Longpath uses a m_present bool because there is no SmartSDR handle
     // mechanism; upstream's isPresent() returns !m_handle.isEmpty().
     if (!m_present && (!m_model.isEmpty() || !m_serial.isEmpty())) {
         m_present = true;
@@ -134,8 +134,8 @@ void TunerModel::applyStatus(const QMap<QString, QString>& kvs)
 // ── Connection binding ────────────────────────────────────────────────────
 
 // From AetherSDR src/models/TunerModel.cpp:setDirectConnection [@0cd4559]
-// Renamed bindConnection (NereusSDR divergence; no SmartSDR handle routing).
-// directConnectionChanged() emits with no bool argument in NereusSDR.
+// Renamed bindConnection (Longpath divergence; no SmartSDR handle routing).
+// directConnectionChanged() emits with no bool argument in Longpath.
 void TunerModel::bindConnection(TgxlConnection* conn)
 {
     if (m_conn == conn) { return; }

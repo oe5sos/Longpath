@@ -19,6 +19,7 @@
 #include <QLineEdit>
 #include <QPushButton>
 
+class QCheckBox;
 class QNetworkAccessManager;
 class QNetworkReply;
 
@@ -44,6 +45,13 @@ private:
     QLineEdit* m_modelEdit    = nullptr;
     QPushButton* m_probeButton = nullptr;
     QLabel*    m_probeLabel   = nullptr;
+    // Der Dienst aus Longpath heraus (2026-09-17)
+    QLineEdit*   m_binaryEdit    = nullptr;
+    QLineEdit*   m_modelPathEdit = nullptr;
+    QCheckBox*   m_autoStart     = nullptr;
+    QPushButton* m_startButton   = nullptr;
+    QPushButton* m_stopButton    = nullptr;
+    QLabel*      m_serverState   = nullptr;
 
     QNetworkAccessManager* m_net = nullptr;
     QNetworkReply*         m_probe = nullptr;

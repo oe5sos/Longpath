@@ -1,8 +1,8 @@
 // =================================================================
-// tests/tst_parametric_eq_widget_axis.cpp  (NereusSDR)
+// tests/tst_parametric_eq_widget_axis.cpp  (Longpath)
 // =================================================================
 //
-// no-port-check: NereusSDR-original test file.  Cites for the math
+// no-port-check: Longpath-original test file.  Cites for the math
 // under test live in ParametricEqWidget.cpp.
 // =================================================================
 //

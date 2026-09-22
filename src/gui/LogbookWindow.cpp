@@ -1,11 +1,11 @@
 // =================================================================
-// src/gui/LogbookWindow.cpp  (NereusSDR)
+// src/gui/LogbookWindow.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original — see LogbookWindow.h.
+// Longpath-original — see LogbookWindow.h.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
 //   2026-09-21 — Sync QRZ: das QRZ-Logbuch abholen und wie einen Import
@@ -315,19 +315,13 @@ void LogbookWindow::buildUi()
     m_table->horizontalHeader()->setSortIndicator(m_sortColumn, m_sortOrder);
     m_table->horizontalHeader()->setSectionsMovable(true);
     m_table->horizontalHeader()->setContextMenuPolicy(Qt::CustomContextMenu);
-    m_table->setStyleSheet(QStringLiteral(
-        "QTableWidget { background: %1; alternate-background-color: %4;"
-        "  color: %2; border: 1px solid %3; gridline-color: %3;"
-        "  font-size: 11px; }"
-        "QTableWidget::item:selected { background: %6; color: %2; }"
-        "QHeaderView::section { background: %4; color: %5; border: none;"
-        "  border-bottom: 1px solid %3; padding: 3px 6px; font-size: 11px; }"
-    ).arg(QString::fromLatin1(Style::kInsetBg),
-          QString::fromLatin1(Style::kTextPrimary),
-          QString::fromLatin1(Style::kBorderSubtle),
-          QString::fromLatin1(Style::kButtonBg),
-          QString::fromLatin1(Style::kTextSecondary),
-          QString::fromLatin1(Style::kAccent)));
+    // Glas & Tiefe (2026-09-17): der zentrale Tabellenstil — versenkt,
+    // Kopf als Versalzeile ohne Kaesten, Auswahl gedeckt. Schriften per
+    // setFont, nicht im Stylesheet (Groesse kaskadiert sonst in den Kopf).
+    m_table->setStyleSheet(Style::tableStyle());
+    m_table->setFont([this] { QFont f = font(); f.setPixelSize(Style::kFontSmall); return f; }());
+    m_table->horizontalHeader()->setFont(Style::capsFont(font(), 8));
+    m_table->horizontalHeader()->setHighlightSections(false);
 
     // ── Table beside a detail pane (L1, 2026-08-10) ──────────────────
     //
@@ -1659,7 +1653,7 @@ void LogbookWindow::exportAdif()
 {
     const QString path = QFileDialog::getSaveFileName(
         this, QStringLiteral("Export ADIF"),
-        QStringLiteral("nereus-log.adi"),
+        QStringLiteral("longpath-log.adi"),
         QStringLiteral("ADIF (*.adi *.adif)"));
     if (path.isEmpty()) { return; }
 
@@ -1685,7 +1679,7 @@ void LogbookWindow::exportCsv()
 {
     const QString path = QFileDialog::getSaveFileName(
         this, QStringLiteral("Export CSV"),
-        QStringLiteral("nereus-log.csv"),
+        QStringLiteral("longpath-log.csv"),
         QStringLiteral("CSV (*.csv)"));
     if (path.isEmpty()) { return; }
 
@@ -1712,7 +1706,7 @@ void LogbookWindow::exportCabrillo()
 {
     const QString path = QFileDialog::getSaveFileName(
         this, QStringLiteral("Export Cabrillo"),
-        QStringLiteral("nereus-log.cbr"),
+        QStringLiteral("longpath-log.cbr"),
         QStringLiteral("Cabrillo (*.cbr *.log)"));
     if (path.isEmpty()) { return; }
 
@@ -1758,7 +1752,7 @@ void LogbookWindow::exportCabrillo()
 
     QTextStream out(&f);
     out << "START-OF-LOG: 3.0\n"
-        << "CREATED-BY: NereusSDR\n"
+        << "CREATED-BY: Longpath\n"
         << "CALLSIGN: " << (myCall.isEmpty()
                                 ? QStringLiteral("NOCALL") : myCall)
         << "\n";

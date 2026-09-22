@@ -1,13 +1,13 @@
 // =================================================================
-// src/core/TwoToneController.cpp  (NereusSDR)
+// src/core/TwoToneController.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original file.  Activation flow ports
+// Longpath-original file.  Activation flow ports
 // chkTestIMD_CheckedChanged (setup.cs:11040-11191 [v2.10.3.13]).
 // See TwoToneController.h header for the full attribution block.
 // =================================================================
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-29 — Phase 3M-1c chunk I.1-I.5 — see header.
 //   2026-05-03 — Phase 4 Agent 4B of issue #167 PA-cal hotfix — wires
 //                start()/stop() through Phase 3C
@@ -15,7 +15,7 @@
 //                See header for full attribution.
 // =================================================================
 
-// no-port-check: NereusSDR-original file; Thetis-derived activation flow
+// no-port-check: Longpath-original file; Thetis-derived activation flow
 // is cited inline below.
 
 #include "TwoToneController.h"
@@ -359,7 +359,7 @@ void TwoToneController::continueActivation()
     //           console.PWR = new_pwr;
     //       }
     //
-    // NereusSDR deviation: SetPowerUsingTargetDBM is a Thetis-internal helper
+    // Longpath deviation: SetPowerUsingTargetDBM is a Thetis-internal helper
     // that doesn't yet exist here.  The cleanest semantic match for "Fixed
     // mode" is to use twoTonePower() (the Setup-page-fixed value) directly
     // as the override.  See I.1 step 7 note.

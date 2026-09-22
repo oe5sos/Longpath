@@ -1,14 +1,14 @@
 // =================================================================
-// src/gui/VaxFirstRunDialog.cpp  (NereusSDR)
+// src/gui/VaxFirstRunDialog.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original file — no Thetis port; no attribution-registry row.
+// Longpath-original file — no Thetis port; no attribution-registry row.
 //
 // Mockup source (palette + copy, byte-verbatim for Mac/Linux explains):
 //   .superpowers/brainstorm/64803-1776605394/content/mockup-firstrun.html
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-20 — Written by J.J. Boyd (KG4VCF), with AI-assisted
 //                transformation via Anthropic Claude Code.
 // =================================================================
@@ -225,8 +225,8 @@ QString productDisplayName(VirtualCableProduct p)
             return QStringLiteral("Dante");
         case VirtualCableProduct::FlexRadioDax:
             return QStringLiteral("FlexRadio DAX");
-        case VirtualCableProduct::NereusSdrVax:
-            return QStringLiteral("NereusSDR VAX");
+        case VirtualCableProduct::LongpathVax:
+            return QStringLiteral("Longpath VAX");
         case VirtualCableProduct::None:
         default:
             return QStringLiteral("virtual cable");
@@ -408,7 +408,7 @@ void VaxFirstRunDialog::buildBodyWindowsCablesFound(QVBoxLayout* bodyLayout)
     intro->setText(QStringLiteral(
         "We found <b style='color:%1'>%2 virtual audio cable%3</b> already"
         " installed on your system. Bind them to VAX slots so digital-mode"
-        " apps (WSJT-X, FLDIGI, N1MM+) can see your NereusSDR receivers as"
+        " apps (WSJT-X, FLDIGI, N1MM+) can see your Longpath receivers as"
         " audio sources.")
         .arg(Style::kAccent)
         .arg(inputCount)
@@ -458,7 +458,7 @@ void VaxFirstRunDialog::buildBodyWindowsCablesFound(QVBoxLayout* bodyLayout)
     bodyLayout->addWidget(listFrame);
 
     // Explain callout — paraphrased from mockup; control-surface copy
-    // (NereusSDR-native UX) so no byte-verbatim lock required.
+    // (Longpath-native UX) so no byte-verbatim lock required.
     auto* explain = new QFrame(this);
     explain->setStyleSheet(explainBlockStyle());
     auto* explainLayout = new QVBoxLayout(explain);
@@ -472,7 +472,7 @@ void VaxFirstRunDialog::buildBodyWindowsCablesFound(QVBoxLayout* bodyLayout)
         " audio-device dropdown. Pick it there, then set RX1's"
         " <span style='color:%1;font-weight:bold'>VAX</span> button to"
         " <span style='color:%1;font-weight:bold'>1</span> on the VFO flag."
-        " NereusSDR sends RX1 audio to CABLE-A, WSJT-X reads it. Same for"
+        " Longpath sends RX1 audio to CABLE-A, WSJT-X reads it. Same for"
         " VAX 2/3.")
         .arg(Style::kTextPrimary));
     explainLabel->setStyleSheet(QStringLiteral(
@@ -632,7 +632,7 @@ void VaxFirstRunDialog::buildBodyWindowsNoCables(QVBoxLayout* bodyLayout)
 
     auto* dashedSub = new QLabel(
         QStringLiteral("Close this, install your cable of choice, then"
-                       " re-open Setup \u2192 Audio. NereusSDR will detect"
+                       " re-open Setup \u2192 Audio. Longpath will detect"
                        " it automatically."),
         dashedCard);
     dashedSub->setWordWrap(true);
@@ -666,11 +666,11 @@ void VaxFirstRunDialog::buildBodyWindowsNoCables(QVBoxLayout* bodyLayout)
     explainLabel->setText(QStringLiteral(
         "<span style='color:%1;font-weight:bold'>Why is this required on"
         " Windows?</span> Windows doesn't ship a built-in virtual audio"
-        " cable. NereusSDR <i>could</i> bundle its own kernel driver (and"
+        " cable. Longpath <i>could</i> bundle its own kernel driver (and"
         " we may, in a future version), but it's a significant engineering"
         " investment. For now, we piggy-back on the mature, widely-used"
         " cables the ham-radio community already trusts. On macOS and"
-        " Linux, NereusSDR ships native VAX drivers so no extra install"
+        " Linux, Longpath ships native VAX drivers so no extra install"
         " is needed.")
         .arg(Style::kTextPrimary));
     explainLabel->setStyleSheet(QStringLiteral(
@@ -690,10 +690,10 @@ void VaxFirstRunDialog::buildBodyMacNative(QVBoxLayout* bodyLayout)
     // doesn't lie on broken installs.
     std::array<bool, 4> slotDetected{false, false, false, false};
     for (const auto& cable : m_detected) {
-        if (cable.product != VirtualCableProduct::NereusSdrVax) {
+        if (cable.product != VirtualCableProduct::LongpathVax) {
             continue;
         }
-        // Device name matches "NereusSDR VAX <digit>" (enforced by the
+        // Device name matches "Longpath VAX <digit>" (enforced by the
         // VirtualCableDetector::matchProduct regex). Pull the digit off
         // the tail to place the row in the right slot; anything that
         // doesn't trail with 1-4 gets ignored here.
@@ -720,23 +720,23 @@ void VaxFirstRunDialog::buildBodyMacNative(QVBoxLayout* bodyLayout)
     intro->setStyleSheet(introLabelStyle());
     if (detectedCount == 4) {
         intro->setText(QStringLiteral(
-            "NereusSDR ships native VAX audio devices on macOS."
+            "Longpath ships native VAX audio devices on macOS."
             " <b style='color:%1'>All 4 VAX channels are ready to use</b>"
             " &mdash; no extra installation needed.")
             .arg(Style::kAccent));
     } else if (detectedCount > 0) {
         intro->setText(QStringLiteral(
-            "NereusSDR ships native VAX audio devices on macOS."
+            "Longpath ships native VAX audio devices on macOS."
             " <b style='color:%1'>%2 of 4 VAX channels detected.</b>"
-            " Reinstall NereusSDR if this persists.")
+            " Reinstall Longpath if this persists.")
             .arg(Style::kAmberText)
             .arg(detectedCount));
     } else {
         intro->setText(QStringLiteral(
-            "NereusSDR ships a native CoreAudio HAL plugin for VAX."
+            "Longpath ships a native CoreAudio HAL plugin for VAX."
             " <b style='color:%1'>The HAL plugin was not detected.</b>"
-            " Reinstall NereusSDR or unblock"
-            " <code>NereusSDRVAX.driver</code> in System Settings"
+            " Reinstall Longpath or unblock"
+            " <code>LongpathVAX.driver</code> in System Settings"
             " &rarr; Privacy &amp; Security to enable native VAX.")
             .arg(Style::kAmberText));
     }
@@ -749,17 +749,17 @@ void VaxFirstRunDialog::buildBodyMacNative(QVBoxLayout* bodyLayout)
     listLayout->setContentsMargins(0, 4, 0, 4);
     listLayout->setSpacing(0);
 
-    // Row 1 has the "NereusSDR TX" tail per mockup; rows 2-4 are the
-    // plain "NereusSDR VAX N" line. Device-name copy byte-verbatim.
+    // Row 1 has the "Longpath TX" tail per mockup; rows 2-4 are the
+    // plain "Longpath VAX N" line. Device-name copy byte-verbatim.
     // Each row's status pill flips between "Ready" (detected) and
     // "— not detected —" (absent from m_detected).
     for (int slot = 1; slot <= 4; ++slot) {
         QString deviceLine;
         if (slot == 1) {
             deviceLine = QStringLiteral(
-                "NereusSDR VAX 1 \u00a0\u2022\u00a0 NereusSDR TX");
+                "Longpath VAX 1 \u00a0\u2022\u00a0 Longpath TX");
         } else {
-            deviceLine = QStringLiteral("NereusSDR VAX %1").arg(slot);
+            deviceLine = QStringLiteral("Longpath VAX %1").arg(slot);
         }
         if (slotDetected[slot - 1]) {
             listLayout->addWidget(makeDetRow(
@@ -792,9 +792,9 @@ void VaxFirstRunDialog::buildBodyMacNative(QVBoxLayout* bodyLayout)
     explainLabel->setWordWrap(true);
     explainLabel->setText(QStringLiteral(
         "<span style='color:%1;font-weight:bold'>How it works on macOS:</span>"
-        " NereusSDR installed a CoreAudio HAL plugin during setup."
+        " Longpath installed a CoreAudio HAL plugin during setup."
         " Open WSJT-X, pick"
-        " <span style='color:%1;font-weight:bold'>\"NereusSDR VAX 1\"</span>"
+        " <span style='color:%1;font-weight:bold'>\"Longpath VAX 1\"</span>"
         " as the audio device. Set RX1's VAX button to"
         " <span style='color:%1;font-weight:bold'>1</span> on the VFO flag."
         " Done.")
@@ -814,7 +814,7 @@ void VaxFirstRunDialog::buildBodyLinuxNative(QVBoxLayout* bodyLayout)
     intro->setWordWrap(true);
     intro->setStyleSheet(introLabelStyle());
     intro->setText(QStringLiteral(
-        "NereusSDR created <b style='color:%1'>4 native VAX audio"
+        "Longpath created <b style='color:%1'>4 native VAX audio"
         " sources</b> via PipeWire. All channels are ready &mdash; no"
         " extra installation needed.")
         .arg(Style::kAccent));
@@ -830,7 +830,7 @@ void VaxFirstRunDialog::buildBodyLinuxNative(QVBoxLayout* bodyLayout)
     for (int slot = 1; slot <= 4; ++slot) {
         listLayout->addWidget(makeDetRow(
             slot,
-            QStringLiteral("NereusSDR VAX %1").arg(slot),
+            QStringLiteral("Longpath VAX %1").arg(slot),
             QStringLiteral("PipeWire module-pipe-source \u2022 native"),
             QStringLiteral("Ready"), pillNewStyle(),
             QString(), listFrame));
@@ -847,10 +847,10 @@ void VaxFirstRunDialog::buildBodyLinuxNative(QVBoxLayout* bodyLayout)
     explainLabel->setWordWrap(true);
     explainLabel->setText(QStringLiteral(
         "<span style='color:%1;font-weight:bold'>How it works on Linux:</span>"
-        " NereusSDR dynamically loads PipeWire pipe modules at startup."
+        " Longpath dynamically loads PipeWire pipe modules at startup."
         " They unload when you quit the app. Works on both PipeWire and"
         " PulseAudio (via <code>pipewire-pulse</code> compat). In WSJT-X,"
-        " pick <span style='color:%1;font-weight:bold'>\"NereusSDR VAX 1\"</span>"
+        " pick <span style='color:%1;font-weight:bold'>\"Longpath VAX 1\"</span>"
         " from the audio device list.")
         .arg(Style::kTextPrimary));
     explainLabel->setStyleSheet(QStringLiteral(
@@ -874,7 +874,7 @@ void VaxFirstRunDialog::buildBodyRescanNewCables(QVBoxLayout* bodyLayout)
     intro->setWordWrap(true);
     intro->setStyleSheet(introLabelStyle());
     intro->setText(QStringLiteral(
-        "NereusSDR detected <b style='color:%1'>%2 new virtual audio"
+        "Longpath detected <b style='color:%1'>%2 new virtual audio"
         " cable%3</b> since your last setup. Would you like to bind"
         " them to unassigned VAX slots?")
         .arg(Style::kAccent)
@@ -935,7 +935,7 @@ QWidget* VaxFirstRunDialog::buildFooter()
             break;
         case FirstRunScenario::WindowsNoCables:
             hintText = QStringLiteral(
-                "You can still use NereusSDR through your speakers"
+                "You can still use Longpath through your speakers"
                 " without any cable.");
             break;
         case FirstRunScenario::MacNative:
@@ -950,7 +950,7 @@ QWidget* VaxFirstRunDialog::buildFooter()
             break;
         case FirstRunScenario::RescanNewCables:
             hintText = QStringLiteral(
-                "NereusSDR rescans on app start and when Setup \u2192"
+                "Longpath rescans on app start and when Setup \u2192"
                 " Audio is opened.");
             break;
     }

@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_master_output_widget_signal_refresh.cpp  (NereusSDR)
+// tests/tst_master_output_widget_signal_refresh.cpp  (Longpath)
 // =================================================================
 //
 // Exercises MasterOutputWidget's speakersConfigChanged subscription —

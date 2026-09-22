@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/applets/eq/ClientEqCurveWidget.h  (NereusSDR)
+// src/gui/applets/eq/ClientEqCurveWidget.h  (Longpath)
 // =================================================================
 //
 // Ported from AetherSDR (https://github.com/aethersdr/AetherSDR),
@@ -17,10 +17,10 @@
 // port of the same upstream, so the pair are back together.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-09 — Ported to NereusSDR by Martin Fischer, AI-assisted via
 //                 Anthropic Claude (Cowork). Namespace AetherSDR →
-//                 NereusSDR; include paths rebased onto
+//                 Longpath; include paths rebased onto
 //                 core/strip/ and gui/applets/eq/. Behaviour unchanged.
 // =================================================================
 
@@ -219,7 +219,7 @@ private:
         // ── 16 upstream, ClientEq::kMaxBands here ────────────────
         //
         // Upstream this was a literal 16, matching AetherSDR's
-        // ClientEq::kMaxBands. NereusSDR raised that constant to 24 to
+        // ClientEq::kMaxBands. Longpath raised that constant to 24 to
         // fit a ten-band default layout with room to add more, and the
         // static_assert below caught the mismatch the moment this file
         // was compiled — which is exactly what it is for.

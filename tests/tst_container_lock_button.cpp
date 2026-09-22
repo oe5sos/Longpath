@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_container_lock_button.cpp  (NereusSDR)
+// tests/tst_container_lock_button.cpp  (Longpath)
 // =================================================================
 //
 // Das Schloss in der Titelleiste.
@@ -22,12 +22,12 @@
 //      eine Schleife aus Signalen.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-19 — Original fuer NereusSDR von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
 // =================================================================
 
-// no-port-check: NereusSDR-original test file.
+// no-port-check: Longpath-original test file.
 
 #include <QtTest>
 #include <QPushButton>

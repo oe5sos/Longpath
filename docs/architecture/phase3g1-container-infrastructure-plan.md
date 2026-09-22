@@ -2048,7 +2048,7 @@ Replace `buildUI()` with:
 ```cpp
 void MainWindow::buildUI()
 {
-    setWindowTitle(QStringLiteral("NereusSDR %1").arg(NEREUSSDR_VERSION));
+    setWindowTitle(QStringLiteral("NereusSDR %1").arg(LONGPATH_VERSION));
     setMinimumSize(800, 600);
     resize(1280, 800);
 

@@ -1,7 +1,7 @@
 // src/gui/StyleConstants.h
 
 // =================================================================
-// src/gui/StyleConstants.h  (NereusSDR)
+// src/gui/StyleConstants.h  (Longpath)
 // =================================================================
 //
 // Source attribution (AetherSDR — GPLv3):
@@ -12,10 +12,10 @@
 //
 //   This file is a port or structural derivative of AetherSDR source.
 //   AetherSDR is licensed under the GNU General Public License v3.
-//   NereusSDR is also GPLv3. Attribution follows GPLv3 §5 requirements.
+//   Longpath is also GPLv3. Attribution follows GPLv3 §5 requirements.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-16 — Ported/adapted in C++20/Qt6 for NereusSDR by
 //                 J.J. Boyd (KG4VCF), with AI-assisted transformation
 //                 via Anthropic Claude Code.
@@ -34,6 +34,7 @@
 #include "styles/ThemeQss.h"
 
 #include <QFont>
+#include <QPainter>
 
 namespace Longpath::Style {
 
@@ -137,7 +138,7 @@ constexpr double kCapsTracking = 0.18;
 
 constexpr auto kTextScale       = "#7e7e85";
 constexpr auto kTextInactive    = "#58585e";
-// NereusSDR-original — used in 5+ places for AGC-T / pan / similar labels;
+// Longpath-original — used in 5+ places for AGC-T / pan / similar labels;
 // sits between kTextSecondary (#8090a0) and kTextScale (#607080).
 constexpr auto kLabelMid        = "#828288";
 // Versalzeilen-Text ueber Gruppen (z.B. Spektrum-Overlay-Ueberschriften)
@@ -438,9 +439,9 @@ constexpr auto kSpotWatchlightDefault = "#00b4d8";
 // low-pass slopes, which are shapes rather than bumps and should not
 // compete for attention with the shaping bands in the middle.
 //
-// Four of the eight are NereusSDR's existing accents. Three are new
+// Four of the eight are Longpath's existing accents. Three are new
 // (2026-08-11): the palette needs six distinguishable hues between the
-// greys and NereusSDR only had four, so a coral, a blue and a violet
+// greys and Longpath only had four, so a coral, a blue and a violet
 // were added, spaced to stay apart on #0a0a18 and chosen to sit with
 // the accents rather than beside them.
 constexpr auto kEqBand0 = "#8090a0";   // grey — kTextSecondary, HP slot
@@ -456,6 +457,96 @@ constexpr auto kGaugeNormal     = "#4a7ba8";
 constexpr auto kGaugeWarning    = "#a8853f";
 constexpr auto kGaugeDanger     = "#a86b6d";
 constexpr auto kGaugePeak       = "#c4c4c9";
+
+// ── Glas & Tiefe ─────────────────────────────────────────────────────
+//
+// Die Richtung, die der Betreiber am 2026-09-17 aus vier Stilblaettern
+// gewaehlt hat (docs/design/2026-09-17-design-durchsicht.md, Blatt 3):
+// Panels mit Verlauf und Schatten, Zeichenflaechen VERSENKT (Schwarz,
+// Innenschatten oben, Lichtkante), Knoepfe ERHABEN (Verlauf, Lichtkante,
+// dunkle Unterkante), Zahlen in schwarzen Glaschips, Kurven mit Hof.
+// Die Grundregeln des Hausstils bleiben (zwei Prozent Farbe, Blau ist
+// anfassbar, Warm ist gemessen); das hier ist ihre Ausformung.
+//
+// Licht und Schatten sind ALPHA-Werte auf Weiss bzw. Schwarz, keine
+// Farben: dieselbe Kante liegt auf jedem Grund richtig.
+constexpr auto kGlassPanelTop   = "#17171b";   // Panelverlauf oben
+constexpr auto kGlassPanelBot   = "#0e0e10";   // Panelverlauf unten
+constexpr auto kGlassBtnTop     = "#222227";   // erhabener Knopf, oben
+constexpr auto kGlassBtnBot     = "#141417";   // erhabener Knopf, unten
+constexpr auto kGlassSelTop     = "#2f5f92";   // Auswahl, oben
+constexpr auto kGlassSelBot     = "#1e3d5f";   // Auswahl, unten
+constexpr auto kGlassSelBorder  = "#3d78b0";
+constexpr auto kGlassSelText    = "#dbe9f8";
+constexpr int  kGlassLightAlpha  = 18;   // Lichtkante: Weiss mit diesem Alpha
+constexpr int  kGlassShadeAlpha  = 110;  // Innenschatten: Schwarz, erste Zeile
+constexpr auto kGlassLight       = "rgba(255, 255, 255, 18)";   // dieselbe Kante fuer Stylesheets
+constexpr auto kGlassShade       = "rgba(0, 0, 0, 160)";
+constexpr int  kGlassChipRadius  = 7;
+constexpr int  kGlassPanelRadius = 10;
+
+// ── Mal-Helfer fuer Zeichenflaechen (QPainter) ───────────────────────
+//
+// Dieselben Bauformen wie die Stylesheets, fuer Widgets, die selbst
+// malen (Bandfilter, Panadapter-Chrom, Instrumente). Alphas sind
+// Zahlen, keine Farben; ein echter Weichzeichner kostet bei zwanzig
+// Bildern je Sekunde zu viel, vier Linien geben denselben Eindruck.
+
+/// Innenschatten oben plus Lichtkante — fuer eine VERSENKTE Flaeche.
+inline void paintInsetTop(QPainter& p, const QRect& r)
+{
+    static const int kShade[] = {kGlassShadeAlpha, 70, 40, 18};
+    for (int i = 0; i < 4; ++i) {
+        p.setPen(QColor(0, 0, 0, kShade[i]));
+        p.drawLine(r.left(), r.top() + 1 + i, r.right(), r.top() + 1 + i);
+    }
+    p.setPen(QColor(255, 255, 255, kGlassLightAlpha));
+    p.drawLine(r.left(), r.top(), r.right(), r.top());
+}
+
+/// Ein Glaschip: schwarz, feiner Rahmen, Lichtkante oben innen, ein
+/// Hauch Schatten darunter. Fuer Zahlen, die man liest, nicht drueckt.
+inline void paintGlassChip(QPainter& p, const QRect& box, int radius)
+{
+    p.save();
+    p.setRenderHint(QPainter::Antialiasing, true);
+    p.setPen(QColor(role("border", kBorder)));
+    p.setBrush(QColor(0, 0, 0));
+    p.drawRoundedRect(box, radius, radius);
+    p.setClipRect(box.adjusted(1, 1, -1, -1));
+    p.setRenderHint(QPainter::Antialiasing, false);
+    p.setPen(QColor(255, 255, 255, kGlassLightAlpha));
+    p.drawLine(box.left() + 1, box.top() + 1, box.right() - 1, box.top() + 1);
+    p.setPen(QColor(0, 0, 0, 90));
+    p.drawLine(box.left() + 1, box.top() + 2, box.right() - 1, box.top() + 2);
+    p.restore();
+}
+
+/// Ein ERHABENER Chip wie ein Knopf: Verlauf, Lichtkante oben, dunkle
+/// Kante unten. `pressed` kippt den Verlauf (eingerastet/gedrueckt).
+inline void paintRaisedChip(QPainter& p, const QRect& box, int radius,
+                            bool pressed = false)
+{
+    p.save();
+    p.setRenderHint(QPainter::Antialiasing, true);
+    QLinearGradient g(box.topLeft(), box.bottomLeft());
+    const QColor top(role("glass-btn-top", kGlassBtnTop));
+    const QColor bot(role("glass-btn-bot", kGlassBtnBot));
+    g.setColorAt(0.0, pressed ? bot : top);
+    g.setColorAt(1.0, pressed ? top : bot);
+    p.setBrush(g);
+    p.setPen(QColor(role("border", kBorder)));
+    p.drawRoundedRect(box, radius, radius);
+    p.setClipRect(box.adjusted(1, 1, -1, -1));
+    p.setRenderHint(QPainter::Antialiasing, false);
+    p.setPen(pressed ? QColor(0, 0, 0, kGlassShadeAlpha)
+                     : QColor(255, 255, 255, kGlassLightAlpha));
+    p.drawLine(box.left() + 1, box.top() + 1, box.right() - 1, box.top() + 1);
+    p.setPen(pressed ? QColor(255, 255, 255, kGlassLightAlpha)
+                     : QColor(0, 0, 0, kGlassShadeAlpha));
+    p.drawLine(box.left() + 1, box.bottom() - 1, box.right() - 1, box.bottom() - 1);
+    p.restore();
+}
 
 // Disabled
 constexpr auto kDisabledBg      = "#141417";
@@ -615,6 +706,10 @@ inline QString buttonBaseStyle()
         // Knopfreihen in der Vorlage wirken nicht ruhiger, weil dort weniger
         // steht, sondern weil um jedes Ding mehr Luft ist.
         "  background: %1; border: 1px solid %2; border-radius: %6px;"
+        // Glas & Tiefe (2026-09-17): ein erhabener Knopf hat oben eine
+        // Lichtkante und unten eine dunkle Kante — der Rahmen ist
+        // nicht rundum gleich, sondern das Licht kommt von oben.
+        "  border-top-color: %9; border-bottom-color: %10;"
         "  color: %3; font-size: 11px; font-weight: bold;"
         "  padding: %7px %8px;"
         "}"
@@ -622,7 +717,7 @@ inline QString buttonBaseStyle()
         // Gedrueckt: der Verlauf kippt. Ein Knopf, der sich beim
         // Druecken nicht bewegt, fuehlt sich tot an — und das kostet
         // hier kein einziges Pixel Verschiebung.
-        "QPushButton:pressed { background: %5; }"
+        "QPushButton:pressed { background: %5; border-top-color: %10; border-bottom-color: %9; }"
     ).arg(raisedFill(kButtonBg),
           QLatin1String(kBorder),
           QLatin1String(kTextPrimary),
@@ -630,7 +725,9 @@ inline QString buttonBaseStyle()
           sunkenFill(kButtonBg))
      .arg(formInt("radius", 7))
      .arg(formInt("luft-v", 4))
-     .arg(formInt("luft-h", 10));
+     .arg(formInt("luft-h", 10))
+     .arg(shiftL(QColor(hexRole(kBorder)), 12),
+          shiftL(QColor(hexRole(kBorder)), -14));
 }
 
 inline QString greenCheckedStyle()
@@ -646,18 +743,24 @@ inline QString blueCheckedStyle()
     // dieselbe aufgesetzte Flaeche wie jeder andere, nur in der
     // Akzentfarbe. Zwei verschiedene Bauarten fuer denselben Knopf
     // waeren genau die Art Unstimmigkeit, die man als „unfertig" liest.
+    // Glas & Tiefe (2026-09-17): der gedeckte Auswahlverlauf der
+    // Kopfleisten-Pillen (kGlassSel*) statt des flachen kBlueBg — auf
+    // den Applet-Blaettern leuchteten "Stereo", "Phone", "5.0k", "ON/RX/
+    // TX" und die Scheibenmarke "A" in einem Blau, das die Kopfleiste
+    // laengst nicht mehr trug. Eine Auswahl, eine Farbe.
     return QStringLiteral(
-        "QPushButton:checked { background: %1; color: %2;"
-        " border: 1px solid %3; }"
-    ).arg(raisedFill(kBlueBg, 18, 14),
-          QLatin1String(kBlueText),
-          QLatin1String(kBlueBorder));
+        "QPushButton:checked {"
+        "  background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 %1, stop:1 %2);"
+        "  color: %3; border: 1px solid %4; border-top-color: %5; }"
+    ).arg(hexRole(kGlassSelTop), hexRole(kGlassSelBot),
+          hexRole(kGlassSelText), hexRole(kGlassSelBorder),
+          shiftL(QColor(hexRole(kGlassSelBorder)), 16));
 }
 
 // Eingerastet, aber leise: dunkler Grund, Akzentrand, heller Text.
 //
 // War bis zum 2026-09-02 ein Einzelstueck am MON-Knopf der TxApplet
-// ("NereusSDR-original one-off — do NOT snap to kBlueBg"). Seit dem
+// ("Longpath-original one-off — do NOT snap to kBlueBg"). Seit dem
 // Umbau des TX-Feldes ist es die Bauform fuer ALLE Zustandsschalter
 // dort: VOX, MON, LEV, EQ, CFC, PS-A. Der Grund steht im Hausstil —
 // Farbe bedeckt hoechstens zwei Prozent, also darf im Feld genau eine
@@ -685,16 +788,21 @@ inline QString amberCheckedStyle()
 // Rot, waehrend oben Messing steht.
 inline QString txKeyStyle(bool leise = false)
 {
+    // Glas & Tiefe (2026-09-17): auch die Messingtaste ist erhaben —
+    // Lichtkante oben, dunkle Unterkante, wie jeder andere Knopf.
     return QStringLiteral(
         "QPushButton:checked {"
         "  background: qlineargradient(x1:0, y1:0, x2:0, y2:1,"
         "               stop:0 %1, stop:1 %2);"
         "  color: %3; border: 1px solid %4;"
+        "  border-top-color: %5; border-bottom-color: %6;"
         "}"
     ).arg(QLatin1String(leise ? kTxKeyDimTop : kTxKeyTop),
           QLatin1String(leise ? kTxKeyDimBottom : kTxKeyBottom),
           QLatin1String(kTxKeyText),
-          QLatin1String(leise ? kTxKeyDimBorder : kTxKeyBorder));
+          QLatin1String(leise ? kTxKeyDimBorder : kTxKeyBorder),
+          shiftL(QColor(leise ? kTxKeyDimBorder : kTxKeyBorder), 16),
+          shiftL(QColor(leise ? kTxKeyDimBottom : kTxKeyBottom), -12));
 }
 
 inline QString redCheckedStyle()
@@ -706,7 +814,7 @@ inline QString redCheckedStyle()
 
 // DSP toggle — brighter green than the kGreenBg action buttons.
 // Used by VfoWidget DSP tab and SpectrumOverlayPanel DSP toggles.
-// Source: NereusSDR-original. Distinct semantic from action-button
+// Source: Longpath-original. Distinct semantic from action-button
 // "checked" state because DSP toggles communicate "feature on" not
 // "action engaged."
 constexpr auto kDspToggleBg     = "#1b3527";
@@ -722,28 +830,136 @@ inline QString dspToggleStyle()
 
 inline QString sliderHStyle()
 {
+    // Glas & Tiefe (2026-09-17): die Rinne ist VERSENKT (schwarz, oben
+    // die dunkle Kante, unten Licht), der Griff ERHABEN — eine Pille im
+    // Knopfverlauf mit Akzentrand, nicht mehr die blaue Kugel von Qt.
+    // Blau bleibt am Rand: der Griff ist anfassbar.
     return QStringLiteral(
         "QSlider::groove:horizontal {"
-        "  height: 4px; background: %1; border-radius: 2px;"
+        "  height: 4px; background: %1; border: 1px solid %2;"
+        "  border-top-color: %3; border-bottom-color: %4; border-radius: 3px;"
         "}"
         "QSlider::handle:horizontal {"
-        "  width: 10px; height: 10px; margin: -3px 0;"
-        "  background: %2; border-radius: 5px;"
+        "  width: 10px; height: 14px; margin: -6px 0;"
+        "  background: qlineargradient(x1:0, y1:0, x2:0, y2:1,"
+        "               stop:0 %5, stop:1 %6);"
+        "  border: 1px solid %7; border-top-color: %8; border-radius: 5px;"
         "}"
-    ).arg(kGroove, kAccent);
+        "QSlider::handle:horizontal:hover { background: %9; }"
+    ).arg(hexRole(kInsetBg), hexRole(kBorder),
+          QLatin1String(kGlassShade), QLatin1String(kGlassLight),
+          hexRole(kGlassBtnTop), hexRole(kGlassBtnBot),
+          hexRole(kAccent), shiftL(QColor(hexRole(kAccent)), 18),
+          hexRole(kGlassBtnTop));
 }
 
 inline QString sliderVStyle()
 {
+    // Wie sliderHStyle(), nur stehend: Rinne versenkt (Licht kommt von
+    // oben, also Schattenkante oben), Griff eine liegende Pille.
     return QStringLiteral(
         "QSlider::groove:vertical {"
-        "  width: 4px; background: %1; border-radius: 2px;"
+        "  width: 4px; background: %1; border: 1px solid %2;"
+        "  border-top-color: %3; border-bottom-color: %4; border-radius: 3px;"
         "}"
         "QSlider::handle:vertical {"
-        "  height: 10px; width: 16px; margin: 0 -6px;"
-        "  background: %2; border-radius: 5px;"
+        "  height: 10px; width: 14px; margin: 0 -6px;"
+        "  background: qlineargradient(x1:0, y1:0, x2:0, y2:1,"
+        "               stop:0 %5, stop:1 %6);"
+        "  border: 1px solid %7; border-top-color: %8; border-radius: 5px;"
         "}"
-    ).arg(kGroove, kAccent);
+        "QSlider::handle:vertical:hover { background: %9; }"
+    ).arg(hexRole(kInsetBg), hexRole(kBorder),
+          QLatin1String(kGlassShade), QLatin1String(kGlassLight),
+          hexRole(kGlassBtnTop), hexRole(kGlassBtnBot),
+          hexRole(kAccent), shiftL(QColor(hexRole(kAccent)), 18),
+          hexRole(kGlassBtnTop));
+}
+
+/// Die Platte eines Panels (Glas & Tiefe, 2026-09-17): ein Verlauf von
+/// oben hell nach unten dunkel und ein feiner Rahmen. Fuer schwebende
+/// Fenster und gedockte Zellen dasselbe — die Applets darin sind
+/// durchsichtig, damit die Platte durchscheint.
+inline QString glassPanelFill()
+{
+    return QStringLiteral(
+        "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 %1, stop:1 %2)")
+        .arg(hexRole(kGlassPanelTop), hexRole(kGlassPanelBot));
+}
+
+/// Eine Tabelle hinter Glas (Glas & Tiefe, 2026-09-17): versenkt wie
+/// ein Zahlenfeld, Kopfzeile ohne Kaesten — nur eine Haarlinie unter
+/// den Titeln —, Auswahl im gedeckten Blauverlauf, Gitter leise. Keine
+/// Schriftangaben: Groesse und Versalien setzt der Aufrufer per
+/// setFont (Tabelle 11 px, Kopf capsFont 9 px), sonst kaskadiert eine
+/// font-size aus dem Stylesheet in den Kopf und schlaegt sie tot.
+inline QString tableStyle()
+{
+    return QStringLiteral(
+        "QTableView, QTableWidget, QTreeView, QTreeWidget, QListView, QListWidget {"
+        "  background: %1; color: %2; border: 1px solid %3;"
+        "  border-top-color: %4; border-bottom-color: %5;"
+        "  border-radius: %6px; gridline-color: %7; outline: none;"
+        "  selection-background-color: %8; selection-color: %9;"
+        // Zebra eine Spur heller als der Grund. Ohne diese Zeile nimmt
+        // eine Tabelle mit setAlternatingRowColors(true) die Palette —
+        // und die ist hell: auf dem Logbuch-Blatt vom 2026-09-17 stand
+        // jede zweite Zeile WEISS.
+        "  alternate-background-color: %12;"
+        "}"
+        "QTableView::item, QTableWidget::item, QTreeView::item, QListView::item {"
+        "  padding: 2px 3px; border: none; }"
+        "QTableView::item:selected, QTableWidget::item:selected,"
+        "QTreeView::item:selected, QListView::item:selected {"
+        "  background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 %10, stop:1 %8);"
+        "  color: %9; }"
+        "QHeaderView { background: transparent; border: none; }"
+        "QHeaderView::section { background: transparent; color: %11;"
+        "  border: none; border-bottom: 1px solid %3; padding: 3px 3px; }"
+        "QTableCornerButton::section { background: transparent; border: none; }"
+    ).arg(sunkenFill(kInsetBg, 8, 4),
+          hexRole(kTextPrimary),
+          hexRole(kBorder),
+          QLatin1String(kGlassShade),
+          QLatin1String(kGlassLight),
+          QString::number(kGlassChipRadius),
+          hexRole(kBorderSubtle),
+          hexRole(kGlassSelBot),
+          hexRole(kGlassSelText))
+     .arg(hexRole(kGlassSelTop),
+          hexRole(kTextScale),
+          hexRole(kGlassPanelBot));
+}
+
+/// Ein Zahlenfeld hinter Glas (Glas & Tiefe, 2026-09-17): schwarz,
+/// feiner Rahmen, oben die dunkle Kante des Innenschattens, unten eine
+/// Lichtkante — und KEINE Pfeile. Mausrad, Pfeiltasten und Tippen
+/// bleiben; die Pfeilknoepfe waren Qt-Optik und nahmen dem Feld die
+/// Ruhe. Die Schrift setzt der Aufrufer per setFont (Monospace, Regel
+/// 4) — Groesse gehoert nicht ins Stylesheet (HAUSSTIL.md, die Falle).
+inline QString glassFieldStyle()
+{
+    return QStringLiteral(
+        "QSpinBox, QDoubleSpinBox, QLineEdit {"
+        "  background: %1; border: 1px solid %2;"
+        "  border-top-color: %3; border-bottom-color: %4;"
+        "  border-radius: %5px; color: %6; padding: 3px 8px;"
+        "  selection-background-color: %7; selection-color: %8;"
+        "}"
+        "QSpinBox::up-button, QSpinBox::down-button,"
+        "QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {"
+        "  width: 0px; border: none; }"
+        "QSpinBox:focus, QDoubleSpinBox:focus, QLineEdit:focus {"
+        "  border: 1px solid %9; }"
+    ).arg(sunkenFill(kInsetBg, 8, 4),
+          hexRole(kBorder),
+          QLatin1String(kGlassShade),
+          QLatin1String(kGlassLight),
+          QString::number(kGlassChipRadius),
+          hexRole(kTextPrimary),
+          hexRole(kGlassSelBot),
+          hexRole(kGlassSelText),
+          hexRole(kAccent));
 }
 
 inline QString insetValueStyle()
@@ -751,14 +967,20 @@ inline QString insetValueStyle()
     // VERSENKT: oben dunkel, unten heller — siehe die Notiz bei
     // buttonBaseStyle. Dasselbe Mittel wie bei der Platte, nur
     // umgedreht, und das Feld liegt drin statt drauf.
+    // Glas & Tiefe (2026-09-17): ein Glaschip wie im Bandfilter — oben
+    // die dunkle Kante, unten Licht, Monospace fuer die Zahl (Regel 4).
     return QStringLiteral(
         "QLabel {"
-        "  font-size: 11px; background: %1; border: 1px solid %2;"
-        "  border-radius: 6px; padding: 1px 2px; color: %3;"
+        "  font-size: 11px; font-family: Menlo; background: %1; border: 1px solid %2;"
+        "  border-top-color: %4; border-bottom-color: %5;"
+        "  border-radius: %6px; padding: 1px 4px; color: %3;"
         "}"
-    ).arg(sunkenFill(kInsetBg),
+    ).arg(sunkenFill(kInsetBg, 8, 4),
           QLatin1String(kInsetBorder),
-          QLatin1String(kTextPrimary));
+          QLatin1String(kTextPrimary),
+          QLatin1String(kGlassShade),
+          QLatin1String(kGlassLight))
+     .arg(kGlassChipRadius);
 }
 
 inline QString titleBarStyle()
@@ -767,11 +989,14 @@ inline QString titleBarStyle()
     // kraeftiger als die Platte darunter, und eine dunkle Unterkante,
     // die sie von ihr abhebt. Die Toene stehen weiter in der Palette
     // (kTitleGrad*) — hier ist nur der Schluss dunkler geworden.
+    // Glas & Tiefe (2026-09-17): dazu eine Lichtkante am oberen Rand,
+    // damit der Kopf eine Oberflaeche hat und nicht nur einen Verlauf.
     return QStringLiteral(
         "background: qlineargradient(x1:0,y1:0,x2:0,y2:1,"
         " stop:0 %1, stop:0.5 %2, stop:1 %3);"
-        " border-bottom: 1px solid %4;"
-    ).arg(kTitleGradTop, kTitleGradMid, kTitleGradBot, kTitleBorder);
+        " border-bottom: 1px solid %4; border-top: 1px solid %5;"
+    ).arg(kTitleGradTop, kTitleGradMid, kTitleGradBot, kTitleBorder,
+          QLatin1String(kGlassLight));
 }
 
 // ── Setup Dialog Page Stylesheets ─────────────────────────────────────────────
@@ -782,36 +1007,89 @@ constexpr auto kPageStyle =
     "QWidget { background: #0f0f1a; color: #c8d8e8; }";
 
 constexpr auto kGroupBoxStyle =
-    "QGroupBox { border: 1px solid #304050; border-radius: 6px;"
-    " margin-top: 8px; padding-top: 12px; font-weight: bold; color: #8aa8c0; }"
+    // Eine Gruppe ist eine Platte im Panel: feiner Rahmen mit Licht-
+    // kante, Radius 10 wie die Panels, Titel in Zweitfarbe — nicht
+    // mehr blau und fett, das war die alte Setup-Palette.
+    "QGroupBox { border: 1px solid #2c2c31; border-top-color: #38383e;"
+    " border-radius: 10px; margin-top: 8px; padding-top: 12px;"
+    " font-weight: 600; color: #a6a6ac; }"
     "QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 4px; }";
 
 constexpr auto kSecondaryLabelStyle =
     "QLabel { color: #8090a0; font-size: 11px; }";
 
+// ── Formularstil: Glas & Tiefe (2026-09-18) ───────────────────────────
+//
+// Roadmap C/F, Betreiber am 17.09.: "kannst ruhig weiter designen".
+// Ein Stil fuer alle Formularteile, in Applets wie im Setup-Dialog:
+//
+//   Auswahlfelder (QComboBox) sind ERHABEN wie ein Knopf — Verlauf,
+//   Lichtkante oben, dunkle Kante unten, Radius 7 — denn sie oeffnen
+//   ein Menue, das UEBER der Oberflaeche liegt. Die Liste selbst ist
+//   ein dunkles Glas mit dem gedeckten Auswahlverlauf der Kopfleiste.
+//
+//   Haekchen und Wahlpunkte sind VERSENKT (schwarz, Schattenkante
+//   oben, Lichtkante unten); angehakt fuellt sie derselbe gedeckte
+//   Blauverlauf wie jede andere Auswahl. Radius 4 statt 2 — die
+//   Regel "nie 3" gilt auch fuer Kleines.
+//
+//   Eingabefelder sind Glasfelder (glassFieldStyle), Rinnen versenkt
+//   (sliderHStyle/sliderVStyle), Knoepfe erhaben (buttonBaseStyle).
+//
+// Feste Hexwerte statt hexRole(): die Konstanten muessen constexpr
+// bleiben, weil ~200 Aufrufstellen sie als const char* erwarten; die
+// Glasfarben (kGlass*) haben ohnehin keine Themenrolle. Werte:
+// Kante hell = shiftL(kBorder, +12), Kante dunkel = shiftL(kBorder, -14).
+constexpr auto kGlassEdgeLight = "#38383e";   // Lichtkante auf kBorder
+constexpr auto kGlassEdgeDark  = "#1f1f23";   // Schattenkante auf kBorder
+
 constexpr auto kComboStyle =
-    "QComboBox { background: #1a2a3a; border: 1px solid #304050;"
-    " border-radius: 6px; color: #c8d8e8; font-size: 13px; padding: 2px 4px; }"
-    "QComboBox::drop-down { border: none; }"
-    // 2026-09-08: selection-background-color allein liess Qt die
-    // Vordergrundfarbe des ausgewaehlten Eintrags dem Systemstandard
-    // ueberlassen -- gegen den erzwungenen dunklen Grund praktisch
-    // unsichtbar. selection-color ergaenzt (siehe auch der gleiche Fund
-    // in SpectrumOverlayPanel.cpp::OverlayColors::kPanelStyle).
-    "QComboBox QAbstractItemView { background: #1a2a3a; color: #c8d8e8;"
-    " selection-background-color: #4a7ba8; selection-color: #ffffff; }";
+    "QComboBox {"
+    "  background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #222227, stop:1 #141417);"
+    "  color: #dcdce1; border: 1px solid #2c2c31;"
+    "  border-top-color: #38383e; border-bottom-color: #1f1f23;"
+    "  border-radius: 7px; padding: 3px 8px; }"
+    "QComboBox:hover {"
+    "  background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #2a2a30, stop:1 #1a1a1e); }"
+    "QComboBox:on {"   // aufgeklappt: gedrueckt, der Verlauf kippt
+    "  background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #141417, stop:1 #222227);"
+    "  border-top-color: #1f1f23; border-bottom-color: #38383e; }"
+    "QComboBox:disabled { color: #6a6a70; border-color: #232327; }"
+    "QComboBox::drop-down { border: none; width: 18px; subcontrol-origin: padding; subcontrol-position: center right; }"
+    "QComboBox::down-arrow { image: url(:/icons/spin-down.svg); width: 10px; height: 10px; }"
+    // Die Liste: dunkles Glas, gedeckte Auswahl (kGlassSelBot/Text) —
+    // 2026-09-08 lernte das Haus, dass selection-color ohne
+    // selection-background-color den Eintrag unsichtbar macht.
+    "QComboBox QAbstractItemView {"
+    "  background: #0e0e10; color: #dcdce1; border: 1px solid #2c2c31;"
+    "  selection-background-color: #1e3d5f; selection-color: #dbe9f8; outline: none; }"
+    "QComboBox QAbstractItemView::item { padding: 3px 6px; min-height: 18px; }"
+    "QComboBox QAbstractItemView::item:selected { background: #1e3d5f; color: #dbe9f8; }";
 
 constexpr auto kCheckBoxStyle =
-    "QCheckBox { color: #c8d8e8; font-size: 13px; }"
-    "QCheckBox::indicator { width: 14px; height: 14px; background: #1a2a3a;"
-    " border: 1px solid #304050; border-radius: 2px; }"
-    "QCheckBox::indicator:checked { background: #4a7ba8; border-color: #4a7ba8; }";
+    "QCheckBox { color: #dcdce1; spacing: 6px; min-height: 20px; }"   // min-height: drei Haekchen untereinander kollidierten
+    "QCheckBox:disabled { color: #6a6a70; }"
+    "QCheckBox::indicator { width: 14px; height: 14px;"
+    "  background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #000000, stop:1 #08080c);"
+    "  border: 1px solid #2c2c31; border-top-color: rgba(0, 0, 0, 160);"
+    "  border-bottom-color: rgba(255, 255, 255, 18); border-radius: 4px; }"
+    "QCheckBox::indicator:hover { border-color: #4a7ba8; }"
+    "QCheckBox::indicator:checked {"
+    "  background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #2f5f92, stop:1 #1e3d5f);"
+    "  border: 1px solid #3d78b0; border-top-color: #4b88c1; }"
+    "QCheckBox::indicator:checked:disabled { background: #232327; border-color: #232327; }";
 
 constexpr auto kRadioButtonStyle =
-    "QRadioButton { color: #c8d8e8; font-size: 13px; }"
-    "QRadioButton::indicator { width: 14px; height: 14px; background: #08080a;"
-    " border: 1px solid #2c2c31; border-radius: 7px; }"
-    "QRadioButton::indicator:checked { background: #4a7ba8; border-color: #2f5c86; }";
+    "QRadioButton { color: #dcdce1; spacing: 6px; min-height: 20px; }"
+    "QRadioButton:disabled { color: #6a6a70; }"
+    "QRadioButton::indicator { width: 14px; height: 14px;"
+    "  background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #000000, stop:1 #08080c);"
+    "  border: 1px solid #2c2c31; border-top-color: rgba(0, 0, 0, 160);"
+    "  border-bottom-color: rgba(255, 255, 255, 18); border-radius: 7px; }"
+    "QRadioButton::indicator:hover { border-color: #4a7ba8; }"
+    "QRadioButton::indicator:checked {"
+    "  background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #2f5f92, stop:1 #1e3d5f);"
+    "  border: 1px solid #3d78b0; border-top-color: #4b88c1; }";
 
 // ── Eingabefelder sind Mulden, keine Flaechen ────────────────────────
 //
@@ -851,52 +1129,92 @@ constexpr auto kRadioButtonStyle =
 // ENTFERNT, nicht danebengestellt — sonst haette der Uebersetzer die
 // vergessenen Aufrufstellen nicht gefunden, und die Haelfte der
 // Felder waere flach geblieben.
-inline QString lineEditStyle()
+/// Glasfeld mit Pfeilen: dieselbe versenkte Mulde wie glassFieldStyle(),
+/// aber die Pfeilknoepfe bleiben (Setup-Seiten sind Formulare, dort
+/// helfen sie; die Wertchips in den Applets kommen ohne aus).
+inline QString formFieldStyle()
 {
     return QStringLiteral(
-        "QLineEdit { background: %1; border: 1px solid %2;"
-        " border-radius: %3px; color: %4; font-size: 13px;"
-        " padding: 2px 4px; }")
-        .arg(sunkenFill(kInsetBg),
-             hexRole(kInsetBorder))
-        .arg(formInt("radius", 7))
-        .arg(hexRole(kTextPrimary));
+        "QLineEdit, QSpinBox, QDoubleSpinBox, QPlainTextEdit, QTextEdit {"
+        "  background: %1; border: 1px solid %2;"
+        "  border-top-color: %3; border-bottom-color: %4;"
+        "  border-radius: %5px; color: %6; padding: 3px 8px;"
+        "  selection-background-color: %7; selection-color: %8;"
+        "}"
+        "QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus,"
+        "QPlainTextEdit:focus, QTextEdit:focus { border: 1px solid %9; }"
+        "QLineEdit:disabled, QSpinBox:disabled, QDoubleSpinBox:disabled {"
+        "  color: %10; border-color: %11; }"
+    ).arg(sunkenFill(kInsetBg, 8, 4),
+          hexRole(kBorder),
+          QLatin1String(kGlassShade),
+          QLatin1String(kGlassLight),
+          QString::number(kGlassChipRadius),
+          hexRole(kTextPrimary),
+          hexRole(kGlassSelBot),
+          hexRole(kGlassSelText),
+          hexRole(kAccent))
+     .arg(hexRole(kDisabledText), hexRole(kDisabledBorder));
 }
 
-inline QString spinBoxStyle()
-{
-    return QStringLiteral(
-        "QSpinBox { background: %1; border: 1px solid %2;"
-        " border-radius: %3px; color: %4; font-size: 13px;"
-        " padding: 2px 4px; }")
-        .arg(sunkenFill(kInsetBg),
-             hexRole(kInsetBorder))
-        .arg(formInt("radius", 7))
-        .arg(hexRole(kTextPrimary));
-}
-
-inline QString doubleSpinBoxStyle()
-{
-    return QStringLiteral(
-        "QDoubleSpinBox { background: %1; border: 1px solid %2;"
-        " border-radius: %3px; color: %4; font-size: 13px;"
-        " padding: 2px 4px; }")
-        .arg(sunkenFill(kInsetBg),
-             hexRole(kInsetBorder))
-        .arg(formInt("radius", 7))
-        .arg(hexRole(kTextPrimary));
-}
+inline QString lineEditStyle()   { return formFieldStyle(); }
+inline QString spinBoxStyle()    { return formFieldStyle(); }
+inline QString doubleSpinBoxStyle() { return formFieldStyle(); }
 
 constexpr auto kSliderStyle =
-    "QSlider::groove:horizontal { background: #1a2a3a; height: 4px; border-radius: 2px; }"
-    "QSlider::handle:horizontal { background: #4a7ba8; width: 12px;"
-    " height: 12px; border-radius: 6px; margin: -4px 0; }";
+    // Dieselbe Rinne wie sliderHStyle(), als Konstante fuer die Setup-
+    // Seiten: versenkte Rinne, erhabener Griff mit Akzentrand.
+    "QSlider::groove:horizontal { height: 4px; background: #050507;"
+    " border: 1px solid #2c2c31; border-top-color: rgba(0, 0, 0, 160);"
+    " border-bottom-color: rgba(255, 255, 255, 18); border-radius: 3px; }"
+    "QSlider::handle:horizontal { width: 10px; height: 14px; margin: -6px 0;"
+    " background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #222227, stop:1 #141417);"
+    " border: 1px solid #4a7ba8; border-top-color: #5e8db8; border-radius: 5px; }"
+    "QSlider::handle:horizontal:hover { background: #222227; }";
 
 constexpr auto kButtonStyle =
-    "QPushButton { background: #1a2a3a; border: 1px solid #304050;"
-    " border-radius: 6px; color: #c8d8e8; font-size: 13px; padding: 3px 10px; }"
-    "QPushButton:hover { background: #203040; }"
-    "QPushButton:pressed { background: #4a7ba8; color: #0f0f1a; }";
+    // Erhaben wie buttonBaseStyle(), als Konstante: Verlauf, Licht-
+    // kante oben, dunkle Kante unten; gedrueckt kippt der Verlauf.
+    "QPushButton {"
+    "  background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #29292f, stop:0.55 #1a1a1e, stop:1 #0f0f11);"
+    "  border: 1px solid #2c2c31; border-top-color: #38383e; border-bottom-color: #1f1f23;"
+    "  border-radius: 7px; color: #dcdce1; padding: 4px 12px; }"
+    "QPushButton:hover {"
+    "  background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #42454e, stop:0.55 #2f3138, stop:1 #26282e); }"
+    "QPushButton:pressed {"
+    "  background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #0f0f11, stop:1 #29292f);"
+    "  border-top-color: #1f1f23; border-bottom-color: #38383e; }"
+    "QPushButton:disabled { color: #58585e; border-color: #232327;"
+    "  background: #101013; }";   // flach: ein gesperrter Knopf hat keine Dicke
+
+// Reiter (QTabWidget): die Platte darunter mit Lichtkante, die Reiter
+// erhaben wie Knoepfe; der gewaehlte Reiter ist Teil der Platte —
+// gleicher Grund, keine Unterkante, Text in Erstfarbe.
+constexpr auto kTabStyle =
+    "QTabWidget::pane { border: 1px solid #2c2c31; border-top-color: #38383e;"
+    "  border-radius: 10px; background: #0e0e10; top: -1px; }"
+    "QTabBar::tab {"
+    "  background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #222227, stop:1 #141417);"
+    "  color: #a6a6ac; border: 1px solid #2c2c31; border-top-color: #38383e; border-bottom: none;"
+    "  border-top-left-radius: 7px; border-top-right-radius: 7px;"
+    "  padding: 5px 14px; margin-right: 2px; }"
+    "QTabBar::tab:hover { color: #dcdce1; }"
+    "QTabBar::tab:selected { background: #0e0e10; color: #dcdce1; border-bottom: none;"
+    "  margin-bottom: -1px; }";
+
+// Bildlaufleisten: schmal, dunkel, ohne Pfeile — Qt/macOS malt sonst
+// eine helle Systemleiste in jede Setup-Seite.
+constexpr auto kScrollBarStyle =
+    "QScrollBar:vertical { background: transparent; width: 10px; margin: 0; }"
+    "QScrollBar::handle:vertical { background: #2c2c31; border-radius: 4px; min-height: 24px; margin: 2px; }"
+    "QScrollBar::handle:vertical:hover { background: #3a3a41; }"
+    "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; border: none; background: none; }"
+    "QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: none; }"
+    "QScrollBar:horizontal { background: transparent; height: 10px; margin: 0; }"
+    "QScrollBar::handle:horizontal { background: #2c2c31; border-radius: 4px; min-width: 24px; margin: 2px; }"
+    "QScrollBar::handle:horizontal:hover { background: #3a3a41; }"
+    "QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal { width: 0; border: none; background: none; }"
+    "QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal { background: none; }";
 
 // Apply the canonical "dark page" stylesheet to a Setup page that lays
 // itself out manually (i.e. doesn't inherit the SetupPage::addLabeledX
@@ -922,49 +1240,29 @@ constexpr auto kButtonStyle =
 inline void applyDarkPageStyle(QWidget* w)
 {
     if (!w) { return; }
+    // Glas & Tiefe (2026-09-18): keine eigene Palette mehr, sondern die
+    // Bausteine, die auch die Applets tragen — Auswahlfelder erhaben,
+    // Haekchen versenkt, Felder als Glas, Rinnen versenkt, Knoepfe
+    // erhaben. Eine Seite, die "dunkel" sagt, sagt damit dasselbe wie
+    // das Hauptfenster.
     w->setStyleSheet(QStringLiteral(
         "QWidget { background: %1; color: %2; }"
-        "QGroupBox { color: %7; font-size: 11px;"
-        "  border: 1px solid %3; border-radius: 6px;"
-        "  margin-top: 8px; padding-top: 12px; }"
-        "QGroupBox::title { subcontrol-origin: margin; left: 8px; padding: 0 4px; }"
-        "QLabel { color: %2; }"
-        "QComboBox { background: %4; color: %2; border: 1px solid %3;"
-        "  border-radius: 6px; padding: 2px 6px; }"
-        "QComboBox::drop-down { border: none; }"
-        // 2026-09-08: selection-color ergaenzt (siehe kComboStyle oben) --
-        // ohne sie blieb der ausgewaehlte Eintrag im aufgeklappten
-        // Dropdown praktisch unsichtbar.
-        "QComboBox QAbstractItemView { background: %4; color: %2;"
-        "  selection-background-color: %5; selection-color: %2; }"
-        "QSlider::groove:horizontal { background: %4; height: 4px;"
-        "  border-radius: 2px; }"
-        "QSlider::handle:horizontal { background: %5; width: 12px;"
-        "  margin: -4px 0; border-radius: 6px; }"
-        "QSlider::sub-page:horizontal { background: %5; border-radius: 2px; }"
-        "QSpinBox, QDoubleSpinBox { background: %4; color: %2;"
-        "  border: 1px solid %3; border-radius: 6px; padding: 1px 4px; }"
-        "QCheckBox { color: %2; }"
-        "QCheckBox::indicator { width: 14px; height: 14px; background: %4;"
-        "  border: 1px solid %3; border-radius: 2px; }"
-        "QCheckBox::indicator:checked { background: %5; border-color: %5; }"
-        "QRadioButton { color: %2; }"
-        "QRadioButton::indicator { width: 14px; height: 14px; background: %4;"
-        "  border: 1px solid %3; border-radius: 7px; }"
-        "QRadioButton::indicator:checked { background: %5; border-color: %5; }"
-        "QLineEdit { background: %4; color: %2; border: 1px solid %3;"
-        "  border-radius: 6px; padding: 2px 6px; }"
-        "QPushButton { background: %4; color: %2; border: 1px solid %3;"
-        "  border-radius: 6px; padding: 3px 12px; }"
-        "QPushButton:hover { background: %6; }"
-        "QPushButton:pressed { background: %5; color: %1; }"
-    ).arg(kAppBg, kTextPrimary, kBorder, kButtonBg, kAccent, kButtonHover, kTextSecondary));
+        "QLabel { color: %2; }")
+        .arg(hexRole(kAppBg), hexRole(kTextPrimary))
+        + QLatin1String(kGroupBoxStyle)
+        + QLatin1String(kComboStyle)
+        + QLatin1String(kCheckBoxStyle)
+        + QLatin1String(kRadioButtonStyle)
+        + formFieldStyle()
+        + sliderHStyle()
+        + sliderVStyle()
+        + QLatin1String(kButtonStyle));
 }
 
 // ── TX / RX filter overlay palette ────────────────────────────────────────────
 // Plan 4 D9 (Cluster E).  Used by SpectrumWidget::drawTxFilterOverlay() and
 // SpectrumWidget::drawTxFilterWaterfallColumn().
-// Colours are NereusSDR-original; no Thetis upstream equivalent (Thetis uses
+// Colours are Longpath-original; no Thetis upstream equivalent (Thetis uses
 // hard-coded GDI+ brushes without named constants).
 
 // TX filter overlay — translucent orange.

@@ -1,4 +1,4 @@
-// tests/tst_calibration_tab.cpp  (NereusSDR)
+// tests/tst_calibration_tab.cpp  (Longpath)
 //
 // Smoke tests for CalibrationTab UI (Phase 3P-G commit 2).
 // no-port-check: test file — no Thetis attribution required.

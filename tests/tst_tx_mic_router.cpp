@@ -1,8 +1,8 @@
 // =================================================================
-// tests/tst_tx_mic_router.cpp  (NereusSDR)
+// tests/tst_tx_mic_router.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original test. No Thetis port at this layer.
+// Longpath-original test. No Thetis port at this layer.
 //
 // Verifies the TxMicRouter strategy interface and NullMicSource
 // concrete stub added in Phase 3M-1a Task D.1:
@@ -18,12 +18,12 @@
 // Design ref: docs/architecture/phase3m-tx-epic-master-design.md §5.1.1
 // =================================================================
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-25 — Original test for NereusSDR by J.J. Boyd (KG4VCF),
 //                 with AI-assisted implementation via Anthropic Claude Code.
 // =================================================================
 
-// no-port-check: NereusSDR-original test file.
+// no-port-check: Longpath-original test file.
 
 #include <QtTest/QtTest>
 #include "core/TxMicRouter.h"

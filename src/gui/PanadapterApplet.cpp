@@ -1,4 +1,4 @@
-// no-port-check: AetherSDR-derived NereusSDR file. Per-pan container
+// no-port-check: AetherSDR-derived Longpath file. Per-pan container
 // (SpectrumWidget host, slice association) is adapted structurally from
 // AetherSDR src/gui/PanadapterApplet.{h,cpp} [@0cd4559]. Registered in
 // docs/attribution/aethersdr-reconciliation.md.
@@ -6,7 +6,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // =================================================================
-// src/gui/PanadapterApplet.cpp  (NereusSDR)
+// src/gui/PanadapterApplet.cpp  (Longpath)
 // =================================================================
 //
 // Ported (structurally) from AetherSDR src/gui/PanadapterApplet.{h,cpp}
@@ -15,7 +15,7 @@
 //       per https://github.com/ten9876/AetherSDR (GPLv3; see LICENSE
 //       and About dialog for the live contributor list)
 //
-// See PanadapterApplet.h for full Modification history (NereusSDR).
+// See PanadapterApplet.h for full Modification history (Longpath).
 // =================================================================
 
 #include "gui/PanadapterApplet.h"
@@ -487,7 +487,7 @@ void PanadapterApplet::contextMenuEvent(QContextMenuEvent* event)
 // to be active when the operator reached a button sitting nowhere near any
 // pan. A control drawn ON a pan targets THAT pan, so both move here and
 // carry this applet's own panId(). Neither action exists on AetherSDR's pan
-// menu (design doc s8.5), so this is NereusSDR-original, not a further port.
+// menu (design doc s8.5), so this is Longpath-original, not a further port.
 //
 // Split out of contextMenuEvent so a test can build the menu, find +
 // trigger() these two actions by their operator-facing text, and assert the

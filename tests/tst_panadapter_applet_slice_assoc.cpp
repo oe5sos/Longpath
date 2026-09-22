@@ -1,7 +1,7 @@
 // =================================================================
-// tests/tst_panadapter_applet_slice_assoc.cpp  (NereusSDR)
+// tests/tst_panadapter_applet_slice_assoc.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure.
+// no-port-check: Longpath-original test infrastructure.
 //
 // Phase 3F Sub-Epic D Task 1: PanadapterApplet skeleton + slice assoc.
 // =================================================================

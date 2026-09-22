@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_eq_filter_ring.cpp  (NereusSDR)
+// tests/tst_eq_filter_ring.cpp  (Longpath)
 // =================================================================
 //
 // Three gestures change a band's filter type — clicking its icon,
@@ -16,10 +16,10 @@
 // means "narrow notch" on a peak and "resonant hump on the corner" on a
 // high-pass.
 //
-// no-port-check: NereusSDR-original.
+// no-port-check: Longpath-original.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-11 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

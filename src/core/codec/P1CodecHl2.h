@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/codec/P1CodecHl2.h  (NereusSDR)
+// src/core/codec/P1CodecHl2.h  (Longpath)
 // =================================================================
 //
 // Ported from mi0bot-Thetis sources:
@@ -7,7 +7,7 @@
 //   (WriteMainLoop_HL2)
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-20 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                (KG4VCF), with AI-assisted transformation via Anthropic
 //                Claude Code. HL2-only codec; mirrors mi0bot's

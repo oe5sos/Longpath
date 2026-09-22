@@ -1,12 +1,12 @@
 // =================================================================
-// src/gui/applets/eq/EqHost.cpp  (NereusSDR)
+// src/gui/applets/eq/EqHost.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. See EqHost.h for why an adapter rather than five
+// Longpath-original. See EqHost.h for why an adapter rather than five
 // edited ports.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-09 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================
@@ -38,7 +38,7 @@ int EqHost::copyRecentClientEqTxSamples(float* dst, int count)
     // is drawn over the spectrum so the operator can aim it, and aiming
     // a filter at a spectrum the filter has already changed is chasing
     // your own tail. Aether's own curve sits over its post-EQ analyser
-    // and has the same quirk; NereusSDR does not have to inherit it.
+    // and has the same quirk; Longpath does not have to inherit it.
     return m_chain->micSpectrum().snapshot(dst, count);
 }
 

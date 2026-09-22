@@ -1,13 +1,13 @@
 #pragma once
 
 // =================================================================
-// src/gui/setup/AudioTxInputPage.h  (NereusSDR)
+// src/gui/setup/AudioTxInputPage.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original Setup → Audio → TX Input page.
+// Longpath-original Setup → Audio → TX Input page.
 // No Thetis port, no attribution headers required (per memory:
 // feedback_source_first_ui_vs_dsp — Qt widgets in Setup pages are
-// NereusSDR-native).
+// Longpath-native).
 //
 // Phase 3M-1b Task I.1 (2026-04-28): Top-level PC Mic / Radio Mic
 // radio buttons. Radio Mic disabled with tooltip
@@ -51,7 +51,7 @@
 // Design spec: docs/architecture/phase3m-1b-mic-ssb-voice-plan.md
 // §3 Phase I (I.1–I.4) + pre-code review §5.1 + §5.4.
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-28 — I.1 written by J.J. Boyd (KG4VCF), with AI-assisted
 //                implementation via Anthropic Claude Code.
 //   2026-04-28 — I.2 PC Mic group box written by J.J. Boyd (KG4VCF),
@@ -63,7 +63,7 @@
 //                with AI-assisted implementation via Anthropic Claude Code.
 // =================================================================
 
-// no-port-check: NereusSDR-original file; no Thetis logic ported here.
+// no-port-check: Longpath-original file; no Thetis logic ported here.
 
 #include "gui/SetupPage.h"
 #include "core/audio/CompositeTxMicRouter.h"

@@ -19,7 +19,7 @@
  */
 
 // =================================================================
-// src/core/codec/P2CodecHermes.cpp  (NereusSDR)
+// src/core/codec/P2CodecHermes.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources (multi-source) [v2.10.3.15 / 3759d09]:
@@ -31,7 +31,7 @@
 //     (GetDDC() P2 Hermes-class branch — rx1=0, rx2=1)
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-07-25 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                (KG4VCF), with AI-assisted transformation via Anthropic
 //                Claude Code. Phase 3F Sub-Epic I Task 7c. Extends

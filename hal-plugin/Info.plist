@@ -8,11 +8,11 @@
     <key>CFBundleExecutable</key>
     <string>LongpathVAX</string>
     <key>CFBundleIdentifier</key>
-    <string>com.nereussdr.vax</string>
+    <string>at.oe5sos.longpath.vax</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>NereusSDR VAX</string>
+    <string>Longpath VAX</string>
     <key>CFBundlePackageType</key>
     <string>BNDL</string>
     <key>CFBundleShortVersionString</key>
@@ -20,7 +20,7 @@
     <key>CFBundleVersion</key>
     <string>1</string>
     <key>AudioServerPlugIn_BundleResourceID</key>
-    <string>com.nereussdr.vax</string>
+    <string>at.oe5sos.longpath.vax</string>
     <key>CFPlugInFactories</key>
     <dict>
         <key>F58308D0-1ABD-4D44-845B-F308A64CDA16</key>

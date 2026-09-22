@@ -1,12 +1,12 @@
 // =================================================================
-// src/core/BeamHeading.cpp  (NereusSDR)
+// src/core/BeamHeading.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. See BeamHeading.h for why the end stop is the
+// Longpath-original. See BeamHeading.h for why the end stop is the
 // part that matters.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-09 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

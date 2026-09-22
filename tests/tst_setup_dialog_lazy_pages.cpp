@@ -1,8 +1,8 @@
-// tests/tst_setup_dialog_lazy_pages.cpp  (NereusSDR)
+// tests/tst_setup_dialog_lazy_pages.cpp  (Longpath)
 //
 // Issues #272 + #301 regression suite: lazy SetupDialog page construction.
 //
-// no-port-check: NereusSDR-original UI test fixture. SetupDialog is not a
+// no-port-check: Longpath-original UI test fixture. SetupDialog is not a
 // Thetis port, so no upstream attribution applies here.
 //
 // Background. SetupDialog::buildTree() used to construct all 55 setup pages

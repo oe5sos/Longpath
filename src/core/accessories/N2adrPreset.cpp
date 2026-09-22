@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/accessories/N2adrPreset.cpp  (NereusSDR)
+// src/core/accessories/N2adrPreset.cpp  (Longpath)
 // =================================================================
 //
 // Ported from mi0bot-Thetis source:
@@ -10,7 +10,7 @@
 // See N2adrPreset.h for the full design + scope rationale.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-30 — Extracted from Hl2IoBoardTab.cpp:950-995 + RadioModel.cpp
 //                :1077-1111 to centralise the per-band write table.
 //                Adds 13 SWL bands × pin-7 RX entries previously missing.

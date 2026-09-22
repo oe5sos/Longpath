@@ -1,17 +1,17 @@
 #pragma once
 
 // =================================================================
-// src/gui/spectrum/ActivePeakHoldTrace.h  (NereusSDR)
+// src/gui/spectrum/ActivePeakHoldTrace.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/display.cs
 //   original licence from Thetis source is included below
 //
-// NereusSDR-original class structure. Constants and logic reference
+// Longpath-original class structure. Constants and logic reference
 // Thetis display.cs: m_bActivePeakHold and associated peak-hold
 // rendering.  Thetis stores the trace as a per-bin max array
-// (display.cs:~4750) and decays it in the display timer; NereusSDR
+// (display.cs:~4750) and decays it in the display timer; Longpath
 // mirrors that pattern here with an explicit tickFrame() step.
 //
 // Design decision Q14.1 (locked): rendered as a separate pass on
@@ -19,7 +19,7 @@
 // architectural flexibility.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-01 — Created in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via
 //                 Anthropic Claude Code.

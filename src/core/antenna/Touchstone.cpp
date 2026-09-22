@@ -1,12 +1,12 @@
 // =================================================================
-// src/core/antenna/Touchstone.cpp  (NereusSDR)
+// src/core/antenna/Touchstone.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. See Touchstone.h for the parts of the format
+// Longpath-original. See Touchstone.h for the parts of the format
 // that bite.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-10 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

@@ -42,9 +42,9 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 THETIS_DIR = Path(os.environ.get(
-    "NEREUS_THETIS_DIR", REPO.parent.parent.parent / "Thetis")).expanduser()
+    "LONGPATH_THETIS_DIR", REPO.parent.parent.parent / "Thetis")).expanduser()
 MI0BOT_DIR = Path(os.environ.get(
-    "NEREUS_MI0BOT_DIR", REPO.parent.parent.parent / "mi0bot-Thetis")).expanduser()
+    "LONGPATH_MI0BOT_DIR", REPO.parent.parent.parent / "mi0bot-Thetis")).expanduser()
 CORPUS_PATH = REPO / "docs" / "attribution" / "thetis-author-tags.json"
 
 CONTRIBUTOR_INDEX_PATH = REPO / "docs" / "attribution" / \

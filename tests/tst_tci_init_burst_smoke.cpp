@@ -1,4 +1,4 @@
-// no-port-check: NereusSDR-original smoke test for the init-burst wrapper.
+// no-port-check: Longpath-original smoke test for the init-burst wrapper.
 // Phase 3J-1 Task 4.1 — three asserts only:
 //   1. buildInitBurst() returns a non-empty list.
 //   2. Last entry equals "ready;".

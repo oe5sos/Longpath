@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/setup/hardware/OcOutputsHfTab.cpp  (NereusSDR)
+// src/gui/setup/hardware/OcOutputsHfTab.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -8,12 +8,12 @@
 //    grpTransmitPinActionHF, grpUSBBCD, grpExtPAControlHF, etc.)
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-20 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                (KG4VCF), with AI-assisted transformation via Anthropic
 //                Claude Code. Sub-sub-tab under Hardware → OC Outputs.
 //                Persistence via OcMatrix model (Phase 3P-D Task 1).
-//                NereusSDR spin: 14 bands (incl. GEN/WWV/XVTR) vs
+//                Longpath spin: 14 bands (incl. GEN/WWV/XVTR) vs
 //                Thetis's 12; GEN/WWV rows greyed by default.
 // =================================================================
 //

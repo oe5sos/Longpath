@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_beam_heading.cpp  (NereusSDR)
+// tests/tst_beam_heading.cpp  (Longpath)
 // =================================================================
 //
 // The end stop is the part that is easy to get wrong and expensive to
@@ -11,10 +11,10 @@
 // So the tests are mostly about the stop, and the numbers in them were
 // computed independently before the C++ was written.
 //
-// no-port-check: NereusSDR-original.
+// no-port-check: Longpath-original.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-09 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

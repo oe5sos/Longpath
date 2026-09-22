@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_two_tone_controller_pa_cal_integration.cpp  (NereusSDR)
+// tests/tst_two_tone_controller_pa_cal_integration.cpp  (Longpath)
 // =================================================================
 //
 // Phase 4 Agent 4B of issue #167 PA-cal safety hotfix — verifies
@@ -23,7 +23,7 @@
 //
 // =================================================================
 
-// no-port-check: NereusSDR-original test file. All Thetis cites are in
+// no-port-check: Longpath-original test file. All Thetis cites are in
 // TwoToneController.h/.cpp at the call sites under test.
 
 #include <QtTest/QtTest>

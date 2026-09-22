@@ -1,16 +1,16 @@
-// no-port-check: NereusSDR-original — parser + dispatch shells ported from
+// no-port-check: Longpath-original — parser + dispatch shells ported from
 // Thetis TCIServer.cs:4900-5197 [v2.10.3.13]. Handler bodies are stubs;
 // Phase 5+ adds individual cases via the matrix runner.
 
-// src/core/TciProtocol.cpp  (NereusSDR)
-// NereusSDR-original — TCI command protocol handler implementation.
+// src/core/TciProtocol.cpp  (Longpath)
+// Longpath-original — TCI command protocol handler implementation.
 //
 // Parser ported from Thetis TCIServer.cs:4900-4924 [v2.10.3.13].
 // Two-switch dispatch shape from Thetis TCIServer.cs:4924-5197 [v2.10.3.13].
 //
 // This file REPLACES the Phase 1 stub (commit 77d27b3).
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-10 — Phase 3J-1 Task 3.1 by J.J. Boyd (KG4VCF);
 //                AI-assisted transformation via Anthropic Claude Code.
 
@@ -140,7 +140,7 @@ void TciProtocol::enqueueLocalBroadcast(const QString& frame)
 void TciProtocol::enqueueLocalBroadcastVfo(int rxIndex, qint64 hz, bool isTxBound)
 {
     // Per-rx (vfo:rx,chan,hz) covers both channels; Thetis sendVFO at
-    // TCIServer.cs:2061-2093 [v2.10.3.13] -- format string.  NereusSDR
+    // TCIServer.cs:2061-2093 [v2.10.3.13] -- format string.  Longpath
     // collapses VFO A/B onto the slice, so both channels read the same hz.
     {
         const QString vfoKey0   = QStringLiteral("vfo:%1,0").arg(rxIndex);
@@ -228,7 +228,7 @@ QStringList TciProtocol::buildInitBurst() const
     // and Hamlib's TCI driver gate TCI-audio mode on recognising the server
     // identifier — they enable TCI audio ONLY when the server advertises as
     // ExpertSDR3 / SunSDR2PRO.  An unknown identifier (e.g. "Thetis" alone,
-    // or "NereusSDR") makes WSJT-X fall back to non-TCI audio: the radio
+    // or "Longpath") makes WSJT-X fall back to non-TCI audio: the radio
     // keys via the trx command but WSJT-X never streams TX_AUDIO_STREAM
     // frames, and it sends `trx:0,true;` (without the `,tci` suffix)
     // because it never entered TCI-audio mode.  Bench-verified symptom
@@ -252,8 +252,8 @@ QStringList TciProtocol::buildInitBurst() const
     const bool emulateSunSdr = s.value(QStringLiteral("TciEmulateSunSDR2Pro"),
                                        QStringLiteral("True")).toString()
                                == QStringLiteral("True");
-    // NereusSDR divergence: HardwareSpecific.Model has no NereusSDR equivalent;
-    // hardcode "NereusSDR" until Phase 4 Task 4.2 wires RadioModel state.
+    // Longpath divergence: HardwareSpecific.Model has no Longpath equivalent;
+    // hardcode "Longpath" until Phase 4 Task 4.2 wires RadioModel state.
     const QString deviceName = emulateSunSdr
         ? QStringLiteral("SunSDR2PRO")
         : QStringLiteral("Longpath");
@@ -263,7 +263,7 @@ QStringList TciProtocol::buildInitBurst() const
     lines << QStringLiteral("receive_only:false;");
 
     // From Thetis TCIServer.cs:2530 [v2.10.3.13] — locked at 2 per design doc §1.2;
-    // Slice C/D are NereusSDR-internal and not exposed via TCI in Phase 3J-1.
+    // Slice C/D are Longpath-internal and not exposed via TCI in Phase 3J-1.
     // Reads kExposedReceiverCount so the live-broadcast gate in TciServer
     // cannot drift from the count advertised here (Codex round 6, PR #293).
     lines << QStringLiteral("trx_count:%1;").arg(kExposedReceiverCount);
@@ -325,7 +325,7 @@ QStringList TciProtocol::buildInitialRadioStateLines() const
 
     // bRX2Enabled -- From Thetis TCIServer.cs:2489 [v2.10.3.15] reads
     // consoleThreadSafe.RX2Enabled (console.cs:37278 [v2.10.3.15] -- backed by
-    // chkRX2.Checked + the rx2_enabled member).  NereusSDR's equivalent is
+    // chkRX2.Checked + the rx2_enabled member).  Longpath's equivalent is
     // m_connectionActiveRxCount >= 2 (RadioModel::rx2Enabled() Q_INVOKABLE
     // shim added alongside this commit reads exactly that).
     bool bRX2Enabled = false;
@@ -349,7 +349,7 @@ QStringList TciProtocol::buildInitialRadioStateLines() const
 
     // From Thetis TCIServer.cs:2493-2502 [v2.10.3.15] -- sendDDS/sendVFO read
     // consoleThreadSafe.CentreFrequency / CentreRX2Frequency / VFOAFreq /
-    // VFOBFreq. NereusSDR collapses VFO B onto the slice's single VFO; both
+    // VFOBFreq. Longpath collapses VFO B onto the slice's single VFO; both
     // channels of a slice read the same value.
     const qint64 rx1FreqHz  = readVfoHz(0, 0);
     const qint64 rx2FreqHz  = readVfoHz(1, 0);
@@ -364,23 +364,23 @@ QStringList TciProtocol::buildInitialRadioStateLines() const
     //       else if (chkVFOATX.Checked)   tx_freq = VFOAFreq;
     //   }
     //
-    // NereusSDR architectural divergence (deferred to Phase 3F multi-pan):
+    // Longpath architectural divergence (deferred to Phase 3F multi-pan):
     //   * VFOBTX and VFOATX checkboxes are not modeled yet
     //   * VFOASubFreq (Thetis VFO B of RX1, used as sub-RX VFO in split) is
-    //     not modeled -- NereusSDR slice model has one freq per slice
+    //     not modeled -- Longpath slice model has one freq per slice
     //   * VFOSplit is per-slice (split(rx)) rather than radio-global like
     //     Thetis's chkVFOSplit
     //
-    // NereusSDR is single-RX in production today (rx2Enabled is only true
+    // Longpath is single-RX in production today (rx2Enabled is only true
     // once Phase 3F multi-pan ships).  In the single-RX (!rx2Enabled) case
     // with no VFOBTX, Thetis's TXFreq reduces to VFOAFreq exactly --
     // matching readVfoHz(0, 0).  This is the ONLY reachable Thetis path
-    // for NereusSDR today, ported byte-for-byte.  When 3F lands the
+    // for Longpath today, ported byte-for-byte.  When 3F lands the
     // multi-RX paths, this expression needs the full TXFreq port (and
     // VFOBTX / VFOATX state on RadioModel).
     const qint64 txFreqHz   = rx1FreqHz;
     // Derive the band label from the TX frequency. Thetis reads
-    // consoleThreadSafe.TXBand directly; NereusSDR derives via
+    // consoleThreadSafe.TXBand directly; Longpath derives via
     // Band::bandFromFrequency (IARU Region 2 lookup) + bandLabel ("20m"
     // lowercase format), matching the golden capture format
     // (tx_frequency_thetis:14250000,20m,false,false;).
@@ -388,7 +388,7 @@ QStringList TciProtocol::buildInitialRadioStateLines() const
 
     // Per-rx mode reader -- From Thetis TCIServer.cs:2508-2509 [v2.10.3.15] --
     // sendMode reads consoleThreadSafe.RX1DSPMode / RX2DSPMode and uppercases.
-    // NereusSDR's mode() shim already returns uppercase canonical names.
+    // Longpath's mode() shim already returns uppercase canonical names.
     const auto readMode = [this](int rx) -> QString {
         QString m;
         QMetaObject::invokeMethod(m_radio, "mode",
@@ -421,7 +421,7 @@ QStringList TciProtocol::buildInitialRadioStateLines() const
     const int filterHigh[2] = { readFilterHigh(0), readFilterHigh(1) };
 
     // MOX -- From Thetis TCIServer.cs:2515-2516 [v2.10.3.15] reads
-    // consoleThreadSafe.MOX.  NereusSDR's mox() shim mirrors this.
+    // consoleThreadSafe.MOX.  Longpath's mox() shim mirrors this.
     bool mox = false;
     QMetaObject::invokeMethod(m_radio, "mox",
                               Qt::DirectConnection,
@@ -429,7 +429,7 @@ QStringList TciProtocol::buildInitialRadioStateLines() const
 
     // TUNE -- From Thetis TCIServer.cs:2636-2637 [v2.10.3.15] reads
     // consoleThreadSafe.TUN (console.cs:18677-18684 [v2.10.3.15] -- backed
-    // by chkTUN.Checked).  NereusSDR's equivalent is the m_isTuning latch
+    // by chkTUN.Checked).  Longpath's equivalent is the m_isTuning latch
     // (set true by setTune(true), cleared by completeTuneOff() after the
     // tune-off settle delay; semantically identical to Thetis chkTUN).
     // Exposed via RadioModel::tune() Q_INVOKABLE shim added alongside this
@@ -445,7 +445,7 @@ QStringList TciProtocol::buildInitialRadioStateLines() const
     //       sendNREnable(zeroBaseRx, nr > 0, false, nr);
     //       sendNREnable(zeroBaseRx, nr > 0, true,  nr);
     //   }
-    // Thetis collapses "off" -> 0 in GetSelectedNR.  NereusSDR splits the
+    // Thetis collapses "off" -> 0 in GetSelectedNR.  Longpath splits the
     // state in two: rxNr(rx) is the bool gate (true iff active), rxNrIndex(rx)
     // is the preferred slot (1..N) even when NR is off.  To match Thetis
     // semantics we read BOTH and collapse: if the gate is off the slot reads
@@ -565,7 +565,7 @@ QStringList TciProtocol::buildInitialRadioStateLines() const
     // mapped via the LOG curve audioGainToDb (TCIServer.cs:4778-4787
     // [v2.10.3.15]).
     //
-    // Phase 3F Sub-Epic J Task 10 closeout: NereusSDR has no sub-receiver
+    // Phase 3F Sub-Epic J Task 10 closeout: Longpath has no sub-receiver
     // model (no analog of Thetis's RX1-sub slider), so a single per-slice AF
     // gain -- SliceModel::afGain, read here via RadioModel::afGain(rx) --
     // stands in for BOTH of a receiver's channels.  This mirrors the
@@ -627,7 +627,7 @@ QStringList TciProtocol::buildInitialRadioStateLines() const
 
     // RIT / XIT -- From Thetis TCIServer.cs:2587-2594 [v2.10.3.15] -- both
     // emitted per-rx but driven by the single radio-global RITOn/XITOn/
-    // RITValue/XITValue values.  NereusSDR's shim signatures match.
+    // RITValue/XITValue values.  Longpath's shim signatures match.
     const bool ritOn = readBoolGlobal("ritEnable");
     const bool xitOn = readBoolGlobal("xitEnable");
     const int  ritVal = readIntGlobal("ritOffset");
@@ -650,7 +650,7 @@ QStringList TciProtocol::buildInitialRadioStateLines() const
     // digl_click_tune_offset default 2210 Hz; console.cs:14658 for
     // digu_click_tune_offset default 1500 Hz).
     //
-    // NereusSDR architectural divergence: per-slice storage on SliceModel
+    // Longpath architectural divergence: per-slice storage on SliceModel
     // (m_diglOffsetHz / m_diguOffsetHz; defaults 0 Hz per SliceModel.h:928-929)
     // rather than radio-global.  Per-slice was chosen for the multi-slice
     // future where each slice may run a different DIG profile.  For the TCI
@@ -679,7 +679,7 @@ QStringList TciProtocol::buildInitialRadioStateLines() const
     //   return m_cwController != null ? m_cwController.GetMacroSpeed() : 30;
     //   return m_cwController != null ? m_cwController.GetMacroDelayMs() : 0;
     //   return m_cwController != null ? m_cwController.GetKeyerSpeed()  : 30;
-    // NereusSDR has no CwController yet (Phase 3M-2 introduces it).  Until
+    // Longpath has no CwController yet (Phase 3M-2 introduces it).  Until
     // then we emit the same numeric defaults Thetis emits when its controller
     // is absent -- this is the Thetis-faithful null-controller path, ported
     // verbatim.  Phase 3M-2 replaces these with readIntGlobal calls to the
@@ -728,7 +728,7 @@ QStringList TciProtocol::buildInitialRadioStateLines() const
 
     // monEnable -- From Thetis TCIServer.cs:2654 [v2.10.3.15] --
     // sendMONEnable(consoleThreadSafe.MON) where MON = chkMON.Checked
-    // (console.cs:18656-18663 [v2.10.3.15]).  NereusSDR's equivalent lives
+    // (console.cs:18656-18663 [v2.10.3.15]).  Longpath's equivalent lives
     // on TransmitModel as the m_monEnabled bool (default false, never
     // persisted -- safety: MON loads OFF always per Thetis audio.cs:406).
     // The RadioModel::monEnabled() Q_INVOKABLE shim (added alongside this
@@ -746,13 +746,13 @@ QStringList TciProtocol::buildInitialRadioStateLines() const
     // concepts: chkPower toggles whether the radio is actively streaming
     // (separate from "is the radio reachable / network-connected").
     //
-    // NereusSDR architectural divergence: there is no separate Power button.
+    // Longpath architectural divergence: there is no separate Power button.
     // Connection IS power -- the moment a radio is connected, it streams.
     // RadioModel::powerOn() Q_INVOKABLE shim (added alongside this commit)
     // therefore returns isConnected().  This is consistent with how the rest
-    // of the NereusSDR UI treats connection state (no Off-but-connected
+    // of the Longpath UI treats connection state (no Off-but-connected
     // mode).  Bench impact: TCI clients see start; while connected, stop;
-    // would only be emitted if NereusSDR adds a "soft off" mode later.
+    // would only be emitted if Longpath adds a "soft off" mode later.
     bool powerOn = false;
     QMetaObject::invokeMethod(m_radio, "powerOn",
                               Qt::DirectConnection,
@@ -765,7 +765,7 @@ QStringList TciProtocol::buildInitialRadioStateLines() const
         lines << buildDdsLine(1, rx2FreqHz);
         lines << buildIfLine(0, 0, 0);
         lines << buildIfLine(0, 1, 0);
-        // NereusSDR divergence (design doc §7 row 1): Thetis TCIServer.cs:2374-2375
+        // Longpath divergence (design doc §7 row 1): Thetis TCIServer.cs:2374-2375
         // [v2.10.3.13] calls sendIF(1,1) TWICE (copy-paste bug). We emit the intended
         // (1,0)+(1,1) cross-product instead, matching the sendVFO enumeration below.
         lines << buildIfLine(1, 0, 0);
@@ -1354,7 +1354,7 @@ QString TciProtocol::buildStartStopLine(bool powerOn)
     return powerOn ? QStringLiteral("start;") : QStringLiteral("stop;");
 }
 
-// NereusSDR architectural divergence — Slice A/B/C/D maps to trx:N wire format.
+// Longpath architectural divergence — Slice A/B/C/D maps to trx:N wire format.
 // Identity through Phase 3; same mapping in subsequent phases (design doc §1.2).
 int TciProtocol::sliceToTrx(int slice) { return slice; }
 int TciProtocol::trxToSlice(int trx) { return trx; }
@@ -2655,7 +2655,7 @@ QString TciProtocol::handleXitOffsetCommand(const QStringList& args)
 // sendRxBalance format at TCIServer.cs:2187-2191 [v2.10.3.13]:
 //   "rx_balance:" + rx + "," + chan + "," + balance.ToString("F2", CultureInfo.InvariantCulture) + ";"
 // NOTE: Thetis pan-slider calibration (40-x*0.8 transform at TCIServer.cs:4644-4652
-//       [v2.10.3.13]) NOT replicated in Phase 9 stub — NereusSDR stores F2 dB directly.
+//       [v2.10.3.13]) NOT replicated in Phase 9 stub — Longpath stores F2 dB directly.
 //       Clamp to [-40.0, 40.0] per TCIServer.cs:4650 [v2.10.3.13] IS replicated.
 //       Full Thetis pan math deferred to Phase 20 (SetupForm / mixer integration).
 QString TciProtocol::handleRxBalanceCommand(const QStringList& args)
@@ -2974,7 +2974,7 @@ QString TciProtocol::handleIqStartStopCommand(const QStringList& args, bool enab
 // Original C# logic:
 //   1-arg path: if rx==0 → sendRXEnable(rx, !MOX); rx==1 → sendRXEnable(rx, RX2Enabled && !MOX).
 //   2-arg path: if rx==0 → always on (no-op); if rx==1 → RX2Enabled = enable.
-// NereusSDR simplification: MOX-gating on query deferred to Phase 17;
+// Longpath simplification: MOX-gating on query deferred to Phase 17;
 //   stored enable state returned directly. rx0 always stays true on set.
 // sendRXEnable at TCIServer.cs:2279-2283 [v2.10.3.13]: "rx_enable:rx,bool;"
 QString TciProtocol::handleRxEnableCommand(const QStringList& args)
@@ -3122,7 +3122,7 @@ QString TciProtocol::handleCalibrationExCommand(const QStringList& args)
 // From Thetis TCIServer.cs:5190 [v2.10.3.13] — shutdown_ex case in 1-arg query switch.
 // handleShutdown at TCIServer.cs:4752-4765 [v2.10.3.13]: BeginInvoke → console.Close().
 // STUB: logs warning + returns empty. Actual shutdown wiring is a maintainer-policy
-//   decision; Phase 24+ may implement it. TCI clients must not be able to close NereusSDR.
+//   decision; Phase 24+ may implement it. TCI clients must not be able to close Longpath.
 QString TciProtocol::handleShutdownExCommand()
 {
     qCWarning(lcTci) << "TCI client requested shutdown_ex; ignored — Phase 13 stub (maintainer-policy decision)";

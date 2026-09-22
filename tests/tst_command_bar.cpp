@@ -1,6 +1,6 @@
-// tests/tst_command_bar.cpp  (NereusSDR)
+// tests/tst_command_bar.cpp  (Longpath)
 //
-// NereusSDR-original. No Thetis port.
+// Longpath-original. No Thetis port.
 //
 // ── Die Kopfleiste ───────────────────────────────────────────────────
 //
@@ -389,20 +389,46 @@ private slots:
         CommandBar bar;
         bar.attach(&slice);
 
-        slice.setActiveNr(NrSlot::DFNR);
+        // NNR, nicht DFNR: seit dem 2026-09-17 stehen nur noch die
+        // Minderungen in der Leiste, die dieser Bau auch enthaelt, und
+        // DFNR ist ohne DeepFilterNet-Bibliothek keine davon. NNR (WDSP
+        // 2.10) ist immer dabei und steht ebenfalls hinter den ersten
+        // drei.
+        slice.setActiveNr(NrSlot::NNR);
 
         QCOMPARE(bar.activePill(QStringLiteral("NR")),
-                 QStringLiteral("DFNR"));
+                 QStringLiteral("NNR"));
         QCOMPARE(bar.pillsIn(QStringLiteral("NR")).last(),
-                 QStringLiteral("DFNR"));
+                 QStringLiteral("NNR"));
 
-        // Und der nachgerueckte Knopf schaltet auch wirklich DFNR —
+        // Und der nachgerueckte Knopf schaltet auch wirklich NNR —
         // nicht das, was vorher an seiner Stelle stand. Die Nutzlast
         // haengt am Knopf, nicht an seiner Stelle in der Liste.
         slice.setActiveNr(NrSlot::Off);
         QVERIFY(bar.clickPill(QStringLiteral("NR"),
-                              QStringLiteral("DFNR")));
-        QCOMPARE(slice.activeNr(), NrSlot::DFNR);
+                              QStringLiteral("NNR")));
+        QCOMPARE(slice.activeNr(), NrSlot::NNR);
+    }
+
+    /// Was dieser Bau nicht enthaelt, steht nicht in der Leiste: ohne
+    /// HAVE_DFNR kein DFNR, ohne HAVE_BNR kein BNR (2026-09-17, "bitte
+    /// kontrollieren ... auch die anderen optionen im offenen menü").
+    void onlyBuiltInNrBackendsAreOffered()
+    {
+        SliceModel slice;
+        CommandBar bar;
+        bar.attach(&slice);
+        const QStringList all = bar.allNrLabels();
+#ifndef HAVE_DFNR
+        QVERIFY2(!all.contains(QStringLiteral("DFNR")),
+                 "DFNR steht in der Leiste, obwohl es in diesem Bau nichts tut");
+#endif
+#ifndef HAVE_BNR
+        QVERIFY2(!all.contains(QStringLiteral("BNR")),
+                 "BNR steht in der Leiste, obwohl es in diesem Bau nichts tut");
+#endif
+        QVERIFY(all.contains(QStringLiteral("NNR")));
+        QVERIFY(all.contains(QStringLiteral("NR4")));
     }
 
     /// Rechtsklick auf eine NR-Pille oeffnet ihre Schnellregler.

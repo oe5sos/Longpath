@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/TciSensorManager.h  (NereusSDR)
+// src/core/TciSensorManager.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
@@ -7,7 +7,7 @@
 //   original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-10 — Phase 3J-1 Task 19.1 by J.J. Boyd (KG4VCF),
 //                AI-assisted transformation via Anthropic Claude Code.
 // =================================================================
@@ -52,8 +52,8 @@ mw0lge@grange-lane.co.uk
 // Richard Samphire can be reached by email at :  mw0lge@grange-lane.co.uk                    //
 //============================================================================================//
 
-// src/core/TciSensorManager.h  (NereusSDR)
-// NereusSDR-original — TCI sensor wire-format helpers + interval aggregation.
+// src/core/TciSensorManager.h  (Longpath)
+// Longpath-original — TCI sensor wire-format helpers + interval aggregation.
 //
 // Ports the four private sendXxx sensor methods and the per-listener
 // MinimumRequiredRxSensorInterval / MinimumRequiredTxSensorInterval helpers
@@ -154,7 +154,7 @@ public:
     // The per-listener clampIntervalMs helper is at TCIServer.cs:501-506
     // [v2.10.3.13] (clamps 30..1000 ms).
     //
-    // NereusSDR flattens the two levels (server + per-listener) into one
+    // Longpath flattens the two levels (server + per-listener) into one
     // static helper: pass in the per-client interval list directly.
     //
     // Behaviour:

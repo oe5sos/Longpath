@@ -1,8 +1,8 @@
 // =================================================================
-// tests/tst_mox_controller_vox_enabled.cpp  (NereusSDR)
+// tests/tst_mox_controller_vox_enabled.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original test. No Thetis logic is ported in this test
+// Longpath-original test. No Thetis logic is ported in this test
 // file. The test exercises:
 //   - MoxController::setVoxEnabled(bool)   — H.1 Phase 3M-1b
 //   - MoxController::onModeChanged(DSPMode) — H.1 Phase 3M-1b
@@ -17,7 +17,7 @@
 // Excluded (4 modes):     CWL, CWU, SPEC, DRM.
 // =================================================================
 
-// no-port-check: NereusSDR-original test file — no upstream Thetis port.
+// no-port-check: Longpath-original test file — no upstream Thetis port.
 
 #include <QtTest/QtTest>
 #include <QSignalSpy>

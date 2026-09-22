@@ -1,8 +1,8 @@
 // =================================================================
-// tests/tst_p1_mic_extraction.cpp  (NereusSDR)
+// tests/tst_p1_mic_extraction.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original test file.  Verifies the mic16 byte zone
+// Longpath-original test file.  Verifies the mic16 byte zone
 // extraction inside the static P1RadioConnection::parseEp6Frame
 // 4-arg overload (Phase 3M-1c TX pump v3).
 //
@@ -14,13 +14,13 @@
 //
 // =================================================================
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-29 — New test for Phase 3M-1c TX pump v3 by J.J. Boyd
 //                 (KG4VCF), with AI-assisted implementation via
 //                 Anthropic Claude Code.
 // =================================================================
 
-// no-port-check: NereusSDR-original test file.  No Thetis logic ported.
+// no-port-check: Longpath-original test file.  No Thetis logic ported.
 
 #include <QtTest/QtTest>
 #include <QObject>

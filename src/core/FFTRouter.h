@@ -1,19 +1,19 @@
 // =================================================================
-// src/core/FFTRouter.h  (NereusSDR)
+// src/core/FFTRouter.h  (Longpath)
 // =================================================================
 //
-// no-port-check: NereusSDR-original. Routes FFT frames from receivers
+// no-port-check: Longpath-original. Routes FFT frames from receivers
 // (DDCs) to subscribed pans per the AetherSDR overlay model (one DDC
 // can feed N pans at different zoom levels of the same I/Q data).
-// AetherSDR is a thin Flex API client; NereusSDR owns the FFT pipeline
+// AetherSDR is a thin Flex API client; Longpath owns the FFT pipeline
 // locally, so there is no upstream class to port. See
 // docs/architecture/2026-05-26-phase3f-multi-pan-multi-slice-design.md
 // for the design context.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-27  J.J. Boyd / KG4VCF  Phase 3F Sub-Epic D Task 7.
-//                                    NereusSDR-original receiver-to-pan
+//                                    Longpath-original receiver-to-pan
 //                                    fan-out router. Owns the bidirectional
 //                                    receiverId <-> panId topology; the
 //                                    RadioModel-level fan-out wiring lands

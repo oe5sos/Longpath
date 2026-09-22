@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_voice_signal_detector.cpp  (NereusSDR)
+// tests/tst_voice_signal_detector.cpp  (Longpath)
 // =================================================================
 //
 // Der Signalerkenner hinter dem „S-Verlauf".
@@ -13,12 +13,12 @@
 // sich auf den Zustand beschraenken; hier ist das VERHALTEN pruefbar.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-19 — Original fuer NereusSDR von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
 // =================================================================
 
-// no-port-check: NereusSDR-original test file.
+// no-port-check: Longpath-original test file.
 
 #include <QtTest>
 

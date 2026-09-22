@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_signal_history_markers.cpp  (NereusSDR)
+// tests/tst_signal_history_markers.cpp  (Longpath)
 // =================================================================
 //
 // Der zweite Markenkanal im Panadapter: die Marken des S-Verlaufs
@@ -13,12 +13,12 @@
 // Bank-Matrix.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-19 — Original fuer NereusSDR von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
 // =================================================================
 
-// no-port-check: NereusSDR-original test file.
+// no-port-check: Longpath-original test file.
 
 #include <QtTest>
 

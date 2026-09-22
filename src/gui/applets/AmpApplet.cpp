@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/applets/AmpApplet.cpp  (NereusSDR)
+// src/gui/applets/AmpApplet.cpp  (Longpath)
 // =================================================================
 //
 // Source attribution (AetherSDR, GPLv3):
@@ -7,14 +7,14 @@
 //       per https://github.com/ten9876/AetherSDR (GPLv3)
 //   This file is a port or structural derivative of AetherSDR source.
 //   AetherSDR is licensed under the GNU General Public License v3.
-//   NereusSDR is also GPLv3. Attribution follows GPLv3 section 5 requirements.
+//   Longpath is also GPLv3. Attribution follows GPLv3 section 5 requirements.
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-18  Ported in C++20/Qt6 for NereusSDR by J.J. Boyd (KG4VCF),
 //                 with AI-assisted transformation via Anthropic Claude Code.
 //                 Layout from AetherSDR src/gui/AmpApplet.{h,cpp} [@0cd4559].
 //                 Changes from upstream: AppletWidget base; RadioModel* ctor;
-//                 NereusSDR HGauge setter API replaces positional constructor.
+//                 Longpath HGauge setter API replaces positional constructor.
 // =================================================================
 
 #include "AmpApplet.h"

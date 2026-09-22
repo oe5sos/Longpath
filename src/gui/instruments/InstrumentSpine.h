@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/gui/instruments/InstrumentSpine.h  (NereusSDR)
+// src/gui/instruments/InstrumentSpine.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // ── Die Geometrie zweimal, die Mittel einmal ─────────────────────────
 //
@@ -36,7 +36,7 @@
 // eine S-Stauchung stehen könnte.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-17 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

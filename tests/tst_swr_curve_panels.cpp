@@ -1,6 +1,6 @@
-// tests/tst_swr_curve_panels.cpp  (NereusSDR)
+// tests/tst_swr_curve_panels.cpp  (Longpath)
 //
-// NereusSDR-original. No Thetis port.
+// Longpath-original. No Thetis port.
 //
 // ── The layout, checked with arithmetic ──────────────────────────────
 //

@@ -1,12 +1,12 @@
 #pragma once
 
 // =================================================================
-// src/gui/setup/AudioDevicesPage.h  (NereusSDR)
+// src/gui/setup/AudioDevicesPage.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original Setup → Audio → Devices page. No Thetis port,
+// Longpath-original Setup → Audio → Devices page. No Thetis port,
 // no attribution headers required (per memory: feedback_source_first_
-// ui_vs_dsp — Qt widgets in Setup pages are NereusSDR-native).
+// ui_vs_dsp — Qt widgets in Setup pages are Longpath-native).
 //
 // Sub-Phase 12 Task 12.2 (2026-04-20): implements three DeviceCard
 // instances (Speakers / Headphones / TX Input) with live-edit commit

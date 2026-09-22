@@ -1,11 +1,11 @@
 #pragma once
 
 // =================================================================
-// src/gui/applets/eq/EqHost.h  (NereusSDR)
+// src/gui/applets/eq/EqHost.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. The seam between AetherSDR's ported equaliser
-// widgets and NereusSDR's channel strip.
+// Longpath-original. The seam between AetherSDR's ported equaliser
+// widgets and Longpath's channel strip.
 //
 // The ported widgets talk to an `AudioEngine`, and they use exactly
 // five things from it:
@@ -16,11 +16,11 @@
 //     copyRecentClientEqRxSamples()
 //     saveClientEqSettings()          persistence
 //
-// NereusSDR has no AudioEngine of that shape, and its channel strip is
+// Longpath has no AudioEngine of that shape, and its channel strip is
 // transmit-only. Rather than editing five ported files to reach into
 // StripChain — which would turn a verbatim port into a modified one and
 // make the next upstream comparison useless — this presents the same
-// five names over NereusSDR's own parts.
+// five names over Longpath's own parts.
 //
 // An adapter is the honest way to port a widget: the borrowed code
 // stays byte-comparable against upstream, and every adaptation lives in
@@ -28,7 +28,7 @@
 //
 // ── Receive side ─────────────────────────────────────────────────────
 //
-// There isn't one. NereusSDR's channel strip processes the microphone
+// There isn't one. Longpath's channel strip processes the microphone
 // on the way out; the receive audio goes through WDSP and has its own
 // equaliser applet. clientEqRx() therefore returns null, and the panel
 // is only ever shown on the transmit path. Returning null rather than
@@ -37,7 +37,7 @@
 // not a working one that edits the wrong thing.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-09 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

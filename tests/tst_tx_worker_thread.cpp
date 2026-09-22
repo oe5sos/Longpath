@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_tx_worker_thread.cpp  (NereusSDR)
+// tests/tst_tx_worker_thread.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for TxWorkerThread (Phase 3M-1c TX pump architecture
@@ -53,7 +53,7 @@
 //
 // =================================================================
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-29 — New test for Phase 3M-1c TX pump architecture redesign.
 //                 Rewritten same day for v3 semaphore-driven design.
 //                 J.J. Boyd (KG4VCF), with AI-assisted implementation
@@ -71,8 +71,8 @@
 //                 / same AI tooling.
 // =================================================================
 
-// no-port-check: NereusSDR-original test file.  No Thetis logic ported.
-// NEREUS_BUILD_TESTS must be defined (see tests/CMakeLists.txt).
+// no-port-check: Longpath-original test file.  No Thetis logic ported.
+// LONGPATH_BUILD_TESTS must be defined (see tests/CMakeLists.txt).
 
 #include <QtTest/QtTest>
 #include <QObject>

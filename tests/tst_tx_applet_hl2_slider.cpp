@@ -1,11 +1,11 @@
-// no-port-check: NereusSDR-original test file.  Exercises the per-SKU
+// no-port-check: Longpath-original test file.  Exercises the per-SKU
 // power-slider rescale + dB-label formula + Thetis-faithful tooltips.
 // All Thetis source cites for the underlying formulae live in
 // TxApplet.cpp (rescalePowerSlidersForModel + updatePowerSliderLabels)
 // and HpsdrModel.h (per-SKU constants).
 //
 // =================================================================
-// tests/tst_tx_applet_hl2_slider.cpp  (NereusSDR)
+// tests/tst_tx_applet_hl2_slider.cpp  (Longpath)
 // =================================================================
 //
 // Issue #175 / mi0bot HL2 TX power port - Task 7.

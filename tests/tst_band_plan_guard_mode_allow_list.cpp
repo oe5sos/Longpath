@@ -1,4 +1,4 @@
-// no-port-check: test-only — exercises NereusSDR-native BandPlanGuard mode allow-list
+// no-port-check: test-only — exercises Longpath-native BandPlanGuard mode allow-list
 // 3M-1b Task K.1: isModeAllowedForTx + checkMoxAllowed parametrized over all 12 DSPModes.
 #include <QtTest>
 #include "core/safety/BandPlanGuard.h"

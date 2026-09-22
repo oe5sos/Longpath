@@ -1,12 +1,12 @@
 // =================================================================
-// tests/tst_radio_status.cpp  (NereusSDR)
+// tests/tst_radio_status.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source (SWR formula):
 //   Project Files/Source/Console/console.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-20 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via
 //                 Anthropic Claude Code.

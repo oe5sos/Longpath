@@ -1,6 +1,6 @@
 // no-port-check: test fixture asserting sendTxIq() and setTrxRelay()
 // interface-level behaviour on P1RadioConnection and P2RadioConnection.
-// No Thetis logic is ported here; this file is NereusSDR-original.
+// No Thetis logic is ported here; this file is Longpath-original.
 //
 // Verifies:
 //   - Both subclasses override all RadioConnection pure-virtual TX methods

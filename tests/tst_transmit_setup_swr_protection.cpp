@@ -1,4 +1,4 @@
-// tests/tst_transmit_setup_swr_protection.cpp  (NereusSDR)
+// tests/tst_transmit_setup_swr_protection.cpp  (Longpath)
 //
 // Phase 3M-0 Task 9 — SWR Protection group box on Setup → Transmit.
 // no-port-check: test fixture — no Thetis attribution required.

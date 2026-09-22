@@ -112,11 +112,11 @@ QTEST_MAIN(TestBandFromName)
 
 - [ ] **Step 2: Register the test and run to verify failure**
 
-Append to `tests/CMakeLists.txt` (next to the other `nereus_add_test` lines, around line 200):
+Append to `tests/CMakeLists.txt` (next to the other `longpath_add_test` lines, around line 200):
 
 ```cmake
 # ── Issue #118: band-button auto-mode ────────────────────────────────────
-nereus_add_test(tst_band_from_name)
+longpath_add_test(tst_band_from_name)
 ```
 
 Build + run:
@@ -294,7 +294,7 @@ QTEST_MAIN(TestSliceHasSettingsFor)
 Append to `tests/CMakeLists.txt`:
 
 ```cmake
-nereus_add_test(tst_slice_has_settings_for)
+longpath_add_test(tst_slice_has_settings_for)
 ```
 
 Run:
@@ -468,7 +468,7 @@ QTEST_MAIN(TestBandDefaults)
 Append to `tests/CMakeLists.txt`:
 
 ```cmake
-nereus_add_test(tst_band_defaults)
+longpath_add_test(tst_band_defaults)
 ```
 
 Run:
@@ -877,7 +877,7 @@ QTEST_MAIN(TestRadioModelBandClick)
 Append to `tests/CMakeLists.txt`:
 
 ```cmake
-nereus_add_test(tst_radio_model_band_click)
+longpath_add_test(tst_radio_model_band_click)
 ```
 
 Run:

@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/ConnectionPanel.cpp  (NereusSDR)
+// src/gui/ConnectionPanel.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -7,7 +7,7 @@
 //   Project Files/Source/Console/clsDiscoveredRadioPicker.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -136,13 +136,13 @@ namespace Longpath {
 // next repro say whether this dialog contributes at all, without a profiler.
 //
 // Disabled by default. Enable with either of:
-//   QT_LOGGING_RULES="nereus.connpanel.timing.debug=true"
+//   QT_LOGGING_RULES="longpath.connpanel.timing.debug=true"
 //   QT_LOGGING_RULES="*.timing.debug=true"   (covers nereus.setup.timing too)
-Q_LOGGING_CATEGORY(lcConnPanelTiming, "nereus.connpanel.timing")
+Q_LOGGING_CATEGORY(lcConnPanelTiming, "longpath.connpanel.timing")
 
 // ---------------------------------------------------------------------------
 // Color constants — from ucRadioList.cs ~:1115 (adapted to dark theme)
-// ucRadioList uses light background; NereusSDR uses dark background.
+// ucRadioList uses light background; Longpath uses dark background.
 // ---------------------------------------------------------------------------
 // From ucRadioList.cs:1118 — connectedFill = Color.FromArgb(235, 248, 235)
 static constexpr QColor kColorOnlineFree  { 20, 80, 30};    // dark green — online + free
@@ -390,7 +390,7 @@ void ConnectionPanel::buildUI()
     // Phase 3Q Task 5: ColMac replaced by ColLastSeen; MAC moves to detail panel.
     // clsDiscoveredRadioPicker.cs columns: Hardware(:111), IP(:118), Base Port(:126),
     //   Mac Address(:134), Protocol(:142), Version(:150)
-    // NereusSDR adds: status dot (col 0), Board type (col 2), In-Use (col 7)
+    // Longpath adds: status dot (col 0), Board type (col 2), In-Use (col 7)
     QStringList headers;
     headers << QStringLiteral("●")           // Col 0 — state pill dot
             << QStringLiteral("Name")        // Col 1 — clsDiscoveredRadioPicker.cs:112 "Hardware"
@@ -916,7 +916,7 @@ void ConnectionPanel::setStatusText(const QString& text)
 // Apply background color to a table row based on radio state.
 // Color coding from ucRadioList.cs:1115-1126:
 //   connectedFill  = Color.FromArgb(235, 248, 235)  → kColorOnlineFree
-//   inUseFill      = amber (not in Thetis, NereusSDR addition)
+//   inUseFill      = amber (not in Thetis, Longpath addition)
 //   offline/error  = grey/red
 //
 // Phase 3Q Task 5: state dot in ColStatus is given the StatePill color.
@@ -1182,7 +1182,7 @@ void ConnectionPanel::onRadioLost(const QString& macAddress)
     if (row >= 0) {
         // Grey out the row rather than removing it (offline state)
         // ucRadioList.cs has no "offline" concept — it removes them.
-        // NereusSDR keeps them greyed for user context.
+        // Longpath keeps them greyed for user context.
         for (int col = 0; col < ColCount; ++col) {
             QTableWidgetItem* cell = m_radioTable->item(row, col);
             if (cell) {
@@ -1455,7 +1455,7 @@ void ConnectionPanel::onTableDoubleClicked(int /*row*/, int /*column*/)
 // ---------------------------------------------------------------------------
 // Context menu — right-click
 // Source: ucRadioList.cs context (trash icon = remove), clsDiscoveredRadioPicker.cs
-// NereusSDR provides: Connect, Disconnect, Copy MAC
+// Longpath provides: Connect, Disconnect, Copy MAC
 // Deferred stubs: Forget (Task 15), Edit IP (Task 16)
 // ---------------------------------------------------------------------------
 

@@ -1,12 +1,12 @@
 // =================================================================
-// tests/tst_pgxl_connection_reconnect.cpp  (NereusSDR)
+// tests/tst_pgxl_connection_reconnect.cpp  (Longpath)
 // =================================================================
-// NereusSDR-native test. No AetherSDR equivalent (auto-reconnect
-// with exponential backoff is a NereusSDR Tier 2 addition per
+// Longpath-native test. No AetherSDR equivalent (auto-reconnect
+// with exponential backoff is a Longpath Tier 2 addition per
 // design doc §2 and §6.4).
 // Backoff sequence: 1/2/5/10/30/60 s, saturates at 60 s.
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-19  Created by J.J. Boyd (KG4VCF), with AI-assisted
 //                 transformation via Anthropic Claude Code.
 //                 Test: backoffSequence verifies 8 calls to

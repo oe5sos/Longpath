@@ -1,8 +1,8 @@
 // =================================================================
-// src/gui/setup/TestTwoTonePage.cpp  (NereusSDR)
+// src/gui/setup/TestTwoTonePage.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original Setup → Test → Two-Tone IMD page.
+// Longpath-original Setup → Test → Two-Tone IMD page.
 // See TestTwoTonePage.h for the full header.
 //
 // Phase 3M-1c Task H (2026-04-29): page UI + model↔UI two-way sync.
@@ -12,7 +12,7 @@
 // Written by J.J. Boyd (KG4VCF), AI-assisted via Anthropic Claude Code.
 // =================================================================
 
-// no-port-check: NereusSDR-original file; no Thetis logic ported here.
+// no-port-check: Longpath-original file; no Thetis logic ported here.
 
 #include "TestTwoTonePage.h"
 

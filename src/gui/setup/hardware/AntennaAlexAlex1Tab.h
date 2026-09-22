@@ -1,14 +1,14 @@
 #pragma once
 
 // =================================================================
-// src/gui/setup/hardware/AntennaAlexAlex1Tab.h  (NereusSDR)
+// src/gui/setup/hardware/AntennaAlexAlex1Tab.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
 //   Project Files/Source/Console/setup.designer.cs (~lines 23385-25538, tpAlexFilterControl)
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-20 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                (KG4VCF), with AI-assisted transformation via Anthropic
 //                Claude Code. Sub-sub-tab under Hardware → Antenna/ALEX.
@@ -118,7 +118,7 @@ public:
     void restoreSettings(const QString& macAddress);
 
     // Test seam — returns whether the Saturn BPF1 groupbox is visible.
-    // Always compiled (NEREUS_BUILD_TESTS is set on NereusSDRObjs globally). Used by
+    // Always compiled (LONGPATH_BUILD_TESTS is set on NereusSDRObjs globally). Used by
     // tst_alex1_filters_tab to verify the Saturn/non-Saturn capability gate.
     bool isSaturnBpf1Visible() const;
 

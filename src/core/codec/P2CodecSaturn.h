@@ -19,7 +19,7 @@
  */
 
 // =================================================================
-// src/core/codec/P2CodecSaturn.h  (NereusSDR)
+// src/core/codec/P2CodecSaturn.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources (multi-source) [@501e3f5]:
@@ -29,7 +29,7 @@
 //     (G8NJJ setBPF1ForOrionIISaturn — Saturn-specific HPF override)
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-20 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                (KG4VCF), with AI-assisted transformation via Anthropic
 //                Claude Code. Extends P2CodecOrionMkII by overriding

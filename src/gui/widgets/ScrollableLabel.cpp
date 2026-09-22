@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/widgets/ScrollableLabel.cpp  (NereusSDR)
+// src/gui/widgets/ScrollableLabel.cpp  (Longpath)
 // =================================================================
 //
 // Source attribution (AetherSDR — GPLv3):
@@ -10,10 +10,10 @@
 //
 //   This file is a port or structural derivative of AetherSDR source.
 //   AetherSDR is licensed under the GNU General Public License v3.
-//   NereusSDR is also GPLv3. Attribution follows GPLv3 §5 requirements.
+//   Longpath is also GPLv3. Attribution follows GPLv3 §5 requirements.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-16 — Ported/adapted in C++20/Qt6 for NereusSDR by
 //                 J.J. Boyd (KG4VCF), with AI-assisted transformation
 //                 via Anthropic Claude Code.
@@ -21,7 +21,7 @@
 //                 `src/gui/GuardedSlider.h:81-100`.
 // =================================================================
 
-// NereusSDR native widget; Qt skeleton patterns informed by AetherSDR's
+// Longpath native widget; Qt skeleton patterns informed by AetherSDR's
 // `ScrollableLabel` in `~/AetherSDR/src/gui/GuardedSlider.h:81-100`.
 
 #include "ScrollableLabel.h"

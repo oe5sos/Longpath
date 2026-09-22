@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # =================================================================
-# scripts/find-unsurfaced-features.py  (NereusSDR)
+# scripts/find-unsurfaced-features.py  (Longpath)
 # =================================================================
 #
 # Sucht Merkmale, die gebaut sind und an keiner Bedienflaeche haengen.
@@ -22,7 +22,7 @@
 #                                                            # nie gerufene Setter
 #
 # =================================================================
-# Modification history (NereusSDR):
+# Modification history (Longpath):
 #   2026-08-19 — Original fuer NereusSDR von Martin Fischer,
 #                 KI-gestuetzt ueber Anthropic Claude (Cowork).
 # =================================================================

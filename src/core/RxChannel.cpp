@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/RxChannel.cpp  (NereusSDR)
+// src/core/RxChannel.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -12,7 +12,7 @@
 //   Project Files/Source/ChannelMaster/cmaster.c, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -384,7 +384,7 @@ void RxChannel::setMode(DSPMode mode)
     m_mode.store(val);
 
 #ifdef HAVE_WDSP
-    // Phase 3R K-bench: RADE_U / RADE_L are NereusSDR-native modes
+    // Phase 3R K-bench: RADE_U / RADE_L are Longpath-native modes
     // (WdspTypes.h:159-186) that WDSP has no knowledge of. The RX
     // pipeline keeps WDSP alive as the demod front-end in RADE
     // modes (RxDspWorker.cpp:160-191 — "WDSP always runs ... RADE
@@ -404,7 +404,7 @@ void RxChannel::setMode(DSPMode mode)
 
 DSPMode RxChannel::wdspModeFor(DSPMode mode)
 {
-    // NereusSDR-native: WdspTypes.h:181-186 reserves RADE_U / RADE_L
+    // Longpath-native: WdspTypes.h:181-186 reserves RADE_U / RADE_L
     // as non-WDSP slice modes. The RX K-bench pipeline runs WDSP as
     // the SSB demod front-end in both, so the WDSP-facing equivalent
     // is USB for RADE_U and LSB for RADE_L.
@@ -1151,6 +1151,91 @@ void RxChannel::setSbnrAlgo(SbnrAlgo a)
 }
 
 // ---------------------------------------------------------------------------
+// NNR — Neural Noise Reduction (WDSP 2.10 nnr.c, Warren Pratt NR0V).
+// No Thetis precedent — new upstream algorithm, not a port.
+// ---------------------------------------------------------------------------
+
+void RxChannel::setNnrTuning(const NnrTuning& t)
+{
+    m_nnrTuning = t;
+#ifdef HAVE_WDSP
+    SetRXANNRPosition (m_channelId, static_cast<int>(t.position));
+    SetRXANNRModel    (m_channelId, t.model);
+    SetRXANNRMaskFloor(m_channelId, t.maskFloorDb);
+    SetRXANNRAlpha    (m_channelId, t.alpha);
+    SetRXANNRAlphaKnee(m_channelId, t.alphaKneeDb);
+    SetRXANNRTau      (m_channelId, t.tauSeconds);
+    SetRXANNRMaxGain  (m_channelId, t.maxGainDb);
+    SetRXANNRSmooth   (m_channelId, t.attackMs, t.releaseMs);
+#endif
+}
+
+void RxChannel::setNnrPosition(NrPosition p)
+{
+    m_nnrTuning.position = p;
+#ifdef HAVE_WDSP
+    SetRXANNRPosition(m_channelId, static_cast<int>(p));
+#endif
+}
+
+void RxChannel::setNnrModel(int slot)
+{
+    m_nnrTuning.model = slot;
+#ifdef HAVE_WDSP
+    SetRXANNRModel(m_channelId, slot);
+#endif
+}
+
+void RxChannel::setNnrMaskFloor(double floorDb)
+{
+    m_nnrTuning.maskFloorDb = floorDb;
+#ifdef HAVE_WDSP
+    SetRXANNRMaskFloor(m_channelId, floorDb);
+#endif
+}
+
+void RxChannel::setNnrAlpha(double alpha)
+{
+    m_nnrTuning.alpha = alpha;
+#ifdef HAVE_WDSP
+    SetRXANNRAlpha(m_channelId, alpha);
+#endif
+}
+
+void RxChannel::setNnrAlphaKnee(double kneeDb)
+{
+    m_nnrTuning.alphaKneeDb = kneeDb;
+#ifdef HAVE_WDSP
+    SetRXANNRAlphaKnee(m_channelId, kneeDb);
+#endif
+}
+
+void RxChannel::setNnrTau(double tauSeconds)
+{
+    m_nnrTuning.tauSeconds = tauSeconds;
+#ifdef HAVE_WDSP
+    SetRXANNRTau(m_channelId, tauSeconds);
+#endif
+}
+
+void RxChannel::setNnrMaxGain(double gainDb)
+{
+    m_nnrTuning.maxGainDb = gainDb;
+#ifdef HAVE_WDSP
+    SetRXANNRMaxGain(m_channelId, gainDb);
+#endif
+}
+
+void RxChannel::setNnrSmooth(double attackMs, double releaseMs)
+{
+    m_nnrTuning.attackMs  = attackMs;
+    m_nnrTuning.releaseMs = releaseMs;
+#ifdef HAVE_WDSP
+    SetRXANNRSmooth(m_channelId, attackMs, releaseMs);
+#endif
+}
+
+// ---------------------------------------------------------------------------
 // setActiveNr — central mode dispatch (Sub-epic C-1)
 // Porting from Thetis console.cs:43297-43450 SelectNR() [v2.10.3.13]
 // Original C# logic (condensed — NR1 case shown):
@@ -1173,6 +1258,7 @@ void RxChannel::setActiveNr(NrSlot slot)
     SetRXAEMNRRun(m_channelId, (slot == NrSlot::NR2) ? 1 : 0);
     SetRXARNNRRun(m_channelId, (slot == NrSlot::NR3) ? 1 : 0);
     SetRXASBNRRun(m_channelId, (slot == NrSlot::NR4) ? 1 : 0);
+    SetRXANNRRun (m_channelId, (slot == NrSlot::NNR) ? 1 : 0);
 #endif
 
     // Post-WDSP filter flags.  Filter instances added in Tasks 9-11; for now
@@ -1186,7 +1272,8 @@ void RxChannel::setActiveNr(NrSlot slot)
     // until Task 12 retires setEmnrEnabled / setNrEnabled.  Not strictly
     // required for correctness, but avoids surprising readers of the old API.
     m_nrEnabled  .store(slot == NrSlot::NR1 || slot == NrSlot::NR2 ||
-                        slot == NrSlot::NR3 || slot == NrSlot::NR4);
+                        slot == NrSlot::NR3 || slot == NrSlot::NR4 ||
+                        slot == NrSlot::NNR);
     m_emnrEnabled.store(slot == NrSlot::NR2);
 }
 
@@ -1471,7 +1558,7 @@ void RxChannel::setAfGain(double gain)
     // From Thetis Project Files/Source/Console/radio.cs:1077-1107 [v2.10.3.14]
     //   rx_output_gain_dsp = 1.0 + WDSP.SetRXAPanelGain1(WDSP.id(thread, subrx), value)
     //   //[2.10.3.5]MW0LGE wave recorder volume normalise  — wave recorder
-    //     branch deliberately not ported here; NereusSDR has no wave_file_writer
+    //     branch deliberately not ported here; Longpath has no wave_file_writer
     //     yet, and recorder gain hooks belong in the recorder module when it lands.
     // WDSP: third_party/wdsp/src/patchpanel.c:142 — assigns directly to
     //   rxa[channel].panel.p->gain1 under csDSP critical section.
@@ -1482,12 +1569,12 @@ void RxChannel::setAfGain(double gain)
 void RxChannel::setAudioPan(double pan)
 {
 #ifdef HAVE_WDSP
-    // Convert NereusSDR -1.0..+1.0 to WDSP 0.0..1.0:
-    //   wdsp_pan = (nereus_pan + 1.0) / 2.0
+    // Convert Longpath -1.0..+1.0 to WDSP 0.0..1.0:
+    //   wdsp_pan = (longpath_pan + 1.0) / 2.0
     //   -1.0 → 0.0 (full left), 0.0 → 0.5 (center), +1.0 → 1.0 (full right)
     // WDSP applies sin-law: gain2I = sin(pan*PI), gain2Q = 1 when pan>0.5
     // From Thetis Project Files/Source/Console/radio.cs:1386-1403
-    //   default pan = 0.5f (center in WDSP 0..1 scale → NereusSDR 0.0)
+    //   default pan = 0.5f (center in WDSP 0..1 scale → Longpath 0.0)
     // WDSP: third_party/wdsp/src/patchpanel.c:159
     const double wdspPan = (pan + 1.0) / 2.0;
     SetRXAPanelPan(m_channelId, wdspPan);
@@ -1532,7 +1619,7 @@ void RxChannel::setShiftFrequency(double offsetHz)
     // From Thetis radio.cs:1419-1420 [v2.10.3.15]: both calls use the same
     // sign, and both fire on EVERY RXOsc change, including a change back to
     // zero. Thetis has no run gate at all: SetRXAShiftRun appears nowhere in
-    // its Console tree, so the gate below is NereusSDR-original and now
+    // its Console tree, so the gate below is Longpath-original and now
     // covers only the run flag.
     //
     // The two frequency pushes used to sit inside the else of an
@@ -1621,7 +1708,7 @@ bool RxChannel::editNotch(int index, const Notch& n)
     // From Thetis console.cs:40028-40030 [v2.10.3.15] (ChangeNotchBW) and
     // console.cs:40100-40102 [v2.10.3.15] (ChangeNotchCentreFrequency). Both
     // Thetis edit paths read the current tuple back, change one member and
-    // push the whole tuple; NereusSDR's caller already holds the whole tuple,
+    // push the whole tuple; Longpath's caller already holds the whole tuple,
     // so the readback is unnecessary.
     // WDSP: third_party/wdsp/src/nbp.c:444, returns -1 when notch >= nn.
     //
@@ -2344,7 +2431,7 @@ qint64 RxChannel::rebuild(WdspEngine& engine, const ChannelConfig& cfg)
 // Returns elapsed ms if rebuild occurred, 0 if nothing changed, -1 if no
 // engine is attached or the channel is not in the engine.
 //
-// NereusSDR-original — no Thetis source ported; the per-mode key naming
+// Longpath-original — no Thetis source ported; the per-mode key naming
 // mirrors the DspOptionsPage AppSettings keys (design Section 4B).
 
 namespace {
@@ -2353,7 +2440,7 @@ namespace {
 // From design Section 4B — Phone covers SSB/AM/SAM/DSB, CW covers
 // CWU/CWL, Dig covers DIGU/DIGL/DSB/SPEC/DRM, FM covers FM.
 //
-// NereusSDR-original helper — no Thetis source ported.
+// Longpath-original helper — no Thetis source ported.
 QString rxModeKeyPart(DSPMode mode)
 {
     switch (mode) {
@@ -2462,7 +2549,7 @@ qint64 RxChannel::onModeChanged(DSPMode newMode)
 // Filter frequency response (Task 1.5)
 // ---------------------------------------------------------------------------
 //
-// NereusSDR-original — no Thetis source ported; algorithm is generic FFT-of-
+// Longpath-original — no Thetis source ported; algorithm is generic FFT-of-
 // filter-taps.  Uses WDSP fir_bandpass() because it is the exact function
 // that WDSP's CalcBandpassFilter() calls internally, so the synthesized taps
 // match the filter WDSP is actually running.  The taps are zero-padded into a

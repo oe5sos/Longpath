@@ -1,8 +1,8 @@
-// no-port-check: NereusSDR-original test. hasMicJack is a NereusSDR-original
+// no-port-check: Longpath-original test. hasMicJack is a Longpath-original
 // capability flag with no Thetis port; no attribution is required.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-27 — Original test for NereusSDR by J.J. Boyd (KG4VCF),
 //                 with AI-assisted implementation via Anthropic Claude Code.
 // =================================================================
@@ -30,7 +30,7 @@ private slots:
     //   ANAN-7000DLE / 8000DLE / Anvelina, Saturn G2 / G2-1K  → true
     //   HermesLite 2 (all variants)                             → false
     //
-    // §11 cite: NereusSDR-original; derived from Thetis Setup->Audio->Primary
+    // §11 cite: Longpath-original; derived from Thetis Setup->Audio->Primary
     // per-board panel visibility:
     //   panelSaturnMicInput  (setup.designer.cs:8613 [v2.10.3.13])
     //   panelOrionMic        (setup.designer.cs:8661 [v2.10.3.13])

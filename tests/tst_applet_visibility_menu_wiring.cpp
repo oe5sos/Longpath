@@ -2,7 +2,7 @@
 // MainWindow stay in sync via AppletVisibilityController. This test
 // builds the menu structures the same way MainWindow does, without
 // instantiating MainWindow itself.
-// no-port-check: NereusSDR-original — no Thetis source.
+// no-port-check: Longpath-original — no Thetis source.
 
 #include <QtTest/QtTest>
 #include <QApplication>

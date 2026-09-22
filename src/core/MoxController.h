@@ -1,9 +1,9 @@
 // =================================================================
-// src/core/MoxController.h  (NereusSDR)
+// src/core/MoxController.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original file. The MOX state machine and its enumerated
-// states are designed for NereusSDR's Qt6 architecture; logic and
+// Longpath-original file. The MOX state machine and its enumerated
+// states are designed for Longpath's Qt6 architecture; logic and
 // timer constants are derived from Thetis:
 //   console.cs:29311-29678 [v2.10.3.13] — chkMOX_CheckedChanged2
 //   console.cs:19659-19698 [v2.10.3.13] — mox_delay / space_mox_delay /
@@ -32,12 +32,12 @@
 //
 // Disambiguation: this class is the *radio-level* MOX state machine.
 // PttMode (src/core/PttMode.h) carries the Thetis PTTMode enum.
-// PttSource (src/core/PttSource.h) is a NereusSDR-native enum tracking
+// PttSource (src/core/PttSource.h) is a Longpath-native enum tracking
 // the UI surface that triggered the PTT event (Diagnostics page).
 // None of these three are supersets of each other; all coexist.
 // =================================================================
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-25 — Original implementation for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted implementation via
 //                 Anthropic Claude Code.
@@ -127,21 +127,21 @@
 //                   without VFOBTX still yields rx==1 because TX comes
 //                   off VFO-A. setRx2Enabled / setVfobTx public slots
 //                   are added (idempotent, no-emit) for future RadioModel
-//                   wiring; both default to false (NereusSDR has no RX2
+//                   wiring; both default to false (Longpath has no RX2
 //                   wired yet).
 //   2026-05-07 — Phase 3M-3a-iv post-bench refactor (Option A): removed
 //                 setAntiVoxSourceVax(bool) slot, antiVoxSourceWhatRequested
 //                 signal, and m_antiVoxSourceVax / m_antiVoxSourceVaxInitialized
 //                 members.  Thetis chkAntiVoxSource (RX vs VAC) at
 //                 setup.designer.cs:44646-44657 [v2.10.3.13] does not map
-//                 to NereusSDR's architecture: VAX is a digital-mode app bus
+//                 to Longpath's architecture: VAX is a digital-mode app bus
 //                 with no mic-feedback path, so the audio output device is
 //                 the only valid anti-VOX cancellation reference.  See
 //                 commit message for full rationale.  J.J. Boyd (KG4VCF),
 //                 AI-assisted via Anthropic Claude Code.
 // =================================================================
 
-// no-port-check: NereusSDR-original file; Thetis state-machine
+// no-port-check: Longpath-original file; Thetis state-machine
 // derived values are cited inline below.
 
 #pragma once
@@ -229,6 +229,16 @@ public:
     // 3M-2 CW QSK; not used in any 3M-1a path.
     static constexpr int kBreakInDelayMs = 300;
 
+    // Longpath-original (2026-09-13, operator-approved) — NOT a Thetis
+    // port; Thetis has no equivalent (its mox_delay/space_mox_delay are
+    // short hardware-settle waits AFTER MOX already drops, not a hold
+    // before dropping it). Modeled on a competing OpenHPSDR console's
+    // fix for hardware/mic PTT (a footswitch wired into the radio's mic-
+    // PTT line): releasing PTT the instant the switch opens can clip the
+    // tail of the last spoken syllable. Held here as a plain fixed
+    // constant rather than a Setup-page control -- see onMicPttFromRadio().
+    static constexpr int kMicPttReleaseTailMs = 150;
+
     // ── Getters ──────────────────────────────────────────────────────────────
     bool     isMox()      const noexcept { return m_mox; }
     MoxState state()      const noexcept { return m_state; }
@@ -237,9 +247,9 @@ public:
     //
     // Mirrors Thetis _manual_mox (console.cs:240 [v2.10.3.13]):
     //   "True if the MOX button was clicked on (not PTT)"
-    // In NereusSDR, TUN goes through setTune() which sets this flag.
+    // In Longpath, TUN goes through setTune() which sets this flag.
     // setMox() does NOT touch this flag (Thetis sets it via chkMOX_
-    // CheckedChanged2 only; NereusSDR narrows that to the TUN path).
+    // CheckedChanged2 only; Longpath narrows that to the TUN path).
     // F.1 subscribers wanting to distinguish a TUN-triggered MOX from a
     // raw setMox(true) call should read this getter inside their
     // hardwareFlipped(bool isTx) slot. External code must not set this
@@ -284,8 +294,15 @@ public:
     //   ctrl.setTimerIntervals(0, 0, 0, 0, 0, 0);
     // so QCoreApplication::processEvents() drives the entire walk
     // without waiting for wall-clock time.
+    //
+    // micPttTailMs (2026-09-13, added with kMicPttReleaseTailMs -- NOT
+    // part of the Thetis B.3 chain above) defaults to 0 so every existing
+    // 6-argument call site above keeps its original all-synchronous
+    // behavior unchanged; pass it explicitly only to test the tail delay
+    // itself.
     void setTimerIntervals(int rfMs, int moxMs, int spaceMs,
-                           int keyUpMs, int pttOutMs, int breakInMs);
+                           int keyUpMs, int pttOutMs, int breakInMs,
+                           int micPttTailMs = 0);
 
 public slots:
     // setTune: engage / release the TUN function.
@@ -301,7 +318,7 @@ public slots:
     //   console.cs:30142 — _manual_mox = false                 [v2.10.3.13]
     //
     // Note: Thetis sets flags AFTER chkMOX.Checked = true (line 30081)
-    // and AFTER await Task.Delay(100) (line 30083). NereusSDR sets them
+    // and AFTER await Task.Delay(100) (line 30083). Longpath sets them
     // BEFORE setMox(true) so that phase-signal subscribers (F.1) see a
     // consistent m_manualMox=true / m_pttMode=Manual snapshot when their
     // slots fire. This ordering deviation is intentional and documented.
@@ -403,7 +420,7 @@ public slots:
     //   private static float vox_gain = 1.0f;  // default 1.0
     //   // Used in CMSetTXAVoxThresh when MicBoost is on
     //
-    // NereusSDR exposes this as TransmitModel::voxGainScalar.  Changing
+    // Longpath exposes this as TransmitModel::voxGainScalar.  Changing
     // it re-evaluates the scaled threshold even if dB and micBoost are
     // unchanged.
     //
@@ -453,7 +470,7 @@ public slots:
     // 3M-3a-iv post-bench refactor (Option A): setAntiVoxSourceVax slot
     // removed.  Thetis chkAntiVoxSource at setup.designer.cs:44646-44657
     // [v2.10.3.13] selects between RX and VAC as the anti-VOX cancellation
-    // reference; that choice does not map to NereusSDR's architecture, where
+    // reference; that choice does not map to Longpath's architecture, where
     // VAX is a digital-mode app bus with no mic-feedback path and the audio
     // output device is therefore the only valid source.  See class header /
     // commit message for the architectural rationale.
@@ -582,7 +599,7 @@ public slots:
     //   _current_ptt_mode = PTTMode.MIC;                   [v2.10.3.13]
     //   From Thetis console.cs:25492 [v2.10.3.13]
     //
-    // In NereusSDR, H.5 will extract mic_ptt from the P1/P2 status frame and
+    // In Longpath, H.5 will extract mic_ptt from the P1/P2 status frame and
     // call this slot.  Wiring deferred to H.5; this slot establishes the API.
     //
     // Note: the slot name is "FromRadio" to distinguish hardware PTT from a
@@ -610,7 +627,7 @@ public slots:
     //   _current_ptt_mode = PTTMode.VOX;                    [v2.10.3.13]
     //   From Thetis console.cs:25507 [v2.10.3.13]
     //
-    // In NereusSDR, the VOX active event will be driven by WDSP DEXP detection
+    // In Longpath, the VOX active event will be driven by WDSP DEXP detection
     // polling (TxChannel TX-meter readback, related to D.7).  Wiring deferred
     // to 3M-3a or via TxChannel TX-meter polling.
     void onVoxActive(bool active);
@@ -633,7 +650,7 @@ public slots:
     // Triggered when the radio's X2 input jack asserts or de-asserts.
     // PTTMode::X2 is defined in Thetis enums.cs:353 [v2.10.3.13] but the
     // X2 PTT dispatch path in Thetis is not currently extracted to PollPTT.
-    // NereusSDR pre-wires the slot here for parity completeness; wiring
+    // Longpath pre-wires the slot here for parity completeness; wiring
     // deferred to 3M-3a or later when X2 status-frame parsing lands.
     void onX2Ptt(bool pressed);
 
@@ -683,7 +700,7 @@ public slots:
     // emitted from these slots — they only mirror upstream RadioModel state so
     // that the rx argument carried by Pre/Post signals stays correct.
     //
-    // Default for both: false. NereusSDR does not have RX2 wired yet, so the
+    // Default for both: false. Longpath does not have RX2 wired yet, so the
     // emitted rx argument is always 1 until RadioModel calls these setters.
     //
     // From Thetis console.cs:29324 [v2.10.3.13] — MoxPreChangeHandlers and
@@ -884,7 +901,7 @@ signals:
     // 3M-3a-iv post-bench refactor (Option A): antiVoxSourceWhatRequested
     // signal removed alongside setAntiVoxSourceVax.  See class-header
     // comment block for the architectural rationale (Thetis chkAntiVoxSource
-    // does not map to NereusSDR's architecture).
+    // does not map to Longpath's architecture).
 
     // antiVoxRunRequested: emitted when the master anti-VOX enable changes.
     //
@@ -976,6 +993,10 @@ private slots:
     void onKeyUpDelayElapsed();
     void onPttOutElapsed();
     void onBreakInDelayElapsed(); // declared for 3M-2 CW QSK; not started in 3M-1a
+
+    // Longpath-original -- see kMicPttReleaseTailMs / m_micPttReleaseTailTimer.
+    // Fires kMicPttReleaseTailMs after mic-PTT release; actually drops MOX.
+    void onMicPttReleaseTailElapsed();
 
 private:
     // isVoiceMode: true for the 8 voice-family DSP modes.
@@ -1150,7 +1171,7 @@ private:
     // ── C.4: multicast Pre/Post rx-argument state ────────────────────────────
     // m_rx2Enabled mirrors RadioModel "RX2 enabled" flag.
     // m_vfobTx mirrors RadioModel "VFO-B is the TX VFO" flag.
-    // Both default false — NereusSDR has no RX2 wired yet (3F territory).
+    // Both default false — Longpath has no RX2 wired yet (3F territory).
     // activeRxForTx() returns 2 iff (m_rx2Enabled && m_vfobTx), else 1.
     //
     // From Thetis console.cs:29324 [v2.10.3.13] — MoxPreChangeHandlers and
@@ -1176,6 +1197,15 @@ private:
     QTimer m_keyUpDelayTimer;   // 10 ms — TX→RX: mox_delay (SSB) or key_up_delay (CW); drives TxToRxInFlight
     QTimer m_pttOutDelayTimer;  // 20 ms — TX→RX: HW settle before WDSP RX on; drives TxToRxFlush
     QTimer m_breakInDelayTimer; // 300 ms — 3M-2 CW QSK; NOT started from any B.3 logic
+
+    // Longpath-original, not part of the Thetis B.3 chain above -- see
+    // kMicPttReleaseTailMs's declaration comment. Started on mic-PTT
+    // release instead of calling setMox(false) immediately; stopAllTimers()
+    // (called at the top of every setMox()) cancels it the same way it
+    // cancels every other B.3 timer, so a fresh mic-PTT press (or any
+    // other setMox() call) during the hold correctly cancels the pending
+    // release.
+    QTimer m_micPttReleaseTailTimer;
 };
 
 } // namespace Longpath

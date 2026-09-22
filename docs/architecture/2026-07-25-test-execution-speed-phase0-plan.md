@@ -24,7 +24,7 @@ of those branches, or cherry-pick `6ed89682`), so it is deliberately not a
 task here.
 
 **This plan does not depend on it.** Every task below applies cleanly with
-or without it. Tasks 2 and 3 touch `nereus_add_test()`, which that commit
+or without it. Tasks 2 and 3 touch `longpath_add_test()`, which that commit
 also edits, so expect a small conflict if both land; resolve by keeping
 `EXCLUDE_FROM_ALL` on the `add_executable` line and this plan's other
 changes around it.
@@ -122,7 +122,7 @@ endif()
 - [ ] **Step 4: Reconfigure and confirm the message appears**
 
 ```bash
-cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DNEREUS_BUILD_TESTS=ON 2>&1 | grep ccache
+cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DLONGPATH_BUILD_TESTS=ON 2>&1 | grep ccache
 ```
 
 Expected: `-- ccache enabled: /opt/homebrew/bin/ccache`
@@ -163,9 +163,9 @@ library) because its only content is a global static constructor, which a
 static-library link would discard as unreferenced.
 
 **Files:**
-- Modify: `tests/CMakeLists.txt` (the `nereus_add_test` function, and a new library above it)
+- Modify: `tests/CMakeLists.txt` (the `longpath_add_test` function, and a new library above it)
 
-- [ ] **Step 1: Add the shared object library above `function(nereus_add_test name)`**
+- [ ] **Step 1: Add the shared object library above `function(longpath_add_test name)`**
 
 ```cmake
 # ── Shared sandbox-init object library (2026-07-25) ────────────────────
@@ -180,14 +180,14 @@ static-library link would discard as unreferenced.
 # preserving the pre-main() QStandardPaths::setTestModeEnabled(true)
 # guarantee that keeps ctest runs from overwriting the developer's real
 # NereusSDR.settings (see the header comment in TestSandboxInit.cpp).
-add_library(nereus_test_sandbox OBJECT TestSandboxInit.cpp)
-target_link_libraries(nereus_test_sandbox PRIVATE Qt6::Core)
-if(NEREUS_USE_PCH)
-    target_precompile_headers(nereus_test_sandbox REUSE_FROM NereusSDRObjs)
+add_library(longpath_test_sandbox OBJECT TestSandboxInit.cpp)
+target_link_libraries(longpath_test_sandbox PRIVATE Qt6::Core)
+if(LONGPATH_USE_PCH)
+    target_precompile_headers(longpath_test_sandbox REUSE_FROM NereusSDRObjs)
 endif()
 ```
 
-- [ ] **Step 2: Swap the source for the object in `nereus_add_test`**
+- [ ] **Step 2: Swap the source for the object in `longpath_add_test`**
 
 Replace this line:
 
@@ -198,7 +198,7 @@ Replace this line:
 with:
 
 ```cmake
-    add_executable(${name} ${name}.cpp $<TARGET_OBJECTS:nereus_test_sandbox> ${ARGN})
+    add_executable(${name} ${name}.cpp $<TARGET_OBJECTS:longpath_test_sandbox> ${ARGN})
 ```
 
 (If `6ed89682` has landed, the line reads `add_executable(${name}
@@ -208,7 +208,7 @@ EXCLUDE_FROM_ALL ${name}.cpp TestSandboxInit.cpp ${ARGN})`; keep
 - [ ] **Step 3: Rebuild one test and run it**
 
 ```bash
-cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DNEREUS_BUILD_TESTS=ON >/dev/null && cmake --build build --target tst_app_settings_profile -j 2>&1 | tail -2 && ctest --test-dir build -R '^tst_app_settings_profile$' --output-on-failure
+cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DLONGPATH_BUILD_TESTS=ON >/dev/null && cmake --build build --target tst_app_settings_profile -j 2>&1 | tail -2 && ctest --test-dir build -R '^tst_app_settings_profile$' --output-on-failure
 ```
 
 Expected: `100% tests passed, 0 tests failed out of 1`.
@@ -291,7 +291,7 @@ so no test file is edited and the taxonomy cannot drift.
 **Files:**
 - Modify: `tests/CMakeLists.txt`
 
-- [ ] **Step 1: Add the derivation helper above `function(nereus_add_test name)`**
+- [ ] **Step 1: Add the derivation helper above `function(longpath_add_test name)`**
 
 ```cmake
 # ── Subsystem label derivation (2026-07-25) ────────────────────────────
@@ -301,7 +301,7 @@ so no test file is edited and the taxonomy cannot drift.
 #
 # Measured distribution across the suite: core 83%, models 38%, gui 30%
 # (tests commonly touch more than one, so these do not sum to 100).
-function(_nereus_derive_test_labels out_var src_file)
+function(_longpath_derive_test_labels out_var src_file)
     set(_labels "")
     if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${src_file}")
         set(${out_var} "unclassified" PARENT_SCOPE)
@@ -328,7 +328,7 @@ function(_nereus_derive_test_labels out_var src_file)
 endfunction()
 ```
 
-- [ ] **Step 2: Apply labels and timeout in `nereus_add_test`**
+- [ ] **Step 2: Apply labels and timeout in `longpath_add_test`**
 
 Replace this line:
 
@@ -345,7 +345,7 @@ with:
     # test from an indefinite block into a failure. 120s is deliberately
     # generous: the slowest test in the suite as of 2026-07-25 is
     # tst_reconnect_on_silence at 53.5s, and Task 4 brings that under 1s.
-    _nereus_derive_test_labels(_test_labels "${name}.cpp")
+    _longpath_derive_test_labels(_test_labels "${name}.cpp")
     set_tests_properties(${name} PROPERTIES
         LABELS "${_test_labels}"
         TIMEOUT 120)
@@ -354,7 +354,7 @@ with:
 - [ ] **Step 3: Reconfigure and verify labels exist**
 
 ```bash
-cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DNEREUS_BUILD_TESTS=ON >/dev/null && ctest --test-dir build -N -L core 2>/dev/null | tail -1
+cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DLONGPATH_BUILD_TESTS=ON >/dev/null && ctest --test-dir build -N -L core 2>/dev/null | tail -1
 ```
 
 Expected: `Total Tests: 433` (or close; the design measured 83% of 519).
@@ -607,7 +607,7 @@ Test now runs in under 2s."
 ## Task 5: Resolve the 7 unregistered test files
 
 **Why:** 526 `tst_*.cpp` files exist but only 519 are registered with
-`nereus_add_test()`. The other seven compile-rot silently: nothing builds
+`longpath_add_test()`. The other seven compile-rot silently: nothing builds
 or runs them, so they can reference deleted APIs indefinitely without
 anyone noticing.
 
@@ -626,7 +626,7 @@ tst_tx_applet_mic_gain
 - [ ] **Step 1: Determine whether each is intentionally platform-gated**
 
 ```bash
-cd /Users/j.j.boyd/NereusSDR && for t in tst_linux_backend_detection tst_linux_pipe_bus tst_p2_regression_freeze_capture tst_pipewire_stream_config tst_pipewire_stream_integration tst_slice_auto_agc tst_tx_applet_mic_gain; do printf "%-38s %s\n" "$t" "$(grep -c 'Q_OS_LINUX\|NEREUS_HAVE_PIPEWIRE' tests/$t.cpp)"; done
+cd /Users/j.j.boyd/NereusSDR && for t in tst_linux_backend_detection tst_linux_pipe_bus tst_p2_regression_freeze_capture tst_pipewire_stream_config tst_pipewire_stream_integration tst_slice_auto_agc tst_tx_applet_mic_gain; do printf "%-38s %s\n" "$t" "$(grep -c 'Q_OS_LINUX\|LONGPATH_HAVE_PIPEWIRE' tests/$t.cpp)"; done
 ```
 
 Interpretation: a nonzero count means the file is Linux/PipeWire-specific
@@ -640,20 +640,20 @@ registration at the end of `tests/CMakeLists.txt`:
 
 ```cmake
 # TEMPORARY — compile check for unregistered tests, remove before commit
-nereus_add_test(tst_slice_auto_agc)
-nereus_add_test(tst_tx_applet_mic_gain)
-nereus_add_test(tst_p2_regression_freeze_capture)
+longpath_add_test(tst_slice_auto_agc)
+longpath_add_test(tst_tx_applet_mic_gain)
+longpath_add_test(tst_p2_regression_freeze_capture)
 ```
 
 Then:
 
 ```bash
-cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DNEREUS_BUILD_TESTS=ON >/dev/null && cmake --build build --target tst_slice_auto_agc tst_tx_applet_mic_gain tst_p2_regression_freeze_capture -j 2>&1 | tail -20
+cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DLONGPATH_BUILD_TESTS=ON >/dev/null && cmake --build build --target tst_slice_auto_agc tst_tx_applet_mic_gain tst_p2_regression_freeze_capture -j 2>&1 | tail -20
 ```
 
 - [ ] **Step 3: Register the ones that compile and pass; delete the ones that do not**
 
-For each that builds and passes, keep its `nereus_add_test()` line and move
+For each that builds and passes, keep its `longpath_add_test()` line and move
 it next to its thematic neighbours in the file (remove the TEMPORARY
 comment).
 
@@ -676,7 +676,7 @@ For the Linux/PipeWire-gated files, leave them alone and add a comment in
 # tst_linux_backend_detection, tst_linux_pipe_bus,
 # tst_pipewire_stream_config, tst_pipewire_stream_integration
 # are Linux/PipeWire-specific. They are intentionally not registered
-# via nereus_add_test() here. Audited 2026-07-25; if the Linux audio
+# via longpath_add_test() here. Audited 2026-07-25; if the Linux audio
 # work needs them in CI, register them under an if(LINUX) guard.
 ```
 
@@ -697,7 +697,7 @@ git add tests/CMakeLists.txt tests/
 git commit -S -m "test: reconcile 7 unregistered tst_*.cpp files
 
 526 test source files existed but only 519 were registered via
-nereus_add_test(), so seven were never built or run and could rot
+longpath_add_test(), so seven were never built or run and could rot
 against deleted APIs indefinitely.
 
 Registered the ones that still build and pass, deleted the ones that

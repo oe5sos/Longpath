@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/gui/applets/TxVoiceCheckDialog.h  (NereusSDR)
+// src/gui/applets/TxVoiceCheckDialog.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // Hear yourself, record fifteen seconds, get three sentences and a
 // button that sets the equaliser.
@@ -43,7 +43,7 @@
 // carries latency and seams, and AetherSDR — whose workflow the bench
 // wants 1:1 — never does it. Its PUDU monitor records the processed
 // chain output and plays it back (ClientPuduMonitor @31b29583); this
-// window now runs exactly that loop, with NereusSDR's own parts:
+// window now runs exactly that loop, with Longpath's own parts:
 //
 //   Record 15 s  → both worker taps captured simultaneously —
 //                  PRE-strip for the analysis, POST-strip for the ear.
@@ -62,7 +62,7 @@
 // on-air MON path for real transmissions is untouched by all this.)
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-08 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
 //   2026-08-11 — Second recorder on the post-strip monitor tap +

@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/safety/TxInhibitMonitor.h  (NereusSDR)
+// src/core/safety/TxInhibitMonitor.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis [v2.10.3.13 @501e3f5]:
@@ -10,14 +10,14 @@
 // CLAUDE.md "Byte-for-byte headers and multi-file attribution".
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-25 — Ported to C++20/Qt6 for NereusSDR by J.J. Boyd
 //                (KG4VCF), with AI-assisted transformation via
 //                Anthropic Claude Code.
 //                Task: Phase 3M-0 Task 4 — TxInhibitMonitor
 //                Ports PollTXInhibit (console.cs:25801-25839 [v2.10.3.13]).
 //                notifyRxOnly, notifyOutOfBand, notifyBlockTxAntenna are
-//                NereusSDR-native aggregation paths; doc-comment cites
+//                Longpath-native aggregation paths; doc-comment cites
 //                reference console.cs:15283-15307, console.cs:6770-6806,
 //                console.cs:29435-29481, and Andromeda.cs:285-306 as the
 //                Thetis upstream context for each inhibit source.

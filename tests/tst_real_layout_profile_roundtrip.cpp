@@ -100,6 +100,7 @@
 #include "core/AppSettings.h"
 #include "core/ConnectionState.h"
 #include "gui/LayoutProfiles.h"
+#include "gui/WindowChrome.h"
 #include "gui/MainWindow.h"
 #include "models/RadioModel.h"
 #include "gui/WindowPlacement.h"
@@ -302,8 +303,15 @@ private slots:
                      "%1: die Sichtbarkeit ging beim Ablösen verloren")
                      .arg(panelId)));
 
-        // Aufraeumen: zurueck in die Spalte, fuer die naechste Zeile.
-        win->close();
+        // Aufraeumen: zurueck in die Spalte, fuer die naechste Zeile --
+        // ueber das x der Titelleiste, nicht ueber close(): seit 70edf36d
+        // (2026-09-17) dockt ein QCloseEvent nie mehr (siehe
+        // AppletFloatingWindow::closeEvent).
+        {
+            auto* bar = win->findChild<WindowTitleBar*>();
+            QVERIFY(bar);
+            emit bar->closeRequested();
+        }
         QVERIFY2(QTest::qWaitFor([p, applet]() {
                      return applet && p->applets().contains(applet);
                  }, 3000),
@@ -345,9 +353,14 @@ private slots:
         // Falls es schon abgeloest waere (z.B. Rest einer vorigen Zeile
         // von Test 1 -- sollte nicht sein, aber robust bleiben): erst
         // andocken.
+        // Andocken ueber das x der Titelleiste, nicht ueber close():
+        // seit 70edf36d dockt ein QCloseEvent nie mehr, und ein
+        // liegengebliebenes Fenster verfaelschte "before" unten.
         for (AppletFloatingWindow* w : m_mw->findChildren<AppletFloatingWindow*>()) {
             if (w && w->appletId() == kTargetId) {
-                w->close();
+                if (auto* bar = w->findChild<WindowTitleBar*>()) {
+                    emit bar->closeRequested();
+                }
                 QTest::qWait(200);
             }
         }

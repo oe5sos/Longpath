@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_audio_engine_mox_gate_release.cpp  (NereusSDR)
+// tests/tst_audio_engine_mox_gate_release.cpp  (Longpath)
 // =================================================================
 //
 // Drives the real MoxController -> AudioEngine::setMoxState wire that

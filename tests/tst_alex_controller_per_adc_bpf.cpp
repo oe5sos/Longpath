@@ -1,7 +1,7 @@
 // =================================================================
-// tests/tst_alex_controller_per_adc_bpf.cpp  (NereusSDR)
+// tests/tst_alex_controller_per_adc_bpf.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure.
+// no-port-check: Longpath-original test infrastructure.
 //
 // Phase 3F Sub-Epic B Task 11+: AlexController per-ADC BPF state machine
 // per docs/architecture/2026-05-26-phase3f-multi-pan-multi-slice-design.md §4.

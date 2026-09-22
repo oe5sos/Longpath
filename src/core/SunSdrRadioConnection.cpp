@@ -1,13 +1,13 @@
-// no-port-check: NereusSDR/Longpath-original. See header for scope.
+// no-port-check: Longpath/Longpath-original. See header for scope.
 
 // =================================================================
-// src/core/SunSdrRadioConnection.cpp  (NereusSDR/Longpath)
+// src/core/SunSdrRadioConnection.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR/Longpath-original. Scope and rationale in the header.
+// Longpath/Longpath-original. Scope and rationale in the header.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-26 — Original for NereusSDR/Longpath by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

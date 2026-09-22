@@ -5,7 +5,7 @@
 // well-known callsigns used as test inputs, not ported callsigns.
 // Precedent: B2-B5.
 //
-// NereusSDR - CtyDatParser tests
+// Longpath - CtyDatParser tests
 //
 // Phase 3J-2 Task C1. Pins the contract that CtyDatParser loads
 // cty.dat (AD1C / K1EA Country File) and resolves callsign prefixes

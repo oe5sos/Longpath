@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/PaGainProfile.h  (NereusSDR)
+// src/core/PaGainProfile.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -14,7 +14,7 @@
 //   original licence from mi0bot-Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-03 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code. Phase 1 Agent 1A of issue #167 PA-cal
@@ -135,7 +135,7 @@ namespace Longpath {
 /// circuits (gbb >= 99.5) to a linear-fallback path so HL2 users don't
 /// regress on HF transmit until they calibrate.
 ///
-/// NereusSDR-specific Band slots (`GEN`, `WWV`, `XVTR`, and the SWL bands
+/// Longpath-specific Band slots (`GEN`, `WWV`, `XVTR`, and the SWL bands
 /// `Band120m`..`Band11m`) have NO Thetis equivalent in the gain table.
 /// They return the 100.0f sentinel; the same downstream short-circuit
 /// handles them.
@@ -147,7 +147,7 @@ float defaultPaGainsForBand(HPSDRModel model, Band band) noexcept;
 
 /// All-100.0f sentinel profile used for the `Bypass` factory entry in
 /// `PaProfileManager`. Returns 100.0f for every band including the
-/// NereusSDR-specific slots. Same downstream-short-circuit semantics as
+/// Longpath-specific slots. Same downstream-short-circuit semantics as
 /// `defaultPaGainsForBand` — the linear-fallback math takes over.
 float bypassPaGainsForBand(Band band) noexcept;
 

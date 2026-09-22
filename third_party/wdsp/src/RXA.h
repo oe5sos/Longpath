@@ -139,6 +139,10 @@ struct _rxa
 	} emnr;
 	struct
 	{
+		NNR p; // WDSP 2.10 Neural Noise Reduction
+	} nnr;
+	struct
+	{
 		WCPAGC p;
 	} agc;
 	struct
@@ -215,7 +219,7 @@ extern void SetRXAMode (int channel, int mode);
 
 extern void RXAResCheck (int channel);
 
-extern void RXAbp1Check (int channel, int amd_run, int snba_run, int emnr_run, int anf_run, int anr_run, int rnnr_run, int sbnr_run); // NR3 + NR4 support
+extern void RXAbp1Check (int channel, int amd_run, int snba_run, int emnr_run, int anf_run, int anr_run, int rnnr_run, int sbnr_run, int nnr_run); // NR3 + NR4 + NNR support
 
 extern void RXAbp1Set (int channel);
 

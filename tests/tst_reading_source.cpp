@@ -5,7 +5,7 @@
 // Pruefung, dass die Zahlen mit der Quelle uebereinstimmen.
 
 // =================================================================
-// tests/tst_reading_source.cpp  (NereusSDR)
+// tests/tst_reading_source.cpp  (Longpath)
 // =================================================================
 //
 // Die Quellenliste der Instrumente und die Kennlinie der Empfangsskala.
@@ -37,7 +37,7 @@
 // sondern nennt die Zahl, damit die Änderung auffällt.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-17 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

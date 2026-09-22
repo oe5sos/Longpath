@@ -1,8 +1,8 @@
 // =================================================================
-// src/core/audio/MicReorderBuffer.h  (NereusSDR)
+// src/core/audio/MicReorderBuffer.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original (no Thetis equivalent: Thetis network.c:761-772
+// Longpath-original (no Thetis equivalent: Thetis network.c:761-772
 // [v2.10.3.13] discards the port-1026 mic sequence number entirely).
 //
 // Why this exists — network investigation 2026-08-11, remote bench:
@@ -42,7 +42,7 @@
 // thread's port-1026 handler. All state is plain members.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-11 — Created for the remote-bench mic reordering fix by
 //                 Ralph Martin Fischer (OE5SOS), AI-assisted
 //                 implementation via Anthropic Claude (Cowork).

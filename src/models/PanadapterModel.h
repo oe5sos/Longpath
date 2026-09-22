@@ -1,14 +1,14 @@
 #pragma once
 
 // =================================================================
-// src/models/PanadapterModel.h  (NereusSDR)
+// src/models/PanadapterModel.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/console.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -85,14 +85,14 @@ struct BandGridSettings {
     int   dbMax;
     int   dbMin;
     float clarityFloor   = std::numeric_limits<float>::quiet_NaN();
-    // NereusSDR-original — no Thetis equivalent.
+    // Longpath-original — no Thetis equivalent.
     // Last-seen noise-floor estimate for this band, persisted across sessions.
     // NaN until at least one 2s settle window has been observed on this band.
     float bandNFEstimate = std::numeric_limits<float>::quiet_NaN();
 };
 
 // Represents a single panadapter display.
-// In NereusSDR, panadapters are entirely client-side — the radio sends
+// In Longpath, panadapters are entirely client-side — the radio sends
 // raw I/Q, and the client computes FFT data for display. This model
 // holds display state (center frequency, bandwidth, dBm range, per-band
 // grid slots, current band).
@@ -151,7 +151,7 @@ public:
     float clarityFloor(Band b) const;
     void setClarityFloor(Band b, float floor);
 
-    // NereusSDR-original — no Thetis equivalent.
+    // Longpath-original — no Thetis equivalent.
     // Per-band noise-floor estimate (Task 2.10). NaN until the settle
     // detector has observed a stable floor on this band. Read by the
     // band-change handler (MainWindow) to prime ClarityController's EWMA

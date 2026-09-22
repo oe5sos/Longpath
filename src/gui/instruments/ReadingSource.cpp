@@ -7,7 +7,7 @@
 // steht da, damit die Suche nicht ein zweites Mal gemacht wird.
 
 // =================================================================
-// src/gui/instruments/ReadingSource.cpp  (NereusSDR)
+// src/gui/instruments/ReadingSource.cpp  (Longpath)
 // =================================================================
 // Siehe ReadingSource.h — eine Liste, nicht eine zweite.
 // =================================================================
@@ -345,6 +345,12 @@ QString ReadingDescriptor::text(double value) const
 {
     if (format) { return format(value); }
     return QString::number(value, 'f', decimals);
+}
+
+QString ReadingDescriptor::textWithUnit(double value) const
+{
+    if (format || unit.isEmpty()) { return text(value); }
+    return QStringLiteral("%1 %2").arg(text(value), unit);
 }
 
 QString ReadingDescriptor::thetisName() const

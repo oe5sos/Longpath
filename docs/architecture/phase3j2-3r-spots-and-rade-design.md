@@ -351,7 +351,7 @@ The C-port we vendored embeds the neural-net weights directly into the static li
 ### CMake glue
 
 - `add_subdirectory(third_party/rade)` after the existing `third_party/wdsp` line.
-- `target_link_libraries(NereusSDRObjs PUBLIC rade)` (the actual main object library is `NereusSDRObjs`, not `NereusSDR_core` as originally assumed; see Task A2 finding).
+- `target_link_libraries(NereusSDRObjs PUBLIC rade)` (the actual main object library is `NereusSDRObjs`, not `Longpath_core` as originally assumed; see Task A2 finding).
 - `target_include_directories(NereusSDRObjs PUBLIC ${CMAKE_SOURCE_DIR}/third_party/rade/src ...)` plus four additional radae_nopy include dirs for transitive headers (Opus types, NN data) so `RadeChannel` sees `rade_api.h` and friends.
 - New test targets for `test_rade_channel`, `test_rade_text` inherit through `NereusSDRObjs`.
 - Three small patches to `third_party/rade/cmake/BuildOpus.cmake` for Ninja support: `BUILD_COMMAND make` (not `$(MAKE)`), `BUILD_BYPRODUCTS` declared, `PATCH_COMMAND ${CMAKE_CURRENT_LIST_DIR}/..` (not `${CMAKE_SOURCE_DIR}`). All documented inline + in the A2 commit message; upstreamable to radae_nopy as a small PR.

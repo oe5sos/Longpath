@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_audio_engine_rx_leak_during_mox.cpp  (NereusSDR)
+// tests/tst_audio_engine_rx_leak_during_mox.cpp  (Longpath)
 // =================================================================
 //
 // Exercises AudioEngine E.4: RX-leak-during-MOX fold via activeSlice
@@ -20,7 +20,7 @@
 //   rxBlockReady_moxOnToOff_blockResumes
 //                                     — MOX off again → push resumes
 //
-// Test seam: setMoxStateForTest() (NEREUS_BUILD_TESTS) drives the gate
+// Test seam: setMoxStateForTest() (LONGPATH_BUILD_TESTS) drives the gate
 // without a full RadioModel/MoxController fixture.
 //
 // Observation method: FakeAudioBus injected via setSpeakersBusForTest().

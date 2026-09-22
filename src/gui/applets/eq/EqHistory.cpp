@@ -1,12 +1,12 @@
 // =================================================================
-// src/gui/applets/eq/EqHistory.cpp  (NereusSDR)
+// src/gui/applets/eq/EqHistory.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. See EqHistory.h for why the snapshots are whole
+// Longpath-original. See EqHistory.h for why the snapshots are whole
 // states rather than diffs, and why the hook fires at the wrong end.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-11 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

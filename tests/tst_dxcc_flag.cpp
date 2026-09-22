@@ -1,6 +1,6 @@
 // The flag table's contract is mostly about what it does NOT do: an
 // entity it does not know gets no flag, never a guessed one.
-// no-port-check: NereusSDR-original.
+// no-port-check: Longpath-original.
 
 #include <QtTest/QtTest>
 #include "core/DxccFlag.h"

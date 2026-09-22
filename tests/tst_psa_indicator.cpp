@@ -1,7 +1,7 @@
-// no-port-check: NereusSDR-original unit-test file.  Thetis cite comments
+// no-port-check: Longpath-original unit-test file.  Thetis cite comments
 // document upstream sources; no Thetis logic ported in this test file.
 // =================================================================
-// tests/tst_psa_indicator.cpp  (NereusSDR)
+// tests/tst_psa_indicator.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for the Phase 3M-4 Task 10 PsaIndicatorWidget.
@@ -33,11 +33,11 @@
 //      - Swapped: "Blue 0-90 ... Red 182+"
 //      - "Showing level, " prefix when !hideFeedback
 //
-// Source: NereusSDR-original.  See PsaIndicatorWidget.h for the Thetis
+// Source: Longpath-original.  See PsaIndicatorWidget.h for the Thetis
 // cite map.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-06 — New test file for Phase 3M-4 Task 10: PsaIndicatorWidget
 //                 unit tests.  J.J. Boyd (KG4VCF), with AI-assisted
 //                 implementation via Anthropic Claude Code.
@@ -129,7 +129,7 @@ private slots:
         // driven exclusively by psInfo()'s calibrationAttemptsChanged
         // parameter (matches Thetis ucInfoBar.cs:812 [v2.10.3.13] PSInfo
         // body — the flag was previously bumped on every setFeedbackLevel
-        // call, which was a NereusSDR-only deviation that the bench user
+        // call, which was a Longpath-only deviation that the bench user
         // tripped on when the FB label showed "Feedback" instead of the
         // numeric value).  Tests now drive the slot directly.
         PsaIndicatorWidget w(nullptr);
@@ -149,7 +149,7 @@ private slots:
         //   if (_bCorrectionsBeingApplied) {
         //       lblPS.Text = "Correcting"; lblPS.BackColor = Lime;
         //   }
-        // Phase 3M-4 bench-fix Round 2: dropped the NereusSDR-only
+        // Phase 3M-4 bench-fix Round 2: dropped the Longpath-only
         // m_correcting nested branch.  Lime/SeaGreen split is decided
         // purely by m_correctionsApplied per upstream byte-for-byte.
         PsaIndicatorWidget w(nullptr);

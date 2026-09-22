@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/audio/TxMicSource.cpp  (NereusSDR)
+// src/core/audio/TxMicSource.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
@@ -35,7 +35,7 @@ warren@wpratt.com
 */
 
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-29 — Initial port for NereusSDR by J.J. Boyd (KG4VCF),
 //                 Phase 3M-1c TX pump architecture redesign v3, with
 //                 AI-assisted implementation via Anthropic Claude
@@ -49,7 +49,7 @@ warren@wpratt.com
 #include <algorithm>
 #include <cstring>
 
-Q_LOGGING_CATEGORY(lcTxMicSrc, "nereus.tx.micsrc")
+Q_LOGGING_CATEGORY(lcTxMicSrc, "longpath.tx.micsrc")
 
 namespace Longpath {
 
@@ -148,7 +148,7 @@ bool TxMicSource::isRunning() const noexcept
 // ---------------------------------------------------------------------------
 // inbound — port of Thetis Inbound() at cmbuffs.c:88-121 [v2.10.3.13].
 //
-// One-to-one mapping (NereusSDR <-> Thetis):
+// One-to-one mapping (Longpath <-> Thetis):
 //   m_accept gate          <==> _InterlockedAnd(&a->accept, 1)
 //   m_csIn lock            <==> EnterCriticalSection(&a->csIN)
 //   wrap-aware ring write  <==> two-memcpy split (cmbuffs.c:108-109)
@@ -156,7 +156,7 @@ bool TxMicSource::isRunning() const noexcept
 //                                a->r1_unqueuedsamps / a->r1_outsize;
 //                                ReleaseSemaphore(a->Sem_BuffReady, n, 0);
 //
-// NereusSDR-specific details:
+// Longpath-specific details:
 //   - input is float (radio mic source produces float); Thetis uses
 //     double throughout.  We promote float->double on copy and zero
 //     the Q channel (mono mic) — matches Thetis network.c:769

@@ -1,7 +1,7 @@
 // =================================================================
-// tests/tst_diversity_dialog_persistence.cpp  (NereusSDR)
+// tests/tst_diversity_dialog_persistence.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure.
+// no-port-check: Longpath-original test infrastructure.
 //
 // Phase 3F Sub-Epic G Task 2: per-band diversity persistence round-trip.
 //

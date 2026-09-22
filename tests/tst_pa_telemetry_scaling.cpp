@@ -4,7 +4,7 @@
 // docstrings, not derivation claims. The ported functions themselves are
 // registered in THETIS-PROVENANCE.md.
 // =================================================================
-// tests/tst_pa_telemetry_scaling.cpp  (NereusSDR)
+// tests/tst_pa_telemetry_scaling.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for Longpath::scaleFwdPowerWatts() and

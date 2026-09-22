@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_amateur_bands.cpp  (NereusSDR)
+// tests/tst_amateur_bands.cpp  (Longpath)
 // =================================================================
 //
 // A band edge drawn in the wrong place is worse than no band edge at
@@ -11,10 +11,10 @@
 // would put the 40 m edge at 7.300 for an operator in Region 1. These
 // tests are mostly about the three places the regions differ.
 //
-// no-port-check: NereusSDR-original.
+// no-port-check: Longpath-original.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-10 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

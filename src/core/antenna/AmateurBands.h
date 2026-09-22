@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/core/antenna/AmateurBands.h  (NereusSDR)
+// src/core/antenna/AmateurBands.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // Where the bands begin and end, so a sweep can be drawn against
 // something real.
@@ -33,7 +33,7 @@
 // Region 1 edges checked against the IARU R1 HF band plan, August 2026.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-10 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

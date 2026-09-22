@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/core/strip/StripSettings.h  (NereusSDR)
+// src/core/strip/StripSettings.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // Save and restore the channel strip.
 //
@@ -31,7 +31,7 @@
 // the stage's own default rather than a zero.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-08 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

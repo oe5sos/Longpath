@@ -1,8 +1,8 @@
 // =================================================================
-// tests/tst_mox_controller_tune.cpp  (NereusSDR)
+// tests/tst_mox_controller_tune.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original test. No Thetis port at this layer.
+// Longpath-original test. No Thetis port at this layer.
 //
 // Verifies the setTune(bool) slot added in Phase 3M-1a Task B.5:
 //   - setTune(true) engages MOX + sets manualMox / pttMode = Manual
@@ -18,7 +18,7 @@
 // assignment block at lines 30093-30094 and the clear at line 30142.
 // =================================================================
 
-// no-port-check: NereusSDR-original test file.
+// no-port-check: Longpath-original test file.
 
 #include <QtTest/QtTest>
 #include <QSignalSpy>
@@ -165,7 +165,7 @@ private slots:
     {
         // Per Thetis: _current_ptt_mode is NOT cleared in chkTUN's TUN-off
         // path. It clears indirectly via chkMOX_CheckedChanged2 TX→RX branch
-        // (console.cs:29496 [v2.10.3.13]). In NereusSDR that belongs to F.1.
+        // (console.cs:29496 [v2.10.3.13]). In Longpath that belongs to F.1.
         // So after setTune(false), m_pttMode must still be Manual.
         MoxController ctrl;
         ctrl.setTimerIntervals(0, 0, 0, 0, 0, 0);
@@ -228,7 +228,7 @@ private slots:
         ctrl.setTune(true);
         QCoreApplication::processEvents();
 
-        // Expected order: flags set before setMox (NereusSDR ordering choice),
+        // Expected order: flags set before setMox (Longpath ordering choice),
         // then the phase signals in Codex P1 order.
         QCOMPARE(log.size(), 5);
         QCOMPARE(log.at(0), QStringLiteral("pttModeChanged(Manual)"));
@@ -438,7 +438,7 @@ private slots:
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // §7 — Flags are set BEFORE setMox (NereusSDR ordering choice)
+    // §7 — Flags are set BEFORE setMox (Longpath ordering choice)
     //
     // Verify that when txAboutToBegin fires (synchronously inside setMox),
     // m_manualMox is already true. This confirms the "flags before MOX"

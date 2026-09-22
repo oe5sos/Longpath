@@ -1,12 +1,12 @@
 // =================================================================
-// src/core/CallsignCache.cpp  (NereusSDR)
+// src/core/CallsignCache.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. See CallsignCache.h for why a stale entry is
+// Longpath-original. See CallsignCache.h for why a stale entry is
 // handed back rather than deleted.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-10 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

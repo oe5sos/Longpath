@@ -1,11 +1,11 @@
 // =================================================================
-// src/core/AdifNetworkUploader.cpp  (NereusSDR)
+// src/core/AdifNetworkUploader.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original — see AdifNetworkUploader.h.
+// Longpath-original — see AdifNetworkUploader.h.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
 // =================================================================

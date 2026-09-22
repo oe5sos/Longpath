@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_rf2ks_applet_context_menu.cpp  (NereusSDR-native)
+// tests/tst_rf2ks_applet_context_menu.cpp  (Longpath-native)
 // =================================================================
 //   2026-05-24  J.J. Boyd (KG4VCF), AI-assisted via Anthropic Claude.
 // =================================================================

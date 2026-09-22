@@ -1,12 +1,12 @@
 #pragma once
 
 // =================================================================
-// src/gui/setup/TxProfileSetupPage.h  (NereusSDR)
+// src/gui/setup/TxProfileSetupPage.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original Setup → Audio → TX Profile editor page.
+// Longpath-original Setup → Audio → TX Profile editor page.
 // No Thetis port for the Qt widgets themselves (per memory:
-// feedback_source_first_ui_vs_dsp — Setup pages are NereusSDR-native).
+// feedback_source_first_ui_vs_dsp — Setup pages are Longpath-native).
 // The save / delete / focus-gated unsaved-prompt SEMANTICS mirror Thetis:
 //
 //   setup.cs:9505-9543 [v2.10.3.13] — comboTXProfileName_SelectedIndexChanged
@@ -37,7 +37,7 @@
 //     • Dirty-tracking via subscription to TransmitModel *Changed signals
 //       (set on load, cleared on save/load/setActiveProfile).
 //
-// Test seams (no NEREUS_BUILD_TESTS guard — same convention as
+// Test seams (no LONGPATH_BUILD_TESTS guard — same convention as
 // TestTwoTonePage / AudioTxInputPage):
 //   • setSavePromptHook(...)         — replace QInputDialog::getText.
 //   • setOverwriteConfirmHook(...)   — replace QMessageBox::question.
@@ -48,15 +48,15 @@
 //                                       needing real focus events.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-29 — Phase 3M-1c chunk J.3+J.4 implementation by J.J. Boyd
 //                 (KG4VCF), with AI-assisted implementation via Anthropic
 //                 Claude Code.  Setup → Audio → TX Profile editor surface
 //                 mirroring the Thetis save / delete / unsaved-prompt
-//                 semantics; UI is NereusSDR-native.
+//                 semantics; UI is Longpath-native.
 // =================================================================
 
-// no-port-check: NereusSDR-original file; Thetis-derived semantics are
+// no-port-check: Longpath-original file; Thetis-derived semantics are
 // cited inline where they apply.
 
 #include "gui/SetupPage.h"
@@ -103,7 +103,7 @@ public:
     QPushButton* deleteButton() const { return m_deleteBtn; }
 
     // ── Test seams ──────────────────────────────────────────────────────────
-    // (No NEREUS_BUILD_TESTS guard — same convention as TestTwoTonePage.)
+    // (No LONGPATH_BUILD_TESTS guard — same convention as TestTwoTonePage.)
     //
     // SavePromptHook: replaces QInputDialog::getText for the save dialog.
     // Returns {accepted, name}; name is the user-typed string.  Empty / all-

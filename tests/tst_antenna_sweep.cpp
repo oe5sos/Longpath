@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_antenna_sweep.cpp  (NereusSDR)
+// tests/tst_antenna_sweep.cpp  (Longpath)
 // =================================================================
 //
 // Three modules, one job: turn a measured sweep into "add 22 cm to
@@ -22,10 +22,10 @@
 // Every expected number below was computed in Python before the C++
 // was written — see the run recorded in the commit message.
 //
-// no-port-check: NereusSDR-original.
+// no-port-check: Longpath-original.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-10 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

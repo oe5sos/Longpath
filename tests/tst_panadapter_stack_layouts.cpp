@@ -1,7 +1,7 @@
 // =================================================================
-// tests/tst_panadapter_stack_layouts.cpp  (NereusSDR)
+// tests/tst_panadapter_stack_layouts.cpp  (Longpath)
 // =================================================================
-// no-port-check: NereusSDR-original test infrastructure.
+// no-port-check: Longpath-original test infrastructure.
 //
 // Phase 3F Sub-Epic D Task 3: PanadapterStack skeleton (default single layout).
 // =================================================================

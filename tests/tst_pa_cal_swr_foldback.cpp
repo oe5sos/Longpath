@@ -1,8 +1,8 @@
-// no-port-check: NereusSDR-original unit-test file.  The mi0bot
+// no-port-check: Longpath-original unit-test file.  The mi0bot
 // NetworkIO.cs reference below is a cite comment documenting which
 // upstream behaviour the assertions verify; no C# is translated here.
 // =================================================================
-// tests/tst_pa_cal_swr_foldback.cpp  (NereusSDR)
+// tests/tst_pa_cal_swr_foldback.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for TransmitModel::swrProtectFactor + the foldback-aware
@@ -27,7 +27,7 @@
 // Strategy:
 //   The wire-byte computation is exposed as a static helper
 //   `RadioModel::computeWireDriveForTest(int powerPct, float swrFactor)`
-//   under NEREUS_BUILD_TESTS — same test-seam pattern Task 3.4 used
+//   under LONGPATH_BUILD_TESTS — same test-seam pattern Task 3.4 used
 //   (handlePaTelemetryForTest).  The helper is a pure function that
 //   reproduces the exact `clamp(int(255.0f * f * swrProtect), 0, 255)`
 //   formula inlined at all three setTxDrive sites in RadioModel.cpp,

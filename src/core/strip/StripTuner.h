@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/core/strip/StripTuner.h  (NereusSDR)
+// src/core/strip/StripTuner.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // Turn one voice measurement into a whole chain setting.
 //
@@ -48,7 +48,7 @@
 // completely or discard completely, and neither is what they want.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-08 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

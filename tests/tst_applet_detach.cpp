@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_applet_detach.cpp  (NereusSDR)
+// tests/tst_applet_detach.cpp  (Longpath)
 // =================================================================
 //
 // Ein Applet aus der Spalte in ein eigenes Fenster — und zurück.
@@ -32,7 +32,7 @@
 // je nach Schreibtisch mal wahr und mal nicht.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-16 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 //   2026-08-17 — Ziehen-zum-Ablösen wieder entfernt; die Schwellen-
@@ -49,6 +49,8 @@
 #include <QSignalSpy>
 
 #include "gui/applets/AppletFloatingWindow.h"
+#include "gui/WindowChrome.h"
+
 #include "gui/applets/AppletKeys.h"
 #include "gui/applets/AppletPanelWidget.h"
 #include "gui/applets/AppletVisibilityController.h"
@@ -410,14 +412,27 @@ private slots:
                  "zurueck in der Spalte, aber unsichtbar");
     }
 
-    void closingTheWindowAsksToDock()
+    void closingTheWindowDoesNotDockButTheTitleBarCrossDoes()
     {
+        // Seit 70edf36d (2026-09-17, "Schwebende Fenster docken sich
+        // beim Beenden nicht mehr selbst an") dockt ein QCloseEvent NIE
+        // mehr: er kommt an ein rahmenloses Fenster nur vom System, und
+        // beim Beenden ueber Dock/Apfelmenue lief er VOR
+        // MainWindow::closeEvent -- das Profil sah dann ein
+        // schwebendes Fenster weniger ("profile bleiben wieder nicht
+        // automatisch gespeichert!!!!!"). Das x der Titelleiste ist
+        // die Absicht des Bedienenden und geht direkt auf den
+        // Andock-Weg. Bis dahin prueften diese Zeilen das Gegenteil.
         auto* rx = new StubApplet(QStringLiteral("rx"));
         auto* win = new AppletFloatingWindow(rx, QStringLiteral("Rx"), 1);
         QSignalSpy spy(win, &AppletFloatingWindow::dockRequested);
 
         win->close();
+        QCOMPARE(spy.count(), 0);
 
+        auto* bar = win->findChild<WindowTitleBar*>();
+        QVERIFY(bar);
+        emit bar->closeRequested();
         QCOMPARE(spy.count(), 1);
         QCOMPARE(spy.at(0).at(0).toString(), QStringLiteral("Rx"));
 

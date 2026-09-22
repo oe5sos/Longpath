@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_tx_switch_bar.cpp  (NereusSDR)
+// tests/tst_tx_switch_bar.cpp  (Longpath)
 // =================================================================
 //
 // Die vier Sendeschalter der unteren Leiste.
@@ -18,12 +18,12 @@
 // zu sehen und nicht erst am Geraet.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-18 — Original fuer NereusSDR von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
 // =================================================================
 
-// no-port-check: NereusSDR-original test file.
+// no-port-check: Longpath-original test file.
 
 #include <QtTest>
 #include <QPushButton>

@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/PaProfileManager.h  (NereusSDR)
+// src/core/PaProfileManager.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis sources:
@@ -10,7 +10,7 @@
 //   original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-03 — Original implementation for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted implementation via Anthropic
 //                 Claude Code. Phase 2 Agent 2B of issue #167 PA-cal
@@ -18,9 +18,9 @@
 //                 without per-band PA gain compensation produced >300 W
 //                 output on a 200 W ANAN-8000DLE).
 //
-//                 NereusSDR-original glue file: per-MAC scoping, in-memory
+//                 Longpath-original glue file: per-MAC scoping, in-memory
 //                 cache, AppSettings persistence, and active-profile-on-
-//                 connect resolver are NereusSDR-native (parallel to
+//                 connect resolver are Longpath-native (parallel to
 //                 MicProfileManager); Thetis-derived handler logic is
 //                 cited inline below.
 //
@@ -77,7 +77,7 @@
 // Richard Samphire can be reached by email at :  mw0lge@grange-lane.co.uk                    //
 //============================================================================================//
 
-// no-port-check: NereusSDR-original file; Thetis-derived handler logic
+// no-port-check: Longpath-original file; Thetis-derived handler logic
 // is cited inline below.
 
 #pragma once
@@ -105,7 +105,7 @@ namespace Longpath {
 // parallel manifest key (`_names`, comma-separated) as the source of
 // truth for the profile list. This matches the MicProfileManager pattern.
 //
-// Active-profile-on-connect (NereusSDR-spin enhancement over Thetis):
+// Active-profile-on-connect (Longpath-spin enhancement over Thetis):
 // on load(connectedModel):
 //   1. Read hardware/<mac>/pa/profile/active. If present and the named
 //      profile is in the manifest, use it.

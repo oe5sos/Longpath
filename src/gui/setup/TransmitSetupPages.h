@@ -1,14 +1,14 @@
 #pragma once
 
 // =================================================================
-// src/gui/setup/TransmitSetupPages.h  (NereusSDR)
+// src/gui/setup/TransmitSetupPages.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/setup.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -29,7 +29,7 @@
 //                 m_chkAntiVoxSource member from DexpVoxPage; replaced the
 //                 chkAntiVoxSource checkbox with a static info-row label.
 //                 Thetis chkAntiVoxSource (RX vs VAC) does not map to
-//                 NereusSDR's architecture; see TransmitSetupPages.cpp info
+//                 Longpath's architecture; see TransmitSetupPages.cpp info
 //                 row tooltip for the rationale.  J.J. Boyd (KG4VCF),
 //                 AI-assisted via Anthropic Claude Code.
 // =================================================================
@@ -144,7 +144,7 @@ private:
 
     // Section: ATT-on-TX (H.4 — wired)
     // chkATTOnTX — Thetis setup.designer.cs:5926-5939 [v2.10.3.13] (tpAlexAntCtrl).
-    // NereusSDR places it in Power (better thematic grouping).
+    // Longpath places it in Power (better thematic grouping).
     QCheckBox* m_chkAttOnTx{nullptr};
 
     // udATTOnTX — Thetis setup.cs:3990-4015 [v2.10.3.13] ATTOnTX property.
@@ -211,12 +211,12 @@ private:
 };
 
 // ---------------------------------------------------------------------------
-// Transmit > Speech Processor — TX dashboard (NereusSDR-spin)
+// Transmit > Speech Processor — TX dashboard (Longpath-spin)
 //
 // No direct Thetis equivalent.  The Thetis "Speech Proc" tile lives on the
 // main console as a single CPDR enable+gain pair (console.cs CPDR controls
 // [v2.10.3.13]), and the per-stage controls (Phrot / CFC / CESSB / Leveler
-// / ALC) live across multiple Setup → DSP tabs.  NereusSDR repurposes this
+// / ALC) live across multiple Setup → DSP tabs.  Longpath repurposes this
 // page as a one-stop overview that shows the live state of every TXA
 // speech-chain stage and cross-links to where each stage is configured.
 //
@@ -327,13 +327,13 @@ private:
     // Phase 3M-3a-iv Task 10 landed Tau (ms) only.  3M-3a-iv scope-expansion
     // adds chkAntiVoxEnable / udAntiVoxGain so the bench verification matrix
     // is runnable from a fresh install.  Layout order matches Thetis Y-coords:
-    // Enable (Y=19) -> [Source info row, NereusSDR-spin] -> Gain (Y=71)
+    // Enable (Y=19) -> [Source info row, Longpath-spin] -> Gain (Y=71)
     // -> Tau (Y=96).  3M-3a-iv post-bench refactor (Option A) replaced the
     // chkAntiVoxSource checkbox with a static info-row label explaining the
     // architectural divergence from Thetis (VAX is not a mic-feedback path,
     // so the audio output device is the only valid source).
     QCheckBox*      m_chkAntiVoxEnable{nullptr};        // chkAntiVoxEnable
-    // NereusSDR-original divergence (already shipped in 3M-1b H.3): TM uses
+    // Longpath-original divergence (already shipped in 3M-1b H.3): TM uses
     // int dB rather than Thetis decimal-with-0.1-step.  Default 0 dB rather
     // than Thetis +10 dB.  Both are kept here for consistency with shipped
     // behavior; full Thetis parity (decimal + default 10) is a follow-up.

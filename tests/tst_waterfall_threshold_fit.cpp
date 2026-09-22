@@ -1,6 +1,6 @@
-// tests/tst_waterfall_threshold_fit.cpp  (NereusSDR)
+// tests/tst_waterfall_threshold_fit.cpp  (Longpath)
 //
-// NereusSDR-original. No Thetis port.
+// Longpath-original. No Thetis port.
 //
 // ── Zwei rote Baender, die niemand gesendet hat ──────────────────────
 //

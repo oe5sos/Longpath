@@ -1,12 +1,12 @@
 // =================================================================
-// src/core/QrzLogbookUploader.cpp  (NereusSDR)
+// src/core/QrzLogbookUploader.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original — see QrzLogbookUploader.h, in particular the
+// Longpath-original — see QrzLogbookUploader.h, in particular the
 // note on why this is a different service from QrzClient.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
 // =================================================================
@@ -22,7 +22,7 @@
 namespace Longpath {
 
 namespace {
-Q_LOGGING_CATEGORY(lcQrzLog, "nereus.qrz.logbook")
+Q_LOGGING_CATEGORY(lcQrzLog, "longpath.qrz.logbook")
 
 constexpr const char* kApi = "https://logbook.qrz.com/api";
 constexpr int kTimeoutMs = 20000;

@@ -1,8 +1,8 @@
 // =================================================================
-// src/core/FaultLog.h  (NereusSDR)
+// src/core/FaultLog.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-native ring buffer of the last 10 fault events per device,
+// Longpath-native ring buffer of the last 10 fault events per device,
 // persisted to AppSettings as a JSON array. Consumed by the PGXL
 // advanced setup page and any future fault-history surface.
 //

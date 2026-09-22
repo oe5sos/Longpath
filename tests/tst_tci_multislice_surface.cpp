@@ -1,8 +1,8 @@
 // =================================================================
-// tests/tst_tci_multislice_surface.cpp  (NereusSDR)
+// tests/tst_tci_multislice_surface.cpp  (Longpath)
 // =================================================================
 //
-// no-port-check: NereusSDR-original test. The wire formats it asserts
+// no-port-check: Longpath-original test. The wire formats it asserts
 // are cited to Thetis; the multi-slice questions it asks have no Thetis
 // answer, because Thetis tops out at two receivers and one transmitter
 // bound to RX1.

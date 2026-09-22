@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_spectrum_pipeline_modes.cpp  (NereusSDR)
+// tests/tst_spectrum_pipeline_modes.cpp  (Longpath)
 // =================================================================
 //
 // Phase 1B verification — exercise every detector x averaging
@@ -21,7 +21,7 @@
 // Thetis; intentionally absent from SpectrumAveraging enum.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-06 -- Created in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                  (KG4VCF), with AI-assisted transformation via
 //                  Anthropic Claude Code.

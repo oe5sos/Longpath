@@ -1,7 +1,7 @@
-// no-port-check: NereusSDR-original unit-test file.  Thetis cite comments
+// no-port-check: Longpath-original unit-test file.  Thetis cite comments
 // document upstream sources; no Thetis logic ported in this test file.
 // =================================================================
-// tests/tst_ps_feedback_channel.cpp  (NereusSDR)
+// tests/tst_ps_feedback_channel.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for the Phase 3M-4 Task 4 PsFeedbackChannel wrapper class.
@@ -29,15 +29,15 @@
 //      with the existing TX channel id.
 //
 // Test strategy mirrors tst_wdsp_engine_dexp_init.cpp: friend access via
-// NEREUS_BUILD_TESTS sets m_initialized = true synchronously to bypass the
+// LONGPATH_BUILD_TESTS sets m_initialized = true synchronously to bypass the
 // async wisdom path, then drives createTxChannel + psFeedbackChannel().
 //
-// Source: NereusSDR-original wrapper.  No Thetis source; Thetis manages
+// Source: Longpath-original wrapper.  No Thetis source; Thetis manages
 //         WDSP channels via ChannelMaster.dll.  See ps_sync_stub.c for
 //         the SetPSRxIdx routing symbol.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-06 — New test file for Phase 3M-4 Task 4: PsFeedbackChannel
 //                 wrapper smoke tests.  J.J. Boyd (KG4VCF), with
 //                 AI-assisted implementation via Anthropic Claude Code.
@@ -53,7 +53,7 @@ using namespace Longpath;
 
 // Channel ID convention (matches tst_wdsp_engine_tx_channel.cpp):
 //   TX channel: WDSP.id(1, 0) = CMsubrcvr * CMrcvr = 1 * 1 = 1
-//   (dsp.cs:926-944 case 2, with NereusSDR CMsubrcvr=CMrcvr=1)
+//   (dsp.cs:926-944 case 2, with Longpath CMsubrcvr=CMrcvr=1)
 static constexpr int kTxChannelIdForTest = 1;
 
 class TstPsFeedbackChannel : public QObject {
@@ -69,7 +69,7 @@ private slots:
     // TX channel id.
     void hasUniqueChannelId() {
         WdspEngine engine;
-        engine.m_initialized = true;   // friend access (NEREUS_BUILD_TESTS)
+        engine.m_initialized = true;   // friend access (LONGPATH_BUILD_TESTS)
                                         // bypasses async wisdom path
 
         // PS feedback channel is opened during initialize() — but in the

@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/safety/SwrProtectionController.cpp  (NereusSDR)
+// src/core/safety/SwrProtectionController.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis [v2.10.3.13 @501e3f5]:
@@ -10,7 +10,7 @@
 // CLAUDE.md "Byte-for-byte headers and multi-file attribution".
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-25 — Ported to C++20/Qt6 for NereusSDR by J.J. Boyd
 //                (KG4VCF), with AI-assisted transformation via
 //                Anthropic Claude Code.
@@ -231,7 +231,7 @@ void SwrProtectionController::ingest(float fwdW, float revW, bool tuneActive) no
     }
 
     // ── Measurement mode ──────────────────────────────────────────────────
-    // NereusSDR-original; see the header for why this is not a hole in
+    // Longpath-original; see the header for why this is not a hole in
     // the protection. Publishes the reading, acts on nothing.
     if (m_measurementMode && !m_windBackLatched
         && fwdW <= kMeasurementCeilingW) {

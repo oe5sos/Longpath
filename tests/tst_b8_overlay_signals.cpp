@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_b8_overlay_signals.cpp  (NereusSDR)
+// tests/tst_b8_overlay_signals.cpp  (Longpath)
 // =================================================================
 //
 // TDD: verify SpectrumOverlayPanel Display-flyout signals are wired

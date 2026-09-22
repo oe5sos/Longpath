@@ -140,7 +140,7 @@ If gen1 state looks correct, next isolation tests:
 
 ```sh
 cd /Users/j.j.boyd/NereusSDR/.worktrees/phase3m-1a-tune-only-first-rf
-export NEREUS_THETIS_DIR=/Users/j.j.boyd/Thetis
+export LONGPATH_THETIS_DIR=/Users/j.j.boyd/Thetis
 cmake --build build -j$(sysctl -n hw.ncpu)
 ```
 

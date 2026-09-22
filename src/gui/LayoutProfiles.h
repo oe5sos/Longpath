@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/gui/LayoutProfiles.h  (NereusSDR)
+// src/gui/LayoutProfiles.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original.
+// Longpath-original.
 //
 // ── Mehrere Ansichten, jede selbst gestaltet ─────────────────────────
 //
@@ -55,7 +55,7 @@
 // Regel, die man vorhersagen kann.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-15 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

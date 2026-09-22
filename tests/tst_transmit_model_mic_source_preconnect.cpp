@@ -1,8 +1,8 @@
 // =================================================================
-// tests/tst_transmit_model_mic_source_preconnect.cpp  (NereusSDR)
+// tests/tst_transmit_model_mic_source_preconnect.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original test file. No Thetis port at this layer.
+// Longpath-original test file. No Thetis port at this layer.
 //
 // Verifies the pre-connect Mic_Source persistence fallback added in
 // eager-borg-d64bed on 2026-05-06.
@@ -27,13 +27,13 @@
 //   load_neitherKey_defaultsToPc         — first-run baseline preserved
 // =================================================================
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-06 — Original test for NereusSDR by J.J. Boyd (KG4VCF),
 //                 with AI-assisted implementation via Anthropic Claude
 //                 Code (eager-borg-d64bed).
 // =================================================================
 
-// no-port-check: NereusSDR-original test file.
+// no-port-check: Longpath-original test file.
 
 #include <QtTest/QtTest>
 

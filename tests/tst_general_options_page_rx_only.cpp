@@ -1,7 +1,7 @@
-// tests/tst_general_options_page_rx_only.cpp  (NereusSDR)
+// tests/tst_general_options_page_rx_only.cpp  (Longpath)
 //
 // Phase 3M-1a G.2 — Receive Only checkbox visibility wired from
-// BoardCapabilities::isRxOnlySku (NereusSDR-original).
+// BoardCapabilities::isRxOnlySku (Longpath-original).
 //
 // no-port-check: test fixture — no Thetis attribution required.
 //
@@ -77,7 +77,7 @@ private slots:
         // Inject isRxOnlySku=true via setCapsRxOnlyForTest (3M-1a G.2 test hook).
         // HermesLiteRxOnly has no HPSDRModel entry so setBoardForTest cannot
         // reach its caps; this hook is the correct seam.
-        // Cite: BoardCapabilities::isRxOnlySku (NereusSDR-original, Phase 3M-0 Task 1).
+        // Cite: BoardCapabilities::isRxOnlySku (Longpath-original, Phase 3M-0 Task 1).
         RadioModel model;
         model.setCapsRxOnlyForTest(true);
         GeneralOptionsPage page(&model);

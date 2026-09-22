@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_panadapter_header.cpp  (NereusSDR)
+// tests/tst_panadapter_header.cpp  (Longpath)
 // =================================================================
 //
 // Die Kopfleiste des Panadapters.
@@ -14,12 +14,12 @@
 //   2. dass sie der Mitte FOLGT und sie nicht einmalig zeigt
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-19 — Original fuer NereusSDR von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
 // =================================================================
 
-// no-port-check: NereusSDR-original test file.
+// no-port-check: Longpath-original test file.
 
 #include <QtTest>
 #include <QPushButton>

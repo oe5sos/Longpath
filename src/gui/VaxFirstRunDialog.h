@@ -1,10 +1,10 @@
 #pragma once
 
 // =================================================================
-// src/gui/VaxFirstRunDialog.h  (NereusSDR)
+// src/gui/VaxFirstRunDialog.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original file — no Thetis port; no attribution-registry row.
+// Longpath-original file — no Thetis port; no attribution-registry row.
 //
 // Modal first-run assistant that walks the user through VAX channel
 // setup. Five scenarios (Windows with/without 3rd-party cables, macOS
@@ -16,7 +16,7 @@
 // in Task 11b + Sub-Phase 12 respectively.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-20 — Written by J.J. Boyd (KG4VCF), with AI-assisted
 //                transformation via Anthropic Claude Code.
 // =================================================================
@@ -49,9 +49,9 @@ public:
                       const QVector<DetectedCable>& detected,
                       QWidget* parent = nullptr);
 
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     // Test seam — returns the scenario this dialog was constructed for.
-    // Gated behind NEREUS_BUILD_TESTS so production builds don't expose
+    // Gated behind LONGPATH_BUILD_TESTS so production builds don't expose
     // the getter. Matches the AudioEngine::setVaxBusForTest pattern.
     FirstRunScenario scenarioForTest() const { return m_scenario; }
 
@@ -82,7 +82,7 @@ private:
     // "Apply suggested" / "Apply to VAX 3 & 4". Pure function of
     // m_scenario + m_detected; used internally by onApplySuggested() and
     // by the Scenario E footer label synthesis in buildFooter(). Exposed
-    // to tests via the NEREUS_BUILD_TESTS-gated suggestedBindingsForTest()
+    // to tests via the LONGPATH_BUILD_TESTS-gated suggestedBindingsForTest()
     // forwarder above.
     QVector<QPair<int, QString>> computeSuggestedBindings() const;
 

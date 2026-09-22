@@ -1,5 +1,5 @@
 // =================================================================
-// src/gui/applets/TunerApplet.cpp  (NereusSDR)
+// src/gui/applets/TunerApplet.cpp  (Longpath)
 // =================================================================
 //
 // Source attribution (AetherSDR -- GPLv3):
@@ -10,10 +10,10 @@
 //
 //   This file is a port or structural derivative of AetherSDR source.
 //   AetherSDR is licensed under the GNU General Public License v3.
-//   NereusSDR is also GPLv3. Attribution follows GPLv3 ss.5 requirements.
+//   Longpath is also GPLv3. Attribution follows GPLv3 ss.5 requirements.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-18  Ported/adapted in C++20/Qt6 for NereusSDR by
 //                 J.J. Boyd (KG4VCF), with AI-assisted transformation
 //                 via Anthropic Claude Code.
@@ -30,6 +30,7 @@
 // =================================================================
 
 #include "TunerApplet.h"
+#include "gui/StyleConstants.h"
 #include "gui/styles/ThemeQss.h"
 #include "core/AppSettings.h"
 #include "gui/HGauge.h"
@@ -171,7 +172,7 @@ void TunerApplet::buildUI()
     // tuningChanged lambda only drops the carrier we put up, never the
     // operator's manual TUN.
     //
-    // NereusSDR-native; no AetherSDR equivalent (AetherSDR routes through
+    // Longpath-native; no AetherSDR equivalent (AetherSDR routes through
     // a real FlexRadio that handles the carrier internally).
     connect(m_tuneBtn, &QPushButton::clicked, this, [this]() {
         if (!m_tunerModel) { return; }
@@ -372,7 +373,7 @@ void TunerApplet::setTunerModel(TunerModel* model)
     // Tuning state: red button + "TUNING..." + post-tune SWR flash.
     // From AetherSDR src/gui/TunerApplet.cpp:setTunerModel() tuningChanged [@0cd4559]
     //
-    // NereusSDR adds carrier orchestration here:
+    // Longpath adds carrier orchestration here:
     //   * on tuning=1 from a TGXL hardware TUNE press (operator pushed the
     //     button on the device) we engage the local tune-carrier so TGXL
     //     sees RF and doesn't abort with "low RF power". When the TUNE
@@ -396,8 +397,9 @@ void TunerApplet::setTunerModel(TunerModel* model)
             m_postTuneTimer->stop();
             m_tuneSwr = 999.0f;  // reset high so capture tracking works
             m_tuneBtn->setStyleSheet(Style::themed(QStringLiteral(
-                "QPushButton { background: #cc2222; border: 1px solid #c25a5c; "
-                "border-radius: 6px; color: #ffffff; font-size: 11px; font-weight: bold; }")));
+                "QPushButton { background: %1; border: 1px solid %2; "
+                "border-radius: 6px; color: #ffffff; font-size: 11px; font-weight: bold; }")
+                .arg(QLatin1String(Style::kRedBg), QLatin1String(Style::kTxRed))));
             m_tuneBtn->setText(QStringLiteral("TUNING..."));
 
             // Engage local CW tune carrier + standby PGXL for a hardware-
@@ -520,10 +522,25 @@ void TunerApplet::setPowerScale(int maxWatts, bool hasAmplifier)
 {
     // From AetherSDR src/gui/TunerApplet.cpp:setPowerScale [@0cd4559]
     if (hasAmplifier) {
-        // PGXL: 0-2000 W, red > 1500 W
-        m_fwdPowerGauge->setRange(0.0, 2000.0);
-        m_fwdPowerGauge->setYellowStart(1500.0);
-        m_fwdPowerGauge->setRedStart(1500.0);
+        // Code review, 2026-09-13 (changelog comparison with another
+        // client): same
+        // fix as TxApplet::setPowerScale, kept in lockstep with it per
+        // this function's own "damit die Anzeigen nicht auseinander-
+        // laufen" contract. maxWatts<=0 (PGXL, RF-Kit/RF2K-S -- both
+        // genuinely ~2kW-class) keeps the historical fixed scale;
+        // maxWatts>0 (a future lower-power amp) scales proportionally
+        // instead of inheriting the fixed 2kW ceiling.
+        if (maxWatts > 0) {
+            const double red = static_cast<double>(maxWatts);
+            m_fwdPowerGauge->setRange(0.0, red * 1.2);
+            m_fwdPowerGauge->setYellowStart(red);
+            m_fwdPowerGauge->setRedStart(red);
+        } else {
+            // PGXL: 0-2000 W, red > 1500 W
+            m_fwdPowerGauge->setRange(0.0, 2000.0);
+            m_fwdPowerGauge->setYellowStart(1500.0);
+            m_fwdPowerGauge->setRedStart(1500.0);
+        }
     } else if (maxWatts > 100) {
         // Aurora (500 W): 0-600 W, red > 500 W
         m_fwdPowerGauge->setRange(0.0, 600.0);
@@ -561,9 +578,10 @@ void TunerApplet::syncFromModel()
     } else if (m_tunerModel->isOperate() && m_tunerModel->isBypass()) {
         m_operateBtn->setText(QStringLiteral("BYPASS"));
         m_operateBtn->setStyleSheet(Style::themed(QStringLiteral(
-            "QPushButton { background: #906000; border: 1px solid #a8853f; "
+            "QPushButton { background: %1; border: 1px solid #a8853f; "
             "border-radius: 6px; color: #ffffff; font-size: 11px; font-weight: bold; }"
-            "QPushButton:hover { background: #a8853f; }")));
+            "QPushButton:hover { background: #a8853f; }")
+            .arg(QLatin1String(Style::kAmberBorder))));
     } else {
         m_operateBtn->setText(QStringLiteral("STANDBY"));
         m_operateBtn->setStyleSheet(Style::themed(QStringLiteral(

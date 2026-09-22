@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_applet_reorder.cpp  (NereusSDR)
+// tests/tst_applet_reorder.cpp  (Longpath)
 // =================================================================
 //
 // Das Verschieben der Applets im rechten Stapel.
@@ -11,7 +11,7 @@
 // Fenster ein und bekommt nach dem Neustart ein anderes.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-15 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================

@@ -1,11 +1,11 @@
 // =================================================================
-// src/gui/widgets/BandwidthFilterPane.cpp  (NereusSDR)
+// src/gui/widgets/BandwidthFilterPane.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original. Begruendung steht im Header.
+// Longpath-original. Begruendung steht im Header.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-20 — Original fuer NereusSDR von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
 // =================================================================
@@ -197,6 +197,11 @@ void BandwidthFilterPane::setHasFrequency(bool on)
     update();
 }
 
+QSize BandwidthFilterPane::sizeHint() const
+{
+    return QSize(360, 140);
+}
+
 QRect BandwidthFilterPane::plotRect() const
 {
     return QRect(kPadX, kPadTop,
@@ -239,6 +244,37 @@ BandwidthFilterPane::Zone BandwidthFilterPane::zoneAt(int x) const
 }
 
 // ── Zeichnen ─────────────────────────────────────────────────────────
+//
+// Richtung „Glas & Tiefe", vom Betreiber am 2026-09-17 aus vier
+// Stilblaettern gewaehlt (docs/design/2026-09-17-design-durchsicht.md).
+// Die Flaeche ist VERSENKT — Schwarz, Innenschatten oben, Lichtkante —
+// wie ein Instrument hinter Glas. Die Kurve traegt einen Hof, der
+// Durchlass ist ein Glasstreifen, die Zahlen sitzen in Chips.
+//
+// Was aus den Tagen davor bleibt, weil es nichts mit dem Look zu tun
+// hat, sondern mit dem Lesen:
+//   * fester Pegelbereich, 40 dB ueber dem 10. Perzentil (2026-08-23,
+//     "wo kein signal ist, ist die linie am boden");
+//   * gerade Striche, keine Rundung (2026-08-23, die Vorlage hat
+//     scharfe Ecken);
+//   * schnell hoch, gemaechlich runter (setTrace);
+//   * Kantenwerte ohne Vorzeichen (2026-09-03, "minus darf nie");
+//   * Wortmarken tauschen bei LSB die Seite (2026-09-17);
+//   * die Kurve bekommt das ganze Feld (2026-09-17, "schaut eher flach").
+//
+// Was weg ist: die Anteilszellen und die Feinskala im Durchlass. Das
+// gewaehlte Blatt hatte beides nicht; die Zellen lagen als Kaesten
+// ueber der gefuellten Flaeche, die Feinskala war ein zweiter Rahmen.
+
+namespace {
+
+// Die Mal-Helfer (paintInsetTop, paintGlassChip) liegen seit dem
+// 2026-09-18 in StyleConstants.h — der Panadapter-Chrom braucht sie
+// auch.
+using Style::paintInsetTop;
+using Style::paintGlassChip;
+
+} // namespace
 
 void BandwidthFilterPane::paintEvent(QPaintEvent*)
 {
@@ -247,90 +283,82 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
 
     const QRect r = plotRect();
 
-    // Grund: eine Mulde, oben minimal heller. Dieselbe Richtung wie bei
-    // den Eingabefeldern — versenkt, nicht aufgelegt.
-    QLinearGradient bg(0, 0, 0, height());
-    bg.setColorAt(0.0, QColor(Style::role("inset-bg-top", Style::kInsetBgTop)));
-    bg.setColorAt(1.0, QColor(Style::role("inset", Style::kInsetBg)));
-    p.fillRect(rect(), bg);
+    // ── Grund: versenkt ─────────────────────────────────────────────
+    p.fillRect(rect(), QColor(Style::role("inset-bg", Style::kInsetBg)));
+    paintInsetTop(p, rect());
+    p.setPen(QColor(255, 255, 255, 6));
+    p.drawLine(0, height() - 1, width() - 1, height() - 1);
 
-    // Kein Rahmenkasten mehr.
+    // ── Die Marken der Achse: auf RUNDEN Frequenzen ─────────────────
     //
-    // OpenHPSDR zeichnet die Flaeche randlos — das Bild steht fuer
-    // sich, statt in einem Kaestchen zu sitzen. Auf dem Foto des
-    // Betreibers (2026-08-23) ist das einer der auffaelligsten
-    // Unterschiede: bei uns rahmte eine Linie jede Flaeche ein, dort
-    // trennen nur die Zwischenraeume.
+    // Bisher standen sie bei VFO ± k·Schritt. Steht der VFO auf
+    // 7.192.500, liegen sie alle auf halben Kilohertz, und die
+    // dreistellige Anzeige rundet mal auf, mal ab: 7.189 · 7.191 ·
+    // 7.192 · 7.194 · 7.197 — gleiche Abstaende, ungleiche Zahlen, so
+    // auf dem Foto vom 2026-09-17. Die Achse gehoert dem Band, nicht
+    // dem VFO: Marken auf 7.188 · 7.190 · 7.192 …, die VFO-Linie steht
+    // dazwischen, wo sie hingehoert. Gitter und Beschriftung nehmen
+    // dieselbe Liste, damit die Zahlen etwas zum Festhalten haben.
+    const int stepHz = (m_spanHz <= 6000) ? 1000
+                     : (m_spanHz <= 24000) ? 2000 : 5000;
+    QVector<int> marks;
+    {
+        const double first = std::ceil((m_vfoHz - m_spanHz / 2.0) / stepHz) * stepHz;
+        for (double f = first; f <= m_vfoHz + m_spanHz / 2.0; f += stepHz) {
+            marks << static_cast<int>(std::lround(f - m_vfoHz));
+        }
+    }
 
-    // Senkrechte Hilfslinien alle 2 kHz — dieselbe Teilung wie die
-    // Beschriftungen darunter, damit die Zahlen etwas zum Festhalten
-    // haben.
-    const QColor grid(0x14, 0x14, 0x18);
+    QColor grid(Style::role("spectrum-grid", Style::kSpectrumGrid));
+    grid.setAlpha(28);
     p.setPen(grid);
-    for (int hz = -m_spanHz / 2; hz <= m_spanHz / 2; hz += 2000) {
+    for (int hz : marks) {
         const int x = hzToX(hz);
-        p.drawLine(x, r.top(), x, r.bottom());
+        p.drawLine(x, r.top() - 6, x, r.bottom());
+    }
+
+    // ── Der Durchlass als Glasstreifen ──────────────────────────────
+    //
+    // Von oben bis unten (Betreiber 2026-09-17), als Verlauf: oben
+    // etwas dichter, unten leiser, mit einer Lichtkante am oberen
+    // Rand. Er liegt UNTER der Kurve — die Kurve ist die Messung, der
+    // Streifen nur das Fenster, durch das man sie hoert.
+    const int xl = hzToX(m_low);
+    const int xh = hzToX(m_high);
+    const QColor accent(Style::role("accent", Style::kAccent));
+    {
+        QLinearGradient pass(0, 0, 0, height());
+        QColor c0(accent); c0.setAlpha(54);
+        QColor c1(accent); c1.setAlpha(24);
+        pass.setColorAt(0.0, c0);
+        pass.setColorAt(1.0, c1);
+        p.fillRect(QRect(xl, 0, std::max(1, xh - xl), height()), pass);
+        p.setPen(QColor(255, 255, 255, 26));
+        p.drawLine(xl + 1, 0, xh - 1, 0);
+    }
+
+    // Die Nulllinie ist die VFO-Frequenz.
+    {
+        const int x0 = hzToX(0);
+        p.setPen(QColor(Style::role("border", Style::kBorder)));
+        p.drawLine(x0, r.top() - 6, x0, r.bottom());
     }
 
     // ── Das Signal ──────────────────────────────────────────────────
     //
-    // Vorbild: die Vorlage, vorgefuehrt am 2026-08-22: der Bandfilter
-    // zeigt dort das ECHTE Spektrum, und erst dadurch sieht man, ob
-    // die Kante an der richtigen Stelle sitzt. Ohne Kurve ist das
-    // Fenster ein Zahlenformular.
-    //
-    // Der Ausschnitt kommt vom Panadapter (SpectrumWidget::
-    // dbmOverRange) — dieselbe Abbildung, dieselbe Kalibrierung. Eine
-    // zweite eigene waere ein zweiter Ort, an dem sie falsch sein
-    // kann.
-    //
-    // Massstab: der Kopf des Fensters gehoert den Beschriftungen, also
-    // beginnt die Kurve darunter. Der Pegelbereich richtet sich nach
-    // dem, was da ist (mit Mindestspanne), sonst klebt eine leise
-    // Band-Mitte am Boden und man sieht nichts.
-    if (m_trace.size() >= 2) {
-        // ── FESTER Massstab ueber dem Rauschflur ────────────────────
-        //
-        // Der Betreiber am 2026-08-23, mit drei Bildern von OpenHPSDR
-        // Die Vorlage: "wo kein signal ist, ist die linie am boden" und
-        // "wenn kein signal ist, linie bei 0, auch bei den
-        // sprechpausen".
-        //
-        // Genau daran lag der Unterschied — nicht an Farbe oder
-        // Strichstaerke. Wir dehnten bisher IMMER auf Minimum bis
-        // Maximum der sichtbaren Werte. Ist nur Rauschen da, wird
-        // dessen Zappeln von ein paar Dezibel auf die volle Hoehe
-        // gezogen: die Flaeche sieht belebt aus, wo nichts ist. In den
-        // Sprechpausen sprang die Kurve deshalb jedes Mal auf.
-        //
-        // Die Vorlage haelt einen FESTEN Bereich: der Rauschflur liegt
-        // unten am Boden, und nur was wirklich darueber ist, ragt
-        // heraus. Sechzig Dezibel — dieselbe Groessenordnung, die auch
-        // der Panadapter zeigt, und genug fuer den staerksten Traeger.
-        //
-        // Der Boden ist ein UNTERES PERZENTIL, kein Minimum: ein
-        // einzelner Ausreisser nach unten (eine Luecke, ein
-        // Nulldurchgang) wuerde sonst die ganze Skala verschieben.
+    // Der Ausschnitt kommt vom Panadapter (SpectrumWidget::dbmOverRange)
+    // — dieselbe Abbildung, dieselbe Kalibrierung. Fester Bereich:
+    // Boden ist das 10. Perzentil (ein Ausreisser verschiebt sonst die
+    // Skala), Decke 40 dB darueber — ein starkes Signal fuellt die
+    // Flaeche, ein sehr starkes stoesst oben an, wie in der Vorlage.
+    const QColor traceLine(Style::role("measured", Style::kAmberText));
+    const int top = r.top() + 6;
+    const int bot = r.bottom() - 2;
+    if (m_trace.size() >= 2 && bot > top) {
         QVector<float> sorted = m_trace;
         std::sort(sorted.begin(), sorted.end());
-        const float lo = sorted.at(sorted.size() / 10);   // 10. Perzentil
-        // ── 40 dB, nicht 60 ─────────────────────────────────────────
-        //
-        // Der Betreiber am 2026-08-23: "der eigentliche filterbereich
-        // sollte natürlich stark nach oben gehen wie bei open."
-        //
-        // Auf seinen Bildern reichen die Signale fast bis an den
-        // oberen Rand, waehrend der Rauschflur unten klebt. Mit 60 dB
-        // Spanne blieb bei uns ein Traeger von 30 dB ueber dem Flur
-        // auf HALBER Hoehe stehen — richtig gerechnet, aber kraftlos.
-        //
-        // Vierzig Dezibel: ein starkes Signal fuellt die Flaeche, ein
-        // sehr starkes stoesst oben an. Genau das tut die Vorlage
-        // auch — auf einem seiner Bilder laeuft die rechte Spitze in
-        // den Rand.
+        const float lo = sorted.at(sorted.size() / 10);
         const float hi = lo + 40.0f;
-        const int top = r.top() + 30;          // Platz fuer die Marken
-        const int bot = r.bottom() - 2;
         const double yScale = (bot - top) / static_cast<double>(hi - lo);
 
         QPolygonF poly;
@@ -343,40 +371,27 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
             poly << QPointF(x, qBound<double>(top, y, bot));
         }
         poly << QPointF(r.right(), bot);
-
-        // ── GERADE Striche, so wie die Vorlage ──────────────
-        //
-        // Hier lag einen Tag lang ein Catmull-Rom-Zug, weil ich den
-        // Satz "das sind 2 welten" als "die Vorlage rundet" gelesen
-        // habe. Die Bilder vom 2026-08-23 sagen das Gegenteil: auf
-        // dem Ausschnitt 14.127–14.135 hat der Zug SCHARFE Ecken,
-        // Ecke an Ecke, ohne jede Rundung.
-        //
-        // Der ruhige Eindruck kommt nicht vom Weg zwischen den
-        // Punkten, sondern von ihrer Zahl — die Vorlage setzt sie
-        // rund zwoelf Bildpunkte auseinander. Das ist jetzt in
-        // BandwidthFilterApplet geregelt; hier wird wieder schlicht
-        // verbunden.
         QPainterPath tracePath;
         tracePath.addPolygon(poly);
 
-        // ── Pegelraster ─────────────────────────────────────────────
+        // ── Pegelraster mit dBm-Marke ───────────────────────────────
         //
-        // Drei waagrechte Linien mit dBm-Marke. Ohne sie ist die Kurve
-        // eine Form ohne Massstab: man sieht, DASS da etwas ist, aber
-        // nicht, wie stark. Die Vorlage zeigt an derselben Stelle einen
-        // Pegelwert im Durchlass.
+        // Drei waagrechte Linien. Die Zahlen nur, wenn sie Platz
+        // haben (2026-09-17: bei elf Punkten Abstand beruehrten sich
+        // alle drei) — eine Linie ohne Zahl ist immer noch ein Raster.
         {
-            QFont tiny = font();
-            tiny.setPointSizeF(std::max(6.0, tiny.pointSizeF() - 3.5));
-            p.setFont(tiny);
-            const QColor gridLine(0x1c, 0x1c, 0x22);
+            p.setFont(Style::monoFont(font(), Style::kFontCaption));
+            QColor gridLine(grid); gridLine.setAlpha(44);
             const QColor gridText(Style::role("text-scale", Style::kTextScale));
+            const int spacing = (bot - top) / 4;
+            const bool roomForAll = spacing >= 14;
+            const bool roomForOne = spacing >= 10;
             for (int k = 1; k <= 3; ++k) {
                 const double frac = k / 4.0;
                 const int y = static_cast<int>(bot - (bot - top) * frac);
                 p.setPen(gridLine);
                 p.drawLine(r.left() + 1, y, r.right() - 1, y);
+                if (!roomForAll && !(roomForOne && k == 2)) { continue; }
                 const int dbm = static_cast<int>(std::lround(lo + (hi - lo) * frac));
                 p.setPen(gridText);
                 p.drawText(QRect(r.right() - 46, y - 7, 42, 12),
@@ -385,48 +400,56 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
             }
         }
 
-        // ── Nur der Durchlass ist GEFUELLT ──────────────────────────
-        //
-        // Vorbild: die Vorlage, vom Betreiber am 2026-08-22
-        // gezeigt: dort ist die Kurve INNERHALB des Filters flaechig
-        // gefuellt, ausserhalb nur eine duenne Linie. Das ist der
-        // Griff, der das Fenster lesbar macht — man sieht auf einen
-        // Blick, was durchkommt und was die Kante abschneidet.
-        //
-        // Er hatte es so beschrieben: "beim bandfilter geht es darum,
-        // dass eigentlich alles gleich aussieht ... gut gefallen hat
-        // mir openhpsdr."
-        const int xlF = qBound(r.left(), hzToX(m_low),  r.right());
-        const int xhF = qBound(r.left(), hzToX(m_high), r.right());
+        const int xlF = qBound(r.left(), xl, r.right());
+        const int xhF = qBound(r.left(), xh, r.right());
 
-        QColor traceLine(Style::role("trace", Style::kFilterPaneTrace));
-        // Die Vorlage traegt ein deutlich kraeftigeres Bernstein als
-        // unser gedaempftes #c8a06a. Ohne diesen Schritt bleibt die
-        // Kurve neben dem tuerkisen Durchlass blass.
-        traceLine = traceLine.lighter(118);
-        traceLine.setHsv(traceLine.hue(),
-                         qMin(255, int(traceLine.saturation() * 1.35)),
-                         traceLine.value());
-        // ── Hof, Verlauf, Linie — in dieser Reihenfolge ─────────────
+        // Kantenglaettung NUR fuer den Kurvenzug: Raster, Streifen und
+        // Griffe sind waagrecht und senkrecht, Glaettung machte sie
+        // nur unscharf.
+        p.setRenderHint(QPainter::Antialiasing, true);
+
+        // ── Verlauf unter der ganzen Kurve ──────────────────────────
+        {
+            QLinearGradient grad(0, top, 0, bot);
+            QColor c0(traceLine); c0.setAlpha(96);
+            QColor c1(traceLine); c1.setAlpha(0);
+            grad.setColorAt(0.0, c0);
+            grad.setColorAt(1.0, c1);
+            p.setPen(Qt::NoPen);
+            p.setBrush(grad);
+            p.drawPath(tracePath);
+        }
+
+        // ── Im Durchlass gefuellt ───────────────────────────────────
         //
-        // Der Betreiber hat das OpenHPSDR-Bild vergroessern lassen,
-        // damit ich den Filterbereich genau sehe (2026-08-23). Der
-        // auffaelligste Unterschied ist nicht Farbe und nicht
-        // Strichstaerke, sondern ein HOF um die Kurve: ein breiter,
-        // weicher Schein, der nach aussen ausblendet. Daraus entsteht
-        // der Eindruck, den er mit "wirkt eher 3D" beschrieben hat.
+        // Was HOERBAR ist, steht als Flaeche da (2026-09-17: "leider
+        // ist da nur ein kleiner strich"); ausserhalb bleibt der zarte
+        // Verlauf — man sieht auf einen Blick, was die Kante
+        // abschneidet.
+        {
+            p.save();
+            p.setClipRect(QRect(xlF, top, std::max(1, xhF - xlF), bot - top + 1));
+            QLinearGradient inner(0, top, 0, bot);
+            QColor i0(traceLine); i0.setAlpha(150);
+            QColor i1(traceLine); i1.setAlpha(64);
+            inner.setColorAt(0.0, i0);
+            inner.setColorAt(1.0, i1);
+            p.setPen(Qt::NoPen);
+            p.setBrush(inner);
+            p.drawPath(tracePath);
+            p.restore();
+        }
+
+        // ── Hof, dann Linie ─────────────────────────────────────────
         //
-        // EIN breiter Strich waere falsch — der gibt einen Balken.
-        // Drei Durchgaenge von breit und blass nach schmal und
-        // kraeftig geben den Verlauf.
+        // Der Hof ist es, was der Betreiber am OpenHPSDR-Bild als
+        // "wirkt eher 3D" beschrieben hat (2026-08-23): kein breiter
+        // Strich, sondern Durchgaenge von breit und blass nach schmal
+        // und kraeftig. Drei, seit die Stuetzstellen dicht genug
+        // liegen, dass keine Zacke zum Klumpen wird.
         {
             struct GlowPass { double width; int alpha; };
-            // Zwei Durchgaenge, nicht drei: mit den grob gesetzten
-            // Stuetzstellen traegt die Linie selbst wieder, und der
-            // dritte Durchgang machte aus jeder Zacke einen Klumpen.
-            static const GlowPass kGlow[] = {
-                {7.0, 12}, {3.0, 22},
-            };
+            static const GlowPass kGlow[] = { {8.0, 14}, {4.0, 30}, {2.5, 60} };
             p.setBrush(Qt::NoBrush);
             for (const GlowPass& g : kGlow) {
                 QColor glow(traceLine);
@@ -438,47 +461,15 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
                 p.drawPath(tracePath);
             }
         }
-
-        // ── Weicher Verlauf unter der GANZEN Kurve ──────────────────
-        //
-        // So macht es die Vorlage: eine duenne Linie, darunter ein
-        // Verlauf, der nach unten ausblendet — ueber die ganze Breite,
-        // nicht nur im Durchlass. Der Durchlass wird durch seinen
-        // Umriss kenntlich, nicht durch eine zweite Fuellung.
-        //
-        // Hier stand eine DECKENDE Fuellung, auf den Durchlass
-        // beschnitten. Sie sollte am 2026-08-23 schon zweimal weichen
-        // — beide Ersetzungen sind stillschweigend danebengegangen,
-        // und die Festschreibungen behaupteten die Aenderung trotzdem.
-        // Aufgefallen ist es erst, als der Schein im Bild fehlte und
-        // ein grep nach dem neuen Namen NULL Treffer lieferte.
-        {
-            QLinearGradient grad(0, top, 0, bot);
-            QColor c0(traceLine); c0.setAlpha(130);
-            QColor c1(traceLine); c1.setAlpha(10);
-            grad.setColorAt(0.0, c0);
-            grad.setColorAt(1.0, c1);
-            p.setPen(Qt::NoPen);
-            p.setBrush(grad);
-            p.drawPath(tracePath);
-        }
-
-        // Zarte Linie, wie in der Vorlage. 1,2 war fuer eine Flaeche
-        // dieser Groesse zu fett.
-        p.setPen(QPen(traceLine, 1.0));
+        p.setPen(QPen(traceLine, 1.5));
         p.setBrush(Qt::NoBrush);
         p.drawPath(tracePath);
 
         // ── Die blasse Bezugslinie ──────────────────────────────────
         //
-        // Auf den Bildern von OpenHPSDR laeuft quer durchs Bild eine
-        // zweite, viel blassere Linie — deutlich ueber dem Rauschflur
-        // und ruhig. Das ist der GEGLAETTETE Mittelwert: er sagt, wo
-        // der Empfaenger im Mittel steht, und macht damit sichtbar, ob
-        // eine Spitze wirklich heraussticht oder nur der Flur atmet.
-        //
-        // Traeges Gleiten (alpha 0,02), damit sie sich nicht mit der
-        // Kurve mitbewegt — eine Bezugslinie, die zappelt, ist keine.
+        // Der GEGLAETTETE Mittelwert, traege (alpha 0,02): sagt, wo
+        // der Empfaenger im Mittel steht, und macht sichtbar, ob eine
+        // Spitze wirklich heraussticht oder nur der Flur atmet.
         {
             if (m_avgLine.size() != m_trace.size()) {
                 m_avgLine = m_trace;
@@ -489,7 +480,7 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
                 }
             }
             QColor avg(Style::role("text-scale", Style::kTextScale));
-            avg.setAlpha(70);
+            avg.setAlpha(60);
             p.setPen(QPen(avg, 1.0));
             QPolygonF ap;
             ap.reserve(m_avgLine.size());
@@ -499,288 +490,127 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
                 const double y = bot - (m_avgLine[i] - lo) * yScale;
                 ap << QPointF(x, qBound<double>(top, y, bot));
             }
-            p.setBrush(Qt::NoBrush);
             p.drawPolyline(ap);
         }
-
-        // ── Feinskala oben im Durchlass ─────────────────────────────
-        //
-        // In der Vorlage laeuft am oberen Rand des Durchlasses eine
-        // duenne Linie mit drei Teilstrichen. Sie sagt nichts Neues —
-        // sie gibt dem Rechteck einen Boden und macht auf einen Blick
-        // klar, dass es ein MASS ist und keine Markierung.
-        if (xhF - xlF > 40) {
-            QColor tick(m_accent);
-            tick.setAlpha(150);
-            p.setPen(tick);
-            const int yT = top + 8;
-            p.drawLine(xlF + 6, yT, xhF - 6, yT);
-            for (int k = 1; k <= 3; ++k) {
-                const int x = xlF + (xhF - xlF) * k / 4;
-                p.drawLine(x, yT - 3, x, yT + 3);
-            }
-        }
-
-        // ── Was liegt DRIN? Ablage und Pegel ────────────────────────
-        //
-        // Die Vorlage zeigt unter dem Durchlass eine Reihe Zellen:
-        // "+324 / 14dB", "+777 / 11dB", "+1.5k / 12dB". Das ist die
-        // Antwort auf die Frage, fuer die man dieses Fenster aufmacht —
-        // welche Anteile kommen durch, und wie stark.
-        //
-        // Wir nehmen die vier staerksten Spitzen im Durchlass, die
-        // mindestens 6 dB ueber dem leisesten Punkt darin liegen (sonst
-        // benennt man Rauschen), und mit Mindestabstand, damit nicht
-        // viermal derselbe Buckel gezaehlt wird.
-        if (xhF - xlF > 60 && bot - top > 40) {
-            const int n = m_trace.size();
-            auto hzAt = [&](int i) {
-                return -m_spanHz / 2.0 + m_spanHz * double(i) / (n - 1);
-            };
-            const int i0 = qBound(0, int((m_low  + m_spanHz / 2.0)
-                                         / m_spanHz * (n - 1)), n - 1);
-            const int i1 = qBound(0, int((m_high + m_spanHz / 2.0)
-                                         / m_spanHz * (n - 1)), n - 1);
-            float floorDb = m_trace[qMin(i0, i1)];
-            for (int i = qMin(i0, i1); i <= qMax(i0, i1); ++i) {
-                floorDb = qMin(floorDb, m_trace[i]);
-            }
-
-            // ── FESTE Eimer, nicht die fuenf hoechsten Spitzen ──
-            //
-            // Hier stand eine Spitzensuche: sie fand die fuenf
-            // staerksten Buckel und beschriftete nur die. Stand ein
-            // einziger Traeger im Durchlass, blieb genau EINE Zelle
-            // uebrig — das Blatt vom 2026-08-23 zeigt das.
-            //
-            // Die Vorlage macht es anders. Auf dem Bild mit dem
-            // ruhigen Durchlass stehen ACHT Zellen nebeneinander
-            // (+377, +755, +939, +1.4k, +1.8k, +1.9k, +2.3k, +2.4k)
-            // und fast alle melden 0 dB. Die Abstaende sind
-            // unregelmaessig, die Zahl der Zellen nicht: der
-            // Durchlass wird in gleich breite Eimer geteilt, und jede
-            // Zelle nennt die Lage IHRES groessten Wertes. Die Reihe
-            // steht damit immer, auch wenn nichts zu hoeren ist.
-            struct Peak { int i; float db; };
-            QVector<Peak> peaks;
-            {
-                const int lo = qMin(i0, i1);
-                const int hi = qMax(i0, i1);
-                const int pxWide = qAbs(hzToX(m_high) - hzToX(m_low));
-                // Rund 46 px je Zelle — schmaler, und "+1.4k" passt
-                // nicht mehr hinein.
-                const int cells = qBound(1, qMin(pxWide / 46, hi - lo), 8);
-                for (int k = 0; k < cells; ++k) {
-                    const int s0 = lo + (hi - lo) * k / cells;
-                    const int s1 = lo + (hi - lo) * (k + 1) / cells;
-                    if (s1 <= s0) { continue; }
-                    int best = s0;
-                    for (int i = s0; i < s1; ++i) {
-                        if (m_trace[i] > m_trace[best]) { best = i; }
-                    }
-                    peaks.append({best, m_trace[best]});
-                }
-            }
-
-            if (!peaks.isEmpty()) {
-                QFont cell = font();
-                cell.setPointSizeF(std::max(6.0, cell.pointSizeF() - 3.5));
-                p.setFont(cell);
-                const int cw = (xhF - xlF) / peaks.size();
-                const int cy = bot - 32;
-                for (int k = 0; k < peaks.size(); ++k) {
-                    const QRect box(xlF + k * cw, cy, cw - 1, 28);
-                    p.setPen(Qt::NoPen);
-                    // Leiser als vorher (110 -> 150 auf dunklem Grund
-                    // heisst: weniger Kontrast zur Flaeche). Die Zellen
-                    // sind Beiwerk, nicht die Hauptsache.
-                    p.setBrush(QColor(0, 0, 0, 150));
-                    p.drawRect(box);
-
-                    const double offHz = hzAt(peaks[k].i);
-                    const QString offTxt = (qAbs(offHz) >= 1000.0)
-                        ? QStringLiteral("%1%2k")
-                              .arg(offHz < 0 ? QStringLiteral("-")
-                                             : QStringLiteral("+"))
-                              .arg(qAbs(offHz) / 1000.0, 0, 'f', 1)
-                        : QStringLiteral("%1%2")
-                              .arg(offHz < 0 ? QStringLiteral("-")
-                                             : QStringLiteral("+"))
-                              .arg(int(qAbs(offHz)));
-                    QColor cellInk(Style::role("text", Style::kTextPrimary));
-                    cellInk.setAlpha(190);
-                    p.setPen(cellInk);
-                    p.drawText(QRect(box.x(), box.y() + 1, box.width(), 13),
-                               Qt::AlignCenter, offTxt);
-                    p.setPen(QColor(Style::role("text-scale",
-                                                Style::kTextScale)));
-                    p.drawText(QRect(box.x(), box.y() + 14, box.width(), 13),
-                               Qt::AlignCenter,
-                               QStringLiteral("%1dB")
-                                   .arg(int(std::lround(peaks[k].db - floorDb))));
-                }
-            }
-        }
+        p.setRenderHint(QPainter::Antialiasing, false);
     }
 
-    // Die Nulllinie ist die VFO-Frequenz. Sie traegt einen eigenen Ton,
-    // sonst ist sie eine Hilfslinie unter vielen.
-    {
-        const int x0 = hzToX(0);
-        p.setPen(QColor(Style::role("border", Style::kBorder)));
-        p.drawLine(x0, r.top(), x0, r.bottom());
-    }
+    // ── Die Kanten ──────────────────────────────────────────────────
+    //
+    // Etwas heller als das Auswahlblau, damit sie auf dem Streifen
+    // stehen; ueber die ganze Hoehe, weil die Zahlen oben und die
+    // Achse unten zu dieser Saeule gehoeren.
+    const QColor edge = accent.lighter(140);
+    p.setPen(QPen(edge, 1));
+    p.drawLine(xl, 0, xl, height());
+    p.drawLine(xh, 0, xh, height());
 
-    // ── Der Durchlass ────────────────────────────────────────────────
-    const int xl = hzToX(m_low);
-    const int xh = hzToX(m_high);
-
-    QColor fill = m_accent;
-    // 0,10 war auf dem Vergleichsblatt kaum zu sehen; die Vorlage
-    // legt eine deutlich erkennbare Tuenche ueber den Durchlass.
-    fill.setAlphaF(0.14f);
-    p.fillRect(QRect(xl, r.top(), std::max(1, xh - xl), r.height()), fill);
-
-    QColor topEdge = m_accent;
-    topEdge.setAlphaF(0.55f);
-    p.setPen(topEdge);
-    p.drawLine(xl, r.top(), xh, r.top());
-
-    p.setPen(QPen(m_accent, 2));
-    p.drawLine(xl, r.top(), xl, r.bottom());
-    p.drawLine(xh, r.top(), xh, r.bottom());
-
-    // Griffe als Pillen in halber Hoehe. Die ganze Kante als Griff
-    // waere zwar groesser, sagt aber nicht, WO man fassen soll.
+    // ── Griffe: erhabene Pillen in halber Hoehe ─────────────────────
+    //
+    // Die ganze Kante als Griff waere groesser, sagt aber nicht, WO
+    // man fassen soll. Erhaben: Verlauf, Lichtkante oben, dunkle
+    // Unterkante — das Gegenstueck zur versenkten Flaeche.
     auto drawHandle = [&](int x, bool active) {
         const QRect h(x - 4, r.center().y() - 11, 9, 22);
-        p.setBrush(QColor(active ? 0x1e : 0x16, active ? 0x2a : 0x20,
-                          active ? 0x36 : 0x2a));
-        p.setPen(QPen(m_accent, active ? 2 : 1));
-        p.drawRoundedRect(h, 3, 3);
-        QColor tick = m_accent;
-        tick.setAlphaF(0.8f);
-        p.setPen(tick);
-        p.drawLine(x, h.top() + 5, x, h.bottom() - 5);
+        QLinearGradient g(0, h.top(), 0, h.bottom());
+        g.setColorAt(0.0, QColor(active ? Style::kGlassSelTop : Style::kGlassBtnTop));
+        g.setColorAt(1.0, QColor(active ? Style::kGlassSelBot : Style::kGlassBtnBot));
+        p.save();
+        p.setRenderHint(QPainter::Antialiasing, true);
+        p.setPen(QColor(0, 0, 0, 140));
         p.setBrush(Qt::NoBrush);
+        p.drawRoundedRect(h.translated(0, 1), 4, 4);        // Schatten
+        p.setPen(QPen(edge, active ? 1.5 : 1.0));
+        p.setBrush(g);
+        p.drawRoundedRect(h, 4, 4);
+        p.setPen(QColor(255, 255, 255, Style::kGlassLightAlpha + 8));
+        p.drawLine(h.left() + 3, h.top() + 1, h.right() - 3, h.top() + 1);   // Lichtkante
+        QColor tick(edge); tick.setAlphaF(0.85f);
+        p.setPen(tick);
+        p.drawLine(x, h.top() + 6, x, h.bottom() - 6);
+        p.restore();
     };
     drawHandle(xl, m_hover == Zone::LowEdge || m_drag == Zone::LowEdge);
     drawHandle(xh, m_hover == Zone::HighEdge || m_drag == Zone::HighEdge);
 
-    // ── Beschriftungen oben ──────────────────────────────────────────
-    QFont small = font();
-    small.setPointSizeF(std::max(6.0, small.pointSizeF() - 3.0));
-    QFont value = font();
-    value.setPointSizeF(std::max(7.0, value.pointSizeF() - 2.0));
-
+    // ── Beschriftungen oben ─────────────────────────────────────────
+    //
+    // Zahlen Monospace (Hausstil Regel 4), auf der Schriftleiter: 11
+    // fuer Werte, 9 fuer Achse und Marken. Wortmarken als Versalzeile.
+    const QFont value = Style::monoFont(font(), Style::kFontSmall);
+    const QFont small = Style::monoFont(font(), Style::kFontCaption);
     const QColor faint(Style::role("text-scale", Style::kTextScale));
     const QColor ink(Style::role("text", Style::kTextPrimary));
 
-    // ── Eng: die Wortmarken weichen, die Zahlen bleiben ─────────────
-    //
-    // Der Betreiber hat es am 2026-08-22 fotografiert: beim
-    // Verkleinern schoben sich "LOW CUT" und "HIGH CUT" ineinander und
-    // ueber das Kaestchen mit der Breite. Drei Beschriftungen wollen
-    // Platz, den es nicht mehr gibt.
-    //
-    // Rangfolge, wie ueberall sonst in diesem Fenster: zuerst faellt
-    // das WORT, dann die Zahl. Die Zahl traegt die Information; das
-    // Wort sagt nur, was ohnehin an der Kante steht, an der es klebt.
-    //
-    // Gemessen wird gegen den tatsaechlichen Platz zwischen den beiden
-    // Griffen, nicht gegen die Fensterbreite: bei schmalem Durchlass
-    // ist es auch in einem breiten Fenster eng.
+    // Eng: zuerst faellt das WORT, dann die Zahl (2026-08-22). Gemessen
+    // am Platz zwischen den Griffen, nicht an der Fensterbreite — und
+    // fuer die Zahlen am tatsaechlichen Platz NEBEN dem Breitenchip:
+    // Monospace ist breiter als die Textschrift von frueher, und auf
+    // dem 620×105-Blatt schob sich "3.00 kHz" in den Chip. Wo die Zahl
+    // nicht neben den Chip passt, faellt sie; LOW/HIGH stehen ohnehin
+    // in der Bedienzeile darunter.
     const int labelRoom = xh - xl;
     const bool wordMarks = labelRoom >= 190;
-    const bool numbers   = labelRoom >= 110;
+    const QString widthText = widthLabel(m_high - m_low);
+    const int chipW  = QFontMetrics(value).horizontalAdvance(widthText) + 18;
+    const int valueW = std::max(QFontMetrics(value).horizontalAdvance(cutLabel(m_low)),
+                                QFontMetrics(value).horizontalAdvance(cutLabel(m_high)));
+    const bool numbers = labelRoom >= chipW + 2 * (valueW + 14);
 
-    // ── Wortmarken wieder da, ueber den Zahlen ──────────────────────
-    //
-    // Sie waren am 2026-08-22 entfallen, weil sie oben mit dem
-    // Breitenkaestchen kollidierten. Auf den Bildern des Betreibers
-    // vom 2026-08-23 stehen sie aber sehr wohl — als kleine,
-    // gesperrte Grossbuchstaben UEBER dem Wert, nicht daneben. So
-    // gedraengt wird nichts, und die Zahl bekommt ihre Ueberschrift
-    // zurueck.
     if (wordMarks) {
-        QFont mark = font();
-        mark.setPointSizeF(std::max(5.5, mark.pointSizeF() - 4.0));
-        mark.setLetterSpacing(QFont::AbsoluteSpacing, 1.2);
-        p.setFont(mark);
+        // Die Wortmarken folgen dem Seitenband: ohne Vorzeichen muss
+        // das Wort sagen, was die Zahl ist. Bei LSB liegt die nahe
+        // Kante rechts — links steht also der Audio-HOCHschnitt.
+        p.setFont(Style::capsFont(font(), 8));
         p.setPen(faint);
-        p.drawText(QRect(xl + 4, 1, 74, 10),
+        const bool lowerSideband = (m_low < 0 && m_high <= 0);
+        p.drawText(QRect(xl + 5, 1, 90, 10),
                    Qt::AlignLeft | Qt::AlignVCenter,
-                   QStringLiteral("LOW CUT"));
-        p.drawText(QRect(xh - 78, 1, 74, 10),
+                   lowerSideband ? QStringLiteral("HIGH CUT")
+                                 : QStringLiteral("LOW CUT"));
+        p.drawText(QRect(xh - 95, 1, 90, 10),
                    Qt::AlignRight | Qt::AlignVCenter,
-                   QStringLiteral("HIGH CUT"));
+                   lowerSideband ? QStringLiteral("LOW CUT")
+                                 : QStringLiteral("HIGH CUT"));
     }
 
-    // Frueherer Vermerk (2026-08-22), zur Geschichte:
-    //
-    // Sie sagten, was ohnehin an der Stelle steht, an der sie klebten,
-    // und waren die Haelfte des Gedraenges oben. Seit die Zahlen unten
-    // an ihren Kanten stehen, braucht es sie nicht mehr. (wordMarks
-    // bleibt als Groessenmass fuer die Zahlen erhalten.)
-    Q_UNUSED(small);
-    Q_UNUSED(faint);
-
     if (numbers) {
-        // ── Die Kantenwerte AN DIE KANTEN, unten ────────────────────
-        //
-        // Sie standen oben und stiessen dort mit dem Breitenkaestchen
-        // zusammen — auf dem Bild des Betreibers vom 2026-08-22 lagen
-        // "LOW CUT", "HIGH CUT" und "2.9 kHz" uebereinander.
-        //
-        // Unten an der jeweiligen Kante ist ohnehin der bessere Platz:
-        // die Zahl steht dort, wo sie gilt, und muss nicht sagen,
-        // wozu sie gehoert.
-        // Oben AN DEN KANTEN, wie in der Vorlage — dort steht
-        // "LOW CUT +100 Hz" links und "HIGH CUT +2.44 kHz" rechts vom
-        // Breitenkaestchen. Unten ist kein Platz mehr: dort stehen
-        // jetzt die Anteilszellen.
         p.setFont(value);
         p.setPen(ink);
-        const int yVal = wordMarks ? 11 : 3;
-        p.drawText(QRect(xl + 4, yVal, 74, 13),
+        const int yVal = wordMarks ? 12 : 4;
+        p.drawText(QRect(xl + 5, yVal, 90, 13),
                    Qt::AlignLeft | Qt::AlignVCenter, cutLabel(m_low));
-        p.drawText(QRect(xh - 78, yVal, 74, 13),
+        p.drawText(QRect(xh - 95, yVal, 90, 13),
                    Qt::AlignRight | Qt::AlignVCenter, cutLabel(m_high));
     }
 
-    // Die Breite in der Mitte, in einem eigenen Kaestchen: sie ist die
-    // Zahl, nach der man den Filter benennt.
+    // Die Breite in der Mitte, in einem Glaschip: sie ist die Zahl,
+    // nach der man den Filter benennt.
     {
-        const QString t = widthLabel(m_high - m_low);
-        const QFontMetrics fm(value);
-        const int tw = fm.horizontalAdvance(t) + 14;
         const int cx = (xl + xh) / 2;
-        const QRect box(cx - tw / 2, 8, tw, 17);
-        p.setBrush(QColor(Style::role("app-bg", Style::kAppBg)));
-        p.setPen(QColor(Style::role("border", Style::kBorder)));
-        p.drawRoundedRect(box, 3, 3);
+        const QRect box(cx - chipW / 2, 7, chipW, 19);
+        paintGlassChip(p, box, Style::kGlassChipRadius);
+        p.setFont(value);
         p.setPen(ink);
-        p.drawText(box, Qt::AlignCenter, t);
-        p.setBrush(Qt::NoBrush);
+        p.drawText(box, Qt::AlignCenter, widthText);
     }
 
-    // ── Die Beschriftung des Empfaengers ─────────────────────────────
+    // ── Die Beschriftung des Empfaengers ────────────────────────────
+    //
+    // Eine Kapsel, kein Knopf: grau, nicht blau — sie ist keine
+    // Bedienung, und "Blau ist anfassbar".
     {
-        p.setFont(small);
-        const QFontMetrics fm(small);
-        const int tw = fm.horizontalAdvance(m_label) + 10;
-        const QRect box(4, 4, tw, 13);
-        QColor bgc = m_accent;
-        bgc.setAlphaF(0.22f);
-        p.setBrush(bgc);
-        p.setPen(m_accent);
-        p.drawRoundedRect(box, 2, 2);
-        p.setPen(ink);
+        const QFont cap = Style::capsFont(font(), 8);
+        const QFontMetrics fm(cap);
+        const int tw = fm.horizontalAdvance(m_label) + 14;
+        const QRect box(4, 4, tw, 14);
+        paintGlassChip(p, box, 7);
+        p.setFont(cap);
+        p.setPen(QColor(Style::role("text-secondary", Style::kTextSecondary)));
         p.drawText(box, Qt::AlignCenter, m_label);
-        p.setBrush(Qt::NoBrush);
     }
 
-    // ── Die Achse ────────────────────────────────────────────────────
+    // ── Die Achse ───────────────────────────────────────────────────
     //
     // Ohne Verbindung steht hier NICHTS. Eine erfundene Frequenz waere
     // eine Behauptung — dieselbe Regel wie beim Panadapter-Kopf.
@@ -792,29 +622,43 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
         return;
     }
 
-    // ── Abstand statt Abschnitt am Rand ─────────────────────────────
+    // Zahlen mittig unter ihrer Marke, am Rand hineingeschoben statt
+    // angeschnitten (".111" statt "7.111" ist schlimmer als keine).
     //
-    // Die Zahlen standen mittig unter ihrer Linie, auch wenn die Linie
-    // am Bildrand lag — die aeusseren wurden dadurch angeschnitten
-    // (".111" statt "7.111"). Eine halb gelesene Frequenz ist
-    // schlimmer als keine.
-    //
-    // Schrittweite richtet sich nach der Spanne: bei 2 kHz Fenster
-    // waeren 2-kHz-Schritte eine einzige Marke.
-    const int stepHz = (m_spanHz <= 6000) ? 1000
-                     : (m_spanHz <= 24000) ? 2000 : 5000;
-    for (int hz = -(m_spanHz / 2 / stepHz) * stepHz;
-         hz <= m_spanHz / 2; hz += stepHz) {
+    // Eng — die Flaeche im RxApplet ist 180 Punkte breit — stuenden
+    // fuenf Zahlen ineinander ("14.22014.222…" auf dem Blatt vom
+    // 2026-09-17). Dann bekommt nur jede zweite (dritte, …) Marke eine
+    // Zahl; die Gitterlinien bleiben alle. Gemessen an der breitesten
+    // Zahl gegen den Markenabstand, nicht geraten.
+    int every = 1;
+    if (marks.size() >= 2) {
+        int widest = 0;
+        for (int hz : marks) {
+            widest = qMax(widest, p.fontMetrics().horizontalAdvance(axisLabel(m_vfoHz + hz)));
+        }
+        const int gap = qAbs(hzToX(marks[1]) - hzToX(marks[0]));
+        if (gap > 0) {
+            while (every * gap < widest + 10) { ++every; }
+        }
+    }
+    // Das Hineinschieben am Rand kann eine Zahl auf ihre Nachbarin
+    // schieben (268 px breit: "14.22014.222", Blatt vom 2026-09-18).
+    // Darum merkt sich die Schleife den rechten Rand der zuletzt
+    // gezeichneten Zahl; was darueber laege, entfaellt — eine Zahl
+    // weniger ist besser als zwei ineinander.
+    int lastRight = -1000;
+    for (int i = 0; i < marks.size(); ++i) {
+        if (i % every != 0) { continue; }
+        const int hz = marks[i];
         const int x = hzToX(hz);
-        const bool isCentre = (hz == 0);
         const QString t = axisLabel(m_vfoHz + hz);
         const int tw = p.fontMetrics().horizontalAdvance(t) + 8;
         int left = x - tw / 2;
         if (left < 1) { left = 1; }
         if (left + tw > width() - 1) { left = width() - 1 - tw; }
-        p.setPen(isCentre ? QColor(Style::role("text-secondary",
-                                               Style::kTextSecondary))
-                          : faint);
+        if (left < lastRight + 4) { continue; }
+        lastRight = left + tw;
+        p.setPen(faint);
         p.drawText(QRect(left, height() - kPadBottom + 2, tw, 13),
                    Qt::AlignCenter, t);
     }

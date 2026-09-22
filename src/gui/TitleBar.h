@@ -3,7 +3,7 @@
 #include "core/RadioLinkKind.h"
 
 // =================================================================
-// src/gui/TitleBar.h  (NereusSDR)
+// src/gui/TitleBar.h  (Longpath)
 // =================================================================
 //
 // Ported from AetherSDR source:
@@ -12,21 +12,21 @@
 //
 // AetherSDR is licensed under the GNU General Public License v3; see
 // https://github.com/ten9876/AetherSDR for the contributor list and
-// project-level LICENSE. NereusSDR is also GPLv3. AetherSDR source
+// project-level LICENSE. Longpath is also GPLv3. AetherSDR source
 // files carry no per-file GPL header; attribution is at project level
 // per docs/attribution/HOW-TO-PORT.md rule 6.
 //
 // Upstream reference: AetherSDR v0.8.16 (2026-04).
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-20 — Ported/adapted in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code. Phase 3O Sub-Phase 10 Task 10c.
 //                 Scoped-down port: master-output strip only. AetherSDR's
 //                 heartbeat / multiFLEX / PC-audio / headphone / minimal-
 //                 mode / feature-request widgets are intentionally omitted
-//                 (deferred to separate NereusSDR phases — 3G-14 plans the
+//                 (deferred to separate Longpath phases — 3G-14 plans the
 //                 💡 feature-request widget; headphone devices land in
 //                 Sub-Phase 12 Setup → Audio → Devices; connection-state
 //                 UI is already served elsewhere).
@@ -38,7 +38,7 @@
 //                 #203040`) follow AetherSDR `TitleBar.cpp:30-31`. App-
 //                 name label colour and font follow AetherSDR
 //                 `TitleBar.cpp:101-103` with the literal "AetherSDR"
-//                 replaced by "NereusSDR".
+//                 replaced by "Longpath".
 //                 Design spec: docs/architecture/2026-04-19-vax-design.md
 //                 §6.3 + §7.3.
 //   2026-04-20 — Task 10d: consolidated the 💡 feature-request button
@@ -66,7 +66,7 @@
 //                 banner in the same commit; the date/local row is dropped
 //                 because local time already sits in the menu bar and the
 //                 date is not an operator-facing fact worth the pixels.
-//                 NereusSDR-original UI, not a Thetis/AetherSDR port.
+//                 Longpath-original UI, not a Thetis/AetherSDR port.
 // =================================================================
 
 #include "core/AudioEngine.h"
@@ -86,7 +86,7 @@ namespace Longpath {
 class MasterOutputWidget;
 
 // ConnectionSegment — always-visible connection-state indicator living
-// in the TitleBar, between the menu bar and the centre "NereusSDR" label.
+// in the TitleBar, between the menu bar and the centre "Longpath" label.
 //
 // Visual layout (left → right within the segment):
 //   [state dot]  [▲ Mbps]  [RTT ms (color-coded, clickable)]  [▼ Mbps]  [|]  [♪ pip]
@@ -218,7 +218,7 @@ private:
 //   [menuBar, inserted at position 0 via setMenuBar()]
 //   [ConnectionSegment — state dot + radio info + activity LED]
 //   [stretch]
-//   [NereusSDR app-name label]
+//   [Longpath app-name label]
 //   [stretch]
 //   [MasterOutputWidget — speaker button + master slider + readout]
 //   [6 px spacing]

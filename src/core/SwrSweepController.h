@@ -1,5 +1,5 @@
 // =================================================================
-// src/core/SwrSweepController.h  (NereusSDR)
+// src/core/SwrSweepController.h  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
@@ -7,14 +7,14 @@
 //
 // Umfang der Uebernahme: EINE Konstante. kTuneSettleMs = 300 spiegelt
 // das Task.Delay(300) um die TUNE-Umschaltung (console.cs:44743
-// [@852bf0e]). Alles Weitere in dieser Datei ist NereusSDR-original --
+// [@852bf0e]). Alles Weitere in dieser Datei ist Longpath-original --
 // Thetis kennt keinen Bandwobbler. Dass eine geborgte Konstante
 // trotzdem den vollen Kopf traegt, ist der Hausstand: FFTEngine.cpp
 // steht mit derselben Begruendung in der PROVENANCE-Tabelle
 // („constant reference only").
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-13 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
 //   2026-08-17 — Verbatim console.cs header + PROVENANCE row added; the
@@ -81,7 +81,7 @@
 
 // =================================================================
 //
-// NereusSDR-original feature (no Thetis equivalent — Thetis has no
+// Longpath-original feature (no Thetis equivalent — Thetis has no
 // band-sweep SWR analyzer). Built entirely on ported, bench-proven
 // primitives: MoxController::setTune (BandPlanGuard-gated),
 // RadioConnection::setTxFrequency (Alex TX-LPF follows inside the
@@ -106,7 +106,7 @@
 // already runs on the main thread.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-13 — Created by Ralph Martin Fischer (OE5SOS),
 //                 AI-assisted implementation via Anthropic Claude
 //                 (Cowork).

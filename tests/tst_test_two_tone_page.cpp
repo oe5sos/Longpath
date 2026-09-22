@@ -1,4 +1,4 @@
-// tests/tst_test_two_tone_page.cpp  (NereusSDR)
+// tests/tst_test_two_tone_page.cpp  (Longpath)
 //
 // Phase 3M-1c Task H — Setup → Test → Two-Tone page
 //

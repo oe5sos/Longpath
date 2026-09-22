@@ -1,8 +1,8 @@
 // =================================================================
-// src/gui/setup/AudioVaxPage.cpp  (NereusSDR)
+// src/gui/setup/AudioVaxPage.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original Setup → Audio → VAX page.
+// Longpath-original Setup → Audio → VAX page.
 // See AudioVaxPage.h for the full header.
 //
 // Sub-Phase 12 Task 12.3 (2026-04-20): Written by J.J. Boyd (KG4VCF),
@@ -16,6 +16,7 @@
 
 #include "AudioVaxPage.h"
 #include "gui/styles/ThemeQss.h"
+#include "gui/StyleConstants.h"
 
 #include "core/AppSettings.h"
 #include "core/AudioDeviceConfig.h"
@@ -45,16 +46,7 @@ namespace Longpath {
 // ---------------------------------------------------------------------------
 namespace {
 
-static const char* kGroupStyle =
-    "QGroupBox {"
-    "  border: 1px solid #203040;"
-    "  border-radius: 6px;"
-    "  margin-top: 8px;"
-    "  padding-top: 12px;"
-    "  font-weight: bold;"
-    "  color: #8aa8c0;"
-    "}"
-    "QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 4px; }";
+static const char* kGroupStyle = Style::kGroupBoxStyle;   // Hausplatte (Glas & Tiefe, 2026-09-18)
 
 static const char* kBadgeStyle =
     "QLabel {"
@@ -66,16 +58,13 @@ static const char* kBadgeStyle =
     "  padding: 2px 6px;"
     "}";
 
-static const char* kAutoDetectStyle =
-    "QPushButton {"
-    "  background: #1a2a3a;"
-    "  border: 1px solid #203040;"
-    "  border-radius: 6px;"
-    "  color: #4a7ba8;"
-    "  font-size: 11px;"
-    "  padding: 3px 8px;"
-    "}"
-    "QPushButton:hover { background: #203040; }";
+// Hausknopf, Text in Akzentfarbe: ein Verweis-Knopf, kein Schalter.
+static QString autoDetectStyle()
+{
+    return QLatin1String(Style::kButtonStyle)
+         + QStringLiteral("QPushButton { color: %1; font-size: 11px; padding: 3px 8px; }")
+               .arg(QLatin1String(Style::kAccent));
+}
 
 // Binding-status banner — persistent one-line indicator kept hidden;
 // queried by test probes (findStatusBanner) via Qt widget hierarchy.
@@ -118,21 +107,17 @@ static const char* kSpecRowValueStyle =
 static const char* kSpecRowPlaceholderStyle =
     "QLabel { color: #607080; font-size: 11px; font-style: italic; }";
 
-static const char* kActionBtnStyle =
-    "QPushButton {"
-    "  background: #1a2a3a;"
-    "  border: 1px solid #203040;"
-    "  border-radius: 6px;"
-    "  color: #8aa8c0;"
-    "  font-size: 11px;"
-    "  padding: 3px 10px;"
-    "}"
-    "QPushButton:hover { background: #203040; color: #c8d8e8; }";
+static QString actionBtnStyle()
+{
+    return QLatin1String(Style::kButtonStyle)
+         + QStringLiteral("QPushButton { font-size: 11px; padding: 3px 10px; }");
+}
 
-static const char* kEnableChkStyle =
-    "QCheckBox { color: #8aa8c0; font-size: 11px; font-weight: bold; }"
-    "QCheckBox::indicator { width: 14px; height: 14px; }"
-    "QCheckBox::indicator:checked { background: #4a7ba8; border: 1px solid #4a7ba8; border-radius: 2px; }";
+static QString enableChkStyle()
+{
+    return QLatin1String(Style::kCheckBoxStyle)
+         + QStringLiteral("QCheckBox { font-size: 11px; font-weight: bold; }");
+}
 
 // Label builder for the disabled "native (bound automatically)" info
 // row shown at the top of the Auto-detect menu on Mac/Linux when the
@@ -141,20 +126,20 @@ static const char* kEnableChkStyle =
 QString nativeHalLabelForCableImpl(const DetectedCable& cable)
 {
     return QStringLiteral(
-               "►  %1 · NereusSDR · native (bound automatically)")
+               "►  %1 · Longpath · native (bound automatically)")
         .arg(cable.deviceName);
 }
 
 // Default node description for a channel (spec §10).
 QString defaultNodeDescription(int channel)
 {
-    return QStringLiteral("NereusSDR VAX %1").arg(channel);
+    return QStringLiteral("Longpath VAX %1").arg(channel);
 }
 
 // PipeWire node name for a channel — the string consumer apps use.
 QString pipeWireNodeName(int channel)
 {
-    return QStringLiteral("nereussdr.vax-%1").arg(channel);
+    return QStringLiteral("longpath.vax-%1").arg(channel);
 }
 
 } // namespace
@@ -179,7 +164,7 @@ VaxChannelCard::VaxChannelCard(int channel, QWidget* parent)
     //    findChild traversal is DFS in child-creation order, so earliest
     //    parented wins.
     m_autoDetectBtn = new QPushButton(QStringLiteral("Auto-detect…"), this);
-    m_autoDetectBtn->setStyleSheet(QLatin1String(kAutoDetectStyle));
+    m_autoDetectBtn->setStyleSheet(autoDetectStyle());
     m_autoDetectBtn->setAutoDefault(false);
     m_autoDetectBtn->setDefault(false);
     m_autoDetectBtn->setVisible(false);
@@ -208,7 +193,7 @@ VaxChannelCard::VaxChannelCard(int channel, QWidget* parent)
         auto* enableRow = new QHBoxLayout;
         enableRow->setSpacing(6);
         m_enableChk = new QCheckBox(tr("On"), this);
-        m_enableChk->setStyleSheet(QLatin1String(kEnableChkStyle));
+        m_enableChk->setStyleSheet(enableChkStyle());
         m_enableChk->setChecked(false);  // loadFromSettings() will set real value
         m_enableChk->setToolTip(tr("Enable this VAX channel. When on, Longpath "
                                    "exposes the channel as a PipeWire source that "
@@ -300,7 +285,7 @@ VaxChannelCard::VaxChannelCard(int channel, QWidget* parent)
         btnRow->setSpacing(6);
 
         m_renameBtn = new QPushButton(tr("Rename…"), this);
-        m_renameBtn->setStyleSheet(QLatin1String(kActionBtnStyle));
+        m_renameBtn->setStyleSheet(actionBtnStyle());
         m_renameBtn->setAutoDefault(false);
         m_renameBtn->setDefault(false);
         m_renameBtn->setToolTip(tr("Change the display name this channel is "
@@ -308,7 +293,7 @@ VaxChannelCard::VaxChannelCard(int channel, QWidget* parent)
         btnRow->addWidget(m_renameBtn);
 
         m_copyNodeBtn = new QPushButton(tr("Copy node name"), this);
-        m_copyNodeBtn->setStyleSheet(QLatin1String(kActionBtnStyle));
+        m_copyNodeBtn->setStyleSheet(actionBtnStyle());
         m_copyNodeBtn->setAutoDefault(false);
         m_copyNodeBtn->setDefault(false);
         m_copyNodeBtn->setToolTip(
@@ -534,7 +519,7 @@ void VaxChannelCard::updateBadge()
         } else {
 #if defined(Q_OS_MAC) || defined(Q_OS_LINUX)
             const QString nativeName =
-                QStringLiteral("NereusSDR VAX %1").arg(m_channel);
+                QStringLiteral("Longpath VAX %1").arg(m_channel);
             if (hasDevice) {
                 // BYO override path.
                 if (!m_busOpen) {
@@ -544,7 +529,7 @@ void VaxChannelCard::updateBadge()
                         QStringLiteral("⚠  Bus failed to open: %1")
                             .arg(deviceName));
                     m_statusLabel->setToolTip(QStringLiteral(
-                        "NereusSDR tried to open the selected 3rd-party "
+                        "Longpath tried to open the selected 3rd-party "
                         "virtual cable but the PortAudio stream failed. "
                         "The device may be busy, unplugged, or the "
                         "Driver API / sample-rate combo may be "
@@ -569,17 +554,17 @@ void VaxChannelCard::updateBadge()
 #  if defined(Q_OS_MAC)
                     m_statusLabel->setText(QStringLiteral(
                         "⚠  Native HAL unavailable — reinstall "
-                        "NereusSDR"));
+                        "Longpath"));
                     m_statusLabel->setToolTip(QStringLiteral(
-                        "NereusSDR could not open the bundled CoreAudio "
+                        "Longpath could not open the bundled CoreAudio "
                         "HAL plugin's shared-memory bridge. Reinstall "
-                        "NereusSDR, or unblock NereusSDRVAX.driver in "
+                        "Longpath, or unblock LongpathVAX.driver in "
                         "System Settings → Privacy & Security."));
 #  else
                     m_statusLabel->setText(QStringLiteral(
                         "⚠  Native PipeWire bridge unavailable"));
                     m_statusLabel->setToolTip(QStringLiteral(
-                        "NereusSDR could not create a PipeWire "
+                        "Longpath could not create a PipeWire "
                         "pipe-source for this VAX slot. Check that "
                         "PipeWire is running and that pactl is "
                         "available on PATH."));
@@ -620,7 +605,7 @@ void VaxChannelCard::updateBadge()
                         QStringLiteral("⚠  Bus failed to open: %1")
                             .arg(deviceName));
                     m_statusLabel->setToolTip(QStringLiteral(
-                        "NereusSDR tried to open the selected virtual "
+                        "Longpath tried to open the selected virtual "
                         "cable but the PortAudio stream failed. The "
                         "device may be busy, unplugged, or the Driver "
                         "API / sample-rate combo may be unsupported."));
@@ -662,7 +647,9 @@ void VaxChannelCard::updateBadge()
 #if defined(Q_OS_MAC) || defined(Q_OS_LINUX)
     // Amber badge logic — hidden widget, state kept for API compat.
     if (hasDevice) {
-        const bool isNative = deviceName.contains(QStringLiteral("NereusSDR"),
+        const bool isNative = deviceName.contains(QStringLiteral("Longpath"),
+                                                   Qt::CaseInsensitive)
+                           || deviceName.contains(QStringLiteral("Longpath"),   // vor 2026-09-17
                                                    Qt::CaseInsensitive);
         const bool badgeOn = !isNative
             && (VirtualCableDetector::consumerCount(deviceName) == 0);
@@ -690,7 +677,7 @@ void VaxChannelCard::onAutoDetectClicked()
     }
 
     // Scan virtual cables (or use injected test vector if the seam is active).
-#ifdef NEREUS_BUILD_TESTS
+#ifdef LONGPATH_BUILD_TESTS
     const QVector<DetectedCable> cables =
         m_useTestCables ? m_testCables : VirtualCableDetector::scan();
 #else
@@ -706,7 +693,7 @@ void VaxChannelCard::onAutoDetectClicked()
 #if defined(Q_OS_MAC) || defined(Q_OS_LINUX)
     int nativeHalCount = 0;
     for (const DetectedCable& cable : cables) {
-        if (cable.product != VirtualCableProduct::NereusSdrVax) {
+        if (cable.product != VirtualCableProduct::LongpathVax) {
             continue;
         }
         QAction* act = menu.addAction(nativeHalLabelForCable(cable));
@@ -736,7 +723,7 @@ void VaxChannelCard::onAutoDetectClicked()
         bool hasAny = false;
         for (const DetectedCable& cable : cables) {
 #if defined(Q_OS_MAC) || defined(Q_OS_LINUX)
-            if (cable.product == VirtualCableProduct::NereusSdrVax) {
+            if (cable.product == VirtualCableProduct::LongpathVax) {
                 continue;
             }
 #endif

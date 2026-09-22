@@ -1,14 +1,14 @@
 // =================================================================
-// src/core/MicProfileManager.h  (NereusSDR)
+// src/core/MicProfileManager.h  (Longpath)
 // =================================================================
 //
-// NereusSDR-original file. The mic-profile-bank API is a port of the
+// Longpath-original file. The mic-profile-bank API is a port of the
 // Thetis comboTXProfile / Setup → TX Profile editor flow:
 //   setup.cs:9505-9543 [v2.10.3.13] — comboTXProfileName_SelectedIndexChanged
 //   setup.cs:9545-9612 [v2.10.3.13] — btnTXProfileSave_Click
 //   setup.cs:9615-9656 [v2.10.3.13] — btnTXProfileDelete_Click
 //
-// NereusSDR collapses the Thetis many-table TXProfile schema (~206 columns
+// Longpath collapses the Thetis many-table TXProfile schema (~206 columns
 // in DB.ds.Tables["TXProfile"]) to the live-fields-only subset (93 keys =
 // 15 mic/VOX/MON + 7 two-tone + 1 drive-power-source enum + 22 EQ + 1
 // TX EQ blob + 3 Leveler + 2 ALC + 41 CFC/CPDR/CESSB/PhRot + 2 FilterLow/High).
@@ -35,7 +35,7 @@
 //
 // =================================================================
 //
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-28 — Original implementation for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted implementation via
 //                 Anthropic Claude Code.
@@ -51,11 +51,11 @@
 //                 profileModifiedChanged (Plan 4 Cluster A, Task 2/D1).
 //                 FilterLow/FilterHigh added to liveKeyList, defaultProfileValues,
 //                 captureLiveValues, and applyValuesToModel (93 keys total).
-//                 NereusSDR-original additions.
+//                 Longpath-original additions.
 //                 J.J. Boyd (KG4VCF), AI-assisted via Anthropic Claude Code.
 // =================================================================
 
-// no-port-check: NereusSDR-original file; Thetis-derived handler logic
+// no-port-check: Longpath-original file; Thetis-derived handler logic
 // is cited inline below.
 
 #pragma once
@@ -115,7 +115,7 @@ public:
     /// otherwise.
     ///
     /// Cite: setup.cs:9535-9541 [v2.10.3.13] — Thetis loadTXProfile + active
-    /// assignment.  NereusSDR omits the Thetis focus-gated unsaved-changes
+    /// assignment.  Longpath omits the Thetis focus-gated unsaved-changes
     /// prompt (UI-layer concern; Phase J.4 owns it) — this method is the
     /// pure mechanical apply.
     bool setActiveProfile(const QString& name, TransmitModel* tx);
@@ -127,7 +127,7 @@ public:
     /// Overwrites if the name already exists.  Returns true on success.
     ///
     /// Cite: setup.cs:9545-9612 [v2.10.3.13] — Thetis btnTXProfileSave_Click.
-    /// NereusSDR omits the empty-name and overwrite-confirm dialogs — UI layer
+    /// Longpath omits the empty-name and overwrite-confirm dialogs — UI layer
     /// (Phase J.3) handles those before calling into this method.
     bool saveProfile(const QString& name, const TransmitModel* tx);
 
@@ -136,7 +136,7 @@ public:
     /// per F.3).  Returns true on success.
     ///
     /// Cite: setup.cs:9615-9656 [v2.10.3.13] — Thetis btnTXProfileDelete_Click.
-    /// NereusSDR omits the are-you-sure confirmation dialog — UI layer
+    /// Longpath omits the are-you-sure confirmation dialog — UI layer
     /// (Phase J.3) handles that before calling into this method.
     bool deleteProfile(const QString& name);
 

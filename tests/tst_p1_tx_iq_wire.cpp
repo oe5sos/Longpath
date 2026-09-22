@@ -1,6 +1,6 @@
 // no-port-check: test-only — deskhpsdr/Thetis file names appear only in
 // source-cite comments that document which upstream line each assertion
-// verifies. No Thetis logic is ported here; this file is NereusSDR-original.
+// verifies. No Thetis logic is ported here; this file is Longpath-original.
 //
 // Wire-byte snapshot tests for P1RadioConnection::sendTxIq() (3M-1a Task E.2).
 //
@@ -221,7 +221,7 @@ private slots:
     // ── 8. Mic bytes are zero (NullMicSource) ─────────────────────────────
     // Even when I/Q are non-zero, mic bytes [0..3] per sample must be zero.
     // Cite: deskhpsdr/src/old_protocol.c:2429-2434 [@120188f]
-    //   (HL2 path writes zeros; NereusSDR 3M-1a uses NullMicSource)
+    //   (HL2 path writes zeros; Longpath 3M-1a uses NullMicSource)
     void micBytesAreZeroForNullMicSource() {
         P1RadioConnection conn;
 

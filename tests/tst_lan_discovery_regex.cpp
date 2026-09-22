@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_lan_discovery_regex.cpp  (NereusSDR)
+// tests/tst_lan_discovery_regex.cpp  (Longpath)
 // =================================================================
 //
 // Unit tests for LanDiscovery regex parsing and deduplication.

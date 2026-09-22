@@ -1,11 +1,11 @@
 // =================================================================
-// src/gui/applets/ClientChainApplet.cpp  (NereusSDR)
+// src/gui/applets/ClientChainApplet.cpp  (Longpath)
 // =================================================================
 //
-// NereusSDR-original — per-client TCI connection detail applet.
+// Longpath-original — per-client TCI connection detail applet.
 //
 // This file contains no ported Thetis logic; it is a new UI surface
-// built to NereusSDR design conventions (Template C, plain English
+// built to Longpath design conventions (Template C, plain English
 // Qt strings, AppSettings persistence, StyleConstants palette).
 //
 // Pattern-matches TciApplet (Phase 21, commit 0b615a7) for style
@@ -13,7 +13,7 @@
 // same StyleConstants color palette, same showEvent/hideEvent guard.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-10 — Phase 3J-1 Task 22.1 by J.J. Boyd (KG4VCF);
 //                AI-assisted transformation via Anthropic Claude Code.
 //                Per-client rows with TX badge, peer + User-Agent,
@@ -148,8 +148,7 @@ ClientChainApplet::ClientChainApplet(TciServer* server, QWidget* parent)
     // ── Rows area (rebuilt by refresh()) ─────────────────────────────────────
     auto* rowsContainer = new QWidget(this);
     rowsContainer->setStyleSheet(QStringLiteral(
-        "QWidget { background: %1; }"
-    ).arg(Style::kPanelBg));
+        "QWidget { background: transparent; }"));   // Platte scheint durch (Glas & Tiefe)
     m_rowsLayout = new QVBoxLayout(rowsContainer);
     m_rowsLayout->setContentsMargins(0, 0, 0, 0);
     m_rowsLayout->setSpacing(0);
@@ -215,8 +214,8 @@ QWidget* ClientChainApplet::buildClientRow(
 {
     auto* row = new QWidget(this);
     row->setStyleSheet(QStringLiteral(
-        "QWidget { background: %1; border-bottom: 1px solid %2; }"
-    ).arg(Style::kPanelBg, Style::kBorderSubtle));
+        "QWidget { background: transparent; border-bottom: 1px solid %1; }"
+    ).arg(Style::kBorderSubtle));
 
     auto* vbox = new QVBoxLayout(row);
     vbox->setContentsMargins(6, 4, 6, 4);
@@ -390,7 +389,7 @@ void ClientChainApplet::rebuildRows()
     // second teardown reads a half-destroyed QTextDocument's HarfBuzz
     // buffer and SIGSEGVs in hb_buffer_destroy.  Crash report:
     //   /Users/j.j.boyd/Library/Logs/DiagnosticReports/
-    //     NereusSDR-2026-05-23-130427.ips
+    //     Longpath-2026-05-23-130427.ips
     if (m_rebuildInProgress) {
         return;
     }

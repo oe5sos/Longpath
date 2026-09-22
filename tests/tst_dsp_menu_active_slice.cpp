@@ -1,4 +1,4 @@
-// no-port-check: NereusSDR-original test infrastructure.
+// no-port-check: Longpath-original test infrastructure.
 //
 // Phase 3F Sub-Epic J Task 3. The DSP menu is not attached to any flag, so
 // with two receivers running nothing said which one it meant. It used to

@@ -98,7 +98,7 @@ AETHER_FILES = [
 FREEDV_CALLSIGNS = ["VK5DGR", "K6AQ", "KD0EAG", "NH6Z", "N2ADR"]
 # Distinctive freedv-gui source filenames. Same precaution as
 # AETHER_FILES: limited to bases unlikely to false-positive against
-# NereusSDR-original code. Full-tree-only and gated on a "freedv-gui"
+# Longpath-original code. Full-tree-only and gated on a "freedv-gui"
 # sibling marker (see RE_FREEDV_FILE_NEAR_MARKER).
 FREEDV_FILES = [
     "RADEReceiveStep", "RADETransmitStep", "rade_text", "FreeDVReporter",
@@ -107,7 +107,7 @@ FREEDV_FILES = [
 ]
 
 # Distinctive Thetis source filenames. Limited to bases that are unlikely
-# to false-positive against NereusSDR-original code (e.g. "Setup" alone
+# to false-positive against Longpath-original code (e.g. "Setup" alone
 # would over-trigger; "setup.cs" with the .cs extension is specific to
 # the C# upstream).
 THETIS_FILES = [
@@ -129,7 +129,7 @@ RE_SOURCE_COMMENT = re.compile(
     r"//\s*(Source|From|Ported from)\s*[:\-]?\s*.*\b(thetis|MeterManager|console\.cs|cmaster\.cs|bandwidth_monitor|IoBoardHl2)\b",
     re.IGNORECASE,
 )
-# AetherSDR tells (full-tree only). AETHER_FILE names overlap with NereusSDR's
+# AetherSDR tells (full-tree only). AETHER_FILE names overlap with Longpath's
 # own class names (`RadioModel`, `SliceModel`, `AudioEngine`, …), so the bare
 # filename match would fire on every downstream user. Require the word
 # "AetherSDR" on the same line.
@@ -238,7 +238,8 @@ def diffed_lines(rel):
 def parse_provenance_paths(*doc_paths):
     """Return union of *first-column* file paths listed in provenance tables.
 
-    Default (no args): just THETIS-PROVENANCE.md (diff-mode contract).
+    Default (no args): just THETIS-PROVENANCE.md; diff mode passes the
+    WDSP table as well (2026-09-21), see main().
 
     Full-tree mode passes (PROVENANCE, WDSP_PROVENANCE, AETHER_RECONCILIATION)
     to get the complete "registered somewhere" set. All three docs use the
@@ -306,7 +307,14 @@ def parse_provenance_paths(*doc_paths):
                     if base:
                         paths.add(f"{base}{tok}")
                     continue
-                if tok.startswith("src/"):
+                # 2026-09-21: THETIS-PROVENANCE.md registers tests
+                # (`tests/tst_*.cpp`, unquoted first cell) and
+                # WDSP-PROVENANCE.md the vendored tree under
+                # `third_party/wdsp/src/`; both were dropped here by
+                # the `src/` prefix test, so every registered test and
+                # WDSP file was flagged the moment a PR touched it
+                # (PR #42, 53 files, all of them already in a table).
+                if re.match(r"(src|tests|third_party)/", tok):
                     stem = re.sub(r"\.[^./]+$", "", tok)
                     paths.add(tok)
                     base = stem
@@ -405,7 +413,11 @@ def main():
         mode_label = "full-tree"
     else:
         files = diffed_files()
-        listed = parse_provenance_paths()
+        # The WDSP table owns third_party/wdsp/src/ the way the Thetis
+        # table owns src/ and tests/ -- a PR that touches a registered
+        # WDSP file (the NNR port's dprintf, a header rename) is not a
+        # new port.
+        listed = parse_provenance_paths(PROVENANCE, WDSP_PROVENANCE)
         mode_label = "diff"
     if not files:
         print("No added/modified files in diff range — nothing to check.")

@@ -34,7 +34,7 @@ private slots:
             // Add more when new antenna QMenu sites land.
         };
 
-        const QString root = QString::fromLatin1(NEREUS_SOURCE_ROOT);
+        const QString root = QString::fromLatin1(LONGPATH_SOURCE_ROOT);
         for (const QString& rel : knownAntennaMenuSites) {
             QFile f(root + QStringLiteral("/") + rel);
             QVERIFY2(f.open(QIODevice::ReadOnly | QIODevice::Text),

@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_mainwindow_status_bar_safety.cpp  (NereusSDR)
+// tests/tst_mainwindow_status_bar_safety.cpp  (Longpath)
 // =================================================================
 //
 // no-port-check: widget-level construction / accessor test for the TX
@@ -291,7 +291,8 @@ private slots:
             // property the reserved-slot design actually depends on.
             QCOMPARE(s->minimumWidth(), s->maximumWidth());
             QVERIFY(s->minimumWidth() == kSafetySlotWidthPx
-                    || s->minimumWidth() == kOverloadSlotWidthPx);
+                    || s->minimumWidth() == kOverloadSlotWidthPx
+                    || s->minimumWidth() == kTxSlotWidthPx);
         }
     }
 
@@ -325,12 +326,20 @@ private slots:
                  qPrintable(QStringLiteral("PA badge needs %1 px, slot is %2")
                                 .arg(pa.sizeHint().width()).arg(kSlotWidth)));
 
+        // "ON AIR", nicht "TX": so heisst das Abzeichen seit dem
+        // 2026-08-20, und mit dem Punkt-Symbol davor. Hier stand bis zum
+        // 2026-09-17 "TX" — der Pruefstand mass ein Wort, das nie mehr
+        // auf dem Schirm stand, und uebersah so das abgeschnittene "R".
         StatusBadge tx;
-        tx.setLabel(QStringLiteral("TX"));
+        tx.setSvgIcon(QStringLiteral(":/icons/badge-dot.svg"));
+        tx.setLabel(QStringLiteral("ON AIR"));
         tx.ensurePolished();
-        QVERIFY2(tx.sizeHint().width() <= kSlotWidth,
-                 qPrintable(QStringLiteral("TX badge needs %1 px, slot is %2")
-                                .arg(tx.sizeHint().width()).arg(kSlotWidth)));
+        QVERIFY2(tx.sizeHint().width() <= kTxSlotWidthPx,
+                 qPrintable(QStringLiteral("ON AIR badge needs %1 px, slot is %2")
+                                .arg(tx.sizeHint().width()).arg(kTxSlotWidthPx)));
+        QVERIFY2(tx.sizeHint().width() > kSlotWidth,
+                 "ON AIR passt in den alten 60-px-Platz -- dann braucht es "
+                 "den eigenen Platz nicht mehr, und dieser Test darf zurueck");
 
     }
 };

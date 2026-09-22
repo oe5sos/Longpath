@@ -1,7 +1,7 @@
 #pragma once
 
 // =================================================================
-// src/gui/spectrum/SpectrumDetector.h  (NereusSDR)
+// src/gui/spectrum/SpectrumDetector.h  (Longpath)
 // =================================================================
 //
 // Ported from WDSP source:
@@ -13,13 +13,13 @@
 //
 //   The WDSP analyzer performs detector reduction in linear-power
 //   domain BEFORE averaging; Thetis avenger() then converts to dB
-//   per av_mode (analyzer.c:464-554).  NereusSDR mirrors that
+//   per av_mode (analyzer.c:464-554).  Longpath mirrors that
 //   ordering — see SpectrumAvenger.h.
 //
 //   Original WDSP source license preserved verbatim below.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-05-05 — Created in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via
 //                 Anthropic Claude Code.
@@ -28,7 +28,7 @@
 //                 (pix_per_bin ≤ 1.0 — multi-bin per pixel —
 //                 and pix_per_bin > 1.0 — multi-pixel per bin)
 //                 included.  Type-narrowed from double to float
-//                 to match NereusSDR's spectrum pipeline.
+//                 to match Longpath's spectrum pipeline.
 // =================================================================
 
 //=================================================================
@@ -85,7 +85,7 @@ namespace Longpath {
 ///   fsclipH        — right fractional clip (same)
 ///   detOffset      — output-pixel offset added during pixel-index calc
 ///
-/// For NereusSDR's typical call site: fsclipL=0, fsclipH=m, detOffset=0.
+/// For Longpath's typical call site: fsclipL=0, fsclipH=m, detOffset=0.
 void applySpectrumDetector(SpectrumDetector detType,
                            int m,
                            int numPixels,
@@ -100,7 +100,7 @@ void applySpectrumDetector(SpectrumDetector detType,
 
 /// QVector-friendly wrapper.  Resizes `pixels` to `numPixels` if needed.
 /// Defaults fsclipL = 0, fsclipH = bins.size(), detOffset = 0 — the
-/// NereusSDR call shape (no sub-band segmentation).
+/// Longpath call shape (no sub-band segmentation).
 void applySpectrumDetector(SpectrumDetector detType,
                            const QVector<float>& bins,
                            int numPixels,

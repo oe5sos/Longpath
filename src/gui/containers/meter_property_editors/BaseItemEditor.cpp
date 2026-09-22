@@ -1,12 +1,12 @@
 // =================================================================
-// src/gui/containers/meter_property_editors/BaseItemEditor.cpp  (NereusSDR)
+// src/gui/containers/meter_property_editors/BaseItemEditor.cpp  (Longpath)
 // =================================================================
 //
 // Ported from Thetis source:
 //   Project Files/Source/Console/MeterManager.cs, original licence from Thetis source is included below
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
@@ -53,6 +53,7 @@ mw0lge@grange-lane.co.uk
 //============================================================================================//
 
 #include "BaseItemEditor.h"
+#include "gui/StyleConstants.h"
 
 #include "../../meters/MeterItem.h"
 #include "../../instruments/ReadingSource.h"
@@ -76,30 +77,11 @@ namespace {
 
 // Shared style tokens with ContainerSettingsDialog — kept local to
 // avoid cross-include churn.
-constexpr const char* kSpinStyle =
-    "QDoubleSpinBox, QSpinBox {"
-    "  background: #0a0a18; color: #c8d8e8;"
-    "  border: 1px solid #1e2e3e; border-radius: 6px;"
-    "  padding: 1px 4px; min-height: 18px;"
-    "}";
+static QString kSpinStyle() { return Longpath::Style::formFieldStyle(); }   // seit 2026-09-18 das Glasfeld
 
-constexpr const char* kComboStyle =
-    "QComboBox {"
-    "  background: #0a0a18; color: #c8d8e8;"
-    "  border: 1px solid #1e2e3e; border-radius: 6px;"
-    "  padding: 2px 4px; min-height: 18px;"
-    "}"
-    "QComboBox QAbstractItemView {"
-    "  background: #0a0a18; color: #c8d8e8;"
-    "  border: 1px solid #205070;"
-    // 2026-09-08: selection-color ergaenzt -- ohne sie blieb der
-    // ausgewaehlte Eintrag im aufgeklappten Dropdown praktisch
-    // unsichtbar (Betreiber: "immer das ausgewaehlte ist unsichtbar").
-    "  selection-background-color: #4a7ba8; selection-color: #ffffff;"
-    "}";
+constexpr const char* kComboStyle = Longpath::Style::kComboStyle;   // seit 2026-09-18 die Hausdefinition (Glas & Tiefe)
 
-constexpr const char* kCheckStyle =
-    "QCheckBox { color: #c8d8e8; }";
+constexpr const char* kCheckStyle = Longpath::Style::kCheckBoxStyle;   // seit 2026-09-18 die Hausdefinition (Glas & Tiefe)
 
 constexpr const char* kLabelStyle =
     "QLabel { color: #8090a0; font-size: 11px; }";
@@ -296,7 +278,7 @@ QDoubleSpinBox* BaseItemEditor::makeDoubleRow(const QString& label,
                                               double step, int decimals)
 {
     auto* spin = new QDoubleSpinBox(this);
-    spin->setStyleSheet(kSpinStyle);
+    spin->setStyleSheet(kSpinStyle());
     spin->setRange(min, max);
     spin->setSingleStep(step);
     spin->setDecimals(decimals);
@@ -308,7 +290,7 @@ QDoubleSpinBox* BaseItemEditor::makeDoubleRow(const QString& label,
 QSpinBox* BaseItemEditor::makeIntRow(const QString& label, int min, int max)
 {
     auto* spin = new QSpinBox(this);
-    spin->setStyleSheet(kSpinStyle);
+    spin->setStyleSheet(kSpinStyle());
     spin->setRange(min, max);
     spin->setMinimumWidth(kDefaultFieldWidth);
     addRow(label, spin);

@@ -1,6 +1,6 @@
-// tests/tst_signal_reading.cpp  (NereusSDR)
+// tests/tst_signal_reading.cpp  (Longpath)
 //
-// NereusSDR-original. No Thetis port.
+// Longpath-original. No Thetis port.
 //
 // Ohne Verbindung stand an drei Stellen "-395 dBm" -- Zifferblatt,
 // Zahlenfeld, VFO-Leiste. Das ist kein schwaches Signal, das ist gar

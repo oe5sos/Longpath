@@ -4,7 +4,7 @@
 
 **Goal:** Replace the `pactl`-primary Linux audio bridge with a libpipewire-0.3 native path plus per-slice output routing, split sidetone/MON sinks, and live telemetry, while keeping a `pactl`/`QAudioSink` fallback for pure-Pulse hosts.
 
-**Architecture:** Add a runtime detector (`LinuxAudioBackend`) cached in `AudioEngine`. Introduce one unified `PipeWireStream` class that handles all three PipeWire stream shapes (virtual source, sink producer, source consumer) via a `StreamConfig` struct. Wrap it in a role-driven `PipeWireBus : IAudioBus`. Leave `LinuxPipeBus` untouched as the Pactl-path fallback; add a minimal `QAudioSinkAdapter : IAudioBus` for the None-path speakers. Thread-loop lifecycle is `pw_thread_loop` owned by `AudioEngine`, single instance shared by all streams. Per-slice routing is a new `QString sinkNodeName` property on `SliceModel`. All PipeWire code is behind `#ifdef NEREUS_HAVE_PIPEWIRE`.
+**Architecture:** Add a runtime detector (`LinuxAudioBackend`) cached in `AudioEngine`. Introduce one unified `PipeWireStream` class that handles all three PipeWire stream shapes (virtual source, sink producer, source consumer) via a `StreamConfig` struct. Wrap it in a role-driven `PipeWireBus : IAudioBus`. Leave `LinuxPipeBus` untouched as the Pactl-path fallback; add a minimal `QAudioSinkAdapter : IAudioBus` for the None-path speakers. Thread-loop lifecycle is `pw_thread_loop` owned by `AudioEngine`, single instance shared by all streams. Per-slice routing is a new `QString sinkNodeName` property on `SliceModel`. All PipeWire code is behind `#ifdef LONGPATH_HAVE_PIPEWIRE`.
 
 **Tech Stack:** C++20, Qt6 (Core, Widgets, Multimedia, Test), libpipewire-0.3 ≥0.3.50 (pkg-config), CMake, Ninja, GPG-signed commits per project convention.
 
@@ -60,7 +60,7 @@
 
 | Path | What changes |
 |---|---|
-| `CMakeLists.txt` (root) | `pkg_check_modules(PIPEWIRE libpipewire-0.3>=0.3.50)`, conditional `NEREUS_HAVE_PIPEWIRE` define, link new source files. |
+| `CMakeLists.txt` (root) | `pkg_check_modules(PIPEWIRE libpipewire-0.3>=0.3.50)`, conditional `LONGPATH_HAVE_PIPEWIRE` define, link new source files. |
 | `tests/CMakeLists.txt` | Register the seven new test files. |
 | `src/core/AudioEngine.h` | Add `LinuxAudioBackend` member, `PipeWireThreadLoop` instance (Linux+PipeWire only), new accessors, `audioBackendChanged()` signal. |
 | `src/core/AudioEngine.cpp` | Call `detectLinuxBackend()` in ctor, start/stop thread loop, rewrite `makeVaxBus()` to dispatch on backend, add `makeTxInputBus`, `makePrimaryOut`, `makeSidetoneOut`, `makeMonitorOut`, per-slice route cache in `rxBlockReady`. |
@@ -122,7 +122,7 @@ Tasks 1–5 land build + detection. Tasks 6–11 land the stream core. Tasks 12�
 **Files:**
 - Modify: `CMakeLists.txt` (around line 154 where `FFTW3` is already detected via pkg-config)
 
-**Purpose:** Add optional libpipewire-0.3 build dependency with a `NEREUS_HAVE_PIPEWIRE` compile flag. No code changes yet — just the flag so later tasks can compile conditionally.
+**Purpose:** Add optional libpipewire-0.3 build dependency with a `LONGPATH_HAVE_PIPEWIRE` compile flag. No code changes yet — just the flag so later tasks can compile conditionally.
 
 - [ ] **Step 1: Read the current pkg-config block**
 
@@ -153,7 +153,7 @@ if(PIPEWIRE_FOUND)
     target_link_libraries(NereusSDR PRIVATE ${PIPEWIRE_LIBRARIES})
     target_include_directories(NereusSDR PRIVATE ${PIPEWIRE_INCLUDE_DIRS})
     target_compile_options(NereusSDR PRIVATE ${PIPEWIRE_CFLAGS_OTHER})
-    target_compile_definitions(NereusSDR PRIVATE NEREUS_HAVE_PIPEWIRE)
+    target_compile_definitions(NereusSDR PRIVATE LONGPATH_HAVE_PIPEWIRE)
 endif()
 ```
 
@@ -164,7 +164,7 @@ Expected on the shakedown machine: "Setting up libpipewire-0.3-dev ...".
 
 - [ ] **Step 5: Reconfigure + build**
 
-Run: `cd ~/nereussdr && cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DNEREUS_BUILD_TESTS=ON 2>&1 | grep -i pipewire`
+Run: `cd ~/nereussdr && cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DLONGPATH_BUILD_TESTS=ON 2>&1 | grep -i pipewire`
 Expected: `-- PipeWire 1.4.7 — native Linux audio bridge enabled` (or the installed version).
 Run: `cmake --build build -j$(nproc) 2>&1 | tail -5` — should succeed unchanged (no code references the flag yet).
 
@@ -175,7 +175,7 @@ git add CMakeLists.txt
 git commit -S -m "$(cat <<'EOF'
 build(linux): detect libpipewire-0.3 via pkg-config
 
-Adds NEREUS_HAVE_PIPEWIRE compile flag gated on
+Adds LONGPATH_HAVE_PIPEWIRE compile flag gated on
 libpipewire-0.3 >= 0.3.50. No code changes yet — this wires the
 build system so subsequent tasks can land PipeWire sources behind
 the flag. Builds without libpipewire-0.3-dev still succeed; the
@@ -365,11 +365,11 @@ QTEST_MAIN(TestLinuxBackendDetection)
 
 - [ ] **Step 2: Register the test**
 
-Find `tests/CMakeLists.txt` and follow the pattern used by other `tst_*` entries. Add a `nereus_add_test(tst_linux_backend_detection)` or equivalent macro call (match the existing macro name used for other tests).
+Find `tests/CMakeLists.txt` and follow the pattern used by other `tst_*` entries. Add a `longpath_add_test(tst_linux_backend_detection)` or equivalent macro call (match the existing macro name used for other tests).
 
 - [ ] **Step 3: Run the failing test**
 
-Run: `cd ~/nereussdr && cmake -B build -G Ninja -DNEREUS_BUILD_TESTS=ON && cmake --build build -j$(nproc) 2>&1 | tail -20`
+Run: `cd ~/nereussdr && cmake -B build -G Ninja -DLONGPATH_BUILD_TESTS=ON && cmake --build build -j$(nproc) 2>&1 | tail -20`
 Expected: LINK ERROR — `undefined reference to NereusSDR::detectLinuxBackend` and `toString`. Good — that's the failing-test confirmation.
 
 - [ ] **Step 4: Implement the pure detection logic (`.cpp` stub)**
@@ -978,7 +978,7 @@ EOF
 // =================================================================
 #pragma once
 
-#ifdef NEREUS_HAVE_PIPEWIRE
+#ifdef LONGPATH_HAVE_PIPEWIRE
 
 #include <QString>
 #include <pipewire/pipewire.h>
@@ -1017,7 +1017,7 @@ private:
 
 }  // namespace NereusSDR
 
-#endif  // NEREUS_HAVE_PIPEWIRE
+#endif  // LONGPATH_HAVE_PIPEWIRE
 ```
 
 - [ ] **Step 2: Implementation**
@@ -1026,7 +1026,7 @@ private:
 // =================================================================
 // src/core/audio/PipeWireThreadLoop.cpp  (NereusSDR)
 // =================================================================
-#ifdef NEREUS_HAVE_PIPEWIRE
+#ifdef LONGPATH_HAVE_PIPEWIRE
 #include "core/audio/PipeWireThreadLoop.h"
 
 #include <QLoggingCategory>
@@ -1099,7 +1099,7 @@ bool PipeWireThreadLoop::connect()
 
 }  // namespace NereusSDR
 
-#endif  // NEREUS_HAVE_PIPEWIRE
+#endif  // LONGPATH_HAVE_PIPEWIRE
 ```
 
 - [ ] **Step 3: Register in CMake under the PIPEWIRE_FOUND branch**
@@ -1135,7 +1135,7 @@ feat(audio): PipeWireThreadLoop — RAII wrapper over pw_thread_loop
 Owns pw_thread_loop + pw_context + pw_core as one unit. Starts the
 loop in connect(), records server version and RT-scheduling state,
 tears everything down cleanly in the dtor. All PipeWire-C API code
-is gated on NEREUS_HAVE_PIPEWIRE so the build stays clean on hosts
+is gated on LONGPATH_HAVE_PIPEWIRE so the build stays clean on hosts
 without libpipewire-0.3-dev.
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
@@ -1165,7 +1165,7 @@ EOF
 // =================================================================
 #pragma once
 
-#ifdef NEREUS_HAVE_PIPEWIRE
+#ifdef LONGPATH_HAVE_PIPEWIRE
 
 #include <QObject>
 #include <QString>
@@ -1260,7 +1260,7 @@ private:
 
 }  // namespace NereusSDR
 
-#endif  // NEREUS_HAVE_PIPEWIRE
+#endif  // LONGPATH_HAVE_PIPEWIRE
 ```
 
 - [ ] **Step 2: Minimal `.cpp` skeleton (just `configToProperties` + empty other methods)**
@@ -1269,7 +1269,7 @@ private:
 // =================================================================
 // src/core/audio/PipeWireStream.cpp  (NereusSDR)
 // =================================================================
-#ifdef NEREUS_HAVE_PIPEWIRE
+#ifdef LONGPATH_HAVE_PIPEWIRE
 #include "core/audio/PipeWireStream.h"
 
 #include <QLoggingCategory>
@@ -1327,7 +1327,7 @@ PipeWireStream::Telemetry PipeWireStream::telemetry() const {
 
 }  // namespace NereusSDR
 
-#endif  // NEREUS_HAVE_PIPEWIRE
+#endif  // LONGPATH_HAVE_PIPEWIRE
 ```
 
 - [ ] **Step 3: Write the config test**
@@ -1339,7 +1339,7 @@ Create `tests/tst_pipewire_stream_config.cpp`:
 // tests/tst_pipewire_stream_config.cpp
 // Author: J.J. Boyd (KG4VCF), AI-assisted via Claude Code. 2026-04-23.
 // =================================================================
-#ifdef NEREUS_HAVE_PIPEWIRE
+#ifdef LONGPATH_HAVE_PIPEWIRE
 
 #include <QtTest/QtTest>
 #include <pipewire/pipewire.h>
@@ -1849,7 +1849,7 @@ EOF
 // =================================================================
 #pragma once
 
-#ifdef NEREUS_HAVE_PIPEWIRE
+#ifdef LONGPATH_HAVE_PIPEWIRE
 
 #include "core/IAudioBus.h"
 #include "core/audio/PipeWireStream.h"
@@ -1898,14 +1898,14 @@ private:
 
 }  // namespace NereusSDR
 
-#endif  // NEREUS_HAVE_PIPEWIRE
+#endif  // LONGPATH_HAVE_PIPEWIRE
 ```
 
 - [ ] **Step 2: Implementation — role → StreamConfig mapping**
 
 ```cpp
 // src/core/audio/PipeWireBus.cpp
-#ifdef NEREUS_HAVE_PIPEWIRE
+#ifdef LONGPATH_HAVE_PIPEWIRE
 #include "core/audio/PipeWireBus.h"
 #include "core/audio/PipeWireThreadLoop.h"
 
@@ -2155,7 +2155,7 @@ EOF
 In `AudioEngine.h`:
 
 ```cpp
-#if defined(Q_OS_LINUX) && defined(NEREUS_HAVE_PIPEWIRE)
+#if defined(Q_OS_LINUX) && defined(LONGPATH_HAVE_PIPEWIRE)
     std::unique_ptr<PipeWireThreadLoop> m_pwLoop;
 #endif
 ```
@@ -2167,7 +2167,7 @@ Forward-declare `PipeWireThreadLoop` at top.
 In `AudioEngine::AudioEngine()` after the detection log:
 
 ```cpp
-#if defined(Q_OS_LINUX) && defined(NEREUS_HAVE_PIPEWIRE)
+#if defined(Q_OS_LINUX) && defined(LONGPATH_HAVE_PIPEWIRE)
     if (m_linuxBackend == LinuxAudioBackend::PipeWire) {
         m_pwLoop = std::make_unique<PipeWireThreadLoop>();
         if (!m_pwLoop->connect()) {
@@ -2186,7 +2186,7 @@ Replace the `#elif defined(Q_OS_LINUX)` block in `makeVaxBus`:
 
 ```cpp
 #elif defined(Q_OS_LINUX)
-#  ifdef NEREUS_HAVE_PIPEWIRE
+#  ifdef LONGPATH_HAVE_PIPEWIRE
     if (m_linuxBackend == LinuxAudioBackend::PipeWire && m_pwLoop) {
         auto role = PipeWireBus::Role::Vax1;
         switch (channel) {
@@ -2447,7 +2447,7 @@ void dispatchesToNamedBus() {
 }
 ```
 
-`installFakeBusForTest` is a `#ifdef NEREUS_ENABLE_TEST_HOOKS` method.
+`installFakeBusForTest` is a `#ifdef LONGPATH_ENABLE_TEST_HOOKS` method.
 
 - [ ] **Step 2: Implement route lookup in `rxBlockReady`**
 
@@ -2663,7 +2663,7 @@ In `MainWindow::MainWindow()` after `AudioEngine` is up:
 - [ ] **Step 1: Write test (env-gated)**
 
 ```cpp
-#ifdef NEREUS_HAVE_PIPEWIRE
+#ifdef LONGPATH_HAVE_PIPEWIRE
 #include <QtTest/QtTest>
 #include "core/audio/PipeWireThreadLoop.h"
 #include "core/audio/PipeWireStream.h"
@@ -2763,7 +2763,7 @@ Under the pending version block, add the bullet from spec §13.
 - [ ] **Step 1: Fresh build**
 
 ```
-cd ~/nereussdr && cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DNEREUS_BUILD_TESTS=ON && cmake --build build -j$(nproc)
+cd ~/nereussdr && cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DLONGPATH_BUILD_TESTS=ON && cmake --build build -j$(nproc)
 ```
 
 - [ ] **Step 2: Launch + verify log**

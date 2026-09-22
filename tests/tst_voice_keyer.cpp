@@ -1,5 +1,5 @@
 // =================================================================
-// tests/tst_voice_keyer.cpp  (NereusSDR)
+// tests/tst_voice_keyer.cpp  (Longpath)
 // =================================================================
 //
 // Der Sprachspeicher: zehn Ansagen, Tasten, CQ-Wiederholung.
@@ -13,12 +13,12 @@
 // Zusammengeschweisst braeuchte jeder dieser Faelle ein Funkgeraet.
 //
 // =================================================================
-// Modification history (NereusSDR):
+// Modification history (Longpath):
 //   2026-08-19 — Original fuer NereusSDR von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
 // =================================================================
 
-// no-port-check: NereusSDR-original test file.
+// no-port-check: Longpath-original test file.
 
 #include <QtTest>
 #include <QTemporaryDir>

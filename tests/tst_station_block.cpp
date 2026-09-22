@@ -117,7 +117,7 @@ private slots:
 
     void clearingTheNameAlsoClearsTheHardwareLine() {
         StationBlock b;
-        b.setRadioName(QStringLiteral("Nereus G2"));
+        b.setRadioName(QStringLiteral("ANAN G2"));
         b.setHardwareLine(QStringLiteral("ANAN-G2"), QStringLiteral("v27"));
         b.setRadioName(QString());
         QCOMPARE(b.hardwareLine(), QString());
