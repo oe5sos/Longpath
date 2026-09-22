@@ -205,7 +205,11 @@ public:
     void clear();
 
     const QsoRecordingInfo& info() const { return m_info; }
+    // Der Pfad der laufenden/letzten Aufnahme -- nach start() der
+    // tatsaechlich beanspruchte (bei Kollision mit "_1", "_2", ...).
     const QString&          path() const { return m_path; }
+    // Oeffentlich fuer den Pruefstand: beansprucht den Namen atomar.
+    static QString claimUniquePath(const QString& wantedPath, QString* error = nullptr);
 
 private:
     void flushAligned();

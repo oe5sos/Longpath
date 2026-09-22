@@ -94,6 +94,11 @@
   des Servers, `zoom_cap` bleibt allein die Obergrenze der angefragten
   Zoomstufe (AetherSDR #5536/#5655). Echte KiwiSDR (zoom_max 14) sind
   unveraendert.
+- **QSO-Recorder: zwei Starts in derselben Sekunde loeschten die erste
+  Aufnahme.** Der Dateiname traegt den Sekundenstempel, der Schreiber
+  oeffnete mit Truncate. Der Name wird jetzt atomar beansprucht
+  (NewOnly); ist er vergeben, heisst die neue Aufnahme `_1`, `_2`, ...
+  -- eine Aufnahme geht nie mehr durch eine andere verloren.
 
 ## [0.6.4] - 2026-09-22
 
