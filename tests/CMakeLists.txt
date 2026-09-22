@@ -5125,6 +5125,8 @@ longpath_add_test(tst_logbook_toolbar_wraps)
 longpath_add_test(tst_logbook_one_page)
 # -- Blue Marble fuer die Kugel aus GIBS-Kacheln (mit LONGPATH_NET echt) --
 longpath_add_test(tst_blue_marble_fetcher)
+# -- DX-Radar: Wurzelskala, Himmelsrichtungen, Punkte, dritte Ansicht --
+longpath_add_test(tst_dx_radar)
 
 # -- Die Kopfleiste. Prueft, was Arithmetik hergibt: genau eine Pille je
 #    Gruppe an, sie folgt dem Modell statt dem Klick, und beim Wechsel

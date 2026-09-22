@@ -22,6 +22,7 @@
 #include "core/Maidenhead.h"
 #include "gui/StyleConstants.h"
 #include "gui/widgets/FlatMapWidget.h"
+#include "gui/widgets/DxRadarWidget.h"
 #include "gui/widgets/FlowLayout.h"
 #include "gui/widgets/GibsTileLayer.h"
 #include "core/sat/SatelliteService.h"
@@ -130,12 +131,14 @@ void QsoMapWindow::setEmbedded(bool on)
 
 void QsoMapWindow::zoomActiveView(double factor)
 {
+    if (m_stack->currentIndex() == 2) { return; }   // der Radar zoomt nicht
     if (m_stack->currentIndex() == 0) { m_globe->zoomBy(factor); }
     else                              { m_flat->zoomBy(factor); }
 }
 
 void QsoMapWindow::resetActiveView()
 {
+    if (m_stack->currentIndex() == 2) { return; }
     if (m_stack->currentIndex() == 0) { m_globe->resetView(); }
     else                              { m_flat->resetView(); }
 }
@@ -345,6 +348,15 @@ void QsoMapWindow::buildUi()
         "Switch between the globe and the whole world at once"));
     bar->addWidget(m_viewBtn);
 
+    // DX-Radar: Peilung und Entfernung von zu Hause, Norden oben.
+    m_radarBtn = new QPushButton(QStringLiteral("Radar"), this);
+    m_radarBtn->setCheckable(true);
+    m_radarBtn->setStyleSheet(Style::buttonBaseStyle() + Style::blueCheckedStyle());
+    m_radarBtn->setToolTip(QStringLiteral(
+        "DX radar: the same contacts by bearing and distance from home — "
+        "north up, rings at 500 … 20 000 km"));
+    bar->addWidget(m_radarBtn);
+
     // Nur eingebettet sichtbar: das grosse Fenster holen.
     m_popOutBtn = new QPushButton(QStringLiteral("\u2197"), this);
     m_popOutBtn->setStyleSheet(Style::buttonBaseStyle());
@@ -368,9 +380,11 @@ void QsoMapWindow::buildUi()
     m_globe->setBeamSpread(0.0);
     m_flat = new FlatMapWidget(this);
 
+    m_radar = new DxRadarWidget(this);
     m_stack = new QStackedWidget(this);
     m_stack->addWidget(m_globe);
     m_stack->addWidget(m_flat);
+    m_stack->addWidget(m_radar);   // Index 2
     col->addWidget(m_stack, 1);
 
     m_summary = new QLabel(QString{}, this);
@@ -417,10 +431,30 @@ void QsoMapWindow::buildUi()
             this, &QsoMapWindow::showGridInfo);
 
     connect(m_viewBtn, &QPushButton::clicked, this, [this]() {
-        const bool toFlat = m_stack->currentIndex() == 0;
+        // Aus dem Radar heraus fuehrt der Knopf zur jeweils anderen
+        // Kartenansicht; der Radar-Haken geht dabei aus.
+        const int cur = m_stack->currentIndex() == 2 ? m_viewBeforeRadar
+                                                     : m_stack->currentIndex();
+        const bool toFlat = cur == 0;
+        if (m_radarBtn && m_radarBtn->isChecked()) {
+            QSignalBlocker b(m_radarBtn);
+            m_radarBtn->setChecked(false);
+        }
         m_stack->setCurrentIndex(toFlat ? 1 : 0);
         m_viewBtn->setText(toFlat ? QStringLiteral("Globe")
                                   : QStringLiteral("Flat map"));
+    });
+    connect(m_radarBtn, &QPushButton::toggled, this, [this](bool on) {
+        if (on) {
+            if (m_stack->currentIndex() != 2) { m_viewBeforeRadar = m_stack->currentIndex(); }
+            m_stack->setCurrentIndex(2);
+        } else if (m_stack->currentIndex() == 2) {
+            m_stack->setCurrentIndex(m_viewBeforeRadar);
+        }
+    });
+    connect(m_radar, &DxRadarWidget::pointClicked, this,
+            [this](const QString& label, double, double) {
+        showStationInfo(label);
     });
 
     // ── Durchzoomen zwischen den beiden Ansichten (2026-08-19) ───────
@@ -535,9 +569,11 @@ void QsoMapWindow::setHomeGrid(const QString& grid)
         m_globe->setHome(lat, lon);
         m_globe->resetView();
         m_flat->setHome(lat, lon);
+        m_radar->setHome(lat, lon);
         applyStationMarker();
     } else {
         m_flat->clearHome();
+        m_radar->clearHome();
     }
 }
 
@@ -764,6 +800,7 @@ void QsoMapWindow::rebuild()
 
     m_globe->setPoints(points);
     m_flat->setPoints(points);
+    m_radar->setPoints(points);
 
     // Say what could not be placed. A map quietly showing a third of the
     // log looks exactly like a map of the whole log, and the operator
@@ -1183,7 +1220,13 @@ void QsoMapWindow::flyToStation(const QString& call, double lat, double lon,
 {
     // Der Flug ist eine Sache der flachen Karte; die Kugel kennt ihn
     // nicht. Also erst umschalten, dann fliegen.
-    if (m_stack->currentIndex() == 0) { m_stack->setCurrentIndex(1); }
+    if (m_stack->currentIndex() != 1) {
+        if (m_radarBtn && m_radarBtn->isChecked()) {
+            QSignalBlocker b(m_radarBtn);
+            m_radarBtn->setChecked(false);
+        }
+        m_stack->setCurrentIndex(1);
+    }
     if (m_viewBtn) { m_viewBtn->setText(QStringLiteral("Globe")); }
 
     const QString c = call.trimmed().toUpper();
