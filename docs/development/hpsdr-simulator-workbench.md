@@ -223,3 +223,33 @@ Block steht jetzt vor `createRxChannel()`; im Protokoll steht seither
 `.bin`-Dateien (2 + 4,5 MB) wie das DeepFilterNet3-Modell ins Bundle,
 neben die Binaerdatei und ins Install-Praefix — vorher fand ein
 installiertes Paket sie ueberhaupt nicht.
+
+## Runde 4 (2026-09-22): der Mikrofonweg
+
+Neue Station: die fuenf Schalter aus Setup > Audio > TX Input. Der
+Simulator meldet `MIC BOOST`, `LINE IN`, `TIP/Ring`, `MicBias` und
+`LineGain`; am HL2 fehlen die ersten beiden, weil dort dieselben Bits
+Q5/PA/Tune tragen — die Werkbank prueft, was das Board hergibt, und
+laeuft darum fuer diese Station am besten gegen `-hermes`.
+
+**Fund:** keines der fuenf Bits kam an. `RadioConnection` kann sie seit
+3M-1b (`setMicBoost`, `setLineIn`, `setMicTipRing`, `setMicBias`,
+`setMicXlr` — jedes mit Quelle und Polaritaet dokumentiert), die
+Setup-Seite schreibt sie ins `TransmitModel`, und dazwischen war nichts:
+`micBiasChanged` & Co. hatten als einzige Empfaenger die Oberflaeche
+selbst. Der Kommentar in `TransmitModel::setMicBias` sagt es sogar —
+„Phase G wires the SetMicBias() bit; model just stores + signals". Phase
+G hat den Draht gelegt, angeschlossen hat ihn niemand.
+
+Jetzt haengen alle fuenf an `RadioModel::connectMicInputSignals()`, nach
+dem Muster von `connectMicPttDisabledSignal()`: queued binden und einmal
+vorladen. Am Simulator:
+
+```
+MIC BOOST= 00000001      (beim Verbinden vorgeladen)
+LINE IN=   00000001
+TIP/Ring=  00000001
+MicBias=   00000001
+LineGain=  00000011  (17)
+```
+

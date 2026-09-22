@@ -366,7 +366,38 @@ private slots:
             qInfo() << "OC 20m: slice" << s->frequency() << "erwartet 0x" << QString::number(rx20, 16);
         }
 
+        // ── 4g. Der Mikrofonweg ──────────────────────────────────────
+        // Setup > Audio > TX Input schaltet fuenf Bits, die im C&C-Rahmen
+        // stehen: Vorverstaerker (+20 dB), Mic/Line, Belegung Tip/Ring,
+        // Mikrofonspeisung und die Line-Daempfung. Der Simulator meldet
+        // jedes davon. Am HL2 sind Boost und Line-In nicht zu sehen — dort
+        // tragen dieselben Bits Q5/PA/Tune —, Bias, Tip/Ring und LineGain
+        // schon; die Werkbank prueft, was das Board hergibt.
+        TransmitModel& tx = model.transmitModel();
+        const bool micBoostBefore   = tx.micBoost();
+        const bool lineInBefore     = tx.lineIn();
+        const bool micTipRingBefore = tx.micTipRing();
+        const bool micBiasBefore    = tx.micBias();
+        const int  lineGainBefore   = tx.lineInGain();
+        const bool showsMicBoost = (info.boardType != HPSDRHW::HermesLite);
+        tx.setMicBoost(true);
+        tx.setLineIn(true);
+        tx.setMicTipRing(false);   // Ring ist das Mikrofon (Drahtbit invertiert)
+        tx.setMicBias(true);
+        tx.setLineInGain(17);
+        QTest::qWait(1200);
+        qInfo() << "MIC boost" << tx.micBoost() << "lineIn" << tx.lineIn()
+                << "tipRing" << tx.micTipRing() << "bias" << tx.micBias()
+                << "lineGain" << tx.lineInGain()
+                << "| Board zeigt Boost/Line-In:" << showsMicBoost;
+
         // ── 5. Trennen ───────────────────────────────────────────────
+        tx.setMicBoost(micBoostBefore);
+        tx.setLineIn(lineInBefore);
+        tx.setMicTipRing(micTipRingBefore);
+        tx.setMicBias(micBiasBefore);
+        tx.setLineInGain(lineGainBefore);
+        QTest::qWait(300);
         model.disconnectFromRadio();
         QTRY_COMPARE_WITH_TIMEOUT(model.connectionState(), ConnectionState::Disconnected, 8000);
 
@@ -385,7 +416,12 @@ private slots:
                         || l.contains(QLatin1String("Stop")) || l.contains(QLatin1String("ALEX"))
                         || l.contains(QLatin1String("DRIVE")) || l.contains(QLatin1String("RECEIVERS"))
                         || l.contains(QLatin1String("ATT"))
-                        || l.contains(QLatin1String("OpenCollector"))) {
+                        || l.contains(QLatin1String("OpenCollector"))
+                        || l.contains(QLatin1String("MIC"))
+                        || l.contains(QLatin1String("Mic"))
+                        || l.contains(QLatin1String("LINE IN"))
+                        || l.contains(QLatin1String("LineGain"))
+                        || l.contains(QLatin1String("TIP/Ring"))) {
                         seen << l.trimmed();
                     }
                 }
@@ -425,6 +461,22 @@ private slots:
                 // Daempfungsglied: die Stufe muss den Draht erreicht haben.
                 QVERIFY2(all.contains(QStringLiteral("ATT")),
                          "Der Simulator sah nie eine Daempfungs-Einstellung");
+                // Mikrofonweg: jedes gesetzte Bit muss am Simulator
+                // angekommen sein. Vor dem 2026-09-22 kam KEINES davon an —
+                // die Oberflaeche schrieb ins Modell, und dort endete es.
+                QVERIFY2(all.contains(QStringLiteral("MicBias= 00000001")),
+                         "Die Mikrofonspeisung (Mic Bias) kam am Simulator nie an");
+                QVERIFY2(all.contains(QStringLiteral("TIP/Ring= 00000001")),
+                         "Die Belegung Tip/Ring kam am Simulator nie an");
+                QVERIFY2(all.contains(QStringLiteral("LineGain= 00000011")),
+                         "Die Line-Daempfung (17) kam am Simulator nie an");
+                if (showsMicBoost) {
+                    QVERIFY2(all.contains(QStringLiteral("MIC BOOST= 00000001")),
+                             "Der Mikrofonvorverstaerker (+20 dB) kam am Simulator nie an");
+                    QVERIFY2(all.contains(QStringLiteral("LINE IN= 00000001")),
+                             "Die Umschaltung auf Line-In kam am Simulator nie an");
+                }
+
                 // N2ADR am OC-Bus: der Simulator meldet jede Aenderung des
                 // Open-Collector-Bytes. Die erwarteten Werte muessen in
                 // dieser Reihenfolge vorgekommen sein (Zwischenwerte sind

@@ -4166,6 +4166,10 @@ target_compile_definitions(tst_p2_mic_ptt_wire PRIVATE LONGPATH_BUILD_TESTS)
 # RadioModel::wireConnectionSignals + adds connect-time priming.
 # Source cite: Thetis console.cs:19757-19766 [v2.10.3.13+501e3f51].
 longpath_add_test(tst_radio_model_mic_ptt_wire)
+# -- Mikrofonschalter am Draht (2026-09-22, Werkbank Runde 4): Boost,
+#    Line-In, Tip/Ring, Bias und XLR erreichen die Verbindung -- beim
+#    Umschalten und beim Verbinden. Vorher endeten sie im Modell. --
+longpath_add_test(tst_radio_model_mic_inputs_wire)
 target_compile_definitions(tst_radio_model_mic_ptt_wire PRIVATE LONGPATH_BUILD_TESTS)
 
 # ── Phase 3M-1b Task G.6: P1 mic_xlr storage-only ──────────────────────────
