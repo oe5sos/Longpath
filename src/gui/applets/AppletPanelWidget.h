@@ -189,6 +189,11 @@ signals:
 
 protected:
     void resizeEvent(QResizeEvent* event) override;
+
+public:
+    // Mindestens Style::kAppletPanelW, sonst so breit wie das breiteste
+    // Feld im Raster plus Rollbalken -- siehe AppletPanelWidget.cpp.
+    QSize minimumSizeHint() const override;
     bool eventFilter(QObject* watched, QEvent* event) override;
 
 private:

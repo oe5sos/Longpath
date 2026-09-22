@@ -354,7 +354,27 @@ void ContainerWidget::setContent(QWidget* widget)
         }
         layout->addWidget(m_content);
     }
+    refreshMinimumWidth();
     emit contentChanged(m_content);
+}
+
+void ContainerWidget::refreshMinimumWidth()
+{
+    int w = kMinContainerWidth;
+    if (m_content) {
+        w = qMax(w, m_content->minimumSizeHint().width());
+    }
+    if (w != minimumWidth()) {
+        setMinimumWidth(w);
+    }
+}
+
+bool ContainerWidget::event(QEvent* event)
+{
+    if (event->type() == QEvent::LayoutRequest) {
+        refreshMinimumWidth();
+    }
+    return QWidget::event(event);
 }
 
 // ── Reiter ───────────────────────────────────────────────────────────
@@ -543,8 +563,9 @@ void ContainerWidget::setDockMode(DockMode mode)
     bool changed = (m_dockMode != mode);
     m_dockMode = mode;
 
-    // Enforce minimum width in all dock modes so the applets are always usable.
-    setMinimumWidth(260);
+    // Enforce minimum width in all dock modes so the applets are always
+    // usable -- and never narrower than the content itself needs.
+    refreshMinimumWidth();
 
     // ── Der Griff ────────────────────────────────────────────────────
     //
