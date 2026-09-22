@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Added
+
+- **RX-Profile (Zahnrad des RX-Applets)**: die Empfangsverarbeitung
+  einer Scheibe -- AGC, Rauschminderung samt Parametern aller Plaetze,
+  Autonotch, Stoeraustaster, Rauschsperre, APF, binaural -- unter einem
+  Namen speichern und mit einem Klick wieder laden (Load / Save / Delete
+  / Save As). Frequenz, Modus und Filter bleiben aussen vor, das ist die
+  Sache der Frequenzspeicher. Profile gelten geraeteuebergreifend.
+
 ### Changed
 
 - **Das Logbuch ist eine Seite.** Nach dem Bild der Vorlage (Betreiber,
@@ -128,14 +137,6 @@ Programm, das der Betreiber taeglich benutzte.
 - **Fussleiste: "ON AIR" passte unter Linux nicht in seinen Platz** --
   78 Punkte waren am Mac gemessen, die Linux-Schrift braucht 81; jetzt
   84.
-### Added
-
-- **RX-Profile (Zahnrad des RX-Applets)**: die Empfangsverarbeitung
-  einer Scheibe -- AGC, Rauschminderung samt Parametern aller Plaetze,
-  Autonotch, Stoeraustaster, Rauschsperre, APF, binaural -- unter einem
-  Namen speichern und mit einem Klick wieder laden (Load / Save / Delete
-  / Save As). Frequenz, Modus und Filter bleiben aussen vor, das ist die
-  Sache der Frequenzspeicher. Profile gelten geraeteuebergreifend.
 
 ## [0.6.3] - 2026-09-21
 

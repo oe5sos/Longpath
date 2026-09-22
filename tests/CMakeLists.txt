@@ -313,10 +313,6 @@ longpath_add_test(tst_logbook_stats_widget)
 #    cannot hold is bounded and reported, not read from beyond the
 #    allocation. NereusSDR-original bound, 2026-09-20 --
 longpath_add_test(tst_wdsp_delay_clamp)
-# -- Receive profiles (Longpath-original, 2026-09-20): AGC / NR / NB /
-#    ANF / squelch of a slice under a name -- manager + popup --
-longpath_add_test(tst_rx_profile_manager)
-longpath_add_test(tst_rx_profile_popup)
 
 # ── Phase 3M-4 Task 3: TxChannel PureSignal API wrappers (22 functions) ──
 # Smoke tests for the 22 PS API wrappers added in Task 3:
@@ -4853,6 +4849,10 @@ longpath_add_test(tst_kiwi_tx_mute)
 # Schranke (nie eine echte, DDC-gebundene Scheibe fuettern/steuern),
 # hier fuer KiwiSDR nachgezogen. Siehe Kommentarkopf der Testdatei.
 longpath_add_test(tst_kiwi_sdr_safety_gate)
+# -- Receive profiles (Longpath-original, 2026-09-20): AGC / NR / NB /
+#    ANF / squelch of a slice under a name -- manager + popup --
+longpath_add_test(tst_rx_profile_manager)
+longpath_add_test(tst_rx_profile_popup)
 longpath_add_test(tst_sunsdr_audio_feed)
 longpath_add_test(tst_sunsdr_is_reachable)
 longpath_add_test(tst_compact_bar_draws)
