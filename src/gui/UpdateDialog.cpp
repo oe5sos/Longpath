@@ -27,6 +27,8 @@
 #include <QStandardPaths>
 #include <QTextBrowser>
 #include <QVBoxLayout>
+#include <QApplication>
+#include <QDebug>
 
 namespace Longpath {
 
@@ -225,6 +227,11 @@ void UpdateDialog::onCheckFailed(const QString& why)
 
 void UpdateDialog::onActionClicked()
 {
+    // Sichtbar im Log, welcher Weg den Knopf ausgeloest hat -- ein
+    // Download darf nur auf einen Klick hin starten.
+    qInfo() << "UpdateDialog: action button triggered, mode" << static_cast<int>(m_mode)
+            << "sender" << (sender() ? sender()->metaObject()->className() : "none")
+            << "focus" << (QApplication::focusWidget() ? QApplication::focusWidget()->metaObject()->className() : "none");
     switch (m_mode) {
     case Action::Download: startDownload(); break;
     case Action::Retry:    checkNow(); break;
@@ -236,6 +243,7 @@ void UpdateDialog::onActionClicked()
 void UpdateDialog::startDownload()
 {
     if (!m_release || !m_asset) { return; }
+    qInfo() << "UpdateDialog: download starts for" << m_asset->name;
     setBusy(true);
     m_progress->setRange(0, 0);
     const QString dir = QStandardPaths::writableLocation(QStandardPaths::TempLocation)
