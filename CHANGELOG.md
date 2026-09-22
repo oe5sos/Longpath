@@ -12,6 +12,61 @@
   Klick zeigt die Stationskarte. Nach dem Bild der Vorlage
   („GLOBE | DX RADAR"). Die Schalter „Radar", „Map" und „Stats" zeigen
   ihren Zustand jetzt blau. Pruefstand `tst_dx_radar`.
+- **Frequenzspeicher** (Tools > Memories…, Memory Quick Save / Quick
+  Restore): Thetis' Memory-Fenster portiert -- Gruppe, Frequenz, Name,
+  Modus, Abstimmschritt, FM-Repeater/CTCSS, Leistung, Filter, AGC, AGC-T
+  je Speicherplatz; Add/Copy/Delete/Select, Zellen im Grid editierbar.
+  Die Datei ist Thetis' `memory.xml` in seinem Format (mit
+  `memory_bak.xml` als Rueckfall), neben der Einstellungsdatei -- eine
+  Thetis-Speicherliste laesst sich hineinkopieren. Quick Save/Restore
+  merkt sich Frequenz, Modus und Filter wie die Frontplattenknoepfe.
+  `docs/architecture/2026-09-20-memories.md`. Live am Funkgeraet noch
+  nicht geprueft.
+- **Einstellungs-Backup (File > Settings Backups...)** -- die Backup-
+  Haelfte von Thetis' Datenbank-Manager (clsDBMan.cs / frmDBMan.cs):
+  Kopien der Einstellungsdatei in `backups/` mit Beschreibung, Liste
+  mit Zeit und Alter, Wiederherstellen (Sicherheitskopie „Before
+  restore", dann Beenden ohne Speichern), Umbenennen, Exportieren,
+  Entfernen, Ordner oeffnen; auf Wunsch automatische Kopien beim Start
+  und beim Beenden mit Thetis' Grossvater-Vater-Sohn-Ausduennung (7 Tage
+  alles, dann je Woche/Monat/Jahr eine; nur automatische Kopien werden
+  geloescht). Alles aus, bis es eingeschaltet wird -- wie bei Thetis.
+- **RX-Profile (Zahnrad des RX-Applets)**: die Empfangsverarbeitung
+  einer Scheibe -- AGC, Rauschminderung samt Parametern aller Plaetze,
+  Autonotch, Stoeraustaster, Rauschsperre, APF, binaural -- unter einem
+  Namen speichern und mit einem Klick wieder laden (Load / Save / Delete
+  / Save As). Frequenz, Modus und Filter bleiben aussen vor, das ist die
+  Sache der Frequenzspeicher. Profile gelten geraeteuebergreifend.
+- **Zeitmarken im Wasserfall** (Setup > Display > Time Markers: aus, 15 s,
+  30 s, 1/5/10/15 min): duenne Linien quer ueber den Wasserfall an den
+  Uhrgrenzen, jede mit der Uhrzeit beschriftet (UTC oder lokal, wie der
+  Zeitstempel). Jede Zeile traegt ihren eigenen Zeitstempel, darum
+  laufen die Marken mit ihren Zeilen mit und stehen in einer
+  angehaltenen Historie still. Aus, bis man es einschaltet. Idee aus
+  AetherSDR v26.9.3.
+- **Nativer CW-Decoder** (View > Containers > Applets, sichtbar in CWL
+  und CWU): dekodiert Morse direkt aus dem Empfangston, ohne fldigi.
+  Tonhoehe und Tempo werden erkannt und koennen festgehalten werden
+  (LOCK Hz / LOCK WPM); das Suchband folgt dem eingestellten CW-Pitch.
+  Unsichere Zeichen erscheinen gedaempft, Rauschen wird gar nicht erst
+  gezeigt. Decoder ist ggmorse (MIT, unveraendert vendort), der Wrapper
+  ein Port aus AetherSDR -- der Ersatz fuer den am 20.09.
+  zurueckgezogenen ersten Anlauf. Live ueber einen KiwiSDR an der
+  DRA5-Bake (5,195 MHz, 15 WPM) bestaetigt.
+- **Help > Check for Updates…** -- ein Klick, Installation automatisch.
+  Fragt die neueste Veroeffentlichung bei GitHub ab, zeigt Version und
+  Notizen, laedt das Paket fuer diese Maschine (macOS Apple Silicon /
+  Intel als DMG, Windows-Installer, Linux-AppImage), prueft es gegen
+  SHA256SUMS.txt derselben Veroeffentlichung, spielt es ein (macOS: an
+  die Stelle des laufenden Programms, ohne Kennwort) und startet
+  Longpath mit denselben Argumenten neu. Dazu eine stille Pruefung beim
+  Start (Haken im Dialog, hoechstens einmal je 20 h): gibt es eine
+  neuere Version, geht der Dialog von selbst auf. Keine GPG-Pruefung
+  im Programm (kein gpg auf einem stock-macOS); die Pruefsumme ueber
+  GitHubs HTTPS sichert den Download. Menue: "About Longpath" statt
+  des alten Namens. Und die Version steht jetzt immer in der Kopfzeile
+  neben dem Namen -- auf einem Release-Bau stand dort bisher nichts,
+  und im Vollbild fehlt der Fenstertitel.
 
 ### Changed
 
@@ -56,6 +111,56 @@
   Im selben Bild: der Lautstaerkewert in der Titelleiste zeigte "100" als
   "L0(" -- 22 feste Punkte fuer einen Glaschip, der seit dem 17.09. mit
   Polster und Rahmen 30 braucht; jetzt aus der Schriftbreite.
+- **WSJT-X: zwei Instanzen auf einem UDP-Port setzten die Decodes der
+  einen auf das Band der anderen.** Der Client merkte sich EINE
+  Dial-Frequenz fuer alle Instanzen; wer 40 m und 20 m parallel
+  dekodiert (oder WSJT-X neben JTDX), sah falsche Spots. Jetzt je
+  Instanz-ID (Status-Nachricht), Close raeumt auf, ein Decode ohne
+  bekanntes Dial wird verworfen statt geraten (AetherSDR #3595).
+- **KiwiSDR-Wasserfall auf Servern mit anderem `zoom_max`** (Web-888,
+  RaspSDR: 11 statt 14): der Start-Offset wurde fest auf der
+  2^24-Skala kodiert, der Server klemmte ihn an die Bandkante -- der
+  Ausschnitt stimmte nicht. Der Massstab ist jetzt `1024 << zoom_max`
+  des Servers, `zoom_cap` bleibt allein die Obergrenze der angefragten
+  Zoomstufe (AetherSDR #5536/#5655). Echte KiwiSDR (zoom_max 14) sind
+  unveraendert.
+- **QSO-Recorder: zwei Starts in derselben Sekunde loeschten die erste
+  Aufnahme.** Der Dateiname traegt den Sekundenstempel, der Schreiber
+  oeffnete mit Truncate. Der Name wird jetzt atomar beansprucht
+  (NewOnly); ist er vergeben, heisst die neue Aufnahme `_1`, `_2`, ...
+  -- eine Aufnahme geht nie mehr durch eine andere verloren.
+- **Ein KiwiSDR folgt jetzt der zugeordneten Scheibe** -- Frequenz,
+  Betriebsart, Filter und Panadapter gehen bei jeder Aenderung an den
+  Empfaenger. Bisher wurde er genau einmal abgestimmt, bei der Zuordnung,
+  und blieb dann stehen, egal was der Bediener drehte (die Nachfuehrung
+  war aus AetherSDR portiert, aber nie angeschlossen). Ausserdem bekommt
+  er die CW-Tonhoehe der Scheibe statt 0, womit der Traeger bisher auf
+  0 Hz und damit ausserhalb jedes CW-Durchlasses lag.
+
+- **CW ueber einen KiwiSDR war unhoerbar: der Durchlass wurde zweimal um
+  die Tonhoehe verschoben.** Longpaths CW-Filter sitzen auf der Tonhoehe
+  (Thetis: 500 Hz bei 650 Hz Pitch = 400..900), das Kiwi-Abstimmkommando
+  rechnet die Tonhoehe aber selbst dazu -- der Kiwi bekam 1050..1550, der
+  Ton bei 650 Hz lag daneben. Der nachgefuehrte CW-Durchlass wird jetzt
+  vorher traegersymmetrisch gemacht (-250..+250), der Kiwi landet bei
+  400..900 mit dem BFO um die Tonhoehe versetzt. Live an DK0WCY gefunden
+  (Tonhoehe pendelte sich danach bei 648 Hz ein).
+- **Nebenfenster gehen nicht mehr hinter den schwebenden Paletten auf.**
+  Channel Strip, Logbuch, Setup, Spot-Hub, Meldungen -- jedes Fenster,
+  das aus dem Hauptfenster heraus aufgeht, lag auf macOS auf der normalen
+  Fensterebene, die schwebenden Paletten (Panadapter, Rotor/Log,
+  Bandbreitenfilter ...) als NSPanels darueber; raise() half nicht. Ein
+  App-weiter Filter hebt jedes solche Fenster beim Anzeigen auf die Ebene
+  der Paletten (das zuletzt gezeigte steht vorne) und senkt es wieder,
+  sobald Longpath nicht die aktive App ist -- sonst stuende es ueber
+  jedem anderen Programm. Andere Plattformen unveraendert.
+- **VAX bleibt hoerbar, wenn nur das Programm aktualisiert wurde.** Ein
+  per DMG aktualisiertes Longpath (Help > Check for Updates...) trifft
+  noch auf den Audiotreiber bis 0.6.3, der seine Bloecke unter den alten
+  Namen anlegt; der Ton-Bus oeffnet jetzt erst den neuen, dann den alten
+  Namen und legt nur neu an, wenn beide fehlen. Dazu die Kennung beim
+  FreeDV-Reporter („Longpath <Version>", stand dort noch mit dem alten
+  Namen) und ein Pruefstand fuer den Schluesselbund-Umzug.
 
 ## [0.6.4] - 2026-09-22
 

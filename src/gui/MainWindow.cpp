@@ -267,6 +267,8 @@ warren@wpratt.com
 #include "gui/LayoutProfiles.h"
 #include "gui/widgets/WorldTexture.h"
 #include "applets/StripWindow.h"
+#include "UpdateDialog.h"
+#include "core/UpdateChecker.h"
 #include "widgets/RotorLogbookPanel.h"
 #include "widgets/RotorDialWidget.h"
 #include "gui/ToolWindow.h"
@@ -325,6 +327,8 @@ warren@wpratt.com
 #include "applets/FrequencyApplet.h"
 #include "applets/InstrumentApplet.h"
 #include "gui/WindowPlacement.h"
+#include "gui/SettingsBackupDialog.h"
+#include "core/SettingsBackup.h"
 #include "applets/AmpApplet.h"
 #include "applets/Rf2ksApplet.h"
 #include "applets/AppletVisibilityController.h"
@@ -337,6 +341,7 @@ warren@wpratt.com
 #include "applets/TxEqDialog.h"
 // Phase 3J-2 H1: Tools menu modeless singletons (Spot Hub + FreeDV Reporter).
 #include "SpotHubDialog.h"
+#include "MemoryDialog.h"
 #include "FreeDVReporterDialog.h"
 // Phase 3F Sub-Epic G T4: bench-minimum Diversity dialog (Tools menu).
 #include "DiversityDialog.h"
@@ -365,6 +370,7 @@ warren@wpratt.com
 #include "applets/CwxApplet.h"
 #include "applets/DvkApplet.h"
 #include "applets/RttyDecoderApplet.h"
+#include "applets/CwDecoderApplet.h"
 #include "applets/QsoRecorderApplet.h"
 #include "applets/KiwiSdrApplet.h"
 #include "KiwiWaterfallPanel.h"
@@ -1064,6 +1070,7 @@ MainWindow::MainWindow(QWidget* parent)
         saveMainWindowGeometry();
         AppSettings::instance().save();
         qWarning() << "[ProfileSaveOnQuit:aboutToQuit] AppSettings::save() done";
+        takeShutdownBackupIfWanted();
     });
 
     // ── Sichern, ohne auf das Beenden zu warten (2026-09-17) ─────────
@@ -6547,6 +6554,12 @@ void MainWindow::populateDefaultMeter()
     panel->addApplet(m_rttyDecoderApplet);
     m_rttyDecoderApplet->setVisible(false);
 
+    // CwDecoderApplet (2026-09-21) -- visible only when the active slice's
+    // mode is DSPMode::CWL or DSPMode::CWU. Same wiring as the RTTY one.
+    m_cwDecoderApplet = new CwDecoderApplet(m_radioModel, nullptr);
+    panel->addApplet(m_cwDecoderApplet);
+    m_cwDecoderApplet->setVisible(false);
+
     // Ghost applets — hidden per docs/superpowers/plans/2026-05-01-ui-polish-right-panel.md §Task 6.
     // These applets are entirely placeholder-only today (no wired controls).
     // Showing them is misleading — users click e.g. "Equalizer" and nothing happens.
@@ -6602,6 +6615,10 @@ void MainWindow::populateDefaultMeter()
     m_kiwiWaterfallPanel = new KiwiWaterfallPanel(m_radioModel, nullptr);
     panel->addApplet(m_kiwiWaterfallPanel);
     wireKiwiSdr();
+
+    // Stille Pruefung auf eine neuere Veroeffentlichung (UpdateDialog.h);
+    // laeuft 20 s nach dem Start, hoechstens einmal je 20 h, offline still.
+    scheduleStartupUpdateCheck();
 
     // BandwidthFilterApplet — die Durchlassflaeche (2026-08-20).
     //
@@ -7053,6 +7070,7 @@ void MainWindow::populateDefaultMeter()
     m_appletsById[QStringLiteral("PhoneCw")]    = m_phoneCwApplet;
     m_appletsById[QStringLiteral("Rade")]       = m_radeApplet;
     m_appletsById[QStringLiteral("RttyDecoder")] = m_rttyDecoderApplet;
+    m_appletsById[QStringLiteral("CwDecoder")] = m_cwDecoderApplet;
     m_appletsById[QStringLiteral("Vax")]        = m_vaxApplet;
     m_appletsById[QStringLiteral("Dvk")]        = m_dvkApplet;
     m_appletsById[QStringLiteral("QsoRec")]     = m_qsoRecorderApplet;
@@ -7117,6 +7135,9 @@ void MainWindow::populateDefaultMeter()
     // setAvailable(true) only when mode is DSPMode::DIGL.
     m_appletVis->registerApplet(QStringLiteral("RttyDecoder"),
                                 QStringLiteral("RTTY Decoder"), true);
+    // CW: same shape -- defaultVisible=true, gated on CWL/CWU below.
+    m_appletVis->registerApplet(QStringLiteral("CwDecoder"),
+                                QStringLiteral("CW Decoder"), true);
     m_appletVis->registerApplet(QStringLiteral("Vax"),
                                 QStringLiteral("VAX"),          true);
     // Sprachspeicher (2026-08-19). Sichtbar ab Werk: er ist auch ohne
@@ -7250,6 +7271,10 @@ void MainWindow::populateDefaultMeter()
         {QStringLiteral("rtty"), QStringLiteral("digital"),
          QStringLiteral("decoder"), QStringLiteral("baudot"),
          QStringLiteral("fernschreiber"), QStringLiteral("digl")});
+    m_appletVis->describeApplet(QStringLiteral("CwDecoder"),
+        QStringLiteral("Digital"),
+        {QStringLiteral("cw"), QStringLiteral("morse"), QStringLiteral("decoder"),
+         QStringLiteral("telegrafie"), QStringLiteral("cwl"), QStringLiteral("cwu")});
     m_appletVis->describeApplet(QStringLiteral("Vax"),
         QStringLiteral("Audio"),
         {QStringLiteral("vax"), QStringLiteral("audio"),
@@ -7435,6 +7460,7 @@ void MainWindow::populateDefaultMeter()
     // method's doc comment in MainWindow.h.
     m_appletVis->setAvailable(QStringLiteral("Rade"),  false);
     m_appletVis->setAvailable(QStringLiteral("RttyDecoder"), false);
+    m_appletVis->setAvailable(QStringLiteral("CwDecoder"), false);
 
     // RF-Kit RF2K-S: available only when the master toggle is enabled.
     // Default OFF; live-updated via rfKitEnabledChanged below.
@@ -8467,6 +8493,17 @@ void MainWindow::buildMenuBar()
         settingsAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_Comma));
         settingsAction->setMenuRole(QAction::NoRole);  // Keep in File menu, don't let macOS move it
         settingsAction->setToolTip(QStringLiteral("Open application settings"));
+    }
+
+    // Thetis puts "Database Manager" under Setup, right after "Setup"
+    // (console.designer.cs:4125-4128 [@852bf0e]); Longpath's Settings
+    // live under File, so the backups follow them here.
+    {
+        QAction* backupsAction = fileMenu->addAction(QStringLiteral("Settings &Backups..."),
+                                                     this, &MainWindow::openSettingsBackups);
+        backupsAction->setMenuRole(QAction::NoRole);
+        backupsAction->setToolTip(QStringLiteral(
+            "Back up, restore and prune copies of the settings file"));
     }
 
     {
@@ -9733,6 +9770,34 @@ void MainWindow::buildMenuBar()
         connect(spotHubAction, &QAction::triggered, this, &MainWindow::openSpotHub);
     }
 
+    // Frequency memories -- Thetis's Memory window (console.cs:40519-40524
+    // [@852bf0e] mnuMemory_Click) and the front-panel quick memory pair
+    // (btnMemoryQuickSave / btnMemoryQuickRestore, console.cs:36442-36455
+    // [@852bf0e]). Modeless singleton, built on first use.
+    {
+        QAction* memAction = toolsMenu->addAction(QStringLiteral("&Memories..."));
+        memAction->setObjectName(QStringLiteral("actMemories"));
+        memAction->setToolTip(QStringLiteral(
+            "Open the memory list: store the current frequency, mode, filter "
+            "and AGC, and recall a stored one."));
+        connect(memAction, &QAction::triggered, this, &MainWindow::openMemories);
+
+        QAction* quickSave = toolsMenu->addAction(QStringLiteral("Memory Quick &Save"));
+        quickSave->setObjectName(QStringLiteral("actMemoryQuickSave"));
+        quickSave->setToolTip(QStringLiteral(
+            "Remember the current frequency, mode and filter for Quick Restore."));
+        connect(quickSave, &QAction::triggered, this, [this]() {
+            if (m_radioModel) { m_radioModel->memoryQuickSave(); }
+        });
+        QAction* quickRestore = toolsMenu->addAction(QStringLiteral("Memory Quick &Restore"));
+        quickRestore->setObjectName(QStringLiteral("actMemoryQuickRestore"));
+        quickRestore->setToolTip(QStringLiteral(
+            "Return to the frequency, mode and filter remembered by Quick Save."));
+        connect(quickRestore, &QAction::triggered, this, [this]() {
+            if (m_radioModel) { m_radioModel->memoryQuickRestore(); }
+        });
+    }
+
     // Rotor dial — step 1 of the logbook/rotator work. A modeless
     // window rather than a dock or a splitter pane: the surrounding
     // layout stays untouched while the instrument itself is reviewed.
@@ -10016,6 +10081,14 @@ void MainWindow::buildMenuBar()
 
     helpMenu->addSeparator();
 #endif
+
+    // Betreiber 2026-09-21: "unter Help moechte ich den automatischen
+    // Downloader/Installer der neuersten Version. Ein Klick, Installation
+    // automatisch." -- UpdateDialog.h.
+    helpMenu->addAction(QStringLiteral("Check for &Updates…"), this,
+                        &MainWindow::openUpdateDialog);
+
+    helpMenu->addSeparator();
 
     helpMenu->addAction(QStringLiteral("&About Longpath"), this, [this]() {
         AboutDialog dlg(this);
@@ -11804,12 +11877,16 @@ void MainWindow::rebindRttyRadeAvailability(SliceModel* slice)
     if (m_rttyDecoderApplet) {
         m_rttyDecoderApplet->setSlice(slice);
     }
+    if (m_cwDecoderApplet) {
+        m_cwDecoderApplet->setSlice(slice);
+    }
 
     if (!m_appletVis) { return; }
 
     if (!slice) {
         m_appletVis->setAvailable(QStringLiteral("Rade"), false);
         m_appletVis->setAvailable(QStringLiteral("RttyDecoder"), false);
+        m_appletVis->setAvailable(QStringLiteral("CwDecoder"), false);
         return;
     }
 
@@ -11826,6 +11903,9 @@ void MainWindow::rebindRttyRadeAvailability(SliceModel* slice)
         // flag's mark/shift container; this applet follows the same gate.
         m_appletVis->setAvailable(QStringLiteral("RttyDecoder"),
                                   mode == DSPMode::DIGL);
+        // CW decoder: the two CW modes, nothing else (2026-09-21).
+        m_appletVis->setAvailable(QStringLiteral("CwDecoder"),
+                                  mode == DSPMode::CWL || mode == DSPMode::CWU);
     };
     applyForMode(slice->dspMode());
 
@@ -14289,11 +14369,74 @@ void MainWindow::openChannelStrip()
     m_stripWindow->activateWindow();
 }
 
+void MainWindow::openUpdateDialog()
+{
+    if (!m_updateDialog) {
+        m_updateDialog = new UpdateDialog(QCoreApplication::applicationVersion(), this);
+        m_updateDialog->setAttribute(Qt::WA_DeleteOnClose, false);
+        connect(m_updateDialog.data(), &UpdateDialog::restartRequested, this, [this]() {
+            // Der Neustart-Helfer wartet auf unser Ende; ein normales
+            // close() laeuft durch den Beenden-Weg (Profil sichern usw.).
+            close();
+        });
+    }
+    m_updateDialog->checkNow();
+    m_updateDialog->show();
+    m_updateDialog->raise();
+    m_updateDialog->activateWindow();
+}
+
+// Stille Pruefung beim Start: nur wenn der Haken gesetzt ist und die
+// letzte Pruefung aelter als 20 h ist; offline passiert nichts. Eine
+// neuere Version oeffnet den Dialog, sonst bleibt es still.
+void MainWindow::scheduleStartupUpdateCheck()
+{
+    auto& s = AppSettings::instance();
+    const bool enabled = s.value(UpdateDialog::startupCheckKey(), QStringLiteral("True")).toString()
+                         == QStringLiteral("True");
+    const QDateTime last = QDateTime::fromString(
+        s.value(UpdateDialog::lastCheckKey(), QString()).toString(), Qt::ISODate);
+    if (!UpdateDialog::startupCheckDue(enabled, last, QDateTime::currentDateTimeUtc())) { return; }
+    // Ein Testbau (leere Version) hat nichts zu vergleichen.
+    if (UpdateChecker::numericVersion(QCoreApplication::applicationVersion()).isEmpty()) { return; }
+    QTimer::singleShot(20000, this, [this]() {
+        auto* checker = new UpdateChecker(QCoreApplication::applicationVersion(), this);
+        connect(checker, &UpdateChecker::latestKnown, this,
+                [this, checker](const ReleaseInfo& release, bool newer) {
+            checker->deleteLater();
+            AppSettings::instance().setValue(UpdateDialog::lastCheckKey(),
+                                             QDateTime::currentDateTimeUtc().toString(Qt::ISODate));
+            if (!newer) { return; }
+            if (!m_updateDialog) {
+                m_updateDialog = new UpdateDialog(QCoreApplication::applicationVersion(), this);
+                m_updateDialog->setAttribute(Qt::WA_DeleteOnClose, false);
+                connect(m_updateDialog.data(), &UpdateDialog::restartRequested, this, [this]() { close(); });
+            }
+            m_updateDialog->showRelease(release, true);
+            m_updateDialog->show();
+            m_updateDialog->raise();
+        });
+        connect(checker, &UpdateChecker::checkFailed, checker, &QObject::deleteLater);
+        checker->checkLatest();
+    });
+}
+
 void MainWindow::openRotorSetup()
 {
     if (RotorLogbookPanel* panel = ensureRotorPanel()) {
         panel->showRotorSetup();
     }
+}
+
+void MainWindow::openMemories()
+{
+    if (!m_radioModel) { return; }
+    if (!m_memoryDialog) {
+        m_memoryDialog = new MemoryDialog(m_radioModel, this);
+    }
+    m_memoryDialog->show();
+    m_memoryDialog->raise();
+    m_memoryDialog->activateWindow();
 }
 
 void MainWindow::openSpotHub()
@@ -14783,6 +14926,50 @@ void MainWindow::updatePsaIndicatorVisibility()
         m_chromeBar->setItemAvailable(m_psaIndicator, caps && armed);
         m_chromeBar->relayout(m_chromeBarWidget->width());
     }
+}
+
+void MainWindow::openSettingsBackups()
+{
+    if (!m_settingsBackupDialog) {
+        m_settingsBackupDialog = new SettingsBackupDialog(AppSettings::instance().filePath(), this);
+        // After Thetis clsDBMan.cs:975-978 [@852bf0e] MakeActiveDB:
+        //   _frm_dbman.Hide();
+        //   Console.getConsole().Restart = true;
+        //   Console.getConsole().Close();
+        // Longpath closes and does not restart itself (the operator
+        // starts it again); the quit goes the Cmd+Q way, with the
+        // shutdown lock set first, so every floating window follows.
+        connect(m_settingsBackupDialog, &SettingsBackupDialog::restoreCompleted, this, [this]() {
+            if (m_settingsBackupDialog) { m_settingsBackupDialog->hide(); }
+            qWarning() << "[SettingsBackup] restored -- closing without saving";
+            m_shuttingDown = true;
+            qApp->quit();
+        });
+    }
+    m_settingsBackupDialog->refresh();
+    m_settingsBackupDialog->show();
+    m_settingsBackupDialog->raise();
+    m_settingsBackupDialog->activateWindow();
+}
+
+// From Thetis clsDBMan.cs:541-557 [@852bf0e]
+//   public static void Shutdown()
+//   {
+//       ...
+//               if (di.BackupOnShutdown)
+//                   TakeBackup(Guid.Empty, "Shutdown", true);
+//   }
+// called from console.cs:2694-2696 right after DB.Exit() ("close and
+// save database"); here right after the final AppSettings::save().
+void MainWindow::takeShutdownBackupIfWanted()
+{
+    if (m_shutdownBackupDone) { return; }
+    m_shutdownBackupDone = true;
+    AppSettings& s = AppSettings::instance();
+    // A restore is pending: the file on disk is the restored one, not
+    // this session's state -- nothing to copy.
+    if (s.saveInhibited()) { return; }
+    SettingsBackup::takeAutomaticBackupIfWanted(s, QStringLiteral("Shutdown"));
 }
 
 void MainWindow::showAudioDiagnoseDialog()
@@ -15556,6 +15743,7 @@ void MainWindow::closeEvent(QCloseEvent* event)
 
     AppSettings::instance().save();
     qWarning() << "[ProfileSaveOnQuit:closeEvent] AppSettings::save() done";
+    takeShutdownBackupIfWanted();
 
     // ── Schwebende Fenster JETZT abraeumen ───────────────────────────
     //

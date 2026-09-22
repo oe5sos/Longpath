@@ -272,6 +272,7 @@ private:
     // Section: Time
     QComboBox* m_timestampPosCombo{nullptr};  // None/Left/Right
     QComboBox* m_timestampModeCombo{nullptr}; // UTC/Local
+    QComboBox* m_timeMarkerCombo{nullptr};    // Off / 15 s ... 15 min
 
     // Section: Rewind history (Sub-epic E task 11)
     QComboBox* m_historyDepthCombo{nullptr};

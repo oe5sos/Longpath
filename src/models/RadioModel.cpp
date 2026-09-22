@@ -246,6 +246,8 @@ warren@wpratt.com
 */
 
 #include "RadioModel.h"
+#include "MemoryList.h"
+#include "MemoryRecord.h"
 #include "BandDefaults.h"
 #include "RxDspWorker.h"
 #include "core/FFTEngine.h"
@@ -254,6 +256,7 @@ warren@wpratt.com
 #include "core/MoxController.h"
 #include "core/safety/RegionSetting.h"
 #include "core/MicProfileManager.h"
+#include "core/RxProfileManager.h"
 #include "core/PaProfile.h"
 #include "core/PaProfileManager.h"
 #include "core/PaTelemetryScaling.h"
@@ -548,6 +551,34 @@ RadioModel::RadioModel(QObject* parent)
     // treats a null as a safe no-op (tests that build AudioEngine
     // standalone).
     m_audioEngine->setRadioModel(this);
+
+    // Frequency memories. From Thetis console.cs:2006-2007 [@852bf0e]:
+    //   MemoryList = MemoryList.Restore();
+    //   MemoryList.CheckVersion();
+    m_memories = new MemoryList(this);
+    {
+        QString err;
+        if (!m_memories->restore(memoriesDir(), &err)) {
+            qCWarning(lcMemories) << "memories not restored:" << err;
+        }
+        m_memories->checkVersion();
+    }
+    {
+        // Quick memory text, persisted like Thetis's txtMemoryQuick
+        // (console.cs:3955-3956 [@852bf0e]).
+        const auto& s = AppSettings::instance();
+        const QString quick = s.value(QStringLiteral("MemoryQuick"), QString()).toString();
+        bool ok = false;
+        const double mhz = quick.toDouble(&ok);
+        if (ok && mhz > 0.0) {
+            m_quickSaveFreqHz = mhz * 1.0e6;
+            m_quickSaveMode = SliceModel::modeFromName(
+                s.value(QStringLiteral("MemoryQuickMode"), QStringLiteral("LSB")).toString());
+            m_quickSaveFilterLow = s.value(QStringLiteral("MemoryQuickFilterLow"), 0).toInt();
+            m_quickSaveFilterHigh = s.value(QStringLiteral("MemoryQuickFilterHigh"), 0).toInt();
+            m_quickSaveValid = true;
+        }
+    }
 
     // Sprachspeicher: Ordner neben die Einstellungsdatei legen und
     // laden. Neben die Einstellungen und nicht in den Programmordner —
@@ -1065,6 +1096,11 @@ RadioModel::RadioModel(QObject* parent)
     // AppSettings.  The activeProfileChanged signal is consumed by the UI
     // (TxApplet J.1 + TxProfileSetupPage J.3) for combo-selection mirror.
     m_micProfileMgr = new MicProfileManager(this);
+
+    // Receive profiles: no wiring beyond ownership -- applyProfile writes
+    // SliceModel properties through their setters, which persist and
+    // signal on their own.
+    m_rxProfileMgr = new RxProfileManager(AppSettings::instance(), this);
 
     // ── Phase 4 Agent 4A of #167: PaProfileManager ───────────────────────────
     //
@@ -1867,7 +1903,7 @@ RadioModel::RadioModel(QObject* parent)
                 QString()).toString(),
         s.value(QStringLiteral("FreeDvReporter/Message"),
                 QString()).toString(),
-        QStringLiteral("NereusSDR ") + QStringLiteral(LONGPATH_VERSION));
+        QStringLiteral("Longpath ") + QStringLiteral(LONGPATH_VERSION));
     {
         const QString serverUrl = s.value(
             QStringLiteral("FreeDvReporter/ServerUrl"),
@@ -1895,7 +1931,7 @@ RadioModel::RadioModel(QObject* parent)
                 QString()).toString(),
         s.value(QStringLiteral("PskReporter/GridSquare"),
                 QString()).toString(),
-        QStringLiteral("NereusSDR ") + QStringLiteral(LONGPATH_VERSION));
+        QStringLiteral("Longpath ") + QStringLiteral(LONGPATH_VERSION));
 
     // Per-source adapter slots. Auto-connection (sender + receiver both on
     // the main thread) gives DirectConnection, so the spot lands in
@@ -2633,7 +2669,7 @@ void RadioModel::restoreSpotClientAutoStartState()
             const QString message =
                 s.value(QStringLiteral("FreeDvReporter/Message")).toString();
             const QString versionStr =
-                QStringLiteral("NereusSDR ")
+                QStringLiteral("Longpath ")
                     + QStringLiteral(LONGPATH_VERSION);
             qCInfo(lcDsp)
                 << "FreeDVReporter: starting connection with identity"
@@ -2663,7 +2699,7 @@ void RadioModel::restoreSpotClientAutoStartState()
         if (pskGrid.isEmpty()) pskGrid = userGrid;
         if (!pskCall.isEmpty()) {
             m_pskReporter->setIdentity(pskCall, pskGrid,
-                                       QStringLiteral("NereusSDR ") + QStringLiteral(LONGPATH_VERSION));
+                                       QStringLiteral("Longpath ") + QStringLiteral(LONGPATH_VERSION));
             if (isTrue(QStringLiteral("PskReporterAutoStart"))) {
                 m_pskReporter->setAutoSendIntervalSec(
                     PskReporterClient::kReportingIntervalSec);
@@ -13236,6 +13272,194 @@ QString RadioModel::mode(int rx) const
         return QString();
     }
     return SliceModel::modeName(slice->dspMode());
+}
+
+// ---------------------------------------------------------------------------
+// Frequency memories
+// ---------------------------------------------------------------------------
+
+QString RadioModel::memoriesDir() const
+{
+    // Thetis: app_data_path + "memory.xml" (Memory/MemoryList.cs:107
+    // [@852bf0e]) -- the folder its database lives in. Here: the folder the
+    // settings file lives in, which the profile switch already isolates.
+    return QFileInfo(AppSettings::instance().filePath()).absolutePath();
+}
+
+bool RadioModel::saveMemories(QString* error) const
+{
+    if (!m_memories) { return false; }
+    return m_memories->save(memoriesDir(), error);
+}
+
+// From Thetis Memory/MemoryForm.cs:502-546 [@852bf0e] -- MemoryRecordAdd_Click:
+//   string mem_name = Convert.ToString(console.VFOAFreq);   //W4TME
+//   console.MemoryList.List.Add(new MemoryRecord("", console.VFOAFreq, mem_name,
+//       console.RX1DSPMode, true, console.TuneStepList[console.TuneStepIndex].Name,
+//       console.CurrentFMTXMode, console.FMTXOffsetMHz,
+//       console.radio.GetDSPTX(0).CTCSSFlag, console.radio.GetDSPTX(0).CTCSSFreqHz,
+//       console.PWR, (int)console.radio.GetDSPTX(0).TXFMDeviation, console.VFOSplit,
+//       console.TXFreq, console.RX1Filter, console.RX1FilterLow, console.RX1FilterHigh,
+//       "", console.radio.GetDSPRX(0, 0).RXAGCMode, console.RF, ...schedule...));
+// (The "New Spot" group is the Alt+M keyboard path, not taken here.)
+MemoryRecord RadioModel::captureMemory() const
+{
+    MemoryRecord r;
+    const SliceModel* slice = m_activeSlice;
+    if (!slice) { return r; }
+
+    const double mhz = slice->frequency() / 1.0e6;
+    r.group = QString();
+    r.rxFreqMHz = mhz;
+    // Convert.ToString(console.VFOAFreq): the frequency in MHz as the name.
+    r.name = QString::number(mhz, 'f', 6);
+    r.dspMode = slice->dspMode();
+    r.scan = true;
+    // TuneStepList[TuneStepIndex].Name; a step outside Thetis's table keeps
+    // the record default.
+    const QString stepName = MemoryRecord::tuneStepNameFromHz(slice->stepHz());
+    if (!stepName.isEmpty()) { r.tuneStep = stepName; }
+    r.rptr = slice->fmTxMode();
+    r.rptrOffsetMHz = slice->fmOffsetHz() / 1.0e6;
+    r.ctcssOn = slice->fmCtcssMode() != 0;
+    r.ctcssFreq = slice->fmCtcssValueHz();
+    // TXFMDeviation: not a Longpath model property; the record default stays.
+    r.power = m_transmitModel.power();
+    // VFOSplit / TXFreq: Longpath has no split VFO (design 2026-05-26 §3);
+    // recorded as "no split, TX = RX" so a Thetis reading the file gets a
+    // consistent pair.
+    r.split = false;
+    r.txFreqMHz = mhz;
+    // Longpath deviation: no Filter enum. The current bounds name a preset
+    // when they match one of the mode's presets (F1..F10 in table order),
+    // otherwise VAR1 -- which is what Thetis stores after a manual edge drag.
+    r.rxFilterLow = slice->filterLow();
+    r.rxFilterHigh = slice->filterHigh();
+    r.rxFilter = QStringLiteral("VAR1");
+    {
+        const QList<std::pair<int, int>> presets = SliceModel::presetsForMode(slice->dspMode());
+        for (int i = 0; i < presets.size() && i < 10; ++i) {
+            if (presets[i].first == slice->filterLow() && presets[i].second == slice->filterHigh()) {
+                r.rxFilter = QStringLiteral("F%1").arg(i + 1);
+                break;
+            }
+        }
+    }
+    r.comments = QString();
+    r.agcMode = slice->agcMode();
+    r.agcT = slice->agcThreshold();
+    return r;
+}
+
+// From Thetis console.cs:40527-40556 [@852bf0e]
+//   public void RecallMemory(MemoryRecord record)
+//   {
+//       VFOAFreq = record.RXFreq;
+//       RX1DSPMode = record.DSPMode;
+//       TuneStepIndex = TuneStepLookup(record.TuneStep);
+//       if (record.DSPMode == DSPMode.FM)
+//       {
+//           CurrentFMTXMode = record.RPTR;
+//           FMTXOffsetMHz = record.RPTROffset;
+//           CTCSSOn = record.CTCSSOn;
+//           CTCSSFreq = record.CTCSSFreq;
+//           FMDeviation_Hz = record.Deviation;
+//       }
+//       else
+//       {
+//           RX1Filter = record.RXFilter;
+//           if (record.RXFilter == Filter.VAR1 || record.RXFilter == Filter.VAR2)
+//               UpdateRX1Filters(record.RXFilterLow, record.RXFilterHigh);
+//       }
+//       PWR = record.Power;
+//       VFOSplit = record.Split;
+//       TXFreq = record.TXFreq; //MW0LGE_21k9 moved here after the split, and done always
+//       RX1AGCMode = record.AGCMode;
+//       if (RF != record.AGCT && AutoAGCRX1) AutoAGCRX1 = false; // turn off 'auto agc' only if different MW0LGE_21k8
+//       RF = record.AGCT;
+//   }
+void RadioModel::recallMemory(const MemoryRecord& record)
+{
+    SliceModel* slice = m_activeSlice;
+    if (!slice) { return; }
+
+    slice->setFrequency(record.rxFreqMHz * 1.0e6);
+    slice->setDspMode(record.dspMode);
+
+    // TuneStepIndex = TuneStepLookup(record.TuneStep): -1 (unknown name)
+    // leaves the step alone here rather than selecting index -1.
+    const int stepHz = MemoryRecord::tuneStepHzFromName(record.tuneStep);
+    if (stepHz > 0) { slice->setStepHz(stepHz); }
+
+    if (record.dspMode == DSPMode::FM) {
+        slice->setFmTxMode(record.rptr);
+        slice->setFmOffsetHz(static_cast<int>(std::lround(record.rptrOffsetMHz * 1.0e6)));
+        slice->setFmCtcssMode(record.ctcssOn ? 1 : 0);
+        slice->setFmCtcssValueHz(record.ctcssFreq);
+        // FMDeviation_Hz = record.Deviation: no Longpath model property yet.
+    } else {
+        // Longpath deviation: no Filter enum to select a preset by name, so
+        // the stored bounds are applied for every filter, not only VAR1/VAR2
+        // -- for a preset they are that preset's bounds as captured.
+        slice->setFilter(record.rxFilterLow, record.rxFilterHigh);
+    }
+
+    m_transmitModel.setPower(record.power);
+    // VFOSplit = record.Split; TXFreq = record.TXFreq;
+    //MW0LGE_21k9 moved here after the split, and done always  [original inline comment from console.cs:40551]
+    // Longpath has no split VFO; both are stored, neither is applied.
+    slice->setAgcMode(record.agcMode);
+    // turn off 'auto agc' only if different MW0LGE_21k8  [original inline comment from console.cs:40553]
+    if (slice->agcThreshold() != record.agcT && slice->autoAgcEnabled()) {
+        slice->setAutoAgcEnabled(false);
+    }
+    slice->setAgcThreshold(record.agcT);
+}
+
+// From Thetis console.cs:36442-36447 [@852bf0e]
+//   private void btnMemoryQuickSave_Click(object sender, System.EventArgs e)
+//   {
+//       txtMemoryQuick.Text = txtVFOAFreq.Text;
+//       quick_save_mode = RX1DSPMode;
+//       quick_save_filter = RX1Filter;
+//   }
+void RadioModel::memoryQuickSave()
+{
+    const SliceModel* slice = m_activeSlice;
+    if (!slice) { return; }
+    m_quickSaveFreqHz = slice->frequency();
+    m_quickSaveMode = slice->dspMode();
+    m_quickSaveFilterLow = slice->filterLow();
+    m_quickSaveFilterHigh = slice->filterHigh();
+    m_quickSaveValid = true;
+
+    auto& s = AppSettings::instance();
+    s.setValue(QStringLiteral("MemoryQuick"), QString::number(m_quickSaveFreqHz / 1.0e6, 'f', 6));
+    s.setValue(QStringLiteral("MemoryQuickMode"), SliceModel::modeName(m_quickSaveMode));
+    s.setValue(QStringLiteral("MemoryQuickFilterLow"), m_quickSaveFilterLow);
+    s.setValue(QStringLiteral("MemoryQuickFilterHigh"), m_quickSaveFilterHigh);
+    scheduleSettingsSave();
+}
+
+// From Thetis console.cs:36449-36454 [@852bf0e]
+//   private void btnMemoryQuickRestore_Click(object sender, System.EventArgs e)
+//   {
+//       RX1DSPMode = quick_save_mode;
+//       VFOAFreq = freqFromString(txtMemoryQuick.Text);
+//       RX1Filter = quick_save_filter;
+//   }
+void RadioModel::memoryQuickRestore()
+{
+    SliceModel* slice = m_activeSlice;
+    if (!slice || !m_quickSaveValid) { return; }
+    slice->setDspMode(m_quickSaveMode);
+    slice->setFrequency(m_quickSaveFreqHz);
+    slice->setFilter(m_quickSaveFilterLow, m_quickSaveFilterHigh);
+}
+
+bool RadioModel::hasQuickMemory() const
+{
+    return m_quickSaveValid;
 }
 
 bool RadioModel::split(int rx) const

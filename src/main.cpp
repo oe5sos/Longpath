@@ -1,7 +1,9 @@
 #include "gui/MainWindow.h"
+#include "gui/AuxiliaryWindowLeveler.h"
 #include "gui/styles/AppTheme.h"
 #include "gui/styles/Theme.h"
 #include "core/AppSettings.h"
+#include "core/SettingsBackup.h"
 #include "core/AudioDeviceConfig.h"
 #include "core/BuildIdentity.h"
 #include "core/MacMicPermission.h"
@@ -205,7 +207,11 @@ int main(int argc, char* argv[])
 
     QApplication app(argc, argv);
     app.setApplicationName("Longpath");
-    app.setApplicationVersion(LONGPATH_VERSION);
+    // LONGPATH_PRETEND_VERSION: nur fuer Pruefstaende des Updaters (Help >
+    // Check for Updates...) -- laesst einen Bau aelter aussehen, als er
+    // ist, damit sich der Weg Herunterladen/Pruefen/Einspielen ohne eine
+    // echte neue Veroeffentlichung durchspielen laesst.
+    app.setApplicationVersion(qEnvironmentVariable("LONGPATH_PRETEND_VERSION", QStringLiteral(LONGPATH_VERSION)));
     app.setOrganizationName("Longpath");
     app.setWindowIcon(QIcon(":/icons/Longpath.png"));
 
@@ -344,12 +350,25 @@ int main(int argc, char* argv[])
     //
     app.installEventFilter(new Longpath::Style::ThemeFilter(&app));
 
+    // Nebenfenster (Channel Strip, Logbuch, Setup, Meldungen ...) auf die
+    // Ebene der schwebenden Paletten heben, sonst gehen sie auf macOS
+    // hinter ihnen auf -- siehe AuxiliaryWindowLeveler.h.
+    app.installEventFilter(new Longpath::AuxiliaryWindowLeveler(&app));
+
     // Register custom metatypes for cross-thread signal/slot connections.
     qRegisterMetaType<Longpath::RadioConnectionError>();
     qRegisterMetaType<Longpath::AudioDeviceConfig>();
 
     // Load XML settings
     Longpath::AppSettings::instance().load();
+
+    // Automatic start-up copy of the settings file (File > Settings
+    // Backups, "Backup on start-up"; off unless switched on). After
+    // load() so the switch is known, before the migrations below so the
+    // copy is the file as the previous session left it -- see
+    // SettingsBackup::takeAutomaticBackupIfWanted.
+    Longpath::SettingsBackup::takeAutomaticBackupIfWanted(
+        Longpath::AppSettings::instance(), QStringLiteral("Startup"));
 
     // Phase 3O schema migration — must run before any AppSettings reads.
     Longpath::AppSettings::migrateVaxSchemaV1ToV2();

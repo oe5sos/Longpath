@@ -28,6 +28,11 @@
 //             eingehaengt).
 //
 // Erledigt:
+//   Stufe 3b — Nachfuehrung: Frequenz, Betriebsart, Filter und Panadapter
+//             der zugeordneten Scheibe gehen bei jeder Aenderung an den
+//             Kiwi (2026-09-21; bis dahin wurde er nur bei der Zuordnung
+//             einmal abgestimmt -- updateSliceTracking war portiert,
+//             aber nirgends aufgerufen).
 //   Stufe 5 — Ton: decodedAudioReady in die Mischung (2026-08-27).
 //   Stufe 6 — Wasserfall: waterfallRowReady auf den Panadapter.
 //   Stufe 7a — Sendesperre (syncKiwiSdrTransmitMute).
@@ -477,7 +482,10 @@ void MainWindow::addKiwiSdrReceiver(const QString& name,
             slice->panKey(),
             QString(),   // Bandname: der Kiwi braucht ihn nur fuer den
                          // Bandrueckruf, und der ist Stufe 7.
-            0);
+            // Die CW-Tonhoehe, auf der die CW-Filter der Scheibe sitzen
+            // -- mit 0 legte der Kiwi den Traeger auf 0 Hz, ausserhalb
+            // jedes CW-Durchlasses (2026-09-21).
+            SliceModel::cwPitchHz());
     }
 
     m_kiwiSdrManager->connectProfile(id);
@@ -488,6 +496,52 @@ void MainWindow::addKiwiSdrReceiver(const QString& name,
         << (slice ? QStringLiteral(" -> Scheibe %1").arg(slice->sliceIndex())
                   : QStringLiteral(" OHNE SCHEIBE — sein Ton hat keinen "
                                    "Weg in die Mischung"));
+}
+
+// ── Stufe 3b: der Kiwi folgt der Scheibe ────────────────────────────
+//
+// Aether haengt in seiner Scheiben-Verdrahtung (MainWindow_Wiring.cpp
+// [@31b29583]) frequencyChanged, modeChanged, filterChanged und
+// panIdChanged JEDER Scheibe an updateKiwiSdrVirtualTrackingForSlice,
+// dazu cwPitchChanged des Senders. Bei uns kann nur eine ZUGEORDNETE
+// Scheibe Kiwi-gefuettert sein, also wird je Zuordnung verdrahtet und
+// beim Loesen wieder getrennt; die CW-Tonhoehe hat in Longpath (noch)
+// keine Bedienflaeche und kein Signal -- SliceModel::cwPitchHz() wird
+// bei jeder Nachfuehrung frisch gelesen.
+void MainWindow::rewireKiwiSdrTrackingForSlice(int sliceId, const QString& profileId)
+{
+    for (const QMetaObject::Connection& c : m_kiwiSdrTrackingConnections.take(sliceId)) {
+        disconnect(c);
+    }
+    if (profileId.isEmpty() || !m_radioModel) { return; }
+    SliceModel* slice = m_radioModel->sliceById(sliceId);
+    if (!slice) { return; }
+
+    QVector<QMetaObject::Connection> conns;
+    auto follow = [this, slice]() { updateKiwiSdrTrackingForSlice(slice); };
+    conns << connect(slice, &SliceModel::frequencyChanged, this, follow);
+    conns << connect(slice, &SliceModel::dspModeChanged, this, follow);
+    conns << connect(slice, &SliceModel::filterChanged, this, follow);
+    conns << connect(slice, &SliceModel::panKeyChanged, this, follow);
+    m_kiwiSdrTrackingConnections.insert(sliceId, conns);
+}
+
+void MainWindow::updateKiwiSdrTrackingForSlice(SliceModel* slice)
+{
+    if (!m_kiwiSdrManager || !slice) { return; }
+    const int sliceId = slice->sliceIndex();
+    // Dieselbe Sicherheitsschranke wie Ton und Wasserfall: eine Scheibe,
+    // die inzwischen ein echtes Funkgeraet uebernommen hat, steuert
+    // keinen Kiwi mehr (die Zuordnung faellt gleich ohnehin).
+    if (!kiwiControllableSlice(sliceId)) { return; }
+    m_kiwiSdrManager->updateSliceTracking(
+        sliceId,
+        slice->frequency() / 1.0e6,
+        SliceModel::modeName(slice->dspMode()),
+        slice->filterLow(), slice->filterHigh(),
+        slice->panKey(),
+        QString(),   // Bandname: Stufe 7, wie bei der Zuordnung
+        SliceModel::cwPitchHz());
 }
 
 // Siehe MainWindow.h. Sicherheitsschranke, uebertragen aus der SunSDR-
@@ -567,7 +621,8 @@ void MainWindow::wireKiwiSdr()
         refreshKiwiSdrAppletReceivers();
     });
     connect(m_kiwiSdrManager, &KiwiSdrManager::sliceAssignmentChanged, this,
-            [this](int, const QString&) {
+            [this](int sliceId, const QString& profileId) {
+        rewireKiwiSdrTrackingForSlice(sliceId, profileId);
         refreshKiwiSdrAppletReceivers();
     });
 

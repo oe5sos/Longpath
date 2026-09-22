@@ -65,6 +65,28 @@ const char* shmNameForRole(CoreAudioHalBus::Role role) {
     return kShmNameVax1;
 }
 
+// Die Namen, unter denen der Treiber bis 0.6.3 (Bundle "NereusSDR VAX")
+// seine Bloecke anlegt. Ein Programm, das per DMG aktualisiert wurde
+// (Help > Check for Updates...), trifft noch auf diesen Treiber -- erst
+// die .pkg-Installation bringt den neuen. Beim Oeffnen wird der neue
+// Name versucht, dann dieser; erst wenn beide fehlen, wird neu angelegt.
+constexpr const char* kLegacyShmNameVax1 = "/nereussdr-vax-1";
+constexpr const char* kLegacyShmNameVax2 = "/nereussdr-vax-2";
+constexpr const char* kLegacyShmNameVax3 = "/nereussdr-vax-3";
+constexpr const char* kLegacyShmNameVax4 = "/nereussdr-vax-4";
+constexpr const char* kLegacyShmNameTxIn = "/nereussdr-vax-tx";
+
+const char* legacyShmNameForRole(CoreAudioHalBus::Role role) {
+    switch (role) {
+        case CoreAudioHalBus::Role::Vax1:    return kLegacyShmNameVax1;
+        case CoreAudioHalBus::Role::Vax2:    return kLegacyShmNameVax2;
+        case CoreAudioHalBus::Role::Vax3:    return kLegacyShmNameVax3;
+        case CoreAudioHalBus::Role::Vax4:    return kLegacyShmNameVax4;
+        case CoreAudioHalBus::Role::TxInput: return kLegacyShmNameTxIn;
+    }
+    return kLegacyShmNameVax1;
+}
+
 // Backlog guards for the TX drain path — ported verbatim from
 // VirtualAudioBridge::readTxAudio so the TX consumer keeps near-real-time
 // latency when the HAL plugin has written more than we can drain in a tick.
@@ -111,6 +133,18 @@ bool CoreAudioHalBus::open(const AudioFormat& format) {
     // already have it mapped. If that fails, create it at the canonical size.
     int fd = ::shm_open(m_shmName, O_RDWR, 0666);
     bool created = false;
+    if (fd < 0) {
+        // Noch der Treiber bis 0.6.3 im System? Dann dessen Block nehmen
+        // -- der Name ist der einzige Unterschied.
+        const char* legacy = legacyShmNameForRole(m_role);
+        const int legacyFd = ::shm_open(legacy, O_RDWR, 0666);
+        if (legacyFd >= 0) {
+            qCInfo(lcAudio) << "CoreAudioHalBus: using the pre-0.6.4 driver's block"
+                            << legacy;
+            m_shmName = legacy;
+            fd = legacyFd;
+        }
+    }
     if (fd < 0) {
         fd = ::shm_open(m_shmName, O_CREAT | O_RDWR, 0666);
         if (fd < 0) {

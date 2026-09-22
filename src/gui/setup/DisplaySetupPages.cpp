@@ -1721,6 +1721,7 @@ void WaterfallDefaultsPage::loadFromRenderer()
     QSignalBlocker b13(m_showTxZeroLineToggle);
     QSignalBlocker b14(m_timestampPosCombo);
     QSignalBlocker b15(m_timestampModeCombo);
+    QSignalBlocker b15b(m_timeMarkerCombo);
 
     m_highThresholdSlider->setValue(static_cast<int>(sw->wfHighThreshold()));
     m_lowThresholdSlider->setValue(static_cast<int>(sw->wfLowThreshold()));
@@ -1777,6 +1778,10 @@ void WaterfallDefaultsPage::loadFromRenderer()
     m_showTxZeroLineToggle->setChecked(sw->showTxZeroLineOnWaterfall());
     m_timestampPosCombo->setCurrentIndex(static_cast<int>(sw->wfTimestampPosition()));
     m_timestampModeCombo->setCurrentIndex(static_cast<int>(sw->wfTimestampMode()));
+    {
+        const int idx = m_timeMarkerCombo->findData(sw->wfTimeMarkerSeconds());
+        m_timeMarkerCombo->setCurrentIndex(idx < 0 ? 0 : idx);
+    }
 
     // Low Color picker moved to Setup → Appearance → Colors & Theme.
 
@@ -2247,6 +2252,34 @@ void WaterfallDefaultsPage::buildUI()
         }
     });
     timeForm->addRow(QStringLiteral("Timestamp Mode:"), m_timestampModeCombo);
+
+    // Longpath, 2026-09-21 (idea from AetherSDR #5538): clock-aligned time
+    // markers through the waterfall. The choices come from the widget so
+    // page and widget cannot disagree.
+    m_timeMarkerCombo = new QComboBox(timeGroup);
+    for (int sec : SpectrumWidget::wfTimeMarkerChoices()) {
+        QString text;
+        if (sec <= 0) {
+            text = QStringLiteral("Off");
+        } else if (sec < 60) {
+            text = QStringLiteral("%1 s").arg(sec);
+        } else {
+            text = QStringLiteral("%1 min").arg(sec / 60);
+        }
+        m_timeMarkerCombo->addItem(text, sec);
+    }
+    m_timeMarkerCombo->setToolTip(QStringLiteral(
+        "Thin time lines across the waterfall at clock boundaries (every 15 s, "
+        "minute, quarter hour, ...), each labelled with the time in the "
+        "timestamp mode's zone. The lines scroll with their rows and hold "
+        "still in a paused history."));
+    connect(m_timeMarkerCombo, qOverload<int>(&QComboBox::currentIndexChanged),
+            this, [this](int i) {
+        if (auto* w = model() ? model()->spectrumWidget() : nullptr) {
+            w->setWfTimeMarkerSeconds(m_timeMarkerCombo->itemData(i).toInt());
+        }
+    });
+    timeForm->addRow(QStringLiteral("Time Markers:"), m_timeMarkerCombo);
 
     contentLayout()->addWidget(timeGroup);
 

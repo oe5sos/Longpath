@@ -137,6 +137,14 @@ public:
     static constexpr int kDailyBackupsToKeep = 14;
     /// Die Tageskopien, aelteste zuerst (fuer Pruefstaende und Aufraeumen).
     QStringList dailyBackups() const;
+    // Settings backup restore (SettingsBackupDialog): once a backup has
+    // been copied over the live file, no save() may run any more --
+    // forty-odd call sites save on their own occasions, and the very
+    // next one would overwrite the restored file with the in-memory
+    // state of the running program. Inhibited saves are logged and
+    // dropped; the program is expected to close right after.
+    void setSaveInhibited(bool inhibited) { m_saveInhibited = inhibited; }
+    bool saveInhibited() const { return m_saveInhibited; }
 
     // Get/set top-level settings.
     QVariant value(const QString& key, const QVariant& defaultValue = {}) const;
@@ -486,6 +494,7 @@ private:
     static QString macKeyFromSettingsKey(const QString& settingsKey);
 
     QString m_filePath;
+    bool m_saveInhibited = false;
     QMap<QString, QString> m_settings;
     QMap<QString, QString> m_stationSettings;
     bool    m_dirty{false};

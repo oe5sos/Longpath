@@ -553,7 +553,13 @@ private slots:
     // (Tools menu). Same lazy-construction pattern as openPureSignalDialog;
     // both dialogs are single-instance for the lifetime of MainWindow.
     void openSpotHub();
+    // Frequency memories (Thetis MemoryForm + the front-panel quick memory):
+    // Tools > Memories..., Tools > Memory Quick Save / Quick Restore.
+    void openMemories();
     void openFreeDVReporter();
+    // File > Settings Backups... -- the backups half of Thetis's Database
+    // Manager (SettingsBackupDialog). Same lazy, single-instance pattern.
+    void openSettingsBackups();
     /// Task B4 (bottom-banner + pan-menu epic): +PAN icon click handler.
     /// Also the View > Pan Layout… (Ctrl+L) menu action's target. Gated on
     /// m_radioModel->isConnected(); opens PanLayoutDialog sized to
@@ -1018,11 +1024,23 @@ private:
     // modeless dialog instance owned by the TxApplet.
     void wireSetupDialog(class SetupDialog* dialog);
 
+    // Help > Check for Updates... und die stille Startpruefung
+    // (UpdateDialog.h). Betreiber 2026-09-21: "ein Klick, Installation
+    // automatisch".
+    void openUpdateDialog();
+    void scheduleStartupUpdateCheck();
+
     // KiwiSDR — siehe MainWindow_KiwiSdr.cpp.
     void wireKiwiSdr();
     void refreshKiwiSdrAppletReceivers();
     void addKiwiSdrReceiver(const QString& name, const QString& endpoint);
     void syncKiwiSdrTransmitMute();
+    // Stufe 3b (2026-09-21): der Kiwi folgt der zugeordneten Scheibe --
+    // Frequenz, Betriebsart, Filter, Panadapter. Verdrahtet je Zuordnung
+    // (nicht je Scheibe wie bei Aether, wo jede Scheibe einen Kiwi haben
+    // kann); geloest, sobald die Zuordnung faellt.
+    void rewireKiwiSdrTrackingForSlice(int sliceId, const QString& profileId);
+    void updateKiwiSdrTrackingForSlice(class SliceModel* slice);
     // Sicherheitsschranke (2026-08-24, uebertragen aus der SunSDR-
     // Durchsicht -- siehe docs/architecture/2026-08-24-sunsdr-tci-
     // client-design.md): die EINE Stelle, die "gibt es diese Scheibe
@@ -1098,6 +1116,7 @@ private:
     // preserves geometry / table state). Both members are accessed by
     // the H1 test seam below.
     QPointer<SpotHubDialog>        m_spotHubDialog;
+    QPointer<class MemoryDialog>   m_memoryDialog;
     // m_voiceCheckDialog is gone (2026-08-11): the voice check is an
     // embedded tab of StripWindow now; openVoiceCheck() routes there.
     QPointer<StripWindow>          m_stripWindow;
@@ -1117,6 +1136,12 @@ private:
     QIODevice*    m_puduCaptureIo{nullptr};
     QByteArray    m_puduRawTake;
     QPointer<FreeDVReporterDialog> m_freeDVReporterDialog;
+    QPointer<class SettingsBackupDialog> m_settingsBackupDialog;
+    // The "Backup on shut-down" copy (Thetis DBMan.Shutdown()) is taken
+    // right after the final AppSettings::save(); two shutdown paths save
+    // (closeEvent and aboutToQuit), one copy is enough.
+    void takeShutdownBackupIfWanted();
+    bool m_shutdownBackupDone{false};
 
     // Status bar widgets (double-height AetherSDR design, 46px)
     //
@@ -1465,6 +1490,7 @@ private:
     // dspModeChanged lambda.
     class RadeApplet* m_radeApplet{nullptr};
     class RttyDecoderApplet* m_rttyDecoderApplet{nullptr};
+    class CwDecoderApplet*   m_cwDecoderApplet{nullptr};
     // Torn down and rebuilt on every rebindRttyRadeAvailability() call --
     // same QMetaObject::Connection-list idiom CommandBar::attach() uses,
     // so the dspModeChanged listener below never accumulates one dangling
@@ -1489,6 +1515,9 @@ private:
     // MainWindow_KiwiSdr.cpp; was dort NOCH NICHT steht, ist am Kopf
     // jener Datei aufgezaehlt.
     class KiwiSdrManager* m_kiwiSdrManager{nullptr};
+    // Je zugeordneter Scheibe die vier Nachfuehr-Verbindungen (Stufe 3b).
+    QHash<int, QVector<QMetaObject::Connection>> m_kiwiSdrTrackingConnections;
+    QPointer<class UpdateDialog> m_updateDialog;
 
     // ── SunSDR (TCI-Client, 2026-08-24) ──────────────────────────────
     //

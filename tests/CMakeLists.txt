@@ -4853,6 +4853,40 @@ longpath_add_test(tst_kiwi_tx_mute)
 # Schranke (nie eine echte, DDC-gebundene Scheibe fuettern/steuern),
 # hier fuer KiwiSDR nachgezogen. Siehe Kommentarkopf der Testdatei.
 longpath_add_test(tst_kiwi_sdr_safety_gate)
+# -- Frequency memories (Thetis Memory/MemoryRecord.cs + MemoryList.cs +
+#    MemoryForm.cs, console.cs RecallMemory / quick memory, 2026-09-20):
+#    memory.xml round trip against a Thetis sample, backup fallback, the
+#    table model, capture/recall on the active slice, the dialog --
+longpath_add_test(tst_memory_list)
+longpath_add_test(tst_memory_dialog)
+# -- Settings backups (Thetis clsDBMan.cs / frmDBMan.cs, the backup half
+#    of the Database Manager, 2026-09-20): copy + sidecar, listing,
+#    rename/remove/export/restore, the GFS prune, the dialog --
+longpath_add_test(tst_settings_backup)
+longpath_add_test(tst_settings_backup_dialog)
+# -- Receive profiles (Longpath-original, 2026-09-20): AGC / NR / NB /
+#    ANF / squelch of a slice under a name -- manager + popup --
+longpath_add_test(tst_rx_profile_manager)
+longpath_add_test(tst_rx_profile_popup)
+# -- Waterfall time markers (Longpath-original, 2026-09-21): clock-aligned
+#    boundaries across the visible rows, labels, zones, silent labels --
+longpath_add_test(tst_waterfall_time_markers)
+# -- CW decoder (ggmorse wrapper ported from AetherSDR, 2026-09-21):
+#    synthetic keyed CW decodes, estimates, ring bound, stop semantics --
+longpath_add_test(tst_cw_decoder)
+longpath_add_test(tst_cw_decoder_applet)
+# 2026-09-21, KiwiSDR Stufe 3b: der Kiwi folgt der zugeordneten Scheibe
+# (Frequenz, Betriebsart, Filter) -- vorher nur einmal bei der Zuordnung.
+longpath_add_test(tst_kiwi_tracking_follows_the_slice)
+# 2026-09-21: Nebenfenster (Channel Strip, Logbuch, Setup, Meldungen) auf
+# die Ebene der schwebenden Paletten -- welche Fenster der Filter anfasst.
+longpath_add_test(tst_auxiliary_window_leveler)
+# 2026-09-21: Help > Check for Updates... -- Release-JSON, Version, Paket,
+# SHA256SUMS, Startpruefung, Zielpfad, Neustart-Helfer, DMG-Einspielen (macOS).
+longpath_add_test(tst_update_checker)
+# 2026-09-21: Schluesselbund-Dienstname "Longpath: <key>" mit Umzug vom
+# alten Namen -- live nur mit LONGPATH_KEYCHAIN_LIVE=1 (echter Schluesselbund).
+longpath_add_test(tst_credential_store_migration)
 longpath_add_test(tst_sunsdr_audio_feed)
 longpath_add_test(tst_sunsdr_is_reachable)
 longpath_add_test(tst_compact_bar_draws)

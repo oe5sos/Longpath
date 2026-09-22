@@ -505,6 +505,9 @@ set(CORE_SOURCES
     src/core/antenna/AntennaTrim.cpp
     src/core/antenna/RadioSweep.cpp
     src/core/AppSettings.cpp
+    src/core/SettingsBackup.cpp
+    src/core/RxProfileManager.cpp
+    src/core/CwDecoder.cpp
     src/core/BeamHeading.cpp
     src/core/BoardCapabilities.cpp
     src/core/CallsignCache.cpp
@@ -552,6 +555,8 @@ set(CORE_SOURCES
     src/core/KiwiSdrProtocol.cpp
     src/core/KiwiSdrClient.cpp
     src/core/KiwiPublicDirectory.cpp
+    src/core/UpdateChecker.cpp
+    src/core/UpdateInstaller.cpp
     src/core/KiwiSdrRedirectPolicy.cpp
     src/core/KiwiSdrCredentialStore.cpp
     src/core/KiwiSdrManager.cpp
@@ -716,6 +721,8 @@ set(MODEL_SOURCES
     src/models/BandDefaults.cpp
     src/models/BandPlanManager.cpp
     src/models/SliceModel.cpp
+    src/models/MemoryRecord.cpp
+    src/models/MemoryList.cpp
     src/models/PanadapterModel.cpp
     src/models/MeterModel.cpp
     src/models/TransmitModel.cpp
@@ -797,6 +804,7 @@ set(GUI_SOURCES
     src/gui/popup_placement.cpp
     src/gui/SpectrumOverlayMenu.cpp
     src/gui/spectrum/WaterfallTicker.cpp
+    src/gui/spectrum/WaterfallTimeMarkers.cpp
     src/gui/widgets/CenterMarkSlider.h
     src/gui/widgets/DexpPeakMeter.h
     src/gui/widgets/DexpPeakMeter.cpp
@@ -807,6 +815,8 @@ set(GUI_SOURCES
     src/gui/FramelessResizer.cpp
     src/gui/WindowChrome.cpp
     src/gui/ToolWindow.cpp
+    src/gui/AuxiliaryWindowLeveler.cpp
+    src/gui/UpdateDialog.cpp
     src/gui/widgets/FilterPresetEditDialog.cpp
     src/gui/widgets/GuardedComboBox.h
     src/gui/widgets/GuardedSlider.h
@@ -876,6 +886,8 @@ set(GUI_SOURCES
     src/gui/DiversityDialog.h
     src/gui/SpotHubDialog.cpp
     src/gui/SpotHubDialog.h
+    src/gui/MemoryDialog.cpp
+    src/gui/MemoryDialog.h
     src/gui/ParkInfoDialog.cpp
     src/gui/ParkInfoDialog.h
     src/gui/FreeDVReporterDialog.cpp
@@ -1058,6 +1070,8 @@ set(GUI_SOURCES
     src/gui/widgets/WorldMapCatalog.cpp
     src/gui/widgets/WorldTexture.cpp
     src/gui/LogbookWindow.cpp
+    src/gui/SettingsBackupDialog.cpp
+    src/gui/widgets/RxProfilePopup.cpp
     src/gui/QsoMapWindow.cpp
     src/core/DxccFlag.cpp
     src/core/SolarTimes.cpp
@@ -1142,6 +1156,7 @@ set(GUI_SOURCES
     src/gui/applets/CwxApplet.cpp
     src/gui/applets/DvkApplet.cpp
     src/gui/applets/RttyDecoderApplet.cpp
+    src/gui/applets/CwDecoderApplet.cpp
     src/gui/applets/QsoRecorderApplet.cpp
     src/gui/applets/BandwidthFilterApplet.cpp
     src/gui/applets/CatApplet.cpp
@@ -1488,6 +1503,13 @@ target_link_libraries(LongpathObjs PUBLIC r8brain)
 # --------------------------------------------------------------------------
 add_subdirectory(third_party/sgp4)
 target_link_libraries(LongpathObjs PUBLIC sgp4)
+
+# --------------------------------------------------------------------------
+# ggmorse (MIT) -- the CW (Morse) decoder behind src/core/CwDecoder
+# (2026-09-21). Vendored unmodified; see third_party/ggmorse/README-LONGPATH.md.
+# --------------------------------------------------------------------------
+add_subdirectory(third_party/ggmorse)
+target_link_libraries(LongpathObjs PUBLIC ggmorse)
 
 # --------------------------------------------------------------------------
 # DeepFilterNet3 DFNR — pre-built neural noise reduction library (MIT/Apache-2.0)

@@ -66,6 +66,7 @@ mw0lge@grange-lane.co.uk
 #include "core/audio/QsoRecorder.h"
 
 #include <QFile>
+#include <QFileInfo>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonParseError>
@@ -79,11 +80,58 @@ void QsoRecorder::setSampleRate(int hz)
     if (hz > 0) { m_rate = hz; }
 }
 
+// Den Namen beanspruchen, ohne eine vorhandene Aufnahme zu ueberschreiben:
+// die Datei wird mit NewOnly (O_EXCL) angelegt -- ein atomarer Anspruch,
+// kein "gibt es schon?" mit Luecke dazwischen. Ist der Name vergeben, wird
+// "_1", "_2", ... angehaengt. Der Anlass (2026-09-21): die Datei hiess
+// qso-<yyyyMMdd-HHmmss>[-call].wav und der Schreiber oeffnete mit
+// Truncate; zwei Starts in derselben Sekunde loeschten die erste Aufnahme
+// wortlos. Nach AetherSDR #5644 [@3c4672dd] (dort dieselbe Idee im
+// QsoRecorder), hier eigen.
+QString QsoRecorder::claimUniquePath(const QString& wantedPath, QString* error)
+{
+    const QFileInfo fi(wantedPath);
+    const QString dir = fi.absolutePath();
+    const QString stem = fi.completeBaseName();
+    const QString suffix = fi.suffix();
+    constexpr int kMaxAttempts = 1000;
+    QString lastError;
+    for (int attempt = 0; attempt < kMaxAttempts; ++attempt) {
+        const QString name = attempt == 0
+            ? fi.fileName()
+            : (suffix.isEmpty()
+                   ? QStringLiteral("%1_%2").arg(stem).arg(attempt)
+                   : QStringLiteral("%1_%2.%3").arg(stem).arg(attempt).arg(suffix));
+        const QString candidate = dir + QLatin1Char('/') + name;
+        QFile f(candidate);
+        if (f.open(QIODevice::WriteOnly | QIODevice::NewOnly)) {
+            f.close();
+            return candidate;
+        }
+        lastError = f.errorString();
+        // Vergeben (auch ein haengender Link zaehlt als vergeben): naechster
+        // Versuch. Alles andere -- Rechte, fehlender Ordner -- ist ein
+        // Fehler, den kein Zaehler behebt.
+        const QFileInfo ci(candidate);
+        if (!ci.exists() && !ci.isSymbolicLink()) {
+            break;
+        }
+    }
+    if (error) {
+        *error = QStringLiteral("cannot create %1: %2").arg(wantedPath, lastError);
+    }
+    return {};
+}
+
 bool QsoRecorder::start(const QString& wavPath, const QsoRecordingInfo& info,
                         QString* error)
 {
     clear();
-    m_path = wavPath;
+    const QString claimed = claimUniquePath(wavPath, error);
+    if (claimed.isEmpty()) {
+        return false;
+    }
+    m_path = claimed;
     m_info = info;
     m_info.sampleRate = m_rate;
     if (!m_info.utcStart.isValid()) {
@@ -92,7 +140,11 @@ bool QsoRecorder::start(const QString& wavPath, const QsoRecordingInfo& info,
 
     const auto fmt = m_saveFloat32 ? WavStreamWriter::Format::Float32Stereo
                                     : WavStreamWriter::Format::Pcm16Stereo;
-    if (!m_writer.open(wavPath, m_rate, fmt, /*dither=*/true, error)) {
+    // Die Datei gehoert seit claimUniquePath() uns; der Schreiber darf sie
+    // mit Truncate oeffnen.
+    if (!m_writer.open(claimed, m_rate, fmt, /*dither=*/true, error)) {
+        QFile::remove(claimed);
+        m_path.clear();
         return false;
     }
 

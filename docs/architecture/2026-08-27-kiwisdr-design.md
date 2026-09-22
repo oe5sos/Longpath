@@ -1,6 +1,6 @@
 # KiwiSDR Receive Client — Design & Status
 
-Status: **shipped**, Stufen 1–6 + 7a. Stufe 7 (Bandrückruf, virtuelle
+Status: **shipped**, Stufen 1–6 + 3b (Nachführung, 2026-09-21) + 7a. Stufe 7 (Bandrückruf, virtuelle
 Antennen, Diversity) ist bewusst nicht gebaut — siehe unten, kein
 vergessener Rest.
 Companion tests: `kiwi_sdr_protocol_test.cpp`, `kiwi_sdr_redirect_policy_test.cpp`,
@@ -100,6 +100,40 @@ blendet Empfänger mit deaktivierter oder unbekannter API-Policy komplett
 aus dem Dialog aus — es wird kein Verbindungsversuch gegen den Willen
 des Betreibers unternommen. Der Abruf ist strikt manuell (ein Klick =
 ein Abruf), mit ehrlichem User-Agent, kein Hintergrund-Polling.
+
+## Nachtrag 2026-09-21 — Stufe 3b: der Kiwi folgt der Scheibe
+
+Beim Livetest des CW-Decoders über einen KiwiSDR fielen zwei Dinge auf,
+die der Ein-Nacht-Port nicht mitgebracht hatte:
+
+1. **Der Kiwi wurde nur einmal abgestimmt — bei der Zuordnung.**
+   `KiwiSdrManager::updateSliceTracking` war portiert, aber nirgends
+   aufgerufen; Aether hängt es in seiner Scheiben-Verdrahtung an
+   `frequencyChanged`/`modeChanged`/`filterChanged`/`panIdChanged` jeder
+   Scheibe. Longpath verdrahtet jetzt **je Zuordnung**
+   (`rewireKiwiSdrTrackingForSlice`, ausgelöst von
+   `sliceAssignmentChanged`) und trennt beim Lösen wieder;
+   `updateKiwiSdrTrackingForSlice` geht durch dieselbe Schranke
+   `kiwiControllableSlice` wie Ton und Wasserfall. Beobachtbare Kante
+   für den Prüfstand: neues Signal `sliceTrackingUpdated`.
+2. **CW war unhörbar.** Die Zuordnung übergab die CW-Tonhöhe 0 (der
+   Träger landete auf 0 Hz, außerhalb jedes CW-Durchlasses), und der
+   Client verschob den tonhöhen-zentrierten Scheibenfilter (Thetis:
+   400..900 bei 650 Hz) ein zweites Mal um die Tonhöhe, weil
+   `formatSoundTuneCommand` ihn trägersymmetrisch erwartet, wie Flex
+   ihn meldet. Jetzt: `SliceModel::cwPitchHz()` wird übergeben und
+   `KiwiSdrProtocol::carrierSymmetricCwPassband` nimmt die Tonhöhe vor
+   dem Kommando wieder heraus. Live an DK0WCY geprüft: die vom Decoder
+   gemessene Tonhöhe pendelte sich danach bei 648 Hz ein (vorher ~1085).
+
+Die CW-Tonhöhe hat in Longpath noch keine Bedienfläche und kein
+Änderungssignal (`AppSettings CWPitch`, Vorgabe 600); sie wird bei
+jeder Nachführung frisch gelesen. Aethers `cwPitchChanged`-Anbindung
+kommt, wenn die Bedienfläche kommt.
+
+Prüfstände: `tst_kiwi_tracking_follows_the_slice` (Frequenz, Betriebsart,
+Filter folgen; gelöste Zuordnung und übernommene Scheibe folgen nicht),
+`kiwi_sdr_protocol_test` (Rundlauf des CW-Durchlasses).
 
 ## Was fehlt — Stufe 7, eine offene Entscheidung, kein Bug
 

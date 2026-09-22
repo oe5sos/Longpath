@@ -135,6 +135,8 @@ class AudioEngine;
 class WdspEngine;
 class RxDspWorker;
 class NoiseFloorTracker;
+class MemoryList;
+struct MemoryRecord;
 // Phase 3F Sub-Epic F Task 5: per-ADC wideband FFT engine. Forward decl
 // here; included in RadioModel.cpp so we don't pull fftw3.h into every
 // translation unit that touches RadioModel.h.
@@ -156,6 +158,7 @@ class CompositeTxMicRouter;
 // 3M-1c L.1 / L.2: forward declarations for the MicProfileManager bank
 // (chunk F) + the TwoToneController activation orchestrator (chunk I).
 class MicProfileManager;
+class RxProfileManager;
 class TwoToneController;
 class SwrSweepController;
 // 3M-4 Task 7: PureSignal coordinator (cal lifecycle, MOX integration,
@@ -974,6 +977,10 @@ public:
     // TxProfileSetupPage (J.3 ctor).  Non-owning; lifetime is RadioModel's
     // lifetime.  See header §3M-1c L.1 for the construction + connect flow.
     MicProfileManager* micProfileManager() const { return m_micProfileMgr; }
+
+    // Receive profiles (AGC / NR / NB / ANF / squelch of a slice under a
+    // name), global rather than per MAC. Non-owning; RadioModel's lifetime.
+    RxProfileManager* rxProfileManager() const { return m_rxProfileMgr; }
 
     // Phase 4 Agent 4A of issue #167: expose PaProfileManager so the future
     // PaGainByBandPage (Phase 6 Agent 6A) and tests can hand the per-MAC
@@ -1988,6 +1995,32 @@ public slots:
     /// See `docs/architecture/2026-05-26-phase3f-multi-pan-multi-slice-design.md`
     /// §3 ("VFO A/B / split: not implemented").
     Q_INVOKABLE bool split(int rx) const;
+
+    // ── Frequency memories (Thetis Memory/MemoryForm.cs + console.cs) ──
+    //
+    // The memory list lives in memory.xml next to the settings file, in
+    // Thetis's own layout (see models/MemoryList.h), restored when the model
+    // is built (console.cs:2006-2007 [@852bf0e]) and saved by the dialog
+    // after every change, as MemoryForm does.
+    MemoryList* memories() const { return m_memories; }
+    bool saveMemories(QString* error = nullptr) const;
+    /// Where memory.xml lives: the directory of the settings file.
+    QString memoriesDir() const;
+
+    /// The active slice's state as one record, the way MemoryForm's Add
+    /// button captures it (Memory/MemoryForm.cs:502-546 [@852bf0e]).
+    MemoryRecord captureMemory() const;
+    /// Apply a record to the active slice: console.cs:40527-40556
+    /// [@852bf0e] RecallMemory.
+    void recallMemory(const MemoryRecord& record);
+
+    /// Quick memory: one frequency + mode + filter, console.cs:36442-36455
+    /// [@852bf0e] btnMemoryQuickSave_Click / btnMemoryQuickRestore_Click.
+    /// The frequency text persists as Thetis's txtMemoryQuick
+    /// (console.cs:2769/:3955 [@852bf0e], AppSettings "MemoryQuick").
+    void memoryQuickSave();
+    void memoryQuickRestore();
+    bool hasQuickMemory() const;
 
     // ── Phase 3J-1 closeout Item 3 (2026-05-12): TCI Q_INVOKABLE long tail ──
     //
@@ -3639,6 +3672,7 @@ private:
     // connectToRadio(); setMacAddress("") is called in teardownConnection so
     // mutators silently no-op while no radio is selected.
     MicProfileManager* m_micProfileMgr{nullptr};
+    RxProfileManager*  m_rxProfileMgr{nullptr};
 
     // Phase 4 Agent 4A of issue #167 — PaProfileManager.  QObject child of
     // RadioModel; mirrors m_micProfileMgr lifecycle exactly.  Constructed
@@ -3750,6 +3784,16 @@ private:
     std::unique_ptr<FreeDVStationModel>   m_freeDvStationModel;
     std::unique_ptr<RxDecodeModel>        m_rxDecodeModel;
     std::unique_ptr<DxccColorProvider>    m_dxccColorProvider;
+
+    // Frequency memories (Thetis MemoryList), owned here, restored in the
+    // constructor from memoriesDir().
+    MemoryList*  m_memories{nullptr};
+    // Quick memory (Thetis txtMemoryQuick + quick_save_mode / quick_save_filter)
+    double  m_quickSaveFreqHz{0.0};
+    DSPMode m_quickSaveMode{DSPMode::LSB};
+    int     m_quickSaveFilterLow{0};
+    int     m_quickSaveFilterHigh{0};
+    bool    m_quickSaveValid{false};
 
     std::unique_ptr<DxClusterClient>      m_dxCluster;      // DX cluster (DxSpider / AR-Cluster / CC-Cluster)
     std::unique_ptr<DxClusterClient>      m_rbn;            // Reverse Beacon Network (RBN-suffixed spotter)
