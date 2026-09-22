@@ -4849,6 +4849,9 @@ longpath_add_test(tst_kiwi_tx_mute)
 # Schranke (nie eine echte, DDC-gebundene Scheibe fuettern/steuern),
 # hier fuer KiwiSDR nachgezogen. Siehe Kommentarkopf der Testdatei.
 longpath_add_test(tst_kiwi_sdr_safety_gate)
+# 2026-09-21: Nebenfenster (Channel Strip, Logbuch, Setup, Meldungen) auf
+# die Ebene der schwebenden Paletten -- welche Fenster der Filter anfasst.
+longpath_add_test(tst_auxiliary_window_leveler)
 longpath_add_test(tst_sunsdr_audio_feed)
 longpath_add_test(tst_sunsdr_is_reachable)
 longpath_add_test(tst_compact_bar_draws)
@@ -4865,26 +4868,6 @@ longpath_add_test(tst_tci_probe_reads_header)
 longpath_add_test(tst_tci_binary_frame_roundtrip)
 longpath_add_test(tst_asr_end_to_end)
 longpath_add_test(tst_asr_against_live_server)
-nereus_add_test(tst_kiwi_sdr_safety_gate)
-# 2026-09-21: Nebenfenster (Channel Strip, Logbuch, Setup, Meldungen) auf
-# die Ebene der schwebenden Paletten -- welche Fenster der Filter anfasst.
-nereus_add_test(tst_auxiliary_window_leveler)
-nereus_add_test(tst_sunsdr_audio_feed)
-nereus_add_test(tst_sunsdr_is_reachable)
-nereus_add_test(tst_compact_bar_draws)
-nereus_add_test(tst_puresignal_stability)
-nereus_add_test(tst_ps_stability_visible)
-nereus_add_test(tst_waterfall_banding)
-nereus_add_test(tst_radio_link_kind)
-nereus_add_test(tst_ps_thresholds_persist)
-nereus_add_test(tst_todays_work_together)
-nereus_add_test(tst_every_applet_is_reachable)
-nereus_add_test(tst_asr_settings_page)
-nereus_add_test(tst_settings_are_remembered)
-nereus_add_test(tst_tci_probe_reads_header)
-nereus_add_test(tst_tci_binary_frame_roundtrip)
-nereus_add_test(tst_asr_end_to_end)
-nereus_add_test(tst_asr_against_live_server)
 
 longpath_add_test(tst_filter_follows_the_panadapter)
 longpath_add_test(tst_filter_pane_sheet)
