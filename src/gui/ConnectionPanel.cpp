@@ -371,6 +371,17 @@ void ConnectionPanel::buildUI()
 
     // --- Phase 3Q Task 5: Top connection-status strip ---
     mainLayout->addWidget(buildStatusStrip());
+    // Der lange Grund eines Fehlschlags (Watchdog-Text mit Absaetzen)
+    // passt in keine 40-px-Leiste: die Leiste bekommt den ersten Satz,
+    // der Rest steht hier, umgebrochen, und verschwindet mit dem Grund.
+    m_failureDetailLabel = new QLabel(this);
+    m_failureDetailLabel->setWordWrap(true);
+    m_failureDetailLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    m_failureDetailLabel->setStyleSheet(QStringLiteral(
+        "QLabel { color: %1; font-size: 11px; padding: 2px 8px; }")
+        .arg(QLatin1String(Style::kAmberWarn)));
+    m_failureDetailLabel->setVisible(false);
+    mainLayout->addWidget(m_failureDetailLabel);
 
     // --- Status label ---
     m_statusLabel = new QLabel(this);
@@ -767,9 +778,13 @@ void ConnectionPanel::updateStatusStrip()
         RadioConnection* conn = m_radioModel->connection();
         if (conn) {
             const RadioInfo& ri = conn->radioInfo();
+            if (m_failureDetailLabel) { m_failureDetailLabel->setVisible(false); }
+            m_stripInfoLabel->setToolTip(QString());
             m_stripInfoLabel->setText(QStringLiteral("Connected — %1  (%2)")
                 .arg(ri.displayName(), ri.address.toString()));
         } else {
+            if (m_failureDetailLabel) { m_failureDetailLabel->setVisible(false); }
+            m_stripInfoLabel->setToolTip(QString());
             m_stripInfoLabel->setText(QStringLiteral("Connected — %1")
                 .arg(m_radioModel->name()));
         }
@@ -786,11 +801,21 @@ void ConnectionPanel::updateStatusStrip()
         m_stripPillLabel->setStyleSheet(QStringLiteral(
             "QLabel { color: %1; font-size: 16px; }").arg(QLatin1String(kPillOfflineColor)));
 
-        m_stripInfoLabel->setText(m_lastConnectFailureDetail.isEmpty()
+        // Erster Absatz in die Leiste, der Rest darunter (siehe
+        // m_failureDetailLabel in buildUI).
+        const QString detail = m_lastConnectFailureDetail.trimmed();
+        const QString first  = detail.section(QStringLiteral("\n"), 0, 0).trimmed();
+        const QString rest   = detail.mid(first.size()).trimmed();
+        m_stripInfoLabel->setText(first.isEmpty()
             ? QStringLiteral("Disconnected")
-            : QStringLiteral("Disconnected — %1").arg(m_lastConnectFailureDetail));
+            : QStringLiteral("Disconnected — %1").arg(first));
+        m_stripInfoLabel->setToolTip(detail);
         m_stripInfoLabel->setStyleSheet(Style::themed(QStringLiteral(
             "QLabel { color: #8090a0; font-size: 13px; }")));
+        if (m_failureDetailLabel) {
+            m_failureDetailLabel->setText(rest);
+            m_failureDetailLabel->setVisible(!rest.isEmpty());
+        }
 
         m_stripDisconnectBtn->setVisible(false);
 

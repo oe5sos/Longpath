@@ -111,6 +111,10 @@ public:
     explicit ConnectionPanel(RadioModel* model, QWidget* parent = nullptr);
     ~ConnectionPanel() override;
 
+    /// Fuer Pruefstaende: Leistentext und die Erklaerung darunter.
+    QLabel* stripInfoLabelForTest() const { return m_stripInfoLabel; }
+    QLabel* failureDetailLabelForTest() const { return m_failureDetailLabel; }
+
     // Update the connection status display.
     void setStatusText(const QString& text);
 
@@ -209,6 +213,10 @@ private:
     QLabel*        m_stripInfoLabel{nullptr};
     QPushButton*   m_stripDisconnectBtn{nullptr};
     QLabel*        m_stripReconnectLabel{nullptr};
+    // Die Erklaerung zu einem Fehlschlag: mehrzeilig UNTER der Leiste,
+    // die selbst nur eine Zeile hoch ist (2026-09-22: der Text stand
+    // oben und unten abgeschnitten in der Leiste).
+    QLabel*        m_failureDetailLabel{nullptr};
 
     // Set from RadioModel::connectAttemptFailed, shown in place of the
     // plain "Disconnected" text until the next connect attempt starts or
