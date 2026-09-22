@@ -4763,6 +4763,10 @@ longpath_add_test(tst_applet_panel_gutter)
 
 # -- AppletPanelWidget setAppletVisible: order-preserving show/hide --
 longpath_add_test(tst_applet_panel_set_visible)
+# -- 2026-09-22: die Spalte ist so breit wie ihr breitestes Feld, der
+#    Container folgt (frisches Profil bei 1280 Punkten: RX/TX rechts
+#    abgeschnitten) --
+longpath_add_test(tst_applet_panel_min_width)
 longpath_add_test(tst_applet_detach_reachable)
 longpath_add_test(tst_applet_window_size)
 longpath_add_test(tst_real_mainwindow_detach)

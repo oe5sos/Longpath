@@ -40,6 +40,23 @@
   Mindesthoehe — sonst schob ein schmales Fenster die Karte unter ihre
   Knoepfe. Pruefstand `tst_logbook_one_page`.
 
+### Fixed
+
+- **Die Applet-Spalte war im frischen Profil rechts abgeschnitten.** Bei
+  1280 Punkten Fensterbreite fehlten RX-"MUTE"/"BIN", die TX-Knoepfe
+  (MOX, TUNE) und "2-Tone": Panel und Container hatten ein festes
+  Minimum von 260 Punkten -- das schlaegt in Qt jeden Layout-Hinweis --,
+  das Raster brauchte aber 317 (DvkApplet), und der Rollbereich rollt
+  nicht waagrecht. Die Spalte ist jetzt so breit wie ihr breitestes
+  Feld (AppletPanelWidget::minimumSizeHint), der Container folgt ihr
+  (ContainerWidget::refreshMinimumWidth auf jede Layout-Anfrage), der
+  Splitter gibt dem Panadapter entsprechend weniger. Gefunden beim
+  Sichten des 0.6.4-Pakets in einem leeren Profil; die Automatisierungs-
+  bruecke meldet in dumpTree seither auch minSize/minHint je Widget.
+  Im selben Bild: der Lautstaerkewert in der Titelleiste zeigte "100" als
+  "L0(" -- 22 feste Punkte fuer einen Glaschip, der seit dem 17.09. mit
+  Polster und Rahmen 30 braucht; jetzt aus der Schriftbreite.
+
 ## [0.6.4] - 2026-09-22
 
 Der Arbeitsast des Betreibers seit dem 9. September, in `main`

@@ -273,6 +273,11 @@ public:
     // --- Content Slot ---
     QWidget* content() const { return m_content; }
     void setContent(QWidget* widget);
+    // Untergrenze der Breite: kMinContainerWidth, oder mehr, wenn der
+    // Inhalt mehr braucht (AppletPanelWidget::minimumSizeHint). Ein
+    // festes setMinimumWidth(260) schlug den Hinweis des Inhalts und
+    // liess den Splitter die Spalte zu schmal machen (2026-09-22).
+    void refreshMinimumWidth();
 
     // ── Mehrere Fenster in einer Kachel ──────────────────────────────
     //
@@ -373,6 +378,9 @@ protected:
     void contextMenuEvent(QContextMenuEvent* event) override;
     void leaveEvent(QEvent* event) override;
     bool eventFilter(QObject* watched, QEvent* event) override;
+    // LayoutRequest aus dem Inhalt (Raster umgebaut, Feld ein-/aus-
+    // geblendet) -> refreshMinimumWidth().
+    bool event(QEvent* event) override;
 
 private:
     void buildUI();

@@ -49,9 +49,13 @@ namespace Longpath {
 AppletPanelWidget::AppletPanelWidget(QWidget* parent)
     : QWidget(parent)
 {
-    // Minimum width matches AetherSDR AppletPanel (260px), but allow
-    // dynamic expansion when the user drags the splitter handle wider.
-    setMinimumWidth(Style::kAppletPanelW);
+    // Die Untergrenze der Breite liefert minimumSizeHint() (unten):
+    // Style::kAppletPanelW wie die AetherSDR-Vorlage, oder mehr, wenn
+    // ein Feld mehr braucht. KEIN setMinimumWidth() hier -- ein
+    // ausdruecklich gesetztes Minimum schlaegt in Qt jeden Hinweis, und
+    // genau so blieb die Spalte bei 260 stehen, waehrend ihr Raster 317
+    // brauchte (2026-09-22, frisches Profil bei 1280 Punkten: RX-"MUTE"
+    // und die TX-Knoepfe rechts abgeschnitten).
     // Longpath--AppletPanelWidget: Selektor mit Namensraum, sonst greift
     // die Regel nicht (siehe AppletFloatingWindow). Der Grund der
     // Spalte ist seit "Glas & Tiefe" der App-Grund — dunkler als die
@@ -194,6 +198,24 @@ void AppletPanelWidget::clearHeaderWidget()
     m_headerAspect = 0.0f;
 }
 
+// Die Spalte ist so breit wie ihr breitestes Feld. Das Raster (ein
+// QGridLayout) kennt die Untergrenze jedes sichtbaren Feldes; der
+// Rollbereich reicht sie nicht weiter, weil ein QScrollArea nach oben
+// nur seine eigene, kleine Untergrenze meldet -- und die waagrechte
+// Rollung ist aus. Also hier: Rasterbreite (samt 8 px Rollbalkenrand)
+// gegen kAppletPanelW, das groessere gilt. Der Splitter und der
+// Container nehmen den Wert ueber die Layout-Kette; siehe
+// ContainerWidget::refreshMinimumWidth().
+QSize AppletPanelWidget::minimumSizeHint() const
+{
+    const QSize base = QWidget::minimumSizeHint();
+    int w = Style::kAppletPanelW;
+    if (m_grid && m_scrollArea) {
+        w = qMax(w, m_grid->minimumSizeHint().width() + 2 * m_scrollArea->frameWidth());
+    }
+    return QSize(w, base.height());
+}
+
 void AppletPanelWidget::resizeEvent(QResizeEvent* event)
 {
     QWidget::resizeEvent(event);
@@ -245,6 +267,10 @@ void AppletPanelWidget::addApplet(AppletWidget* applet)
             this, [this](AppletWidget* a) {
         if (a) { emit appletSettingsRequested(a); }
     });
+    // Ein neues Feld kann breiter sein als alle bisherigen: dem Layout
+    // darueber sagen, dass minimumSizeHint() sich geaendert hat (der
+    // Rollbereich reicht das nicht weiter).
+    updateGeometry();
 }
 
 void AppletPanelWidget::removeApplet(AppletWidget* applet)
@@ -277,6 +303,7 @@ void AppletPanelWidget::removeApplet(AppletWidget* applet)
         m_dragApplet = nullptr;
         m_dragging = false;
     }
+    updateGeometry();
 }
 
 void AppletPanelWidget::setAppletVisible(AppletWidget* applet, bool visible)
@@ -285,6 +312,7 @@ void AppletPanelWidget::setAppletVisible(AppletWidget* applet, bool visible)
     QWidget* wrapper = m_wrappers.value(applet, nullptr);
     if (!wrapper) { return; }  // applet not in this panel
     wrapper->setVisible(visible);
+    updateGeometry();
 }
 
 void AppletPanelWidget::addWidget(QWidget* widget, const QString& title)

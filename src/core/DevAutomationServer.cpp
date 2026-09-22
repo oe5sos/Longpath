@@ -187,6 +187,18 @@ QJsonObject describeAutomationWidget(const QWidget* w)
         {QStringLiteral("x"), gp.x()}, {QStringLiteral("y"), gp.y()},
         {QStringLiteral("w"), w->width()}, {QStringLiteral("h"), w->height()},
     };
+    // Die Untergrenzen dazu -- wer ein Fenster sprengt, verraet sich hier
+    // (2026-09-22: Applet-Spalte im frischen Profil bei 1280 Punkten
+    // rechts abgeschnitten). minSize ist das explizit gesetzte Minimum,
+    // minHint das der Layouts; Qt nimmt je Achse das explizite, wenn
+    // eines gesetzt ist, sonst den Hint.
+    o[QStringLiteral("minSize")] = QJsonObject{
+        {QStringLiteral("w"), w->minimumWidth()}, {QStringLiteral("h"), w->minimumHeight()},
+    };
+    const QSize hint = w->minimumSizeHint();
+    o[QStringLiteral("minHint")] = QJsonObject{
+        {QStringLiteral("w"), hint.width()}, {QStringLiteral("h"), hint.height()},
+    };
 
     // A checkable button's own text names which control it is -- "checked"
     // alone doesn't (the six DSP-style method buttons in a row would all
