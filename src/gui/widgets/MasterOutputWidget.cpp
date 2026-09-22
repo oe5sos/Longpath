@@ -16,6 +16,7 @@
 // =================================================================
 
 #include "MasterOutputWidget.h"
+#include "gui/ScopedChildWidget.h"
 
 #include "core/AppSettings.h"
 #include "core/AudioDeviceConfig.h"
@@ -247,7 +248,8 @@ void MasterOutputWidget::setCurrentOutputDevice(const QString& name)
 
 void MasterOutputWidget::onSpeakerContextMenu(const QPoint& pos)
 {
-    QMenu menu(this);
+    ScopedChildWidget<QMenu> menuOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+    QMenu& menu = *menuOwner.get();
     menu.setTitle(QStringLiteral("Output device"));
 
     auto* group = new QActionGroup(&menu);
@@ -292,6 +294,9 @@ void MasterOutputWidget::onSpeakerContextMenu(const QPoint& pos)
     }
 
     menu.exec(m_speakerBtn->mapToGlobal(pos));
+    // Das Elternteil kann waehrend exec() gestorben sein — dann ist
+    // auch das Menue weg und `this` eine Leiche. Siehe ScopedChildWidget.h.
+    if (!menuOwner) { return; }
 }
 
 void MasterOutputWidget::onAudioEngineVolumeChanged(float v)

@@ -14,6 +14,7 @@
 // =================================================================
 
 #include "LogbookWindow.h"
+#include "gui/ScopedChildWidget.h"
 #include "core/LogbookStats.h"
 #include "gui/widgets/LogbookStatsWidget.h"
 
@@ -289,7 +290,8 @@ void LogbookWindow::buildUi()
             return;
         }
 
-        QMenu menu(this);
+        ScopedChildWidget<QMenu> menuOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+        QMenu& menu = *menuOwner.get();
         auto* header = menu.addAction(fromSelection
             ? QStringLiteral("Send %1 marked contacts to…").arg(rows.size())
             : QStringLiteral("Send %1 not yet uploaded to…").arg(rows.size()));
@@ -311,6 +313,9 @@ void LogbookWindow::buildUi()
         }
         QAction* chosen = menu.exec(m_uploadBtn->mapToGlobal(
             QPoint(0, m_uploadBtn->height())));
+        // Das Elternteil kann waehrend exec() gestorben sein — dann ist
+        // auch das Menue weg und `this` eine Leiche. Siehe ScopedChildWidget.h.
+        if (!menuOwner) { return; }
         if (chosen && map.contains(chosen)) {
             uploadEntries(rows, map.value(chosen));
         }
@@ -463,7 +468,8 @@ void LogbookWindow::buildUi()
 
     connect(m_table->horizontalHeader(), &QHeaderView::customContextMenuRequested,
             this, [this](const QPoint& pos) {
-        QMenu menu(this);
+        ScopedChildWidget<QMenu> menuOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+        QMenu& menu = *menuOwner.get();
         const QStringList labels = headerLabels();
         for (int c = 0; c < ColumnCount; ++c) {
             QAction* a = menu.addAction(labels.at(c));
@@ -476,6 +482,9 @@ void LogbookWindow::buildUi()
             });
         }
         menu.exec(m_table->horizontalHeader()->mapToGlobal(pos));
+        // Das Elternteil kann waehrend exec() gestorben sein — dann ist
+        // auch das Menue weg und `this` eine Leiche. Siehe ScopedChildWidget.h.
+        if (!menuOwner) { return; }
     });
 
     connect(m_table->horizontalHeader(), &QHeaderView::sectionResized,
@@ -908,7 +917,8 @@ void LogbookWindow::showRowMenu(const QPoint& pos)
     if (idx < 0) { return; }
     const LogEntry& e = m_all.at(idx);
 
-    QMenu menu(this);
+    ScopedChildWidget<QMenu> menuOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+    QMenu& menu = *menuOwner.get();
 
     // The bearing is only meaningful when both locators are known —
     // ours and theirs. Without it the entry has a bearing field holding
@@ -950,6 +960,9 @@ void LogbookWindow::showRowMenu(const QPoint& pos)
     connect(edit, &QAction::triggered, this, &LogbookWindow::editSelected);
 
     menu.exec(m_table->viewport()->mapToGlobal(pos));
+    // Das Elternteil kann waehrend exec() gestorben sein — dann ist
+    // auch das Menue weg und `this` eine Leiche. Siehe ScopedChildWidget.h.
+    if (!menuOwner) { return; }
 }
 
 void LogbookWindow::refreshTable()

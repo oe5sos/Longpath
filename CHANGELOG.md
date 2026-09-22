@@ -97,6 +97,22 @@
 
 ### Fixed
 
+- **Kontextmenues liegen nicht mehr auf dem Stapel.** Ein QMenu mit
+  `parent = this` ist trotzdem ein eigenes Fenster, und `exec()` dreht
+  eine eigene Ereignisschleife — stirbt das Elternteil darin, raeumt Qt
+  das Menue mit ab, und der Rahmenausgang gibt dieselbe Adresse ein
+  zweites Mal frei. Am 2026-08-30 hat genau das Longpath beendet
+  ("pointer being freed was not allocated", Kontextmenue der
+  Profilleiste offen, Fenster geschlossen); damals wurde die
+  Aufraeumschleife entschaerft, die Ursache blieb. Alle 28 Stellen
+  legen ihr Menue jetzt ueber `ScopedChildWidget` auf den Haufen —
+  gleiche Elternschaft, gleiches Verhalten, aber nichts mehr, was
+  doppelt freigegeben werden koennte. Und jede Stelle fragt nach
+  `exec()` erst den Halter, ob ihr Elternteil noch da ist, ehe sie
+  wieder an `this` fasst — sonst liefe die Auswertung des Menuepunkts
+  auf einer Leiche. Pruefstand `tst_scoped_child_widget` (mit rohem
+  Zeiger statt QPointer: SIGSEGV).
+
 - **FFTWs Planer lief ohne Sperre.** Je Genauigkeit gibt es genau einen,
   prozessweit, und keiner ist threadsicher — Longpath plante trotzdem aus
   mehreren Faeden gleichzeitig: ein Panadapter je Scheibe (jeder auf

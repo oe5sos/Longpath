@@ -117,6 +117,7 @@
 //============================================================================================//
 
 #include "RxApplet.h"
+#include "gui/ScopedChildWidget.h"
 #include "gui/widgets/RxProfilePopup.h"
 #include "core/RxProfileManager.h"
 #include "gui/styles/ThemeQss.h"
@@ -325,7 +326,8 @@ void RxApplet::buildUi()
         ));
         connect(m_rxAntBtn, &QPushButton::clicked, this, [this] {
             // B3: AntennaPopupBuilder — capability-gated popup (Phase 3P-I-a T22).
-            QMenu menu(this);
+            ScopedChildWidget<QMenu> menuOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+            QMenu& menu = *menuOwner.get();
             // Dark popup palette — without this, Ubuntu's default theme renders
             // items as dark-on-dark (only visible on hover). Issue #98.
             menu.setStyleSheet(Style::themed(QStringLiteral(
@@ -347,6 +349,9 @@ void RxApplet::buildUi()
             menu.setStyleSheet(QString::fromLatin1(kPopupMenu));  // Phase 3P-I-a T22 — issue #98
             const QAction* sel = menu.exec(
                 m_rxAntBtn->mapToGlobal(QPoint(0, m_rxAntBtn->height())));
+            // Das Elternteil kann waehrend exec() gestorben sein — dann ist
+            // auch das Menue weg und `this` eine Leiche. Siehe ScopedChildWidget.h.
+            if (!menuOwner) { return; }
             if (sel && m_slice) {
                 const QString text = sel->data().isValid() ? sel->data().toString()
                                                            : sel->text();
@@ -372,7 +377,8 @@ void RxApplet::buildUi()
         )));
         connect(m_txAntBtn, &QPushButton::clicked, this, [this] {
             // B3: AntennaPopupBuilder TX mode — only main ANT1-3 (Phase 3P-I-a T22).
-            QMenu menu(this);
+            ScopedChildWidget<QMenu> menuOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+            QMenu& menu = *menuOwner.get();
             // Dark popup palette — see RX button above. Issue #98.
             menu.setStyleSheet(Style::themed(QStringLiteral(
                 "QMenu { background: #1a2a3a; color: #c8d8e8;"
@@ -393,6 +399,9 @@ void RxApplet::buildUi()
             menu.setStyleSheet(QString::fromLatin1(kPopupMenu));  // Phase 3P-I-a T22 — issue #98
             const QAction* sel = menu.exec(
                 m_txAntBtn->mapToGlobal(QPoint(0, m_txAntBtn->height())));
+            // Das Elternteil kann waehrend exec() gestorben sein — dann ist
+            // auch das Menue weg und `this` eine Leiche. Siehe ScopedChildWidget.h.
+            if (!menuOwner) { return; }
             if (sel && m_slice) {
                 const QString text = sel->data().isValid() ? sel->data().toString()
                                                            : sel->text();

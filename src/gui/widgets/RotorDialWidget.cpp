@@ -11,6 +11,7 @@
 // =================================================================
 
 #include "RotorDialWidget.h"
+#include "gui/ScopedChildWidget.h"
 
 #include "core/AppSettings.h"
 #include "gui/StyleConstants.h"
@@ -131,7 +132,8 @@ RotorDialWidget::RotorDialWidget(QWidget* parent)
 
 void RotorDialWidget::contextMenuEvent(QContextMenuEvent* ev)
 {
-    QMenu menu(this);
+    ScopedChildWidget<QMenu> menuOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+    QMenu& menu = *menuOwner.get();
     auto* group = new QActionGroup(&menu);
     group->setExclusive(true);
 
@@ -155,6 +157,9 @@ void RotorDialWidget::contextMenuEvent(QContextMenuEvent* ev)
         });
     }
     menu.exec(ev->globalPos());
+    // Das Elternteil kann waehrend exec() gestorben sein — dann ist
+    // auch das Menue weg und `this` eine Leiche. Siehe ScopedChildWidget.h.
+    if (!menuOwner) { return; }
     ev->accept();
 }
 

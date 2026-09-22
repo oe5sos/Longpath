@@ -15,6 +15,7 @@
 // =================================================================
 
 #include "GlobeWidget.h"
+#include "gui/ScopedChildWidget.h"
 #include "WorldTexture.h"
 #include "core/AppSettings.h"
 #include "gui/ColorSwatchButton.h"
@@ -388,7 +389,8 @@ void GlobeWidget::resetView()
 // Bedienflaeche — hier steht jetzt, dass die Kugel zoomt.
 void GlobeWidget::contextMenuEvent(QContextMenuEvent* e)
 {
-    QMenu menu(this);
+    ScopedChildWidget<QMenu> menuOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+    QMenu& menu = *menuOwner.get();
     // Dieselbe Menue-Optik wie ueberall sonst (RxApplet, VFO-Flagge,
     // Panadapter): sonst sieht ein Menue nach einem anderen Programm aus.
     menu.setStyleSheet(QString::fromLatin1(kPopupMenu));
@@ -409,6 +411,9 @@ void GlobeWidget::contextMenuEvent(QContextMenuEvent* e)
     // Navigation: Zoom, Ziel anfliegen, Ansicht zuruecksetzen.
 
     const QAction* chosen = menu.exec(e->globalPos());
+    // Das Elternteil kann waehrend exec() gestorben sein — dann ist
+    // auch das Menue weg und `this` eine Leiche. Siehe ScopedChildWidget.h.
+    if (!menuOwner) { return; }
     if (chosen == in)        { zoomBy(1.3); }
     else if (chosen == out)  { zoomBy(1.0 / 1.3); }
     else if (chosen == toTx && m_hasTarget) { flyTo(m_targetLat, m_targetLon); }

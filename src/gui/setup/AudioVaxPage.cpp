@@ -15,6 +15,7 @@
 // =================================================================
 
 #include "AudioVaxPage.h"
+#include "gui/ScopedChildWidget.h"
 #include "gui/styles/ThemeQss.h"
 #include "gui/StyleConstants.h"
 
@@ -684,7 +685,8 @@ void VaxChannelCard::onAutoDetectClicked()
     const QVector<DetectedCable> cables = VirtualCableDetector::scan();
 #endif
 
-    QMenu menu(this);
+    ScopedChildWidget<QMenu> menuOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+    QMenu& menu = *menuOwner.get();
     menu.setStyleSheet(Style::themed(
         "QMenu { background: #0f0f1a; color: #c8d8e8; border: 1px solid #203040; }"
         "QMenu::item:selected { background: #203040; }"
@@ -817,6 +819,9 @@ void VaxChannelCard::onAutoDetectClicked()
 
     menu.exec(m_autoDetectBtn->mapToGlobal(
         QPoint(0, m_autoDetectBtn->height())));
+    // Das Elternteil kann waehrend exec() gestorben sein — dann ist
+    // auch das Menue weg und `this` eine Leiche. Siehe ScopedChildWidget.h.
+    if (!menuOwner) { return; }
 }
 
 // ---------------------------------------------------------------------------

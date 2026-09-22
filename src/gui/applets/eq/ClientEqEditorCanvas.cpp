@@ -25,6 +25,7 @@
 // =================================================================
 
 #include "gui/applets/eq/ClientEqEditorCanvas.h"
+#include "gui/ScopedChildWidget.h"
 #include "gui/applets/eq/EqFilterRing.h"
 #include "gui/applets/eq/EqHost.h"
 #include "core/strip/ClientEq.h"
@@ -280,7 +281,8 @@ void ClientEqEditorCanvas::contextMenuEvent(QContextMenuEvent* ev)
     if (idx < 0) { QWidget::contextMenuEvent(ev); return; }
 
     const auto bp = m_eq->band(idx);
-    QMenu menu(this);
+    ScopedChildWidget<QMenu> menuOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+    QMenu& menu = *menuOwner.get();
 
     auto* typeLabel = menu.addAction(
         QString("Band %1 — %2").arg(idx + 1)
@@ -317,6 +319,9 @@ void ClientEqEditorCanvas::contextMenuEvent(QContextMenuEvent* ev)
     auto* resetAct = menu.addAction("Reset to default");
 
     QAction* chosen = menu.exec(ev->globalPos());
+    // Das Elternteil kann waehrend exec() gestorben sein — dann ist
+    // auch das Menue weg und `this` eine Leiche. Siehe ScopedChildWidget.h.
+    if (!menuOwner) { return; }
     if (!chosen) return;
 
     // Same path as the double-click and as the icon row. The menu used

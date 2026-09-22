@@ -104,6 +104,7 @@
 //                                    Anthropic Claude Code.
 
 #include "SpotHubDialog.h"
+#include "gui/ScopedChildWidget.h"
 #include "gui/StyleConstants.h"
 #include "gui/styles/ThemeQss.h"
 
@@ -2904,7 +2905,8 @@ void SpotHubDialog::buildSpotListTab(QTabWidget* tabs)
             Qt::DisplayRole).toString();
         const bool offerParkInfo = !reference.isEmpty() && rowSource == QLatin1String("POTA");
 
-        QMenu menu(this);
+        ScopedChildWidget<QMenu> menuOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+        QMenu& menu = *menuOwner.get();
         QAction* tune  = menu.addAction(
             QStringLiteral("Tune to %1").arg(call));
         QAction* rotor = menu.addAction(
@@ -2922,6 +2924,9 @@ void SpotHubDialog::buildSpotListTab(QTabWidget* tabs)
             : nullptr;
         QAction* chosen =
             menu.exec(m_spotTable->viewport()->mapToGlobal(pos));
+            // Das Elternteil kann waehrend exec() gestorben sein — dann ist
+            // auch das Menue weg und `this` eine Leiche. Siehe ScopedChildWidget.h.
+            if (!menuOwner) { return; }
         if (chosen == tune && freq > 0.0) {
             emit tuneRequested(freq);
         } else if (chosen == rotor) {

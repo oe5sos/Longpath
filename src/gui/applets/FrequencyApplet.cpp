@@ -5,6 +5,7 @@
 // =================================================================
 
 #include "gui/applets/FrequencyApplet.h"
+#include "gui/ScopedChildWidget.h"
 
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
@@ -232,7 +233,8 @@ void FrequencyApplet::toggleKiwiDisplay()
 
 void FrequencyApplet::contextMenuEvent(QContextMenuEvent* ev)
 {
-    QMenu menu(this);
+    ScopedChildWidget<QMenu> menuOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+    QMenu& menu = *menuOwner.get();
 
     // Haken, keine Punkte: die beiden Zeilen sind unabhaengig. Ein
     // Auswahlkranz aus "keine / Stehwelle / SWR / beide" waere
@@ -294,6 +296,9 @@ void FrequencyApplet::contextMenuEvent(QContextMenuEvent* ev)
     // Ein Menuepunkt fuer etwas, das nichts mehr aendert, ist eine
     // Falle -- weg statt weiter anzubieten.
     menu.exec(ev->globalPos());
+    // Das Elternteil kann waehrend exec() gestorben sein — dann ist
+    // auch das Menue weg und `this` eine Leiche. Siehe ScopedChildWidget.h.
+    if (!menuOwner) { return; }
     ev->accept();
 }
 
