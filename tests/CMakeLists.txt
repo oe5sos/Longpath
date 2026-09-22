@@ -304,10 +304,6 @@ longpath_add_test(tst_puresignal_caps)
 # Source: Thetis wdsp/calcc.c:891-1132 [v2.10.3.13] @501e3f51.
 longpath_add_test(tst_wdsp_ps_smoke)
 
-# -- Waterfall time markers (Longpath-original, 2026-09-21): clock-aligned
-#    boundaries across the visible rows, labels, zones, silent labels --
-nereus_add_test(tst_waterfall_time_markers)
-
 # -- Logbook Kennzahlen + Awards (2026-09-18): totals, distributions,
 #    countries via cty.dat with the Sicily fold, DXCC/WAS/grids/zones --
 longpath_add_test(tst_logbook_stats)
@@ -4853,6 +4849,9 @@ longpath_add_test(tst_kiwi_tx_mute)
 # Schranke (nie eine echte, DDC-gebundene Scheibe fuettern/steuern),
 # hier fuer KiwiSDR nachgezogen. Siehe Kommentarkopf der Testdatei.
 longpath_add_test(tst_kiwi_sdr_safety_gate)
+# -- Waterfall time markers (Longpath-original, 2026-09-21): clock-aligned
+#    boundaries across the visible rows, labels, zones, silent labels --
+longpath_add_test(tst_waterfall_time_markers)
 longpath_add_test(tst_sunsdr_audio_feed)
 longpath_add_test(tst_sunsdr_is_reachable)
 longpath_add_test(tst_compact_bar_draws)
