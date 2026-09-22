@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Einstellungs-Backup (File > Settings Backups...)** -- die Backup-
+  Haelfte von Thetis' Datenbank-Manager (clsDBMan.cs / frmDBMan.cs):
+  Kopien der Einstellungsdatei in `backups/` mit Beschreibung, Liste
+  mit Zeit und Alter, Wiederherstellen (Sicherheitskopie „Before
+  restore", dann Beenden ohne Speichern), Umbenennen, Exportieren,
+  Entfernen, Ordner oeffnen; auf Wunsch automatische Kopien beim Start
+  und beim Beenden mit Thetis' Grossvater-Vater-Sohn-Ausduennung (7 Tage
+  alles, dann je Woche/Monat/Jahr eine; nur automatische Kopien werden
+  geloescht). Alles aus, bis es eingeschaltet wird -- wie bei Thetis.
+
 ### Changed
 
 - **Das Logbuch ist eine Seite.** Nach dem Bild der Vorlage (Betreiber,
@@ -128,17 +140,6 @@ Programm, das der Betreiber taeglich benutzte.
 - **Fussleiste: "ON AIR" passte unter Linux nicht in seinen Platz** --
   78 Punkte waren am Mac gemessen, die Linux-Schrift braucht 81; jetzt
   84.
-### Added
-
-- **Einstellungs-Backup (File > Settings Backups...)** -- die Backup-
-  Haelfte von Thetis' Datenbank-Manager (clsDBMan.cs / frmDBMan.cs):
-  Kopien der Einstellungsdatei in `backups/` mit Beschreibung, Liste
-  mit Zeit und Alter, Wiederherstellen (Sicherheitskopie „Before
-  restore", dann Beenden ohne Speichern), Umbenennen, Exportieren,
-  Entfernen, Ordner oeffnen; auf Wunsch automatische Kopien beim Start
-  und beim Beenden mit Thetis' Grossvater-Vater-Sohn-Ausduennung (7 Tage
-  alles, dann je Woche/Monat/Jahr eine; nur automatische Kopien werden
-  geloescht). Alles aus, bis es eingeschaltet wird -- wie bei Thetis.
 
 ## [0.6.3] - 2026-09-21
 

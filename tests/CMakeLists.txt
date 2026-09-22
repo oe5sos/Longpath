@@ -313,11 +313,6 @@ longpath_add_test(tst_logbook_stats_widget)
 #    cannot hold is bounded and reported, not read from beyond the
 #    allocation. NereusSDR-original bound, 2026-09-20 --
 longpath_add_test(tst_wdsp_delay_clamp)
-# -- Settings backups (Thetis clsDBMan.cs / frmDBMan.cs, the backup half
-#    of the Database Manager, 2026-09-20): copy + sidecar, listing,
-#    rename/remove/export/restore, the GFS prune, the dialog --
-longpath_add_test(tst_settings_backup)
-longpath_add_test(tst_settings_backup_dialog)
 
 # ── Phase 3M-4 Task 3: TxChannel PureSignal API wrappers (22 functions) ──
 # Smoke tests for the 22 PS API wrappers added in Task 3:
@@ -4854,6 +4849,11 @@ longpath_add_test(tst_kiwi_tx_mute)
 # Schranke (nie eine echte, DDC-gebundene Scheibe fuettern/steuern),
 # hier fuer KiwiSDR nachgezogen. Siehe Kommentarkopf der Testdatei.
 longpath_add_test(tst_kiwi_sdr_safety_gate)
+# -- Settings backups (Thetis clsDBMan.cs / frmDBMan.cs, the backup half
+#    of the Database Manager, 2026-09-20): copy + sidecar, listing,
+#    rename/remove/export/restore, the GFS prune, the dialog --
+longpath_add_test(tst_settings_backup)
+longpath_add_test(tst_settings_backup_dialog)
 longpath_add_test(tst_sunsdr_audio_feed)
 longpath_add_test(tst_sunsdr_is_reachable)
 longpath_add_test(tst_compact_bar_draws)
