@@ -37,6 +37,13 @@
   Namen speichern und mit einem Klick wieder laden (Load / Save / Delete
   / Save As). Frequenz, Modus und Filter bleiben aussen vor, das ist die
   Sache der Frequenzspeicher. Profile gelten geraeteuebergreifend.
+- **Zeitmarken im Wasserfall** (Setup > Display > Time Markers: aus, 15 s,
+  30 s, 1/5/10/15 min): duenne Linien quer ueber den Wasserfall an den
+  Uhrgrenzen, jede mit der Uhrzeit beschriftet (UTC oder lokal, wie der
+  Zeitstempel). Jede Zeile traegt ihren eigenen Zeitstempel, darum
+  laufen die Marken mit ihren Zeilen mit und stehen in einer
+  angehaltenen Historie still. Aus, bis man es einschaltet. Idee aus
+  AetherSDR v26.9.3.
 
 ### Changed
 
