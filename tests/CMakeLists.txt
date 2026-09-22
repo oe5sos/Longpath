@@ -4864,6 +4864,10 @@ longpath_add_test(tst_memory_dialog)
 #    rename/remove/export/restore, the GFS prune, the dialog --
 longpath_add_test(tst_settings_backup)
 longpath_add_test(tst_settings_backup_dialog)
+# -- Receive profiles (Longpath-original, 2026-09-20): AGC / NR / NB /
+#    ANF / squelch of a slice under a name -- manager + popup --
+longpath_add_test(tst_rx_profile_manager)
+longpath_add_test(tst_rx_profile_popup)
 longpath_add_test(tst_sunsdr_audio_feed)
 longpath_add_test(tst_sunsdr_is_reachable)
 longpath_add_test(tst_compact_bar_draws)

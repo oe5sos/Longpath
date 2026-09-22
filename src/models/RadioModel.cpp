@@ -256,6 +256,7 @@ warren@wpratt.com
 #include "core/MoxController.h"
 #include "core/safety/RegionSetting.h"
 #include "core/MicProfileManager.h"
+#include "core/RxProfileManager.h"
 #include "core/PaProfile.h"
 #include "core/PaProfileManager.h"
 #include "core/PaTelemetryScaling.h"
@@ -1095,6 +1096,11 @@ RadioModel::RadioModel(QObject* parent)
     // AppSettings.  The activeProfileChanged signal is consumed by the UI
     // (TxApplet J.1 + TxProfileSetupPage J.3) for combo-selection mirror.
     m_micProfileMgr = new MicProfileManager(this);
+
+    // Receive profiles: no wiring beyond ownership -- applyProfile writes
+    // SliceModel properties through their setters, which persist and
+    // signal on their own.
+    m_rxProfileMgr = new RxProfileManager(AppSettings::instance(), this);
 
     // ── Phase 4 Agent 4A of #167: PaProfileManager ───────────────────────────
     //

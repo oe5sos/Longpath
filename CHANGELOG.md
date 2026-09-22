@@ -31,6 +31,12 @@
   und beim Beenden mit Thetis' Grossvater-Vater-Sohn-Ausduennung (7 Tage
   alles, dann je Woche/Monat/Jahr eine; nur automatische Kopien werden
   geloescht). Alles aus, bis es eingeschaltet wird -- wie bei Thetis.
+- **RX-Profile (Zahnrad des RX-Applets)**: die Empfangsverarbeitung
+  einer Scheibe -- AGC, Rauschminderung samt Parametern aller Plaetze,
+  Autonotch, Stoeraustaster, Rauschsperre, APF, binaural -- unter einem
+  Namen speichern und mit einem Klick wieder laden (Load / Save / Delete
+  / Save As). Frequenz, Modus und Filter bleiben aussen vor, das ist die
+  Sache der Frequenzspeicher. Profile gelten geraeteuebergreifend.
 
 ### Changed
 

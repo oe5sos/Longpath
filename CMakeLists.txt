@@ -506,6 +506,7 @@ set(CORE_SOURCES
     src/core/antenna/RadioSweep.cpp
     src/core/AppSettings.cpp
     src/core/SettingsBackup.cpp
+    src/core/RxProfileManager.cpp
     src/core/BeamHeading.cpp
     src/core/BoardCapabilities.cpp
     src/core/CallsignCache.cpp
@@ -1064,6 +1065,7 @@ set(GUI_SOURCES
     src/gui/widgets/WorldTexture.cpp
     src/gui/LogbookWindow.cpp
     src/gui/SettingsBackupDialog.cpp
+    src/gui/widgets/RxProfilePopup.cpp
     src/gui/QsoMapWindow.cpp
     src/core/DxccFlag.cpp
     src/core/SolarTimes.cpp

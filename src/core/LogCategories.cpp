@@ -27,6 +27,7 @@ Q_LOGGING_CATEGORY(lcSpots,      "longpath.spots")
 Q_LOGGING_CATEGORY(lcAutomation, "longpath.automation")
 Q_LOGGING_CATEGORY(lcMemories,   "longpath.memories", QtInfoMsg)
 Q_LOGGING_CATEGORY(lcSettingsBackup, "longpath.settingsbackup", QtInfoMsg)
+Q_LOGGING_CATEGORY(lcRxProfiles,  "longpath.rxprofiles", QtInfoMsg)
 
 // --- LogManager ---
 
