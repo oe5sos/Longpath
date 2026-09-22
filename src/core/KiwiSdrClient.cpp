@@ -60,7 +60,11 @@ constexpr quint8 kSoundCompressedFlag = 0x10;
 constexpr quint8 kSoundRestartFlag = 0x20;
 constexpr int kSpecWaterfallHeaderBytes = 4;
 constexpr int kExtendedWaterfallHeaderBytes = 16;
-constexpr int kDefaultWaterfallZoomCap = 14;
+// KiwiSDR MAX_ZOOM (rx/rx_waterfall.h): seeds both the start fixed-point
+// scale (WF_WIDTH << zoom_max) and the request ceiling until the server
+// advertises its own zoom_max / zoom_cap (AetherSDR #5536/#5655
+// [@6701ffbc, @4a70e2b4]).
+constexpr int kDefaultWaterfallZoomMax = 14;
 constexpr int kDefaultWaterfallFftBins = 1024;
 constexpr int kWaterfallMinDbmLimit = -260;
 constexpr int kWaterfallMaxDbmLimit = 30;
@@ -69,7 +73,6 @@ constexpr int kWaterfallAutoMinRows = kWaterfallAutoHistoryRows;
 constexpr float kWaterfallAutoReuseToleranceDb = 5.0f;
 constexpr quint64 kMaxSequenceGapPaddingFrames = 8;
 constexpr int kWaterfallGuiMinIntervalMs = 33;
-constexpr double kWaterfallStartFixedPointScale = 16777216.0; // 2^24
 constexpr quint64 kWebSocketSessionIdBase = 1ULL << 62;
 constexpr const char* kSoundCompressionEnv = "AETHER_KIWI_SND_COMP";
 constexpr const char* kWaterfallCompressionEnv = "AETHER_KIWI_WF_COMP";
@@ -213,29 +216,6 @@ double waterfallZoomScale(int zoom)
 double waterfallRowSpanMhz(double fullBandwidthMhz, int zoom)
 {
     return fullBandwidthMhz / waterfallZoomScale(zoom);
-}
-
-quint32 waterfallStartFixedPoint(double fullLowMhz, double fullBandwidthMhz,
-                                 double rowLowMhz)
-{
-    const double requested = fullBandwidthMhz > 0.0
-        ? ((rowLowMhz - fullLowMhz) / fullBandwidthMhz)
-              * kWaterfallStartFixedPointScale
-        : 0.0;
-    return static_cast<quint32>(std::clamp(
-        std::isfinite(requested) ? std::round(requested) : 0.0,
-        0.0,
-        std::min(kWaterfallStartFixedPointScale - 1.0,
-                 static_cast<double>(std::numeric_limits<quint32>::max()))));
-}
-
-double waterfallStartFixedPointToLowMhz(double fullLowMhz,
-                                        double fullBandwidthMhz,
-                                        quint32 start)
-{
-    return fullLowMhz
-        + (static_cast<double>(start) / kWaterfallStartFixedPointScale)
-            * fullBandwidthMhz;
 }
 
 double waterfallMetadataValueToMhz(double value)
@@ -549,7 +529,9 @@ void KiwiSdrClient::connectToEndpoint(const QString& endpoint,
     }
     m_waterfallServerCenterMhz = kDefaultWaterfallCenterMhz;
     m_waterfallServerBandwidthMhz = kDefaultWaterfallBandwidthMhz;
-    m_waterfallZoomCap = kDefaultWaterfallZoomCap;
+    m_waterfallZoomMax = kDefaultWaterfallZoomMax;
+    m_waterfallZoomCap = kDefaultWaterfallZoomMax;
+    m_waterfallZoomCapFromServer = false;
     m_waterfallFftBins = kDefaultWaterfallFftBins;
     m_waterfallRequestValid = false;
     m_waterfallRequestPanId.clear();
@@ -1474,6 +1456,14 @@ void KiwiSdrClient::sendReceiverControlsToServer()
         c.agcGainDb, c.agcDecayMs));
 }
 
+int KiwiSdrClient::effectiveWaterfallZoomCap() const
+{
+    // One ceiling for both directions: the zoom we request and the zoom a
+    // frame header may carry. A cap above zoom_max is meaningless, so the
+    // lower of the two wins.
+    return std::clamp(std::min(m_waterfallZoomCap, m_waterfallZoomMax), 0, 20);
+}
+
 void KiwiSdrClient::sendWaterfallViewToServer()
 {
     if (receiverControlSuppressed()) {
@@ -1510,7 +1500,12 @@ void KiwiSdrClient::sendWaterfallViewToServer()
         : kDefaultWaterfallCenterMhz;
     const double fullLowMhz = fullCenterMhz - fullBandwidthMhz * 0.5;
     const double fullHighMhz = fullCenterMhz + fullBandwidthMhz * 0.5;
-    const int zoomCap = std::clamp(m_waterfallZoomCap, 0, 20);
+    // zoom_cap bounds the zoom we may request; zoom_max fixes the scale
+    // (never zoom_cap: a KiwiSDR shared waterfall sends zoom_cap=11 next
+    // to zoom_max=14 and still reads start on the 2^24 scale).
+    const int zoomCap = effectiveWaterfallZoomCap();
+    const double startScale =
+        KiwiSdrProtocol::waterfallStartFixedPointScale(m_waterfallZoomMax);
     const double halfBandwidthMhz = std::max(0.0005, viewBandwidthMhz * 0.5);
     const double viewLowMhz = std::clamp(viewCenterMhz - halfBandwidthMhz,
                                          fullLowMhz,
@@ -1539,10 +1534,10 @@ void KiwiSdrClient::sendWaterfallViewToServer()
             viewMidMhz - candidateRowSpanMhz * 0.5,
             fullLowMhz,
             std::max(fullLowMhz, fullHighMhz - candidateRowSpanMhz));
-        const quint32 candidateStart = waterfallStartFixedPoint(
-            fullLowMhz, fullBandwidthMhz, candidateLowMhz);
-        candidateLowMhz = waterfallStartFixedPointToLowMhz(
-            fullLowMhz, fullBandwidthMhz, candidateStart);
+        const quint32 candidateStart = KiwiSdrProtocol::waterfallStartFixedPoint(
+            fullLowMhz, fullBandwidthMhz, candidateLowMhz, startScale);
+        candidateLowMhz = KiwiSdrProtocol::waterfallStartFixedPointToLowMhz(
+            fullLowMhz, fullBandwidthMhz, candidateStart, startScale);
         const double candidateHighMhz = candidateLowMhz
             + std::min(fullBandwidthMhz,
                        waterfallRowSpanMhz(fullBandwidthMhz, candidate));
@@ -1554,7 +1549,7 @@ void KiwiSdrClient::sendWaterfallViewToServer()
         // requested.
         const double coverEpsilonMhz = std::max(
             1.0e-9,
-            (fullBandwidthMhz / kWaterfallStartFixedPointScale) * 2.0);
+            (fullBandwidthMhz / startScale) * 2.0);
         if (candidateLowMhz <= viewLowMhz + coverEpsilonMhz
             && candidateHighMhz + coverEpsilonMhz >= viewHighMhz) {
             zoom = candidate;
@@ -1567,8 +1562,8 @@ void KiwiSdrClient::sendWaterfallViewToServer()
     }
     if (!selectedRequest) {
         zoom = 0;
-        start = waterfallStartFixedPoint(fullLowMhz, fullBandwidthMhz,
-                                         fullLowMhz);
+        start = KiwiSdrProtocol::waterfallStartFixedPoint(
+            fullLowMhz, fullBandwidthMhz, fullLowMhz, startScale);
         requestLowMhz = fullLowMhz;
         requestHighMhz = fullHighMhz;
     }
@@ -1911,7 +1906,7 @@ bool KiwiSdrClient::parseWaterfallFrameHeader(const QByteArray& frame,
 
     const quint32 parsedStart = readLittleEndianU32(frame.constData() + 4);
     const int parsedZoom = static_cast<uchar>(frame[8]);
-    if (parsedZoom < 0 || parsedZoom > m_waterfallZoomCap) {
+    if (parsedZoom < 0 || parsedZoom > effectiveWaterfallZoomCap()) {
         return false;
     }
     if (start) {
@@ -1926,7 +1921,7 @@ bool KiwiSdrClient::parseWaterfallFrameHeader(const QByteArray& frame,
 QVector<float> KiwiSdrClient::decodeWaterfallFrame(const QByteArray& frame) const
 {
     QVector<float> bins = KiwiSdrProtocol::decodeWaterfallFrame(
-        frame, m_waterfallZoomCap).binsDbm;
+        frame, effectiveWaterfallZoomCap()).binsDbm;
     if (m_waterfallCalibrationDb != 0) {
         for (float& bin : bins) {
             bin = KiwiSdrProtocol::calibratedWaterfallLevel(
@@ -2258,7 +2253,7 @@ void KiwiSdrClient::handleWaterfallFrame(const QByteArray& frame)
     const KiwiSdrProtocol::WaterfallLineHeader header =
         KiwiSdrProtocol::parseWaterfallLineHeader(frame);
     recordFrameObservation(
-        KiwiSdrProtocol::classifyWaterfallFrame(frame, m_waterfallZoomCap));
+        KiwiSdrProtocol::classifyWaterfallFrame(frame, effectiveWaterfallZoomCap()));
     const quint64 sequenceGaps = header.valid
         ? KiwiSdrProtocol::sequenceGapCount(m_telemetry.waterfallSequence,
                                             header.sequence)
@@ -2277,8 +2272,8 @@ void KiwiSdrClient::handleWaterfallFrame(const QByteArray& frame)
     }
 
     const QVector<float> rawBins =
-        KiwiSdrProtocol::decodeWaterfallFrame(frame,
-                                              m_waterfallZoomCap).binsDbm;
+        KiwiSdrProtocol::decodeWaterfallFrame(
+            frame, effectiveWaterfallZoomCap()).binsDbm;
     if (rawBins.isEmpty()) {
         return;
     }
@@ -2315,8 +2310,9 @@ void KiwiSdrClient::handleWaterfallFrame(const QByteArray& frame)
             ? m_waterfallServerCenterMhz
             : kDefaultWaterfallCenterMhz;
         const double fullLowMhz = fullCenterMhz - fullBandwidthMhz * 0.5;
-        rowLowMhz = waterfallStartFixedPointToLowMhz(
-            fullLowMhz, fullBandwidthMhz, frameStart);
+        rowLowMhz = KiwiSdrProtocol::waterfallStartFixedPointToLowMhz(
+            fullLowMhz, fullBandwidthMhz, frameStart,
+            KiwiSdrProtocol::waterfallStartFixedPointScale(m_waterfallZoomMax));
         rowHighMhz = rowLowMhz
             + std::min(fullBandwidthMhz,
                        waterfallRowSpanMhz(fullBandwidthMhz, frameZoom));
@@ -2599,11 +2595,26 @@ void KiwiSdrClient::handleTextMessage(StreamKind stream, const QString& text)
                 m_waterfallRequestValid = false;
                 sendWaterfallViewToServer();
             }
-        } else if (key == QStringLiteral("zoom_cap")
-                   || key == QStringLiteral("zoom_max")) {
-            m_waterfallZoomCap = std::clamp(static_cast<int>(value), 0, 20);
-            m_waterfallRequestValid = false;
-            sendWaterfallViewToServer();
+        } else if (key == QStringLiteral("zoom_max")) {
+            // MAX_ZOOM: the start fixed-point scale. The request ceiling
+            // follows it unless the server sent an explicit zoom_cap.
+            if (std::isfinite(value)) {
+                m_waterfallZoomMax = std::clamp(static_cast<int>(value), 0, 20);
+                if (!m_waterfallZoomCapFromServer) {
+                    m_waterfallZoomCap = m_waterfallZoomMax;
+                }
+                m_waterfallRequestValid = false;
+                sendWaterfallViewToServer();
+            }
+        } else if (key == QStringLiteral("zoom_cap")) {
+            // A ceiling on the zoom we may request (v1.900+ shared
+            // waterfalls send 11 next to zoom_max=14). Never the scale.
+            if (std::isfinite(value)) {
+                m_waterfallZoomCap = std::clamp(static_cast<int>(value), 0, 20);
+                m_waterfallZoomCapFromServer = true;
+                m_waterfallRequestValid = false;
+                sendWaterfallViewToServer();
+            }
         } else if (key == QStringLiteral("wf_fft_size")) {
             updateWaterfallFftBins(static_cast<int>(value));
         } else if (stream == StreamKind::Waterfall

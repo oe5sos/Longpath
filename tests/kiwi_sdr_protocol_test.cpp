@@ -1110,5 +1110,47 @@ int main()
         return fail("dBm to S-unit conversion is wrong");
     }
 
+    // Waterfall start scale follows the server's zoom_max (AetherSDR #5536).
+    {
+        using namespace Longpath::KiwiSdrProtocol;
+        if (waterfallStartFixedPointScale(14) != 16777216.0) {
+            return fail("zoom_max=14 must keep the KiwiSDR 2^24 start scale");
+        }
+        if (waterfallStartFixedPointScale(11) != 2097152.0) {
+            return fail("zoom_max=11 (Web-888) must use the 2^21 start scale");
+        }
+        if (waterfallStartFixedPointScale(-3) != 1024.0
+            || waterfallStartFixedPointScale(40) != waterfallStartFixedPointScale(20)) {
+            return fail("zoom_max must be clamped to [0, 20]");
+        }
+        // 30 MHz span, row starting at 7.0 MHz: the same fraction encodes
+        // to a start 8x smaller on the Web-888 scale, and decodes back.
+        const double fullLow = 0.0, fullBw = 30.0, rowLow = 7.0;
+        const double kiwi = waterfallStartFixedPointScale(14);
+        const double web888 = waterfallStartFixedPointScale(11);
+        const quint32 sKiwi = waterfallStartFixedPoint(fullLow, fullBw, rowLow, kiwi);
+        const quint32 sWeb = waterfallStartFixedPoint(fullLow, fullBw, rowLow, web888);
+        if (sKiwi != 3914684u || sWeb != 489335u) {
+            return fail("waterfall start encoding is wrong for one of the scales");
+        }
+        if (!nearlyEqual(static_cast<float>(
+                waterfallStartFixedPointToLowMhz(fullLow, fullBw, sWeb, web888)),
+                7.0f, 0.001f)) {
+            return fail("waterfall start does not decode back on the Web-888 scale");
+        }
+        // The old fixed constant applied to a Web-888 server exceeds its
+        // range: the encoded start is larger than the scale - 1.
+        if (sKiwi <= static_cast<quint32>(web888 - 1.0)) {
+            return fail("test premise: the 2^24 start must be out of the 2^21 range");
+        }
+        if (waterfallStartFixedPoint(fullLow, fullBw, 31.0, web888) != 2097151u) {
+            return fail("waterfall start must clamp to scale - 1");
+        }
+        if (waterfallStartFixedPoint(fullLow, 0.0, rowLow, web888) != 0u
+            || waterfallStartFixedPointToLowMhz(fullLow, fullBw, 5u, 0.0) != fullLow) {
+            return fail("degenerate span/scale must not divide by zero");
+        }
+    }
+
     return 0;
 }

@@ -87,6 +87,13 @@
   dekodiert (oder WSJT-X neben JTDX), sah falsche Spots. Jetzt je
   Instanz-ID (Status-Nachricht), Close raeumt auf, ein Decode ohne
   bekanntes Dial wird verworfen statt geraten (AetherSDR #3595).
+- **KiwiSDR-Wasserfall auf Servern mit anderem `zoom_max`** (Web-888,
+  RaspSDR: 11 statt 14): der Start-Offset wurde fest auf der
+  2^24-Skala kodiert, der Server klemmte ihn an die Bandkante -- der
+  Ausschnitt stimmte nicht. Der Massstab ist jetzt `1024 << zoom_max`
+  des Servers, `zoom_cap` bleibt allein die Obergrenze der angefragten
+  Zoomstufe (AetherSDR #5536/#5655). Echte KiwiSDR (zoom_max 14) sind
+  unveraendert.
 
 ## [0.6.4] - 2026-09-22
 
