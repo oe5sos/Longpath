@@ -17,6 +17,14 @@
   Mindesthoehe — sonst schob ein schmales Fenster die Karte unter ihre
   Knoepfe. Pruefstand `tst_logbook_one_page`.
 
+### Fixed
+
+- **QSO-Recorder: zwei Starts in derselben Sekunde loeschten die erste
+  Aufnahme.** Der Dateiname traegt den Sekundenstempel, der Schreiber
+  oeffnete mit Truncate. Der Name wird jetzt atomar beansprucht
+  (NewOnly); ist er vergeben, heisst die neue Aufnahme `_1`, `_2`, ...
+  -- eine Aufnahme geht nie mehr durch eine andere verloren.
+
 ## [0.6.4] - 2026-09-22
 
 Der Arbeitsast des Betreibers seit dem 9. September, in `main`
@@ -128,13 +136,6 @@ Programm, das der Betreiber taeglich benutzte.
 - **Fussleiste: "ON AIR" passte unter Linux nicht in seinen Platz** --
   78 Punkte waren am Mac gemessen, die Linux-Schrift braucht 81; jetzt
   84.
-### Fixed
-
-- **QSO-Recorder: zwei Starts in derselben Sekunde loeschten die erste
-  Aufnahme.** Der Dateiname traegt den Sekundenstempel, der Schreiber
-  oeffnete mit Truncate. Der Name wird jetzt atomar beansprucht
-  (NewOnly); ist er vergeben, heisst die neue Aufnahme `_1`, `_2`, ...
-  -- eine Aufnahme geht nie mehr durch eine andere verloren.
 
 ## [0.6.3] - 2026-09-21
 
