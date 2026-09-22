@@ -4,6 +4,18 @@
 
 ### Changed
 
+- **Die Kugel zeigt die Erde.** Ohne eigenes Weltbild setzt sich die Kugel
+  ihr NASA Blue Marble selbst zusammen — aus denselben GIBS-Kacheln, die
+  die flache Karte zeichnet (Stufe 3, 50 Kacheln, 5120 × 2560), einmal
+  beim Start, dann liegt es als Datei samt Vermerk im Kartenordner. Bis
+  dahin (und ohne Netz) bleibt die schematische Kugel. Neuer Fotostil
+  „Natural" als Voreinstellung: das Foto, wie es ist, Tag/Nacht und
+  Randabschattung kommen von der Kugel; „Muted", „Night wash" und
+  „Crisp" bleiben waehlbar. Die Kugel tastet das Foto bilinear ab, damit
+  die Kueste beim Hineinzoomen nicht in Kloetze zerfaellt. Betreiber
+  2026-09-22: „dieses bild als weltkugel ist haesslich". Pruefstand
+  `tst_blue_marble_fetcher` (mit `LONGPATH_NET=1` mit echten Kacheln).
+
 - **Das Logbuch ist eine Seite.** Nach dem Bild der Vorlage (Betreiber,
   2026-09-22): Tabelle, Karte und Detailkarte nebeneinander, die
   Kennzahlen als Reihe darunter. Die Karte ist das Kartenfenster als
