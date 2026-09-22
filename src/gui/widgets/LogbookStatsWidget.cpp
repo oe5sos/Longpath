@@ -13,6 +13,8 @@
 
 #include "gui/widgets/LogbookStatsWidget.h"
 
+#include "gui/widgets/FlowLayout.h"
+
 #include "core/DxccFlag.h"
 #include "gui/StyleConstants.h"
 
@@ -140,10 +142,18 @@ LogbookStatsWidget::LogbookStatsWidget(QWidget* parent)
     setStyleSheet(QStringLiteral("#logbookStats { background: %1; }")
                       .arg(QLatin1String(Style::kAppBg)));
 
-    m_grid = new QGridLayout(this);
-    m_grid->setContentsMargins(10, 10, 10, 10);
+    // Zwei Anordnungen fuer dieselben sechs Kacheln: das Raster fuer den
+    // Dialog, die umbrechende Reihe unter der Logtabelle (schmal wird das
+    // Fenster sonst nie — sechs Kacheln nebeneinander sind fast 1000 px).
+    m_outer = new QVBoxLayout(this);
+    m_outer->setContentsMargins(10, 10, 10, 10);
+    m_grid = new QGridLayout;
+    m_grid->setContentsMargins(0, 0, 0, 0);
     m_grid->setHorizontalSpacing(10);
     m_grid->setVerticalSpacing(10);
+    m_flow = new FlowLayout(nullptr, 10, 10);
+    m_outer->addLayout(m_grid);
+    m_outer->addLayout(m_flow);
 
     QVBoxLayout* body = nullptr;
 
@@ -234,15 +244,19 @@ QLabel* LogbookStatsWidget::valueLine(QWidget* parent)
 
 void LogbookStatsWidget::placeTiles()
 {
-    for (QWidget* w : m_tiles) { m_grid->removeWidget(w); }
-    for (int c = 0; c < 6; ++c) { m_grid->setColumnStretch(c, 0); }
+    for (QWidget* w : m_tiles) {
+        m_grid->removeWidget(w);
+        m_flow->removeWidget(w);
+    }
     if (m_singleRow) {
-        for (int i = 0; i < m_tiles.size(); ++i) {
-            m_grid->addWidget(m_tiles.at(i), 0, i);
-            m_grid->setColumnStretch(i, 1);
+        for (QWidget* w : m_tiles) {
+            // Was in der Zeile uebrig bleibt, teilen sich die Kacheln.
+            w->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+            m_flow->addWidget(w);
         }
     } else {
         for (int i = 0; i < m_tiles.size(); ++i) {
+            m_tiles.at(i)->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
             m_grid->addWidget(m_tiles.at(i), i / 3, i % 3);
         }
         for (int c = 0; c < 3; ++c) { m_grid->setColumnStretch(c, 1); }

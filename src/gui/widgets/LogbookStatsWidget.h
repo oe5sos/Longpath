@@ -89,7 +89,9 @@ private:
     void placeTiles();
 
     LogbookStats   m_stats;
-    QGridLayout*   m_grid{nullptr};
+    class QVBoxLayout* m_outer{nullptr};
+    QGridLayout*   m_grid{nullptr};       // 2 × 3, der Dialog
+    class FlowLayout* m_flow{nullptr};    // eine Reihe, die umbricht
     QVector<QWidget*> m_tiles;    // Log, Bands, Modes, Activity, Countries, Awards
     bool           m_singleRow{false};
     QLabel*        m_total{nullptr};

@@ -406,7 +406,19 @@ void LogbookWindow::buildUi()
         v->addLayout(head);
         m_statsRow = new LogbookStatsWidget(m_statsSection);
         m_statsRow->setSingleRow(true);
-        v->addWidget(m_statsRow);
+        // Gedeckelt und rollbar: bricht die Reihe bei schmalem Fenster in
+        // zwei oder drei Kachelzeilen um, darf sie der Tabelle nicht die
+        // Hoehe nehmen.
+        auto* scroll = new QScrollArea(m_statsSection);
+        scroll->setWidgetResizable(true);
+        scroll->setFrameShape(QFrame::NoFrame);
+        scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+        scroll->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+        scroll->setStyleSheet(QStringLiteral("QScrollArea { background: transparent; }"));
+        scroll->setWidget(m_statsRow);
+        scroll->setMinimumHeight(120);
+        scroll->setMaximumHeight(240);
+        v->addWidget(scroll);
     }
     m_statsSection->setVisible(false);
     col->addWidget(m_statsSection);

@@ -46,6 +46,11 @@ public:
     Qt::Orientations expandingDirections() const override { return Qt::Horizontal; }
     bool  hasHeightForWidth() const override { return true; }
     int   heightForWidth(int width) const override;
+    // Die Mindesthoehe bei dieser Breite IST die umgebrochene Hoehe —
+    // ohne das rechnet das umschliessende QVBoxLayout mit einer Zeile
+    // und die Nachbarn rutschen unter die Leiste (Kartenspalte bei
+    // 640 px, 2026-09-22).
+    int   minimumHeightForWidth(int width) const override { return heightForWidth(width); }
     QSize sizeHint() const override;
     QSize minimumSize() const override;
     void  setGeometry(const QRect& rect) override;

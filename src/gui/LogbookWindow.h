@@ -251,6 +251,7 @@ public:
     /// Fuer Pruefstaende: die eingebettete Karte und die Kennzahlenreihe.
     class QsoMapWindow* mapPanelForTest() const { return m_mapPanel; }
     class LogbookStatsWidget* statsRowForTest() const { return m_statsRow; }
+    QWidget* statsSectionForTest() const { return m_statsSection; }
     class QPushButton* mapToggleForTest() const { return m_mapToggle; }
     class QPushButton* statsToggleForTest() const { return m_statsToggle; }
 

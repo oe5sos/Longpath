@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Das Logbuch ist eine Seite.** Nach dem Bild der Vorlage (Betreiber,
+  2026-09-22): Tabelle, Karte und Detailkarte nebeneinander, die
+  Kennzahlen als Reihe darunter. Die Karte ist das Kartenfenster als
+  Spalte — ohne Datumsbereich, denn sie zeigt, was die Tabelle zeigt;
+  markierte Zeilen heben hervor statt zu filtern. Die Kennzahlenreihe
+  (Log, Baender, Moden, 26 Wochen, Laender, Awards) folgt demselben
+  Filter und bricht bei schmalem Fenster um. „Map" und „Stats" in der
+  Werkzeugleiste schalten beides ein und aus, der Zustand bleibt
+  gemerkt; „↗" in der Karte und in der Reihe holt das jeweilige eigene
+  Fenster wie bisher. Umbrechende Leisten melden ihre Hoehe jetzt als
+  Mindesthoehe — sonst schob ein schmales Fenster die Karte unter ihre
+  Knoepfe. Pruefstand `tst_logbook_one_page`.
+
 ## [0.6.4] - 2026-09-22
 
 Der Arbeitsast des Betreibers seit dem 9. September, in `main`

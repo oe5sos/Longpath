@@ -83,7 +83,16 @@ QSize FlowLayout::minimumSize() const
         h = qMax(h, s.height());
     }
     const QMargins m = contentsMargins();
-    return QSize(w + m.left() + m.right(), h + m.top() + m.bottom());
+    // Die Hoehe: so viele Zeilen, wie die AKTUELLE Breite braucht. Ein
+    // QSplitter oder QBoxLayout fragt die Mindesthoehe ohne Breite —
+    // meldet die Leiste dann nur eine Zeile, drueckt das Fenster die
+    // Nachbarn unter sie (Kartenspalte bei 640 px, 2026-09-22). Breiter
+    // gezogen faellt der Wert nach dem naechsten setGeometry wieder.
+    int minH = h + m.top() + m.bottom();
+    if (geometry().width() > 0) {
+        minH = qMax(minH, heightForWidth(geometry().width()));
+    }
+    return QSize(w + m.left() + m.right(), minH);
 }
 
 void FlowLayout::setGeometry(const QRect& rect)
