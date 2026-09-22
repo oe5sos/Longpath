@@ -507,6 +507,7 @@ set(CORE_SOURCES
     src/core/AppSettings.cpp
     src/core/SettingsBackup.cpp
     src/core/RxProfileManager.cpp
+    src/core/CwDecoder.cpp
     src/core/BeamHeading.cpp
     src/core/BoardCapabilities.cpp
     src/core/CallsignCache.cpp
@@ -1151,6 +1152,7 @@ set(GUI_SOURCES
     src/gui/applets/CwxApplet.cpp
     src/gui/applets/DvkApplet.cpp
     src/gui/applets/RttyDecoderApplet.cpp
+    src/gui/applets/CwDecoderApplet.cpp
     src/gui/applets/QsoRecorderApplet.cpp
     src/gui/applets/BandwidthFilterApplet.cpp
     src/gui/applets/CatApplet.cpp
@@ -1497,6 +1499,13 @@ target_link_libraries(LongpathObjs PUBLIC r8brain)
 # --------------------------------------------------------------------------
 add_subdirectory(third_party/sgp4)
 target_link_libraries(LongpathObjs PUBLIC sgp4)
+
+# --------------------------------------------------------------------------
+# ggmorse (MIT) -- the CW (Morse) decoder behind src/core/CwDecoder
+# (2026-09-21). Vendored unmodified; see third_party/ggmorse/README-LONGPATH.md.
+# --------------------------------------------------------------------------
+add_subdirectory(third_party/ggmorse)
+target_link_libraries(LongpathObjs PUBLIC ggmorse)
 
 # --------------------------------------------------------------------------
 # DeepFilterNet3 DFNR — pre-built neural noise reduction library (MIT/Apache-2.0)

@@ -4871,6 +4871,10 @@ longpath_add_test(tst_rx_profile_popup)
 # -- Waterfall time markers (Longpath-original, 2026-09-21): clock-aligned
 #    boundaries across the visible rows, labels, zones, silent labels --
 longpath_add_test(tst_waterfall_time_markers)
+# -- CW decoder (ggmorse wrapper ported from AetherSDR, 2026-09-21):
+#    synthetic keyed CW decodes, estimates, ring bound, stop semantics --
+longpath_add_test(tst_cw_decoder)
+longpath_add_test(tst_cw_decoder_applet)
 longpath_add_test(tst_sunsdr_audio_feed)
 longpath_add_test(tst_sunsdr_is_reachable)
 longpath_add_test(tst_compact_bar_draws)

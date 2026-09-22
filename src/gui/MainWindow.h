@@ -1478,6 +1478,7 @@ private:
     // dspModeChanged lambda.
     class RadeApplet* m_radeApplet{nullptr};
     class RttyDecoderApplet* m_rttyDecoderApplet{nullptr};
+    class CwDecoderApplet*   m_cwDecoderApplet{nullptr};
     // Torn down and rebuilt on every rebindRttyRadeAvailability() call --
     // same QMetaObject::Connection-list idiom CommandBar::attach() uses,
     // so the dspModeChanged listener below never accumulates one dangling

@@ -100,6 +100,8 @@ def classify(path: str) -> str:
         return "fftw3-vendored"
     if path.startswith("third_party/sgp4/"):
         return "sgp4-vendored"
+    if path.startswith("third_party/ggmorse/"):
+        return "ggmorse-vendored"
     if path in THETIS_PORTS:
         # Future refinement: split mi0bot-port vs thetis-port by inspecting
         # the PROVENANCE variant cell. For now, "thetis-port" covers both.
@@ -144,6 +146,10 @@ REQUIRED_MARKERS: dict[str, list] = {
     # Vallado's reference SGP4 (MIT via python-sgp4); every source file
     # names its author in the head. See SGP4-PROVENANCE.md.
     "sgp4-vendored": ["vallado"],
+    # ggmorse (MIT) is vendored byte-identical; the upstream files carry
+    # no per-file header (the licence is the repository-level LICENSE),
+    # so nothing to require -- see docs/attribution/GGMORSE-PROVENANCE.md.
+    "ggmorse-vendored": [],
     "nereussdr-original": [],
     "attribution-doc": [],
     "docs": [],

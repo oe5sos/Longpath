@@ -16,6 +16,7 @@
 > [freedv-gui](https://github.com/drowe67/freedv-gui),
 > [radae_nopy](https://github.com/peterbmarks/radae_nopy) (BSD-2-Clause),
 > [r8brain-free-src](https://github.com/avaneev/r8brain-free-src) (MIT),
+> [ggmorse](https://github.com/ggerganov/ggmorse) (MIT),
 > and the [Anvelina PRO III gateware](https://github.com/n1gp/Anvelina_PROIII)
 > (GPLv3).
 >

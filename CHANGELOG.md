@@ -44,6 +44,15 @@
   laufen die Marken mit ihren Zeilen mit und stehen in einer
   angehaltenen Historie still. Aus, bis man es einschaltet. Idee aus
   AetherSDR v26.9.3.
+- **Nativer CW-Decoder** (View > Containers > Applets, sichtbar in CWL
+  und CWU): dekodiert Morse direkt aus dem Empfangston, ohne fldigi.
+  Tonhoehe und Tempo werden erkannt und koennen festgehalten werden
+  (LOCK Hz / LOCK WPM); das Suchband folgt dem eingestellten CW-Pitch.
+  Unsichere Zeichen erscheinen gedaempft, Rauschen wird gar nicht erst
+  gezeigt. Decoder ist ggmorse (MIT, unveraendert vendort), der Wrapper
+  ein Port aus AetherSDR -- der Ersatz fuer den am 20.09.
+  zurueckgezogenen ersten Anlauf. Live ueber einen KiwiSDR an der
+  DRA5-Bake (5,195 MHz, 15 WPM) bestaetigt.
 
 ### Changed
 
