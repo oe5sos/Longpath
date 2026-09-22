@@ -190,7 +190,10 @@ QDateTime SatelliteTracker::oldestEpoch() const
     if (oldest == 0.0) { return {}; }
     // JD 2440587.5 = 1970-01-01T00:00Z
     const qint64 ms = qRound64((oldest - 2440587.5) * 86400.0 * 1000.0);
-    return QDateTime::fromMSecsSinceEpoch(ms, QTimeZone::UTC);
+    // QTimeZone::utc(), nicht QTimeZone::UTC: das Enum gibt es erst ab
+    // Qt 6.5, das Linux-aarch64-Paket baut mit Ubuntus Qt 6.4.2
+    // (release.yml; 0.6.4-Lauf 2026-09-22 brach genau hier ab).
+    return QDateTime::fromMSecsSinceEpoch(ms, QTimeZone::utc());
 }
 
 double SatelliteTracker::julianDate(const QDateTime& utcIn)
