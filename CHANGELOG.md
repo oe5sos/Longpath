@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Frequenzspeicher** (Tools > Memories…, Memory Quick Save / Quick
+  Restore): Thetis' Memory-Fenster portiert -- Gruppe, Frequenz, Name,
+  Modus, Abstimmschritt, FM-Repeater/CTCSS, Leistung, Filter, AGC, AGC-T
+  je Speicherplatz; Add/Copy/Delete/Select, Zellen im Grid editierbar.
+  Die Datei ist Thetis' `memory.xml` in seinem Format (mit
+  `memory_bak.xml` als Rueckfall), neben der Einstellungsdatei -- eine
+  Thetis-Speicherliste laesst sich hineinkopieren. Quick Save/Restore
+  merkt sich Frequenz, Modus und Filter wie die Frontplattenknoepfe.
+  `docs/architecture/2026-09-20-memories.md`. Live am Funkgeraet noch
+  nicht geprueft.
+
 ### Changed
 
 - **Das Logbuch ist eine Seite.** Nach dem Bild der Vorlage (Betreiber,
@@ -16,6 +29,9 @@
   Fenster wie bisher. Umbrechende Leisten melden ihre Hoehe jetzt als
   Mindesthoehe — sonst schob ein schmales Fenster die Karte unter ihre
   Knoepfe. Pruefstand `tst_logbook_one_page`.
+
+### Fixed
+
 
 ## [0.6.4] - 2026-09-22
 
@@ -128,18 +144,6 @@ Programm, das der Betreiber taeglich benutzte.
 - **Fussleiste: "ON AIR" passte unter Linux nicht in seinen Platz** --
   78 Punkte waren am Mac gemessen, die Linux-Schrift braucht 81; jetzt
   84.
-### Added
-
-- **Frequenzspeicher** (Tools > Memories…, Memory Quick Save / Quick
-  Restore): Thetis' Memory-Fenster portiert -- Gruppe, Frequenz, Name,
-  Modus, Abstimmschritt, FM-Repeater/CTCSS, Leistung, Filter, AGC, AGC-T
-  je Speicherplatz; Add/Copy/Delete/Select, Zellen im Grid editierbar.
-  Die Datei ist Thetis' `memory.xml` in seinem Format (mit
-  `memory_bak.xml` als Rueckfall), neben der Einstellungsdatei -- eine
-  Thetis-Speicherliste laesst sich hineinkopieren. Quick Save/Restore
-  merkt sich Frequenz, Modus und Filter wie die Frontplattenknoepfe.
-  `docs/architecture/2026-09-20-memories.md`. Live am Funkgeraet noch
-  nicht geprueft.
 
 ## [0.6.3] - 2026-09-21
 
