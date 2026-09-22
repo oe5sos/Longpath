@@ -446,6 +446,8 @@ private:
     // Phase 3P-D Task 3.
     const OcMatrix* m_ocMatrix{nullptr};
 
+    qint64 m_lastGapSignalMs{0};   // Drossel fuer iqSequenceGap()
+
     // Non-owning pointer to RadioModel's CalibrationController.
     // When non-null, hzToPhaseWord() multiplies by effectiveFreqCorrectionFactor().
     // Default null → factor 1.0 → byte-identical to pre-cal output.

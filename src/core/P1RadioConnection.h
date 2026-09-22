@@ -820,6 +820,7 @@ private:
     bool    m_duplex{true};
     bool    m_diversity{false};
     quint8  m_ocOutput{0};
+    qint64  m_lastGapSignalMs{0};   // Drossel fuer iqSequenceGap()
     // Diagnostic: log a single line whenever the resolved ocByte changes.
     // mutable so const buildCodecContext() can update it.
     mutable int m_lastOcByteLogged{0xFFFF};

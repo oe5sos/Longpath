@@ -97,6 +97,17 @@
 
 ### Fixed
 
+- **Ein Loch im Datenstrom malte einen Schmierer ins Spektrum.** Der
+  Panadapter schiebt seine Abtastwerte in ein gleitendes Fenster; fehlen
+  mittendrin Pakete (WLAN, ausgelastete Gegenstelle), steht im Fenster
+  ein Sprung — und ein Sprung ist breitbandig. Das naechste Bild zeigte
+  dann einen Strich ueber die ganze Breite, der aussieht wie ein Signal.
+  Longpath zaehlte diese Loecher bisher nur (Anzeige in der Titelleiste).
+  Jetzt melden beide Protokolle sie (gedrosselt auf 20 ms), und jeder
+  Panadapter verwirft daraufhin sein angefangenes Fenster: das naechste
+  Bild entsteht nur aus Werten nach dem Loch. Pruefstand
+  `tst_fft_window_after_gap`.
+
 - **Kontextmenues liegen nicht mehr auf dem Stapel.** Ein QMenu mit
   `parent = this` ist trotzdem ein eigenes Fenster, und `exec()` dreht
   eine eigene Ereignisschleife — stirbt das Elternteil darin, raeumt Qt

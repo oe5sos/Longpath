@@ -721,6 +721,21 @@ MainWindow::MainWindow(QWidget* parent)
                 connect(conn, &RadioConnection::iqPacketLoss,
                         seg, &ConnectionSegment::onIqPacketLoss,
                         Qt::UniqueConnection);
+
+                // Und ein Loch im Strom verwirft das angefangene
+                // FFT-Fenster jedes Panadapters. Ohne das steht der
+                // Sprung an der Nahtstelle im naechsten Bild — und ein
+                // Sprung ist breitbandig, er malt einen Schmierer ueber
+                // die ganze Breite, der aussieht wie ein Signal. Trifft
+                // vor allem Geraete am WLAN. Die Verbindung drosselt
+                // das Signal schon auf 20 ms; hier wird nur eine Fahne
+                // gesetzt, die jeder Engine auf seinem Faden abholt.
+                connect(conn, &RadioConnection::iqSequenceGap, this,
+                        [this]() {
+                    for (FFTEngine* e : std::as_const(m_fftEngines)) {
+                        if (e) { e->requestWindowReset(); }
+                    }
+                }, Qt::UniqueConnection);
             }
         };
         wireRtt();

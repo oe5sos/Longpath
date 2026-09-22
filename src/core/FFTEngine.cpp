@@ -238,6 +238,16 @@ void FFTEngine::setDecimation(int factor)
 void FFTEngine::feedIQ(const QVector<float>& interleavedIQ)
 {
 #ifdef HAVE_FFTW3
+    // Ein Loch im Strom macht das angefangene Fenster wertlos: der
+    // Sprung an der Nahtstelle ist breitbandig und malt einen Schmierer
+    // ueber das ganze Bild. requestWindowReset() setzt die Fahne von
+    // irgendeinem Faden, abgeholt wird sie hier, auf dem Faden, dem das
+    // Fenster gehoert.
+    if (m_windowResetPending.exchange(false)) {
+        m_iqWritePos = 0;
+        m_windowResets.fetch_add(1);
+    }
+
     // Apply any pending FFT size change (coalesces rapid slider drags)
     int pending = m_pendingFftSize.exchange(0);
     if (pending > 0 && pending != m_currentFftSize) {
