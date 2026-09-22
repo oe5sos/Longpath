@@ -1838,4 +1838,15 @@ double waterfallStartFixedPointToLowMhz(double fullLowMhz,
         + (static_cast<double>(start) / fixedPointScale) * fullBandwidthMhz;
 }
 
+std::pair<int, int> carrierSymmetricCwPassband(int lowCutHz, int highCutHz,
+                                               int cwPitchHz, bool cwLowerSideband)
+{
+    if (cwPitchHz == 0) {
+        return {lowCutHz, highCutHz};
+    }
+    // The same signed shift formatSoundTuneCommand() adds back.
+    const int shiftHz = (cwLowerSideband ? -1 : 1) * cwPitchHz;
+    return {lowCutHz - shiftHz, highCutHz - shiftHz};
+}
+
 } // namespace Longpath::KiwiSdrProtocol

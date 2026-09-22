@@ -28,6 +28,8 @@
 #include <QStringList>
 #include <QVector>
 
+#include <utility>
+
 #include <QtGlobal>
 
 namespace Longpath::KiwiSdrProtocol {
@@ -376,6 +378,18 @@ quint32 waterfallStartFixedPoint(double fullLowMhz, double fullBandwidthMhz,
 double waterfallStartFixedPointToLowMhz(double fullLowMhz,
                                         double fullBandwidthMhz,
                                         quint32 start, double fixedPointScale);
+
+// Longpath's CW filters are centred on the CW pitch, the Thetis way
+// (SliceModel::defaultFilterCenter: CWU = +pitch, CWL = -pitch; a 500 Hz
+// filter at 650 Hz pitch is 400..900). formatSoundTuneCommand() expects
+// the passband the way Flex reports it -- symmetric about the carrier
+// (-250..+250) -- and shifts it by the pitch itself. Feeding it the
+// pitch-centred numbers shifted them twice (1050..1550), the tone at 650
+// Hz fell outside the passband, and CW through a KiwiSDR was inaudible
+// (found live on DK0WCY, 2026-09-21). This takes the pitch back out.
+// Non-CW passbands and a zero pitch pass through unchanged.
+std::pair<int, int> carrierSymmetricCwPassband(int lowCutHz, int highCutHz,
+                                               int cwPitchHz, bool cwLowerSideband);
 
 } // namespace Longpath::KiwiSdrProtocol
 

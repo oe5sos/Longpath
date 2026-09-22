@@ -4875,6 +4875,9 @@ longpath_add_test(tst_waterfall_time_markers)
 #    synthetic keyed CW decodes, estimates, ring bound, stop semantics --
 longpath_add_test(tst_cw_decoder)
 longpath_add_test(tst_cw_decoder_applet)
+# 2026-09-21, KiwiSDR Stufe 3b: der Kiwi folgt der zugeordneten Scheibe
+# (Frequenz, Betriebsart, Filter) -- vorher nur einmal bei der Zuordnung.
+longpath_add_test(tst_kiwi_tracking_follows_the_slice)
 longpath_add_test(tst_sunsdr_audio_feed)
 longpath_add_test(tst_sunsdr_is_reachable)
 longpath_add_test(tst_compact_bar_draws)

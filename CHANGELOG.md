@@ -115,6 +115,22 @@
   oeffnete mit Truncate. Der Name wird jetzt atomar beansprucht
   (NewOnly); ist er vergeben, heisst die neue Aufnahme `_1`, `_2`, ...
   -- eine Aufnahme geht nie mehr durch eine andere verloren.
+- **Ein KiwiSDR folgt jetzt der zugeordneten Scheibe** -- Frequenz,
+  Betriebsart, Filter und Panadapter gehen bei jeder Aenderung an den
+  Empfaenger. Bisher wurde er genau einmal abgestimmt, bei der Zuordnung,
+  und blieb dann stehen, egal was der Bediener drehte (die Nachfuehrung
+  war aus AetherSDR portiert, aber nie angeschlossen). Ausserdem bekommt
+  er die CW-Tonhoehe der Scheibe statt 0, womit der Traeger bisher auf
+  0 Hz und damit ausserhalb jedes CW-Durchlasses lag.
+
+- **CW ueber einen KiwiSDR war unhoerbar: der Durchlass wurde zweimal um
+  die Tonhoehe verschoben.** Longpaths CW-Filter sitzen auf der Tonhoehe
+  (Thetis: 500 Hz bei 650 Hz Pitch = 400..900), das Kiwi-Abstimmkommando
+  rechnet die Tonhoehe aber selbst dazu -- der Kiwi bekam 1050..1550, der
+  Ton bei 650 Hz lag daneben. Der nachgefuehrte CW-Durchlass wird jetzt
+  vorher traegersymmetrisch gemacht (-250..+250), der Kiwi landet bei
+  400..900 mit dem BFO um die Tonhoehe versetzt. Live an DK0WCY gefunden
+  (Tonhoehe pendelte sich danach bei 648 Hz ein).
 
 ## [0.6.4] - 2026-09-22
 

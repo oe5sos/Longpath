@@ -683,6 +683,11 @@ void SliceModel::widthToEdges(int widthHz, DSPMode mode, int currentCenter,
 
 // From Thetis console.cs:35076-35097 [@852bf0e] —
 // die default_center-Berechnung aus ptbFilterShift_Scroll.
+int SliceModel::cwPitchHz()
+{
+    return currentCwPitch();
+}
+
 int SliceModel::defaultFilterCenter(DSPMode mode, int widthHz)
 {
     switch (mode) {

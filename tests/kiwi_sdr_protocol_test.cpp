@@ -1152,5 +1152,42 @@ int main()
         }
     }
 
+    // Longpath's CW filters are pitch-centred (SliceModel::defaultFilterCenter,
+    // the Thetis way: a 500 Hz filter at 650 Hz pitch is 400..900 for CWU,
+    // -900..-400 for CWL). formatSoundTuneCommand() adds the pitch shift
+    // itself, so the tracked passband must be made carrier-symmetric first
+    // or it is shifted twice and the tone lands outside it (found live on
+    // DK0WCY, 2026-09-21).
+    {
+        using namespace Longpath::KiwiSdrProtocol;
+        const auto cwu = carrierSymmetricCwPassband(400, 900, 650, false);
+        const auto cwl = carrierSymmetricCwPassband(-900, -400, 650, true);
+        if (cwu.first != -250 || cwu.second != 250
+            || cwl.first != -250 || cwl.second != 250) {
+            return fail("pitch-centred CW passband must come back carrier-symmetric");
+        }
+        const auto untouched = carrierSymmetricCwPassband(400, 900, 0, false);
+        if (untouched.first != 400 || untouched.second != 900) {
+            return fail("a zero pitch must leave the passband alone");
+        }
+        // Round trip: the Kiwi ends up with the slice's own passband and the
+        // BFO moved by the pitch, so the carrier demodulates at +650 (CWU)
+        // or -650 Hz (CWL) -- inside the filter, where the operator hears it.
+        if (formatSoundTuneCommand(QStringLiteral("cw"), cwu.first, cwu.second,
+                                   10144.0, 650, false, 6000)
+                != QStringLiteral("SET mod=cw low_cut=400 high_cut=900 freq=10143.350")
+            || formatSoundTuneCommand(QStringLiteral("cw"), cwl.first, cwl.second,
+                                      10144.0, 650, true, 6000)
+                != QStringLiteral("SET mod=cw low_cut=-900 high_cut=-400 freq=10144.650")) {
+            return fail("carrier-symmetric CW passband does not round-trip through the tune command");
+        }
+        // The premise: feeding the pitch-centred numbers straight in shifts
+        // them a second time, and 650 Hz is no longer inside 1050..1550.
+        if (formatSoundTuneCommand(QStringLiteral("cw"), 400, 900, 10144.0, 650, false, 6000)
+                != QStringLiteral("SET mod=cw low_cut=1050 high_cut=1550 freq=10143.350")) {
+            return fail("test premise: the unconverted passband must be shifted twice");
+        }
+    }
+
     return 0;
 }
