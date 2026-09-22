@@ -29,6 +29,16 @@
   Mindesthoehe — sonst schob ein schmales Fenster die Karte unter ihre
   Knoepfe. Pruefstand `tst_logbook_one_page`.
 
+### Fixed
+
+- **VAX bleibt hoerbar, wenn nur das Programm aktualisiert wurde.** Ein
+  per DMG aktualisiertes Longpath (Help > Check for Updates...) trifft
+  noch auf den Audiotreiber bis 0.6.3, der seine Bloecke unter den alten
+  Namen anlegt; der Ton-Bus oeffnet jetzt erst den neuen, dann den alten
+  Namen und legt nur neu an, wenn beide fehlen. Dazu die Kennung beim
+  FreeDV-Reporter („Longpath <Version>", stand dort noch mit dem alten
+  Namen) und ein Pruefstand fuer den Schluesselbund-Umzug.
+
 ## [0.6.4] - 2026-09-22
 
 Der Arbeitsast des Betreibers seit dem 9. September, in `main`
