@@ -35,6 +35,7 @@
 #include "core/BoardCapabilities.h"
 #include "core/ConnectionState.h"
 #include "core/HpsdrModel.h"
+#include "core/OcMatrix.h"
 #include "core/PttSource.h"
 #include "core/RadioDiscovery.h"
 #include "core/RadioStatus.h"
@@ -316,6 +317,55 @@ private slots:
             qInfo() << "SLICE2 removed, slices" << model.slices().size();
         }
 
+        // ── 4f. N2ADR-Filterplatine am Open-Collector-Bus ────────────
+        // Der HL2 hat kein Alex-Board. Sein Vorfilter beim Empfang und
+        // sein Oberwellenfilter beim Senden ist die N2ADR-Platine, die an
+        // denselben sieben Open-Collector-Pins haengt. Longpath fuellt die
+        // OcMatrix beim Verbinden aus dem N2ADR-Preset (Vorgabe: ein,
+        // Issue #174), und buildCodecContext() liest daraus je Band und je
+        // Senderichtung ein Byte. Am Draht MUSS ein Bandwechsel darum ein
+        // anderes OC-Byte erzeugen — sonst sitzt beim Senden das falsche
+        // Tiefpassfilter im Weg, und das ist der eine Fehler an einem
+        // HL2, den man nicht am Bildschirm sieht, sondern beim Nachbarn.
+        //
+        //   40 m  Empfang Pins {2,6} = 0x44   Senden Pin {2} = 0x04
+        //   20 m  Empfang Pins {3,6} = 0x48   Senden Pin {3} = 0x08
+        QList<quint8> ocExpected;
+        if (model.boardCapabilities().hasIoBoardHl2) {
+            const OcMatrix& oc = model.ocMatrix();
+            const quint8 rx40 = oc.maskFor(Band::Band40m, false);
+            const quint8 tx40 = oc.maskFor(Band::Band40m, true);
+            const quint8 rx20 = oc.maskFor(Band::Band20m, false);
+            const quint8 tx20 = oc.maskFor(Band::Band20m, true);
+            qInfo("OC matrix 40m rx=0x%02x tx=0x%02x | 20m rx=0x%02x tx=0x%02x",
+                  rx40, tx40, rx20, tx20);
+            QVERIFY2(rx40 != 0 && rx20 != 0 && rx40 != rx20,
+                     "Die OcMatrix ist leer oder kennt keine zwei verschiedenen Baender — "
+                     "dann kann am Draht auch nichts umschalten (N2ADR-Preset nicht angewandt?)");
+
+            s->setFrequency(7'050'000.0);
+            QTest::qWait(900);
+            ocExpected << rx40;
+            qInfo() << "OC 40m: slice" << s->frequency() << "erwartet 0x" << QString::number(rx40, 16);
+
+            if (!noTx) {
+                model.setMox(true);
+                QTRY_VERIFY_WITH_TIMEOUT(model.mox(), 5000);
+                QTest::qWait(700);
+                ocExpected << tx40;
+                model.setMox(false);
+                QTRY_VERIFY_WITH_TIMEOUT(!model.mox(), 8000);
+                QTest::qWait(500);
+                ocExpected << rx40;
+                qInfo() << "OC 40m senden: erwartet 0x" << QString::number(tx40, 16);
+            }
+
+            s->setFrequency(14'200'000.0);
+            QTest::qWait(900);
+            ocExpected << rx20;
+            qInfo() << "OC 20m: slice" << s->frequency() << "erwartet 0x" << QString::number(rx20, 16);
+        }
+
         // ── 5. Trennen ───────────────────────────────────────────────
         model.disconnectFromRadio();
         QTRY_COMPARE_WITH_TIMEOUT(model.connectionState(), ConnectionState::Disconnected, 8000);
@@ -334,7 +384,8 @@ private slots:
                         || l.contains(QLatin1String("DEVICE")) || l.contains(QLatin1String("Start"))
                         || l.contains(QLatin1String("Stop")) || l.contains(QLatin1String("ALEX"))
                         || l.contains(QLatin1String("DRIVE")) || l.contains(QLatin1String("RECEIVERS"))
-                        || l.contains(QLatin1String("ATT"))) {
+                        || l.contains(QLatin1String("ATT"))
+                        || l.contains(QLatin1String("OpenCollector"))) {
                         seen << l.trimmed();
                     }
                 }
@@ -374,6 +425,39 @@ private slots:
                 // Daempfungsglied: die Stufe muss den Draht erreicht haben.
                 QVERIFY2(all.contains(QStringLiteral("ATT")),
                          "Der Simulator sah nie eine Daempfungs-Einstellung");
+                // N2ADR am OC-Bus: der Simulator meldet jede Aenderung des
+                // Open-Collector-Bytes. Die erwarteten Werte muessen in
+                // dieser Reihenfolge vorgekommen sein (Zwischenwerte sind
+                // erlaubt — der Weg dahin gehoert dem Geraet).
+                if (!ocExpected.isEmpty()) {
+                    QList<quint8> ocSeen;
+                    const QRegularExpression ocRe(
+                        QStringLiteral("OpenCollector=\\s*([0-9a-f]{8})"));
+                    for (const QString& l : lines) {
+                        const auto m = ocRe.match(l);
+                        if (m.hasMatch()) {
+                            ocSeen << static_cast<quint8>(m.captured(1).toUInt(nullptr, 16));
+                        }
+                    }
+                    QStringList seenHex;
+                    for (const quint8 v : ocSeen) { seenHex << QStringLiteral("0x%1").arg(v, 2, 16, QLatin1Char('0')); }
+                    QStringList wantHex;
+                    for (const quint8 v : ocExpected) { wantHex << QStringLiteral("0x%1").arg(v, 2, 16, QLatin1Char('0')); }
+                    qInfo().noquote() << "OC am Draht:" << seenHex.join(QStringLiteral(" "))
+                                      << "| erwartet der Reihe nach:" << wantHex.join(QStringLiteral(" "));
+                    int at = 0;
+                    for (const quint8 want : ocExpected) {
+                        while (at < ocSeen.size() && ocSeen.at(at) != want) { ++at; }
+                        QVERIFY2(at < ocSeen.size(),
+                                 qPrintable(QStringLiteral("Das OC-Byte 0x%1 kam am Simulator nie an. "
+                                                           "Gesehen: %2 — erwartet: %3")
+                                            .arg(want, 2, 16, QLatin1Char('0'))
+                                            .arg(seenHex.join(QLatin1Char(' ')))
+                                            .arg(wantHex.join(QLatin1Char(' ')))));
+                        ++at;
+                    }
+                }
+
                 // Zweiter Empfaenger: seine Frequenz muss auf einem
                 // eigenen DDC angekommen sein.
                 QVERIFY2(all.contains(QStringLiteral("7050000")),

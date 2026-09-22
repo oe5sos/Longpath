@@ -31,6 +31,25 @@ if (0 && sock_TCP_Client < 0 && udp_retries > 10 && ODEVICE != DEV_NONE) {
 if (bytes_read < 0 && errno != EAGAIN) { t_perror("recvfrom"); continue; }
 ```
 
+Und, seit dem 2026-09-22, ein fuenfter Patch in `hpsdrsim.h` — der
+wichtigste, weil er den „Wedge" aus Runde 2 endgueltig erklaert:
+
+```c
+#define WB_TXPAD 8192
+EXTERN double  isample[OLDRTXLEN + WB_TXPAD];   /* war [OLDRTXLEN] */
+EXTERN double  qsample[OLDRTXLEN + WB_TXPAD];
+```
+
+Die Hauptschleife schreibt ein ganzes Sendepaket (bis zu ~1000 Werte) in
+`isample`/`qsample` und prueft den Umbruch **erst danach**
+(`if (txptr >= OLDRTXLEN) { txptr = 0; }`). Am Pufferende laeuft sie also
+ueber — und traf die naechsten Globals: `sock_udp` stand danach auf **0**,
+jedes `recvfrom()` lieferte ENOTSOCK, und der Simulator drehte mit 100 %
+CPU im Kreis (mit dem `continue`-Patch) oder beendete sich (ohne). Genau
+dieselbe Klasse wie der WDSP-Eingangsring vom 21.09.: eine Schranke, die
+nur *hinterher* prueft. Das Polster faengt den Ueberlauf, die Logik bleibt
+Wort fuer Wort die des Originals. Seither laufen Ratenwechsel durch.
+
 Ohne die letzten beiden lief der Simulator auf macOS nach dem
 STOP/START eines Ratenwechsels zweimal in seinen TCP-Zweig (einmal
 100 % CPU ohne UDP-Verarbeitung, einmal Abbruch mit „recvfrom: Socket
@@ -155,3 +174,52 @@ Nicht bewertet: `rx2Enabled()` bleibt bei zwei Scheiben falsch, weil
 `setActiveRxCountLive()` keinen Aufrufer hat (TCI-Init-Burst meldet
 `rx2_enable=false`); Thetis' RX2-Begriff deckt sich nicht mit Longpaths
 Scheiben — eine Entscheidung, kein Fix.
+
+## Runde 3 (2026-09-22): Filterplatine, und zwei Funde daneben
+
+**Neue Station: N2ADR am Open-Collector-Bus.** Der HL2 hat kein
+Alex-Board; sein Vorfilter beim Empfang und sein Oberwellenfilter beim
+Senden ist die N2ADR-Platine an denselben sieben OC-Pins. Longpath fuellt
+die `OcMatrix` beim Verbinden aus dem N2ADR-Preset (Vorgabe: ein),
+`buildCodecContext()` liest daraus je Band und je Senderichtung ein Byte.
+Die Werkbank stellt 40 m ein, schaltet auf Senden und zurueck, stellt
+20 m ein und vergleicht die Folge mit dem, was der Simulator als
+`OpenCollector=` gemeldet hat:
+
+```
+OC am Draht: 0x48 0x08 0x48 0x08 0x48 0x08 0x48 0x00 0x48 0x44 0x04 0x44 0x48
+erwartet:                                              0x44 0x04 0x44 0x48
+```
+
+20 m empfangen 0x48 (Pins 3+6), 20 m senden 0x08 (Pin 3), 40 m 0x44/0x04
+— alles richtig. Die 0x00 dazwischen ist kein Fehler, sondern die
+dokumentierte Bypass-Entscheidung: zwei Scheiben auf verschiedenen
+Baendern (14,2 MHz und 7,05 MHz) koennen nicht dasselbe Vorfilter
+brauchen, also nimmt Longpath die Platine beim Empfang aus dem Weg
+(`P1RadioConnection.cpp`, `kAlexBypassSentinel`).
+
+**Fund 1 — Longpath stuerzte bei JEDER Verbindung ab, wenn die
+NNR-Gewichte fehlen.** `RadioModel::connectToRadio()` legt den
+Empfangskanal an und schiebt danach die NNR-Parameter nach
+(`setNnrTuning`). Ohne Modelldatei steigt `nnet_build()` vorher aus,
+`n->df` bleibt NULL — und `setAlpha_nnet`/`setKnee_nnet` (und ihre beiden
+Abfragen) fassten diesen Kopf als einzige Funktionen der Datei ungeprueft
+an. `nnr.c` laeuft mit `NNR_ALL_MODELS()` ueber jeden angelegten NNET,
+nicht nur ueber die geladenen: ein `SetRXANNRAlpha()` genuegte.
+SIGSEGV, mitten im Verbinden. Upstream WDSP 2.10 hat dieselbe Luecke
+(gegen einen zweiten, unabhaengigen Klon derselben Ausgabe geprueft);
+die Wache ist in `nnet.c` dokumentiert, Pruefstand
+`tst_nnr_without_model` (am alten Code: SIGSEGV).
+
+**Fund 2 — NNR lud sein Modell nie.** Derselbe Block setzte den
+Modellpfad (`SetNNRModelPathSlot`) **nach** `createRxChannel()`. Die
+NNET-Objekte entstehen aber beim Anlegen des Kanals und lesen den Pfad
+dabei genau einmal; `SetNNRModelPathSlot` legt hinterher nur eine
+Zeichenkette ab. Der erste Kanal jeder Sitzung lief also als Durchreiche
+(„nnet: no usable model … passing audio through"), waehrend das
+Protokoll gleich darauf „NNR: loading model slot 0 from …" meldete. Der
+Block steht jetzt vor `createRxChannel()`; im Protokoll steht seither
+`nnet: model loaded — ch 16/32/48/64, …`. Dazu kopiert CMake die beiden
+`.bin`-Dateien (2 + 4,5 MB) wie das DeepFilterNet3-Modell ins Bundle,
+neben die Binaerdatei und ins Install-Praefix — vorher fand ein
+installiertes Paket sie ueberhaupt nicht.

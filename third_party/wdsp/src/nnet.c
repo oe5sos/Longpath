@@ -24,6 +24,15 @@ warren@wpratt.com
 
 */
 
+/*
+Modification history (Longpath):
+  2026-09-22 -- NULL-Wache in setAlpha_nnet/getAlpha_nnet/setKnee_nnet/
+                getKnee_nnet, siehe den Kommentar bei diesen Funktionen.
+                Der Rest der Datei ist der Stand von WDSP 2.10.
+                For Longpath by Martin Fischer (OE5SOS), AI-assisted via
+                Anthropic Claude.
+*/
+
 #define _CRT_SECURE_NO_WARNINGS
 
 #include "comm.h"
@@ -1605,23 +1614,47 @@ double getTau_nnet (NNET n)
 	return n->tau;
 }
 
+/*  Longpath deviation from WDSP 2.10 (2026-09-22) -- the only change in
+	this file.  n->df is created at the END of nnet_build(); when no model
+	loads (missing/unreadable wdsp_nnr_<slot>.bin, and the compiled-in
+	fallback arrays are empty by design -- see nnr_model_stub.c) the build
+	returns 0, n->ready stays 0 and n->df stays NULL, while the NNET object
+	itself lives on.  nnr.c's NNR_ALL_MODELS() then still walks that object
+	for every setter, so SetRXANNRAlpha()/SetRXANNRAlphaKnee() dereferenced
+	NULL and took the whole program down -- found 2026-09-22 on the HL2
+	simulator workbench: Longpath crashed on EVERY connect on a machine
+	without the model files (RadioModel::connectToRadio -> setNnrTuning).
+
+	The four functions below are the only ones in this file that touch
+	n->df unguarded; every neighbour already checks (setSmooth_nnet: "if
+	(n->df)", setMaxGain_nnet / setFloor_nnet: "if (n->ready)", flush and
+	run: "if (!n->ready) return").  Upstream WDSP 2.10 has the same hole
+	(checked against a second, independent clone of the same release), so
+	this is a bug fix, not a local behaviour change: a model-less NNET is
+	a pass-through, and remembering an alpha it will never apply is the
+	same "no effect" the guarded setters already deliver.  The getters
+	answer with create_dfhead()'s own defaults (alpha = 1.0, knee = -10 dB)
+	rather than reading through a NULL head.  */
+
 void setAlpha_nnet (NNET n, double alpha)
 {
-	setAlpha_dfhead (n->df, alpha);
+	if (n->df) setAlpha_dfhead (n->df, alpha);
 }
 
 double getAlpha_nnet (NNET n)
 {
+	if (!n->df) return 1.0;			/* create_dfhead(): d->alpha = 1.0 */
 	return getAlpha_dfhead (n->df);
 }
 
 void setKnee_nnet (NNET n, double knee_db)
 {
-	setKnee_dfhead (n->df, knee_db);
+	if (n->df) setKnee_dfhead (n->df, knee_db);
 }
 
 double getKnee_nnet (NNET n)
 {
+	if (!n->df) return -10.0;		/* create_dfhead(): d->knee = -10 dB */
 	return getKnee_dfhead (n->df);
 }
 

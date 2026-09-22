@@ -55,7 +55,7 @@ canonical TAPR/OpenHPSDR-wdsp repository's `wdsp 2.10/Source/` tree.
 | --- | --- | --- | --- |
 | `third_party/wdsp/src/nnr.c` | Verbatim vendor of WDSP 2.10 (commit `b02d5bac675dd2f33ec2bab2b339f79a597c47dd`) | `TAPR/OpenHPSDR-wdsp` `wdsp 2.10/Source/nnr.c` | 2026-09-14 |
 | `third_party/wdsp/src/nnr.h` | Verbatim vendor, same commit; 2026-09-22 `__declspec (dllexport)` dropped from the twelve prototypes (static build, MSVC) | `wdsp 2.10/Source/nnr.h` | 2026-09-14 |
-| `third_party/wdsp/src/nnet.c` | Verbatim vendor, same commit | `wdsp 2.10/Source/nnet.c` | 2026-09-14 |
+| `third_party/wdsp/src/nnet.c` | WDSP 2.10 (same commit) + NULL-Wache in `setAlpha_nnet`/`getAlpha_nnet`/`setKnee_nnet`/`getKnee_nnet` (siehe den Kommentar an dieser Stelle in der Datei); sonst unveraendert | `wdsp 2.10/Source/nnet.c` | 2026-09-22 |
 | `third_party/wdsp/src/nnet.h` | Verbatim vendor, same commit | `wdsp 2.10/Source/nnet.h` | 2026-09-14 |
 | `third_party/wdsp/src/nnet_profile.h` | Verbatim vendor, same commit | `wdsp 2.10/Source/nnet_profile.h` | 2026-09-14 |
 | `third_party/wdsp/src/nnio.c` | Verbatim vendor, same commit | `wdsp 2.10/Source/nnio.c` | 2026-09-14 |

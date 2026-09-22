@@ -1435,6 +1435,44 @@ if(WDSP_FOUND)
     add_subdirectory(third_party/wdsp)
     target_link_libraries(LongpathObjs PUBLIC wdsp_static)
     target_compile_definitions(LongpathObjs PUBLIC HAVE_WDSP)
+
+    # NNR (WDSP 2.10) weights — same treatment as the DeepFilterNet3 model
+    # below: ModelPaths::probeModel("nnr", …) looks next to the binary, in
+    # the bundle's Resources and in the install prefix, and only then in the
+    # source tree. Without these copies NNR found nothing in an installed
+    # package and ran as a pass-through, while the log claimed a model was
+    # loaded (found 2026-09-22 at the HL2 workbench). nnr_model_stub.c's
+    # built-in arrays are empty by design, so the .bin files are the only
+    # source of weights.
+    set(NNR_MODELS
+        "${CMAKE_SOURCE_DIR}/third_party/wdsp/models/wdsp_nnr_0.bin"
+        "${CMAKE_SOURCE_DIR}/third_party/wdsp/models/wdsp_nnr_1.bin")
+    set(NNR_MODELS_PRESENT TRUE)
+    foreach(_nnr_model IN LISTS NNR_MODELS)
+        if(NOT EXISTS "${_nnr_model}")
+            set(NNR_MODELS_PRESENT FALSE)
+        endif()
+    endforeach()
+    if(NNR_MODELS_PRESENT)
+        if(APPLE)
+            add_custom_command(TARGET Longpath POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E make_directory
+                    "$<TARGET_BUNDLE_DIR:Longpath>/Contents/Resources/models/nnr"
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    ${NNR_MODELS} "$<TARGET_BUNDLE_DIR:Longpath>/Contents/Resources/models/nnr/"
+                COMMENT "Copying NNR models to app bundle Resources/models/nnr")
+        else()
+            add_custom_command(TARGET Longpath POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E make_directory
+                    "$<TARGET_FILE_DIR:Longpath>/models/nnr"
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    ${NNR_MODELS} "$<TARGET_FILE_DIR:Longpath>/models/nnr/"
+                COMMENT "Copying NNR models to build directory models/nnr")
+            install(FILES ${NNR_MODELS}
+                DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/Longpath/models/nnr"
+                OPTIONAL)
+        endif()
+    endif()
 endif()
 
 # --------------------------------------------------------------------------
