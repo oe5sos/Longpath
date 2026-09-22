@@ -120,6 +120,8 @@ public:
     /// Der geteilte Kachelspeicher, fuer Tests und Einstellungen.
     GibsTileLayer* imagery() const { return m_tiles; }
     FlatMapWidget* flatMapForTest() const { return m_flat; }
+    class DxRadarWidget* radarForTest() const { return m_radar; }
+    QPushButton* radarButtonForTest() const { return m_radarBtn; }
     /// Wie viele Kontakte die Karte beim letzten Aufbau gezeichnet hat.
     int shownCountForTest() const { return m_lastShown.size(); }
     /// Ein Rufzeichen so behandeln, als waere es im Feld eingegeben.
@@ -177,6 +179,9 @@ private:
     QStackedWidget* m_stack{nullptr};
     GlobeWidget*    m_globe{nullptr};
     FlatMapWidget*  m_flat{nullptr};
+    class DxRadarWidget* m_radar{nullptr};   // dritte Ansicht (2026-09-22)
+    QPushButton*    m_radarBtn{nullptr};
+    int             m_viewBeforeRadar{0};    // Kugel oder flach, wohin „Radar" aus zurueckfuehrt
 
     // ── Wahl des Kartenhintergrunds ─────────────────────────────────
     //

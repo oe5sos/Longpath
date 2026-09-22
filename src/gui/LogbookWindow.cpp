@@ -253,6 +253,10 @@ void LogbookWindow::buildUi()
         b->setStyleSheet(Style::buttonBaseStyle());
         top->addWidget(b);
     }
+    // Die zwei Schalter muessen als Schalter zu sehen sein: gedrueckt blau.
+    for (QPushButton* b : {mapBtn, statsBtn}) {
+        b->setStyleSheet(Style::buttonBaseStyle() + Style::blueCheckedStyle());
+    }
     col->addLayout(top);
     connect(mapBtn, &QPushButton::toggled, this, &LogbookWindow::setMapPanelShown);
     connect(statsBtn, &QPushButton::toggled, this, &LogbookWindow::setStatsRowShown);

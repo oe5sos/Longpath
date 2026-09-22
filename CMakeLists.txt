@@ -1054,6 +1054,7 @@ set(GUI_SOURCES
     src/gui/widgets/GibsTileLayer.cpp
     src/gui/widgets/FlowLayout.cpp
     src/gui/widgets/BlueMarbleFetcher.cpp
+    src/gui/widgets/DxRadarWidget.cpp
     src/gui/widgets/WorldMapCatalog.cpp
     src/gui/widgets/WorldTexture.cpp
     src/gui/LogbookWindow.cpp

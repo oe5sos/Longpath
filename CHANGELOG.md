@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Added
+
+- **DX-Radar** als dritte Ansicht des Kartenfensters (Knopf „Radar",
+  auch in der Kartenspalte des Logbuchs): dieselben Kontakte nach
+  Peilung und Entfernung von zu Hause, Norden oben, Ringe 500 …
+  20 000 km mit Wurzelskala (5 000 km auf halbem Radius), markierte
+  Kontakte hervorgehoben, Mauszeiger nennt Rufzeichen, Peilung und km,
+  Klick zeigt die Stationskarte. Nach dem Bild der Vorlage
+  („GLOBE | DX RADAR"). Die Schalter „Radar", „Map" und „Stats" zeigen
+  ihren Zustand jetzt blau. Pruefstand `tst_dx_radar`.
+
 ### Changed
 
 - **Die Kugel zeigt die Erde.** Ohne eigenes Weltbild setzt sich die Kugel
