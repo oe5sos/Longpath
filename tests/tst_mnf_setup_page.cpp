@@ -500,7 +500,7 @@ private slots:
         engine->m_initialized = true;   // friend access (LONGPATH_BUILD_TESTS)
 
         RxChannel* ch = engine->createRxChannel(WdspEngine::kFirstSliceChannelId,
-                                                /*inputBufferSize*/ 238,
+                                                /*inputBufferSize*/ 64,   // teilt den WDSP-Ring, wie bufferSizeForRate(48000)
                                                 /*dspBufferSize*/ 4096,
                                                 /*inputSampleRate*/ 48000,
                                                 /*dspSampleRate*/ 48000,
@@ -548,7 +548,7 @@ private slots:
         engine->m_initialized = true;   // friend access (LONGPATH_BUILD_TESTS)
 
         RxChannel* ch = engine->createRxChannel(WdspEngine::kFirstSliceChannelId,
-                                                238, 4096, 48000, 48000, 48000);
+                                                64, 4096, 48000, 48000, 48000);   // 64 teilt den WDSP-Ring
         QVERIFY(ch);
 
         MnfSetupPage page(&model);

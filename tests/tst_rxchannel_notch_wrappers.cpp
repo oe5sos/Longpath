@@ -86,7 +86,7 @@ private:
     {
         engine.m_initialized = true;   // friend access (LONGPATH_BUILD_TESTS)
         return engine.createRxChannel(kNotchTestChannel,
-                                      /*inputBufferSize*/ 238,
+                                      /*inputBufferSize*/ 64,   // teilt den WDSP-Ring, wie bufferSizeForRate(48000)
                                       /*dspBufferSize*/ kDspBufferSize,
                                       /*inputSampleRate*/ kDspSampleRateHz,
                                       /*dspSampleRate*/ kDspSampleRateHz,
