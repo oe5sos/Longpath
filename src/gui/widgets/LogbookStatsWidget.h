@@ -67,6 +67,12 @@ public:
     void setStats(const LogbookStats& stats);
     const LogbookStats& stats() const { return m_stats; }
 
+    // Sechs Kacheln in EINER Reihe statt 2 × 3 — die Kennzahlenzeile
+    // unter der Logtabelle (eine Seite, 2026-09-22). Der Dialog bleibt
+    // beim Raster.
+    void setSingleRow(bool on);
+    bool singleRow() const { return m_singleRow; }
+
     // For tests: the charts and the tile captions, in build order.
     StatsBarChart* bandChart() const { return m_bandChart; }
     StatsBarChart* modeChart() const { return m_modeChart; }
@@ -80,8 +86,12 @@ private:
     QLabel* valueLine(QWidget* parent);
     void rebuild();
 
+    void placeTiles();
+
     LogbookStats   m_stats;
     QGridLayout*   m_grid{nullptr};
+    QVector<QWidget*> m_tiles;    // Log, Bands, Modes, Activity, Countries, Awards
+    bool           m_singleRow{false};
     QLabel*        m_total{nullptr};
     QLabel*        m_logLines{nullptr};
     StatsBarChart* m_bandChart{nullptr};

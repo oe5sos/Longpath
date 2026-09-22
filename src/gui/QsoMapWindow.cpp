@@ -107,7 +107,25 @@ void QsoMapWindow::keyPressEvent(QKeyEvent* e)
     case Qt::Key_0:      resetActiveView();     return;
     default: break;
     }
+    // Eingebettet ist Escape kein „Fenster zu" — QDialog wuerde das
+    // Widget sonst mitten aus dem Logbuch ausblenden.
+    if (m_embedded && e->key() == Qt::Key_Escape) { e->ignore(); return; }
     QDialog::keyPressEvent(e);
+}
+
+void QsoMapWindow::setEmbedded(bool on)
+{
+    if (m_embedded == on) { return; }
+    m_embedded = on;
+    setWindowFlags(on ? Qt::Widget : Qt::Dialog);
+    if (m_rangeBox) { m_rangeBox->setVisible(!on); }
+    for (QWidget* w : m_rangeControls) { w->setVisible(!on); }
+    // Weltbild-Auswahl und KML-Export gehoeren ins grosse Fenster; in
+    // der Spalte kosten sie nur eine Zeile.
+    if (m_backgroundBox) { m_backgroundBox->setVisible(!on); }
+    if (m_earthBtn) { m_earthBtn->setVisible(!on); }
+    if (m_popOutBtn) { m_popOutBtn->setVisible(on); }
+    rebuild();
 }
 
 void QsoMapWindow::zoomActiveView(double factor)
@@ -165,6 +183,7 @@ void QsoMapWindow::buildUi()
         h->addWidget(toCap);
         h->addWidget(m_to);
         bar->addWidget(box);
+        m_rangeBox = box;
     }
     m_rangeControls << fromCap << m_from << toCap << m_to;
 
@@ -212,6 +231,7 @@ void QsoMapWindow::buildUi()
         h->addWidget(bgCap);
         h->addWidget(m_background);
         bar->addWidget(box);
+        m_backgroundBox = box;
     }
 
     // ── Zu einer Station fliegen ─────────────────────────────────────
@@ -289,6 +309,7 @@ void QsoMapWindow::buildUi()
     });
 
     auto* earthBtn = new QPushButton(QStringLiteral("Google Earth…"), this);
+    m_earthBtn = earthBtn;
     earthBtn->setStyleSheet(Style::buttonBaseStyle());
     earthBtn->setToolTip(QStringLiteral(
         "Export what the filters currently show as a KML file and open "
@@ -323,6 +344,15 @@ void QsoMapWindow::buildUi()
     m_viewBtn->setToolTip(QStringLiteral(
         "Switch between the globe and the whole world at once"));
     bar->addWidget(m_viewBtn);
+
+    // Nur eingebettet sichtbar: das grosse Fenster holen.
+    m_popOutBtn = new QPushButton(QStringLiteral("\u2197"), this);
+    m_popOutBtn->setStyleSheet(Style::buttonBaseStyle());
+    m_popOutBtn->setToolTip(QStringLiteral("Open the map in its own window"));
+    m_popOutBtn->setVisible(false);
+    bar->addWidget(m_popOutBtn);
+    connect(m_popOutBtn, &QPushButton::clicked, this, &QsoMapWindow::popOutRequested);
+
     col->addLayout(bar);
 
     // Second row: one pill per band and mode the log actually has,
@@ -448,7 +478,11 @@ void QsoMapWindow::setSelection(const QVector<LogEntry>& selected)
         : QStringLiteral("Only marked"));
     // Opened from a selection, start by showing just that — it is what
     // the operator asked for. The tick is there to widen it back out.
-    m_onlySelected->setChecked(any);
+    // Eingebettet nicht: dort ist die aktuelle Zeile immer „markiert",
+    // und die Karte soll weiter alles zeigen, was die Tabelle zeigt —
+    // die Markierung hebt hervor, sie filtert nicht (ausser der Haken
+    // wird von Hand gesetzt).
+    if (!m_embedded) { m_onlySelected->setChecked(any); }
     for (QWidget* w : m_rangeControls) { w->setEnabled(!any); }
 
     rebuild();
@@ -670,7 +704,8 @@ void QsoMapWindow::rebuild()
     for (const LogEntry& e : source) {
         const bool marked = markedRows.contains(entryKey(e));
 
-        if (!onlyMarked) {
+        // Eingebettet filtert die Logtabelle; hier kommt an, was sie zeigt.
+        if (!onlyMarked && !m_embedded) {
             // A contact with no timestamp is kept rather than dropped:
             // an imported log full of dateless records would otherwise
             // produce an empty map for every range the operator tries.

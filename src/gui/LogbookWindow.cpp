@@ -118,6 +118,18 @@ LogbookWindow::LogbookWindow(const QString& adifPath, QWidget* parent)
     restoreSplitState();
     restoreGeometryState();
     reload();
+
+    // Eine Seite: Karte und Kennzahlen zeigen, wie beim letzten Mal —
+    // beim ersten Mal beides an, das ist der Sinn der Sache.
+    {
+        AppSettings& s = AppSettings::instance();
+        const bool map = s.value(QStringLiteral("LogbookShowMap"), QStringLiteral("True"))
+                             .toString() == QStringLiteral("True");
+        const bool stats = s.value(QStringLiteral("LogbookShowStats"), QStringLiteral("True"))
+                               .toString() == QStringLiteral("True");
+        setMapPanelShown(map);
+        setStatsRowShown(stats);
+    }
 }
 
 void LogbookWindow::closeEvent(QCloseEvent* event)
@@ -159,12 +171,13 @@ void LogbookWindow::restoreGeometryState()
 void LogbookWindow::restoreSplitState()
 {
     const QByteArray st = AppSettings::instance()
-        .value(QStringLiteral("LogbookSplitState")).toByteArray();
+        .value(QStringLiteral("LogbookSplitState3")).toByteArray();
     if (!st.isEmpty() && m_split->restoreState(st)) { return; }
     // A first run, or a saved state from a build with a different
     // number of panes. Give the table the room and the pane enough to
-    // read a callsign in.
-    m_split->setSizes({860, 300});
+    // read a callsign in; the map column in the middle takes its share
+    // only while it is shown.
+    m_split->setSizes({620, 340, 280});
 }
 
 void LogbookWindow::setQrzClient(QrzClient* qrz)
@@ -204,10 +217,15 @@ void LogbookWindow::buildUi()
     m_uploadBtn = new QPushButton(QStringLiteral("Upload…"), this);
     m_uploadBtn->setToolTip(
         QStringLiteral("Send the selected contacts to a logging service"));
-    auto* mapBtn  = new QPushButton(QStringLiteral("Map…"), this);
-    mapBtn->setToolTip(
-        QStringLiteral("See the contacts in a period on a globe or a "
-                       "world map"));
+    // „Map" und „Stats" schalten die eingebettete Karte und die
+    // Kennzahlenreihe — eine Seite statt drei Fenster (2026-09-22). Die
+    // Fenster gibt es weiter, ueber „↗" in der Karte bzw. der Reihe.
+    m_mapToggle = new QPushButton(QStringLiteral("Map"), this);
+    m_mapToggle->setCheckable(true);
+    m_mapToggle->setToolTip(
+        QStringLiteral("Show the contacts on a globe or a world map "
+                       "beside the table — what the filters show"));
+    QPushButton* mapBtn = m_mapToggle;
     auto* importBtn = new QPushButton(QStringLiteral("Import…"), this);
     importBtn->setToolTip(QStringLiteral(
         "Merge an ADIF file into this log, skipping contacts it already has"));
@@ -224,19 +242,20 @@ void LogbookWindow::buildUi()
         "Export the filtered view as a Cabrillo 3.0 skeleton — check "
         "the exchange column against the contest's rules before "
         "submitting"));
-    auto* statsBtn = new QPushButton(QStringLiteral("Stats…"), this);
-    statsBtn->setToolTip(QStringLiteral(
-        "Contacts per band, mode and year, unique calls and squares, "
-        "furthest DX — for whatever the filters currently show"));
+    m_statsToggle = new QPushButton(QStringLiteral("Stats"), this);
+    m_statsToggle->setCheckable(true);
+    m_statsToggle->setToolTip(QStringLiteral(
+        "Contacts per band, mode and week, top countries, awards — "
+        "as a row under the table, for whatever the filters currently show"));
+    QPushButton* statsBtn = m_statsToggle;
     for (QPushButton* b : {m_editBtn, m_deleteBtn, m_uploadBtn, mapBtn,
                            statsBtn, importBtn, m_syncBtn, adifBtn, csvBtn, cabrBtn}) {
         b->setStyleSheet(Style::buttonBaseStyle());
         top->addWidget(b);
     }
     col->addLayout(top);
-    connect(mapBtn, &QPushButton::clicked, this, &LogbookWindow::openMap);
-    connect(statsBtn, &QPushButton::clicked,
-            this, &LogbookWindow::showStatistics);
+    connect(mapBtn, &QPushButton::toggled, this, &LogbookWindow::setMapPanelShown);
+    connect(statsBtn, &QPushButton::toggled, this, &LogbookWindow::setStatsRowShown);
     connect(cabrBtn, &QPushButton::clicked,
             this, &LogbookWindow::exportCabrillo);
     connect(importBtn, &QPushButton::clicked,
@@ -366,6 +385,32 @@ void LogbookWindow::buildUi()
     connect(m_detail, &QsoDetailPane::editRequested,
             this, &LogbookWindow::editSelected);
 
+    // ── Kennzahlenreihe ──────────────────────────────────────────────
+    m_statsSection = new QWidget(this);
+    {
+        auto* v = new QVBoxLayout(m_statsSection);
+        v->setContentsMargins(0, 0, 0, 0);
+        v->setSpacing(2);
+        auto* head = new QHBoxLayout;
+        head->setContentsMargins(0, 0, 0, 0);
+        auto* cap = new QLabel(QStringLiteral("STATISTICS · what the filters show"), m_statsSection);
+        cap->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 9px; letter-spacing: 1px; }")
+                               .arg(QString::fromLatin1(Style::kTextScale)));
+        head->addWidget(cap);
+        head->addStretch(1);
+        auto* popOut = new QPushButton(QStringLiteral("\u2197"), m_statsSection);
+        popOut->setStyleSheet(Style::buttonBaseStyle());
+        popOut->setToolTip(QStringLiteral("Open the statistics in their own window"));
+        connect(popOut, &QPushButton::clicked, this, &LogbookWindow::showStatistics);
+        head->addWidget(popOut);
+        v->addLayout(head);
+        m_statsRow = new LogbookStatsWidget(m_statsSection);
+        m_statsRow->setSingleRow(true);
+        v->addWidget(m_statsRow);
+    }
+    m_statsSection->setVisible(false);
+    col->addWidget(m_statsSection);
+
     m_stats = new QLabel(QString{}, this);
     m_stats->setWordWrap(true);
     m_stats->setStyleSheet(QStringLiteral(
@@ -435,9 +480,12 @@ void LogbookWindow::buildUi()
         if (idx < 0) { m_detail->clearEntry(); return; }
         m_detail->setEntry(m_all.at(idx));
     });
+    // Markierte Zeilen auf der eingebetteten Karte, wie im Fenster.
+    connect(m_table, &QTableWidget::itemSelectionChanged,
+            this, &LogbookWindow::syncMapPanelSelection);
 
     connect(m_split, &QSplitter::splitterMoved, this, [this](int, int) {
-        AppSettings::instance().setValue(QStringLiteral("LogbookSplitState"),
+        AppSettings::instance().setValue(QStringLiteral("LogbookSplitState3"),
                                          m_split->saveState());
     });
 
@@ -1039,6 +1087,7 @@ void LogbookWindow::updateStats()
 {
     // The Kennzahlen dialog follows the same view as this status line.
     refreshStatsView();
+    refreshMapPanel();
 
     QSet<QString> calls;
     QSet<QString> bands;
@@ -1432,20 +1481,7 @@ void LogbookWindow::openMap()
             if (m_map && m_map->isVisible()) { m_map->flyToStation(call, lat, lon, caption); }
         });
     }
-    m_map->setPositionFallback(m_fallback);
-
-    // Home comes from whichever contact recorded it most recently. The
-    // panel knows the operator's locator, but the map is opened from
-    // here — and the log carries the same answer, with the advantage of
-    // being right for an imported log made from a different station.
-    QString home;
-    for (const LogEntry& e : m_all) {
-        if (!e.myGridSquare.trimmed().isEmpty()) {
-            home = e.myGridSquare;
-            break;   // m_all is newest first
-        }
-    }
-    m_map->setHomeGrid(home);
+    prepareMap(m_map);
     m_map->setEntries(m_all);
 
     // Rows picked out in the table go to the map as a selection. With
@@ -1837,12 +1873,90 @@ void LogbookWindow::showStatistics()
 
 void LogbookWindow::refreshStatsView()
 {
-    if (!m_statsView || !m_statsDialog || !m_statsDialog->isVisible()) { return; }
+    const bool dialogWants = m_statsView && m_statsDialog && m_statsDialog->isVisible();
+    // isVisibleTo(this): vor dem ersten show() ist nichts „visible", die
+    // Reihe soll aber schon beim Aufgehen gefuellt sein.
+    const bool rowWants    = m_statsRow && m_statsSection && m_statsSection->isVisibleTo(this);
+    if (!dialogWants && !rowWants) { return; }
     QVector<LogEntry> shown;
     shown.reserve(m_visible.size());
     for (int i : m_visible) { shown.push_back(m_all.at(i)); }
-    m_statsView->setStats(LogbookStats::compute(shown, m_cty,
-                                                QDateTime::currentDateTimeUtc()));
+    const LogbookStats stats = LogbookStats::compute(shown, m_cty,
+                                                     QDateTime::currentDateTimeUtc());
+    if (dialogWants) { m_statsView->setStats(stats); }
+    if (rowWants)    { m_statsRow->setStats(stats); }
+}
+
+// ── Eine Seite: Karte und Kennzahlen im Fenster ──────────────────────
+
+void LogbookWindow::prepareMap(QsoMapWindow* map)
+{
+    map->setQrzClient(m_qrz);
+    map->setSatellites(m_satellites);
+    map->setPositionFallback(m_fallback);
+    // Home comes from whichever contact recorded it most recently. The
+    // panel knows the operator's locator, but the map is opened from
+    // here — and the log carries the same answer, with the advantage of
+    // being right for an imported log made from a different station.
+    QString home;
+    for (const LogEntry& e : m_all) {
+        if (!e.myGridSquare.trimmed().isEmpty()) {
+            home = e.myGridSquare;
+            break;   // m_all is newest first
+        }
+    }
+    map->setHomeGrid(home);
+}
+
+void LogbookWindow::setMapPanelShown(bool on)
+{
+    if (on && !m_mapPanel) {
+        m_mapPanel = new QsoMapWindow(this);
+        m_mapPanel->setEmbedded(true);
+        m_split->insertWidget(1, m_mapPanel);
+        connect(m_mapPanel, &QsoMapWindow::popOutRequested, this, &LogbookWindow::openMap);
+        connect(m_detail, &QsoDetailPane::stationLocated, m_mapPanel,
+                [this](const QString& call, double lat, double lon, const QString& caption) {
+            if (m_mapPanel && m_mapPanel->isVisibleTo(this)) {
+                m_mapPanel->flyToStation(call, lat, lon, caption);
+            }
+        });
+        // Frisch eingefuegt: erst jetzt hat der Teiler drei Spalten.
+        restoreSplitState();
+    }
+    if (m_mapPanel) { m_mapPanel->setVisible(on); }
+    if (m_mapToggle && m_mapToggle->isChecked() != on) { m_mapToggle->setChecked(on); }
+    AppSettings::instance().setValue(QStringLiteral("LogbookShowMap"),
+                                     on ? QStringLiteral("True") : QStringLiteral("False"));
+    if (on) { refreshMapPanel(); }
+}
+
+void LogbookWindow::setStatsRowShown(bool on)
+{
+    if (m_statsSection) { m_statsSection->setVisible(on); }
+    if (m_statsToggle && m_statsToggle->isChecked() != on) { m_statsToggle->setChecked(on); }
+    AppSettings::instance().setValue(QStringLiteral("LogbookShowStats"),
+                                     on ? QStringLiteral("True") : QStringLiteral("False"));
+    if (on) { refreshStatsView(); }
+}
+
+void LogbookWindow::refreshMapPanel()
+{
+    if (!m_mapPanel || !m_mapPanel->isVisibleTo(this)) { return; }
+    prepareMap(m_mapPanel);
+    QVector<LogEntry> shown;
+    shown.reserve(m_visible.size());
+    for (int i : m_visible) { shown.push_back(m_all.at(i)); }
+    m_mapPanel->setEntries(shown);
+    syncMapPanelSelection();
+}
+
+void LogbookWindow::syncMapPanelSelection()
+{
+    if (!m_mapPanel || !m_mapPanel->isVisibleTo(this)) { return; }
+    QVector<LogEntry> marked;
+    for (int idx : selectedSourceRows()) { marked.append(m_all.at(idx)); }
+    m_mapPanel->setSelection(marked);
 }
 
 
