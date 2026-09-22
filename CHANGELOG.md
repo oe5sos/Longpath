@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+## [0.6.4] - 2026-09-22
+
+Der Arbeitsast des Betreibers seit dem 9. September, in `main`
+zusammengefuehrt (PR #42): die Gestaltungsrichtung "Glas & Tiefe"
+(Bandfilter, Sendeteil, Applets in zweiter Runde, Setup-Dialog,
+Panadapter-Chrom, Logbuch-Tabelle), die Neural Noise Reduction (NNR,
+WDSP 2.10) als achte Rauschminderung, der letzte Rest des alten Namens
+in Kopfzeilen und Kommentaren, dazu die Reparaturen aus derselben Zeit
+(Bandfilter-Kurve, LSB-Durchlass, unsichtbare Bandbreite im 3D-Modus,
+schwebende Fenster, die sich beim Beenden selbst andockten). Unterwegs
+gefunden: eine Blockgroesse, die WDSPs Eingangsring nicht teilt, schrieb
+hinter den Puffer -- die Kanaloeffnung weist so etwas jetzt ab. Pakete
+fuer macOS (Apple Silicon und Intel), Windows und Linux (x86_64 und
+aarch64), alle GPG-signiert; 0.6.3 vom Vortag war aelter als das
+Programm, das der Betreiber taeglich benutzte.
+
 ### Added
 
 - **⤢ in jeder schwebenden Titelleiste: volle Groesse und zurueck.**
@@ -84,6 +100,19 @@
   Dieselbe Ursache wie beim Antennenfenster am 2026-09-01 (Qt::Tool-
   Panels liegen auf macOS ueber einem gewoehnlichen QDialog); der
   SetupDialog bekommt jetzt dieselbe Ebene.
+
+- **WDSP-Eingangsring: eine Blockgroesse, die den Ring nicht teilt,
+  schrieb hinter den Puffer.** iobuffs.c prueft den Umbruch nur auf
+  Gleichheit; mit 238 Werten je Block ("ein P2-Paket", so stand es als
+  Vorgabe von createRxChannel und in einem Pruefstand) landete ab dem
+  35. Block ein Rest hinter dem Ring -- am Mac unbemerkt, auf dem
+  Linux-Runner ein Absturz in fexchange2. Vorgabe jetzt 64 (was die
+  App ohnehin nimmt, bufferSizeForRate), und createRxChannel weist
+  jede Groesse ab, die den Ring nicht teilt.
+
+- **Fussleiste: "ON AIR" passte unter Linux nicht in seinen Platz** --
+  78 Punkte waren am Mac gemessen, die Linux-Schrift braucht 81; jetzt
+  84.
 
 ## [0.6.3] - 2026-09-21
 
