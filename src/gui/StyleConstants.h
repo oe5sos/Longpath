@@ -174,6 +174,11 @@ constexpr auto kBorderMuted     = "#3d3d41";
 // Vorrang — dieser Wert ist nur die Vorgabe fuer alle, die keine
 // gewaehlt haben.
 constexpr auto kPanadapterBg    = "#141e27";
+// Tiefsee der Blue-Marble-Kugel: die Farbe, die eine FEHLENDE Kachel
+// bekommt, damit das Loch wie Ozean aussieht und nicht wie ein
+// Schwarzbild. Aus dem GIBS-Foto gemessen (Pazifik, Level 3), nicht
+// aus der Hauspalette — die Kugel ist ein Foto, kein Chrom.
+constexpr auto kMapOceanDeep    = "#081024";
 // ── Eigener Wert, nicht derselbe wie der Seitengrund ────────────────
 //
 // kInsetBg trug bis zum 2026-08-21 EXAKT denselben Wert wie kAppBg

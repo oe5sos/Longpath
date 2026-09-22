@@ -138,8 +138,8 @@ void DxRadarWidget::paintEvent(QPaintEvent*)
 
     // Schirm
     QRadialGradient face(c, R);
-    face.setColorAt(0.0, QColor(18, 24, 34));
-    face.setColorAt(1.0, QColor(10, 12, 16));
+    face.setColorAt(0.0, QColor(Style::kPanadapterBg));
+    face.setColorAt(1.0, QColor(Style::kPanelBg));
     p.setPen(Qt::NoPen);
     p.setBrush(face);
     p.drawEllipse(c, R, R);

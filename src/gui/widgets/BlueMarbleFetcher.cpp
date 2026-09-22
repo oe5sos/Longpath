@@ -4,6 +4,7 @@
 // Longpath-original. No Thetis port.
 #include "gui/widgets/BlueMarbleFetcher.h"
 
+#include "gui/StyleConstants.h"
 #include "gui/widgets/WorldMapCatalog.h"
 #include "gui/widgets/WorldTexture.h"
 
@@ -49,7 +50,7 @@ QImage BlueMarbleFetcher::compose(GibsTileLayer& tiles, int level, bool* complet
     const int width  = qRound(360.0 / degPerPx);
     const int height = qRound(180.0 / degPerPx);
     QImage out(width, height, QImage::Format_RGB32);
-    out.fill(QColor(8, 16, 36));   // Ozean, falls eine Kachel fehlt
+    out.fill(QColor(Style::kMapOceanDeep));   // Ozean, falls eine Kachel fehlt
     QPainter p(&out);
     bool all = true;
     const auto ids = GibsTileLayer::tilesFor(level, -180.0, 180.0, -90.0, 90.0);
