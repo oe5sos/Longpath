@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Zeitmarken im Wasserfall** (Setup > Display > Time Markers: aus, 15 s,
+  30 s, 1/5/10/15 min): duenne Linien quer ueber den Wasserfall an den
+  Uhrgrenzen, jede mit der Uhrzeit beschriftet (UTC oder lokal, wie der
+  Zeitstempel). Jede Zeile traegt ihren eigenen Zeitstempel, darum
+  laufen die Marken mit ihren Zeilen mit und stehen in einer
+  angehaltenen Historie still. Aus, bis man es einschaltet. Idee aus
+  AetherSDR v26.9.3.
+
 ### Changed
 
 - **Das Logbuch ist eine Seite.** Nach dem Bild der Vorlage (Betreiber,
@@ -16,6 +26,9 @@
   Fenster wie bisher. Umbrechende Leisten melden ihre Hoehe jetzt als
   Mindesthoehe — sonst schob ein schmales Fenster die Karte unter ihre
   Knoepfe. Pruefstand `tst_logbook_one_page`.
+
+### Fixed
+
 
 ## [0.6.4] - 2026-09-22
 
@@ -128,15 +141,6 @@ Programm, das der Betreiber taeglich benutzte.
 - **Fussleiste: "ON AIR" passte unter Linux nicht in seinen Platz** --
   78 Punkte waren am Mac gemessen, die Linux-Schrift braucht 81; jetzt
   84.
-### Added
-
-- **Zeitmarken im Wasserfall** (Setup > Display > Time Markers: aus, 15 s,
-  30 s, 1/5/10/15 min): duenne Linien quer ueber den Wasserfall an den
-  Uhrgrenzen, jede mit der Uhrzeit beschriftet (UTC oder lokal, wie der
-  Zeitstempel). Jede Zeile traegt ihren eigenen Zeitstempel, darum
-  laufen die Marken mit ihren Zeilen mit und stehen in einer
-  angehaltenen Historie still. Aus, bis man es einschaltet. Idee aus
-  AetherSDR v26.9.3.
 
 ## [0.6.3] - 2026-09-21
 
