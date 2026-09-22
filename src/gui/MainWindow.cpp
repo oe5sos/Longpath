@@ -278,6 +278,7 @@ warren@wpratt.com
 #include "gui/AntennaWindow.h"
 #include "core/QrzLogbookUploader.h"
 #include "core/sat/SatelliteService.h"
+#include "gui/widgets/BlueMarbleFetcher.h"
 #include "core/CloudlogUploader.h"
 #include "core/AdifNetworkUploader.h"
 
@@ -13169,6 +13170,11 @@ void MainWindow::ensureSatellites()
     if (m_satellites) { return; }
     m_satellites = new SatelliteService(this);
     m_satellites->start();
+    // Im selben Atemzug das Weltbild: ohne eigenes Bild setzt sich die
+    // Kugel ihr Blue Marble aus den GIBS-Kacheln zusammen (einmal, dann
+    // liegt es im Kartenordner). Betreiber 2026-09-22: die schematische
+    // Kugel „ist haesslich".
+    BlueMarbleFetcher::ensureDefault();
 }
 
 void MainWindow::ensureExtraUploaders()

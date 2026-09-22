@@ -433,6 +433,7 @@ void RotorLogbookPanel::buildUi()
         menu.addSeparator();
         QAction* schematic = nullptr;
         QAction* landColour = nullptr;
+        QAction* styleNatural = nullptr;
         QAction* styleMuted = nullptr;
         QAction* styleNight = nullptr;
         QAction* styleCrisp = nullptr;
@@ -445,6 +446,9 @@ void RotorLogbookPanel::buildUi()
             // hat sein eigenes, unabhaengiges Glimmen.
             QMenu* styleMenu = menu.addMenu(QStringLiteral("Photo style"));
             const WorldTexture::Style cur = WorldTexture::style();
+            styleNatural = styleMenu->addAction(QStringLiteral("Natural"));
+            styleNatural->setCheckable(true);
+            styleNatural->setChecked(cur == WorldTexture::Style::Natural);
             styleMuted = styleMenu->addAction(QStringLiteral("Muted"));
             styleMuted->setCheckable(true);
             styleMuted->setChecked(cur == WorldTexture::Style::Muted);
@@ -475,6 +479,8 @@ void RotorLogbookPanel::buildUi()
             const QColor picked = QColorDialog::getColor(
                 m_globe->landColour(), this, tr("Land colour"));
             if (picked.isValid()) { m_globe->setLandColour(picked); }
+        } else if (chosen == styleNatural) {
+            WorldTexture::setStyle(WorldTexture::Style::Natural);
         } else if (chosen == styleMuted) {
             WorldTexture::setStyle(WorldTexture::Style::Muted);
         } else if (chosen == styleNight) {

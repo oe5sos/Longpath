@@ -70,6 +70,11 @@ enum class Style {
     Muted,      // fast Graustufe, stark verdunkelt -- am naehesten am Hausstil
     NightWash,  // volle Farbe, deutlich verdunkelt
     Crisp,      // volle Farbe, nur leicht verdunkelt -- am naehesten am Originalfoto
+    Natural,    // das Foto, wie es ist -- Tag/Nacht und Randabschattung
+                // kommen von der Kugel selbst. Voreinstellung seit
+                // 2026-09-22 („dieses bild als weltkugel ist haesslich"):
+                // im Logbuch ist die Kugel gross, da soll sie wie die
+                // Erde aussehen, nicht wie ein Instrument.
 };
 
 // Settings key holding the chosen style.

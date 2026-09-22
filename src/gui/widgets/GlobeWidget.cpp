@@ -859,12 +859,34 @@ void GlobeWidget::renderSphere()
             const double lon = m_viewLon * kDeg
                 + std::atan2(dx, nz * std::cos(vla) - dy * std::sin(vla));
 
-            int tx = static_cast<int>((norm180(lon / kDeg) + 180.0)
-                                      / 360.0 * tw) % tw;
+            // Bildpunkt in der Textur, mit Nachkommastellen: beim Foto
+            // bilinear zwischen den vier Nachbarn gemischt, damit die
+            // Kueste beim Hineinzoomen nicht in Kloetze zerfaellt; die
+            // schematische Maske bleibt hart (zwei Farben, keine Stufen).
+            const double fx = (norm180(lon / kDeg) + 180.0) / 360.0 * tw;
+            const double fy = (90.0 - lat / kDeg) / 180.0 * th;
+            int tx = static_cast<int>(fx) % tw;
             if (tx < 0) { tx += tw; }
-            int ty = static_cast<int>((90.0 - lat / kDeg) / 180.0 * th);
-            ty = std::clamp(ty, 0, th - 1);
-            const QRgb base = texture.pixel(tx, ty);
+            int ty = std::clamp(static_cast<int>(fy), 0, th - 1);
+            QRgb base = texture.pixel(tx, ty);
+            if (haveCustomTexture) {
+                const int tx1 = (tx + 1) % tw;
+                const int ty1 = std::min(ty + 1, th - 1);
+                const double ax = fx - std::floor(fx);
+                const double ay = fy - std::floor(fy);
+                const QRgb p00 = base;
+                const QRgb p10 = texture.pixel(tx1, ty);
+                const QRgb p01 = texture.pixel(tx, ty1);
+                const QRgb p11 = texture.pixel(tx1, ty1);
+                auto mix = [&](int c00, int c10, int c01, int c11) {
+                    const double top = c00 + (c10 - c00) * ax;
+                    const double bot = c01 + (c11 - c01) * ax;
+                    return static_cast<int>(top + (bot - top) * ay + 0.5);
+                };
+                base = qRgb(mix(qRed(p00),   qRed(p10),   qRed(p01),   qRed(p11)),
+                            mix(qGreen(p00), qGreen(p10), qGreen(p01), qGreen(p11)),
+                            mix(qBlue(p00),  qBlue(p10),  qBlue(p01),  qBlue(p11)));
+            }
 
             // Lambert term against the sun, with a floor so the night
             // side stays legible rather than going black — this is an

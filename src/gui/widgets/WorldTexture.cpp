@@ -69,13 +69,15 @@ Curve curveFor(Style s)
     case Style::Muted:     return Curve{true,  0.50, 1.20};
     case Style::NightWash: return Curve{false, 0.62, 1.08};
     case Style::Crisp:     return Curve{false, 0.84, 1.05};
+    case Style::Natural:   return Curve{false, 1.00, 1.00};
     }
-    return Curve{true, 0.50, 1.20};
+    return Curve{false, 1.00, 1.00};
 }
 
 QImage applyStyle(const QImage& src, Style style)
 {
     if (src.isNull()) { return src; }
+    if (style == Style::Natural) { return src; }   // nichts zu rechnen
 
     QImage out = src.convertToFormat(QImage::Format_RGB32);
     const Curve curve = curveFor(style);
@@ -158,10 +160,11 @@ QString styleSettingsKey()
 Style style()
 {
     const QString v = AppSettings::instance()
-        .value(styleSettingsKey(), QStringLiteral("Muted")).toString();
+        .value(styleSettingsKey(), QStringLiteral("Natural")).toString();
     if (v == QStringLiteral("NightWash")) { return Style::NightWash; }
     if (v == QStringLiteral("Crisp"))     { return Style::Crisp; }
-    return Style::Muted;
+    if (v == QStringLiteral("Muted"))     { return Style::Muted; }
+    return Style::Natural;
 }
 
 void setStyle(Style s)
@@ -170,7 +173,8 @@ void setStyle(Style s)
 
     const QString v = s == Style::NightWash ? QStringLiteral("NightWash")
                      : s == Style::Crisp     ? QStringLiteral("Crisp")
-                                              : QStringLiteral("Muted");
+                     : s == Style::Muted     ? QStringLiteral("Muted")
+                                              : QStringLiteral("Natural");
     AppSettings::instance().setValue(styleSettingsKey(), v);
     emit Notifier::instance().changed();
 }
