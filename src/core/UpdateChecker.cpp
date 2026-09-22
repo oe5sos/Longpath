@@ -72,8 +72,8 @@ QUrl UpdateChecker::latestReleaseApiUrl()
 
 QByteArray UpdateChecker::userAgent()
 {
-#ifdef NEREUSSDR_VERSION
-    return QByteArrayLiteral("Longpath/" NEREUSSDR_VERSION " (+https://github.com/oe5sos/Longpath)");
+#ifdef LONGPATH_VERSION
+    return QByteArrayLiteral("Longpath/" LONGPATH_VERSION " (+https://github.com/oe5sos/Longpath)");
 #else
     return QByteArrayLiteral("Longpath (+https://github.com/oe5sos/Longpath)");
 #endif

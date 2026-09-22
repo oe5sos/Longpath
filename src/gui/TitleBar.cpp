@@ -548,7 +548,7 @@ TitleBar::TitleBar(AudioEngine* audio, QWidget* parent)
     // 2026-09-21 ("die Version sollte man auch sehen!"): on a release
     // build the tag is empty and nothing showed at all -- the version
     // now stands here always, the tag joins it on a development build.
-    QString identity = QStringLiteral(NEREUSSDR_VERSION);
+    QString identity = QStringLiteral(LONGPATH_VERSION);
     const QString tag = BuildIdentity::buildTag();
     if (!tag.isEmpty()) {
         identity += QStringLiteral(" · %1").arg(tag);

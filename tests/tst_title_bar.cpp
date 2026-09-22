@@ -58,9 +58,9 @@ private slots:
         TitleBar bar(&engine);
         auto* label = bar.findChild<QLabel*>(QStringLiteral("titleBarVersion"));
         QVERIFY(label);
-        QVERIFY(label->text().startsWith(QStringLiteral(NEREUSSDR_VERSION)));
+        QVERIFY(label->text().startsWith(QStringLiteral(LONGPATH_VERSION)));
         // Ohne Bau-Tag (Pruefstand: main() setzt keinen) nur die Version.
-        QCOMPARE(label->text(), QStringLiteral(NEREUSSDR_VERSION));
+        QCOMPARE(label->text(), QStringLiteral(LONGPATH_VERSION));
     }
 
     // ── 2. setMenuBar re-parents the menu bar into the strip ──────────────
