@@ -53,6 +53,20 @@
   ein Port aus AetherSDR -- der Ersatz fuer den am 20.09.
   zurueckgezogenen ersten Anlauf. Live ueber einen KiwiSDR an der
   DRA5-Bake (5,195 MHz, 15 WPM) bestaetigt.
+- **Help > Check for Updates…** -- ein Klick, Installation automatisch.
+  Fragt die neueste Veroeffentlichung bei GitHub ab, zeigt Version und
+  Notizen, laedt das Paket fuer diese Maschine (macOS Apple Silicon /
+  Intel als DMG, Windows-Installer, Linux-AppImage), prueft es gegen
+  SHA256SUMS.txt derselben Veroeffentlichung, spielt es ein (macOS: an
+  die Stelle des laufenden Programms, ohne Kennwort) und startet
+  Longpath mit denselben Argumenten neu. Dazu eine stille Pruefung beim
+  Start (Haken im Dialog, hoechstens einmal je 20 h): gibt es eine
+  neuere Version, geht der Dialog von selbst auf. Keine GPG-Pruefung
+  im Programm (kein gpg auf einem stock-macOS); die Pruefsumme ueber
+  GitHubs HTTPS sichert den Download. Menue: "About Longpath" statt
+  des alten Namens. Und die Version steht jetzt immer in der Kopfzeile
+  neben dem Namen -- auf einem Release-Bau stand dort bisher nichts,
+  und im Vollbild fehlt der Fenstertitel.
 
 ### Changed
 

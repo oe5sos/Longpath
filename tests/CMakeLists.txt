@@ -4881,6 +4881,9 @@ longpath_add_test(tst_kiwi_tracking_follows_the_slice)
 # 2026-09-21: Nebenfenster (Channel Strip, Logbuch, Setup, Meldungen) auf
 # die Ebene der schwebenden Paletten -- welche Fenster der Filter anfasst.
 longpath_add_test(tst_auxiliary_window_leveler)
+# 2026-09-21: Help > Check for Updates... -- Release-JSON, Version, Paket,
+# SHA256SUMS, Startpruefung, Zielpfad, Neustart-Helfer, DMG-Einspielen (macOS).
+longpath_add_test(tst_update_checker)
 longpath_add_test(tst_sunsdr_audio_feed)
 longpath_add_test(tst_sunsdr_is_reachable)
 longpath_add_test(tst_compact_bar_draws)
