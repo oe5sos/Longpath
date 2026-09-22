@@ -76,7 +76,12 @@ StatusToast::StatusToast(const QString& message,
     // Height follows the wrapped text rather than a fixed value: the
     // messages range from "TX > Slice B" to a two-line auto-connect
     // explanation, and a fixed height would clip the long ones.
-    adjustSize();
+    //
+    // adjustSize() allein reichte nicht: es fragt den sizeHint, und der
+    // kennt bei einem umbrechenden QLabel die Zielbreite noch nicht —
+    // ein vierzeiliger Watchdog-Text stand unten abgeschnitten
+    // (2026-09-22). Die Hoehe fuer GENAU diese Breite fragen.
+    setFixedHeight(layout->totalHeightForWidth(kToastWidth));
 
     m_dismissTimer.setSingleShot(true);
     connect(&m_dismissTimer, &QTimer::timeout, this, &QWidget::close);

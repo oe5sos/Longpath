@@ -5127,6 +5127,8 @@ longpath_add_test(tst_logbook_one_page)
 longpath_add_test(tst_blue_marble_fetcher)
 # -- DX-Radar: Wurzelskala, Himmelsrichtungen, Punkte, dritte Ansicht --
 longpath_add_test(tst_dx_radar)
+# -- Verbindungsfenster: der lange Fehlschlag-Text passt (Leiste + darunter, Hinweis) --
+longpath_add_test(tst_connect_failure_text_fits)
 
 # -- Die Kopfleiste. Prueft, was Arithmetik hergibt: genau eine Pille je
 #    Gruppe an, sie folgt dem Modell statt dem Klick, und beim Wechsel
