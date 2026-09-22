@@ -154,6 +154,13 @@
   der Paletten (das zuletzt gezeigte steht vorne) und senkt es wieder,
   sobald Longpath nicht die aktive App ist -- sonst stuende es ueber
   jedem anderen Programm. Andere Plattformen unveraendert.
+- **VAX bleibt hoerbar, wenn nur das Programm aktualisiert wurde.** Ein
+  per DMG aktualisiertes Longpath (Help > Check for Updates...) trifft
+  noch auf den Audiotreiber bis 0.6.3, der seine Bloecke unter den alten
+  Namen anlegt; der Ton-Bus oeffnet jetzt erst den neuen, dann den alten
+  Namen und legt nur neu an, wenn beide fehlen. Dazu die Kennung beim
+  FreeDV-Reporter („Longpath <Version>", stand dort noch mit dem alten
+  Namen) und ein Pruefstand fuer den Schluesselbund-Umzug.
 
 ## [0.6.4] - 2026-09-22
 

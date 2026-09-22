@@ -82,7 +82,10 @@ private slots:
         // A consumer (the HAL plugin, or a second test fd) should be able
         // to open the same segment read-only. If this fails, push() could
         // never reach the plugin.
-        int fd = ::shm_open(kVax1Path, O_RDONLY, 0666);
+        // bus.shmName(), nicht der Literal: auf einem Rechner mit dem
+        // Treiber bis 0.6.3 nimmt der Bus dessen Block (/nereussdr-vax-1)
+        // -- das ist Absicht, nicht Fehler.
+        int fd = ::shm_open(bus.shmName(), O_RDONLY, 0666);
         QVERIFY2(fd >= 0, "shm_open after bus.open() should return a valid fd");
 
         struct stat st{};
@@ -103,7 +106,7 @@ private slots:
         QVERIFY2(bus.open(fmt), qPrintable(bus.errorString()));
 
         // Open the same segment from the test side (simulating the plugin).
-        int fd = ::shm_open(kVax1Path, O_RDWR, 0666);
+        int fd = ::shm_open(bus.shmName(), O_RDWR, 0666);
         QVERIFY(fd >= 0);
         void* ptr = ::mmap(nullptr, sizeof(VaxShmBlock),
                            PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
@@ -144,7 +147,7 @@ private slots:
 
         // Map the same segment from the test side and write samples into
         // the ring as if the HAL plugin had done so.
-        int fd = ::shm_open(kTxInputPath, O_RDWR, 0666);
+        int fd = ::shm_open(bus.shmName(), O_RDWR, 0666);
         QVERIFY(fd >= 0);
         void* ptr = ::mmap(nullptr, sizeof(VaxShmBlock),
                            PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
