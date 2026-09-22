@@ -716,6 +716,8 @@ set(MODEL_SOURCES
     src/models/BandDefaults.cpp
     src/models/BandPlanManager.cpp
     src/models/SliceModel.cpp
+    src/models/MemoryRecord.cpp
+    src/models/MemoryList.cpp
     src/models/PanadapterModel.cpp
     src/models/MeterModel.cpp
     src/models/TransmitModel.cpp
@@ -876,6 +878,8 @@ set(GUI_SOURCES
     src/gui/DiversityDialog.h
     src/gui/SpotHubDialog.cpp
     src/gui/SpotHubDialog.h
+    src/gui/MemoryDialog.cpp
+    src/gui/MemoryDialog.h
     src/gui/ParkInfoDialog.cpp
     src/gui/ParkInfoDialog.h
     src/gui/FreeDVReporterDialog.cpp

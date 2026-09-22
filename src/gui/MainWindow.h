@@ -553,6 +553,9 @@ private slots:
     // (Tools menu). Same lazy-construction pattern as openPureSignalDialog;
     // both dialogs are single-instance for the lifetime of MainWindow.
     void openSpotHub();
+    // Frequency memories (Thetis MemoryForm + the front-panel quick memory):
+    // Tools > Memories..., Tools > Memory Quick Save / Quick Restore.
+    void openMemories();
     void openFreeDVReporter();
     /// Task B4 (bottom-banner + pan-menu epic): +PAN icon click handler.
     /// Also the View > Pan Layout… (Ctrl+L) menu action's target. Gated on
@@ -1098,6 +1101,7 @@ private:
     // preserves geometry / table state). Both members are accessed by
     // the H1 test seam below.
     QPointer<SpotHubDialog>        m_spotHubDialog;
+    QPointer<class MemoryDialog>   m_memoryDialog;
     // m_voiceCheckDialog is gone (2026-08-11): the voice check is an
     // embedded tab of StripWindow now; openVoiceCheck() routes there.
     QPointer<StripWindow>          m_stripWindow;

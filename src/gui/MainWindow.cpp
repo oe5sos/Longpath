@@ -337,6 +337,7 @@ warren@wpratt.com
 #include "applets/TxEqDialog.h"
 // Phase 3J-2 H1: Tools menu modeless singletons (Spot Hub + FreeDV Reporter).
 #include "SpotHubDialog.h"
+#include "MemoryDialog.h"
 #include "FreeDVReporterDialog.h"
 // Phase 3F Sub-Epic G T4: bench-minimum Diversity dialog (Tools menu).
 #include "DiversityDialog.h"
@@ -9733,6 +9734,34 @@ void MainWindow::buildMenuBar()
         connect(spotHubAction, &QAction::triggered, this, &MainWindow::openSpotHub);
     }
 
+    // Frequency memories -- Thetis's Memory window (console.cs:40519-40524
+    // [@852bf0e] mnuMemory_Click) and the front-panel quick memory pair
+    // (btnMemoryQuickSave / btnMemoryQuickRestore, console.cs:36442-36455
+    // [@852bf0e]). Modeless singleton, built on first use.
+    {
+        QAction* memAction = toolsMenu->addAction(QStringLiteral("&Memories..."));
+        memAction->setObjectName(QStringLiteral("actMemories"));
+        memAction->setToolTip(QStringLiteral(
+            "Open the memory list: store the current frequency, mode, filter "
+            "and AGC, and recall a stored one."));
+        connect(memAction, &QAction::triggered, this, &MainWindow::openMemories);
+
+        QAction* quickSave = toolsMenu->addAction(QStringLiteral("Memory Quick &Save"));
+        quickSave->setObjectName(QStringLiteral("actMemoryQuickSave"));
+        quickSave->setToolTip(QStringLiteral(
+            "Remember the current frequency, mode and filter for Quick Restore."));
+        connect(quickSave, &QAction::triggered, this, [this]() {
+            if (m_radioModel) { m_radioModel->memoryQuickSave(); }
+        });
+        QAction* quickRestore = toolsMenu->addAction(QStringLiteral("Memory Quick &Restore"));
+        quickRestore->setObjectName(QStringLiteral("actMemoryQuickRestore"));
+        quickRestore->setToolTip(QStringLiteral(
+            "Return to the frequency, mode and filter remembered by Quick Save."));
+        connect(quickRestore, &QAction::triggered, this, [this]() {
+            if (m_radioModel) { m_radioModel->memoryQuickRestore(); }
+        });
+    }
+
     // Rotor dial — step 1 of the logbook/rotator work. A modeless
     // window rather than a dock or a splitter pane: the surrounding
     // layout stays untouched while the instrument itself is reviewed.
@@ -14294,6 +14323,17 @@ void MainWindow::openRotorSetup()
     if (RotorLogbookPanel* panel = ensureRotorPanel()) {
         panel->showRotorSetup();
     }
+}
+
+void MainWindow::openMemories()
+{
+    if (!m_radioModel) { return; }
+    if (!m_memoryDialog) {
+        m_memoryDialog = new MemoryDialog(m_radioModel, this);
+    }
+    m_memoryDialog->show();
+    m_memoryDialog->raise();
+    m_memoryDialog->activateWindow();
 }
 
 void MainWindow::openSpotHub()
