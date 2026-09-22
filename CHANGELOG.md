@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Nativer CW-Decoder** (View > Containers > Applets, sichtbar in CWL
+  und CWU): dekodiert Morse direkt aus dem Empfangston, ohne fldigi.
+  Tonhoehe und Tempo werden erkannt und koennen festgehalten werden
+  (LOCK Hz / LOCK WPM); das Suchband folgt dem eingestellten CW-Pitch.
+  Unsichere Zeichen erscheinen gedaempft, Rauschen wird gar nicht erst
+  gezeigt. Decoder ist ggmorse (MIT, unveraendert vendort), der Wrapper
+  ein Port aus AetherSDR -- der Ersatz fuer den am 20.09.
+  zurueckgezogenen ersten Anlauf. Live ueber einen KiwiSDR an der
+  DRA5-Bake (5,195 MHz, 15 WPM) bestaetigt.
+
 ### Changed
 
 - **Das Logbuch ist eine Seite.** Nach dem Bild der Vorlage (Betreiber,
@@ -16,6 +28,9 @@
   Fenster wie bisher. Umbrechende Leisten melden ihre Hoehe jetzt als
   Mindesthoehe — sonst schob ein schmales Fenster die Karte unter ihre
   Knoepfe. Pruefstand `tst_logbook_one_page`.
+
+### Fixed
+
 
 ## [0.6.4] - 2026-09-22
 
@@ -128,17 +143,6 @@ Programm, das der Betreiber taeglich benutzte.
 - **Fussleiste: "ON AIR" passte unter Linux nicht in seinen Platz** --
   78 Punkte waren am Mac gemessen, die Linux-Schrift braucht 81; jetzt
   84.
-### Added
-
-- **Nativer CW-Decoder** (View > Containers > Applets, sichtbar in CWL
-  und CWU): dekodiert Morse direkt aus dem Empfangston, ohne fldigi.
-  Tonhoehe und Tempo werden erkannt und koennen festgehalten werden
-  (LOCK Hz / LOCK WPM); das Suchband folgt dem eingestellten CW-Pitch.
-  Unsichere Zeichen erscheinen gedaempft, Rauschen wird gar nicht erst
-  gezeigt. Decoder ist ggmorse (MIT, unveraendert vendort), der Wrapper
-  ein Port aus AetherSDR -- der Ersatz fuer den am 20.09.
-  zurueckgezogenen ersten Anlauf. Live ueber einen KiwiSDR an der
-  DRA5-Bake (5,195 MHz, 15 WPM) bestaetigt.
 
 ## [0.6.3] - 2026-09-21
 
