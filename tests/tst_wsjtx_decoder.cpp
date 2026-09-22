@@ -35,6 +35,45 @@ static void writeWsjtxString(QDataStream& ds, const QString& s) {
     ds.writeRawData(utf8.constData(), utf8.size());
 }
 
+// A Status (type 1) datagram from instance `id` with `dialHz`.
+static QByteArray statusPacket(const QString& id, quint64 dialHz,
+                               const QString& mode = QStringLiteral("FT8")) {
+    QByteArray pkt;
+    QDataStream out(&pkt, QIODevice::WriteOnly);
+    out.setByteOrder(QDataStream::BigEndian);
+    out << quint32(0xADBCCBDA) << quint32(2) << quint32(1);
+    writeWsjtxString(out, id);
+    out << dialHz;
+    writeWsjtxString(out, mode);
+    return pkt;
+}
+
+// A Decode (type 2) datagram from instance `id` at audio offset `deltaHz`.
+static QByteArray decodePacket(const QString& id, quint32 deltaHz,
+                               const QString& message) {
+    QByteArray pkt;
+    QDataStream out(&pkt, QIODevice::WriteOnly);
+    out.setByteOrder(QDataStream::BigEndian);
+    out << quint32(0xADBCCBDA) << quint32(2) << quint32(2);
+    writeWsjtxString(out, id);
+    out << quint8(1);                        // isNew
+    out << quint32(61680000) << qint32(-7) << double(0.1) << deltaHz;
+    writeWsjtxString(out, "~");
+    writeWsjtxString(out, message);
+    out << quint8(0) << quint8(0);           // lowConfidence, offAir
+    return pkt;
+}
+
+// A Close (type 6) datagram from instance `id`.
+static QByteArray closePacket(const QString& id) {
+    QByteArray pkt;
+    QDataStream out(&pkt, QIODevice::WriteOnly);
+    out.setByteOrder(QDataStream::BigEndian);
+    out << quint32(0xADBCCBDA) << quint32(2) << quint32(6);
+    writeWsjtxString(out, id);
+    return pkt;
+}
+
 class TestWsjtxDecoder : public QObject {
     Q_OBJECT
 private slots:
@@ -44,6 +83,11 @@ private slots:
     void skipsLowConfidence();
     void extractsCallsign_data();
     void extractsCallsign();
+    // AetherSDR #3595 [@ae15dd7e]: the dial is per instance.
+    void twoInstancesKeepTheirOwnBand();
+    void decodeWithoutStatusIsDropped();
+    void closeForgetsTheInstance();
+    void zeroDialIsIgnored();
 };
 
 void TestWsjtxDecoder::parsesStatusUpdatesDialFreq() {
@@ -148,6 +192,78 @@ void TestWsjtxDecoder::skipsLowConfidence() {
     QSignalSpy spotSpy(&c, &WsjtxClient::spotReceived);
     c.processPacketForTest(pkt);
     QCOMPARE(spotSpy.count(), 0);
+}
+
+// Two WSJT-X instances on one port, 40 m and 20 m, their Status
+// datagrams interleaved: each decode lands on ITS instance's dial.
+// With one "last dial seen" the 40 m decode (offset 1320 Hz) that
+// arrived after the 20 m Status was painted at 14.075 MHz.
+void TestWsjtxDecoder::twoInstancesKeepTheirOwnBand() {
+    WsjtxClient c;
+    QSignalSpy spotSpy(&c, &WsjtxClient::spotReceived);
+    c.processPacketForTest(statusPacket(QStringLiteral("WSJT-X"), 7074000));
+    c.processPacketForTest(statusPacket(QStringLiteral("WSJT-X - 2"), 14074000));
+    QCOMPARE(c.dialTrackerForTest().instanceCount(), 2);
+
+    c.processPacketForTest(decodePacket(QStringLiteral("WSJT-X"), 1320,
+                                        QStringLiteral("CQ OE5SOS JN67")));
+    c.processPacketForTest(decodePacket(QStringLiteral("WSJT-X - 2"), 2000,
+                                        QStringLiteral("CQ JA1MZK PM95")));
+    // The 40 m instance reports again AFTER the 20 m one: still its own band.
+    c.processPacketForTest(statusPacket(QStringLiteral("WSJT-X - 2"), 14074000));
+    c.processPacketForTest(decodePacket(QStringLiteral("WSJT-X"), 500,
+                                        QStringLiteral("CQ DL1ABC JO31")));
+
+    QCOMPARE(spotSpy.count(), 3);
+    QCOMPARE(spotSpy.at(0).first().value<DxSpot>().freqMhz, 7.075320);
+    QCOMPARE(spotSpy.at(1).first().value<DxSpot>().freqMhz, 14.076000);
+    QCOMPARE(spotSpy.at(2).first().value<DxSpot>().freqMhz, 7.074500);
+}
+
+// A decode from an instance that has not reported its dial yet cannot be
+// placed; it is dropped, not painted on another instance's band.
+void TestWsjtxDecoder::decodeWithoutStatusIsDropped() {
+    WsjtxClient c;
+    QSignalSpy spotSpy(&c, &WsjtxClient::spotReceived);
+    c.processPacketForTest(statusPacket(QStringLiteral("WSJT-X"), 7074000));
+    c.processPacketForTest(decodePacket(QStringLiteral("WSJT-X - 2"), 1000,
+                                        QStringLiteral("CQ JA1MZK PM95")));
+    QCOMPARE(spotSpy.count(), 0);
+    // Once its Status arrives, the next decode is placed.
+    c.processPacketForTest(statusPacket(QStringLiteral("WSJT-X - 2"), 21074000));
+    c.processPacketForTest(decodePacket(QStringLiteral("WSJT-X - 2"), 1000,
+                                        QStringLiteral("CQ JA1MZK PM95")));
+    QCOMPARE(spotSpy.count(), 1);
+    QCOMPARE(spotSpy.at(0).first().value<DxSpot>().freqMhz, 21.075000);
+}
+
+// Close (type 6) forgets the instance: a relaunch does not inherit the
+// old band until its first Status.
+void TestWsjtxDecoder::closeForgetsTheInstance() {
+    WsjtxClient c;
+    QSignalSpy spotSpy(&c, &WsjtxClient::spotReceived);
+    c.processPacketForTest(statusPacket(QStringLiteral("WSJT-X"), 7074000));
+    c.processPacketForTest(closePacket(QStringLiteral("WSJT-X")));
+    QCOMPARE(c.dialTrackerForTest().instanceCount(), 0);
+    c.processPacketForTest(decodePacket(QStringLiteral("WSJT-X"), 1000,
+                                        QStringLiteral("CQ JA1MZK PM95")));
+    QCOMPARE(spotSpy.count(), 0);
+}
+
+// WSJT-X reports 0 Hz while it has no rig: that is not a dial.
+void TestWsjtxDecoder::zeroDialIsIgnored() {
+    WsjtxClient c;
+    QSignalSpy spotSpy(&c, &WsjtxClient::spotReceived);
+    c.processPacketForTest(statusPacket(QStringLiteral("WSJT-X"), 0));
+    QCOMPARE(c.dialTrackerForTest().instanceCount(), 0);
+    c.processPacketForTest(decodePacket(QStringLiteral("WSJT-X"), 1000,
+                                        QStringLiteral("CQ JA1MZK PM95")));
+    QCOMPARE(spotSpy.count(), 0);
+    // An earlier good dial survives a later 0 Hz report.
+    c.processPacketForTest(statusPacket(QStringLiteral("WSJT-X"), 7074000));
+    c.processPacketForTest(statusPacket(QStringLiteral("WSJT-X"), 0));
+    QCOMPARE(c.dialTrackerForTest().dialFreqHzFor(QStringLiteral("WSJT-X")).value_or(0.0),
+             7074000.0);
 }
 
 void TestWsjtxDecoder::extractsCallsign_data() {

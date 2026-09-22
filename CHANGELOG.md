@@ -81,6 +81,12 @@
   Im selben Bild: der Lautstaerkewert in der Titelleiste zeigte "100" als
   "L0(" -- 22 feste Punkte fuer einen Glaschip, der seit dem 17.09. mit
   Polster und Rahmen 30 braucht; jetzt aus der Schriftbreite.
+- **WSJT-X: zwei Instanzen auf einem UDP-Port setzten die Decodes der
+  einen auf das Band der anderen.** Der Client merkte sich EINE
+  Dial-Frequenz fuer alle Instanzen; wer 40 m und 20 m parallel
+  dekodiert (oder WSJT-X neben JTDX), sah falsche Spots. Jetzt je
+  Instanz-ID (Status-Nachricht), Close raeumt auf, ein Decode ohne
+  bekanntes Dial wird verworfen statt geraten (AetherSDR #3595).
 
 ## [0.6.4] - 2026-09-22
 

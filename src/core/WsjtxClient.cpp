@@ -151,6 +151,7 @@ void WsjtxClient::parseMessage(const QByteArray& data)
     switch (msgType) {
     case 1:  parseStatus(ds);  break;  // Status — dial freq, mode
     case 2:  parseDecode(ds);  break;  // Decode — the spots
+    case 6:  parseClose(ds);   break;  // Close — instance exiting
     case 12: parseLoggedAdif(ds); break;  // Logged ADIF — a finished QSO
     default: break;
     }
@@ -193,10 +194,22 @@ void WsjtxClient::parseStatus(QDataStream& ds)
     QString mode;
     if (!readQString(ds, mode)) return;
 
-    m_dialFreqHz = static_cast<double>(dialFreq);
+    // Per instance, not one for all (AetherSDR #3595, [@ae15dd7e]).
+    const double dialFreqHz = static_cast<double>(dialFreq);
+    m_dialTracker.noteStatus(id, dialFreqHz);
     m_mode = mode;
 
-    emit statusReceived(id, m_dialFreqHz, mode);
+    emit statusReceived(id, dialFreqHz, mode);
+}
+
+// ── Close message (type 6) — instance is exiting ────────────────────────────
+
+// From AetherSDR src/core/WsjtxClient.cpp [@ae15dd7e]
+void WsjtxClient::parseClose(QDataStream& ds)
+{
+    QString id;
+    if (!readQString(ds, id)) return;
+    m_dialTracker.forget(id);
 }
 
 // ── Decode message (type 2) — extract spots ─────────────────────────────────
@@ -236,8 +249,19 @@ void WsjtxClient::parseDecode(QDataStream& ds)
     QString call = extractCallsign(message);
     if (call.isEmpty()) return;
 
-    // Calculate actual frequency: dial + audio offset
-    double freqHz = m_dialFreqHz + deltaFreqHz;
+    // Calculate actual frequency: THIS instance's dial + audio offset. The
+    // dial must come from the same instance id as the decode -- with two
+    // WSJT-X instances on one port, using whichever Status arrived last put
+    // one band's decodes on the other band's panadapter (AetherSDR #3595,
+    // [@ae15dd7e]). An instance that has not reported a dial yet cannot be
+    // placed; drop the decode rather than paint it on a guessed band.
+    const std::optional<double> dialFreqHz = m_dialTracker.dialFreqHzFor(id);
+    if (!dialFreqHz) {
+        qCDebug(lcSpots) << "WsjtxClient: dropping decode from" << id
+                         << "- no Status (dial frequency) seen from that instance yet";
+        return;
+    }
+    double freqHz = *dialFreqHz + deltaFreqHz;
     double freqMhz = freqHz / 1.0e6;
 
     // Build the spot
