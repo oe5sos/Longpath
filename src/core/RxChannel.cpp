@@ -246,6 +246,7 @@ warren@wpratt.com
 */
 
 #include "RxChannel.h"
+#include "core/dsp/FftwPlannerLock.h"
 #include "AppSettings.h"
 #include "LogCategories.h"
 #include "NbFamily.h"
@@ -2597,6 +2598,13 @@ QVector<float> RxChannel::filterResponseMagnitudes(int nPoints) const
     constexpr int kFftSize = 4096;
     static_assert(kFftSize >= kTapCount, "FFT size must exceed tap count");
 
+    // Belegung, Plan und Freigabe der DOPPELTEN Genauigkeit gehoeren unter
+    // dieselbe Sperre wie WDSPs eigenes Planen: WDSPwisdom() laeuft bei uns
+    // auf einem eigenen Faden und OpenChannel/CloseChannel planen intern.
+    // fftw_execute() unten ist threadsicher und bleibt draussen — es liegt
+    // auf dem Weg zum Bild. Siehe FftwPlannerLock.h.
+    auto plannerLock = fftwPlannerLock();
+
     // Allocate aligned FFTW3 buffers.
     fftw_complex* in  = fftw_alloc_complex(kFftSize);
     fftw_complex* out = fftw_alloc_complex(kFftSize);
@@ -2615,7 +2623,9 @@ QVector<float> RxChannel::filterResponseMagnitudes(int nPoints) const
         in[i][0] = taps[i];
     }
 
-    // Use FFTW_ESTIMATE to avoid touching the global FFTW wisdom/mutex.
+    // FFTW_ESTIMATE: kein Messen, aber sehr wohl derselbe globale
+    // Planerzustand — die Sperre oben ist die Antwort darauf, nicht das
+    // Planungsflag (der frühere Kommentar behauptete das Gegenteil).
     fftw_plan plan = fftw_plan_dft_1d(kFftSize, in, out, FFTW_FORWARD, FFTW_ESTIMATE);
     if (!plan) {
         fftw_free(in);

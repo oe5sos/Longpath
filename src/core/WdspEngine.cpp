@@ -53,6 +53,7 @@ warren@wpratt.com
 */
 
 #include "WdspEngine.h"
+#include "core/dsp/FftwPlannerLock.h"
 #include "RxChannel.h"
 
 #include <algorithm>
@@ -204,6 +205,11 @@ bool WdspEngine::initialize(const QString& configDir)
                   << "needsGeneration=" << needsGeneration;
 
     auto* wisdomThread = QThread::create([configPath]() {
+        // WDSPwisdom() plant mit FFTW_PATIENT und schreibt den globalen
+        // Wissensspeicher der doppelten Genauigkeit — beides waehrend die
+        // Oberflaeche weiterlaeuft und z. B. ein Filterbild rechnet.
+        // Siehe FftwPlannerLock.h.
+        auto plannerLock = Longpath::fftwPlannerLock();
         WDSPwisdom(const_cast<char*>(configPath.constData()));
     });
     wisdomThread->setObjectName(QStringLiteral("WisdomThread"));
@@ -419,6 +425,7 @@ RxChannel* WdspEngine::createRxChannel(int channelId,
         }
     }
     // From Thetis cmaster.c:72-86 [v2.10.3.13] (create_rcvr OpenChannel call)
+    { auto plannerLock = fftwPlannerLock();  // siehe FftwPlannerLock.h
     OpenChannel(
         channelId,
         inputBufferSize,        // in_size
@@ -443,6 +450,7 @@ RxChannel* WdspEngine::createRxChannel(int channelId,
     // Without this, the RxChannel guard (if val == m_mode) would skip the
     // WDSP call when the requested mode matches the cached default.
     SetRXAMode(channelId, static_cast<int>(DSPMode::LSB));
+    }
     // Both bp1 AND nbp0 must be seeded — see RxChannel::setFilterFreqs
     // comment for why. Thetis seeds both at channel create.
     SetRXABandpassFreqs(channelId, -2850.0, -150.0);
@@ -497,7 +505,9 @@ void WdspEngine::destroyRxChannel(int channelId)
     // src/core/NbFamily.h. Do NOT re-add destroy_anbEXT/nobEXT here.
 
     // Close the WDSP channel
+    { auto plannerLock = fftwPlannerLock();  // siehe FftwPlannerLock.h
     CloseChannel(channelId);
+    }
 #endif
 
     m_rxChannels.erase(it);
@@ -768,7 +778,9 @@ qint64 WdspEngine::rebuildRxChannel(int channelId, const ChannelConfig& cfg)
     // Do NOT add destroy_anbEXT/nobEXT here.
 
     // Close the old WDSP channel.
+    { auto plannerLock = fftwPlannerLock();  // siehe FftwPlannerLock.h
     CloseChannel(channelId);
+    }
 #endif
 
     // Destroy the old RxChannel C++ wrapper (runs ~NbFamily, ~DeepFilterFilter, etc.).
@@ -777,6 +789,7 @@ qint64 WdspEngine::rebuildRxChannel(int channelId, const ChannelConfig& cfg)
 
 #ifdef HAVE_WDSP
     // Recreate the WDSP channel with the new config.
+    { auto plannerLock = fftwPlannerLock();  // siehe FftwPlannerLock.h
     OpenChannel(
         channelId,
         cfg.bufferSize,             // in_size
@@ -796,6 +809,7 @@ qint64 WdspEngine::rebuildRxChannel(int channelId, const ChannelConfig& cfg)
     // same pattern as createRxChannel() so that applyState() early-return
     // guards fire correctly for values that haven't changed.
     SetRXAMode(channelId, static_cast<int>(DSPMode::LSB));
+    }
     SetRXABandpassFreqs(channelId, -2850.0, -150.0);
     RXANBPSetFreqs(channelId, -2850.0, -150.0);
     SetRXAAGCMode(channelId, static_cast<int>(AGCMode::Med));
@@ -978,6 +992,7 @@ TxChannel* WdspEngine::createTxChannel(int channelId,
     // From Thetis cmaster.c:177-190 (create_xmtr OpenChannel call) [v2.10.3.13]
     // Differences vs. RX: type=1 (TX), bfo=1 (block-on-output), dsp_rate=96000,
     // tdelayup=0, tslewup=0.010, tdelaydown=0, tslewdown=0.010.
+    { auto plannerLock = fftwPlannerLock();  // siehe FftwPlannerLock.h
     OpenChannel(
         channelId,
         inputBufferSize,        // in_size — from cmaster.c:179 pcm->xcm_insize[in_id]
@@ -1007,6 +1022,7 @@ TxChannel* WdspEngine::createTxChannel(int channelId,
     // OpenChannel(type=1).  Cite: deskhpsdr/src/transmitter.c:1459-1473 [@120188f]:
     //   SetTXABandpassWindow(tx->id, 1);   // 7-term Blackman-Harris
     //   SetTXABandpassRun(tx->id, 1);
+    }
     //   SetTXAAMSQRun(tx->id, 0);          // disable mic noise gate
     //   SetTXAALCAttack(tx->id, 1);        // 1 ms attack
     //   SetTXAALCDecay(tx->id, 10);        // 10 ms decay
@@ -1265,7 +1281,9 @@ void WdspEngine::destroyTxChannel(int channelId)
     destroy_dexp(channelId);
 
     // Close the WDSP TX channel.
+    { auto plannerLock = fftwPlannerLock();  // siehe FftwPlannerLock.h
     CloseChannel(channelId);
+    }
 #endif
 
     // Drop the DEXP buffer slot regardless of HAVE_WDSP — the non-HAVE_WDSP
@@ -1316,6 +1334,7 @@ void WdspEngine::openPsFeedbackChannel()
 
 #ifdef HAVE_WDSP
     // From Thetis cmaster.c:72-86 (create_rcvr OpenChannel call) [v2.10.3.13]
+    { auto plannerLock = fftwPlannerLock();  // siehe FftwPlannerLock.h
     OpenChannel(
         kPsFeedbackChannelId,
         kPsInputBufferSize,                 // in_size
@@ -1337,6 +1356,7 @@ void WdspEngine::openPsFeedbackChannel()
     // reads autonomously and expects the channel live.  state=1, dmode=0
     // (no drain — channel isn't running yet).
     SetChannelState(kPsFeedbackChannelId, 1, 0);
+    }
 
     qCInfo(lcDsp) << "Opened PS feedback RX channel"
                   << kPsFeedbackChannelId
@@ -1357,7 +1377,9 @@ void WdspEngine::closePsFeedbackChannel()
     // Deactivate with drain before closing.  dmode=1: drain-mode close
     // (mirrors destroyRxChannel pattern at WdspEngine.cpp:381).
     SetChannelState(kPsFeedbackChannelId, 0, 1);
+    { auto plannerLock = fftwPlannerLock();  // siehe FftwPlannerLock.h
     CloseChannel(kPsFeedbackChannelId);
+    }
     qCInfo(lcDsp) << "Closed PS feedback RX channel" << kPsFeedbackChannelId;
 #endif
 
@@ -1405,7 +1427,9 @@ qint64 WdspEngine::rebuildTxChannel(int channelId, const ChannelConfig& cfg)
     SetChannelState(channelId, 0, 1);
 
     // Close the old WDSP TX channel.
+    { auto plannerLock = fftwPlannerLock();  // siehe FftwPlannerLock.h
     CloseChannel(channelId);
+    }
 #endif
 
     // Destroy the old TxChannel C++ wrapper.
@@ -1419,6 +1443,7 @@ qint64 WdspEngine::rebuildTxChannel(int channelId, const ChannelConfig& cfg)
     // cfg.bufferSize = new in_size; cfg.filterSize = new dsp_size.
     // For TX dsp_rate we reuse kTxDspSampleRate (96000) — the ChannelConfig
     // struct carries a single sampleRate field intended for the I/O rates.
+    { auto plannerLock = fftwPlannerLock();  // siehe FftwPlannerLock.h
     OpenChannel(
         channelId,
         cfg.bufferSize,             // in_size (new input block size)
@@ -1437,6 +1462,7 @@ qint64 WdspEngine::rebuildTxChannel(int channelId, const ChannelConfig& cfg)
     // Re-seed TX defaults — same block as createTxChannel() so that
     // applyState() setter guards fire correctly for unchanged values.
     SetTXABandpassWindow(channelId, 1);
+    }
     SetTXABandpassRun(channelId, 1);
     SetTXAAMSQRun(channelId, 0);
     SetTXAALCAttack(channelId, 1);
