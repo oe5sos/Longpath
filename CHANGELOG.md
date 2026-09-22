@@ -42,6 +42,9 @@
   Splitter gibt dem Panadapter entsprechend weniger. Gefunden beim
   Sichten des 0.6.4-Pakets in einem leeren Profil; die Automatisierungs-
   bruecke meldet in dumpTree seither auch minSize/minHint je Widget.
+  Im selben Bild: der Lautstaerkewert in der Titelleiste zeigte "100" als
+  "L0(" -- 22 feste Punkte fuer einen Glaschip, der seit dem 17.09. mit
+  Polster und Rahmen 30 braucht; jetzt aus der Schriftbreite.
 
 ## [0.6.4] - 2026-09-22
 

@@ -25,6 +25,7 @@
 #include <QAction>
 #include <QActionGroup>
 #include <QHBoxLayout>
+#include <QFontMetrics>
 #include <QLabel>
 #include <QMenu>
 #include <QPoint>
@@ -142,7 +143,16 @@ MasterOutputWidget::MasterOutputWidget(AudioEngine* audio, QWidget* parent)
     // ── Inset percent readout ──────────────────────────────────────────────
     m_dbLabel = new QLabel(QString::number(pct), this);
     m_dbLabel->setObjectName(QStringLiteral("dbLabel"));
-    m_dbLabel->setFixedWidth(22);
+    // Breit genug fuer "100" in der Schrift des Glaschips (Menlo 11 px,
+    // insetValueStyle: 4 px Polster + 1 px Rahmen je Seite). Die festen
+    // 22 Punkte von frueher zeigten die Vorgabe 100 als "L0(" -- am
+    // 2026-09-22 im 0.6.4-Paket gesehen, seit dem Glaschip vom 17.09.
+    {
+        QFont chip = m_dbLabel->font();
+        chip.setFamily(QStringLiteral("Menlo"));
+        chip.setPixelSize(11);
+        m_dbLabel->setFixedWidth(QFontMetrics(chip).horizontalAdvance(QStringLiteral("100")) + 10);
+    }
     m_dbLabel->setAlignment(Qt::AlignCenter);
     m_dbLabel->setStyleSheet(Style::insetValueStyle());
     layout->addWidget(m_dbLabel);
