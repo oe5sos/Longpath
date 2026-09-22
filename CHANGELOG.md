@@ -17,6 +17,16 @@
   Mindesthoehe — sonst schob ein schmales Fenster die Karte unter ihre
   Knoepfe. Pruefstand `tst_logbook_one_page`.
 
+### Fixed
+
+- **KiwiSDR-Wasserfall auf Servern mit anderem `zoom_max`** (Web-888,
+  RaspSDR: 11 statt 14): der Start-Offset wurde fest auf der
+  2^24-Skala kodiert, der Server klemmte ihn an die Bandkante -- der
+  Ausschnitt stimmte nicht. Der Massstab ist jetzt `1024 << zoom_max`
+  des Servers, `zoom_cap` bleibt allein die Obergrenze der angefragten
+  Zoomstufe (AetherSDR #5536/#5655). Echte KiwiSDR (zoom_max 14) sind
+  unveraendert.
+
 ## [0.6.4] - 2026-09-22
 
 Der Arbeitsast des Betreibers seit dem 9. September, in `main`
@@ -128,15 +138,6 @@ Programm, das der Betreiber taeglich benutzte.
 - **Fussleiste: "ON AIR" passte unter Linux nicht in seinen Platz** --
   78 Punkte waren am Mac gemessen, die Linux-Schrift braucht 81; jetzt
   84.
-### Fixed
-
-- **KiwiSDR-Wasserfall auf Servern mit anderem `zoom_max`** (Web-888,
-  RaspSDR: 11 statt 14): der Start-Offset wurde fest auf der
-  2^24-Skala kodiert, der Server klemmte ihn an die Bandkante -- der
-  Ausschnitt stimmte nicht. Der Massstab ist jetzt `1024 << zoom_max`
-  des Servers, `zoom_cap` bleibt allein die Obergrenze der angefragten
-  Zoomstufe (AetherSDR #5536/#5655). Echte KiwiSDR (zoom_max 14) sind
-  unveraendert.
 
 ## [0.6.3] - 2026-09-21
 
