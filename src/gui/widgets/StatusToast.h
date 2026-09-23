@@ -72,6 +72,10 @@ public:
 protected:
     void mousePressEvent(QMouseEvent* event) override;
 
+    /// Die Hoehe nach dem Polieren noch einmal rechnen -- siehe
+    /// die Begruendung in StatusToast.cpp.
+    void showEvent(QShowEvent* event) override;
+
 private:
     QString m_message;
     QTimer  m_dismissTimer;

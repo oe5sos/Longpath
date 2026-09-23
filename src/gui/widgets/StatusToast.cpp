@@ -18,6 +18,7 @@
 
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QShowEvent>
 #include <QMouseEvent>
 
 namespace Longpath {
@@ -89,6 +90,34 @@ StatusToast::StatusToast(const QString& message,
 }
 
 StatusToast::~StatusToast() = default;
+
+void StatusToast::showEvent(QShowEvent* event)
+{
+    QWidget::showEvent(event);
+
+    // Die Hoehe NOCH EINMAL rechnen, jetzt wo der Kasten wirklich
+    // angezeigt wird.
+    //
+    // Der Konstruktor rechnet sie auch, aber zu einem Zeitpunkt, an dem
+    // Qt das Stylesheet noch nicht angewandt hat: `font-size: 11px`
+    // steht erst nach dem Polieren in der Schriftmetrik der
+    // Beschriftung, und bis dahin antwortet heightForWidth() fuer eine
+    // andere Schrift als die, die spaeter gemalt wird. Jede Abweichung
+    // nach unten schneidet den Text ab.
+    //
+    // Betreiber am 2026-09-23, zum ZWEITEN Mal (das erste Mal am
+    // 2026-09-22, damals von adjustSize() auf totalHeightForWidth()
+    // umgestellt): der sechszeilige Hinweis "Das Geraet wurde gefunden,
+    // liefert aber binnen 6 s keinen Datenstrom ..." stand unten
+    // abgeschnitten. Hier liess er sich nicht nachstellen -- weder
+    // offscreen noch mit dem echten Schriftsatz. Statt weiter zu raten,
+    // was diesmal anders war, faellt die Abhaengigkeit von den
+    // Metriken zum Bauzeitpunkt ganz weg.
+    if (auto* lay = layout()) {
+        const int needed = lay->totalHeightForWidth(width());
+        if (needed > height()) { setFixedHeight(needed); }
+    }
+}
 
 void StatusToast::refresh(int timeoutMs)
 {
