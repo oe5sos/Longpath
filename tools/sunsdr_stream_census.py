@@ -114,6 +114,109 @@ def carve(data, magic0):
         start = i + 1
 
 
+# ── pcap/pcapng lesen ───────────────────────────────────────────────────
+#
+# Eine Aufzeichnung mit `tcpdump -w` ist um ein Vielfaches kleiner und
+# schneller einzulesen als dieselben Pakete als Hexziffern, und sie
+# bleibt liegen: dieselbe Minute am Geraet laesst sich spaeter noch
+# einmal auswerten, ohne das Geraet noch einmal zu brauchen. macOS'
+# tcpdump schreibt klassisches pcap; Wireshark schreibt pcapng. Beides
+# wird hier gelesen, ohne fremde Pakete.
+
+def _pcapPackets(fh):
+    """(Zeit in Sekunden, Rohbytes ab Linkschicht) je Paket."""
+    head = fh.read(4)
+    if len(head) < 4:
+        return
+    magic = int.from_bytes(head, "little")
+    if magic in (0x0A0D0D0A,):
+        yield from _pcapngPackets(fh, head)
+        return
+    if magic in (0xA1B2C3D4, 0xA1B23C4D):
+        endian, nano = "little", (magic == 0xA1B23C4D)
+    elif magic in (0xD4C3B2A1, 0x4D3CB2A1):
+        endian, nano = "big", (magic == 0x4D3CB2A1)
+    else:
+        raise SystemExit("Das ist keine pcap-Datei (Magie %08x)." % magic)
+    rest = fh.read(20)
+    link = int.from_bytes(rest[16:20], endian)
+    while True:
+        hdr = fh.read(16)
+        if len(hdr) < 16:
+            return
+        ts = int.from_bytes(hdr[0:4], endian)
+        frac = int.from_bytes(hdr[4:8], endian)
+        caplen = int.from_bytes(hdr[8:12], endian)
+        data = fh.read(caplen)
+        if len(data) < caplen:
+            return
+        yield ts + frac / (1e9 if nano else 1e6), link, data
+
+
+def _pcapngPackets(fh, head):
+    """Nur so viel pcapng, wie tcpdump/Wireshark hier schreiben."""
+    endian = "little"
+    link = 1
+    fh.seek(0)
+    while True:
+        bh = fh.read(8)
+        if len(bh) < 8:
+            return
+        btype = int.from_bytes(bh[0:4], endian)
+        blen = int.from_bytes(bh[4:8], endian)
+        if blen < 12:
+            return
+        body = fh.read(blen - 12)
+        fh.read(4)
+        if btype == 0x00000001 and len(body) >= 4:          # Interface Description
+            link = int.from_bytes(body[0:2], endian)
+        elif btype == 0x00000006 and len(body) >= 20:       # Enhanced Packet
+            hi = int.from_bytes(body[4:8], endian)
+            lo = int.from_bytes(body[8:12], endian)
+            caplen = int.from_bytes(body[12:16], endian)
+            ts = ((hi << 32) | lo) / 1e6
+            yield ts, link, body[20:20 + caplen]
+
+
+def _udpPayload(link, data):
+    """Nutzbytes eines UDP-Datagramms, oder None. Nur IPv4/UDP."""
+    if link == 0:            # DLT_NULL (loopback)
+        off = 4
+    elif link == 1:          # DLT_EN10MB
+        if len(data) < 14 or data[12:14] != b"\x08\x00":
+            return None
+        off = 14
+    elif link == 113:        # DLT_LINUX_SLL
+        off = 16
+    elif link == 12 or link == 101:   # DLT_RAW
+        off = 0
+    elif link == 276:        # DLT_LINUX_SLL2
+        off = 20
+    else:
+        off = 0
+    if len(data) < off + 20:
+        return None
+    ip = data[off:]
+    if (ip[0] >> 4) != 4:
+        return None
+    ihl = (ip[0] & 0x0F) * 4
+    if ip[9] != 17 or len(ip) < ihl + 8:
+        return None
+    return ip[ihl + 8:]
+
+
+def pcapDatagrams(path):
+    """(Zeitmarke als Text, UDP-Nutzbytes) je Datagramm der Datei."""
+    import datetime
+    with open(path, "rb") as fh:
+        for ts, link, data in _pcapPackets(fh):
+            pl = _udpPayload(link, data)
+            if pl is None:
+                continue
+            t = datetime.datetime.fromtimestamp(ts).strftime("%H:%M:%S.%f")
+            yield t, pl
+
+
 class FileLike:
     """Gibt datagrams() dasselbe .stdout wie ein Popen-Objekt."""
     def __init__(self, fh):
@@ -135,10 +238,17 @@ def main():
                          "zwei Bloecke auseinanderzuhalten, und wenig genug, "
                          "dass dieses Programm bei 1 900 Paketen/s mitkommt. "
                          "2000 nimmt alles (aber rechne mit Verlusten).")
+    ap.add_argument("--pcap", default="",
+                    help="eine mit `tcpdump -w` gesicherte Aufzeichnung "
+                         "auswerten statt selbst mitzulesen")
     ap.add_argument("--from-file", dest="fromFile", default="",
                     help="statt tcpdump eine schon gesicherte -x-Ausgabe "
                          "auswerten (tcpdump ... > datei)")
     args = ap.parse_args()
+
+    if args.pcap:
+        censusFromPcap(args)
+        return
 
     if args.fromFile:
         with open(args.fromFile, "r") as fh:
@@ -152,6 +262,29 @@ def main():
                             stderr=subprocess.DEVNULL, text=True)
 
     census(proc, args)
+
+
+def censusFromPcap(args):
+    """Dieselbe Auszaehlung, nur aus einer Datei statt vom Draht."""
+    bySeq = collections.OrderedDict()
+    order = []
+    total = 0
+    firstTs = lastTs = None
+    for ts, pl in pcapDatagrams(args.pcap):
+        pkt = carve(pl, args.magic0)
+        if pkt is None:
+            continue
+        seq = pkt[6] | (pkt[7] << 8)
+        total += 1
+        if seq not in bySeq:
+            bySeq[seq] = []
+            order.append(seq)
+        bySeq[seq].append((pkt[:HEADER], pkt[HEADER:]))
+        if firstTs is None:
+            firstTs = ts
+        lastTs = ts
+    elapsed = spanSeconds(firstTs, lastTs) or 1e-9
+    report(bySeq, order, total, elapsed)
 
 
 def census(proc, args):

@@ -18,6 +18,17 @@
   `--from-file` laesst sich eine gesicherte Aufzeichnung nachtraeglich
   auswerten.
 
+- **Beide QRP-Mitleser lesen jetzt auch eine gesicherte Aufzeichnung**
+  (`--pcap`, klassisches pcap wie von `tcpdump -w` und pcapng wie von
+  Wireshark, ohne fremde Pakete): eine Minute am Geraet bleibt damit
+  liegen und laesst sich spaeter noch einmal auswerten, statt sie fuer
+  jede neue Frage neu zu fahren. `tools/sunsdr_opcode_watch.py` zeigt
+  ausserdem mit `--full` die ganze Nutzlast -- am 2026-08-26 schickte
+  ExpertSDR2 beim Verbinden ein rund 1,2 kB grosses Paket, und zwar
+  zweimal, waehrend Longpath an derselben Stelle einen einzigen
+  30-Byte-Rahmen schickt. Was in diesem Paket steht, sagt Longpath dem
+  Geraet bis heute nie.
+
 - **2D/3D-Umschaltung im Blatt des Rechtsklicks** (Panadapter >
   Rechtsklick > „Darstellung"): die Wahl zwischen dem Wasserfall und
   den gestapelten 3D-Trassen gab es bisher nur in der Knopfleiste auf
