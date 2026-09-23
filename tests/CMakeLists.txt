@@ -6855,6 +6855,11 @@ longpath_add_test(tst_legacy_iq_tap_is_stream_zero)
 # the file has a stated reason to exist.
 longpath_add_test(tst_status_toast_preserves_bottom_bar)
 
+# -- Ein abgeschnittener Hinweis ist schlimmer als keiner (2026-09-23,
+#    zum zweiten Mal gemeldet). Nagelt die Eigenschaft fest, nicht die
+#    Rechenweise. --
+longpath_add_test(tst_status_toast_fits_its_text)
+
 # Phase 3F Sub-Epic C Task 7: RadioModel slice lifecycle.
 # 2 tests: addSliceOnPan_exists_and_is_callable (cap enforcement after
 # the first successful add), removeSlice_refuses_to_remove_last_slice

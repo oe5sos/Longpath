@@ -156,6 +156,19 @@
 
 ### Fixed
 
+- **Ein abgeschnittener Hinweis, zum zweiten Mal gemeldet.** Der
+  sechszeilige Text „Das Gerät wurde gefunden, liefert aber binnen 6 s
+  keinen Datenstrom …“ stand unten abgeschnitten; der letzte Satz
+  fehlte. `StatusToast` rechnete seine Höhe im Konstruktor, also bevor
+  Qt das Stylesheet angewandt hat -- `font-size: 11px` steht erst nach
+  dem Polieren in der Schriftmetrik, und bis dahin antwortet
+  `heightForWidth()` für eine andere Schrift als die, die später gemalt
+  wird. Die Höhe wird jetzt beim Anzeigen noch einmal gerechnet, wo
+  alles endgültig ist. Prüfstand `tst_status_toast_fits_its_text` nagelt
+  die Eigenschaft fest (passt der Text in den Kasten?) statt der
+  Rechenweise -- die war schon am 2026-09-22 einmal ausgetauscht worden
+  und hat es trotzdem wieder erwischt.
+
 - **Der Wiederholungsfilter fuer die SunSDR2 QRP ist wieder draussen.**
   Er kam am 2026-09-23 herein, weil die QRP jeden IQ-Block achtmal
   schickt -- das ist auch richtig gemessen und an diesem Tag noch einmal

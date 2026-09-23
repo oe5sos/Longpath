@@ -644,6 +644,11 @@ private:
     /// Ein Paket in das Fenster legen und gegen alle Pakete derselben
     /// Folgenummer darin vergleichen -- ueber die ganze Nutzlast.
     void probeFeed(quint16 seq, const QByteArray& payload);
+
+    /// Werkbank: Steuerrahmen aus einer Umgebungsvariablen
+    /// schicken (Hexziffern, durch Komma getrennt). PRE geht vor
+    /// dem Zustandsrahmen hinaus, EXTRA danach.
+    void sendBenchFrames(const QString& envName);
     void probeReportIfDue();
 };
 

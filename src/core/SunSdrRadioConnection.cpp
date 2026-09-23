@@ -789,42 +789,18 @@ void SunSdrRadioConnection::processControlDatagram(const QByteArray& data,
     m_awaitingBeacon = false;
 
     if (m_controlSocket) {
+        // ExpertSDR2 schickt den Zustandsrahmen nicht als erstes, sondern
+        // als vorletztes -- davor liegen rund zwanzig andere. Ob die
+        // Reihenfolge zaehlt, laesst sich nur ausprobieren, also gibt es
+        // beide Seiten: PRE davor, EXTRA danach.
+        sendBenchFrames(QStringLiteral("LONGPATH_SUNSDR_PRE"));
+
         const QByteArray stateSync = stateSyncFrameForTest();
         m_controlSocket->writeDatagram(stateSync, m_radioAddr,
                                         m_profile->defaultCtrlPort);
         recordBytesSent(static_cast<qint64>(stateSync.size()));
 
-        // ── Werkbank: weitere Rahmen nachschicken ───────────────────────
-        //
-        // LONGPATH_SUNSDR_EXTRA traegt Steuerrahmen als Hexziffern, durch
-        // Komma getrennt, die direkt nach dem Zustandsrahmen hinausgehen.
-        //
-        // Wozu: am 2026-09-23 ist gemessen, dass die QRP an Longpath
-        // jeden Block ACHTMAL schickt (bytegleich, im Treiber ueber alle
-        // 1200 Byte geprueft), an ExpertSDR2 dagegen zwei VERSCHIEDENE.
-        // Der einzige Unterschied ist, was beim Verbinden gesagt wird:
-        // ExpertSDR schickt rund zwei Dutzend Rahmen, Longpath einen.
-        // Damit laesst sich einer nach dem anderen ausprobieren, ohne
-        // fuer jeden Versuch neu zu bauen.
-        //
-        // Nur fuer die Werkbank: ohne die Variable geht nichts hinaus,
-        // und was hineingeschrieben wird, entscheidet der Mensch davor.
-        const QString extra = qEnvironmentVariable("LONGPATH_SUNSDR_EXTRA");
-        if (!extra.isEmpty()) {
-            const QStringList parts = extra.split(QLatin1Char(','),
-                                                  Qt::SkipEmptyParts);
-            for (const QString& hex : parts) {
-                const QByteArray frame =
-                    QByteArray::fromHex(hex.trimmed().toLatin1());
-                if (frame.isEmpty()) { continue; }
-                m_controlSocket->writeDatagram(frame, m_radioAddr,
-                                                m_profile->defaultCtrlPort);
-                recordBytesSent(static_cast<qint64>(frame.size()));
-                qCInfo(lcSunSdr) << "SunSdr: Werkbank-Rahmen gesendet, Opcode"
-                                 << (frame.size() > 2 ? quint8(frame[2]) : 0)
-                                 << "-" << frame.size() << "Byte";
-            }
-        }
+        sendBenchFrames(QStringLiteral("LONGPATH_SUNSDR_EXTRA"));
     }
 
     // No downstream DSP-readiness signal exists yet to gate this on
@@ -1160,6 +1136,43 @@ void SunSdrRadioConnection::setWatchdogEnabled(bool) {}
 // abgeschnittener Nutzlast. Hier wird sie ueber alle 1200 Byte
 // beantwortet.
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// sendBenchFrames — Steuerrahmen aus einer Umgebungsvariablen schicken
+//
+// LONGPATH_SUNSDR_PRE geht VOR dem Zustandsrahmen hinaus,
+// LONGPATH_SUNSDR_EXTRA danach; beide tragen Rahmen als Hexziffern,
+// durch Komma getrennt.
+//
+// Wozu: am 2026-09-23 ist gemessen, dass die QRP an Longpath jeden
+// Block ACHTMAL schickt (bytegleich, im Treiber ueber alle 1200 Byte
+// geprueft), an ExpertSDR2 dagegen zwei VERSCHIEDENE. Der einzige
+// Unterschied ist, was beim Verbinden gesagt wird: ExpertSDR schickt
+// rund zwei Dutzend Rahmen, Longpath einen. Damit laesst sich das
+// ausprobieren, ohne fuer jeden Versuch neu zu bauen -- und auch die
+// REIHENFOLGE, denn ExpertSDR schickt den Zustandsrahmen zuletzt.
+//
+// Nur fuer die Werkbank: ohne die Variable geht nichts hinaus, und was
+// hineingeschrieben wird, entscheidet der Mensch davor.
+// ---------------------------------------------------------------------------
+void SunSdrRadioConnection::sendBenchFrames(const QString& envName)
+{
+    if (!m_controlSocket || !m_profile) { return; }
+    const QString list = qEnvironmentVariable(envName.toLatin1().constData());
+    if (list.isEmpty()) { return; }
+
+    const QStringList parts = list.split(QLatin1Char(','), Qt::SkipEmptyParts);
+    for (const QString& hex : parts) {
+        const QByteArray frame = QByteArray::fromHex(hex.trimmed().toLatin1());
+        if (frame.isEmpty()) { continue; }
+        m_controlSocket->writeDatagram(frame, m_radioAddr,
+                                        m_profile->defaultCtrlPort);
+        recordBytesSent(static_cast<qint64>(frame.size()));
+        qCInfo(lcSunSdr) << "SunSdr: Werkbank-Rahmen" << envName << "Opcode"
+                         << (frame.size() > 2 ? quint8(frame[2]) : 0)
+                         << "-" << frame.size() << "Byte";
+    }
+}
+
 void SunSdrRadioConnection::probeFeed(quint16 seq, const QByteArray& payload)
 {
     ++m_probePackets;
