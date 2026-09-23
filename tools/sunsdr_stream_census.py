@@ -251,6 +251,10 @@ def main():
                          "zwei Bloecke auseinanderzuhalten, und wenig genug, "
                          "dass dieses Programm bei 1 900 Paketen/s mitkommt. "
                          "2000 nimmt alles (aber rechne mit Verlusten).")
+    ap.add_argument("--window", type=float, default=0.0,
+                    help="die Aufzeichnung in Abschnitte dieser Laenge "
+                         "zerlegen und jeden einzeln auszaehlen -- so wird "
+                         "eine Umstellung am Geraet sichtbar (nur mit --pcap)")
     ap.add_argument("--pcap", default="",
                     help="eine mit `tcpdump -w` gesicherte Aufzeichnung "
                          "auswerten statt selbst mitzulesen")
@@ -278,26 +282,57 @@ def main():
 
 
 def censusFromPcap(args):
-    """Dieselbe Auszaehlung, nur aus einer Datei statt vom Draht."""
-    bySeq = collections.OrderedDict()
-    order = []
-    total = 0
-    firstTs = lastTs = None
+    """Dieselbe Auszaehlung, nur aus einer Datei statt vom Draht.
+
+    Mit --window wird die Aufzeichnung in Abschnitte zerlegt und jeder
+    einzeln ausgezaehlt. Das ist der Weg, eine Umstellung AM GERAET zu
+    sehen: wenn jemand mitten im Mitschnitt die Abtastrate wechselt,
+    steht der Unterschied in zwei aufeinanderfolgenden Abschnitten.
+    """
+    bucket = Bucket()
+    windowStart = None
     for ts, pl in pcapDatagrams(args.pcap):
         pkt = carve(pl, args.magic0)
         if pkt is None:
             continue
+        if windowStart is None:
+            windowStart = ts
+        if args.window and (spanSeconds(windowStart, ts) or 0) >= args.window:
+            print("\n# ══ Abschnitt %s bis %s ═══════════════════════════"
+                  % (windowStart[:12], ts[:12]))
+            bucket.report()
+            bucket = Bucket()
+            windowStart = ts
+        bucket.add(ts, pkt)
+    if args.window:
+        print("\n# ══ letzter Abschnitt ab %s ═══════════════════════"
+              % (windowStart or "?")[:12])
+    bucket.report()
+
+
+class Bucket:
+    """Die Pakete eines Abschnitts, nach Folgenummer geordnet."""
+    def __init__(self):
+        self.bySeq = collections.OrderedDict()
+        self.order = []
+        self.total = 0
+        self.first = None
+        self.last = None
+
+    def add(self, ts, pkt):
         seq = pkt[6] | (pkt[7] << 8)
-        total += 1
-        if seq not in bySeq:
-            bySeq[seq] = []
-            order.append(seq)
-        bySeq[seq].append((pkt[:HEADER], pkt[HEADER:]))
-        if firstTs is None:
-            firstTs = ts
-        lastTs = ts
-    elapsed = spanSeconds(firstTs, lastTs) or 1e-9
-    report(bySeq, order, total, elapsed)
+        self.total += 1
+        if seq not in self.bySeq:
+            self.bySeq[seq] = []
+            self.order.append(seq)
+        self.bySeq[seq].append((pkt[:HEADER], pkt[HEADER:]))
+        if self.first is None:
+            self.first = ts
+        self.last = ts
+
+    def report(self):
+        elapsed = spanSeconds(self.first, self.last) or 1e-9
+        report(self.bySeq, self.order, self.total, elapsed)
 
 
 def census(proc, args):

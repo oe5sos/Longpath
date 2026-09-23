@@ -29,6 +29,16 @@
   30-Byte-Rahmen schickt. Was in diesem Paket steht, sagt Longpath dem
   Geraet bis heute nie.
 
+- **Die Mitleser sagen jetzt auch, WER den Rahmen geschickt hat**, und
+  die Zaehlung laesst sich mit `--window` in Abschnitte zerlegen. Ohne
+  die Richtung ist kein Steuerrahmen zu deuten -- derselbe Opcode heisst
+  hin „stell X auf diesen Wert“ und zurueck „X ist dieser Wert“. Ueber
+  den Port geht das nicht (beide Seiten benutzen 50001), sondern ueber
+  die Adresse; welche davon das Geraet ist, verraet die Rundsendung.
+  Mit den Abschnitten wird eine Umstellung am Geraet sichtbar: wer
+  mitten im Mitschnitt die Abtastrate wechselt, hinterlaesst den
+  Unterschied zwischen zwei aufeinanderfolgenden Abschnitten.
+
 - **2D/3D-Umschaltung im Blatt des Rechtsklicks** (Panadapter >
   Rechtsklick > „Darstellung"): die Wahl zwischen dem Wasserfall und
   den gestapelten 3D-Trassen gab es bisher nur in der Knopfleiste auf
