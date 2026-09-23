@@ -36,6 +36,7 @@
 #include "core/ConnectionState.h"
 #include "core/HpsdrModel.h"
 #include "core/OcMatrix.h"
+#include "core/IoBoardHl2.h"
 #include "core/MoxController.h"
 #include "core/PttSource.h"
 #include "core/RadioDiscovery.h"
@@ -417,6 +418,29 @@ private slots:
             QTRY_VERIFY_WITH_TIMEOUT(!model.mox(), 8000);
             QTest::qWait(600);
             txAttChecked = true;
+        }
+
+        // ── 4i. Die I/O-Platine am I2C-Bus ───────────────────────────
+        // Der HL2 haengt seine I/O-Platine (und die N2ADR-Filterplatine)
+        // an einen I2C-Bus, den die Firmware durchreicht: Longpath legt
+        // eine Lese-Anfrage in den C&C-Rahmen, das Geraet antwortet im
+        // Empfangsstrom mit gesetztem Bit 7 in C0. Beim Verbinden fragt
+        // Longpath die Hardware-Version ab (Geraet 0x41, Register 0) und
+        // haelt die Platine fuer erkannt, wenn 0xF1 zurueckkommt.
+        //
+        // Bis zum 2026-09-23 war dieser Weg an der Werkbank nicht zu
+        // pruefen: der Simulator nahm die Anfrage entgegen und schwieg.
+        // Seither hat er ein kleines Geraetemodell (siehe
+        // docs/development/hpsdr-simulator-workbench.md) — 0x41/0 gibt
+        // 0xF1, jedes andere Register ein erkennbares Muster.
+        if (model.boardCapabilities().hasIoBoardHl2) {
+            const IoBoardHl2& io = model.ioBoard();
+            QTRY_VERIFY_WITH_TIMEOUT(io.hardwareVersion() != 0, 8000);
+            qInfo() << "IOBOARD hwVersion 0x" << QString::number(io.hardwareVersion(), 16)
+                    << "erkannt" << io.isDetected();
+            QCOMPARE(int(io.hardwareVersion()), 0xF1);
+            QVERIFY2(io.isDetected(),
+                     "Die Antwort 0xF1 kam an, aber die Platine gilt nicht als erkannt");
         }
 
         // ── 5. Trennen ───────────────────────────────────────────────

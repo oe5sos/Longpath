@@ -1952,6 +1952,11 @@ longpath_add_test(tst_radio_model_status_wiring)
 #   case 0x20: adc[0..2] = ControlBytesIn[1..3] & 0x01
 longpath_add_test(tst_p1_adc_overflow_extraction)
 
+# -- I2C-Antwort ist kein PTT (2026-09-23, Werkbank Runde 6): ein
+#    Unterrahmen mit C0-Bit 7 traegt eine zurueckgegebene Adresse, keine
+#    Zustandsbits -- die ungerade Adresse 0x7D hat das Geraet gekeyt. --
+longpath_add_test(tst_p1_i2c_response_is_not_ptt)
+
 # ── Phase 3P-G commit 1: CalibrationController model ─────────────────────────
 # Verifies defaults (freqFactor=1.0, all offsets=0), setter signal emission
 # (idempotent no-fire), effectiveFreqCorrectionFactor() toggle between normal

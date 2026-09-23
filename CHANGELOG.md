@@ -97,6 +97,20 @@
 
 ### Fixed
 
+- **Eine Antwort der HL2-I/O-Platine konnte das Funkgeraet auf Sendung
+  schicken.** Beantwortet die Platine eine I2C-Leseanfrage, traegt der
+  Rahmen in C0 die Antwortmarke (Bit 7) und darunter die
+  zurueckgegebene Adresse — keine Zustandsbits. Die Telemetrie
+  ueberspringt solche Rahmen seit jeher, die Mikrofon-PTT-Auswertung las
+  sie mit: jede Adresse mit gesetztem Bit 0 galt als gedrueckte
+  Sendetaste. Longpath fragt beim Verbinden die Version der Platine ab
+  (Geraet 0x41), die Antwort kommt mit C0 = 0xFD — und das Geraet ging
+  auf Sendung, ohne dass jemand etwas gedrueckt hat. An der Werkbank
+  nachgestellt, seit der Simulator I2C beantworten kann; Pruefstand
+  `tst_p1_i2c_response_is_not_ptt` (am alten Code rot). Thetis hat das
+  Problem nicht — dort liegt die Auswertung im else-Zweig der
+  I2C-Pruefung.
+
 - **Ein Loch im Datenstrom malte einen Schmierer ins Spektrum.** Der
   Panadapter schiebt seine Abtastwerte in ein gleitendes Fenster; fehlen
   mittendrin Pakete (WLAN, ausgelastete Gegenstelle), steht im Fenster

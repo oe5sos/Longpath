@@ -253,3 +253,46 @@ MicBias=   00000001
 LineGain=  00000011  (17)
 ```
 
+## Runde 6 (2026-09-23): der Simulator lernt I2C — und das Geraet ging auf Sendung
+
+Der HL2 haengt seine I/O-Platine und die N2ADR-Filterplatine an einen
+I2C-Bus, den die Firmware durchreicht. Longpath legt eine Leseanfrage in
+den C&C-Rahmen (C0 = Sendebit | Bus<<1 | Anforderung<<7, C1 = 0x07 lesen,
+C2 = 0x80|Geraet, C3 = Register); das Geraet antwortet im Empfangsstrom
+mit gesetztem Bit 7 in C0. Der Simulator nahm die Anfrage bisher
+entgegen und schwieg — dieser ganze Weg war nicht pruefbar.
+
+**Sechster Bench-Patch** (`hpsdrsim.c`, gebaute Fassung in
+`~/Longpath/hpsdrsim-bench`): ein winziges Geraetemodell. Adresse 0x41
+Register 0 gibt 0xF1 (die Software liest das als „I/O-Platine, Fassung
+1"), jedes andere Register ein erkennbares Muster (0xA0|reg …). Die
+Antwort belegt den naechsten ep6-Unterrahmen: C0 = 0x80 | Adresse, C1–C4
+die Daten; die Abtastwerte desselben Rahmens bleiben unberuehrt, nur die
+Telemetrie faellt einmal aus. Mit `WB_NO_I2C=1` bleibt das Modell stumm
+(so isoliert man, ob ein Fund an der Antwort haengt — genau so wurde der
+Fund unten eingekreist).
+
+**Fund: eine Antwort der Platine schickte das Geraet auf Sendung.**
+Sofort beim ersten Lauf mit Antworten stand der Rauschflur 70 dB zu hoch
+und der S9-Ton war weg. Mit `WB_NO_I2C=1` war alles normal — also lag es
+an der Antwort. Im Protokoll des Simulators:
+
+```
+06:08:13.524  WERKBANK I2C READ dev=0x41 reg=0x00 -> C0=0xfd … C4=0xf1
+06:08:13.584             PTT= 00000001 (         1)
+```
+
+C0 = 0x80 | 0x7D. Bit 7 ist die Antwortmarke, 0x7D die zurueckgegebene
+Adresse — und deren Bit 0 las `parseEp6Frame()` als Mikrofon-PTT. Der
+Telemetriezweig ueberspringt Antwortrahmen laengst (`if (c0 & 0x80)
+continue;`), die PTT-Auswertung stand darueber und las sie mit. Am
+echten HL2 mit I/O-Platine ist das dieselbe Lage: das Geraet sendet,
+ohne dass jemand etwas drueckt, und bleibt auf Sendung, solange die
+Antworten kommen.
+
+Behoben; Pruefstand `tst_p1_i2c_response_is_not_ptt` (ohne Simulator,
+vier Faelle inklusive „echtes PTT kommt weiter durch"). Die Werkbank hat
+dazu die Station 4i: nach dem Verbinden muss `IoBoardHl2::isDetected()`
+gelten und die Hardware-Version 0xF1 sein — das erste Mal, dass dieser
+Weg ganz gelaufen ist.
+
