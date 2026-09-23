@@ -5361,6 +5361,10 @@ longpath_add_test(tst_sunsdr_radio_connection)
 #    docs/development/sunsdr-simulator-workbench.md --
 longpath_add_test(tst_sunsdr_sim_workbench)
 
+# -- Wiederholte Bloecke der QRP (2026-09-23, an der Bank gemessen):
+#    jeder Block kommt achtmal, verschraenkt mit den Nachbarn. --
+longpath_add_test(tst_sunsdr_duplicate_blocks)
+
 # Connection-plan Phase A.1-A.3 (docs/architecture/2026-08-26-sunsdr-
 # connection-plan.md): enum/board-id/factory-dispatch coverage that
 # doesn't need bench hardware. See each file's own header for what it

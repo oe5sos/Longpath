@@ -106,6 +106,16 @@
 
 ### Fixed
 
+- **SunSDR2 QRP: die Signalverarbeitung bekam jede Probe achtmal.** An
+  der Bank gemessen (2026-09-23, 30 000 Pakete): die QRP schickt jeden
+  Datenblock acht Mal, ueber rund 32 ms verteilt und mit den
+  Nachbarbloecken verschraenkt. Der Treiber reichte alle acht weiter —
+  1920 statt 240 Bloecke je Sekunde. Wiederholungen werden jetzt an
+  ihrer Folgenummer erkannt und verworfen (ein Ring der letzten 32
+  Nummern; ein Vergleich mit dem vorigen Paket genuegt nicht, weil die
+  Kopien nicht hintereinander kommen). Pruefstand
+  `tst_sunsdr_duplicate_blocks`, dazu eine Station an der Werkbank.
+
 - **SunSDR2 QRP: die Suchanfrage geht jetzt auch geradeaus an die
   eingetragene Adresse**, nicht nur an die Rundsendeadressen der
   Schnittstellen. Ein WLAN mit Client-Isolation, ein Router mit

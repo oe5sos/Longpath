@@ -382,6 +382,13 @@ void SunSdrRadioConnection::onConnectTimeout()
     }
     m_txArmed.store(false, std::memory_order_release);
     m_mox.store(false, std::memory_order_release);
+
+    // Der Ring der zuletzt angenommenen Folgenummern gehoert zur Sitzung:
+    // eine neue faengt bei null an, sonst koennte eine Nummer aus der
+    // alten Sitzung einen echten Block der neuen verwerfen.
+    m_recentSeqPos = 0;
+    m_recentSeqCount = 0;
+    m_duplicateBlocks = 0;
     // Step 3: a pacer left running after this teardown fires would be a
     // "phantom pacer" ticking against a connection that just declared
     // itself timed out — same discipline as the socket closes right
@@ -409,6 +416,14 @@ void SunSdrRadioConnection::disconnect()
                                // reopen the RX gate — see onControlReadyRead()
     m_radioAddr.clear();
     setRxReady(false);
+
+    // Der Ring der zuletzt angenommenen Folgenummern gehoert zur Sitzung:
+    // eine neue faengt bei null an, sonst koennte eine Nummer aus der
+    // alten Sitzung einen echten Block der neuen verwerfen. Dieselbe
+    // Ueberlegung wie bei m_radioAddr eine Zeile darueber.
+    m_recentSeqPos = 0;
+    m_recentSeqCount = 0;
+    m_duplicateBlocks = 0;
 
     // Step 2 TX gate: bench arming is per-session, deliberately not
     // sticky (setTxArmedForTest()'s own comment) — a disconnect() ends
@@ -881,6 +896,13 @@ void SunSdrRadioConnection::processStreamDatagram(const QByteArray& data,
         return;  // TX-active frames don't apply to a receive-only connection
     }
 
+    // Wiederholte Bloecke wegwerfen — die QRP schickt jeden achtmal.
+    // Siehe sequenceSeenRecently() und den Kommentar am Ring im Kopf.
+    if (sequenceSeenRecently(hdr.seq)) {
+        ++m_duplicateBlocks;
+        return;
+    }
+
     QVector<float> samples;
     SunSdr::decodeIqSamples(
         reinterpret_cast<const quint8*>(data.constData()) + SunSdr::kIqHeaderSize,
@@ -1030,5 +1052,28 @@ void SunSdrRadioConnection::setPuresignalRun(bool) {}
 void SunSdrRadioConnection::setMicPTTDisabled(bool) {}
 void SunSdrRadioConnection::setMicXlr(bool) {}
 void SunSdrRadioConnection::setWatchdogEnabled(bool) {}
+
+
+// ---------------------------------------------------------------------------
+// sequenceSeenRecently — die Wiederholungen der QRP erkennen
+//
+// Gemessen am Geraet (2026-09-23, 30 000 Pakete in 15,5 s): jeder Block
+// kommt achtmal, in abnehmenden Abstaenden ueber rund 32 ms verteilt
+// (11,6 / 8,0 / 4,0 / 3,0 / 2,0 / 2,0 / 2,0 ms) und dabei verschraenkt
+// mit den Nachbarbloecken. Neue Bloecke kommen alle 4,17 ms, also
+// 240/s; mal 200 Probenpaare sind das 48 000 Proben je Sekunde.
+//
+// Ohne diese Wache landet jede Probe achtmal in der Signalverarbeitung.
+// ---------------------------------------------------------------------------
+bool SunSdrRadioConnection::sequenceSeenRecently(quint16 seq)
+{
+    for (int i = 0; i < m_recentSeqCount; ++i) {
+        if (m_recentSeqs[static_cast<size_t>(i)] == seq) { return true; }
+    }
+    m_recentSeqs[static_cast<size_t>(m_recentSeqPos)] = seq;
+    m_recentSeqPos = (m_recentSeqPos + 1) % kRecentSeqSlots;
+    if (m_recentSeqCount < kRecentSeqSlots) { ++m_recentSeqCount; }
+    return false;
+}
 
 } // namespace Longpath

@@ -75,3 +75,54 @@ Senden. `sendTxIq()` ist leer, und die TX-Opcodes sind reine Kodierer
 ohne Draht. Das Messgeraet meldet ein TX-Paket, wenn eins kaeme
 („Strom: TX-Paket empfangen") — mehr kann es nicht pruefen, solange am
 echten Geraet nicht gemessen wurde, was die QRP dort erwartet.
+
+## Was die Bank am 2026-09-23 ergeben hat
+
+Die QRP stand einen Vormittag zur Verfuegung (ohne Antenne, also nur
+Empfang). Mitgeschnitten wurden 30 000 Pakete in 15,46 s ueber einen
+eigenen Ethernet-Adapter (`en9`, 192.168.16.100 ↔ .200, 100 Mbit
+voll-duplex). Die Datei lag bei `~/qrp-capture.pcap`.
+
+**Die QRP schickt jeden Datenblock achtmal.**
+
+```
+29 683 IQ-Pakete in 15,46 s      = 1920 Pakete/s auf dem Draht
+ 3 718 verschiedene Nutzlasten   =  240 Bloecke/s  (alle 4,17 ms)
+       3 703 davon exakt achtmal
+       Kopien ueber ~32 ms verteilt: 11,6 / 8,0 / 4,0 / 3,0 / 2,0 / 2,0 / 2,0 ms
+       und verschraenkt mit den Nachbarbloecken
+```
+
+240 Bloecke/s × 200 Probenpaare = **48 000 Proben/s**. Der Treiber
+rechnete mit 312 500 Hz (`kProfileQrp`) und reichte alle acht Kopien
+weiter — die Signalverarbeitung bekam also jede Probe achtmal, auf
+einer Achse, die um den Faktor 6,5 danebenlag. Dass das nie auffiel,
+liegt daran, dass Rauschen in jedem Massstab wie Rauschen aussieht.
+
+Die Diagnosezeile im Treiber, die „byte-identical to the one before
+them" zaehlt, meldete dabei immer 0 — die Kopien kommen eben nicht
+hintereinander.
+
+**Warum 48 kHz?** Weil unser Zustandsrahmen ein mitgeschnittener
+Byte-Block vom 2026-08-26 ist, den wir unveraendert zurueckspielen. Was
+immer ExpertSDR2 damals eingestellt hatte, stellt die QRP heute wieder
+ein. Die Rate zu WAEHLEN braucht den Opcode dafuer — offen, siehe
+`sunsdr-bench-ohne-antenne.md`.
+
+**Nebenbei mitgemessen:**
+
+- **Statusrahmen**, 77 Byte, Opcode 0x00, exakt 20/s. Darin zwei
+  Fliesskommazahlen, die sich waehrend des Laufs bewegten: 36,5 → 37,0
+  und 27,0 → 27,5 (Offset 15 und 19) — das sind Temperaturen. Dazu ein
+  16-Bit-Wert um 33 560, der leicht driftet, und ein schneller Zaehler
+  bei Offset 6. Longpath wirft diese Rahmen heute weg.
+- **Das Lebenszeichen geht sauber hinaus**: acht Stueck in 15,5 s, also
+  alle 1,93 s. Der Verbindungsabriss, der die Sitzung eroeffnet hatte,
+  kam vom Messgeraet dieser Werkbank: es lief noch und hielt die festen
+  Ports 50001/50002, die der Treiber selbst binden wollte. **Messgeraet
+  aus, bevor echte Hardware drankommt.**
+
+Das Messgeraet stellt diese Eigenschaften seither nach
+(`--repeat 8 --block-rate 240`, Statusrahmen mit 20/s), und die
+Werkbank prueft, dass der Treiber sieben von acht Kopien verwirft.
+

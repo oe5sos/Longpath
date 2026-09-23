@@ -131,6 +131,12 @@ def main():
     ap.add_argument("--tone-offset", type=float, default=10000.0)
     ap.add_argument("--tone-dbfs", type=float, default=-30.0)
     ap.add_argument("--noise-dbfs", type=float, default=-80.0)
+    ap.add_argument("--repeat", type=int, default=8,
+                    help="wie oft jeder Block wiederholt wird (am Geraet "
+                         "gemessen: 8; 1 = keine Wiederholung)")
+    ap.add_argument("--block-rate", type=float, default=240.0,
+                    help="neue Bloecke je Sekunde (am Geraet: 240 -> "
+                         "48 000 Proben/s)")
     ap.add_argument("--keepalive-timeout", type=float, default=8.0,
                     help="Sekunden ohne Lebenszeichen, nach denen der "
                          "Strom verstummt (0 = nie)")
@@ -160,11 +166,15 @@ def main():
     phase = 0.0
     last_keepalive = 0.0
     next_pkt = time.monotonic()
-    pkt_interval = IQ_COMPLEX / SAMPLE_RATE  # 0,64 ms
+    # Am Geraet gemessen (2026-09-23): neue Bloecke alle 4,17 ms (240/s),
+    # jeder achtmal wiederholt -> 1920 Pakete/s auf dem Draht, aber nur
+    # 48 000 Proben/s an echten Daten.
+    pkt_interval = 1.0 / args.block_rate
     payload, phase = make_payload(args.tone_offset, args.tone_dbfs,
                                   args.noise_dbfs, phase)
     payload_age = time.monotonic()
     sent = 0
+    last_status = 0.0
     last_report = time.monotonic()
 
     while True:
@@ -244,18 +254,33 @@ def main():
                                               args.noise_dbfs, phase)
                 payload_age = now
             while next_pkt <= now:
-                strm.sendto(iq_header(seq) + payload, stream_peer)
+                pkt = iq_header(seq) + payload
+                for _ in range(max(1, args.repeat)):
+                    strm.sendto(pkt, stream_peer)
+                    sent += 1
                 seq = (seq + 1) & 0xFFFF
-                sent += 1
                 next_pkt += pkt_interval
             # Nicht endlos nachholen, wenn die Maschine kurz stockt.
             if next_pkt < now - 0.1:
                 next_pkt = now
 
+        # Statusrahmen, 20/s -- so wie das echte Geraet (Temperatur als
+        # float bei Offset 15 und 19, siehe Mitschnitt vom 2026-09-23).
+        if streaming and stream_peer and now - last_status >= 0.05:
+            last_status = now
+            st = bytearray(77)
+            st[0:4] = bytes([MAGIC0_QRP, MAGIC1, 0x00, 0x1f])
+            st[6:10] = int(now * 1e6).to_bytes(8, "little")[:4]   # schneller Zaehler
+            struct.pack_into("<f", st, 15, 36.5)                  # Temperatur 1
+            struct.pack_into("<f", st, 19, 27.0)                  # Temperatur 2
+            struct.pack_into("<f", st, 31, 1.0)
+            strm.sendto(bytes(st), stream_peer)
+
         if now - last_report >= 5.0:
             if streaming:
-                log("Strom: %d Pakete in 5 s (%.0f/s, %.1f MB/s)"
-                    % (sent, sent / 5.0, sent * 1210 / 5.0 / 1e6))
+                log("Strom: %d Pakete in 5 s (%.0f/s, %.1f MB/s) — davon "
+                    "%.0f/s echte Bloecke" % (sent, sent / 5.0,
+                    sent * 1210 / 5.0 / 1e6, sent / 5.0 / max(1, args.repeat)))
             sent = 0
             last_report = now
 
