@@ -139,6 +139,7 @@
 #include <portaudio.h>
 
 #include <QDateTime>
+#include <QStandardPaths>
 
 #include <algorithm>
 #include <vector>
@@ -597,6 +598,31 @@ std::unique_ptr<IAudioBus> AudioEngine::makeBus(const AudioDeviceConfig& cfg,
     // PortAudio path — used for speakers / mic / Windows-BYO VAX devices.
     // Platform-native VAX RX/TX virtual buses use makeVaxBus() /
     // makeVaxTxBus() (Sub-Phase 8.5).
+
+    // ── Kein echtes Geraet aus einem Pruefstand heraus (2026-09-23) ──
+    //
+    // Pa_OpenStream greift auf die Tonkarte der Maschine zu: auf macOS
+    // CoreAudio, mit allem, was daran haengt -- Geraeteaufzaehlung, HAL,
+    // und bei einem Aufnahmegeraet auch die Mikrofon-Freigabe. Auf einem
+    // CI-Laeufer ohne Tonausgabe kann dieser Aufruf minutenlang stehen;
+    // genau so ist tst_audio_engine_speakers_live_reconfig am 2026-09-23
+    // auf "Build (macOS Apple Silicon (2/2))" in CTests 120-s-Decke
+    // gelaufen, waehrend derselbe Pruefstand hier in 2 s durchlaeuft.
+    // Auf dem Rechner des Betreibers waere es schlimmer als langsam: ein
+    // Pruefstand, der sich das Mikrofon nimmt.
+    //
+    // Dieselbe Wache wie bei showAudioDiagnoseDialog(): QStandardPaths::
+    // isTestModeEnabled() ist in jedem Pruefstand-Programm wahr
+    // (tests/TestSandboxInit.cpp setzt es vor main()) und in einer
+    // echten Installation nie. Die Pruefstaende, die ueber diesen Weg
+    // kommen, legen ihren Bus ohnehin selbst per
+    // setSpeakersBusForTest()/FakeAudioBus unter -- keiner von ihnen
+    // prueft, dass hier ein ECHTER Bus herauskommt.
+    if (QStandardPaths::isTestModeEnabled()) {
+        qCInfo(lcAudio) << "makeBus: Pruefmodus — kein echtes Audiogeraet geoeffnet";
+        return nullptr;
+    }
+
     auto bus = std::make_unique<PortAudioBus>();
     PortAudioConfig pcfg;
     pcfg.direction     = capture ? AudioDirection::Input

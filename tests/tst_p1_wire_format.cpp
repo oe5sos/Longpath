@@ -342,6 +342,46 @@ private slots:
         QVERIFY(!conn.hl2ThrottledForTest());
     }
 
+    // ── Der Drosselwaechter gehoert der VERBINDUNG (2026-09-23) ──────
+    //
+    // hl2CheckBandwidthMonitor() verglich den Folgestand gegen ein
+    // funktionslokales `static` -- also gegen EINEN Wert fuer alle
+    // P1-Verbindungen des Prozesses. Wer zwei Geraete gleichzeitig
+    // verbunden hat (oder, wie hier, zwei Verbindungen nacheinander),
+    // liess die eine gegen den Stand der anderen pruefen.
+    //
+    // Die erste Verbindung laeuft bis zur Drosselmeldung; die zweite
+    // bekommt danach GENAU so viele Takte, wie vorher gereicht haetten.
+    // Mit dem `static` war sie damit gedrosselt, obwohl ihr eigener
+    // erster Takt nur den Anfangsstand setzen darf.
+    void hl2ThrottleStateIsPerConnection() {
+        P1RadioConnection first;
+        first.init();
+        first.setBoardForTest(HPSDRHW::HermesLite);
+        // Takt 1 setzt den Anfangsstand, Takte 2-4 zaehlen drei
+        // Stillstaende -- kBwThrottleGapCount ist 3.
+        for (int i = 0; i < 4; ++i) { first.hl2BandwidthTickForTest(4711); }
+        QVERIFY2(first.hl2ThrottledForTest(),
+                 "vier Takte ohne Fortschritt muessen die Drossel melden");
+
+        P1RadioConnection second;
+        second.init();
+        second.setBoardForTest(HPSDRHW::HermesLite);
+        // Dieselbe Folgenummer, aber nur drei Takte: einer geht fuer den
+        // eigenen Anfangsstand drauf, es bleiben zwei Stillstaende.
+        for (int i = 0; i < 3; ++i) { second.hl2BandwidthTickForTest(4711); }
+        QVERIFY2(!second.hl2ThrottledForTest(),
+                 "die zweite Verbindung darf den Stand der ersten nicht erben");
+
+        // Und sie meldet sehr wohl, wenn ihr eigener Strom steht.
+        second.hl2BandwidthTickForTest(4711);
+        QVERIFY(second.hl2ThrottledForTest());
+
+        // Geht die Folgenummer weiter, ist die Drossel wieder weg.
+        second.hl2BandwidthTickForTest(4712);
+        QVERIFY(!second.hl2ThrottledForTest());
+    }
+
     void hl2IoBoardInitNoopForNonHl2() {
         // hl2SendIoBoardInit() is only meaningful when hasIoBoardHl2 is set.
         // For a non-HL2 board (e.g. Hermes), setBoardForTest must not
