@@ -4,6 +4,15 @@
 
 ### Added
 
+- **2D/3D-Umschaltung im Blatt des Rechtsklicks** (Panadapter >
+  Rechtsklick > „Darstellung"): die Wahl zwischen dem Wasserfall und
+  den gestapelten 3D-Trassen gab es bisher nur in der Knopfleiste auf
+  dem Spektrum (`SpectrumOverlayPanel`), nicht in dem Blatt, das der
+  Rechtsklick oeffnet -- dort sucht man sie aber, weil dort sonst
+  alles steht, was man an der Anzeige schnell verstellt. Beide Wege
+  zeigen jetzt denselben Wert; das Oeffnen des Blattes allein stellt
+  nichts um. Pruefstand `tst_overlay_menu_render_mode`.
+
 - **Messgeraet fuer die SunSDR2 QRP** (`tools/sunsdr_sim.py`,
   Longpath-eigen): stellt Suchanfrage, Beacon, Zustandsrahmen, den
   IQ-Strom mit 312 500 Hz und das Verstummen nach 8 s ohne

@@ -165,6 +165,34 @@ void SpectrumOverlayMenu::buildUI()
         emit fillAlphaChanged(static_cast<float>(v) / 100.0f);
     });
 
+    // ── 2D / 3D ──────────────────────────────────────────────────────
+    //
+    // Betreiber 2026-09-23, mit Bild von genau diesem Blatt: „hier sollte
+    // das 2d und 3d zum aendern sein!"
+    //
+    // Es gab die Umschaltung schon -- aber im SpectrumOverlayPanel, der
+    // Knopfleiste AUF dem Spektrum. Dieses Blatt hier oeffnet der
+    // Rechtsklick auf den Panadapter, und es traegt sonst alles, was man
+    // an der Anzeige schnell verstellt. Zweimal habe ich ihm gesagt, die
+    // Zeile sei hier -- sie war es nie. Jetzt ist sie es.
+    //
+    // Dieselbe Reihenfolge wie drueben (0 = 2D, 1 = 3D), damit der Wert
+    // ueber beide Wege derselbe bleibt.
+    auto* modeRow = new QHBoxLayout;
+    modeRow->addWidget(new QLabel(QStringLiteral("Darstellung"), this));
+    m_renderModeCombo = new QComboBox(this);
+    m_renderModeCombo->setObjectName(QStringLiteral("overlayMenuRenderModeCombo"));
+    m_renderModeCombo->addItems({QStringLiteral("2D Wasserfall"),
+                                 QStringLiteral("3D gestapelte Trassen")});
+    m_renderModeCombo->setToolTip(QStringLiteral(
+        "2D: Trasse plus Wasserfall.\n"
+        "3D: perspektivisch gestapelte Trassen."));
+    modeRow->addWidget(m_renderModeCombo, 1);
+    layout->addLayout(modeRow);
+
+    connect(m_renderModeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &SpectrumOverlayMenu::spectrumRenderModeChanged);
+
     // --- Display Range section ---
     auto* rangeLabel = new QLabel(QStringLiteral("Display Range"), this);
     rangeLabel->setStyleSheet(Style::themed(QStringLiteral("font-weight: bold; color: #4a7ba8; margin-top: 6px;")));
@@ -280,6 +308,17 @@ void SpectrumOverlayMenu::setWfUpdatePeriodMs(int ms)
     m_wfSpeedSlider->setValue(qBound(10, ms, 500));
     m_wfSpeedLabel->setText(QStringLiteral("%1 ms").arg(qBound(10, ms, 500)));
     m_wfSpeedSlider->blockSignals(false);
+}
+
+void SpectrumOverlayMenu::setSpectrumRenderModeIndex(int renderModeIndex)
+{
+    if (!m_renderModeCombo) { return; }
+    // Ohne blockSignals wuerde das Nachziehen beim Oeffnen so aussehen wie
+    // ein Klick des Betreibers und den Panadapter umstellen -- genau der
+    // Fehler, der im SpectrumOverlayPanel schon einmal drinsteckte.
+    m_renderModeCombo->blockSignals(true);
+    m_renderModeCombo->setCurrentIndex(qBound(0, renderModeIndex, 1));
+    m_renderModeCombo->blockSignals(false);
 }
 
 void SpectrumOverlayMenu::setValues(int wfColorGain, int wfBlackLevel, bool autoBlack,

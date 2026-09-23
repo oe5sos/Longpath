@@ -4713,6 +4713,7 @@ longpath_add_test(tst_peak_blob_detector)
 #   FFTEngine::setDecimation range [1..32] enforced; out-of-range rejected.
 #   Uses QTEST_MAIN (QApplication required for SpectrumWidget construction).
 longpath_add_test(tst_spectrum_overlays)
+longpath_add_test(tst_overlay_menu_render_mode)
 
 # ── Task 3.1: MultimeterPage + configurable MeterPoller timing ───────────────
 # Verifies new setIntervalMs/intervalMs and setAverageWindow/averageWindow

@@ -8837,6 +8837,11 @@ void SpectrumWidget::mousePressEvent(QMouseEvent* event)
                     this, [this](int v) { m_wfColorScheme = static_cast<WfColorScheme>(v); update(); scheduleSettingsSave(); });
             connect(m_overlayMenu, &SpectrumOverlayMenu::fillAlphaChanged,
                     this, [this](float v) { m_fillAlpha = v; update(); scheduleSettingsSave(); });
+            connect(m_overlayMenu, &SpectrumOverlayMenu::spectrumRenderModeChanged,
+                    this, [this](int idx) {
+                        setSpectrumRenderMode(idx == 1 ? SpectrumRenderMode::Mode3D
+                                                       : SpectrumRenderMode::Mode2D);
+                    });
             connect(m_overlayMenu, &SpectrumOverlayMenu::panFillChanged,
                     this, [this](bool v) { m_panFill = v; update(); scheduleSettingsSave(); });
             connect(m_overlayMenu, &SpectrumOverlayMenu::refLevelChanged,
@@ -8859,6 +8864,12 @@ void SpectrumWidget::mousePressEvent(QMouseEvent* event)
                                   m_fillAlpha, m_panFill, false,
                                   m_refLevel, m_dynamicRange, m_ctunEnabled);
         m_overlayMenu->setWfUpdatePeriodMs(m_wfUpdatePeriodMs);
+        // Den gespeicherten Modus nachziehen, sonst stuende beim Oeffnen
+        // immer "2D" da, auch wenn der Panadapter laengst 3D zeigt --
+        // derselbe Fehler, der im SpectrumOverlayPanel schon einmal drin
+        // war (siehe setSpectrumRenderModeIndex dort).
+        m_overlayMenu->setSpectrumRenderModeIndex(
+            m_renderMode == SpectrumRenderMode::Mode3D ? 1 : 0);
         // The frequency under the cursor, captured at popup time: the
         // popup outlives the press, and by the time the button is clicked
         // the pointer has moved onto the popup itself.
