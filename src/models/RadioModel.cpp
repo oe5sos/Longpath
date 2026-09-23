@@ -6385,6 +6385,50 @@ void RadioModel::connectToRadio(const RadioInfo& info)
         // The audio-output side (AudioEngine push) is gated in
         // RxDspWorker: when the slice is in RADE the WDSP-decoded
         // audio is discarded and RADE owns the speaker path.
+
+        // NNR-Modelle VOR dem Anlegen des Kanals. create_nnr() baut seine
+        // NNET-Objekte beim Anlegen des Empfangskanals und liest den
+        // Modellpfad dabei EINMAL; SetNNRModelPathSlot() legt hinterher nur
+        // eine Zeichenkette ab und baut nichts neu. Stand dieser Block wie
+        // bis zum 2026-09-22 weiter unten -- nach createRxChannel und nach
+        // setNnrTuning --, dann bekam der erste Kanal jeder Sitzung nie ein
+        // Modell: NNR lief als Durchreiche, und die Diagnose behauptete
+        // trotzdem, das Modell sei geladen. Gefunden an der HL2-Werkbank
+        // (Runde 3), zusammen mit dem Absturz, den dieselbe Reihenfolge
+        // ausloeste (nnet.c: setAlpha_nnet auf einem Kopf, den es nicht gibt).
+        // NNR models — global (SetNNRModelPathSlot), not per-channel.
+        // No Thetis precedent (new WDSP 2.10 algorithm). Slot 0 is the
+        // smaller/default model, slot 1 the larger one; both are shipped
+        // as external .bin files (see nnr_model_stub.c — the compiled-in
+        // fallback arrays are intentionally empty).
+        {
+            const QString default0 = Longpath::ModelPaths::nnrModel0Bin();
+            const QString model0 = AppSettings::instance().value(
+                QStringLiteral("NnrModelPath0"), default0).toString();
+            if (!model0.isEmpty()) {
+                qCInfo(lcDsp) << "NNR: loading model slot 0 from" << model0;
+#ifdef HAVE_WDSP
+                SetNNRModelPathSlot(0, model0.toStdString().c_str());
+#endif
+            } else {
+                qCWarning(lcDsp) << "NNR model slot 0 not found at expected paths;"
+                                 << "NNR slot 0 will be disabled until a model is loaded.";
+            }
+
+            const QString default1 = Longpath::ModelPaths::nnrModel1Bin();
+            const QString model1 = AppSettings::instance().value(
+                QStringLiteral("NnrModelPath1"), default1).toString();
+            if (!model1.isEmpty()) {
+                qCInfo(lcDsp) << "NNR: loading model slot 1 from" << model1;
+#ifdef HAVE_WDSP
+                SetNNRModelPathSlot(1, model1.toStdString().c_str());
+#endif
+            } else {
+                qCWarning(lcDsp) << "NNR model slot 1 not found at expected paths;"
+                                 << "NNR slot 1 will be disabled until a model is loaded.";
+            }
+        }
+
         RxChannel* rxCh = m_wdspEngine->createRxChannel(0, wdspInSize, 4096,
                                                          wdspInputRate, 48000, 48000);
 
@@ -6541,39 +6585,6 @@ void RadioModel::connectToRadio(const RadioInfo& info)
                         } else {
                             qCWarning(lcDsp) << "NR3 model not found at expected paths;"
                                              << "NR3 will be disabled until a model is loaded.";
-                        }
-                    }
-
-                    // NNR models — global (SetNNRModelPathSlot), not per-channel.
-                    // No Thetis precedent (new WDSP 2.10 algorithm). Slot 0 is the
-                    // smaller/default model, slot 1 the larger one; both are shipped
-                    // as external .bin files (see nnr_model_stub.c — the compiled-in
-                    // fallback arrays are intentionally empty).
-                    {
-                        const QString default0 = Longpath::ModelPaths::nnrModel0Bin();
-                        const QString model0 = AppSettings::instance().value(
-                            QStringLiteral("NnrModelPath0"), default0).toString();
-                        if (!model0.isEmpty()) {
-                            qCInfo(lcDsp) << "NNR: loading model slot 0 from" << model0;
-#ifdef HAVE_WDSP
-                            SetNNRModelPathSlot(0, model0.toStdString().c_str());
-#endif
-                        } else {
-                            qCWarning(lcDsp) << "NNR model slot 0 not found at expected paths;"
-                                             << "NNR slot 0 will be disabled until a model is loaded.";
-                        }
-
-                        const QString default1 = Longpath::ModelPaths::nnrModel1Bin();
-                        const QString model1 = AppSettings::instance().value(
-                            QStringLiteral("NnrModelPath1"), default1).toString();
-                        if (!model1.isEmpty()) {
-                            qCInfo(lcDsp) << "NNR: loading model slot 1 from" << model1;
-#ifdef HAVE_WDSP
-                            SetNNRModelPathSlot(1, model1.toStdString().c_str());
-#endif
-                        } else {
-                            qCWarning(lcDsp) << "NNR model slot 1 not found at expected paths;"
-                                             << "NNR slot 1 will be disabled until a model is loaded.";
                         }
                     }
 

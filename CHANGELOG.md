@@ -97,6 +97,23 @@
 
 ### Fixed
 
+- **Longpath stuerzte bei jeder Verbindung ab, wenn die NNR-Gewichte
+  fehlen.** Ohne `wdsp_nnr_0.bin`/`wdsp_nnr_1.bin` laeuft NNR (WDSP 2.10)
+  absichtlich als Durchreiche — aber vier Funktionen in `nnet.c` fassten
+  dabei einen Rauschkopf an, den es dann nicht gibt, und
+  `RadioModel::connectToRadio()` ruft genau diesen Weg beim Anlegen des
+  Empfangskanals auf. Ergebnis: SIGSEGV mitten im Verbinden, auf jeder
+  Maschine, neben der die Modelldateien nicht liegen. Wache in `nnet.c`
+  (dieselbe, die die Nachbarfunktionen laengst haben; upstream WDSP 2.10
+  hat die Luecke auch), Pruefstand `tst_nnr_without_model`.
+- **NNR lud sein Modell nie.** Der Modellpfad wurde erst NACH dem Anlegen
+  des Kanals gesetzt; die Rechenobjekte lesen ihn aber genau einmal, beim
+  Anlegen. Der erste Empfangskanal jeder Sitzung arbeitete darum ohne
+  Modell, waehrend das Protokoll „NNR: loading model slot 0 …" meldete.
+  Reihenfolge getauscht; ausserdem liefert das Paket die beiden
+  Modelldateien jetzt mit (Bundle, Binaerverzeichnis, Install-Praefix) —
+  vorher fand ein installiertes Longpath sie ueberhaupt nicht.
+
 - **Die Applet-Spalte war im frischen Profil rechts abgeschnitten.** Bei
   1280 Punkten Fensterbreite fehlten RX-"MUTE"/"BIN", die TX-Knoepfe
   (MOX, TUNE) und "2-Tone": Panel und Container hatten ein festes

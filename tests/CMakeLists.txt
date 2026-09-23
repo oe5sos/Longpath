@@ -314,6 +314,16 @@ longpath_add_test(tst_logbook_stats_widget)
 #    allocation. NereusSDR-original bound, 2026-09-20 --
 longpath_add_test(tst_wdsp_delay_clamp)
 
+# -- NNR ohne Modelldatei (2026-09-22, HL2-Werkbank Runde 3): setAlpha/
+#    setKnee auf einem NNET, dessen Modell nie geladen wurde -- vier
+#    ungeprueft dereferenzierte Zeiger in nnet.c, ein Absturz bei jeder
+#    Verbindung auf Maschinen ohne die Gewichte --
+longpath_add_test(tst_nnr_without_model)
+if(TEST tst_nnr_without_model)
+    set_tests_properties(tst_nnr_without_model PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
+
 # ── Phase 3M-4 Task 3: TxChannel PureSignal API wrappers (22 functions) ──
 # Smoke tests for the 22 PS API wrappers added in Task 3:
 #   19 calcc setters/readers (setPSRunCal, setPSMox, setPSReset, setPSMancal,
