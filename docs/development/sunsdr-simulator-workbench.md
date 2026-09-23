@@ -126,3 +126,27 @@ Das Messgeraet stellt diese Eigenschaften seither nach
 (`--repeat 8 --block-rate 240`, Statusrahmen mit 20/s), und die
 Werkbank prueft, dass der Treiber sieben von acht Kopien verwirft.
 
+## Die Werkbank gegen das ECHTE Geraet
+
+Mit `LONGPATH_SUNSDR_FIXED_PORTS=1` bindet der Pruefstand die festen
+Ports 50001/50002 statt fluechtiger — das echte Geraet antwortet nur
+dorthin (am 2026-08-26 live gelernt). Dann darf allerdings **nichts
+anderes** diese Ports halten: kein zweites Longpath, kein ExpertSDR2,
+kein Messgeraet.
+
+```bash
+LONGPATH_SUNSDRSIM=192.168.16.200:50001 LONGPATH_SUNSDR_FIXED_PORTS=1 \
+  QT_QPA_PLATFORM=offscreen ./build/tests/tst_sunsdr_sim_workbench
+```
+
+Am 2026-09-23 so gefahren, direkt gegen die QRP:
+
+```
+STATE 3 (verbunden), 400 Proben je Block, Spitze 1,7e-05 (Rauschflur ohne Antenne)
+IQ-Bloecke nach 10 s: 149 -> 2552          = 240 Bloecke/s
+DOPPELT verworfen: 17 754 bei 2 552        = 7 von 8, wie am Draht gemessen
+```
+
+Der Tonpegel wird am echten Geraet nur gegen „nicht still" geprueft —
+ohne Antenne liegt dort nur der eigene Rauschflur.
+

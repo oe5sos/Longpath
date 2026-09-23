@@ -73,8 +73,13 @@ private slots:
             hp.value(1, QStringLiteral("50001")).toUInt());
 
         SunSdrRadioConnection conn;
-        // Feste Ports gehoeren dem Messgeraet, siehe Kopf.
-        conn.setFixedPortBindingEnabledForTest(false);
+        // Feste Ports gehoeren dem Messgeraet, siehe Kopf — ausser die
+        // Werkbank faehrt gegen ein ECHTES Geraet. Das antwortet nur auf
+        // Port 50001 (am 2026-08-26 live gelernt: mit fluechtigem Port
+        // ging die Anfrage hinaus und nie etwas zurueck), also muessen
+        // dann die festen Ports her und nichts anderes darf sie halten.
+        const bool realRadio = qEnvironmentVariableIsSet("LONGPATH_SUNSDR_FIXED_PORTS");
+        conn.setFixedPortBindingEnabledForTest(realRadio);
         conn.init();
 
         QSignalSpy state(&conn, &RadioConnection::connectionStateChanged);
@@ -109,9 +114,14 @@ private slots:
         qInfo() << "Proben je Block" << samples.size() << "Spitze" << peak;
         QVERIFY2(samples.size() == SunSdr::kIqComplexPerPkt * 2,
                  "Ein Block traegt nicht 200 Probenpaare");
-        QVERIFY2(peak > 0.001,
-                 "Der Empfangsstrom ist still — das Messgeraet sendet einen "
-                 "Ton, der Treiber gibt ihn nicht weiter");
+        // Am Messgeraet liegt ein kraeftiger Ton an; ein echtes Geraet
+        // ohne Antenne liefert nur seinen eigenen Rauschflur (gemessen:
+        // Spitze um 2e-05). Still darf es in beiden Faellen nicht sein.
+        const double floorExpected = realRadio ? 1e-7 : 0.001;
+        QVERIFY2(peak > floorExpected,
+                 qPrintable(QStringLiteral(
+                     "Der Empfangsstrom ist still (Spitze %1) — die Proben "
+                     "kommen nicht durch").arg(peak)));
 
         // ── 3. Frequenz setzen ───────────────────────────────────────
         // Der Treiber schickt sie als Kandidaten-Kodierung (Wert mal

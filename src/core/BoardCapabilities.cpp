@@ -1260,8 +1260,13 @@ const BoardCapabilities kSunSdr2Qrp = {
     .widebandAdcs     = 0,   // no wideband/panadapter-bypass stream documented
     // Native rate 312,500 Hz — confirmed, design doc "IQ stream" section.
     // Not negotiated; this is the only rate the wire protocol produces.
-    .sampleRates      = {312500, 0, 0, 0, 0, 0},
-    .maxSampleRate    = 312500,
+    // 2026-09-23 an der Bank gemessen: die QRP liefert mit dem
+    // Handschlag, den wir (und ExpertSDR2) schicken, 48 000 Proben/s —
+    // 240 Bloecke je Sekunde zu 200 Probenpaaren. Die 312 500 hier
+    // waren von der DX uebernommen und ausdruecklich nie bestaetigt;
+    // siehe SunSdrProtocol.h, Profile::rxNativeRateHz.
+    .sampleRates      = {48000, 0, 0, 0, 0, 0},
+    .maxSampleRate    = 48000,
     // No OpenHPSDR-style wire-encoded step attenuator exists on this
     // protocol. SunSDR has its own, structurally different mechanism: a
     // single opcode (0x05) selecting one of 4 discrete preamp/atten

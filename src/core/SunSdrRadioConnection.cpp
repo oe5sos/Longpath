@@ -501,7 +501,7 @@ void SunSdrRadioConnection::setReceiverFrequency(int receiverIndex, quint64 freq
     // 7.1 MHz (0.01%), consistent with VFO scroll-settling lag between
     // the last captured packet and the display's final resting value,
     // not a formula error. Payload:
-    // SunSdr::encodeFrequencyPayloadCandidate() (freqHz * 10, 8-byte
+    // SunSdr::encodeFrequencyPayload() (freqHz * 10, 8-byte
     // LE, from ArtemisSDR's real sunsdr_send_freq_pkt(),
     // sunsdr.c:2259-2277 [@f8b01d25c5]).
     //
@@ -517,7 +517,7 @@ void SunSdrRadioConnection::setReceiverFrequency(int receiverIndex, quint64 freq
     // next thing to investigate.
     QByteArray frame = QByteArray::fromHex(
         "03ff0800080000000000010000008ca31dd7");
-    frame += SunSdr::encodeFrequencyPayloadCandidate(frequencyHz);
+    frame += SunSdr::encodeFrequencyPayload(frequencyHz);
 
     m_controlSocket->writeDatagram(frame, m_radioAddr, m_profile->defaultCtrlPort);
     recordBytesSent(static_cast<qint64>(frame.size()));

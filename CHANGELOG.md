@@ -106,6 +106,19 @@
 
 ### Fixed
 
+- **SunSDR2 QRP: die Abtastrate stand auf einer Annahme und war falsch.**
+  312 500 Hz waren von der SunSDR2 DX uebernommen und im Code
+  ausdruecklich als unbestaetigt vermerkt. An der Bank gemessen
+  (2026-09-23, zwei Sitzungen am selben Geraet — einmal Longpath, einmal
+  ExpertSDR2 als Gegenprobe): die QRP liefert 240 Bloecke je Sekunde zu
+  200 Probenpaaren, also **48 000 Proben/s**. Profil und
+  Geraeteeigenschaften stehen jetzt darauf.
+- **SunSDR2 QRP: die Frequenz-Kodierung ist bewiesen.** ExpertSDR2 auf
+  drei vorher notierte Frequenzen gestellt und mitgeschnitten: 14 074 000,
+  3 600 000 und 28 500 000 Hz kommen als Wert mal zehn, acht Bytes,
+  niederwertig zuerst — auf das Hertz genau. `…PayloadCandidate` heisst
+  jetzt `…Payload`.
+
 - **SunSDR2 QRP: die Signalverarbeitung bekam jede Probe achtmal.** An
   der Bank gemessen (2026-09-23, 30 000 Pakete): die QRP schickt jeden
   Datenblock acht Mal, ueber rund 32 ms verteilt und mit den
