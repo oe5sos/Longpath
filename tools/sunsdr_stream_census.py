@@ -81,21 +81,36 @@ def datagrams(proc):
         yield ts, bytes.fromhex("".join(cur))
 
 
+# Wie viel Nutzlast mindestens da sein muss, damit ein Paket zaehlt.
+# Bei --snap wird abgeschnitten; 64 Byte sind 10 Probenpaare und genug,
+# um zwei Bloecke auseinanderzuhalten (IQ-Rauschen ist nie gleich).
+MIN_PAYLOAD = 64
+
+
 def carve(data, magic0):
     """Schneidet das IQ-Paket aus dem Datagramm heraus.
 
     Mit `-i any` legt macOS einen PKTAP-Kopf davor, dessen Laenge nicht
-    fest ist; darum wird die Marke gesucht statt gezaehlt. Gueltig ist
-    nur, was danach genau PACKET Bytes lang ist -- sonst greift die
-    Suche zufaellige Bytes in der Nutzlast.
+    fest ist; darum wird die Marke gesucht statt gezaehlt.
+
+    Ein Treffer zaehlt nur, wenn danach ein vollstaendiger Kopf steht,
+    der Opcode 0xFE lautet UND das Laengenfeld 1200 sagt. Die Marke
+    allein ist zu schwach -- zwei zufaellige Bytes kommen in 1200 Byte
+    Rauschen staendig vor. Die Nutzlast DARF kuerzer sein als 1200: mit
+    einer kleinen tcpdump-Schnittlaenge (-s) passt der Mitschnitt in
+    einen Bruchteil des Platzes, und fuer die Frage, ob zwei Bloecke
+    dieselben Bytes tragen, genuegt der Anfang.
     """
     start = 0
     while True:
         i = data.find(bytes([magic0, MAGIC1]), start)
         if i < 0:
             return None
-        if len(data) - i == PACKET:
-            return data[i:]
+        rest = data[i:]
+        if (len(rest) >= HEADER + MIN_PAYLOAD
+                and rest[2] == OP_RX_IDLE
+                and (rest[4] | (rest[5] << 8)) == PAYLOAD):
+            return rest[:PACKET]
         start = i + 1
 
 
@@ -114,6 +129,12 @@ def main():
     ap.add_argument("--magic0", type=lambda x: int(x, 0), default=0x03,
                     help="0x03 = QRP, 0x32 = DX, 0x01 = PRO")
     ap.add_argument("--port", type=int, default=50002)
+    ap.add_argument("--snap", type=int, default=320,
+                    help="tcpdumps Schnittlaenge. 320 = IP/UDP-Kopf, der "
+                         "10-Byte-Kopf und 282 Byte Nutzlast -- genug, um "
+                         "zwei Bloecke auseinanderzuhalten, und wenig genug, "
+                         "dass dieses Programm bei 1 900 Paketen/s mitkommt. "
+                         "2000 nimmt alles (aber rechne mit Verlusten).")
     ap.add_argument("--from-file", dest="fromFile", default="",
                     help="statt tcpdump eine schon gesicherte -x-Ausgabe "
                          "auswerten (tcpdump ... > datei)")
@@ -124,8 +145,8 @@ def main():
             census(FileLike(fh), args)
         return
 
-    cmd = ["tcpdump", "-i", args.iface, "-n", "-l", "-U", "-x", "-s", "2000",
-           "udp port %d" % args.port]
+    cmd = ["tcpdump", "-i", args.iface, "-n", "-l", "-U", "-x",
+           "-s", str(args.snap), "udp port %d" % args.port]
     print("# " + " ".join(cmd), flush=True)
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                             stderr=subprocess.DEVNULL, text=True)
@@ -146,8 +167,6 @@ def census(proc, args):
         for ts, data in datagrams(proc):
             pkt = carve(data, args.magic0)
             if pkt is None:
-                continue
-            if pkt[2] != OP_RX_IDLE:
                 continue
             seq = pkt[6] | (pkt[7] << 8)
             total += 1
@@ -210,13 +229,16 @@ def report(bySeq, order, total, elapsed):
         if len(items) < 2:
             continue
         groups += 1
-        base = items[0][1]
+        # Nur so weit vergleichen, wie bei ALLEN Kopien Nutzlast da ist
+        # -- bei abgeschnittenem Mitschnitt sonst ein Scheinunterschied.
+        n = min(len(pl) for _h, pl in items)
+        base = items[0][1][:n]
         allSame = True
         for _hdr, pl in items[1:]:
-            if pl == base:
+            if pl[:n] == base:
                 continue
             allSame = False
-            for i, (a, b) in enumerate(zip(base, pl)):
+            for i, (a, b) in enumerate(zip(base, pl[:n])):
                 if a != b:
                     firstDiff[i] += 1
                     break
