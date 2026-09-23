@@ -26,6 +26,7 @@
 
 #include <QtTest/QtTest>
 #include <QComboBox>
+#include <QDir>
 #include <QSignalSpy>
 
 #include "gui/SpectrumOverlayMenu.h"
@@ -90,6 +91,29 @@ private slots:
         QCOMPARE(cmb->currentIndex(), 1);
         menu.setSpectrumRenderModeIndex(-3);
         QCOMPARE(cmb->currentIndex(), 0);
+    }
+
+    // Mit LONGPATH_GRAB_DIR faellt das Blatt als Bild heraus -- so laesst
+    // sich zeigen, wie die neue Zeile zwischen den anderen aussieht, ohne
+    // die ganze Anwendung dafuer zu starten. Ohne die Variable tut die
+    // Stelle nichts.
+    void theSheetAsAPicture()
+    {
+        const QString grabDir = qEnvironmentVariable("LONGPATH_GRAB_DIR");
+        if (grabDir.isEmpty()) {
+            QSKIP("LONGPATH_GRAB_DIR nicht gesetzt -- kein Bild gewuenscht.");
+        }
+        SpectrumOverlayMenu menu;
+        menu.setSpectrumRenderModeIndex(1);
+        menu.resize(menu.sizeHint());
+        const QPixmap shot = menu.grab();
+        QVERIFY2(!shot.isNull(), "das Blatt liess sich nicht abbilden");
+        QDir().mkpath(grabDir);
+        const QString path =
+            QDir(grabDir).filePath(QStringLiteral("overlay-menu-2d-3d.png"));
+        QVERIFY2(shot.save(path), qPrintable(QStringLiteral(
+            "Bild liess sich nicht schreiben: %1").arg(path)));
+        qInfo() << "Blatt abgelegt:" << path;
     }
 };
 
