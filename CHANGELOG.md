@@ -97,6 +97,20 @@
 
 ### Fixed
 
+- **FFTWs Planer lief ohne Sperre.** Je Genauigkeit gibt es genau einen,
+  prozessweit, und keiner ist threadsicher — Longpath plante trotzdem aus
+  mehreren Faeden gleichzeitig: ein Panadapter je Scheibe (jeder auf
+  seinem Faden, beim Groessenwechsel wird neu geplant), das Breitbandbild,
+  das Filterbild des Empfangskanals und WDSP, dessen Wissensaufbau hier
+  auf einem eigenen Faden laeuft. In den Quellen stand sogar, FFTW_ESTIMATE
+  weiche „dem globalen FFTW-Mutex" aus; das tut es nicht — es misst nur
+  nicht, fasst aber denselben Zustand an. Jetzt haengt jede Belegung,
+  jeder Plan und jedes Freigeben an der Sperre seiner Genauigkeit
+  (`fftwPlannerLock` / `fftwfPlannerLock`); `fftw_execute` bleibt bewusst
+  draussen, es ist threadsicher und liegt auf dem Echtzeitpfad. Loesung
+  aus AetherSDR uebernommen (`7f68dda0`), Pruefstand
+  `tst_fftw_planner_lock`.
+
 - **Setup > Audio > TX Input schaltete ins Leere.** Mikrofon-Vorverstaerker
   (+20 dB), Umschaltung Mic/Line, Belegung Tip/Ring, Mikrofonspeisung und
   der XLR-Schalter landeten im Modell und blieben dort: die Verbindung

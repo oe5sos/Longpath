@@ -314,6 +314,11 @@ longpath_add_test(tst_logbook_stats_widget)
 #    allocation. NereusSDR-original bound, 2026-09-20 --
 longpath_add_test(tst_wdsp_delay_clamp)
 
+# -- FFTW-Planersperre (2026-09-22): je Genauigkeit EINE prozessweite
+#    Sperre, sie schliesst wirklich aus, und viele Faeden halten Planen
+#    und Freigeben darunter aus. Portiert aus AetherSDR [@7f68dda0]. --
+longpath_add_test(tst_fftw_planner_lock)
+
 # -- NNR ohne Modelldatei (2026-09-22, HL2-Werkbank Runde 3): setAlpha/
 #    setKnee auf einem NNET, dessen Modell nie geladen wurde -- vier
 #    ungeprueft dereferenzierte Zeiger in nnet.c, ein Absturz bei jeder

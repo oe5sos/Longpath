@@ -59,6 +59,7 @@
 //============================================================================================//
 
 #include "FFTEngine.h"
+#include "core/dsp/FftwPlannerLock.h"
 #include "LogCategories.h"
 #include "MemoryLock.h"
 #include "PerfMonitor.h"
@@ -79,6 +80,10 @@ FFTEngine::FFTEngine(int receiverId, QObject* parent)
 FFTEngine::~FFTEngine()
 {
 #ifdef HAVE_FFTW3
+    // Planer UND Belegungen unter der Sperre der einfachen Genauigkeit:
+    // ein zweiter Panadapter auf seinem eigenen Faden kann in genau
+    // diesem Moment planen. Siehe FftwPlannerLock.h.
+    auto plannerLock = fftwfPlannerLock();
     if (m_plan) {
         fftwf_destroy_plan(m_plan);
     }
@@ -290,6 +295,10 @@ void FFTEngine::replanFft()
     int size = m_fftSize.load();
     qCInfo(lcDsp) << "FFTEngine: replanning FFT size" << size;
 
+    // Eine Sperre ueber den ganzen Umbau: Verwerfen, Freigeben, Belegen
+    // und Planen fassen alle denselben prozessweiten Planer an.
+    auto plannerLock = fftwfPlannerLock();
+
     // Destroy old plan and buffers.  Unlock memory BEFORE free so the
     // kernel doesn't carry a stale lock past the lifetime of the page.
     if (m_plan) {
@@ -328,8 +337,11 @@ void FFTEngine::replanFft()
     lockMemory(m_fftIn,  fftBytes, "FFTEngine::m_fftIn");
     lockMemory(m_fftOut, fftBytes, "FFTEngine::m_fftOut");
 
-    // FFTW_ESTIMATE: fast plan without measurement (avoids global FFTW mutex
-    // contention with WDSP audio thread). Startup wisdom covers common sizes.
+    // FFTW_ESTIMATE: schneller Plan ohne Messung. (Bis 2026-09-22 stand
+    // hier, ESTIMATE weiche „dem globalen FFTW-Mutex" aus — das stimmt
+    // nicht: ESTIMATE misst nicht, fasst aber denselben globalen
+    // Planerzustand an. Deshalb die Sperre oben.) Das Startwissen deckt
+    // die ueblichen Groessen ab.
     m_plan = fftwf_plan_dft_1d(size, m_fftIn, m_fftOut, FFTW_FORWARD, FFTW_ESTIMATE);
 
     m_currentFftSize = size;

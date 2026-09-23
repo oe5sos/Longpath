@@ -563,6 +563,7 @@ set(CORE_SOURCES
     src/core/ReceivePresentationSync.cpp
     src/core/WdspEngine.cpp
     src/core/RxChannel.cpp
+    src/core/dsp/FftwPlannerLock.cpp
     src/core/TxChannel.cpp
     src/core/RadeChannel.cpp
     src/core/RadeText.cpp

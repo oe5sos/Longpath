@@ -7,6 +7,7 @@
 //
 // =================================================================
 #include "core/WidebandFftEngine.h"
+#include "core/dsp/FftwPlannerLock.h"
 
 #include <algorithm>
 #include <cmath>
@@ -16,19 +17,20 @@ namespace Longpath {
 WidebandFftEngine::WidebandFftEngine(QObject* parent)
     : QObject(parent)
 {
+    auto plannerLock = fftwfPlannerLock();   // siehe FftwPlannerLock.h
     m_input  = fftwf_alloc_real(kFftSize);
     m_output = fftwf_alloc_complex(kFftSize / 2 + 1);
-    // FFTW_ESTIMATE matches the codebase convention used by FFTEngine
-    // (FFTEngine.cpp:333). It avoids the global FFTW measurement
-    // mutex which can otherwise contend with the WDSP audio thread
-    // during plan creation. The 16384-pt r2c plan is small enough
-    // that ESTIMATE is fine without measured wisdom.
+    // FFTW_ESTIMATE wie in FFTEngine. (Die frühere Begruendung, das
+    // weiche dem globalen FFTW-Mutex aus, war falsch — siehe
+    // FftwPlannerLock.h; die Sperre steht jetzt oben.) Der 16384-Punkte-
+    // r2c-Plan ist klein genug, dass ESTIMATE ohne gemessenes Wissen reicht.
     m_plan = fftwf_plan_dft_r2c_1d(kFftSize, m_input, m_output,
                                    FFTW_ESTIMATE);
 }
 
 WidebandFftEngine::~WidebandFftEngine()
 {
+    auto plannerLock = fftwfPlannerLock();   // siehe FftwPlannerLock.h
     if (m_plan != nullptr) {
         fftwf_destroy_plan(m_plan);
     }
