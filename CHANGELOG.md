@@ -4,6 +4,14 @@
 
 ### Added
 
+- **Der QRP-Messtag vom 2026-09-23 steht im Entwurfsdokument**
+  (`docs/architecture/2026-08-24-sunsdr-native-driver-design.md`): die
+  gemessenen Unterschiede zwischen dem Strom an Longpath und dem an
+  ExpertSDR2, vier gelesene Opcodes, was ausgeschlossen ist -- und die
+  Warnung, dass die nachgespielten Steuerrahmen das Geraet ueber das
+  Trennen hinaus gedaempft haben und erst ein Netzstecker-Zyklus das
+  behoben hat.
+
 - **Ein Messgeraet im QRP-Treiber selbst** (`LONGPATH_SUNSDR_PROBE=1`)
   und eine Werkbank-Naht, um dem Geraet weitere Steuerrahmen
   nachzuschicken (`LONGPATH_SUNSDR_EXTRA=<hex,hex,...>`). Ohne die
