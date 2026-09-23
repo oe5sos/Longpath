@@ -5362,6 +5362,18 @@ longpath_add_test(tst_sunsdr_radio_connection)
 #    docs/development/sunsdr-simulator-workbench.md --
 longpath_add_test(tst_sunsdr_sim_workbench)
 
+# -- Wiederholte Bloecke der QRP (2026-09-23, zweimal unabhaengig
+#    gemessen): jeder Block kommt achtmal, verschraenkt mit den Nachbarn.
+#    Der Filter gehoert nur zusammen mit der Stelle in
+#    RadioModel::connectToRadio hierher, die die Abtastrate ankommen
+#    laesst -- siehe SunSdrRadioConnection::processStreamDatagram. --
+longpath_add_test(tst_sunsdr_duplicate_blocks)
+
+# -- Die QRP muss mit IHRER Abtastrate gefahren werden, nicht mit Atlas'
+#    (2026-09-23: sie steht in keiner HPSDRModel-Liste, darum fiel die
+#    Aufloesung still auf Atlas und mit ihr auf 192 kHz). --
+longpath_add_test(tst_sunsdr_board_caps)
+
 # -- Wiederholte Bloecke der QRP (2026-09-23, an der Bank gemessen):
 #    jeder Block kommt achtmal, verschraenkt mit den Nachbarn. --
 

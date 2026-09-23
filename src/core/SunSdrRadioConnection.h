@@ -179,6 +179,10 @@ public:
     // via this accessor).
     bool isRxReadyForTest() const { return m_rxReady.load(std::memory_order_acquire); }
 
+    /// Wie viele Pakete als Wiederholung verworfen wurden. Am Geraet sind
+    /// das sieben von acht -- siehe sequenceSeenRecently().
+    quint64 duplicateBlocksDroppedForTest() const { return m_duplicateBlocks; }
+
     // True once a beacon reply has set m_radioAddr and not since cleared
     // by disconnect()/onConnectTimeout()/onDataWatchdogTick(). Tests use
     // this to confirm every teardown path actually clears it — a real
@@ -599,6 +603,54 @@ private:
     quint16 m_txSeq{0};   // control-channel-independent; used only for the
                           // periodic silent IQ-stream keepalive (design doc:
                           // "the host must keep sending silent 0xFE packets")
+
+    // ── Wiederholte Bloecke erkennen ────────────────────────────────────
+    //
+    // Die QRP schickt JEDEN Block achtmal. Zweimal unabhaengig gemessen,
+    // zuletzt am 2026-09-23 mit tools/sunsdr_stream_census.py, das am
+    // Draht mitliest statt im Treiber zu zaehlen: 38 207 Pakete in 20 s,
+    // darin 4 793 verschiedene Folgenummern, 4 761 davon genau achtmal,
+    // und in JEDER Gruppe waren alle Nutzlasten bytegleich (verschieden:
+    // null). Byte 3 des Kopfes ist dabei immer 0xFF, traegt also keine
+    // Teilnummer -- es sind wirklich Kopien, keine Teilstuecke.
+    //
+    // Die Kopien kommen ueber rund 32 ms verteilt und VERSCHRAENKT mit
+    // den Nachbarbloecken. Ein Vergleich mit dem unmittelbar vorigen
+    // Paket findet sie darum nie; genau daran ist die alte Diagnosezeile
+    // in processStreamDatagram vorbeigelaufen, die monatelang "0 von
+    // 1922" meldete und die Fehlersuche zweimal in die Irre geschickt
+    // hat.
+    //
+    // Ohne diese Wache bekommt die Signalverarbeitung jede Probe
+    // achtmal: 1 920 Pakete/s statt 240, also 384 000 statt 48 000
+    // Proben je Sekunde.
+    //
+    // Ein kleiner Ring genuegt: neue Bloecke kommen alle 4,17 ms, die
+    // Kopien eines Blocks liegen innerhalb von 32 ms -- 32 Plaetze
+    // decken 133 ms ab. Linear durchsuchen ist bei 1 920 Paketen je
+    // Sekunde billiger als jede Buchfuehrung darum herum.
+    static constexpr int kRecentSeqSlots = 32;
+    std::array<quint16, kRecentSeqSlots> m_recentSeqs{};
+    int      m_recentSeqPos{0};
+    int      m_recentSeqCount{0};
+    quint64  m_duplicateBlocks{0};
+
+    /// true, wenn diese Folgenummer schon angenommen wurde; sonst wird
+    /// sie vermerkt und false geliefert.
+    bool sequenceSeenRecently(quint16 seq);
+
+    // ── Was einmal je Sekunde ins Protokoll geht ────────────────────────
+    //
+    // Frueher standen diese Zaehler als funktionslokale `static` in
+    // processStreamDatagram -- also EINE Reihe Zahlen fuer alle
+    // Verbindungen des Prozesses. Dieselbe Falle wie im
+    // HL2-Bandbreitenwaechter (behoben 2026-09-23); hier gehoert der
+    // Stand zur Verbindung.
+    QElapsedTimer m_diagTimer;
+    bool     m_diagStarted{false};
+    quint64  m_diagPacketsSeen{0};
+    quint64  m_diagBlocksAccepted{0};
+    float    m_diagPeakAbs{0.0f};
 };
 
 } // namespace Longpath

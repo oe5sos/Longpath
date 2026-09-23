@@ -1514,6 +1514,13 @@ public:
     // state handler, and override board capabilities. Production code
     // must never use these.
     void injectConnectionForTest(RadioConnection* conn) { m_connection = conn; }
+
+    // Die Modell-/Kenndatenwahl ohne Verbindung: ein Pruefstand kann so
+    // nachsehen, mit welcher Abtastrate ein gemeldetes Board gefahren
+    // wuerde, ohne einen Socket zu oeffnen (tst_sunsdr_board_caps).
+    void applyHardwareProfileForTest(const RadioInfo& info) {
+        applyHardwareProfileFor(info);
+    }
     // Install a real PureSignal coordinator without the full WDSP/connect
     // pipeline so codec-context tests can distinguish the auto-cal preference
     // from the cmd-state machine's effective PSEnabled state. RadioModel owns
@@ -2696,6 +2703,12 @@ private:
     // setHpsdrModelForTest() seam so production and tests stay in
     // sync.
     void applyHpsdrModel(HPSDRModel m);
+
+    // Welches Modell fuer dieses Geraet gilt, und welche Kenndaten. Aus
+    // connectToRadio herausgeloest, weil die SunSDR hier eine Ausnahme
+    // braucht (sie steht in keiner HPSDRModel-Liste) und die Entscheidung
+    // ohne Netz pruefbar sein soll.
+    void applyHardwareProfileFor(const RadioInfo& info);
 
     // Pushes AlexController's per-band antenna state to the connection.
     // Full port of Thetis HPSDR/Alex.cs:310-413 UpdateAlexAntSelection.

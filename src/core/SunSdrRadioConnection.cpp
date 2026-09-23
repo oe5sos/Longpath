@@ -238,6 +238,13 @@ void SunSdrRadioConnection::connectToRadio(const RadioInfo& info)
     m_awaitingBeacon = true;
     m_radioAddr.clear();
     setRxReady(false);
+    // Der Ring der zuletzt angenommenen Folgenummern gehoert zur Sitzung:
+    // eine neue faengt bei null an, sonst koennte eine Nummer aus der
+    // alten Sitzung einen echten Block der neuen verwerfen. Dieselbe
+    // Ueberlegung wie bei m_radioAddr eine Zeile darueber.
+    m_recentSeqPos = 0;
+    m_recentSeqCount = 0;
+    m_duplicateBlocks = 0;
 
     setState(ConnectionState::Connecting);
 
@@ -413,6 +420,13 @@ void SunSdrRadioConnection::disconnect()
                                // reopen the RX gate — see onControlReadyRead()
     m_radioAddr.clear();
     setRxReady(false);
+    // Der Ring der zuletzt angenommenen Folgenummern gehoert zur Sitzung:
+    // eine neue faengt bei null an, sonst koennte eine Nummer aus der
+    // alten Sitzung einen echten Block der neuen verwerfen. Dieselbe
+    // Ueberlegung wie bei m_radioAddr eine Zeile darueber.
+    m_recentSeqPos = 0;
+    m_recentSeqCount = 0;
+    m_duplicateBlocks = 0;
 
     // Der Ring der zuletzt angenommenen Folgenummern gehoert zur Sitzung:
     // eine neue faengt bei null an, sonst koennte eine Nummer aus der
@@ -889,39 +903,28 @@ void SunSdrRadioConnection::processStreamDatagram(const QByteArray& data,
     if (hdr.opcode != SunSdr::kOpIqRxIdle) {
         return;  // TX-active frames don't apply to a receive-only connection
     }
+    ++m_diagPacketsSeen;   // vor dem Filter: sonst zaehlt es nur die Bloecke
 
-    // ── Hier stand bis zum 2026-09-23 ein Wiederholungsfilter ───────────
+    // ── Wiederholte Bloecke wegwerfen ───────────────────────────────────
     //
-    // Er ist wieder draussen. Nicht weil die Messung falsch war -- sie
-    // stimmt, am Geraet nachgemessen und heute noch einmal bestaetigt:
+    // Die QRP schickt jeden Block achtmal, Byte fuer Byte gleich. Der
+    // Messstand und der Grund fuer den Ring stehen am Ring selbst im
+    // Kopf dieser Klasse.
     //
-    //   Pakete/s = 1922 | Folgenummer wiederholt: 1682 | bytegleich: 1682
-    //                   | VERSCHIEDEN: 0
-    //
-    // Jede Wiederholung traegt wirklich dieselben Bytes, und die 240
-    // uebrig bleibenden Bloecke je Sekunde kommen lueckenlos aufsteigend
-    // (eigene Messung: 241 angenommen/s, 0 Spruenge, 0 rueckwaerts).
-    //
-    // Der Filter ist trotzdem raus, weil er am Geraet nicht funktioniert
-    // hat. Der Betreiber hoert mit ihm ein Rauschen, das "nicht typisch"
-    // klingt -- mit der alten Fassung ohne Filter klingt dasselbe Geraet
-    // richtig. Das gilt sogar dann, wenn man zusaetzlich die
-    // Abtastrate auf die gemessenen 48 kHz stellt, also die Kombination,
-    // die rechnerisch stimmen MUESSTE.
-    //
-    // Was daraus folgt: irgendetwas an diesem Strom verstehen wir noch
-    // nicht. Solange das so ist, hat das Ohr am echten Geraet Vorrang vor
-    // meiner Paketzaehlung -- ein Zustand, der nachweislich funktioniert,
-    // ist mehr wert als einer, der nachweislich zaehlbar ist.
-    //
-    // Was zu klaeren bleibt, bevor jemand das noch einmal anfasst:
-    //   * Warum liefert die alte Fassung mit 1922 Paketen/s in eine auf
-    //     192 000 gestellte Verarbeitung etwas, das richtig klingt?
-    //   * Schickt main dem Geraet inzwischen etwas anderes als die
-    //     Fassung vom 2026-09-02 (TX-Taktgeber, Lebenszeichen), und
-    //     antwortet die QRP deshalb mit achtfach wiederholten Bloecken
-    //     statt mit einem dichten Strom?
-    // Die Messwerkzeuge dafuer stehen in tools/sunsdr_opcode_watch.py.
+    // Zur Geschichte, damit niemand das dritte Mal danebengreift: dieser
+    // Filter war am 2026-09-23 schon einmal drin (#65) und am selben Tag
+    // wieder draussen (#68), weil es am Geraet mit ihm falsch klang. Der
+    // Grund war nicht der Filter, sondern dass die Abtastrate nie
+    // ankam -- die QRP hat keinen HPSDRModel-Eintrag, darum fiel die
+    // Modellaufloesung auf Atlas zurueck und die Signalverarbeitung lief
+    // mit Atlas' 192 000 Hz weiter. Aus 48 200 Proben/s in einen auf
+    // 192 000 gestellten Weg wird ein um den Faktor vier ausgehungerter
+    // Empfang. Behoben in RadioModel::connectToRadio; dieser Filter
+    // gehoert nur ZUSAMMEN mit jener Stelle hierher.
+    if (sequenceSeenRecently(hdr.seq)) {
+        ++m_duplicateBlocks;
+        return;
+    }
 
     QVector<float> samples;
     SunSdr::decodeIqSamples(
@@ -929,44 +932,38 @@ void SunSdrRadioConnection::processStreamDatagram(const QByteArray& data,
         data.size() - SunSdr::kIqHeaderSize, &samples);
     if (samples.isEmpty()) { return; }
 
-    // TEMPORARY diagnostic, 2026-09-03 (bench session, real antenna,
-    // ExpertSDR2 shows the same "waterfall but no station audio" symptom
-    // -- ruling out a Longpath-specific decode bug, but not yet ruling
-    // out whether the QRP's ADC/RF front end is genuinely live at all.
-    // Two checks, once a second: (a) the payload's raw bytes vs the
-    // previous packet's -- identical would mean frozen/stuck data, not
-    // real antenna noise; (b) peak decoded sample magnitude, as a coarse
-    // "is anything moving" gauge. Remove once this question is settled.
-    {
-        static QElapsedTimer diagTimer;
-        static bool diagStarted = false;
-        static QByteArray lastPayload;
-        static quint64 packetsSinceLog = 0;
-        static quint64 identicalToPrevSinceLog = 0;
-        if (!diagStarted) { diagTimer.start(); diagStarted = true; }
-
-        const QByteArray payload = data.mid(SunSdr::kIqHeaderSize);
-        ++packetsSinceLog;
-        if (!lastPayload.isEmpty() && payload == lastPayload) {
-            ++identicalToPrevSinceLog;
-        }
-        lastPayload = payload;
-
-        if (diagTimer.elapsed() > 1000) {
-            diagTimer.restart();
-            float peakAbs = 0.0f;
-            for (float v : samples) {
-                const float a = v < 0.0f ? -v : v;
-                if (a > peakAbs) { peakAbs = a; }
-            }
-            qCInfo(lcSunSdr) << "SunSdr: [DIAG] peak |sample| =" << peakAbs
-                             << "(full scale 1.0) --" << identicalToPrevSinceLog
-                             << "of" << packetsSinceLog
-                             << "packets this second were byte-identical "
-                                "to the one before them";
-            packetsSinceLog = 0;
-            identicalToPrevSinceLog = 0;
-        }
+    // ── Einmal je Sekunde: was wirklich ankommt ─────────────────────────
+    //
+    // Hier stand bis zum 2026-09-23 eine Zeile, die jedes Paket mit dem
+    // UNMITTELBAR VORIGEN verglich und darum immer "0 von 1922"
+    // meldete -- die Kopien kommen verschraenkt an, das vorige Paket ist
+    // nie die Kopie. Diese Zahl hat die Fehlersuche zweimal in die
+    // falsche Richtung geschickt. Sie ist ersetzt durch das, was sich
+    // ohne Trugschluss sagen laesst: wie viele Pakete hereinkamen, wie
+    // viele davon als neuer Block angenommen wurden, und wie laut es
+    // war. Wer wissen will, ob die Wiederholungen wirklich gleich sind,
+    // nimmt tools/sunsdr_stream_census.py -- das liest am Draht mit und
+    // vergleicht alle Kopien einer Folgenummer miteinander.
+    if (!m_diagStarted) {
+        m_diagTimer.start();
+        m_diagStarted = true;
+    }
+    ++m_diagBlocksAccepted;
+    for (const float v : samples) {
+        const float a = v < 0.0f ? -v : v;
+        if (a > m_diagPeakAbs) { m_diagPeakAbs = a; }
+    }
+    if (m_diagTimer.elapsed() > 1000) {
+        const double secs = double(m_diagTimer.elapsed()) / 1000.0;
+        qCInfo(lcSunSdr) << "SunSdr: Empfang" << quint64(double(m_diagPacketsSeen) / secs)
+                         << "Pakete/s ->" << quint64(double(m_diagBlocksAccepted) / secs)
+                         << "Bloecke/s =" << quint64(double(m_diagBlocksAccepted) / secs
+                                                     * SunSdr::kIqComplexPerPkt)
+                         << "Proben/s | Spitze" << m_diagPeakAbs;
+        m_diagTimer.restart();
+        m_diagPacketsSeen = 0;
+        m_diagBlocksAccepted = 0;
+        m_diagPeakAbs = 0.0f;
     }
 
     if (state() == ConnectionState::Connecting) {
@@ -1073,5 +1070,29 @@ void SunSdrRadioConnection::setMicPTTDisabled(bool) {}
 void SunSdrRadioConnection::setMicXlr(bool) {}
 void SunSdrRadioConnection::setWatchdogEnabled(bool) {}
 
+
+// ---------------------------------------------------------------------------
+// sequenceSeenRecently — die Wiederholungen der QRP erkennen
+//
+// Zweimal unabhaengig gemessen (2026-09-23): jeder Block kommt achtmal,
+// in abnehmenden Abstaenden ueber rund 32 ms verteilt und dabei
+// verschraenkt mit den Nachbarbloecken. Neue Bloecke kommen alle
+// 4,17 ms, also 241/s; mal 200 Probenpaare sind das 48 200 Proben je
+// Sekunde. Der zweite Messlauf las am Draht mit, nicht im Treiber, und
+// verglich alle acht Nutzlasten einer Folgenummer miteinander:
+// bytegleich in jeder der 4 780 Gruppen, verschieden in keiner.
+//
+// Ohne diese Wache landet jede Probe achtmal in der Signalverarbeitung.
+// ---------------------------------------------------------------------------
+bool SunSdrRadioConnection::sequenceSeenRecently(quint16 seq)
+{
+    for (int i = 0; i < m_recentSeqCount; ++i) {
+        if (m_recentSeqs[static_cast<size_t>(i)] == seq) { return true; }
+    }
+    m_recentSeqs[static_cast<size_t>(m_recentSeqPos)] = seq;
+    m_recentSeqPos = (m_recentSeqPos + 1) % kRecentSeqSlots;
+    if (m_recentSeqCount < kRecentSeqSlots) { ++m_recentSeqCount; }
+    return false;
+}
 
 } // namespace Longpath

@@ -147,12 +147,15 @@ private slots:
                      .arg(blocksBeforeWait).arg(blocksAfterWait)));
         QCOMPARE(conn.state(), ConnectionState::Connected);
 
-        // ── 4b. Wiederholte Bloecke: bewusst KEINE Pruefung mehr ─────
-        // Der Treiber wirft die achtfachen Wiederholungen der QRP seit
-        // dem 2026-09-23 nicht mehr weg -- siehe die Begruendung in
-        // SunSdrRadioConnection::processStreamDatagram. Solange der
-        // Widerspruch zwischen Messung und Hoereindruck offen ist,
-        // behauptet hier nichts mehr eine Zahl darueber.
+        // ── 4b. Wiederholte Bloecke ──────────────────────────────────
+        // Das Messgeraet schickt jeden Block einmal, das echte Geraet
+        // achtmal. Gegen das Messgeraet darf also nichts verworfen
+        // werden -- faellt das durch, wirft der Filter echte Bloecke weg.
+        qInfo() << "DOPPELT verworfen:" << conn.duplicateBlocksDroppedForTest()
+                << "bei" << iq.count() << "angenommenen";
+        if (!realRadio) {
+            QCOMPARE(conn.duplicateBlocksDroppedForTest(), quint64(0));
+        }
 
         // ── 5. Trennen ───────────────────────────────────────────────
         conn.disconnect();

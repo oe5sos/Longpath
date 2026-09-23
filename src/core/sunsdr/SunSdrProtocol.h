@@ -165,13 +165,15 @@ struct Profile {
     //   * ExpertSDR2 bekommt am selben Tag am selben Geraet dieselbe
     //     Achtfachung; sie ist also keine Folge unseres Handschlags.
     //
-    // UND TROTZDEM: die Fassung, die am Geraet richtig klingt, wirft die
-    // Wiederholungen NICHT weg und faehrt mit 192 000. Die rechnerisch
-    // stimmige Kombination (Wiederholungen weg + 48 000 gestellt) klingt
-    // falsch. Dieser Widerspruch ist ungeloest, und bis er geloest ist,
-    // wird dieser Wert nirgends im Empfangsweg gelesen — die Rate kommt
-    // ueber BoardCapabilities, und die QRP faellt dort mangels
-    // HPSDRModel-Eintrag auf Atlas' Zeile zurueck.
+    // Der Widerspruch, der am selben Tag dazwischenkam — die Fassung mit
+    // Filter und 48 000 klang am Geraet falsch, die ohne Filter richtig —
+    // ist am 2026-09-23 nachmittags aufgeloest, und zwar NICHT zugunsten
+    // der Achtfachung: die Rate kam nie an. Die QRP hat keinen
+    // HPSDRModel-Eintrag, darum fiel die Modellaufloesung auf Atlas
+    // zurueck und mit ihr die Abtastrate auf Atlas' 192 000 — im
+    // Protokoll einer laufenden Verbindung nachgelesen. „Filter + 48 000"
+    // war in Wahrheit „Filter + 192 000", also ein um den Faktor vier
+    // ausgehungerter Empfangsweg. Siehe RadioModel::connectToRadio.
     double      rxNativeRateHz;
 };
 
@@ -185,11 +187,12 @@ inline constexpr Profile kProfilePro{
 
 // Ports and magic byte confirmed against a real bench capture,
 // 2026-08-24 (21,720 packets, ExpertSDR2 <-> QRP) — design doc
-// "Confirmed: ports and magic byte". rxNativeRateHz bleibt der von der
-// DX uebernommene, unbestaetigte Wert — siehe Profile::rxNativeRateHz
-// fuer den Messstand vom 2026-09-23 und den offenen Widerspruch.
+// "Confirmed: ports and magic byte". rxNativeRateHz ist seit dem
+// 2026-09-23 gemessen statt von der DX uebernommen: 241 verschiedene
+// Bloecke je Sekunde zu 200 Probenpaaren = 48 000 Hz. Der Messlauf steht
+// bei Profile::rxNativeRateHz und in BoardCapabilities' QRP-Zeile.
 inline constexpr Profile kProfileQrp{
-    Variant::Qrp, "SunSDR2 QRP", 50001, 50002, 0x03, 312500.0};
+    Variant::Qrp, "SunSDR2 QRP", 50001, 50002, 0x03, 48000.0};
 
 // From ArtemisSDR sunsdr.h:28 [@f8b01d25c5]. Second magic byte, fixed
 // across every model/profile — only byte[0] varies.

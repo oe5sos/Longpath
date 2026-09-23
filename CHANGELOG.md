@@ -106,6 +106,46 @@
 
 ### Fixed
 
+- **Die SunSDR2 QRP lief mit Atlas' Abtastrate.** `defaultModelForBoard()`
+  kennt nur OpenHPSDR-Baugruppen; die QRP steht in keiner
+  `HPSDRModel`-Liste, also entschied bisher das gewaehlte Ersatzmodell
+  (Atlas/Metis) ueber die Abtastrate -- **192 000 Hz fuer ein Geraet, das
+  48 000 liefert**. Im Protokoll einer laufenden Verbindung stand das
+  woertlich: `model= HPSDR (Atlas/Metis) effectiveBoard= 0` und
+  `Connecting with sampleRate= 192000`. Damit war auch jede Aenderung an
+  der Abtastrate in `BoardCapabilities` wirkungslos: die Zeile der QRP
+  wurde nie gelesen. `RadioModel::connectToRadio` nimmt fuer das
+  SunSDR-Protokoll jetzt die Kenndaten des gemeldeten Boards; das Modell
+  selbst bleibt unangetastet (es steuert Codec, PA-Telemetrie und
+  PureSignal, lauter Dinge, die dieses Geraet nicht hat). Pruefstand
+  `tst_sunsdr_board_caps` mit Gegenprobe.
+
+  Damit loest sich der Widerspruch vom selben Tag auf, der zum Rueckbau
+  in der vorigen Zeile gefuehrt hat: „Filter + 48 kHz" war in Wahrheit
+  „Filter + 192 kHz", also ein um den Faktor vier ausgehungerter
+  Empfangsweg -- deshalb klang es falsch, obwohl die Zahlen stimmten.
+  Der **Wiederholungsfilter ist darum wieder drin**, zusammen mit den
+  gemessenen 48 000 Hz in den Kenndaten der QRP und im Profil. Die drei
+  Teile gehoeren zusammen; einzeln ist jeder von ihnen falsch.
+
+  Die Messung dahinter ist unabhaengig vom Treiber gemacht
+  (`tools/sunsdr_stream_census.py`, 20 s am Draht mitgelesen): 38 207
+  Pakete, 4 793 verschiedene Folgenummern, 4 761 davon genau achtmal, und
+  in **jeder** der 4 780 Gruppen waren alle Nutzlasten bytegleich
+  (verschieden: null). Byte 3 des Kopfes ist immer `0xFF`, traegt also
+  keine Teilnummer -- es sind Kopien, keine Teilstuecke.
+
+- **Die Diagnosezeile des QRP-Treibers hat drei Wochen lang das Falsche
+  gemeldet.** Sie verglich jedes Paket nur mit dem unmittelbar vorigen.
+  Die Kopien kommen aber verschraenkt mit den Nachbarbloecken an, also
+  ist das vorige Paket nie die Kopie -- die Zeile meldete darum immer
+  „0 von 1922" und hat die Fehlersuche zweimal in die falsche Richtung
+  geschickt. Sie sagt jetzt, was sich ohne Trugschluss sagen laesst:
+  Pakete/s, angenommene Bloecke/s, daraus Proben/s, und die Spitze. Ihre
+  Zaehler lagen ausserdem als funktionslokale `static` vor, also eine
+  Reihe Zahlen fuer alle Verbindungen des Prozesses -- dieselbe Falle wie
+  im HL2-Bandbreitenwaechter; sie gehoeren jetzt zur Verbindung.
+
 - **Der Wiederholungsfilter fuer die SunSDR2 QRP ist wieder draussen.**
   Er kam am 2026-09-23 herein, weil die QRP jeden IQ-Block achtmal
   schickt -- das ist auch richtig gemessen und an diesem Tag noch einmal
