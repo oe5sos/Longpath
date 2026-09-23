@@ -106,6 +106,23 @@
 
 ### Fixed
 
+- **Der Wiederholungsfilter fuer die SunSDR2 QRP ist wieder draussen.**
+  Er kam am 2026-09-23 herein, weil die QRP jeden IQ-Block achtmal
+  schickt -- das ist auch richtig gemessen und an diesem Tag noch einmal
+  bestaetigt: von 1 922 Paketen je Sekunde tragen 1 682 eine schon
+  dagewesene Folgenummer, und zwar **Byte fuer Byte dieselben Daten**
+  (Abweichungen: null). Die verbleibenden 240 Bloecke kommen lueckenlos
+  aufsteigend an. Rechnerisch sind das 48 000 Proben/s.
+  Am Geraet funktioniert es trotzdem nicht: mit dem Filter klingt das
+  Rauschen „nicht typisch", ohne ihn klingt dasselbe Geraet richtig --
+  und zwar auch dann, wenn man zusaetzlich die Abtastrate auf die
+  gemessenen 48 kHz stellt, also in der Kombination, die stimmen
+  muesste. Solange dieser Widerspruch offen ist, hat der Zustand
+  Vorrang, der nachweislich funktioniert. Die Messwerte und die zwei
+  offenen Fragen stehen im Quelltext an der Stelle, wo der Filter war
+  (`SunSdrRadioConnection::processStreamDatagram`), damit niemand die
+  Arbeit noch einmal von vorn macht.
+
 - **Das Rotor/Log-Fenster sprang nach dem Verbinden vor die
   Connect-Maske.** Betreiber am 2026-09-22 zur SunSDR2 QRP: „uebrigens
   das erscheint immer nach oeffnen von qrp, beim anan usw. ist das nicht

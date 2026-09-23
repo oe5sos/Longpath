@@ -386,9 +386,6 @@ void SunSdrRadioConnection::onConnectTimeout()
     // Der Ring der zuletzt angenommenen Folgenummern gehoert zur Sitzung:
     // eine neue faengt bei null an, sonst koennte eine Nummer aus der
     // alten Sitzung einen echten Block der neuen verwerfen.
-    m_recentSeqPos = 0;
-    m_recentSeqCount = 0;
-    m_duplicateBlocks = 0;
     // Step 3: a pacer left running after this teardown fires would be a
     // "phantom pacer" ticking against a connection that just declared
     // itself timed out — same discipline as the socket closes right
@@ -421,9 +418,6 @@ void SunSdrRadioConnection::disconnect()
     // eine neue faengt bei null an, sonst koennte eine Nummer aus der
     // alten Sitzung einen echten Block der neuen verwerfen. Dieselbe
     // Ueberlegung wie bei m_radioAddr eine Zeile darueber.
-    m_recentSeqPos = 0;
-    m_recentSeqCount = 0;
-    m_duplicateBlocks = 0;
 
     // Step 2 TX gate: bench arming is per-session, deliberately not
     // sticky (setTxArmedForTest()'s own comment) — a disconnect() ends
@@ -896,12 +890,38 @@ void SunSdrRadioConnection::processStreamDatagram(const QByteArray& data,
         return;  // TX-active frames don't apply to a receive-only connection
     }
 
-    // Wiederholte Bloecke wegwerfen — die QRP schickt jeden achtmal.
-    // Siehe sequenceSeenRecently() und den Kommentar am Ring im Kopf.
-    if (sequenceSeenRecently(hdr.seq)) {
-        ++m_duplicateBlocks;
-        return;
-    }
+    // ── Hier stand bis zum 2026-09-23 ein Wiederholungsfilter ───────────
+    //
+    // Er ist wieder draussen. Nicht weil die Messung falsch war -- sie
+    // stimmt, am Geraet nachgemessen und heute noch einmal bestaetigt:
+    //
+    //   Pakete/s = 1922 | Folgenummer wiederholt: 1682 | bytegleich: 1682
+    //                   | VERSCHIEDEN: 0
+    //
+    // Jede Wiederholung traegt wirklich dieselben Bytes, und die 240
+    // uebrig bleibenden Bloecke je Sekunde kommen lueckenlos aufsteigend
+    // (eigene Messung: 241 angenommen/s, 0 Spruenge, 0 rueckwaerts).
+    //
+    // Der Filter ist trotzdem raus, weil er am Geraet nicht funktioniert
+    // hat. Der Betreiber hoert mit ihm ein Rauschen, das "nicht typisch"
+    // klingt -- mit der alten Fassung ohne Filter klingt dasselbe Geraet
+    // richtig. Das gilt sogar dann, wenn man zusaetzlich die
+    // Abtastrate auf die gemessenen 48 kHz stellt, also die Kombination,
+    // die rechnerisch stimmen MUESSTE.
+    //
+    // Was daraus folgt: irgendetwas an diesem Strom verstehen wir noch
+    // nicht. Solange das so ist, hat das Ohr am echten Geraet Vorrang vor
+    // meiner Paketzaehlung -- ein Zustand, der nachweislich funktioniert,
+    // ist mehr wert als einer, der nachweislich zaehlbar ist.
+    //
+    // Was zu klaeren bleibt, bevor jemand das noch einmal anfasst:
+    //   * Warum liefert die alte Fassung mit 1922 Paketen/s in eine auf
+    //     192 000 gestellte Verarbeitung etwas, das richtig klingt?
+    //   * Schickt main dem Geraet inzwischen etwas anderes als die
+    //     Fassung vom 2026-09-02 (TX-Taktgeber, Lebenszeichen), und
+    //     antwortet die QRP deshalb mit achtfach wiederholten Bloecken
+    //     statt mit einem dichten Strom?
+    // Die Messwerkzeuge dafuer stehen in tools/sunsdr_opcode_watch.py.
 
     QVector<float> samples;
     SunSdr::decodeIqSamples(
@@ -1053,27 +1073,5 @@ void SunSdrRadioConnection::setMicPTTDisabled(bool) {}
 void SunSdrRadioConnection::setMicXlr(bool) {}
 void SunSdrRadioConnection::setWatchdogEnabled(bool) {}
 
-
-// ---------------------------------------------------------------------------
-// sequenceSeenRecently — die Wiederholungen der QRP erkennen
-//
-// Gemessen am Geraet (2026-09-23, 30 000 Pakete in 15,5 s): jeder Block
-// kommt achtmal, in abnehmenden Abstaenden ueber rund 32 ms verteilt
-// (11,6 / 8,0 / 4,0 / 3,0 / 2,0 / 2,0 / 2,0 ms) und dabei verschraenkt
-// mit den Nachbarbloecken. Neue Bloecke kommen alle 4,17 ms, also
-// 240/s; mal 200 Probenpaare sind das 48 000 Proben je Sekunde.
-//
-// Ohne diese Wache landet jede Probe achtmal in der Signalverarbeitung.
-// ---------------------------------------------------------------------------
-bool SunSdrRadioConnection::sequenceSeenRecently(quint16 seq)
-{
-    for (int i = 0; i < m_recentSeqCount; ++i) {
-        if (m_recentSeqs[static_cast<size_t>(i)] == seq) { return true; }
-    }
-    m_recentSeqs[static_cast<size_t>(m_recentSeqPos)] = seq;
-    m_recentSeqPos = (m_recentSeqPos + 1) % kRecentSeqSlots;
-    if (m_recentSeqCount < kRecentSeqSlots) { ++m_recentSeqCount; }
-    return false;
-}
 
 } // namespace Longpath

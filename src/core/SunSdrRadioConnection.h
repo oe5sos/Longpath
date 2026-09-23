@@ -188,9 +188,6 @@ public:
     // their only "is there an open session" gate).
     bool hasRadioAddrForTest() const { return !m_radioAddr.isNull(); }
 
-    /// Wie viele Pakete als Wiederholung verworfen wurden (Diagnose,
-    /// siehe m_recentSeqs). Am Geraet sind das sieben von acht.
-    quint64 duplicateBlocksDroppedForTest() const { return m_duplicateBlocks; }
 
     // Exposes the private data-watchdog silence threshold, same
     // rationale as connectTimeoutMsForTest() above.
@@ -449,33 +446,6 @@ private:
     // a real socket — same shape as processControlDatagram() below.
     void processStreamDatagram(const QByteArray& datagram, const QHostAddress& sender);
 
-    // ── Wiederholte Bloecke erkennen (Bank 2026-09-23) ──────────────────
-    //
-    // Die QRP schickt JEDEN Block achtmal. Am Geraet gemessen (30 000
-    // Pakete, 15,5 s): 29 683 IQ-Pakete, darin nur 3 718 verschiedene
-    // Nutzlasten — 3 703 davon exakt achtmal, verteilt ueber rund 32 ms
-    // und verschraenkt mit den Nachbarbloecken (deshalb reicht ein
-    // Vergleich mit dem VORIGEN Paket nicht; genau daran ist die
-    // Diagnosezeile im Treiber vorbeigelaufen, die "byte-identical to
-    // the one before them" zaehlt und immer 0 meldete).
-    //
-    // Ohne diese Wache bekommt die Signalverarbeitung jede Probe
-    // achtmal: 1920 Pakete/s statt 240, also 384 000 statt 48 000
-    // Proben je Sekunde.
-    //
-    // Ein kleiner Ring genuegt: neue Bloecke kommen alle 4,17 ms, die
-    // Kopien eines Blocks liegen innerhalb von 32 ms — 32 Plaetze
-    // decken 133 ms ab. Linear durchsuchen ist bei 1920 Paketen je
-    // Sekunde billiger als jede Buchfuehrung darum herum.
-    static constexpr int kRecentSeqSlots = 32;
-    std::array<quint16, kRecentSeqSlots> m_recentSeqs{};
-    int      m_recentSeqPos{0};
-    int      m_recentSeqCount{0};
-    quint64  m_duplicateBlocks{0};
-
-    /// true, wenn diese Folgenummer schon angenommen wurde; sonst wird
-    /// sie vermerkt und false geliefert.
-    bool sequenceSeenRecently(quint16 seq);
 
     // Shared by onControlReadyRead() (real socket data) and
     // feedControlDatagramForTest() (synthetic test data) — same split as
