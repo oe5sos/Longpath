@@ -82,6 +82,8 @@
 #include "models/Band.h"
 
 #include <QElapsedTimer>
+#include <QMap>
+#include <QPair>
 #include <QHostAddress>
 #include <QMutex>
 #include <QString>
@@ -599,6 +601,50 @@ private:
     quint16 m_txSeq{0};   // control-channel-independent; used only for the
                           // periodic silent IQ-stream keepalive (design doc:
                           // "the host must keep sending silent 0xFE packets")
+
+    // ── Der Strom von innen, mit LONGPATH_SUNSDR_PROBE=1 ────────────────
+    //
+    // Am 2026-09-23 haben zwei Tage Fehlersuche daran gehangen, was
+    // genau in diesen Paketen steht, und jede Antwort kam von aussen:
+    // tcpdump, und zwar mit abgeschnittener Nutzlast (`-s 320`), also
+    // ein Vergleich der ersten 282 von 1200 Byte. "Bytegleich" hiess
+    // damit immer nur "gleich im ersten Viertel".
+    //
+    // Hier sieht der Treiber jedes Byte, braucht kein sudo und kein
+    // fremdes Programm. Er sammelt die Pakete einer Folgenummer, bis
+    // die naechste anfaengt, und sagt einmal je Sekunde:
+    //   * Pakete/s und Rahmen/s,
+    //   * wie viele Pakete ein Rahmen traegt,
+    //   * ob deren Nutzlasten ueber die GANZEN 1200 Byte gleich sind,
+    //   * und wo die erste Abweichung steht, falls nicht.
+    //
+    // Aus ist er immer, ausser die Umgebungsvariable ist gesetzt: das
+    // hier ist ein Messgeraet, kein Betriebsmerkmal.
+    // WICHTIG, zweimal teuer gelernt: NICHT mit dem unmittelbar vorigen
+    // Paket vergleichen. Die Kopien einer Folgenummer kommen VERSCHRAENKT
+    // mit den Nachbarn an, also ist das vorige Paket praktisch nie die
+    // Kopie. Die alte Diagnosezeile hat so drei Wochen lang "0 von 1922"
+    // gemeldet, und die erste Fassung dieses Messgeraets ist am
+    // 2026-09-23 in dieselbe Falle gelaufen ("1 Paket je Rahmen", was
+    // nur hiess: zwei Nachbarn hatten selten dieselbe Nummer).
+    // Darum ein Fenster ueber die zuletzt gesehenen Folgenummern.
+    bool m_probeOn{false};
+    bool m_probeChecked{false};
+    QElapsedTimer m_probeTimer;
+    static constexpr int kProbeWindow = 64;
+    QList<QPair<quint16, QByteArray>> m_probeSeen;  // juengste zuerst
+    QMap<quint16, int> m_probeCount;    // Folgenummer -> wie viele Pakete
+    quint64 m_probePackets{0};
+    quint64 m_probeRepeats{0};          // Pakete mit schon gesehener Nummer
+    quint64 m_probeSame{0};             // davon GANZ bytegleich
+    quint64 m_probeDiffer{0};           // davon irgendwo verschieden
+    int     m_probeFirstDiff{-1};
+    QMap<int, quint64> m_probeSizes;    // Pakete je Nummer -> wie oft
+
+    /// Ein Paket in das Fenster legen und gegen alle Pakete derselben
+    /// Folgenummer darin vergleichen -- ueber die ganze Nutzlast.
+    void probeFeed(quint16 seq, const QByteArray& payload);
+    void probeReportIfDue();
 };
 
 } // namespace Longpath

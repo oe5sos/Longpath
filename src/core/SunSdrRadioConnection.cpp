@@ -15,6 +15,9 @@
 #include "SunSdrRadioConnection.h"
 
 #include <QLoggingCategory>
+#include <QStringList>
+
+#include <algorithm>
 #include <QMutexLocker>
 #include <QNetworkAddressEntry>
 #include <QNetworkDatagram>
@@ -790,6 +793,38 @@ void SunSdrRadioConnection::processControlDatagram(const QByteArray& data,
         m_controlSocket->writeDatagram(stateSync, m_radioAddr,
                                         m_profile->defaultCtrlPort);
         recordBytesSent(static_cast<qint64>(stateSync.size()));
+
+        // ── Werkbank: weitere Rahmen nachschicken ───────────────────────
+        //
+        // LONGPATH_SUNSDR_EXTRA traegt Steuerrahmen als Hexziffern, durch
+        // Komma getrennt, die direkt nach dem Zustandsrahmen hinausgehen.
+        //
+        // Wozu: am 2026-09-23 ist gemessen, dass die QRP an Longpath
+        // jeden Block ACHTMAL schickt (bytegleich, im Treiber ueber alle
+        // 1200 Byte geprueft), an ExpertSDR2 dagegen zwei VERSCHIEDENE.
+        // Der einzige Unterschied ist, was beim Verbinden gesagt wird:
+        // ExpertSDR schickt rund zwei Dutzend Rahmen, Longpath einen.
+        // Damit laesst sich einer nach dem anderen ausprobieren, ohne
+        // fuer jeden Versuch neu zu bauen.
+        //
+        // Nur fuer die Werkbank: ohne die Variable geht nichts hinaus,
+        // und was hineingeschrieben wird, entscheidet der Mensch davor.
+        const QString extra = qEnvironmentVariable("LONGPATH_SUNSDR_EXTRA");
+        if (!extra.isEmpty()) {
+            const QStringList parts = extra.split(QLatin1Char(','),
+                                                  Qt::SkipEmptyParts);
+            for (const QString& hex : parts) {
+                const QByteArray frame =
+                    QByteArray::fromHex(hex.trimmed().toLatin1());
+                if (frame.isEmpty()) { continue; }
+                m_controlSocket->writeDatagram(frame, m_radioAddr,
+                                                m_profile->defaultCtrlPort);
+                recordBytesSent(static_cast<qint64>(frame.size()));
+                qCInfo(lcSunSdr) << "SunSdr: Werkbank-Rahmen gesendet, Opcode"
+                                 << (frame.size() > 2 ? quint8(frame[2]) : 0)
+                                 << "-" << frame.size() << "Byte";
+            }
+        }
     }
 
     // No downstream DSP-readiness signal exists yet to gate this on
@@ -890,6 +925,18 @@ void SunSdrRadioConnection::processStreamDatagram(const QByteArray& data,
         return;  // TX-active frames don't apply to a receive-only connection
     }
 
+    if (!m_probeChecked) {
+        m_probeChecked = true;
+        m_probeOn = qEnvironmentVariableIsSet("LONGPATH_SUNSDR_PROBE");
+        if (m_probeOn) {
+            m_probeTimer.start();
+            qCInfo(lcSunSdr) << "SunSdr: Messgeraet an (LONGPATH_SUNSDR_PROBE)";
+        }
+    }
+    if (m_probeOn) {
+        probeFeed(hdr.seq, data.mid(SunSdr::kIqHeaderSize));
+    }
+
     // ── Hier stand bis zum 2026-09-23 ein Wiederholungsfilter ───────────
     //
     // Er ist wieder draussen. Nicht weil die Messung falsch war -- sie
@@ -914,14 +961,44 @@ void SunSdrRadioConnection::processStreamDatagram(const QByteArray& data,
     // meiner Paketzaehlung -- ein Zustand, der nachweislich funktioniert,
     // ist mehr wert als einer, der nachweislich zaehlbar ist.
     //
-    // Was zu klaeren bleibt, bevor jemand das noch einmal anfasst:
-    //   * Warum liefert die alte Fassung mit 1922 Paketen/s in eine auf
-    //     192 000 gestellte Verarbeitung etwas, das richtig klingt?
-    //   * Schickt main dem Geraet inzwischen etwas anderes als die
-    //     Fassung vom 2026-09-02 (TX-Taktgeber, Lebenszeichen), und
-    //     antwortet die QRP deshalb mit achtfach wiederholten Bloecken
-    //     statt mit einem dichten Strom?
-    // Die Messwerkzeuge dafuer stehen in tools/sunsdr_opcode_watch.py.
+    // STAND 2026-09-23 abends, nach einem Tag Messen am Geraet. Was
+    // jetzt BEWIESEN ist -- nicht vermutet:
+    //
+    //   * Die Achtfachung stimmt, und zwar ueber die ganze Nutzlast.
+    //     Im Treiber selbst gemessen (LONGPATH_SUNSDR_PROBE=1, Fenster
+    //     ueber 64 Folgenummern, volle 1200 Byte):
+    //         1921 Pakete/s, 247 Folgenummern/s,
+    //         8 Pakete bei 232 der 247 Nummern,
+    //         1683 Wiederholungen, davon GANZ bytegleich 1683,
+    //         verschieden 0.
+    //
+    //   * ExpertSDR2 bekommt an DEMSELBEN Geraet, in derselben Stunde,
+    //     etwas anderes: 480 Pakete/s, 240 Folgenummern/s, ZWEI Pakete
+    //     je Nummer, und die beiden sind VERSCHIEDEN (4797 von 4797
+    //     Gruppen). Die Rahmenrate ist bei beiden 240/s.
+    //
+    //   Es ist also keine Eigenart des Geraets und kein Messfehler: die
+    //   QRP legt uns achtmal dasselbe in acht Plaetze, waehrend sie
+    //   ExpertSDR zwei Plaetze mit echten Daten fuellt. Der Unterschied
+    //   liegt in dem, was beim Verbinden gesagt wird -- ExpertSDR2
+    //   schickt rund zwei Dutzend Steuerrahmen, dieser Treiber einen.
+    //
+    // Was AUSGESCHLOSSEN ist:
+    //   * Die Abtastrate allein. Mit 48 000 in den Kenndaten UND
+    //     gefiltertem Strom stimmt die Rechnung von vorne bis hinten
+    //     (Protokoll: sampleRate=48000, 240 Bloecke/s, 48 007 Proben/s)
+    //     -- und am Geraet klingt genau das am schlechtesten.
+    //   * Die empfangsseitigen Steuerrahmen von ExpertSDR2, verbatim
+    //     nachgeschickt (0x03 0x04 0x0f 0x10 0x11 0x13 0x15 0x16 0x18
+    //     0x1a 0x1c, alle mit den Originalbytes aus einem Mitschnitt
+    //     desselben Abends): der Strom bleibt Paket fuer Paket derselbe.
+    //     Ausprobiert ueber LONGPATH_SUNSDR_EXTRA.
+    //
+    // Was als naechstes zu versuchen waere: dieselben Rahmen in
+    // ExpertSDRs REIHENFOLGE, also groesstenteils VOR dem
+    // Zustandsrahmen 0x01 statt danach. Der Mitschnitt liegt in
+    // ~/Longpath/werkzeug/mitschnitte; auslesen mit
+    // tools/sunsdr_opcode_watch.py --pcap <datei> --full.
 
     QVector<float> samples;
     SunSdr::decodeIqSamples(
@@ -1073,5 +1150,81 @@ void SunSdrRadioConnection::setMicPTTDisabled(bool) {}
 void SunSdrRadioConnection::setMicXlr(bool) {}
 void SunSdrRadioConnection::setWatchdogEnabled(bool) {}
 
+
+// ---------------------------------------------------------------------------
+// probeFeed / probeCloseFrame / probeReportIfDue — der Strom von innen
+//
+// Siehe den Kommentar an den Mitgliedern im Kopf. Kurz: die Frage, ob
+// die Pakete einer Folgenummer dieselben Daten tragen, ist am
+// 2026-09-23 zweimal von aussen beantwortet worden, beide Male mit
+// abgeschnittener Nutzlast. Hier wird sie ueber alle 1200 Byte
+// beantwortet.
+// ---------------------------------------------------------------------------
+void SunSdrRadioConnection::probeFeed(quint16 seq, const QByteArray& payload)
+{
+    ++m_probePackets;
+
+    // Gegen ALLE Pakete derselben Folgenummer im Fenster vergleichen,
+    // ueber die ganze Nutzlast -- nicht nur gegen das vorige Paket und
+    // nicht nur ueber die ersten Bytes.
+    bool isRepeat = false;
+    for (const auto& prev : std::as_const(m_probeSeen)) {
+        if (prev.first != seq) { continue; }
+        isRepeat = true;
+        if (prev.second == payload) {
+            ++m_probeSame;
+        } else {
+            ++m_probeDiffer;
+            if (m_probeFirstDiff < 0) {
+                const int n = std::min(prev.second.size(), payload.size());
+                for (int k = 0; k < n; ++k) {
+                    if (prev.second[k] != payload[k]) { m_probeFirstDiff = k; break; }
+                }
+            }
+        }
+        break;
+    }
+    if (isRepeat) { ++m_probeRepeats; }
+
+    m_probeCount[seq] += 1;
+    m_probeSeen.prepend(qMakePair(seq, payload));
+    while (m_probeSeen.size() > kProbeWindow) { m_probeSeen.removeLast(); }
+
+    probeReportIfDue();
+}
+
+void SunSdrRadioConnection::probeReportIfDue()
+{
+    if (m_probeTimer.elapsed() <= 1000) { return; }
+    const double secs = double(m_probeTimer.elapsed()) / 1000.0;
+
+    m_probeSizes.clear();
+    for (auto it = m_probeCount.cbegin(); it != m_probeCount.cend(); ++it) {
+        m_probeSizes[it.value()] += 1;
+    }
+    QStringList sizes;
+    for (auto it = m_probeSizes.cbegin(); it != m_probeSizes.cend(); ++it) {
+        sizes << QStringLiteral("%1x bei %2 Nummern").arg(it.key()).arg(it.value());
+    }
+
+    qCInfo(lcSunSdr).nospace()
+        << "SunSdr: [MESSUNG] " << quint64(double(m_probePackets) / secs)
+        << " Pakete/s, " << quint64(double(m_probeCount.size()) / secs)
+        << " Folgenummern/s | Pakete je Nummer: " << sizes.join(QStringLiteral(", "))
+        << " | Wiederholungen: " << m_probeRepeats
+        << ", davon GANZ bytegleich: " << m_probeSame
+        << ", verschieden: " << m_probeDiffer
+        << (m_probeFirstDiff >= 0
+                ? QStringLiteral(" (erste Abweichung bei Byte %1)").arg(m_probeFirstDiff)
+                : QString());
+
+    m_probeTimer.restart();
+    m_probePackets = 0;
+    m_probeRepeats = 0;
+    m_probeSame = 0;
+    m_probeDiffer = 0;
+    m_probeFirstDiff = -1;
+    m_probeCount.clear();
+}
 
 } // namespace Longpath

@@ -4,6 +4,22 @@
 
 ### Added
 
+- **Ein Messgeraet im QRP-Treiber selbst** (`LONGPATH_SUNSDR_PROBE=1`)
+  und eine Werkbank-Naht, um dem Geraet weitere Steuerrahmen
+  nachzuschicken (`LONGPATH_SUNSDR_EXTRA=<hex,hex,...>`). Ohne die
+  Variablen tut beides nichts.
+
+  Das Messgeraet zaehlt, was der Treiber wirklich bekommt: Pakete/s,
+  Folgenummern/s, wie viele Pakete auf eine Nummer entfallen, und ob
+  deren Nutzlasten ueber die **ganzen 1200 Byte** gleich sind. Es
+  braucht kein `sudo` und kein fremdes Programm. Wichtig dabei -- und an
+  einem Tag dreimal teuer gelernt: es vergleicht ueber ein Fenster der
+  letzten 64 Folgenummern, **nicht** mit dem unmittelbar vorigen Paket.
+  Die Kopien einer Nummer kommen verschraenkt mit den Nachbarn an, also
+  ist das vorige Paket praktisch nie die Kopie; die alte Diagnosezeile
+  meldete deshalb drei Wochen lang „0 von 1922“, und die erste Fassung
+  dieses Messgeraets lief in dieselbe Falle.
+
 - **`tools/sunsdr_stream_census.py`** -- zaehlt den Empfangsstrom einer
   SunSDR2 QRP aus und beantwortet die Frage, an der sich am 2026-09-23
   Messung und Hoereindruck widersprochen haben: tragen die acht Pakete
