@@ -1312,3 +1312,92 @@ functions in `SunSdrProtocol.{h,cpp}`, unit-tested against the one real
 captured frame this project has, ready to wire into
 `setReceiverFrequency()` the moment a bench capture confirms or refines
 the formula.
+
+---
+
+## Messtag 2026-09-23: was der Strom wirklich trägt, und was nicht
+
+Ein ganzer Tag am Gerät, mit drei eigenen Messwerkzeugen und einem
+Mitschnitt von ExpertSDR2 am selben Funkgerät in derselben Stunde. Was
+hier steht, ist gemessen; wo etwas offen ist, steht das ausdrücklich
+dabei.
+
+### Der Strom an Longpath und der an ExpertSDR2 sind verschieden
+
+| | Pakete/s | Folgenummern/s | Pakete je Nummer | Nutzlasten |
+| --- | --- | --- | --- | --- |
+| Longpath | 1921 | 247 | **8** bei 232 der 247 | **byteweise gleich** (1683 von 1683) |
+| ExpertSDR2 | 480 | 240 | **2** | **verschieden** (4797 von 4797) |
+
+Die Rahmenrate ist bei beiden 240/s. Die QRP legt Longpath achtmal
+dasselbe in acht Plätze und füllt ExpertSDR zwei Plätze mit echten
+Daten. **Es ist keine Eigenart des Geräts.** Der Unterschied liegt in
+dem, was beim Verbinden gesagt wird: ExpertSDR2 schickt rund zwei
+Dutzend Steuerrahmen, dieser Treiber genau einen.
+
+Gemessen mit `LONGPATH_SUNSDR_PROBE=1` (im Treiber, über die ganzen
+1200 Byte, Fenster über 64 Folgenummern) und
+`tools/sunsdr_stream_census.py` (am Draht, unabhängig vom Treiber).
+
+### Die Falle, die diesen Tag dreimal gekostet hat
+
+**Nie mit dem unmittelbar vorigen Paket vergleichen.** Die Kopien einer
+Folgenummer kommen VERSCHRÄNKT mit den Nachbarn an, also ist das vorige
+Paket praktisch nie die Kopie. Betroffen waren nacheinander:
+
+* die Diagnosezeile im Treiber (meldete drei Wochen lang „0 von 1922"),
+* die erste Auswertung mit `tcpdump -s 320` (verglich nur die ersten
+  282 von 1200 Byte),
+* die erste Fassung des Messgeräts im Treiber selbst (meldete „1 Paket
+  je Rahmen", was nur hieß: zwei Nachbarn haben selten dieselbe Nummer).
+
+### Aus dem Steuerkanal gelesen
+
+Mitschnitte in `~/Longpath/werkzeug/mitschnitte`, auszulesen mit
+`tools/sunsdr_opcode_watch.py --pcap <datei> --full`.
+
+| Opcode | Nutzlast im Mitschnitt | Deutung |
+| --- | --- | --- |
+| `0x07` | `b8de3c04` = 71 098 040 | **VFO-Frequenz mal zehn** — 7.109.804 Hz, gegen den Bildschirm geprüft. Longpath schickt stattdessen `0x08`. |
+| `0x18` | `00804f12` = 307 200 000 | = 96 000 × 3200. Allein gesendet ändert es am Strom nichts. |
+| `0x12` | 1024 Byte voller `…00c1b77f0000` | **keine Konfiguration**, sondern uninitialisierter Speicher von ExpertSDR2 (64-Bit-Zeiger). Nichts zum Nachbauen. |
+| `0x01` | `01000000 0c080403 02020202` | byteweise DERSELBE Rahmen, den Longpath schickt. War nie das Problem. |
+
+**Beide Seiten benutzen Port 50001.** Die Richtung eines Rahmens lässt
+sich nur über die Adresse bestimmen, nicht über den Port — eine
+Annahme, die sich am selben Tag sofort gerächt hat.
+
+### Was ausgeschlossen ist
+
+* **Die Abtastrate allein.** Mit 48 000 in den Kenndaten UND
+  gefiltertem Strom stimmt die Kette von vorne bis hinten
+  (`sampleRate=48000`, 240 Blöcke/s, 48 007 Proben/s) — und am Gerät
+  klingt genau das am schlechtesten. Der Betreiber: „komplett
+  schlecht".
+* **Die empfangsseitigen Rahmen von ExpertSDR2, verbatim
+  nachgeschickt** (`0x03 0x04 0x0f 0x10 0x11 0x13 0x15 0x16 0x18 0x1a
+  0x1c`, Originalbytes): der Strom bleibt Paket für Paket derselbe,
+  wenn sie NACH dem Zustandsrahmen kommen. Kommen sie DAVOR, bricht die
+  Verbindung ganz ab („Das Gerät wurde gefunden, liefert aber binnen 6 s
+  keinen Datenstrom").
+
+### Warnung für den nächsten, der hier misst
+
+Diese elf Rahmen haben das Gerät **gedämpft, und zwar über das Trennen
+hinaus**: der Pegel fiel von `peak |sample| ≈ 1,7e-05` auf `2,4e-06`
+(Faktor sieben, rund 17 dB) und blieb dort, obwohl die
+Einstellungsdatei nachweislich unverändert war und ExpertSDR2 am selben
+Gerät einen normalen Rauschteppich zeigte. **Erst ein
+Netzstecker-Zyklus hat es behoben.**
+
+ExpertSDR2 überschreibt diesen Zustand beim Verbinden mit seinen
+eigenen Werten; dieser Treiber tut das nicht — er schickt einen Rahmen
+und erbt den Rest. Wer hier weiter probiert, fragt vorher den Betreiber
+und rechnet damit, dass das Gerät den Zustand behält.
+
+### Nächster Schritt
+
+Dieselben Rahmen in ExpertSDRs Reihenfolge, aber vollständig — also
+auch die Abfragen, auf die das Gerät antwortet, und in der Taktung des
+Originals. Der Mitschnitt reicht dafür aus und braucht das Gerät nicht
+mehr.
