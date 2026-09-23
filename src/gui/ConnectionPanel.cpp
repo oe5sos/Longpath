@@ -96,6 +96,7 @@ mw0lge@grange-lane.co.uk
 //============================================================================================//
 
 #include "ConnectionPanel.h"
+#include "gui/ScopedChildWidget.h"
 #include "gui/styles/ThemeQss.h"
 #include "AddCustomRadioDialog.h"
 #include "models/RadioModel.h"
@@ -1497,7 +1498,8 @@ void ConnectionPanel::onContextMenuRequested(const QPoint& pos)
     RadioInfo info = selectedRadio();
     bool connected = m_radioModel->isConnected();
 
-    QMenu menu(this);
+    ScopedChildWidget<QMenu> menuOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+    QMenu& menu = *menuOwner.get();
     menu.setStyleSheet(Style::themed(QStringLiteral(
         "QMenu { background: #0a1a28; color: #c8d8e8; border: 1px solid #203040; }"
         "QMenu::item:selected { background: #205070; }"
@@ -1527,6 +1529,9 @@ void ConnectionPanel::onContextMenuRequested(const QPoint& pos)
     actCopyMac->setEnabled(!info.macAddress.isEmpty());
 
     QAction* triggered = menu.exec(m_radioTable->viewport()->mapToGlobal(pos));
+    // Das Elternteil kann waehrend exec() gestorben sein — dann ist
+    // auch das Menue weg und `this` eine Leiche. Siehe ScopedChildWidget.h.
+    if (!menuOwner) { return; }
     if (!triggered) {
         return;
     }

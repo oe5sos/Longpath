@@ -37,6 +37,7 @@
 // =================================================================
 
 #include "SpectrumOverlayPanel.h"
+#include "gui/ScopedChildWidget.h"
 
 #include "StyleConstants.h"
 #include "gui/styles/ThemeQss.h"    // Style::role — Kurvenfarbe aus dem Theme
@@ -660,7 +661,8 @@ void SpectrumOverlayPanel::updateLayout()
             m_moreBtn->setToolTip(
                 QStringLiteral("Weitere Gruppen — hier ist der Platz zu Ende"));
             connect(m_moreBtn, &QPushButton::clicked, this, [this]() {
-                QMenu menu(this);
+                ScopedChildWidget<QMenu> menuOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+                QMenu& menu = *menuOwner.get();
                 int g = 0;
                 for (int i = 0; i < m_menuBtns.size(); ++i) {
                     while (g < static_cast<int>(std::size(kGroupHeads))
@@ -683,6 +685,9 @@ void SpectrumOverlayPanel::updateLayout()
                     });
                 }
                 menu.exec(mapToGlobal(m_moreBtn->geometry().bottomLeft()));
+                // Das Elternteil kann waehrend exec() gestorben sein — dann ist
+                // auch das Menue weg und `this` eine Leiche. Siehe ScopedChildWidget.h.
+                if (!menuOwner) { return; }
             });
         }
         m_moreBtn->setVisible(true);

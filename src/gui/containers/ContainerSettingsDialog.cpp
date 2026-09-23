@@ -99,6 +99,7 @@ mw0lge@grange-lane.co.uk
 //============================================================================================//
 
 #include "ContainerSettingsDialog.h"
+#include "gui/ScopedChildWidget.h"
 #include "gui/StyleConstants.h"
 #include "gui/styles/ThemeQss.h"
 #include "ContainerManager.h"
@@ -1988,7 +1989,8 @@ void ContainerSettingsDialog::onLoadPreset()
         "QMenu::item:selected { background: #4a7ba8; color: #0f0f1a; }"
         "QMenu::separator { background: #203040; height: 1px; }";
 
-    QMenu menu(this);
+    ScopedChildWidget<QMenu> menuOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+    QMenu& menu = *menuOwner.get();
     menu.setStyleSheet(QLatin1String(kMenuStyle));
 
     // S-Meter sub-menu
@@ -2050,6 +2052,9 @@ void ContainerSettingsDialog::onLoadPreset()
     menu.addAction(QStringLiteral("Spacer"), this, [this]{ loadPresetByName(QStringLiteral("Spacer")); });
 
     menu.exec(m_btnPreset->mapToGlobal(QPoint(0, -menu.sizeHint().height())));
+    // Das Elternteil kann waehrend exec() gestorben sein — dann ist
+    // auch das Menue weg und `this` eine Leiche. Siehe ScopedChildWidget.h.
+    if (!menuOwner) { return; }
 }
 
 void ContainerSettingsDialog::loadPresetByName(const QString& name)

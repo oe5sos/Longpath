@@ -241,6 +241,7 @@ warren@wpratt.com
 //============================================================================================//
 
 #include "MainWindow.h"
+#include "gui/ScopedChildWidget.h"
 #include "gui/styles/ThemeQss.h"
 #include "ConnectionPanel.h"
 #include "NetworkDiagnosticsDialog.h"
@@ -1261,7 +1262,8 @@ void MainWindow::showTileTabMenu(const QString& tileId)
     ContainerWidget* tile = m_containerManager->container(tileId);
     if (!tile) { return; }
 
-    QMenu menu(this);
+    ScopedChildWidget<QMenu> menuOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+    QMenu& menu = *menuOwner.get();
     menu.setStyleSheet(QString::fromLatin1(kPopupMenu));
     menu.addSection(QStringLiteral("Fenster hierher holen"));
 
@@ -1280,6 +1282,9 @@ void MainWindow::showTileTabMenu(const QString& tileId)
     }
 
     QAction* chosen = menu.exec(QCursor::pos());
+    // Das Elternteil kann waehrend exec() gestorben sein — dann ist
+    // auch das Menue weg und `this` eine Leiche. Siehe ScopedChildWidget.h.
+    if (!menuOwner) { return; }
     if (!chosen || !byAction.contains(chosen)) { return; }
 
     const QString otherId = byAction.value(chosen);
@@ -12486,7 +12491,8 @@ void MainWindow::onCpuMenuRequested(const QPoint& localPos)
 {
     if (!m_systemTile) { return; }
 
-    QMenu menu(this);
+    ScopedChildWidget<QMenu> menuOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+    QMenu& menu = *menuOwner.get();
     QAction* sysAct = menu.addAction(tr("System"));
     sysAct->setCheckable(true);
     sysAct->setChecked(m_cpuShowSystem);
@@ -12495,6 +12501,9 @@ void MainWindow::onCpuMenuRequested(const QPoint& localPos)
     appAct->setChecked(!m_cpuShowSystem);
 
     QAction* chosen = menu.exec(m_systemTile->mapToGlobal(localPos));
+    // Das Elternteil kann waehrend exec() gestorben sein — dann ist
+    // auch das Menue weg und `this` eine Leiche. Siehe ScopedChildWidget.h.
+    if (!menuOwner) { return; }
     if (!chosen) { return; }
 
     const bool newSys = (chosen == sysAct);
@@ -13092,7 +13101,8 @@ void MainWindow::showConnectionPanel()
 // use "Connect to other radio…" to re-select the same radio.
 void MainWindow::showSegmentContextMenu(const QPoint& globalPos)
 {
-    QMenu menu(this);
+    ScopedChildWidget<QMenu> menuOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+    QMenu& menu = *menuOwner.get();
 
     menu.addAction(tr("Disconnect"), this, [this]() {
         m_radioModel->disconnectFromRadio();
@@ -13116,6 +13126,9 @@ void MainWindow::showSegmentContextMenu(const QPoint& globalPos)
     });
 
     menu.exec(globalPos);
+    // Das Elternteil kann waehrend exec() gestorben sein — dann ist
+    // auch das Menue weg und `this` eine Leiche. Siehe ScopedChildWidget.h.
+    if (!menuOwner) { return; }
 }
 
 void MainWindow::showStationContextMenu(const QPoint& globalPos)
@@ -13126,7 +13139,8 @@ void MainWindow::showStationContextMenu(const QPoint& globalPos)
         return;
     }
 
-    QMenu menu(this);
+    ScopedChildWidget<QMenu> menuOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+    QMenu& menu = *menuOwner.get();
 
     menu.addAction(tr("Disconnect"), this, [this]() {
         m_radioModel->disconnectFromRadio();
@@ -13160,6 +13174,9 @@ void MainWindow::showStationContextMenu(const QPoint& globalPos)
     });
 
     menu.exec(globalPos);
+    // Das Elternteil kann waehrend exec() gestorben sein — dann ist
+    // auch das Menue weg und `this` eine Leiche. Siehe ScopedChildWidget.h.
+    if (!menuOwner) { return; }
 }
 
 void MainWindow::showSupportDialog()
@@ -15842,6 +15859,14 @@ void MainWindow::closeEvent(QCloseEvent* event)
     // selbst ab — sie gehoeren nicht zu den "Werkzeugfenstern", die
     // diese Schleife eigentlich sucht, und duerfen hier nicht
     // angefasst werden, gleich ob sie gerade laufen oder nicht.
+    //
+    // 2026-09-22: die Ursache von damals ist zusaetzlich weg. Alle
+    // Kontextmenues liegen jetzt auf dem Haufen (ScopedChildWidget,
+    // siehe gui/ScopedChildWidget.h), also gibt es keine Stapeladresse
+    // mehr, die ein deleteLater() freigeben koennte. Diese Schleife
+    // laesst Popups trotzdem in Ruhe: zwei Schranken gegen einen
+    // Absturz, der den Betreiber sein Fenster gekostet hat, sind eine
+    // mehr als noetig und eine weniger als bereut.
     for (QWidget* w : QApplication::topLevelWidgets()) {
         if (w == this) { continue; }
         if (!w->isWindow()) { continue; }

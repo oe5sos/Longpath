@@ -11,6 +11,7 @@
 // =================================================================
 
 #include "gui/widgets/ProfileRail.h"
+#include "gui/ScopedChildWidget.h"
 
 #include "gui/LayoutProfiles.h"
 #include "gui/StyleConstants.h"
@@ -193,7 +194,8 @@ bool ProfileRail::eventFilter(QObject* watched, QEvent* event)
 
 void ProfileRail::showMenuFor(const QString& name, const QPoint& globalPos)
 {
-    QMenu menu(this);
+    ScopedChildWidget<QMenu> menuOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+    QMenu& menu = *menuOwner.get();
     // Der volle Name als Überschrift. Auf dem Abzeichen steht nur ein
     // Buchstabe, und ein Menü mit „Löschen“ über einem „C“ ist zu wenig
     // Auskunft für etwas, das nicht rückgängig zu machen ist.
@@ -219,6 +221,9 @@ void ProfileRail::showMenuFor(const QString& name, const QPoint& globalPos)
     del->setEnabled(m_profiles && m_profiles->names().size() > 1);
 
     QAction* chosen = menu.exec(globalPos);
+    // Das Elternteil kann waehrend exec() gestorben sein — dann ist
+    // auch das Menue weg und `this` eine Leiche. Siehe ScopedChildWidget.h.
+    if (!menuOwner) { return; }
     if (chosen == save)      { emit saveRequested(name); }
     else if (chosen == exportToDesktop) { emit exportRequested(name); }
     else if (chosen == importFromDesktop) { emit importRequested(name); }

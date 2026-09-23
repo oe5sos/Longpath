@@ -4797,6 +4797,11 @@ longpath_add_test(tst_whisper_server_launcher)
 target_link_libraries(tst_whisper_server_launcher PRIVATE Qt6::Network)
 longpath_add_test(tst_pan_options_button)
 longpath_add_test(tst_window_widgets)
+
+# -- ScopedChildWidget (2026-09-22): ein Kontextmenue auf dem Haufen statt
+#    auf dem Stapel -- normales Aufraeumen, und Aufraeumen nachdem das
+#    Elternteil das Kind schon mitgenommen hat (Absturz vom 2026-08-30). --
+longpath_add_test(tst_scoped_child_widget)
 longpath_add_test(tst_real_container_move)
 longpath_add_test(tst_real_zoom_visible)
 longpath_add_test(tst_disconnect_label_transparent)

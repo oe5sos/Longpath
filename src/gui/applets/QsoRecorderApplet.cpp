@@ -64,6 +64,7 @@ mw0lge@grange-lane.co.uk
 // =================================================================
 
 #include "QsoRecorderApplet.h"
+#include "gui/ScopedChildWidget.h"
 
 #include "gui/StyleConstants.h"
 #include "gui/styles/PopupMenuStyle.h"
@@ -322,7 +323,8 @@ void QsoRecorderApplet::buildUI()
         const QString file = item->data(Qt::UserRole).toString();
         if (file.isEmpty()) { return; }
 
-        QMenu menu(this);
+        ScopedChildWidget<QMenu> menuOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+        QMenu& menu = *menuOwner.get();
         menu.setStyleSheet(QString::fromLatin1(kPopupMenu));
         QAction* listen = menu.addAction(
             m_player.isPlaying() && m_player.currentPath() == file
@@ -333,6 +335,9 @@ void QsoRecorderApplet::buildUI()
         QAction* del = menu.addAction(QStringLiteral("Delete recording"));
 
         const QAction* chosen = menu.exec(m_list->mapToGlobal(pos));
+        // Das Elternteil kann waehrend exec() gestorben sein — dann ist
+        // auch das Menue weg und `this` eine Leiche. Siehe ScopedChildWidget.h.
+        if (!menuOwner) { return; }
         if (chosen == listen) {
             if (m_player.isPlaying() && m_player.currentPath() == file) {
                 m_player.stop();
