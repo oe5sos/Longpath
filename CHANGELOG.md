@@ -106,6 +106,21 @@
 
 ### Fixed
 
+- **Das Rotor/Log-Fenster sprang nach dem Verbinden vor die
+  Connect-Maske.** Betreiber am 2026-09-22 zur SunSDR2 QRP: „uebrigens
+  das erscheint immer nach oeffnen von qrp, beim anan usw. ist das nicht
+  so." Die Maske raeumt beim Oeffnen alle schwebenden Fenster weg; kam
+  die Verbindung zustande, holte der Connected-Zweig sie sofort zurueck
+  -- die Maske selbst schliesst sich aber erst eine Sekunde spaeter. In
+  dieser Sekunde standen sie davor, und zwar unausweichlich: die
+  schwebenden Werkzeugfenster sind `Qt::Tool`, auf macOS NSPanels auf
+  einer hoeheren Fensterebene als ein gewoehnlicher QDialog -- ein
+  `raise()` auf die Maske kaeme dagegen nicht an. Jetzt wird nicht
+  gehoben, sondern gewartet: alle drei Wiederherstellungsstellen laufen
+  durch eine Funktion, die die Liste liegen laesst, solange die Maske
+  steht; der `destroyed`-Haken der Maske ist der letzte Ausloeser.
+  Pruefstand `tst_connect_mask_keeps_the_floaters_behind`.
+
 - **Ein Pruefstand nahm sich die Tonkarte.** `AudioEngine::makeBus()`
   rief `Pa_OpenStream` auch aus einem Pruefprogramm heraus -- also
   CoreAudio samt Geraeteaufzaehlung und, bei einem Aufnahmegeraet, der

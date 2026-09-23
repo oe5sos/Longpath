@@ -217,6 +217,24 @@ public:
     { return m_kiwiSdrManager; }
     RadioModel* radioModelForTest() const { return m_radioModel; }
 
+    // ── Pruefzugaenge fuer „hinter die Connect-Maske" ────────────────
+    //
+    // Die Regel ist nur an einem laufenden MainWindow pruefbar (die
+    // Maske selbst entscheidet mit), aber ein Pruefstand kann sich kein
+    // echtes Rotor/Log-Fenster ins Layout stellen, ohne ein Profil
+    // anzufassen. Also ein Stellvertreter: irgendein Fenster in die
+    // Liste legen und danach fragen, ob es schon zurueck ist.
+    void rememberFloatingWindowBehindConnectMaskForTest(QWidget* w)
+    {
+        if (!w) { return; }
+        w->hide();
+        m_floatingContainersHiddenPreConnect.append(w);
+    }
+    int floatingWindowsWaitingForConnectMaskForTest() const
+    { return int(m_floatingContainersHiddenPreConnect.size()); }
+    void restoreFloatingWindowsForTest()
+    { restoreFloatingWindowsHiddenBehindConnectMask(); }
+
     // ── Pruefzugaenge fuer den SunSDR ────────────────────────────────
     //
     // connectSunSdr ist der Weg, den der Menuepunkt geht — derselbe
@@ -945,6 +963,14 @@ private:
     /// alles beim naechsten Connected ODER beim Schliessen der Maske
     /// ohne Verbindung.
     void hideFloatingWindowsBehindConnectMask();
+
+    /// Die Gegenseite: zeigt wieder, was fuer die Maske weggeraeumt wurde
+    /// -- aber erst, wenn die Maske wirklich weg ist. Solange sie steht,
+    /// bleibt die Liste liegen (siehe die Begruendung an der Definition:
+    /// die schwebenden Fenster sind Qt::Tool und stehen auf macOS auf
+    /// einer hoeheren Ebene als die Maske, ein raise() auf sie hilft
+    /// nicht). Mehrfach aufrufbar; bei leerer Liste ein No-Op.
+    void restoreFloatingWindowsHiddenBehindConnectMask();
 
     /// Ersatz fuer showFullScreen() -- siehe m_borderlessFullSize. Randlos
     /// und auf die volle Bildschirmflaeche gesetzt, KEIN eigener macOS-
@@ -1715,6 +1741,12 @@ private:
     // deswegen tatsaechlich versteckt wurden, damit die erste Verbindung
     // genau die wieder zeigt und nichts, was ohnehin schon zu war.
     QList<QPointer<QWidget>> m_floatingContainersHiddenPreConnect;
+    /// Der Rotor/Log-Einmalhaken (Konstruktor) hat bei der ersten
+    /// Verbindung dieser Sitzung zugeschlagen und moechte m_rotorWindow
+    /// zeigen -- ausgefuehrt wird der Wunsch in
+    /// restoreFloatingWindowsHiddenBehindConnectMask(), sobald die
+    /// Connect-Maske aus dem Weg ist.
+    bool m_showRotorAfterConnectMask{false};
     /// Fuehrt die Windrose im Spektrum nach, solange sie zu
     class WindowTitleBar* m_rotorHeader{nullptr};
     class ToolWindow*     m_rotorWindow{nullptr};
