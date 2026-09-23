@@ -282,27 +282,27 @@ private slots:
     // section for the full derivation and what would actually confirm
     // or kill this hypothesis.
 
-    void encodeFrequencyPayloadCandidateMatchesArtemisSdrScaleFormula()
+    void encodeFrequencyPayloadMatchesArtemisSdrScaleFormula()
     {
         // 14,213,950 Hz * 10 = 142,139,500 as an 8-byte LE integer.
-        const QByteArray encoded = encodeFrequencyPayloadCandidate(14213950);
+        const QByteArray encoded = encodeFrequencyPayload(14213950);
         QCOMPARE(encoded.size(), 8);
         QCOMPARE(encoded, hexBytes("6c e0 78 08 00 00 00 00"));
     }
 
-    void decodeFrequencyPayloadCandidateIsTheExactInverseOfEncode()
+    void decodeFrequencyPayloadIsTheExactInverseOfEncode()
     {
         for (quint64 freq : {1'800'000ULL, 7'074'000ULL, 14'074'000ULL,
                               21'074'000ULL, 50'313'000ULL}) {
-            const QByteArray encoded = encodeFrequencyPayloadCandidate(freq);
-            QCOMPARE(decodeFrequencyPayloadCandidate(encoded), freq);
+            const QByteArray encoded = encodeFrequencyPayload(freq);
+            QCOMPARE(decodeFrequencyPayload(encoded), freq);
         }
     }
 
-    void decodeFrequencyPayloadCandidateTooShortReturnsZero()
+    void decodeFrequencyPayloadTooShortReturnsZero()
     {
-        QCOMPARE(decodeFrequencyPayloadCandidate(QByteArray()), quint64(0));
-        QCOMPARE(decodeFrequencyPayloadCandidate(hexBytes("6c e0 78 08 00 00 00")),
+        QCOMPARE(decodeFrequencyPayload(QByteArray()), quint64(0));
+        QCOMPARE(decodeFrequencyPayload(hexBytes("6c e0 78 08 00 00 00")),
                   quint64(0));
     }
 
@@ -328,7 +328,7 @@ private slots:
         // own earlier notes" for why the two differ by 4 bytes).
         const QByteArray payload = fullFrame.mid(18, 8);
         QCOMPARE(payload, hexBytes("6c e0 78 08 00 00 00 00"));
-        QCOMPARE(decodeFrequencyPayloadCandidate(payload), quint64(14213950));
+        QCOMPARE(decodeFrequencyPayload(payload), quint64(14213950));
     }
 
     // ── TX control-channel pure encoders (Step 1 of 6) ──────────────────

@@ -150,9 +150,26 @@ struct Profile {
     // Native RX rate. DX and PRO are both 312500 Hz on-wire
     // (ArtemisSDR sunsdr.c:2728-2741 [@f8b01d25c5]; the PRO row's
     // comment there records it was raised to match DX in v2.1.9).
-    // The QRP value here is carried over from DX by assumption, NOT
-    // independently confirmed — the design doc's capture analysis
-    // established magic byte and header framing, not sample rate.
+    //
+    // Der QRP-Wert stand hier bis zum 2026-09-23 als uebernommene
+    // ANNAHME (aus DX), ausdruecklich nicht bestaetigt. Jetzt ist er
+    // gemessen — und die Annahme war falsch. An der Bank, aus zwei
+    // unabhaengigen Sitzungen am selben Geraet am selben Tag:
+    //
+    //   Longpath   29 683 Pakete/15,5 s = 1920/s, davon 3 718 echte
+    //              Bloecke = 240/s -> 48 100 Proben/s
+    //   ExpertSDR2 50 126 Pakete/26,1 s = 1920/s, davon 6 274 echte
+    //              Bloecke = 240/s -> 48 064 Proben/s
+    //
+    // Die QRP schickt jeden Block achtmal (siehe
+    // SunSdrRadioConnection::sequenceSeenRecently); die 1920 Pakete je
+    // Sekunde sind also nicht die Probenrate. 240 Bloecke × 200
+    // Probenpaare = 48 000 Hz.
+    //
+    // Das gilt fuer DEN Handschlag, den wir zurueckspielen (und den
+    // ExpertSDR2 an diesem Tag ebenfalls schickte — Byte fuer Byte
+    // derselbe Rahmen). Ob die QRP andere Raten kann, ist offen: der
+    // Opcode dafuer ist noch nicht zugeordnet.
     double      rxNativeRateHz;
 };
 
@@ -166,10 +183,11 @@ inline constexpr Profile kProfilePro{
 
 // Ports and magic byte confirmed against a real bench capture,
 // 2026-08-24 (21,720 packets, ExpertSDR2 <-> QRP) — design doc
-// "Confirmed: ports and magic byte". rxNativeRateHz is the DX value,
-// carried over unconfirmed (see Profile::rxNativeRateHz comment).
+// "Confirmed: ports and magic byte". rxNativeRateHz am 2026-09-23 an
+// der Bank gemessen (48 kHz, nicht die von DX uebernommenen 312,5 kHz)
+// — siehe Profile::rxNativeRateHz.
 inline constexpr Profile kProfileQrp{
-    Variant::Qrp, "SunSDR2 QRP", 50001, 50002, 0x03, 312500.0};
+    Variant::Qrp, "SunSDR2 QRP", 50001, 50002, 0x03, 48000.0};
 
 // From ArtemisSDR sunsdr.h:28 [@f8b01d25c5]. Second magic byte, fixed
 // across every model/profile — only byte[0] varies.
@@ -289,7 +307,18 @@ bool parseIqHeader(const quint8* data, int len, const Profile& profile,
 void decodeIqSamples(const quint8* payload, int payloadLen,
                      QVector<float>* outInterleaved);
 
-// ── Frequency-set payload (opcode 0x08/0x09): candidate encoding ────
+// ── Frequency-set payload (opcode 0x08): BESTAETIGT 2026-09-23 ─────
+//
+// Am 2026-09-23 auf das Hertz genau nachgemessen: ExpertSDR2 gegen die
+// echte QRP, drei vorher notierte Frequenzen, Mitschnitt auf dem Draht.
+//
+//   14 074 000 Hz -> a085630800000000 -> /10 = 14 074 000   exakt
+//    3 600 000 Hz -> 0051250200000000 -> /10 =  3 600 000   exakt
+//   28 500 000 Hz -> 40c1fc1000000000 -> /10 = 28 500 000   exakt
+//
+// Damit ist die Formel keine Vermutung mehr, und die 700 Hz aus dem
+// Versuch vom 2026-08-27 (unten) waren tatsaechlich der nachlaufende
+// Abstimmknopf, nicht die Formel.
 //
 // CONFIRMED 2026-08-27. Design doc, "candidate frequency-encoding
 // formula found — source-grounded, band-plausible" (2026-08-26),
@@ -320,12 +349,12 @@ void decodeIqSamples(const quint8* payload, int payloadLen,
 
 // Encodes `freqHz` as an 8-byte little-endian `freqHz * 10` payload,
 // matching sunsdr_send_freq_pkt()'s byte layout exactly.
-QByteArray encodeFrequencyPayloadCandidate(quint64 freqHz);
+QByteArray encodeFrequencyPayload(quint64 freqHz);
 
 // Inverse of the above: reads an 8-byte little-endian payload and
 // returns `value / 10` as the candidate frequency in Hz. Returns 0 if
 // `payload` is shorter than 8 bytes.
-quint64 decodeFrequencyPayloadCandidate(const QByteArray& payload);
+quint64 decodeFrequencyPayload(const QByteArray& payload);
 
 // ── TX control-channel opcodes: PURE ENCODERS, ZERO WIRE REACHABILITY ──
 //

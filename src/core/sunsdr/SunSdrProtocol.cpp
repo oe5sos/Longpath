@@ -223,7 +223,7 @@ namespace {
 constexpr quint64 kFreqScaleCandidate = 10;
 }
 
-QByteArray encodeFrequencyPayloadCandidate(quint64 freqHz)
+QByteArray encodeFrequencyPayload(quint64 freqHz)
 {
     const quint64 scaled = freqHz * kFreqScaleCandidate;
     QByteArray out(8, char(0));
@@ -233,7 +233,7 @@ QByteArray encodeFrequencyPayloadCandidate(quint64 freqHz)
     return out;
 }
 
-quint64 decodeFrequencyPayloadCandidate(const QByteArray& payload)
+quint64 decodeFrequencyPayload(const QByteArray& payload)
 {
     if (payload.size() < 8) { return 0; }
     quint64 scaled = 0;

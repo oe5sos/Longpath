@@ -287,6 +287,34 @@ void SunSdrRadioConnection::sendDiscoveryBroadcast()
     // a live capture showed ExpertSDR2 itself doing (loopback, WLAN,
     // wired, each with its own broadcast address), not a single guessed
     // 255.255.255.255. See the class header's top-of-file comment.
+    // ── Zuerst geradeaus an das Geraet, das der Betreiber eingetragen
+    //    hat (2026-09-23) ───────────────────────────────────────────────
+    //
+    // Die Rundsendung bleibt — sie ist der Weg, der am Geraet bewiesen
+    // wurde. Aber sie ist auch der einzige, und das ist eine Schwaeche:
+    // ein WLAN mit Client-Isolation, ein Router mit gefilterter
+    // Rundsendung, ein anderes VLAN, ein Gast-Netz — in all diesen
+    // Faellen kommt die Anfrage nie an, obwohl die Adresse des Geraets
+    // im Eintrag steht und ein gewoehnliches Paket dorthin ankaeme. Ein
+    // zusaetzliches Paket an genau diese Adresse kostet 24 Byte und
+    // macht den Fall auf.
+    //
+    // Es ist dieselbe Anfrage (Opcode 0x00, eine reine Frage), also
+    // kann sie auch nichts verstellen; das Geraet antwortet auf den
+    // Absenderport, gleich ob es die Rundsendung oder dieses Paket
+    // beantwortet. Eine Doppelantwort ist unschaedlich:
+    // processControlDatagram() verwirft den zweiten Beacon, sobald der
+    // Handschlag laeuft (eigener Prueffall in
+    // tst_sunsdr_radio_connection).
+    //
+    // Nebenwirkung, die die Werkbank erst moeglich macht: ueber die
+    // Rueckschleife gibt es keine Rundsendeadresse, also erreichte die
+    // Anfrage ein Messgeraet auf 127.0.0.1 nie.
+    if (!m_radioInfo.address.isNull()) {
+        m_controlSocket->writeDatagram(query, m_radioInfo.address, ctrlPort);
+        recordBytesSent(static_cast<qint64>(query.size()));
+    }
+
     for (const QNetworkInterface& iface : QNetworkInterface::allInterfaces()) {
         if (!(iface.flags() & QNetworkInterface::IsUp)) { continue; }
         for (const QNetworkAddressEntry& entry : iface.addressEntries()) {
@@ -354,6 +382,13 @@ void SunSdrRadioConnection::onConnectTimeout()
     }
     m_txArmed.store(false, std::memory_order_release);
     m_mox.store(false, std::memory_order_release);
+
+    // Der Ring der zuletzt angenommenen Folgenummern gehoert zur Sitzung:
+    // eine neue faengt bei null an, sonst koennte eine Nummer aus der
+    // alten Sitzung einen echten Block der neuen verwerfen.
+    m_recentSeqPos = 0;
+    m_recentSeqCount = 0;
+    m_duplicateBlocks = 0;
     // Step 3: a pacer left running after this teardown fires would be a
     // "phantom pacer" ticking against a connection that just declared
     // itself timed out — same discipline as the socket closes right
@@ -381,6 +416,14 @@ void SunSdrRadioConnection::disconnect()
                                // reopen the RX gate — see onControlReadyRead()
     m_radioAddr.clear();
     setRxReady(false);
+
+    // Der Ring der zuletzt angenommenen Folgenummern gehoert zur Sitzung:
+    // eine neue faengt bei null an, sonst koennte eine Nummer aus der
+    // alten Sitzung einen echten Block der neuen verwerfen. Dieselbe
+    // Ueberlegung wie bei m_radioAddr eine Zeile darueber.
+    m_recentSeqPos = 0;
+    m_recentSeqCount = 0;
+    m_duplicateBlocks = 0;
 
     // Step 2 TX gate: bench arming is per-session, deliberately not
     // sticky (setTxArmedForTest()'s own comment) — a disconnect() ends
@@ -458,7 +501,7 @@ void SunSdrRadioConnection::setReceiverFrequency(int receiverIndex, quint64 freq
     // 7.1 MHz (0.01%), consistent with VFO scroll-settling lag between
     // the last captured packet and the display's final resting value,
     // not a formula error. Payload:
-    // SunSdr::encodeFrequencyPayloadCandidate() (freqHz * 10, 8-byte
+    // SunSdr::encodeFrequencyPayload() (freqHz * 10, 8-byte
     // LE, from ArtemisSDR's real sunsdr_send_freq_pkt(),
     // sunsdr.c:2259-2277 [@f8b01d25c5]).
     //
@@ -474,7 +517,7 @@ void SunSdrRadioConnection::setReceiverFrequency(int receiverIndex, quint64 freq
     // next thing to investigate.
     QByteArray frame = QByteArray::fromHex(
         "03ff0800080000000000010000008ca31dd7");
-    frame += SunSdr::encodeFrequencyPayloadCandidate(frequencyHz);
+    frame += SunSdr::encodeFrequencyPayload(frequencyHz);
 
     m_controlSocket->writeDatagram(frame, m_radioAddr, m_profile->defaultCtrlPort);
     recordBytesSent(static_cast<qint64>(frame.size()));
@@ -853,6 +896,13 @@ void SunSdrRadioConnection::processStreamDatagram(const QByteArray& data,
         return;  // TX-active frames don't apply to a receive-only connection
     }
 
+    // Wiederholte Bloecke wegwerfen — die QRP schickt jeden achtmal.
+    // Siehe sequenceSeenRecently() und den Kommentar am Ring im Kopf.
+    if (sequenceSeenRecently(hdr.seq)) {
+        ++m_duplicateBlocks;
+        return;
+    }
+
     QVector<float> samples;
     SunSdr::decodeIqSamples(
         reinterpret_cast<const quint8*>(data.constData()) + SunSdr::kIqHeaderSize,
@@ -1002,5 +1052,28 @@ void SunSdrRadioConnection::setPuresignalRun(bool) {}
 void SunSdrRadioConnection::setMicPTTDisabled(bool) {}
 void SunSdrRadioConnection::setMicXlr(bool) {}
 void SunSdrRadioConnection::setWatchdogEnabled(bool) {}
+
+
+// ---------------------------------------------------------------------------
+// sequenceSeenRecently — die Wiederholungen der QRP erkennen
+//
+// Gemessen am Geraet (2026-09-23, 30 000 Pakete in 15,5 s): jeder Block
+// kommt achtmal, in abnehmenden Abstaenden ueber rund 32 ms verteilt
+// (11,6 / 8,0 / 4,0 / 3,0 / 2,0 / 2,0 / 2,0 ms) und dabei verschraenkt
+// mit den Nachbarbloecken. Neue Bloecke kommen alle 4,17 ms, also
+// 240/s; mal 200 Probenpaare sind das 48 000 Proben je Sekunde.
+//
+// Ohne diese Wache landet jede Probe achtmal in der Signalverarbeitung.
+// ---------------------------------------------------------------------------
+bool SunSdrRadioConnection::sequenceSeenRecently(quint16 seq)
+{
+    for (int i = 0; i < m_recentSeqCount; ++i) {
+        if (m_recentSeqs[static_cast<size_t>(i)] == seq) { return true; }
+    }
+    m_recentSeqs[static_cast<size_t>(m_recentSeqPos)] = seq;
+    m_recentSeqPos = (m_recentSeqPos + 1) % kRecentSeqSlots;
+    if (m_recentSeqCount < kRecentSeqSlots) { ++m_recentSeqCount; }
+    return false;
+}
 
 } // namespace Longpath
