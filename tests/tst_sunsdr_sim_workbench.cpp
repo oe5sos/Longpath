@@ -147,19 +147,12 @@ private slots:
                      .arg(blocksBeforeWait).arg(blocksAfterWait)));
         QCOMPARE(conn.state(), ConnectionState::Connected);
 
-        // ── 4b. Wiederholte Bloecke ──────────────────────────────────
-        // Das Messgeraet schickt jeden Block achtmal, so wie das Geraet
-        // (an der Bank gemessen, 2026-09-23). Sieben davon muessen
-        // verworfen werden — sonst bekommt die Signalverarbeitung jede
-        // Probe achtmal.
-        qInfo() << "DOPPELT verworfen:" << conn.duplicateBlocksDroppedForTest()
-                << "bei" << iq.count() << "weitergereichten Bloecken";
-        QVERIFY2(conn.duplicateBlocksDroppedForTest() > quint64(iq.count()) * 5,
-                 qPrintable(QStringLiteral(
-                     "Von acht Kopien je Block kamen zu wenige als Wiederholung "
-                     "an (%1 verworfen, %2 weitergereicht) — laeuft das "
-                     "Messgeraet mit --repeat 8?")
-                     .arg(conn.duplicateBlocksDroppedForTest()).arg(iq.count())));
+        // ── 4b. Wiederholte Bloecke: bewusst KEINE Pruefung mehr ─────
+        // Der Treiber wirft die achtfachen Wiederholungen der QRP seit
+        // dem 2026-09-23 nicht mehr weg -- siehe die Begruendung in
+        // SunSdrRadioConnection::processStreamDatagram. Solange der
+        // Widerspruch zwischen Messung und Hoereindruck offen ist,
+        // behauptet hier nichts mehr eine Zahl darueber.
 
         // ── 5. Trennen ───────────────────────────────────────────────
         conn.disconnect();
