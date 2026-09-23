@@ -347,6 +347,11 @@ public:
     // Test seam — inject a fake IAudioBus into the headphones slot.
     void setHeadphonesBusForTest(std::unique_ptr<IAudioBus> bus);
 
+    /// Test seam (2026-09-23) — liegt gerade ein Lautsprecher-Bus an?
+    /// Belegt, dass makeBus() im Pruefmodus KEIN echtes Geraet oeffnet:
+    /// nach setSpeakersConfig() steht hier nichts mehr.
+    bool hasSpeakersBusForTest() const { return m_speakersBus != nullptr; }
+
     // Test seam — inject a fake IAudioBus into the TX-input slot so unit
     // tests can exercise pullTxMic without standing up a real PortAudio
     // capture device. Takes ownership of `bus`.
