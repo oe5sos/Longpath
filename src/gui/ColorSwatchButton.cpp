@@ -31,11 +31,20 @@ void ColorSwatchButton::setColor(const QColor& c)
     emit colorChanged(m_color);
 }
 
+// Begruendung fuer DontUseNativeDialog: siehe ColorSwatchButton.h.
+// Kurz: Qts eigener Dialog zeichnet zuverlaessig, laesst sich mit
+// Escape schliessen und hat Bedienelemente, die auch die
+// Bedienungshilfen finden -- das native NSColorPanel tat am
+// 2026-09-23 nichts davon.
+QColorDialog::ColorDialogOptions ColorSwatchButton::pickerOptions()
+{
+    return QColorDialog::ShowAlphaChannel | QColorDialog::DontUseNativeDialog;
+}
+
 void ColorSwatchButton::openPicker()
 {
     const QColor picked = QColorDialog::getColor(
-        m_color, this, tr("Choose color"),
-        QColorDialog::ShowAlphaChannel);
+        m_color, this, tr("Choose color"), pickerOptions());
     if (picked.isValid()) {
         setColor(picked);
     }

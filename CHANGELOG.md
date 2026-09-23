@@ -164,6 +164,30 @@
 
 ### Fixed
 
+- **Der Farbwaehler konnte das Programm unbeendbar machen.** Betreiber
+  am 2026-09-23: „kann longpath nicht schliessen … trotzdem muesste der
+  mit command Q geschlossen werden." Auf macOS nimmt Qt fuer
+  `QColorDialog::getColor()` standardmaessig das **native**
+  NSColorPanel. Beim Betreiber stand es als schwarzes Fenster **ohne ein
+  einziges bedienbares Element** da (Bedienungshilfen-Baum leer), auf
+  einem anderen Schreibtisch — waehrend `getColor()` seine eigene
+  Ereignisschleife fuhr. Das Programm nahm nichts mehr an: kein Cmd+Q,
+  kein Schliessen, **nicht einmal SIGTERM**; es musste abgeschossen
+  werden. `ColorSwatchButton` verlangt jetzt `DontUseNativeDialog`,
+  also Qts eigenen Dialog — der zeichnet, laesst sich mit Escape
+  schliessen und hat Bedienelemente. Die Optionen stehen als
+  `ColorSwatchButton::pickerOptions()` an einer Stelle, damit ein
+  Pruefstand sie lesen kann (`tst_color_picker_not_native`): der
+  blockierende statische Aufruf selbst laesst sich nicht pruefen, ohne
+  dass der Pruefstand mit haengt.
+
+  **Noch offen:** rund 50 weitere `QColorDialog::getColor()`-Aufrufe
+  (Spot-Hub, Behaelter-Editoren, Panadapter-Leiste) nehmen weiterhin den
+  nativen Dialog. Ein mechanischer Sammelumbau ist am 2026-09-23
+  versucht worden und an den unterschiedlichen Signaturen der
+  Aufrufstellen zerbrochen — das gehoert von Hand gemacht, nicht per
+  Suchen-und-Ersetzen.
+
 - **Ein abgeschnittener Hinweis, zum zweiten Mal gemeldet.** Der
   sechszeilige Text „Das Gerät wurde gefunden, liefert aber binnen 6 s
   keinen Datenstrom …“ stand unten abgeschnitten; der letzte Satz
