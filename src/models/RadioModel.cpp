@@ -9082,6 +9082,7 @@ void RadioModel::wireConnectionSignals(int wdspInSize)
     // so the radio sees every UI flip.  Longpath mirrors that via a queued
     // signal/slot bind here, and primes once below.
     connectMicPttDisabledSignal();
+    connectMicInputSignals();
 
     // ── Task 2.5 of P1 full-parity epic: pureSig → setPuresignalRun ─────────
     // Wire the user PureSignal-enable toggle to the wire-bit setter added in
@@ -9446,6 +9447,58 @@ void RadioModel::connectMicPttDisabledSignal()
                                              d = m_transmitModel.micPttDisabled()]() {
         conn->setMicPTTDisabled(d);
     }, Qt::QueuedConnection);
+}
+
+// ---------------------------------------------------------------------------
+// connectMicInputSignals — die fuenf uebrigen Mikrofon-Schalter an den Draht.
+//
+// Gefunden am 2026-09-22 an der HPSDR-Werkbank (Runde 4): die Verbindung
+// kann diese Bits seit 3M-1b (setMicBoost/setLineIn/setMicTipRing/
+// setMicBias/setMicXlr, alle mit Quellenangabe und Polaritaet dokumentiert),
+// und die Oberflaeche schreibt sie brav ins TransmitModel — aber dazwischen
+// war nichts. `micBiasChanged` & Co. hatten als einzige Empfaenger die
+// Setup-Seite selbst (Haken nachziehen, „geaendert" merken); der Kommentar
+// in TransmitModel::setMicBias sagt es sogar: „Phase G wires the
+// SetMicBias() bit; model just stores + signals." Phase G hat den Draht
+// gelegt, aber niemand hat ihn angeschlossen.
+//
+// Folge am Geraet: Setup > Audio > TX Input schaltete ins Leere. Der
+// Mikrofonvorverstaerker (+20 dB), die Umschaltung Mic/Line, die Belegung
+// Tip/Ring und vor allem die Mikrofonspeisung (ein Elektretmikrofon
+// bleibt ohne sie stumm) standen immer auf der Vorgabe der Verbindung —
+// Boost aus, Line aus, Tip = Mikrofon, Bias aus. Ein Klick aenderte die
+// Anzeige und sonst nichts, ueber jede Sitzung hinweg.
+//
+// Gleiches Muster wie connectMicPttDisabledSignal() direkt darueber:
+// queued binden (die Verbindung lebt auf ihrem eigenen Faden) und einmal
+// vorladen, damit eine frische Verbindung den gespeicherten Stand des
+// Betreibers uebernimmt und nicht erst beim naechsten Klick.
+// ---------------------------------------------------------------------------
+void RadioModel::connectMicInputSignals()
+{
+    if (!m_connection) {
+        return;
+    }
+    const auto bind = [this](auto signal, auto slot, auto value) {
+        QObject::connect(&m_transmitModel, signal, m_connection, slot,
+                         Qt::QueuedConnection);
+        QMetaObject::invokeMethod(m_connection, [conn = m_connection, slot, value]() {
+            (conn->*slot)(value);
+        }, Qt::QueuedConnection);
+    };
+    bind(&TransmitModel::micBoostChanged,   &RadioConnection::setMicBoost,
+         m_transmitModel.micBoost());
+    bind(&TransmitModel::lineInChanged,     &RadioConnection::setLineIn,
+         m_transmitModel.lineIn());
+    bind(&TransmitModel::micTipRingChanged, &RadioConnection::setMicTipRing,
+         m_transmitModel.micTipRing());
+    bind(&TransmitModel::micBiasChanged,    &RadioConnection::setMicBias,
+         m_transmitModel.micBias());
+    // XLR ist eine P2-Sache (Saturn/G2, transmit_specific_buffer[50] Bit 5);
+    // P1 speichert den Schalter nur. Trotzdem hier, damit die Entscheidung
+    // an EINER Stelle steht und nicht je Protokoll ein zweites Mal.
+    bind(&TransmitModel::micXlrChanged,     &RadioConnection::setMicXlr,
+         m_transmitModel.micXlr());
 }
 
 // ---------------------------------------------------------------------------

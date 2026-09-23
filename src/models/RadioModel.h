@@ -1552,6 +1552,7 @@ public:
     // tst_radio_model_mic_ptt_wire can verify the signal/slot bind + prime
     // path without spinning up the full wireConnectionSignals pipeline.
     void wireMicPttDisabledForTest() { connectMicPttDisabledSignal(); }
+    void wireMicInputsForTest() { connectMicInputSignals(); }
     void setLastBandForTest(Longpath::Band b) {
         const bool cross = (b != m_lastBand);
         m_lastBand = b;
@@ -2831,6 +2832,8 @@ private:
     // in isolation by tst_radio_model_mic_ptt_wire without needing to spin
     // up the full DSP-thread pipeline that wireConnectionSignals starts.
     void connectMicPttDisabledSignal();
+    // Werkbank Runde 4: Boost / Line-In / Tip-Ring / Bias / XLR an den Draht.
+    void connectMicInputSignals();
 
     // Issue #177 — deferred completion of the TUN-off path.
     //

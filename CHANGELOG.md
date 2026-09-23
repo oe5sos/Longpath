@@ -97,6 +97,17 @@
 
 ### Fixed
 
+- **Setup > Audio > TX Input schaltete ins Leere.** Mikrofon-Vorverstaerker
+  (+20 dB), Umschaltung Mic/Line, Belegung Tip/Ring, Mikrofonspeisung und
+  der XLR-Schalter landeten im Modell und blieben dort: die Verbindung
+  kann diese Bits seit langem, die Oberflaeche schreibt sie brav — nur
+  verbunden hatte sie niemand. Am Geraet hiess das, dass ein Elektret-
+  mikrofon ohne Speisung stumm blieb, egal was der Haken sagte. Jetzt
+  gehen alle fuenf an den Draht, und der gespeicherte Stand wird beim
+  Verbinden einmal vorgeladen. Nachgewiesen an der HPSDR-Werkbank gegen
+  den Hermes-Simulator (vorher kam keines der Bits an), Pruefstand
+  `tst_radio_model_mic_inputs_wire`.
+
 - **Longpath stuerzte bei jeder Verbindung ab, wenn die NNR-Gewichte
   fehlen.** Ohne `wdsp_nnr_0.bin`/`wdsp_nnr_1.bin` laeuft NNR (WDSP 2.10)
   absichtlich als Durchreiche — aber vier Funktionen in `nnet.c` fassten
