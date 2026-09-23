@@ -8348,22 +8348,16 @@ void MainWindow::populateDefaultMeter()
                     // nur noch fuer den m_rotorDock-Zweig, wo es tatsaechlich
                     // die richtige Frage beantwortet.
                     if (m_rotorWindow) {
-                        m_rotorWindow->show();
-                        m_rotorWindow->raise();
+                        m_showRotorAfterConnectMask = true;
                     } else if (m_rotorDock) {
                         m_rotorDock->setVisible(m_rotorDockWantedVisible);
                     }
 
                     // Dieselbe Freigabe fuer die schwebenden Meter/Applet-
                     // Fenster, die restoreState() versteckt hatte (siehe
-                    // dort). QPointer haelt fest, ob eines inzwischen ganz
-                    // geschlossen (nicht nur versteckt) wurde -- dann bleibt
-                    // es aus, statt aus dem Nichts wiederzukommen.
-                    for (const QPointer<QWidget>& w
-                         : std::as_const(m_floatingContainersHiddenPreConnect)) {
-                        if (w) { w->show(); w->raise(); }
-                    }
-                    m_floatingContainersHiddenPreConnect.clear();
+                    // dort). Beides erledigt die gemeinsame Stelle -- sie
+                    // wartet, solange die Connect-Maske noch steht.
+                    restoreFloatingWindowsHiddenBehindConnectMask();
 
                     QObject::disconnect(*rotorShowConn);
                 }
@@ -13066,6 +13060,62 @@ void MainWindow::hideFloatingWindowsBehindConnectMask()
     }
 }
 
+// ---------------------------------------------------------------------------
+// restoreFloatingWindowsHiddenBehindConnectMask
+//
+// Die Gegenseite von hideFloatingWindowsBehindConnectMask(): holt zurueck,
+// was fuer die Connect-Maske weggeraeumt wurde.
+//
+// ── Warum das WARTET, bis die Maske weg ist (2026-09-23) ────────────────
+//
+// Betreiber am 2026-09-22 zur SunSDR2 QRP: „uebrigens das erscheint immer
+// nach oeffnen von qrp, beim anan usw. ist das nicht so" -- auf dem Bild
+// steht das Rotor/Log-Fenster mitten ueber der noch offenen Connect-Maske.
+//
+// Der Weg dahin: showConnectionPanel() versteckt alle schwebenden Fenster
+// („ALLE fliegenden Fenster gehoeren hinter die ConnectMaske"), die
+// Verbindung kommt zustande, und der Connected-Zweig holte sie sofort
+// wieder hervor -- die Maske selbst schliesst sich aber erst eine Sekunde
+// spaeter (Phase 3Q Task 5, das singleShot in onConnectionStateChanged).
+// In dieser Sekunde stehen sie vor ihr.
+//
+// Und sie stehen wirklich VOR ihr, nicht bloss zufaellig obenauf: die
+// schwebenden Werkzeugfenster sind Qt::Tool, auf macOS ein NSPanel auf
+// einer HOEHEREN Fensterebene als ein gewoehnlicher QDialog. Ein raise()
+// auf die Maske hilft dagegen nichts -- dieselbe Ebenen-Falle, die schon
+// beim Antennenfenster (2026-09-01) und beim Setup-Dialog (2026-09-17)
+// zugeschlagen hat, nur andersherum.
+//
+// Also nicht heben, sondern warten: steht die Maske noch, bleibt die
+// Liste liegen. Ihr destroyed-Haken ruft dieselbe Stelle gleich nochmal,
+// und dann ist der Weg frei.
+// ---------------------------------------------------------------------------
+void MainWindow::restoreFloatingWindowsHiddenBehindConnectMask()
+{
+    if (m_shuttingDown) { return; }
+    if (m_connectionPanel && m_connectionPanel->isVisible()) { return; }
+
+    // Der Rotor/Log-Einmalhaken merkt sich hier nur den Wunsch (siehe
+    // Konstruktor); gezeigt wird er an derselben Stelle wie alles andere,
+    // damit er nicht doch wieder allein vorpreschen kann.
+    if (m_showRotorAfterConnectMask) {
+        m_showRotorAfterConnectMask = false;
+        if (m_rotorWindow) {
+            m_rotorWindow->show();
+            m_rotorWindow->raise();
+        }
+    }
+
+    // QPointer haelt fest, ob eines inzwischen ganz geschlossen (nicht nur
+    // versteckt) wurde -- dann bleibt es aus, statt aus dem Nichts
+    // wiederzukommen.
+    for (const QPointer<QWidget>& w
+         : std::as_const(m_floatingContainersHiddenPreConnect)) {
+        if (w) { w->show(); w->raise(); }
+    }
+    m_floatingContainersHiddenPreConnect.clear();
+}
+
 void MainWindow::showConnectionPanel()
 {
     // Maske auf, Fenster weg -- egal, WER sie oeffnet (automatisch
@@ -13086,21 +13136,15 @@ void MainWindow::showConnectionPanel()
             // Betreiber sah nur noch eine leere Flaeche. Die Regel
             // heisst "hinter die ConnectMaske", nicht "weg bis zur
             // Verbindung": schliesst der Betreiber die Maske, gehoert
-            // ihm sein Layout zurueck. Beim Verbinden uebernimmt
-            // stattdessen der Connected-Zweig in
-            // onConnectionStateChanged dieselbe Liste (dann ist sie
-            // hier schon leer -- doppeltes show() droht nicht).
-            if (m_shuttingDown) { return; }
-            if (m_radioModel
-                && m_radioModel->connectionState()
-                       == ConnectionState::Connected) {
-                return;
-            }
-            for (const QPointer<QWidget>& w
-                 : std::as_const(m_floatingContainersHiddenPreConnect)) {
-                if (w) { w->show(); w->raise(); }
-            }
-            m_floatingContainersHiddenPreConnect.clear();
+            // ihm sein Layout zurueck.
+            //
+            // Bis 2026-09-23 stand hier ein "ist verbunden? dann macht
+            // es der Connected-Zweig". Das gilt nicht mehr: seit der
+            // Connected-Zweig seinerseits wartet, bis die Maske weg ist,
+            // IST diese Stelle der letzte Ausloeser -- mit oder ohne
+            // Verbindung. Ist die Liste schon leer, ist der Aufruf ein
+            // No-Op.
+            restoreFloatingWindowsHiddenBehindConnectMask();
         });
     }
     m_connectionPanel->show();
@@ -15065,11 +15109,7 @@ void MainWindow::onConnectionStateChanged()
         // behandelt bereits der eigene, einmalige Rotor/Log-Haken
         // weiter unten im Konstruktor -- diese Schleife hier ist
         // dieselbe Wiederherstellung, nur nicht auf "einmal" begrenzt).
-        for (const QPointer<QWidget>& w
-             : std::as_const(m_floatingContainersHiddenPreConnect)) {
-            if (w) { w->show(); w->raise(); }
-        }
-        m_floatingContainersHiddenPreConnect.clear();
+        restoreFloatingWindowsHiddenBehindConnectMask();
 
         // Review-Fund 2026-09-01 (adversarial bestaetigt): ein Profil
         // mit sichtbarem Antennen-Fenster, angewendet OHNE Verbindung,
