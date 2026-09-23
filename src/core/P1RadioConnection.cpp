@@ -3294,7 +3294,32 @@ void P1RadioConnection::parseEp6Frame(const QByteArray& pkt)
     //
     // Emitted unconditionally each frame: MoxController::onMicPttFromRadio
     // is idempotent, so repeated false→false calls are harmless.
-    const bool micPtt = ((c0_sub0 & 0x01) != 0) || ((c0_sub1 & 0x01) != 0);
+    //
+    // ── Ein I2C-Rahmen traegt KEIN PTT (Werkbank 2026-09-23) ────────────
+    //
+    // Traegt C0 Bit 7, ist der Unterrahmen die Antwort auf eine
+    // I2C-Leseanfrage — dann sind die unteren sieben Bits die
+    // zurueckgegebene Adresse und NICHT Zustandsbits des Funkgeraets. Der
+    // Telemetriezweig unten ueberspringt solche Rahmen laengst; das
+    // Mikrofon-PTT las sie mit, und jede Adresse mit gesetztem Bit 0
+    // wurde als gedrueckte Sendetaste gelesen.
+    //
+    // Am Simulator nachgestellt, nachdem er I2C beantworten gelernt hat:
+    // Longpath fragt beim Verbinden die Version der HL2-I/O-Platine ab
+    // (Geraet 0x41, Register 0, Bus 1), die Antwort kommt mit C0 = 0xFD
+    // zurueck — und 60 ms spaeter stand im Protokoll des Simulators
+    // "PTT= 00000001". Das Geraet ging auf Sendung, ohne dass jemand
+    // etwas gedrueckt hat, und blieb es, solange die Antworten kamen.
+    // Am echten HL2 mit I/O-Platine ist das dieselbe Lage.
+    //
+    // Thetis hat das Problem nicht, weil dort die Zustandsbits im
+    // else-Zweig der I2C-Pruefung gelesen werden
+    // (networkproto1.c:478-493 [@c26a8a4]); Longpath hatte die
+    // Extraktion aus dem Zweig herausgezogen.
+    const bool sub0IsI2c = (c0_sub0 & 0x80) != 0;
+    const bool sub1IsI2c = (c0_sub1 & 0x80) != 0;
+    const bool micPtt = (!sub0IsI2c && (c0_sub0 & 0x01) != 0)
+                     || (!sub1IsI2c && (c0_sub1 & 0x01) != 0);
     emit micPttFromRadio(micPtt);
 
     // Phase 3P-H Task 4: PA telemetry — extract raw 16-bit ADC counts from
