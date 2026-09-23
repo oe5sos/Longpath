@@ -104,6 +104,39 @@ private slots:
         QVERIFY(true);  // if we get here, no crash
     }
 
+    // ── 1b. Im Pruefmodus wird KEIN echtes Geraet geoeffnet ────────────────
+    //
+    // makeBus() ruft sonst Pa_OpenStream und damit CoreAudio. Auf dem
+    // CI-Laeufer ohne Tonausgabe stand dieser Pruefstand am 2026-09-23
+    // deshalb in CTests 120-s-Decke ("Build (macOS Apple Silicon (2/2))"),
+    // waehrend er hier in zwei Sekunden durchlaeuft; auf dem Rechner des
+    // Betreibers haette er sich sonst die Tonkarte genommen.
+    //
+    // Der Beleg: ein untergeschobener FakeAudioBus liegt an, danach
+    // setzt setSpeakersConfig() ihn zurueck -- und es kommt KEINER
+    // nach, weil makeBus() im Pruefmodus nullptr liefert. Das Signal
+    // muss trotzdem kommen (siehe naechster Fall).
+    void setSpeakersConfigOpensNoRealDeviceInTestMode() {
+        Harness h = makeHarness();
+        QVERIFY2(h.engine->hasSpeakersBusForTest(),
+                 "der untergeschobene FakeAudioBus sollte anliegen");
+
+        QSignalSpy spy(h.engine, &AudioEngine::speakersConfigChanged);
+        AudioDeviceConfig cfg;
+        cfg.deviceName = QString();   // Plattform-Standardgeraet
+        h.engine->setSpeakersConfig(cfg);
+
+        // Ohne PortAudio kehrt applySpeakersConfig() vor dem Umbau
+        // zurueck und meldet nichts -- dann sagt dieser Fall nichts
+        // ueber makeBus() aus und haette nur eine falsche Farbe.
+        if (spy.count() == 0) {
+            QSKIP("PortAudio nicht verfuegbar — applySpeakersConfig kehrt frueh zurueck");
+        }
+
+        QVERIFY2(!h.engine->hasSpeakersBusForTest(),
+                 "makeBus() darf im Pruefmodus kein echtes Geraet oeffnen");
+    }
+
     // ── 2. speakersConfigChanged emits after setSpeakersConfig ─────────────
 
     void setSpeakersConfigEmitsSignal() {

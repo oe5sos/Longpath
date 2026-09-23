@@ -106,6 +106,33 @@
 
 ### Fixed
 
+- **Ein Pruefstand nahm sich die Tonkarte.** `AudioEngine::makeBus()`
+  rief `Pa_OpenStream` auch aus einem Pruefprogramm heraus -- also
+  CoreAudio samt Geraeteaufzaehlung und, bei einem Aufnahmegeraet, der
+  Mikrofon-Freigabe. Auf einem CI-Laeufer ohne Tonausgabe kann dieser
+  Aufruf stehen bleiben: am 2026-09-23 lief
+  `tst_audio_engine_speakers_live_reconfig` auf „Build (macOS Apple
+  Silicon (2/2))" in CTests 120-s-Decke, waehrend derselbe Pruefstand am
+  Schreibtisch in zwei Sekunden durchlaeuft. Jetzt liefert `makeBus()`
+  im Pruefmodus (`QStandardPaths::isTestModeEnabled()`, dieselbe Wache
+  wie bei `showAudioDiagnoseDialog()`) `nullptr`, ohne PortAudio
+  anzufassen. Die Pruefstaende schieben ihren Bus ohnehin selbst unter.
+
+- **Der HL2-Drosselwaechter gehoerte allen Verbindungen zugleich.**
+  `hl2CheckBandwidthMonitor()` verglich den ep6-Folgestand gegen ein
+  funktionslokales `static` -- eine einzige Variable fuer jede
+  P1-Verbindung des Prozesses. Mit zwei gleichzeitig verbundenen
+  Geraeten prueft der Wachhund der einen gegen den Folgestand der
+  anderen: je nachdem, welcher Takt zuletzt lief, meldet er eine
+  Drosselung, die es nicht gab, oder verschlaeft eine, die es gab. Der
+  Stand liegt jetzt bei der Verbindung und wird beim Trennen
+  zurueckgesetzt. Dazu die Meldung selbst: sie sagte „pausing ep2
+  command frames", obwohl `onEp2PacerTick()` den Drosselzustand
+  ausdruecklich nicht mehr liest -- der Betreiber bekam eine Massnahme
+  gemeldet, die niemand ergreift. Sie sagt jetzt, was wirklich los ist
+  („ep6 stream stalled"). Pruefstand
+  `tst_p1_wire_format::hl2ThrottleStateIsPerConnection`.
+
 - **SunSDR2 QRP: die Abtastrate stand auf einer Annahme und war falsch.**
   312 500 Hz waren von der SunSDR2 DX uebernommen und im Code
   ausdruecklich als unbestaetigt vermerkt. An der Bank gemessen

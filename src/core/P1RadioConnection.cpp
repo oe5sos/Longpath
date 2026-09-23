@@ -849,6 +849,14 @@ void P1RadioConnection::disconnect()
     m_reconnectAttempts = 0;
     m_lastEp6At = QDateTime();
     m_reconnectedLogged = false;
+    // Der Drosselzustand gehoert zur gerade beendeten Sitzung. Bleibt er
+    // stehen, startet die naechste Verbindung mit der Folgenummer der
+    // vorigen im Ruecken -- genau die Verwechslung, die das frueher
+    // funktionslokale `static` in hl2CheckBandwidthMonitor() gemacht hat.
+    m_hl2Throttled = false;
+    m_hl2ThrottleCount = 0;
+    m_bwLastSeqValid = false;
+    m_bwLastSeqAtTick = 0;
 
     if (m_running && m_socket && !m_radioInfo.address.isNull()) {
         m_running = false;
@@ -4184,26 +4192,39 @@ void P1RadioConnection::hl2CheckBandwidthMonitor()
     // The upstream bandwidth_monitor.{c,h} (MW0LGE [@c26a8a4]) is a byte-rate
     // telemetry helper; throttle detection is a Longpath addition.
     static constexpr int kBwThrottleGapCount = 3;  // NereusSDR heuristic
-    static quint32 s_lastSeq = 0;
 
+    // Der Vergleichsstand gehoert der VERBINDUNG, nicht der Funktion
+    // (2026-09-23). Bis dahin stand hier ein `static quint32 s_lastSeq`:
+    // eine einzige Variable fuer jede P1-Verbindung des Prozesses. Wer
+    // zwei Geraete gleichzeitig verbunden hat, liess den Wachhund der
+    // einen Verbindung gegen den Folgestand der anderen pruefen -- je
+    // nachdem, welcher Takt zuletzt lief, meldete er eine Drosselung,
+    // die es nicht gab, oder verschlief eine, die es gab. In einem
+    // Pruefprogramm mit mehreren Verbindungen nacheinander dasselbe.
     if (!m_lastEp6At.isValid()) {
         // No frames yet — nothing to monitor.
-        s_lastSeq = m_epRecvSeqExpected;
+        m_bwLastSeqAtTick = m_epRecvSeqExpected;
+        m_bwLastSeqValid  = true;
         return;
     }
 
-    if (m_epRecvSeqExpected == s_lastSeq) {
+    if (m_bwLastSeqValid && m_epRecvSeqExpected == m_bwLastSeqAtTick) {
         // Sequence stalled this tick.
         ++m_hl2ThrottleCount;
         if (!m_hl2Throttled && m_hl2ThrottleCount >= kBwThrottleGapCount) {
             m_hl2Throttled = true;
             m_hl2LastThrottleTick = QDateTime::currentDateTimeUtc();
+            // Die Meldung sagte bis 2026-09-23 "pausing ep2 command
+            // frames" -- das stimmt seit dem Pacer nicht mehr:
+            // onEp2PacerTick() liest m_hl2Throttled ausdruecklich NICHT
+            // (siehe den Kopfkommentar dort, "Thetis never pauses
+            // sends"). Der Betreiber bekam also im Statusband eine
+            // Massnahme gemeldet, die niemand ergreift.
             qCWarning(lcConnection) << "HL2: LAN PHY throttle detected (seq-gap fallback) —"
                                     << "ep6 sequence stalled for"
-                                    << m_hl2ThrottleCount << "watchdog ticks;"
-                                    << "pausing ep2 command frames";
+                                    << m_hl2ThrottleCount << "watchdog ticks";
             emit errorOccurred(RadioConnectionError::None,
-                               QStringLiteral("HL2 LAN throttled — pausing ep2"));
+                               QStringLiteral("HL2 LAN throttled — ep6 stream stalled"));
         }
     } else {
         // Sequence advanced — clear throttle.
@@ -4214,7 +4235,8 @@ void P1RadioConnection::hl2CheckBandwidthMonitor()
         m_hl2ThrottleCount = 0;
     }
 
-    s_lastSeq = m_epRecvSeqExpected;
+    m_bwLastSeqAtTick = m_epRecvSeqExpected;
+    m_bwLastSeqValid  = true;
 }
 
 // ---------------------------------------------------------------------------

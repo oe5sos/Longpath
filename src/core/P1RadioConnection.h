@@ -919,6 +919,17 @@ private:
     bool      m_hl2Throttled{false};
     int       m_hl2ThrottleCount{0};
     QDateTime m_hl2LastThrottleTick;
+    // Der Stand von m_epRecvSeqExpected beim VORIGEN Wachhund-Takt --
+    // die Groesse, gegen die die Rueckfall-Heuristik "seit dem letzten
+    // Takt nichts angekommen" prueft. Lag bis 2026-09-23 als
+    // funktionslokales `static` in hl2CheckBandwidthMonitor(), also
+    // EINE Variable fuer alle P1-Verbindungen des Prozesses; zwei
+    // gleichzeitig verbundene Geraete (oder zwei Verbindungen
+    // nacheinander im selben Pruefprogramm) verglichen sich gegen den
+    // Folgestand des jeweils anderen. Der Sentinel unterscheidet
+    // "noch kein Takt gelaufen" von der gueltigen Folgenummer 0.
+    quint32   m_bwLastSeqAtTick{0};
+    bool      m_bwLastSeqValid{false};
 
 #ifdef LONGPATH_BUILD_TESTS
 public:
@@ -939,6 +950,15 @@ public:
     }
     int currentAttenForTest() const { return m_stepAttn[0]; }
     bool hl2ThrottledForTest() const { return m_hl2Throttled; }
+    /// Einen Takt des Bandbreiten-Wachhunds fahren, ohne Funkgeraet:
+    /// setzt den Stand, den ein ep6-Rahmen hinterlassen haette, und
+    /// ruft die Pruefung auf. Fuer tst_p1_wire_format (Rueckfall-Zweig,
+    /// m_bwMonitor nicht verdrahtet).
+    void hl2BandwidthTickForTest(quint32 seqExpected) {
+        m_lastEp6At = QDateTime::currentDateTimeUtc();
+        m_epRecvSeqExpected = seqExpected;
+        hl2CheckBandwidthMonitor();
+    }
     // Compress the silence-watchdog and reconnect-retry timeline so
     // tst_reconnect_on_silence does not sleep for 42 real seconds (which
     // set the parallel floor for the whole ctest run).  Guarded rather
