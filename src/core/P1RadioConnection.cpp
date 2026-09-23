@@ -2702,6 +2702,15 @@ void P1RadioConnection::onReadyRead()
                                   |  quint32(raw[7]);
                 if (m_ep6HaveSeq && seq > m_ep6LastSeq + 1) {
                     m_ep6WndLost += seq - m_ep6LastSeq - 1;
+                    // Das angefangene FFT-Fenster ist jetzt wertlos.
+                    // Gedrosselt, sonst flutet ein schlechter Funkweg die
+                    // Ereignisschlange: ein Fenster dauert bei 768 kHz
+                    // gut 5 ms, 20 ms Abstand verliert also nichts.
+                    const qint64 nowGap = QDateTime::currentMSecsSinceEpoch();
+                    if (nowGap - m_lastGapSignalMs >= 20) {
+                        m_lastGapSignalMs = nowGap;
+                        emit iqSequenceGap();
+                    }
                 }
                 m_ep6LastSeq = seq;
                 m_ep6HaveSeq = true;

@@ -523,6 +523,13 @@ signals:
     /// 2026-08-22 traegt die Kopfleiste sie.
     void iqPacketLoss(double lossPercent, quint32 lost, quint32 received);
 
+    /// Im Empfangsstrom fehlten Pakete — das angefangene FFT-Fenster ist
+    /// wertlos (der Sprung an der Nahtstelle malt einen breitbandigen
+    /// Schmierer). Gedrosselt gesendet: hoechstens alle 20 ms, sonst
+    /// flutet ein schlechter Funkweg die Ereignisschlange. Empfaenger:
+    /// RadioModel, das es an die Panadapter weiterreicht.
+    void iqSequenceGap();
+
     // PSU supply voltage (V) from supply_volts (P1 AIN6 / P2 bytes 45-46).
     // Converted via Hermes DC-volts formula (console.cs computeHermesDCVoltage()
     // [v2.10.3.13]). Emitted at most once per 50 mV change.

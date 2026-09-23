@@ -3171,6 +3171,15 @@ void P2RadioConnection::processIqPacket(const QByteArray& data, int ddcIndex)
         ++m_iqSeqWndEvents;
         if (delta > 0) {
             m_iqSeqWndLost += static_cast<quint32>(delta);
+            // Fehlende Pakete: das angefangene FFT-Fenster ist wertlos.
+            // Gedrosselt wie in P1 (20 ms), sonst flutet ein schlechter
+            // Funkweg die Ereignisschlange. Ein Umsortieren oder ein
+            // Doppelpaket (delta < 0) laesst das Fenster in Ruhe.
+            const qint64 nowGap = QDateTime::currentMSecsSinceEpoch();
+            if (nowGap - m_lastGapSignalMs >= 20) {
+                m_lastGapSignalMs = nowGap;
+                emit iqSequenceGap();
+            }
         }
     }
     m_rx[ddcIndex].rxInSeqNo = seq;

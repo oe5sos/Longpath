@@ -319,6 +319,10 @@ longpath_add_test(tst_wdsp_delay_clamp)
 #    und Freigeben darunter aus. Portiert aus AetherSDR [@7f68dda0]. --
 longpath_add_test(tst_fftw_planner_lock)
 
+# -- FFT-Fenster nach einem Loch im Strom (2026-09-22): das angefangene
+#    Fenster wird verworfen, statt den Sprung als Schmierer zu malen. --
+longpath_add_test(tst_fft_window_after_gap)
+
 # -- NNR ohne Modelldatei (2026-09-22, HL2-Werkbank Runde 3): setAlpha/
 #    setKnee auf einem NNET, dessen Modell nie geladen wurde -- vier
 #    ungeprueft dereferenzierte Zeiger in nnet.c, ein Absturz bei jeder

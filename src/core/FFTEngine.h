@@ -193,6 +193,23 @@ public slots:
     // Accumulates until fftSize samples are collected, then runs FFT.
     void feedIQ(const QVector<float>& interleavedIQ);
 
+    /// Das angefangene Fenster verwerfen — nach einem Loch im Datenstrom.
+    ///
+    /// Der Panadapter schiebt seine Abtastwerte in ein gleitendes Fenster
+    /// und rechnet erst, wenn es voll ist. Fehlen mittendrin Pakete (WLAN,
+    /// ausgelastete Gegenstelle), steht im Fenster ein Sprung — und ein
+    /// Sprung ist breitbandig: er malt einen Schmierer ueber das ganze
+    /// Bild, der aussieht wie ein Signal. Diese Methode wirft das
+    /// angefangene Fenster weg, sodass das naechste Bild nur aus Werten
+    /// nach dem Loch entsteht.
+    ///
+    /// Darf von JEDEM Faden gerufen werden: sie setzt nur eine Fahne, die
+    /// feedIQ() auf seinem eigenen Faden abholt.
+    void requestWindowReset() { m_windowResetPending.store(true); }
+
+    /// Wie oft ein Fenster deshalb verworfen wurde (Diagnose).
+    quint64 windowResets() const { return m_windowResets.load(); }
+
 signals:
     // Emitted when a new FFT frame is ready.
     // binsDbm contains fftSize float values (full FFT-shifted bins, neg-freq
@@ -323,6 +340,8 @@ private:
     // I/Q accumulation buffer (interleaved pairs)
     QVector<float> m_iqBuffer;
     int m_iqWritePos{0};  // write position in sample pairs
+    std::atomic<bool>    m_windowResetPending{false};  // von requestWindowReset()
+    std::atomic<quint64> m_windowResets{0};            // nur Diagnose
 
     // Output rate limiting
     QElapsedTimer m_frameTimer;
