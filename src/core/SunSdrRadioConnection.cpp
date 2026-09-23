@@ -287,6 +287,34 @@ void SunSdrRadioConnection::sendDiscoveryBroadcast()
     // a live capture showed ExpertSDR2 itself doing (loopback, WLAN,
     // wired, each with its own broadcast address), not a single guessed
     // 255.255.255.255. See the class header's top-of-file comment.
+    // ── Zuerst geradeaus an das Geraet, das der Betreiber eingetragen
+    //    hat (2026-09-23) ───────────────────────────────────────────────
+    //
+    // Die Rundsendung bleibt — sie ist der Weg, der am Geraet bewiesen
+    // wurde. Aber sie ist auch der einzige, und das ist eine Schwaeche:
+    // ein WLAN mit Client-Isolation, ein Router mit gefilterter
+    // Rundsendung, ein anderes VLAN, ein Gast-Netz — in all diesen
+    // Faellen kommt die Anfrage nie an, obwohl die Adresse des Geraets
+    // im Eintrag steht und ein gewoehnliches Paket dorthin ankaeme. Ein
+    // zusaetzliches Paket an genau diese Adresse kostet 24 Byte und
+    // macht den Fall auf.
+    //
+    // Es ist dieselbe Anfrage (Opcode 0x00, eine reine Frage), also
+    // kann sie auch nichts verstellen; das Geraet antwortet auf den
+    // Absenderport, gleich ob es die Rundsendung oder dieses Paket
+    // beantwortet. Eine Doppelantwort ist unschaedlich:
+    // processControlDatagram() verwirft den zweiten Beacon, sobald der
+    // Handschlag laeuft (eigener Prueffall in
+    // tst_sunsdr_radio_connection).
+    //
+    // Nebenwirkung, die die Werkbank erst moeglich macht: ueber die
+    // Rueckschleife gibt es keine Rundsendeadresse, also erreichte die
+    // Anfrage ein Messgeraet auf 127.0.0.1 nie.
+    if (!m_radioInfo.address.isNull()) {
+        m_controlSocket->writeDatagram(query, m_radioInfo.address, ctrlPort);
+        recordBytesSent(static_cast<qint64>(query.size()));
+    }
+
     for (const QNetworkInterface& iface : QNetworkInterface::allInterfaces()) {
         if (!(iface.flags() & QNetworkInterface::IsUp)) { continue; }
         for (const QNetworkAddressEntry& entry : iface.addressEntries()) {

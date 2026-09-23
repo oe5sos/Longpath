@@ -4,6 +4,15 @@
 
 ### Added
 
+- **Messgeraet fuer die SunSDR2 QRP** (`tools/sunsdr_sim.py`,
+  Longpath-eigen): stellt Suchanfrage, Beacon, Zustandsrahmen, den
+  IQ-Strom mit 312 500 Hz und das Verstummen nach 8 s ohne
+  Lebenszeichen nach. Damit laesst sich der native QRP-Treiber ohne
+  Funkgeraet fahren — Anleitung in
+  `docs/development/sunsdr-simulator-workbench.md`, Werkbank-Pruefstand
+  `tst_sunsdr_sim_workbench` (ueberspringt sich ohne
+  `LONGPATH_SUNSDRSIM`).
+
 - **DX-Radar** als dritte Ansicht des Kartenfensters (Knopf „Radar",
   auch in der Kartenspalte des Logbuchs): dieselben Kontakte nach
   Peilung und Entfernung von zu Hause, Norden oben, Ringe 500 …
@@ -96,6 +105,15 @@
   Knoepfe. Pruefstand `tst_logbook_one_page`.
 
 ### Fixed
+
+- **SunSDR2 QRP: die Suchanfrage geht jetzt auch geradeaus an die
+  eingetragene Adresse**, nicht nur an die Rundsendeadressen der
+  Schnittstellen. Ein WLAN mit Client-Isolation, ein Router mit
+  gefilterter Rundsendung, ein Gast- oder anderes VLAN — in all diesen
+  Faellen kam die Anfrage nie an, obwohl die Adresse des Geraets im
+  Eintrag steht und ein gewoehnliches Paket dorthin ankaeme. Es ist
+  dieselbe reine Frage (Opcode 0x00), sie kann also nichts verstellen;
+  eine Doppelantwort verwirft der Treiber ohnehin.
 
 - **Eine Antwort der HL2-I/O-Platine konnte das Funkgeraet auf Sendung
   schicken.** Beantwortet die Platine eine I2C-Leseanfrage, traegt der
