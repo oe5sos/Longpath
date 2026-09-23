@@ -4,6 +4,31 @@
 
 ### Added
 
+- **`tools/sunsdr_stream_census.py`** -- zaehlt den Empfangsstrom einer
+  SunSDR2 QRP aus und beantwortet die Frage, an der sich am 2026-09-23
+  Messung und Hoereindruck widersprochen haben: tragen die acht Pakete
+  mit derselben Folgenummer dieselben Bytes (dann 48 000 Proben/s) oder
+  verschiedene (dann 384 000, und der Wiederholungsfilter war ein
+  Datenverlust)? Es vergleicht alle Kopien einer Folgenummer
+  MITEINANDER -- die Kopien kommen verschraenkt mit den Nachbarbloecken
+  an, weshalb der Vergleich mit dem unmittelbar vorigen Paket, den die
+  Diagnosezeile im Treiber macht, immer null meldet. Dazu Byte 3 des
+  Kopfes, das der Treiber gar nicht liest. Liest nur mit (tcpdump),
+  sendet nichts, braucht eine Minute am Geraet und kein Ohr; mit
+  `--from-file` laesst sich eine gesicherte Aufzeichnung nachtraeglich
+  auswerten.
+
+- **Beide QRP-Mitleser lesen jetzt auch eine gesicherte Aufzeichnung**
+  (`--pcap`, klassisches pcap wie von `tcpdump -w` und pcapng wie von
+  Wireshark, ohne fremde Pakete): eine Minute am Geraet bleibt damit
+  liegen und laesst sich spaeter noch einmal auswerten, statt sie fuer
+  jede neue Frage neu zu fahren. `tools/sunsdr_opcode_watch.py` zeigt
+  ausserdem mit `--full` die ganze Nutzlast -- am 2026-08-26 schickte
+  ExpertSDR2 beim Verbinden ein rund 1,2 kB grosses Paket, und zwar
+  zweimal, waehrend Longpath an derselben Stelle einen einzigen
+  30-Byte-Rahmen schickt. Was in diesem Paket steht, sagt Longpath dem
+  Geraet bis heute nie.
+
 - **2D/3D-Umschaltung im Blatt des Rechtsklicks** (Panadapter >
   Rechtsklick > „Darstellung"): die Wahl zwischen dem Wasserfall und
   den gestapelten 3D-Trassen gab es bisher nur in der Knopfleiste auf
