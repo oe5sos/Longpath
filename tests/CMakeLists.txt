@@ -4916,6 +4916,11 @@ longpath_add_test(tst_kiwi_tracking_follows_the_slice)
 # 2026-09-21: Nebenfenster (Channel Strip, Logbuch, Setup, Meldungen) auf
 # die Ebene der schwebenden Paletten -- welche Fenster der Filter anfasst.
 longpath_add_test(tst_auxiliary_window_leveler)
+
+# -- Der Farbwaehler darf nicht der native sein (2026-09-23: das native
+#    NSColorPanel stand als schwarzes, leeres Fenster da und machte das
+#    Programm unbeendbar -- nicht einmal SIGTERM half). --
+longpath_add_test(tst_color_picker_not_native)
 # 2026-09-21: Help > Check for Updates... -- Release-JSON, Version, Paket,
 # SHA256SUMS, Startpruefung, Zielpfad, Neustart-Helfer, DMG-Einspielen (macOS).
 longpath_add_test(tst_update_checker)

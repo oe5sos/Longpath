@@ -2,6 +2,7 @@
 #pragma once
 
 #include <QColor>
+#include <QColorDialog>
 #include <QPushButton>
 #include <QString>
 
@@ -25,6 +26,23 @@ public:
 
     QColor color() const { return m_color; }
     void setColor(const QColor& c);
+
+    /// Die Optionen, mit denen der Farbwaehler aufgeht.
+    ///
+    /// Als benannter Wert, damit ein Pruefstand ihn lesen kann:
+    /// `QColorDialog::getColor()` ist ein blockierender statischer
+    /// Aufruf, den kein Test ausloesen kann, ohne selbst haengen zu
+    /// bleiben -- also wird wenigstens festgenagelt, WOMIT er
+    /// aufgerufen wird.
+    ///
+    /// DontUseNativeDialog ist kein Geschmack, sondern eine Lehre vom
+    /// 2026-09-23: auf macOS nimmt Qt sonst das native NSColorPanel,
+    /// und genau das stand beim Betreiber als schwarzes Fenster ohne
+    /// ein einziges bedienbares Element da, waehrend getColor() seine
+    /// eigene Ereignisschleife fuhr. Das Programm nahm nichts mehr an,
+    /// nicht einmal Cmd+Q, nicht einmal SIGTERM -- es musste
+    /// abgeschossen werden.
+    static QColorDialog::ColorDialogOptions pickerOptions();
 
     static QString colorToHex(const QColor& c);
     static QColor colorFromHex(const QString& hex);
