@@ -63,6 +63,15 @@ public:
     /// Anzeigewerten gehoert, sondern zum Takt.
     void setWfUpdatePeriodMs(int ms);
 
+    /// Betreiber 2026-09-23: „hier sollte das 2d und 3d zum aendern
+    /// sein!" -- die Umschaltung gab es nur im SpectrumOverlayPanel,
+    /// also in einem anderen Blatt als dem, das der Rechtsklick auf den
+    /// Panadapter oeffnet. Gesucht hat er sie hier. 0 = 2D, 1 = 3D.
+    /// Getrennt von setValues() aus demselben Grund wie
+    /// setWfUpdatePeriodMs: der Wert gehoert dem Panadapter, nicht den
+    /// Wasserfall-Reglern, und wird beim Oeffnen nachgezogen.
+    void setSpectrumRenderModeIndex(int renderModeIndex);
+
 signals:
     void wfColorGainChanged(int gain);
     void wfBlackLevelChanged(int level);
@@ -74,6 +83,8 @@ signals:
     void wfColorSchemeChanged(int scheme);
     void fillAlphaChanged(float alpha);
     void panFillChanged(bool on);
+    /// 0 = 2D (Trasse + Wasserfall), 1 = 3D (gestapelte Trassen).
+    void spectrumRenderModeChanged(int mode);
     void refLevelChanged(float dBm);
     void dynRangeChanged(float dB);
     void ctunChanged(bool enabled);
@@ -103,6 +114,7 @@ private:
     QComboBox* m_schemeCombo{nullptr};
     QSlider*   m_fillAlphaSlider{nullptr};
     QCheckBox* m_panFillCheck{nullptr};
+    QComboBox* m_renderModeCombo{nullptr};
     QSlider*   m_refLevelSlider{nullptr};
     QSlider*   m_dynRangeSlider{nullptr};
     QLabel*    m_wfGainLabel{nullptr};
