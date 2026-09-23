@@ -178,7 +178,7 @@ def _pcapngPackets(fh, head):
             yield ts, link, body[20:20 + caplen]
 
 
-def _udpPayload(link, data):
+def _udpPayload(link, data, withPeers=False):
     """Nutzbytes eines UDP-Datagramms, oder None. Nur IPv4/UDP."""
     if link == 0:            # DLT_NULL (loopback)
         off = 4
@@ -202,19 +202,32 @@ def _udpPayload(link, data):
     ihl = (ip[0] & 0x0F) * 4
     if ip[9] != 17 or len(ip) < ihl + 8:
         return None
-    return ip[ihl + 8:]
+    body = ip[ihl + 8:]
+    if not withPeers:
+        return body
+    src = ".".join(str(b) for b in ip[12:16])
+    dst = ".".join(str(b) for b in ip[16:20])
+    sport = int.from_bytes(ip[ihl:ihl + 2], "big")
+    dport = int.from_bytes(ip[ihl + 2:ihl + 4], "big")
+    return body, "%s:%d" % (src, sport), "%s:%d" % (dst, dport)
 
 
-def pcapDatagrams(path):
-    """(Zeitmarke als Text, UDP-Nutzbytes) je Datagramm der Datei."""
+def pcapDatagrams(path, withPeers=False):
+    """(Zeitmarke als Text, UDP-Nutzbytes) je Datagramm der Datei.
+
+    Mit withPeers zusaetzlich (Absender, Empfaenger) als "ip:port" --
+    ohne die Richtung laesst sich nicht sagen, ob ein Rahmen eine Frage
+    des Programms oder eine Antwort des Geraets ist, und genau daran
+    haengt jede Deutung.
+    """
     import datetime
     with open(path, "rb") as fh:
         for ts, link, data in _pcapPackets(fh):
-            pl = _udpPayload(link, data)
-            if pl is None:
+            got = _udpPayload(link, data, withPeers)
+            if got is None:
                 continue
             t = datetime.datetime.fromtimestamp(ts).strftime("%H:%M:%S.%f")
-            yield t, pl
+            yield (t,) + got if withPeers else (t, got)
 
 
 class FileLike:

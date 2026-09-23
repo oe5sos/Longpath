@@ -111,7 +111,7 @@ def _pcapngPackets(fh, head):
             yield ts, link, body[20:20 + caplen]
 
 
-def _udpPayload(link, data):
+def _udpPayload(link, data, withPeers=False):
     """Nutzbytes eines UDP-Datagramms, oder None. Nur IPv4/UDP."""
     if link == 0:            # DLT_NULL (loopback)
         off = 4
@@ -135,19 +135,32 @@ def _udpPayload(link, data):
     ihl = (ip[0] & 0x0F) * 4
     if ip[9] != 17 or len(ip) < ihl + 8:
         return None
-    return ip[ihl + 8:]
+    body = ip[ihl + 8:]
+    if not withPeers:
+        return body
+    src = ".".join(str(b) for b in ip[12:16])
+    dst = ".".join(str(b) for b in ip[16:20])
+    sport = int.from_bytes(ip[ihl:ihl + 2], "big")
+    dport = int.from_bytes(ip[ihl + 2:ihl + 4], "big")
+    return body, "%s:%d" % (src, sport), "%s:%d" % (dst, dport)
 
 
-def pcapDatagrams(path):
-    """(Zeitmarke als Text, UDP-Nutzbytes) je Datagramm der Datei."""
+def pcapDatagrams(path, withPeers=False):
+    """(Zeitmarke als Text, UDP-Nutzbytes) je Datagramm der Datei.
+
+    Mit withPeers zusaetzlich (Absender, Empfaenger) als "ip:port" --
+    ohne die Richtung laesst sich nicht sagen, ob ein Rahmen eine Frage
+    des Programms oder eine Antwort des Geraets ist, und genau daran
+    haengt jede Deutung.
+    """
     import datetime
     with open(path, "rb") as fh:
         for ts, link, data in _pcapPackets(fh):
-            pl = _udpPayload(link, data)
-            if pl is None:
+            got = _udpPayload(link, data, withPeers)
+            if got is None:
                 continue
             t = datetime.datetime.fromtimestamp(ts).strftime("%H:%M:%S.%f")
-            yield t, pl
+            yield (t,) + got if withPeers else (t, got)
 
 MAGIC1 = 0xFF
 KNOWN = {
@@ -191,6 +204,11 @@ def main():
                     help="0 = bis Strg-C")
     ap.add_argument("--magic0", type=lambda x: int(x, 0), default=0x03,
                     help="0x03 = QRP, 0x32 = DX, 0x01 = PRO")
+    ap.add_argument("--port", type=int, default=50001,
+                    help="Steuerport (beide Seiten benutzen ihn)")
+    ap.add_argument("--radio", default="",
+                    help="Adresse des Funkgeraets, fuer die Richtungspfeile. "
+                         "Ohne Angabe aus der Rundsendung erraten.")
     ap.add_argument("--mark", action="store_true",
                     help="Eingabetaste setzt eine Marke ins Protokoll")
     ap.add_argument("--pcap", default="",
@@ -201,14 +219,19 @@ def main():
     args = ap.parse_args()
 
     if args.pcap:
+        frames = [(ts, pl, src, dst) for ts, pl, src, dst
+                  in pcapDatagrams(args.pcap, withPeers=True)]
+        radio = args.radio or guessRadio(frames, args.magic0)
+        if radio:
+            print("# Geraet: %s" % radio)
         seen = {}
-        for ts, pl in pcapDatagrams(args.pcap):
-            emit(ts, pl, args, seen)
+        for ts, pl, src, dst in frames:
+            emit(ts, pl, args, seen, src, dst, radio)
         summarise(seen)
         return
 
     cmd = ["tcpdump", "-i", args.iface, "-n", "-l", "-U", "-x", "-s", "2000",
-           "udp port 50001"]
+           "udp port %d" % args.port]
     print("# " + " ".join(cmd), flush=True)
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                             stderr=subprocess.DEVNULL, text=True)
@@ -242,8 +265,13 @@ def main():
     summarise(seen)
 
 
-def emit(ts, pl, args, seen):
-    """Einen Steuerrahmen aufschreiben, falls es einer ist."""
+def emit(ts, pl, args, seen, src="", dst="", radio=""):
+    """Einen Steuerrahmen aufschreiben, falls es einer ist.
+
+    Die Richtung steht dabei, weil ohne sie keine Deutung moeglich ist:
+    derselbe Opcode heisst in die eine Richtung "sag mir X" oder "stell
+    X auf diesen Wert" und in die andere "X ist dieser Wert".
+    """
     if len(pl) < 3 or pl[0] != args.magic0 or pl[1] != MAGIC1:
         return
     op = pl[2]
@@ -255,9 +283,39 @@ def emit(ts, pl, args, seen):
     payload = body if args.full else body[:min(max(declared, 8), 64)]
     seen[op] = seen.get(op, 0) + 1
     more = "" if (args.full or len(payload) == len(body)) else "..."
-    print("%s  op=0x%02x  len=%-4d ganz=%-5d payload=%s%s %s"
-          % (ts, op, declared, len(pl), payload.hex(), more,
+    # Wer mit wem. Ueber den Port geht das NICHT: beide Seiten benutzen
+    # 50001 (am 2026-09-23 im Mitschnitt gesehen -- eine Annahme, die
+    # sich sofort geraecht hat, weil dann jeder Rahmen wie eine Frage
+    # des Programms aussah). Also ueber die Adresse.
+    if src and dst and radio:
+        arrow = "-->" if dst.split(":")[0] == radio else "<--"
+    else:
+        arrow = "   "
+    print("%s %s op=0x%02x  len=%-4d ganz=%-5d payload=%s%s %s"
+          % (ts, arrow, op, declared, len(pl), payload.hex(), more,
              KNOWN.get(op, "?? nicht zugeordnet")), flush=True)
+
+
+def guessRadio(frames, magic0):
+    """Das Geraet ist die Seite, die die Rundsendung NICHT geschickt hat.
+
+    Opcode 0x00 geht als Rundsendung an x.x.x.255 hinaus; ihr Absender
+    ist damit das Programm, und der andere Teilnehmer das Geraet.
+    """
+    program = ""
+    hosts = set()
+    for _ts, pl, src, dst in frames:
+        if len(pl) < 3 or pl[0] != magic0 or pl[1] != MAGIC1:
+            continue
+        s_ip, d_ip = src.split(":")[0], dst.split(":")[0]
+        hosts.add(s_ip)
+        hosts.add(d_ip)
+        if pl[2] == 0x00 and d_ip.endswith(".255"):
+            program = s_ip
+    if not program:
+        return ""
+    rest = [h for h in hosts if h != program and not h.endswith(".255")]
+    return rest[0] if len(rest) == 1 else ""
 
 
 def summarise(seen):
