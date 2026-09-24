@@ -164,6 +164,32 @@
 
 ### Fixed
 
+- **Panadapter-Beschriftungen wichen je nach Bildschirm-Skalierung von
+  der uebrigen Grafik ab.** Betreiber am 2026-09-24: „die fontgröße des
+  graphen sollte immer die gleiche pixelgröße haben“. Der Hausstil
+  (`capsFont()` in `StyleConstants.h`) haelt Beschriftungen auf Graphen
+  pixelfest (`setPixelSize`), unabhaengig von der System-DPI -- an
+  sechs Stellen im Panadapter/Wasserfall (dBm-Skala, Bandplan-Zeile,
+  Wasserfall-„LIVE“-Chip, Wasserfall-Zeitachse, IMD-Overlay, die
+  „HIGH SWR“-Warnung) stand stattdessen das DPI-abhaengige
+  `setPointSize`. Die Bandplan-Zeile war dabei zusaetzlich intern
+  inkonsistent: ihre Zeilenhoehe wurde schon immer als Pixelmass
+  gerechnet (`bandH = m_bandPlanFontSize + 4`), waehrend die Schrift
+  selbst DPI-abhaengig gerendert wurde -- beide Rechnungen meinten
+  nicht dasselbe.
+
+  Zwei der sechs Groessen (7 px, 48 px) lagen ausserhalb der erlaubten
+  Schriftleiter `{9, 11, 13, 16, 22, 38}`; auf Ruecksprache mit dem
+  Betreiber ist die Leiter um benannte Stufen `kFontMicro` (7) und
+  `kFontAlarm` (48) erweitert worden, statt die tatsaechlichen
+  Pixelgroessen zu veraendern -- am Bildschirm sieht nichts anders aus.
+
+  Pruefstand `scripts/verify-spectrum-labels-pixelfest.py`, in `ci.yml`
+  eingehaengt, bewusst nur auf `SpectrumWidget.cpp` beschraenkt (andere
+  Grafiken im Baum -- Kanalstreifen-Meter, EQ-Kurve,
+  Verstaerker-Diagramm, Setup-Protokoll -- sind eigene Widgets und
+  nicht Teil dieser Meldung).
+
 - **Der Farbwaehler konnte das Programm unbeendbar machen.** Betreiber
   am 2026-09-23: „kann longpath nicht schliessen … trotzdem muesste der
   mit command Q geschlossen werden." Auf macOS nimmt Qt fuer

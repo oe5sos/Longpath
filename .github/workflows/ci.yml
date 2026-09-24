@@ -118,6 +118,16 @@ jobs:
         # flag A whatever the operator selected.
         run: python3 scripts/verify-no-captured-slice-spectrum-wiring.py
 
+      - name: Panadapter labels stay pixel-locked
+        # 2026-09-24: the panadapter/waterfall (SpectrumWidget) mixed
+        # setPixelSize (house style, DPI-independent) with setPointSize
+        # (DPI-dependent) across its own labels -- the dBm scale, band
+        # plan, waterfall LIVE chip/time axis, IMD overlay, and the HIGH
+        # SWR warning rendered at a different apparent size than the
+        # frequency-axis/grid text next to them depending on display
+        # scaling. Scoped to this one widget, not a tree-wide sweep.
+        run: python3 scripts/verify-spectrum-labels-pixelfest.py
+
       # ------------------------------------------------------------------
       # Inline author-tag preservation (added 2026-04-21 after DH1KLM drop)
       # ------------------------------------------------------------------
