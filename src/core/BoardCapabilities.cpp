@@ -1258,19 +1258,26 @@ const BoardCapabilities kSunSdr2Qrp = {
     .maxSlices        = 1,
     .userDdcCount     = 1,
     .widebandAdcs     = 0,   // no wideband/panadapter-bypass stream documented
-    // Native rate 312,500 Hz — confirmed, design doc "IQ stream" section.
-    // Not negotiated; this is the only rate the wire protocol produces.
-    // OFFEN (2026-09-23). Gezaehlt wurden 240 verschiedene Bloecke je
-    // Sekunde zu 200 Probenpaaren = 48 000 Proben/s -- aber die Fassung,
-    // die am Geraet richtig klingt, faehrt mit 192 000 und ohne
-    // Wiederholungsfilter. Solange dieser Widerspruch nicht aufgeloest
-    // ist, steht hier der alte, von der SunSDR2 DX uebernommene Wert.
-    // Er wird auf dem Verbindungsweg ohnehin nicht gelesen: die QRP hat
-    // keinen HPSDRModel-Eintrag, darum faellt die Modellaufloesung auf
-    // Atlas und mit ihr auf Atlas' Kenndaten (192 kHz). Auch das ist
-    // offen -- siehe CHANGELOG zum 2026-09-23.
-    .sampleRates      = {312500, 0, 0, 0, 0, 0},
-    .maxSampleRate    = 312500,
+    // 48 000 Hz — am Geraet gemessen (2026-09-23/24), nicht uebernommen.
+    //
+    // Die 312 500 Hz standen hier seit dem 2026-08-26; sie sind von der
+    // SunSDR2 DX abgeschrieben und waren fuer die QRP nie geprueft.
+    //
+    // Mit Blockantwort (jeder Block wird mit seiner Folgenummer
+    // beantwortet, wie ExpertSDR2 es tut) liefert die QRP am 2026-09-24
+    // im Treiber gemessen: 240 Pakete/s, 240 Folgenummern/s, eine Kopie
+    // je Nummer -- 240 Bloecke zu 200 Probenpaaren = 48 000 Proben/s.
+    // Ohne Antwort wiederholt sie jeden Block bis zu achtmal (1920
+    // Pakete/s, bytegleich); das war der Stand vom 2026-09-23 und keine
+    // Eigenschaft des Stroms, sondern ein Zeichen, dass niemand quittiert.
+    //
+    // Diese Zeile wurde bis zum 2026-09-23 gar nicht gelesen: die QRP hat
+    // keinen HPSDRModel-Eintrag, darum fiel die Modellaufloesung auf
+    // Atlas und mit ihr auf Atlas' 192 kHz. Siehe die Stelle in
+    // RadioModel::connectToRadio, die das jetzt richtigstellt -- ohne sie
+    // ist die Zahl hier wirkungslos.
+    .sampleRates      = {48000, 0, 0, 0, 0, 0},
+    .maxSampleRate    = 48000,
     // No OpenHPSDR-style wire-encoded step attenuator exists on this
     // protocol. SunSDR has its own, structurally different mechanism: a
     // single opcode (0x05) selecting one of 4 discrete preamp/atten

@@ -4129,6 +4129,24 @@ QVector<int> RadioModel::allowedStreamSampleRates() const
     return out;
 }
 
+// Eine pro Band gespeicherte Rate gilt nur, wenn das VERBUNDENE Geraet sie
+// kann. Die Schluessel sind nicht je Geraet: nach einer ANAN-Sitzung stand
+// dort 192 000, und beim Verbinden der SunSDR2 QRP (nur 48 000) stellte
+// die Wiederanwendung den Empfangskanal 200 ms nach dem Connect auf
+// 192 000 zurueck -- 48k-Daten in einem 192k-Kanal, am Geraet als
+// "schlechtes Rauschen" gehoert (2026-09-24). Der Verbindungsweg prueft
+// seine Rate schon gegen dieselbe Liste (resolveSampleRate).
+bool RadioModel::restoredRateAllowed(int rateHz) const
+{
+    const QVector<int> allowed = allowedStreamSampleRates();
+    if (allowed.isEmpty() || allowed.contains(rateHz)) {
+        return true;
+    }
+    qCInfo(lcConnection) << "Gespeicherte Abtastrate" << rateHz
+                         << "verworfen: das verbundene Geraet kann nur" << allowed;
+    return false;
+}
+
 // Codex review round 7, PR #293. See RadioModel.h.
 void RadioModel::applyRestoredSampleRate(SliceModel* slice)
 {
@@ -4137,6 +4155,9 @@ void RadioModel::applyRestoredSampleRate(SliceModel* slice)
     }
     const int restored = slice->sampleRateHz();
     if (restored <= 0) {
+        return;
+    }
+    if (!restoredRateAllowed(restored)) {
         return;
     }
 
@@ -6067,11 +6088,7 @@ void RadioModel::connectToRadio(const RadioInfo& info)
     // full confidence to a different coupler.
     m_couplerZero.reset();
 
-    HPSDRModel selectedModel = info.modelOverride;
-    if (selectedModel == HPSDRModel::FIRST) {
-        selectedModel = defaultModelForBoard(info.boardType);
-    }
-    applyHpsdrModel(selectedModel);
+    applyHardwareProfileFor(info);
 
     qCDebug(lcConnection) << "HardwareProfile: model=" << displayName(m_hardwareProfile.model)
                           << "effectiveBoard=" << static_cast<int>(m_hardwareProfile.effectiveBoard)
@@ -12347,6 +12364,55 @@ void RadioModel::applyHpsdrModel(HPSDRModel m)
     }
 }
 
+// ---------------------------------------------------------------------------
+// applyHardwareProfileFor — welches Modell, und welche Kenndaten
+//
+// Aus connectToRadio herausgeloest, damit sich die Entscheidung ohne
+// Netz und ohne Funkgeraet pruefen laesst (tst_sunsdr_board_caps).
+// ---------------------------------------------------------------------------
+void RadioModel::applyHardwareProfileFor(const RadioInfo& info)
+{
+    HPSDRModel selectedModel = info.modelOverride;
+    if (selectedModel == HPSDRModel::FIRST) {
+        selectedModel = defaultModelForBoard(info.boardType);
+    }
+    applyHpsdrModel(selectedModel);
+
+    // ── Die SunSDR steht in keiner HPSDRModel-Liste ─────────────────────
+    //
+    // defaultModelForBoard() kennt nur OpenHPSDR-Baugruppen. Fuer die
+    // SunSDR2 QRP faellt es auf HPSDRModel::HPSDR zurueck, und
+    // profileForModel() setzt damit effectiveBoard = Atlas. Ab da
+    // entscheiden ATLAS' Kenndaten ueber die Abtastrate -- 192 000 Hz
+    // fuer ein Geraet, das 48 000 liefert.
+    //
+    // Am 2026-09-23 stand genau das im Protokoll einer laufenden
+    // QRP-Verbindung, waehrend der Treiber 1 920 Pakete je Sekunde
+    // hereinbekam:
+    //
+    //     HardwareProfile: model= HPSDR (Atlas/Metis) effectiveBoard= 0
+    //     Connecting with sampleRate= 192000
+    //
+    // Deshalb hat auch die Abtastrate in BoardCapabilities nie gewirkt:
+    // die Zeile der QRP wurde auf diesem Weg nie gelesen. Zwei Tage lang
+    // sind Fassungen gegeneinander gehoert worden, von denen keine das
+    // war, was draufstand.
+    //
+    // Das MODELL bleibt, wie es ist. Es steuert Codec, PA-Telemetrie und
+    // PureSignal -- lauter OpenHPSDR-Dinge, die dieses Geraet nicht hat;
+    // der Atlas-Rueckfall ist dort der harmloseste Stand. Korrigiert wird
+    // nur, WELCHE Kenndaten gelten: die des gemeldeten Boards.
+    if (info.protocol == ProtocolVersion::SunSdr) {
+        m_hardwareProfile.effectiveBoard = info.boardType;
+        m_hardwareProfile.caps           = &BoardCapsTable::forBoard(info.boardType);
+        m_hardwareProfile.adcCount       = m_hardwareProfile.caps->adcCount;
+        qCInfo(lcConnection)
+            << "SunSDR: Kenndaten vom gemeldeten Board statt vom "
+               "Atlas-Rueckfall -- Abtastrate"
+            << m_hardwareProfile.caps->maxSampleRate;
+    }
+}
+
 void RadioModel::setConnectionState(ConnectionState s)
 {
     if (m_connectionState == s) {
@@ -12477,9 +12543,11 @@ void RadioModel::onConnectionStateChanged(ConnectionState state)
         // the loss — this closes the loop at the only trustworthy
         // point.
         if (m_activeSlice && m_pendingRestoredRateHz > 0) {
-            m_activeSlice->setSampleRateHz(m_pendingRestoredRateHz);
+            if (restoredRateAllowed(m_pendingRestoredRateHz)) {
+                m_activeSlice->setSampleRateHz(m_pendingRestoredRateHz);
+                applyRestoredSampleRate(m_activeSlice);
+            }
             m_pendingRestoredRateHz = 0;
-            applyRestoredSampleRate(m_activeSlice);
         }
         // Remote bench 2026-08-11 (the parked MOX-rate investigation,
         // closed here): and the DDC assignment itself, for the same

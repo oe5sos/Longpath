@@ -819,7 +819,7 @@ void SunSdrRadioConnection::processControlDatagram(const QByteArray& data,
     // citation) starts counting from whenever it considers the
     // session live, which is at latest right after this state-sync
     // reply, not after Longpath happens to have decoded something.
-    if (m_keepaliveTimer) {
+    if (m_keepaliveTimer && !blockReplyEnabled()) {
         m_keepaliveTimer->start(kKeepaliveIntervalMs);
     }
 
@@ -899,6 +899,10 @@ void SunSdrRadioConnection::processStreamDatagram(const QByteArray& data,
     }
     if (hdr.opcode != SunSdr::kOpIqRxIdle) {
         return;  // TX-active frames don't apply to a receive-only connection
+    }
+
+    if (blockReplyEnabled()) {
+        replyToBlock(hdr.seq);
     }
 
     if (!m_probeChecked) {
@@ -1171,6 +1175,49 @@ void SunSdrRadioConnection::sendBenchFrames(const QString& envName)
                          << (frame.size() > 2 ? quint8(frame[2]) : 0)
                          << "-" << frame.size() << "Byte";
     }
+}
+
+bool SunSdrRadioConnection::blockReplyEnabled()
+{
+    if (!m_blockReplyChecked) {
+        if (!m_profile) { return false; }
+        m_blockReplyChecked = true;
+        // Fuer die QRP der Normalfall, am Geraet bestaetigt (2026-09-24:
+        // 240 Pakete/s, 1x je Folgenummer, und am Ohr "sollte passen").
+        // DX/PRO sind nie gegen ein echtes Geraet gelaufen; dort bleibt
+        // der bisherige Keepalive, bis jemand es dort misst.
+        // LONGPATH_SUNSDR_BLOCKANTWORT=0/1 ueberstimmt beides.
+        const QByteArray env = qgetenv("LONGPATH_SUNSDR_BLOCKANTWORT");
+        m_blockReplyOn = env.isEmpty() ? m_profile->variant == SunSdr::Variant::Qrp
+                                       : env != "0";
+        qCInfo(lcSunSdr) << "SunSdr: Blockantwort" << (m_blockReplyOn ? "an" : "aus")
+                         << "-- jeder neue Block wird mit derselben Folgenummer"
+                            " still beantwortet, statt alle 2 s ein Keepalive";
+    }
+    return m_blockReplyOn;
+}
+
+void SunSdrRadioConnection::replyToBlock(quint16 seq)
+{
+    if (!m_streamSocket || !m_profile || m_radioAddr.isNull()) { return; }
+
+    for (int i = 0; i < m_blockReplyFill; ++i) {
+        if (m_blockReplyRing[i] == seq) { return; }
+    }
+    m_blockReplyRing[m_blockReplyPos] = seq;
+    m_blockReplyPos = (m_blockReplyPos + 1) % int(m_blockReplyRing.size());
+    m_blockReplyFill = std::min(m_blockReplyFill + 1, int(m_blockReplyRing.size()));
+
+    // Kopf wie ExpertSDR2 im Leerlauf und wie ArtemisSDRs
+    // sunsdr_build_tx_silence(), sunsdr.c:4105-4115 [@f8b01d25c5]:
+    // op=0xFE, byte8=0x01, byte9=0x00, Nutzlast Null (Stille).
+    QByteArray pkt = SunSdr::buildIqHeader(*m_profile, SunSdr::kOpIqRxIdle,
+                                           seq, /*byte8=*/0x01, /*byte9=*/0x00);
+    pkt.append(SunSdr::kIqPayloadSize, char(0));
+    m_streamSocket->writeDatagram(pkt, m_radioAddr, m_profile->defaultStreamPort);
+    recordBytesSent(static_cast<qint64>(pkt.size()));
+    ++m_blockRepliesSent;
+    m_lastBlockReplySeq = seq;
 }
 
 void SunSdrRadioConnection::probeFeed(quint16 seq, const QByteArray& payload)

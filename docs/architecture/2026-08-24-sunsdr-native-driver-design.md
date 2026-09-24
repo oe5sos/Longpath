@@ -1477,6 +1477,14 @@ t≈43-49 s, Ursache unbekannt (kein Steuerkanal-Rahmen faellt zeitlich
 zusammen, vermutlich eine geraeteseitige Aussetzer- oder
 Neuabgleich-Phase; noch nicht weiter untersucht).
 
+> **Korrektur, am selben Tag nach Richtungen getrennt gezaehlt (fuenfte
+> Runde):** die Zahlen oben sind Summen ueber BEIDE Richtungen. "~500/s,
+> zwei Pakete je Nummer" sind 240/s von der QRP (eine Kopie je Nummer)
+> plus 240/s Antworten von ExpertSDR2 mit derselben Nummer, dazu einige
+> Statusrahmen. Und der "Ruecksprung auf 1940/s" war keine Achtfachung,
+> sondern 960/s in JEDER Richtung, eine Kopie je Nummer: 960 x 200 =
+> 192 000 Proben/s, also vermutlich eine kurz umgestellte Abtastrate.
+
 **Befund 2 -- ein Rahmen mit einem voellig anderen Magic-Byte, nie
 zuvor dokumentiert.**
 
@@ -1585,3 +1593,158 @@ Rahmen generell auf -- ein weiterer Grund, keinen neuen unbestaetigten
 Opcode an dieses Geraet zu senden, ohne die Daempfung als moegliche
 Folge einzuplanen (Pegel vorher UND nachher pruefen, nicht nur ob der
 Datenstrom kommt).
+
+### 2026-09-24, vierte Runde: der Datenport selbst -- ExpertSDR2 sendet zurueck, im Blocktakt
+
+Der oben als "naechster sinnvoller Schritt" genannte durchgehende
+Mitschnitt (Steuer- und Datenkanal zusammen, echte ExpertSDR2-Sitzung,
+rein passiv mitgelesen, kein Byte gesendet) ist ausgewertet worden --
+diesmal der Datenport (50002) selbst, nicht nur der Steuerkanal.
+
+**Befund: ExpertSDR2 sendet auf Port 50002 zurueck an die QRP -- im
+exakten Takt der empfangenen Bloecke.**
+
+Vor dem Verbindungsaufbau laeuft auf Port 50002 nur eine Richtung
+(Radio -> Host, ~1940 Pakete/s, die bekannte Achtfachung). Ab dem
+Moment, in dem der Steuerkanal-Verbindungsburst abgeschlossen ist
+(rel. t ~ 11 s in diesem Mitschnitt), erscheint eine ZWEITE Richtung
+auf demselben Port: Host -> Radio, 1210 Byte, **konstant 240 Pakete/s**
+-- exakt die bekannte Blockrate (240 echte Bloecke/s bei 48 000
+Proben/s), nicht die 2-Sekunden-Taktung, die dieser Treiber fuer seinen
+eigenen Keepalive-Rahmen (`onKeepaliveTimeout()`, `kOpIqRxIdle`,
+Nutzlast durchgehend Null, alle 2000 ms) verwendet.
+
+**Die Kopplung ist eng, nicht nur beilaeufig:** in der kurzen
+1940-Pakete/s-Anomalie von Minute 42-49 (siehe Abschnitt "der 33-ff-
+Versuch" oben, dort nur am Steuerkanal beobachtet) steigt die
+Host->Radio-Rate auf demselben Datenport im GLEICHEN Fenster exakt
+proportional auf **960 Pakete/s (das Vierfache)** -- beide Richtungen
+bleiben synchron gekoppelt, obwohl kein einziger Steuerkanal-Rahmen in
+diesem Fenster liegt. Was auch immer die Blockrate kurzzeitig
+vervierfacht hat, hat beide Richtungen gleichermassen erfasst.
+
+**Was in den Host->Radio-Rahmen steht** (Kopf beginnt mit demselben
+Praefix wie der zugehoerige Radio->Host-Rahmen der gleichen
+Folgenummer, `03 ff fe ff b0 04 <seq> 01`, dann zwei Byte, die beim
+Radio->Host-Rahmen `00 00` sind und beim Host->Radio-Rahmen einen
+zweiten Zaehler tragen): keine Nullen, sondern eine durchgaengige
+Nutzlast ueber den ganzen 16-Bit-Wertebereich (-31523 bis 31654 in
+einer Stichprobe).
+
+> **Zweimal korrigiert, am selben Tag.** Der erste Blick auf den rohen
+> Hex-Text las "paarweise gleiche Werte". Eine Nachkorrektur dekodierte
+> dann als int16 ab Byte 16 und fand "keine Paarung, Rauschen" -- das war
+> FALSCH: der Kopf ist 10 Byte (`SunSdrProtocol.h`, kIqHeaderSize), die
+> Nutzlast 200 Slots zu 6 Byte, je 24 Bit Q und 24 Bit I. So dekodiert:
+> **Q = I in 100 % der Slots** (480 000 von 480 000), sehr glatt
+> (Lag-1-Autokorrelation 0,945), Pegel um 1,7 % Vollausschlag. Also ein
+> reelles, bandbegrenztes Signal mit 48 kHz -- vermutlich ExpertSDR2s
+> Mikrofon-/Sendeton im Leerlauf, Opcode 0xFE = "RX/idle-TX". Der erste
+> Blick hatte recht, nur mit der falschen Wortbreite beschrieben.
+
+**Was das bedeutet, ohne dass es schon eine Antwort ist:** dieser
+Treiber tut etwas oberflaechlich Aehnliches (er sendet auch auf dem
+Datenport zurueck), aber weder im selben Takt (240/s vs. alle 2 s)
+noch mit vergleichbarer Nutzlast (Null vs. echte Werte). Das ist die
+bisher konkreteste, am besten belegte Erklaerung fuer den Unterschied
+zwischen den beiden Stroemen -- konkreter als die Verbindungsreihenfolge
+(widerlegt) und konkreter als der `33 ff`-Rahmen (ausprobiert,
+gescheitert).
+
+**Nicht ausprobiert, mit Absicht:** einen eigenen, ratengekoppelten
+Host->Radio-Strom auf dem Datenport nachzubauen ist eine Code-Aenderung,
+kein Parameter-Versuch, und braucht vorher ein Verstaendnis der
+Nutzlast (was genau steht in den Paaren?), sonst wird wieder nur
+geraten. Das ist der naechste Schritt, wenn die Zeit dafuer da ist --
+nicht heute.
+
+**Kein Echo:** die Host->Radio-Nutzlast ist kein verzoegertes Abbild
+einer Radio->Host-Nutzlast -- gegen alle Radio->Host-Rahmen in einem
+0,5-Sekunden-Fenster verglichen, bester Treffer 6% Byte-Uebereinstimmung
+(Zufallsniveau). Zwei aufeinanderfolgende Host->Radio-Nutzlasten
+stimmen zu ~10% ueberein, was zum Rauschcharakter kleiner Werte passt
+(haeufig 0x00/0xFF als hohes Byte), nicht auf ein festes Muster
+hindeutet.
+
+Fuer heute genug -- die naechste sinnvolle Untersuchung braucht ein
+klares Ziel (was genau soll die Nutzlast bedeuten, bevor man sie
+nachbaut), nicht noch mehr Bytevergleiche ohne Hypothese.
+
+### 2026-09-24, fuenfte Runde: geloest -- die QRP wartet auf eine Antwort je Block
+
+**Der Mechanismus.** Den Mitschnitt nach Richtung getrennt und je
+Sekunde ausgezaehlt (nur IQ-Rahmen, Opcode 0xFE):
+
+| Zeit | QRP -> Host | Kopien je Nr. | Host -> QRP |
+|---|---|---|---|
+| 0-10 s, vor dem Connect | 1920/s | 7,7 | 0 |
+| ab 12 s | 240/s | **1,00** | 240/s |
+| 43-48 s | 960/s | **1,00** | 960/s |
+
+ExpertSDR2 beantwortet **jeden** Block der QRP mit einem eigenen
+0xFE-Rahmen, der **dieselbe Folgenummer** traegt -- 44 439 von 44 439
+Nummern, im Median 0,16 ms nach der QRP, nie vorher. Ab der ersten
+Antwort schickt die QRP jede Nummer genau einmal. Ohne Antwort
+wiederholt sie jeden Block bis zu achtmal. Das ist keine Eigenschaft des
+Stroms, sondern ein Zeichen, dass niemand quittiert.
+
+**Warum wir es nicht gesehen haben.**
+
+* Unser Treiber hatte die Idee schon -- `onKeepaliveTimeout()` schickt
+  stille 0xFE-Rahmen --, aber **alle 2 s**, mit eigenem Zaehler und
+  byte8=0x00. ArtemisSDR schickt dieselben Stillerahmen (byte8=0x01,
+  "matches ExpertSDR3 idle") im Takt des Geraets, 1562,5/8 je Sekunde
+  (`sunsdr.c:4105-4115, 4181, 4326-4360 [@f8b01d25c5]`). Portierungsluecke.
+* `tools/sunsdr_stream_census.py` zaehlt auf Port 50002 ohne Richtung.
+  ExpertSDR2s Antwort hat Opcode, Laenge und Nummer des Blocks, also
+  wurden daraus "zwei verschiedene Pakete je Nummer" -- die Tabelle vom
+  2026-09-23 (Abschnitt "Messtag") ist in dieser Zeile ein Zaehlfehler.
+
+**Umgesetzt** (`SunSdrRadioConnection::replyToBlock`): jeder neue Block
+wird sofort mit 0xFE, byte8=0x01, byte9=0x00, Nutzlast Null und seiner
+eigenen Folgenummer beantwortet; ein Ring der letzten 32 Nummern haelt
+verschraenkte Kopien ab. Fuer die QRP der Normalfall, DX/PRO (nie
+gemessen) behalten den 2-s-Keepalive; `LONGPATH_SUNSDR_BLOCKANTWORT=0/1`
+ueberstimmt. Am Geraet gemessen, mit Freigabe des Betreibers:
+
+```
+240 Pakete/s, 240 Folgenummern/s | 1x je Nummer | Wiederholungen: 0
+peak |sample| = 1,8e-05 ... 2,6e-05   (gesund, keine Daempfung)
+```
+
+Nur Datenport, derselbe Rahmentyp, den der Treiber seit Wochen schickt
+-- kein Steuerkanal-Opcode, kein Daempfungs-Zwischenfall.
+
+**Und warum es trotzdem erst "schlechtes Rauschen" war.** Zwei weitere
+Fehler, die erst zusammen mit der Blockantwort sichtbar wurden:
+
+1. Die QRP lief mit Atlas' 192 000 Hz (keine HPSDRModel-Zeile). Aus dem
+   geschlossenen PR #71 uebernommen, ohne dessen Wiederholungsfilter:
+   `RadioModel::applyHardwareProfileFor` + 48 000 in BoardCapabilities.
+2. Selbst dann stellte der Connected-Uebergang den Empfangskanal 200 ms
+   spaeter auf 192 000 zurueck: die pro Band gespeicherte Rate
+   (`Slice0/Band20m/SampleRate`) ist nicht je Geraet und stammte aus
+   ANAN-Sitzungen.
+
+   ```
+   Created RX channel 0 bufSize= 64 rate= 48000
+   setRxChannelRate: channel 0 -> 192000 Hz, in_size= 256
+   ```
+
+   48k-Daten in einem 192k-Kanal -- genau das "schlechte Rauschen" vom
+   2026-09-22/23, und der Betreiber hat es am Ohr sofort wiedererkannt.
+   Jetzt wird eine gespeicherte Rate verworfen, die nicht in
+   `allowedStreamSampleRates()` des verbundenen Geraets steht.
+
+Mit allen drei Teilen, ohne Antenne gehoert: **"anders, sollte passen"**.
+Die Bestaetigung mit Antenne und echtem Signal steht noch aus (der
+Betreiber prueft in den naechsten Tagen).
+
+**Nebenbefund.** Ohne Antenne sind 78 % aller empfangenen Proben exakt 0,
+auch bei ExpertSDR2 -- die QRP liefert dann nahezu digitale Stille mit
+vereinzelten +-1. Das erklaert, warum sich Fassungen ohne Antenne so
+schwer gegeneinander hoeren liessen.
+
+**Noch offen, nicht Teil dieser Loesung:** eine mit der QRP verbundene
+Longpath-Instanz liess sich an diesem Tag mehrfach weder per Menue noch
+per SIGTERM beenden (nicht verbundene Instanzen schon).

@@ -190,6 +190,8 @@ public:
     // their only "is there an open session" gate).
     bool hasRadioAddrForTest() const { return !m_radioAddr.isNull(); }
 
+    quint64 blockRepliesSentForTest() const { return m_blockRepliesSent; }
+    quint16 lastBlockReplySeqForTest() const { return m_lastBlockReplySeq; }
 
     // Exposes the private data-watchdog silence threshold, same
     // rationale as connectTimeoutMsForTest() above.
@@ -650,6 +652,25 @@ private:
     /// dem Zustandsrahmen hinaus, EXTRA danach.
     void sendBenchFrames(const QString& envName);
     void probeReportIfDue();
+
+    // Blockantwort: jeden NEUEN Block der QRP sofort mit einem stillen
+    // 0xFE-Paket derselben Folgenummer beantworten, statt alle 2 s einen
+    // Keepalive mit eigenem Zaehler zu schicken. Ohne Antwort wiederholt
+    // die QRP jeden Block bis zu achtmal. So macht es ExpertSDR2
+    // (Mitschnitt 2026-09-24: 44 439 von 44 439 Nummern gespiegelt, im
+    // Median 0,16 ms nach der QRP). Fuer die QRP der Normalfall, fuer
+    // DX/PRO (ungemessen) aus; LONGPATH_SUNSDR_BLOCKANTWORT=0/1
+    // ueberstimmt. Design doc, "2026-09-24, fuenfte Runde". Der Ring haelt
+    // die zuletzt beantworteten Nummern, weil Kopien verschraenkt ankommen.
+    bool m_blockReplyOn{false};
+    bool m_blockReplyChecked{false};
+    std::array<quint16, 32> m_blockReplyRing{};
+    int m_blockReplyFill{0};
+    int m_blockReplyPos{0};
+    quint64 m_blockRepliesSent{0};
+    quint16 m_lastBlockReplySeq{0};
+    bool blockReplyEnabled();
+    void replyToBlock(quint16 seq);
 };
 
 } // namespace Longpath

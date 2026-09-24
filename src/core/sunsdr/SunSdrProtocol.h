@@ -151,27 +151,21 @@ struct Profile {
     // (ArtemisSDR sunsdr.c:2728-2741 [@f8b01d25c5]; the PRO row's
     // comment there records it was raised to match DX in v2.1.9).
     //
-    // Der QRP-Wert ist eine aus der DX uebernommene ANNAHME und
-    // ausdruecklich NICHT bestaetigt — daran hat sich auch am
-    // 2026-09-23 nichts geaendert, obwohl an dem Tag viel gemessen
-    // wurde. Der Stand, damit niemand die Arbeit noch einmal macht:
+    // QRP: 48 000 Hz, gemessen, nicht von der DX uebernommen.
     //
-    //   * Auf dem Draht kommen 1 922 IQ-Pakete je Sekunde an, jedes mit
-    //     200 Probenpaaren.
-    //   * Davon tragen 1 682 eine schon dagewesene Folgenummer, und
-    //     zwar Byte fuer Byte dieselben Daten (gemessen: VERSCHIEDEN=0).
-    //     Es bleiben 240 verschiedene Bloecke je Sekunde, lueckenlos
-    //     aufsteigend -> rechnerisch 48 000 Proben/s.
-    //   * ExpertSDR2 bekommt am selben Tag am selben Geraet dieselbe
-    //     Achtfachung; sie ist also keine Folge unseres Handschlags.
-    //
-    // UND TROTZDEM: die Fassung, die am Geraet richtig klingt, wirft die
-    // Wiederholungen NICHT weg und faehrt mit 192 000. Die rechnerisch
-    // stimmige Kombination (Wiederholungen weg + 48 000 gestellt) klingt
-    // falsch. Dieser Widerspruch ist ungeloest, und bis er geloest ist,
-    // wird dieser Wert nirgends im Empfangsweg gelesen — die Rate kommt
-    // ueber BoardCapabilities, und die QRP faellt dort mangels
-    // HPSDRModel-Eintrag auf Atlas' Zeile zurueck.
+    //   * Wird jeder Block mit seiner Folgenummer beantwortet (so macht
+    //     es ExpertSDR2, 2026-09-24 im Mitschnitt: 44 439 von 44 439
+    //     Nummern gespiegelt), liefert die QRP 240 Bloecke je Sekunde zu
+    //     200 Probenpaaren, je Nummer genau einmal -> 48 000 Proben/s.
+    //   * Ohne Antwort wiederholt sie jeden Block bis zu achtmal,
+    //     bytegleich (1 920 Pakete/s). Die Messungen vom 2026-09-23
+    //     zeigten nur diesen Zustand; dass ExpertSDR2 "zwei verschiedene
+    //     Pakete je Nummer" bekomme, war ein Zaehlfehler -- das Werkzeug
+    //     zaehlte ExpertSDR2s eigene Antwort (gleiche Nummer, Gegen-
+    //     richtung) mit.
+    //   * Die Rate kam bis dahin auch nie an: die QRP hat keinen
+    //     HPSDRModel-Eintrag, die Modellaufloesung fiel auf Atlas und mit
+    //     ihr auf 192 000. Siehe RadioModel::applyHardwareProfileFor.
     double      rxNativeRateHz;
 };
 
@@ -185,11 +179,12 @@ inline constexpr Profile kProfilePro{
 
 // Ports and magic byte confirmed against a real bench capture,
 // 2026-08-24 (21,720 packets, ExpertSDR2 <-> QRP) — design doc
-// "Confirmed: ports and magic byte". rxNativeRateHz bleibt der von der
-// DX uebernommene, unbestaetigte Wert — siehe Profile::rxNativeRateHz
-// fuer den Messstand vom 2026-09-23 und den offenen Widerspruch.
+// "Confirmed: ports and magic byte". rxNativeRateHz ist gemessen statt
+// von der DX uebernommen: 240 Bloecke je Sekunde zu 200 Probenpaaren =
+// 48 000 Hz. Der Messlauf steht bei Profile::rxNativeRateHz und in
+// BoardCapabilities' QRP-Zeile.
 inline constexpr Profile kProfileQrp{
-    Variant::Qrp, "SunSDR2 QRP", 50001, 50002, 0x03, 312500.0};
+    Variant::Qrp, "SunSDR2 QRP", 50001, 50002, 0x03, 48000.0};
 
 // From ArtemisSDR sunsdr.h:28 [@f8b01d25c5]. Second magic byte, fixed
 // across every model/profile — only byte[0] varies.
