@@ -77,12 +77,55 @@ private slots:
         // Filter, Schrittweite. Die Vorlage ordnet es genauso.
         CommandBar bar;
         const QStringList g = bar.groups();
-        QCOMPARE(g.size(), 5);
+        // RATE kam am 2026-09-24 dazu, "neben NR usw.": keine Wahl, eine
+        // Anzeige -- darum ganz ans Ende.
+        QCOMPARE(g.size(), 6);
         QCOMPARE(g.at(0), QStringLiteral("Band"));
         QCOMPARE(g.at(1), QStringLiteral("Mode"));
         QCOMPARE(g.at(2), QStringLiteral("Filter"));
         QCOMPARE(g.at(3), QStringLiteral("Step"));
         QCOMPARE(g.at(4), QStringLiteral("NR"));
+        QCOMPARE(g.at(5), QStringLiteral("Rate"));
+    }
+
+    // ── RATE ─────────────────────────────────────────────────────────
+    // Am 2026-09-24 lief der QRP-Kanal auf 192 kHz, waehrend 48 kHz
+    // ankamen. Die Anzeige zeigt die Kanalrate und wird bernsteinfarben,
+    // wenn die gemessene Rate zwei Sekunden in Folge deutlich abweicht.
+    void theRateShowsTheChannelAndStaysQuietWhenItMatches()
+    {
+        CommandBar bar;
+        QCOMPARE(bar.rateReadoutText(), QStringLiteral("\u2014"));
+        bar.setRateReadout(48000, 48000);
+        bar.setRateReadout(48000, 47100);   // UDP gebuendelt: -2 %
+        bar.setRateReadout(48000, 49300);
+        QCOMPARE(bar.rateReadoutText(), QStringLiteral("48 kHz"));
+        QVERIFY(!bar.rateReadoutWarns());
+    }
+
+    void aStarvedChannelWarnsAfterTwoSeconds()
+    {
+        CommandBar bar;
+        bar.setRateReadout(192000, 48000);
+        QVERIFY2(!bar.rateReadoutWarns(), "die erste Sekunde ist angebrochen");
+        bar.setRateReadout(192000, 48000);
+        QVERIFY(bar.rateReadoutWarns());
+        QCOMPARE(bar.rateReadoutText(), QStringLiteral("192 kHz"));
+
+        // Stimmt es wieder, geht die Warnung sofort weg.
+        bar.setRateReadout(48000, 48000);
+        QVERIFY(!bar.rateReadoutWarns());
+    }
+
+    void disconnectingClearsTheReadout()
+    {
+        CommandBar bar;
+        bar.setRateReadout(192000, 384000);
+        bar.setRateReadout(192000, 384000);
+        QVERIFY(bar.rateReadoutWarns());
+        bar.setRateReadout(0, 0);
+        QVERIFY(!bar.rateReadoutWarns());
+        QCOMPARE(bar.rateReadoutText(), QStringLiteral("\u2014"));
     }
 
     void threeVisibleEntriesNotThirteen()
@@ -168,8 +211,10 @@ private slots:
         // Der Test hat beim Einbau von NR am 2026-08-21 genau darauf
         // hingewiesen — und vorher schon einen echten Entwurfsfehler
         // bei den Filterpillen aufgedeckt.
+        // RATE ist ebenfalls ausgenommen: sie ist eine Anzeige, keine
+        // Wahl, und hat gar keine Pillen (2026-09-24).
         for (const QString& g : bar.groups()) {
-            if (g == QStringLiteral("NR")) { continue; }
+            if (g == QStringLiteral("NR") || g == QStringLiteral("Rate")) { continue; }
             int lit = 0;
             for (const QString& p : bar.pillsIn(g)) {
                 if (bar.activePill(g) == p) { ++lit; }

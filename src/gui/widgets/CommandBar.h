@@ -64,6 +64,7 @@
 #include <QWidget>
 
 class QHBoxLayout;
+class QLabel;
 class QPushButton;
 
 namespace Longpath {
@@ -93,6 +94,16 @@ public:
     /// die vorige wieder — beim Umschalten zwischen Pans darf die
     /// Leiste nicht an der alten weiterhängen und deren Modus melden.
     void attach(SliceModel* slice);
+
+    /// RATE rechts neben NR: die Rate, mit der der Empfangskanal WIRKLICH
+    /// laeuft, und daneben (im Tooltip) die gemessene Eingangsrate. Weichen
+    /// die beiden zwei Sekunden in Folge um mehr als 10 % ab, wird die
+    /// Anzeige bernsteinfarben -- am 2026-09-24 lief der QRP-Kanal auf
+    /// 192 kHz, waehrend 48 kHz ankamen, und nichts auf dem Bildschirm
+    /// hat es verraten. channelRateHz <= 0 heisst: keine Verbindung.
+    void setRateReadout(int channelRateHz, int measuredRateHz);
+    QString rateReadoutText() const;
+    bool rateReadoutWarns() const { return m_rateWarn; }
 
     /// Ein Widget ans rechte Ende der Leiste hängen — dort sitzt das
     /// Plus. Getrennt vom Konstruktor, weil der Sichtbarkeitsverwalter
@@ -168,6 +179,8 @@ private:
     void buildFilterGroup(QHBoxLayout* row);
     void buildNrGroup(QHBoxLayout* row);
     void buildBandGroup(QHBoxLayout* row);
+    void buildRateGroup(QHBoxLayout* row);
+    void applyRateStyle(bool warn);
 
     /// Die Filterbreiten haengen am Modus — CW hat andere als SSB.
     /// Deshalb werden die drei Pillen NEU BESCHRIFTET statt neu
@@ -199,6 +212,9 @@ private:
     // Gruppentyp verlassen sollte.
     QVector<Group*> m_groups;
     QHBoxLayout* m_row{nullptr};   // die äußere Reihe, für addTrailing()
+    QLabel* m_rateLabel{nullptr};
+    bool m_rateWarn{false};
+    int m_rateMismatchSeconds{0};
     QPointer<SliceModel> m_slice;
     QList<QMetaObject::Connection> m_links;
 

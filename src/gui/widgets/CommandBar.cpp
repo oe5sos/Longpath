@@ -25,6 +25,8 @@
 #include <QPushButton>
 #include <QVBoxLayout>
 
+#include <cstdlib>
+
 namespace Longpath {
 namespace {
 
@@ -117,6 +119,7 @@ CommandBar::CommandBar(QWidget* parent) : QWidget(parent)
     buildFilterGroup(row);
     buildStepGroup(row);
     buildNrGroup(row);
+    buildRateGroup(row);
     row->addStretch(1);
 }
 
@@ -595,6 +598,97 @@ void CommandBar::buildNrGroup(QHBoxLayout* row)
     }
 
     addOverflow(g, m_allNr, [this](NrSlot s) { pushNrToModel(s); });
+}
+
+// ── RATE: was der Empfangskanal wirklich faehrt ──────────────────────
+//
+// Betreiber am 2026-09-24, nachdem der QRP-Kanal drei Tage lang auf
+// 192 kHz lief, waehrend 48 kHz ankamen: "waere es nicht sinnvoll, diese
+// rate oben in der taskleiste einzubauen? ... neben NR usw." Angezeigt
+// wird die Rate des Kanals, nicht die eingestellte -- der Fehler war
+// genau der Unterschied zwischen beiden.
+void CommandBar::buildRateGroup(QHBoxLayout* row)
+{
+    Group& g = addGroup(QStringLiteral("Rate"), row);
+    m_rateLabel = new QLabel(QStringLiteral("—"), this);
+    m_rateLabel->setAlignment(Qt::AlignCenter);
+    m_rateLabel->setToolTip(tr("Nicht verbunden"));
+    if (g.row) { g.row->addWidget(m_rateLabel); }
+    applyRateStyle(false);
+}
+
+void CommandBar::applyRateStyle(bool warn)
+{
+    if (!m_rateLabel) { return; }
+    const QString top = QString::fromLatin1(warn ? Style::kAmberBg : Style::kGlassBtnTop);
+    const QString bot = QString::fromLatin1(warn ? Style::kAmberBg : Style::kGlassBtnBot);
+    const QString border = QString::fromLatin1(warn ? Style::kAmberBorder : Style::kBorder);
+    const QString text = QString::fromLatin1(warn ? Style::kAmberText : Style::kTextSecondary);
+    m_rateLabel->setStyleSheet(QStringLiteral(
+        "QLabel {"
+        "  background: qlineargradient(x1:0, y1:0, x2:0, y2:1,"
+        "               stop:0 %1, stop:1 %2);"
+        "  border: 1px solid %3; border-radius: %5px;"
+        "  color: %4; font-size: 11px; font-weight: 600;"
+        "  padding: 0 11px; min-height: %6px; max-height: %6px;"
+        "}")
+        .arg(top, bot, border, text)
+        .arg(kPillRadius)
+        .arg(kPillHeight));
+}
+
+namespace {
+QString rateText(int hz)
+{
+    if (hz % 1000 == 0) {
+        return QStringLiteral("%1 kHz").arg(hz / 1000);
+    }
+    return QStringLiteral("%1 kHz").arg(hz / 1000.0, 0, 'f', 1);
+}
+} // namespace
+
+void CommandBar::setRateReadout(int channelRateHz, int measuredRateHz)
+{
+    if (!m_rateLabel) { return; }
+    if (channelRateHz <= 0) {
+        m_rateLabel->setText(QStringLiteral("—"));
+        m_rateLabel->setToolTip(tr("Nicht verbunden"));
+        m_rateMismatchSeconds = 0;
+        m_rateWarn = false;
+        applyRateStyle(false);
+        return;
+    }
+    m_rateLabel->setText(rateText(channelRateHz));
+
+    // Nur eine gemessene, deutlich abweichende Rate zaehlt, und erst nach
+    // zwei Sekunden in Folge: die erste Sekunde nach dem Verbinden ist
+    // angebrochen, und UDP kommt gebuendelt.
+    const bool mismatch = measuredRateHz > 0
+        && std::abs(measuredRateHz - channelRateHz) > channelRateHz / 10;
+    m_rateMismatchSeconds = mismatch ? m_rateMismatchSeconds + 1 : 0;
+    const bool warn = m_rateMismatchSeconds >= 2;
+
+    if (warn) {
+        m_rateLabel->setToolTip(
+            tr("Der Empfangskanal läuft mit %1, es kommen aber %2 an — "
+               "so klingt es falsch.")
+                .arg(rateText(channelRateHz), rateText(measuredRateHz)));
+    } else if (measuredRateHz > 0) {
+        m_rateLabel->setToolTip(tr("Empfangskanal %1 · gemessen %2")
+                                    .arg(rateText(channelRateHz),
+                                         rateText(measuredRateHz)));
+    } else {
+        m_rateLabel->setToolTip(tr("Empfangskanal %1").arg(rateText(channelRateHz)));
+    }
+    if (warn != m_rateWarn) {
+        m_rateWarn = warn;
+        applyRateStyle(warn);
+    }
+}
+
+QString CommandBar::rateReadoutText() const
+{
+    return m_rateLabel ? m_rateLabel->text() : QString();
 }
 
 void CommandBar::pushNrToModel(NrSlot slot)
