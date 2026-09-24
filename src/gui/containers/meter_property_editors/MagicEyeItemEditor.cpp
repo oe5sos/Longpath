@@ -48,7 +48,7 @@ void MagicEyeItemEditor::buildTypeSpecific()
     connect(m_btnGlowColor, &QPushButton::clicked, this, [this, applyGlowColor]() {
         MagicEyeItem* x = qobject_cast<MagicEyeItem*>(m_item);
         if (!x) { return; }
-        const QColor chosen = QColorDialog::getColor(x->glowColor(), this);
+        const QColor chosen = QColorDialog::getColor(x->glowColor(), this, QString(), QColorDialog::DontUseNativeDialog);
         if (chosen.isValid()) { x->setGlowColor(chosen); applyGlowColor(chosen); notifyChanged(); }
     });
     addRow(QStringLiteral("Glow color"), m_btnGlowColor);

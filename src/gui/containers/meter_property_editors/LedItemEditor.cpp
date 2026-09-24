@@ -91,7 +91,7 @@ void LedItemEditor::buildTypeSpecific()
     connect(m_btnTrueColour, &QPushButton::clicked, this, [this]() {
         LEDItem* x = qobject_cast<LEDItem*>(m_item);
         if (!x) { return; }
-        const QColor chosen = QColorDialog::getColor(x->trueColour(), this);
+        const QColor chosen = QColorDialog::getColor(x->trueColour(), this, QString(), QColorDialog::DontUseNativeDialog);
         if (chosen.isValid()) {
             x->setTrueColour(chosen);
             m_btnTrueColour->setStyleSheet(Style::themed(
@@ -107,7 +107,7 @@ void LedItemEditor::buildTypeSpecific()
     connect(m_btnFalseColour, &QPushButton::clicked, this, [this]() {
         LEDItem* x = qobject_cast<LEDItem*>(m_item);
         if (!x) { return; }
-        const QColor chosen = QColorDialog::getColor(x->falseColour(), this);
+        const QColor chosen = QColorDialog::getColor(x->falseColour(), this, QString(), QColorDialog::DontUseNativeDialog);
         if (chosen.isValid()) {
             x->setFalseColour(chosen);
             m_btnFalseColour->setStyleSheet(Style::themed(
@@ -133,7 +133,7 @@ void LedItemEditor::buildTypeSpecific()
     connect(m_btnPanelBack1, &QPushButton::clicked, this, [this]() {
         LEDItem* x = qobject_cast<LEDItem*>(m_item);
         if (!x) { return; }
-        const QColor chosen = QColorDialog::getColor(x->panelBackColour1(), this);
+        const QColor chosen = QColorDialog::getColor(x->panelBackColour1(), this, QString(), QColorDialog::DontUseNativeDialog);
         if (chosen.isValid()) {
             x->setPanelBackColour1(chosen);
             m_btnPanelBack1->setStyleSheet(Style::themed(
@@ -149,7 +149,7 @@ void LedItemEditor::buildTypeSpecific()
     connect(m_btnPanelBack2, &QPushButton::clicked, this, [this]() {
         LEDItem* x = qobject_cast<LEDItem*>(m_item);
         if (!x) { return; }
-        const QColor chosen = QColorDialog::getColor(x->panelBackColour2(), this);
+        const QColor chosen = QColorDialog::getColor(x->panelBackColour2(), this, QString(), QColorDialog::DontUseNativeDialog);
         if (chosen.isValid()) {
             x->setPanelBackColour2(chosen);
             m_btnPanelBack2->setStyleSheet(Style::themed(

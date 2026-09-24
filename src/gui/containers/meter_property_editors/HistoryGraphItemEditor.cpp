@@ -66,7 +66,7 @@ void HistoryGraphItemEditor::buildTypeSpecific()
     connect(m_btnLineColor0, &QPushButton::clicked, this, [this]() {
         HistoryGraphItem* x = qobject_cast<HistoryGraphItem*>(m_item);
         if (!x) { return; }
-        const QColor chosen = QColorDialog::getColor(x->lineColor0(), this);
+        const QColor chosen = QColorDialog::getColor(x->lineColor0(), this, QString(), QColorDialog::DontUseNativeDialog);
         if (chosen.isValid()) {
             x->setLineColor0(chosen);
             m_btnLineColor0->setStyleSheet(Style::themed(
@@ -82,7 +82,7 @@ void HistoryGraphItemEditor::buildTypeSpecific()
     connect(m_btnLineColor1, &QPushButton::clicked, this, [this]() {
         HistoryGraphItem* x = qobject_cast<HistoryGraphItem*>(m_item);
         if (!x) { return; }
-        const QColor chosen = QColorDialog::getColor(x->lineColor1(), this);
+        const QColor chosen = QColorDialog::getColor(x->lineColor1(), this, QString(), QColorDialog::DontUseNativeDialog);
         if (chosen.isValid()) {
             x->setLineColor1(chosen);
             m_btnLineColor1->setStyleSheet(Style::themed(

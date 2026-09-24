@@ -66,7 +66,7 @@ void FadeCoverItemEditor::buildTypeSpecific()
         if (!fade) { return; }
         const QColor chosen = QColorDialog::getColor(fade->colour1(), this,
                                                      QStringLiteral("Color 1"),
-                                                     QColorDialog::ShowAlphaChannel);
+                                                     QColorDialog::ShowAlphaChannel | QColorDialog::DontUseNativeDialog);
         if (chosen.isValid()) {
             fade->setColour1(chosen);
             m_btnColour1->setStyleSheet(Style::themed(
@@ -85,7 +85,7 @@ void FadeCoverItemEditor::buildTypeSpecific()
         if (!fade) { return; }
         const QColor chosen = QColorDialog::getColor(fade->colour2(), this,
                                                      QStringLiteral("Color 2"),
-                                                     QColorDialog::ShowAlphaChannel);
+                                                     QColorDialog::ShowAlphaChannel | QColorDialog::DontUseNativeDialog);
         if (chosen.isValid()) {
             fade->setColour2(chosen);
             m_btnColour2->setStyleSheet(Style::themed(

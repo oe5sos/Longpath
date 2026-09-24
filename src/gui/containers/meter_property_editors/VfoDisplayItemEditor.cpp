@@ -78,7 +78,7 @@ void VfoDisplayItemEditor::buildTypeSpecific()
             VfoDisplayItem* v = qobject_cast<VfoDisplayItem*>(m_item);
             if (!v) { return; }
             const QColor chosen = QColorDialog::getColor(
-                Qt::gray, this, QString(), QColorDialog::ShowAlphaChannel);
+                Qt::gray, this, QString(), QColorDialog::ShowAlphaChannel | QColorDialog::DontUseNativeDialog);
             if (chosen.isValid()) {
                 (v->*setter)(chosen);
                 applyBtnColor(btn, chosen);

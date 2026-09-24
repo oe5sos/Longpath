@@ -93,7 +93,7 @@ void WebImageItemEditor::buildTypeSpecific()
         WebImageItem* w = qobject_cast<WebImageItem*>(m_item);
         if (!w) { return; }
         const QColor chosen = QColorDialog::getColor(
-            w->fallbackColor(), this, QString(), QColorDialog::ShowAlphaChannel);
+            w->fallbackColor(), this, QString(), QColorDialog::ShowAlphaChannel | QColorDialog::DontUseNativeDialog);
         if (chosen.isValid()) {
             w->setFallbackColor(chosen);
             applyBtnColor(m_btnFallback, chosen);

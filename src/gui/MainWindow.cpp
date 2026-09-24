@@ -3455,7 +3455,7 @@ void MainWindow::onPanBackgroundColour()
     // Hintergrundbild darunter liegt.
     const QColor c = QColorDialog::getColor(
         w->backgroundFillColor(), this, tr("Grundfarbe des Panadapters"),
-        QColorDialog::ShowAlphaChannel);
+        QColorDialog::ShowAlphaChannel | QColorDialog::DontUseNativeDialog);
     if (c.isValid()) { w->setBackgroundFillColor(c); }
 }
 

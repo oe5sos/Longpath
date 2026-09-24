@@ -128,6 +128,15 @@ jobs:
         # scaling. Scoped to this one widget, not a tree-wide sweep.
         run: python3 scripts/verify-spectrum-labels-pixelfest.py
 
+      - name: No native color dialog
+        # 2026-09-23/24: on macOS, QColorDialog::getColor() without
+        # DontUseNativeDialog uses the native NSColorPanel, which stood as
+        # a blank window with zero accessible elements while getColor()'s
+        # own event loop ran -- the operator could not quit the app, not
+        # even with SIGTERM. Every call site across the tree now requires
+        # the flag; this keeps a new one from silently reintroducing it.
+        run: python3 scripts/verify-no-native-color-dialog.py
+
       # ------------------------------------------------------------------
       # Inline author-tag preservation (added 2026-04-21 after DH1KLM drop)
       # ------------------------------------------------------------------

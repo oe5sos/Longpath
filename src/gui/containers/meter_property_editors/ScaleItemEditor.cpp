@@ -190,7 +190,7 @@ void ScaleItemEditor::buildTypeSpecific()
         ScaleItem* scale = qobject_cast<ScaleItem*>(m_item);
         if (!scale) { return; }
         const QColor chosen = QColorDialog::getColor(scale->tickColor(), this,
-                                                     QStringLiteral("Tick color"));
+                                                     QStringLiteral("Tick color"), QColorDialog::DontUseNativeDialog);
         if (chosen.isValid()) { scale->setTickColor(chosen); applyTickBtn(chosen); notifyChanged(); }
     });
     addRow(QStringLiteral("Tick color"), m_btnTickColor);
@@ -207,7 +207,7 @@ void ScaleItemEditor::buildTypeSpecific()
         ScaleItem* scale = qobject_cast<ScaleItem*>(m_item);
         if (!scale) { return; }
         const QColor chosen = QColorDialog::getColor(scale->labelColor(), this,
-                                                     QStringLiteral("Label color"));
+                                                     QStringLiteral("Label color"), QColorDialog::DontUseNativeDialog);
         if (chosen.isValid()) { scale->setLabelColor(chosen); applyLabelBtn(chosen); notifyChanged(); }
     });
     addRow(QStringLiteral("Label color"), m_btnLabelColor);
@@ -247,7 +247,7 @@ void ScaleItemEditor::buildTypeSpecific()
         ScaleItem* scale = qobject_cast<ScaleItem*>(m_item);
         if (!scale) { return; }
         const QColor chosen = QColorDialog::getColor(scale->titleColour(), this,
-                                                     QStringLiteral("Title color"));
+                                                     QStringLiteral("Title color"), QColorDialog::DontUseNativeDialog);
         if (chosen.isValid()) {
             scale->setTitleColour(chosen);
             applyTitleBtn(chosen);

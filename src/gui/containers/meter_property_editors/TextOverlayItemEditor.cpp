@@ -76,7 +76,7 @@ void TextOverlayItemEditor::buildTypeSpecific()
     connect(m_btnColour1, &QPushButton::clicked, this, [this]() {
         TextOverlayItem* x = qobject_cast<TextOverlayItem*>(m_item);
         if (!x) { return; }
-        const QColor chosen = QColorDialog::getColor(x->textColour1(), this);
+        const QColor chosen = QColorDialog::getColor(x->textColour1(), this, QString(), QColorDialog::DontUseNativeDialog);
         if (chosen.isValid()) {
             x->setTextColour1(chosen);
             m_btnColour1->setStyleSheet(Style::themed(
@@ -92,7 +92,7 @@ void TextOverlayItemEditor::buildTypeSpecific()
     connect(m_btnBackColour1, &QPushButton::clicked, this, [this]() {
         TextOverlayItem* x = qobject_cast<TextOverlayItem*>(m_item);
         if (!x) { return; }
-        const QColor chosen = QColorDialog::getColor(Qt::darkGray, this);
+        const QColor chosen = QColorDialog::getColor(Qt::darkGray, this, QString(), QColorDialog::DontUseNativeDialog);
         if (chosen.isValid()) {
             x->setTextBackColour1(chosen);
             m_btnBackColour1->setStyleSheet(Style::themed(
@@ -158,7 +158,7 @@ void TextOverlayItemEditor::buildTypeSpecific()
     connect(m_btnColour2, &QPushButton::clicked, this, [this]() {
         TextOverlayItem* x = qobject_cast<TextOverlayItem*>(m_item);
         if (!x) { return; }
-        const QColor chosen = QColorDialog::getColor(x->textColour2(), this);
+        const QColor chosen = QColorDialog::getColor(x->textColour2(), this, QString(), QColorDialog::DontUseNativeDialog);
         if (chosen.isValid()) {
             x->setTextColour2(chosen);
             m_btnColour2->setStyleSheet(Style::themed(
@@ -174,7 +174,7 @@ void TextOverlayItemEditor::buildTypeSpecific()
     connect(m_btnBackColour2, &QPushButton::clicked, this, [this]() {
         TextOverlayItem* x = qobject_cast<TextOverlayItem*>(m_item);
         if (!x) { return; }
-        const QColor chosen = QColorDialog::getColor(Qt::darkGray, this);
+        const QColor chosen = QColorDialog::getColor(Qt::darkGray, this, QString(), QColorDialog::DontUseNativeDialog);
         if (chosen.isValid()) {
             x->setTextBackColour2(chosen);
             m_btnBackColour2->setStyleSheet(Style::themed(
@@ -239,7 +239,7 @@ void TextOverlayItemEditor::buildTypeSpecific()
     connect(m_btnPanelBack1, &QPushButton::clicked, this, [this]() {
         TextOverlayItem* x = qobject_cast<TextOverlayItem*>(m_item);
         if (!x) { return; }
-        const QColor chosen = QColorDialog::getColor(Qt::darkGray, this);
+        const QColor chosen = QColorDialog::getColor(Qt::darkGray, this, QString(), QColorDialog::DontUseNativeDialog);
         if (chosen.isValid()) {
             x->setPanelBackColour1(chosen);
             m_btnPanelBack1->setStyleSheet(Style::themed(
@@ -255,7 +255,7 @@ void TextOverlayItemEditor::buildTypeSpecific()
     connect(m_btnPanelBack2, &QPushButton::clicked, this, [this]() {
         TextOverlayItem* x = qobject_cast<TextOverlayItem*>(m_item);
         if (!x) { return; }
-        const QColor chosen = QColorDialog::getColor(Qt::darkGray, this);
+        const QColor chosen = QColorDialog::getColor(Qt::darkGray, this, QString(), QColorDialog::DontUseNativeDialog);
         if (chosen.isValid()) {
             x->setPanelBackColour2(chosen);
             m_btnPanelBack2->setStyleSheet(Style::themed(

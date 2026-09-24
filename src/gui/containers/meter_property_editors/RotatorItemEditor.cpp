@@ -185,7 +185,7 @@ void RotatorItemEditor::buildTypeSpecific()
             RotatorItem* r = qobject_cast<RotatorItem*>(m_item);
             if (!r) { return; }
             const QColor chosen = QColorDialog::getColor(
-                Qt::gray, this, QString(), QColorDialog::ShowAlphaChannel);
+                Qt::gray, this, QString(), QColorDialog::ShowAlphaChannel | QColorDialog::DontUseNativeDialog);
             if (chosen.isValid()) {
                 (r->*setter)(chosen);
                 applyBtnColor(btn, chosen);

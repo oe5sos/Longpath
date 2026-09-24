@@ -58,7 +58,7 @@ void DialItemEditor::buildTypeSpecific()
             DialItem* d = qobject_cast<DialItem*>(m_item);
             if (!d) { return; }
             const QColor chosen = QColorDialog::getColor(
-                (d->*getter)(), this, QString(), QColorDialog::ShowAlphaChannel);
+                (d->*getter)(), this, QString(), QColorDialog::ShowAlphaChannel | QColorDialog::DontUseNativeDialog);
             if (chosen.isValid()) {
                 (d->*setter)(chosen);
                 applyBtnColor(btn, chosen);
