@@ -1180,13 +1180,19 @@ void SunSdrRadioConnection::sendBenchFrames(const QString& envName)
 bool SunSdrRadioConnection::blockReplyEnabled()
 {
     if (!m_blockReplyChecked) {
+        if (!m_profile) { return false; }
         m_blockReplyChecked = true;
-        m_blockReplyOn = qEnvironmentVariableIsSet("LONGPATH_SUNSDR_BLOCKANTWORT");
-        if (m_blockReplyOn) {
-            qCInfo(lcSunSdr) << "SunSdr: Blockantwort an (LONGPATH_SUNSDR_BLOCKANTWORT)"
-                                " -- jeder neue Block wird mit derselben Folgenummer"
-                                " still beantwortet, kein 2-s-Keepalive";
-        }
+        // Fuer die QRP der Normalfall, am Geraet bestaetigt (2026-09-24:
+        // 240 Pakete/s, 1x je Folgenummer, und am Ohr "sollte passen").
+        // DX/PRO sind nie gegen ein echtes Geraet gelaufen; dort bleibt
+        // der bisherige Keepalive, bis jemand es dort misst.
+        // LONGPATH_SUNSDR_BLOCKANTWORT=0/1 ueberstimmt beides.
+        const QByteArray env = qgetenv("LONGPATH_SUNSDR_BLOCKANTWORT");
+        m_blockReplyOn = env.isEmpty() ? m_profile->variant == SunSdr::Variant::Qrp
+                                       : env != "0";
+        qCInfo(lcSunSdr) << "SunSdr: Blockantwort" << (m_blockReplyOn ? "an" : "aus")
+                         << "-- jeder neue Block wird mit derselben Folgenummer"
+                            " still beantwortet, statt alle 2 s ein Keepalive";
     }
     return m_blockReplyOn;
 }
@@ -1210,6 +1216,8 @@ void SunSdrRadioConnection::replyToBlock(quint16 seq)
     pkt.append(SunSdr::kIqPayloadSize, char(0));
     m_streamSocket->writeDatagram(pkt, m_radioAddr, m_profile->defaultStreamPort);
     recordBytesSent(static_cast<qint64>(pkt.size()));
+    ++m_blockRepliesSent;
+    m_lastBlockReplySeq = seq;
 }
 
 void SunSdrRadioConnection::probeFeed(quint16 seq, const QByteArray& payload)

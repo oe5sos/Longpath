@@ -653,6 +653,62 @@ private slots:
         QTRY_COMPARE_WITH_TIMEOUT(iqSpy.count(), 1, 500);
     }
 
+    // 2026-09-24: die QRP wiederholt jeden Block bis zu achtmal, bis der
+    // Host ihn mit derselben Folgenummer beantwortet (ExpertSDR2-Mitschnitt;
+    // am Geraet bestaetigt: danach 240 Pakete/s, eine Kopie je Nummer).
+    // Acht verschraenkte Kopien von zwei Bloecken muessen genau zwei
+    // Antworten ausloesen, jede mit der Nummer ihres Blocks.
+    void everyNewBlockIsAnsweredOnceWithItsOwnSequence()
+    {
+        qunsetenv("LONGPATH_SUNSDR_BLOCKANTWORT");
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+
+        const QHostAddress radio(QStringLiteral("192.0.2.200"));
+        conn.feedControlDatagramForTest(
+            QByteArray::fromHex("03ff011a7c0000004119c0a810c8c0a810c851c300004928"),
+            radio);
+        QVERIFY(conn.isRxReadyForTest());
+
+        auto block = [](quint16 seq) {
+            QByteArray pkt = SunSdr::buildIqHeader(
+                SunSdr::kProfileQrp, SunSdr::kOpIqRxIdle, seq, 0x01, 0x00);
+            pkt.append(SunSdr::kIqPayloadSize, char(0));
+            return pkt;
+        };
+        for (int copy = 0; copy < 8; ++copy) {
+            conn.feedStreamDatagramFromSenderForTest(block(7), radio);
+            conn.feedStreamDatagramFromSenderForTest(block(8), radio);
+        }
+
+        QTRY_COMPARE_WITH_TIMEOUT(conn.blockRepliesSentForTest(), quint64(2), 500);
+        QCOMPARE(conn.lastBlockReplySeqForTest(), quint16(8));
+    }
+
+    void blockReplyCanBeSwitchedOff()
+    {
+        qputenv("LONGPATH_SUNSDR_BLOCKANTWORT", "0");
+        auto restore = qScopeGuard([] { qunsetenv("LONGPATH_SUNSDR_BLOCKANTWORT"); });
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+
+        const QHostAddress radio(QStringLiteral("192.0.2.200"));
+        conn.feedControlDatagramForTest(
+            QByteArray::fromHex("03ff011a7c0000004119c0a810c8c0a810c851c300004928"),
+            radio);
+        QSignalSpy iqSpy(&conn, &RadioConnection::iqDataReceived);
+        conn.feedStreamDatagramFromSenderForTest(silentIqPacket(), radio);
+
+        QTRY_COMPARE_WITH_TIMEOUT(iqSpy.count(), 1, 500);
+        QCOMPARE(conn.blockRepliesSentForTest(), quint64(0));
+    }
+
     // onConnectTimeout()'s gotBeacon=true branch (a beacon replied, the
     // stream never started) left m_radioAddr set — found in review,
     // 2026-08-28. disconnect() already cleared it; this path didn't.
