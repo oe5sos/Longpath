@@ -29,6 +29,27 @@ private slots:
         delete w;
     }
 
+    // 2026-09-24: mit schwebendem Panadapter liess sich Longpath nicht
+    // beenden. Beim Beenden schliesst Qt alle Fenster der Reihe nach und
+    // bricht ab, sobald eines ablehnt -- und dieses lehnte ab, solange die
+    // Abbau-Sperre noch nicht gesetzt war. closeAllWindows() ist genau
+    // dieser Weg (nicht spontan). Das Fenster muss zugehen, ohne anzudocken.
+    void closing_all_windows_is_not_refused_and_does_not_dock()
+    {
+        auto* applet = new PanadapterApplet(QStringLiteral("pan-0"));
+        auto* w = new PanFloatingWindow(applet, nullptr);
+        QSignalSpy dockSpy(w, &PanFloatingWindow::dockRequested);
+        w->show();
+        QVERIFY(QTest::qWaitForWindowExposed(w));
+
+        QApplication::closeAllWindows();
+
+        QVERIFY2(!w->isVisible(),
+                 "ein abgelehntes Schliessen bricht das ganze Beenden ab");
+        QCOMPARE(dockSpy.count(), 0);
+        delete w;
+    }
+
     void dock_requested_signal_emitted_on_request_dock()
     {
         auto* applet = new PanadapterApplet(QStringLiteral("pan-floated"));
