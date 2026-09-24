@@ -189,6 +189,11 @@ void showSunSdrNotice(QWidget* parent, QMessageBox::Icon icon,
     auto* box = new QMessageBox(icon, title, text, QMessageBox::Ok, parent);
     box->setAttribute(Qt::WA_DeleteOnClose);
     box->setModal(false);
+    // Nicht nativ, sonst wird aus show() auf macOS ein blockierendes
+    // [NSAlert runModal] (Qt 6.11, 2026-09-24) -- gegen setModal(false).
+#if QT_VERSION >= QT_VERSION_CHECK(6, 6, 0)
+    box->setOption(QMessageBox::Option::DontUseNativeDialog);
+#endif
     box->show();
 }
 

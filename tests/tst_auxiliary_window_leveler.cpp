@@ -56,6 +56,14 @@ private slots:
         // Ein QMessageBox mit Elternteil auch -- der "eingefrorene"
         // Fall, wenn die Meldung hinter den Paletten steht.
         QMessageBox box(&main);
+        // Nicht nativ: auf macOS mit Qt 6.11 wird ein nativer QMessageBox
+        // beim show() zu [NSAlert runModal] -- eine modale Schleife, die
+        // erst endet, wenn jemand klickt. Hier klickt niemand; der Test
+        // hing 300 s (2026-09-24, mit `sample` belegt). Das Programm
+        // zeigt seine nicht blockierenden Meldungen ebenfalls nicht nativ.
+#if QT_VERSION >= QT_VERSION_CHECK(6, 6, 0)
+        box.setOption(QMessageBox::Option::DontUseNativeDialog);
+#endif
         box.show();
         QVERIFY(QTest::qWaitForWindowExposed(&box));
         QVERIFY(leveler.trackedForTest().contains(&box));
