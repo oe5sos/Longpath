@@ -4109,6 +4109,15 @@ bool RadioModel::sampleRateIsRadioWide() const
     return qobject_cast<Longpath::P1RadioConnection*>(m_connection) != nullptr;
 }
 
+int RadioModel::rx0ChannelRateHz() const
+{
+    if (!isConnected() || !m_wdspEngine) {
+        return 0;
+    }
+    RxChannel* ch = m_wdspEngine->rxChannel(0);
+    return ch ? ch->sampleRate() : 0;
+}
+
 QVector<int> RadioModel::allowedStreamSampleRates() const
 {
     // Disconnected: no board to ask, so no list. Callers decide what to show

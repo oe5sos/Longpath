@@ -714,6 +714,11 @@ public:
     /// width the radio is not sending.
     QVector<int> allowedStreamSampleRates() const;
 
+    /// Die Rate, mit der der WDSP-Kanal von Empfaenger 0 gerade WIRKLICH
+    /// laeuft; 0 ohne Verbindung. Fuer die RATE-Anzeige der Knopfleiste
+    /// (2026-09-24) -- die GUI fragt keinen Kanal direkt.
+    int rx0ChannelRateHz() const;
+
     // Phase 3F bench fix 2026-06-03: optional initialPanId is stamped on the
     // new SliceModel as a dynamic property BEFORE sliceAdded() emits, so the
     // MainWindow handler can route the VfoWidget to the owning pan. Passing

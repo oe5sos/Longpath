@@ -4151,13 +4151,8 @@ void MainWindow::buildUI()
             if (!m_commandBar || !m_radioModel) { return; }
             ReceiverManager* rm = m_radioModel->receiverManager();
             const quint64 measured = rm ? rm->takeRx0InputSamples() : 0;
-            int channelRate = 0;
-            if (m_radioModel->isConnected() && m_radioModel->wdspEngine()) {
-                if (RxChannel* ch = m_radioModel->wdspEngine()->rxChannel(0)) {
-                    channelRate = ch->sampleRate();
-                }
-            }
-            m_commandBar->setRateReadout(channelRate, static_cast<int>(measured));
+            m_commandBar->setRateReadout(m_radioModel->rx0ChannelRateHz(),
+                                         static_cast<int>(measured));
         });
         rateTimer->start();
     }
