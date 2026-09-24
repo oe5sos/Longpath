@@ -689,6 +689,11 @@ public:
     /// rate is a stream-wide transaction rather than a slice property.
     void applyRestoredSampleRate(SliceModel* slice);
 
+    /// True unless the connected radio's allowedStreamSampleRates() is known
+    /// and does not contain rateHz. Guards the per-band restore, whose keys
+    /// are not per radio.
+    bool restoredRateAllowed(int rateHz) const;
+
     /// True when one sample rate covers the whole radio rather than one DDC.
     ///
     /// Protocol 1 encodes the rate as srBits in C&C bank 0

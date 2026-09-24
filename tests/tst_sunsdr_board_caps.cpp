@@ -34,7 +34,12 @@
 #include "core/BoardCapabilities.h"
 #include "core/HpsdrModel.h"
 #include "core/RadioDiscovery.h"
+#include "core/AppSettings.h"
+#include "core/SunSdrRadioConnection.h"
 #include "models/RadioModel.h"
+#include "models/SliceModel.h"
+
+#include <QScopeGuard>
 
 using namespace Longpath;
 
@@ -100,6 +105,54 @@ private slots:
                     HPSDRModel::FIRST));
 
         QCOMPARE(model.boardCapabilities().board, HPSDRHW::HermesLite);
+    }
+
+    // 2026-09-24: die gespeicherte Rate je Band (Slice0/Band20m/SampleRate)
+    // gilt nicht je Geraet. Nach ANAN-Sitzungen stand dort 192 000, und
+    // beim Verbinden der QRP stellte die Wiederanwendung den Empfangskanal
+    // 200 ms nach dem Connect darauf zurueck -- 48k-Daten in einem
+    // 192k-Kanal, am Geraet als "schlechtes Rauschen" gehoert.
+    void aStoredRateTheQrpCannotDoIsNotAllowed()
+    {
+        RadioModel model;
+        model.applyHardwareProfileForTest(
+            infoFor(HPSDRHW::SunSdr2Qrp, ProtocolVersion::SunSdr));
+        SunSdrRadioConnection conn;
+        model.injectConnectionForTest(&conn);
+        auto detach = qScopeGuard([&] { model.injectConnectionForTest(nullptr); });
+
+        QCOMPARE(model.allowedStreamSampleRates(), QVector<int>{48000});
+        QVERIFY(model.restoredRateAllowed(48000));
+        QVERIFY(!model.restoredRateAllowed(192000));
+    }
+
+    void theConnectedRestoreKeepsTheQrpAt48k()
+    {
+        RadioModel model;
+        model.applyHardwareProfileForTest(
+            infoFor(HPSDRHW::SunSdr2Qrp, ProtocolVersion::SunSdr));
+        model.configureStreamPool(/*userDdcCount*/ 1, /*maxSlices*/ 1, 48000);
+        SunSdrRadioConnection conn;
+        model.injectConnectionForTest(&conn);
+        auto detach = qScopeGuard([&] { model.injectConnectionForTest(nullptr); });
+
+        const int id = model.addSlice();
+        SliceModel* slice = model.sliceById(id);
+        QVERIFY(slice);
+        const int stream = slice->streamIndex();
+        QVERIFY2(stream >= 0, "precondition: the slice is bound to a stream");
+        QCOMPARE(model.streamSampleRateHzForTest(stream), 48000);
+
+        // Der Stand aus einer frueheren Sitzung mit einem anderen Geraet.
+        AppSettings::instance().setValue(
+            QStringLiteral("Slice0/Band20m/SampleRate"), 192000);
+        slice->setStreamIndex(-1);
+        model.loadSliceState(slice);
+        slice->setStreamIndex(stream);
+
+        model.onConnectionStateChangedForTest(ConnectionState::Connected);
+
+        QCOMPARE(model.streamSampleRateHzForTest(stream), 48000);
     }
 };
 

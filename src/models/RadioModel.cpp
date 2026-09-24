@@ -4129,6 +4129,24 @@ QVector<int> RadioModel::allowedStreamSampleRates() const
     return out;
 }
 
+// Eine pro Band gespeicherte Rate gilt nur, wenn das VERBUNDENE Geraet sie
+// kann. Die Schluessel sind nicht je Geraet: nach einer ANAN-Sitzung stand
+// dort 192 000, und beim Verbinden der SunSDR2 QRP (nur 48 000) stellte
+// die Wiederanwendung den Empfangskanal 200 ms nach dem Connect auf
+// 192 000 zurueck -- 48k-Daten in einem 192k-Kanal, am Geraet als
+// "schlechtes Rauschen" gehoert (2026-09-24). Der Verbindungsweg prueft
+// seine Rate schon gegen dieselbe Liste (resolveSampleRate).
+bool RadioModel::restoredRateAllowed(int rateHz) const
+{
+    const QVector<int> allowed = allowedStreamSampleRates();
+    if (allowed.isEmpty() || allowed.contains(rateHz)) {
+        return true;
+    }
+    qCInfo(lcConnection) << "Gespeicherte Abtastrate" << rateHz
+                         << "verworfen: das verbundene Geraet kann nur" << allowed;
+    return false;
+}
+
 // Codex review round 7, PR #293. See RadioModel.h.
 void RadioModel::applyRestoredSampleRate(SliceModel* slice)
 {
@@ -4137,6 +4155,9 @@ void RadioModel::applyRestoredSampleRate(SliceModel* slice)
     }
     const int restored = slice->sampleRateHz();
     if (restored <= 0) {
+        return;
+    }
+    if (!restoredRateAllowed(restored)) {
         return;
     }
 
@@ -12522,9 +12543,11 @@ void RadioModel::onConnectionStateChanged(ConnectionState state)
         // the loss — this closes the loop at the only trustworthy
         // point.
         if (m_activeSlice && m_pendingRestoredRateHz > 0) {
-            m_activeSlice->setSampleRateHz(m_pendingRestoredRateHz);
+            if (restoredRateAllowed(m_pendingRestoredRateHz)) {
+                m_activeSlice->setSampleRateHz(m_pendingRestoredRateHz);
+                applyRestoredSampleRate(m_activeSlice);
+            }
             m_pendingRestoredRateHz = 0;
-            applyRestoredSampleRate(m_activeSlice);
         }
         // Remote bench 2026-08-11 (the parked MOX-rate investigation,
         // closed here): and the DDC assignment itself, for the same
