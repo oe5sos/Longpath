@@ -1484,10 +1484,13 @@ Praefix wie der zugehoerige Radio->Host-Rahmen der gleichen
 Folgenummer, `03 ff fe ff b0 04 <seq> 01`, dann zwei Byte, die beim
 Radio->Host-Rahmen `00 00` sind und beim Host->Radio-Rahmen einen
 zweiten Zaehler tragen): keine Nullen, sondern eine durchgaengige
-Nutzlast, deren 16-Bit-Werte paarweise auftreten (Wert, dann derselbe
-Wert noch einmal, fortlaufend) -- sieht nach einer Stereo-Interleaved-
-Struktur aus (L=R), nicht nach reiner IQ-Kodierung. Nicht weiter
-zerlegt.
+Nutzlast ueber den ganzen 16-Bit-Wertebereich (-31523 bis 31654 in
+einer Stichprobe). **Korrektur, selber Tag:** ein erster Blick auf den
+rohen Hex-Text las das als paarweise wiederholte Werte ("Stereo,
+L=R") -- sauber als kleinendische int16 dekodiert (Kopf ist 16 Byte,
+nicht 8) stimmt das nicht: von 298 Wertepaaren stimmen 0 ueberein. Die
+Werte sehen nach echtem, unkorreliertem Rauschen aus, nicht nach einem
+festen Muster oder einer verdoppelten Struktur. Nicht weiter zerlegt.
 
 **Was das bedeutet, ohne dass es schon eine Antwort ist:** dieser
 Treiber tut etwas oberflaechlich Aehnliches (er sendet auch auf dem
