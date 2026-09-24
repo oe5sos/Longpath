@@ -114,18 +114,29 @@ constexpr auto kTextTertiary    = "#909096";
 //
 // Die Zahlen sind ein Vorschlag mit einer Stelle, an der man ihn
 // aendert. Herkunft:
+//   Micro    7  — die kleinsten Panadapter-Beschriftungen (dBm-Skala,
+//                 Wasserfall-"LIVE"-Chip, Wasserfall-Zeitachse):
+//                 setPointSize(7) am 2026-09-24 auf setPixelSize(7)
+//                 umgestellt (Betreiber: die Schrift des Panadapters
+//                 soll pixelfest sein, nicht DPI-abhaengig), damit
+//                 sichtbar auf die Leiter genommen statt als
+//                 Ausnahme durchgerutscht
 //   Caption  9  — HAUSSTIL.md §Die acht Regeln, Regel 1: 8-9 px
 //   Small   11  — die haeufigste Groesse im Baum
 //   Body    13  — die VFO-Zeile des Frequenz-Widgets
 //   Sub     16  — bisher duenn belegt (8 Vorkommen), fuellt die Luecke
 //   Reading 22  — der abgelesene Wert in der Instrumenten-Fusszeile
 //   Display 38  — die Frequenz selbst
+//   Alarm   48  — die "HIGH SWR"-Warnung auf dem Panadapter: dieselbe
+//                 2026-09-24-Umstellung, derselbe Grund
+constexpr int kFontMicro   = 7;
 constexpr int kFontCaption = 9;
 constexpr int kFontSmall   = 11;
 constexpr int kFontBody    = 13;
 constexpr int kFontSub     = 16;
 constexpr int kFontReading = 22;
 constexpr int kFontDisplay = 38;
+constexpr int kFontAlarm   = 48;
 
 /// Laufweite der Versalzeile, als Anteil der Schriftgroesse.
 /// HAUSSTIL.md §Die acht Regeln: „.18em".

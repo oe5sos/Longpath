@@ -5136,8 +5136,13 @@ void SpectrumWidget::drawDbmScale(QPainter& p, const QRect& specRect)
     }
 
     // ── dBm labels ───────────────────────────────────────────────────────
+    // setPixelSize statt setPointSize: der Hausstil (capsFont() in
+    // StyleConstants.h) haelt Beschriftungen auf dem Graphen pixelfest,
+    // nicht DPI-abhaengig -- sonst weicht diese Schrift von den
+    // Frequenzachsen- und Grid-Beschriftungen ab, die schon setPixelSize
+    // verwenden. Betreiber am 2026-09-24.
     QFont f = p.font();
-    f.setPointSize(7);
+    f.setPixelSize(Style::kFontMicro);
     p.setFont(f);
     const QFontMetrics fm(f);
 
@@ -5233,7 +5238,13 @@ void SpectrumWidget::drawBandPlan(QPainter& p, const QRect& specRect)
         // Label: mode + lowest license class allowed (only if there's room).
         if (x2 - x1 > 20) {
             QFont f = p.font();
-            f.setPointSize(m_bandPlanFontSize);
+            // setPixelSize statt setPointSize: bandH weiter oben rechnet
+            // schon mit m_bandPlanFontSize als Pixelmass
+            // (bandH = m_bandPlanFontSize + 4), die Schrift selbst lief
+            // aber DPI-abhaengig -- beide Rechnungen meinten also nicht
+            // dasselbe. Der gespeicherte Zahlenwert bleibt unveraendert,
+            // nur wie er interpretiert wird.
+            f.setPixelSize(m_bandPlanFontSize);
             f.setBold(true);
             p.setFont(f);
 
@@ -5300,8 +5311,10 @@ void SpectrumWidget::drawTimeScale(QPainter& p, const QRect& wfRect)
         p.setRenderHint(QPainter::Antialiasing, false);
     }
 
+    // setPixelSize statt setPointSize: siehe die Begruendung an der
+    // ersten Stelle oben (dBm-Beschriftungen).
     QFont liveFont = p.font();
-    liveFont.setPointSize(7);
+    liveFont.setPixelSize(Style::kFontMicro);
     liveFont.setBold(true);
     p.setFont(liveFont);
     p.setPen(m_wfLive ? QColor(Style::role("text-secondary", Style::kTextSecondary)) : Qt::white);
@@ -5315,8 +5328,10 @@ void SpectrumWidget::drawTimeScale(QPainter& p, const QRect& wfRect)
         return;
     }
 
+    // setPixelSize statt setPointSize: siehe die Begruendung bei den
+    // dBm-Beschriftungen weiter oben.
     QFont f = p.font();
-    f.setPointSize(7);
+    f.setPixelSize(Style::kFontMicro);
     f.setBold(false);
     p.setFont(f);
     const QFontMetrics fm(f);
@@ -7960,8 +7975,10 @@ void SpectrumWidget::drawImdOverlay(QPainter& p, const QRect& specRect)
     // which the current mockup doesn't model), then label/val1/val2.
     const auto t = m_imdOverlay->formatReadout();
     p.setPen(QColor("#c8d8e8"));
+    // setPixelSize statt setPointSize: siehe die Begruendung bei den
+    // dBm-Beschriftungen weiter oben.
     QFont mono(QStringLiteral("Menlo"));
-    mono.setPointSize(9);
+    mono.setPixelSize(9);
     mono.setStyleHint(QFont::Monospace);
     p.setFont(mono);
 
@@ -8051,8 +8068,13 @@ void SpectrumWidget::paintHighSwrOverlay(QPainter& p)
         ? QStringLiteral("HIGH SWR\n\nPOWER FOLD BACK")
         : QStringLiteral("HIGH SWR");
 
+    // setPixelSize statt setPointSize: siehe die Begruendung bei den
+    // dBm-Beschriftungen weiter oben. Der Zahlenwert 48 ist ohnehin
+    // Longpaths eigene Wahl, nicht Thetis' fontDX2d_font14 (das waere
+    // 14pt) -- hier wird nur die Masseinheit auf Pixel umgestellt, der
+    // Wert bleibt unveraendert.
     QFont f = p.font();
-    f.setPointSize(48);
+    f.setPixelSize(Style::kFontAlarm);
     f.setBold(true);
     p.setFont(f);
     p.setPen(kRed);

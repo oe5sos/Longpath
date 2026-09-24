@@ -42,7 +42,7 @@ BASELINE = REPO / "docs" / "design" / "style-drift-baseline.json"
 
 # Die Schriftleiter aus StyleConstants.h. Eine Groesse, die NICHT darauf
 # liegt, ist Drift: sie ist gewachsen, nicht entschieden.
-LADDER = {9, 11, 13, 16, 22, 38}
+LADDER = {7, 9, 11, 13, 16, 22, 38, 48}
 RE_FONT_PX = re.compile(r"font-size:\s*(\d+)px")
 RE_SET_PIXEL = re.compile(r"setPixelSize\(\s*(\d+)\s*\)")
 
