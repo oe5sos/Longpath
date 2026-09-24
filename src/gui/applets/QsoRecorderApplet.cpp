@@ -499,6 +499,11 @@ void QsoRecorderApplet::warnWithoutBlocking(const QString& text)
                                 QStringLiteral("QSO Recorder"), text,
                                 QMessageBox::Ok, this);
     box->setAttribute(Qt::WA_DeleteOnClose);
+    // Nicht nativ, sonst wird aus open() auf macOS ein blockierendes
+    // [NSAlert runModal] (Qt 6.11, 2026-09-24).
+#if QT_VERSION >= QT_VERSION_CHECK(6, 6, 0)
+    box->setOption(QMessageBox::Option::DontUseNativeDialog);
+#endif
     box->open();
 }
 
