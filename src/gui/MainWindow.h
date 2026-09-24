@@ -160,6 +160,11 @@ public:
     explicit MainWindow(QWidget* parent = nullptr);
     ~MainWindow() override;
 
+    /// Die FFT-Groesse fuer ein Geraet: sein eigener Eintrag
+    /// (hardware/<mac>/display/fftSize), sonst DisplayFftSize, sonst
+    /// `fallback`. Nur gueltige Reglerwerte (4096 .. 262144).
+    static int fftSizeForRadio(const QString& mac, int fallback);
+
     // ── Phase 3M-0 Task 14 test accessors ────────────────────────────────
     // TX Inhibit no longer has a label of its own. It paints onto the TX
     // badge (prohibition symbol) and raises a toast; see setTxInhibited().
@@ -781,6 +786,10 @@ private:
     /// Stream 0's engine. Back-compat accessor for call sites that still
     /// address "the" FFT engine (display settings, Max Bin, auto-zoom).
     FFTEngine* primaryFftEngine() const { return m_fftEngines.value(0, nullptr); }
+
+    /// FFT-Groesse des Panadapters je Geraet: die gespeicherte dieses
+    /// Geraets, sonst die globale (DisplayFftSize). Beim Verbinden.
+    void applyPerRadioFftSize(const QString& mac);
 
     /// Build and register one FFTEngine for `streamIndex`, configured as
     /// the old single-engine path was, moved onto the shared FFT thread.

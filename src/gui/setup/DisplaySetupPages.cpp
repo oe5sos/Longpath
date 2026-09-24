@@ -629,9 +629,21 @@ void SpectrumDefaultsPage::buildUI()
             // survives restart.  Previously the slider drove the engine
             // but never wrote to AppSettings, so launch always reverted
             // to the FFTEngine ctor default (typically 4096).
-            AppSettings::instance().setValue(
-                QStringLiteral("DisplayFftSize"),
-                QString::number(newSize));
+            //
+            // Je Geraet, wenn eines verbunden ist (2026-09-24): dieselbe
+            // Punktzahl ist bei 48 kHz ein viermal laengeres Zeitfenster
+            // als bei 192 kHz. Ohne Verbindung der globale Wert, den jedes
+            // Geraet ohne eigenen Eintrag bekommt (MainWindow::
+            // applyPerRadioFftSize).
+            const QString mac = model()->currentRadioMac();
+            if (!mac.isEmpty()) {
+                AppSettings::instance().setHardwareValue(
+                    mac, QStringLiteral("display/fftSize"), newSize);
+            } else {
+                AppSettings::instance().setValue(
+                    QStringLiteral("DisplayFftSize"),
+                    QString::number(newSize));
+            }
         }
 
         // Bin-width readout, fresh from newSize.  Format "N3" = 3 decimal
