@@ -1528,3 +1528,60 @@ echte QRP wiederholen -- mit demselben `LONGPATH_SUNSDR_PRE`-Mechanismus
 wie beim letzten Versuch, aber diesmal mit dem zusaetzlichen Rahmentyp
 im Werkzeug beruecksichtigt, damit er nicht stillschweigend
 herausgefiltert wird.
+
+### 2026-09-24, dritte Runde: der 33-ff-Rahmen probiert -- Verbindung schlaegt fehl, kein Zwischenfall
+
+Der oben vorgeschlagene naechste Schritt ist gelaufen: derselbe
+Verbindungsburst wie am 2026-09-23 (24 Rahmen, gleiche Reihenfolge),
+diesmal mit dem neu gefundenen `33 ff`-Rahmen als allererstem PRE-Eintrag
+(`~/Longpath/werkzeug/qrp-expert-folge-mit-33ff.sh`, mit dem Betreiber am
+Geraet).
+
+**Ergebnis: schlechter als vorher, nicht besser.** Die Verbindung kam gar
+nicht zustande -- `SunSdr: beacon replied but no I/Q stream followed`.
+Anders als beim reinen 24-Rahmen-Versuch vom Vortag (der wenigstens einen
+-- wenn auch verdoppelten -- Datenstrom bekam), blieb hier der Datenport
+komplett still. Der `33 ff`-Rahmen hat die Verbindung nicht verbessert,
+sondern zum Stillstand gebracht.
+
+**Kein Zwischenfall:** direkt danach normal (ohne PRE/EXTRA) verbunden --
+sofortiger Connect, Panadapter/Wasserfall liefen sauber, S-Meter zeigte
+S-3. Das Geraet selbst ist durch den Versuch nicht beeintraechtigt
+worden, anders als am 2026-09-23.
+
+**Schlussfolgerung:** der `33 ff`-Rahmen ist entweder in dieser Form
+falsch konstruiert (die vier Kopien im Mitschnitt haben unterschiedliche
+Nutzdaten -- moeglicherweise traegt er einen Zustand, der beim
+naechsten Rahmen mit einer bestimmten Antwort erwartet wird, die dieser
+Treiber nicht liefert), oder er gehoert gar nicht in einen einmaligen
+Verbindungsburst, sondern ist Teil eines eigenen, noch unbekannten
+Protokoll-Nebenkanals, den ExpertSDR2 fuer etwas anderes benutzt (evtl.
+TX-Vorbereitung, EQ/Preset-Uebertragung o.ae.) und der mit reinem
+RX-Empfang nichts zu tun hat.
+
+**Nicht empfohlen als naechster Schritt:** denselben Rahmen erneut in
+Varianten auszuprobieren, ohne vorher zu verstehen, WAS er bedeutet.
+Das reine Ausprobieren von Byte-Varianten an einem unbekannten Rahmen
+ist genau das Risiko, vor dem diese Datei an mehreren Stellen warnt.
+
+### 2026-09-24: derselbe Daempfungs-Zwischenfall wie am 2026-09-23 -- wieder durch unzugeordnete Rahmen
+
+Der 33-ff-Versuch oben hat, wie am Vortag, den Pegel gedaempft:
+`peak |sample|` fiel von der gesunden Grosse (`1,9e-05 ... 2,7e-05`) auf
+`2,0e-06 ... 4,8e-06` -- derselbe Faktor ~7-10 (~17 dB) wie beim
+2026-09-23-Zwischenfall. Ursache mit hoher Wahrscheinlichkeit dieselbe:
+unzugeordnete Steuerrahmen (0x03/0x04/0x0f/0x10/0x11/0x13/0x15/0x16/
+0x18/0x1a/0x1c, diesmal zusaetzlich 0x33ff) an ein Geraet gesendet, das
+diesen Zustand ueber das Trennen hinaus behaelt.
+
+**Behoben wie beim letzten Mal:** Netzstecker-Zyklus am QRP. Nach dem
+Wiedereinschalten sofort verifiziert (`LONGPATH_SUNSDR_PROBE=1`, normaler
+Connect ohne PRE/EXTRA): `peak |sample| = 1,9e-05 ... 2,7e-05` --
+wieder im gesunden Bereich.
+
+**Das bestaetigt zusaetzlich:** die Daempfung ist keine Eigenart der
+elf urspruenglichen Opcodes allein, sondern tritt bei UNBEKANNTEN
+Rahmen generell auf -- ein weiterer Grund, keinen neuen unbestaetigten
+Opcode an dieses Geraet zu senden, ohne die Daempfung als moegliche
+Folge einzuplanen (Pegel vorher UND nachher pruefen, nicht nur ob der
+Datenstrom kommt).
