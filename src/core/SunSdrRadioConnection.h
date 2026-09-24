@@ -650,6 +650,22 @@ private:
     /// dem Zustandsrahmen hinaus, EXTRA danach.
     void sendBenchFrames(const QString& envName);
     void probeReportIfDue();
+
+    // Werkbank (LONGPATH_SUNSDR_BLOCKANTWORT): jeden NEUEN Block der QRP
+    // sofort mit einem stillen 0xFE-Paket derselben Folgenummer
+    // beantworten, statt alle 2 s einen Keepalive mit eigenem Zaehler zu
+    // schicken. So macht es ExpertSDR2 (Mitschnitt 2026-09-24: 44 439 von
+    // 44 439 Nummern gespiegelt, im Median 0,16 ms nach der QRP), und im
+    // selben Moment faellt die Achtfachung weg. Design doc, Abschnitt
+    // "2026-09-24, vierte Runde". Der Ring haelt die zuletzt beantworteten
+    // Nummern fest, weil die acht Kopien verschraenkt ankommen.
+    bool m_blockReplyOn{false};
+    bool m_blockReplyChecked{false};
+    std::array<quint16, 32> m_blockReplyRing{};
+    int m_blockReplyFill{0};
+    int m_blockReplyPos{0};
+    bool blockReplyEnabled();
+    void replyToBlock(quint16 seq);
 };
 
 } // namespace Longpath

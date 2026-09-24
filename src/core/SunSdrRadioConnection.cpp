@@ -819,7 +819,7 @@ void SunSdrRadioConnection::processControlDatagram(const QByteArray& data,
     // citation) starts counting from whenever it considers the
     // session live, which is at latest right after this state-sync
     // reply, not after Longpath happens to have decoded something.
-    if (m_keepaliveTimer) {
+    if (m_keepaliveTimer && !blockReplyEnabled()) {
         m_keepaliveTimer->start(kKeepaliveIntervalMs);
     }
 
@@ -899,6 +899,10 @@ void SunSdrRadioConnection::processStreamDatagram(const QByteArray& data,
     }
     if (hdr.opcode != SunSdr::kOpIqRxIdle) {
         return;  // TX-active frames don't apply to a receive-only connection
+    }
+
+    if (blockReplyEnabled()) {
+        replyToBlock(hdr.seq);
     }
 
     if (!m_probeChecked) {
@@ -1171,6 +1175,41 @@ void SunSdrRadioConnection::sendBenchFrames(const QString& envName)
                          << (frame.size() > 2 ? quint8(frame[2]) : 0)
                          << "-" << frame.size() << "Byte";
     }
+}
+
+bool SunSdrRadioConnection::blockReplyEnabled()
+{
+    if (!m_blockReplyChecked) {
+        m_blockReplyChecked = true;
+        m_blockReplyOn = qEnvironmentVariableIsSet("LONGPATH_SUNSDR_BLOCKANTWORT");
+        if (m_blockReplyOn) {
+            qCInfo(lcSunSdr) << "SunSdr: Blockantwort an (LONGPATH_SUNSDR_BLOCKANTWORT)"
+                                " -- jeder neue Block wird mit derselben Folgenummer"
+                                " still beantwortet, kein 2-s-Keepalive";
+        }
+    }
+    return m_blockReplyOn;
+}
+
+void SunSdrRadioConnection::replyToBlock(quint16 seq)
+{
+    if (!m_streamSocket || !m_profile || m_radioAddr.isNull()) { return; }
+
+    for (int i = 0; i < m_blockReplyFill; ++i) {
+        if (m_blockReplyRing[i] == seq) { return; }
+    }
+    m_blockReplyRing[m_blockReplyPos] = seq;
+    m_blockReplyPos = (m_blockReplyPos + 1) % int(m_blockReplyRing.size());
+    m_blockReplyFill = std::min(m_blockReplyFill + 1, int(m_blockReplyRing.size()));
+
+    // Kopf wie ExpertSDR2 im Leerlauf und wie ArtemisSDRs
+    // sunsdr_build_tx_silence(), sunsdr.c:4105-4115 [@f8b01d25c5]:
+    // op=0xFE, byte8=0x01, byte9=0x00, Nutzlast Null (Stille).
+    QByteArray pkt = SunSdr::buildIqHeader(*m_profile, SunSdr::kOpIqRxIdle,
+                                           seq, /*byte8=*/0x01, /*byte9=*/0x00);
+    pkt.append(SunSdr::kIqPayloadSize, char(0));
+    m_streamSocket->writeDatagram(pkt, m_radioAddr, m_profile->defaultStreamPort);
+    recordBytesSent(static_cast<qint64>(pkt.size()));
 }
 
 void SunSdrRadioConnection::probeFeed(quint16 seq, const QByteArray& payload)
