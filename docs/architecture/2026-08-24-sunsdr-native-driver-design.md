@@ -1449,3 +1449,139 @@ unterschieden. Der nächste sinnvolle Schritt ist ein **durchgehender**
 Mitschnitt (Steuerkanal und Datenkanal zusammen, über die volle Dauer
 einer ExpertSDR-Sitzung, nicht nur den Verbindungsaufbau) statt eines
 weiteren Rahmen-Versuchs.
+
+### 2026-09-24, zweite Runde: durchgehender Mitschnitt gefahren -- ein neues Magic-Byte gefunden
+
+Der oben vorgeschlagene durchgehende Mitschnitt ist gelaufen: `tcpdump`
+auf beiden Ports gleichzeitig (Steuerkanal 50001 + Datenkanal 50002),
+passiv, ohne ein einziges Byte zu senden, ueber eine echte
+ExpertSDR2-Sitzung von rund 3:55 Minuten (142 592 UDP-Pakete, 204 davon
+Steuerkanal). Der Betreiber hat ExpertSDR2 normal verbunden und
+bedient, waehrend mitgelesen wurde.
+
+**Befund 1 -- die Umschaltung faellt auf die ersten 0,34 Sekunden.**
+
+Die Datenrate auf Port 50002 zeigt zwei klar getrennte Zustaende:
+
+```
+vor dem Verbinden:      ~1940 Pakete/s  (8-fache Kopie -- unser eigenes Bild)
+ab der Verbindung:       ~500 Pakete/s  (240 Folgenummern/s, ZWEI Pakete je
+                                          Nummer -- ExpertSDRs bekanntes Bild)
+```
+
+Der Wechsel geschieht binnen einer Sekunde nach dem letzten Rahmen des
+Verbindungsbursts (t=0,34 s im Mitschnitt) und bleibt dann fuer die
+gesamte weitere Sitzung stabil bei 500/s -- mit einer einzigen
+Ausnahme: ein rund 6 Sekunden langer Ruecksprung auf 1940/s bei
+t≈43-49 s, Ursache unbekannt (kein Steuerkanal-Rahmen faellt zeitlich
+zusammen, vermutlich eine geraeteseitige Aussetzer- oder
+Neuabgleich-Phase; noch nicht weiter untersucht).
+
+**Befund 2 -- ein Rahmen mit einem voellig anderen Magic-Byte, nie
+zuvor dokumentiert.**
+
+Der zweite Rahmen, den ExpertSDR2 ueberhaupt schickt -- noch vor dem
+Zustandsrahmen `0x01` -- traegt nicht das bekannte Magic-Byte-Paar
+`03 ff`, sondern `33 ff`:
+
+```
+t=0,2402s H->R len=1218  33ff0500000000000000000000005f1d9b9c0000...
+```
+
+1218 Byte, ueberwiegend Nullen, mit einem 19-Byte-Kopf
+(`33 ff 05 00 00 00 00 00 00 00 00 00 00 5f 1d 9b 9c 00 00`), der bei
+allen fuenf im Mitschnitt vorkommenden Exemplaren identisch ist. Der
+Rahmen taucht insgesamt fuenfmal auf: einmal im Verbindungsburst
+(t=0,24s), zweimal kurz hintereinander bei t≈31,55s, zweimal kurz
+hintereinander bei t≈38,45s -- letztere mit erkennbar strukturierten
+Nutzdaten (`73cb88ec233fc711a64b...`, sieht nach Float32-Werten aus,
+aehnlich den bekannten 338-Byte-Antwortrahmen). Die spaeten
+Vorkommen fallen zeitlich mit keiner bekannten Nutzerhandlung
+zusammen, die im Mitschnitt selbst sichtbar waere.
+
+**Das ist mit den bisherigen Werkzeugen nie repliziert worden.** Der
+Treiber kennt nur `SunSdr::kMagic1 = 0xFF` mit dem festen ersten Byte
+`0x03` (`SunSdrRadioConnection.cpp:780`); ein Rahmen mit erstem Byte
+`0x33` wuerde von `parseControlHeader()` gar nicht als gueltiger
+Steuerrahmen erkannt und still verworfen. Die "24-Rahmen-Wiederholung"
+vom 2026-09-24 (siehe oben, "Verbindungsreihenfolge ist es nicht")
+wurde aus einem frueheren Mitschnitt gebaut, der -- wenn er dasselbe
+Auswertewerkzeug benutzte -- diesen Rahmen moeglicherweise nie erfasst
+oder nie mitgeschickt hat, weil das Werkzeug ausschliesslich nach
+`03 ff`-Rahmen sucht.
+
+**Damit ist die dritte, bisher unentschiedene Erklaerung aus der
+letzten Runde am wahrscheinlichsten:** nicht die Reihenfolge der
+bekannten Steuerrahmen, sondern ein Rahmentyp, der bisher komplett
+ausserhalb des Blickfelds lag.
+
+**Nicht ausprobiert, mit Absicht:** einen `33 ff`-Rahmen an die echte
+QRP zu senden ist ein unbestaetigter Opcode wie jeder andere und faellt
+unter dieselbe Regel wie alle anderen SunSDR-Rahmen -- nur mit
+aktueller, ausdruecklicher Zustimmung des Betreibers am Geraet, nicht
+aus der Ferne und nicht ohne ihn.
+
+**Naechster Schritt, noch nicht begonnen:** den vollstaendigen
+Verbindungsburst dieser Sitzung (Steuerkanal-Rahmen aus diesem
+Mitschnitt, jetzt inklusive des `33 ff`-Rahmens, byte-exakt) gegen die
+echte QRP wiederholen -- mit demselben `LONGPATH_SUNSDR_PRE`-Mechanismus
+wie beim letzten Versuch, aber diesmal mit dem zusaetzlichen Rahmentyp
+im Werkzeug beruecksichtigt, damit er nicht stillschweigend
+herausgefiltert wird.
+
+### 2026-09-24, dritte Runde: der 33-ff-Rahmen probiert -- Verbindung schlaegt fehl, kein Zwischenfall
+
+Der oben vorgeschlagene naechste Schritt ist gelaufen: derselbe
+Verbindungsburst wie am 2026-09-23 (24 Rahmen, gleiche Reihenfolge),
+diesmal mit dem neu gefundenen `33 ff`-Rahmen als allererstem PRE-Eintrag
+(`~/Longpath/werkzeug/qrp-expert-folge-mit-33ff.sh`, mit dem Betreiber am
+Geraet).
+
+**Ergebnis: schlechter als vorher, nicht besser.** Die Verbindung kam gar
+nicht zustande -- `SunSdr: beacon replied but no I/Q stream followed`.
+Anders als beim reinen 24-Rahmen-Versuch vom Vortag (der wenigstens einen
+-- wenn auch verdoppelten -- Datenstrom bekam), blieb hier der Datenport
+komplett still. Der `33 ff`-Rahmen hat die Verbindung nicht verbessert,
+sondern zum Stillstand gebracht.
+
+**Kein Zwischenfall:** direkt danach normal (ohne PRE/EXTRA) verbunden --
+sofortiger Connect, Panadapter/Wasserfall liefen sauber, S-Meter zeigte
+S-3. Das Geraet selbst ist durch den Versuch nicht beeintraechtigt
+worden, anders als am 2026-09-23.
+
+**Schlussfolgerung:** der `33 ff`-Rahmen ist entweder in dieser Form
+falsch konstruiert (die vier Kopien im Mitschnitt haben unterschiedliche
+Nutzdaten -- moeglicherweise traegt er einen Zustand, der beim
+naechsten Rahmen mit einer bestimmten Antwort erwartet wird, die dieser
+Treiber nicht liefert), oder er gehoert gar nicht in einen einmaligen
+Verbindungsburst, sondern ist Teil eines eigenen, noch unbekannten
+Protokoll-Nebenkanals, den ExpertSDR2 fuer etwas anderes benutzt (evtl.
+TX-Vorbereitung, EQ/Preset-Uebertragung o.ae.) und der mit reinem
+RX-Empfang nichts zu tun hat.
+
+**Nicht empfohlen als naechster Schritt:** denselben Rahmen erneut in
+Varianten auszuprobieren, ohne vorher zu verstehen, WAS er bedeutet.
+Das reine Ausprobieren von Byte-Varianten an einem unbekannten Rahmen
+ist genau das Risiko, vor dem diese Datei an mehreren Stellen warnt.
+
+### 2026-09-24: derselbe Daempfungs-Zwischenfall wie am 2026-09-23 -- wieder durch unzugeordnete Rahmen
+
+Der 33-ff-Versuch oben hat, wie am Vortag, den Pegel gedaempft:
+`peak |sample|` fiel von der gesunden Grosse (`1,9e-05 ... 2,7e-05`) auf
+`2,0e-06 ... 4,8e-06` -- derselbe Faktor ~7-10 (~17 dB) wie beim
+2026-09-23-Zwischenfall. Ursache mit hoher Wahrscheinlichkeit dieselbe:
+unzugeordnete Steuerrahmen (0x03/0x04/0x0f/0x10/0x11/0x13/0x15/0x16/
+0x18/0x1a/0x1c, diesmal zusaetzlich 0x33ff) an ein Geraet gesendet, das
+diesen Zustand ueber das Trennen hinaus behaelt.
+
+**Behoben wie beim letzten Mal:** Netzstecker-Zyklus am QRP. Nach dem
+Wiedereinschalten sofort verifiziert (`LONGPATH_SUNSDR_PROBE=1`, normaler
+Connect ohne PRE/EXTRA): `peak |sample| = 1,9e-05 ... 2,7e-05` --
+wieder im gesunden Bereich.
+
+**Das bestaetigt zusaetzlich:** die Daempfung ist keine Eigenart der
+elf urspruenglichen Opcodes allein, sondern tritt bei UNBEKANNTEN
+Rahmen generell auf -- ein weiterer Grund, keinen neuen unbestaetigten
+Opcode an dieses Geraet zu senden, ohne die Daempfung als moegliche
+Folge einzuplanen (Pegel vorher UND nachher pruefen, nicht nur ob der
+Datenstrom kommt).
