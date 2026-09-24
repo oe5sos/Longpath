@@ -208,6 +208,21 @@ void PanFloatingWindow::closeEvent(QCloseEvent* event)
     // wurde genau dafuer eingebaut). Beides darf das Profil nicht
     // umschreiben. Volle Begruendung in
     // AppletFloatingWindow::closeEvent().
+    //
+    // ABER: ein ignore() beim Beenden bricht bei Qt das GANZE Beenden ab
+    // (QApplication schliesst alle Fenster der Reihe nach und gibt auf,
+    // sobald eines ablehnt). Am 2026-09-24 liess sich Longpath darum mit
+    // schwebendem Panadapter ueberhaupt nicht mehr beenden -- sechs
+    // Versuche hintereinander, jeder endete hier mit m_shuttingDown=false,
+    // spontaneous=false, und MainWindow::closeEvent lief nie. Das Schliessen
+    // aller Fenster beim Beenden kommt NICHT spontan an; darum wird es
+    // angenommen (versteckt nur, kein Andocken -- das Profil fragt
+    // isPanFloating() und die Lage des Fensters, nicht die Sichtbarkeit).
+    // Abgelehnt wird nur noch, was das Fenstersystem spontan schickt.
+    if (!event->spontaneous()) {
+        event->accept();
+        return;
+    }
     event->ignore();
 }
 
