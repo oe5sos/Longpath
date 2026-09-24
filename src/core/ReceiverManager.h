@@ -70,6 +70,8 @@
 #include <QMap>
 #include <QMutex>
 
+#include <atomic>
+
 #include "codec/CodecContext.h"   // PsDdcConfig + Q_DECLARE_METATYPE
 #include "HpsdrModel.h"           // HPSDRModel
 
@@ -299,7 +301,17 @@ signals:
     // for a fresh assignment, and reset() has already dropped every receiver.
     void ddcCodecChanged();
 
+public:
+    /// Komplexe Proben, die seit dem letzten Aufruf an Empfaenger 0
+    /// weitergereicht wurden -- gemessen, nicht eingestellt. Die
+    /// Ratenanzeige in der Knopfleiste liest das einmal je Sekunde und
+    /// vergleicht es mit der Rate des Empfangskanals (2026-09-24: die QRP
+    /// lieferte 48 000/s in einen auf 192 000 gestellten Kanal, und nichts
+    /// auf dem Bildschirm hat es verraten).
+    quint64 takeRx0InputSamples() { return m_rx0InputSamples.exchange(0); }
+
 private:
+    std::atomic<quint64> m_rx0InputSamples{0};
     // Rebuild hardware DDC mapping after receiver changes.
     void rebuildHardwareMapping();
 

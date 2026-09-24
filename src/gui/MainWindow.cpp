@@ -4175,6 +4175,25 @@ void MainWindow::buildUI()
     // unangetastet — alle 900 Zeilen darunter kennen ihn unverändert.
     m_commandBar = new CommandBar(this);
 
+    // ── RATE: einmal je Sekunde, was der Empfangskanal faehrt ─────────
+    //
+    // Kanalrate aus dem WDSP-Kanal selbst, nicht aus einer Einstellung,
+    // und die gemessene Eingangsrate aus dem Zaehler im ReceiverManager.
+    // Am 2026-09-24 lief der QRP-Kanal auf 192 kHz, waehrend 48 kHz
+    // ankamen -- hoerbar, aber nirgends sichtbar.
+    {
+        auto* rateTimer = new QTimer(this);
+        rateTimer->setInterval(1000);
+        connect(rateTimer, &QTimer::timeout, this, [this]() {
+            if (!m_commandBar || !m_radioModel) { return; }
+            ReceiverManager* rm = m_radioModel->receiverManager();
+            const quint64 measured = rm ? rm->takeRx0InputSamples() : 0;
+            m_commandBar->setRateReadout(m_radioModel->rx0ChannelRateHz(),
+                                         static_cast<int>(measured));
+        });
+        rateTimer->start();
+    }
+
     // ── Bandwechsel aus der Leiste ──────────────────────────────────
     //
     // Der Betreiber am 2026-08-22: "bandwechsel sollte auch mit

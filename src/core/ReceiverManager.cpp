@@ -393,6 +393,10 @@ void ReceiverManager::feedIqData(int hwReceiverIndex, const QVector<float>& samp
                                << "wdspChannel=" << rxIt->wdspChannel
                                << "samples=" << samples.size();
         }
+        if (logicalIndex == 0) {
+            m_rx0InputSamples.fetch_add(static_cast<quint64>(samples.size() / 2),
+                                        std::memory_order_relaxed);
+        }
         emit iqDataForReceiver(logicalIndex, samples);
         if (rxIt->wdspChannel >= 0) {
             emit iqDataForChannel(rxIt->wdspChannel, samples);
