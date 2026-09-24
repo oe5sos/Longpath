@@ -461,7 +461,7 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
                 p.drawPath(tracePath);
             }
         }
-        p.setPen(QPen(traceLine, 1.5));
+        p.setPen(QPen(traceLine, 0.75));
         p.setBrush(Qt::NoBrush);
         p.drawPath(tracePath);
 
