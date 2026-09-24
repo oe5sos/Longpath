@@ -1401,3 +1401,51 @@ Dieselben Rahmen in ExpertSDRs Reihenfolge, aber vollständig — also
 auch die Abfragen, auf die das Gerät antwortet, und in der Taktung des
 Originals. Der Mitschnitt reicht dafür aus und braucht das Gerät nicht
 mehr.
+
+### 2026-09-24: die Verbindungsreihenfolge ist es nicht
+
+Der „nächste Schritt" von oben ist gelaufen (`~/Longpath/werkzeug/
+qrp-expert-folge.sh`, mit dem Betreiber am Gerät): alle 24 Rahmen aus
+ExpertSDRs Mitschnitt, in der Original-Reihenfolge, 12 vor dem
+Zustandsrahmen und 12 danach, gegen die echte QRP.
+
+**Ergebnis: keine Änderung.** 35 s durchgehend gemessen
+(`LONGPATH_SUNSDR_PROBE=1`, im Treiber selbst, über alle 1200 Byte):
+
+```
+1920 Pakete/s, 247 Folgenummern/s
+8x bei 232 der 247 Nummern
+Wiederholungen: 1683, davon GANZ bytegleich: 1683, verschieden: 0
+```
+
+Byte für Byte dasselbe Bild wie ohne jeden zusätzlichen Rahmen. Damit
+ist die Hypothese „ExpertSDR bekommt echte Daten, weil es dem Gerät
+beim Verbinden etwas anderes sagt" **widerlegt**, nicht nur für die
+Rahmen nach dem Zustandsrahmen (das stand hier schon), sondern auch für
+die zwölf davor. Der Unterschied zwischen dem, was ExpertSDR bekommt,
+und dem, was dieser Treiber bekommt, liegt nicht in der Verbindungs-
+reihenfolge.
+
+Kein Zwischenfall diesmal: der Pegel blieb die ganze Messung über im
+gesunden Bereich (`peak |sample| = 1,4e-05 … 2,8e-05`), anders als beim
+ersten Versuch am 2026-09-23.
+
+Was damit übrig bleibt, ohne dass hier schon eine Antwort feststeht:
+
+* Etwas, das ExpertSDR **laufend** anders macht, nicht nur beim
+  Verbinden — eine andere Keepalive-Taktung, ein periodischer Rahmen,
+  der nicht im einmaligen Verbindungsmitschnitt vorkommt.
+* Oder es ist tatsächlich eine feste Eigenschaft des Geräts, und
+  ExpertSDR wertet dieselben acht Kopien anders aus als dieser Treiber
+  (z. B. weil es dieselbe Wache nicht kennt und die Wiederholungen
+  gar nicht herausfiltert, sondern irgendwo anders im Signalweg
+  mittelt oder verwirft).
+* Oder etwas außerhalb des Steuerkanals überhaupt — ein Vorgang auf
+  dem Datenport 50002 selbst, den ein Mitschnitt des Steuerports
+  (50001) nie zeigen würde.
+
+Keine dieser drei ist mit den vorhandenen Werkzeugen schon
+unterschieden. Der nächste sinnvolle Schritt ist ein **durchgehender**
+Mitschnitt (Steuerkanal und Datenkanal zusammen, über die volle Dauer
+einer ExpertSDR-Sitzung, nicht nur den Verbindungsaufbau) statt eines
+weiteren Rahmen-Versuchs.
