@@ -6838,6 +6838,11 @@ longpath_add_test(tst_pan_display_settings_inherit)
 # codec and wire stayed on the previous band's.
 longpath_add_test(tst_restored_sample_rate_reaches_the_ddc)
 
+# -- Die FFT-Groesse des Panadapters gilt je Geraet (2026-09-24): eine
+#    feste Punktzahl ist bei 48 kHz ein viermal laengeres Fenster als bei
+#    192 kHz. --
+longpath_add_test(tst_fft_size_per_radio)
+
 # Codex review round 6, PR #293: Phase 3F gave TCI more slices than TCI ever
 # agreed to talk about. tx_frequency must come from the slice TxSliceArbiter
 # bound TX to rather than from receiver 0, and tagged frames must stop at the

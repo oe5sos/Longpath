@@ -2366,6 +2366,43 @@ void MainWindow::fanWidebandBinsForTest(PanadapterStack* stack, int adcIndex,
 // `audio[cmMAXSubRcvr]` (cmaster.h:75-82 [v2.10.3.15]).  So slices that share
 // a DDC share one spectrum and appear as separate flags on it, and the engine
 // pool is sized by stream, not by slice.
+void MainWindow::applyPerRadioFftSize(const QString& mac)
+{
+    // Der FFT-Regler war nur global (DisplayFftSize). Eine feste
+    // Punktzahl ist aber je nach Abtastrate ein anderes Zeitfenster:
+    // 16 384 sind an der ANAN (192 kHz) 85 ms, an der SunSDR2 QRP
+    // (48 kHz) 341 ms -- dort bewegte sich Spektrum und Bandfilter-Kurve
+    // traege (Betreiber 2026-09-24, "pro Geraet merken"). Ohne Eintrag
+    // fuer dieses Geraet gilt der globale Wert, auch damit ein Wechsel
+    // QRP -> ANAN in derselben Sitzung nicht den QRP-Wert mitnimmt.
+    FFTEngine* engine = m_radioModel ? m_radioModel->fftEngine() : nullptr;
+    if (!engine || mac.isEmpty()) {
+        return;
+    }
+    const int size = fftSizeForRadio(mac, engine->fftSizeBaseline());
+    if (size == engine->fftSizeBaseline()) {
+        return;
+    }
+    engine->setFftSizeBaseline(size);
+    engine->setFftSize(size);
+    qInfo() << "FFT-Groesse fuer" << mac << "->" << size;
+}
+
+int MainWindow::fftSizeForRadio(const QString& mac, int fallback)
+{
+    auto valid = [](int n) { return n >= 4096 && n <= (4096 << 6); };
+    auto& s = AppSettings::instance();
+    if (!mac.isEmpty()) {
+        const int perRadio =
+            s.hardwareValue(mac, QStringLiteral("display/fftSize")).toInt();
+        if (valid(perRadio)) {
+            return perRadio;
+        }
+    }
+    const int global = s.value(QStringLiteral("DisplayFftSize")).toString().toInt();
+    return valid(global) ? global : fallback;
+}
+
 FFTEngine* MainWindow::createFftEngineForStream(int streamIndex)
 {
     if (streamIndex < 0) { return nullptr; }
@@ -15195,6 +15232,7 @@ void MainWindow::onConnectionStateChanged()
         // connected board lacks the feature.
         m_stepAttController->setHasStepAttenuatorCal(caps.hasStepAttenuatorCal);
         m_stepAttController->loadSettings(m_radioModel->connection()->radioInfo().macAddress);
+        applyPerRadioFftSize(m_radioModel->connection()->radioInfo().macAddress);
 
         // Phase 3Q Task 5 — auto-close: 1 s after connect, accept() the panel if open.
         // Fires on transitions TO Connected only (not on repeated Connected emits).
