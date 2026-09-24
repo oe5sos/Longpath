@@ -1449,3 +1449,58 @@ unterschieden. Der nächste sinnvolle Schritt ist ein **durchgehender**
 Mitschnitt (Steuerkanal und Datenkanal zusammen, über die volle Dauer
 einer ExpertSDR-Sitzung, nicht nur den Verbindungsaufbau) statt eines
 weiteren Rahmen-Versuchs.
+
+### 2026-09-24, vierte Runde: der Datenport selbst -- ExpertSDR2 sendet zurueck, im Blocktakt
+
+Der oben als "naechster sinnvoller Schritt" genannte durchgehende
+Mitschnitt (Steuer- und Datenkanal zusammen, echte ExpertSDR2-Sitzung,
+rein passiv mitgelesen, kein Byte gesendet) ist ausgewertet worden --
+diesmal der Datenport (50002) selbst, nicht nur der Steuerkanal.
+
+**Befund: ExpertSDR2 sendet auf Port 50002 zurueck an die QRP -- im
+exakten Takt der empfangenen Bloecke.**
+
+Vor dem Verbindungsaufbau laeuft auf Port 50002 nur eine Richtung
+(Radio -> Host, ~1940 Pakete/s, die bekannte Achtfachung). Ab dem
+Moment, in dem der Steuerkanal-Verbindungsburst abgeschlossen ist
+(rel. t ~ 11 s in diesem Mitschnitt), erscheint eine ZWEITE Richtung
+auf demselben Port: Host -> Radio, 1210 Byte, **konstant 240 Pakete/s**
+-- exakt die bekannte Blockrate (240 echte Bloecke/s bei 48 000
+Proben/s), nicht die 2-Sekunden-Taktung, die dieser Treiber fuer seinen
+eigenen Keepalive-Rahmen (`onKeepaliveTimeout()`, `kOpIqRxIdle`,
+Nutzlast durchgehend Null, alle 2000 ms) verwendet.
+
+**Die Kopplung ist eng, nicht nur beilaeufig:** in der kurzen
+1940-Pakete/s-Anomalie von Minute 42-49 (siehe Abschnitt "der 33-ff-
+Versuch" oben, dort nur am Steuerkanal beobachtet) steigt die
+Host->Radio-Rate auf demselben Datenport im GLEICHEN Fenster exakt
+proportional auf **960 Pakete/s (das Vierfache)** -- beide Richtungen
+bleiben synchron gekoppelt, obwohl kein einziger Steuerkanal-Rahmen in
+diesem Fenster liegt. Was auch immer die Blockrate kurzzeitig
+vervierfacht hat, hat beide Richtungen gleichermassen erfasst.
+
+**Was in den Host->Radio-Rahmen steht** (Kopf beginnt mit demselben
+Praefix wie der zugehoerige Radio->Host-Rahmen der gleichen
+Folgenummer, `03 ff fe ff b0 04 <seq> 01`, dann zwei Byte, die beim
+Radio->Host-Rahmen `00 00` sind und beim Host->Radio-Rahmen einen
+zweiten Zaehler tragen): keine Nullen, sondern eine durchgaengige
+Nutzlast, deren 16-Bit-Werte paarweise auftreten (Wert, dann derselbe
+Wert noch einmal, fortlaufend) -- sieht nach einer Stereo-Interleaved-
+Struktur aus (L=R), nicht nach reiner IQ-Kodierung. Nicht weiter
+zerlegt.
+
+**Was das bedeutet, ohne dass es schon eine Antwort ist:** dieser
+Treiber tut etwas oberflaechlich Aehnliches (er sendet auch auf dem
+Datenport zurueck), aber weder im selben Takt (240/s vs. alle 2 s)
+noch mit vergleichbarer Nutzlast (Null vs. echte Werte). Das ist die
+bisher konkreteste, am besten belegte Erklaerung fuer den Unterschied
+zwischen den beiden Stroemen -- konkreter als die Verbindungsreihenfolge
+(widerlegt) und konkreter als der `33 ff`-Rahmen (ausprobiert,
+gescheitert).
+
+**Nicht ausprobiert, mit Absicht:** einen eigenen, ratengekoppelten
+Host->Radio-Strom auf dem Datenport nachzubauen ist eine Code-Aenderung,
+kein Parameter-Versuch, und braucht vorher ein Verstaendnis der
+Nutzlast (was genau steht in den Paaren?), sonst wird wieder nur
+geraten. Das ist der naechste Schritt, wenn die Zeit dafuer da ist --
+nicht heute.
