@@ -1507,3 +1507,15 @@ kein Parameter-Versuch, und braucht vorher ein Verstaendnis der
 Nutzlast (was genau steht in den Paaren?), sonst wird wieder nur
 geraten. Das ist der naechste Schritt, wenn die Zeit dafuer da ist --
 nicht heute.
+
+**Kein Echo:** die Host->Radio-Nutzlast ist kein verzoegertes Abbild
+einer Radio->Host-Nutzlast -- gegen alle Radio->Host-Rahmen in einem
+0,5-Sekunden-Fenster verglichen, bester Treffer 6% Byte-Uebereinstimmung
+(Zufallsniveau). Zwei aufeinanderfolgende Host->Radio-Nutzlasten
+stimmen zu ~10% ueberein, was zum Rauschcharakter kleiner Werte passt
+(haeufig 0x00/0xFF als hohes Byte), nicht auf ein festes Muster
+hindeutet.
+
+Fuer heute genug -- die naechste sinnvolle Untersuchung braucht ein
+klares Ziel (was genau soll die Nutzlast bedeuten, bevor man sie
+nachbaut), nicht noch mehr Bytevergleiche ohne Hypothese.
