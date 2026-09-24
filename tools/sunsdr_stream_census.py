@@ -241,6 +241,15 @@ def main():
     ap.add_argument("--pcap", default="",
                     help="eine mit `tcpdump -w` gesicherte Aufzeichnung "
                          "auswerten statt selbst mitzulesen")
+    ap.add_argument("--src", default="",
+                    help="nur Pakete VON dieser Adresse zaehlen (die QRP). "
+                         "Ohne das zaehlt das Werkzeug beide Richtungen: "
+                         "ein Host, der jeden Block mit derselben "
+                         "Folgenummer beantwortet (ExpertSDR2, Longpath "
+                         "seit 2026-09-24), erscheint dann als 'zwei "
+                         "verschiedene Pakete je Nummer'. Genau das hat die "
+                         "Messung vom 2026-09-23 in die Irre gefuehrt. "
+                         "Nur beim Live-Mitlesen, nicht bei --pcap/--from-file.")
     ap.add_argument("--from-file", dest="fromFile", default="",
                     help="statt tcpdump eine schon gesicherte -x-Ausgabe "
                          "auswerten (tcpdump ... > datei)")
@@ -256,7 +265,12 @@ def main():
         return
 
     cmd = ["tcpdump", "-i", args.iface, "-n", "-l", "-U", "-x",
-           "-s", str(args.snap), "udp port %d" % args.port]
+           "-s", str(args.snap),
+           ("udp port %d and src host %s" % (args.port, args.src))
+           if args.src else ("udp port %d" % args.port)]
+    if not args.src:
+        print("# ACHTUNG: beide Richtungen werden gezaehlt -- mit --src "
+              "<Adresse der QRP> nur ihre eigenen Pakete.", flush=True)
     print("# " + " ".join(cmd), flush=True)
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                             stderr=subprocess.DEVNULL, text=True)

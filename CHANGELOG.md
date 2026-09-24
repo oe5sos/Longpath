@@ -175,6 +175,30 @@
 
 ### Fixed
 
+- **SunSDR2 QRP: jeder Block kam achtmal, und die Abtastrate kam nie an
+  -- beides behoben.** Drei Fehler, die nur zusammen richtig klingen:
+  * Die QRP wiederholt jeden IQ-Block, bis der Host ihn mit derselben
+    Folgenummer beantwortet. ExpertSDR2 tut das (Mitschnitt 2026-09-24:
+    44 439 von 44 439 Nummern gespiegelt, 0,16 ms nach der QRP), unser
+    Treiber schickte nur alle 2 s einen Stillerahmen. Jetzt wird jeder
+    neue Block sofort still beantwortet (`LONGPATH_SUNSDR_BLOCKANTWORT=0`
+    schaltet es ab); am Geraet gemessen 240 Pakete/s, eine Kopie je
+    Nummer, Pegel gesund.
+  * Die QRP lief mit Atlas' 192 kHz (sie steht in keiner
+    HPSDRModel-Liste); jetzt gelten die Kenndaten des gemeldeten Boards,
+    48 kHz. Aus dem geschlossenen #71, ohne dessen Wiederholungsfilter.
+  * Die pro Band gespeicherte Abtastrate ist nicht je Geraet: nach
+    ANAN-Sitzungen stellte sie den QRP-Empfangskanal 200 ms nach dem
+    Verbinden auf 192 kHz zurueck. Eine gespeicherte Rate, die das
+    verbundene Geraet nicht kann, wird jetzt verworfen -- das gilt fuer
+    alle Geraete.
+  Betreiber, ohne Antenne gehoert: "anders, sollte passen"; die
+  Bestaetigung mit Antenne steht aus. `tools/sunsdr_stream_census.py`
+  hat eine neue Option `--src`: ohne sie zaehlte es beide Richtungen,
+  und genau das hatte die Messung vom 2026-09-23 in die Irre gefuehrt.
+  Pruefstaende in `tst_sunsdr_radio_connection` und
+  `tst_sunsdr_board_caps`, jeweils mit Gegenprobe.
+
 - **Panadapter-Beschriftungen wichen je nach Bildschirm-Skalierung von
   der uebrigen Grafik ab.** Betreiber am 2026-09-24: „die fontgröße des
   graphen sollte immer die gleiche pixelgröße haben“. Der Hausstil
