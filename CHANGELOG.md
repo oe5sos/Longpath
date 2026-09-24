@@ -4,6 +4,17 @@
 
 ### Added
 
+- **QRP-Verbindungsreihenfolge widerlegt.** ExpertSDRs kompletter
+  Verbindungsstoss (24 Steuerrahmen, Original-Reihenfolge, 12 vor und
+  12 nach dem Zustandsrahmen) am Gerät nachgespielt --
+  `~/Longpath/werkzeug/qrp-expert-folge.sh`. 35 s durchgehend gemessen:
+  keine Änderung, weiterhin acht bytegleiche Kopien je Folgenummer
+  (1683 von 1683). Die Hypothese „ExpertSDR bekommt echte Daten wegen
+  einer anderen Verbindungsreihenfolge“ ist damit erledigt --
+  festgehalten in
+  `docs/architecture/2026-08-24-sunsdr-native-driver-design.md`,
+  Abschnitt „2026-09-24: die Verbindungsreihenfolge ist es nicht“.
+
 - **Der QRP-Messtag vom 2026-09-23 steht im Entwurfsdokument**
   (`docs/architecture/2026-08-24-sunsdr-native-driver-design.md`): die
   gemessenen Unterschiede zwischen dem Strom an Longpath und dem an
