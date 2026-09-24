@@ -487,7 +487,7 @@ void RotorLogbookPanel::buildUi()
             setStatus(QStringLiteral("Schematic globe"));
         } else if (chosen == landColour) {
             const QColor picked = QColorDialog::getColor(
-                m_globe->landColour(), this, tr("Land colour"));
+                m_globe->landColour(), this, tr("Land colour"), QColorDialog::DontUseNativeDialog);
             if (picked.isValid()) { m_globe->setLandColour(picked); }
         } else if (chosen == styleNatural) {
             WorldTexture::setStyle(WorldTexture::Style::Natural);

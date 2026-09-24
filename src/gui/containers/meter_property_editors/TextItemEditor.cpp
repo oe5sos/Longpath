@@ -65,7 +65,7 @@ void TextItemEditor::buildTypeSpecific()
     connect(m_btnTextColor, &QPushButton::clicked, this, [this, applyTextColor]() {
         TextItem* x = qobject_cast<TextItem*>(m_item);
         if (!x) { return; }
-        const QColor chosen = QColorDialog::getColor(x->textColor(), this);
+        const QColor chosen = QColorDialog::getColor(x->textColor(), this, QString(), QColorDialog::DontUseNativeDialog);
         if (chosen.isValid()) { x->setTextColor(chosen); applyTextColor(chosen); notifyChanged(); }
     });
     addRow(QStringLiteral("Text color"), m_btnTextColor);

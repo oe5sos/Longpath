@@ -834,7 +834,7 @@ void SpotHubDialog::buildClusterTab(QTabWidget* tabs)
     connect(dxcColorBtn, &QPushButton::clicked, this, [this, dxcColorBtn] {
         QColor c = QColorDialog::getColor(
             QColor(AppSettings::instance().value("DxClusterSpotColor", "#D2B48C").toString()),
-            this, "DX Cluster Spot Color");
+            this, "DX Cluster Spot Color", QColorDialog::DontUseNativeDialog);
         if (c.isValid()) {
             dxcColorBtn->setStyleSheet(swatchStyle(c));
             AppSettings::instance().setValue("DxClusterSpotColor", c.name());
@@ -1071,7 +1071,7 @@ void SpotHubDialog::buildRbnTab(QTabWidget* tabs)
     connect(rbnColorBtn, &QPushButton::clicked, this, [this, rbnColorBtn] {
         QColor c = QColorDialog::getColor(
             QColor(AppSettings::instance().value("RbnSpotColor", "#4a7ba8").toString()),
-            this, "RBN Spot Color");
+            this, "RBN Spot Color", QColorDialog::DontUseNativeDialog);
         if (c.isValid()) {
             rbnColorBtn->setStyleSheet(swatchStyle(c));
             AppSettings::instance().setValue("RbnSpotColor", c.name());
@@ -1260,7 +1260,7 @@ void SpotHubDialog::buildWsjtxTab(QTabWidget* tabs)
     connect(m_wsjtxColorCQ, &QPushButton::clicked, this, [this] {
         QColor c = QColorDialog::getColor(
             QColor(AppSettings::instance().value("WsjtxColorCQ", "#6fa384").toString()),
-            this, "CQ Spot Color");
+            this, "CQ Spot Color", QColorDialog::DontUseNativeDialog);
         if (c.isValid()) {
             m_wsjtxColorCQ->setStyleSheet(swatchStyle(c));
             AppSettings::instance().setValue("WsjtxColorCQ", c.name());
@@ -1292,7 +1292,7 @@ void SpotHubDialog::buildWsjtxTab(QTabWidget* tabs)
     connect(m_wsjtxColorPOTA, &QPushButton::clicked, this, [this] {
         QColor c = QColorDialog::getColor(
             QColor(AppSettings::instance().value("WsjtxColorPOTA", "#00FFFF").toString()),
-            this, "CQ POTA Spot Color");
+            this, "CQ POTA Spot Color", QColorDialog::DontUseNativeDialog);
         if (c.isValid()) {
             m_wsjtxColorPOTA->setStyleSheet(swatchStyle(c));
             AppSettings::instance().setValue("WsjtxColorPOTA", c.name());
@@ -1324,7 +1324,7 @@ void SpotHubDialog::buildWsjtxTab(QTabWidget* tabs)
     connect(m_wsjtxColorCallingMe, &QPushButton::clicked, this, [this] {
         QColor c = QColorDialog::getColor(
             QColor(AppSettings::instance().value("WsjtxColorCallingMe", "#c25a5c").toString()),
-            this, "Calling Me Spot Color");
+            this, "Calling Me Spot Color", QColorDialog::DontUseNativeDialog);
         if (c.isValid()) {
             m_wsjtxColorCallingMe->setStyleSheet(swatchStyle(c));
             AppSettings::instance().setValue("WsjtxColorCallingMe", c.name());
@@ -1353,7 +1353,7 @@ void SpotHubDialog::buildWsjtxTab(QTabWidget* tabs)
     connect(m_wsjtxColorDefault, &QPushButton::clicked, this, [this] {
         QColor c = QColorDialog::getColor(
             QColor(AppSettings::instance().value("WsjtxColorDefault", "#FFFFFF").toString()),
-            this, "Default Spot Color");
+            this, "Default Spot Color", QColorDialog::DontUseNativeDialog);
         if (c.isValid()) {
             m_wsjtxColorDefault->setStyleSheet(swatchStyle(c));
             AppSettings::instance().setValue("WsjtxColorDefault", c.name());
@@ -1677,7 +1677,7 @@ void SpotHubDialog::buildPotaTab(QTabWidget* tabs)
     connect(potaColorBtn, &QPushButton::clicked, this, [this, potaColorBtn] {
         QColor c = QColorDialog::getColor(
             QColor(AppSettings::instance().value("PotaSpotColor", "#c2924f").toString()),
-            this, "POTA Spot Color");
+            this, "POTA Spot Color", QColorDialog::DontUseNativeDialog);
         if (c.isValid()) {
             potaColorBtn->setStyleSheet(swatchStyle(c));
             AppSettings::instance().setValue("PotaSpotColor", c.name());
@@ -1832,7 +1832,7 @@ void SpotHubDialog::buildSotaTab(QTabWidget* tabs)
     connect(sotaColorBtn, &QPushButton::clicked, this, [this, sotaColorBtn] {
         QColor c = QColorDialog::getColor(
             QColor(AppSettings::instance().value("SotaSpotColor", "#c2924f").toString()),
-            this, "SOTA Spot Color");
+            this, "SOTA Spot Color", QColorDialog::DontUseNativeDialog);
         if (c.isValid()) {
             sotaColorBtn->setStyleSheet(swatchStyle(c));
             AppSettings::instance().setValue("SotaSpotColor", c.name());
@@ -2274,7 +2274,7 @@ void SpotHubDialog::buildFreeDvTab(QTabWidget* tabs)
     connect(freedvColorBtn, &QPushButton::clicked, this, [this, freedvColorBtn] {
         QColor c = QColorDialog::getColor(
             QColor(AppSettings::instance().value("FreeDvSpotColor", "#c2924f").toString()),
-            this, "FreeDV Spot Color");
+            this, "FreeDV Spot Color", QColorDialog::DontUseNativeDialog);
         if (c.isValid()) {
             freedvColorBtn->setStyleSheet(swatchStyle(c));
             AppSettings::instance().setValue("FreeDvSpotColor", c.name());
@@ -2778,7 +2778,7 @@ void SpotHubDialog::buildSpotListTab(QTabWidget* tabs)
     connect(m_watchlistColorBtn, &QPushButton::clicked, this, [this] {
         QColor c = QColorDialog::getColor(
             QColor(AppSettings::instance().value("SpotWatchlistColor", Style::kSpotWatchlightDefault).toString()),
-            this, "Watchlist Highlight Color");
+            this, "Watchlist Highlight Color", QColorDialog::DontUseNativeDialog);
         if (c.isValid()) {
             m_watchlistColorBtn->setStyleSheet(swatchStyle(c));
             AppSettings::instance().setValue("SpotWatchlistColor", c.name());
@@ -3511,7 +3511,7 @@ void SpotHubDialog::buildDisplayTab(QTabWidget* tabs)
     connect(colorSwatch, &QPushButton::clicked, this,
             [this, colorSwatch, save] {
         QColor current(AppSettings::instance().value("SpotsOverrideColor", "#c2924f").toString());
-        QColor c = QColorDialog::getColor(current, this, "Spot Text Color");
+        QColor c = QColorDialog::getColor(current, this, "Spot Text Color", QColorDialog::DontUseNativeDialog);
         if (c.isValid()) {
             colorSwatch->setStyleSheet(swatchStyle(c));
             save("SpotsOverrideColor", c.name());
@@ -3555,7 +3555,7 @@ void SpotHubDialog::buildDisplayTab(QTabWidget* tabs)
     connect(bgColorSwatch, &QPushButton::clicked, this,
             [this, bgColorSwatch, save] {
         QColor current(AppSettings::instance().value("SpotsOverrideBgColor", "#0a0a14").toString());
-        QColor c = QColorDialog::getColor(current, this, "Spot Background Color");
+        QColor c = QColorDialog::getColor(current, this, "Spot Background Color", QColorDialog::DontUseNativeDialog);
         if (c.isValid()) {
             bgColorSwatch->setStyleSheet(swatchStyle(c));
             save("SpotsOverrideBgColor", c.name());

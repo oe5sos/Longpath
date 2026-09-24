@@ -113,7 +113,7 @@ void SignalTextItemEditor::buildTypeSpecific()
     connect(m_btnColour, &QPushButton::clicked, this, [this]() {
         SignalTextItem* x = qobject_cast<SignalTextItem*>(m_item);
         if (!x) { return; }
-        const QColor chosen = QColorDialog::getColor(x->colour(), this);
+        const QColor chosen = QColorDialog::getColor(x->colour(), this, QString(), QColorDialog::DontUseNativeDialog);
         if (chosen.isValid()) {
             x->setColour(chosen);
             m_btnColour->setStyleSheet(Style::themed(
@@ -129,7 +129,7 @@ void SignalTextItemEditor::buildTypeSpecific()
     connect(m_btnPeakColour, &QPushButton::clicked, this, [this]() {
         SignalTextItem* x = qobject_cast<SignalTextItem*>(m_item);
         if (!x) { return; }
-        const QColor chosen = QColorDialog::getColor(x->peakValueColour(), this);
+        const QColor chosen = QColorDialog::getColor(x->peakValueColour(), this, QString(), QColorDialog::DontUseNativeDialog);
         if (chosen.isValid()) {
             x->setPeakValueColour(chosen);
             m_btnPeakColour->setStyleSheet(Style::themed(
@@ -145,7 +145,7 @@ void SignalTextItemEditor::buildTypeSpecific()
     connect(m_btnMarkerColour, &QPushButton::clicked, this, [this]() {
         SignalTextItem* x = qobject_cast<SignalTextItem*>(m_item);
         if (!x) { return; }
-        const QColor chosen = QColorDialog::getColor(x->markerColour(), this);
+        const QColor chosen = QColorDialog::getColor(x->markerColour(), this, QString(), QColorDialog::DontUseNativeDialog);
         if (chosen.isValid()) {
             x->setMarkerColour(chosen);
             m_btnMarkerColour->setStyleSheet(Style::themed(

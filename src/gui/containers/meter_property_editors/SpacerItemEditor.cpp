@@ -44,7 +44,7 @@ void SpacerItemEditor::buildTypeSpecific()
         if (!spacer) { return; }
         const QColor chosen = QColorDialog::getColor(spacer->colour1(), this,
                                                      QStringLiteral("Color 1"),
-                                                     QColorDialog::ShowAlphaChannel);
+                                                     QColorDialog::ShowAlphaChannel | QColorDialog::DontUseNativeDialog);
         if (chosen.isValid()) {
             spacer->setColour1(chosen);
             m_btnColour1->setStyleSheet(Style::themed(
@@ -63,7 +63,7 @@ void SpacerItemEditor::buildTypeSpecific()
         if (!spacer) { return; }
         const QColor chosen = QColorDialog::getColor(spacer->colour2(), this,
                                                      QStringLiteral("Color 2"),
-                                                     QColorDialog::ShowAlphaChannel);
+                                                     QColorDialog::ShowAlphaChannel | QColorDialog::DontUseNativeDialog);
         if (chosen.isValid()) {
             spacer->setColour2(chosen);
             m_btnColour2->setStyleSheet(Style::themed(

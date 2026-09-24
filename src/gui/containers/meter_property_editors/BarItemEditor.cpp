@@ -166,7 +166,7 @@ void BarItemEditor::buildTypeSpecific()
         if (!bar) { return; }
         const QColor chosen = QColorDialog::getColor(bar->barColor(), this,
                                                      QStringLiteral("Bar color"),
-                                                     QColorDialog::ShowAlphaChannel);
+                                                     QColorDialog::ShowAlphaChannel | QColorDialog::DontUseNativeDialog);
         if (chosen.isValid()) {
             bar->setBarColor(chosen);
             m_btnBarColor->setStyleSheet(Style::themed(
@@ -185,7 +185,7 @@ void BarItemEditor::buildTypeSpecific()
         if (!bar) { return; }
         const QColor chosen = QColorDialog::getColor(bar->barRedColor(), this,
                                                      QStringLiteral("Bar red color"),
-                                                     QColorDialog::ShowAlphaChannel);
+                                                     QColorDialog::ShowAlphaChannel | QColorDialog::DontUseNativeDialog);
         if (chosen.isValid()) {
             bar->setBarRedColor(chosen);
             m_btnBarRedColor->setStyleSheet(Style::themed(
@@ -206,7 +206,7 @@ void BarItemEditor::buildTypeSpecific()
         if (!bar) { return; }
         const QColor chosen = QColorDialog::getColor(bar->edgeBackgroundColor(), this,
                                                      QStringLiteral("Edge background color"),
-                                                     QColorDialog::ShowAlphaChannel);
+                                                     QColorDialog::ShowAlphaChannel | QColorDialog::DontUseNativeDialog);
         if (chosen.isValid()) {
             bar->setEdgeBackgroundColor(chosen);
             m_btnEdgeBg->setStyleSheet(Style::themed(
@@ -224,7 +224,7 @@ void BarItemEditor::buildTypeSpecific()
         if (!bar) { return; }
         const QColor chosen = QColorDialog::getColor(bar->edgeLowColor(), this,
                                                      QStringLiteral("Edge low color"),
-                                                     QColorDialog::ShowAlphaChannel);
+                                                     QColorDialog::ShowAlphaChannel | QColorDialog::DontUseNativeDialog);
         if (chosen.isValid()) {
             bar->setEdgeLowColor(chosen);
             m_btnEdgeLow->setStyleSheet(Style::themed(
@@ -242,7 +242,7 @@ void BarItemEditor::buildTypeSpecific()
         if (!bar) { return; }
         const QColor chosen = QColorDialog::getColor(bar->edgeHighColor(), this,
                                                      QStringLiteral("Edge high color"),
-                                                     QColorDialog::ShowAlphaChannel);
+                                                     QColorDialog::ShowAlphaChannel | QColorDialog::DontUseNativeDialog);
         if (chosen.isValid()) {
             bar->setEdgeHighColor(chosen);
             m_btnEdgeHigh->setStyleSheet(Style::themed(
@@ -260,7 +260,7 @@ void BarItemEditor::buildTypeSpecific()
         if (!bar) { return; }
         const QColor chosen = QColorDialog::getColor(bar->edgeAvgColor(), this,
                                                      QStringLiteral("Edge avg color"),
-                                                     QColorDialog::ShowAlphaChannel);
+                                                     QColorDialog::ShowAlphaChannel | QColorDialog::DontUseNativeDialog);
         if (chosen.isValid()) {
             bar->setEdgeAvgColor(chosen);
             m_btnEdgeAvg->setStyleSheet(Style::themed(

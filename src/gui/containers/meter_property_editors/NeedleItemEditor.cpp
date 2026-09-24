@@ -276,7 +276,7 @@ void NeedleItemEditor::buildTypeSpecific()
         if (!needle) { return; }
         const QColor chosen = QColorDialog::getColor(
             needle->needleColor(), this, QStringLiteral("Needle color"),
-            QColorDialog::ShowAlphaChannel);
+            QColorDialog::ShowAlphaChannel | QColorDialog::DontUseNativeDialog);
         if (chosen.isValid()) {
             needle->setNeedleColor(chosen);
             m_btnNeedleColor->setStyleSheet(Style::themed(
@@ -443,7 +443,7 @@ void NeedleItemEditor::buildTypeSpecific()
         if (!needle) { return; }
         const QColor chosen = QColorDialog::getColor(
             needle->historyColor(), this, QStringLiteral("History color"),
-            QColorDialog::ShowAlphaChannel);
+            QColorDialog::ShowAlphaChannel | QColorDialog::DontUseNativeDialog);
         if (chosen.isValid()) {
             needle->setHistoryColor(chosen);
             m_btnHistoryColor->setStyleSheet(Style::themed(

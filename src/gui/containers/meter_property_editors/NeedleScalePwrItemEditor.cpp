@@ -189,7 +189,7 @@ void NeedleScalePwrItemEditor::buildTypeSpecific()
         if (!nspi) { return; }
         const QColor chosen = QColorDialog::getColor(nspi->lowColour(), this,
                                                      QStringLiteral("Low color"),
-                                                     QColorDialog::ShowAlphaChannel);
+                                                     QColorDialog::ShowAlphaChannel | QColorDialog::DontUseNativeDialog);
         if (chosen.isValid()) {
             nspi->setLowColour(chosen);
             m_btnLowColour->setStyleSheet(Style::themed(
@@ -207,7 +207,7 @@ void NeedleScalePwrItemEditor::buildTypeSpecific()
         if (!nspi) { return; }
         const QColor chosen = QColorDialog::getColor(nspi->highColour(), this,
                                                      QStringLiteral("High color"),
-                                                     QColorDialog::ShowAlphaChannel);
+                                                     QColorDialog::ShowAlphaChannel | QColorDialog::DontUseNativeDialog);
         if (chosen.isValid()) {
             nspi->setHighColour(chosen);
             m_btnHighColour->setStyleSheet(Style::themed(

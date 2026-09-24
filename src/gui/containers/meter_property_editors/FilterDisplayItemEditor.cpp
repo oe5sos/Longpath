@@ -162,49 +162,49 @@ void FilterDisplayItemEditor::buildTypeSpecific()
         FilterDisplayItem* f = qobject_cast<FilterDisplayItem*>(m_item);
         if (!f) { return; }
         const QColor chosen = QColorDialog::getColor(
-            Qt::green, this, QString(), QColorDialog::ShowAlphaChannel);
+            Qt::green, this, QString(), QColorDialog::ShowAlphaChannel | QColorDialog::DontUseNativeDialog);
         if (chosen.isValid()) { f->setDataLineColour(chosen); applyBtnColor(m_btnDataLine, chosen); notifyChanged(); }
     });
     connect(m_btnDataFill, &QPushButton::clicked, this, [this]() {
         FilterDisplayItem* f = qobject_cast<FilterDisplayItem*>(m_item);
         if (!f) { return; }
         const QColor chosen = QColorDialog::getColor(
-            Qt::green, this, QString(), QColorDialog::ShowAlphaChannel);
+            Qt::green, this, QString(), QColorDialog::ShowAlphaChannel | QColorDialog::DontUseNativeDialog);
         if (chosen.isValid()) { f->setDataFillColour(chosen); applyBtnColor(m_btnDataFill, chosen); notifyChanged(); }
     });
     connect(m_btnEdgesRx, &QPushButton::clicked, this, [this]() {
         FilterDisplayItem* f = qobject_cast<FilterDisplayItem*>(m_item);
         if (!f) { return; }
         const QColor chosen = QColorDialog::getColor(
-            Qt::yellow, this, QString(), QColorDialog::ShowAlphaChannel);
+            Qt::yellow, this, QString(), QColorDialog::ShowAlphaChannel | QColorDialog::DontUseNativeDialog);
         if (chosen.isValid()) { f->setEdgesColourRX(chosen); applyBtnColor(m_btnEdgesRx, chosen); notifyChanged(); }
     });
     connect(m_btnEdgesTx, &QPushButton::clicked, this, [this]() {
         FilterDisplayItem* f = qobject_cast<FilterDisplayItem*>(m_item);
         if (!f) { return; }
         const QColor chosen = QColorDialog::getColor(
-            Qt::red, this, QString(), QColorDialog::ShowAlphaChannel);
+            Qt::red, this, QString(), QColorDialog::ShowAlphaChannel | QColorDialog::DontUseNativeDialog);
         if (chosen.isValid()) { f->setEdgesColourTX(chosen); applyBtnColor(m_btnEdgesTx, chosen); notifyChanged(); }
     });
     connect(m_btnNotch, &QPushButton::clicked, this, [this]() {
         FilterDisplayItem* f = qobject_cast<FilterDisplayItem*>(m_item);
         if (!f) { return; }
         const QColor chosen = QColorDialog::getColor(
-            Qt::darkYellow, this, QString(), QColorDialog::ShowAlphaChannel);
+            Qt::darkYellow, this, QString(), QColorDialog::ShowAlphaChannel | QColorDialog::DontUseNativeDialog);
         if (chosen.isValid()) { f->setNotchColour(chosen); applyBtnColor(m_btnNotch, chosen); notifyChanged(); }
     });
     connect(m_btnBack, &QPushButton::clicked, this, [this]() {
         FilterDisplayItem* f = qobject_cast<FilterDisplayItem*>(m_item);
         if (!f) { return; }
         const QColor chosen = QColorDialog::getColor(
-            Qt::black, this, QString(), QColorDialog::ShowAlphaChannel);
+            Qt::black, this, QString(), QColorDialog::ShowAlphaChannel | QColorDialog::DontUseNativeDialog);
         if (chosen.isValid()) { f->setMeterBackColour(chosen); applyBtnColor(m_btnBack, chosen); notifyChanged(); }
     });
     connect(m_btnText, &QPushButton::clicked, this, [this]() {
         FilterDisplayItem* f = qobject_cast<FilterDisplayItem*>(m_item);
         if (!f) { return; }
         const QColor chosen = QColorDialog::getColor(
-            Qt::white, this, QString(), QColorDialog::ShowAlphaChannel);
+            Qt::white, this, QString(), QColorDialog::ShowAlphaChannel | QColorDialog::DontUseNativeDialog);
         if (chosen.isValid()) { f->setTextColour(chosen); applyBtnColor(m_btnText, chosen); notifyChanged(); }
     });
 }

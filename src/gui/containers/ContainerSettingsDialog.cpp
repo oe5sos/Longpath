@@ -819,7 +819,7 @@ void ContainerSettingsDialog::buildContainerPropertiesSection(QVBoxLayout* paren
     connect(m_bgColorBtn, &QPushButton::clicked, this, [this]() {
         QColor initial(QStringLiteral("#0f0f1a"));
         QColor chosen = QColorDialog::getColor(initial, this,
-                                               QStringLiteral("Background Color"));
+                                               QStringLiteral("Background Color"), QColorDialog::DontUseNativeDialog);
         if (chosen.isValid()) {
             m_bgColorBtn->setStyleSheet(Style::themed(
                 QStringLiteral("QPushButton { background: %1; border: 1px solid #205070;"

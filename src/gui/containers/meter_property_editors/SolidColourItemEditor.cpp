@@ -37,7 +37,7 @@ void SolidColourItemEditor::buildTypeSpecific()
         if (!solid) { return; }
         const QColor chosen = QColorDialog::getColor(solid->colour(), this,
                                                      QStringLiteral("Fill color"),
-                                                     QColorDialog::ShowAlphaChannel);
+                                                     QColorDialog::ShowAlphaChannel | QColorDialog::DontUseNativeDialog);
         if (chosen.isValid()) {
             solid->setColour(chosen);
             m_btnColour->setStyleSheet(Style::themed(
