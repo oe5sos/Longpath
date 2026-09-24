@@ -178,7 +178,6 @@
 #endif
 
 #include <algorithm>
-#include <climits>
 #include <cmath>
 #include <cstddef>
 #include <cstring>
