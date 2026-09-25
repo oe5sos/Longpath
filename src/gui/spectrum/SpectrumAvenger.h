@@ -34,6 +34,17 @@
 //                 owns the per-channel state arrays (av_sum,
 //                 av_buff, indices) so SpectrumWidget can hold
 //                 separate spectrum + waterfall instances.
+//   2026-09-25 — Mode-dependent av_sum reset ported from Thetis
+//                 wdsp/analyzer.c ResetPixelBuffers [@852bf0e]: after
+//                 resize()/clear() the next apply() starts recursive
+//                 linear at 1.0e-12 and recursive log at -160 dB. The
+//                 port had zeroed av_sum, i.e. started log mode at 0 dB
+//                 (top of scale) -> red flash on every panadapter resize.
+//                 Martin Fischer, AI-assisted via Anthropic Claude.
+//   2026-09-25 — resampleTo(): a display-width change carries av_sum /
+//                 av_buff over (WDSP keeps them across SetAnalyzer), so a
+//                 panadapter resize no longer starts the average over.
+//                 Martin Fischer, AI-assisted via Anthropic Claude.
 // =================================================================
 
 //=================================================================
@@ -95,6 +106,15 @@ public:
     /// accumulators.
     void resize(int numPixels);
 
+    /// Display-width change: carry the running state over to the new
+    /// pixel count by resampling, instead of resetting it. WDSP keeps
+    /// av_sum across a pixel-count change -- its arrays are dMAX_PIXELS
+    /// (comm.h:120) long and SetAnalyzer (analyzer.c:1261-1265 [@852bf0e])
+    /// only changes num_pixels -- whereas these arrays are sized to the
+    /// width, so resize() had to drop them. Falls back to resize() when
+    /// there is nothing to carry (empty, or a reset still pending).
+    void resampleTo(int numPixels);
+
     /// Set the window-averaging frame depth (av_mode == 2).
     /// Clamped to [1, kMaxAverage].  Reduces dMAX_AVERAGE per
     /// analyzer.c:535-537 ring-wrap logic.  Resets indices.
@@ -152,6 +172,10 @@ private:
     // numPixels × kMaxAverage; only the first numAverage rows are
     // walked at runtime.
     QVector<QVector<double>> m_avBuff;
+
+    // Set by resize()/clear(); the next apply(), which knows av_mode,
+    // performs the mode-dependent reset of ResetPixelBuffers (see .cpp).
+    bool m_seedNext{true};
 
     int m_numAverage{2};   // av_mode==2 frame count, [1, kMaxAverage]
     int m_avInIdx{0};
