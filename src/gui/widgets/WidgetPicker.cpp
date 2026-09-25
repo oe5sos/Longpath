@@ -13,10 +13,14 @@
 
 #include "gui/widgets/WidgetPicker.h"
 
+#include "gui/SideAreaWindow.h"
 #include "gui/StyleConstants.h"
 #include "gui/applets/AppletVisibilityController.h"
 
+#include <QApplication>
 #include <QCursor>
+#include <QDrag>
+#include <QMimeData>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
@@ -40,15 +44,59 @@ class CardFrame : public QWidget {
 public:
     using QWidget::QWidget;
     std::function<void()> onClick;
+    /// Kennung, die beim Ziehen mitgeht (kSidePageMimeType). Leer: die
+    /// Karte laesst sich nicht ziehen.
+    QString dragId;
 
 protected:
+    void mousePressEvent(QMouseEvent* e) override
+    {
+        if (e->button() == Qt::LeftButton) {
+            m_pressPos = e->position().toPoint();
+            m_dragged = false;
+        }
+        QWidget::mousePressEvent(e);
+    }
+
+    // ── Ziehen statt Klicken ────────────────────────────────────────
+    //
+    // Betreiber 2026-09-25: "widget oeffnen und per drag and drop auf die
+    // taskleiste". Wer die Karte ueber die Zieh-Schwelle hinaus bewegt,
+    // zieht sie -- auf den Seitenbereich, der sie als Seite aufnimmt. Ein
+    // Klick ohne Bewegung bleibt, was er war: ein-/ausschalten.
+    void mouseMoveEvent(QMouseEvent* e) override
+    {
+        if ((e->buttons() & Qt::LeftButton) && !m_dragged && !dragId.isEmpty()
+            && isEnabled()
+            && (e->position().toPoint() - m_pressPos).manhattanLength()
+                   >= QApplication::startDragDistance()) {
+            m_dragged = true;
+            auto* mime = new QMimeData;
+            mime->setData(QLatin1String(kSidePageMimeType), dragId.toUtf8());
+            auto* drag = new QDrag(this);
+            drag->setMimeData(mime);
+            const QPixmap shot = grab();
+            drag->setPixmap(shot.scaledToWidth(qMin(shot.width(), 260),
+                                               Qt::SmoothTransformation));
+            drag->setHotSpot(QPoint(12, 12));
+            drag->exec(Qt::CopyAction);
+            return;
+        }
+        QWidget::mouseMoveEvent(e);
+    }
+
     void mouseReleaseEvent(QMouseEvent* e) override
     {
-        if (e->button() == Qt::LeftButton && isEnabled() && onClick) {
+        if (e->button() == Qt::LeftButton && isEnabled() && onClick && !m_dragged) {
             onClick();
         }
+        m_dragged = false;
         QWidget::mouseReleaseEvent(e);
     }
+
+private:
+    QPoint m_pressPos;
+    bool m_dragged{false};
 };
 
 } // namespace
@@ -225,6 +273,7 @@ void WidgetPicker::rebuild()
             emit toggled(id, next);
         };
         frame->onClick = click;
+        frame->dragId = id;
 
         m_cards->insertWidget(m_cards->count() - 1, frame);
         m_byId.insert(id, Card{frame, id, avail, m_vis->isVisible(id), click});

@@ -20,6 +20,9 @@
 #include <QAbstractButton>
 #include <QCloseEvent>
 #include <QContextMenuEvent>
+#include <QDragEnterEvent>
+#include <QDropEvent>
+#include <QMimeData>
 #include <QHBoxLayout>
 #include <QMenu>
 #include <QPainter>
@@ -217,6 +220,7 @@ SideAreaWindow::SideAreaWindow(QWidget* parent)
     outer->addWidget(m_rail, 0);
 
     setWindowFlags(windowFlags() | Qt::FramelessWindowHint);
+    setAcceptDrops(true);
     setMinimumWidth(minExpandedWidth());
     setMinimumHeight(160);
     FramelessResizer::install(this, 6, m_titleBar->sizeHint().height());
@@ -447,6 +451,40 @@ void SideAreaWindow::scheduleSettle()
     if (m_settleTimer) { m_settleTimer->start(); }
 }
 
+void SideAreaWindow::setDropHighlight(bool on)
+{
+    if (m_dropHighlight == on) { return; }
+    m_dropHighlight = on;
+    update();
+}
+
+void SideAreaWindow::dragEnterEvent(QDragEnterEvent* ev)
+{
+    if (ev->mimeData() && ev->mimeData()->hasFormat(QLatin1String(kSidePageMimeType))) {
+        ev->acceptProposedAction();
+        setDropHighlight(true);
+        return;
+    }
+    QWidget::dragEnterEvent(ev);
+}
+
+void SideAreaWindow::dragLeaveEvent(QDragLeaveEvent* ev)
+{
+    setDropHighlight(false);
+    QWidget::dragLeaveEvent(ev);
+}
+
+void SideAreaWindow::dropEvent(QDropEvent* ev)
+{
+    setDropHighlight(false);
+    if (!ev->mimeData()) { return; }
+    const QString id = QString::fromUtf8(
+        ev->mimeData()->data(QLatin1String(kSidePageMimeType))).trimmed();
+    if (id.isEmpty()) { return; }
+    ev->acceptProposedAction();
+    emit pageDropped(id);
+}
+
 void SideAreaWindow::paintEvent(QPaintEvent*)
 {
     // Dieselbe Platte wie AppletFloatingWindow, die Leiste eine Spur
@@ -466,6 +504,15 @@ void SideAreaWindow::paintEvent(QPaintEvent*)
     }
     p.setPen(QColor(Style::hexRole(Style::kBorderSubtle)));
     p.drawRect(rect().adjusted(0, 0, -1, -1));
+    if (m_dropHighlight) {
+        // Ablegen moeglich: Rand in der Auswahlfarbe, innen ein Hauch
+        // davon -- dieselbe Sprache wie ein gewaehltes Leistensymbol.
+        QColor fill(Style::hexRole(Style::kGlassSelTop));
+        fill.setAlpha(50);
+        p.fillRect(rect(), fill);
+        p.setPen(QPen(QColor(Style::hexRole(Style::kGlassSelBorder)), 2.0));
+        p.drawRect(rect().adjusted(1, 1, -2, -2));
+    }
 }
 
 void SideAreaWindow::moveEvent(QMoveEvent* ev)

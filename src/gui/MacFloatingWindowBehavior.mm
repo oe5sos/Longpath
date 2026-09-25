@@ -96,4 +96,9 @@ void setPaletteWindowLevel(QWidget* widget, bool floating)
     }
 }
 
+bool anyMouseButtonDown()
+{
+    return [NSEvent pressedMouseButtons] != 0;
+}
+
 } // namespace Longpath

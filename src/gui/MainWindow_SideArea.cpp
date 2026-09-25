@@ -30,6 +30,7 @@
 
 #include "core/AppSettings.h"
 #include "gui/LayoutProfiles.h"
+#include "gui/MacFloatingWindowBehavior.h"
 #include "gui/SideAreaWindow.h"
 #include "gui/WindowChrome.h"
 #include "gui/ToolWindow.h"
@@ -41,6 +42,9 @@
 #include "gui/widgets/RotorLogbookPanel.h"
 
 #include <QApplication>
+#include <QCursor>
+#include <QEvent>
+#include <QTimer>
 #include <QDockWidget>
 #include <QGuiApplication>
 #include <QMenu>
@@ -52,6 +56,75 @@ namespace Longpath {
 namespace {
 const QString kRotorPageId = QStringLiteral("WinRotorLog");
 constexpr int kNeighbourSlackPx = 16;   // „grenzt an" — Lücke bis hierhin
+
+// ── Ein Fenster auf den Seitenbereich ziehen ─────────────────────────
+//
+// Betreiber 2026-09-25: "wichtig waere, dass ich alle fenster dort
+// hinziehen kann". Die schwebenden Fenster werden vom Fenstersystem an
+// der Titelleiste gezogen; Qt sieht davon nur Move-Ereignisse, keine
+// Maustasten. Der Waechter merkt sich ein Fenster, das so bewegt wird,
+// waehrend der Zeiger ueber dem Seitenbereich steht, laesst den Bereich
+// aufleuchten und fragt dann alle 60 ms, ob die Taste los ist -- dann
+// wird abgelegt. Zieht der Zeiger weiter, erlischt es wieder.
+class SideAreaDropWatcher : public QObject {
+public:
+    using IdFor = std::function<QString(QWidget*)>;
+    using Drop  = std::function<void(QWidget*)>;
+
+    SideAreaDropWatcher(SideAreaWindow* area, IdFor idFor, Drop drop)
+        : QObject(area), m_area(area), m_idFor(std::move(idFor)),
+          m_drop(std::move(drop))
+    {
+        m_poll.setInterval(60);
+        connect(&m_poll, &QTimer::timeout, this, [this]() { poll(); });
+        qApp->installEventFilter(this);
+    }
+
+protected:
+    bool eventFilter(QObject* obj, QEvent* ev) override
+    {
+        if (ev->type() != QEvent::Move) { return false; }
+        auto* w = qobject_cast<QWidget*>(obj);
+        if (!w || !w->isWindow() || w == m_area || !m_area
+            || !m_area->isVisible()) {
+            return false;
+        }
+        if (m_idFor(w).isEmpty()) { return false; }
+        if (m_area->frameGeometry().contains(QCursor::pos())) {
+            m_candidate = w;
+            m_area->setDropHighlight(true);
+            if (!m_poll.isActive()) { m_poll.start(); }
+        } else if (m_candidate == w) {
+            clear();
+        }
+        return false;
+    }
+
+private:
+    void poll()
+    {
+        if (!m_candidate || !m_area) { clear(); return; }
+        if (!m_area->frameGeometry().contains(QCursor::pos())) { clear(); return; }
+        if (anyMouseButtonDown()) { return; }   // noch in der Hand
+        QPointer<QWidget> w = m_candidate;
+        clear();
+        // Nicht aus dem Zeitgeber heraus abbauen, der gerade laeuft.
+        QTimer::singleShot(0, m_area, [this, w]() { if (w) { m_drop(w); } });
+    }
+
+    void clear()
+    {
+        m_candidate.clear();
+        m_poll.stop();
+        if (m_area) { m_area->setDropHighlight(false); }
+    }
+
+    QPointer<SideAreaWindow> m_area;
+    IdFor m_idFor;
+    Drop m_drop;
+    QPointer<QWidget> m_candidate;
+    QTimer m_poll;
+};
 }
 
 bool MainWindow::sideAreaHas(const QString& id) const
@@ -80,6 +153,19 @@ SideAreaWindow* MainWindow::ensureSideArea()
             this, &MainWindow::onSideAreaCollapsed);
     connect(m_sideArea, &SideAreaWindow::stateSettled,
             this, [this]() { saveLayoutNow(); });
+    // Karte aus "Widget hinzufuegen" hier abgelegt.
+    connect(m_sideArea, &SideAreaWindow::pageDropped, this,
+            [this](const QString& id) {
+        if (addToSideArea(sideAreaKeyFor(id), true)) { saveLayoutNow(); }
+    });
+    // Ein schwebendes Fenster hier losgelassen.
+    new SideAreaDropWatcher(
+        m_sideArea,
+        [this](QWidget* w) { return sideAreaIdForWindow(w); },
+        [this](QWidget* w) {
+            const QString id = sideAreaIdForWindow(w);
+            if (!id.isEmpty() && addToSideArea(id, true)) { saveLayoutNow(); }
+        });
     return m_sideArea;
 }
 
@@ -88,6 +174,28 @@ void MainWindow::saveLayoutNow()
     if (m_shuttingDown || !m_layoutProfiles) { return; }
     m_layoutProfiles->captureIntoCurrent();
     m_layoutProfiles->save();
+}
+
+QString MainWindow::sideAreaIdForWindow(QWidget* w) const
+{
+    if (!w) { return {}; }
+    if (w == m_rotorWindow) { return kRotorPageId; }
+    if (auto* af = qobject_cast<AppletFloatingWindow*>(w)) {
+        return af->appletId();
+    }
+    // Panadapter und Meter-Container nicht: sie tragen eine GPU-Flaeche
+    // (QRhiWidget), und die ueberlebt das Umhaengen ueber eine Fenster-
+    // grenze nicht (AetherSDR #2495, siehe detachApplet()).
+    return {};
+}
+
+QString MainWindow::sideAreaKeyFor(const QString& id) const
+{
+    if (id == kRotorPageId) { return id; }
+    // Nur, was eine Seite sein kann: Rotor/Log oder ein Applet. Die
+    // uebrigen Eintraege des Auswaehlers (Fenster, Leisten) nicht.
+    const QString key = canonicalAppletKey(id);
+    return m_appletsById.contains(key) ? key : QString();
 }
 
 QString MainWindow::sideAreaTitleFor(const QString& id) const

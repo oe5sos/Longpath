@@ -251,6 +251,10 @@ public:
     class AppletWidget* appletForKeyForTest(const QString& key) const
     { return appletForKey(key); }
     class ToolWindow* rotorWindowForTest() const { return m_rotorWindow; }
+    QString sideAreaIdForWindowForTest(QWidget* w) const
+    { return sideAreaIdForWindow(w); }
+    QString sideAreaKeyForForTest(const QString& id) const
+    { return sideAreaKeyFor(id); }
 
     // ── Pruefzugaenge fuer den SunSDR ────────────────────────────────
     //
@@ -1815,6 +1819,11 @@ private:
     void resizeNeighbourPans(int edgeX, const QRect& area, int dx);
     void applySideAreaState(const QVariantMap& s);
     QString sideAreaTitleFor(const QString& id) const;
+    /// Seitenkennung eines schwebenden Fensters (leer: kann keine Seite
+    /// werden, etwa ein Panadapter).
+    QString sideAreaIdForWindow(QWidget* w) const;
+    /// Kennung aus dem Auswaehler → Seitenkennung (leer: keine Seite).
+    QString sideAreaKeyFor(const QString& id) const;
     /// Profil jetzt aufnehmen und ablegen (nicht beim Herunterfahren).
     void saveLayoutNow();
     QrzClient*           m_qrzClient{nullptr};

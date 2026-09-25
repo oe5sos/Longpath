@@ -49,6 +49,12 @@ namespace Longpath {
 class WindowTitleBar;
 class SideRailButton;
 
+/// MIME-Typ, unter dem eine Seitenkennung (Panelkennung oder
+/// "WinRotorLog") gezogen wird -- vom Auswaehler "Widget hinzufuegen"
+/// auf den Seitenbereich (Betreiber 2026-09-25: "widget oeffnen und per
+/// drag and drop auf die taskleiste").
+inline constexpr char kSidePageMimeType[] = "application/x-longpath-page-id";
+
 class SideAreaWindow : public QWidget {
     Q_OBJECT
 public:
@@ -94,6 +100,12 @@ public:
 
     static constexpr int kRailW = 38;
 
+    /// Aufleuchten, solange etwas darueber gezogen wird, das hier
+    /// abgelegt werden kann (Karte aus dem Auswaehler oder ein
+    /// schwebendes Fenster).
+    void setDropHighlight(bool on);
+    bool dropHighlight() const { return m_dropHighlight; }
+
     // ── Für Tests ────────────────────────────────────────────────────
     QStringList railIdsForTest() const;
     QString titleForTest() const;
@@ -110,12 +122,17 @@ signals:
     /// Lage/Größe stehen still (Ende der Geste), oder Seiten/Zustand
     /// haben sich geändert — Zeit, ins Profil zu schreiben.
     void stateSettled();
+    /// Eine Karte aus dem Auswaehler wurde hier abgelegt.
+    void pageDropped(const QString& id);
 
 protected:
     void paintEvent(QPaintEvent* ev) override;
     void moveEvent(QMoveEvent* ev) override;
     void resizeEvent(QResizeEvent* ev) override;
     void closeEvent(QCloseEvent* ev) override;
+    void dragEnterEvent(QDragEnterEvent* ev) override;
+    void dragLeaveEvent(QDragLeaveEvent* ev) override;
+    void dropEvent(QDropEvent* ev) override;
 
 private:
     struct Page {
@@ -142,6 +159,7 @@ private:
     bool m_collapsed{false};
     int  m_expandedWidth{0};
     bool m_applyingCollapse{false};
+    bool m_dropHighlight{false};
 
     static constexpr int kSettleMs = 400;
 };

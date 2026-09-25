@@ -126,6 +126,17 @@ private slots:
         QVERIFY(w.takePage(QStringLiteral("gibt-es-nicht")) == nullptr);
     }
 
+    void dropHighlightToggles()
+    {
+        SideAreaWindow w;
+        QVERIFY(w.acceptDrops());
+        QVERIFY(!w.dropHighlight());
+        w.setDropHighlight(true);
+        QVERIFY(w.dropHighlight());
+        w.setDropHighlight(false);
+        QVERIFY(!w.dropHighlight());
+    }
+
     // Für das Profil zählt die AUFGEKLAPPTE Lage — auch wenn gerade zu.
     void capturedStateIsTheExpandedGeometry()
     {

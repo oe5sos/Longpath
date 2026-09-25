@@ -17,6 +17,7 @@
 #include "gui/PanFloatingWindow.h"
 #include "gui/PanadapterStack.h"
 #include "gui/PanadapterApplet.h"
+#include "gui/applets/AppletFloatingWindow.h"
 #include "gui/applets/AppletPanelWidget.h"
 #include "gui/applets/AppletVisibilityController.h"
 #include "gui/applets/AppletWidget.h"
@@ -183,6 +184,51 @@ private slots:
         QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
         QVERIFY(!m_mw->sideAreaForTest());
         QVERIFY(m_mw->rotorWindowForTest());   // eigenes Fenster
+    }
+
+    // Karte aus "Widget hinzufuegen" abgelegt -> Seite (Betreiber 2026-09-25:
+    // "widget oeffnen und per drag and drop auf die taskleiste"). Was keine
+    // Seite sein kann (Fenster ausser Rotor/Log, Leisten), wird abgewiesen.
+    void droppedPickerCardBecomesAPage()
+    {
+        m_mw->setSideAreaEnabledForTest(true);
+        SideAreaWindow* area = m_mw->sideAreaForTest();
+        QVERIFY(area);
+        QCOMPARE(m_mw->sideAreaKeyForForTest(QStringLiteral("Tx")), QStringLiteral("Tx"));
+        QCOMPARE(m_mw->sideAreaKeyForForTest(QStringLiteral("WinRotorLog")),
+                 QStringLiteral("WinRotorLog"));
+        QVERIFY(m_mw->sideAreaKeyForForTest(QStringLiteral("WinLogbook")).isEmpty());
+        QVERIFY(m_mw->sideAreaKeyForForTest(QStringLiteral("ChromeStatusBar")).isEmpty());
+
+        emit area->pageDropped(QStringLiteral("Tx"));
+        QVERIFY(area->hasPage(QStringLiteral("Tx")));
+        QCOMPARE(area->activeId(), QStringLiteral("Tx"));
+        emit area->pageDropped(QStringLiteral("WinLogbook"));
+        QVERIFY(!area->hasPage(QStringLiteral("WinLogbook")));
+    }
+
+    // Ein schwebendes Applet-Fenster kennt seine Seitenkennung; wird es
+    // abgelegt, verschwindet das Fenster und das Applet ist eine Seite.
+    void floatingAppletWindowCanBeDroppedIn()
+    {
+        SideAreaWindow* area = m_mw->sideAreaForTest();
+        QVERIFY(area);
+        m_mw->removeFromSideAreaToOwnWindowForTest(QStringLiteral("Tx"));
+        AppletFloatingWindow* win = nullptr;
+        for (QWidget* w : QApplication::topLevelWidgets()) {
+            auto* f = qobject_cast<AppletFloatingWindow*>(w);
+            if (f && f->appletId() == QStringLiteral("Tx")) { win = f; }
+        }
+        QVERIFY(win);
+        QCOMPARE(m_mw->sideAreaIdForWindowForTest(win), QStringLiteral("Tx"));
+        QVERIFY(m_mw->addToSideAreaForTest(m_mw->sideAreaIdForWindowForTest(win), true));
+        QVERIFY(area->hasPage(QStringLiteral("Tx")));
+        QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+        for (QWidget* w : QApplication::topLevelWidgets()) {
+            auto* f = qobject_cast<AppletFloatingWindow*>(w);
+            QVERIFY(!(f && f->appletId() == QStringLiteral("Tx")));
+        }
+        m_mw->removeFromSideAreaToOwnWindowForTest(QStringLiteral("Tx"));
     }
 
     // Zuklappen gibt die Breite einem angrenzenden schwebenden Panadapter,
