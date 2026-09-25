@@ -107,6 +107,34 @@ void SpectrumAvenger::resize(int numPixels)
     m_seedNext = true;
 }
 
+void SpectrumAvenger::resampleTo(int numPixels)
+{
+    const int oldPixels = m_avSum.size();
+    if (oldPixels == 0 || numPixels <= 0 || m_seedNext) {
+        resize(numPixels);
+        return;
+    }
+    if (oldPixels == numPixels) { return; }
+
+    // Nearest source pixel by position: pixel x of the new width covers the
+    // same fraction of the span as pixel x*old/new of the old width. Same
+    // mapping as WaterfallHistoryBuffer::resizeWidth.
+    auto resample = [oldPixels, numPixels](const QVector<double>& src) {
+        QVector<double> dst(numPixels);
+        for (int x = 0; x < numPixels; ++x) {
+            const int sx = std::min(oldPixels - 1,
+                static_cast<int>(static_cast<qint64>(x) * oldPixels / numPixels));
+            dst[x] = src[sx];
+        }
+        return dst;
+    };
+    m_avSum = resample(m_avSum);
+    for (QVector<double>& row : m_avBuff) {
+        row = (row.size() == oldPixels) ? resample(row)
+                                        : QVector<double>(numPixels, 0.0);
+    }
+}
+
 void SpectrumAvenger::setNumAverage(int numFrames)
 {
     m_numAverage = std::max(1, std::min(numFrames, kMaxAverage));

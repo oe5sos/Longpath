@@ -41,6 +41,10 @@
 //                 port had zeroed av_sum, i.e. started log mode at 0 dB
 //                 (top of scale) -> red flash on every panadapter resize.
 //                 Martin Fischer, AI-assisted via Anthropic Claude.
+//   2026-09-25 — resampleTo(): a display-width change carries av_sum /
+//                 av_buff over (WDSP keeps them across SetAnalyzer), so a
+//                 panadapter resize no longer starts the average over.
+//                 Martin Fischer, AI-assisted via Anthropic Claude.
 // =================================================================
 
 //=================================================================
@@ -101,6 +105,15 @@ public:
     /// when display width / FFT size change.  Resets all running
     /// accumulators.
     void resize(int numPixels);
+
+    /// Display-width change: carry the running state over to the new
+    /// pixel count by resampling, instead of resetting it. WDSP keeps
+    /// av_sum across a pixel-count change -- its arrays are dMAX_PIXELS
+    /// (comm.h:120) long and SetAnalyzer (analyzer.c:1261-1265 [@852bf0e])
+    /// only changes num_pixels -- whereas these arrays are sized to the
+    /// width, so resize() had to drop them. Falls back to resize() when
+    /// there is nothing to carry (empty, or a reset still pending).
+    void resampleTo(int numPixels);
 
     /// Set the window-averaging frame depth (av_mode == 2).
     /// Clamped to [1, kMaxAverage].  Reduces dMAX_AVERAGE per

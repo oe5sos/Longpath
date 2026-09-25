@@ -73,6 +73,54 @@ private slots:
         QVERIFY(std::fabs(out[0] - second) < 1e-3);
     }
 
+    // A display-width change carries the running average over: the first
+    // frame at the new width continues where the old width left off,
+    // instead of dipping to -160 dB (which the waterfall safety net then
+    // painted as a red line, 2026-09-25).
+    void resampleCarriesTheAverageAcrossAWidthChange()
+    {
+        SpectrumAvenger av;
+        av.resize(4);
+        const QVector<float> quiet4(4, 1.0e-14f);      // -140 dB
+        QVector<float> out;
+        for (int k = 0; k < 200; ++k) {
+            av.apply(quiet4, 3, kAlpha, 1.0, kNoCorrection, false, 0.0, out);
+        }
+        av.resampleTo(10);
+        QCOMPARE(av.numPixels(), 10);
+        const QVector<float> quiet10(10, 1.0e-14f);
+        av.apply(quiet10, 3, kAlpha, 1.0, kNoCorrection, false, 0.0, out);
+        QCOMPARE(out.size(), 10);
+        for (float v : out) { QVERIFY(std::fabs(v - (-140.0f)) < 0.01f); }
+
+        // Narrower again, window mode: the frame ring comes along too.
+        SpectrumAvenger win;
+        win.resize(6);
+        win.setNumAverage(4);
+        const QVector<float> quiet6(6, 1.0e-14f);
+        for (int k = 0; k < 10; ++k) {
+            win.apply(quiet6, 2, kAlpha, 1.0, kNoCorrection, false, 0.0, out);
+        }
+        win.resampleTo(3);
+        const QVector<float> quiet3(3, 1.0e-14f);
+        win.apply(quiet3, 2, kAlpha, 1.0, kNoCorrection, false, 0.0, out);
+        for (float v : out) { QVERIFY(std::fabs(v - (-140.0f)) < 0.01f); }
+    }
+
+    // With a reset still pending (nothing averaged yet), resampleTo is a
+    // plain resize: the mode-dependent start still applies.
+    void resampleWithPendingResetIsAResize()
+    {
+        SpectrumAvenger av;
+        av.resize(4);
+        av.resampleTo(8);
+        const QVector<float> in(8, 1.0e-14f);
+        QVector<float> out;
+        av.apply(in, 3, kAlpha, 1.0, kNoCorrection, false, 0.0, out);
+        const double expect = kAlpha * -160.0 + (1.0 - kAlpha) * -140.0;
+        QVERIFY(std::fabs(out[0] - expect) < 1e-3);
+    }
+
     // Peak hold and window mode keep the zeroed state (WDSP "default").
     void peakHoldStillStartsFromZero()
     {

@@ -3344,7 +3344,11 @@ void SpectrumWidget::updateSpectrumLinear(int receiverId,
         m_displayLinearPixels.resize(displayWidth);
     }
     if (m_spectrumAvenger.numPixels() != displayWidth) {
-        m_spectrumAvenger.resize(displayWidth);
+        // Breite geaendert (Fenster gezogen, Seitenbereich zu/auf): den
+        // laufenden Mittelwert mitnehmen statt neu anfangen -- sonst eine
+        // Zeile weit unter dem Clarity-Fenster, die fitThresholdsToData
+        // dann rot einfaerbt (WFDIAG 2026-09-25). Siehe resampleTo().
+        m_spectrumAvenger.resampleTo(displayWidth);
     }
     Longpath::applySpectrumDetector(m_spectrumDetector,
                                      sliceCount,
@@ -3410,7 +3414,11 @@ void SpectrumWidget::updateSpectrumLinear(int receiverId,
         m_wfDisplayLinearPixels.resize(displayWidth);
     }
     if (m_waterfallAvenger.numPixels() != displayWidth) {
-        m_waterfallAvenger.resize(displayWidth);
+        // Breite geaendert (Fenster gezogen, Seitenbereich zu/auf): den
+        // laufenden Mittelwert mitnehmen statt neu anfangen -- sonst eine
+        // Zeile weit unter dem Clarity-Fenster, die fitThresholdsToData
+        // dann rot einfaerbt (WFDIAG 2026-09-25). Siehe resampleTo().
+        m_waterfallAvenger.resampleTo(displayWidth);
     }
     Longpath::applySpectrumDetector(m_waterfallDetector,
                                      sliceCount,
