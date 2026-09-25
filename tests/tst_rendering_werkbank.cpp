@@ -222,6 +222,29 @@ private slots:
                  w.setSpectrumRenderMode(SpectrumRenderMode::Mode2D);
                  w.setWaterfallDetector(SpectrumDetector::Peak);
              }},
+            // Palettenvergleich (Design-Durchsicht G6, 2026-09-26): nur
+            // vorhandene Paletten, Martins Stand sonst unveraendert.
+            {QStringLiteral("q_palette_default"), [martin](SpectrumWidget& w) {
+                 martin(w);
+                 w.setSpectrumRenderMode(SpectrumRenderMode::Mode2D);
+                 w.setWfColorScheme(WfColorScheme::Default);
+             }},
+            {QStringLiteral("q_palette_muted"), [martin](SpectrumWidget& w) {
+                 martin(w);
+                 w.setSpectrumRenderMode(SpectrumRenderMode::Mode2D);
+                 w.setWfColorScheme(WfColorScheme::Muted);
+             }},
+            {QStringLiteral("q_palette_clarityblue"), [martin](SpectrumWidget& w) {
+                 martin(w);
+                 w.setSpectrumRenderMode(SpectrumRenderMode::Mode2D);
+                 w.setWfColorScheme(WfColorScheme::ClarityBlue);
+             }},
+            {QStringLiteral("q_palette_muted_peak"), [martin](SpectrumWidget& w) {
+                 martin(w);
+                 w.setSpectrumRenderMode(SpectrumRenderMode::Mode2D);
+                 w.setWfColorScheme(WfColorScheme::Muted);
+                 w.setWaterfallDetector(SpectrumDetector::Peak);
+             }},
             {QStringLiteral("d_3d_peak_peak"), [martin](SpectrumWidget& w) {
                  martin(w);
                  w.setSpectrumDetector(SpectrumDetector::Peak);
