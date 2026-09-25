@@ -5138,6 +5138,13 @@ void SpectrumWidget::drawFreqScale(QPainter& p, const QRect& r)
             lx = textRect.right() - labelSize.width();
         }
         const qreal ly = textRect.center().y() - labelSize.height() / 2.0;
+        // Nur ganz oder gar nicht: eine Zahl, die ueber den Rand der Leiste
+        // ragt, wurde rechts vom LIVE-Knopf bzw. dem Randstreifen halb
+        // verdeckt ("14.12" statt "14.125", 2026-09-25) -- abgeschnittene
+        // Frequenzen sind schlechter als fehlende.
+        if (lx < r.left() || lx + labelSize.width() > r.right() + 1) {
+            continue;
+        }
         p.drawStaticText(QPointF(lx, ly), cit.value());
     }
 }
