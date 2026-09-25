@@ -28,6 +28,7 @@
 // =================================================================
 
 #include "AppletWidget.h"
+#include "models/RadioModel.h"   // vollstaendiger Typ fuer QPointer<RadioModel>
 #include "gui/StyleConstants.h"
 #include "gui/ComboStyle.h"
 

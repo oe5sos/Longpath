@@ -29,6 +29,7 @@
 
 #pragma once
 #include <QWidget>
+#include <QPointer>
 #include <QIcon>
 #include <QLabel>
 #include <QVBoxLayout>
@@ -83,7 +84,16 @@ protected:
     // Horizontal divider line
     QFrame* divider();
 
-    RadioModel* m_model = nullptr;
+    // QPointer statt rohem Zeiger (2026-09-25): das Hauptfenster baut das
+    // RadioModel VOR seinen Kind-Widgets ab, die Applets ueberleben es also
+    // um einen Augenblick. Jeder Applet-Destruktor, der dann noch
+    // m_model->... anfasste, las freigegebenen Speicher -- AddressSanitizer
+    // in tst_quit_leaves_no_pending_deletes: heap-use-after-free in
+    // RadioModel::audioEngine() aus ~RttyDecoderApplet(); in der CI als
+    // SIGSEGV/SIGBUS beim Beenden (#83, #90). Der QPointer wird null, sobald
+    // das Modell weg ist; die vorhandenen "if (m_model && ...)"-Pruefungen
+    // greifen damit von selbst.
+    QPointer<RadioModel> m_model;
     bool m_updatingFromModel = false;
 };
 

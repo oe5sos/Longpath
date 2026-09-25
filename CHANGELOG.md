@@ -175,6 +175,15 @@
 
 ### Fixed
 
+- **Zeitweiliger Absturz beim Beenden (Applets nach dem RadioModel).** Das
+  Hauptfenster baut das RadioModel vor seinen Kind-Widgets ab;
+  `~RttyDecoderApplet`/`~CwDecoderApplet` fragten danach noch
+  `m_model->audioEngine()` ab. AddressSanitizer: heap-use-after-free, 3 von 3
+  Läufen; in der CI als SIGSEGV/SIGBUS nach bestandenen Prüfungen (#83, #90).
+  `AppletWidget::m_model` ist jetzt `QPointer<RadioModel>` — null, sobald das
+  Modell weg ist, für alle Applets. Unter ASAN danach `tst_quit_leaves_no_pending_deletes`
+  und `tst_real_notch_rightclick` je 3 von 3 sauber.
+
 - **Zoomknöpfe unten links im Wasserfall zeigten keine Beschriftung.**
   Die vier Knöpfe [S] [B] [−] [+] waren seit dem app-weiten Grundstil vom
   2026-09-18 („Glas & Tiefe“, `padding: 4px 12px` für jeden QPushButton)
