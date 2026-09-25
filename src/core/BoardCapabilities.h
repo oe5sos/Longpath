@@ -591,7 +591,7 @@ namespace BoardCapsTable {
     // Preamp combo item: display text + underlying PreampMode-like index.
     struct PreampItem {
         const char* label;   // e.g. "0dB", "-10dB", "-20db" (case from Thetis)
-        int         modeInt; // index into NereusSDR PreampMode (0=Off..6=Minus50)
+        int         modeInt; // index into PreampMode (0=Off..6=Minus50, 7=Plus10)
     };
 
     // Returns the RX1 preamp combo items for a given board + ALEX presence.

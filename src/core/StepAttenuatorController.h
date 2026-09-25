@@ -112,7 +112,11 @@ enum class PreampMode {
     Minus20,    // MW0LGE_21d step atten [Thetis enums.cs:246]
     Minus30,
     Minus40,
-    Minus50
+    Minus50,
+    // Longpath extension, no Thetis equivalent: the SunSDR2 QRP's +10 dB
+    // preamp step (opcode 0x04 payload 03, captured from ExpertSDR2
+    // 2026-09-25). Appended so the persisted indices 0..6 keep meaning.
+    Plus10
 };
 
 // --- Controller ---
@@ -203,6 +207,10 @@ public:
 
     // Set preamp mode (e.g. from UI).
     void setPreampMode(PreampMode mode);
+    // Sends the current preamp mode to the radio again without a change
+    // -- for a radio whose preamp state is unknown after connect (SunSDR2
+    // QRP), so the combo and the radio agree. Longpath-original.
+    void pushPreampModeToHardware();
 
     // Attenuator value bounds (hardware limits).
     //   Most boards: 0..31 dB unsigned.

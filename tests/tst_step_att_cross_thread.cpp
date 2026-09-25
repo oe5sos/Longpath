@@ -53,6 +53,8 @@ public:
     std::atomic<QThread*> setAttenuatorRanOnThread{nullptr};
     std::atomic<QThread*> setPreampRanOnThread{nullptr};
     std::atomic<int>       lastAttenuatorDb{-999};
+    std::atomic<QThread*> setPreampIndexRanOnThread{nullptr};
+    std::atomic<int>       lastPreampModeIdx{-999};
 
     explicit MockConnection(QObject* parent = nullptr)
         : RadioConnection(parent)
@@ -75,6 +77,11 @@ public:
     void setPreamp(bool) override {
         setPreampRanOnThread.store(QThread::currentThread(),
                                    std::memory_order_release);
+    }
+    void setPreampModeIndex(int idx) override {
+        lastPreampModeIdx.store(idx, std::memory_order_release);
+        setPreampIndexRanOnThread.store(QThread::currentThread(),
+                                        std::memory_order_release);
     }
     void setTxDrive(int) override {}
     void setMox(bool) override {}
@@ -205,6 +212,38 @@ private slots:
         QVERIFY2(ranOn == &worker,
                  "setPreamp ran on the wrong thread — direct cross-thread "
                  "method call instead of QMetaObject::invokeMethod queued");
+    }
+
+    // Multi-step preamp (SunSDR2 QRP): the mode index travels on the same
+    // queued call, and pushPreampModeToHardware re-sends without a change.
+    void setPreampMode_carriesModeIndex() {
+        QThread worker;
+        auto* mockConn = new MockConnection();
+        mockConn->moveToThread(&worker);
+        worker.start();
+
+        StepAttenuatorController controller;
+        controller.setTickTimerEnabled(false);
+        controller.setRadioConnection(mockConn);
+
+        controller.setPreampMode(PreampMode::Plus10);
+        QThread* ranOn = waitForSlotFire(mockConn->setPreampIndexRanOnThread);
+        const int first = mockConn->lastPreampModeIdx.load(std::memory_order_acquire);
+
+        mockConn->setPreampIndexRanOnThread.store(nullptr, std::memory_order_release);
+        mockConn->lastPreampModeIdx.store(-999, std::memory_order_release);
+        controller.pushPreampModeToHardware();
+        QThread* again = waitForSlotFire(mockConn->setPreampIndexRanOnThread);
+        const int second = mockConn->lastPreampModeIdx.load(std::memory_order_acquire);
+
+        worker.quit();
+        worker.wait();
+        delete mockConn;
+
+        QCOMPARE(ranOn, &worker);
+        QCOMPARE(first, static_cast<int>(PreampMode::Plus10));
+        QCOMPARE(again, &worker);
+        QCOMPARE(second, static_cast<int>(PreampMode::Plus10));
     }
 
     // Note: the third call site (applyAttToHardware in StepAttenuator

@@ -196,6 +196,10 @@ public:
     // Der Rahmen, den setAttenuator(dB) schicken wuerde; leer fuer
     // Werte, die die QRP nicht hat.
     static QByteArray attenuatorFrameFor(int dB);
+    // Der Rahmen, den setPreampModeIndex(i) schicken wuerde (Opcode 0x04,
+    // Nutzlast 03/02/01/00 = +10/0/-10/-20 dB); leer fuer Stufen, die die
+    // QRP nicht hat. i ist ein PreampMode-Index (StepAttenuatorController.h).
+    static QByteArray preampFrameFor(int preampModeIdx);
     // Der DDC-Frequenzrahmen (Opcode 0x07) fuer Unterempfaenger 0 (RX1)
     // oder 1 (RX2) -- der Rahmen, der die QRP auf echtes I/Q schaltet.
     static QByteArray ddcFrequencyFrame(int subReceiver, quint64 frequencyHz);
@@ -401,6 +405,10 @@ public slots:
     // sits outside the no-op block below despite RX-side gain/atten
     // otherwise being an RX-not-TX control.
     void setAttenuator(int dB) override;
+    // Die vier Stufen des Preamp-Knopfs von ExpertSDR2 (+10/0/-10/-20 dB),
+    // ein Opcode 0x04. Kommt von StepAttenuatorController (RX-Applet,
+    // ATT-Zeile) und beim Verbinden einmal mit dem gespeicherten Stand.
+    void setPreampModeIndex(int preampModeIdx) override;
 
     // Step 2 of the SunSDR2 QRP TX-chain plan (design synthesis quote:
     // "Gate scaffolding — still zero wire reachability... real setMox()

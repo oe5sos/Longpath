@@ -759,6 +759,47 @@ private slots:
                  QByteArray::fromHex("03ff04000400000000000100000053ccd3b302000000"));
     }
 
+    // Preamp-Schalter (PreampMode-Index -> Opcode 0x04): die vier Rahmen
+    // entstehen aus Kopf + Stufe + CRC-32 und muessen byte-genau die
+    // mitgeschnittenen ExpertSDR2-Rahmen vom 2026-09-25 sein.
+    void preampFramesMatchExpertSdr2Bytes()
+    {
+        // 7 = Plus10, 1 = On (0 dB), 2 = Minus10, 3 = Minus20
+        QCOMPARE(SunSdrRadioConnection::preampFrameFor(7).toHex(),
+                 QByteArray("03ff04000400000000000100000036ab6f0b03000000"));
+        QCOMPARE(SunSdrRadioConnection::preampFrameFor(1).toHex(),
+                 QByteArray("03ff04000400000000000100000053ccd3b302000000"));
+        QCOMPARE(SunSdrRadioConnection::preampFrameFor(2).toHex(),
+                 QByteArray("03ff040004000000000001000000bd6366a101000000"));
+        QCOMPARE(SunSdrRadioConnection::preampFrameFor(3).toHex(),
+                 QByteArray("03ff040004000000000001000000d804da1900000000"));
+        // Off heisst bei Thetis -20 dB (HPSDR_OFF) -> derselbe Rahmen.
+        QCOMPARE(SunSdrRadioConnection::preampFrameFor(0),
+                 SunSdrRadioConnection::preampFrameFor(3));
+        // -30..-50 dB und Unsinn gibt es an der QRP nicht.
+        QVERIFY(SunSdrRadioConnection::preampFrameFor(4).isEmpty());
+        QVERIFY(SunSdrRadioConnection::preampFrameFor(6).isEmpty());
+        QVERIFY(SunSdrRadioConnection::preampFrameFor(-1).isEmpty());
+        QVERIFY(SunSdrRadioConnection::preampFrameFor(8).isEmpty());
+        // Die Abschwaecher-Rahmen sind dieselben Bytes.
+        QCOMPARE(SunSdrRadioConnection::preampFrameFor(1),
+                 SunSdrRadioConnection::attenuatorFrameFor(0));
+        QCOMPARE(SunSdrRadioConnection::preampFrameFor(2),
+                 SunSdrRadioConnection::attenuatorFrameFor(-10));
+    }
+
+    // Ohne offene Sitzung schickt der Schalter nichts (und stuerzt nicht).
+    void preampWithoutSessionSendsNothing()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        QVERIFY(!conn.hasRadioAddrForTest());
+        const double before = conn.txByteRate(5000);
+        conn.setPreampModeIndex(7);
+        QCOMPARE(conn.txByteRate(5000), before);
+    }
+
     // 0x07 = DDC-Frequenz je Unterempfaenger; der RX1-Rahmen schaltet die
     // QRP auf echtes I/Q (am Geraet eingegrenzt 2026-09-25). Byte-genau
     // gegen ExpertSDR2s eigene Rahmen von diesem Tag.

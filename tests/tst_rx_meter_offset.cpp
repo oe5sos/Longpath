@@ -56,6 +56,7 @@ private slots:
     void preampOffset_minus30();
     void preampOffset_minus40();
     void preampOffset_minus50();
+    void preampOffset_plus10();
 
     // MeterPoller::setRxOffsetSource accepts a callable and the poller stays
     // valid for poll/pollSMeter with null rx/tx channels (the existing nullptr
@@ -231,6 +232,13 @@ void TestRxMeterOffset::preampOffset_minus40()
 void TestRxMeterOffset::preampOffset_minus50()
 {
     QCOMPARE(rxPreampOffsetDbFor(6), 50.0f);
+}
+
+// Longpath extension, not in Thetis: PreampMode::Plus10 (index 7, SunSDR2
+// QRP +10 dB step) reads 10 dB lower than the 0 dB reference.
+void TestRxMeterOffset::preampOffset_plus10()
+{
+    QCOMPARE(rxPreampOffsetDbFor(7), -10.0f);
 }
 
 // 3. MeterPoller plumbing.
