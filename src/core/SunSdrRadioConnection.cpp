@@ -22,6 +22,7 @@
 #include <QNetworkAddressEntry>
 #include <QNetworkDatagram>
 #include <QNetworkInterface>
+#include <cmath>
 
 namespace Longpath {
 
@@ -228,6 +229,12 @@ void SunSdrRadioConnection::connectToRadio(const RadioInfo& info)
 
     m_radioInfo = info;
     m_profile = &resolveProfile(info.boardType);
+    m_rxLevelGain = static_cast<float>(std::pow(10.0, m_profile->rxLevelTrimDb / 20.0));
+    m_singleChannelWarned = false;
+    m_singleChannelSeen = false;
+    m_qCheckTimer.invalidate();
+    m_qNonZeroInWindow = 0;
+    m_qSamplesInWindow = 0;
     // Step 3: keep the pacer's own profile pointer (defaulted to
     // kProfileQrp at construction — see SunSdrTxPacer.h's own comment)
     // in sync with whatever this connection actually resolved, so the
@@ -521,6 +528,22 @@ void SunSdrRadioConnection::setReceiverFrequency(int receiverIndex, quint64 freq
     qCInfo(lcSunSdr) << "SunSdr: setReceiverFrequency() ->" << frequencyHz << "Hz";
 }
 
+QByteArray SunSdrRadioConnection::attenuatorFrameFor(int dB)
+{
+    // Opcode 0x04, Nutzlast = Stufenindex 00/01/02 = -20/-10/0 dB.
+    // Gemessen 2026-09-25, siehe den Kommentar in setAttenuator().
+    if (dB == 0) {
+        return QByteArray::fromHex("03ff04000400000000000100000053ccd3b302000000");
+    }
+    if (dB == -10) {
+        return QByteArray::fromHex("03ff040004000000000001000000bd6366a101000000");
+    }
+    if (dB == -20) {
+        return QByteArray::fromHex("03ff040004000000000001000000d804da1900000000");
+    }
+    return {};
+}
+
 void SunSdrRadioConnection::setAttenuator(int dB)
 {
     // Bench-confirmed 2026-08-27, re-derived from the real capture
@@ -561,16 +584,30 @@ void SunSdrRadioConnection::setAttenuator(int dB)
         return;
     }
 
-    QByteArray frame;
-    if (dB == 0) {
-        frame = QByteArray::fromHex(
-            "03ff040004000000000001000000d804da1900000000");
-    } else if (dB == -20) {
-        frame = QByteArray::fromHex(
-            "03ff040004000000000001000000bd6366a101000000");
-    } else {
+    // ── BERICHTIGT 2026-09-25 ─────────────────────────────────────
+    //
+    // Die Zuordnung oben (26.08.: "00000000 = 0 dB, 01000000 = -20 dB")
+    // war FALSCH. Am 2026-09-25 in ExpertSDR2 alle vier Stufen des
+    // Preamp-Knopfs der Reihe nach durchgeschaltet, mitgeschnitten
+    // (/tmp/qrp-att.pcap, Zeitleiste /tmp/qrp-att-zeiten.txt):
+    //   0 dB (Start) -> 02, +10 dB -> 03, -20 dB -> 00, -10 dB -> 01,
+    //   0 dB -> 02
+    // -- genau ArtemisSDRs DX-Schema (Index 0..3 = -20/-10/0/+10 dB,
+    // sunsdr.h:33-47 [@f8b01d25c5]), nur ohne das 0x80-Bit und unter
+    // Opcode 0x04 statt 0x05. Mit der alten Zuordnung haette
+    // setAttenuator(0) die QRP auf -20 dB gestellt. Aufgerufen wurde es
+    // nie (die QRP-Zeile hat keinen Stufenabschwaecher), gesendet also
+    // nichts Falsches.
+    //
+    // Die Rahmen selbst stimmen byte-genau mit dem Mitschnitt vom
+    // 2026-09-25 ueberein (die fuer 00 und 01 waren schon vorher
+    // richtig, nur falsch benannt); 02 ist ExpertSDR2s eigener
+    // Startrahmen. +10 dB (03, Tail 36ab6f0b) ist kein Abschwaecher und
+    // gehoert zu setPreamp, nicht hierher.
+    const QByteArray frame = attenuatorFrameFor(dB);
+    if (frame.isEmpty()) {
         qCInfo(lcSunSdr) << "SunSdr: setAttenuator(" << dB
-                         << ") — only 0 and -20 dB are bench-confirmed, "
+                         << ") — only 0, -10 and -20 dB exist on the QRP, "
                             "not sending anything for this value";
         return;
     }
@@ -1020,15 +1057,52 @@ void SunSdrRadioConnection::processStreamDatagram(const QByteArray& data,
                              << "(full scale 1.0) --" << identicalToPrevSinceLog
                              << "of" << packetsSinceLog
                              << "packets this second were byte-identical "
-                                "to the one before them";
+                                "to the one before them -- Q ungleich 0:"
+                             << m_qNonZeroPercent << "%";
             packetsSinceLog = 0;
             identicalToPrevSinceLog = 0;
+        }
+    }
+
+    // ── Traegt der Q-Kanal Daten? ─────────────────────────────────
+    //
+    // Nach dem Einschalten liefert die QRP nur EINEN reellen Kanal -- Q
+    // ist dann zu 100 % exakt 0 (2026-09-25, 1,7 Mio. Proben), die
+    // Seitenbaender liegen gespiegelt uebereinander. Erst ExpertSDR2
+    // schaltet echtes I/Q ein, und das bleibt bis zum Ausschalten.
+    // Welcher Befehl das ist, ist noch offen; diese Zaehlung zeigt es an
+    // (je Verbindung, sekundenweise).
+    for (int i = 1; i < samples.size(); i += 2) {
+        if (samples[i] != 0.0f) { ++m_qNonZeroInWindow; }
+    }
+    m_qSamplesInWindow += static_cast<quint64>(samples.size() / 2);
+    if (!m_qCheckTimer.isValid()) { m_qCheckTimer.start(); }
+    if (m_qCheckTimer.elapsed() > 1000 && m_qSamplesInWindow > 0) {
+        m_qCheckTimer.restart();
+        m_qNonZeroPercent = 100.0 * double(m_qNonZeroInWindow) / double(m_qSamplesInWindow);
+        m_singleChannelSeen = (m_qNonZeroInWindow == 0);
+        m_qNonZeroInWindow = 0;
+        m_qSamplesInWindow = 0;
+        if (m_singleChannelSeen && !m_singleChannelWarned) {
+            m_singleChannelWarned = true;
+            qCWarning(lcSunSdr) << "SunSdr: die QRP liefert nur EINEN Kanal (Q = 0) --"
+                                   " echtes I/Q ist nicht eingeschaltet, die Seitenbaender"
+                                   " liegen uebereinander. Uebergang: ExpertSDR2 einmal"
+                                   " verbinden lassen, dann Longpath.";
         }
     }
 
     if (state() == ConnectionState::Connecting) {
         setState(ConnectionState::Connected);
         if (m_connectWatchdog) { m_connectWatchdog->stop(); }
+    }
+
+    // Pegelabgleich je Geraet (SunSdr::Profile::rxLevelTrimDb) -- erst
+    // hier, nach der DIAG-Messung, damit deren Werte weiter den rohen
+    // Vollausschlag zeigen und mit den Messungen vor dem Abgleich
+    // vergleichbar bleiben.
+    if (m_rxLevelGain != 1.0f) {
+        for (float& v : samples) { v *= m_rxLevelGain; }
     }
 
     emit iqDataReceived(/*hwReceiverIndex=*/0, samples);

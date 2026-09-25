@@ -709,6 +709,86 @@ private slots:
         QCOMPARE(conn.blockRepliesSentForTest(), quint64(0));
     }
 
+    // ── Pegelabgleich QRP, 2026-09-25 ─────────────────────────────
+    // Gemessen gegen ExpertSDR2 am selben Geraet: -127,9 dBm dort,
+    // -147,9 dBm in Longpath ohne Abgleich -> +20,0 dB auf die Proben.
+    void qrpSamplesAreRaisedByTheMeasuredTwentyDb()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        QCOMPARE(conn.rxLevelGainForTest(), 10.0f);
+
+        const QHostAddress radio(QStringLiteral("192.0.2.200"));
+        conn.feedControlDatagramForTest(
+            QByteArray::fromHex("03ff011a7c0000004119c0a810c8c0a810c851c300004928"),
+            radio);
+        QSignalSpy iqSpy(&conn, &RadioConnection::iqDataReceived);
+
+        // Erster Slot: Q = 500 (Bytes 0-2), I = 1000 (Bytes 3-5), 24 Bit LE.
+        QByteArray pkt = SunSdr::buildIqHeader(
+            SunSdr::kProfileQrp, SunSdr::kOpIqRxIdle, /*seq=*/1, 0x01, 0x00);
+        QByteArray payload(SunSdr::kIqPayloadSize, char(0));
+        payload[0] = char(500 & 0xff); payload[1] = char((500 >> 8) & 0xff);
+        payload[3] = char(1000 & 0xff); payload[4] = char((1000 >> 8) & 0xff);
+        pkt.append(payload);
+        conn.feedStreamDatagramFromSenderForTest(pkt, radio);
+
+        QTRY_COMPARE_WITH_TIMEOUT(iqSpy.count(), 1, 500);
+        const auto samples = iqSpy.first().at(1).value<QVector<float>>();
+        QVERIFY(samples.size() >= 2);
+        const float raw = 1.0f / 8388608.0f;   // 1 / 2^23
+        QVERIFY(qFuzzyCompare(samples[0], 1000.0f * raw * 10.0f));   // I
+        QVERIFY(qFuzzyCompare(samples[1],  500.0f * raw * 10.0f));   // Q
+    }
+
+    // Preamp/Abschwaecher 0x04, am 2026-09-25 in ExpertSDR2 der Reihe
+    // nach durchgeschaltet: 00/01/02/03 = -20/-10/0/+10 dB. Die alte
+    // Zuordnung schickte fuer "0 dB" die -20-dB-Stufe.
+    void attenuatorFramesFollowTheMeasuredOrder()
+    {
+        QVERIFY(SunSdrRadioConnection::attenuatorFrameFor(0).toHex().endsWith("02000000"));
+        QVERIFY(SunSdrRadioConnection::attenuatorFrameFor(-10).toHex().endsWith("01000000"));
+        QVERIFY(SunSdrRadioConnection::attenuatorFrameFor(-20).toHex().endsWith("00000000"));
+        QVERIFY(SunSdrRadioConnection::attenuatorFrameFor(10).isEmpty());
+        QVERIFY(SunSdrRadioConnection::attenuatorFrameFor(-30).isEmpty());
+        // ExpertSDR2s eigener Startrahmen, byte-genau.
+        QCOMPARE(SunSdrRadioConnection::attenuatorFrameFor(0),
+                 QByteArray::fromHex("03ff04000400000000000100000053ccd3b302000000"));
+    }
+
+    // Nach dem Einschalten liefert die QRP nur einen Kanal (Q = 0). Die
+    // DIAG-Sekunde erkennt das.
+    void singleChannelStateIsRecognised()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        const QHostAddress radio(QStringLiteral("192.0.2.200"));
+        conn.feedControlDatagramForTest(
+            QByteArray::fromHex("03ff011a7c0000004119c0a810c8c0a810c851c300004928"),
+            radio);
+
+        auto onlyI = [](quint16 seq) {
+            QByteArray pkt = SunSdr::buildIqHeader(
+                SunSdr::kProfileQrp, SunSdr::kOpIqRxIdle, seq, 0x01, 0x00);
+            QByteArray payload(SunSdr::kIqPayloadSize, char(0));
+            for (int k = 0; k < SunSdr::kIqPayloadSize; k += 6) {
+                payload[k + 3] = char(7);   // I traegt Daten, Q (Bytes 0-2) bleibt 0
+            }
+            pkt.append(payload);
+            return pkt;
+        };
+        conn.feedStreamDatagramFromSenderForTest(onlyI(1), radio);
+        QTest::qWait(1100);
+        conn.feedStreamDatagramFromSenderForTest(onlyI(2), radio);
+        QVERIFY(conn.singleChannelSeenForTest());
+    }
+
     // onConnectTimeout()'s gotBeacon=true branch (a beacon replied, the
     // stream never started) left m_radioAddr set — found in review,
     // 2026-08-28. disconnect() already cleared it; this path didn't.

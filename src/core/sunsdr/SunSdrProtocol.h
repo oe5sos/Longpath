@@ -167,6 +167,26 @@ struct Profile {
     //     HPSDRModel-Eintrag, die Modellaufloesung fiel auf Atlas und mit
     //     ihr auf 192 000. Siehe RadioModel::applyHardwareProfileFor.
     double      rxNativeRateHz;
+
+    // Pegelabgleich des Empfangswegs in dB, auf die normierten Proben
+    // (1/2^23) aufgeschlagen, bevor sie Longpath verlassen.
+    //
+    // QRP: +20,0 dB, GEMESSEN am 2026-09-25 gegen ExpertSDR2 am selben
+    // Geraet im selben Zustand (echtes I/Q, Preamp 0 dB, 20 m, 3 kHz,
+    // ohne Antenne): ExpertSDR2 zeigt im Mittel -127,9 dBm Rauschen
+    // (-127,5 / -127,8 / -127,9 / -128,3), Longpath ohne Abgleich
+    // -147,9 dBm (TCI rx_sensors). Ohne diesen Abgleich klingt Longpath
+    // im richtigen I/Q-Betrieb "ganz leise" bis "kein Ton" -- die AGC
+    // hebt Rauschen bei -148 dBm nicht hoerbar an.
+    //
+    // Vorbild fuer die Groessenordnung: ArtemisSDR gleicht das S-Meter
+    // der SunSDR2 DX um +18,98 dB an, ebenfalls gegen die Hersteller-
+    // software gemessen (clsHardwareSpecific.cs:452 [@8ee3e72]). Dort als
+    // Meter-Versatz; hier auf die Proben, damit Anzeige, S-Meter UND
+    // Lautstaerke zusammen stimmen ("halte dich am SunSDR", Betreiber).
+    // DX und PRO bleiben bei 0 -- nie an einer QRP-fremden Hardware
+    // gemessen.
+    double      rxLevelTrimDb = 0.0;
 };
 
 // From ArtemisSDR sunsdr.c:2728-2732 [@f8b01d25c5].
@@ -184,7 +204,8 @@ inline constexpr Profile kProfilePro{
 // 48 000 Hz. Der Messlauf steht bei Profile::rxNativeRateHz und in
 // BoardCapabilities' QRP-Zeile.
 inline constexpr Profile kProfileQrp{
-    Variant::Qrp, "SunSDR2 QRP", 50001, 50002, 0x03, 48000.0};
+    Variant::Qrp, "SunSDR2 QRP", 50001, 50002, 0x03, 48000.0,
+    /*rxLevelTrimDb=*/20.0};
 
 // From ArtemisSDR sunsdr.h:28 [@f8b01d25c5]. Second magic byte, fixed
 // across every model/profile — only byte[0] varies.
