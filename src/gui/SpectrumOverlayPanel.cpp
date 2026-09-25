@@ -1660,10 +1660,18 @@ void SpectrumOverlayPanel::buildZoomButtons()
     static constexpr int kZBtnH = 20;
     static constexpr int kZGap  = 2;
 
+    // "padding: 0; margin: 0; min-width: 0;" wie im Vorbild (AetherSDR
+    // SpectrumWidget.cpp:2162-2168 [@d58e2b8a]) — beim Uebernehmen
+    // verloren gegangen. Seit dem app-weiten Grundstil vom 2026-09-18
+    // ("Glas & Tiefe", Style::kButtonStyle) erbt jeder QPushButton ohne
+    // eigene Angabe "padding: 4px 12px"; bei 24 px Breite blieb fuer das
+    // Zeichen nichts uebrig, und der Betreiber sah vier leere Kaestchen
+    // (2026-09-25). Pruefung: tst_zoom_buttons_legible.
     const QString zBtnStyle =
         "QPushButton { background: rgba(20, 30, 45, 200); "
         "border: 1px solid rgba(255, 255, 255, 40); border-radius: 6px; "
-        "color: #c8d8e8; font-size: 11px; font-weight: bold; }"
+        "color: #c8d8e8; font-size: 11px; font-weight: bold; "
+        "padding: 0; margin: 0; min-width: 0; }"
         "QPushButton:hover { background: rgba(0, 112, 192, 180); "
         "border: 1px solid #4a7ba8; }"
         "QPushButton:pressed { background: rgba(0, 144, 224, 200); }";
@@ -1681,7 +1689,10 @@ void SpectrumOverlayPanel::buildZoomButtons()
     // eine Pruefung zuverlaessig daneben (erlebt am 2026-08-22).
     m_zoomSegBtn  = makeZBtn(QStringLiteral("S"));
     m_zoomBandBtn = makeZBtn(QStringLiteral("B"));
-    m_zoomOutBtn  = makeZBtn(QStringLiteral("-"));
+    // Echtes Minuszeichen U+2212 wie im Vorbild (AetherSDR
+    // SpectrumWidget.cpp:2201 [@d58e2b8a]); der Bindestrich ist bei
+    // 11 px nur 4x4 Pixel gross und neben dem "+" kaum zu sehen.
+    m_zoomOutBtn  = makeZBtn(QStringLiteral("−"));
     m_zoomInBtn   = makeZBtn(QStringLiteral("+"));
 
     m_zoomSegBtn->setToolTip(QStringLiteral("Segment zoom — fit visible slice passband"));

@@ -2204,6 +2204,7 @@ longpath_add_test(tst_waterfall_defaults_changes)
 # grid-change path). Regression test: AGC/NF-AGC/Clarity must write to the
 # active-threshold mirror, not the persisted user fields.
 longpath_add_test(tst_waterfall_threshold_persistence)
+longpath_add_test(tst_waterfall_clarity_anchor)
 
 # ── Task 2.9: NF-aware grid + Copy button + NoiseFloorEstimator::prime() ─────
 # Thetis source: console.cs:46074-46086 [v2.10.3.13] GridMinFollowsNFRX1 /
@@ -4955,6 +4956,7 @@ longpath_add_test(tst_frequency_widget_tunes)
 longpath_add_test(tst_a_second_receiver_can_be_closed)
 longpath_add_test(tst_instrument_brightness_sheet)
 longpath_add_test(tst_zoom_buttons_do_something)
+longpath_add_test(tst_zoom_buttons_legible)
 longpath_add_test(tst_waterfall_survives_the_move)
 longpath_add_test(tst_splitter_handles_grabbable)
 if(TEST tst_splitter_handles_grabbable)

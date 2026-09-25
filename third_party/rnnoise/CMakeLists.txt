@@ -24,9 +24,17 @@ include(FetchContent)
 
 # Pinned to match the revision vendored in Thetis v2.10.3.13 @ 501e3f51.
 # Verified 2026-04-23 against https://gitlab.xiph.org/xiph/rnnoise HEAD.
+#
+# Geholt vom GitHub-Spiegel des Projekts, nicht mehr von gitlab.xiph.org
+# (2026-09-25): an diesem Morgen antwortete gitlab.xiph.org mit 502/504,
+# und jeder CI-Lauf (PRs #87, #88, #89) scheiterte schon beim Holen. Der
+# Spiegel github.com/xiph/rnnoise traegt denselben Commit 70f1d256
+# ("Remove outdated TRAINING-README"), am selben Tag nachgeprueft --
+# ein Git-Commit ist durch seinen Hash festgelegt, der Inhalt also
+# bitgleich. Der Stand selbst bleibt unveraendert.
 FetchContent_Declare(
     rnnoise_upstream
-    GIT_REPOSITORY https://gitlab.xiph.org/xiph/rnnoise.git
+    GIT_REPOSITORY https://github.com/xiph/rnnoise.git
     GIT_TAG        70f1d256acd4b34a572f999a05c87bf00b67730d
     GIT_SHALLOW    FALSE   # full clone required for specific SHA pin
 )

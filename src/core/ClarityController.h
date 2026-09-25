@@ -80,6 +80,11 @@ public:
     // Last emitted thresholds (qQNaN() before any emission).
     float lastLow() const noexcept  { return m_lastLow;  }
     float lastHigh() const noexcept { return m_lastHigh; }
+    // Der Rauschboden, aus dem lastLow()/lastHigh() gebildet wurden.
+    // Der Wasserfall braucht ihn, um die Schwellen an seinen eigenen
+    // Bildpunkten zu verankern (SpectrumWidget::composeWaterfall-
+    // ActiveThresholds, 2026-09-25).
+    float lastEmittedFloor() const noexcept { return m_lastEmittedFloor; }
 
     // Tunables — default to spec-locked values, exposed for tests.
     void setPollIntervalMs(int ms);

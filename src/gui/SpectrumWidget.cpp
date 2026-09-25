@@ -2662,6 +2662,11 @@ void SpectrumWidget::setWfAgcEnabled(bool on)
 void SpectrumWidget::setClarityActive(bool on)
 {
     m_clarityActive = on;
+    if (!on) {
+        // Beim naechsten Einschalten frisch am Bild verankern, nicht mit
+        // einem Boden von vor Minuten (anderes Band, anderer Zustand).
+        m_wfPixelFloorDbm = std::numeric_limits<float>::quiet_NaN();
+    }
 }
 
 // Task 2.8: NF-AGC — auto-track waterfall thresholds to noise floor + offset.
@@ -2697,6 +2702,11 @@ void SpectrumWidget::setWaterfallStopOnTx(bool on)
 // overwrote the user's saved thresholds.
 void SpectrumWidget::setClarityWaterfallThresholds(float low, float high)
 {
+    // Ohne Boden gibt es nichts zu verankern: die Schwellen gelten so,
+    // wie Clarity sie schickt (das bisherige Verhalten).
+    m_clarityLow      = low;
+    m_clarityHigh     = high;
+    m_clarityFloorDbm = std::numeric_limits<float>::quiet_NaN();
     if (qFuzzyCompare(m_wfActiveLowThreshold, low) &&
         qFuzzyCompare(m_wfActiveHighThreshold, high)) {
         return;
@@ -2706,6 +2716,31 @@ void SpectrumWidget::setClarityWaterfallThresholds(float low, float high)
     update();
     // No scheduleSettingsSave() — Clarity output is runtime state, not
     // a user preference.
+}
+
+void SpectrumWidget::setClarityWaterfallThresholds(float low, float high,
+                                                   float floorDbm)
+{
+    const float prevFloor = m_clarityFloorDbm;
+    setClarityWaterfallThresholds(low, high);
+    if (!std::isfinite(floorDbm)) { return; }
+    // Springt Clarity weit (Bandwechsel, Neuabstimmung, Zustandswechsel
+    // des Geraets), gilt der alte Bildpunkt-Boden nicht mehr: neu
+    // ansetzen statt sekundenlang hinterherzugleiten.
+    constexpr float kReprimeJumpDb = 6.0f;
+    if (std::isfinite(prevFloor)
+        && std::abs(floorDbm - prevFloor) > kReprimeJumpDb) {
+        m_wfPixelFloorDbm = std::numeric_limits<float>::quiet_NaN();
+    }
+    m_clarityFloorDbm = floorDbm;
+    // Bis die naechste Zeile den Bildpunkt-Boden kennt, die Verankerung
+    // der vorigen Zeile weiterfuehren statt kurz auf die Bin-Schwellen
+    // zurueckzuspringen.
+    if (std::isfinite(m_wfPixelFloorDbm)) {
+        const float shift = m_wfPixelFloorDbm - m_clarityFloorDbm;
+        m_wfActiveLowThreshold  = m_clarityLow  + shift;
+        m_wfActiveHighThreshold = m_clarityHigh + shift;
+    }
 }
 
 void SpectrumWidget::setWfOpacity(int percent)
@@ -5865,6 +5900,34 @@ void SpectrumWidget::composeWaterfallActiveThresholds(const QVector<float>& wfPi
     if (!m_clarityActive) {
         m_wfActiveLowThreshold  = m_wfLowThreshold;
         m_wfActiveHighThreshold = m_wfHighThreshold;
+    } else if (std::isfinite(m_clarityFloorDbm)
+               && std::isfinite(m_clarityLow) && std::isfinite(m_clarityHigh)) {
+        // ── Clarity am eigenen Bild verankern (2026-09-25) ───────────
+        //
+        // Clarity bildet low/high = Boden + Abstand, den Boden aber aus
+        // den FFT-Bins (30. Perzentil). Gefaerbt werden diese Bildpunkte
+        // hier — nach Wasserfall-Detektor und Mittelung, bei mehreren
+        // Bins je Punkt. Beide Boeden fallen je nach Signalstatistik
+        // weit auseinander: an einer SunSDR2 QRP ohne Antenne lag der
+        // Bin-Boden 17 dB UNTER den Bildpunkten (echtes I/Q, spitzes
+        // Rauschen: der Wasserfall wurde ganz rot) und im Einkanal-
+        // Zustand 10 dB DARUEBER (ganz schwarz). Gemessen, nicht
+        // geschaetzt: WFDIAG-Protokoll 06:46 und 06:49.
+        //
+        // Darum dasselbe Perzentil auf die Bildpunkte, langsam geglaettet
+        // wie der Lauf-Minimum/Maximum-Folger darunter (0,05 je Zeile, bei
+        // ~10 Zeilen/s rund 2 s), und Clarity's Fenster um den Unterschied
+        // verschoben. Abstaende, Totband und Glaettung bleiben Clarity's.
+        const float pixFloor = m_wfPixelFloorEstimator.estimate(wfPixelsDbm);
+        if (std::isfinite(pixFloor)) {
+            constexpr float kPixFloorAlpha = 0.05f;
+            m_wfPixelFloorDbm = std::isfinite(m_wfPixelFloorDbm)
+                ? kPixFloorAlpha * pixFloor + (1.0f - kPixFloorAlpha) * m_wfPixelFloorDbm
+                : pixFloor;
+            const float shift = m_wfPixelFloorDbm - m_clarityFloorDbm;
+            m_wfActiveLowThreshold  = m_clarityLow  + shift;
+            m_wfActiveHighThreshold = m_clarityHigh + shift;
+        }
     }
 
     // AGC: one-pole follower on display-pixel min/max biases the

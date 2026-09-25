@@ -5227,7 +5227,10 @@ void MainWindow::buildUI()
     connect(m_clarityController, &ClarityController::waterfallThresholdsChanged,
             activeSpectrumWidget(), [this](float low, float high) {
         activeSpectrumWidget()->setClarityActive(true);
-        activeSpectrumWidget()->setClarityWaterfallThresholds(low, high);
+        // Mit dem Boden, aus dem die Schwellen stammen — der Wasserfall
+        // verankert sie an seinen eigenen Bildpunkten (2026-09-25).
+        activeSpectrumWidget()->setClarityWaterfallThresholds(
+            low, high, m_clarityController->lastEmittedFloor());
     });
 
     // Clarity → SpectrumWidget NF-aware grid (Task 2.9).
