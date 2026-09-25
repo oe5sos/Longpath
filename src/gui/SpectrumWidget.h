@@ -177,6 +177,7 @@ mw0lge@grange-lane.co.uk
 #include "core/ConnectionState.h"
 #include "core/SignalHistoryStore.h"
 #include "core/WdspTypes.h"  // DSPMode — for TX filter IQ-space mapping (Plan 4 D9)
+#include "core/NoiseFloorEstimator.h"  // Rauschboden der Wasserfall-Bildpunkte
 
 QT_BEGIN_NAMESPACE
 class QLabel;
@@ -641,6 +642,17 @@ public:
     // (_RX1waterfallPreviousMinValue) is a runtime field separate from
     // waterfall_low_threshold.
     void setClarityWaterfallThresholds(float low, float high);
+
+    // Dasselbe mit dem Rauschboden, aus dem Clarity die Schwellen
+    // gebildet hat. Dann verankert der Wasserfall sie an seinen EIGENEN
+    // Bildpunkten: Clarity schaetzt den Boden aus den FFT-Bins, gefaerbt
+    // werden aber die Bildpunkte nach Detektor und Mittelung — und die
+    // liegen je nach Signalstatistik weit daneben (SunSDR2 QRP,
+    // 2026-09-25: 17 dB darunter im I/Q-Betrieb, der Wasserfall ganz rot;
+    // 10 dB darueber im Einkanal-Zustand, ganz schwarz). Clarity bleibt
+    // zustaendig fuer Abstaende, Glaettung und Totband; nur der
+    // Bezugspunkt wandert dorthin, wo die Farben entstehen.
+    void setClarityWaterfallThresholds(float low, float high, float floorDbm);
 
     // Threshold composition pulled out of pushWaterfallRow() so the
     // regression test can drive it headlessly. Mutates the active
@@ -2544,6 +2556,13 @@ private:
 
     bool  m_wfAgcEnabled{true};
     bool  m_clarityActive{false};     // Phase 3G-9c: suppresses legacy AGC when Clarity drives thresholds
+    // Clarity-Schwellen samt ihrem Bin-Rauschboden, und der geglaettete
+    // Rauschboden der Wasserfall-Bildpunkte (Verankerung, 2026-09-25).
+    float m_clarityLow{std::numeric_limits<float>::quiet_NaN()};
+    float m_clarityHigh{std::numeric_limits<float>::quiet_NaN()};
+    float m_clarityFloorDbm{std::numeric_limits<float>::quiet_NaN()};
+    float m_wfPixelFloorDbm{std::numeric_limits<float>::quiet_NaN()};
+    NoiseFloorEstimator m_wfPixelFloorEstimator;   // 30. Perzentil wie Clarity
     // NF-AGC: Task 2.8 — auto-track thresholds to noise floor + offset.
     bool  m_wfNfAgcEnabled{false};
     int   m_wfNfAgcOffsetDb{0};       // offset applied above/below noise floor
