@@ -3791,6 +3791,8 @@ void SpectrumWidget::resizeEvent(QResizeEvent* event)
     updateVfoPositions();
 }
 
+static int specHFromHeight(int widgetH, float spectrumFrac, int chromeH);
+
 void SpectrumWidget::applyResizeSettled()
 {
     // Recreate waterfall image at new size
@@ -3802,7 +3804,14 @@ void SpectrumWidget::applyResizeSettled()
 #else
     int wfW = w - effectiveStripW();
 #endif
-    int wfH = static_cast<int>(h * (1.0f - m_spectrumFrac)) - kFreqScaleH - kDividerH;
+    // Dieselbe Hoehe, die der Zeichenweg dem Wasserfall gibt (GPU:
+    // renderGpuFrame, CPU: paintEvent) -- ueber specHFromHeight, wie dort.
+    // Hier stand int(h*(1-frac)) - chrome: auf dem GPU-Weg teilt der die
+    // Flaeche NACH Abzug der Leisten, also kamen z. B. bei h=620 340
+    // Bildzeilen auf 353 Pixel -- eine krumme Streckung um 1,04, die jede
+    // Zeile ueber zwei Pixelreihen verschmierte (2026-09-25).
+    int wfH = h - specHFromHeight(h, m_spectrumFrac, kFreqScaleH + kDividerH)
+              - kFreqScaleH - kDividerH;
     if (wfW > 0 && wfH > 0 && (m_waterfall.isNull() ||
         m_waterfall.width() != wfW || m_waterfall.height() != wfH)) {
         m_waterfall = QImage(wfW, wfH, QImage::Format_RGB32);
