@@ -34,6 +34,13 @@
 //                 owns the per-channel state arrays (av_sum,
 //                 av_buff, indices) so SpectrumWidget can hold
 //                 separate spectrum + waterfall instances.
+//   2026-09-25 — Mode-dependent av_sum reset ported from Thetis
+//                 wdsp/analyzer.c ResetPixelBuffers [@852bf0e]: after
+//                 resize()/clear() the next apply() starts recursive
+//                 linear at 1.0e-12 and recursive log at -160 dB. The
+//                 port had zeroed av_sum, i.e. started log mode at 0 dB
+//                 (top of scale) -> red flash on every panadapter resize.
+//                 Martin Fischer, AI-assisted via Anthropic Claude.
 // =================================================================
 
 //=================================================================
@@ -152,6 +159,10 @@ private:
     // numPixels × kMaxAverage; only the first numAverage rows are
     // walked at runtime.
     QVector<QVector<double>> m_avBuff;
+
+    // Set by resize()/clear(); the next apply(), which knows av_mode,
+    // performs the mode-dependent reset of ResetPixelBuffers (see .cpp).
+    bool m_seedNext{true};
 
     int m_numAverage{2};   // av_mode==2 frame count, [1, kMaxAverage]
     int m_avInIdx{0};

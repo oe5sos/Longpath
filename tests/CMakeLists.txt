@@ -4659,6 +4659,9 @@ longpath_add_test(tst_detector_modes)
 # [v2.10.3.13].  Asserts pipeline output is sized to displayWidth and all
 # pixels finite (no NaN / Inf from any detector x averaging combo).
 longpath_add_test(tst_spectrum_pipeline_modes)
+# 2026-09-25: avenger reset per Thetis ResetPixelBuffers (no red flash on
+# every panadapter resize).
+longpath_add_test(tst_spectrum_avenger_reset)
 
 # Phase 2 -- FFTEngine window function ports (Rectangular / BH-4T / Hann /
 # Flat-Top / Hamming / Kaiser / BH-7T) per WDSP analyzer.c:52-173 +

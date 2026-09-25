@@ -104,6 +104,7 @@ void SpectrumAvenger::resize(int numPixels)
     m_availFrames = 0;
     m_avInIdx = 0;
     m_avOutIdx = 0;
+    m_seedNext = true;
 }
 
 void SpectrumAvenger::setNumAverage(int numFrames)
@@ -126,6 +127,7 @@ void SpectrumAvenger::clear()
     m_availFrames = 0;
     m_avInIdx = 0;
     m_avOutIdx = 0;
+    m_seedNext = true;
 }
 
 // From Thetis WDSP analyzer.c:464-554 [v2.10.3.13] — avenger() verbatim port.
@@ -151,6 +153,28 @@ void SpectrumAvenger::apply(const QVector<float>& tPixels,
 
     int i;
     double factor;
+
+    // ── The mode-dependent reset clear() promised ────────────────────
+    //
+    // clear() and resize() cannot know av_mode, so they zero av_sum and
+    // raise m_seedNext; here, with the mode in hand, the reset is
+    // completed the way WDSP does it. Without this, recursive-log mode
+    // (3) started from av_sum = 0, which it reads as 0 dB -- the top of
+    // the scale -- and every panadapter resize (a floating pan widened by
+    // the side area, 2026-09-25) flashed red and decayed for seconds.
+    // From Thetis Project Files/Source/wdsp/analyzer.c:1109-1147 [@852bf0e]
+    //[2.10.2]MW0LGE reset all the pixel and average buffers
+    //   case 1: av_sum = 1.0e-12;   case 3: av_sum = -160.0;
+    //   default: memset(av_sum, 0)  (already done by clear()/resize())
+    if (m_seedNext) {
+        m_seedNext = false;
+        if (avMode == 1) {
+            std::fill(m_avSum.begin(), m_avSum.end(), 1.0e-12);
+        } else if (avMode == 3) {
+            std::fill(m_avSum.begin(), m_avSum.end(), -160.0);
+        }
+    }
+
     switch (avMode)
     {
     case -1:    // peak-hold
