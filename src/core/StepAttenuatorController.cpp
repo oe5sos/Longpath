@@ -277,15 +277,23 @@ void StepAttenuatorController::setPreampMode(PreampMode mode)
     // connection-thread state (m_rxPreamp[0] + m_forceBank11Next) is
     // written on the connection thread, not the controller thread.
     // Same rationale as setAttenuation above.
-    if (m_connection) {
-        RadioConnection* conn = m_connection.get();
-        const bool enabled = (mode != PreampMode::Off);
-        QMetaObject::invokeMethod(conn, [conn, enabled]() {
-            conn->setPreamp(enabled);
-        });
-    }
+    pushPreampModeToHardware();
 
     emit preampModeChanged(m_preampMode);
+}
+
+void StepAttenuatorController::pushPreampModeToHardware()
+{
+    if (m_connection) {
+        RadioConnection* conn = m_connection.get();
+        const bool enabled = (m_preampMode != PreampMode::Off);
+        const int modeIdx = static_cast<int>(m_preampMode);
+        QMetaObject::invokeMethod(conn, [conn, enabled, modeIdx]() {
+            conn->setPreamp(enabled);
+            // Multi-step preamps (SunSDR2 QRP); no-op on P1/P2.
+            conn->setPreampModeIndex(modeIdx);
+        });
+    }
 }
 
 void StepAttenuatorController::setMaxAttenuation(int dB)
@@ -745,6 +753,9 @@ void StepAttenuatorController::applyClassicAutoAtt(int adc)
         // Preamp mode fallback — From Thetis console.cs:21574-21594.
         PreampMode newMode = m_preampMode;
         switch (m_preampMode) {
+        case PreampMode::Plus10:  // Longpath: SunSDR2 QRP, one step down to 0 dB
+            newMode = PreampMode::On;
+            break;
         case PreampMode::Off:
         case PreampMode::On:
             newMode = PreampMode::Minus10;

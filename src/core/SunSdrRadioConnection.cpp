@@ -586,6 +586,61 @@ QByteArray SunSdrRadioConnection::attenuatorFrameFor(int dB)
     return {};
 }
 
+QByteArray SunSdrRadioConnection::preampFrameFor(int preampModeIdx)
+{
+    // Opcode 0x04, Nutzlast = Stufenindex. Mitgeschnitten 2026-09-25, als
+    // Martin in ExpertSDR2 alle vier Stufen des Preamp-Knopfs der Reihe
+    // nach durchgeschaltet hat (/tmp/qrp-att.pcap): 0 dB -> 02, +10 dB ->
+    // 03, -20 dB -> 00, -10 dB -> 01. Dasselbe Schema wie ArtemisSDRs DX
+    // (Index 0..3 = -20/-10/0/+10 dB, sunsdr.h:33-47 [@f8b01d25c5]), dort
+    // unter Opcode 0x05 und mit dem 0x80-Bit.
+    //
+    // PreampMode-Indizes (StepAttenuatorController.h): 7 Plus10, 1 On
+    // (0 dB), 2 Minus10, 3 Minus20; 0 Off heisst bei Thetis "-20 dB"
+    // (HPSDR_OFF) und bekommt darum denselben Rahmen wie Minus20. Die
+    // Anzeige-Korrektur (rxPreampOffsetDbFor) passt zu genau dieser
+    // Zuordnung: On = 0 dB Bezug, +10 dB -> -10, -10 dB -> +10, -20 -> +20.
+    char step = 0;
+    switch (preampModeIdx) {
+    case 7: step = 0x03; break;  // +10 dB
+    case 1: step = 0x02; break;  //   0 dB, ExpertSDR2s Startzustand
+    case 2: step = 0x01; break;  // -10 dB
+    case 3:                      // -20 dB
+    case 0: step = 0x00; break;  // Off = HPSDR_OFF = -20 dB
+    default: return {};          // -30..-50 dB gibt es an der QRP nicht
+    }
+    QByteArray frame = QByteArray::fromHex("03ff04000400000000000100000000000000");
+    frame.append(step);
+    frame.append(3, '\0');
+    // Das Rahmenende (Bytes 14..17) ist CRC-32 ueber den Rahmen; fuer die
+    // vier Stufen ergibt das byte-genau die mitgeschnittenen Rahmen
+    // (Test tst_sunsdr_radio_connection::preampFramesMatchExpertSdr2Bytes).
+    return SunSdr::withControlFrameCrc(frame);
+}
+
+void SunSdrRadioConnection::setPreampModeIndex(int preampModeIdx)
+{
+    if (!m_controlSocket || !m_profile || m_radioAddr.isNull()) {
+        return;
+    }
+    // Nur die QRP ist an diesem Rahmen gemessen; eine DX/PRO hat ihren
+    // Preamp unter Opcode 0x05 (ArtemisSDR) und bekommt hier nichts.
+    if (m_profile->variant != SunSdr::Variant::Qrp) {
+        return;
+    }
+    const QByteArray frame = preampFrameFor(preampModeIdx);
+    if (frame.isEmpty()) {
+        qCInfo(lcSunSdr) << "SunSdr: setPreampModeIndex(" << preampModeIdx
+                         << ") -- no such preamp step on the QRP, not sending";
+        return;
+    }
+    m_controlSocket->writeDatagram(frame, m_radioAddr, m_profile->defaultCtrlPort);
+    recordBytesSent(static_cast<qint64>(frame.size()));
+    qCInfo(lcSunSdr).noquote() << "SunSdr: preamp step ->"
+                               << frame.mid(18, 1).toHex() << "(mode index"
+                               << preampModeIdx << ")";
+}
+
 void SunSdrRadioConnection::setAttenuator(int dB)
 {
     // Bench-confirmed 2026-08-27, re-derived from the real capture

@@ -322,6 +322,10 @@ constexpr float rxPreampOffsetDbFor(int preampModeIdx) noexcept {
         case 4: return 30.0f;   // PreampMode::Minus30
         case 5: return 40.0f;   // PreampMode::Minus40
         case 6: return 50.0f;   // PreampMode::Minus50
+        // Longpath extension, not in Thetis: PreampMode::Plus10 (SunSDR2
+        // QRP +10 dB step) -- 10 dB more gain than HPSDR_ON, so the reading
+        // comes down by 10 dB to stay calibrated.
+        case 7: return -10.0f;
         default: return 0.0f;
     }
 }

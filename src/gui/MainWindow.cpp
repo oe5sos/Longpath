@@ -15353,6 +15353,26 @@ void MainWindow::onConnectionStateChanged()
         // connected board lacks the feature.
         m_stepAttController->setHasStepAttenuatorCal(caps.hasStepAttenuatorCal);
         m_stepAttController->loadSettings(m_radioModel->connection()->radioInfo().macAddress);
+        if (m_radioModel->connection()->radioInfo().boardType == HPSDRHW::SunSdr2Qrp) {
+            // SunSDR2 QRP: vier Preamp-Stufen (+10/0/-10/-20 dB) statt eines
+            // Stufenabschwaechers. Die Anzeige-Korrektur laeuft darum ueber
+            // den Preamp-Zweig von rxMeterOffsetDb (step att aus), und der
+            // Stand wird beim Verbinden einmal geschickt -- nach dem
+            // Einschalten ist er unbekannt, ExpertSDR2 setzt ihn beim Start
+            // ebenso. Ein gespeicherter Stand, den die QRP nicht hat (etwa
+            // der alte Vorgabewert Off), wird zu 0 dB. Longpath, 2026-09-25.
+            m_stepAttController->setStepAttEnabled(false);
+            const auto qrpItems = BoardCapsTable::preampItemsForBoard(
+                HPSDRHW::SunSdr2Qrp, false);
+            const int cur = static_cast<int>(m_stepAttController->preampMode());
+            const bool known = std::any_of(qrpItems.begin(), qrpItems.end(),
+                [cur](const BoardCapsTable::PreampItem& it) { return it.modeInt == cur; });
+            if (known) {
+                m_stepAttController->pushPreampModeToHardware();
+            } else {
+                m_stepAttController->setPreampMode(PreampMode::On);
+            }
+        }
         applyPerRadioFftSize(m_radioModel->connection()->radioInfo().macAddress);
 
         // Phase 3Q Task 5 — auto-close: 1 s after connect, accept() the panel if open.

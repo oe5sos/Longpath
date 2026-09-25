@@ -1463,6 +1463,19 @@ static constexpr PreampItem kOnOffPlusAlex[] = {
     {"-50db", 6},  // PreampMode::Minus50 (ALEX)
 };
 
+// SunSDR2 QRP (Longpath, no Thetis equivalent -- Thetis does not drive
+// this radio): the four states of ExpertSDR2's preamp knob, one opcode
+// 0x04 with payload 03/02/01/00 = +10/0/-10/-20 dB, captured 2026-09-25
+// (see SunSdrRadioConnection::preampFrameFor). 0 dB is ExpertSDR2's
+// start state and maps to PreampMode::On, which the meter offset table
+// (rxPreampOffsetDbFor) treats as the 0 dB reference.
+static constexpr PreampItem kSunSdrQrp[] = {
+    {"+10dB", 7},  // PreampMode::Plus10 (Longpath extension)
+    {"0dB",   1},  // PreampMode::On
+    {"-10dB", 2},  // PreampMode::Minus10
+    {"-20dB", 3},  // PreampMode::Minus20
+};
+
 // Hermes Lite 2: uses anan100d 4-step set (Off / -10 / -20 / -30 dB).
 // HL2 is not in Thetis SetComboPreampForHPSDR (it postdates that switch),
 // but its LNA supports the same 4-level control as the anan100d set.
@@ -1523,6 +1536,9 @@ std::span<const PreampItem> preampItemsForBoard(HPSDRHW hw, bool alexPresent) no
         // SetComboPreampForHPSDR switch (HL2 postdates it); uses anan100d set
         // per spec §8 and mi0bot HL2 LNA design [@c26a8a4]. Phase 3P-C Step 2.
         return items(kAnan100d);
+
+    case HPSDRHW::SunSdr2Qrp:
+        return items(kSunSdrQrp);
 
     default:
         return items(kAnan100d);

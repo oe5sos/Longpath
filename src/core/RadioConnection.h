@@ -215,6 +215,13 @@ public slots:
     // --- Hardware Control ---
     virtual void setAttenuator(int dB) = 0;
     virtual void setPreamp(bool enabled) = 0;
+    // Preamp step as a PreampMode index (StepAttenuatorController.h).
+    // setPreamp(bool) above only carries on/off, which is all an
+    // OpenHPSDR board has; a radio whose preamp has more states (the
+    // SunSDR2 QRP: +10/0/-10/-20 dB under one opcode) overrides this.
+    // StepAttenuatorController calls both; the default does nothing, so
+    // P1/P2 behaviour is untouched. Longpath-original, 2026-09-25.
+    virtual void setPreampModeIndex(int preampModeIdx) { Q_UNUSED(preampModeIdx); }
     virtual void setTxDrive(int level) = 0;
     virtual void setMox(bool enabled) = 0;
     virtual void setAntennaRouting(AntennaRouting routing) = 0;

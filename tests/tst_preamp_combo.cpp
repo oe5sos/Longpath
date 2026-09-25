@@ -181,6 +181,26 @@ private slots:
         QCOMPARE(items[6].modeInt, static_cast<int>(PreampMode::Minus50)); // "-50db"
     }
 
+    // ─── SunSDR2 QRP: four steps under one opcode (Longpath, no Thetis) ─────
+    // ExpertSDR2's preamp knob, captured 2026-09-25: +10/0/-10/-20 dB.
+    // 0 dB is PreampMode::On so the meter offset table keeps its 0 dB
+    // reference; +10 dB is the appended PreampMode::Plus10.
+    void sunsdr_qrp_four_steps()
+    {
+        auto items = BoardCapsTable::preampItemsForBoard(HPSDRHW::SunSdr2Qrp, false);
+        QCOMPARE(int(items.size()), 4);
+        QCOMPARE(QLatin1String(items[0].label), QLatin1String("+10dB"));
+        QCOMPARE(QLatin1String(items[1].label), QLatin1String("0dB"));
+        QCOMPARE(QLatin1String(items[2].label), QLatin1String("-10dB"));
+        QCOMPARE(QLatin1String(items[3].label), QLatin1String("-20dB"));
+        QCOMPARE(items[0].modeInt, static_cast<int>(PreampMode::Plus10));
+        QCOMPARE(items[1].modeInt, static_cast<int>(PreampMode::On));
+        QCOMPARE(items[2].modeInt, static_cast<int>(PreampMode::Minus10));
+        QCOMPARE(items[3].modeInt, static_cast<int>(PreampMode::Minus20));
+        // Appended after Minus50 so persisted indices 0..6 keep meaning.
+        QCOMPARE(static_cast<int>(PreampMode::Plus10), 7);
+    }
+
     // ─── RxApplet preamp combo populates per board at construction ───────────
     // Phase 3P-C Step 3: verifies populatePreampCombo() is called at init,
     // not hardcoded. Uses preampComboItemCountForTest() accessor.
@@ -191,6 +211,35 @@ private slots:
         model.setBoardForTest(HPSDRHW::HermesLite);
         RxApplet applet(nullptr, &model);
         QCOMPARE(applet.preampComboItemCountForTest(), 4);
+    }
+
+    void rxapplet_sunsdr_qrp_combo_has_four_items()
+    {
+        // Through the real profile path: the QRP has no HPSDRModel row, so
+        // setBoardForTest() would resolve it to Atlas; applyHardwareProfile
+        // takes the reported board for SunSDR (RadioModel.cpp).
+        RadioModel model;
+        RadioInfo info;
+        info.boardType     = HPSDRHW::SunSdr2Qrp;
+        info.protocol      = ProtocolVersion::SunSdr;
+        info.modelOverride = HPSDRModel::HPSDR;
+        model.applyHardwareProfileForTest(info);
+        RxApplet applet(nullptr, &model);
+        QCOMPARE(applet.preampComboItemCountForTest(), 4);
+    }
+
+    // Live 2026-09-25: das Applet entsteht vor der Verbindung (Hermes-
+    // Vorgabe); verbindet sich dann die QRP, muss die Liste mitwechseln.
+    void rxapplet_relists_preamp_when_the_board_changes()
+    {
+        RadioModel model;
+        RxApplet applet(nullptr, &model);
+        applet.setBoardCapabilities(BoardCapsTable::forBoard(HPSDRHW::Hermes));
+        QCOMPARE(applet.preampComboLabelsForTest().first(), QStringLiteral("0dB"));
+        applet.setBoardCapabilities(BoardCapsTable::forBoard(HPSDRHW::SunSdr2Qrp));
+        QCOMPARE(applet.preampComboLabelsForTest(),
+                 (QStringList{QStringLiteral("+10dB"), QStringLiteral("0dB"),
+                              QStringLiteral("-10dB"), QStringLiteral("-20dB")}));
     }
 
     void rxapplet_hermes_with_alex_combo_has_seven_items()
