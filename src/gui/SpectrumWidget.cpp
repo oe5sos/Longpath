@@ -10964,7 +10964,11 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
     const float effectiveRow = static_cast<float>(m_wfWriteRow) + (1.0f - pushFrac);
     float rowOffset = (m_wfGpuTexH > 0)
         ? effectiveRow / static_cast<float>(m_wfGpuTexH) : 0.0f;
-    float uniforms[] = {rowOffset, 0.0f, 0.0f, 0.0f};
+    // Zweiter Wert: die Hoehe einer Texturzeile in UV. Der Shader klemmt
+    // damit die Unterkante, damit dort nicht die neueste Zeile durch den
+    // Ringumbruch hineinmischt (waterfall.frag, 2026-09-25).
+    const float texelH = (m_wfGpuTexH > 0) ? 1.0f / static_cast<float>(m_wfGpuTexH) : 0.0f;
+    float uniforms[] = {rowOffset, texelH, 0.0f, 0.0f};
     batch->updateDynamicBuffer(m_wfUbo, 0, sizeof(uniforms), uniforms);
 
     // ---- Overlay texture (static, only on state change) ----

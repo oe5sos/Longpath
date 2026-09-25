@@ -210,6 +210,11 @@ private slots:
                  w.setSpectrumRenderMode(SpectrumRenderMode::Mode2D);
                  w.setWaterfallDetector(SpectrumDetector::Average);
              }},
+            {QStringLiteral("g_echo_probe"), [martin](SpectrumWidget& w) {
+                 martin(w);
+                 w.setSpectrumRenderMode(SpectrumRenderMode::Mode2D);
+                 w.setWaterfallDetector(SpectrumDetector::Peak);
+             }},
             {QStringLiteral("d_3d_peak_peak"), [martin](SpectrumWidget& w) {
                  martin(w);
                  w.setSpectrumDetector(SpectrumDetector::Peak);
@@ -236,8 +241,17 @@ private slots:
 
             Scene scene(20260925);
             // ~12 s Verlauf bei 30 Bildern/s, damit der Wasserfall voll ist
+            const bool echoProbe = v.id.startsWith(QLatin1String("g_echo"));
             for (int n = 0; n < 360; ++n) {
-                w.updateSpectrumLinear(0, scene.frame(n), 1.0, 0.0);
+                QVector<float> f = scene.frame(n);
+                // Echo-Probe: ein starker Traeger nur in den letzten Bildern.
+                // Oben muss er stehen, an der Unterkante darf er nicht
+                // auftauchen (Ringumbruch, waterfall.frag).
+                if (echoProbe && n >= 350) {
+                    const int b = binFor(14105300.0);
+                    for (int k = -1; k <= 1; ++k) { f[b + k] += static_cast<float>(db2p(-60.0)); }
+                }
+                w.updateSpectrumLinear(0, f, 1.0, 0.0);
                 QTest::qWait(33);
             }
             const QImage img = grabSpectrum(w);
