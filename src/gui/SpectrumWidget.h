@@ -927,6 +927,7 @@ public:
 
     void setShowFps(bool on);
     bool showFps() const { return m_showFps; }
+    float fpsDisplayValueForTest() const { return m_fpsDisplayValue; }
 
     // 2026-05-26 KG4VCF perf instrumentation: toggle the in-spectrum
     // perf overlay (paint/gap/fft/overlay timings + audio underruns

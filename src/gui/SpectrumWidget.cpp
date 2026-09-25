@@ -10755,6 +10755,25 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
                 static_cast<double>(nowMs - m_lastPaintWallMs));
         }
         m_lastPaintWallMs = nowMs;
+
+        // Bilder je Sekunde HIER zaehlen, wo wirklich ein Bild entsteht.
+        // Bis 2026-09-25 zaehlte der Zaehler in der statischen
+        // Ueberlagerung mit -- die wird nur bei Aenderungen neu gebaut,
+        // also zeigte er "Neuaufbauten je Sekunde" (im Leerlauf fast 0).
+        // Die Zahl wird weiter dort gezeichnet; neu gebaut wird die
+        // Ueberlagerung dafuer einmal je Sekunde.
+        if (m_showFps) {
+            ++m_fpsFrameCount;
+            if (m_fpsLastUpdateMs == 0) {
+                m_fpsLastUpdateMs = nowMs;
+            } else if (nowMs - m_fpsLastUpdateMs >= 1000) {
+                const double elapsed = (nowMs - m_fpsLastUpdateMs) / 1000.0;
+                m_fpsDisplayValue = static_cast<float>(m_fpsFrameCount / elapsed);
+                m_fpsFrameCount   = 0;
+                m_fpsLastUpdateMs = nowMs;
+                m_overlayStaticDirty = true;
+            }
+        }
     }
 
     QRhi* r = rhi();
@@ -11171,21 +11190,10 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
             }
 
             // FPS overlay for GPU mode (QPainter path draws its own
-            // counter in paintEvent). Drawn into the cached overlay
-            // texture means it only updates on state changes or VFO
-            // tuning — good enough for a diagnostic counter and avoids
-            // re-uploading every frame.
+            // counter in paintEvent). Gezaehlt wird in renderGpuFrame();
+            // hier steht nur die Zahl, die Ueberlagerung wird dafuer
+            // einmal je Sekunde neu gebaut.
             if (m_showFps) {
-                const qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
-                m_fpsFrameCount++;
-                if (m_fpsLastUpdateMs == 0) {
-                    m_fpsLastUpdateMs = nowMs;
-                } else if (nowMs - m_fpsLastUpdateMs >= 1000) {
-                    const double elapsed = (nowMs - m_fpsLastUpdateMs) / 1000.0;
-                    m_fpsDisplayValue = static_cast<float>(m_fpsFrameCount / elapsed);
-                    m_fpsFrameCount   = 0;
-                    m_fpsLastUpdateMs = nowMs;
-                }
                 const QString fpsText =
                     QStringLiteral("%1 fps").arg(m_fpsDisplayValue, 0, 'f', 1);
                 QFont ff = p.font();
