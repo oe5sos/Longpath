@@ -745,6 +745,8 @@ set(GUI_SOURCES
     src/gui/LayoutProfiles.h
     src/gui/WindowPlacement.cpp
     src/gui/WindowPlacement.h
+    src/gui/SideAreaWindow.cpp
+    src/gui/SideAreaWindow.h
     # Instrumente: eine Quellenliste, ein Zeichenweg. ReadingSource ist
     # die Beschreibung der Messgroessen (Skala, Schwelle, Teilung),
     # InstrumentSpine die Geometrie (Bogen / Gerade), InstrumentPainter
@@ -905,6 +907,7 @@ set(GUI_SOURCES
     src/gui/MainWindow_KiwiSdr.cpp
     src/gui/MainWindow_Asr.cpp
     src/gui/MainWindow_SunSdr.cpp
+    src/gui/MainWindow_SideArea.cpp
     src/gui/KiwiPublicReceiverPicker.cpp
     src/gui/LanScanDialog.cpp
     src/gui/LanScanDialog.h

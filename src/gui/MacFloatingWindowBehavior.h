@@ -67,10 +67,19 @@ class QWidget;
 namespace Longpath {
 void enableFullScreenAuxiliaryBehavior(QWidget* window);
 void setPaletteWindowLevel(QWidget* window, bool floating);
+/// Ist gerade eine Maustaste gedrueckt? Waehrend das System ein Fenster
+/// an der Titelleiste zieht, sieht Qt keine Maustasten (die Geste gehoert
+/// dem Fenstersystem) -- [NSEvent pressedMouseButtons] schon. Gebraucht
+/// vom Seitenbereich: ein Fenster, das ueber ihm LOSGELASSEN wird, legt
+/// sich hinein (2026-09-25).
+bool anyMouseButtonDown();
 }
 #else
+#include <QGuiApplication>
 namespace Longpath {
 inline void enableFullScreenAuxiliaryBehavior(QWidget*) {}
 inline void setPaletteWindowLevel(QWidget*, bool) {}
+inline bool anyMouseButtonDown()
+{ return QGuiApplication::mouseButtons() != Qt::NoButton; }
 }
 #endif

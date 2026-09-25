@@ -328,6 +328,7 @@ warren@wpratt.com
 #include "applets/FrequencyApplet.h"
 #include "applets/InstrumentApplet.h"
 #include "gui/WindowPlacement.h"
+#include "gui/SideAreaWindow.h"
 #include "gui/SettingsBackupDialog.h"
 #include "core/SettingsBackup.h"
 #include "applets/AmpApplet.h"
@@ -1851,6 +1852,14 @@ void MainWindow::bringAppletToFront(const QString& id)
             || !m_appletVis->isEffectivelyVisible(id)) {
             return;
         }
+        // Seite im Seitenbereich: diese Seite zeigen, den Bereich heben.
+        if (sideAreaHas(id)) {
+            m_sideArea->setActive(id);
+            m_sideArea->show();
+            m_sideArea->raise();
+            m_sideArea->activateWindow();
+            return;
+        }
         QWidget* front = m_floatingApplets.value(id, nullptr);
         if (!front) {
             AppletWidget* a = m_appletsById.value(id, nullptr);
@@ -1872,7 +1881,7 @@ void MainWindow::bringAppletToFront(const QString& id)
     });
 }
 
-bool MainWindow::appletHiddenInColumn(QWidget* applet) const
+bool MainWindow::appletHiddenInColumn(QWidget* applet, bool countScrolledAway) const
 {
     if (!applet || !isVisible() || isMinimized() || !applet->isVisible()) {
         return true;
@@ -1890,7 +1899,8 @@ bool MainWindow::appletHiddenInColumn(QWidget* applet) const
     // visibleRegion ist, was davon im Fenster ueberhaupt Platz hat.
     const QRect shown = box->visibleRegion().boundingRect();
     if (shown.width() * shown.height() * 2 < box->width() * box->height()) {
-        return true;
+        if (countScrolledAway) { return true; }
+        return false;
     }
     const QRect onScreen(box->mapToGlobal(shown.topLeft()), shown.size());
 
@@ -1923,6 +1933,17 @@ void MainWindow::applyAppletVisibility(const QString& id, bool effective)
     // in der Spalte einzuhaengen, entscheidet sich hier — und nur hier.
     if (id.startsWith(QLatin1String("Win"))) {
         applyWindowVisibility(id, effective);
+        return;
+    }
+
+    // Seite im Seitenbereich: dort bleibt sie, solange der Bediener sie
+    // nicht ausschaltet. Nur „nicht verfuegbar" (etwa der CW-Decoder
+    // ausserhalb von CW) nimmt sie nicht heraus — sonst waere sie nach
+    // jedem Moduswechsel aus dem Bereich verschwunden.
+    if (sideAreaHas(id)) {
+        if (!effective && m_appletVis && !m_appletVis->isVisible(id)) {
+            removeFromSideArea(id, SideAreaExit::Home);
+        }
         return;
     }
 
@@ -4672,7 +4693,14 @@ void MainWindow::buildUI()
 
     // Rotor/Log unter dem Panadapter, falls zuletzt so gewaehlt. Nach
     // dem Fensteraufbau, weil ensureRotorPanel() das Dock erst anlegt.
-    if (AppSettings::instance().value(QStringLiteral("RotorPanelBelow"),
+    //
+    // Hat das Profil Rotor/Log eben in den Seitenbereich gelegt, gilt
+    // das: diese globalen Schluessel stammen aus der Zeit davor und
+    // wuerden es sonst wieder herausreissen (Profil laeuft VOR diesem
+    // Block, siehe populateDefaultMeter oben).
+    if (sideAreaHas(QStringLiteral("WinRotorLog"))) {
+        // nichts -- der Seitenbereich haelt es
+    } else if (AppSettings::instance().value(QStringLiteral("RotorPanelBelow"),
                                       QStringLiteral("False")).toString()
             == QStringLiteral("True")) {
         setRotorPanelBelow(true);
@@ -7882,7 +7910,14 @@ void MainWindow::populateDefaultMeter()
                 // samt Fenstergeometrie im Schwebe-Fall.
                 {
                     QVariantMap rotor;
-                    if (m_rotorWindow) {
+                    if (sideAreaHas(QStringLiteral("WinRotorLog"))) {
+                        // Im Seitenbereich; seine Lage steht unter
+                        // "sideArea". Eine Anwendung kennt "side" nicht
+                        // als eigene Form und laesst das Panel dem
+                        // Seitenbereich-Schritt am Ende.
+                        rotor.insert(QStringLiteral("form"),
+                                     QStringLiteral("side"));
+                    } else if (m_rotorWindow) {
                         rotor.insert(QStringLiteral("form"),
                                      QStringLiteral("floating"));
                         const QRect g = m_rotorWindow->geometry();
@@ -7949,6 +7984,13 @@ void MainWindow::populateDefaultMeter()
                 mw.insert(QStringLiteral("fullScreen"), m_borderlessFullSize);
                 mw.insert(QStringLiteral("maximized"), isMaximized());
                 s.insert(QStringLiteral("mainWindow"), mw);
+
+                // Seitenbereich: Seiten, aktive Seite, zu/auf, Lage. Fehlt
+                // der Schluessel, gibt es keinen Bereich.
+                if (m_sideArea && !m_sideArea->pageIds().isEmpty()) {
+                    s.insert(QStringLiteral("sideArea"),
+                             m_sideArea->captureState());
+                }
                 return s;
             },
             // ── herstellen ───────────────────────────────────────────
@@ -7996,6 +8038,13 @@ void MainWindow::populateDefaultMeter()
                 // unnoetig. Hierher vorgezogen: die Hauptfenster-
                 // Geometrie steht fest, BEVOR irgendein schwebendes
                 // Fenster seine Position gegen sie prueft.
+                // Seitenbereich zuerst aufloesen: jede Seite zurueck in
+                // ihre Grundheimat (Spalte / Dock), still. Alles Weitere
+                // stellt die Anwendung wie gewohnt her, und ganz am Ende
+                // baut applySideAreaState() den Bereich neu -- so muss
+                // keine der vorhandenen Wiederherstellungen ihn kennen.
+                dissolveSideArea(SideAreaExit::Silent);
+
                 const QVariantMap mw =
                     s.value(QStringLiteral("mainWindow")).toMap();
                 const bool wantFullScreen =
@@ -8430,6 +8479,8 @@ void MainWindow::populateDefaultMeter()
                     for (const QVariant& v : sizes) { px << v.toInt(); }
                     m_mainSplitter->setSizes(px);
                 }
+                applySideAreaState(
+                    s.value(QStringLiteral("sideArea")).toMap());
                 qWarning() << "[ProfileApply:Step] 6/6 fertig";
             });
 
@@ -9784,6 +9835,30 @@ void MainWindow::buildMenuBar()
         connect(m_freeCanvasAction, &QAction::toggled, this, [this](bool on) {
             setFreeCanvasMode(on);
             if (on) { moveAllAppletsToCanvas(); }
+        });
+    }
+
+    // ── Seitenbereich rechts (Betreiber 2026-09-25, Variante 2) ──────
+    //
+    // Ein schwebender Bereich mit Symbolleiste am rechten Rand: Rotor/Log
+    // und Applets als Seiten, ein Klick wechselt, ein Klick auf das
+    // aktive Symbol klappt zu. Der Haken folgt dem Bereich (auch wenn
+    // ein Profil ihn anlegt oder aufloest) — aboutToShow statt eigener
+    // Buchfuehrung.
+    {
+        QAction* sideAct = containersMenu->addAction(
+            QStringLiteral("Seitenbereich rechts"));
+        sideAct->setCheckable(true);
+        sideAct->setToolTip(QStringLiteral(
+            "Rotor/Log und Applets in einem Bereich am rechten Rand, "
+            "umschaltbar über eine Symbolleiste; Klick auf das aktive "
+            "Symbol klappt ihn zu."));
+        connect(containersMenu, &QMenu::aboutToShow, sideAct, [this, sideAct]() {
+            QSignalBlocker block(sideAct);
+            sideAct->setChecked(m_sideArea != nullptr);
+        });
+        connect(sideAct, &QAction::toggled, this, [this](bool on) {
+            setSideAreaEnabled(on);
         });
     }
 
@@ -13216,6 +13291,12 @@ void MainWindow::hideFloatingWindowsBehindConnectMask()
         m_rotorWindow->hide();
         m_floatingContainersHiddenPreConnect.append(m_rotorWindow);
     }
+    // Der Seitenbereich ist ein schwebendes Fenster wie die anderen: hinter
+    // die Verbindungsmaske, und mit derselben Liste wieder hervor.
+    if (m_sideArea && m_sideArea->isVisible()) {
+        m_sideArea->hide();
+        m_floatingContainersHiddenPreConnect.append(m_sideArea.data());
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -13892,6 +13973,13 @@ void MainWindow::raiseRotorPanel()
 // Eintraege auseinanderlaufen.
 void MainWindow::detachRotorPanel()
 {
+    // Im Seitenbereich hat Rotor/Log schon einen schwebenden Platz. Wer
+    // hier ankommt (Start-Wiederherstellung ueber "RotorFloating",
+    // Profil), soll es nicht herausreissen — nur den Bereich zeigen.
+    if (sideAreaHas(QStringLiteral("WinRotorLog"))) {
+        m_sideArea->show();
+        return;
+    }
     RotorLogbookPanel* panel = ensureRotorPanel();
     if (!panel) { return; }
     if (m_rotorWindow) {                 // schon draussen: nach vorn
@@ -14058,6 +14146,12 @@ void MainWindow::syncOuterSplitterHandle()
 // auseinanderlaufen.
 void MainWindow::setRotorPanelBelow(bool below)
 {
+    // Steht Rotor/Log im Seitenbereich, erst heraus — sonst haengte die
+    // Zeile unten das Panel dem Rollbereich des Bereichs unter der Hand
+    // weg.
+    if (sideAreaHas(QStringLiteral("WinRotorLog"))) {
+        removeFromSideArea(QStringLiteral("WinRotorLog"), SideAreaExit::Silent);
+    }
     RotorLogbookPanel* panel = ensureRotorPanel();
     if (!panel || !m_belowPane || !m_rotorDock) { return; }
 
@@ -14192,6 +14286,12 @@ void MainWindow::applyWindowVisibility(const QString& id, bool on)
         return;
     }
     if (id == QLatin1String("WinRotorLog")) {
+        if (sideAreaHas(id)) {
+            // Im Seitenbereich: an = bleibt dort; aus = heraus und
+            // zurueck an seinen Grundplatz.
+            if (!on) { removeFromSideArea(id, SideAreaExit::Home); }
+            return;
+        }
         if (on) { detachRotorPanel(); } else { dockRotorPanel(); }
         return;
     }
@@ -16046,6 +16146,10 @@ void MainWindow::closeEvent(QCloseEvent* event)
     for (AppletFloatingWindow* w : m_floatingApplets) { delete w; }
     m_floatingApplets.clear();
     if (m_rotorWindow) { delete m_rotorWindow; m_rotorWindow = nullptr; }
+    // Der Seitenbereich mit allem, was darin steht -- wie die schwebenden
+    // Applets eine Zeile hoeher. Das Profil ist am Anfang von closeEvent()
+    // schon aufgenommen, samt "sideArea".
+    if (m_sideArea) { delete m_sideArea.data(); }
 
     // ── UND ALLES ANDERE, WAS NOCH AM SCHREIBTISCH STEHT ────────────
     //
