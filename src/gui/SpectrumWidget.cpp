@@ -6103,6 +6103,42 @@ void SpectrumWidget::fitThresholdsToData(float& low, float& high,
 // detector + avenger in updateSpectrumLinear().  AGC + NF-AGC + threshold
 // compute iterate display pixels per Thetis Display.cs:6713-6738
 // [v2.10.3.13] (waterfall_data[i] indexed by pixel).
+float SpectrumWidget::wfRowSourceReduce(const QVector<float>& src, int x, float scale,
+                                         SpectrumDetector detector)
+{
+    const int n = src.size();
+    if (n <= 0) { return 0.0f; }
+    int first = static_cast<int>(static_cast<float>(x) * scale);
+    int last  = static_cast<int>(static_cast<float>(x + 1) * scale) - 1;
+    first = qBound(0, first, n - 1);
+    last  = qBound(first, last, n - 1);   // Aufweiten: genau ein Punkt
+    if (last == first) { return src[first]; }
+    switch (detector) {
+    case SpectrumDetector::Sample:
+        // Der erste Punkt im Fenster -- die Wahl "Sample" heisst genau das.
+        return src[first];
+    case SpectrumDetector::Average:
+    case SpectrumDetector::RMS: {
+        // Mittlere LEISTUNG, nicht mittlere dB: ein Traeger in einem der
+        // zwei Punkte zaehlt mit -3 dB, statt im dB-Mittel zu versinken.
+        double sum = 0.0;
+        for (int i = first; i <= last; ++i) {
+            sum += std::pow(10.0, static_cast<double>(src[i]) / 10.0);
+        }
+        return static_cast<float>(10.0 * std::log10(sum / (last - first + 1) + 1e-60));
+    }
+    case SpectrumDetector::Peak:
+    case SpectrumDetector::Rosenfell:
+    default: {
+        float m = src[first];
+        for (int i = first + 1; i <= last; ++i) {
+            if (src[i] > m) { m = src[i]; }
+        }
+        return m;
+    }
+    }
+}
+
 void SpectrumWidget::pushWaterfallRow(const QVector<float>& wfPixelsDbm)
 {
     if (m_waterfall.isNull() || wfPixelsDbm.isEmpty()) {
@@ -6150,12 +6186,6 @@ void SpectrumWidget::pushWaterfallRow(const QVector<float>& wfPixelsDbm)
     const qint64 now = QDateTime::currentMSecsSinceEpoch();
     m_wfLastPushMs = now;
 
-    // Issue #230 fix: threshold composition moved out — writes go to
-    // the render-active mirror (m_wfActiveLow/High), never the
-    // persisted user fields. Thetis-faithful per Thetis
-    // display.cs:6575-6594 [v2.10.3.13].
-    composeWaterfallActiveThresholds(wfPixelsDbm);
-
     const int n = wfPixelsDbm.size();
     int h = m_waterfall.height();
     // Decrement write pointer so newest row is always at m_wfWriteRow.
@@ -6163,11 +6193,41 @@ void SpectrumWidget::pushWaterfallRow(const QVector<float>& wfPixelsDbm)
 
     int w = m_waterfall.width();
     QRgb* scanline = reinterpret_cast<QRgb*>(m_waterfall.scanLine(m_wfWriteRow));
-    // Map source-pixel range to scanline pixels.  When pipeline displayWidth
-    // matches m_waterfall.width() (typical case: both = panel width minus
-    // strip), this is a 1:1 copy; if widths diverge (e.g. resize race),
-    // proportional sampling preserves visual continuity.
+    // Map source-pixel range to scanline pixels.
+    //
+    // ── Retina: zwei Quellpunkte je Zeilenpunkt (2026-09-25) ─────────
+    //
+    // Hier stand "typically 1:1". Das stimmt seit dem 2026-08-26 nicht
+    // mehr: die Pipeline rechnet in GERAETE-Pixeln (displayWidth x dpr,
+    // updateSpectrumLinear), das Wasserfallbild ist in LOGISCHEN Pixeln
+    // angelegt (applyResizeSettled). Auf einem 2x-Schirm kommen also zwei
+    // Quellpunkte auf einen Zeilenpunkt, und die alte Punktabtastung nahm
+    // davon nur den ersten -- jede zweite Spalte fiel weg. Ein schmaler
+    // Traeger (CW, FT8, Bake) lag in der Haelfte der Faelle genau in der
+    // verworfenen Spalte: gestrichelt oder unsichtbar, waehrend das
+    // Spektrum darueber ihn zeigte (Rendering-Werkbank 2026-09-25).
+    //
+    // Jetzt fasst die Regel des eingestellten Wasserfall-Detektors die
+    // Quellpunkte zusammen, die auf den Zeilenpunkt fallen: Peak/Rosenfell
+    // das Maximum, Average/RMS die mittlere Leistung, Sample der erste
+    // Punkt (wie bisher -- das ist, was "Sample" verspricht). Bei 1:1 (und
+    // beim Aufweiten) ist das in jedem Fall genau der alte Punkt.
     const float pxScale = static_cast<float>(n) / static_cast<float>(w);
+    // Erst verdichten, dann Schwellen bilden: die Clarity-Verankerung und
+    // die Automatik sollen die Werte sehen, die gleich eingefaerbt werden.
+    // Mit den unverdichteten waere das Rauschen nach dem Maximum um gut
+    // 1 dB heller geraten als vorher, bei gleichen Schwellen.
+    m_wfRowReduced.resize(w);
+    for (int x = 0; x < w; ++x) {
+        m_wfRowReduced[x] = wfRowSourceReduce(wfPixelsDbm, x, pxScale,
+                                              m_waterfallDetector);
+    }
+
+    // Issue #230 fix: threshold composition moved out — writes go to
+    // the render-active mirror (m_wfActiveLow/High), never the
+    // persisted user fields. Thetis-faithful per Thetis
+    // display.cs:6575-6594 [v2.10.3.13].
+    composeWaterfallActiveThresholds(m_wfRowReduced);
 
     // Einmal normieren, zweimal verwenden: die Intensität geht in die
     // Historie, die Farbe daraus in die sichtbare Zeile. Vorher wurde
@@ -6201,9 +6261,7 @@ void SpectrumWidget::pushWaterfallRow(const QVector<float>& wfPixelsDbm)
     // und ein Kommentar, der eine Wirkung behauptet, die es nicht gibt,
     // ist schlimmer als kein Kommentar.
     for (int x = 0; x < w; ++x) {
-        int srcPx = static_cast<int>(static_cast<float>(x) * pxScale);
-        srcPx = qBound(0, srcPx, n - 1);
-        const float f = waterfallIntensityF(wfPixelsDbm[srcPx],
+        const float f = waterfallIntensityF(m_wfRowReduced[x],
                                             m_wfActiveLowThreshold,
                                             m_wfActiveHighThreshold,
                                             m_wfBlackLevel, m_wfColorGain);

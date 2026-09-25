@@ -7314,3 +7314,7 @@ endforeach()
 
 
 
+# 2026-09-25: rendering bench (skips without LONGPATH_GRAB_DIR) and the
+# Retina waterfall column reduction it found.
+longpath_add_test(tst_rendering_werkbank)
+longpath_add_test(tst_waterfall_column_reduce)
