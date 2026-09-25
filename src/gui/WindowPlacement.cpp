@@ -189,4 +189,22 @@ void snapToGridAfterSettle(QWidget* w, int grid, int delayMs)
     timer->start(delayMs);
 }
 
+double coveredFraction(const QRect& target, const QList<QRect>& covers)
+{
+    if (target.isEmpty()) { return 1.0; }
+    constexpr int kSteps = 16;
+    int covered = 0;
+    for (int iy = 0; iy < kSteps; ++iy) {
+        for (int ix = 0; ix < kSteps; ++ix) {
+            // Zellmitten, damit die Raender nicht doppelt zaehlen.
+            const QPoint p(target.x() + (2 * ix + 1) * target.width() / (2 * kSteps),
+                           target.y() + (2 * iy + 1) * target.height() / (2 * kSteps));
+            for (const QRect& c : covers) {
+                if (c.contains(p)) { ++covered; break; }
+            }
+        }
+    }
+    return static_cast<double>(covered) / (kSteps * kSteps);
+}
+
 } // namespace Longpath

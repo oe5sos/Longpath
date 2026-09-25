@@ -7090,6 +7090,8 @@ longpath_add_test(tst_dsp_menu_active_slice)
 # edge on the lower pan of a 2v layout. Bench-reported 2026-07-28.
 longpath_add_test(tst_popup_placement)
 longpath_add_test(tst_window_placement_oversized)
+# 2026-09-25: an applet switched on must not land under floating windows.
+longpath_add_test(tst_window_coverage)
 
 # Phase 3F Task B2: painted pan-layout preview tile (ported from AetherSDR
 # PanLayoutDialog.cpp LayoutThumbnail [@c6481cb]). Geometry tests guard
