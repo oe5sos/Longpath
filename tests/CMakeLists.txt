@@ -7092,6 +7092,9 @@ longpath_add_test(tst_popup_placement)
 longpath_add_test(tst_window_placement_oversized)
 # 2026-09-25: an applet switched on must not land under floating windows.
 longpath_add_test(tst_window_coverage)
+# 2026-09-25: side area with an icon rail (operator chose variant 2).
+longpath_add_test(tst_side_area_window)
+longpath_add_test(tst_side_area_integration)
 
 # Phase 3F Task B2: painted pan-layout preview tile (ported from AetherSDR
 # PanLayoutDialog.cpp LayoutThumbnail [@c6481cb]). Geometry tests guard

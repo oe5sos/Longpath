@@ -97,6 +97,7 @@ namespace Longpath {
 enum class ToastSeverity : int;
 
 class RadioModel;
+class SideAreaWindow;
 class ConnectionPanel;
 class SupportDialog;
 class WdspEngine;
@@ -239,6 +240,17 @@ public:
     { return int(m_floatingContainersHiddenPreConnect.size()); }
     void restoreFloatingWindowsForTest()
     { restoreFloatingWindowsHiddenBehindConnectMask(); }
+
+    // ── Pruefzugaenge fuer den Seitenbereich (tst_side_area_integration) ──
+    void setSideAreaEnabledForTest(bool on) { setSideAreaEnabled(on); }
+    bool addToSideAreaForTest(const QString& id, bool activate)
+    { return addToSideArea(id, activate); }
+    void removeFromSideAreaToOwnWindowForTest(const QString& id)
+    { removeFromSideArea(id, SideAreaExit::OwnWindow); }
+    class SideAreaWindow* sideAreaForTest() const { return sideArea(); }
+    class AppletWidget* appletForKeyForTest(const QString& key) const
+    { return appletForKey(key); }
+    class ToolWindow* rotorWindowForTest() const { return m_rotorWindow; }
 
     // ── Pruefzugaenge fuer den SunSDR ────────────────────────────────
     //
@@ -962,7 +974,28 @@ private:
     void bringAppletToFront(const QString& id);
     /// Ist das Applet in der Spalte des Hauptfensters für den Bediener
     /// verdeckt (von schwebenden Fenstern, weggerollt, Fenster zu)?
-    bool appletHiddenInColumn(QWidget* applet) const;
+    /// `countScrolledAway`: auch weggerollt zaehlt als verdeckt.
+    bool appletHiddenInColumn(QWidget* applet, bool countScrolledAway = true) const;
+
+    // ── Seitenbereich (MainWindow_SideArea.cpp) ──────────────────────
+    //
+    // Betreiber 2026-09-25, Variante 2: ein schwebender Bereich mit
+    // Symbolleiste am rechten Rand, eine Seite je Fenster (Rotor/Log oder
+    // ein Applet). Eine Seite darin gilt als sichtbar.
+    enum class SideAreaExit {
+        OwnWindow,  ///< als eigenes Fenster an der Stelle des Bereichs
+        Home,       ///< zurück in Spalte bzw. Dock (ausgeschaltet)
+        Silent      ///< nur zurück, für die Profilanwendung
+    };
+    bool sideAreaHas(const QString& id) const;
+    class SideAreaWindow* sideArea() const;
+    /// Legt Rotor/Log ("WinRotorLog") oder ein Applet (Panelkennung) als
+    /// Seite in den Bereich; nimmt es dazu aus seiner bisherigen Heimat.
+    bool addToSideArea(const QString& id, bool activate);
+    void removeFromSideArea(const QString& id, SideAreaExit exit);
+    /// Menü „Seitenbereich rechts": an legt Rotor/Log und die sichtbaren
+    /// Spalten-Applets hinein; aus macht jede Seite zum eigenen Fenster.
+    void setSideAreaEnabled(bool on);
 
     /// Zurück in die Spalte, an die gemerkte Stelle. Räumt das Fenster
     /// ab. Tut nichts, wenn das Applet nicht abgelöst ist.
@@ -1769,6 +1802,21 @@ private:
     /// Fuehrt die Windrose im Spektrum nach, solange sie zu
     class WindowTitleBar* m_rotorHeader{nullptr};
     class ToolWindow*     m_rotorWindow{nullptr};
+    // Seitenbereich (MainWindow_SideArea.cpp). Die Stelle in der Spalte,
+    // an die ein Applet beim Herausnehmen zurückkehrt.
+    QPointer<class SideAreaWindow> m_sideArea;
+    QHash<QString, int> m_sideAreaDockIndex;
+    class SideAreaWindow* ensureSideArea();
+    void dissolveSideArea(SideAreaExit exit);
+    void showSideAreaAddMenu(const QPoint& globalPos);
+    void onSideAreaCollapsed(bool collapsed, int delta);
+    /// Schwebende Panadapter, deren rechter Rand an `edgeX` grenzt und die
+    /// `area` senkrecht überlappen, um `dx` breiter (+) oder schmaler (−).
+    void resizeNeighbourPans(int edgeX, const QRect& area, int dx);
+    void applySideAreaState(const QVariantMap& s);
+    QString sideAreaTitleFor(const QString& id) const;
+    /// Profil jetzt aufnehmen und ablegen (nicht beim Herunterfahren).
+    void saveLayoutNow();
     QrzClient*           m_qrzClient{nullptr};
     // One window, reused. Kept so a second measurement lands in the
     // same place as the first rather than beside it.
