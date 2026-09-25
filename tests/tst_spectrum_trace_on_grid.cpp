@@ -12,6 +12,11 @@
 // die 1-Hz-Normierung (normalizeShiftDb) kam in der GPU-Kurve gar nicht
 // vor, obwohl Gitter und Ueberlagerungen sie anwenden.
 //
+// Nachtrag 2026-09-26: Gitter und Zahlen bekamen auch die Kalibrierung
+// (Werks-Kalibrierung + Preamp/ATT) mit -- Kurve und Achse verschoben sich
+// gemeinsam, abgelesen wurde roh. Die Kalibrierung steckt jetzt in den
+// Pixelwerten, die Achse steht.
+//
 // Messung: ein flaches Spektrum genau auf einer Gitterlinie (-120 dBm,
 // Spanne -150..-60, Linien alle 10 dB). Liegt die Kurve richtig, verdeckt
 // sie ihre Linie, und sie steht genau einen Linienabstand unter der
@@ -87,16 +92,15 @@ private slots:
         QTest::addColumn<bool>("readCalibrated");
         QTest::newRow("ohne Bandplan") << false << false << 0.0f << false;
         QTest::newRow("mit Bandplan") << true << false << 0.0f << false;
-        // GPU-Kurve und Gitter verschieben sich um dieselbe Normierung
-        // (wie im CPU-Pfad). Vorher bekam nur das Gitter sie.
-        QTest::newRow("1-Hz-Normierung") << false << true << 0.0f << false;
-        // Soll: die Achse steht fest, die Kalibrierung verschiebt die
-        // DATEN -- ein Rohwert -135 mit +15 dB liest sich als -120. Ist:
-        // Gitter und Zahlen laufen durch dbmToY mit und verschieben sich
-        // mit, die Ablesung bleibt roh (siehe QEXPECT_FAIL unten).
-        // +15: kein Vielfaches von 10, sonst fiele das verschobene Gitter
-        // wieder auf Linien.
-        QTest::newRow("Kalibrierung +15 dB kalibriert ablesen") << false << false << 15.0f << true;
+        // Die Achse steht fest, Normierung und Kalibrierung verschieben
+        // die DATEN: ein Rohwert, um beide vorgehalten, liest sich als
+        // -120. Bis 2026-09-26 liefen Gitter und Zahlen mit (dbmToY) und
+        // die Ablesung blieb roh.
+        QTest::newRow("1-Hz-Normierung") << false << true << 0.0f << true;
+        // +15: kein Vielfaches von 10, sonst fiele ein mitverschobenes
+        // Gitter wieder auf Linien und der Test saehe nichts.
+        QTest::newRow("Kalibrierung +15 dB") << false << false << 15.0f << true;
+        QTest::newRow("Kalibrierung +15 dB mit Bandplan") << true << false << 15.0f << true;
     }
 
     void traceSitsOnItsGridLine()
@@ -128,8 +132,8 @@ private slots:
         w.show();
         QVERIFY(QTest::qWaitForWindowExposed(&w));
 
-        // Flach auf -120 dBm; im Kalibrier-Fall um die Verschiebung
-        // vorgehalten, so dass die kalibrierte Ablesung -120 waere.
+        // Flach auf -120 dBm; mit Normierung/Kalibrierung um die
+        // Verschiebung vorgehalten, so dass die Ablesung -120 ist.
         // 4096 Bins: 46,875 Hz, Normierung -16,7 dB -- kein Vielfaches der
         // 10-dB-Linien (bei 2048 Bins waeren es -19,7, fast genau zwei).
         QVector<float> bins(4096);
@@ -162,11 +166,6 @@ private slots:
         qInfo().noquote() << QStringLiteral("Kurve y=%1, erwartet %2 (Linien %3/%4, Abstand %5)")
                                  .arg(pr.traceY, 0, 'f', 1).arg(expected, 0, 'f', 1)
                                  .arg(pr.line2).arg(pr.line1).arg(spacing, 0, 'f', 0);
-        if (readCalibrated) {
-            QEXPECT_FAIL("", "Gitter und dBm-Zahlen bekommen die Kalibrierung "
-                             "mit (dbmToY), die Ablesung bleibt roh -- Befund "
-                             "2026-09-25, Entscheidung beim Betreiber", Abort);
-        }
         QVERIFY2(std::abs(pr.traceY - expected) <= 3.0,
                  qPrintable(QStringLiteral("Kurve liegt nicht auf ihrer -120-dBm-Linie: "
                                            "y=%1 statt %2")
