@@ -586,6 +586,13 @@ public:
     void setLineWidth(float w);
     float lineWidth() const { return m_lineWidth; }
 
+    // ENTWURF 2026-09-26 ("Kurven mit Hof", Richtung Glas & Tiefe):
+    // weiche Kante (1 Geraete-Pixel Alpha-Auslauf beidseits) und ein
+    // schwacher Hof um die GPU-Kurve. Beide aus, bis der Betreiber
+    // entschieden hat; nur fuer die Vergleichsbilder schaltbar.
+    void setTraceSoftEdgeForDraft(bool on) { m_traceSoftEdge = on; m_hasNewSpectrum = true; update(); }
+    void setTraceHaloForDraft(bool on) { m_traceHalo = on; m_hasNewSpectrum = true; update(); }
+
     // Trace gradient: when enabled, the QPainter fill gradient ramps
     // from transparent at baseline to the fill color at the trace,
     // and the trace uses a vertical color gradient. GPU path keeps
@@ -2533,6 +2540,9 @@ private:
     // DisplaySetupPages.cpp), which the old 1.6f default couldn't even
     // reach (the slider casts to int).
     float       m_lineWidth{1.0f};
+    bool        m_traceSoftEdge{false};   // ENTWURF, siehe setTraceSoftEdgeForDraft
+    bool        m_traceHalo{false};       // ENTWURF, siehe setTraceHaloForDraft
+    int         m_lineStripCount{1};      // Streifen im Linienpuffer (renderGpuFrame)
     // ── Warum das zwei Fahnen sind und nicht eine ────────────────────
     //
     // Es war eine, und sie bedeutete auf den beiden Malwegen etwas
@@ -3293,6 +3303,10 @@ private:
     // From AetherSDR: kMaxFftBins = 8192, kFftVertStride = 6
     static constexpr int kMaxFftBins = 65536;
     static constexpr int kFftVertStride = 6;  // x, y, r, g, b, a
+    // Kurve als bis zu fuenf Streifen: Hof oben/unten, Kante oben,
+    // Kern, Kante unten (ENTWURF 2026-09-26). Ohne Kante/Hof bleibt es
+    // bei einem Streifen.
+    static constexpr int kLineStrips = 5;
 
 #endif
 

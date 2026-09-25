@@ -10571,7 +10571,7 @@ void SpectrumWidget::initSpectrumPipeline()
     // Setup slider previously only reached the QPainter fallback path,
     // never the GPU one -- see m_lineWidth's other call sites).
     m_fftLineVbo = r->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer,
-                                 kMaxFftBins * 2 * kFftVertStride * sizeof(float));
+                                 kMaxFftBins * 2 * kFftVertStride * kLineStrips * sizeof(float));
     if (!rhiCreate(m_fftLineVbo, "spectrum line vertex buffer", &m_gpuInitFailure)) { return; }
 
     m_fftFillVbo = r->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer,
@@ -11602,8 +11602,46 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
         // symmetric ribbon (offset applied on both sides of the centre).
         const float lineHalfWidthPx = (m_lineWidth * dpr) * 0.5f;
 
-        QVector<float> lineVerts(n * 2 * kFftVertStride);
+        // ── ENTWURF 2026-09-26: weiche Kante und Hof ───────────────────
+        //
+        // Der Kern ist das bisherige Band. Mit weicher Kante wird er um
+        // je einen Geraete-Pixel schmaler gerechnet und aussen laeuft ein
+        // Streifen von voller Deckkraft auf 0 -- Gouraud-Verlauf statt
+        // Treppe, ohne neuen Shader (AetherSDR 088b68a7 macht dasselbe im
+        // Fragment-Shader mit einem Kantenattribut). Der Hof ist ein
+        // breiteres Band mit 22 % in der Mitte und 0 aussen, unter der
+        // Linie gezeichnet.
+        const float featherPx = m_traceSoftEdge ? 1.0f : 0.0f;
+        const float coreHalfPx = m_traceSoftEdge
+            ? qMax(0.35f, lineHalfWidthPx - 0.5f * featherPx)
+            : lineHalfWidthPx;
+        const float haloHalfPx = lineHalfWidthPx + 2.5f * dpr;
+        constexpr float kHaloAlpha = 0.22f;
+        const int nStrips = (m_traceHalo ? 2 : 0) + (m_traceSoftEdge ? 3 : 1);
+        m_lineStripCount = nStrips;
+
+        QVector<float> lineVerts(n * 2 * kFftVertStride * nStrips);
         QVector<float> fillVerts(n * 2 * kFftVertStride);
+        // Zwei Punkte eines Streifens: Mitte + Normale * o1 mit Deckkraft
+        // a1 und Mitte + Normale * o2 mit a2 (o in Geraete-Pixeln).
+        auto putStrip = [&](int strip, int j, float x, float y,
+                            float nxNdcPerPx, float nyNdcPerPx,
+                            float o1, float a1, float o2, float a2,
+                            float r, float g, float b) {
+            int k = (strip * n + j) * 2 * kFftVertStride;
+            lineVerts[k]     = x + nxNdcPerPx * o1;
+            lineVerts[k + 1] = y + nyNdcPerPx * o1;
+            lineVerts[k + 2] = r;
+            lineVerts[k + 3] = g;
+            lineVerts[k + 4] = b;
+            lineVerts[k + 5] = a1;
+            lineVerts[k + 6] = x + nxNdcPerPx * o2;
+            lineVerts[k + 7] = y + nyNdcPerPx * o2;
+            lineVerts[k + 8]  = r;
+            lineVerts[k + 9]  = g;
+            lineVerts[k + 10] = b;
+            lineVerts[k + 11] = a2;
+        };
 
         for (int j = 0; j < n; ++j) {
             float x = (n > 1) ? 2.0f * j / (n - 1) - 1.0f : 0.0f;
@@ -11668,19 +11706,37 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
             // unchanged from the old single-vertex value) -- a solid
             // ribbon, no feather in this pass (see the block comment
             // above the loop).
-            int li = j * 2 * kFftVertStride;
-            lineVerts[li]     = x + offXNdc;
-            lineVerts[li + 1] = y + offYNdc;
-            lineVerts[li + 2] = cr;
-            lineVerts[li + 3] = cg;
-            lineVerts[li + 4] = cb2;
-            lineVerts[li + 5] = 0.9f;
-            lineVerts[li + 6] = x - offXNdc;
-            lineVerts[li + 7] = y - offYNdc;
-            lineVerts[li + 8]  = cr;
-            lineVerts[li + 9]  = cg;
-            lineVerts[li + 10] = cb2;
-            lineVerts[li + 11] = 0.9f;
+            if (!m_traceSoftEdge && !m_traceHalo) {
+                int li = j * 2 * kFftVertStride;
+                lineVerts[li]     = x + offXNdc;
+                lineVerts[li + 1] = y + offYNdc;
+                lineVerts[li + 2] = cr;
+                lineVerts[li + 3] = cg;
+                lineVerts[li + 4] = cb2;
+                lineVerts[li + 5] = 0.9f;
+                lineVerts[li + 6] = x - offXNdc;
+                lineVerts[li + 7] = y - offYNdc;
+                lineVerts[li + 8]  = cr;
+                lineVerts[li + 9]  = cg;
+                lineVerts[li + 10] = cb2;
+                lineVerts[li + 11] = 0.9f;
+            } else {
+                // Normale je Geraete-Pixel in NDC
+                const float nx = (-uyPx) / (vpWpx * 0.5f);
+                const float ny = ( uxPx) / (vpHpx * 0.5f);
+                int s = 0;
+                if (m_traceHalo) {
+                    putStrip(s++, j, x, y, nx, ny,  haloHalfPx, 0.0f, 0.0f, kHaloAlpha, cr, cg, cb2);
+                    putStrip(s++, j, x, y, nx, ny,  0.0f, kHaloAlpha, -haloHalfPx, 0.0f, cr, cg, cb2);
+                }
+                if (m_traceSoftEdge) {
+                    putStrip(s++, j, x, y, nx, ny,  coreHalfPx + featherPx, 0.0f, coreHalfPx, 0.9f, cr, cg, cb2);
+                    putStrip(s++, j, x, y, nx, ny,  coreHalfPx, 0.9f, -coreHalfPx, 0.9f, cr, cg, cb2);
+                    putStrip(s++, j, x, y, nx, ny, -coreHalfPx, 0.9f, -coreHalfPx - featherPx, 0.0f, cr, cg, cb2);
+                } else {
+                    putStrip(s++, j, x, y, nx, ny,  lineHalfWidthPx, 0.9f, -lineHalfWidthPx, 0.9f, cr, cg, cb2);
+                }
+            }
 
             // ── Fuellung: dicht an der Kurve, weg zur Grundlinie ─────
             //
@@ -11714,7 +11770,7 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
         }
 
         batch->updateDynamicBuffer(m_fftLineVbo, 0,
-            n * 2 * kFftVertStride * sizeof(float), lineVerts.constData());
+            n * 2 * kFftVertStride * nStrips * sizeof(float), lineVerts.constData());
         batch->updateDynamicBuffer(m_fftFillVbo, 0,
             n * 2 * kFftVertStride * sizeof(float), fillVerts.constData());
 
@@ -11931,7 +11987,11 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
         cb->setViewport(specVp);
         const QRhiCommandBuffer::VertexInput lineVbuf(m_fftLineVbo, 0);
         cb->setVertexInput(0, 1, &lineVbuf);
-        cb->draw(m_visibleBinCount * 2);  // ribbon: 2 vertices per point
+        // Je Streifen ein eigener Zug aus demselben Puffer (ENTWURF:
+        // Hof, Kanten, Kern -- ohne sie genau einer wie bisher).
+        for (int s = 0; s < m_lineStripCount; ++s) {
+            cb->draw(m_visibleBinCount * 2, 1, s * m_visibleBinCount * 2);
+        }
     }
 
     // Draw overlay -- static chrome layer first, then dynamic
