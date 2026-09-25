@@ -7318,3 +7318,4 @@ endforeach()
 # Retina waterfall column reduction it found.
 longpath_add_test(tst_rendering_werkbank)
 longpath_add_test(tst_waterfall_column_reduce)
+longpath_add_test(tst_freq_scale_labels)

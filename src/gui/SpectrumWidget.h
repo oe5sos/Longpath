@@ -2249,6 +2249,9 @@ public:
     // kostet eine Addition je Bildpunkt.
     static float waterfallIntensityF(float dbm, float lowDbm, float highDbm,
                                      int blackLevel, int colorGain);
+    // Beschriftung einer Frequenzmarke (MHz) mit den Nachkommastellen, die
+    // der Markenabstand stepHz braucht (25 kHz -> 3, 50 kHz -> 2, 100 kHz -> 1).
+    static QString freqScaleLabel(double hz, double stepHz);
     /// Der Wert fuer Wasserfall-Zeilenpunkt x, wenn `scale` Quellpunkte
     /// (Geraete-Pixel der Pipeline) auf einen Zeilenpunkt (logisches
     /// Pixel) fallen -- auf Retina zwei --, zusammengefasst nach der Regel

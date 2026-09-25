@@ -5070,6 +5070,25 @@ void SpectrumWidget::drawTuneGuide(QPainter& p, const QRect& specRect)
 }
 
 // ---- Frequency scale bar ----
+// Beschriftung einer Frequenzmarke in MHz, mit so vielen Nachkommastellen,
+// wie der Abstand der Marken braucht. Bis 2026-09-25 galten zwei Stellen fuer
+// jeden Abstand ab 10 kHz -- beim 25-kHz-Raster (Spanne 100..500 kHz, z. B.
+// 192 kHz Abtastrate) stand dann "14.18" an der Marke 14,175 und "14.22" an
+// 14,225: die Skala zeigte Frequenzen, die dort nicht liegen.
+QString SpectrumWidget::freqScaleLabel(double hz, double stepHz)
+{
+    int decimals = 1;
+    const double stepMhz = stepHz / 1.0e6;
+    while (decimals < 6) {
+        const double scaled = stepMhz * std::pow(10.0, decimals);
+        if (std::abs(scaled - std::round(scaled)) < 1e-6) {
+            break;
+        }
+        ++decimals;
+    }
+    return QString::number(hz / 1.0e6, 'f', decimals);
+}
+
 void SpectrumWidget::drawFreqScale(QPainter& p, const QRect& r)
 {
     p.fillRect(r, QColor(Style::hexRole(Style::kBadgeInfoBg)));
@@ -5104,16 +5123,7 @@ void SpectrumWidget::drawFreqScale(QPainter& p, const QRect& r)
     double startFreq = std::ceil((m_centerHz - m_bandwidthHz / 2.0) / freqStep) * freqStep;
     for (double f = startFreq; f < m_centerHz + m_bandwidthHz / 2.0; f += freqStep) {
         int x = hzToX(f, r);
-        // Format as MHz with appropriate decimals
-        double mhz = f / 1.0e6;
-        QString label;
-        if (freqStep >= 100000.0) {
-            label = QString::number(mhz, 'f', 1);
-        } else if (freqStep >= 10000.0) {
-            label = QString::number(mhz, 'f', 2);
-        } else {
-            label = QString::number(mhz, 'f', 3);
-        }
+        const QString label = freqScaleLabel(f, freqStep);
 
         // Cached QStaticText render — see m_freqLabelCache comment in
         // SpectrumWidget.h.  Working set grows as the user pans but
