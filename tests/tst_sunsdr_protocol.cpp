@@ -46,6 +46,35 @@ class TestSunSdrProtocol : public QObject
     Q_OBJECT
 
 private slots:
+    // CRC-32 ueber den Rahmen mit genulltem Feld 14..17 -- an 13 echten
+    // Rahmen von 10 Befehlen aus ExpertSDR2s Start (2026-09-25) byte-genau.
+    void controlFrameCrcReproducesThirteenCapturedFrames()
+    {
+        const char* captured[] = {
+            "03ff040004000000000001000000d804da1900000000",
+            "03ff040004000000000001000000bd6366a101000000",
+            "03ff04000400000000000100000053ccd3b302000000",
+            "03ff04000400000000000100000036ab6f0b03000000",
+            "03ff070008000000000001000000dabdabb764697a0800000000",
+            "03ff0700080001000000010000001850a11e10ae220100000000",
+            "03ff0800080000000000010000000274f8840000000000000000",
+            "03ff100004000000000001000000a444f1b700000000",
+            "03ff160024000000000001000000e080ab4c01000000010000000000000000000000c80000001e000000bc020000070000003c000000",
+            "03ff18000c000000000001000000302af6b30000000000804f1200000000",
+            "03ff1c00100000000000010000000b63797c13370c041449040114ae47013b4f5200",
+            "03ff0c000000000000000100000037f7affe",
+            "03ff01000c0000000000010000007648ea9e010000000c08040302020202",
+        };
+        for (const char* hex : captured) {
+            const QByteArray frame = QByteArray::fromHex(hex);
+            QByteArray blanked = frame;
+            blanked[14] = blanked[15] = blanked[16] = blanked[17] = 0;
+            QCOMPARE(Longpath::SunSdr::withControlFrameCrc(blanked).toHex(), frame.toHex());
+        }
+        // Zu kurz fuer einen Kopf: unveraendert.
+        QCOMPARE(Longpath::SunSdr::withControlFrameCrc(QByteArray("abc")), QByteArray("abc"));
+    }
+
 
     // ── Control header ───────────────────────────────────────────────
 

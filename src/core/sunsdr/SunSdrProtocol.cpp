@@ -223,6 +223,34 @@ namespace {
 constexpr quint64 kFreqScaleCandidate = 10;
 }
 
+quint32 controlFrameCrc(const QByteArray& frame)
+{
+    // CRC-32/IEEE, bitweise (die Rahmen sind hoechstens ein paar hundert
+    // Byte, Tempo spielt keine Rolle). Bytes 14..17 zaehlen als null.
+    quint32 crc = 0xFFFFFFFFu;
+    for (int i = 0; i < frame.size(); ++i) {
+        const quint8 byte = (i >= 14 && i < 18) ? 0 : static_cast<quint8>(frame.at(i));
+        crc ^= byte;
+        for (int bit = 0; bit < 8; ++bit) {
+            crc = (crc & 1u) ? (crc >> 1) ^ 0xEDB88320u : (crc >> 1);
+        }
+    }
+    return crc ^ 0xFFFFFFFFu;
+}
+
+QByteArray withControlFrameCrc(QByteArray frame)
+{
+    if (frame.size() < 18) {
+        return frame;
+    }
+    const quint32 crc = controlFrameCrc(frame);
+    frame[14] = static_cast<char>(crc & 0xFF);
+    frame[15] = static_cast<char>((crc >> 8) & 0xFF);
+    frame[16] = static_cast<char>((crc >> 16) & 0xFF);
+    frame[17] = static_cast<char>((crc >> 24) & 0xFF);
+    return frame;
+}
+
 QByteArray encodeFrequencyPayload(quint64 freqHz)
 {
     const quint64 scaled = freqHz * kFreqScaleCandidate;

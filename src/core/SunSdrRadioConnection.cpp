@@ -519,13 +519,55 @@ void SunSdrRadioConnection::setReceiverFrequency(int receiverIndex, quint64 freq
     // If retuning proves unreliable across repeated real-world use,
     // this header tail — not the now-confirmed payload formula — is the
     // next thing to investigate.
+    // ── Erst die DDC (0x07), dann die VFO (0x08) ── 2026-09-25 ──────
+    //
+    // Nach dem Einschalten liefert die QRP nur EINEN reellen Kanal (Q = 0).
+    // Am Geraet eingegrenzt (Martin schaltete zwischen jedem Versuch aus
+    // und ein, Gruppen A/B/C, dann 0x07 allein): ein einziger 0x07-Rahmen
+    // fuer Unterempfaenger 0 schaltet echtes I/Q ein -- Q ungleich 0 von
+    // 0 % auf 21 %. ExpertSDR2 schickt ihn beim Verbinden mit seiner
+    // VFO-Frequenz, 0x08 dagegen mit 0 Hz. Das deckt sich mit ArtemisSDRs
+    // DX-Schema (Nummern dort um eins hoeher): 0x08 DX = "freq, DDC
+    // companion, sub 0=RX1/1=RX2", 0x09 DX = "freq, primary/TX VFO"
+    // (sunsdr.c:2381,2386,2656 [@f8b01d25c5]). Longpath stellte bisher nur
+    // die VFO ein, nie die DDC.
+    //
+    // Nur fuer die QRP -- nur dort gemessen.
+    if (m_profile->variant == SunSdr::Variant::Qrp) {
+        const QByteArray ddc = ddcFrequencyFrame(0, frequencyHz);
+        m_controlSocket->writeDatagram(ddc, m_radioAddr, m_profile->defaultCtrlPort);
+        recordBytesSent(static_cast<qint64>(ddc.size()));
+    }
+
+    // Pruefsumme jetzt gerechnet (SunSdr::withControlFrameCrc) -- vorher
+    // trug JEDE Frequenz das feste Ende 8ca31dd7 einer einzigen.
     QByteArray frame = QByteArray::fromHex(
         "03ff0800080000000000010000008ca31dd7");
     frame += SunSdr::encodeFrequencyPayload(frequencyHz);
+    frame = SunSdr::withControlFrameCrc(frame);
 
     m_controlSocket->writeDatagram(frame, m_radioAddr, m_profile->defaultCtrlPort);
     recordBytesSent(static_cast<qint64>(frame.size()));
-    qCInfo(lcSunSdr) << "SunSdr: setReceiverFrequency() ->" << frequencyHz << "Hz";
+    qCInfo(lcSunSdr) << "SunSdr: setReceiverFrequency() ->" << frequencyHz << "Hz (DDC 0x07 + VFO 0x08)";
+}
+
+QByteArray SunSdrRadioConnection::ddcFrequencyFrame(int subReceiver, quint64 frequencyHz)
+{
+    // Kopf byte-genau aus ExpertSDR2s Start am 2026-09-25
+    // (/tmp/qrp-att.pcap): [2] Opcode 0x07, [4] Laenge 8, [6] Unter-
+    // empfaenger, [10] 0x01, [14..17] das Rahmenende, je Unterempfaenger
+    // so, wie ExpertSDR2 es schickte. Nutzlast wie bei 0x08: u64 LE in
+    // Zehntel-Hertz (encodeFrequencyPayload). Das Rahmenende wird unten
+    // neu gerechnet (CRC-32, SunSdr::withControlFrameCrc).
+    const char* head = subReceiver == 1
+        ? "03ff0700080001000000010000001850a11e"
+        : "03ff070008000000000001000000dabdabb7";
+    QByteArray frame = QByteArray::fromHex(head);
+    frame += SunSdr::encodeFrequencyPayload(frequencyHz);
+    // Das Ende (Bytes 14..17) ist CRC-32 ueber den Rahmen -- fuer jede
+    // Frequenz neu gerechnet. Mit dem alten Ende verwarf die QRP einen
+    // Rahmen mit anderer Frequenz (Versuch "07x", 2026-09-25).
+    return SunSdr::withControlFrameCrc(frame);
 }
 
 QByteArray SunSdrRadioConnection::attenuatorFrameFor(int dB)

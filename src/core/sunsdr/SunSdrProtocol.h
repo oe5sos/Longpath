@@ -369,6 +369,29 @@ void decodeIqSamples(const quint8* payload, int payloadLen,
 // matching sunsdr_send_freq_pkt()'s byte layout exactly.
 QByteArray encodeFrequencyPayload(quint64 freqHz);
 
+// ── Die Pruefsumme der Steuerrahmen: ENTSCHLUESSELT 2026-09-25 ─────
+//
+// Bytes 14..17 jedes Steuerrahmens (Host -> Geraet) sind CRC-32 (das
+// gewoehnliche, zlib/IEEE: Polynom 0x04C11DB7 gespiegelt, Start und
+// Abschluss 0xFFFFFFFF) ueber den GANZEN Rahmen, mit diesen vier Bytes
+// auf null gesetzt, Little-Endian abgelegt. Gefunden an einem Test der
+// Linearitaet (die vier Preamp-Rahmen 0x04 00/01/02/03: XOR der vier
+// Enden = 0 -> linear -> CRC) und dann an 13 mitgeschnittenen Rahmen
+// von 10 Befehlen byte-genau bestaetigt (0x01, 0x04 x4, 0x07 x2, 0x08,
+// 0x0c, 0x10, 0x16, 0x18, 0x1c).
+//
+// Vorher galt das Ende als "vermutlich Pruefsumme, Verfahren unbekannt"
+// (Versuch 2026-08-27 gegen die Standardverfahren erfolglos), und
+// Longpath schickte nur byte-genau nachgespielte Rahmen -- oder, bei
+// 0x08, jede Frequenz mit dem festen Ende einer einzigen. Am Geraet
+// gezeigt: ein 0x07-Rahmen mit anderer Frequenz, aber altem Ende, wird
+// verworfen.
+quint32 controlFrameCrc(const QByteArray& frame);
+
+// Traegt controlFrameCrc() in Bytes 14..17 ein (der Rahmen muss
+// mindestens den 18-Byte-Kopf haben; sonst unveraendert zurueck).
+QByteArray withControlFrameCrc(QByteArray frame);
+
 // Inverse of the above: reads an 8-byte little-endian payload and
 // returns `value / 10` as the candidate frequency in Hz. Returns 0 if
 // `payload` is shorter than 8 bytes.
