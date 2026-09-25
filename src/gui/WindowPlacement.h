@@ -25,9 +25,13 @@
 //   2026-08-16 — Als freie Funktion herausgezogen, Verhalten
 //                 unverändert. Martin Fischer, AI-assisted via
 //                 Anthropic Claude (Cowork).
+//   2026-09-25 — coveredFraction(): eingeschaltete Applets nach vorne.
+//                 Martin Fischer, AI-assisted via Anthropic Claude.
 // =================================================================
 
+#include <QList>
 #include <QPoint>
+#include <QRect>
 #include <QSize>
 
 class QWidget;
@@ -104,5 +108,21 @@ void snapToGridAfterSettle(QWidget* w, int grid = kSnapGridPx,
 ///     genug, um das Fenster mit der Maus wieder hereinziehen zu
 ///     können.
 void ensureOnVisibleScreen(QWidget* w, QWidget* anchor, QSize minSize);
+
+// ── Liegt etwas darueber? ────────────────────────────────────────────
+//
+// Betreiber 2026-09-25: "wenn ich rx einblende ist es versteckt ... ich
+// muss es dann hinter meinen anderen Fenstern suchen". Ein Applet, das
+// in die Spalte des Hauptfensters kommt, liegt unter jedem schwebenden
+// Werkzeugfenster (Qt::Tool = NSPanel auf der Palettenebene, immer ueber
+// normalen Fenstern) -- und bei ihm stehen Panadapter, TX, Rotor/Log
+// genau ueber dieser Spalte.
+//
+// Anteil (0..1) von `target`, den die Rechtecke in `covers` zusammen
+// decken. Ueberlappungen untereinander werden nicht doppelt gezaehlt:
+// gerechnet wird auf einem 16x16-Punkteraster ueber `target`, genau
+// genug fuer "liegt es zu einem guten Teil unter etwas". Leeres
+// `target` gilt als ganz verdeckt (es ist nirgends zu sehen).
+double coveredFraction(const QRect& target, const QList<QRect>& covers);
 
 } // namespace Longpath

@@ -954,6 +954,16 @@ private:
                       const QRect& rect = QRect(),
                       const QString& screenKey = QString());
 
+    /// Ein vom Bediener eben eingeschaltetes Applet nach vorne holen:
+    /// sein Fenster heben, und wenn es in der Spalte unter schwebenden
+    /// Fenstern laege (oder dort gar nicht zu sehen ist), als eigenes
+    /// Fenster obenauf ablösen. Nur für Einschalten per Menü/Plus —
+    /// nicht beim Start oder Profilwechsel, die Lagen gehören dem Profil.
+    void bringAppletToFront(const QString& id);
+    /// Ist das Applet in der Spalte des Hauptfensters für den Bediener
+    /// verdeckt (von schwebenden Fenstern, weggerollt, Fenster zu)?
+    bool appletHiddenInColumn(QWidget* applet) const;
+
     /// Zurück in die Spalte, an die gemerkte Stelle. Räumt das Fenster
     /// ab. Tut nichts, wenn das Applet nicht abgelöst ist.
     void dockAppletBack(const QString& appletId);

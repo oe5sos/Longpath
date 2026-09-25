@@ -1823,6 +1823,96 @@ void MainWindow::dockAppletBack(const QString& appletId)
     }
 }
 
+// ── Eingeschaltet heisst: VORNE ──────────────────────────────────────
+//
+// Betreiber 2026-09-25: "wenn ich rx einblende ist es versteckt. das
+// darf nicht sein, muss immer im vordergrund sein ... ich muss es dann
+// hinter meinen anderen fenstern suchen."
+//
+// Nachgesehen: das RX-Applet kam in die Spalte des Hauptfensters, und
+// ueber genau dieser Spalte standen seine schwebenden Fenster
+// (Panadapter, Rotor/Log). Die sind Qt::Tool -- auf macOS NSPanels auf
+// der Palettenebene, IMMER ueber jedem normalen Fenster; ein raise()
+// des Hauptfensters kommt nicht darueber (siehe AuxiliaryWindowLeveler,
+// #43). Er musste Fenster wegschieben, um es zu finden.
+//
+// Darum: wer ein Applet einschaltet, sieht es. Schwebt es schon (eigenes
+// Fenster oder die ganze Spalte als Container-Fenster), wird dieses
+// Fenster gehoben. Steht es in der Spalte und ist dort verdeckt oder
+// gar nicht zu sehen, wird es an seiner Stelle als eigenes Fenster
+// abgeloest -- dieselbe Geste wie der Pfeil in seiner Kopfleiste, nur
+// ohne dass man es erst finden muss -- und obenauf gezeigt.
+void MainWindow::bringAppletToFront(const QString& id)
+{
+    // Einen Umlauf spaeter: erst dann hat die Spalte das Applet
+    // eingeordnet und es eine Lage, gegen die sich pruefen laesst.
+    QTimer::singleShot(0, this, [this, id]() {
+        if (m_shuttingDown || !m_appletVis
+            || !m_appletVis->isEffectivelyVisible(id)) {
+            return;
+        }
+        QWidget* front = m_floatingApplets.value(id, nullptr);
+        if (!front) {
+            AppletWidget* a = m_appletsById.value(id, nullptr);
+            if (!a || !m_appletPanel) { return; }
+            QWidget* host = a->window();
+            if (host && host != this) {
+                // Die Spalte schwebt selbst (Container-Fenster).
+                front = host;
+            } else if (appletHiddenInColumn(a)) {
+                detachApplet(a, m_appletPanel->appletPosition(a));
+                front = m_floatingApplets.value(id, nullptr);
+            }
+        }
+        if (front) {
+            front->show();
+            front->raise();
+            front->activateWindow();
+        }
+    });
+}
+
+bool MainWindow::appletHiddenInColumn(QWidget* applet) const
+{
+    if (!applet || !isVisible() || isMinimized() || !applet->isVisible()) {
+        return true;
+    }
+    // Das Rasterfeld mit Kopfleiste, wie detachApplet() es aufhebt.
+    QWidget* box = applet;
+    for (QWidget* w = applet->parentWidget(); w; w = w->parentWidget()) {
+        if (QString::fromLatin1(w->metaObject()->className())
+                .contains(QStringLiteral("GridCellWidget"))) {
+            box = w;
+            break;
+        }
+    }
+    // Weggerollt (die Spalte scrollt) oder vom Eltern abgeschnitten:
+    // visibleRegion ist, was davon im Fenster ueberhaupt Platz hat.
+    const QRect shown = box->visibleRegion().boundingRect();
+    if (shown.width() * shown.height() * 2 < box->width() * box->height()) {
+        return true;
+    }
+    const QRect onScreen(box->mapToGlobal(shown.topLeft()), shown.size());
+
+    // Was als eigenes Fenster darueber steht. Nicht mitgezaehlt: dieses
+    // Fenster, Popups/Tooltips, und der Auswaehler selbst -- der geht
+    // rechts unter dem Plus auf, genau ueber der Spalte, und ist nach
+    // der Auswahl wieder zu.
+    QList<QRect> covers;
+    const auto tops = QApplication::topLevelWidgets();
+    for (QWidget* w : tops) {
+        if (!w || w == this || !w->isVisible() || w->isMinimized()) { continue; }
+        const Qt::WindowType type = w->windowType();
+        if (type == Qt::Popup || type == Qt::ToolTip
+            || type == Qt::SplashScreen || type == Qt::Desktop) {
+            continue;
+        }
+        if (qobject_cast<WidgetPicker*>(w)) { continue; }
+        covers.append(w->frameGeometry());
+    }
+    return coveredFraction(onScreen, covers) >= 0.25;
+}
+
 void MainWindow::applyAppletVisibility(const QString& id, bool effective)
 {
     // ── Die eigenen Fenster ──────────────────────────────────────────
@@ -7515,6 +7605,10 @@ void MainWindow::populateDefaultMeter()
     // Vorlage. Nicht in eine Leiste gesteckt: dort wäre es eines von
     // zwanzig Zeichen, und genau so war es bisher unsichtbar.
     m_addWidgetBtn = new AddWidgetButton(m_appletVis, centralWidget());
+    connect(m_addWidgetBtn, &AddWidgetButton::toggled, this,
+            [this](const QString& id, bool visible) {
+        if (visible) { bringAppletToFront(id); }
+    });
     m_addWidgetBtn->setToolTip(QStringLiteral(
         "Fenster hinzufügen oder entfernen"));
     m_addWidgetBtn->raise();
@@ -8435,6 +8529,10 @@ void MainWindow::populateDefaultMeter()
     // der Verwalter die Kategorien, die der Auswähler links anzeigt.
     if (m_commandBar) {
         m_addWidget = new AddWidgetButton(m_appletVis, m_commandBar);
+        connect(m_addWidget, &AddWidgetButton::toggled, this,
+                [this](const QString& id, bool visible) {
+            if (visible) { bringAppletToFront(id); }
+        });
         m_commandBar->addTrailing(m_addWidget);
     }
 
@@ -9763,6 +9861,7 @@ void MainWindow::buildMenuBar()
 
             connect(act, &QAction::toggled, this, [this, id](bool checked) {
                 if (m_appletVis) { m_appletVis->setVisible(id, checked); }
+                if (checked) { bringAppletToFront(id); }
                 // Betreiber 2026-08-30, ueber einen Regressionstest
                 // gefunden: dieser Weg fehlte im Gegensatz zum
                 // Ausblenden-Kreuz (appletHideRequested oben) das
