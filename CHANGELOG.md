@@ -175,6 +175,15 @@
 
 ### Fixed
 
+- **Zoomknöpfe unten links im Wasserfall zeigten keine Beschriftung.**
+  Die vier Knöpfe [S] [B] [−] [+] waren seit dem app-weiten Grundstil vom
+  2026-09-18 („Glas & Tiefe“, `padding: 4px 12px` für jeden QPushButton)
+  vier leere Kästchen: bei 24 px Breite blieb für das Zeichen nichts übrig.
+  Der Stil setzt jetzt wie das Vorbild (AetherSDR) `padding: 0; margin: 0;
+  min-width: 0;`, und der Minus-Knopf trägt das echte Minuszeichen U+2212.
+  Prüfung `tst_zoom_buttons_legible` läuft mit dem Grundstil (vorher
+  Textfläche −2×10, jetzt 22×18).
+
 - **SunSDR2 QRP: jeder Block kam achtmal, und die Abtastrate kam nie an
   -- beides behoben.** Drei Fehler, die nur zusammen richtig klingen:
   * Die QRP wiederholt jeden IQ-Block, bis der Host ihn mit derselben
