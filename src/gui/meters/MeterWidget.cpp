@@ -799,9 +799,15 @@ void MeterWidget::initOverlayPipeline()
     m_ovPipeline->setRenderPassDescriptor(renderTarget()->renderPassDescriptor());
 
     // Alpha blending for overlay compositing
+    //
+    // Die Ueberlagerungen sind Format_RGBA8888_Premultiplied (Farbe schon
+    // mit Alpha multipliziert). srcColor = SrcAlpha multiplizierte ein
+    // zweites Mal und machte die Kantenpixel jeder Schrift zu dunkel --
+    // vormultiplizierte Quellen brauchen One / OneMinusSrcAlpha
+    // (2026-09-25, wie im Panadapter).
     QRhiGraphicsPipeline::TargetBlend blend;
     blend.enable = true;
-    blend.srcColor = QRhiGraphicsPipeline::SrcAlpha;
+    blend.srcColor = QRhiGraphicsPipeline::One;
     blend.dstColor = QRhiGraphicsPipeline::OneMinusSrcAlpha;
     blend.srcAlpha = QRhiGraphicsPipeline::One;
     blend.dstAlpha = QRhiGraphicsPipeline::OneMinusSrcAlpha;

@@ -10462,9 +10462,17 @@ void SpectrumWidget::initOverlayPipeline()
     m_ovPipeline->setRenderPassDescriptor(renderTarget()->renderPassDescriptor());
 
     // Alpha blending for overlay compositing
+    //
+    // Die Ueberlagerungsbilder sind Format_RGBA8888_Premultiplied und
+    // gehen roh auf die GPU: die Farbe ist also schon mit Alpha
+    // multipliziert. Mit srcColor = SrcAlpha wurde ein zweites Mal
+    // multipliziert -- eine Filterflaeche mit Alpha 0,3 kam mit 0,09 an,
+    // und die Kantenpixel jeder Schrift wurden dunkler als QPainter sie
+    // meinte. Der CPU-Pfad zeichnete dieselben Farben richtig. Fuer
+    // vormultiplizierte Quellen gilt One / OneMinusSrcAlpha (2026-09-25).
     QRhiGraphicsPipeline::TargetBlend blend;
     blend.enable = true;
-    blend.srcColor = QRhiGraphicsPipeline::SrcAlpha;
+    blend.srcColor = QRhiGraphicsPipeline::One;
     blend.dstColor = QRhiGraphicsPipeline::OneMinusSrcAlpha;
     blend.srcAlpha = QRhiGraphicsPipeline::One;
     blend.dstAlpha = QRhiGraphicsPipeline::OneMinusSrcAlpha;
