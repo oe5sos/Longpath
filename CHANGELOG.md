@@ -175,6 +175,20 @@
 
 ### Fixed
 
+- **SunSDR2 QRP: Longpath schaltet echtes I/Q jetzt selbst ein — und die
+  Prüfsumme der Steuerrahmen ist entschlüsselt.** Nach dem Einschalten
+  liefert die QRP nur einen reellen Kanal (Q = 0); bisher schaltete erst
+  ExpertSDR2 echtes I/Q ein. Am Gerät mit dem Betreiber eingegrenzt (je
+  Versuch Aus/Ein, Gruppen A/B/C, dann einzeln): ein einziger Befehl `0x07`
+  (DDC-Frequenz, Unterempfänger 0) schaltet um — Q ≠ 0 von 0 % auf 21 %.
+  Longpath schickt ihn jetzt bei jeder Frequenzeinstellung vor `0x08`.
+  Dabei gefunden: Bytes 14..17 jedes Steuerrahmens sind **CRC-32 über den
+  Rahmen mit genulltem Feld** (an 13 Rahmen von 10 Befehlen byte-genau
+  bestätigt). Mit dem alten, festen Ende verwarf die QRP Rahmen mit anderer
+  Frequenz — auch Longpaths bisherige `0x08`-Rahmen trugen für fast jede
+  Frequenz eine falsche Prüfsumme. `SunSdr::withControlFrameCrc` rechnet sie
+  jetzt für `0x07` und `0x08`.
+
 - **Schwebendes Fenster größer als der Bildschirm: ungültiges `qBound`.**
   `ensureOnVisibleScreen()` klemmte die Position mit vertauschten Grenzen,
   sobald ein Fenster (etwa ein schwebender Panadapter mit seiner

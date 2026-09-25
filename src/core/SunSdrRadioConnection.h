@@ -196,6 +196,9 @@ public:
     // Der Rahmen, den setAttenuator(dB) schicken wuerde; leer fuer
     // Werte, die die QRP nicht hat.
     static QByteArray attenuatorFrameFor(int dB);
+    // Der DDC-Frequenzrahmen (Opcode 0x07) fuer Unterempfaenger 0 (RX1)
+    // oder 1 (RX2) -- der Rahmen, der die QRP auf echtes I/Q schaltet.
+    static QByteArray ddcFrequencyFrame(int subReceiver, quint64 frequencyHz);
     quint16 lastBlockReplySeqForTest() const { return m_lastBlockReplySeq; }
 
     // Exposes the private data-watchdog silence threshold, same

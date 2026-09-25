@@ -759,6 +759,25 @@ private slots:
                  QByteArray::fromHex("03ff04000400000000000100000053ccd3b302000000"));
     }
 
+    // 0x07 = DDC-Frequenz je Unterempfaenger; der RX1-Rahmen schaltet die
+    // QRP auf echtes I/Q (am Geraet eingegrenzt 2026-09-25). Byte-genau
+    // gegen ExpertSDR2s eigene Rahmen von diesem Tag.
+    void ddcFrameMatchesExpertSdr2Bytes()
+    {
+        QCOMPARE(SunSdrRadioConnection::ddcFrequencyFrame(0, 14224010).toHex(),
+                 QByteArray("03ff070008000000000001000000dabdabb764697a0800000000"));
+        QCOMPARE(SunSdrRadioConnection::ddcFrequencyFrame(1, 1905000).toHex(),
+                 QByteArray("03ff0700080001000000010000001850a11e10ae220100000000"));
+    }
+
+    // Andere Frequenz -> andere Pruefsumme (CRC-32 ueber den Rahmen). Mit
+    // dem alten Ende verwarf die QRP den Rahmen (Versuch "07x").
+    void ddcFrameCarriesTheCrcOfItsOwnFrequency()
+    {
+        QCOMPARE(SunSdrRadioConnection::ddcFrequencyFrame(0, 7328400).toHex(),
+                 QByteArray("03ff07000800000000000100000081b75f33a0395e0400000000"));
+    }
+
     // Nach dem Einschalten liefert die QRP nur einen Kanal (Q = 0). Die
     // DIAG-Sekunde erkennt das.
     void singleChannelStateIsRecognised()
