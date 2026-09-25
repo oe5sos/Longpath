@@ -245,6 +245,20 @@ private slots:
                  w.setWfColorScheme(WfColorScheme::Muted);
                  w.setWaterfallDetector(SpectrumDetector::Peak);
              }},
+            // Ueberlagerungen, die in der Nacht noch nicht angesehen waren
+            // (2026-09-26): Peak-Hold-Linie, aktiver Peak-Hold mit Fuellung,
+            // Spitzen-Markierungen, Rauschbodenlinie, Spitzenwert-Text.
+            {QStringLiteral("r_overlays"), [martin](SpectrumWidget& w) {
+                 martin(w);
+                 w.setSpectrumRenderMode(SpectrumRenderMode::Mode2D);
+                 w.setPeakHoldEnabled(true);
+                 w.setActivePeakHoldEnabled(true);
+                 w.setActivePeakHoldFill(true);
+                 w.setPeakBlobsEnabled(true);
+                 w.setPeakBlobsCount(4);
+                 w.setShowNoiseFloor(true);
+                 w.setShowPeakValueOverlay(true);
+             }},
             {QStringLiteral("d_3d_peak_peak"), [martin](SpectrumWidget& w) {
                  martin(w);
                  w.setSpectrumDetector(SpectrumDetector::Peak);
