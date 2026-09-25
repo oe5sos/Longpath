@@ -6225,6 +6225,9 @@ void SpectrumWidget::pushWaterfallRow(const QVector<float>& wfPixelsDbm)
     int h = m_waterfall.height();
     // Decrement write pointer so newest row is always at m_wfWriteRow.
     m_wfWriteRow = (m_wfWriteRow - 1 + h) % h;
+#ifdef LONGPATH_GPU_SPECTRUM
+    ++m_wfRowsSinceUpload;
+#endif
 
     int w = m_waterfall.width();
     QRgb* scanline = reinterpret_cast<QRgb*>(m_waterfall.scanLine(m_wfWriteRow));
@@ -10736,6 +10739,7 @@ void SpectrumWidget::initialize(QRhiCommandBuffer* cb)
     cb->resourceUpdate(batch);
     m_wfTexFullUpload = false;
     m_wfLastUploadedRow = m_wfWriteRow;
+    m_wfRowsSinceUpload = 0;
     m_rhiInitialized = true;
 }
 
@@ -10927,6 +10931,23 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
             }
         }
 
+        // ── Nach einer Pause: ganz hochladen ──────────────────────────
+        //
+        // Der Teil-Upload unten laeuft von m_wfLastUploadedRow rueckwaerts
+        // bis m_wfWriteRow. Wurde zwischen zwei Bildern mehr als eine
+        // Texturhoehe geschrieben (Fenster versteckt oder nicht
+        // gezeichnet, bei 101 ms je Zeile nach gut einer halben Minute),
+        // ist der Ring umgelaufen: der Abstand der beiden Zeiger nennt
+        // nur noch den Rest, der Rest der Textur blieb alt -- ein
+        // Wasserfall aus neuen Zeilen oben und Zeilen von VOR der Pause
+        // darunter, in falscher Zeitfolge. Gefunden 2026-09-26 im
+        // Pruefstand (LONGPATH_RENDER_HIDDEN=2): 400 Zeilen geschrieben,
+        // 72 hochgeladen. m_waterfall hat dann ohnehin lauter neue
+        // Zeilen, also einmal ganz.
+        if (m_wfRowsSinceUpload >= m_wfGpuTexH) {
+            m_wfTexFullUpload = true;
+        }
+
         if (m_wfTexFullUpload) {
             // Sizes agree by construction at this point, but the
             // consequence of them ever not agreeing is a texture with
@@ -10954,6 +10975,7 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
             batch->uploadTexture(m_wfGpuTex, QRhiTextureUploadEntry(0, 0,
                 QRhiTextureSubresourceUploadDescription(rgba)));
             m_wfLastUploadedRow = m_wfWriteRow;
+            m_wfRowsSinceUpload = 0;
             m_wfTexFullUpload = false;
         } else if (m_wfWriteRow != m_wfLastUploadedRow) {
             // Incremental: upload only dirty rows
@@ -10977,6 +10999,7 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
                 batch->uploadTexture(m_wfGpuTex, uploadDesc);
             }
             m_wfLastUploadedRow = m_wfWriteRow;
+            m_wfRowsSinceUpload = 0;
         }
     }
 

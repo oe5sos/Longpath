@@ -236,8 +236,25 @@ private slots:
             w.setClarityActive(true);
             w.setClarityWaterfallThresholds(-140.0f, -80.0f, -135.0f);
             v.apply(w);
-            w.show();
-            QVERIFY(QTest::qWaitForWindowExposed(&w));
+            // LONGPATH_RENDER_HIDDEN=1: waehrend der Einspielung versteckt.
+            // Bei schlafendem Bildschirm drosselt macOS ein sichtbares
+            // GPU-Fenster auf wenige Bilder/s, der GUI-Thread steht bis
+            // 1 s, und der Wasserfall-Takt holt verpasste Zeilen mit
+            // Kopien nach -- Bloecke statt Zeilen. Versteckt rechnet das
+            // Widget weiter, gezeichnet wird erst am Ende.
+            // =2: erst zeigen (Textur anlegen), dann verstecken -- wie ein
+            // schwebendes Panadapter-Fenster, das sich versteckt, solange
+            // Longpath nicht die aktive App ist (hidesOnDeactivate).
+            const int hiddenMode = qEnvironmentVariableIntValue("LONGPATH_RENDER_HIDDEN");
+            const bool hidden = hiddenMode != 0;
+            if (!hidden || hiddenMode == 2) {
+                w.show();
+                QVERIFY(QTest::qWaitForWindowExposed(&w));
+            }
+            if (hiddenMode == 2) {
+                QTest::qWait(300);
+                w.hide();
+            }
 
             Scene scene(20260925);
             // ~12 s Verlauf bei 30 Bildern/s, damit der Wasserfall voll ist
@@ -253,6 +270,11 @@ private slots:
                 }
                 w.updateSpectrumLinear(0, f, 1.0, 0.0);
                 QTest::qWait(33);
+            }
+            if (hidden) {
+                w.show();
+                QVERIFY(QTest::qWaitForWindowExposed(&w));
+                QTest::qWait(300);
             }
             const QImage img = grabSpectrum(w);
             QVERIFY2(!img.isNull(), "leeres Bild");

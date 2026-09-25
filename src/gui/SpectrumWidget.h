@@ -3197,6 +3197,11 @@ private:
     int  m_wfGpuTexW{0};
     int  m_wfGpuTexH{0};
     int  m_wfLastUploadedRow{-1};
+    // Zeilen, die pushWaterfallRow seit dem letzten Hochladen geschrieben
+    // hat. Der Teil-Upload laeuft von m_wfLastUploadedRow bis
+    // m_wfWriteRow -- nach mehr als einer Texturhoehe ist der Ring
+    // umgelaufen, und dieser Abstand zeigt nur noch den Rest (2026-09-26).
+    int  m_wfRowsSinceUpload{0};
 
     // ---- Overlay GPU resources ----
     QRhiGraphicsPipeline*       m_ovPipeline{nullptr};
