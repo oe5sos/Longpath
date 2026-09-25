@@ -191,6 +191,11 @@ public:
     bool hasRadioAddrForTest() const { return !m_radioAddr.isNull(); }
 
     quint64 blockRepliesSentForTest() const { return m_blockRepliesSent; }
+    float rxLevelGainForTest() const { return m_rxLevelGain; }
+    bool singleChannelSeenForTest() const { return m_singleChannelSeen; }
+    // Der Rahmen, den setAttenuator(dB) schicken wuerde; leer fuer
+    // Werte, die die QRP nicht hat.
+    static QByteArray attenuatorFrameFor(int dB);
     quint16 lastBlockReplySeqForTest() const { return m_lastBlockReplySeq; }
 
     // Exposes the private data-watchdog silence threshold, same
@@ -668,6 +673,17 @@ private:
     int m_blockReplyFill{0};
     int m_blockReplyPos{0};
     quint64 m_blockRepliesSent{0};
+    // Pegelabgleich aus dem Profil (10^(rxLevelTrimDb/20)), beim
+    // Verbinden gesetzt.
+    float m_rxLevelGain{1.0f};
+    // Einkanal-Zustand der QRP (Q = 0) in der letzten DIAG-Sekunde, und
+    // ob die Warnung dazu in dieser Verbindung schon kam.
+    bool m_singleChannelSeen{false};
+    bool m_singleChannelWarned{false};
+    QElapsedTimer m_qCheckTimer;
+    quint64 m_qNonZeroInWindow{0};
+    quint64 m_qSamplesInWindow{0};
+    double m_qNonZeroPercent{0.0};
     quint16 m_lastBlockReplySeq{0};
     bool blockReplyEnabled();
     void replyToBlock(quint16 seq);

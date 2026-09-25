@@ -175,6 +175,24 @@
 
 ### Fixed
 
+- **SunSDR2 QRP: im richtigen I/Q-Betrieb „ganz leise“ bis „kein Ton“, S-Meter
+  20 dB zu tief.** Gegen ExpertSDR2 am selben Gerät gemessen (echtes I/Q,
+  Preamp 0 dB, 20 m, 3 kHz, ohne Antenne): dort −127,9 dBm Rauschen, in
+  Longpath −147,9 dBm. Die QRP-Proben bekommen jetzt einen Pegelabgleich von
+  +20,0 dB (`SunSdr::Profile::rxLevelTrimDb`, nur QRP; DX/PRO 0). Live danach:
+  −127,5 / −127,7 dBm. Vorbild der Größenordnung: ArtemisSDR gleicht die
+  SunSDR2 DX um +18,98 dB gegen die Herstellersoftware an.
+- **SunSDR2 QRP: Preamp-Stufen (Opcode 0x04) waren falsch zugeordnet.** In
+  ExpertSDR2 der Reihe nach durchgeschaltet und mitgeschnitten: 00/01/02/03 =
+  −20/−10/0/+10 dB. `setAttenuator(0)` hätte die QRP auf −20 dB gestellt
+  (wurde nie aufgerufen). Jetzt 0 → 02, −10 → 01, −20 → 00.
+- **SunSDR2 QRP: Einkanal-Zustand wird erkannt.** Nach dem Einschalten liefert
+  die QRP nur einen reellen Kanal (Q = 100 % exakt 0, Seitenbänder gespiegelt
+  übereinander — das „schreckliche Rauschen“); erst ExpertSDR2 schaltet echtes
+  I/Q ein. Die DIAG-Zeile zeigt jetzt den Anteil Q ≠ 0, und einmal je
+  Verbindung kommt eine Warnung. Den Befehl, der I/Q einschaltet, sendet
+  Longpath noch nicht (Suche mit dem Betreiber am Gerät steht aus).
+
 - **SunSDR2 QRP: jeder Block kam achtmal, und die Abtastrate kam nie an
   -- beides behoben.** Drei Fehler, die nur zusammen richtig klingen:
   * Die QRP wiederholt jeden IQ-Block, bis der Host ihn mit derselben
