@@ -3286,8 +3286,17 @@ void SpectrumWidget::updateSpectrumLinear(int receiverId,
         m_waterfallAvenger.clear();
     }
 
+    // Die 1-Hz-Normierung haengt an der Bin-Breite, also an der Bin-Zahl.
+    // Gitter und dBm-Zahlen stehen in der statischen Ueberlagerung, die
+    // nur bei Bedarf neu gezeichnet wird -- ohne diesen Anstoss blieben
+    // sie nach einem Neuplan der FFT auf der alten Bin-Breite stehen,
+    // waehrend die Kurve schon die neue nahm (2026-09-25).
+    const bool binCountChanged = (m_fullLinearBins.size() != binsLinear.size());
     m_fullLinearBins = binsLinear;
     m_fftWindowEnb   = qMax(windowEnb, 1e-9);
+    if (binCountChanged && m_dispNormalize) {
+        markOverlayDirty();
+    }
 
     // Display pixel count -- spectrum panel width minus dBm strip column,
     // in DEVICE pixels. Per Thetis Display.cs:4970 DrawPanadapterDX2D(int
@@ -11500,9 +11509,22 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
         const float range  = m_dynamicRange;
         const float yBot = -1.0f;
         const float yTop = 1.0f;
+        // Boden der dBm-Achse: wie dbmToYf die OBERKANTE des Bandplan-
+        // Streifens, nicht der Rand des Bereichs. Bis 2026-09-25 rechnete
+        // die GPU-Kurve ueber die volle Hoehe, Gitter und Ueberlagerungen
+        // ohne den Streifen -- mit Bandplan lag die Kurve am Rauschboden
+        // um fast die Streifenhoehe zu tief (tst_spectrum_trace_on_grid).
+        // Die Fuellung reicht weiter bis yBot, wie im CPU-Pfad bis
+        // specRect.bottom().
+        const float stripFrac = (specRect.height() > 0)
+            ? static_cast<float>(bandPlanStripHeight()) / static_cast<float>(specRect.height())
+            : 0.0f;
+        const float yFloor = yBot + 2.0f * qBound(0.0f, stripFrac, 1.0f);
 
         const float fa = m_fillAlpha;
-        const float cal = m_dbmCalOffset;
+        // Kalibrierung UND 1-Hz-Normierung, wie dbmToYf -- die Normierung
+        // fehlte hier, Gitter und Ueberlagerungen hatten sie schon.
+        const float cal = m_dbmCalOffset + normalizeShiftDb();
 
         // Flat-mode colour picked from m_fillColor.
         const float flatR = m_fillColor.redF();
@@ -11555,7 +11577,7 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
         for (int j = 0; j < n; ++j) {
             float x = (n > 1) ? 2.0f * j / (n - 1) - 1.0f : 0.0f;
             float t = qBound(0.0f, ((m_renderedPixels[j] + cal) - minDbm) / range, 1.0f);
-            float y = yBot + t * (yTop - yBot);
+            float y = yFloor + t * (yTop - yFloor);
 
             // Ribbon perpendicular offset: central difference of the
             // neighbouring points for the local tangent (smoother than a
@@ -11568,8 +11590,8 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
             const float xNext = (n > 1) ? 2.0f * jNext / (n - 1) - 1.0f : 0.0f;
             const float tPrev = qBound(0.0f, ((m_renderedPixels[jPrev] + cal) - minDbm) / range, 1.0f);
             const float tNext = qBound(0.0f, ((m_renderedPixels[jNext] + cal) - minDbm) / range, 1.0f);
-            const float yPrev = yBot + tPrev * (yTop - yBot);
-            const float yNext = yBot + tNext * (yTop - yBot);
+            const float yPrev = yFloor + tPrev * (yTop - yFloor);
+            const float yNext = yFloor + tNext * (yTop - yFloor);
 
             const float dxPx = (xNext - xPrev) * (vpWpx * 0.5f);
             const float dyPx = (yNext - yPrev) * (vpHpx * 0.5f);
@@ -11682,7 +11704,7 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
             for (int j = 0; j < n; ++j) {
                 float x = (n > 1) ? 2.0f * j / (n - 1) - 1.0f : 0.0f;
                 float t = qBound(0.0f, ((m_pxPeakHold[j] + cal) - minDbm) / range, 1.0f);
-                float y = yBot + t * (yTop - yBot);
+                float y = yFloor + t * (yTop - yFloor);
 
                 const int jPrev = qMax(j - 1, 0);
                 const int jNext = qMin(j + 1, n - 1);
@@ -11690,8 +11712,8 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
                 const float xNext = (n > 1) ? 2.0f * jNext / (n - 1) - 1.0f : 0.0f;
                 const float tPrev = qBound(0.0f, ((m_pxPeakHold[jPrev] + cal) - minDbm) / range, 1.0f);
                 const float tNext = qBound(0.0f, ((m_pxPeakHold[jNext] + cal) - minDbm) / range, 1.0f);
-                const float yPrev = yBot + tPrev * (yTop - yBot);
-                const float yNext = yBot + tNext * (yTop - yBot);
+                const float yPrev = yFloor + tPrev * (yTop - yFloor);
+                const float yNext = yFloor + tNext * (yTop - yFloor);
 
                 const float dxPx = (xNext - xPrev) * (vpWpx * 0.5f);
                 const float dyPx = (yNext - yPrev) * (vpHpx * 0.5f);
