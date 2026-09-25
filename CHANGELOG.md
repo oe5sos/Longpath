@@ -175,6 +175,18 @@
 
 ### Fixed
 
+- **Wasserfall ganz rot oder ganz schwarz, obwohl Clarity an war.** Clarity
+  schätzte den Rauschboden aus den FFT-Bins, eingefärbt werden aber die
+  Wasserfall-Bildpunkte nach Detektor und Mittelung. An einer SunSDR2 QRP
+  ohne Antenne lagen beide 17 dB auseinander (echtes I/Q: Rauschen bei 72 %
+  der Farbskala, rot) bzw. 10 dB in die andere Richtung (Einkanal-Zustand:
+  unter der Skala, schwarz). Der Wasserfall verankert Clarity's Fenster
+  jetzt am 30. Perzentil seiner eigenen Bildpunkte, geglättet über rund 2 s;
+  Abstände, Totband und Glättung bleiben Clarity's. Live an der QRP:
+  Rauschen in beiden Zuständen bei 20–22 % der Skala, ruhiges Blau.
+  AetherSDR schätzt ebenso auf den eingefärbten Werten
+  (`SpectrumWidget.cpp:8623-8654`). Prüfung `tst_waterfall_clarity_anchor`.
+
 - **SunSDR2 QRP: jeder Block kam achtmal, und die Abtastrate kam nie an
   -- beides behoben.** Drei Fehler, die nur zusammen richtig klingen:
   * Die QRP wiederholt jeden IQ-Block, bis der Host ihn mit derselben
