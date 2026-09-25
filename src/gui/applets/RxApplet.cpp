@@ -1299,6 +1299,28 @@ void RxApplet::setBoardCapabilities(const BoardCapabilities& caps)
         m_stepAttSpin->setRange(caps.attenuator.minDb, caps.attenuator.maxDb);
     }
 
+    // Die Preamp-Liste gehoert genauso zum Board. Gebaut wird das Applet
+    // vor jeder Verbindung (Hermes-Vorgabe), und connectSlice() fuellt nur
+    // nach, wenn die Scheibe NACH dem Verbinden gesetzt wird -- an der
+    // SunSDR2 QRP blieb so die ANAN-Liste 0/-10/-20/-30 stehen statt
+    // +10/0/-10/-20 (live 2026-09-25). Danach die Stufe waehlen, die der
+    // Regler gerade hat; preampModeChanged zieht spaetere Aenderungen nach.
+    if (m_preampCombo) {
+        const auto items = BoardCapsTable::preampItemsForBoard(
+            caps.board, caps.hasAlexFilters);
+        int current = m_preampCombo->currentData().toInt();
+        if (m_model && m_model->stepAttController()) {
+            current = static_cast<int>(m_model->stepAttController()->preampMode());
+        }
+        QSignalBlocker blk(m_preampCombo);
+        m_preampCombo->clear();
+        for (const auto& item : items) {
+            m_preampCombo->addItem(QString::fromLatin1(item.label), item.modeInt);
+        }
+        const int idx = m_preampCombo->findData(current);
+        if (idx >= 0) { m_preampCombo->setCurrentIndex(idx); }
+    }
+
     // B3: store caps for AntennaPopupBuilder (popup lambdas read this).
     m_popupCaps = caps;
 }
@@ -1831,6 +1853,16 @@ int RxApplet::visibleOvlBadgeCountForTest() const
 int RxApplet::preampComboItemCountForTest() const
 {
     return m_preampCombo ? m_preampCombo->count() : -1;
+}
+
+QStringList RxApplet::preampComboLabelsForTest() const
+{
+    QStringList out;
+    if (!m_preampCombo) { return out; }
+    for (int i = 0; i < m_preampCombo->count(); ++i) {
+        out << m_preampCombo->itemText(i);
+    }
+    return out;
 }
 
 // Phase 3P-F Task 4: parse ANT<n> label from the button text and return n.

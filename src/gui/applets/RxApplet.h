@@ -236,6 +236,8 @@ public:
     // Test-only: returns the item count in the preamp combo at construction.
     // Phase 3P-C Step 3: verifies per-board populate from BoardCapabilities.
     int preampComboItemCountForTest() const;
+    /// Die Beschriftungen der Preamp-Liste, von oben nach unten.
+    QStringList preampComboLabelsForTest() const;
 
     // Test-only: returns antenna number (1/2/3) shown by each button.
     // Phase 3P-F Task 4: verifies per-band wiring to AlexController.

@@ -228,6 +228,20 @@ private slots:
         QCOMPARE(applet.preampComboItemCountForTest(), 4);
     }
 
+    // Live 2026-09-25: das Applet entsteht vor der Verbindung (Hermes-
+    // Vorgabe); verbindet sich dann die QRP, muss die Liste mitwechseln.
+    void rxapplet_relists_preamp_when_the_board_changes()
+    {
+        RadioModel model;
+        RxApplet applet(nullptr, &model);
+        applet.setBoardCapabilities(BoardCapsTable::forBoard(HPSDRHW::Hermes));
+        QCOMPARE(applet.preampComboLabelsForTest().first(), QStringLiteral("0dB"));
+        applet.setBoardCapabilities(BoardCapsTable::forBoard(HPSDRHW::SunSdr2Qrp));
+        QCOMPARE(applet.preampComboLabelsForTest(),
+                 (QStringList{QStringLiteral("+10dB"), QStringLiteral("0dB"),
+                              QStringLiteral("-10dB"), QStringLiteral("-20dB")}));
+    }
+
     void rxapplet_hermes_with_alex_combo_has_seven_items()
     {
         RadioModel model;
