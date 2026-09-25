@@ -7089,6 +7089,7 @@ longpath_add_test(tst_dsp_menu_active_slice)
 # constrains QMenu, so the right-click waterfall panel opened below the bottom
 # edge on the lower pan of a 2v layout. Bench-reported 2026-07-28.
 longpath_add_test(tst_popup_placement)
+longpath_add_test(tst_window_placement_oversized)
 
 # Phase 3F Task B2: painted pan-layout preview tile (ported from AetherSDR
 # PanLayoutDialog.cpp LayoutThumbnail [@c6481cb]). Geometry tests guard

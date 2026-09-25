@@ -175,6 +175,14 @@
 
 ### Fixed
 
+- **Schwebendes Fenster größer als der Bildschirm: ungültiges `qBound`.**
+  `ensureOnVisibleScreen()` klemmte die Position mit vertauschten Grenzen,
+  sobald ein Fenster (etwa ein schwebender Panadapter mit seiner
+  Mindestgröße) breiter oder höher war als die verfügbare Fläche. Im
+  Debug-Bau brach Qts Zusicherung `!(max < min)` ab, im Release-Bau kam still
+  die linke/obere Kante heraus. Das ist jetzt das ausdrückliche Verhalten;
+  `tst_window_placement_oversized` hält es fest.
+
 - **Zeitweiliger Absturz beim Beenden (Applets nach dem RadioModel).** Das
   Hauptfenster baut das RadioModel vor seinen Kind-Widgets ab;
   `~RttyDecoderApplet`/`~CwDecoderApplet` fragten danach noch

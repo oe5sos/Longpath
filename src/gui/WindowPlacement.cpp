@@ -117,8 +117,16 @@ void ensureOnVisibleScreen(QWidget* w, QWidget* anchor, QSize minSize)
         ? anchorRect.center().y() - height / 2
         : avail.y() + (avail.height() - height) / 2;
 
-    x = qBound(avail.x(), x, avail.right()  - width);
-    y = qBound(avail.y(), y, avail.bottom() - height);
+    // Ist das Fenster breiter/hoeher als die verfuegbare Flaeche, laege
+    // die obere Grenze UNTER der unteren. qBound(min, v, max) mit
+    // max < min ist ungueltig: im Debug-Bau bricht Qts Zusicherung ab
+    // ("!(max < min)", qminmax.h -- tst_pan_floating_window,
+    // tst_panadapter_stack_layouts, tst_real_pan_float_state unter
+    // Debug/ASAN, 2026-09-25), im Release-Bau kam still die linke bzw.
+    // obere Kante heraus. Genau das wird jetzt ausdruecklich: ein
+    // uebergrosses Fenster beginnt an der linken/oberen Kante der Flaeche.
+    x = qBound(avail.x(), x, qMax(avail.x(), avail.right()  - width));
+    y = qBound(avail.y(), y, qMax(avail.y(), avail.bottom() - height));
 
     w->setGeometry(x, y, width, height);
     qCDebug(lcWindowPlacement) << "repositioned to visible area"
