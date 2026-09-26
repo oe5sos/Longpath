@@ -196,25 +196,29 @@ void LogbookWindow::setVisible(bool visible)
     // selbst zurueck. Jede gespeicherte Hoehe ging so verloren, und auf
     // dem Laptop schob macOS das Fenster dabei nach oben.
     //
-    // Darum: was vor dem ersten Zeigen vorgesehen war, kurz danach noch
+    // Darum: was vor dem ersten Zeigen vorgesehen war, danach noch
     // einmal anwenden -- nie kleiner als der Inhalt dann braucht. Die
     // Lage nur, wenn sie wirklich wiederhergestellt wurde; sonst bleibt
     // Qts Platzierung neben dem Hauptfenster.
+    //
+    // Mehrmals, nicht einmal: im Test ist die Mindesthoehe nach 20 ms
+    // eingeschwungen, im laufenden Programm (Karte, Karteikarte,
+    // Kennzahlen) spaeter -- live nach 50 ms noch 776 statt 637.
     const bool first = visible && !m_shownOnce;
     const QRect intended = geometry();
     QDialog::setVisible(visible);
     if (!first) { return; }
     m_shownOnce = true;
     const bool withPosition = m_geometryRestored;
-    QTimer::singleShot(50, this, [this, intended, withPosition]() {
-        if (!isVisible() || isMaximized() || isFullScreen()) { return; }
-        const QSize size = intended.size().expandedTo(minimumSizeHint());
-        if (withPosition) {
-            setGeometry(QRect(intended.topLeft(), size));
-        } else if (this->size() != size) {
-            resize(size);
-        }
-    });
+    for (int ms : {50, 300, 1000}) {
+        QTimer::singleShot(ms, this, [this, intended, withPosition]() {
+            if (!isVisible() || isMaximized() || isFullScreen()) { return; }
+            const QSize size = intended.size().expandedTo(minimumSizeHint());
+            const QRect want = withPosition ? QRect(intended.topLeft(), size)
+                                            : QRect(pos(), size);
+            if (geometry() != want) { setGeometry(want); }
+        });
+    }
 }
 
 void LogbookWindow::restoreSplitState()

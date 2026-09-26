@@ -65,7 +65,7 @@ private slots:
         w.resize(1000, 700);
         w.show();
         QVERIFY(QTest::qWaitForWindowExposed(&w));
-        QTest::qWait(200);
+        QTest::qWait(1300);
         qInfo() << "Mindestgroesse" << w.minimumSizeHint() << "Groesse" << w.size();
         // Voraussetzung: der Inhalt passt wirklich in 700 px Hoehe.
         QVERIFY(w.minimumSizeHint().height() <= 700);
@@ -83,7 +83,7 @@ private slots:
         w.resize(1000, 200);
         w.show();
         QVERIFY(QTest::qWaitForWindowExposed(&w));
-        QTest::qWait(200);
+        QTest::qWait(1300);
         QVERIFY(w.height() >= w.minimumSizeHint().height());
     }
 };
