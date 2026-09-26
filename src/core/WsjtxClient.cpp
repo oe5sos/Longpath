@@ -29,6 +29,7 @@
 //                                    Anthropic Claude Code.
 
 #include "WsjtxClient.h"
+#include "core/AppSettings.h"
 #include "AdifLog.h"
 #include "LogCategories.h"
 
@@ -67,7 +68,7 @@ WsjtxClient::~WsjtxClient()
 // PotaClient (B2), and DxClusterClient (B3) ports.
 QString WsjtxClient::logFilePath() const
 {
-    return QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation)
+    return AppSettings::dataDir()
            + "/wsjtx.log";
 }
 

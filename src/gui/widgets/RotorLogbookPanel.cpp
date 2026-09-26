@@ -237,7 +237,7 @@ RotorLogbookPanel::RotorLogbookPanel(RadioModel* radio, QrzClient* qrz,
 QString RotorLogbookPanel::logbookPath()
 {
     const QString dir =
-        QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
+        AppSettings::dataDir();
     QDir().mkpath(dir);
     return dir + QStringLiteral("/logbook.adi");
 }
@@ -1685,7 +1685,7 @@ void RotorLogbookPanel::downloadWorldImage(const QStringList& candidates,
     if (!m_net) { m_net = new QNetworkAccessManager(this); }
 
     const QString dest =
-        QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation)
+        AppSettings::dataDir()
         + QStringLiteral("/world.jpg");
 
     setStatus(QStringLiteral("Downloading world image (%1)…").arg(label));

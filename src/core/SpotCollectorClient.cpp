@@ -20,6 +20,7 @@
 //                                    AI tooling: Anthropic Claude Code.
 
 #include "SpotCollectorClient.h"
+#include "core/AppSettings.h"
 #include "LogCategories.h"
 
 #include <QRegularExpression>
@@ -54,7 +55,7 @@ SpotCollectorClient::~SpotCollectorClient()
 // Longpath's per-user state.
 QString SpotCollectorClient::logFilePath() const
 {
-    return QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation)
+    return AppSettings::dataDir()
            + "/spotcollector.log";
 }
 

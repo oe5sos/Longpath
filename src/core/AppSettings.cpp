@@ -245,6 +245,16 @@ QString AppSettings::resolveConfigDir(const QString& profile)
     return root + QStringLiteral("/profiles/") + profile;
 }
 
+QString AppSettings::dataDir()
+{
+    const QString override = qEnvironmentVariable("LONGPATH_CONFIG_DIR").trimmed();
+    if (!override.isEmpty()) {
+        QDir().mkpath(override);
+        return override;
+    }
+    return QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
+}
+
 QString AppSettings::resolveSettingsPath(const QString& profile)
 {
     return resolveConfigDir(profile) + QStringLiteral("/") + appFileBaseName()

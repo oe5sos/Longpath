@@ -62,6 +62,7 @@ mw0lge@grange-lane.co.uk
 //============================================================================================//
 
 #include "PureSignalApplet.h"
+#include "core/AppSettings.h"
 
 #include "core/PureSignal.h"
 #include "gui/HGauge.h"
@@ -335,8 +336,7 @@ void PureSignalApplet::wireRightClicks()
     // inside the lambda on m_ps presence so they're safe pre-coordinator.
     connect(m_saveBtn, &QPushButton::clicked, this, [this]() {
         if (!m_ps) { return; }
-        const QString defaultDir = QStandardPaths::writableLocation(
-                QStandardPaths::AppConfigLocation)
+        const QString defaultDir = AppSettings::dataDir()
             + QStringLiteral("/PureSignal/");
         QDir().mkpath(defaultDir);
         const QString filename = QFileDialog::getSaveFileName(
@@ -349,8 +349,7 @@ void PureSignalApplet::wireRightClicks()
 
     connect(m_restoreBtn, &QPushButton::clicked, this, [this]() {
         if (!m_ps) { return; }
-        const QString defaultDir = QStandardPaths::writableLocation(
-                QStandardPaths::AppConfigLocation)
+        const QString defaultDir = AppSettings::dataDir()
             + QStringLiteral("/PureSignal/");
         const QString filename = QFileDialog::getOpenFileName(
             this, tr("Restore PureSignal corrections"), defaultDir,

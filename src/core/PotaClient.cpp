@@ -62,7 +62,7 @@ PotaClient::~PotaClient()
 // from Task B1.
 QString PotaClient::logFilePath() const
 {
-    return QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation)
+    return AppSettings::dataDir()
            + "/pota.log";
 }
 

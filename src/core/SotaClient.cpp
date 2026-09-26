@@ -38,7 +38,7 @@ SotaClient::~SotaClient()
 
 QString SotaClient::logFilePath() const
 {
-    return QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation)
+    return AppSettings::dataDir()
            + "/sota.log";
 }
 
