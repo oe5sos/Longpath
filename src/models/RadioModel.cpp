@@ -1872,6 +1872,23 @@ RadioModel::RadioModel(QObject* parent)
     if (!m_dxccColorProvider->loadCtyDat()) {
         qWarning("cty.dat not loaded: DXCC colouring, flags and map fallback are off");
     }
+    // Und was schon gearbeitet ist: AetherSDR liest dafuer ein vom
+    // Betreiber gewaehltes ADIF ein und beobachtet es
+    // (From AetherSDR src/gui/MainWindow.cpp:1563-1568 [@d58e2b8a],
+    // importAdifFile + setAutoReload). Longpath hat genau ein Log, das
+    // eigene Logbuch (derselbe Pfad wie RotorLogbookPanel::logbookPath).
+    // Ohne es galt mit geladener cty.dat jeder Spot als neues Land, und
+    // der Spot-Hub zaehlte unter "New DXCC in feed" jeden Spot mit.
+    // Eingelesen im Hintergrund-Thread des Providers; nach jedem
+    // Schreiben des Logs (QSaveFile: ersetzen, der Ordner-Waechter
+    // nimmt die neue Datei auf) nach 2 s erneut.
+    {
+        const QString log = AppSettings::dataDir() + QStringLiteral("/logbook.adi");
+        if (QFileInfo::exists(log)) {
+            m_dxccColorProvider->importAdifFile(log);
+            m_dxccColorProvider->setAutoReload(true, log);
+        }
+    }
 
     // 2026-05-12 bench fix: seed FreeDVStationModel::setOurGridSquare
     // from the User/GridSquare AppSettings key.  Without this the
