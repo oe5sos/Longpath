@@ -1859,6 +1859,19 @@ RadioModel::RadioModel(QObject* parent)
     m_freeDvStationModel  = std::make_unique<FreeDVStationModel>(this);
     m_rxDecodeModel       = std::make_unique<RxDecodeModel>(/*maxSize*/ 200, this);
     m_dxccColorProvider   = std::make_unique<DxccColorProvider>(this);
+    // cty.dat laden (2026-09-26). Beim Port kam der Provider mit, nicht
+    // der Aufruf, der ihn fuellt, und nicht der Eintrag in resources.qrc:
+    // From AetherSDR src/gui/MainWindow.cpp:1555 [@d58e2b8a] --
+    // `m_dxccProvider.loadCtyDat(":/cty.dat");` ("DXCC spot coloring #330").
+    // Ohne ihn war der Parser leer: keine DXCC-Faerbung der Spots, keine
+    // Flagge und kein "schon gearbeitet" je Land im Rotor/Log-Feld, keine
+    // Ersatzposition auf der Logbuch-Karte (Betreiber-Log: 3304 Kontakte
+    // ohne Locator "could not be placed at all"). Hier statt im
+    // MainWindow, weil der Provider in Longpath dem RadioModel gehoert;
+    // vor jedem ADIF-Einlesen, das den Parser danach nur noch liest.
+    if (!m_dxccColorProvider->loadCtyDat()) {
+        qWarning("cty.dat not loaded: DXCC colouring, flags and map fallback are off");
+    }
 
     // 2026-05-12 bench fix: seed FreeDVStationModel::setOurGridSquare
     // from the User/GridSquare AppSettings key.  Without this the
