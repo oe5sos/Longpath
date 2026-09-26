@@ -3665,7 +3665,17 @@ double SpectrumWidget::peakDbmInSlicePassband() const
     for (int i = firstPx; i <= lastPx; ++i) {
         if (src[i] > peak) { peak = src[i]; }
     }
-    return static_cast<double>(peak);
+    // Roh zurueck an den MaxBin-Detektor: seit 2026-09-26 tragen die
+    // Pixelwerte Kalibrierung und 1-Hz-Normierung (updateSpectrumLinear,
+    // dbmScale). MeterPoller addiert die Kalibrierung selbst (Thetis
+    // console.cs:46881 [v2.10.3.13] max_bin + offset) -- sonst stuende sie
+    // doppelt im S-Meter, und die Normierung, eine Anzeigeeinstellung,
+    // ginge mit hinein (tst_notch_visual_does_not_perturb_noise_floor_or_
+    // maxbin, max_bin_passband_peak_stays_raw_under_calibration).
+    // Der Waechter -400 bleibt -400: bei negativer Kalibrierung (ANAN G2
+    // -4,476 dB) kaeme er sonst als -395,5 durch das "> -400"-Tor.
+    if (peak <= -400.0f) { return -400.0; }
+    return static_cast<double>(peak) - (m_dbmCalOffset + normalizeShiftDb());
 }
 
 // ---------------------------------------------------------------------------

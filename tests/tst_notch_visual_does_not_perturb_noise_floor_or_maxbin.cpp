@@ -45,6 +45,7 @@
 //                                    authoring via Anthropic Claude Code.
 // =================================================================
 
+#include <cmath>
 #include <QtTest/QtTest>
 #include <QApplication>
 #include <QMetaObject>
@@ -339,6 +340,35 @@ private slots:
         // The analog S-Meter's MaxBin mode is fed from this. Notching a loud
         // carrier must not drop the needle.
         QCOMPARE(onPeak, offPeak);
+    }
+
+    // Seit 2026-09-26 (PR #102) tragen die Pixelwerte die Kalibrierung und
+    // die 1-Hz-Normierung. Der MaxBin-Wert fuers S-Meter muss trotzdem roh
+    // bleiben: MeterPoller addiert die Kalibrierung selbst (Thetis
+    // console.cs:46881 max_bin + offset), sonst stuende sie doppelt drin,
+    // und die Normierung -- eine reine Anzeigeeinstellung -- ginge ins
+    // S-Meter.
+    void max_bin_passband_peak_stays_raw_under_calibration()
+    {
+        SpectrumWidget plain;
+        configure(plain);
+        feed(plain, 1);
+
+        SpectrumWidget cal;
+        configure(cal);
+        cal.setDbmCalOffset(15.0f);
+        cal.setDispNormalize(true);
+        feed(cal, 1);
+
+        QVERIFY2(plain.peakDbmInSlicePassband() > -400.0, "Sentinel -- Geometrie falsch");
+        // Die Kurve ist verschoben (kalibriert + normiert) ...
+        QVERIFY(std::abs(cal.renderedPixels()[kTonePixel]
+                         - plain.renderedPixels()[kTonePixel]) > 1.0f);
+        // ... der Messwert fuers S-Meter nicht.
+        QVERIFY2(std::abs(cal.peakDbmInSlicePassband() - plain.peakDbmInSlicePassband()) < 0.01,
+                 qPrintable(QStringLiteral("MaxBin %1 statt %2 -- Kalibrierung doppelt?")
+                                .arg(cal.peakDbmInSlicePassband())
+                                .arg(plain.peakDbmInSlicePassband())));
     }
 
     void active_peak_hold_sees_the_dent()
