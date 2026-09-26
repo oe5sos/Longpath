@@ -866,18 +866,73 @@ void AppSettings::rotateDailyBackup()
     }
 }
 
+// ── Binaere Werte (2026-09-26) ──────────────────────────────────────
+//
+// Jeder Wert wird als Text gespeichert: val.toString(). Fuer ein
+// QByteArray heisst das QString::fromUtf8() -- und jedes Byte, das kein
+// gueltiges UTF-8 ist, wird dabei zu U+FFFD. saveGeometry() und
+// saveState() liefern genau solche Bytes. In der Betreiber-Datei standen
+// zwoelf Fensterzustaende als Kette von Ersatzzeichen (Logbuch-Groesse,
+// -Aufteilung und -Spalten, Rotor/Log-Fenster, schwebende Panadapter,
+// Antennen-, Karten-, Verbindungs-, Spot-Hub- und FreeDV-Fenster);
+// restoreGeometry() lehnte sie ab, und jedes dieser Fenster ging an der
+// Vorgabe auf -- das Rotor/Log-Fenster in der Mitte.
+//
+// Jetzt wie bei QSettings: Bytes, die als Text nicht heil ankaemen,
+// werden als "@ByteArray(<base64>)" abgelegt und beim Lesen wieder zu
+// Bytes. Alles, was als Text ueberlebt -- also jeder bisher richtig
+// gespeicherte Wert, auch selbst base64-kodierte Zustaende --, bleibt
+// auf der Platte, wie es war.
+namespace {
+
+const QLatin1String kByteArrayOpen("@ByteArray(");
+
+bool survivesAsText(const QByteArray& bytes)
+{
+    for (const char c : bytes) {
+        const auto u = static_cast<unsigned char>(c);
+        // XML 1.0 kennt keine Steuerzeichen ausser Tab/Zeilenende.
+        if (u < 0x20 && u != '\t' && u != '\n' && u != '\r') { return false; }
+    }
+    return QString::fromUtf8(bytes).toUtf8() == bytes;
+}
+
+QString encodeValue(const QVariant& val)
+{
+    if (val.typeId() == QMetaType::QByteArray) {
+        const QByteArray bytes = val.toByteArray();
+        if (!survivesAsText(bytes)) {
+            return kByteArrayOpen + QString::fromLatin1(bytes.toBase64())
+                   + QLatin1Char(')');
+        }
+    }
+    return val.toString();
+}
+
+QVariant decodeValue(const QString& stored)
+{
+    if (stored.startsWith(kByteArrayOpen) && stored.endsWith(QLatin1Char(')'))) {
+        const QStringView b64 = QStringView(stored).mid(
+            kByteArrayOpen.size(), stored.size() - kByteArrayOpen.size() - 1);
+        return QVariant(QByteArray::fromBase64(b64.toLatin1()));
+    }
+    return QVariant(stored);
+}
+
+} // namespace
+
 QVariant AppSettings::value(const QString& key, const QVariant& defaultValue) const
 {
     auto it = m_settings.constFind(key);
     if (it != m_settings.constEnd()) {
-        return QVariant(it.value());
+        return decodeValue(it.value());
     }
     return defaultValue;
 }
 
 void AppSettings::setValue(const QString& key, const QVariant& val)
 {
-    const QString str = val.toString();
+    const QString str = encodeValue(val);
     auto it = m_settings.find(key);
     if (it != m_settings.end() && it.value() == str) { return; }   // nichts Neues
     m_settings.insert(key, str);
@@ -908,14 +963,14 @@ QVariant AppSettings::stationValue(const QString& key, const QVariant& defaultVa
 {
     auto it = m_stationSettings.constFind(key);
     if (it != m_stationSettings.constEnd()) {
-        return QVariant(it.value());
+        return decodeValue(it.value());
     }
     return defaultValue;
 }
 
 void AppSettings::setStationValue(const QString& key, const QVariant& val)
 {
-    m_stationSettings.insert(key, val.toString());
+    m_stationSettings.insert(key, encodeValue(val));
 }
 
 QString AppSettings::stationName() const
@@ -1123,7 +1178,7 @@ void AppSettings::setDiscoveryProfile(DiscoveryProfile p)
 void AppSettings::setHardwareValue(const QString& mac, const QString& key, const QVariant& value)
 {
     const QString fullKey = QStringLiteral("hardware/%1/%2").arg(mac, key);
-    m_settings.insert(fullKey, value.toString());
+    m_settings.insert(fullKey, encodeValue(value));
 }
 
 QVariant AppSettings::hardwareValue(const QString& mac, const QString& key,
@@ -1132,7 +1187,7 @@ QVariant AppSettings::hardwareValue(const QString& mac, const QString& key,
     const QString fullKey = QStringLiteral("hardware/%1/%2").arg(mac, key);
     auto it = m_settings.constFind(fullKey);
     if (it != m_settings.constEnd()) {
-        return QVariant(it.value());
+        return decodeValue(it.value());
     }
     return defaultValue;
 }
@@ -1144,7 +1199,7 @@ QMap<QString, QVariant> AppSettings::hardwareValues(const QString& mac) const
     for (auto it = m_settings.constBegin(); it != m_settings.constEnd(); ++it) {
         if (it.key().startsWith(prefix)) {
             const QString bareKey = it.key().mid(prefix.size());
-            result.insert(bareKey, QVariant(it.value()));
+            result.insert(bareKey, decodeValue(it.value()));
         }
     }
     return result;
