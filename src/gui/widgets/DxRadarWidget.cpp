@@ -397,9 +397,15 @@ void DxRadarWidget::paintRotor(QPainter& p, const QPointF& c, double R) const
     QString rest;
     if (known && m_rotorTargetDeg >= 0.0) {
         const double d = std::fmod(m_rotorTargetDeg - m_rotorDeg + 540.0, 360.0) - 180.0;
-        rest = QStringLiteral("→ %1  %2 %3°").arg(deg3(m_rotorTargetDeg))
-                   .arg(d < 0 ? QStringLiteral("CCW") : QStringLiteral("CW"))
-                   .arg(int(std::lround(std::abs(d))));
+        // Angekommen: wie die Karteikarte ("Already pointing there"),
+        // nicht "CCW 0°" (Nachttest 2026-09-26).
+        if (std::abs(d) < 1.5) {
+            rest = QStringLiteral("→ %1  on target").arg(deg3(m_rotorTargetDeg));
+        } else {
+            rest = QStringLiteral("→ %1  %2 %3°").arg(deg3(m_rotorTargetDeg))
+                       .arg(d < 0 ? QStringLiteral("CCW") : QStringLiteral("CW"))
+                       .arg(int(std::lround(std::abs(d))));
+        }
     } else if (m_rotorTargetDeg >= 0.0) {
         rest = QStringLiteral("→ %1").arg(deg3(m_rotorTargetDeg));
     }
