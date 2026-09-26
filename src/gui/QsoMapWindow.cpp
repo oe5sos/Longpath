@@ -391,7 +391,11 @@ void QsoMapWindow::buildUi()
     // Das kleine Rotor-Radar links der Karte. Quadratisch, so hoch wie
     // die Flaeche (resizeEvent); die Gradzahlen stehen in der Karteikarte.
     m_rotorRadar = new DxRadarWidget(this);
-    m_rotorRadar->setRotorReadout(false);
+    // Der Stand des Rotors immer sichtbar: Grad unten links, und
+    // "not connected", solange keine Ablesung kommt.
+    m_rotorRadar->setRotorReadout(true);
+    m_rotorRadar->setRotorCompact(true);
+    m_rotorRadar->setRotorStatusShown(true);
     m_rotorRadar->setVisible(false);
     // Ein Viertel der Breite, hoechstens 300 -- und keine Mindestbreite,
     // damit das Logbuch weiter auf die halbe Bildschirmbreite schrumpft
@@ -1280,6 +1284,7 @@ void QsoMapWindow::flyToStation(const QString& call, double lat, double lon,
 void QsoMapWindow::setRotorRadarShown(bool on)
 {
     m_rotorRadarShown = on;
+    m_radar->setRotorStatusShown(on);
     updateRotorRadarVisibility();
 }
 

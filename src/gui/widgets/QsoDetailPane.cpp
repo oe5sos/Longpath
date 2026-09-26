@@ -666,9 +666,16 @@ void QsoDetailPane::refreshBeam()
         m_travel->setText(QStringLiteral("Rotor at %1° — %2")
                               .arg(m_rotorDeg, 0, 'f', 0)
                               .arg(BeamHeading::advice(m)));
+        m_travel->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
+                                    .arg(QLatin1String(Style::kAmberWarn)));
         m_travel->setVisible(true);
     } else {
-        m_travel->setVisible(false);
+        // Der Stand muss immer zu sehen sein -- auch, dass es keinen gibt
+        // (Betreiber 2026-09-26). Eine erfundene Gradzahl waere schlimmer.
+        m_travel->setText(QStringLiteral("Rotor not connected — no current heading"));
+        m_travel->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
+                                    .arg(QLatin1String(Style::kTextScale)));
+        m_travel->setVisible(true);
     }
 }
 

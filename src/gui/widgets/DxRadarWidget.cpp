@@ -290,6 +290,18 @@ void DxRadarWidget::setRotorReadout(bool on)
     update();
 }
 
+void DxRadarWidget::setRotorCompact(bool on)
+{
+    m_rotorCompact = on;
+    update();
+}
+
+void DxRadarWidget::setRotorStatusShown(bool on)
+{
+    m_rotorStatusShown = on;
+    update();
+}
+
 void DxRadarWidget::paintRotor(QPainter& p, const QPointF& c, double R) const
 {
     const auto onRing = [&](double deg, double r) {
@@ -340,8 +352,7 @@ void DxRadarWidget::paintRotor(QPainter& p, const QPointF& c, double R) const
         p.drawPolygon(marker);
     }
 
-    if (m_rotorDeg < 0.0) { return; }
-
+    if (m_rotorDeg >= 0.0) {
     // Nadel: verjuengt zur Spitze, kurzes Gegengewicht hinter der Achse,
     // weicher Schein darunter -- wie im Contestprogramm und im
     // Rotor-Kompass des Rotor/Log-Felds.
@@ -373,26 +384,68 @@ void DxRadarWidget::paintRotor(QPainter& p, const QPointF& c, double R) const
     p.setBrush(amber);
     p.drawEllipse(c, 3.2, 3.2);
 
+    }
+
     if (!m_rotorReadout) { return; }
+    const bool known = m_rotorDeg >= 0.0;
+    if (!known && !m_rotorStatusShown && m_rotorTargetDeg < 0.0) { return; }
+
+    const auto deg3 = [](double d) {
+        return QStringLiteral("%1°").arg(int(std::lround(d)) % 360, 3, 10, QLatin1Char('0'));
+    };
+    QString rest;
+    if (known && m_rotorTargetDeg >= 0.0) {
+        const double d = std::fmod(m_rotorTargetDeg - m_rotorDeg + 540.0, 360.0) - 180.0;
+        rest = QStringLiteral("→ %1  %2 %3°").arg(deg3(m_rotorTargetDeg))
+                   .arg(d < 0 ? QStringLiteral("CCW") : QStringLiteral("CW"))
+                   .arg(int(std::lround(std::abs(d))));
+    } else if (m_rotorTargetDeg >= 0.0) {
+        rest = QStringLiteral("→ %1").arg(deg3(m_rotorTargetDeg));
+    }
+
     QFont big = p.font();
     big.setFamily(QStringLiteral("Menlo"));
-    big.setPixelSize(22);
     big.setBold(true);
+    QFont sm = big;
+    sm.setBold(false);
+    const QColor dim(Style::kTextScale);
+    if (m_rotorCompact) {
+        big.setPixelSize(16);
+        sm.setPixelSize(10);
+        const double y2 = height() - 8.0;
+        const double y1 = rest.isEmpty() ? y2 : y2 - 14.0;
+        p.setFont(big);
+        if (known) {
+            p.setPen(amber);
+            p.drawText(QPointF(6.0, y1), deg3(m_rotorDeg));
+        } else {
+            p.setFont(sm);
+            p.setPen(dim);
+            p.drawText(QPointF(6.0, y1), QStringLiteral("ROTOR  not connected"));
+        }
+        if (!rest.isEmpty()) {
+            p.setFont(sm);
+            p.setPen(QColor(Style::kTextPrimary));
+            p.drawText(QPointF(6.0, y2), rest);
+        }
+        return;
+    }
+
+    big.setPixelSize(22);
+    sm.setPixelSize(12);
     p.setFont(big);
-    p.setPen(amber);
-    p.drawText(QPointF(10.0, 30.0), QStringLiteral("%1°")
-        .arg(int(std::lround(m_rotorDeg)) % 360, 3, 10, QLatin1Char('0')));
-    if (m_rotorTargetDeg >= 0.0) {
-        QFont sm = big;
-        sm.setPixelSize(12);
-        sm.setBold(false);
+    if (known) {
+        p.setPen(amber);
+        p.drawText(QPointF(10.0, 30.0), deg3(m_rotorDeg));
+    } else {
+        p.setFont(sm);
+        p.setPen(dim);
+        p.drawText(QPointF(10.0, 26.0), QStringLiteral("ROTOR  not connected"));
+    }
+    if (!rest.isEmpty()) {
         p.setFont(sm);
         p.setPen(QColor(Style::kTextPrimary));
-        const double d = std::fmod(m_rotorTargetDeg - m_rotorDeg + 540.0, 360.0) - 180.0;
-        p.drawText(QPointF(10.0, 50.0), QStringLiteral("→ %1°  %2 %3°")
-            .arg(int(std::lround(m_rotorTargetDeg)) % 360, 3, 10, QLatin1Char('0'))
-            .arg(d < 0 ? QStringLiteral("CCW") : QStringLiteral("CW"))
-            .arg(int(std::lround(std::abs(d)))));
+        p.drawText(QPointF(10.0, 50.0), rest);
     }
 }
 

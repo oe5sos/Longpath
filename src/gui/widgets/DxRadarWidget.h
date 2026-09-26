@@ -65,6 +65,12 @@ public:
     // Ist-Grad und Rest oben links. Aus, wenn die Zahlen schon woanders
     // stehen (die Karteikarte im Logbuch).
     void setRotorReadout(bool on);
+    // Klein neben der Karte: Zahlen unten links statt gross oben, und
+    // "nicht verbunden", solange keine Ablesung da ist -- der Stand des
+    // Rotors muss immer zu sehen sein (Betreiber 2026-09-26: "man muss
+    // auch den aktuellen Stand des Rotors sehen!!!").
+    void setRotorCompact(bool on);
+    void setRotorStatusShown(bool on);
     double rotorHeading() const { return m_rotorDeg; }
     double rotorTarget() const { return m_rotorTargetDeg; }
 
@@ -106,6 +112,8 @@ private:
     double m_rotorTargetDeg{-1.0};
     double m_rotorBeamWidth{40.0};
     bool   m_rotorReadout{true};
+    bool   m_rotorCompact{false};
+    bool   m_rotorStatusShown{false};
     void paintRotor(QPainter& p, const QPointF& c, double R) const;
     QVector<MapPoint> m_points;
     QVector<Placed>   m_placed;
