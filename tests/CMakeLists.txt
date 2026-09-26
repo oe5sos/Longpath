@@ -5226,6 +5226,8 @@ longpath_add_test(tst_flat_map_flyto)
 longpath_add_test(tst_sandbox_data_dir)
 # Karteikarte im Logbuch: Drehrichtung aus QRZ-Koordinaten (2026-09-26).
 longpath_add_test(tst_logbook_beam_bearing)
+# Logbuch: Eingabezeile "NEW QSO" (2026-09-26).
+longpath_add_test(tst_logbook_entry_row)
 longpath_add_test(tst_qso_map_flyto_window)
 # -- Satelliten ueber dem Horizont auf der Karte + Stempel im Detailpaneel --
 longpath_add_test(tst_qso_map_satellites)

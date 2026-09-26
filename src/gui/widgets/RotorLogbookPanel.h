@@ -28,6 +28,8 @@
 #include <QVector>
 #include <QWidget>
 
+#include <limits>
+
 class QTimer;
 
 class QLabel;
@@ -107,6 +109,9 @@ public:
     // window keeps showing on top of a profile that never opened it.
     // No-op if the window was never created.
     void hideLogbook();
+    // Das offene Logbuch nach vorne holen, ohne es neu einzulesen (Start:
+    // Panadapter und Rotor/Log gehen nach ihm auf und lagen davor).
+    void raiseLogbookIfOpen();
 
     // Open the rotator setup dialog. Public for the same reason as
     // showLogbook(): an operator whose rotator is not working yet
@@ -240,8 +245,20 @@ private:
                             const QString& label);
     bool appendToLogFile(const LogEntry& entry, QString* error);
     LogEntry buildEntry() const;
+    // Das Geruest jedes neuen QSOs: Rufzeichen, Zeit, eigener Locator,
+    // und Frequenz / Band / Betriebsart vom Funkgeraet (2026-09-26, damit
+    // die Eingabezeile im Logbuch dasselbe loggt wie dieses Feld).
+    LogEntry draftFromRadio(const QString& call) const;
+    // Der eine Weg ins Log: Entfernung/Peilung, Satellitenstempel, die
+    // Doppelt-Frage (an askParent), Datei, Hochladen, Liste, qsoLogged.
+    // false, wenn nicht geloggt; *message sagt dann warum.
+    bool commitEntry(LogEntry e, QWidget* askParent, QString* message);
+    // Ein QSO aus der Eingabezeile des Logbuch-Fensters.
+    void logFromLogbook(const LogEntry& partial);
     void stampSatellites(LogEntry& e) const;
 
+    // Letzte echte Ablesung des Rotors, NaN solange keiner verbunden ist.
+    double              m_lastRotorAz{std::numeric_limits<double>::quiet_NaN()};
     RadioModel*         m_radio{nullptr};
     QrzClient*          m_qrz{nullptr};
     class SatelliteService* m_satellites{nullptr};
