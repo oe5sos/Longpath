@@ -33,7 +33,7 @@ private slots:
         d.setActualBearing(74.0);     // Parkstellung der Station
         d.setTargetBearing(11.0);     // OE5VVM, Laakirchen
         d.setState(RotorDialWidget::State::Turning);
-        for (int side : {130, 145, 160, 200, 260}) {
+        for (int side : {70, 80, 90, 100, 130, 145, 160, 200, 260}) {
             d.resize(side, side);
             d.show();
             QVERIFY(QTest::qWaitForWindowExposed(&d));
