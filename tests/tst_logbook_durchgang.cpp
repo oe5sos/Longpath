@@ -34,10 +34,12 @@
 #include <QTableWidget>
 #include <QTemporaryDir>
 #include <QTimer>
+#include <QTimeZone>
 
 #include "core/AdifLog.h"
 #include "core/QsoConfirmation.h"
 #include "gui/LogbookWindow.h"
+#include "gui/widgets/RotorLogbookPanel.h"
 #include "gui/QsoMapWindow.h"
 #include "gui/widgets/QsoDetailPane.h"
 #include "core/AppSettings.h"
@@ -220,6 +222,10 @@ private slots:
     void initTestCase()
     {
         QStandardPaths::setTestModeEnabled(true);
+        // Die Rotor/Log-Schritte loeschen und schreiben
+        // RotorLogbookPanel::logbookPath(). Eine gesetzte Sandbox-Variable
+        // lenkte das auf einen echten Ordner -- hier nie.
+        qunsetenv("LONGPATH_CONFIG_DIR");
         QVERIFY(m_dir.isValid());
         m_log = m_dir.filePath(QStringLiteral("logbook.adi"));
         const QString fixture = qEnvironmentVariable("LONGPATH_LOGBOOK_FIXTURE");
@@ -887,6 +893,169 @@ private slots:
             if (gone.contains(t->item(r, 0)->text() + t->item(r, 1)->text() + t->item(r, 2)->text())) { ++stillThere; }
         }
         QCOMPARE(stillThere, 0);
+    }
+
+    // Ein QSO aus WSJT-X, waehrend das Logbuch offen ist, danach eine
+    // Korrektur im Logbuch: das WSJT-X-QSO muss in der Datei bleiben.
+    // saveAll() schreibt den Stand des Fensters -- war der alt, loeschte
+    // die Korrektur das neue QSO (Nachttest 2026-09-26).
+    void aWsjtxContactSurvivesAnEditInTheOpenLogbook()
+    {
+        const QString path = RotorLogbookPanel::logbookPath();
+        QVERIFY2(!path.startsWith(QDir::homePath() + QStringLiteral("/Library/Preferences/Longpath/"))
+                 && !path.startsWith(QDir::homePath() + QStringLiteral("/.config/Longpath/")),
+                 qPrintable(QStringLiteral("Testpfad zeigt auf echte Daten: ") + path));
+        QFile::remove(path);
+        {
+            QFile f(path);
+            QVERIFY(f.open(QIODevice::WriteOnly));
+            f.write("t\n<EOH>\n"
+                    "<CALL:5>K1ABC <QSO_DATE:8>20260920 <TIME_ON:6>101500 <BAND:3>20m <MODE:3>SSB <EOR>\n"
+                    "<CALL:5>G4ABC <QSO_DATE:8>20260921 <TIME_ON:6>111500 <BAND:3>40m <MODE:2>CW <EOR>\n");
+        }
+        RotorLogbookPanel panel(nullptr, nullptr, nullptr);
+        panel.showLogbook();
+        LogbookWindow* w = panel.findChild<LogbookWindow*>();
+        QVERIFY(w);
+        QVERIFY(QTest::qWaitForWindowExposed(w));
+        QCOMPARE(w->entryCountForTesting(), 2);
+
+        LogEntry ft8;
+        ft8.call = QStringLiteral("JA1FT8");
+        ft8.timeOn = QDateTime(QDate(2026, 9, 26), QTime(22, 40, 15), QTimeZone::UTC);
+        ft8.band = QStringLiteral("20m");
+        ft8.mode = QStringLiteral("FT8");
+        ft8.freqMHz = 14.074;
+        panel.logExternalQso(ft8);
+        QCoreApplication::processEvents();
+        qInfo() << "Logbuch nach WSJT-X-QSO:" << w->entryCountForTesting() << "Kontakte";
+
+        // Korrektur an einem alten Kontakt.
+        QTableWidget* table = logTable(w);
+        int row = -1;
+        for (int r = 0; r < table->rowCount(); ++r) {
+            if (table->item(r, 2) && table->item(r, 2)->text() == QStringLiteral("G4ABC")) { row = r; }
+        }
+        QVERIFY(row >= 0);
+        table->setCurrentCell(row, 2);
+        autoAnswerModals(this, [](QWidget* m) {
+            auto* dlg = qobject_cast<QDialog*>(m);
+            if (!dlg) { return; }
+            auto* form = qobject_cast<QFormLayout*>(dlg->layout());
+            for (QLineEdit* e : dlg->findChildren<QLineEdit*>()) {
+                auto* l = form ? qobject_cast<QLabel*>(form->labelForField(e)) : nullptr;
+                if (l && l->text() == QStringLiteral("Comment")) { e->setText(QStringLiteral("korrigiert")); }
+            }
+            for (QDialogButtonBox* box : dlg->findChildren<QDialogButtonBox*>()) {
+                if (QPushButton* save = box->button(QDialogButtonBox::Save)) { save->click(); return; }
+            }
+        });
+        buttonWith(w, QStringLiteral("Edit…"))->click();
+
+        QStringList calls;
+        for (const LogEntry& e : AdifLog::read(path)) { calls << e.call; }
+        qInfo() << "Datei nach der Korrektur:" << calls;
+        QVERIFY2(calls.contains(QStringLiteral("JA1FT8")), "WSJT-X-QSO durch die Korrektur geloescht");
+        QCOMPARE(calls.size(), 3);
+        w->hide();
+        QFile::remove(path);
+    }
+
+    // Dasselbe, aber das WSJT-X-QSO kommt, WAEHREND der Bearbeiten-Dialog
+    // bzw. die Loesch-Rueckfrage offen ist: das Logbuch liest neu ein und
+    // sortiert um -- bearbeitet/geloescht werden muss trotzdem der
+    // Kontakt, der gewaehlt war.
+    void aWsjtxContactArrivingDuringADialogChangesNothingElse()
+    {
+        const QString path = RotorLogbookPanel::logbookPath();
+        QVERIFY2(!path.startsWith(QDir::homePath() + QStringLiteral("/Library/Preferences/Longpath/"))
+                 && !path.startsWith(QDir::homePath() + QStringLiteral("/.config/Longpath/")),
+                 qPrintable(QStringLiteral("Testpfad zeigt auf echte Daten: ") + path));
+        auto writeLog = [&path]() {
+            QFile::remove(path);
+            QFile f(path);
+            f.open(QIODevice::WriteOnly);
+            f.write("t\n<EOH>\n"
+                    "<CALL:5>K1ABC <QSO_DATE:8>20260920 <TIME_ON:6>101500 <BAND:3>20m <MODE:3>SSB <EOR>\n"
+                    "<CALL:5>G4ABC <QSO_DATE:8>20260921 <TIME_ON:6>111500 <BAND:3>40m <MODE:2>CW <EOR>\n");
+        };
+        auto ft8 = [](const QString& call, int minute) {
+            LogEntry e;
+            e.call = call;
+            e.timeOn = QDateTime(QDate(2026, 9, 26), QTime(22, minute, 15), QTimeZone::UTC);
+            e.band = QStringLiteral("20m");
+            e.mode = QStringLiteral("FT8");
+            return e;
+        };
+        auto rowOf = [](QTableWidget* t, const QString& call) {
+            for (int r = 0; r < t->rowCount(); ++r) {
+                if (t->item(r, 2) && t->item(r, 2)->text() == call) { return r; }
+            }
+            return -1;
+        };
+
+        // Bearbeiten
+        writeLog();
+        {
+            RotorLogbookPanel panel(nullptr, nullptr, nullptr);
+            panel.showLogbook();
+            LogbookWindow* w = panel.findChild<LogbookWindow*>();
+            QVERIFY(QTest::qWaitForWindowExposed(w));
+            QTableWidget* t = logTable(w);
+            t->setCurrentCell(rowOf(t, QStringLiteral("G4ABC")), 2);
+            RotorLogbookPanel* pp = &panel;
+            autoAnswerModals(this, [pp, ft8](QWidget* m) {
+                auto* dlg = qobject_cast<QDialog*>(m);
+                if (!dlg) { return; }
+                pp->logExternalQso(ft8(QStringLiteral("JA1FT8"), 40));   // mitten im Dialog
+                auto* form = qobject_cast<QFormLayout*>(dlg->layout());
+                for (QLineEdit* e : dlg->findChildren<QLineEdit*>()) {
+                    auto* l = form ? qobject_cast<QLabel*>(form->labelForField(e)) : nullptr;
+                    if (l && l->text() == QStringLiteral("Comment")) { e->setText(QStringLiteral("korrigiert")); }
+                }
+                for (QDialogButtonBox* box : dlg->findChildren<QDialogButtonBox*>()) {
+                    if (QPushButton* save = box->button(QDialogButtonBox::Save)) { save->click(); return; }
+                }
+            });
+            buttonWith(w, QStringLiteral("Edit…"))->click();
+            QMultiMap<QString, QString> byCall;
+            for (const LogEntry& e : AdifLog::read(path)) { byCall.insert(e.call, e.comment); }
+            qInfo() << "Bearbeiten mit WSJT-X dazwischen:" << byCall;
+            QCOMPARE(byCall.size(), 3);
+            QCOMPARE(byCall.value(QStringLiteral("G4ABC")), QStringLiteral("korrigiert"));
+            QVERIFY(byCall.contains(QStringLiteral("JA1FT8")));
+            QCOMPARE(byCall.value(QStringLiteral("JA1FT8")), QString());
+            w->hide();
+        }
+
+        // Loeschen
+        writeLog();
+        {
+            RotorLogbookPanel panel(nullptr, nullptr, nullptr);
+            panel.showLogbook();
+            LogbookWindow* w = panel.findChild<LogbookWindow*>();
+            QVERIFY(QTest::qWaitForWindowExposed(w));
+            QTableWidget* t = logTable(w);
+            t->clearSelection();
+            t->selectRow(rowOf(t, QStringLiteral("G4ABC")));
+            RotorLogbookPanel* pp = &panel;
+            autoAnswerModals(this, [pp, ft8](QWidget* m) {
+                auto* box = qobject_cast<QMessageBox*>(m);
+                if (!box) { return; }
+                pp->logExternalQso(ft8(QStringLiteral("VK2FT8"), 41));   // mitten in der Rueckfrage
+                box->button(QMessageBox::Yes)->click();
+            });
+            buttonWith(w, QStringLiteral("Delete"))->click();
+            QStringList calls;
+            for (const LogEntry& e : AdifLog::read(path)) { calls << e.call; }
+            qInfo() << "Loeschen mit WSJT-X dazwischen:" << calls;
+            QCOMPARE(calls.size(), 2);
+            QVERIFY(calls.contains(QStringLiteral("K1ABC")));
+            QVERIFY(calls.contains(QStringLiteral("VK2FT8")));
+            QVERIFY(!calls.contains(QStringLiteral("G4ABC")));
+            w->hide();
+        }
+        QFile::remove(path);
     }
 };
 

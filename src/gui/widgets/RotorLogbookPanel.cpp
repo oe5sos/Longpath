@@ -2259,6 +2259,11 @@ void RotorLogbookPanel::logExternalQso(const LogEntry& entry)
         return;
     }
 
+    // Ein offenes Logbuch liest mit. Sonst haelt es den alten Stand,
+    // und seine naechste Korrektur (saveAll schreibt die ganze Datei)
+    // loeschte dieses QSO wieder (Nachttest 2026-09-26).
+    if (m_logWindow) { m_logWindow->reload(); }
+
     QString msg = QStringLiteral("Logged %1 from WSJT-X").arg(e.call);
     if (!e.band.isEmpty()) { msg += QStringLiteral(" on %1").arg(e.band); }
     if (m_uploader && m_uploader->isConfigured()) {
@@ -2298,6 +2303,10 @@ void RotorLogbookPanel::markUploaded(const QString& call)
         // consequence is that it gets offered for upload again, where
         // QRZ will call it a duplicate.
         qWarning("Couldn't record the QRZ upload: %s", qPrintable(err));
+    } else if (m_logWindow) {
+        // Wie beim WSJT-X-QSO: sonst schriebe die naechste Korrektur im
+        // Logbuch den Vermerk wieder zurueck.
+        m_logWindow->reload();
     }
     m_lastLogged = LogEntry{};
 }

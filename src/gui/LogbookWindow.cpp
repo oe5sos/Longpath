@@ -1345,6 +1345,30 @@ bool LogbookWindow::saveAll()
     return false;
 }
 
+namespace {
+
+// Derselbe Kontakt nach einem modalen Dialog wiederfinden. Waehrend
+// "Edit" oder die Loesch-Rueckfrage offen stehen, laeuft die
+// Ereignisschleife weiter -- ein QSO aus WSJT-X liest das Logbuch neu
+// ein, und m_all ist danach neu sortiert (neuestes zuerst): der alte
+// Index zeigt auf den Nachbarn. Wiedererkannt am ganzen Datensatz,
+// nicht an isSameQso(), das eine Zeittoleranz hat und zwei Kontakte
+// derselben Station kurz hintereinander verwechseln wuerde.
+int indexOfRecord(const QVector<LogEntry>& all, const QString& record,
+                  int hint, const QSet<int>& taken = {})
+{
+    if (hint >= 0 && hint < all.size() && !taken.contains(hint)
+        && all.at(hint).toAdifRecord() == record) {
+        return hint;
+    }
+    for (int i = 0; i < all.size(); ++i) {
+        if (!taken.contains(i) && all.at(i).toAdifRecord() == record) { return i; }
+    }
+    return -1;
+}
+
+} // namespace
+
 void LogbookWindow::editSelected()
 {
     const int view = m_table->currentRow();
@@ -1352,6 +1376,7 @@ void LogbookWindow::editSelected()
     if (idx < 0) { return; }
 
     LogEntry e = m_all.at(idx);
+    const QString original = e.toAdifRecord();
 
     QDialog dlg(this);
     dlg.setWindowTitle(QStringLiteral("Edit %1").arg(e.call));
@@ -1439,6 +1464,10 @@ void LogbookWindow::editSelected()
     const auto edited = [&shown](const QLineEdit* le) { return le->text() != shown.value(le); };
 
     if (dlg.exec() != QDialog::Accepted) { return; }
+    // Waehrend des Dialogs neu eingelesen? Dann steht der Kontakt
+    // anderswo -- oder gar nicht mehr.
+    const int at = indexOfRecord(m_all, original, idx);
+    if (at < 0) { return; }
 
     if (call->text().trimmed().isEmpty()) {
         QMessageBox::warning(this, QStringLiteral("Logbook"),
@@ -1480,7 +1509,7 @@ void LogbookWindow::editSelected()
     if (edited(country)) { e.country      = country->text().trimmed(); }
     if (edited(comment)) { e.comment      = comment->text().trimmed(); }
 
-    m_all[idx] = e;
+    m_all[at] = e;
     if (saveAll()) { reload(); }
 }
 
@@ -1490,6 +1519,8 @@ void LogbookWindow::deleteSelected()
     // is being rebuilt underneath is how you remove the wrong contact.
     QList<int> victims = selectedSourceRows();
     if (victims.isEmpty()) { return; }
+    QList<QPair<QString, int>> records;
+    for (int idx : victims) { records.append({m_all.at(idx).toAdifRecord(), idx}); }
 
     const QString question = victims.size() == 1
         ? QStringLiteral("Delete the contact with %1?")
@@ -1502,6 +1533,14 @@ void LogbookWindow::deleteSelected()
         return;
     }
 
+    // Nach der Rueckfrage wiederfinden (siehe indexOfRecord): geloescht
+    // wird, was gefragt wurde, nicht was inzwischen an der Stelle steht.
+    QSet<int> found;
+    for (const auto& [record, hint] : records) {
+        const int at = indexOfRecord(m_all, record, hint, found);
+        if (at >= 0) { found.insert(at); }
+    }
+    victims = QList<int>(found.begin(), found.end());
     std::sort(victims.begin(), victims.end(), std::greater<int>());
     for (int idx : victims) { m_all.removeAt(idx); }
     if (saveAll()) { reload(); }
