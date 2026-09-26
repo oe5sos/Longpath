@@ -125,6 +125,13 @@ struct MergeResult {
 // Still conservative in one respect: a value already present locally is
 // left alone rather than overwritten. Adding what is missing cannot
 // destroy anything; replacing what is there can.
+//
+// One exception (2026-09-26): a received confirmation may arrive where
+// the local copy says it has not. QSL_RCVD / LOTW_QSL_RCVD /
+// EQSL_QSL_RCVD go from anything unconfirmed (N, R, I, empty) to Y/V,
+// with their date; never the other way. Many loggers -- and the QRZ
+// export -- write "N" explicitly, and without this a confirmation
+// report changed nothing on exactly those contacts.
 MergeResult merge(const QVector<LogEntry>& existing,
                   const QVector<LogEntry>& incoming);
 
