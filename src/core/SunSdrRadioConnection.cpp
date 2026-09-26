@@ -232,6 +232,8 @@ void SunSdrRadioConnection::connectToRadio(const RadioInfo& info)
     m_rxLevelGain = static_cast<float>(std::pow(10.0, m_profile->rxLevelTrimDb / 20.0));
     m_singleChannelWarned = false;
     m_singleChannelSeen = false;
+    m_iqConfirmed = false;
+    m_streamStartTimer.invalidate();
     m_qCheckTimer.invalidate();
     m_qNonZeroInWindow = 0;
     m_qSamplesInWindow = 0;
@@ -1200,6 +1202,37 @@ void SunSdrRadioConnection::processStreamDatagram(const QByteArray& data,
     // vergleichbar bleiben.
     if (m_rxLevelGain != 1.0f) {
         for (float& v : samples) { v *= m_rxLevelGain; }
+    }
+
+    // ── Einschaltstoss stumm ── 2026-09-26 ──────────────────────────
+    //
+    // Frisch eingeschaltet liefert die QRP nur I (Q = 0), bis
+    // setReceiverFrequency() mit 0x07 echtes I/Q einschaltet. Dazwischen
+    // liegt rund eine Sekunde (Protokoll 26.09.: verbunden 58,436, 0x07
+    // 58,581, Q ungleich 0 erst in der naechsten DIAG-Sekunde), in der
+    // die Seitenbaender uebereinanderliegen und der Pegel ~20 dB zu hoch
+    // ist -- Betreiber: "war kurz ganz laut". Solange ein Block keinen
+    // einzigen Q-Wert traegt, geht Stille weiter (das Spektrum zeigt dann
+    // den Thetis-Boden -200 dBm), hoechstens m_singleChannelHoldMs ab dem
+    // ersten Block. Bleibt die QRP laenger einkanalig, laeuft das Signal
+    // wie bisher durch und die Warnung oben sagt, warum.
+    //
+    // Echtes I/Q ohne Antenne hat ~17 % Q-Werte ungleich 0; ein Block
+    // (~200 Paare) ist dann praktisch nie ganz leer. Ein einziger Block
+    // mit Q schaltet die Sperre fuer diese Verbindung ab.
+    if (!m_iqConfirmed) {
+        bool anyQ = false;
+        for (int i = 1; i < samples.size(); i += 2) {
+            if (samples[i] != 0.0f) { anyQ = true; break; }
+        }
+        if (anyQ) {
+            m_iqConfirmed = true;
+        } else {
+            if (!m_streamStartTimer.isValid()) { m_streamStartTimer.start(); }
+            if (m_streamStartTimer.elapsed() < m_singleChannelHoldMs) {
+                samples.fill(0.0f);
+            }
+        }
     }
 
     emit iqDataReceived(/*hwReceiverIndex=*/0, samples);

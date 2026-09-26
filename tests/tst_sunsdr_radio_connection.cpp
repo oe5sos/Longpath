@@ -95,6 +95,30 @@ QByteArray silentIqPacket()
     return pkt;
 }
 
+// Ein QRP-Block: I (Bytes 3-5 je Paar) traegt immer Daten, Q (Bytes 0-2)
+// nur mit withQ -- nach dem Einschalten bleibt Q exakt 0.
+QByteArray qrpBlock(quint16 seq, bool withQ)
+{
+    QByteArray pkt = SunSdr::buildIqHeader(
+        SunSdr::kProfileQrp, SunSdr::kOpIqRxIdle, seq, 0x01, 0x00);
+    QByteArray payload(SunSdr::kIqPayloadSize, char(0));
+    for (int k = 0; k < SunSdr::kIqPayloadSize; k += 6) {
+        payload[k + 3] = char(7);
+        if (withQ) { payload[k] = char(5); }
+    }
+    pkt.append(payload);
+    return pkt;
+}
+
+double peakOf(const QList<QVariant>& emission)
+{
+    double peak = 0.0;
+    for (const float v : emission.at(1).value<QVector<float>>()) {
+        peak = std::max(peak, double(std::abs(v)));
+    }
+    return peak;
+}
+
 // Step 3 (SunSDR2 QRP TX-chain plan): the exact same "armed, in-band,
 // mode-allowed" TxCheckContext the Step 2 tests above already use
 // (setMoxAcceptedWhenArmedAndInBandSendsZeroBytes()'s own ctx) — reused
@@ -847,6 +871,51 @@ private slots:
         QTest::qWait(1100);
         conn.feedStreamDatagramFromSenderForTest(onlyI(2), radio);
         QVERIFY(conn.singleChannelSeenForTest());
+    }
+
+    // Frisch eingeschaltet (nur I) war der Ton rund eine Sekunde laut, bis
+    // 0x07 echtes I/Q einschaltete (Betreiber 2026-09-26: "war kurz ganz
+    // laut"). Bis zum ersten Block mit Q geht Stille weiter; danach laeuft
+    // alles durch, auch ein spaeterer Block ohne Q.
+    void startupSingleChannelIsSilentUntilIqArrives()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        conn.setRxReadyForTest(true);
+        QSignalSpy iqSpy(&conn, &RadioConnection::iqDataReceived);
+
+        conn.feedStreamDatagramForTest(qrpBlock(1, /*withQ=*/false));
+        QCOMPARE(iqSpy.count(), 1);
+        QCOMPARE(peakOf(iqSpy.last()), 0.0);        // nur I -> Stille
+        conn.feedStreamDatagramForTest(qrpBlock(2, /*withQ=*/true));
+        QVERIFY(peakOf(iqSpy.last()) > 0.0);        // I/Q -> durch
+        conn.feedStreamDatagramForTest(qrpBlock(3, /*withQ=*/false));
+        QVERIFY(peakOf(iqSpy.last()) > 0.0);        // danach nie mehr gesperrt
+    }
+
+    // Bleibt die QRP einkanalig (0x07 kam nicht an), laeuft das Signal nach
+    // der Frist wie frueher durch -- lieber falsch als gar nichts, die
+    // Einkanal-Warnung sagt dann warum.
+    void singleChannelPassesAfterTheHold()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        conn.setRxReadyForTest(true);
+        conn.setSingleChannelHoldMsForTest(100);
+        QSignalSpy iqSpy(&conn, &RadioConnection::iqDataReceived);
+
+        conn.feedStreamDatagramForTest(qrpBlock(1, /*withQ=*/false));
+        QCOMPARE(iqSpy.count(), 1);
+        QCOMPARE(peakOf(iqSpy.last()), 0.0);
+        QTest::qWait(150);
+        conn.feedStreamDatagramForTest(qrpBlock(2, /*withQ=*/false));
+        QVERIFY(peakOf(iqSpy.last()) > 0.0);
     }
 
     // onConnectTimeout()'s gotBeacon=true branch (a beacon replied, the
