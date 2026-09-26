@@ -704,6 +704,11 @@ void LogbookWindow::buildFilterBar(QVBoxLayout* col)
         QSignalBlocker b1(m_search), b2(m_bandBox), b3(m_modeBox);
         QSignalBlocker b4(m_gridEdit), b5(m_countryEdit), b6(m_useDates);
         QSignalBlocker b7(m_activationBox);
+        // „Unconfirmed only" kam nach Clear dazu und blieb stehen: die
+        // Tabelle blieb gefiltert, obwohl Clear gedrueckt war (Nachttest
+        // 2026-09-26).
+        QSignalBlocker b8(m_unconfirmedOnly);
+        m_unconfirmedOnly->setChecked(false);
         m_search->clear();
         m_bandBox->setCurrentIndex(0);
         m_modeBox->setCurrentIndex(0);
@@ -1420,6 +1425,19 @@ void LogbookWindow::editSelected()
     connect(box, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
     connect(box, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
 
+    // Was der Dialog beim Oeffnen zeigte. Nur ein Feld, dessen Text sich
+    // davon unterscheidet, wird uebernommen und dabei in Form gebracht --
+    // ein unveraendertes Feld bleibt, wie es in der Datei steht.
+    // Nachttest 2026-09-26: 1495 Kontakte im Betreiber-Log tragen den
+    // Locator in der ueblichen Schreibweise "PL05sa"; wer nur den
+    // Kommentar aenderte, bekam "PL05SA" mitgeschrieben. Ebenso das
+    // Datum: ein Kontakt ohne gueltige Zeit bekaeme sonst still, was das
+    // Feld ohne Wert anzeigt.
+    const QDateTime shownWhen = when->dateTime();
+    QHash<const QLineEdit*, QString> shown;
+    for (const QLineEdit* le : dlg.findChildren<QLineEdit*>()) { shown.insert(le, le->text()); }
+    const auto edited = [&shown](const QLineEdit* le) { return le->text() != shown.value(le); };
+
     if (dlg.exec() != QDialog::Accepted) { return; }
 
     if (call->text().trimmed().isEmpty()) {
@@ -1428,35 +1446,39 @@ void LogbookWindow::editSelected()
         return;
     }
 
-    e.call         = call->text().trimmed().toUpper();
-    e.timeOn       = when->dateTime();
-    e.band         = band->text().trimmed();
-    e.mode         = mode->text().trimmed().toUpper();
-    e.submode      = submode->text().trimmed().toUpper();
-    e.rstSent      = sent->text().trimmed();
-    e.rstRcvd      = rcvd->text().trimmed();
-    e.gridSquare   = grid->text().trimmed().toUpper();
-    e.myGridSquare = myGrid->text().trimmed().toUpper();
+    if (edited(call))    { e.call         = call->text().trimmed().toUpper(); }
+    if (when->dateTime() != shownWhen) { e.timeOn = when->dateTime(); }
+    if (edited(band))    { e.band         = band->text().trimmed(); }
+    if (edited(mode))    { e.mode         = mode->text().trimmed().toUpper(); }
+    if (edited(submode)) { e.submode      = submode->text().trimmed().toUpper(); }
+    if (edited(sent))    { e.rstSent      = sent->text().trimmed(); }
+    if (edited(rcvd))    { e.rstRcvd      = rcvd->text().trimmed(); }
+    if (edited(grid))    { e.gridSquare   = grid->text().trimmed().toUpper(); }
+    if (edited(myGrid))  { e.myGridSquare = myGrid->text().trimmed().toUpper(); }
 
-    e.mySotaRef.clear();
-    e.myPotaRef.clear();
-    if (const QString mine = myActivation->text().trimmed().toUpper();
-        !mine.isEmpty()) {
-        if (mine.contains(QLatin1Char('/'))) { e.mySotaRef = mine; }
-        else                                 { e.myPotaRef = mine; }
+    if (edited(myActivation)) {
+        e.mySotaRef.clear();
+        e.myPotaRef.clear();
+        if (const QString mine = myActivation->text().trimmed().toUpper();
+            !mine.isEmpty()) {
+            if (mine.contains(QLatin1Char('/'))) { e.mySotaRef = mine; }
+            else                                 { e.myPotaRef = mine; }
+        }
     }
-    e.sotaRef.clear();
-    e.potaRef.clear();
-    if (const QString theirs = theirActivation->text().trimmed().toUpper();
-        !theirs.isEmpty()) {
-        if (theirs.contains(QLatin1Char('/'))) { e.sotaRef = theirs; }
-        else                                   { e.potaRef = theirs; }
+    if (edited(theirActivation)) {
+        e.sotaRef.clear();
+        e.potaRef.clear();
+        if (const QString theirs = theirActivation->text().trimmed().toUpper();
+            !theirs.isEmpty()) {
+            if (theirs.contains(QLatin1Char('/'))) { e.sotaRef = theirs; }
+            else                                   { e.potaRef = theirs; }
+        }
     }
 
-    e.name         = name->text().trimmed();
-    e.qth          = qth->text().trimmed();
-    e.country      = country->text().trimmed();
-    e.comment      = comment->text().trimmed();
+    if (edited(name))    { e.name         = name->text().trimmed(); }
+    if (edited(qth))     { e.qth          = qth->text().trimmed(); }
+    if (edited(country)) { e.country      = country->text().trimmed(); }
+    if (edited(comment)) { e.comment      = comment->text().trimmed(); }
 
     m_all[idx] = e;
     if (saveAll()) { reload(); }
