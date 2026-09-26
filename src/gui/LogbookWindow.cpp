@@ -2097,6 +2097,9 @@ void LogbookWindow::buildEntryRow(QVBoxLayout* col)
     m_entryCall->setStyleSheet(Style::lineEditStyle());
     m_entryCall->setFont(Style::monoFont(m_entryCall->font(), 14, QFont::Bold));
     m_entryCall->setFixedWidth(170);
+    // Fest, nicht "Expanding" (Vorgabe von QLineEdit): sonst gibt das
+    // FlowLayout dem Feld Platz, den es nicht nehmen kann -- eine Luecke.
+    m_entryCall->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
     m_entryCall->setToolTip(QStringLiteral(
         "The station you are working. Filters the log below as you type, "
         "so you see at once whether and when you worked them before."));
@@ -2132,11 +2135,13 @@ void LogbookWindow::buildEntryRow(QVBoxLayout* col)
     m_entryRstS = new QLineEdit(QStringLiteral("59"), this);
     m_entryRstS->setStyleSheet(Style::lineEditStyle());
     m_entryRstS->setFixedWidth(52);
+    m_entryRstS->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
     row->addWidget(m_entryRstS);
     row->addWidget(small(QStringLiteral("R")));
     m_entryRstR = new QLineEdit(QStringLiteral("59"), this);
     m_entryRstR->setStyleSheet(Style::lineEditStyle());
     m_entryRstR->setFixedWidth(52);
+    m_entryRstR->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
     row->addWidget(m_entryRstR);
 
     m_entryComment = new QLineEdit(this);
@@ -2249,7 +2254,10 @@ void LogbookWindow::refreshRadioReadout()
         m_entryFreq->setText(QStringLiteral("—"));
         m_entryMode->setVisible(false);
         m_entryBand->setVisible(false);
-        m_entrySource->setText(QStringLiteral("no radio"));
+        // Ein Funkgeraet gibt es, nur noch keine Verbindung (und damit
+        // keinen Empfaenger) -- "no radio" waere falsch.
+        m_entrySource->setText(m_radio ? QStringLiteral("radio not connected")
+                                       : QStringLiteral("no radio"));
         return;
     }
     m_entryFreq->setText(dottedHz(s->frequency()));
