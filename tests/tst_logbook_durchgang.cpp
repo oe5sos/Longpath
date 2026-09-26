@@ -819,6 +819,75 @@ private slots:
         QVERIFY(text.trimmed().endsWith(QStringLiteral("END-OF-LOG:")));
         qInfo().noquote() << "Meldungen:" << told.join(QStringLiteral(" | ")).simplified();
     }
+
+    // Sortieren: die Reihenfolge stimmt wirklich (Datum+Zeit, Rufzeichen,
+    // Frequenz als Zahl), in beide Richtungen.
+    void sortingPutsRowsInOrder()
+    {
+        LogbookWindow w(m_log);
+        w.resize(1600, 950);
+        w.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QTableWidget* t = logTable(&w);
+        QHeaderView* h = t->horizontalHeader();
+        auto colText = [t](int row, int col) { QTableWidgetItem* it = t->item(row, col); return it ? it->text() : QString(); };
+        auto checkOrder = [&](int col, bool numeric, const char* what) {
+            for (int pass = 0; pass < 2; ++pass) {
+                emit h->sectionClicked(col);
+                const bool asc = h->sortIndicatorOrder() == Qt::AscendingOrder;
+                int bad = 0;
+                QString prev;
+                for (int r = 0; r < t->rowCount(); ++r) {
+                    QString cur = colText(r, col);
+                    if (col == 0) { cur += QLatin1Char(' ') + colText(r, 1); }   // Datum + Zeit
+                    if (cur.isEmpty() || r == 0) { if (!cur.isEmpty()) { prev = cur; } continue; }
+                    int cmp = numeric ? (cur.toDouble() < prev.toDouble() ? -1 : cur.toDouble() > prev.toDouble() ? 1 : 0)
+                                      : QString::compare(cur, prev, Qt::CaseInsensitive);
+                    if ((asc && cmp < 0) || (!asc && cmp > 0)) { ++bad; }
+                    prev = cur;
+                }
+                qInfo().noquote() << QStringLiteral("Sortieren %1 %2: %3 Zeilen ausser der Reihe")
+                                         .arg(QLatin1String(what), asc ? QStringLiteral("auf") : QStringLiteral("ab")).arg(bad);
+                QCOMPARE(bad, 0);
+            }
+        };
+        checkOrder(0, false, "Datum");
+        checkOrder(2, false, "Rufzeichen");
+        checkOrder(3, true, "Frequenz");
+    }
+
+    // Mehrere auf einmal loeschen: genau diese, sonst nichts.
+    void deletingSeveralRemovesExactlyThose()
+    {
+        LogbookWindow w(m_log);
+        w.resize(1600, 950);
+        w.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QTableWidget* t = logTable(&w);
+        const int before = w.entryCountForTesting();
+        QSet<QString> gone;
+        t->clearSelection();
+        for (int r : {1, 3, 7}) {
+            t->selectionModel()->select(t->model()->index(r, 0),
+                                        QItemSelectionModel::Select | QItemSelectionModel::Rows);
+            gone.insert(t->item(r, 0)->text() + t->item(r, 1)->text() + t->item(r, 2)->text());
+        }
+        QString asked;
+        QTimer* timer = answerModals(this, [&asked](QWidget* m) {
+            if (auto* box = qobject_cast<QMessageBox*>(m)) { asked = box->text(); box->button(QMessageBox::Yes)->click(); }
+        });
+        buttonWith(&w, QStringLiteral("Delete"))->click();
+        delete timer;
+        qInfo().noquote() << "Rueckfrage:" << asked;
+        QCOMPARE(asked, QStringLiteral("Delete 3 contacts?"));
+        QCOMPARE(w.entryCountForTesting(), before - 3);
+        QCOMPARE(AdifLog::read(m_log).size(), before - 3);
+        int stillThere = 0;
+        for (int r = 0; r < t->rowCount(); ++r) {
+            if (gone.contains(t->item(r, 0)->text() + t->item(r, 1)->text() + t->item(r, 2)->text())) { ++stillThere; }
+        }
+        QCOMPARE(stillThere, 0);
+    }
 };
 
 QTEST_MAIN(TstLogbookDurchgang)
