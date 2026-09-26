@@ -225,7 +225,10 @@ private slots:
         QVERIFY(view->stats().dxccWorked == 1 || view->stats().dxccWorked == 2);
 
         // Narrow the view to CW: the dialog follows the filter while open.
-        QLineEdit* search = w.findChild<QLineEdit*>();
+        // Das Suchfeld ausdruecklich: seit der Eingabezeile (2026-09-26)
+        // ist das erste Textfeld im Fenster das Rufzeichen der neuen
+        // Verbindung, nicht die Suche.
+        QLineEdit* search = w.searchForTest();
         QVERIFY(search);
         search->setText(QStringLiteral("DL1ABC"));
         QTRY_COMPARE(view->totalLabel()->text(), QStringLiteral("1"));

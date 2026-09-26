@@ -417,8 +417,8 @@ void DxRadarWidget::paintRotor(QPainter& p, const QPointF& c, double R) const
     sm.setBold(false);
     const QColor dim(Style::kTextScale);
     if (m_rotorCompact) {
-        big.setPixelSize(16);
-        sm.setPixelSize(10);
+        big.setPixelSize(Style::kFontSub);
+        sm.setPixelSize(Style::kFontCaption);
         const double y2 = height() - 8.0;
         const double y1 = rest.isEmpty() ? y2 : y2 - 14.0;
         p.setFont(big);
@@ -447,8 +447,8 @@ void DxRadarWidget::paintRotor(QPainter& p, const QPointF& c, double R) const
         return;
     }
 
-    big.setPixelSize(22);
-    sm.setPixelSize(12);
+    big.setPixelSize(Style::kFontReading);
+    sm.setPixelSize(Style::kFontSmall);
     p.setFont(big);
     if (known) {
         p.setPen(amber);

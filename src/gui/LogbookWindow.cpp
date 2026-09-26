@@ -2100,8 +2100,8 @@ void LogbookWindow::buildEntryRow(QVBoxLayout* col)
 
     auto* caption = new QLabel(QStringLiteral("NEW QSO"), this);
     caption->setStyleSheet(QStringLiteral(
-        "QLabel { color: %1; font-size: 10px; letter-spacing: 2px; }")
-        .arg(QLatin1String(Style::kTextScale)));
+        "QLabel { color: %1; font-size: %2px; letter-spacing: 2px; }")
+        .arg(QLatin1String(Style::kTextScale)).arg(Style::kFontCaption));
     row->addWidget(caption);
 
     m_entryCall = new QLineEdit(this);
@@ -2274,7 +2274,7 @@ void LogbookWindow::refreshRadioReadout()
     SliceModel* s = m_radio ? m_radio->activeSlice() : nullptr;
     const bool live = s && m_radio->connectionState() == ConnectionState::Connected;
     m_entryLive->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
-        .arg(live ? QStringLiteral("#5cbe78") : QString::fromLatin1(Style::kTextScale)));
+        .arg(QString::fromLatin1(live ? Style::kLiveGreen : Style::kTextScale)));
     if (!s) {
         m_entryFreq->setText(QStringLiteral("—"));
         m_entryMode->setVisible(false);
@@ -2327,7 +2327,7 @@ void LogbookWindow::reportLogged(bool ok, const QString& message)
 {
     m_entryHint->setText(message);
     m_entryHint->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
-        .arg(ok ? QStringLiteral("#6fa384") : QString::fromLatin1(Style::kAmberWarn)));
+        .arg(QString::fromLatin1(ok ? Style::kGreenText : Style::kAmberWarn)));
     if (!ok) { return; }
     const QString call = Callsigns::normalized(m_entryCall->text());
     // Rufzeichen und Kommentar gehen, die Rapporte bleiben: die naechste
