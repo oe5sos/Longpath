@@ -688,7 +688,11 @@ void QsoDetailPane::refreshExtras()
     // on top of them, and the pane draws one contact's fields over
     // another's for a frame. Nothing being deleted is on the call
     // stack, so the immediate delete is safe.
-    while (QLayoutItem* it = m_extras->takeAt(0)) {
+    // Nach der Anzahl, nicht bis takeAt() nichts mehr liefert: anders als
+    // QBoxLayout meldet QFormLayout ein takeAt() hinter dem Ende als
+    // Warnung -- bei jeder Auswahl eine Zeile "Invalid index 0" im Log.
+    while (m_extras->count() > 0) {
+        QLayoutItem* it = m_extras->takeAt(0);
         delete it->widget();
         delete it;
     }
