@@ -2851,6 +2851,8 @@ longpath_add_test(tst_app_settings_migration)
 # prevents any future change from accidentally adding one.  Background in
 # docs/architecture/2026-05-12-phase3j-1-loose-ends-plan.md Item 7.
 longpath_add_test(tst_app_settings_arbitrary_key_persistence)
+# Binaere Werte (saveGeometry/saveState) ueberleben Speichern + Neuladen (2026-09-26).
+longpath_add_test(tst_app_settings_binary_values)
 
 # ── Phase 3J-1 closeout Item 3 (2026-05-12): production Q_INVOKABLE shims ───
 # 18 category-level tests invoking the new RadioModel shims via
