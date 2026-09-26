@@ -193,6 +193,7 @@ public:
     quint64 blockRepliesSentForTest() const { return m_blockRepliesSent; }
     float rxLevelGainForTest() const { return m_rxLevelGain; }
     bool singleChannelSeenForTest() const { return m_singleChannelSeen; }
+    void setSingleChannelHoldMsForTest(int ms) { m_singleChannelHoldMs = ms; }
     // Der Rahmen, den setAttenuator(dB) schicken wuerde; leer fuer
     // Werte, die die QRP nicht hat.
     static QByteArray attenuatorFrameFor(int dB);
@@ -695,6 +696,11 @@ private:
     quint64 m_qNonZeroInWindow{0};
     quint64 m_qSamplesInWindow{0};
     double m_qNonZeroPercent{0.0};
+    // Einschaltstoss: bis der erste Block mit Q kommt, geht Stille weiter,
+    // hoechstens so lange ab dem ersten Block (siehe processStreamDatagram).
+    bool m_iqConfirmed{false};
+    QElapsedTimer m_streamStartTimer;
+    int m_singleChannelHoldMs{2000};
     quint16 m_lastBlockReplySeq{0};
     bool blockReplyEnabled();
     void replyToBlock(quint16 seq);

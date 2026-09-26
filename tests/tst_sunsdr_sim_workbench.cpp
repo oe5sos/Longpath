@@ -87,6 +87,10 @@ private slots:
         QSignalSpy iq(&conn, &RadioConnection::iqDataReceived);
 
         // ── 1. Verbinden: Suchanfrage → Beacon → Zustandsrahmen ──────
+        // Die Werkbank prueft den rohen Strom: keine Stille am Anfang
+        // (Einschaltstoss-Sperre, 2026-09-26), sonst saehe ein frisch
+        // eingeschaltetes Geraet vor dem Frequenzsetzen stumm aus.
+        conn.setSingleChannelHoldMsForTest(0);
         conn.connectToRadio(qrpAt(addr, port));
         QTRY_VERIFY_WITH_TIMEOUT(conn.state() == ConnectionState::Connected
                                  || failed.count() > 0, 12000);
