@@ -240,6 +240,16 @@ private:
                             const QString& label);
     bool appendToLogFile(const LogEntry& entry, QString* error);
     LogEntry buildEntry() const;
+    // Das Geruest jedes neuen QSOs: Rufzeichen, Zeit, eigener Locator,
+    // und Frequenz / Band / Betriebsart vom Funkgeraet (2026-09-26, damit
+    // die Eingabezeile im Logbuch dasselbe loggt wie dieses Feld).
+    LogEntry draftFromRadio(const QString& call) const;
+    // Der eine Weg ins Log: Entfernung/Peilung, Satellitenstempel, die
+    // Doppelt-Frage (an askParent), Datei, Hochladen, Liste, qsoLogged.
+    // false, wenn nicht geloggt; *message sagt dann warum.
+    bool commitEntry(LogEntry e, QWidget* askParent, QString* message);
+    // Ein QSO aus der Eingabezeile des Logbuch-Fensters.
+    void logFromLogbook(const LogEntry& partial);
     void stampSatellites(LogEntry& e) const;
 
     RadioModel*         m_radio{nullptr};

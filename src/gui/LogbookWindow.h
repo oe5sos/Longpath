@@ -42,6 +42,8 @@
 
 #include <QDialog>
 #include <QList>
+#include <QMetaObject>
+#include <QPointer>
 #include <QVector>
 
 #include <functional>
@@ -57,12 +59,14 @@ class QPushButton;
 class QResizeEvent;
 class QSplitter;
 class QTableWidget;
+class QTimer;
 class QVBoxLayout;
 
 namespace Longpath {
 
 class QrzClient;
 class QsoDetailPane;
+class RadioModel;
 class QsoUploader;
 class QrzLogbookUploader;
 class QrzLogbookFetcher;
@@ -139,6 +143,15 @@ signals:
     // rotor-shaped hole in it.
     void turnRotorRequested(double bearingDeg, const QString& call);
 
+    // ── Loggen aus dem Logbuch (2026-09-26) ──────────────────────────
+    //
+    // Die Eingabezeile oben gibt nur, was dort steht (Rufzeichen, RST,
+    // Kommentar) und was QRZ zur Station weiss. Frequenz, Band,
+    // Betriebsart, Zeit und eigener Locator setzt das Rotor/Log-Feld,
+    // das auch sonst loggt -- eine Datei, eine Doppelt-Regel, ein
+    // Hochladen. Die Antwort kommt ueber reportLogged().
+    void logQsoRequested(const LogEntry& partial);
+
 public:
 
     // Passed straight to the map: the centre of a contact's DXCC entity,
@@ -148,13 +161,39 @@ public:
         std::function<bool(const QString& call, double& lat, double& lon)>;
     void setPositionFallback(PositionFallback fn);
 
+    // Frequenz und Betriebsart fuer die Eingabezeile, live vom
+    // Funkgeraet. Ohne Funkgeraet zeigt die Zeile "—".
+    void setRadio(RadioModel* radio);
+    // Ergebnis von logQsoRequested(): Meldung in der Zeile; bei Erfolg
+    // neu laden und die Zeile fuer die naechste Station leeren.
+    void reportLogged(bool ok, const QString& message);
+
+    QLineEdit*   entryCallForTest() const { return m_entryCall; }
+    QLineEdit*   entryCommentForTest() const { return m_entryComment; }
+    QLabel*      entryFreqForTest() const { return m_entryFreq; }
+    QLabel*      entryModeForTest() const { return m_entryMode; }
+    QLabel*      entryHintForTest() const { return m_entryHint; }
+    QPushButton* entryLogButtonForTest() const { return m_entryLogBtn; }
+    QLineEdit*   searchForTest() const { return m_search; }
+
 signals:
     // The file changed underneath other views (edit or delete).
     void logChanged();
 
+protected:
+    bool eventFilter(QObject* watched, QEvent* event) override;
+
 private:
     void buildUi();
     void buildFilterBar(QVBoxLayout* col);
+    void buildEntryRow(QVBoxLayout* col);
+    void rewireSlice();
+    void refreshRadioReadout();
+    void requestLog();
+    void clearEntry();
+    // Rufzeichen in der Karteikarte zeigen: der neueste Kontakt, wenn er
+    // im Log steht, sonst was QRZ ueber ihn weiss.
+    void showStationFor(const QString& call);
     // Refill the band and mode lists from what is actually in the log,
     // keeping the current choice if it is still there. Offering every
     // band in existence would make most of the list a way to get no
@@ -264,6 +303,23 @@ private:
     QVector<int>      m_visible;  // indices into m_all, after filtering
 
     QLineEdit*    m_search{nullptr};
+
+    // Eingabezeile "NEW QSO"
+    QLineEdit*    m_entryCall{nullptr};
+    QLabel*       m_entryLive{nullptr};
+    QLabel*       m_entryFreq{nullptr};
+    QLabel*       m_entryMode{nullptr};
+    QLabel*       m_entryBand{nullptr};
+    QLabel*       m_entrySource{nullptr};
+    QLineEdit*    m_entryRstS{nullptr};
+    QLineEdit*    m_entryRstR{nullptr};
+    QLineEdit*    m_entryComment{nullptr};
+    QPushButton*  m_entryLogBtn{nullptr};
+    QLabel*       m_entryHint{nullptr};
+    QTimer*       m_entryLookup{nullptr};
+    QPointer<RadioModel> m_radio;
+    QMetaObject::Connection m_sliceFreqConn;
+    QMetaObject::Connection m_sliceModeConn;
     QComboBox*    m_bandBox{nullptr};
     QComboBox*    m_modeBox{nullptr};
     // Distinct SOTA/POTA activation references found in the log —
