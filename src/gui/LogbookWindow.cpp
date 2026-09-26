@@ -2213,9 +2213,22 @@ void LogbookWindow::buildEntryRow(QVBoxLayout* col)
 
 bool LogbookWindow::eventFilter(QObject* watched, QEvent* event)
 {
-    if (event->type() == QEvent::KeyPress
-        && (watched == m_entryCall || watched == m_entryRstS
-            || watched == m_entryRstR || watched == m_entryComment)) {
+    const bool entryField = watched == m_entryCall || watched == m_entryRstS
+                         || watched == m_entryRstR || watched == m_entryComment;
+    // Erst fragt Qt, ob ein Tastenkuerzel die Taste will. Das Hauptfenster
+    // hat eines auf Esc (Vollbild verlassen) -- im echten Programm kam Esc
+    // deshalb nie im Feld an (Live-Test 2026-09-26; QTest schickt die
+    // Taste direkt und sah es nicht). Die Felder melden Esc und Enter als
+    // ihre eigenen, dann geht die Taste als KeyPress hierher.
+    if (entryField && event->type() == QEvent::ShortcutOverride) {
+        auto* ke = static_cast<QKeyEvent*>(event);
+        if (ke->key() == Qt::Key_Escape || ke->key() == Qt::Key_Return
+            || ke->key() == Qt::Key_Enter) {
+            event->accept();
+            return true;
+        }
+    }
+    if (event->type() == QEvent::KeyPress && entryField) {
         auto* ke = static_cast<QKeyEvent*>(event);
         if (ke->key() == Qt::Key_Return || ke->key() == Qt::Key_Enter) {
             requestLog();

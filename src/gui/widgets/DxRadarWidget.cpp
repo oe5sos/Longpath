@@ -7,6 +7,7 @@
 #include "gui/StyleConstants.h"
 #include "gui/widgets/GlobeWidget.h"
 
+#include <QFontMetrics>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
@@ -421,7 +422,16 @@ void DxRadarWidget::paintRotor(QPainter& p, const QPointF& c, double R) const
         } else {
             p.setFont(sm);
             p.setPen(dim);
-            p.drawText(QPointF(6.0, y1), QStringLiteral("ROTOR  not connected"));
+            // Schmal (Live-Test 2026-09-26: "ROTOR not connec"): kuerzer
+            // statt abgeschnitten.
+            QString offline = QStringLiteral("ROTOR  not connected");
+            if (QFontMetrics(sm).horizontalAdvance(offline) > width() - 12) {
+                offline = QStringLiteral("ROTOR  offline");
+            }
+            if (QFontMetrics(sm).horizontalAdvance(offline) > width() - 12) {
+                offline = QStringLiteral("ROTOR —");
+            }
+            p.drawText(QPointF(6.0, y1), offline);
         }
         if (!rest.isEmpty()) {
             p.setFont(sm);

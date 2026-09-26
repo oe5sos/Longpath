@@ -8493,6 +8493,7 @@ void MainWindow::populateDefaultMeter()
                 // setzt der AuxiliaryWindowLeveler die Ebenen neu).
                 if (m_appletVis
                     && m_appletVis->isVisible(QStringLiteral("WinLogbook"))) {
+                    m_raiseLogbookAfterConnectMask = true;
                     QTimer::singleShot(0, this, [this]() { raiseLogbookIfOpen(); });
                     if (qApp->applicationState() != Qt::ApplicationActive) {
                         auto* once = new QMetaObject::Connection;
@@ -13376,11 +13377,13 @@ void MainWindow::restoreFloatingWindowsHiddenBehindConnectMask()
     // Der Rotor/Log-Einmalhaken merkt sich hier nur den Wunsch (siehe
     // Konstruktor); gezeigt wird er an derselben Stelle wie alles andere,
     // damit er nicht doch wieder allein vorpreschen kann.
+    bool restoredAny = false;
     if (m_showRotorAfterConnectMask) {
         m_showRotorAfterConnectMask = false;
         if (m_rotorWindow) {
             m_rotorWindow->show();
             m_rotorWindow->raise();
+            restoredAny = true;
         }
     }
 
@@ -13389,9 +13392,20 @@ void MainWindow::restoreFloatingWindowsHiddenBehindConnectMask()
     // wiederzukommen.
     for (const QPointer<QWidget>& w
          : std::as_const(m_floatingContainersHiddenPreConnect)) {
-        if (w) { w->show(); w->raise(); }
+        if (w) { w->show(); w->raise(); restoredAny = true; }
     }
     m_floatingContainersHiddenPreConnect.clear();
+
+    // Die eben gezeigten Fenster liegen jetzt vorne -- auch vor einem
+    // offenen Logbuch, das der Betreiber vor sich hatte. Beim Start war
+    // das das Bild "ist schon wieder im Vordergrund" (2026-09-26): der
+    // Profil-Schritt 6 holte das Logbuch nach vorne, Panadapter und
+    // Rotor/Log kamen aber erst mit der Verbindung. Das Logbuch wieder
+    // davor.
+    if (restoredAny || m_raiseLogbookAfterConnectMask) {
+        m_raiseLogbookAfterConnectMask = false;
+        QTimer::singleShot(0, this, [this]() { raiseLogbookIfOpen(); });
+    }
 }
 
 void MainWindow::showConnectionPanel()
@@ -14372,6 +14386,11 @@ void MainWindow::applyWindowVisibility(const QString& id, bool on)
 
 void MainWindow::raiseLogbookIfOpen()
 {
+    // Das Verbinden-Fenster geht vor: solange es offen ist, wartet der
+    // Betreiber auf die Auswahl eines Geraets, und ein Logbuch davor
+    // versteckte es (Test 2026-09-26). Schliesst es, holt
+    // restoreFloatingWindowsHiddenBehindConnectMask() das Logbuch nach.
+    if (m_connectionPanel && m_connectionPanel->isVisible()) { return; }
     // Nur, was schon da ist: ensureRotorPanel() wuerde das Rotor/Log-Feld
     // erst anlegen -- hier soll nichts Neues aufgehen.
     if (!m_rotorDock && !m_rotorWindow) { return; }

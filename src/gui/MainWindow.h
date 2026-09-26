@@ -698,6 +698,8 @@ private:
     void openLogbookWindow();
     // Start: das offene Logbuch vor Panadapter und Rotor/Log (2026-09-26).
     void raiseLogbookIfOpen();
+    // Start mit offenem Logbuch: nach dem Verbinden-Fenster nach vorne.
+    bool m_raiseLogbookAfterConnectMask{false};
     void openRotorSetup();
     void openVoiceCheck();
     void wirePuduMonitor();

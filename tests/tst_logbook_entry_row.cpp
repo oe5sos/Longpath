@@ -14,6 +14,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
+#include <QShortcut>
 #include <QSignalSpy>
 #include <QSplitter>
 #include <QStandardPaths>
@@ -105,6 +106,32 @@ private slots:
         QVERIFY(w.entryCommentForTest()->text().isEmpty());
         QVERIFY(w.searchForTest()->text().isEmpty());
         QVERIFY(w.isVisible());
+    }
+
+    // Wie im echten Programm: ein Esc-Kuerzel liegt auf dem Elternfenster
+    // (MainWindow: Vollbild verlassen). Die Felder muessen Esc trotzdem
+    // bekommen -- ShortcutOverride annehmen. QTest::keyClick geht am
+    // Kuerzel vorbei, deshalb hier der Weg ueber die Kuerzel-Abfrage.
+    void escWinsOverAnEscapeShortcut()
+    {
+        QTemporaryDir dir;
+        LogbookWindow w(writeAdif(QDir(dir.path())));
+        auto* sc = new QShortcut(QKeySequence(Qt::Key_Escape), &w);
+        QSignalSpy fired(sc, &QShortcut::activated);
+        w.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        w.activateWindow();
+        QTest::keyClicks(w.entryCallForTest(), QStringLiteral("OE3AA"));
+        // Wie QApplication: vor der Abfrage "nicht angenommen".
+        QKeyEvent over(QEvent::ShortcutOverride, Qt::Key_Escape, Qt::NoModifier);
+        over.ignore();
+        QCoreApplication::sendEvent(w.entryCallForTest(), &over);
+        QVERIFY(over.isAccepted());
+        QKeyEvent over2(QEvent::ShortcutOverride, Qt::Key_Return, Qt::NoModifier);
+        over2.ignore();
+        QCoreApplication::sendEvent(w.entryCommentForTest(), &over2);
+        QVERIFY(over2.isAccepted());
+        QCOMPARE(fired.count(), 0);
     }
 
     // Ohne leeres Rufzeichen kein Loggen, aber eine Meldung.

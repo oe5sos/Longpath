@@ -123,6 +123,57 @@ private slots:
         QVERIFY(leveler.trackedForTest().isEmpty());
         qApp->removeEventFilter(&leveler);
     }
+
+    // Die Reihenfolge, zuletzt benutztes Fenster zuerst (2026-09-26): beim
+    // Zurueckkommen in die App stellt macOS alle Paletten vor das Logbuch,
+    // das der Betreiber vor sich hatte; der Leveler stellt diese Liste
+    // wieder her. Aktivieren, Anklicken (auch eines Kindes) und Zeigen
+    // zaehlen, Aufklapper nicht.
+    void theRecentOrderFollowsWhatTheOperatorTouches()
+    {
+        AuxiliaryWindowLeveler leveler;
+        qApp->installEventFilter(&leveler);
+        QWidget main;
+        main.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&main));
+        auto* logbook = new QDialog(&main);
+        auto* child = new QWidget(logbook);
+        logbook->show();
+        QVERIFY(QTest::qWaitForWindowExposed(logbook));
+        auto* palette = new QWidget(&main, Qt::Tool);
+        palette->show();
+        QVERIFY(QTest::qWaitForWindowExposed(palette));
+        // Zuletzt gezeigt: die Palette vorne.
+        QCOMPARE(leveler.recentOrderForTest().value(0), palette);
+
+        // Klick in ein Kind des Logbuchs: das Logbuch nach vorne.
+        QMouseEvent press(QEvent::MouseButtonPress, QPointF(1, 1), QPointF(1, 1),
+                          Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+        QCoreApplication::sendEvent(child, &press);
+        QCOMPARE(leveler.recentOrderForTest().value(0), static_cast<QWidget*>(logbook));
+        QCOMPARE(leveler.recentOrderForTest().value(1), palette);
+
+        // Aktivierung der Palette: sie wieder vorne, jedes Fenster nur einmal.
+        QEvent act(QEvent::WindowActivate);
+        QCoreApplication::sendEvent(palette, &act);
+        QCOMPARE(leveler.recentOrderForTest().value(0), palette);
+        QCOMPARE(leveler.recentOrderForTest().count(palette), 1);
+
+        // Ein Aufklapper (Qt::Popup, wie Menues und Auswahllisten) ist
+        // keine Lage, die sich jemand merkt.
+        QWidget popup(&main, Qt::Popup);
+        popup.resize(40, 40);
+        popup.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&popup));
+        QVERIFY(!leveler.recentOrderForTest().contains(&popup));
+        QCOMPARE(leveler.recentOrderForTest().value(0), palette);
+        popup.hide();
+
+        delete palette;
+        delete logbook;
+        QVERIFY(!leveler.recentOrderForTest().contains(palette));
+        qApp->removeEventFilter(&leveler);
+    }
 };
 
 QTEST_MAIN(TstAuxiliaryWindowLeveler)
