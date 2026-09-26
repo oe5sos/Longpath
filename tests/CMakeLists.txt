@@ -5222,6 +5222,8 @@ longpath_add_test(tst_flatmap_station_marker)
 #    Netz, der Flug der flachen Karte, die Zielstation mit Grosskreis --
 longpath_add_test(tst_gibs_tile_geometry)
 longpath_add_test(tst_flat_map_flyto)
+# ENTWURF: Bauteile fuer die Blaetter "Loggen und Rotor im Logbuch".
+longpath_add_test(tst_logbuch_entwurf_werkbank)
 longpath_add_test(tst_qso_map_flyto_window)
 # -- Satelliten ueber dem Horizont auf der Karte + Stempel im Detailpaneel --
 longpath_add_test(tst_qso_map_satellites)
