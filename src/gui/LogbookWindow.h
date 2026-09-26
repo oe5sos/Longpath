@@ -323,6 +323,10 @@ private:
     QPushButton*  m_entryLogBtn{nullptr};
     QLabel*       m_entryHint{nullptr};
     QTimer*       m_entryLookup{nullptr};
+    // Tippen in der Suche: Karte und Kennzahlen erst nach einer kurzen
+    // Pause nachziehen (Vorschlag 2026-09-27, siehe .cpp).
+    QTimer*       m_followUpTimer{nullptr};
+    bool          m_deferFollowUp{false};
     QPointer<RadioModel> m_radio;
     QMetaObject::Connection m_sliceFreqConn;
     QMetaObject::Connection m_sliceModeConn;
