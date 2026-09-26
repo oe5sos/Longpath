@@ -30,6 +30,10 @@
 #include "gui/widgets/FlowLayout.h"
 #include "gui/StyleConstants.h"
 #include "gui/widgets/QsoDetailPane.h"
+#include "core/Maidenhead.h"
+#include "models/Band.h"
+#include "models/RadioModel.h"
+#include "models/SliceModel.h"
 
 #include <QSplitter>
 
@@ -50,6 +54,7 @@
 #include <QFormLayout>
 #include <QHBoxLayout>
 #include <QHeaderView>
+#include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
 #include <QMessageBox>
@@ -59,11 +64,13 @@
 #include <QSet>
 #include <QSignalBlocker>
 #include <QTableWidget>
+#include <QTimer>
 #include <QTextStream>
 #include <QTimeZone>
 #include <QVBoxLayout>
 
 #include <algorithm>
+#include <cmath>
 
 #include <algorithm>
 
@@ -115,6 +122,11 @@ LogbookWindow::LogbookWindow(const QString& adifPath, QWidget* parent)
     // after every start looks like a station nobody has ever heard of.
     m_callCache.load();
     buildUi();
+    // Kein Knopf ist Standardknopf. In einem QDialog ist jeder QPushButton
+    // "autoDefault": Return in einem Feld drueckt dann zusaetzlich den
+    // ersten Knopf -- Return in der Suche oeffnete "Edit..." (gefunden
+    // 2026-09-26 an einem haengenden Test: modaler Bearbeiten-Dialog).
+    for (QPushButton* b : findChildren<QPushButton*>()) { b->setAutoDefault(false); b->setDefault(false); }
     restoreHeaderState();
     restoreSplitState();
     restoreGeometryState();
@@ -204,6 +216,8 @@ void LogbookWindow::buildUi()
     // und liessen es nicht schmaler ziehen — die Leiste bricht jetzt in
     // eine zweite Zeile um (Betreiber, 2026-09-21). Das Suchfeld nimmt,
     // was in seiner Zeile uebrig bleibt.
+    buildEntryRow(col);
+
     auto* top = new FlowLayout(nullptr, 6, 6);
     m_search = new QLineEdit(this);
     m_search->setPlaceholderText(
@@ -373,6 +387,10 @@ void LogbookWindow::buildUi()
     // nimmt die Breite des Rollbereichs.
     m_detail = new QsoDetailPane;
     m_detail->setCache(&m_callCache);
+    connect(m_detail, &QsoDetailPane::beamChanged, this, [this](double deg) {
+        m_rotorTargetDeg = deg;
+        applyRotorToMap();
+    });
     auto* detailScroll = new QScrollArea(m_split);
     detailScroll->setWidgetResizable(true);
     detailScroll->setFrameShape(QFrame::NoFrame);
@@ -535,23 +553,7 @@ void LogbookWindow::buildUi()
     // because "who is this" is a fair question about a station you have
     // never worked, and an empty pane is a poor answer to it.
     connect(m_search, &QLineEdit::returnPressed, this, [this]() {
-        const QString call = Callsigns::normalized(m_search->text());
-        if (call.isEmpty()) { return; }
-
-        for (int row = 0; row < m_visible.size(); ++row) {
-            const int idx = sourceRow(row);
-            if (idx < 0) { continue; }
-            if (Callsigns::normalized(m_all.at(idx).call) != call) {
-                continue;
-            }
-            m_table->setCurrentCell(row, ColCall);
-            m_detail->setEntry(m_all.at(idx));
-            m_detail->lookUpNow();
-            return;
-        }
-
-        if (!Callsigns::isLikelyCallsign(call)) { return; }
-        m_detail->showCallsign(call);
+        showStationFor(m_search->text());
     });
     connect(m_editBtn,   &QPushButton::clicked, this, &LogbookWindow::editSelected);
     connect(m_deleteBtn, &QPushButton::clicked, this, &LogbookWindow::deleteSelected);
@@ -1942,6 +1944,8 @@ void LogbookWindow::setMapPanelShown(bool on)
     if (on && !m_mapPanel) {
         m_mapPanel = new QsoMapWindow(this);
         m_mapPanel->setEmbedded(true);
+        m_mapPanel->setRotorRadarShown(true);
+        applyRotorToMap();
         m_split->insertWidget(1, m_mapPanel);
         connect(m_mapPanel, &QsoMapWindow::popOutRequested, this, &LogbookWindow::openMap);
         connect(m_detail, &QsoDetailPane::stationLocated, m_mapPanel,
@@ -2054,6 +2058,328 @@ void LogbookWindow::mergeFetchedEntries(const QString& adif)
     // „hochgeladen" gilt fuer jeden dieser Datensaetze.
     for (LogEntry& e : incoming) { e.uploadedToQrz = true; }
     importEntries(incoming, QStringLiteral("your QRZ logbook"), /*fromQrz*/ true);
+}
+
+
+// ── Eingabezeile "NEW QSO" (2026-09-26) ─────────────────────────────────
+//
+// Betreiber: "ich sehe hier nirgendwo, wo ich das QSO loggen koennte, die
+// Frequenz und die Betriebsart geht auch ab. Ich will dieses auch zum
+// Loggen verwenden." Gewaehlt: Blatt A -- eine Zeile ueber der Suche.
+// Das Rufzeichen filtert zugleich das Log darunter (war er schon da?)
+// und zeigt die Station in der Karteikarte. Enter loggt, Esc leert.
+
+namespace {
+
+// 14215800 -> "14.215.800", wie die Frequenz am Funkgeraet steht.
+QString dottedHz(double hz)
+{
+    const qint64 v = qRound64(hz);
+    const qint64 mhz = v / 1000000;
+    const qint64 khz = (v / 1000) % 1000;
+    const qint64 rest = v % 1000;
+    return QStringLiteral("%1.%2.%3").arg(mhz)
+        .arg(khz, 3, 10, QLatin1Char('0'))
+        .arg(rest, 3, 10, QLatin1Char('0'));
+}
+
+QString chipStyle()
+{
+    return QStringLiteral(
+        "QLabel { background: %1; color: %2; border: 1px solid %3;"
+        " border-radius: 6px; padding: 2px 8px; font-size: 11px; font-weight: bold; }")
+        .arg(QLatin1String(Style::kGreenBg), QLatin1String(Style::kGreenText),
+             QLatin1String(Style::kGreenBorder));
+}
+
+} // namespace
+
+void LogbookWindow::buildEntryRow(QVBoxLayout* col)
+{
+    auto* row = new FlowLayout(nullptr, 6, 6);
+
+    auto* caption = new QLabel(QStringLiteral("NEW QSO"), this);
+    caption->setStyleSheet(QStringLiteral(
+        "QLabel { color: %1; font-size: 10px; letter-spacing: 2px; }")
+        .arg(QLatin1String(Style::kTextScale)));
+    row->addWidget(caption);
+
+    m_entryCall = new QLineEdit(this);
+    m_entryCall->setPlaceholderText(QStringLiteral("callsign"));
+    m_entryCall->setStyleSheet(Style::lineEditStyle());
+    m_entryCall->setFont(Style::monoFont(m_entryCall->font(), 14, QFont::Bold));
+    m_entryCall->setFixedWidth(170);
+    // Fest, nicht "Expanding" (Vorgabe von QLineEdit): sonst gibt das
+    // FlowLayout dem Feld Platz, den es nicht nehmen kann -- eine Luecke.
+    m_entryCall->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    m_entryCall->setToolTip(QStringLiteral(
+        "The station you are working. Filters the log below as you type, "
+        "so you see at once whether and when you worked them before."));
+    row->addWidget(m_entryCall);
+
+    m_entryLive = new QLabel(QStringLiteral("●"), this);
+    row->addWidget(m_entryLive);
+    m_entryFreq = new QLabel(QStringLiteral("—"), this);
+    m_entryFreq->setFont(Style::monoFont(m_entryFreq->font(), 14));
+    m_entryFreq->setStyleSheet(QStringLiteral("QLabel { color: %1; }")
+                                   .arg(QLatin1String(Style::kTextPrimary)));
+    m_entryFreq->setToolTip(QStringLiteral(
+        "Frequency and mode are taken from the radio when you log"));
+    row->addWidget(m_entryFreq);
+    m_entryMode = new QLabel(this);
+    m_entryMode->setStyleSheet(chipStyle());
+    row->addWidget(m_entryMode);
+    m_entryBand = new QLabel(this);
+    m_entryBand->setStyleSheet(chipStyle());
+    row->addWidget(m_entryBand);
+    m_entrySource = new QLabel(QStringLiteral("from radio"), this);
+    m_entrySource->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
+                                     .arg(QLatin1String(Style::kTextScale)));
+    row->addWidget(m_entrySource);
+
+    auto small = [this](const QString& text) {
+        auto* l = new QLabel(text, this);
+        l->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
+                             .arg(QLatin1String(Style::kTextScale)));
+        return l;
+    };
+    row->addWidget(small(QStringLiteral("RST S")));
+    m_entryRstS = new QLineEdit(QStringLiteral("59"), this);
+    m_entryRstS->setStyleSheet(Style::lineEditStyle());
+    m_entryRstS->setFixedWidth(52);
+    m_entryRstS->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    row->addWidget(m_entryRstS);
+    row->addWidget(small(QStringLiteral("R")));
+    m_entryRstR = new QLineEdit(QStringLiteral("59"), this);
+    m_entryRstR->setStyleSheet(Style::lineEditStyle());
+    m_entryRstR->setFixedWidth(52);
+    m_entryRstR->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    row->addWidget(m_entryRstR);
+
+    m_entryComment = new QLineEdit(this);
+    m_entryComment->setPlaceholderText(QStringLiteral("comment"));
+    m_entryComment->setStyleSheet(Style::lineEditStyle());
+    m_entryComment->setMinimumWidth(180);
+    m_entryComment->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    row->addWidget(m_entryComment);
+
+    m_entryLogBtn = new QPushButton(QStringLiteral("Log QSO"), this);
+    m_entryLogBtn->setAutoDefault(false);
+    // Die Hauptsache der Zeile: in der Auswahlfarbe, wie ein gedrueckter
+    // Schalter -- dieselbe Flaeche wie "Map"/"Stats" im gedrueckten Zustand.
+    m_entryLogBtn->setStyleSheet(Style::buttonBaseStyle()
+        + QString(Style::blueCheckedStyle()).replace(
+              QStringLiteral("QPushButton:checked"), QStringLiteral("QPushButton")));
+    row->addWidget(m_entryLogBtn);
+
+    m_entryHint = new QLabel(QStringLiteral("Enter logs · Esc clears"), this);
+    m_entryHint->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
+                                   .arg(QLatin1String(Style::kTextScale)));
+    row->addWidget(m_entryHint);
+
+    col->addLayout(row);
+
+    for (QLineEdit* e : {m_entryCall, m_entryRstS, m_entryRstR, m_entryComment}) {
+        e->installEventFilter(this);
+    }
+    connect(m_entryLogBtn, &QPushButton::clicked, this, &LogbookWindow::requestLog);
+
+    // Tippen filtert das Log (Doppelt-Blick) und zeigt die Station nach
+    // einer kurzen Pause in der Karteikarte -- entprellt wie im
+    // Rotor/Log-Feld, damit OE, OE5, OE5V nicht drei Anfragen werden.
+    m_entryLookup = new QTimer(this);
+    m_entryLookup->setSingleShot(true);
+    m_entryLookup->setInterval(700);
+    connect(m_entryLookup, &QTimer::timeout, this, [this]() {
+        const QString call = Callsigns::normalized(m_entryCall->text());
+        if (call.size() >= 3 && Callsigns::isLikelyCallsign(call)) { showStationFor(call); }
+    });
+    connect(m_entryCall, &QLineEdit::textEdited, this, [this](const QString& text) {
+        const QString up = text.toUpper();
+        if (up != text) {
+            const int pos = m_entryCall->cursorPosition();
+            m_entryCall->setText(up);
+            m_entryCall->setCursorPosition(pos);
+        }
+        if (m_search) { m_search->setText(Callsigns::normalized(up)); }
+        m_entryLookup->start();
+        m_entryHint->setText(QStringLiteral("Enter logs · Esc clears"));
+        m_entryHint->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
+                                       .arg(QLatin1String(Style::kTextScale)));
+    });
+
+    refreshRadioReadout();
+}
+
+bool LogbookWindow::eventFilter(QObject* watched, QEvent* event)
+{
+    if (event->type() == QEvent::KeyPress
+        && (watched == m_entryCall || watched == m_entryRstS
+            || watched == m_entryRstR || watched == m_entryComment)) {
+        auto* ke = static_cast<QKeyEvent*>(event);
+        if (ke->key() == Qt::Key_Return || ke->key() == Qt::Key_Enter) {
+            requestLog();
+            return true;        // nicht an den Dialog: kein Standardknopf
+        }
+        if (ke->key() == Qt::Key_Escape) {
+            clearEntry();
+            return true;        // nicht an den Dialog: Esc schliesst sonst das Logbuch
+        }
+    }
+    return QDialog::eventFilter(watched, event);
+}
+
+void LogbookWindow::setRadio(RadioModel* radio)
+{
+    if (m_radio) { disconnect(m_radio, nullptr, this, nullptr); }
+    m_radio = radio;
+    if (m_radio) {
+        connect(m_radio, &RadioModel::activeSliceChanged,
+                this, [this](int) { rewireSlice(); });
+        connect(m_radio, &RadioModel::connectionStateChanged,
+                this, [this](ConnectionState) { refreshRadioReadout(); });
+    }
+    rewireSlice();
+}
+
+void LogbookWindow::rewireSlice()
+{
+    disconnect(m_sliceFreqConn);
+    disconnect(m_sliceModeConn);
+    if (SliceModel* s = m_radio ? m_radio->activeSlice() : nullptr) {
+        m_sliceFreqConn = connect(s, &SliceModel::frequencyChanged,
+                                  this, [this](double) { refreshRadioReadout(); });
+        m_sliceModeConn = connect(s, &SliceModel::dspModeChanged,
+                                  this, [this](DSPMode) { refreshRadioReadout(); });
+    }
+    refreshRadioReadout();
+}
+
+void LogbookWindow::refreshRadioReadout()
+{
+    if (!m_entryFreq) { return; }
+    SliceModel* s = m_radio ? m_radio->activeSlice() : nullptr;
+    const bool live = s && m_radio->connectionState() == ConnectionState::Connected;
+    m_entryLive->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
+        .arg(live ? QStringLiteral("#5cbe78") : QString::fromLatin1(Style::kTextScale)));
+    if (!s) {
+        m_entryFreq->setText(QStringLiteral("—"));
+        m_entryMode->setVisible(false);
+        m_entryBand->setVisible(false);
+        // Ein Funkgeraet gibt es, nur noch keine Verbindung (und damit
+        // keinen Empfaenger) -- "no radio" waere falsch.
+        m_entrySource->setText(m_radio ? QStringLiteral("radio not connected")
+                                       : QStringLiteral("no radio"));
+        return;
+    }
+    m_entryFreq->setText(dottedHz(s->frequency()));
+    m_entryMode->setText(SliceModel::modeName(s->dspMode()));
+    m_entryMode->setVisible(true);
+    const QString band = bandLabel(bandFromFrequency(s->frequency()));
+    m_entryBand->setText(band);
+    m_entryBand->setVisible(!band.isEmpty());
+    m_entrySource->setText(live ? QStringLiteral("from radio")
+                                : QStringLiteral("radio not connected"));
+}
+
+void LogbookWindow::requestLog()
+{
+    LogEntry e;
+    e.call    = Callsigns::normalized(m_entryCall->text());
+    if (e.call.isEmpty()) {
+        reportLogged(false, QStringLiteral("Enter a callsign to log"));
+        m_entryCall->setFocus();
+        return;
+    }
+    e.rstSent = m_entryRstS->text().trimmed();
+    e.rstRcvd = m_entryRstR->text().trimmed();
+    e.comment = m_entryComment->text().trimmed();
+    // Was QRZ zu genau diesem Rufzeichen weiss -- nicht das Blatt einer
+    // anderen Station, die gerade in der Karteikarte steht.
+    if (m_callCache.contains(e.call)) {
+        const CallsignInfo info = m_callCache.get(e.call);
+        e.name    = info.displayName();
+        e.qth     = info.city;
+        e.country = info.country;
+        if (isValidGridSquare(info.grid.trimmed())) {
+            e.gridSquare = info.grid.trimmed().toUpper();
+        } else if (info.hasLatLon) {
+            e.gridSquare = gridSquareFromLatLon(info.latitude, info.longitude);
+        }
+    }
+    emit logQsoRequested(e);
+}
+
+void LogbookWindow::reportLogged(bool ok, const QString& message)
+{
+    m_entryHint->setText(message);
+    m_entryHint->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
+        .arg(ok ? QStringLiteral("#6fa384") : QString::fromLatin1(Style::kAmberWarn)));
+    if (!ok) { return; }
+    const QString call = Callsigns::normalized(m_entryCall->text());
+    // Rufzeichen und Kommentar gehen, die Rapporte bleiben: die naechste
+    // Station wird meist mit denselben gearbeitet (wie im Rotor/Log-Feld).
+    m_entryCall->clear();
+    m_entryComment->clear();
+    if (m_search) { m_search->clear(); }
+    reload();
+    emit logChanged();
+    m_entryCall->setFocus();
+    Q_UNUSED(call);
+}
+
+void LogbookWindow::clearEntry()
+{
+    m_entryLookup->stop();
+    m_entryCall->clear();
+    m_entryComment->clear();
+    if (m_search) { m_search->clear(); }
+    m_entryCall->setFocus();
+}
+
+void LogbookWindow::showStationFor(const QString& raw)
+{
+    const QString call = Callsigns::normalized(raw);
+    if (call.isEmpty()) { return; }
+
+    for (int row = 0; row < m_visible.size(); ++row) {
+        const int idx = sourceRow(row);
+        if (idx < 0) { continue; }
+        if (Callsigns::normalized(m_all.at(idx).call) != call) {
+            continue;
+        }
+        m_table->setCurrentCell(row, ColCall);
+        m_detail->setEntry(m_all.at(idx));
+        m_detail->lookUpNow();
+        return;
+    }
+
+    if (!Callsigns::isLikelyCallsign(call)) { return; }
+    m_detail->showCallsign(call);
+}
+
+
+// ── Rotor im Logbuch (2026-09-26) ───────────────────────────────────────
+
+void LogbookWindow::setRotorBearing(double deg)
+{
+    m_rotorDeg = std::isnan(deg) ? -1.0 : deg;
+    if (m_detail) { m_detail->setRotorBearing(deg); }
+    applyRotorToMap();
+}
+
+void LogbookWindow::setRotorBeamWidth(double deg)
+{
+    m_rotorBeamDeg = deg;
+    applyRotorToMap();
+}
+
+void LogbookWindow::applyRotorToMap()
+{
+    if (!m_mapPanel) { return; }
+    m_mapPanel->setRotorBeamWidth(m_rotorBeamDeg);
+    m_mapPanel->setRotorHeading(m_rotorDeg);
+    m_mapPanel->setRotorTarget(m_rotorTargetDeg);
 }
 
 } // namespace Longpath

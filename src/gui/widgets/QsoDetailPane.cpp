@@ -614,8 +614,11 @@ void QsoDetailPane::refreshBeam()
     // offering nothing.
     double sp = 0.0, km = 0.0;
     const bool have = m_haveEntry && beamNow(sp, km) && km > 0.0;
+    const double before = m_haveBeam ? m_beamDeg : -1.0;
     m_haveBeam = have;
     m_beamDeg = have ? BeamHeading::wrap360(sp) : 0.0;
+    const double now = m_haveBeam ? m_beamDeg : -1.0;
+    if (!qFuzzyCompare(before + 2.0, now + 2.0)) { emit beamChanged(now); }
 
     m_turnShort->setEnabled(have);
     m_turnLong->setEnabled(have);
@@ -663,9 +666,16 @@ void QsoDetailPane::refreshBeam()
         m_travel->setText(QStringLiteral("Rotor at %1° — %2")
                               .arg(m_rotorDeg, 0, 'f', 0)
                               .arg(BeamHeading::advice(m)));
+        m_travel->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
+                                    .arg(QLatin1String(Style::kAmberWarn)));
         m_travel->setVisible(true);
     } else {
-        m_travel->setVisible(false);
+        // Der Stand muss immer zu sehen sein -- auch, dass es keinen gibt
+        // (Betreiber 2026-09-26). Eine erfundene Gradzahl waere schlimmer.
+        m_travel->setText(QStringLiteral("Rotor not connected — no current heading"));
+        m_travel->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
+                                    .arg(QLatin1String(Style::kTextScale)));
+        m_travel->setVisible(true);
     }
 }
 

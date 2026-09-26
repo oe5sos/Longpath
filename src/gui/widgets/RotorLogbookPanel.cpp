@@ -76,6 +76,7 @@
 #include <QInputDialog>
 #include <QMenu>
 #include <cmath>
+#include <limits>
 #include <QMessageBox>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
@@ -1081,6 +1082,10 @@ void RotorLogbookPanel::ensureRotor()
         m_simTimer->stop();
         m_dial->setSimulated(false);
         m_dial->setActualBearing(az);
+        // Das Logbuch zeigt ihn auch -- nur echte Ablesungen, nie die
+        // Stellvertreter-Nadel (2026-09-26).
+        m_lastRotorAz = az;
+        if (m_logWindow) { m_logWindow->setRotorBearing(az); }
     });
 
     // Az/el rotators: the reported elevation appears on the dial. The
@@ -1107,6 +1112,8 @@ void RotorLogbookPanel::ensureRotor()
                           .arg(m_rotor->description()));
             break;
         case RotorController::State::Disconnected:
+            m_lastRotorAz = std::numeric_limits<double>::quiet_NaN();
+            if (m_logWindow) { m_logWindow->setRotorBearing(m_lastRotorAz); }
             setStatus(QStringLiteral("Rotator disconnected"), true);
             break;
         case RotorController::State::Error:
@@ -2016,14 +2023,36 @@ void RotorLogbookPanel::adoptGridFromQrz(const CallsignInfo& info)
 
 LogEntry RotorLogbookPanel::buildEntry() const
 {
-    LogEntry e;
-    e.call         = Callsigns::normalized(m_callEdit->text());
-    e.timeOn       = QDateTime::currentDateTimeUtc();
-    e.myGridSquare = m_myGrid->text().trimmed().toUpper();
+    LogEntry e = draftFromRadio(m_callEdit->text());
     e.gridSquare   = m_dxGrid->text().trimmed().toUpper();
     e.rstSent      = m_rstSent->text().trimmed();
     e.rstRcvd      = m_rstRcvd->text().trimmed();
     e.comment      = m_comment->text().trimmed();
+
+    // QRZ detail, but only when it belongs to THIS callsign — a card
+    // left over from the previous station would put the wrong operator
+    // in the log.
+    if (m_lastInfo.isValid()
+        && Callsigns::normalized(m_lastInfo.call) == e.call) {
+        e.name    = m_lastInfo.displayName();
+        e.qth     = m_lastInfo.city;
+        e.country = m_lastInfo.country;
+    }
+
+    if (isValidGridSquare(e.myGridSquare) && isValidGridSquare(e.gridSquare)) {
+        e.distanceKm = calculateDistanceKm(e.myGridSquare, e.gridSquare);
+        e.bearingDeg = calculateBearingInDegrees(e.myGridSquare, e.gridSquare);
+    }
+    stampSatellites(e);
+    return e;
+}
+
+LogEntry RotorLogbookPanel::draftFromRadio(const QString& call) const
+{
+    LogEntry e;
+    e.call         = Callsigns::normalized(call);
+    e.timeOn       = QDateTime::currentDateTimeUtc();
+    e.myGridSquare = m_myGrid->text().trimmed().toUpper();
 
     if (SliceModel* s = m_radio ? m_radio->activeSlice() : nullptr) {
         e.freqMHz = s->frequency() / 1e6;
@@ -2041,22 +2070,6 @@ LogEntry RotorLogbookPanel::buildEntry() const
             e.mode = m;
         }
     }
-
-    // QRZ detail, but only when it belongs to THIS callsign — a card
-    // left over from the previous station would put the wrong operator
-    // in the log.
-    if (m_lastInfo.isValid()
-        && Callsigns::normalized(m_lastInfo.call) == e.call) {
-        e.name    = m_lastInfo.displayName();
-        e.qth     = m_lastInfo.city;
-        e.country = m_lastInfo.country;
-    }
-
-    if (isValidGridSquare(e.myGridSquare) && isValidGridSquare(e.gridSquare)) {
-        e.distanceKm = calculateDistanceKm(e.myGridSquare, e.gridSquare);
-        e.bearingDeg = calculateBearingInDegrees(e.myGridSquare, e.gridSquare);
-    }
-    stampSatellites(e);
     return e;
 }
 
@@ -2106,13 +2119,20 @@ bool RotorLogbookPanel::appendToLogFile(const LogEntry& entry, QString* error)
     return true;
 }
 
-void RotorLogbookPanel::onLogQso()
+bool RotorLogbookPanel::commitEntry(LogEntry e, QWidget* askParent, QString* message)
 {
-    const LogEntry e = buildEntry();
+    QString dummy;
+    QString& msg = message ? *message : dummy;
     if (!e.isValid()) {
-        setStatus(QStringLiteral("Enter a callsign to log"), true);
-        return;
+        msg = QStringLiteral("Enter a callsign to log");
+        return false;
     }
+    if (e.distanceKm <= 0.0
+        && isValidGridSquare(e.myGridSquare) && isValidGridSquare(e.gridSquare)) {
+        e.distanceKm = calculateDistanceKm(e.myGridSquare, e.gridSquare);
+        e.bearingDeg = calculateBearingInDegrees(e.myGridSquare, e.gridSquare);
+    }
+    stampSatellites(e);
 
     // Ask, do not refuse. Working the same station twice on one band
     // and mode inside a couple of minutes is unusual but legitimate —
@@ -2120,7 +2140,7 @@ void RotorLogbookPanel::onLogQso()
     // The same rule the importer uses, so one idea of "the same QSO"
     // rather than two that disagree.
     if (m_worked.wouldDuplicate(e)) {
-        if (QMessageBox::question(this, QStringLiteral("Duplicate"),
+        if (QMessageBox::question(askParent ? askParent : this, QStringLiteral("Duplicate"),
                 QStringLiteral("You already have %1 on %2 at about this "
                                "time.\n\nLog it again?")
                     .arg(e.call,
@@ -2128,31 +2148,60 @@ void RotorLogbookPanel::onLogQso()
                                           : e.band),
                 QMessageBox::Yes | QMessageBox::No, QMessageBox::No)
             != QMessageBox::Yes) {
-            setStatus(QStringLiteral("Not logged — %1 is already in the log")
-                          .arg(e.call), true);
-            return;
+            msg = QStringLiteral("Not logged — %1 is already in the log").arg(e.call);
+            return false;
         }
     }
 
     QString err;
     if (!appendToLogFile(e, &err)) {
-        setStatus(QStringLiteral("Couldn't write the log: %1").arg(err), true);
-        return;
+        msg = QStringLiteral("Couldn't write the log: %1").arg(err);
+        return false;
     }
 
     // Confirm the local write before the upload, so a failing upload
     // never reads as a lost contact.
-    QString msg = QStringLiteral("Logged %1").arg(e.call);
+    msg = QStringLiteral("Logged %1").arg(e.call);
     if (!e.band.isEmpty()) { msg += QStringLiteral(" on %1").arg(e.band); }
     if (m_uploader && m_uploader->isConfigured()) {
         msg += QStringLiteral(" · uploading…");
         m_lastLogged = e;
         m_uploader->upload(e);
     }
-    setStatus(msg);
 
     refreshRecentList();
     emit qsoLogged(e);
+    return true;
+}
+
+void RotorLogbookPanel::logFromLogbook(const LogEntry& partial)
+{
+    // Frequenz, Band, Betriebsart, Zeit und eigener Locator kommen von
+    // hier -- dieselben wie beim "Log QSO" dieses Felds. Aus dem Logbuch
+    // nur, was dort eingegeben oder nachgeschlagen wurde.
+    LogEntry e = draftFromRadio(partial.call);
+    e.rstSent    = partial.rstSent;
+    e.rstRcvd    = partial.rstRcvd;
+    e.comment    = partial.comment;
+    e.name       = partial.name;
+    e.qth        = partial.qth;
+    e.country    = partial.country;
+    e.gridSquare = partial.gridSquare;
+
+    QString msg;
+    const bool ok = commitEntry(e, m_logWindow ? static_cast<QWidget*>(m_logWindow) : this, &msg);
+    setStatus(msg, !ok);
+    if (m_logWindow) { m_logWindow->reportLogged(ok, msg); }
+}
+
+void RotorLogbookPanel::onLogQso()
+{
+    QString msg;
+    const LogEntry e = buildEntry();
+    const bool ok = commitEntry(e, this, &msg);
+    setStatus(msg, !ok);
+    if (!ok) { return; }
+    if (m_logWindow) { m_logWindow->reload(); }
 
     // Clear only what belongs to the contact just made. The locators
     // and the reports stay — the next station is usually worked with
@@ -2374,6 +2423,14 @@ void RotorLogbookPanel::openLogbookWindow()
         // So the target goes on the dial and beginTurn() decides the
         // rest, exactly as it does for the button. Whatever it does, it
         // now does the same thing from both places.
+        // Die Eingabezeile oben im Logbuch loggt ueber dieses Feld: eine
+        // Datei, eine Doppelt-Regel, ein Hochladen (2026-09-26).
+        m_logWindow->setRadio(m_radio);
+        m_logWindow->setRotorBeamWidth(m_dial ? m_dial->beamWidth() : 40.0);
+        m_logWindow->setRotorBearing(m_lastRotorAz);
+        connect(m_logWindow, &LogbookWindow::logQsoRequested,
+                this, &RotorLogbookPanel::logFromLogbook);
+
         connect(m_logWindow, &LogbookWindow::turnRotorRequested, this,
                 [this](double bearing, const QString& call) {
             Q_UNUSED(call);
@@ -2415,6 +2472,13 @@ void RotorLogbookPanel::openLogbookWindow()
 void RotorLogbookPanel::hideLogbook()
 {
     if (m_logWindow) { m_logWindow->hide(); }
+}
+
+void RotorLogbookPanel::raiseLogbookIfOpen()
+{
+    if (!m_logWindow || !m_logWindow->isVisible()) { return; }
+    m_logWindow->raise();
+    m_logWindow->activateWindow();
 }
 
 void RotorLogbookPanel::setStatus(const QString& text, bool warn)
