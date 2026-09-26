@@ -21,9 +21,15 @@
 //   LONGPATH_RX_CAL_STEPS  Abschwaecher-Stufen, z. B. "0,10,20,30"
 //   LONGPATH_GRAB_DIR      Bilder und Tabelle (rx_cal.csv)
 //
-// Am Simulator springen die Werte mit der Stufe: hpsdrsim daempft nicht,
-// die Kalibrierung aber rechnet die Stufe heraus. Das Werkzeug prueft dort
-// nur, dass es laeuft; beurteilt wird am echten Geraet.
+// Ohne Antenne (nur Rauschboden) geht es auch: dann bleibt das Rohsignal
+// am Wandler fast gleich, und die Kalibrierung hebt die Ablesung mit jeder
+// Stufe an. Richtig ist dann, dass Kurve und S-Meter GEMEINSAM steigen.
+// Deshalb gibt das Werkzeug zusaetzlich den Gleichlauf aus, die Spanne von
+// (Kurve - S-Meter). Er muss klein sein, mit und ohne Antenne. Vor PR #102
+// war er so gross wie die Abschwaecher-Spanne.
+//
+// Der HL2-Simulator (hpsdrsim -hermeslite2) daempft den Testton wirklich.
+// Dort muss also wie mit Antenne alles stehen bleiben.
 
 #include <QtTest>
 
@@ -194,11 +200,11 @@ private slots:
         if (!dir.isEmpty()) {
             QFile f(dir + QStringLiteral("/rx_cal.csv"));
             if (f.open(QIODevice::WriteOnly | QIODevice::Text)) {
-                f.write("att_db;smeter_dbm;trace_dbm;maxbin_dbm\n");
+                f.write("att_db;smeter_dbm;trace_dbm;maxbin_dbm;trace_minus_smeter_db\n");
                 for (const Reading& r : readings) {
-                    f.write(QStringLiteral("%1;%2;%3;%4\n").arg(r.attDb)
+                    f.write(QStringLiteral("%1;%2;%3;%4;%5\n").arg(r.attDb)
                                 .arg(r.sMeter, 0, 'f', 2).arg(r.trace, 0, 'f', 2)
-                                .arg(r.maxBin, 0, 'f', 2).toUtf8());
+                                .arg(r.maxBin, 0, 'f', 2).arg(r.trace - r.sMeter, 0, 'f', 2).toUtf8());
                 }
             }
         }
@@ -213,6 +219,14 @@ private slots:
                                  .arg(span(&Reading::sMeter), 0, 'f', 1)
                                  .arg(span(&Reading::trace), 0, 'f', 1)
                                  .arg(span(&Reading::maxBin), 0, 'f', 1);
+        // Gleichlauf: gilt auch ohne Antenne, wo die Ablesung mit der Stufe
+        // steigen MUSS (siehe Kopf).
+        double lo = 1e9, hi = -1e9;
+        for (const Reading& r : readings) {
+            lo = qMin(lo, r.trace - r.sMeter);
+            hi = qMax(hi, r.trace - r.sMeter);
+        }
+        qInfo().noquote() << QStringLiteral("GLEICHLAUF Kurve - S-Meter: Spanne %1 dB").arg(hi - lo, 0, 'f', 1);
 
         model->disconnectFromRadio();
         QTest::qWait(1000);
