@@ -13,6 +13,8 @@
 
 #include "gui/widgets/RotorDialWidget.h"
 #include "gui/widgets/RotorLogbookPanel.h"
+#include "gui/widgets/DxRadarWidget.h"
+#include "core/Maidenhead.h"
 
 #include <QLineEdit>
 
@@ -55,6 +57,41 @@ private slots:
             QVERIFY(tape.grab().save(dir + QStringLiteral("/dial_tape_%1.png").arg(w)));
         }
         tape.hide();
+
+        // Das Radar aus der Logbuch-Karte, mit dem Rotor-Kegel (Entwurf).
+        {
+            double hlat = 0.0, hlon = 0.0;
+            calculateLatLonFromGridSquare(QStringLiteral("JN67VV"), hlat, hlon);
+            QVector<MapPoint> pts;
+            auto add = [&pts](double lat, double lon, const QString& l, bool hi) {
+                MapPoint m; m.lat = lat; m.lon = lon; m.label = l; m.highlight = hi; pts << m;
+            };
+            add(47.98, 13.82, QStringLiteral("OE5VVM"), true);
+            add(41.7, -72.7, QStringLiteral("K1ABC"), false);
+            add(35.7, 139.7, QStringLiteral("JA1XYZ"), false);
+            add(-33.9, 151.2, QStringLiteral("VK2AB"), false);
+            add(51.5, -0.1, QStringLiteral("G4ABC"), false);
+            add(40.4, -3.7, QStringLiteral("EA4XX"), false);
+            add(55.7, 37.6, QStringLiteral("UA3AA"), false);
+            add(-23.5, -46.6, QStringLiteral("PY2AA"), false);
+            add(60.2, 24.9, QStringLiteral("OH2AA"), false);
+            add(48.2, 16.4, QStringLiteral("OE1XXX"), false);
+            const QList<QSize> sizes = {QSize(740, 219), QSize(740, 430), QSize(220, 219), QSize(300, 394)};
+            for (const QSize& sz : sizes) {
+                DxRadarWidget r;
+                r.setHome(hlat, hlon);
+                r.setPoints(pts);
+                r.setRotorHeading(74.0);
+                r.setRotorTarget(11.0);
+                r.setRotorBeamWidth(60.0);
+                r.setRotorReadout(sz.width() >= 300);   // klein: Zahlen stehen in der Karteikarte
+                r.resize(sz);
+                r.show();
+                QVERIFY(QTest::qWaitForWindowExposed(&r));
+                QTest::qWait(150);
+                QVERIFY(r.grab().save(dir + QStringLiteral("/radar_%1x%2.png").arg(sz.width()).arg(sz.height())));
+            }
+        }
 
         RotorLogbookPanel panel(nullptr, nullptr, nullptr);
         panel.resize(360, 760);

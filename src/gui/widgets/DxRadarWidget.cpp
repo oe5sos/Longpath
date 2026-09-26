@@ -190,6 +190,102 @@ void DxRadarWidget::paintEvent(QPaintEvent*)
         p.drawLine(c, c + dir * R);
     }
 
+    // ── ENTWURF: Rotor wie im Contestprogramm ("Rotoren: Kegel") ────
+    const auto onRing = [&](double deg, double r) {
+        const double a = deg * kPi / 180.0;
+        return c + QPointF(std::sin(a), -std::cos(a)) * r;
+    };
+    if (m_rotorDeg >= 0.0) {
+        const QColor amber(Style::kAmberText);
+        const double half = m_rotorBeamWidth / 2.0;
+        QPainterPath wedge;
+        wedge.moveTo(c);
+        wedge.arcTo(QRectF(c.x() - R, c.y() - R, 2.0 * R, 2.0 * R),
+                    90.0 - (m_rotorDeg - half), -m_rotorBeamWidth);
+        wedge.closeSubpath();
+        QRadialGradient fade(c, R);
+        QColor hub = amber; hub.setAlpha(120);
+        QColor rim = amber; rim.setAlpha(14);
+        fade.setColorAt(0.0, hub);
+        fade.setColorAt(1.0, rim);
+        p.setPen(Qt::NoPen);
+        p.setBrush(fade);
+        p.drawPath(wedge);
+        QColor edge = amber; edge.setAlpha(90);
+        p.setPen(QPen(edge, 1.0));
+        p.setBrush(Qt::NoBrush);
+        p.drawLine(c, onRing(m_rotorDeg - half, R));
+        p.drawLine(c, onRing(m_rotorDeg + half, R));
+    }
+    if (m_rotorTargetDeg >= 0.0) {
+        QColor blue(Style::kAccent); blue.setAlpha(170);
+        QPen pen(blue, 1.4, Qt::DashLine, Qt::RoundCap);
+        pen.setDashPattern({3.0, 3.0});
+        p.setPen(pen);
+        p.drawLine(c, onRing(m_rotorTargetDeg, R));
+        QPolygonF marker;
+        marker << onRing(m_rotorTargetDeg, R)
+               << onRing(m_rotorTargetDeg - 6.0, R + 11.0)
+               << onRing(m_rotorTargetDeg + 6.0, R + 11.0);
+        p.setPen(Qt::NoPen);
+        p.setBrush(QColor(Style::kBlueBg));
+        p.drawPolygon(marker);
+    }
+    if (m_rotorDeg >= 0.0) {
+        const QColor amber(Style::kAmberText);
+        const double a = m_rotorDeg * kPi / 180.0;
+        const QPointF dir(std::sin(a), -std::cos(a));
+        const QPointF nrm(std::cos(a), std::sin(a));
+        const QPointF tip = c + dir * (R * 0.90);
+        const double halfW = R * 0.02;
+        const QPointF tail = c - dir * (R * 0.16);
+        QPolygonF body;
+        body << tip << c + nrm * halfW << tail + nrm * (halfW * 0.7)
+             << tail - nrm * (halfW * 0.7) << c - nrm * halfW;
+        QColor halo = amber; halo.setAlpha(60);
+        QPen haloPen(halo, 3.0, Qt::SolidLine, Qt::RoundCap);
+        haloPen.setJoinStyle(Qt::RoundJoin);
+        p.setPen(haloPen);
+        p.setBrush(Qt::NoBrush);
+        p.drawPolygon(body);
+        p.setPen(Qt::NoPen);
+        p.setBrush(amber);
+        p.drawPolygon(body);
+        QRadialGradient glow(c, R * 0.09);
+        QColor g0 = amber; g0.setAlpha(110);
+        QColor g1 = amber; g1.setAlpha(0);
+        glow.setColorAt(0.0, g0);
+        glow.setColorAt(1.0, g1);
+        p.setBrush(glow);
+        p.drawEllipse(c, R * 0.09, R * 0.09);
+        p.setBrush(amber);
+        p.drawEllipse(c, 3.2, 3.2);
+
+        if (m_rotorReadout) {
+            QFont big = p.font();
+            big.setFamily(QStringLiteral("Menlo"));
+            big.setPixelSize(22);
+            big.setBold(true);
+            QFont sm = big;
+            sm.setPixelSize(12);
+            sm.setBold(false);
+            p.setFont(big);
+            p.setPen(amber);
+            const QString now = QStringLiteral("%1°").arg(int(std::lround(m_rotorDeg)) % 360, 3, 10, QLatin1Char('0'));
+            p.drawText(QPointF(10.0, 30.0), now);
+            if (m_rotorTargetDeg >= 0.0) {
+                p.setFont(sm);
+                p.setPen(QColor(Style::kTextPrimary));
+                double d = std::fmod(m_rotorTargetDeg - m_rotorDeg + 540.0, 360.0) - 180.0;
+                p.drawText(QPointF(10.0, 50.0), QStringLiteral("→ %1°  %2 %3°")
+                    .arg(int(std::lround(m_rotorTargetDeg)) % 360, 3, 10, QLatin1Char('0'))
+                    .arg(d < 0 ? QStringLiteral("CCW") : QStringLiteral("CW"))
+                    .arg(int(std::lround(std::abs(d)))));
+            }
+            p.setFont(f);
+        }
+    }
+
     // Kontakte: erst die gewoehnlichen, dann die markierten obendrauf.
     m_painted = 0;
     if (!m_hasHome) {

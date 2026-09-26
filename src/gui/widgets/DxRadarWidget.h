@@ -48,6 +48,15 @@ public:
     // Ein Richtstrahl aus der Rotorsteuerung, in Grad; negativ = keiner.
     void setBeamHeading(double deg);
 
+    // ENTWURF 2026-09-26 ("Rotor im Logbuch", Betreiber: "wir haben ja
+    // eine schoene Grafik bereits" = das Radar): der Rotor wie im
+    // Contestprogramm -- Kegel in Oeffnungsbreite, verjuengte Nadel mit
+    // Gegengewicht, blaue Zielmarke am Rand. < 0 = nicht zeichnen.
+    void setRotorHeading(double deg) { m_rotorDeg = deg; update(); }
+    void setRotorTarget(double deg)  { m_rotorTargetDeg = deg; update(); }
+    void setRotorBeamWidth(double deg) { m_rotorBeamWidth = deg; update(); }
+    void setRotorReadout(bool on) { m_rotorReadout = on; update(); }
+
     // ── Geometrie, fuer Pruefstaende ─────────────────────────────────
     // Entfernung → Radius (0..1) mit Wurzelskala.
     static double radiusFor(double km, double maxKm);
@@ -82,6 +91,10 @@ private:
     double m_homeLat{0.0}, m_homeLon{0.0};
     double m_maxKm{20000.0};
     double m_beamDeg{-1.0};
+    double m_rotorDeg{-1.0};
+    double m_rotorTargetDeg{-1.0};
+    double m_rotorBeamWidth{60.0};
+    bool   m_rotorReadout{true};
     QVector<MapPoint> m_points;
     QVector<Placed>   m_placed;
     int    m_painted{0};
