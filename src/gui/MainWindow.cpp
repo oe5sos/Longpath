@@ -8481,6 +8481,30 @@ void MainWindow::populateDefaultMeter()
                 }
                 applySideAreaState(
                     s.value(QStringLiteral("sideArea")).toMap());
+
+                // ── Das Logbuch vorne (2026-09-26) ──────────────────
+                //
+                // Schritt 2 oeffnet das Logbuch, Schritt 4 und 5 danach
+                // Panadapter und Rotor/Log -- und was zuletzt aufgeht,
+                // liegt vorne. Betreiber: "ist schon wieder im
+                // Vordergrund". Wer das Logbuch im Profil offen hat,
+                // arbeitet darin: es kommt nach vorne, jetzt und noch
+                // einmal, wenn macOS die App erst danach aktiviert (dann
+                // setzt der AuxiliaryWindowLeveler die Ebenen neu).
+                if (m_appletVis
+                    && m_appletVis->isVisible(QStringLiteral("WinLogbook"))) {
+                    QTimer::singleShot(0, this, [this]() { raiseLogbookIfOpen(); });
+                    if (qApp->applicationState() != Qt::ApplicationActive) {
+                        auto* once = new QMetaObject::Connection;
+                        *once = connect(qApp, &QGuiApplication::applicationStateChanged, this,
+                            [this, once](Qt::ApplicationState st) {
+                                if (st != Qt::ApplicationActive) { return; }
+                                disconnect(*once);
+                                delete once;
+                                QTimer::singleShot(0, this, [this]() { raiseLogbookIfOpen(); });
+                            });
+                    }
+                }
                 qWarning() << "[ProfileApply:Step] 6/6 fertig";
             });
 
@@ -14343,6 +14367,16 @@ void MainWindow::applyWindowVisibility(const QString& id, bool on)
     if (id == QLatin1String("WinSpotHub")) {
         if (on) { openSpotHub(); } else { closeIf(m_spotHubDialog); }
         return;
+    }
+}
+
+void MainWindow::raiseLogbookIfOpen()
+{
+    // Nur, was schon da ist: ensureRotorPanel() wuerde das Rotor/Log-Feld
+    // erst anlegen -- hier soll nichts Neues aufgehen.
+    if (!m_rotorDock && !m_rotorWindow) { return; }
+    if (RotorLogbookPanel* panel = ensureRotorPanel()) {
+        panel->raiseLogbookIfOpen();
     }
 }
 

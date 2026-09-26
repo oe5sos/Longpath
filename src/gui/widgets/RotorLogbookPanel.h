@@ -109,6 +109,9 @@ public:
     // window keeps showing on top of a profile that never opened it.
     // No-op if the window was never created.
     void hideLogbook();
+    // Das offene Logbuch nach vorne holen, ohne es neu einzulesen (Start:
+    // Panadapter und Rotor/Log gehen nach ihm auf und lagen davor).
+    void raiseLogbookIfOpen();
 
     // Open the rotator setup dialog. Public for the same reason as
     // showLogbook(): an operator whose rotator is not working yet
