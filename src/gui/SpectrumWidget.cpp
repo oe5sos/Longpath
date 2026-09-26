@@ -2168,18 +2168,24 @@ void SpectrumWidget::setHeatmapEnabled(bool on)
 
 void SpectrumWidget::setDbmCalOffset(float db)
 {
-    db = qBound(-30.0f, db, 30.0f);
+    // +-30 war die Spanne des Setup-Felds fuer die eigene Anzeigekorrektur.
+    // MainWindow schiebt hier aber die ganze Kette hinein (Werks-
+    // kalibrierung + Preamp/ATT aus rxMeterOffsetDb) -- Thetis fuehrt beides
+    // getrennt (Display.RX1DisplayCalOffset, RX1PreampOffset). Bei ATT 30 +
+    // 0,98 dB Werkskalibrierung fehlte der Anzeige 1 dB (Werkbank
+    // tst_rx_cal_probe am HL2-Simulator, 2026-09-26), bei 61-dB-Abschwaechern
+    // mehr. Die Grenze ist nur noch eine Plausibilitaetsschranke; das
+    // Setup-Feld behaelt seine +-30.
+    db = qBound(-100.0f, db, 100.0f);
     if (qFuzzyCompare(m_dbmCalOffset, db)) {
         return;
     }
     m_dbmCalOffset = db;
     scheduleSettingsSave();
-    markOverlayDirty();  // dBm scale strip labels shift
-    // 2026-05-22 calibration fix: ensure FFT vertex VBO re-runs so the
-    // updated m_dbmCalOffset reaches the rendered trace position, not just
-    // the axis labels.  FFT data delivery normally triggers update() on its
-    // own, but this guards against the case where the cal pushes before any
-    // FFT frame has arrived (e.g. controller attaches before connection).
+    // Seit 2026-09-26 wirkt die Kalibrierung auf die Pixelwerte (naechstes
+    // Bild in updateSpectrumLinear), nicht auf die Achse. Die Squelch-Linie
+    // rechnet sie selbst dazu und steht in der Ueberlagerung.
+    markOverlayDirty();
     update();
 }
 
@@ -2483,14 +2489,13 @@ void SpectrumWidget::setDispNormalize(bool on)
 {
     if (m_dispNormalize == on) { return; }
     m_dispNormalize = on;
-    // The shift is applied at render time inside dbmToY / dbmToYf
-    // (-10 * log10(binWidthHz)) so the entire spectrum trace, NF line,
-    // peak hold, peak blobs, dBm-scale labels, and grid lines all
-    // recompose to a 1-Hz reference bandwidth in lockstep.  The WDSP
-    // SetDisplayNormOneHz path (Thetis specHPSDR.cs:325) would do the
-    // same thing inside the analyzer; doing it at the rendering stage
-    // keeps the FFT engine untouched and the toggle is reversible
-    // without a channel rebuild.
+    // Die Verschiebung (-10 * log10(binWidthHz)) geht seit 2026-09-26 mit
+    // der Kalibrierung in die Pixelwerte (updateSpectrumLinear, dbmScale):
+    // Kurve, Rauschboden, Peak-Hold, Spitzen und Wasserfall bekommen sie,
+    // Gitter und dBm-Zahlen bleiben stehen -- so wie es WDSPs
+    // SetDisplayNormOneHz (Thetis specHPSDR.cs:325) im Analyzer tut.
+    // Vorher lag sie in dbmToY und verschob die Achse gleich mit, die
+    // Ablesung aenderte sich nicht. Weiter ohne Kanal-Neubau umschaltbar.
     markOverlayDirty();
     update();
 }
@@ -3286,17 +3291,8 @@ void SpectrumWidget::updateSpectrumLinear(int receiverId,
         m_waterfallAvenger.clear();
     }
 
-    // Die 1-Hz-Normierung haengt an der Bin-Breite, also an der Bin-Zahl.
-    // Gitter und dBm-Zahlen stehen in der statischen Ueberlagerung, die
-    // nur bei Bedarf neu gezeichnet wird -- ohne diesen Anstoss blieben
-    // sie nach einem Neuplan der FFT auf der alten Bin-Breite stehen,
-    // waehrend die Kurve schon die neue nahm (2026-09-25).
-    const bool binCountChanged = (m_fullLinearBins.size() != binsLinear.size());
     m_fullLinearBins = binsLinear;
     m_fftWindowEnb   = qMax(windowEnb, 1e-9);
-    if (binCountChanged && m_dispNormalize) {
-        markOverlayDirty();
-    }
 
     // Display pixel count -- spectrum panel width minus dBm strip column,
     // in DEVICE pixels. Per Thetis Display.cs:4970 DrawPanadapterDX2D(int
@@ -3333,7 +3329,23 @@ void SpectrumWidget::updateSpectrumLinear(int receiverId,
     // dbmOffset folded into the avenger's power-domain scale so that
     // 10·log10(linear · scale) == 10·log10(linear) + dbmOffset, matching
     // FFTEngine.cpp:348 [v2.10.3.13] (binsDbm = 10·log10 + offset).
-    const double dbmScale  = std::pow(10.0, dbmOffset / 10.0);
+    //
+    // ── Kalibrierung gehoert an die DATEN, nicht an die Achse ──────────
+    //
+    // Bis 2026-09-26 kam m_dbmCalOffset (Werks-Kalibrierung + Preamp/ATT-
+    // Stufe, von MainWindow aus rxMeterOffsetDb gesetzt) und die 1-Hz-
+    // Normierung erst in dbmToY dazu -- und dbmToY zeichnet auch das
+    // Gitter und die dBm-Zahlen. Kurve und Skala verschoben sich also
+    // gemeinsam, und abgelesen wurde der ROHWERT: Preamp auf -20 dB, das
+    // S-Meter blieb stehen, das Spektrum fiel um 20 dB. Thetis rechnet
+    // die Kalibrierung auf die Pixelwerte (Display.cs, RX1DisplayCalOffset
+    // + Preamp-Offset je Pixel), die Achse bleibt fest. Hier, im
+    // Leistungsmassstab des Mittelwertbildners, heben sich Rohsprung und
+    // Kalibriersprung beim Umschalten schon in der Mittelung auf. Kurve,
+    // Wasserfall, Spitzen, Rauschboden und 3D sehen damit kalibrierte dBm;
+    // dbmToY/dbmToYf sind reine Achse (tst_spectrum_trace_on_grid).
+    const double dbmScale  = std::pow(10.0, (dbmOffset + m_dbmCalOffset
+                                             + normalizeShiftDb()) / 10.0);
 
     auto avengerMode = [](SpectrumAveraging m) -> int {
         // Wire-format integer codes per WDSP analyzer.c:464 [v2.10.3.13].
@@ -3661,7 +3673,17 @@ double SpectrumWidget::peakDbmInSlicePassband() const
     for (int i = firstPx; i <= lastPx; ++i) {
         if (src[i] > peak) { peak = src[i]; }
     }
-    return static_cast<double>(peak);
+    // Roh zurueck an den MaxBin-Detektor: seit 2026-09-26 tragen die
+    // Pixelwerte Kalibrierung und 1-Hz-Normierung (updateSpectrumLinear,
+    // dbmScale). MeterPoller addiert die Kalibrierung selbst (Thetis
+    // console.cs:46881 [v2.10.3.13] max_bin + offset) -- sonst stuende sie
+    // doppelt im S-Meter, und die Normierung, eine Anzeigeeinstellung,
+    // ginge mit hinein (tst_notch_visual_does_not_perturb_noise_floor_or_
+    // maxbin, max_bin_passband_peak_stays_raw_under_calibration).
+    // Der Waechter -400 bleibt -400: bei negativer Kalibrierung (ANAN G2
+    // -4,476 dB) kaeme er sonst als -395,5 durch das "> -400"-Tor.
+    if (peak <= -400.0f) { return -400.0; }
+    return static_cast<double>(peak) - (m_dbmCalOffset + normalizeShiftDb());
 }
 
 // ---------------------------------------------------------------------------
@@ -4863,7 +4885,10 @@ void SpectrumWidget::drawSquelchLine(QPainter& p, const QRect& specRect)
 {
     if (!m_squelchLineVisible || specRect.isEmpty()) { return; }
 
-    const int y = dbmToY(static_cast<float>(m_squelchDbm), specRect);
+    // Die Schwelle geht roh an WDSP (RxChannel::setAmsqThresh), die Kurve
+    // ist kalibriert -- also hier dieselbe Kalibrierung, damit die Linie
+    // dort steht, wo ein Signal sie in der Kurve kreuzt.
+    const int y = dbmToY(static_cast<float>(m_squelchDbm) + m_dbmCalOffset, specRect);
     if (y < specRect.top() || y > specRect.bottom()) { return; }
 
     const QColor col = roleColor("warn", Style::kAmberWarn, 220);
@@ -5236,9 +5261,9 @@ void SpectrumWidget::drawDbmScale(QPainter& p, const QRect& specRect)
     const qreal staticAscent = fm.ascent();
 
     for (float dbm = firstLabel; dbm <= m_refLevel; dbm += stepDb) {
-        // Route through dbmToY() so m_dbmCalOffset is applied consistently with
-        // the grid/trace/peak-hold paths — otherwise a non-zero cal offset would
-        // drift strip ticks off the actual grid lines.
+        // Dieselbe Achse wie die Gitterlinien (dbmToY). Die Kalibrierung
+        // steckt seit 2026-09-26 in den Daten, nicht mehr hier -- vorher
+        // wanderten Zahlen und Gitter mit ihr, und abgelesen wurde roh.
         const int y = dbmToY(dbm, specRect);
         if (y < labelTop || y > specRect.bottom() - 5) continue;
 
@@ -5509,11 +5534,13 @@ float SpectrumWidget::normalizeShiftDb() const
 
 int SpectrumWidget::dbmToY(float dbm, const QRect& r) const
 {
-    // Phase 3G-8: apply display calibration offset before mapping to Y.
-    // From Thetis display.cs:1372 Display.RX1DisplayCalOffset.
-    const float calibrated = dbm + m_dbmCalOffset + normalizeShiftDb();
+    // Reine Achse: dbm ist schon ein ANGEZEIGTER Wert (Gitterlinie,
+    // Beschriftung, kalibrierte Pixelwerte). Die Kalibrierung
+    // (Thetis display.cs:1372 Display.RX1DisplayCalOffset) und die
+    // 1-Hz-Normierung stecken seit 2026-09-26 in den Daten, siehe
+    // updateSpectrumLinear (dbmScale).
     float bottom = m_refLevel - m_dynamicRange;
-    float frac = (calibrated - bottom) / m_dynamicRange;
+    float frac = (dbm - bottom) / m_dynamicRange;
     frac = qBound(0.0f, frac, 1.0f);
     // Reserve the band plan strip height — the dBm floor must map to the
     // TOP of the band plan strip, not the panel bottom, so spectrum
@@ -5526,9 +5553,9 @@ int SpectrumWidget::dbmToY(float dbm, const QRect& r) const
 
 float SpectrumWidget::dbmToYf(float dbm, const QRect& r) const
 {
-    const float calibrated = dbm + m_dbmCalOffset + normalizeShiftDb();
+    // Reine Achse wie dbmToY.
     float bottom = m_refLevel - m_dynamicRange;
-    float frac = (calibrated - bottom) / m_dynamicRange;
+    float frac = (dbm - bottom) / m_dynamicRange;
     frac = qBound(0.0f, frac, 1.0f);
     const int   bandH        = bandPlanStripHeight();
     const float contentBottom = static_cast<float>(r.bottom() - bandH);
@@ -11516,7 +11543,8 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
     // Thetis Display.cs:5249-5378 [v2.10.3.13] per-pixel render loop
     // (DrawLine over current_display_data[i], i = 0..nDecimatedWidth-1).
     // Honours:
-    //   - m_dbmCalOffset (shifts every pixel's dBm before y mapping)
+    //   - m_dbmCalOffset: steckt seit 2026-09-26 schon in m_renderedPixels
+    //     (updateSpectrumLinear, dbmScale), hier nur noch die Achse
     //   - m_heatmapEnabled (aus = flache Kurvenfarbe, an = Regenbogen;
     //     bis 2026-08-15 haftete das an m_gradientEnabled, das auf dem
     //     CPU-Pfad etwas anderes bedeutet — siehe Header)
@@ -11553,9 +11581,9 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
         const float yFloor = yBot + 2.0f * qBound(0.0f, stripFrac, 1.0f);
 
         const float fa = m_fillAlpha;
-        // Kalibrierung UND 1-Hz-Normierung, wie dbmToYf -- die Normierung
-        // fehlte hier, Gitter und Ueberlagerungen hatten sie schon.
-        const float cal = m_dbmCalOffset + normalizeShiftDb();
+        // Kalibrierung und 1-Hz-Normierung stecken seit 2026-09-26 in den
+        // Pixelwerten selbst (updateSpectrumLinear, dbmScale) -- hier wie
+        // in dbmToYf nur noch die Achse.
 
         // Flat-mode colour picked from m_fillColor.
         const float flatR = m_fillColor.redF();
@@ -11607,7 +11635,7 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
 
         for (int j = 0; j < n; ++j) {
             float x = (n > 1) ? 2.0f * j / (n - 1) - 1.0f : 0.0f;
-            float t = qBound(0.0f, ((m_renderedPixels[j] + cal) - minDbm) / range, 1.0f);
+            float t = qBound(0.0f, (m_renderedPixels[j] - minDbm) / range, 1.0f);
             float y = yFloor + t * (yTop - yFloor);
 
             // Ribbon perpendicular offset: central difference of the
@@ -11619,8 +11647,8 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
             const int jNext = qMin(j + 1, n - 1);
             const float xPrev = (n > 1) ? 2.0f * jPrev / (n - 1) - 1.0f : 0.0f;
             const float xNext = (n > 1) ? 2.0f * jNext / (n - 1) - 1.0f : 0.0f;
-            const float tPrev = qBound(0.0f, ((m_renderedPixels[jPrev] + cal) - minDbm) / range, 1.0f);
-            const float tNext = qBound(0.0f, ((m_renderedPixels[jNext] + cal) - minDbm) / range, 1.0f);
+            const float tPrev = qBound(0.0f, (m_renderedPixels[jPrev] - minDbm) / range, 1.0f);
+            const float tNext = qBound(0.0f, (m_renderedPixels[jNext] - minDbm) / range, 1.0f);
             const float yPrev = yFloor + tPrev * (yTop - yFloor);
             const float yNext = yFloor + tNext * (yTop - yFloor);
 
@@ -11734,15 +11762,15 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
             QVector<float> peakVerts(n * 2 * kFftVertStride);
             for (int j = 0; j < n; ++j) {
                 float x = (n > 1) ? 2.0f * j / (n - 1) - 1.0f : 0.0f;
-                float t = qBound(0.0f, ((m_pxPeakHold[j] + cal) - minDbm) / range, 1.0f);
+                float t = qBound(0.0f, (m_pxPeakHold[j] - minDbm) / range, 1.0f);
                 float y = yFloor + t * (yTop - yFloor);
 
                 const int jPrev = qMax(j - 1, 0);
                 const int jNext = qMin(j + 1, n - 1);
                 const float xPrev = (n > 1) ? 2.0f * jPrev / (n - 1) - 1.0f : 0.0f;
                 const float xNext = (n > 1) ? 2.0f * jNext / (n - 1) - 1.0f : 0.0f;
-                const float tPrev = qBound(0.0f, ((m_pxPeakHold[jPrev] + cal) - minDbm) / range, 1.0f);
-                const float tNext = qBound(0.0f, ((m_pxPeakHold[jNext] + cal) - minDbm) / range, 1.0f);
+                const float tPrev = qBound(0.0f, (m_pxPeakHold[jPrev] - minDbm) / range, 1.0f);
+                const float tNext = qBound(0.0f, (m_pxPeakHold[jNext] - minDbm) / range, 1.0f);
                 const float yPrev = yFloor + tPrev * (yTop - yFloor);
                 const float yNext = yFloor + tNext * (yTop - yFloor);
 

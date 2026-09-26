@@ -4848,6 +4848,7 @@ if(TEST tst_waterfall_after_pause)
     set_tests_properties(tst_waterfall_after_pause PROPERTIES RUN_SERIAL TRUE)
 endif()
 longpath_add_test(tst_window_grid_snap)
+longpath_add_test(tst_rx_cal_probe)
 longpath_add_test(tst_form_variants)
 if(TEST tst_form_variants)
     set_tests_properties(tst_form_variants PROPERTIES
