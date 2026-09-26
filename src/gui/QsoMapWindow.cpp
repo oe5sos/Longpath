@@ -18,6 +18,7 @@
 
 #include "core/AdifLog.h"
 #include "core/AppSettings.h"
+#include "core/BeamHeading.h"
 #include "core/KmlExport.h"
 #include "core/Maidenhead.h"
 #include "gui/StyleConstants.h"
@@ -1240,20 +1241,11 @@ void QsoMapWindow::flyToStation(const QString& call, double lat, double lon,
     if (isValidGridSquare(m_homeGrid)) {
         double hlat = 0.0, hlon = 0.0;
         calculateLatLonFromGridSquare(m_homeGrid, hlat, hlon);
-        // Entfernung und Peilung ueber den Grosskreis, wie die Karte sie zeichnet.
-        constexpr double kPi = 3.14159265358979323846;
-        const double R = 6371.0;
-        const double p1 = hlat * kPi / 180.0, p2 = lat * kPi / 180.0;
-        const double dl = (lon - hlon) * kPi / 180.0;
-        const double a = std::sin((p2 - p1) / 2) * std::sin((p2 - p1) / 2)
-                       + std::cos(p1) * std::cos(p2) * std::sin(dl / 2) * std::sin(dl / 2);
-        const double km = 2.0 * R * std::asin(std::min(1.0, std::sqrt(a)));
-        const double y = std::sin(dl) * std::cos(p2);
-        const double x = std::cos(p1) * std::sin(p2) - std::sin(p1) * std::cos(p2) * std::cos(dl);
-        double brg = std::atan2(y, x) * 180.0 / kPi;
-        if (brg < 0.0) { brg += 360.0; }
+        // Entfernung und Peilung ueber den Grosskreis, wie die Karte sie
+        // zeichnet -- dieselbe Rechnung wie die Karteikarte daneben.
+        const BeamHeading::GreatCircle g = BeamHeading::greatCircle(hlat, hlon, lat, lon);
         text += QStringLiteral(" · %1 km · %2°")
-                    .arg(km, 0, 'f', 0).arg(brg, 0, 'f', 0);
+                    .arg(g.km, 0, 'f', 0).arg(g.bearingDeg, 0, 'f', 0);
     }
     m_info->setText(text);
     m_info->setVisible(true);

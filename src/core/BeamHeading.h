@@ -35,6 +35,9 @@
 // Modification history (Longpath):
 //   2026-08-09 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
+//   2026-09-26 — greatCircle(): one distance/bearing from coordinates
+//                 for the logbook card and the map. AI-assisted via
+//                 Anthropic Claude, operator Martin Fischer.
 // =================================================================
 
 #include <QString>
@@ -46,6 +49,21 @@ double wrap360(double deg);
 
 // The long path for a given short-path bearing.
 double longPath(double shortPathDeg);
+
+// Distance (km) and initial bearing (degrees true, 0-360) along the
+// great circle from one position to another, degrees north/east.
+//
+// 2026-09-26: the logbook card turned the rotor by the bearing stored
+// in the log, which came from the 4-character locator -- for OE5VVM in
+// Laakirchen, 9 km north of the station, the centre of JN67 put him
+// 74 km to the south-west ("Turn to 234°"). The map beside it already
+// used QRZ's coordinates and said 11°. Both now use this one formula,
+// so the card and the map cannot disagree again.
+struct GreatCircle {
+    double km{0.0};
+    double bearingDeg{0.0};
+};
+GreatCircle greatCircle(double lat1, double lon1, double lat2, double lon2);
 
 // Where a rotor cannot turn through.
 enum class Stop {
