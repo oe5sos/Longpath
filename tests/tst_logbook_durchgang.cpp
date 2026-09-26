@@ -16,10 +16,12 @@
 // Zerleger.
 
 #include <QtTest>
+#include <memory>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDateEdit>
 #include <QDialog>
+#include <QFileDialog>
 #include <QDialogButtonBox>
 #include <QFormLayout>
 #include <QLabel>
@@ -145,6 +147,19 @@ void autoAnswerModals(QObject* ctx, const std::function<void(QWidget*)>& act)
         if (QWidget* m = QApplication::activeModalWidget()) { act(m); t->deleteLater(); }
     });
     t->start();
+}
+
+// Beantwortet Dialoge, solange er lebt (fuer Ablaeufe mit mehreren
+// Fenstern nacheinander: Dateidialog, dann Meldung).
+QTimer* answerModals(QObject* ctx, const std::function<void(QWidget*)>& act)
+{
+    auto* t = new QTimer(ctx);
+    t->setInterval(40);
+    QObject::connect(t, &QTimer::timeout, ctx, [act]() {
+        if (QWidget* m = QApplication::activeModalWidget()) { act(m); }
+    });
+    t->start();
+    return t;
 }
 
 void grab(QWidget* w, const QString& name)
@@ -706,6 +721,103 @@ private slots:
         w.statsToggleForTest()->click();
         QVERIFY(w.mapPanelForTest()->isVisible());
         QVERIFY(w.statsSectionForTest()->isVisible());
+    }
+
+    // Exporte: was gefiltert zu sehen ist, geht hinaus -- beim ADIF jedes
+    // Feld jedes Kontakts, auch was Longpath nicht kennt.
+    void exportsCarryWhatIsShown()
+    {
+        LogbookWindow w(m_log);
+        w.resize(1600, 950);
+        w.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QTableWidget* table = logTable(&w);
+        QComboBox* band = comboWith(&w, QStringLiteral("20m"));
+        QVERIFY(band);
+        band->setCurrentIndex(band->findText(QStringLiteral("20m"), Qt::MatchFixedString));
+        const int shown = table->rowCount();
+        QVERIFY(shown > 0);
+
+        QStringList told;
+        auto exportTo = [&](const QString& button, const QString& file) {
+            const QString wanted = m_dir.filePath(file);
+            auto chosen = std::make_shared<QString>();
+            QTimer* t = answerModals(this, [&told, wanted, chosen](QWidget* m) {
+                if (auto* fd = qobject_cast<QFileDialog*>(m)) {
+                    fd->selectFile(wanted);
+                    // Der Qt-Dialog setzt damit den Ordner; den Namen
+                    // behaelt er vom Vorschlag -- also gilt, was er meldet.
+                    *chosen = fd->selectedFiles().value(0);
+                    QMetaObject::invokeMethod(fd, "done", Qt::DirectConnection,
+                                              Q_ARG(int, QDialog::Accepted));
+                } else if (auto* box = qobject_cast<QMessageBox*>(m)) {
+                    told << box->text();
+                    box->accept();
+                }
+            });
+            QPushButton* b = buttonWith(&w, button);
+            if (!b) { qWarning() << "kein Knopf" << button; delete t; return QString(); }
+            b->click();
+            delete t;
+            return *chosen;
+        };
+
+        // ADIF
+        const QString adi = exportTo(QStringLiteral("Export ADIF…"), QStringLiteral("export.adi"));
+        QVERIFY2(QFile::exists(adi), "keine ADIF-Datei");
+        const QList<Record> out = rawRecords([&]() { QFile f(adi); f.open(QIODevice::ReadOnly); return f.readAll(); }());
+        QCOMPARE(out.size(), shown);
+        QMap<QByteArray, int> pool;
+        auto flat = [](const Record& r) {
+            QByteArray o; const auto m = asMap(r);
+            for (auto it = m.cbegin(); it != m.cend(); ++it) { o += it.key() + '=' + it.value() + '\x1f'; }
+            return o;
+        };
+        // Gegen den Stand der Datei jetzt (fruehere Schritte haben
+        // bearbeitet, geloescht, eingelesen).
+        const QByteArray now = [this]() { QFile f(m_log); f.open(QIODevice::ReadOnly); return f.readAll(); }();
+        for (const Record& r : rawRecords(now)) { ++pool[flat(r)]; }
+        int notVerbatim = 0;
+        for (const Record& r : out) {
+            if (pool.value(flat(r)) > 0) { --pool[flat(r)]; } else { ++notVerbatim; }
+            if (asMap(r).value("BAND").toLower() != "20m") { ++notVerbatim; }
+        }
+        QCOMPARE(notVerbatim, 0);
+
+        // CSV: Kopfzeile + eine Zeile je Kontakt.
+        const QString csv = exportTo(QStringLiteral("Export CSV…"), QStringLiteral("export.csv"));
+        QFile cf(csv);
+        QVERIFY(cf.open(QIODevice::ReadOnly));
+        const QByteArray csvBytes = cf.readAll();
+        // Datensaetze nach RFC 4180 zaehlen: ein Zeilenende zaehlt nur
+        // ausserhalb von Anfuehrungszeichen (ein Kommentar darf einen
+        // Umbruch enthalten, gequotet ist das gueltig).
+        int csvRecords = 0, rawLines = 0;
+        bool inQuotes = false, lineHasText = false;
+        for (const char ch : csvBytes) {
+            if (ch == '"') { inQuotes = !inQuotes; }
+            if (ch == '\n') {
+                ++rawLines;
+                if (!inQuotes && lineHasText) { ++csvRecords; lineHasText = false; }
+                continue;
+            }
+            if (ch != '\r') { lineHasText = true; }
+        }
+        if (lineHasText) { ++csvRecords; }
+        QVERIFY2(!inQuotes, "CSV endet in einem offenen Anfuehrungszeichen");
+        qInfo().noquote() << QStringLiteral("CSV %1 Datensaetze (%2 Zeilen) fuer %3 Kontakte")
+                                 .arg(csvRecords).arg(rawLines).arg(shown);
+        QCOMPARE(csvRecords, shown + 1);
+
+        // Cabrillo: eine QSO:-Zeile je Kontakt, zwischen START- und END-OF-LOG.
+        const QString cbr = exportTo(QStringLiteral("Cabrillo…"), QStringLiteral("export.cbr"));
+        QFile bf(cbr);
+        QVERIFY(bf.open(QIODevice::ReadOnly | QIODevice::Text));
+        const QString text = QString::fromUtf8(bf.readAll());
+        QCOMPARE(text.count(QStringLiteral("\nQSO:")), shown);
+        QVERIFY(text.startsWith(QStringLiteral("START-OF-LOG")));
+        QVERIFY(text.trimmed().endsWith(QStringLiteral("END-OF-LOG:")));
+        qInfo().noquote() << "Meldungen:" << told.join(QStringLiteral(" | ")).simplified();
     }
 };
 
