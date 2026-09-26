@@ -38,13 +38,29 @@ GridCellWidget::GridCellWidget(const QString& id, QWidget* parent)
     // durchsichtig.
     setObjectName(QStringLiteral("gridCell"));
     setAttribute(Qt::WA_StyledBackground, true);
+    // Leichtes Rendering (2026-09-26, Betreiber: "generelles leichtes
+    // rendering von allem ... nur minimale veraenderung"): die Platte
+    // bekommt die Rundung, die HAUSSTIL.md fuer sie vorsieht
+    // (kGlassPanelRadius, bis dahin nirgends benutzt).
     setStyleSheet(QStringLiteral(
-        "QWidget#gridCell { background: %1; border: 1px solid %2; }")
+        "QWidget#gridCell { background: %1; border: 1px solid %2;"
+        " border-radius: %3px; }")
             .arg(Style::glassPanelFill(),
-                 QString::fromLatin1(Style::kBorderSubtle)));
+                 QString::fromLatin1(Style::kBorderSubtle))
+            .arg(Style::kGlassPanelRadius));
 
     m_titleBar = new QWidget(this);
-    m_titleBar->setStyleSheet(Style::titleBarStyle());
+    // Der Kopf liegt oben in der gerundeten Platte: dieselbe Rundung
+    // oben (ein Pixel weniger, innerhalb des Rahmens), sonst stuenden
+    // seine eckigen Enden ueber den runden Ecken. Nur fuer den Kopf
+    // selbst (#gridCellHead), nicht fuer seine Kinder.
+    m_titleBar->setObjectName(QStringLiteral("gridCellHead"));
+    m_titleBar->setAttribute(Qt::WA_StyledBackground, true);
+    m_titleBar->setStyleSheet(QStringLiteral(
+        "QWidget#gridCellHead { %1 border-top-left-radius: %2px;"
+        " border-top-right-radius: %2px; }")
+            .arg(Style::titleBarStyle())
+            .arg(Style::kGlassPanelRadius - 1));
 
     m_titleLayout = new QHBoxLayout(m_titleBar);
     m_titleLayout->setContentsMargins(2, 0, 4, 0);
