@@ -98,7 +98,10 @@ public:
     /// Die Geometrie ist immer die AUFGEKLAPPTE.
     QVariantMap captureState() const;
 
-    static constexpr int kRailW = 38;
+    // 40 statt 38 (2026-09-26): ein Vielfaches des Fensterrasters
+    // (WindowPlacement kSnapGridPx), sonst laege der zugeklappte Bereich
+    // mit seiner rechten Kante neben dem Raster.
+    static constexpr int kRailW = 40;
 
     /// Aufleuchten, solange etwas darueber gezogen wird, das hier
     /// abgelegt werden kann (Karte aus dem Auswaehler oder ein

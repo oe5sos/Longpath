@@ -11,6 +11,7 @@
 // =================================================================
 
 #include "gui/SideAreaWindow.h"
+#include "gui/WindowPlacement.h"
 
 #include "gui/FramelessResizer.h"
 #include "gui/MacFloatingWindowBehavior.h"
@@ -504,6 +505,10 @@ void SideAreaWindow::paintEvent(QPaintEvent*)
     }
     p.setPen(QColor(Style::hexRole(Style::kBorderSubtle)));
     p.drawRect(rect().adjusted(0, 0, -1, -1));
+    // Lichtkante oben innen wie jede Platte (Style::paintWindowPlate,
+    // 2026-09-26); hier einzeln, weil die Leiste dazwischen gemalt wird.
+    p.setPen(QColor(255, 255, 255, Style::kGlassLightAlpha));
+    p.drawLine(1, 1, width() - 2, 1);
     if (m_dropHighlight) {
         // Ablegen moeglich: Rand in der Auswahlfarbe, innen ein Hauch
         // davon -- dieselbe Sprache wie ein gewaehltes Leistensymbol.
@@ -518,7 +523,12 @@ void SideAreaWindow::paintEvent(QPaintEvent*)
 void SideAreaWindow::moveEvent(QMoveEvent* ev)
 {
     QWidget::moveEvent(ev);
-    if (!m_applyingCollapse) { scheduleSettle(); }
+    if (!m_applyingCollapse) {
+        scheduleSettle();
+        // Raster wie jedes schwebende Fenster (2026-09-26) -- war hier
+        // gar nicht angeschlossen.
+        snapToGridAfterSettle(this);
+    }
 }
 
 void SideAreaWindow::resizeEvent(QResizeEvent* ev)
@@ -527,7 +537,10 @@ void SideAreaWindow::resizeEvent(QResizeEvent* ev)
     if (!m_applyingCollapse && !m_collapsed) {
         m_expandedWidth = width();
     }
-    if (!m_applyingCollapse) { scheduleSettle(); }
+    if (!m_applyingCollapse) {
+        scheduleSettle();
+        snapToGridAfterSettle(this);
+    }
 }
 
 void SideAreaWindow::closeEvent(QCloseEvent* ev)

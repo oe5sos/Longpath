@@ -297,6 +297,9 @@ void AppletFloatingWindow::resizeEvent(QResizeEvent* ev)
 {
     QWidget::resizeEvent(ev);
     scheduleGeometryReport();
+    // Raster auch fuer die Groesse (2026-09-26): alle vier Kanten, siehe
+    // WindowPlacement.h snappedFrameRect.
+    snapToGridAfterSettle(this);
 }
 
 void AppletFloatingWindow::paintEvent(QPaintEvent*)
@@ -306,12 +309,7 @@ void AppletFloatingWindow::paintEvent(QPaintEvent*)
     // gedockte Zelle (GridCellWidget); die Applets darin sind
     // durchsichtig, damit sie durchscheint.
     QPainter p(this);
-    QLinearGradient g(0, 0, 0, height());
-    g.setColorAt(0.0, QColor(Style::hexRole(Style::kGlassPanelTop)));
-    g.setColorAt(1.0, QColor(Style::hexRole(Style::kGlassPanelBot)));
-    p.fillRect(rect(), g);
-    p.setPen(QColor(Style::hexRole(Style::kBorderSubtle)));
-    p.drawRect(rect().adjusted(0, 0, -1, -1));
+    Style::paintWindowPlate(p, rect());
 }
 
 void AppletFloatingWindow::scheduleGeometryReport()

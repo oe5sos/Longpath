@@ -240,6 +240,9 @@ void PanFloatingWindow::resizeEvent(QResizeEvent*)
 {
     emit geometryChanged(panId(), saveGeometry());
     saveGeometryState();
+    // Raster auch fuer die Groesse (2026-09-26): alle vier Kanten, siehe
+    // WindowPlacement.h snappedFrameRect.
+    snapToGridAfterSettle(this);
 }
 
 void PanFloatingWindow::saveGeometryState()

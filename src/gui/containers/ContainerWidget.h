@@ -399,6 +399,9 @@ private:
     void doResize(int w, int h);
 
     static int roundToNearestTen(int value);
+    // Raster wie die Fenster, immer; Strg = frei (2026-09-26).
+    static bool gridSnapActive();
+    static int roundToGrid(int value);
     static QString axisLockToString(AxisLock lock);
     static AxisLock axisLockFromString(const QString& str);
     static QString dockModeToString(DockMode mode);

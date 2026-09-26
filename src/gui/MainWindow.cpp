@@ -10524,11 +10524,14 @@ void MainWindow::buildStatusBar()
     // zwei Stufen unterscheiden — auf dem Schirm kaum zu benennen und
     // trotzdem der Grund, warum die beiden Leisten nicht wie ein Paar
     // wirkten. Jetzt dieselbe Konstante wie oben.
+    // Leichtes Rendering (2026-09-26): dieselbe Platte wie die
+    // Befehlsleiste oben (Verlauf), und statt der harten Linie die
+    // Lichtkante -- die beiden Leisten wirken als Paar.
     sb->setStyleSheet(Style::themed(QStringLiteral(
         "QStatusBar { background: %1; border-top: 1px solid %2; }"
         "QStatusBar::item { border: none; }")
-        .arg(QString::fromLatin1(Style::kStatusBarBg),
-             QString::fromLatin1(Style::kBorderSubtle))));
+        .arg(Style::glassPanelFill(),
+             QLatin1String(Style::kGlassLight))));
 
     // Wrapper widget for the full-width custom layout. Stored as a
     // member so resizeEvent can read its width for m_chromeBar->relayout().
@@ -12924,9 +12927,21 @@ double MainWindow::readSystemCpuPercent()
                               / static_cast<double>(totalDelta));
 }
 
+// Das Hauptfenster rastet wie die schwebenden Fenster ein (2026-09-26):
+// Betreiber "alle widget in einer linie". Sein Rahmen samt Titelleiste
+// liegt auf dem Raster, sonst stuenden die schwebenden Fenster sauber
+// untereinander, aber neben ihm versetzt. Maximiert/Vollbild bleibt
+// unberuehrt (WindowPlacement).
+void MainWindow::moveEvent(QMoveEvent* event)
+{
+    QMainWindow::moveEvent(event);
+    if (!m_shuttingDown) { snapToGridAfterSettle(this); }
+}
+
 void MainWindow::resizeEvent(QResizeEvent* event)
 {
     QMainWindow::resizeEvent(event);
+    if (!m_shuttingDown) { snapToGridAfterSettle(this); }
 
     // Das schwebende Plus hat keine Anordnung, die es mitzieht.
     positionAddWidgetButton();

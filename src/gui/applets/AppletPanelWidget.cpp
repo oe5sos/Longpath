@@ -403,10 +403,14 @@ QWidget* AppletPanelWidget::wrapWithTitleBar(QWidget* child, const QString& titl
             "QPushButton { background: transparent; border: none;"
             "  color: %1; font-size: 11px; padding: 0; }"
             "QPushButton:hover { background: %2; color: %3;"
-            "  border-radius: 3px; }")
+            "  border-radius: %4px; }")
             .arg(QString::fromLatin1(Style::kTextScale),
                  QString::fromLatin1(Style::kButtonHover),
-                 QString::fromLatin1(Style::kTextPrimary));
+                 QString::fromLatin1(Style::kTextPrimary))
+            // Dieselbe Rundung wie die Kopfknoepfe der Zellen
+            // (GridCellWidget, kGlassChipRadius) -- hier stand 3
+            // (leichtes Rendering, 2026-09-26).
+            .arg(Style::kGlassChipRadius);
 
         auto* detach = new QPushButton(QStringLiteral("\u2197"), titleBar);
         detach->setFixedSize(16, 14);

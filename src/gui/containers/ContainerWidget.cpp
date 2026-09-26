@@ -53,6 +53,9 @@ mw0lge@grange-lane.co.uk
 //============================================================================================//
 
 #include "ContainerWidget.h"
+#include "gui/WindowPlacement.h"
+
+#include <cmath>
 #include "gui/ScopedChildWidget.h"
 
 #include "gui/StyleConstants.h"
@@ -881,6 +884,24 @@ int ContainerWidget::roundToNearestTen(int value)
     return ((value + 5) / 10) * 10;
 }
 
+// ── Raster statt Strg-Zehnerschritte (2026-09-26) ─────────────────────
+//
+// Thetis (ucMeter.cs) rundet beim Ziehen/Groessern nur mit gedrueckter
+// Strg-Taste auf 10. Der Betreiber will "alle widget in einer linie":
+// Container rasten jetzt immer auf dasselbe Raster wie die Fenster
+// (WindowPlacement kSnapGridPx), Strg gibt die freie Lage -- also genau
+// umgekehrt. Bewusste Abweichung von Thetis, UX-Wunsch des Betreibers.
+bool ContainerWidget::gridSnapActive()
+{
+    return !(QApplication::keyboardModifiers() & Qt::ControlModifier);
+}
+
+int ContainerWidget::roundToGrid(int value)
+{
+    const int g = kSnapGridPx;
+    return static_cast<int>(std::lround(value / static_cast<double>(g))) * g;
+}
+
 // --- Hover show/hide ---
 
 void ContainerWidget::mouseMoveEvent(QMouseEvent* event)
@@ -1039,9 +1060,9 @@ void ContainerWidget::updateDrag(const QPoint& globalPos)
     if (isFloating()) {
         // From Thetis ucMeter.cs:319-345 [v2.10.3.13]
         QPoint newPos = globalPos - m_dragStartPos;
-        if (QApplication::keyboardModifiers() & Qt::ControlModifier) {
-            newPos.setX(roundToNearestTen(newPos.x()));
-            newPos.setY(roundToNearestTen(newPos.y()));
+        if (gridSnapActive()) {
+            newPos.setX(roundToGrid(newPos.x()));
+            newPos.setY(roundToGrid(newPos.y()));
         }
         if (parentWidget() && parentWidget()->pos() != newPos) {
             parentWidget()->move(newPos);
@@ -1049,9 +1070,9 @@ void ContainerWidget::updateDrag(const QPoint& globalPos)
     } else {
         // From Thetis ucMeter.cs:346-374 [v2.10.3.13] — overlay-docked, clamped
         QPoint newPos = globalPos - m_dragStartPos;
-        if (QApplication::keyboardModifiers() & Qt::ControlModifier) {
-            newPos.setX(roundToNearestTen(newPos.x()));
-            newPos.setY(roundToNearestTen(newPos.y()));
+        if (gridSnapActive()) {
+            newPos.setX(roundToGrid(newPos.x()));
+            newPos.setY(roundToGrid(newPos.y()));
         }
         if (parentWidget()) {
             int maxX = parentWidget()->width() - width();
@@ -1100,9 +1121,9 @@ void ContainerWidget::updateResize(const QPoint& globalPos)
     int newW = m_resizeStartSize.width() + dX;
     int newH = m_resizeStartSize.height() + dY;
 
-    if (QApplication::keyboardModifiers() & Qt::ControlModifier) {
-        newW = roundToNearestTen(newW);
-        newH = roundToNearestTen(newH);
+    if (gridSnapActive()) {
+        newW = roundToGrid(newW);
+        newH = roundToGrid(newH);
     }
 
     doResize(newW, newH);

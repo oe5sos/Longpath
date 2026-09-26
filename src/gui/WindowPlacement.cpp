@@ -6,6 +6,7 @@
 // =================================================================
 
 #include "gui/WindowPlacement.h"
+#include "gui/MacFloatingWindowBehavior.h"
 
 #include <cmath>
 
@@ -144,7 +145,28 @@ QPoint snappedTopLeft(const QPoint& pos, int grid)
     return QPoint(snapAxis(pos.x()), snapAxis(pos.y()));
 }
 
-void snapToGridAfterSettle(QWidget* w, int grid, int delayMs)
+// Letzter Rasterversuch je Fenster, siehe snapToGridAfterSettle().
+static QHash<QWidget*, QRect> s_lastSnapAttempt;
+
+QRect snappedFrameRect(const QRect& frame, const QSize& minSize, int grid)
+{
+    if (grid <= 1 || !frame.isValid()) { return frame; }
+    const auto snapAxis = [grid](int v) {
+        return static_cast<int>(std::lround(v / static_cast<double>(grid))) * grid;
+    };
+    const int left   = snapAxis(frame.x());
+    const int top    = snapAxis(frame.y());
+    int right  = snapAxis(frame.x() + frame.width());
+    int bottom = snapAxis(frame.y() + frame.height());
+    // Mindestgroesse (und nie null): die ferne Kante rasterweise hinaus.
+    const int minW = qMax(grid, minSize.width());
+    const int minH = qMax(grid, minSize.height());
+    while (right - left < minW)  { right  += grid; }
+    while (bottom - top < minH)  { bottom += grid; }
+    return QRect(left, top, right - left, bottom - top);
+}
+
+void snapToGridAfterSettle(QWidget* w, int grid, int delayMs, bool snapSize)
 {
     if (!w) { return; }
 
@@ -158,7 +180,7 @@ void snapToGridAfterSettle(QWidget* w, int grid, int delayMs)
     if (!timer) {
         timer = new QTimer(w);
         timer->setSingleShot(true);
-        QObject::connect(timer, &QTimer::timeout, w, [w, grid, delayMs, timer]() {
+        QObject::connect(timer, &QTimer::timeout, w, [w, grid, delayMs, timer, snapSize]() {
             // Betreiber 2026-09-02: TX-Fenster liess sich waehrend
             // eines Kanten-Groessenzugs (oben/links) nicht mehr
             // bewegen. Ursache: ein solcher Zug verschiebt den
@@ -171,19 +193,79 @@ void snapToGridAfterSettle(QWidget* w, int grid, int delayMs)
             // so einem Zug (kurze Pause, nicht losgelassen) --
             // verschieben statt schnappen, sonst kaempft dieses
             // move() mit dem noch laufenden nativen Zug.
-            if (QGuiApplication::mouseButtons() != Qt::NoButton) {
+            //
+            // anyMouseButtonDown() statt QGuiApplication::mouseButtons():
+            // waehrend das System ein Fenster zieht oder groessert,
+            // sieht Qt die Maustaste nicht (die Geste gehoert dem
+            // Fenstersystem) -- das Raster griff sonst mitten in einen
+            // langsamen Zug (2026-09-26).
+            if (anyMouseButtonDown()) {
                 timer->start(delayMs);
                 return;
             }
-            const QPoint snapped = snappedTopLeft(w->pos(), grid);
-            // Nur bewegen, wenn es tatsaechlich abweicht -- der
-            // Rueckstoss dieses move() loest selbst ein moveEvent()
-            // aus, das diese Funktion erneut aufruft; beim zweiten
-            // Mal stimmt die Position schon, also keine dritte Runde.
-            if (snapped != w->pos()) { w->move(snapped); }
+            if (w->windowState() & (Qt::WindowMaximized | Qt::WindowFullScreen
+                                    | Qt::WindowMinimized)) {
+                return;
+            }
+            if (!snapSize) {
+                const QPoint snapped = snappedTopLeft(w->pos(), grid);
+                // Nur bewegen, wenn es tatsaechlich abweicht -- der
+                // Rueckstoss dieses move() loest selbst ein moveEvent()
+                // aus, das diese Funktion erneut aufruft; beim zweiten
+                // Mal stimmt die Position schon, also keine dritte Runde.
+                if (snapped != w->pos()) { w->move(snapped); }
+                return;
+            }
+            // Der RAHMEN rastet ein: bei rahmenlosen Fenstern dasselbe wie
+            // geometry(), beim Hauptfenster samt Titelleiste -- sonst
+            // stuenden dessen Aussenkanten neben den schwebenden daneben.
+            const QRect frame = w->frameGeometry();
+            const QSize deco = frame.size() - w->size();
+            QRect target = snappedFrameRect(frame, w->minimumSize() + deco, grid);
+            // Nie ueber die nutzbare Flaeche hinaus nach oben/links: das
+            // Hauptfenster liegt z. B. bei y = 33 direkt unter der
+            // Menueleiste; gerundet auf 32 schoebe macOS es zurueck, und
+            // das Raster versuchte es alle 180 ms von neuem. Dann auf die
+            // naechste Rasterlinie INNERHALB (40), untere Kante bleibt.
+            if (const QScreen* scr = w->screen()) {
+                const QRect avail = scr->availableGeometry();
+                const auto ceilTo = [grid](int v) {
+                    return static_cast<int>(std::ceil(v / static_cast<double>(grid))) * grid;
+                };
+                int left = target.left();
+                int top = target.top();
+                int right = target.left() + target.width();
+                int bottom = target.top() + target.height();
+                if (top < avail.top() && frame.top() >= avail.top()) {
+                    top = ceilTo(avail.top());
+                }
+                if (left < avail.left() && frame.left() >= avail.left()) {
+                    left = ceilTo(avail.left());
+                }
+                const QSize minFrame = w->minimumSize() + deco;
+                while (right - left < qMax(grid, minFrame.width()))   { right += grid; }
+                while (bottom - top < qMax(grid, minFrame.height()))  { bottom += grid; }
+                target = QRect(left, top, right - left, bottom - top);
+            }
+            if (target == frame) {
+                s_lastSnapAttempt.remove(w);   // gelungen
+                return;
+            }
+            // Steht das Fenster nach einem Versuch nicht dort, und waere
+            // der Versuch derselbe: das System haelt es fest (Menueleiste,
+            // Dock, Bildschirmrand). Nicht weiter draengen.
+            if (s_lastSnapAttempt.value(w) == target) { return; }
+            s_lastSnapAttempt.insert(w, target);
+            // Ein Aufruf fuer Lage und Groesse: move() und resize()
+            // einzeln loesten zwei Runden aus. setGeometry() meint den
+            // Innenbereich, also um die Rahmenstaerke versetzt. Wie beim
+            // Punkt oben stimmt beim Rueckstoss schon alles.
+            const QPoint inset = w->geometry().topLeft() - frame.topLeft();
+            w->setGeometry(QRect(target.topLeft() + inset, target.size() - deco));
         });
         QObject::connect(w, &QObject::destroyed, w, [w]() {
             timers.remove(w);
+            s_lastSnapAttempt.remove(w);
         });
     }
     timer->start(delayMs);
