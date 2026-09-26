@@ -46,6 +46,13 @@ double norm180(double deg)
     return d - 180.0;
 }
 
+/// Breite der ungezoomten Karte in einem Feld dieser Groesse: 2:1, so
+/// gross wie es passt. Grundlage von mapRect() und resizeEvent().
+double baseMapWidth(double w, double h)
+{
+    return (w / 2.0 > h) ? h * 2.0 : w;
+}
+
 /// Die Beschriftung der Locator-Felder. Warmes Weiß, sehr durchsichtig
 /// — sie soll über der Textur liegen und nicht auf ihr. Über eine
 /// Rolle, weil hier gemalt wird und kein Stylesheet vorbeikommt.
@@ -266,12 +273,8 @@ QRectF FlatMapWidget::mapRect() const
     // 2:1, centred, as large as fits — then zoom and pan on top.
     const double w = width();
     const double h = height();
-    double mw = w;
-    double mh = mw / 2.0;
-    if (mh > h) { mh = h; mw = mh * 2.0; }
-
-    mw *= m_zoom;
-    mh *= m_zoom;
+    const double mw = baseMapWidth(w, h) * m_zoom;
+    const double mh = mw / 2.0;
     return QRectF((w - mw) / 2.0 + m_pan.x(),
                   (h - mh) / 2.0 + m_pan.y(), mw, mh);
 }
@@ -324,9 +327,22 @@ int FlatMapWidget::pointAt(const QPointF& pos) const
     return best;
 }
 
-void FlatMapWidget::resizeEvent(QResizeEvent*)
+void FlatMapWidget::resizeEvent(QResizeEvent* e)
 {
     m_nightDirty = true;
+
+    // m_pan steht in Bildpunkten der Karte. Waechst die Karte mit dem
+    // Fenster, muss die Verschiebung im selben Mass mitwachsen, sonst
+    // rutscht der Ort aus der Mitte: bei 8x von Long Island in den
+    // Atlantik, beim Verkleinern ganz aus dem Bild (Betreiber
+    // 2026-09-26: "wenn ich das Fenster beim Logbuch groesser ziehe,
+    // verschwindet die Grafik").
+    const QSize before = e->oldSize();
+    if (before.width() > 0 && before.height() > 0) {
+        const double was = baseMapWidth(before.width(), before.height());
+        const double now = baseMapWidth(e->size().width(), e->size().height());
+        if (was > 0.0 && now > 0.0) { m_pan *= now / was; }
+    }
 }
 
 void FlatMapWidget::buildNightOverlay()
