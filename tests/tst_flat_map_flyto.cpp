@@ -39,6 +39,31 @@ private slots:
         QVERIFY2(std::abs(lon - 14.3) < 0.05, qPrintable(QString::number(lon)));
     }
 
+    // Betreiber 2026-09-26: "wenn ich das Fenster beim Logbuch groesser
+    // ziehe, verschwindet die Grafik". Die Verschiebung stand in
+    // Bildpunkten der Karte; wuchs die Karte mit dem Fenster, rutschte
+    // der Ort aus der Mitte -- bei 8x von Long Island in den Atlantik,
+    // beim Verkleinern ganz aus dem Bild.
+    void resizing_keeps_the_place_in_the_middle()
+    {
+        FlatMapWidget w;
+        w.resize(700, 450);
+        w.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        w.flyTo(40.9, -73.3, 8.0, /*durationMs*/ 0);
+
+        for (const QSize s : {QSize(1100, 700), QSize(500, 300), QSize(1300, 450)}) {
+            w.resize(s);
+            QTRY_COMPARE(w.size(), s);
+            double lat = 0.0, lon = 0.0;
+            QVERIFY(w.viewCentre(lat, lon));
+            QVERIFY2(std::abs(lat - 40.9) < 0.05 && std::abs(lon + 73.3) < 0.05,
+                     qPrintable(QStringLiteral("%1x%2: Mitte %3 / %4")
+                                    .arg(s.width()).arg(s.height()).arg(lat).arg(lon)));
+            QCOMPARE(w.zoom(), 8.0);
+        }
+    }
+
     void the_flight_bows_outwards_before_it_lands()
     {
         // Von 8x nach 8x an einen anderen Ort: die Mitte des Flugs liegt
