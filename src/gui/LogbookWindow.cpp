@@ -70,6 +70,7 @@
 #include <QVBoxLayout>
 
 #include <algorithm>
+#include <cmath>
 
 #include <algorithm>
 
@@ -121,6 +122,11 @@ LogbookWindow::LogbookWindow(const QString& adifPath, QWidget* parent)
     // after every start looks like a station nobody has ever heard of.
     m_callCache.load();
     buildUi();
+    // Kein Knopf ist Standardknopf. In einem QDialog ist jeder QPushButton
+    // "autoDefault": Return in einem Feld drueckt dann zusaetzlich den
+    // ersten Knopf -- Return in der Suche oeffnete "Edit..." (gefunden
+    // 2026-09-26 an einem haengenden Test: modaler Bearbeiten-Dialog).
+    for (QPushButton* b : findChildren<QPushButton*>()) { b->setAutoDefault(false); b->setDefault(false); }
     restoreHeaderState();
     restoreSplitState();
     restoreGeometryState();
@@ -381,6 +387,10 @@ void LogbookWindow::buildUi()
     // nimmt die Breite des Rollbereichs.
     m_detail = new QsoDetailPane;
     m_detail->setCache(&m_callCache);
+    connect(m_detail, &QsoDetailPane::beamChanged, this, [this](double deg) {
+        m_rotorTargetDeg = deg;
+        applyRotorToMap();
+    });
     auto* detailScroll = new QScrollArea(m_split);
     detailScroll->setWidgetResizable(true);
     detailScroll->setFrameShape(QFrame::NoFrame);
@@ -1934,6 +1944,8 @@ void LogbookWindow::setMapPanelShown(bool on)
     if (on && !m_mapPanel) {
         m_mapPanel = new QsoMapWindow(this);
         m_mapPanel->setEmbedded(true);
+        m_mapPanel->setRotorRadarShown(true);
+        applyRotorToMap();
         m_split->insertWidget(1, m_mapPanel);
         connect(m_mapPanel, &QsoMapWindow::popOutRequested, this, &LogbookWindow::openMap);
         connect(m_detail, &QsoDetailPane::stationLocated, m_mapPanel,
@@ -2344,6 +2356,30 @@ void LogbookWindow::showStationFor(const QString& raw)
 
     if (!Callsigns::isLikelyCallsign(call)) { return; }
     m_detail->showCallsign(call);
+}
+
+
+// ── Rotor im Logbuch (2026-09-26) ───────────────────────────────────────
+
+void LogbookWindow::setRotorBearing(double deg)
+{
+    m_rotorDeg = std::isnan(deg) ? -1.0 : deg;
+    if (m_detail) { m_detail->setRotorBearing(deg); }
+    applyRotorToMap();
+}
+
+void LogbookWindow::setRotorBeamWidth(double deg)
+{
+    m_rotorBeamDeg = deg;
+    applyRotorToMap();
+}
+
+void LogbookWindow::applyRotorToMap()
+{
+    if (!m_mapPanel) { return; }
+    m_mapPanel->setRotorBeamWidth(m_rotorBeamDeg);
+    m_mapPanel->setRotorHeading(m_rotorDeg);
+    m_mapPanel->setRotorTarget(m_rotorTargetDeg);
 }
 
 } // namespace Longpath

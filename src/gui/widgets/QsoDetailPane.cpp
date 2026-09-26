@@ -614,8 +614,11 @@ void QsoDetailPane::refreshBeam()
     // offering nothing.
     double sp = 0.0, km = 0.0;
     const bool have = m_haveEntry && beamNow(sp, km) && km > 0.0;
+    const double before = m_haveBeam ? m_beamDeg : -1.0;
     m_haveBeam = have;
     m_beamDeg = have ? BeamHeading::wrap360(sp) : 0.0;
+    const double now = m_haveBeam ? m_beamDeg : -1.0;
+    if (!qFuzzyCompare(before + 2.0, now + 2.0)) { emit beamChanged(now); }
 
     m_turnShort->setEnabled(have);
     m_turnLong->setEnabled(have);

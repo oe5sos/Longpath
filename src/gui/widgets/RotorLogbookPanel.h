@@ -28,6 +28,8 @@
 #include <QVector>
 #include <QWidget>
 
+#include <limits>
+
 class QTimer;
 
 class QLabel;
@@ -252,6 +254,8 @@ private:
     void logFromLogbook(const LogEntry& partial);
     void stampSatellites(LogEntry& e) const;
 
+    // Letzte echte Ablesung des Rotors, NaN solange keiner verbunden ist.
+    double              m_lastRotorAz{std::numeric_limits<double>::quiet_NaN()};
     RadioModel*         m_radio{nullptr};
     QrzClient*          m_qrz{nullptr};
     class SatelliteService* m_satellites{nullptr};

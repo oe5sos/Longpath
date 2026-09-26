@@ -140,6 +140,19 @@ public:
     // Karte zeigt, was die Tabelle zeigt), Escape schliesst nichts, und
     // ein Knopf „↗" bittet um das grosse Fenster. Vor show() rufen.
     void setEmbedded(bool on);
+
+    // ── Rotor neben der Karte (2026-09-26, Blatt "Radar 3") ─────────
+    //
+    // Ein kleines Radar links in der Kartenflaeche, immer da: Kegel =
+    // wohin die Antenne gerade zeigt, blaue Marke = die Station. Zeigt die
+    // Flaeche selbst das Radar, traegt das grosse den Rotor und das kleine
+    // tritt zurueck. Negative Werte = unbekannt / kein Ziel.
+    void setRotorRadarShown(bool on);
+    void setRotorHeading(double deg);
+    void setRotorTarget(double deg);
+    void setRotorBeamWidth(double deg);
+    class DxRadarWidget* rotorRadarForTest() const { return m_rotorRadar; }
+    void showRadarViewForTest(bool on);
     bool isEmbedded() const { return m_embedded; }
 
 signals:
@@ -180,6 +193,9 @@ private:
     GlobeWidget*    m_globe{nullptr};
     FlatMapWidget*  m_flat{nullptr};
     class DxRadarWidget* m_radar{nullptr};   // dritte Ansicht (2026-09-22)
+    class DxRadarWidget* m_rotorRadar{nullptr};   // klein, links (2026-09-26)
+    bool m_rotorRadarShown{false};
+    void updateRotorRadarVisibility();
     QPushButton*    m_radarBtn{nullptr};
     int             m_viewBeforeRadar{0};    // Kugel oder flach, wohin „Radar" aus zurueckfuehrt
 
@@ -191,6 +207,7 @@ private:
     // showPopup() ist kein Signal, an das man sich haengen koennte.
 protected:
     bool eventFilter(QObject* obj, QEvent* event) override;
+    void resizeEvent(QResizeEvent* e) override;
 
 private:
     QComboBox* m_background{nullptr};

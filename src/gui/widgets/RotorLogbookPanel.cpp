@@ -76,6 +76,7 @@
 #include <QInputDialog>
 #include <QMenu>
 #include <cmath>
+#include <limits>
 #include <QMessageBox>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
@@ -1081,6 +1082,10 @@ void RotorLogbookPanel::ensureRotor()
         m_simTimer->stop();
         m_dial->setSimulated(false);
         m_dial->setActualBearing(az);
+        // Das Logbuch zeigt ihn auch -- nur echte Ablesungen, nie die
+        // Stellvertreter-Nadel (2026-09-26).
+        m_lastRotorAz = az;
+        if (m_logWindow) { m_logWindow->setRotorBearing(az); }
     });
 
     // Az/el rotators: the reported elevation appears on the dial. The
@@ -1107,6 +1112,8 @@ void RotorLogbookPanel::ensureRotor()
                           .arg(m_rotor->description()));
             break;
         case RotorController::State::Disconnected:
+            m_lastRotorAz = std::numeric_limits<double>::quiet_NaN();
+            if (m_logWindow) { m_logWindow->setRotorBearing(m_lastRotorAz); }
             setStatus(QStringLiteral("Rotator disconnected"), true);
             break;
         case RotorController::State::Error:
@@ -2419,6 +2426,8 @@ void RotorLogbookPanel::openLogbookWindow()
         // Die Eingabezeile oben im Logbuch loggt ueber dieses Feld: eine
         // Datei, eine Doppelt-Regel, ein Hochladen (2026-09-26).
         m_logWindow->setRadio(m_radio);
+        m_logWindow->setRotorBeamWidth(m_dial ? m_dial->beamWidth() : 40.0);
+        m_logWindow->setRotorBearing(m_lastRotorAz);
         connect(m_logWindow, &LogbookWindow::logQsoRequested,
                 this, &RotorLogbookPanel::logFromLogbook);
 

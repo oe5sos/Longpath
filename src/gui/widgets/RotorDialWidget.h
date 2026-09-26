@@ -120,6 +120,7 @@ public:
     Shape shape() const noexcept { return m_shape; }
 
     void setBeamWidth(double deg);
+    double beamWidth() const noexcept { return m_beamWidth; }
 
     // ── Is the actual needle reporting, or pretending? ───────────────
     //

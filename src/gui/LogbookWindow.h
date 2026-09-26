@@ -168,6 +168,12 @@ public:
     // neu laden und die Zeile fuer die naechste Station leeren.
     void reportLogged(bool ok, const QString& message);
 
+    // Wo der Rotor gerade steht (NaN = unbekannt / kein Rotor) und wie
+    // breit der Strahl ist. Geht an die Karteikarte ("Rotor at ...") und
+    // an das Rotor-Radar neben der Karte (2026-09-26).
+    void setRotorBearing(double deg);
+    void setRotorBeamWidth(double deg);
+
     QLineEdit*   entryCallForTest() const { return m_entryCall; }
     QLineEdit*   entryCommentForTest() const { return m_entryComment; }
     QLabel*      entryFreqForTest() const { return m_entryFreq; }
@@ -320,6 +326,10 @@ private:
     QPointer<RadioModel> m_radio;
     QMetaObject::Connection m_sliceFreqConn;
     QMetaObject::Connection m_sliceModeConn;
+    double m_rotorDeg{-1.0};
+    double m_rotorTargetDeg{-1.0};
+    double m_rotorBeamDeg{40.0};
+    void applyRotorToMap();
     QComboBox*    m_bandBox{nullptr};
     QComboBox*    m_modeBox{nullptr};
     // Distinct SOTA/POTA activation references found in the log —

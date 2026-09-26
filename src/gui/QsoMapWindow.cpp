@@ -46,6 +46,7 @@
 #include <QImage>
 #include <QKeyEvent>
 #include <QHBoxLayout>
+#include <QResizeEvent>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
@@ -386,7 +387,24 @@ void QsoMapWindow::buildUi()
     m_stack->addWidget(m_globe);
     m_stack->addWidget(m_flat);
     m_stack->addWidget(m_radar);   // Index 2
-    col->addWidget(m_stack, 1);
+
+    // Das kleine Rotor-Radar links der Karte. Quadratisch, so hoch wie
+    // die Flaeche (resizeEvent); die Gradzahlen stehen in der Karteikarte.
+    m_rotorRadar = new DxRadarWidget(this);
+    m_rotorRadar->setRotorReadout(false);
+    m_rotorRadar->setVisible(false);
+    // Ein Viertel der Breite, hoechstens 300 -- und keine Mindestbreite,
+    // damit das Logbuch weiter auf die halbe Bildschirmbreite schrumpft
+    // (tst_logbook_toolbar_wraps).
+    m_rotorRadar->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+    m_rotorRadar->setMinimumWidth(0);
+    m_rotorRadar->setMaximumWidth(300);
+    auto* mapRow = new QHBoxLayout;
+    mapRow->setContentsMargins(0, 0, 0, 0);
+    mapRow->setSpacing(8);
+    mapRow->addWidget(m_rotorRadar, 1);
+    mapRow->addWidget(m_stack, 3);
+    col->addLayout(mapRow, 1);
 
     m_summary = new QLabel(QString{}, this);
     m_summary->setWordWrap(true);
@@ -453,6 +471,8 @@ void QsoMapWindow::buildUi()
             m_stack->setCurrentIndex(m_viewBeforeRadar);
         }
     });
+    connect(m_stack, &QStackedWidget::currentChanged,
+            this, [this](int) { updateRotorRadarVisibility(); });
     connect(m_radar, &DxRadarWidget::pointClicked, this,
             [this](const QString& label, double, double) {
         showStationInfo(label);
@@ -571,10 +591,12 @@ void QsoMapWindow::setHomeGrid(const QString& grid)
         m_globe->resetView();
         m_flat->setHome(lat, lon);
         m_radar->setHome(lat, lon);
+        m_rotorRadar->setHome(lat, lon);
         applyStationMarker();
     } else {
         m_flat->clearHome();
         m_radar->clearHome();
+        m_rotorRadar->clearHome();
     }
 }
 
@@ -802,6 +824,7 @@ void QsoMapWindow::rebuild()
     m_globe->setPoints(points);
     m_flat->setPoints(points);
     m_radar->setPoints(points);
+    m_rotorRadar->setPoints(points);
 
     // Say what could not be placed. A map quietly showing a third of the
     // log looks exactly like a map of the whole log, and the operator
@@ -1249,6 +1272,54 @@ void QsoMapWindow::flyToStation(const QString& call, double lat, double lon,
     }
     m_info->setText(text);
     m_info->setVisible(true);
+}
+
+
+// ── Rotor neben der Karte (2026-09-26) ──────────────────────────────────
+
+void QsoMapWindow::setRotorRadarShown(bool on)
+{
+    m_rotorRadarShown = on;
+    updateRotorRadarVisibility();
+}
+
+void QsoMapWindow::updateRotorRadarVisibility()
+{
+    if (!m_rotorRadar) { return; }
+    // Zeigt die Flaeche schon das Radar, waere ein zweites daneben doppelt.
+    const bool bigRadar = m_stack && m_stack->currentIndex() == 2;
+    // Zu schmal zum Ablesen: dann lieber nur die Karte.
+    const bool roomy = width() >= 420;
+    m_rotorRadar->setVisible(m_rotorRadarShown && !bigRadar && roomy);
+}
+
+void QsoMapWindow::resizeEvent(QResizeEvent* e)
+{
+    QDialog::resizeEvent(e);
+    updateRotorRadarVisibility();
+}
+
+void QsoMapWindow::setRotorHeading(double deg)
+{
+    m_rotorRadar->setRotorHeading(deg);
+    m_radar->setRotorHeading(deg);
+}
+
+void QsoMapWindow::setRotorTarget(double deg)
+{
+    m_rotorRadar->setRotorTarget(deg);
+    m_radar->setRotorTarget(deg);
+}
+
+void QsoMapWindow::setRotorBeamWidth(double deg)
+{
+    m_rotorRadar->setRotorBeamWidth(deg);
+    m_radar->setRotorBeamWidth(deg);
+}
+
+void QsoMapWindow::showRadarViewForTest(bool on)
+{
+    if (m_radarBtn) { m_radarBtn->setChecked(on); }
 }
 
 } // namespace Longpath

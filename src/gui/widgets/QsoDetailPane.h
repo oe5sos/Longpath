@@ -108,6 +108,9 @@ signals:
     void stationLocated(const QString& call, double lat, double lon,
                         const QString& caption);
     void editRequested();
+    // Die Richtung zur gezeigten Station, sobald sie sich aendert (-1 =
+    // keine). Fuer das Rotor-Radar neben der Karte (2026-09-26).
+    void beamChanged(double bearingDeg);
 
 private:
     void buildUi();

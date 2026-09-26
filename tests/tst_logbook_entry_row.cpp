@@ -15,11 +15,18 @@
 #include <QLineEdit>
 #include <QPushButton>
 #include <QSignalSpy>
+#include <QSplitter>
 #include <QStandardPaths>
 #include <QTemporaryDir>
 
+#include <cmath>
+#include <limits>
+
 #include "core/AdifLog.h"
+#include "core/AppSettings.h"
 #include "gui/LogbookWindow.h"
+#include "gui/QsoMapWindow.h"
+#include "gui/widgets/DxRadarWidget.h"
 #include "gui/widgets/RotorLogbookPanel.h"
 
 using namespace Longpath;
@@ -119,6 +126,49 @@ private slots:
         w.setRadio(nullptr);
         QCOMPARE(w.entryFreqForTest()->text(), QStringLiteral("—"));
         QVERIFY(!w.entryModeForTest()->isVisible());
+    }
+
+    // Rotor im Logbuch (Blatt "Radar 3"): kleines Radar links der Karte,
+    // Kegel = Rotorstellung, Marke = Richtung zur gezeigten Station.
+    void theRotorRadarBesideTheMapFollowsRotorAndStation()
+    {
+        AppSettings::instance().setValue(QStringLiteral("LogbookShowMap"), QStringLiteral("True"));
+        QTemporaryDir dir;
+        LogbookWindow w(writeAdif(QDir(dir.path())));
+        w.resize(1600, 900);
+        w.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QsoMapWindow* map = w.mapPanelForTest();
+        QVERIFY(map);
+        // Wie beim Betreiber: die Karte breit (Teiler Tabelle | Karte | Karteikarte).
+        for (QSplitter* sp : w.findChildren<QSplitter*>()) {
+            if (sp->count() == 3 && sp->widget(1) == map) { sp->setSizes({380, 900, 320}); }
+        }
+        QTRY_VERIFY2(map->width() >= 420, qPrintable(QString::number(map->width())));
+        DxRadarWidget* small = map->rotorRadarForTest();
+        QVERIFY(small);
+        QTRY_VERIFY(small->isVisible());
+
+        // Noch kein Rotor: kein Kegel.
+        QVERIFY(small->rotorHeading() < 0.0);
+        w.setRotorBearing(74.0);
+        QCOMPARE(small->rotorHeading(), 74.0);
+        QCOMPARE(map->radarForTest()->rotorHeading(), 74.0);
+
+        // Eine Station waehlen: die Marke zeigt ihre Richtung (Suche + Return).
+        w.searchForTest()->setText(QStringLiteral("OE5VVM"));
+        QTest::keyClick(w.searchForTest(), Qt::Key_Return);
+        QTRY_VERIFY(small->rotorTarget() >= 0.0);
+
+        // Rotor weg: der Kegel geht.
+        w.setRotorBearing(std::numeric_limits<double>::quiet_NaN());
+        QVERIFY(small->rotorHeading() < 0.0);
+
+        // Zeigt die Flaeche selbst das Radar, tritt das kleine zurueck.
+        map->showRadarViewForTest(true);
+        QTRY_VERIFY(!small->isVisible());
+        map->showRadarViewForTest(false);
+        QTRY_VERIFY(small->isVisible());
     }
 
     // Der ganze Weg: Eingabezeile -> Rotor/Log-Feld -> Datei -> Tabelle.
