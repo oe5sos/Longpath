@@ -1057,6 +1057,81 @@ private slots:
         }
         QFile::remove(path);
     }
+
+    // Doppelt loggen aus der Eingabezeile: Rueckfrage; Nein = nicht
+    // geloggt, Ja = zweimal. Nach dem Loeschen im Logbuch fragt es nicht
+    // mehr (die Liste "schon gearbeitet" folgt der Datei).
+    void loggingTwiceAsksAndDeletingForgets()
+    {
+        const QString path = RotorLogbookPanel::logbookPath();
+        QVERIFY2(!path.startsWith(QDir::homePath() + QStringLiteral("/Library/Preferences/Longpath/")),
+                 qPrintable(path));
+        QFile::remove(path);
+        RotorLogbookPanel panel(nullptr, nullptr, nullptr);
+        panel.showLogbook();
+        LogbookWindow* w = panel.findChild<LogbookWindow*>();
+        QVERIFY(QTest::qWaitForWindowExposed(w));
+        auto logCall = [w](const QString& call) {
+            w->entryCallForTest()->setFocus();
+            // Nach "Not logged" bleibt das Rufzeichen stehen (zum
+            // Korrigieren) -- fuer den naechsten Versuch leeren.
+            w->entryCallForTest()->selectAll();
+            QTest::keyClick(w->entryCallForTest(), Qt::Key_Backspace);
+            QTest::keyClicks(w->entryCallForTest(), call);
+            QTest::keyClick(w->entryCallForTest(), Qt::Key_Return);
+        };
+        auto count = [&path](const QString& call) {
+            int n = 0;
+            for (const LogEntry& e : AdifLog::read(path)) { if (e.call == call) { ++n; } }
+            return n;
+        };
+        QStringList asked;
+        auto answer = [this, &asked](QMessageBox::StandardButton b) {
+            return answerModals(this, [&asked, b](QWidget* m) {
+                if (auto* box = qobject_cast<QMessageBox*>(m)) {
+                    // macOS zeigt keinen Titel -- am Text erkennen.
+                    asked << (box->text().contains(QStringLiteral("already have")) ? QStringLiteral("Duplicate") : box->text());
+                    box->button(b)->click();
+                }
+            });
+        };
+
+        logCall(QStringLiteral("OE5VVM"));
+        QCOMPARE(count(QStringLiteral("OE5VVM")), 1);
+
+        QTimer* t = answer(QMessageBox::No);
+        logCall(QStringLiteral("OE5VVM"));
+        delete t;
+        QCOMPARE(asked, QStringList{QStringLiteral("Duplicate")});
+        QCOMPARE(count(QStringLiteral("OE5VVM")), 1);
+        qInfo().noquote() << "Nein ->" << w->entryHintForTest()->text();
+
+        asked.clear();
+        t = answer(QMessageBox::Yes);
+        logCall(QStringLiteral("OE5VVM"));
+        delete t;
+        QCOMPARE(asked, QStringList{QStringLiteral("Duplicate")});
+        QCOMPARE(count(QStringLiteral("OE5VVM")), 2);
+
+        // Beide im Logbuch loeschen ...
+        QTableWidget* table = logTable(w);
+        QTRY_COMPARE(table->rowCount(), 2);
+        table->selectAll();
+        t = answer(QMessageBox::Yes);
+        buttonWith(w, QStringLiteral("Delete"))->click();
+        delete t;
+        QCOMPARE(count(QStringLiteral("OE5VVM")), 0);
+
+        // ... und neu loggen: keine Rueckfrage mehr.
+        asked.clear();
+        t = answer(QMessageBox::No);
+        logCall(QStringLiteral("OE5VVM"));
+        delete t;
+        QVERIFY2(asked.isEmpty(), qPrintable(asked.join(QStringLiteral(", "))));
+        QCOMPARE(count(QStringLiteral("OE5VVM")), 1);
+        w->hide();
+        QFile::remove(path);
+    }
 };
 
 QTEST_MAIN(TstLogbookDurchgang)
