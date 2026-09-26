@@ -64,6 +64,7 @@ mw0lge@grange-lane.co.uk
 // =================================================================
 
 #include "QsoRecorderApplet.h"
+#include "core/AppSettings.h"
 #include "gui/ScopedChildWidget.h"
 
 #include "gui/StyleConstants.h"
@@ -156,8 +157,7 @@ QString QsoRecorderApplet::recordingFolder() const
 {
     // Neben die Einstellungen, wie beim Sprachspeicher — ein Ort, den
     // man wiederfindet, ohne zu suchen.
-    const QString base = QStandardPaths::writableLocation(
-        QStandardPaths::AppConfigLocation);
+    const QString base = AppSettings::dataDir();
     QDir().mkpath(base + QStringLiteral("/recordings"));
     return base + QStringLiteral("/recordings");
 }

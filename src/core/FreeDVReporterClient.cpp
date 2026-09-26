@@ -170,7 +170,7 @@ QString FreeDVReporterClient::logFilePath() const
     // QCoreApplication::organizationName / applicationName are set
     // (mirrors SpotCollectorClient / PotaClient / DxClusterClient /
     // WsjtxClient B1-B4 ports).
-    return QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation)
+    return AppSettings::dataDir()
            + "/freedv.log";
 }
 

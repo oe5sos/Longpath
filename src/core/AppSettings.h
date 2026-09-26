@@ -230,6 +230,19 @@ public:
     static QString resolveSettingsPath(const QString& profile);
     static QString resolveConfigDir(const QString& profile);
 
+    // Der Ordner fuer Dateien NEBEN den Einstellungen: Logbuch, QRZ-
+    // Zwischenspeicher, Stationsfotos, Weltbild, Spot-Protokolle.
+    // Ist LONGPATH_CONFIG_DIR gesetzt, ist es dieser Ordner -- eine
+    // Sandbox-Instanz darf nie in die echten Daten des Betreibers
+    // schreiben (2026-09-26: das Logbuch lag trotz LONGPATH_CONFIG_DIR
+    // weiter in ~/Library/Preferences/Longpath/Longpath). Sonst, wie
+    // bisher, QStandardPaths::AppConfigLocation.
+    static QString dataDir();
+    // Laeuft diese Instanz in einer Sandbox (LONGPATH_CONFIG_DIR gesetzt)?
+    // Dann auch eigene Zugangsdaten im Schluesselbund (CredentialStore):
+    // ein Test-QSO darf nie ins echte QRZ-Logbuch hochgeladen werden.
+    static bool isSandbox();
+
     // Profile names are restricted to [A-Za-z0-9_-] and non-empty.
     // Anything else (path traversal, whitespace, separators) falls back
     // to the default/empty profile in the resolvers above.

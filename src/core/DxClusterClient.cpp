@@ -35,6 +35,7 @@
 //                                    Claude Code.
 
 #include "DxClusterClient.h"
+#include "core/AppSettings.h"
 #include "LogCategories.h"
 
 #include <QRegularExpression>
@@ -83,7 +84,7 @@ DxClusterClient::~DxClusterClient()
 // and PotaClient (B2) ports.
 QString DxClusterClient::logFilePath() const
 {
-    return QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation)
+    return AppSettings::dataDir()
            + "/" + m_logFileName;
 }
 

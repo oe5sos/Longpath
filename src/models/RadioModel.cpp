@@ -6334,7 +6334,7 @@ void RadioModel::connectToRadio(const RadioInfo& info)
 
     // Initialize WDSP DSP engine (wisdom runs async — channel creation
     // is deferred until initializedChanged fires)
-    QString configDir = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
+    QString configDir = AppSettings::dataDir();
     // Sample rate + active RX count come from Hardware Config (per-MAC).
     // Falls back to Thetis default (192000, setup.cs:866) when nothing
     // is persisted, and to the board-cap first-entry if 192000 isn't
