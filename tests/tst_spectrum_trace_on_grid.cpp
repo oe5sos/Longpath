@@ -101,6 +101,8 @@ private slots:
         // Gitter wieder auf Linien und der Test saehe nichts.
         QTest::newRow("Kalibrierung +15 dB") << false << false << 15.0f << true;
         QTest::newRow("Kalibrierung +15 dB mit Bandplan") << true << false << 15.0f << true;
+        // ATT 31 dB + Werkskalibrierung: ueber der alten +-30-Klemme.
+        QTest::newRow("Kalibrierung +35 dB") << false << false << 35.0f << true;
     }
 
     void traceSitsOnItsGridLine()

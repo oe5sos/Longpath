@@ -2168,7 +2168,15 @@ void SpectrumWidget::setHeatmapEnabled(bool on)
 
 void SpectrumWidget::setDbmCalOffset(float db)
 {
-    db = qBound(-30.0f, db, 30.0f);
+    // +-30 war die Spanne des Setup-Felds fuer die eigene Anzeigekorrektur.
+    // MainWindow schiebt hier aber die ganze Kette hinein (Werks-
+    // kalibrierung + Preamp/ATT aus rxMeterOffsetDb) -- Thetis fuehrt beides
+    // getrennt (Display.RX1DisplayCalOffset, RX1PreampOffset). Bei ATT 30 +
+    // 0,98 dB Werkskalibrierung fehlte der Anzeige 1 dB (Werkbank
+    // tst_rx_cal_probe am HL2-Simulator, 2026-09-26), bei 61-dB-Abschwaechern
+    // mehr. Die Grenze ist nur noch eine Plausibilitaetsschranke; das
+    // Setup-Feld behaelt seine +-30.
+    db = qBound(-100.0f, db, 100.0f);
     if (qFuzzyCompare(m_dbmCalOffset, db)) {
         return;
     }
