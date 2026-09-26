@@ -93,11 +93,15 @@ QString CommandBar::pillStyle()
 CommandBar::CommandBar(QWidget* parent) : QWidget(parent)
 {
     setAttribute(Qt::WA_StyledBackground, true);
+    // Leichtes Rendering (2026-09-26): dieselbe Platte wie die Panels
+    // (Verlauf) und oben die Lichtkante aus HAUSSTIL.md "Weiche
+    // Uebergaenge" -- vorher flach kPanelBg.
     setStyleSheet(QStringLiteral(
         "CommandBar { background: %1; border: 1px solid %2;"
-        "             border-radius: 6px; }")
-        .arg(QString::fromLatin1(Style::kPanelBg),
-             QString::fromLatin1(Style::kBorderSubtle)));
+        "             border-top-color: %3; border-radius: 6px; }")
+        .arg(Style::glassPanelFill(),
+             QString::fromLatin1(Style::kBorderSubtle),
+             QLatin1String(Style::kGlassLight)));
 
     auto* row = new QHBoxLayout(this);
     row->setContentsMargins(13, 9, 13, 10);

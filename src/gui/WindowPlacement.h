@@ -55,14 +55,35 @@ namespace Longpath {
 constexpr int kSnapGridPx = 8;
 QPoint snappedTopLeft(const QPoint& pos, int grid = kSnapGridPx);
 
+// ── Kanten statt Ecke (2026-09-26) ────────────────────────────────────
+//
+// Betreiber: "einen minimalen kleinen Raster ueber die ganze Oberflaeche,
+// an das jedes Widget andockt ... alle auf gleicher Linie, Hoehe und
+// Breite" -- und zum Bestand: "vorhanden, passt aber nicht zu 100 %".
+// Gerastert wurde nur die linke obere Ecke; rechte und untere Kante
+// lagen, wo die Groesse sie hinstellte. Jetzt rastet jede KANTE fuer
+// sich (links, oben, rechts, unten). Getrennt gerundete Lage und Groesse
+// wuerden zwei aneinanderliegende Fenster um bis zu ein Raster
+// auseinanderreissen; eine gemeinsame Kante rundet so bei beiden gleich.
+// Nie kleiner als minSize: dann wandert die rechte/untere Kante ein
+// Raster weiter hinaus.
+QRect snappedFrameRect(const QRect& frame, const QSize& minSize = QSize(),
+                       int grid = kSnapGridPx);
+
 // Von moveEvent() jeder schwebenden Fensterklasse mit einer Zeile
 // aufzurufen. Legt bei Bedarf einen einmaligen, an `w` gebundenen
 // Debounce-Timer an (kein Member in der aufrufenden Klasse noetig) und
 // startet ihn neu; erst wenn er ablaeuft, ohne dass diese Funktion
 // zwischenzeitlich erneut aufgerufen wurde, schnappt er `w` aufs
 // Raster -- also nach dem Loslassen, nicht waehrend des Ziehens.
+//
+// Seit 2026-09-26 mit Groesse: der Fensterrahmen (frameGeometry) rastet
+// an allen vier Kanten ein, siehe snappedFrameRect(). snapSize = false
+// rastet nur die linke obere Ecke (fuer Fenster, deren Breite ein
+// anderer festlegt). Maximierte, Vollbild- und minimierte Fenster
+// bleiben unberuehrt.
 void snapToGridAfterSettle(QWidget* w, int grid = kSnapGridPx,
-                           int delayMs = 180);
+                           int delayMs = 180, bool snapSize = true);
 
 /// Dafür sorgen, dass `w` auf einem verbundenen Bildschirm zu sehen
 /// ist. Verschoben wird, wenn (a) keine Geometrie gespeichert war,

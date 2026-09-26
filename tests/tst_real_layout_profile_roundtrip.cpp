@@ -156,7 +156,9 @@ QRect distinctiveRectFor(const QString& id)
     // so prueft der Test weiter den Speicherweg und nicht das Raster.
     // Dieselbe Funktion wie im Betrieb, damit ein geaendertes Raster den
     // Test mitnimmt statt ihn stumm zu brechen.
-    return QRect(snappedTopLeft(QPoint(x, y)), QSize(w, ht));
+    // Seit 2026-09-26 rasten alle vier Kanten ein (snappedFrameRect),
+    // nicht nur die Ecke -- dieselbe Funktion wie im Betrieb.
+    return snappedFrameRect(QRect(QPoint(x, y), QSize(w, ht)));
 }
 
 /// "Neustart": ein FRISCHES LayoutProfiles, das nur ueber AppSettings

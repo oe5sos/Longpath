@@ -204,10 +204,14 @@ PanadapterApplet::PanadapterApplet(const QString& panId, QWidget* parent)
     });
     setFloatingIndicator(false);
 
-    head->setStyleSheet(QStringLiteral(
-        "QWidget { background: %1; border-bottom: 1px solid %2; }")
-        .arg(QLatin1String(Style::kTitleGradBot),
-             QLatin1String(Style::kBorderSubtle)));
+    // Leichtes Rendering (2026-09-26): derselbe Kopf wie an jedem
+    // anderen Panel (Verlauf + Lichtkante, Style::titleBarStyle), statt
+    // flach. Nur fuer den Kopf selbst -- die alte Regel "QWidget { .. }"
+    // gab jedem Kind im Kopf eine eigene Flaeche und eine Unterkante.
+    head->setObjectName(QStringLiteral("panHead"));
+    head->setAttribute(Qt::WA_StyledBackground, true);
+    head->setStyleSheet(QStringLiteral("QWidget#panHead { %1 }")
+                            .arg(Style::titleBarStyle()));
     layout->addWidget(head, 0);
 
     layout->addWidget(m_spectrum, 1);

@@ -520,6 +520,24 @@ inline void paintInsetTop(QPainter& p, const QRect& r)
     p.drawLine(r.left(), r.top(), r.right(), r.top());
 }
 
+/// Die Platte eines schwebenden Fensters (leichtes Rendering,
+/// 2026-09-26): derselbe Verlauf wie eine gedockte Zelle
+/// (glassPanelFill), feiner Rahmen und die Lichtkante oben innen aus
+/// HAUSSTIL.md "Weiche Uebergaenge". Bis dahin malten ToolWindow,
+/// AppletFloatingWindow und SideAreaWindow je fuer sich Verlauf und
+/// Rahmen, ohne Lichtkante.
+inline void paintWindowPlate(QPainter& p, const QRect& r)
+{
+    QLinearGradient g(r.topLeft(), r.bottomLeft());
+    g.setColorAt(0.0, QColor(hexRole(kGlassPanelTop)));
+    g.setColorAt(1.0, QColor(hexRole(kGlassPanelBot)));
+    p.fillRect(r, g);
+    p.setPen(QColor(hexRole(kBorderSubtle)));
+    p.drawRect(r.adjusted(0, 0, -1, -1));
+    p.setPen(QColor(255, 255, 255, kGlassLightAlpha));
+    p.drawLine(r.left() + 1, r.top() + 1, r.right() - 1, r.top() + 1);
+}
+
 /// Ein Glaschip: schwarz, feiner Rahmen, Lichtkante oben innen, ein
 /// Hauch Schatten darunter. Fuer Zahlen, die man liest, nicht drueckt.
 inline void paintGlassChip(QPainter& p, const QRect& box, int radius)

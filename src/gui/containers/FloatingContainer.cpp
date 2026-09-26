@@ -203,6 +203,14 @@ void FloatingContainer::moveEvent(QMoveEvent* event)
     snapToGridAfterSettle(this);
 }
 
+void FloatingContainer::resizeEvent(QResizeEvent* event)
+{
+    QWidget::resizeEvent(event);
+    // Raster auch fuer die Groesse (2026-09-26): alle vier Kanten, siehe
+    // WindowPlacement.h snappedFrameRect.
+    snapToGridAfterSettle(this);
+}
+
 void FloatingContainer::saveGeometry()
 {
     auto& s = AppSettings::instance();

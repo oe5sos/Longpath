@@ -194,17 +194,15 @@ void ToolWindow::resizeEvent(QResizeEvent* ev)
 {
     QWidget::resizeEvent(ev);
     saveGeometryState();
+    // Raster auch fuer die Groesse (2026-09-26): alle vier Kanten, siehe
+    // WindowPlacement.h snappedFrameRect.
+    snapToGridAfterSettle(this);
 }
 
 void ToolWindow::paintEvent(QPaintEvent*)
 {
     QPainter p(this);
-    QLinearGradient g(0, 0, 0, height());
-    g.setColorAt(0.0, QColor(Style::hexRole(Style::kGlassPanelTop)));
-    g.setColorAt(1.0, QColor(Style::hexRole(Style::kGlassPanelBot)));
-    p.fillRect(rect(), g);
-    p.setPen(QColor(Style::hexRole(Style::kBorderSubtle)));
-    p.drawRect(rect().adjusted(0, 0, -1, -1));
+    Style::paintWindowPlate(p, rect());
 }
 
 } // namespace Longpath

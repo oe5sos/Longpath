@@ -238,7 +238,11 @@ private slots:
         m_mw->setSideAreaEnabledForTest(true);
         SideAreaWindow* area = m_mw->sideAreaForTest();
         QVERIFY(area);
-        area->setGeometry(900, 100, 330, 500);
+        // Rasterfeste Werte (2026-09-26): Fenster rasten jetzt an allen
+        // vier Kanten auf 8 px ein, krumme Werte (900/330) zog das
+        // Raster nach dem Setzen auf 904/328.
+        constexpr int kAreaW = 328;
+        area->setGeometry(904, 104, kAreaW, 496);
 
         auto* stack = m_mw->findChild<PanadapterStack*>();
         auto* pan = m_mw->findChild<PanadapterApplet*>();
@@ -248,17 +252,17 @@ private slots:
         QTest::qWait(300);
         PanFloatingWindow* win = stack->floatingWindowForTest(pan->panId());
         QVERIFY(win);
-        win->setGeometry(96, 150, 800, 300);   // rechter Rand 896: 4 px Luft
+        win->setGeometry(96, 152, 800, 304);   // rechter Rand 896: 8 px Luft
         QTest::qWait(50);
         const int w0 = win->width();
 
         area->setCollapsed(true);
-        QCOMPARE(win->width(), w0 + (330 - SideAreaWindow::kRailW));
+        QCOMPARE(win->width(), w0 + (kAreaW - SideAreaWindow::kRailW));
         area->setCollapsed(false);
         QCOMPARE(win->width(), w0);
 
         // Ein Panadapter, der NICHT angrenzt, bleibt, wie er ist.
-        win->setGeometry(96, 150, 600, 300);
+        win->setGeometry(96, 152, 600, 304);
         QTest::qWait(50);
         area->setCollapsed(true);
         QCOMPARE(win->width(), 600);
