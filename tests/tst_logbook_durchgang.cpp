@@ -689,6 +689,8 @@ private slots:
         QTableWidget* table = logTable(&w);
         QTest::qWait(100);
         const QSize withBoth = table->size();
+        qInfo().noquote() << "Karte: Mindestbreite" << w.mapPanelForTest()->minimumSizeHint().width()
+                          << "px, Fenster" << w.width() << "px";
         w.mapToggleForTest()->click();
         QVERIFY(!w.mapPanelForTest()->isVisible());
         w.statsToggleForTest()->click();
