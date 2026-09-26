@@ -11620,7 +11620,7 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
         const int nStrips = (m_traceHalo ? 2 : 0) + (m_traceSoftEdge ? 3 : 1);
         m_lineStripCount = nStrips;
 
-        QVector<float> lineVerts(n * 2 * kFftVertStride * nStrips);
+        QVector<float> lineVerts(static_cast<qsizetype>(n) * 2 * kFftVertStride * nStrips);
         QVector<float> fillVerts(n * 2 * kFftVertStride);
         // Zwei Punkte eines Streifens: Mitte + Normale * o1 mit Deckkraft
         // a1 und Mitte + Normale * o2 mit a2 (o in Geraete-Pixeln).
@@ -11628,7 +11628,7 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
                             float nxNdcPerPx, float nyNdcPerPx,
                             float o1, float a1, float o2, float a2,
                             float r, float g, float b) {
-            int k = (strip * n + j) * 2 * kFftVertStride;
+            const qsizetype k = (static_cast<qsizetype>(strip) * n + j) * 2 * kFftVertStride;
             lineVerts[k]     = x + nxNdcPerPx * o1;
             lineVerts[k + 1] = y + nyNdcPerPx * o1;
             lineVerts[k + 2] = r;
@@ -11770,7 +11770,7 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
         }
 
         batch->updateDynamicBuffer(m_fftLineVbo, 0,
-            n * 2 * kFftVertStride * nStrips * sizeof(float), lineVerts.constData());
+            static_cast<size_t>(n) * 2 * kFftVertStride * nStrips * sizeof(float), lineVerts.constData());
         batch->updateDynamicBuffer(m_fftFillVbo, 0,
             n * 2 * kFftVertStride * sizeof(float), fillVerts.constData());
 
