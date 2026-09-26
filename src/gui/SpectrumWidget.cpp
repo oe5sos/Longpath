@@ -3286,8 +3286,17 @@ void SpectrumWidget::updateSpectrumLinear(int receiverId,
         m_waterfallAvenger.clear();
     }
 
+    // Die 1-Hz-Normierung haengt an der Bin-Breite, also an der Bin-Zahl.
+    // Gitter und dBm-Zahlen stehen in der statischen Ueberlagerung, die
+    // nur bei Bedarf neu gezeichnet wird -- ohne diesen Anstoss blieben
+    // sie nach einem Neuplan der FFT auf der alten Bin-Breite stehen,
+    // waehrend die Kurve schon die neue nahm (2026-09-25).
+    const bool binCountChanged = (m_fullLinearBins.size() != binsLinear.size());
     m_fullLinearBins = binsLinear;
     m_fftWindowEnb   = qMax(windowEnb, 1e-9);
+    if (binCountChanged && m_dispNormalize) {
+        markOverlayDirty();
+    }
 
     // Display pixel count -- spectrum panel width minus dBm strip column,
     // in DEVICE pixels. Per Thetis Display.cs:4970 DrawPanadapterDX2D(int
@@ -3791,6 +3800,8 @@ void SpectrumWidget::resizeEvent(QResizeEvent* event)
     updateVfoPositions();
 }
 
+static int specHFromHeight(int widgetH, float spectrumFrac, int chromeH);
+
 void SpectrumWidget::applyResizeSettled()
 {
     // Recreate waterfall image at new size
@@ -3802,7 +3813,14 @@ void SpectrumWidget::applyResizeSettled()
 #else
     int wfW = w - effectiveStripW();
 #endif
-    int wfH = static_cast<int>(h * (1.0f - m_spectrumFrac)) - kFreqScaleH - kDividerH;
+    // Dieselbe Hoehe, die der Zeichenweg dem Wasserfall gibt (GPU:
+    // renderGpuFrame, CPU: paintEvent) -- ueber specHFromHeight, wie dort.
+    // Hier stand int(h*(1-frac)) - chrome: auf dem GPU-Weg teilt der die
+    // Flaeche NACH Abzug der Leisten, also kamen z. B. bei h=620 340
+    // Bildzeilen auf 353 Pixel -- eine krumme Streckung um 1,04, die jede
+    // Zeile ueber zwei Pixelreihen verschmierte (2026-09-25).
+    int wfH = h - specHFromHeight(h, m_spectrumFrac, kFreqScaleH + kDividerH)
+              - kFreqScaleH - kDividerH;
     if (wfW > 0 && wfH > 0 && (m_waterfall.isNull() ||
         m_waterfall.width() != wfW || m_waterfall.height() != wfH)) {
         m_waterfall = QImage(wfW, wfH, QImage::Format_RGB32);
@@ -5061,6 +5079,25 @@ void SpectrumWidget::drawTuneGuide(QPainter& p, const QRect& specRect)
 }
 
 // ---- Frequency scale bar ----
+// Beschriftung einer Frequenzmarke in MHz, mit so vielen Nachkommastellen,
+// wie der Abstand der Marken braucht. Bis 2026-09-25 galten zwei Stellen fuer
+// jeden Abstand ab 10 kHz -- beim 25-kHz-Raster (Spanne 100..500 kHz, z. B.
+// 192 kHz Abtastrate) stand dann "14.18" an der Marke 14,175 und "14.22" an
+// 14,225: die Skala zeigte Frequenzen, die dort nicht liegen.
+QString SpectrumWidget::freqScaleLabel(double hz, double stepHz)
+{
+    int decimals = 1;
+    const double stepMhz = stepHz / 1.0e6;
+    while (decimals < 6) {
+        const double scaled = stepMhz * std::pow(10.0, decimals);
+        if (std::abs(scaled - std::round(scaled)) < 1e-6) {
+            break;
+        }
+        ++decimals;
+    }
+    return QString::number(hz / 1.0e6, 'f', decimals);
+}
+
 void SpectrumWidget::drawFreqScale(QPainter& p, const QRect& r)
 {
     p.fillRect(r, QColor(Style::hexRole(Style::kBadgeInfoBg)));
@@ -5095,16 +5132,7 @@ void SpectrumWidget::drawFreqScale(QPainter& p, const QRect& r)
     double startFreq = std::ceil((m_centerHz - m_bandwidthHz / 2.0) / freqStep) * freqStep;
     for (double f = startFreq; f < m_centerHz + m_bandwidthHz / 2.0; f += freqStep) {
         int x = hzToX(f, r);
-        // Format as MHz with appropriate decimals
-        double mhz = f / 1.0e6;
-        QString label;
-        if (freqStep >= 100000.0) {
-            label = QString::number(mhz, 'f', 1);
-        } else if (freqStep >= 10000.0) {
-            label = QString::number(mhz, 'f', 2);
-        } else {
-            label = QString::number(mhz, 'f', 3);
-        }
+        const QString label = freqScaleLabel(f, freqStep);
 
         // Cached QStaticText render — see m_freqLabelCache comment in
         // SpectrumWidget.h.  Working set grows as the user pans but
@@ -5129,6 +5157,13 @@ void SpectrumWidget::drawFreqScale(QPainter& p, const QRect& r)
             lx = textRect.right() - labelSize.width();
         }
         const qreal ly = textRect.center().y() - labelSize.height() / 2.0;
+        // Nur ganz oder gar nicht: eine Zahl, die ueber den Rand der Leiste
+        // ragt, wurde rechts vom LIVE-Knopf bzw. dem Randstreifen halb
+        // verdeckt ("14.12" statt "14.125", 2026-09-25) -- abgeschnittene
+        // Frequenzen sind schlechter als fehlende.
+        if (lx < r.left() || lx + labelSize.width() > r.right() + 1) {
+            continue;
+        }
         p.drawStaticText(QPointF(lx, ly), cit.value());
     }
 }
@@ -6103,6 +6138,42 @@ void SpectrumWidget::fitThresholdsToData(float& low, float& high,
 // detector + avenger in updateSpectrumLinear().  AGC + NF-AGC + threshold
 // compute iterate display pixels per Thetis Display.cs:6713-6738
 // [v2.10.3.13] (waterfall_data[i] indexed by pixel).
+float SpectrumWidget::wfRowSourceReduce(const QVector<float>& src, int x, float scale,
+                                         SpectrumDetector detector)
+{
+    const int n = src.size();
+    if (n <= 0) { return 0.0f; }
+    int first = static_cast<int>(static_cast<float>(x) * scale);
+    int last  = static_cast<int>(static_cast<float>(x + 1) * scale) - 1;
+    first = qBound(0, first, n - 1);
+    last  = qBound(first, last, n - 1);   // Aufweiten: genau ein Punkt
+    if (last == first) { return src[first]; }
+    switch (detector) {
+    case SpectrumDetector::Sample:
+        // Der erste Punkt im Fenster -- die Wahl "Sample" heisst genau das.
+        return src[first];
+    case SpectrumDetector::Average:
+    case SpectrumDetector::RMS: {
+        // Mittlere LEISTUNG, nicht mittlere dB: ein Traeger in einem der
+        // zwei Punkte zaehlt mit -3 dB, statt im dB-Mittel zu versinken.
+        double sum = 0.0;
+        for (int i = first; i <= last; ++i) {
+            sum += std::pow(10.0, static_cast<double>(src[i]) / 10.0);
+        }
+        return static_cast<float>(10.0 * std::log10(sum / (last - first + 1) + 1e-60));
+    }
+    case SpectrumDetector::Peak:
+    case SpectrumDetector::Rosenfell:
+    default: {
+        float m = src[first];
+        for (int i = first + 1; i <= last; ++i) {
+            if (src[i] > m) { m = src[i]; }
+        }
+        return m;
+    }
+    }
+}
+
 void SpectrumWidget::pushWaterfallRow(const QVector<float>& wfPixelsDbm)
 {
     if (m_waterfall.isNull() || wfPixelsDbm.isEmpty()) {
@@ -6150,24 +6221,51 @@ void SpectrumWidget::pushWaterfallRow(const QVector<float>& wfPixelsDbm)
     const qint64 now = QDateTime::currentMSecsSinceEpoch();
     m_wfLastPushMs = now;
 
-    // Issue #230 fix: threshold composition moved out — writes go to
-    // the render-active mirror (m_wfActiveLow/High), never the
-    // persisted user fields. Thetis-faithful per Thetis
-    // display.cs:6575-6594 [v2.10.3.13].
-    composeWaterfallActiveThresholds(wfPixelsDbm);
-
     const int n = wfPixelsDbm.size();
     int h = m_waterfall.height();
     // Decrement write pointer so newest row is always at m_wfWriteRow.
     m_wfWriteRow = (m_wfWriteRow - 1 + h) % h;
+#ifdef LONGPATH_GPU_SPECTRUM
+    ++m_wfRowsSinceUpload;
+#endif
 
     int w = m_waterfall.width();
     QRgb* scanline = reinterpret_cast<QRgb*>(m_waterfall.scanLine(m_wfWriteRow));
-    // Map source-pixel range to scanline pixels.  When pipeline displayWidth
-    // matches m_waterfall.width() (typical case: both = panel width minus
-    // strip), this is a 1:1 copy; if widths diverge (e.g. resize race),
-    // proportional sampling preserves visual continuity.
+    // Map source-pixel range to scanline pixels.
+    //
+    // ── Retina: zwei Quellpunkte je Zeilenpunkt (2026-09-25) ─────────
+    //
+    // Hier stand "typically 1:1". Das stimmt seit dem 2026-08-26 nicht
+    // mehr: die Pipeline rechnet in GERAETE-Pixeln (displayWidth x dpr,
+    // updateSpectrumLinear), das Wasserfallbild ist in LOGISCHEN Pixeln
+    // angelegt (applyResizeSettled). Auf einem 2x-Schirm kommen also zwei
+    // Quellpunkte auf einen Zeilenpunkt, und die alte Punktabtastung nahm
+    // davon nur den ersten -- jede zweite Spalte fiel weg. Ein schmaler
+    // Traeger (CW, FT8, Bake) lag in der Haelfte der Faelle genau in der
+    // verworfenen Spalte: gestrichelt oder unsichtbar, waehrend das
+    // Spektrum darueber ihn zeigte (Rendering-Werkbank 2026-09-25).
+    //
+    // Jetzt fasst die Regel des eingestellten Wasserfall-Detektors die
+    // Quellpunkte zusammen, die auf den Zeilenpunkt fallen: Peak/Rosenfell
+    // das Maximum, Average/RMS die mittlere Leistung, Sample der erste
+    // Punkt (wie bisher -- das ist, was "Sample" verspricht). Bei 1:1 (und
+    // beim Aufweiten) ist das in jedem Fall genau der alte Punkt.
     const float pxScale = static_cast<float>(n) / static_cast<float>(w);
+    // Erst verdichten, dann Schwellen bilden: die Clarity-Verankerung und
+    // die Automatik sollen die Werte sehen, die gleich eingefaerbt werden.
+    // Mit den unverdichteten waere das Rauschen nach dem Maximum um gut
+    // 1 dB heller geraten als vorher, bei gleichen Schwellen.
+    m_wfRowReduced.resize(w);
+    for (int x = 0; x < w; ++x) {
+        m_wfRowReduced[x] = wfRowSourceReduce(wfPixelsDbm, x, pxScale,
+                                              m_waterfallDetector);
+    }
+
+    // Issue #230 fix: threshold composition moved out — writes go to
+    // the render-active mirror (m_wfActiveLow/High), never the
+    // persisted user fields. Thetis-faithful per Thetis
+    // display.cs:6575-6594 [v2.10.3.13].
+    composeWaterfallActiveThresholds(m_wfRowReduced);
 
     // Einmal normieren, zweimal verwenden: die Intensität geht in die
     // Historie, die Farbe daraus in die sichtbare Zeile. Vorher wurde
@@ -6201,9 +6299,7 @@ void SpectrumWidget::pushWaterfallRow(const QVector<float>& wfPixelsDbm)
     // und ein Kommentar, der eine Wirkung behauptet, die es nicht gibt,
     // ist schlimmer als kein Kommentar.
     for (int x = 0; x < w; ++x) {
-        int srcPx = static_cast<int>(static_cast<float>(x) * pxScale);
-        srcPx = qBound(0, srcPx, n - 1);
-        const float f = waterfallIntensityF(wfPixelsDbm[srcPx],
+        const float f = waterfallIntensityF(m_wfRowReduced[x],
                                             m_wfActiveLowThreshold,
                                             m_wfActiveHighThreshold,
                                             m_wfBlackLevel, m_wfColorGain);
@@ -10388,9 +10484,17 @@ void SpectrumWidget::initOverlayPipeline()
     m_ovPipeline->setRenderPassDescriptor(renderTarget()->renderPassDescriptor());
 
     // Alpha blending for overlay compositing
+    //
+    // Die Ueberlagerungsbilder sind Format_RGBA8888_Premultiplied und
+    // gehen roh auf die GPU: die Farbe ist also schon mit Alpha
+    // multipliziert. Mit srcColor = SrcAlpha wurde ein zweites Mal
+    // multipliziert -- eine Filterflaeche mit Alpha 0,3 kam mit 0,09 an,
+    // und die Kantenpixel jeder Schrift wurden dunkler als QPainter sie
+    // meinte. Der CPU-Pfad zeichnete dieselben Farben richtig. Fuer
+    // vormultiplizierte Quellen gilt One / OneMinusSrcAlpha (2026-09-25).
     QRhiGraphicsPipeline::TargetBlend blend;
     blend.enable = true;
-    blend.srcColor = QRhiGraphicsPipeline::SrcAlpha;
+    blend.srcColor = QRhiGraphicsPipeline::One;
     blend.dstColor = QRhiGraphicsPipeline::OneMinusSrcAlpha;
     blend.srcAlpha = QRhiGraphicsPipeline::One;
     blend.dstAlpha = QRhiGraphicsPipeline::OneMinusSrcAlpha;
@@ -10635,6 +10739,7 @@ void SpectrumWidget::initialize(QRhiCommandBuffer* cb)
     cb->resourceUpdate(batch);
     m_wfTexFullUpload = false;
     m_wfLastUploadedRow = m_wfWriteRow;
+    m_wfRowsSinceUpload = 0;
     m_rhiInitialized = true;
 }
 
@@ -10654,6 +10759,25 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
                 static_cast<double>(nowMs - m_lastPaintWallMs));
         }
         m_lastPaintWallMs = nowMs;
+
+        // Bilder je Sekunde HIER zaehlen, wo wirklich ein Bild entsteht.
+        // Bis 2026-09-25 zaehlte der Zaehler in der statischen
+        // Ueberlagerung mit -- die wird nur bei Aenderungen neu gebaut,
+        // also zeigte er "Neuaufbauten je Sekunde" (im Leerlauf fast 0).
+        // Die Zahl wird weiter dort gezeichnet; neu gebaut wird die
+        // Ueberlagerung dafuer einmal je Sekunde.
+        if (m_showFps) {
+            ++m_fpsFrameCount;
+            if (m_fpsLastUpdateMs == 0) {
+                m_fpsLastUpdateMs = nowMs;
+            } else if (nowMs - m_fpsLastUpdateMs >= 1000) {
+                const double elapsed = (nowMs - m_fpsLastUpdateMs) / 1000.0;
+                m_fpsDisplayValue = static_cast<float>(m_fpsFrameCount / elapsed);
+                m_fpsFrameCount   = 0;
+                m_fpsLastUpdateMs = nowMs;
+                m_overlayStaticDirty = true;
+            }
+        }
     }
 
     QRhi* r = rhi();
@@ -10807,6 +10931,23 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
             }
         }
 
+        // ── Nach einer Pause: ganz hochladen ──────────────────────────
+        //
+        // Der Teil-Upload unten laeuft von m_wfLastUploadedRow rueckwaerts
+        // bis m_wfWriteRow. Wurde zwischen zwei Bildern mehr als eine
+        // Texturhoehe geschrieben (Fenster versteckt oder nicht
+        // gezeichnet, bei 101 ms je Zeile nach gut einer halben Minute),
+        // ist der Ring umgelaufen: der Abstand der beiden Zeiger nennt
+        // nur noch den Rest, der Rest der Textur blieb alt -- ein
+        // Wasserfall aus neuen Zeilen oben und Zeilen von VOR der Pause
+        // darunter, in falscher Zeitfolge. Gefunden 2026-09-26 im
+        // Pruefstand (LONGPATH_RENDER_HIDDEN=2): 400 Zeilen geschrieben,
+        // 72 hochgeladen. m_waterfall hat dann ohnehin lauter neue
+        // Zeilen, also einmal ganz.
+        if (m_wfRowsSinceUpload >= m_wfGpuTexH) {
+            m_wfTexFullUpload = true;
+        }
+
         if (m_wfTexFullUpload) {
             // Sizes agree by construction at this point, but the
             // consequence of them ever not agreeing is a texture with
@@ -10834,6 +10975,7 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
             batch->uploadTexture(m_wfGpuTex, QRhiTextureUploadEntry(0, 0,
                 QRhiTextureSubresourceUploadDescription(rgba)));
             m_wfLastUploadedRow = m_wfWriteRow;
+            m_wfRowsSinceUpload = 0;
             m_wfTexFullUpload = false;
         } else if (m_wfWriteRow != m_wfLastUploadedRow) {
             // Incremental: upload only dirty rows
@@ -10857,6 +10999,7 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
                 batch->uploadTexture(m_wfGpuTex, uploadDesc);
             }
             m_wfLastUploadedRow = m_wfWriteRow;
+            m_wfRowsSinceUpload = 0;
         }
     }
 
@@ -10897,7 +11040,11 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
     const float effectiveRow = static_cast<float>(m_wfWriteRow) + (1.0f - pushFrac);
     float rowOffset = (m_wfGpuTexH > 0)
         ? effectiveRow / static_cast<float>(m_wfGpuTexH) : 0.0f;
-    float uniforms[] = {rowOffset, 0.0f, 0.0f, 0.0f};
+    // Zweiter Wert: die Hoehe einer Texturzeile in UV. Der Shader klemmt
+    // damit die Unterkante, damit dort nicht die neueste Zeile durch den
+    // Ringumbruch hineinmischt (waterfall.frag, 2026-09-25).
+    const float texelH = (m_wfGpuTexH > 0) ? 1.0f / static_cast<float>(m_wfGpuTexH) : 0.0f;
+    float uniforms[] = {rowOffset, texelH, 0.0f, 0.0f};
     batch->updateDynamicBuffer(m_wfUbo, 0, sizeof(uniforms), uniforms);
 
     // ---- Overlay texture (static, only on state change) ----
@@ -11066,21 +11213,10 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
             }
 
             // FPS overlay for GPU mode (QPainter path draws its own
-            // counter in paintEvent). Drawn into the cached overlay
-            // texture means it only updates on state changes or VFO
-            // tuning — good enough for a diagnostic counter and avoids
-            // re-uploading every frame.
+            // counter in paintEvent). Gezaehlt wird in renderGpuFrame();
+            // hier steht nur die Zahl, die Ueberlagerung wird dafuer
+            // einmal je Sekunde neu gebaut.
             if (m_showFps) {
-                const qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
-                m_fpsFrameCount++;
-                if (m_fpsLastUpdateMs == 0) {
-                    m_fpsLastUpdateMs = nowMs;
-                } else if (nowMs - m_fpsLastUpdateMs >= 1000) {
-                    const double elapsed = (nowMs - m_fpsLastUpdateMs) / 1000.0;
-                    m_fpsDisplayValue = static_cast<float>(m_fpsFrameCount / elapsed);
-                    m_fpsFrameCount   = 0;
-                    m_fpsLastUpdateMs = nowMs;
-                }
                 const QString fpsText =
                     QStringLiteral("%1 fps").arg(m_fpsDisplayValue, 0, 'f', 1);
                 QFont ff = p.font();
@@ -11404,9 +11540,22 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
         const float range  = m_dynamicRange;
         const float yBot = -1.0f;
         const float yTop = 1.0f;
+        // Boden der dBm-Achse: wie dbmToYf die OBERKANTE des Bandplan-
+        // Streifens, nicht der Rand des Bereichs. Bis 2026-09-25 rechnete
+        // die GPU-Kurve ueber die volle Hoehe, Gitter und Ueberlagerungen
+        // ohne den Streifen -- mit Bandplan lag die Kurve am Rauschboden
+        // um fast die Streifenhoehe zu tief (tst_spectrum_trace_on_grid).
+        // Die Fuellung reicht weiter bis yBot, wie im CPU-Pfad bis
+        // specRect.bottom().
+        const float stripFrac = (specRect.height() > 0)
+            ? static_cast<float>(bandPlanStripHeight()) / static_cast<float>(specRect.height())
+            : 0.0f;
+        const float yFloor = yBot + 2.0f * qBound(0.0f, stripFrac, 1.0f);
 
         const float fa = m_fillAlpha;
-        const float cal = m_dbmCalOffset;
+        // Kalibrierung UND 1-Hz-Normierung, wie dbmToYf -- die Normierung
+        // fehlte hier, Gitter und Ueberlagerungen hatten sie schon.
+        const float cal = m_dbmCalOffset + normalizeShiftDb();
 
         // Flat-mode colour picked from m_fillColor.
         const float flatR = m_fillColor.redF();
@@ -11459,7 +11608,7 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
         for (int j = 0; j < n; ++j) {
             float x = (n > 1) ? 2.0f * j / (n - 1) - 1.0f : 0.0f;
             float t = qBound(0.0f, ((m_renderedPixels[j] + cal) - minDbm) / range, 1.0f);
-            float y = yBot + t * (yTop - yBot);
+            float y = yFloor + t * (yTop - yFloor);
 
             // Ribbon perpendicular offset: central difference of the
             // neighbouring points for the local tangent (smoother than a
@@ -11472,8 +11621,8 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
             const float xNext = (n > 1) ? 2.0f * jNext / (n - 1) - 1.0f : 0.0f;
             const float tPrev = qBound(0.0f, ((m_renderedPixels[jPrev] + cal) - minDbm) / range, 1.0f);
             const float tNext = qBound(0.0f, ((m_renderedPixels[jNext] + cal) - minDbm) / range, 1.0f);
-            const float yPrev = yBot + tPrev * (yTop - yBot);
-            const float yNext = yBot + tNext * (yTop - yBot);
+            const float yPrev = yFloor + tPrev * (yTop - yFloor);
+            const float yNext = yFloor + tNext * (yTop - yFloor);
 
             const float dxPx = (xNext - xPrev) * (vpWpx * 0.5f);
             const float dyPx = (yNext - yPrev) * (vpHpx * 0.5f);
@@ -11586,7 +11735,7 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
             for (int j = 0; j < n; ++j) {
                 float x = (n > 1) ? 2.0f * j / (n - 1) - 1.0f : 0.0f;
                 float t = qBound(0.0f, ((m_pxPeakHold[j] + cal) - minDbm) / range, 1.0f);
-                float y = yBot + t * (yTop - yBot);
+                float y = yFloor + t * (yTop - yFloor);
 
                 const int jPrev = qMax(j - 1, 0);
                 const int jNext = qMin(j + 1, n - 1);
@@ -11594,8 +11743,8 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
                 const float xNext = (n > 1) ? 2.0f * jNext / (n - 1) - 1.0f : 0.0f;
                 const float tPrev = qBound(0.0f, ((m_pxPeakHold[jPrev] + cal) - minDbm) / range, 1.0f);
                 const float tNext = qBound(0.0f, ((m_pxPeakHold[jNext] + cal) - minDbm) / range, 1.0f);
-                const float yPrev = yBot + tPrev * (yTop - yBot);
-                const float yNext = yBot + tNext * (yTop - yBot);
+                const float yPrev = yFloor + tPrev * (yTop - yFloor);
+                const float yNext = yFloor + tNext * (yTop - yFloor);
 
                 const float dxPx = (xNext - xPrev) * (vpWpx * 0.5f);
                 const float dyPx = (yNext - yPrev) * (vpHpx * 0.5f);

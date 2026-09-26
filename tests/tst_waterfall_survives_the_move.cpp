@@ -99,7 +99,7 @@ private:
 private slots:
     void aReleaseAndRebuildDoesNotShowRawMemory()
     {
-#ifndef NEREUS_GPU_SPECTRUM
+#ifndef LONGPATH_GPU_SPECTRUM
         // CPU-Renderpfad (GPU_SPECTRUM=OFF): keine GPU-Textur, kein
         // releaseResources(), kein Framebuffer — der Fehler, den dieser
         // Test festnagelt, kann hier nicht entstehen. Ohne diesen Zweig

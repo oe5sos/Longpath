@@ -927,6 +927,7 @@ public:
 
     void setShowFps(bool on);
     bool showFps() const { return m_showFps; }
+    float fpsDisplayValueForTest() const { return m_fpsDisplayValue; }
 
     // 2026-05-26 KG4VCF perf instrumentation: toggle the in-spectrum
     // perf overlay (paint/gap/fft/overlay timings + audio underruns
@@ -2249,6 +2250,17 @@ public:
     // kostet eine Addition je Bildpunkt.
     static float waterfallIntensityF(float dbm, float lowDbm, float highDbm,
                                      int blackLevel, int colorGain);
+    // Beschriftung einer Frequenzmarke (MHz) mit den Nachkommastellen, die
+    // der Markenabstand stepHz braucht (25 kHz -> 3, 50 kHz -> 2, 100 kHz -> 1).
+    static QString freqScaleLabel(double hz, double stepHz);
+    /// Der Wert fuer Wasserfall-Zeilenpunkt x, wenn `scale` Quellpunkte
+    /// (Geraete-Pixel der Pipeline) auf einen Zeilenpunkt (logisches
+    /// Pixel) fallen -- auf Retina zwei --, zusammengefasst nach der Regel
+    /// des Wasserfall-Detektors (Peak: Maximum, Average/RMS: mittlere
+    /// Leistung, Sample: erster Punkt). Beim Aufweiten (scale < 1) der
+    /// eine naechste Punkt. Siehe pushWaterfallRow().
+    static float wfRowSourceReduce(const QVector<float>& src, int x, float scale,
+                                   SpectrumDetector detector);
     // lowColor: Thetis display.cs:2516/6764-6787 waterfall_low_color,
     // honoured for WfColorScheme::Enhanced only (see .cpp). A default
     // parameter, not an instance read, so this stays the pure function
@@ -2348,6 +2360,9 @@ private:
     /// pushWaterfallRow() zwanzigmal in der Sekunde läuft und eine
     /// Neubelegung je Zeile reine Verschwendung wäre.
     QVector<quint8> m_wfRowIntensity;
+    // Die Zeile auf Bildbreite verdichtet (Maximum je Zeilenpunkt), vor
+    // Schwellen und Farbe -- siehe pushWaterfallRow().
+    QVector<float> m_wfRowReduced;
     QVector<qint64> m_wfHistoryTimestamps;         // parallel; per-row wall-clock ms
     int             m_wfHistoryWriteRow{0};        // LIFO; index 0 = newest
     int             m_wfHistoryRowCount{0};        // saturates at capacity
@@ -3182,6 +3197,11 @@ private:
     int  m_wfGpuTexW{0};
     int  m_wfGpuTexH{0};
     int  m_wfLastUploadedRow{-1};
+    // Zeilen, die pushWaterfallRow seit dem letzten Hochladen geschrieben
+    // hat. Der Teil-Upload laeuft von m_wfLastUploadedRow bis
+    // m_wfWriteRow -- nach mehr als einer Texturhoehe ist der Ring
+    // umgelaufen, und dieser Abstand zeigt nur noch den Rest (2026-09-26).
+    int  m_wfRowsSinceUpload{0};
 
     // ---- Overlay GPU resources ----
     QRhiGraphicsPipeline*       m_ovPipeline{nullptr};

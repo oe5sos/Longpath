@@ -112,6 +112,16 @@ add_library(longpath_test_sandbox OBJECT EXCLUDE_FROM_ALL TestSandboxInit.cpp)
 target_link_libraries(longpath_test_sandbox PRIVATE Qt6::Core)
 
 function(longpath_add_test name)
+    # Ein Test HINTER dem Sammelziel all_tests (unten) kommt nicht in
+    # dessen Abhaengigkeiten: CI baut nur all_tests, ctest meldet ihn
+    # dann als "Not Run" -- so am 2026-09-25 mit drei neuen Tests, die
+    # ans Dateiende gehaengt waren. Laut abbrechen statt still fehlen.
+    if(TARGET all_tests)
+        message(FATAL_ERROR "longpath_add_test(${name}) steht hinter dem "
+                "Sammelziel all_tests und wuerde im CI nie gebaut. Den "
+                "Eintrag vor den Block 'Aggregate \"all_tests\" target' "
+                "verschieben.")
+    endif()
     # Sharding gate — when this test's hash bucket doesn't match the
     # active shard, register a stub OBJECT library (EXCLUDE_FROM_ALL,
     # backed by the shared stub source set up at the top of this file)
@@ -4825,6 +4835,18 @@ longpath_add_test(tst_spectrum_trace_visible)
 if(TEST tst_spectrum_trace_visible)
     set_tests_properties(tst_spectrum_trace_visible PROPERTIES RUN_SERIAL TRUE)
 endif()
+longpath_add_test(tst_spectrum_trace_on_grid)
+if(TEST tst_spectrum_trace_on_grid)
+    set_tests_properties(tst_spectrum_trace_on_grid PROPERTIES RUN_SERIAL TRUE)
+endif()
+longpath_add_test(tst_spectrum_fps_counter)
+if(TEST tst_spectrum_fps_counter)
+    set_tests_properties(tst_spectrum_fps_counter PROPERTIES RUN_SERIAL TRUE)
+endif()
+longpath_add_test(tst_waterfall_after_pause)
+if(TEST tst_waterfall_after_pause)
+    set_tests_properties(tst_waterfall_after_pause PROPERTIES RUN_SERIAL TRUE)
+endif()
 longpath_add_test(tst_form_variants)
 if(TEST tst_form_variants)
     set_tests_properties(tst_form_variants PROPERTIES
@@ -7148,6 +7170,13 @@ longpath_add_test(tst_tnf_ui_wiring)
 #         section 8.3 + section 11.
 longpath_add_test(tst_notch_visual_does_not_perturb_noise_floor_or_maxbin)
 
+# 2026-09-25: Rendering-Pruefstand (ohne LONGPATH_GRAB_DIR uebersprungen),
+# die Retina-Spaltenzusammenfassung und die Frequenzskalen-Beschriftung,
+# die er gefunden hat.
+longpath_add_test(tst_rendering_werkbank)
+longpath_add_test(tst_waterfall_column_reduce)
+longpath_add_test(tst_freq_scale_labels)
+
 # --------------------------------------------------------------------------
 # Aggregate "all_tests" target  (2026-05-26 KG4VCF dev-loop fix, from PR #291)
 # --------------------------------------------------------------------------
@@ -7311,6 +7340,5 @@ foreach(_asan_gap_target IN ITEMS
         target_link_options(${_asan_gap_target} PRIVATE -fsanitize=address)
     endif()
 endforeach()
-
 
 

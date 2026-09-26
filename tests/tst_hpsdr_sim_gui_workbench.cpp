@@ -30,7 +30,7 @@
 #include <QPainter>
 #include <QSignalSpy>
 #include <QTabWidget>
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
 #include <QRhiWidget>
 #endif
 
@@ -41,7 +41,7 @@ namespace {
 QImage grabWindow(QWidget* top)
 {
     QImage base = top->grab().toImage();
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
     QPainter p(&base);
     const QList<QRhiWidget*> gpu = top->findChildren<QRhiWidget*>();
     for (QRhiWidget* w : gpu) {

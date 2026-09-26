@@ -318,7 +318,7 @@ private slots:
         // Widget ein QPainter-QWidget, QWidget::grab() liefert das Bild
         // auch offscreen — der Schwarzbild-Check laeuft also gerade
         // dort, wo er ohne GPU am ehesten gebraucht wird.
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
         if (QGuiApplication::platformName() == QLatin1String("offscreen")) {
             QSKIP("Kein echtes QRhi-Backend unter der Offscreen-Plattform -- "
                   "grabFramebuffer() kann hier nichts Aussagekraeftiges "
@@ -349,7 +349,7 @@ private slots:
                          "%1 hinterlaesst die Mitte bei %2 Hz")
                          .arg(name).arg(m_sw->centerFrequency())));
             // Und das Bild muss noch etwas zeigen, nicht nur Schwarz.
-#ifdef NEREUS_GPU_SPECTRUM
+#ifdef LONGPATH_GPU_SPECTRUM
             const QImage img = m_sw->grabFramebuffer();
 #else
             const QImage img = m_sw->grab().toImage();

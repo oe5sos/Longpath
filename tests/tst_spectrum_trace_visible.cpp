@@ -30,7 +30,7 @@ using namespace Longpath;
 class TstSpectrumTraceVisible : public QObject { Q_OBJECT
 private slots:
     void theTraceIsActuallyVisibleOnTheFramebuffer() {
-#ifndef NEREUS_GPU_SPECTRUM
+#ifndef LONGPATH_GPU_SPECTRUM
         // CPU-Renderpfad (GPU_SPECTRUM=OFF): SpectrumWidget ist hier ein
         // QWidget mit QPainter, es gibt keinen Framebuffer und keine
         // Zeichenreihenfolge von Overlay-Quad und Kurve — genau das, was
