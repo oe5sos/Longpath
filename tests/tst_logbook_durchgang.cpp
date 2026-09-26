@@ -41,6 +41,7 @@
 #include "gui/LogbookWindow.h"
 #include "gui/widgets/RotorLogbookPanel.h"
 #include "gui/QsoMapWindow.h"
+#include "gui/widgets/DxRadarWidget.h"
 #include "gui/widgets/QsoDetailPane.h"
 #include "core/AppSettings.h"
 
@@ -1131,6 +1132,111 @@ private slots:
         QCOMPARE(count(QStringLiteral("OE5VVM")), 1);
         w->hide();
         QFile::remove(path);
+    }
+
+    // Jeder Schalter der Karte, hin und zurueck, mit dem ganzen Log:
+    // kein Absturz, und am Ende zeigt sie wieder dasselbe.
+    void everyMapControlRoundTrips()
+    {
+        AppSettings::instance().setValue(QStringLiteral("LogbookShowMap"), QStringLiteral("True"));
+        LogbookWindow w(m_log);
+        w.resize(1600, 950);
+        w.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QsoMapWindow* map = w.mapPanelForTest();
+        QVERIFY(map && map->isVisible());
+        auto box = [map](const QString& t) -> QCheckBox* {
+            for (QCheckBox* c : map->findChildren<QCheckBox*>()) { if (c->text().startsWith(t)) { return c; } }
+            return nullptr;
+        };
+        auto btn = [map](const QString& t) -> QPushButton* {
+            for (QPushButton* b : map->findChildren<QPushButton*>()) { if (b->text() == t) { return b; } }
+            return nullptr;
+        };
+        QStringList slow;
+        auto timed = [&slow](const QString& what, const std::function<void()>& f) {
+            QElapsedTimer t; t.start();
+            f();
+            QCoreApplication::processEvents();
+            if (t.elapsed() > 400) { slow << QStringLiteral("%1 %2 ms").arg(what).arg(t.elapsed()); }
+        };
+        // Kein Netz im Test.
+        if (QCheckBox* img = box(QStringLiteral("Imagery"))) { img->setChecked(false); }
+        QCoreApplication::processEvents();
+        const int all = map->shownCountForTest();
+        qInfo() << "Karte zeigt" << all << "Orte";
+        QVERIFY(all > 0);
+
+        // Markierte Zeilen, dann "Only marked".
+        QTableWidget* table = logTable(&w);
+        table->clearSelection();
+        for (int r : {0, 1, 2, 3}) {
+            table->selectionModel()->select(table->model()->index(r, 0),
+                                            QItemSelectionModel::Select | QItemSelectionModel::Rows);
+        }
+        QCheckBox* only = box(QStringLiteral("Only marked"));
+        QVERIFY(only);
+        timed(QStringLiteral("Only marked an"), [&]() { only->setChecked(true); });
+        const int marked = map->shownCountForTest();
+        qInfo() << "nur markierte:" << marked;
+        QVERIFY(marked <= 4);
+        timed(QStringLiteral("Only marked aus"), [&]() { only->setChecked(false); });
+        QCOMPARE(map->shownCountForTest(), all);
+
+        for (const QString& t : {QStringLiteral("Paths"), QStringLiteral("Grid"), QStringLiteral("Satellites")}) {
+            QCheckBox* c = box(t);
+            QVERIFY2(c, qPrintable(t));
+            const bool was = c->isChecked();
+            timed(t + QStringLiteral(" um"), [&]() { c->setChecked(!was); });
+            timed(t + QStringLiteral(" zurueck"), [&]() { c->setChecked(was); });
+        }
+        for (const QString& t : {QStringLiteral("+"), QStringLiteral("+"), QStringLiteral("−"), QStringLiteral("Fit")}) {
+            QPushButton* b = btn(t);
+            QVERIFY2(b, qPrintable(t));
+            timed(QStringLiteral("Knopf ") + t, [&]() { b->click(); });
+        }
+        // Flach <-> Globus, zweimal; dazwischen zoomen.
+        QPushButton* view = btn(QStringLiteral("Flat map"));
+        if (!view) { view = btn(QStringLiteral("Globe")); }
+        QVERIFY(view);
+        for (int i = 0; i < 4; ++i) {
+            timed(QStringLiteral("Ansicht ") + view->text(), [&]() { view->click(); });
+            timed(QStringLiteral("zoom in"), [&]() { btn(QStringLiteral("+"))->click(); });
+        }
+        timed(QStringLiteral("Fit"), [&]() { btn(QStringLiteral("Fit"))->click(); });
+        // Grosses Radar und zurueck.
+        QPushButton* radar = map->radarButtonForTest();
+        QVERIFY(radar);
+        timed(QStringLiteral("Radar an"), [&]() { radar->click(); });
+        QVERIFY(map->radarForTest()->isVisible());
+        timed(QStringLiteral("Radar aus"), [&]() { radar->click(); });
+        // Jedes Band aus und wieder an.
+        QList<QPushButton*> pills;
+        for (QPushButton* b : map->findChildren<QPushButton*>()) {
+            if (b->isCheckable() && b->text().endsWith(QLatin1Char('m')) && b != radar) { pills << b; }
+        }
+        qInfo() << "Band-Knoepfe:" << pills.size();
+        for (QPushButton* p : pills) {
+            timed(QStringLiteral("Band ") + p->text() + QStringLiteral(" aus"), [&]() { p->click(); });
+        }
+        QVERIFY(map->shownCountForTest() < all);
+        for (QPushButton* p : pills) {
+            timed(QStringLiteral("Band ") + p->text() + QStringLiteral(" an"), [&]() { p->click(); });
+        }
+        QCOMPARE(map->shownCountForTest(), all);
+        // Herausloesen: eigenes Fenster, zu, noch einmal.
+        for (int i = 0; i < 2; ++i) {
+            timed(QStringLiteral("herausloesen"), [&]() { emit map->popOutRequested(); });
+            QsoMapWindow* big = nullptr;
+            for (QsoMapWindow* m : w.findChildren<QsoMapWindow*>()) { if (m != map && m->isWindow() && m->isVisible()) { big = m; } }
+            QVERIFY2(big, "kein eigenes Kartenfenster");
+            QVERIFY(QTest::qWaitForWindowExposed(big));
+            big->close();
+            QCoreApplication::processEvents();
+        }
+        QVERIFY(map->isVisible());
+        QCOMPARE(map->shownCountForTest(), all);
+        qInfo().noquote() << "langsam (>400 ms):" << (slow.isEmpty() ? QStringLiteral("nichts") : slow.join(QStringLiteral("; ")));
     }
 };
 
