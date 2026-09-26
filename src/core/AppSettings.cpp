@@ -255,6 +255,11 @@ QString AppSettings::dataDir()
     return QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
 }
 
+bool AppSettings::isSandbox()
+{
+    return !qEnvironmentVariable("LONGPATH_CONFIG_DIR").trimmed().isEmpty();
+}
+
 QString AppSettings::resolveSettingsPath(const QString& profile)
 {
     return resolveConfigDir(profile) + QStringLiteral("/") + appFileBaseName()

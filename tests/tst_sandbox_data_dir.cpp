@@ -11,6 +11,7 @@
 
 #include "core/AppSettings.h"
 #include "core/CallsignCache.h"
+#include "core/CredentialStore.h"
 #include "gui/widgets/RotorLogbookPanel.h"
 #include "gui/widgets/StationPhoto.h"
 
@@ -27,6 +28,27 @@ private slots:
         QVERIFY(CallsignCache::defaultPath().startsWith(dir.path()));
         QVERIFY(StationPhoto::cacheDir().startsWith(dir.path()));
         qunsetenv("LONGPATH_CONFIG_DIR");
+    }
+
+    // Die Zugangsdaten (QRZ-Logbuch-Schluessel, Cloudlog ...) kommen aus
+    // dem Schluesselbund. In der Sandbox ein eigener Namensraum: ein
+    // Eintrag der echten Instanz ist dort unsichtbar.
+    void credentialsAreSeparateInTheSandbox()
+    {
+        qunsetenv("LONGPATH_CONFIG_DIR");
+        QVERIFY(!AppSettings::isSandbox());
+        const QString key = QStringLiteral("test.sandboxprobe");
+        const QString acct = QStringLiteral("probe");
+        CredentialStore::store(key, acct, QStringLiteral("echt"));
+        QCOMPARE(CredentialStore::retrieve(key, acct), QStringLiteral("echt"));
+
+        QTemporaryDir dir;
+        qputenv("LONGPATH_CONFIG_DIR", dir.path().toLocal8Bit());
+        QVERIFY(AppSettings::isSandbox());
+        QVERIFY(CredentialStore::retrieve(key, acct) != QStringLiteral("echt"));
+
+        qunsetenv("LONGPATH_CONFIG_DIR");
+        CredentialStore::erase(key, acct);
     }
 
     void withoutItNothingChanges()

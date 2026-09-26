@@ -14,6 +14,7 @@
 // =================================================================
 
 #include "CredentialStore.h"
+#include "core/AppSettings.h"
 
 #include <QHash>
 #include <QProcess>
@@ -33,7 +34,10 @@ QHash<QString, QString>& sessionVault()
 
 QString vaultKey(const QString& key, const QString& account)
 {
-    return key + QLatin1Char('\x1f') + account;
+    // Die Sandbox auch hier getrennt (siehe serviceName()).
+    const QString ns = AppSettings::isSandbox() ? QStringLiteral("sandbox\x1f")
+                                                : QString{};
+    return ns + key + QLatin1Char('\x1f') + account;
 }
 
 #ifdef Q_OS_MACOS
@@ -43,6 +47,13 @@ constexpr int kSecurityTimeoutMs = 5000;
 // operator can find and delete it without going through this app.
 QString serviceName(const QString& key)
 {
+    // Eine Sandbox (LONGPATH_CONFIG_DIR) hat ihren eigenen Namensraum:
+    // sie sieht die echten Zugaenge nicht -- sonst luede ein Test-QSO mit
+    // dem echten Schluessel ins QRZ-Logbuch des Betreibers hoch
+    // (2026-09-26, vor einem Nachttest des Logbuchs gefunden).
+    if (AppSettings::isSandbox()) {
+        return QStringLiteral("Longpath Sandbox: %1").arg(key);
+    }
     return QStringLiteral("Longpath: %1").arg(key);
 }
 
@@ -147,8 +158,9 @@ QString CredentialStore::retrieve(const QString& key, const QString& account)
         return out;
     }
     // Der Umzug (siehe legacyServiceName): unter dem alten Namen lesen,
-    // unter dem neuen ablegen, den alten Eintrag danach loeschen.
-    if (runSecurity({
+    // unter dem neuen ablegen, den alten Eintrag danach loeschen. Nie aus
+    // einer Sandbox -- sie wuerde die echten alten Eintraege loeschen.
+    if (!AppSettings::isSandbox() && runSecurity({
             QStringLiteral("find-generic-password"),
             QStringLiteral("-s"), legacyServiceName(key),
             QStringLiteral("-a"), account,

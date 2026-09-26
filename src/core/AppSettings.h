@@ -238,6 +238,10 @@ public:
     // weiter in ~/Library/Preferences/Longpath/Longpath). Sonst, wie
     // bisher, QStandardPaths::AppConfigLocation.
     static QString dataDir();
+    // Laeuft diese Instanz in einer Sandbox (LONGPATH_CONFIG_DIR gesetzt)?
+    // Dann auch eigene Zugangsdaten im Schluesselbund (CredentialStore):
+    // ein Test-QSO darf nie ins echte QRZ-Logbuch hochgeladen werden.
+    static bool isSandbox();
 
     // Profile names are restricted to [A-Za-z0-9_-] and non-empty.
     // Anything else (path traversal, whitespace, separators) falls back
