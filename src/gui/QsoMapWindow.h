@@ -60,6 +60,7 @@ class QLineEdit;
 namespace Longpath {
 
 class FlatMapWidget;
+class FlowLayout;
 class GibsTileLayer;
 class GlobeWidget;
 class QrzClient;
@@ -216,7 +217,7 @@ private:
 
     // Filter pills and their state. An empty active set means "no
     // filtering" (everything shown), so a fresh window hides nothing.
-    QHBoxLayout*  m_pillRow{nullptr};
+    FlowLayout*   m_pillRow{nullptr};
     QSet<QString> m_offBands;    // pills the operator has turned OFF
     QSet<QString> m_offModes;
 

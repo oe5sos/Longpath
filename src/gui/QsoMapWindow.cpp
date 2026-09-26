@@ -370,8 +370,12 @@ void QsoMapWindow::buildUi()
 
     // Second row: one pill per band and mode the log actually has,
     // filled in by rebuildFilterPills() once entries arrive.
-    m_pillRow = new QHBoxLayout;
-    m_pillRow->setSpacing(4);
+    //
+    // Umbrechend wie die Zeile darueber (2026-09-26): als starre Zeile
+    // verlangte sie mit 12 Baendern und 8 Betriebsarten 1105 px -- im
+    // Logbuch eingebettet blieben der Tabelle bei 1600 px Fensterbreite
+    // 187 px.
+    m_pillRow = new FlowLayout(nullptr, 4, 4);
     col->addLayout(m_pillRow);
 
     m_globe = new GlobeWidget(this);
@@ -694,7 +698,7 @@ void QsoMapWindow::rebuildFilterPills()
         addCaption(QStringLiteral("MODE"));
         for (const QString& m : modeList) { addPill(m, m, false); }
     }
-    m_pillRow->addStretch(1);
+    m_pillRow->addStretch();
 }
 
 namespace {
