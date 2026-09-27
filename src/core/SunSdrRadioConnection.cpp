@@ -1130,7 +1130,13 @@ void SunSdrRadioConnection::processStreamDatagram(const QByteArray& data,
     // previous packet's -- identical would mean frozen/stuck data, not
     // real antenna noise; (b) peak decoded sample magnitude, as a coarse
     // "is anything moving" gauge. Remove once this question is settled.
-    {
+    //
+    // 2026-09-27: settled (0x07 switches real I/Q on, 2026-09-25; the QRP
+    // runs at the bench). Left in, but only behind the driver's own probe
+    // switch LONGPATH_SUNSDR_PROBE=1: unconditionally it wrote one line a
+    // second -- 2710 of the ~4000 lines in Martin's log that day -- and
+    // copied every packet's payload to compare it with the next.
+    if (m_probeOn) {
         static QElapsedTimer diagTimer;
         static bool diagStarted = false;
         static QByteArray lastPayload;
