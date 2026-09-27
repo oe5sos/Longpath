@@ -13638,7 +13638,11 @@ MemoryRecord RadioModel::captureMemory() const
     if (!stepName.isEmpty()) { r.tuneStep = stepName; }
     r.rptr = slice->fmTxMode();
     r.rptrOffsetMHz = slice->fmOffsetHz() / 1.0e6;
-    r.ctcssOn = slice->fmCtcssMode() != 0;
+    // CTCSSOn is the TX tone (console.cs:40318-40328 [@852bf0e]:
+    // radio.GetDSPTX(0).CTCSSFlag): only Encode / Enc+Dec count. Before
+    // 2026-09-27 a Decode-only slice was stored as "on" and came back from
+    // the memory as Encode -- transmitting a tone nobody had switched on.
+    r.ctcssOn = (slice->fmCtcssMode() == 1 || slice->fmCtcssMode() == 3);
     r.ctcssFreq = slice->fmCtcssValueHz();
     r.deviation = m_fmDeviationHz;   // (int)console.radio.GetDSPTX(0).TXFMDeviation
     r.power = m_transmitModel.power();

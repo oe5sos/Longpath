@@ -184,6 +184,24 @@ private slots:
         }
     }
 
+    void aDecodeOnlyToneIsNotStoredAsATxTone()
+    {
+        RadioModel model;
+        const int id = model.addSlice();
+        model.setActiveSlice(id);
+        SliceModel* s = model.activeSlice();
+        QVERIFY(s);
+        s->setFrequency(145'600'000.0);
+        s->setDspMode(DSPMode::FM);
+        s->setFmCtcssMode(2);   // Decode only
+        QVERIFY(!model.captureMemory().ctcssOn);
+        s->setFmCtcssMode(3);   // Enc+Dec
+        QVERIFY(model.captureMemory().ctcssOn);
+        s->setFmCtcssMode(1);   // Encode
+        QVERIFY(model.captureMemory().ctcssOn);
+        model.memories()->clear();
+    }
+
     void aNewTxModeTurnsReverseOffAndTheReceiverComesBack()
     {
         RadioModel model;
