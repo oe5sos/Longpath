@@ -122,6 +122,9 @@ const QString kRotorUseSerialKey = QStringLiteral("RotorUseLocalSerial");
 const QString kRotorModelKey     = QStringLiteral("RotorHamlibModel");
 const QString kRotorDeviceKey    = QStringLiteral("RotorSerialDevice");
 const QString kRotorBaudKey      = QStringLiteral("RotorSerialBaud");
+// Beim Start wieder verbinden, wenn der Betreiber zuletzt verbunden hatte
+// (und nicht selbst getrennt). "True"/"False" (2026-09-26).
+const QString kRotorConnectOnStartKey = QStringLiteral("RotorConnectOnStart");
 // Mechanical end stop, degrees; negative = turns freely. Drives the
 // dial's travel-path maths so the shown direction is the one the mast
 // can actually take.
@@ -719,6 +722,64 @@ void RotorLogbookPanel::buildUi()
             [this](double) { beginTurn(); });
     connect(stopBtn, &QPushButton::clicked,
             this, &RotorLogbookPanel::haltTurn);
+
+    // ── Den Rotor beim Start wieder verbinden (2026-09-26) ───────────
+    //
+    // Betreiber: "man muss auch den aktuellen Stand des Rotors sehen!!!"
+    // Bisher verband der Rotor nur ueber Rotor... -> Connect; nach jedem
+    // Neustart gab es keinen Stand, bis man das wieder tat. Hatte der
+    // Betreiber zuletzt verbunden (und nicht selbst getrennt), verbindet
+    // Longpath jetzt von selbst -- nur lesen, nie drehen. Ist der Rotor
+    // nicht erreichbar (anderes Netz, ausgeschaltet), steht das in der
+    // Statuszeile, und Logbuch und Radar zeigen "not connected".
+    if (AppSettings::instance().value(kRotorConnectOnStartKey, QStringLiteral("False"))
+            .toString() == QStringLiteral("True")) {
+        QTimer::singleShot(1500, this, [this]() {
+            QString err;
+            if (connectRotorFromSettings(&err)) {
+                setStatus(QStringLiteral("Connecting to the rotator…"));
+            } else {
+                setStatus(QStringLiteral("Rotator: %1").arg(err), true);
+            }
+        });
+    }
+}
+
+bool RotorLogbookPanel::connectRotorFromSettings(QString* err)
+{
+    ensureRotor();
+    if (m_rotor->isConnected()) { return true; }
+    AppSettings& s = AppSettings::instance();
+    // Dieselbe Voreinstellung wie der Dialog (lokaler rotctld).
+    const bool local = s.value(kRotorUseSerialKey, true).toBool();
+    if (local) {
+        const int model = s.value(kRotorModelKey, 601).toInt();
+        const QString device = s.value(kRotorDeviceKey, QString{}).toString().trimmed();
+        const int baud = s.value(kRotorBaudKey, 9600).toInt();
+        if (device.isEmpty()) {
+            if (err) { *err = QStringLiteral("no rotator device set up (Rotor…)"); }
+            return false;
+        }
+        QString e;
+        if (!m_rotorProc.start(model, device, baud, 4533, &e)) {
+            if (err) { *err = e; }
+            return false;
+        }
+        const quint16 port = m_rotorProc.listenPort();
+        m_rotor->setTarget(QStringLiteral("127.0.0.1"), port);
+        s.setValue(kRotorHostKey, QStringLiteral("127.0.0.1"));
+        s.setValue(kRotorPortKey, port);
+    } else {
+        const QString host = s.value(kRotorHostKey, QString{}).toString().trimmed();
+        const quint16 port = static_cast<quint16>(s.value(kRotorPortKey, 4533).toUInt());
+        if (host.isEmpty()) {
+            if (err) { *err = QStringLiteral("no rotctld address set up (Rotor…)"); }
+            return false;
+        }
+        m_rotor->setTarget(host, port ? port : 4533);
+    }
+    m_rotor->connectToRotor();
+    return true;
 }
 
 // ── Shrinking down to the compass ───────────────────────────────────
@@ -1526,9 +1587,15 @@ void RotorLogbookPanel::openRotorSetupDialog()
         if (m_rotor->isConnected()) {
             m_rotor->disconnectFromRotor();
             m_rotorProc.stop();
+            // Selbst getrennt: beim naechsten Start nicht wieder verbinden.
+            AppSettings::instance().setValue(kRotorConnectOnStartKey,
+                                              QStringLiteral("False"));
             refreshUi();
             return;
         }
+        // Verbunden wird auf Wunsch: beim naechsten Start wieder.
+        AppSettings::instance().setValue(kRotorConnectOnStartKey,
+                                          QStringLiteral("True"));
 
         const bool local = modeBox->currentIndex() == 0;
         s.setValue(kRotorUseSerialKey, local);

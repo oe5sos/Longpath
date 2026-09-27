@@ -112,6 +112,10 @@ public:
     // Das offene Logbuch nach vorne holen, ohne es neu einzulesen (Start:
     // Panadapter und Rotor/Log gehen nach ihm auf und lagen davor).
     void raiseLogbookIfOpen();
+    // Den Rotor mit den gespeicherten Einstellungen verbinden (lokaler
+    // rotctld oder Netz-rotctld), wie Rotor... -> Connect. false + Grund,
+    // wenn nichts eingerichtet ist oder rotctld nicht startet.
+    bool connectRotorFromSettings(QString* err = nullptr);
 
     // Open the rotator setup dialog. Public for the same reason as
     // showLogbook(): an operator whose rotator is not working yet
