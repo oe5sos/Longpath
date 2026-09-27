@@ -177,6 +177,9 @@ public:
     // distinguish "wired to the right slice" from "wired at all".  Same
     // unguarded test-hook convention as injectAudioFrameForTest above.
     TciProtocol* protocolForTest() const { return m_protocol.get(); }
+    // Wer gerade als Taster gilt (m_moxOwner), fuer Tests, die auf die
+    // Verarbeitung eines trx-Befehls warten muessen statt zu schlafen.
+    QWebSocket* moxOwnerForTest() const { return m_moxOwner.data(); }
 
 signals:
     // Emitted after the server begins listening.  port is the actual bound port
