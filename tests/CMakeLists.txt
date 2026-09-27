@@ -2332,6 +2332,9 @@ longpath_add_test(tst_hpsdr_sim_gui_workbench)
 # -- Satelliten in Sicht: TLE-Satz, Vallado-Pruefvektor, Beobachter-
 #    geometrie, ISS-Plausibilitaet, Stempeltext --
 longpath_add_test(tst_satellite_tracker)
+# -- Zahlen mit Punkt, auch bei deutscher Systemsprache (2026-09-27): aus
+#    dem Terminal verwarf SGP4 alle 95 Satelliten (sscanf + Dezimalkomma). --
+longpath_add_test(tst_c_numeric_locale)
 # -- TLE-Speicher (nachgespielter CelesTrak, Datei, Alter, Fehlerseite) +
 #    ADIF-Rundweg des Stempels --
 longpath_add_test(tst_tle_store)

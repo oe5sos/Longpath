@@ -175,6 +175,16 @@
 
 ### Fixed
 
+- **Satelliten fehlten bei deutscher Systemsprache.** Aus dem Terminal
+  gestartet (oder auf einem deutschen Linux) meldete Longpath „TLE-Satz:
+  0 Satelliten, 95 verworfen“: Qt setzt beim Start das C-Gebietsschema auf
+  die Systemsprache, und SGP4 las die Bahndaten mit `sscanf("%lf")` --
+  mit Komma als Dezimalzeichen. Dasselbe traf `fscanf` in WDSP (gespeicherte
+  PureSignal-Korrektur, Impulsantwort aus Datei). `main()` setzt jetzt
+  direkt nach der QApplication `LC_NUMERIC` auf „C“, wie Qt es empfiehlt
+  (`src/core/CNumericLocale.h`); die Anzeige bleibt unberührt.
+  Prüfstand `tst_c_numeric_locale`.
+
 - **SGP4: `strcpy` auf sich selbst in `sgp4init`.** Vallados
   `twoline2rv` reicht `satrec.satnum` als `satn` an `sgp4init` weiter, das
   dann `strcpy(satrec.satnum, satn)` macht — Quelle gleich Ziel, also

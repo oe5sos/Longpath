@@ -6,6 +6,7 @@
 #include "core/SettingsBackup.h"
 #include "core/AudioDeviceConfig.h"
 #include "core/BuildIdentity.h"
+#include "core/CNumericLocale.h"
 #include "core/MacMicPermission.h"
 #include "core/audio/RealtimeAudioPriority.h"
 #include "core/RadioConnection.h"
@@ -206,6 +207,11 @@ int main(int argc, char* argv[])
     }
 
     QApplication app(argc, argv);
+    // Gleich danach, bevor irgendetwas Zahlen aus Text liest: Qt hat eben
+    // setlocale(LC_ALL, "") aufgerufen, und mit deutscher Systemsprache
+    // lasen sscanf/fscanf in SGP4 und WDSP ein Komma als Dezimalzeichen
+    // (alle Satelliten verworfen). Siehe core/CNumericLocale.h.
+    Longpath::useCNumericLocale();
     app.setApplicationName("Longpath");
     // LONGPATH_PRETEND_VERSION: nur fuer Pruefstaende des Updaters (Help >
     // Check for Updates...) -- laesst einen Bau aelter aussehen, als er
