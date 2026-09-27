@@ -106,6 +106,12 @@ public:
 private:
     bool m_shownOnce{false};
     bool m_geometryRestored{false};
+    // Einschwingen nach dem ersten Zeigen (2026-09-27): das Ziel der
+    // Nachtakte. Beginnt bei der vorgesehenen Groesse; jede Verkleinerung
+    // in dieser Zeit ist gewollt (Qt verkleinert nie von selbst) und wird
+    // das neue Ziel, eine Vergroesserung nie.
+    bool  m_settling{false};
+    QSize m_settleTarget;
 
 private:
     void showRowMenu(const QPoint& pos);
