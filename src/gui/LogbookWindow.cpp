@@ -204,6 +204,11 @@ void LogbookWindow::setVisible(bool visible)
     // Mehrmals, nicht einmal: im Test ist die Mindesthoehe nach 20 ms
     // eingeschwungen, im laufenden Programm (Karte, Karteikarte,
     // Kennzahlen) spaeter -- live nach 50 ms noch 776 statt 637.
+    //
+    // Nur zuruecknehmen, was aufgezogen wurde -- nie vergroessern
+    // (2026-09-27): wer das Fenster in der ersten Sekunde kleiner zieht,
+    // behaelt es so. Vorher stellte der naechste Takt die vorgesehene
+    // Groesse wieder her (auf der CI: tst_logbook_toolbar_wraps).
     const bool first = visible && !m_shownOnce;
     const QRect intended = geometry();
     QDialog::setVisible(visible);
@@ -213,10 +218,11 @@ void LogbookWindow::setVisible(bool visible)
     for (int ms : {50, 300, 1000}) {
         QTimer::singleShot(ms, this, [this, intended, withPosition]() {
             if (!isVisible() || isMaximized() || isFullScreen()) { return; }
-            const QSize size = intended.size().expandedTo(minimumSizeHint());
-            const QRect want = withPosition ? QRect(intended.topLeft(), size)
-                                            : QRect(pos(), size);
-            if (geometry() != want) { setGeometry(want); }
+            const QSize bound = intended.size().expandedTo(minimumSizeHint());
+            const QSize size = this->size().boundedTo(bound);
+            if (size == this->size()) { return; }   // nichts aufgezogen
+            setGeometry(withPosition ? QRect(intended.topLeft(), size)
+                                     : QRect(pos(), size));
         });
     }
 }
