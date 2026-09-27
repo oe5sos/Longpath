@@ -1859,6 +1859,36 @@ RadioModel::RadioModel(QObject* parent)
     m_freeDvStationModel  = std::make_unique<FreeDVStationModel>(this);
     m_rxDecodeModel       = std::make_unique<RxDecodeModel>(/*maxSize*/ 200, this);
     m_dxccColorProvider   = std::make_unique<DxccColorProvider>(this);
+    // cty.dat laden (2026-09-26). Beim Port kam der Provider mit, nicht
+    // der Aufruf, der ihn fuellt, und nicht der Eintrag in resources.qrc:
+    // From AetherSDR src/gui/MainWindow.cpp:1555 [@d58e2b8a] --
+    // `m_dxccProvider.loadCtyDat(":/cty.dat");` ("DXCC spot coloring #330").
+    // Ohne ihn war der Parser leer: keine DXCC-Faerbung der Spots, keine
+    // Flagge und kein "schon gearbeitet" je Land im Rotor/Log-Feld, keine
+    // Ersatzposition auf der Logbuch-Karte (Betreiber-Log: 3304 Kontakte
+    // ohne Locator "could not be placed at all"). Hier statt im
+    // MainWindow, weil der Provider in Longpath dem RadioModel gehoert;
+    // vor jedem ADIF-Einlesen, das den Parser danach nur noch liest.
+    if (!m_dxccColorProvider->loadCtyDat()) {
+        qWarning("cty.dat not loaded: DXCC colouring, flags and map fallback are off");
+    }
+    // Und was schon gearbeitet ist: AetherSDR liest dafuer ein vom
+    // Betreiber gewaehltes ADIF ein und beobachtet es
+    // (From AetherSDR src/gui/MainWindow.cpp:1563-1568 [@d58e2b8a],
+    // importAdifFile + setAutoReload). Longpath hat genau ein Log, das
+    // eigene Logbuch (derselbe Pfad wie RotorLogbookPanel::logbookPath).
+    // Ohne es galt mit geladener cty.dat jeder Spot als neues Land, und
+    // der Spot-Hub zaehlte unter "New DXCC in feed" jeden Spot mit.
+    // Eingelesen im Hintergrund-Thread des Providers; nach jedem
+    // Schreiben des Logs (QSaveFile: ersetzen, der Ordner-Waechter
+    // nimmt die neue Datei auf) nach 2 s erneut.
+    {
+        const QString log = AppSettings::dataDir() + QStringLiteral("/logbook.adi");
+        if (QFileInfo::exists(log)) {
+            m_dxccColorProvider->importAdifFile(log);
+            m_dxccColorProvider->setAutoReload(true, log);
+        }
+    }
 
     // 2026-05-12 bench fix: seed FreeDVStationModel::setOurGridSquare
     // from the User/GridSquare AppSettings key.  Without this the

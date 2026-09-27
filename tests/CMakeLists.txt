@@ -6219,6 +6219,8 @@ longpath_add_test(tst_dspmode_rade)
 #   resetButtonClickInvokesResetTx        - button click dispatches to
 #                                           RadeChannel::resetTx.
 longpath_add_test(tst_rade_applet)
+# cty.dat ist zur Laufzeit geladen, nicht nur in Tests (2026-09-26).
+longpath_add_test(tst_cty_dat_loaded_at_runtime)
 
 # ── Phase 3R Task L3: Mode menu + VFO chip RADE entry ────────────────────────
 # Pins the RADE entries (upper + lower sidebands) in the user-facing
