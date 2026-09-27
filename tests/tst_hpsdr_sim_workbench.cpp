@@ -277,6 +277,11 @@ private slots:
         }
 
         // ── 4c. TUNE ein/aus — PTT am Simulator ──────────────────────
+        // Ausdruecklich USB (2026-09-27): fm_deviation_reaches_wdsp laeuft
+        // vorher im selben Programm und hinterliess die Scheibe in FM; FM
+        // sendet in Longpath noch nicht, der Bandplan verweigerte MOX, und
+        // dieser Schritt fiel je nach Reihenfolge durch.
+        s->setDspMode(DSPMode::USB);
         const bool noTx = qEnvironmentVariableIsSet("LONGPATH_HPSDRSIM_NO_TX");
         bool tuned = false;
         bool moxed = false;
