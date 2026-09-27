@@ -175,6 +175,18 @@
 
 ### Fixed
 
+- **SGP4: `strcpy` auf sich selbst in `sgp4init`.** Vallados
+  `twoline2rv` reicht `satrec.satnum` als `satn` an `sgp4init` weiter, das
+  dann `strcpy(satrec.satnum, satn)` macht — Quelle gleich Ziel, also
+  undefiniertes Verhalten, praktisch harmlos. AddressSanitizer bricht dort
+  aber ab (`strcpy-param-overlap`): ein voller Debug/ASAN-Lauf verlor 23
+  von 906 Tests, `tst_satellite_tracker` und jeden Test, der ein
+  `MainWindow` baut (das startet den Satellitendienst). Ein markierter
+  lokaler Patch in `third_party/sgp4/SGP4.cpp` überspringt jetzt nur die
+  Selbstkopie; festgehalten unter „Local modifications" in
+  `docs/attribution/SGP4-PROVENANCE.md`. Upstream (python-sgp4 `master`)
+  ist an der Stelle unverändert.
+
 - **SunSDR2 QRP: Longpath schaltet echtes I/Q jetzt selbst ein — und die
   Prüfsumme der Steuerrahmen ist entschlüsselt.** Nach dem Einschalten
   liefert die QRP nur einen reellen Kanal (Q = 0); bisher schaltete erst
