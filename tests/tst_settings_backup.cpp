@@ -395,14 +395,21 @@ private slots:
     void takeBackupPrunesWhenEnabled()
     {
         Rig rig;
-        const qint64 nowSecs = QDateTime::currentDateTimeUtc().toSecsSinceEpoch();
         // Two automatic copies 20 and 21 days back. Whether they share an
         // ISO week depends on today's weekday, so plant them 20 and 27
         // days back instead: always different weeks -> both stay; and
-        // one 20.5 days back: same week as the 20-day one -> goes.
-        const QString a = rig.plant(nowSecs - 20 * 86400, QStringLiteral("Startup"), true);
-        const QString a2 = rig.plant(nowSecs - 20 * 86400 - 3600, QStringLiteral("Startup"), true);
-        const QString c = rig.plant(nowSecs - 27 * 86400, QStringLiteral("Startup"), true);
+        // one an hour before the 20-day one: same week -> goes.
+        //
+        // At noon of that day, not "now minus 20 days": the prune groups
+        // by LOCAL date, and between 00:00 and 01:00 on a Sunday "now
+        // minus 20 days" is a Monday just after midnight -- the copy an
+        // hour earlier then fell into the previous week and stayed (seen
+        // 2026-09-27 00:04).
+        const qint64 base = QDateTime(QDate::currentDate().addDays(-20), QTime(12, 0))
+                                .toSecsSinceEpoch();
+        const QString a = rig.plant(base, QStringLiteral("Startup"), true);
+        const QString a2 = rig.plant(base - 3600, QStringLiteral("Startup"), true);
+        const QString c = rig.plant(base - 7 * 86400, QStringLiteral("Startup"), true);
 
         SettingsBackup b(rig.settingsPath);
         b.setPruneEnabled(true);
