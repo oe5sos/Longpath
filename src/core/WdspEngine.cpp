@@ -1066,6 +1066,18 @@ TxChannel* WdspEngine::createTxChannel(int channelId,
     SetTXAPanelRun(channelId, 1);
     SetTXAPanelSelect(channelId, 2);
     SetTXAPostGenRun(channelId, 0);
+    // FM: kein CTCSS-Ton, solange niemand ihn einschaltet (2026-09-27).
+    // create_fmmod legt ctcss_run = 1 bei 100 Hz an (TXA.c:354-356);
+    // Thetis schaltet ihn beim Start ab:
+    // From Thetis Console/radio.cs:2480-2512 [@852bf0e] -- SyncAll():
+    //   CTCSSFreqHz = ctcss_freq_hz;  TXFMDeviation = tx_fm_deviation;
+    //   CTCSSFlag = ctcss_flag;   (Voreinstellungen 100.0 / 5000.0 / false,
+    //   radio.cs:2899-2923)
+    // Longpath rief SetTXACTCSSRun nie -- jede FM-Aussendung trug einen
+    // 100-Hz-Ton.
+    SetTXACTCSSFreq(channelId, 100.0);
+    SetTXAFMDeviation(channelId, 5000.0);
+    SetTXACTCSSRun(channelId, 0);
     qCInfo(lcDsp) << "TX channel" << channelId
                   << "init: ALC max-gain capped at 0 dB (per deskhpsdr [@120188f])";
 

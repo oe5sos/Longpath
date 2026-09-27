@@ -1485,6 +1485,16 @@ void RxChannel::setAmsqThresh(double dB)
 // Squelch — FM
 // ---------------------------------------------------------------------------
 
+void RxChannel::setCtcssNotchFreq(double hz)
+{
+#ifdef HAVE_WDSP
+    // From Thetis Console/radio.cs:2913-2916 [@852bf0e]
+    SetRXACTCSSFreq(m_channelId, hz);
+#else
+    Q_UNUSED(hz);
+#endif
+}
+
 void RxChannel::setFmsqEnabled(bool enabled)
 {
     if (enabled == m_fmsqEnabled.load()) {

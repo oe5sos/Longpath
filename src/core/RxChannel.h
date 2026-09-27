@@ -630,6 +630,10 @@ public:
     //   linear = pow(10.0, dB / 20.0)
     bool fmsqEnabled() const { return m_fmsqEnabled.load(); }
     void setFmsqEnabled(bool enabled);
+    /// Die CTCSS-Kerbe beim Empfang auf den gewaehlten Ton (2026-09-27).
+    /// From Thetis Console/radio.cs:2913-2916 [@852bf0e] -- CTCSSFreqHz
+    /// setzt auch SetRXACTCSSFreq der Empfangskanaele.
+    void setCtcssNotchFreq(double hz);
     void setFmsqThresh(double dB);  // converts dB → linear before WDSP call
 
     // --- Audio panel (mute / pan / binaural) ---
