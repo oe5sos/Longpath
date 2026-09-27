@@ -634,6 +634,7 @@ public:
     /// From Thetis Console/radio.cs:2913-2916 [@852bf0e] -- CTCSSFreqHz
     /// setzt auch SetRXACTCSSFreq der Empfangskanaele.
     void setCtcssNotchFreq(double hz);
+    double ctcssNotchFreqForTest() const { return m_ctcssNotchHz; }
     /// FM-Deviation fuer die Demodulation (2026-09-27).
     /// From Thetis Console/radio.cs:1427-1444 [@852bf0e] -- RXFMDeviation
     /// -> SetRXAFMDeviation, Voreinstellung 5000.0.
@@ -1026,6 +1027,7 @@ private:
     // From Thetis radio.cs:1312 — rx_fm_squelch_on default = false
     std::atomic<bool> m_fmsqEnabled{false};
     double m_fmDeviationHz{5000.0};
+    double m_ctcssNotchHz{254.1};   // WDSP create_fmd default (RXA.c:208)
     // muted: audio panel mute — off by default (panel runs)
     // From Thetis Project Files/Source/Console/dsp.cs:393-394
     std::atomic<bool> m_muted{false};

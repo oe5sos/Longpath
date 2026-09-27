@@ -211,6 +211,9 @@ private slots:
 
     void reverseToggleStored() {
         SliceModel s;
+        // Reverse needs a repeater offset: in Simplex Thetis disables the
+        // box (console.cs:40414-40424, chkFMTXRev.Enabled = false).
+        s.setFmTxMode(FmTxMode::Low);
         s.setFmReverse(false);
 
         FmOptContainer c;
@@ -219,9 +222,15 @@ private slots:
 
         auto* revBtn = findNamed<QPushButton>(&c, "revBtn");
         QVERIFY(revBtn != nullptr);
+        QVERIFY(revBtn->isEnabled());
         revBtn->click();  // toggles checked state
 
         QVERIFY(s.fmReverse());
+
+        s.setFmTxMode(FmTxMode::Simplex);   // turns Reverse off, locks the box
+        QVERIFY(!s.fmReverse());
+        QVERIFY(!revBtn->isChecked());
+        QVERIFY(!revBtn->isEnabled());
     }
 
     // ── TX direction button mutual exclusion ──────────────────────────────────

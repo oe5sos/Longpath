@@ -3425,6 +3425,18 @@ void RadioModel::openRxChannelPool(int poolSize, int inputBufferSize,
 
     // FM-Deviation (2026-09-27): WDSP legt jeden Kanal mit 5000 Hz an.
     pushFmDeviationToChannels();
+
+    // CTCSS-Kerbe beim Empfang auf den Ton des Slices (2026-09-27). WDSP
+    // legt sie bei 254.1 Hz an (wdsp RXA.c:208); Thetis setzt beim Start
+    // CTCSSFreqHz = ctcss_freq_hz, das auch SetRXACTCSSFreq ruft
+    // (radio.cs:2480-2512 SyncAll, 2913-2916 [@852bf0e]). Bisher zog
+    // Longpath die Kerbe erst beim ersten Tonwechsel nach.
+    for (SliceModel* s : m_slices) {
+        if (!s) { continue; }
+        if (RxChannel* rx = m_wdspEngine->rxChannel(s->sliceIndex())) {
+            rx->setCtcssNotchFreq(s->fmCtcssValueHz());
+        }
+    }
 }
 
 // ── Phase 3F Sub-Epic I: pooled-channel activation ──────────────────────────
@@ -13626,7 +13638,11 @@ MemoryRecord RadioModel::captureMemory() const
     if (!stepName.isEmpty()) { r.tuneStep = stepName; }
     r.rptr = slice->fmTxMode();
     r.rptrOffsetMHz = slice->fmOffsetHz() / 1.0e6;
-    r.ctcssOn = slice->fmCtcssMode() != 0;
+    // CTCSSOn is the TX tone (console.cs:40318-40328 [@852bf0e]:
+    // radio.GetDSPTX(0).CTCSSFlag): only Encode / Enc+Dec count. Before
+    // 2026-09-27 a Decode-only slice was stored as "on" and came back from
+    // the memory as Encode -- transmitting a tone nobody had switched on.
+    r.ctcssOn = (slice->fmCtcssMode() == 1 || slice->fmCtcssMode() == 3);
     r.ctcssFreq = slice->fmCtcssValueHz();
     r.deviation = m_fmDeviationHz;   // (int)console.radio.GetDSPTX(0).TXFMDeviation
     r.power = m_transmitModel.power();

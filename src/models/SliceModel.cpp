@@ -1948,6 +1948,13 @@ void SliceModel::setFmOffsetHz(int hz)
 void SliceModel::setFmTxMode(FmTxMode mode)
 {
     if (m_fmTxMode == mode) { return; }
+    // From Thetis console.cs:40400-40440 [@852bf0e] -- chkFMTXHigh /
+    // chkFMTXSimplex / chkFMTXLow_CheckedChanged: every new TX mode turns
+    // Reverse off FIRST (chkFMTXRev.Checked = false, while CurrentFMTXMode
+    // still holds the old mode, so the receive frequency moves back by the
+    // right offset), then sets the mode. Before 2026-09-27 Reverse stayed
+    // on and the receiver stayed on the input frequency.
+    setFmReverse(false);
     m_fmTxMode = mode;
     emit fmTxModeChanged(mode);
 }

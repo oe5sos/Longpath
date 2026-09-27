@@ -91,6 +91,8 @@
 
 #include "AppletWidget.h"
 
+#include <QPointer>
+
 class QStackedWidget;
 class QButtonGroup;
 class QSlider;
@@ -100,6 +102,8 @@ class QComboBox;
 class QTimer;
 
 namespace Longpath {
+
+class SliceModel;
 
 class HGauge;
 class DexpPeakMeter;
@@ -150,6 +154,11 @@ private:
     // Phase 3M-1b: wire mic gain slider + mic level gauge timer.
     void wireControls();
     void syncFmDeviation();   // FM page 5.0k / 2.5k from the model (2026-09-27)
+    // FM page controls follow the active slice (2026-09-27).
+    void bindFmSlice(SliceModel* s);
+    void syncFmSliceControls();
+    void fillFmMemories();   // FM page memory combo from the memory list
+    QPointer<SliceModel> m_fmSlice;
     // ── Shared ───────────────────────────────────────────────────────────────
     QStackedWidget* m_stack{nullptr};
     QButtonGroup*   m_tabGroup{nullptr};

@@ -109,6 +109,14 @@ private slots:
         s->setDspMode(DSPMode::FM);
         QTest::qWait(300);
 
+        // CTCSS-Kerbe beim Empfang steht nach dem Verbinden auf dem Ton
+        // des Slices, nicht auf WDSPs 254.1 Hz.
+        if (RxChannel* rx0 = model.rxChannelForSlice(s->sliceIndex())) {
+            qInfo() << "FM RX-CTCSS-Kerbe" << rx0->ctcssNotchFreqForTest()
+                    << "Slice-Ton" << s->fmCtcssValueHz();
+            QCOMPARE(rx0->ctcssNotchFreqForTest(), s->fmCtcssValueHz());
+        }
+
         const double txBefore = model.txChannel()->fmDeviationInWdsp();
         qInfo() << "FM WDSP-TX-Deviation vorher" << txBefore
                 << "Filter" << s->filterLow() << s->filterHigh();
