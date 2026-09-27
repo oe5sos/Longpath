@@ -14463,6 +14463,10 @@ void MainWindow::onIqSequenceGap()
 
 void MainWindow::raiseLogbookIfOpen()
 {
+    // Eingereiht per singleShot -- beim Beenden kann das erst mitten im
+    // Abbau drankommen (closeEvent stellt Ausstehendes selbst zu). Dann
+    // gibt es nichts mehr nach vorne zu holen.
+    if (m_shuttingDown) { return; }
     // Das Verbinden-Fenster geht vor: solange es offen ist, wartet der
     // Betreiber auf die Auswahl eines Geraets, und ein Logbuch davor
     // versteckte es (Test 2026-09-26). Schliesst es, holt

@@ -25,6 +25,7 @@
 #include "models/LogEntry.h"
 
 #include <QHash>
+#include <QPointer>
 #include <QVector>
 #include <QWidget>
 
@@ -300,7 +301,7 @@ private:
 
     // Created on first use and kept. Two windows over one file is how
     // one of them ends up writing over the other's correction.
-    LogbookWindow* m_logWindow{nullptr};
+    QPointer<LogbookWindow> m_logWindow;
     QVector<QsoUploader*> m_uploadTargets;
 
     // The rotator link, and the timer that stands in for one. Exactly

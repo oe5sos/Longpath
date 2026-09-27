@@ -136,6 +136,7 @@ class PsaIndicatorWidget;
 class AppletVisibilityController;
 class AppletWidget;
 class QrzClient;
+class RotorLogbookPanel;
 class QrzLogbookUploader;
 class CloudlogUploader;
 class AdifNetworkUploader;
@@ -1438,7 +1439,11 @@ private:
     QWidget*   m_belowPane{nullptr};   // Flaeche unter dem Panadapter
     // Das Panel selbst, unabhaengig davon, WO es gerade haengt (Dock
     // oder untere Flaeche). ensureRotorPanel() liest diesen Zeiger.
-    class RotorLogbookPanel* m_rotorPanel{nullptr};
+    // QPointer (2026-09-27): beim Beenden geht das Panel mit seinem
+    // Fenster/Dock zu Bruch, und ein noch eingereihtes
+    // raiseLogbookIfOpen() griff danach auf den freigegebenen Speicher
+    // zu (SIGSEGV in tst_window_close_stays_closed).
+    QPointer<RotorLogbookPanel> m_rotorPanel;
     int m_hDelta{0};
     int m_vDelta{0};
 
