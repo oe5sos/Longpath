@@ -1512,6 +1512,8 @@ target_compile_definitions(tst_audio_engine_reset_audio_settings PRIVATE LONGPAT
 # P2RadioConnection::setRx1Preamp(bool) routes to byte 1403 bit 1 via codec.
 # Default state (rx1Preamp=false) leaves bit 1 clear → regression-freeze safe.
 longpath_add_test(tst_rxapplet_adc_ovl)
+# SQL-Regler steuert in FM die FM-Rauschsperre (Thetis, 2026-09-27).
+longpath_add_test(tst_rxapplet_fm_squelch)
 target_compile_definitions(tst_rxapplet_adc_ovl PRIVATE LONGPATH_BUILD_TESTS)
 
 # ── Issue #174: HL2 A-ATT label flip on auto-att toggle ─────────────────────

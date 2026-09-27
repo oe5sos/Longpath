@@ -249,6 +249,12 @@ public:
     // [v2.10.3.13-beta2] HL2 A-ATT label flip on auto-att toggle.
     QString attLabelTextForTest() const;
 private:
+    // SQL-Regler: in FM die FM-Rauschsperre (2026-09-27).
+    void syncSquelchFromModel();
+public:
+    static double fmSquelchDbFromSlider(int n);
+    static int fmSquelchSliderFromDb(double dB);
+private:
 #endif
 
 signals:
