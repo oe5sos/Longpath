@@ -19,6 +19,8 @@
 
 #include "gui/applets/PhoneCwApplet.h"
 #include "gui/widgets/VfoModeContainers.h"
+#include "models/MemoryList.h"
+#include "models/MemoryRecord.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
 
@@ -117,6 +119,68 @@ private slots:
             applet.show();
             QVERIFY(QTest::qWaitForWindowExposed(&applet));
             applet.grab().save(grabDir + QStringLiteral("/fm-seite.png"));
+        }
+    }
+
+    void theMemoryCombosListRecallAndStepWithWrap()
+    {
+        RadioModel model;
+        model.configureStreamPool(5, 5, 192000);
+        const int id = model.addSlice();
+        model.setActiveSlice(id);
+        SliceModel* s = model.activeSlice();
+        QVERIFY(s);
+        MemoryList* mem = model.memories();
+        QVERIFY(mem);
+        mem->clear();
+
+        PhoneCwApplet applet(&model);
+        auto* combo = named<QComboBox>(applet, QStringLiteral("FM memory channel"));
+        QVERIFY(combo);
+        QVERIFY(!combo->isEnabled());   // leer: nichts zu waehlen
+
+        auto addMem = [&](const QString& name, double mhz) {
+            MemoryRecord r;
+            r.name = name;
+            r.rxFreqMHz = mhz;
+            r.txFreqMHz = mhz;
+            r.dspMode = DSPMode::FM;
+            mem->add(r);
+        };
+        addMem(QStringLiteral("OE5XLL"), 145.600);
+        addMem(QStringLiteral("OE5XBM"), 438.950);
+        addMem(QStringLiteral("S55VUR"), 145.675);
+        QCOMPARE(combo->count(), 3);
+        QVERIFY(combo->isEnabled());
+        QCOMPARE(combo->itemText(1), QStringLiteral("OE5XBM"));
+
+        // Auswahl ruft ab (comboFMMemory_SelectedIndexChanged).
+        combo->setCurrentIndex(1);
+        QCOMPARE(s->frequency(), 438'950'000.0);
+        QCOMPARE(s->dspMode(), DSPMode::FM);
+
+        // Pfeile blaettern mit Umlauf.
+        auto* next = named<QPushButton>(applet, QStringLiteral("Next FM memory"));
+        auto* prev = named<QPushButton>(applet, QStringLiteral("Previous FM memory"));
+        QVERIFY(next && prev);
+        next->click();
+        QCOMPARE(combo->currentIndex(), 2);
+        QCOMPARE(s->frequency(), 145'675'000.0);
+        next->click();
+        QCOMPARE(combo->currentIndex(), 0);   // Umlauf
+        prev->click();
+        QCOMPARE(combo->currentIndex(), 2);   // Umlauf rueckwaerts
+        mem->clear();
+
+        const QString grabDir = qEnvironmentVariable("LONGPATH_GRAB_DIR");
+        if (!grabDir.isEmpty()) {
+            addMem(QStringLiteral("OE5XLL"), 145.600);
+            applet.showPage(2);
+            applet.resize(300, 520);
+            applet.show();
+            QVERIFY(QTest::qWaitForWindowExposed(&applet));
+            applet.grab().save(grabDir + QStringLiteral("/fm-speicher.png"));
+            mem->clear();
         }
     }
 

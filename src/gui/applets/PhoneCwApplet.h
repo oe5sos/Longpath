@@ -157,6 +157,7 @@ private:
     // FM page controls follow the active slice (2026-09-27).
     void bindFmSlice(SliceModel* s);
     void syncFmSliceControls();
+    void fillFmMemories();   // FM page memory combo from the memory list
     QPointer<SliceModel> m_fmSlice;
     // ── Shared ───────────────────────────────────────────────────────────────
     QStackedWidget* m_stack{nullptr};

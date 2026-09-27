@@ -38,7 +38,9 @@
 //                 RadioModel::setFmDeviationHz (console.cs FMDeviation_Hz,
 //                 [@852bf0e]); CTCSS, tone (Thetis' 49), simplex, offset,
 //                 direction and reverse bound to the active slice
-//                 (console.cs:40293-40468). Martin Fischer (OE5SOS),
+//                 (console.cs:40293-40468); memory channels list +
+//                 recall + wrap-around stepping (console.cs:40311-40316,
+//                 40557-40576). Martin Fischer (OE5SOS),
 //                 AI-assisted via Anthropic Claude Code.
 // =================================================================
 
@@ -140,6 +142,7 @@
 #include "gui/HGauge.h"
 #include "gui/ComboStyle.h"
 #include "gui/widgets/DexpPeakMeter.h"
+#include "gui/widgets/TriBtn.h"
 #include "NyiOverlay.h"
 #include "core/BoardCapabilities.h"
 #include "core/AudioEngine.h"
@@ -147,6 +150,8 @@
 #include "core/TxChannel.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
+#include "models/MemoryList.h"
+#include "models/MemoryRecord.h"
 #include "gui/widgets/VfoModeContainers.h"
 #include "models/TransmitModel.h"
 #include "gui/StyleConstants.h"
@@ -827,15 +832,14 @@ void PhoneCwApplet::buildFmPage(QWidget* page)
         m_fmMemCombo->setAccessibleName(QStringLiteral("FM memory channel"));
         row->addWidget(m_fmMemCombo, 1);
 
-        m_fmMemPrev = new QPushButton(QStringLiteral("\u25c4"), page);
-        m_fmMemPrev->setFixedSize(22, 22);
-        m_fmMemPrev->setStyleSheet(phoneButtonStyle());
+        // Painted triangles like every other stepper (TriBtn, 22x22): the
+        // U+25C4 / U+25BA glyphs did not show inside the styled 22 px
+        // buttons -- two empty boxes (2026-09-27).
+        m_fmMemPrev = new TriBtn(TriBtn::Left, page);
         m_fmMemPrev->setAccessibleName(QStringLiteral("Previous FM memory"));
         row->addWidget(m_fmMemPrev);
 
-        m_fmMemNext = new QPushButton(QStringLiteral("\u25ba"), page);
-        m_fmMemNext->setFixedSize(22, 22);
-        m_fmMemNext->setStyleSheet(phoneButtonStyle());
+        m_fmMemNext = new TriBtn(TriBtn::Right, page);
         m_fmMemNext->setAccessibleName(QStringLiteral("Next FM memory"));
         row->addWidget(m_fmMemNext);
 
@@ -848,9 +852,6 @@ void PhoneCwApplet::buildFmPage(QWidget* page)
     NyiOverlay::markNyi(m_fmMicSlider,     kNyiFm);
     NyiOverlay::markNyi(m_fmMicLabel,      kNyiFm);
     NyiOverlay::markNyi(m_fmProfileCombo,  kNyiFm);
-    NyiOverlay::markNyi(m_fmMemCombo,      kNyiFm);
-    NyiOverlay::markNyi(m_fmMemPrev,       kNyiFm);
-    NyiOverlay::markNyi(m_fmMemNext,       kNyiFm);
 }
 
 // ── wireControls — Phase 3M-1b mic gain slider + mic level gauge ─────────────
@@ -937,6 +938,31 @@ void PhoneCwApplet::wireControls()
             bindFmSlice(m_model ? m_model->activeSlice() : nullptr);
         });
         bindFmSlice(m_model->activeSlice());
+    }
+
+    // ── FM page: memory channels (2026-09-27) ─────────────────────────────────
+    // From Thetis console.cs:40311-40316 [@852bf0e] -- InitMemoryFrontPanel:
+    // comboFMMemory.DataSource = MemoryList.List, DisplayMember = "Name";
+    // console.cs:40557-40576 -- a selection recalls the memory, Up/Down step
+    // with wrap-around.
+    if (MemoryList* mem = m_model->memories()) {
+        connect(mem, &MemoryList::listChanged, this, [this]() { fillFmMemories(); });
+        connect(m_fmMemCombo, &QComboBox::currentIndexChanged, this, [this](int idx) {
+            if (m_updatingFromModel || !m_model || !m_model->memories()) { return; }
+            MemoryList* list = m_model->memories();
+            if (idx < 0 || idx >= list->count()) { return; }
+            // comboFMMemory_SelectedIndexChanged: RecallMemory(new MemoryRecord(selected))
+            m_model->recallMemory(MemoryRecord(list->at(idx)));
+        });
+        auto step = [this](int delta) {
+            const int n = m_model && m_model->memories() ? m_model->memories()->count() : 0;
+            if (n == 0 || m_fmMemCombo->currentIndex() < 0) { return; }
+            // btnFMMemoryUp: (i + 1) % n; btnFMMemoryDown: (i - 1 + n) % n
+            m_fmMemCombo->setCurrentIndex((m_fmMemCombo->currentIndex() + delta + n) % n);
+        };
+        connect(m_fmMemNext, &QPushButton::clicked, this, [step]() { step(+1); });
+        connect(m_fmMemPrev, &QPushButton::clicked, this, [step]() { step(-1); });
+        fillFmMemories();
     }
 
     TransmitModel& tx = m_model->transmitModel();
@@ -1407,6 +1433,30 @@ void PhoneCwApplet::syncFmSliceControls()
         // chkFMTXRev.Enabled = false in Simplex (console.cs:40414-40424).
         m_offsetRevBtn->setEnabled(tx != FmTxMode::Simplex);
     }
+    m_updatingFromModel = false;
+}
+
+// The memory combo lists the memory channels by name, like Thetis'
+// comboFMMemory. Refilling never recalls (Thetis: DataSource rebinding
+// happens with `initializing` set).
+void PhoneCwApplet::fillFmMemories()
+{
+    if (!m_fmMemCombo || !m_model) { return; }
+    MemoryList* list = m_model->memories();
+    const int n = list ? list->count() : 0;
+    m_updatingFromModel = true;
+    const int keep = m_fmMemCombo->currentIndex();
+    m_fmMemCombo->clear();
+    for (int i = 0; i < n; ++i) {
+        const QString name = list->at(i).name;
+        m_fmMemCombo->addItem(name.isEmpty() ? QStringLiteral("#%1").arg(i + 1) : name);
+    }
+    if (n > 0) {
+        m_fmMemCombo->setCurrentIndex(keep >= 0 && keep < n ? keep : 0);
+    }
+    m_fmMemCombo->setEnabled(n > 0);
+    m_fmMemPrev->setEnabled(n > 0);
+    m_fmMemNext->setEnabled(n > 0);
     m_updatingFromModel = false;
 }
 
