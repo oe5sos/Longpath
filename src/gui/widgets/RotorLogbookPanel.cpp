@@ -2506,6 +2506,11 @@ void RotorLogbookPanel::openLogbookWindow()
         m_logWindow->setRotorBearing(m_lastRotorAz);
         connect(m_logWindow, &LogbookWindow::logQsoRequested,
                 this, &RotorLogbookPanel::logFromLogbook);
+        // Schliessen melden, damit der Haken „Logbuch" in der Auswahl
+        // mitgeht -- sonst ging das Logbuch bei jedem Start wieder auf
+        // (Betreiber 2026-09-27).
+        connect(m_logWindow, &QDialog::finished,
+                this, &RotorLogbookPanel::logbookClosed);
 
         connect(m_logWindow, &LogbookWindow::turnRotorRequested, this,
                 [this](double bearing, const QString& call) {

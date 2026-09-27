@@ -156,6 +156,10 @@ public:
 
 signals:
     void qsoLogged(const LogEntry& entry);
+    // Der Betreiber hat das Logbuchfenster selbst zugemacht (roter Knopf).
+    // hideLogbook() loest es NICHT aus -- nur QDialog::finished, also ein
+    // echtes Schliessen, kein Verstecken durch Profil oder Verbinden-Maske.
+    void logbookClosed();
 
 protected:
     // Every resize re-decides which rows still fit — see

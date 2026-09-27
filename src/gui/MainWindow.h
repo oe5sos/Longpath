@@ -1049,6 +1049,12 @@ private:
     /// der Spalte, entscheidet sich hier und nur hier.
     void applyWindowVisibility(const QString& id, bool on);
 
+    /// Der Betreiber hat ein solches Fenster selbst geschlossen (roter
+    /// Knopf): der Haken in der Auswahl geht aus und das Profil merkt es,
+    /// sonst reisst der naechste Start es wieder auf. Das Schliessen beim
+    /// Beenden zaehlt nicht -- was da offen war, soll wieder aufgehen.
+    void noteWindowClosedByOperator(const QString& id);
+
     /// Bildschirmkennung für die Geometrie im Profil.
     /// QScreen::serialNumber() zuerst — nur sie hält zwei baugleiche
     /// Monitore auseinander; name() tut das nicht. Wo die Plattform

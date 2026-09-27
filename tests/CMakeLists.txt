@@ -4838,6 +4838,9 @@ longpath_add_test(tst_whisper_server_launcher)
 target_link_libraries(tst_whisper_server_launcher PRIVATE Qt6::Network)
 longpath_add_test(tst_pan_options_button)
 longpath_add_test(tst_window_widgets)
+# -- Roter Knopf = zu, auch beim naechsten Start (2026-09-27): Kanalzug,
+#    Logbuch und Spot-Zentrale gingen trotz Schliessen immer wieder auf. --
+longpath_add_test(tst_window_close_stays_closed)
 
 # -- ScopedChildWidget (2026-09-22): ein Kontextmenue auf dem Haufen statt
 #    auf dem Stapel -- normales Aufraeumen, und Aufraeumen nachdem das
