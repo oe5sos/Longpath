@@ -1478,6 +1478,43 @@ if(WDSP_FOUND)
                 OPTIONAL)
         endif()
     endif()
+
+    # NR3 (rnnoise) weights -- dieselbe Luecke wie oben bei NNR, gefunden
+    # 2026-09-27 in Martins Protokoll: die installierte Fassung (von
+    # longpath-auto-install.sh aus dem CMake-Bau kopiert) meldete „NR3 model
+    # not found at expected paths". Nur release.yml legte die Modelle von
+    # Hand dazu; ein Bau im Quellbaum fand sie ueber den Rueckfall in
+    # third_party/. third_party/rnnoise baut mit USE_WEIGHTS_FILE, also ohne
+    # eingebaute Gewichte -- ohne Datei hatte NR3 gar kein Modell.
+    set(RNNOISE_MODELS
+        "${CMAKE_SOURCE_DIR}/third_party/rnnoise/models/Default_large.bin"
+        "${CMAKE_SOURCE_DIR}/third_party/rnnoise/models/Default_small.bin")
+    set(RNNOISE_MODELS_PRESENT TRUE)
+    foreach(_rnn_model IN LISTS RNNOISE_MODELS)
+        if(NOT EXISTS "${_rnn_model}")
+            set(RNNOISE_MODELS_PRESENT FALSE)
+        endif()
+    endforeach()
+    if(RNNOISE_MODELS_PRESENT)
+        if(APPLE)
+            add_custom_command(TARGET Longpath POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E make_directory
+                    "$<TARGET_BUNDLE_DIR:Longpath>/Contents/Resources/models/rnnoise"
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    ${RNNOISE_MODELS} "$<TARGET_BUNDLE_DIR:Longpath>/Contents/Resources/models/rnnoise/"
+                COMMENT "Copying rnnoise (NR3) models to app bundle Resources/models/rnnoise")
+        else()
+            add_custom_command(TARGET Longpath POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E make_directory
+                    "$<TARGET_FILE_DIR:Longpath>/models/rnnoise"
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    ${RNNOISE_MODELS} "$<TARGET_FILE_DIR:Longpath>/models/rnnoise/"
+                COMMENT "Copying rnnoise (NR3) models to build directory models/rnnoise")
+            install(FILES ${RNNOISE_MODELS}
+                DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/Longpath/models/rnnoise"
+                OPTIONAL)
+        endif()
+    endif()
 endif()
 
 # --------------------------------------------------------------------------
