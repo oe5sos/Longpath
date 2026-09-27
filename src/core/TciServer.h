@@ -179,7 +179,9 @@ public:
     TciProtocol* protocolForTest() const { return m_protocol.get(); }
     // Wer gerade als Taster gilt (m_moxOwner), fuer Tests, die auf die
     // Verarbeitung eines trx-Befehls warten muessen statt zu schlafen.
-    QWebSocket* moxOwnerForTest() const { return m_moxOwner.data(); }
+    // Out of line: QPointer<QWebSocket>::data() needs the complete type,
+    // and this header only forward-declares QWebSocket (gcc refuses).
+    QWebSocket* moxOwnerForTest() const;
 
 signals:
     // Emitted after the server begins listening.  port is the actual bound port
