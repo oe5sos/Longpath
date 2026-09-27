@@ -148,7 +148,7 @@ Template variant (see `HEADER-TEMPLATES.md`):
 | src/gui/applets/DiversityApplet.h | Project Files/Source/Console/DiversityForm.cs | full | port | thetis-samphire | applet declaration; pairs with DiversityApplet.cpp |
 | src/gui/applets/FmApplet.cpp | Project Files/Source/Console/setup.cs; Project Files/Source/Console/console.cs | full | port | multi-source | 38-tone CTCSS list + 5.0k/2.5k deviation presets + Simplex button (Thetis setup.cs FM tab); console.cs FM mode wiring; all controls NYI |
 | src/gui/applets/FmApplet.h | Project Files/Source/Console/setup.cs; Project Files/Source/Console/console.cs | full | port | multi-source | applet declaration; pairs with FmApplet.cpp |
-| src/gui/applets/PhoneCwApplet.cpp | Project Files/Source/Console/setup.cs | full | port | thetis-samphire | 38-tone CTCSS standard list |
+| src/gui/applets/PhoneCwApplet.cpp | Project Files/Source/Console/setup.cs; Project Files/Source/Console/console.cs | full; 19151-19171; 20860-20885; 40318-40395 | port | thetis-samphire | 38-tone CTCSS standard list; mic gain range; FM deviation 5.0k/2.5k (2026-09-27) |
 | src/gui/applets/PhoneCwApplet.h | Project Files/Source/Console/setup.cs | full | port | thetis-samphire | applet declaration; pairs with PhoneCwApplet.cpp |
 | src/gui/applets/PureSignalApplet.cpp | Project Files/Source/Console/PSForm.cs | full | port | thetis-samphire | PureSignal feedback/correction control layout (Samphire-authored, /*…*/ header preserved); all controls NYI — wired in 3M-4 |
 | src/gui/applets/PureSignalApplet.h | Project Files/Source/Console/PSForm.cs | full | port | thetis-samphire | applet declaration; pairs with PureSignalApplet.cpp |

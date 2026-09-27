@@ -9,7 +9,8 @@
 //   - Filter = +/-(Deviation + 3000), Vorgabe und beim Umschalten,
 //     nur fuer Slices in FM;
 //   - die Wahl bleibt gespeichert;
-//   - die Knoepfe folgen dem Modell und steuern es;
+//   - die Knoepfe der FM-Seite (Phone/CW-Applet) folgen dem Modell und
+//     steuern es;
 //   - der Frequenzspeicher nimmt die Deviation mit;
 //   - ein Rebuild des Sendekanals behaelt Deviation und CTCSS.
 
@@ -21,7 +22,7 @@
 #include "core/AppSettings.h"
 #include "core/TxChannel.h"
 #include "core/dsp/TxChannelState.h"
-#include "gui/applets/FmApplet.h"
+#include "gui/applets/PhoneCwApplet.h"
 #include "models/MemoryList.h"
 #include "models/MemoryRecord.h"
 #include "models/RadioModel.h"
@@ -103,7 +104,9 @@ private slots:
     void theAppletButtonsFollowAndDriveTheModel()
     {
         RadioModel model;
-        FmApplet applet(&model);
+        // The FM page of the Phone/CW applet is what FM shows
+        // (MainWindow: showPage(2)); FmApplet is never instantiated.
+        PhoneCwApplet applet(&model);
         QPushButton* five = buttonWithText(applet, QStringLiteral("5.0k"));
         QPushButton* half = buttonWithText(applet, QStringLiteral("2.5k"));
         QVERIFY(five && half);

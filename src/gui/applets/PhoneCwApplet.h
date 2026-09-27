@@ -149,6 +149,7 @@ private:
     void buildFmPage(QWidget* page);
     // Phase 3M-1b: wire mic gain slider + mic level gauge timer.
     void wireControls();
+    void syncFmDeviation();   // FM page 5.0k / 2.5k from the model (2026-09-27)
     // ── Shared ───────────────────────────────────────────────────────────────
     QStackedWidget* m_stack{nullptr};
     QButtonGroup*   m_tabGroup{nullptr};
