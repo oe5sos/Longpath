@@ -1487,6 +1487,7 @@ void RxChannel::setAmsqThresh(double dB)
 
 void RxChannel::setCtcssNotchFreq(double hz)
 {
+    m_ctcssNotchHz = hz;
 #ifdef HAVE_WDSP
     // From Thetis Console/radio.cs:2913-2916 [@852bf0e]
     SetRXACTCSSFreq(m_channelId, hz);

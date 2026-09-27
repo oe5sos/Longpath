@@ -3425,6 +3425,18 @@ void RadioModel::openRxChannelPool(int poolSize, int inputBufferSize,
 
     // FM-Deviation (2026-09-27): WDSP legt jeden Kanal mit 5000 Hz an.
     pushFmDeviationToChannels();
+
+    // CTCSS-Kerbe beim Empfang auf den Ton des Slices (2026-09-27). WDSP
+    // legt sie bei 254.1 Hz an (wdsp RXA.c:208); Thetis setzt beim Start
+    // CTCSSFreqHz = ctcss_freq_hz, das auch SetRXACTCSSFreq ruft
+    // (radio.cs:2480-2512 SyncAll, 2913-2916 [@852bf0e]). Bisher zog
+    // Longpath die Kerbe erst beim ersten Tonwechsel nach.
+    for (SliceModel* s : m_slices) {
+        if (!s) { continue; }
+        if (RxChannel* rx = m_wdspEngine->rxChannel(s->sliceIndex())) {
+            rx->setCtcssNotchFreq(s->fmCtcssValueHz());
+        }
+    }
 }
 
 // ── Phase 3F Sub-Epic I: pooled-channel activation ──────────────────────────
