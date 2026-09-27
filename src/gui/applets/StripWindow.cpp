@@ -9,6 +9,9 @@
 // Modification history (Longpath):
 //   2026-08-08 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
+//   2026-09-27 — Stage pages scroll (StagePageScroll): the window no
+//                 longer needs ~1000 px of height. Martin Fischer,
+//                 AI-assisted via Anthropic Claude.
 // =================================================================
 
 #include "gui/applets/StripWindow.h"
@@ -56,6 +59,35 @@
 namespace Longpath {
 
 namespace {
+
+// A stage page in the tab bar, in a scroll area (2026-09-27). The
+// compressor page alone is ~660 px tall; with the rows above the tabs
+// the window's minimum height came to ~1000 px -- taller than a MacBook
+// Air's usable screen (849 px). The operator's screenshot showed the
+// bottom of the window behind the Dock, and it could not be dragged
+// smaller. In a scroll area a page keeps its natural size wherever
+// there is room and scrolls only where there is not.
+class StagePageScroll : public QScrollArea {
+public:
+    explicit StagePageScroll(QWidget* page)
+    {
+        setWidget(page);
+        setWidgetResizable(true);
+        setFrameShape(QFrame::NoFrame);
+        setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+        // The tab pane behind shows through, exactly as before.
+        setStyleSheet(QStringLiteral("QScrollArea { background: transparent; }"));
+        viewport()->setAutoFillBackground(false);
+        page->setAutoFillBackground(false);
+    }
+
+    // QScrollArea caps its hint at 36 x 24 lines of text. The page's own
+    // hint is the size the window should open at when the screen has it.
+    QSize sizeHint() const override
+    {
+        return widget() ? widget()->sizeHint() : QScrollArea::sizeHint();
+    }
+};
 
 QString dimStyle()
 {
@@ -426,7 +458,7 @@ void StripWindow::buildUi()
         case StripChain::Stage::Limiter: page = buildLimiterPanel(); break;
         default:                         page = buildPlaceholder(s); break;
         }
-        m_tabs->addTab(page,
+        m_tabs->addTab(new StagePageScroll(page),
                        QString::fromLatin1(StripChain::stageName(s)));
     }
 
@@ -1394,7 +1426,8 @@ void StripWindow::reloadControls()
         case StripChain::Stage::Limiter: page = buildLimiterPanel(); break;
         default:                         page = buildPlaceholder(s); break;
         }
-        m_tabs->addTab(page, QString::fromLatin1(StripChain::stageName(s)));
+        m_tabs->addTab(new StagePageScroll(page),
+                       QString::fromLatin1(StripChain::stageName(s)));
     }
     m_tabs->addTab(buildTxSpectrumPanel(), QStringLiteral("On air"));
     // Back where buildUi() put it, same instance, recording intact.

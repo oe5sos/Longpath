@@ -8,6 +8,8 @@
 // Modification history (Longpath):
 //   2026-08-15 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
+//   2026-09-27 — startWithFirst(): beim Start immer Profil 1. Martin
+//                 Fischer, AI-assisted via Anthropic Claude.
 // =================================================================
 
 #include "gui/LayoutProfiles.h"
@@ -422,6 +424,13 @@ void LayoutProfiles::save() const
             AppSettings::instance().save();
         });
     }
+}
+
+void LayoutProfiles::startWithFirst()
+{
+    if (m_order.isEmpty() || m_current == m_order.first()) { return; }
+    m_current = m_order.first();
+    emit currentChanged(m_current);
 }
 
 void LayoutProfiles::load()

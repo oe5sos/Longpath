@@ -733,12 +733,10 @@ MainWindow::MainWindow(QWidget* parent)
                 // vor allem Geraete am WLAN. Die Verbindung drosselt
                 // das Signal schon auf 20 ms; hier wird nur eine Fahne
                 // gesetzt, die jeder Engine auf seinem Faden abholt.
-                connect(conn, &RadioConnection::iqSequenceGap, this,
-                        [this]() {
-                    for (FFTEngine* e : std::as_const(m_fftEngines)) {
-                        if (e) { e->requestWindowReset(); }
-                    }
-                }, Qt::UniqueConnection);
+                // Benannter Slot, kein Lambda: siehe onIqSequenceGap().
+                connect(conn, &RadioConnection::iqSequenceGap,
+                        this, &MainWindow::onIqSequenceGap,
+                        Qt::UniqueConnection);
             }
         };
         wireRtt();
@@ -8098,12 +8096,14 @@ void MainWindow::populateDefaultMeter()
                 // keine der vorhandenen Wiederherstellungen ihn kennen.
                 dissolveSideArea(SideAreaExit::Silent);
 
-                const QVariantMap mw =
-                    s.value(QStringLiteral("mainWindow")).toMap();
-                const bool wantFullScreen =
-                    mw.contains(QStringLiteral("fullScreen"))
-                        ? mw.value(QStringLiteral("fullScreen")).toBool()
-                        : wasFullScreen;
+                // Betreiber 2026-09-27: „longpath sollte immer
+                // formatfüllend sein." Ein Profil schaltet das Vollbild
+                // nicht mehr ab -- auch eines, das mit fullScreen=false
+                // aufgenommen wurde (etwa nachdem es ueber Ansicht >
+                // Full Screen fuer eine Weile verlassen war). Die
+                // Aufnahme behaelt den Schluessel; er entscheidet nur
+                // nichts mehr.
+                const bool wantFullScreen = true;
                 // Diagnose 2026-09-01 (leeres-Fenster-Untersuchung): NUR
                 // bei einer Abweichung loest enterBorderlessFullSize()/
                 // exitBorderlessFullSize() ihren hide()/setWindowFlag()/
@@ -8115,15 +8115,7 @@ void MainWindow::populateDefaultMeter()
                                << wasFullScreen << "wantFullScreen="
                                << wantFullScreen;
                 }
-                if (wantFullScreen) {
-                    enterBorderlessFullSize();
-                } else {
-                    exitBorderlessFullSize();
-                    if (mw.value(QStringLiteral("maximized")).toBool()
-                        && !isMaximized()) {
-                        showMaximized();
-                    }
-                }
+                enterBorderlessFullSize();
 
                 // Erst das Weltbild: es loest den Geber aus, und die
                 // Ansichten sollen einmal neu zeichnen und nicht
@@ -8563,6 +8555,9 @@ void MainWindow::populateDefaultMeter()
             });
 
         m_layoutProfiles->load();
+        // Immer Profil 1, nicht das zuletzt aktive (Betreiber 2026-09-27,
+        // siehe LayoutProfiles::startWithFirst()).
+        m_layoutProfiles->startWithFirst();
         // Betreiber 2026-09-01: "letzter Zustand nie beim Öffnen
         // sichtbar" -- zeigt, was TATSAECHLICH von der Platte kam,
         // bevor applyCurrent() irgendetwas damit tut. Vergleich mit
@@ -8593,6 +8588,10 @@ void MainWindow::populateDefaultMeter()
             // löst m_apply ohne diese Wache aus. Bug + Fix 2026-08-28.
             m_layoutProfiles->applyCurrent();
         }
+        // Auch ohne ein Profil, das angewandt wird (allererster Start):
+        // formatfuellend (Betreiber 2026-09-27, siehe die Profil-
+        // Anwendung oben). Nach applyCurrent() ist das schon geschehen.
+        if (!m_borderlessFullSize) { enterBorderlessFullSize(); }
         wireProfileRail();
 
         // Der Rotor/Log-Dock kommt erst mit der ERSTEN Verbindung nach
@@ -10435,24 +10434,14 @@ void MainWindow::buildMenuBar()
         });
     }
 
-    // Betreiber 2026-09-02: "kann ich das Fenster auch nicht kleiner und
-    // größer machen" -- enterBorderlessFullSize() (2026-09-01) nimmt dem
-    // Fenster Qt::FramelessWindowHint weg und damit die nativen
-    // Ziehgriffe; es gibt aber keinen Knopf und keine Taste, die zurueck
-    // in den normalen, groessenveraenderbaren Rahmen fuehrt -- und der
-    // Zustand kann schon beim Start lautlos aus einem gespeicherten
-    // Profil (fullScreen=true) kommen, ohne dass irgendetwas auf dem
-    // Schirm sagt, warum das Fenster jetzt starr ist. Escape ist der
-    // Fluchtweg, den jedes Vollbild kennt -- Standardkontext
-    // (Qt::WindowShortcut), damit ein fokussierter Dialog sein eigenes
-    // Escape (schliessen) zuerst bekommt.
-    {
-        auto* exitBorderlessShortcut = new QShortcut(
-            QKeySequence(Qt::Key_Escape), this);
-        connect(exitBorderlessShortcut, &QShortcut::activated, this, [this]() {
-            exitBorderlessFullSize();
-        });
-    }
+    // Esc verlaesst das Vollbild NICHT mehr (2026-09-27). Seit
+    // 2026-09-02 tat es das, als einziger Fluchtweg aus dem randlosen
+    // Fenster ("kann ich das Fenster auch nicht kleiner und größer
+    // machen"). Seit 2026-09-08 gibt es dafuer Ansicht > Full Screen
+    // mit eigenem Kuerzel -- und Esc im Hauptfenster (ein Eingabefeld
+    // abbrechen, eine Auswahl verwerfen) liess Longpath nebenbei aus
+    // dem Vollbild fallen. Betreiber 2026-09-27: „longpath sollte immer
+    // formatfüllend sein."
 }
 
 // Reserved safety slot dim helper (design §4.5). Static so both
@@ -14465,8 +14454,19 @@ void MainWindow::noteWindowClosedByOperator(const QString& id)
     });
 }
 
+void MainWindow::onIqSequenceGap()
+{
+    for (FFTEngine* e : std::as_const(m_fftEngines)) {
+        if (e) { e->requestWindowReset(); }
+    }
+}
+
 void MainWindow::raiseLogbookIfOpen()
 {
+    // Eingereiht per singleShot -- beim Beenden kann das erst mitten im
+    // Abbau drankommen (closeEvent stellt Ausstehendes selbst zu). Dann
+    // gibt es nichts mehr nach vorne zu holen.
+    if (m_shuttingDown) { return; }
     // Das Verbinden-Fenster geht vor: solange es offen ist, wartet der
     // Betreiber auf die Auswahl eines Geraets, und ein Logbuch davor
     // versteckte es (Test 2026-09-26). Schliesst es, holt
@@ -14851,6 +14851,14 @@ void MainWindow::openChannelStrip()
         });
     }
     m_stripWindow->show();
+    // Ganz auf die freie Flaeche (2026-09-27: 980 x 1000 auf 849 px
+    // Hoehe, unten hinter dem Dock). Erst nach show(), dann kennt macOS
+    // die Titelleiste; und noch einmal nach dem ersten Durchlauf, falls
+    // das native Fenster seine Groesse erst dann meldet.
+    fitIntoAvailableScreen(m_stripWindow);
+    QTimer::singleShot(0, m_stripWindow.data(), [w = m_stripWindow.data()]() {
+        fitIntoAvailableScreen(w);
+    });
     m_stripWindow->raise();
     m_stripWindow->activateWindow();
 }

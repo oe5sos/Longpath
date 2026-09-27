@@ -136,6 +136,7 @@ class PsaIndicatorWidget;
 class AppletVisibilityController;
 class AppletWidget;
 class QrzClient;
+class RotorLogbookPanel;
 class QrzLogbookUploader;
 class CloudlogUploader;
 class AdifNetworkUploader;
@@ -492,6 +493,14 @@ private slots:
     /// on a pointer-to-member target. On a lambda Qt6 warns and refuses
     /// the connect outright — the handler would never fire.
     void onAddTnfClicked(const QString& panId);
+
+    /// Ein Loch im IQ-Strom: jeder Panadapter verwirft sein angefangenes
+    /// FFT-Fenster. Ein Slot, kein Lambda (2026-09-27): wireRtt verbindet
+    /// ihn bei jedem Verbindungsversuch neu, mit Qt::UniqueConnection --
+    /// und an einem Lambda verweigerte Qt6 genau diesen connect ("unique
+    /// connections require a pointer to member function", stand bei
+    /// jedem Verbinden im Protokoll). Das Verwerfen geschah also nie.
+    void onIqSequenceGap();
 
     /// TNF: surface a rejected add. Without this a +TNF press inside the
     /// 10 Hz dedupe window is silently ignored and the button reads as dead.
@@ -1430,7 +1439,11 @@ private:
     QWidget*   m_belowPane{nullptr};   // Flaeche unter dem Panadapter
     // Das Panel selbst, unabhaengig davon, WO es gerade haengt (Dock
     // oder untere Flaeche). ensureRotorPanel() liest diesen Zeiger.
-    class RotorLogbookPanel* m_rotorPanel{nullptr};
+    // QPointer (2026-09-27): beim Beenden geht das Panel mit seinem
+    // Fenster/Dock zu Bruch, und ein noch eingereihtes
+    // raiseLogbookIfOpen() griff danach auf den freigegebenen Speicher
+    // zu (SIGSEGV in tst_window_close_stays_closed).
+    QPointer<RotorLogbookPanel> m_rotorPanel;
     int m_hDelta{0};
     int m_vDelta{0};
 
