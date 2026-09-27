@@ -36,8 +36,10 @@
 //                 strip; VOX peak polling lives on TxApplet now.
 //   2026-09-27 — FM page: deviation 5.0k / 2.5k wired to
 //                 RadioModel::setFmDeviationHz (console.cs FMDeviation_Hz,
-//                 [@852bf0e]). Martin Fischer (OE5SOS), AI-assisted via
-//                 Anthropic Claude Code.
+//                 [@852bf0e]); CTCSS, tone (Thetis' 49), simplex, offset,
+//                 direction and reverse bound to the active slice
+//                 (console.cs:40293-40468). Martin Fischer (OE5SOS),
+//                 AI-assisted via Anthropic Claude Code.
 // =================================================================
 
 //=================================================================
@@ -144,6 +146,8 @@
 #include "core/MoxController.h"
 #include "core/TxChannel.h"
 #include "models/RadioModel.h"
+#include "models/SliceModel.h"
+#include "gui/widgets/VfoModeContainers.h"
 #include "models/TransmitModel.h"
 #include "gui/StyleConstants.h"
 
@@ -193,22 +197,10 @@ static inline QString phoneButtonStyle()
           Longpath::Style::kButtonAltHover);
 }
 
-// CTCSS tones (standard 38-tone list from Thetis setup.cs)
-static const QStringList kCtcssTones = {
-    QStringLiteral("67.0"),  QStringLiteral("71.9"),  QStringLiteral("74.4"),
-    QStringLiteral("77.0"),  QStringLiteral("79.7"),  QStringLiteral("82.5"),
-    QStringLiteral("85.4"),  QStringLiteral("88.5"),  QStringLiteral("91.5"),
-    QStringLiteral("94.8"),  QStringLiteral("97.4"),  QStringLiteral("100.0"),
-    QStringLiteral("103.5"), QStringLiteral("107.2"), QStringLiteral("110.9"),
-    QStringLiteral("114.8"), QStringLiteral("118.8"), QStringLiteral("123.0"),
-    QStringLiteral("127.3"), QStringLiteral("131.8"), QStringLiteral("136.5"),
-    QStringLiteral("141.3"), QStringLiteral("146.2"), QStringLiteral("151.4"),
-    QStringLiteral("156.7"), QStringLiteral("162.2"), QStringLiteral("167.9"),
-    QStringLiteral("173.8"), QStringLiteral("179.9"), QStringLiteral("186.2"),
-    QStringLiteral("192.8"), QStringLiteral("203.5"), QStringLiteral("210.7"),
-    QStringLiteral("218.1"), QStringLiteral("225.7"), QStringLiteral("233.6"),
-    QStringLiteral("241.8"), QStringLiteral("254.1"),
-};
+// CTCSS tones: the FM page uses Thetis' 49-tone console list
+// (console.cs:236-241 CTCSS_array) via FmOptContainer::ctcssTones(), the
+// same list as the VFO flag (2026-09-27). The 38-tone list that stood here
+// was labelled "from Thetis setup.cs", but setup.cs has no CTCSS list.
 
 
 // ── PhoneCwApplet ─────────────────────────────────────────────────────────────
@@ -697,13 +689,17 @@ void PhoneCwApplet::buildFmPage(QWidget* page)
         m_ctcssBtn = new QPushButton(QStringLiteral("CTCSS"), page);
         m_ctcssBtn->setCheckable(true);
         m_ctcssBtn->setFixedHeight(22);
-        m_ctcssBtn->setFixedWidth(52);
+        // Width from the text, like the Simplex button below: a fixed 52 px
+        // cut the label to "·TCSS·" (2026-09-27).
+        m_ctcssBtn->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
         m_ctcssBtn->setStyleSheet(phoneButtonStyle() + Longpath::Style::greenCheckedStyle());
         m_ctcssBtn->setAccessibleName(QStringLiteral("CTCSS sub-audible tone squelch"));
         row->addWidget(m_ctcssBtn);
 
         m_ctcssCombo = new QComboBox(page);
-        m_ctcssCombo->addItems(kCtcssTones);
+        for (double hz : FmOptContainer::ctcssTones()) {
+            m_ctcssCombo->addItem(QString::number(hz, 'f', 1), hz);
+        }
         applyComboStyle(m_ctcssCombo);
         m_ctcssCombo->setAccessibleName(QStringLiteral("CTCSS tone frequency"));
         row->addWidget(m_ctcssCombo, 1);
@@ -851,14 +847,6 @@ void PhoneCwApplet::buildFmPage(QWidget* page)
     // ── Mark all FM controls NYI (Phase 3I-1) ────────────────────────────────
     NyiOverlay::markNyi(m_fmMicSlider,     kNyiFm);
     NyiOverlay::markNyi(m_fmMicLabel,      kNyiFm);
-    NyiOverlay::markNyi(m_ctcssBtn,        kNyiFm);
-    NyiOverlay::markNyi(m_ctcssCombo,      kNyiFm);
-    NyiOverlay::markNyi(m_simplexBtn,      kNyiFm);
-    NyiOverlay::markNyi(m_rptOffsetSlider, kNyiFm);
-    NyiOverlay::markNyi(m_rptOffsetLabel,  kNyiFm);
-    NyiOverlay::markNyi(m_offsetMinusBtn,  kNyiFm);
-    NyiOverlay::markNyi(m_offsetPlusBtn,   kNyiFm);
-    NyiOverlay::markNyi(m_offsetRevBtn,    kNyiFm);
     NyiOverlay::markNyi(m_fmProfileCombo,  kNyiFm);
     NyiOverlay::markNyi(m_fmMemCombo,      kNyiFm);
     NyiOverlay::markNyi(m_fmMemPrev,       kNyiFm);
@@ -904,6 +892,51 @@ void PhoneCwApplet::wireControls()
         connect(m_model, &RadioModel::fmDeviationHzChanged,
                 this, [this](int) { syncFmDeviation(); });
         syncFmDeviation();
+    }
+
+    // ── FM page: CTCSS, simplex, offset, direction, reverse (2026-09-27) ─────
+    // Bound to the active slice: the same SliceModel properties the VFO
+    // flag's FM container drives; both follow the slice's signals.
+    {
+        connect(m_ctcssBtn, &QPushButton::clicked, this, [this](bool on) {
+            if (m_updatingFromModel || !m_fmSlice) { return; }
+            // From Thetis console.cs:40293-40296, 40318-40328 [@852bf0e] --
+            // chkFMCTCSS -> CTCSSOn -> radio.GetDSPTX(0).CTCSSFlag: the box
+            // keys the TX tone only; a decode choice made in the flag stays.
+            const int mode = m_fmSlice->fmCtcssMode();
+            const bool decode = (mode == 2 || mode == 3);
+            m_fmSlice->setFmCtcssMode(on ? (decode ? 3 : 1) : (decode ? 2 : 0));
+        });
+        connect(m_ctcssCombo, &QComboBox::currentIndexChanged, this, [this](int idx) {
+            if (m_updatingFromModel || !m_fmSlice || idx < 0) { return; }
+            // comboFMCTCSS_SelectedIndexChanged -> CTCSSFreq (console.cs:40298-40302)
+            m_fmSlice->setFmCtcssValueHz(m_ctcssCombo->itemData(idx).toDouble());
+        });
+        // chkFMTXSimplex / chkFMTXLow / chkFMTXHigh (console.cs:40400-40440):
+        // one of three; SliceModel::setFmTxMode turns Reverse off first.
+        auto pickTx = [this](FmTxMode m) {
+            if (m_updatingFromModel || !m_fmSlice) { return; }
+            m_fmSlice->setFmTxMode(m);
+            syncFmSliceControls();
+        };
+        connect(m_simplexBtn,     &QPushButton::clicked, this, [pickTx]() { pickTx(FmTxMode::Simplex); });
+        connect(m_offsetMinusBtn, &QPushButton::clicked, this, [pickTx]() { pickTx(FmTxMode::Low); });
+        connect(m_offsetPlusBtn,  &QPushButton::clicked, this, [pickTx]() { pickTx(FmTxMode::High); });
+        connect(m_offsetRevBtn,   &QPushButton::clicked, this, [this](bool on) {
+            if (m_updatingFromModel || !m_fmSlice) { return; }
+            m_fmSlice->setFmReverse(on);   // chkFMTXRev_CheckedChanged (console.cs:40442-40468)
+        });
+        // Offset slider in kHz (udFMOffset_ValueChanged -> FMTXOffsetMHz,
+        // console.cs:40395-40398).
+        connect(m_rptOffsetSlider, &QSlider::valueChanged, this, [this](int kHz) {
+            m_rptOffsetLabel->setText(QString::number(kHz));
+            if (m_updatingFromModel || !m_fmSlice) { return; }
+            m_fmSlice->setFmOffsetHz(kHz * 1000);
+        });
+        connect(m_model, &RadioModel::activeSliceChanged, this, [this](int) {
+            bindFmSlice(m_model ? m_model->activeSlice() : nullptr);
+        });
+        bindFmSlice(m_model->activeSlice());
     }
 
     TransmitModel& tx = m_model->transmitModel();
@@ -1327,6 +1360,52 @@ void PhoneCwApplet::syncFmDeviation()
     } else if (hz == 2500) {
         m_dev5kBtn->setChecked(false);
         m_dev25kBtn->setChecked(true);
+    }
+    m_updatingFromModel = false;
+}
+
+// ── FM page ⇄ active slice (2026-09-27) ──────────────────────────────────────
+
+void PhoneCwApplet::bindFmSlice(SliceModel* s)
+{
+    if (m_fmSlice) { disconnect(m_fmSlice, nullptr, this, nullptr); }
+    m_fmSlice = s;
+    if (s) {
+        connect(s, &SliceModel::fmCtcssModeChanged,    this, [this](int)      { syncFmSliceControls(); });
+        connect(s, &SliceModel::fmCtcssValueHzChanged, this, [this](double)   { syncFmSliceControls(); });
+        connect(s, &SliceModel::fmOffsetHzChanged,     this, [this](int)      { syncFmSliceControls(); });
+        connect(s, &SliceModel::fmTxModeChanged,       this, [this](FmTxMode) { syncFmSliceControls(); });
+        connect(s, &SliceModel::fmReverseChanged,      this, [this](bool)     { syncFmSliceControls(); });
+    }
+    syncFmSliceControls();
+}
+
+void PhoneCwApplet::syncFmSliceControls()
+{
+    if (!m_ctcssBtn) { return; }
+    m_updatingFromModel = true;
+    const bool have = !m_fmSlice.isNull();
+    for (QWidget* w : {static_cast<QWidget*>(m_ctcssBtn), static_cast<QWidget*>(m_ctcssCombo),
+                       static_cast<QWidget*>(m_simplexBtn), static_cast<QWidget*>(m_rptOffsetSlider),
+                       static_cast<QWidget*>(m_offsetMinusBtn), static_cast<QWidget*>(m_offsetPlusBtn),
+                       static_cast<QWidget*>(m_offsetRevBtn)}) {
+        w->setEnabled(have);
+    }
+    if (have) {
+        const int mode = m_fmSlice->fmCtcssMode();
+        m_ctcssBtn->setChecked(mode == 1 || mode == 3);
+        const int idx = m_ctcssCombo->findText(QString::number(m_fmSlice->fmCtcssValueHz(), 'f', 1));
+        if (idx >= 0) { m_ctcssCombo->setCurrentIndex(idx); }
+        const int kHz = m_fmSlice->fmOffsetHz() / 1000;
+        m_rptOffsetSlider->setValue(kHz);
+        m_rptOffsetLabel->setText(QString::number(kHz));
+        const FmTxMode tx = m_fmSlice->fmTxMode();
+        m_simplexBtn->setChecked(tx == FmTxMode::Simplex);
+        m_offsetMinusBtn->setChecked(tx == FmTxMode::Low);
+        m_offsetPlusBtn->setChecked(tx == FmTxMode::High);
+        m_offsetRevBtn->setChecked(m_fmSlice->fmReverse());
+        // chkFMTXRev.Enabled = false in Simplex (console.cs:40414-40424).
+        m_offsetRevBtn->setEnabled(tx != FmTxMode::Simplex);
     }
     m_updatingFromModel = false;
 }

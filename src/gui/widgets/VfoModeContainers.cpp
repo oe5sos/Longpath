@@ -143,6 +143,11 @@ static const double kCtcssTones[] = {
 };
 static constexpr int kCtcssCount = static_cast<int>(sizeof(kCtcssTones) / sizeof(kCtcssTones[0]));
 
+QVector<double> FmOptContainer::ctcssTones()
+{
+    return QVector<double>(std::begin(kCtcssTones), std::end(kCtcssTones));
+}
+
 // ── RttyMarkShiftContainer step constants ─────────────────────────────────
 // AetherSDR VfoWidget.cpp uses 25 Hz step for Mark and 5 Hz step for Shift.
 // These are UX choices, not DSP constants — native Longpath values.
@@ -311,7 +316,18 @@ void FmOptContainer::buildUi()
 
 void FmOptContainer::setSlice(SliceModel* s)
 {
+    if (m_slice) { disconnect(m_slice, nullptr, this, nullptr); }
     m_slice = s;
+    if (s) {
+        // Follow the model (2026-09-27): the FM applet, a memory recall and
+        // a TX-mode change (which turns Reverse off) change these as well;
+        // before, the flag only read the slice once.
+        connect(s, &SliceModel::fmCtcssModeChanged,    this, [this](int)      { syncFromSlice(); });
+        connect(s, &SliceModel::fmCtcssValueHzChanged, this, [this](double)   { syncFromSlice(); });
+        connect(s, &SliceModel::fmOffsetHzChanged,     this, [this](int)      { syncFromSlice(); });
+        connect(s, &SliceModel::fmTxModeChanged,       this, [this](FmTxMode) { syncFromSlice(); });
+        connect(s, &SliceModel::fmReverseChanged,      this, [this](bool)     { syncFromSlice(); });
+    }
     syncFromSlice();
 }
 
@@ -322,6 +338,7 @@ void FmOptContainer::syncFromSlice()
     const QSignalBlocker b1(m_toneModeCmb);
     const QSignalBlocker b2(m_toneValueCmb);
     const QSignalBlocker b3(m_offsetKhzSpin);
+    const QSignalBlocker b4(m_revBtn);
 
     // Tone mode: find the index whose itemData == m_slice->fmCtcssMode()
     const int mode = m_slice->fmCtcssMode();
@@ -348,8 +365,10 @@ void FmOptContainer::syncFromSlice()
     m_simplexBtn->setChecked(txMode == FmTxMode::Simplex);
     m_txHighBtn->setChecked(txMode == FmTxMode::High);
 
-    // Reverse toggle (independent)
+    // Reverse toggle. From Thetis console.cs:40414-40424 [@852bf0e] --
+    // chkFMTXSimplex_CheckedChanged: chkFMTXRev.Enabled = false in Simplex.
     m_revBtn->setChecked(m_slice->fmReverse());
+    m_revBtn->setEnabled(txMode != FmTxMode::Simplex);
 }
 
 
