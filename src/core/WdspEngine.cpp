@@ -1492,6 +1492,11 @@ qint64 WdspEngine::rebuildTxChannel(int channelId, const ChannelConfig& cfg)
     SetTXAPanelRun(channelId, 1);
     SetTXAPanelSelect(channelId, 2);
     SetTXAPostGenRun(channelId, 0);
+    // FM: wie createTxChannel -- create_fmmod legt ctcss_run = 1 an
+    // (2026-09-27; die gewaehlten Werte setzt applyState() unten).
+    SetTXACTCSSFreq(channelId, 100.0);
+    SetTXAFMDeviation(channelId, 5000.0);
+    SetTXACTCSSRun(channelId, 0);
 
     qCInfo(lcDsp) << "Rebuild: opened TX channel" << channelId
                   << "bufSize=" << cfg.bufferSize

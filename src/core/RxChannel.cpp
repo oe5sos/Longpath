@@ -1495,6 +1495,15 @@ void RxChannel::setCtcssNotchFreq(double hz)
 #endif
 }
 
+void RxChannel::setFmDeviation(double hz)
+{
+    m_fmDeviationHz = hz;
+#ifdef HAVE_WDSP
+    // From Thetis Console/radio.cs:1427-1444 [@852bf0e] -- RXFMDeviation
+    SetRXAFMDeviation(m_channelId, hz);
+#endif
+}
+
 void RxChannel::setFmsqEnabled(bool enabled)
 {
     if (enabled == m_fmsqEnabled.load()) {

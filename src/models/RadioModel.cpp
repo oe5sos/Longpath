@@ -552,6 +552,11 @@ RadioModel::RadioModel(QObject* parent)
     // standalone).
     m_audioEngine->setRadioModel(this);
 
+    // FM-Deviation (2026-09-27): Thetis haelt die Wahl mit dem Konsolen-
+    // zustand (console.cs:3236-3237 [@852bf0e], GetStateList: RadioButton
+    // -> Name/Checked).
+    m_fmDeviationHz = SliceModel::fmDeviationHz();
+
     // Frequency memories. From Thetis console.cs:2006-2007 [@852bf0e]:
     //   MemoryList = MemoryList.Restore();
     //   MemoryList.CheckVersion();
@@ -3417,6 +3422,9 @@ void RadioModel::openRxChannelPool(int poolSize, int inputBufferSize,
     // is not (RXANBPSetTuneFrequency short-circuits at
     // third_party/wdsp/src/nbp.c:479).
     syncNotchesToAllChannels();
+
+    // FM-Deviation (2026-09-27): WDSP legt jeden Kanal mit 5000 Hz an.
+    pushFmDeviationToChannels();
 }
 
 // ── Phase 3F Sub-Epic I: pooled-channel activation ──────────────────────────
@@ -6871,6 +6879,7 @@ void RadioModel::connectToRadio(const RadioInfo& info)
             // FM-CTCSS des Sende-Slices (2026-09-27) -- WdspEngine hat den
             // Ton beim Anlegen abgeschaltet, hier gilt die Wahl des Slices.
             pushFmToneFromTxSlice();
+            m_txChannel->setFmDeviation(static_cast<double>(m_fmDeviationHz));
             qCInfo(lcDsp) << "TX channel FM CTCSS: WDSP ctcss_run ="
                           << m_txChannel->ctcssRunInWdsp()
                           << "(0 = kein Ton; vor 2026-09-27 stand hier 1)";
@@ -9973,6 +9982,42 @@ double RadioModel::composedShiftHz(const SliceModel* slice,
 // nur, wenn der Slice "Encode" oder "Enc+Dec" gewaehlt hat; fmmod laeuft
 // ohnehin nur in FM.
 // ---------------------------------------------------------------------------
+void RadioModel::setFmDeviationHz(int hz)
+{
+    if (hz <= 0 || hz == m_fmDeviationHz) { return; }
+    m_fmDeviationHz = hz;
+    AppSettings::instance().setValue(QStringLiteral("FmDeviationHz"), QString::number(hz));
+    scheduleSettingsSave();
+    pushFmDeviationToChannels();
+
+    // From Thetis console.cs:40325-40347 [@852bf0e] -- fmDeviation2k (and
+    // fmDeviation5k, :40363-40385): TX and both RX deviations, then every
+    // receiver in FM gets the filter that fits the new deviation:
+    //   int halfBw = (int)(radio.GetDSPRX(0, 0).RXFMDeviation + radio.GetDSPRX(0, 0).RXFMHighCut); //[2.10.3.4]MW0LGE
+    //   UpdateRX1Filters(-halfBw, halfBw, force);
+    // The TX half (SetTXFilters(FM, +/-halfBw)) is not repeated here:
+    // Longpath derives the TX bandpass from the TX filter, and in WDSP
+    // TXA bp0 runs before the FM modulator (TXA.c:573/582), whose own
+    // output bandpass follows the deviation set above.
+    const int halfBw = SliceModel::fmHalfBandwidthHz();
+    for (SliceModel* s : m_slices) {
+        if (s && s->dspMode() == DSPMode::FM) { s->setFilter(-halfBw, halfBw); }
+    }
+    emit fmDeviationHzChanged(hz);
+}
+
+void RadioModel::pushFmDeviationToChannels()
+{
+    const double dev = static_cast<double>(m_fmDeviationHz);
+    if (m_wdspEngine) {
+        for (int ch = WdspEngine::kFirstSliceChannelId;
+             ch < WdspEngine::kMaxSliceChannels; ++ch) {
+            if (RxChannel* rx = m_wdspEngine->rxChannel(ch)) { rx->setFmDeviation(dev); }
+        }
+    }
+    if (m_txChannel) { m_txChannel->setFmDeviation(dev); }
+}
+
 void RadioModel::pushFmToneFromTxSlice()
 {
     if (!m_txChannel) { return; }
@@ -13583,7 +13628,7 @@ MemoryRecord RadioModel::captureMemory() const
     r.rptrOffsetMHz = slice->fmOffsetHz() / 1.0e6;
     r.ctcssOn = slice->fmCtcssMode() != 0;
     r.ctcssFreq = slice->fmCtcssValueHz();
-    // TXFMDeviation: not a Longpath model property; the record default stays.
+    r.deviation = m_fmDeviationHz;   // (int)console.radio.GetDSPTX(0).TXFMDeviation
     r.power = m_transmitModel.power();
     // VFOSplit / TXFreq: Longpath has no split VFO (design 2026-05-26 §3);
     // recorded as "no split, TX = RX" so a Thetis reading the file gets a
@@ -13656,7 +13701,7 @@ void RadioModel::recallMemory(const MemoryRecord& record)
         slice->setFmOffsetHz(static_cast<int>(std::lround(record.rptrOffsetMHz * 1.0e6)));
         slice->setFmCtcssMode(record.ctcssOn ? 1 : 0);
         slice->setFmCtcssValueHz(record.ctcssFreq);
-        // FMDeviation_Hz = record.Deviation: no Longpath model property yet.
+        setFmDeviationHz(record.deviation);   // FMDeviation_Hz = record.Deviation;
     } else {
         // Longpath deviation: no Filter enum to select a preset by name, so
         // the stored bounds are applied for every filter, not only VAR1/VAR2

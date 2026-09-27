@@ -4193,6 +4193,11 @@ TxChannelState TxChannel::captureState() const
     s.filterLowHz  = m_filterLowHz;
     s.filterHighHz = m_filterHighHz;
 
+    // FM (2026-09-27)
+    s.ctcssRun      = m_ctcssRun;
+    s.ctcssFreqHz   = m_ctcssFreq;
+    s.fmDeviationHz = m_fmDeviationHz;
+
     // Mic / EQ carry
     s.micGainDb  = m_micGainDb;
     s.eqEnabled  = m_eqEnabled;
@@ -4253,6 +4258,11 @@ void TxChannel::applyState(const TxChannelState& s)
     m_filterLowHz  = s.filterLowHz;
     m_filterHighHz = s.filterHighHz;
     setTxBandpass(s.filterLowHz, s.filterHighHz);
+
+    // FM (2026-09-27): Ton und Deviation wie vor dem Rebuild.
+    setCtcssFreq(s.ctcssFreqHz);
+    setFmDeviation(s.fmDeviationHz);
+    setCtcssRun(s.ctcssRun);
 
     // Mic / EQ carry only — no WDSP call yet
     m_micGainDb  = s.micGainDb;
@@ -4957,6 +4967,26 @@ void TxChannel::setCtcssFreq(double hz)
 #ifdef HAVE_WDSP
     if (m_channelId < 0 || txa[m_channelId].fmmod.p == nullptr) { return; }
     SetTXACTCSSFreq(m_channelId, hz);
+#endif
+}
+
+void TxChannel::setFmDeviation(double hz)
+{
+    m_fmDeviationHz = hz;
+#ifdef HAVE_WDSP
+    if (m_channelId < 0 || txa[m_channelId].fmmod.p == nullptr) { return; }
+    // From Thetis Console/radio.cs:2882-2899 [@852bf0e] -- TXFMDeviation
+    SetTXAFMDeviation(m_channelId, hz);
+#endif
+}
+
+double TxChannel::fmDeviationInWdsp() const
+{
+#ifdef HAVE_WDSP
+    if (m_channelId < 0 || txa[m_channelId].fmmod.p == nullptr) { return -1.0; }
+    return txa[m_channelId].fmmod.p->deviation;
+#else
+    return -1.0;
 #endif
 }
 

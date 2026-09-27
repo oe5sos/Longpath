@@ -115,6 +115,7 @@
 #include "gui/widgets/TriBtn.h"
 #include "gui/StyleConstants.h"
 #include "NyiOverlay.h"
+#include "models/RadioModel.h"
 
 #include <QComboBox>
 #include <QSlider>
@@ -364,8 +365,6 @@ void FmApplet::buildUI()
     // -----------------------------------------------------------------------
     const QString kPhase = QStringLiteral("Phase 3I-3");
     NyiOverlay::markNyi(m_micSlider,       kPhase);
-    NyiOverlay::markNyi(m_dev5kBtn,        kPhase);
-    NyiOverlay::markNyi(m_dev25kBtn,       kPhase);
     NyiOverlay::markNyi(m_ctcssBtn,        kPhase);
     NyiOverlay::markNyi(m_ctcssCombo,      kPhase);
     NyiOverlay::markNyi(m_simplexBtn,      kPhase);
@@ -374,11 +373,43 @@ void FmApplet::buildUI()
     NyiOverlay::markNyi(m_offsetPosBtn,    kPhase);
     NyiOverlay::markNyi(m_offsetRevBtn,    kPhase);
     NyiOverlay::markNyi(m_txProfileCombo,  kPhase);
+
+    // Control 2 wired (2026-09-27): Thetis radFMDeviation5kHz /
+    // radFMDeviation2kHz -> FMDeviation_Hz (console.cs:20860-20885,
+    // 40318-40395 [@852bf0e]); RadioModel pushes TX + RX deviation and
+    // the FM filter. An already-checked button stays checked.
+    auto pick = [this](int hz) {
+        if (m_updatingFromModel || !m_model) { return; }
+        m_model->setFmDeviationHz(hz);
+        syncFromModel();
+    };
+    connect(m_dev5kBtn,  &QPushButton::clicked, this, [pick]() { pick(5000); });
+    connect(m_dev25kBtn, &QPushButton::clicked, this, [pick]() { pick(2500); });
+    if (m_model) {
+        connect(m_model, &RadioModel::fmDeviationHzChanged,
+                this, [this](int) { syncFromModel(); });
+    }
+    syncFromModel();
 }
 
 void FmApplet::syncFromModel()
 {
-    // NYI — no model wiring until Phase 3I-3
+    // Only the deviation pair is wired so far; the other controls are
+    // still NYI (the working FM controls live in the VFO flag).
+    // From Thetis console.cs:20870-20879 [@852bf0e] -- FMDeviation_Hz
+    // setter: 5000 checks 5 kHz, 2500 checks 2.5 kHz, anything else
+    // leaves both as they are.
+    if (!m_model || !m_dev5kBtn || !m_dev25kBtn) { return; }
+    m_updatingFromModel = true;
+    const int hz = m_model->fmDeviationHz();
+    if (hz == 5000) {
+        m_dev25kBtn->setChecked(false);
+        m_dev5kBtn->setChecked(true);
+    } else if (hz == 2500) {
+        m_dev5kBtn->setChecked(false);
+        m_dev25kBtn->setChecked(true);
+    }
+    m_updatingFromModel = false;
 }
 
 } // namespace Longpath

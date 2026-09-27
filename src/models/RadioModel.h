@@ -1142,6 +1142,14 @@ public:
     /// FM-CTCSS des Sende-Slices an den Sendekanal (2026-09-27).
     void pushFmToneFromTxSlice();
 
+    /// FM-Deviation fuer Senden und Empfang aller Kanaele, 5000 oder
+    /// 2500 Hz (Thetis console FMDeviation_Hz, radFMDeviation5kHz /
+    /// radFMDeviation2kHz). Gespeichert als FmDeviationHz. 2026-09-27.
+    int fmDeviationHz() const { return m_fmDeviationHz; }
+    void setFmDeviationHz(int hz);
+    /// Die Deviation an alle offenen RX-Kanaele und den Sendekanal.
+    void pushFmDeviationToChannels();
+
     /// Longpath Audio Channel Strip — the client-side transmit chain.
     ///
     /// Lives for as long as the connection does, because the strip's
@@ -1339,6 +1347,7 @@ signals:
     // RX1_MeterCalOffsetDb override).  MeterPoller connects this to
     // refresh its cached offset value.
     void rxMeterOffsetChanged(double db);
+    void fmDeviationHzChanged(int hz);
 
 public:
 
@@ -3395,6 +3404,7 @@ private:
     // Written from the wireSampleRateChanged path in connectToRadio().
     // connectionSampleRateHz() / connectionSampleRateText() read this.
     int m_connectionSampleRateHz{0};
+    int m_fmDeviationHz{5000};
 
     // Task 1.7: active-RX count last pushed to the wire (0 = disconnected).
     // Updated by setActiveRxCountLive() after hardware reconfiguration completes.

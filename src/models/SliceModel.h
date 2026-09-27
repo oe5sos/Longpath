@@ -588,6 +588,13 @@ public:
     /// Durchlass einer CW-Scheibe deuten muessen (der KiwiSDR-Pfad).
     static int cwPitchHz();
 
+    /// Die FM-Deviation (AppSettings FmDeviationHz, Vorgabe 5000 --
+    /// Thetis console FMDeviation_Hz) und die halbe FM-Filterbreite
+    /// daraus: Deviation + FM-Hochpass 3000 (Thetis radio.cs:1571
+    /// rx_fm_highcut). 2026-09-27.
+    static int fmDeviationHz();
+    static int fmHalfBandwidthHz();
+
     /// Breite setzen, Mitte behalten (soweit die Betriebsart das
     /// zulaesst). Geht durch setFilter, also durch die Begrenzung.
     void setFilterWidth(int widthHz);

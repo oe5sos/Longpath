@@ -802,6 +802,13 @@ public:
     /// fuer das Protokoll beim Anlegen des Sendekanals.
     int ctcssRunInWdsp() const;
     double ctcssFreqForTest() const { return m_ctcssFreq; }
+    /// FM-Deviation beim Senden (2026-09-27).
+    /// From Thetis Console/radio.cs:2882-2899 [@852bf0e] -- TXFMDeviation
+    /// -> SetTXAFMDeviation, Voreinstellung 5000.0.
+    void setFmDeviation(double hz);
+    double fmDeviationForTest() const { return m_fmDeviationHz; }
+    /// Was WDSP haelt (fmmod.deviation), -1 ohne Kanal.
+    double fmDeviationInWdsp() const;
 
     /// Test seam: returns the DSPMode last passed to SetTXAMode (the WDSP-
     /// mapped value, not the carry m_mode which preserves RADE_U/L for
@@ -3133,6 +3140,7 @@ private:
     DSPMode m_lastWdspTxMode{DSPMode::USB};  // test seam: RADE_U/L map -> USB/LSB
     bool   m_ctcssRun{false};
     double m_ctcssFreq{100.0};
+    double m_fmDeviationHz{5000.0};
     int     m_filterLowHz  {200};            // carry; setTxBandpass also calls WDSP
     int     m_filterHighHz {2700};           // carry; setTxBandpass also calls WDSP
 
