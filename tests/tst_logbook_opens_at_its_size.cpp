@@ -75,6 +75,26 @@ private slots:
         QCOMPARE(w.width(), qMax(1000, w.minimumSizeHint().width()));
     }
 
+    // Wer das Fenster in der ersten Sekunde kleiner zieht, behaelt es so:
+    // die Nachtakte nehmen nur zurueck, was Qt aufgezogen hat
+    // (2026-09-27; vorher stellte der naechste Takt die vorgesehene
+    // Groesse wieder her -- auf der CI in tst_logbook_toolbar_wraps).
+    void aShrinkInTheFirstSecondStays()
+    {
+        LogbookWindow w(m_log);
+        w.resize(1000, 700);
+        w.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QTest::qWait(10);
+        const QSize min = w.minimumSizeHint();
+        const QSize smaller(qMax(min.width(), 900), qMax(min.height(), 650));
+        QVERIFY2(smaller.width() < 1000 || smaller.height() < 700,
+                 "Inhalt braucht die ganze vorgesehene Groesse");
+        w.resize(smaller);
+        QTest::qWait(1300);
+        QCOMPARE(w.size(), smaller.expandedTo(w.minimumSizeHint()));
+    }
+
     // Kleiner als der Inhalt braucht, wird es nie -- die Leisten duerfen
     // sich nicht ueberdecken.
     void neverSmallerThanTheContent()
