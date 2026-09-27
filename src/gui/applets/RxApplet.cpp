@@ -647,7 +647,14 @@ void RxApplet::buildUi()
         m_sqlBtn = greenToggle(QStringLiteral("SQL"), 52, 20);
         connect(m_sqlBtn, &QPushButton::toggled, this, [this](bool on) {
             if (m_updatingFromModel || !m_slice) { return; }
-            m_slice->setSsqlEnabled(on);
+            // In FM die FM-Rauschsperre (2026-09-27) -- sonst war sie
+            // nirgends zu erreichen. Thetis steuert je Betriebsart: im
+            // FM-Zweig RXFMSquelchOn = true, SSqlOn/RXAMSquelchOn = false.
+            if (m_slice->dspMode() == DSPMode::FM) {
+                m_slice->setFmsqEnabled(on);
+            } else {
+                m_slice->setSsqlEnabled(on);
+            }
         });
         row->addWidget(m_sqlBtn);
 
@@ -658,7 +665,11 @@ void RxApplet::buildUi()
         m_sqlSlider->setStyleSheet(Style::sliderHStyle());
         connect(m_sqlSlider, &QSlider::valueChanged, this, [this](int val) {
             if (m_updatingFromModel || !m_slice) { return; }
-            m_slice->setSsqlThresh(static_cast<double>(val));
+            if (m_slice->dspMode() == DSPMode::FM) {
+                m_slice->setFmsqThresh(fmSquelchDbFromSlider(val));
+            } else {
+                m_slice->setSsqlThresh(static_cast<double>(val));
+            }
         });
         row->addWidget(m_sqlSlider, 1);
 
@@ -1371,14 +1382,7 @@ void RxApplet::syncFromModel()
         // SliceModel pan: −1.0..+1.0 → slider 0..100 (center = 50)
         m_panSlider->setValue(qRound(m_slice->audioPan() * 50.0 + 50.0));
     }
-    {
-        QSignalBlocker bl(m_sqlBtn);
-        m_sqlBtn->setChecked(m_slice->ssqlEnabled());
-    }
-    {
-        QSignalBlocker bl(m_sqlSlider);
-        m_sqlSlider->setValue(qRound(m_slice->ssqlThresh()));
-    }
+    syncSquelchFromModel();
 
     // AGC-T slider initial pull (§B1 fix-up).
     if (m_agcTSlider) {
@@ -1503,14 +1507,12 @@ void RxApplet::connectSlice(SliceModel* s)
         QSignalBlocker bl(m_panSlider);
         m_panSlider->setValue(qRound(pan * 50.0 + 50.0));
     });
-    connect(s, &SliceModel::ssqlEnabledChanged, this, [this](bool on) {
-        QSignalBlocker bl(m_sqlBtn);
-        m_sqlBtn->setChecked(on);
-    });
-    connect(s, &SliceModel::ssqlThreshChanged, this, [this](double thresh) {
-        QSignalBlocker bl(m_sqlSlider);
-        m_sqlSlider->setValue(qRound(thresh));
-    });
+    // SQL zeigt in FM die FM-Rauschsperre, sonst die Sprach-Sperre.
+    connect(s, &SliceModel::ssqlEnabledChanged, this, [this](bool) { syncSquelchFromModel(); });
+    connect(s, &SliceModel::ssqlThreshChanged, this, [this](double) { syncSquelchFromModel(); });
+    connect(s, &SliceModel::fmsqEnabledChanged, this, [this](bool) { syncSquelchFromModel(); });
+    connect(s, &SliceModel::fmsqThreshChanged, this, [this](double) { syncSquelchFromModel(); });
+    connect(s, &SliceModel::dspModeChanged, this, [this](DSPMode) { syncSquelchFromModel(); });
 
     // AGC-T slider model→UI sync (§B1 fix-up).
     // The B1 alignment commits added AGC-T writing (m_slice->setAgcThreshold)
@@ -2166,6 +2168,43 @@ void RxApplet::applyColumnDirection()
     // rechte (3) die Reihen der linken auseinander.
     for (int i = 0; i < m_columns->count(); ++i) {
         m_columns->setStretch(i, stacked ? 0 : (i == 0 ? 2 : 3));
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FM-Rauschsperre am SQL-Regler (2026-09-27).
+// From Thetis console.cs:47225-47235 [@852bf0e]:
+//   if (_rx1_dsp_mode == DSPMode.FM) //FM Squelch
+//     //nValue = ptbSquelch.Value; // 0-100
+//     //[2.10.3.5]MW0LGE convert to a 0-100 scale from a -160 to 0 scale
+//     nValue = (int)(((ptbSquelch.Value + 160) / 160f) * 100f);
+//     FMSquelchThreshold = (float)Math.Pow(10.0, -2.0 * nValue / 100.0);
+// Longpaths Regler laeuft schon auf der 0-100-Skala (wie nValue).
+// SliceModel haelt die Schwelle in dB (RxChannel: linear = 10^(dB/20)),
+// also dB = -0.4 * n.
+// ---------------------------------------------------------------------------
+double RxApplet::fmSquelchDbFromSlider(int n)
+{
+    return -0.4 * static_cast<double>(n);
+}
+
+int RxApplet::fmSquelchSliderFromDb(double dB)
+{
+    return qBound(0, qRound(-dB / 0.4), 100);
+}
+
+void RxApplet::syncSquelchFromModel()
+{
+    if (!m_slice || !m_sqlBtn || !m_sqlSlider) { return; }
+    const bool fm = m_slice->dspMode() == DSPMode::FM;
+    {
+        QSignalBlocker bl(m_sqlBtn);
+        m_sqlBtn->setChecked(fm ? m_slice->fmsqEnabled() : m_slice->ssqlEnabled());
+    }
+    {
+        QSignalBlocker bl(m_sqlSlider);
+        m_sqlSlider->setValue(fm ? fmSquelchSliderFromDb(m_slice->fmsqThresh())
+                                 : qRound(m_slice->ssqlThresh()));
     }
 }
 

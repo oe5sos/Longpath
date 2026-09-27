@@ -251,6 +251,17 @@ public:
 private:
 #endif
 
+public:
+    // SQL-Regler in FM: Thetis' 0-100-Skala <-> FM-Rauschsperre in dB
+    // (2026-09-27, siehe RxApplet.cpp).
+    static double fmSquelchDbFromSlider(int n);
+    static int fmSquelchSliderFromDb(double dB);
+
+private:
+    // SQL-Knopf und -Regler aus dem Modell: in FM die FM-Rauschsperre,
+    // sonst die Sprach-Sperre.
+    void syncSquelchFromModel();
+
 signals:
     void autoAgcToggled(bool on);
     void openSetupRequested();
