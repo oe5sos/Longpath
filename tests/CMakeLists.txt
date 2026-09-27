@@ -280,6 +280,8 @@ longpath_add_test(tst_clarity_defaults)
 # ── Phase 3G-9c Clarity adaptive display tuning ──────────────────────────
 longpath_add_test(tst_noise_floor_estimator)
 longpath_add_test(tst_noise_floor_tracker)
+# RX-Messwerte: PB SNR nach Thetis, feste Zahlenbreite (2026-09-27).
+longpath_add_test(tst_rx_meter_readings)
 longpath_add_test(tst_clarity_controller)
 
 # ── Task 2.10: per-band NF-estimate priming (Longpath-original) ─────────
@@ -919,6 +921,11 @@ longpath_add_test(tst_nr_backends_process_audio)
 # wdspmain-Thread nicht mehr an die Reihe, der Ring lief ueber, und
 # fexchange2 stuerzte mit SIGSEGV ab -- Echtzeit braucht die Maschine
 # fuer sich. Wie tst_notch_removable_offline: RUN_SERIAL.
+longpath_add_test(tst_pbsnr_noise_probe)
+# Taktet den WDSP-Kanal wie das Funkgeraet (siehe tst_nr_backends_process_audio).
+if(TEST tst_pbsnr_noise_probe)
+    set_tests_properties(tst_pbsnr_noise_probe PROPERTIES RUN_SERIAL TRUE)
+endif()
 if(TEST tst_nr_backends_process_audio)
     set_tests_properties(tst_nr_backends_process_audio PROPERTIES RUN_SERIAL TRUE)
 endif()

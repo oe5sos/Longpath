@@ -37,6 +37,7 @@ class InstrumentFooter : public QWidget {
     Q_OBJECT
 
 public:
+    int valueMinimumWidthForTest() const;
     explicit InstrumentFooter(QWidget* parent = nullptr);
 
     /// Die Grösse links, z. B. „Stehwelle".
@@ -58,6 +59,7 @@ private:
     QLabel* m_caption{nullptr};
     QLabel* m_middle{nullptr};
     QLabel* m_value{nullptr};
+    int     m_valueWidth{0};   // groesste bisher gezeigte Breite (2026-09-27)
 };
 
 } // namespace Longpath

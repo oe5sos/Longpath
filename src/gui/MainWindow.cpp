@@ -309,6 +309,7 @@ warren@wpratt.com
 #include "core/StepAttenuatorController.h"
 #include "core/MoxController.h"  // 3M-1a G.1: F.2 connect (hardwareFlipped → onMoxHardwareFlipped)
 #include "core/NoiseFloorTracker.h"
+#include "core/PassbandSnr.h"
 #include "core/BoardCapabilities.h"
 #include "core/TxSliceArbiter.h"  // Phase 3F Sub-Epic C Task 9: TX-handoff routing
 #include "models/PanadapterModel.h"
@@ -5388,11 +5389,52 @@ void MainWindow::buildUI()
         // muesste wissen, welcher fuer welche Groesse gilt. Genau diese
         // Doppelung war der Grund, warum „Max Bin" nur ueber ein
         // zweites Menue erreichbar war.
-        if (m_meterPoller) {
-            m_meterPoller->feedReading(MeterBinding::NoiseFloor,
-                                       static_cast<double>(nfDbm));
-        }
+        // Seit 2026-09-27 kommt der Rauschflur des Instruments aus dem
+        // Thetis-Tracker des aktiven Empfaengers (siehe unten, am
+        // gemittelten Signal): Clarity sah nur Strom 0 und stand still,
+        // wenn Clarity aus war.
+        Q_UNUSED(nfDbm);
     });
+
+    // ── SNR (PBSNR) und Rauschflur je aktivem Empfaenger (2026-09-27) ─
+    //
+    // PB SNR hatte eine Messgroesse, ein Preset und einen Menueeintrag --
+    // aber nichts rechnete einen Wert. Jetzt wie Thetis
+    // (console.cs:46846-46856 [@852bf0e]): am gemittelten Signal (samt
+    // RX-Offset), nur mit gutem Rauschflur, sonst 0; beim Senden -999.
+    // Rauschflur und FFT (Bandbreite, Fenster-ENB) des Stroms, auf dem
+    // der aktive Empfaenger liegt -- nicht Strom 0.
+    if (m_meterPoller) {
+        connect(m_meterPoller, &MeterPoller::readingUpdated,
+                this, [this](int bindingId, double value) {
+            if (bindingId != MeterBinding::SignalAvg || !m_radioModel || !m_meterPoller) { return; }
+            SliceModel* slice = m_radioModel->activeSlice();
+            NoiseFloorTracker* nf = m_radioModel->noiseFloorTrackerForSlice(slice);
+            const int stream = slice ? slice->streamIndex() : 0;
+            FFTEngine* fft = m_fftEngines.value(stream >= 0 ? stream : 0, nullptr);
+            if (!slice || !nf || !nf->isGood() || !fft) {
+                m_meterPoller->feedReading(MeterBinding::PbSnr, 0.0);
+                return;
+            }
+            // Rauschflur im Mass des Signals. Die FFT liefert rohe dBFS
+            // (die Kalibrierung setzt erst die Anzeige auf), das gemittelte
+            // Signal traegt schon den RX-Offset (Kalibrierung + Preamp/ATT,
+            // RadioModel::rxMeterOffsetDb). Thetis rechnet den Rauschflur
+            // aus Anzeigewerten, die RX1Offset bereits enthalten (display.cs,
+            // RX1Offset und processNoiseFloor) -- beide Werte im selben Mass.
+            // Ohne den Offset lag PB SNR am QRP auf reinem Rauschen bei -6 dB.
+            const double nfDbm = static_cast<double>(nf->noiseFloor())
+                                 + m_radioModel->rxMeterOffsetDb();
+            m_meterPoller->feedReading(MeterBinding::NoiseFloor, nfDbm);
+            const bool mox = m_radioModel->moxController()
+                             && m_radioModel->moxController()->isMox();
+            const PassbandSnrResult r = passbandSnr(
+                value, nfDbm, fft->sampleRate(), fft->fftSize(),
+                fft->windowEnb(), slice->filterLow(), slice->filterHigh(),
+                /*shiftDb=*/0.0, mox);
+            m_meterPoller->feedReading(MeterBinding::PbSnr, r.estimatedSnr);
+        });
+    }
 
     // RADE verdraengt den Rauschflur, solange es laeuft: beide
     // beantworten dieselbe Frage -- wie gut komme ich hier durch.
