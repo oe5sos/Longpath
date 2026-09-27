@@ -49,6 +49,7 @@ InstrumentFooter::InstrumentFooter(QWidget* parent)
     m_value->setFont(Style::monoFont(m_value->font(), Style::kFontReading,
                                      QFont::DemiBold));
     setValueColour(QColor(Style::role("measured", Style::kAmberText)));
+    m_value->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
     lay->addWidget(m_value, 0, Qt::AlignBaseline);
 }
 
@@ -60,6 +61,14 @@ void InstrumentFooter::setCaption(const QString& text)
 void InstrumentFooter::setValueText(const QString& text)
 {
     m_value->setText(text);
+    // Die Breite waechst nur (2026-09-27): "S7" nach "S9+20", "-99 dBm"
+    // nach "-105 dBm" schob sonst die ganze Zeile hin und her, weil
+    // niemand Platz reservierte.
+    const int w = m_value->fontMetrics().horizontalAdvance(text);
+    if (w > m_valueWidth) {
+        m_valueWidth = w;
+        m_value->setMinimumWidth(w);
+    }
 }
 
 void InstrumentFooter::setValueColour(const QColor& c)
@@ -82,5 +91,7 @@ void InstrumentFooter::setPeakAndLimit(const QString& peakText,
     if (!limitText.isEmpty()) { parts << QStringLiteral("LIM %1").arg(limitText); }
     m_middle->setText(parts.join(QStringLiteral(" · ")));
 }
+
+int InstrumentFooter::valueMinimumWidthForTest() const { return m_value->minimumWidth(); }
 
 } // namespace Longpath

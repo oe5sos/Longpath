@@ -1333,6 +1333,11 @@ inline QFont monoFont(const QFont& base, int px, QFont::Weight w = QFont::Normal
     f.setPixelSize(px);
     f.setWeight(w);
     f.setFamily(QStringLiteral("Menlo"));
+    // Menlo gibt es nur auf dem Mac. Ohne diesen Hinweis nahm Qt unter
+    // Windows/Linux eine proportionale Schrift, und die Stellen tanzten
+    // doch (2026-09-27).
+    f.setStyleHint(QFont::TypeWriter);
+    f.setFixedPitch(true);
     return f;
 }
 
