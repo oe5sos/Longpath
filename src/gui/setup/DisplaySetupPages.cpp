@@ -2530,10 +2530,19 @@ void GridScalesPage::buildUI()
     // Thetis: setup.designer.cs:34683 (udDisplayGridStep) — rewritten
     // Thetis original: "Horizontal Grid Step Size in dB."
     m_dbStepSpin->setToolTip(QStringLiteral("Horizontal grid step size in dB. Sets the spacing between dB grid lines across all bands (global, not per-band)."));
+    // Der gespeicherte Wert des Panadapters (2026-09-27; 0 = automatisch,
+    // dann zeigt der Regler die 10 dB, die meist gelten).
+    if (auto* w = model() ? model()->spectrumWidget() : nullptr) {
+        if (w->gridStepDb() > 0) { m_dbStepSpin->setValue(w->gridStepDb()); }
+    }
     connect(m_dbStepSpin, qOverload<int>(&QSpinBox::valueChanged),
             this, [this](int v) {
         if (auto* pan = firstPan(model())) {
             pan->setGridStep(v);
+        }
+        // Wirkt jetzt am Panadapter -- PanadapterModel liest niemand.
+        if (auto* w = model() ? model()->spectrumWidget() : nullptr) {
+            w->setGridStepDb(v);
         }
     });
     gridForm->addRow(QStringLiteral("dB Step (global):"), m_dbStepSpin);
