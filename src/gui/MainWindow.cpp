@@ -5405,12 +5405,20 @@ void MainWindow::buildUI()
                 m_meterPoller->feedReading(MeterBinding::PbSnr, 0.0);
                 return;
             }
-            m_meterPoller->feedReading(MeterBinding::NoiseFloor,
-                                       static_cast<double>(nf->noiseFloor()));
+            // Rauschflur im Mass des Signals. Die FFT liefert rohe dBFS
+            // (die Kalibrierung setzt erst die Anzeige auf), das gemittelte
+            // Signal traegt schon den RX-Offset (Kalibrierung + Preamp/ATT,
+            // RadioModel::rxMeterOffsetDb). Thetis rechnet den Rauschflur
+            // aus Anzeigewerten, die RX1Offset bereits enthalten (display.cs,
+            // RX1Offset und processNoiseFloor) -- beide Werte im selben Mass.
+            // Ohne den Offset lag PB SNR am QRP auf reinem Rauschen bei -6 dB.
+            const double nfDbm = static_cast<double>(nf->noiseFloor())
+                                 + m_radioModel->rxMeterOffsetDb();
+            m_meterPoller->feedReading(MeterBinding::NoiseFloor, nfDbm);
             const bool mox = m_radioModel->moxController()
                              && m_radioModel->moxController()->isMox();
             const PassbandSnrResult r = passbandSnr(
-                value, nf->noiseFloor(), fft->sampleRate(), fft->fftSize(),
+                value, nfDbm, fft->sampleRate(), fft->fftSize(),
                 fft->windowEnb(), slice->filterLow(), slice->filterHigh(),
                 /*shiftDb=*/0.0, mox);
             m_meterPoller->feedReading(MeterBinding::PbSnr, r.estimatedSnr);
