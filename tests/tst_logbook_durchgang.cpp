@@ -223,6 +223,11 @@ private slots:
     void initTestCase()
     {
         QStandardPaths::setTestModeEnabled(true);
+        // Die Export-Schritte beantworten den Speichern-Dialog als Widget.
+        // Auf dem Mac waere er sonst der native Dialog (kein QWidget) und
+        // der Test hinge bis zum ctest-Deckel -- die CI merkt das nicht,
+        // weil sie offscreen laeuft.
+        QCoreApplication::setAttribute(Qt::AA_DontUseNativeDialogs, true);
         // Die Rotor/Log-Schritte loeschen und schreiben
         // RotorLogbookPanel::logbookPath(). Eine gesetzte Sandbox-Variable
         // lenkte das auf einen echten Ordner -- hier nie.
