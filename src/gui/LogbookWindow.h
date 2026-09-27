@@ -97,6 +97,16 @@ protected:
     void moveEvent(QMoveEvent* event) override;
     void resizeEvent(QResizeEvent* event) override;
 
+public:
+    // 2026-09-26: beim ersten Zeigen die vorgesehene Groesse (gespeichert
+    // oder vom Aufrufer gesetzt) noch einmal anwenden, sobald die
+    // umbrechenden Leisten ihre wirkliche Breite kennen -- siehe .cpp.
+    void setVisible(bool visible) override;
+
+private:
+    bool m_shownOnce{false};
+    bool m_geometryRestored{false};
+
 private:
     void showRowMenu(const QPoint& pos);
     void saveGeometryState();

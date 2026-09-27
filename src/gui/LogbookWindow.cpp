@@ -178,7 +178,47 @@ void LogbookWindow::restoreGeometryState()
     // Empty on a first run, or a saved state from before this window
     // had a screen of its own to remember -- the resize(1240, 620)
     // above already set a sane default in that case.
-    if (!st.isEmpty()) { restoreGeometry(st); }
+    if (!st.isEmpty()) { m_geometryRestored = restoreGeometry(st); }
+}
+
+void LogbookWindow::setVisible(bool visible)
+{
+    // ── Die gespeicherte Groesse halten (2026-09-26) ─────────────────
+    //
+    // Beim ersten Zeigen kennen die umbrechenden Leisten (Knopfzeilen
+    // der Karte, Werkzeugleisten) noch nicht ihre wirkliche Breite. Die
+    // Kartenspalte steht fuer einen Durchgang schmal -- das kleine
+    // Rotor-Radar belegt noch Platz, die Aufteilung ist noch nicht
+    // angekommen --, die Knoepfe brauchen dort viele Zeilen, und das
+    // Logbuch meldet fuer diesen Augenblick bis zu 931 px Mindesthoehe.
+    // Qt zieht das Fenster darauf auf; einen Takt spaeter ist die
+    // Mindesthoehe wieder 597, aber das Fenster schrumpft nie von
+    // selbst zurueck. Jede gespeicherte Hoehe ging so verloren, und auf
+    // dem Laptop schob macOS das Fenster dabei nach oben.
+    //
+    // Darum: was vor dem ersten Zeigen vorgesehen war, danach noch
+    // einmal anwenden -- nie kleiner als der Inhalt dann braucht. Die
+    // Lage nur, wenn sie wirklich wiederhergestellt wurde; sonst bleibt
+    // Qts Platzierung neben dem Hauptfenster.
+    //
+    // Mehrmals, nicht einmal: im Test ist die Mindesthoehe nach 20 ms
+    // eingeschwungen, im laufenden Programm (Karte, Karteikarte,
+    // Kennzahlen) spaeter -- live nach 50 ms noch 776 statt 637.
+    const bool first = visible && !m_shownOnce;
+    const QRect intended = geometry();
+    QDialog::setVisible(visible);
+    if (!first) { return; }
+    m_shownOnce = true;
+    const bool withPosition = m_geometryRestored;
+    for (int ms : {50, 300, 1000}) {
+        QTimer::singleShot(ms, this, [this, intended, withPosition]() {
+            if (!isVisible() || isMaximized() || isFullScreen()) { return; }
+            const QSize size = intended.size().expandedTo(minimumSizeHint());
+            const QRect want = withPosition ? QRect(intended.topLeft(), size)
+                                            : QRect(pos(), size);
+            if (geometry() != want) { setGeometry(want); }
+        });
+    }
 }
 
 void LogbookWindow::restoreSplitState()

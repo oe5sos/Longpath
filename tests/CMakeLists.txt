@@ -5237,6 +5237,8 @@ longpath_add_test(tst_qso_map_flyto_window)
 longpath_add_test(tst_qso_map_satellites)
 # -- Logbuch-Werkzeugleiste bricht um statt das Fenster breit zu halten --
 longpath_add_test(tst_logbook_toolbar_wraps)
+# Das Logbuch geht in der vorgesehenen Groesse auf (2026-09-26).
+longpath_add_test(tst_logbook_opens_at_its_size)
 # -- Logbuch als eine Seite: Karte als Spalte, Kennzahlen als Reihe --
 longpath_add_test(tst_logbook_one_page)
 # -- Blue Marble fuer die Kugel aus GIBS-Kacheln (mit LONGPATH_NET echt) --
