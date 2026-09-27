@@ -1754,6 +1754,8 @@ longpath_add_test(tst_band_change_retunes_ddc_in_ctun)
 # reason (console.cs:31889-31893 [v2.10.3.15]).
 # Longpath-original: no Thetis port.
 longpath_add_test(tst_tx_frequency_follows_tx_slice)
+# FM-Relais: Ablage, Reverse, 49 Toene, Speichern (2026-09-27).
+longpath_add_test(tst_fm_repeater_wiring)
 
 # ── Phase 3F Sub-Epic B Task 17: AlexController event-matrix coverage ─────────
 # Verifies the 16-row event trigger matrix from design §10:

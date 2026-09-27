@@ -1139,6 +1139,8 @@ public:
     // in TxChannel drives fexchange2 → sendTxIq (SPSC ring) while running.
     // Wired by 3M-1a Task G.1 (bench fix: TUNE carrier now reaches the radio).
     TxChannel* txChannel() const { return m_txChannel; }
+    /// FM-CTCSS des Sende-Slices an den Sendekanal (2026-09-27).
+    void pushFmToneFromTxSlice();
 
     /// Longpath Audio Channel Strip — the client-side transmit chain.
     ///

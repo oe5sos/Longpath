@@ -130,19 +130,16 @@
 namespace Longpath {
 
 // ── CTCSS tone list ────────────────────────────────────────────────────────
-// 41-entry ITU standard CTCSS sub-tone table.
-// AetherSDR VfoWidget.cpp uses the same list; values are an ITU/TIA standard
-// so they are not invented here — they are authoritative reference values.
+// Die 49 Toene von Thetis (2026-09-27; vorher 41 -- 69.3, 159.8, 165.5,
+// 171.3, 177.3, 183.5, 189.9 und 199.5 fehlten, ein Thetis-Speicher mit
+// einem davon fand seinen Ton im Menue nicht).
+// From Thetis Console/console.cs:236-241 [@852bf0e] -- CTCSS_array
 static const double kCtcssTones[] = {
-     67.0,  71.9,  74.4,  77.0,  79.7,
-     82.5,  85.4,  88.5,  91.5,  94.8,
-     97.4, 100.0, 103.5, 107.2, 110.9,
-    114.8, 118.8, 123.0, 127.3, 131.8,
-    136.5, 141.3, 146.2, 151.4, 156.7,
-    162.2, 167.9, 173.8, 179.9, 186.2,
-    192.8, 203.5, 206.5, 210.7, 218.1,
-    225.7, 229.1, 233.6, 241.8, 250.3,
-    254.1
+     67.0,  69.3,  71.9,  74.4,  77.0,  79.7,  82.5,  85.4,  88.5,  91.5,
+     94.8,  97.4, 100.0, 103.5, 107.2, 110.9, 114.8, 118.8, 123.0, 127.3,
+    131.8, 136.5, 141.3, 146.2, 151.4, 156.7, 159.8, 162.2, 165.5, 167.9,
+    171.3, 173.8, 177.3, 179.9, 183.5, 186.2, 189.9, 192.8, 199.5, 203.5,
+    206.5, 210.7, 218.1, 225.7, 229.1, 233.6, 241.8, 250.3, 254.1
 };
 static constexpr int kCtcssCount = static_cast<int>(sizeof(kCtcssTones) / sizeof(kCtcssTones[0]));
 
@@ -225,11 +222,11 @@ void FmOptContainer::buildUi()
         m_revBtn     = new QPushButton(QStringLiteral("Rev"), this);
 
         m_txLowBtn->setObjectName("txLowBtn");
-        m_txLowBtn->setToolTip(QStringLiteral("TX below RX (repeater Low offset) — Phase 3M-1"));
+        m_txLowBtn->setToolTip(QStringLiteral("TX below RX (repeater Low offset)"));
         m_simplexBtn->setObjectName("simplexBtn");
         m_simplexBtn->setToolTip(QStringLiteral("Simplex — TX on same frequency as RX"));
         m_txHighBtn->setObjectName("txHighBtn");
-        m_txHighBtn->setToolTip(QStringLiteral("TX above RX (repeater High offset) — Phase 3M-1"));
+        m_txHighBtn->setToolTip(QStringLiteral("TX above RX (repeater High offset)"));
         m_revBtn->setObjectName("revBtn");
         m_revBtn->setToolTip(QStringLiteral("Reverse — listen on the repeater output frequency"));
 
@@ -247,7 +244,9 @@ void FmOptContainer::buildUi()
 
     // ── Signal connections ────────────────────────────────────────────────
 
-    // TODO Phase 3M-3: CTCSS decode requires a sub-audible tone detector
+    // CTCSS Encode (und Enc+Dec) setzt den Ton beim Senden:
+    // RadioModel::pushFmToneFromTxSlice (2026-09-27).
+    // Decode braucht weiterhin einen Tondetektor -- Thetis/WDSP haben keinen:
     // (bandpass at ctcssValueHz + threshold). WDSP FMSQ handles noise-level
     // squelch only, not tone-coded squelch. The SliceModel properties
     // (fmCtcssMode, fmCtcssValueHz) store the user's selection for when
@@ -272,7 +271,7 @@ void FmOptContainer::buildUi()
         m_slice->setFmOffsetHz(kHz * 1000);
     });
 
-    // Phase 3M-1: wire TX CTCSS encode and keydown repeater shift
+    // Sendeablage: RadioModel::txFrequencyForSlice (2026-09-27).
     connect(m_txLowBtn, &QPushButton::clicked, this, [this]() {
         if (!m_slice) { return; }
         m_slice->setFmTxMode(FmTxMode::Low);
@@ -281,7 +280,7 @@ void FmOptContainer::buildUi()
         m_txHighBtn->setChecked(false);
     });
 
-    // Phase 3M-1: wire TX CTCSS encode and keydown repeater shift
+    // Sendeablage: RadioModel::txFrequencyForSlice (2026-09-27).
     connect(m_simplexBtn, &QPushButton::clicked, this, [this]() {
         if (!m_slice) { return; }
         m_slice->setFmTxMode(FmTxMode::Simplex);
@@ -290,10 +289,10 @@ void FmOptContainer::buildUi()
         m_txHighBtn->setChecked(false);
         // Simplex: no repeater offset. The offset spinbox retains its last
         // non-simplex value (Thetis console.cs:40412 chkFMTXSimplex_CheckedChanged
-        // does not zero udFMOffset). TX effects deferred to Phase 3M-1.
+        // does not zero udFMOffset).
     });
 
-    // Phase 3M-1: wire TX CTCSS encode and keydown repeater shift
+    // Sendeablage: RadioModel::txFrequencyForSlice (2026-09-27).
     connect(m_txHighBtn, &QPushButton::clicked, this, [this]() {
         if (!m_slice) { return; }
         m_slice->setFmTxMode(FmTxMode::High);
@@ -302,8 +301,8 @@ void FmOptContainer::buildUi()
         m_txHighBtn->setChecked(true);
     });
 
-    // fmReverse is display-only in 3G-10. TX repeater listen reversal
-    // (swapping TX/RX frequencies on keydown) is Phase 3M-1.
+    // Reverse: RadioModel verschiebt die Empfangsfrequenz um die Ablage
+    // und kehrt die Sendeablage um (Thetis console.cs:40442-40468).
     connect(m_revBtn, &QPushButton::toggled, this, [this](bool checked) {
         if (!m_slice) { return; }
         m_slice->setFmReverse(checked);

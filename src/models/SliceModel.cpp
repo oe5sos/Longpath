@@ -2437,6 +2437,13 @@ void SliceModel::saveToSettings(Band band)
     s.setValue(sp + QStringLiteral("RitHz"),      m_ritHz);
     s.setValue(sp + QStringLiteral("XitEnabled"), boolStr(m_xitEnabled));
     s.setValue(sp + QStringLiteral("XitHz"),      m_xitHz);
+    // FM-Relais (2026-09-27): Ton, Ablage, Richtung. Reverse nicht --
+    // es hat die Empfangsfrequenz schon verschoben, ein Wiederherstellen
+    // verschoebe sie ein zweites Mal.
+    s.setValue(sp + QStringLiteral("FmCtcssMode"),    m_fmCtcssMode);
+    s.setValue(sp + QStringLiteral("FmCtcssValueHz"), m_fmCtcssValueHz);
+    s.setValue(sp + QStringLiteral("FmOffsetHz"),     m_fmOffsetHz);
+    s.setValue(sp + QStringLiteral("FmTxMode"),       static_cast<int>(m_fmTxMode));
     s.setValue(sp + QStringLiteral("AfGain"),     m_afGain);
     s.setValue(sp + QStringLiteral("RfGain"),     m_rfGain);
     s.setValue(sp + QStringLiteral("RxAntenna"),  m_rxAntenna);
@@ -2818,6 +2825,19 @@ void SliceModel::restoreFromSettings(Band band)
     }
     if (s.contains(sp + QStringLiteral("XitEnabled"))) {
         setXitEnabled(s.value(sp + QStringLiteral("XitEnabled")).toString() == QLatin1String("True"));
+    }
+    if (s.contains(sp + QStringLiteral("FmCtcssMode"))) {
+        setFmCtcssMode(s.value(sp + QStringLiteral("FmCtcssMode")).toInt());
+    }
+    if (s.contains(sp + QStringLiteral("FmCtcssValueHz"))) {
+        setFmCtcssValueHz(s.value(sp + QStringLiteral("FmCtcssValueHz")).toDouble());
+    }
+    if (s.contains(sp + QStringLiteral("FmOffsetHz"))) {
+        setFmOffsetHz(s.value(sp + QStringLiteral("FmOffsetHz")).toInt());
+    }
+    if (s.contains(sp + QStringLiteral("FmTxMode"))) {
+        const int m = s.value(sp + QStringLiteral("FmTxMode")).toInt();
+        if (m >= 0 && m <= 2) { setFmTxMode(static_cast<FmTxMode>(m)); }
     }
     if (s.contains(sp + QStringLiteral("XitHz"))) {
         setXitHz(s.value(sp + QStringLiteral("XitHz")).toInt());

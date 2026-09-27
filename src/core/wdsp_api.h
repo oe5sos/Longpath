@@ -846,6 +846,23 @@ void SetRXAFMSQRun(int channel, int run);
 void SetRXAFMSQThreshold(int channel, double threshold);
 
 // ---------------------------------------------------------------------------
+// FM CTCSS / deviation (fmmod.c / fmd.c)
+//
+// From Thetis Project Files/Source/Console/radio.cs:2881-2940 [@852bf0e]
+// (TXFMDeviation, CTCSSFreqHz, CTCSSFlag) and :1429-1443, :1509-1525
+// (RXFMDeviation, RXFMCTCSSFilter). WDSP: third_party/wdsp/src/fmmod.c:147-184,
+// fmd.c:246-275. create_fmmod starts with ctcss_run = 1 at 100 Hz
+// (TXA.c:354-356) -- Thetis switches it off in SyncAll.
+// ---------------------------------------------------------------------------
+
+void SetTXACTCSSFreq(int channel, double freq);
+void SetTXACTCSSRun(int channel, int run);
+void SetTXAFMDeviation(int channel, double deviation);
+void SetRXACTCSSFreq(int channel, double freq);
+void SetRXACTCSSRun(int channel, int run);
+void SetRXAFMDeviation(int channel, double deviation);
+
+// ---------------------------------------------------------------------------
 // Metering (meter.h)
 // ---------------------------------------------------------------------------
 

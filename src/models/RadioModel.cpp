@@ -875,6 +875,7 @@ RadioModel::RadioModel(QObject* parent)
     connect(m_txSliceArbiter, &TxSliceArbiter::txBoundSliceChanged,
             this, [this](int, int) {
         pushTxFrequencyFromTxSlice();
+        pushFmToneFromTxSlice();
         pushTxModeAndBandpass();
         applyTxAntennaFromBoundSlice();
         if (m_moxController) {
@@ -5155,6 +5156,49 @@ int RadioModel::addSlice(const QString& initialPanId, bool suppressAutoStreamBin
     connect(slice, &SliceModel::xitHzChanged, this, [this, slice]() {
         if (slice == txBoundSlice()) { pushTxFrequencyFromTxSlice(); }
     });
+    // FM-Relaisablage (2026-09-27): Ablage, Richtung, Reverse und der
+    // Wechsel nach/aus FM aendern die Sendefrequenz.
+    connect(slice, &SliceModel::fmOffsetHzChanged, this, [this, slice](int) {
+        if (slice == txBoundSlice()) { pushTxFrequencyFromTxSlice(); }
+        scheduleSettingsSave();
+    });
+    connect(slice, &SliceModel::fmTxModeChanged, this, [this, slice](FmTxMode) {
+        if (slice == txBoundSlice()) { pushTxFrequencyFromTxSlice(); }
+    });
+    connect(slice, &SliceModel::dspModeChanged, this, [this, slice](DSPMode) {
+        if (slice == txBoundSlice()) {
+            pushTxFrequencyFromTxSlice();
+            pushFmToneFromTxSlice();
+        }
+    });
+    // Reverse hoert auf der Eingabe des Relais: die Empfangsfrequenz
+    // wandert um die Ablage, die Sendeablage kehrt sich um.
+    // From Thetis Console/console.cs:40442-40468 [@852bf0e]
+    //   chkFMTXRev_CheckedChanged: on  -> Low: VFOAFreq -= off; High: += off
+    //                              off -> Low: VFOAFreq += off; High: -= off
+    connect(slice, &SliceModel::fmReverseChanged, this, [this, slice](bool on) {
+        if (slice->fmTxMode() != FmTxMode::Simplex) {
+            const qint64 off = static_cast<qint64>(slice->fmOffsetHz());
+            const bool low = slice->fmTxMode() == FmTxMode::Low;
+            const qint64 delta = (low == on) ? -off : off;
+            const qint64 f = static_cast<qint64>(slice->frequency()) + delta;
+            if (f > 0) { slice->setFrequency(static_cast<double>(f)); }
+        }
+        if (slice == txBoundSlice()) { pushTxFrequencyFromTxSlice(); }
+    });
+    // CTCSS: Ton beim Senden, Kerbe beim Empfang.
+    connect(slice, &SliceModel::fmCtcssModeChanged, this, [this, slice](int) {
+        if (slice == txBoundSlice()) { pushFmToneFromTxSlice(); }
+        scheduleSettingsSave();
+    });
+    connect(slice, &SliceModel::fmCtcssValueHzChanged, this, [this, slice](double hz) {
+        if (RxChannel* rx = m_wdspEngine ? m_wdspEngine->rxChannel(slice->sliceIndex()) : nullptr) {
+            rx->setCtcssNotchFreq(hz);
+        }
+        if (slice == txBoundSlice()) { pushFmToneFromTxSlice(); }
+        scheduleSettingsSave();
+    });
+    connect(slice, &SliceModel::fmTxModeChanged, this, [this](FmTxMode) { scheduleSettingsSave(); });
 
     // 3M-1b H.1: only the TX-bound slice owns the global VOX mode gate.
     // Every slice is wired because the binding can move, but an RX/UI-only
@@ -6824,6 +6868,12 @@ void RadioModel::connectToRadio(const RadioInfo& info)
             // Task 4.2: give TxChannel a handle to WdspEngine so onModeChanged()
             // can call rebuild() when the active mode's DSP-Options settings change.
             m_txChannel->setWdspEngine(m_wdspEngine);
+            // FM-CTCSS des Sende-Slices (2026-09-27) -- WdspEngine hat den
+            // Ton beim Anlegen abgeschaltet, hier gilt die Wahl des Slices.
+            pushFmToneFromTxSlice();
+            qCInfo(lcDsp) << "TX channel FM CTCSS: WDSP ctcss_run ="
+                          << m_txChannel->ctcssRunInWdsp()
+                          << "(0 = kein Ton; vor 2026-09-27 stand hier 1)";
 
             // ── L.1: construct Pc + Radio mic sources + composite router ──────────
             // Construct after m_connection is live so RadioMicSource has a valid
@@ -9663,7 +9713,26 @@ quint64 RadioModel::txFrequencyForSlice(const SliceModel* slice) const
 
     const qint64 xitOffset =
         slice->xitEnabled() ? static_cast<qint64>(slice->xitHz()) : 0LL;
-    const qint64 txHz = static_cast<qint64>(slice->frequency()) + xitOffset;
+    qint64 txHz = static_cast<qint64>(slice->frequency()) + xitOffset;
+
+    // FM-Relaisablage (2026-09-27). Bisher nur Oberflaeche.
+    // From Thetis Console/console.cs:29347-29366 [@852bf0e]:
+    //   //FM Offsets
+    //   if (radio.GetDSPTX(0).CurrentDSPMode == DSPMode.FM
+    //       && current_fm_tx_mode != FMTXMode.Simplex && !chkVFOSplit.Checked)
+    //     Low:  !chkFMTXRev -> TXFreq -= fm_tx_offset_mhz; // usual case
+    //                  else -> TXFreq += fm_tx_offset_mhz;
+    //     High: !chkFMTXRev -> TXFreq += fm_tx_offset_mhz; // usual case
+    //                  else -> TXFreq -= fm_tx_offset_mhz;
+    // Thetis verschiebt beim Tasten; Longpath fuehrt die Sendefrequenz
+    // staendig nach, daher hier. Split kennt Longpath als eigenen
+    // Sende-Slice -- dessen eigene FM-Einstellung gilt.
+    if (slice->dspMode() == DSPMode::FM && slice->fmTxMode() != FmTxMode::Simplex) {
+        const qint64 off = static_cast<qint64>(slice->fmOffsetHz());
+        const bool high = slice->fmTxMode() == FmTxMode::High;
+        const bool rev = slice->fmReverse();
+        txHz += (high != rev) ? off : -off;
+    }
     return (txHz < 0) ? 0 : static_cast<quint64>(txHz);
 }
 
@@ -9895,6 +9964,26 @@ double RadioModel::composedShiftHz(const SliceModel* slice,
     }
 
     return offset;
+}
+
+// ---------------------------------------------------------------------------
+// FM CTCSS-Ton aus dem Sende-Slice (2026-09-27).
+// From Thetis Console/console.cs:40488-40516 [@852bf0e] (CTCSSOn / CTCSSFreq)
+// -> radio.cs:2901-2940 (SetTXACTCSSFreq / SetTXACTCSSRun). Der Ton laeuft
+// nur, wenn der Slice "Encode" oder "Enc+Dec" gewaehlt hat; fmmod laeuft
+// ohnehin nur in FM.
+// ---------------------------------------------------------------------------
+void RadioModel::pushFmToneFromTxSlice()
+{
+    if (!m_txChannel) { return; }
+    const SliceModel* slice = txBoundSlice();
+    if (!slice) {
+        m_txChannel->setCtcssRun(false);
+        return;
+    }
+    const int mode = slice->fmCtcssMode();   // 0 Off, 1 Encode, 2 Decode, 3 Enc+Dec
+    m_txChannel->setCtcssFreq(slice->fmCtcssValueHz());
+    m_txChannel->setCtcssRun(mode == 1 || mode == 3);
 }
 
 void RadioModel::pushTxFrequencyFromTxSlice()

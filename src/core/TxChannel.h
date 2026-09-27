@@ -792,6 +792,17 @@ public:
     /// is then fed into the same TXA mic-input path.
     void setTxMode(DSPMode mode);
 
+    /// FM CTCSS-Ton beim Senden (2026-09-27).
+    /// From Thetis Console/radio.cs:2901-2940 [@852bf0e] -- CTCSSFreqHz /
+    /// CTCSSFlag -> SetTXACTCSSFreq / SetTXACTCSSRun.
+    void setCtcssRun(bool on);
+    void setCtcssFreq(double hz);
+    bool ctcssRunForTest() const { return m_ctcssRun; }
+    /// Was WDSP selbst gerade haelt (fmmod.ctcss_run), -1 ohne Kanal --
+    /// fuer das Protokoll beim Anlegen des Sendekanals.
+    int ctcssRunInWdsp() const;
+    double ctcssFreqForTest() const { return m_ctcssFreq; }
+
     /// Test seam: returns the DSPMode last passed to SetTXAMode (the WDSP-
     /// mapped value, not the carry m_mode which preserves RADE_U/L for
     /// Longpath-side dispatch). Used by tst_tx_channel_rade_mode_mapping
@@ -3120,6 +3131,8 @@ private:
     // Mode + filter carry
     DSPMode m_mode         {DSPMode::USB};   // carry; setTxMode also calls WDSP
     DSPMode m_lastWdspTxMode{DSPMode::USB};  // test seam: RADE_U/L map -> USB/LSB
+    bool   m_ctcssRun{false};
+    double m_ctcssFreq{100.0};
     int     m_filterLowHz  {200};            // carry; setTxBandpass also calls WDSP
     int     m_filterHighHz {2700};           // carry; setTxBandpass also calls WDSP
 

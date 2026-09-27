@@ -4926,4 +4926,38 @@ void TxChannel::setPSTxIdx(int txid, int idx)
 #endif
 }
 
+// ---------------------------------------------------------------------------
+// FM CTCSS (2026-09-27)
+// From Thetis Console/radio.cs:2901-2940 [@852bf0e]:
+//   CTCSSFreqHz -> WDSP.SetTXACTCSSFreq(WDSP.id(thread, 0), value)
+//   CTCSSFlag   -> WDSP.SetTXACTCSSRun(WDSP.id(thread, 0), value)
+// ---------------------------------------------------------------------------
+void TxChannel::setCtcssRun(bool on)
+{
+    m_ctcssRun = on;
+#ifdef HAVE_WDSP
+    if (m_channelId < 0 || txa[m_channelId].fmmod.p == nullptr) { return; }
+    SetTXACTCSSRun(m_channelId, on ? 1 : 0);
+#endif
+}
+
+int TxChannel::ctcssRunInWdsp() const
+{
+#ifdef HAVE_WDSP
+    if (m_channelId < 0 || txa[m_channelId].fmmod.p == nullptr) { return -1; }
+    return txa[m_channelId].fmmod.p->ctcss_run;
+#else
+    return -1;
+#endif
+}
+
+void TxChannel::setCtcssFreq(double hz)
+{
+    m_ctcssFreq = hz;
+#ifdef HAVE_WDSP
+    if (m_channelId < 0 || txa[m_channelId].fmmod.p == nullptr) { return; }
+    SetTXACTCSSFreq(m_channelId, hz);
+#endif
+}
+
 } // namespace Longpath
