@@ -493,6 +493,14 @@ private slots:
     /// the connect outright — the handler would never fire.
     void onAddTnfClicked(const QString& panId);
 
+    /// Ein Loch im IQ-Strom: jeder Panadapter verwirft sein angefangenes
+    /// FFT-Fenster. Ein Slot, kein Lambda (2026-09-27): wireRtt verbindet
+    /// ihn bei jedem Verbindungsversuch neu, mit Qt::UniqueConnection --
+    /// und an einem Lambda verweigerte Qt6 genau diesen connect ("unique
+    /// connections require a pointer to member function", stand bei
+    /// jedem Verbinden im Protokoll). Das Verwerfen geschah also nie.
+    void onIqSequenceGap();
+
     /// TNF: surface a rejected add. Without this a +TNF press inside the
     /// 10 Hz dedupe window is silently ignored and the button reads as dead.
     void onNotchAddRejected(const QString& reason);

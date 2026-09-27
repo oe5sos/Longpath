@@ -733,12 +733,10 @@ MainWindow::MainWindow(QWidget* parent)
                 // vor allem Geraete am WLAN. Die Verbindung drosselt
                 // das Signal schon auf 20 ms; hier wird nur eine Fahne
                 // gesetzt, die jeder Engine auf seinem Faden abholt.
-                connect(conn, &RadioConnection::iqSequenceGap, this,
-                        [this]() {
-                    for (FFTEngine* e : std::as_const(m_fftEngines)) {
-                        if (e) { e->requestWindowReset(); }
-                    }
-                }, Qt::UniqueConnection);
+                // Benannter Slot, kein Lambda: siehe onIqSequenceGap().
+                connect(conn, &RadioConnection::iqSequenceGap,
+                        this, &MainWindow::onIqSequenceGap,
+                        Qt::UniqueConnection);
             }
         };
         wireRtt();
@@ -14451,6 +14449,13 @@ void MainWindow::noteWindowClosedByOperator(const QString& id)
             m_layoutProfiles->save();
         }
     });
+}
+
+void MainWindow::onIqSequenceGap()
+{
+    for (FFTEngine* e : std::as_const(m_fftEngines)) {
+        if (e) { e->requestWindowReset(); }
+    }
 }
 
 void MainWindow::raiseLogbookIfOpen()
