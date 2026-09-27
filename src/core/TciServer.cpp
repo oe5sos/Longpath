@@ -2874,6 +2874,11 @@ int TciServer::activeIqSubscriberCount(int receiver) const
     return count;
 }
 
+QWebSocket* TciServer::moxOwnerForTest() const
+{
+    return m_moxOwner.data();
+}
+
 } // namespace Longpath
 
 #endif // HAVE_WEBSOCKETS
