@@ -27,6 +27,9 @@
 //                 Anthropic Claude (Cowork).
 //   2026-09-25 — coveredFraction(): eingeschaltete Applets nach vorne.
 //                 Martin Fischer, AI-assisted via Anthropic Claude.
+//   2026-09-27 — fitFrameIntoArea(): Werkzeugfenster nie groesser als
+//                 der Schirm. Martin Fischer, AI-assisted via Anthropic
+//                 Claude.
 // =================================================================
 
 #include <QList>
@@ -145,5 +148,27 @@ void ensureOnVisibleScreen(QWidget* w, QWidget* anchor, QSize minSize);
 // genug fuer "liegt es zu einem guten Teil unter etwas". Leeres
 // `target` gilt als ganz verdeckt (es ist nirgends zu sehen).
 double coveredFraction(const QRect& target, const QList<QRect>& covers);
+
+// ── Nicht groesser als der Schirm ────────────────────────────────────
+//
+// Betreiber 2026-09-27, Bild vom MacBook Air: der Kanalzug stand
+// 980 x 1000 auf 849 px nutzbarer Hoehe -- sein unterer Teil lag hinter
+// dem Dock, und er liess sich nicht kleiner ziehen. Ein Fenster, das
+// aufgeht, soll ganz auf die freie Flaeche passen.
+//
+// Der Rahmen `frame` (mit Titelleiste) so klein wie noetig, damit er in
+// `area` (availableGeometry()) passt -- aber nicht kleiner als
+// `minFrame` --, und dann so wenig wie moeglich verschoben, bis er ganz
+// darin liegt. Passt er schon, kommt er unveraendert zurueck. Ist
+// `minFrame` selbst groesser als `area`, gewinnt die Mindestgroesse und
+// die linke obere Ecke liegt auf der von `area` (Titelleiste bleibt
+// greifbar).
+QRect fitFrameIntoArea(const QRect& frame, const QRect& area,
+                       const QSize& minFrame = QSize());
+
+/// fitFrameIntoArea() am Fenster `w`, auf der freien Flaeche seines
+/// Schirms. Erst nach show() aufrufen: vorher kennt macOS die
+/// Titelleiste nicht, und frameGeometry() waere zu klein.
+void fitIntoAvailableScreen(QWidget* w);
 
 } // namespace Longpath

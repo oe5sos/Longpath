@@ -8,6 +8,7 @@
 #include "gui/WindowPlacement.h"
 #include "gui/MacFloatingWindowBehavior.h"
 
+#include <algorithm>
 #include <cmath>
 
 #include <QGuiApplication>
@@ -287,6 +288,38 @@ double coveredFraction(const QRect& target, const QList<QRect>& covers)
         }
     }
     return static_cast<double>(covered) / (kSteps * kSteps);
+}
+
+QRect fitFrameIntoArea(const QRect& frame, const QRect& area,
+                       const QSize& minFrame)
+{
+    if (area.isEmpty()) { return frame; }
+    const QSize size = frame.size().boundedTo(area.size()).expandedTo(minFrame);
+    // So wenig wie moeglich schieben: erst die rechte/untere Kante
+    // herein, dann die linke/obere -- die gewinnt, falls die Mindest-
+    // groesse nicht hineinpasst (Titelleiste bleibt erreichbar).
+    int x = std::min(frame.x(), area.x() + area.width() - size.width());
+    int y = std::min(frame.y(), area.y() + area.height() - size.height());
+    x = std::max(x, area.x());
+    y = std::max(y, area.y());
+    return QRect(QPoint(x, y), size);
+}
+
+void fitIntoAvailableScreen(QWidget* w)
+{
+    if (!w || !w->isVisible()) { return; }
+    QScreen* scr = w->screen();
+    if (!scr) { return; }
+    const QRect frame = w->frameGeometry();
+    // Rahmen (Titelleiste) = Unterschied zwischen aussen und innen.
+    const QSize extra = frame.size() - w->size();
+    // Kleiner als sein Layout erlaubt, wird es ohnehin nicht.
+    const QSize minClient = w->minimumSize().expandedTo(w->minimumSizeHint());
+    const QRect fit = fitFrameIntoArea(frame, scr->availableGeometry(),
+                                       minClient + extra);
+    if (fit == frame) { return; }
+    w->resize(fit.size() - extra);
+    w->move(fit.topLeft());
 }
 
 } // namespace Longpath
