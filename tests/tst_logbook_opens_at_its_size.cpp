@@ -90,9 +90,41 @@ private slots:
         const QSize smaller(qMax(min.width(), 900), qMax(min.height(), 650));
         QVERIFY2(smaller.width() < 1000 || smaller.height() < 700,
                  "Inhalt braucht die ganze vorgesehene Groesse");
+        // Erst verkleinern, wenn die wirkliche Mindestgroesse es zulaesst:
+        // unter Last auf cocoa war sie nach 10 ms noch 698 hoch, und Qt
+        // klemmte das resize sofort ab (der Wunsch kam nie als Ereignis
+        // an). Noch in der Einschwingzeit -- die Nachtakte laufen noch.
+        QTRY_VERIFY_WITH_TIMEOUT(w.minimumSize().width() <= smaller.width()
+                                 && w.minimumSize().height() <= smaller.height(), 250);
         w.resize(smaller);
         QTest::qWait(1300);
         QCOMPARE(w.size(), smaller.expandedTo(w.minimumSizeHint()));
+    }
+
+    // Zieht Qt das Fenster NACH einer Verkleinerung noch einmal auf,
+    // gehen die Nachtakte auf die Verkleinerung zurueck -- nicht nur auf
+    // die vorgesehene Groesse (2026-09-27).
+    void aGrowthAfterAShrinkGoesBackToTheShrink()
+    {
+        LogbookWindow w(m_log);
+        w.resize(1000, 700);
+        w.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        // Eine echte Verkleinerung (700 -> 650), sobald die wirkliche
+        // Mindestgroesse sie zulaesst; minimumSizeHint() springt beim
+        // Einschwingen (offscreen kurz 820) und taugt hier nicht.
+        const QSize smaller(900, 650);
+        QTRY_VERIFY_WITH_TIMEOUT(w.minimumSize().width() <= smaller.width()
+                                 && w.minimumSize().height() <= smaller.height(), 250);
+        w.resize(smaller);
+        QCOMPARE(w.size(), smaller);
+        // Wie eine voruebergehende Mindesthoehe beim Einschwingen: Qt zieht
+        // auf, und von selbst schrumpft das Fenster nie zurueck.
+        w.setMinimumHeight(smaller.height() + 48);
+        QCOMPARE(w.height(), smaller.height() + 48);
+        w.setMinimumHeight(0);
+        QTest::qWait(1300);
+        QCOMPARE(w.size(), smaller);
     }
 
     // Kleiner als der Inhalt braucht, wird es nie -- die Leisten duerfen

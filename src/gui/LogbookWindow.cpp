@@ -162,6 +162,9 @@ void LogbookWindow::moveEvent(QMoveEvent* event)
 void LogbookWindow::resizeEvent(QResizeEvent* event)
 {
     QDialog::resizeEvent(event);
+    if (m_settling) {
+        m_settleTarget = m_settleTarget.boundedTo(event->size());
+    }
     saveGeometryState();
 }
 
@@ -209,16 +212,27 @@ void LogbookWindow::setVisible(bool visible)
     // (2026-09-27): wer das Fenster in der ersten Sekunde kleiner zieht,
     // behaelt es so. Vorher stellte der naechste Takt die vorgesehene
     // Groesse wieder her (auf der CI: tst_logbook_toolbar_wraps).
+    //
+    // Ziel ist die kleinste Groesse, die das Fenster in dieser Zeit hatte
+    // (m_settleTarget, gefuehrt in resizeEvent): zieht Qt NACH einer
+    // Verkleinerung noch einmal auf, geht es auf die Verkleinerung
+    // zurueck, nicht nur auf die vorgesehene Groesse (unter Last auf
+    // cocoa: 900x650 gewollt, 900x698 aufgezogen, 2026-09-27).
     const bool first = visible && !m_shownOnce;
     const QRect intended = geometry();
+    if (first) {
+        m_settling = true;
+        m_settleTarget = intended.size();
+    }
     QDialog::setVisible(visible);
     if (!first) { return; }
     m_shownOnce = true;
     const bool withPosition = m_geometryRestored;
     for (int ms : {50, 300, 1000}) {
-        QTimer::singleShot(ms, this, [this, intended, withPosition]() {
+        QTimer::singleShot(ms, this, [this, intended, withPosition, ms]() {
+            if (ms == 1000) { m_settling = false; }
             if (!isVisible() || isMaximized() || isFullScreen()) { return; }
-            const QSize bound = intended.size().expandedTo(minimumSizeHint());
+            const QSize bound = m_settleTarget.expandedTo(minimumSizeHint());
             const QSize size = this->size().boundedTo(bound);
             if (size == this->size()) { return; }   // nichts aufgezogen
             setGeometry(withPosition ? QRect(intended.topLeft(), size)
