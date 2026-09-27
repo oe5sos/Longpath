@@ -5,12 +5,16 @@
 // Ported from Thetis sources:
 //   Project Files/Source/Console/console.cs, original licence from Thetis source is included below
 //   Project Files/Source/Console/display.cs, original licence from Thetis source is included below
+//   Project Files/Source/Console/radio.cs, original licence from Thetis source is included below
 //
 // =================================================================
 // Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
+//   2026-09-27 — FM filter from the FM deviation: rx_fm_highcut from
+//                 radio.cs:1571 [@852bf0e]. Martin Fischer (OE5SOS),
+//                 AI-assisted via Anthropic Claude Code.
 // =================================================================
 
 //=================================================================
@@ -95,6 +99,49 @@
 //=================================================================
 // Waterfall AGC Modifications Copyright (C) 2013 Phil Harman (VK6APH)
 // Transitions to directX and continual modifications Copyright (C) 2020-2025 Richard Samphire (MW0LGE)
+//=================================================================
+//
+//============================================================================================//
+// Dual-Licensing Statement (Applies Only to Author's Contributions, Richard Samphire MW0LGE) //
+// ------------------------------------------------------------------------------------------ //
+// For any code originally written by Richard Samphire MW0LGE, or for any modifications       //
+// made by him, the copyright holder for those portions (Richard Samphire) reserves the       //
+// right to use, license, and distribute such code under different terms, including           //
+// closed-source and proprietary licences, in addition to the GNU General Public License      //
+// granted above. Nothing in this statement restricts any rights granted to recipients under  //
+// the GNU GPL. Code contributed by others (not Richard Samphire) remains licensed under      //
+// its original terms and is not affected by this dual-licensing statement in any way.        //
+// Richard Samphire can be reached by email at :  mw0lge@grange-lane.co.uk                    //
+//============================================================================================//
+
+//=================================================================
+// radio.cs
+//=================================================================
+// PowerSDR is a C# implementation of a Software Defined Radio.
+// Copyright (C) 2004-2009  FlexRadio Systems
+// Copyright (C) 2010-2020  Doug Wigley
+// Copyright (C) 2019-2026  Richard Samphire
+//
+// This program is free software; you can redistribute it and/or
+// modify it under the terms of the GNU General Public License
+// as published by the Free Software Foundation; either version 2
+// of the License, or (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program; if not, write to the Free Software
+// Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+//
+// You may contact us via email at: sales@flex-radio.com.
+// Paper mail may be sent to: 
+//    FlexRadio Systems
+//    8900 Marybank Dr.
+//    Austin, TX 78750
+//    USA
 //=================================================================
 //
 //============================================================================================//
@@ -686,6 +733,20 @@ void SliceModel::widthToEdges(int widthHz, DSPMode mode, int currentCenter,
 int SliceModel::cwPitchHz()
 {
     return currentCwPitch();
+}
+
+int SliceModel::fmDeviationHz()
+{
+    const int hz = AppSettings::instance()
+        .value(QStringLiteral("FmDeviationHz"), 5000).toInt();
+    return hz > 0 ? hz : 5000;
+}
+
+int SliceModel::fmHalfBandwidthHz()
+{
+    // From Thetis Console/radio.cs:1571 [@852bf0e] -- rx_fm_highcut = 3000.0
+    constexpr int kRxFmHighCutHz = 3000;
+    return fmDeviationHz() + kRxFmHighCutHz;
 }
 
 int SliceModel::defaultFilterCenter(DSPMode mode, int widthHz)
@@ -1981,13 +2042,16 @@ std::pair<int, int> SliceModel::defaultFilterForMode(DSPMode mode)
     case DSPMode::CWU:
         // From Thetis console.cs:5417 — F5: (cw_pitch-200) to (cw_pitch+200)
         return {kCwPitch - 200, kCwPitch + 200};
-    case DSPMode::FM:
-        // FM filters are dynamic in Thetis (from deviation + high cut).
-        // Default deviation=5000, so use ±8000 as reasonable default.
-        // From Thetis console.cs:7559-7565
-        // Upstream inline attribution preserved verbatim (console.cs:7560):
+    case DSPMode::FM: {
+        // FM filters are dynamic in Thetis (from deviation + high cut):
+        // +/-8000 at 5 kHz deviation, +/-5500 at 2.5 kHz (2026-09-27; was
+        // a fixed +/-8000).
+        // From Thetis console.cs:7498-7503 [@852bf0e]
+        // Upstream inline attribution preserved verbatim (console.cs:7499):
         //   int halfBw = (int)(radio.GetDSPRX(0, 0).RXFMDeviation + radio.GetDSPRX(0, 0).RXFMHighCut);  //[2.10.3.4]MW0LGE
-        return {-8000, 8000};
+        const int halfBw = fmHalfBandwidthHz();
+        return {-halfBw, halfBw};
+    }
     case DSPMode::AM:
         // From Thetis console.cs:5459 — F5: -5000 to 5000
         return {-5000, 5000};

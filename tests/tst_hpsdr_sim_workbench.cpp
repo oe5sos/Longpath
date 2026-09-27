@@ -44,6 +44,8 @@
 #include "core/StepAttenuatorController.h"
 #include "core/WdspEngine.h"
 #include "models/Band.h"
+#include "core/RxChannel.h"
+#include "core/TxChannel.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
 #include "models/TransmitModel.h"
@@ -79,6 +81,58 @@ MeterReading readMeter(Longpath::RadioModel& model, int samples = 8)
 
 class TstHpsdrSimWorkbench : public QObject { Q_OBJECT
 private slots:
+    // FM-Deviation am verbundenen Geraet (2026-09-27): was WDSP im
+    // Sendekanal wirklich haelt, vor und nach dem Umschalten auf 2,5 kHz,
+    // und der Filter des FM-Slices (Thetis: +/-(Deviation + 3000)).
+    void fm_deviation_reaches_wdsp()
+    {
+        const QString target = qEnvironmentVariable("LONGPATH_HPSDRSIM");
+        if (target.isEmpty()) {
+            QSKIP("LONGPATH_HPSDRSIM nicht gesetzt — Werkbank, kein CI-Test.");
+        }
+        const QStringList hp = target.split(QLatin1Char(':'));
+        RadioDiscovery disc;
+        QSignalSpy found(&disc, &RadioDiscovery::radioDiscovered);
+        disc.probeAddress(QHostAddress(hp.value(0, QStringLiteral("127.0.0.1"))),
+                          static_cast<quint16>(hp.value(1, QStringLiteral("1024")).toUInt()));
+        QTRY_VERIFY_WITH_TIMEOUT(found.count() > 0, 8000);
+        const RadioInfo info = found.first().first().value<RadioInfo>();
+
+        RadioModel model;
+        model.setFmDeviationHz(5000);
+        model.connectToRadio(info);
+        QTRY_VERIFY_WITH_TIMEOUT(model.connectionState() == ConnectionState::Connected, 15000);
+        QTRY_VERIFY_WITH_TIMEOUT(model.txChannel() != nullptr, 10000);
+        QVERIFY(model.activeSlice());
+        SliceModel* s = model.activeSlice();
+        s->setFrequency(145'500'000.0);
+        s->setDspMode(DSPMode::FM);
+        QTest::qWait(300);
+
+        const double txBefore = model.txChannel()->fmDeviationInWdsp();
+        qInfo() << "FM WDSP-TX-Deviation vorher" << txBefore
+                << "Filter" << s->filterLow() << s->filterHigh();
+        QCOMPARE(txBefore, 5000.0);
+
+        model.setFmDeviationHz(2500);
+        QTest::qWait(200);
+        const double txAfter = model.txChannel()->fmDeviationInWdsp();
+        RxChannel* rx = model.rxChannelForSlice(s->sliceIndex());
+        qInfo() << "FM WDSP-TX-Deviation nachher" << txAfter
+                << "RX-Kanal" << (rx ? rx->fmDeviationForTest() : -1.0)
+                << "Filter" << s->filterLow() << s->filterHigh();
+        QCOMPARE(txAfter, 2500.0);
+        QVERIFY(rx);
+        QCOMPARE(rx->fmDeviationForTest(), 2500.0);
+        QCOMPARE(s->filterLow(), -5500);
+        QCOMPARE(s->filterHigh(), 5500);
+
+        model.setFmDeviationHz(5000);
+        QCOMPARE(model.txChannel()->fmDeviationInWdsp(), 5000.0);
+        model.disconnectFromRadio();
+        QTest::qWait(300);
+    }
+
     void discover_connect_receive_tune_disconnect()
     {
         const QString target = qEnvironmentVariable("LONGPATH_HPSDRSIM");

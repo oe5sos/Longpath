@@ -72,6 +72,13 @@ struct TxChannelState {
     bool   cpdrOn                       = false;
     double cpdrLevelDb                  = 0.0;
 
+    // ── FM (2026-09-27) ───────────────────────────────────────────────────────
+    // CTCSS-Ton und Deviation -- ein Rebuild oeffnet den WDSP-Kanal neu,
+    // und create_fmmod legt ctcss_run = 1 bei 100 Hz an.
+    bool   ctcssRun                     = false;
+    double ctcssFreqHz                  = 100.0;
+    double fmDeviationHz                = 5000.0;
+
     // ── PureSignal placeholder ────────────────────────────────────────────────
     // Carry-only — 3M-4 work. Captured and reapplied without WDSP call so
     // the state survives a rebuild even though PureSignal is not yet wired.
