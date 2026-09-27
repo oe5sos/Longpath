@@ -120,6 +120,9 @@ class TestRadeApplet;
 // 2026-09-17: same pattern for the NR-backend audio pruefstand, which
 // pushes real audio through every noise-reduction slot on a real channel.
 class TstNrBackendsProcessAudio;
+// 2026-09-27: same pattern for the PB-SNR noise probe, which pushes
+// Gaussian noise through a real channel and reads the S meter.
+class TstPbsnrNoiseProbe;
 // Phase 3F Sub-Epic I closeout, defect H1: the per-stream drain-geometry
 // test primes the engine so createRxChannel can seed real RX channels.
 class TestStreamPoolBinding;
@@ -815,6 +818,8 @@ private:
     // (tests/tst_nr_backends_process_audio.cpp), which needs really
     // opened RX channels to run NR1..NR4/NNR/MNR on audio.
     friend class ::TstNrBackendsProcessAudio;
+    // 2026-09-27: same friendship for the PB-SNR noise probe.
+    friend class ::TstPbsnrNoiseProbe;
 #endif
 };
 
