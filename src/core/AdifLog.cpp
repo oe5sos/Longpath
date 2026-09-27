@@ -29,6 +29,7 @@
 #include "AdifLog.h"
 
 #include "core/Maidenhead.h"
+#include "core/QsoConfirmation.h"
 
 #include <QDate>
 #include <QFile>
@@ -356,6 +357,41 @@ bool isSameQso(const LogEntry& a, const LogEntry& b)
     return secs <= kDuplicateToleranceMinutes * 60;
 }
 
+namespace {
+
+// Die drei Empfangs-Bestaetigungen, und das Datum, das zu jeder gehoert.
+bool isConfirmationReceivedField(const QString& name)
+{
+    return name == QLatin1String("QSL_RCVD")
+        || name == QLatin1String("LOTW_QSL_RCVD")
+        || name == QLatin1String("EQSL_QSL_RCVD");
+}
+
+QString confirmationDateField(const QString& receivedField)
+{
+    if (receivedField == QLatin1String("QSL_RCVD"))      { return QStringLiteral("QSLRDATE"); }
+    if (receivedField == QLatin1String("LOTW_QSL_RCVD")) { return QStringLiteral("LOTW_QSLRDATE"); }
+    return QStringLiteral("EQSL_QSLRDATE");
+}
+
+// Mit der Bestaetigung ihr Datum: vorhanden -> ersetzt (es gehoerte
+// zum alten "nicht bestaetigt"), fehlend -> ergaenzt.
+void takeConfirmationDate(LogEntry& have, const LogEntry& in, const QString& receivedField)
+{
+    const QString dateField = confirmationDateField(receivedField);
+    QString date;
+    for (const auto& kv : in.extras) {
+        if (kv.first == dateField) { date = kv.second; break; }
+    }
+    if (date.isEmpty()) { return; }
+    for (auto& mine : have.extras) {
+        if (mine.first == dateField) { mine.second = date; return; }
+    }
+    have.extras.append({dateField, date});
+}
+
+} // namespace
+
 MergeResult merge(const QVector<LogEntry>& existing,
                   const QVector<LogEntry>& incoming)
 {
@@ -388,8 +424,26 @@ MergeResult merge(const QVector<LogEntry>& existing,
             bool grew = false;
             for (const auto& kv : in.extras) {
                 bool present = false;
-                for (const auto& mine : have.extras) {
-                    if (mine.first == kv.first) { present = true; break; }
+                for (auto& mine : have.extras) {
+                    if (mine.first != kv.first) { continue; }
+                    present = true;
+                    // Eine Bestaetigung darf ankommen, auch wenn lokal
+                    // schon "nicht bestaetigt" steht (2026-09-26). Viele
+                    // Programme -- und der QRZ-Export -- schreiben
+                    // QSL_RCVD/LOTW_QSL_RCVD=N ausdruecklich; ohne diese
+                    // Ausnahme aenderte ein LoTW-Bericht an genau diesen
+                    // Kontakten nichts, der Fehler, den diese Regel
+                    // verhindern soll (Betreiber-Log: 9268 Kontakte mit
+                    // QSL_RCVD=N, 193 mit LOTW_QSL_RCVD=N, 0 bestaetigt).
+                    // Nur hinauf, nie zurueck: ein Y bleibt Y.
+                    if (isConfirmationReceivedField(mine.first)
+                        && QsoConfirmation::parse(kv.second) == QsoConfirmation::State::Confirmed
+                        && QsoConfirmation::parse(mine.second) != QsoConfirmation::State::Confirmed) {
+                        mine.second = kv.second;
+                        takeConfirmationDate(have, in, mine.first);
+                        grew = true;
+                    }
+                    break;
                 }
                 if (present) { continue; }
                 have.extras.append(kv);
