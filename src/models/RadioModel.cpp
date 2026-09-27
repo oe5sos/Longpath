@@ -35,6 +35,12 @@
 //                 propagation to TransmitModel::setStepAttenuatorController
 //                 inside RadioModel::setStepAttController.  J.J. Boyd
 //                 (KG4VCF), AI-assisted via Anthropic Claude Code.
+//   2026-09-27 -- CW pitch setter (Martin Fischer, OE5SOS, AI-assisted via
+//                 Anthropic Claude): setCwPitch/cwPitchChanged after the
+//                 console.cs CWPitch setter [@852bf0e] (RX part only;
+//                 sidetone and the MOX VFO shift are CW TX, deferred);
+//                 APF centre = CWPitch + tune from the setting instead of
+//                 a fixed 600 (setup.cs tbRX1APFTune_Scroll).
 // =================================================================
 
 //=================================================================
@@ -2941,6 +2947,88 @@ void RadioModel::setRfKitEnabled(bool enabled)
     }
 
     emit rfKitEnabledChanged(enabled);
+}
+
+// ── CW-Tonhoehe ────────────────────────────────────────────────────────────
+//
+// Porting from Thetis console.cs:18142-18242 [@852bf0e] — public int
+// CWPitch, set (Schrittfolge ausfuehrlich bei SliceModel::
+// centreCwFilterOnPitch). Hier die Reihenfolge und was davon bei uns
+// ankommt:
+//
+//   cw_pitch = value; if (cw_pitch <= 0) cw_pitch = 0;  //-W2PA
+//       -> Klemmen wie CATCWPitch (unten), dann AppSettings "CWPitch".
+//   udCWPitch.Value = cw_pitch;
+//       -> das Setup-Feld horcht auf cwPitchChanged.
+//   Display.CWPitch = cw_pitch;
+//       -> kein Gegenstueck: die CW-Nullinie/Anzeigeversatz ist nicht
+//          portiert.
+//   NetworkIO.SetCWSidetoneFreq(cw_pitch);
+//       -> Mithoerton = SENDEN. 3M-2 CW-TX ist zurueckgestellt
+//          (Betreiber 2026-08-27); bewusst weggelassen.
+//   //-W2PA June 2017 … die Vorgabenschleife (rx1_filters/rx2_filters)
+//       -> FilterPresetStore::followCwPitch (Plaetze mit Ueberschreibung;
+//          die Vorgaben selbst rechnet presetsForMode aus der Tonhoehe)
+//          und SliceModel::recentreStoredCwFilters (gespeicherte
+//          Banddurchlaesse, siehe dort).
+//   switch (_rx1_dsp_mode) CWL/CWU:
+//       if (_mox) VFOAFreq += diff (…VFOBFreq bei Split)
+//           -> SENDEN, weggelassen (siehe oben).
+//       else txtVFOAFreq_LostFocus / txtVFOBFreq_LostFocus
+//           -> Thetis stimmt hier neu ab, weil es den Empfaenger in CW
+//              um die Tonhoehe versetzt (console.cs:31759-31767). Longpath
+//              stimmt den DDC auf die Anzeigefrequenz ab, ohne diesen
+//              Versatz — also gibt es nichts neu abzustimmen.
+//       RX1Filter = rx1_filter; RX2Filter = rx2_filter;
+//           -> SliceModel::followCwPitch je Scheibe.
+//   SetupForm.RX1APFFreq = ptbCWAPFFreq.Value (und RX1sub/RX2)
+//       -> tbRX1APFTune_Scroll: RXAPFFreq = console.CWPitch + Tune
+//          (setup.cs:17112) — hier je Scheibe CWPitch + apfTuneHz.
+//   if (old_cwpitch != cw_pitch) CWPitchChangedHandlers?.Invoke(…)
+//       -> emit cwPitchChanged(pitch), ebenfalls nur bei Aenderung.
+int RadioModel::cwPitch() const
+{
+    return SliceModel::cwPitchHz();
+}
+
+void RadioModel::setCwPitch(int hz)
+{
+    // From Thetis setup.cs:5733-5734 [@852bf0e] — CATCWPitch klemmt auf
+    // die Spanne des Setup-Felds, bevor es setzt:
+    //   value = (int)Math.Max(udDSPCWPitch.Minimum, value);
+    //   value = (int)Math.Min(udDSPCWPitch.Maximum, value);
+    const int pitch = SliceModel::clampCwPitch(hz);
+    const int oldPitch = cwPitch();
+    if (pitch == oldPitch) {
+        return;
+    }
+
+    AppSettings::instance().setValue(QStringLiteral("CWPitch"),
+                                     QString::number(pitch));
+
+    // Die Vorgabenschleife und RX1Filter/RX2Filter.
+    if (m_filterPresetStore) {
+        m_filterPresetStore->followCwPitch(pitch);
+    }
+    SliceModel::recentreStoredCwFilters(pitch);
+    for (SliceModel* slice : std::as_const(m_slices)) {
+        slice->followCwPitch(pitch);
+    }
+
+    // APF-Mitte.
+    // From Thetis setup.cs:17112 [@852bf0e] — tbRX1APFTune_Scroll:
+    //   console.radio.GetDSPRX(0, 0).RXAPFFreq = console.CWPitch + (double)tbRX1APFTune.Value;
+    if (m_wdspEngine) {
+        for (SliceModel* slice : std::as_const(m_slices)) {
+            if (RxChannel* rxCh = m_wdspEngine->rxChannel(slice->sliceIndex())) {
+                rxCh->setApfFreq(static_cast<double>(pitch)
+                                 + static_cast<double>(slice->apfTuneHz()));
+            }
+        }
+    }
+
+    scheduleSettingsSave();
+    emit cwPitchChanged(pitch);
 }
 
 // ── Per-radio peripherals helpers ──────────────────────────────────────────
@@ -6709,7 +6797,13 @@ void RadioModel::connectToRadio(const RadioInfo& info)
                 rxCh->setApfSelection(3);       // radio.cs:1986 _rx_apf_type = 3 (bi-quad)
                 rxCh->setApfBandwidth(600.0);   // radio.cs:1948 rx_apf_bw = 600.0 Hz
                 rxCh->setApfGain(1.0);          // radio.cs:1967 rx_apf_gain = 1.0
-                rxCh->setApfFreq(600.0);        // radio.cs:1929 rx_apf_freq = 600.0 Hz
+                // radio.cs:1929 rx_apf_freq = 600.0 Hz ist nur der Startwert
+                // der Klasse; Thetis setzt die Mitte danach aus dem Setup
+                // (tbRX1APFTune_Scroll, setup.cs:17112: CWPitch + Tune).
+                // Mit fest 600 lag der APF nach einem Neustart neben einer
+                // anders eingestellten Tonhoehe (2026-09-27).
+                rxCh->setApfFreq(static_cast<double>(cwPitch())
+                                 + static_cast<double>(m_activeSlice->apfTuneHz()));
                 rxCh->setApfEnabled(m_activeSlice->apfEnabled());
                 // Squelch initial push — From Thetis radio.cs:1185,1164,1274,1293,1312
                 rxCh->setSsqlEnabled(m_activeSlice->ssqlEnabled());
@@ -10866,10 +10960,13 @@ void RadioModel::wireSliceSignals(SliceModel* slice)
     connect(slice, &SliceModel::apfTuneHzChanged, this, [this, slice](int hz) {
         RxChannel* rxCh = m_wdspEngine->rxChannel(slice->sliceIndex());
         if (rxCh) {
-            // From Thetis setup.cs:17071 — freq = CWPitch + tuneOffset
-            // CW pitch default 600 Hz from Thetis console.cs
-            static constexpr double kCwPitchHz = 600.0;
-            rxCh->setApfFreq(kCwPitchHz + static_cast<double>(hz));
+            // From Thetis setup.cs:17112 [@852bf0e] — freq = CWPitch + tuneOffset
+            // (tbRX1APFTune_Scroll; bei v2.10.3.13 stand es auf :17071).
+            // CWPitch ist seit 2026-09-27 die eingestellte Tonhoehe, nicht
+            // mehr fest 600 (die Vorgabe aus Thetis console.cs); eine
+            // Aenderung schiebt die Mitte in setCwPitch nach.
+            rxCh->setApfFreq(static_cast<double>(cwPitch())
+                             + static_cast<double>(hz));
         }
         scheduleSettingsSave();
     });

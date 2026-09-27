@@ -14,7 +14,6 @@
 
 #include "CwDecoderApplet.h"
 
-#include "core/AppSettings.h"
 #include "core/AudioEngine.h"
 #include "core/CwDecoder.h"
 #include "core/audio/AudioTapRing.h"
@@ -81,6 +80,11 @@ CwDecoderApplet::CwDecoderApplet(RadioModel* model, QWidget* parent)
             if (m_slice && m_slice->sliceIndex() == index) {
                 setSlice(nullptr);
             }
+        });
+        // The operator moved the CW pitch (Setup > DSP > CW): the filters
+        // moved with it, so must the band the decoder searches.
+        connect(m_model, &RadioModel::cwPitchChanged, this, [this](int) {
+            applyPitchBandFromSlice();
         });
     }
 
@@ -198,14 +202,14 @@ void CwDecoderApplet::setSlice(SliceModel* slice)
 }
 
 // The band the decoder searches for the tone: the operator's CW pitch
-// (AppSettings "CWPitch", the Thetis-sourced value SliceModel's CW filter
-// presets sit on) +/- 150 Hz.
+// (SliceModel::cwPitchHz -- AppSettings "CWPitch", the Thetis-sourced value
+// SliceModel's CW filter presets sit on, already clamped) +/- 150 Hz.
 void CwDecoderApplet::applyPitchBandFromSlice()
 {
     if (!m_decoder) { return; }
-    int pitch = AppSettings::instance().value(QStringLiteral("CWPitch"), 600).toInt();
-    pitch = std::clamp(pitch, 100, 2000);
-    m_decoder->setPitchRange(std::max(100, pitch - kPitchPadHz), pitch + kPitchPadHz);
+    const int pitch = SliceModel::cwPitchHz();
+    m_pitchBand = qMakePair(std::max(100, pitch - kPitchPadHz), pitch + kPitchPadHz);
+    m_decoder->setPitchRange(m_pitchBand.first, m_pitchBand.second);
 }
 
 void CwDecoderApplet::updateAudioTap()

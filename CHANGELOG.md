@@ -4,6 +4,22 @@
 
 ### Added
 
+- **CW-Tonhoehe einstellbar, und alles folgt ihr live.** Setup › DSP ›
+  CW › „CW Pitch (Hz)“ (Thetis `udDSPCWPitch`: 200–2250 Hz, Schritt 10,
+  Tooltip wortgetreu) setzt `RadioModel::setCwPitch`, das
+  `cwPitchChanged(int)` meldet. Nachgezogen wird wie im Thetis-Setter
+  `CWPitch` (console.cs, [@852bf0e]): jede CW-Vorgabe, jeder vom
+  Bedienenden ueberschriebene Platz, VAR1/VAR2, der laufende Durchlass
+  jeder CW-Scheibe und die gespeicherten Banddurchlaesse wandern auf die
+  neue Tonhoehe, Breite bleibt, an der Spiegelgrenze rutschen sie statt
+  ueber den Traeger zu reichen. APF-Mitte (Tonhoehe + Feinabstimmung,
+  auch beim Verbinden statt fest 600 Hz), das Suchband des CW-Decoders
+  und die KiwiSDR-Nachfuehrung folgen ebenfalls. Nur Empfang: Mithoerton
+  und der VFO-Versatz bei MOX gehoeren zu CW-TX (zurueckgestellt).
+  Nebenwirkung: CW-F1 (±750 Hz) liegt bei 600 Hz jetzt auf 0–1500 statt
+  −150–1350 Hz, weil auch die Vorgabentabelle an der Spiegelgrenze
+  rutscht; die gelesene Spanne ist 200–2250 statt 100–2000.
+
 - **QRP-Verbindungsreihenfolge widerlegt.** ExpertSDRs kompletter
   Verbindungsstoss (24 Steuerrahmen, Original-Reihenfolge, 12 vor und
   12 nach dem Zustandsrahmen) am Gerät nachgespielt --
