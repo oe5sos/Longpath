@@ -241,6 +241,7 @@ warren@wpratt.com
 //============================================================================================//
 
 #include "MainWindow.h"
+#include "gui/DxccSpotColours.h"
 #include "gui/ScopedChildWidget.h"
 #include "gui/styles/ThemeQss.h"
 #include "ConnectionPanel.h"
@@ -4184,6 +4185,16 @@ void MainWindow::buildUI()
                 this, refreshSpots);
         connect(spotModel, &SpotModel::spotsRefreshed,
                 this, refreshSpots);
+
+        // DXCC-Farben (2026-09-27): eingeschaltet, abschaltbar im
+        // Spot-Hub, in den Farben des Hauses -- siehe DxccSpotColours.h.
+        // Das eigene Log liest der Provider im Hintergrund; ist es da,
+        // die Spots neu faerben.
+        if (auto* dxcc = m_radioModel->dxccColorProvider()) {
+            applyDxccSpotColours(*dxcc);
+            connect(dxcc, &DxccColorProvider::importFinished,
+                    this, [refreshSpots](int, int) { refreshSpots(); });
+        }
 
         // 2026-05-12 bench fix (Gap #3 follow-on).  Right-click → Remove
         // Spot on the panadapter emits spotRemoveRequested(idx) → purge
@@ -14907,6 +14918,12 @@ void MainWindow::openSpotHub()
                 this, [this] {
                     if (activeSpectrumWidget()) {
                         activeSpectrumWidget()->loadSpotDisplaySettings();
+                    }
+                    // Der DXCC-Schalter im Display-Reiter (2026-09-27).
+                    if (DxccColorProvider* dxcc = m_radioModel
+                            ? m_radioModel->dxccColorProvider() : nullptr) {
+                        applyDxccSpotColours(*dxcc);
+                        if (SpotModel* sm = m_radioModel->spotModel()) { sm->refresh(); }
                     }
                 });
         // Defensive re-seed.  The primary seed runs at MainWindow startup

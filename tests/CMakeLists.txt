@@ -6083,6 +6083,8 @@ longpath_add_test(tst_dxcc_worked_status)
 #   (W1AW on 20m PHONE -> colorWorked dim grey). Source:
 #   AetherSDR src/core/DxccColorProvider.{h,cpp} [@0cd4559].
 longpath_add_test(tst_dxcc_color_provider)
+# DXCC-Farben der Spots: an, Hausfarben, Schalter im Spot-Hub (2026-09-27).
+longpath_add_test(tst_dxcc_spot_colours)
 
 # ── Phase 3J-2 Task D1: SpotModel (TCI-keyed spot sink) ────────────────────
 # Pins the contract that SpotModel is a QMap<int, SpotData> sink
