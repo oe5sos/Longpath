@@ -14044,6 +14044,9 @@ RotorLogbookPanel* MainWindow::ensureRotorPanel()
         ensureSatellites();
         panel->setSatellites(m_satellites);
         m_rotorPanel = panel;
+        connect(panel, &RotorLogbookPanel::logbookClosed, this, [this]() {
+            noteWindowClosedByOperator(QStringLiteral("WinLogbook"));
+        });
         m_rotorDock->setWidget(panel);
         addDockWidget(Qt::RightDockWidgetArea, m_rotorDock);
     }
@@ -14437,6 +14440,31 @@ void MainWindow::applyWindowVisibility(const QString& id, bool on)
     }
 }
 
+// Kanalzug, Logbuch und Spot-Zentrale gingen bei jedem Start wieder auf,
+// obwohl der Betreiber sie zugemacht hatte (2026-09-27: „es ist channel
+// strip, logbook usw. immer wieder erneut offen"). Dieselbe Luecke wie am
+// 2026-09-01 beim Antennenfenster (AntennaWindow::closed): der rote Knopf
+// schloss das Fenster, der Haken im AppletVisibilityController blieb an,
+// das Profil sicherte ihn beim Beenden als „sichtbar", und
+// applyWindowVisibility() oeffnete es beim naechsten Start treu wieder.
+//
+// Erst im naechsten Durchlauf entscheiden: bei Cmd+Q schliesst Qt jedes
+// Fenster in beliebiger Reihenfolge, oft die Dialoge VOR dem Hauptfenster.
+// Bis dieser Aufruf dran ist, hat closeEvent() m_shuttingDown gesetzt und
+// das Profil schon gesichert -- dann war es ein Beenden, kein Wunsch.
+void MainWindow::noteWindowClosedByOperator(const QString& id)
+{
+    QTimer::singleShot(0, this, [this, id]() {
+        if (m_shuttingDown || !m_appletVis) { return; }
+        if (!m_appletVis->isVisible(id)) { return; }
+        m_appletVis->setVisible(id, false);
+        if (m_layoutProfiles) {
+            m_layoutProfiles->captureIntoCurrent();
+            m_layoutProfiles->save();
+        }
+    });
+}
+
 void MainWindow::raiseLogbookIfOpen()
 {
     // Das Verbinden-Fenster geht vor: solange es offen ist, wartet der
@@ -14818,6 +14846,9 @@ void MainWindow::openChannelStrip()
     if (!m_stripWindow) {
         m_stripWindow = new StripWindow(m_radioModel, this);
         wirePuduMonitor();
+        connect(m_stripWindow.data(), &QDialog::finished, this, [this]() {
+            noteWindowClosedByOperator(QStringLiteral("WinChannelStrip"));
+        });
     }
     m_stripWindow->show();
     m_stripWindow->raise();
@@ -14911,6 +14942,9 @@ void MainWindow::openSpotHub()
             m_radioModel->spotTableModel(),
             m_radioModel->dxccColorProvider(),
             this);
+        connect(m_spotHubDialog.data(), &QDialog::finished, this, [this]() {
+            noteWindowClosedByOperator(QStringLiteral("WinSpotHub"));
+        });
         // Bridge spotsClearedAll (Display tab's "Clear All Spots" button)
         // to SpotModel::clear so the global QShortcut and the dialog
         // button share one truth-source.
