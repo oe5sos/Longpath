@@ -152,6 +152,18 @@ public:
     /// verwenden.
     void applyCurrent();
 
+    /// Beim Start gilt Profil 1 -- das oberste in der Schiene --, nicht
+    /// das zuletzt aktive. Betreiber 2026-09-27: „beim start von longpath
+    /// muss immer das standardprofil zu sehen sein", „ich habe ihn [...]
+    /// als profil 1 gespeichert". Um 20:43 war Longpath auf ein zweites
+    /// Profil gesprungen, und jeder weitere Start kam dort wieder heraus.
+    ///
+    /// Setzt nur m_current, OHNE captureIntoCurrent(): beim Start gibt es
+    /// nichts zu sichern, und eine Aufnahme des noch nicht hergestellten
+    /// Fensters ueberschriebe das zuletzt aktive Profil mit der Vorgabe.
+    /// Danach wie immer applyCurrent().
+    void startWithFirst();
+
     QVariantMap snapshot(const QString& name) const;
 
     /// Ein einzelnes Profil (Name, Zustand, Band-/Modus-Bindung) als

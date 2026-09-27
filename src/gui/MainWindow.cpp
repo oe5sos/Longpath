@@ -8555,6 +8555,9 @@ void MainWindow::populateDefaultMeter()
             });
 
         m_layoutProfiles->load();
+        // Immer Profil 1, nicht das zuletzt aktive (Betreiber 2026-09-27,
+        // siehe LayoutProfiles::startWithFirst()).
+        m_layoutProfiles->startWithFirst();
         // Betreiber 2026-09-01: "letzter Zustand nie beim Öffnen
         // sichtbar" -- zeigt, was TATSAECHLICH von der Platte kam,
         // bevor applyCurrent() irgendetwas damit tut. Vergleich mit
