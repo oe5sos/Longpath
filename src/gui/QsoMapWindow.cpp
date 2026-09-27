@@ -832,7 +832,15 @@ void QsoMapWindow::rebuild()
     m_globe->setPoints(points);
     m_flat->setPoints(points);
     m_radar->setPoints(points);
-    m_rotorRadar->setPoints(points);
+    // Das kleine Rotor-Radar neben der Karte nur mit dem, was markiert
+    // ist -- der gewaehlten Station (Betreiber 2026-09-27, Blatt R3). Die
+    // Karte daneben zeigt schon jeden Kontakt; zwischen 9271 Punkten
+    // ging der Kegel des Rotors unter. Das grosse Radar zeigt weiter alle.
+    QVector<MapPoint> marked;
+    for (const MapPoint& p : points) {
+        if (p.highlight) { marked.append(p); }
+    }
+    m_rotorRadar->setPoints(marked);
 
     // Say what could not be placed. A map quietly showing a third of the
     // log looks exactly like a map of the whole log, and the operator

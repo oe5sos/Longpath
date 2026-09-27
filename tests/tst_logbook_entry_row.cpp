@@ -9,6 +9,7 @@
 // Doppelt-Regel), Esc leert die Zeile und schliesst NICHT das Logbuch.
 
 #include <QtTest>
+#include <QTableWidget>
 #include <QDir>
 #include <QFile>
 #include <QLabel>
@@ -186,6 +187,20 @@ private slots:
         w.searchForTest()->setText(QStringLiteral("OE5VVM"));
         QTest::keyClick(w.searchForTest(), Qt::Key_Return);
         QTRY_VERIFY(small->rotorTarget() >= 0.0);
+        // Das kleine Radar zeigt nur die gewaehlte Station, das grosse alle
+        // (2026-09-27, Blatt R3). Ohne Filter, eine Zeile gewaehlt.
+        w.searchForTest()->clear();
+        QTableWidget* table = nullptr;
+        for (QTableWidget* t : w.findChildren<QTableWidget*>()) {
+            if (!table || t->rowCount() > table->rowCount()) { table = t; }
+        }
+        QVERIFY(table && table->rowCount() == 2);
+        table->selectRow(0);
+        QTRY_COMPARE(small->pointsPainted(), 1);
+        map->showRadarViewForTest(true);
+        QTRY_COMPARE(map->radarForTest()->pointsPainted(), 2);
+        map->showRadarViewForTest(false);
+        QTRY_VERIFY(small->isVisible());
 
         // Rotor weg: der Kegel geht.
         w.setRotorBearing(std::numeric_limits<double>::quiet_NaN());
