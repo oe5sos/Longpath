@@ -2494,6 +2494,8 @@ longpath_add_test(tst_spectrum_widget_highswr_overlay)
 # No pixel-diff — visual: red border appears on TX.
 # Derives from Thetis display.cs:1569-1593 [v2.10.3.13] Display.MOX setter.
 longpath_add_test(tst_spectrum_widget_mox_overlay)
+# Panadapter-Mausrad: Trackpad, Rasten, Zoom-Bereich, SnapTune, dB-Raster (2026-09-27).
+longpath_add_test(tst_panadapter_wheel)
 
 # ── Phase 3M-1a H.2: MeterPoller TX bindings on MOX engage ───────────────────
 # Verifies setInTx(bool) switches poll set, idempotency, null guards in

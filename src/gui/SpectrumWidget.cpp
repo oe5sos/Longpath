@@ -1161,6 +1161,7 @@ void SpectrumWidget::loadSettings()
 
     // Phase 3G-8 commit 5: grid / scales state.
     m_gridEnabled = readBool(QStringLiteral("DisplayGridEnabled"), true);
+    m_gridStepDb = qBound(0, readInt(QStringLiteral("DisplayGridStepDb"), 0), 40);
     m_showZeroLine = readBool(QStringLiteral("DisplayShowZeroLine"), false);
     m_showFps = readBool(QStringLiteral("DisplayShowFps"), false);
     // B8 Task 21: cursor frequency readout persists across restarts.
@@ -1420,6 +1421,7 @@ void SpectrumWidget::saveSettings()
     // Phase 3G-8 commit 5: grid / scales state.
     s.setValue(settingsKey(QStringLiteral("DisplayGridEnabled"), m_panIndex),
               m_gridEnabled ? QStringLiteral("True") : QStringLiteral("False"));
+    s.setValue(settingsKey(QStringLiteral("DisplayGridStepDb"), m_panIndex), m_gridStepDb);
     s.setValue(settingsKey(QStringLiteral("DisplayShowZeroLine"), m_panIndex),
               m_showZeroLine ? QStringLiteral("True") : QStringLiteral("False"));
     s.setValue(settingsKey(QStringLiteral("DisplayShowFps"), m_panIndex),
@@ -2906,6 +2908,15 @@ void SpectrumWidget::setGridEnabled(bool on)
     markOverlayDirty();
 }
 
+void SpectrumWidget::setGridStepDb(int db)
+{
+    db = qBound(0, db, 40);
+    if (m_gridStepDb == db) { return; }
+    m_gridStepDb = db;
+    scheduleSettingsSave();
+    markOverlayDirty();
+}
+
 void SpectrumWidget::setShowZeroLine(bool on)
 {
     if (m_showZeroLine == on) { return; }
@@ -4040,6 +4051,9 @@ void SpectrumWidget::drawGrid(QPainter& p, const QRect& specRect)
     float step = 10.0f;  // 10 dB steps
     if (m_dynamicRange <= 50.0f) {
         step = 5.0f;
+    }
+    if (m_gridStepDb > 0) {
+        step = static_cast<float>(m_gridStepDb);   // Setup: dB Step
     }
 
     for (float dbm = bottom + step; dbm < m_refLevel; dbm += step) {
@@ -10249,43 +10263,95 @@ void SpectrumWidget::wheelEvent(QWheelEvent* event)
     }
 
     // Plain scroll: tune VFO by step size (matches Thetis panadapter behavior)
-    // Ctrl+scroll: adjust ref level
-    // Ctrl+Shift+scroll: zoom bandwidth
-    int delta = event->angleDelta().y();
-    if (delta == 0) {
-        QWidget::wheelEvent(event);
+    // Cmd/Ctrl+scroll: zoom bandwidth
+    // Shift+scroll: adjust ref level
+    //
+    // Schritte statt Rohwerte (2026-09-27). Ein Trackpad schickt viele
+    // kleine Ereignisse; jedes zaehlte als voller Schritt, und ein
+    // Wischen stimmte Dutzende Schritte weit ab oder zoomte davon.
+    const int steps = wheelStepsFor(event);
+    if (steps == 0) {
+        event->accept();
         return;
     }
 
     if (event->modifiers() & Qt::MetaModifier || event->modifiers() & Qt::ControlModifier) {
         // Cmd+scroll (macOS) or Ctrl+scroll: zoom bandwidth in/out
-        double factor = (delta > 0) ? 0.8 : 1.25;
+        double factor = (steps > 0) ? 0.8 : 1.25;
         double newBw = m_bandwidthHz * factor;
         newBw = std::clamp(newBw, 1000.0, m_sampleRateHz);
-        m_bandwidthHz = newBw;
-        // Recenter on VFO when zooming
-        m_centerHz = m_vfoHz;
-        emit centerChanged(m_centerHz);
+        // Recenter on VFO when zooming. Ueber setFrequencyRange
+        // (2026-09-27): nur dort wird der Wasserfall umgerechnet, der
+        // Zoom gespeichert und frequencyRangeChanged gesendet, dem die
+        // Zoom-Leiste folgt -- das Rad ging an allen dreien vorbei.
+        const double oldCenter = m_centerHz;
+        setFrequencyRange(m_vfoHz, newBw);
+        if (!qFuzzyCompare(oldCenter, m_centerHz)) {
+            emit centerChanged(m_centerHz);
+        }
         emit bandwidthChangeRequested(newBw);
-        updateVfoPositions();
-#ifdef LONGPATH_GPU_SPECTRUM
-        markOverlayDirty();
-#endif
     } else if (event->modifiers() & Qt::ShiftModifier) {
         // Shift+scroll: adjust ref level
-        float step = (delta > 0) ? 5.0f : -5.0f;
+        float step = (steps > 0) ? 5.0f : -5.0f;
         m_refLevel = qBound(-160.0f, m_refLevel + step, 20.0f);
         scheduleSettingsSave();
     } else {
-        // Plain scroll: tune VFO by step size
-        int steps = (delta > 0) ? 1 : -1;
-        double newHz = m_vfoHz + steps * m_stepHz;
-        newHz = std::max(newHz, 100000.0);
-        emit frequencyClicked(newHz);
+        // Plain scroll: tune VFO by step size, auf das Schrittraster
+        // (2026-09-27; vorher lief 14.215.050 mit 100-Hz-Schritten auf
+        // ...150/...250 statt auf ...100/...200).
+        emit frequencyClicked(std::max(snapTuneHz(m_vfoHz, m_stepHz, steps), 100000.0));
     }
 
     update();
-    QWidget::wheelEvent(event);
+    event->accept();
+}
+
+// From Thetis console.cs:31215-31228 [@852bf0e] -- SnapTune(freq_mhz, step_size_hz, num_steps):
+//   long temp = freq_hz / step_size_hz; // do integer division to end up on a step size boundary
+//   // handle when starting frequency was already on a step size boundary and tuning down
+//   if (num_steps < 0 && freq_hz % step_size_hz != 0)
+//       num_steps++; // off boundary -- add one as the divide takes care of one step
+//   temp += num_steps; freq_hz = temp * step_size_hz;
+double SpectrumWidget::snapTuneHz(double freqHz, int stepHz, int numSteps)
+{
+    if (stepHz <= 0) { return freqHz; }
+    const qint64 f = static_cast<qint64>(std::llround(freqHz));
+    qint64 temp = f / stepHz;
+    if (numSteps < 0 && f % stepHz != 0) {
+        numSteps++;
+    }
+    temp += numSteps;
+    return static_cast<double>(temp * stepHz);
+}
+
+// Radereignis -> ganze Schritte (2026-09-27).
+// From AetherSDR src/gui/SpectrumWidget.cpp:11529-11573 [@d58e2b8a]:
+// Trackpad (pixelDelta) je ~15 px ein Schritt, Nachlauf und
+// Querwischen ignoriert; Mausrad (angleDelta) je 120 ein Schritt; beides
+// auf +-1 je Ereignis begrenzt und in 50 ms entprellt (#504, #556, #2150).
+int SpectrumWidget::wheelStepsFor(QWheelEvent* ev)
+{
+    int steps = 0;
+    if (!ev->pixelDelta().isNull()) {
+        if (ev->phase() == Qt::ScrollMomentum) { return 0; }
+        if (qAbs(ev->pixelDelta().x()) > qAbs(ev->pixelDelta().y())) { return 0; }
+        m_wheelPixelAccum += ev->pixelDelta().y();
+        steps = m_wheelPixelAccum / 15;
+        m_wheelPixelAccum -= steps * 15;
+    } else {
+        m_wheelAngleAccum += ev->angleDelta().y();
+        steps = m_wheelAngleAccum / 120;
+        m_wheelAngleAccum -= steps * 120;
+    }
+    steps = qBound(-1, steps, 1);
+    if (steps != 0) {
+        const qint64 now = QDateTime::currentMSecsSinceEpoch();
+        if (now - m_lastWheelStepMs < 50) {
+            return 0;
+        }
+        m_lastWheelStepMs = now;
+    }
+    return steps;
 }
 
 // ============================================================================

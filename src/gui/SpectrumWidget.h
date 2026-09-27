@@ -737,6 +737,12 @@ public:
 
     void setGridEnabled(bool on);
     bool gridEnabled() const { return m_gridEnabled; }
+    // Abstand der waagrechten dB-Linien (2026-09-27). 0 = wie bisher
+    // selbst (10 dB, bei <= 50 dB Bereich 5 dB). Der Regler "dB Step"
+    // schrieb in das tote PanadapterModel und wirkte nie.
+    // Thetis: setup.designer.cs udDisplayGridStep, "Horizontal Grid Step Size in dB."
+    void setGridStepDb(int db);
+    int gridStepDb() const { return m_gridStepDb; }
 
     // Right-edge dBm scale strip visibility. When false, the strip is
     // hidden and the spectrum fills the full widget width.
@@ -1924,6 +1930,12 @@ protected:
     /// Zeigt der Panadapter an dieser Stelle ein eigenes Menue?
     bool hasOwnContextMenuAt(const QPoint& pos) const;
     void wheelEvent(QWheelEvent* event) override;
+    // Radereignis -> ganze Schritte (Trackpad/hochaufloesend, 2026-09-27).
+    int wheelStepsFor(QWheelEvent* ev);
+public:
+    // Thetis SnapTune (console.cs:31215-31228): auf das Schrittraster.
+    static double snapTuneHz(double freqHz, int stepHz, int numSteps);
+protected:
     void leaveEvent(QEvent* event) override;
 
 private:
@@ -2631,6 +2643,7 @@ private:
     // ---- Phase 3G-8 commit 5: grid / scales renderer state ----
 
     bool  m_gridEnabled{true};
+    int   m_gridStepDb{0};      // 0 = automatisch
     bool  m_showZeroLine{false};
     bool  m_showFps{false};
     bool  m_dbmScaleVisible{true};  // right-edge dBm strip; false → spectrum fills full width
@@ -2686,6 +2699,9 @@ private:
     int    m_filterLowHz{-2850};    // LSB default — from Thetis
     int    m_filterHighHz{-150};
     int    m_stepHz{100};           // tuning step size
+    int    m_wheelPixelAccum{0};
+    int    m_wheelAngleAccum{0};
+    qint64 m_lastWheelStepMs{0};
 
     int    m_panIndex{0};            // for per-pan settings keys
 
