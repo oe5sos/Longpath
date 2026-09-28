@@ -13370,6 +13370,20 @@ void RadioModel::setTune(bool on)
         // match Thetis console.cs:30010 [v2.10.3.13] ordering (G.4 fixup).
         if (m_moxController) {
             m_moxController->setTune(true);
+            // Kam MOX nicht (Bandplan: z. B. FM/AM noch ohne Senden,
+            // Frequenz ausserhalb; oder die Sende-Verriegelung), dann TUNE
+            // gleich wieder aus -- wie Thetis' chkTUN, das bei verweigertem
+            // chkMOX selbst auf false geht. Bis 2026-09-27 blieb TUNE hier
+            // „an" (isTune true, mox false): der Knopf leuchtete, gesendet
+            // wurde nichts, und Betriebsart/Leistung blieben vertauscht, bis
+            // man TUNE von Hand wieder ausschaltete. Gefunden an der HL2-
+            // Werkbank. Der Aus-Zweig deckt den Fall „MOX war nie an" schon
+            // ab (completeTuneOff ueber den Einmal-Zeitgeber). Den Grund
+            // zeigt der moxRejected-Hinweis.
+            if (!m_moxController->isMox()) {
+                setTune(false);
+                return;
+            }
         }
 
     } else {
