@@ -18,6 +18,7 @@
 
 #include <QEvent>
 #include <QMenu>
+#include <QPointer>
 #include <QPushButton>
 #include <QVBoxLayout>
 
@@ -194,7 +195,13 @@ bool ProfileRail::eventFilter(QObject* watched, QEvent* event)
 
 void ProfileRail::showMenuFor(const QString& name, const QPoint& globalPos)
 {
-    ScopedChildWidget<QMenu> menuOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+    // Am Hauptfenster, nicht an der Leiste (2026-09-27): die Leiste hat
+    // ein eigenes natives Fenster, und ein Menue daran bekam von Qt keinen
+    // Fensterbezug ("QWidgetWindow(... ProfileRailClassWindow) must be a
+    // top level window." bei jedem Rechtsklick in Martins Protokoll) --
+    // auf macOS kann es dann hinter schwebenden Werkzeugfenstern landen.
+    ScopedChildWidget<QMenu> menuOwner(window());   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+    const QPointer<ProfileRail> self(this);
     QMenu& menu = *menuOwner.get();
     // Der volle Name als Überschrift. Auf dem Abzeichen steht nur ein
     // Buchstabe, und ein Menü mit „Löschen“ über einem „C“ ist zu wenig
@@ -223,7 +230,9 @@ void ProfileRail::showMenuFor(const QString& name, const QPoint& globalPos)
     QAction* chosen = menu.exec(globalPos);
     // Das Elternteil kann waehrend exec() gestorben sein — dann ist
     // auch das Menue weg und `this` eine Leiche. Siehe ScopedChildWidget.h.
-    if (!menuOwner) { return; }
+    // Weil das Menue am Hauptfenster haengt, kann die Leiste auch allein
+    // gestorben sein: dafuer `self`.
+    if (!menuOwner || !self) { return; }
     if (chosen == save)      { emit saveRequested(name); }
     else if (chosen == exportToDesktop) { emit exportRequested(name); }
     else if (chosen == importFromDesktop) { emit importRequested(name); }

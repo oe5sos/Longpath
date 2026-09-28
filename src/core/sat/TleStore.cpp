@@ -19,8 +19,30 @@ TleStore::TleStore(QObject* parent)
     : QObject(parent)
     , m_cachePath(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)
                   + QStringLiteral("/tle/amateur.tle"))
-    , m_source(QStringLiteral("https://celestrak.org/NORAD/elements/gp.php?GROUP=amateur&FORMAT=tle"))
+    , m_source(defaultSource())
 {
+}
+
+QUrl TleStore::defaultSource()
+{
+    return QUrl(QStringLiteral("https://celestrak.org/NORAD/elements/gp.php?GROUP=amateur&FORMAT=tle"));
+}
+
+QDateTime TleStore::lastAttemptAt() const
+{
+    const QFileInfo marker(m_cachePath + QStringLiteral(".attempt"));
+    return marker.exists() ? marker.lastModified().toUTC() : QDateTime();
+}
+
+void TleStore::markAttempt() const
+{
+    QDir().mkpath(QFileInfo(m_cachePath).absolutePath());
+    QFile marker(m_cachePath + QStringLiteral(".attempt"));
+    if (marker.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        // Der Inhalt ist nur fuer Menschen; zaehlen tut die Dateizeit.
+        marker.write(QDateTime::currentDateTimeUtc().toString(Qt::ISODate).toUtf8());
+        marker.close();
+    }
 }
 
 bool TleStore::looksLikeTle(const QString& text)
@@ -49,12 +71,21 @@ bool TleStore::isStale(int maxAgeHours) const
 
 void TleStore::refreshIfStale(int maxAgeHours)
 {
-    if (isStale(maxAgeHours)) { refresh(); }
+    if (!isStale(maxAgeHours)) { return; }
+    const QDateTime last = lastAttemptAt();
+    if (last.isValid()
+        && last.secsTo(QDateTime::currentDateTimeUtc()) < qint64(kRetryHours) * 3600) {
+        return;
+    }
+    refresh();
 }
 
 void TleStore::refresh()
 {
     if (m_reply) { return; }
+    // Siehe TleStore.h: aus einem Pruefstand nie zu CelesTrak.
+    if (QStandardPaths::isTestModeEnabled() && m_source == defaultSource()) { return; }
+    markAttempt();
     QNetworkRequest req(m_source);
     req.setHeader(QNetworkRequest::UserAgentHeader, QStringLiteral("Longpath"));
     req.setTransferTimeout(20000);

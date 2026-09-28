@@ -4844,6 +4844,9 @@ longpath_add_test(tst_window_widgets)
 # -- Roter Knopf = zu, auch beim naechsten Start (2026-09-27): Kanalzug,
 #    Logbuch und Spot-Zentrale gingen trotz Schliessen immer wieder auf. --
 longpath_add_test(tst_window_close_stays_closed)
+# -- Rechtsklick-Menues am Fenster, nicht am nativen Feld (2026-09-27):
+#    „ProfileRailClassWindow must be a top level window" im Protokoll. --
+longpath_add_test(tst_menus_of_native_fields)
 # -- Formatfuellend + Werkzeugfenster passen auf den Schirm (2026-09-27):
 #    Kanalzug 980x1000 auf 849 px Hoehe, unten hinter dem Dock. --
 longpath_add_test(tst_tool_windows_fit_the_screen)
