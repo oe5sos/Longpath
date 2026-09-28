@@ -22,6 +22,8 @@
 #include <QtTest>
 
 #include "gui/widgets/CommandBar.h"
+#include "core/AppSettings.h"
+#include "models/FilterPresetStore.h"
 #include "models/SliceModel.h"
 #include "gui/widgets/DspParamPopup.h"
 #include "gui/widgets/DspQuickPopups.h"
@@ -398,6 +400,48 @@ private slots:
                  qPrintable(QStringLiteral(
                      "SSB und CW zeigen dieselben Breiten: %1")
                      .arg(ssb.join(QLatin1Char('|')))));
+    }
+
+    /// Das „…" der Filtergruppe zeigt die Vorgaben mit ihren NAMEN —
+    /// ohne Speicher die Thetis-Namen, mit Speicher auch das, was der
+    /// Betreiber unter Setup › Filter Presets selbst eingetragen hat.
+    ///
+    /// Bis 2026-09-28 las das Menue SliceModel::presetsForMode direkt:
+    /// eigene Vorgaben kamen nie an, und die Beschriftung war aus den
+    /// Kanten gerechnet — CW F10 (±13 Hz) hiesse „26", Thetis sagt „25".
+    void theFilterOverflowOffersNamedAndOwnPresets()
+    {
+        AppSettings::instance().remove(QStringLiteral("CWPitch"));
+        SliceModel slice;
+        slice.setDspMode(DSPMode::CWU);
+        CommandBar bar;
+        bar.attach(&slice);
+
+        auto entries = bar.filterMenuEntries();
+        QCOMPARE(entries.size(), 10);
+        QCOMPARE(entries.at(0).name, QStringLiteral("1.0k"));
+        QCOMPARE(entries.at(0).low, 100);
+        QCOMPARE(entries.at(0).high, 1100);
+        QCOMPARE(entries.at(9).name, QStringLiteral("25"));
+        QCOMPARE(entries.at(9).low, 587);
+        QCOMPARE(entries.at(9).high, 613);
+
+        FilterPresetStore store;
+        store.setPreset(DSPMode::CWU, 0, FilterPreset{QStringLiteral("Mine"), 400, 800});
+        bar.setFilterPresetStore(&store);
+        entries = bar.filterMenuEntries();
+        QCOMPARE(entries.at(0).name, QStringLiteral("Mine"));
+        QCOMPARE(entries.at(0).low, 400);
+        QCOMPARE(entries.at(0).high, 800);
+        QCOMPARE(entries.at(1).name, QStringLiteral("800"));
+
+        // Folgt dem Modus der Scheibe.
+        slice.setDspMode(DSPMode::USB);
+        entries = bar.filterMenuEntries();
+        QCOMPARE(entries.at(3).name, QStringLiteral("3.3k"));
+        QCOMPARE(entries.at(3).high, 3400);
+
+        store.resetAll();
     }
 
     /// NR schaltet ein — und ein zweiter Klick wieder aus.

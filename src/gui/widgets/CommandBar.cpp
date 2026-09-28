@@ -9,6 +9,9 @@
 // Modification history (Longpath):
 //   2026-08-15 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
+//   2026-09-28 -- the filter "…" reads FilterPresetStore (Thetis names +
+//                 the operator's own presets), Martin Fischer, OE5SOS,
+//                 AI-assisted via Anthropic Claude.
 // =================================================================
 
 #include "gui/widgets/CommandBar.h"
@@ -16,6 +19,7 @@
 #include "gui/StyleConstants.h"
 #include "gui/widgets/DspQuickPopups.h"
 #include "core/AppSettings.h"
+#include "models/FilterPresetStore.h"
 #include "models/SliceModel.h"
 
 #include <QHBoxLayout>
@@ -387,10 +391,12 @@ void CommandBar::buildFilterGroup(QHBoxLayout* row)
     connect(more, &QPushButton::clicked, this, [this]() {
         if (!m_slice) { return; }
         QMenu m(this);
-        const auto all = SliceModel::presetsForMode(m_slice->dspMode());
-        for (const auto& pr : all) {
-            const int low = pr.first, high = pr.second;
-            QAction* a = m.addAction(filterLabel(low, high));
+        // Beschriftet mit dem NAMEN der Vorgabe, wie Thetis' Knoepfe —
+        // nicht mit der aus den Kanten gerechneten Breite: CW F10 ist
+        // ±13 Hz, also 26 Hz breit, und heisst in Thetis „25".
+        for (const FilterMenuEntry& e : filterMenuEntries()) {
+            const int low = e.low, high = e.high;
+            QAction* a = m.addAction(e.name);
             connect(a, &QAction::triggered, this,
                     [this, low, high]() { pushFilterToModel(low, high); });
         }
@@ -400,6 +406,31 @@ void CommandBar::buildFilterGroup(QHBoxLayout* row)
                 [this]() { askForCustomFilter(); });
         m.exec(QCursor::pos());
     });
+}
+
+void CommandBar::setFilterPresetStore(FilterPresetStore* store)
+{
+    m_presetStore = store;
+}
+
+QVector<CommandBar::FilterMenuEntry> CommandBar::filterMenuEntries() const
+{
+    QVector<FilterMenuEntry> out;
+    if (!m_slice) { return out; }
+    const DSPMode mode = m_slice->dspMode();
+    if (m_presetStore) {
+        for (const FilterPreset& p : m_presetStore->presetsForMode(mode)) {
+            out.append({p.name, p.low, p.high});
+        }
+        return out;
+    }
+    const auto edges = SliceModel::presetsForMode(mode);
+    const QStringList names = SliceModel::presetNamesForMode(mode);
+    for (int i = 0; i < edges.size(); ++i) {
+        out.append({names.value(i, filterLabel(edges[i].first, edges[i].second)),
+                    edges[i].first, edges[i].second});
+    }
+    return out;
 }
 
 /// Wie eine Breite in der Leiste heisst: „2.9k" statt „-2900…-100".
@@ -422,10 +453,14 @@ QString CommandBar::filterLabel(int low, int high)
 //
 // Genau deshalb steht die Auswahl in den EINSTELLUNGEN und nicht im
 // Quelltext: die erste Bitte enthielt zwei Breiten, die unsere
-// Preset-Liste gar nicht kennt (sie fuehrt 5,0 / 4,4 / 3,8 / 3,2 /
-// 2,9 / 2,6 / 2,3 / 1,7 / 1,1 / 0,5), die zweite nur bekannte. Waere
-// die Reihe fest verdrahtet, waere jede Meinungsaenderung eine
-// Uebersetzung; so ist sie eine Zahl in einer Datei.
+// Preset-Liste damals nicht kannte (sie fuehrte 5,0 / 4,4 / 3,8 / 3,2 /
+// 2,9 / 2,6 / 2,3 / 1,7 / 1,1 / 0,5), die zweite nur bekannte. Seit
+// 2026-09-28 fuehrt sie die Thetis-Liste 5,0 / 4,4 / 3,8 / 3,3 / 2,9 /
+// 2,7 / 2,4 / 2,1 / 1,8 / 1,0 — die alte war erfunden (siehe
+// SliceModel::presetsForMode); jetzt fehlt 3,5 aus der ersten Bitte
+// und 3,2 aus der zweiten. Waere die Reihe fest verdrahtet, waere jede
+// Meinungsaenderung eine Uebersetzung; so ist sie eine Zahl in einer
+// Datei.
 //
 // Die drei vorderen sind darum keine Presets, sondern BREITEN. Das ist
 // auch naeher an der Sache: wer „3,2" sagt, meint eine Breite und

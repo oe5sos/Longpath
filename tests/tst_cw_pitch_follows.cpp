@@ -25,6 +25,9 @@
 // Modification history (Longpath):
 //   2026-09-27 -- Original fuer Longpath von Martin Fischer (OE5SOS),
 //                 KI-gestuetzt ueber Anthropic Claude.
+//   2026-09-28 -- thePresetTableSlidesAtALowPitch auf die Thetis-
+//                 Tabelle umgestellt (Martin Fischer, OE5SOS,
+//                 KI-gestuetzt ueber Anthropic Claude).
 // =================================================================
 
 // no-port-check: Longpath-original test file.
@@ -132,18 +135,27 @@ private slots:
     {
         AppSettings::instance().setValue(QStringLiteral("CWPitch"),
                                          QStringLiteral("300"));
+        // Thetis-Tabelle (console.cs:5339-5379 [@852bf0e]) seit
+        // 2026-09-28; vorher hing dieser Test an erfundenen Breiten
+        // (±750 … ±6).
         const auto cwu = SliceModel::presetsForMode(DSPMode::CWU);
         QCOMPARE(cwu.size(), 10);
-        QCOMPARE(cwu[0], Edges(0, 1500));    // ±750 -> gerutscht
-        QCOMPARE(cwu[1], Edges(0, 1000));    // ±500 -> gerutscht
-        QCOMPARE(cwu[2], Edges(0, 800));     // ±400 -> gerutscht
-        QCOMPARE(cwu[3], Edges(0, 600));     // ±300 -> liegt genau an
+        QCOMPARE(cwu[0], Edges(0, 1000));    // ±500 -> gerutscht
+        QCOMPARE(cwu[1], Edges(0, 800));     // ±400 -> gerutscht
+        QCOMPARE(cwu[2], Edges(0, 600));     // ±300 -> liegt genau an
+        QCOMPARE(cwu[3], Edges(50, 550));    // ±250 -> unberuehrt
         QCOMPARE(cwu[4], Edges(100, 500));   // ±200 -> unberuehrt
-        QCOMPARE(cwu[9], Edges(294, 306));   // ±6
+        QCOMPARE(cwu[9], Edges(287, 313));   // ±13, „25"
 
         const auto cwl = SliceModel::presetsForMode(DSPMode::CWL);
-        QCOMPARE(cwl[0], Edges(-1500, 0));
+        QCOMPARE(cwl[0], Edges(-1000, 0));
+        QCOMPARE(cwl[1], Edges(-800, 0));
         QCOMPARE(cwl[4], Edges(-500, -100));
+
+        // Thetis behaelt beim Verschieben den Namen (console.cs:18165
+        // [@852bf0e]) — die Namen haengen nicht an der Tonhoehe.
+        QCOMPARE(SliceModel::presetNamesForMode(DSPMode::CWU).value(0),
+                 QStringLiteral("1.0k"));
     }
 
     void noPresetCrossesTheCarrierAtAnyPitch()

@@ -20,6 +20,9 @@
 //                 OE5SOS, AI-assisted via Anthropic Claude; Thetis
 //                 v2.10.3.15-5-g852bf0e setup.designer.cs udDSPCWPitch /
 //                 console.cs CWPitch setter).
+//   2026-09-28 -- presetNamesForMode (Thetis InitFilterPresets names),
+//                 commonPresetsForMode removed (no caller). Martin
+//                 Fischer (OE5SOS), AI-assisted via Anthropic Claude.
 // =================================================================
 
 //=================================================================
@@ -132,6 +135,7 @@
 #include <QPointer>
 #include <QTimer>
 #include <QString>
+#include <QStringList>
 
 #include <atomic>
 #include <limits>
@@ -1102,17 +1106,18 @@ public:
 
     // ---- Per-mode filter presets ----
     // Returns the F5 (default) filter low/high for a given mode.
-    // Ported from Thetis console.cs:5180-5575 InitFilterPresets.
+    // Ported from Thetis console.cs:5118-5515 [@852bf0e] InitFilterPresets.
     static std::pair<int, int> defaultFilterForMode(DSPMode mode);
 
     // Returns the full ordered filter preset list for the given mode.
-    // Source of truth: InitFilterPresets() table (Thetis console.cs:5180-5575 [v2.10.3.13]).
-    // Each pair is (low_hz, high_hz) relative to the carrier.
+    // Source of truth: InitFilterPresets() table (Thetis console.cs:5118-5515 [@852bf0e]).
+    // Each pair is (low_hz, high_hz) relative to the carrier. CWL/CWU
+    // sit on the current CW pitch and slide at the image limit.
     static QList<std::pair<int, int>> presetsForMode(DSPMode mode);
 
-    // Returns the 5-6 most-common filter presets for the given mode,
-    // matching Thetis main-panel filter buttons (compact subset of presetsForMode).
-    static QList<std::pair<int, int>> commonPresetsForMode(DSPMode mode);
+    // The Thetis button names of the same slots, same order ("5.0k",
+    // "1.0k", "800" …). FilterPresetStore uses them as default names.
+    static QStringList presetNamesForMode(DSPMode mode);
 
     // Returns human-readable mode name (e.g., DSPMode::LSB → "LSB")
     static QString modeName(DSPMode mode);

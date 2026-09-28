@@ -9,6 +9,9 @@
 //   2026-05-02 — Original implementation for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted authoring via Anthropic
 //                 Claude Code (Stage C2 filter preset editor).
+//   2026-09-28 -- an emptied name falls back to the slot's Thetis name
+//                 instead of "F<n>" (Martin Fischer, OE5SOS, AI-assisted
+//                 via Anthropic Claude).
 // =================================================================
 
 #include "FilterPresetsSetupPage.h"
@@ -314,7 +317,8 @@ void FilterPresetsSetupPage::commitTableRow(int row)
     FilterPreset p;
     p.name = nameEdit->text().trimmed();
     if (p.name.isEmpty()) {
-        p.name = QStringLiteral("F%1").arg(row + 1);
+        // Leerer Name: zurueck auf den Thetis-Namen des Platzes.
+        p.name = FilterPresetStore::defaultPreset(currentMode(), row).name;
         nameEdit->setText(p.name);
     }
     p.low  = lowSpin->value();

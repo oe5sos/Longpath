@@ -24,6 +24,8 @@
 // Modification history (Longpath):
 //   2026-09-20 -- Created for Longpath by Martin Fischer (OE5SOS),
 //                 AI-assisted via Anthropic Claude.
+//   2026-09-28 -- USB F6 is 100..2800 (Thetis InitFilterPresets), Martin
+//                 Fischer (OE5SOS), AI-assisted via Anthropic Claude.
 // =================================================================
 //=================================================================
 // MemoryForm.cs
@@ -177,7 +179,7 @@ private slots:
         rig.slice->setFrequency(14'205'000.0);
         rig.slice->setDspMode(DSPMode::USB);
         rig.slice->setStepHz(500);
-        rig.slice->setFilter(100, 2700);     // USB F6 in Thetis's preset table
+        rig.slice->setFilter(100, 2800);     // USB F6 "2.7k" in Thetis's preset table
         rig.slice->setAgcMode(AGCMode::Fast);
         rig.slice->setAgcThreshold(-33);
         rig.radio->transmitModel().setPower(42);
@@ -188,15 +190,17 @@ private slots:
         QCOMPARE(r.dspMode, DSPMode::USB);
         QCOMPARE(r.tuneStep, QStringLiteral("500Hz"));
         QCOMPARE(r.rxFilterLow, 100);
-        QCOMPARE(r.rxFilterHigh, 2700);
+        QCOMPARE(r.rxFilterHigh, 2800);
         QCOMPARE(r.agcMode, AGCMode::Fast);
         QCOMPARE(r.agcT, -33);
         QCOMPARE(r.power, 42);
         QVERIFY(!r.split);
         QCOMPARE(r.txFreqMHz, 14.205);
         QVERIFY(r.scan);
-        // 100..2700 is USB F6 in Thetis's table (console.cs:5233-5273), so it
-        // gets that name; an odd pair is VAR1.
+        // 100..2800 is USB F6 in Thetis's table (console.cs:5171-5211
+        // [@852bf0e]), so it gets that name; an odd pair is VAR1. (Until
+        // 2026-09-28 this said 100..2700 — true only of the invented table
+        // Longpath carried then.)
         QCOMPARE(r.rxFilter, QStringLiteral("F6"));
         rig.slice->setFilter(123, 2345);
         QCOMPARE(rig.radio->captureMemory().rxFilter, QStringLiteral("VAR1"));

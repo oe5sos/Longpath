@@ -6,9 +6,9 @@
 // =================================================================
 //
 // Longpath-original file. Filter preset defaults are delegated to
-// SliceModel::presetsForMode (ported from Thetis console.cs:5180-5575
-// [v2.10.3.13] — InitFilterPresets). This class adds a user-override
-// layer + AppSettings persistence on top.
+// SliceModel::presetsForMode / presetNamesForMode (ported from Thetis
+// console.cs:5118-5515 [@852bf0e] — InitFilterPresets). This class adds a
+// user-override layer + AppSettings persistence on top.
 //
 // =================================================================
 // Modification history (Longpath):
@@ -19,6 +19,9 @@
 //                 change (Martin Fischer, OE5SOS, AI-assisted via
 //                 Anthropic Claude); the ported arithmetic stays in
 //                 SliceModel::centreCwFilterOnPitch.
+//   2026-09-28 -- default names = Thetis button names ("1.0k", "800" …)
+//                 instead of "F1".."F10" (Martin Fischer, OE5SOS,
+//                 AI-assisted via Anthropic Claude).
 // =================================================================
 
 #pragma once
@@ -32,7 +35,7 @@
 namespace Longpath {
 
 /// A single filter preset slot.
-/// name   — display label (e.g., "F1", "DX-2.4k"); user-renameable.
+/// name   — display label (e.g., Thetis "2.9k", or "DX-2.4k"); user-renameable.
 /// low    — low edge in Hz, signed (negative for LSB family).
 /// high   — high edge in Hz, signed.
 struct FilterPreset {
@@ -45,7 +48,7 @@ struct FilterPreset {
 /// with a user-override layer persisted in AppSettings.
 ///
 /// AppSettings key layout (per slot):
-///   filters/<mode>/<slot>/name   — e.g. "F1" / "DX-2.4k"
+///   filters/<mode>/<slot>/name   — e.g. "2.9k" / "DX-2.4k"
 ///   filters/<mode>/<slot>/low    — integer Hz (string-encoded)
 ///   filters/<mode>/<slot>/high   — integer Hz
 ///
@@ -70,9 +73,10 @@ public:
     /// that slot (via defaultPreset).
     QList<FilterPreset> presetsForMode(DSPMode mode) const;
 
-    /// Returns the Thetis-verbatim default preset for a given mode + slot.
-    /// Defaults come from SliceModel::presetsForMode (InitFilterPresets,
-    /// console.cs:5180-5575 [v2.10.3.13]).  Slot is 0-based (0..9).
+    /// Returns the Thetis-verbatim default preset for a given mode + slot:
+    /// edges from SliceModel::presetsForMode, name from presetNamesForMode
+    /// (InitFilterPresets, console.cs:5118-5515 [@852bf0e]).  Slot is
+    /// 0-based (0..9).
     static FilterPreset defaultPreset(DSPMode mode, int slot);
 
     // ── Write ─────────────────────────────────────────────────────────────
