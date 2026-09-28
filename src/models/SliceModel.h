@@ -16,6 +16,10 @@
 //                 Claude Code.
 //                 Structural pattern follows AetherSDR (ten9876/AetherSDR,
 //                 GPLv3).
+//   2026-09-27 -- CW pitch range constants + follow API (Martin Fischer,
+//                 OE5SOS, AI-assisted via Anthropic Claude; Thetis
+//                 v2.10.3.15-5-g852bf0e setup.designer.cs udDSPCWPitch /
+//                 console.cs CWPitch setter).
 // =================================================================
 
 //=================================================================
@@ -584,8 +588,10 @@ public:
     static int defaultFilterCenter(DSPMode mode, int widthHz);
 
     /// Die CW-Tonhoehe, auf der die CW-Filter sitzen (AppSettings
-    /// CWPitch, Thetis-Quelle, 100..2000 Hz). Fuer Verbraucher, die den
+    /// CWPitch, Thetis-Quelle, 200..2250 Hz). Fuer Verbraucher, die den
     /// Durchlass einer CW-Scheibe deuten muessen (der KiwiSDR-Pfad).
+    /// Gesetzt wird sie nur ueber RadioModel::setCwPitch, das auch
+    /// cwPitchChanged meldet.
     static int cwPitchHz();
 
     /// Die FM-Deviation (AppSettings FmDeviationHz, Vorgabe 5000 --
@@ -594,6 +600,43 @@ public:
     /// rx_fm_highcut). 2026-09-27.
     static int fmDeviationHz();
     static int fmHalfBandwidthHz();
+
+    // ── CW-Tonhoehe: Spanne und Nachfuehren ──────────────────────────
+    //
+    // From Thetis setup.designer.cs:38259-38284 [@852bf0e] — udDSPCWPitch
+    // (Setup > DSP > CW > „CW Pitch (Hz)"): Increment 10, Maximum 2250,
+    // Minimum 200, Value 600. Das Konsolenfeld udCWPitch hat dieselben
+    // Werte (console.Designer.cs, Zeilen 1372-1392 bei 852bf0e). Frueher
+    // wurde hier auf 100..2000 geklemmt — mit dem Vermerk „matches Thetis
+    // udCWPitch", was nicht stimmte.
+    static constexpr int kCwPitchMinHz     = 200;
+    static constexpr int kCwPitchMaxHz     = 2250;
+    static constexpr int kCwPitchStepHz    = 10;
+    static constexpr int kCwPitchDefaultHz = 600;
+
+    /// Auf die Spanne der beiden Thetis-Felder klemmen — das, was
+    /// CATCWPitch vor dem Setzen tut (setup.cs:5733-5734).
+    static int clampCwPitch(int hz);
+
+    /// Einen CW-Durchlass auf die Tonhoehe setzen und die Breite
+    /// behalten, mit dem Rutschen an der Spiegelgrenze: der
+    /// Schleifenkoerper des Thetis-Setters CWPitch
+    /// (console.cs:18162-18195). Fuer alles ausser CWL/CWU unveraendert.
+    static void centreCwFilterOnPitch(int& low, int& high, DSPMode mode,
+                                      int pitchHz);
+
+    /// Die Scheibe folgt einer neuen Tonhoehe: VAR1/VAR2 von CWL und
+    /// CWU (in Thetis Teil derselben Schleife) und, wenn sie in CW
+    /// steht, der laufende Durchlass (Thetis: RX1Filter = rx1_filter).
+    void followCwPitch(int pitchHz);
+
+    /// Die gespeicherten CW-Durchlaesse aller Scheiben und Baender
+    /// (Slice<n>/Band<b>/ModeCWL|ModeCWU/Filter*, dazu der alte
+    /// Band-Schluessel, wenn das Band in CW steht) auf die neue
+    /// Tonhoehe setzen. In Thetis merkt sich ein Band den PLATZ
+    /// (LastFilter = F5, VAR1 …), dessen Werte die Schleife mitnimmt;
+    /// wir merken uns die Werte selbst, also muessen sie mit.
+    static void recentreStoredCwFilters(int pitchHz);
 
     /// Breite setzen, Mitte behalten (soweit die Betriebsart das
     /// zulaesst). Geht durch setFilter, also durch die Begrenzung.

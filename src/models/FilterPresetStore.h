@@ -15,6 +15,10 @@
 //   2026-05-02 — Original implementation for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted authoring via Anthropic
 //                 Claude Code (Stage C2 filter preset editor).
+//   2026-09-27 -- followCwPitch: overridden CW slots follow a pitch
+//                 change (Martin Fischer, OE5SOS, AI-assisted via
+//                 Anthropic Claude); the ported arithmetic stays in
+//                 SliceModel::centreCwFilterOnPitch.
 // =================================================================
 
 #pragma once
@@ -93,6 +97,15 @@ public:
     /// Clears all filter override AppSettings keys.
     /// Emits presetsChanged for every mode.
     void resetAll();
+
+    /// The CW pitch moved: every overridden CWL/CWU slot is re-centred on
+    /// the new pitch, width and name kept, via
+    /// SliceModel::centreCwFilterOnPitch (which carries the Thetis port).
+    /// Slots without an override need nothing -- their defaults are
+    /// computed from the pitch already. Emits presetsChanged(CWL) and
+    /// presetsChanged(CWU) either way, because those defaults moved too.
+    /// Called by RadioModel::setCwPitch only.
+    void followCwPitch(int pitchHz);
 
 signals:
     /// Emitted on any mutation for the affected mode.

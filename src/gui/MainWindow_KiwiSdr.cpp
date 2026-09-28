@@ -32,7 +32,8 @@
 //             der zugeordneten Scheibe gehen bei jeder Aenderung an den
 //             Kiwi (2026-09-21; bis dahin wurde er nur bei der Zuordnung
 //             einmal abgestimmt -- updateSliceTracking war portiert,
-//             aber nirgends aufgerufen).
+//             aber nirgends aufgerufen). Seit 2026-09-27 auch die
+//             CW-Tonhoehe (RadioModel::cwPitchChanged).
 //   Stufe 5 — Ton: decodedAudioReady in die Mischung (2026-08-27).
 //   Stufe 6 — Wasserfall: waterfallRowReady auf den Panadapter.
 //   Stufe 7a — Sendesperre (syncKiwiSdrTransmitMute).
@@ -56,6 +57,7 @@
 #include "models/SliceModel.h"
 #include "models/TransmitModel.h"
 
+#include <QPointer>
 #include <QTimer>
 
 #include <QStringList>
@@ -505,9 +507,12 @@ void MainWindow::addKiwiSdrReceiver(const QString& name,
 // panIdChanged JEDER Scheibe an updateKiwiSdrVirtualTrackingForSlice,
 // dazu cwPitchChanged des Senders. Bei uns kann nur eine ZUGEORDNETE
 // Scheibe Kiwi-gefuettert sein, also wird je Zuordnung verdrahtet und
-// beim Loesen wieder getrennt; die CW-Tonhoehe hat in Longpath (noch)
-// keine Bedienflaeche und kein Signal -- SliceModel::cwPitchHz() wird
-// bei jeder Nachfuehrung frisch gelesen.
+// beim Loesen wieder getrennt. Die CW-Tonhoehe meldet seit 2026-09-27
+// RadioModel::cwPitchChanged (Setup > DSP > CW); SliceModel::cwPitchHz()
+// wird bei jeder Nachfuehrung frisch gelesen. Eigene Verbindung, weil
+// eine neue Tonhoehe den Filter nicht immer bewegt: ein breiter CW-
+// Durchlass, der schon an der Spiegelgrenze anliegt, bleibt, wo er ist
+// (SliceModel::centreCwFilterOnPitch) -- filterChanged kaeme dann nie.
 void MainWindow::rewireKiwiSdrTrackingForSlice(int sliceId, const QString& profileId)
 {
     for (const QMetaObject::Connection& c : m_kiwiSdrTrackingConnections.take(sliceId)) {
@@ -523,6 +528,14 @@ void MainWindow::rewireKiwiSdrTrackingForSlice(int sliceId, const QString& profi
     conns << connect(slice, &SliceModel::dspModeChanged, this, follow);
     conns << connect(slice, &SliceModel::filterChanged, this, follow);
     conns << connect(slice, &SliceModel::panKeyChanged, this, follow);
+    // Absender ist hier das Modell, nicht die Scheibe: stirbt die Scheibe
+    // vor dem Loesen der Zuordnung, trennt Qt diese Verbindung nicht von
+    // selbst -- daher der QPointer statt des rohen Zeigers.
+    const QPointer<SliceModel> guarded(slice);
+    conns << connect(m_radioModel, &RadioModel::cwPitchChanged, this,
+                     [this, guarded]() {
+        if (guarded) { updateKiwiSdrTrackingForSlice(guarded.data()); }
+    });
     m_kiwiSdrTrackingConnections.insert(sliceId, conns);
 }
 

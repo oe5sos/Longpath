@@ -12,6 +12,8 @@
 //   2026-05-02 — Original implementation for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted authoring via Anthropic
 //                 Claude Code (Stage C2 filter preset editor).
+//   2026-09-27 -- followCwPitch (Martin Fischer, OE5SOS, AI-assisted via
+//                 Anthropic Claude). See FilterPresetStore.h.
 // =================================================================
 
 #include "FilterPresetStore.h"
@@ -206,6 +208,24 @@ void FilterPresetStore::resetAll()
     };
     for (DSPMode m : kAllModes) {
         clearMode(m);
+        emit presetsChanged(m);
+    }
+}
+
+// ── followCwPitch ─────────────────────────────────────────────────────────────
+
+void FilterPresetStore::followCwPitch(int pitchHz)
+{
+    for (DSPMode m : {DSPMode::CWL, DSPMode::CWU}) {
+        for (int slot = 0; slot < 10; ++slot) {
+            auto override = loadSlot(m, slot);
+            if (!override.has_value()) {
+                continue;
+            }
+            FilterPreset p = override.value();
+            SliceModel::centreCwFilterOnPitch(p.low, p.high, m, pitchHz);
+            persistPreset(m, slot, p);
+        }
         emit presetsChanged(m);
     }
 }

@@ -14,6 +14,8 @@
 //                 Claude Code.
 //                 Structural pattern follows AetherSDR (ten9876/AetherSDR,
 //                 GPLv3).
+//   2026-09-27 -- cwPitch()/setCwPitch()/cwPitchChanged(int) (Martin
+//                 Fischer, OE5SOS, AI-assisted via Anthropic Claude).
 // =================================================================
 
 //=================================================================
@@ -1039,6 +1041,19 @@ public:
     // FilterPresetsSetupPage can read/write user-customised presets.
     // Constructed once in RadioModel ctor; lifetime is RadioModel's lifetime.
     FilterPresetStore* filterPresetStore() const { return m_filterPresetStore; }
+
+    // ── CW-Tonhoehe (2026-09-27) ───────────────────────────────────────────
+    // Thetis console.cs CWPitch: EIN Wert fuer alle Empfaenger, der die
+    // CW-Filter, den APF und die Anzeige traegt. Gespeichert in
+    // AppSettings "CWPitch" (SliceModel::cwPitchHz liest ihn), gesetzt
+    // nur hier: setCwPitch klemmt auf 200..2250, schiebt die CW-Vorgaben
+    // (FilterPresetStore), die gespeicherten und die laufenden CW-
+    // Durchlaesse jeder Scheibe und die APF-Mitte nach und meldet
+    // cwPitchChanged -- nur, wenn sich der Wert wirklich geaendert hat.
+    // Senden (Mithoerton, VFO-Versatz bei MOX) ist bewusst NICHT dabei:
+    // 3M-2 CW-TX ist zurueckgestellt.
+    int  cwPitch() const;
+    void setCwPitch(int hz);
 
     // ── Phase 3J-2 H2: spot-system accessors ────────────────────────────────
     // RadioModel owns the seven spot-ingest clients, three view models, and
@@ -2372,6 +2387,10 @@ signals:
     // RF-Kit -> General). Consumers (e.g. MainWindow applet visibility)
     // react to show/hide the RF2K-S applet.
     void rfKitEnabledChanged(bool enabled);
+    // Die CW-Tonhoehe hat sich geaendert (setCwPitch). Thetis:
+    // CWPitchChangedHandlers (console.cs:18241). Abnehmer: CW-Decoder
+    // (Suchband), KiwiSDR-Nachfuehrung, Setup-Feld.
+    void cwPitchChanged(int hz);
     // Fires on each transition to Connected with the RadioInfo of the live
     // connection. HardwarePage (Phase 3I) listens to this to repopulate
     // sub-tabs with per-radio fields.

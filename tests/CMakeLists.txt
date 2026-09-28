@@ -4966,6 +4966,10 @@ longpath_add_test(tst_waterfall_time_markers)
 #    synthetic keyed CW decodes, estimates, ring bound, stop semantics --
 longpath_add_test(tst_cw_decoder)
 longpath_add_test(tst_cw_decoder_applet)
+# 2026-09-27: die CW-Tonhoehe bekommt Setter, Signal und Setup-Feld --
+# Thetis-CWPitch-Setter: CW-Durchlaesse (Vorgaben, Ueberschreibungen,
+# VAR, laufend, gespeichert) folgen, Rutschen an der Spiegelgrenze.
+longpath_add_test(tst_cw_pitch_follows)
 # 2026-09-21, KiwiSDR Stufe 3b: der Kiwi folgt der zugeordneten Scheibe
 # (Frequenz, Betriebsart, Filter) -- vorher nur einmal bei der Zuordnung.
 longpath_add_test(tst_kiwi_tracking_follows_the_slice)

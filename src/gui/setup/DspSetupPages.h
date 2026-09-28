@@ -15,6 +15,9 @@
 //   2026-05-04 — Issue #175 Wave 1: dropped misplaced AM TX / Carrier
 //                 Level stub from AmSamSetupPage (control belongs at
 //                 Thetis grpTXAM on tpTransmit, not the DSP/AM tab).
+//   2026-09-27 — CwSetupPage: CW Pitch (Hz) field (Thetis udDSPCWPitch)
+//                 wired to RadioModel::setCwPitch. Martin Fischer (OE5SOS),
+//                 AI-assisted via Anthropic Claude.
 // =================================================================
 
 //=================================================================
@@ -93,6 +96,7 @@
 #include <QCheckBox>
 #include <QList>
 
+class QSpinBox;
 class QTableWidget;
 
 namespace Longpath {
@@ -176,8 +180,12 @@ public:
     // level shown ancestor, which is awkward in a unit test).
     bool sidetoneRowVisibleForTest() const;
 
+    // Test seam — the CW Pitch field (Thetis udDSPCWPitch).
+    QSpinBox* cwPitchSpinForTest() const { return m_cwPitch; }
+
 private:
-    QWidget* m_sidetoneRow = nullptr;
+    QWidget*  m_sidetoneRow = nullptr;
+    QSpinBox* m_cwPitch     = nullptr;
 };
 
 // ── AM / SAM ─────────────────────────────────────────────────────────────────

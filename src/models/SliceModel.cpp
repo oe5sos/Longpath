@@ -15,6 +15,13 @@
 //   2026-09-27 — FM filter from the FM deviation: rx_fm_highcut from
 //                 radio.cs:1571 [@852bf0e]. Martin Fischer (OE5SOS),
 //                 AI-assisted via Anthropic Claude Code.
+//   2026-09-27 -- CW pitch follows live, by Martin Fischer (OE5SOS),
+//                 AI-assisted via Anthropic Claude, from Thetis
+//                 v2.10.3.15-5-g852bf0e: centreCwFilterOnPitch (loop body
+//                 of the console.cs CWPitch setter, image-limit slide),
+//                 followCwPitch, recentreStoredCwFilters, clampCwPitch;
+//                 CW pitch range 200..2250 (udCWPitch/udDSPCWPitch), one
+//                 read site instead of four.
 // =================================================================
 
 //=================================================================
@@ -169,6 +176,7 @@
 #include "models/RadioModel.h"
 
 #include <QFile>
+#include <QRegularExpression>
 #include <QStandardPaths>
 
 #include <algorithm>
@@ -642,16 +650,16 @@ bool SliceModel::filterCrossesCarrier(int low, int high, DSPMode mode)
 namespace {
 
 // From Thetis display.cs:1023 [@852bf0e] — cw_pitch
-// default 600. Dieselbe Quelle und dieselben Grenzen wie in
-// presetsForMode; bewusst nicht dorthin ausgelagert, weil das eine
-// Aenderung an einem geprueften Pfad waere.
+// default 600. Seit 2026-09-27 die EINE Lesestelle: defaultFilterForMode,
+// presetsForMode und commonPresetsForMode lasen den Schluessel vorher je
+// selbst und klemmten auf 100..2000 — viermal dieselbe, falsche Spanne.
+// Die richtige steht bei kCwPitchMinHz/kCwPitchMaxHz im Kopf.
 int currentCwPitch()
 {
     auto& s = AppSettings::instance();
-    int pitch = s.value(QStringLiteral("CWPitch"), 600).toInt();
-    if (pitch < 100)  { pitch = 100;  }
-    if (pitch > 2000) { pitch = 2000; }
-    return pitch;
+    return SliceModel::clampCwPitch(
+        s.value(QStringLiteral("CWPitch"),
+                SliceModel::kCwPitchDefaultHz).toInt());
 }
 
 // From Thetis console.cs:14636 / :14671 [@852bf0e].
@@ -747,6 +755,170 @@ int SliceModel::fmHalfBandwidthHz()
     // From Thetis Console/radio.cs:1571 [@852bf0e] -- rx_fm_highcut = 3000.0
     constexpr int kRxFmHighCutHz = 3000;
     return fmDeviationHz() + kRxFmHighCutHz;
+}
+
+int SliceModel::clampCwPitch(int hz)
+{
+    // Die Spanne der beiden Thetis-Felder (kCwPitchMinHz..kCwPitchMaxHz,
+    // Herkunft im Kopf). Der Setter selbst klemmt nur nach unten
+    // (console.cs:18150, `if (cw_pitch <= 0) cw_pitch = 0;  //-W2PA`);
+    // was ueber die Felder oder CAT kommt, ist schon in der Spanne —
+    // RadioModel::setCwPitch klemmt beim Setzen wie CATCWPitch.
+    return std::clamp(hz, kCwPitchMinHz, kCwPitchMaxHz);
+}
+
+// ── Ein CW-Durchlass folgt der Tonhoehe ──────────────────────────────
+//
+// Porting from Thetis console.cs:18142-18242 [@852bf0e] — public int
+// CWPitch, set. Der Setter macht der Reihe nach:
+//   1. cw_pitch setzen, nach unten auf 0 klemmen (//-W2PA),
+//      udCWPitch.Value, Display.CWPitch und
+//      NetworkIO.SetCWSidetoneFreq(cw_pitch) nachziehen;
+//   2. fuer JEDEN Platz F1..NONE (also auch VAR1/VAR2) die CWL- und
+//      CWU-Vorgabe von rx1_filters UND rx2_filters auf die Tonhoehe
+//      setzen, Breite behalten, an der Spiegelgrenze rutschen — das
+//      hier;
+//   3. steht RX1 in CWL/CWU: bei MOX VFO A (und B bei Split) um die
+//      Differenz schieben, sonst die VFO-Texte neu auswerten
+//      (txtVFOAFreq_LostFocus, also neu abstimmen), dann RX1Filter und
+//      RX2Filter neu anwenden — die Vorgabe, die gerade in 2. verschoben
+//      wurde;
+//   4. APF-Mitte fuer RX1/RX1sub/RX2 neu setzen (SetupForm.RX1APFFreq …,
+//      das landet in tbRX1APFTune_Scroll: RXAPFFreq = CWPitch + Tune);
+//   5. CWPitchChangedHandlers, nur wenn sich der Wert geaendert hat.
+// Wo was bei uns liegt: RadioModel::setCwPitch.
+//
+// Upstream-Kommentar vor der Schleife, wortgetreu (console.cs:18155-18159):
+//
+//   //-W2PA June 2017
+//   //      This centers the passband of the CW filters on the pitch frequency, but if CWPitch setter is called by mode buttons,
+//   //      it prevents filter setting from persisting when the mode changes or band changes, since band changes trigger mode changes.
+//   //      This happened because of a line:  CWPitch = cw_pitch;  in SetRX1Mode and SetRX2Mode.
+//   //      Those are now commented out. This should only be called by the CW Pitch control in the UI and Setup, or by a CAT command.
+//
+// Bei uns genauso: nur RadioModel::setCwPitch ruft das auf (aus dem
+// Setup-Feld), nie ein Betriebsartwechsel.
+//
+// `bw / 2` ist Ganzzahlteilung: eine ungerade Breite verliert dabei 1 Hz.
+// Das ist Thetis, und so bleibt es.
+void SliceModel::centreCwFilterOnPitch(int& low, int& high, DSPMode mode,
+                                       int pitchHz)
+{
+    // From Thetis console.cs:18162-18195 [@852bf0e] — Schleifenkoerper
+    // des CWPitch-Setters (W2PA, siehe oben), je Betriebsart eine Haelfte.
+    const int bw = high - low;
+    switch (mode) {
+    case DSPMode::CWL:
+        // Adjust CWL filters
+        low  = -pitchHz - bw / 2;
+        high = -pitchHz + bw / 2;
+        if (high > 0) { // stop shifting the passband when it hits the image limit, while allowing pitch to continue to decrease
+            low -= high;  // slide the passband down to put its edge at zero
+            high = 0;
+        }
+        // n6vl  [original inline comment from console.cs:18178, auf
+        // rx2_filters[CWL].SetFilter — die zweite Tabelle bekommt
+        // dieselben Werte; bei uns teilen sich alle Scheiben eine]
+        break;
+    case DSPMode::CWU:
+        // Adjust CWU filters
+        low  = pitchHz - bw / 2;
+        high = pitchHz + bw / 2;
+        if (low < 0) { // stop adjusting the passband when it hits the image limit, while allowing pitch to continue to decrease
+            high -= low;  // slide the passband up to put its edge at zero
+            low = 0;
+        }
+        break;
+    default:
+        break;
+    }
+}
+
+// Schritt 2 (VAR1/VAR2) und Schritt 3 (RX1Filter = rx1_filter) des
+// Setters fuer eine Scheibe.
+//
+// Schritt 3 wendet in Thetis den gewaehlten PLATZ neu an, dessen Werte
+// Schritt 2 gerade verschoben hat. Wir fuehren keinen gewaehlten Platz
+// (RxApplet leitet die Hervorhebung aus den Werten ab), also wird der
+// laufende Durchlass selbst verschoben — mit derselben Rechnung. Das
+// Ergebnis ist dasselbe: auch ein von Hand gezogener Durchlass liegt in
+// Thetis auf VAR1 (SelectRX1VarFilter) und wird von der Schleife
+// mitgenommen.
+//
+// Abweichung: Thetis wendet RX2Filter nur an, wenn RX1 in CW steht
+// (der switch fragt _rx1_dsp_mode). Hier folgt jede Scheibe, die selbst
+// in CW steht — die Scheiben sind unabhaengig, und eine CW-Scheibe mit
+// einem Durchlass neben dem Ton waere der Fehler, den der Setter
+// verhindern soll.
+void SliceModel::followCwPitch(int pitchHz)
+{
+    for (int slot = 0; slot < kVarSlots; ++slot) {
+        for (DSPMode m : {DSPMode::CWL, DSPMode::CWU}) {
+            auto it = m_varFilters[slot].find(static_cast<int>(m));
+            if (it == m_varFilters[slot].end()) { continue; }
+            int low  = it->first;
+            int high = it->second;
+            centreCwFilterOnPitch(low, high, m, pitchHz);
+            *it = qMakePair(low, high);
+        }
+    }
+
+    if (m_dspMode == DSPMode::CWL || m_dspMode == DSPMode::CWU) {
+        int low  = m_filterLow;
+        int high = m_filterHigh;
+        centreCwFilterOnPitch(low, high, m_dspMode, pitchHz);
+        setFilter(low, high);   // geht durch die Begrenzung
+    }
+}
+
+// Die gespeicherten CW-Durchlaesse anderer Baender. Thetis braucht das
+// nicht: ein Band merkt sich dort den Platz (preset[m].LastFilter), und
+// die Werte des Platzes hat die Schleife schon verschoben. Wir merken
+// uns je (Scheibe, Band, Betriebsart) die Kanten selbst — ohne diesen
+// Schritt kaeme nach dem naechsten Bandwechsel der alte Durchlass neben
+// dem neuen Ton zurueck.
+//
+// Zwei Schluesselformen, beide aus saveToSettings:
+//   Slice<n>/Band<b>/ModeCWL/FilterLow|High   (seit Phase 3J-1 Item 4)
+//   Slice<n>/Band<b>/FilterLow|High           (alt; gehoert zur Betriebsart
+//                                              in Slice<n>/Band<b>/DspMode)
+void SliceModel::recentreStoredCwFilters(int pitchHz)
+{
+    static const QRegularExpression kModeKey(
+        QStringLiteral("^(Slice\\d+/Band[^/]+/Mode(CWL|CWU)/)FilterLow$"));
+    static const QRegularExpression kBandKey(
+        QStringLiteral("^(Slice\\d+/Band[^/]+/)FilterLow$"));
+
+    auto& s = AppSettings::instance();
+    const QStringList keys = s.allKeys();
+    for (const QString& lowKey : keys) {
+        QString prefix;
+        DSPMode mode = DSPMode::CWU;
+        if (const QRegularExpressionMatch m = kModeKey.match(lowKey); m.hasMatch()) {
+            prefix = m.captured(1);
+            mode   = modeFromName(m.captured(2));
+        } else if (const QRegularExpressionMatch b = kBandKey.match(lowKey); b.hasMatch()) {
+            prefix = b.captured(1);
+            const QString modeKey = prefix + QStringLiteral("DspMode");
+            if (!s.contains(modeKey)) { continue; }
+            const int raw = s.value(modeKey).toInt();
+            if (raw != static_cast<int>(DSPMode::CWL)
+                && raw != static_cast<int>(DSPMode::CWU)) {
+                continue;
+            }
+            mode = static_cast<DSPMode>(raw);
+        } else {
+            continue;
+        }
+
+        const QString highKey = prefix + QStringLiteral("FilterHigh");
+        if (!s.contains(highKey)) { continue; }
+        int low  = s.value(lowKey).toInt();
+        int high = s.value(highKey).toInt();
+        centreCwFilterOnPitch(low, high, mode, pitchHz);
+        s.setValue(lowKey,  low);
+        s.setValue(highKey, high);
+    }
 }
 
 int SliceModel::defaultFilterCenter(DSPMode mode, int widthHz)
@@ -2014,18 +2186,14 @@ std::pair<int, int> SliceModel::defaultFilterForMode(DSPMode mode)
 {
     // Phase 3J-1 closeout Item 6 (2026-05-12): read CW pitch from
     // AppSettings instead of hardcoding 600.  Operator-configurable in
-    // Thetis (Setup → Keyboard / DSP → CW pitch slider; default 600 Hz);
-    // the dedicated Longpath setter lands with Phase 3M-2 CW TX, but the
-    // read path needs to be in place now so the filter center moves with
-    // the setting once that UI ships.  Range matches Thetis udCWPitch
-    // (Setup.designer.cs CW pitch up-down: 100..2000 Hz).
+    // Thetis (Setup → DSP → CW → CW Pitch; default 600 Hz).  The setter
+    // arrived 2026-09-27 as RadioModel::setCwPitch (Setup → DSP → CW),
+    // independent of Phase 3M-2 CW TX.  Range 200..2250 from Thetis
+    // udCWPitch / udDSPCWPitch — see kCwPitchMinHz in SliceModel.h (the
+    // 100..2000 once quoted here was never Thetis's).
     //
     // From Thetis display.cs:1023 [v2.10.3.13] — cw_pitch default 600.
-    auto& s = AppSettings::instance();
-    int cwPitch = s.value(QStringLiteral("CWPitch"), 600).toInt();
-    if (cwPitch < 100)  { cwPitch = 100;  }
-    if (cwPitch > 2000) { cwPitch = 2000; }
-    const int kCwPitch = cwPitch;
+    const int kCwPitch = currentCwPitch();
     // From Thetis console.cs:14636
     static constexpr int kDiguOffset = 1500;
     // From Thetis console.cs:14671
@@ -2123,11 +2291,20 @@ QList<std::pair<int, int>> SliceModel::presetsForMode(DSPMode mode)
     // Phase 3J-1 closeout Item 6 (2026-05-12): read CW pitch from
     // AppSettings — see defaultFilterForMode() above for the full
     // rationale.  Default 600 Hz from Thetis display.cs:1023.
-    auto& s = AppSettings::instance();
-    int cwPitch = s.value(QStringLiteral("CWPitch"), 600).toInt();
-    if (cwPitch < 100)  { cwPitch = 100;  }
-    if (cwPitch > 2000) { cwPitch = 2000; }
-    const int kCwPitch = cwPitch;
+    const int kCwPitch = currentCwPitch();
+
+    // Die CW-Tabelle rutscht an der Spiegelgrenze, wie in Thetis jede
+    // Vorgabe, sobald der CWPitch-Setter gelaufen ist (console.cs:
+    // 18162-18195, centreCwFilterOnPitch): bei tiefer Tonhoehe reicht
+    // ein breiter Platz sonst ueber den Traeger (CWU F1 bei 300 Hz:
+    // -450..1050 statt 0..1500). Die Plaetze sitzen schon auf der
+    // Tonhoehe, das Nachzentrieren aendert nur das Rutschen.
+    const auto slidCw = [kCwPitch](DSPMode m, QList<std::pair<int, int>> table) {
+        for (auto& p : table) {
+            centreCwFilterOnPitch(p.first, p.second, m, kCwPitch);
+        }
+        return table;
+    };
     // From Thetis console.cs:14636 [v2.10.3.13]
     static constexpr int kDiguOffset = 1500;
     // From Thetis console.cs:14671 [v2.10.3.13]
@@ -2152,18 +2329,20 @@ QList<std::pair<int, int>> SliceModel::presetsForMode(DSPMode mode)
                  {-1200,1200}, {-600,600} };
     case DSPMode::CWL:
         // From Thetis console.cs:5359-5399 [v2.10.3.13] — CWL F1-F10 (lower sideband CW)
-        return { {-(kCwPitch+750), -(kCwPitch-750)}, {-(kCwPitch+500), -(kCwPitch-500)},
+        return slidCw(mode, {
+                 {-(kCwPitch+750), -(kCwPitch-750)}, {-(kCwPitch+500), -(kCwPitch-500)},
                  {-(kCwPitch+400), -(kCwPitch-400)}, {-(kCwPitch+300), -(kCwPitch-300)},
                  {-(kCwPitch+200), -(kCwPitch-200)}, {-(kCwPitch+125), -(kCwPitch-125)},
                  {-(kCwPitch+50),  -(kCwPitch-50)},  {-(kCwPitch+25),  -(kCwPitch-25)},
-                 {-(kCwPitch+12),  -(kCwPitch-12)},  {-(kCwPitch+6),   -(kCwPitch-6)} };
+                 {-(kCwPitch+12),  -(kCwPitch-12)},  {-(kCwPitch+6),   -(kCwPitch-6)} });
     case DSPMode::CWU:
         // From Thetis console.cs:5401-5441 [v2.10.3.13] — CWU F1-F10 (upper sideband CW)
-        return { {kCwPitch-750, kCwPitch+750}, {kCwPitch-500, kCwPitch+500},
+        return slidCw(mode, {
+                 {kCwPitch-750, kCwPitch+750}, {kCwPitch-500, kCwPitch+500},
                  {kCwPitch-400, kCwPitch+400}, {kCwPitch-300, kCwPitch+300},
                  {kCwPitch-200, kCwPitch+200}, {kCwPitch-125, kCwPitch+125},
                  {kCwPitch-50,  kCwPitch+50},  {kCwPitch-25,  kCwPitch+25},
-                 {kCwPitch-12,  kCwPitch+12},  {kCwPitch-6,   kCwPitch+6} };
+                 {kCwPitch-12,  kCwPitch+12},  {kCwPitch-6,   kCwPitch+6} });
     case DSPMode::FM:
         // From Thetis console.cs:5527 region [v2.10.3.13] — FM uses wide symmetric filters
         return { {-8000,8000}, {-6000,6000}, {-4000,4000} };
@@ -2228,11 +2407,7 @@ QList<std::pair<int, int>> SliceModel::commonPresetsForMode(DSPMode mode)
         // Phase 3J-1 closeout Item 6 (2026-05-12): read CW pitch from
         // AppSettings.  See defaultFilterForMode() for the full rationale.
         // From Thetis display.cs:1023 [v2.10.3.13] — default 600.
-        auto& s = AppSettings::instance();
-        int cwPitch = s.value(QStringLiteral("CWPitch"), 600).toInt();
-        if (cwPitch < 100)  { cwPitch = 100;  }
-        if (cwPitch > 2000) { cwPitch = 2000; }
-        const int kCwPitch = cwPitch;
+        const int kCwPitch = currentCwPitch();
         const int sign = (mode == DSPMode::CWL) ? -1 : 1;
         return { {sign*(kCwPitch-50),  sign*(kCwPitch+50)},
                  {sign*(kCwPitch-100), sign*(kCwPitch+100)},
