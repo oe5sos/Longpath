@@ -214,6 +214,8 @@ private:
     void askForCustomFilter();
     /// Wie eine Breite in der Leiste heisst: „2.9k" statt „-2900…-100".
     static QString filterLabel(int low, int high);
+    /// Die Pille des laufenden Filters: Name der Vorgabe oder Breite.
+    QString runningFilterLabel(int low, int high) const;
     /// Die drei Breiten, die vorne stehen (Einstellung
     /// „CommandBarFilterFront", Vorgabe 2700,2900,3500 Hz).
     static QVector<int> frontWidthsHz();

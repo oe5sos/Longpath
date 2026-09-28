@@ -18,6 +18,8 @@
 //                 (SliceModel::presetNamesForMode) instead of "F1".."F10"
 //                 (Martin Fischer, OE5SOS, AI-assisted via Anthropic
 //                 Claude).
+//   2026-09-28 -- nameForEdges / defaultNameForEdges (Martin Fischer,
+//                 OE5SOS, AI-assisted via Anthropic Claude).
 // =================================================================
 
 #include "FilterPresetStore.h"
@@ -133,6 +135,35 @@ FilterPreset FilterPresetStore::defaultPreset(DSPMode mode, int slot)
         p.high = 3000;
     }
     return p;
+}
+
+// ── nameForEdges ──────────────────────────────────────────────────────────────
+
+// Thetis beschriftet den laufenden Filter mit dem Namen des gewaehlten
+// Platzes: panelFilter.Text = "Filter - " + ...GetName(f)
+// (console.cs:7721 [@852bf0e], RX2 :38256). Genaue Gleichheit, keine
+// Toleranz: die Vorgaben und der laufende Durchlass werden mit derselben
+// Rechnung verschoben (CW-Tonhoehe), sie bleiben also deckungsgleich.
+QString FilterPresetStore::nameForEdges(DSPMode mode, int low, int high) const
+{
+    for (const FilterPreset& p : presetsForMode(mode)) {
+        if (p.low == low && p.high == high) {
+            return p.name;
+        }
+    }
+    return QString();
+}
+
+QString FilterPresetStore::defaultNameForEdges(DSPMode mode, int low, int high)
+{
+    const auto edges = SliceModel::presetsForMode(mode);
+    const QStringList names = SliceModel::presetNamesForMode(mode);
+    for (int i = 0; i < edges.size() && i < names.size(); ++i) {
+        if (edges[i].first == low && edges[i].second == high) {
+            return names.at(i);
+        }
+    }
+    return QString();
 }
 
 // ── presetsForMode ────────────────────────────────────────────────────────────
