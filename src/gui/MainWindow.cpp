@@ -4295,6 +4295,9 @@ void MainWindow::buildUI()
     // Säule: Leiste oben, Splitter darunter. Der Splitter bleibt sonst
     // unangetastet — alle 900 Zeilen darunter kennen ihn unverändert.
     m_commandBar = new CommandBar(this);
+    // Das „…" der Filtergruppe liest den Vorgabenspeicher: Thetis-Namen
+    // und die eigenen Vorgaben aus Setup › Filter Presets (2026-09-28).
+    m_commandBar->setFilterPresetStore(m_radioModel->filterPresetStore());
 
     // ── RATE: einmal je Sekunde, was der Empfangskanal faehrt ─────────
     //

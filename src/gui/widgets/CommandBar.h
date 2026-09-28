@@ -52,6 +52,9 @@
 // Modification history (Longpath):
 //   2026-08-15 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
+//   2026-09-28 -- the filter "…" reads FilterPresetStore (Thetis names +
+//                 the operator's own presets), Martin Fischer, OE5SOS,
+//                 AI-assisted via Anthropic Claude.
 // =================================================================
 
 #include "core/WdspTypes.h"
@@ -69,6 +72,7 @@ class QPushButton;
 
 namespace Longpath {
 
+class FilterPresetStore;
 class SliceModel;
 
 class CommandBar : public QWidget {
@@ -110,6 +114,23 @@ public:
     /// im MainWindow erst lange nach dem Fensteraufbau entsteht und die
     /// Leiste nicht auf ihn warten soll.
     void addTrailing(QWidget* w);
+
+    /// Woher das „…" der Filtergruppe seine Vorgaben nimmt: aus dem
+    /// Vorgabenspeicher, also mit den Thetis-Namen („1.0k", „800" …)
+    /// und mit dem, was der Betreiber unter Setup › Filter Presets
+    /// selbst eingetragen hat. Ohne Speicher (Tests, frueher Aufbau)
+    /// die Thetis-Vorgaben selbst. Ein Zeiger auf den Speicher, nicht
+    /// aufs RadioModel — die Leiste kennt sonst nur die Scheibe.
+    void setFilterPresetStore(FilterPresetStore* store);
+
+    /// Was das „…" der Filtergruppe gerade anbietet, in Reihenfolge:
+    /// Name und Kanten. Ohne Scheibe leer.
+    struct FilterMenuEntry {
+        QString name;
+        int     low{0};
+        int     high{0};
+    };
+    QVector<FilterMenuEntry> filterMenuEntries() const;
 
     // ── Für Tests ────────────────────────────────────────────────────
     //
@@ -216,6 +237,7 @@ private:
     bool m_rateWarn{false};
     int m_rateMismatchSeconds{0};
     QPointer<SliceModel> m_slice;
+    QPointer<FilterPresetStore> m_presetStore;
     QList<QMetaObject::Connection> m_links;
 
     // Der vollständige Rest, den das „…" anbietet.

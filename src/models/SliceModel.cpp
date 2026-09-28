@@ -22,6 +22,14 @@
 //                 followCwPitch, recentreStoredCwFilters, clampCwPitch;
 //                 CW pitch range 200..2250 (udCWPitch/udDSPCWPitch), one
 //                 read site instead of four.
+//   2026-09-28 -- Filter preset table Thetis-faithful, by Martin Fischer
+//                 (OE5SOS), AI-assisted via Anthropic Claude, from Thetis
+//                 v2.10.3.15-5-g852bf0e console.cs InitFilterPresets:
+//                 values and names (presetNamesForMode) for LSB/USB/DIGL/
+//                 DIGU/CWL/CWU/AM/SAM/DSB replace a table whose values no
+//                 Thetis release ever carried; DIGU/DIGL default F5 +-500
+//                 (was +-600 "1.2k", likewise never upstream); FM/SPEC/DRM
+//                 marked Longpath-own; unused commonPresetsForMode removed.
 // =================================================================
 
 //=================================================================
@@ -651,8 +659,9 @@ namespace {
 
 // From Thetis display.cs:1023 [@852bf0e] — cw_pitch
 // default 600. Seit 2026-09-27 die EINE Lesestelle: defaultFilterForMode,
-// presetsForMode und commonPresetsForMode lasen den Schluessel vorher je
-// selbst und klemmten auf 100..2000 — viermal dieselbe, falsche Spanne.
+// presetsForMode und commonPresetsForMode (2026-09-28 entfernt, ohne
+// Aufrufer) lasen den Schluessel vorher je selbst und klemmten auf
+// 100..2000 — viermal dieselbe, falsche Spanne.
 // Die richtige steht bei kCwPitchMinHz/kCwPitchMaxHz im Kopf.
 int currentCwPitch()
 {
@@ -2173,7 +2182,7 @@ void SliceModel::setRttyShiftHz(int hz)
 // Per-mode default filter presets
 // ---------------------------------------------------------------------------
 
-// Porting from Thetis console.cs:5180-5575 — InitFilterPresets, F5 per mode.
+// Porting from Thetis console.cs:5180-5575 [v2.10.3.13] — InitFilterPresets, F5 per mode.
 //
 // Filter low/high are in Hz relative to the carrier frequency.
 // LSB: negative offsets (passband below carrier)
@@ -2194,28 +2203,28 @@ std::pair<int, int> SliceModel::defaultFilterForMode(DSPMode mode)
     //
     // From Thetis display.cs:1023 [v2.10.3.13] — cw_pitch default 600.
     const int kCwPitch = currentCwPitch();
-    // From Thetis console.cs:14636
+    // From Thetis console.cs:14636 [v2.10.3.13]
     static constexpr int kDiguOffset = 1500;
-    // From Thetis console.cs:14671
+    // From Thetis console.cs:14671 [v2.10.3.13]
     // Upstream inline attribution preserved verbatim:
     //   :14669  //reset preset filter's center frequency - W4TME
     static constexpr int kDiglOffset = 2210;
 
     switch (mode) {
     case DSPMode::LSB:
-        // From Thetis console.cs:5207 — F5: -3000 to -100
+        // From Thetis console.cs:5207 [v2.10.3.13] — F5: -3000 to -100
         return {-3000, -100};
     case DSPMode::USB:
-        // From Thetis console.cs:5249 — F5: 100 to 3000
+        // From Thetis console.cs:5249 [v2.10.3.13] — F5: 100 to 3000
         return {100, 3000};
     case DSPMode::DSB:
-        // From Thetis console.cs:5543 — F5: -3300 to 3300
+        // From Thetis console.cs:5543 [v2.10.3.13] — F5: -3300 to 3300
         return {-3300, 3300};
     case DSPMode::CWL:
-        // From Thetis console.cs:5375 — F5: -(cw_pitch+200) to -(cw_pitch-200)
+        // From Thetis console.cs:5375 [v2.10.3.13] — F5: -(cw_pitch+200) to -(cw_pitch-200)
         return {-(kCwPitch + 200), -(kCwPitch - 200)};
     case DSPMode::CWU:
-        // From Thetis console.cs:5417 — F5: (cw_pitch-200) to (cw_pitch+200)
+        // From Thetis console.cs:5417 [v2.10.3.13] — F5: (cw_pitch-200) to (cw_pitch+200)
         return {kCwPitch - 200, kCwPitch + 200};
     case DSPMode::FM: {
         // FM filters are dynamic in Thetis (from deviation + high cut):
@@ -2228,11 +2237,11 @@ std::pair<int, int> SliceModel::defaultFilterForMode(DSPMode mode)
         return {-halfBw, halfBw};
     }
     case DSPMode::AM:
-        // From Thetis console.cs:5459 — F5: -5000 to 5000
+        // From Thetis console.cs:5459 [v2.10.3.13] — F5: -5000 to 5000
         return {-5000, 5000};
     case DSPMode::DIGU:
         // Phase 3J-1 closeout Item 4 (2026-05-12): reverted to Thetis F5
-        // default (kDiguOffset ± 600 = 900..2100 Hz).  The Phase 3J-1
+        // default (kDiguOffset ± 500 = 1000..2000 Hz).  The Phase 3J-1
         // bench fix (commit 624b51c6) widened this to F1 (3 kHz) because
         // setDspMode slammed the default on EVERY mode change, which
         // chopped FT8/FT4 audio when WSJT-X drove band switches via
@@ -2241,10 +2250,13 @@ std::pair<int, int> SliceModel::defaultFilterForMode(DSPMode mode)
         // is now the right Thetis-faithful first-touch default, matching
         // upstream behavior.
         //
-        // From Thetis console.cs:5328 [v2.10.3.13] — DIGU F5 preset:
-        //   preset[m].SetFilter(Filter.F5, digu_click_tune_offset - 600,
-        //                       digu_click_tune_offset + 600, "1.2k");
-        return {kDiguOffset - 600, kDiguOffset + 600};
+        // 2026-09-28: bis dahin ±600 mit dem angeblich woertlichen Zitat
+        // `digu_click_tune_offset - 600, … "1.2k"` — das stand in keiner
+        // Thetis-Fassung (alle 567 Staende von console.cs durchsucht).
+        //
+        // From Thetis console.cs:5271 [@852bf0e] — DIGU F5 preset:
+        //   preset[m].SetFilter(f, digu_click_tune_offset - 500, digu_click_tune_offset + 500, "1.0k");
+        return {kDiguOffset - 500, kDiguOffset + 500};
     case DSPMode::SPEC:
         // SPEC mode: passthrough, wide filter
         return {-5000, 5000};
@@ -2252,12 +2264,11 @@ std::pair<int, int> SliceModel::defaultFilterForMode(DSPMode mode)
         // Phase 3J-1 closeout Item 4 (2026-05-12): reverted to Thetis F5
         // default -- see DIGU case above for the full rationale.
         //
-        // From Thetis console.cs:5286 [v2.10.3.13] — DIGL F5 preset:
-        //   preset[m].SetFilter(Filter.F5, -(digl_click_tune_offset + 600),
-        //                       -(digl_click_tune_offset - 600), "1.2k");
-        return {-(kDiglOffset + 600), -(kDiglOffset - 600)};
+        // From Thetis console.cs:5229 [@852bf0e] — DIGL F5 preset:
+        //   preset[m].SetFilter(f, -digl_click_tune_offset - 500, -digl_click_tune_offset + 500, "1.0k");
+        return {-kDiglOffset - 500, -kDiglOffset + 500};
     case DSPMode::SAM:
-        // From Thetis console.cs:5501 — F5: -5000 to 5000
+        // From Thetis console.cs:5501 [v2.10.3.13] — F5: -5000 to 5000
         return {-5000, 5000};
     case DSPMode::DRM:
         // DRM: wide filter similar to AM
@@ -2282,163 +2293,189 @@ std::pair<int, int> SliceModel::defaultFilterForMode(DSPMode mode)
 // ---------------------------------------------------------------------------
 // Full per-mode filter preset table
 // ---------------------------------------------------------------------------
+//
+// Porting from Thetis console.cs:5118-5515 [@852bf0e] — InitFilterPresets.
+// Wortgleich bei v2.10.3.13 (501e3f5, dort 5180-5577) und bei mi0bot
+// (0cef1c9). Je Betriebsart F1..F10 mit Kanten UND Namen; der Name ist
+// das, was Thetis auf den Knopf schreibt („1.0k", „800" …). VAR1/VAR2
+// derselben Tabelle fuehrt bei uns SliceModel selbst (m_varFilters).
+//
+//   // used to initialize all the filter variables
+//   [original inline comment from console.cs:5120]
+//
+// Bis 2026-09-28 stand hier eine andere Tabelle (seit 67f5079e,
+// 2026-05-02). Sie zitierte diese Stelle mit den richtigen Zeilen, ihre
+// Werte standen aber in keiner Thetis-Fassung: alle 567 Staende von
+// console.cs seit 2017 durchsucht, keiner kennt CW ±750…±6, SSB
+// 100..3300/2700/600, DIGU ±3000 oder AM ±1000/±500. Die Namen hiessen
+// schlicht „F1"…„F10".
 
-// From Thetis console.cs:5180-5575 [v2.10.3.13] — InitFilterPresets (F1-F10 per mode).
-// Returns (low_hz, high_hz) pairs in Thetis F1→F10 order. The full list drives
-// RxApplet's 10-button filter grid; VfoWidget uses commonPresetsForMode() (a subset).
-QList<std::pair<int, int>> SliceModel::presetsForMode(DSPMode mode)
+namespace {
+
+struct PresetSlot {
+    int         low;
+    int         high;
+    const char* name;
+};
+
+QList<PresetSlot> presetTable(DSPMode mode)
 {
-    // Phase 3J-1 closeout Item 6 (2026-05-12): read CW pitch from
-    // AppSettings — see defaultFilterForMode() above for the full
-    // rationale.  Default 600 Hz from Thetis display.cs:1023.
-    const int kCwPitch = currentCwPitch();
-
-    // Die CW-Tabelle rutscht an der Spiegelgrenze, wie in Thetis jede
-    // Vorgabe, sobald der CWPitch-Setter gelaufen ist (console.cs:
-    // 18162-18195, centreCwFilterOnPitch): bei tiefer Tonhoehe reicht
-    // ein breiter Platz sonst ueber den Traeger (CWU F1 bei 300 Hz:
-    // -450..1050 statt 0..1500). Die Plaetze sitzen schon auf der
-    // Tonhoehe, das Nachzentrieren aendert nur das Rutschen.
-    const auto slidCw = [kCwPitch](DSPMode m, QList<std::pair<int, int>> table) {
-        for (auto& p : table) {
-            centreCwFilterOnPitch(p.first, p.second, m, kCwPitch);
-        }
-        return table;
-    };
-    // From Thetis console.cs:14636 [v2.10.3.13]
-    static constexpr int kDiguOffset = 1500;
-    // From Thetis console.cs:14671 [v2.10.3.13]
-    // Upstream tags preserved: //W4TME (from cited console.cs:14669) [v2.10.3.15]
-    static constexpr int kDiglOffset = 2210;
+    // Die Thetis-Namen, damit die Zeilen unten wie das Original lesen.
+    const int cw_pitch = currentCwPitch();
+    const int digu_click_tune_offset = kDiguClickTuneOffset;
+    const int digl_click_tune_offset = kDiglClickTuneOffset;
 
     switch (mode) {
     case DSPMode::LSB:
-        // From Thetis console.cs:5191-5231 [v2.10.3.13] — LSB F1-F10
-        return { {-5100,-100}, {-4500,-100}, {-3900,-100}, {-3300,-100},
-                 {-3000,-100}, {-2700,-100}, {-2400,-100}, {-1800,-100},
-                 {-1200,-100}, {-600,-100} };
+        // From Thetis console.cs:5129-5169 [@852bf0e]
+        return { {-5100, -100, "5.0k"}, {-4500, -100, "4.4k"},
+                 {-3900, -100, "3.8k"}, {-3400, -100, "3.3k"},
+                 {-3000, -100, "2.9k"}, {-2800, -100, "2.7k"},
+                 {-2500, -100, "2.4k"}, {-2200, -100, "2.1k"},
+                 {-1900, -100, "1.8k"}, {-1100, -100, "1.0k"} };
     case DSPMode::USB:
-        // From Thetis console.cs:5233-5273 [v2.10.3.13] — USB F1-F10
-        return { {100,5100}, {100,4500}, {100,3900}, {100,3300},
-                 {100,3000}, {100,2700}, {100,2400}, {100,1800},
-                 {100,1200}, {100,600} };
-    case DSPMode::DSB:
-        // From Thetis console.cs:5527-5575 [v2.10.3.13] — DSB F1-F10, symmetric
-        return { {-5100,5100}, {-4500,4500}, {-3900,3900}, {-3300,3300},
-                 {-3000,3000}, {-2700,2700}, {-2400,2400}, {-1800,1800},
-                 {-1200,1200}, {-600,600} };
-    case DSPMode::CWL:
-        // From Thetis console.cs:5359-5399 [v2.10.3.13] — CWL F1-F10 (lower sideband CW)
-        return slidCw(mode, {
-                 {-(kCwPitch+750), -(kCwPitch-750)}, {-(kCwPitch+500), -(kCwPitch-500)},
-                 {-(kCwPitch+400), -(kCwPitch-400)}, {-(kCwPitch+300), -(kCwPitch-300)},
-                 {-(kCwPitch+200), -(kCwPitch-200)}, {-(kCwPitch+125), -(kCwPitch-125)},
-                 {-(kCwPitch+50),  -(kCwPitch-50)},  {-(kCwPitch+25),  -(kCwPitch-25)},
-                 {-(kCwPitch+12),  -(kCwPitch-12)},  {-(kCwPitch+6),   -(kCwPitch-6)} });
-    case DSPMode::CWU:
-        // From Thetis console.cs:5401-5441 [v2.10.3.13] — CWU F1-F10 (upper sideband CW)
-        return slidCw(mode, {
-                 {kCwPitch-750, kCwPitch+750}, {kCwPitch-500, kCwPitch+500},
-                 {kCwPitch-400, kCwPitch+400}, {kCwPitch-300, kCwPitch+300},
-                 {kCwPitch-200, kCwPitch+200}, {kCwPitch-125, kCwPitch+125},
-                 {kCwPitch-50,  kCwPitch+50},  {kCwPitch-25,  kCwPitch+25},
-                 {kCwPitch-12,  kCwPitch+12},  {kCwPitch-6,   kCwPitch+6} });
-    case DSPMode::FM:
-        // From Thetis console.cs:5527 region [v2.10.3.13] — FM uses wide symmetric filters
-        return { {-8000,8000}, {-6000,6000}, {-4000,4000} };
-    case DSPMode::AM:
-        // From Thetis console.cs:5443-5483 [v2.10.3.13] — AM F1-F10, symmetric
-        return { {-10000,10000}, {-6000,6000}, {-5000,5000},
-                 {-4000,4000},   {-3000,3000}, {-2500,2500},
-                 {-2000,2000},   {-1500,1500}, {-1000,1000}, {-500,500} };
-    case DSPMode::DIGU:
-        // From Thetis console.cs:5317-5357 [v2.10.3.13] — DIGU F1-F10
-        return { {kDiguOffset-3000, kDiguOffset+3000}, {kDiguOffset-2000, kDiguOffset+2000},
-                 {kDiguOffset-1500, kDiguOffset+1500}, {kDiguOffset-1000, kDiguOffset+1000},
-                 {kDiguOffset-500,  kDiguOffset+500},  {kDiguOffset-300,  kDiguOffset+300},
-                 {kDiguOffset-150,  kDiguOffset+150},  {kDiguOffset-100,  kDiguOffset+100},
-                 {kDiguOffset-50,   kDiguOffset+50},   {kDiguOffset-25,   kDiguOffset+25} };
-    case DSPMode::SPEC:
-        // Passthrough wideband
-        return { {-5000,5000} };
+        // From Thetis console.cs:5171-5211 [@852bf0e]
+        return { {100, 5100, "5.0k"}, {100, 4500, "4.4k"},
+                 {100, 3900, "3.8k"}, {100, 3400, "3.3k"},
+                 {100, 3000, "2.9k"}, {100, 2800, "2.7k"},
+                 {100, 2500, "2.4k"}, {100, 2200, "2.1k"},
+                 {100, 1900, "1.8k"}, {100, 1100, "1.0k"} };
     case DSPMode::DIGL:
-        // From Thetis console.cs:5275-5315 [v2.10.3.13] — DIGL F1-F10
-        return { {-(kDiglOffset+3000), -(kDiglOffset-3000)}, {-(kDiglOffset+2000), -(kDiglOffset-2000)},
-                 {-(kDiglOffset+1500), -(kDiglOffset-1500)}, {-(kDiglOffset+1000), -(kDiglOffset-1000)},
-                 {-(kDiglOffset+500),  -(kDiglOffset-500)},  {-(kDiglOffset+300),  -(kDiglOffset-300)},
-                 {-(kDiglOffset+150),  -(kDiglOffset-150)},  {-(kDiglOffset+100),  -(kDiglOffset-100)},
-                 {-(kDiglOffset+50),   -(kDiglOffset-50)},   {-(kDiglOffset+25),   -(kDiglOffset-25)} };
+        // From Thetis console.cs:5213-5253 [@852bf0e]
+        return { {-digl_click_tune_offset - 1500, -digl_click_tune_offset + 1500, "3.0k"},
+                 {-digl_click_tune_offset - 1250, -digl_click_tune_offset + 1250, "2.5k"},
+                 {-digl_click_tune_offset - 1000, -digl_click_tune_offset + 1000, "2.0k"},
+                 {-digl_click_tune_offset - 750,  -digl_click_tune_offset + 750,  "1.5k"},
+                 {-digl_click_tune_offset - 500,  -digl_click_tune_offset + 500,  "1.0k"},
+                 {-digl_click_tune_offset - 400,  -digl_click_tune_offset + 400,  "800"},
+                 {-digl_click_tune_offset - 300,  -digl_click_tune_offset + 300,  "600"},
+                 {-digl_click_tune_offset - 150,  -digl_click_tune_offset + 150,  "300"},
+                 {-digl_click_tune_offset - 75,   -digl_click_tune_offset + 75,   "150"},
+                 {-digl_click_tune_offset - 38,   -digl_click_tune_offset + 38,   "75"} };
+    case DSPMode::DIGU:
+        // From Thetis console.cs:5255-5295 [@852bf0e]
+        return { {digu_click_tune_offset - 1500, digu_click_tune_offset + 1500, "3.0k"},
+                 {digu_click_tune_offset - 1250, digu_click_tune_offset + 1250, "2.5k"},
+                 {digu_click_tune_offset - 1000, digu_click_tune_offset + 1000, "2.0k"},
+                 {digu_click_tune_offset - 750,  digu_click_tune_offset + 750,  "1.5k"},
+                 {digu_click_tune_offset - 500,  digu_click_tune_offset + 500,  "1.0k"},
+                 {digu_click_tune_offset - 400,  digu_click_tune_offset + 400,  "800"},
+                 {digu_click_tune_offset - 300,  digu_click_tune_offset + 300,  "600"},
+                 {digu_click_tune_offset - 150,  digu_click_tune_offset + 150,  "300"},
+                 {digu_click_tune_offset - 75,   digu_click_tune_offset + 75,   "150"},
+                 {digu_click_tune_offset - 38,   digu_click_tune_offset + 38,   "75"} };
+    case DSPMode::CWL:
+        // From Thetis console.cs:5297-5337 [@852bf0e]
+        return { {-cw_pitch - 500, -cw_pitch + 500, "1.0k"},
+                 {-cw_pitch - 400, -cw_pitch + 400, "800"},
+                 {-cw_pitch - 300, -cw_pitch + 300, "600"},
+                 {-cw_pitch - 250, -cw_pitch + 250, "500"},
+                 {-cw_pitch - 200, -cw_pitch + 200, "400"},
+                 {-cw_pitch - 125, -cw_pitch + 125, "250"},
+                 {-cw_pitch - 75,  -cw_pitch + 75,  "150"},
+                 {-cw_pitch - 50,  -cw_pitch + 50,  "100"},
+                 {-cw_pitch - 25,  -cw_pitch + 25,  "50"},
+                 {-cw_pitch - 13,  -cw_pitch + 13,  "25"} };
+    case DSPMode::CWU:
+        // From Thetis console.cs:5339-5379 [@852bf0e]
+        return { {cw_pitch - 500, cw_pitch + 500, "1.0k"},
+                 {cw_pitch - 400, cw_pitch + 400, "800"},
+                 {cw_pitch - 300, cw_pitch + 300, "600"},
+                 {cw_pitch - 250, cw_pitch + 250, "500"},
+                 {cw_pitch - 200, cw_pitch + 200, "400"},
+                 {cw_pitch - 125, cw_pitch + 125, "250"},
+                 {cw_pitch - 75,  cw_pitch + 75,  "150"},
+                 {cw_pitch - 50,  cw_pitch + 50,  "100"},
+                 {cw_pitch - 25,  cw_pitch + 25,  "50"},
+                 {cw_pitch - 13,  cw_pitch + 13,  "25"} };
+    case DSPMode::AM:
+        // From Thetis console.cs:5381-5421 [@852bf0e]
+        return { {-10000, 10000, "20k"},  {-9000, 9000, "18k"},
+                 {-8000,  8000,  "16k"},  {-6000, 6000, "12k"},
+                 {-5000,  5000,  "10k"},  {-4500, 4500, "9.0k"},
+                 {-4000,  4000,  "8.0k"}, {-3500, 3500, "7.0k"},
+                 {-3000,  3000,  "6.0k"}, {-2500, 2500, "5.0k"} };
     case DSPMode::SAM:
-        // From Thetis console.cs:5485-5525 [v2.10.3.13] — SAM F1-F10, symmetric
-        return { {-10000,10000}, {-6000,6000}, {-5000,5000},
-                 {-4000,4000},   {-3000,3000}, {-2500,2500},
-                 {-2000,2000},   {-1500,1500}, {-1000,1000}, {-500,500} };
+        // From Thetis console.cs:5423-5463 [@852bf0e]
+        return { {-10000, 10000, "20k"},  {-9000, 9000, "18k"},
+                 {-8000,  8000,  "16k"},  {-6000, 6000, "12k"},
+                 {-5000,  5000,  "10k"},  {-4500, 4500, "9.0k"},
+                 {-4000,  4000,  "8.0k"}, {-3500, 3500, "7.0k"},
+                 {-3000,  3000,  "6.0k"}, {-2500, 2500, "5.0k"} };
+    case DSPMode::DSB:
+        // From Thetis console.cs:5465-5505 [@852bf0e]
+        return { {-8000, 8000, "16k"},  {-6000, 6000, "12k"},
+                 {-5000, 5000, "10k"},  {-4000, 4000, "8.0k"},
+                 {-3300, 3300, "6.6k"}, {-2600, 2600, "5.2k"},
+                 {-2000, 2000, "4.0k"}, {-1550, 1550, "3.1k"},
+                 {-1450, 1450, "2.9k"}, {-1200, 1200, "2.4k"} };
+
+    // ── Longpath-eigen: Thetis hat hier keine Vorgaben ───────────────
+    //
+    // FM, SPEC und DRM fallen in InitFilterPresets in den `default:`-Zweig
+    // (LastFilter = NONE, console.cs:5507-5508 [@852bf0e]), und
+    // SetRX1Mode sperrt dort die Filterknoepfe (DisableAllFilters,
+    // console.cs:34285 FM / 34339 SPEC / 34403 DRM [@852bf0e]). Die
+    // Werte unten sind unsere; bis 2026-09-28 gab der FM-Zweig
+    // „console.cs:5527 region" als Quelle an, das ist der DSB-Block. Der
+    // Betreiber hat am 2026-09-28 entschieden, sie zu behalten. Namen in
+    // Thetis' Schreibweise (volle Breite, „8.0k", „16k").
+    case DSPMode::FM:
+        return { {-8000, 8000, "16k"}, {-6000, 6000, "12k"}, {-4000, 4000, "8.0k"} };
+    case DSPMode::SPEC:
+        return { {-5000, 5000, "10k"} };
     case DSPMode::DRM:
-        // DRM: wide digital AM-like filters
-        return { {-10000,10000}, {-5000,5000} };
+        return { {-10000, 10000, "20k"}, {-5000, 5000, "10k"} };
     case DSPMode::RADE_U:
         // Phase 3R Task J1.  RADE Upper sideband: single fixed-bandwidth
         // preset matching the 1700 Hz modem passband.  No F1-F10
         // variants; RADE has a fixed bandwidth per sideband.
-        return { {650, 2350} };
+        return { {650, 2350, "1.7k"} };
     case DSPMode::RADE_L:
         // Phase 3R Task J1.  RADE Lower sideband: mirror of RADE-U.
-        return { {-2350, -650} };
+        return { {-2350, -650, "1.7k"} };
     }
     // Fallback
-    return { {100, 3000} };
+    return { {100, 3000, "2.9k"} };
 }
 
-// ---------------------------------------------------------------------------
-// Common (compact) per-mode filter preset subset
-// ---------------------------------------------------------------------------
+} // namespace
 
-// Per Thetis main-panel filter buttons. Subset of presetsForMode() — 5-6 entries per mode
-// for VfoWidget's compact flag context. Values match Thetis console.cs F-button layout.
-QList<std::pair<int, int>> SliceModel::commonPresetsForMode(DSPMode mode)
+// Returns (low_hz, high_hz) pairs in Thetis F1→F10 order. Drives the „…"
+// of the command bar (via FilterPresetStore), the Setup page and the
+// memory Filter name (RadioModel::captureMemory).
+QList<std::pair<int, int>> SliceModel::presetsForMode(DSPMode mode)
 {
-    switch (mode) {
-    case DSPMode::USB:
-        return {{100,2400}, {100,2700}, {100,2900}, {100,3000}, {100,3200}};
-    case DSPMode::LSB:
-        return {{-2400,-100}, {-2700,-100}, {-2900,-100}, {-3000,-100}, {-3200,-100}};
-    case DSPMode::CWU:
-    case DSPMode::CWL: {
-        // Phase 3J-1 closeout Item 6 (2026-05-12): read CW pitch from
-        // AppSettings.  See defaultFilterForMode() for the full rationale.
-        // From Thetis display.cs:1023 [v2.10.3.13] — default 600.
-        const int kCwPitch = currentCwPitch();
-        const int sign = (mode == DSPMode::CWL) ? -1 : 1;
-        return { {sign*(kCwPitch-50),  sign*(kCwPitch+50)},
-                 {sign*(kCwPitch-100), sign*(kCwPitch+100)},
-                 {sign*(kCwPitch-150), sign*(kCwPitch+150)},
-                 {sign*(kCwPitch-250), sign*(kCwPitch+250)},
-                 {sign*(kCwPitch-500), sign*(kCwPitch+500)} };
+    // Die CW-Tabelle rutscht an der Spiegelgrenze, wie in Thetis jede
+    // Vorgabe, sobald der CWPitch-Setter gelaufen ist (console.cs:
+    // 18162-18195, centreCwFilterOnPitch): bei tiefer Tonhoehe reicht
+    // ein breiter Platz sonst ueber den Traeger (CWU F1 bei 300 Hz:
+    // -200..800 statt 0..1000). Die Plaetze sitzen schon auf der
+    // Tonhoehe, das Nachzentrieren aendert nur das Rutschen.
+    const QList<PresetSlot> table = presetTable(mode);
+    const int pitch = currentCwPitch();
+    QList<std::pair<int, int>> out;
+    out.reserve(table.size());
+    for (const PresetSlot& s : table) {
+        int low  = s.low;
+        int high = s.high;
+        centreCwFilterOnPitch(low, high, mode, pitch);   // nur CWL/CWU
+        out.append({low, high});
     }
-    case DSPMode::AM:
-    case DSPMode::SAM:
-        return {{-2900,2900}, {-3500,3500}, {-5000,5000}};
-    case DSPMode::FM:
-        return {{-3000,3000}, {-5000,5000}, {-8000,8000}};
-    case DSPMode::DIGU:
-    case DSPMode::DIGL: {
-        // From Thetis console.cs:14636,14671 [v2.10.3.13]
-        //reset preset filter's center frequency - W4TME  [original inline comment from console.cs:14647,14682]
-        const int o = (mode == DSPMode::DIGU) ? 1500 : 2210;
-        const int sign = (mode == DSPMode::DIGL) ? -1 : 1;
-        return { {sign*(o-1350), sign*(o+1350)},
-                 {sign*(o-1450), sign*(o+1450)},
-                 {sign*(o-1500), sign*(o+1500)},
-                 {sign*(o-1650), sign*(o+1650)},
-                 {sign*(o-1750), sign*(o+1750)} };
+    return out;
+}
+
+// Die Namen derselben Plaetze, in derselben Reihenfolge. Thetis behaelt
+// den Namen, wenn der CWPitch-Setter einen Platz verschiebt
+// (console.cs:18165 `string name = …GetName(f)` [@852bf0e]) — die Namen
+// haengen also nicht an der Tonhoehe.
+QStringList SliceModel::presetNamesForMode(DSPMode mode)
+{
+    QStringList out;
+    for (const PresetSlot& s : presetTable(mode)) {
+        out.append(QString::fromLatin1(s.name));
     }
-    case DSPMode::DSB:
-        return {{-2900,2900}, {-3500,3500}};
-    case DSPMode::DRM:
-        return {{-5000,5000}};
-    default:
-        return {{100, 3000}};
-    }
+    return out;
 }
 
 // ---------------------------------------------------------------------------
