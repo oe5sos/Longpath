@@ -54,7 +54,17 @@ if(WIN32)
 endif()
 
 # macOS: ensure Homebrew lib/include paths are in the search path
-if(APPLE)
+#
+# Only for local builds. Releases switch it off
+# (-DLONGPATH_HOMEBREW_PATHS=OFF, release.yml): link_directories() also puts
+# /opt/homebrew/lib into the app's LC_RPATH, AHEAD of its own Frameworks.
+# The shipped Intel 0.6.4 carried it; on a Mac with Homebrew Qt installed
+# such an app loads that Qt instead of the bundled one -- with the official
+# Qt 6.8 the bundled plugins then refuse to load ("mismatching Qt
+# versions") and Longpath does not start (reproduced 2026-09-29).
+option(LONGPATH_HOMEBREW_PATHS
+       "macOS: add Homebrew lib/include to the search paths (local builds only)" ON)
+if(APPLE AND LONGPATH_HOMEBREW_PATHS)
     execute_process(COMMAND brew --prefix OUTPUT_VARIABLE HOMEBREW_PREFIX OUTPUT_STRIP_TRAILING_WHITESPACE)
     if(HOMEBREW_PREFIX)
         link_directories("${HOMEBREW_PREFIX}/lib")
@@ -1312,6 +1322,25 @@ if(LONGPATH_LTO_AVAILABLE)
         INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO TRUE)
 else()
     target_link_libraries(Longpath PRIVATE LongpathObjs)
+endif()
+
+# LSMinimumSystemVersion im Info.plist (2026-09-29). Ohne den Schluessel
+# startete ein zu altes macOS die App und dyld brach dann beim Laden der
+# ersten zu neuen Bibliothek ab -- ein Absturz statt der Finder-Meldung
+# „benoetigt macOS 12 oder neuer". Mit Zielversion (Releases) gilt sie;
+# ohne (lokaler Bau gegen Homebrew) laeuft das Ergebnis nur auf diesem
+# macOS, und genau das steht dann drin.
+if(APPLE)
+    if(CMAKE_OSX_DEPLOYMENT_TARGET)
+        set(LONGPATH_MIN_MACOS "${CMAKE_OSX_DEPLOYMENT_TARGET}")
+    else()
+        execute_process(COMMAND sw_vers -productVersion
+                        OUTPUT_VARIABLE _longpath_host_macos
+                        OUTPUT_STRIP_TRAILING_WHITESPACE
+                        ERROR_QUIET)
+        string(REGEX MATCH "^[0-9]+\\.[0-9]+" LONGPATH_MIN_MACOS
+               "${_longpath_host_macos}")
+    endif()
 endif()
 
 set_target_properties(Longpath PROPERTIES

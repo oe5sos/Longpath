@@ -191,6 +191,35 @@
 
 ### Fixed
 
+- **Longpath läuft wieder auf älteren Systemen, auf allen Prozessoren.**
+  Gemessen an den ausgelieferten 0.6.4-Paketen (minos jeder Mach-O-Datei,
+  höchste verlangte glibc):
+  - Mac Apple Silicon verlangte **macOS 15** (Qt und FFTW aus Homebrew,
+    für das macOS des Bau-Rechners gebaut), obwohl „14.0“ eingetragen war.
+    Jetzt wie die Intel-Fassung: offizielles Qt 6.8, FFTW aus dem
+    Quelltext, **ab macOS 12 (Monterey)** auf Apple Silicon und Intel.
+  - Linux ARM (aarch64) verlangte **glibc 2.38** (Ubuntu 24.04, Ubuntus
+    Qt 6.4) und startete auf dem Raspberry Pi (Raspberry Pi OS Bookworm,
+    glibc 2.36) nicht. Jetzt wie x86-64: Ubuntu 22.04 mit offiziellem
+    Qt 6.8.3, **ab glibc 2.35** (Ubuntu 22.04+, Debian 12+, Raspberry Pi
+    OS Bookworm).
+  - Serielles PTT/CW fehlte in Mac Intel, Linux x64 und Linux ARM
+    (`qtserialport` war nicht installiert); jetzt überall.
+  - Die Mac-Pakete tragen `LSMinimumSystemVersion`: ein zu altes macOS
+    meldet das, statt beim Start abzustürzen.
+  - Das Intel-Programm 0.6.4 trug `/opt/homebrew/lib` als **ersten**
+    Suchpfad (aus `link_directories` in `CMakeLists.txt`). Mit dem
+    offiziellen Qt im Paket hätte das auf jedem Mac mit Homebrew-Qt dessen
+    Qt geladen, und Longpath wäre nicht gestartet (lokal nachgestellt).
+    Releases bauen jetzt mit `-DLONGPATH_HOMEBREW_PATHS=OFF`.
+  - WebP/TIFF, die die Bilddialoge anbieten, fehlten in allen Fassungen
+    außer Mac Apple Silicon (`qtimageformats` nicht installiert).
+  - Xcode 16 ist festgelegt: Qt 6.8 linkt noch `AGL.framework`, das im
+    macOS-26-SDK fehlt.
+  - Die Release-Pipeline prüft bei jedem Bau Untergrenze, Architektur und
+    Verweise nach außen (`packaging/macos/check-min-macos.sh`) bzw. die
+    glibc-Untergrenze (Linux-Job).
+
 - **Satelliten fehlten bei deutscher Systemsprache.** Aus dem Terminal
   gestartet (oder auf einem deutschen Linux) meldete Longpath „TLE-Satz:
   0 Satelliten, 95 verworfen“: Qt setzt beim Start das C-Gebietsschema auf
