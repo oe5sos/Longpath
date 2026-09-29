@@ -14,18 +14,21 @@
 //
 // Geprueft, mit bewusst nativ gemachtem Feld (wie im Programm):
 //   - Profilleiste: Rechtsklick auf ein Abzeichen, keine Warnung, das
-//     Menue haengt am Fenster.
-// Das Rotor/Log-Feld hat dasselbe Muster, bleibt aber vorerst: sein
-// Stylesheet „background: kAppBg" (ohne Selektor) faerbt heute auch seine
-// Menues; am Fenster bekaemen sie das App-Grau #1a1a1e statt #08080a --
-// eine sichtbare Aenderung, die Martin entscheidet.
+//     Menue haengt am Fenster;
+//   - Rotor/Log-Feld: Rechtsklick ins Feld, ebenso. Seine Menues werden
+//     dadurch heller -- das App-Menuegrau #1a1a1e statt des #08080a, das
+//     ihnen das Feld-Stylesheet „background: kAppBg" (ohne Selektor)
+//     vererbte. Martin, 2026-09-29, gefragt: „ja".
 //
 // Modification history (Longpath):
 //   2026-09-27 — Original fuer Longpath von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude.
+//   2026-09-29 — Rotor/Log-Feld dazu. Martin Fischer, KI-gestuetzt
+//                 ueber Anthropic Claude.
 // =================================================================
 #include <QtTest>
 #include <QApplication>
+#include <QContextMenuEvent>
 #include <QMenu>
 #include <QPushButton>
 #include <QRegularExpression>
@@ -33,6 +36,7 @@
 
 #include "gui/LayoutProfiles.h"
 #include "gui/widgets/ProfileRail.h"
+#include "gui/widgets/RotorLogbookPanel.h"
 
 using namespace Longpath;
 
@@ -60,6 +64,13 @@ class TstMenusOfNativeFields : public QObject
 {
     Q_OBJECT
 private slots:
+    void initTestCase()
+    {
+        // Das Rotor/Log-Feld liest RotorLogbookPanel::logbookPath(); eine
+        // gesetzte Sandbox-Variable lenkte das auf einen echten Ordner.
+        qunsetenv("LONGPATH_CONFIG_DIR");
+    }
+
     void theProfileRailMenuHangsOnTheWindow()
     {
         QTest::failOnWarning(notTopLevel());
@@ -86,6 +97,26 @@ private slots:
         closeMenuSoon(&parentSeen);
         emit badge->customContextMenuRequested(QPoint(5, 5));
         QCOMPARE(parentSeen, rail->window());
+    }
+
+    void theLogbookPanelMenuHangsOnTheWindow()
+    {
+        QTest::failOnWarning(notTopLevel());
+        QWidget top;
+        top.resize(500, 600);
+        auto* panel = new RotorLogbookPanel(nullptr, nullptr, nullptr, &top);
+        panel->setAttribute(Qt::WA_NativeWindow);
+        panel->setGeometry(0, 0, 500, 600);
+        top.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&top));
+        QVERIFY(panel->windowHandle());
+
+        QWidget* parentSeen = nullptr;
+        closeMenuSoon(&parentSeen);
+        QContextMenuEvent ev(QContextMenuEvent::Mouse, QPoint(40, 40),
+                             panel->mapToGlobal(QPoint(40, 40)));
+        QApplication::sendEvent(panel, &ev);
+        QCOMPARE(parentSeen, panel->window());
     }
 };
 
