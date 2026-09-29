@@ -326,13 +326,14 @@ void RotorLogbookPanel::buildUi()
     m_photo->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(m_photo, &QWidget::customContextMenuRequested, this,
             [this](const QPoint& pos) {
-        ScopedChildWidget<QMenu> menuOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+        ScopedChildWidget<QMenu> menuOwner(window());   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+        const QPointer<RotorLogbookPanel> self(this);   // Menue am Fenster: am nativen Feld bekam es keinen Fensterbezug (2026-09-27)
         QMenu& menu = *menuOwner.get();
         QAction* off = menu.addAction(QStringLiteral("Don't show QRZ photos"));
         const QAction* chosen = menu.exec(m_photo->mapToGlobal(pos));
         // Das Elternteil kann waehrend exec() gestorben sein — dann ist
         // auch das Menue weg und `this` eine Leiche. Siehe ScopedChildWidget.h.
-        if (!menuOwner) { return; }
+        if (!menuOwner || !self) { return; }
         if (chosen == off) {
             AppSettings::instance().setValue(kShowPhotoKey, false);
             m_photo->showPlaceholder(QString{});
@@ -432,7 +433,8 @@ void RotorLogbookPanel::buildUi()
     // beides hier, im einen Knopf, der schon fuer "wie sieht die Kugel
     // aus" zustaendig ist.
     connect(worldBtn, &QPushButton::clicked, this, [this, worldBtn]() {
-        ScopedChildWidget<QMenu> menuOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+        ScopedChildWidget<QMenu> menuOwner(window());   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+        const QPointer<RotorLogbookPanel> self(this);   // Menue am Fenster: am nativen Feld bekam es keinen Fensterbezug (2026-09-27)
         QMenu& menu = *menuOwner.get();
         QAction* small = menu.addAction(
             QStringLiteral("Download from NASA — 2048 × 1024 (about 1 MB)"));
@@ -477,7 +479,7 @@ void RotorLogbookPanel::buildUi()
             QPoint(0, worldBtn->height())));
         // Das Elternteil kann waehrend exec() gestorben sein — dann ist
         // auch das Menue weg und `this` eine Leiche. Siehe ScopedChildWidget.h.
-        if (!menuOwner) { return; }
+        if (!menuOwner || !self) { return; }
         if (chosen == small) {
             downloadWorldImage(smallCandidates(), 0,
                                QStringLiteral("2048 × 1024"));
@@ -884,13 +886,14 @@ bool RotorLogbookPanel::teachableBearing(double* outDeg) const
 // Rotate dreht. Das galt fuer die Knoepfe und gilt hier weiter.
 void RotorLogbookPanel::contextMenuEvent(QContextMenuEvent* ev)
 {
-    ScopedChildWidget<QMenu> menuOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+    ScopedChildWidget<QMenu> menuOwner(window());   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+    const QPointer<RotorLogbookPanel> self(this);   // Menue am Fenster: am nativen Feld bekam es keinen Fensterbezug (2026-09-27)
     QMenu& menu = *menuOwner.get();
     buildAimMenu(menu, ev->globalPos());
     menu.exec(ev->globalPos());
     // Das Elternteil kann waehrend exec() gestorben sein — dann ist
     // auch das Menue weg und `this` eine Leiche. Siehe ScopedChildWidget.h.
-    if (!menuOwner) { return; }
+    if (!menuOwner || !self) { return; }
     ev->accept();
 }
 
@@ -1003,7 +1006,8 @@ void RotorLogbookPanel::userPresetMenu(int slot, const QPoint& globalPos)
     const QString labelKey = kPresetLabelKey.arg(slot + 1);
     const bool taught = !s.value(degKey, QString{}).toString().isEmpty();
 
-    ScopedChildWidget<QMenu> menuOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+    ScopedChildWidget<QMenu> menuOwner(window());   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+    const QPointer<RotorLogbookPanel> self(this);   // Menue am Fenster: am nativen Feld bekam es keinen Fensterbezug (2026-09-27)
     QMenu& menu = *menuOwner.get();
     double teach = 0.0;
     const bool canTeach = teachableBearing(&teach);
@@ -1021,7 +1025,7 @@ void RotorLogbookPanel::userPresetMenu(int slot, const QPoint& globalPos)
         menu.exec(globalPos);
         // Das Elternteil kann waehrend exec() gestorben sein — dann ist
         // auch das Menue weg und `this` eine Leiche. Siehe ScopedChildWidget.h.
-        if (!menuOwner) { return; }
+        if (!menuOwner || !self) { return; }
     if (!chosen) { return; }
 
     if (chosen == save) {
@@ -1059,7 +1063,8 @@ void RotorLogbookPanel::parkMenu(const QPoint& globalPos)
     AppSettings& s = AppSettings::instance();
     const bool taught = !s.value(kParkDegKey, QString{}).toString().isEmpty();
 
-    ScopedChildWidget<QMenu> menuOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+    ScopedChildWidget<QMenu> menuOwner(window());   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+    const QPointer<RotorLogbookPanel> self(this);   // Menue am Fenster: am nativen Feld bekam es keinen Fensterbezug (2026-09-27)
     QMenu& menu = *menuOwner.get();
     double teach = 0.0;
     const bool canTeach = teachableBearing(&teach);
@@ -1075,7 +1080,7 @@ void RotorLogbookPanel::parkMenu(const QPoint& globalPos)
     QAction* chosen = menu.exec(globalPos);
     // Das Elternteil kann waehrend exec() gestorben sein — dann ist
     // auch das Menue weg und `this` eine Leiche. Siehe ScopedChildWidget.h.
-    if (!menuOwner) { return; }
+    if (!menuOwner || !self) { return; }
     if (!chosen) { return; }
     if (chosen == save) {
         s.setValue(kParkDegKey, QString::number(teach, 'f', 1));
