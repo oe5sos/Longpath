@@ -101,12 +101,20 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Beide Zeilen auf Ubuntu 22.04 mit offiziellem Qt 6.8.3
+          # (2026-09-29): das AppImage braucht dann hoechstens glibc 2.35
+          # und laeuft auf Ubuntu 22.04+, Debian 12+ und Raspberry Pi OS
+          # Bookworm. Die ARM-Zeile baute bis 0.6.4 auf ubuntu-24.04-arm
+          # mit Ubuntus Qt 6.4 und brauchte glibc 2.38 -- auf dem Raspberry
+          # Pi (Bookworm, glibc 2.36) startete sie nicht.
           - runner: ubuntu-22.04
             arch: x86_64
-            use_aqt: true
-          - runner: ubuntu-24.04-arm
+            qt_host: linux
+            qt_arch: linux_gcc_64
+          - runner: ubuntu-22.04-arm
             arch: aarch64
-            use_aqt: false
+            qt_host: linux_arm64
+            qt_arch: linux_gcc_arm64
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -128,25 +136,26 @@ jobs:
             libasound2-dev libjack-jackd2-dev \
             libpipewire-0.3-dev
 
-      - name: Install system Qt (ARM only)
-        if: matrix.use_aqt == false
-        run: |
-          sudo apt-get install -y qt6-base-dev qt6-multimedia-dev \
-            qt6-base-private-dev qt6-shadertools-dev qt6-svg-dev \
-            qt6-websockets-dev
-
-      - name: Install Qt 6.8 via aqtinstall (x86_64)
-        if: matrix.use_aqt == true
+      - name: Install Qt 6.8 via aqtinstall
         run: |
           pip3 install aqtinstall
           # Qt 6.8+ folds qtsvg/qttools/qttranslations into qtbase; not listable as -m modules.
-          aqt install-qt linux desktop 6.8.3 linux_gcc_64 \
-            -m qtmultimedia qtshadertools qtwebsockets \
+          # qtserialport (2026-09-29): ohne das Modul baute Longpath ohne
+          # serielles PTT/CW -- in 0.6.4 hatten es nur Mac Apple Silicon
+          # (Homebrew-Qt) und Windows. qtimageformats: WebP/TIFF, die die
+          # Bilddialoge (Panadapter-Hintergrund, Weltkarte) anbieten.
+          aqt install-qt ${{ matrix.qt_host }} desktop 6.8.3 ${{ matrix.qt_arch }} \
+            -m qtmultimedia qtshadertools qtwebsockets qtserialport qtimageformats \
             --outputdir ${{ github.workspace }}/Qt
-          echo "Qt6_DIR=${{ github.workspace }}/Qt/6.8.3/gcc_64/lib/cmake/Qt6" >> $GITHUB_ENV
-          echo "CMAKE_PREFIX_PATH=${{ github.workspace }}/Qt/6.8.3/gcc_64" >> $GITHUB_ENV
-          echo "PATH=${{ github.workspace }}/Qt/6.8.3/gcc_64/bin:$PATH" >> $GITHUB_ENV
-          echo "LD_LIBRARY_PATH=${{ github.workspace }}/Qt/6.8.3/gcc_64/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+          # Der Ordnername haengt an der Architektur (gcc_64, gcc_arm64 ...);
+          # gesucht statt geraten.
+          QTDIR=$(dirname "$(dirname "$(ls -d ${{ github.workspace }}/Qt/6.8.3/*/bin/qmake | head -1)")")
+          test -x "$QTDIR/bin/qmake" || { echo "::error::Qt 6.8.3 nicht gefunden"; exit 1; }
+          echo "QTDIR=$QTDIR" >> $GITHUB_ENV
+          echo "Qt6_DIR=$QTDIR/lib/cmake/Qt6" >> $GITHUB_ENV
+          echo "CMAKE_PREFIX_PATH=$QTDIR" >> $GITHUB_ENV
+          echo "PATH=$QTDIR/bin:$PATH" >> $GITHUB_ENV
+          echo "LD_LIBRARY_PATH=$QTDIR/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -165,13 +174,12 @@ jobs:
       - name: Configure
         run: |
           ccache --max-size=2G
-          CMAKE_EXTRA=""
-          if [ "${{ matrix.use_aqt }}" = "true" ]; then
-            CMAKE_EXTRA="-DCMAKE_PREFIX_PATH=${{ github.workspace }}/Qt/6.8.3/gcc_64"
-          else
-            # Ubuntu 24.04 ARM ships Qt 6.4.2; QRhiWidget requires 6.7+.
-            # Mirror ci.yml linux-gcc: CPU-only spectrum on this runner.
-            CMAKE_EXTRA="-DLONGPATH_GPU_SPECTRUM=OFF"
+          CMAKE_EXTRA="-DCMAKE_PREFIX_PATH=$QTDIR"
+          if [ "${{ matrix.arch }}" = "aarch64" ]; then
+            # Bis 0.6.4 zwangsweise (Ubuntus Qt 6.4 hatte kein QRhiWidget).
+            # Mit Qt 6.8 ginge der GPU-Panadapter, auf ARM-Grafik (Raspberry
+            # Pi) ist er aber ungeprueft: der erprobte CPU-Weg bleibt.
+            CMAKE_EXTRA="$CMAKE_EXTRA -DLONGPATH_GPU_SPECTRUM=OFF"
           fi
           cmake -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
@@ -225,11 +233,7 @@ jobs:
           QT_SELECT: qt6
           EXTRA_QT_PLUGINS: multimedia
         run: |
-          if [ "${{ matrix.use_aqt }}" = "true" ]; then
-            export QMAKE=${{ github.workspace }}/Qt/6.8.3/gcc_64/bin/qmake
-          else
-            export QMAKE=$(which qmake6 2>/dev/null || which qmake)
-          fi
+          export QMAKE="$QTDIR/bin/qmake"
           mkdir -p AppDir/usr/share/applications
           cat > AppDir/usr/share/applications/Longpath.desktop << 'DESKTOP'
           [Desktop Entry]
@@ -290,6 +294,28 @@ jobs:
             --desktop-file AppDir/usr/share/applications/Longpath.desktop \
             --output appimage
 
+      # Untergrenze pruefen (2026-09-29): keine Datei im AppImage darf
+      # eine neuere glibc verlangen als Ubuntu 22.04 hat. 0.6.4 brauchte
+      # auf ARM 2.38 und lief auf dem Raspberry Pi nicht -- das faellt
+      # jetzt beim Bauen auf, nicht beim Anwender.
+      - name: Check glibc floor (2.35)
+        run: |
+          max=$(find AppDir -type f \( -name '*.so*' -o -path '*/bin/*' \) \
+                | while read -r f; do objdump -T "$f" 2>/dev/null; done \
+                | grep -o 'GLIBC_2\.[0-9]*' | sort -uV | tail -1)
+          echo "hoechste verlangte glibc: $max"
+          if [ -z "$max" ]; then
+            echo "::error::Keine ELF-Datei mit glibc-Bezug im AppDir gefunden -- Pruefung kaputt?"
+            exit 1
+          fi
+          if [ "$(printf '%s\n' "$max" GLIBC_2.35 | sort -V | tail -1)" != "GLIBC_2.35" ]; then
+            echo "::error::Das AppImage verlangt $max -- Untergrenze ist glibc 2.35 (Ubuntu 22.04)."
+            find AppDir -type f \( -name '*.so*' -o -path '*/bin/*' \) | while read -r f; do
+              objdump -T "$f" 2>/dev/null | grep -q "$max" && echo "  $f"
+            done
+            exit 1
+          fi
+
       - name: Upload AppImage artifact
         uses: actions/upload-artifact@v4
         with:
@@ -303,10 +329,16 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Beide Zeilen: offizielles Qt 6.8 (aqtinstall) und FFTW aus dem
+          # Quelltext, Untergrenze macOS 12 -- die kleinste, die Qt 6.8
+          # traegt (2026-09-29). Bis 0.6.4 nahm die arm64-Zeile Qt und FFTW
+          # aus Homebrew; deren Flaschen sind fuer das macOS des Laeufers
+          # gebaut (minos 15.0), und die Apple-Silicon-Fassung startete
+          # erst ab macOS 15 -- trotz „14.0" hier.
           - runner: macos-15
             arch: arm64
             dmg_suffix: macOS-apple-silicon
-            deployment_target: "14.0"
+            deployment_target: "12.0"
           # Intel Mac restored 2026-05-03 via cross-compile from the abundant
           # Apple Silicon runner. Native macos-13 was unviable: original Phase
           # 3N attempt failed on label rejection (2026-04-12); re-attempt found
@@ -317,7 +349,9 @@ jobs:
           - runner: macos-15
             arch: x86_64
             dmg_suffix: macOS-intel
-            deployment_target: "11.0"
+            # War „11.0"; Qt 6.8 selbst verlangt 12.0 (so stand es in jeder
+            # Qt-Bibliothek von 0.6.4) -- die 11 war nie wahr.
+            deployment_target: "12.0"
     runs-on: ${{ matrix.runner }}
     # Capture the Apple Developer ID secret into a job-level env var so
     # step-level `if:` guards can evaluate it. GitHub Actions forbids
@@ -326,59 +360,81 @@ jobs:
     # env is populated after secrets are available.
     env:
       HAS_APPLE_DEVELOPER_ID: ${{ secrets.APPLE_DEVELOPER_ID != '' }}
+      # Auch fuer alles, was nicht ueber CMAKE_OSX_DEPLOYMENT_TARGET geht:
+      # autotools (Opus in third_party/rade), cargo (DeepFilterNet3).
+      MACOSX_DEPLOYMENT_TARGET: ${{ matrix.deployment_target }}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ needs.prepare.outputs.tag }}
 
-      - name: Install dependencies (arm64 native)
-        if: matrix.arch == 'arm64'
-        # autoconf/automake/libtool/wget required by third_party/rade
-        # vendored Opus (autotools + wget DRED model download). Not in
-        # default macOS runner image.
-        run: brew install qt@6 ninja create-dmg fftw ccache autoconf automake libtool wget
+      # Qt 6.8 linkt am Mac noch AGL.framework mit; das macOS-26-SDK
+      # (Xcode 26) hat es nicht mehr: „ld: framework 'AGL' not found"
+      # (lokal nachgestellt 2026-09-29). Qt 6.8 ist die letzte Reihe, die
+      # macOS 12 traegt -- also Xcode 16 (SDK 15) festhalten, statt zu
+      # hoffen, dass der Laeufer es als Vorgabe hat.
+      - name: Select Xcode 16 (SDK with AGL for Qt 6.8)
+        run: |
+          XC=$(ls -d /Applications/Xcode_16*.app 2>/dev/null | sort -V | tail -1)
+          if [ -z "$XC" ]; then
+            echo "::error::Kein Xcode 16 auf dem Laeufer -- Qt 6.8 braucht das SDK mit AGL."
+            ls -d /Applications/Xcode*.app
+            exit 1
+          fi
+          sudo xcode-select -s "$XC/Contents/Developer"
+          xcodebuild -version
+          SDK="$(xcrun --show-sdk-path)"
+          echo "SDK: $SDK"
+          test -d "$SDK/System/Library/Frameworks/AGL.framework" \
+            || { echo "::error::$SDK hat kein AGL.framework"; exit 1; }
 
-      - name: Install non-Qt brew packages (x86_64 cross-compile)
-        if: matrix.arch == 'x86_64'
+      - name: Install build tools (brew)
+        # Nur Werkzeuge -- nichts, was ins Paket gelinkt wird. Homebrew-
+        # Bibliotheken sind fuer das macOS des Laeufers gebaut und wuerden
+        # die Untergrenze hochziehen (siehe deployment_target oben).
         # autoconf/automake/libtool/wget required by third_party/rade
         # vendored Opus (autotools + wget DRED model download). Not in
         # default macOS runner image.
         run: brew install ninja create-dmg ccache autoconf automake libtool wget
 
-      - name: Install Qt 6.8 for x86_64 macOS via aqtinstall
-        if: matrix.arch == 'x86_64'
+      - name: Install Qt 6.8 via aqtinstall
+        # clang_64 ist universell (x86_64 + arm64). qtserialport
+        # (2026-09-29): fehlte in der Intel-Fassung, also kein serielles
+        # PTT/CW dort. qtimageformats: WebP/TIFF fuer die Bilddialoge.
         uses: jurplel/install-qt-action@v4
         with:
           version: '6.8.*'
           host: 'mac'
           target: 'desktop'
           arch: 'clang_64'
-          modules: 'qtmultimedia qtshadertools qtwebsockets'
+          modules: 'qtmultimedia qtshadertools qtwebsockets qtserialport qtimageformats'
           cache: true
 
-      - name: Build FFTW from source for x86_64 (both precisions)
-        if: matrix.arch == 'x86_64'
+      - name: Build FFTW from source (both precisions)
         run: |
           # Longpath needs both libfftw3 (double, for libspecbleach + WDSP)
           # and libfftw3f (single, for FFTEngine). FFTW autotools forces one
           # precision per configure run, so we run install twice into the
           # same prefix.
-          PREFIX="${{ github.workspace }}/fftw-x86_64"
-          CFLAGS="-arch x86_64 -mmacosx-version-min=${{ matrix.deployment_target }}"
+          PREFIX="${{ github.workspace }}/fftw-${{ matrix.arch }}"
+          CFLAGS="-arch ${{ matrix.arch }} -mmacosx-version-min=${{ matrix.deployment_target }}"
+          # --host nur beim Kreuzbau; arm64 baut auf dem arm64-Laeufer nativ.
+          HOSTARG=""
+          if [ "${{ matrix.arch }}" = "x86_64" ]; then HOSTARG="--host=x86_64-apple-darwin"; fi
           curl -fsSL https://fftw.org/pub/fftw/fftw-3.3.10.tar.gz -o fftw.tar.gz
           tar xzf fftw.tar.gz
           cd fftw-3.3.10
 
           # Pass 1 — double precision (libfftw3)
           ./configure --enable-shared --disable-doc \
-            --prefix="$PREFIX" CFLAGS="$CFLAGS" --host=x86_64-apple-darwin
+            --prefix="$PREFIX" CFLAGS="$CFLAGS" $HOSTARG
           make -j$(sysctl -n hw.ncpu)
           make install
           make distclean
 
           # Pass 2 — single precision (libfftw3f)
           ./configure --enable-single --enable-shared --disable-doc \
-            --prefix="$PREFIX" CFLAGS="$CFLAGS" --host=x86_64-apple-darwin
+            --prefix="$PREFIX" CFLAGS="$CFLAGS" $HOSTARG
           make -j$(sysctl -n hw.ncpu)
           make install
 
@@ -453,31 +509,24 @@ jobs:
       - name: Configure
         run: |
           ccache --max-size=2G
-          if [ "${{ matrix.arch }}" = "x86_64" ]; then
-            # Cross-compile path: FFTW comes from our source build at
-            # ${{ github.workspace }}/fftw-x86_64. PKG_CONFIG_PATH lets
-            # Longpath's pkg_check_modules(FFTW3 fftw3) find it; LDFLAGS
-            # adds -L so the linker resolves -lfftw3 (Longpath's
-            # third_party CMakeLists.txt files only call
-            # target_link_libraries, not target_link_directories — brew's
-            # /opt/homebrew/lib is in the default linker path on the arm64
-            # row, our cross-compile prefix is not). Qt is installed by
-            # jurplel/install-qt-action and exposed via Qt6_DIR env.
-            FFTW_PREFIX="${{ github.workspace }}/fftw-x86_64"
-            export PKG_CONFIG_PATH="$FFTW_PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
-            export LDFLAGS="-L$FFTW_PREFIX/lib $LDFLAGS"
-            CMAKE_PREFIX_PATH_VAL="$FFTW_PREFIX"
-          else
-            # Native path: brew supplies both Qt and FFTW under the brew
-            # prefix (/opt/homebrew on Apple Silicon). No env-var dance
-            # needed because brew's lib dir is in the default search path.
-            CMAKE_PREFIX_PATH_VAL="$(brew --prefix)"
-          fi
+          # FFTW comes from our source build at fftw-<arch> on both rows.
+          # PKG_CONFIG_PATH lets Longpath's pkg_check_modules(FFTW3 fftw3)
+          # find it; LDFLAGS adds -L so the linker resolves -lfftw3
+          # (Longpath's third_party CMakeLists.txt files only call
+          # target_link_libraries, not target_link_directories). Qt is
+          # installed by jurplel/install-qt-action and exposed via
+          # Qt6_DIR / QT_ROOT_DIR. Homebrew's prefix stays OUT of the
+          # search path: anything found there would drag its minos along.
+          FFTW_PREFIX="${{ github.workspace }}/fftw-${{ matrix.arch }}"
+          export PKG_CONFIG_PATH="$FFTW_PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
+          export LDFLAGS="-L$FFTW_PREFIX/lib $LDFLAGS"
+          CMAKE_PREFIX_PATH_VAL="$FFTW_PREFIX;$QT_ROOT_DIR"
           cmake -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_OSX_DEPLOYMENT_TARGET="${{ matrix.deployment_target }}" \
             -DCMAKE_OSX_ARCHITECTURES="${{ matrix.arch }}" \
             -DCMAKE_PREFIX_PATH="$CMAKE_PREFIX_PATH_VAL" \
+            -DLONGPATH_HOMEBREW_PATHS=OFF \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
@@ -490,15 +539,9 @@ jobs:
 
       - name: Bundle Qt frameworks
         run: |
-          # macdeployqt comes from brew on the arm64 row, from aqtinstall on
-          # the x86_64 row. jurplel/install-qt-action exposes the install via
-          # QT_ROOT_DIR.
-          if [ "${{ matrix.arch }}" = "x86_64" ]; then
-            MACDEPLOYQT="$QT_ROOT_DIR/bin/macdeployqt"
-          else
-            MACDEPLOYQT="$(brew --prefix qt@6)/bin/macdeployqt"
-          fi
-          "$MACDEPLOYQT" build/Longpath.app -verbose=1 -always-overwrite
+          # macdeployqt from aqtinstall on both rows (QT_ROOT_DIR, set by
+          # jurplel/install-qt-action).
+          "$QT_ROOT_DIR/bin/macdeployqt" build/Longpath.app -verbose=1 -always-overwrite
 
       - name: Copy license notices into app bundle
         run: |
@@ -527,6 +570,13 @@ jobs:
           mkdir -p build/Longpath.app/Contents/Resources/models/nnr
           cp third_party/wdsp/models/wdsp_nnr_0.bin build/Longpath.app/Contents/Resources/models/nnr/
           cp third_party/wdsp/models/wdsp_nnr_1.bin build/Longpath.app/Contents/Resources/models/nnr/
+
+      # Untergrenze pruefen (2026-09-29): keine Datei im Paket darf ein
+      # neueres macOS verlangen als deployment_target, und jede muss die
+      # Architektur der Zeile tragen. 0.6.4 Apple Silicon verlangte 15.0
+      # und startete auf macOS 12-14 nicht -- das faellt jetzt hier auf.
+      - name: Check macOS floor and architecture
+        run: packaging/macos/check-min-macos.sh build/Longpath.app "${{ matrix.deployment_target }}" "${{ matrix.arch }}"
 
       # Sign the .app bundle. With APPLE_DEVELOPER_ID set we use Developer
       # ID + hardened runtime + entitlements (required for notarization).
@@ -669,7 +719,8 @@ jobs:
           target: 'desktop'
           arch: 'win64_msvc2022_64'
           # Qt 6.8+ folds qtsvg into qtbase; not listable as a separate module.
-          modules: 'qtmultimedia qtserialport qtwebsockets qtshadertools'
+          # qtimageformats (2026-09-29): WebP/TIFF fuer die Bilddialoge.
+          modules: 'qtmultimedia qtserialport qtwebsockets qtshadertools qtimageformats'
           cache: true
 
       - name: Install Ninja and NSIS
