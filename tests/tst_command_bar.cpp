@@ -28,8 +28,12 @@
 #include "gui/widgets/DspParamPopup.h"
 #include "gui/widgets/DspQuickPopups.h"
 
+#include <QApplication>
+#include <QMenu>
 #include <QPushButton>
+#include <QRegularExpression>
 #include <QSlider>
+#include <QTimer>
 
 using namespace Longpath;
 
@@ -590,6 +594,63 @@ private slots:
         more->click();
         QCOMPARE(spy.count(), 1);
         QCOMPARE(spy.at(0).at(0).value<NrSlot>(), NrSlot::NR3);
+    }
+    /// Jedes „…"-Menue haengt am Fenster, nicht an der Leiste.
+    ///
+    /// Befund 2026-09-29 (Martins Protokoll): „QWidgetWindow(...,
+    /// name="QWidgetClassWindow") must be a top level window." — dreimal,
+    /// jedesmal kurz vor einem Bandwechsel auf die gespeicherte Frequenz
+    /// des Bandes. Die Leiste liegt neben dem nativen Panadapter; je nach
+    /// Aufbau hat sie selbst ein natives Fenster oder ihr (namenloses)
+    /// Elternteil. Ein QMenu an so einem Feld bekommt von Qt keinen
+    /// Fensterbezug — QWindow::setTransientParent() lehnt ab. Beide
+    /// Aufbauten werden geprueft. Die Farbe bleibt: am echten Hauptfenster
+    /// verglichen, 0 abweichende Pixel.
+    void theOverflowMenusHangOnTheWindow_data()
+    {
+        QTest::addColumn<bool>("barItselfNative");
+        QTest::newRow("Leiste nativ") << true;
+        QTest::newRow("Leiste im nativen Feld") << false;
+    }
+
+    void theOverflowMenusHangOnTheWindow()
+    {
+        QFETCH(bool, barItselfNative);
+        QTest::failOnWarning(QRegularExpression(QStringLiteral("must be a top level window")));
+
+        SliceModel slice;
+        slice.setDspMode(DSPMode::USB);
+        QWidget top;
+        top.resize(1200, 120);
+        auto* field = new QWidget(&top);
+        field->setGeometry(0, 0, 1200, 120);
+        field->setAttribute(Qt::WA_DontCreateNativeAncestors);
+        field->setAttribute(Qt::WA_NativeWindow);
+        auto* bar = new CommandBar(field);
+        if (barItselfNative) {
+            bar->setAttribute(Qt::WA_NativeWindow);
+        }
+        bar->setGeometry(0, 0, 1200, 120);
+        bar->attach(&slice);
+        top.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&top));
+        QCOMPARE(bar->windowHandle() != nullptr, barItselfNative);
+
+        int opened = 0;
+        for (QPushButton* more : bar->findChildren<QPushButton*>()) {
+            if (more->text() != QStringLiteral("…")) { continue; }
+            QWidget* parentSeen = nullptr;
+            QTimer::singleShot(150, qApp, [&parentSeen]() {
+                if (auto* m = qobject_cast<QMenu*>(QApplication::activePopupWidget())) {
+                    parentSeen = m->parentWidget();
+                    m->close();
+                }
+            });
+            more->click();
+            QCOMPARE(parentSeen, static_cast<QWidget*>(&top));
+            ++opened;
+        }
+        QCOMPARE(opened, 5);   // Modus, Band, Filter, Schritt, NR
     }
 };
 
