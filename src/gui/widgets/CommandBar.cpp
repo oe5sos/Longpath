@@ -16,6 +16,7 @@
 
 #include "gui/widgets/CommandBar.h"
 
+#include "gui/ScopedChildWidget.h"
 #include "gui/StyleConstants.h"
 #include "gui/widgets/DspQuickPopups.h"
 #include "core/AppSettings.h"
@@ -306,7 +307,13 @@ void CommandBar::addOverflow(Group& g, const QVector<Entry>& all, Apply apply)
     if (g.row) { g.row->addWidget(more); }
 
     connect(more, &QPushButton::clicked, this, [this, all, apply]() {
-        QMenu m(this);
+        // Am Fenster, nicht an der Leiste: die Leiste (oder ihr Elternteil)
+        // hat ein eigenes natives Fenster, und ein Menue daran bekam von Qt
+        // keinen Fensterbezug -- „QWidgetClassWindow must be a top level
+        // window." im Protokoll vom 2026-09-29, jedesmal kurz vor einem
+        // Bandwechsel. Wie ProfileRail (2552eadc).
+        ScopedChildWidget<QMenu> menuOwner(window());   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+        QMenu& m = *menuOwner.get();
         for (const auto& e : all) {
             QAction* a = m.addAction(e.first);
             connect(a, &QAction::triggered, this,
@@ -390,7 +397,8 @@ void CommandBar::buildFilterGroup(QHBoxLayout* row)
 
     connect(more, &QPushButton::clicked, this, [this]() {
         if (!m_slice) { return; }
-        QMenu m(this);
+        ScopedChildWidget<QMenu> menuOwner(window());   // am Fenster, siehe addOverflow()
+        QMenu& m = *menuOwner.get();
         // Beschriftet mit dem NAMEN der Vorgabe, wie Thetis' Knoepfe —
         // nicht mit der aus den Kanten gerechneten Breite: CW F10 ist
         // ±13 Hz, also 26 Hz breit, und heisst in Thetis „25".
