@@ -35,7 +35,10 @@
 #include <QtCore/QSet>
 #include <QtCore/QString>
 
+#include <array>
+
 #include "TciSendQueue.h"
+#include "core/audio/AudioRingSpsc.h"
 
 class QWebSocket;
 
@@ -87,6 +90,25 @@ struct TciClientSession {
 
     // From Thetis TCIServer.cs:767 [v2.10.3.13] — m_audioStreamEnabled HashSet<int>
     QSet<int> audioStreamEnabled;
+
+    // ── Eigener Tonvorrat je Sitzung (2026-09-30) ───────────────────────────
+    //
+    // Bis dahin lag der Ring beim SERVER, einer je Empfaenger, und jeder
+    // Client popte daraus. Wer zuerst kam, nahm die Abtastwerte — der zweite
+    // bekam, was uebrig war, also Stille mit Loechern. Das trifft jeden
+    // Fall mit mehr als einem Zuhoerer: Handfunke am Telefon und am iPad,
+    // oder Handfunke neben einem Digimode-Programm, das denselben Empfaenger
+    // abonniert hat.
+    //
+    // Der Erzeugerring beim Server bleibt (der DSP-Faden darf keine
+    // Sitzungen anfassen); der Hauptfaden verteilt daraus in diese Puffer,
+    // und jeder Client liest danach seinen eigenen — mit seiner eigenen
+    // Blockgroesse, seiner eigenen Rate und seinem eigenen Format.
+    //
+    // 65536 Byte sind 8192 Stereo-Rahmen bei 48 kHz, also gut 170 ms. Der
+    // Abfluss laeuft alle 5 ms (960 Byte), das ist reichlich Luft — und
+    // trotzdem halb so viel, wie ein Ring je Empfaenger kostete.
+    std::array<AudioRingSpsc<65536>, 2> audioVorrat;
 
     // ── Spektrumstrom (Longpath-eigen, 2026-09-30) ──────────────────────────
     //

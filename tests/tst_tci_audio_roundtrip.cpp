@@ -30,6 +30,7 @@ private slots:
     void mono_nimmt_links_und_behaelt_die_dauer();
     void mono_bei_12khz_liefert_ein_viertel();
     void format_echo_meldet_die_sitzung_nicht_das_programm();
+    void zwei_zuhoerer_nehmen_sich_nichts_weg();
 
 private:
     // Gemeinsamer Aufbau fuer die beiden Mono-Pruefpunkte: Server hoch,
@@ -443,6 +444,72 @@ void TestTciAudioRoundtrip::format_echo_meldet_die_sitzung_nicht_das_programm()
     QCOMPARE(typ, 101u);
 
     client.close();
+    server.stop();
+}
+
+// ── zwei_zuhoerer_nehmen_sich_nichts_weg() ──────────────────────────────────
+//
+// Bis 2026-09-30 lag der Tonring beim SERVER, einer je Empfaenger, und jeder
+// Client popte daraus. Wer zuerst kam, nahm die Abtastwerte — der zweite
+// bekam, was uebrig war. Ein Ring, viele Leser, das geht nicht auf.
+//
+// Der Fall ist nicht konstruiert: Handfunke am Telefon und am iPad, oder
+// Handfunke neben einem Digimode-Programm am selben Empfaenger. An Martins
+// Server haengt neben der Handfunke ein Stream-Deck-Plugin.
+//
+// Geprueft wird das Einzige, was zaehlt: beide bekommen GLEICH VIEL, und
+// zwar das Ganze.
+
+void TestTciAudioRoundtrip::zwei_zuhoerer_nehmen_sich_nichts_weg()
+{
+    TciServer server(nullptr);
+    QVERIFY(server.start(0));
+
+    QWebSocket a, b;
+    QSignalSpy aVerb(&a, &QWebSocket::connected), bVerb(&b, &QWebSocket::connected);
+    QSignalSpy aBin(&a, &QWebSocket::binaryMessageReceived);
+    QSignalSpy bBin(&b, &QWebSocket::binaryMessageReceived);
+    const QUrl u(QStringLiteral("ws://127.0.0.1:%1").arg(server.port()));
+    a.open(u); b.open(u);
+    QVERIFY(aVerb.wait(2000));
+    QVERIFY(bVerb.count() > 0 || bVerb.wait(2000));
+
+    // Beide auf denselben Empfaenger, beide in der Vorgabe (48 kHz stereo).
+    a.sendTextMessage(QStringLiteral("audio_start:0;"));
+    b.sendTextMessage(QStringLiteral("audio_start:0;"));
+    QTest::qWait(80);
+
+    // Ein Signal, an dem sich jede Luecke zeigt: konstant +0,5.
+    constexpr int kRahmen = 8192;
+    std::vector<float> L(1024, 0.5f), R(1024, 0.5f);
+    for (int g = 0; g < kRahmen; g += 1024) {
+        server.injectAudioFrameForTest(0, L.data(), R.data(), 1024, 48000);
+        QTest::qWait(12);   // dem Abfluss Zeit lassen, sonst staut es sich
+    }
+    QTest::qWait(400);
+
+    auto werte = [](QSignalSpy& s) {
+        int n = 0;
+        for (int i = 0; i < s.count(); ++i) {
+            const QByteArray f = s.at(i).at(0).toByteArray();
+            if (f.size() > 64) { n += (f.size() - 64) / 4; }   // Float32
+        }
+        return n;
+    };
+    const int nA = werte(aBin), nB = werte(bBin);
+
+    QVERIFY2(nA > 0 && nB > 0,
+             qPrintable(QStringLiteral("Beide muessen Ton bekommen — A %1, B %2")
+                            .arg(nA).arg(nB)));
+    // Gleich viel, nicht "einer bekommt alles". Toleranz fuer den Takt: die
+    // beiden Abonnements starten Millisekunden auseinander.
+    const double verhaeltnis = double(std::min(nA, nB)) / std::max(nA, nB);
+    QVERIFY2(verhaeltnis > 0.8,
+             qPrintable(QStringLiteral(
+                 "A bekam %1 Werte, B %2 — einer nimmt dem anderen den Ton weg")
+                 .arg(nA).arg(nB)));
+
+    a.close(); b.close();
     server.stop();
 }
 

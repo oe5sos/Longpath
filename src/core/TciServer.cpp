@@ -242,6 +242,65 @@ TciServer::TciServer(RadioModel* model, QObject* parent)
         // From Thetis TCIServer.cs:5444-5512 [v2.10.3.13] — the sendRXAudioStream
         // loop reads samples, resamples, encodes, and calls sendBinaryFrame.
         // Longpath replicates this per drain-tick rather than in a dedicated thread.
+        // ── Verteilen, bevor gelesen wird (2026-09-30) ──────────────────────
+        //
+        // Der Erzeugerring m_audioRing[rx] hat EINEN Verbraucher: diese
+        // Schleife. Frueher popte jeder Client direkt daraus — wer zuerst
+        // kam, nahm die Abtastwerte, der zweite bekam Stille mit Loechern.
+        // Ein Ring, viele Leser, das geht nicht auf.
+        //
+        // Jetzt wird der Ring genau einmal geleert und sein Inhalt an alle
+        // Sitzungen weitergereicht, die diesen Empfaenger abonniert haben.
+        // Danach liest jede aus IHREM Vorrat — mit ihrer Blockgroesse, ihrer
+        // Rate, ihrem Format. Hat niemand abonniert, wird trotzdem geleert,
+        // damit der Ring nicht volllaeuft und der DSP-Faden ins Verwerfen
+        // gerät.
+        {
+            static thread_local std::vector<uint8_t> verteiler;
+            // Ein Stereo-Rahmen sind zwei floats, also acht Byte. NUR ganze
+            // Rahmen weiterreichen: bricht man mitten in einem Paar ab, ist
+            // ab dem naechsten Block links und rechts vertauscht und die
+            // Wertgrenzen verschoben — im Pruefstand kam daraufhin -4,2e14
+            // heraus, weil vier Bytes aus zwei verschiedenen floats als einer
+            // gelesen wurden.
+            static constexpr int kRahmenBytes = 2 * int(sizeof(float));
+            // Portionsweise, hoechstens eine halbe Sitzungskapazitaet je
+            // Runde. tryPushCopy verwirft naemlich die GANZE Eingabe, wenn
+            // sie nicht in den freien Platz passt (bewusst so — ein
+            // Teilschreiben wuerde die Rahmenausrichtung zerstoeren, siehe
+            // AudioRingSpsc.h). Ein Schwung, der groesser ist als der
+            // Sitzungsring, kaeme also nirgends an: im Pruefstand wurden 250
+            // ms auf einmal eingespeist, und der Vorrat blieb leer, waehrend
+            // der Abfluss altes Scratch als Ton verschickte (-4,2e14).
+            //
+            // Im Betrieb kommt das nie vor — der Abfluss laeuft alle 5 ms,
+            // das sind 960 Byte. Die Schranke greift nur, wenn sich etwas
+            // angestaut hat, und laesst den Stau dann ueber mehrere Takte
+            // abfliessen statt ihn zu verwerfen.
+            static constexpr size_t kPortion = 32768;
+            for (int rx = 0; rx < kMaxTciRxSlices; ++rx) {
+                size_t da = std::min(m_audioRing[rx].usedBytes(), kPortion);
+                da -= da % kRahmenBytes;
+                if (da == 0) { continue; }
+                if (verteiler.size() < da) { verteiler.resize(da); }
+                const qint64 gelesen =
+                    m_audioRing[rx].popInto(verteiler.data(), static_cast<int>(da));
+                if (gelesen <= 0) { continue; }
+                for (auto cit = clientsSnapshot.cbegin();
+                     cit != clientsSnapshot.cend(); ++cit) {
+                    const auto& s = cit.value();
+                    if (!s->audioStreamEnabled.contains(rx)) { continue; }
+                    // tryPushCopy verwirft bei Überlauf das Neueste. Ein
+                    // Client, der nicht abholt (eingefrorenes Telefon), staut
+                    // damit niemanden auf — er verliert nur seinen eigenen
+                    // Ton, und das hoert man beim Zurueckkommen als Sprung,
+                    // nicht als wachsende Verzoegerung.
+                    s->audioVorrat[rx].tryPushCopy(verteiler.data(),
+                                                   static_cast<int>(gelesen));
+                }
+            }
+        }
+
         for (auto cit = clientsSnapshot.begin(); cit != clientsSnapshot.end(); ++cit) {
             QWebSocket* ws = cit.key();
             const auto& session  = cit.value();
@@ -279,8 +338,8 @@ TciServer::TciServer(RadioModel* model, QObject* parent)
                 const int ringSamples = perChSamples * kRingChannels;
                 const int wantBytes = ringSamples * static_cast<int>(sizeof(float));
 
-                if (m_audioRing[rx].usedBytes() < static_cast<size_t>(wantBytes)) {
-                    continue;  // not enough data yet; wait for next tick
+                if (session->audioVorrat[rx].usedBytes() < static_cast<size_t>(wantBytes)) {
+                    continue;  // noch nicht genug beisammen; naechster Takt
                 }
 
                 // Pop from the ring into the scratch buffer.
@@ -288,7 +347,7 @@ TciServer::TciServer(RadioModel* model, QObject* parent)
                 const int maxScratch = kMaxDrainSamples;
                 if (ringSamples > maxScratch) { continue; }  // safety
 
-                const qint64 got = m_audioRing[rx].popInto(
+                const qint64 got = session->audioVorrat[rx].popInto(
                     reinterpret_cast<uint8_t*>(m_drainScratch.data()),
                     wantBytes);
                 if (got < wantBytes) { continue; }
