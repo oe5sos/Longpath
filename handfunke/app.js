@@ -482,6 +482,20 @@ link.addEventListener('open', () => {
   //
   // Erst danach lohnt Opus — es würde die verbleibenden 24 auf etwa 4 kB/s
   // drücken, kostet aber eine Bibliothek im Browser.
+  // ── Messwerte anfordern ──────────────────────────────────────────────────
+  //
+  // Longpath schickt sie NICHT von selbst: `rxSensorsEnabled` steht ab Werk
+  // auf false und wird erst durch diese Zeile wahr (TciClientSession.h:235).
+  // Das ist Thetis-getreu — dort verlangt `setRxSensorsEnabled` ebenfalls
+  // eine ausdrueckliche Anmeldung. Ohne sie bleibt der Signalbalken leer,
+  // und genau das war am echten Geraet zu sehen, bevor diese Zeile stand.
+  //
+  // 200 ms ist die Server-Vorgabe und zugleich sein unteres Ende der
+  // sinnvollen Spanne; schneller braucht ein Balken nicht zu sein, und
+  // langsamer wirkt er traege.
+  link.send(`rx_sensors_enable:true,200`);
+  link.send(`tx_sensors_enable:true,200`);
+
   link.send(`audio_samplerate:${state.audioRate}`);
   link.send(`audio_stream_channels:1`);
   link.send(`audio_stream_sample_type:int16`);
@@ -494,12 +508,22 @@ link.addEventListener('open', () => {
   // verwirft ihn antwortlos — deshalb steht darunter der Rückfall.
   link.send(`spectrum_start:${state.trx},${pan.width},12`);
 
-  // Rückfall auf rohes I/Q, wenn nach zwei Sekunden kein Spektrum kam.
-  // Nicht sofort beides anfordern: das wäre auf einem Longpath-Server die
-  // doppelte Last für dasselbe Bild.
+  // Rückfall auf rohes I/Q — aber nur, wenn der Server den Befehl gar nicht
+  // KENNT, nicht schon dann, wenn gerade keine Bilder kommen.
+  //
+  // Bis 2026-09-30 hing der Rückfall am Ausbleiben von Daten. Beim Start
+  // ohne verbundenes Funkgerät kamen zwei Sekunden lang keine — und das
+  // Telefon zog daraufhin rohes I/Q, das Vielfache an Daten, obwohl der
+  // Server das fertige Bild sehr wohl liefern konnte, sobald ein Gerät dran
+  // war. Am echten Gerät im Log gesehen: „IQ stream subscribed rx 0" direkt
+  // nach einem Start, bei dem die Verbindung noch im Aufbau war.
+  //
+  // Longpath bestätigt das Abonnement mit den geltenden Werten zurück; ein
+  // fremder Server (Thetis, ExpertSDR) schweigt dazu. Das ist der richtige
+  // Prüfstein.
   clearTimeout(state.iqRueckfall);
   state.iqRueckfall = setTimeout(() => {
-    if (!state.hatSpektrumstrom) {
+    if (!link.st.spektrumBestaetigt) {
       link.send(`iq_start:${state.trx}`);
       state.rueckfall = true;
     }

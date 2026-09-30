@@ -38,6 +38,9 @@ export class TciLink extends EventTarget {
       volume: null,              // dB, global
       rxVolume: [null, null],
       smeter: [null, null],
+    spektrumBestaetigt: false,   // Server hat spectrum_start zurueckgemeldet
+    spektrumPunkte: null,        // die Punktzahl, auf die er geklemmt hat
+    spektrumFps: null,
       txPower: null, txSwr: null,
       iqRate: null, audioRate: null,
       modes: [],
@@ -66,7 +69,18 @@ export class TciLink extends EventTarget {
   }
 
   _open() {
-    if (this.ws) { try { this.ws.close(); } catch (e) {} }
+    // Einen Vorgaenger ZUERST entschaerfen, dann schliessen. Sonst feuert sein
+    // onclose gleich darauf und legt einen zweiten Wiederholungs-Timer an, der
+    // spaeter eine laengst stehende Verbindung wegraeumt.
+    if (this.ws) {
+      const alt = this.ws;
+      alt.onopen = alt.onclose = alt.onerror = alt.onmessage = null;
+      this.ws = null;
+      try { alt.close(); } catch (e) {}
+    }
+    // Ein laufender Wiederholungs-Timer hat ab hier keinen Auftrag mehr.
+    clearTimeout(this.retryTimer);
+
     let ws;
     try { ws = new WebSocket(this.url); }
     catch (e) { this._retry(); return; }
@@ -74,10 +88,23 @@ export class TciLink extends EventTarget {
     this.ws = ws;
 
     ws.onopen = () => {
+      if (this.ws !== ws) { return; }
+      // ENTSCHEIDEND: den Wiederholungs-Timer abbestellen. Ohne diese Zeile
+      // ueberlebt ein Timer aus einem frueheren Fehlversuch den geglueckten
+      // Aufbau und ruft eine Sekunde spaeter _open(), das die eben stehende
+      // Verbindung wieder zumacht — und so fort, im Sekundentakt.
+      //
+      // Am echten Geraet am 2026-09-30 gesehen: der Server protokollierte
+      // connect/disconnect im Sekundentakt, die Stroeme kamen je knapp eine
+      // Sekunde lang. Genau dieser Fall trifft ein Telefon, das aus dem
+      // Ruhezustand kommt: der erste Versuch scheitert, der zweite traegt.
+      clearTimeout(this.retryTimer);
       this.retryMs = 1000;
       this._emit('open');
     };
     ws.onclose = () => {
+      // Ein veralteter Socket darf den Zustand des aktuellen nicht anfassen.
+      if (this.ws !== ws) { return; }
       this.ready = false;
       this._emit('state');
       this._retry();
@@ -150,10 +177,26 @@ export class TciLink extends EventTarget {
       case 'volume':      s.volume = num(0); break;
       case 'rx_volume':   { const t = int(0); if (t !== null) s.rxVolume[t] = num(2); break; }
 
+      // Bestaetigung des Spektrum-Abonnements. Longpath schickt sie mit
+      // den TATSAECHLICH geltenden Werten zurueck (TciServer.cpp, kSpecStart)
+      // — ein fremder Server kennt den Befehl nicht und schweigt. Genau
+      // daran, und nicht am Ausbleiben von Daten, gehoert der Rueckfall auf
+      // rohes I/Q festgemacht.
+      case 'spectrum_start': {
+        const t2 = int(0);
+        if (t2 !== null) {
+          s.spektrumBestaetigt = true;
+          s.spektrumPunkte = int(1);
+          s.spektrumFps    = int(2);
+        }
+        break;
+      }
+      case 'spectrum_stop': s.spektrumBestaetigt = false; break;
+
       case 'iq_samplerate':     s.iqRate    = int(0); break;
       case 'audio_samplerate':  s.audioRate = int(0); break;
 
-      // Messwerte. Longpath sendet sie laufend (Vorgabe alle 200 ms).
+      // Messwerte. Kommen erst nach `rx_sensors_enable:true` (siehe app.js).
       case 'rx_sensors': { const t = int(0); if (t !== null) s.smeter[t] = num(1); break; }
       case 'tx_sensors': s.txPower = num(1); s.txSwr = num(2); break;
     }

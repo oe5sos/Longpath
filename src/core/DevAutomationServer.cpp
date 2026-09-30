@@ -402,7 +402,24 @@ QJsonObject DevAutomationServer::doConnect(const QString& macKeyOrEmpty)
                             QStringLiteral("no saved radio for ") + macKey}};
     }
 
-    m_radioModel->connectToRadio(saved->info);
+    // NICHT direkt aufrufen: dieser Handler läuft im Hauptfaden, und der
+    // Verbindungsaufbau braucht genau den — er wartet auf UDP-Antworten des
+    // Geräts, die nur die Ereignisschleife zustellt. Ein direkter Aufruf
+    // blockiert also die Schleife, auf die er selbst angewiesen ist, und die
+    // Verbindung kommt nie zustande.
+    //
+    // Beim ersten Versuch an echtem Gerät genau so passiert: das Verb lief in
+    // die Zeitüberschreitung, im Log stand "Connecting with sampleRate=192000"
+    // und danach nichts mehr — kein Socket, kein Rahmen. Der Klick-Weg hat das
+    // Problem nicht, weil dort die Schleife nach dem Handler weiterläuft.
+    //
+    // Also einreihen und sofort antworten. Die Antwort sagt deshalb
+    // "connecting", nicht "connected" — ob es geklappt hat, fragt der Aufrufer
+    // danach mit `get radio` ab.
+    QMetaObject::invokeMethod(m_radioModel.data(), [m = m_radioModel, info = saved->info] {
+        if (!m.isNull()) { m->connectToRadio(info); }
+    }, Qt::QueuedConnection);
+
     return QJsonObject{
         {QStringLiteral("ok"), true},
         {QStringLiteral("connecting"), saved->info.displayName()},
@@ -417,7 +434,9 @@ QJsonObject DevAutomationServer::doDisconnect()
         return QJsonObject{{QStringLiteral("ok"), false},
                            {QStringLiteral("error"), QStringLiteral("no radio model")}};
     }
-    m_radioModel->disconnectFromRadio();
+    QMetaObject::invokeMethod(m_radioModel.data(), [m = m_radioModel] {
+        if (!m.isNull()) { m->disconnectFromRadio(); }
+    }, Qt::QueuedConnection);
     return QJsonObject{{QStringLiteral("ok"), true},
                        {QStringLiteral("disconnected"), true}};
 }

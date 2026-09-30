@@ -27,6 +27,27 @@ class TestTciAudioRoundtrip : public QObject {
     Q_OBJECT
 private slots:
     void synthetic_1khz_tone_arrives_as_binary_frame();
+    void mono_nimmt_links_und_behaelt_die_dauer();
+    void mono_bei_12khz_liefert_ein_viertel();
+
+private:
+    // Gemeinsamer Aufbau fuer die beiden Mono-Pruefpunkte: Server hoch,
+    // Client dran, Format aushandeln, `dauerRahmen` Stereorahmen einspeisen,
+    // und ALLE eingegangenen Werte samt Kopfzahlen zurueckgeben.
+    //
+    // Links traegt +1, rechts −1. Beide sind konstant, damit jeder einzelne
+    // ausgegebene Wert verraet, aus welchem Kanal er stammt — auch nachdem
+    // ein Resampler darueber gelaufen ist (ein FIR ueber einer Konstanten
+    // gibt dieselbe Konstante zurueck, sobald er eingeschwungen ist).
+    struct Ausbeute {
+        int werte{0};          // Zahl der ausgegebenen Float-Werte insgesamt
+        int rahmen{0};         // Zahl der Binaerrahmen
+        quint32 kanaele{0};    // Kopffeld `channels` des ersten Rahmens
+        quint32 rate{0};       // Kopffeld `sampleRate` des ersten Rahmens
+        float kleinster{0.0f}; // kleinster Wert ueber alle Rahmen
+        float groesster{0.0f};
+    };
+    Ausbeute monoLauf(int wunschRate, int dauerRahmen);
 };
 
 // ── synthetic_1khz_tone_arrives_as_binary_frame() ───────────────────────────
@@ -194,6 +215,165 @@ void TestTciAudioRoundtrip::synthetic_1khz_tone_arrives_as_binary_frame()
     // ── Cleanup ───────────────────────────────────────────────────────────────
     client.close();
     server.stop();
+}
+
+// ── monoLauf() ───────────────────────────────────────────────────────────────
+
+TestTciAudioRoundtrip::Ausbeute
+TestTciAudioRoundtrip::monoLauf(int wunschRate, int dauerRahmen)
+{
+    Ausbeute a;
+
+    TciServer server(nullptr);
+    if (!server.start(0)) { return a; }
+
+    QWebSocket client;
+    QSignalSpy verbunden(&client, &QWebSocket::connected);
+    QSignalSpy binaer(&client, &QWebSocket::binaryMessageReceived);
+    client.open(QUrl(QStringLiteral("ws://127.0.0.1:%1").arg(server.port())));
+    if (!verbunden.wait(2000)) { return a; }
+
+    // Format VOR dem Abonnieren: handleAudioSubscribe legt die Resampler
+    // anhand der dann geltenden Rate und Kanalzahl an.
+    client.sendTextMessage(QStringLiteral("audio_samplerate:%1;").arg(wunschRate));
+    client.sendTextMessage(QStringLiteral("audio_stream_channels:1;"));
+    client.sendTextMessage(QStringLiteral("audio_start:0;"));
+    QTest::qWait(50);
+
+    // Einspeisen. Der Ring fasst 131072 Bytes; bei 8192 Stereorahmen sind
+    // das 65536 Bytes, also mit Sicherheitsabstand. Waehrend dieser Schleife
+    // laeuft keine Ereignisschleife, es wird also nichts abgeflossen sein.
+    constexpr int kBlock = 1024;
+    std::vector<float> L(kBlock, 1.0f), R(kBlock, -1.0f);
+    for (int gesendet = 0; gesendet < dauerRahmen; gesendet += kBlock) {
+        const int n = std::min(kBlock, dauerRahmen - gesendet);
+        server.injectAudioFrameForTest(0, L.data(), R.data(), n, 48000);
+    }
+
+    // Der Abflusstakt ist 5 ms und gibt je Runde einen Block ab. 8192
+    // Rahmen sind hoechstens 8 Bloecke, 400 ms sind reichlich.
+    QTest::qWait(400);
+
+    auto lies = [](const QByteArray& f, int off) -> quint32 {
+        const auto* p = reinterpret_cast<const quint8*>(f.constData() + off);
+        return quint32(p[0]) | (quint32(p[1]) << 8)
+             | (quint32(p[2]) << 16) | (quint32(p[3]) << 24);
+    };
+
+    bool erster = true;
+    for (int r = 0; r < binaer.count(); ++r) {
+        const QByteArray f = binaer.at(r).at(0).toByteArray();
+        if (f.size() <= 64) { continue; }
+        if (erster) {
+            a.rate    = lies(f, 4);
+            a.kanaele = lies(f, 28);
+            erster = false;
+        }
+        const int zahl = (f.size() - 64) / 4;   // Float32
+        for (int i = 0; i < zahl; ++i) {
+            float v = 0.0f;
+            std::memcpy(&v, f.constData() + 64 + i * 4, 4);
+            if (a.werte == 0 && i == 0) { a.kleinster = a.groesster = v; }
+            a.kleinster = std::min(a.kleinster, v);
+            a.groesster = std::max(a.groesster, v);
+            ++a.werte;
+        }
+        ++a.rahmen;
+    }
+
+    client.close();
+    server.stop();
+    return a;
+}
+
+// ── mono_nimmt_links_und_behaelt_die_dauer() ─────────────────────────────────
+//
+// Der Fehler, den dieser Pruefpunkt festhaelt, wurde am 2026-09-30 an einem
+// echten Geraet gemessen (ANVELINA Pro 3, 20 m): bei ausgehandelten 12 kHz
+// mono kamen 24 064 Werte je Sekunde an statt 12 000 — genau Faktor zwei.
+//
+// Ursache: drainAudio popte `audioStreamSamples * channels` Werte aus dem
+// Ring und hielt das fuer `audioStreamSamples` Zeitpunkte. Der Ring traegt
+// aber IMMER Stereo (onAudioFrameReady legt L und R paarweise hinein), also
+// waren es bei channels == 1 nur halb so viele Zeitpunkte, und L,R,L,R lief
+// als vermeintliches Mono weiter: doppelte Rate, vermischte Kanaele, eine
+// Oktave zu tiefer Ton.
+//
+// Thetis macht es andersherum und ist damit richtig: getrennte L/R-Schlangen,
+// bei `channels <= 1` ein Feld aus NUR links, und danach in beiden Faellen
+// `Advance(packetSamples)` auf beiden Schlangen — die Blockdauer haengt dort
+// nicht an der Kanalzahl (TCIServer.cs:5896-5911 [v2.10.3.15]).
+//
+// Hier bei 48 kHz, also ohne Umtaster: der 48-kHz-Pfad uebersprang die
+// kanalweise Behandlung frueher ganz und war deshalb genauso betroffen.
+
+void TestTciAudioRoundtrip::mono_nimmt_links_und_behaelt_die_dauer()
+{
+    constexpr int kRahmen = 8192;
+    const Ausbeute a = monoLauf(48000, kRahmen);
+
+    QVERIFY2(a.rahmen >= 1, "Es muss mindestens ein Rahmen ankommen");
+    QCOMPARE(a.kanaele, 1u);
+    QCOMPARE(a.rate,    48000u);
+
+    // Nur links. Rechts traegt −1; taucht ein negativer Wert auf, ist der
+    // verschraenkte Puffer ungetrennt durchgelaufen.
+    QVERIFY2(a.kleinster > 0.9f,
+             qPrintable(QStringLiteral(
+                 "Ein Wert war %1 — rechts (−1) ist in den Monostrom geraten")
+                 .arg(double(a.kleinster))));
+    QVERIFY2(a.groesster < 1.1f,
+             qPrintable(QStringLiteral("Unerwarteter Hoechstwert %1")
+                            .arg(double(a.groesster))));
+
+    // Die Dauer: 8192 eingespeiste Zeitpunkte muessen 8192 Werte ergeben,
+    // nicht 16384. Der Abfluss gibt nur ganze Bloecke zu je 2048 Zeitpunkten
+    // ab, der Rest bleibt im Ring — deshalb hoechstens kRahmen, und wegen
+    // der Blockung mindestens kRahmen − 2048.
+    QVERIFY2(a.werte <= kRahmen,
+             qPrintable(QStringLiteral(
+                 "%1 Werte aus %2 Zeitpunkten — bei Mono darf hoechstens einer "
+                 "je Zeitpunkt herauskommen (Faktor %3)")
+                 .arg(a.werte).arg(kRahmen)
+                 .arg(double(a.werte) / kRahmen, 0, 'f', 2)));
+    QVERIFY2(a.werte >= kRahmen - 2048,
+             qPrintable(QStringLiteral("Nur %1 von %2 Werten abgeflossen")
+                            .arg(a.werte).arg(kRahmen)));
+}
+
+// ── mono_bei_12khz_liefert_ein_viertel() ─────────────────────────────────────
+//
+// Derselbe Fehler mit Umtaster davor — das ist der Fall, der an der
+// Handfunke wirklich lief. 48 kHz herunter auf 12 kHz ist Faktor vier: aus
+// 8192 Zeitpunkten werden rund 2048 Werte. Mit dem alten Fehler waren es
+// 4096, und der Ton lag eine Oktave zu tief.
+
+void TestTciAudioRoundtrip::mono_bei_12khz_liefert_ein_viertel()
+{
+    constexpr int kRahmen = 8192;
+    const Ausbeute a = monoLauf(12000, kRahmen);
+
+    QVERIFY2(a.rahmen >= 1, "Es muss mindestens ein Rahmen ankommen");
+    QCOMPARE(a.kanaele, 1u);
+    QCOMPARE(a.rate,    12000u);
+
+    // Nur links, auch nach dem Umtaster: ein FIR ueber der Konstanten +1
+    // gibt +1 zurueck, sobald er eingeschwungen ist. Der erste Block traegt
+    // das Einschwingen, deshalb ist die Schranke hier lockerer als oben.
+    QVERIFY2(a.kleinster > -0.1f,
+             qPrintable(QStringLiteral(
+                 "Ein Wert war %1 — rechts (−1) ist in den Monostrom geraten")
+                 .arg(double(a.kleinster))));
+
+    const double erwartet = kRahmen / 4.0;
+    QVERIFY2(a.werte <= erwartet * 1.05,
+             qPrintable(QStringLiteral(
+                 "%1 Werte statt rund %2 — das ist Faktor %3 zu viel")
+                 .arg(a.werte).arg(erwartet)
+                 .arg(a.werte / erwartet, 0, 'f', 2)));
+    QVERIFY2(a.werte >= erwartet - 512,
+             qPrintable(QStringLiteral("Nur %1 von rund %2 Werten abgeflossen")
+                            .arg(a.werte).arg(erwartet)));
 }
 
 QTEST_GUILESS_MAIN(TestTciAudioRoundtrip)

@@ -241,12 +241,35 @@ TciServer::TciServer(RadioModel* model, QObject* parent)
             for (int rx : session->audioStreamEnabled) {
                 if (rx < 0 || rx >= kMaxTciRxSlices) { continue; }
 
-                // Number of interleaved float samples to pop each tick.
-                // audioStreamSamples is per-channel; multiply by channels.
-                const int channels = session->audioStreamChannels;  // 1 or 2
-                const int perChSamples = session->audioStreamSamples;  // default 2048
-                const int totalSamples = perChSamples * channels;
-                const int wantBytes = totalSamples * static_cast<int>(sizeof(float));
+                // Der Ring traegt IMMER 48 kHz stereo verschraenkt — das legt
+                // onAudioFrameReady() fest, das L und R paarweise hineinlegt,
+                // ohne die Wunschkanalzahl des Clients zu kennen. Die
+                // Kanalzahl unten ist das SENDEFORMAT, nicht das Ringformat.
+                static constexpr int kRingChannels = 2;
+
+                const int channels = session->audioStreamChannels;  // 1 oder 2
+                const int perChSamples = session->audioStreamSamples;  // Vorgabe 2048
+
+                // Ein Block ist perChSamples ZEITPUNKTE lang, unabhaengig
+                // davon, wie viele Kanaele der Client haben will.
+                //
+                // From Thetis TCIServer.cs:5896-5911 [v2.10.3.15] — Thetis
+                // haelt getrennte L/R-Warteschlangen, baut bei channels <= 1
+                // ein Feld der Laenge packetSamples nur aus links, sonst
+                // packetSamples * 2 verschraenkt, und ruft danach in BEIDEN
+                // Faellen leftPending.Advance(packetSamples) und
+                // rightPending.Advance(packetSamples). Die Blockdauer haengt
+                // dort also nicht an der Kanalzahl.
+                //
+                // Bis 2026-09-30 rechnete Longpath hier totalSamples =
+                // perChSamples * channels und popte das aus dem Stereoring.
+                // Bei channels == 1 waren das nur perChSamples/2 Zeitpunkte,
+                // und L,R,L,R lief als vermeintliches Mono weiter. Am echten
+                // Geraet (ANVELINA, 20 m) gemessen: 24 064 Werte/s statt
+                // 12 000 bei ausgehandelten 12 kHz — genau Faktor zwei, dazu
+                // vermischte Kanaele und eine Oktave zu tiefer Ton.
+                const int ringSamples = perChSamples * kRingChannels;
+                const int wantBytes = ringSamples * static_cast<int>(sizeof(float));
 
                 if (m_audioRing[rx].usedBytes() < static_cast<size_t>(wantBytes)) {
                     continue;  // not enough data yet; wait for next tick
@@ -255,7 +278,7 @@ TciServer::TciServer(RadioModel* model, QObject* parent)
                 // Pop from the ring into the scratch buffer.
                 // Scratch is sized for kMaxDrainSamples = 2048*2 floats.
                 const int maxScratch = kMaxDrainSamples;
-                if (totalSamples > maxScratch) { continue; }  // safety
+                if (ringSamples > maxScratch) { continue; }  // safety
 
                 const qint64 got = m_audioRing[rx].popInto(
                     reinterpret_cast<uint8_t*>(m_drainScratch.data()),
@@ -271,14 +294,14 @@ TciServer::TciServer(RadioModel* model, QObject* parent)
                     m_sliceRxGainLinear[rx].load(std::memory_order_acquire);
                 float blockPeak = 0.0f;
                 if (sliceGain != 1.0f) {
-                    for (int i = 0; i < totalSamples; ++i) {
+                    for (int i = 0; i < ringSamples; ++i) {
                         m_drainScratch[i] *= sliceGain;
                         const float a = std::fabs(m_drainScratch[i]);
                         if (a > blockPeak) { blockPeak = a; }
                     }
                 } else {
                     // No gain adjust -- just track peak without mutating samples.
-                    for (int i = 0; i < totalSamples; ++i) {
+                    for (int i = 0; i < ringSamples; ++i) {
                         const float a = std::fabs(m_drainScratch[i]);
                         if (a > blockPeak) { blockPeak = a; }
                     }
@@ -289,9 +312,17 @@ TciServer::TciServer(RadioModel* model, QObject* parent)
                 // Phase 16: xresampleFV resamples in-place using the per-session
                 // per-slice RESAMPLEF instance created in handleAudioSubscribe.
                 const float* samples = m_drainScratch.data();
-                int outSamples = totalSamples;
+                int outSamples = ringSamples;
 
-                if (session->audioSampleRate != 48000) {
+                // Nur wenn Ringformat und Sendeformat sich decken, darf der
+                // Block unveraendert weiter: 48 kHz und stereo. Alles andere
+                // muss durch die kanalweise Behandlung darunter — auch reines
+                // Mono bei 48 kHz, das frueher hier durchrutschte und den
+                // verschraenkten Stereoblock als Mono ausgab.
+                const bool ringFormatPasst =
+                    (session->audioSampleRate == 48000) && (channels == kRingChannels);
+
+                if (!ringFormatPasst) {
                     // KANALWEISE umtasten. Bis 2026-09-30 lief der verschränkte
                     // Stereopuffer als EIN Strom durch einen einzigen
                     // Resampler — WDSPs RESAMPLEF rechnet aber einkanalig und
@@ -307,19 +338,38 @@ TciServer::TciServer(RadioModel* model, QObject* parent)
                     static thread_local std::array<float, kMaxDrainSamples> chIn{};
                     static thread_local std::array<float, kMaxOutSamples> chOut{};
 
+                    const bool umtasten = (session->audioSampleRate != 48000);
+
                     bool ok = true;
                     int framesOut = 0;
                     for (int ch = 0; ch < channels && ok; ++ch) {
-                        auto rIt = session->audioResamplers.find(
-                            TciClientSession::resamplerKey(rx, ch));
-                        if (rIt == session->audioResamplers.end()) { ok = false; break; }
+                        // Welchen Ringkanal dieser Ausgabekanal traegt. Bei
+                        // Mono ist das der LINKE — nicht die Mischung aus
+                        // beiden. From Thetis TCIServer.cs:5897-5900
+                        // [v2.10.3.15]: `leftPending.CopyTo(interleaved, 0,
+                        // packetSamples)` im Zweig `channels <= 1`.
+                        const int quelle = std::min(ch, kRingChannels - 1);
 
-                        // Auftrennen: nur diesen Kanal, dicht gepackt.
+                        // Auftrennen: nur diesen Kanal, dicht gepackt. Der
+                        // Schritt ist kRingChannels, weil der RING stereo ist
+                        // — nicht `channels`, das Sendeformat.
                         for (int i = 0; i < perChSamples; ++i) {
-                            chIn[i] = m_drainScratch[i * channels + ch];
+                            chIn[i] = m_drainScratch[i * kRingChannels + quelle];
                         }
+
                         int n = 0;
-                        xresampleFV(chIn.data(), chOut.data(), perChSamples, &n, rIt.value());
+                        if (umtasten) {
+                            auto rIt = session->audioResamplers.find(
+                                TciClientSession::resamplerKey(rx, ch));
+                            if (rIt == session->audioResamplers.end()) { ok = false; break; }
+                            xresampleFV(chIn.data(), chOut.data(), perChSamples, &n,
+                                        rIt.value());
+                        } else {
+                            // 48 kHz Mono: nur entschraenken, nichts umtasten.
+                            std::copy(chIn.begin(), chIn.begin() + perChSamples,
+                                      chOut.begin());
+                            n = perChSamples;
+                        }
                         if (ch == 0) {
                             framesOut = n;
                         } else if (n != framesOut) {
