@@ -9,6 +9,7 @@
 // =================================================================
 
 #include "DevAutomationServer.h"
+#include "AppSettings.h"   // connect: gespeichertes Radio holen
 #include "LogCategories.h"
 
 #include <QApplication>
@@ -349,6 +350,12 @@ QJsonObject DevAutomationServer::handleLine(const QByteArray& line)
         }
         return doGrab(parts.at(1));
     }
+    if (verb == QStringLiteral("connect")) {
+        return doConnect(parts.size() >= 2 ? parts.at(1) : QString());
+    }
+    if (verb == QStringLiteral("disconnect")) {
+        return doDisconnect();
+    }
     if (verb == QStringLiteral("get")) {
         if (parts.size() < 2) {
             return QJsonObject{{QStringLiteral("ok"), false},
@@ -360,7 +367,59 @@ QJsonObject DevAutomationServer::handleLine(const QByteArray& line)
     return QJsonObject{{QStringLiteral("ok"), false},
                         {QStringLiteral("error"),
                          QStringLiteral("unknown command: ") + verb +
-                             QStringLiteral(" (known: ping, dumpTree, grab, get)")}};
+                             QStringLiteral(" (known: ping, dumpTree, grab, get, connect, disconnect)")}};
+}
+
+// ── doConnect / doDisconnect (2026-09-30) ────────────────────────────────────
+//
+// Begründung an der Deklaration. Kurz: ohne diese beiden hängt jeder Livetest
+// an einem Mausklick, und Verbinden sendet nicht.
+//
+// Der Weg ist derselbe, den der Connect-Knopf nimmt
+// (ConnectionPanel::onConnectClicked → RadioModel::connectToRadio), nur ohne
+// das Panel: das gespeicherte Radio aus den Einstellungen holen und übergeben.
+// Bewusst NICHT der Discovery-Weg — ein Verb, das sich sein Ziel selbst sucht,
+// könnte am falschen Gerät landen, und in einem Shack steht selten nur eines.
+QJsonObject DevAutomationServer::doConnect(const QString& macKeyOrEmpty)
+{
+    if (m_radioModel.isNull()) {
+        return QJsonObject{{QStringLiteral("ok"), false},
+                           {QStringLiteral("error"), QStringLiteral("no radio model")}};
+    }
+
+    AppSettings& s = AppSettings::instance();
+    const QString macKey = macKeyOrEmpty.isEmpty() ? s.lastConnected() : macKeyOrEmpty;
+    if (macKey.isEmpty()) {
+        return QJsonObject{{QStringLiteral("ok"), false},
+                           {QStringLiteral("error"),
+                            QStringLiteral("no macKey given and no last-connected radio")}};
+    }
+
+    const auto saved = s.savedRadio(macKey);
+    if (!saved) {
+        return QJsonObject{{QStringLiteral("ok"), false},
+                           {QStringLiteral("error"),
+                            QStringLiteral("no saved radio for ") + macKey}};
+    }
+
+    m_radioModel->connectToRadio(saved->info);
+    return QJsonObject{
+        {QStringLiteral("ok"), true},
+        {QStringLiteral("connecting"), saved->info.displayName()},
+        {QStringLiteral("macKey"), macKey},
+        {QStringLiteral("address"), saved->info.address.toString()},
+    };
+}
+
+QJsonObject DevAutomationServer::doDisconnect()
+{
+    if (m_radioModel.isNull()) {
+        return QJsonObject{{QStringLiteral("ok"), false},
+                           {QStringLiteral("error"), QStringLiteral("no radio model")}};
+    }
+    m_radioModel->disconnectFromRadio();
+    return QJsonObject{{QStringLiteral("ok"), true},
+                       {QStringLiteral("disconnected"), true}};
 }
 
 QJsonObject DevAutomationServer::doPing() const

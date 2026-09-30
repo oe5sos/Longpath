@@ -650,16 +650,18 @@ void TciServer::hookAudioAndIqTaps()
         // Ebenfalls QueuedConnection: fftReady kommt vom FFT-Faden, m_clients
         // und QWebSocket gehören dem Hauptfaden. Der QVector ist implizit
         // geteilt, die Kopie also billig.
-        if (auto* fft = m_model->fftEngine()) {
-            connect(fft, &FFTEngine::fftReady,
-                    this, &TciServer::onFftBinsReady,
-                    Qt::QueuedConnection);
-            qCInfo(lcTci) << "TciServer: Spektrum-Abgriff an FFTEngine::fftReady";
-        } else {
-            // Kein Grund zu scheitern: ohne FFTEngine gibt es eben kein
-            // Spektrum, aber I/Q und Ton laufen weiter.
-            qCInfo(lcTci) << "TciServer: keine FFTEngine — Spektrumstrom steht nicht bereit";
-        }
+        // Der Abgriff wird hier NICHT fest verdrahtet: beim Serverstart gibt es
+        // die FFTEngine noch gar nicht. MainWindow startet den TCI-Server
+        // (MainWindow.cpp:987) lange bevor es dem RadioModel seine Engine gibt
+        // (MainWindow.cpp:5054). Ein Versuch an dieser Stelle findet immer
+        // nullptr — beim ersten Livetest an einem echten Gerät stand genau das
+        // im Log ("keine FFTEngine — Spektrumstrom steht nicht bereit"), und
+        // der Spektrumstrom wäre tot geblieben.
+        //
+        // Stattdessen holt ensureFftTap() das nach, sobald ein Client wirklich
+        // ein Spektrum bestellt. Dann steht die Engine längst, und der Fall
+        // "Server läuft, Radio kommt später" ist damit gleich mit erschlagen.
+        ensureFftTap();
     }
 }
 
@@ -2371,6 +2373,35 @@ void TciServer::onTextMessageReceived(const QString& msg)
         const QString kSpecStart  = QStringLiteral("spectrum_start:");
         const QString kSpecStop   = QStringLiteral("spectrum_stop:");
 
+        // ── Sendesperre für das Netz, Stelle 3 von 3 (2026-09-30) ───────────
+        //
+        // `tune:N,true` startet den Abstimmträger — der geht auf die Antenne
+        // wie jedes andere Senden. Es lief an den beiden anderen Sperren
+        // vorbei, weil es in TciProtocol behandelt wird und das die Sitzung
+        // nicht kennt: dort ist nicht zu sehen, ob ein Befehl von Loopback
+        // oder aus dem Netz kommt.
+        //
+        // Gefunden bei der Durchsicht vor dem ersten Livetest an einem echten
+        // Gerät, und zwar genau deshalb, weil der Abstimmträger die Stelle
+        // ist, an der man beim Nachdenken über „senden" zuletzt hinschaut:
+        // er heisst nicht so, aber er ist es.
+        {
+            QString t = trimmed;
+            if (t.startsWith(QStringLiteral("tune:"), Qt::CaseInsensitive)) {
+                const QStringList a = t.mid(5).split(QLatin1Char(','));
+                const bool willTune = a.size() >= 2 &&
+                    a.at(1).trimmed().compare(QLatin1String("true"),
+                                              Qt::CaseInsensitive) == 0;
+                if (willTune && !session->fromLoopback && !remoteTxAllowed()) {
+                    qCWarning(lcTci)
+                        << "TciServer: Abstimmträger von" << session->peer
+                        << "abgelehnt — Senden aus dem Netz ist nicht"
+                        << "freigegeben (TciAllowRemoteTx)";
+                    return;
+                }
+            }
+        }
+
         // ── spectrum_start / spectrum_stop (Longpath-eigen) ─────────────────
         //
         //   spectrum_start:<rx>[,<punkte>[,<bilder je sekunde>]]
@@ -2404,6 +2435,9 @@ void TciServer::onTextMessageReceived(const QString& msg)
                     const int f = args.at(2).trimmed().toInt(&ok3);
                     if (ok3) { session->spectrumFps = std::clamp(f, 1, 30); }
                 }
+                // Jetzt ist die FFTEngine da, auch wenn sie es beim Serverstart
+                // noch nicht war.
+                ensureFftTap();
                 if (!session->spectrumEnabled.contains(rx)) {
                     session->spectrumEnabled.insert(rx);
                     qCInfo(lcTci) << "TciServer: Spektrum abonniert rx" << rx
@@ -2736,7 +2770,7 @@ void TciServer::onTextMessageReceived(const QString& msg)
                     // onClientDisconnected() uses this to unkey a radio whose
                     // keying client has vanished. See the member note in
                     // TciServer.h.
-                    // ── Sendesperre für das Netz, Stelle 1 von 2 ─────────────
+                    // ── Sendesperre für das Netz, Stelle 1 von 3 ─────────────
                     //
                     // Die andere sitzt bei der Annahme von TX-Ton. Beide sind
                     // nötig, siehe dort. Ein Client aus dem Netz, der nicht
@@ -2891,7 +2925,7 @@ void TciServer::onBinaryMessageReceived(const QByteArray& data)
     if (streamTypeInt != static_cast<int>(TciStreamType::TxAudioStream)) { return; }
     if (length <= 0) { return; }
 
-    // ── Sendesperre für das Netz, Stelle 2 von 2 (2026-09-30) ────────────────
+    // ── Sendesperre für das Netz, Stelle 2 von 3 (2026-09-30) ────────────────
     //
     // Die andere sitzt im trx-Weg. BEIDE sind nötig: sperrte man nur das
     // Tasten, könnte ein Client weiter TX-Ton einspeisen und über eine andere
@@ -3328,6 +3362,26 @@ void TciServer::onRawIqDataReceived(const QVector<float>& interleavedIQ)
 // SpectrumWidget::dbmOverRange es am Pult macht. Ein Mittelwert über 64 Bins
 // lässt einen schmalen Träger im Rauschen verschwinden, und genau der ist
 // das, was man sucht.
+// Verdrahtet den Spektrum-Abgriff, sobald die FFTEngine da ist — und nur
+// einmal. Wird beim Serverstart versucht (da meist vergeblich, siehe dort) und
+// bei jedem spectrum_start nachgeholt.
+void TciServer::ensureFftTap()
+{
+    if (m_fftTapConnected) { return; }
+    if (m_model.isNull()) { return; }
+    auto* fft = m_model->fftEngine();
+    if (!fft) { return; }
+
+    // QueuedConnection: fftReady kommt vom FFT-Faden, m_clients und
+    // QWebSocket gehören dem Hauptfaden. Der QVector ist implizit geteilt,
+    // die Kopie also billig.
+    connect(fft, &FFTEngine::fftReady,
+            this, &TciServer::onFftBinsReady,
+            Qt::QueuedConnection);
+    m_fftTapConnected = true;
+    qCInfo(lcTci) << "TciServer: Spektrum-Abgriff an FFTEngine::fftReady";
+}
+
 void TciServer::onFftBinsReady(int receiverId, const QVector<float>& binsDbm)
 {
     if (binsDbm.isEmpty() || receiverId < 0 || receiverId > 1) { return; }

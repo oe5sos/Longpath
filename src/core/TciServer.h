@@ -321,6 +321,20 @@ private slots:
     // Called from onClientDisconnected and stop().
     void cleanupResamplers(std::shared_ptr<TciClientSession>& session);
 
+private:
+    // Ab hier wieder gewöhnliche Mitglieder: der Block darüber ist
+    // `private slots:`, und eine Membervariable darin lässt moc scheitern
+    // ("Not a signal or slot declaration").
+
+    // Verdrahtet den Spektrum-Abgriff, sobald die FFTEngine existiert — und nur
+    // einmal. Beim Serverstart gibt es sie noch nicht: MainWindow startet den
+    // TCI-Server (MainWindow.cpp:987) lange bevor es dem RadioModel seine
+    // Engine gibt (MainWindow.cpp:5054). Beim ersten Livetest an einem echten
+    // Gerät stand deshalb "keine FFTEngine" im Log und der Spektrumstrom wäre
+    // tot geblieben. Wird darum bei jedem spectrum_start nachgeholt.
+    void ensureFftTap();
+    bool m_fftTapConnected{false};
+
     // Phase 3J-1 review P2.3: connect RX audio tap (RxChannel::audioFrameReady
     // → onAudioFrameReady) and IQ tap (RadioModel::rawIqData →
     // onRawIqDataReceived).  Called from BOTH the constructor AND start() so
