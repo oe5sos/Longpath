@@ -168,6 +168,11 @@ export class TciLink extends EventTarget {
     const sampleType = h[2];
     const length     = h[5];
     const streamType = h[6];
+    // Kanalzahl nur uebernehmen, wenn sie plausibel ist. Der Kopfkommentar in
+    // TciBinaryFrame.h warnt ausdruecklich: bei fremden Servern steht hier
+    // Muell (beobachtet wurden 0, 1229 und das Bitmuster einer Fliesskommazahl
+    // -- offenbar ein wiederverwendeter Puffer). Longpath fuellt es korrekt.
+    const kopfKanaele = (h[7] === 1 || h[7] === 2) ? h[7] : 0;
 
     // Bytes je Wert. Der Spektrumstrom (100) traegt EIN Byte je Wert —
     // ohne diesen Fall rechnet die Pruefung darunter mit vier und
@@ -186,8 +191,13 @@ export class TciLink extends EventTarget {
 
     if (streamType === 0)        { this.bytes.iq += buf.byteLength;
                                    this._emit('iq', { receiver, vals }); }
-    else if (streamType === 1)   { this.bytes.audio += buf.byteLength;
-                                   this._emit('audio', { receiver, vals }); }
+    else if (streamType === 1)   {
+      this.bytes.audio += buf.byteLength;
+      // Faellt der Kopf aus, aus der ausgehandelten Rate schliessen: wir
+      // bitten um mono, also ist mono die bessere Annahme als stereo.
+      const channels = kopfKanaele || 1;
+      this._emit('audio', { receiver, vals, channels });
+    }
     else if (streamType === 100) { // fertiges Spektrum, Longpath-eigen
                                    this.bytes.spec += buf.byteLength;
                                    this._emit('spectrum', { receiver, vals }); }

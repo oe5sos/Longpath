@@ -84,17 +84,27 @@ def spectrum_frame(receiver, fps, dbm_werte):
     return b''.join(struct.pack('<I', v) for v in hdr) + bytes_
 
 
-def stream_frame(receiver, sample_rate, stream_type, values):
-    """64-Byte-Kopf + float32-Nutzlast, genau wie TciBinaryFrame."""
+def stream_frame(receiver, sample_rate, stream_type, values,
+                 sample_type=3, channels=2):
+    """64-Byte-Kopf + Nutzlast, genau wie TciBinaryFrame.
+
+    sample_type 3 = Float32 (vier Byte), 0 = Int16 (zwei Byte).
+    """
     hdr = [0] * 16
     hdr[0] = receiver
     hdr[1] = sample_rate
-    hdr[2] = 3                 # Float32
+    hdr[2] = sample_type
     hdr[5] = len(values)       # ALLE Werte, nicht je Kanal
     hdr[6] = stream_type
-    hdr[7] = 2                 # Kanaele
-    return b''.join(struct.pack('<I', v) for v in hdr) + \
-           struct.pack(f'<{len(values)}f', *values)
+    hdr[7] = channels
+    kopf = b''.join(struct.pack('<I', v) for v in hdr)
+    if sample_type == 0:
+        nutz = struct.pack(f'<{len(values)}h',
+                           *(max(-32768, min(32767, int(round(v * 32767))))
+                             for v in values))
+    else:
+        nutz = struct.pack(f'<{len(values)}f', *values)
+    return kopf + nutz
 
 
 class Verbindung(threading.Thread):
@@ -108,6 +118,10 @@ class Verbindung(threading.Thread):
         self.spec_punkte = 256
         self.spec_fps = 10
         self.spec_zeit = 0.0
+        # Vom Client ausgehandelt (audio_samplerate / _channels / _sample_type).
+        self.audio_rate = AUDIO_RATE
+        self.audio_kanaele = 2
+        self.audio_typ = 3        # Float32
         self.phase = 0.0
         self.tonphase = 0.0
 
@@ -208,6 +222,22 @@ class Verbindung(threading.Thread):
                 f'spectrum_start:{args[0]},{self.spec_punkte},{self.spec_fps};')
             print(f'  {self.addr[1]}: Spektrum an, {self.spec_punkte} Punkte,'
                   f' {self.spec_fps} B/s')
+        elif name == 'audio_samplerate':
+            if args and args[0].isdigit():
+                self.audio_rate = int(args[0])
+                self.sende_text(f'audio_samplerate:{self.audio_rate};')
+                print(f'  {self.addr[1]}: Tonrate {self.audio_rate}')
+        elif name == 'audio_stream_channels':
+            if args and args[0].isdigit():
+                self.audio_kanaele = max(1, min(2, int(args[0])))
+                self.sende_text(f'audio_stream_channels:{self.audio_kanaele};')
+                print(f'  {self.addr[1]}: Tonkanaele {self.audio_kanaele}')
+        elif name == 'audio_stream_sample_type':
+            typen = {'int16': 0, 'int24': 1, 'int32': 2, 'float32': 3}
+            if args and args[0].lower() in typen:
+                self.audio_typ = typen[args[0].lower()]
+                self.sende_text(f'audio_stream_sample_type:{args[0].lower()};')
+                print(f'  {self.addr[1]}: Tontyp {args[0].lower()}')
         elif name == 'spectrum_stop':
             self.spec_an = False
             self.sende_text(f'spectrum_stop:{args[0]};')
@@ -260,18 +290,22 @@ class Verbindung(threading.Thread):
                 self.sende_binaer(stream_frame(0, IQ_RATE, 0, werte))
 
             if self.audio_an:
+                # Gleiche Spieldauer wie vorher, aber in der ausgehandelten
+                # Rate: bei 12 kHz sind das ein Viertel der Abtastungen.
+                rahmen = max(1, int((AUDIO_BLOCK // 2) * self.audio_rate / AUDIO_RATE))
                 werte = []
-                for i in range(AUDIO_BLOCK // 2):
-                    t = self.tonphase + i / AUDIO_RATE
+                for i in range(rahmen):
+                    t = self.tonphase + i / self.audio_rate
                     # Ein ruhiger Zweiklang, damit man hoert, dass es laeuft,
                     # ohne dass es nach Alarm klingt.
                     v = 0.09 * math.sin(2 * math.pi * 620 * t) \
                       + 0.05 * math.sin(2 * math.pi * 930 * t) \
                       + random.gauss(0, 0.004)
-                    werte.append(v)
-                    werte.append(v)
-                self.tonphase += (AUDIO_BLOCK // 2) / AUDIO_RATE
-                self.sende_binaer(stream_frame(0, AUDIO_RATE, 1, werte))
+                    for _ in range(self.audio_kanaele):
+                        werte.append(v)
+                self.tonphase += rahmen / self.audio_rate
+                self.sende_binaer(stream_frame(0, self.audio_rate, 1, werte,
+                                               self.audio_typ, self.audio_kanaele))
 
             if self.spec_an and (jetzt - self.spec_zeit) >= 1.0 / self.spec_fps:
                 self.spec_zeit = jetzt

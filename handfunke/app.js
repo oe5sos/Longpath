@@ -44,6 +44,7 @@ const state = {
   wfRow: 0,
   spec: null,
   specMin: -130, specMax: -30,
+  audioRate: 12000,          // ausgehandelt; 48000 wäre Faktor 16 teurer
   hatSpektrumstrom: false,   // Server liefert fertige Bins
   rueckfall: false,          // wir rechnen selbst aus rohem I/Q
   iqRueckfall: null,
@@ -387,13 +388,17 @@ async function tonStarten() {
     await ctx.audioWorklet.addModule('rx-worklet.js');
     const node = new AudioWorkletNode(ctx, 'rx-worklet', {
       outputChannelCount: [2],
-      processorOptions: { capacity: 48000, target: 2400 },
+      // srcRate ist die ausgehandelte Rate, nicht die des Ausgangs — ohne sie
+      // liefe der Ton bei 12 kHz Quelle viermal zu schnell.
+      processorOptions: { capacity: 48000, target: 2400, srcRate: state.audioRate },
     });
     const gain = ctx.createGain();
     gain.gain.value = state.afPct / 100;
     node.connect(gain).connect(ctx.destination);
     await ctx.resume();
     state.audio = ctx; state.node = node; state.gain = gain;
+    // Fuer die Fehlersuche erreichbar (siehe window.__link oben).
+    window.__audioCtx = ctx; window.__gain = gain; window.__node = node;
   } catch (e) {
     // Kein Ton ist kein Grund, die Bedienung zu verlieren.
     console.warn('Ton nicht verfuegbar:', e);
@@ -404,8 +409,11 @@ async function tonStarten() {
 
 link.addEventListener('audio', (e) => {
   if (!state.node) return;
+  // Kanalzahl aus dem Rahmen ableiten, nicht raten: wir bitten um mono, aber
+  // ein Server darf stereo schicken.
+  const kanaele = e.detail.channels || 1;
   state.node.port.postMessage(
-    { type: 'pcm', data: e.detail.vals, channels: 2 }, [e.detail.vals.buffer]);
+    { type: 'pcm', data: e.detail.vals, channels: kanaele }, [e.detail.vals.buffer]);
 });
 
 // ── Regler ──────────────────────────────────────────────────────────────────
@@ -451,8 +459,19 @@ $('tune').addEventListener('click', () => {
 
 // ── Ereignisse vom Draht ────────────────────────────────────────────────────
 link.addEventListener('open', () => {
-  // Strom anfordern. Die Raten nimmt der Server aus seinen Einstellungen;
-  // wir fragen sie nicht vor, sondern lesen, was er meldet.
+  // ── Tonformat aushandeln, BEVOR der Strom startet ────────────────────────
+  //
+  // 48 kHz float32 stereo sind 384 kB/s. 12 kHz int16 mono sind 24 — Faktor
+  // sechzehn, ohne einen einzigen Codec. Die Bandbreite von 6 kHz reicht für
+  // alles, was ein Empfänger an Sprache herausgibt (SSB endet bei 3 kHz), und
+  // mono ist richtig, weil hier ohnehin ein Empfänger zu hören ist.
+  //
+  // Erst danach lohnt Opus — es würde die verbleibenden 24 auf etwa 4 kB/s
+  // drücken, kostet aber eine Bibliothek im Browser.
+  link.send(`audio_samplerate:${state.audioRate}`);
+  link.send(`audio_stream_channels:1`);
+  link.send(`audio_stream_sample_type:int16`);
+
   link.send(`audio_start:${state.trx}`);
 
   // Zuerst das FERTIGE Spektrum: die Punktzahl ist unsere Breite, mehr kann
@@ -490,7 +509,16 @@ link.addEventListener('spectrum', (e) => {
   hatSpektrum = true;
 });
 link.addEventListener('ready', () => zeichneBedienung());
-link.addEventListener('state', () => { zeichneKopf(); zeichneBedienung(); });
+link.addEventListener('state', () => {
+  // Der Server hat das letzte Wort über die Rate. Weicht sie von unserer
+  // Bitte ab, muss das Worklet es erfahren — sonst stimmt die Tonhöhe nicht.
+  const r = link.st.audioRate;
+  if (r && r !== state.audioRate) {
+    state.audioRate = r;
+    if (state.node) { state.node.port.postMessage({ type: 'rate', value: r }); }
+  }
+  zeichneKopf(); zeichneBedienung();
+});
 
 // Verbindung weg: Kopplungsblatt zurueckholen, aber erst nach einer Weile —
 // ein kurzer Aussetzer soll den Bediener nicht aus der Bedienung werfen.
@@ -507,7 +535,10 @@ setInterval(() => {
 function schleife(t) {
   zeichneBild();
   const r = link.tickRates(t);
-  $('rate').textContent = (r.iq + r.audio) ? (r.iq + r.audio + ' kB/s') : '';
+  // Alles zusammen, was die Leitung kostet — auch das Spektrum, das anfangs
+  // fehlte und die Anzeige zu günstig aussehen liess.
+  const gesamt = r.iq + r.audio + r.spec + r.text;
+  $('rate').textContent = gesamt ? (gesamt + ' kB/s') : '';
   $('fussBild').textContent = r.spec ? (r.spec + ' kB/s bild')
                             : r.iq   ? (r.iq + ' kB/s bild (roh)') : '';
   $('fussTon').textContent = r.audio ? r.audio + ' kB/s ton' : '';
