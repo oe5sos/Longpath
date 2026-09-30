@@ -502,8 +502,28 @@ async function tonStarten() {
       weg = 'scriptprocessor';
     }
 
+    // ── Begrenzer, damit der Verstärkungsvorrat nicht klirrt ──────────────
+    //
+    // Seit der AF-Regler bis Faktor 4 verstärkt, kann ein starkes Signal die
+    // Vollaussteuerung überschreiten — die AGC des Empfängers liefert in der
+    // Regelung Spitzen um 0,98, mal 4 sind das 3,9. Digitales Klirren klingt
+    // scheußlich und wird für einen Fehler des Programms gehalten.
+    //
+    // Der Begrenzer greift erst bei -3 dBFS, arbeitet mit Verhältnis 20:1 und
+    // ohne Kniebereich: unterhalb tut er nichts, oberhalb hält er. Das ist
+    // kein Klangeingriff, sondern ein Deckel — Kompression im eigentlichen
+    // Sinn (Dynamik verdichten) wäre eine Gestaltungsfrage und steht hier
+    // ausdrücklich nicht.
+    const deckel = ctx.createDynamicsCompressor();
+    deckel.threshold.value = -3;
+    deckel.knee.value = 0;
+    deckel.ratio.value = 20;
+    deckel.attack.value = 0.003;
+    deckel.release.value = 0.25;
+
     node.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(deckel);
+    deckel.connect(ctx.destination);
     await ctx.resume();
 
     state.audio = ctx; state.node = node; state.gain = gain;
