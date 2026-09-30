@@ -425,7 +425,13 @@ async function tonStarten() {
   try {
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) { throw new Error('Dieser Browser kennt keinen AudioContext'); }
-    const ctx = new AC({ sampleRate: 48000, latencyHint: 'interactive' });
+    // KEINE Abtastrate vorgeben. Die Rate ist eine Eigenschaft des
+    // Ausgabegeraets, nicht unsere Wahl: iOS liefert je nach Hoerer 48000,
+    // 44100 oder bei Bluetooth auch 16000, und eine abweichende Vorgabe
+    // wird dort teils ignoriert, teils schlaegt die Erzeugung fehl. Wir
+    // brauchen sie ohnehin nicht — TonKern rechnet auf ctx.sampleRate um,
+    // was immer das ist.
+    const ctx = new AC({ latencyHint: 'interactive' });
 
     const gain = ctx.createGain();
     gain.gain.value = afFaktor(state.afPct);
@@ -484,6 +490,7 @@ async function tonStarten() {
       const sp = ctx.createScriptProcessor(2048, 1, 2);
       let leerZaehler = 0;
       sp.onaudioprocess = (ev) => {
+        state.tonTakte = (state.tonTakte || 0) + 1;
         const out = ev.outputBuffer;
         const voll = kern.zieh(out.getChannelData(0), out.getChannelData(1), out.length);
         // Denselben Leerlauf melden wie das Worklet, damit die Fusszeile auf
@@ -570,8 +577,28 @@ async function tonStarten() {
     state.tonStartLaeuft = false;
   }
 }
+// Der sichtbare Weg: ein Knopf, der sagt, was er tut. Die Beruehrung
+// irgendwo auf der Seite bleibt zusaetzlich — sie schadet nicht und hilft
+// dem, der ohnehin tippt.
+$('tonAn').addEventListener('click', async () => {
+  await tonStarten();
+  zeichneTonKnopf();
+});
 ['touchend', 'click'].forEach(ev =>
-  document.addEventListener(ev, tonStarten, { passive: true }));
+  document.addEventListener(ev, async () => {
+    await tonStarten(); zeichneTonKnopf();
+  }, { passive: true }));
+
+// Der Knopf steht da, solange kein Ton laeuft, und verschwindet danach.
+function zeichneTonKnopf() {
+  const k = $('tonAn');
+  if (!k) { return; }
+  const laeuft = !!state.node && state.audio && state.audio.state === 'running';
+  k.hidden = laeuft;
+  if (!laeuft) { k.textContent = state.tonFehler ? 'TON?' : 'TON EIN'; }
+}
+setInterval(zeichneTonKnopf, 1000);
+zeichneTonKnopf();
 
 link.addEventListener('audio', (e) => {
   if (!state.node) return;
@@ -821,6 +848,36 @@ function koppelGrund() {
   return 'Keine Antwort. Laeuft Longpath, und ist die Adresse richtig?';
 }
 
+// ── Selbstmeldung (2026-09-30) ──────────────────────────────────────────────
+//
+// Ein Telefon hat keine Konsole, die jemand lesen koennte, und Vorlesen
+// lassen ist muehsam und fehleranfaellig. Also meldet die Seite einmal
+// nach dem Start, wie es um ihre Tonkette steht — reine Zustandszahlen,
+// kein Inhalt, und nur an den Rechner, von dem sie geladen wurde.
+setTimeout(async () => {
+  const C = state.audio, K = state.node && state.node._kern;
+  const d = {
+    sicher: window.isSecureContext,
+    weg: state.tonWeg || 'keiner',
+    fehler: state.tonFehler || '-',
+    ctx: C ? C.state : 'kein ctx',
+    ctxRate: C ? C.sampleRate : 0,
+    takte: state.tonTakte || 0,          // wurde onaudioprocess je gerufen?
+    af: state.gain ? +state.gain.gain.value.toFixed(2) : -1,
+    afPct: state.afPct,
+    rahmen: link.bytes.audio,
+    tonTyp: link.st.audioTypRahmen,
+    rate: link.st.audioRate,
+    vorrat: K ? K.have : -1,
+    ziel: K ? K.target : -1,
+    anlauf: K ? K.anlauf : '-',
+    leer: K ? K.starved : -1,
+    ready: link.ready,
+  };
+  const q = Object.entries(d).map(([k, v]) => k + '=' + encodeURIComponent(String(v))).join('&');
+  try { await fetch('/melde?' + q); } catch (e) {}
+}, 12000);
+
 // ── Bildschleife ────────────────────────────────────────────────────────────
 function schleife(t) {
   zeichneBild();
@@ -837,6 +894,7 @@ function schleife(t) {
   // Konsole, die auf einem Telefon niemand sieht.
   $('fussTon').textContent = state.tonFehler
     ? state.tonFehler
+    : !state.node ? 'Ton aus — auf TON EIN tippen'
     : (r.audio ? r.audio + ' kB/s ton'
                  + (state.tonWeg === 'scriptprocessor' ? ' (ersatzweg)' : '')
                : '');
