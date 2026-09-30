@@ -14,6 +14,10 @@
 //                 Claude Code.
 //                 Structural pattern follows AetherSDR (ten9876/AetherSDR,
 //                 GPLv3).
+//   2026-09-28 -- filter label shows the preset name when the running
+//                 filter is a preset (Thetis console.cs:7721 [@852bf0e]),
+//                 width otherwise; Martin Fischer (OE5SOS), AI-assisted via
+//                 Anthropic Claude.
 // =================================================================
 
 //=================================================================
@@ -200,7 +204,11 @@ RxApplet::RxApplet(SliceModel* slice, RadioModel* model, QWidget* parent)
         connect(m_model->filterPresetStore(), &FilterPresetStore::presetsChanged,
                 this, [this](DSPMode mode) {
             // Only rebuild when the changed mode matches the currently-active mode.
+            // Seit 2026-09-28 haengt die Filterbeschriftung am Namen der
+            // Vorgabe — ein umbenannter oder verschobener Platz muss sie
+            // nachziehen.
             if (m_slice && mode == m_slice->dspMode()) {
+                updateFilterLabel();
             }
         });
     }
@@ -415,7 +423,7 @@ void RxApplet::buildUi()
         // Control 5: Filter width label (color #00c8ff, 11px bold)
         // §A2 one-off: #00c8ff is a lighter cyan than kAccent (#00b4d8); distinct
         // intent (filter display highlight vs interactive accent). Not snapped.
-        m_filterWidthLbl = new QLabel(QStringLiteral("2.9K"), this);
+        m_filterWidthLbl = new QLabel(QStringLiteral("2.9k"), this);
         m_filterWidthLbl->setAlignment(Qt::AlignCenter);
         m_filterWidthLbl->setStyleSheet(QStringLiteral(
             "QLabel { color: #4a7ba8; font-size: 11px; font-weight: bold; }"  // §A2 one-off filter highlight
@@ -1100,8 +1108,9 @@ void RxApplet::buildUi()
     m_rxAntBtn->setToolTip(QStringLiteral("Toggles receive antenna between RX and TX antennas for RX1"));
     // Longpath native — no single Thetis TX-antenna tooltip
     m_txAntBtn->setToolTip(QStringLiteral("Select the transmit antenna port"));
-    // Longpath native — filter width label, no Thetis equivalent control
-    m_filterWidthLbl->setToolTip(QStringLiteral("Current filter passband width"));
+    // Longpath native — filter label: preset name (Thetis panelFilter title)
+    // or passband width
+    m_filterWidthLbl->setToolTip(QStringLiteral("Current filter: preset name, or passband width"));
     // Longpath native — Thetis uses discrete radio buttons per mode
     m_modeCombo->setToolTip(QStringLiteral("Select operating mode"));
     // m_muteBtn und m_afSlider sind 2026-08-18 zurueckgekommen — die
@@ -1119,21 +1128,38 @@ void RxApplet::buildUi()
     m_xitOnBtn->setToolTip(QStringLiteral("Transmit Incremental Tuning - offset TX frequency by the value below in Hz."));
 }
 
+// Ist der laufende Filter eine Vorgabe, steht ihr NAME da, wie in Thetis:
+//   panelFilter.Text = "Filter - " + rx1_filters[(int)_rx1_dsp_mode].GetName(f);
+// From Thetis console.cs:7721 [@852bf0e] (RX2: console.cs:38256).
+// Sonst die Breite. Thetis hat dafuer keinen Fall — ein von Hand gezogener
+// Filter liegt dort auf VAR1 und heisst „Var 1"; wir fuehren keinen
+// gewaehlten Platz und zeigen stattdessen die Breite.
+//
+// Der Unterschied ist sichtbar: CW F10 ist ±13 Hz, also 26 Hz breit, und
+// heisst „25"; bis 2026-09-28 stand hier „26".
 void RxApplet::updateFilterLabel()
 {
     if (!m_slice) {
         m_filterWidthLbl->setText(QStringLiteral("---"));
         return;
     }
-    m_filterWidthLbl->setText(
-        formatFilterWidth(m_slice->filterLow(), m_slice->filterHigh()));
+    const DSPMode mode = m_slice->dspMode();
+    const int low  = m_slice->filterLow();
+    const int high = m_slice->filterHigh();
+    FilterPresetStore* store = m_model ? m_model->filterPresetStore() : nullptr;
+    const QString name = store ? store->nameForEdges(mode, low, high)
+                               : FilterPresetStore::defaultNameForEdges(mode, low, high);
+    m_filterWidthLbl->setText(name.isEmpty() ? formatFilterWidth(low, high) : name);
 }
 
+// Kleines „k" wie in den Thetis-Namen („2.7k"), damit eine Vorgabe und
+// eine von Hand gezogene Breite gleich geschrieben stehen (bis 2026-09-28
+// „2.7K").
 QString RxApplet::formatFilterWidth(int low, int high)
 {
     const int width = qAbs(high - low);
     if (width >= 1000) {
-        return QStringLiteral("%1K").arg(width / 1000.0, 0, 'g', 3);
+        return QStringLiteral("%1k").arg(width / 1000.0, 0, 'g', 3);
     }
     return QStringLiteral("%1").arg(width);
 }

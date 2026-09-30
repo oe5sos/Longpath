@@ -12,6 +12,8 @@
 //   2026-09-28 -- the filter "…" reads FilterPresetStore (Thetis names +
 //                 the operator's own presets), Martin Fischer, OE5SOS,
 //                 AI-assisted via Anthropic Claude.
+//   2026-09-28 -- the running-filter pill says the preset name when the
+//                 filter is a preset (same rule as the RX applet).
 // =================================================================
 
 #include "gui/widgets/CommandBar.h"
@@ -439,6 +441,20 @@ QVector<CommandBar::FilterMenuEntry> CommandBar::filterMenuEntries() const
                     edges[i].first, edges[i].second});
     }
     return out;
+}
+
+/// Was die Pille des LAUFENDEN Filters sagt: der Name der Vorgabe, wenn er
+/// eine ist, sonst die Breite. Dieselbe Regel wie im RX-Applet
+/// (RxApplet::updateFilterLabel, dort mit dem Thetis-Bezug) — sonst
+/// stuende oben „26" und rechts „25" fuer denselben Filter.
+QString CommandBar::runningFilterLabel(int low, int high) const
+{
+    if (!m_slice) { return filterLabel(low, high); }
+    const DSPMode mode = m_slice->dspMode();
+    const QString name = m_presetStore
+        ? m_presetStore->nameForEdges(mode, low, high)
+        : FilterPresetStore::defaultNameForEdges(mode, low, high);
+    return name.isEmpty() ? filterLabel(low, high) : name;
 }
 
 /// Wie eine Breite in der Leiste heisst: „2.9k" statt „-2900…-100".
@@ -875,7 +891,7 @@ void CommandBar::pullFromModel()
     if (Group* g = group(QStringLiteral("Filter"))) {
         const int lo = m_slice->filterLow();
         const int hi = m_slice->filterHigh();
-        const QString label = filterLabel(lo, hi);
+        const QString label = runningFilterLabel(lo, hi);
 
         // Dieselbe Regel wie bei Modus und Schrittweite: was laeuft,
         // rueckt an die letzte sichtbare Stelle, wenn es nicht schon

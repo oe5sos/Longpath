@@ -22,6 +22,10 @@
 //   2026-09-28 -- default names = Thetis button names ("1.0k", "800" …)
 //                 instead of "F1".."F10" (Martin Fischer, OE5SOS,
 //                 AI-assisted via Anthropic Claude).
+//   2026-09-28 -- nameForEdges / defaultNameForEdges: the running filter
+//                 is labelled by its preset name, as Thetis labels the
+//                 selected filter (Martin Fischer, OE5SOS, AI-assisted via
+//                 Anthropic Claude).
 // =================================================================
 
 #pragma once
@@ -78,6 +82,16 @@ public:
     /// (InitFilterPresets, console.cs:5118-5515 [@852bf0e]).  Slot is
     /// 0-based (0..9).
     static FilterPreset defaultPreset(DSPMode mode, int slot);
+
+    /// Der Name der Vorgabe, deren Kanten genau (low, high) sind — mit den
+    /// eigenen Vorgaben des Betreibers. Leer, wenn keine passt (von Hand
+    /// gezogen, eigene Breite). Longpath fuehrt keinen gewaehlten Platz wie
+    /// Thetis' rx1_filter, darum wird er aus den Kanten zurueckgewonnen.
+    QString nameForEdges(DSPMode mode, int low, int high) const;
+
+    /// Dasselbe gegen die Thetis-Vorgaben allein, fuer Stellen ohne
+    /// Speicher (Tests, frueher Aufbau).
+    static QString defaultNameForEdges(DSPMode mode, int low, int high);
 
     // ── Write ─────────────────────────────────────────────────────────────
 
