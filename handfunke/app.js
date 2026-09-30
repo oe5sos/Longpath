@@ -474,7 +474,14 @@ async function tonStarten() {
       // 2048 Proben sind bei 48 kHz rund 43 ms — gross genug, dass der
       // Hauptfaden dazwischen zeichnen darf, klein genug, dass die
       // Verzoegerung nicht auffaellt.
-      const sp = ctx.createScriptProcessor(2048, 0, 2);
+      //
+      // EIN Eingangskanal, nicht null. Ein ScriptProcessorNode ohne Eingang
+      // wird nicht überall getaktet: manche Umsetzungen rufen
+      // onaudioprocess nur, wenn etwas hineinfliesst, und Safari gehoert
+      // dazu. Der Knoten haengt dann stumm im Graphen, und niemand sieht,
+      // warum. Deshalb bekommt er unten eine stille Quelle vorgeschaltet —
+      // sie liefert Nullen und dient nur dem Takt.
+      const sp = ctx.createScriptProcessor(2048, 1, 2);
       let leerZaehler = 0;
       sp.onaudioprocess = (ev) => {
         const out = ev.outputBuffer;
@@ -486,12 +493,32 @@ async function tonStarten() {
           state.tonLeerlaufZuletzt = performance.now();
         }
       };
+      // Die stille Quelle, die den Takt garantiert (siehe oben). Ein
+      // ConstantSourceNode mit offset 0 liefert Nullen, kostet nichts und
+      // haelt den ScriptProcessor am Laufen.
+      let takt = null;
+      try {
+        takt = ctx.createConstantSource();
+        takt.offset.value = 0;
+        takt.connect(sp);
+        takt.start();
+      } catch (e) {
+        // Kennt der Browser ConstantSourceNode nicht, tut es auch ein
+        // leerer Puffer in Dauerschleife.
+        try {
+          const leer = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+          const q = ctx.createBufferSource();
+          q.buffer = leer; q.loop = true; q.connect(sp); q.start();
+          takt = q;
+        } catch (e2) { /* dann eben ohne — auf Chrome laeuft es auch so */ }
+      }
+
       // Eine Huelle, die sich nach aussen wie der Worklet-Knoten verhaelt —
       // so kennt der Rest der Seite nur EINEN Weg.
       node = {
         _sp: sp, _kern: kern,
         connect: (z) => sp.connect(z),
-        disconnect: () => sp.disconnect(),
+        disconnect: () => { try { if (takt) takt.disconnect(); } catch (e) {} sp.disconnect(); },
         port: { postMessage: (m) => {
           if (m.type === 'pcm') { kern.push(m.data, m.channels); }
           else if (m.type === 'mute') { kern.muted = !!m.value; }
