@@ -2668,6 +2668,12 @@ void TciServer::onTextMessageReceived(const QString& rohMsg)
                 const bool willTune = a.size() >= 2 &&
                     a.at(1).trimmed().compare(QLatin1String("true"),
                                               Qt::CaseInsensitive) == 0;
+                // Ausdrueckliches Abschalten — alles andere (Abfrage ohne
+                // Argument, Tippfehler) ist KEIN Abschalten und darf die
+                // Buchfuehrung nicht anfassen.
+                const bool willTuneAus = a.size() >= 2 &&
+                    a.at(1).trimmed().compare(QLatin1String("false"),
+                                              Qt::CaseInsensitive) == 0;
                 if (willTune && !session->fromLoopback && !remoteTxAllowed()) {
                     qCWarning(lcTci)
                         << "TciServer: Abstimmträger von" << session->peer
@@ -2698,12 +2704,38 @@ void TciServer::onTextMessageReceived(const QString& rohMsg)
                     if (m_moxOwner.data() != ws) { m_ownerPingsUnanswered = 0; }
                     m_moxOwner = ws;
                     startKeyedWatchdog();
-                } else if (!m_moxOwner.isNull() && m_moxOwner.data() == ws) {
-                    // Nur loslassen, wenn auch nicht gleichzeitig über trx:
-                    // gesendet wird — sonst nähme ein tune-off dem laufenden
-                    // Sendebetrieb seinen Wachhund weg.
-                    const bool sendetNoch = !m_model.isNull() && m_model->mox()
-                                            && !m_model->isTune();
+                } else if (willTuneAus && !m_moxOwner.isNull()
+                           && m_moxOwner.data() == ws) {
+                    // Nur bei AUSDRUECKLICHEM `tune:N,false` loslassen, und
+                    // auch dann nur, wenn das Geraet danach wirklich nicht
+                    // mehr sendet.
+                    //
+                    // Beide Bedingungen sind Nachbesserungen vom selben Tag,
+                    // gefunden bei der Durchsicht der eigenen Reparatur:
+                    //
+                    //  1. Der Zweig griff vorher bei JEDEM tune-Rahmen, der
+                    //     nicht `,true` war — also auch bei der reinen
+                    //     Statusabfrage `tune:0;`, die ein fremder Client
+                    //     voellig zu Recht schickt. Der Verteiler laesst den
+                    //     Traeger dabei stehen (TciProtocol.cpp: ein Argument
+                    //     ist der Abfragepfad), die Buchfuehrung gab ihn aber
+                    //     frei.
+                    //
+                    //  2. Die Bedingung lautete `mox() && !isTune()` und war
+                    //     damit WAEHREND des Abstimmtraegers immer falsch —
+                    //     `isTune()` ist ja gerade dann wahr. Losgelassen
+                    //     wurde also genau in dem Zustand, den zu sichern der
+                    //     ganze Block da ist. Richtig ist `mox() || isTune()`:
+                    //     sendet das Geraet in IRGENDEINER Form, bleibt der
+                    //     Besitzer stehen.
+                    //
+                    // Zusammen hoben die beiden den Fix vom selben Tag wieder
+                    // auf: nach einem `tune:0;` mitten im Traeger lief der
+                    // Sender ohne Wachhund, ohne Deckel und ohne Besitzer —
+                    // genau der Zustand, den der Kommentar oben zu schliessen
+                    // behauptet.
+                    const bool sendetNoch = !m_model.isNull()
+                                            && (m_model->mox() || m_model->isTune());
                     if (!sendetNoch) {
                         m_moxOwner = nullptr;
                         stopKeyedWatchdog();

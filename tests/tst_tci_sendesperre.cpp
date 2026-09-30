@@ -247,6 +247,49 @@ private slots:
         server.stop();
     }
 
+    // ── Eine Abfrage darf den Traeger nicht entsichern ──────────────────────
+    //
+    // Der Fund, der diesen Pruefpunkt erzwungen hat, steckte in der Reparatur
+    // vom selben Tag. Der else-Zweig griff bei JEDEM tune-Rahmen, der nicht
+    // `,true` war — also auch bei der reinen Statusabfrage `tune:0;`, die ein
+    // fremder Client voellig zu Recht schickt. Und die Bedingung
+    // `mox() && !isTune()` war waehrend des Traegers zwangslaeufig falsch.
+    //
+    // Zusammen: nach einem `tune:0;` mitten im Traeger lief der Sender ohne
+    // Besitzer, ohne Wachhund und ohne Sendezeit-Deckel weiter. Genau der
+    // Zustand, den der Fix eine Stunde vorher geschlossen hatte.
+    void abfrage_entsichert_den_traeger_nicht()
+    {
+        TciServer server(nullptr);
+        QWebSocket client;
+        QVERIFY(aufbauen(server, client, /*sendenFrei=*/true));
+
+        schicke(client, QStringLiteral("tune:0,true;"));
+        QVERIFY2(server.moxOwnerForTest() != nullptr,
+                 "Aufbau: der Traeger muss einen Besitzer haben");
+
+        // Die reine Abfrage. Der Verteiler laesst den Traeger stehen, also
+        // muss auch die Buchfuehrung stehen bleiben.
+        schicke(client, QStringLiteral("tune:0;"));
+        QVERIFY2(server.moxOwnerForTest() != nullptr,
+                 "Eine Abfrage »tune:0;« hat dem laufenden Traeger den "
+                 "Besitzer genommen — damit faellt auch Wachhund und "
+                 "Sendezeit-Deckel weg");
+
+        // Ein Tippfehler ebenso wenig.
+        schicke(client, QStringLiteral("tune:0,1;"));
+        QVERIFY2(server.moxOwnerForTest() != nullptr,
+                 "»tune:0,1;« ist kein Abschalten und darf nichts freigeben");
+
+        // Erst das ausdrueckliche Abschalten gibt frei.
+        schicke(client, QStringLiteral("tune:0,false;"));
+        QVERIFY2(server.moxOwnerForTest() == nullptr,
+                 "Nach »tune:0,false;« muss der Besitzer frei sein");
+
+        client.close();
+        server.stop();
+    }
+
     // ── Ohne Anmeldung geht gar nichts ──────────────────────────────────────
     void ohne_anmeldung_kein_senden()
     {
