@@ -2626,6 +2626,30 @@ void TciServer::onTextMessageReceived(const QString& rohMsg)
                 trimmed.mid(kSpecStart.size()).split(QLatin1Char(','));
             bool ok = false;
             const int rx = args.value(0).trimmed().toInt(&ok);
+
+            // Nur Empfaenger 0 (2026-09-30). RadioModel haelt EINE FFTEngine
+            // (RadioModel.h:900), und die traegt eine feste Empfaengernummer,
+            // die sie in jedes fftReady schreibt. Fuer rx 1 kann also nie ein
+            // Bild entstehen.
+            //
+            // Bis heute wurde `spectrum_start:1` trotzdem bestaetigt. Das war
+            // schlimmer als eine Ablehnung: der Client nimmt die Bestaetigung
+            // als Zusage, laesst darum seinen Rueckfall auf rohes I/Q liegen
+            // und wartet dann fuer immer auf Bilder, die nie kommen — mit
+            // schwarzem Wasserfall und ohne jeden Hinweis, woran es liegt.
+            //
+            // Schweigen ist hier die ehrliche Antwort: unbekannte und
+            // abgelehnte Befehle werden in TCI antwortlos verworfen, und
+            // genau daran erkennt ein Client, dass er den anderen Weg nehmen
+            // muss. Kommen eines Tages mehrere FFTEngines, gehoert diese
+            // Schranke erweitert statt entfernt.
+            if (ok && rx != 0) {
+                qCInfo(lcTci) << "TciServer: spectrum_start fuer rx" << rx
+                              << "abgelehnt — es gibt nur einen Spektrum-Abgriff,"
+                              << "peer" << session->peer;
+                return;
+            }
+
             if (ok && rx >= 0 && rx <= 1) {
                 if (args.size() >= 2) {
                     bool ok2 = false;

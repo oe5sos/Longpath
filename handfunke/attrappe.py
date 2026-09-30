@@ -117,6 +117,10 @@ class Verbindung(threading.Thread):
         self.spec_an = False
         self.spec_punkte = 256
         self.spec_fps = 10
+        # Messwerte kommen erst auf Anforderung — so wie beim echten Server
+        # (TciClientSession::rxSensorsEnabled steht ab Werk auf false).
+        self.rx_sensors_an = False
+        self.rx_sensors_ms = 200
         self.spec_zeit = 0.0
         # Vom Client ausgehandelt (audio_samplerate / _channels / _sample_type).
         self.audio_rate = AUDIO_RATE
@@ -213,6 +217,13 @@ class Verbindung(threading.Thread):
             print(f'  {self.addr[1]}: IQ an')
         elif name == 'iq_stop':
             self.iq_an = False
+        elif name == 'rx_sensors_enable':
+            # Thetis-getreu: args[0] = true/false, args[1] optional das
+            # Intervall in Millisekunden.
+            self.rx_sensors_an = (args[0].strip().lower() == 'true') if args else False
+            if len(args) >= 2:
+                try: self.rx_sensors_ms = max(30, min(1000, int(args[1])))
+                except ValueError: pass
         elif name == 'audio_start':
             self.audio_an = True
             print(f'  {self.addr[1]}: Ton an')
@@ -334,8 +345,17 @@ class Verbindung(threading.Thread):
                     werte.append(v)
                 self.sende_binaer(spectrum_frame(0, self.spec_fps, werte))
 
-            # S-Meter, wie der echte Server alle 200 ms
-            if jetzt - smeter_zeit > 0.2:
+            # S-Meter — NUR nach ausdruecklicher Anmeldung, wie der echte
+            # Server. Bis 2026-09-30 schickte die Attrappe sie ungefragt, und
+            # genau daran bin ich haengengeblieben: der Signalbalken lief
+            # gegen die Attrappe, blieb am echten Geraet aber leer, und ich
+            # habe den Fehler eine Weile im Server gesucht statt im Client
+            # (der `rx_sensors_enable:true` nie schickte).
+            #
+            # Eine Attrappe, die gutmuetiger ist als das Original, ist keine
+            # Hilfe — sie verschiebt Fehler nach hinten, dorthin wo sie teurer
+            # sind.
+            if self.rx_sensors_an and jetzt - smeter_zeit > self.rx_sensors_ms / 1000.0:
                 smeter_zeit = jetzt
                 dbm = -83 + 9 * math.sin(jetzt / 2.2) + random.gauss(0, 1.2)
                 self.sende_text(f'rx_sensors:0,{dbm:.1f};')
