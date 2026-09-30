@@ -298,8 +298,47 @@ TciServer::TciServer(RadioModel* model, QObject* parent)
                 // domain and the resampler sees clean amplitude).  Item 13:
                 // track block peak |sample| for TciApplet's slice level meter
                 // -- replaces the fake sine-wave placeholder.
-                const float sliceGain =
+                const float sliceGainRoh =
                     m_sliceRxGainLinear[rx].load(std::memory_order_acquire);
+
+                // ── Den lokalen AF-Regler herausrechnen (2026-09-30) ────────
+                //
+                // Der TCI-Abgriff sitzt HINTER WDSPs panel.gain1 (rxa.c:698),
+                // und Longpath speist dort den AF-Regler ein
+                // (RxChannel::setAfGain). Wer am Rechner leise stellt, weil
+                // er dort gerade nicht zuhört, macht damit auch das Telefon
+                // leise — und am Telefon lässt sich nichts dagegen tun: der
+                // TCI-Pegelregler kann ausdrücklich nur dämpfen.
+                //
+                // In Thetis passiert das NICHT. Dort ist PanelGain1 ein
+                // eigener Per-RX-Regler (radio.cs:1079-1090, gespeist von
+                // ptbRX0Gain), auf den die Hauptlautstärke nicht wirkt
+                // (audio.cs:248-258 -> cmaster.cs:954-957); der TCI-Abgriff
+                // liegt davor. Longpath hat beide Regler zu einem
+                // verschmolzen und legt die Dämpfung damit in den Fernton
+                // hinein, den Thetis herausshält. Das ist eine
+                // Portierungslücke, kein Entwurf.
+                //
+                // Longpath kennt das Problem bereits und hat es für den
+                // VAX-Abgriff genauso gelöst — AudioEngine.cpp:1370-1387,
+                // dort steht es wörtlich: VAX erbe sonst "whatever
+                // attenuation the speaker slider is currently applying,
+                // which is wrong". Dieselbe Rechnung, dieselbe Begründung,
+                // derselbe Schutz gegen Division durch fast Null.
+                //
+                // Bei ganz zugedrehtem Regler bleibt es still: die Werte sind
+                // innerhalb von WDSP schon mit ~0 multipliziert worden, da
+                // ist nichts mehr zurückzuholen. Das behebt erst ein Abgriff
+                // vor panel.gain1.
+                float afInverse = 1.0f;
+                if (!m_model.isNull() && m_model->wdspEngine()) {
+                    if (RxChannel* ch = m_model->wdspEngine()->rxChannel(rx)) {
+                        const double af = ch->afGain();
+                        if (af > 0.001) { afInverse = static_cast<float>(1.0 / af); }
+                    }
+                }
+                const float sliceGain = sliceGainRoh * afInverse;
+
                 float blockPeak = 0.0f;
                 if (sliceGain != 1.0f) {
                     for (int i = 0; i < ringSamples; ++i) {

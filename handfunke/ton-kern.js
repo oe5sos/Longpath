@@ -56,6 +56,7 @@ class TonKern {
     this.pos = 0;              // Leseposition, gebrochen
     this.muted = false;
     this.starved = 0;
+    this.anlauf = true;   // erst bei vollem Vorrat losspielen
   }
 
   _raten() {
@@ -78,7 +79,7 @@ class TonKern {
     this.leeren();
   }
 
-  leeren() { this.w = this.rd = this.have = 0; this.pos = 0; }
+  leeren() { this.w = this.rd = this.have = 0; this.pos = 0; this.anlauf = true; }
 
   push(vals, channels) {
     const frames = channels === 2 ? (vals.length >> 1) : vals.length;
@@ -110,9 +111,27 @@ class TonKern {
   zieh(L, R, n) {
     const gebraucht = Math.ceil(this.pos + n * this.schritt) + 1;
 
+    // Anlaufsperre: erst losspielen, wenn der Vorrat WIRKLICH da ist.
+    //
+    // Bis 2026-09-30 wurde nur gefragt, ob genug fuer DIESEN Block da ist —
+    // bei 12 kHz und 2048 Ausgabeproben sind das 512 Quellproben, also 43 ms.
+    // Der als Vorrat dokumentierte Wert (120 ms) wurde damit nie eingehalten:
+    // gespielt wurde mit null Reserve, und jeder Netzjitter kostete sofort
+    // einen ganzen stillen Ausgabeblock. Auf einem Telefon im WLAN ist
+    // Jitter der Normalfall, nicht die Ausnahme.
+    //
+    // Also: nach jedem Leerlauf erst wieder anlaufen, wenn `target`
+    // Quellproben beisammen sind. Das kostet einmalig die Vorratszeit und
+    // erspart danach das Stottern.
+    if (this.anlauf && this.have < this.target) {
+      L.fill(0); if (R !== L) { R.fill(0); }
+      return false;
+    }
+    this.anlauf = false;
+
     if (this.muted || this.have < gebraucht) {
       L.fill(0); if (R !== L) { R.fill(0); }
-      if (!this.muted) { this.starved++; }
+      if (!this.muted) { this.starved++; this.anlauf = true; }
       return false;
     }
 

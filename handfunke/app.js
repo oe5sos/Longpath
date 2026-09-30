@@ -393,6 +393,24 @@ function zeichneBild() {
   }
 }
 
+// Der AF-Regler des Telefons — mit VERSTAERKUNGSVORRAT.
+//
+// Bis 2026-09-30 war er `afPct/100`, also 0 bis 1,0: ein reiner Daempfer
+// ohne jede Reserve. Das ist fuer eine Fernbedienung der falsche Bereich,
+// denn der Ton kommt schon dem AF-Regler AM RECHNER unterworfen an — der
+// TCI-Abgriff sitzt hinter WDSPs panel.gain1 (RXA.c:698). Steht der Regler
+// am Mac leise, weil der Bediener dort gerade nicht zuhoert, kommt das
+// Telefon leise an und konnte nichts dagegen tun.
+//
+// Jetzt: 70 % bleibt Faktor 1,0 (die gewohnte Stellung klingt wie bisher),
+// darunter wird gedaempft, darueber bis Faktor 4 (+12 dB) verstaerkt. Der
+// Bereich oberhalb ist bewusst gespreizt, damit das letzte Stueck Weg nicht
+// in einem Sprung liegt.
+function afFaktor(pct) {
+  if (pct <= 70) { return pct / 70; }                 // 0 … 1,0
+  return 1 + (pct - 70) / 30 * 3;                     // 1,0 … 4,0
+}
+
 // ── Ton ─────────────────────────────────────────────────────────────────────
 // iOS gibt Ton erst nach einer Beruehrung frei. Wir versuchen es bei jeder
 // Beruehrung erneut, bis es klappt — ohne einen eigenen Knopf dafuer.
@@ -410,7 +428,7 @@ async function tonStarten() {
     const ctx = new AC({ sampleRate: 48000, latencyHint: 'interactive' });
 
     const gain = ctx.createGain();
-    gain.gain.value = state.afPct / 100;
+    gain.gain.value = afFaktor(state.afPct);
 
     let node = null;
     let weg = null;
@@ -426,7 +444,16 @@ async function tonStarten() {
         // sie liefe der Ton bei 12 kHz Quelle viermal zu schnell.
         processorOptions: { srcRate: state.audioRate },
       });
-      node.port.onmessage = () => {};
+      // Leerlauf zaehlen statt wegwerfen. Das Worklet meldet bei jedem 32.
+      // leeren Block; ohne diese Zeile war die einzige Diagnose fuer
+      // stotternden Ton ein leerer Rumpf, und der Leerlauf musste von Hand
+      // ueber den Scheitelfaktor ausgeschlossen werden.
+      node.port.onmessage = (e) => {
+        if (e.data && e.data.type === 'starved') {
+          state.tonLeerlauf = (state.tonLeerlauf || 0) + 32;
+          state.tonLeerlaufZuletzt = performance.now();
+        }
+      };
       weg = 'worklet';
     } else {
       // ── Rueckfall: ScriptProcessorNode ───────────────────────────────────
@@ -448,9 +475,16 @@ async function tonStarten() {
       // Hauptfaden dazwischen zeichnen darf, klein genug, dass die
       // Verzoegerung nicht auffaellt.
       const sp = ctx.createScriptProcessor(2048, 0, 2);
+      let leerZaehler = 0;
       sp.onaudioprocess = (ev) => {
         const out = ev.outputBuffer;
-        kern.zieh(out.getChannelData(0), out.getChannelData(1), out.length);
+        const voll = kern.zieh(out.getChannelData(0), out.getChannelData(1), out.length);
+        // Denselben Leerlauf melden wie das Worklet, damit die Fusszeile auf
+        // beiden Wegen dasselbe sagt.
+        if (!voll && !kern.muted && (++leerZaehler & 31) === 0) {
+          state.tonLeerlauf = (state.tonLeerlauf || 0) + 32;
+          state.tonLeerlaufZuletzt = performance.now();
+        }
       };
       // Eine Huelle, die sich nach aussen wie der Worklet-Knoten verhaelt —
       // so kennt der Rest der Seite nur EINEN Weg.
@@ -514,7 +548,7 @@ function reglerBinden(trackId, beiWert) {
 }
 reglerBinden('afTrack', (p) => {
   state.afPct = p;
-  if (state.gain) state.gain.gain.value = p / 100;
+  if (state.gain) state.gain.gain.value = afFaktor(p);
   zeichneBedienung();
 });
 reglerBinden('pwrTrack', (p) => link.send(`drive:${state.trx},${p}`));
@@ -759,6 +793,11 @@ function schleife(t) {
     : (r.audio ? r.audio + ' kB/s ton'
                  + (state.tonWeg === 'scriptprocessor' ? ' (ersatzweg)' : '')
                : '');
+  // Stottert der Ton gerade, steht das da — sonst sucht man es im Funkgeraet.
+  if (!state.tonFehler && state.tonLeerlaufZuletzt
+      && performance.now() - state.tonLeerlaufZuletzt < 2000) {
+    $('fussTon').textContent += ' ⚠ stockt';
+  }
   $('fussTon').className = state.tonFehler ? 'warn' : '';
   // Eine Verbindung kann formal offen stehen und trotzdem tot sein — WLAN
   // weg, Rechner im Ruhezustand, Longpath beendet. Der Socket merkt das erst
