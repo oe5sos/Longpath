@@ -891,6 +891,34 @@ QStringList TciProtocol::buildInitialRadioStateLines() const
     // no sub rx on rx2
     lines << buildRxChannelEnableLine(1, 1, false);
 
+    // Sendeleistung und Abstimmleistung — bis 2026-09-30 fehlten sie im
+    // Init-Burst, obwohl Thetis sie dort ausdrücklich mitschickt:
+    // TCIServer.cs:2626-2631 [v2.10.3.13] ruft in sendInitialisationData()
+    //   handleDrive({"0"}); handleDrive({"1"});
+    //   handleTuneDrive({"0"}); handleTuneDrive({"1"});
+    // also je den ABFRAGE-Pfad, dessen Antwort sendDrivePower / sendTunePower
+    // auf den Draht legt. Ohne diese vier Zeilen weiß eine frisch verbundene
+    // Fernbedienung nicht, auf welcher Leistung die Station steht — ihr
+    // Regler stünde auf einem geratenen Wert, bis jemand ihn anfasst. Genau
+    // das fiel beim ersten Lauf der Handfunke auf (drive kam als null an).
+    //
+    // Der Bereich wird wie in sendDrivePower auf 0..100 geklemmt
+    // (TCIServer.cs:2335-2341), damit der Erstzustand nie eine unmögliche
+    // Leistung behauptet.
+    {
+        int drivePct = 0, tunePct = 0;
+        QMetaObject::invokeMethod(m_radio, "drivePower", Qt::DirectConnection,
+                                  Q_RETURN_ARG(int, drivePct));
+        QMetaObject::invokeMethod(m_radio, "tuneDrivePower", Qt::DirectConnection,
+                                  Q_RETURN_ARG(int, tunePct));
+        drivePct = std::clamp(drivePct, 0, 100);
+        tunePct  = std::clamp(tunePct,  0, 100);
+        lines << QStringLiteral("drive:0,%1;").arg(drivePct);
+        lines << QStringLiteral("drive:1,%1;").arg(drivePct);
+        lines << QStringLiteral("tune_drive:0,%1;").arg(tunePct);
+        lines << QStringLiteral("tune_drive:1,%1;").arg(tunePct);
+    }
+
     // From Thetis TCIServer.cs:2483-2487 [v2.10.3.13]
     lines << buildTrxLine(0, mox && !(false && bRX2Enabled));
     lines << buildTrxLine(1, mox && (false && bRX2Enabled));
