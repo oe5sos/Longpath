@@ -42,7 +42,8 @@ export class TciLink extends EventTarget {
       rxVolume: [null, null],
       smeter: [null, null],
     angemeldet: false,           // auth:ok gesehen
-    audioTyp: null,              // vom Server bestaetigtes Tonformat
+    audioTyp: null,              // aus dem Text-Echo (unzuverlaessig, s.u.)
+    audioTypRahmen: null,        // was WIRKLICH im Binaerkopf steht
     spektrumBestaetigt: false,   // Server hat spectrum_start zurueckgemeldet
     spektrumPunkte: null,        // die Punktzahl, auf die er geklemmt hat
     spektrumFps: null,
@@ -247,7 +248,8 @@ export class TciLink extends EventTarget {
     // ohne diesen Fall rechnet die Pruefung darunter mit vier und
     // verwirft jeden Spektrumrahmen als unstimmig. Genau so passiert,
     // live gefunden: die Rahmen kamen an und fielen still durch.
-    const bps = sampleType === 100 ? 1
+    const bps = sampleType === 100 ? 1   // Spektrum, dBm+200
+              : sampleType === 101 ? 1   // mu-law, ein Byte je Abtastung
               : sampleType === 0   ? 2
               : sampleType === 1   ? 3 : 4;
     const payload = buf.byteLength - HDR;
@@ -262,6 +264,7 @@ export class TciLink extends EventTarget {
                                    this._emit('iq', { receiver, vals }); }
     else if (streamType === 1)   {
       this.bytes.audio += buf.byteLength;
+      this._tonTypGesehen(sampleType);
       // Faellt der Kopf aus, aus der ausgehandelten Rate schliessen: wir
       // bitten um mono, also ist mono die bessere Annahme als stereo.
       const channels = kopfKanaele || 1;
@@ -271,6 +274,22 @@ export class TciLink extends EventTarget {
                                    this.bytes.spec += buf.byteLength;
                                    this._emit('spectrum', { receiver, vals }); }
     // 2/3/4 gehen uns als Empfaenger nichts an.
+  }
+
+  // Merkt sich den Probentyp des zuletzt empfangenen Tonrahmens.
+  //
+  // Warum nicht das Text-Echo: `audio_stream_sample_type:` kommt aus dem
+  // GLOBALEN RadioModel, nicht aus der Sitzung (Durchsicht 2026-09-30). Es
+  // meldet also, was irgendwo eingestellt ist, nicht was DIESE Verbindung
+  // bekommt. Am 2026-09-30 live gesehen: der Client bat um mulaw8, das Echo
+  // sagte int16, und die Nachfass-Pruefung schaltete daraufhin selbst auf
+  // int16 zurueck — obwohl der Server mulaw8 durchaus geliefert haette.
+  // Der Binaerkopf luegt nicht.
+  _tonTypGesehen(sampleType) {
+    if (this.st.audioTypRahmen !== sampleType) {
+      this.st.audioTypRahmen = sampleType;
+      this._emit('state');
+    }
   }
 
   _values(buf, sampleType, length) {

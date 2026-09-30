@@ -630,12 +630,19 @@ link.addEventListener('open', () => {
 
   // Nachfassen: bestaetigt der Server nicht mulaw8, auf int16 zurueck. Ohne
   // das haengt der Ton an der Hoffnung, dass die Gegenseite den Namen kennt.
+  // Nachfassen: kommen nach drei Sekunden KEINE mu-law-Rahmen an, auf int16
+  // zurueck. Geprueft wird am Binaerkopf (audioTypRahmen), nicht am
+  // Text-Echo — das kommt aus dem globalen RadioModel und meldet, was
+  // irgendwo eingestellt ist, nicht was diese Verbindung bekommt. Am
+  // 2026-09-30 live in die Falle getappt: das Echo sagte int16, die Seite
+  // schaltete daraufhin selbst zurueck, und der billige Ton kam nie zum
+  // Einsatz, obwohl der Server ihn geliefert haette.
   clearTimeout(state.tonTypPruefung);
   state.tonTypPruefung = setTimeout(() => {
-    if (link.st.audioTyp && link.st.audioTyp !== 'mulaw8') {
+    if (link.st.audioTypRahmen !== null && link.st.audioTypRahmen !== 101) {
       link.send(`audio_stream_sample_type:int16`);
     }
-  }, 1500);
+  }, 3000);
 
   link.send(`audio_start:${state.trx}`);
 
