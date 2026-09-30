@@ -413,6 +413,41 @@ void P2RadioConnection::init()
             return;
         }
 
+        // ── Erst senden, wenn das Geraet sich gemeldet hat (2026-09-30) ──
+        //
+        // Bis hierher lief dieser Takt ab SendStart: 4 x 1444 Byte alle
+        // 5 ms an ein Geraet, das noch gar nicht laeuft. Kennt der Mac
+        // die MAC-Adresse des Geraets noch nicht -- die Discovery laeuft
+        // per Rundruf und legt keinen ARP-Eintrag an --, haelt macOS
+        // gezielte Pakete bis zur ARP-Antwort in einer Warteschlange von
+        // 16 fest und verwirft bei Ueberlauf die AELTESTEN (xnu
+        // bsd/netinet/in_arp.c arp_llinfo_addq: Q_DROPHEAD;
+        // net.link.ether.inet.maxhold = 16). Ueber WLAN und Mikrotik
+        // dauert ARP 25-45 ms; so lange fuellte dieser Takt die Schlange,
+        // und vorne fielen General, Rx, Tx und HighPriority(run=1)
+        // heraus. HighPriority wird im RX nicht wiederholt: das Geraet
+        // startete nie, der Watchdog schlug nach 6 s zu, der Reconnect
+        // (ARP inzwischen bekannt) klappte sofort -- am 29.09. zweimal
+        // beim ersten Connect nach Programmstart (ANVELINA PRO 3).
+        // Nachgestellt ohne Geraet: derselbe Takt als ICMP an einen Host
+        // ohne ARP-Eintrag -> die ersten 8 von 40 fehlen, netstat zaehlt
+        // 8 "dropped due to no ARP entry"; mit ARP-Eintrag 40 von 40.
+        //
+        // Thetis sendet an 1029 ohnehin erst, wenn das Geraet streamt:
+        // die TX-Pakete entstehen aus dessen Mikrofonrahmen.
+        // From Thetis ChannelMaster/network.c:772 [@852bf0e] — Inbound(inid(1, 0), ...) je Mikrofonrahmen
+        // From Thetis ChannelMaster/cmaster.c:397 [@852bf0e] — xilv(), "call Outbound()"
+        // From Thetis ChannelMaster/obbuffs.c:169 [@852bf0e] — sendOutbound(id, a->out)
+        // From Thetis ChannelMaster/network.c:1388 [@852bf0e] — sendPacket(..., base_outbound_port + 5) // 1029
+        // Vor dem Start gehen dort nur die vier SendStart-Pakete und der
+        // Keepalive hinaus. m_lastFrameAtMs wird vom ersten Status- oder
+        // I/Q-Rahmen gesetzt und von connectToRadio() geloescht; im RX ist
+        // der Ring leer (TxChannel schiebt nur bei laufendem TX-Kanal),
+        // es geht also nichts verloren.
+        if (m_lastFrameAtMs == 0) {
+            return;
+        }
+
         // Drain kTxFramesPerTick (4) frames per 5 ms tick at 192 kHz.
         // Each frame: 4-byte BE sequence number + 240 samples × 6 bytes = 1444 bytes.
         // Cite: deskhpsdr/src/new_protocol.h:37 [@120188f]

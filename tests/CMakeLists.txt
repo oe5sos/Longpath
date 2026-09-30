@@ -2445,6 +2445,13 @@ target_compile_definitions(tst_p1_watchdog_wire PRIVATE LONGPATH_BUILD_TESTS)
 longpath_add_test(tst_p2_tx_iq_wire)
 target_compile_definitions(tst_p2_tx_iq_wire PRIVATE LONGPATH_BUILD_TESTS)
 
+# ── P2 TX I/Q erst nach dem ersten Rahmen des Geraets (2026-09-30) ─────────
+# Schein-Geraet auf 127.0.0.1:1024/1025/1029: vor dem ersten Status darf an
+# 1029 nichts ankommen (ARP-Warteschlange von macOS verwarf sonst SendStart),
+# danach laeuft der Takt. Ueberspringt sich, wenn die Ports belegt sind.
+longpath_add_test(tst_p2_tx_iq_waits_for_radio)
+target_compile_definitions(tst_p2_tx_iq_waits_for_radio PRIVATE LONGPATH_BUILD_TESTS)
+
 # ── Phase 3M-1a Task E.7: P2 MOX wire byte (byte 4 bit 1 = 0x02) ─────────────
 # 10 tests verify:
 #   1-5. Legacy path (no codec): default=0, setMox(true)→1, setMox(false)→0,

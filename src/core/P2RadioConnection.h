@@ -485,6 +485,12 @@ private:
     // AetherSDR hat gar keinen solchen Waechter; er ist unsere Zutat.
     // Sie bleibt, weil ein Haenger ohne Rueckmeldung schlimmer waere —
     // aber sie meldet sich jetzt im Klartext (onConnectTimeout).
+    //
+    // Nachtrag 2026-09-30: die Dauer von ARP war nicht das Problem.
+    // Waehrend ARP lief, verwarf macOS die aeltesten gehaltenen Pakete —
+    // SendStart —, weil der TX-I/Q-Takt die Warteschlange (16) fuellte;
+    // danach half keine Wartezeit mehr. Behoben am m_txIqTimer
+    // (P2RadioConnection.cpp, init()).
     static constexpr int kConnectTimeoutMs = 6000;
 
 public:
