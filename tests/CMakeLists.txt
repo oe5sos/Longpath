@@ -2902,6 +2902,13 @@ longpath_add_test(tst_tci_origin_and_tx_time_cap)
 # (dBm+200 auf ein Byte), die Randfälle und die Spitzenwert-Verdichtung.
 longpath_add_test(tst_tci_spectrum_stream)
 
+# ── Tonumtaster je Kanal (2026-09-30) ──────────────────────────────────────
+# WDSPs RESAMPLEF rechnet einkanalig und reell. Der verschraenkte
+# Stereopuffer lief bis 2026-09-30 als EIN Strom hindurch: L und R
+# vermischten sich, und die Tonhoehe stimmte nicht, weil der Resampler die
+# doppelte Abtastzahl sah. Betraf jede Rate ausser 48000.
+longpath_add_test(tst_tci_audio_resample_channels)
+
 # ── Phase 3J-1 closeout Item 4 (2026-05-12): per-(band, mode) filter ────────
 # Pins the contract that SliceModel::setDspMode saves the current filter
 # under (currentBand, OLD mode) and restores from (currentBand, NEW mode)

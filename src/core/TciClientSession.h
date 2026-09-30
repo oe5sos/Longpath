@@ -121,7 +121,27 @@ struct TciClientSession {
     // From Thetis TCIServer.cs:789 [v2.10.3.13] — m_rxAudioResamplers
     // Dictionary<int, Resampler> replaced by QHash<int, void*> (opaque ptr
     // to RESAMPLEF struct allocated via create_resampleF / create_resampleFV).
+    // Schlüssel ist NICHT der Empfänger allein, sondern (rx, Kanal) —
+    // resamplerKey() unten. Grund, gefunden 2026-09-30:
+    //
+    // WDSPs RESAMPLEF rechnet einkanalig und reell (third_party/wdsp/src/
+    // resample.c: ein Ringpuffer, ein Wert je Abtastung, kein Kanalbegriff).
+    // Bis dahin lief der VERSCHRÄNKTE Stereopuffer (L,R,L,R,…) als EIN Strom
+    // hindurch. Das hatte zwei Folgen, beide bei jeder Rate ausser 48000 (nur
+    // dort überspringt der Abfluss den Umtaster ganz):
+    //   1. L und R liefen durch denselben FIR und vermischten sich.
+    //   2. Die Tonhöhe stimmte nicht — der Resampler sah doppelt so viele
+    //      Werte wie es Abtastungen gibt, rechnete also faktisch von 96 kHz
+    //      herunter.
+    // Belegt an WDSP selbst in tests/tst_tci_audio_resample_channels.cpp.
+    //
+    // Also je Kanal ein eigener Resampler, und der Abfluss trennt vor dem
+    // Umtasten auf und verschränkt danach wieder.
     QHash<int, void*> audioResamplers;
+
+    // (rx, Kanal) -> Schlüssel. Zwei Kanäle sind das Maximum: TCI kennt Mono
+    // und Stereo, nichts dazwischen (audio_stream_channels: 1 oder 2).
+    static constexpr int resamplerKey(int rx, int channel) { return rx * 2 + channel; }
 
     // ── Audio stream configuration ───────────────────────────────────────────
     // From Thetis TCIServer.cs:779 [v2.10.3.13] — m_audioSampleRate = 48000

@@ -289,16 +289,55 @@ TciServer::TciServer(RadioModel* model, QObject* parent)
                 const float* samples = m_drainScratch.data();
                 int outSamples = totalSamples;
 
-                auto rIt = session->audioResamplers.find(rx);
-                if (rIt != session->audioResamplers.end() &&
-                    session->audioSampleRate != 48000) {
-                    // Allocate a temporary output buffer on the stack.
-                    // Max output = totalSamples * max_ratio (48000/8000 = 6).
+                if (session->audioSampleRate != 48000) {
+                    // KANALWEISE umtasten. Bis 2026-09-30 lief der verschränkte
+                    // Stereopuffer als EIN Strom durch einen einzigen
+                    // Resampler — WDSPs RESAMPLEF rechnet aber einkanalig und
+                    // reell (resample.c: ein Ringpuffer, kein Kanalbegriff).
+                    // Folge: L und R vermischten sich, UND die Tonhöhe stimmte
+                    // nicht, weil der Resampler die doppelte Abtastzahl sah
+                    // und faktisch von 96 kHz herunterrechnete. Betraf jede
+                    // Rate ausser 48000; nur dort wird hier ganz übersprungen.
+                    // Belegt an WDSP selbst in
+                    // tests/tst_tci_audio_resample_channels.cpp.
                     static constexpr int kMaxOutSamples = kMaxDrainSamples * 8;
                     static thread_local std::array<float, kMaxOutSamples> outBuf{};
-                    xresampleFV(m_drainScratch.data(), outBuf.data(),
-                                totalSamples, &outSamples, rIt.value());
-                    samples = outBuf.data();
+                    static thread_local std::array<float, kMaxDrainSamples> chIn{};
+                    static thread_local std::array<float, kMaxOutSamples> chOut{};
+
+                    bool ok = true;
+                    int framesOut = 0;
+                    for (int ch = 0; ch < channels && ok; ++ch) {
+                        auto rIt = session->audioResamplers.find(
+                            TciClientSession::resamplerKey(rx, ch));
+                        if (rIt == session->audioResamplers.end()) { ok = false; break; }
+
+                        // Auftrennen: nur diesen Kanal, dicht gepackt.
+                        for (int i = 0; i < perChSamples; ++i) {
+                            chIn[i] = m_drainScratch[i * channels + ch];
+                        }
+                        int n = 0;
+                        xresampleFV(chIn.data(), chOut.data(), perChSamples, &n, rIt.value());
+                        if (ch == 0) {
+                            framesOut = n;
+                        } else if (n != framesOut) {
+                            // Beide Resampler laufen mit denselben Raten und
+                            // derselben Blocklänge; verschiedene Längen wären
+                            // ein Fehler in WDSP. Dann lieber diesen Block
+                            // auslassen als versetzte Kanäle senden.
+                            ok = false;
+                            break;
+                        }
+                        if (framesOut * channels > kMaxOutSamples) { ok = false; break; }
+
+                        // Wieder verschränken.
+                        for (int i = 0; i < framesOut; ++i) {
+                            outBuf[i * channels + ch] = chOut[i];
+                        }
+                    }
+                    if (!ok) { continue; }
+                    outSamples = framesOut * channels;
+                    samples    = outBuf.data();
                 }
 
                 // Encode + send binary frame.
@@ -2009,7 +2048,17 @@ void TciServer::handleAudioSubscribe(std::shared_ptr<TciClientSession>& session,
     }
     session->audioStreamEnabled.insert(rx);
 
-    if (!session->audioResamplers.contains(rx)) {
+    // JE KANAL ein Resampler — die Begründung steht am Feld audioResamplers
+    // in TciClientSession.h. Kurz: WDSPs RESAMPLEF kennt keine Kanäle, und ein
+    // verschränkter Stereopuffer durch einen einzigen Resampler kommt vermischt
+    // und in der falschen Tonhöhe heraus.
+    //
+    // Beide werden immer angelegt, auch wenn der Client gerade Mono fährt: er
+    // darf jederzeit auf Stereo umschalten (audio_stream_channels), und dann
+    // soll der zweite Kanal nicht erst mit kaltem Filter anlaufen.
+    for (int ch = 0; ch < 2; ++ch) {
+        const int key = TciClientSession::resamplerKey(rx, ch);
+        if (session->audioResamplers.contains(key)) { continue; }
         const int inRate  = 48000;                        // WDSP RX output is always 48 kHz
         const int outRate = session->audioSampleRate;     // negotiated client rate (default 48000)
         // create_resampleFV(in_rate, out_rate) — from resample.c:342-344 [WDSP v1.29]:
@@ -2017,12 +2066,16 @@ void TciServer::handleAudioSubscribe(std::shared_ptr<TciClientSession>& session,
         // size=0 + null buffers are intentional; xresampleFV sets them per-call.
         void* resampler = create_resampleFV(inRate, outRate);
         if (resampler) {
-            session->audioResamplers.insert(rx, resampler);
-            qCInfo(lcTci) << "TciServer: audio resampler created for rx" << rx
-                          << "peer" << session->peer
-                          << "in_rate" << inRate << "out_rate" << outRate;
+            session->audioResamplers.insert(key, resampler);
+            if (ch == 0) {
+                qCInfo(lcTci) << "TciServer: audio resampler created for rx" << rx
+                              << "peer" << session->peer
+                              << "in_rate" << inRate << "out_rate" << outRate
+                              << "(je Kanal einer)";
+            }
         } else {
             qCWarning(lcTci) << "TciServer: create_resampleFV failed for rx" << rx
+                             << "channel" << ch
                              << "in_rate" << inRate << "out_rate" << outRate;
         }
     }
@@ -2042,14 +2095,19 @@ void TciServer::handleAudioUnsubscribe(std::shared_ptr<TciClientSession>& sessio
     }
     session->audioStreamEnabled.remove(rx);
 
-    auto rIt = session->audioResamplers.find(rx);
-    if (rIt != session->audioResamplers.end()) {
-        // destroy_resampleFV — from resample.c:358-360 [WDSP v1.29]:
-        //   destroy_resampleF((RESAMPLEF)ptr);
-        destroy_resampleFV(rIt.value());
-        session->audioResamplers.erase(rIt);
-        qCInfo(lcTci) << "TciServer: audio resampler destroyed for rx" << rx
-                      << "peer" << session->peer;
+    // Beide Kanäle abräumen — sie wurden auch beide angelegt.
+    for (int ch = 0; ch < 2; ++ch) {
+        auto rIt = session->audioResamplers.find(TciClientSession::resamplerKey(rx, ch));
+        if (rIt != session->audioResamplers.end()) {
+            // destroy_resampleFV — from resample.c:358-360 [WDSP v1.29]:
+            //   destroy_resampleF((RESAMPLEF)ptr);
+            destroy_resampleFV(rIt.value());
+            session->audioResamplers.erase(rIt);
+            if (ch == 0) {
+                qCInfo(lcTci) << "TciServer: audio resampler destroyed for rx" << rx
+                              << "peer" << session->peer;
+            }
+        }
     }
 }
 
@@ -2339,14 +2397,19 @@ void TciServer::onTextMessageReceived(const QString& msg)
                     // Recreate the resampler for any active audio subscriptions,
                     // since the target rate has changed.  Destroy old, rebuild.
                     for (int rx : session->audioStreamEnabled) {
-                        auto rIt = session->audioResamplers.find(rx);
-                        if (rIt != session->audioResamplers.end()) {
-                            destroy_resampleFV(rIt.value());
-                            session->audioResamplers.erase(rIt);
-                        }
-                        void* newResampler = create_resampleFV(48000, sr);
-                        if (newResampler) {
-                            session->audioResamplers.insert(rx, newResampler);
+                        // Beide Kanäle neu — siehe audioResamplers in
+                        // TciClientSession.h.
+                        for (int ch = 0; ch < 2; ++ch) {
+                            const int key = TciClientSession::resamplerKey(rx, ch);
+                            auto rIt = session->audioResamplers.find(key);
+                            if (rIt != session->audioResamplers.end()) {
+                                destroy_resampleFV(rIt.value());
+                                session->audioResamplers.erase(rIt);
+                            }
+                            void* newResampler = create_resampleFV(48000, sr);
+                            if (newResampler) {
+                                session->audioResamplers.insert(key, newResampler);
+                            }
                         }
                     }
                 }
