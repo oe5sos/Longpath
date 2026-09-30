@@ -14043,6 +14043,35 @@ int RadioModel::agcGain(int rx) const
     return 0;
 }
 
+// ── TX-Leistung / Abstimmleistung (TCI `drive:` / `tune_drive:`) ────────────
+//
+// From Thetis TCIServer.cs:4138-4164 [v2.10.3.13] — handleDrive setzt
+// consoleThreadSafe.PWR, handleTuneDrive die Abstimmleistung; der Bereich
+// 0..100 steht dort in sendDrivePower / sendTunePower (TCIServer.cs:2328-2341).
+//
+// Unterschied zu Thetis, absichtlich: die Abstimmleistung liegt in Longpath
+// pro Band (TransmitModel::setTunePower schreibt auf das aktuelle Band und
+// klemmt dabei modellabhängig -- HERMESLITE 0..99, sonst 0..100,
+// TransmitModel.cpp setTunePowerForBand).  Deshalb klemmt hier nur die
+// Sendeleistung selbst; die Abstimmleistung überlassen wir der Klemmung des
+// Modells, damit ein HL2 nicht über seine 99 hinausgesetzt wird.
+void RadioModel::setDrivePower(int pct)
+{
+    transmitModel().setPower(std::clamp(pct, 0, 100));
+}
+int RadioModel::drivePower() const
+{
+    return m_transmitModel.power();
+}
+void RadioModel::setTuneDrivePower(int pct)
+{
+    transmitModel().setTunePower(pct);
+}
+int RadioModel::tuneDrivePower() const
+{
+    return m_transmitModel.tunePower();
+}
+
 // ── Squelch ─────────────────────────────────────────────────────────────────
 void RadioModel::setSqlEnable(int rx, bool on)
 {

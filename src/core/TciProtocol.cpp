@@ -21,6 +21,8 @@
 #include "TciVfoCoalescer.h"
 #include "models/Band.h"  // bandFromFrequency + bandLabel for tx_frequency_thetis
 
+#include <algorithm>  // std::clamp — bisher nur transitiv erreichbar
+
 namespace Longpath {
 
 // From Thetis TCIServer.cs:2260-2279 [v2.10.3.15] -- agcModeToTciMode.
@@ -1396,6 +1398,12 @@ QString TciProtocol::handleSetCommand(const QString& name, const QStringList& ar
     // Phase 8: TRX family.
     // From Thetis TCIServer.cs:4932 [v2.10.3.13] — trx case in set switch.
     if (name == QStringLiteral("trx"))          { return handleTrxCommand(args); }
+    // From Thetis TCIServer.cs:5420-5421 [v2.10.3.13] — drive case in set switch.
+    if (name == QStringLiteral("drive"))        { return handleDriveCommand(args); }
+    // From Thetis TCIServer.cs:5423-5424 [v2.10.3.13] — tune_drive case in set switch.
+    if (name == QStringLiteral("tune_drive"))   { return handleTuneDriveCommand(args); }
+    // From Thetis TCIServer.cs:5372-5374 [v2.10.3.13] — tune case in set switch.
+    if (name == QStringLiteral("tune"))         { return handleTuneCommand(args); }
     // From Thetis TCIServer.cs:4935 [v2.10.3.13] — split_enable case in set switch.
     if (name == QStringLiteral("split_enable")) { return handleSplitEnableCommand(args); }
     // From Thetis TCIServer.cs:5061 [v2.10.3.13] — mute case in set switch.
@@ -2442,6 +2450,131 @@ QString TciProtocol::handleAgcGainCommand(const QStringList& args)
         return {};
     }
 
+    return {};
+}
+
+// ── drive / tune_drive / tune ───────────────────────────────────────────────
+//
+// Diese drei fehlten bis 2026-09-30 vollständig. Wirkung: die Leistungs- und
+// Abstimmknöpfe jeder Fernbedienung blieben still wirkungslos, weil der
+// Dispatcher unbekannte Namen ohne Antwort verwirft. Aufgefallen beim
+// Abgleich gegen "TCI Remote" von ON7OFF, die drive in ihrer Pflichtliste
+// führt; betrifft aber genauso N1MM+ und Log4OM.
+//
+// From Thetis TCIServer.cs:4138-4164 [v2.10.3.13] — handleDrive /
+// handleTuneDrive: 1 Argument = Abfrage, 2 Argumente = Setzen. Die Antwort
+// baut sendDrivePower / sendTunePower (TCIServer.cs:2328-2341):
+//   "drive:" + rx + "," + drive + ";"        (nur wenn 0 <= drive <= 100)
+//   "tune_drive:" + rx + "," + drive + ";"   (dito)
+// Der rx-Index wird in Thetis nur durchgereicht — PWR ist eine Konsolen-
+// eigenschaft, keine Empfängereigenschaft. Longpath hält es genauso: der
+// Index wird geprüft und zurückgespiegelt, wirkt aber nicht auf die Auswahl.
+QString TciProtocol::handleDriveCommand(const QStringList& args)
+{
+    if (args.isEmpty()) { return {}; }
+    bool ok = false;
+    const int rx = args.at(0).trimmed().toInt(&ok);
+    if (!ok || rx < 0 || rx > 1) { return {}; }
+
+    if (args.size() == 1) {
+        int pwr = 0;
+        QMetaObject::invokeMethod(m_radio, "drivePower", Qt::DirectConnection,
+                                  Q_RETURN_ARG(int, pwr));
+        // Thetis sendet gar nichts, wenn der Wert ausserhalb 0..100 liegt
+        // (sendDrivePower, TCIServer.cs:2335-2341). Ein stiller Abbruch bei
+        // einer ABFRAGE würde den Client hängen lassen, deshalb klemmen wir
+        // hier statt zu schweigen — der gemeldete Wert bleibt damit immer
+        // gültig, und der Client bekommt immer eine Antwort.
+        pwr = std::clamp(pwr, 0, 100);
+        return QStringLiteral("drive:%1,%2;").arg(rx).arg(pwr);
+    }
+
+    bool ok2 = false;
+    const int pwr = args.at(1).trimmed().toInt(&ok2);
+    if (!ok2) { return {}; }
+    QMetaObject::invokeMethod(m_radio, "setDrivePower", Qt::DirectConnection,
+                              Q_ARG(int, std::clamp(pwr, 0, 100)));
+    m_pendingNotifications << QStringLiteral("drive:%1,%2;")
+                                 .arg(rx).arg(std::clamp(pwr, 0, 100));
+    return {};
+}
+
+// From Thetis TCIServer.cs:4164-4190 [v2.10.3.13] — handleTuneDrive.
+QString TciProtocol::handleTuneDriveCommand(const QStringList& args)
+{
+    if (args.isEmpty()) { return {}; }
+    bool ok = false;
+    const int rx = args.at(0).trimmed().toInt(&ok);
+    if (!ok || rx < 0 || rx > 1) { return {}; }
+
+    if (args.size() == 1) {
+        int pwr = 0;
+        QMetaObject::invokeMethod(m_radio, "tuneDrivePower", Qt::DirectConnection,
+                                  Q_RETURN_ARG(int, pwr));
+        pwr = std::clamp(pwr, 0, 100);
+        return QStringLiteral("tune_drive:%1,%2;").arg(rx).arg(pwr);
+    }
+
+    bool ok2 = false;
+    const int pwr = args.at(1).trimmed().toInt(&ok2);
+    if (!ok2) { return {}; }
+    // Keine eigene Klemmung: TransmitModel::setTunePower klemmt modell-
+    // abhängig (HERMESLITE 0..99, sonst 0..100). Die Rückmeldung holt darum
+    // den TATSÄCHLICH gesetzten Wert ab, statt den gewünschten zu wiederholen
+    // — sonst behauptet die Meldung am HL2 eine 100, die nie ankam.
+    QMetaObject::invokeMethod(m_radio, "setTuneDrivePower", Qt::DirectConnection,
+                              Q_ARG(int, pwr));
+    int applied = 0;
+    QMetaObject::invokeMethod(m_radio, "tuneDrivePower", Qt::DirectConnection,
+                              Q_RETURN_ARG(int, applied));
+    m_pendingNotifications << QStringLiteral("tune_drive:%1,%2;").arg(rx).arg(applied);
+    return {};
+}
+
+// From Thetis TCIServer.cs:5372-5374 [v2.10.3.13] — tune case in set switch.
+// handleTune at TCIServer.cs (private void handleTune): 2 Argumente = setzen
+// (nur wenn sich der Zustand ändert: `if (consoleThreadSafe.TUN != tune)`),
+// 1 Argument = Abfrage → sendTune(rx, TUN) = "tune:" + rx + "," + bool + ";".
+//
+// Longpath sendete tune: bisher nur AUS (buildTuneLine + der tuneChanged-
+// Broadcast in TciServer.cpp:1170), nahm aber kein eingehendes tune an — die
+// Fernbedienung konnte den Abstimmträger also anzeigen, nicht auslösen.
+QString TciProtocol::handleTuneCommand(const QStringList& args)
+{
+    if (args.isEmpty()) { return {}; }
+    bool ok = false;
+    const int rx = args.at(0).trimmed().toInt(&ok);
+    if (!ok || rx < 0 || rx > 1) { return {}; }
+
+    if (args.size() == 1) {
+        bool on = false;
+        QMetaObject::invokeMethod(m_radio, "tune", Qt::DirectConnection,
+                                  Q_RETURN_ARG(bool, on));
+        return QStringLiteral("tune:%1,%2;")
+            .arg(rx).arg(on ? QStringLiteral("true") : QStringLiteral("false"));
+    }
+
+    const QString boolStr = args.at(1).trimmed().toLower();
+    if (boolStr != QStringLiteral("true") && boolStr != QStringLiteral("false")) {
+        return {};
+    }
+    const bool on = (boolStr == QStringLiteral("true"));
+
+    // Wie Thetis nur bei echter Änderung schalten: setTune(true) fährt die
+    // MOX-Zustandsmaschine und den WDSP-Trägergenerator an (RadioModel.h:1939
+    // ff.), ein zweites setTune(true) auf einen bereits laufenden Träger wäre
+    // keine Wiederholung, sondern ein zweiter Anlauf derselben Kette.
+    bool current = false;
+    QMetaObject::invokeMethod(m_radio, "tune", Qt::DirectConnection,
+                              Q_RETURN_ARG(bool, current));
+    if (current != on) {
+        QMetaObject::invokeMethod(m_radio, "setTune", Qt::DirectConnection,
+                                  Q_ARG(bool, on));
+    }
+    // Keine eigene Meldung in die Warteschlange: den tune:-Broadcast macht
+    // schon TciServer über TransmitModel::tuneChanged (TciServer.cpp:1170),
+    // und zwar erst, wenn der Träger wirklich steht. Eine zweite Meldung von
+    // hier wäre ein Versprechen vor der Tatsache.
     return {};
 }
 
