@@ -71,6 +71,19 @@ def frame(payload, opcode):
     return head + payload
 
 
+def spectrum_frame(receiver, fps, dbm_werte):
+    """Der Longpath-eigene Spektrumrahmen: ein Byte je Wert, dBm + 200."""
+    hdr = [0] * 16
+    hdr[0] = receiver
+    hdr[1] = fps                # hier steht die Bildrate, nicht die Abtastrate
+    hdr[2] = 100                # UInt8Dbm
+    hdr[5] = len(dbm_werte)
+    hdr[6] = 100                # SpectrumStream
+    hdr[7] = 1
+    bytes_ = bytes(max(0, min(255, int(round(d + 200)))) for d in dbm_werte)
+    return b''.join(struct.pack('<I', v) for v in hdr) + bytes_
+
+
 def stream_frame(receiver, sample_rate, stream_type, values):
     """64-Byte-Kopf + float32-Nutzlast, genau wie TciBinaryFrame."""
     hdr = [0] * 16
@@ -91,6 +104,10 @@ class Verbindung(threading.Thread):
         self.lauft = True
         self.iq_an = False
         self.audio_an = False
+        self.spec_an = False
+        self.spec_punkte = 256
+        self.spec_fps = 10
+        self.spec_zeit = 0.0
         self.phase = 0.0
         self.tonphase = 0.0
 
@@ -181,6 +198,19 @@ class Verbindung(threading.Thread):
             print(f'  {self.addr[1]}: Ton an')
         elif name == 'audio_stop':
             self.audio_an = False
+        elif name == 'spectrum_start':
+            self.spec_an = True
+            if len(args) >= 2 and args[1].isdigit():
+                self.spec_punkte = max(64, min(1024, int(args[1])))
+            if len(args) >= 3 and args[2].isdigit():
+                self.spec_fps = max(1, min(30, int(args[2])))
+            self.sende_text(
+                f'spectrum_start:{args[0]},{self.spec_punkte},{self.spec_fps};')
+            print(f'  {self.addr[1]}: Spektrum an, {self.spec_punkte} Punkte,'
+                  f' {self.spec_fps} B/s')
+        elif name == 'spectrum_stop':
+            self.spec_an = False
+            self.sende_text(f'spectrum_stop:{args[0]};')
         elif name in ('drive', 'tune_drive', 'vfo', 'modulation',
                       'rx_filter_band', 'trx', 'tune'):
             # Wie der echte Server: setzen und die Gegenmeldung schicken,
@@ -242,6 +272,27 @@ class Verbindung(threading.Thread):
                     werte.append(v)
                 self.tonphase += (AUDIO_BLOCK // 2) / AUDIO_RATE
                 self.sende_binaer(stream_frame(0, AUDIO_RATE, 1, werte))
+
+            if self.spec_an and (jetzt - self.spec_zeit) >= 1.0 / self.spec_fps:
+                self.spec_zeit = jetzt
+                p = self.spec_punkte
+                spanne = IQ_RATE                      # volle Breite
+                werte = []
+                for i in range(p):
+                    hz = -spanne / 2 + spanne * i / (p - 1)
+                    v = -128.0 + random.gauss(0, 1.5)   # Grundrauschen in dBm
+                    for thz, amp, blink in traeger:
+                        a = amp
+                        if blink:
+                            a *= max(0.0, math.sin(jetzt / blink) ** 2)
+                        if a <= 0:
+                            continue
+                        d = hz - thz
+                        # Traegerbreite rund 300 Hz, in dB ueber dem Rauschen
+                        v += (20 * math.log10(a / 0.01 + 1)
+                              * math.exp(-(d * d) / (2 * 300.0 ** 2)))
+                    werte.append(v)
+                self.sende_binaer(spectrum_frame(0, self.spec_fps, werte))
 
             # S-Meter, wie der echte Server alle 200 ms
             if jetzt - smeter_zeit > 0.2:

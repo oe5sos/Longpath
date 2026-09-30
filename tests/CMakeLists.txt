@@ -2895,6 +2895,13 @@ longpath_add_test(tst_tci_drive_tune_drive)
 # ein Sendevorgang hatte überhaupt keine Obergrenze.
 longpath_add_test(tst_tci_origin_and_tx_time_cap)
 
+# ── Spektrumstrom (2026-09-30) ──────────────────────────────────────────────
+# Longpath-eigener sechster Stromtyp: fertig gerechnetes Spektrum statt rohem
+# I/Q. Gemessen kostet I/Q 404 kB/s bei 48 kHz und rund 1,5 MB/s bei 192 kHz;
+# der Spektrumrahmen kostet rund 27 kB/s. Der Prüfstand pinnt Kopf, Kodierung
+# (dBm+200 auf ein Byte), die Randfälle und die Spitzenwert-Verdichtung.
+longpath_add_test(tst_tci_spectrum_stream)
+
 # ── Phase 3J-1 closeout Item 4 (2026-05-12): per-(band, mode) filter ────────
 # Pins the contract that SliceModel::setDspMode saves the current filter
 # under (currentBand, OLD mode) and restores from (currentBand, NEW mode)

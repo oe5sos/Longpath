@@ -34,6 +34,7 @@
 #include "models/SliceModel.h"  // Phase 3J-1 closeout: SliceModel signal wireup for local broadcast.
 #include "models/NotchModel.h"  // TNF section 6.4: master notch enable broadcast.
 #include "models/TransmitModel.h"  // Phase 3J-1 closeout (review P2): MON / TUN broadcast wireup.
+#include "FFTEngine.h"                // Spektrum-Abgriff: fftReady liefert fertige dBm-Bins
 #include "MoxController.h"         // Phase 3J-1 closeout (review P2): MOX broadcast wireup.
 #include "TxSliceArbiter.h"        // Codex review round 6: tx_frequency follows the TX-bound slice.
 #include "AudioEngine.h"           // Phase 3J-1 closeout (review P1 #1): volume change broadcast.
@@ -597,6 +598,27 @@ void TciServer::hookAudioAndIqTaps()
                 Qt::QueuedConnection);
         m_iqTapConnected = true;
         qCInfo(lcTci) << "TciServer: IQ tap connected to RadioModel::rawIqData";
+
+        // ── Spektrum-Abgriff (Longpath-eigen, 2026-09-30) ────────────────────
+        //
+        // Der Server hat die fertigen dBm-Bins ohnehin: FFTEngine rechnet sie
+        // für den Panadapter und meldet sie über fftReady. Sie an einen
+        // Client weiterzugeben kostet nichts — verglichen damit, ihn den
+        // rohen I/Q-Strom ziehen und selbst eine FFT rechnen zu lassen.
+        //
+        // Ebenfalls QueuedConnection: fftReady kommt vom FFT-Faden, m_clients
+        // und QWebSocket gehören dem Hauptfaden. Der QVector ist implizit
+        // geteilt, die Kopie also billig.
+        if (auto* fft = m_model->fftEngine()) {
+            connect(fft, &FFTEngine::fftReady,
+                    this, &TciServer::onFftBinsReady,
+                    Qt::QueuedConnection);
+            qCInfo(lcTci) << "TciServer: Spektrum-Abgriff an FFTEngine::fftReady";
+        } else {
+            // Kein Grund zu scheitern: ohne FFTEngine gibt es eben kein
+            // Spektrum, aber I/Q und Ton laufen weiter.
+            qCInfo(lcTci) << "TciServer: keine FFTEngine — Spektrumstrom steht nicht bereit";
+        }
     }
 }
 
@@ -2143,6 +2165,68 @@ void TciServer::onTextMessageReceived(const QString& msg)
         const QString kAudioStop  = QStringLiteral("audio_stop:");
         const QString kIqStart    = QStringLiteral("iq_start:");
         const QString kIqStop     = QStringLiteral("iq_stop:");
+        const QString kSpecStart  = QStringLiteral("spectrum_start:");
+        const QString kSpecStop   = QStringLiteral("spectrum_stop:");
+
+        // ── spectrum_start / spectrum_stop (Longpath-eigen) ─────────────────
+        //
+        //   spectrum_start:<rx>[,<punkte>[,<bilder je sekunde>]]
+        //   spectrum_stop:<rx>
+        //
+        // Nicht Teil von TCI. Ein fremder Server kennt es nicht und ein
+        // fremder Client fordert es nie an — beide merken davon nichts, weil
+        // unbekannte Namen ohnehin antwortlos verworfen werden. Der Gegenwert
+        // ist groß: gemessen 404 kB/s für rohes I/Q bei 48 kHz gegen rund
+        // 27 kB/s für ein fertiges Spektrum.
+        //
+        // Die Punktzahl kommt vom CLIENT, nicht vom Server: nur er weiß, wie
+        // breit sein Bildschirm ist. Genau das ist der Hebel — nicht härter zu
+        // komprimieren, sondern gar nicht erst mehr zu schicken, als gezeigt
+        // werden kann.
+        if (trimmed.startsWith(kSpecStart)) {
+            const QStringList args =
+                trimmed.mid(kSpecStart.size()).split(QLatin1Char(','));
+            bool ok = false;
+            const int rx = args.value(0).trimmed().toInt(&ok);
+            if (ok && rx >= 0 && rx <= 1) {
+                if (args.size() >= 2) {
+                    bool ok2 = false;
+                    const int p = args.at(1).trimmed().toInt(&ok2);
+                    // 64..1024: darunter ist es kein Spektrum mehr, darüber
+                    // kann kein Handy es zeigen.
+                    if (ok2) { session->spectrumPoints = std::clamp(p, 64, 1024); }
+                }
+                if (args.size() >= 3) {
+                    bool ok3 = false;
+                    const int f = args.at(2).trimmed().toInt(&ok3);
+                    if (ok3) { session->spectrumFps = std::clamp(f, 1, 30); }
+                }
+                if (!session->spectrumEnabled.contains(rx)) {
+                    session->spectrumEnabled.insert(rx);
+                    qCInfo(lcTci) << "TciServer: Spektrum abonniert rx" << rx
+                                  << session->spectrumPoints << "Punkte,"
+                                  << session->spectrumFps << "B/s, peer"
+                                  << session->peer;
+                }
+                // Bestätigung mit den TATSÄCHLICH gültigen Werten, nicht mit
+                // den gewünschten — der Client soll wissen, worauf geklemmt
+                // wurde, statt es zu raten.
+                session->sendQueue.push(TciSendQueue::Priority::Control,
+                    QStringLiteral("spectrum_start:%1,%2,%3;")
+                        .arg(rx).arg(session->spectrumPoints).arg(session->spectrumFps));
+            }
+        } else if (trimmed.startsWith(kSpecStop)) {
+            bool ok = false;
+            const int rx = trimmed.mid(kSpecStop.size()).trimmed().toInt(&ok);
+            if (ok && rx >= 0 && rx <= 1) {
+                if (session->spectrumEnabled.remove(rx)) {
+                    qCInfo(lcTci) << "TciServer: Spektrum abbestellt rx" << rx
+                                  << "peer" << session->peer;
+                }
+                session->sendQueue.push(TciSendQueue::Priority::Control,
+                    QStringLiteral("spectrum_stop:%1;").arg(rx));
+            }
+        } else
         if (trimmed.startsWith(kAudioStart)) {
             bool ok = false;
             const int rx = trimmed.mid(kAudioStart.size()).trimmed().toInt(&ok);
@@ -2988,6 +3072,66 @@ void TciServer::onRawIqDataReceived(const QVector<float>& interleavedIQ)
             outBuf.constData());
 
         ws->sendBinaryMessage(frame);
+    }
+}
+
+// ── onFftBinsReady (Longpath-eigen, 2026-09-30) ──────────────────────────────
+//
+// Das Gegenstück zum I/Q-Abgriff darüber, für Clients, die ein BILD wollen
+// statt Rohdaten. Begründung an TciStreamType::SpectrumStream; die Zahl, um
+// die es geht: gemessen 404 kB/s für rohes I/Q bei 48 kHz gegen rund 27 kB/s
+// für ein fertiges Spektrum.
+//
+// Zwei Dinge passieren hier, und beide sparen mehr als jede Kompression:
+//   1. Verdichten auf die Bildpunktzahl, die der CLIENT genannt hat. Aus
+//      bis zu 16384 Bins werden 256 — nur er weiß, wie breit sein Schirm ist.
+//   2. Drosseln auf die Bildrate, die der Client genannt hat. Die FFTEngine
+//      liefert rund 30 Bilder je Sekunde; ein Telefon will zehn.
+//
+// Verdichtet wird über den SPITZENWERT, nicht den Mittelwert — wie
+// SpectrumWidget::dbmOverRange es am Pult macht. Ein Mittelwert über 64 Bins
+// lässt einen schmalen Träger im Rauschen verschwinden, und genau der ist
+// das, was man sucht.
+void TciServer::onFftBinsReady(int receiverId, const QVector<float>& binsDbm)
+{
+    if (binsDbm.isEmpty() || receiverId < 0 || receiverId > 1) { return; }
+    if (m_clients.isEmpty()) { return; }
+
+    const qint64 jetzt = QDateTime::currentMSecsSinceEpoch();
+
+    // Gleiche Vorsichtsmaßnahme wie beim I/Q-Abgriff: sendBinaryMessage kann
+    // synchron onClientDisconnected auslösen und damit m_clients ändern,
+    // während wir darüber laufen.
+    const QHash<QWebSocket*, std::shared_ptr<TciClientSession>> schnappschuss = m_clients;
+    const int n = binsDbm.size();
+
+    for (auto it = schnappschuss.cbegin(); it != schnappschuss.cend(); ++it) {
+        QWebSocket* ws      = it.key();
+        const auto& session = it.value();
+        if (!session->spectrumEnabled.contains(receiverId)) { continue; }
+
+        const qint64 abstandMs = 1000 / std::max(1, session->spectrumFps);
+        if (jetzt - session->lastSpectrumMs < abstandMs) { continue; }
+        session->lastSpectrumMs = jetzt;
+
+        const int punkte = std::clamp(session->spectrumPoints, 64, 1024);
+        QVector<float> bild(punkte);
+        for (int i = 0; i < punkte; ++i) {
+            // Bereichsgrenzen in 64 Bit rechnen: 16384 Bins mal 1024 Punkte
+            // läuft in int noch nicht über, aber die Rechnung soll auch dann
+            // stimmen, wenn die FFT einmal größer wird.
+            const int von = static_cast<int>(static_cast<qint64>(i) * n / punkte);
+            const int bis = std::max(von + 1,
+                static_cast<int>(static_cast<qint64>(i + 1) * n / punkte));
+            float spitze = -200.0f;
+            for (int b = von; b < bis && b < n; ++b) {
+                if (binsDbm[b] > spitze) { spitze = binsDbm[b]; }
+            }
+            bild[i] = spitze;
+        }
+
+        ws->sendBinaryMessage(TciBinaryFrame::buildSpectrumPayload(
+            receiverId, session->spectrumFps, punkte, bild.constData()));
     }
 }
 

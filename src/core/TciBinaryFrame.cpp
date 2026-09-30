@@ -98,6 +98,42 @@ static void writeUInt32LE(char* buf, int offset, quint32 value)
 //
 // When samples is nullptr this produces the 64-byte header-only frame
 // (corresponds to Thetis's Array.Empty<byte>() TX_CHRONO payload).
+// ── buildSpectrumPayload (Longpath-eigen, 2026-09-30) ────────────────────────
+//
+// Begründung und Kodierung stehen an der Deklaration in TciBinaryFrame.h.
+// Kurz: derselbe 64-Byte-Kopf, aber ein Byte je Wert (dBm + 200), weil ein
+// fertiges Spektrum rund ein Sechzigstel dessen kostet, was rohes I/Q kostet.
+QByteArray TciBinaryFrame::buildSpectrumPayload(int receiver, int fps,
+                                                int points, const float* binsDbm)
+{
+    if (points <= 0 || binsDbm == nullptr) { return {}; }
+
+    QByteArray payload(64 + points, '\0');
+    char* buf = payload.data();
+
+    writeUInt32LE(buf,  0, static_cast<quint32>(receiver));
+    // Kein Abtastwert-Strom: hier steht die BILDRATE, siehe Header-Kommentar.
+    writeUInt32LE(buf,  4, static_cast<quint32>(fps));
+    writeUInt32LE(buf,  8, static_cast<quint32>(TciSampleType::UInt8Dbm));
+    writeUInt32LE(buf, 12, 0u);
+    writeUInt32LE(buf, 16, 0u);
+    writeUInt32LE(buf, 20, static_cast<quint32>(points));
+    writeUInt32LE(buf, 24, static_cast<quint32>(TciStreamType::SpectrumStream));
+    writeUInt32LE(buf, 28, 1u);                                // ein "Kanal"
+    for (int i = 0; i < 8; ++i) { writeUInt32LE(buf, 32 + 4 * i, 0u); }
+
+    auto* out = reinterpret_cast<quint8*>(buf + 64);
+    for (int i = 0; i < points; ++i) {
+        const float db = binsDbm[i];
+        // NaN faellt hier auf den Boden statt undefiniert durchzurutschen:
+        // ein stummer Kanal liefert gelegentlich -inf/NaN, und ein
+        // Zufallsbyte waere im Wasserfall ein heller Strich aus dem Nichts.
+        const int v = (db == db) ? static_cast<int>(std::lround(db + 200.0f)) : 0;
+        out[i] = static_cast<quint8>(std::clamp(v, 0, 255));
+    }
+    return payload;
+}
+
 QByteArray TciBinaryFrame::buildStreamPayload(int receiver, int sampleRate,
                                                int sampleType, int length,
                                                int streamType, int channels,

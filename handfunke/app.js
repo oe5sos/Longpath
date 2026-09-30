@@ -44,6 +44,9 @@ const state = {
   wfRow: 0,
   spec: null,
   specMin: -130, specMax: -30,
+  hatSpektrumstrom: false,   // Server liefert fertige Bins
+  rueckfall: false,          // wir rechnen selbst aus rohem I/Q
+  iqRueckfall: null,
   audio: null, node: null,
 };
 
@@ -224,7 +227,8 @@ const wf = $('wf'), wfCtx = wf.getContext('2d', { willReadFrequently: false });
 const N = 1024;
 const fft = new Fft(N);
 const spec = new Float32Array(N);
-const glatt = new Float32Array(N);
+const glatt = new Float32Array(N);        // eigene FFT (Rückfall)
+let specServer = new Float32Array(0);     // fertig vom Server (Regelfall)
 let hatSpektrum = false;
 
 // Die Wasserfallrampe „Gedaempft" mit genau den sieben Stuetzpunkten aus
@@ -271,6 +275,7 @@ function zeichneBild() {
   // vor einer leeren Fläche sitzt und rät, ob die Verbindung hängt oder die
   // Station schweigt — am Telefon sieht man den Unterschied sonst nicht.
   const still = !hatSpektrum || (performance.now() - letzteIq > 2000);
+  if (still) { state.hatSpektrumstrom = false; }
   if (still) {
     panCtx.fillStyle = '#141e27'; panCtx.fillRect(0, 0, W, H);
     wfCtx.fillStyle = '#0c0c0e';  wfCtx.fillRect(0, 0, wf.width, wf.height);
@@ -286,11 +291,19 @@ function zeichneBild() {
 
   // Selbsttaetige Hoehenlage: der Boden auf das 10. Hundertstel, die Decke
   // ueber die Spitze. Sonst muesste der Bediener am Handy Regler suchen.
+  // Zwei Quellen, ein Bild: kommt das Spektrum fertig vom Server, ist es
+  // schon auf unsere Breite verdichtet; rechnen wir selbst, liegen hier die
+  // eigenen FFT-Bins. Die Wahl muss VOR der Höhenlage stehen — sie rechnet
+  // schon damit.
+  const quelle = state.hatSpektrumstrom ? specServer : glatt;
+  const M = quelle.length;
+  if (M === 0) { return; }
+
   // Boden aus dem Mittelwert (das Grundrauschen), Decke aus der Spitze —
   // nicht Minimum/Maximum, sonst bestimmt ein einzelner Einbruch den Boden.
   let summe = 0, max = -Infinity;
-  for (let i = 0; i < N; i++) { summe += glatt[i]; if (glatt[i] > max) max = glatt[i]; }
-  const min = summe / N;
+  for (let i = 0; i < M; i++) { summe += quelle[i]; if (quelle[i] > max) max = quelle[i]; }
+  const min = summe / M;
   state.specMin = state.specMin * 0.9 + (min - 6) * 0.1;
   state.specMax = state.specMax * 0.9 + (max + 8) * 0.1;
   const lo = state.specMin, hi = Math.max(state.specMax, lo + 20);
@@ -303,14 +316,16 @@ function zeichneBild() {
   for (let i = 1; i < 8; i++) { const xx = Math.round(W*i/8)+.5;
     panCtx.beginPath(); panCtx.moveTo(xx, 0); panCtx.lineTo(xx, H); panCtx.stroke(); }
 
-  // Spitzenwert-Verdichtung 1024 Bins -> W Bildpunkte. Ein einzelner Bin je
-  // Punkt liesse schmale Traeger durchrutschen — sie sind aber genau das,
-  // was man sucht.
+  // Auf die Bildpunkte bringen. Kommt das Spektrum fertig vom Server, ist es
+  // schon auf unsere Breite verdichtet und das hier streckt nur noch; rechnen
+  // wir selbst, verdichtet es 1024 Bins — über den Spitzenwert, sonst
+  // rutschen schmale Träger durch.
   const spitze = new Float32Array(W);
   for (let x = 0; x < W; x++) {
-    const von = Math.floor(x * N / W), bis = Math.max(von + 1, Math.floor((x + 1) * N / W));
+    const von = Math.floor(x * M / W);
+    const bis = Math.max(von + 1, Math.floor((x + 1) * M / W));
     let m = -Infinity;
-    for (let i = von; i < bis; i++) if (glatt[i] > m) m = glatt[i];
+    for (let i = von; i < bis && i < M; i++) if (quelle[i] > m) m = quelle[i];
     spitze[x] = m;
   }
 
@@ -342,10 +357,17 @@ function zeichneBild() {
     wfPuffCtx.drawImage(wf, 0, 0);
     wfCtx.clearRect(0, 0, wf.width, wf.height);
     wfCtx.drawImage(wfPuff, 0, 1);
+    // Der Wasserfall bekommt eine EIGENE, engere Spanne. Sobald der Server
+    // echte dBm liefert, reicht die Panadapter-Spanne über 85 dB — ein
+    // Träger 30 dB über dem Rauschen läge dann im dunklen Drittel der Rampe
+    // und wäre kaum zu sehen. Am Pult haben Panadapter und Wasserfall aus
+    // demselben Grund getrennte Regler; hier nehmen wir den Rauschboden plus
+    // 55 dB, was in der Praxis vom Grundrauschen bis zum lauten Träger reicht.
+    const wfLo = lo, wfHi = lo + 55;
     const d = zeile.data;
     for (let x = 0; x < wf.width; x++) {
       const db = spitze[Math.min(W - 1, Math.floor(x * W / wf.width))];
-      const c = rampe((db - lo) / (hi - lo));
+      const c = rampe((db - wfLo) / (wfHi - wfLo));
       const o = x * 4;
       d[o] = c[0]; d[o+1] = c[1]; d[o+2] = c[2]; d[o+3] = 255;
     }
@@ -432,7 +454,40 @@ link.addEventListener('open', () => {
   // Strom anfordern. Die Raten nimmt der Server aus seinen Einstellungen;
   // wir fragen sie nicht vor, sondern lesen, was er meldet.
   link.send(`audio_start:${state.trx}`);
-  link.send(`iq_start:${state.trx}`);
+
+  // Zuerst das FERTIGE Spektrum: die Punktzahl ist unsere Breite, mehr kann
+  // der Schirm nicht zeigen. Gegen rohes I/Q spart das den Faktor sechzig.
+  // Ein fremder Server (Thetis, ExpertSDR) kennt den Befehl nicht und
+  // verwirft ihn antwortlos — deshalb steht darunter der Rückfall.
+  link.send(`spectrum_start:${state.trx},${pan.width},12`);
+
+  // Rückfall auf rohes I/Q, wenn nach zwei Sekunden kein Spektrum kam.
+  // Nicht sofort beides anfordern: das wäre auf einem Longpath-Server die
+  // doppelte Last für dasselbe Bild.
+  clearTimeout(state.iqRueckfall);
+  state.iqRueckfall = setTimeout(() => {
+    if (!state.hatSpektrumstrom) {
+      link.send(`iq_start:${state.trx}`);
+      state.rueckfall = true;
+    }
+  }, 2000);
+});
+
+// Fertiges Spektrum vom Server — das Telefon rechnet dann gar nichts mehr.
+link.addEventListener('spectrum', (e) => {
+  const v = e.detail.vals;
+  if (!v.length) return;
+  state.hatSpektrumstrom = true;
+  letzteIq = performance.now();
+  if (neueZeilen < 3) neueZeilen++;
+
+  // Die Punktzahl bestimmt der Server (er klemmt unsere Bitte). Also nicht
+  // auf N festnageln, sondern nehmen, was kommt.
+  if (specServer.length !== v.length) { specServer = new Float32Array(v.length); }
+  for (let i = 0; i < v.length; i++) {
+    specServer[i] = hatSpektrum ? specServer[i] * 0.6 + v[i] * 0.4 : v[i];
+  }
+  hatSpektrum = true;
 });
 link.addEventListener('ready', () => zeichneBedienung());
 link.addEventListener('state', () => { zeichneKopf(); zeichneBedienung(); });
@@ -453,7 +508,8 @@ function schleife(t) {
   zeichneBild();
   const r = link.tickRates(t);
   $('rate').textContent = (r.iq + r.audio) ? (r.iq + r.audio + ' kB/s') : '';
-  $('fussBild').textContent = r.iq ? r.iq + ' kB/s bild' : '';
+  $('fussBild').textContent = r.spec ? (r.spec + ' kB/s bild')
+                            : r.iq   ? (r.iq + ' kB/s bild (roh)') : '';
   $('fussTon').textContent = r.audio ? r.audio + ' kB/s ton' : '';
   $('fussStatus').textContent = link.ready ? '◆ gekoppelt'
                               : (link.ws && link.ws.readyState === 1) ? '◆ verbinde…' : '◇ getrennt';

@@ -44,9 +44,9 @@ export class TciLink extends EventTarget {
     };
 
     // Datenzaehler fuer die Fusszeile — was die Leitung wirklich kostet.
-    this.bytes = { iq: 0, audio: 0, text: 0 };
+    this.bytes = { iq: 0, audio: 0, spec: 0, text: 0 };
     this._lastTick = 0;
-    this.rate = { iq: 0, audio: 0, text: 0 };
+    this.rate = { iq: 0, audio: 0, spec: 0, text: 0 };
   }
 
   // ── Verbindung ────────────────────────────────────────────────────────────
@@ -169,7 +169,13 @@ export class TciLink extends EventTarget {
     const length     = h[5];
     const streamType = h[6];
 
-    const bps = sampleType === 0 ? 2 : sampleType === 1 ? 3 : 4;
+    // Bytes je Wert. Der Spektrumstrom (100) traegt EIN Byte je Wert —
+    // ohne diesen Fall rechnet die Pruefung darunter mit vier und
+    // verwirft jeden Spektrumrahmen als unstimmig. Genau so passiert,
+    // live gefunden: die Rahmen kamen an und fielen still durch.
+    const bps = sampleType === 100 ? 1
+              : sampleType === 0   ? 2
+              : sampleType === 1   ? 3 : 4;
     const payload = buf.byteLength - HDR;
     // Lieber einen Rahmen verwerfen als falsch deuten: sagt der Kopf mehr
     // Werte an, als Bytes da sind, stimmt etwas nicht.
@@ -178,16 +184,28 @@ export class TciLink extends EventTarget {
     const vals = this._values(buf, sampleType, length);
     if (!vals) return;
 
-    if (streamType === 0)      { this.bytes.iq += buf.byteLength;
-                                 this._emit('iq', { receiver, vals }); }
-    else if (streamType === 1) { this.bytes.audio += buf.byteLength;
-                                 this._emit('audio', { receiver, vals }); }
+    if (streamType === 0)        { this.bytes.iq += buf.byteLength;
+                                   this._emit('iq', { receiver, vals }); }
+    else if (streamType === 1)   { this.bytes.audio += buf.byteLength;
+                                   this._emit('audio', { receiver, vals }); }
+    else if (streamType === 100) { // fertiges Spektrum, Longpath-eigen
+                                   this.bytes.spec += buf.byteLength;
+                                   this._emit('spectrum', { receiver, vals }); }
     // 2/3/4 gehen uns als Empfaenger nichts an.
   }
 
   _values(buf, sampleType, length) {
     switch (sampleType) {
       case 3: return new Float32Array(buf, HDR, length);
+      case 100: {
+        // UInt8Dbm: ein Byte je Wert, dBm + 200. Longpath-eigen, nur im
+        // Spektrumstrom. Das Maß stammt von piHPSDR und deckt -200..+55 dBm
+        // bei 1 dB Auflösung ab — mehr sieht am Telefon ohnehin niemand.
+        const src = new Uint8Array(buf, HDR, length);
+        const out = new Float32Array(length);
+        for (let i = 0; i < length; i++) out[i] = src[i] - 200;
+        return out;
+      }
       case 0: {
         const src = new Int16Array(buf, HDR, length);
         const out = new Float32Array(length);
@@ -224,9 +242,10 @@ export class TciLink extends EventTarget {
     this.rate = {
       iq:    Math.round(this.bytes.iq    / dt / 1024),
       audio: Math.round(this.bytes.audio / dt / 1024),
+      spec:  Math.round(this.bytes.spec  / dt / 1024),
       text:  Math.round(this.bytes.text  / dt / 1024),
     };
-    this.bytes = { iq: 0, audio: 0, text: 0 };
+    this.bytes = { iq: 0, audio: 0, spec: 0, text: 0 };
     this._lastTick = now;
     return this.rate;
   }

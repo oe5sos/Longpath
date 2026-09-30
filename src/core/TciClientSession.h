@@ -88,6 +88,30 @@ struct TciClientSession {
     // From Thetis TCIServer.cs:767 [v2.10.3.13] — m_audioStreamEnabled HashSet<int>
     QSet<int> audioStreamEnabled;
 
+    // ── Spektrumstrom (Longpath-eigen, 2026-09-30) ──────────────────────────
+    //
+    // Fertig gerechnetes Spektrum statt rohem I/Q — siehe die Begründung am
+    // TciStreamType::SpectrumStream. Der Client sagt beim Anfordern, wie viele
+    // Bildpunkte er hat und wie oft er ein Bild will; der Server verdichtet
+    // auf genau diese Punktzahl. Das ist der eigentliche Hebel: nicht die
+    // Kompression, sondern gar nicht erst mehr zu schicken, als das Gerät
+    // zeichnen kann.
+    QSet<int> spectrumEnabled;
+
+    // Bildpunkte je Bild. Vorgabe 256: ein Telefon quer hat rund 400
+    // Bildpunkte, hochkant knapp 400 — mehr als 1024 kann kein Handy zeigen,
+    // weniger als 64 wäre kein Spektrum mehr.
+    int spectrumPoints{256};
+
+    // Bilder je Sekunde. Vorgabe 10 — darunter ruckelt der Wasserfall
+    // sichtbar, darüber sieht das Auge am Telefon nichts mehr dazu.
+    int spectrumFps{10};
+
+    // Zeitpunkt des letzten gesendeten Spektrums (ms seit Epoche), für die
+    // Drossel. Ohne sie ginge jedes FFT-Bild der Engine raus (rund 30/s),
+    // also das Dreifache des Verlangten.
+    qint64 lastSpectrumMs{0};
+
     // Phase 16 Task 16.3 (sub-commit b): per-slice WDSP RESAMPLEF instance.
     // Created lazily on audio_start, destroyed on audio_stop + disconnect.
     // Key = rx index (slice).  void* avoids pulling WDSP resample.h into

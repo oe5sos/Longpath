@@ -289,6 +289,13 @@ private slots:
     // PublishIQSamples.
     void onRawIqDataReceived(const QVector<float>& interleavedIQ);
 
+    // Fertig gerechnetes Spektrum an die Clients, die eines abonniert haben.
+    // Hängt an FFTEngine::fftReady — der Server rechnet also nichts zusätzlich,
+    // er gibt weiter, was der Panadapter ohnehin bekommt. Verdichtung auf die
+    // Bildpunktzahl des Clients und Drosselung auf dessen Bildrate passieren
+    // dort; Begründung an der Implementierung.
+    void onFftBinsReady(int receiverId, const QVector<float>& binsDbm);
+
     // Destroys all RESAMPLEF instances for the given session and clears the map.
     // Called from onClientDisconnected and stop().
     void cleanupResamplers(std::shared_ptr<TciClientSession>& session);
