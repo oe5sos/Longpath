@@ -2079,20 +2079,67 @@ const char* kTokenKey     = "Longpath: TCI Fernzugriff";
 const char* kTokenAccount = "tci-remote";
 }  // namespace
 
+// ── Rückfall auf die Einstellungsdatei (2026-09-30) ─────────────────────────
+//
+// Der Schlüsselbund ist der erste Weg und bleibt es. Aber er ist nicht
+// überall da:
+//
+//   * Auf Linux und Windows gibt CredentialStore::store() schlicht `false`
+//     zurück (CredentialStore.cpp, #else-Zweig) — dort liess sich bis heute
+//     ÜBERHAUPT KEIN Token setzen, und der ganze Fernzugriff war unbenutzbar.
+//     Die Setup-Seite nahm die Eingabe entgegen und verwarf sie stillschweigend.
+//   * Auf macOS bindet der Schlüsselbund einen Eintrag an die Zugriffsliste
+//     des anlegenden Programms. Am 2026-09-30 live erlebt: ein von aussen
+//     gesetzter Eintrag war für Longpath nicht lesbar, der Server meldete
+//     unverdrossen "kein Token hinterlegt", und von aussen war nicht zu sehen,
+//     warum.
+//
+// Der Rückfall legt das Token im Klartext in die Einstellungsdatei. Das ist
+// schwächer als der Schlüsselbund, und deshalb steht es auch so im Log. Es
+// ist aber deutlich besser als die Lage davor: ohne Token weist der Server
+// JEDE Verbindung aus dem Netz ab, der Fernzugriff ist also nicht etwa
+// unsicher, sondern gar nicht vorhanden. Wer sein Telefon ans eigene Funkgerät
+// lassen will, braucht einen Weg, der auf seinem Rechner funktioniert.
+//
+// Wer es sicherer will, hat weiterhin den Schlüsselbund — er wird zuerst
+// gefragt, und solange er etwas liefert, wird die Datei nicht angefasst.
+namespace {
+const char* kTokenSetting = "TciRemoteTokenPlain";
+}
+
 QString TciServer::remoteToken()
 {
-    return CredentialStore::retrieve(QString::fromLatin1(kTokenKey),
-                                     QString::fromLatin1(kTokenAccount));
+    const QString ausBund = CredentialStore::retrieve(
+        QString::fromLatin1(kTokenKey), QString::fromLatin1(kTokenAccount));
+    if (!ausBund.isEmpty()) { return ausBund; }
+
+    return AppSettings::instance()
+        .value(QString::fromLatin1(kTokenSetting), QString()).toString();
 }
 
 bool TciServer::setRemoteToken(const QString& token)
 {
     if (token.isEmpty()) {
+        AppSettings::instance().setValue(QString::fromLatin1(kTokenSetting),
+                                         QString());
         return CredentialStore::erase(QString::fromLatin1(kTokenKey),
                                       QString::fromLatin1(kTokenAccount));
     }
-    return CredentialStore::store(QString::fromLatin1(kTokenKey),
-                                  QString::fromLatin1(kTokenAccount), token);
+
+    if (CredentialStore::store(QString::fromLatin1(kTokenKey),
+                               QString::fromLatin1(kTokenAccount), token)) {
+        // Geglückt: eine etwaige Klartextkopie aus einem früheren Rückfall
+        // gehört jetzt weg, sonst veraltet sie unbemerkt.
+        AppSettings::instance().setValue(QString::fromLatin1(kTokenSetting),
+                                         QString());
+        return true;
+    }
+
+    qCWarning(lcTci) << "TciServer: Der Schlüsselbund nimmt das Token nicht an"
+                     << "— es wird im Klartext in den Einstellungen abgelegt."
+                     << "Auf Linux und Windows ist das der Normalfall.";
+    AppSettings::instance().setValue(QString::fromLatin1(kTokenSetting), token);
+    return true;
 }
 
 QString TciServer::generateRemoteToken()
