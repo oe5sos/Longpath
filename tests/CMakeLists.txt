@@ -2916,6 +2916,13 @@ longpath_add_test(tst_tci_audio_resample_channels)
 # still), aus dem Netz Token und ausdrueckliche Sendefreigabe.
 longpath_add_test(tst_tci_remote_auth)
 
+# ── Fernzugriffs-Gruppe auf der TCI-Setupseite (2026-09-30) ───────────────
+# Prueft, dass die Bedienelemente da sind und der Hinweistext sagt, was
+# gerade gilt — eine Sicherheitsgruppe, die schweigt, wenn sie wirkungslos
+# ist, verleitet dazu, sich auf sie zu verlassen. Zeichnet mit
+# LONGPATH_BLATT_PNG=<pfad> zusaetzlich ein Blatt zum Ansehen.
+longpath_add_test(tst_tci_remote_access_page)
+
 # ── Phase 3J-1 closeout Item 4 (2026-05-12): per-(band, mode) filter ────────
 # Pins the contract that SliceModel::setDspMode saves the current filter
 # under (currentBand, OLD mode) and restores from (currentBand, NEW mode)
