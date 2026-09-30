@@ -814,7 +814,12 @@ function schleife(t) {
                  + (state.tonWeg === 'scriptprocessor' ? ' (ersatzweg)' : '')
                : '');
   // Stottert der Ton gerade, steht das da — sonst sucht man es im Funkgeraet.
-  if (!state.tonFehler && state.tonLeerlaufZuletzt
+  //
+  // Nur bei STEHENDER Verbindung: ohne Gegenstelle laeuft die Tonkette
+  // selbstverstaendlich leer, und "stockt" waere dann die falsche Erklaerung
+  // fuer etwas, das die Fusszeile daneben schon richtig benennt
+  // ("getrennt"). Genau so am 2026-09-30 gesehen.
+  if (link.ready && !state.tonFehler && state.tonLeerlaufZuletzt
       && performance.now() - state.tonLeerlaufZuletzt < 2000) {
     $('fussTon').textContent += ' ⚠ stockt';
   }
