@@ -3852,6 +3852,26 @@ void MainWindow::buildUI()
         title += QStringLiteral(" [%1]").arg(profile);
     }
 
+    // ── Prüflauf kenntlich machen (2026-09-30) ──────────────────────────────
+    //
+    // LONGPATH_CONFIG_DIR schickt diesen Lauf in einen anderen
+    // Einstellungsordner. Das ist die Betriebsart, in der Prüfläufe gegen ein
+    // echtes Gerät laufen, ohne die Einstellungen des Betreibers anzufassen —
+    // und genau das ist die Falle: das Fenster sieht aus wie Longpath, trägt
+    // aber ein fremdes Layout, eine fremde Frequenz und ein fremdes Band.
+    //
+    // Am 2026-09-30 genau so passiert. Der Betreiber sah die Prüf-Instanz,
+    // hielt sie für seine eigene und meldete der Reihe nach "höre keine
+    // signale" (das Sandbox-Profil stand auf 7199,9 kHz, einem toten
+    // Bandende), "layout sieht nicht normal aus" und "ev. falsche version".
+    // Alles drei stimmte — es war eben nicht seine Installation.
+    //
+    // Ein Wort im Fenstertitel kostet nichts und beantwortet alle drei
+    // Fragen, bevor sie entstehen.
+    if (!qEnvironmentVariable("LONGPATH_CONFIG_DIR").trimmed().isEmpty()) {
+        title += QStringLiteral(" — PRÜFLAUF (eigener Einstellungsordner)");
+    }
+
     setWindowTitle(title);
     setMinimumSize(800, 600);
     resize(1280, 800);
