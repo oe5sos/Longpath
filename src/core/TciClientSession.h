@@ -143,6 +143,37 @@ struct TciClientSession {
     // und Stereo, nichts dazwischen (audio_stream_channels: 1 oder 2).
     static constexpr int resamplerKey(int rx, int channel) { return rx * 2 + channel; }
 
+    // ── Herkunft und Anmeldung (2026-09-30) ─────────────────────────────────
+    //
+    // TCI kennt weder Anmeldung noch Verschlüsselung — in der 41-seitigen
+    // Spezifikation kommen auth, password, token und TLS kein einziges Mal
+    // vor. Solange der Server auf 127.0.0.1 lauscht, ist das vertretbar: wer
+    // dort verbinden kann, sitzt ohnehin am Rechner. Sobald er ins Netz geht,
+    // ist es das nicht mehr — ein Handy kann dann tasten, und jedes andere
+    // Gerät im WLAN auch.
+    //
+    // Deshalb der Schnitt entlang der HERKUNFT, nicht entlang eines globalen
+    // Schalters: was von Loopback kommt, läuft unverändert weiter (WSJT-X,
+    // JTDX, N1MM+, Log4OM, Hamlib — die kennen kein auth: und sollen es nicht
+    // lernen müssen). Was aus dem Netz kommt, muss sich anmelden und darf
+    // erst senden, wenn der Betreiber das ausdrücklich erlaubt hat.
+    //
+    // Ein Server, der auf Loopback gebunden ist, sieht ohnehin nur
+    // Loopback-Gegenstellen — dort ist beides also wirkungslos, und genau so
+    // soll es sein.
+    bool fromLoopback{true};
+
+    // Angemeldet? Auf Loopback von vornherein true. Aus dem Netz erst, wenn
+    // ein `auth:<token>` mit dem richtigen Token kam. Bis dahin beantwortet
+    // der Server ausschließlich auth: und hält auch den Init-Burst zurück —
+    // der verrät sonst Rufzeichen, Gerät und Frequenz an jeden, der den Port
+    // findet.
+    bool authenticated{true};
+
+    // Zahl der Fehlversuche. Nach kMaxAuthAttempts wird die Verbindung
+    // geschlossen; ohne das könnte jemand Token für Token durchprobieren.
+    int authAttempts{0};
+
     // ── Audio stream configuration ───────────────────────────────────────────
     // From Thetis TCIServer.cs:779 [v2.10.3.13] — m_audioSampleRate = 48000
     int audioSampleRate{48000};

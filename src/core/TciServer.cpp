@@ -44,6 +44,7 @@
 #include "RxChannel.h"
 #include "TxChannel.h"
 #include "AppSettings.h"  // Phase 18: TciIqSwap + TciAlwaysStreamIq flags
+#include "CredentialStore.h"        // Fernzugriffs-Token (Schluesselbund)
 
 // Phase 16 Task 16.3 (sub-commit b): WDSP RESAMPLEF lifecycle.
 // resample.h declares create_resampleF / destroy_resampleF / xresampleF, and
@@ -69,6 +70,7 @@ void  destroy_resampleFV(void* ptr);
 #include <QWebSocketCorsAuthenticator>  // Herkunftsprüfung, siehe start()
 #include <QWebSocketServer>
 #include <QDateTime>
+#include <QRandomGenerator>          // Token aus der Systemquelle
 
 #include <algorithm>  // std::clamp — drive:/tune_drive:-Broadcasts
 
@@ -1685,6 +1687,34 @@ void TciServer::onNewConnection()
         // User-Agent HTTP header maps to session->userAgent).
         session->connectedAt.start();
 
+        // ── Herkunft feststellen (2026-09-30) ────────────────────────────────
+        //
+        // Begründung an TciClientSession::fromLoopback. Kurz: der Schnitt
+        // läuft entlang der Herkunft, nicht entlang eines globalen Schalters.
+        // Loopback bleibt, wie es war — jeder Logger und jedes Digimode-
+        // Programm verbindet dort und kennt kein auth:. Aus dem Netz muss sich
+        // ein Client anmelden.
+        //
+        // isLoopback() erkennt 127.0.0.0/8 und ::1 zuverlässig; die Adresse
+        // kommt vom Socket, nicht vom Client, also ist sie nicht zu fälschen.
+        session->fromLoopback = ws->peerAddress().isLoopback();
+        if (!session->fromLoopback) {
+            const QString token = remoteToken();
+            // Ohne hinterlegtes Token gibt es keinen Fernzugriff. Das ist die
+            // sichere Richtung: lieber niemanden hereinlassen als jeden.
+            session->authenticated = false;
+            if (token.isEmpty()) {
+                qCWarning(lcTci)
+                    << "TciServer: Verbindung aus dem Netz von" << session->peer
+                    << "abgewiesen — kein Token hinterlegt (Setup → TCI Server)";
+                ws->close(QWebSocketProtocol::CloseCodePolicyViolated,
+                          QStringLiteral("kein Token hinterlegt"));
+                continue;
+            }
+            qCInfo(lcTci) << "TciServer: Verbindung aus dem Netz von" << session->peer
+                          << "— wartet auf auth:";
+        }
+
         // Phase 26 review finding #3: apply AudioTciPage AppSettings defaults
         // at connect time so that a client that never sends explicit audio
         // config commands inherits the operator's configured preferences.
@@ -1771,7 +1801,11 @@ void TciServer::onNewConnection()
         // wired the session lifecycle but never invoked buildInitBurst()
         // (Phase 4 Task 4.1+4.2 built the burst but no commit wired it to
         // the connect path).
-        if (m_protocol) {
+        // Der Init-Burst geht erst nach der Anmeldung raus. Er verrät sonst
+        // Rufzeichen, Gerätetyp, Frequenz und Betriebsart an jeden, der den
+        // Port findet — noch bevor irgendetwas geprüft wurde. Auf Loopback ist
+        // `authenticated` von vornherein true, dort ändert sich nichts.
+        if (m_protocol && session->authenticated) {
             const QStringList burst = m_protocol->buildInitBurst();
             for (const QString& line : burst) {
                 session->sendQueue.push(TciSendQueue::Priority::Control, line);
@@ -1856,6 +1890,61 @@ void TciServer::releaseMoxHeldBy(QWebSocket* ws, const QString& peer, const QStr
         m_model->setMox(false);
     }
     emit moxReleasedOnClientLoss(peer);
+}
+
+// ── Fernzugriff: Token und Sendefreigabe (2026-09-30) ───────────────────────
+//
+// Begründung an TciClientSession::fromLoopback: der Schnitt läuft entlang der
+// Herkunft. Loopback bleibt unangetastet, damit jeder Logger und jedes
+// Digimode-Programm weiterläuft; aus dem Netz braucht es Token und eine
+// ausdrückliche Sendefreigabe.
+
+namespace {
+// Schlüsselbund-Kennung. "Longpath: …" ist die Form, die das Programm überall
+// benutzt (siehe CLAUDE.md — der alte Nereus-Name wird nur noch beim Lesen
+// erkannt, nie neu geschrieben).
+const char* kTokenKey     = "Longpath: TCI Fernzugriff";
+const char* kTokenAccount = "tci-remote";
+}  // namespace
+
+QString TciServer::remoteToken()
+{
+    return CredentialStore::retrieve(QString::fromLatin1(kTokenKey),
+                                     QString::fromLatin1(kTokenAccount));
+}
+
+bool TciServer::setRemoteToken(const QString& token)
+{
+    if (token.isEmpty()) {
+        return CredentialStore::erase(QString::fromLatin1(kTokenKey),
+                                      QString::fromLatin1(kTokenAccount));
+    }
+    return CredentialStore::store(QString::fromLatin1(kTokenKey),
+                                  QString::fromLatin1(kTokenAccount), token);
+}
+
+QString TciServer::generateRemoteToken()
+{
+    // 160 Bit aus QRandomGenerator::system() — das ist die Quelle des
+    // Betriebssystems, nicht der voreingestellte Mersenne-Twister.
+    // Base32 ohne 0/O/1/I, damit das Token notfalls abgetippt werden kann,
+    // ohne dass jemand über eine Null gegen ein O stolpert.
+    static const char kAlpha[] = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";  // 32 Zeichen
+    QString out;
+    out.reserve(32);
+    for (int i = 0; i < 32; ++i) {
+        out.append(QLatin1Char(kAlpha[QRandomGenerator::system()->bounded(32)]));
+    }
+    return out;
+}
+
+bool TciServer::remoteTxAllowed()
+{
+    // Ab Werk NEIN. Wer aus dem Netz senden will, schaltet es bewusst frei —
+    // und hat dann immer noch Token, Sendezeit-Deckel und Wachhund über sich.
+    return AppSettings::instance()
+               .value(QStringLiteral("TciAllowRemoteTx"), QStringLiteral("False"))
+               .toString() == QStringLiteral("True");
 }
 
 // ── Sendezeit-Deckel (2026-09-30) ───────────────────────────────────────────
@@ -2201,6 +2290,62 @@ void TciServer::onTextMessageReceived(const QString& msg)
         }
         emit messageLogged(QStringLiteral("in"), session->peer, logLine,
                            session->lastCommandAt);
+    }
+
+    // ── Anmeldung vor allem anderen (2026-09-30) ─────────────────────────────
+    //
+    // Begründung an TciClientSession::fromLoopback. Solange eine Verbindung
+    // aus dem Netz nicht angemeldet ist, beantwortet der Server ausschließlich
+    // `auth:<token>` — kein Lesen, kein Setzen, kein Strom. Auf Loopback ist
+    // `authenticated` von vornherein true, dieser ganze Block also wirkungslos.
+    if (!session->authenticated) {
+        QString t = msg.trimmed();
+        if (t.endsWith(QLatin1Char(';'))) { t.chop(1); }
+        static const QString kAuth = QStringLiteral("auth:");
+        if (!t.startsWith(kAuth, Qt::CaseInsensitive)) {
+            // Nicht einmal sagen, was fehlt: wer den Port scannt, soll nicht
+            // erfahren, dass hier ein Token erwartet wird.
+            return;
+        }
+        const QString angeboten = t.mid(kAuth.size()).trimmed();
+        const QString erwartet  = remoteToken();
+
+        // Zeitkonstanter Vergleich: ein früher Abbruch bei der ersten falschen
+        // Stelle verrät über die Antwortzeit, wie weit jemand richtig geraten
+        // hat. Der Aufwand ist zwei Zeilen, also gibt es keinen Grund dafür.
+        bool gleich = (angeboten.size() == erwartet.size()) && !erwartet.isEmpty();
+        if (gleich) {
+            QChar diff(0);
+            for (int i = 0; i < erwartet.size(); ++i) {
+                diff = QChar(diff.unicode() | (angeboten.at(i).unicode()
+                                             ^ erwartet.at(i).unicode()));
+            }
+            gleich = (diff.unicode() == 0);
+        }
+
+        if (!gleich) {
+            static constexpr int kMaxAuthAttempts = 3;
+            if (++session->authAttempts >= kMaxAuthAttempts) {
+                qCWarning(lcTci) << "TciServer:" << session->peer
+                                 << "hat sich dreimal falsch angemeldet — getrennt";
+                ws->close(QWebSocketProtocol::CloseCodePolicyViolated,
+                          QStringLiteral("Anmeldung fehlgeschlagen"));
+            }
+            return;
+        }
+
+        session->authenticated = true;
+        qCInfo(lcTci) << "TciServer:" << session->peer << "angemeldet";
+        session->sendQueue.push(TciSendQueue::Priority::Urgent,
+                                QStringLiteral("auth:ok;"));
+        // Jetzt erst der Init-Burst — bis hierher wusste die Gegenstelle
+        // nichts über die Station.
+        if (m_protocol) {
+            for (const QString& line : m_protocol->buildInitBurst()) {
+                session->sendQueue.push(TciSendQueue::Priority::Control, line);
+            }
+        }
+        return;
     }
 
     // Phase 16 Task 16.3 (sub-commit b): intercept audio_start/audio_stop for
@@ -2591,6 +2736,21 @@ void TciServer::onTextMessageReceived(const QString& msg)
                     // onClientDisconnected() uses this to unkey a radio whose
                     // keying client has vanished. See the member note in
                     // TciServer.h.
+                    // ── Sendesperre für das Netz, Stelle 1 von 2 ─────────────
+                    //
+                    // Die andere sitzt bei der Annahme von TX-Ton. Beide sind
+                    // nötig, siehe dort. Ein Client aus dem Netz, der nicht
+                    // senden darf, bekommt sein trx:…,true schlicht nicht
+                    // ausgeführt — und der Zustand wird ihm auch nicht
+                    // bestätigt, damit seine Anzeige nicht behauptet, es liefe.
+                    if (wantsMox && !session->fromLoopback && !remoteTxAllowed()) {
+                        qCWarning(lcTci)
+                            << "TciServer: Sendewunsch von" << session->peer
+                            << "abgelehnt — Senden aus dem Netz ist nicht"
+                            << "freigegeben (TciAllowRemoteTx)";
+                        return;
+                    }
+
                     if (wantsMox) {
                         if (m_moxOwner.data() != ws) { m_ownerPingsUnanswered = 0; }
                         m_moxOwner = ws;
@@ -2730,6 +2890,19 @@ void TciServer::onBinaryMessageReceived(const QByteArray& data)
     //   if (streamType != TCIStreamType.TX_AUDIO_STREAM || length <= 0) return;
     if (streamTypeInt != static_cast<int>(TciStreamType::TxAudioStream)) { return; }
     if (length <= 0) { return; }
+
+    // ── Sendesperre für das Netz, Stelle 2 von 2 (2026-09-30) ────────────────
+    //
+    // Die andere sitzt im trx-Weg. BEIDE sind nötig: sperrte man nur das
+    // Tasten, könnte ein Client weiter TX-Ton einspeisen und über eine andere
+    // Quelle (VOX, lokales MOX) senden; sperrte man nur den Ton, könnte er
+    // tasten und einen Träger stehen lassen. Ein halb gesperrter Sendeweg ist
+    // kein gesperrter Sendeweg.
+    //
+    // Auf Loopback greift das nicht — WSJT-X und JTDX schicken hier ihren
+    // Sendeton, und daran ändert sich nichts.
+    if (!session->authenticated) { return; }
+    if (!session->fromLoopback && !remoteTxAllowed()) { return; }
 
     // ── TX mutex gate ─────────────────────────────────────────────────────────
     //

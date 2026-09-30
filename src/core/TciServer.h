@@ -152,6 +152,27 @@ public:
     void setTxTimeCapSeconds(int seconds);
     int  txTimeCapSeconds() const { return m_txTimeCapSeconds; }
 
+    // ── Fernzugriff: Token und Sendefreigabe (2026-09-30) ───────────────────
+    //
+    // Beides greift AUSSCHLIESSLICH für Verbindungen, die nicht von Loopback
+    // kommen — Begründung an TciClientSession::fromLoopback. Ein Logger auf
+    // demselben Rechner merkt von beidem nichts.
+    //
+    // Das Token liegt im CredentialStore (Schlüsselbund), nicht in den
+    // Einstellungen: die Einstellungsdatei liegt im Klartext im Profil und
+    // wandert in jedes Support-Bündel.
+    static QString remoteToken();
+    static bool    setRemoteToken(const QString& token);
+
+    // Ein neues Token aus 160 Zufallsbits, als 32 Zeichen in Base32 ohne die
+    // verwechselbaren 0/O/1/I — es soll notfalls abgetippt werden können.
+    static QString generateRemoteToken();
+
+    // Darf eine Verbindung aus dem NETZ senden? Ab Werk nein. Der Schalter
+    // wirkt an beiden Stellen, an denen gesendet werden kann: dem trx-Weg und
+    // der Annahme von TX-Ton. Nur eine zu sperren liesse den Sendeweg offen.
+    static bool remoteTxAllowed();
+
     // Test-only: bypass the RxChannel signal chain and inject audio directly
     // into the per-slice ring buffer.  Used by tst_tci_audio_roundtrip;
     // production code paths go through the Qt::DirectConnection signal at

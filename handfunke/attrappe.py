@@ -202,7 +202,13 @@ class Verbindung(threading.Thread):
         name, _, rest = zeile.partition(':')
         name = name.lower()
         args = [a.strip() for a in rest.split(',')] if rest else []
-        if name == 'iq_start':
+        if name == 'auth':
+            # Die Attrappe prueft nichts — sie protokolliert nur, DASS und WANN
+            # die Anmeldung kommt. Der echte Server prueft sie (siehe
+            # tst_tci_remote_auth).
+            print(f'  {self.addr[1]}: auth empfangen ({len(args[0]) if args else 0} Zeichen)')
+            self.sende_text('auth:ok;')
+        elif name == 'iq_start':
             self.iq_an = True
             print(f'  {self.addr[1]}: IQ an')
         elif name == 'iq_stop':

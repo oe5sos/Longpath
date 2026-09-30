@@ -44,6 +44,7 @@ const state = {
   wfRow: 0,
   spec: null,
   specMin: -130, specMax: -30,
+  token: '',                 // nur für den Netzweg nötig
   audioRate: 12000,          // ausgehandelt; 48000 wäre Faktor 16 teurer
   hatSpektrumstrom: false,   // Server liefert fertige Bins
   rueckfall: false,          // wir rechnen selbst aus rohem I/Q
@@ -54,12 +55,18 @@ const state = {
 // ── Kopplung ────────────────────────────────────────────────────────────────
 const gespeichert = () => { try { return localStorage.getItem('handfunke.adresse') || ''; } catch (e) { return ''; } };
 const merken = (v) => { try { localStorage.setItem('handfunke.adresse', v); } catch (e) {} };
+// Das Token wird nur gebraucht, wenn Longpath ins Netz gebunden ist; auf
+// demselben Rechner (Loopback) verlangt der Server keines.
+const tokenLesen  = () => { try { return localStorage.getItem('handfunke.token') || ''; } catch (e) { return ''; } };
+const tokenMerken = (v) => { try { localStorage.setItem('handfunke.token', v); } catch (e) {} };
 
 function starten(adresse) {
   const a = adresse.trim().replace(/^wss?:\/\//, '');
   if (!a) { $('fehler').textContent = 'Bitte eine Adresse eingeben.'; return; }
   const mitPort = /:\d+$/.test(a) ? a : a + ':50001';
   merken(mitPort);
+  state.token = ($('token').value || '').trim().toUpperCase();
+  tokenMerken(state.token);
   $('fehler').textContent = '';
   $('koppeln').classList.remove('an');
   link.connect('ws://' + mitPort);
@@ -68,6 +75,7 @@ function starten(adresse) {
 $('verbinden').addEventListener('click', () => starten($('adresse').value));
 $('adresse').addEventListener('keydown', (e) => { if (e.key === 'Enter') starten($('adresse').value); });
 $('adresse').value = gespeichert();
+$('token').value = tokenLesen();
 
 // Beim Start: liegt eine Adresse vor, gleich versuchen — das Kopplungsblatt
 // kommt von selbst zurueck, wenn es nicht klappt.
@@ -459,6 +467,12 @@ $('tune').addEventListener('click', () => {
 
 // ── Ereignisse vom Draht ────────────────────────────────────────────────────
 link.addEventListener('open', () => {
+  // Anmelden, falls ein Token hinterlegt ist. Auf Loopback verlangt der Server
+  // keines und verwirft die Zeile stillschweigend — schadet also nicht.
+  // Aus dem Netz beantwortet er BIS DAHIN nichts, deshalb muss das hier ganz
+  // vorne stehen, vor jeder Anforderung.
+  if (state.token) { link.send(`auth:${state.token}`); }
+
   // ── Tonformat aushandeln, BEVOR der Strom startet ────────────────────────
   //
   // 48 kHz float32 stereo sind 384 kB/s. 12 kHz int16 mono sind 24 — Faktor
@@ -527,7 +541,16 @@ setInterval(() => {
   const offen = link.ws && link.ws.readyState === 1;
   if (!offen && link.wanted) {
     if (!wegSeit) wegSeit = Date.now();
-    if (Date.now() - wegSeit > 12000) $('koppeln').classList.add('an');
+    if (Date.now() - wegSeit > 12000) {
+      $('koppeln').classList.add('an');
+      // Der häufigste Grund, aus dem Netz nicht hereinzukommen, ist ein
+      // falsches oder fehlendes Token. Das sagen, statt den Bediener raten
+      // zu lassen.
+      if (!link.ready && !state.token) {
+        $('fehler').textContent = 'Keine Antwort. Ist Longpath ins Netz gebunden? '
+                                + 'Dann braucht es das Token aus Setup → TCI Server.';
+      }
+    }
   } else { wegSeit = 0; }
 }, 1000);
 
