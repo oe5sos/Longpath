@@ -38,6 +38,7 @@ export class TciLink extends EventTarget {
       volume: null,              // dB, global
       rxVolume: [null, null],
       smeter: [null, null],
+    audioTyp: null,              // vom Server bestaetigtes Tonformat
     spektrumBestaetigt: false,   // Server hat spectrum_start zurueckgemeldet
     spektrumPunkte: null,        // die Punktzahl, auf die er geklemmt hat
     spektrumFps: null,
@@ -195,6 +196,10 @@ export class TciLink extends EventTarget {
 
       case 'iq_samplerate':     s.iqRate    = int(0); break;
       case 'audio_samplerate':  s.audioRate = int(0); break;
+      // Was der Server WIRKLICH schickt. Ein unbekannter Name liess ihn frueher
+      // still auf float32 fallen — das Teuerste; app.js prueft daran, ob der
+      // billige Ton angekommen ist, statt es zu hoffen.
+      case 'audio_stream_sample_type': s.audioTyp = (args[0] || '').toLowerCase(); break;
 
       // Messwerte. Kommen erst nach `rx_sensors_enable:true` (siehe app.js).
       case 'rx_sensors': { const t = int(0); if (t !== null) s.smeter[t] = num(1); break; }
@@ -257,6 +262,34 @@ export class TciLink extends EventTarget {
         const src = new Uint8Array(buf, HDR, length);
         const out = new Float32Array(length);
         for (let i = 0; i < length; i++) out[i] = src[i] - 200;
+        return out;
+      }
+      case 101: {
+        // mu-law nach ITU-T G.711, ein Byte je Abtastung. Longpath-eigen;
+        // halbiert den Tonstrom gegenueber Int16 (12 kHz mono: 24,9 -> 13,3
+        // kB/s) und klingt an Funkempfang gleichwertig, weil der Fehler dem
+        // Pegel folgt statt als fester Teppich liegenzubleiben.
+        //
+        // Die Tabelle wird beim ersten Rahmen einmal gebaut — 256 Werte, das
+        // ist billiger als jede Rechnung je Abtastung.
+        if (!this._mulaw) {
+          this._mulaw = new Float32Array(256);
+          for (let u = 0; u < 256; u++) {
+            const inv = ~u & 0xFF;
+            const vorzeichen = (inv & 0x80) ? -1 : 1;
+            const segment = (inv >> 4) & 0x07;
+            const mantisse = inv & 0x0F;
+            // Umkehrung der Kodierung in TciBinaryFrame.cpp: Mantisse
+            // zurueckschieben, halbes Quantisierungsintervall dazu, dann die
+            // 0x84-Verschiebung wieder abziehen.
+            let betrag = ((mantisse << 3) + 0x84) << segment;
+            betrag -= 0x84;
+            this._mulaw[u] = vorzeichen * betrag / 32768;
+          }
+        }
+        const src = new Uint8Array(buf, HDR, length);
+        const out = new Float32Array(length);
+        for (let i = 0; i < length; i++) out[i] = this._mulaw[src[i]];
         return out;
       }
       case 0: {

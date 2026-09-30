@@ -202,6 +202,7 @@ QByteArray TciBinaryFrame::encodeSamples(const float* samples, int sampleCount,
         case TciSampleType::Int24:   bytesPerSample = 3; break;
         case TciSampleType::Int32:   bytesPerSample = 4; break;
         case TciSampleType::Float32: bytesPerSample = 4; break;
+        case TciSampleType::MuLaw8:  bytesPerSample = 1; break;
         default:                     bytesPerSample = 4; break;
     }
 
@@ -254,6 +255,40 @@ QByteArray TciBinaryFrame::encodeSamples(const float* samples, int sampleCount,
                 buf[offset++] = static_cast<char>((s24 >> 16) & 0xFF);
                 break;
             }
+            case TciSampleType::MuLaw8: {
+                // mu-law nach ITU-T G.711, Referenz Sun Microsystems g711.c
+                // (ausdruecklich zur freien Verwendung freigegeben; keine
+                // Thetis-Herkunft, das ist eine Longpath-Erweiterung).
+                //
+                // 15 Bit Betrag -> 8 Bit: ein Segment (Zweierpotenz-Bereich)
+                // und eine Mantisse darin. Die 0x84-Verschiebung haelt den
+                // Logarithmus von der Null weg, die Invertierung am Ende
+                // schreibt die Norm vor.
+                //
+                // Die Segmentgrenzen werden GESUCHT, nicht per Tabelle
+                // nachgeschlagen. Der erste Entwurf hatte eine
+                // Nachschlagetabelle ueber `pcm >> 7` — und traf damit
+                // Segment 0 nie, weil das bis 0xFF reicht und dort schon
+                // zwei Indizes hineinfallen. Ergebnis war ein Stoerabstand
+                // von -2,5 dB. Die Suche ueber acht Grenzen ist genauso
+                // schnell und laesst sich nachrechnen.
+                static constexpr qint32 kBias = 0x84;
+                static constexpr qint32 kClip = 32635;
+                static const qint32 kSegEnde[8] = {
+                    0xFF, 0x1FF, 0x3FF, 0x7FF, 0xFFF, 0x1FFF, 0x3FFF, 0x7FFF
+                };
+                qint32 pcm = static_cast<qint32>(std::lroundf(clipped * 32767.0f));
+                const int maske = (pcm < 0) ? 0x7F : 0xFF;
+                if (pcm < 0) { pcm = -pcm; }
+                if (pcm > kClip) { pcm = kClip; }
+                pcm += kBias;
+                int segment = 0;
+                while (segment < 7 && pcm > kSegEnde[segment]) { ++segment; }
+                const int mantisse = (pcm >> (segment + 3)) & 0x0F;
+                buf[offset++] = static_cast<char>(
+                    (~((segment << 4) | mantisse)) & maske);
+                break;
+            }
             case TciSampleType::Int32: {
                 // From Thetis cs:5295-5300:
                 //   int s32 = (int)Math.Round(clippedSample * int.MaxValue);
@@ -293,6 +328,8 @@ int TciBinaryFrame::bytesPerSample(int sampleType)
         case TciSampleType::Int24:   return 3;
         case TciSampleType::Int32:   return 4;
         case TciSampleType::Float32: return 4;
+        case TciSampleType::UInt8Dbm: return 1;
+        case TciSampleType::MuLaw8:   return 1;
         default:                     return 4;  // Float32 fallthrough
     }
 }
@@ -362,6 +399,24 @@ std::vector<float> TciBinaryFrame::decodeSamples(const QByteArray& payload,
                 }
                 samples[static_cast<size_t>(i)] = s24 / 8388608.0f;
                 offset += 3;
+                break;
+            }
+            case TciSampleType::MuLaw8: {
+                // Umkehrung der Kodierung oben. Longpath-eigen, kein Thetis.
+                // Dieselbe Rechnung steht im Browser (handfunke/tci.js,
+                // case 101) — beide Seiten muessen Wert fuer Wert
+                // uebereinstimmen, sonst klingt der Ton verzerrt statt falsch,
+                // und das faellt niemandem auf.
+                if (offset + 1 > payloadSize) { break; }
+                const int u = (~static_cast<int>(bytes[offset])) & 0xFF;
+                const int vorzeichen = (u & 0x80) ? -1 : 1;
+                const int segment  = (u >> 4) & 0x07;
+                const int mantisse = u & 0x0F;
+                int betrag = ((mantisse << 3) + 0x84) << segment;
+                betrag -= 0x84;
+                samples[static_cast<size_t>(i)] =
+                    static_cast<float>(vorzeichen * betrag) / 32768.0f;
+                offset += 1;
                 break;
             }
             case TciSampleType::Int32: {

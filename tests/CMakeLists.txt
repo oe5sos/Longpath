@@ -2923,6 +2923,13 @@ longpath_add_test(tst_tci_remote_auth)
 longpath_add_test(tst_tci_sendesperre)
 target_compile_definitions(tst_tci_sendesperre PRIVATE LONGPATH_BUILD_TESTS)
 
+# ── mu-law als Tonformat (2026-09-30) ─────────────────────────────────────
+# Misst den Stoerabstand statt nur durchzulaufen, prueft dass der Fehler dem
+# Pegel folgt (der ganze Sinn des Kompandierens), und vergleicht die
+# C++-Kennlinie Byte fuer Byte mit der aus handfunke/tci.js.
+longpath_add_test(tst_tci_mulaw)
+target_compile_definitions(tst_tci_mulaw PRIVATE LONGPATH_BUILD_TESTS)
+
 # ── Fernzugriffs-Gruppe auf der TCI-Setupseite (2026-09-30) ───────────────
 # Prueft, dass die Bedienelemente da sind und der Hinweistext sagt, was
 # gerade gilt — eine Sicherheitsgruppe, die schweigt, wenn sie wirkungslos

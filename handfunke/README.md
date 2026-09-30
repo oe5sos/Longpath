@@ -13,12 +13,18 @@ Weil ein Browser eine Sendetaste nicht verantworten kann: iOS friert eine
 Safari-Seite mitten im Senden ein, ohne `close` zu feuern — die Seite kann
 dann nicht mehr zusagen, MOX zu lösen. Empfang, Bedienung und Ton laufen hier;
 **Senden gehört in ein natives Programm**, das das Betriebssystem am Leben
-hält. Deshalb steht die Sendetaste hier gesperrt.
+hält. Deshalb sind **beide** Sendetasten gesperrt — auch der Abstimmträger.
+Der heisst nicht „senden", legt aber einen Dauerträger mit voller Leistung
+auf die Antenne. Bis zum 2026-09-30 war er hier bedienbar, während die
+SENDEN-Taste daneben ausdrücklich tot war; das war ein Fehler und ist behoben.
 
-Serverseitig ist der Fall trotzdem abgesichert: der Sendezeit-Deckel
+Serverseitig ist der Fall abgesichert: der Sendezeit-Deckel
 (`TciMaxTransmitSeconds`, Vorgabe 180 s) und der Wachhund des tastenden
 Clients werfen einen hängenden Sender ab, ganz gleich welcher Client ihn
-getastet hat.
+getastet hat — seit dem 2026-09-30 auch beim Abstimmträger. Vorher hing
+beides allein am `trx:`-Weg, und ein vom Netz getasteter Träger blieb
+stehen, wenn der Client verschwand. Diese Zusage stand hier also schon,
+bevor sie stimmte; jetzt hält sie.
 
 ## Aufbau
 

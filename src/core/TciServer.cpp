@@ -196,6 +196,14 @@ TciServer::TciServer(RadioModel* model, QObject* parent)
         while (m_protocol->hasPendingNotification()) {
             const QString notif = m_protocol->takePendingNotification();
             for (auto sit = clientsSnapshot.cbegin(); sit != clientsSnapshot.cend(); ++sit) {
+                // Das Anmeldetor hielt bis 2026-09-30 nur EINGEHENDE Befehle
+                // auf. Ausgehend lief alles weiter: Frequenz, Betriebsart,
+                // Sendezustand gingen auch an eine Verbindung aus dem Netz,
+                // die sich nie angemeldet hat. Wer den Port findet, konnte
+                // mitlesen, was die Station gerade macht, ohne das Token zu
+                // kennen — und `trx:`-Meldungen verraten sogar, wann gesendet
+                // wird. Ein Tor, das nur in eine Richtung schliesst, ist keins.
+                if (!sit.value()->authenticated) { continue; }
                 sit.value()->sendQueue.push(TciSendQueue::Priority::Control, notif);
             }
         }
@@ -1761,6 +1769,12 @@ void TciServer::onNewConnection()
                     << "abgewiesen — kein Token hinterlegt (Setup → TCI Server)";
                 ws->close(QWebSocketProtocol::CloseCodePolicyViolated,
                           QStringLiteral("kein Token hinterlegt"));
+                // Der Socket landet hier NICHT in m_clients, also raeumt ihn
+                // auch onClientDisconnected() nie weg — er bliebe fuer immer
+                // stehen. Ohne diese Zeile laesst jeder Verbindungsversuch
+                // einen QWebSocket zurueck, unbegrenzt und ohne jede
+                // Anmeldung ausloesbar (Durchsicht 2026-09-30).
+                ws->deleteLater();
                 continue;
             }
             qCInfo(lcTci) << "TciServer: Verbindung aus dem Netz von" << session->peer
@@ -2398,6 +2412,15 @@ void TciServer::onTextMessageReceived(const QString& rohMsg)
         if (logLine.endsWith(QLatin1Char(';'))) {
             logLine.chop(1);
         }
+        // Das Token gehoert nicht ins Protokollfenster und nicht in
+        // session->lastCommand — beide sind fuer den Bediener sichtbar, und
+        // das TCI-Fenster wird beim Suchen nach Fehlern gern weitergereicht.
+        // Bis 2026-09-30 stand es dort im Klartext, weil dieser Block VOR dem
+        // Anmeldetor laeuft.
+        if (logLine.startsWith(QLatin1String("auth:"))) {
+            logLine = QStringLiteral("auth:<verdeckt>");
+            session->lastCommand = logLine;
+        }
         emit messageLogged(QStringLiteral("in"), session->peer, logLine,
                            session->lastCommandAt);
     }
@@ -2760,14 +2783,35 @@ void TciServer::onTextMessageReceived(const QString& rohMsg)
                 // Valid: "int16", "int24", "int32", "float32".  Defaults to float32.
                 // int enum encoding: 0=int16, 1=int24, 2=int32, 3=float32.
                 const QString typeStr = trimmed.mid(kAudioStreamSampleType.size()).trimmed().toLower();
-                int typeInt = 3;  // float32 default (matches TciClientSession default)
+                int typeInt = -1;
                 if (typeStr == QStringLiteral("int16"))   { typeInt = 0; }
                 else if (typeStr == QStringLiteral("int24"))  { typeInt = 1; }
                 else if (typeStr == QStringLiteral("int32"))  { typeInt = 2; }
                 else if (typeStr == QStringLiteral("float32")) { typeInt = 3; }
-                session->audioSampleType = typeInt;
+                // Longpath-eigen, siehe TciSampleType::MuLaw8: ein Byte je
+                // Abtastung, halbiert den Tonstrom gegenueber Int16.
+                else if (typeStr == QStringLiteral("mulaw8")) { typeInt = 101; }
+
+                if (typeInt < 0) {
+                    // ABWEICHUNG von Thetis (TCIServer.cs:5908-5934
+                    // [v2.10.3.13]), das bei unbekanntem Namen stillschweigend
+                    // auf float32 faellt.
+                    //
+                    // Hier nicht: float32 ist das TEUERSTE Format, und ein
+                    // Tippfehler im Client machte den Tonstrom damit achtmal
+                    // so gross, ohne dass irgendwo etwas davon stuende. Fuer
+                    // ein Telefon an einer Mobilfunkleitung ist das der
+                    // falsche Ausgang aus einem Fehler. Der bisherige Wert
+                    // bleibt stehen, und im Protokoll steht, was los war.
+                    qCWarning(lcTci) << "TciServer: audio_stream_sample_type"
+                                     << typeStr << "unbekannt — es bleibt bei"
+                                     << session->audioSampleType
+                                     << "peer" << session->peer;
+                } else {
+                    session->audioSampleType = typeInt;
+                }
                 qCInfo(lcTci) << "TciServer: session audioSampleType set to" << typeStr
-                              << "(" << typeInt << ")"
+                              << "(" << session->audioSampleType << ")"
                               << "peer" << session->peer;
             }
         }
@@ -3529,7 +3573,15 @@ void TciServer::onFftBinsReady(int receiverId, const QVector<float>& binsDbm)
     if (binsDbm.isEmpty() || receiverId < 0 || receiverId > 1) { return; }
     if (m_clients.isEmpty()) { return; }
 
-    const qint64 jetzt = QDateTime::currentMSecsSinceEpoch();
+    // Monotone Uhr, nicht die Wanduhr. Die Wanduhr springt: Zeitumstellung,
+    // ein NTP-Abgleich, ein Anwender, der die Uhr stellt. Springt sie
+    // rueckwaerts, ist `jetzt - lastSpectrumMs` negativ und kleiner als jeder
+    // Abstand — das Bild stuende fuer die Dauer des Sprungs still, ohne dass
+    // irgendetwas kaputt waere (Durchsicht 2026-09-30). QElapsedTimer laeuft
+    // seit Programmstart monoton weiter.
+    static QElapsedTimer uhr;
+    if (!uhr.isValid()) { uhr.start(); }
+    const qint64 jetzt = uhr.elapsed();
 
     // Gleiche Vorsichtsmaßnahme wie beim I/Q-Abgriff: sendBinaryMessage kann
     // synchron onClientDisconnected auslösen und damit m_clients ändern,

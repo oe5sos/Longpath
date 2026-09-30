@@ -85,6 +85,33 @@ enum class TciSampleType : int {
     // Fremde Server senden das nie, fremde Clients fordern es nie an — wer
     // den Typ nicht kennt, bekommt ihn nicht zu sehen.
     UInt8Dbm = 100,
+
+    // Ein Byte je Abtastung, mu-law nach ITU-T G.711 — dieselbe Kennlinie,
+    // die das Telefonnetz seit Jahrzehnten benutzt.
+    //
+    // Warum: der Tonstrom ist mit Abstand der teuerste Teil der Handfunke.
+    // Bei 12 kHz mono Int16 sind das 24,9 kB/s von insgesamt 29,5 — ueber
+    // Mobilfunk 106 MB je Stunde. mu-law halbiert das auf 13,3 kB/s, ohne
+    // eine einzige fremde Zeile Code auf beiden Seiten: die Kennlinie ist
+    // eine Nachschlagetabelle.
+    //
+    // Warum nicht 8 Bit linear: dort liegt das Quantisierungsrauschen als
+    // fester Teppich bei etwa -53 dBFS und ist in CW-Pausen deutlich zu
+    // hoeren. mu-law kompandiert, der Fehler folgt also dem Pegel — an
+    // echtem Kurzwellenton gemessen 37,7 dB Stoerabstand, und abschnittsweise
+    // ebenfalls 37,1 dB. Das liegt unter dem Bandrauschen jedes
+    // Kurzwellenempfaengers.
+    //
+    // Warum nicht Opus: serverseitig waere es zu haben (libopus haengt wegen
+    // RADE ohnehin an der Verknuepfungszeile), aber im Browser nicht. Auf
+    // einer LAN-Adresse ueber http ist der Kontext nicht sicher, und
+    // WebCodecs' AudioDecoder ist [SecureContext] — am 2026-09-30 auf
+    // Martins Telefonpruefseite gemessen: nicht vorhanden. Bliebe eine
+    // WASM-Fremddatei mit ungeklaerter Lizenz fuer weitere 9 kB/s.
+    //
+    // Wie UInt8Dbm ist der Typ selbstverriegelnd: ein fremder Client fordert
+    // "mulaw8" nie an, und wer ihn nicht anfordert, bekommt ihn nie.
+    MuLaw8 = 101,
 };
 
 // Stream type encoding per Thetis enum TCIStreamType (TCIServer.cs:343 [v2.10.3.13])
