@@ -665,7 +665,7 @@ void TunerApplet::setTgxlConnected(bool connected)
 //   Copy diagnostics to clipboard             -> diagnosticsCopyRequested()
 void TunerApplet::contextMenuEvent(QContextMenuEvent* ev)
 {
-    QMenu* menu = buildContextMenu(this);
+    QMenu* menu = buildContextMenu(window());   // am Fenster, siehe AmpApplet::contextMenuEvent()
     menu->exec(ev->globalPos());
     menu->deleteLater();
 }

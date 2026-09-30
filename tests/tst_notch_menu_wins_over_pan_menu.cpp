@@ -175,7 +175,9 @@ private slots:
         sendPress(m_pan, QPoint(m_notchX, 80), Qt::RightButton);
         QCoreApplication::processEvents();
 
-        QMenu* mine = m_pan->findChild<QMenu*>();
+        // Am Fenster, nicht am Panadapter (seit 2026-09-30, siehe
+        // tst_real_menus_hang_on_the_window).
+        QMenu* mine = m_pan->window()->findChild<QMenu*>();
         QVERIFY2(mine, "Rechtsklick auf den Balken oeffnet KEIN Menue");
 
         bool hasNotchEntry = false;

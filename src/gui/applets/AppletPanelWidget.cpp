@@ -589,7 +589,11 @@ int AppletPanelWidget::appletPosition(AppletWidget* applet) const
 QMenu* AppletPanelWidget::buildTitleBarMenuForTesting(AppletWidget* applet)
 {
     if (!applet || !m_wrappers.contains(applet)) { return nullptr; }
-    auto* menu = new QMenu(this);
+    // Am Fenster, nicht am Applet (2026-09-30): der Behaelter der Applet-
+    // Spalte ist nativ, und ein Menue daran bekam von Qt keinen Fensterbezug
+    // („... must be a top level window."). Damit traegt es das Menuegrau
+    // #1a1a1e statt des geerbten #08080a -- Martin: „hell wie alle anderen".
+    auto* menu = new QMenu(window());
     // Wortlaut vom Betreiber vorgegeben (2026-08-16). Die Auslösung
     // hängt AN DER AKTION, nicht am Rückgabewert von exec() — nur so
     // prüft ein Test denselben Weg, den der Bediener nimmt, statt einen
