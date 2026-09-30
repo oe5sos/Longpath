@@ -1,0 +1,154 @@
+/* ── Hausstil-Rollen, 1:1 aus StyleConstants.h ───────────────────────────── */
+:root{
+  --app-bg:#08080a; --panel:#0c0c0e; --inset:#050507; --inset-border:#232329;
+  --border:#2c2c31; --border-subtle:#1f1f23;
+  --text:#dcdce1; --text2:#a6a6ac; --text3:#909096; --text-scale:#7e7e85;
+  --text-inactive:#58585e; --title:#c4c4ca;
+  --accent:#4a7ba8;                    /* anfassbar */
+  --measured:#d8a55f; --amber-dim:#6b5630;  /* gemessen */
+  --ok:#6fa384; --warn:#a8853f; --danger:#a86b6d;
+  --tx-top:#a87a3c; --tx-bot:#8a6a30; --tx-border:#c2924f; --tx-text:#17130a;
+  --tune-top:#7a5a2c; --tune-bot:#634c24; --tune-border:#9a763c;
+  --pan-bg:#141e27; --trace:#c2924f; --grid:#8a8f96; --grid-text:#9aa0a8;
+  --glass-btn-top:#222227; --glass-btn-bot:#141417;
+  --glass-sel-top:#2f5f92; --glass-sel-bot:#1e3d5f;
+  --glass-sel-border:#3d78b0; --glass-sel-text:#dbe9f8;
+  --badge-info:#161e27;
+  --light:rgba(255,255,255,.07);       /* kGlassLightAlpha 18/255 */
+  --shade:rgba(0,0,0,.63);             /* kGlassShadeAlpha 160/255 */
+  --instrument:#f2f2ec;
+
+  /* Schriftleiter — VARIANTE A: 1:1 wie am Schreibtisch */
+  --f-caption:9px; --f-small:11px; --f-body:13px;
+  --f-sub:16px; --f-reading:22px; --f-display:38px;
+
+  --r-chip:7px; --r-panel:10px;
+  --mono:ui-monospace,"SF Mono",Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{width:393px;height:852px;overflow:hidden}
+body{
+  background:var(--app-bg); color:var(--text);
+  font:var(--f-body)/1.3 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;
+  display:flex; flex-direction:column;
+}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+/* Versalzeile — Laufweite 0.18em wie kCapsTracking */
+.caps{font-size:var(--f-caption);letter-spacing:.18em;text-transform:uppercase;
+      font-weight:600;color:var(--text3)}
+
+/* ── Kopf: Verbindung + Station ─────────────────────────────────────────── */
+header{
+  height:44px;flex:none;display:flex;align-items:center;gap:8px;padding:0 14px;
+  background:linear-gradient(#17171b,#0e0e10);
+  border-bottom:1px solid var(--border);
+}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--ok);
+     box-shadow:0 0 6px rgba(111,163,132,.7);flex:none}
+header .name{font-size:var(--f-small);color:var(--title);letter-spacing:.06em}
+header .spacer{flex:1}
+header .rate{font-size:var(--f-caption);color:var(--text-inactive)}
+
+/* ── Frequenz ───────────────────────────────────────────────────────────── */
+.vfo{flex:none;padding:10px 14px 6px;display:flex;align-items:baseline;gap:8px}
+.vfo .hz{font-size:var(--f-display);font-family:var(--mono);color:var(--text);
+         letter-spacing:-.01em;line-height:1}
+.vfo .hz .khz{color:var(--text2)}
+.vfo .hz .dez{color:var(--text-scale);font-size:var(--f-reading)}
+.vfo .unit{font-size:var(--f-small);color:var(--text3)}
+.vfo .spacer{flex:1}
+.vfo .b{font-size:var(--f-small);font-family:var(--mono);color:var(--measured)}
+
+/* ── Panadapter + Wasserfall ────────────────────────────────────────────── */
+.scope{
+  flex:none;margin:2px 10px 0;border:1px solid var(--border);
+  border-radius:var(--r-panel);overflow:hidden;background:var(--pan-bg);
+  box-shadow:inset 0 1px 0 var(--light);
+}
+.scope canvas{display:block;width:100%}
+
+/* ── S-Meter: Licht, nicht Farbe ────────────────────────────────────────── */
+.meter{flex:none;margin:8px 10px 0;padding:7px 10px 8px;
+  background:linear-gradient(#17171b,#0e0e10);
+  border:1px solid var(--border);border-radius:var(--r-panel)}
+.meter .row{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.meter .val{margin-left:auto;font-family:var(--mono);font-size:var(--f-small);
+            color:var(--measured)}
+.bar{height:9px;border-radius:5px;background:var(--inset);
+     border:1px solid var(--inset-border);position:relative;overflow:hidden;
+     box-shadow:inset 0 2px 3px rgba(0,0,0,.55)}
+.bar i{position:absolute;inset:1px auto 1px 1px;border-radius:4px;
+  background:linear-gradient(90deg,#47463b,#817b5c 62%,var(--measured));}
+.ticks{display:flex;justify-content:space-between;margin-top:3px}
+.ticks span{font-size:var(--f-caption);font-family:var(--mono);color:var(--text-scale)}
+
+/* ── Bedienreihen ───────────────────────────────────────────────────────── */
+.group{margin:9px 10px 0}
+.group > .caps{margin:0 2px 5px}
+.chips{display:flex;gap:5px}
+.chip{
+  flex:1;min-width:0;height:34px;                /* 34 sichtbar, 44 Treffer */
+  display:flex;align-items:center;justify-content:center;
+  font-size:var(--f-small);font-family:var(--mono);color:var(--text2);
+  background:linear-gradient(var(--glass-btn-top),var(--glass-btn-bot));
+  border:1px solid var(--border);border-radius:var(--r-chip);
+  box-shadow:inset 0 1px 0 var(--light),0 1px 0 rgba(0,0,0,.5);
+  position:relative;
+}
+.chip::after{content:"";position:absolute;left:0;right:0;top:-5px;bottom:-5px}
+.chip.on{
+  background:linear-gradient(var(--glass-sel-top),var(--glass-sel-bot));
+  border-color:var(--glass-sel-border);color:var(--glass-sel-text);
+}
+.chip.more{flex:0 0 34px;color:var(--text3)}
+/* Zustandsschalter bleiben leise — quietCheckedStyle: im Feld darf genau
+   EINE Stelle kraeftig sein, und das ist die Sendetaste. */
+.chip.quiet.on{background:var(--badge-info);border-color:var(--accent);
+               color:#cfe0f2;box-shadow:inset 0 1px 0 var(--light)}
+
+/* ── Regler ─────────────────────────────────────────────────────────────── */
+.sliders{margin:9px 10px 0;display:flex;flex-direction:column;gap:9px}
+.sl{display:flex;align-items:center;gap:9px}
+.sl .caps{flex:0 0 30px}
+.sl .track{flex:1;height:4px;border-radius:2px;background:var(--inset);
+  border:1px solid var(--inset-border);position:relative;
+  box-shadow:inset 0 1px 2px rgba(0,0,0,.6)}
+.sl .track i{position:absolute;left:0;top:0;bottom:0;border-radius:2px;
+  background:var(--accent);opacity:.55}
+.sl .track b{position:absolute;top:50%;width:14px;height:14px;margin:-7px 0 0 -7px;
+  border-radius:50%;background:linear-gradient(#5b8cba,#3a648c);
+  border:1px solid #6b9ccb;box-shadow:0 1px 2px rgba(0,0,0,.6)}
+.sl .v{flex:0 0 58px;text-align:right;white-space:nowrap;font-family:var(--mono);
+       font-size:var(--f-small);color:var(--measured)}
+
+/* ── Sendefeld ──────────────────────────────────────────────────────────── */
+.txrow{margin:auto 10px 0;padding-top:10px;display:flex;gap:7px;align-items:stretch}
+.tx{
+  flex:1;height:58px;border-radius:9px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:linear-gradient(var(--tx-top),var(--tx-bot));
+  border:1px solid var(--tx-border);color:var(--tx-text);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 2px 0 rgba(0,0,0,.45);
+  font-weight:700;letter-spacing:.14em;font-size:var(--f-sub);
+}
+.tx small{font-size:var(--f-caption);font-weight:600;letter-spacing:.1em;
+          opacity:.72;margin-top:2px}
+.tx.locked{
+  background:linear-gradient(#1a1a1e,#141417);border-color:var(--border);
+  color:var(--text-inactive);box-shadow:inset 0 1px 0 var(--light);
+}
+.tune{
+  flex:0 0 84px;border-radius:9px;
+  display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(var(--tune-top),var(--tune-bot));
+  border:1px solid var(--tune-border);color:#1a150c;
+  font-weight:700;letter-spacing:.12em;font-size:var(--f-body);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 2px 0 rgba(0,0,0,.45);
+}
+
+/* ── Fußzeile ───────────────────────────────────────────────────────────── */
+footer{flex:none;height:30px;display:flex;align-items:center;gap:10px;
+  padding:0 14px;margin-top:8px;
+  background:#0a0a0c;border-top:1px solid var(--border-subtle)}
+footer span{font-size:var(--f-caption);font-family:var(--mono);color:var(--text-inactive)}
+footer .ok{color:var(--ok)}
