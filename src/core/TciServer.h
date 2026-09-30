@@ -212,6 +212,16 @@ public:
     // and this header only forward-declares QWebSocket (gcc refuses).
     QWebSocket* moxOwnerForTest() const;
 
+    // Nur für Prüfstände: behandelt jede Verbindung so, als käme sie aus dem
+    // Netz. Ohne diesen Haken ist die Sendesperre nicht prüfbar — im Testlauf
+    // ist jeder Client Loopback, und `fromLoopback` schaltet die Sperre ab.
+    //
+    // Die Durchsicht am 2026-09-30 fand genau das: keine der drei Sperren
+    // wurde von irgendeinem Prüfpunkt berührt, geprüft war nur der Getter
+    // remoteTxAllowed(). An Martins Station hängt eine Antenne; die Naht, die
+    // den Sender schützt, gehört unter Beobachtung.
+    void setTreatAllClientsAsRemoteForTest(bool on) { m_alleAlsNetzFuerTest = on; }
+
 signals:
     // Emitted after the server begins listening.  port is the actual bound port
     // (useful when start() was called with port=0).
@@ -641,6 +651,10 @@ private:
     // RX timer: always-on once start() is called; emits placeholder rx_sensors
     //   frames to subscribed clients (real readings wired in Phase 24+).
     // TX timer: always-on for Phase 19 stub; Phase 24+ gates on MOX state.
+    // Siehe setTreatAllClientsAsRemoteForTest(). Ab Werk false; im laufenden
+    // Programm wird das nie gesetzt.
+    bool m_alleAlsNetzFuerTest{false};
+
     QTimer* m_rxSensorTimer{nullptr};   // 200ms default; broadcasts rx_sensors to subscribed clients
     QTimer* m_txSensorTimer{nullptr};   // 200ms default; MOX-gated (Phase 24+ wires real gate)
 

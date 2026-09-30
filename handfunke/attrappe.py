@@ -14,7 +14,7 @@ Der Binaerrahmen ist derselbe wie in TciBinaryFrame.h:
   sampleType 3 = Float32 · streamType 0 = IQ, 1 = RX-Ton
 """
 
-import base64, hashlib, math, random, socket, struct, threading, time, sys
+import base64, hashlib, math, os, random, socket, struct, threading, time, sys
 
 PORT = 50099
 IQ_RATE = 48000          # bewusst klein: die Attrappe soll die Naht pruefen,
@@ -347,11 +347,27 @@ class Verbindung(threading.Thread):
 
 
 def main():
+    # Ab Werk nur auf dem eigenen Rechner. Mit `--alle` (oder HOST=0.0.0.0)
+    # auch aus dem LAN erreichbar — das braucht man, sobald man die Handfunke
+    # von einem echten Telefon aus prueft.
+    #
+    # Und zwar aus einem Grund, der nicht auf der Hand liegt: eine Seite, die
+    # von einer LAN-Adresse geladen wurde, darf KEINE Verbindung nach
+    # 127.0.0.1 aufbauen. Der Browser wertet das als Zugriff von einem
+    # oeffentlicheren auf ein privateres Netz und blockt ihn (Private Network
+    # Access). Am 2026-09-30 genau so gemessen: Seite auf
+    # http://172.30.30.121:8767, WebSocket nach ws://127.0.0.1:50099 —
+    # "WebSocket connection failed", ohne dass die Attrappe je etwas sah.
+    # Das gilt fuer die Attrappe wie fuer Longpath selbst: beide muessen unter
+    # der LAN-Adresse erreichbar sein, nicht unter localhost.
+    host = os.environ.get('HOST') or (
+        '0.0.0.0' if '--alle' in sys.argv else '127.0.0.1')
+
     srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    srv.bind(('127.0.0.1', PORT))
+    srv.bind((host, PORT))
     srv.listen(4)
-    print(f'TCI-Attrappe lauscht auf 127.0.0.1:{PORT}')
+    print(f'TCI-Attrappe lauscht auf {host}:{PORT}')
     try:
         while True:
             sock, addr = srv.accept()

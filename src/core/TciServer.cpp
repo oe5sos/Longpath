@@ -1749,7 +1749,7 @@ void TciServer::onNewConnection()
         //
         // isLoopback() erkennt 127.0.0.0/8 und ::1 zuverlässig; die Adresse
         // kommt vom Socket, nicht vom Client, also ist sie nicht zu fälschen.
-        session->fromLoopback = ws->peerAddress().isLoopback();
+        session->fromLoopback = !m_alleAlsNetzFuerTest && ws->peerAddress().isLoopback();
         if (!session->fromLoopback) {
             const QString token = remoteToken();
             // Ohne hinterlegtes Token gibt es keinen Fernzugriff. Das ist die
@@ -1934,11 +1934,19 @@ void TciServer::releaseMoxHeldBy(QWebSocket* ws, const QString& peer, const QStr
     stopKeyedWatchdog();
     // Without a model (test path) there is nothing to unkey; the signal
     // still reports that the bookkeeping fired.
-    const bool stillKeyed = m_model.isNull() ? true : m_model->mox();
-    if (!stillKeyed) { return; }
+    // Der Abstimmträger ist eigens zu nehmen (2026-09-30). `m_isTuning` ist
+    // gelatcht und wird von setMox(false) NICHT gelöscht — es fällt nur durch
+    // ein ausdrückliches tune-off, den Trennungs-Reset oder completeTuneOff().
+    // Ohne diese Zeilen bliebe ein vom Netz getasteter Träger stehen, obwohl
+    // der Wachhund gerade festgestellt hat, dass niemand mehr zusieht.
+    const bool nochAmTunen = m_model.isNull() ? false : m_model->isTune();
+    const bool stillKeyed  = m_model.isNull() ? true  : m_model->mox();
+    if (!stillKeyed && !nochAmTunen) { return; }
     qCWarning(lcTci) << "TciServer: client" << peer << "keyed the radio and"
-                     << why << "— releasing MOX";
+                     << why << "— releasing MOX"
+                     << (nochAmTunen ? "und Abstimmträger" : "");
     if (!m_model.isNull()) {
+        if (nochAmTunen) { m_model->setTune(false); }
         m_model->setMox(false);
     }
     emit moxReleasedOnClientLoss(peer);
@@ -2319,14 +2327,64 @@ void TciServer::onAudioFrameReady(int slice, const float* L, const float* R,
         total * static_cast<int>(sizeof(float)));
 }
 
+// ── mitNormalisiertemNamen() (2026-09-30) ────────────────────────────────────
+//
+// Macht aus "  TRX :0,TRUE;" die Form "trx:0,TRUE;" — nur der NAME vor dem
+// ersten Doppelpunkt wird getrimmt und kleingeschrieben. Die Argumente bleiben
+// Zeichen für Zeichen stehen: dort stehen Rufzeichen, Dateinamen und das
+// Token, und eine Kleinschreibung wäre dort ein Fehler.
+//
+// WARUM DAS SEIN MUSS — der Fund, der diese Funktion erzwungen hat:
+//
+// Die Sendesperre fürs Netz (`trx:`, unten) hat bis zum 2026-09-30 mit
+// `trimmed.startsWith("trx:")` geprüft — schreibungsabhängig und ohne den
+// Namen zu trimmen. Der Befehlsverteiler dahinter (TciProtocol.cpp:84) liest
+// denselben Befehl aber als `parts.at(0).toLower().trimmed()`.
+//
+// Zwei Parser, ein Befehl, verschiedene Ergebnisse. Die Folge:
+//
+//     TRX:0,true;     → Sperre sieht "TRX:" ≠ "trx:", greift NICHT
+//                       Verteiler macht toLower() → führt AUS
+//     trx :0,true;    → dasselbe über das Leerzeichen
+//
+// Aus dem Netz liess sich der Sender damit tasten, obwohl Fernsenden gesperrt
+// war. An Martins Station hängt eine echte Antenne; das ist der schlimmste
+// Fehlerfall, den dieser Server hat.
+//
+// Der Fehler ist nicht "eine Sperre hat ein Zeichen falsch verglichen",
+// sondern "die Sperre hat ihren eigenen Parser". Deshalb wird hier EINMAL
+// normalisiert und danach reden alle dreizehn Abfangstellen UND der
+// Verteiler über denselben Text. Eine neue Abfangstelle kann die Divergenz
+// gar nicht mehr einführen.
+static QString mitNormalisiertemNamen(const QString& roh)
+{
+    const int dp = roh.indexOf(QLatin1Char(':'));
+    if (dp < 0) {
+        // Befehl ohne Argumente (z. B. "ready;") — ganz normalisieren, das
+        // abschliessende Semikolon bleibt, wo es ist.
+        QString nurName = roh;
+        const bool semikolon = nurName.trimmed().endsWith(QLatin1Char(';'));
+        nurName = nurName.trimmed();
+        if (semikolon) { nurName.chop(1); }
+        nurName = nurName.trimmed().toLower();
+        return semikolon ? nurName + QLatin1Char(';') : nurName;
+    }
+    return roh.left(dp).trimmed().toLower() + QLatin1Char(':') + roh.mid(dp + 1);
+}
+
 // ── onTextMessageReceived() ──────────────────────────────────────────────────
 
-void TciServer::onTextMessageReceived(const QString& msg)
+void TciServer::onTextMessageReceived(const QString& rohMsg)
 {
     auto* ws = qobject_cast<QWebSocket*>(sender());
     if (!ws) { return; }
     auto it = m_clients.find(ws);
     if (it == m_clients.end()) { return; }
+
+    // Ab hier gibt es nur noch DIESEN Text. Begründung an
+    // mitNormalisiertemNamen(): zwei Parser für denselben Befehl waren ein
+    // Loch in der Sendesperre.
+    const QString msg = mitNormalisiertemNamen(rohMsg);
 
     auto& session = it.value();
     session->lastCommand   = msg;
@@ -2448,6 +2506,40 @@ void TciServer::onTextMessageReceived(const QString& msg)
                         << "abgelehnt — Senden aus dem Netz ist nicht"
                         << "freigegeben (TciAllowRemoteTx)";
                     return;
+                }
+
+                // ── Besitzer, Wachhund, Sendezeit-Deckel (2026-09-30) ───────
+                //
+                // Bis hierher war der Abstimmträger der einzige Sendeweg OHNE
+                // diese drei Netze. Sie hängen alle an `m_moxOwner`, und den
+                // setzte nur der `trx:`-Weg: onClientDisconnected() entkeyt
+                // nur bei `m_moxOwner.data() == ws`, onTxTimeCapExpired()
+                // steigt bei `m_moxOwner.isNull()` sofort aus. Ein Träger vom
+                // Telefon stand also unbegrenzt auf der Antenne, sobald das
+                // WLAN abriss oder iOS die Seite einfror — und das Modell hat
+                // keine eigene Zeitgrenze für Tune.
+                //
+                // handfunke/README.md versprach ausdrücklich das Gegenteil
+                // („ganz gleich welcher Client ihn getastet hat"). Genau diese
+                // Zusage macht das Freigeben von TciAllowRemoteTx vertretbar,
+                // also muss sie stimmen.
+                //
+                // Gleiche Buchführung wie im `trx:`-Zweig weiter unten, damit
+                // beide Sendewege dieselben Netze haben.
+                if (willTune) {
+                    if (m_moxOwner.data() != ws) { m_ownerPingsUnanswered = 0; }
+                    m_moxOwner = ws;
+                    startKeyedWatchdog();
+                } else if (!m_moxOwner.isNull() && m_moxOwner.data() == ws) {
+                    // Nur loslassen, wenn auch nicht gleichzeitig über trx:
+                    // gesendet wird — sonst nähme ein tune-off dem laufenden
+                    // Sendebetrieb seinen Wachhund weg.
+                    const bool sendetNoch = !m_model.isNull() && m_model->mox()
+                                            && !m_model->isTune();
+                    if (!sendetNoch) {
+                        m_moxOwner = nullptr;
+                        stopKeyedWatchdog();
+                    }
                 }
             }
         }

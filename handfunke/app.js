@@ -46,6 +46,9 @@ const state = {
   specMin: -130, specMax: -30,
   token: '',                 // nur für den Netzweg nötig
   audioRate: 12000,          // ausgehandelt; 48000 wäre Faktor 16 teurer
+  tonStartLaeuft: false,     // Riegel gegen doppelten AudioContext
+  tonWeg: null,              // 'worklet' | 'scriptprocessor'
+  tonFehler: null,           // Text fuer die Fusszeile, wenn kein Ton geht
   hatSpektrumstrom: false,   // Server liefert fertige Bins
   rueckfall: false,          // wir rechnen selbst aus rohem I/Q
   iqRueckfall: null,
@@ -388,28 +391,96 @@ function zeichneBild() {
 // iOS gibt Ton erst nach einer Beruehrung frei. Wir versuchen es bei jeder
 // Beruehrung erneut, bis es klappt — ohne einen eigenen Knopf dafuer.
 async function tonStarten() {
-  if (state.node) return;
+  // Riegel gegen Doppelstart. `state.node` allein reicht NICHT: zwischen der
+  // Pruefung und dem Setzen liegen zwei await-Stellen, und ein einziger Tipp
+  // loest ueber 'touchend' UND 'click' zwei Laeufe aus. Ergebnis waren
+  // zuverlaessig zwei AudioContexts, von denen der erste nie wieder
+  // geschlossen wurde (Durchsicht 2026-09-30).
+  if (state.node || state.tonStartLaeuft) { return; }
+  state.tonStartLaeuft = true;
   try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)({
-      sampleRate: 48000, latencyHint: 'interactive',
-    });
-    await ctx.audioWorklet.addModule('rx-worklet.js');
-    const node = new AudioWorkletNode(ctx, 'rx-worklet', {
-      outputChannelCount: [2],
-      // srcRate ist die ausgehandelte Rate, nicht die des Ausgangs — ohne sie
-      // liefe der Ton bei 12 kHz Quelle viermal zu schnell.
-      processorOptions: { capacity: 48000, target: 2400, srcRate: state.audioRate },
-    });
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) { throw new Error('Dieser Browser kennt keinen AudioContext'); }
+    const ctx = new AC({ sampleRate: 48000, latencyHint: 'interactive' });
+
     const gain = ctx.createGain();
     gain.gain.value = state.afPct / 100;
-    node.connect(gain).connect(ctx.destination);
+
+    let node = null;
+    let weg = null;
+
+    if (ctx.audioWorklet) {
+      // Der gute Weg: eigener Audio-Faden, stottert nicht, wenn der
+      // Hauptfaden den Wasserfall zeichnet.
+      await ctx.audioWorklet.addModule('ton-kern.js');   // muss zuerst
+      await ctx.audioWorklet.addModule('rx-worklet.js');
+      node = new AudioWorkletNode(ctx, 'rx-worklet', {
+        outputChannelCount: [2],
+        // srcRate ist die ausgehandelte Rate, nicht die des Ausgangs — ohne
+        // sie liefe der Ton bei 12 kHz Quelle viermal zu schnell.
+        processorOptions: { srcRate: state.audioRate },
+      });
+      node.port.onmessage = () => {};
+      weg = 'worklet';
+    } else {
+      // ── Rueckfall: ScriptProcessorNode ───────────────────────────────────
+      //
+      // `AudioWorklet` ist [SecureContext]. Eine Seite, die ueber http von
+      // einer LAN-Adresse kommt — also genau der Fall "Telefon im eigenen
+      // Netz" —, ist KEIN sicherer Kontext, und dann ist ctx.audioWorklet
+      // schlicht undefined. Am 2026-09-30 an http://172.30.30.121:8767
+      // gemessen: isSecureContext false, audioWorklet undefined,
+      // createScriptProcessor vorhanden.
+      //
+      // Der ScriptProcessorNode ist veraltet und laeuft im Hauptfaden, kann
+      // also unter Last knacken. Fuer 12 kHz Sprache reicht er, und stumm
+      // ist erheblich schlimmer als gelegentlich rauh. Sobald die Seite
+      // ueber https ausgeliefert wird, greift von selbst wieder der obere
+      // Zweig.
+      const kern = new TonKern({ ausgabeRate: ctx.sampleRate, srcRate: state.audioRate });
+      // 2048 Proben sind bei 48 kHz rund 43 ms — gross genug, dass der
+      // Hauptfaden dazwischen zeichnen darf, klein genug, dass die
+      // Verzoegerung nicht auffaellt.
+      const sp = ctx.createScriptProcessor(2048, 0, 2);
+      sp.onaudioprocess = (ev) => {
+        const out = ev.outputBuffer;
+        kern.zieh(out.getChannelData(0), out.getChannelData(1), out.length);
+      };
+      // Eine Huelle, die sich nach aussen wie der Worklet-Knoten verhaelt —
+      // so kennt der Rest der Seite nur EINEN Weg.
+      node = {
+        _sp: sp, _kern: kern,
+        connect: (z) => sp.connect(z),
+        disconnect: () => sp.disconnect(),
+        port: { postMessage: (m) => {
+          if (m.type === 'pcm') { kern.push(m.data, m.channels); }
+          else if (m.type === 'mute') { kern.muted = !!m.value; }
+          else if (m.type === 'flush') { kern.leeren(); }
+          else if (m.type === 'rate') { kern.setRate(m.value); }
+        } },
+      };
+      weg = 'scriptprocessor';
+    }
+
+    node.connect(gain);
+    gain.connect(ctx.destination);
     await ctx.resume();
+
     state.audio = ctx; state.node = node; state.gain = gain;
+    state.tonWeg = weg; state.tonFehler = null;
     // Fuer die Fehlersuche erreichbar (siehe window.__link oben).
     window.__audioCtx = ctx; window.__gain = gain; window.__node = node;
   } catch (e) {
-    // Kein Ton ist kein Grund, die Bedienung zu verlieren.
+    // Kein Ton ist kein Grund, die Bedienung zu verlieren — aber er darf
+    // auch nicht STILL fehlen. Genau das war der Fall: ein console.warn, und
+    // die Seite tat weiter, als liefe alles. Die gemessenen Datenraten haben
+    // dann ankommende Bytes belegt, nicht hoerbaren Ton.
+    state.tonFehler = (window.isSecureContext === false)
+      ? 'kein Ton — die Seite laeuft ohne sicheren Kontext'
+      : ('kein Ton — ' + (e && e.message ? e.message : e));
     console.warn('Ton nicht verfuegbar:', e);
+  } finally {
+    state.tonStartLaeuft = false;
   }
 }
 ['touchend', 'click'].forEach(ev =>
@@ -460,10 +531,24 @@ $('scope').addEventListener('pointermove', (e) => {
 $('scope').addEventListener('pointerup', () => { wischVon = null; });
 $('scope').addEventListener('pointercancel', () => { wischVon = null; });
 
-// ── Abstimmtraeger ──────────────────────────────────────────────────────────
-$('tune').addEventListener('click', () => {
-  link.send(`tune:${state.trx},${link.st.tune ? 'false' : 'true'}`);
-});
+// ── Abstimmtraeger: bewusst KEIN Knopf ──────────────────────────────────────
+//
+// Hier stand bis zum 2026-09-30 ein Klickhorcher, der `tune:N,true` schickte.
+// Das war ein Fehler, und zwar ein sendender: der Abstimmtraeger legt einen
+// Dauertraeger mit voller Leistung auf die Antenne. Er heisst nur nicht
+// „senden", deshalb ist er beim Nachdenken ueber die Sendesperre durchgerutscht
+// — waehrend die SENDEN-Taste daneben ausdruecklich tot war.
+//
+// Dazu kam, was die Durchsicht am selben Tag am Server fand: der tune-Weg war
+// der einzige Sendeweg ohne Besitzer, Wachhund und Sendezeit-Deckel (das ist
+// jetzt behoben, TciServer.cpp). Ein Telefon, dessen WLAN abreisst oder das
+// iOS einfriert, haette den Traeger unbegrenzt stehen lassen.
+//
+// Die Handfunke ist zum Hoeren und Bedienen. Beide Sendetasten sind tot und
+// sehen auch so aus. Soll das Telefon eines Tages senden duerfen, ist das eine
+// bewusste Erweiterung mit eigener Zustandsmeldung vom Server und einer
+// Sicherung gegen Fehltipp (langes Druecken) — nicht ein Knopf, der still
+// funktioniert, weil die Verbindung zufaellig ueber Loopback lief.
 
 // ── Ereignisse vom Draht ────────────────────────────────────────────────────
 link.addEventListener('open', () => {
@@ -588,7 +673,16 @@ function schleife(t) {
   $('rate').textContent = gesamt ? (gesamt + ' kB/s') : '';
   $('fussBild').textContent = r.spec ? (r.spec + ' kB/s bild')
                             : r.iq   ? (r.iq + ' kB/s bild (roh)') : '';
-  $('fussTon').textContent = r.audio ? r.audio + ' kB/s ton' : '';
+  // Der Ton bekommt die Wahrheit, nicht nur eine Byte-Zahl: eine Datenrate
+  // ohne hoerbaren Ton hat am 2026-09-30 eine ganze Messreihe wertlos
+  // gemacht. Faellt der Ton aus, steht das hier — und nicht nur in einer
+  // Konsole, die auf einem Telefon niemand sieht.
+  $('fussTon').textContent = state.tonFehler
+    ? state.tonFehler
+    : (r.audio ? r.audio + ' kB/s ton'
+                 + (state.tonWeg === 'scriptprocessor' ? ' (ersatzweg)' : '')
+               : '');
+  $('fussTon').className = state.tonFehler ? 'warn' : '';
   $('fussStatus').textContent = link.ready ? '◆ gekoppelt'
                               : (link.ws && link.ws.readyState === 1) ? '◆ verbinde…' : '◇ getrennt';
   $('fussStatus').className = link.ready ? 'ok' : '';

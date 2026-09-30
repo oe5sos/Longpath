@@ -2916,6 +2916,13 @@ longpath_add_test(tst_tci_audio_resample_channels)
 # still), aus dem Netz Token und ausdrueckliche Sendefreigabe.
 longpath_add_test(tst_tci_remote_auth)
 
+# ── Sendesperre fuers Netz (2026-09-30) ───────────────────────────────────
+# Prueft die NAHT, nicht den Getter: echte Clients schicken `trx:`/`tune:` in
+# den Schreibweisen, die bis 2026-09-30 an der Sperre vorbeiliefen (TRX:,
+# `trx :`), dazu Besitzer und Ruecknahme des Abstimmtraegers beim Trennen.
+longpath_add_test(tst_tci_sendesperre)
+target_compile_definitions(tst_tci_sendesperre PRIVATE LONGPATH_BUILD_TESTS)
+
 # ── Fernzugriffs-Gruppe auf der TCI-Setupseite (2026-09-30) ───────────────
 # Prueft, dass die Bedienelemente da sind und der Hinweistext sagt, was
 # gerade gilt — eine Sicherheitsgruppe, die schweigt, wenn sie wirkungslos

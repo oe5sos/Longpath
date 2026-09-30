@@ -11,8 +11,13 @@
 <link rel="stylesheet" href="stil.css">
 <style>
 /* Ergaenzungen, die das Entwurfsblatt nicht brauchte ───────────────────── */
-html,body{width:100%;height:100%}
-body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+/* 100dvh statt 100%: auf iOS faehrt Safaris Adresszeile ein und aus, und
+   100% meint die GROSSE Hoehe — der untere Rand liegt dann ausserhalb des
+   sichtbaren Bereichs. 100dvh folgt der Zeile. 100vh davor ist der Rueckfall
+   fuer Browser, die dvh nicht kennen. */
+html,body{width:100%;height:100vh;height:100dvh}
+body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+     overflow-x:hidden;overflow-y:auto}
 .scope{position:relative;touch-action:none}
 .scope canvas{width:100%;height:auto}
 /* Abstimmstrich in der Mitte — dort sitzt die Empfangsfrequenz */
@@ -42,7 +47,9 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
   border:1px solid var(--glass-sel-border);color:var(--glass-sel-text);
   font:600 var(--f-sub)/1 inherit;letter-spacing:.08em}
 #koppeln .fehler{color:var(--warn);font-size:var(--f-small);min-height:16px}
-.tx.locked{pointer-events:none}
+/* Beide gesperrten Sendetasten nehmen auch keine Tipper an — nicht nur
+   optisch tot, sondern wirklich. */
+.tx.locked,.tune.locked{pointer-events:none}
 </style>
 </head>
 <body>
@@ -113,7 +120,7 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
 
 <div class="txrow">
   <div class="tx locked" id="tx">SENDEN <small>NUR IN DER APP</small></div>
-  <div class="tune" id="tune">TUNE</div>
+  <div class="tune locked" id="tune">TUNE <small>NUR IN DER APP</small></div>
 </div>
 
 <footer>
@@ -135,6 +142,10 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
   <button id="verbinden">Verbinden</button>
 </div>
 
+<!-- ton-kern.js zuerst: app.js braucht TonKern fuer den Rueckfall auf
+     ScriptProcessorNode, wenn AudioWorklet fehlt (LAN ueber http). Kein
+     Modul, damit dieselbe Datei auch per addModule ins Worklet passt. -->
+<script src="ton-kern.js"></script>
 <script type="module" src="app.js"></script>
 </body>
 </html>

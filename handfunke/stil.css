@@ -26,7 +26,14 @@
   --mono:ui-monospace,"SF Mono",Menlo,monospace;
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-html,body{width:393px;height:852px;overflow:hidden}
+/* 393x852 ist das Mass, an dem die Gestaltung entstanden ist (iPhone 14 Pro).
+   Es steht hier nur noch, damit das Blatt im Browser wie ein Telefon
+   aussieht — index.html ueberschreibt es fuer den echten Einsatz. Waagrecht
+   wird nie gescrollt, senkrecht schon: lieber scrollen als abschneiden.
+   Bis 2026-09-30 stand hier overflow:hidden, und auf jedem Geraet, das
+   nicht genau 852 Punkte hoch ist, lagen Fusszeile und Sendetasten
+   ausserhalb und waren nicht erreichbar. */
+html,body{width:393px;height:852px;overflow-x:hidden}
 body{
   background:var(--app-bg); color:var(--text);
   font:var(--f-body)/1.3 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;
@@ -139,11 +146,22 @@ header .rate{font-size:var(--f-caption);color:var(--text-inactive)}
 }
 .tune{
   flex:0 0 84px;border-radius:9px;
-  display:flex;align-items:center;justify-content:center;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
   background:linear-gradient(var(--tune-top),var(--tune-bot));
   border:1px solid var(--tune-border);color:#1a150c;
   font-weight:700;letter-spacing:.12em;font-size:var(--f-body);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 2px 0 rgba(0,0,0,.45);
+}
+.tune small{font-size:var(--f-caption);font-weight:600;letter-spacing:.06em;
+            opacity:.72;margin-top:2px}
+/* Gesperrt sieht gesperrt aus — dieselbe Behandlung wie bei SENDEN.
+   Bis 2026-09-30 war TUNE in Messing und voll bedienbar, waehrend SENDEN
+   daneben tot dalag. Beide tasten den Sender; der Abstimmtraeger heisst nur
+   nicht so. Eine scharfe Taste neben einer toten ist genau die Art
+   Widerspruch, die irgendwann jemandem die Endstufe kostet. */
+.tune.locked{
+  background:linear-gradient(#1a1a1e,#141417);border-color:var(--border);
+  color:var(--text-inactive);box-shadow:inset 0 1px 0 var(--light);
 }
 
 /* ── Fußzeile ───────────────────────────────────────────────────────────── */
@@ -152,3 +170,5 @@ footer{flex:none;height:30px;display:flex;align-items:center;gap:10px;
   background:#0a0a0c;border-top:1px solid var(--border-subtle)}
 footer span{font-size:var(--f-caption);font-family:var(--mono);color:var(--text-inactive)}
 footer .ok{color:var(--ok)}
+/* Ein fehlender Ton wird in der Fusszeile gemeldet, nicht verschwiegen. */
+footer .warn{color:var(--warn)}
