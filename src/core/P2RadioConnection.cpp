@@ -600,6 +600,7 @@ void P2RadioConnection::connectToRadio(const RadioInfo& info)
     m_intentionalDisconnect = false;
     m_userInitiatedDisconnect = false;
     m_totalIqPackets = 0;
+    m_datagramsSinceConnect = 0;
 
     // Use HardwareProfile for capability lookup (Phase 3I-RP).
     // Fall back to board-byte lookup if setHardwareProfile() was never called.
@@ -2017,6 +2018,7 @@ void P2RadioConnection::onReadyRead()
 {
     while (m_socket && m_socket->hasPendingDatagrams()) {
         QNetworkDatagram datagram = m_socket->receiveDatagram();
+        ++m_datagramsSinceConnect;
         QByteArray data = datagram.data();
         quint16 sourcePort = datagram.senderPort();
 
@@ -3403,7 +3405,10 @@ void P2RadioConnection::onConnectTimeout()
     if (m_totalIqPackets > 0) { return; }
 
     qCWarning(lcConnection) << "P2: Connect watchdog fired — no DDC I/Q frame within"
-                            << kConnectTimeoutMs << "ms; tearing down and emitting connectFailed(Timeout)";
+                            << kConnectTimeoutMs << "ms; datagrams since connectToRadio():"
+                            << m_datagramsSinceConnect << "local port:"
+                            << (m_socket ? m_socket->localPort() : 0)
+                            << "; tearing down and emitting connectFailed(Timeout)";
 
     // Issue #239: tear down to Disconnected so the UI does not claim
     // "Connected" while the radio is unreachable. Stop the keep-alive,

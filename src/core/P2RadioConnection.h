@@ -945,6 +945,14 @@ private:
     std::array<QVector<float>, kMaxDdc> m_iqBuffers;
     int m_totalIqPackets{0};
 
+    // Jedes Datagramm seit connectToRadio(), gleich welcher Port, auch
+    // leere (2026-09-30). Nur fuer die Zeile des Connect-Watchdogs:
+    // 0 heisst "vom Geraet kam ueberhaupt nichts an", mehr als 0 ohne
+    // I/Q heisst "das Geraet antwortet, streamt aber nicht". Die beiden
+    // Faelle haben verschiedene Ursachen und sahen im Protokoll bisher
+    // gleich aus.
+    int m_datagramsSinceConnect{0};
+
 #ifdef LONGPATH_BUILD_TESTS
 public:
     // Test-only helpers — allow unit tests to inject board state without a live radio.
