@@ -208,7 +208,12 @@ function zeichneBedienung() {
 function zeichneKopf() {
   const s = link.st;
   const verbunden = link.ws && link.ws.readyState === 1;
-  $('led').className = 'dot' + (verbunden ? (link.ready ? '' : ' wait') : ' off');
+  // Dieselbe Lebendigkeitspruefung wie in der Fusszeile: nicht der Socket
+  // entscheidet, ob es laeuft, sondern ob Daten kommen.
+  const totStill = link.ready && link.letzteDaten
+                 && (performance.now() - link.letzteDaten > 3000);
+  $('led').className = 'dot' + (!verbunden ? ' off'
+                              : (link.ready && !totStill) ? '' : ' wait');
   $('station').textContent = verbunden
     ? ('LONGPATH' + (s.device ? ' · ' + s.device.toUpperCase() : ''))
     : 'NICHT VERBUNDEN';
@@ -517,20 +522,47 @@ reglerBinden('pwrTrack', (p) => link.send(`drive:${state.trx},${p}`));
 // ── Abstimmen durch Wischen im Spektrum ─────────────────────────────────────
 // Eine Wischbewegung verschiebt die Frequenz um so viele Hertz, wie sie
 // Bildpunkte zuruecklegt — bezogen auf die tatsaechliche Abtastrate.
-let wischVon = null, wischHz = 0;
+let wischVon = null, wischHz = 0, wischAktiv = false, wischLetzt = 0, wischZiel = null;
+
+// Ab wie vielen Bildpunkten ein Wisch als Wisch gilt. Darunter war es ein
+// Tipp, und ein Tipp darf die Frequenz NICHT verstellen: ein Daumen trifft
+// nie auf den Punkt genau, und bis 2026-09-30 verstimmte jede Beruehrung des
+// Wasserfalls das Geraet (Durchsicht, 3/3 bestaetigt).
+const kWischTotzone = 10;
+// Nicht bei jedem Bewegungsereignis senden. Ein Telefon liefert 60 bis 120
+// davon je Sekunde, und jedes war ein eigener vfo-Befehl ueber die Leitung —
+// beim langsamen Ziehen ueber das Band waren das Hunderte in Folge.
+const kWischAbstandMs = 60;
+
 $('scope').addEventListener('pointerdown', (e) => {
   wischVon = e.clientX; wischHz = link.st.vfo[state.trx][0];
+  wischAktiv = false; wischLetzt = 0; wischZiel = null;
   $('scope').setPointerCapture(e.pointerId);
 });
 $('scope').addEventListener('pointermove', (e) => {
   if (wischVon === null) return;
+  const weg = e.clientX - wischVon;
+  if (!wischAktiv) {
+    if (Math.abs(weg) < kWischTotzone) return;
+    wischAktiv = true;
+  }
   const spanne = link.st.iqRate || 192000;
   const proPixel = spanne / $('scope').getBoundingClientRect().width;
-  const neu = Math.round((wischHz - (e.clientX - wischVon) * proPixel) / 10) * 10;
+  const neu = Math.round((wischHz - weg * proPixel) / 10) * 10;
+  wischZiel = neu;
+  const jetzt = performance.now();
+  if (jetzt - wischLetzt < kWischAbstandMs) return;
+  wischLetzt = jetzt;
   link.send(`vfo:${state.trx},0,${neu}`);
 });
-$('scope').addEventListener('pointerup', () => { wischVon = null; });
-$('scope').addEventListener('pointercancel', () => { wischVon = null; });
+$('scope').addEventListener('pointerup', () => {
+  // Den letzten Stand nachreichen: durch die Drosselung kann bis zu ein
+  // Intervall Wegstrecke ungesendet geblieben sein, und dann steht das
+  // Geraet ein Stueck neben dem, wo der Finger losgelassen hat.
+  if (wischAktiv && wischZiel !== null) { link.send(`vfo:${state.trx},0,${wischZiel}`); }
+  wischVon = null; wischAktiv = false; wischZiel = null;
+});
+$('scope').addEventListener('pointercancel', () => { wischVon = null; wischAktiv = false; wischZiel = null; });
 
 // ── Abstimmtraeger: bewusst KEIN Knopf ──────────────────────────────────────
 //
@@ -672,16 +704,34 @@ setInterval(() => {
     if (!wegSeit) wegSeit = Date.now();
     if (Date.now() - wegSeit > 12000) {
       $('koppeln').classList.add('an');
-      // Der häufigste Grund, aus dem Netz nicht hereinzukommen, ist ein
-      // falsches oder fehlendes Token. Das sagen, statt den Bediener raten
-      // zu lassen.
-      if (!link.ready && !state.token) {
-        $('fehler').textContent = 'Keine Antwort. Ist Longpath ins Netz gebunden? '
-                                + 'Dann braucht es das Token aus Setup → TCI Server.';
-      }
+      $('fehler').textContent = koppelGrund();
     }
   } else { wegSeit = 0; }
 }, 1000);
+
+// Warum es nicht klappt — in einem Satz, den man auf einem Telefon lesen kann.
+//
+// Bis 2026-09-30 stand hier eine einzige Meldung, und die war ausgerechnet
+// abgeschaltet, sobald ein Token gesetzt war: `if (!link.ready && !state.token)`.
+// Also genau im haeufigsten Fall — Token falsch oder veraltet — schwieg die
+// Seite und liess den Bediener raten (Durchsicht 2026-09-30).
+function koppelGrund() {
+  // Der Server trennt mit 1008 und Klartext, wenn dreimal falsch angemeldet
+  // wurde. Das ist die eindeutigste Auskunft, die es gibt.
+  if (link.schliessCode === 1008) {
+    return (link.schliessGrund || 'Abgewiesen')
+         + '. Das Token stimmt nicht — neues holen unter Setup → TCI Server.';
+  }
+  if (state.token && !link.st.angemeldet) {
+    return 'Longpath antwortet, nimmt das Token aber nicht an. '
+         + 'In Setup → TCI Server ein neues erzeugen und hier eintragen.';
+  }
+  if (!state.token) {
+    return 'Keine Antwort. Ist Longpath ins Netz gebunden? '
+         + 'Dann braucht es das Token aus Setup → TCI Server.';
+  }
+  return 'Keine Antwort. Laeuft Longpath, und ist die Adresse richtig?';
+}
 
 // ── Bildschleife ────────────────────────────────────────────────────────────
 function schleife(t) {
@@ -703,9 +753,18 @@ function schleife(t) {
                  + (state.tonWeg === 'scriptprocessor' ? ' (ersatzweg)' : '')
                : '');
   $('fussTon').className = state.tonFehler ? 'warn' : '';
-  $('fussStatus').textContent = link.ready ? '◆ gekoppelt'
+  // Eine Verbindung kann formal offen stehen und trotzdem tot sein — WLAN
+  // weg, Rechner im Ruhezustand, Longpath beendet. Der Socket merkt das erst
+  // nach Minuten. Bis 2026-09-30 zeigte die Seite derweil gruen und
+  // '◆ gekoppelt' (Durchsicht). Also an den DATEN messen, nicht am Socket:
+  // der Server schickt Messwerte alle 200 ms, drei Sekunden Stille sind
+  // eindeutig.
+  const still = link.ready && link.letzteDaten
+              && (performance.now() - link.letzteDaten > 3000);
+  $('fussStatus').textContent = still ? '◆ keine Daten'
+                              : link.ready ? '◆ gekoppelt'
                               : (link.ws && link.ws.readyState === 1) ? '◆ verbinde…' : '◇ getrennt';
-  $('fussStatus').className = link.ready ? 'ok' : '';
+  $('fussStatus').className = still ? 'warn' : (link.ready ? 'ok' : '');
   requestAnimationFrame(schleife);
 }
 requestAnimationFrame(schleife);

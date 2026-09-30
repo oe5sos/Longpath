@@ -25,6 +25,9 @@ export class TciLink extends EventTarget {
     this.retryMs = 1000;
     this.retryTimer = null;
     this.ready = false;          // ready; aus dem Init-Burst gesehen
+    this.letzteDaten = 0;        // Zeitstempel der letzten Nachricht
+    this.schliessCode = null;    // warum der Server zuletzt zumachte
+    this.schliessGrund = '';
 
     // Zustand, wie ihn der Server meldet. Nichts hiervon wird geraten:
     // jeder Wert kommt aus einer Zeile des Servers.
@@ -38,6 +41,7 @@ export class TciLink extends EventTarget {
       volume: null,              // dB, global
       rxVolume: [null, null],
       smeter: [null, null],
+    angemeldet: false,           // auth:ok gesehen
     audioTyp: null,              // vom Server bestaetigtes Tonformat
     spektrumBestaetigt: false,   // Server hat spectrum_start zurueckgemeldet
     spektrumPunkte: null,        // die Punktzahl, auf die er geklemmt hat
@@ -103,15 +107,25 @@ export class TciLink extends EventTarget {
       this.retryMs = 1000;
       this._emit('open');
     };
-    ws.onclose = () => {
+    ws.onclose = (ev) => {
       // Ein veralteter Socket darf den Zustand des aktuellen nicht anfassen.
       if (this.ws !== ws) { return; }
+      // Grund festhalten: der Server trennt mit 1008 und einem Klartext,
+      // wenn die Anmeldung dreimal scheiterte. Ohne das steht die Seite
+      // stumm da und der Bediener raet.
+      this.schliessCode  = ev && ev.code;
+      this.schliessGrund = (ev && ev.reason) || '';
       this.ready = false;
+      this.st.angemeldet = false;
       this._emit('state');
       this._retry();
     };
     ws.onerror = () => { /* onclose folgt ohnehin */ };
     ws.onmessage = (ev) => {
+      // Wann zuletzt ueberhaupt etwas kam. Ein WebSocket kann minutenlang
+      // offen stehen, nachdem die Gegenstelle weg ist; nur die Daten sagen
+      // die Wahrheit.
+      this.letzteDaten = performance.now();
       if (typeof ev.data === 'string') {
         this.bytes.text += ev.data.length;
         // Ein Rahmen kann mehrere Befehle tragen, mit ';' getrennt.
@@ -155,6 +169,13 @@ export class TciLink extends EventTarget {
       case 'protocol':        s.protocol = args.join(','); break;
       case 'modulations_list': s.modes = args.filter(Boolean); break;
       case 'ready':           this.ready = true; this._emit('ready'); break;
+      // Der Server bestaetigt eine geglueckte Anmeldung und schickt erst
+      // danach den Init-Burst. Bei falschem Token schweigt er und trennt nach
+      // dem dritten Versuch — deshalb ist das Ausbleiben dieser Zeile das
+      // einzige Zeichen, an dem die Seite ein falsches Token erkennen kann.
+      case 'auth':            if ((args[0] || '').toLowerCase() === 'ok') {
+                                s.angemeldet = true; this._emit('state');
+                              } break;
 
       case 'vfo': {
         const t = int(0), ch = int(1), hz = int(2);
