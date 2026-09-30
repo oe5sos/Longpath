@@ -29,6 +29,7 @@ private slots:
     void synthetic_1khz_tone_arrives_as_binary_frame();
     void mono_nimmt_links_und_behaelt_die_dauer();
     void mono_bei_12khz_liefert_ein_viertel();
+    void format_echo_meldet_die_sitzung_nicht_das_programm();
 
 private:
     // Gemeinsamer Aufbau fuer die beiden Mono-Pruefpunkte: Server hoch,
@@ -374,6 +375,75 @@ void TestTciAudioRoundtrip::mono_bei_12khz_liefert_ein_viertel()
     QVERIFY2(a.werte >= erwartet - 512,
              qPrintable(QStringLiteral("Nur %1 von rund %2 Werten abgeflossen")
                             .arg(a.werte).arg(erwartet)));
+}
+
+// ── format_echo_meldet_die_sitzung_nicht_das_programm() ──────────────────────
+//
+// Bis 2026-09-30 lief `audio_stream_sample_type:` durch den Abfangpunkt
+// HINDURCH bis zu TciProtocol. Das kennt nur die vier TCI-Namen, faellt bei
+// allem anderen auf float32, setzt damit das GLOBALE RadioModel und echot
+// float32 an alle Clients.
+//
+// Am echten Geraet gemessen: Rahmen mit Probentyp 101 (mu-law) kamen an,
+// waehrend das Echo "float32" sagte. Der Client schaltete daraufhin selbst
+// auf int16 zurueck — der billige Ton kam nie zum Einsatz. Schwerer noch:
+// ein Client, der mulaw8 anfordert, haette einem gleichzeitig laufenden
+// WSJT-X das Tonformat verstellt.
+//
+// Das Format gehoert der Sitzung. Der Prueffpunkt haelt beides fest: das Echo
+// nennt den Sitzungswert, und die Rahmen tragen ihn auch.
+
+void TestTciAudioRoundtrip::format_echo_meldet_die_sitzung_nicht_das_programm()
+{
+    TciServer server(nullptr);
+    QVERIFY(server.start(0));
+
+    QWebSocket client;
+    QSignalSpy verbunden(&client, &QWebSocket::connected);
+    QSignalSpy binaer(&client, &QWebSocket::binaryMessageReceived);
+    client.open(QUrl(QStringLiteral("ws://127.0.0.1:%1").arg(server.port())));
+    QVERIFY(verbunden.wait(2000));
+
+    QStringList antworten;
+    connect(&client, &QWebSocket::textMessageReceived,
+            [&antworten](const QString& s) { antworten << s; });
+
+    client.sendTextMessage(QStringLiteral("audio_stream_sample_type:mulaw8;"));
+    QTest::qWait(120);
+
+    bool sahMulaw = false, sahFloat = false;
+    for (const QString& z : antworten) {
+        for (const QString& teil : z.split(QLatin1Char(';'))) {
+            const QString s = teil.trimmed();
+            if (!s.startsWith(QLatin1String("audio_stream_sample_type:"))) { continue; }
+            if (s.contains(QLatin1String("mulaw8")))  { sahMulaw = true; }
+            if (s.contains(QLatin1String("float32"))) { sahFloat = true; }
+        }
+    }
+    QVERIFY2(sahMulaw, qPrintable(QStringLiteral(
+        "Das Echo muss mulaw8 nennen — bekommen: %1").arg(antworten.join(QLatin1Char(' ')))));
+    QVERIFY2(!sahFloat, "float32 im Echo heisst, der Befehl lief bis TciProtocol "
+                        "durch und hat das globale Modell verstellt");
+
+    // Und die Rahmen tragen es auch.
+    client.sendTextMessage(QStringLiteral("audio_start:0;"));
+    QTest::qWait(50);
+    std::vector<float> L(1024, 0.5f), R(1024, 0.5f);
+    for (int i = 0; i < 8; ++i) {
+        server.injectAudioFrameForTest(0, L.data(), R.data(), 1024, 48000);
+    }
+    QTest::qWait(250);
+
+    QVERIFY2(binaer.count() >= 1, "Es muss ein Tonrahmen ankommen");
+    const QByteArray f = binaer.at(0).at(0).toByteArray();
+    QVERIFY(f.size() > 64);
+    const auto* p = reinterpret_cast<const quint8*>(f.constData() + 8);   // sampleType
+    const quint32 typ = quint32(p[0]) | (quint32(p[1]) << 8)
+                      | (quint32(p[2]) << 16) | (quint32(p[3]) << 24);
+    QCOMPARE(typ, 101u);
+
+    client.close();
+    server.stop();
 }
 
 QTEST_GUILESS_MAIN(TestTciAudioRoundtrip)

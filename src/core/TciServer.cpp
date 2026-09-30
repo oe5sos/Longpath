@@ -2852,6 +2852,38 @@ void TciServer::onTextMessageReceived(const QString& rohMsg)
                 qCInfo(lcTci) << "TciServer: session audioSampleType set to" << typeStr
                               << "(" << session->audioSampleType << ")"
                               << "peer" << session->peer;
+
+                // ── Hier ist Schluss (2026-09-30) ───────────────────────────
+                //
+                // Der Befehl darf NICHT an TciProtocol weiterlaufen. Dort
+                // (handleAudioStreamSampleTypeCommand) kennt man nur die vier
+                // TCI-Namen, faellt bei allem anderen auf float32, setzt damit
+                // das GLOBALE RadioModel und echot float32 an ALLE Clients.
+                //
+                // Zwei Schaeden. Erstens ein falsches Echo: am 2026-09-30 live
+                // gemessen kamen Rahmen mit Probentyp 101 (mu-law) an,
+                // waehrend das Echo "float32" sagte — der Client schaltete
+                // daraufhin selbst auf int16 zurueck, und der billige Ton kam
+                // nie zum Einsatz. Zweitens, und schwerer: ein Client, der
+                // mulaw8 anfordert, haette damit das globale Format verstellt
+                // und einem gleichzeitig laufenden WSJT-X das Tonformat unter
+                // den Fuessen weggezogen.
+                //
+                // Das Format gehoert in Longpath der SITZUNG, nicht dem
+                // Programm — anders als in Thetis, wo ein Server einen
+                // Zustand hat. Diese Abweichung war schon da (audioSampleType
+                // steht in TciClientSession); sie wird hier nur zu Ende
+                // gefuehrt. Also: selbst bestaetigen, mit dem Wert, der fuer
+                // DIESE Verbindung gilt, und den Befehl schlucken.
+                static const char* kNamen[] = {"int16", "int24", "int32", "float32"};
+                const int st = session->audioSampleType;
+                const QString name = (st >= 0 && st <= 3)
+                                   ? QString::fromLatin1(kNamen[st])
+                                   : (st == 101 ? QStringLiteral("mulaw8")
+                                                : QStringLiteral("float32"));
+                session->sendQueue.push(TciSendQueue::Priority::Control,
+                    QStringLiteral("audio_stream_sample_type:%1;").arg(name));
+                return;
             }
         }
 
