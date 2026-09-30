@@ -65,8 +65,11 @@ void  destroy_resampleFV(void* ptr);
 #include <QHostAddress>
 #include <QTimer>
 #include <QWebSocket>
+#include <QWebSocketCorsAuthenticator>  // Herkunftsprüfung, siehe start()
 #include <QWebSocketServer>
 #include <QDateTime>
+
+#include <algorithm>  // std::clamp — drive:/tune_drive:-Broadcasts
 
 namespace Longpath {
 
@@ -1177,6 +1180,27 @@ void TciServer::hookGlobalBroadcasts()
                     QStringLiteral("tune:1,false;"));  // !VFOBTX path
             });
 
+    // ── DRIVE + TUNE_DRIVE (drive: / tune_drive: lines) ────────────────────
+    // Source: Thetis PowerChangedHandlers at TCIServer.cs:1090-1095
+    // [v2.10.3.13] — die Konsole meldet jede Leistungsänderung von sich aus
+    // weiter (sendDrivePower / sendTunePower), damit ein Client, der den
+    // Regler NICHT bewegt hat, den neuen Stand trotzdem sieht.
+    //
+    // Ohne das hier hätte eine Fernbedienung ihren Leistungsregler zwar
+    // setzen können (handleDriveCommand), aber jedes Drehen am Gerät selbst
+    // wäre ihr entgangen — der Schieber am Telefon stünde dann falsch, bis
+    // jemand neu abfragt.
+    connect(&m_model->transmitModel(), &TransmitModel::powerChanged, this,
+            [this](int pct) {
+                m_protocol->enqueueLocalBroadcast(
+                    QStringLiteral("drive:0,%1;").arg(std::clamp(pct, 0, 100)));
+            });
+    connect(&m_model->transmitModel(), &TransmitModel::tunePowerChanged, this,
+            [this](int pct) {
+                m_protocol->enqueueLocalBroadcast(
+                    QStringLiteral("tune_drive:0,%1;").arg(std::clamp(pct, 0, 100)));
+            });
+
     // ── MON enable + volume (mon_enable: / mon_volume: lines) ──────────────
     // Source: Thetis MONChangedHandlers + MONVolumeChangedHandlers at
     // TCIServer.cs:6744-6745 [v2.10.3.15] routed to OnMONChanged /
@@ -1366,7 +1390,69 @@ bool TciServer::start(const QHostAddress& bindAddress, quint16 port)
     connect(m_server, &QWebSocketServer::newConnection,
             this, &TciServer::onNewConnection);
 
-    qCInfo(lcTci) << "TciServer: listening on" << m_server->serverPort();
+    // ── Herkunftsprüfung (2026-09-30) ───────────────────────────────────────
+    //
+    // WebSocket-Verbindungen unterliegen NICHT der Gleiche-Herkunft-Regel des
+    // Browsers. Ohne diesen Haken konnte jede beliebige Webseite, die der
+    // Bediener irgendwo im Browser offen hat, `new WebSocket("ws://127.0.0.1:
+    // 50001")` aufmachen und `trx:0,true;` schicken — also die Station tasten.
+    // Die Bindung an 127.0.0.1 hilft dagegen NICHT: sie hält andere Rechner
+    // fern, nicht einen Browser auf genau diesem Rechner. Auch Thetis,
+    // deskHPSDR und AetherSDR haben diese Prüfung nicht; sie ist
+    // Longpath-eigen.
+    //
+    // Die Regel, und warum sie nichts kaputtmacht:
+    //   - Native Clients (WSJT-X, JTDX, N1MM+, Log4OM, Hamlib, TCI Remote)
+    //     senden beim Handschlag KEINEN Origin-Kopf. Sie werden angenommen
+    //     wie bisher.
+    //   - Ein Browser sendet IMMER einen Origin-Kopf. Solche Verbindungen
+    //     werden nur angenommen, wenn die Herkunft in `TciAllowedOrigins`
+    //     steht (Vorgabe: leer, also keine).
+    //
+    // Deshalb ist es ausdrücklich KEINE Erlaubnisliste über alle Clients —
+    // das würde jeden Logger aussperren, der nichts von Herkünften weiß —
+    // sondern genau eine Sperre gegen fremde Webseiten.
+    //
+    // Eine eigene Longpath-Weboberfläche trägt sich später hier ein.
+    connect(m_server, &QWebSocketServer::originAuthenticationRequired,
+            this, [this](QWebSocketCorsAuthenticator* auth) {
+                if (!auth) { return; }
+                const QString origin = auth->origin().trimmed();
+                if (origin.isEmpty()) {
+                    auth->setAllowed(true);   // nativer Client, kein Browser
+                    return;
+                }
+                const QStringList allowed =
+                    AppSettings::instance()
+                        .value(QStringLiteral("TciAllowedOrigins"), QString())
+                        .toString()
+                        .split(QLatin1Char(','), Qt::SkipEmptyParts);
+                bool ok = false;
+                for (const QString& a : allowed) {
+                    if (a.trimmed().compare(origin, Qt::CaseInsensitive) == 0) {
+                        ok = true;
+                        break;
+                    }
+                }
+                auth->setAllowed(ok);
+                if (!ok) {
+                    qCWarning(lcTci)
+                        << "TciServer: Verbindung aus dem Browser abgelehnt,"
+                        << "Herkunft" << origin
+                        << "steht nicht in TciAllowedOrigins";
+                }
+            });
+
+    // Sendezeit-Deckel aus den Einstellungen übernehmen (0 = aus, Vorgabe
+    // 180 s). Beim Start gelesen statt bei jedem Tasten, damit eine Änderung
+    // während eines laufenden Sendevorgangs nicht mitten hinein greift; der
+    // Setter oben zieht sie für den nächsten Start ohnehin nach.
+    setTxTimeCapSeconds(AppSettings::instance()
+                            .value(QStringLiteral("TciMaxTransmitSeconds"), 180)
+                            .toInt());
+
+    qCInfo(lcTci) << "TciServer: listening on" << m_server->serverPort()
+                  << "| Sendezeit-Deckel" << m_txTimeCapSeconds << "s";
     emit serverStarted(m_server->serverPort());
 
     // From Thetis TCIServer.cs:2650-2654 [v2.10.3.13] — 20s server-driven ping
@@ -1711,6 +1797,65 @@ void TciServer::releaseMoxHeldBy(QWebSocket* ws, const QString& peer, const QStr
     emit moxReleasedOnClientLoss(peer);
 }
 
+// ── Sendezeit-Deckel (2026-09-30) ───────────────────────────────────────────
+//
+// Begründung am Feld m_txTimeCap in TciServer.h. Kurz: der Wachhund oben
+// fängt einen toten oder eingefrorenen Client; er fängt nicht den Client, der
+// putzmunter weitersendet, weil das Telefon in der Tasche liegt. Dagegen
+// hilft nur eine harte Obergrenze je Sendevorgang.
+//
+// Bewusst NICHT an MOX allgemein gehängt, sondern an den TCI-MOX-Besitzer:
+// wer vor dem Gerät sitzt und selbst tastet, sieht ja, dass er sendet.
+
+void TciServer::setTxTimeCapSeconds(int seconds)
+{
+    m_txTimeCapSeconds = qMax(0, seconds);
+    if (m_txTimeCapSeconds == 0) {
+        stopTxTimeCap();
+        return;
+    }
+    // Läuft gerade ein Sendevorgang, gilt die neue Grenze ab sofort — von
+    // vorn gerechnet. Die Alternative (alte Grenze zu Ende laufen lassen)
+    // wäre schwerer zu erklären als der Neustart.
+    if (m_txTimeCap && m_txTimeCap->isActive()) {
+        m_txTimeCap->start(m_txTimeCapSeconds * 1000);
+    }
+}
+
+void TciServer::startTxTimeCap()
+{
+    if (m_txTimeCapSeconds <= 0) { return; }
+    if (!m_txTimeCap) {
+        m_txTimeCap = new QTimer(this);   // parented — stirbt mit dem Server
+        m_txTimeCap->setSingleShot(true);
+        connect(m_txTimeCap, &QTimer::timeout, this, &TciServer::onTxTimeCapExpired);
+    }
+    // Einmalig und immer von vorn: jeder neue Sendevorgang bekommt die volle
+    // Zeit, auch wenn der vorige kurz zuvor endete.
+    m_txTimeCap->start(m_txTimeCapSeconds * 1000);
+}
+
+void TciServer::stopTxTimeCap()
+{
+    if (m_txTimeCap) { m_txTimeCap->stop(); }
+}
+
+void TciServer::onTxTimeCapExpired()
+{
+    if (m_moxOwner.isNull()) { return; }
+    auto it = m_clients.find(m_moxOwner.data());
+    const QString peer = (it != m_clients.end()) ? it.value()->peer
+                                                 : QStringLiteral("(unbekannt)");
+    qCWarning(lcTci) << "TciServer: Sendezeit-Deckel von" << m_txTimeCapSeconds
+                     << "s erreicht — MOX von" << peer << "wird abgeworfen";
+    // Der gemeinsame Weg macht den Rest: Besitzer löschen, entkeyen, Wachhund
+    // und Deckel stoppen, melden.
+    releaseMoxHeldBy(m_moxOwner.data(), peer,
+                     QStringLiteral("hat den Sendezeit-Deckel von %1 s erreicht")
+                         .arg(m_txTimeCapSeconds));
+    emit moxReleasedOnTimeCap(peer, m_txTimeCapSeconds);
+}
+
 void TciServer::setKeyedWatchdog(int intervalMs, int maxUnanswered)
 {
     m_keyedWatchdogIntervalMs   = qMax(50, intervalMs);
@@ -1731,12 +1876,17 @@ void TciServer::startKeyedWatchdog()
         m_ownerPingsUnanswered = 0;
         m_keyedWatchdog->start(m_keyedWatchdogIntervalMs);
     }
+    // Der Sendezeit-Deckel teilt den Lebenszyklus des Wachhunds: er läuft
+    // genau dann, wenn ein TCI-Client den Sender hält. Dadurch greifen beide
+    // Ausstiege (Abbruch, Ping-Ausfall) ohne weitere Verdrahtung auch für ihn.
+    startTxTimeCap();
 }
 
 void TciServer::stopKeyedWatchdog()
 {
     if (m_keyedWatchdog) { m_keyedWatchdog->stop(); }
     m_ownerPingsUnanswered = 0;
+    stopTxTimeCap();   // gemeinsamer Lebenszyklus, siehe startKeyedWatchdog()
 }
 
 void TciServer::onKeyedWatchdogTick()

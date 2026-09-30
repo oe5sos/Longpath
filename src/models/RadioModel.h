@@ -2110,6 +2110,28 @@ public slots:
     Q_INVOKABLE void setAgcGain(int rx, int gain);
     Q_INVOKABLE int  agcGain(int rx) const;
 
+    // TX-Leistung / Abstimmleistung — Fassade für die TCI-Kommandos `drive:`
+    // und `tune_drive:`.  Beide fehlten bis 2026-09-30 vollständig, weshalb
+    // die Leistungsschieber jeder Fernbedienung (TCI Remote von ON7OFF,
+    // N1MM+, Log4OM) still wirkungslos blieben: TciProtocol verwirft
+    // unbekannte Namen ohne Antwort (TciProtocol.cpp, dispatch-Ende).
+    //
+    // From Thetis TCIServer.cs:4138-4164 [v2.10.3.13] — handleDrive /
+    // handleTuneDrive: 1 Argument = Abfrage, 2 Argumente = Setzen; Ziel ist
+    // consoleThreadSafe.PWR bzw. TUNPower.  Der Bereich 0..100 wird dort
+    // beim SENDEN geprüft (sendDrivePower / sendTunePower,
+    // TCIServer.cs:2328-2341: `if (drive < 0 || drive > 100) return;`).
+    // Longpath klemmt statt dessen schon hier, damit ein fremder Client mit
+    // einem Ausreißer nicht erst eine unmögliche Leistung setzt und dann
+    // eine Meldung bekommt, die nie gesendet wird.
+    //
+    // Ziel ist TransmitModel::power / tunePower — dieselben Eigenschaften,
+    // die das TX-Applet über seine Schieber setzt (TxApplet.cpp:866).
+    Q_INVOKABLE void setDrivePower(int pct);
+    Q_INVOKABLE int  drivePower() const;
+    Q_INVOKABLE void setTuneDrivePower(int pct);
+    Q_INVOKABLE int  tuneDrivePower() const;
+
     // Squelch — routes to SliceModel::ssqlEnabled / ssqlThresh.  TCI level
     // is int (-140..0 dBm); SliceModel::ssqlThresh is double in same units.
     Q_INVOKABLE void setSqlEnable(int rx, bool on);

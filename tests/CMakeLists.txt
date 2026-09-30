@@ -2880,6 +2880,21 @@ longpath_add_test(tst_app_settings_binary_values)
 # tst_tci_matrix_runner -- this file pins the PRODUCTION-side wiring.
 longpath_add_test(tst_tci_radio_model_shims)
 
+# ── TCI drive / tune_drive / tune (2026-09-30) ──────────────────────────────
+# Die drei Kommandos fehlten vollständig; weil unbekannte Namen still
+# verworfen werden, blieb jeder Leistungsregler einer Fernbedienung wirkungslos,
+# ohne dass irgendwo ein Fehler auftauchte. Der Prüfstand pinnt beide Pfade
+# (Setzen mit Klemmung, Abfrage) und die Regel, dass `tune:` keine eigene
+# Zustandsmeldung erfindet, solange der Träger nicht wirklich steht.
+longpath_add_test(tst_tci_drive_tune_drive)
+
+# ── Herkunftsprüfung + Sendezeit-Deckel (2026-09-30) ────────────────────────
+# Zwei Sicherungen, ohne die der TCI-Server nicht ins Netz darf: eine fremde
+# Webseite im Browser des Bedieners konnte bisher die Station tasten (WebSocket
+# kennt keine Gleiche-Herkunft-Regel, und Loopback hilft dagegen nicht), und
+# ein Sendevorgang hatte überhaupt keine Obergrenze.
+longpath_add_test(tst_tci_origin_and_tx_time_cap)
+
 # ── Phase 3J-1 closeout Item 4 (2026-05-12): per-(band, mode) filter ────────
 # Pins the contract that SliceModel::setDspMode saves the current filter
 # under (currentBand, OLD mode) and restores from (currentBand, NEW mode)

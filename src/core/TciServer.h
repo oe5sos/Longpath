@@ -144,6 +144,14 @@ public:
     // for tests; the app keeps the defaults.
     void setKeyedWatchdog(int intervalMs, int maxUnanswered);
 
+    // Sendezeit-Deckel: Obergrenze für einen einzelnen, über TCI getasteten
+    // Sendevorgang. 0 schaltet ihn ab. Der Wert stammt sonst aus der
+    // Einstellung `TciMaxTransmitSeconds` (Vorgabe 180 s) — siehe die
+    // ausführliche Begründung am Feld m_txTimeCap. Für Prüfstände, damit sie
+    // nicht drei Minuten warten müssen.
+    void setTxTimeCapSeconds(int seconds);
+    int  txTimeCapSeconds() const { return m_txTimeCapSeconds; }
+
     // Test-only: bypass the RxChannel signal chain and inject audio directly
     // into the per-slice ring buffer.  Used by tst_tci_audio_roundtrip;
     // production code paths go through the Qt::DirectConnection signal at
@@ -210,6 +218,12 @@ signals:
     // Also emitted when no RadioModel is installed (test path), so the
     // ownership bookkeeping can be checked without a radio.
     void moxReleasedOnClientLoss(const QString& peer);
+
+    // Der Sendezeit-Deckel hat zugeschlagen: ein über TCI getasteter
+    // Sendevorgang lief länger als erlaubt und wurde abgeworfen. Trägt die
+    // Gegenstelle und die abgelaufene Grenze, damit die Oberfläche es dem
+    // Bediener sagen kann — ein stiller Abwurf wäre nur ein zweites Rätsel.
+    void moxReleasedOnTimeCap(const QString& peer, int seconds);
 
     // Emitted when the server fails to bind.
     void errorOccurred(const QString& errStr);
@@ -539,6 +553,38 @@ private:
     int     m_keyedWatchdogIntervalMs{1000};
     int     m_keyedWatchdogMaxUnanswered{3};
     int     m_ownerPingsUnanswered{0};
+
+    // ── Sendezeit-Deckel (2026-09-30) ────────────────────────────────────────
+    //
+    // Der Wachhund darüber deckt zwei Fälle ab: Socket weg (Absturz) und
+    // Socket lebt, aber niemand antwortet (Hänger). Er deckt NICHT den dritten
+    // ab, der bei einer Handy-Fernbedienung der wahrscheinlichste ist: Client
+    // lebt, antwortet brav auf jeden Ping — und sendet trotzdem weiter, weil
+    // das Telefon in der Tasche liegt, die Sendetaste klemmt oder der Bediener
+    // schlicht vergessen hat loszulassen. Gegen diesen Fall hilft nur eine
+    // harte Obergrenze für die Dauer eines einzelnen Sendevorgangs.
+    //
+    // Das ist die klassische Zeitbegrenzung (time-out timer), die jedes
+    // kommerzielle Funkgerät mitbringt; ON7OFF verlangt sie für seine
+    // Fernbedienung ausdrücklich serverseitig (60-120 s empfohlen).
+    //
+    // Der Deckel läuft im gleichen Lebenszyklus wie der Wachhund: er startet,
+    // wenn ein Client MOX erwirbt, und endet bei jeder Freigabe — damit greift
+    // er ohne Zusatzarbeit auch bei Abbruch und Ping-Ausfall.
+    //
+    // Er gilt AUSSCHLIESSLICH für über TCI getastete Sendevorgänge. Ein am
+    // Gerät selbst ausgelöstes MOX fasst er nicht an: wer vor dem Gerät sitzt,
+    // sieht, dass er sendet, und braucht keinen Aufpasser.
+    //
+    // Einstellung `TciMaxTransmitSeconds` (AppSettings), 0 schaltet ihn ab.
+    // Vorgabe 180 s: großzügig genug für einen langen Durchgang in Sprache,
+    // kurz genug, dass ein vergessenes Mikrofon nicht das Band blockiert.
+    void startTxTimeCap();
+    void stopTxTimeCap();
+    void onTxTimeCapExpired();
+
+    QTimer* m_txTimeCap{nullptr};
+    int     m_txTimeCapSeconds{180};
 
     // ── Phase 19: sensor broadcast timers ────────────────────────────────────
     //
