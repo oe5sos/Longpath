@@ -145,7 +145,7 @@ function zeichneBedienung() {
       const el = document.createElement('div');
       el.className = 'chip' + (hz >= b.von && hz <= b.bis ? ' on' : '');
       el.textContent = b.n;
-      el.onclick = () => link.send(`vfo:${state.trx},0,${b.mitte}`);
+      el.onclick = () => { link.send(`vfo:${state.trx},0,${b.mitte}`); wasserfallLeeren(); };
       $('bands').appendChild(el);
     });
     const mehr = document.createElement('div');
@@ -324,6 +324,26 @@ const wfPuffCtx = wfPuff.getContext('2d');
 
 let letzteIq = 0;
 let neueZeilen = 0;      // vom Datenstrom gefuellt, von der Zeichenschleife geleert
+
+// ── Den Wasserfall leeren (2026-10-01) ──────────────────────────────────────
+//
+// Der Wasserfall ist eine Historie: jede Zeile ist ein Augenblick von
+// frueher. Nach einem Frequenzsprung zeigt diese Historie ein Band, auf dem
+// man gar nicht mehr steht — sie ist nicht veraltet, sondern FALSCH, und sie
+// braucht eine halbe Minute, bis sie nach oben herausgewandert ist.
+//
+// Betreiber am 2026-10-01: "der wasserfall unten springt nicht sofort auf
+// die frequenz". Genau das: er springt nicht, er schiebt sich langsam weg.
+//
+// Also beim Sprung loeschen. Das kostet die Historie, die ohnehin nichts
+// mehr aussagt, und das Bild baut sich in einer Sekunde neu auf.
+function wasserfallLeeren() {
+  try {
+    wfCtx.fillStyle = '#0c0c0e';
+    wfCtx.fillRect(0, 0, wf.width, wf.height);
+  } catch (e) { /* vor dem ersten Zeichnen */ }
+  neueZeilen = 0;
+}
 link.addEventListener('iq', (e) => {
   const v = e.detail.vals;
   if (v.length < N * 2) return;
@@ -864,6 +884,9 @@ function spanneSetzen(hz) {
   if (neu === state.spanneHz) { return; }
   state.spanneHz = neu;
   link.send(`spectrum_start:${state.trx},${pan.width},12,${neu}`);
+  // Nach einem Zoom passt die alte Historie nicht mehr: dieselben Zeilen
+  // decken jetzt eine andere Bandbreite ab.
+  wasserfallLeeren();
   zeichneKopf();
 }
 
@@ -899,7 +922,15 @@ $('scope').addEventListener('pointerup', () => {
   // Den letzten Stand nachreichen: durch die Drosselung kann bis zu ein
   // Intervall Wegstrecke ungesendet geblieben sein, und dann steht das
   // Geraet ein Stueck neben dem, wo der Finger losgelassen hat.
-  if (wischAktiv && wischZiel !== null) { link.send(`vfo:${state.trx},0,${wischZiel}`); }
+  if (wischAktiv && wischZiel !== null) {
+    link.send(`vfo:${state.trx},0,${wischZiel}`);
+    // Weit genug gesprungen, dass die Historie nicht mehr passt? Dann weg
+    // damit. Schwelle ist ein Zehntel der gezeigten Spanne — darunter
+    // ueberlappt der alte Ausschnitt noch so weit, dass die alten Zeilen
+    // mehr nuetzen als stoeren.
+    const spanne = state.spanneHz > 0 ? state.spanneHz : (link.st.iqRate || 192000);
+    if (Math.abs(wischZiel - wischHz) > spanne / 10) { wasserfallLeeren(); }
+  }
   wischVon = null; wischAktiv = false; wischZiel = null;
   state.bildHalten = false;
   state.wischVersatzPx = 0;
