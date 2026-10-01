@@ -87,8 +87,13 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
 </div>
 
 <div class="scope" id="scope">
-  <canvas id="pan" width="373" height="104"></canvas>
-  <canvas id="wf"  width="373" height="196"></canvas>
+  <!-- Hoehen am laufenden Geraet nachgemessen (2026-10-01): mit 104/196 war
+       die Seite 973 Punkte hoch bei 852 verfuegbaren, und man musste fuer
+       Band und Regler wischen. Zusammen mit knapperen Polstern passt das
+       Wichtige jetzt wieder ohne Wischen. Der Wasserfall bleibt deutlich
+       hoeher als der Panadapter — gesehen wird vor allem dort. -->
+  <canvas id="pan" width="373" height="96"></canvas>
+  <canvas id="wf"  width="373" height="160"></canvas>
   <div class="cursor"></div>
 </div>
 
