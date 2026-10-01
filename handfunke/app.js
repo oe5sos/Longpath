@@ -60,6 +60,31 @@ const state = {
 };
 
 // ── Kopplung ────────────────────────────────────────────────────────────────
+//
+// Die Seite weiss, woher sie geladen wurde — und Longpath laeuft auf
+// genau diesem Rechner. Die Adresse muss also niemand eintippen.
+//
+// Das war bis zum 2026-10-01 anders, und es hat einen Abend gekostet: Auf
+// dem Telefon stand noch eine alte IP aus einem anderen Netz, und die
+// Seite meldete nur "keine Antwort". Ein Rechnername aus dem Heimnetz
+// (`...local`) ueberlebt jeden Netzwechsel; eine IP tut das nicht.
+//
+// Faellt der Name weg (Seite per file:// geoeffnet), bleibt das Feld leer
+// und das Kopplungsblatt fragt wie bisher.
+function eigenerHost() {
+  const h = location.hostname;
+  if (!h || h === 'localhost' || h === '127.0.0.1') { return ''; }
+  return h;
+}
+
+/** Derselbe Rechner, Longpaths Port.
+ *
+ *  Es gibt nur diese eine Adresse — auch wenn die Bruecke laeuft: die
+ *  belegt dieselbe Portnummer auf der Netzadresse, waehrend Longpath
+ *  127.0.0.1 haelt. Darum muss hier nichts probiert und nichts
+ *  unterschieden werden. */
+const PORT_TCI = 50001;
+
 const gespeichert = () => { try { return localStorage.getItem('handfunke.adresse') || ''; } catch (e) { return ''; } };
 const merken = (v) => { try { localStorage.setItem('handfunke.adresse', v); } catch (e) {} };
 // Das Token wird nur gebraucht, wenn Longpath ins Netz gebunden ist; auf
@@ -81,12 +106,22 @@ function starten(adresse) {
 
 $('verbinden').addEventListener('click', () => starten($('adresse').value));
 $('adresse').addEventListener('keydown', (e) => { if (e.key === 'Enter') starten($('adresse').value); });
-$('adresse').value = gespeichert();
+$('adresse').value = gespeichert() || (eigenerHost() ? eigenerHost() + ':' + PORT_TCI : '');
 $('token').value = tokenLesen();
 
-// Beim Start: liegt eine Adresse vor, gleich versuchen — das Kopplungsblatt
-// kommt von selbst zurueck, wenn es nicht klappt.
-if (gespeichert()) starten(gespeichert());
+/** Verbindet ohne Eingabe mit dem Rechner, von dem die Seite kam. */
+function verbindeSelbst() {
+  const host = eigenerHost();
+  if (!host) { return false; }
+  starten(host + ':' + PORT_TCI);
+  return true;
+}
+
+// Beim Start: eine gemerkte Adresse hat Vorrang (der Operator hat sie
+// bewusst gesetzt), sonst der eigene Rechner. Das Kopplungsblatt kommt von
+// selbst zurueck, wenn beides nicht klappt.
+if (gespeichert()) { starten(gespeichert()); }
+else { verbindeSelbst(); }
 
 // ── Anzeige ─────────────────────────────────────────────────────────────────
 function hzText(hz) {
