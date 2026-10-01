@@ -414,6 +414,35 @@ function afFaktor(pct) {
 // ── Ton ─────────────────────────────────────────────────────────────────────
 // iOS gibt Ton erst nach einer Beruehrung frei. Wir versuchen es bei jeder
 // Beruehrung erneut, bis es klappt — ohne einen eigenen Knopf dafuer.
+// ── Den Stummschalter aushebeln (2026-10-01) ────────────────────────────────
+//
+// iOS stuft Ton aus einer Webseite als "Ambient" ein, und diese Kategorie
+// gehorcht dem kleinen Schieber an der Seite des Telefons: steht er auf
+// stumm, bleibt der eingebaute Lautsprecher still — WEB-AUDIO EINGESCHLOSSEN.
+// Kopfhoerer sind davon nicht betroffen, iOS gibt dort trotzdem aus.
+//
+// Genau dieses Bild am 2026-10-01: alle Zahlen richtig (Rahmen kamen an, der
+// Puffer war voll, der Tonknoten lief, der Regler stand auf 1,0), nichts zu
+// hoeren — aber "mit ohrstöpsel geht es". Von aussen sieht das aus wie ein
+// Fehler im Programm und ist keiner.
+//
+// Spielt die Seite ein <audio>-Element ab, wechselt iOS in die Kategorie
+// "Playback", und die ignoriert den Schieber. Das Element traegt eine
+// Sekunde Stille und laeuft in Schleife; es ist nicht zu hoeren und kostet
+// nichts.
+//
+// Der Aufruf muss aus einer Beruehrung kommen — deshalb steht er in
+// tonStarten() und nicht irgendwo beim Laden.
+function stummesElementStarten() {
+  const el = $('stillhalter');
+  if (!el) { return; }
+  try {
+    el.volume = 0;          // hoerbar ist daran nichts
+    const p = el.play();
+    if (p && p.catch) { p.catch(() => { /* ohne geht es eben nur mit Hoerer */ }); }
+  } catch (e) { /* desgleichen */ }
+}
+
 async function tonStarten() {
   // Riegel gegen Doppelstart. `state.node` allein reicht NICHT: zwischen der
   // Pruefung und dem Setzen liegen zwei await-Stellen, und ein einziger Tipp
@@ -423,6 +452,10 @@ async function tonStarten() {
   if (state.node || state.tonStartLaeuft) { return; }
   state.tonStartLaeuft = true;
   try {
+    // ZUERST: iOS in die Playback-Kategorie bringen, bevor der AudioContext
+    // entsteht. Danach gehorcht der Ton dem Stummschalter nicht mehr.
+    stummesElementStarten();
+
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) { throw new Error('Dieser Browser kennt keinen AudioContext'); }
     // KEINE Abtastrate vorgeben. Die Rate ist eine Eigenschaft des
@@ -571,6 +604,19 @@ async function tonStarten() {
     node.connect(gain);
     gain.connect(deckel);
     deckel.connect(ctx.destination);
+
+    // Zwei Horchposten, damit sich nachweisen laesst, WO ein Ton verschwindet:
+    // einer am Regler (vor dem Begrenzer), einer am Ausgang. Die Seite misst
+    // sich damit selbst und meldet es — auf einem Telefon ist das der einzige
+    // Weg, an diese Zahlen zu kommen.
+    try {
+      state.mess1 = ctx.createAnalyser(); state.mess1.fftSize = 2048;
+      state.mess1.smoothingTimeConstant = 0;
+      gain.connect(state.mess1);
+      state.mess2 = ctx.createAnalyser(); state.mess2.fftSize = 2048;
+      state.mess2.smoothingTimeConstant = 0;
+      deckel.connect(state.mess2);
+    } catch (e) { /* ohne Messpunkte laeuft es trotzdem */ }
     await ctx.resume();
 
     state.audio = ctx; state.node = node; state.gain = gain;
@@ -596,11 +642,48 @@ async function tonStarten() {
 $('tonAn').addEventListener('click', async () => {
   await tonStarten();
   zeichneTonKnopf();
+  // Nach dem Tippen melden: das ist der Augenblick, in dem sich
+  // entscheidet, ob die Tonkette steht. Ohne diese Zeile muss man raten,
+  // ob der Knopf gedrueckt wurde und was er bewirkt hat.
+  setTimeout(() => melde('knopf'), 1500);
 });
 ['touchend', 'click'].forEach(ev =>
   document.addEventListener(ev, async () => {
     await tonStarten(); zeichneTonKnopf();
   }, { passive: true }));
+
+// Testton: ein Sinus durch DIESELBE Kette (Regler, Begrenzer, Ausgang).
+// Hoert man ihn nicht, liegt es an der Kette oder am Geraet — hoert man ihn,
+// liegt es an den Daten. Das trennt die beiden Faelle in einem Griff.
+// Erreichbar ueber langes Tippen auf die Datenrate oben rechts.
+async function testton() {
+  await tonStarten();
+  const C = state.audio;
+  if (!C) { return; }
+  try {
+    const o = C.createOscillator();
+    o.frequency.value = 700;
+    const g = C.createGain();
+    g.gain.value = 0.25;
+    o.connect(g);
+    // Bewusst am Regler VORBEI direkt an den Ausgang: so prueft der Ton die
+    // Ausgabe des Geraets, nicht unsere Lautstaerkerechnung.
+    g.connect(C.destination);
+    o.start();
+    setTimeout(() => { try { o.stop(); o.disconnect(); g.disconnect(); } catch (e) {} }, 2000);
+    melde('testton');
+  } catch (e) { /* nichts */ }
+}
+(() => {
+  const r = $('rate');
+  if (!r) { return; }
+  let halt = null;
+  const an = () => { halt = setTimeout(testton, 700); };
+  const aus = () => { clearTimeout(halt); };
+  ['touchstart', 'mousedown'].forEach(e => r.addEventListener(e, an, { passive: true }));
+  ['touchend', 'touchcancel', 'mouseup', 'mouseleave'].forEach(e =>
+    r.addEventListener(e, aus, { passive: true }));
+})();
 
 // Der Knopf steht da, solange kein Ton laeuft, und verschwindet danach.
 function zeichneTonKnopf() {
@@ -867,7 +950,7 @@ function koppelGrund() {
 // lassen ist muehsam und fehleranfaellig. Also meldet die Seite einmal
 // nach dem Start, wie es um ihre Tonkette steht — reine Zustandszahlen,
 // kein Inhalt, und nur an den Rechner, von dem sie geladen wurde.
-setTimeout(async () => {
+async function melde(anlass) {
   const C = state.audio, K = state.node && state.node._kern;
   const d = {
     sicher: window.isSecureContext,
@@ -887,9 +970,23 @@ setTimeout(async () => {
     leer: K ? K.starved : -1,
     ready: link.ready,
   };
+  // Pegel an beiden Horchposten — in dBFS, gerundet.
+  const pegel = (an) => {
+    if (!an) { return 'kein'; }
+    const z = new Float32Array(an.fftSize);
+    an.getFloatTimeDomainData(z);
+    let s = 0; for (let i = 0; i < z.length; i++) { s += z[i] * z[i]; }
+    const rms = Math.sqrt(s / z.length);
+    return rms > 0 ? Math.round(20 * Math.log10(rms)) : 'still';
+  };
+  d.vorDeckel  = pegel(state.mess1);
+  d.nachDeckel = pegel(state.mess2);
+  d.ausgabe    = (C && C.destination) ? C.destination.channelCount : -1;
+  d.anlass = anlass || 'start';
   const q = Object.entries(d).map(([k, v]) => k + '=' + encodeURIComponent(String(v))).join('&');
   try { await fetch('/melde?' + q); } catch (e) {}
-}, 12000);
+}
+setTimeout(() => melde('start'), 12000);
 
 // ── Bildschleife ────────────────────────────────────────────────────────────
 function schleife(t) {

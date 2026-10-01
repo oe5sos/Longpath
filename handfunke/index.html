@@ -146,6 +146,14 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
 <!-- ton-kern.js zuerst: app.js braucht TonKern fuer den Rueckfall auf
      ScriptProcessorNode, wenn AudioWorklet fehlt (LAN ueber http). Kein
      Modul, damit dieselbe Datei auch per addModule ins Worklet passt. -->
+<!-- Stilles Tonelement, damit iOS die Seite als "Playback" einstuft und
+     nicht als "Ambient". Begruendung in app.js bei stummesElementStarten():
+     ohne das schaltet der Stummschalter am iPhone den eingebauten
+     Lautsprecher ab, waehrend Kopfhoerer weiter spielen. Am 2026-10-01 genau
+     so erlebt. Die Datei ist eine eine Sekunde lange Stille in WAV, als
+     data:-URI eingebettet — kein zusaetzlicher Abruf. -->
+<audio id="stillhalter" loop playsinline preload="auto"
+       src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YQAAAAA="></audio>
 <script src="ton-kern.js"></script>
 <script type="module" src="app.js"></script>
 </body>
