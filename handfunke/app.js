@@ -302,10 +302,25 @@ const glatt = new Float32Array(N);        // eigene FFT (Rückfall)
 let specServer = new Float32Array(0);     // fertig vom Server (Regelfall)
 let hatSpektrum = false;
 
-// Die Wasserfallrampe „Gedaempft" mit genau den sieben Stuetzpunkten aus
-// SpectrumWidget.cpp — Grundrauschen verschwindet, Waerme erst oben.
-const STOPS = [[0,[8,8,10]],[.30,[12,12,14]],[.48,[44,44,49]],[.64,[88,88,94]],
-               [.78,[129,123,92]],[.92,[216,165,95]],[1,[242,242,236]]];
+// Die Wasserfallrampe „Gedaempft" aus SpectrumWidget.cpp, mit EINER
+// Abweichung: ihr dunkler Teil liegt hier auf dem Panel-Blau (--pan-bg
+// #141e27) statt auf Grau.
+//
+// Warum: am Schreibtisch fuellt der Wasserfall ein halbes Fenster, da traegt
+// Grau. Am Telefon ist er eine Handflaeche gross und wird oft im Hellen
+// angesehen — dort verschwand alles unterhalb eines starken Traegers in
+// einem einzigen gleichfoermigen Grau, obwohl er ein Drittel der Hoehe
+// bekommt. Betreiber hat am 2026-10-01 die Richtung „Glas und Tiefe"
+// gewaehlt, in der dieser Boden blau ist.
+//
+// Was NICHT uebernommen wird, obwohl es naheliegt: Longpaths
+// WfColorScheme::ClarityBlue. Die ist lesbar, laeuft oben aber ueber Gruen
+// und Gelb nach Rot — genau der Regenbogen, den „Gedaempft" 2026-08-15
+// bewusst abgeschafft hat, und Rot ist hier der Warnung vorbehalten.
+// Geaendert ist also nur die Grundfarbe, nicht der Aufbau: Boden
+// verschwindet, Waerme erst oben, Weiss ganz oben.
+const STOPS = [[0,[11,14,19]],[.30,[20,30,39]],[.48,[36,56,78]],[.64,[92,106,112]],
+               [.78,[150,132,92]],[.92,[216,165,95]],[1,[242,242,236]]];
 function rampe(t) {
   t = t < 0 ? 0 : t > 1 ? 1 : t;
   for (let i = 1; i < STOPS.length; i++) {

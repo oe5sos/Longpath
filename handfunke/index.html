@@ -92,7 +92,7 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
   <div class="cursor"></div>
 </div>
 
-<div class="meter">
+<div class="meter schicht">
   <div class="row">
     <span class="caps">Signal</span>
     <span class="val" id="smeter">—</span>
@@ -103,17 +103,16 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
   </div>
 </div>
 
-<div class="group">
+<!-- Betriebsart und Band gehoeren zusammen (was hoere ich, und wo) — darum
+     ein Panel. app.js fuellt unveraendert #modes und #bands. -->
+<div class="feld schicht">
   <div class="caps">Betriebsart</div>
   <div class="chips" id="modes"></div>
-</div>
-
-<div class="group">
   <div class="caps">Band</div>
   <div class="chips" id="bands"></div>
 </div>
 
-<div class="sliders">
+<div class="sliders schicht">
   <div class="sl">
     <span class="caps">AF</span>
     <div class="track" id="afTrack"><i id="afFill" style="width:0%"></i><b id="afKnob" style="left:0%"></b></div>
@@ -126,12 +125,10 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
   </div>
 </div>
 
-<div class="group">
+<!-- Filter und Aufbereitung gehoeren zusammen (wie raeume ich auf) -->
+<div class="feld schicht">
   <div class="caps">Filter</div>
   <div class="chips" id="filters"></div>
-</div>
-
-<div class="group">
   <div class="caps">Aufbereitung</div>
   <div class="chips" id="dsp"></div>
 </div>
