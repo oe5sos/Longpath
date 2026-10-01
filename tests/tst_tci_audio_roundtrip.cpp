@@ -19,6 +19,7 @@
 #include <cstring>
 #include <vector>
 
+#include "TciBurstHelfer.h"
 #include "core/TciServer.h"
 
 using namespace Longpath;
@@ -404,6 +405,12 @@ void TestTciAudioRoundtrip::format_echo_meldet_die_sitzung_nicht_das_programm()
     QSignalSpy binaer(&client, &QWebSocket::binaryMessageReceived);
     client.open(QUrl(QStringLiteral("ws://127.0.0.1:%1").arg(server.port())));
     QVERIFY(verbunden.wait(2000));
+
+    // Erst den Init-Burst abwarten, dann mitschreiben: er bringt selbst
+    // `audio_stream_sample_type:;` mit und landete auf dem CI-Laeufer
+    // mitten in der Messung (2026-10-02). Siehe TciBurstHelfer.h.
+    QVERIFY2(TciTest::warteAufReady(client),
+             "Kein ready; — der Server ist gar nicht fertig geworden");
 
     QStringList antworten;
     connect(&client, &QWebSocket::textMessageReceived,
