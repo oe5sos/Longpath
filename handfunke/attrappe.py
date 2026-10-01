@@ -121,6 +121,7 @@ class Verbindung(threading.Thread):
         # (TciClientSession::rxSensorsEnabled steht ab Werk auf false).
         self.rx_sensors_an = False
         self.rx_sensors_ms = 200
+        self.spec_spanne = 0          # 0 = volle Breite
         self.spec_zeit = 0.0
         # Vom Client ausgehandelt (audio_samplerate / _channels / _sample_type).
         self.audio_rate = AUDIO_RATE
@@ -235,6 +236,14 @@ class Verbindung(threading.Thread):
                 self.spec_punkte = max(64, min(1024, int(args[1])))
             if len(args) >= 3 and args[2].isdigit():
                 self.spec_fps = max(1, min(30, int(args[2])))
+            if len(args) >= 4 and args[3].isdigit():
+                # Vierter Wert: gezeigte Bandbreite in Hertz, 0 = alles.
+                # Longpath schneidet dafuer mittig aus den FFT-Bins; hier
+                # wird das Bild einfach schmaler gerechnet. Fuer die
+                # Bedienprobe ist das gleichwertig — und ohne das laesst
+                # sich das Kneifen nicht ohne Funkgeraet ausprobieren.
+                hz = int(args[3])
+                self.spec_spanne = 0 if hz <= 0 else max(2000, min(IQ_RATE, hz))
             self.sende_text(
                 f'spectrum_start:{args[0]},{self.spec_punkte},{self.spec_fps};')
             print(f'  {self.addr[1]}: Spektrum an, {self.spec_punkte} Punkte,'
@@ -278,6 +287,10 @@ class Verbindung(threading.Thread):
 
         # Traeger, die die Handfunke zeigen soll: Versatz in Hz von der Mitte,
         # Staerke, und ob sie dauernd da sind oder blinken.
+        # Die Traeger stehen auf FESTEN Frequenzen, nicht relativ zur Mitte.
+        # Nur so bewirkt das Abstimmen etwas Sichtbares: faehrt man auf einen
+        # zu, wandert er ins Bild. Lagen sie relativ zur Mitte, stuende das
+        # Bild still — und genau das war am echten Geraet die Beschwerde.
         traeger = [(-14000, 0.22, 0.0), (-6200, 0.09, 0.0), (-1500, 0.45, 0.0),
                    (3100, 0.13, 0.7), (8800, 0.30, 0.0), (15500, 0.06, 1.3)]
         t0 = time.time()
@@ -327,7 +340,7 @@ class Verbindung(threading.Thread):
             if self.spec_an and (jetzt - self.spec_zeit) >= 1.0 / self.spec_fps:
                 self.spec_zeit = jetzt
                 p = self.spec_punkte
-                spanne = IQ_RATE                      # volle Breite
+                spanne = self.spec_spanne or IQ_RATE
                 werte = []
                 for i in range(p):
                     hz = -spanne / 2 + spanne * i / (p - 1)

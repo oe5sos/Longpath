@@ -76,6 +76,31 @@ void  destroy_resampleFV(void* ptr);
 
 namespace Longpath {
 
+// ── rueckstauFrei() (2026-10-01) ─────────────────────────────────────────────
+//
+// Darf an diesen Socket noch ein Binaerrahmen? Qt puffert, was der Client
+// nicht abholt, und der Puffer waechst ohne Grenze.
+//
+// Das trifft genau den Fall, fuer den die Handfunke gebaut ist: ein Telefon,
+// das iOS einfriert, wenn es in die Tasche wandert. Die Verbindung bleibt
+// formal offen, der Client holt aber nichts mehr ab — und der Server
+// schaufelt bei 12 kHz mu-law gut 13 kB in jede Sekunde hinein. Nach einer
+// Viertelstunde in der Tasche waeren das zwölf Megabyte je Strom.
+//
+// Ab der Schwelle wird verworfen statt gepuffert. Das ist die richtige Wahl
+// fuer Ton und Bild: beide sind nur im Augenblick etwas wert. Was der Client
+// verpasst hat, will er beim Zurueckkommen nicht nachgereicht bekommen — er
+// will das JETZT hoeren und sehen, nicht die Viertelstunde von vorhin.
+//
+// 256 kB sind bei 13 kB/s rund zwanzig Sekunden Rueckstand. Wer so weit
+// hinterherhaengt, hat kein Puffer-, sondern ein Leitungsproblem.
+static bool rueckstauFrei(QWebSocket* ws)
+{
+    static constexpr qint64 kMaxAusstehend = 256 * 1024;
+    return ws && ws->bytesToWrite() < kMaxAusstehend;
+}
+
+
 // ── Constructor / destructor ─────────────────────────────────────────────────
 //
 // Phase 2 Task 2.1: constructor body is intentionally empty — no meter timers,
@@ -512,7 +537,14 @@ TciServer::TciServer(RadioModel* model, QObject* parent)
                     channels,
                     samples);
 
-                ws->sendBinaryMessage(frame);
+                // Nur senden, wenn der Client hinterherkommt. Begruendung
+                // an rueckstauFrei(): ein eingefrorenes Telefon haelt die
+                // Verbindung offen und holt nichts ab.
+                if (rueckstauFrei(ws)) {
+                    ws->sendBinaryMessage(frame);
+                } else {
+                    session->framesDropped += 1;
+                }
             }
         }
     });
@@ -3873,6 +3905,10 @@ void TciServer::onRawIqDataReceived(const QVector<float>& interleavedIQ)
             2,             // always 2 channels for IQ (I + Q)
             outBuf.constData());
 
+        // Begruendung an rueckstauFrei(): roher I/Q ist der teuerste Strom,
+        // und was der Client verpasst hat, will er nicht nachgereicht
+        // bekommen — er will das Jetzt sehen.
+        if (!rueckstauFrei(ws)) { continue; }
         ws->sendBinaryMessage(frame);
     }
 }
@@ -3986,6 +4022,8 @@ void TciServer::onFftBinsReady(int receiverId, const QVector<float>& binsDbm)
             bild[i] = spitze;
         }
 
+        // Ein Bild, das zwanzig Sekunden alt ist, hilft niemandem mehr.
+        if (!rueckstauFrei(ws)) { continue; }
         ws->sendBinaryMessage(TciBinaryFrame::buildSpectrumPayload(
             receiverId, session->spectrumFps, punkte, bild.constData()));
     }
