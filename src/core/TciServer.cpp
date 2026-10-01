@@ -2162,8 +2162,21 @@ QString TciServer::remoteToken()
 bool TciServer::setRemoteToken(const QString& token)
 {
     if (token.isEmpty()) {
-        AppSettings::instance().setValue(QString::fromLatin1(kTokenSetting),
-                                         QString());
+        // Die Klartextkopie nur anfassen, wenn es wirklich eine gibt.
+        //
+        // Ein bedingungsloses setValue() schreibt die Einstellungsdatei bei
+        // JEDEM Aufraeumen neu — und im Testbetrieb teilen sich alle
+        // Pruefstaende eine Datei (QStandardPaths::setTestModeEnabled).
+        // Zwei parallel laufende Staende schrieben sich dann gegenseitig
+        // hinein; am 2026-10-01 fiel darueber
+        // tst_tci_remote_auth::loopback_bekommt_den_init_burst_ohne_anmeldung
+        // im Sammellauf, waehrend er einzeln gruen blieb.
+        if (!AppSettings::instance()
+                 .value(QString::fromLatin1(kTokenSetting), QString())
+                 .toString().isEmpty()) {
+            AppSettings::instance().setValue(QString::fromLatin1(kTokenSetting),
+                                             QString());
+        }
         return CredentialStore::erase(QString::fromLatin1(kTokenKey),
                                       QString::fromLatin1(kTokenAccount));
     }
@@ -2171,9 +2184,14 @@ bool TciServer::setRemoteToken(const QString& token)
     if (CredentialStore::store(QString::fromLatin1(kTokenKey),
                                QString::fromLatin1(kTokenAccount), token)) {
         // Geglückt: eine etwaige Klartextkopie aus einem früheren Rückfall
-        // gehört jetzt weg, sonst veraltet sie unbemerkt.
-        AppSettings::instance().setValue(QString::fromLatin1(kTokenSetting),
-                                         QString());
+        // gehört jetzt weg, sonst veraltet sie unbemerkt. Auch hier nur
+        // anfassen, wenn es eine gibt — Begründung oben.
+        if (!AppSettings::instance()
+                 .value(QString::fromLatin1(kTokenSetting), QString())
+                 .toString().isEmpty()) {
+            AppSettings::instance().setValue(QString::fromLatin1(kTokenSetting),
+                                             QString());
+        }
         return true;
     }
 

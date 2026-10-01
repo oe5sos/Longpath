@@ -2922,7 +2922,6 @@ longpath_add_test(tst_tci_remote_auth)
 # `trx :`), dazu Besitzer und Ruecknahme des Abstimmtraegers beim Trennen.
 longpath_add_test(tst_tci_sendesperre)
 target_compile_definitions(tst_tci_sendesperre PRIVATE LONGPATH_BUILD_TESTS)
-
 # ── mu-law als Tonformat (2026-09-30) ─────────────────────────────────────
 # Misst den Stoerabstand statt nur durchzulaufen, prueft dass der Fehler dem
 # Pegel folgt (der ganze Sinn des Kompandierens), und vergleicht die
@@ -7451,4 +7450,28 @@ foreach(_asan_gap_target IN ITEMS
     endif()
 endforeach()
 
-
+# ── Gemeinsame Sperre fuer die Fernzugriffs-Pruefstaende (2026-10-01) ──────
+#
+# Diese drei fassen dieselben AppSettings-Schluessel an (TciAllowRemoteTx,
+# TciRemoteTokenPlain), und im Testbetrieb teilen sich ALLE Staende eine
+# Einstellungsdatei: QStandardPaths::setTestModeEnabled(true) gibt ihnen
+# denselben Pfad (TestSandboxInit.cpp).
+#
+# Parallel gestartet schrieben sie sich gegenseitig hinein — der eine setzt
+# die Sendefreigabe auf an, waehrend der andere prueft, dass sie ab Werk aus
+# ist. Ergebnis war ein Flattern, das einzeln nie auftrat: im Sammellauf fiel
+# mal tst_tci_remote_auth, mal tst_tci_sendesperre, in etwa zwei von drei
+# Durchgaengen.
+#
+# Diese Zeilen stehen am DATEIENDE, weil set_tests_properties die Tests
+# bereits kennen muss — vor longpath_add_test() bricht CMake ab
+# ("Can not find test to add properties to").
+#
+# RESOURCE_LOCK statt RUN_SERIAL: nur diese drei laufen nacheinander, alles
+# andere weiter parallel. Das kostet ein paar Sekunden und macht den
+# Sammellauf verlaesslich.
+set_tests_properties(
+  tst_tci_remote_auth
+  tst_tci_sendesperre
+  tst_tci_remote_access_page
+  PROPERTIES RESOURCE_LOCK longpath_tci_fernzugriff_settings)
