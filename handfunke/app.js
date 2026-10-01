@@ -117,11 +117,32 @@ function verbindeSelbst() {
   return true;
 }
 
-// Beim Start: eine gemerkte Adresse hat Vorrang (der Operator hat sie
-// bewusst gesetzt), sonst der eigene Rechner. Das Kopplungsblatt kommt von
-// selbst zurueck, wenn beides nicht klappt.
-if (gespeichert()) { starten(gespeichert()); }
-else { verbindeSelbst(); }
+// Beim Start: eine gemerkte Adresse hat Vorrang — der Operator hat sie
+// bewusst gesetzt. ABER sie kann veraltet sein: eine IP aus einem anderen
+// Netz steht nach einem Netzwechsel still im Weg, und die Seite meldete
+// bisher nur "keine Antwort" (am 2026-10-01 genau so passiert, mit einer
+// 192.168er-Adresse auf dem Telefon, waehrend der Mac im 172.30.30er hing).
+//
+// Darum: gemerkte Adresse zuerst, aber wenn sie binnen fuenf Sekunden
+// nicht zu Longpath fuehrt, still auf den eigenen Rechner umschwenken —
+// den, von dem diese Seite kam. Der kann gar nicht falsch sein.
+if (gespeichert()) {
+  starten(gespeichert());
+  const gemerkt = gespeichert();
+  const eigen = eigenerHost() ? eigenerHost() + ':' + PORT_TCI : '';
+  if (eigen && eigen !== gemerkt) {
+    let fertig = false;
+    const merkeErfolg = () => { fertig = true; };
+    link.addEventListener('ready', merkeErfolg, { once: true });
+    setTimeout(() => {
+      if (fertig) { return; }
+      link.removeEventListener('ready', merkeErfolg);
+      starten(eigen);
+    }, 5000);
+  }
+} else {
+  verbindeSelbst();
+}
 
 // ── Anzeige ─────────────────────────────────────────────────────────────────
 function hzText(hz) {

@@ -134,33 +134,67 @@ def adressen():
     return raus
 
 
-if __name__ == "__main__":
-    # An die NETZADRESSE binden, nicht an 0.0.0.0: auf 0.0.0.0 waere der Port
-    # schon von Longpath belegt (das haelt 127.0.0.1:50001), und die Bruecke
-    # kaeme gar nicht hoch.
+def horcher():
+    """Oeffnet alle Sockets, auf denen die Handfunke hereinkommen kann.
+
+    Zwei, nicht einer — und das ist der Punkt, an dem es am 2026-10-01
+    noch einmal scheiterte:
+
+      IPv4 auf der NETZADRESSE. Nicht 0.0.0.0, denn das schloesse
+      127.0.0.1 ein, und das haelt Longpath selbst.
+
+      IPv6 auf allem (`::`, aber V6ONLY). Ein `.local`-Name loest auf
+      diesem Mac auf FUENF Adressen auf, und `::1` steht an erster
+      Stelle. Browser probieren IPv6 zuerst; horcht dort nichts, meldet
+      die Seite "keine Antwort", obwohl ueber IPv4 alles bereitstuende.
+      Longpath hat gar keinen IPv6-Socket, also gibt es hier auch keinen
+      Konflikt.
+    """
+    offen = []
     eigene = adressen()
-    if not eigene:
-        print("Keine Netzadresse gefunden — haengt der Rechner im WLAN?", flush=True)
+    # Zusaetzlich der alte Port 50010. Er kostet nichts und ist der Rueckweg,
+    # falls die Umstellung auf 50001 irgendwo klemmt — am 2026-10-01 lief die
+    # Handfunke am iPhone bereits ueber 50010, und ein Stand, der nachts
+    # umgebaut und nicht am Geraet geprueft werden konnte, darf diesen Weg
+    # nicht mitnehmen.
+    PORTS = [HORCH_PORT] + ([50010] if HORCH_PORT != 50010 else [])
+    for port in PORTS:
+        if eigene:
+            v4 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            v4.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            try:
+                v4.bind((eigene[0], port)); v4.listen(8); offen.append((v4, f"{eigene[0]}:{port}"))
+            except OSError as e:
+                print(f"IPv4 {eigene[0]}:{port} nicht belegbar ({e})", flush=True)
+                v4.close()
+        v6 = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+        v6.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        v6.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
+        try:
+            v6.bind(("::", port)); v6.listen(8); offen.append((v6, f"[::]:{port}"))
+        except OSError as e:
+            print(f"IPv6 [::]:{port} nicht belegbar ({e})", flush=True)
+            v6.close()
+    return offen
+
+
+if __name__ == "__main__":
+    import select
+    offen = horcher()
+    if not offen:
+        print("Kein Socket zu oeffnen — horcht Longpath dort schon selbst?", flush=True)
         raise SystemExit(1)
-    srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    try:
-        srv.bind((eigene[0], HORCH_PORT))
-    except OSError as e:
-        print(f"{eigene[0]}:{HORCH_PORT} laesst sich nicht belegen ({e}).", flush=True)
-        print("Horcht Longpath dort schon selbst? Dann wird die Bruecke nicht "
-              "gebraucht.", flush=True)
-        raise SystemExit(1)
-    srv.listen(8)
-    for a in eigene:
-        print(f"Bruecke offen auf {a}:{HORCH_PORT} — in der Handfunke steht "
-              f"damit dieselbe Adresse wie ohne Bruecke", flush=True)
+    for _, wo in offen:
+        print(f"Bruecke offen auf {wo}", flush=True)
     print(f"weitergereicht an {ZIEL[0]}:{ZIEL[1]} · Strg-C beendet sie\n", flush=True)
     try:
         while True:
-            k, a = srv.accept()
-            threading.Thread(target=bedienen, args=(k, a), daemon=True).start()
+            bereit, _, _ = select.select([s for s, _ in offen], [], [], 1.0)
+            for srv in bereit:
+                k, a = srv.accept()
+                threading.Thread(target=bedienen, args=(k, a), daemon=True).start()
     except KeyboardInterrupt:
         print("\nBruecke zu.", flush=True)
     finally:
-        srv.close()
+        for srv, _ in offen:
+            srv.close()
