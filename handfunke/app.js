@@ -47,6 +47,8 @@ const state = {
   token: '',                 // nur für den Netzweg nötig
   audioRate: 12000,          // ausgehandelt; 48000 wäre Faktor 16 teurer
   spanneHz: 48000,           // gezeigte Bandbreite; 0 = alles
+  bildHalten: false,         // Bild einfrieren, solange abgestimmt wird
+  wischVersatzPx: 0,         // wie weit der Finger von der Mitte weg ist
   tonTypPruefung: null,      // Nachfassen, falls mulaw8 nicht bestaetigt wird
   tonStartLaeuft: false,     // Riegel gegen doppelten AudioContext
   tonWeg: null,              // 'worklet' | 'scriptprocessor'
@@ -222,6 +224,46 @@ function zeichneKopf() {
   // Wie breit das Bild gerade ist. Ohne diese Angabe weiss man beim Kneifen
   // nicht, wo man gelandet ist — und auch nicht, wie fein die Abstimmung
   // gerade greift (das Raster haengt an der Spanne).
+  // ── Der Abstimmstrich gehoert dorthin, wo die Frequenz ist ──────────────
+  //
+  // Bis 2026-10-01 stand er fest bei 50 % (stil.css, .cursor). Damit zeigte
+  // er beim Abstimmen keine Bewegung — der Betreiber: "beim wischen nach
+  // rechts und links ändert sich nur die frequenz". Genau so war es: die
+  // Zahl lief, das Bild stand, und der Strich blieb stur in der Mitte.
+  //
+  // Die Bildmitte ist die DDC-Frequenz (dds), nicht die abgestimmte (vfo).
+  // Beide fallen nur zusammen, solange nicht innerhalb der DDC-Breite
+  // abgestimmt wird. Der Abstand zwischen ihnen, geteilt durch die gezeigte
+  // Spanne, ist die Stelle im Bild.
+  {
+    const c = document.querySelector('.cursor');
+    if (c) {
+      // Waehrend des Haltens zeigt der Strich, wohin der Finger faehrt.
+      if (state.bildHalten) {
+        const b = $('scope').getBoundingClientRect().width || 1;
+        const anteil = 50 - (state.wischVersatzPx / b) * 100;
+        c.style.left = Math.max(0, Math.min(100, anteil)).toFixed(2) + '%';
+        c.style.opacity = '1';
+        return;
+      }
+      const mitte = link.st.dds[state.trx];
+      const vfo   = link.st.vfo[state.trx] ? link.st.vfo[state.trx][0] : null;
+      const spanne = state.spanneHz > 0 ? state.spanneHz : (link.st.iqRate || 0);
+      if (mitte && vfo && spanne > 0) {
+        // 0 % ist der linke Rand, 100 % der rechte; die Mitte ist 50 %.
+        const anteil = 50 + ((vfo - mitte) / spanne) * 100;
+        // Am Rand stehenbleiben statt aus dem Bild zu laufen: ausserhalb
+        // waere er unsichtbar, und dann waere nicht zu sehen, dass die
+        // Frequenz den Ausschnitt verlassen hat.
+        c.style.left = Math.max(0, Math.min(100, anteil)).toFixed(2) + '%';
+        c.style.opacity = (anteil < 0 || anteil > 100) ? '0.35' : '1';
+      } else {
+        c.style.left = '50%';
+        c.style.opacity = '1';
+      }
+    }
+  }
+
   const sp = $('spanne');
   if (sp) {
     const hz = state.spanneHz > 0 ? state.spanneHz : (link.st.iqRate || 0);
@@ -759,6 +801,20 @@ $('scope').addEventListener('pointermove', (e) => {
   if (!wischAktiv) {
     if (Math.abs(weg) < kWischTotzone) return;
     wischAktiv = true;
+    // Das Bild festhalten, solange der Finger unten ist.
+    //
+    // Longpath fuehrt die Bildmitte der Abstimmung nach
+    // (RadioModel.cpp: setCenterFrequency(slice->frequency())). Das Bild
+    // wandert also MIT, die Mitte bleibt die Mitte — und sichtbar aendert
+    // sich nur die Zahl. Betreiber am 2026-10-01: "beim wischen nach rechts
+    // und links ändert sich nur die frequenz".
+    //
+    // Was man beim Abstimmen sehen will, ist das Gegenteil: ein stehendes
+    // Bild, durch das der Abstimmstrich faehrt, damit man sieht, WOHIN man
+    // faehrt. Solange der Finger unten ist, wird deshalb kein neues Bild
+    // angenommen und der Strich wandert stattdessen. Beim Loslassen laeuft
+    // es normal weiter.
+    state.bildHalten = true;
   }
   // Mit der GEZEIGTEN Spanne rechnen, nicht mit der vollen DDC-Breite.
   // Vorher stand hier immer iqRate (192 kHz): bei 373 Punkten waren das
@@ -773,6 +829,8 @@ $('scope').addEventListener('pointermove', (e) => {
   const raster = spanne <= 24000 ? 10 : (spanne <= 96000 ? 50 : 100);
   const neu = Math.round((wischHz - weg * proPixel) / raster) * raster;
   wischZiel = neu;
+  // Wie weit der Strich vom Bildmittelpunkt weg ist, in Bildpunkten.
+  state.wischVersatzPx = weg;
   const jetzt = performance.now();
   if (jetzt - wischLetzt < kWischAbstandMs) return;
   wischLetzt = jetzt;
@@ -832,6 +890,8 @@ $('scope').addEventListener('pointerup', () => {
   // Geraet ein Stueck neben dem, wo der Finger losgelassen hat.
   if (wischAktiv && wischZiel !== null) { link.send(`vfo:${state.trx},0,${wischZiel}`); }
   wischVon = null; wischAktiv = false; wischZiel = null;
+  state.bildHalten = false;
+  state.wischVersatzPx = 0;
 });
 $('scope').addEventListener('pointercancel', () => { wischVon = null; wischAktiv = false; wischZiel = null; });
 
@@ -949,6 +1009,10 @@ link.addEventListener('open', () => {
 link.addEventListener('spectrum', (e) => {
   const v = e.detail.vals;
   if (!v.length) return;
+  // Waehrend des Abstimmens kein neues Bild annehmen — siehe
+  // state.bildHalten. Der Zaehler laeuft weiter, damit die Datenrate
+  // stimmt; nur das Bild friert ein.
+  if (state.bildHalten) { state.hatSpektrumstrom = true; return; }
   state.hatSpektrumstrom = true;
   letzteIq = performance.now();
   if (neueZeilen < 3) neueZeilen++;

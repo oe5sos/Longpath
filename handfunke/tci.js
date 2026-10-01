@@ -40,7 +40,8 @@ export class TciLink extends EventTarget {
       drive: null, tuneDrive: null,
       volume: null,              // dB, global
       rxVolume: [null, null],
-      smeter: [null, null],
+      dds: [null, null],           // Mitte des Spektrumbildes je Empfaenger
+    smeter: [null, null],
     angemeldet: false,           // auth:ok gesehen
     audioTyp: null,              // aus dem Text-Echo (unzuverlaessig, s.u.)
     audioTypRahmen: null,        // was WIRKLICH im Binaerkopf steht
@@ -215,6 +216,13 @@ export class TciLink extends EventTarget {
         break;
       }
       case 'spectrum_stop': s.spektrumBestaetigt = false; break;
+
+      // Mitte des Spektrumbildes (die DDC-Frequenz), NICHT die abgestimmte.
+      // Beide fallen nur zusammen, solange nicht innerhalb der DDC-Breite
+      // abgestimmt wird. Ohne diesen Wert weiss die Seite nicht, wo im Bild
+      // die Empfangsfrequenz liegt — und zeichnete den Abstimmstrich stur in
+      // die Mitte, wo er oft gar nicht hingehoert.
+      case 'dds':             { const t2 = int(0); if (t2 !== null) s.dds[t2] = num(1); break; }
 
       case 'iq_samplerate':     s.iqRate    = int(0); break;
       case 'audio_samplerate':  s.audioRate = int(0); break;
