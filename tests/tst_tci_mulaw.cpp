@@ -155,6 +155,112 @@ private slots:
         }
     }
 
+    // ── Gegen die NORM, nicht gegen uns selbst ──────────────────────────────
+    //
+    // Der Pruefpunkt darunter vergleicht C++ mit einer hier nachgebauten
+    // Fassung der JavaScript-Rechnung. Das faengt Drift zwischen den beiden
+    // Umsetzungen — aber nicht den Fall, dass BEIDE denselben Fehler haben.
+    // Genau der ist am 2026-09-30 eingetreten: der Kodierer lieferte -2,5 dB
+    // Stoerabstand, und dieser Vergleich blieb gruen, weil er die Dekodierung
+    // prueft und beide Dekodierer richtig waren.
+    //
+    // Also eine dritte, unabhaengige Referenz: feste Wertepaare aus ITU-T
+    // G.711 beziehungsweise der Sun-Referenz g711.c. Die stehen hier als
+    // Zahlen und nicht als Formel — eine Formel koennte denselben Denkfehler
+    // tragen wie der Code.
+    void normwerte_stimmen()
+    {
+        struct Paar { quint8 byte; int pcm; const char* was; };
+        // ulaw2linear() der Sun-Referenz, nachgeschlagen, nicht gerechnet:
+        static const Paar kDekodiert[] = {
+            { 0xFF,      0, "Null, positives Vorzeichen" },
+            { 0x7F,      0, "Null, negatives Vorzeichen" },
+            { 0x00, -32124, "Vollaussteuerung negativ" },
+            { 0x80,  32124, "Vollaussteuerung positiv" },
+            // Segment 0, Mantisse 15. Nachgerechnet an der Sun-Formel,
+            // Schritt fuer Schritt — der erste Entwurf dieser Tabelle hatte
+            // hier 264 stehen, aus dem Kopf geschrieben statt gerechnet:
+            //   u_val = ~0xF0 = 0x0F
+            //   t = ((0x0F & 0xF) << 3) + 0x84 = 120 + 132 = 252
+            //   t <<= (0x0F & 0x70) >> 4 = 0            -> 252
+            //   (0x0F & 0x80) == 0, also t - 0x84       -> 120
+            { 0xF0,    120, "Segment 0, Mantisse 15" },
+            { 0x70,   -120, "dasselbe negativ" },
+        };
+        QByteArray eins(1, '\0');
+        for (const auto& p : kDekodiert) {
+            eins[0] = char(p.byte);
+            const auto v = TciBinaryFrame::decodeSamples(
+                eins, 0, 1, int(TciSampleType::MuLaw8));
+            QCOMPARE(v.size(), size_t(1));
+            const int gerechnet = int(std::lround(double(v[0]) * 32768.0));
+            QVERIFY2(std::abs(gerechnet - p.pcm) <= 1,
+                     qPrintable(QStringLiteral(
+                         "Byte 0x%1 (%2): G.711 sagt %3, wir rechnen %4")
+                         .arg(p.byte, 2, 16, QLatin1Char('0'))
+                         .arg(QLatin1String(p.was)).arg(p.pcm).arg(gerechnet)));
+        }
+
+        // Und die Gegenrichtung: linear2ulaw der Referenz.
+        struct Paar2 { float wert; quint8 byte; };
+        static const Paar2 kKodiert[] = {
+            { 0.0f,      0xFF },   // Null -> 0xFF
+            { 1.0f,      0x80 },   // Vollaussteuerung positiv
+            { -1.0f,     0x00 },   // Vollaussteuerung negativ
+        };
+        for (const auto& p : kKodiert) {
+            const QByteArray roh = TciBinaryFrame::encodeSamples(
+                &p.wert, 1, int(TciSampleType::MuLaw8));
+            QCOMPARE(roh.size(), 1);
+            const quint8 gerechnet = quint8(roh.at(0));
+            QVERIFY2(gerechnet == p.byte,
+                     qPrintable(QStringLiteral(
+                         "Wert %1: G.711 sagt 0x%2, wir kodieren 0x%3")
+                         .arg(double(p.wert))
+                         .arg(p.byte, 2, 16, QLatin1Char('0'))
+                         .arg(gerechnet, 2, 16, QLatin1Char('0'))));
+        }
+    }
+
+    // ── Die Klemme haelt ────────────────────────────────────────────────────
+    //
+    // kClip = 32635 ist die einzige Wand gegen Segment 8, das es nicht gibt:
+    // ohne sie liefe die Segmentsuche bei sehr grossen Werten ueber die
+    // Tabelle hinaus. Bisher hat kein Pruefpunkt sie beruehrt.
+    void klemme_haelt_gegen_segment_acht()
+    {
+        // Weit ueber Vollaussteuerung, in beide Richtungen.
+        const std::vector<float> wild = { 1.5f, -1.5f, 10.0f, -10.0f,
+                                          1.0f, -1.0f, 0.9999f };
+        const QByteArray roh = TciBinaryFrame::encodeSamples(
+            wild.data(), int(wild.size()), int(TciSampleType::MuLaw8));
+        QCOMPARE(roh.size(), int(wild.size()));
+
+        // Jedes Byte muss ein gueltiges mu-law-Byte sein, und das Segment
+        // (die drei Bits 4..6 des INVERTIERTEN Bytes) darf nie 8 ergeben —
+        // mehr als 7 passt gar nicht hinein, ein Ueberlauf zeigte sich also
+        // als Vorzeichenkipper oder als falsches Segment.
+        for (int i = 0; i < roh.size(); ++i) {
+            const int u = (~int(quint8(roh.at(i)))) & 0xFF;
+            const int seg = (u >> 4) & 0x07;
+            QVERIFY2(seg <= 7, "Segment ausserhalb der Tabelle");
+            // Das Vorzeichen muss das des Eingangs sein.
+            const bool negativ = (u & 0x80) != 0;
+            QVERIFY2(negativ == (wild[size_t(i)] < 0.0f),
+                     qPrintable(QStringLiteral("Vorzeichen gekippt bei %1")
+                                    .arg(double(wild[size_t(i)]))));
+        }
+
+        // Und zurueck: nichts darf ueber Vollaussteuerung herauskommen.
+        const auto zurueck = TciBinaryFrame::decodeSamples(
+            roh, 0, int(wild.size()), int(TciSampleType::MuLaw8));
+        for (float v : zurueck) {
+            QVERIFY2(v >= -1.0f && v <= 1.0f,
+                     qPrintable(QStringLiteral("Wert %1 ausserhalb [-1,1]")
+                                    .arg(double(v))));
+        }
+    }
+
     // ── Beide Seiten rechnen gleich ─────────────────────────────────────────
     //
     // Bildet die Dekodiertabelle aus handfunke/tci.js (case 101) Zeile fuer

@@ -3284,6 +3284,14 @@ void TciServer::onTextMessageReceived(const QString& rohMsg)
     while (m_protocol->hasPendingNotification()) {
         const QString notif = m_protocol->takePendingNotification();
         for (auto sit = m_clients.cbegin(); sit != m_clients.cend(); ++sit) {
+            // Dasselbe Anmeldetor wie im Abflusstakt. Es gibt ZWEI Stellen,
+            // die Meldungen verteilen — diese hier und die im Takt —, und
+            // beim ersten Einbau bekam nur die andere das Tor. Eine halb
+            // geschlossene Tuer ist keine: wer den Port findet, konnte ueber
+            // genau diesen Weg weiter mitlesen, was die Station tut, ohne
+            // das Token zu kennen. Gefunden bei der Durchsicht der eigenen
+            // Reparatur (2026-09-30).
+            if (!sit.value()->authenticated) { continue; }
             sit.value()->sendQueue.push(TciSendQueue::Priority::Control, notif);
         }
     }

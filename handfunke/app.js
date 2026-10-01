@@ -549,7 +549,20 @@ async function tonStarten() {
     // Sinn (Dynamik verdichten) wäre eine Gestaltungsfrage und steht hier
     // ausdrücklich nicht.
     const deckel = ctx.createDynamicsCompressor();
-    deckel.threshold.value = -3;
+    // Schwelle dicht unter Vollaussteuerung, nicht bei -3 dBFS.
+    //
+    // Bei -3 griff er auch in der Stellung 70 %, die ausdruecklich als
+    // "klingt wie bisher" zugesagt ist: die AGC des Empfaengers liefert in
+    // der Regelung Spitzen um 0,98 (-0,2 dBFS), und die liegen ueber -3.
+    // Der Deckel zog damit jede Sprachspitze 20:1 zusammen — aus einem
+    // Schutz gegen Klirren war unversehens ein Klangeingriff geworden.
+    // Gefunden bei der Durchsicht der eigenen Reparatur (2026-09-30).
+    //
+    // Bei -1 dBFS bleibt die Eins-zu-eins-Stellung unangetastet (dort kann
+    // nichts ueber 1,0 kommen, die Quelle ist ja begrenzt) und der Deckel
+    // tut genau das, wofuer er da ist: er faengt ab, was der
+    // Verstaerkungsvorrat darueber hinaustreibt.
+    deckel.threshold.value = -1;
     deckel.knee.value = 0;
     deckel.ratio.value = 20;
     deckel.attack.value = 0.003;
@@ -904,7 +917,12 @@ function schleife(t) {
   // selbstverstaendlich leer, und "stockt" waere dann die falsche Erklaerung
   // fuer etwas, das die Fusszeile daneben schon richtig benennt
   // ("getrennt"). Genau so am 2026-09-30 gesehen.
-  if (link.ready && !state.tonFehler && state.tonLeerlaufZuletzt
+  // Nur melden, wenn ueberhaupt ein Tonstrom laeuft. Ohne Strom laeuft die
+  // Kette selbstverstaendlich leer — "stockt" waere dann die falsche
+  // Erklaerung fuer "es kommt nichts", und sie stuende dauerhaft da. Die
+  // Pruefung auf link.ready allein genuegte nicht: die Verbindung kann
+  // stehen, ohne dass Ton abonniert ist.
+  if (link.ready && r.audio > 0 && !state.tonFehler && state.tonLeerlaufZuletzt
       && performance.now() - state.tonLeerlaufZuletzt < 2000) {
     $('fussTon').textContent += ' ⚠ stockt';
   }
