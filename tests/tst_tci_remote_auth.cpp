@@ -92,25 +92,48 @@ private slots:
 
     // ── Token ───────────────────────────────────────────────────────────────
 
-    void token_ist_lang_genug_und_ohne_verwechselbare_zeichen() {
+    void code_laesst_sich_abtippen() {
+        // Seit dem 2026-10-01 acht Zeichen in zwei Gruppen: ABCD-EFGH.
+        //
+        // Vorher waren es 32. Das war aus Sicht der Kryptographie schoener
+        // und in der Praxis unbrauchbar — der Betreiber hat zu Recht
+        // reklamiert, dass niemand 32 Zeichen auf einem Telefon abtippt.
+        // Was den kurzen Code schuetzt, ist nicht seine Laenge, sondern die
+        // Sperre gegen Durchprobieren (siehe unten).
         const QString t = TciServer::generateRemoteToken();
-        QCOMPARE(t.size(), 32);
+        QCOMPARE(t.size(), 9);                       // 8 Zeichen + ein Strich
+        QCOMPARE(t.at(4), QLatin1Char('-'));
+        QCOMPARE(TciServer::normalisierterCode(t).size(), 8);
 
-        // 0/O und 1/I fehlen absichtlich: das Token soll notfalls abgetippt
-        // werden können, ohne dass jemand über eine Null gegen ein O stolpert.
+        // 0/O und 1/I fehlen absichtlich: wer abtippt, soll nicht ueber eine
+        // Null gegen ein O stolpern.
         QVERIFY2(!t.contains(QLatin1Char('0')), "0 ist mit O zu verwechseln");
         QVERIFY2(!t.contains(QLatin1Char('O')), "O ist mit 0 zu verwechseln");
         QVERIFY2(!t.contains(QLatin1Char('1')), "1 ist mit I zu verwechseln");
         QVERIFY2(!t.contains(QLatin1Char('I')), "I ist mit 1 zu verwechseln");
 
         for (const QChar c : t) {
-            QVERIFY2(c.isUpper() || c.isDigit(), "nur Grossbuchstaben und Ziffern");
+            QVERIFY2(c.isUpper() || c.isDigit() || c == QLatin1Char('-'),
+                     "nur Grossbuchstaben, Ziffern und der Trennstrich");
         }
     }
 
+    void code_darf_geschrieben_werden_wie_er_gelesen_wird() {
+        // Wer abtippt, laesst den Strich mal weg und schreibt mal klein.
+        // Das darf nicht ueber die Anmeldung entscheiden.
+        const QString echt = QStringLiteral("ABCD-EFGH");
+        const QString soll = QStringLiteral("ABCDEFGH");
+        QCOMPARE(TciServer::normalisierterCode(echt), soll);
+        QCOMPARE(TciServer::normalisierterCode(QStringLiteral("abcd-efgh")), soll);
+        QCOMPARE(TciServer::normalisierterCode(QStringLiteral("abcdefgh")), soll);
+        QCOMPARE(TciServer::normalisierterCode(QStringLiteral(" ABCD EFGH ")), soll);
+        QCOMPARE(TciServer::normalisierterCode(QStringLiteral("AbCd-EfGh")), soll);
+    }
+
     void zwei_token_sind_nie_gleich() {
-        // 32 Zeichen aus 32 Möglichkeiten sind 160 Bit. Kämen zwei gleiche
-        // heraus, zöge die Zufallsquelle nicht.
+        // Acht Zeichen aus 32 Moeglichkeiten sind 40 Bit, rund 1,1 Billionen
+        // Faelle. Kaemen unter 64 Ziehungen zwei gleiche heraus, zoege die
+        // Zufallsquelle nicht.
         QSet<QString> gesehen;
         for (int i = 0; i < 64; ++i) { gesehen.insert(TciServer::generateRemoteToken()); }
         QCOMPARE(gesehen.size(), 64);

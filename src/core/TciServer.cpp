@@ -1875,6 +1875,19 @@ void TciServer::onNewConnection()
                 ws->deleteLater();
                 continue;
             }
+            // Gesperrte Gegenstelle gar nicht erst annehmen. Begruendung an
+            // m_fehlversuche: der Kopplungscode ist kurz genug zum Abtippen,
+            // also muss das Durchprobieren hier scheitern und nicht an seiner
+            // Laenge.
+            if (istGesperrt(session->peer)) {
+                qCWarning(lcTci) << "TciServer: Verbindung von" << session->peer
+                                 << "abgewiesen — zu viele falsche"
+                                 << "Kopplungscodes, vorerst gesperrt";
+                ws->close(QWebSocketProtocol::CloseCodePolicyViolated,
+                          QStringLiteral("zu viele Fehlversuche"));
+                ws->deleteLater();
+                continue;
+            }
             qCInfo(lcTci) << "TciServer: Verbindung aus dem Netz von" << session->peer
                           << "— wartet auf auth:";
         }
@@ -2107,6 +2120,32 @@ namespace {
 const char* kTokenSetting = "TciRemoteTokenPlain";
 }
 
+bool TciServer::istGesperrt(const QString& peer) const
+{
+    const auto it = m_fehlversuche.constFind(peer);
+    if (it == m_fehlversuche.constEnd()) { return false; }
+    if (it->first < kMaxFehl) { return false; }
+    const qint64 seit = QDateTime::currentMSecsSinceEpoch() - it->second;
+    return seit < kSperreMs;
+}
+
+void TciServer::merkeFehlversuch(const QString& peer)
+{
+    auto& e = m_fehlversuche[peer];
+    const qint64 jetzt = QDateTime::currentMSecsSinceEpoch();
+    // Nach Ablauf der Sperre von vorn zaehlen — sonst saesse jemand, der
+    // sich einmal vertippt hat, fuer immer in der Liste.
+    if (e.first >= kMaxFehl
+        && (jetzt - e.second) >= kSperreMs) { e.first = 0; }
+    e.first += 1;
+    e.second = jetzt;
+    if (e.first >= kMaxFehl) {
+        qCWarning(lcTci) << "TciServer:" << peer << "hat" << e.first
+                         << "mal den falschen Kopplungscode geschickt —"
+                         << "gesperrt fuer" << (kSperreMs / 60000) << "Minuten";
+    }
+}
+
 QString TciServer::remoteToken()
 {
     const QString ausBund = CredentialStore::retrieve(
@@ -2142,19 +2181,47 @@ bool TciServer::setRemoteToken(const QString& token)
     return true;
 }
 
+// ── Der Kopplungscode (2026-10-01) ──────────────────────────────────────────
+//
+// Acht Zeichen, in zwei Vierergruppen gezeigt: ABCD-EFGH.
+//
+// Vorher waren es 32. Das war aus Sicht der Kryptographie schoener und in
+// der Praxis unbrauchbar: niemand tippt 32 Zeichen auf einem Telefon ab,
+// ohne sich zu vertippen, und der Betreiber hat genau das zu Recht
+// reklamiert.
+//
+// Warum acht trotzdem reichen: 32^8 sind rund 1,1 Billionen Moeglichkeiten,
+// und — das ist der eigentliche Schutz — der Server zaehlt Fehlversuche je
+// Gegenstelle und sperrt sie. Durchprobieren scheitert nicht an der Laenge
+// des Codes, sondern daran, dass man es nicht oft genug versuchen darf. Ein
+// langer Code ohne Versuchsgrenze waere die schlechtere Wahl gewesen.
+//
+// Base32 ohne 0/O/1/I: wer abtippt, soll nicht ueber eine Null gegen ein O
+// stolpern.
 QString TciServer::generateRemoteToken()
 {
-    // 160 Bit aus QRandomGenerator::system() — das ist die Quelle des
-    // Betriebssystems, nicht der voreingestellte Mersenne-Twister.
-    // Base32 ohne 0/O/1/I, damit das Token notfalls abgetippt werden kann,
-    // ohne dass jemand über eine Null gegen ein O stolpert.
     static const char kAlpha[] = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";  // 32 Zeichen
     QString out;
-    out.reserve(32);
-    for (int i = 0; i < 32; ++i) {
+    out.reserve(9);
+    for (int i = 0; i < 8; ++i) {
+        if (i == 4) { out.append(QLatin1Char('-')); }
         out.append(QLatin1Char(kAlpha[QRandomGenerator::system()->bounded(32)]));
     }
     return out;
+}
+
+// Vergleichsform: Bindestriche weg, Kleinschreibung hoch. Wer den Code
+// abtippt, soll ihn schreiben duerfen, wie er ihn liest — mit oder ohne
+// Strich, gross oder klein.
+QString TciServer::normalisierterCode(const QString& roh)
+{
+    QString s;
+    s.reserve(roh.size());
+    for (QChar c : roh) {
+        if (c == QLatin1Char('-') || c.isSpace()) { continue; }
+        s.append(c.toUpper());
+    }
+    return s;
 }
 
 bool TciServer::remoteTxAllowed()
@@ -2585,8 +2652,12 @@ void TciServer::onTextMessageReceived(const QString& rohMsg)
             // erfahren, dass hier ein Token erwartet wird.
             return;
         }
-        const QString angeboten = t.mid(kAuth.size()).trimmed();
-        const QString erwartet  = remoteToken();
+        // Beide Seiten in die Vergleichsform bringen: der Code wird als
+        // ABCD-EFGH angezeigt, und wer ihn abtippt, laesst den Strich mal
+        // weg und schreibt mal klein. Das darf nicht ueber die Anmeldung
+        // entscheiden.
+        const QString angeboten = normalisierterCode(t.mid(kAuth.size()));
+        const QString erwartet  = normalisierterCode(remoteToken());
 
         // Zeitkonstanter Vergleich: ein früher Abbruch bei der ersten falschen
         // Stelle verrät über die Antwortzeit, wie weit jemand richtig geraten
@@ -2602,6 +2673,7 @@ void TciServer::onTextMessageReceived(const QString& rohMsg)
         }
 
         if (!gleich) {
+            merkeFehlversuch(session->peer);
             static constexpr int kMaxAuthAttempts = 3;
             if (++session->authAttempts >= kMaxAuthAttempts) {
                 qCWarning(lcTci) << "TciServer:" << session->peer
@@ -2613,6 +2685,7 @@ void TciServer::onTextMessageReceived(const QString& rohMsg)
         }
 
         session->authenticated = true;
+        m_fehlversuche.remove(session->peer);   // geglueckt: Zaehler weg
         qCInfo(lcTci) << "TciServer:" << session->peer << "angemeldet";
         session->sendQueue.push(TciSendQueue::Priority::Urgent,
                                 QStringLiteral("auth:ok;"));

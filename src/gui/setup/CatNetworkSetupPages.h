@@ -158,6 +158,7 @@ private:
     QLineEdit*   m_tokenEdit{nullptr};        // schreibgeschützt, Monospace
     QPushButton* m_tokenNewBtn{nullptr};
     QPushButton* m_tokenCopyBtn{nullptr};
+    QLineEdit*   m_originsEdit{nullptr};     // erlaubte Herkünfte für Browser
     QCheckBox*   m_allowRemoteTxCheck{nullptr};
     QLabel*      m_remoteHintLabel{nullptr};
 

@@ -168,6 +168,10 @@ public:
     // verwechselbaren 0/O/1/I — es soll notfalls abgetippt werden können.
     static QString generateRemoteToken();
 
+    // Vergleichsform des Kopplungscodes: ohne Bindestriche, in Grossbuchstaben.
+    // Wer ihn abtippt, soll ihn schreiben duerfen, wie er ihn liest.
+    static QString normalisierterCode(const QString& roh);
+
     // Darf eine Verbindung aus dem NETZ senden? Ab Werk nein. Der Schalter
     // wirkt an beiden Stellen, an denen gesendet werden kann: dem trx-Weg und
     // der Annahme von TX-Ton. Nur eine zu sperren liesse den Sendeweg offen.
@@ -654,6 +658,29 @@ private:
     // Siehe setTreatAllClientsAsRemoteForTest(). Ab Werk false; im laufenden
     // Programm wird das nie gesetzt.
     bool m_alleAlsNetzFuerTest{false};
+
+    // ── Sperre gegen Durchprobieren (2026-10-01) ────────────────────────────
+    //
+    // Der Kopplungscode ist seit heute acht Zeichen lang statt 32, damit man
+    // ihn auf einem Telefon abtippen kann. Was ihn schuetzt, ist deshalb
+    // nicht mehr seine Laenge, sondern diese Sperre: wer ihn durchprobieren
+    // will, darf es nicht oft genug.
+    //
+    // Die Zaehlung je Sitzung (authAttempts) genuegte dafuer nicht — nach
+    // drei Fehlversuchen wird getrennt, und danach verbindet man eben neu.
+    // Gezaehlt wird darum je GEGENSTELLE, und zwar ueber Verbindungen
+    // hinweg.
+    //
+    // Adresse -> {Fehlversuche, Zeitpunkt des letzten}. Nach kMaxFehl ist
+    // die Adresse fuer kSperreMs dicht; ein geglueckter Code loescht den
+    // Eintrag sofort.
+    QHash<QString, QPair<int, qint64>> m_fehlversuche;
+    static constexpr int   kMaxFehl   = 8;
+    static constexpr qint64 kSperreMs = 5 * 60 * 1000;
+
+    // true, wenn die Gegenstelle gerade gesperrt ist.
+    bool istGesperrt(const QString& peer) const;
+    void merkeFehlversuch(const QString& peer);
 
     QTimer* m_rxSensorTimer{nullptr};   // 200ms default; broadcasts rx_sensors to subscribed clients
     QTimer* m_txSensorTimer{nullptr};   // 200ms default; MOX-gated (Phase 24+ wires real gate)

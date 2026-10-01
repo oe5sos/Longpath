@@ -376,6 +376,38 @@ void CatTciServerPage::buildRemoteAccessGroup()
 
     form->addRow(tr("Token:"), tokenRow);
 
+    // ── Erlaubte Herkünfte (2026-10-01) ─────────────────────────────────────
+    //
+    // Ohne dieses Feld liess sich die Handfunke überhaupt nicht einrichten:
+    // der Server weist eine Verbindung aus einem BROWSER ab, solange deren
+    // Herkunft nicht hier steht (TciServer::start, Origin-Prüfung), und es
+    // gab keinen Weg, sie einzutragen. Am 2026-10-01 beim Einrichten des
+    // Telefons aufgefallen — der Betreiber hatte Token und Bindung gesetzt
+    // und kam trotzdem nicht herein.
+    //
+    // Clients OHNE Herkunft (WSJT-X, Quisk, jedes native Programm) sind von
+    // der Prüfung nicht betroffen; sie schicken keinen Origin-Kopf. Das Feld
+    // betrifft also ausschliesslich Seiten im Browser.
+    m_originsEdit = new QLineEdit(group);
+    m_originsEdit->setStyleSheet(Style::glassFieldStyle());
+    m_originsEdit->setFont(Style::monoFont(m_originsEdit->font(), Style::kFontSmall));
+    m_originsEdit->setPlaceholderText(
+        tr("e.g. http://192.168.1.10:8767 — comma separated"));
+    m_originsEdit->setToolTip(tr(
+        "Web pages that may connect, by their address. A page served from "
+        "anywhere else is refused even with the right token. Native clients "
+        "(WSJT-X, Quisk, loggers) send no origin and are unaffected.\n\n"
+        "This is the address the PAGE is served from — not the address of "
+        "this computer's TCI server."));
+    m_originsEdit->setText(AppSettings::instance()
+        .value(QStringLiteral("TciAllowedOrigins"), QString()).toString());
+    connect(m_originsEdit, &QLineEdit::editingFinished, this, [this] {
+        AppSettings::instance().setValue(QStringLiteral("TciAllowedOrigins"),
+                                         m_originsEdit->text().trimmed());
+        refreshRemoteAccessState();
+    });
+    form->addRow(tr("Allowed pages:"), m_originsEdit);
+
     // ── Senden aus dem Netz ─────────────────────────────────────────────────
     m_allowRemoteTxCheck = new QCheckBox(tr("Allow transmit from the network"), group);
     m_allowRemoteTxCheck->setStyleSheet(QString::fromLatin1(Style::kCheckBoxStyle));
