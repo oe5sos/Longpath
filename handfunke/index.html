@@ -36,32 +36,48 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
      overflow-x:hidden;overflow-y:auto}
 .scope{position:relative;touch-action:none}
 .scope canvas{width:100%;height:auto}
-/* Abstimmstrich in der Mitte — dort sitzt die Empfangsfrequenz */
+/* Abstimmstrich in der Mitte — dort sitzt die Empfangsfrequenz.
+   Der Kopf leuchtet leise, wie alles Anfassbare in dieser Gestaltung: er
+   ist die einzige Marke im Bild, die man sucht, waehrend man wischt. */
 .cursor{position:absolute;left:50%;top:0;bottom:0;width:1px;
-        background:rgba(220,220,225,.30);pointer-events:none}
-.cursor::before{content:"";position:absolute;left:-3px;top:0;width:7px;height:7px;
-  background:var(--accent);border-radius:50%;transform:translateX(0)}
+        background:rgba(230,230,235,.42);pointer-events:none}
+.cursor::before{content:"";position:absolute;left:-4px;top:0;width:9px;height:9px;
+  background:var(--accent);border-radius:50%;transform:translateX(0);
+  box-shadow:0 0 10px rgba(74,123,168,.95)}
 .dot.off{background:var(--text-inactive);box-shadow:none}
 .dot.wait{background:var(--warn);box-shadow:0 0 6px rgba(168,133,63,.6)}
 .chip{cursor:pointer;-webkit-user-select:none;user-select:none}
 .chip:active{background:linear-gradient(var(--glass-btn-bot),var(--glass-btn-top))}
 .sl .track{cursor:pointer}
-/* Kopplungsblatt — nur beim ersten Start oder nach Verbindungsabriss */
+/* Kopplungsblatt — nur beim ersten Start oder nach Verbindungsabriss.
+   Zieht mit der Gestaltung "Glas und Tiefe" mit: es ist das ERSTE, was man
+   von der Handfunke sieht, und ein Blatt im alten Stil vor einer Seite im
+   neuen sieht aus wie zwei Programme.
+   Die Weichzeichnung bleibt hier als einzige der Seite — dieses Blatt
+   steht still, es kostet also nichts je Bild. */
 #koppeln{position:fixed;inset:0;z-index:9;display:none;
-  background:rgba(8,8,10,.94);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+  background:
+    radial-gradient(120% 60% at 50% 12%, rgba(23,33,43,.97) 0%, rgba(11,13,16,.97) 52%, rgba(8,8,10,.98) 100%);
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
   flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:0 28px}
 #koppeln.an{display:flex}
-#koppeln h1{font-size:var(--f-sub);font-weight:600;letter-spacing:.06em;color:var(--title)}
+#koppeln h1{font-size:var(--f-sub);font-weight:600;letter-spacing:.07em;color:var(--title);
+  text-shadow:0 0 20px rgba(216,165,95,.15),0 2px 6px rgba(0,0,0,.7)}
 #koppeln p{font-size:var(--f-small);color:var(--text3);text-align:center;line-height:1.5}
-#koppeln input{width:100%;height:42px;padding:0 12px;border-radius:var(--r-chip);
-  background:var(--inset);border:1px solid var(--inset-border);color:var(--text);
+/* Eingefasst wie die Regler-Bahnen: tief eingelassen, damit man sieht, dass
+   man hineinschreibt. */
+#koppeln input{width:100%;height:44px;padding:0 12px;border-radius:11px;
+  background:#040507;border:1px solid rgba(0,0,0,.8);color:var(--text);
   font:var(--f-sub)/1 var(--mono);text-align:center;
-  box-shadow:inset 0 2px 4px rgba(0,0,0,.55)}
-#koppeln input:focus{outline:none;border-color:var(--accent)}
-#koppeln button{width:100%;height:46px;border-radius:var(--r-chip);
-  background:linear-gradient(var(--glass-sel-top),var(--glass-sel-bot));
-  border:1px solid var(--glass-sel-border);color:var(--glass-sel-text);
-  font:600 var(--f-sub)/1 inherit;letter-spacing:.08em}
+  box-shadow:inset 0 2px 5px rgba(0,0,0,.85)}
+#koppeln input:focus{outline:none;border-color:var(--accent);
+  box-shadow:inset 0 2px 5px rgba(0,0,0,.85),0 0 0 3px rgba(74,123,168,.22)}
+#koppeln button{width:100%;height:48px;border-radius:11px;
+  background:linear-gradient(#36699f,#21436a);
+  border:1px solid #4886c0;color:#e2eefb;
+  font:600 var(--f-sub)/1 inherit;letter-spacing:.08em;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.2),
+             0 0 16px rgba(74,123,168,.35),0 2px 6px rgba(0,0,0,.55)}
 #koppeln .fehler{color:var(--warn);font-size:var(--f-small);min-height:16px}
 /* Beide gesperrten Sendetasten nehmen auch keine Tipper an — nicht nur
    optisch tot, sondern wirklich. */
