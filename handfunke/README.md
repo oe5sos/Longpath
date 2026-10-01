@@ -34,8 +34,25 @@ bevor sie stimmte; jetzt hält sie.
 | `stil.css`      | Der Hausstil, 1:1 aus `StyleConstants.h` übernommen. |
 | `tci.js`        | Der Draht: WebSocket, Textkanal, Binärrahmen, FFT. |
 | `app.js`        | Anzeige und Bedienung. |
-| `rx-worklet.js` | Empfangston im Audio-Faden, mit Ringpuffer. |
+| `rx-worklet.js` | Empfangston im Audio-Faden. Hülle um `ton-kern.js`. |
+| `ton-kern.js`   | Ringpuffer und Hochtastung. Wird von BEIDEN Tonwegen benutzt — dem Worklet und dem Ersatzweg (siehe unten), damit die Rechnung nicht zweimal dasteht und auseinanderläuft. |
 | `attrappe.py`   | Prüfstand: ein TCI-Server aus Pappe, für Läufe ohne Funkgerät. |
+| `kann-das-telefon.html` | Selbstauskunft eines Geräts: sicherer Kontext, AudioWorklet, WebCodecs, Bildschirmmaße. Meldet das Ergebnis an den Webserver, statt es abtippen zu lassen. |
+
+### Zwei Tonwege
+
+`AudioWorklet` ist **[SecureContext]** und fehlt auf einer LAN-Adresse über
+`http` — also genau dort, wo das Telefon die Seite holt. Dann greift der
+Ersatzweg über `ScriptProcessorNode`. Der läuft im Hauptfaden statt im
+Tonfaden und kann unter Last rauh werden; stumm wäre erheblich schlimmer.
+
+Zwei Fallen dabei, beide am echten Gerät gefunden:
+
+* Ein ScriptProcessor **ohne Eingangskanal** wird von Safari nicht getaktet.
+  Er bekommt deshalb einen Eingang und eine stille Quelle davor.
+* iOS stuft Web-Audio als *Ambient* ein, und diese Kategorie gehorcht dem
+  Stummschalter am Gerät — Kopfhörer ausgenommen. Ein stilles `<audio>`-
+  Element bringt die Seite in die Kategorie *Playback*, die ihn ignoriert.
 
 ### Die eine Regel
 
@@ -52,11 +69,45 @@ Server nicht zurückmeldet.
 
 1. In Longpath: **Setup → CAT & Network → TCI Server** einschalten und
    *Bind interface* auf die **konkrete WLAN-Adresse** stellen — nicht auf
-   `0.0.0.0`.
-2. Die Herkunft der Seite in `TciAllowedOrigins` eintragen. Ohne das weist der
-   Server sie ab: WebSocket kennt keine Gleiche-Herkunft-Regel, deshalb prüft
-   Longpath sie selbst (siehe `TciServer::start`).
-3. Am Telefon die Seite aufrufen, Adresse eingeben, *Zum Home-Bildschirm*.
+   Loopback, sonst kommt das Telefon nicht hin.
+2. Dort unter *Remote access*: **Token** → `New` erzeugt einen
+   Kopplungscode aus acht Zeichen (`ABCD-EFGH`). Beim Eintippen sind
+   Bindestrich und Groß-/Kleinschreibung egal.
+3. Ebendort **Allowed pages**: die Adresse eintragen, von der die Seite
+   kommt, etwa `http://192.168.1.10:8767`. Ohne das weist der Server sie ab —
+   WebSocket kennt keine Gleiche-Herkunft-Regel, deshalb prüft Longpath sie
+   selbst (`TciServer::start`). Native Clients wie WSJT-X schicken keine
+   Herkunft und sind davon nicht betroffen.
+4. Am Telefon die Seite aufrufen, Adresse und Code eingeben,
+   *Zum Home-Bildschirm*.
+5. **Einmal auf `TON EIN` tippen.** iOS gibt Ton erst nach einer Berührung
+   frei; der Knopf verschwindet, sobald er läuft.
+
+### Bedienung
+
+* **Tippen** im Spektrum oder Wasserfall springt auf die Stelle.
+* **Wischen** stimmt ab. Dabei friert das Bild ein und der Zeiger wandert —
+  so sieht man, wohin man fährt. Longpath führt die Bildmitte sonst der
+  Abstimmung nach, und dann ändert sich sichtbar nur die Zahl.
+* **Kneifen** vergrößert, von 192 bis 6 kHz. Der Ausschnitt wird am Server
+  genommen, bevor verdichtet wird — nur so steigt die Auflösung wirklich
+  (bei 6 kHz sind es 16 Hz je Bildpunkt statt 515).
+* **Lange auf die Datenrate tippen** spielt einen Testton direkt an den
+  Ausgang, am Lautstärkeregler vorbei. Trennt „das Gerät gibt nichts aus"
+  von „unsere Daten taugen nicht".
+
+### Was es kostet
+
+Gemessen am echten Gerät (ANVELINA Pro 3, 12 kHz mono mu-law):
+
+| | kB/s |
+|---|---|
+| Ton | 12,9 |
+| Bild (373 Punkte) | 4,2 |
+| Messwerte | 0,5 |
+| **gesamt** | **17,6** — rund 63 MB je Stunde |
+
+Roher I/Q wäre an derselben Stelle über 400 kB/s.
 
 ## Ohne Funkgerät prüfen
 
@@ -71,12 +122,16 @@ wanderndes S-Meter. Sie ersetzt Longpath nicht — sie prüft die Naht.
 
 ## Was noch fehlt
 
-- **Der schmale Spektrumrahmen.** Heute rechnet das Telefon die FFT selbst aus
-  rohem I/Q. Gemessen: 404 kB/s bei 48 kHz, hochgerechnet rund 1,5 MB/s bei
-  192 kHz. Das trägt im WLAN und nicht unterwegs. Ein eigener Rahmen mit
-  fertigen Bins (8 bit je Bin, Punktzahl aus der Pixelbreite) drückt das auf
-  rund 27 kB/s.
-- **Ton-Kompression.** Opus mono 48 kHz in 20-ms-Rahmen statt float32-Stereo.
-- **Senden**, siehe oben.
-- **Antenne, Mikrofonpegel, Bandwechsel** als TCI-Befehle — die gibt es
-  serverseitig noch nicht.
+* **Senden.** Beide Sendetasten sind tot, auch `TUNE` — der Abstimmträger
+  heißt nicht so, legt aber einen Dauerträger auf die Antenne. Soll das
+  Telefon je senden dürfen, braucht es eine eigene Zustandsmeldung vom
+  Server und eine Sicherung gegen Fehltipp.
+* **Ein Symbol für den Startbildschirm.** Entwürfe liegen unter
+  `docs/design/2026-09-30-handfunke-symbol.html`.
+* **Zwei Zuhörer am selben Empfänger** teilen sich seit 2026-09-30 den Ton
+  richtig (eigener Vorrat je Sitzung), aber `spectrum_start` für Empfänger 2
+  wird abgelehnt — es gibt nur einen Spektrum-Abgriff.
+* **Opus** würde den Ton von 13 auf 4 kB/s drücken. Serverseitig wäre es zu
+  haben (libopus hängt wegen RADE ohnehin an der Verknüpfungszeile), im
+  Browser nicht: WebCodecs' `AudioDecoder` ist ebenfalls [SecureContext] und
+  fehlt über `http`. Bliebe eine WASM-Fremddatei — für 9 kB/s zu teuer.
