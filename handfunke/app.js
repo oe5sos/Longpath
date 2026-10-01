@@ -218,9 +218,16 @@ function zeichneKopf() {
                  && (performance.now() - link.letzteDaten > 3000);
   $('led').className = 'dot' + (!verbunden ? ' off'
                               : (link.ready && !totStill) ? '' : ' wait');
-  $('station').textContent = verbunden
-    ? ('LONGPATH' + (s.device ? ' · ' + s.device.toUpperCase() : ''))
-    : 'NICHT VERBUNDEN';
+  // Das `device:`-Feld des Init-Bursts ist NICHT das Funkgeraet, sondern
+  // Longpaths Tarnkappe: der TCI-Server gibt sich als SunSDR2PRO aus, weil
+  // WSJT-X und Hamlib TCI-Audio nur freischalten, wenn der Server sich so
+  // meldet (TciEmulateSunSDR2Pro, am Pruefstand 2026-05-11 bestaetigt).
+  // Hier ungefiltert angezeigt hat es am 2026-10-01 genau das angerichtet,
+  // was es anrichten muss — Betreiber: "ist komischerweise mit sunsdr
+  // verbunden … sollte aber mit avelina". Also nur zeigen, was stimmt:
+  // die Handfunke spricht mit Longpath. Welches Geraet dort haengt, sagt
+  // TCI nicht, und Raten waere schlimmer als Schweigen.
+  $('station').textContent = verbunden ? 'LONGPATH' : 'NICHT VERBUNDEN';
 
   // Wie breit das Bild gerade ist. Ohne diese Angabe weiss man beim Kneifen
   // nicht, wo man gelandet ist — und auch nicht, wie fein die Abstimmung
@@ -1295,8 +1302,21 @@ function schleife(t) {
   // fehlte und die Anzeige zu günstig aussehen liess.
   const gesamt = r.iq + r.audio + r.spec + r.text;
   $('rate').textContent = gesamt ? (gesamt + ' kB/s') : '';
-  $('fussBild').textContent = r.spec ? (r.spec + ' kB/s bild')
-                            : r.iq   ? (r.iq + ' kB/s bild (roh)') : '';
+  // Kommt kein Bild, steht hier WARUM — nicht nur eine fehlende Zahl.
+  //
+  // Am 2026-10-01 blieb der Wasserfall schwarz, waehrend Ton und
+  // Signalpegel liefen, und nichts auf der Seite sagte, woran es lag
+  // (Ursache war: die installierte Longpath-Fassung kannte den Befehl
+  // `spectrum_start` gar nicht). Dieselbe Stille entsteht, wenn in
+  // Longpath schlicht kein Funkgeraet verbunden ist. Ein leerer Kasten
+  // laesst den Operator raten; ein Satz nicht.
+  const bildLaeuft = r.spec > 0 || r.iq > 0;
+  $('fussBild').className = bildLaeuft ? '' : 'warn';
+  $('fussBild').textContent =
+      r.spec ? (r.spec + ' kB/s bild')
+    : r.iq   ? (r.iq + ' kB/s bild (roh)')
+    : link.ready ? 'kein bild — funkgerät verbunden?'
+    : '';
   // Der Ton bekommt die Wahrheit, nicht nur eine Byte-Zahl: eine Datenrate
   // ohne hoerbaren Ton hat am 2026-09-30 eine ganze Messreihe wertlos
   // gemacht. Faellt der Ton aus, steht das hier — und nicht nur in einer
