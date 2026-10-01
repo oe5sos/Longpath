@@ -145,7 +145,8 @@ function zeichneBedienung() {
       const el = document.createElement('div');
       el.className = 'chip' + (hz >= b.von && hz <= b.bis ? ' on' : '');
       el.textContent = b.n;
-      el.onclick = () => { link.send(`vfo:${state.trx},0,${b.mitte}`); wasserfallLeeren(); };
+      el.onclick = () => { link.send(`vfo:${state.trx},0,${b.mitte}`);
+        wasserfallSchnitt(); letzteMitteHz = b.mitte; };
       $('bands').appendChild(el);
     });
     const mehr = document.createElement('div');
@@ -353,16 +354,88 @@ let neueZeilen = 0;      // vom Datenstrom gefuellt, von der Zeichenschleife gel
 // braucht eine halbe Minute, bis sie nach oben herausgewandert ist.
 //
 // Betreiber am 2026-10-01: "der wasserfall unten springt nicht sofort auf
-// die frequenz". Genau das: er springt nicht, er schiebt sich langsam weg.
+// die frequenz". Darauf hin wurde beim Sprung GELOESCHT — und am selben
+// Abend kam die Gegenbeschwerde: "jede frequenzaenderung loescht unten den
+// panadapter und er laedt wieder neu … man sollte immer etwas sehen".
 //
-// Also beim Sprung loeschen. Das kostet die Historie, die ohnehin nichts
-// mehr aussagt, und das Bild baut sich in einer Sekunde neu auf.
+// Beides stimmt, und beides zusammen ergibt die richtige Loesung: Die
+// Historie ist nicht wertlos, sie steht nur an der falschen Stelle. Ein
+// Pult schiebt sie darum seitlich mit, statt sie wegzuwerfen — ein Traeger
+// bleibt dabei unter sich selbst stehen, und man sieht ununterbrochen
+// etwas. Nur wo die Zeilen wirklich nichts mehr bedeuten (anderes Band,
+// andere Bandbreite), wird eine Trennlinie gezogen statt das Bild
+// geleert: oberhalb das Neue, unterhalb das Alte, und der Schnitt
+// wandert in ein paar Sekunden von selbst hinaus.
+
 function wasserfallLeeren() {
   try {
     wfCtx.fillStyle = '#0c0c0e';
     wfCtx.fillRect(0, 0, wf.width, wf.height);
   } catch (e) { /* vor dem ersten Zeichnen */ }
   neueZeilen = 0;
+}
+
+/** Hertz je Bildpunkt des Wasserfalls — eine Stelle, damit Schieben und
+ *  Skalieren nicht auseinanderlaufen. */
+function hzProPunkt() {
+  const spanne = state.spanneHz > 0 ? state.spanneHz : (link.st.iqRate || 192000);
+  return spanne / wf.width;
+}
+
+/** Schiebt die Historie um die Frequenzaenderung zur Seite.
+ *
+ *  Steigt die Mittenfrequenz um dHz, wandert ein fester Sender im Bild nach
+ *  LINKS — darum das Minus. Der frei werdende Rand wird dunkel gefuellt:
+ *  dort ist nichts bekannt, und eine Wiederholung waere gelogen.
+ *
+ *  Weiter als die Bildbreite hat das Schieben keinen Sinn, dann ueberlappt
+ *  nichts mehr; in dem Fall ein Schnitt. */
+function wasserfallSchieben(dHz) {
+  if (!dHz) { return; }
+  const dx = Math.round(-dHz / hzProPunkt());
+  if (dx === 0) { return; }
+  if (Math.abs(dx) >= wf.width) { wasserfallSchnitt(); return; }
+  try {
+    // Ueber den Zwischenpuffer, wie beim Zeilenschub: ein Canvas, der sich
+    // selbst als Quelle zeichnet, schiebt nicht verlaesslich.
+    wfPuffCtx.clearRect(0, 0, wf.width, wf.height);
+    wfPuffCtx.drawImage(wf, 0, 0);
+    wfCtx.fillStyle = '#0c0c0e';
+    wfCtx.fillRect(0, 0, wf.width, wf.height);
+    wfCtx.drawImage(wfPuff, dx, 0);
+  } catch (e) { /* vor dem ersten Zeichnen */ }
+}
+
+/** Haelt den Wasserfall unter der Frequenz fest, egal wer sie geaendert hat.
+ *
+ *  Vier Stellen schoben die Historie frueher selbst — Tipp, Wisch, Band,
+ *  Zoom. Das deckte aber nur die eigenen Bedienungen ab: dreht der Operator
+ *  am Pult oder an einem anderen Client, kommt die neue Frequenz ueber den
+ *  Draht herein, und davon erfuhr der Wasserfall nichts. Darum hier EINE
+ *  Stelle, die im Zeichentakt die Mitte vergleicht; sie faengt jede
+ *  Aenderung, ganz gleich woher sie kam. */
+let letzteMitteHz = null;
+function mitteVerfolgen() {
+  const v = link.st.vfo[state.trx];
+  const jetzt = v ? v[0] : null;
+  if (jetzt === null) { return; }
+  if (letzteMitteHz === null) { letzteMitteHz = jetzt; return; }
+  if (jetzt === letzteMitteHz) { return; }
+  wasserfallSchieben(jetzt - letzteMitteHz);
+  letzteMitteHz = jetzt;
+}
+
+/** Zieht eine Trennlinie statt zu loeschen: oben das Neue, unten das Alte.
+ *
+ *  Fuer Bandwechsel und Zoom — dort deckt dieselbe Zeile danach etwas
+ *  voellig anderes ab, und Schieben hilft nicht. Die Linie sagt, wo der
+ *  Schnitt liegt, und das Bild bleibt sichtbar, bis das Alte unten
+ *  herausgewandert ist. */
+function wasserfallSchnitt() {
+  try {
+    wfCtx.fillStyle = 'rgba(216,165,95,.55)';   // Bernstein, wie alles Gemessene
+    wfCtx.fillRect(0, 0, wf.width, 2);
+  } catch (e) { /* vor dem ersten Zeichnen */ }
 }
 link.addEventListener('iq', (e) => {
   const v = e.detail.vals;
@@ -904,9 +977,10 @@ function spanneSetzen(hz) {
   if (neu === state.spanneHz) { return; }
   state.spanneHz = neu;
   link.send(`spectrum_start:${state.trx},${pan.width},12,${neu}`);
-  // Nach einem Zoom passt die alte Historie nicht mehr: dieselben Zeilen
-  // decken jetzt eine andere Bandbreite ab.
-  wasserfallLeeren();
+  // Nach einem Zoom decken dieselben Zeilen eine andere Bandbreite ab.
+  // Schieben hilft da nicht — ein Schnitt sagt, ab wo der neue Massstab
+  // gilt, und laesst das Alte sichtbar hinauswandern.
+  wasserfallSchnitt();
   zeichneKopf();
 }
 
@@ -971,8 +1045,8 @@ $('scope').addEventListener('pointerup', (e) => {
     if (ziel) {
       const vorher = link.st.vfo[state.trx] ? link.st.vfo[state.trx][0] : ziel;
       link.send(`vfo:${state.trx},0,${ziel}`);
-      const spanne = state.spanneHz > 0 ? state.spanneHz : (link.st.iqRate || 192000);
-      if (Math.abs(ziel - vorher) > spanne / 10) { wasserfallLeeren(); }
+      // Nicht hier schieben: mitteVerfolgen() tut es, sobald das Geraet die
+      // neue Frequenz bestaetigt. Zweimal schieben hiesse doppelt schieben.
     }
   }
   // Den letzten Stand nachreichen: durch die Drosselung kann bis zu ein
@@ -980,12 +1054,7 @@ $('scope').addEventListener('pointerup', (e) => {
   // Geraet ein Stueck neben dem, wo der Finger losgelassen hat.
   if (wischAktiv && wischZiel !== null) {
     link.send(`vfo:${state.trx},0,${wischZiel}`);
-    // Weit genug gesprungen, dass die Historie nicht mehr passt? Dann weg
-    // damit. Schwelle ist ein Zehntel der gezeigten Spanne — darunter
-    // ueberlappt der alte Ausschnitt noch so weit, dass die alten Zeilen
-    // mehr nuetzen als stoeren.
-    const spanne = state.spanneHz > 0 ? state.spanneHz : (link.st.iqRate || 192000);
-    if (Math.abs(wischZiel - wischHz) > spanne / 10) { wasserfallLeeren(); }
+    // Auch hier nicht selbst schieben — siehe mitteVerfolgen().
   }
   wischVon = null; wischAktiv = false; wischZiel = null;
   state.bildHalten = false;
@@ -1219,6 +1288,7 @@ setTimeout(() => melde('start'), 12000);
 
 // ── Bildschleife ────────────────────────────────────────────────────────────
 function schleife(t) {
+  mitteVerfolgen();
   zeichneBild();
   const r = link.tickRates(t);
   // Alles zusammen, was die Leitung kostet — auch das Spektrum, das anfangs
