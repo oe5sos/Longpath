@@ -918,7 +918,43 @@ $('scope').addEventListener('pointermove', (e) => {
     if (zeiger.size < 2) { kneifVon = 0; }
   }, { passive: true }));
 
-$('scope').addEventListener('pointerup', () => {
+// ── Tippen springt dorthin (2026-10-01) ─────────────────────────────────────
+//
+// Betreiber: "wenn ich ein signal sehe, vor allem im unteren pandapter
+// möchte ich auch dort hinklicken, das funktioniert aber nicht".
+//
+// Es ging nicht, weil die Totzone (gegen ungewolltes Verstimmen beim
+// Anfassen) jeden Tipp verschluckte, ohne ihn je als Befehl zu werten. Das
+// war eine halbe Loesung: nicht verstimmen ist richtig, nichts tun ist es
+// nicht.
+//
+// Jetzt: ein kurzer Tipp OHNE Bewegung springt auf die getippte Stelle, ein
+// Wisch zieht wie bisher. Beide Canvas liegen im selben Element, also gilt
+// das fuer Spektrum und Wasserfall gleichermassen — und gerade im
+// Wasserfall sieht man eine Station oft zuerst.
+function frequenzAnStelle(clientX) {
+  const r = $('scope').getBoundingClientRect();
+  if (!r.width) { return null; }
+  const spanne = state.spanneHz > 0 ? state.spanneHz : (link.st.iqRate || 192000);
+  const mitte  = link.st.vfo[state.trx] ? link.st.vfo[state.trx][0] : null;
+  if (!mitte) { return null; }
+  // Die Bildmitte ist die abgestimmte Frequenz (Longpath fuehrt sie nach).
+  const versatz = (clientX - r.left) / r.width - 0.5;
+  const raster = spanne <= 24000 ? 10 : (spanne <= 96000 ? 50 : 100);
+  return Math.round((mitte + versatz * spanne) / raster) * raster;
+}
+
+$('scope').addEventListener('pointerup', (e) => {
+  // Kein Wisch gewesen und nur ein Finger im Spiel? Dann war es ein Tipp.
+  if (!wischAktiv && zeiger.size <= 1 && wischVon !== null) {
+    const ziel = frequenzAnStelle(e.clientX);
+    if (ziel) {
+      const vorher = link.st.vfo[state.trx] ? link.st.vfo[state.trx][0] : ziel;
+      link.send(`vfo:${state.trx},0,${ziel}`);
+      const spanne = state.spanneHz > 0 ? state.spanneHz : (link.st.iqRate || 192000);
+      if (Math.abs(ziel - vorher) > spanne / 10) { wasserfallLeeren(); }
+    }
+  }
   // Den letzten Stand nachreichen: durch die Drosselung kann bis zu ein
   // Intervall Wegstrecke ungesendet geblieben sein, und dann steht das
   // Geraet ein Stueck neben dem, wo der Finger losgelassen hat.
