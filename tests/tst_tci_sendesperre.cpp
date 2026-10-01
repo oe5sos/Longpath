@@ -39,6 +39,7 @@
 #include <QWebSocket>
 #include <QUrl>
 
+#include <QElapsedTimer>
 #include "core/AppSettings.h"
 #include "core/CredentialStore.h"
 #include "core/TciServer.h"
@@ -74,7 +75,43 @@ private:
         if (!verbunden.wait(2000)) { return false; }
 
         client.sendTextMessage(QStringLiteral("auth:%1;").arg(QLatin1String(kToken)));
-        QTest::qWait(80);
+
+        // Auf das ENDE des Init-Bursts warten, nicht auf eine Zahl von
+        // Millisekunden.
+        //
+        // Hier standen 80 ms, und das ging eine Weile gut — auf dieser
+        // Maschine. Auf dem CI-Laeufer nicht: der Burst hat rund 98 Rahmen,
+        // und er fuehrt `trx:0,false; trx:1,false;` mit sich. Kommt er auch
+        // nur teilweise zu spaet, landet er in den gesammelten Antworten,
+        // und `bestaetigungKam(..., "trx")` liest ihn als Bestaetigung eines
+        // Sendebefehls. Ergebnis am 2026-10-01: sechs Faelle rot, und zwar
+        // in BEIDE Richtungen — die Sperre schien zu versagen UND die
+        // Freigabe schien nicht durchzugehen. Ein Pruefstand, der von der
+        // Geschwindigkeit der Maschine abhaengt, misst nicht die Sache,
+        // sondern den Tag.
+        //
+        // Der Burst endet mit `ready;`. Darauf laesst sich warten.
+        bool burstDurch = false;
+        const QMetaObject::Connection horcher =
+            connect(&client, &QWebSocket::textMessageReceived,
+                    [&burstDurch](const QString& nachricht) {
+                        for (const QString& teil :
+                             nachricht.split(QLatin1Char(';'))) {
+                            if (teil.trimmed().compare(QLatin1String("ready"),
+                                    Qt::CaseInsensitive) == 0) {
+                                burstDurch = true;
+                            }
+                        }
+                    });
+        QElapsedTimer uhr;
+        uhr.start();
+        while (!burstDurch && uhr.elapsed() < 8000) { QTest::qWait(20); }
+        disconnect(horcher);
+        if (!burstDurch) { return false; }
+
+        // Noch einen Augenblick, damit ein Nachzuegler hinter `ready;` nicht
+        // doch noch in die Messung faellt.
+        QTest::qWait(60);
         return true;
     }
 
