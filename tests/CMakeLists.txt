@@ -7470,8 +7470,18 @@ endforeach()
 # RESOURCE_LOCK statt RUN_SERIAL: nur diese drei laufen nacheinander, alles
 # andere weiter parallel. Das kostet ein paar Sekunden und macht den
 # Sammellauf verlaesslich.
-set_tests_properties(
-  tst_tci_remote_auth
-  tst_tci_sendesperre
-  tst_tci_remote_access_page
-  PROPERTIES RESOURCE_LOCK longpath_tci_fernzugriff_settings)
+# Jeden Stand einzeln und nur, wenn er in DIESER Konfiguration ueberhaupt
+# registriert wurde. Ohne die Pruefung bricht CMake ab
+# ("Can not find test to add properties to"), sobald ein Stand fehlt — und
+# das ist der Normalfall: ohne Qt6::WebSockets oder ohne GUI faellt je nach
+# Bauumgebung ein anderer weg. Am 2026-10-01 scheiterte daran der
+# Configure-Schritt auf Linux UND macOS, waehrend er lokal durchlief.
+foreach(stand IN ITEMS
+    tst_tci_remote_auth
+    tst_tci_sendesperre
+    tst_tci_remote_access_page)
+  if(TEST ${stand})
+    set_tests_properties(${stand}
+      PROPERTIES RESOURCE_LOCK longpath_tci_fernzugriff_settings)
+  endif()
+endforeach()
