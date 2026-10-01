@@ -674,6 +674,12 @@ private:
     // Adresse -> {Fehlversuche, Zeitpunkt des letzten}. Nach kMaxFehl ist
     // die Adresse fuer kSperreMs dicht; ein geglueckter Code loescht den
     // Eintrag sofort.
+    // Abtastrate des I/Q-Stroms, vom Geraet gemeldet. Der Spektrum-Ausschnitt
+    // rechnet damit, wie viele Hertz ein FFT-Bin abdeckt. Atomar, weil
+    // onFftBinsReady aus der Ereignisschleife kommt und der Setter aus einem
+    // Signal des Modells.
+    std::atomic<int> m_fftSampleRate{0};
+
     QHash<QString, QPair<int, qint64>> m_fehlversuche;
     static constexpr int   kMaxFehl   = 8;
     static constexpr qint64 kSperreMs = 5 * 60 * 1000;

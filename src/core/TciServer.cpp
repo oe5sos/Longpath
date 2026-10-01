@@ -1483,6 +1483,9 @@ void TciServer::hookGlobalBroadcasts()
     connect(m_model, &RadioModel::wireSampleRateChanged, this,
             [this](double rateHz) {
                 const int rateInt = static_cast<int>(rateHz);
+                // Fuer den Spektrum-Ausschnitt festhalten: er muss wissen,
+                // wie viele Hertz die Bins zusammen abdecken.
+                m_fftSampleRate.store(rateInt, std::memory_order_release);
                 m_protocol->enqueueLocalBroadcast(
                     QStringLiteral("iq_samplerate:%1;").arg(rateInt));
                 // sendIFLimits follows in Thetis (TCIServer.cs:2535-2536
@@ -2874,6 +2877,17 @@ void TciServer::onTextMessageReceived(const QString& rohMsg)
                     const int f = args.at(2).trimmed().toInt(&ok3);
                     if (ok3) { session->spectrumFps = std::clamp(f, 1, 30); }
                 }
+                if (args.size() >= 4) {
+                    // Vierter Wert: die gewuenschte Bandbreite in Hertz.
+                    // 0 heisst "alles", sonst ein mittiger Ausschnitt.
+                    // Begruendung an TciClientSession::spectrumSpanHz.
+                    bool ok4 = false;
+                    const int hz = args.at(3).trimmed().toInt(&ok4);
+                    if (ok4) {
+                        session->spectrumSpanHz =
+                            (hz <= 0) ? 0 : std::clamp(hz, 2000, 1000000);
+                    }
+                }
                 // Jetzt ist die FFTEngine da, auch wenn sie es beim Serverstart
                 // noch nicht war.
                 ensureFftTap();
@@ -3913,16 +3927,42 @@ void TciServer::onFftBinsReady(int receiverId, const QVector<float>& binsDbm)
         session->lastSpectrumMs = jetzt;
 
         const int punkte = std::clamp(session->spectrumPoints, 64, 1024);
+
+        // ── Ausschnitt (2026-10-01) ─────────────────────────────────────────
+        //
+        // Der Client darf eine Bandbreite verlangen; dann wird mittig
+        // beschnitten, BEVOR verdichtet wird. Das ist der Unterschied
+        // zwischen "feiner" und "groesser gemalt": die Punkte decken dann
+        // weniger Hertz ab, statt dieselben Hertz breiter zu zeigen.
+        //
+        // Die Bins decken die volle Abtastrate ab (m_fftSampleRate, vom
+        // Panadapter gesetzt). Ist sie unbekannt, bleibt es bei allem —
+        // lieber die ganze Breite als ein falsch beschnittener Ausschnitt.
+        int erstesBin = 0;
+        int letztesBin = n;   // ausschliesslich
+        const int abtastrate = m_fftSampleRate.load(std::memory_order_acquire);
+        if (session->spectrumSpanHz > 0 && abtastrate > 0
+            && session->spectrumSpanHz < abtastrate) {
+            const double anteil = double(session->spectrumSpanHz) / double(abtastrate);
+            const int breite = std::max(punkte, int(std::lround(n * anteil)));
+            if (breite < n) {
+                erstesBin  = (n - breite) / 2;
+                letztesBin = erstesBin + breite;
+            }
+        }
+        const int sichtbar = letztesBin - erstesBin;
+
         QVector<float> bild(punkte);
         for (int i = 0; i < punkte; ++i) {
             // Bereichsgrenzen in 64 Bit rechnen: 16384 Bins mal 1024 Punkte
             // läuft in int noch nicht über, aber die Rechnung soll auch dann
             // stimmen, wenn die FFT einmal größer wird.
-            const int von = static_cast<int>(static_cast<qint64>(i) * n / punkte);
-            const int bis = std::max(von + 1,
-                static_cast<int>(static_cast<qint64>(i + 1) * n / punkte));
+            const int von = erstesBin
+                + static_cast<int>(static_cast<qint64>(i) * sichtbar / punkte);
+            const int bis = std::max(von + 1, erstesBin
+                + static_cast<int>(static_cast<qint64>(i + 1) * sichtbar / punkte));
             float spitze = -200.0f;
-            for (int b = von; b < bis && b < n; ++b) {
+            for (int b = von; b < bis && b < letztesBin && b < n; ++b) {
                 if (binsDbm[b] > spitze) { spitze = binsDbm[b]; }
             }
             bild[i] = spitze;

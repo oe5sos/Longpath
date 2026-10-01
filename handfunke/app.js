@@ -46,6 +46,7 @@ const state = {
   specMin: -130, specMax: -30,
   token: '',                 // nur für den Netzweg nötig
   audioRate: 12000,          // ausgehandelt; 48000 wäre Faktor 16 teurer
+  spanneHz: 48000,           // gezeigte Bandbreite; 0 = alles
   tonTypPruefung: null,      // Nachfassen, falls mulaw8 nicht bestaetigt wird
   tonStartLaeuft: false,     // Riegel gegen doppelten AudioContext
   tonWeg: null,              // 'worklet' | 'scriptprocessor'
@@ -217,6 +218,15 @@ function zeichneKopf() {
   $('station').textContent = verbunden
     ? ('LONGPATH' + (s.device ? ' · ' + s.device.toUpperCase() : ''))
     : 'NICHT VERBUNDEN';
+
+  // Wie breit das Bild gerade ist. Ohne diese Angabe weiss man beim Kneifen
+  // nicht, wo man gelandet ist — und auch nicht, wie fein die Abstimmung
+  // gerade greift (das Raster haengt an der Spanne).
+  const sp = $('spanne');
+  if (sp) {
+    const hz = state.spanneHz > 0 ? state.spanneHz : (link.st.iqRate || 0);
+    sp.textContent = hz ? (hz >= 1000 ? Math.round(hz / 1000) + ' kHz' : hz + ' Hz') : '';
+  }
 
   const [mhz, khz, hz] = hzText(s.vfo[state.trx][0]);
   $('hz').innerHTML = `${mhz}<span class="khz">${khz}</span><span class="dez">${hz}</span>`;
@@ -750,15 +760,72 @@ $('scope').addEventListener('pointermove', (e) => {
     if (Math.abs(weg) < kWischTotzone) return;
     wischAktiv = true;
   }
-  const spanne = link.st.iqRate || 192000;
+  // Mit der GEZEIGTEN Spanne rechnen, nicht mit der vollen DDC-Breite.
+  // Vorher stand hier immer iqRate (192 kHz): bei 373 Punkten waren das
+  // 515 Hz je Bildpunkt, und die Frequenz sprang beim Abstimmen in
+  // Halbkilohertz-Schritten. Betreiber am 2026-10-01: "frequenz kann man
+  // zwar ändern, aber sehr schlecht".
+  const spanne = state.spanneHz > 0 ? state.spanneHz : (link.st.iqRate || 192000);
   const proPixel = spanne / $('scope').getBoundingClientRect().width;
-  const neu = Math.round((wischHz - weg * proPixel) / 10) * 10;
+  // Das Raster folgt der Spanne: wer eng zoomt, will auch fein abstimmen.
+  // 10 Hz bei schmaler Sicht, 100 Hz bei breiter — sonst zappelt die
+  // Anzeige, ohne dass man das Signal trifft.
+  const raster = spanne <= 24000 ? 10 : (spanne <= 96000 ? 50 : 100);
+  const neu = Math.round((wischHz - weg * proPixel) / raster) * raster;
   wischZiel = neu;
   const jetzt = performance.now();
   if (jetzt - wischLetzt < kWischAbstandMs) return;
   wischLetzt = jetzt;
   link.send(`vfo:${state.trx},0,${neu}`);
 });
+// ── Kneifen zum Vergroessern (2026-10-01) ───────────────────────────────────
+//
+// Betreiber: "vergrössern kann ich leider nicht". Es gab schlicht keinen Weg.
+//
+// Die Spanne wird am SERVER beschnitten (spectrum_start, vierter Wert), nicht
+// hier — nur so steigt die Aufloesung wirklich. Schnitte der Browser zu,
+// malte er dieselben groben Punkte nur breiter.
+const kSpannen = [6000, 12000, 24000, 48000, 96000, 192000];
+let kneifVon = 0;
+const zeiger = new Map();
+
+function spanneSetzen(hz) {
+  const neu = kSpannen.reduce((a, b) =>
+    Math.abs(b - hz) < Math.abs(a - hz) ? b : a);
+  if (neu === state.spanneHz) { return; }
+  state.spanneHz = neu;
+  link.send(`spectrum_start:${state.trx},${pan.width},12,${neu}`);
+  zeichneKopf();
+}
+
+$('scope').addEventListener('pointerdown', (e) => {
+  zeiger.set(e.pointerId, e.clientX);
+  if (zeiger.size === 2) {
+    const [a, b] = [...zeiger.values()];
+    kneifVon = Math.abs(a - b);
+    wischVon = null;              // kein Abstimmen waehrend des Kneifens
+    wischAktiv = false;
+  }
+}, { passive: true });
+
+$('scope').addEventListener('pointermove', (e) => {
+  if (!zeiger.has(e.pointerId)) { return; }
+  zeiger.set(e.pointerId, e.clientX);
+  if (zeiger.size !== 2 || !kneifVon) { return; }
+  const [a, b] = [...zeiger.values()];
+  const jetzt = Math.abs(a - b);
+  if (jetzt < 20) { return; }
+  // Auseinander = naeher heran = kleinere Spanne.
+  spanneSetzen(state.spanneHz * (kneifVon / jetzt));
+  kneifVon = jetzt;
+}, { passive: true });
+
+['pointerup', 'pointercancel', 'pointerleave'].forEach(ev =>
+  $('scope').addEventListener(ev, (e) => {
+    zeiger.delete(e.pointerId);
+    if (zeiger.size < 2) { kneifVon = 0; }
+  }, { passive: true }));
+
 $('scope').addEventListener('pointerup', () => {
   // Den letzten Stand nachreichen: durch die Drosselung kann bis zu ein
   // Intervall Wegstrecke ungesendet geblieben sein, und dann steht das
@@ -854,7 +921,7 @@ link.addEventListener('open', () => {
   // der Schirm nicht zeigen. Gegen rohes I/Q spart das den Faktor sechzig.
   // Ein fremder Server (Thetis, ExpertSDR) kennt den Befehl nicht und
   // verwirft ihn antwortlos — deshalb steht darunter der Rückfall.
-  link.send(`spectrum_start:${state.trx},${pan.width},12`);
+  link.send(`spectrum_start:${state.trx},${pan.width},12,${state.spanneHz}`);
 
   // Rückfall auf rohes I/Q — aber nur, wenn der Server den Befehl gar nicht
   // KENNT, nicht schon dann, wenn gerade keine Bilder kommen.

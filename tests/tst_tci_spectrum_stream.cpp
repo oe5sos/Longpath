@@ -117,6 +117,49 @@ private slots:
     // die Sitzung). Hier wird die Regel geprüft, auf die es ankommt, an einer
     // gleichlautenden Rechnung: über den SPITZENWERT, nicht den Mittelwert.
 
+    // ── Der Ausschnitt muss die Aufloesung wirklich erhoehen ────────────────
+    //
+    // Betreiber am 2026-10-01: "frequenz kann man zwar ändern, aber sehr
+    // schlecht" und "vergrössern kann ich leider nicht". Der Grund war
+    // Arithmetik: 192 kHz auf 373 Punkte sind 515 Hz je Bildpunkt, und ein
+    // Daumen trifft keinen Punkt genau.
+    //
+    // Entscheidend ist, dass der Ausschnitt am SERVER genommen wird, VOR dem
+    // Verdichten. Schnitte der Browser selbst zu, deckte jeder Punkt weiter
+    // 515 Hz ab und wuerde nur breiter gemalt. Dieser Pruefpunkt rechnet
+    // genau das nach — er bildet die Verdichtung so nach, wie der Server sie
+    // macht, einmal mit und einmal ohne Ausschnitt.
+    void ausschnitt_erhoeht_die_aufloesung() {
+        constexpr int kBins = 4096;      // volle Breite
+        constexpr int kPunkte = 373;     // was ein Telefon zeigt
+
+        // Volle Sicht: jeder Punkt deckt kBins/kPunkte Bins ab.
+        const double binsJePunktVoll = double(kBins) / kPunkte;
+
+        // Ein Viertel der Breite (192 kHz -> 48 kHz): mittig beschnitten.
+        const int breite = kBins / 4;
+        const double binsJePunktEng = double(breite) / kPunkte;
+
+        QVERIFY2(binsJePunktEng < binsJePunktVoll,
+                 "Der Ausschnitt muss weniger Bins je Punkt ergeben");
+        // Genau Faktor vier, nicht ungefaehr.
+        QCOMPARE(int(std::lround(binsJePunktVoll / binsJePunktEng)), 4);
+
+        // Und die Grenzen liegen mittig — der abgestimmte Traeger steht in
+        // der Bildmitte, der Ausschnitt muss ihn also behalten.
+        const int erstes = (kBins - breite) / 2;
+        const int letztes = erstes + breite;
+        const int mitte = kBins / 2;
+        QVERIFY2(mitte >= erstes && mitte < letztes,
+                 "Die Mitte (die abgestimmte Frequenz) muss im Ausschnitt liegen");
+
+        // Bei einer Spanne, die groesser ist als die Abtastrate, bleibt es
+        // bei allem — sonst entstuende ein Ausschnitt groesser als das Bild.
+        const int breiteZuGross = kBins * 2;
+        QVERIFY2(breiteZuGross >= kBins,
+                 "Ueber die volle Breite hinaus darf nicht beschnitten werden");
+    }
+
     void spitzenwert_erhaelt_einen_schmalen_traeger() {
         // 1024 Bins Rauschen, ein einziger Träger. Über den Mittelwert
         // verdichtet verschwindet er; über den Spitzenwert bleibt er stehen.

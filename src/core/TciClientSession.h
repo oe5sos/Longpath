@@ -125,6 +125,20 @@ struct TciClientSession {
     // weniger als 64 wäre kein Spektrum mehr.
     int spectrumPoints{256};
 
+    // Gewuenschte Bandbreite des Spektrumbildes in Hertz, 0 = alles.
+    //
+    // Ohne das zeigt ein Telefon die volle DDC-Breite: 192 kHz auf 373
+    // Punkten sind 515 Hz je Bildpunkt. Ein Daumen trifft nie einen Punkt
+    // genau, also springt die Frequenz beim Abstimmen in
+    // Halbkilohertz-Schritten — der Betreiber am 2026-10-01: "frequenz kann
+    // man zwar ändern, aber sehr schlecht".
+    //
+    // Der Ausschnitt wird am SERVER genommen, nicht im Browser. Nur so
+    // steigt die Aufloesung wirklich: 24 kHz auf 373 Punkte sind 64 Hz je
+    // Punkt. Schnitte der Browser selbst zu, haette er weiter 515er-Punkte
+    // und wuerde sie nur breiter malen.
+    int spectrumSpanHz{0};
+
     // Bilder je Sekunde. Vorgabe 10 — darunter ruckelt der Wasserfall
     // sichtbar, darüber sieht das Auge am Telefon nichts mehr dazu.
     int spectrumFps{10};
