@@ -241,7 +241,8 @@ function zeichneKopf() {
       // Waehrend des Haltens zeigt der Strich, wohin der Finger faehrt.
       if (state.bildHalten) {
         const b = $('scope').getBoundingClientRect().width || 1;
-        const anteil = 50 - (state.wischVersatzPx / b) * 100;
+        // Dieselbe Richtung wie die Frequenz oben: der Zeiger folgt dem Finger.
+        const anteil = 50 + (state.wischVersatzPx / b) * 100;
         c.style.left = Math.max(0, Math.min(100, anteil)).toFixed(2) + '%';
         c.style.opacity = '1';
         return;
@@ -827,7 +828,17 @@ $('scope').addEventListener('pointermove', (e) => {
   // 10 Hz bei schmaler Sicht, 100 Hz bei breiter — sonst zappelt die
   // Anzeige, ohne dass man das Signal trifft.
   const raster = spanne <= 24000 ? 10 : (spanne <= 96000 ? 50 : 100);
-  const neu = Math.round((wischHz - weg * proPixel) / raster) * raster;
+  // PLUS, nicht minus: der Finger zieht den ZEIGER, nicht das Band.
+  //
+  // Solange das Bild mitwanderte, galt die Karten-Konvention — Finger nach
+  // rechts schob das Band nach rechts, man fuhr also abwaerts. Seit das Bild
+  // beim Abstimmen steht (bildHalten), zieht man den Zeiger durch ein
+  // stehendes Spektrum, und dann muss er dem Finger folgen: rechts ist
+  // rechts, und rechts sind die hoeheren Frequenzen.
+  //
+  // Betreiber am 2026-10-01: "zeiger geht genau seitenverkehrt". Ich hatte
+  // beim Umbau die alte Richtung stehen lassen.
+  const neu = Math.round((wischHz + weg * proPixel) / raster) * raster;
   wischZiel = neu;
   // Wie weit der Strich vom Bildmittelpunkt weg ist, in Bildpunkten.
   state.wischVersatzPx = weg;
