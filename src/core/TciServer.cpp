@@ -67,6 +67,9 @@ void  destroy_resampleFV(void* ptr);
 #include <QHostAddress>
 #include <QTimer>
 #include <QWebSocket>
+#include <QNetworkInterface>
+#include <QHostInfo>
+#include <QUrl>
 #include <QWebSocketCorsAuthenticator>  // Herkunftsprüfung, siehe start()
 #include <QWebSocketServer>
 #include <QDateTime>
@@ -94,6 +97,52 @@ namespace Longpath {
 //
 // 256 kB sind bei 13 kB/s rund zwanzig Sekunden Rueckstand. Wer so weit
 // hinterherhaengt, hat kein Puffer-, sondern ein Leitungsproblem.
+// Gehoert diese Herkunft zu DIESEM Rechner?
+//
+// Vergleicht nur den Hostnamen der Herkunft (Schema und Port sind egal —
+// die Weboberflaeche kann auf jedem Port liegen) gegen:
+//   * localhost / 127.0.0.1 / ::1
+//   * jede IP-Adresse einer laufenden Netzwerkkarte
+//   * den eigenen Rechnernamen, mit und ohne ".local" (Bonjour)
+//
+// Absichtlich NICHT per Namensaufloesung geprueft: ein DNS-Server, auf den
+// Longpath keinen Einfluss hat, duerfte sonst entscheiden, wer an das
+// Funkgeraet darf.
+static bool istEigeneHerkunft(const QString& origin)
+{
+    const QUrl url(origin);
+    const QString host = url.host().trimmed().toLower();
+    if (host.isEmpty()) { return false; }
+
+    if (host == QLatin1String("localhost")
+        || host == QLatin1String("127.0.0.1")
+        || host == QLatin1String("::1")) {
+        return true;
+    }
+
+    // Eigene Adressen
+    const auto alle = QNetworkInterface::allInterfaces();
+    for (const auto& iface : alle) {
+        if (!iface.flags().testFlag(QNetworkInterface::IsRunning)) { continue; }
+        for (const auto& entry : iface.addressEntries()) {
+            if (entry.ip().toString().compare(host, Qt::CaseInsensitive) == 0) {
+                return true;
+            }
+        }
+    }
+
+    // Eigener Rechnername, mit und ohne .local
+    const QString eigen = QHostInfo::localHostName().trimmed().toLower();
+    if (!eigen.isEmpty()) {
+        const QString kurz = eigen.section(QLatin1Char('.'), 0, 0);
+        if (host == eigen || host == kurz
+            || host == kurz + QLatin1String(".local")) {
+            return true;
+        }
+    }
+    return false;
+}
+
 static bool rueckstauFrei(QWebSocket* ws)
 {
     static constexpr qint64 kMaxAusstehend = 256 * 1024;
@@ -1690,12 +1739,30 @@ bool TciServer::start(const QHostAddress& bindAddress, quint16 port)
                         break;
                     }
                 }
+                // Die EIGENE Weboberfläche gilt ohne Eintrag.
+                //
+                // Hier stand seit dem Bau der Prüfung: "Eine eigene
+                // Longpath-Weboberfläche trägt sich später hier ein." Sie kam
+                // (die Handfunke), nur eingetragen hat sie sich nie — und am
+                // 2026-10-01 stand der Operator eine Stunde vor einer Seite,
+                // die nur "keine Antwort" meldete, während Longpath jede
+                // Verbindung still mit 403 abwies. Eine Liste, die von Hand
+                // gepflegt werden muss, damit das eigene Programm mit sich
+                // selbst reden darf, ist keine Sicherheit, sondern eine Falle.
+                //
+                // Erlaubt ist darum eine Herkunft, die auf DIESEN Rechner
+                // zeigt. Das gibt nichts preis: eine fremde Webseite liegt
+                // immer auf einer fremden Herkunft, und genau die bleibt
+                // draußen. Wogegen die Prüfung gebaut wurde — die
+                // beliebige Seite im Browser des Operators, die heimlich
+                // `trx:0,true;` schickt —, davor schützt sie unverändert.
+                if (!ok) { ok = istEigeneHerkunft(origin); }
                 auth->setAllowed(ok);
                 if (!ok) {
                     qCWarning(lcTci)
                         << "TciServer: Verbindung aus dem Browser abgelehnt,"
                         << "Herkunft" << origin
-                        << "steht nicht in TciAllowedOrigins";
+                        << "— weder dieser Rechner noch in TciAllowedOrigins";
                 }
             });
 

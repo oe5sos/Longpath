@@ -100,10 +100,14 @@ def bedienen(klient, adresse):
             erst += d
         klient.settimeout(None)
         kopf, _, rest = erst.partition(b"\r\n\r\n")
-        hatte = b"origin:" in kopf.lower()
-        ziel.sendall(ohne_origin(kopf) + b"\r\n\r\n" + rest)
-        if hatte:
-            print(f"  {adresse[0]}: Origin-Kopf entfernt (sonst 403)", flush=True)
+        # Seit Longpath die eigene Weboberflaeche selbst erkennt
+        # (istEigeneHerkunft in TciServer.cpp), muss der Origin NICHT mehr
+        # gestrichen werden — im Gegenteil: durchgereicht laesst er die
+        # richtige Pruefung greifen, statt die Verbindung als nativen
+        # Client zu tarnen. Nur gegen eine aeltere Fassung, die das noch
+        # nicht kann, wird er entfernt; das zeigt sich daran, dass sie mit
+        # 403 antwortet.
+        ziel.sendall(erst)
     except OSError as e:
         print(f"  {adresse[0]}: Handschlag fehlgeschlagen ({e})", flush=True)
         klient.close(); ziel.close(); return
