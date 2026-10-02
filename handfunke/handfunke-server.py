@@ -12,9 +12,19 @@ Zwei Dinge, die ein nackter `python3 -m http.server` nicht tut:
     zu finden, weil er gar nicht mehr im Code stand.
   * Saubere Typen fuer .webmanifest und .js, sonst nimmt iOS das
     Startbildschirm-Symbol nicht an.
+  * Eine Annahmestelle fuer `/melde`. Ein Telefon hat keine Konsole, die
+    jemand lesen koennte; die Seite meldet darum ihren Zustand hierher.
+
+Zur Annahmestelle: bis zum 2026-10-02 gab es sie nicht, und die Meldung
+landete als 404 im Protokoll — sichtbar nur, WEIL sie scheiterte (unten
+schreibt log_message ausschliesslich 4xx und 5xx). Das hat zweimal an einem
+Tag den Fehler gefunden: einmal einen schlafenden AudioContext, einmal einen
+Tonstrom, der mit vollen 12 kB/s Stille trug. Ein naiver "Fix", der nur 204
+zurueckgibt, haette sie stumm gemacht — darum wird hier ausdruecklich
+protokolliert, und zwar lesbar statt als Fragezeichenkette.
 """
 
-import http.server, os, socket, socketserver, sys
+import http.server, os, socket, socketserver, sys, urllib.parse
 
 ORDNER = os.path.dirname(os.path.abspath(__file__))
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8771
@@ -35,6 +45,43 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def end_headers(self):
         self.send_header("Cache-Control", "no-store, must-revalidate")
         super().end_headers()
+
+    def do_GET(self):
+        if self.path.split("?", 1)[0] == "/melde":
+            self.melde_annehmen()
+            return
+        super().do_GET()
+
+    # Die Zustandsmeldung der Seite: eine Zeile, die man lesen kann.
+    #
+    # Reihenfolge ist Absicht — was zuerst kommt, beantwortet die Frage
+    # "kommt ueberhaupt etwas an, und laeuft die Tonkette?" am schnellsten:
+    #   ready   Verbindung steht und der Init-Burst ist durch
+    #   ctx     Zustand des AudioContext (suspended = schlaeft, kein Ton)
+    #   rahmen  empfangene Tonrahmen
+    #   vorrat  Fuellstand des Rings; steht er am Anschlag, wird nicht geleert
+    #   takte   wie oft die Tonausgabe gerufen wurde
+    FELDER = ("anlass", "ready", "ctx", "rahmen", "vorrat", "ziel", "takte",
+              "leer", "rate", "tonTyp", "weg", "af", "vorDeckel", "nachDeckel",
+              "sicher", "fehler")
+
+    def melde_annehmen(self):
+        roh = urllib.parse.urlparse(self.path).query
+        felder = urllib.parse.parse_qs(roh, keep_blank_values=True)
+        teile = []
+        for name in self.FELDER:
+            if name in felder:
+                teile.append(f"{name}={felder[name][0]}")
+        # Was die Seite sonst noch mitschickt, hinten anhaengen statt
+        # verschlucken: eine neue Kennzahl soll nicht erst hier eingetragen
+        # werden muessen, um sichtbar zu sein.
+        for name in sorted(felder):
+            if name not in self.FELDER:
+                teile.append(f"{name}={felder[name][0]}")
+        super().log_message("MELDUNG  %s", "  ".join(teile))
+        self.send_response(204)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
 
     def log_message(self, fmt, *args):
         # Nur Fehler, sonst laeuft das Protokoll mit jedem Spektrumbild voll.
