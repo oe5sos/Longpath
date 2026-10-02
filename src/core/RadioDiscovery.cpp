@@ -545,9 +545,16 @@ bool RadioDiscovery::parseP2Reply(const QByteArray& bytes, const QHostAddress& s
     out.hasPureSignal        = (out.boardType != HPSDRHW::Atlas && out.boardType != HPSDRHW::Unknown);
     out.maxSampleRate        = 1536000;  // P2 supports higher sample rates
 
+    // "in use" ist das run-Bit des Geraets: die Gateware baut Byte 4 als
+    // 0x02 + run (n1gp-Anvelina_PROIII Ethernet/sdr_send.v:171 [@8e86a61]).
+    // Steht es schon vor unserem Connect auf 1, streamt das Geraet an ein
+    // anderes Ziel, und das Ziel wird nur bei run = 0 neu uebernommen
+    // (Ethernet/network.v:731-736 [@8e86a61]) — das muss im Protokoll
+    // stehen, sonst laesst sich ein stummer erster Connect nicht zuordnen.
     qCDebug(lcDiscovery) << "P2 response from" << out.address.toString()
                          << "board:" << BoardCapsTable::forBoard(out.boardType).displayName
-                         << "fw:" << out.firmwareVersion;
+                         << "fw:" << out.firmwareVersion
+                         << "in use:" << out.inUse;
 
     return true;
 }

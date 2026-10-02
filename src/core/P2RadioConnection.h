@@ -485,6 +485,12 @@ private:
     // AetherSDR hat gar keinen solchen Waechter; er ist unsere Zutat.
     // Sie bleibt, weil ein Haenger ohne Rueckmeldung schlimmer waere —
     // aber sie meldet sich jetzt im Klartext (onConnectTimeout).
+    //
+    // Nachtrag 2026-09-30: die Dauer von ARP war nicht das Problem.
+    // Waehrend ARP lief, verwarf macOS die aeltesten gehaltenen Pakete —
+    // SendStart —, weil der TX-I/Q-Takt die Warteschlange (16) fuellte;
+    // danach half keine Wartezeit mehr. Behoben am m_txIqTimer
+    // (P2RadioConnection.cpp, init()).
     static constexpr int kConnectTimeoutMs = 6000;
 
 public:
@@ -944,6 +950,14 @@ private:
     // --- I/Q buffers and packet counters ---
     std::array<QVector<float>, kMaxDdc> m_iqBuffers;
     int m_totalIqPackets{0};
+
+    // Jedes Datagramm seit connectToRadio(), gleich welcher Port, auch
+    // leere (2026-09-30). Nur fuer die Zeile des Connect-Watchdogs:
+    // 0 heisst "vom Geraet kam ueberhaupt nichts an", mehr als 0 ohne
+    // I/Q heisst "das Geraet antwortet, streamt aber nicht". Die beiden
+    // Faelle haben verschiedene Ursachen und sahen im Protokoll bisher
+    // gleich aus.
+    int m_datagramsSinceConnect{0};
 
 #ifdef LONGPATH_BUILD_TESTS
 public:
