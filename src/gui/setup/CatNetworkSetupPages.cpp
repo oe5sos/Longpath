@@ -932,12 +932,22 @@ void CatTciServerPage::setTciServer(Longpath::TciServer* server)
         connect(server, &Longpath::TciServer::serverStarted,
                 this, [this](quint16) {
                     m_tciServerRunning = true;
+                    m_tciBindWartet.clear();
                     m_tciClientCount = 0;
+                    refreshTciStatusDisplay();
+                });
+        connect(server, &Longpath::TciServer::bindWartetAufAdresse,
+                this, [this](const QString& adresse, quint16 port,
+                             const QString& grund) {
+                    m_tciServerRunning = false;
+                    m_tciBindWartet = tr("%1:%2 — %3").arg(adresse)
+                                          .arg(port).arg(grund);
                     refreshTciStatusDisplay();
                 });
         connect(server, &Longpath::TciServer::serverStopped,
                 this, [this]() {
                     m_tciServerRunning = false;
+                    m_tciBindWartet.clear();
                     m_tciClientCount = 0;
                     refreshTciStatusDisplay();
                 });
@@ -984,6 +994,14 @@ void CatTciServerPage::refreshTciStatusDisplay()
                 tr("<span style='color:#6fa384'>●</span> Running (%1 %2)")
                     .arg(m_tciClientCount)
                     .arg(m_tciClientCount == 1 ? tr("client") : tr("clients")));
+        } else if (!m_tciBindWartet.isEmpty()) {
+            // Dritter Zustand: der Bind ist gescheitert und wird wiederholt.
+            // Ohne ihn stand hier nur "Stopped", und der Bediener hatte keine
+            // Ahnung, dass die eingestellte Adresse gar nicht existiert — am
+            // 2026-10-02 nach einem Netzwechsel genau so passiert.
+            m_statusLabel->setText(
+                tr("<span style='color:#c2924f'>●</span> Wartet auf %1")
+                    .arg(m_tciBindWartet.toHtmlEscaped()));
         } else {
             m_statusLabel->setText(
                 tr("<span style='color:#c25a5c'>●</span> Stopped"));

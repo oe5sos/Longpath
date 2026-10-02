@@ -231,6 +231,16 @@ signals:
     // (useful when start() was called with port=0).
     void serverStarted(quint16 port);
 
+    // Der Bind ist gescheitert und ein Wiederversuch laeuft.
+    //
+    // Gibt es, weil ein gescheiterter Bind sonst nur eine Zeile im Log ist:
+    // am 2026-10-02 wechselte der Rechner das Netz, die eingestellte feste
+    // Adresse gab es nicht mehr, und der TCI-Server kam schlicht nicht hoch.
+    // Fuer den Bediener sah das aus wie ein defektes Programm — die
+    // Fernbedienung am Telefon fand nichts, und nirgends stand warum.
+    void bindWartetAufAdresse(const QString& adresse, quint16 port,
+                              const QString& grund);
+
     // Emitted after stop() completes and all clients have been disconnected.
     void serverStopped();
 
@@ -432,6 +442,22 @@ private:
     // implicit conversion to T* for member access.
     QPointer<RadioModel> m_model;
     QWebSocketServer*  m_server{nullptr};
+
+    // ── Wiederversuch nach gescheitertem listen() ───────────────────────────
+    //
+    // Ein Bind kann aus Gruenden scheitern, die von selbst vergehen: die
+    // Netzadresse ist beim Start noch nicht da (WLAN haengt noch), sie
+    // verschwindet beim Netzwechsel, oder ein anderer Prozess haelt den Port
+    // noch einen Augenblick. Ohne Wiederversuch bleibt der Server fuer immer
+    // unten, auch wenn die Ursache nach zwei Sekunden weg ist.
+    QTimer*      m_bindWiederversuch{nullptr};
+    QHostAddress m_bindWunschAdresse;
+    quint16      m_bindWunschPort{0};
+    int          m_bindFehlversuche{0};
+
+    void bindWiederversuchPlanen(const QHostAddress& adresse, quint16 port,
+                                 const QString& grund);
+    void bindWiederversuchAbbrechen();
     QHash<QWebSocket*, std::shared_ptr<TciClientSession>> m_clients;
 
     QTimer* m_pingTimer{nullptr};
