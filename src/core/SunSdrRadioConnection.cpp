@@ -237,6 +237,16 @@ void SunSdrRadioConnection::connectToRadio(const RadioInfo& info)
     m_qCheckTimer.invalidate();
     m_qNonZeroInWindow = 0;
     m_qSamplesInWindow = 0;
+    // Das Inventar gehoert zur Sitzung, gleiche Ueberlegung wie bei
+    // m_radioAddr: eine Rahmensorte aus der vorigen Verbindung darf im
+    // Bericht der neuen nicht als "schon gesehen" dastehen.
+    m_controlInventory.clear();
+    m_streamStateInventory.clear();
+    m_controlFramesSeen = 0;
+    m_controlFramesUnparsed = 0;
+    m_inventoryFullWarned = false;
+    m_inventoryClock.invalidate();
+    m_lastStreamStateValid = false;
     // Step 3: keep the pacer's own profile pointer (defaulted to
     // kProfileQrp at construction — see SunSdrTxPacer.h's own comment)
     // in sync with whatever this connection actually resolved, so the
@@ -420,6 +430,15 @@ void SunSdrRadioConnection::onConnectTimeout()
 
 void SunSdrRadioConnection::disconnect()
 {
+    // Zuerst der Bericht, dann das Aufraeumen: nach connectToRadio() ist
+    // das Inventar leer, und ein Betreiber, der eine Stunde gefunkt hat,
+    // soll das Ergebnis im Log finden, ohne es waehrenddessen abfragen zu
+    // muessen. Nur wenn ueberhaupt etwas angekommen ist -- eine Zeile
+    // "nichts aufgenommen" bei jedem Programmende waere Laerm.
+    if (!m_controlInventory.isEmpty() || !m_streamStateInventory.isEmpty()) {
+        qCInfo(lcSunSdr).noquote() << frameInventoryReport();
+    }
+
     m_running = false;
     m_awaitingBeacon = false;  // a late beacon reply after this must not
                                // reopen the RX gate — see onControlReadyRead()
@@ -899,8 +918,26 @@ void SunSdrRadioConnection::feedControlDatagramForTest(
 void SunSdrRadioConnection::processControlDatagram(const QByteArray& data,
                                                      const QHostAddress& sender)
 {
-    if (!m_awaitingBeacon || !m_profile) {
-        return;  // handshake already done, or no session pending — drain only
+    if (!m_profile) {
+        return;  // no session pending — nothing to measure against
+    }
+
+    if (!m_awaitingBeacon) {
+        // Der Handschlag ist durch. Bis zum 2026-10-02 stand hier ein
+        // `return` mit der Begruendung "drain only" -- und damit hat
+        // dieser Treiber jeden Steuerrahmen weggeworfen, den die QRP im
+        // Betrieb von sich aus schickt. Jetzt wird er gezaehlt und
+        // beschrieben (siehe FrameTally im Kopf). Es wird nichts
+        // beantwortet und nichts gesendet: dieser Zweig liest nur.
+        //
+        // Fremde Absender bleiben draussen, gleiche Begruendung wie bei
+        // processStreamDatagram() -- der Steuerport wird mit
+        // ShareAddress gebunden, eine noch laufende Vorsitzung derselben
+        // QRP darf das Inventar nicht mit fuellen.
+        if (sender == m_radioAddr) {
+            noteControlFrame(data);
+        }
+        return;
     }
 
     // Beacon-reply shape (header comment; design doc "the
@@ -1033,6 +1070,13 @@ void SunSdrRadioConnection::processStreamDatagram(const QByteArray& data,
             data.size(), *m_profile, &hdr)) {
         return;
     }
+    // Vor dem Filter, nicht danach: der Opcode (0xFE Empfang / 0xFD
+    // Senden) und die beiden Zustandsbytes [8:9] sind das einzige, was
+    // die QRP waehrend des Betriebs ununterbrochen ueber sich selbst
+    // sagt. Sie hier wegzuwerfen, war der zweite Grund dafuer, dass
+    // dieser Treiber keine Messwerte kennt.
+    noteStreamState(hdr);
+
     if (hdr.opcode != SunSdr::kOpIqRxIdle) {
         return;  // TX-active frames don't apply to a receive-only connection
     }
@@ -1495,6 +1539,198 @@ void SunSdrRadioConnection::probeReportIfDue()
     m_probeDiffer = 0;
     m_probeFirstDiff = -1;
     m_probeCount.clear();
+}
+
+// ---------------------------------------------------------------------------
+// noteControlFrame / noteStreamState / tallyFrame / frameInventoryReport
+//
+// Das Mithoeren. Warum es ueberhaupt gebraucht wird, steht am FrameTally
+// im Kopf; hier stehen nur die Entscheidungen, die man beim Lesen des
+// Codes sonst nachrechnen muesste:
+//
+//  * Ein Rahmen, der sich nicht als Steuerkopf lesen laesst, wird
+//    getrennt gezaehlt und NICHT geraten. Die Beacon-Antwort selbst ist
+//    so ein Fall: sie traegt 0x1a an Byte [3], wo parseControlHeader()
+//    0x00 verlangt (siehe processControlDatagram). Ein Zaehler, der so
+//    etwas unter "unlesbar" fuehrt, ist ehrlicher als ein Parser, der
+//    sich die Regel passend macht.
+//  * Am Strom wird nur das Tripel (Opcode, Byte 8, Byte 9) inventarisiert,
+//    nicht die 1200 Byte Nutzlast. Die Nutzlast ist das I/Q selbst und
+//    aendert sich in jedem Paket; das Messgeraet dafuer gibt es schon
+//    (LONGPATH_SUNSDR_PROBE, siehe probeFeed).
+// ---------------------------------------------------------------------------
+
+void SunSdrRadioConnection::noteControlFrame(const QByteArray& data)
+{
+    ++m_controlFramesSeen;
+
+    SunSdr::ControlHeader hdr;
+    if (!SunSdr::parseControlHeader(
+            reinterpret_cast<const quint8*>(data.constData()),
+            int(data.size()), *m_profile, &hdr)) {
+        ++m_controlFramesUnparsed;
+        return;
+    }
+
+    // Die gelesene Laenge, nicht die angekuendigte: ein Rahmen, dessen
+    // [4:5] etwas anderes behauptet als dasteht, ist genau der Fall, den
+    // man sehen will. Die angekuendigte Laenge steht im Bericht daneben,
+    // sobald sie abweicht.
+    const QByteArray payload = data.mid(SunSdr::kCtlHeaderSize);
+    if (hdr.declaredPayloadLen != payload.size()) {
+        qCInfo(lcSunSdr).nospace()
+            << "SunSdr: Steuerrahmen op=0x" << Qt::hex << hdr.opcode << Qt::dec
+            << " kuendigt " << hdr.declaredPayloadLen
+            << " Byte Nutzlast an, dasteht " << payload.size();
+    }
+    tallyFrame(m_controlInventory, "Steuerkanal", hdr.opcode, hdr.sub,
+               quint16(payload.size()), payload);
+}
+
+void SunSdrRadioConnection::noteStreamState(const SunSdr::IqHeader& hdr)
+{
+    // Dieser Pfad laeuft 1920 mal je Sekunde, im selben Thread, der die
+    // Proben in den Empfang gibt. Darum zuerst der billige Vergleich auf
+    // drei Bytes: solange sich am Zustand nichts aendert -- und das ist
+    // der Normalfall, millionenfach -- bleibt es bei einem Zaehler und es
+    // wird kein QByteArray gebaut (QByteArray hat keine
+    // Kurzpuffer-Optimierung, jedes waere eine Allokation auf dem Haufen).
+    // Erst eine echte Aenderung kostet etwas.
+    if (m_lastStreamStateValid && hdr.opcode == m_lastStreamOpcode
+        && hdr.byte8 == m_lastStreamByte8 && hdr.byte9 == m_lastStreamByte9) {
+        auto it = m_streamStateInventory.find(frameKey(hdr.opcode, 0, 2));
+        if (it != m_streamStateInventory.end()) {
+            ++it.value().count;
+            if (m_inventoryClock.isValid()) {
+                it.value().lastSeenMs = m_inventoryClock.elapsed();
+            }
+            return;
+        }
+        // Nicht im Inventar, obwohl als "zuletzt gesehen" vermerkt: der
+        // Deckel hat zugeschlagen. Dann faellt es unten durch und
+        // tallyFrame() entscheidet erneut -- nicht hier, damit es genau
+        // eine Stelle gibt, die den Deckel kennt.
+    }
+
+    m_lastStreamOpcode = hdr.opcode;
+    m_lastStreamByte8 = hdr.byte8;
+    m_lastStreamByte9 = hdr.byte9;
+    m_lastStreamStateValid = true;
+
+    const QByteArray state = QByteArray(1, char(hdr.byte8))
+                             + QByteArray(1, char(hdr.byte9));
+    tallyFrame(m_streamStateInventory, "Strom", hdr.opcode, /*sub=*/0,
+               /*len=*/2, state);
+}
+
+void SunSdrRadioConnection::tallyFrame(QHash<quint64, FrameTally>& inventory,
+                                       const char* channel, quint8 opcode,
+                                       quint16 sub, quint16 len,
+                                       const QByteArray& payload)
+{
+    if (!m_inventoryClock.isValid()) {
+        m_inventoryClock.start();
+    }
+    const qint64 now = m_inventoryClock.elapsed();
+    const QByteArray kept = payload.left(kMaxTallyPayloadBytes);
+    const quint64 key = frameKey(opcode, sub, len);
+
+    auto it = inventory.find(key);
+    if (it == inventory.end()) {
+        if (inventory.size() >= kMaxFrameKinds) {
+            if (!m_inventoryFullWarned) {
+                m_inventoryFullWarned = true;
+                qCWarning(lcSunSdr)
+                    << "SunSdr: Mithoeren gedeckelt --" << kMaxFrameKinds
+                    << "Rahmensorten erreicht, weitere werden nicht mehr "
+                       "aufgenommen (Bericht bleibt gueltig fuer die bisherigen)";
+            }
+            return;
+        }
+        FrameTally fresh;
+        fresh.count = 1;
+        fresh.firstPayload = kept;
+        fresh.lastPayload = kept;
+        fresh.firstSeenMs = now;
+        fresh.lastSeenMs = now;
+        inventory.insert(key, fresh);
+        qCInfo(lcSunSdr).nospace()
+            << "SunSdr: neue Rahmensorte auf " << channel << " -- op=0x"
+            << Qt::hex << opcode << Qt::dec << " sub=" << sub
+            << " len=" << len << " nutzlast=" << kept.toHex().constData()
+            << " (bei " << now << " ms)";
+        return;
+    }
+
+    FrameTally& tally = it.value();
+    ++tally.count;
+    tally.lastSeenMs = now;
+    if (tally.lastPayload == kept) {
+        return;
+    }
+
+    // Hier liegt der eigentliche Gewinn: eine Sorte, deren Nutzlast sich
+    // aendert, waehrend am Geraet gedreht oder getastet wird, ist ein
+    // Messwert oder eine Zustandsmeldung -- das ist der Faden, an dem die
+    // acht unzugeordneten Opcodes haengen.
+    ++tally.payloadChanges;
+    const QByteArray vorher = tally.lastPayload;
+    tally.lastPayload = kept;
+    if (tally.changesLogged < kMaxChangeLogsPerKind) {
+        ++tally.changesLogged;
+        qCInfo(lcSunSdr).nospace()
+            << "SunSdr: " << channel << " op=0x" << Qt::hex << opcode << Qt::dec
+            << " sub=" << sub << " Nutzlast geaendert: "
+            << vorher.toHex().constData() << " -> " << kept.toHex().constData()
+            << " (bei " << now << " ms)";
+        if (tally.changesLogged == kMaxChangeLogsPerKind) {
+            qCInfo(lcSunSdr).nospace()
+                << "SunSdr: " << channel << " op=0x" << Qt::hex << opcode
+                << Qt::dec << " -- weitere Aenderungen werden nur gezaehlt";
+        }
+    }
+}
+
+QString SunSdrRadioConnection::frameInventoryReport() const
+{
+    QStringList zeilen;
+    const auto abschnitt = [&zeilen](const char* channel,
+                                     const QHash<quint64, FrameTally>& inventory) {
+        QList<quint64> keys = inventory.keys();
+        std::sort(keys.begin(), keys.end());
+        for (const quint64 key : keys) {
+            const FrameTally& t = inventory.value(key);
+            zeilen << QStringLiteral(
+                          "%1 op=0x%2 sub=%3 len=%4 | %5x | Aenderungen %6 "
+                          "| zuerst %7 ms, zuletzt %8 ms | erste %9 letzte %10")
+                          .arg(QString::fromLatin1(channel))
+                          .arg(quint8(key >> 32), 2, 16, QChar('0'))
+                          .arg(quint16((key >> 16) & 0xFFFF))
+                          .arg(quint16(key & 0xFFFF))
+                          .arg(t.count)
+                          .arg(t.payloadChanges)
+                          .arg(t.firstSeenMs)
+                          .arg(t.lastSeenMs)
+                          .arg(QString::fromLatin1(t.firstPayload.toHex()))
+                          .arg(QString::fromLatin1(t.lastPayload.toHex()));
+        }
+    };
+    abschnitt("Steuerkanal", m_controlInventory);
+    abschnitt("Strom", m_streamStateInventory);
+
+    if (zeilen.isEmpty()) {
+        return QStringLiteral(
+            "SunSdr: Mithoeren -- nichts aufgenommen (kein Rahmen vom Geraet "
+            "angekommen, seit die Verbindung stand)");
+    }
+    zeilen.prepend(QStringLiteral(
+                       "SunSdr: Mithoeren -- Steuerrahmen %1 (davon unlesbar %2), "
+                       "Sorten: Steuerkanal %3, Strom %4")
+                       .arg(m_controlFramesSeen)
+                       .arg(m_controlFramesUnparsed)
+                       .arg(m_controlInventory.size())
+                       .arg(m_streamStateInventory.size()));
+    return zeilen.join(QLatin1Char('\n'));
 }
 
 } // namespace Longpath

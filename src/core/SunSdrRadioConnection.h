@@ -704,6 +704,96 @@ private:
     quint16 m_lastBlockReplySeq{0};
     bool blockReplyEnabled();
     void replyToBlock(quint16 seq);
+
+    // ── Mithoeren: was das Geraet von sich aus meldet ────────────────────
+    //
+    // Bis zum 2026-10-02 hat dieser Treiber dem Geraet nur zugehoert,
+    // solange er auf die Beacon-Antwort wartete: processControlDatagram()
+    // stieg mit `if (!m_awaitingBeacon ...) return;` aus, und im Kopf der
+    // Strompakete blieben Opcode und die zwei Zustandsbytes [8:9]
+    // ungelesen -- TX-aktive Rahmen (0xFD) flogen ganz hinaus. Damit fiel
+    // alles auf den Boden, was die QRP ueber ihren eigenen Zustand sagt:
+    // kein Messwert, kein Mikrofon-PTT, keine Spannung, keine
+    // Uebersteuerung. P2RadioConnection meldet davon neun Dinge nach oben
+    // (meterDataReceived, paTelemetryUpdated, adcOverflow,
+    // micPttFromRadio, ...), dieser Treiber vier.
+    //
+    // Und es ist derselbe Grund, aus dem acht Opcodes seit dem
+    // 2026-08-26 unzugeordnet sind (0x03, 0x0c, 0x0d, 0x0f, 0x11, 0x13,
+    // 0x16, 0x1c): der Treiber hat sie nie angesehen. Bisher brauchte
+    // ihre Zuordnung tcpdump mit sudo und ein ExpertSDR2 daneben
+    // (tools/sunsdr_opcode_watch.py) -- also einen Termin an der Bank.
+    //
+    // Diese zwei Inventare aendern am Betrieb nichts und schicken nichts.
+    // Sie halten je Rahmensorte fest, wie oft sie kam und ob die Nutzlast
+    // sich aendert, denn das trennt die beiden interessanten Faelle:
+    // eine Nutzlast, die sich im Betrieb aendert, ist ein Messwert; eine,
+    // die konstant bleibt, ist Ausstattung. Die Zuordnung entsteht damit
+    // im normalen Funkbetrieb.
+    struct FrameTally {
+        quint64 count{0};
+        quint64 payloadChanges{0};
+        QByteArray firstPayload;
+        QByteArray lastPayload;
+        qint64 firstSeenMs{0};
+        qint64 lastSeenMs{0};
+        int changesLogged{0};
+    };
+
+    // Opcode, Unterindex und Nutzlastlaenge in einem Wort. Die Laenge
+    // gehoert in den Schluessel: dieselbe Opcode-Nummer mit anderer
+    // Laenge ist auf diesem Protokoll eine andere Rahmensorte (der
+    // Steuerkopf traegt die Laenge selbst, [4:5]).
+    static constexpr quint64 frameKey(quint8 opcode, quint16 sub, quint16 len)
+    {
+        return (quint64(opcode) << 32) | (quint64(sub) << 16) | quint64(len);
+    }
+
+    // Deckel. 64 Sorten sind mehr als die rund drei Dutzend, die
+    // ExpertSDR2 beim Verbinden ueberhaupt schickt; was darueber kaeme,
+    // waere kein Inventar mehr, sondern eine Gegenstelle, die um sich
+    // streut -- dann steht EINE Warnung im Log und es wird nicht weiter
+    // gesammelt. Je Sorte werden hoechstens drei Aenderungen
+    // ausgeschrieben, danach nur noch gezaehlt: der Strom liefert 1920
+    // Pakete je Sekunde, ein Zustandsbyte, das im Takt wackelt, darf das
+    // Log nicht fuellen.
+    static constexpr int kMaxFrameKinds = 64;
+    static constexpr int kMaxChangeLogsPerKind = 3;
+    // Mitgeschriebene Nutzlast je Sorte. Reicht fuer die vier u32-Werte,
+    // aus denen die bekannten Rahmen bestehen, und haelt das Log lesbar
+    // (ExpertSDR2 schickt beim Verbinden auch ein 1,2-kB-Paket).
+    static constexpr int kMaxTallyPayloadBytes = 32;
+
+    void noteControlFrame(const QByteArray& data);
+    void noteStreamState(const SunSdr::IqHeader& hdr);
+    void tallyFrame(QHash<quint64, FrameTally>& inventory, const char* channel,
+                    quint8 opcode, quint16 sub, quint16 len,
+                    const QByteArray& payload);
+
+    QHash<quint64, FrameTally> m_controlInventory;
+    QHash<quint64, FrameTally> m_streamStateInventory;
+    quint64 m_controlFramesSeen{0};
+    quint64 m_controlFramesUnparsed{0};
+    bool m_inventoryFullWarned{false};
+    // Laeuft ab dem Augenblick, in dem die Verbindung steht, damit die
+    // Zeiten im Bericht gegen den Verbindungsbeginn lesbar sind und nicht
+    // gegen die Uhr des Rechners.
+    QElapsedTimer m_inventoryClock;
+    // Der Schnellvergleich aus noteStreamState(): das zuletzt gesehene
+    // Tripel (Opcode, Byte 8, Byte 9) des Stromkopfs.
+    quint8 m_lastStreamOpcode{0};
+    quint8 m_lastStreamByte8{0};
+    quint8 m_lastStreamByte9{0};
+    bool m_lastStreamStateValid{false};
+
+public:
+    // Ein Bericht in Textform, eine Zeile je Rahmensorte. Geht beim
+    // Trennen ins Log und ist der Beleg, den ein Pruefstand liest --
+    // dieselbe Rolle wie probeReportIfDue() fuer das Messgeraet am Strom.
+    QString frameInventoryReport() const;
+    int controlFrameKindsForTest() const { return int(m_controlInventory.size()); }
+    int streamStateKindsForTest() const { return int(m_streamStateInventory.size()); }
+    quint64 controlFramesSeenForTest() const { return m_controlFramesSeen; }
 };
 
 } // namespace Longpath

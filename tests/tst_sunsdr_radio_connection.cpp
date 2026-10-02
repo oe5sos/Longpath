@@ -1459,6 +1459,183 @@ private slots:
             SunSdrRadioConnection::dataSilenceTimeoutMsForTest() + 2000);
         QVERIFY(!conn.pacerRunningForTest());
     }
+
+    // ── Mithoeren: was das Geraet von sich aus meldet ──────────────────
+    //
+    // Bis zum 2026-10-02 war dieser Treiber auf der Meldeseite taub:
+    // processControlDatagram() stieg nach dem Handschlag mit "drain only"
+    // aus, und im Stromkopf blieben Opcode und Zustandsbytes ungelesen.
+    // Diese Pruefungen halten beides fest -- einschliesslich der zwei
+    // Faelle, die beim Nachbauen am leichtesten verloren gehen: der
+    // fremde Absender und der TX-aktive Rahmen, der fuer das I/Q
+    // verworfen, fuers Inventar aber gezaehlt wird.
+
+    // Ein gueltiger Steuerrahmen, wie das Geraet ihn im Betrieb schickt:
+    // 18-Byte-Kopf plus Nutzlast, mit dem Magic der QRP.
+    static QByteArray qrpControlFrame(quint8 opcode, quint16 sub,
+                                      const QByteArray& payload)
+    {
+        QByteArray frame = SunSdr::buildControlHeader(
+            SunSdr::kProfileQrp, opcode, sub, quint16(payload.size()));
+        frame.append(payload);
+        return frame;
+    }
+
+    // Bringt die Verbindung in denselben Zustand wie
+    // realBeaconReplyOpensGateAndRepliesWithStateSync(): Handschlag durch,
+    // m_radioAddr gesetzt, RX-Tor offen.
+    static QHostAddress handshake(SunSdrRadioConnection& conn)
+    {
+        const QHostAddress radio(QStringLiteral("192.0.2.200"));  // RFC 5737
+        conn.feedControlDatagramForTest(
+            QByteArray::fromHex("03ff011a7c0000004119c0a810c8c0a810c851c300004928"),
+            radio);
+        return radio;
+    }
+
+    void steuerrahmenNachDemHandschlagKommenInsInventar()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        const QHostAddress radio = handshake(conn);
+        QVERIFY(conn.isRxReadyForTest());
+
+        // Der Beacon selbst gehoert nicht ins Inventar — er lief durch den
+        // Handschlag-Zweig, nicht durch das Mithoeren.
+        QCOMPARE(conn.controlFrameKindsForTest(), 0);
+
+        conn.feedControlDatagramForTest(
+            qrpControlFrame(0x0d, 0, QByteArray::fromHex("01000000")), radio);
+
+        QCOMPARE(conn.controlFramesSeenForTest(), quint64(1));
+        QCOMPARE(conn.controlFrameKindsForTest(), 1);
+        const QString bericht = conn.frameInventoryReport();
+        QVERIFY2(bericht.contains(QStringLiteral("op=0x0d")), qPrintable(bericht));
+        QVERIFY2(bericht.contains(QStringLiteral("01000000")), qPrintable(bericht));
+    }
+
+    // Derselbe Opcode mit anderer Nutzlast ist KEINE neue Sorte, sondern
+    // eine Aenderung — das ist die Unterscheidung, an der sich ein
+    // Messwert von einer Ausstattungsmeldung erkennen laesst.
+    void geaenderteNutzlastZaehltAlsAenderungNichtAlsNeueSorte()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        const QHostAddress radio = handshake(conn);
+
+        conn.feedControlDatagramForTest(
+            qrpControlFrame(0x0d, 0, QByteArray::fromHex("01000000")), radio);
+        conn.feedControlDatagramForTest(
+            qrpControlFrame(0x0d, 0, QByteArray::fromHex("02000000")), radio);
+
+        QCOMPARE(conn.controlFrameKindsForTest(), 1);
+        QCOMPARE(conn.controlFramesSeenForTest(), quint64(2));
+        const QString bericht = conn.frameInventoryReport();
+        QVERIFY2(bericht.contains(QStringLiteral("Aenderungen 1")), qPrintable(bericht));
+        QVERIFY2(bericht.contains(QStringLiteral("erste 01000000 letzte 02000000")),
+                 qPrintable(bericht));
+    }
+
+    // Gleiche Begruendung wie bei processStreamDatagram()s Absenderpruefung:
+    // der Steuerport wird mit ShareAddress gebunden, eine noch laufende
+    // Vorsitzung derselben QRP darf das Inventar nicht mit fuellen.
+    void fremderAbsenderKommtNichtInsInventar()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        handshake(conn);
+
+        conn.feedControlDatagramForTest(
+            qrpControlFrame(0x0d, 0, QByteArray::fromHex("01000000")),
+            QHostAddress(QStringLiteral("192.0.2.111")));
+
+        QCOMPARE(conn.controlFramesSeenForTest(), quint64(0));
+        QCOMPARE(conn.controlFrameKindsForTest(), 0);
+    }
+
+    // Die Zustandsbytes [8:9] des Stromkopfs. Zwei Bloecke mit
+    // verschiedenen Bytes sind eine Sorte mit einer Aenderung.
+    void zustandsbytesAusDemStromKommenInsInventar()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        handshake(conn);
+
+        conn.feedStreamDatagramForTest(qrpBlock(1, true));
+        QCOMPARE(conn.streamStateKindsForTest(), 1);
+
+        QByteArray andererZustand = SunSdr::buildIqHeader(
+            SunSdr::kProfileQrp, SunSdr::kOpIqRxIdle, 2, 0x02, 0x01);
+        andererZustand.append(QByteArray(SunSdr::kIqPayloadSize, char(0)));
+        conn.feedStreamDatagramForTest(andererZustand);
+
+        QCOMPARE(conn.streamStateKindsForTest(), 1);
+        const QString bericht = conn.frameInventoryReport();
+        QVERIFY2(bericht.contains(QStringLiteral("Strom op=0xfe")), qPrintable(bericht));
+        QVERIFY2(bericht.contains(QStringLiteral("erste 0100 letzte 0201")),
+                 qPrintable(bericht));
+    }
+
+    // Ein TX-aktiver Rahmen (0xFD) wird fuer das I/Q verworfen — er traegt
+    // kein Empfangssignal. Fuers Inventar zaehlt er trotzdem: dass das
+    // Geraet ueberhaupt in den Sendezustand gegangen ist, ist genau die
+    // Meldung, die dieser Treiber bisher nicht gesehen hat.
+    void txAktiverRahmenZaehltObwohlErFuersIqVerworfenWird()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        handshake(conn);
+
+        QSignalSpy iq(&conn, &RadioConnection::iqDataReceived);
+        QByteArray txRahmen = SunSdr::buildIqHeader(
+            SunSdr::kProfileQrp, SunSdr::kOpIqTxActive, 1, 0x02, 0x01);
+        txRahmen.append(QByteArray(SunSdr::kIqPayloadSize, char(0)));
+        conn.feedStreamDatagramForTest(txRahmen);
+
+        QCOMPARE(iq.count(), 0);
+        QCOMPARE(conn.streamStateKindsForTest(), 1);
+        QVERIFY2(conn.frameInventoryReport().contains(QStringLiteral("Strom op=0xfd")),
+                 qPrintable(conn.frameInventoryReport()));
+    }
+
+    // Das Inventar gehoert zur Sitzung, gleiche Begruendung wie bei
+    // m_radioAddr: eine Sorte aus der vorigen Verbindung darf im Bericht
+    // der neuen nicht als "schon gesehen" dastehen.
+    void inventarBeginntMitJederVerbindungNeu()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        const QHostAddress radio = handshake(conn);
+        conn.feedControlDatagramForTest(
+            qrpControlFrame(0x0d, 0, QByteArray::fromHex("01000000")), radio);
+        QCOMPARE(conn.controlFrameKindsForTest(), 1);
+
+        conn.disconnect();
+        conn.connectToRadio(someQrpInfo());
+
+        QCOMPARE(conn.controlFrameKindsForTest(), 0);
+        QCOMPARE(conn.controlFramesSeenForTest(), quint64(0));
+        QVERIFY(conn.frameInventoryReport().contains(
+            QStringLiteral("nichts aufgenommen")));
+    }
 };
 
 QTEST_MAIN(TestSunSdrRadioConnection)
