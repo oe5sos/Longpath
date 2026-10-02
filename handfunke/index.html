@@ -99,7 +99,9 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
   <span class="unit">MHz</span>
   <span class="spacer"></span>
   <span class="b" id="band"></span>
+  <button class="zoom" id="zoomRaus" aria-label="Ausschnitt vergroessern">−</button>
   <span class="b" id="spanne"></span>
+  <button class="zoom" id="zoomRein" aria-label="Ausschnitt verkleinern">+</button>
 </div>
 
 <div class="scope" id="scope">
@@ -110,6 +112,9 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
        hoeher als der Panadapter — gesehen wird vor allem dort. -->
   <canvas id="pan" width="373" height="96"></canvas>
   <canvas id="wf"  width="373" height="160"></canvas>
+  <!-- Der Durchlass liegt UNTER dem Abstimmstrich: er sagt, was zu hoeren
+       ist, der Strich sagt, worauf abgestimmt ist. -->
+  <div class="durchlass" id="durchlass"></div>
   <div class="cursor"></div>
 </div>
 
@@ -164,6 +169,18 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
   <span id="fussBild"></span>
   <span id="fussTon"></span>
 </footer>
+
+<div id="qsy">
+  <div class="karte">
+    <h1>FREQUENZ</h1>
+    <input id="qsyFeld" type="text" inputmode="decimal" autocomplete="off"
+           spellcheck="false" placeholder="7.134.60  ·  7134.6  ·  7.1346">
+    <div class="reihe">
+      <button id="qsyOk">Setzen</button>
+      <button id="qsyAb" class="still">Abbrechen</button>
+    </div>
+  </div>
+</div>
 
 <div id="koppeln" class="an">
   <h1>LONGPATH HANDFUNKE</h1>

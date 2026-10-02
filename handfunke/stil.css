@@ -26,6 +26,44 @@
   --mono:ui-monospace,"SF Mono",Menlo,monospace;
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+
+/* iOS: langes Halten auf dem Bild rief die Lupe und markierte die halbe
+   Seite (Betreiber 2026-10-02: "wenn man zu lange am cursor bleibt kommt
+   die lupe und dann ist alles markiert"). Auf einer Fernbedienung gibt es
+   nichts zu markieren — ausser in den Eingabefeldern, und die behalten es. */
+html,body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+input,textarea{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default}
+
+/* Der Durchlassbereich als FLAECHE, nicht als Strich.
+   Betreiber 2026-10-02: "man sollte die bandbreite nun auch nicht nur als
+   strich sehen". Liegt unter dem Abstimmstrich, nimmt keine Beruehrung an. */
+.durchlass{position:absolute;top:0;bottom:0;display:none;pointer-events:none;
+  background:rgba(194,146,79,.12);
+  border-left:1px solid rgba(194,146,79,.42);
+  border-right:1px solid rgba(194,146,79,.42)}
+
+/* Zoomtasten neben der Spannenanzeige. Kneifen gibt es seit dem 2026-10-01,
+   aber eine Geste, die man nicht sieht, gibt es fuer den Bediener nicht. */
+.zoom{font:inherit;color:var(--text2);background:transparent;border:0;
+  padding:0 7px;line-height:1;cursor:pointer}
+.zoom:active{color:var(--accent)}
+
+/* Frequenz direkt eintippen (Betreiber 2026-10-02). Gleiche Bauart wie das
+   Kopplungsblatt, damit nichts Neues zu lernen ist. */
+#qsy{position:fixed;inset:0;z-index:10;display:none;align-items:center;
+  justify-content:center;padding:22px;background:rgba(6,6,8,.72)}
+#qsy.an{display:flex}
+#qsy .karte{width:100%;max-width:330px;display:flex;flex-direction:column;gap:12px;
+  padding:18px;border-radius:15px;background:var(--panel);border:1px solid var(--line)}
+#qsy h1{font-size:var(--f-sub);font-weight:600;letter-spacing:.07em;color:var(--title)}
+#qsy input{width:100%;height:46px;padding:0 12px;border-radius:11px;text-align:center;
+  font:600 20px/1 ui-monospace,Menlo,monospace;color:var(--title);
+  background:var(--sunk);border:1px solid var(--line)}
+#qsy input:focus{outline:none;border-color:var(--accent)}
+#qsy .reihe{display:flex;gap:9px}
+#qsy button{flex:1;height:46px;border-radius:11px;font:600 14px/1 inherit;
+  letter-spacing:.06em;color:#14100a;background:var(--accent);border:0;cursor:pointer}
+#qsy button.still{color:var(--text2);background:transparent;border:1px solid var(--line)}
 /* 393x852 ist das Mass, an dem die Gestaltung entstanden ist (iPhone 14 Pro).
    Es steht hier nur noch, damit das Blatt im Browser wie ein Telefon
    aussieht — index.html ueberschreibt es fuer den echten Einsatz. Waagrecht
