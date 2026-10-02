@@ -15,6 +15,7 @@
 #include "SunSdrRadioConnection.h"
 
 #include <QLoggingCategory>
+#include <QRegularExpression>
 #include <QStringList>
 
 #include <algorithm>
@@ -259,6 +260,8 @@ void SunSdrRadioConnection::connectToRadio(const RadioInfo& info)
     m_iqSeqWndBackwards = 0;
     m_iqSeqWndClock.invalidate();
     m_lastGapSignalMs = -1;
+    m_benchFramesSent = 0;
+    m_benchFramesRejected = 0;
     // Step 3: keep the pacer's own profile pointer (defaulted to
     // kProfileQrp at construction — see SunSdrTxPacer.h's own comment)
     // in sync with whatever this connection actually resolved, so the
@@ -1448,15 +1451,74 @@ void SunSdrRadioConnection::sendBenchFrames(const QString& envName)
     if (list.isEmpty()) { return; }
 
     const QStringList parts = list.split(QLatin1Char(','), Qt::SkipEmptyParts);
-    for (const QString& hex : parts) {
-        const QByteArray frame = QByteArray::fromHex(hex.trimmed().toLatin1());
-        if (frame.isEmpty()) { continue; }
+    for (const QString& rohHex : parts) {
+        const QString hex = rohHex.trimmed();
+
+        // QByteArray::fromHex() UEBERSPRINGT ungueltige Zeichen still.
+        // Ein verrutschtes Zeichen in einer von Hand zusammengesetzten
+        // Zeile ergibt damit einen anderen, kuerzeren Rahmen -- und der
+        // geht ans Funkgeraet, ohne dass irgendwo steht, dass nicht das
+        // hinausging, was dastand. Fuer einen Versuch am Geraet ist das
+        // die schlechteste Art zu scheitern: man sucht die Ursache im
+        // Geraet, und sie liegt in der Zeile. Darum hier streng:
+        // nur Hexziffern, nur gerade Laenge, sonst gar nicht.
+        static const QRegularExpression nurHex(QStringLiteral("^[0-9a-fA-F]+$"));
+        if (!nurHex.match(hex).hasMatch() || (hex.size() % 2) != 0) {
+            qCWarning(lcSunSdr).nospace().noquote()
+                << "SunSdr: Werkbank-Rahmen aus " << envName
+                << " uebersprungen -- keine saubere Hexfolge gerader Laenge: \""
+                << hex << "\"";
+            ++m_benchFramesRejected;
+            continue;
+        }
+
+        const QByteArray frame = QByteArray::fromHex(hex.toLatin1());
+
+        if (frame.size() < SunSdr::kCtlHeaderSize
+            || quint8(frame[0]) != m_profile->magic0
+            || quint8(frame[1]) != SunSdr::kMagic1) {
+            qCWarning(lcSunSdr).nospace().noquote()
+                << "SunSdr: Werkbank-Rahmen aus " << envName
+                << " uebersprungen -- kein Steuerrahmen dieses Geraets ("
+                << frame.size() << " Byte, erwartet mindestens "
+                << SunSdr::kCtlHeaderSize << " mit Magie 0x"
+                << Qt::hex << m_profile->magic0 << " 0x" << SunSdr::kMagic1 << ")";
+            ++m_benchFramesRejected;
+            continue;
+        }
+
+        // Die Pruefsumme nachrechnen und beim Abweichen warnen, aber den
+        // Rahmen UNVERAENDERT schicken: was hinausgeht, entscheidet der
+        // Mensch davor (siehe Kopf dieser Funktion). Die Warnung ist
+        // trotzdem noetig, denn am Geraet gezeigt (2026-09-25): ein
+        // Rahmen mit falschem Ende wird stillschweigend VERWORFEN. Ohne
+        // diese Zeile sucht man den Grund, warum der Versuch nichts
+        // bewirkt hat, ueberall ausser an der richtigen Stelle.
+        QByteArray genullt = frame;
+        genullt[14] = genullt[15] = genullt[16] = genullt[17] = 0;
+        const QByteArray mitCrc = SunSdr::withControlFrameCrc(genullt);
+        if (mitCrc != frame) {
+            qCWarning(lcSunSdr).noquote()
+                << QStringLiteral(
+                       "SunSdr: Werkbank-Rahmen aus %1 hat eine falsche "
+                       "Pruefsumme -- das Geraet wird ihn verwerfen. "
+                       "Dasteht %2, richtig waere %3. Er geht trotzdem "
+                       "unveraendert hinaus.")
+                       .arg(envName)
+                       .arg(QString::fromLatin1(frame.mid(14, 4).toHex()))
+                       .arg(QString::fromLatin1(mitCrc.mid(14, 4).toHex()));
+        }
+
         m_controlSocket->writeDatagram(frame, m_radioAddr,
                                         m_profile->defaultCtrlPort);
         recordBytesSent(static_cast<qint64>(frame.size()));
-        qCInfo(lcSunSdr) << "SunSdr: Werkbank-Rahmen" << envName << "Opcode"
-                         << (frame.size() > 2 ? quint8(frame[2]) : 0)
-                         << "-" << frame.size() << "Byte";
+        ++m_benchFramesSent;
+        qCInfo(lcSunSdr).nospace().noquote()
+            << "SunSdr: Werkbank-Rahmen " << envName << " -- op=0x"
+            << Qt::hex << quint8(frame[2]) << Qt::dec
+            << " sub=" << (quint16(quint8(frame[6])) | (quint16(quint8(frame[7])) << 8))
+            << " " << frame.size() << " Byte, Nutzlast "
+            << frame.mid(SunSdr::kCtlHeaderSize).toHex().constData();
     }
 }
 

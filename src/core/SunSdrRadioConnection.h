@@ -826,6 +826,13 @@ private:
     // Problem nicht, weil sie gegen die absolute Uhr rechnen.
     qint64 m_lastGapSignalMs{-1};
 
+    // Wie viele Werkbank-Rahmen in dieser Sitzung hinausgingen und wie
+    // viele abgewiesen wurden. Gezaehlt, nicht nur geloggt: ein Pruefstand
+    // soll belegen koennen, dass eine kaputte Hexzeile WIRKLICH nichts
+    // schickt -- und nicht halb etwas.
+    quint32 m_benchFramesSent{0};
+    quint32 m_benchFramesRejected{0};
+
     void noteControlFrame(const QByteArray& data);
     void noteStreamState(const SunSdr::IqHeader& hdr);
     void tallyFrame(QHash<quint64, FrameTally>& inventory, const char* channel,
@@ -860,6 +867,8 @@ public:
     quint64 seqRepeatsForTest() const { return m_iqSeqWndRepeats; }
     quint64 seqLostForTest() const { return m_iqSeqWndLost; }
     quint64 seqBackwardsForTest() const { return m_iqSeqWndBackwards; }
+    quint32 benchFramesSentForTest() const { return m_benchFramesSent; }
+    quint32 benchFramesRejectedForTest() const { return m_benchFramesRejected; }
 };
 
 } // namespace Longpath

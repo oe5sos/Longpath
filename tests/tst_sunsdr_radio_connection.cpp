@@ -1690,6 +1690,52 @@ private slots:
             QStringLiteral("nichts aufgenommen")));
     }
 
+    // ── Werkbank-Rahmen: was hinausgeht, muss das sein, was dastand ────
+    //
+    // Der Versuch mit dem Verbindungsablauf (siehe
+    // docs/architecture/2026-10-02-sunsdr-verbindungsablauf.md) haengt an
+    // dieser Schnittstelle. QByteArray::fromHex() ueberspringt ungueltige
+    // Zeichen STILL -- ein verrutschtes Zeichen ergaebe einen anderen,
+    // kuerzeren Rahmen, und der ginge ans Funkgeraet, ohne dass es
+    // irgendwo steht.
+
+    void werkbankRahmenMitKaputtemHexGehenNichtHinaus()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+
+        // "xx" ist kein Hex, "03ff0" hat ungerade Laenge -- beide muessen
+        // wortlos liegenbleiben, nicht halb hinausgehen.
+        qputenv("LONGPATH_SUNSDR_PRE", "03ffxx0004000000000001000000a444f1b700000000,03ff0");
+        handshake(conn);
+        qunsetenv("LONGPATH_SUNSDR_PRE");
+
+        QCOMPARE(conn.benchFramesSentForTest(), 0u);
+        QCOMPARE(conn.benchFramesRejectedForTest(), 2u);
+    }
+
+    void werkbankRahmenMitSauberemHexGehtHinaus()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+
+        // Einer der dreizehn echten ExpertSDR2-Rahmen (0x10), mit
+        // richtiger Pruefsumme -- siehe tst_sunsdr_protocol.cpp.
+        qputenv("LONGPATH_SUNSDR_PRE",
+                "03ff100004000000000001000000a444f1b700000000");
+        handshake(conn);
+        qunsetenv("LONGPATH_SUNSDR_PRE");
+
+        QCOMPARE(conn.benchFramesSentForTest(), 1u);
+        QCOMPARE(conn.benchFramesRejectedForTest(), 0u);
+    }
+
     // ── Folgenummern: Verlust, Luecken, Wiederholungen ────────────────
     //
     // P1 und P2 melden das seit langem, dieser Treiber bisher nicht. Die
