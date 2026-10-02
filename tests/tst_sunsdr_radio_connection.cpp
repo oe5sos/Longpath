@@ -1542,6 +1542,59 @@ private slots:
                  qPrintable(bericht));
     }
 
+    // Der Fall, fuer den die Werteliste da ist: vier Stufen am
+    // Vorverstaerker, am Ende steht wieder der Anfangswert. Erste und
+    // letzte Nutzlast allein wuerden "keine Aenderung" suggerieren.
+    void alleVerschiedenenWerteStehenImBericht()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        const QHostAddress radio = handshake(conn);
+
+        for (const char* hex : {"00000000", "01000000", "02000000",
+                                "03000000", "00000000"}) {
+            conn.feedControlDatagramForTest(
+                qrpControlFrame(0x05, 0, QByteArray::fromHex(hex)), radio);
+        }
+
+        const QString bericht = conn.frameInventoryReport();
+        QCOMPARE(conn.controlFrameKindsForTest(), 1);
+        QVERIFY2(bericht.contains(QStringLiteral(
+                     "Werte: 00000000, 01000000, 02000000, 03000000")),
+                 qPrintable(bericht));
+        // Vier Stufen hin und eine zurueck sind vier Aenderungen.
+        QVERIFY2(bericht.contains(QStringLiteral("Aenderungen 4")),
+                 qPrintable(bericht));
+        // Und der Beleg, dass erste/letzte allein getaeuscht haetten:
+        QVERIFY2(bericht.contains(QStringLiteral("erste 00000000 letzte 00000000")),
+                 qPrintable(bericht));
+    }
+
+    // Mehr verschiedene Werte als die Liste traegt: dann steht "..." dahinter
+    // und die Zahl der Aenderungen traegt die Aussage.
+    void zuVieleWerteWerdenAbgekuerzt()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        const QHostAddress radio = handshake(conn);
+
+        for (int i = 0; i < 12; ++i) {
+            QByteArray p(4, char(0));
+            p[0] = char(i);
+            conn.feedControlDatagramForTest(qrpControlFrame(0x0f, 0, p), radio);
+        }
+
+        const QString bericht = conn.frameInventoryReport();
+        QVERIFY2(bericht.contains(QStringLiteral("...")), qPrintable(bericht));
+        QVERIFY2(bericht.contains(QStringLiteral("Aenderungen 11")), qPrintable(bericht));
+    }
+
     // Gleiche Begruendung wie bei processStreamDatagram()s Absenderpruefung:
     // der Steuerport wird mit ShareAddress gebunden, eine noch laufende
     // Vorsitzung derselben QRP darf das Inventar nicht mit fuellen.

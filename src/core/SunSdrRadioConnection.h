@@ -738,6 +738,14 @@ private:
         qint64 firstSeenMs{0};
         qint64 lastSeenMs{0};
         int changesLogged{0};
+        // Alle verschiedenen Werte dieser Sorte, in der Reihenfolge ihres
+        // ersten Auftretens. Erste und letzte Nutzlast allein genuegen
+        // nicht: wer am Vorverstaerker durch vier Stufen dreht, hat am
+        // Ende wieder den Anfangswert dastehen, und die drei dazwischen
+        // -- also genau die Zuordnung -- waeren weg. Mit der Liste
+        // braucht es EINEN Durchgang am Knopf statt vier.
+        QList<QByteArray> distinctPayloads;
+        bool moreThanListed{false};
     };
 
     // Opcode, Unterindex und Nutzlastlaenge in einem Wort. Die Laenge
@@ -763,6 +771,13 @@ private:
     // aus denen die bekannten Rahmen bestehen, und haelt das Log lesbar
     // (ExpertSDR2 schickt beim Verbinden auch ein 1,2-kB-Paket).
     static constexpr int kMaxTallyPayloadBytes = 32;
+    // Acht verschiedene Werte je Sorte. Ein Schalter mit mehr Stellungen
+    // als das hat, ist in diesem Geraet nicht bekannt (der
+    // Vorverstaerker hat vier); ein Rahmen mit mehr ist eher ein
+    // Messwert oder ein Zaehler, und dort sagt die Liste ohnehin nichts
+    // mehr -- dann steht "..." dahinter und die Zahl der Aenderungen
+    // traegt die Aussage.
+    static constexpr int kMaxDistinctPayloads = 8;
 
     // ── Folgenummern nachzaehlen: Verlust, Luecken, Wiederholungen ───────
     //

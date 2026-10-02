@@ -1682,6 +1682,7 @@ void SunSdrRadioConnection::tallyFrame(QHash<quint64, FrameTally>& inventory,
         fresh.lastPayload = kept;
         fresh.firstSeenMs = now;
         fresh.lastSeenMs = now;
+        fresh.distinctPayloads.append(kept);
         inventory.insert(key, fresh);
         qCInfo(lcSunSdr).nospace()
             << "SunSdr: neue Rahmensorte auf " << channel << " -- op=0x"
@@ -1705,6 +1706,13 @@ void SunSdrRadioConnection::tallyFrame(QHash<quint64, FrameTally>& inventory,
     ++tally.payloadChanges;
     const QByteArray vorher = tally.lastPayload;
     tally.lastPayload = kept;
+    if (!tally.distinctPayloads.contains(kept)) {
+        if (tally.distinctPayloads.size() < kMaxDistinctPayloads) {
+            tally.distinctPayloads.append(kept);
+        } else {
+            tally.moreThanListed = true;
+        }
+    }
     if (tally.changesLogged < kMaxChangeLogsPerKind) {
         ++tally.changesLogged;
         qCInfo(lcSunSdr).nospace()
@@ -1729,9 +1737,17 @@ QString SunSdrRadioConnection::frameInventoryReport() const
         std::sort(keys.begin(), keys.end());
         for (const quint64 key : keys) {
             const FrameTally& t = inventory.value(key);
+            QStringList werte;
+            for (const QByteArray& p : t.distinctPayloads) {
+                werte << QString::fromLatin1(p.toHex());
+            }
+            if (t.moreThanListed) {
+                werte << QStringLiteral("...");
+            }
             zeilen << QStringLiteral(
                           "%1 op=0x%2 sub=%3 len=%4 | %5x | Aenderungen %6 "
-                          "| zuerst %7 ms, zuletzt %8 ms | erste %9 letzte %10")
+                          "| zuerst %7 ms, zuletzt %8 ms | erste %9 letzte %10"
+                          " | Werte: %11")
                           .arg(QString::fromLatin1(channel))
                           .arg(quint8(key >> 32), 2, 16, QChar('0'))
                           .arg(quint16((key >> 16) & 0xFFFF))
@@ -1741,7 +1757,8 @@ QString SunSdrRadioConnection::frameInventoryReport() const
                           .arg(t.firstSeenMs)
                           .arg(t.lastSeenMs)
                           .arg(QString::fromLatin1(t.firstPayload.toHex()))
-                          .arg(QString::fromLatin1(t.lastPayload.toHex()));
+                          .arg(QString::fromLatin1(t.lastPayload.toHex()))
+                          .arg(werte.join(QStringLiteral(", ")));
         }
     };
     abschnitt("Steuerkanal", m_controlInventory);
