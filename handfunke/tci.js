@@ -46,6 +46,11 @@ export class TciLink extends EventTarget {
     audioTyp: null,              // aus dem Text-Echo (unzuverlaessig, s.u.)
     audioTypRahmen: null,        // was WIRKLICH im Binaerkopf steht
     spektrumBestaetigt: false,   // Server hat spectrum_start zurueckgemeldet
+    // Die WIRKLICHE Spanne des Bildes, vom Server gemeldet.
+    //   null = noch nichts gehoert (dann gilt unser Wunsch)
+    //      0 = volle Breite, Spanne unbekannt (dann gilt die I/Q-Rate)
+    //    > 0 = genau diese Hertz
+    spektrumSpanneHz: null,
     spektrumPunkte: null,        // die Punktzahl, auf die er geklemmt hat
     spektrumFps: null,
       txPower: null, txSwr: null,
@@ -215,7 +220,21 @@ export class TciLink extends EventTarget {
         }
         break;
       }
-      case 'spectrum_stop': s.spektrumBestaetigt = false; break;
+      case 'spectrum_stop':
+        s.spektrumBestaetigt = false; s.spektrumSpanneHz = null; break;
+
+      // Die Spanne, die WIRKLICH im Bild steckt (Longpath-eigen).
+      //
+      // Noetig, weil der Server unseren Wunsch anheben kann: die Punktzahl
+      // ist eine Untergrenze fuer die Zahl der Bins, und ohne bekannte
+      // Abtastrate beschneidet er gar nicht. Rechneten wir weiter mit dem
+      // Wunsch, saessen Abstimmstrich, Durchlassband und das Schieben des
+      // Wasserfalls still daneben.
+      case 'spectrum_span': {
+        const t3 = int(0);
+        if (t3 !== null) { s.spektrumSpanneHz = int(1); }
+        break;
+      }
 
       // Mitte des Spektrumbildes (die DDC-Frequenz), NICHT die abgestimmte.
       // Beide fallen nur zusammen, solange nicht innerhalb der DDC-Breite

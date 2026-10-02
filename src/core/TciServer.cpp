@@ -4073,6 +4073,32 @@ void TciServer::onFftBinsReady(int receiverId, const QVector<float>& binsDbm)
         }
         const int sichtbar = letztesBin - erstesBin;
 
+        // ── Die WIRKLICHE Spanne melden, sobald sie sich aendert ────────────
+        //
+        // Begruendung an TciClientSession::spectrumSpanGemeldetHz. Kurz: der
+        // Client rechnet Abstimmstrich, Durchlassband und das Schieben des
+        // Wasserfalls aus SEINEM Wunsch. Der Zuschnitt oben kann davon
+        // abweichen — die Untergrenze `punkte` hebt eine zu schmale Bitte an,
+        // und ohne bekannte Abtastrate wird gar nicht beschnitten. Dann sitzt
+        // beim Bediener alles falsch, ohne dass irgendwo etwas davon steht.
+        //
+        // 0 heisst "volle Breite, Spanne unbekannt" — der Client faellt dann
+        // auf die I/Q-Rate zurueck, die er ohnehin kennt.
+        const int spanneEffektivHz =
+            (abtastrate > 0 && n > 0)
+                ? static_cast<int>(std::lround(double(sichtbar) / double(n)
+                                               * double(abtastrate)))
+                : 0;
+        if (spanneEffektivHz != session->spectrumSpanGemeldetHz) {
+            session->spectrumSpanGemeldetHz = spanneEffektivHz;
+            // Control-Rang, nicht Urgent: das ist eine Auskunft, kein
+            // Sendebefehl. Und nur bei AENDERUNG — sonst haengt an jedem
+            // Bild eine Textzeile, zehnmal je Sekunde.
+            session->sendQueue.push(TciSendQueue::Priority::Control,
+                QStringLiteral("spectrum_span:%1,%2;")
+                    .arg(receiverId).arg(spanneEffektivHz));
+        }
+
         QVector<float> bild(punkte);
         for (int i = 0; i < punkte; ++i) {
             // Bereichsgrenzen in 64 Bit rechnen: 16384 Bins mal 1024 Punkte
