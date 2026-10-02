@@ -1271,10 +1271,28 @@ link.addEventListener('state', () => {
 // ein kurzer Aussetzer soll den Bediener nicht aus der Bedienung werfen.
 let wegSeit = 0;
 setInterval(() => {
-  const offen = link.ws && link.ws.readyState === 1;
+  // „Socket offen" ist KEIN Mass fuer verbunden.
+  //
+  // Aus dem Netz nimmt Longpath die Verbindung an und schweigt dann, bis
+  // `auth:` kommt (TciServer.cpp:1961) — der Socket steht auf 1, waehrend
+  // nichts geht. Hier stand genau diese Pruefung, also galt der Zustand als
+  // verbunden, `wegSeit` wurde jede Sekunde zurueckgesetzt, und das
+  // Kopplungsblatt kam NIE zurueck. Am 2026-10-02 stand das Telefon dadurch
+  // vor einer toten Seite ohne jedes Eingabefeld: kein Ton, kein Bild, keine
+  // Stelle, an der man das Token haette eintippen koennen.
+  //
+  // Ueber die Bruecke konnte das nicht auffallen — dort kam jede Verbindung
+  // aus Loopback, und Loopback verlangt kein Token.
+  //
+  // Massstab ist darum `ready`: erst der Init-Burst heisst verbunden.
+  const offen = link.ws && link.ws.readyState === 1 && link.ready;
+  // Steht der Socket, fehlt aber die Antwort, ist die Lage eindeutig und
+  // muss nicht ausgesessen werden. Nur ein echter Abriss bekommt die lange
+  // Schonfrist, damit ein kurzer WLAN-Huepfer niemanden aus der Bedienung wirft.
+  const frist = (link.ws && link.ws.readyState === 1) ? 6000 : 12000;
   if (!offen && link.wanted) {
     if (!wegSeit) wegSeit = Date.now();
-    if (Date.now() - wegSeit > 12000) {
+    if (Date.now() - wegSeit > frist) {
       $('koppeln').classList.add('an');
       $('fehler').textContent = koppelGrund();
     }
@@ -1297,6 +1315,13 @@ function koppelGrund() {
   if (state.token && !link.st.angemeldet) {
     return 'Longpath antwortet, nimmt das Token aber nicht an. '
          + 'In Setup → TCI Server ein neues erzeugen und hier eintragen.';
+  }
+  // Socket steht, aber wir haben gar kein Token zu bieten — der haeufigste
+  // Fall nach dem Umstellen auf die Netzadresse. Das ist keine „keine
+  // Antwort", sondern eine klare Forderung, und sie gehoert auch so gesagt.
+  if (!state.token && link.ws && link.ws.readyState === 1) {
+    return 'Longpath ist erreichbar, verlangt aber ein Token. '
+         + 'In Setup → TCI Server auf „New" tippen und den Code hier eintragen.';
   }
   if (!state.token) {
     return 'Keine Antwort. Ist Longpath ins Netz gebunden? '
