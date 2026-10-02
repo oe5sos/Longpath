@@ -194,7 +194,10 @@ private slots:
         QVERIFY2(server.moxOwnerForTest() != nullptr,
                  "Mit Freigabe muss der Sendewunsch durchgehen — sonst sperrt "
                  "der Prüfpunkt oben aus einem anderen Grund als der Sperre");
-        QVERIFY2(bestaetigungKam(antworten, QStringLiteral("trx")),
+        // Aktiv auf das Echo warten, nicht auf die 80 ms aus schicke():
+        // der Besitzer stand auf dem CI-Laeufer bereits, das Echo war noch
+        // unterwegs (2026-10-02).
+        QVERIFY2(TciTest::warteAufAntwort(antworten, QStringLiteral("trx")),
                  "Mit Freigabe muss der Server den Sendewunsch auch bestätigen "
                  "— sonst misst der Prüfpunkt oben nichts");
 

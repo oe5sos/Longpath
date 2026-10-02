@@ -38,6 +38,7 @@
 #include <QElapsedTimer>
 #include <QObject>
 #include <QString>
+#include <QStringList>
 #include <QTest>
 #include <QWebSocket>
 
@@ -77,6 +78,42 @@ inline bool warteAufReady(QWebSocket& client, int grenzeMs = 8000,
     QObject::disconnect(horcher);
     if (durch && nachlaufMs > 0) { QTest::qWait(nachlaufMs); }
     return durch;
+}
+
+/** Wartet, bis eine Antwort mit diesem Namen eintrifft.
+ *
+ *  Gegenstueck zu warteAufReady fuer die Messung danach: ein Befehl wird
+ *  geschickt und die Bestaetigung kommt, wenn sie kommt — nicht nach einer
+ *  festen Zahl von Millisekunden. Am 2026-10-02 fiel genau daran noch ein
+ *  Fall um, nachdem der Burst schon sauber abgewartet wurde: der Besitzer
+ *  war gesetzt (der Befehl war also durch), aber das Echo war nach 80 ms
+ *  noch unterwegs.
+ *
+ *  @param gesammelt Liste, in die ein textMessageReceived-Horcher schreibt
+ *  @param name      erwarteter Befehlsname, z. B. "trx"
+ *  @return true, sobald eine Zeile mit `name:` eintrifft.
+ *
+ *  Fuer den umgekehrten Fall — es darf NICHTS kommen — taugt diese Funktion
+ *  nicht: dort muss man eine Weile warten und danach pruefen, und genau das
+ *  tut der Aufrufer weiterhin selbst.
+ */
+inline bool warteAufAntwort(const QStringList& gesammelt, const QString& name,
+                            int grenzeMs = 4000)
+{
+    QElapsedTimer uhr;
+    uhr.start();
+    while (uhr.elapsed() < grenzeMs) {
+        for (const QString& zeile : gesammelt) {
+            for (const QString& teil : zeile.split(QLatin1Char(';'))) {
+                if (teil.trimmed().startsWith(name + QLatin1Char(':'),
+                                              Qt::CaseInsensitive)) {
+                    return true;
+                }
+            }
+        }
+        QTest::qWait(20);
+    }
+    return false;
 }
 
 }  // namespace TciTest
