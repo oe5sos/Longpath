@@ -99,8 +99,14 @@ html,body{width:393px;height:852px;overflow-x:hidden}
    Die einzige Weichzeichnung der Seite liegt auf dem Kopplungsblatt, das
    steht still. */
 body{
+  /* Entwurf B, 2026-10-02: der Verlauf lief ueber #17212b — ein deutliches
+     Blaugruen, das es am Pult nirgends gibt. Longpath hat genau EINE blaue
+     Flaeche, den Panadapter (#141e27); alles andere ist neutrales Grau.
+     Der Dunst machte die Seite erkennbar zu einer Telefon-App statt zu
+     Longpath. Jetzt neutral, und die Tiefe kommt aus Licht und Schatten
+     statt aus Farbe. */
   background:
-    radial-gradient(130% 68% at 50% -8%, #17212b 0%, #0b0d10 46%, var(--app-bg) 100%);
+    radial-gradient(120% 80% at 50% 0%, #101016 0%, var(--app-bg) 62%);
   background-attachment:fixed;
   color:var(--text);
   font:var(--f-body)/1.3 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;
@@ -109,17 +115,24 @@ body{
 /* Die gemeinsame Rolle aller schwebenden Flaechen. Eine Stelle, nicht
    fuenf — sonst driften sie beim naechsten Feinschliff auseinander. */
 .schicht{
-  background:linear-gradient(rgba(34,36,42,.88),rgba(18,19,23,.92));
-  border:1px solid rgba(255,255,255,.075);
-  border-radius:14px;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.07),
-             0 10px 22px rgba(0,0,0,.55),
-             0 2px 5px rgba(0,0,0,.45);
+  /* Entwurf B: durchscheinendes Weiss (rgba(34,36,42,.88)) ersetzt durch
+     Longpaths eigene Flaechenwerte. Ein Weissschleier ist generisches Glas;
+     #101014 -> #0c0c0e ist kInsetBgTop -> kPanelBg, also dasselbe Paar, mit
+     dem am Schreibtisch jede Gruppe gezeichnet wird. Radius 14 -> 10 und
+     kBorderSubtle als Rahmen bringen die Fugen auf Pultmass. */
+  background:linear-gradient(180deg,#101014 0%,var(--panel) 100%);
+  border:1px solid var(--border-subtle);
+  border-radius:10px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05),
+             0 6px 18px rgba(0,0,0,.45),
+             0 1px 3px rgba(0,0,0,.4);
 }
 .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
 /* Versalzeile — Laufweite 0.18em wie kCapsTracking */
-.caps{font-size:var(--f-caption);letter-spacing:.18em;text-transform:uppercase;
-      font-weight:600;color:var(--text3)}
+/* Entwurf B: 0.13em statt 0.18em und eine Spur dunkler. Die Gruppenkoepfe
+   am Pult sind Beschriftung, nicht Inhalt — sie sollen sich wegducken. */
+.caps{font-size:var(--f-caption);letter-spacing:.13em;text-transform:uppercase;
+      font-weight:600;color:#6b6b71}
 
 /* ── Kopf: Verbindung + Station ─────────────────────────────────────────── */
 header{
@@ -148,9 +161,12 @@ header .rate{font-size:var(--f-caption);color:var(--text-inactive)}
 
 /* ── Panadapter + Wasserfall ────────────────────────────────────────────── */
 .scope{
-  flex:none;margin:0 12px;border:1px solid rgba(255,255,255,.08);
-  border-radius:14px;overflow:hidden;background:#0b141c;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 10px 24px rgba(0,0,0,.6);
+  /* Entwurf B: der Panadapter ist das einzige VERSENKTE Element der Seite —
+     man schaut hinein, man fasst ihn nicht an. Darum kInsetBorder als Rahmen
+     und der Schatten nach innen statt nach aussen. */
+  flex:none;margin:0 12px;border:1px solid var(--inset-border);
+  border-radius:8px;overflow:hidden;background:#0b141c;
+  box-shadow:inset 0 2px 10px rgba(0,0,0,.6);
 }
 .scope canvas{display:block;width:100%}
 
@@ -178,22 +194,28 @@ header .rate{font-size:var(--f-caption);color:var(--text-inactive)}
 .feld .chips + .caps{margin-top:9px}
 .chips{display:flex;gap:6px}
 .chip{
-  flex:1;min-width:0;height:36px;                /* 36 sichtbar, 44 Treffer */
+  flex:1;min-width:0;height:38px;                /* 38 sichtbar, 44 Treffer */
   display:flex;align-items:center;justify-content:center;
   font-size:var(--f-small);font-family:var(--mono);color:var(--text2);
-  background:linear-gradient(rgba(44,46,53,.9),rgba(24,25,30,.9));
-  border:1px solid rgba(255,255,255,.07);border-radius:9px;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 2px 4px rgba(0,0,0,.45);
+  /* Entwurf B: feste Grauwerte statt Weissschleier, dazu ein sichtbarer
+     Rahmen. Hoehe 36 -> 38, weil die Flaeche durch den engeren Radius
+     optisch schrumpft und der Finger nichts verlieren darf. */
+  background:linear-gradient(180deg,#242429 0%,#141417 100%);
+  border:1px solid #33333a;border-radius:8px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 1px 2px rgba(0,0,0,.5);
   position:relative;
 }
 .chip::after{content:"";position:absolute;left:0;right:0;top:-4px;bottom:-4px}
 .chip.on{
-  background:linear-gradient(#36699f,#21436a);
-  border-color:#4886c0;color:#e2eefb;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.2),
-             0 0 14px rgba(74,123,168,.4),0 2px 5px rgba(0,0,0,.5);
+  /* Entwurf B: das Blau von kGlassSel (#2f5f92/#1e3d5f/#3d78b0), also genau
+     die Werte, mit denen am Pult eine Auswahl leuchtet. */
+  background:linear-gradient(180deg,#2f5f92 0%,#1e3d5f 100%);
+  border-color:#3d78b0;color:var(--glass-sel-text);
+  box-shadow:0 0 0 1px rgba(61,120,176,.35),
+             0 2px 8px rgba(47,95,146,.35),
+             inset 0 1px 0 rgba(255,255,255,.14);
 }
-.chip.more{flex:0 0 36px;color:var(--text3)}
+.chip.more{flex:0 0 38px;color:var(--text3)}
 /* Zustandsschalter bleiben leise — quietCheckedStyle: im Feld darf genau
    EINE Stelle kraeftig sein, und das ist die Sendetaste. */
 .chip.quiet.on{background:var(--badge-info);border-color:var(--accent);
