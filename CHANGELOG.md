@@ -12,7 +12,8 @@ Thetis**; FM mit CTCSS, Ablage, Reverse und Rauschsperre; ein Logbuch,
 das loggt und den Rotor zeigt; Menues am Fenster statt an der Leiste;
 die SunSDR2 QRP mit echtem I/Q; viele Rendering- und Absturzfunde. Die
 Pakete laufen jetzt auch auf **aelteren Systemen**: macOS ab 12 (Apple
-Silicon und Intel), Linux ab glibc 2.35 (x86_64 und aarch64), Windows x64.
+Silicon und Intel), Linux x86_64 ab glibc 2.35, Linux aarch64 ab glibc 2.38,
+Windows x64.
 
 ### Added
 
