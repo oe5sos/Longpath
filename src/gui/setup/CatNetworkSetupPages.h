@@ -123,6 +123,9 @@ private:
     // tracking is the canonical pattern.
     QPointer<class Longpath::TciServer> m_tciServerRef;
     bool m_tciServerRunning{false};
+    // Gescheiterter Bind mit laufendem Wiederversuch — dritter Zustand neben
+    // laeuft/gestoppt. Leer heisst: kein Wiederversuch im Gange.
+    QString m_tciBindWartet;
     int  m_tciClientCount{0};
     void refreshTciStatusDisplay();
 
