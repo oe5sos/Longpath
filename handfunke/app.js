@@ -762,6 +762,22 @@ async function tonStarten() {
     // was immer das ist.
     const ctx = new AC({ latencyHint: 'interactive' });
 
+    // SOFORT aufwecken, noch im Fingertipp — nicht erst am Ende.
+    //
+    // Weiter unten steht `await ctx.resume()`, und dorthin fuehren zwei
+    // `await ctx.audioWorklet.addModule(...)`. iOS raeumt die Berechtigung
+    // eines Fingertipps aber mit dem ERSTEN await ab: was danach kommt, gilt
+    // nicht mehr als vom Bediener ausgeloest, und `resume()` wird stillschweigend
+    // nicht ausgefuehrt. Der Kontext bleibt `suspended`, die Tondaten laufen
+    // in den Ring, der Vorrat steht am Anschlag — und zu hoeren ist nichts.
+    // Genau das meldete die Seite am 2026-10-02: `ctx=suspended`,
+    // `rahmen=11490`, `vorrat=12000`. Betreiber: "ton geht nicht".
+    //
+    // Hier ist die Berechtigung noch da. Das Ergebnis wird nicht abgewartet
+    // (ein await waere genau der Fehler, den diese Zeile vermeidet); das
+    // `await ctx.resume()` unten bleibt als zweiter Versuch stehen.
+    try { ctx.resume(); } catch (e) { /* zweiter Versuch kommt unten */ }
+
     const gain = ctx.createGain();
     gain.gain.value = afFaktor(state.afPct);
 
@@ -945,6 +961,13 @@ $('tonAn').addEventListener('click', async () => {
 });
 ['touchend', 'click'].forEach(ev =>
   document.addEventListener(ev, async () => {
+    // Fangnetz: steht ein fertiger Kontext still, hilft kein neuer Aufbau —
+    // `tonStarten` steigt bei vorhandenem `state.node` sofort wieder aus.
+    // Ein stiller Kontext braucht genau eines: ein `resume()` im Fingertipp.
+    // Darum SYNCHRON und vor jedem await, sonst ist die Berechtigung weg.
+    if (state.audio && state.audio.state !== 'running') {
+      try { state.audio.resume(); } catch (e) { /* beim naechsten Tipp wieder */ }
+    }
     await tonStarten(); zeichneTonKnopf();
   }, { passive: true }));
 
