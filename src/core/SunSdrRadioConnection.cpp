@@ -901,13 +901,28 @@ void SunSdrRadioConnection::setActiveReceiverCount(int count)
 
 void SunSdrRadioConnection::setSampleRate(int sampleRate)
 {
-    // The QRP's native rate is fixed at 312,500 Hz (design doc "IQ
-    // stream" section) — not negotiated. A caller requesting a
-    // different rate isn't wrong to ask (Longpath's resampling
-    // infrastructure could in principle adapt), but this connection
-    // has nothing to send to change it on the wire, so the request is
-    // simply not actionable here.
-    Q_UNUSED(sampleRate);
+    // 48 000 Hz, am Geraet gemessen (2026-09-23/24): 240 Bloecke je
+    // Sekunde zu 200 Probenpaaren. Hier stand bis zum 2026-10-02 noch
+    // "fixed at 312,500 Hz" -- diese Zahl war von der SunSDR2 DX
+    // abgeschrieben, fuer die QRP nie geprueft und ist widerlegt. Sie
+    // stehenzulassen heisst, dass der naechste Leser sie glaubt; die
+    // richtige Zahl steht in BoardCapabilities (kSunSdr2Qrp.sampleRates)
+    // und in longpath-qrp-48khz.
+    //
+    // Umstellen kann diese Verbindung die Rate nicht: welcher Opcode das
+    // tut, ist offen -- es braucht einen Mitschnitt, bei dem ExpertSDR2
+    // die Rate umstellt. Eine Anfrage auf etwas anderes wird darum
+    // protokolliert statt still verschluckt: sie ist nicht falsch
+    // gestellt, sie ist hier nur nicht ausfuehrbar, und wer im Log nach
+    // der Ursache einer unerwarteten Rate sucht, soll diese Zeile finden.
+    const double native = m_profile ? m_profile->rxNativeRateHz
+                                   : SunSdr::kProfileQrp.rxNativeRateHz;
+    if (double(sampleRate) != native) {
+        qCDebug(lcSunSdr) << "SunSdr: setSampleRate(" << sampleRate
+                          << ") nicht ausfuehrbar -- das Geraet laeuft auf"
+                          << native
+                          << "Hz, der Opcode zum Umstellen ist unbekannt";
+    }
 }
 
 void SunSdrRadioConnection::onControlReadyRead()
