@@ -764,6 +764,53 @@ private:
     // (ExpertSDR2 schickt beim Verbinden auch ein 1,2-kB-Paket).
     static constexpr int kMaxTallyPayloadBytes = 32;
 
+    // ── Folgenummern nachzaehlen: Verlust, Luecken, Wiederholungen ───────
+    //
+    // P1 und P2 melden `iqPacketLoss` und `iqSequenceGap` nach oben, dieser
+    // Treiber nicht -- obwohl er die Folgenummern seit dem ersten Tag im
+    // Kopf jedes Strompakets liest. Es fehlte nur das Auszaehlen.
+    //
+    // Die QRP braucht dafuer eine eigene Regel, die es bei P1/P2 nicht
+    // gibt: sie WIEDERHOLT Bloecke. Ohne Blockantwort kam am 2026-09-23
+    // jede Folgenummer achtmal, bytegleich; mit Blockantwort einmal
+    // (gemessen 2026-09-24). Eine Wiederholung ist also kein Verlust und
+    // auch kein Fehler, sondern eine Eigenschaft des Geraets -- sie darf
+    // weder als Luecke gezaehlt werden noch den Nenner der
+    // Verlustrechnung aufblaehen, sonst sieht ein echter Verlust bei
+    // achtfachem Strom achtmal kleiner aus, als er ist.
+    //
+    // Darum drei getrennte Zahlen je Fenster: neue Folgenummern,
+    // Wiederholungen, verlorene. Der Nebengewinn ist eine Diagnose, die
+    // es bisher nur mit LONGPATH_SUNSDR_PROBE gab: im Log steht, ob
+    // gerade eine oder acht Kopien je Nummer ankommen, also ob die
+    // Blockantwort wirkt.
+    void auditStreamSeq(quint16 seq);
+
+    // Eine Differenz darueber wird als Rueckwaerts-Paket gelesen, nicht
+    // als Luecke: die Nummern sind 16 Bit breit und laufen bei 240
+    // Bloecken je Sekunde alle ~273 s um, ein Spaetling ergibt dann eine
+    // riesige Differenz. 1024 Nummern sind bei dieser Rate gut vier
+    // Sekunden -- so lange haelt der Stillstands-Wachhund ohnehin nicht
+    // still (kDataWatchdogTickMs), eine echte Luecke dieser Groesse ist
+    // also kein Zaehlproblem mehr, sondern ein Verbindungsabbruch.
+    static constexpr quint16 kMaxPlausibleGap = 1024;
+
+    bool m_seqSeen{false};
+    quint16 m_lastSeq{0};
+    quint64 m_iqSeqWndFrames{0};
+    quint64 m_iqSeqWndRepeats{0};
+    quint64 m_iqSeqWndLost{0};
+    quint64 m_iqSeqWndEvents{0};
+    quint64 m_iqSeqWndBackwards{0};
+    QElapsedTimer m_iqSeqWndClock;
+    // Minus eins heisst "noch nie gemeldet", nicht "bei 0 ms gemeldet".
+    // Die Drosselung rechnet gegen m_iqSeqWndClock.elapsed(), und das ist
+    // am Anfang selbst 0 -- mit einem 0 als Startwert verschwand deshalb
+    // die ERSTE Luecke einer Verbindung still, genau die, die am meisten
+    // sagt. Vom eigenen Pruefstand gefunden, 2026-10-02. P1/P2 haben das
+    // Problem nicht, weil sie gegen die absolute Uhr rechnen.
+    qint64 m_lastGapSignalMs{-1};
+
     void noteControlFrame(const QByteArray& data);
     void noteStreamState(const SunSdr::IqHeader& hdr);
     void tallyFrame(QHash<quint64, FrameTally>& inventory, const char* channel,
@@ -794,6 +841,10 @@ public:
     int controlFrameKindsForTest() const { return int(m_controlInventory.size()); }
     int streamStateKindsForTest() const { return int(m_streamStateInventory.size()); }
     quint64 controlFramesSeenForTest() const { return m_controlFramesSeen; }
+    quint64 seqFramesForTest() const { return m_iqSeqWndFrames; }
+    quint64 seqRepeatsForTest() const { return m_iqSeqWndRepeats; }
+    quint64 seqLostForTest() const { return m_iqSeqWndLost; }
+    quint64 seqBackwardsForTest() const { return m_iqSeqWndBackwards; }
 };
 
 } // namespace Longpath

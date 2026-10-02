@@ -1636,6 +1636,169 @@ private slots:
         QVERIFY(conn.frameInventoryReport().contains(
             QStringLiteral("nichts aufgenommen")));
     }
+
+    // ── Folgenummern: Verlust, Luecken, Wiederholungen ────────────────
+    //
+    // P1 und P2 melden das seit langem, dieser Treiber bisher nicht. Die
+    // QRP-eigene Regel ist die Wiederholung: dieselbe Nummer achtmal ist
+    // kein Verlust (gemessen 2026-09-23), und sie darf den Nenner der
+    // Verlustrechnung nicht aufblaehen.
+
+    static QByteArray qrpBlockSeq(quint16 seq)
+    {
+        QByteArray pkt = SunSdr::buildIqHeader(
+            SunSdr::kProfileQrp, SunSdr::kOpIqRxIdle, seq, 0x01, 0x00);
+        pkt.append(QByteArray(SunSdr::kIqPayloadSize, char(0)));
+        return pkt;
+    }
+
+    void luekenloseFolgeMeldetKeinenVerlust()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        handshake(conn);
+
+        QSignalSpy gap(&conn, &RadioConnection::iqSequenceGap);
+        for (quint16 n = 100; n < 140; ++n) {
+            conn.feedStreamDatagramForTest(qrpBlockSeq(n));
+        }
+
+        QCOMPARE(conn.seqFramesForTest(), quint64(40));
+        QCOMPARE(conn.seqLostForTest(), quint64(0));
+        QCOMPARE(conn.seqRepeatsForTest(), quint64(0));
+        QCOMPARE(gap.count(), 0);
+    }
+
+    // Die Eigenschaft, an der sich dieser Treiber von P1/P2 unterscheidet:
+    // achtmal dieselbe Nummer ist der Normalzustand ohne Blockantwort.
+    void achtfachWiederholungIstKeinVerlust()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        handshake(conn);
+
+        QSignalSpy gap(&conn, &RadioConnection::iqSequenceGap);
+        for (quint16 n = 1; n <= 10; ++n) {
+            for (int kopie = 0; kopie < 8; ++kopie) {
+                conn.feedStreamDatagramForTest(qrpBlockSeq(n));
+            }
+        }
+
+        QCOMPARE(conn.seqFramesForTest(), quint64(10));
+        QCOMPARE(conn.seqRepeatsForTest(), quint64(70));
+        QCOMPARE(conn.seqLostForTest(), quint64(0));
+        QCOMPARE(gap.count(), 0);
+    }
+
+    void echteLueckeWirdGezaehltUndGemeldet()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        handshake(conn);
+
+        QSignalSpy gap(&conn, &RadioConnection::iqSequenceGap);
+        conn.feedStreamDatagramForTest(qrpBlockSeq(10));
+        conn.feedStreamDatagramForTest(qrpBlockSeq(14));  // 11,12,13 fehlen
+
+        QCOMPARE(conn.seqLostForTest(), quint64(3));
+        QCOMPARE(gap.count(), 1);
+    }
+
+    // 16 Bit laufen um. 65535 -> 0 ist eine lueckenlose Folge, keine
+    // Luecke von 65535 Nummern -- darum wird die Differenz als quint16
+    // gebildet.
+    // Gegenprobe zur Drosselung: viele Luecken in derselben Millisekunde
+    // ergeben EINE Meldung, nicht zwanzig -- und nicht null. Der
+    // Startwert -1 ist genau dafuer da (siehe m_lastGapSignalMs).
+    void vieleLueckenKurzHintereinanderMeldenEinmal()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        handshake(conn);
+
+        QSignalSpy gap(&conn, &RadioConnection::iqSequenceGap);
+        quint16 n = 1000;
+        for (int i = 0; i < 20; ++i) {
+            conn.feedStreamDatagramForTest(qrpBlockSeq(n));
+            n = quint16(n + 3);  // je zwei Nummern fehlen
+        }
+
+        QCOMPARE(gap.count(), 1);
+        QCOMPARE(conn.seqLostForTest(), quint64(38));  // 19 Luecken x 2
+    }
+
+    void umlaufDerSechzehnBitIstKeineLuecke()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        handshake(conn);
+
+        conn.feedStreamDatagramForTest(qrpBlockSeq(65534));
+        conn.feedStreamDatagramForTest(qrpBlockSeq(65535));
+        conn.feedStreamDatagramForTest(qrpBlockSeq(0));
+        conn.feedStreamDatagramForTest(qrpBlockSeq(1));
+
+        QCOMPARE(conn.seqFramesForTest(), quint64(4));
+        QCOMPARE(conn.seqLostForTest(), quint64(0));
+    }
+
+    // Ein Spaetling zaehlt nicht als Verlust, und er darf den Stand nicht
+    // zurueckdrehen -- sonst waere die naechste richtige Nummer eine
+    // Riesenluecke.
+    void spaetlingZaehltNichtAlsVerlustUndDrehtDenStandNichtZurueck()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        handshake(conn);
+
+        conn.feedStreamDatagramForTest(qrpBlockSeq(5000));
+        conn.feedStreamDatagramForTest(qrpBlockSeq(4000));  // rueckwaerts
+        conn.feedStreamDatagramForTest(qrpBlockSeq(5001));  // schliesst an 5000 an
+
+        QCOMPARE(conn.seqBackwardsForTest(), quint64(1));
+        QCOMPARE(conn.seqLostForTest(), quint64(0));
+        QCOMPARE(conn.seqFramesForTest(), quint64(2));
+    }
+
+    void folgenummernBeginnenMitJederVerbindungNeu()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        handshake(conn);
+        conn.feedStreamDatagramForTest(qrpBlockSeq(9000));
+        QCOMPARE(conn.seqFramesForTest(), quint64(1));
+
+        conn.disconnect();
+        conn.connectToRadio(someQrpInfo());
+        handshake(conn);
+        // Nummer 10 nach 9000: ohne Ruecksetzen waere das eine Luecke.
+        conn.feedStreamDatagramForTest(qrpBlockSeq(10));
+
+        QCOMPARE(conn.seqFramesForTest(), quint64(1));
+        QCOMPARE(conn.seqLostForTest(), quint64(0));
+        QCOMPARE(conn.seqBackwardsForTest(), quint64(0));
+    }
 };
 
 QTEST_MAIN(TestSunSdrRadioConnection)

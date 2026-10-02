@@ -247,6 +247,18 @@ void SunSdrRadioConnection::connectToRadio(const RadioInfo& info)
     m_inventoryFullWarned = false;
     m_inventoryClock.invalidate();
     m_lastStreamStateValid = false;
+    // Die Folgenummern-Zaehlung gehoert zur Sitzung: die erste Nummer der
+    // neuen Verbindung darf nicht gegen die letzte der alten gerechnet
+    // werden, sonst steht eine Luecke im Bericht, die es nie gab.
+    m_seqSeen = false;
+    m_lastSeq = 0;
+    m_iqSeqWndFrames = 0;
+    m_iqSeqWndRepeats = 0;
+    m_iqSeqWndLost = 0;
+    m_iqSeqWndEvents = 0;
+    m_iqSeqWndBackwards = 0;
+    m_iqSeqWndClock.invalidate();
+    m_lastGapSignalMs = -1;
     // Step 3: keep the pacer's own profile pointer (defaulted to
     // kProfileQrp at construction — see SunSdrTxPacer.h's own comment)
     // in sync with whatever this connection actually resolved, so the
@@ -1081,6 +1093,8 @@ void SunSdrRadioConnection::processStreamDatagram(const QByteArray& data,
         return;  // TX-active frames don't apply to a receive-only connection
     }
 
+    auditStreamSeq(hdr.seq);
+
     if (blockReplyEnabled()) {
         replyToBlock(hdr.seq);
     }
@@ -1731,6 +1745,115 @@ QString SunSdrRadioConnection::frameInventoryReport() const
                        .arg(m_controlInventory.size())
                        .arg(m_streamStateInventory.size()));
     return zeilen.join(QLatin1Char('\n'));
+}
+
+// ---------------------------------------------------------------------------
+// auditStreamSeq — Folgenummern auszaehlen
+//
+// Begruendung und die QRP-eigene Regel stehen am Aufruf im Kopf. Hier nur
+// die Rechnung: die Nummern sind 16 Bit breit, also wird die Differenz
+// bewusst als quint16 gebildet -- damit stimmt sie ueber den Umlauf hinweg
+// (65535 -> 0 ergibt 1, nicht -65535).
+// ---------------------------------------------------------------------------
+
+void SunSdrRadioConnection::auditStreamSeq(quint16 seq)
+{
+    if (!m_iqSeqWndClock.isValid()) {
+        m_iqSeqWndClock.start();
+    }
+
+    if (!m_seqSeen) {
+        m_seqSeen = true;
+        m_lastSeq = seq;
+        ++m_iqSeqWndFrames;
+        return;
+    }
+
+    const quint16 delta = quint16(seq - m_lastSeq);
+
+    if (delta == 0) {
+        // Wiederholung. Die QRP legt dieselbe Nummer bis zu achtmal hin,
+        // wenn niemand quittiert -- kein Verlust, kein Fehler, und
+        // m_lastSeq bleibt stehen.
+        ++m_iqSeqWndRepeats;
+    } else if (delta == 1) {
+        m_lastSeq = seq;
+        ++m_iqSeqWndFrames;
+    } else if (delta <= kMaxPlausibleGap) {
+        m_iqSeqWndLost += quint64(delta) - 1;
+        ++m_iqSeqWndEvents;
+        m_lastSeq = seq;
+        ++m_iqSeqWndFrames;
+
+        // Gedrosselt wie bei P1/P2 (20 ms): ein schlechter Netzweg darf
+        // die Ereignisschlange nicht fluten. Das Signal sagt "das
+        // angefangene FFT-Fenster ist wertlos", und dafuer genuegt eine
+        // Meldung je 20 ms.
+        const qint64 now = m_iqSeqWndClock.elapsed();
+        if (m_lastGapSignalMs < 0 || now - m_lastGapSignalMs >= 20) {
+            m_lastGapSignalMs = now;
+            emit iqSequenceGap();
+        }
+    } else {
+        // Rueckwaerts: ein Spaetling oder eine Umsortierung. m_lastSeq
+        // wird NICHT zurueckgedreht, sonst zaehlt die naechste richtige
+        // Nummer als Riesenluecke -- derselbe Umgang wie bei P2
+        // ("negative = reorder/duplicate, no loss").
+        ++m_iqSeqWndBackwards;
+    }
+
+    // Fensterbericht alle 5 s, gleiche Taktung wie P2s Folgenummern-Pruefung,
+    // damit sich die Zahlen zweier Geraete im selben Log vergleichen lassen.
+    if (m_iqSeqWndClock.elapsed() < 5000) {
+        return;
+    }
+
+    const double secs = double(m_iqSeqWndClock.elapsed()) / 1000.0;
+    const double nenner = double(m_iqSeqWndFrames + m_iqSeqWndLost);
+    const double verlustProzent =
+        nenner > 0.0 ? 100.0 * double(m_iqSeqWndLost) / nenner : 0.0;
+
+    emit iqPacketLoss(verlustProzent, quint32(m_iqSeqWndLost),
+                      quint32(m_iqSeqWndFrames));
+
+    // Kopien je Nummer: 1,0 heisst, die Blockantwort wirkt; 8,0 heisst,
+    // das Geraet bekommt keine Quittung und wiederholt (gemessen
+    // 2026-09-23/24). Die Zahl steht hier, weil sie sonst nur mit
+    // LONGPATH_SUNSDR_PROBE zu bekommen war.
+    const double kopien = m_iqSeqWndFrames > 0
+        ? double(m_iqSeqWndFrames + m_iqSeqWndRepeats) / double(m_iqSeqWndFrames)
+        : 0.0;
+
+    if (m_iqSeqWndLost > 0 || m_iqSeqWndEvents > 0 || m_iqSeqWndBackwards > 0) {
+        qCInfo(lcSunSdr).noquote()
+            << QStringLiteral("SunSdr: Folgenummern -- %1 Nummern in %2 s "
+                              "(%3/s), VERLOREN %4 (%5 %), %6 Luecken, "
+                              "%7 rueckwaerts, %8 Kopien je Nummer")
+                   .arg(m_iqSeqWndFrames)
+                   .arg(secs, 0, 'f', 1)
+                   .arg(double(m_iqSeqWndFrames) / secs, 0, 'f', 0)
+                   .arg(m_iqSeqWndLost)
+                   .arg(verlustProzent, 0, 'f', 2)
+                   .arg(m_iqSeqWndEvents)
+                   .arg(m_iqSeqWndBackwards)
+                   .arg(kopien, 0, 'f', 1);
+    } else {
+        qCDebug(lcSunSdr).noquote()
+            << QStringLiteral("SunSdr: Folgenummern sauber -- %1 Nummern in "
+                              "%2 s (%3/s), %4 Kopien je Nummer")
+                   .arg(m_iqSeqWndFrames)
+                   .arg(secs, 0, 'f', 1)
+                   .arg(double(m_iqSeqWndFrames) / secs, 0, 'f', 0)
+                   .arg(kopien, 0, 'f', 1);
+    }
+
+    m_iqSeqWndClock.restart();
+    m_iqSeqWndFrames = 0;
+    m_iqSeqWndRepeats = 0;
+    m_iqSeqWndLost = 0;
+    m_iqSeqWndEvents = 0;
+    m_iqSeqWndBackwards = 0;
+    m_lastGapSignalMs = -1;
 }
 
 } // namespace Longpath
