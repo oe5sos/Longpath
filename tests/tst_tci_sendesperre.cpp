@@ -89,6 +89,36 @@ private:
         QTest::qWait(80);
     }
 
+    /** Wartet, bis der Besitzer den erwarteten Zustand hat.
+     *
+     *  Warum: `schicke()` wartet feste 80 ms, und das reicht auf diesem
+     *  Rechner immer und auf einem belasteten CI-Laeufer nicht. Am
+     *  2026-10-02 fiel genau daran
+     *  `abfrage_entsichert_den_traeger_nicht` um — der Befehl
+     *  `tune:0,false;` war unterwegs, als der Pruefpunkt schon sah.
+     *
+     *  Das ist dieselbe Krankheit, die in diesem Testbaum schon dreimal
+     *  zugeschlagen hat (TciBurstHelfer.h): eine feste Zahl, wo auf ein
+     *  Ereignis gewartet werden muss. Ein Pruefstand, der von der
+     *  Geschwindigkeit der Maschine abhaengt, misst nicht die Sache,
+     *  sondern den Tag.
+     *
+     *  Nur fuer erwartete WECHSEL. Fuer "es darf sich nichts aendern" taugt
+     *  es nicht — dort muss man eine Weile warten und danach pruefen, und
+     *  genau das tun die betreffenden Pruefpunkte weiterhin selbst.
+     */
+    static bool warteAufBesitzer(TciServer& server, bool besetzt,
+                                 int grenzeMs = 4000)
+    {
+        QElapsedTimer uhr;
+        uhr.start();
+        while (uhr.elapsed() < grenzeMs) {
+            if ((server.moxOwnerForTest() != nullptr) == besetzt) { return true; }
+            QTest::qWait(20);
+        }
+        return (server.moxOwnerForTest() != nullptr) == besetzt;
+    }
+
     // Ob ein Sendebefehl AUSGEFÜHRT wurde, erkennt man an der Antwort: der
     // Server bestätigt `trx:`/`tune:` zurück, wenn er sie durchlässt, und
     // schweigt, wenn die Sperre greift (`return` vor dem Verteiler).
@@ -191,7 +221,7 @@ private slots:
                 [&antworten](const QString& s) { antworten << s; });
 
         schicke(client, QStringLiteral("trx:0,true;"));
-        QVERIFY2(server.moxOwnerForTest() != nullptr,
+        QVERIFY2(warteAufBesitzer(server, true),
                  "Mit Freigabe muss der Sendewunsch durchgehen — sonst sperrt "
                  "der Prüfpunkt oben aus einem anderen Grund als der Sperre");
         // Aktiv auf das Echo warten, nicht auf die 80 ms aus schicke():
@@ -219,12 +249,12 @@ private slots:
 
         QVERIFY(server.moxOwnerForTest() == nullptr);
         schicke(client, QStringLiteral("tune:0,true;"));
-        QVERIFY2(server.moxOwnerForTest() != nullptr,
+        QVERIFY2(warteAufBesitzer(server, true),
                  "Der Abstimmträger muss einen Besitzer eintragen — sonst "
                  "nimmt ihn niemand zurück, wenn der Client verschwindet");
 
         schicke(client, QStringLiteral("tune:0,false;"));
-        QVERIFY2(server.moxOwnerForTest() == nullptr,
+        QVERIFY2(warteAufBesitzer(server, false),
                  "Nach tune-off muss der Besitzer wieder frei sein");
 
         client.close();
@@ -240,13 +270,13 @@ private slots:
             QWebSocket client;
             QVERIFY(aufbauen(server, client, /*sendenFrei=*/true));
             schicke(client, QStringLiteral("tune:0,true;"));
-            QVERIFY(server.moxOwnerForTest() != nullptr);
+            QVERIFY(warteAufBesitzer(server, true));
             client.close();
             QTest::qWait(200);
         }
         // Ohne RadioModel meldet releaseMoxHeldBy() die Buchführung trotzdem;
         // entscheidend ist, dass der Besitzer weg ist und das Signal fiel.
-        QVERIFY2(server.moxOwnerForTest() == nullptr,
+        QVERIFY2(warteAufBesitzer(server, false),
                  "Nach dem Trennen darf kein Besitzer mehr eingetragen sein");
         QVERIFY2(freigegeben.count() >= 1,
                  "Das Trennen muss die Rücknahme auslösen — sonst bleibt der "
@@ -272,7 +302,7 @@ private slots:
         QVERIFY(aufbauen(server, client, /*sendenFrei=*/true));
 
         schicke(client, QStringLiteral("tune:0,true;"));
-        QVERIFY2(server.moxOwnerForTest() != nullptr,
+        QVERIFY2(warteAufBesitzer(server, true),
                  "Aufbau: der Traeger muss einen Besitzer haben");
 
         // Die reine Abfrage. Der Verteiler laesst den Traeger stehen, also
@@ -290,7 +320,7 @@ private slots:
 
         // Erst das ausdrueckliche Abschalten gibt frei.
         schicke(client, QStringLiteral("tune:0,false;"));
-        QVERIFY2(server.moxOwnerForTest() == nullptr,
+        QVERIFY2(warteAufBesitzer(server, false),
                  "Nach »tune:0,false;« muss der Besitzer frei sein");
 
         client.close();
