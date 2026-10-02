@@ -139,6 +139,22 @@ struct TciClientSession {
     // und wuerde sie nur breiter malen.
     int spectrumSpanHz{0};
 
+    // Welche Spanne TATSAECHLICH im Bild steckt — und zuletzt gemeldet wurde.
+    //
+    // Nicht dasselbe wie der Wunsch darueber. Der Zuschnitt rechnet
+    //     breite = max(punkte, lround(n * wunsch/abtastrate))
+    // und die Untergrenze `punkte` greift, sobald der Wunsch schmaler ist,
+    // als die Punktzahl an Bins hergibt: bei 373 Punkten und einer 2048er
+    // FFT wird aus 6 kHz in Wahrheit knapp 8,8 kHz. Kennt der Server die
+    // Abtastrate gar nicht, bleibt es bei der VOLLEN Breite.
+    //
+    // Der Client rechnet aber mit seinem Wunsch weiter: Abstimmstrich,
+    // Durchlassband und das Schieben des Wasserfalls haengen alle daran.
+    // Weicht die Wahrheit ab, sitzt alles davon falsch — und zwar still.
+    // Darum wird jede Aenderung als `spectrum_span:<rx>,<hz>;` gemeldet;
+    // 0 heisst "volle Breite, Spanne unbekannt".
+    int spectrumSpanGemeldetHz{-1};   // -1 = noch nie gemeldet
+
     // Bilder je Sekunde. Vorgabe 10 — darunter ruckelt der Wasserfall
     // sichtbar, darüber sieht das Auge am Telefon nichts mehr dazu.
     int spectrumFps{10};

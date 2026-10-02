@@ -60,6 +60,27 @@ const state = {
   audio: null, node: null,
 };
 
+/** Wie viele Hertz das Bild WIRKLICH zeigt.
+ *
+ *  Eine Stelle, nicht fuenf. Vorher rechnete jede Stelle fuer sich mit
+ *  `state.spanneHz` — also mit unserem WUNSCH. Der Server kann davon
+ *  abweichen: die Punktzahl ist eine Untergrenze fuer die Zahl der Bins
+ *  (bei 373 Punkten und einer 2048er FFT wird aus 6 kHz knapp 8,8 kHz), und
+ *  ohne bekannte Abtastrate beschneidet er gar nicht. Dann sitzen
+ *  Abstimmstrich, Durchlassband und der Wasserfallversatz daneben, ohne dass
+ *  irgendwo etwas davon steht.
+ *
+ *  Seit `spectrum_span` sagt er es. Reihenfolge: gemeldete Spanne, sonst
+ *  volle Breite (I/Q-Rate), sonst unser Wunsch, sonst der Rueckfall.
+ */
+function bildSpanneHz(rueckfall) {
+  const gemeldet = link.st.spektrumSpanneHz;
+  if (gemeldet > 0) { return gemeldet; }
+  if (gemeldet === 0) { return link.st.iqRate || rueckfall || 0; }
+  if (state.spanneHz > 0) { return state.spanneHz; }
+  return link.st.iqRate || rueckfall || 0;
+}
+
 // ── Kopplung ────────────────────────────────────────────────────────────────
 //
 // Die Seite weiss, woher sie geladen wurde — und Longpath laeuft auf
@@ -316,7 +337,7 @@ function zeichneKopf() {
     const m  = (link.st.mode[state.trx] || '').toLowerCase();
     const mitteD = link.st.dds[state.trx];
     const vfoD   = link.st.vfo[state.trx] ? link.st.vfo[state.trx][0] : null;
-    const spanneD = state.spanneHz > 0 ? state.spanneHz : (link.st.iqRate || 0);
+    const spanneD = bildSpanneHz(0);
     let lo1 = f[0], hi1 = f[1];
     if (bd && mitteD && vfoD && spanneD > 0 &&
         Number.isFinite(lo1) && Number.isFinite(hi1) && hi1 !== lo1) {
@@ -356,7 +377,7 @@ function zeichneKopf() {
       }
       const mitte = link.st.dds[state.trx];
       const vfo   = link.st.vfo[state.trx] ? link.st.vfo[state.trx][0] : null;
-      const spanne = state.spanneHz > 0 ? state.spanneHz : (link.st.iqRate || 0);
+      const spanne = bildSpanneHz(0);
       if (mitte && vfo && spanne > 0) {
         // 0 % ist der linke Rand, 100 % der rechte; die Mitte ist 50 %.
         const anteil = 50 + ((vfo - mitte) / spanne) * 100;
@@ -374,7 +395,7 @@ function zeichneKopf() {
 
   const sp = $('spanne');
   if (sp) {
-    const hz = state.spanneHz > 0 ? state.spanneHz : (link.st.iqRate || 0);
+    const hz = bildSpanneHz(0);
     sp.textContent = hz ? (hz >= 1000 ? Math.round(hz / 1000) + ' kHz' : hz + ' Hz') : '';
   }
 
@@ -491,7 +512,7 @@ function wasserfallLeeren() {
 /** Hertz je Bildpunkt des Wasserfalls — eine Stelle, damit Schieben und
  *  Skalieren nicht auseinanderlaufen. */
 function hzProPunkt() {
-  const spanne = state.spanneHz > 0 ? state.spanneHz : (link.st.iqRate || 192000);
+  const spanne = bildSpanneHz(192000);
   return spanne / wf.width;
 }
 
@@ -1088,7 +1109,7 @@ $('scope').addEventListener('pointermove', (e) => {
   // 515 Hz je Bildpunkt, und die Frequenz sprang beim Abstimmen in
   // Halbkilohertz-Schritten. Betreiber am 2026-10-01: "frequenz kann man
   // zwar ändern, aber sehr schlecht".
-  const spanne = state.spanneHz > 0 ? state.spanneHz : (link.st.iqRate || 192000);
+  const spanne = bildSpanneHz(192000);
   const proPixel = spanne / $('scope').getBoundingClientRect().width;
   // Das Raster folgt der Spanne: wer eng zoomt, will auch fein abstimmen.
   // 10 Hz bei schmaler Sicht, 100 Hz bei breiter — sonst zappelt die
@@ -1303,7 +1324,7 @@ $('qsy').addEventListener('click', (e) => { if (e.target === $('qsy')) qsySchlie
 function frequenzAnStelle(clientX) {
   const r = $('scope').getBoundingClientRect();
   if (!r.width) { return null; }
-  const spanne = state.spanneHz > 0 ? state.spanneHz : (link.st.iqRate || 192000);
+  const spanne = bildSpanneHz(192000);
   const mitte  = link.st.vfo[state.trx] ? link.st.vfo[state.trx][0] : null;
   if (!mitte) { return null; }
   // Die Bildmitte ist die abgestimmte Frequenz (Longpath fuehrt sie nach).
