@@ -1,0 +1,244 @@
+/* ── Hausstil-Rollen, 1:1 aus StyleConstants.h ───────────────────────────── */
+:root{
+  --app-bg:#08080a; --panel:#0c0c0e; --inset:#050507; --inset-border:#232329;
+  --border:#2c2c31; --border-subtle:#1f1f23;
+  --text:#dcdce1; --text2:#a6a6ac; --text3:#909096; --text-scale:#7e7e85;
+  --text-inactive:#58585e; --title:#c4c4ca;
+  --accent:#4a7ba8;                    /* anfassbar */
+  --measured:#d8a55f; --amber-dim:#6b5630;  /* gemessen */
+  --ok:#6fa384; --warn:#a8853f; --danger:#a86b6d;
+  --tx-top:#a87a3c; --tx-bot:#8a6a30; --tx-border:#c2924f; --tx-text:#17130a;
+  --tune-top:#7a5a2c; --tune-bot:#634c24; --tune-border:#9a763c;
+  --pan-bg:#141e27; --trace:#c2924f; --grid:#8a8f96; --grid-text:#9aa0a8;
+  --glass-btn-top:#222227; --glass-btn-bot:#141417;
+  --glass-sel-top:#2f5f92; --glass-sel-bot:#1e3d5f;
+  --glass-sel-border:#3d78b0; --glass-sel-text:#dbe9f8;
+  --badge-info:#161e27;
+  --light:rgba(255,255,255,.07);       /* kGlassLightAlpha 18/255 */
+  --shade:rgba(0,0,0,.63);             /* kGlassShadeAlpha 160/255 */
+  --instrument:#f2f2ec;
+
+  /* Schriftleiter — VARIANTE A: 1:1 wie am Schreibtisch */
+  --f-caption:9px; --f-small:11px; --f-body:13px;
+  --f-sub:16px; --f-reading:22px; --f-display:38px;
+
+  --r-chip:7px; --r-panel:10px;
+  --mono:ui-monospace,"SF Mono",Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+/* 393x852 ist das Mass, an dem die Gestaltung entstanden ist (iPhone 14 Pro).
+   Es steht hier nur noch, damit das Blatt im Browser wie ein Telefon
+   aussieht — index.html ueberschreibt es fuer den echten Einsatz. Waagrecht
+   wird nie gescrollt, senkrecht schon: lieber scrollen als abschneiden.
+   Bis 2026-09-30 stand hier overflow:hidden, und auf jedem Geraet, das
+   nicht genau 852 Punkte hoch ist, lagen Fusszeile und Sendetasten
+   ausserhalb und waren nicht erreichbar. */
+html,body{width:393px;height:852px;overflow-x:hidden}
+/* ── Glas und Tiefe (2026-10-01) ─────────────────────────────────────────
+   Betreiber hat aus drei Richtungen diese gewaehlt — dieselbe, die am
+   2026-09-17 schon fuer Longpath selbst gewaehlt wurde. Der Grundsatz:
+   die ANORDNUNG bleibt, wie sie war (wer die Seite kennt, findet alles am
+   selben Platz), und was sich aendert, ist nur, wie fest die Teile
+   aussehen — Panels schweben mit Schatten und Lichtkante, Gemessenes
+   bekommt einen Hof statt eines Kastens, der Grund traegt ein leises
+   Leuchten.
+
+   Was bewusst NICHT mitkommt: backdrop-filter. Glas heisst hier Schatten
+   und Lichtkante, keine Weichzeichnung — die kostet auf jedem Bild
+   Rechenzeit, und das ist genau das Budget, das der Wasserfall braucht.
+   Die einzige Weichzeichnung der Seite liegt auf dem Kopplungsblatt, das
+   steht still. */
+body{
+  background:
+    radial-gradient(130% 68% at 50% -8%, #17212b 0%, #0b0d10 46%, var(--app-bg) 100%);
+  background-attachment:fixed;
+  color:var(--text);
+  font:var(--f-body)/1.3 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;
+  display:flex; flex-direction:column;
+}
+/* Die gemeinsame Rolle aller schwebenden Flaechen. Eine Stelle, nicht
+   fuenf — sonst driften sie beim naechsten Feinschliff auseinander. */
+.schicht{
+  background:linear-gradient(rgba(34,36,42,.88),rgba(18,19,23,.92));
+  border:1px solid rgba(255,255,255,.075);
+  border-radius:14px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.07),
+             0 10px 22px rgba(0,0,0,.55),
+             0 2px 5px rgba(0,0,0,.45);
+}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+/* Versalzeile — Laufweite 0.18em wie kCapsTracking */
+.caps{font-size:var(--f-caption);letter-spacing:.18em;text-transform:uppercase;
+      font-weight:600;color:var(--text3)}
+
+/* ── Kopf: Verbindung + Station ─────────────────────────────────────────── */
+header{
+  height:46px;flex:none;display:flex;align-items:center;gap:9px;padding:0 16px;
+}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--ok);
+     box-shadow:0 0 10px rgba(111,163,132,.9),0 0 3px rgba(111,163,132,1);flex:none}
+header .name{font-size:var(--f-caption);letter-spacing:.17em;text-transform:uppercase;
+             color:var(--text3)}
+header .spacer{flex:1}
+header .rate{font-size:var(--f-caption);color:var(--text-inactive)}
+
+/* ── Frequenz ───────────────────────────────────────────────────────────── */
+.vfo{flex:none;padding:4px 16px 8px;display:flex;align-items:baseline;gap:8px}
+/* Hof statt Kasten: die Zahl leuchtet leise, wie eine Anzeige hinter Glas.
+   Der zweite Schatten ist kein Schmuck — er haelt sie lesbar, wenn der
+   Grund im Verlauf heller wird. */
+.vfo .hz{font-size:var(--f-display);font-family:var(--mono);color:var(--text);
+         letter-spacing:-.015em;line-height:1;
+         text-shadow:0 0 22px rgba(216,165,95,.17),0 2px 6px rgba(0,0,0,.7)}
+.vfo .hz .khz{color:var(--text2)}
+.vfo .hz .dez{color:var(--text-scale);font-size:var(--f-reading)}
+.vfo .unit{font-size:var(--f-small);color:var(--text3)}
+.vfo .spacer{flex:1}
+.vfo .b{font-size:var(--f-small);font-family:var(--mono);color:var(--measured)}
+
+/* ── Panadapter + Wasserfall ────────────────────────────────────────────── */
+.scope{
+  flex:none;margin:0 12px;border:1px solid rgba(255,255,255,.08);
+  border-radius:14px;overflow:hidden;background:#0b141c;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 10px 24px rgba(0,0,0,.6);
+}
+.scope canvas{display:block;width:100%}
+
+/* ── S-Meter: Licht, nicht Farbe ────────────────────────────────────────── */
+.meter{flex:none;margin:10px 12px 0;padding:8px 12px 9px}
+.meter .row{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.meter .val{margin-left:auto;font-family:var(--mono);font-size:var(--f-small);
+            color:var(--measured);text-shadow:0 0 12px rgba(216,165,95,.3)}
+.bar{height:10px;border-radius:6px;background:#040507;
+     border:1px solid rgba(0,0,0,.8);position:relative;overflow:hidden;
+     box-shadow:inset 0 2px 5px rgba(0,0,0,.85)}
+.bar i{position:absolute;inset:1px auto 1px 1px;border-radius:5px;
+  background:linear-gradient(90deg,#47463b,#817b5c 62%,var(--measured));
+  box-shadow:0 0 12px rgba(216,165,95,.45)}
+.ticks{display:flex;justify-content:space-between;margin-top:3px}
+.ticks span{font-size:var(--f-caption);font-family:var(--mono);color:var(--text-scale)}
+
+/* ── Bedienreihen ───────────────────────────────────────────────────────── */
+/* Zwei Panels statt vier lose Gruppen: die Beschriftungen wandern NACH
+   INNEN, dadurch gehoeren Betriebsart+Band sichtbar zusammen und
+   Filter+Aufbereitung ebenso. Die Gruppen selbst bleiben, was sie waren —
+   app.js fuellt weiterhin #modes/#bands/#filters/#dsp. */
+.feld{margin:10px 12px 0;padding:8px 12px 10px}
+.feld > .caps{margin:0 0 6px}
+.feld .chips + .caps{margin-top:9px}
+.chips{display:flex;gap:6px}
+.chip{
+  flex:1;min-width:0;height:36px;                /* 36 sichtbar, 44 Treffer */
+  display:flex;align-items:center;justify-content:center;
+  font-size:var(--f-small);font-family:var(--mono);color:var(--text2);
+  background:linear-gradient(rgba(44,46,53,.9),rgba(24,25,30,.9));
+  border:1px solid rgba(255,255,255,.07);border-radius:9px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 2px 4px rgba(0,0,0,.45);
+  position:relative;
+}
+.chip::after{content:"";position:absolute;left:0;right:0;top:-4px;bottom:-4px}
+.chip.on{
+  background:linear-gradient(#36699f,#21436a);
+  border-color:#4886c0;color:#e2eefb;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.2),
+             0 0 14px rgba(74,123,168,.4),0 2px 5px rgba(0,0,0,.5);
+}
+.chip.more{flex:0 0 36px;color:var(--text3)}
+/* Zustandsschalter bleiben leise — quietCheckedStyle: im Feld darf genau
+   EINE Stelle kraeftig sein, und das ist die Sendetaste. */
+.chip.quiet.on{background:var(--badge-info);border-color:var(--accent);
+               color:#cfe0f2;box-shadow:inset 0 1px 0 var(--light)}
+
+/* ── Regler ─────────────────────────────────────────────────────────────── */
+.sliders{margin:10px 12px 0;padding:10px 12px;display:flex;flex-direction:column;gap:12px}
+.sl{display:flex;align-items:center;gap:10px}
+.sl .caps{flex:0 0 30px}
+.sl .track{flex:1;height:5px;border-radius:3px;background:#040507;
+  border:1px solid rgba(0,0,0,.8);position:relative;
+  box-shadow:inset 0 1px 3px rgba(0,0,0,.9)}
+.sl .track i{position:absolute;left:0;top:0;bottom:0;border-radius:3px;
+  background:var(--accent);box-shadow:0 0 10px rgba(74,123,168,.55)}
+/* 18 statt 14: der Knopf ist das einzige, was man am Telefon WIRKLICH
+   greifen muss, und 14 px waren schon am Schreibtisch knapp. */
+.sl .track b{position:absolute;top:50%;width:18px;height:18px;margin:-9px 0 0 -9px;
+  border-radius:50%;background:linear-gradient(#6b9cca,#3a648c);
+  border:1px solid #7fb0dd;
+  box-shadow:0 2px 6px rgba(0,0,0,.75),0 0 10px rgba(74,123,168,.35)}
+.sl .v{flex:0 0 54px;text-align:right;white-space:nowrap;font-family:var(--mono);
+       font-size:var(--f-small);color:var(--measured)}
+
+/* ── Sendefeld ──────────────────────────────────────────────────────────── */
+.txrow{margin:auto 12px 0;padding-top:10px;display:flex;gap:7px;align-items:stretch}
+/* Solange ueber Netz nicht gesendet werden kann, schrumpfen die beiden
+   Tasten zu EINER ruhigen Zeile. Vorher belegten sie 58 px im besten
+   Daumenbereich fuer etwas, das dort nie geht — und zwei tote Tasten sehen
+   aus wie ein Fehler, nicht wie eine Absicht.
+   :has() kennt Safari seit 16.4. Fehlt es, greifen nur die .locked-Regeln
+   darunter und es bleibt beim heutigen Bild: zwei erkennbar tote Tasten.
+   Das ist ein Rueckschritt in der Form, kein Verlust an Funktion. */
+.txrow:has(.tx.locked) .tune{display:none}
+.txrow:has(.tx.locked) .tx{
+  height:36px;border-radius:11px;flex-direction:row;gap:6px;
+  background:rgba(18,19,23,.6);border:1px solid rgba(255,255,255,.05);
+  box-shadow:none;font-weight:600;letter-spacing:.13em;font-size:var(--f-caption);
+  text-transform:uppercase;color:var(--text-inactive);
+}
+.txrow:has(.tx.locked) .tx small{margin-top:0;opacity:1;font-size:var(--f-caption)}
+.tx{
+  flex:1;height:58px;border-radius:9px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:linear-gradient(var(--tx-top),var(--tx-bot));
+  border:1px solid var(--tx-border);color:var(--tx-text);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 2px 0 rgba(0,0,0,.45);
+  font-weight:700;letter-spacing:.14em;font-size:var(--f-sub);
+}
+.tx small{font-size:var(--f-caption);font-weight:600;letter-spacing:.1em;
+          opacity:.72;margin-top:2px}
+.tx.locked{
+  background:linear-gradient(#1a1a1e,#141417);border-color:var(--border);
+  color:var(--text-inactive);box-shadow:inset 0 1px 0 var(--light);
+}
+.tune{
+  flex:0 0 84px;border-radius:9px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:linear-gradient(var(--tune-top),var(--tune-bot));
+  border:1px solid var(--tune-border);color:#1a150c;
+  font-weight:700;letter-spacing:.12em;font-size:var(--f-body);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 2px 0 rgba(0,0,0,.45);
+}
+.tune small{font-size:var(--f-caption);font-weight:600;letter-spacing:.06em;
+            opacity:.72;margin-top:2px}
+/* Gesperrt sieht gesperrt aus — dieselbe Behandlung wie bei SENDEN.
+   Bis 2026-09-30 war TUNE in Messing und voll bedienbar, waehrend SENDEN
+   daneben tot dalag. Beide tasten den Sender; der Abstimmtraeger heisst nur
+   nicht so. Eine scharfe Taste neben einer toten ist genau die Art
+   Widerspruch, die irgendwann jemandem die Endstufe kostet. */
+.tune.locked{
+  background:linear-gradient(#1a1a1e,#141417);border-color:var(--border);
+  color:var(--text-inactive);box-shadow:inset 0 1px 0 var(--light);
+}
+
+/* ── Fußzeile ───────────────────────────────────────────────────────────── */
+footer{flex:none;height:30px;display:flex;align-items:center;gap:10px;
+  padding:0 16px;margin-top:8px}
+footer span{font-size:var(--f-caption);font-family:var(--mono);color:var(--text-inactive)}
+footer .ok{color:var(--ok)}
+/* Ein fehlender Ton wird in der Fusszeile gemeldet, nicht verschwiegen. */
+footer .warn{color:var(--warn)}
+
+/* ── Tonfreigabe (2026-09-30) ────────────────────────────────────────────
+   iOS gibt Ton erst nach einer Beruehrung frei. Das war bis heute eine
+   UNSICHTBARE Voraussetzung: die Seite wartete auf einen Tipp irgendwohin,
+   und wer das nicht wusste, sass vor einem laufenden Wasserfall ohne Ton
+   und ohne Hinweis. Am echten iPhone genau so erlebt — Betreiber: "sehe
+   wasserfall", "kein ton", und die Selbstmeldung der Seite zeigte dann
+   `weg=keiner, ctx=kein ctx, takte=0`: die Tonkette war nie erzeugt worden.
+   Jetzt steht da ein Knopf, und er verschwindet, sobald der Ton laeuft. */
+.tonAn{
+  flex:none;height:24px;padding:0 11px;border-radius:12px;
+  background:linear-gradient(var(--tune-top),var(--tune-bot));
+  border:1px solid var(--tune-border);color:#1a150c;
+  font:700 var(--f-caption)/1 inherit;letter-spacing:.1em;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 2px 0 rgba(0,0,0,.45);
+}
+.tonAn[hidden]{display:none}

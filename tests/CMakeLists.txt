@@ -2895,6 +2895,47 @@ longpath_add_test(tst_tci_drive_tune_drive)
 # ein Sendevorgang hatte überhaupt keine Obergrenze.
 longpath_add_test(tst_tci_origin_and_tx_time_cap)
 
+# ── Spektrumstrom (2026-09-30) ──────────────────────────────────────────────
+# Longpath-eigener sechster Stromtyp: fertig gerechnetes Spektrum statt rohem
+# I/Q. Gemessen kostet I/Q 404 kB/s bei 48 kHz und rund 1,5 MB/s bei 192 kHz;
+# der Spektrumrahmen kostet rund 27 kB/s. Der Prüfstand pinnt Kopf, Kodierung
+# (dBm+200 auf ein Byte), die Randfälle und die Spitzenwert-Verdichtung.
+longpath_add_test(tst_tci_spectrum_stream)
+
+# ── Tonumtaster je Kanal (2026-09-30) ──────────────────────────────────────
+# WDSPs RESAMPLEF rechnet einkanalig und reell. Der verschraenkte
+# Stereopuffer lief bis 2026-09-30 als EIN Strom hindurch: L und R
+# vermischten sich, und die Tonhoehe stimmte nicht, weil der Resampler die
+# doppelte Abtastzahl sah. Betraf jede Rate ausser 48000.
+longpath_add_test(tst_tci_audio_resample_channels)
+
+# ── Fernzugriff: Token + Sendefreigabe (2026-09-30) ────────────────────────
+# TCI kennt weder Anmeldung noch Verschluesselung. Solange der Server auf
+# Loopback lauscht, ist das vertretbar; im Netz nicht. Der Schnitt laeuft
+# entlang der HERKUNFT: Loopback unveraendert (sonst steht jeder Logger
+# still), aus dem Netz Token und ausdrueckliche Sendefreigabe.
+longpath_add_test(tst_tci_remote_auth)
+
+# ── Sendesperre fuers Netz (2026-09-30) ───────────────────────────────────
+# Prueft die NAHT, nicht den Getter: echte Clients schicken `trx:`/`tune:` in
+# den Schreibweisen, die bis 2026-09-30 an der Sperre vorbeiliefen (TRX:,
+# `trx :`), dazu Besitzer und Ruecknahme des Abstimmtraegers beim Trennen.
+longpath_add_test(tst_tci_sendesperre)
+target_compile_definitions(tst_tci_sendesperre PRIVATE LONGPATH_BUILD_TESTS)
+# ── mu-law als Tonformat (2026-09-30) ─────────────────────────────────────
+# Misst den Stoerabstand statt nur durchzulaufen, prueft dass der Fehler dem
+# Pegel folgt (der ganze Sinn des Kompandierens), und vergleicht die
+# C++-Kennlinie Byte fuer Byte mit der aus handfunke/tci.js.
+longpath_add_test(tst_tci_mulaw)
+target_compile_definitions(tst_tci_mulaw PRIVATE LONGPATH_BUILD_TESTS)
+
+# ── Fernzugriffs-Gruppe auf der TCI-Setupseite (2026-09-30) ───────────────
+# Prueft, dass die Bedienelemente da sind und der Hinweistext sagt, was
+# gerade gilt — eine Sicherheitsgruppe, die schweigt, wenn sie wirkungslos
+# ist, verleitet dazu, sich auf sie zu verlassen. Zeichnet mit
+# LONGPATH_BLATT_PNG=<pfad> zusaetzlich ein Blatt zum Ansehen.
+longpath_add_test(tst_tci_remote_access_page)
+
 # ── Phase 3J-1 closeout Item 4 (2026-05-12): per-(band, mode) filter ────────
 # Pins the contract that SliceModel::setDspMode saves the current filter
 # under (currentBand, OLD mode) and restores from (currentBand, NEW mode)
@@ -7409,4 +7450,38 @@ foreach(_asan_gap_target IN ITEMS
     endif()
 endforeach()
 
-
+# ── Gemeinsame Sperre fuer die Fernzugriffs-Pruefstaende (2026-10-01) ──────
+#
+# Diese drei fassen dieselben AppSettings-Schluessel an (TciAllowRemoteTx,
+# TciRemoteTokenPlain), und im Testbetrieb teilen sich ALLE Staende eine
+# Einstellungsdatei: QStandardPaths::setTestModeEnabled(true) gibt ihnen
+# denselben Pfad (TestSandboxInit.cpp).
+#
+# Parallel gestartet schrieben sie sich gegenseitig hinein — der eine setzt
+# die Sendefreigabe auf an, waehrend der andere prueft, dass sie ab Werk aus
+# ist. Ergebnis war ein Flattern, das einzeln nie auftrat: im Sammellauf fiel
+# mal tst_tci_remote_auth, mal tst_tci_sendesperre, in etwa zwei von drei
+# Durchgaengen.
+#
+# Diese Zeilen stehen am DATEIENDE, weil set_tests_properties die Tests
+# bereits kennen muss — vor longpath_add_test() bricht CMake ab
+# ("Can not find test to add properties to").
+#
+# RESOURCE_LOCK statt RUN_SERIAL: nur diese drei laufen nacheinander, alles
+# andere weiter parallel. Das kostet ein paar Sekunden und macht den
+# Sammellauf verlaesslich.
+# Jeden Stand einzeln und nur, wenn er in DIESER Konfiguration ueberhaupt
+# registriert wurde. Ohne die Pruefung bricht CMake ab
+# ("Can not find test to add properties to"), sobald ein Stand fehlt — und
+# das ist der Normalfall: ohne Qt6::WebSockets oder ohne GUI faellt je nach
+# Bauumgebung ein anderer weg. Am 2026-10-01 scheiterte daran der
+# Configure-Schritt auf Linux UND macOS, waehrend er lokal durchlief.
+foreach(stand IN ITEMS
+    tst_tci_remote_auth
+    tst_tci_sendesperre
+    tst_tci_remote_access_page)
+  if(TEST ${stand})
+    set_tests_properties(${stand}
+      PROPERTIES RESOURCE_LOCK longpath_tci_fernzugriff_settings)
+  endif()
+endforeach()

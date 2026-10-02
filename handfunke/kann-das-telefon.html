@@ -1,0 +1,129 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kann das Telefon das?</title>
+<style>
+  body{background:#15171a;color:#e6e6e6;font:15px/1.5 -apple-system,system-ui,sans-serif;margin:0;padding:16px}
+  h1{font-size:17px;margin:0 0 4px}
+  p.sub{color:#8b9196;margin:0 0 16px;font-size:13px}
+  table{border-collapse:collapse;width:100%;margin-bottom:18px}
+  td{padding:6px 4px;border-bottom:1px solid #262a2e;vertical-align:top}
+  td.k{color:#8b9196;width:52%}
+  .ja{color:#7fc98a}.nein{color:#d98a8a}.hm{color:#d9bd7f}
+  h2{font-size:13px;color:#d9bd7f;margin:18px 0 2px;text-transform:uppercase;letter-spacing:.06em}
+  code{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:#9fc4d9}
+  button{background:#2a2f34;color:#e6e6e6;border:1px solid #3a4046;border-radius:6px;
+         padding:11px 16px;font-size:15px;width:100%;margin-bottom:14px}
+</style>
+<h1>Kann das Telefon das?</h1>
+<p class="sub">Handfunke-Selbstpruefung. Die Antworten gelten fuer <em>diese</em> Herkunft
+&mdash; ueber <code>https</code> aufgerufen kommt etwas anderes heraus als ueber <code>http</code>.</p>
+<button id="go">Tonpruefung starten (Beruehrung noetig)</button>
+<div id="out">messe&hellip;</div>
+
+<script>
+const out = document.getElementById('out');
+const teile = [];
+function abschnitt(t){ teile.push(`<h2>${t}</h2><table>`); }
+function zeile(k, v, klasse){
+  teile.push(`<tr><td class="k">${k}</td><td class="${klasse||''}">${v}</td></tr>`);
+}
+function ende(){ teile.push('</table>'); }
+function jn(b){ return b ? ['ja','ja'] : ['nein','nein']; }
+function mal(){ out.innerHTML = teile.join(''); }
+
+// ── 1. Wo stehen wir ───────────────────────────────────────────────────────
+abschnitt('Herkunft');
+zeile('Adresse', `<code>${location.origin}</code>`);
+zeile('Schema', `<code>${location.protocol}</code>`);
+const sicher = window.isSecureContext;
+zeile('isSecureContext', ...(sicher?['ja','ja']:['<b>nein</b> &mdash; alles mit [SecureContext] faellt aus','nein']));
+zeile('User-Agent', `<code>${navigator.userAgent}</code>`);
+ende();
+
+// ── 2. WebCodecs ───────────────────────────────────────────────────────────
+abschnitt('WebCodecs');
+const hatAD = typeof AudioDecoder !== 'undefined';
+zeile('AudioDecoder vorhanden', ...jn(hatAD));
+zeile('AudioEncoder vorhanden', ...jn(typeof AudioEncoder !== 'undefined'));
+zeile('EncodedAudioChunk vorhanden', ...jn(typeof EncodedAudioChunk !== 'undefined'));
+ende();
+
+// ── 3. Container-Wege ──────────────────────────────────────────────────────
+abschnitt('Container / Medienelement');
+const a = document.createElement('audio');
+[['audio/ogg; codecs=opus'],['audio/webm; codecs=opus'],
+ ['audio/mp4; codecs=opus'],['audio/mp4; codecs="opus"']].forEach(([t])=>{
+  const r = a.canPlayType(t);
+  zeile(`canPlayType <code>${t}</code>`, r||'""', r==='probably'?'ja':(r?'hm':'nein'));
+});
+const MS = window.ManagedMediaSource || window.MediaSource;
+zeile('MediaSource', ...jn(!!window.MediaSource));
+zeile('ManagedMediaSource', ...jn(!!window.ManagedMediaSource));
+if (MS && MS.isTypeSupported) {
+  ['audio/mp4; codecs="opus"','audio/webm; codecs="opus"','audio/mp4; codecs="mp4a.40.2"']
+  .forEach(t=>{ let r=false; try{r=MS.isTypeSupported(t);}catch(e){}
+    zeile(`isTypeSupported <code>${t}</code>`, ...jn(r)); });
+}
+ende();
+
+// ── 4. Was wir heute schon brauchen ────────────────────────────────────────
+abschnitt('Grundlagen');
+zeile('WebAssembly', ...jn(typeof WebAssembly !== 'undefined'));
+zeile('Worker', ...jn(typeof Worker !== 'undefined'));
+const AC = window.AudioContext || window.webkitAudioContext;
+zeile('AudioContext', ...jn(!!AC));
+ende();
+mal();
+
+// ── 5. Der Kern: laeuft der Worklet hier ueberhaupt? ───────────────────────
+// Braucht eine Beruehrung, sonst gibt iOS den Ton nicht frei.
+document.getElementById('go').addEventListener('click', async () => {
+  abschnitt('Tonpruefung (nach Beruehrung)');
+  let ctx = null;
+  try {
+    ctx = new AC({ sampleRate: 48000, latencyHint: 'interactive' });
+    zeile('AudioContext erzeugt', 'ja &mdash; Ausgangsrate ' + ctx.sampleRate + ' Hz', 'ja');
+  } catch (e) { zeile('AudioContext erzeugt', 'nein: ' + e.name, 'nein'); ende(); mal(); return; }
+
+  zeile('ctx.audioWorklet vorhanden', ...jn(!!ctx.audioWorklet));
+  if (ctx.audioWorklet) {
+    // Ein Ein-Zeilen-Prozessor als Blob: prueft addModule ohne Fremddatei.
+    const src = `registerProcessor('p',class extends AudioWorkletProcessor{
+      process(i,o){const c=o[0][0];for(let k=0;k<c.length;k++)
+        {this.t=(this.t||0)+1;c[k]=Math.sin(this.t*2*Math.PI*700/sampleRate)*0.15;}return true}})`;
+    const url = URL.createObjectURL(new Blob([src], {type:'text/javascript'}));
+    try {
+      await ctx.audioWorklet.addModule(url);
+      zeile('addModule', 'ja', 'ja');
+      const n = new AudioWorkletNode(ctx, 'p');
+      n.connect(ctx.destination);
+      await ctx.resume();
+      zeile('ctx.state nach resume', ctx.state, ctx.state==='running'?'ja':'hm');
+      zeile('<b>Hoerst du einen 700-Hz-Ton?</b>',
+            'Wenn ja, laeuft der Worklet auf dieser Herkunft wirklich.', 'hm');
+      setTimeout(()=>{ try{ n.disconnect(); ctx.close(); }catch(e){} }, 3000);
+    } catch (e) {
+      zeile('addModule', '<b>nein</b>: ' + e.name + ' &mdash; ' + e.message, 'nein');
+    }
+  }
+
+  // AudioDecoder wirklich fragen, nicht nur ob das Wort existiert.
+  if (hatAD) {
+    for (const cfg of [{codec:'opus',sampleRate:48000,numberOfChannels:1},
+                       {codec:'opus',sampleRate:24000,numberOfChannels:1},
+                       {codec:'opus',sampleRate:12000,numberOfChannels:1}]) {
+      try {
+        const s = await AudioDecoder.isConfigSupported(cfg);
+        zeile(`isConfigSupported opus ${cfg.sampleRate} Hz mono`, ...jn(s.supported));
+      } catch (e) {
+        zeile(`isConfigSupported opus ${cfg.sampleRate} Hz mono`, 'Fehler: '+e.name, 'nein');
+      }
+    }
+  } else {
+    zeile('AudioDecoder', 'fehlt &mdash; ' + (sicher ? 'Safari zu alt' :
+          'wahrscheinlich weil die Seite nicht sicher ist'), 'nein');
+  }
+  ende(); mal();
+}, { once: true });
+</script>

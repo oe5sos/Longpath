@@ -1,0 +1,123 @@
+<!doctype html><html lang="de"><head><meta charset="utf-8">
+<title>Entwurf A — Aufgeraeumt</title><link rel="stylesheet" href="_grund.css">
+<style>
+/* ENTWURF A — Aufgeraeumt.
+   Dieselben Teile wie heute, nur in Rangordnung gebracht:
+   1. Der Wasserfall bekommt eine Farbskala statt Grau — heute sieht man
+      dort fast nichts, obwohl er ein Drittel der Hoehe bekommt.
+   2. Die vier gleich aussehenden Knopfreihen werden EINE Reihe hinter
+      Reitern. Heute konkurrieren Betriebsart, Band, Filter und
+      Aufbereitung um dieselbe Aufmerksamkeit, obwohl man im Betrieb
+      meistens nur eine davon anfasst.
+   3. SENDEN/TUNE sind hier gesperrt und bleiben es auf absehbare Zeit —
+      sie verschwinden in eine Zeile statt zwei Tasten im besten
+      Daumenbereich zu belegen. */
+header{height:44px;flex:none;display:flex;align-items:center;gap:8px;padding:0 14px;
+  background:linear-gradient(#17171b,#0e0e10);border-bottom:1px solid var(--border)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--ok);
+  box-shadow:0 0 6px rgba(111,163,132,.7)}
+header .name{font-size:var(--f-small);color:var(--title);letter-spacing:.06em}
+header .spacer{flex:1}
+header .rate{font-size:var(--f-caption);color:var(--text-inactive);font-family:var(--mono)}
+
+.vfo{flex:none;padding:12px 14px 8px;display:flex;align-items:baseline;gap:8px}
+.vfo .hz{font-size:var(--f-display);font-family:var(--mono);line-height:1;letter-spacing:-.01em}
+.vfo .hz .dez{color:var(--text-scale);font-size:var(--f-reading)}
+.vfo .unit{font-size:var(--f-small);color:var(--text3)}
+.vfo .spacer{flex:1}
+.vfo .b{font-size:var(--f-small);font-family:var(--mono);color:var(--measured)}
+
+/* Der Platz, den das Zusammenfassen der vier Knopfreihen gewinnt, geht
+   NICHT als Leere verloren, sondern ans Band — sonst waere das Aufraeumen
+   ein reines Verschieben. flex:1 heisst: der Wasserfall nimmt, was uebrig
+   bleibt, und waechst auf hoeheren Geraeten mit. */
+.scope{flex:1;min-height:0;margin:0 10px;border:1px solid var(--border);
+  border-radius:var(--r-panel);display:flex;flex-direction:column;
+  overflow:hidden;background:var(--pan-bg);position:relative;box-shadow:inset 0 1px 0 var(--light)}
+#pan{flex:none;height:100px}
+#wf{flex:1;min-height:0;height:auto}
+.scope canvas{width:100%}
+.cursor{position:absolute;left:50%;top:0;bottom:0;width:1px;background:rgba(220,220,225,.34)}
+.cursor::before{content:"";position:absolute;left:-3px;top:0;width:7px;height:7px;
+  background:var(--accent);border-radius:50%}
+
+.meter{flex:none;margin:8px 10px 0;padding:7px 10px 8px;
+  background:linear-gradient(#17171b,#0e0e10);border:1px solid var(--border);
+  border-radius:var(--r-panel)}
+.meter .row{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.meter .val{margin-left:auto;font-family:var(--mono);font-size:var(--f-small);color:var(--measured)}
+.bar{height:9px;border-radius:5px;background:var(--inset);border:1px solid var(--inset-border);
+  position:relative;overflow:hidden;box-shadow:inset 0 2px 3px rgba(0,0,0,.55)}
+.bar i{position:absolute;inset:1px auto 1px 1px;border-radius:4px;width:62%;
+  background:linear-gradient(90deg,#47463b,#817b5c 62%,var(--measured))}
+.ticks{display:flex;justify-content:space-between;margin-top:3px}
+.ticks span{font-size:var(--f-caption);font-family:var(--mono);color:var(--text-scale)}
+
+/* Reiter statt vier Reihen */
+.reiter{margin:12px 10px 0;display:flex;gap:2px;border-bottom:1px solid var(--border-subtle)}
+.reiter div{flex:1;text-align:center;padding:7px 0 8px;font-size:var(--f-caption);
+  letter-spacing:.14em;text-transform:uppercase;font-weight:600;color:var(--text-inactive)}
+.reiter div.on{color:var(--measured);box-shadow:inset 0 -2px 0 var(--measured)}
+
+.chips{display:flex;gap:5px;margin:9px 10px 0}
+.chip{flex:1;min-width:0;height:38px;display:flex;align-items:center;justify-content:center;
+  font-size:var(--f-small);font-family:var(--mono);color:var(--text2);
+  background:linear-gradient(var(--glass-btn-top),var(--glass-btn-bot));
+  border:1px solid var(--border);border-radius:var(--r-chip);
+  box-shadow:inset 0 1px 0 var(--light),0 1px 0 rgba(0,0,0,.5)}
+.chip.on{background:linear-gradient(var(--glass-sel-top),var(--glass-sel-bot));
+  border-color:var(--glass-sel-border);color:var(--glass-sel-text)}
+.chip.more{flex:0 0 38px;color:var(--text3)}
+
+.sliders{margin:14px 10px 0;display:flex;flex-direction:column;gap:12px}
+.sl{display:flex;align-items:center;gap:9px}
+.sl .caps{flex:0 0 30px}
+.sl .track{flex:1;height:4px;border-radius:2px;background:var(--inset);
+  border:1px solid var(--inset-border);position:relative;box-shadow:inset 0 1px 2px rgba(0,0,0,.6)}
+.sl .track i{position:absolute;left:0;top:0;bottom:0;border-radius:2px;background:var(--accent);opacity:.55}
+.sl .track b{position:absolute;top:50%;width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;
+  background:linear-gradient(#5b8cba,#3a648c);border:1px solid #6b9ccb;box-shadow:0 1px 2px rgba(0,0,0,.6)}
+.sl .v{flex:0 0 58px;text-align:right;font-family:var(--mono);font-size:var(--f-small);color:var(--measured)}
+
+.gesperrt{margin:14px 10px 0;height:34px;display:flex;align-items:center;justify-content:center;
+  gap:8px;border:1px dashed var(--border);border-radius:var(--r-chip);
+  font-size:var(--f-caption);letter-spacing:.12em;text-transform:uppercase;color:var(--text-inactive)}
+footer{flex:none;height:30px;display:flex;align-items:center;gap:10px;padding:0 14px;margin-top:8px;
+  background:#0a0a0c;border-top:1px solid var(--border-subtle)}
+footer span{font-size:var(--f-caption);font-family:var(--mono);color:var(--text-inactive)}
+footer .ok{color:var(--ok)}
+</style></head><body>
+
+<header><span class="dot"></span><span class="name">LONGPATH · ANVELINA</span>
+<span class="spacer"></span><span class="rate">18 kB/s</span></header>
+
+<div class="vfo"><span class="hz mono">14.074<span class="dez">.000</span></span>
+<span class="unit">MHz</span><span class="spacer"></span>
+<span class="b">20 m</span><span class="b">48 kHz</span></div>
+
+<div class="scope"><canvas id="pan" width="746" height="200"></canvas>
+<canvas id="wf" width="746" height="330"></canvas><div class="cursor"></div></div>
+
+<div class="meter"><div class="row"><span class="caps">Signal</span>
+<span class="val">S8 · −74 dBm</span></div><div class="bar"><i></i></div>
+<div class="ticks"><span>1</span><span>3</span><span>5</span><span>7</span><span>9</span><span>+20</span><span>+40</span></div></div>
+
+<div class="reiter"><div class="on">Band</div><div>Mode</div><div>Filter</div><div>DSP</div></div>
+<div class="chips"><span class="chip">40</span><span class="chip">30</span>
+<span class="chip on">20</span><span class="chip">17</span><span class="chip">15</span>
+<span class="chip more">…</span></div>
+
+<div class="sliders">
+<div class="sl"><span class="caps">AF</span><div class="track"><i style="width:70%"></i><b style="left:70%"></b></div><span class="v">70 %</span></div>
+<div class="sl"><span class="caps">PWR</span><div class="track"><i style="width:55%"></i><b style="left:55%"></b></div><span class="v">55 %</span></div>
+</div>
+
+<div class="gesperrt">Senden nur in der App</div>
+<footer><span class="ok">◆ gekoppelt</span><span>4 kB/s bild</span><span>13 kB/s ton</span></footer>
+
+<script src="bild.js"></script>
+<script>
+malPan(document.getElementById('pan'), '#d8a55f', ['rgba(216,165,95,.28)','rgba(216,165,95,0)']);
+malWf(document.getElementById('wf'));
+</script>
+</body></html>

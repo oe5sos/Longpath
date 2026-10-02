@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=393, initial-scale=1, viewport-fit=cover">
+<title>Longpath Handfunke</title>
+<style>
+/* ── Hausstil-Rollen, 1:1 aus StyleConstants.h ───────────────────────────── */
+:root{
+  --app-bg:#08080a; --panel:#0c0c0e; --inset:#050507; --inset-border:#232329;
+  --border:#2c2c31; --border-subtle:#1f1f23;
+  --text:#dcdce1; --text2:#a6a6ac; --text3:#909096; --text-scale:#7e7e85;
+  --text-inactive:#58585e; --title:#c4c4ca;
+  --accent:#4a7ba8;                    /* anfassbar */
+  --measured:#d8a55f; --amber-dim:#6b5630;  /* gemessen */
+  --ok:#6fa384; --warn:#a8853f; --danger:#a86b6d;
+  --tx-top:#a87a3c; --tx-bot:#8a6a30; --tx-border:#c2924f; --tx-text:#17130a;
+  --tune-top:#7a5a2c; --tune-bot:#634c24; --tune-border:#9a763c;
+  --pan-bg:#141e27; --trace:#c2924f; --grid:#8a8f96; --grid-text:#9aa0a8;
+  --glass-btn-top:#222227; --glass-btn-bot:#141417;
+  --glass-sel-top:#2f5f92; --glass-sel-bot:#1e3d5f;
+  --glass-sel-border:#3d78b0; --glass-sel-text:#dbe9f8;
+  --badge-info:#161e27;
+  --light:rgba(255,255,255,.07);       /* kGlassLightAlpha 18/255 */
+  --shade:rgba(0,0,0,.63);             /* kGlassShadeAlpha 160/255 */
+  --instrument:#f2f2ec;
+
+  /* Schriftleiter — VARIANTE A: 1:1 wie am Schreibtisch */
+  --f-caption:9px; --f-small:11px; --f-body:13px;
+  --f-sub:16px; --f-reading:22px; --f-display:38px;
+
+  --r-chip:7px; --r-panel:10px;
+  --mono:ui-monospace,"SF Mono",Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{width:393px;height:852px;overflow:hidden}
+body{
+  background:var(--app-bg); color:var(--text);
+  font:var(--f-body)/1.3 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;
+  display:flex; flex-direction:column;
+}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+/* Versalzeile — Laufweite 0.18em wie kCapsTracking */
+.caps{font-size:var(--f-caption);letter-spacing:.18em;text-transform:uppercase;
+      font-weight:600;color:var(--text3)}
+
+/* ── Kopf: Verbindung + Station ─────────────────────────────────────────── */
+header{
+  height:44px;flex:none;display:flex;align-items:center;gap:8px;padding:0 14px;
+  background:linear-gradient(#17171b,#0e0e10);
+  border-bottom:1px solid var(--border);
+}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--ok);
+     box-shadow:0 0 6px rgba(111,163,132,.7);flex:none}
+header .name{font-size:var(--f-small);color:var(--title);letter-spacing:.06em}
+header .spacer{flex:1}
+header .rate{font-size:var(--f-caption);color:var(--text-inactive)}
+
+/* ── Frequenz ───────────────────────────────────────────────────────────── */
+.vfo{flex:none;padding:10px 14px 6px;display:flex;align-items:baseline;gap:8px}
+.vfo .hz{font-size:var(--f-display);font-family:var(--mono);color:var(--text);
+         letter-spacing:-.01em;line-height:1}
+.vfo .hz .khz{color:var(--text2)}
+.vfo .hz .dez{color:var(--text-scale);font-size:var(--f-reading)}
+.vfo .unit{font-size:var(--f-small);color:var(--text3)}
+.vfo .spacer{flex:1}
+.vfo .b{font-size:var(--f-small);font-family:var(--mono);color:var(--measured)}
+
+/* ── Panadapter + Wasserfall ────────────────────────────────────────────── */
+.scope{
+  flex:none;margin:2px 10px 0;border:1px solid var(--border);
+  border-radius:var(--r-panel);overflow:hidden;background:var(--pan-bg);
+  box-shadow:inset 0 1px 0 var(--light);
+}
+.scope canvas{display:block;width:100%}
+
+/* ── S-Meter: Licht, nicht Farbe ────────────────────────────────────────── */
+.meter{flex:none;margin:8px 10px 0;padding:7px 10px 8px;
+  background:linear-gradient(#17171b,#0e0e10);
+  border:1px solid var(--border);border-radius:var(--r-panel)}
+.meter .row{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.meter .val{margin-left:auto;font-family:var(--mono);font-size:var(--f-small);
+            color:var(--measured)}
+.bar{height:9px;border-radius:5px;background:var(--inset);
+     border:1px solid var(--inset-border);position:relative;overflow:hidden;
+     box-shadow:inset 0 2px 3px rgba(0,0,0,.55)}
+.bar i{position:absolute;inset:1px auto 1px 1px;border-radius:4px;
+  background:linear-gradient(90deg,#47463b,#817b5c 62%,var(--measured));}
+.ticks{display:flex;justify-content:space-between;margin-top:3px}
+.ticks span{font-size:var(--f-caption);font-family:var(--mono);color:var(--text-scale)}
+
+/* ── Bedienreihen ───────────────────────────────────────────────────────── */
+.group{margin:9px 10px 0}
+.group > .caps{margin:0 2px 5px}
+.chips{display:flex;gap:5px}
+.chip{
+  flex:1;min-width:0;height:34px;                /* 34 sichtbar, 44 Treffer */
+  display:flex;align-items:center;justify-content:center;
+  font-size:var(--f-small);font-family:var(--mono);color:var(--text2);
+  background:linear-gradient(var(--glass-btn-top),var(--glass-btn-bot));
+  border:1px solid var(--border);border-radius:var(--r-chip);
+  box-shadow:inset 0 1px 0 var(--light),0 1px 0 rgba(0,0,0,.5);
+  position:relative;
+}
+.chip::after{content:"";position:absolute;left:0;right:0;top:-5px;bottom:-5px}
+.chip.on{
+  background:linear-gradient(var(--glass-sel-top),var(--glass-sel-bot));
+  border-color:var(--glass-sel-border);color:var(--glass-sel-text);
+}
+.chip.more{flex:0 0 34px;color:var(--text3)}
+/* Zustandsschalter bleiben leise — quietCheckedStyle: im Feld darf genau
+   EINE Stelle kraeftig sein, und das ist die Sendetaste. */
+.chip.quiet.on{background:var(--badge-info);border-color:var(--accent);
+               color:#cfe0f2;box-shadow:inset 0 1px 0 var(--light)}
+
+/* ── Regler ─────────────────────────────────────────────────────────────── */
+.sliders{margin:9px 10px 0;display:flex;flex-direction:column;gap:9px}
+.sl{display:flex;align-items:center;gap:9px}
+.sl .caps{flex:0 0 30px}
+.sl .track{flex:1;height:4px;border-radius:2px;background:var(--inset);
+  border:1px solid var(--inset-border);position:relative;
+  box-shadow:inset 0 1px 2px rgba(0,0,0,.6)}
+.sl .track i{position:absolute;left:0;top:0;bottom:0;border-radius:2px;
+  background:var(--accent);opacity:.55}
+.sl .track b{position:absolute;top:50%;width:14px;height:14px;margin:-7px 0 0 -7px;
+  border-radius:50%;background:linear-gradient(#5b8cba,#3a648c);
+  border:1px solid #6b9ccb;box-shadow:0 1px 2px rgba(0,0,0,.6)}
+.sl .v{flex:0 0 58px;text-align:right;white-space:nowrap;font-family:var(--mono);
+       font-size:var(--f-small);color:var(--measured)}
+
+/* ── Sendefeld ──────────────────────────────────────────────────────────── */
+.txrow{margin:auto 10px 0;padding-top:10px;display:flex;gap:7px;align-items:stretch}
+.tx{
+  flex:1;height:58px;border-radius:9px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:linear-gradient(var(--tx-top),var(--tx-bot));
+  border:1px solid var(--tx-border);color:var(--tx-text);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 2px 0 rgba(0,0,0,.45);
+  font-weight:700;letter-spacing:.14em;font-size:var(--f-sub);
+}
+.tx small{font-size:var(--f-caption);font-weight:600;letter-spacing:.1em;
+          opacity:.72;margin-top:2px}
+.tx.locked{
+  background:linear-gradient(#1a1a1e,#141417);border-color:var(--border);
+  color:var(--text-inactive);box-shadow:inset 0 1px 0 var(--light);
+}
+.tune{
+  flex:0 0 84px;border-radius:9px;
+  display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(var(--tune-top),var(--tune-bot));
+  border:1px solid var(--tune-border);color:#1a150c;
+  font-weight:700;letter-spacing:.12em;font-size:var(--f-body);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 2px 0 rgba(0,0,0,.45);
+}
+
+/* ── Fußzeile ───────────────────────────────────────────────────────────── */
+footer{flex:none;height:30px;display:flex;align-items:center;gap:10px;
+  padding:0 14px;margin-top:8px;
+  background:#0a0a0c;border-top:1px solid var(--border-subtle)}
+footer span{font-size:var(--f-caption);font-family:var(--mono);color:var(--text-inactive)}
+footer .ok{color:var(--ok)}
+</style>
+</head>
+<body>
+
+<header>
+  <span class="dot"></span>
+  <span class="name">LONGPATH · ANAN 10E</span>
+  <span class="spacer"></span>
+  <span class="rate mono">48 kB/s</span>
+</header>
+
+<div class="vfo">
+  <span class="hz mono">14<span class="khz">.074</span><span class="dez">.000</span></span>
+  <span class="unit">MHz</span>
+  <span class="spacer"></span>
+  <span class="b">20 m</span>
+</div>
+
+<div class="scope">
+  <canvas id="pan" width="373" height="104"></canvas>
+  <canvas id="wf"  width="373" height="196"></canvas>
+</div>
+
+<div class="meter">
+  <div class="row">
+    <span class="caps">Signal</span>
+    <span class="val">S7 · −79 dBm</span>
+  </div>
+  <div class="bar"><i style="width:58%"></i></div>
+  <div class="ticks">
+    <span>1</span><span>3</span><span>5</span><span>7</span><span>9</span><span>+20</span><span>+40</span>
+  </div>
+</div>
+
+<div class="group">
+  <div class="caps">Betriebsart</div>
+  <div class="chips">
+    <div class="chip">LSB</div><div class="chip on">USB</div><div class="chip">CW</div>
+    <div class="chip">DIGU</div><div class="chip">AM</div><div class="chip more">…</div>
+  </div>
+</div>
+
+<div class="group">
+  <div class="caps">Band</div>
+  <div class="chips">
+    <div class="chip">40</div><div class="chip">30</div><div class="chip on">20</div>
+    <div class="chip">17</div><div class="chip">15</div><div class="chip more">…</div>
+  </div>
+</div>
+
+<div class="sliders">
+  <div class="sl">
+    <span class="caps">AF</span>
+    <div class="track"><i style="width:62%"></i><b style="left:62%"></b></div>
+    <span class="v">−12 dB</span>
+  </div>
+  <div class="sl">
+    <span class="caps">RF</span>
+    <div class="track"><i style="width:48%"></i><b style="left:48%"></b></div>
+    <span class="v">48</span>
+  </div>
+</div>
+
+<div class="group">
+  <div class="caps">Filter</div>
+  <div class="chips">
+    <div class="chip">1.8k</div><div class="chip on">2.4k</div><div class="chip">2.7k</div>
+    <div class="chip">3.1k</div><div class="chip">VAR</div><div class="chip more">…</div>
+  </div>
+</div>
+
+<div class="group">
+  <div class="caps">Aufbereitung</div>
+  <div class="chips">
+    <div class="chip on quiet">NB</div><div class="chip quiet">NR</div>
+    <div class="chip quiet">ANF</div><div class="chip on quiet">SQL</div>
+    <div class="chip quiet">RIT</div><div class="chip more">…</div>
+  </div>
+</div>
+
+<div class="txrow">
+  <div class="tx locked">SENDEN <small>NUR IN DER APP</small></div>
+  <div class="tune">TUNE</div>
+</div>
+
+<footer>
+  <span class="ok">◆ gekoppelt</span>
+  <span>27 kB/s bild</span>
+  <span>21 kB/s ton</span>
+</footer>
+
+<script>
+// Panadapter: Kurve #c2924f, Fuellung 22 % an der Kurve -> 0 zur Grundlinie.
+(function(){
+  const c=document.getElementById('pan'),x=c.getContext('2d'),W=c.width,H=c.height;
+  x.fillStyle='#141e27';x.fillRect(0,0,W,H);
+  x.strokeStyle='rgba(138,143,150,.16)';x.lineWidth=1;
+  for(let i=1;i<6;i++){const y=Math.round(H*i/6)+.5;x.beginPath();x.moveTo(0,y);x.lineTo(W,y);x.stroke();}
+  for(let i=1;i<8;i++){const p=Math.round(W*i/8)+.5;x.beginPath();x.moveTo(p,0);x.lineTo(p,H);x.stroke();}
+  // dBm-Skala
+  x.fillStyle='#9aa0a8';x.font='9px ui-monospace,Menlo,monospace';
+  ['-40','-70','-100','-130'].forEach((t,i)=>x.fillText(t,3,16+i*Math.round((H-22)/3)));
+  // Spektrum: Rauschteppich + ein paar Traeger
+  const n=W,pts=[];
+  let seed=7; const rnd=()=>{seed=(seed*1103515245+12345)&0x7fffffff;return seed/0x7fffffff;};
+  for(let i=0;i<n;i++){
+    let v=H*0.80+(rnd()-0.5)*7;
+    [[72,26],[118,40],[150,15],[206,52],[248,20],[300,33],[340,12]].forEach(([p,a])=>{
+      const d=i-p; v-=a*Math.exp(-(d*d)/(2*3.2*3.2));
+    });
+    pts.push(Math.max(6,Math.min(H-3,v)));
+  }
+  const g=x.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,'rgba(194,146,79,.22)');g.addColorStop(1,'rgba(194,146,79,0)');
+  x.beginPath();x.moveTo(0,H);pts.forEach((v,i)=>x.lineTo(i,v));x.lineTo(W,H);x.closePath();
+  x.fillStyle=g;x.fill();
+  x.beginPath();pts.forEach((v,i)=>i?x.lineTo(i,v):x.moveTo(i,v));
+  x.strokeStyle='#c2924f';x.lineWidth=1;x.stroke();
+
+  // Wasserfall, Rampe "Gedaempft" mit ihren sieben Stuetzpunkten
+  const w=document.getElementById('wf'),y=w.getContext('2d'),WW=w.width,WH=w.height;
+  const stops=[[0,[8,8,10]],[.30,[12,12,14]],[.48,[44,44,49]],[.64,[88,88,94]],
+               [.78,[129,123,92]],[.92,[216,165,95]],[1,[242,242,236]]];
+  const ramp=t=>{for(let i=1;i<stops.length;i++){if(t<=stops[i][0]){
+      const [a,ca]=stops[i-1],[b,cb]=stops[i],k=(t-a)/(b-a);
+      return `rgb(${ca.map((v,j)=>Math.round(v+(cb[j]-v)*k)).join(',')})`;}}
+    return 'rgb(242,242,236)';};
+  // Zeile fuer Zeile wie im echten Wasserfall: unten neu, nach oben altern.
+  // Traeger kommen und gehen, statt als glatte Baender durchzulaufen.
+  const img=y.createImageData(WW,WH);
+  for(let row=0;row<WH;row++){
+    const t=row/WH;                       // 0 = aelteste Zeile oben
+    for(let i=0;i<WW;i++){
+      let v=0.07+rnd()*0.06;              // Grundrauschen, verschwindet in der Rampe
+      [[72,26,.15,.95],[118,40,0,.62],[150,15,.40,1],[206,52,0,1],
+       [248,20,.22,.78],[300,33,.55,1],[340,12,0,.35]].forEach(([p,a,von,bis])=>{
+        if(t<von||t>bis) return;
+        const rand=Math.min(1,Math.min(t-von,bis-t)*14);   // weich ein- und ausblenden
+        const d=i-p+Math.sin(row/33+p)*1.6;                // leichtes Zittern
+        v+=(a/58)*rand*Math.exp(-(d*d)/(2*2.6*2.6));
+      });
+      const c=ramp(Math.max(0,Math.min(1,v))).match(/\d+/g);
+      const o=(row*WW+i)*4;
+      img.data[o]=+c[0];img.data[o+1]=+c[1];img.data[o+2]=+c[2];img.data[o+3]=255;
+    }
+  }
+  y.putImageData(img,0,0);
+})();
+</script>
+</body>
+</html>

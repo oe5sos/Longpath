@@ -35,7 +35,10 @@
 #include <QtCore/QSet>
 #include <QtCore/QString>
 
+#include <array>
+
 #include "TciSendQueue.h"
+#include "core/audio/AudioRingSpsc.h"
 
 class QWebSocket;
 
@@ -88,6 +91,63 @@ struct TciClientSession {
     // From Thetis TCIServer.cs:767 [v2.10.3.13] — m_audioStreamEnabled HashSet<int>
     QSet<int> audioStreamEnabled;
 
+    // ── Eigener Tonvorrat je Sitzung (2026-09-30) ───────────────────────────
+    //
+    // Bis dahin lag der Ring beim SERVER, einer je Empfaenger, und jeder
+    // Client popte daraus. Wer zuerst kam, nahm die Abtastwerte — der zweite
+    // bekam, was uebrig war, also Stille mit Loechern. Das trifft jeden
+    // Fall mit mehr als einem Zuhoerer: Handfunke am Telefon und am iPad,
+    // oder Handfunke neben einem Digimode-Programm, das denselben Empfaenger
+    // abonniert hat.
+    //
+    // Der Erzeugerring beim Server bleibt (der DSP-Faden darf keine
+    // Sitzungen anfassen); der Hauptfaden verteilt daraus in diese Puffer,
+    // und jeder Client liest danach seinen eigenen — mit seiner eigenen
+    // Blockgroesse, seiner eigenen Rate und seinem eigenen Format.
+    //
+    // 65536 Byte sind 8192 Stereo-Rahmen bei 48 kHz, also gut 170 ms. Der
+    // Abfluss laeuft alle 5 ms (960 Byte), das ist reichlich Luft — und
+    // trotzdem halb so viel, wie ein Ring je Empfaenger kostete.
+    std::array<AudioRingSpsc<65536>, 2> audioVorrat;
+
+    // ── Spektrumstrom (Longpath-eigen, 2026-09-30) ──────────────────────────
+    //
+    // Fertig gerechnetes Spektrum statt rohem I/Q — siehe die Begründung am
+    // TciStreamType::SpectrumStream. Der Client sagt beim Anfordern, wie viele
+    // Bildpunkte er hat und wie oft er ein Bild will; der Server verdichtet
+    // auf genau diese Punktzahl. Das ist der eigentliche Hebel: nicht die
+    // Kompression, sondern gar nicht erst mehr zu schicken, als das Gerät
+    // zeichnen kann.
+    QSet<int> spectrumEnabled;
+
+    // Bildpunkte je Bild. Vorgabe 256: ein Telefon quer hat rund 400
+    // Bildpunkte, hochkant knapp 400 — mehr als 1024 kann kein Handy zeigen,
+    // weniger als 64 wäre kein Spektrum mehr.
+    int spectrumPoints{256};
+
+    // Gewuenschte Bandbreite des Spektrumbildes in Hertz, 0 = alles.
+    //
+    // Ohne das zeigt ein Telefon die volle DDC-Breite: 192 kHz auf 373
+    // Punkten sind 515 Hz je Bildpunkt. Ein Daumen trifft nie einen Punkt
+    // genau, also springt die Frequenz beim Abstimmen in
+    // Halbkilohertz-Schritten — der Betreiber am 2026-10-01: "frequenz kann
+    // man zwar ändern, aber sehr schlecht".
+    //
+    // Der Ausschnitt wird am SERVER genommen, nicht im Browser. Nur so
+    // steigt die Aufloesung wirklich: 24 kHz auf 373 Punkte sind 64 Hz je
+    // Punkt. Schnitte der Browser selbst zu, haette er weiter 515er-Punkte
+    // und wuerde sie nur breiter malen.
+    int spectrumSpanHz{0};
+
+    // Bilder je Sekunde. Vorgabe 10 — darunter ruckelt der Wasserfall
+    // sichtbar, darüber sieht das Auge am Telefon nichts mehr dazu.
+    int spectrumFps{10};
+
+    // Zeitpunkt des letzten gesendeten Spektrums (ms seit Epoche), für die
+    // Drossel. Ohne sie ginge jedes FFT-Bild der Engine raus (rund 30/s),
+    // also das Dreifache des Verlangten.
+    qint64 lastSpectrumMs{0};
+
     // Phase 16 Task 16.3 (sub-commit b): per-slice WDSP RESAMPLEF instance.
     // Created lazily on audio_start, destroyed on audio_stop + disconnect.
     // Key = rx index (slice).  void* avoids pulling WDSP resample.h into
@@ -97,7 +157,58 @@ struct TciClientSession {
     // From Thetis TCIServer.cs:789 [v2.10.3.13] — m_rxAudioResamplers
     // Dictionary<int, Resampler> replaced by QHash<int, void*> (opaque ptr
     // to RESAMPLEF struct allocated via create_resampleF / create_resampleFV).
+    // Schlüssel ist NICHT der Empfänger allein, sondern (rx, Kanal) —
+    // resamplerKey() unten. Grund, gefunden 2026-09-30:
+    //
+    // WDSPs RESAMPLEF rechnet einkanalig und reell (third_party/wdsp/src/
+    // resample.c: ein Ringpuffer, ein Wert je Abtastung, kein Kanalbegriff).
+    // Bis dahin lief der VERSCHRÄNKTE Stereopuffer (L,R,L,R,…) als EIN Strom
+    // hindurch. Das hatte zwei Folgen, beide bei jeder Rate ausser 48000 (nur
+    // dort überspringt der Abfluss den Umtaster ganz):
+    //   1. L und R liefen durch denselben FIR und vermischten sich.
+    //   2. Die Tonhöhe stimmte nicht — der Resampler sah doppelt so viele
+    //      Werte wie es Abtastungen gibt, rechnete also faktisch von 96 kHz
+    //      herunter.
+    // Belegt an WDSP selbst in tests/tst_tci_audio_resample_channels.cpp.
+    //
+    // Also je Kanal ein eigener Resampler, und der Abfluss trennt vor dem
+    // Umtasten auf und verschränkt danach wieder.
     QHash<int, void*> audioResamplers;
+
+    // (rx, Kanal) -> Schlüssel. Zwei Kanäle sind das Maximum: TCI kennt Mono
+    // und Stereo, nichts dazwischen (audio_stream_channels: 1 oder 2).
+    static constexpr int resamplerKey(int rx, int channel) { return rx * 2 + channel; }
+
+    // ── Herkunft und Anmeldung (2026-09-30) ─────────────────────────────────
+    //
+    // TCI kennt weder Anmeldung noch Verschlüsselung — in der 41-seitigen
+    // Spezifikation kommen auth, password, token und TLS kein einziges Mal
+    // vor. Solange der Server auf 127.0.0.1 lauscht, ist das vertretbar: wer
+    // dort verbinden kann, sitzt ohnehin am Rechner. Sobald er ins Netz geht,
+    // ist es das nicht mehr — ein Handy kann dann tasten, und jedes andere
+    // Gerät im WLAN auch.
+    //
+    // Deshalb der Schnitt entlang der HERKUNFT, nicht entlang eines globalen
+    // Schalters: was von Loopback kommt, läuft unverändert weiter (WSJT-X,
+    // JTDX, N1MM+, Log4OM, Hamlib — die kennen kein auth: und sollen es nicht
+    // lernen müssen). Was aus dem Netz kommt, muss sich anmelden und darf
+    // erst senden, wenn der Betreiber das ausdrücklich erlaubt hat.
+    //
+    // Ein Server, der auf Loopback gebunden ist, sieht ohnehin nur
+    // Loopback-Gegenstellen — dort ist beides also wirkungslos, und genau so
+    // soll es sein.
+    bool fromLoopback{true};
+
+    // Angemeldet? Auf Loopback von vornherein true. Aus dem Netz erst, wenn
+    // ein `auth:<token>` mit dem richtigen Token kam. Bis dahin beantwortet
+    // der Server ausschließlich auth: und hält auch den Init-Burst zurück —
+    // der verrät sonst Rufzeichen, Gerät und Frequenz an jeden, der den Port
+    // findet.
+    bool authenticated{true};
+
+    // Zahl der Fehlversuche. Nach kMaxAuthAttempts wird die Verbindung
+    // geschlossen; ohne das könnte jemand Token für Token durchprobieren.
+    int authAttempts{0};
 
     // ── Audio stream configuration ───────────────────────────────────────────
     // From Thetis TCIServer.cs:779 [v2.10.3.13] — m_audioSampleRate = 48000
