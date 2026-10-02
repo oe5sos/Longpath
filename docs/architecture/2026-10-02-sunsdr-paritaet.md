@@ -48,9 +48,32 @@ Trennung arbeitet man an Dingen, die es am Gerät nie geben wird.
 | **Mithören**: aufnehmen, was das Gerät meldet | **erledigt**, PR #150 |
 | `iqPacketLoss`, `iqSequenceGap` nach oben melden | Der Treiber hat die Folgenummern und zählt sie nicht aus — ANAN meldet beides. Rein rechnerisch, kein Protokollwissen nötig |
 | Veralteter Kommentar an `setSampleRate` (nennt die widerlegten 312 500 Hz) | Textfehler, irreführend beim Lesen |
-| `setAntennaRouting` auf die drei Buchsen (A1/A2/A3) | Opcode 0x15 bestätigt, Rahmenbauer liegt fertig in `SunSdrProtocol.h`. Umschalten ohne Senden ist am Gerät harmlos |
-| `setTxDrive` (Leistungsstellung) | Opcode 0x17 bestätigt, Rahmenbauer liegt fertig. Ohne MOX entsteht keine HF |
-| `setTxFrequency` | Frequenz-Opcode 0x08 ist am Gerät bewiesen (dreimal gegen ExpertSDR2) |
+| `setAntennaRouting` auf die drei Buchsen (A1/A2/A3) | Opcode 0x15, Rahmenbauer liegt fertig. **Nicht bench-bestätigt** — die Selektorbytes sind aus zitierbarer Quelle, aber an der QRP nie geprüft, und A3 hat einen RX/TX-Split (RX 0x03, TX 0x02). Baubar, Live-Prüfung nötig |
+
+### 2a. Zwei Korrekturen an dieser Einteilung (2026-10-02, beim Bauen gefunden)
+
+Zwei Punkte standen zuerst unter „reine Software". Der Code selbst sagt,
+warum sie dort nicht hingehören — und beide Fehleinschätzungen hätten am
+Gerät wehgetan:
+
+* **`setTxDrive` gehört zu Sorte 4, nicht 2.** `buildDriveFrame()` trägt
+  die ausdrückliche Anweisung „DO NOT WIRE THIS INTO setTxDrive() OR ANY
+  OTHER CALLER YET": der Leistungsbyte darf nicht hinausgehen, solange es
+  keine QRP-eigene Leistungs-Kalibriertabelle gibt. Die einzige bekannte
+  ist DX/PRO-Hardware, nur 40 m, und im Entwurf als „very likely wrong
+  for a QRP" vermerkt. Es gibt sogar einen Prüfstand, der **null
+  Produktions-Aufrufstellen** erzwingt (`tst_sunsdr_protocol.cpp`,
+  `buildDriveFrameHasNoProductionCallSites`). Das braucht einen
+  Messaufbau am Ausgang, also den Dummy-Load.
+
+* **`setTxFrequency` gehört zu Sorte 3, nicht 2.** Longpath stellt den
+  Empfang schon über **denselben** Opcode ein, der im DX-Schema der
+  primäre/TX-VFO ist: `setReceiverFrequency()` schickt 0x07 (DDC) **und**
+  0x08 (VFO), und 0x08 entspricht ArtemisSDRs „freq, primary/TX VFO".
+  Eine Sendefrequenz naiv über 0x08 zu setzen hätte also beim Senden die
+  **Empfangsfrequenz mitgezogen** — Split und XIT wären kaputt, und zwar
+  unsichtbar, bis man es am Gerät hört. Wie ExpertSDR2 zwei Frequenzen
+  getrennt hält, muss der Mitschnitt zeigen.
 
 ### 3. Braucht einen Mitschnitt mit ExpertSDR2 — ohne Antenne, zwei Minuten am Gerät
 
