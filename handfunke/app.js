@@ -1098,7 +1098,8 @@ $('scope').addEventListener('pointermove', (e) => {
 // hier — nur so steigt die Aufloesung wirklich. Schnitte der Browser zu,
 // malte er dieselben groben Punkte nur breiter.
 const kSpannen = [6000, 12000, 24000, 48000, 96000, 192000];
-let kneifVon = 0;
+let kneifVon = 0;        // Fingerabstand beim Beginn der Geste
+let kneifSpanne = 0;     // Spanne beim Beginn der Geste
 const zeiger = new Map();
 
 function spanneSetzen(hz) {
@@ -1126,11 +1127,33 @@ function spanneStufe(richtung) {
 $('zoomRein').addEventListener('click', () => spanneStufe(-1));
 $('zoomRaus').addEventListener('click', () => spanneStufe(+1));
 
+// ── Feinschritt +/- 100 Hz, rechts oben im Panadapter (2026-10-02) ─────────
+//
+// Betreiber: "vielleicht sollte ein plus und minus oben rechts im panadapter
+// sein um die frequenz um +/- 100 zu verschieben". Wischen trifft auf ein
+// paar hundert Hertz genau — fuer das letzte Stueck auf eine Station ist das
+// zu grob, und das Eintippblatt ist dafuer zu umstaendlich.
+const kFeinHz = 100;
+function feinschritt(d) {
+  const v = link.st.vfo[state.trx] ? link.st.vfo[state.trx][0] : null;
+  if (!v) { return; }
+  link.send(`vfo:${state.trx},0,${v + d}`);
+  // Nicht selbst schieben — mitteVerfolgen() tut es, sobald das Geraet die
+  // neue Frequenz bestaetigt. Zweimal schieben hiesse doppelt schieben.
+}
+$('feinAb').addEventListener('click', () => feinschritt(-kFeinHz));
+$('feinAuf').addEventListener('click', () => feinschritt(+kFeinHz));
+// Die Tasten liegen IM Bild. Ohne das hier begaenne jeder Druck zugleich
+// einen Abstimmwisch darunter, und das Bild fröre fuer die Dauer ein.
+['pointerdown', 'pointerup', 'pointermove'].forEach(ev =>
+  $('feinschritt').addEventListener(ev, (e) => e.stopPropagation()));
+
 $('scope').addEventListener('pointerdown', (e) => {
   zeiger.set(e.pointerId, e.clientX);
   if (zeiger.size === 2) {
     const [a, b] = [...zeiger.values()];
     kneifVon = Math.abs(a - b);
+    kneifSpanne = state.spanneHz > 0 ? state.spanneHz : (link.st.iqRate || 48000);
     wischVon = null;              // kein Abstimmen waehrend des Kneifens
     wischAktiv = false;
   }
@@ -1143,15 +1166,30 @@ $('scope').addEventListener('pointermove', (e) => {
   const [a, b] = [...zeiger.values()];
   const jetzt = Math.abs(a - b);
   if (jetzt < 20) { return; }
+
+  // Bezug ist der ANFANG der Geste, nicht das vorige Ereignis.
+  //
+  // Hier stand `spanneSetzen(state.spanneHz * (kneifVon / jetzt))` und
+  // danach `kneifVon = jetzt`. Damit war das Verhaeltnis bei jedem
+  // Mausbericht rund 1,001 — die gerechnete Spanne lag also immer dicht an
+  // der aktuellen, rastete auf denselben Wert ein, und `spanneSetzen` stieg
+  // bei `neu === state.spanneHz` sofort wieder aus. Weil der Bezugspunkt
+  // zugleich nachgezogen wurde, konnte sich auch nichts aufsummieren: die
+  // Geste konnte RECHNERISCH nie etwas bewirken, egal wie weit die Finger
+  // auseinandergingen. Betreiber am 2026-10-02: "man sollte mit beiden
+  // finger auseinanderziehen alles vergroessern koennen".
+  //
+  // Mit festem Anfangsbezug waechst das Verhaeltnis mit der Geste, und die
+  // naechste Raststufe wird erreicht, sobald die Finger weit genug sind.
+  //
   // Auseinander = naeher heran = kleinere Spanne.
-  spanneSetzen(state.spanneHz * (kneifVon / jetzt));
-  kneifVon = jetzt;
+  spanneSetzen(kneifSpanne * (kneifVon / jetzt));
 }, { passive: true });
 
 ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev =>
   $('scope').addEventListener(ev, (e) => {
     zeiger.delete(e.pointerId);
-    if (zeiger.size < 2) { kneifVon = 0; }
+    if (zeiger.size < 2) { kneifVon = 0; kneifSpanne = 0; }
   }, { passive: true }));
 
 // Untergrenze knapp unter 160 m, Obergrenze knapp ueber 23 cm. Was

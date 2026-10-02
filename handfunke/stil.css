@@ -42,6 +42,18 @@ input,textarea{-webkit-user-select:text;user-select:text;-webkit-touch-callout:d
   border-left:1px solid rgba(194,146,79,.42);
   border-right:1px solid rgba(194,146,79,.42)}
 
+/* Feinschritt rechts oben im Panadapter. Dunkel unterlegt, damit die Tasten
+   auch ueber hellem Wasserfall lesbar bleiben, aber zurueckhaltend genug, um
+   das Bild nicht zu zerschneiden. */
+.feinschritt{position:absolute;top:6px;right:6px;z-index:3;display:flex;
+  align-items:center;gap:2px;padding:2px 4px;border-radius:9px;
+  background:rgba(10,12,16,.62);border:1px solid rgba(138,143,150,.22)}
+.feinschritt span{font:600 9px/1 ui-monospace,Menlo,monospace;
+  letter-spacing:.04em;color:var(--text3);padding:0 1px}
+.feinschritt button{width:30px;height:26px;border:0;border-radius:7px;
+  background:transparent;color:var(--text2);font:400 17px/1 inherit;cursor:pointer}
+.feinschritt button:active{background:rgba(194,146,79,.22);color:var(--accent)}
+
 /* Zoomtasten neben der Spannenanzeige. Kneifen gibt es seit dem 2026-10-01,
    aber eine Geste, die man nicht sieht, gibt es fuer den Bediener nicht. */
 .zoom{font:inherit;color:var(--text2);background:transparent;border:0;

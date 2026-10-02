@@ -116,6 +116,13 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
        ist, der Strich sagt, worauf abgestimmt ist. -->
   <div class="durchlass" id="durchlass"></div>
   <div class="cursor"></div>
+  <!-- Feinschritt: liegt IM Bild, rechts oben, und haelt seine Beruehrungen
+       von der Abstimmgeste darunter fern (app.js). -->
+  <div class="feinschritt" id="feinschritt">
+    <button id="feinAb"  aria-label="100 Hz tiefer">−</button>
+    <span>100 Hz</span>
+    <button id="feinAuf" aria-label="100 Hz hoeher">+</button>
+  </div>
 </div>
 
 <div class="meter schicht">
