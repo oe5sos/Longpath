@@ -101,20 +101,24 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Beide Zeilen auf Ubuntu 22.04 mit offiziellem Qt 6.8.3
-          # (2026-09-29): das AppImage braucht dann hoechstens glibc 2.35
-          # und laeuft auf Ubuntu 22.04+, Debian 12+ und Raspberry Pi OS
-          # Bookworm. Die ARM-Zeile baute bis 0.6.4 auf ubuntu-24.04-arm
-          # mit Ubuntus Qt 6.4 und brauchte glibc 2.38 -- auf dem Raspberry
-          # Pi (Bookworm, glibc 2.36) startete sie nicht.
+          # Beide Zeilen mit offiziellem Qt 6.8.3 (2026-09-29). x86_64 baut
+          # auf Ubuntu 22.04 und braucht hoechstens glibc 2.35. Fuer ARM
+          # geht das nicht: Qts eigene aarch64-Werkzeuge (moc, rcc) sind
+          # selbst gegen glibc 2.38 gebaut und laufen auf ubuntu-22.04-arm
+          # gar nicht (v0.6.5, erster Lauf: "GLIBC_2.38 not found" beim
+          # moc). Die ARM-Zeile baut darum auf ubuntu-24.04-arm und
+          # verlangt glibc 2.38 -- wie 0.6.4, Raspberry Pi OS Bookworm
+          # (2.36) bleibt aussen vor.
           - runner: ubuntu-22.04
             arch: x86_64
             qt_host: linux
             qt_arch: linux_gcc_64
-          - runner: ubuntu-22.04-arm
+            glibc_floor: "2.35"
+          - runner: ubuntu-24.04-arm
             arch: aarch64
             qt_host: linux_arm64
             qt_arch: linux_gcc_arm64
+            glibc_floor: "2.38"
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -298,7 +302,7 @@ jobs:
       # eine neuere glibc verlangen als Ubuntu 22.04 hat. 0.6.4 brauchte
       # auf ARM 2.38 und lief auf dem Raspberry Pi nicht -- das faellt
       # jetzt beim Bauen auf, nicht beim Anwender.
-      - name: Check glibc floor (2.35)
+      - name: Check glibc floor (${{ matrix.glibc_floor }})
         run: |
           max=$(find AppDir -type f \( -name '*.so*' -o -path '*/bin/*' \) \
                 | while read -r f; do objdump -T "$f" 2>/dev/null; done \
@@ -308,8 +312,9 @@ jobs:
             echo "::error::Keine ELF-Datei mit glibc-Bezug im AppDir gefunden -- Pruefung kaputt?"
             exit 1
           fi
-          if [ "$(printf '%s\n' "$max" GLIBC_2.35 | sort -V | tail -1)" != "GLIBC_2.35" ]; then
-            echo "::error::Das AppImage verlangt $max -- Untergrenze ist glibc 2.35 (Ubuntu 22.04)."
+          floor="GLIBC_${{ matrix.glibc_floor }}"
+          if [ "$(printf '%s\n' "$max" "$floor" | sort -V | tail -1)" != "$floor" ]; then
+            echo "::error::Das AppImage verlangt $max -- Untergrenze ist glibc ${{ matrix.glibc_floor }}."
             find AppDir -type f \( -name '*.so*' -o -path '*/bin/*' \) | while read -r f; do
               objdump -T "$f" 2>/dev/null | grep -q "$max" && echo "  $f"
             done

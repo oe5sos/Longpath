@@ -2,6 +2,77 @@
 
 ## [Unreleased]
 
+## [0.6.5] - 2026-10-02
+
+Zehn Tage Arbeit seit 0.6.4, rund 120 Pull Requests: **Longpath am
+iPhone** (die Handfunke, eine Weboberflaeche ueber TCI mit Spektrum,
+Wasserfall, Ton und Bedienung) und dafuer ein TCI, das gegen fremde
+Webseiten und das Netz abgesichert ist; die **Filtervorgaben wie in
+Thetis**; FM mit CTCSS, Ablage, Reverse und Rauschsperre; ein Logbuch,
+das loggt und den Rotor zeigt; Menues am Fenster statt an der Leiste;
+die SunSDR2 QRP mit echtem I/Q; viele Rendering- und Absturzfunde. Die
+Pakete laufen jetzt auch auf **aelteren Systemen**: macOS ab 12 (Apple
+Silicon und Intel), Linux ab glibc 2.35 (x86_64 und aarch64), Windows x64.
+
+### Added
+
+- **Handfunke: Longpath am iPhone** (#146). Eine Webseite, die Longpath
+  selbst ausliefert: Spektrum und Wasserfall, Abstimmen durch Tippen und
+  Ziehen, Ton (12 kHz mono, mu-law), Kopplung mit kurzem Code, Symbol fuer
+  den Startbildschirm. Findet den Rechner ueber seinen Namen, auch ueber IPv6.
+- **TCI: Fernzugriff nur mit Token, Senden aus dem Netz ab Werk gesperrt**
+  (#145, #146). Herkunftspruefung fuer Webseiten, Sendezeit-Deckel,
+  drive/tune_drive/tune, Fernzugriffs-Gruppe in Setup › TCI mit ablesbarem
+  Token. Schmaler Spektrumrahmen (4 kB/s statt 257) und Zoom im Spektrum.
+- **Logbuch loggt mit Frequenz und Mode vom Funkgeraet**, der Rotor steht als
+  Radar neben der Karte und zeigt nur die gewaehlte Station (#107, #118);
+  Drehrichtung aus der genauen Lage statt aus dem Locator (#106).
+- **FM wie Thetis**: kein 100-Hz-Ton mehr beim Senden, CTCSS, Relaisablage
+  und Reverse wirken (#120, #130), Rauschsperre ueber den SQL-Regler (#123),
+  Deviation 5 / 2,5 kHz (#129).
+- **DXCC-Farben der Spots** in den Hausfarben, abschaltbar (#119); cty.dat
+  wird zur Laufzeit geladen (#115).
+- **Seitenbereich rechts**: Rotor/Log und Applets hinter einer Symbolleiste
+  (#99); ein eingeschaltetes Applet kommt nach vorne (#96).
+- **SunSDR2 QRP**: echtes I/Q wird selbst eingeschaltet (#94), Preamp-Schalter
+  +10/0/−10/−20 dB (#95), Pegel wie ExpertSDR2 (#89), Einschaltstoss stumm (#104).
+- **RX-Messwerte nach Thetis**: PB SNR, Rauschflur je Empfaenger, AGC-Gain,
+  feste Zahlenbreite (#121).
+
+### Changed
+
+- **Filtervorgaben Thetis-getreu** (#139): Werte, Namen, DIGx-Grundfilter;
+  der laufende Filter heisst wie seine Vorgabe (#140).
+- **Menues am Fenster** statt an der Leiste oder am nativen Feld: Befehlsleiste,
+  Rotor/Log, Profilleiste (#136, #142, #143).
+- **Longpath startet immer formatfuellend** mit Profil 1, der Kanalzug passt
+  auf den Schirm (#134); der rote Knopf schliesst Kanalzug, Logbuch und
+  Spot-Zentrale dauerhaft (#133).
+- **Panadapter**: Trackpad in ganzen Schritten, Rad-Zoom meldet den Bereich,
+  Abstimmen rastet ein, dB-Raster wirkt (#122); leichtes Rendering ueberall,
+  Fensterraster an allen vier Kanten (#103).
+- **Aeltere Systeme, alle Prozessoren** (#141): Mac ab macOS 12, Linux ab
+  glibc 2.35, Qt 6.8 in allen Paketen, serialport und imageformats ueberall.
+
+### Fixed
+
+- **Rendering: zehn Panadapter-Fehler** (Retina, Echo, Skala, Alpha,
+  Bandplan, FPS, Wasserfall nach Pause) (#100); kein rotes Aufblitzen bei
+  Groessenaenderung (#98).
+- **TUNE geht wieder aus, wenn MOX verweigert wird** (#137).
+- **TCI**: Ton kanalweise umgetastet (L und R vermischten sich ausser bei
+  48 kHz), Mono lief doppelt so schnell, Binaerstroeme stauten sich bei einem
+  eingefrorenen Client, der lokale AF-Regler daempfte den Fernton mit (#146).
+- **Fensterzustaende gingen beim Speichern verloren** (AppSettings, #111);
+  das Logbuch geht in der gespeicherten Hoehe auf (#113, #125, #132).
+- **Karte**: der Ort bleibt beim Vergroessern in der Mitte (#105).
+- **Absturz beim Beenden** mit Applets nach dem RadioModel (#92) und
+  weitere Beenden-Faelle (#83, #134).
+- **Satelliten fehlten bei deutscher Systemsprache** (#135); SGP4 kopierte
+  satnum auf sich selbst (#126).
+
+### Weitere Eintraege seit 0.6.4
+
 ### Added
 
 - **CW-Tonhoehe einstellbar, und alles folgt ihr live.** Setup › DSP ›
