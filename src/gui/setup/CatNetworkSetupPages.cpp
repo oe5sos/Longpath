@@ -999,9 +999,14 @@ void CatTciServerPage::refreshTciStatusDisplay()
             // Ohne ihn stand hier nur "Stopped", und der Bediener hatte keine
             // Ahnung, dass die eingestellte Adresse gar nicht existiert — am
             // 2026-10-02 nach einem Netzwechsel genau so passiert.
+            // Bernstein aus dem Hausstil, nicht als rohe Zahl: #c2924f stand
+            // hier im ersten Wurf und ist obendrein der ABGELOESTE Wert —
+            // "measured #c2924f -> #d8a55f" (StyleConstants.h). Die
+            // Drift-Ratsche hat ihn zu Recht angehalten.
             m_statusLabel->setText(
-                tr("<span style='color:#c2924f'>●</span> Wartet auf %1")
-                    .arg(m_tciBindWartet.toHtmlEscaped()));
+                tr("<span style='color:%1'>●</span> Wartet auf %2")
+                    .arg(QString::fromLatin1(Style::kAmberText),
+                         m_tciBindWartet.toHtmlEscaped()));
         } else {
             m_statusLabel->setText(
                 tr("<span style='color:#c25a5c'>●</span> Stopped"));
