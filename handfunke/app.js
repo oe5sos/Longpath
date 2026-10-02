@@ -49,6 +49,7 @@ const state = {
   spanneHz: 48000,           // gezeigte Bandbreite; 0 = alles
   bildHalten: false,         // Bild einfrieren, solange abgestimmt wird
   wischVersatzPx: 0,         // wie weit der Finger von der Mitte weg ist
+  wfBoden: null,             // geglaetteter Rauschboden des Wasserfalls (dBm)
   tonTypPruefung: null,      // Nachfassen, falls mulaw8 nicht bestaetigt wird
   tonStartLaeuft: false,     // Riegel gegen doppelten AudioContext
   tonWeg: null,              // 'worklet' | 'scriptprocessor'
@@ -299,6 +300,48 @@ function zeichneKopf() {
   // Beide fallen nur zusammen, solange nicht innerhalb der DDC-Breite
   // abgestimmt wird. Der Abstand zwischen ihnen, geteilt durch die gezeigte
   // Spanne, ist die Stelle im Bild.
+  // ── Der Durchlass als Flaeche ──────────────────────────────────────────
+  //
+  // Betreiber 2026-10-02: "man sollte die bandbreite nun auch nicht nur als
+  // strich sehen". Der Strich sagt, worauf abgestimmt ist; das Band sagt,
+  // was davon zu hoeren ist — und ob ein Signal ueberhaupt hineinfaellt.
+  //
+  // Die Grenzen kommen als Versatz zur abgestimmten Frequenz (rx_filter_band).
+  // Bei den unteren Seitenbaendern meldet der Server sie teils positiv; dann
+  // liegt der Durchlass in Wahrheit UNTER dem Traeger und muss gespiegelt
+  // werden, sonst zeigt das Band auf die falsche Seite.
+  {
+    const bd = $('durchlass');
+    const f  = link.st.filter[state.trx] || [];
+    const m  = (link.st.mode[state.trx] || '').toLowerCase();
+    const mitteD = link.st.dds[state.trx];
+    const vfoD   = link.st.vfo[state.trx] ? link.st.vfo[state.trx][0] : null;
+    const spanneD = state.spanneHz > 0 ? state.spanneHz : (link.st.iqRate || 0);
+    let lo1 = f[0], hi1 = f[1];
+    if (bd && mitteD && vfoD && spanneD > 0 &&
+        Number.isFinite(lo1) && Number.isFinite(hi1) && hi1 !== lo1) {
+      if (lo1 > hi1) { const t = lo1; lo1 = hi1; hi1 = t; }
+      const unten = m === 'lsb' || m === 'cwl' || m === 'digl';
+      if (unten && lo1 >= 0 && hi1 >= 0) { const a = -hi1; hi1 = -lo1; lo1 = a; }
+      const pA = 50 + ((vfoD + lo1 - mitteD) / spanneD) * 100;
+      const pB = 50 + ((vfoD + hi1 - mitteD) / spanneD) * 100;
+      const links  = Math.max(0, Math.min(100, Math.min(pA, pB)));
+      const rechts = Math.max(0, Math.min(100, Math.max(pA, pB)));
+      if (rechts - links >= 0.4) {
+        bd.style.left  = links.toFixed(2) + '%';
+        bd.style.width = (rechts - links).toFixed(2) + '%';
+        bd.style.display = 'block';
+      } else {
+        // Schmaler als ein halbes Prozent: als Flaeche nicht mehr lesbar,
+        // und ein Ein-Pixel-Band waere nur ein zweiter Strich neben dem
+        // Abstimmstrich. Dann lieber nichts — weiter hineinzoomen hilft.
+        bd.style.display = 'none';
+      }
+    } else if (bd) {
+      bd.style.display = 'none';
+    }
+  }
+
   {
     const c = document.querySelector('.cursor');
     if (c) {
@@ -388,8 +431,15 @@ let hatSpektrum = false;
 // Original lagen die Traeger der Attrappe im graublauen Teil und blieben
 // kuehl, obwohl sie das Lauteste im Bild waren. Der warme Ton beginnt
 // jetzt bei 0,60 statt 0,78, der Boden bleibt unveraendert dunkel.
-const STOPS = [[0,[11,14,19]],[.30,[20,30,39]],[.46,[33,52,74]],[.60,[124,108,78]],
-               [.78,[188,144,86]],[.92,[216,165,95]],[1,[242,242,236]]];
+//
+// Zweiter Durchgang 2026-10-02: die ersten 30 % der Rampe waren praktisch
+// schwarz, also eine Totzone von fast einem Drittel. Zusammen mit dem zu hoch
+// liegenden Boden (siehe dort) blieb eine leise Station unsichtbar. Der dunkle
+// Teil ist jetzt auf 18 % gestaucht und der Boden eine Spur heller, damit man
+// SIEHT, dass dort Rauschen ist und nicht etwa nichts ankommt. Der Aufbau
+// bleibt: Blau unten, Waerme oben, Weiss ganz oben, kein Rot.
+const STOPS = [[0,[13,17,23]],[.18,[24,36,49]],[.34,[38,62,88]],[.50,[104,100,82]],
+               [.68,[172,133,83]],[.86,[214,164,95]],[1,[244,244,238]]];
 function rampe(t) {
   t = t < 0 ? 0 : t > 1 ? 1 : t;
   for (let i = 1; i < STOPS.length; i++) {
@@ -567,6 +617,23 @@ function zeichneBild() {
   // schon auf unsere Breite verdichtet und das hier streckt nur noch; rechnen
   // wir selbst, verdichtet es 1024 Bins — über den Spitzenwert, sonst
   // rutschen schmale Träger durch.
+  // ── Hoehenlage des Wasserfalls: Rauschboden, nicht Mittelwert ──────────
+  //
+  // Der Wasserfall sass bisher auf `lo`, und `lo` kommt aus dem MITTELWERT
+  // des Spektrums. Auf einem belebten Band zieht jeder starke Traeger diesen
+  // Mittelwert nach oben; der echte Rauschboden liegt dann darunter, und
+  // eine leise Station ein paar dB ueber dem Rauschen landet trotzdem im
+  // schwarzen Teil der Rampe. Betreiber am 2026-10-02: "display unten sehr
+  // dunkel, sieht man sehr schwer ob eine station hier ist oder nicht".
+  //
+  // Ein unteres Perzentil trifft das Rauschen auch dann noch, wenn das halbe
+  // Band belegt ist — ein Mittelwert nie. Darauf setzt die Rampe auf, und
+  // alles darueber bekommt sofort Farbe. 42 dB statt 55 dazu: der laute
+  // Traeger darf ruhig ausbrennen, die leise Station muss man sehen.
+  const sortiert = Float32Array.from(quelle).sort();
+  const p20 = sortiert[Math.floor(M * 0.20)];
+  state.wfBoden = (state.wfBoden === null) ? p20 : state.wfBoden * 0.88 + p20 * 0.12;
+
   const spitze = new Float32Array(W);
   for (let x = 0; x < W; x++) {
     const von = Math.floor(x * M / W);
@@ -610,7 +677,7 @@ function zeichneBild() {
     // und wäre kaum zu sehen. Am Pult haben Panadapter und Wasserfall aus
     // demselben Grund getrennte Regler; hier nehmen wir den Rauschboden plus
     // 55 dB, was in der Praxis vom Grundrauschen bis zum lauten Träger reicht.
-    const wfLo = lo, wfHi = lo + 55;
+    const wfLo = state.wfBoden - 3, wfHi = wfLo + 42;
     const d = zeile.data;
     for (let x = 0; x < wf.width; x++) {
       const db = spitze[Math.min(W - 1, Math.floor(x * W / wf.width))];
@@ -694,6 +761,22 @@ async function tonStarten() {
     // brauchen sie ohnehin nicht — TonKern rechnet auf ctx.sampleRate um,
     // was immer das ist.
     const ctx = new AC({ latencyHint: 'interactive' });
+
+    // SOFORT aufwecken, noch im Fingertipp — nicht erst am Ende.
+    //
+    // Weiter unten steht `await ctx.resume()`, und dorthin fuehren zwei
+    // `await ctx.audioWorklet.addModule(...)`. iOS raeumt die Berechtigung
+    // eines Fingertipps aber mit dem ERSTEN await ab: was danach kommt, gilt
+    // nicht mehr als vom Bediener ausgeloest, und `resume()` wird stillschweigend
+    // nicht ausgefuehrt. Der Kontext bleibt `suspended`, die Tondaten laufen
+    // in den Ring, der Vorrat steht am Anschlag — und zu hoeren ist nichts.
+    // Genau das meldete die Seite am 2026-10-02: `ctx=suspended`,
+    // `rahmen=11490`, `vorrat=12000`. Betreiber: "ton geht nicht".
+    //
+    // Hier ist die Berechtigung noch da. Das Ergebnis wird nicht abgewartet
+    // (ein await waere genau der Fehler, den diese Zeile vermeidet); das
+    // `await ctx.resume()` unten bleibt als zweiter Versuch stehen.
+    try { ctx.resume(); } catch (e) { /* zweiter Versuch kommt unten */ }
 
     const gain = ctx.createGain();
     gain.gain.value = afFaktor(state.afPct);
@@ -878,6 +961,13 @@ $('tonAn').addEventListener('click', async () => {
 });
 ['touchend', 'click'].forEach(ev =>
   document.addEventListener(ev, async () => {
+    // Fangnetz: steht ein fertiger Kontext still, hilft kein neuer Aufbau —
+    // `tonStarten` steigt bei vorhandenem `state.node` sofort wieder aus.
+    // Ein stiller Kontext braucht genau eines: ein `resume()` im Fingertipp.
+    // Darum SYNCHRON und vor jedem await, sonst ist die Berechtigung weg.
+    if (state.audio && state.audio.state !== 'running') {
+      try { state.audio.resume(); } catch (e) { /* beim naechsten Tipp wieder */ }
+    }
     await tonStarten(); zeichneTonKnopf();
   }, { passive: true }));
 
@@ -1031,7 +1121,8 @@ $('scope').addEventListener('pointermove', (e) => {
 // hier — nur so steigt die Aufloesung wirklich. Schnitte der Browser zu,
 // malte er dieselben groben Punkte nur breiter.
 const kSpannen = [6000, 12000, 24000, 48000, 96000, 192000];
-let kneifVon = 0;
+let kneifVon = 0;        // Fingerabstand beim Beginn der Geste
+let kneifSpanne = 0;     // Spanne beim Beginn der Geste
 const zeiger = new Map();
 
 function spanneSetzen(hz) {
@@ -1047,11 +1138,45 @@ function spanneSetzen(hz) {
   zeichneKopf();
 }
 
+// Kneifen gibt es seit dem 2026-10-01 — aber eine Geste, die man nicht sieht,
+// gibt es fuer den Bediener nicht: er hat am 2026-10-02 erneut nach dem
+// Vergroessern gefragt. Zwei Tasten neben der Spannenanzeige sagen es selbst.
+function spanneStufe(richtung) {
+  const i = kSpannen.indexOf(state.spanneHz);
+  const j = (i < 0 ? kSpannen.indexOf(48000) : i) + richtung;
+  if (j < 0 || j >= kSpannen.length) { return; }
+  spanneSetzen(kSpannen[j]);
+}
+$('zoomRein').addEventListener('click', () => spanneStufe(-1));
+$('zoomRaus').addEventListener('click', () => spanneStufe(+1));
+
+// ── Feinschritt +/- 100 Hz, rechts oben im Panadapter (2026-10-02) ─────────
+//
+// Betreiber: "vielleicht sollte ein plus und minus oben rechts im panadapter
+// sein um die frequenz um +/- 100 zu verschieben". Wischen trifft auf ein
+// paar hundert Hertz genau — fuer das letzte Stueck auf eine Station ist das
+// zu grob, und das Eintippblatt ist dafuer zu umstaendlich.
+const kFeinHz = 100;
+function feinschritt(d) {
+  const v = link.st.vfo[state.trx] ? link.st.vfo[state.trx][0] : null;
+  if (!v) { return; }
+  link.send(`vfo:${state.trx},0,${v + d}`);
+  // Nicht selbst schieben — mitteVerfolgen() tut es, sobald das Geraet die
+  // neue Frequenz bestaetigt. Zweimal schieben hiesse doppelt schieben.
+}
+$('feinAb').addEventListener('click', () => feinschritt(-kFeinHz));
+$('feinAuf').addEventListener('click', () => feinschritt(+kFeinHz));
+// Die Tasten liegen IM Bild. Ohne das hier begaenne jeder Druck zugleich
+// einen Abstimmwisch darunter, und das Bild fröre fuer die Dauer ein.
+['pointerdown', 'pointerup', 'pointermove'].forEach(ev =>
+  $('feinschritt').addEventListener(ev, (e) => e.stopPropagation()));
+
 $('scope').addEventListener('pointerdown', (e) => {
   zeiger.set(e.pointerId, e.clientX);
   if (zeiger.size === 2) {
     const [a, b] = [...zeiger.values()];
     kneifVon = Math.abs(a - b);
+    kneifSpanne = state.spanneHz > 0 ? state.spanneHz : (link.st.iqRate || 48000);
     wischVon = null;              // kein Abstimmen waehrend des Kneifens
     wischAktiv = false;
   }
@@ -1064,16 +1189,102 @@ $('scope').addEventListener('pointermove', (e) => {
   const [a, b] = [...zeiger.values()];
   const jetzt = Math.abs(a - b);
   if (jetzt < 20) { return; }
+
+  // Bezug ist der ANFANG der Geste, nicht das vorige Ereignis.
+  //
+  // Hier stand `spanneSetzen(state.spanneHz * (kneifVon / jetzt))` und
+  // danach `kneifVon = jetzt`. Damit war das Verhaeltnis bei jedem
+  // Mausbericht rund 1,001 — die gerechnete Spanne lag also immer dicht an
+  // der aktuellen, rastete auf denselben Wert ein, und `spanneSetzen` stieg
+  // bei `neu === state.spanneHz` sofort wieder aus. Weil der Bezugspunkt
+  // zugleich nachgezogen wurde, konnte sich auch nichts aufsummieren: die
+  // Geste konnte RECHNERISCH nie etwas bewirken, egal wie weit die Finger
+  // auseinandergingen. Betreiber am 2026-10-02: "man sollte mit beiden
+  // finger auseinanderziehen alles vergroessern koennen".
+  //
+  // Mit festem Anfangsbezug waechst das Verhaeltnis mit der Geste, und die
+  // naechste Raststufe wird erreicht, sobald die Finger weit genug sind.
+  //
   // Auseinander = naeher heran = kleinere Spanne.
-  spanneSetzen(state.spanneHz * (kneifVon / jetzt));
-  kneifVon = jetzt;
+  spanneSetzen(kneifSpanne * (kneifVon / jetzt));
 }, { passive: true });
 
 ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev =>
   $('scope').addEventListener(ev, (e) => {
     zeiger.delete(e.pointerId);
-    if (zeiger.size < 2) { kneifVon = 0; }
+    if (zeiger.size < 2) { kneifVon = 0; kneifSpanne = 0; }
   }, { passive: true }));
+
+// Untergrenze knapp unter 160 m, Obergrenze knapp ueber 23 cm. Was
+// ausserhalb liegt, ist ein Tippfehler und kein Wunsch — lieber nichts tun
+// als das Funkgeraet irgendwohin schicken.
+const kQsyMin = 1600000, kQsyMax = 1300000000;
+
+// ── Frequenz eintippen (2026-10-02) ─────────────────────────────────────────
+//
+// Betreiber: "man sollte durch anklicken der frequenz die genaue frequenz
+// aendern koennen". Wischen und Tippen ins Bild treffen auf ein paar hundert
+// Hertz genau — fuer eine verabredete Frequenz ist das nichts.
+//
+// Die Eingabe nimmt alles an, was ein Funker hinschreibt, und raet NICHT:
+//   7.134.600  Punkte als Tausender (so steht es am Pult)  -> Hertz
+//   7134.6     eine Zahl mit Rest                          -> Kilohertz
+//   7.1346     kleine Zahl                                 -> Megahertz
+// Mehr als ein Punkt kann kein Komma sein, also sind es Tausender. Bleibt
+// ein einzelner Punkt, entscheidet die Groesse — eindeutig, weil kein
+// Amateurband bei 7 kHz und keines bei 7 MHz ... als Kilohertz gelesen in
+// Reichweite liegt.
+function hzAusEingabe(roh) {
+  const t = (roh || '').trim().replace(/\s|'/g, '').replace(/,/g, '.');
+  if (!t || !/^[0-9.]+$/.test(t)) { return null; }
+
+  // Mehr als ein Punkt kann kein Komma sein — das sind Tausendertrenner, wie
+  // sie am Pult stehen. Dann ist die Zahl schon in Hertz und es gibt nichts
+  // zu raten.
+  if ((t.match(/\./g) || []).length > 1) {
+    const hz = parseInt(t.replace(/\./g, ''), 10);
+    return (hz >= kQsyMin && hz <= kQsyMax) ? hz : null;
+  }
+
+  const z = parseFloat(t);
+  if (!isFinite(z) || z <= 0) { return null; }
+
+  // Sonst: die ERSTE Deutung nehmen, die auf einem Funkband landen kann.
+  //
+  // Eine Schwelle auf die blosse Groesse reicht nicht. Der erste Versuch hier
+  // las alles ab 100000 als Hertz — damit wurde aus "144300" (jeder meint
+  // 144,300 MHz) sang- und klanglos 144 Kilohertz. Umgekehrt muss "7134600"
+  // Hertz bleiben. Beides zugleich kann keine feste Grenze, die Reihenfolge
+  // Hz -> kHz -> MHz dagegen schon: sie trifft genau eine davon, weil die
+  // anderen weit ausserhalb jedes Bandes liegen.
+  for (const faktor of [1, 1000, 1e6]) {
+    const hz = Math.round(z * faktor);
+    if (hz >= kQsyMin && hz <= kQsyMax) { return hz; }
+  }
+  return null;
+}
+
+function qsyOeffnen() {
+  const v = link.st.vfo[state.trx] ? link.st.vfo[state.trx][0] : null;
+  $('qsyFeld').value = v ? (v / 1e6).toFixed(5) : '';
+  $('qsy').classList.add('an');
+  // Erst nach dem Einblenden, sonst bleibt die Tastatur auf iOS zu.
+  setTimeout(() => { $('qsyFeld').focus(); $('qsyFeld').select(); }, 50);
+}
+function qsySchliessen() { $('qsy').classList.remove('an'); $('qsyFeld').blur(); }
+function qsySetzen() {
+  const hz = hzAusEingabe($('qsyFeld').value);
+  if (hz === null) { $('qsyFeld').value = ''; return; }
+  link.send(`vfo:${state.trx},0,${hz}`);
+  // Wie beim Bandwechsel: ein Schnitt sagt, ab wo der neue Massstab gilt.
+  wasserfallSchnitt(); letzteMitteHz = hz;
+  qsySchliessen();
+}
+$('hz').addEventListener('click', qsyOeffnen);
+$('qsyOk').addEventListener('click', qsySetzen);
+$('qsyAb').addEventListener('click', qsySchliessen);
+$('qsyFeld').addEventListener('keydown', (e) => { if (e.key === 'Enter') qsySetzen(); });
+$('qsy').addEventListener('click', (e) => { if (e.target === $('qsy')) qsySchliessen(); });
 
 // ── Tippen springt dorthin (2026-10-01) ─────────────────────────────────────
 //
@@ -1123,7 +1334,30 @@ $('scope').addEventListener('pointerup', (e) => {
   state.bildHalten = false;
   state.wischVersatzPx = 0;
 });
-$('scope').addEventListener('pointercancel', () => { wischVon = null; wischAktiv = false; wischZiel = null; });
+// Abbruch raeumt GENAU SO AUF wie ein Loslassen.
+//
+// Hier fehlten `bildHalten` und `wischVersatzPx`, und das war kein
+// Schoenheitsfehler: iOS feuert pointercancel, sobald es die Lupe aufzieht —
+// also genau dann, wenn der Finger etwas laenger auf dem Bild liegt. Danach
+// blieb `bildHalten` fuer immer wahr, der spectrum-Horcher stieg bei jedem
+// Bild sofort wieder aus, der Wasserfall bekam keine Zeile mehr und die
+// Fusszeile meldete, es komme kein Bild. Betreiber am 2026-10-02: "zu langes
+// bleiben am cursor im panadapter loescht den wasserfall und es steht, kein
+// funkgeraet gefunden". Es war nie das Funkgeraet — es war diese Zeile.
+$('scope').addEventListener('pointercancel', () => {
+  wischVon = null; wischAktiv = false; wischZiel = null;
+  state.bildHalten = false; state.wischVersatzPx = 0;
+  zeiger.clear(); kneifVon = 0;
+});
+
+// Fangnetz: liegt kein Finger mehr auf dem Bild, darf nichts mehr eingefroren
+// sein. Greift auch, wenn ein Ereignis ganz ausbleibt — und ein eingefrorenes
+// Bild ist der eine Zustand, aus dem der Bediener nicht von selbst herausfindet.
+setInterval(() => {
+  if (state.bildHalten && zeiger.size === 0 && wischVon === null) {
+    state.bildHalten = false; state.wischVersatzPx = 0;
+  }
+}, 1000);
 
 // ── Abstimmtraeger: bewusst KEIN Knopf ──────────────────────────────────────
 //
@@ -1271,10 +1505,28 @@ link.addEventListener('state', () => {
 // ein kurzer Aussetzer soll den Bediener nicht aus der Bedienung werfen.
 let wegSeit = 0;
 setInterval(() => {
-  const offen = link.ws && link.ws.readyState === 1;
+  // „Socket offen" ist KEIN Mass fuer verbunden.
+  //
+  // Aus dem Netz nimmt Longpath die Verbindung an und schweigt dann, bis
+  // `auth:` kommt (TciServer.cpp:1961) — der Socket steht auf 1, waehrend
+  // nichts geht. Hier stand genau diese Pruefung, also galt der Zustand als
+  // verbunden, `wegSeit` wurde jede Sekunde zurueckgesetzt, und das
+  // Kopplungsblatt kam NIE zurueck. Am 2026-10-02 stand das Telefon dadurch
+  // vor einer toten Seite ohne jedes Eingabefeld: kein Ton, kein Bild, keine
+  // Stelle, an der man das Token haette eintippen koennen.
+  //
+  // Ueber die Bruecke konnte das nicht auffallen — dort kam jede Verbindung
+  // aus Loopback, und Loopback verlangt kein Token.
+  //
+  // Massstab ist darum `ready`: erst der Init-Burst heisst verbunden.
+  const offen = link.ws && link.ws.readyState === 1 && link.ready;
+  // Steht der Socket, fehlt aber die Antwort, ist die Lage eindeutig und
+  // muss nicht ausgesessen werden. Nur ein echter Abriss bekommt die lange
+  // Schonfrist, damit ein kurzer WLAN-Huepfer niemanden aus der Bedienung wirft.
+  const frist = (link.ws && link.ws.readyState === 1) ? 6000 : 12000;
   if (!offen && link.wanted) {
     if (!wegSeit) wegSeit = Date.now();
-    if (Date.now() - wegSeit > 12000) {
+    if (Date.now() - wegSeit > frist) {
       $('koppeln').classList.add('an');
       $('fehler').textContent = koppelGrund();
     }
@@ -1297,6 +1549,13 @@ function koppelGrund() {
   if (state.token && !link.st.angemeldet) {
     return 'Longpath antwortet, nimmt das Token aber nicht an. '
          + 'In Setup → TCI Server ein neues erzeugen und hier eintragen.';
+  }
+  // Socket steht, aber wir haben gar kein Token zu bieten — der haeufigste
+  // Fall nach dem Umstellen auf die Netzadresse. Das ist keine „keine
+  // Antwort", sondern eine klare Forderung, und sie gehoert auch so gesagt.
+  if (!state.token && link.ws && link.ws.readyState === 1) {
+    return 'Longpath ist erreichbar, verlangt aber ein Token. '
+         + 'In Setup → TCI Server auf „New" tippen und den Code hier eintragen.';
   }
   if (!state.token) {
     return 'Keine Antwort. Ist Longpath ins Netz gebunden? '
