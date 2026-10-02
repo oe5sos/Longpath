@@ -417,7 +417,20 @@ void TestTciAudioRoundtrip::format_echo_meldet_die_sitzung_nicht_das_programm()
             [&antworten](const QString& s) { antworten << s; });
 
     client.sendTextMessage(QStringLiteral("audio_stream_sample_type:mulaw8;"));
-    QTest::qWait(120);
+    // Auf das Echo WARTEN, nicht auf eine Zahl von Millisekunden.
+    //
+    // Hier standen 120 ms. Am 2026-10-02 fiel der Pruefpunkt damit auf dem
+    // CI-Laeufer um, und zwar mit leerer Ausbeute: "Das Echo muss mulaw8
+    // nennen — bekommen: " — es war gar nichts da. Nicht das Format war
+    // falsch, die Antwort war noch unterwegs.
+    //
+    // Der Burst ist oben schon abgewartet, der Mitschreiber steht erst
+    // danach: was jetzt mit diesem Namen kommt, ist die Antwort auf unseren
+    // Befehl und nichts anderes.
+    QVERIFY2(TciTest::warteAufAntwort(antworten,
+                 QStringLiteral("audio_stream_sample_type")),
+             "Keine Antwort auf audio_stream_sample_type: — der Server hat "
+             "den Befehl gar nicht beantwortet");
 
     bool sahMulaw = false, sahFloat = false;
     for (const QString& z : antworten) {
