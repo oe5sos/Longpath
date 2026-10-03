@@ -221,26 +221,6 @@ int main(int argc, char* argv[])
     app.setOrganizationName("Longpath");
     app.setWindowIcon(QIcon(":/icons/Longpath.png"));
 
-    // 2026-05-25 KG4VCF bench fix: elevate the main GUI thread to
-    // USER_INTERACTIVE QoS so heavy user-initiated background work
-    // (parallel compiles, mdworker indexing, Time Machine snapshots,
-    // etc.) does not preempt the Qt event loop and produce visibly
-    // choppy spectrum / waterfall rendering.  The audio DSP thread
-    // already gets a stronger elevation (see RxDspWorker::onThreadStarted)
-    // but the GUI thread runs the spectrum paint cycle and was still
-    // being preempted at DEFAULT QoS.  Bench symptom: "whole program
-    // stutters when a build happens".
-    //
-    // Cross-platform via src/core/audio/RealtimeAudioPriority.cpp:
-    //   macOS:   pthread_set_qos_class_self_np(USER_INTERACTIVE)
-    //   Linux:   nice(-5)  (soft-fail without privilege)
-    //   Windows: SetThreadPriority(ABOVE_NORMAL) -- was HIGHEST; dropped
-    //            2026-09-03 after a measured ~85ms periodic Windows-only
-    //            audio glitch traced to this thread contending at the
-    //            same tier as audio-critical work (see
-    //            RealtimeAudioPriority.cpp's elevateGuiMainThreadPriority).
-    Longpath::elevateGuiMainThreadPriority();
-
     // 2026-05-22 bench-finding: pkill / kill / system shutdown sends SIGTERM
     // by default; the OS terminates the process without giving Qt a chance
     // to run aboutToQuit handlers.  Without translation, this skips
@@ -265,12 +245,6 @@ int main(int argc, char* argv[])
                                       "quit", Qt::QueuedConnection);
         }
     });
-
-    // Trigger the macOS microphone permission dialog deterministically
-    // (issue #203). The OS only prompts when something actually engages
-    // TCC; relying on PortAudio's CoreAudio backend to do so is unreliable
-    // on machines without a built-in mic, so call AVCaptureDevice directly.
-    Longpath::requestMicrophonePermission();
 
     // Re-parse properly so --help / --version / unknown options surface
     // via Qt's standard machinery. The earlyProfile pass above already
@@ -330,6 +304,57 @@ int main(int argc, char* argv[])
     }
 
     logStartupHardwareInventory();
+
+    // Steht hier und nicht direkt hinter dem QApplication-Bau, weil die
+    // Meldung dieses Aufrufs ins Log gehoert: bis zum 2026-10-03 lief er
+    // rund 70 Zeilen VOR dem qInstallMessageHandler, und damit fehlte in
+    // allen fuenf vorliegenden Betriebslogs sowohl das "GUI main thread
+    // elevated to USER_INTERACTIVE QoS" als auch -- schlimmer -- die
+    // Warnung "Failed to elevate GUI main thread", die ein Misslingen
+    // meldet. Ein Ruckeln der Oberflaeche waere damit nicht
+    // nachvollziehbar gewesen.
+    //
+    // Spaeter ist gefahrlos: es existiert noch kein Fenster und keine
+    // Ereignisschleife, die QoS gilt dem Faden, nicht dem Zeitpunkt.
+    // 2026-05-25 KG4VCF bench fix: elevate the main GUI thread to
+    // USER_INTERACTIVE QoS so heavy user-initiated background work
+    // (parallel compiles, mdworker indexing, Time Machine snapshots,
+    // etc.) does not preempt the Qt event loop and produce visibly
+    // choppy spectrum / waterfall rendering.  The audio DSP thread
+    // already gets a stronger elevation (see RxDspWorker::onThreadStarted)
+    // but the GUI thread runs the spectrum paint cycle and was still
+    // being preempted at DEFAULT QoS.  Bench symptom: "whole program
+    // stutters when a build happens".
+    //
+    // Cross-platform via src/core/audio/RealtimeAudioPriority.cpp:
+    //   macOS:   pthread_set_qos_class_self_np(USER_INTERACTIVE)
+    //   Linux:   nice(-5)  (soft-fail without privilege)
+    //   Windows: SetThreadPriority(ABOVE_NORMAL) -- was HIGHEST; dropped
+    //            2026-09-03 after a measured ~85ms periodic Windows-only
+    //            audio glitch traced to this thread contending at the
+    //            same tier as audio-critical work (see
+    //            RealtimeAudioPriority.cpp's elevateGuiMainThreadPriority).
+    Longpath::elevateGuiMainThreadPriority();
+
+    // Trigger the macOS microphone permission dialog deterministically
+    // (issue #203). The OS only prompts when something actually engages
+    // TCC; relying on PortAudio's CoreAudio backend to do so is unreliable
+    // on machines without a built-in mic, so call AVCaptureDevice directly.
+    //
+    // Steht hier und nicht weiter oben, weil die Antwort ins Log gehoert.
+    // Der Aufruf lag bis zum 2026-10-03 rund 45 Zeilen VOR dem Oeffnen der
+    // Log-Datei: er lief, aber seine einzige Ausgabe — "Microphone TCC
+    // status on launch: NotDetermined|Authorized|Denied" — ging ins Leere,
+    // weil der Meldungs-Umleiter erst danach gesetzt wird. Genau diese
+    // Zeile hat am 2026-10-03 gefehlt, als ein unbeantworteter
+    // Berechtigungsdialog den ganzen Verbindungsaufbau einfror; der
+    // Zustand war aus dem Log nicht zu erkennen.
+    //
+    // Spaeter ist hier gefahrlos: der Mikrofon-Eingang wird erst beim
+    // Verbinden geoeffnet (AudioEngine::start), und bis dahin liegen
+    // Fenster und Ereignisschleife laengst.
+    // Siehe docs/architecture/2026-10-03-verbindungshaenger-mikrofon.md.
+    Longpath::requestMicrophonePermission();
 
     // Fusion style as a clean cross-platform base, then layer the
     // Longpath dark palette + minimal baseline QSS on top so every
