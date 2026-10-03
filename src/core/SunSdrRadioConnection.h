@@ -818,6 +818,8 @@ private:
     quint64 m_iqSeqWndEvents{0};
     quint64 m_iqSeqWndBackwards{0};
     QElapsedTimer m_iqSeqWndClock;
+    // Wann der saubere Bericht zuletzt im Log stand (alle 60 s, siehe dort).
+    QElapsedTimer m_iqSeqCleanClock;
     // Minus eins heisst "noch nie gemeldet", nicht "bei 0 ms gemeldet".
     // Die Drosselung rechnet gegen m_iqSeqWndClock.elapsed(), und das ist
     // am Anfang selbst 0 -- mit einem 0 als Startwert verschwand deshalb

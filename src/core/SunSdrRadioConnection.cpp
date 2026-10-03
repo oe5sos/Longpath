@@ -259,6 +259,7 @@ void SunSdrRadioConnection::connectToRadio(const RadioInfo& info)
     m_iqSeqWndEvents = 0;
     m_iqSeqWndBackwards = 0;
     m_iqSeqWndClock.invalidate();
+    m_iqSeqCleanClock.invalidate();
     m_lastGapSignalMs = -1;
     m_benchFramesSent = 0;
     m_benchFramesRejected = 0;
@@ -1931,8 +1932,22 @@ void SunSdrRadioConnection::auditStreamSeq(quint16 seq)
                    .arg(m_iqSeqWndEvents)
                    .arg(m_iqSeqWndBackwards)
                    .arg(kopien, 0, 'f', 1);
-    } else {
-        qCDebug(lcSunSdr).noquote()
+    } else if (!m_iqSeqCleanClock.isValid()
+               || m_iqSeqCleanClock.elapsed() >= 60000) {
+        // Der saubere Fall gehoert ins Log, nur seltener -- alle 60 s statt
+        // alle 5. Dieselbe Taktung wie P2s Folgenummern-Pruefung, und aus
+        // demselben Grund: "alles in Ordnung" ist eine Aussage, die man
+        // beim Nachlesen braucht.
+        //
+        // Er stand hier zuerst auf Debug und war damit unsichtbar, weil die
+        // Kategorie longpath.sunsdr im Betrieb nur INF zeigt. Am 2026-10-03
+        // im ersten echten Lauf gemerkt: genau die Zahl "Kopien je Nummer"
+        // entscheidet den Versuch gegen die Achtfachung (1,0 = die
+        // Blockantwort wirkt, 8,0 = das Geraet bekommt keine Quittung) --
+        // und sie fehlt im Normalfall, also in genau dem Fall, in dem man
+        // sie ansieht.
+        m_iqSeqCleanClock.restart();
+        qCInfo(lcSunSdr).noquote()
             << QStringLiteral("SunSdr: Folgenummern sauber -- %1 Nummern in "
                               "%2 s (%3/s), %4 Kopien je Nummer")
                    .arg(m_iqSeqWndFrames)
