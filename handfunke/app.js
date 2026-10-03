@@ -1606,7 +1606,25 @@ setInterval(() => {
       $('koppeln').classList.add('an');
       $('fehler').textContent = koppelGrund();
     }
-  } else { wegSeit = 0; }
+  } else {
+    wegSeit = 0;
+    // Und wieder WEG damit, sobald es wieder geht.
+    //
+    // Hier stand nur `wegSeit = 0`. Die Seite holt sich die Verbindung nach
+    // einem Abriss von selbst zurueck (am 2026-10-03 gemessen: Server weg bei
+    // 14 s, Blatt kommt bei 28 s, wieder verbunden bei 43 s) — aber das Blatt
+    // blieb liegen. Der Bediener saesse vor einem laufenden Empfaenger und
+    // einem Blatt, das nach der Adresse fragt, und muesste raten, ob es nun
+    // geht. Genau diese Sorte Zweideutigkeit hat heute schon zwei Stunden
+    // gekostet.
+    //
+    // Es gibt keinen Weg, das Blatt absichtlich zu oeffnen; es erscheint nur
+    // bei einem Abriss. Darum ist Zumachen bei `ready` immer richtig.
+    if ($('koppeln').classList.contains('an')) {
+      $('koppeln').classList.remove('an');
+      $('fehler').textContent = '';
+    }
+  }
 }, 1000);
 
 // Warum es nicht klappt — in einem Satz, den man auf einem Telefon lesen kann.
