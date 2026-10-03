@@ -771,6 +771,13 @@ private:
     // aus denen die bekannten Rahmen bestehen, und haelt das Log lesbar
     // (ExpertSDR2 schickt beim Verbinden auch ein 1,2-kB-Paket).
     static constexpr int kMaxTallyPayloadBytes = 32;
+    // Eine Antwort, die zum ersten Mal auftaucht, wird GANZ ins Log
+    // geschrieben -- einmal je Rahmensorte, bis zu dieser Grenze. Grund:
+    // am 2026-10-03 kam auf den Rahmen 0x0c eine Antwort mit 320 Byte
+    // Nutzlast (IEEE-754-Doubles, erkennbar 12,5 und -2,4). Mit den 32
+    // Byte der Mitschrift sieht man, DASS da etwas ist, und nicht WAS --
+    // und ein zweiter Lauf am Geraet kostet mehr als diese Zeile.
+    static constexpr int kMaxFirstSightBytes = 1024;
     // Acht verschiedene Werte je Sorte. Ein Schalter mit mehr Stellungen
     // als das hat, ist in diesem Geraet nicht bekannt (der
     // Vorverstaerker hat vier); ein Rahmen mit mehr ist eher ein

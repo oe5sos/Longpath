@@ -1761,6 +1761,14 @@ void SunSdrRadioConnection::tallyFrame(QHash<quint64, FrameTally>& inventory,
             << Qt::hex << opcode << Qt::dec << " sub=" << sub
             << " len=" << len << " nutzlast=" << kept.toHex().constData()
             << " (bei " << now << " ms)";
+        // Beim ERSTEN Auftreten die ganze Nutzlast, wenn sie laenger ist
+        // als die Mitschrift -- siehe kMaxFirstSightBytes.
+        if (payload.size() > kept.size()) {
+            qCInfo(lcSunSdr).nospace()
+                << "SunSdr: ... op=0x" << Qt::hex << opcode << Qt::dec
+                << " ganz (" << payload.size() << " Byte): "
+                << payload.left(kMaxFirstSightBytes).toHex().constData();
+        }
         return;
     }
 

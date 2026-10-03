@@ -176,3 +176,69 @@ Der Versuch dazu bleibt derselbe (PRE/EXTRA oben), das **Erfolgsmaß
 steigt auf 2"** — zwei Pakete je Nummer mit verschiedenem Inhalt. Beides
 steht in der Folgenummern-Zeile, die seit dem 2026-10-03 alle 60 s im Log
 mitläuft.
+
+---
+
+# Der Versuch, gefahren am 2026-10-03 (Messlauf, ohne Antenne)
+
+Gefahren mit `tests/tst_sunsdr_messlauf.cpp` gegen die echte QRP
+(192.168.16.200), Sandkasten-Einstellungen, kein MOX, kein Drive, keine
+PA-Freigabe — also keine HF. Referenzmaß vorher: 240 Nummern/s, **1,20
+Kopien je Nummer**, keine Verluste.
+
+## Ergebnis 1: alle sechs Rahmen werden angenommen
+
+`0x16`, `0x18`, `0x1c`, `0x10`, `0x0c`, `0x01` — **jeder wird quittiert**
+(gleicher Opcode zurück, leere Nutzlast). Die Prüfsummen stimmen also, und
+das Gerät verwirft nichts davon. Die Quittung ist damit ein belastbares
+Mittel, um zu sehen, ob ein Rahmen angekommen ist.
+
+## Ergebnis 2: die Datenrate ändert sich NICHT
+
+Nach dem Versuch: 240 Nummern/s, 1,22–1,23 Kopien je Nummer, und die
+Doppelpakete sind weiterhin **ganz bytegleich** (das eingebaute Messgerät:
+„Wiederholungen: 55, davon GANZ bytegleich: 55, verschieden: 0").
+
+**Damit ist die Hypothese von heute früh widerlegt:** diese sechs Rahmen
+schalten keinen zweiten Datenstrom frei, und die zweite Paketsorte, die
+ExpertSDR2 bekommt, ist kein zweiter Empfänger, den man mit ihnen
+einschaltet. Was weiterhin fehlt, sind die übrigen rund vierzehn Rahmen
+des Verbindungsablaufs — und die gibt es nur aus einem Mitschnitt.
+
+## Ergebnis 3, der eigentliche Gewinn: `0x0c` ist eine ABFRAGE
+
+Auf `0x0c` (18 Byte, keine Nutzlast) antwortet das Gerät mit **320 Byte**:
+
+```
+10748be4 | 0000000000002940 3333333333 3303c0 | … (39 Doubles)
+```
+
+Die vier Kopfbytes `10748be4`, dann **39 IEEE-754-Doubles**, und deren
+Verteilung ist aussagekräftig:
+
+| Wert | Anzahl |
+| --- | --- |
+| **12,5** | **12** |
+| **−2,4** | **12** |
+| 0,999997 | 2 |
+| 0,0078125 (= 1/128) | 5 |
+| 0,00273437 | 2 |
+| 3,05176e−05 (= 1/32768) | 3 |
+| 0,000170898 / 4,27e−06 / 8,96e−07 | je 1 |
+
+**Zwölf Paare (12,5 / −2,4)** — und zwölf ist genau die Zahl der
+Kurzwellenbänder. Dazu Skalierungsfaktoren als Zweierpotenz-Brüche. Das
+ist eine **Kalibriertabelle, die das Gerät selbst herausgibt.**
+
+Warum das wichtig ist: `buildDriveFrame()` ist gesperrt, weil „no QRP
+bench power-calibration table exists yet" — die einzige bekannte Tabelle
+ist DX-Hardware, 40 m, „very likely wrong for a QRP". Wenn die zwölf
+Paare die bandweise Leistungskalibrierung sind, kommt diese Tabelle **vom
+Gerät**, und die Sperre für Schritt 4 hat eine Lösung, die niemand
+abschätzen muss.
+
+**Das ist ein Kandidat, keine Tatsache.** Was 12,5 und −2,4 bedeuten, ist
+offen (Watt? dB? Skalierung?), und die Zuordnung zu einzelnen Bändern
+erst recht. Prüfen lässt sich das, ohne etwas zu senden: dieselbe Abfrage
+auf verschiedenen Bändern stellen und sehen, ob sich die Reihenfolge der
+Werte mitdreht.
