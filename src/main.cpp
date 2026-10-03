@@ -266,12 +266,6 @@ int main(int argc, char* argv[])
         }
     });
 
-    // Trigger the macOS microphone permission dialog deterministically
-    // (issue #203). The OS only prompts when something actually engages
-    // TCC; relying on PortAudio's CoreAudio backend to do so is unreliable
-    // on machines without a built-in mic, so call AVCaptureDevice directly.
-    Longpath::requestMicrophonePermission();
-
     // Re-parse properly so --help / --version / unknown options surface
     // via Qt's standard machinery. The earlyProfile pass above already
     // pinned AppSettings; this second pass is purely for user-facing UX.
@@ -330,6 +324,26 @@ int main(int argc, char* argv[])
     }
 
     logStartupHardwareInventory();
+
+    // Trigger the macOS microphone permission dialog deterministically
+    // (issue #203). The OS only prompts when something actually engages
+    // TCC; relying on PortAudio's CoreAudio backend to do so is unreliable
+    // on machines without a built-in mic, so call AVCaptureDevice directly.
+    //
+    // Steht hier und nicht weiter oben, weil die Antwort ins Log gehoert.
+    // Der Aufruf lag bis zum 2026-10-03 rund 45 Zeilen VOR dem Oeffnen der
+    // Log-Datei: er lief, aber seine einzige Ausgabe — "Microphone TCC
+    // status on launch: NotDetermined|Authorized|Denied" — ging ins Leere,
+    // weil der Meldungs-Umleiter erst danach gesetzt wird. Genau diese
+    // Zeile hat am 2026-10-03 gefehlt, als ein unbeantworteter
+    // Berechtigungsdialog den ganzen Verbindungsaufbau einfror; der
+    // Zustand war aus dem Log nicht zu erkennen.
+    //
+    // Spaeter ist hier gefahrlos: der Mikrofon-Eingang wird erst beim
+    // Verbinden geoeffnet (AudioEngine::start), und bis dahin liegen
+    // Fenster und Ereignisschleife laengst.
+    // Siehe docs/architecture/2026-10-03-verbindungshaenger-mikrofon.md.
+    Longpath::requestMicrophonePermission();
 
     // Fusion style as a clean cross-platform base, then layer the
     // Longpath dark palette + minimal baseline QSS on top so every

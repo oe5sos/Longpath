@@ -107,3 +107,75 @@ Longpath so starten, dass es nicht im sichtbaren Space liegt, und die
 Mikrofon-Berechtigung noch nicht erteilt haben. Dann verbinden. Sicherer
 Nachweis auch ohne das: `sample <pid> 3` während des Aufbaus — steht
 `PortAudioBus::open` unter `connectToRadio`, ist es dieser Pfad.
+
+---
+
+## Nachtrag 2026-10-03 abends — zwei Funde, beide am Code und am Betriebslog
+
+### 1. Es ist nicht ein Gerät, es sind sieben
+
+Der Nachmittag hat das Mikrofon behoben (eigener Zweig: keine eifrige
+Öffnung, solange TCC die Frage noch stellt). Das schließt den *beobachteten*
+Fall, nicht die Gattung. `AudioEngine::start()` öffnet nämlich **sieben**
+Geräte hintereinander, jedes ohne Zeitlimit, alle in derselben
+verschachtelten Ereignisschleife:
+
+| # | Aufruf | was dahinter liegt |
+|---|---|---|
+| 1 | `ensureSpeakersOpen()` | Lautsprecher, `PortAudioBus` |
+| 2 | `ensureTxInputOpen()` | Mikrofon, `PortAudioBus` |
+| 3–6 | `makeVaxBus(1..4)` | VAX RX 1–4, CoreAudio-HAL-Plug-in |
+| 7 | `makeVaxTxBus()` | VAX TX, CoreAudio-HAL-Plug-in |
+
+Jeder einzelne davon kann aus denselben Gründen hängen wie das Mikrofon.
+Eine Berechtigungsprüfung je Gerät ist deshalb keine Lösung der Gattung —
+sie war nur die richtige Lösung des einen Falls, der wirklich eingetreten
+ist.
+
+### 2. Gemessen, nicht geschätzt: im Normalfall dauert das Ganze 20 ms
+
+Aus Martins Betriebslog vom 2026-10-03, 19:02 (Verbindung zur SunSDR QRP,
+alles in Ordnung):
+
+```
+19:02:41.274  locked 49152 bytes for tag PortAudioBus::m_ring
+19:02:41.282  PortAudioBus: mic opened at native 44100 Hz, resampling to 48000 Hz
+19:02:41.292  PortAudioBus: input via [Core Audio] on "BoomAudio" — latency 11.6 ms
+19:02:41.292  VAX 1..4 + VAX TX bus opened (eager)
+19:02:41.292  AudioEngine started ( speakers bus open )
+```
+
+Also: **Mikrofon 18 ms, alle fünf VAX-Busse zusammen unter 1 ms.** Ein
+Zeitlimit von wenigen Sekunden wäre damit vier Größenordnungen über dem
+Normalfall — es kann im gesunden Betrieb nicht auslösen. Das ist das
+Argument für Richtung 1, und es ist jetzt belegt statt geraten.
+
+Nebenbefund aus derselben Zeile, der die Gefahr nicht kleiner macht: der
+TX-Eingang ist hier **kein eingebautes Mikrofon**, sondern `BoomAudio` —
+ein fremdes virtuelles Audiogerät, das mit 44 100 Hz läuft und über r8brain
+hochgerechnet wird. Genau diese Sorte Gerät (fremder Treiber, der nebenbei
+noch von einem anderen Programm gehalten werden kann) ist der plausibelste
+Kandidat für ein Hängen ohne Berechtigungsdialog.
+
+### 3. Der Zustand war aus dem Log nicht zu erkennen — und das war kein Zufall
+
+Es gibt eine Zeile, die den ganzen Nachmittag erspart hätte:
+
+```
+INF: Microphone TCC status on launch: NotDetermined
+```
+
+`requestMicrophonePermission()` schreibt sie bei jedem Start. In keinem von
+Martins Logs steht sie. Der Grund ist Reihenfolge, nicht Filterung: der
+Aufruf stand in `main.cpp` rund **45 Zeilen vor** dem Öffnen der Log-Datei
+und dem `qInstallMessageHandler`. Er lief also, seine Ausgabe ging ins
+Leere.
+
+Behoben im selben Zug: der Aufruf steht jetzt direkt nach
+`logStartupHardwareInventory()`, also nach dem Umleiter. Später ist
+gefahrlos — der Mikrofon-Eingang wird erst beim Verbinden geöffnet, und bis
+dahin liegen Fenster und Ereignisschleife längst.
+
+**Die Regel dahinter, und sie ist allgemeiner als dieser Fall:** eine
+Diagnoseausgabe vor dem Einrichten des Logs ist keine Diagnoseausgabe. Wer
+in `main()` etwas protokolliert, muss wissen, ob der Umleiter schon steht.
