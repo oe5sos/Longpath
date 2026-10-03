@@ -61,6 +61,10 @@ const state = {
   tonWeg: null,              // 'worklet' | 'scriptprocessor'
   tonFehler: null,           // Text fuer die Fusszeile, wenn kein Ton geht
   hatSpektrumstrom: false,   // Server liefert fertige Bins
+  // Zuletzt angezeigter Sendezustand. Nicht die Wahrheit, sondern was
+  // auf dem Schirm steht — damit die Zeile nur bei einer FLANKE neu
+  // geschrieben wird und nicht sechzigmal je Sekunde.
+  sendetGezeigt: false,
   rueckfall: false,          // wir rechnen selbst aus rohem I/Q
   iqRueckfall: null,
   audio: null, node: null,
@@ -1794,7 +1798,12 @@ function schleife(t) {
   // stillen Tonstrom. Eine Kante an der falschen Stelle ist schlimmer als
   // keine.
   const bildLaeuft = r.spec > 0 || r.iq > 0;
-  const nurRauschen = bildLaeuft && state.hfAbstand !== null
+  // Waehrend gesendet wird, ist der Empfaenger stumm. "nur rauschen —
+  // antenne?" waere dann die falsche Erklaerung fuer etwas, das die
+  // Sendezeile daneben schon richtig benennt; dieselbe Regel wie bei
+  // "stockt" ohne Tonstrom.
+  const sendetGerade = link.ready && (link.st.mox || link.st.tune);
+  const nurRauschen = bildLaeuft && !sendetGerade && state.hfAbstand !== null
                       && state.hfAbstand < 15;
   $('fussBild').className = (!bildLaeuft || nurRauschen) ? 'warn' : '';
   $('fussBild').textContent =
@@ -1824,7 +1833,8 @@ function schleife(t) {
   // Erklaerung fuer "es kommt nichts", und sie stuende dauerhaft da. Die
   // Pruefung auf link.ready allein genuegte nicht: die Verbindung kann
   // stehen, ohne dass Ton abonniert ist.
-  if (link.ready && r.audio > 0 && !state.tonFehler && state.tonLeerlaufZuletzt
+  if (link.ready && !sendetGerade && r.audio > 0 && !state.tonFehler
+      && state.tonLeerlaufZuletzt
       && performance.now() - state.tonLeerlaufZuletzt < 2000) {
     $('fussTon').textContent += ' ⚠ stockt';
   }
@@ -1841,6 +1851,39 @@ function schleife(t) {
                               : link.ready ? '◆ gekoppelt'
                               : (link.ws && link.ws.readyState === 1) ? '◆ verbinde…' : '◇ getrennt';
   $('fussStatus').className = still ? 'warn' : (link.ready ? 'ok' : '');
+
+  // ── Wenn die Station sendet, darf die Seite das nicht verschweigen ──────
+  //
+  // `trx:` und `tune:` werden seit dem Anfang mitgelesen (tci.js) und waren
+  // bis hierher nirgends verwendet: die Seite WUSSTE, dass gesendet wird,
+  // und sagte nichts. Fuer eine Fernbedienung, die nur hoert, ist das die
+  // unangenehmste Form von Stille — Wasserfall leer, Ton weg, S-Meter
+  // unten, und nichts erklaert es. Genau dieselbe Gattung Fehler wie das
+  // eingefrorene S-Meter, nur umgekehrt: dort behauptete die Anzeige etwas
+  // Falsches, hier laesst sie etwas Richtiges weg.
+  //
+  // Seit dem Mikrofon-PTT der SunSDR QRP kann das auch ohne Zutun am Pult
+  // passieren: Taste am Mikrofon gedrueckt -> Longpath meldet `trx:0,true`
+  // -> hier steht es.
+  //
+  // Die Zeile sitzt dort, wo sonst "SENDEN / NUR IN DER APP" steht: gleiche
+  // Geometrie, gleicher Platz, nur in Messing. Kein Rot — Rot bleibt der
+  // Warnung, und Senden ist keine Warnung, sondern ein Zustand.
+  //
+  // Was hier bewusst NICHT passiert: das S-Meter wird nicht geleert. Ob
+  // Longpath waehrend des Sendens weiter echte Empfangswerte meldet, ist
+  // nicht geprueft — und das zu pruefen hiesse senden. Ungeprueft etwas
+  // ausblenden waere genauso geraten wie es ungeprueft stehenzulassen.
+  // `sendetGerade` ist weiter oben in derselben Runde schon bestimmt.
+  const txEl = $('tx');
+  if (sendetGerade !== state.sendetGezeigt) {
+    state.sendetGezeigt = sendetGerade;
+    txEl.classList.toggle('sendet', sendetGerade);
+    txEl.innerHTML = sendetGerade
+      ? (link.st.tune ? 'STATION STIMMT AB <small>EMPFÄNGER STUMM</small>'
+                      : 'STATION SENDET <small>EMPFÄNGER STUMM</small>')
+      : 'SENDEN <small>NUR IN DER APP</small>';
+  }
   requestAnimationFrame(schleife);
 }
 requestAnimationFrame(schleife);
