@@ -122,3 +122,20 @@ Klickereignisse `isTrusted: false` tragen.
 
 **Nur begrenzte Schleifen in Seitenskripten, und im Zweifel die Seite neu
 laden, bevor gemessen wird.**
+
+Zweiter Fallstrick, derselbe Tag: ist der Browser-Bereich **verborgen**,
+pausiert `requestAnimationFrame` — und damit die ganze Zeichenschleife. Dann
+stehen Datenraten und Fußzeile still, während Ton, S-Meter und
+Frequenzanzeige weiterlaufen (die hängen an Ereignissen, nicht am Bild). Das
+sieht aus wie eine tote Fußzeile und ist keine:
+
+```
+versteckt=true   fuss=""            rate=""
+nach dem Nach-vorne-Holen:
+versteckt=true   fuss="4 kB/s bild" rate="15 kB/s"
+```
+
+Auf dem Telefon ist dieses Verhalten richtig — im Hintergrund soll nicht
+gezeichnet werden, und der Ton läuft unabhängig weiter. Beim Messen muss man
+es nur wissen: **vor jeder Messung an der Bildschleife den Tab nach vorne
+holen** (`document.hidden` prüfen).

@@ -631,7 +631,17 @@ function zeichneBild() {
   // vor einer leeren Fläche sitzt und rät, ob die Verbindung hängt oder die
   // Station schweigt — am Telefon sieht man den Unterschied sonst nicht.
   const still = !hatSpektrum || (performance.now() - letzteIq > 2000);
-  if (still) { state.hatSpektrumstrom = false; }
+  if (still) {
+    state.hatSpektrumstrom = false;
+    // Auch den gemessenen Rauschabstand vergessen. Er ist geglaettet
+    // (0,9/0,1) und braeuchte sonst nach dem Wiederkommen rund zwei Sekunden,
+    // um sich vom alten Wert zu loesen — in denen die Fusszeile den Hinweis
+    // "nur rauschen" zeigen koennte, waehrend laengst Stationen da sind, oder
+    // umgekehrt. Eine Messung, die niemand mehr vornimmt, gehoert verworfen
+    // und nicht fortgeschrieben; dieselbe Regel wie beim S-Meter.
+    state.hfAbstand = null;
+    state.wfBoden = null;
+  }
   if (still) {
     panCtx.fillStyle = '#141e27'; panCtx.fillRect(0, 0, W, H);
     wfCtx.fillStyle = '#0c0c0e';  wfCtx.fillRect(0, 0, wf.width, wf.height);
