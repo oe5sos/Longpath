@@ -266,6 +266,10 @@ void SunSdrRadioConnection::connectToRadio(const RadioInfo& info)
     // neuen Verbindung gegen die letzte Nummer der alten, und es gilt als
     // Spaetling statt als Anfang. Vom eigenen Pruefstand gefunden.
     for (KanalZustand& kz : m_kanal) { kz = KanalZustand{}; }
+    m_seqSeen = false;
+    m_lastSeq = 0;
+    m_seqRing.clear();
+    m_seqOutOfPlace = 0;
     m_iqSeqWndFrames = 0;
     m_iqSeqWndRepeats = 0;
     m_iqSeqWndLost = 0;
@@ -1018,8 +1022,22 @@ void SunSdrRadioConnection::processControlDatagram(const QByteArray& data,
         // beide Seiten: PRE davor, EXTRA danach.
         sendBenchFrames(QStringLiteral("LONGPATH_SUNSDR_PRE"));
 
-        const QByteArray stateSync = stateSyncFrameForTest();
-        sendeSteuerrahmen(stateSync, "Zustandsrahmen beim Verbinden");
+        const SunSdr::StromModus modus = stromModusAusUmgebung();
+        const QByteArray stateSync =
+            SunSdr::buildStromStartFrame(*m_profile, modus);
+        if (modus != SunSdr::StromModus::EinStrom48) {
+            qCWarning(lcSunSdr).noquote()
+                << QStringLiteral(
+                       "SunSdr: Strommodus aus der Umgebung -- %1. Das ist "
+                       "ein VERSUCH: die Rate kommt aus einem Mitschnitt "
+                       "vom 2026-10-03 und ist am Geraet nicht "
+                       "gegengeprueft, und der zweite Kanal hat oben noch "
+                       "keinen Empfaenger.")
+                       .arg(modus == SunSdr::StromModus::ZweiStroemeJe48
+                                ? QStringLiteral("zwei Stroeme, je 48 kHz")
+                                : QStringLiteral("zwei Stroeme, je 96 kHz"));
+        }
+        sendeSteuerrahmen(stateSync, "Stromstart 0x01");
 
         sendBenchFrames(QStringLiteral("LONGPATH_SUNSDR_EXTRA"));
     }
@@ -1948,7 +1966,7 @@ void SunSdrRadioConnection::auditStreamSeq(int kanal, quint16 seq)
     }
 
     if (m_probeOn && m_seqDeltas.size() < kMaxSeqDeltas) {
-        m_seqDeltas.append(qMakePair(seq, quint16(seq - m_kanal[kanal].lastSeq)));
+        m_seqDeltas.append(qMakePair(seq, quint16(seq - m_lastSeq)));
     }
 
     // Fenster zuerst schliessen, dann das neue Paket einsortieren: so
@@ -1958,19 +1976,19 @@ void SunSdrRadioConnection::auditStreamSeq(int kanal, quint16 seq)
         berichteFolgenummern();
     }
 
-    // Der Zustand gehoert JE KANAL -- zwei Stroeme haben eigene
-    // Nummernraeume. Die Fensterzahlen bleiben gemeinsam: sie messen den
-    // Netzweg, nicht den einzelnen Empfaenger.
-    KanalZustand& kz = m_kanal[kanal];
+    // Ein GLOBALER Nummernraum fuer alle Stroeme -- am 2026-10-03 am Geraet
+    // gemessen (siehe KanalZustand im Kopf). Der Kanal steht nur in der
+    // Meldung, damit eine Luecke zuzuordnen ist.
+    Q_UNUSED(kanal);
 
-    const auto merken = [&kz](quint16 n) {
-        kz.seqRing.append(n);
-        while (kz.seqRing.size() > kSeqRingSize) { kz.seqRing.removeFirst(); }
+    const auto merken = [this](quint16 n) {
+        m_seqRing.append(n);
+        while (m_seqRing.size() > kSeqRingSize) { m_seqRing.removeFirst(); }
     };
 
-    if (!kz.seqSeen) {
-        kz.seqSeen = true;
-        kz.lastSeq = seq;
+    if (!m_seqSeen) {
+        m_seqSeen = true;
+        m_lastSeq = seq;
         merken(seq);
         ++m_iqSeqWndFrames;
         return;
@@ -1979,20 +1997,20 @@ void SunSdrRadioConnection::auditStreamSeq(int kanal, quint16 seq)
     // 1. Schon gesehen? Dann ist es eine Wiederholung -- die QRP schickt
     //    bytegleiche Kopien, und zwar mit Abstand, nicht direkt
     //    hintereinander (am 2026-10-03 gemessen, siehe Kopf).
-    if (kz.seqRing.contains(seq)) {
+    if (m_seqRing.contains(seq)) {
         ++m_iqSeqWndRepeats;
-        kz.seqOutOfPlace = 0;
+        m_seqOutOfPlace = 0;
         return;
     }
 
-    const quint16 delta = quint16(seq - kz.lastSeq);
+    const quint16 delta = quint16(seq - m_lastSeq);
 
     // 2. Der Normalfall: die naechste Nummer.
     if (delta == 1) {
-        kz.lastSeq = seq;
+        m_lastSeq = seq;
         merken(seq);
         ++m_iqSeqWndFrames;
-        kz.seqOutOfPlace = 0;
+        m_seqOutOfPlace = 0;
         return;
     }
 
@@ -2000,10 +2018,10 @@ void SunSdrRadioConnection::auditStreamSeq(int kanal, quint16 seq)
     if (delta >= 2 && delta <= kMaxPlausibleGap) {
         m_iqSeqWndLost += quint64(delta) - 1;
         ++m_iqSeqWndEvents;
-        kz.lastSeq = seq;
+        m_lastSeq = seq;
         merken(seq);
         ++m_iqSeqWndFrames;
-        kz.seqOutOfPlace = 0;
+        m_seqOutOfPlace = 0;
 
         // Gedrosselt wie bei P1/P2 (20 ms). Minus eins heisst "noch nie
         // gemeldet" -- mit 0 als Startwert verschwand die ERSTE Luecke
@@ -2020,19 +2038,19 @@ void SunSdrRadioConnection::auditStreamSeq(int kanal, quint16 seq)
     //    Unterschieden wird nicht an der Groesse der Differenz -- die ist
     //    bei einem Neuanfang beliebig --, sondern daran, ob es bei DIESEM
     //    EINEN Paket bleibt.
-    ++kz.seqOutOfPlace;
-    if (kz.seqOutOfPlace < kSeqRestartAfter) {
+    ++m_seqOutOfPlace;
+    if (m_seqOutOfPlace < kSeqRestartAfter) {
         ++m_iqSeqWndBackwards;
         return;  // lastSeq NICHT zurueckdrehen
     }
 
     ++m_iqSeqWndRestarts;
     qCInfo(lcSunSdr).nospace()
-        << "SunSdr: Folgenummern auf Kanal " << kanal << " fangen neu an ("
-        << kz.lastSeq << " -> " << seq << ") -- der Strom wurde neu gestartet";
-    kz.seqRing.clear();
-    kz.seqOutOfPlace = 0;
-    kz.lastSeq = seq;
+        << "SunSdr: Folgenummern fangen neu an ("
+        << m_lastSeq << " -> " << seq << ") -- der Strom wurde neu gestartet";
+    m_seqRing.clear();
+    m_seqOutOfPlace = 0;
+    m_lastSeq = seq;
     merken(seq);
     ++m_iqSeqWndFrames;
 }
@@ -2215,6 +2233,26 @@ void SunSdrRadioConnection::pruefeMikrofonPtt(quint8 streamOpcode)
                      << "(aus dem Stromkopf, Opcode 0x"
                      << QString::number(streamOpcode, 16) << ")";
     emit micPttFromRadio(txAktiv);
+}
+
+SunSdr::StromModus SunSdrRadioConnection::stromModusAusUmgebung() const
+{
+    const QString wahl =
+        qEnvironmentVariable("LONGPATH_SUNSDR_STROMMODUS").trimmed();
+    if (wahl == QStringLiteral("je48")) {
+        return SunSdr::StromModus::ZweiStroemeJe48;
+    }
+    if (wahl == QStringLiteral("je96")) {
+        return SunSdr::StromModus::ZweiStroemeJe96;
+    }
+    if (!wahl.isEmpty() && wahl != QStringLiteral("48")) {
+        qCWarning(lcSunSdr).noquote()
+            << QStringLiteral("SunSdr: LONGPATH_SUNSDR_STROMMODUS=\"%1\" "
+                              "kenne ich nicht -- es bleibt bei einem Strom "
+                              "mit 48 kHz. Erlaubt: 48, 48_96, 96_144.")
+                   .arg(wahl);
+    }
+    return SunSdr::StromModus::EinStrom48;
 }
 
 } // namespace Longpath

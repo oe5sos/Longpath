@@ -223,6 +223,28 @@ namespace {
 constexpr quint64 kFreqScaleCandidate = 10;
 }
 
+QByteArray stromModusPayload(StromModus modus)
+{
+    switch (modus) {
+    case StromModus::EinStrom48:
+        return QByteArray::fromHex("010000000c08040302020202");
+    case StromModus::ZweiStroemeJe48:
+        return QByteArray::fromHex("020000000c08040302020202");
+    case StromModus::ZweiStroemeJe96:
+        return QByteArray::fromHex("020100000a06040302020201");
+    }
+    return QByteArray::fromHex("010000000c08040302020202");
+}
+
+QByteArray buildStromStartFrame(const Profile& profile, StromModus modus)
+{
+    const QByteArray nutz = stromModusPayload(modus);
+    QByteArray frame = buildControlHeader(profile, 0x01, 0,
+                                          quint16(nutz.size()));
+    frame += nutz;
+    return withControlFrameCrc(frame);
+}
+
 quint32 controlFrameCrc(const QByteArray& frame)
 {
     // CRC-32/IEEE, bitweise (die Rahmen sind hoechstens ein paar hundert

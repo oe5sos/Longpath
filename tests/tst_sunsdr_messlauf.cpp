@@ -261,6 +261,15 @@ private slots:
             .arg(conn.mikrofonPttFlankenForTest())
             .arg(conn.geraetSendetForTest() ? QStringLiteral("ja")
                                             : QStringLiteral("nein"));
+        for (int k = 0; k < 4; ++k) {
+            const quint64 n = conn.kanalPaketeForTest(k);
+            if (n == 0) { continue; }
+            qInfo().noquote() << QStringLiteral(
+                "Kanal %1: %2 Pakete (%3/s), %4 Fortsetzungen  ->  %5 kHz")
+                .arg(k).arg(n).arg(double(n)/secs, 0, 'f', 0)
+                .arg(conn.kanalFortsetzungenForTest(k))
+                .arg(double(n)/secs*200/1000, 0, 'f', 0);
+        }
         qInfo().noquote() << conn.frameInventoryReport();
         qInfo().noquote() << conn.seqDeltaReport();
 

@@ -838,14 +838,17 @@ private:
         QByteArray letzteNutzlast;   // nur fuer den Vergleich bei gleicher Nummer
         quint64 pakete{0};
         quint64 fortsetzungen{0};
-        // Die Folgenummern gehoeren JE KANAL gezaehlt: zwei Stroeme haben
-        // eigene Nummernraeume, und dieselbe Nummer auf beiden ist keine
-        // Wiederholung, sondern ein anderer Strom. Vom eigenen Pruefstand
-        // gefunden, 2026-10-03.
-        bool seqSeen{false};
-        quint16 lastSeq{0};          // hoechste gesehene Nummer
-        QList<quint16> seqRing;      // die letzten Nummern, fuer Wiederholungen
-        int seqOutOfPlace{0};        // Pakete in Folge, die zu nichts passen
+        // KEINE eigenen Folgenummern je Kanal -- am 2026-10-03 am Geraet
+        // widerlegt. Der Pruefstand hatte angenommen, zwei Stroeme haetten
+        // eigene Nummernraeume; der Versuch mit zwei Stroemen zeigt das
+        // Gegenteil:
+        //
+        //   0(1) 1(2) 2(1) 3(2) 4(1) 5(2) 6(1) 7(2) ...
+        //
+        // Die Nummern laufen GLOBAL fortlaufend, und byte9 sagt nur, zu
+        // welchem Strom ein Paket gehoert. Je Kanal gezaehlt sah jeder
+        // Kanal nur jede zweite Nummer -- und der Zaehler meldete 50 %
+        // Verlust bei einem vollkommen gesunden Strom.
     };
     KanalZustand m_kanal[kMaxKanaele];
 
@@ -856,6 +859,23 @@ private:
         if (hdr.byte8 < 2) { return 0; }
         return (hdr.byte9 < kMaxKanaele) ? int(hdr.byte9) : 0;
     }
+
+    // ── Welcher Strommodus beim Verbinden gesetzt wird ──────────────────
+    //
+    // Vorgabe ist EinStrom48, also genau das, was dieser Treiber seit dem
+    // 2026-08-26 schickt. Umgestellt wird NUR ueber die Umgebung:
+    //
+    //   LONGPATH_SUNSDR_STROMMODUS=48       (Vorgabe)
+    //   LONGPATH_SUNSDR_STROMMODUS=je48     zwei Stroeme, je 48 kHz  (2x Daten)
+    //   LONGPATH_SUNSDR_STROMMODUS=je96     zwei Stroeme, je 96 kHz  (4x Daten)
+    //
+    // Warum nicht als Einstellung in der Oberflaeche: die Rate ist am
+    // 2026-10-03 aus einem Mitschnitt gewonnen und am Geraet noch NICHT
+    // gegengeprueft. Was oben mit dem zweiten Kanal passiert, ist auch
+    // noch offen -- BoardCapabilities fuehrt weiter maxReceivers = 1.
+    // Erst wenn beides steht, gehoert das in die Oberflaeche; bis dahin
+    // ist es ein Versuch, und ein Versuch wird ausdruecklich gewaehlt.
+    SunSdr::StromModus stromModusAusUmgebung() const;
 
     void auditStreamSeq(int kanal, quint16 seq);
     // Schliesst das 5-s-Fenster: meldet nach oben und schreibt ins Log.
@@ -914,6 +934,11 @@ private:
     // Neuanfang des Stroms. Drei genuegen: bei 240 Nummern/s sind das 12 ms,
     // und eine echte Stoerung dieser Laenge waere ohnehin eine Luecke.
     static constexpr int kSeqRestartAfter = 3;
+
+    bool m_seqSeen{false};
+    quint16 m_lastSeq{0};        // hoechste gesehene Nummer, ueber alle Stroeme
+    QList<quint16> m_seqRing;    // die letzten Nummern, fuer Wiederholungen
+    int m_seqOutOfPlace{0};      // Pakete in Folge, die zu nichts passen
 
     quint64 m_iqSeqWndRestarts{0};
     quint64 m_iqSeqWndFrames{0};

@@ -1858,17 +1858,26 @@ private slots:
         handshake(conn);
 
         QSignalSpy iq(&conn, &RadioConnection::iqDataReceived);
+        // So kommt es am Geraet wirklich (2026-10-03 gemessen): die Nummern
+        // laufen GLOBAL fortlaufend, byte9 wechselt dabei den Strom.
+        // Die erste Fassung dieses Tests nahm an, beide Kanaele traegen
+        // dieselbe Nummer -- der Versuch am Geraet hat das widerlegt, und
+        // der Zaehler meldete daraufhin 50 % Verlust bei gesundem Strom.
         conn.feedStreamDatagramForTest(qrpBlockKanal(1, 2, 0, char(7)));
-        conn.feedStreamDatagramForTest(qrpBlockKanal(1, 2, 1, char(9)));
+        conn.feedStreamDatagramForTest(qrpBlockKanal(2, 2, 1, char(9)));
+        conn.feedStreamDatagramForTest(qrpBlockKanal(3, 2, 0, char(7)));
+        conn.feedStreamDatagramForTest(qrpBlockKanal(4, 2, 1, char(9)));
 
-        QCOMPARE(iq.count(), 2);
+        QCOMPARE(iq.count(), 4);
         QCOMPARE(iq.at(0).at(0).toInt(), 0);
         QCOMPARE(iq.at(1).at(0).toInt(), 1);
-        QCOMPARE(conn.kanalPaketeForTest(0), quint64(1));
-        QCOMPARE(conn.kanalPaketeForTest(1), quint64(1));
-        // Jeder Kanal hat seine eigene Nummer 1 gesehen -- das ist KEINE
-        // Wiederholung, sondern ein anderer Strom.
+        QCOMPARE(conn.kanalPaketeForTest(0), quint64(2));
+        QCOMPARE(conn.kanalPaketeForTest(1), quint64(2));
+        // Lueckenlos im globalen Nummernraum: kein Verlust, keine
+        // Wiederholung.
         QCOMPARE(conn.seqRepeatsForTest(), quint64(0));
+        QCOMPARE(conn.seqLostForTest(), quint64(0));
+        QCOMPARE(conn.seqFramesForTest(), quint64(4));
     }
 
     // Zwei Pakete mit derselben Nummer, aber VERSCHIEDENEM Inhalt: das ist

@@ -574,6 +574,42 @@ private slots:
     // vom 2026-09-23, als unzugeordnete Opcodes an die QRP geschickt
     // wurden. Bestaetigt wird darum nicht durch Probieren am Geraet,
     // sondern durch einen Mitschnitt, in dem ExpertSDR2 sendet.
+    // ── Die drei gemessenen Stromstart-Rahmen ──────────────────────────
+    //
+    // Der aus EinStrom48 gebaute Rahmen MUSS byte-fuer-byte der sein, den
+    // Longpath heute schickt (stateSyncFrameForTest) und der im
+    // ExpertSDR2-Mitschnitt steht. Stimmt das, sind auch die beiden
+    // anderen Rahmen richtig gebaut -- gleicher Kopf, gleiche
+    // Pruefsummenrechnung, nur andere Nutzlast.
+    void stromStartRahmenStimmtMitDemAufgezeichnetenUeberein()
+    {
+        using namespace Longpath::SunSdr;
+        QCOMPARE(buildStromStartFrame(kProfileQrp, StromModus::EinStrom48).toHex(),
+                 QByteArray("03ff01000c0000000000010000007648ea9e"
+                            "010000000c08040302020202"));
+        // Die zwei gemessenen Zustaende mit zwei Stroemen. Nutzlast
+        // byte-fuer-byte aus dem Mitschnitt vom 2026-10-03; die Pruefsumme
+        // rechnet dieselbe Funktion, die oben an dreizehn echten Rahmen
+        // bestaetigt ist.
+        const QByteArray a =
+            buildStromStartFrame(kProfileQrp, StromModus::ZweiStroemeJe48);
+        const QByteArray b =
+            buildStromStartFrame(kProfileQrp, StromModus::ZweiStroemeJe96);
+        QCOMPARE(a.mid(18).toHex(), QByteArray("020000000c08040302020202"));
+        QCOMPARE(b.mid(18).toHex(), QByteArray("020100000a06040302020201"));
+        // Erste zwei Bytes der Nutzlast: Zahl der Stroeme, und sie steigt.
+        QCOMPARE(quint8(a[18]), quint8(2));
+        QCOMPARE(quint8(b[18]), quint8(2));
+        QCOMPARE(quint8(b[19]), quint8(1));
+        // Und die Pruefsummen sind gueltig -- nachgerechnet wie bei den
+        // dreizehn aufgezeichneten Rahmen.
+        for (const QByteArray& f : {a, b}) {
+            QByteArray genullt = f;
+            genullt[14] = genullt[15] = genullt[16] = genullt[17] = 0;
+            QCOMPARE(withControlFrameCrc(genullt).toHex(), f.toHex());
+        }
+    }
+
     // Gegenprobe zu den zwei Sperren darueber und darunter: eine Suche, die
     // nie etwas findet, beweist nichts. withControlFrameCrc() WIRD benutzt
     // (SunSdrRadioConnection.cpp, Frequenzrahmen) -- findet die Hilfe sie
