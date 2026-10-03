@@ -250,6 +250,9 @@ void SunSdrRadioConnection::connectToRadio(const RadioInfo& info)
     m_offeneRahmen.clear();
     m_quittungenGesehen = 0;
     m_rahmenOhneQuittung = 0;
+    m_letzteAnschlagMeldungMs = -1;
+    m_anschlagProben = 0;
+    m_anschlagMeldungen = 0;
     m_rahmenWiederholt = 0;
     m_inventoryClock.invalidate();
     m_lastStreamStateValid = false;
@@ -1196,6 +1199,9 @@ void SunSdrRadioConnection::processStreamDatagram(const QByteArray& data,
         reinterpret_cast<const quint8*>(data.constData()) + SunSdr::kIqHeaderSize,
         data.size() - SunSdr::kIqHeaderSize, &samples);
     if (samples.isEmpty()) { return; }
+
+    // Vor der Pegelanhebung weiter unten, siehe kAnschlagSchwelle.
+    pruefeAnschlag(samples);
 
     // TEMPORARY diagnostic, 2026-09-03 (bench session, real antenna,
     // ExpertSDR2 shows the same "waterfall but no station audio" symptom
@@ -2165,6 +2171,36 @@ void SunSdrRadioConnection::pruefeOffeneRahmen()
                                         "stillschweigend verworfen)");
         m_offeneRahmen.removeAt(i);
     }
+}
+
+void SunSdrRadioConnection::pruefeAnschlag(const QVector<float>& samples)
+{
+    int amAnschlag = 0;
+    for (const float v : samples) {
+        if (v >= kAnschlagSchwelle || v <= -kAnschlagSchwelle) {
+            ++amAnschlag;
+        }
+    }
+    if (amAnschlag == 0) { return; }
+
+    m_anschlagProben += quint64(amAnschlag);
+    if (amAnschlag < kAnschlagSchwelleAnzahl) { return; }
+
+    const qint64 now = m_iqSeqWndClock.isValid() ? m_iqSeqWndClock.elapsed() : 0;
+    if (m_letzteAnschlagMeldungMs >= 0
+        && now - m_letzteAnschlagMeldungMs < kAnschlagMeldeAbstandMs) {
+        return;
+    }
+    m_letzteAnschlagMeldungMs = now;
+    ++m_anschlagMeldungen;
+
+    // Dieselbe Meldung, die P1 und P2 aus einem Statusbit des Geraets
+    // machen -- hier aus dem Signal selbst. Der Wandler ist einer (adc 0).
+    emit adcOverflow(0);
+    qCWarning(lcSunSdr).nospace()
+        << "SunSdr: Uebersteuerung -- " << amAnschlag << " von "
+        << samples.size() << " Proben am Anschlag. Vorverstaerker "
+           "zurueckdrehen oder Daempfung zuschalten.";
 }
 
 } // namespace Longpath

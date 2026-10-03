@@ -1881,6 +1881,109 @@ private slots:
                  "Ein Werkbank-Rahmen wurde nachgeschickt");
     }
 
+
+    // ── Uebersteuerung ─────────────────────────────────────────────────
+    //
+    // Eine der zwei echten Luecken im Empfang: P1/P2 melden adcOverflow aus
+    // einem Statusbit, die QRP schickt keines (am 2026-10-03 gemessen:
+    // zehn Minuten kein unaufgeforderter Rahmen, Zustandsbytes konstant).
+    // Also aus dem Signal selbst -- eine Probe am Anschlag ist eine Probe
+    // am Anschlag.
+
+    // Ein Block mit Proben am Vollausschlag. Der Wandler liefert 24 Bit in
+    // den oberen drei Byte eines 32-Bit-Worts; 0x7fffff ist der Anschlag.
+    static QByteArray qrpBlockVollausschlag(quint16 seq, int wieViele)
+    {
+        QByteArray pkt = SunSdr::buildIqHeader(
+            SunSdr::kProfileQrp, SunSdr::kOpIqRxIdle, seq, 0x01, 0x00);
+        QByteArray payload(SunSdr::kIqPayloadSize, char(0));
+        for (int i = 0; i < wieViele && i < SunSdr::kIqComplexPerPkt; ++i) {
+            const int k = i * SunSdr::kIqBytesPerComplex;
+            // I-Anteil (Byte 3..5) auf 0x7fffff
+            payload[k + 3] = char(0xFF);
+            payload[k + 4] = char(0xFF);
+            payload[k + 5] = char(0x7F);
+        }
+        pkt.append(payload);
+        return pkt;
+    }
+
+    void vollausschlagMeldetUebersteuerung()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        handshake(conn);
+
+        QSignalSpy ueber(&conn, &RadioConnection::adcOverflow);
+        conn.feedStreamDatagramForTest(qrpBlockVollausschlag(1, 40));
+
+        QCOMPARE(ueber.count(), 1);
+        QCOMPARE(ueber.first().at(0).toInt(), 0);
+        QCOMPARE(conn.anschlagMeldungenForTest(), quint64(1));
+        QCOMPARE(conn.anschlagProbenForTest(), quint64(40));
+    }
+
+    // Der Rauschflur ohne Antenne liegt bei etwa 2e-05 -- sechs
+    // Zehnerpotenzen unter der Schwelle. Es darf nichts anschlagen.
+    void rauschenMeldetKeineUebersteuerung()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        handshake(conn);
+
+        QSignalSpy ueber(&conn, &RadioConnection::adcOverflow);
+        for (quint16 n = 1; n <= 20; ++n) {
+            conn.feedStreamDatagramForTest(qrpBlockSeq(n));
+        }
+
+        QCOMPARE(ueber.count(), 0);
+        QCOMPARE(conn.anschlagProbenForTest(), quint64(0));
+    }
+
+    // Eine einzelne Probe am Anschlag kann ein Zufall sein und darf keine
+    // Meldung ausloesen -- gezaehlt wird sie trotzdem.
+    void einzelneProbeAmAnschlagMeldetNichts()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        handshake(conn);
+
+        QSignalSpy ueber(&conn, &RadioConnection::adcOverflow);
+        conn.feedStreamDatagramForTest(qrpBlockVollausschlag(1, 1));
+
+        QCOMPARE(ueber.count(), 0);
+        QCOMPARE(conn.anschlagProbenForTest(), quint64(1));
+    }
+
+    // Und die Drosselung: 240 Pakete je Sekunde duerfen nicht 240
+    // Meldungen ergeben.
+    void uebersteuerungWirdGedrosselt()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        handshake(conn);
+
+        QSignalSpy ueber(&conn, &RadioConnection::adcOverflow);
+        for (quint16 n = 1; n <= 50; ++n) {
+            conn.feedStreamDatagramForTest(qrpBlockVollausschlag(n, 40));
+        }
+
+        QCOMPARE(ueber.count(), 1);
+        QCOMPARE(conn.anschlagProbenForTest(), quint64(50 * 40));
+    }
+
     // ── Folgenummern: Verlust, Luecken, Wiederholungen ────────────────
     //
     // P1 und P2 melden das seit langem, dieser Treiber bisher nicht. Die

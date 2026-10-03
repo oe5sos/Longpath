@@ -50,6 +50,12 @@ const state = {
   bildHalten: false,         // Bild einfrieren, solange abgestimmt wird
   wischVersatzPx: 0,         // wie weit der Finger von der Mitte weg ist
   wfBoden: null,             // geglaetteter Rauschboden des Wasserfalls (dBm)
+  // null = noch nicht versucht, true = 'playback' gesetzt, false = Behelf.
+  // Die drei Zustaende muessen unterscheidbar bleiben: 'behelf' heisst, die
+  // Schnittstelle fehlt und der Stummschalter greift wieder — das ist ein
+  // Befund. 'noch nicht versucht' ist keiner.
+  sitzungGesetzt: null,
+  hfAbstand: null,           // geglaettet: staerkster Punkt minus Rauschboden (dB)
   tonTypPruefung: null,      // Nachfassen, falls mulaw8 nicht bestaetigt wird
   tonStartLaeuft: false,     // Riegel gegen doppelten AudioContext
   tonWeg: null,              // 'worklet' | 'scriptprocessor'
@@ -403,8 +409,44 @@ function zeichneKopf() {
   $('hz').innerHTML = `${mhz}<span class="khz">${khz}</span><span class="dez">${hz}</span>`;
   $('band').textContent = bandFuer(s.vfo[state.trx][0]);
 
+  // ── Das S-Meter darf nicht weiterzeigen, wenn niemand mehr misst ───────
+  //
+  // Hier stand nur `if (sm !== null)`, und `sm` behaelt nach einem Abriss
+  // seinen letzten Wert. Am 2026-10-03 nachgemessen: Server weg bei 8 s, die
+  // Kopfzeile sprang sofort auf "NICHT VERBUNDEN" und die Leuchte ging aus —
+  // das S-Meter aber stand noch dreissig Sekunden spaeter auf "S7 · -82 dBm".
+  //
+  // Es ist das Instrument, das man beim Hoeren dauernd ansieht. Ein
+  // eingefrorenes S7 sieht aus wie ein Signal, und genau diese Sorte
+  // Zweideutigkeit hat an einem einzigen Tag dreimal Zeit gekostet
+  // (schlafender AudioContext, bunter Wasserfall ohne Antenne,
+  // Kopplungsblatt ueber intakter Verbindung).
+  //
+  // Dieselbe Regel wie beim Durchlassband: lieber nichts zeigen als etwas
+  // Falsches.
+  // Massstab ist `ready`, nicht der Socket: Messwerte kommen erst nach dem
+  // Init-Burst. Ein offener Socket ohne Anmeldung liefert keine — und wuerde
+  // den letzten Wert stehen lassen.
   const sm = s.smeter[state.trx];
-  if (sm !== null) {
+  // Ohne abgestimmte Frequenz gibt es keinen Empfaenger — und damit auch
+  // keinen Messwert.
+  //
+  // Steht TCI, haengt aber kein Funkgeraet dran, meldet Longpath als
+  // Rueckfall -140 dBm (TciServer.cpp, rxSensorTimer: WDSP-Konvention fuer
+  // "kein Kanal"). Die Seite machte daraus brav "S1 · -140 dBm" — eine
+  // Messung, die niemand vorgenommen hat. Am 2026-10-03 live so gesehen,
+  // waehrend der Panadapter daneben schon "kein Funkgeraet verbunden"
+  // schrieb und die Frequenzanzeige ehrlich "—" zeigte. Drei Anzeigen,
+  // zwei Wahrheiten.
+  //
+  // Geprueft wird die Frequenz, nicht der Zahlenwert des Pegels: -140 ist
+  // Longpaths Konvention, ein fremder Server waehlt eine andere. Bei 0 Hz
+  // ist dagegen jeder Server gemeint, und kein Funkgeraet steht je auf 0.
+  const keinGeraet = !s.vfo[state.trx] || !s.vfo[state.trx][0];
+  if (!link.ready || keinGeraet) {
+    $('smeter').textContent = '—';
+    $('sbar').style.width = '0%';
+  } else if (sm !== null) {
     $('smeter').textContent = `${sEinheit(sm)} · ${Math.round(sm)} dBm`;
     // −127 dBm = S1, 6 dB je S-Stufe, S9 = −73, darueber bis +40 dB.
     // Gleiche Skala wie die Beschriftung darunter: S1 = -121 … S9+40 = -33.
@@ -593,7 +635,17 @@ function zeichneBild() {
   // vor einer leeren Fläche sitzt und rät, ob die Verbindung hängt oder die
   // Station schweigt — am Telefon sieht man den Unterschied sonst nicht.
   const still = !hatSpektrum || (performance.now() - letzteIq > 2000);
-  if (still) { state.hatSpektrumstrom = false; }
+  if (still) {
+    state.hatSpektrumstrom = false;
+    // Auch den gemessenen Rauschabstand vergessen. Er ist geglaettet
+    // (0,9/0,1) und braeuchte sonst nach dem Wiederkommen rund zwei Sekunden,
+    // um sich vom alten Wert zu loesen — in denen die Fusszeile den Hinweis
+    // "nur rauschen" zeigen koennte, waehrend laengst Stationen da sind, oder
+    // umgekehrt. Eine Messung, die niemand mehr vornimmt, gehoert verworfen
+    // und nicht fortgeschrieben; dieselbe Regel wie beim S-Meter.
+    state.hfAbstand = null;
+    state.wfBoden = null;
+  }
   if (still) {
     panCtx.fillStyle = '#141e27'; panCtx.fillRect(0, 0, W, H);
     wfCtx.fillStyle = '#0c0c0e';  wfCtx.fillRect(0, 0, wf.width, wf.height);
@@ -654,6 +706,21 @@ function zeichneBild() {
   const sortiert = Float32Array.from(quelle).sort();
   const p20 = sortiert[Math.floor(M * 0.20)];
   state.wfBoden = (state.wfBoden === null) ? p20 : state.wfBoden * 0.88 + p20 * 0.12;
+
+  // ── Wie weit ragt das Stärkste über das Rauschen? ──────────────────────
+  //
+  // Weil der Wasserfall jetzt auf dem GEMESSENEN Rauschboden sitzt, malt er
+  // auch reines Rauschen bunt und strukturiert. Das ist beim Hören richtig —
+  // aber am 2026-10-03 hat der Betreiber daraus geschlossen, es komme HF an,
+  // während in Wahrheit die Antenne fehlte: 7 dB Abstand auf 40 m am Morgen.
+  // Früher wäre das schwarz geblieben und hätte für sich gesprochen.
+  //
+  // Also sagt die Seite es jetzt selbst. Geglättet, weil ein einzelnes Bild
+  // zappelt und eine flackernde Warnung schlimmer ist als keine.
+  const spitzeDb = sortiert[M - 1];
+  const abstandJetzt = spitzeDb - p20;
+  state.hfAbstand = (state.hfAbstand === null)
+      ? abstandJetzt : state.hfAbstand * 0.9 + abstandJetzt * 0.1;
 
   const spitze = new Float32Array(W);
   for (let x = 0; x < W; x++) {
@@ -750,13 +817,48 @@ function afFaktor(pct) {
 //
 // Der Aufruf muss aus einer Beruehrung kommen — deshalb steht er in
 // tonStarten() und nicht irgendwo beim Laden.
+/** Sagt iOS, dass hier WIEDERGABE stattfindet — nicht Beiwerk.
+ *
+ *  Ohne diese Ansage legt Safari den Ton in die Kategorie "ambient", und die
+ *  gehorcht dem Stummschalter am Geraet: ueber Kopfhoerer hoert man alles,
+ *  ueber den Lautsprecher nichts. Genau das war am 2026-10-03 der Fall, und
+ *  es war von aussen nicht zu erkennen — die Seite meldete eine tadellose
+ *  Kette:
+ *
+ *      ctx=running  vorrat=3410  ziel=1440  takte=216
+ *      af=1  vorDeckel=-33  nachDeckel=-32
+ *
+ *  Also voller Pegel direkt vor dem Ausgang. Der Ton verliess die Seite und
+ *  wurde erst vom Betriebssystem verworfen.
+ *
+ *  navigator.audioSession gibt es seit iOS 16.4. Wo es fehlt, bleibt der
+ *  alte Behelf darunter.
+ */
+function wiedergabeSitzungSetzen() {
+  try {
+    if (navigator.audioSession) {
+      navigator.audioSession.type = 'playback';
+      return true;
+    }
+  } catch (e) { /* dann eben der Behelf */ }
+  return false;
+}
+
+/** Der alte Behelf fuer iOS vor 16.4: eine Sekunde Stille in Schleife.
+ *
+ *  Hier stand `el.volume = 0`, und das war der Fehler — ein Element mit
+ *  Lautstaerke null gilt Safari nicht als Wiedergabe und verschiebt die
+ *  Kategorie darum NICHT. Die Datei ist ohnehin Stille; die Lautstaerke muss
+ *  nicht zusaetzlich auf null stehen, damit nichts zu hoeren ist. Der
+ *  Kommentar daneben hat es die ganze Zeit zugegeben ("ohne geht es eben nur
+ *  mit Hoerer") — nur las es niemand als Fehlerbeschreibung.
+ */
 function stummesElementStarten() {
   const el = $('stillhalter');
   if (!el) { return; }
   try {
-    el.volume = 0;          // hoerbar ist daran nichts
     const p = el.play();
-    if (p && p.catch) { p.catch(() => { /* ohne geht es eben nur mit Hoerer */ }); }
+    if (p && p.catch) { p.catch(() => { /* dann bleibt es beim Hoerer */ }); }
   } catch (e) { /* desgleichen */ }
 }
 
@@ -769,8 +871,11 @@ async function tonStarten() {
   if (state.node || state.tonStartLaeuft) { return; }
   state.tonStartLaeuft = true;
   try {
-    // ZUERST: iOS in die Playback-Kategorie bringen, bevor der AudioContext
+    // ZUERST: iOS in die Playback-Kategorie bringen, BEVOR der AudioContext
     // entsteht. Danach gehorcht der Ton dem Stummschalter nicht mehr.
+    // Erst die richtige Schnittstelle, dann der Behelf — beide schaden
+    // einander nicht.
+    state.sitzungGesetzt = wiedergabeSitzungSetzen();
     stummesElementStarten();
 
     const AC = window.AudioContext || window.webkitAudioContext;
@@ -1551,7 +1656,25 @@ setInterval(() => {
       $('koppeln').classList.add('an');
       $('fehler').textContent = koppelGrund();
     }
-  } else { wegSeit = 0; }
+  } else {
+    wegSeit = 0;
+    // Und wieder WEG damit, sobald es wieder geht.
+    //
+    // Hier stand nur `wegSeit = 0`. Die Seite holt sich die Verbindung nach
+    // einem Abriss von selbst zurueck (am 2026-10-03 gemessen: Server weg bei
+    // 14 s, Blatt kommt bei 28 s, wieder verbunden bei 43 s) — aber das Blatt
+    // blieb liegen. Der Bediener saesse vor einem laufenden Empfaenger und
+    // einem Blatt, das nach der Adresse fragt, und muesste raten, ob es nun
+    // geht. Genau diese Sorte Zweideutigkeit hat heute schon zwei Stunden
+    // gekostet.
+    //
+    // Es gibt keinen Weg, das Blatt absichtlich zu oeffnen; es erscheint nur
+    // bei einem Abriss. Darum ist Zumachen bei `ready` immer richtig.
+    if ($('koppeln').classList.contains('an')) {
+      $('koppeln').classList.remove('an');
+      $('fehler').textContent = '';
+    }
+  }
 }, 1000);
 
 // Warum es nicht klappt — in einem Satz, den man auf einem Telefon lesen kann.
@@ -1595,6 +1718,18 @@ async function melde(anlass) {
   const C = state.audio, K = state.node && state.node._kern;
   const d = {
     sicher: window.isSecureContext,
+    // Ob die Wiedergabe-Sitzung gesetzt werden konnte. Ohne sie gehorcht der
+    // Ton dem Stummschalter, und das sieht von aussen aus wie "kein Ton",
+    // obwohl die ganze Kette tadellos laeuft.
+    // Drei Zustaende, nicht zwei. Am 2026-10-03 meldete die Seite beim Start
+    // `sitzung=behelf`, und das las sich wie der Fehler vom selben Morgen
+    // (Ton gehorcht dem Stummschalter) — dabei war die Sitzung zu diesem
+    // Zeitpunkt nur noch gar nicht gesetzt worden; das passiert erst beim
+    // Tonstart. Ein Diagnosefeld, das einen Befund meldet, wo keiner ist,
+    // schickt die Fehlersuche in die falsche Richtung. Dasselbe Muster, das
+    // dieser Tag sechsmal in der Anzeige hatte, hier im eigenen Werkzeug.
+    sitzung: state.sitzungGesetzt === null ? 'nicht versucht'
+           : state.sitzungGesetzt ? 'playback' : 'behelf',
     weg: state.tonWeg || 'keiner',
     fehler: state.tonFehler || '-',
     ctx: C ? C.state : 'kein ctx',
@@ -1603,6 +1738,8 @@ async function melde(anlass) {
     af: state.gain ? +state.gain.gain.value.toFixed(2) : -1,
     afPct: state.afPct,
     rahmen: link.bytes.audio,
+    // Abstand Rauschboden -> staerkster Punkt. Unter 10 dB kommt keine HF an.
+    hfdb: state.hfAbstand === null ? -1 : +state.hfAbstand.toFixed(1),
     tonTyp: link.st.audioTypRahmen,
     rate: link.st.audioRate,
     vorrat: K ? K.have : -1,
@@ -1646,10 +1783,23 @@ function schleife(t) {
   // `spectrum_start` gar nicht). Dieselbe Stille entsteht, wenn in
   // Longpath schlicht kein Funkgeraet verbunden ist. Ein leerer Kasten
   // laesst den Operator raten; ein Satz nicht.
+  //
+  // Kommt ein Bild, aber ohne jedes Signal darin, steht das jetzt auch da —
+  // siehe state.hfAbstand. 15 dB als Grenze, aus Messungen vom 2026-10-03
+  // und nicht geschaetzt: SunSDR2 QRP ohne Antenne 7/8/10 dB, ANVELINA mit
+  // Antenne 28/36/39 dB. Dazwischen liegt eine breite Luecke.
+  //
+  // Die erste Fassung stand bei 10 dB und schwieg darum ausgerechnet bei
+  // exakt 10,0 dB — gemessen am QRP ohne Antenne, bei einem zu 100 %
+  // stillen Tonstrom. Eine Kante an der falschen Stelle ist schlimmer als
+  // keine.
   const bildLaeuft = r.spec > 0 || r.iq > 0;
-  $('fussBild').className = bildLaeuft ? '' : 'warn';
+  const nurRauschen = bildLaeuft && state.hfAbstand !== null
+                      && state.hfAbstand < 15;
+  $('fussBild').className = (!bildLaeuft || nurRauschen) ? 'warn' : '';
   $('fussBild').textContent =
-      r.spec ? (r.spec + ' kB/s bild')
+      nurRauschen ? ('nur rauschen (' + state.hfAbstand.toFixed(0) + ' dB) — antenne?')
+    : r.spec ? (r.spec + ' kB/s bild')
     : r.iq   ? (r.iq + ' kB/s bild (roh)')
     : link.ready ? 'kein bild — funkgerät verbunden?'
     : '';
