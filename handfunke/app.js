@@ -405,8 +405,29 @@ function zeichneKopf() {
   $('hz').innerHTML = `${mhz}<span class="khz">${khz}</span><span class="dez">${hz}</span>`;
   $('band').textContent = bandFuer(s.vfo[state.trx][0]);
 
+  // ── Das S-Meter darf nicht weiterzeigen, wenn niemand mehr misst ───────
+  //
+  // Hier stand nur `if (sm !== null)`, und `sm` behaelt nach einem Abriss
+  // seinen letzten Wert. Am 2026-10-03 nachgemessen: Server weg bei 8 s, die
+  // Kopfzeile sprang sofort auf "NICHT VERBUNDEN" und die Leuchte ging aus —
+  // das S-Meter aber stand noch dreissig Sekunden spaeter auf "S7 · -82 dBm".
+  //
+  // Es ist das Instrument, das man beim Hoeren dauernd ansieht. Ein
+  // eingefrorenes S7 sieht aus wie ein Signal, und genau diese Sorte
+  // Zweideutigkeit hat an einem einzigen Tag dreimal Zeit gekostet
+  // (schlafender AudioContext, bunter Wasserfall ohne Antenne,
+  // Kopplungsblatt ueber intakter Verbindung).
+  //
+  // Dieselbe Regel wie beim Durchlassband: lieber nichts zeigen als etwas
+  // Falsches.
+  // Massstab ist `ready`, nicht der Socket: Messwerte kommen erst nach dem
+  // Init-Burst. Ein offener Socket ohne Anmeldung liefert keine — und wuerde
+  // den letzten Wert stehen lassen.
   const sm = s.smeter[state.trx];
-  if (sm !== null) {
+  if (!link.ready) {
+    $('smeter').textContent = '—';
+    $('sbar').style.width = '0%';
+  } else if (sm !== null) {
     $('smeter').textContent = `${sEinheit(sm)} · ${Math.round(sm)} dBm`;
     // −127 dBm = S1, 6 dB je S-Stufe, S9 = −73, darueber bis +40 dB.
     // Gleiche Skala wie die Beschriftung darunter: S1 = -121 … S9+40 = -33.
