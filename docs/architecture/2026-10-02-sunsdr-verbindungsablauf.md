@@ -237,8 +237,36 @@ Paare die bandweise Leistungskalibrierung sind, kommt diese Tabelle **vom
 Gerät**, und die Sperre für Schritt 4 hat eine Lösung, die niemand
 abschätzen muss.
 
-**Das ist ein Kandidat, keine Tatsache.** Was 12,5 und −2,4 bedeuten, ist
-offen (Watt? dB? Skalierung?), und die Zuordnung zu einzelnen Bändern
-erst recht. Prüfen lässt sich das, ohne etwas zu senden: dieselbe Abfrage
-auf verschiedenen Bändern stellen und sehen, ob sich die Reihenfolge der
-Werte mitdreht.
+**Das war ein Kandidat — und die Gegenprobe hat ihn geschwächt.** Gefahren
+am selben Tag, ohne etwas zu senden: dieselbe Abfrage auf **80 m und auf
+10 m**, dazu zweimal im Abstand von 2,7 s.
+
+> `Steuerkanal op=0x0c len=320 | 2x | Aenderungen 0`
+
+Die Antwort ist **bitgleich** — weder bandabhängig noch zeitlich
+veränderlich. Daraus folgt zweierlei:
+
+* `0x0c` liefert **statische** Daten: Konfiguration oder Werkskalibrierung,
+  keine Momentanwerte. **Als Quelle für S-Meter, Spannung oder Temperatur
+  fällt es damit aus** — die Messwerte für Schritt 3 sind weiter nicht
+  gefunden.
+* Die zwölf Paare sind nicht *nachweislich* eine Bandtabelle. Zwölf
+  gleiche Paare können eine werkseitig überall gleich gefüllte Tabelle
+  sein — oder zwölf etwas anderes. Für die Leistungskalibrierung, die
+  `buildDriveFrame()` fehlt, taugt das erst, wenn die Bedeutung bekannt
+  ist; raten verbietet sich dort besonders, weil am Ende HF entsteht.
+
+Was bleibt und zählt: **`0x0c` ist eine Abfrage, auf die das Gerät
+strukturiert antwortet** — der erste bekannte Weg, überhaupt etwas aus der
+QRP herauszufragen. Und die Quittungen zeigen, dass Rahmen ankommen.
+
+
+## Ergebnis 4: das I/Q ist echt, sobald die Frequenz steht
+
+Im selben Messlauf: **Q ungleich null bei 22,3 %** (40 m) und 19,3 %
+(20 m). Der Einkanal-Zustand von 2026-09-25 (Q = 0, Seitenbänder
+übereinander) tritt also nur auf, solange **kein** Frequenzrahmen `0x07`
+hinausgegangen ist — mit ihm läuft echtes I/Q. Das ist die Bestätigung
+der Eingrenzung vom 2026-09-25 („ein einziger 0x07-Rahmen für
+Unterempfänger 0 schaltet echtes I/Q ein, 0 % → 21 %"), diesmal über
+zwei Bänder und mit dem Messlauf reproduzierbar.

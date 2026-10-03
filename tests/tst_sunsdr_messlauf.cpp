@@ -120,6 +120,32 @@ private slots:
         qInfo().noquote() << QStringLiteral("Frequenz gesetzt: %1 Hz").arg(freqHz);
         QTest::qWait(1500);
 
+        qInfo().noquote() << QStringLiteral(
+            "Q ungleich null: %1 %  (0 % = nur ein reeller Kanal, "
+            "Seitenbaender uebereinander)")
+            .arg(conn.qNonZeroPercentForTest(), 0, 'f', 1);
+
+        // Abfragen ZUR LAUFZEIT, nachdem die Frequenz steht. Damit laesst
+        // sich dieselbe Abfrage auf zwei Baendern stellen und vergleichen.
+        if (qEnvironmentVariableIsSet("LONGPATH_SUNSDR_NACHFRAGE")) {
+            conn.sendBenchFramesForTest(QStringLiteral("LONGPATH_SUNSDR_NACHFRAGE"));
+            QTest::qWait(1200);
+        }
+        if (qEnvironmentVariableIsSet("LONGPATH_SUNSDR_FREQ2")) {
+            const quint64 f2 =
+                qEnvironmentVariable("LONGPATH_SUNSDR_FREQ2").toULongLong();
+            conn.setReceiverFrequency(0, f2);
+            qInfo().noquote() << QStringLiteral("zweite Frequenz: %1 Hz").arg(f2);
+            QTest::qWait(1500);
+            if (qEnvironmentVariableIsSet("LONGPATH_SUNSDR_NACHFRAGE")) {
+                conn.sendBenchFramesForTest(QStringLiteral("LONGPATH_SUNSDR_NACHFRAGE"));
+                QTest::qWait(1200);
+            }
+            qInfo().noquote() << QStringLiteral(
+                "Q ungleich null nach Bandwechsel: %1 %")
+                .arg(conn.qNonZeroPercentForTest(), 0, 'f', 1);
+        }
+
         const int bloeckeVorher = iq.count();
         QElapsedTimer fenster;
         fenster.start();

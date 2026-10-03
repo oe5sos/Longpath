@@ -932,6 +932,19 @@ public:
     quint64 seqLostForTest() const { return m_iqSeqWndLost; }
     quint64 seqBackwardsForTest() const { return m_iqSeqWndBackwards; }
     QString seqDeltaReport() const;
+    // Der Anteil der Proben mit Q ungleich null in der letzten
+    // DIAG-Sekunde. 0 % heisst: die QRP liefert nur einen reellen Kanal,
+    // die Seitenbaender liegen uebereinander -- der Zustand, der am
+    // 2026-09-25 am Geraet eingegrenzt wurde.
+    double qNonZeroPercentForTest() const { return m_qNonZeroPercent; }
+    // Rahmen aus einer Umgebungsvariablen ZUR LAUFZEIT schicken, nicht nur
+    // beim Verbinden. Damit laesst sich eine Abfrage stellen, nachdem das
+    // Geraet in einen bestimmten Zustand gebracht wurde -- etwa: dieselbe
+    // Abfrage 0x0c auf zwei verschiedenen Baendern, um zu sehen, ob die
+    // Antwort bandabhaengig ist. Nur fuer die Werkbank; ohne die Variable
+    // geht nichts hinaus, und die Pruefungen aus
+    // sendBenchFrames() gelten unveraendert.
+    void sendBenchFramesForTest(const QString& envName) { sendBenchFrames(envName); }
     quint64 seqRestartsForTest() const { return m_iqSeqWndRestarts; }
     quint32 benchFramesSentForTest() const { return m_benchFramesSent; }
     quint32 benchFramesRejectedForTest() const { return m_benchFramesRejected; }
