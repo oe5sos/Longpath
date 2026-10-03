@@ -1947,6 +1947,15 @@ longpath_add_test(tst_radio_status)
 longpath_add_test(tst_radio_status_follows_mox)
 longpath_add_test(tst_settings_hygiene)
 
+# ── Dicktengleiche Schrift muss auch ankommen (2026-10-03) ───────────────────
+# tst_schrift_dicktengleich: prueft nicht den FAMILIENNAMEN, sondern was Qt
+#   nach seiner Auswahl hergibt (QFontInfo::fixedPitch). Vier Stellen nannten
+#   je einen Namen, den es auf der laufenden Plattform nicht gibt ("SF Mono"
+#   auf macOS -- loest hier auf zu .AppleSystemUIFont, also proportional --,
+#   "Consolas" ausserhalb von Windows, dazu die CSS-Gattungsnamen
+#   "monospace"/"sans-serif").
+longpath_add_test(tst_schrift_dicktengleich)
+
 # ── Phase 3P-H Task 4: status-packet parsing + RadioModel ownership ──────────
 # tst_p1_status_telemetry: feeds a hand-crafted 1032-byte ep6 datagram
 #   into P1RadioConnection::parseEp6FrameForTest and asserts the new
