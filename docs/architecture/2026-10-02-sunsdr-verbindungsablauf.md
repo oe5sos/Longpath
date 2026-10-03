@@ -629,3 +629,48 @@ zwei Ströme, und beim 96-kHz-Strom zusätzlich zwei Pakete je Nummer.
    nicht entschlüsselt. Für den ersten Schritt braucht man sie nicht —
    die zwei gemessenen Nutzlasten reichen, um 48+96 bzw. 96+144 kHz zu
    bekommen.
+
+---
+
+# Die Messwert-Frage ist entschieden: die QRP gibt keine heraus
+
+Alle Antworten, die das Gerät auf Abfragen schickt, aus **allen** drei
+Mitschnitten zusammengetragen — die vom 2026-09-23 und die vom
+2026-10-03, also über zehn Tage hinweg:
+
+| Abfrage | Antworten | davon verschieden | Länge |
+| --- | --- | --- | --- |
+| `0x0c` | 5 | **1** | 320 Byte |
+| `0x0d` | 5 | **1** | 320 Byte |
+| `0x12` | 5 | **1** | 20 Byte |
+
+**Bitgleich, über zehn Tage, über Neustarts und Bandwechsel hinweg.** Das
+sind Werksdaten — Kalibrierung, Typ, Version —, keine Momentanwerte.
+Dazu passt die Beobachtung vom Vormittag: unaufgefordert schickt das
+Gerät gar nichts, und die Zustandsbytes im Stromkopf bleiben konstant.
+
+Für die Paritätsliste heißt das abschließend:
+
+> **Im Empfang gibt es bei der QRP keine Gerätemesswerte.** Nicht über
+> `0x0c`, nicht über `0x0d`, nicht über `0x12`, nicht unaufgefordert und
+> nicht im Stromkopf.
+
+Das ist kein Mangel von Longpath, sondern eine Eigenschaft des Geräts.
+Was P1 und P2 dort melden, ist ohnehin senderseitig
+(`meterDataReceived` trägt Vorwärts- und Rückwärtsleistung,
+`paTelemetryUpdated` PA-Temperatur und -Strom) — ob die QRP das beim
+**Senden** herausgibt, ist eine eigene Frage und gehört zum Dummy-Load.
+
+Das S-Meter rechnet Longpath selbst aus dem I/Q; Übersteuerung und
+Mikrofon-PTT sind am 2026-10-03 aus dem Signal bzw. dem Stromkopf
+gebaut. Damit ist die Meldeseite im Empfang vollständig, ohne dass das
+Gerät einen einzigen Messwert liefert.
+
+## Was in den Antworten steht, soweit lesbar
+
+* `0x0c`: vier Kopfbytes, dann 39 IEEE-754-Doubles — darunter zwölf Paare
+  (12,5 / −2,4) und Skalierungsfaktoren als Zweierpotenz-Brüche.
+* `0x0d`: beginnt `ad042467`, danach überwiegend Nullen.
+* `0x12`: `ee000300 07000000 41190000 41c27c00 01000100`. Die `4119`
+  taucht auch in der Beacon-Antwort auf (dort neben der IP-Adresse des
+  Geräts) — also eher Typ- oder Versionskennung als Messwert.
