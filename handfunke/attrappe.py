@@ -39,6 +39,17 @@ INIT_BURST = [
     'vfo:0,1,14074000;',
     'vfo:1,0,7100000;',
     'vfo:1,1,7100000;',
+    # Die Mitte des Bildes (die DDC-Frequenz), NICHT die abgestimmte.
+    #
+    # Fehlte bis zum 2026-10-03, und die Luecke war kein Schoenheitsfehler:
+    # die Handfunke rechnet Abstimmstrich UND Durchlassband aus dem Abstand
+    # zwischen abgestimmter Frequenz und Bildmitte. Ohne `dds:` kennt sie die
+    # Mitte nicht, zeichnet darum gar kein Band (richtig so -- lieber nichts
+    # als etwas an der falschen Stelle) und setzt den Strich stur auf 50 %.
+    # An der Werkbank sah damit beides kaputt aus, was am echten Geraet
+    # einwandfrei laeuft.
+    'dds:0,14074000;',
+    'dds:1,7100000;',
     'modulation:0,usb;',
     'modulation:1,lsb;',
     'rx_filter_band:0,100,2500;',
@@ -273,6 +284,20 @@ class Verbindung(threading.Thread):
             # damit der Client seinen Zustand NUR vom Server bekommt.
             if len(args) >= 2:
                 self.sende_text(f'{name}:{",".join(args)};')
+            # Beim Abstimmen wandert die Bildmitte mit, solange die neue
+            # Frequenz nicht mehr ins alte Fenster passt. Die Attrappe macht
+            # es sich einfach und zieht die Mitte immer nach: so pruefen
+            # Abstimmstrich und Durchlassband wenigstens den Normalfall
+            # (Mitte = abgestimmt). Das feinere Verhalten -- Mitte steht,
+            # Strich wandert, bis der Rand kommt -- kann nur das echte
+            # Geraet zeigen.
+            if name == 'vfo' and len(args) >= 3:
+                try:
+                    trx = int(args[0]); kanal = int(args[1]); hz = int(args[2])
+                    if kanal == 0:
+                        self.sende_text(f'dds:{trx},{hz};')
+                except ValueError:
+                    pass
             print(f'  {self.addr[1]}: {zeile}')
 
     # ── Stroeme ───────────────────────────────────────────────────────────
