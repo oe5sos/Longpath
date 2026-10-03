@@ -164,3 +164,60 @@ angefasst.
 Die Reihenfolge ist nicht nach Aufwand sortiert, sondern danach, was das
 Nächste erst möglich macht: ohne 1 ist 3 geraten, ohne 2 ist der Strom
 falsch, und ohne richtigen Strom ist Senden eine Wette.
+
+
+---
+
+# Stand am Ende des 2026-10-03 — neu bilanziert
+
+Nach einem Tag Messen am echten Gerät (ohne Antenne, ohne HF) ist die
+Liste nicht nur kürzer, sondern auch anders geschnitten als gestern.
+
+## Die „4 von 13 Meldungen" war eine irreführende Zahl
+
+Sie zählte Signale, nicht Fähigkeiten. Aufgeschlüsselt:
+
+| Fehlende Meldung | Was wirklich gilt |
+| --- | --- |
+| `iqPacketLoss`, `iqSequenceGap` | **gebaut** am 2026-10-02/03 |
+| `psPairedIqDataReceived` | entfällt — kein PureSignal in der Hardware |
+| `widebandFrameReady` | entfällt — `widebandAdcs = 0` |
+| `meterDataReceived` | trägt **Vorwärts- und Rückwärtsleistung**, also reine **Sende**messwerte → gehört zu Schritt 4, nicht zum Empfang |
+| `paTelemetryUpdated` | PA-Temperatur und -Strom → ebenfalls Senden |
+| `supplyVoltsChanged`, `userAdc0Changed` | unbestätigt, ob die QRP überhaupt eine Spannung meldet |
+| **`adcOverflow`** | **echte Lücke im Empfang** |
+| **`micPttFromRadio`** | **echte Lücke** |
+
+Im **Empfang** fehlen damit noch **zwei** Meldungen, nicht neun. Das
+S-Meter rechnet Longpath ohnehin selbst aus dem I/Q — ein Geräte-S-Meter
+braucht es dafür nicht.
+
+## Was am 2026-10-03 am Gerät geklärt wurde
+
+| Frage | Antwort |
+| --- | --- |
+| Meldet das Gerät von sich aus Messwerte? | **Nein.** Über zehn Minuten kein unaufgeforderter Steuerrahmen, Zustandsbytes im Strom konstant |
+| Gibt es einen Weg, etwas abzufragen? | **Ja**, `0x0c` → 320 Byte, 39 Doubles. Aber **statisch** (band- und zeitunabhängig), also keine Messwertquelle |
+| Ist das I/Q echt? | **Ja**, Q ungleich null 21–24 %, sobald `0x07` hinausgegangen ist |
+| Tritt die Achtfachung noch auf? | **Nein**, 240 Nummern/s bei 1,20 Kopien — die Blockantwort wirkt |
+| Schaltet `0x18` (Haupttakt) die Abtastrate? | **Nein**, keine messbare Wirkung |
+| Kann die QRP einen zweiten Empfänger? | Der **Platz wird akzeptiert und quittiert** (`0x07 sub=1`, dreimal belegt), bleibt aber **stumm** — der Einschalter fehlt |
+| Quittiert das Gerät Steuerrahmen? | **Ja**, jeden angenommenen, binnen 15–50 ms. Und es gehen welche **verloren**: ein VFO-Frequenzrahmen blieb unquittiert |
+
+## Was jetzt wirklich noch fehlt
+
+1. **Zwei Minuten Mitschnitt mit ExpertSDR2** — und zwar nicht mehr „für
+   den Verbindungsablauf" allgemein, sondern für drei konkrete Fragen:
+   welcher Rahmen RX2 einschaltet, welcher die Abtastrate stellt, und
+   welche Rahmen überhaupt noch dazugehören (die dreizehn sind
+   unvollständig).
+2. **Ein 50-Ohm-Abschluss** für alles Sendeseitige — und davor die
+   Bestätigung der Opcode-Nummern (Abschnitt 3a).
+3. **Übersteuerung und Mikrofon-PTT**: die zwei echten Empfangslücken.
+   Wo sie herkommen, ist offen — das Gerät meldet sie nicht von selbst,
+   also stecken sie entweder in einer Abfrage oder in einem der
+   unbekannten Rahmen.
+4. **Unquittierte Rahmen nachschicken** — die eine Stelle, an der heute
+   ein echter Mangel gefunden wurde (eine verlorene Frequenz bleibt
+   unbemerkt). Braucht eine Entscheidung, weil der Treiber dann von
+   selbst Rahmen wiederholt.
