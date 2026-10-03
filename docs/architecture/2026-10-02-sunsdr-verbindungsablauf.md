@@ -42,19 +42,36 @@ liefert — aber die Frage ist damit von „völlig offen" auf „einen Versuch
 wert" gerückt, und der Versuch ist billig: `0x07` mit sub 1 schicken und
 sehen, ob ein zweiter Strom kommt.
 
-### 2. Longpath schickt den Stromstart-Rahmen gar nicht
+### 2. ~~Longpath schickt den Stromstart-Rahmen gar nicht~~ — FALSCH, am 2026-10-03 widerlegt
 
-Longpath schickt beim Verbinden **einen** Rahmen, und das ist ein
-`0x08`-Frequenzrahmen (im Code „state-sync" genannt). Im Mitschnitt ist
-`0x08` aber der Rahmen mit **0 Hz** — und der, der nach Form und Inhalt
-„Strom starten" heißt, ist `0x01` mit einer kleinen Tabelle als Nutzlast
-(`01000000 0c080403 02020202`).
+**Diese Behauptung war falsch, und zwar meine.** Sie stand hier einen
+halben Tag und hat eine Versuchsreihe in die falsche Richtung gelenkt.
 
-Das ist der erste belastbare Kandidat für die Erklärung der
-**Achtfachung**: wenn das Gerät nie den richtigen Startbefehl bekommt,
-läuft es in einem anderen Betriebszustand — und genau das ist der
-beobachtete Unterschied (ExpertSDR2 bekommt zwei verschiedene Pakete je
-Folgenummer, Longpath achtmal dasselbe).
+`stateSyncFrameForTest()` — der eine Rahmen, den Longpath nach der
+Beacon-Antwort schickt — ist
+
+```
+03ff01000c0000000000010000007648ea9e 010000000c08040302020202
+```
+
+also **Opcode 0x01 mit genau der Tabelle `01000000 0c080403 02020202`**,
+und damit **bitgleich** mit dem `0x01`-Rahmen aus dem
+ExpertSDR2-Mitschnitt. Longpath schickt den Stromstart-Rahmen also
+längst, und zwar byteidentisch. Der Kommentar an der Funktion sagt es
+ausdrücklich: „Opcode 0x01 — SUNSDR_OP_STATE_SYNC in ArtemisSDR's
+naming".
+
+Verwechselt hatte ich ihn mit dem Frequenzrahmen `03ff0800…`, der an
+anderer Stelle in derselben Datei steht. Eine Dateistelle gelesen, die
+andere angenommen.
+
+**Was daraus wirklich folgt:** Longpath schickt beim Verbinden vier
+Rahmen — `0x01` (Stromstart), `0x04` (Vorverstärker), `0x07` (DDC-
+Frequenz), `0x08` (VFO) — und bekommt für jeden eine Quittung. Das deckt
+sich genau mit dem ersten Mithör-Bericht. Was gegenüber ExpertSDR2 fehlt,
+sind also nicht der Startrahmen, sondern die Konfigurationsrahmen
+`0x0c`, `0x10`, `0x16`, `0x18`, `0x1c` und die weiteren, die in den
+dreizehn nicht enthalten sind.
 
 ## Der Versuch, fertig zum Abschicken
 

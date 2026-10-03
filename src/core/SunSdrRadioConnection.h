@@ -892,6 +892,47 @@ private:
     quint32 m_benchFramesSent{0};
     quint32 m_benchFramesRejected{0};
 
+    // ── Quittungen: merken, was unbeantwortet blieb ─────────────────────
+    //
+    // Am 2026-10-03 am Geraet gemessen: die QRP quittiert JEDEN
+    // Steuerrahmen, den sie annimmt -- mit demselben Opcode und leerer
+    // Nutzlast, binnen 15 bis 50 ms. Vier geschickte Rahmen, vier
+    // Quittungen; und bei den sechs Rahmen des nachgestellten
+    // Verbindungsablaufs ebenso sechs.
+    //
+    // Damit bekommt ein alter Mangel eine Loesung: bis heute schickte
+    // dieser Treiber jeden Befehl ins Blaue. Am 2026-09-25 wurde gemessen,
+    // dass ein Rahmen mit falscher Pruefsumme stillschweigend VERWORFEN
+    // wird -- "stillschweigend" war dabei unsere Sicht, nicht die des
+    // Geraets: es sagt sehr wohl etwas, naemlich nichts. Wer die
+    // Quittungen zaehlt, sieht den Unterschied.
+    //
+    // Es wird nichts wiederholt und nichts erzwungen: ein unbeantworteter
+    // Rahmen wird EINMAL gemeldet. Ein Treiber, der von selbst
+    // nachschickt, haette am Funkgeraet eine Wirkung, die niemand bestellt
+    // hat.
+    struct OffenerRahmen {
+        quint8 opcode{0};
+        qint64 beiMs{0};
+        QString grund;
+    };
+    // Eine Quittung kam im Messlauf nach 15 bis 50 ms. Eine Sekunde ist
+    // reichlich und trifft keinen gesunden Fall.
+    static constexpr qint64 kQuittungsFristMs = 1000;
+    // Deckel gegen Anwachsen, falls ein Geraet gar nicht quittiert.
+    static constexpr int kMaxOffeneRahmen = 32;
+
+    QList<OffenerRahmen> m_offeneRahmen;
+    quint64 m_quittungenGesehen{0};
+    quint64 m_rahmenOhneQuittung{0};
+    qint64 m_letzteQuittungMs{0};
+
+    // Eine Stelle fuer jeden Steuerrahmen, der an das Geraet geht: senden,
+    // Bytes buchen, auf die Quittung warten. Vorher stand das an sechs
+    // Stellen einzeln, und keine davon sah hin, ob etwas zurueckkam.
+    void sendeSteuerrahmen(const QByteArray& frame, const char* grund);
+    void pruefeOffeneRahmen();
+
     void berichteMithoeren();
     void noteControlFrame(const QByteArray& data);
     void noteStreamState(const SunSdr::IqHeader& hdr);
@@ -949,6 +990,9 @@ public:
     quint32 benchFramesSentForTest() const { return m_benchFramesSent; }
     quint32 benchFramesRejectedForTest() const { return m_benchFramesRejected; }
     bool inventoryReportedForTest() const { return m_inventoryReported; }
+    quint64 quittungenGesehenForTest() const { return m_quittungenGesehen; }
+    quint64 rahmenOhneQuittungForTest() const { return m_rahmenOhneQuittung; }
+    int offeneRahmenForTest() const { return int(m_offeneRahmen.size()); }
 };
 
 } // namespace Longpath

@@ -247,6 +247,9 @@ void SunSdrRadioConnection::connectToRadio(const RadioInfo& info)
     m_controlFramesUnparsed = 0;
     m_inventoryFullWarned = false;
     m_inventoryReported = false;
+    m_offeneRahmen.clear();
+    m_quittungenGesehen = 0;
+    m_rahmenOhneQuittung = 0;
     m_inventoryClock.invalidate();
     m_lastStreamStateValid = false;
     // Die Folgenummern-Zaehlung gehoert zur Sitzung: die erste Nummer der
@@ -572,8 +575,7 @@ void SunSdrRadioConnection::setReceiverFrequency(int receiverIndex, quint64 freq
     // Nur fuer die QRP -- nur dort gemessen.
     if (m_profile->variant == SunSdr::Variant::Qrp) {
         const QByteArray ddc = ddcFrequencyFrame(0, frequencyHz);
-        m_controlSocket->writeDatagram(ddc, m_radioAddr, m_profile->defaultCtrlPort);
-        recordBytesSent(static_cast<qint64>(ddc.size()));
+        sendeSteuerrahmen(ddc, "DDC-Frequenz 0x07");
     }
 
     // Pruefsumme jetzt gerechnet (SunSdr::withControlFrameCrc) -- vorher
@@ -583,8 +585,7 @@ void SunSdrRadioConnection::setReceiverFrequency(int receiverIndex, quint64 freq
     frame += SunSdr::encodeFrequencyPayload(frequencyHz);
     frame = SunSdr::withControlFrameCrc(frame);
 
-    m_controlSocket->writeDatagram(frame, m_radioAddr, m_profile->defaultCtrlPort);
-    recordBytesSent(static_cast<qint64>(frame.size()));
+    sendeSteuerrahmen(frame, "VFO-Frequenz 0x08");
     qCInfo(lcSunSdr) << "SunSdr: setReceiverFrequency() ->" << frequencyHz << "Hz (DDC 0x07 + VFO 0x08)";
 }
 
@@ -671,8 +672,7 @@ void SunSdrRadioConnection::setPreampModeIndex(int preampModeIdx)
                          << ") -- no such preamp step on the QRP, not sending";
         return;
     }
-    m_controlSocket->writeDatagram(frame, m_radioAddr, m_profile->defaultCtrlPort);
-    recordBytesSent(static_cast<qint64>(frame.size()));
+    sendeSteuerrahmen(frame, "Vorverstaerker 0x04");
     qCInfo(lcSunSdr).noquote() << "SunSdr: preamp step ->"
                                << frame.mid(18, 1).toHex() << "(mode index"
                                << preampModeIdx << ")";
@@ -746,8 +746,7 @@ void SunSdrRadioConnection::setAttenuator(int dB)
         return;
     }
 
-    m_controlSocket->writeDatagram(frame, m_radioAddr, m_profile->defaultCtrlPort);
-    recordBytesSent(static_cast<qint64>(frame.size()));
+    sendeSteuerrahmen(frame, "Daempfung 0x04");
     qCInfo(lcSunSdr) << "SunSdr: setAttenuator() ->" << dB << "dB";
 }
 
@@ -1000,9 +999,7 @@ void SunSdrRadioConnection::processControlDatagram(const QByteArray& data,
         sendBenchFrames(QStringLiteral("LONGPATH_SUNSDR_PRE"));
 
         const QByteArray stateSync = stateSyncFrameForTest();
-        m_controlSocket->writeDatagram(stateSync, m_radioAddr,
-                                        m_profile->defaultCtrlPort);
-        recordBytesSent(static_cast<qint64>(stateSync.size()));
+        sendeSteuerrahmen(stateSync, "Zustandsrahmen beim Verbinden");
 
         sendBenchFrames(QStringLiteral("LONGPATH_SUNSDR_EXTRA"));
     }
@@ -1342,6 +1339,11 @@ void SunSdrRadioConnection::onKeepaliveTimeout()
 
 void SunSdrRadioConnection::onDataWatchdogTick()
 {
+    // Gelegenheit, die Quittungsfristen zu pruefen: dieser Tick laeuft
+    // ohnehin regelmaessig, und ein eigener Zeitgeber waere ein zweiter
+    // Takt fuer dieselbe Sache.
+    pruefeOffeneRahmen();
+
     if (!m_running || state() != ConnectionState::Connected) { return; }
     if (!m_lastStreamPacketAt.isValid()) { return; }
     if (m_lastStreamPacketAt.elapsed() <= kDataSilenceTimeoutMs) { return; }
@@ -1519,9 +1521,7 @@ void SunSdrRadioConnection::sendBenchFrames(const QString& envName)
                        .arg(QString::fromLatin1(mitCrc.mid(14, 4).toHex()));
         }
 
-        m_controlSocket->writeDatagram(frame, m_radioAddr,
-                                        m_profile->defaultCtrlPort);
-        recordBytesSent(static_cast<qint64>(frame.size()));
+        sendeSteuerrahmen(frame, "Werkbank-Rahmen");
         ++m_benchFramesSent;
         qCInfo(lcSunSdr).nospace().noquote()
             << "SunSdr: Werkbank-Rahmen " << envName << " -- op=0x"
@@ -1686,6 +1686,24 @@ void SunSdrRadioConnection::noteControlFrame(const QByteArray& data)
     }
     tallyFrame(m_controlInventory, "Steuerkanal", hdr.opcode, hdr.sub,
                quint16(payload.size()), payload);
+
+    // Quittung zuordnen: gleicher Opcode, und der aelteste offene Rahmen
+    // dieses Opcodes gilt als beantwortet (zwei gleiche Opcodes koennen
+    // dicht hintereinander hinausgehen -- 0x08 geht als Zustandsrahmen UND
+    // als VFO-Frequenz).
+    for (int i = 0; i < m_offeneRahmen.size(); ++i) {
+        if (m_offeneRahmen.at(i).opcode != hdr.opcode) { continue; }
+        const qint64 nach =
+            (m_inventoryClock.isValid() ? m_inventoryClock.elapsed() : 0)
+            - m_offeneRahmen.at(i).beiMs;
+        ++m_quittungenGesehen;
+        m_letzteQuittungMs = nach;
+        qCDebug(lcSunSdr).nospace()
+            << "SunSdr: op=0x" << Qt::hex << hdr.opcode << Qt::dec
+            << " nach " << nach << " ms quittiert";
+        m_offeneRahmen.removeAt(i);
+        break;
+    }
 }
 
 void SunSdrRadioConnection::noteStreamState(const SunSdr::IqHeader& hdr)
@@ -2050,6 +2068,46 @@ QString SunSdrRadioConnection::seqDeltaReport() const
     return QStringLiteral("SunSdr: Folgenummern roh, %1 Schritte: %2")
         .arg(m_seqDeltas.size())
         .arg(teile.join(QStringLiteral(" ")));
+}
+
+void SunSdrRadioConnection::sendeSteuerrahmen(const QByteArray& frame,
+                                             const char* grund)
+{
+    if (!m_controlSocket || !m_profile) { return; }
+    m_controlSocket->writeDatagram(frame, m_radioAddr,
+                                    m_profile->defaultCtrlPort);
+    recordBytesSent(static_cast<qint64>(frame.size()));
+
+    if (frame.size() < SunSdr::kCtlHeaderSize) { return; }
+    if (!m_inventoryClock.isValid()) { m_inventoryClock.start(); }
+    if (m_offeneRahmen.size() >= kMaxOffeneRahmen) {
+        // Nicht weiter sammeln. Dass nichts quittiert wird, hat
+        // pruefeOffeneRahmen() dann schon gemeldet.
+        return;
+    }
+    OffenerRahmen offen;
+    offen.opcode = quint8(frame[2]);
+    offen.beiMs = m_inventoryClock.elapsed();
+    offen.grund = QString::fromLatin1(grund);
+    m_offeneRahmen.append(offen);
+}
+
+void SunSdrRadioConnection::pruefeOffeneRahmen()
+{
+    if (m_offeneRahmen.isEmpty() || !m_inventoryClock.isValid()) { return; }
+    const qint64 now = m_inventoryClock.elapsed();
+    for (int i = m_offeneRahmen.size() - 1; i >= 0; --i) {
+        const OffenerRahmen& offen = m_offeneRahmen.at(i);
+        if (now - offen.beiMs < kQuittungsFristMs) { continue; }
+        ++m_rahmenOhneQuittung;
+        qCWarning(lcSunSdr).nospace().noquote()
+            << "SunSdr: Rahmen op=0x" << QString::number(offen.opcode, 16)
+            << " (" << offen.grund << ") wurde nach " << kQuittungsFristMs
+            << " ms nicht quittiert -- das Geraet hat ihn wahrscheinlich "
+               "verworfen (am 2026-09-25 gemessen: eine falsche Pruefsumme "
+               "wird stillschweigend verworfen)";
+        m_offeneRahmen.removeAt(i);
+    }
 }
 
 } // namespace Longpath

@@ -1774,6 +1774,57 @@ private slots:
         QCOMPARE(conn.benchFramesRejectedForTest(), 0u);
     }
 
+    // ── Quittungen ─────────────────────────────────────────────────────
+    //
+    // Am 2026-10-03 am Geraet gemessen: die QRP quittiert jeden Rahmen, den
+    // sie annimmt, mit demselben Opcode und leerer Nutzlast, binnen 15 bis
+    // 50 ms. Bis dahin schickte dieser Treiber jeden Befehl ins Blaue.
+
+    void quittungWirdDemGesendetenRahmenZugeordnet()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        const QHostAddress radio = handshake(conn);
+
+        // Der Handschlag hat den Zustandsrahmen hinausgeschickt, und der
+        // traegt Opcode 0x01 (SUNSDR_OP_STATE_SYNC) -- nicht 0x08. Diese
+        // Verwechslung hat mich am 2026-10-03 eine falsche Behauptung
+        // gekostet ("Longpath schickt den Stromstart-Rahmen gar nicht"):
+        // stateSyncFrameForTest() ist bitgleich mit dem 0x01-Rahmen aus
+        // dem ExpertSDR2-Mitschnitt, Longpath schickt ihn also laengst.
+        QVERIFY(conn.offeneRahmenForTest() >= 1);
+        QCOMPARE(conn.quittungenGesehenForTest(), quint64(0));
+
+        conn.feedControlDatagramForTest(
+            qrpControlFrame(0x01, 0, QByteArray()), radio);
+
+        QCOMPARE(conn.quittungenGesehenForTest(), quint64(1));
+        QCOMPARE(conn.rahmenOhneQuittungForTest(), quint64(0));
+    }
+
+    // Eine Quittung mit anderem Opcode darf den offenen Rahmen nicht
+    // schliessen -- sonst zaehlt der Zaehler irgendetwas, nicht die Sache.
+    void fremdeQuittungSchliesstDenOffenenRahmenNicht()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        const QHostAddress radio = handshake(conn);
+        const int offenVorher = conn.offeneRahmenForTest();
+        QVERIFY(offenVorher >= 1);
+
+        conn.feedControlDatagramForTest(
+            qrpControlFrame(0x16, 0, QByteArray()), radio);
+
+        QCOMPARE(conn.quittungenGesehenForTest(), quint64(0));
+        QCOMPARE(conn.offeneRahmenForTest(), offenVorher);
+    }
+
     // ── Folgenummern: Verlust, Luecken, Wiederholungen ────────────────
     //
     // P1 und P2 melden das seit langem, dieser Treiber bisher nicht. Die
