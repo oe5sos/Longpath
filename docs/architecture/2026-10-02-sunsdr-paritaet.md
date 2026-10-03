@@ -93,6 +93,40 @@ dazu bringt, die Sachen überhaupt zu schicken.
 | Zweiter Empfänger | Offen, ob die Hardware es kann. Der Startablauf setzt `RX2_ENABLE=0` (Opcode 0x1B) — das beweist nur, dass RX2 abgeschaltet *wird* |
 | Mikrofonweg (`setMicBoost`, `setLineIn`, `setLineInGain`, Buchsendetails) | Opcode 0x21 (MIC_SOURCE) ist bestätigt, die Werte nicht |
 
+### 3a. Die Opcode-Nummern der QRP sind nicht die der DX (2026-10-03)
+
+Aus den dreizehn mitgeschnittenen Rahmen und ArtemisSDRs eigener
+Opcode-Tabelle (`sunsdr.h`) ergibt sich ein Befund, der **Schritt 4
+umsortiert**:
+
+| Befehl | QRP (am Gerät gemessen) | DX (ArtemisSDR) |
+| --- | --- | --- |
+| Vorverstärker | `0x04`, Werte 0…3 | `0x05`, Werte 0x80…0x83 |
+| DDC-Frequenz | `0x07` | `0x08` (`FREQ_COMP`) |
+| VFO-Frequenz | `0x08` | `0x09` (`FREQ_PRIMARY`) |
+| erstes Byte des Rahmens | `0x03` | `0x32` |
+
+Dreimal liegt die QRP **um eins darunter**, und die Nutzlast ist anders
+codiert. Longpaths vier TX-Rahmenbauer tragen aber unverändert die
+DX-Nummern: MOX `0x06`, Antenne `0x15`, Drive `0x17`, PA `0x24`.
+
+**Daraus folgt ausdrücklich nicht „minus eins rechnen".** `0x01` passt
+ohne Versatz zu DX' `STATE_SYNC`, die QRP hat also eine eigene Tabelle,
+die in Teilen übereinstimmt. Die einzige haltbare Regel ist: **jede
+Nummer einzeln bestätigen, bevor sie an ein Funkgerät geht.**
+
+Was sonst passiert, ist durchgerechnet: schickt Longpath `0x06` in der
+Annahme „MOX" und bedeutet es bei der QRP etwas anderes, geht beim ersten
+Sendeversuch etwas Unbekanntes ans Gerät — genau der Fehler vom
+2026-09-23, als unzugeordnete Opcodes an die QRP geschickt wurden.
+Bestätigt wird darum **nicht durch Probieren am Gerät**, sondern durch
+einen Mitschnitt, in dem ExpertSDR2 sendet.
+
+Festgehalten ist das mit einer Sperre: `tst_sunsdr_protocol` erzwingt für
+alle vier DX-stämmigen Rahmenbauer **null Produktions-Aufrufstellen**
+(vorher nur für `buildDriveFrame`), mit zwei Gegenproben, damit die
+Sperre nicht blind grün ist.
+
 ### 4. Braucht einen Abschluss am Ausgang — nicht zwingend eine Antenne
 
 Senden: `sendTxIq` auf den Draht, MOX bis zum Gerät, Leistung, Zeitlage
@@ -120,7 +154,10 @@ angefasst.
    wie P2.
 4. **Senden.** Schritte 4–6 des bestehenden TX-Plans. Zuletzt, weil hier
    zum ersten Mal HF entsteht und jeder Versuch eine Freigabe des
-   Betreibers braucht.
+   Betreibers braucht. **Beginnt nicht mit dem Verdrahten, sondern mit der
+   Bestätigung der Opcode-Nummern** (siehe 3a): die vier TX-Rahmenbauer
+   tragen DX-Nummern, und bei drei gemessenen Befehlen liegt die QRP um
+   eins darunter.
 5. **Der Rest.** Abtastrate, zweiter Empfänger, Antennenumschaltung,
    Mikrofon-Zubehör.
 
