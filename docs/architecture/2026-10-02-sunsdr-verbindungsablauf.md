@@ -674,3 +674,33 @@ Gerät einen einzigen Messwert liefert.
 * `0x12`: `ee000300 07000000 41190000 41c27c00 01000100`. Die `4119`
   taucht auch in der Beacon-Antwort auf (dort neben der IP-Adresse des
   Geräts) — also eher Typ- oder Versionskennung als Messwert.
+
+---
+
+# Vorbehalt: Logzeilen konnten verloren gehen (Hinweis aus PR #171)
+
+Eine Nebensitzung hat am 2026-10-03 gemessen, dass sich Logzeilen
+gegenseitig zerschreiben, wenn mehrere Fäden gleichzeitig schreiben —
+**zwischen 7 % und 55 % der Zeilen gingen ganz verloren** (behoben in
+PR #171, dort noch offen). Das betrifft alles, was auf diesem Blatt aus
+**Longpaths Logdatei** gelesen wurde, und gehört dazugesagt.
+
+**Welche Befunde hängen an Logzeilen, und halten sie trotzdem?**
+
+| Befund | Quelle | hält? |
+| --- | --- | --- |
+| Das Gerät quittiert jeden Steuerrahmen | Betriebslog **+** Zähler im Treiber **+** tcpdump | **ja**, dreifach |
+| „1,00 Kopien je Nummer im echten Betrieb" | Betriebslog | ja — eine Zeile ist entweder da oder fehlt, ihre Zahlen werden nicht verfälscht |
+| **„Das Gerät meldet von sich aus nichts"** | zuerst nur Betriebslog | **anfällig** — fehlende Zeilen hätten wie fehlende Meldungen ausgesehen |
+| Raten, Kanäle, Paketzahlen | Zähler im Treiber, über `qInfo` im Prüfstand | ja, nicht über die Logdatei |
+| Verbindungsablauf, Stopp-Rahmen, Abfrage-Antworten | **tcpdump** | ja, am Draht gemessen |
+
+Der eine anfällige Schluss ist **unabhängig bestätigt**: der Mitschnitt
+zeigt jedes Paket am Draht, und dort schickt das Gerät zwischen den
+Quittungen tatsächlich nichts. Hätte das Log Zeilen verloren, wäre die
+Lücke im tcpdump nicht zu sehen gewesen — sie ist es nicht.
+
+**Regel daraus für künftige Messläufe:** ein Negativ-Schluss („es kommt
+nichts") darf nicht allein auf einer Logdatei stehen. Zähler im Code oder
+ein Mitschnitt am Draht — beides zählt, was wirklich ankam, und beides
+war heute vorhanden.
