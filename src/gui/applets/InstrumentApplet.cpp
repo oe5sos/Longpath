@@ -253,7 +253,7 @@ void InstrumentApplet::forEachInstrument(
 
 void InstrumentApplet::contextMenuEvent(QContextMenuEvent* ev)
 {
-    QMenu* menu = buildContextMenu(this);
+    QMenu* menu = buildContextMenu(window());   // am Fenster, siehe AmpApplet::contextMenuEvent()
     menu->exec(ev->globalPos());
     menu->deleteLater();
 }
@@ -262,7 +262,7 @@ void InstrumentApplet::contextMenuEvent(QContextMenuEvent* ev)
 // daher an der Mitte des Widgets verankert statt am Klickpunkt.
 void InstrumentApplet::openExtendedSettings()
 {
-    QMenu* menu = buildContextMenu(this);
+    QMenu* menu = buildContextMenu(window());   // am Fenster, siehe AmpApplet::contextMenuEvent()
     menu->exec(mapToGlobal(rect().center()));
     menu->deleteLater();
 }

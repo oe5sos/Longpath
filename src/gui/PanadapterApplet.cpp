@@ -177,7 +177,7 @@ PanadapterApplet::PanadapterApplet(const QString& panId, QWidget* parent)
              QLatin1String(Style::kAccent)));
     headLay->addWidget(m_btnOptions);
     connect(m_btnOptions, &QPushButton::clicked, this, [this]() {
-        QMenu* m = buildDisplayMenu(this);
+        QMenu* m = buildDisplayMenu(window());   // am Fenster, siehe contextMenuEvent()
         m->exec(m_btnOptions->mapToGlobal(
             QPoint(0, m_btnOptions->height())));
         m->deleteLater();
@@ -479,7 +479,10 @@ void PanadapterApplet::setExtendedViewEnabled(bool on)
 // checkable Extended view entry. Pops at the global cursor position.
 void PanadapterApplet::contextMenuEvent(QContextMenuEvent* event)
 {
-    QMenu* menu = buildContextMenu(this);
+    // Am Fenster, nicht am Applet (2026-09-30): das Applet ist nativ (es
+    // traegt den Panadapter), und ein Menue daran bekam von Qt keinen
+    // Fensterbezug („... must be a top level window.").
+    QMenu* menu = buildContextMenu(window());
     menu->exec(event->globalPos());
     menu->deleteLater();
 }
