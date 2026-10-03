@@ -56,11 +56,13 @@ CTRL_PORT = 50001
 STREAM_PORT = 50002
 CTL_HDR = 18
 
-# Was Longpath selbst je schickt, Stand 2026-10-02: Suchanfrage (0x00),
-# Vorverstaerker/Daempfung (0x04), DDC-Frequenz (0x07), VFO-Frequenz
-# (0x08, auch als "Zustandsrahmen" beim Verbinden). Alles andere in einem
+# Was Longpath selbst je schickt, Stand 2026-10-03 (am Geraet
+# nachgezaehlt, nicht aus dem Code geraten -- die erste Fassung dieser
+# Liste enthielt den Zustandsrahmen falsch): Suchanfrage (0x00),
+# Stromstart/STATE_SYNC (0x01), Vorverstaerker/Daempfung (0x04),
+# DDC-Frequenz (0x07), VFO-Frequenz (0x08). Alles andere in einem
 # Mitschnitt von ExpertSDR2 ist etwas, das wir dem Geraet nie sagen.
-LONGPATH_SENDET = {0x00, 0x04, 0x07, 0x08}
+LONGPATH_SENDET = {0x00, 0x01, 0x04, 0x07, 0x08}
 
 
 def udpMitRichtung(path):
@@ -238,6 +240,55 @@ def selftest():
     os.unlink(pfad)
 
 
+def vergleiche(a, b):
+    """Welche Rahmensorten kommen nur in a, nur in b, oder mit anderer Nutzlast?
+
+    Dafuer gedacht, zwei Mitschnitte desselben Ablaufs gegeneinander zu
+    legen -- etwa einmal mit RX2 ein und einmal aus. Der Rahmen, der sich
+    dabei unterscheidet, IST der Schalter. Genau so laesst sich ein Opcode
+    zuordnen, ohne ihn am Funkgeraet zu erraten.
+    """
+    def sammle(path):
+        aus = {}
+        for ts, src, sport, dst, dport, pl in udpMitRichtung(path):
+            if dport != CTRL_PORT:
+                continue          # nur, was der Rechner hinausschickt
+            k = kopf(pl)
+            if k is None:
+                continue
+            aus.setdefault((k[0], k[1]), []).append(pl[CTL_HDR:])
+        return aus
+
+    A, B = sammle(a), sammle(b)
+    nurA = sorted(set(A) - set(B))
+    nurB = sorted(set(B) - set(A))
+    beide = sorted(set(A) & set(B))
+
+    print("Vergleich:")
+    print("  %s" % a)
+    print("  %s" % b)
+    print()
+    for name, menge in (("nur im ersten", nurA), ("nur im zweiten", nurB)):
+        if menge:
+            print("%s:" % name)
+            for op, sub in menge:
+                print("  op=0x%02x sub=%d  (%s)" % (op, sub, deuten(op)))
+    print()
+    print("in beiden, aber mit ANDERER Nutzlast -- das sind die Kandidaten:")
+    gefunden = False
+    for op, sub in beide:
+        wa, wb = set(x.hex() for x in A[(op, sub)]), set(x.hex() for x in B[(op, sub)])
+        if wa != wb:
+            gefunden = True
+            print("  op=0x%02x sub=%d  (%s)" % (op, sub, deuten(op)))
+            for x in sorted(wa - wb):
+                print("      nur erster:  %s" % x)
+            for x in sorted(wb - wa):
+                print("      nur zweiter: %s" % x)
+    if not gefunden:
+        print("  keine -- dieselben Rahmen mit denselben Werten")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -245,6 +296,9 @@ def main():
                     help="Mitschnitt (pcap oder pcapng)")
     ap.add_argument("--alle", action="store_true",
                     help="auch die Rahmen nach dem Verbindungsablauf zeigen")
+    ap.add_argument("--vergleich", default="",
+                    help="zweiter Mitschnitt: zeigt, welche Rahmen sich "
+                         "zwischen beiden unterscheiden (z. B. RX2 ein/aus)")
     ap.add_argument("--selftest", action="store_true",
                     help="mit einem selbst gebauten Mitschnitt pruefen, "
                          "dass das Werkzeug tut, was es soll")
@@ -254,6 +308,9 @@ def main():
         return
     if not args.pcap:
         ap.error("Entweder eine pcap-Datei oder --selftest.")
+    if args.vergleich:
+        vergleiche(args.pcap, args.vergleich)
+        return
     auswerten(args.pcap, args.alle)
 
 

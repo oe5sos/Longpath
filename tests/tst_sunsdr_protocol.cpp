@@ -41,6 +41,53 @@ QByteArray hexBytes(const char* hex)
 
 } // namespace
 
+// Sucht echte Aufrufstellen einer Funktion unter src/, Kommentarzeilen
+// ausgenommen.
+//
+// Die Kommentar-Ausnahme ist nicht Kosmetik: am 2026-10-03 schlug die
+// erste Fassung dieser Pruefung an einer Zeile an, die genau das Gegenteil
+// sagt -- "encoders (SunSdrProtocol::buildMoxFrame() and friends) are NOT
+// called". Eine Pruefung, die an der Beschreibung des richtigen Zustands
+// scheitert, erzieht dazu, sie abzuschalten.
+//
+// Blockkommentare werden nur erkannt, soweit die Zeile mit * beginnt; das
+// deckt den hier ueblichen Stil ab, mehr soll diese Hilfe nicht leisten.
+inline QStringList aufrufstellenVon(const QString& name)
+{
+    const QString root =
+        QString::fromLatin1(LONGPATH_SOURCE_ROOT) + QStringLiteral("/src");
+    const QRegularExpression callSite(
+        QStringLiteral(R"(\b%1\s*\()").arg(name));
+    QStringList treffer;
+
+    QDirIterator it(root,
+                    QStringList{QStringLiteral("*.cpp"), QStringLiteral("*.h"),
+                                 QStringLiteral("*.cc"), QStringLiteral("*.hpp"),
+                                 QStringLiteral("*.mm")},
+                    QDir::Files, QDirIterator::Subdirectories);
+    while (it.hasNext()) {
+        const QString path = it.next();
+        if (path.endsWith(QStringLiteral("src/core/sunsdr/SunSdrProtocol.h"))
+            || path.endsWith(QStringLiteral("src/core/sunsdr/SunSdrProtocol.cpp"))) {
+            continue;  // Erklaerung und Umsetzung der Funktion selbst
+        }
+        QFile f(path);
+        if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) { continue; }
+        const QStringList zeilen =
+            QString::fromUtf8(f.readAll()).split(QLatin1Char('\n'));
+        for (const QString& zeile : zeilen) {
+            const QString roh = zeile.trimmed();
+            if (roh.startsWith(QStringLiteral("//"))
+                || roh.startsWith(QLatin1Char('*'))) { continue; }
+            if (callSite.match(zeile).hasMatch()) {
+                treffer << path;
+                break;
+            }
+        }
+    }
+    return treffer;
+}
+
 class TestSunSdrProtocol : public QObject
 {
     Q_OBJECT
@@ -487,40 +534,82 @@ private slots:
     // enforcing an absence instead of a presence.
     void buildDriveFrameHasNoProductionCallSites()
     {
-        const QString root =
-            QString::fromLatin1(LONGPATH_SOURCE_ROOT) + QStringLiteral("/src");
-        QDirIterator it(root,
-                        QStringList{QStringLiteral("*.cpp"), QStringLiteral("*.h"),
-                                     QStringLiteral("*.cc"), QStringLiteral("*.hpp"),
-                                     QStringLiteral("*.mm")},
-                        QDir::Files, QDirIterator::Subdirectories);
-
-        const QRegularExpression callSite(
-            QStringLiteral(R"(\bbuildDriveFrame\s*\()"));
-        QStringList offenders;
-
-        while (it.hasNext()) {
-            const QString path = it.next();
-            if (path.endsWith(QStringLiteral(
-                    "src/core/sunsdr/SunSdrProtocol.h")) ||
-                path.endsWith(QStringLiteral(
-                    "src/core/sunsdr/SunSdrProtocol.cpp"))) {
-                continue;  // the function's own declaration/definition
-            }
-            QFile f(path);
-            if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) { continue; }
-            const QString src = QString::fromUtf8(f.readAll());
-            if (callSite.match(src).hasMatch()) {
-                offenders << path;
-            }
-        }
-
+        // Auf aufrufstellenVon() umgestellt (2026-10-03): die eigene Suche
+        // hier traf auch Kommentarzeilen. Das fiel nur deshalb nie auf, weil
+        // ueber buildDriveFrame() zufaellig keine Kommentarzeile mit Klammern
+        // existiert -- bei buildMoxFrame() gibt es eine, und sie sagt das
+        // Gegenteil eines Aufrufs.
+        const QStringList offenders = aufrufstellenVon(QStringLiteral("buildDriveFrame"));
         QVERIFY2(offenders.isEmpty(),
                  qPrintable(QStringLiteral(
                      "buildDriveFrame() must have zero production call "
                      "sites in Step 1 (no QRP bench power-calibration "
                      "table exists yet) -- found references in: ") +
                      offenders.join(QStringLiteral(", "))));
+    }
+
+    // ── Die drei anderen DX-staemmigen TX-Rahmenbauer: ebenso gesperrt ──
+    //
+    // Begruendung ist hier eine ANDERE als bei buildDriveFrame (dort fehlt
+    // die Leistungskalibrierung) und sie ist am 2026-10-03 aus den
+    // mitgeschnittenen Rahmen heraus praeziser geworden: bei der QRP sind
+    // drei am Geraet gemessene Steuerbefehle gegenueber der DX **um eins
+    // nach unten verschoben**, und ihre Nutzlasten sind anders codiert:
+    //
+    //   Vorverstaerker   QRP 0x04, Werte 0..3   | DX 0x05, Werte 0x80..0x83
+    //   DDC-Frequenz     QRP 0x07               | DX 0x08 (FREQ_COMP)
+    //   VFO-Frequenz     QRP 0x08               | DX 0x09 (FREQ_PRIMARY)
+    //
+    // Dazu ist schon das erste Byte ein anderes (QRP 0x03, DX 0x32). Die
+    // QRP spricht also eine verwandte, aber eigene Variante -- und
+    // buildMoxFrame/buildAntennaSelectFrame/buildPaEnableFrame tragen
+    // unveraendert die DX-Nummern 0x06/0x15/0x24. Ein globaler Versatz ist
+    // es allerdings NICHT: 0x01 passt ohne Versatz zu DX' STATE_SYNC.
+    // Daraus folgt nicht "minus eins rechnen", sondern: jede Nummer muss
+    // einzeln bestaetigt werden, bevor sie an ein Funkgeraet geht.
+    //
+    // Was sonst passiert, ist durchgerechnet: schickt Longpath 0x06 in der
+    // Annahme "MOX" und ist die QRP-Bedeutung eine andere, dann geht beim
+    // ersten Sendeversuch etwas Unbekanntes ans Geraet -- genau der Fehler
+    // vom 2026-09-23, als unzugeordnete Opcodes an die QRP geschickt
+    // wurden. Bestaetigt wird darum nicht durch Probieren am Geraet,
+    // sondern durch einen Mitschnitt, in dem ExpertSDR2 sendet.
+    // Gegenprobe zu den zwei Sperren darueber und darunter: eine Suche, die
+    // nie etwas findet, beweist nichts. withControlFrameCrc() WIRD benutzt
+    // (SunSdrRadioConnection.cpp, Frequenzrahmen) -- findet die Hilfe sie
+    // nicht, ist jedes gruene "keine Aufrufstellen" wertlos.
+    void dieSucheFindetEinenEchtenAufruf()
+    {
+        const QStringList treffer =
+            aufrufstellenVon(QStringLiteral("withControlFrameCrc"));
+        QVERIFY2(!treffer.isEmpty(),
+                 "Die Suche findet einen bekannten echten Aufruf nicht -- "
+                 "damit sagen die Sperrpruefungen nichts aus");
+    }
+
+    // Und sie darf sich nicht von einer Kommentarzeile taeuschen lassen:
+    // genau daran schlug die erste Fassung an (SunSdrRadioConnection.cpp
+    // sagt "buildMoxFrame() and friends are NOT called").
+    void dieSucheUebergehtKommentarzeilen()
+    {
+        QVERIFY(aufrufstellenVon(QStringLiteral("buildMoxFrame")).isEmpty());
+    }
+
+    void dieDreiAnderenDxStaemmigenTxEncoderHabenKeineAufrufstellen()
+    {
+        const QStringList gesperrt{QStringLiteral("buildMoxFrame"),
+                                   QStringLiteral("buildAntennaSelectFrame"),
+                                   QStringLiteral("buildPaEnableFrame")};
+        for (const QString& name : gesperrt) {
+            const QStringList offenders = aufrufstellenVon(name);
+            QVERIFY2(offenders.isEmpty(),
+                     qPrintable(QStringLiteral(
+                         "%1() traegt eine DX-Opcode-Nummer, die fuer die QRP "
+                         "nicht bestaetigt ist (bei drei gemessenen Befehlen "
+                         "liegt die QRP um eins darunter). Erst bestaetigen, "
+                         "dann verdrahten -- gefunden in: ")
+                         .arg(name) + offenders.join(QStringLiteral(", "))));
+        }
     }
 
     // ── PA enable (opcode 0x24) ──────────────────────────────────────
