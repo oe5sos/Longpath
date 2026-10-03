@@ -1690,6 +1690,44 @@ private slots:
             QStringLiteral("nichts aufgenommen")));
     }
 
+    // Der Fall, fuer den das Mithoeren gebaut ist: das Geraet schaltet
+    // sich ab (Akku leer, Stecker weg). Das endet NICHT ueber disconnect(),
+    // sondern ueber den Stillstands-Wachhund -- und die Uebersicht muss
+    // trotzdem ins Log, sonst ist die ganze Sammelarbeit genau in dem Lauf
+    // verloren, fuer den sie gedacht war.
+    void geraeteausfallSchreibtDieUebersichtTrotzdem()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        const QHostAddress radio = handshake(conn);
+        conn.feedControlDatagramForTest(
+            qrpControlFrame(0x0d, 0, QByteArray::fromHex("01000000")), radio);
+        QCOMPARE(conn.controlFrameKindsForTest(), 1);
+
+        // Erst ein Strompaket: ohne das kommt die Verbindung nie bis
+        // Connected, und dann greift der Stillstands-Wachhund gar nicht --
+        // es feuert der Verbindungs-Wachhund. Zwei verschiedene Abbrueche,
+        // und nur der erste ist "das Geraet war da und ist weg".
+        conn.feedStreamDatagramForTest(silentIqPacket());
+        QTRY_COMPARE_WITH_TIMEOUT(conn.state(), ConnectionState::Connected, 500);
+
+        // Keine Pakete mehr -- der Wachhund laeuft ab und bricht ab.
+        QTRY_COMPARE_WITH_TIMEOUT(
+            conn.state(), ConnectionState::LinkLost,
+            SunSdrRadioConnection::dataSilenceTimeoutMsForTest() + 2000);
+
+        // Der Beleg: die Uebersicht war fertig, BEVOR die Sitzung geraeumt
+        // wurde -- das Inventar steht also noch, und der Bericht ist
+        // geschrieben. Zweimal darf er nicht kommen, auch wenn der
+        // Betreiber danach noch disconnect() nachschiebt.
+        QVERIFY(conn.inventoryReportedForTest());
+        conn.disconnect();
+        QVERIFY(conn.inventoryReportedForTest());
+    }
+
     // ── Werkbank-Rahmen: was hinausgeht, muss das sein, was dastand ────
     //
     // Der Versuch mit dem Verbindungsablauf (siehe

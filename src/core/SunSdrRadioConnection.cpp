@@ -246,6 +246,7 @@ void SunSdrRadioConnection::connectToRadio(const RadioInfo& info)
     m_controlFramesSeen = 0;
     m_controlFramesUnparsed = 0;
     m_inventoryFullWarned = false;
+    m_inventoryReported = false;
     m_inventoryClock.invalidate();
     m_lastStreamStateValid = false;
     // Die Folgenummern-Zaehlung gehoert zur Sitzung: die erste Nummer der
@@ -451,9 +452,7 @@ void SunSdrRadioConnection::disconnect()
     // soll das Ergebnis im Log finden, ohne es waehrenddessen abfragen zu
     // muessen. Nur wenn ueberhaupt etwas angekommen ist -- eine Zeile
     // "nichts aufgenommen" bei jedem Programmende waere Laerm.
-    if (!m_controlInventory.isEmpty() || !m_streamStateInventory.isEmpty()) {
-        qCInfo(lcSunSdr).noquote() << frameInventoryReport();
-    }
+    berichteMithoeren();
 
     m_running = false;
     m_awaitingBeacon = false;  // a late beacon reply after this must not
@@ -1388,6 +1387,15 @@ void SunSdrRadioConnection::onDataWatchdogTick()
     if (m_controlSocket) { m_controlSocket->close(); }
     if (m_streamSocket) { m_streamSocket->close(); }
 
+    // Der Bericht gehoert AUCH hierher, und das ist der wichtigere Fall:
+    // ein Geraet, das sich ausschaltet (Akku leer, Netzteil weg, Stecker
+    // gezogen), endet nicht ueber disconnect(), sondern hier. Am
+    // 2026-10-03 genau so aufgefallen -- der Betreiber liess die QRP am
+    // Akku mitsammeln und ging weg. Waere der Bericht nur beim
+    // ordentlichen Trennen geschrieben worden, waere die Uebersicht
+    // ausgerechnet in dem Lauf verloren gewesen, fuer den sie gebaut ist.
+    berichteMithoeren();
+
     setState(ConnectionState::LinkLost);
     emit errorOccurred(RadioConnectionError::NoDataTimeout,
                        QStringLiteral("SunSDR: radio stopped responding"));
@@ -1963,6 +1971,20 @@ void SunSdrRadioConnection::auditStreamSeq(quint16 seq)
     m_iqSeqWndEvents = 0;
     m_iqSeqWndBackwards = 0;
     m_lastGapSignalMs = -1;
+}
+
+void SunSdrRadioConnection::berichteMithoeren()
+{
+    // Nur wenn etwas angekommen ist -- eine Zeile "nichts aufgenommen" bei
+    // jedem Programmende waere Laerm. Und nur EINMAL je Sitzung: ein
+    // Wachhund-Abbruch, dem der Betreiber ein disconnect() nachschiebt,
+    // soll die Uebersicht nicht zweimal ins Log schreiben.
+    if (m_inventoryReported) { return; }
+    if (m_controlInventory.isEmpty() && m_streamStateInventory.isEmpty()) {
+        return;
+    }
+    m_inventoryReported = true;
+    qCInfo(lcSunSdr).noquote() << frameInventoryReport();
 }
 
 } // namespace Longpath

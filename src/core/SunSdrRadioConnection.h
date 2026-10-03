@@ -835,6 +835,7 @@ private:
     quint32 m_benchFramesSent{0};
     quint32 m_benchFramesRejected{0};
 
+    void berichteMithoeren();
     void noteControlFrame(const QByteArray& data);
     void noteStreamState(const SunSdr::IqHeader& hdr);
     void tallyFrame(QHash<quint64, FrameTally>& inventory, const char* channel,
@@ -846,6 +847,10 @@ private:
     quint64 m_controlFramesSeen{0};
     quint64 m_controlFramesUnparsed{0};
     bool m_inventoryFullWarned{false};
+    // Ob die Uebersicht in dieser Sitzung schon im Log steht. Sie wird an
+    // zwei Stellen geschrieben -- beim Trennen und beim Wachhund-Abbruch,
+    // siehe berichteMithoeren() -- und darf trotzdem nur einmal kommen.
+    bool m_inventoryReported{false};
     // Laeuft ab dem Augenblick, in dem die Verbindung steht, damit die
     // Zeiten im Bericht gegen den Verbindungsbeginn lesbar sind und nicht
     // gegen die Uhr des Rechners.
@@ -871,6 +876,7 @@ public:
     quint64 seqBackwardsForTest() const { return m_iqSeqWndBackwards; }
     quint32 benchFramesSentForTest() const { return m_benchFramesSent; }
     quint32 benchFramesRejectedForTest() const { return m_benchFramesRejected; }
+    bool inventoryReportedForTest() const { return m_inventoryReported; }
 };
 
 } // namespace Longpath
