@@ -212,11 +212,33 @@ def miss_hf(v, sekunden):
     ein offener Eingang kaum 10. Am 2026-10-03 am selben Vormittag gemessen:
     7 dB am QRP ohne Antenne, 39 dB an der Anvelina mit.
     """
-    v.sende("spectrum_start:0,373,10;")
+    # Ausdruecklich eine SCHMALE Spanne verlangen. Damit zeigt sich zugleich,
+    # ob der Server die wirklich gezeigte Breite zurueckmeldet (`spectrum_span`,
+    # eingefuehrt 2026-10-03): er hebt einen zu schmalen Wunsch naemlich an,
+    # wenn die Punktzahl mehr Bins verlangt, als der Ausschnitt hergibt. Wer
+    # mit seinem Wunsch weiterrechnet, setzt Abstimmstrich und Durchlassband
+    # daneben.
+    v.sende("spectrum_start:0,373,10,12000;")
     v.leeren()
     v.sammle(sekunden)
     rahmen = rahmen_nach_art(v.binaer).get(STREAM_SPEKTRUM, [])
     print(f"  Spektrumrahmen     {len(rahmen):5d}  in {sekunden} s")
+    gemeldet = [z for z in v.zeilen() if z.lower().startswith("spectrum_span")]
+    if gemeldet:
+        try:
+            hz = int(gemeldet[-1].rsplit(",", 1)[1])
+            if hz == 0:
+                print("  gezeigte Spanne      volle Breite (Abtastrate unbekannt)")
+            else:
+                print(f"  gezeigte Spanne    {hz:7d} Hz  (gewuenscht waren 12000)")
+                if abs(hz - 12000) > 500:
+                    print("     -> der Server hat den Wunsch angehoben; genau dafuer")
+                    print("        gibt es die Meldung.")
+        except (IndexError, ValueError):
+            print(f"  gezeigte Spanne    {gemeldet[-1]}")
+    else:
+        print("  gezeigte Spanne      nicht gemeldet — alte Longpath-Fassung")
+        print("                       oder fremder Server (dann gilt der Wunsch)")
     if not rahmen:
         print("  -> Kein Spektrum. Kennt der Server spectrum_start? Geraet dran?")
         return
