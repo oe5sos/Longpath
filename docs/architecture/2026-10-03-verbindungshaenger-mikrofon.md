@@ -179,3 +179,38 @@ dahin liegen Fenster und Ereignisschleife längst.
 **Die Regel dahinter, und sie ist allgemeiner als dieser Fall:** eine
 Diagnoseausgabe vor dem Einrichten des Logs ist keine Diagnoseausgabe. Wer
 in `main()` etwas protokolliert, muss wissen, ob der Umleiter schon steht.
+
+### 4. Dieselbe Falle ein zweites Mal — und dort verschwand eine Warnung
+
+Nachdem die Reihenfolge einmal aufgefallen war, habe ich `main()` darauf
+durchgesehen. Es gibt einen zweiten Fall, und der ist unangenehmer:
+
+`Longpath::elevateGuiMainThreadPriority()` lief rund **70 Zeilen vor** dem
+`qInstallMessageHandler`. Diese Funktion meldet im Erfolgsfall
+
+```
+INF: GUI main thread elevated to USER_INTERACTIVE QoS
+```
+
+und im Misserfolgsfall
+
+```
+WRN: Failed to elevate GUI main thread (errno …)
+```
+
+**In keinem der fünf vorliegenden Betriebslogs steht eine der beiden
+Zeilen.** Die Erfolgsmeldung zu verlieren ist Kosmetik; die Warnung zu
+verlieren ist es nicht — sie ist die einzige Stelle, an der man sieht, dass
+die Oberfläche auf voreingestellter Dienstgüte läuft. Genau das war 2026-05
+das Fehlerbild, für das die Erhöhung eingebaut wurde („whole program
+stutters when a build happens"). Hätte sie stillschweigend nicht gegriffen,
+wäre das aus dem Log nicht zu belegen gewesen.
+
+Beide Aufrufe stehen jetzt hinter dem Umleiter. Dass das Log nicht noch
+früher geöffnet wird, ist Absicht: der Block läge sonst vor der
+Kommandozeilen-Auswertung, und dann würde jedes `Longpath --version` eine
+neue Logdatei anlegen **und die älteste wegwerfen** (die Ablage hält fünf).
+
+**Belegt, nicht geschätzt:** `grep -l "GUI main thread elevated"` über alle
+fünf Logs → 0 Treffer bei 5 Dateien. Die Zeile existiert im Quellcode
+(`RealtimeAudioPriority.cpp:160`).

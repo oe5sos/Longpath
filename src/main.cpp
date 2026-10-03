@@ -221,26 +221,6 @@ int main(int argc, char* argv[])
     app.setOrganizationName("Longpath");
     app.setWindowIcon(QIcon(":/icons/Longpath.png"));
 
-    // 2026-05-25 KG4VCF bench fix: elevate the main GUI thread to
-    // USER_INTERACTIVE QoS so heavy user-initiated background work
-    // (parallel compiles, mdworker indexing, Time Machine snapshots,
-    // etc.) does not preempt the Qt event loop and produce visibly
-    // choppy spectrum / waterfall rendering.  The audio DSP thread
-    // already gets a stronger elevation (see RxDspWorker::onThreadStarted)
-    // but the GUI thread runs the spectrum paint cycle and was still
-    // being preempted at DEFAULT QoS.  Bench symptom: "whole program
-    // stutters when a build happens".
-    //
-    // Cross-platform via src/core/audio/RealtimeAudioPriority.cpp:
-    //   macOS:   pthread_set_qos_class_self_np(USER_INTERACTIVE)
-    //   Linux:   nice(-5)  (soft-fail without privilege)
-    //   Windows: SetThreadPriority(ABOVE_NORMAL) -- was HIGHEST; dropped
-    //            2026-09-03 after a measured ~85ms periodic Windows-only
-    //            audio glitch traced to this thread contending at the
-    //            same tier as audio-critical work (see
-    //            RealtimeAudioPriority.cpp's elevateGuiMainThreadPriority).
-    Longpath::elevateGuiMainThreadPriority();
-
     // 2026-05-22 bench-finding: pkill / kill / system shutdown sends SIGTERM
     // by default; the OS terminates the process without giving Qt a chance
     // to run aboutToQuit handlers.  Without translation, this skips
@@ -324,6 +304,37 @@ int main(int argc, char* argv[])
     }
 
     logStartupHardwareInventory();
+
+    // Steht hier und nicht direkt hinter dem QApplication-Bau, weil die
+    // Meldung dieses Aufrufs ins Log gehoert: bis zum 2026-10-03 lief er
+    // rund 70 Zeilen VOR dem qInstallMessageHandler, und damit fehlte in
+    // allen fuenf vorliegenden Betriebslogs sowohl das "GUI main thread
+    // elevated to USER_INTERACTIVE QoS" als auch -- schlimmer -- die
+    // Warnung "Failed to elevate GUI main thread", die ein Misslingen
+    // meldet. Ein Ruckeln der Oberflaeche waere damit nicht
+    // nachvollziehbar gewesen.
+    //
+    // Spaeter ist gefahrlos: es existiert noch kein Fenster und keine
+    // Ereignisschleife, die QoS gilt dem Faden, nicht dem Zeitpunkt.
+    // 2026-05-25 KG4VCF bench fix: elevate the main GUI thread to
+    // USER_INTERACTIVE QoS so heavy user-initiated background work
+    // (parallel compiles, mdworker indexing, Time Machine snapshots,
+    // etc.) does not preempt the Qt event loop and produce visibly
+    // choppy spectrum / waterfall rendering.  The audio DSP thread
+    // already gets a stronger elevation (see RxDspWorker::onThreadStarted)
+    // but the GUI thread runs the spectrum paint cycle and was still
+    // being preempted at DEFAULT QoS.  Bench symptom: "whole program
+    // stutters when a build happens".
+    //
+    // Cross-platform via src/core/audio/RealtimeAudioPriority.cpp:
+    //   macOS:   pthread_set_qos_class_self_np(USER_INTERACTIVE)
+    //   Linux:   nice(-5)  (soft-fail without privilege)
+    //   Windows: SetThreadPriority(ABOVE_NORMAL) -- was HIGHEST; dropped
+    //            2026-09-03 after a measured ~85ms periodic Windows-only
+    //            audio glitch traced to this thread contending at the
+    //            same tier as audio-critical work (see
+    //            RealtimeAudioPriority.cpp's elevateGuiMainThreadPriority).
+    Longpath::elevateGuiMainThreadPriority();
 
     // Trigger the macOS microphone permission dialog deterministically
     // (issue #203). The OS only prompts when something actually engages
