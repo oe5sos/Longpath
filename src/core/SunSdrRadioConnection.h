@@ -933,6 +933,40 @@ private:
     void sendeSteuerrahmen(const QByteArray& frame, const char* grund);
     void pruefeOffeneRahmen();
 
+    // ── Uebersteuerung aus dem I/Q erkennen ─────────────────────────────
+    //
+    // P1 und P2 melden `adcOverflow`, weil ihre Geraete ein Statusbit dafuer
+    // schicken. Die QRP schickt nichts: am 2026-10-03 ueber zehn Minuten
+    // gemessen, dass sie von sich aus keinen Steuerrahmen sendet und die
+    // Zustandsbytes im Strom konstant bleiben (0100 ueber 149 691 Pakete).
+    //
+    // Gebraucht wird die Meldung trotzdem -- sie ist eine der zwei echten
+    // Luecken im Empfang. Und sie braucht kein Protokollwissen: eine Probe
+    // am Anschlag ist eine Probe am Anschlag. Die Proben kommen als
+    // 24-Bit-Werte, normalisiert auf +-1,0; der Rauschflur ohne Antenne
+    // liegt bei etwa 2e-05 (am Geraet gemessen), also sechs
+    // Zehnerpotenzen darunter. Eine Schwelle knapp unter eins kann hier
+    // nicht falsch anschlagen.
+    //
+    // Gemessen wird VOR der Pegelanhebung des Profils (rxLevelTrimDb, bei
+    // der QRP 20 dB): danach waere der Anschlag des Wandlers nicht mehr
+    // bei eins, und die Schwelle muesste die Verstaerkung mitrechnen --
+    // eine Abhaengigkeit, die man nicht braucht.
+    static constexpr float kAnschlagSchwelle = 0.999f;
+    // So viele Proben am Anschlag in einem Fenster gelten als
+    // Uebersteuerung. Eine einzelne kann ein Zufall des Rauschens sein;
+    // acht in 200 Probenpaaren sind es nicht.
+    static constexpr int kAnschlagSchwelleAnzahl = 8;
+    // Nicht oefter als so melden -- die Anzeige braucht keine 240
+    // Meldungen je Sekunde.
+    static constexpr qint64 kAnschlagMeldeAbstandMs = 500;
+
+    qint64 m_letzteAnschlagMeldungMs{-1};
+    quint64 m_anschlagProben{0};
+    quint64 m_anschlagMeldungen{0};
+
+    void pruefeAnschlag(const QVector<float>& samples);
+
     void berichteMithoeren();
     void noteControlFrame(const QByteArray& data);
     void noteStreamState(const SunSdr::IqHeader& hdr);
@@ -992,6 +1026,8 @@ public:
     bool inventoryReportedForTest() const { return m_inventoryReported; }
     quint64 quittungenGesehenForTest() const { return m_quittungenGesehen; }
     quint64 rahmenOhneQuittungForTest() const { return m_rahmenOhneQuittung; }
+    quint64 anschlagProbenForTest() const { return m_anschlagProben; }
+    quint64 anschlagMeldungenForTest() const { return m_anschlagMeldungen; }
     int offeneRahmenForTest() const { return int(m_offeneRahmen.size()); }
 };
 

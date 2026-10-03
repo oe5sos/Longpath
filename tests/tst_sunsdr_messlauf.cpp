@@ -174,6 +174,10 @@ private slots:
             .arg(conn.quittungenGesehenForTest())
             .arg(conn.rahmenOhneQuittungForTest())
             .arg(conn.offeneRahmenForTest());
+        qInfo().noquote() << QStringLiteral(
+            "Uebersteuerung: %1 Proben am Anschlag, %2 Meldungen")
+            .arg(conn.anschlagProbenForTest())
+            .arg(conn.anschlagMeldungenForTest());
         qInfo().noquote() << conn.frameInventoryReport();
         qInfo().noquote() << conn.seqDeltaReport();
 
