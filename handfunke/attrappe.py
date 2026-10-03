@@ -17,6 +17,8 @@ Der Binaerrahmen ist derselbe wie in TciBinaryFrame.h:
 import base64, hashlib, math, os, random, socket, struct, threading, time, sys
 
 PORT = 50099
+# Ein Band ohne Stationen — siehe die Begruendung bei `traeger`.
+STILL = '--still' in sys.argv
 IQ_RATE = 48000          # bewusst klein: die Attrappe soll die Naht pruefen,
 AUDIO_RATE = 48000       # nicht die Bandbreite
 IQ_BLOCK = 4096          # Werte je Rahmen (I und Q zusammen) -> 2048 Paare
@@ -318,6 +320,18 @@ class Verbindung(threading.Thread):
         # Bild still — und genau das war am echten Geraet die Beschwerde.
         traeger = [(-14000, 0.22, 0.0), (-6200, 0.09, 0.0), (-1500, 0.45, 0.0),
                    (3100, 0.13, 0.7), (8800, 0.30, 0.0), (15500, 0.06, 1.3)]
+        # --still: ein Band ohne jede Station.
+        #
+        # Klingt nach einem nutzlosen Modus und ist doch der wichtigste. Am
+        # 2026-10-03 hat der Betreiber aus einem laufenden, bunten Wasserfall
+        # geschlossen, es komme HF an — gemessen waren 7 dB zwischen
+        # Rauschboden und staerkstem Punkt, am Geraet hing keine Antenne. Seit
+        # der Wasserfall auf dem GEMESSENEN Rauschboden sitzt, malt er auch
+        # reines Rauschen bunt; der Hinweis "nur rauschen — antenne?" in der
+        # Fusszeile faengt das ab. Ohne diesen Modus liesse er sich an der
+        # Werkbank nicht pruefen, denn die Attrappe hat immer Traeger.
+        if STILL:
+            traeger = []
         t0 = time.time()
         smeter_zeit = 0.0
 
@@ -425,7 +439,8 @@ def main():
     srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     srv.bind((host, PORT))
     srv.listen(4)
-    print(f'TCI-Attrappe lauscht auf {host}:{PORT}')
+    print(f'TCI-Attrappe lauscht auf {host}:{PORT}'
+          + ('  [--still: Band ohne Stationen]' if STILL else ''))
     try:
         while True:
             sock, addr = srv.accept()
