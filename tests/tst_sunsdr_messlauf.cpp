@@ -215,6 +215,16 @@ private slots:
                 "Abfrage 0x0c dazwischen");
         }
 
+        // Rate zur Laufzeit umstellen -- der Weg, den spaeter die
+        // Oberflaeche nimmt. LONGPATH_SUNSDR_RATE=96000 schaltet nach dem
+        // Verbinden um.
+        if (qEnvironmentVariableIsSet("LONGPATH_SUNSDR_RATE")) {
+            const int r = qEnvironmentVariableIntValue("LONGPATH_SUNSDR_RATE");
+            conn.setSampleRate(r);
+            qInfo().noquote() << QStringLiteral("setSampleRate(%1) gerufen").arg(r);
+            QTest::qWait(2000);
+        }
+
         const int bloeckeVorher = iq.count();
         QElapsedTimer fenster;
         fenster.start();
@@ -265,10 +275,10 @@ private slots:
             const quint64 n = conn.kanalPaketeForTest(k);
             if (n == 0) { continue; }
             qInfo().noquote() << QStringLiteral(
-                "Kanal %1: %2 Pakete (%3/s), %4 Fortsetzungen  ->  %5 kHz")
+                "Kanal %1: %2 Pakete (%3/s), %4 Fortsetzungen, %5 verworfen")
                 .arg(k).arg(n).arg(double(n)/secs, 0, 'f', 0)
                 .arg(conn.kanalFortsetzungenForTest(k))
-                .arg(double(n)/secs*200/1000, 0, 'f', 0);
+                .arg(conn.kanalVerworfenForTest(k));
         }
         qInfo().noquote() << conn.frameInventoryReport();
         qInfo().noquote() << conn.seqDeltaReport();

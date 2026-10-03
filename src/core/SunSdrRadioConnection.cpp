@@ -270,6 +270,10 @@ void SunSdrRadioConnection::connectToRadio(const RadioInfo& info)
     m_lastSeq = 0;
     m_seqRing.clear();
     m_seqOutOfPlace = 0;
+    // Die Umgebung ist nur die VORBELEGUNG fuer diese Sitzung; setSampleRate
+    // stellt danach um.
+    m_stromModus = stromModusAusUmgebung();
+    m_aktiveEmpfaenger = 1;
     m_iqSeqWndFrames = 0;
     m_iqSeqWndRepeats = 0;
     m_iqSeqWndLost = 0;
@@ -923,34 +927,65 @@ void SunSdrRadioConnection::setMox(bool enabled)
 
 void SunSdrRadioConnection::setActiveReceiverCount(int count)
 {
-    Q_UNUSED(count);
+    // Bis zum 2026-10-03 ein No-op. Jetzt merkt sich die Verbindung die
+    // Zahl -- nicht um sie dem Geraet zu sagen (welcher Rahmen das tut,
+    // ist offen), sondern um zu wissen, fuer welche Kanaele es oben
+    // ueberhaupt einen Empfaenger gibt. Ein zweiter Strom, den niemand
+    // hoert, wird verworfen statt eingespeist.
+    const int neu = qBound(1, count, kMaxKanaele);
+    if (neu == m_aktiveEmpfaenger) { return; }
+    m_aktiveEmpfaenger = neu;
+    qCInfo(lcSunSdr) << "SunSdr: aktive Empfaenger ->" << m_aktiveEmpfaenger
+                     << "(Kanaele darueber werden verworfen)";
 }
 
 void SunSdrRadioConnection::setSampleRate(int sampleRate)
 {
-    // 48 000 Hz, am Geraet gemessen (2026-09-23/24): 240 Bloecke je
-    // Sekunde zu 200 Probenpaaren. Hier stand bis zum 2026-10-02 noch
-    // "fixed at 312,500 Hz" -- diese Zahl war von der SunSDR2 DX
-    // abgeschrieben, fuer die QRP nie geprueft und ist widerlegt. Sie
-    // stehenzulassen heisst, dass der naechste Leser sie glaubt; die
-    // richtige Zahl steht in BoardCapabilities (kSunSdr2Qrp.sampleRates)
-    // und in longpath-qrp-48khz.
+    // Seit dem 2026-10-03 ist das kein No-op mehr: die Rate steht im
+    // Stromstart-Rahmen 0x01, und der ist am Geraet durchgemessen
+    // (SunSdrProtocol.h, StromModus). 48 000 und 96 000 sind belegt.
     //
-    // Umstellen kann diese Verbindung die Rate nicht: welcher Opcode das
-    // tut, ist offen -- es braucht einen Mitschnitt, bei dem ExpertSDR2
-    // die Rate umstellt. Eine Anfrage auf etwas anderes wird darum
-    // protokolliert statt still verschluckt: sie ist nicht falsch
-    // gestellt, sie ist hier nur nicht ausfuehrbar, und wer im Log nach
-    // der Ursache einer unerwarteten Rate sucht, soll diese Zeile finden.
-    const double native = m_profile ? m_profile->rxNativeRateHz
-                                   : SunSdr::kProfileQrp.rxNativeRateHz;
-    if (double(sampleRate) != native) {
-        qCDebug(lcSunSdr) << "SunSdr: setSampleRate(" << sampleRate
-                          << ") nicht ausfuehrbar -- das Geraet laeuft auf"
-                          << native
-                          << "Hz, der Opcode zum Umstellen ist unbekannt";
+    // Warum nur diese zwei: eine Rate, die nicht aus einem Mitschnitt
+    // kommt, waere geraten -- und ein falsch gesetzter Rahmen bedeutet
+    // nicht "geht nicht", sondern Daten einer Rate in einem Kanal einer
+    // anderen. Genau das ist am 2026-09-24 passiert (48k-Daten in einem
+    // 192k-Kanal) und wurde am Geraet als "schlechtes Rauschen" gehoert.
+    SunSdr::StromModus modus;
+    if (sampleRate == 48000) {
+        modus = SunSdr::StromModus::EinStrom48;
+    } else if (sampleRate == 96000) {
+        // Zwei Stroeme je 96 kHz; der erste geht an den Empfaenger, der
+        // zweite wird verworfen, solange es keinen zweiten gibt (siehe
+        // processStreamDatagram).
+        modus = SunSdr::StromModus::ZweiStroemeJe96;
+    } else {
+        qCWarning(lcSunSdr)
+            << "SunSdr: setSampleRate(" << sampleRate
+            << ") -- fuer diese Rate ist kein Stromstart-Rahmen belegt. Es "
+               "bleibt bei" << (m_stromModus == SunSdr::StromModus::EinStrom48
+                                    ? 48000 : 96000)
+            << "Hz. Belegt sind 48000 und 96000 (am Geraet gemessen "
+               "2026-10-03).";
+        return;
+    }
+
+    if (modus == m_stromModus) {
+        return;
+    }
+    m_stromModus = modus;
+    qCInfo(lcSunSdr) << "SunSdr: Abtastrate ->" << sampleRate
+                     << "Hz (Stromstart-Rahmen wird umgestellt)";
+
+    // Steht die Verbindung schon, geht der Rahmen jetzt hinaus -- das
+    // Geraet startet den Strom dann neu und faengt die Folgenummern bei
+    // null an (am 2026-10-03 gemessen; auditStreamSeq erkennt das als
+    // Neuanfang).
+    if (m_running && !m_awaitingBeacon && m_profile) {
+        sendeSteuerrahmen(SunSdr::buildStromStartFrame(*m_profile, m_stromModus),
+                          "Stromstart 0x01 (Rate umgestellt)");
     }
 }
+
 
 void SunSdrRadioConnection::onControlReadyRead()
 {
@@ -1022,7 +1057,7 @@ void SunSdrRadioConnection::processControlDatagram(const QByteArray& data,
         // beide Seiten: PRE davor, EXTRA danach.
         sendBenchFrames(QStringLiteral("LONGPATH_SUNSDR_PRE"));
 
-        const SunSdr::StromModus modus = stromModusAusUmgebung();
+        const SunSdr::StromModus modus = m_stromModus;
         const QByteArray stateSync =
             SunSdr::buildStromStartFrame(*m_profile, modus);
         if (modus != SunSdr::StromModus::EinStrom48) {
@@ -1149,6 +1184,7 @@ void SunSdrRadioConnection::processStreamDatagram(const QByteArray& data,
     }
 
     const int kanal = kanalVon(hdr);
+
     KanalZustand& kz = m_kanal[kanal];
     ++kz.pakete;
 
@@ -1177,6 +1213,18 @@ void SunSdrRadioConnection::processStreamDatagram(const QByteArray& data,
     // weder als Wiederholung noch als Luecke gezaehlt werden.
     if (!fortsetzung) {
         auditStreamSeq(kanal, hdr.seq);
+    }
+
+    // Jetzt erst verwerfen, wenn es fuer diesen Kanal oben keinen
+    // Empfaenger gibt (BoardCapabilities: maxReceivers = 1). NACH der
+    // Folgenummern-Zaehlung, nicht davor: die Nummern laufen GLOBAL ueber
+    // alle Stroeme, also fehlt jede uebersprungene Nummer im Nummernraum
+    // und erscheint als Luecke. Davor gestellt meldete der Zaehler 50 %
+    // VERLUST bei einem vollkommen gesunden Strom -- am 2026-10-03 im
+    // Messlauf am Geraet gesehen, zum zweiten Mal an derselben Stelle.
+    if (kanal >= m_aktiveEmpfaenger) {
+        ++kz.verworfen;
+        return;
     }
 
     if (blockReplyEnabled()) {

@@ -838,6 +838,7 @@ private:
         QByteArray letzteNutzlast;   // nur fuer den Vergleich bei gleicher Nummer
         quint64 pakete{0};
         quint64 fortsetzungen{0};
+        quint64 verworfen{0};        // kein Empfaenger fuer diesen Kanal
         // KEINE eigenen Folgenummern je Kanal -- am 2026-10-03 am Geraet
         // widerlegt. Der Pruefstand hatte angenommen, zwei Stroeme haetten
         // eigene Nummernraeume; der Versuch mit zwei Stroemen zeigt das
@@ -876,6 +877,11 @@ private:
     // Erst wenn beides steht, gehoert das in die Oberflaeche; bis dahin
     // ist es ein Versuch, und ein Versuch wird ausdruecklich gewaehlt.
     SunSdr::StromModus stromModusAusUmgebung() const;
+    // Der Modus dieser Sitzung. Vorbelegt aus der Umgebung, umgestellt von
+    // setSampleRate.
+    SunSdr::StromModus m_stromModus{SunSdr::StromModus::EinStrom48};
+    // Wie viele Kanaele oben ueberhaupt einen Empfaenger haben.
+    int m_aktiveEmpfaenger{1};
 
     void auditStreamSeq(int kanal, quint16 seq);
     // Schliesst das 5-s-Fenster: meldet nach oben und schreibt ins Log.
@@ -1131,6 +1137,9 @@ public:
     quint64 mikrofonPttFlankenForTest() const { return m_mikrofonPttFlanken; }
     quint64 kanalPaketeForTest(int k) const
     { return (k >= 0 && k < kMaxKanaele) ? m_kanal[k].pakete : 0; }
+    int stromModusForTest() const { return int(m_stromModus); }
+    quint64 kanalVerworfenForTest(int k) const
+    { return (k >= 0 && k < kMaxKanaele) ? m_kanal[k].verworfen : 0; }
     quint64 kanalFortsetzungenForTest(int k) const
     { return (k >= 0 && k < kMaxKanaele) ? m_kanal[k].fortsetzungen : 0; }
     int offeneRahmenForTest() const { return int(m_offeneRahmen.size()); }

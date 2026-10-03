@@ -1863,18 +1863,30 @@ private slots:
         // Die erste Fassung dieses Tests nahm an, beide Kanaele traegen
         // dieselbe Nummer -- der Versuch am Geraet hat das widerlegt, und
         // der Zaehler meldete daraufhin 50 % Verlust bei gesundem Strom.
+        // Erst mit EINEM Empfaenger: der zweite Strom wird verworfen, statt
+        // nach oben zu gehen, wo er bestenfalls ignoriert und
+        // schlimmstenfalls mit Kanal 0 vermischt wuerde.
         conn.feedStreamDatagramForTest(qrpBlockKanal(1, 2, 0, char(7)));
         conn.feedStreamDatagramForTest(qrpBlockKanal(2, 2, 1, char(9)));
+        QCOMPARE(iq.count(), 1);
+        QCOMPARE(iq.at(0).at(0).toInt(), 0);
+        QCOMPARE(conn.kanalVerworfenForTest(1), quint64(1));
+
+        // Und jetzt mit zwei: beide gehen durch, jeder auf seinen Kanal.
+        conn.setActiveReceiverCount(2);
         conn.feedStreamDatagramForTest(qrpBlockKanal(3, 2, 0, char(7)));
         conn.feedStreamDatagramForTest(qrpBlockKanal(4, 2, 1, char(9)));
 
-        QCOMPARE(iq.count(), 4);
-        QCOMPARE(iq.at(0).at(0).toInt(), 0);
-        QCOMPARE(iq.at(1).at(0).toInt(), 1);
+        QCOMPARE(iq.count(), 3);
+        QCOMPARE(iq.at(1).at(0).toInt(), 0);
+        QCOMPARE(iq.at(2).at(0).toInt(), 1);
         QCOMPARE(conn.kanalPaketeForTest(0), quint64(2));
         QCOMPARE(conn.kanalPaketeForTest(1), quint64(2));
-        // Lueckenlos im globalen Nummernraum: kein Verlust, keine
-        // Wiederholung.
+        // Lueckenlos im globalen Nummernraum, und zwar EINSCHLIESSLICH der
+        // Nummer des verworfenen Pakets: die Nummern laufen global, also
+        // muss jede gezaehlt werden, auch wenn ihre Proben niemand braucht.
+        // Andernfalls meldet der Zaehler Verlust, wo keiner ist -- am
+        // 2026-10-03 im Messlauf zweimal passiert.
         QCOMPARE(conn.seqRepeatsForTest(), quint64(0));
         QCOMPARE(conn.seqLostForTest(), quint64(0));
         QCOMPARE(conn.seqFramesForTest(), quint64(4));
@@ -1943,6 +1955,32 @@ private slots:
         QCOMPARE(iq.first().at(0).toInt(), 0);
         QCOMPARE(conn.kanalPaketeForTest(0), quint64(1));
         QCOMPARE(conn.kanalPaketeForTest(1), quint64(0));
+    }
+
+    // Die Rate geht jetzt ueber setSampleRate, nicht nur ueber die
+    // Umgebung -- und nur fuer die zwei Raten, die am Geraet gemessen sind.
+    void setSampleRateStelltDenStromstartRahmenUm()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        // Vorgabe: ein Strom, 48 kHz (= EinStrom48).
+        QCOMPARE(conn.stromModusForTest(), 0);
+
+        conn.setSampleRate(96000);
+        QCOMPARE(conn.stromModusForTest(), 2);   // ZweiStroemeJe96
+
+        conn.setSampleRate(48000);
+        QCOMPARE(conn.stromModusForTest(), 0);
+
+        // Eine Rate ohne gemessenen Rahmen aendert NICHTS -- raten geht
+        // hier nicht, ein falscher Rahmen bedeutet Daten einer Rate in
+        // einem Kanal einer anderen (am 2026-09-24 als "schlechtes
+        // Rauschen" gehoert).
+        conn.setSampleRate(192000);
+        QCOMPARE(conn.stromModusForTest(), 0);
     }
 
     // ── Mikrofon-PTT am Geraet ─────────────────────────────────────────
