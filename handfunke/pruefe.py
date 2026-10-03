@@ -234,21 +234,56 @@ def miss_hf(v, sekunden):
         print("  -> Da sind Stationen.")
 
 
+# Der Rueckfallwert des TCI-Servers, wenn es gar keinen Empfangskanal gibt
+# (TciServer.cpp, rxSensorTimer: "Falls back to -140 dBm (WDSP noise floor
+# convention) if WDSP isn't initialized or the channel doesn't exist yet").
+#
+# Er sieht aus wie eine Messung und ist keine. Am 2026-10-03 stand er
+# waehrend der ganzen Fehlersuche im Bild, waehrend gar kein Funkgeraet
+# verbunden war — und liess sich kaum von einem wirklich leeren Band
+# unterscheiden. Das Werkzeug sagt es jetzt dazu.
+KEIN_KANAL_DBM = -140.0
+
+
 def miss_pegel(v, sekunden):
     """Was der Server selbst meldet — die Gegenprobe zu allem oben."""
     v.sende("rx_sensors_enable:true,200;")
+    # Die Frequenz ausdruecklich ABFRAGEN. Sie kommt sonst nur im Init-Burst,
+    # und der ist hier laengst verbraucht — die Pruefung darauf liefe leer.
+    v.sende("vfo:0,0;")
     v.leeren()
     v.sammle(sekunden)
     gefunden = False
+    letzte = {}
     for name in ("rx_sensors", "rx_channel_sensors_ex", "vfo:0,0",
                  "modulation:0", "dds:0"):
         treffer = [z for z in v.zeilen() if z.lower().startswith(name.lower())]
         if treffer:
             print(f"  {name:22s} {treffer[-1]}")
+            letzte[name] = treffer[-1]
             gefunden = True
     if not gefunden:
         print("  -> Der Server meldet nichts. Ohne Token aus dem Netz? Dann")
         print("     schweigt er, bis auth: kommt.")
+        return
+
+    # Zwei Anzeichen, dass ueberhaupt kein Geraet dranhaengt — und beide
+    # sehen harmlos aus, wenn man sie einzeln liest.
+    hinweise = []
+    vfo = letzte.get("vfo:0,0", "")
+    if vfo.endswith(",0"):
+        hinweise.append("die abgestimmte Frequenz ist 0")
+    sens = letzte.get("rx_sensors", "")
+    try:
+        wert = float(sens.rsplit(",", 1)[1])
+        if abs(wert - KEIN_KANAL_DBM) < 0.05:
+            hinweise.append(f"{KEIN_KANAL_DBM:.0f} dBm ist der Rueckfallwert "
+                            "fuer 'kein Empfangskanal', keine Messung")
+    except (IndexError, ValueError):
+        pass
+    if hinweise:
+        print("  -> KEIN FUNKGERAET verbunden: " + "; ".join(hinweise) + ".")
+        print("     Alles Weitere misst dann nur die leere Kette.")
 
 
 # ── Hauptteil ────────────────────────────────────────────────────────────────
