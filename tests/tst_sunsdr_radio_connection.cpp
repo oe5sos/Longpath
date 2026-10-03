@@ -1825,6 +1825,38 @@ private slots:
         QCOMPARE(conn.offeneRahmenForTest(), offenVorher);
     }
 
+    // Beim Trennen geht ein Stopp hinaus -- bis zum 2026-10-03 schickte
+    // dieser Treiber GAR NICHTS, und die QRP streamte danach unbegrenzt
+    // weiter (1940 Pakete/s ins Leere, bis zum Ausschalten). Mit dem Stopp
+    // am Geraet gemessen: 0 Pakete/s.
+    void trennenSchicktDenStopp()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        handshake(conn);
+        QCOMPARE(conn.stoppGeschicktForTest(), quint64(0));
+
+        conn.disconnect();
+        QCOMPARE(conn.stoppGeschicktForTest(), quint64(1));
+    }
+
+    // Ohne stehende Verbindung gibt es keine Gegenstelle -- ein Stopp an
+    // eine Adresse, die wir nicht kennen, waere ein Paket ins Nichts.
+    void trennenOhneVerbindungSchicktKeinenStopp()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        // KEIN Handschlag -- m_awaitingBeacon bleibt true.
+        conn.disconnect();
+        QCOMPARE(conn.stoppGeschicktForTest(), quint64(0));
+    }
+
     // Ein unquittierter Frequenzrahmen wird EINMAL nachgeschickt -- am
     // 2026-10-03 am Geraet beobachtet, dass einer verloren ging, und die
     // Folge ist nicht harmlos: das Geraet steht dann auf einer anderen
@@ -1881,6 +1913,259 @@ private slots:
                  "Ein Werkbank-Rahmen wurde nachgeschickt");
     }
 
+
+    // ── Zwei Stroeme und mehrere Pakete je Folgenummer ─────────────────
+    //
+    // Am 2026-10-03 aus einem ExpertSDR2-Mitschnitt gemessen: die QRP
+    // schickt bei umgestelltem 0x01-Rahmen ZWEI Stroeme (byte8=2, byte9
+    // als Index) mit verschiedenen Raten, und ein Strom ueber 48 kHz
+    // traegt mehrere Pakete je Nummer -- mit VERSCHIEDENEN Proben.
+
+    static QByteArray qrpBlockKanal(quint16 seq, int stroeme, int kanal,
+                                    char fuellwert)
+    {
+        QByteArray pkt = SunSdr::buildIqHeader(
+            SunSdr::kProfileQrp, SunSdr::kOpIqRxIdle, seq,
+            quint8(stroeme), quint8(kanal));
+        QByteArray payload(SunSdr::kIqPayloadSize, char(0));
+        for (int k = 0; k < SunSdr::kIqPayloadSize; k += 6) {
+            payload[k + 3] = fuellwert;      // I
+            payload[k + 0] = char(5);        // Q, damit echtes I/Q gilt
+        }
+        pkt.append(payload);
+        return pkt;
+    }
+
+    void zweiStroemeLandenAufVerschiedenenKanaelen()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        conn.setSingleChannelHoldMsForTest(0);
+        handshake(conn);
+
+        QSignalSpy iq(&conn, &RadioConnection::iqDataReceived);
+        // So kommt es am Geraet wirklich (2026-10-03 gemessen): die Nummern
+        // laufen GLOBAL fortlaufend, byte9 wechselt dabei den Strom.
+        // Die erste Fassung dieses Tests nahm an, beide Kanaele traegen
+        // dieselbe Nummer -- der Versuch am Geraet hat das widerlegt, und
+        // der Zaehler meldete daraufhin 50 % Verlust bei gesundem Strom.
+        // Erst mit EINEM Empfaenger: der zweite Strom wird verworfen, statt
+        // nach oben zu gehen, wo er bestenfalls ignoriert und
+        // schlimmstenfalls mit Kanal 0 vermischt wuerde.
+        conn.feedStreamDatagramForTest(qrpBlockKanal(1, 2, 0, char(7)));
+        conn.feedStreamDatagramForTest(qrpBlockKanal(2, 2, 1, char(9)));
+        QCOMPARE(iq.count(), 1);
+        QCOMPARE(iq.at(0).at(0).toInt(), 0);
+        QCOMPARE(conn.kanalVerworfenForTest(1), quint64(1));
+
+        // Und jetzt mit zwei: beide gehen durch, jeder auf seinen Kanal.
+        conn.setActiveReceiverCount(2);
+        conn.feedStreamDatagramForTest(qrpBlockKanal(3, 2, 0, char(7)));
+        conn.feedStreamDatagramForTest(qrpBlockKanal(4, 2, 1, char(9)));
+
+        QCOMPARE(iq.count(), 3);
+        QCOMPARE(iq.at(1).at(0).toInt(), 0);
+        QCOMPARE(iq.at(2).at(0).toInt(), 1);
+        QCOMPARE(conn.kanalPaketeForTest(0), quint64(2));
+        QCOMPARE(conn.kanalPaketeForTest(1), quint64(2));
+        // Lueckenlos im globalen Nummernraum, und zwar EINSCHLIESSLICH der
+        // Nummer des verworfenen Pakets: die Nummern laufen global, also
+        // muss jede gezaehlt werden, auch wenn ihre Proben niemand braucht.
+        // Andernfalls meldet der Zaehler Verlust, wo keiner ist -- am
+        // 2026-10-03 im Messlauf zweimal passiert.
+        QCOMPARE(conn.seqRepeatsForTest(), quint64(0));
+        QCOMPARE(conn.seqLostForTest(), quint64(0));
+        QCOMPARE(conn.seqFramesForTest(), quint64(4));
+    }
+
+    // Zwei Pakete mit derselben Nummer, aber VERSCHIEDENEM Inhalt: das ist
+    // die zweite Haelfte der Proben (96 kHz), keine Wiederholung. Beide
+    // muessen durchgehen.
+    void zweitesPaketMitAnderemInhaltIstFortsetzung()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        conn.setSingleChannelHoldMsForTest(0);
+        handshake(conn);
+
+        QSignalSpy iq(&conn, &RadioConnection::iqDataReceived);
+        conn.feedStreamDatagramForTest(qrpBlockKanal(5, 2, 0, char(7)));
+        conn.feedStreamDatagramForTest(qrpBlockKanal(5, 2, 0, char(11)));
+
+        QCOMPARE(iq.count(), 2);
+        QCOMPARE(conn.kanalFortsetzungenForTest(0), quint64(1));
+        QCOMPARE(conn.seqRepeatsForTest(), quint64(0));
+        QCOMPARE(conn.seqLostForTest(), quint64(0));
+    }
+
+    // Gegenprobe, und der heutige Normalfall: zwei Pakete mit derselben
+    // Nummer und BYTEGLEICHEM Inhalt sind eine Wiederholung (am
+    // 2026-09-23 am Geraet belegt: 1683 von 1683 ganz bytegleich).
+    void zweitesPaketMitGleichemInhaltBleibtWiederholung()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        conn.setSingleChannelHoldMsForTest(0);
+        handshake(conn);
+
+        conn.feedStreamDatagramForTest(qrpBlockKanal(5, 1, 0, char(7)));
+        conn.feedStreamDatagramForTest(qrpBlockKanal(5, 1, 0, char(7)));
+
+        QCOMPARE(conn.kanalFortsetzungenForTest(0), quint64(0));
+        QCOMPARE(conn.seqRepeatsForTest(), quint64(1));
+    }
+
+    // Und das Wichtigste: am heutigen Betrieb aendert sich nichts. Mit
+    // byte8 = 1 ist der Kanal immer 0, auch wenn byte9 etwas anderes sagt.
+    void einStromBleibtImmerKanalNull()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        conn.setSingleChannelHoldMsForTest(0);
+        handshake(conn);
+
+        QSignalSpy iq(&conn, &RadioConnection::iqDataReceived);
+        // byte8 = 1 (ein Strom), byte9 = 1 -- muss trotzdem Kanal 0 sein.
+        conn.feedStreamDatagramForTest(qrpBlockKanal(1, 1, 1, char(7)));
+
+        QCOMPARE(iq.count(), 1);
+        QCOMPARE(iq.first().at(0).toInt(), 0);
+        QCOMPARE(conn.kanalPaketeForTest(0), quint64(1));
+        QCOMPARE(conn.kanalPaketeForTest(1), quint64(0));
+    }
+
+    // Die Rate geht jetzt ueber setSampleRate, nicht nur ueber die
+    // Umgebung -- und nur fuer die zwei Raten, die am Geraet gemessen sind.
+    void setSampleRateStelltDenStromstartRahmenUm()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        // Vorgabe: ein Strom, 48 kHz (= EinStrom48).
+        QCOMPARE(conn.stromModusForTest(), 0);
+
+        conn.setSampleRate(96000);
+        QCOMPARE(conn.stromModusForTest(), 2);   // ZweiStroemeJe96
+
+        conn.setSampleRate(48000);
+        QCOMPARE(conn.stromModusForTest(), 0);
+
+        // Eine Rate ohne gemessenen Rahmen aendert NICHTS -- raten geht
+        // hier nicht, ein falscher Rahmen bedeutet Daten einer Rate in
+        // einem Kanal einer anderen (am 2026-09-24 als "schlechtes
+        // Rauschen" gehoert).
+        conn.setSampleRate(192000);
+        QCOMPARE(conn.stromModusForTest(), 0);
+    }
+
+    // ── Mikrofon-PTT am Geraet ─────────────────────────────────────────
+    //
+    // Die zweite Empfangsluecke, geschlossen ohne Protokollwissen: der
+    // Stromkopf traegt den Betriebszustand (0xFE Empfang, 0xFD Senden).
+    // Drueckt jemand am Geraet die Mikrofontaste, wechselt der Opcode.
+
+    static QByteArray qrpBlockTx(quint16 seq)
+    {
+        QByteArray pkt = SunSdr::buildIqHeader(
+            SunSdr::kProfileQrp, SunSdr::kOpIqTxActive, seq, 0x02, 0x01);
+        pkt.append(QByteArray(SunSdr::kIqPayloadSize, char(0)));
+        return pkt;
+    }
+
+    void sendezustandAmGeraetMeldetPtt()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        handshake(conn);
+
+        QSignalSpy ptt(&conn, &RadioConnection::micPttFromRadio);
+        conn.feedStreamDatagramForTest(qrpBlockSeq(1));
+        QCOMPARE(ptt.count(), 0);
+
+        conn.feedStreamDatagramForTest(qrpBlockTx(2));
+        QCOMPARE(ptt.count(), 1);
+        QCOMPARE(ptt.first().at(0).toBool(), true);
+        QVERIFY(conn.geraetSendetForTest());
+
+        // Nur die FLANKE: 240 Pakete je Sekunde duerfen nicht 240 Signale
+        // ergeben.
+        for (quint16 n = 3; n <= 30; ++n) {
+            conn.feedStreamDatagramForTest(qrpBlockTx(n));
+        }
+        QCOMPARE(ptt.count(), 1);
+
+        // Und zurueck.
+        conn.feedStreamDatagramForTest(qrpBlockSeq(31));
+        QCOMPARE(ptt.count(), 2);
+        QCOMPARE(ptt.last().at(0).toBool(), false);
+        QVERIFY(!conn.geraetSendetForTest());
+        QCOMPARE(conn.mikrofonPttFlankenForTest(), quint64(2));
+    }
+
+    // Was Longpath selbst ausgeloest hat, ist kein PTT vom Geraet.
+    void eigenesMoxGiltNichtAlsPttVomGeraet()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        handshake(conn);
+        conn.feedStreamDatagramForTest(qrpBlockSeq(1));
+
+        conn.setTxArmedForTest(true);
+        conn.setTxCheckContextForTest(armedInBandCtx());
+        conn.setMox(true);
+        QVERIFY(conn.isMoxForTest());
+
+        QSignalSpy ptt(&conn, &RadioConnection::micPttFromRadio);
+        conn.feedStreamDatagramForTest(qrpBlockTx(2));
+
+        QCOMPARE(ptt.count(), 0);
+        QCOMPARE(conn.mikrofonPttFlankenForTest(), quint64(0));
+        // Der Zustand wird trotzdem mitgefuehrt -- nur nicht als PTT
+        // gemeldet.
+        QVERIFY(conn.geraetSendetForTest());
+    }
+
+    // Ein haengendes PTT darf eine Sitzung nicht ueberleben: das ist der
+    // falsche Zustand, in dem man einen Sender in Erinnerung behaelt.
+    void haengendesPttWirdBeimTrennenZurueckgenommen()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        handshake(conn);
+        conn.feedStreamDatagramForTest(qrpBlockSeq(1));
+        conn.feedStreamDatagramForTest(qrpBlockTx(2));
+
+        QSignalSpy ptt(&conn, &RadioConnection::micPttFromRadio);
+        QVERIFY(conn.geraetSendetForTest());
+        conn.disconnect();
+
+        QCOMPARE(ptt.count(), 1);
+        QCOMPARE(ptt.first().at(0).toBool(), false);
+        QVERIFY(!conn.geraetSendetForTest());
+    }
 
     // ── Uebersteuerung ─────────────────────────────────────────────────
     //

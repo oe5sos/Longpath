@@ -478,6 +478,69 @@ enum class AntennaPort { A1, A2, A3 };
 bool buildAntennaSelectFrame(const Profile& profile, AntennaPort port,
                               bool forTx, QByteArray* out);
 
+// ── Der Stromstart 0x01: hier steht die Abtastrate ──────────────────
+//
+// Am 2026-10-03 aus einem ExpertSDR2-Mitschnitt gemessen, in dem die Rate
+// zweimal umgeschaltet wurde (docs/architecture/
+// 2026-10-02-sunsdr-verbindungsablauf.md): der EINZIGE Rahmen, der sich
+// dabei aendert, ist 0x01 -- derselbe, den Longpath beim Verbinden schon
+// schickt. Drei Nutzlasten sind belegt:
+//
+//   01000000 0c080403 02020202   ein Strom,    48 kHz   (Longpath heute)
+//   02000000 0c080403 02020202   zwei Stroeme, je  48 kHz
+//   02010000 0a060403 02020201   zwei Stroeme, je  96 kHz
+//
+// Am 2026-10-03 am echten Geraet durchgemessen, alle drei, Verlust null:
+//
+//   01...  239 Folgenummern/s  -> ein Strom,   48 kHz    (1x Daten)
+//   0200.. 480 Folgenummern/s  -> zwei Stroeme, je 48 kHz (2x)
+//   0201.. 958 Folgenummern/s  -> zwei Stroeme, je 96 kHz (4x)
+//
+// Erstes Byte = Zahl der Stroeme, zweites = Ratenstufe. Im Mitschnitt von
+// ExpertSDR2 standen die Kanaele auf verschiedenen Raten (48+96 bzw.
+// 96+144); mit NUR diesem Rahmen kommen beide gleich schnell. Was den
+// Unterschied macht, steht in einem der anderen sechzehn Rahmen, die
+// ExpertSDR2 schickt -- fuer die vierfache Datenmenge braucht man es
+// nicht.
+//
+// Das erste Byte ist die Zahl der Stroeme; es erscheint im Stromkopf als
+// byte8 wieder, und byte9 traegt dort den Index (gemessen: Longpath sieht
+// 0100, ExpertSDR2 0200/0201).
+//
+// Was die Bytes 0c 08 04 03 gegen 0a 06 04 03 codieren, ist NICHT
+// entschluesselt. Darum gibt es hier keine Funktion, die aus einer
+// gewuenschten Rate einen Rahmen RECHNET -- nur die drei gemessenen
+// Zustaende, byte-fuer-byte wie aufgezeichnet. Eine gerechnete Rate waere
+// geraten, und das geht an ein Funkgeraet nicht hinaus.
+enum class StromModus {
+    EinStrom48,        // Longpath heute
+    ZweiStroemeJe48,
+    ZweiStroemeJe96,
+};
+
+// Die Nutzlast (12 Byte) zum Modus. Der vollstaendige Rahmen entsteht mit
+// buildControlHeader(profile, 0x01, 0, 12) + Nutzlast + withControlFrameCrc;
+// gegengeprueft, dass das byte-fuer-byte den aufgezeichneten Rahmen ergibt
+// (tst_sunsdr_protocol).
+QByteArray stromModusPayload(StromModus modus);
+
+// Der fertige Rahmen zum Modus.
+QByteArray buildStromStartFrame(const Profile& profile, StromModus modus);
+
+// ── Der Stopp-Befehl 0x02 ───────────────────────────────────────────
+//
+// Am 2026-10-03 aus dem Mitschnitt rate-umschalten.pcap gelesen: beim
+// Beenden schickt ExpertSDR2 zwei Rahmen, 0x06 mit 0 (MOX aus) und 0x02
+// mit 0 -- und das LETZTE Strompaket liegt in derselben Millisekunde wie
+// 0x02. Danach ist die QRP still. ArtemisSDR fuehrt 0x02 als
+// SUNSDR_OP_POWER_OFF (sunsdr.h:32 [@f8b01d25c5]), was dazu passt.
+//
+// Warum das zaehlt: Longpaths disconnect() sagt dem Geraet bis heute
+// NICHTS. Gemessen am 2026-10-03: die QRP streamt danach unbegrenzt
+// weiter, 1940 Pakete/s und 2,3 MB/s ins Leere, bis sie ausgeschaltet
+// wird -- und in diesem Zustand laesst sie sich schlecht neu verbinden.
+QByteArray buildStopFrame(const Profile& profile);
+
 // Builds the 0x17 drive-byte control frame: a bare 0-255 passthrough,
 // u32 payload = raw0to255 (design doc line 984: "u32, low byte =
 // pre-calibrated 0-255 passthrough"; ArtemisSDR

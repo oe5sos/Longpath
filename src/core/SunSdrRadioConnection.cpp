@@ -24,6 +24,7 @@
 #include <QNetworkDatagram>
 #include <QNetworkInterface>
 #include <cmath>
+#include <cstring>
 
 namespace Longpath {
 
@@ -253,20 +254,34 @@ void SunSdrRadioConnection::connectToRadio(const RadioInfo& info)
     m_letzteAnschlagMeldungMs = -1;
     m_anschlagProben = 0;
     m_anschlagMeldungen = 0;
+    m_geraetSendet = false;
+    m_mikrofonPttFlanken = 0;
     m_rahmenWiederholt = 0;
     m_inventoryClock.invalidate();
     m_lastStreamStateValid = false;
     // Die Folgenummern-Zaehlung gehoert zur Sitzung: die erste Nummer der
     // neuen Verbindung darf nicht gegen die letzte der alten gerechnet
     // werden, sonst steht eine Luecke im Bericht, die es nie gab.
+    m_seqDeltas.clear();
+    // Auch der Zustand JE KANAL -- ohne das rechnet das erste Paket der
+    // neuen Verbindung gegen die letzte Nummer der alten, und es gilt als
+    // Spaetling statt als Anfang. Vom eigenen Pruefstand gefunden.
+    for (KanalZustand& kz : m_kanal) { kz = KanalZustand{}; }
     m_seqSeen = false;
     m_lastSeq = 0;
-    m_seqDeltas.clear();
+    m_seqRing.clear();
+    m_seqOutOfPlace = 0;
+    // Die Umgebung ist nur die VORBELEGUNG fuer diese Sitzung; setSampleRate
+    // stellt danach um.
+    m_stromModus = stromModusAusUmgebung();
+    m_aktiveEmpfaenger = 1;
+    m_stoppGeschickt = 0;
     m_iqSeqWndFrames = 0;
     m_iqSeqWndRepeats = 0;
     m_iqSeqWndLost = 0;
     m_iqSeqWndEvents = 0;
     m_iqSeqWndBackwards = 0;
+    m_iqSeqWndRestarts = 0;
     m_iqSeqWndClock.invalidate();
     m_iqSeqCleanClock.invalidate();
     m_lastGapSignalMs = -1;
@@ -460,6 +475,37 @@ void SunSdrRadioConnection::disconnect()
     // soll das Ergebnis im Log finden, ohne es waehrenddessen abfragen zu
     // muessen. Nur wenn ueberhaupt etwas angekommen ist -- eine Zeile
     // "nichts aufgenommen" bei jedem Programmende waere Laerm.
+    // Ein haengendes PTT darf eine Sitzung nicht ueberleben: bricht die
+    // Verbindung ab, waehrend das Geraet sendet, bliebe Longpath sonst im
+    // Zustand "Taste gedrueckt" -- und das ist der falsche Zustand, in dem
+    // man einen Sender in Erinnerung behaelt.
+    if (m_geraetSendet) {
+        m_geraetSendet = false;
+        qCInfo(lcSunSdr) << "SunSdr: Verbindung endet, waehrend das Geraet "
+                            "sendete -- PTT wird zurueckgenommen";
+        emit micPttFromRadio(false);
+    }
+
+    // Dem Geraet sagen, dass der Strom aufhoeren soll -- bis zum
+    // 2026-10-03 hat dieser Treiber beim Trennen GAR NICHTS geschickt, und
+    // die QRP streamte danach unbegrenzt weiter (gemessen: 1940 Pakete/s,
+    // 2,3 MB/s ins Leere, bis zum Ausschalten). Der Rahmen steht im
+    // Mitschnitt vom selben Tag: 0x02 mit vier Nullbytes, und das letzte
+    // Strompaket liegt in derselben Millisekunde.
+    //
+    // Nur wenn die Verbindung wirklich stand: vor dem Handschlag gibt es
+    // keine Gegenstelle, und ein Stopp an eine Adresse, die wir nicht
+    // kennen, waere ein Paket ins Nichts.
+    if (m_running && !m_awaitingBeacon && m_profile && m_controlSocket
+        && !m_radioAddr.isNull()) {
+        sendeSteuerrahmen(SunSdr::buildStopFrame(*m_profile),
+                          "Stopp 0x02 beim Trennen");
+        ++m_stoppGeschickt;
+        // Dem Paket einen Augenblick geben, bevor die Sockets zugehen --
+        // sonst raeumt der Socket es mit ab.
+        if (m_controlSocket->waitForBytesWritten(200)) { /* hinaus */ }
+    }
+
     berichteMithoeren();
 
     m_running = false;
@@ -903,34 +949,65 @@ void SunSdrRadioConnection::setMox(bool enabled)
 
 void SunSdrRadioConnection::setActiveReceiverCount(int count)
 {
-    Q_UNUSED(count);
+    // Bis zum 2026-10-03 ein No-op. Jetzt merkt sich die Verbindung die
+    // Zahl -- nicht um sie dem Geraet zu sagen (welcher Rahmen das tut,
+    // ist offen), sondern um zu wissen, fuer welche Kanaele es oben
+    // ueberhaupt einen Empfaenger gibt. Ein zweiter Strom, den niemand
+    // hoert, wird verworfen statt eingespeist.
+    const int neu = qBound(1, count, kMaxKanaele);
+    if (neu == m_aktiveEmpfaenger) { return; }
+    m_aktiveEmpfaenger = neu;
+    qCInfo(lcSunSdr) << "SunSdr: aktive Empfaenger ->" << m_aktiveEmpfaenger
+                     << "(Kanaele darueber werden verworfen)";
 }
 
 void SunSdrRadioConnection::setSampleRate(int sampleRate)
 {
-    // 48 000 Hz, am Geraet gemessen (2026-09-23/24): 240 Bloecke je
-    // Sekunde zu 200 Probenpaaren. Hier stand bis zum 2026-10-02 noch
-    // "fixed at 312,500 Hz" -- diese Zahl war von der SunSDR2 DX
-    // abgeschrieben, fuer die QRP nie geprueft und ist widerlegt. Sie
-    // stehenzulassen heisst, dass der naechste Leser sie glaubt; die
-    // richtige Zahl steht in BoardCapabilities (kSunSdr2Qrp.sampleRates)
-    // und in longpath-qrp-48khz.
+    // Seit dem 2026-10-03 ist das kein No-op mehr: die Rate steht im
+    // Stromstart-Rahmen 0x01, und der ist am Geraet durchgemessen
+    // (SunSdrProtocol.h, StromModus). 48 000 und 96 000 sind belegt.
     //
-    // Umstellen kann diese Verbindung die Rate nicht: welcher Opcode das
-    // tut, ist offen -- es braucht einen Mitschnitt, bei dem ExpertSDR2
-    // die Rate umstellt. Eine Anfrage auf etwas anderes wird darum
-    // protokolliert statt still verschluckt: sie ist nicht falsch
-    // gestellt, sie ist hier nur nicht ausfuehrbar, und wer im Log nach
-    // der Ursache einer unerwarteten Rate sucht, soll diese Zeile finden.
-    const double native = m_profile ? m_profile->rxNativeRateHz
-                                   : SunSdr::kProfileQrp.rxNativeRateHz;
-    if (double(sampleRate) != native) {
-        qCDebug(lcSunSdr) << "SunSdr: setSampleRate(" << sampleRate
-                          << ") nicht ausfuehrbar -- das Geraet laeuft auf"
-                          << native
-                          << "Hz, der Opcode zum Umstellen ist unbekannt";
+    // Warum nur diese zwei: eine Rate, die nicht aus einem Mitschnitt
+    // kommt, waere geraten -- und ein falsch gesetzter Rahmen bedeutet
+    // nicht "geht nicht", sondern Daten einer Rate in einem Kanal einer
+    // anderen. Genau das ist am 2026-09-24 passiert (48k-Daten in einem
+    // 192k-Kanal) und wurde am Geraet als "schlechtes Rauschen" gehoert.
+    SunSdr::StromModus modus;
+    if (sampleRate == 48000) {
+        modus = SunSdr::StromModus::EinStrom48;
+    } else if (sampleRate == 96000) {
+        // Zwei Stroeme je 96 kHz; der erste geht an den Empfaenger, der
+        // zweite wird verworfen, solange es keinen zweiten gibt (siehe
+        // processStreamDatagram).
+        modus = SunSdr::StromModus::ZweiStroemeJe96;
+    } else {
+        qCWarning(lcSunSdr)
+            << "SunSdr: setSampleRate(" << sampleRate
+            << ") -- fuer diese Rate ist kein Stromstart-Rahmen belegt. Es "
+               "bleibt bei" << (m_stromModus == SunSdr::StromModus::EinStrom48
+                                    ? 48000 : 96000)
+            << "Hz. Belegt sind 48000 und 96000 (am Geraet gemessen "
+               "2026-10-03).";
+        return;
+    }
+
+    if (modus == m_stromModus) {
+        return;
+    }
+    m_stromModus = modus;
+    qCInfo(lcSunSdr) << "SunSdr: Abtastrate ->" << sampleRate
+                     << "Hz (Stromstart-Rahmen wird umgestellt)";
+
+    // Steht die Verbindung schon, geht der Rahmen jetzt hinaus -- das
+    // Geraet startet den Strom dann neu und faengt die Folgenummern bei
+    // null an (am 2026-10-03 gemessen; auditStreamSeq erkennt das als
+    // Neuanfang).
+    if (m_running && !m_awaitingBeacon && m_profile) {
+        sendeSteuerrahmen(SunSdr::buildStromStartFrame(*m_profile, m_stromModus),
+                          "Stromstart 0x01 (Rate umgestellt)");
     }
 }
+
 
 void SunSdrRadioConnection::onControlReadyRead()
 {
@@ -1002,8 +1079,22 @@ void SunSdrRadioConnection::processControlDatagram(const QByteArray& data,
         // beide Seiten: PRE davor, EXTRA danach.
         sendBenchFrames(QStringLiteral("LONGPATH_SUNSDR_PRE"));
 
-        const QByteArray stateSync = stateSyncFrameForTest();
-        sendeSteuerrahmen(stateSync, "Zustandsrahmen beim Verbinden");
+        const SunSdr::StromModus modus = m_stromModus;
+        const QByteArray stateSync =
+            SunSdr::buildStromStartFrame(*m_profile, modus);
+        if (modus != SunSdr::StromModus::EinStrom48) {
+            qCWarning(lcSunSdr).noquote()
+                << QStringLiteral(
+                       "SunSdr: Strommodus aus der Umgebung -- %1. Das ist "
+                       "ein VERSUCH: die Rate kommt aus einem Mitschnitt "
+                       "vom 2026-10-03 und ist am Geraet nicht "
+                       "gegengeprueft, und der zweite Kanal hat oben noch "
+                       "keinen Empfaenger.")
+                       .arg(modus == SunSdr::StromModus::ZweiStroemeJe48
+                                ? QStringLiteral("zwei Stroeme, je 48 kHz")
+                                : QStringLiteral("zwei Stroeme, je 96 kHz"));
+        }
+        sendeSteuerrahmen(stateSync, "Stromstart 0x01");
 
         sendBenchFrames(QStringLiteral("LONGPATH_SUNSDR_EXTRA"));
     }
@@ -1108,12 +1199,55 @@ void SunSdrRadioConnection::processStreamDatagram(const QByteArray& data,
     // sagt. Sie hier wegzuwerfen, war der zweite Grund dafuer, dass
     // dieser Treiber keine Messwerte kennt.
     noteStreamState(hdr);
+    pruefeMikrofonPtt(hdr.opcode);
 
     if (hdr.opcode != SunSdr::kOpIqRxIdle) {
         return;  // TX-active frames don't apply to a receive-only connection
     }
 
-    auditStreamSeq(hdr.seq);
+    const int kanal = kanalVon(hdr);
+
+    KanalZustand& kz = m_kanal[kanal];
+    ++kz.pakete;
+
+    // Wiederkehrende Nummer: Wiederholung oder Fortsetzung? Das entscheidet
+    // der Inhalt (Begruendung am KanalZustand im Kopf). Verglichen wird nur
+    // hier, also nur bei wiederkehrender Nummer.
+    bool fortsetzung = false;
+    const char* nutz = data.constData() + SunSdr::kIqHeaderSize;
+    const int nutzLen = int(data.size()) - SunSdr::kIqHeaderSize;
+    if (kz.gesehen && hdr.seq == kz.letzteNummer) {
+        const bool gleich =
+            kz.letzteNutzlast.size() == nutzLen
+            && std::memcmp(kz.letzteNutzlast.constData(), nutz, size_t(nutzLen)) == 0;
+        if (!gleich) {
+            fortsetzung = true;
+            ++kz.fortsetzungen;
+        }
+    } else {
+        kz.letzteNutzlast = QByteArray(nutz, nutzLen);
+    }
+    kz.gesehen = true;
+    kz.letzteNummer = hdr.seq;
+
+    // Eine Fortsetzung ist KEIN neues Paket im Sinne der Folgenummern --
+    // sie traegt die naechsten Proben derselben Nummer. Sie darf also
+    // weder als Wiederholung noch als Luecke gezaehlt werden.
+    if (!fortsetzung) {
+        auditStreamSeq(kanal, hdr.seq);
+    }
+
+    // Jetzt erst verwerfen, wenn es fuer diesen Kanal oben keinen
+    // Empfaenger gibt (BoardCapabilities: maxReceivers = 1). NACH der
+    // Folgenummern-Zaehlung, nicht davor: die Nummern laufen GLOBAL ueber
+    // alle Stroeme, also fehlt jede uebersprungene Nummer im Nummernraum
+    // und erscheint als Luecke. Davor gestellt meldete der Zaehler 50 %
+    // VERLUST bei einem vollkommen gesunden Strom -- am 2026-10-03 im
+    // Messlauf am Geraet gesehen, zum zweiten Mal an derselben Stelle.
+    if (kanal >= m_aktiveEmpfaenger) {
+        ++kz.verworfen;
+        return;
+    }
 
     if (blockReplyEnabled()) {
         replyToBlock(hdr.seq);
@@ -1322,7 +1456,9 @@ void SunSdrRadioConnection::processStreamDatagram(const QByteArray& data,
         }
     }
 
-    emit iqDataReceived(/*hwReceiverIndex=*/0, samples);
+    // Der Kanal aus dem Stromkopf, nicht mehr fest 0: bei zwei Stroemen
+    // wuerden sonst die Proben beider in einem Topf landen.
+    emit iqDataReceived(kanal, samples);
     emit frameReceived();
 }
 
@@ -1893,7 +2029,7 @@ QString SunSdrRadioConnection::frameInventoryReport() const
 // (65535 -> 0 ergibt 1, nicht -65535).
 // ---------------------------------------------------------------------------
 
-void SunSdrRadioConnection::auditStreamSeq(quint16 seq)
+void SunSdrRadioConnection::auditStreamSeq(int kanal, quint16 seq)
 {
     if (!m_iqSeqWndClock.isValid()) {
         m_iqSeqWndClock.start();
@@ -1909,6 +2045,11 @@ void SunSdrRadioConnection::auditStreamSeq(quint16 seq)
     if (m_iqSeqWndClock.elapsed() >= 5000) {
         berichteFolgenummern();
     }
+
+    // Ein GLOBALER Nummernraum fuer alle Stroeme -- am 2026-10-03 am Geraet
+    // gemessen (siehe KanalZustand im Kopf). Der Kanal steht nur in der
+    // Meldung, damit eine Luecke zuzuordnen ist.
+    Q_UNUSED(kanal);
 
     const auto merken = [this](quint16 n) {
         m_seqRing.append(n);
@@ -1952,8 +2093,7 @@ void SunSdrRadioConnection::auditStreamSeq(quint16 seq)
         ++m_iqSeqWndFrames;
         m_seqOutOfPlace = 0;
 
-        // Gedrosselt wie bei P1/P2 (20 ms): ein schlechter Netzweg darf die
-        // Ereignisschlange nicht fluten. Minus eins heisst "noch nie
+        // Gedrosselt wie bei P1/P2 (20 ms). Minus eins heisst "noch nie
         // gemeldet" -- mit 0 als Startwert verschwand die ERSTE Luecke
         // einer Verbindung still, weil die Uhr am Anfang selbst 0 ist.
         const qint64 now = m_iqSeqWndClock.elapsed();
@@ -1966,22 +2106,18 @@ void SunSdrRadioConnection::auditStreamSeq(quint16 seq)
 
     // 4. Passt zu nichts: ein Spaetling, oder der Strom hat neu angefangen.
     //    Unterschieden wird nicht an der Groesse der Differenz -- die ist
-    //    bei einem Neuanfang beliebig --, sondern daran, ob es BEI DIESEM
-    //    EINEN Paket bleibt. Ein Spaetling ist ein Einzelfall zwischen
-    //    passenden Paketen; ein Neuanfang betrifft alles, was danach kommt.
+    //    bei einem Neuanfang beliebig --, sondern daran, ob es bei DIESEM
+    //    EINEN Paket bleibt.
     ++m_seqOutOfPlace;
     if (m_seqOutOfPlace < kSeqRestartAfter) {
         ++m_iqSeqWndBackwards;
-        return;  // m_lastSeq NICHT zurueckdrehen
+        return;  // lastSeq NICHT zurueckdrehen
     }
 
-    // Neuanfang: ab hier gilt die neue Folge. Ohne diesen Zweig hing der
-    // Zaehler nach einem Stromneustart dauerhaft fest (gemessen: 0 neue
-    // Nummern, 1301 rueckwaerts in 5 s).
     ++m_iqSeqWndRestarts;
     qCInfo(lcSunSdr).nospace()
-        << "SunSdr: Folgenummern fangen neu an (" << m_lastSeq << " -> "
-        << seq << ") -- der Strom wurde neu gestartet";
+        << "SunSdr: Folgenummern fangen neu an ("
+        << m_lastSeq << " -> " << seq << ") -- der Strom wurde neu gestartet";
     m_seqRing.clear();
     m_seqOutOfPlace = 0;
     m_lastSeq = seq;
@@ -2201,6 +2337,48 @@ void SunSdrRadioConnection::pruefeAnschlag(const QVector<float>& samples)
         << "SunSdr: Uebersteuerung -- " << amAnschlag << " von "
         << samples.size() << " Proben am Anschlag. Vorverstaerker "
            "zurueckdrehen oder Daempfung zuschalten.";
+}
+
+void SunSdrRadioConnection::pruefeMikrofonPtt(quint8 streamOpcode)
+{
+    const bool txAktiv = (streamOpcode == SunSdr::kOpIqTxActive);
+    if (txAktiv == m_geraetSendet) {
+        return;  // keine Flanke
+    }
+    m_geraetSendet = txAktiv;
+
+    if (m_mox.load(std::memory_order_acquire)) {
+        qCDebug(lcSunSdr) << "SunSdr: Sendezustand gewechselt, aber MOX steht "
+                             "auf uns -- kein PTT vom Geraet";
+        return;
+    }
+
+    ++m_mikrofonPttFlanken;
+    qCInfo(lcSunSdr) << "SunSdr: PTT vom Geraet:"
+                     << (txAktiv ? "gedrueckt" : "losgelassen")
+                     << "(aus dem Stromkopf, Opcode 0x"
+                     << QString::number(streamOpcode, 16) << ")";
+    emit micPttFromRadio(txAktiv);
+}
+
+SunSdr::StromModus SunSdrRadioConnection::stromModusAusUmgebung() const
+{
+    const QString wahl =
+        qEnvironmentVariable("LONGPATH_SUNSDR_STROMMODUS").trimmed();
+    if (wahl == QStringLiteral("je48")) {
+        return SunSdr::StromModus::ZweiStroemeJe48;
+    }
+    if (wahl == QStringLiteral("je96")) {
+        return SunSdr::StromModus::ZweiStroemeJe96;
+    }
+    if (!wahl.isEmpty() && wahl != QStringLiteral("48")) {
+        qCWarning(lcSunSdr).noquote()
+            << QStringLiteral("SunSdr: LONGPATH_SUNSDR_STROMMODUS=\"%1\" "
+                              "kenne ich nicht -- es bleibt bei einem Strom "
+                              "mit 48 kHz. Erlaubt: 48, 48_96, 96_144.")
+                   .arg(wahl);
+    }
+    return SunSdr::StromModus::EinStrom48;
 }
 
 } // namespace Longpath

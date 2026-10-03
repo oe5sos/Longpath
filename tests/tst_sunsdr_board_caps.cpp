@@ -79,7 +79,12 @@ private slots:
             infoFor(HPSDRHW::SunSdr2Qrp, ProtocolVersion::SunSdr));
 
         QCOMPARE(model.boardCapabilities().board, HPSDRHW::SunSdr2Qrp);
-        QCOMPARE(model.boardCapabilities().maxSampleRate, 48000);
+        // 96 000 seit dem 2026-10-03: am Geraet gemessen, dass der
+        // Stromstart-Rahmen 0x01 die Rate stellt und Kanal 0 dann mit 480
+        // Folgenummern je Sekunde ankommt. Bis dahin stand hier 48 000 --
+        // mit dem Vermerk "nicht verhandelt", und das war schlicht die
+        // Grenze unseres Wissens, nicht die des Geraets.
+        QCOMPARE(model.boardCapabilities().maxSampleRate, 96000);
     }
 
     void withoutTheExceptionItIsAtlasAgain()
@@ -121,9 +126,15 @@ private slots:
         model.injectConnectionForTest(&conn);
         auto detach = qScopeGuard([&] { model.injectConnectionForTest(nullptr); });
 
-        QCOMPARE(model.allowedStreamSampleRates(), QVector<int>{48000});
+        QCOMPARE(model.allowedStreamSampleRates(), (QVector<int>{48000, 96000}));
         QVERIFY(model.restoredRateAllowed(48000));
+        QVERIFY(model.restoredRateAllowed(96000));
+        // Und was die QRP NICHT kann, bleibt gesperrt -- darum geht es in
+        // diesem Pruefpunkt. Am 2026-09-24 hat eine wiederhergestellte
+        // 192-kHz-Rate 48k-Daten in einen 192k-Kanal gelegt, und der
+        // Betreiber hat es als "schlechtes Rauschen" gehoert.
         QVERIFY(!model.restoredRateAllowed(192000));
+        QVERIFY(!model.restoredRateAllowed(144000));
     }
 
     void theConnectedRestoreKeepsTheQrpAt48k()

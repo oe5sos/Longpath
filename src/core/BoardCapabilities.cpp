@@ -1276,8 +1276,21 @@ const BoardCapabilities kSunSdr2Qrp = {
     // Atlas und mit ihr auf Atlas' 192 kHz. Siehe die Stelle in
     // RadioModel::connectToRadio, die das jetzt richtigstellt -- ohne sie
     // ist die Zahl hier wirkungslos.
-    .sampleRates      = {48000, 0, 0, 0, 0, 0},
-    .maxSampleRate    = 48000,
+    // 96 000 Hz ist am 2026-10-03 am Geraet gemessen und laeuft durch die
+    // ganze Kette: der Stromstart-Rahmen 0x01 stellt sie (SunSdrProtocol.h,
+    // StromModus), setSampleRate waehlt ihn, und Kanal 0 kommt mit
+    // 480 Folgenummern je Sekunde = 96 kHz beim Empfaenger an. Gemessen
+    // ohne Verlust, mit erkanntem Stromneustart.
+    //
+    // 144 000 waere ebenfalls belegt (zwei Stroeme je 96 kHz ergeben
+    // zusammen 192 kHz), steht hier aber NICHT: ein Eintrag in dieser
+    // Liste heisst, dass die Oberflaeche die Rate anbietet, und was die
+    // Oberflaeche anbietet, muss durch den ganzen Weg stimmen -- einmal
+    // Daten einer Rate in einem Kanal einer anderen, und der Betreiber
+    // hoert "schlechtes Rauschen" (2026-09-24). Erst wenn der zweite Kanal
+    // oben einen Empfaenger hat, kommt mehr dazu.
+    .sampleRates      = {48000, 96000, 0, 0, 0, 0},
+    .maxSampleRate    = 96000,
     // No OpenHPSDR-style wire-encoded step attenuator exists on this
     // protocol. SunSDR has its own, structurally different mechanism: a
     // single opcode (0x05) selecting one of 4 discrete preamp/atten
