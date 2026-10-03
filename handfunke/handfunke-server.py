@@ -61,9 +61,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     #   rahmen  empfangene Tonrahmen
     #   vorrat  Fuellstand des Rings; steht er am Anschlag, wird nicht geleert
     #   takte   wie oft die Tonausgabe gerufen wurde
-    FELDER = ("anlass", "ready", "ctx", "rahmen", "vorrat", "ziel", "takte",
-              "leer", "rate", "tonTyp", "weg", "af", "vorDeckel", "nachDeckel",
-              "sicher", "fehler")
+    FELDER = ("anlass", "ready", "ctx", "sitzung", "rahmen", "vorrat", "ziel",
+              "takte", "leer", "rate", "tonTyp", "weg", "af", "vorDeckel",
+              "nachDeckel", "sicher", "fehler")
 
     def melde_annehmen(self):
         roh = urllib.parse.urlparse(self.path).query

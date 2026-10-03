@@ -50,6 +50,7 @@ const state = {
   bildHalten: false,         // Bild einfrieren, solange abgestimmt wird
   wischVersatzPx: 0,         // wie weit der Finger von der Mitte weg ist
   wfBoden: null,             // geglaetteter Rauschboden des Wasserfalls (dBm)
+  sitzungGesetzt: false,     // navigator.audioSession auf 'playback' gesetzt?
   tonTypPruefung: null,      // Nachfassen, falls mulaw8 nicht bestaetigt wird
   tonStartLaeuft: false,     // Riegel gegen doppelten AudioContext
   tonWeg: null,              // 'worklet' | 'scriptprocessor'
@@ -750,13 +751,48 @@ function afFaktor(pct) {
 //
 // Der Aufruf muss aus einer Beruehrung kommen — deshalb steht er in
 // tonStarten() und nicht irgendwo beim Laden.
+/** Sagt iOS, dass hier WIEDERGABE stattfindet — nicht Beiwerk.
+ *
+ *  Ohne diese Ansage legt Safari den Ton in die Kategorie "ambient", und die
+ *  gehorcht dem Stummschalter am Geraet: ueber Kopfhoerer hoert man alles,
+ *  ueber den Lautsprecher nichts. Genau das war am 2026-10-03 der Fall, und
+ *  es war von aussen nicht zu erkennen — die Seite meldete eine tadellose
+ *  Kette:
+ *
+ *      ctx=running  vorrat=3410  ziel=1440  takte=216
+ *      af=1  vorDeckel=-33  nachDeckel=-32
+ *
+ *  Also voller Pegel direkt vor dem Ausgang. Der Ton verliess die Seite und
+ *  wurde erst vom Betriebssystem verworfen.
+ *
+ *  navigator.audioSession gibt es seit iOS 16.4. Wo es fehlt, bleibt der
+ *  alte Behelf darunter.
+ */
+function wiedergabeSitzungSetzen() {
+  try {
+    if (navigator.audioSession) {
+      navigator.audioSession.type = 'playback';
+      return true;
+    }
+  } catch (e) { /* dann eben der Behelf */ }
+  return false;
+}
+
+/** Der alte Behelf fuer iOS vor 16.4: eine Sekunde Stille in Schleife.
+ *
+ *  Hier stand `el.volume = 0`, und das war der Fehler — ein Element mit
+ *  Lautstaerke null gilt Safari nicht als Wiedergabe und verschiebt die
+ *  Kategorie darum NICHT. Die Datei ist ohnehin Stille; die Lautstaerke muss
+ *  nicht zusaetzlich auf null stehen, damit nichts zu hoeren ist. Der
+ *  Kommentar daneben hat es die ganze Zeit zugegeben ("ohne geht es eben nur
+ *  mit Hoerer") — nur las es niemand als Fehlerbeschreibung.
+ */
 function stummesElementStarten() {
   const el = $('stillhalter');
   if (!el) { return; }
   try {
-    el.volume = 0;          // hoerbar ist daran nichts
     const p = el.play();
-    if (p && p.catch) { p.catch(() => { /* ohne geht es eben nur mit Hoerer */ }); }
+    if (p && p.catch) { p.catch(() => { /* dann bleibt es beim Hoerer */ }); }
   } catch (e) { /* desgleichen */ }
 }
 
@@ -769,8 +805,11 @@ async function tonStarten() {
   if (state.node || state.tonStartLaeuft) { return; }
   state.tonStartLaeuft = true;
   try {
-    // ZUERST: iOS in die Playback-Kategorie bringen, bevor der AudioContext
+    // ZUERST: iOS in die Playback-Kategorie bringen, BEVOR der AudioContext
     // entsteht. Danach gehorcht der Ton dem Stummschalter nicht mehr.
+    // Erst die richtige Schnittstelle, dann der Behelf — beide schaden
+    // einander nicht.
+    state.sitzungGesetzt = wiedergabeSitzungSetzen();
     stummesElementStarten();
 
     const AC = window.AudioContext || window.webkitAudioContext;
@@ -1595,6 +1634,10 @@ async function melde(anlass) {
   const C = state.audio, K = state.node && state.node._kern;
   const d = {
     sicher: window.isSecureContext,
+    // Ob die Wiedergabe-Sitzung gesetzt werden konnte. Ohne sie gehorcht der
+    // Ton dem Stummschalter, und das sieht von aussen aus wie "kein Ton",
+    // obwohl die ganze Kette tadellos laeuft.
+    sitzung: state.sitzungGesetzt ? 'playback' : 'behelf',
     weg: state.tonWeg || 'keiner',
     fehler: state.tonFehler || '-',
     ctx: C ? C.state : 'kein ctx',
