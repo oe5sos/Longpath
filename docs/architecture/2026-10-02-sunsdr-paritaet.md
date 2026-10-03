@@ -230,3 +230,44 @@ Zustand nirgends von sich aus meldet.
    ein echter Mangel gefunden wurde (eine verlorene Frequenz bleibt
    unbemerkt). Braucht eine Entscheidung, weil der Treiber dann von
    selbst Rahmen wiederholt.
+
+---
+
+# Neuer Mangel, am 2026-10-03 abends gemessen: Longpath sagt beim Trennen nichts
+
+`SunSdrRadioConnection::disconnect()` schickt dem Gerät **keinen einzigen
+Rahmen** — es schließt Sockets, hält Timer an, räumt auf. Dem Funkgerät
+wird nie gesagt, dass der Strom aufhören soll.
+
+**Was das in Zahlen heißt**, mit `tcpdump` nach einem Longpath-Ende
+gemessen (46 Sekunden Mitschnitt, niemand hörte zu):
+
+| | Pakete/s | Kopien je Folgenummer |
+| --- | --- | --- |
+| Reststrom, niemand quittiert | **1940** | **8,1** |
+| Longpath im Betrieb, mit Blockantwort | 240 | 1,00 |
+
+Zwei Dinge auf einmal:
+
+1. **Die Achtfachung ist abschließend erklärt.** Sie ist keine Eigenart
+   des Geräts, sondern genau die Folge fehlender Quittierung — 8,1 Kopien
+   ohne, 1,00 mit Blockantwort. Damit ist die Frage vom 2026-09-23 zu.
+2. **Die QRP streamt nach dem Trennen unbegrenzt weiter**, mit 2,3 MB/s
+   ins Leere, und der Mac antwortet auf jedes Paket mit ICMP „port
+   unreachable". Bekannt war das als Kuriosum („85 leftover I/Q packets",
+   `setFixedPortBindingEnabledForTest`) — es sind aber nicht 85 Pakete,
+   sondern ein Dauerzustand bis zum Ausschalten des Geräts.
+
+Und sehr wahrscheinlich ist das der Grund, warum ExpertSDR2 am selben
+Abend nicht verbinden konnte: das Gerät stand noch im Streaming-Zustand
+der vorigen Sitzung.
+
+**Was fehlt, ist der Stopp-Befehl.** ArtemisSDR führt für die DX
+`SUNSDR_OP_POWER_OFF 0x02`, und die Boot-Folge dort ruft ihn beim Umbau
+der Empfangswege auf. Welche Nummer das bei der QRP ist, wissen wir
+nicht, und geraten wird sie nicht (Abschnitt 3a).
+
+**Der Mitschnitt dafür ist der leichteste von allen:** ExpertSDR2
+verbinden lassen und dann **beenden**. Der letzte Rahmen, der hinausgeht,
+bevor der Strom verstummt, ist der Stopp-Befehl. Damit wäre `disconnect()`
+vollständig — und das Gerät nach jedem Longpath-Ende still.
