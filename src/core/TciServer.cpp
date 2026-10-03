@@ -1652,6 +1652,36 @@ TciServer::~TciServer()
 //      m_server->isListening(), treating double-start as idempotent-true).
 //      Longpath rejects double-start so the caller can detect misuse early.
 
+// Wie lange bis zum naechsten Versuch. Fuenf Sekunden sind kurz genug, dass
+// ein Netzwechsel sich von selbst heilt, bevor jemand zum Telefon greift, und
+// lang genug, dass im Log keine Wand entsteht.
+static constexpr int kBindWiederversuchMs = 5000;
+
+void TciServer::bindWiederversuchPlanen(const QHostAddress& adresse,
+                                        quint16 port, const QString& grund)
+{
+    m_bindWunschAdresse = adresse;
+    m_bindWunschPort = port;
+    if (!m_bindWiederversuch) {
+        m_bindWiederversuch = new QTimer(this);
+        m_bindWiederversuch->setSingleShot(true);
+        m_bindWiederversuch->setInterval(kBindWiederversuchMs);
+        connect(m_bindWiederversuch, &QTimer::timeout, this, [this]() {
+            // Zwischenzeitlich doch gestartet oder abbestellt? Dann nichts tun.
+            if (m_server || m_bindWunschPort == 0) { return; }
+            start(m_bindWunschAdresse, m_bindWunschPort);
+        });
+    }
+    m_bindWiederversuch->start();
+    emit bindWartetAufAdresse(adresse.toString(), port, grund);
+}
+
+void TciServer::bindWiederversuchAbbrechen()
+{
+    if (m_bindWiederversuch) { m_bindWiederversuch->stop(); }
+    m_bindWunschPort = 0;
+}
+
 bool TciServer::start(quint16 port)
 {
     return start(QHostAddress(QHostAddress::LocalHost), port);
@@ -1682,14 +1712,34 @@ bool TciServer::start(const QHostAddress& bindAddress, quint16 port)
     // Setup UI surfaces a tooltip warning when a non-loopback option is
     // selected.
     if (!m_server->listen(bindAddress, port)) {
-        qCWarning(lcTci) << "TciServer: failed to listen on"
-                         << bindAddress.toString() << "port" << port
-                         << m_server->errorString();
         const QString errStr = m_server->errorString();
+        // Nicht jede Sekunde dasselbe ins Log schreiben: der erste Fehlschlag
+        // und danach einer je Minute reichen, um die Lage zu belegen, ohne
+        // die Datei zuzumuellen.
+        if (m_bindFehlversuche == 0
+            || (m_bindFehlversuche % (60000 / kBindWiederversuchMs)) == 0) {
+            qCWarning(lcTci) << "TciServer: failed to listen on"
+                             << bindAddress.toString() << "port" << port
+                             << errStr
+                             << "— Wiederversuch in"
+                             << (kBindWiederversuchMs / 1000) << "s"
+                             << "(Fehlversuch" << (m_bindFehlversuche + 1) << ")";
+        }
         delete m_server;
         m_server = nullptr;
+        ++m_bindFehlversuche;
+        bindWiederversuchPlanen(bindAddress, port, errStr);
         emit errorOccurred(errStr);
         return false;
+    }
+
+    // Geschafft — ein etwa laufender Wiederversuch hat seine Schuldigkeit getan.
+    bindWiederversuchAbbrechen();
+    if (m_bindFehlversuche > 0) {
+        qCInfo(lcTci) << "TciServer: listen auf" << bindAddress.toString()
+                      << "port" << port << "nach" << m_bindFehlversuche
+                      << "Fehlversuchen doch geglueckt";
+        m_bindFehlversuche = 0;
     }
 
     connect(m_server, &QWebSocketServer::newConnection,
@@ -1827,6 +1877,14 @@ bool TciServer::start(const QHostAddress& bindAddress, quint16 port)
 
 void TciServer::stop()
 {
+    // Ein ausdrueckliches Beenden hebt auch einen laufenden Wiederversuch auf
+    // — und zwar VOR dem Ausstieg unten: nach einem gescheiterten listen() ist
+    // `m_server` null, der Wiederversuch laeuft aber trotzdem. Stuende das
+    // Abbrechen danach, liefe er nach einem stop() munter weiter und holte den
+    // Server hinter dem Ruecken des Bedieners wieder hoch.
+    bindWiederversuchAbbrechen();
+    m_bindFehlversuche = 0;
+
     if (!m_server) { return; }
 
     // Phase 26 review finding #4: explicitly sever DSP-thread signal connections
@@ -4072,6 +4130,32 @@ void TciServer::onFftBinsReady(int receiverId, const QVector<float>& binsDbm)
             }
         }
         const int sichtbar = letztesBin - erstesBin;
+
+        // ── Die WIRKLICHE Spanne melden, sobald sie sich aendert ────────────
+        //
+        // Begruendung an TciClientSession::spectrumSpanGemeldetHz. Kurz: der
+        // Client rechnet Abstimmstrich, Durchlassband und das Schieben des
+        // Wasserfalls aus SEINEM Wunsch. Der Zuschnitt oben kann davon
+        // abweichen — die Untergrenze `punkte` hebt eine zu schmale Bitte an,
+        // und ohne bekannte Abtastrate wird gar nicht beschnitten. Dann sitzt
+        // beim Bediener alles falsch, ohne dass irgendwo etwas davon steht.
+        //
+        // 0 heisst "volle Breite, Spanne unbekannt" — der Client faellt dann
+        // auf die I/Q-Rate zurueck, die er ohnehin kennt.
+        const int spanneEffektivHz =
+            (abtastrate > 0 && n > 0)
+                ? static_cast<int>(std::lround(double(sichtbar) / double(n)
+                                               * double(abtastrate)))
+                : 0;
+        if (spanneEffektivHz != session->spectrumSpanGemeldetHz) {
+            session->spectrumSpanGemeldetHz = spanneEffektivHz;
+            // Control-Rang, nicht Urgent: das ist eine Auskunft, kein
+            // Sendebefehl. Und nur bei AENDERUNG — sonst haengt an jedem
+            // Bild eine Textzeile, zehnmal je Sekunde.
+            session->sendQueue.push(TciSendQueue::Priority::Control,
+                QStringLiteral("spectrum_span:%1,%2;")
+                    .arg(receiverId).arg(spanneEffektivHz));
+        }
 
         QVector<float> bild(punkte);
         for (int i = 0; i < punkte; ++i) {

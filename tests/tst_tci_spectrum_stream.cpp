@@ -160,6 +160,57 @@ private slots:
                  "Ueber die volle Breite hinaus darf nicht beschnitten werden");
     }
 
+    // ── Die gezeigte Spanne ist NICHT immer die gewuenschte ─────────────────
+    //
+    // Der Client rechnet Abstimmstrich, Durchlassband und das Schieben des
+    // Wasserfalls aus der Spanne. Nimmt er dafuer seinen WUNSCH, sitzt alles
+    // davon still daneben, sobald der Server anders zuschneidet — und das tut
+    // er in zwei Faellen. Dieser Pruefpunkt rechnet beide nach; er ist die
+    // Begruendung dafuer, dass der Server die wirkliche Spanne meldet
+    // (`spectrum_span:<rx>,<hz>;`).
+    void gezeigte_spanne_weicht_vom_wunsch_ab() {
+        const int punkte = 373;          // was ein Telefon zeigt
+
+        // Fall 1: die Punktzahl ist eine UNTERGRENZE fuer die Zahl der Bins.
+        //   breite = max(punkte, lround(n * wunsch/abtastrate))
+        // Bei einer kleinen FFT hebt sie einen schmalen Wunsch an.
+        {
+            const int n = 2048, abtastrate = 48000, wunsch = 6000;
+            const double anteil = double(wunsch) / abtastrate;
+            const int roh = int(std::lround(n * anteil));          // 256
+            const int breite = std::max(punkte, roh);              // -> 373
+            const int effektiv = int(std::lround(double(breite) / n * abtastrate));
+
+            QVERIFY2(roh < punkte, "Aufbau: der Wunsch muss unter die Punktzahl fallen");
+            QVERIFY2(effektiv > wunsch,
+                     "Die Untergrenze hebt die Spanne an — genau das muss gemeldet werden");
+            // 373/2048 * 48000 = 8742 Hz statt der gewuenschten 6000.
+            QCOMPARE(effektiv, 8742);
+            // Knapp die Haelfte daneben: ein Abstimmstrich, der die Frequenz
+            // ueber `vfo - mitte / spanne` setzt, landet damit weit weg.
+            QVERIFY(double(effektiv) / wunsch > 1.4);
+        }
+
+        // Fall 2: ist die Abtastrate unbekannt, wird GAR NICHT beschnitten.
+        // Der Client wuerde mit 6 kHz rechnen, waehrend das Bild die volle
+        // Breite zeigt — bei 192 kHz ein Faktor 32.
+        {
+            const int abtastrate = 0;
+            const bool beschnitten = (abtastrate > 0);
+            QVERIFY2(!beschnitten,
+                     "Ohne bekannte Abtastrate bleibt es bei der vollen Breite");
+        }
+
+        // Fall 3: passt der Wunsch, stimmt er auch — dann meldet der Server
+        // denselben Wert, und es aendert sich nichts am Verhalten.
+        {
+            const int n = 16384, abtastrate = 48000, wunsch = 6000;
+            const int breite = std::max(punkte, int(std::lround(n * double(wunsch) / abtastrate)));
+            const int effektiv = int(std::lround(double(breite) / n * abtastrate));
+            QCOMPARE(effektiv, wunsch);
+        }
+    }
+
     void spitzenwert_erhaelt_einen_schmalen_traeger() {
         // 1024 Bins Rauschen, ein einziger Träger. Über den Mittelwert
         // verdichtet verschwindet er; über den Spitzenwert bleibt er stehen.
