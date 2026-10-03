@@ -98,10 +98,42 @@ def deuten(op):
     return KNOWN.get(op, "unbekannt")
 
 
-def auswerten(path, alle):
+def findeRechner(path):
+    """Welche Adresse ist der RECHNER (nicht das Geraet)?
+
+    Die Richtung laesst sich NICHT am Zielport ablesen: beide Seiten
+    sprechen Port 50001, also ist dport immer 50001. Die erste Fassung
+    dieses Werkzeugs tat genau das und hielt deshalb am 2026-10-03 im
+    ersten echten Mitschnitt alle zehn Rahmen fuer ausgehend -- auch die
+    fuenf Quittungen des Geraets.
+
+    Belastbar ist die Suchanfrage: Opcode 0x00 geht immer VOM Rechner aus.
+    Fehlt sie im Mitschnitt, entscheidet der Datenstrom -- die
+    1210-Byte-Pakete kommen aus dem Geraet. Bleibt auch das offen, muss es
+    --rechner sagen.
+    """
+    stromQuelle = None
+    for ts, src, sport, dst, dport, pl in udpMitRichtung(path):
+        k = kopf(pl)
+        if k is not None and k[0] == 0x00:
+            return src
+        if (sport == STREAM_PORT or dport == STREAM_PORT) and len(pl) > 1000:
+            stromQuelle = stromQuelle or dst      # Ziel des Stroms = Rechner
+    return stromQuelle
+
+
+def auswerten(path, alle, rechner=None):
     rahmen = []
     ersterStrom = None
     t0 = None
+    if rechner is None:
+        rechner = findeRechner(path)
+    if rechner is None:
+        raise SystemExit(
+            "Die Richtung laesst sich nicht bestimmen: im Mitschnitt fehlen "
+            "sowohl die Suchanfrage (0x00) als auch der Datenstrom. Mit "
+            "--rechner <IP> angeben, welche Adresse der Rechner ist.")
+    print("Rechner: %s (alles andere ist das Geraet)" % rechner)
     for ts, src, sport, dst, dport, pl in udpMitRichtung(path):
         if dport == STREAM_PORT or sport == STREAM_PORT:
             if ersterStrom is None:
@@ -111,7 +143,7 @@ def auswerten(path, alle):
             continue
         if t0 is None:
             t0 = ts
-        raus = (dport == CTRL_PORT)
+        raus = (src == rechner)
         rahmen.append((ts - t0, raus, pl))
 
     if not rahmen:
@@ -249,9 +281,10 @@ def vergleiche(a, b):
     zuordnen, ohne ihn am Funkgeraet zu erraten.
     """
     def sammle(path):
+        rechner = findeRechner(path)
         aus = {}
         for ts, src, sport, dst, dport, pl in udpMitRichtung(path):
-            if dport != CTRL_PORT:
+            if dport != CTRL_PORT or src != rechner:
                 continue          # nur, was der Rechner hinausschickt
             k = kopf(pl)
             if k is None:
@@ -294,6 +327,9 @@ def main():
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("pcap", nargs="?", default="",
                     help="Mitschnitt (pcap oder pcapng)")
+    ap.add_argument("--rechner", default="",
+                    help="IP des Rechners, falls sie sich nicht aus dem "
+                         "Mitschnitt ergibt (siehe findeRechner)")
     ap.add_argument("--alle", action="store_true",
                     help="auch die Rahmen nach dem Verbindungsablauf zeigen")
     ap.add_argument("--vergleich", default="",
@@ -311,7 +347,7 @@ def main():
     if args.vergleich:
         vergleiche(args.pcap, args.vergleich)
         return
-    auswerten(args.pcap, args.alle)
+    auswerten(args.pcap, args.alle, args.rechner or None)
 
 
 if __name__ == "__main__":
