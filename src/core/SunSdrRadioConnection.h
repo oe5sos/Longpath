@@ -882,6 +882,7 @@ private:
     SunSdr::StromModus m_stromModus{SunSdr::StromModus::EinStrom48};
     // Wie viele Kanaele oben ueberhaupt einen Empfaenger haben.
     int m_aktiveEmpfaenger{1};
+    quint64 m_stoppGeschickt{0};
 
     void auditStreamSeq(int kanal, quint16 seq);
     // Schliesst das 5-s-Fenster: meldet nach oben und schreibt ins Log.
@@ -1138,6 +1139,7 @@ public:
     quint64 kanalPaketeForTest(int k) const
     { return (k >= 0 && k < kMaxKanaele) ? m_kanal[k].pakete : 0; }
     int stromModusForTest() const { return int(m_stromModus); }
+    quint64 stoppGeschicktForTest() const { return m_stoppGeschickt; }
     quint64 kanalVerworfenForTest(int k) const
     { return (k >= 0 && k < kMaxKanaele) ? m_kanal[k].verworfen : 0; }
     quint64 kanalFortsetzungenForTest(int k) const

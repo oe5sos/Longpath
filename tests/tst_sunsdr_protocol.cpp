@@ -574,6 +574,17 @@ private slots:
     // vom 2026-09-23, als unzugeordnete Opcodes an die QRP geschickt
     // wurden. Bestaetigt wird darum nicht durch Probieren am Geraet,
     // sondern durch einen Mitschnitt, in dem ExpertSDR2 sendet.
+    // Der Stopp-Rahmen, byte-fuer-byte aus dem Mitschnitt vom 2026-10-03
+    // (rate-umschalten.pcap, dreimal enthalten, immer gleich). ExpertSDR2
+    // schickt ihn beim Beenden, und das letzte Strompaket liegt in
+    // derselben Millisekunde.
+    void stopRahmenStimmtMitDemAufgezeichnetenUeberein()
+    {
+        using namespace Longpath::SunSdr;
+        QCOMPARE(buildStopFrame(kProfileQrp).toHex(),
+                 QByteArray("03ff0200040000000000010000000d99f99d00000000"));
+    }
+
     // ── Die drei gemessenen Stromstart-Rahmen ──────────────────────────
     //
     // Der aus EinStrom48 gebaute Rahmen MUSS byte-fuer-byte der sein, den

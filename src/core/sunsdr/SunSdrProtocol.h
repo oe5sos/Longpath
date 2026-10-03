@@ -527,6 +527,20 @@ QByteArray stromModusPayload(StromModus modus);
 // Der fertige Rahmen zum Modus.
 QByteArray buildStromStartFrame(const Profile& profile, StromModus modus);
 
+// ── Der Stopp-Befehl 0x02 ───────────────────────────────────────────
+//
+// Am 2026-10-03 aus dem Mitschnitt rate-umschalten.pcap gelesen: beim
+// Beenden schickt ExpertSDR2 zwei Rahmen, 0x06 mit 0 (MOX aus) und 0x02
+// mit 0 -- und das LETZTE Strompaket liegt in derselben Millisekunde wie
+// 0x02. Danach ist die QRP still. ArtemisSDR fuehrt 0x02 als
+// SUNSDR_OP_POWER_OFF (sunsdr.h:32 [@f8b01d25c5]), was dazu passt.
+//
+// Warum das zaehlt: Longpaths disconnect() sagt dem Geraet bis heute
+// NICHTS. Gemessen am 2026-10-03: die QRP streamt danach unbegrenzt
+// weiter, 1940 Pakete/s und 2,3 MB/s ins Leere, bis sie ausgeschaltet
+// wird -- und in diesem Zustand laesst sie sich schlecht neu verbinden.
+QByteArray buildStopFrame(const Profile& profile);
+
 // Builds the 0x17 drive-byte control frame: a bare 0-255 passthrough,
 // u32 payload = raw0to255 (design doc line 984: "u32, low byte =
 // pre-calibrated 0-255 passthrough"; ArtemisSDR

@@ -274,6 +274,7 @@ void SunSdrRadioConnection::connectToRadio(const RadioInfo& info)
     // stellt danach um.
     m_stromModus = stromModusAusUmgebung();
     m_aktiveEmpfaenger = 1;
+    m_stoppGeschickt = 0;
     m_iqSeqWndFrames = 0;
     m_iqSeqWndRepeats = 0;
     m_iqSeqWndLost = 0;
@@ -482,6 +483,26 @@ void SunSdrRadioConnection::disconnect()
         qCInfo(lcSunSdr) << "SunSdr: Verbindung endet, waehrend das Geraet "
                             "sendete -- PTT wird zurueckgenommen";
         emit micPttFromRadio(false);
+    }
+
+    // Dem Geraet sagen, dass der Strom aufhoeren soll -- bis zum
+    // 2026-10-03 hat dieser Treiber beim Trennen GAR NICHTS geschickt, und
+    // die QRP streamte danach unbegrenzt weiter (gemessen: 1940 Pakete/s,
+    // 2,3 MB/s ins Leere, bis zum Ausschalten). Der Rahmen steht im
+    // Mitschnitt vom selben Tag: 0x02 mit vier Nullbytes, und das letzte
+    // Strompaket liegt in derselben Millisekunde.
+    //
+    // Nur wenn die Verbindung wirklich stand: vor dem Handschlag gibt es
+    // keine Gegenstelle, und ein Stopp an eine Adresse, die wir nicht
+    // kennen, waere ein Paket ins Nichts.
+    if (m_running && !m_awaitingBeacon && m_profile && m_controlSocket
+        && !m_radioAddr.isNull()) {
+        sendeSteuerrahmen(SunSdr::buildStopFrame(*m_profile),
+                          "Stopp 0x02 beim Trennen");
+        ++m_stoppGeschickt;
+        // Dem Paket einen Augenblick geben, bevor die Sockets zugehen --
+        // sonst raeumt der Socket es mit ab.
+        if (m_controlSocket->waitForBytesWritten(200)) { /* hinaus */ }
     }
 
     berichteMithoeren();

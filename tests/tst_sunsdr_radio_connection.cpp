@@ -1825,6 +1825,38 @@ private slots:
         QCOMPARE(conn.offeneRahmenForTest(), offenVorher);
     }
 
+    // Beim Trennen geht ein Stopp hinaus -- bis zum 2026-10-03 schickte
+    // dieser Treiber GAR NICHTS, und die QRP streamte danach unbegrenzt
+    // weiter (1940 Pakete/s ins Leere, bis zum Ausschalten). Mit dem Stopp
+    // am Geraet gemessen: 0 Pakete/s.
+    void trennenSchicktDenStopp()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        handshake(conn);
+        QCOMPARE(conn.stoppGeschicktForTest(), quint64(0));
+
+        conn.disconnect();
+        QCOMPARE(conn.stoppGeschicktForTest(), quint64(1));
+    }
+
+    // Ohne stehende Verbindung gibt es keine Gegenstelle -- ein Stopp an
+    // eine Adresse, die wir nicht kennen, waere ein Paket ins Nichts.
+    void trennenOhneVerbindungSchicktKeinenStopp()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        // KEIN Handschlag -- m_awaitingBeacon bleibt true.
+        conn.disconnect();
+        QCOMPARE(conn.stoppGeschicktForTest(), quint64(0));
+    }
+
     // ── Zwei Stroeme und mehrere Pakete je Folgenummer ─────────────────
     //
     // Am 2026-10-03 aus einem ExpertSDR2-Mitschnitt gemessen: die QRP

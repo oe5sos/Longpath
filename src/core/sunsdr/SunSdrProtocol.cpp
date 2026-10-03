@@ -245,6 +245,14 @@ QByteArray buildStromStartFrame(const Profile& profile, StromModus modus)
     return withControlFrameCrc(frame);
 }
 
+QByteArray buildStopFrame(const Profile& profile)
+{
+    // Vier Byte Nutzlast, alle null -- byte-fuer-byte wie im Mitschnitt.
+    QByteArray frame = buildControlHeader(profile, 0x02, 0, 4);
+    frame += QByteArray(4, char(0));
+    return withControlFrameCrc(frame);
+}
+
 quint32 controlFrameCrc(const QByteArray& frame)
 {
     // CRC-32/IEEE, bitweise (die Rahmen sind hoechstens ein paar hundert
