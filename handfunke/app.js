@@ -50,7 +50,11 @@ const state = {
   bildHalten: false,         // Bild einfrieren, solange abgestimmt wird
   wischVersatzPx: 0,         // wie weit der Finger von der Mitte weg ist
   wfBoden: null,             // geglaetteter Rauschboden des Wasserfalls (dBm)
-  sitzungGesetzt: false,     // navigator.audioSession auf 'playback' gesetzt?
+  // null = noch nicht versucht, true = 'playback' gesetzt, false = Behelf.
+  // Die drei Zustaende muessen unterscheidbar bleiben: 'behelf' heisst, die
+  // Schnittstelle fehlt und der Stummschalter greift wieder — das ist ein
+  // Befund. 'noch nicht versucht' ist keiner.
+  sitzungGesetzt: null,
   hfAbstand: null,           // geglaettet: staerkster Punkt minus Rauschboden (dB)
   tonTypPruefung: null,      // Nachfassen, falls mulaw8 nicht bestaetigt wird
   tonStartLaeuft: false,     // Riegel gegen doppelten AudioContext
@@ -1717,7 +1721,15 @@ async function melde(anlass) {
     // Ob die Wiedergabe-Sitzung gesetzt werden konnte. Ohne sie gehorcht der
     // Ton dem Stummschalter, und das sieht von aussen aus wie "kein Ton",
     // obwohl die ganze Kette tadellos laeuft.
-    sitzung: state.sitzungGesetzt ? 'playback' : 'behelf',
+    // Drei Zustaende, nicht zwei. Am 2026-10-03 meldete die Seite beim Start
+    // `sitzung=behelf`, und das las sich wie der Fehler vom selben Morgen
+    // (Ton gehorcht dem Stummschalter) — dabei war die Sitzung zu diesem
+    // Zeitpunkt nur noch gar nicht gesetzt worden; das passiert erst beim
+    // Tonstart. Ein Diagnosefeld, das einen Befund meldet, wo keiner ist,
+    // schickt die Fehlersuche in die falsche Richtung. Dasselbe Muster, das
+    // dieser Tag sechsmal in der Anzeige hatte, hier im eigenen Werkzeug.
+    sitzung: state.sitzungGesetzt === null ? 'nicht versucht'
+           : state.sitzungGesetzt ? 'playback' : 'behelf',
     weg: state.tonWeg || 'keiner',
     fehler: state.tonFehler || '-',
     ctx: C ? C.state : 'kein ctx',
