@@ -253,6 +253,8 @@ void SunSdrRadioConnection::connectToRadio(const RadioInfo& info)
     m_letzteAnschlagMeldungMs = -1;
     m_anschlagProben = 0;
     m_anschlagMeldungen = 0;
+    m_geraetSendet = false;
+    m_mikrofonPttFlanken = 0;
     m_inventoryClock.invalidate();
     m_lastStreamStateValid = false;
     // Die Folgenummern-Zaehlung gehoert zur Sitzung: die erste Nummer der
@@ -459,6 +461,17 @@ void SunSdrRadioConnection::disconnect()
     // soll das Ergebnis im Log finden, ohne es waehrenddessen abfragen zu
     // muessen. Nur wenn ueberhaupt etwas angekommen ist -- eine Zeile
     // "nichts aufgenommen" bei jedem Programmende waere Laerm.
+    // Ein haengendes PTT darf eine Sitzung nicht ueberleben: bricht die
+    // Verbindung ab, waehrend das Geraet sendet, bliebe Longpath sonst im
+    // Zustand "Taste gedrueckt" -- und das ist der falsche Zustand, in dem
+    // man einen Sender in Erinnerung behaelt.
+    if (m_geraetSendet) {
+        m_geraetSendet = false;
+        qCInfo(lcSunSdr) << "SunSdr: Verbindung endet, waehrend das Geraet "
+                            "sendete -- PTT wird zurueckgenommen";
+        emit micPttFromRadio(false);
+    }
+
     berichteMithoeren();
 
     m_running = false;
@@ -1107,6 +1120,7 @@ void SunSdrRadioConnection::processStreamDatagram(const QByteArray& data,
     // sagt. Sie hier wegzuwerfen, war der zweite Grund dafuer, dass
     // dieser Treiber keine Messwerte kennt.
     noteStreamState(hdr);
+    pruefeMikrofonPtt(hdr.opcode);
 
     if (hdr.opcode != SunSdr::kOpIqRxIdle) {
         return;  // TX-active frames don't apply to a receive-only connection
@@ -2144,6 +2158,28 @@ void SunSdrRadioConnection::pruefeAnschlag(const QVector<float>& samples)
         << "SunSdr: Uebersteuerung -- " << amAnschlag << " von "
         << samples.size() << " Proben am Anschlag. Vorverstaerker "
            "zurueckdrehen oder Daempfung zuschalten.";
+}
+
+void SunSdrRadioConnection::pruefeMikrofonPtt(quint8 streamOpcode)
+{
+    const bool txAktiv = (streamOpcode == SunSdr::kOpIqTxActive);
+    if (txAktiv == m_geraetSendet) {
+        return;  // keine Flanke
+    }
+    m_geraetSendet = txAktiv;
+
+    if (m_mox.load(std::memory_order_acquire)) {
+        qCDebug(lcSunSdr) << "SunSdr: Sendezustand gewechselt, aber MOX steht "
+                             "auf uns -- kein PTT vom Geraet";
+        return;
+    }
+
+    ++m_mikrofonPttFlanken;
+    qCInfo(lcSunSdr) << "SunSdr: PTT vom Geraet:"
+                     << (txAktiv ? "gedrueckt" : "losgelassen")
+                     << "(aus dem Stromkopf, Opcode 0x"
+                     << QString::number(streamOpcode, 16) << ")";
+    emit micPttFromRadio(txAktiv);
 }
 
 } // namespace Longpath

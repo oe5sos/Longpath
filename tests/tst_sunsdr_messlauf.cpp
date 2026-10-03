@@ -178,6 +178,11 @@ private slots:
             "Uebersteuerung: %1 Proben am Anschlag, %2 Meldungen")
             .arg(conn.anschlagProbenForTest())
             .arg(conn.anschlagMeldungenForTest());
+        qInfo().noquote() << QStringLiteral(
+            "PTT vom Geraet: %1 Flanken, Geraet sendet jetzt: %2")
+            .arg(conn.mikrofonPttFlankenForTest())
+            .arg(conn.geraetSendetForTest() ? QStringLiteral("ja")
+                                            : QStringLiteral("nein"));
         qInfo().noquote() << conn.frameInventoryReport();
         qInfo().noquote() << conn.seqDeltaReport();
 

@@ -1825,6 +1825,101 @@ private slots:
         QCOMPARE(conn.offeneRahmenForTest(), offenVorher);
     }
 
+    // ── Mikrofon-PTT am Geraet ─────────────────────────────────────────
+    //
+    // Die zweite Empfangsluecke, geschlossen ohne Protokollwissen: der
+    // Stromkopf traegt den Betriebszustand (0xFE Empfang, 0xFD Senden).
+    // Drueckt jemand am Geraet die Mikrofontaste, wechselt der Opcode.
+
+    static QByteArray qrpBlockTx(quint16 seq)
+    {
+        QByteArray pkt = SunSdr::buildIqHeader(
+            SunSdr::kProfileQrp, SunSdr::kOpIqTxActive, seq, 0x02, 0x01);
+        pkt.append(QByteArray(SunSdr::kIqPayloadSize, char(0)));
+        return pkt;
+    }
+
+    void sendezustandAmGeraetMeldetPtt()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        handshake(conn);
+
+        QSignalSpy ptt(&conn, &RadioConnection::micPttFromRadio);
+        conn.feedStreamDatagramForTest(qrpBlockSeq(1));
+        QCOMPARE(ptt.count(), 0);
+
+        conn.feedStreamDatagramForTest(qrpBlockTx(2));
+        QCOMPARE(ptt.count(), 1);
+        QCOMPARE(ptt.first().at(0).toBool(), true);
+        QVERIFY(conn.geraetSendetForTest());
+
+        // Nur die FLANKE: 240 Pakete je Sekunde duerfen nicht 240 Signale
+        // ergeben.
+        for (quint16 n = 3; n <= 30; ++n) {
+            conn.feedStreamDatagramForTest(qrpBlockTx(n));
+        }
+        QCOMPARE(ptt.count(), 1);
+
+        // Und zurueck.
+        conn.feedStreamDatagramForTest(qrpBlockSeq(31));
+        QCOMPARE(ptt.count(), 2);
+        QCOMPARE(ptt.last().at(0).toBool(), false);
+        QVERIFY(!conn.geraetSendetForTest());
+        QCOMPARE(conn.mikrofonPttFlankenForTest(), quint64(2));
+    }
+
+    // Was Longpath selbst ausgeloest hat, ist kein PTT vom Geraet.
+    void eigenesMoxGiltNichtAlsPttVomGeraet()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        handshake(conn);
+        conn.feedStreamDatagramForTest(qrpBlockSeq(1));
+
+        conn.setTxArmedForTest(true);
+        conn.setTxCheckContextForTest(armedInBandCtx());
+        conn.setMox(true);
+        QVERIFY(conn.isMoxForTest());
+
+        QSignalSpy ptt(&conn, &RadioConnection::micPttFromRadio);
+        conn.feedStreamDatagramForTest(qrpBlockTx(2));
+
+        QCOMPARE(ptt.count(), 0);
+        QCOMPARE(conn.mikrofonPttFlankenForTest(), quint64(0));
+        // Der Zustand wird trotzdem mitgefuehrt -- nur nicht als PTT
+        // gemeldet.
+        QVERIFY(conn.geraetSendetForTest());
+    }
+
+    // Ein haengendes PTT darf eine Sitzung nicht ueberleben: das ist der
+    // falsche Zustand, in dem man einen Sender in Erinnerung behaelt.
+    void haengendesPttWirdBeimTrennenZurueckgenommen()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        handshake(conn);
+        conn.feedStreamDatagramForTest(qrpBlockSeq(1));
+        conn.feedStreamDatagramForTest(qrpBlockTx(2));
+
+        QSignalSpy ptt(&conn, &RadioConnection::micPttFromRadio);
+        QVERIFY(conn.geraetSendetForTest());
+        conn.disconnect();
+
+        QCOMPARE(ptt.count(), 1);
+        QCOMPARE(ptt.first().at(0).toBool(), false);
+        QVERIFY(!conn.geraetSendetForTest());
+    }
+
     // ── Uebersteuerung ─────────────────────────────────────────────────
     //
     // Eine der zwei echten Luecken im Empfang: P1/P2 melden adcOverflow aus

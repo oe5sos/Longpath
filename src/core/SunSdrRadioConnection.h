@@ -967,6 +967,33 @@ private:
 
     void pruefeAnschlag(const QVector<float>& samples);
 
+    // ── Mikrofon-PTT am Geraet erkennen ─────────────────────────────────
+    //
+    // Die zweite der zwei Empfangsluecken, und sie geht genauso ohne
+    // Protokollwissen wie die Uebersteuerung: P1 und P2 lesen das PTT aus
+    // einem Statusbit, die QRP schickt keine Statusrahmen -- aber ihr
+    // Stromkopf traegt den Betriebszustand. 0xFE heisst Empfang, 0xFD
+    // heisst SENDEN (SunSdrProtocol.h: "0xFE = RX-state/idle-TX,
+    // 0xFD = TX-active"). Drueckt jemand am Geraet die Mikrofontaste,
+    // wechselt der Opcode -- und dieser Treiber hat ihn bisher nur dazu
+    // benutzt, solche Pakete wegzuwerfen.
+    //
+    // Gemeldet wird die FLANKE, nicht jedes Paket. P1/P2 melden den
+    // Zustand mit jedem Statusrahmen, und MoxController::onMicPttFromRadio
+    // ist gegen Wiederholungen gleichgueltig -- bei 240 Strompaketen je
+    // Sekunde waeren 240 Signale ueber eine QueuedConnection aber nichts
+    // als Last.
+    //
+    // Nicht gemeldet wird, was Longpath selbst ausgeloest hat: steht MOX
+    // auf uns, ist der Sendezustand unser eigener und kein PTT vom Geraet.
+    // Heute kann der Fall nicht eintreten (kein Byte des Sendepfads
+    // erreicht den Draht), aber die Unterscheidung gehoert an die Stelle,
+    // die sie trifft -- nicht in den Empfaenger.
+    bool m_geraetSendet{false};
+    quint64 m_mikrofonPttFlanken{0};
+
+    void pruefeMikrofonPtt(quint8 streamOpcode);
+
     void berichteMithoeren();
     void noteControlFrame(const QByteArray& data);
     void noteStreamState(const SunSdr::IqHeader& hdr);
@@ -1028,6 +1055,8 @@ public:
     quint64 rahmenOhneQuittungForTest() const { return m_rahmenOhneQuittung; }
     quint64 anschlagProbenForTest() const { return m_anschlagProben; }
     quint64 anschlagMeldungenForTest() const { return m_anschlagMeldungen; }
+    bool geraetSendetForTest() const { return m_geraetSendet; }
+    quint64 mikrofonPttFlankenForTest() const { return m_mikrofonPttFlanken; }
     int offeneRahmenForTest() const { return int(m_offeneRahmen.size()); }
 };
 
