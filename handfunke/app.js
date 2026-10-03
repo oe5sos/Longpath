@@ -51,6 +51,7 @@ const state = {
   wischVersatzPx: 0,         // wie weit der Finger von der Mitte weg ist
   wfBoden: null,             // geglaetteter Rauschboden des Wasserfalls (dBm)
   sitzungGesetzt: false,     // navigator.audioSession auf 'playback' gesetzt?
+  hfAbstand: null,           // geglaettet: staerkster Punkt minus Rauschboden (dB)
   tonTypPruefung: null,      // Nachfassen, falls mulaw8 nicht bestaetigt wird
   tonStartLaeuft: false,     // Riegel gegen doppelten AudioContext
   tonWeg: null,              // 'worklet' | 'scriptprocessor'
@@ -655,6 +656,21 @@ function zeichneBild() {
   const sortiert = Float32Array.from(quelle).sort();
   const p20 = sortiert[Math.floor(M * 0.20)];
   state.wfBoden = (state.wfBoden === null) ? p20 : state.wfBoden * 0.88 + p20 * 0.12;
+
+  // ── Wie weit ragt das Stärkste über das Rauschen? ──────────────────────
+  //
+  // Weil der Wasserfall jetzt auf dem GEMESSENEN Rauschboden sitzt, malt er
+  // auch reines Rauschen bunt und strukturiert. Das ist beim Hören richtig —
+  // aber am 2026-10-03 hat der Betreiber daraus geschlossen, es komme HF an,
+  // während in Wahrheit die Antenne fehlte: 7 dB Abstand auf 40 m am Morgen.
+  // Früher wäre das schwarz geblieben und hätte für sich gesprochen.
+  //
+  // Also sagt die Seite es jetzt selbst. Geglättet, weil ein einzelnes Bild
+  // zappelt und eine flackernde Warnung schlimmer ist als keine.
+  const spitzeDb = sortiert[M - 1];
+  const abstandJetzt = spitzeDb - p20;
+  state.hfAbstand = (state.hfAbstand === null)
+      ? abstandJetzt : state.hfAbstand * 0.9 + abstandJetzt * 0.1;
 
   const spitze = new Float32Array(W);
   for (let x = 0; x < W; x++) {
@@ -1646,6 +1662,8 @@ async function melde(anlass) {
     af: state.gain ? +state.gain.gain.value.toFixed(2) : -1,
     afPct: state.afPct,
     rahmen: link.bytes.audio,
+    // Abstand Rauschboden -> staerkster Punkt. Unter 10 dB kommt keine HF an.
+    hfdb: state.hfAbstand === null ? -1 : +state.hfAbstand.toFixed(1),
     tonTyp: link.st.audioTypRahmen,
     rate: link.st.audioRate,
     vorrat: K ? K.have : -1,
@@ -1689,10 +1707,18 @@ function schleife(t) {
   // `spectrum_start` gar nicht). Dieselbe Stille entsteht, wenn in
   // Longpath schlicht kein Funkgeraet verbunden ist. Ein leerer Kasten
   // laesst den Operator raten; ein Satz nicht.
+  //
+  // Kommt ein Bild, aber ohne jedes Signal darin, steht das jetzt auch da —
+  // siehe state.hfAbstand. 10 dB als Grenze: ein belegtes Band bringt
+  // Traeger 30 bis 50 dB ueber den Boden, ein offener Eingang kaum 10.
+  // Dazwischen liegt nichts Wirkliches, also ist die Grenze unkritisch.
   const bildLaeuft = r.spec > 0 || r.iq > 0;
-  $('fussBild').className = bildLaeuft ? '' : 'warn';
+  const nurRauschen = bildLaeuft && state.hfAbstand !== null
+                      && state.hfAbstand < 10;
+  $('fussBild').className = (!bildLaeuft || nurRauschen) ? 'warn' : '';
   $('fussBild').textContent =
-      r.spec ? (r.spec + ' kB/s bild')
+      nurRauschen ? ('nur rauschen (' + state.hfAbstand.toFixed(0) + ' dB) — antenne?')
+    : r.spec ? (r.spec + ' kB/s bild')
     : r.iq   ? (r.iq + ' kB/s bild (roh)')
     : link.ready ? 'kein bild — funkgerät verbunden?'
     : '';

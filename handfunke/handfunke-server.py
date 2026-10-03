@@ -63,7 +63,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     #   takte   wie oft die Tonausgabe gerufen wurde
     FELDER = ("anlass", "ready", "ctx", "sitzung", "rahmen", "vorrat", "ziel",
               "takte", "leer", "rate", "tonTyp", "weg", "af", "vorDeckel",
-              "nachDeckel", "sicher", "fehler")
+              "nachDeckel", "hfdb", "sicher", "fehler")
 
     def melde_annehmen(self):
         roh = urllib.parse.urlparse(self.path).query
