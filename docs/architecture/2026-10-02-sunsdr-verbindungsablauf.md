@@ -563,3 +563,69 @@ wiederkehrende `00c1b77f`-Muster, also Zeiger eines 64-Bit-Prozesses, und
 ihre Länge schwankt zwischen Mitschnitten (1200/1024 gegen 340/340). Das
 sind keine Protokollfelder, die man nachbauen sollte — eher ungesäuberte
 Puffer von ExpertSDR2.
+
+---
+
+# 2026-10-03, 19:32: die Abtastrate steht im Rahmen 0x01 — den Longpath längst schickt
+
+Mitschnitt `rate-umschalten.pcap` (118 550 Pakete), ExpertSDR2 verbunden,
+zweimal die Rate umgeschaltet. Die Paketrate über die Zeit:
+
+| Zeit | Pakete/s |
+| --- | --- |
+| Phase A | 720 |
+| Phase B | 1200 |
+| Phase C | 720 |
+
+Und im Steuerkanal ändert sich an genau diesen zwei Stellen **ein**
+Rahmen: `0x01`, der Stromstart.
+
+| | Nutzlast von `0x01` |
+| --- | --- |
+| Longpath heute | `01000000` `0c080403` `02020202` |
+| ExpertSDR2, Phase A/C | `02000000` `0c080403` `02020202` |
+| ExpertSDR2, Phase B | `02010000` `0a060403` `02020201` |
+
+## Es sind zwei Ströme, unterschieden durch `byte9` im Stromkopf
+
+Nach Kanal aufgeschlüsselt — und damit löst sich alles auf:
+
+| Phase | `byte9 = 0` | `byte9 = 1` |
+| --- | --- | --- |
+| A / C | 240 Pakete/s, 1 je Nummer → **48 kHz** | 480 Pakete/s, 2 je Nummer → **96 kHz** |
+| B | 480 Pakete/s, 1 je Nummer → **96 kHz** | 720 Pakete/s, 1,5 je Nummer → **144 kHz** |
+
+ExpertSDR2 lässt sich also **zwei Ströme gleichzeitig** schicken, mit
+**verschiedenen** Raten. Longpath bekommt einen, mit 48 kHz — und der
+Unterschied steht im ersten Byte des `0x01`-Rahmens: **`01` gegen `02`**.
+Dasselbe Byte erscheint im Stromkopf wieder als `byte8` (Longpath sieht
+`0100`, ExpertSDR2 `0200`/`0201`).
+
+Damit ist auch die Beobachtung vom 2026-09-23 endgültig erklärt
+(„ExpertSDR2 bekommt zwei verschiedene Pakete je Nummer"): das waren die
+zwei Ströme, und beim 96-kHz-Strom zusätzlich zwei Pakete je Nummer.
+
+## Was daraus folgt — und es ist viel
+
+1. **Die QRP kann 48, 96 und 144 kHz**, gemessen. `BoardCapabilities`
+   führt `maxSampleRate = 48000`; das ist widerlegt.
+2. **Die QRP kann zwei Ströme gleichzeitig.** Ob das zwei Empfänger sind
+   oder Empfänger plus Panadapter, ist offen — aber es sind zwei
+   unabhängig geratete Ströme, und `0x07` adressiert passend dazu zwei
+   Unterempfänger (sub 0 und sub 1).
+3. **Longpath braucht dafür keinen neuen Opcode.** Es schickt `0x01`
+   bereits; nur die Nutzlast müsste von `01000000 0c080403 02020202` auf
+   eine der gemessenen umgestellt werden. Die beiden bekannten Werte
+   stehen oben, mit gültiger Prüfsumme im Mitschnitt.
+4. **Vorher muss `processStreamDatagram` umgebaut werden**, sonst wird es
+   schlimmer statt besser:
+   * Der zweite Strom (`byte9 = 1`) wird heute **als derselbe behandelt**
+     — die Proben beider Kanäle landen in einem Topf.
+   * Bei 2 Paketen je Nummer gilt das zweite heute als **Wiederholung**
+     und wird verworfen — es ist aber die zweite Hälfte der Proben.
+   Beides zusammen heißt: einfach den Rahmen umstellen würde den Empfang
+   **kaputtmachen**, nicht verbessern.
+5. Die Bedeutung der Bytes `0c 08 04 03` gegen `0a 06 04 03` ist noch
+   nicht entschlüsselt. Für den ersten Schritt braucht man sie nicht —
+   die zwei gemessenen Nutzlasten reichen, um 48+96 bzw. 96+144 kHz zu
+   bekommen.
