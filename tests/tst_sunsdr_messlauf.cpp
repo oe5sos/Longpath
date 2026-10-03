@@ -177,11 +177,58 @@ private slots:
             QTest::qWait(1500);
         }
 
+        // Alle Bedienelemente durchschalten, die beim QRP ueberhaupt etwas
+        // schicken, und mitschreiben, was zurueckkommt. Das ist die Frage,
+        // fuer die das Mithoeren gebaut wurde: aendert sich im Betrieb eine
+        // Nutzlast, ist es ein Messwert; bleibt alles still, meldet das
+        // Geraet nichts. Dazwischen jeweils die Abfrage 0x0c -- wenn ihre
+        // 320 Byte den Geraetezustand tragen, muessen sie sich hier
+        // bewegen.
+        if (qEnvironmentVariableIsSet("LONGPATH_SUNSDR_BEDIENEN")) {
+            const QByteArray abfrage =
+                QByteArray::fromHex("03ff0c000000000000000100000037f7affe");
+            const auto abfragen = [&]() {
+                qputenv("LONGPATH_SUNSDR_ABFRAGE", abfrage.toHex());
+                conn.sendBenchFramesForTest(QStringLiteral("LONGPATH_SUNSDR_ABFRAGE"));
+                qunsetenv("LONGPATH_SUNSDR_ABFRAGE");
+                QTest::qWait(400);
+            };
+
+            abfragen();
+            for (const int stufe : {0, 2, 1, 7}) {   // -20, -10, 0, +10 dB
+                conn.setPreampModeIndex(stufe);
+                QTest::qWait(300);
+                abfragen();
+            }
+            for (const int dB : {0, -20}) {
+                conn.setAttenuator(dB);
+                QTest::qWait(300);
+                abfragen();
+            }
+            conn.setActiveReceiverCount(2);
+            conn.setSampleRate(96000);
+            QTest::qWait(500);
+            abfragen();
+            qInfo().noquote() << QStringLiteral(
+                "Bedienung durchgeschaltet: 4 Vorverstaerkerstufen, "
+                "2 Daempfungswerte, Empfaengerzahl, Abtastrate -- je mit "
+                "Abfrage 0x0c dazwischen");
+        }
+
         const int bloeckeVorher = iq.count();
         QElapsedTimer fenster;
         fenster.start();
         while (fenster.elapsed() < sekunden * 1000) {
-            QTest::qWait(500);
+            // 20 ms, nicht 500: mit groben Bloecken laeuft die
+            // Ereignisschleife zu selten, die Blockantworten gehen
+            // verspaetet hinaus, und das Geraet WIEDERHOLT -- am
+            // 2026-10-03 gemessen 1,20 Kopien je Nummer im Messlauf gegen
+            // 1,00 im echten Betrieb des Betreibers. Der Pruefstand hat
+            // also gemessen, was er selbst verursacht hat. Genau der
+            // Fehler, vor dem feedback-messung-schlaegt-nicht-das-geraet
+            // warnt, nur umgekehrt: hier war nicht das Geraet schuld,
+            // sondern das Messgeraet.
+            QTest::qWait(20);
         }
         const double secs = double(fenster.elapsed()) / 1000.0;
         const int bloecke = iq.count() - bloeckeVorher;

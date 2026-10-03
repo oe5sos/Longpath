@@ -429,3 +429,51 @@ sinnvolle Versicherung — eine verlorene Frequenz **bleibt** sonst
 unbemerkt, und genau einmal ist es passiert —, aber es ist **nicht
 dringend**. Die Ursache jenes einen Verlusts ist offen; er trat in einem
 Lauf auf, in dem zusätzlich ein Konfigurationsrahmen hinausging.
+
+---
+
+# Zwei Korrekturen aus dem echten Betrieb des Betreibers (2026-10-03, 17:50)
+
+Der Betreiber hat Longpath neu gestartet und die QRP verbunden — seine
+Instanz hält damit Gerät und Ports, und sie sammelt selbst mit (das
+Mithören ist seit 06:59 installiert). Ihr Log widerlegt zwei Dinge aus
+meinen eigenen Messläufen.
+
+## 1,00 Kopien je Nummer — mein Messlauf hat gemessen, was er verursacht hat
+
+| | Kopien je Nummer |
+| --- | --- |
+| mein Messlauf | **1,20** |
+| echter Betrieb | **1,00** |
+
+Der Unterschied ist der Prüfstand: er ließ die Ereignisschleife in
+500-ms-Blöcken laufen (`QTest::qWait(500)`), dadurch gingen die
+Blockantworten verspätet hinaus, und das Gerät **wiederholte**. Die
+„rund 50 bytegleichen Wiederholungen je Sekunde" sind also keine
+Eigenschaft des Geräts, sondern eine Folge meiner Messung.
+
+Behoben: der Messlauf tickt jetzt in 20 ms. Und als Merksatz: ein
+Messgerät, das den Takt der Antworten verschiebt, misst sich selbst.
+
+**Im echten Betrieb ist der Strom sauber** — 240 Nummern je Sekunde, eine
+Kopie je Nummer, keine Spätlinge.
+
+## „Das Gerät meldet von sich aus nichts" — präziser gefasst
+
+Im Log des Betreibers steht 88 Sekunden nach dem Verbinden:
+
+```
+neue Rahmensorte auf Steuerkanal -- op=0x1 sub=0 len=6 nutzlast=51c300004928
+```
+
+Diese sechs Byte sind das Ende der **Beacon-Antwort**
+(`03ff011a7c…51c300004928`). Das Gerät hat also auf eine Geräte-Rundfrage
+**geantwortet** — es hat nichts von sich aus gemeldet. Der Befund bleibt
+richtig, muss aber genauer heißen:
+
+> **Die QRP antwortet, aber sie meldet nicht.** Quittungen auf
+> Steuerrahmen, Antworten auf Abfragen (`0x0c`), Antworten auf
+> Rundfragen — alles reaktiv. Kein unaufgeforderter Messwert.
+
+Nützlich ist das trotzdem: solche Antworten im Inventar zeigen, dass das
+Gerät erreichbar ist und wer es sucht.
