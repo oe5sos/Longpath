@@ -192,6 +192,14 @@ Im **Empfang** fehlen damit noch **zwei** Meldungen, nicht neun. Das
 S-Meter rechnet Longpath ohnehin selbst aus dem I/Q — ein Geräte-S-Meter
 braucht es dafür nicht.
 
+**Noch am selben Tag auf eine reduziert:** `adcOverflow` ist gebaut, und
+zwar ohne Protokollwissen — aus dem Signal selbst, denn eine Probe am
+Anschlag ist eine Probe am Anschlag. Am Gerät auf drei Bändern
+gegengemessen: keine Fehlalarme (der Rauschflur ohne Antenne liegt sechs
+Zehnerpotenzen unter der Schwelle). **Offen im Empfang ist damit nur noch
+`micPttFromRadio`** — und das braucht den Mitschnitt, weil die QRP den
+Zustand nirgends von sich aus meldet.
+
 ## Was am 2026-10-03 am Gerät geklärt wurde
 
 | Frage | Antwort |
@@ -213,10 +221,11 @@ braucht es dafür nicht.
    unvollständig).
 2. **Ein 50-Ohm-Abschluss** für alles Sendeseitige — und davor die
    Bestätigung der Opcode-Nummern (Abschnitt 3a).
-3. **Übersteuerung und Mikrofon-PTT**: die zwei echten Empfangslücken.
-   Wo sie herkommen, ist offen — das Gerät meldet sie nicht von selbst,
-   also stecken sie entweder in einer Abfrage oder in einem der
-   unbekannten Rahmen.
+3. ~~Übersteuerung und~~ **Mikrofon-PTT**: Übersteuerung ist am
+   2026-10-03 gebaut (aus dem I/Q, ohne Protokollwissen). Für das
+   Mikrofon-PTT gilt weiter: das Gerät meldet den Zustand nicht von
+   selbst, also steckt er in einer Abfrage oder in einem der unbekannten
+   Rahmen — Mitschnitt.
 4. **Unquittierte Rahmen nachschicken** — die eine Stelle, an der heute
    ein echter Mangel gefunden wurde (eine verlorene Frequenz bleibt
    unbemerkt). Braucht eine Entscheidung, weil der Treiber dann von
