@@ -743,3 +743,39 @@ Und dazu, aus demselben Abend, die Regel über Abwesenheit:
 > Wo Daten ausbleiben könnten, darf man aus ihrem Fehlen nichts
 > schließen; und wo sie ausbleiben, muss die Anzeige das sagen, statt den
 > letzten Wert festzuhalten.
+
+---
+
+# Nachtrag: die Rate im laufenden Betrieb umstellen (gemessen 2026-10-03)
+
+96 kHz war bis hierher nur über den Umgebungsschalter
+`LONGPATH_SUNSDR_STROMMODUS=je96` gemessen — also **nicht** über den Weg,
+den die Oberfläche nimmt. Den geht `RadioModel::setSampleRateLive`, und
+der ruft am Treiber `setSampleRate()`, während die Verbindung schon
+steht. Nachgemessen am echten Gerät, zwei Läufe über je 12 s:
+
+| | 48 kHz (Grundwert) | nach `setSampleRate(96000)` im Betrieb |
+| --- | --- | --- |
+| Folgenummern | 240/s, 1,06 Kopien je Nummer | 400/s, 0 Spätlinge |
+| angenommen / verloren | 1200 / 0 (0,00 %) | 4797 / 0 (0,00 %) |
+| Stromkopf, Nutzlast | nur `0100` | `0100` → `0200`, `0201` |
+| Kanal 0 | 286/s, 0 verworfen | 724/s, 0 verworfen |
+| Kanal 1 | — | 1014/s, **alle** verworfen |
+
+Die letzte Zeile des Stromkopfs ist der eigentliche Beleg: das Gerät
+hatte einen Strom (`byte8 = 01`) und hat nach dem Rahmen **zwei**
+(`byte8 = 02`, `byte9` wechselt 00/01). Es gibt also keinen Neustart der
+Verbindung und keinen Umgebungsschalter dafür — ein Rahmen genügt, und
+Longpath verliert dabei kein einziges Paket.
+
+Kanal 1 wird vollständig verworfen, weil es keinen zweiten Empfänger
+gibt. Das ist gewollt und kostet nur Netz, keine Richtigkeit.
+
+**Was ich hier nicht erklären kann:** die beiden Kanalzähler kommen
+ungleich heraus (724/s gegen 1014/s), obwohl `byte9` paarweise
+wechseln sollte. Ein Teil davon ist Buchführung — die Kanalzähler laufen
+ab dem Verbinden, also enthält Kanal 0 noch die 48-kHz-Phase, Kanal 1
+nicht. Der Rest bleibt offen. Es ist **kein** Verlust: die
+Folgenummernprüfung meldet 0 von 4797 über denselben Zeitraum. Wer hier
+weitermacht, soll die Zähler erst ab dem Umstellen laufen lassen und
+dann neu messen, statt diese Zahl zu deuten.
