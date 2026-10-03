@@ -1833,6 +1833,88 @@ private slots:
         QCOMPARE(gap.count(), 0);
     }
 
+    // Am 2026-10-03 am echten Geraet gemessen: die bytegleichen
+    // Wiederholungen kommen MIT ABSTAND, nicht direkt hintereinander --
+    // "5 3 6 7 8 9 10 8 11 12 13 14 12". Gegen die letzte Nummer gerechnet
+    // waere die 3 nach der 5 ein Rueckwaerts-Laeufer; sie ist aber eine
+    // Wiederholung (das Messgeraet belegt es ueber die ganze Nutzlast:
+    // 100 % bytegleich, verschieden 0). Deshalb der Ring.
+    void wiederholungMitAbstandIstKeinSpaetling()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        handshake(conn);
+
+        for (const quint16 n : {quint16(1), quint16(2), quint16(3), quint16(4),
+                                quint16(5), quint16(3), quint16(6), quint16(7),
+                                quint16(5)}) {
+            conn.feedStreamDatagramForTest(qrpBlockSeq(n));
+        }
+
+        // 1..7 sind sieben Nummern, die 3 und die 5 kamen je zweimal.
+        QCOMPARE(conn.seqFramesForTest(), quint64(7));
+        QCOMPARE(conn.seqRepeatsForTest(), quint64(2));
+        QCOMPARE(conn.seqBackwardsForTest(), quint64(0));
+        QCOMPARE(conn.seqLostForTest(), quint64(0));
+    }
+
+    // Der Fehler, der den Zaehler am Geraet voellig lahmgelegt hat: das
+    // Geraet faengt die Folgenummer bei 0 NEU an, wenn der Strom neu
+    // startet. Die erste Fassung hing danach auf der alten Nummer fest und
+    // meldete "0 Nummern in 5 s, 1301 rueckwaerts".
+    void stromneustartWirdErkanntUndNichtZumDauerzustand()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        handshake(conn);
+
+        for (quint16 n = 42520; n <= 42529; ++n) {
+            conn.feedStreamDatagramForTest(qrpBlockSeq(n));
+        }
+        QCOMPARE(conn.seqFramesForTest(), quint64(10));
+
+        // Jetzt faengt der Strom bei 0 an.
+        for (quint16 n = 0; n <= 20; ++n) {
+            conn.feedStreamDatagramForTest(qrpBlockSeq(n));
+        }
+
+        QCOMPARE(conn.seqRestartsForTest(), quint64(1));
+        // 10 alte + 21 neue, minus die zwei, die bis zum Erkennen des
+        // Neuanfangs als Spaetlinge gezaehlt wurden.
+        QCOMPARE(conn.seqFramesForTest(), quint64(29));
+        QCOMPARE(conn.seqBackwardsForTest(), quint64(2));
+        QCOMPARE(conn.seqLostForTest(), quint64(0));
+    }
+
+    // Gegenprobe dazu: EIN Spaetling zwischen passenden Paketen darf nicht
+    // als Neuanfang gelesen werden, sonst dreht ein einzelnes verirrtes
+    // Paket den ganzen Zaehler um.
+    void einzelnerSpaetlingIstKeinNeuanfang()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        handshake(conn);
+
+        conn.feedStreamDatagramForTest(qrpBlockSeq(5000));
+        conn.feedStreamDatagramForTest(qrpBlockSeq(5001));
+        conn.feedStreamDatagramForTest(qrpBlockSeq(1000));  // weit zurueck
+        conn.feedStreamDatagramForTest(qrpBlockSeq(5002));  // passt wieder
+        conn.feedStreamDatagramForTest(qrpBlockSeq(5003));
+
+        QCOMPARE(conn.seqRestartsForTest(), quint64(0));
+        QCOMPARE(conn.seqBackwardsForTest(), quint64(1));
+        QCOMPARE(conn.seqFramesForTest(), quint64(4));
+    }
+
     void echteLueckeWirdGezaehltUndGemeldet()
     {
         SunSdrRadioConnection conn;

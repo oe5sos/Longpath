@@ -254,6 +254,7 @@ void SunSdrRadioConnection::connectToRadio(const RadioInfo& info)
     // werden, sonst steht eine Luecke im Bericht, die es nie gab.
     m_seqSeen = false;
     m_lastSeq = 0;
+    m_seqDeltas.clear();
     m_iqSeqWndFrames = 0;
     m_iqSeqWndRepeats = 0;
     m_iqSeqWndLost = 0;
@@ -1865,53 +1866,100 @@ void SunSdrRadioConnection::auditStreamSeq(quint16 seq)
         m_iqSeqWndClock.start();
     }
 
+    if (m_probeOn && m_seqDeltas.size() < kMaxSeqDeltas) {
+        m_seqDeltas.append(qMakePair(seq, quint16(seq - m_lastSeq)));
+    }
+
+    // Fenster zuerst schliessen, dann das neue Paket einsortieren: so
+    // gehoert jedes Paket genau zu einem Fenster, und der Bericht steht
+    // nicht mitten in der Buchfuehrung.
+    if (m_iqSeqWndClock.elapsed() >= 5000) {
+        berichteFolgenummern();
+    }
+
+    const auto merken = [this](quint16 n) {
+        m_seqRing.append(n);
+        while (m_seqRing.size() > kSeqRingSize) { m_seqRing.removeFirst(); }
+    };
+
     if (!m_seqSeen) {
         m_seqSeen = true;
         m_lastSeq = seq;
+        merken(seq);
         ++m_iqSeqWndFrames;
+        return;
+    }
+
+    // 1. Schon gesehen? Dann ist es eine Wiederholung -- die QRP schickt
+    //    bytegleiche Kopien, und zwar mit Abstand, nicht direkt
+    //    hintereinander (am 2026-10-03 gemessen, siehe Kopf).
+    if (m_seqRing.contains(seq)) {
+        ++m_iqSeqWndRepeats;
+        m_seqOutOfPlace = 0;
         return;
     }
 
     const quint16 delta = quint16(seq - m_lastSeq);
 
-    if (delta == 0) {
-        // Wiederholung. Die QRP legt dieselbe Nummer bis zu achtmal hin,
-        // wenn niemand quittiert -- kein Verlust, kein Fehler, und
-        // m_lastSeq bleibt stehen.
-        ++m_iqSeqWndRepeats;
-    } else if (delta == 1) {
+    // 2. Der Normalfall: die naechste Nummer.
+    if (delta == 1) {
         m_lastSeq = seq;
+        merken(seq);
         ++m_iqSeqWndFrames;
-    } else if (delta <= kMaxPlausibleGap) {
+        m_seqOutOfPlace = 0;
+        return;
+    }
+
+    // 3. Eine plausible Luecke: dazwischen fehlen Pakete.
+    if (delta >= 2 && delta <= kMaxPlausibleGap) {
         m_iqSeqWndLost += quint64(delta) - 1;
         ++m_iqSeqWndEvents;
         m_lastSeq = seq;
+        merken(seq);
         ++m_iqSeqWndFrames;
+        m_seqOutOfPlace = 0;
 
-        // Gedrosselt wie bei P1/P2 (20 ms): ein schlechter Netzweg darf
-        // die Ereignisschlange nicht fluten. Das Signal sagt "das
-        // angefangene FFT-Fenster ist wertlos", und dafuer genuegt eine
-        // Meldung je 20 ms.
+        // Gedrosselt wie bei P1/P2 (20 ms): ein schlechter Netzweg darf die
+        // Ereignisschlange nicht fluten. Minus eins heisst "noch nie
+        // gemeldet" -- mit 0 als Startwert verschwand die ERSTE Luecke
+        // einer Verbindung still, weil die Uhr am Anfang selbst 0 ist.
         const qint64 now = m_iqSeqWndClock.elapsed();
         if (m_lastGapSignalMs < 0 || now - m_lastGapSignalMs >= 20) {
             m_lastGapSignalMs = now;
             emit iqSequenceGap();
         }
-    } else {
-        // Rueckwaerts: ein Spaetling oder eine Umsortierung. m_lastSeq
-        // wird NICHT zurueckgedreht, sonst zaehlt die naechste richtige
-        // Nummer als Riesenluecke -- derselbe Umgang wie bei P2
-        // ("negative = reorder/duplicate, no loss").
-        ++m_iqSeqWndBackwards;
-    }
-
-    // Fensterbericht alle 5 s, gleiche Taktung wie P2s Folgenummern-Pruefung,
-    // damit sich die Zahlen zweier Geraete im selben Log vergleichen lassen.
-    if (m_iqSeqWndClock.elapsed() < 5000) {
         return;
     }
 
+    // 4. Passt zu nichts: ein Spaetling, oder der Strom hat neu angefangen.
+    //    Unterschieden wird nicht an der Groesse der Differenz -- die ist
+    //    bei einem Neuanfang beliebig --, sondern daran, ob es BEI DIESEM
+    //    EINEN Paket bleibt. Ein Spaetling ist ein Einzelfall zwischen
+    //    passenden Paketen; ein Neuanfang betrifft alles, was danach kommt.
+    ++m_seqOutOfPlace;
+    if (m_seqOutOfPlace < kSeqRestartAfter) {
+        ++m_iqSeqWndBackwards;
+        return;  // m_lastSeq NICHT zurueckdrehen
+    }
+
+    // Neuanfang: ab hier gilt die neue Folge. Ohne diesen Zweig hing der
+    // Zaehler nach einem Stromneustart dauerhaft fest (gemessen: 0 neue
+    // Nummern, 1301 rueckwaerts in 5 s).
+    ++m_iqSeqWndRestarts;
+    qCInfo(lcSunSdr).nospace()
+        << "SunSdr: Folgenummern fangen neu an (" << m_lastSeq << " -> "
+        << seq << ") -- der Strom wurde neu gestartet";
+    m_seqRing.clear();
+    m_seqOutOfPlace = 0;
+    m_lastSeq = seq;
+    merken(seq);
+    ++m_iqSeqWndFrames;
+}
+
+void SunSdrRadioConnection::berichteFolgenummern()
+{
     const double secs = double(m_iqSeqWndClock.elapsed()) / 1000.0;
+    if (secs <= 0.0) { return; }
     const double nenner = double(m_iqSeqWndFrames + m_iqSeqWndLost);
     const double verlustProzent =
         nenner > 0.0 ? 100.0 * double(m_iqSeqWndLost) / nenner : 0.0;
@@ -1919,49 +1967,42 @@ void SunSdrRadioConnection::auditStreamSeq(quint16 seq)
     emit iqPacketLoss(verlustProzent, quint32(m_iqSeqWndLost),
                       quint32(m_iqSeqWndFrames));
 
-    // Kopien je Nummer: 1,0 heisst, die Blockantwort wirkt; 8,0 heisst,
-    // das Geraet bekommt keine Quittung und wiederholt (gemessen
-    // 2026-09-23/24). Die Zahl steht hier, weil sie sonst nur mit
-    // LONGPATH_SUNSDR_PROBE zu bekommen war.
+    // Kopien je Nummer: 1,0 heisst, die Blockantwort wirkt; 8,0 heisst, das
+    // Geraet bekommt keine Quittung und wiederholt (gemessen 2026-09-23/24).
+    // Am 2026-10-03 am Geraet gemessen: 1,2 -- rund 50 bytegleiche
+    // Wiederholungen je Sekunde bei 240 Nummern, ein Rest der Achtfachung.
     const double kopien = m_iqSeqWndFrames > 0
         ? double(m_iqSeqWndFrames + m_iqSeqWndRepeats) / double(m_iqSeqWndFrames)
         : 0.0;
 
-    if (m_iqSeqWndLost > 0 || m_iqSeqWndEvents > 0 || m_iqSeqWndBackwards > 0) {
+    const bool auffaellig = m_iqSeqWndLost > 0 || m_iqSeqWndEvents > 0
+                            || m_iqSeqWndRestarts > 0;
+    if (auffaellig) {
         qCInfo(lcSunSdr).noquote()
             << QStringLiteral("SunSdr: Folgenummern -- %1 Nummern in %2 s "
                               "(%3/s), VERLOREN %4 (%5 %), %6 Luecken, "
-                              "%7 rueckwaerts, %8 Kopien je Nummer")
-                   .arg(m_iqSeqWndFrames)
-                   .arg(secs, 0, 'f', 1)
+                              "%7 Spaetlinge, %8 Neuanfaenge, "
+                              "%9 Kopien je Nummer")
+                   .arg(m_iqSeqWndFrames).arg(secs, 0, 'f', 1)
                    .arg(double(m_iqSeqWndFrames) / secs, 0, 'f', 0)
-                   .arg(m_iqSeqWndLost)
-                   .arg(verlustProzent, 0, 'f', 2)
-                   .arg(m_iqSeqWndEvents)
-                   .arg(m_iqSeqWndBackwards)
-                   .arg(kopien, 0, 'f', 1);
+                   .arg(m_iqSeqWndLost).arg(verlustProzent, 0, 'f', 2)
+                   .arg(m_iqSeqWndEvents).arg(m_iqSeqWndBackwards)
+                   .arg(m_iqSeqWndRestarts).arg(kopien, 0, 'f', 2);
     } else if (!m_iqSeqCleanClock.isValid()
                || m_iqSeqCleanClock.elapsed() >= 60000) {
         // Der saubere Fall gehoert ins Log, nur seltener -- alle 60 s statt
-        // alle 5. Dieselbe Taktung wie P2s Folgenummern-Pruefung, und aus
-        // demselben Grund: "alles in Ordnung" ist eine Aussage, die man
-        // beim Nachlesen braucht.
-        //
-        // Er stand hier zuerst auf Debug und war damit unsichtbar, weil die
-        // Kategorie longpath.sunsdr im Betrieb nur INF zeigt. Am 2026-10-03
-        // im ersten echten Lauf gemerkt: genau die Zahl "Kopien je Nummer"
-        // entscheidet den Versuch gegen die Achtfachung (1,0 = die
-        // Blockantwort wirkt, 8,0 = das Geraet bekommt keine Quittung) --
-        // und sie fehlt im Normalfall, also in genau dem Fall, in dem man
-        // sie ansieht.
+        // alle 5, dieselbe Taktung wie P2s Folgenummern-Pruefung. Er stand
+        // zuerst auf Debug und war damit unsichtbar, weil die Kategorie im
+        // Betrieb nur INF zeigt -- und ausgerechnet "Kopien je Nummer"
+        // entscheidet den Versuch gegen die Achtfachung.
         m_iqSeqCleanClock.restart();
         qCInfo(lcSunSdr).noquote()
             << QStringLiteral("SunSdr: Folgenummern sauber -- %1 Nummern in "
-                              "%2 s (%3/s), %4 Kopien je Nummer")
-                   .arg(m_iqSeqWndFrames)
-                   .arg(secs, 0, 'f', 1)
+                              "%2 s (%3/s), %4 Spaetlinge, "
+                              "%5 Kopien je Nummer")
+                   .arg(m_iqSeqWndFrames).arg(secs, 0, 'f', 1)
                    .arg(double(m_iqSeqWndFrames) / secs, 0, 'f', 0)
-                   .arg(kopien, 0, 'f', 1);
+                   .arg(m_iqSeqWndBackwards).arg(kopien, 0, 'f', 2);
     }
 
     m_iqSeqWndClock.restart();
@@ -1970,6 +2011,7 @@ void SunSdrRadioConnection::auditStreamSeq(quint16 seq)
     m_iqSeqWndLost = 0;
     m_iqSeqWndEvents = 0;
     m_iqSeqWndBackwards = 0;
+    m_iqSeqWndRestarts = 0;
     m_lastGapSignalMs = -1;
 }
 
@@ -1985,6 +2027,21 @@ void SunSdrRadioConnection::berichteMithoeren()
     }
     m_inventoryReported = true;
     qCInfo(lcSunSdr).noquote() << frameInventoryReport();
+}
+
+QString SunSdrRadioConnection::seqDeltaReport() const
+{
+    if (m_seqDeltas.isEmpty()) {
+        return QStringLiteral("SunSdr: keine Folgenummern-Differenzen "
+                              "mitgeschrieben (LONGPATH_SUNSDR_PROBE nicht an?)");
+    }
+    QStringList teile;
+    for (const auto& paar : m_seqDeltas) {
+        teile << QStringLiteral("%1(+%2)").arg(paar.first).arg(paar.second);
+    }
+    return QStringLiteral("SunSdr: Folgenummern roh, %1 Schritte: %2")
+        .arg(m_seqDeltas.size())
+        .arg(teile.join(QStringLiteral(" ")));
 }
 
 } // namespace Longpath

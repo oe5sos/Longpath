@@ -800,6 +800,8 @@ private:
     // gerade eine oder acht Kopien je Nummer ankommen, also ob die
     // Blockantwort wirkt.
     void auditStreamSeq(quint16 seq);
+    // Schliesst das 5-s-Fenster: meldet nach oben und schreibt ins Log.
+    void berichteFolgenummern();
 
     // Eine Differenz darueber wird als Rueckwaerts-Paket gelesen, nicht
     // als Luecke: die Nummern sind 16 Bit breit und laufen bei 240
@@ -810,8 +812,56 @@ private:
     // also kein Zaehlproblem mehr, sondern ein Verbindungsabbruch.
     static constexpr quint16 kMaxPlausibleGap = 1024;
 
+    // ── Diagnose: die ersten Differenzen der Folgenummern ───────────────
+    //
+    // Am 2026-10-03 am echten Geraet gemessen: nachdem die Frequenz gesetzt
+    // ist (und damit echtes I/Q laeuft), hielt auditStreamSeq() JEDES Paket
+    // fuer einen Rueckwaerts-Laeufer -- 0 neue Nummern, 1300 rueckwaerts in
+    // 5 s -- waehrend das Messgeraet daneben saubere 240 Folgenummern/s
+    // zaehlte. Die Zahlen widersprechen sich, also stimmt eine Annahme
+    // nicht, und zwar meine: dass die Nummern um eins steigen.
+    //
+    // Darum werden hier die ersten Differenzen mitgeschrieben, roh. Nur
+    // unter LONGPATH_SUNSDR_PROBE, damit es im Betrieb nichts kostet.
+    static constexpr int kMaxSeqDeltas = 64;
+    QList<QPair<quint16, quint16>> m_seqDeltas;  // (Nummer, Differenz)
+
+    // ── Was am 2026-10-03 am Geraet gemessen wurde, und warum die erste
+    //    Fassung dieses Zaehlers falsch war ────────────────────────────────
+    //
+    // Erste Fassung: Differenz gegen die ZULETZT gesehene Nummer. Am echten
+    // Geraet faellt sie aus zwei Gruenden um:
+    //
+    //  1. Das Geraet faengt die Folgenummer bei 0 NEU an, sobald der Strom
+    //     neu startet (hier: nach dem Frequenzrahmen 0x07). Gemessen:
+    //     ... 42527 42528 42529 | 0 1 2 3 4 5 ...  Der Zaehler hing danach
+    //     auf 42529 fest, hielt JEDES Paket fuer einen Rueckwaerts-Laeufer
+    //     und meldete "0 Nummern in 5 s, 1301 rueckwaerts" -- waehrend das
+    //     Messgeraet daneben saubere 240 Folgenummern/s zaehlte.
+    //
+    //  2. Die bytegleichen Wiederholungen kommen NICHT direkt hintereinander,
+    //     sondern mit Abstand: gemessen "5 3 6 7 8 9 10 8 11 12 13 14 12".
+    //     Gegen die letzte Nummer gerechnet ist die 3 nach der 5 ein
+    //     Rueckwaerts-Laeufer; sie ist aber eine Wiederholung, und das
+    //     Messgeraet bestaetigt es ueber die ganze Nutzlast (bei 240
+    //     Nummern/s rund 50 Wiederholungen/s, davon GANZ bytegleich 100 %,
+    //     verschieden 0).
+    //
+    // Darum jetzt: ein Ring der letzten gesehenen Nummern (dieselbe Idee wie
+    // der Wiederholungsfilter vom 2026-09-23, nur zaehlt er hier und filtert
+    // nicht), Bezug ist die HOECHSTE gesehene Nummer, und ein Neuanfang wird
+    // erkannt statt in einen Dauerzustand zu laufen.
+    static constexpr int kSeqRingSize = 128;
+    // So viele aufeinanderfolgende Pakete, die zu nichts passen, gelten als
+    // Neuanfang des Stroms. Drei genuegen: bei 240 Nummern/s sind das 12 ms,
+    // und eine echte Stoerung dieser Laenge waere ohnehin eine Luecke.
+    static constexpr int kSeqRestartAfter = 3;
+
     bool m_seqSeen{false};
-    quint16 m_lastSeq{0};
+    quint16 m_lastSeq{0};        // hoechste gesehene Nummer
+    QList<quint16> m_seqRing;    // die letzten Nummern, fuer Wiederholungen
+    int m_seqOutOfPlace{0};      // wie viele Pakete in Folge zu nichts passen
+    quint64 m_iqSeqWndRestarts{0};
     quint64 m_iqSeqWndFrames{0};
     quint64 m_iqSeqWndRepeats{0};
     quint64 m_iqSeqWndLost{0};
@@ -874,6 +924,8 @@ public:
     quint64 seqRepeatsForTest() const { return m_iqSeqWndRepeats; }
     quint64 seqLostForTest() const { return m_iqSeqWndLost; }
     quint64 seqBackwardsForTest() const { return m_iqSeqWndBackwards; }
+    QString seqDeltaReport() const;
+    quint64 seqRestartsForTest() const { return m_iqSeqWndRestarts; }
     quint32 benchFramesSentForTest() const { return m_benchFramesSent; }
     quint32 benchFramesRejectedForTest() const { return m_benchFramesRejected; }
     bool inventoryReportedForTest() const { return m_inventoryReported; }
