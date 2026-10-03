@@ -1947,6 +1947,14 @@ longpath_add_test(tst_radio_status)
 longpath_add_test(tst_radio_status_follows_mox)
 longpath_add_test(tst_settings_hygiene)
 
+# ── Qt-Prioritaet gegen QoS-Klasse (2026-10-03) ──────────────────────────────
+# tst_audio_faden_qos: haelt die Regel fest, warum Audio-Faeden OHNE
+#   QThread-Prioritaet starten. Qt setzt fuer eine ausdrueckliche Prioritaet
+#   auf macOS die Ablaufparameter, und Darwin verweigert danach jede
+#   QoS-Klasse (EPERM, Faden bleibt auf QOS_CLASS_UNSPECIFIED). Der
+#   Sende-Faden lief deshalb ohne die Erhoehung, die er haben soll.
+longpath_add_test(tst_audio_faden_qos)
+
 # ── Phase 3P-H Task 4: status-packet parsing + RadioModel ownership ──────────
 # tst_p1_status_telemetry: feeds a hand-crafted 1032-byte ep6 datagram
 #   into P1RadioConnection::parseEp6FrameForTest and asserts the new
