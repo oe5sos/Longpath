@@ -63,6 +63,44 @@ Dauerträger mit voller Leistung auf der Antenne, der nur nicht „senden"
 heißt. Seither sind beide Tasten tot und sehen auch so aus. Diese drei
 Zeilen sind der Grund, warum dieses Dokument existiert.
 
+## Verhalten, wenn der Server weg ist
+
+Nachgestellt, indem die Attrappe mitten im Betrieb beendet und nach gut
+zwanzig Sekunden neu gestartet wird. Das ist kein konstruierter Fall: die
+Auto-Installation tauscht Longpath aus, während das Telefon verbunden ist —
+am 2026-10-03 viermal.
+
+| Was | Erwartet | Gemessen | |
+|---|---|---|---|
+| Kopfzeile | sagt sofort Bescheid | bei 8 s `NICHT VERBUNDEN`, Leuchte aus | ✅ |
+| Bildrate in der Fußzeile | fällt auf null | `4 kB/s` → `1 kB/s` → leer binnen 2 s | ✅ |
+| Kopplungsblatt | kommt nach der Schonfrist | bei 29 s (12 s Frist) | ✅ |
+| Wiederverbinden | von selbst | bei 46–47 s, ohne Zutun | ✅ |
+| Kopplungsblatt danach | geht wieder zu | geht zu (`50b8696a`) | ✅ |
+| S-Meter bei Abriss | zeigt nichts mehr | `—`, Balken 0 % (`4d866388`) | ✅ |
+| Betriebsart / Band / Filter | bleiben stehen, bewegen sich aber nicht auf Tippen | unverändert bei totem Draht | ✅ |
+| Leistungsregler | bewegt sich nicht ohne Server | unverändert | ✅ |
+
+Die letzten beiden sind **kein** Mangel, sondern die richtige Unterscheidung:
+ein eingefrorener **Messwert** lügt, eine eingefrorene **Einstellung** nicht.
+Betriebsart und Filter ändern sich nicht von selbst; das S-Meter schon. Und
+weil die Seite ihren Zustand ausschließlich vom Server übernimmt, gibt ein
+Tipp ins Leere auch keine falsche Rückmeldung.
+
+### Was dabei gefunden wurde
+
+Zwei Anzeigen logen nach einem Abriss weiter, beide in `#157` behoben:
+
+* Das **Kopplungsblatt** blieb über einer längst wiederhergestellten
+  Verbindung liegen.
+* Das **S-Meter** hielt dreißig Sekunden lang „S7 · −82 dBm", weil sein
+  Maßstab der Socket war statt `ready`.
+
+Dasselbe Muster wie an zwei anderen Stellen am selben Tag (schlafender
+AudioContext, bunter Wasserfall ohne Antenne): **die Oberfläche sah nicht so
+aus, wie der Zustand war.** Die Regel, die alle drei Fälle löst, steht schon
+beim Durchlassband — lieber nichts zeigen als etwas Falsches.
+
 ## Was hier NICHT geprüft werden kann
 
 * **Ton am Lautsprecher.** Ob iOS die Wiedergabe-Sitzung annimmt, zeigt nur
