@@ -169,6 +169,11 @@ private slots:
 
         // Das Inventar ist die eigentliche Ausbeute: welche Rahmensorten das
         // Geraet geschickt hat, und ob sich eine Nutzlast geaendert hat.
+        qInfo().noquote() << QStringLiteral(
+            "Quittungen: %1 gesehen, %2 Rahmen unbeantwortet, %3 noch offen")
+            .arg(conn.quittungenGesehenForTest())
+            .arg(conn.rahmenOhneQuittungForTest())
+            .arg(conn.offeneRahmenForTest());
         qInfo().noquote() << conn.frameInventoryReport();
         qInfo().noquote() << conn.seqDeltaReport();
 

@@ -287,3 +287,48 @@ hinausgegangen ist — mit ihm läuft echtes I/Q. Das ist die Bestätigung
 der Eingrenzung vom 2026-09-25 („ein einziger 0x07-Rahmen für
 Unterempfänger 0 schaltet echtes I/Q ein, 0 % → 21 %"), diesmal über
 zwei Bänder und mit dem Messlauf reproduzierbar.
+
+---
+
+# Messreihe 2026-10-03: die vier Konfigurationsrahmen einzeln
+
+Jeder Rahmen einzeln geschickt, nachdem die Verbindung stand und die
+Frequenz gesetzt war, je sieben Sekunden gemessen. Alles bekannte Rahmen
+aus dem Mitschnitt — keine erfundenen Werte, keine HF.
+
+| Lauf | Quittungen | Q ungleich null | Blöcke/s |
+| --- | --- | --- | --- |
+| Referenz (kein Zusatzrahmen) | 3 | 24,0 % | 292,2 |
+| `0x10` | 4 | 21,9 % | 288,6 |
+| `0x16` | 4 | 23,1 % | 286,3 |
+| `0x18` (Haupttakt) | 4 | 21,2 % | 286,5 |
+| `0x1c` | 3 (+1 unbeantwortet) | 21,9 % | 289,2 |
+
+**Ergebnis: alle vier werden angenommen und quittiert, keiner ändert
+etwas Messbares.** Weder Abtastrate noch Paketrate noch der Q-Anteil
+bewegen sich (die Schwankung von 21–24 % ist Rauschen am offenen
+Eingang). Besonders `0x18` ist damit **nicht** der Weg zur Abtastrate über
+48 kHz, obwohl seine Nutzlast den Haupttakt 307,2 MHz trägt.
+
+Was ExpertSDR2s doppelte Datenrate verursacht, steckt also in den
+Rahmen, die in diesen dreizehn **nicht** enthalten sind. Ohne Mitschnitt
+kommt man hier nicht weiter — und Opcodes zu raten ist am Funkgerät
+verboten.
+
+## Der Nebenfund, der die Buchführung rechtfertigt
+
+Im `0x1c`-Lauf: **„3 Quittungen gesehen, 1 Rahmen unbeantwortet"**, und im
+Inventar fehlt `0x08`. Der **VFO-Frequenzrahmen wurde nicht quittiert** —
+er ist unterwegs verloren gegangen, Steuerkanal hin oder zurück.
+
+Das ist kein Einzelfall-Kuriosum, sondern ein echter Mangel: **wenn ein
+Frequenzrahmen verloren geht, steht das Gerät auf einer anderen Frequenz
+als Longpath anzeigt**, und bis heute hätte das niemand gemerkt. UDP
+garantiert nichts, und dieser Treiber hat nie hingesehen.
+
+Daraus folgt ein nächster Schritt, der aber **eine Entscheidung des
+Betreibers braucht**, weil er Rahmen an das Gerät schickt: einen
+unquittierten Rahmen **einmal** nachschicken. Ein Treiber, der von selbst
+wiederholt, wirkt auf das Funkgerät — das gehört nicht ohne Freigabe
+eingebaut. Für eine Frequenz ist das Nachschicken offensichtlich richtig;
+für andere Rahmen muss man es je Opcode entscheiden.
