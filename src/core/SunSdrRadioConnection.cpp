@@ -24,6 +24,7 @@
 #include <QNetworkDatagram>
 #include <QNetworkInterface>
 #include <cmath>
+#include <cstring>
 
 namespace Longpath {
 
@@ -260,14 +261,17 @@ void SunSdrRadioConnection::connectToRadio(const RadioInfo& info)
     // Die Folgenummern-Zaehlung gehoert zur Sitzung: die erste Nummer der
     // neuen Verbindung darf nicht gegen die letzte der alten gerechnet
     // werden, sonst steht eine Luecke im Bericht, die es nie gab.
-    m_seqSeen = false;
-    m_lastSeq = 0;
     m_seqDeltas.clear();
+    // Auch der Zustand JE KANAL -- ohne das rechnet das erste Paket der
+    // neuen Verbindung gegen die letzte Nummer der alten, und es gilt als
+    // Spaetling statt als Anfang. Vom eigenen Pruefstand gefunden.
+    for (KanalZustand& kz : m_kanal) { kz = KanalZustand{}; }
     m_iqSeqWndFrames = 0;
     m_iqSeqWndRepeats = 0;
     m_iqSeqWndLost = 0;
     m_iqSeqWndEvents = 0;
     m_iqSeqWndBackwards = 0;
+    m_iqSeqWndRestarts = 0;
     m_iqSeqWndClock.invalidate();
     m_iqSeqCleanClock.invalidate();
     m_lastGapSignalMs = -1;
@@ -1126,7 +1130,36 @@ void SunSdrRadioConnection::processStreamDatagram(const QByteArray& data,
         return;  // TX-active frames don't apply to a receive-only connection
     }
 
-    auditStreamSeq(hdr.seq);
+    const int kanal = kanalVon(hdr);
+    KanalZustand& kz = m_kanal[kanal];
+    ++kz.pakete;
+
+    // Wiederkehrende Nummer: Wiederholung oder Fortsetzung? Das entscheidet
+    // der Inhalt (Begruendung am KanalZustand im Kopf). Verglichen wird nur
+    // hier, also nur bei wiederkehrender Nummer.
+    bool fortsetzung = false;
+    const char* nutz = data.constData() + SunSdr::kIqHeaderSize;
+    const int nutzLen = int(data.size()) - SunSdr::kIqHeaderSize;
+    if (kz.gesehen && hdr.seq == kz.letzteNummer) {
+        const bool gleich =
+            kz.letzteNutzlast.size() == nutzLen
+            && std::memcmp(kz.letzteNutzlast.constData(), nutz, size_t(nutzLen)) == 0;
+        if (!gleich) {
+            fortsetzung = true;
+            ++kz.fortsetzungen;
+        }
+    } else {
+        kz.letzteNutzlast = QByteArray(nutz, nutzLen);
+    }
+    kz.gesehen = true;
+    kz.letzteNummer = hdr.seq;
+
+    // Eine Fortsetzung ist KEIN neues Paket im Sinne der Folgenummern --
+    // sie traegt die naechsten Proben derselben Nummer. Sie darf also
+    // weder als Wiederholung noch als Luecke gezaehlt werden.
+    if (!fortsetzung) {
+        auditStreamSeq(kanal, hdr.seq);
+    }
 
     if (blockReplyEnabled()) {
         replyToBlock(hdr.seq);
@@ -1335,7 +1368,9 @@ void SunSdrRadioConnection::processStreamDatagram(const QByteArray& data,
         }
     }
 
-    emit iqDataReceived(/*hwReceiverIndex=*/0, samples);
+    // Der Kanal aus dem Stromkopf, nicht mehr fest 0: bei zwei Stroemen
+    // wuerden sonst die Proben beider in einem Topf landen.
+    emit iqDataReceived(kanal, samples);
     emit frameReceived();
 }
 
@@ -1906,14 +1941,14 @@ QString SunSdrRadioConnection::frameInventoryReport() const
 // (65535 -> 0 ergibt 1, nicht -65535).
 // ---------------------------------------------------------------------------
 
-void SunSdrRadioConnection::auditStreamSeq(quint16 seq)
+void SunSdrRadioConnection::auditStreamSeq(int kanal, quint16 seq)
 {
     if (!m_iqSeqWndClock.isValid()) {
         m_iqSeqWndClock.start();
     }
 
     if (m_probeOn && m_seqDeltas.size() < kMaxSeqDeltas) {
-        m_seqDeltas.append(qMakePair(seq, quint16(seq - m_lastSeq)));
+        m_seqDeltas.append(qMakePair(seq, quint16(seq - m_kanal[kanal].lastSeq)));
     }
 
     // Fenster zuerst schliessen, dann das neue Paket einsortieren: so
@@ -1923,14 +1958,19 @@ void SunSdrRadioConnection::auditStreamSeq(quint16 seq)
         berichteFolgenummern();
     }
 
-    const auto merken = [this](quint16 n) {
-        m_seqRing.append(n);
-        while (m_seqRing.size() > kSeqRingSize) { m_seqRing.removeFirst(); }
+    // Der Zustand gehoert JE KANAL -- zwei Stroeme haben eigene
+    // Nummernraeume. Die Fensterzahlen bleiben gemeinsam: sie messen den
+    // Netzweg, nicht den einzelnen Empfaenger.
+    KanalZustand& kz = m_kanal[kanal];
+
+    const auto merken = [&kz](quint16 n) {
+        kz.seqRing.append(n);
+        while (kz.seqRing.size() > kSeqRingSize) { kz.seqRing.removeFirst(); }
     };
 
-    if (!m_seqSeen) {
-        m_seqSeen = true;
-        m_lastSeq = seq;
+    if (!kz.seqSeen) {
+        kz.seqSeen = true;
+        kz.lastSeq = seq;
         merken(seq);
         ++m_iqSeqWndFrames;
         return;
@@ -1939,20 +1979,20 @@ void SunSdrRadioConnection::auditStreamSeq(quint16 seq)
     // 1. Schon gesehen? Dann ist es eine Wiederholung -- die QRP schickt
     //    bytegleiche Kopien, und zwar mit Abstand, nicht direkt
     //    hintereinander (am 2026-10-03 gemessen, siehe Kopf).
-    if (m_seqRing.contains(seq)) {
+    if (kz.seqRing.contains(seq)) {
         ++m_iqSeqWndRepeats;
-        m_seqOutOfPlace = 0;
+        kz.seqOutOfPlace = 0;
         return;
     }
 
-    const quint16 delta = quint16(seq - m_lastSeq);
+    const quint16 delta = quint16(seq - kz.lastSeq);
 
     // 2. Der Normalfall: die naechste Nummer.
     if (delta == 1) {
-        m_lastSeq = seq;
+        kz.lastSeq = seq;
         merken(seq);
         ++m_iqSeqWndFrames;
-        m_seqOutOfPlace = 0;
+        kz.seqOutOfPlace = 0;
         return;
     }
 
@@ -1960,13 +2000,12 @@ void SunSdrRadioConnection::auditStreamSeq(quint16 seq)
     if (delta >= 2 && delta <= kMaxPlausibleGap) {
         m_iqSeqWndLost += quint64(delta) - 1;
         ++m_iqSeqWndEvents;
-        m_lastSeq = seq;
+        kz.lastSeq = seq;
         merken(seq);
         ++m_iqSeqWndFrames;
-        m_seqOutOfPlace = 0;
+        kz.seqOutOfPlace = 0;
 
-        // Gedrosselt wie bei P1/P2 (20 ms): ein schlechter Netzweg darf die
-        // Ereignisschlange nicht fluten. Minus eins heisst "noch nie
+        // Gedrosselt wie bei P1/P2 (20 ms). Minus eins heisst "noch nie
         // gemeldet" -- mit 0 als Startwert verschwand die ERSTE Luecke
         // einer Verbindung still, weil die Uhr am Anfang selbst 0 ist.
         const qint64 now = m_iqSeqWndClock.elapsed();
@@ -1979,25 +2018,21 @@ void SunSdrRadioConnection::auditStreamSeq(quint16 seq)
 
     // 4. Passt zu nichts: ein Spaetling, oder der Strom hat neu angefangen.
     //    Unterschieden wird nicht an der Groesse der Differenz -- die ist
-    //    bei einem Neuanfang beliebig --, sondern daran, ob es BEI DIESEM
-    //    EINEN Paket bleibt. Ein Spaetling ist ein Einzelfall zwischen
-    //    passenden Paketen; ein Neuanfang betrifft alles, was danach kommt.
-    ++m_seqOutOfPlace;
-    if (m_seqOutOfPlace < kSeqRestartAfter) {
+    //    bei einem Neuanfang beliebig --, sondern daran, ob es bei DIESEM
+    //    EINEN Paket bleibt.
+    ++kz.seqOutOfPlace;
+    if (kz.seqOutOfPlace < kSeqRestartAfter) {
         ++m_iqSeqWndBackwards;
-        return;  // m_lastSeq NICHT zurueckdrehen
+        return;  // lastSeq NICHT zurueckdrehen
     }
 
-    // Neuanfang: ab hier gilt die neue Folge. Ohne diesen Zweig hing der
-    // Zaehler nach einem Stromneustart dauerhaft fest (gemessen: 0 neue
-    // Nummern, 1301 rueckwaerts in 5 s).
     ++m_iqSeqWndRestarts;
     qCInfo(lcSunSdr).nospace()
-        << "SunSdr: Folgenummern fangen neu an (" << m_lastSeq << " -> "
-        << seq << ") -- der Strom wurde neu gestartet";
-    m_seqRing.clear();
-    m_seqOutOfPlace = 0;
-    m_lastSeq = seq;
+        << "SunSdr: Folgenummern auf Kanal " << kanal << " fangen neu an ("
+        << kz.lastSeq << " -> " << seq << ") -- der Strom wurde neu gestartet";
+    kz.seqRing.clear();
+    kz.seqOutOfPlace = 0;
+    kz.lastSeq = seq;
     merken(seq);
     ++m_iqSeqWndFrames;
 }

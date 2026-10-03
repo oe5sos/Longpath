@@ -806,7 +806,58 @@ private:
     // es bisher nur mit LONGPATH_SUNSDR_PROBE gab: im Log steht, ob
     // gerade eine oder acht Kopien je Nummer ankommen, also ob die
     // Blockantwort wirkt.
-    void auditStreamSeq(quint16 seq);
+    // ── Zwei Stroeme, und mehrere Pakete je Folgenummer ─────────────────
+    //
+    // Am 2026-10-03 aus einem ExpertSDR2-Mitschnitt gemessen (Blatt
+    // 2026-10-02-sunsdr-verbindungsablauf.md): die QRP kann ZWEI Stroeme
+    // gleichzeitig schicken, mit verschiedenen Raten, und sie
+    // unterscheidet sie im Stromkopf an byte9:
+    //
+    //   0x01-Nutzlast 02000000 ...:  byte9=0 -> 48 kHz, byte9=1 ->  96 kHz
+    //   0x01-Nutzlast 02010000 ...:  byte9=0 -> 96 kHz, byte9=1 -> 144 kHz
+    //
+    // Dazu traegt ein Strom ueber 48 kHz MEHRERE Pakete je Folgenummer
+    // (bei 96 kHz zwei, bei 144 kHz im Mittel 1,5) -- und die tragen
+    // VERSCHIEDENE Proben. Longpath bekommt heute einen Strom mit 48 kHz
+    // (byte8=1, byte9=0), weil es im 0x01-Rahmen 01000000 schickt.
+    //
+    // Dieser Umbau macht den Weg bereit, OHNE am heutigen Betrieb etwas
+    // zu aendern: bei byte8 = 1 ist der Kanal immer 0 und jede
+    // Wiederholung bleibt eine Wiederholung. Erst wenn der 0x01-Rahmen
+    // umgestellt wird, treten die neuen Faelle auf.
+    //
+    // Wiederholung oder Fortsetzung? Das entscheidet der INHALT, nicht die
+    // Nummer -- und zwar belegt: bei 48 kHz sind die Kopien einer Nummer
+    // GANZ bytegleich (2026-09-23: 1683 von 1683), bei 96 kHz tragen die
+    // zwei Pakete einer Nummer verschiedene Proben. Verglichen wird nur,
+    // wenn die Nummer wiederkehrt, also selten.
+    static constexpr int kMaxKanaele = 4;
+    struct KanalZustand {
+        bool gesehen{false};
+        quint16 letzteNummer{0};
+        QByteArray letzteNutzlast;   // nur fuer den Vergleich bei gleicher Nummer
+        quint64 pakete{0};
+        quint64 fortsetzungen{0};
+        // Die Folgenummern gehoeren JE KANAL gezaehlt: zwei Stroeme haben
+        // eigene Nummernraeume, und dieselbe Nummer auf beiden ist keine
+        // Wiederholung, sondern ein anderer Strom. Vom eigenen Pruefstand
+        // gefunden, 2026-10-03.
+        bool seqSeen{false};
+        quint16 lastSeq{0};          // hoechste gesehene Nummer
+        QList<quint16> seqRing;      // die letzten Nummern, fuer Wiederholungen
+        int seqOutOfPlace{0};        // Pakete in Folge, die zu nichts passen
+    };
+    KanalZustand m_kanal[kMaxKanaele];
+
+    // Welcher Kanal gehoert zu diesem Stromkopf? byte8 ist die Zahl der
+    // Stroeme (1 bei Longpath heute, 2 bei ExpertSDR2), byte9 der Index.
+    static int kanalVon(const SunSdr::IqHeader& hdr)
+    {
+        if (hdr.byte8 < 2) { return 0; }
+        return (hdr.byte9 < kMaxKanaele) ? int(hdr.byte9) : 0;
+    }
+
+    void auditStreamSeq(int kanal, quint16 seq);
     // Schliesst das 5-s-Fenster: meldet nach oben und schreibt ins Log.
     void berichteFolgenummern();
 
@@ -864,10 +915,6 @@ private:
     // und eine echte Stoerung dieser Laenge waere ohnehin eine Luecke.
     static constexpr int kSeqRestartAfter = 3;
 
-    bool m_seqSeen{false};
-    quint16 m_lastSeq{0};        // hoechste gesehene Nummer
-    QList<quint16> m_seqRing;    // die letzten Nummern, fuer Wiederholungen
-    int m_seqOutOfPlace{0};      // wie viele Pakete in Folge zu nichts passen
     quint64 m_iqSeqWndRestarts{0};
     quint64 m_iqSeqWndFrames{0};
     quint64 m_iqSeqWndRepeats{0};
@@ -1057,6 +1104,10 @@ public:
     quint64 anschlagMeldungenForTest() const { return m_anschlagMeldungen; }
     bool geraetSendetForTest() const { return m_geraetSendet; }
     quint64 mikrofonPttFlankenForTest() const { return m_mikrofonPttFlanken; }
+    quint64 kanalPaketeForTest(int k) const
+    { return (k >= 0 && k < kMaxKanaele) ? m_kanal[k].pakete : 0; }
+    quint64 kanalFortsetzungenForTest(int k) const
+    { return (k >= 0 && k < kMaxKanaele) ? m_kanal[k].fortsetzungen : 0; }
     int offeneRahmenForTest() const { return int(m_offeneRahmen.size()); }
 };
 
