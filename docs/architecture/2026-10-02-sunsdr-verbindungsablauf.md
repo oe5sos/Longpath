@@ -97,3 +97,82 @@ open /Applications/Longpath.app
   Frage hinter dem offenen Punkt „Abtastrate über 48 kHz". Der dritte
   Wert in seiner Nutzlast ist 0 — ein Platz, in dem eine Rate stehen
   könnte.
+
+---
+
+# Nachtrag 2026-10-03: der erste echte Lauf mit Mithören
+
+Zehn Minuten Betrieb am Gerät (ohne Antenne, Akku), Bericht beim Beenden:
+
+```
+Mithoeren -- Steuerrahmen 4 (davon unlesbar 0), Sorten: Steuerkanal 4, Strom 1
+Steuerkanal op=0x01 len=0 | 1x | bei   0 ms
+Steuerkanal op=0x04 len=0 | 1x | bei  13 ms
+Steuerkanal op=0x07 len=0 | 1x | bei  98 ms
+Steuerkanal op=0x08 len=0 | 1x | bei  99 ms
+Strom       op=0xfe len=2 | 149691x | Aenderungen 0 | 0…623712 ms | Werte: 0100
+```
+
+## 1. Das Gerät quittiert jeden Steuerrahmen
+
+Longpath schickt beim Verbinden genau vier Rahmen — Zustandsrahmen
+(`0x08`), Vorverstärker (`0x04`), DDC-Frequenz (`0x07`), VFO (`0x08`) —
+und bekommt **vier Quittungen mit demselben Opcode und leerer Nutzlast**
+zurück, alle innerhalb von 99 ms. Diese Rückrichtung ist dem Treiber bis
+zum 2026-10-02 vollständig entgangen.
+
+Das ist nutzbar: **keine Quittung = Rahmen verworfen.** Damit lässt sich
+prüfen, ob ein Werkbank-Rahmen angekommen ist, statt ins Blaue zu
+schicken — genau das Problem, das die Prüfsummen-Sache aufgeworfen hat
+(„ein Rahmen mit falschem Ende wird stillschweigend verworfen" — offenbar
+nicht ganz stillschweigend).
+
+## 2. Von sich aus meldet das Gerät nichts
+
+Nach 99 ms kommt auf dem Steuerkanal **über zehn Minuten kein einziger
+weiterer Rahmen**. Kein S-Meter, keine Spannung, keine Temperatur, keine
+Übersteuerungsmeldung.
+
+**Das verändert Schritt 3 des Paritätsplans.** Die Messwerte liegen nicht
+bereit und müssen nicht nur „nach oben gegeben" werden — sie müssen
+**abgefragt** werden, oder es gibt sie nicht. ArtemisSDRs Tabelle führt
+dafür `INFO_QUERY` (DX `0x07`) und `STATE_REQ_A/B` (DX `0x0E`/`0x10`);
+welche Nummer das bei der QRP ist, ist offen (siehe den
+Opcode-Versatz-Befund im Paritätsplan, Abschnitt 3a) — und Opcodes raten
+wird am Gerät nicht gemacht.
+
+Auch die Zustandsbytes im Stromkopf tragen nichts: `0100` über 149 691
+Pakete, **null Änderungen**.
+
+## 3. Die Achtfachung tritt im heutigen Betrieb nicht auf
+
+Gemessen: 149 691 Pakete in 623,7 s = **240,0 Pakete/s** bei 240
+Blöcken/s, also **eine** Kopie je Folgenummer. Die Blockantwort wirkt, wie
+am 2026-09-24 gemessen.
+
+**Damit ist eine Formulierung weiter oben in diesem Blatt falsch:** der
+Verbindungs-Dialog ist nicht „die Wurzel der Achtfachung" — die ist seit
+dem 2026-09-24 erledigt. Was offen bleibt, ist etwas anderes und
+Größeres:
+
+| | Pakete/s | Nummern/s | je Nummer | Proben/s |
+| --- | --- | --- | --- | --- |
+| Longpath heute | 240 | 240 | 1 gleiches | 48 000 |
+| ExpertSDR2, selbes Gerät | 480 | 240 | **2 verschiedene** | **96 000** |
+
+ExpertSDR2 bekommt also die **doppelte Datenmenge**. Und dazu passt der
+zweite Fund aus den dreizehn Rahmen: `0x07` kommt mit **sub 0 und sub 1**,
+auf 14,224 MHz **und** 1,905 MHz — zwei ganz verschiedene Frequenzen.
+
+**Hypothese, die beides zusammenbringt:** die zweite Paketsorte je
+Folgenummer ist der **zweite Empfänger**. Dann wäre „ExpertSDR2 bekommt
+zwei verschiedene Pakete" keine Eigenart des Stroms, sondern einfach ein
+zweiter DDC — und die QRP könnte zwei Empfänger, was
+`BoardCapabilities` bis heute als „not confirmed" führt.
+
+Der Versuch dazu bleibt derselbe (PRE/EXTRA oben), das **Erfolgsmaß
+ändert sich**: nicht „Kopien je Nummer sinkt von 8 auf 1" (sie ist schon
+1), sondern **„Pakete/s verdoppelt sich auf 480 und die Kopien je Nummer
+steigt auf 2"** — zwei Pakete je Nummer mit verschiedenem Inhalt. Beides
+steht in der Folgenummern-Zeile, die seit dem 2026-10-03 alle 60 s im Log
+mitläuft.
