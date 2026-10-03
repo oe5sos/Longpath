@@ -16,9 +16,36 @@ Der Binaerrahmen ist derselbe wie in TciBinaryFrame.h:
 
 import base64, hashlib, math, os, random, socket, struct, threading, time, sys
 
+# --port N: fuer den Fall, dass schon eine Attrappe laeuft. Am 2026-10-03
+# hing eine seit elf Stunden auf 50099 -- sie abzuschiessen waere die
+# bequeme und die falsche Antwort gewesen (sie koennte zu einer anderen
+# Sitzung gehoeren).
 PORT = 50099
+if '--port' in sys.argv:
+    _i = sys.argv.index('--port')
+    if _i + 1 < len(sys.argv):
+        PORT = int(sys.argv[_i + 1])
 # Ein Band ohne Stationen — siehe die Begruendung bei `traeger`.
 STILL = '--still' in sys.argv
+# --sendet N: alle N Sekunden den Sendezustand umschalten (trx:0,true/false).
+#
+# Warum als Schalter der Attrappe und nicht am echten Geraet geprueft: den
+# Sendezustand am echten Geraet herzustellen heisst SENDEN, und das ist ohne
+# Antenne verboten. Die Seite muss aber zeigen koennen, dass die Station
+# sendet -- sonst ist der leere Wasserfall waehrend einer Durchsage nicht von
+# einem Fehler zu unterscheiden. Also hier.
+def _zahl_nach(flagge, standard):
+    if flagge in sys.argv:
+        i = sys.argv.index(flagge)
+        if i + 1 < len(sys.argv):
+            try:
+                return float(sys.argv[i + 1])
+            except ValueError:
+                pass
+        return standard
+    return 0.0
+
+SENDET_ALLE = _zahl_nach('--sendet', 6.0)
 IQ_RATE = 48000          # bewusst klein: die Attrappe soll die Naht pruefen,
 AUDIO_RATE = 48000       # nicht die Bandbreite
 IQ_BLOCK = 4096          # Werte je Rahmen (I und Q zusammen) -> 2048 Paare
@@ -142,6 +169,8 @@ class Verbindung(threading.Thread):
         self.audio_typ = 3        # Float32
         self.phase = 0.0
         self.tonphase = 0.0
+        # Letzter gemeldeter Sendezustand (nur fuer --sendet).
+        self.sendet = False
 
     # ── Handschlag ────────────────────────────────────────────────────────
     def handschlag(self):
@@ -407,6 +436,16 @@ class Verbindung(threading.Thread):
             # Eine Attrappe, die gutmuetiger ist als das Original, ist keine
             # Hilfe — sie verschiebt Fehler nach hinten, dorthin wo sie teurer
             # sind.
+            # Sendezustand umschalten, wenn --sendet gesetzt ist. Der echte
+            # Server meldet `trx:<rx>,<bool>` genauso, aus demselben Anlass
+            # (eigenes MOX, Mikrofontaste am Geraet, CAT).
+            if SENDET_ALLE > 0:
+                soll = int(jetzt / SENDET_ALLE) % 2 == 1
+                if soll != self.sendet:
+                    self.sendet = soll
+                    self.sende_text(f'trx:0,{"true" if soll else "false"};')
+                    print(f'  trx:0,{"true" if soll else "false"} (--sendet)')
+
             if self.rx_sensors_an and jetzt - smeter_zeit > self.rx_sensors_ms / 1000.0:
                 smeter_zeit = jetzt
                 dbm = -83 + 9 * math.sin(jetzt / 2.2) + random.gauss(0, 1.2)
