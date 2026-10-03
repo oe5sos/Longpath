@@ -704,3 +704,42 @@ Lücke im tcpdump nicht zu sehen gewesen — sie ist es nicht.
 nichts") darf nicht allein auf einer Logdatei stehen. Zähler im Code oder
 ein Mitschnitt am Draht — beides zählt, was wirklich ankam, und beides
 war heute vorhanden.
+
+---
+
+# Gegenprobe: fangen die Prüfungen die Fehler, die sie fangen sollen?
+
+Eine Nebensitzung gab am 2026-10-03 den Hinweis, der hier gefehlt hat:
+*ein Prüfstand kann widersprechen — wenn man ihn zuerst gegen die ALTE
+Fassung laufen lässt.* „Grün mit der Behebung sagt nichts, rot ohne sie
+sagt alles."
+
+Genau das war an diesem Tag nicht gemacht worden: alle Prüfungen zu den
+drei Fehlern, die das Gerät aufgedeckt hat, wurden **nach** der Behebung
+geschrieben. Nachgeholt, indem der Code jeweils zurückgebaut und derselbe
+Prüfstand erneut gefahren wurde:
+
+| Prüfung | gegen die alte Fassung |
+| --- | --- |
+| `zweiStroemeLandenAufVerschiedenenKanaelen` (Verwerfen vor der Zählung) | **rot** — `seqLost = 1` statt 0 |
+| `wiederholungMitAbstandIstKeinSpaetling` (Zähler ohne Ring) | **rot** |
+| `stromneustartWirdErkanntUndNichtZumDauerzustand` (kein Neuanfang) | **rot** |
+| `einzelnerSpaetlingIstKeinNeuanfang` | **grün in beiden** |
+
+Die ersten drei fangen also wirklich, was sie sollen. Die vierte ist kein
+Fänger, sondern ein **Wächter**: sie soll in beiden Fassungen grün sein
+und schlägt erst an, wenn die Neuanfang-Erkennung zu früh greift und ein
+einzelnes verirrtes Paket den Zähler umdreht. Beides ist nützlich, aber
+es ist nicht dasselbe — und wer das nicht prüft, hält Wächter für Fänger.
+
+**Der Satz, der dabei zusammengekommen ist** (eine Hälfte von hier, eine
+aus der Nebensitzung):
+
+> Ein Prüfstand bestätigt, was man ihm vorgibt. Nur das Gerät
+> widerspricht — oder die alte Fassung, gegen die man ihn laufen lässt.
+
+Und dazu, aus demselben Abend, die Regel über Abwesenheit:
+
+> Wo Daten ausbleiben könnten, darf man aus ihrem Fehlen nichts
+> schließen; und wo sie ausbleiben, muss die Anzeige das sagen, statt den
+> letzten Wert festzuhalten.
