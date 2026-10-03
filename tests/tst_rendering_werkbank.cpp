@@ -227,6 +227,23 @@ private slots:
                  w.setSpectrumDetector(SpectrumDetector::Peak);
                  w.setWaterfallDetector(SpectrumDetector::Peak);
              }},
+            // ENTWURF "Kurven mit Hof" (2026-09-26): Martins 2D-Stand,
+            // heute / weiche Kante / weiche Kante + Hof.
+            {QStringLiteral("k_kurve_heute"), [martin](SpectrumWidget& w) {
+                 martin(w);
+                 w.setSpectrumRenderMode(SpectrumRenderMode::Mode2D);
+             }},
+            {QStringLiteral("l_kurve_weich"), [martin](SpectrumWidget& w) {
+                 martin(w);
+                 w.setSpectrumRenderMode(SpectrumRenderMode::Mode2D);
+                 w.setTraceSoftEdgeForDraft(true);
+             }},
+            {QStringLiteral("m_kurve_weich_hof"), [martin](SpectrumWidget& w) {
+                 martin(w);
+                 w.setSpectrumRenderMode(SpectrumRenderMode::Mode2D);
+                 w.setTraceSoftEdgeForDraft(true);
+                 w.setTraceHaloForDraft(true);
+             }},
         };
 
         for (const Variant& v : variants) {
