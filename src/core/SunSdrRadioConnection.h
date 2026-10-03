@@ -994,7 +994,32 @@ private:
         quint8 opcode{0};
         qint64 beiMs{0};
         QString grund;
+        QByteArray rahmen;      // zum Nachschicken, siehe unten
+        bool schonWiederholt{false};
     };
+
+    // ── Nachschicken, einmal ────────────────────────────────────────────
+    //
+    // Am 2026-10-03 am Geraet beobachtet: ein VFO-Frequenzrahmen blieb
+    // unquittiert -- er ist unterwegs verloren gegangen. UDP garantiert
+    // nichts, und die Folge ist nicht harmlos: **das Geraet steht dann auf
+    // einer anderen Frequenz, als Longpath anzeigt**, und bis heute haette
+    // das niemand gemerkt.
+    //
+    // Darum wird ein unquittierter Rahmen EINMAL nachgeschickt. Einmal,
+    // nicht in einer Schleife: wiederholt sich der Verlust, ist der Weg
+    // gestoert, und dann hilft kein drittes Paket, sondern eine Meldung.
+    //
+    // Und nur, wo Nachschicken die Lage verbessert: Zustand, Frequenz,
+    // Vorverstaerker, Daempfung. NICHT fuer Werkbank-Rahmen -- was dort
+    // hinausgeht, entscheidet der Mensch davor, und ein Treiber, der dessen
+    // Versuche von selbst verdoppelt, faelscht das Ergebnis.
+    static bool darfNachgeschicktWerden(quint8 opcode)
+    {
+        return opcode == 0x01 || opcode == 0x04
+               || opcode == 0x07 || opcode == 0x08;
+    }
+    quint64 m_rahmenWiederholt{0};
     // Eine Quittung kam im Messlauf nach 15 bis 50 ms. Eine Sekunde ist
     // reichlich und trifft keinen gesunden Fall.
     static constexpr qint64 kQuittungsFristMs = 1000;
@@ -1009,7 +1034,8 @@ private:
     // Eine Stelle fuer jeden Steuerrahmen, der an das Geraet geht: senden,
     // Bytes buchen, auf die Quittung warten. Vorher stand das an sechs
     // Stellen einzeln, und keine davon sah hin, ob etwas zurueckkam.
-    void sendeSteuerrahmen(const QByteArray& frame, const char* grund);
+    void sendeSteuerrahmen(const QByteArray& frame, const char* grund,
+                           bool nachschickbar = true);
     void pruefeOffeneRahmen();
 
     // ── Uebersteuerung aus dem I/Q erkennen ─────────────────────────────
@@ -1144,6 +1170,7 @@ public:
     { return (k >= 0 && k < kMaxKanaele) ? m_kanal[k].verworfen : 0; }
     quint64 kanalFortsetzungenForTest(int k) const
     { return (k >= 0 && k < kMaxKanaele) ? m_kanal[k].fortsetzungen : 0; }
+    quint64 rahmenWiederholtForTest() const { return m_rahmenWiederholt; }
     int offeneRahmenForTest() const { return int(m_offeneRahmen.size()); }
 };
 

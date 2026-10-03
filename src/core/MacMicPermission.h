@@ -16,8 +16,27 @@
 // app launch deterministically engages TCC regardless of what audio hardware
 // is attached, so the user gets the prompt on first launch and the answer is
 // cached for every subsequent mic open. No-op on non-macOS platforms.
+//
+// microphoneAccessGranted() beantwortet dieselbe Frage nachtraeglich, ohne
+// etwas anzufordern: darf dieser Prozess JETZT das Mikrofon oeffnen?
+//
+// Noetig, weil AudioEngine::ensureTxInputOpen() den Eingang eifrig oeffnet —
+// und das blockiert, solange TCC die Frage noch stellt. Am 2026-10-03 hat
+// das den ganzen Verbindungsaufbau eingefroren: der Dialog stand auf einem
+// unsichtbaren Space, PortAudioBus::open() wartete ohne Zeitlimit, und weil
+// der Aufruf in der verschachtelten Ereignisschleife von
+// RadioModel::connectToRadio steckt, stand mit ihm die gesamte Oberflaeche.
+// Siehe docs/architecture/2026-10-03-verbindungshaenger-mikrofon.md.
+//
+// Auf Nicht-macOS immer true — dort gibt es diese Huerde nicht.
 #ifdef Q_OS_MAC
-namespace Longpath { void requestMicrophonePermission(); }
+namespace Longpath {
+void requestMicrophonePermission();
+bool microphoneAccessGranted();
+}
 #else
-namespace Longpath { inline void requestMicrophonePermission() {} }
+namespace Longpath {
+inline void requestMicrophonePermission() {}
+inline bool microphoneAccessGranted() { return true; }
+}
 #endif

@@ -1857,6 +1857,63 @@ private slots:
         QCOMPARE(conn.stoppGeschicktForTest(), quint64(0));
     }
 
+    // Ein unquittierter Frequenzrahmen wird EINMAL nachgeschickt -- am
+    // 2026-10-03 am Geraet beobachtet, dass einer verloren ging, und die
+    // Folge ist nicht harmlos: das Geraet steht dann auf einer anderen
+    // Frequenz als Longpath anzeigt.
+    void unquittierterRahmenWirdEinmalNachgeschickt()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        handshake(conn);
+        // Der Zustandsrahmen 0x01 ist hinaus und wartet auf seine Quittung.
+        QVERIFY(conn.offeneRahmenForTest() >= 1);
+
+        // Keine Quittung. Nach der Frist muss genau EINE Wiederholung
+        // kommen -- und danach eine Meldung, keine zweite Wiederholung.
+        QTRY_VERIFY_WITH_TIMEOUT(conn.rahmenWiederholtForTest() >= 1, 8000);
+        QCOMPARE(conn.rahmenWiederholtForTest(), quint64(1));
+
+        // Und beim Verbindungsende wird gesagt, was offen blieb. Ohne das
+        // fiel es stumm unter den Tisch, weil die Quittungspruefung am
+        // Stillstands-Wachhund haengt und der beim Abbruch stoppt.
+        conn.disconnect();
+        QVERIFY(conn.rahmenOhneQuittungForTest() >= 1);
+        QCOMPARE(conn.rahmenWiederholtForTest(), quint64(1));
+    }
+
+    // Werkbank-Rahmen werden NICHT nachgeschickt: was dort hinausgeht,
+    // entscheidet der Mensch davor, und ein Treiber, der dessen Versuche
+    // verdoppelt, faelscht das Ergebnis.
+    void werkbankRahmenWirdNichtNachgeschickt()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+
+        qputenv("LONGPATH_SUNSDR_PRE",
+                "03ff100004000000000001000000a444f1b700000000");
+        handshake(conn);
+        qunsetenv("LONGPATH_SUNSDR_PRE");
+        QCOMPARE(conn.benchFramesSentForTest(), 1u);
+
+        // Warten, bis die Frist durch ist, dann die Sitzung beenden --
+        // dabei wird gemeldet, was offen blieb.
+        QTRY_VERIFY_WITH_TIMEOUT(conn.rahmenWiederholtForTest() >= 1, 8000);
+        conn.disconnect();
+        QVERIFY(conn.rahmenOhneQuittungForTest() >= 1);
+        // Der Werkbank-Rahmen 0x10 darf nicht wiederholt worden sein; nur
+        // der Zustandsrahmen 0x01 darf das, und auch der nur einmal.
+        QVERIFY2(conn.rahmenWiederholtForTest() <= 1,
+                 "Ein Werkbank-Rahmen wurde nachgeschickt");
+    }
+
+
     // ── Zwei Stroeme und mehrere Pakete je Folgenummer ─────────────────
     //
     // Am 2026-10-03 aus einem ExpertSDR2-Mitschnitt gemessen: die QRP
