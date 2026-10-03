@@ -332,3 +332,48 @@ unquittierten Rahmen **einmal** nachschicken. Ein Treiber, der von selbst
 wiederholt, wirkt auf das Funkgerät — das gehört nicht ohne Freigabe
 eingebaut. Für eine Frequenz ist das Nachschicken offensichtlich richtig;
 für andere Rahmen muss man es je Opcode entscheiden.
+
+---
+
+# Der zweite Unterempfänger: angenommen, aber nicht eingeschaltet (2026-10-03)
+
+Geschickt wurde der `0x07`-Rahmen mit **sub = 1** aus dem Mitschnitt
+(ExpertSDR2s Wert, 1,905 MHz) — ein echter Rahmen, reiner Empfang, keine
+HF. Dreimal wiederholt, dazu dreimal dieselbe Zahl Läufe ohne ihn:
+
+| | Quittungen | unbeantwortet | Blöcke/s | Stromsorten |
+| --- | --- | --- | --- | --- |
+| mit `0x07 sub=1` | **4, 4, 4** | 0, 0, 0 | 288,5 | 1 |
+| ohne | 3, 3, 3 | 0, 0, 0 | 288–292 | 1 |
+
+**Das Gerät akzeptiert und quittiert den zweiten Unterempfänger.** Die
+QRP kennt diesen Platz also — `BoardCapabilities` führt
+`maxReceivers = 1` bis heute mit dem Vermerk „NOT confirmed … whether the
+QRP hardware supports a second receiver at all is open", und das ist
+damit einen Schritt weiter.
+
+**Aber es kommt kein zweiter Strom:** Paketrate unverändert, weiterhin
+genau eine Stromsorte (`0xfe`, Zustandsbytes `0100`). Der Platz wird
+angenommen und bleibt stumm — er ist nicht **eingeschaltet**.
+
+Und damit passt die Rechnung von heute früh wieder zusammen, nur genauer:
+
+* ExpertSDR2 bekommt 480 Pakete/s mit **zwei verschiedenen** Paketen je
+  Folgenummer — das wären zwei Empfänger zu je 240 Blöcken.
+* ExpertSDR2 setzt `0x07` für **beide** Plätze (sub 0 und sub 1).
+* Longpath setzt nur Platz 0, und bekommt genau einen Strom.
+
+Was fehlt, ist der **Einschalter**. ArtemisSDRs Tabelle führt ihn für die
+DX als `SUNSDR_OP_RX2_ENABLE 0x1B`, und die Boot-Folge dort ruft
+`sunsdr_send_u32_cmd(SUNSDR_OP_RX2_ENABLE, rx2_enabled)`. Welche Nummer
+das bei der QRP ist, **wissen wir nicht** — bei drei gemessenen Befehlen
+liegt die QRP um eins unter der DX, bei `0x01` nicht. Deshalb wird sie
+hier nicht geraten: ein falsch getroffener Opcode kann am Funkgerät etwas
+auslösen, das niemand bestellt hat, und zwei Nummern weiter liegen Drive
+(`0x17`) und PA-Freigabe (`0x24`).
+
+**Der nächste Schritt ist damit klar umrissen und braucht zwei Minuten
+Mitschnitt:** ExpertSDR2 verbinden lassen und dabei RX2 ein- und
+ausschalten. Der Rahmen, der sich dabei ändert, ist der Einschalter — und
+dann ist der zweite Empfänger kein offener Punkt mehr, sondern eine
+Einstellung.
