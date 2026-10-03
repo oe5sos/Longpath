@@ -377,3 +377,55 @@ Mitschnitt:** ExpertSDR2 verbinden lassen und dabei RX2 ein- und
 ausschalten. Der Rahmen, der sich dabei ändert, ist der Einschalter — und
 dann ist der zweite Empfänger kein offener Punkt mehr, sondern eine
 Einstellung.
+
+---
+
+# Zweite Messreihe 2026-10-03, nach dem Wiedereinschalten
+
+Der Akku war leer, das Gerät war aus — und damit ergab sich ein Fall, der
+sonst schwer herzustellen ist: ein **frisch eingeschaltetes** Gerät.
+
+## Der Einkanal-Zustand ist ein Einschaltzustand, A/B gemessen
+
+Zwei Läufe direkt hintereinander, am selben Gerät, Minuten auseinander:
+
+| Lauf | Frequenzrahmen `0x07`? | **Q ungleich null** | Quittungen |
+| --- | --- | --- | --- |
+| A | **nein** | **0,0 %** | 1 (nur Zustandsrahmen) |
+| B | ja (40 m) | **21,9 %** | 3 |
+
+Damit ist die Eingrenzung vom 2026-09-25 („ein einziger 0x07-Rahmen für
+Unterempfänger 0 schaltet echtes I/Q ein, 0 % → 21 %") als **A/B-Messung
+am frisch eingeschalteten Gerät** bestätigt. Vorher war das Gerät jeweils
+schon länger an, und der Zustand ließ sich nur aus der Erinnerung
+beschreiben.
+
+Praktisch heißt das: Longpath setzt beim Verbinden ohnehin eine Frequenz,
+also tritt der Zustand im Betrieb nicht auf. Wer aber **ohne**
+Frequenzrahmen messen will — etwa an einem Prüfstand —, misst ein Gerät,
+dessen Seitenbänder übereinanderliegen, und darf das nicht für den
+Normalfall nehmen.
+
+## Die Verlustrate von Steuerrahmen: null von 1212
+
+Gemessen mit 150 Frequenzwechseln je Lauf (jeder Wechsel = zwei Rahmen,
+`0x07` und `0x08`), viermal:
+
+```
+Lauf 1: 303 Quittungen gesehen, 0 unbeantwortet
+Lauf 2: 303 Quittungen gesehen, 0 unbeantwortet
+Lauf 3: 303 Quittungen gesehen, 0 unbeantwortet
+Lauf 4: 303 Quittungen gesehen, 0 unbeantwortet
+```
+
+**Das korrigiert meine eigene Begründung von vorhin.** Oben steht, ein
+Frequenzrahmen sei verloren gegangen, und das stimmt — aber „etwa einer
+von fünfzehn Läufen" war aus einem Einzelfall geschlossen. Über 1212
+Rahmen gemessen ist die Rate **null**. Der Steuerkanal am Kabel ist
+zuverlässig.
+
+Für das Nachschicken unquittierter Rahmen heißt das: es bleibt eine
+sinnvolle Versicherung — eine verlorene Frequenz **bleibt** sonst
+unbemerkt, und genau einmal ist es passiert —, aber es ist **nicht
+dringend**. Die Ursache jenes einen Verlusts ist offen; er trat in einem
+Lauf auf, in dem zusätzlich ein Konfigurationsrahmen hinausging.

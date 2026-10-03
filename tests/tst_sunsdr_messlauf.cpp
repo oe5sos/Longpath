@@ -112,13 +112,23 @@ private slots:
         // 0x07-Rahmen nie hinaus, und die QRP bleibt im Einkanal-Zustand
         // (Q = 0, Seitenbaender uebereinander) -- gemessen am 2026-09-25.
         // Ein Messlauf in diesem Zustand misst nicht den Betrieb.
-        const quint64 freqHz =
-            qEnvironmentVariableIsSet("LONGPATH_SUNSDR_FREQ")
-                ? qEnvironmentVariable("LONGPATH_SUNSDR_FREQ").toULongLong()
-                : 7100000ULL;
-        conn.setReceiverFrequency(0, freqHz);
-        qInfo().noquote() << QStringLiteral("Frequenz gesetzt: %1 Hz").arg(freqHz);
-        QTest::qWait(1500);
+        // Mit LONGPATH_SUNSDR_KEINE_FREQ bleibt der Frequenzrahmen aus --
+        // damit laesst sich der EINSCHALTZUSTAND messen (am 2026-09-25
+        // eingegrenzt: nach dem Einschalten liefert die QRP nur einen
+        // reellen Kanal, Q = 0, die Seitenbaender liegen uebereinander).
+        if (!qEnvironmentVariableIsSet("LONGPATH_SUNSDR_KEINE_FREQ")) {
+            const quint64 freqHz =
+                qEnvironmentVariableIsSet("LONGPATH_SUNSDR_FREQ")
+                    ? qEnvironmentVariable("LONGPATH_SUNSDR_FREQ").toULongLong()
+                    : 7100000ULL;
+            conn.setReceiverFrequency(0, freqHz);
+            qInfo().noquote() << QStringLiteral("Frequenz gesetzt: %1 Hz").arg(freqHz);
+            QTest::qWait(1500);
+        } else {
+            qInfo().noquote() << QStringLiteral(
+                "KEIN Frequenzrahmen -- Einschaltzustand wird gemessen");
+            QTest::qWait(1500);
+        }
 
         qInfo().noquote() << QStringLiteral(
             "Q ungleich null: %1 %  (0 % = nur ein reeller Kanal, "
@@ -144,6 +154,27 @@ private slots:
             qInfo().noquote() << QStringLiteral(
                 "Q ungleich null nach Bandwechsel: %1 %")
                 .arg(conn.qNonZeroPercentForTest(), 0, 'f', 1);
+        }
+
+        // Viele Frequenzwechsel, um die Verlustrate von STEUERRAHMEN zu
+        // messen: jeder Wechsel schickt zwei Rahmen (DDC 0x07 und VFO 0x08)
+        // und muss zwei Quittungen bekommen. Am 2026-10-03 war EINER von
+        // etwa fuenfzehn Laeufen unquittiert -- diese Messung sagt, wie oft
+        // das wirklich vorkommt, und das ist die Zahl, an der die
+        // Entscheidung ueber das Nachschicken haengt.
+        const int wechsel = qEnvironmentVariableIntValue("LONGPATH_SUNSDR_WECHSEL");
+        if (wechsel > 0) {
+            quint64 f = 7000000;
+            for (int i = 0; i < wechsel; ++i) {
+                f += 1000;                       // 1 kHz weiter, im Band bleiben
+                if (f > 7200000) { f = 7000000; }
+                conn.setReceiverFrequency(0, f);
+                QTest::qWait(60);                // Quittung kommt in 15-50 ms
+            }
+            qInfo().noquote() << QStringLiteral(
+                "%1 Frequenzwechsel geschickt (= %2 Steuerrahmen)")
+                .arg(wechsel).arg(wechsel * 2);
+            QTest::qWait(1500);
         }
 
         const int bloeckeVorher = iq.count();
