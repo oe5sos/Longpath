@@ -424,7 +424,22 @@ function zeichneKopf() {
   // Init-Burst. Ein offener Socket ohne Anmeldung liefert keine — und wuerde
   // den letzten Wert stehen lassen.
   const sm = s.smeter[state.trx];
-  if (!link.ready) {
+  // Ohne abgestimmte Frequenz gibt es keinen Empfaenger — und damit auch
+  // keinen Messwert.
+  //
+  // Steht TCI, haengt aber kein Funkgeraet dran, meldet Longpath als
+  // Rueckfall -140 dBm (TciServer.cpp, rxSensorTimer: WDSP-Konvention fuer
+  // "kein Kanal"). Die Seite machte daraus brav "S1 · -140 dBm" — eine
+  // Messung, die niemand vorgenommen hat. Am 2026-10-03 live so gesehen,
+  // waehrend der Panadapter daneben schon "kein Funkgeraet verbunden"
+  // schrieb und die Frequenzanzeige ehrlich "—" zeigte. Drei Anzeigen,
+  // zwei Wahrheiten.
+  //
+  // Geprueft wird die Frequenz, nicht der Zahlenwert des Pegels: -140 ist
+  // Longpaths Konvention, ein fremder Server waehlt eine andere. Bei 0 Hz
+  // ist dagegen jeder Server gemeint, und kein Funkgeraet steht je auf 0.
+  const keinGeraet = !s.vfo[state.trx] || !s.vfo[state.trx][0];
+  if (!link.ready || keinGeraet) {
     $('smeter').textContent = '—';
     $('sbar').style.width = '0%';
   } else if (sm !== null) {
