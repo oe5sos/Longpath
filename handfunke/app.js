@@ -1773,12 +1773,17 @@ function schleife(t) {
   // laesst den Operator raten; ein Satz nicht.
   //
   // Kommt ein Bild, aber ohne jedes Signal darin, steht das jetzt auch da —
-  // siehe state.hfAbstand. 10 dB als Grenze: ein belegtes Band bringt
-  // Traeger 30 bis 50 dB ueber den Boden, ein offener Eingang kaum 10.
-  // Dazwischen liegt nichts Wirkliches, also ist die Grenze unkritisch.
+  // siehe state.hfAbstand. 15 dB als Grenze, aus Messungen vom 2026-10-03
+  // und nicht geschaetzt: SunSDR2 QRP ohne Antenne 7/8/10 dB, ANVELINA mit
+  // Antenne 28/36/39 dB. Dazwischen liegt eine breite Luecke.
+  //
+  // Die erste Fassung stand bei 10 dB und schwieg darum ausgerechnet bei
+  // exakt 10,0 dB — gemessen am QRP ohne Antenne, bei einem zu 100 %
+  // stillen Tonstrom. Eine Kante an der falschen Stelle ist schlimmer als
+  // keine.
   const bildLaeuft = r.spec > 0 || r.iq > 0;
   const nurRauschen = bildLaeuft && state.hfAbstand !== null
-                      && state.hfAbstand < 10;
+                      && state.hfAbstand < 15;
   $('fussBild').className = (!bildLaeuft || nurRauschen) ? 'warn' : '';
   $('fussBild').textContent =
       nurRauschen ? ('nur rauschen (' + state.hfAbstand.toFixed(0) + ' dB) — antenne?')

@@ -249,9 +249,21 @@ def miss_hf(v, sekunden):
     print(f"  Rauschboden (20 %) {boden:6.1f} dBm")
     print(f"  staerkster Punkt   {spitze:6.1f} dBm")
     print(f"  Abstand            {spitze - boden:6.1f} dB")
-    if spitze - boden < 10:
+    # Grenze aus Messungen vom 2026-10-03, nicht geschaetzt:
+    #   SunSDR2 QRP ohne Antenne   7 / 8 / 10 dB
+    #   ANVELINA PRO 3 mit Antenne 28 / 36 / 39 dB
+    # Dazwischen liegt eine breite Luecke. Die erste Fassung stand bei 10 dB
+    # und meldete bei exakt 10,0 "Da sind Stationen" — am QRP ohne Antenne,
+    # bei einem zu 100 % stillen Tonstrom. Eine harte Kante an der falschen
+    # Stelle ist schlimmer als keine; darum 15 dB und ein Zweifelsbereich,
+    # der sich nicht festlegt, statt sich zu irren.
+    abstand = spitze - boden
+    if abstand < 15:
         print("  -> KEIN SIGNAL. Das ist kein Bandzustand, das ist ein")
         print("     offener Eingang: Antenne, Stecker, Relais pruefen.")
+    elif abstand < 20:
+        print("  -> ZWEIFELHAFT. Mehr als blosses Rauschen, aber weit unter")
+        print("     dem, was ein belegtes Band bringt (30 bis 50 dB).")
     else:
         print("  -> Da sind Stationen.")
 
