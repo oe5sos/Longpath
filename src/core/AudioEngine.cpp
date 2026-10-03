@@ -124,6 +124,7 @@
 #include "audio/PortAudioBus.h"
 #include "../models/RadioModel.h"
 #include "../models/SliceModel.h"
+#include "core/MacMicPermission.h"   // microphoneAccessGranted()
 
 #ifdef Q_OS_MAC
 #include "audio/CoreAudioHalBus.h"
@@ -923,6 +924,31 @@ void AudioEngine::ensureTxInputOpen()
         return;
     }
     if (!m_paInitialized) {
+        return;
+    }
+
+    // Nicht oeffnen, solange die Mikrofon-Berechtigung noch offen ist.
+    //
+    // Ohne diese Pruefung blockiert der Oeffnungsversuch, bis der Bediener
+    // den TCC-Dialog beantwortet — ohne Zeitlimit. Das waere halb so
+    // schlimm, laege der Aufruf nicht in der verschachtelten
+    // Ereignisschleife von RadioModel::connectToRadio: dort friert mit ihm
+    // die GESAMTE Oberflaeche ein, samt Verbindungsdialog und dessen
+    // "Abbrechen". Am 2026-10-03 live erlebt — der Dialog stand auf einem
+    // unsichtbaren Space, Longpath war eine Minute spaeter immer noch tot
+    // (0,2 % Prozessorlast, Log stumm, TCI-Port horcht, nimmt aber nichts
+    // an). Belegt per sample(1); beschrieben in
+    // docs/architecture/2026-10-03-verbindungshaenger-mikrofon.md.
+    //
+    // Empfangen braucht kein Mikrofon. Faellt der Eingang weg, bleibt nur
+    // der Pegelbalken leer — ein Zustand, den der Zweig unten ohnehin kennt
+    // und meldet. Das ist ungleich besser als ein totes Programm.
+    //
+    // Sobald die Berechtigung erteilt ist, oeffnet der naechste Aufruf den
+    // Eingang ganz normal; auf Nicht-macOS ist die Pruefung immer true.
+    if (!microphoneAccessGranted()) {
+        qCInfo(lcAudio) << "TX input bus not opened — microphone permission "
+                           "pending or denied; receiving is unaffected";
         return;
     }
 
