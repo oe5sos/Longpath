@@ -477,3 +477,89 @@ richtig, muss aber genauer heißen:
 
 Nützlich ist das trotzdem: solche Antworten im Inventar zeigen, dass das
 Gerät erreichbar ist und wer es sucht.
+
+---
+
+# 2026-10-03 abends: die Mitschnitte lagen seit dem 23. September da
+
+In `~/Longpath/werkzeug/mitschnitte/` liegen zwei ExpertSDR2-Mitschnitte
+vom 2026-09-23, beide 17:04/17:31 — `expert-steuerung.pcap` (9 kB) und
+`expert-rate.pcap` (12 MB). Aus ihnen sind damals die dreizehn Rahmen für
+die CRC-Prüfung gezogen worden; **auf den Verbindungsablauf hat sie
+niemand ausgewertet.** Das ist jetzt nachgeholt, und es beantwortet die
+zwei größten offenen Fragen.
+
+## Die QRP kann 96 kHz — gemessen
+
+| Mitschnitt | Strompakete | Blöcke/s | Abtastrate |
+| --- | --- | --- | --- |
+| `expert-rate.pcap` | 28 561 in 59,6 s | **479** | **96 kHz** |
+
+`BoardCapabilities` führt `maxSampleRate = 48000` und
+`sampleRates = {48000, 0, …}`. Das ist **widerlegt**: an derselben QRP
+lief ExpertSDR2 mit 96 kHz.
+
+## Und damit ist die „doppelte Datenrate" erklärt — es war nie der zweite Empfänger
+
+Am 2026-09-23 war gemessen: ExpertSDR2 bekommt 480 Pakete/s mit **zwei
+verschiedenen** Paketen je Folgenummer, Longpath 240 mit einem. Daraus
+war die Vermutung „das ist der zweite Empfänger" geworden — und sie
+stimmt nicht. Die Struktur des 96-kHz-Stroms:
+
+```
+Folgenummern: 0, 0, 0, 1, 2, 2, 3, 3, 4, 4, 5, 5 …
+4000 Pakete  ->  2000 verschiedene Nummern
+Differenzen:  0 (2000x), 1 (1999x)
+Zustandsbytes [8:9]: konstant 0100
+```
+
+**Bei 96 kHz schickt die QRP zwei Pakete je Folgenummer**, mit je 200
+Probenpaaren — zusammen 400 je Nummer, bei 240 Nummern/s also 96 000
+Proben je Sekunde. Die beiden Pakete tragen verschiedene Proben und sind
+**nicht** unterscheidbar markiert: die Zustandsbytes sind in beiden
+`0100`. Nur die Reihenfolge trennt sie.
+
+### Die Konsequenz für Longpath, und sie ist unangenehm
+
+Der Folgenummern-Zähler von heute behandelt ein zweites Paket mit
+derselben Nummer als **Wiederholung** — richtig bei 48 kHz (dort sind die
+Kopien bytegleich, am Gerät belegt), **falsch bei 96 kHz**: dort wäre es
+die zweite Hälfte der Proben. **Longpath würde bei 96 kHz die Hälfte der
+Daten wegwerfen**, und zwar lautlos.
+
+Wer also die Rate umstellt, muss zugleich `processStreamDatagram`
+umbauen: bei 96 kHz zählt nicht die Folgenummer, sondern die
+Reihenfolge — erstes Paket einer Nummer = Proben 0…199, zweites =
+200…399.
+
+## Der vollständige Verbindungsablauf: 33 Rahmen, alle quittiert
+
+Der Mitschnitt zeigt ExpertSDR2s Ablauf lückenlos (Auszug, Reihenfolge
+original):
+
+```
+0x06 MOX=0   0x02        0x16 Konfig
+0x00 Suche   <- 0x01 Beacon
+0x05 (1200 B)  0x05 (1200 B)  0x12 (1024 B) -> <- 0x12 (20 B)
+0x04 Preamp  0x03  0x17 Drive=0  0x11 fe  0x0f 6b  0x1a  0x04  0x15 Antenne
+0x0c Abfrage -> <- 320 B      0x0d Abfrage -> <- 320 B
+0x1c Kalibrierung   0x10   0x01 Stromstart
+0x18 Haupttakt   0x07 sub0   0x07 sub1   0x13   0x04   0x16   0x08   0x06
+0x18 x2   0x16   0x10 x2
+```
+
+**Siebzehn Opcodes, die Longpath nie schickt:** `0x02`, `0x03`, `0x05`,
+`0x06`, `0x0c`, `0x0d`, `0x0f`, `0x10`, `0x11`, `0x12`, `0x13`, `0x15`,
+`0x16`, `0x17`, `0x18`, `0x1a`, `0x1c`. Das Gerät **quittiert jeden
+einzelnen davon** — die Nummern sind damit alle als „dem Gerät bekannt"
+bestätigt.
+
+**Zwei Abfragen, nicht eine:** `0x0c` und `0x0d`, beide mit 320 Byte
+Antwort. `0x0d` beginnt mit `ad042467` und dann Nullen — eine andere
+Struktur als `0x0c`.
+
+**`0x05` und `0x12` tragen Speicherabbilder:** die Nutzlasten enthalten
+wiederkehrende `00c1b77f`-Muster, also Zeiger eines 64-Bit-Prozesses, und
+ihre Länge schwankt zwischen Mitschnitten (1200/1024 gegen 340/340). Das
+sind keine Protokollfelder, die man nachbauen sollte — eher ungesäuberte
+Puffer von ExpertSDR2.
