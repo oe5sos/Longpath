@@ -504,8 +504,13 @@ void AudioEngine::start()
             // platform-native bus.
             continue;
         }
-        qCInfo(lcAudio) << "[AudioStart:Step]" << (2 + channel)
-                        << "/7 VAX RX" << channel;
+        // In EINEM String zusammenbauen, nicht in den Strom stuecken: qCInfo
+        // setzt zwischen zwei gestreamte Werte ein Leerzeichen, und in
+        // Martins Log stand deshalb "3 /7" statt "3/7". In einer Zeile, die
+        // man liest, waehrend gerade etwas haengt, ist das schlampig.
+        qCInfo(lcAudio).noquote()
+            << QStringLiteral("[AudioStart:Step] %1/7 VAX RX %2")
+                   .arg(2 + channel).arg(channel);
         m_vaxBus[idx] = makeVaxBus(channel);
         if (m_vaxBus[idx]) {
             qCInfo(lcAudio) << "VAX" << channel << "bus opened (eager)"
