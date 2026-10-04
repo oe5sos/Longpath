@@ -1263,7 +1263,13 @@ const BoardCapabilities kSunSdr2Qrp = {
     // faelschlich "stumm".
     .maxReceivers     = 2,
     .maxSlices        = 2,
-    .userDdcCount     = 1,
+    // Zwei Stroeme, nicht einer -- sonst hat der Strompool genau einen
+    // Platz, und eine zweite Scheibe bekommt nie einen eigenen Strom.
+    // Am 2026-10-04 am Geraet gesehen: eine zweite Scheibe auf 20 m
+    // wurde abgelehnt ("Placement: slice 1 freq=14.1 MHz -> Rejected
+    // stream=-1"), obwohl das Geraet zwei Stroeme liefert und der
+    // Treiber beide hochreicht. Das war das letzte Glied der Kette.
+    .userDdcCount     = 2,
     .widebandAdcs     = 0,   // no wideband/panadapter-bypass stream documented
     // 48 000 Hz — am Geraet gemessen (2026-09-23/24), nicht uebernommen.
     //

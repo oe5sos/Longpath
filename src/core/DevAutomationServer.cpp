@@ -356,6 +356,14 @@ QJsonObject DevAutomationServer::handleLine(const QByteArray& line)
     if (verb == QStringLiteral("addSlice")) {
         return doAddSlice();
     }
+    if (verb == QStringLiteral("setFreq")) {
+        if (parts.size() < 3) {
+            return QJsonObject{{QStringLiteral("ok"), false},
+                               {QStringLiteral("error"),
+                                QStringLiteral("setFreq <scheibe> <hz>")}};
+        }
+        return doSetFrequency(parts.at(1).toInt(), parts.at(2).toDouble());
+    }
     if (verb == QStringLiteral("disconnect")) {
         return doDisconnect();
     }
@@ -370,7 +378,7 @@ QJsonObject DevAutomationServer::handleLine(const QByteArray& line)
     return QJsonObject{{QStringLiteral("ok"), false},
                         {QStringLiteral("error"),
                          QStringLiteral("unknown command: ") + verb +
-                             QStringLiteral(" (known: ping, dumpTree, grab, get, connect, disconnect, addSlice)")}};
+                             QStringLiteral(" (known: ping, dumpTree, grab, get, connect, disconnect, addSlice, setFreq)")}};
 }
 
 // ── doConnect / doDisconnect (2026-09-30) ────────────────────────────────────
@@ -402,6 +410,25 @@ QJsonObject DevAutomationServer::doAddSlice()
     }
     return QJsonObject{{QStringLiteral("ok"), true},
                        {QStringLiteral("slice"), id}};
+}
+
+QJsonObject DevAutomationServer::doSetFrequency(int sliceId, double hz)
+{
+    if (m_radioModel.isNull()) {
+        return QJsonObject{{QStringLiteral("ok"), false},
+                           {QStringLiteral("error"), QStringLiteral("no radio model")}};
+    }
+    // Hauptfaden, direkt -- gleiche Begruendung wie bei doAddSlice.
+    SliceModel* slice = m_radioModel->sliceById(sliceId);
+    if (slice == nullptr) {
+        return QJsonObject{{QStringLiteral("ok"), false},
+                           {QStringLiteral("error"),
+                            QStringLiteral("keine Scheibe %1").arg(sliceId)}};
+    }
+    slice->setFrequency(hz);
+    return QJsonObject{{QStringLiteral("ok"), true},
+                       {QStringLiteral("slice"), sliceId},
+                       {QStringLiteral("hz"), slice->frequency()}};
 }
 
 QJsonObject DevAutomationServer::doConnect(const QString& macKeyOrEmpty)

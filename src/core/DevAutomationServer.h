@@ -143,6 +143,12 @@ private:
     /// kommt oben erst an, wenn sich eine zweite Scheibe an ihn bindet.
     QJsonObject doAddSlice();
 
+    /// Die Frequenz einer Scheibe stellen (2026-10-04). Zusammen mit
+    /// doAddSlice() macht das den Live-Beleg fuer zwei Empfaenger ohne
+    /// Mausklick moeglich: eine zweite Scheibe weit genug weg zwingt
+    /// einen zweiten Strom, statt sich den ersten zu teilen.
+    QJsonObject doSetFrequency(int sliceId, double hz);
+
     QLocalServer* m_server{nullptr};
     QPointer<RadioModel> m_radioModel;
 };
