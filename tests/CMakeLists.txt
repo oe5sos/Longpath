@@ -1956,6 +1956,14 @@ longpath_add_test(tst_settings_hygiene)
 #   QoS-Meldung, der an dem Tag jemand nachging.
 longpath_add_test(tst_log_schreibt_atomar)
 
+# ── Qt-Prioritaet gegen QoS-Klasse (2026-10-03) ──────────────────────────────
+# tst_audio_faden_qos: haelt die Regel fest, warum Audio-Faeden OHNE
+#   QThread-Prioritaet starten. Qt setzt fuer eine ausdrueckliche Prioritaet
+#   auf macOS die Ablaufparameter, und Darwin verweigert danach jede
+#   QoS-Klasse (EPERM, Faden bleibt auf QOS_CLASS_UNSPECIFIED). Der
+#   Sende-Faden lief deshalb ohne die Erhoehung, die er haben soll.
+longpath_add_test(tst_audio_faden_qos)
+
 # ── Dicktengleiche Schrift muss auch ankommen (2026-10-03) ───────────────────
 # tst_schrift_dicktengleich: prueft nicht den FAMILIENNAMEN, sondern was Qt
 #   nach seiner Auswahl hergibt (QFontInfo::fixedPitch). Vier Stellen nannten
