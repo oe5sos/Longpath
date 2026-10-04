@@ -3063,16 +3063,16 @@ void P1RadioConnection::sendMetisStart(bool iqAndMic)
     // Sofort lesen, vor jedem weiteren Aufruf: errorString() und alles
     // andere darf errno ueberschreiben.
     if (geschrieben != pkt.size()) {
-        const int fehlerNr = errno;
+        const int fehlerNr = Netz::letzterFehler();
         m_letzterSendeFehler = fehlerNr;
         qCWarning(lcConnection).noquote()
             << QStringLiteral("P1: %1 send failed — wrote %2 of %3 bytes; "
-                              "errno=%4 (%5); Qt: %6")
+                              "fehler=%4 (%5); Qt: %6")
                    .arg(QStringLiteral("Start/Stop"))
                    .arg(geschrieben)
                    .arg(pkt.size())
                    .arg(fehlerNr)
-                   .arg(QString::fromLatin1(std::strerror(fehlerNr)))
+                   .arg(Netz::fehlerName(fehlerNr))
                    .arg(m_socket->errorString());
     }
 }
@@ -3115,16 +3115,16 @@ void P1RadioConnection::sendMetisStop()
     // Sofort lesen, vor jedem weiteren Aufruf: errorString() und alles
     // andere darf errno ueberschreiben.
     if (geschrieben != pkt.size()) {
-        const int fehlerNr = errno;
+        const int fehlerNr = Netz::letzterFehler();
         m_letzterSendeFehler = fehlerNr;
         qCWarning(lcConnection).noquote()
             << QStringLiteral("P1: %1 send failed — wrote %2 of %3 bytes; "
-                              "errno=%4 (%5); Qt: %6")
+                              "fehler=%4 (%5); Qt: %6")
                    .arg(QStringLiteral("Stop"))
                    .arg(geschrieben)
                    .arg(pkt.size())
                    .arg(fehlerNr)
-                   .arg(QString::fromLatin1(std::strerror(fehlerNr)))
+                   .arg(Netz::fehlerName(fehlerNr))
                    .arg(m_socket->errorString());
     }
 }
@@ -3227,16 +3227,16 @@ void P1RadioConnection::sendCommandFrame()
     // Sofort lesen, vor jedem weiteren Aufruf: errorString() und alles
     // andere darf errno ueberschreiben.
     if (geschrieben != pkt.size()) {
-        const int fehlerNr = errno;
+        const int fehlerNr = Netz::letzterFehler();
         m_letzterSendeFehler = fehlerNr;
         qCWarning(lcConnection).noquote()
             << QStringLiteral("P1: %1 send failed — wrote %2 of %3 bytes; "
-                              "errno=%4 (%5); Qt: %6")
+                              "fehler=%4 (%5); Qt: %6")
                    .arg(QStringLiteral("EP2"))
                    .arg(geschrieben)
                    .arg(pkt.size())
                    .arg(fehlerNr)
-                   .arg(QString::fromLatin1(std::strerror(fehlerNr)))
+                   .arg(Netz::fehlerName(fehlerNr))
                    .arg(m_socket->errorString());
     }
 

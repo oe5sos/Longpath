@@ -204,12 +204,12 @@ void meldeSendeFehler(const char* was, qint64 geschrieben, qsizetype soll,
     const QString deutung = Netz::sendeFehlerDeutung(fehlerNr);
     qCWarning(lcConnection).noquote()
         << QStringLiteral("P2: %1 send failed — wrote %2 of %3 bytes; "
-                          "errno=%4 (%5); Qt: %6, error=%7, state=%8%9")
+                          "fehler=%4 (%5); Qt: %6, error=%7, state=%8%9")
                .arg(QString::fromLatin1(was))
                .arg(geschrieben)
                .arg(soll)
                .arg(fehlerNr)
-               .arg(QString::fromLatin1(std::strerror(fehlerNr)))
+               .arg(Netz::fehlerName(fehlerNr))
                .arg(sock ? sock->errorString() : QStringLiteral("-"))
                .arg(sock ? int(sock->error()) : -1)
                .arg(sock ? int(sock->state()) : -1)
@@ -3087,11 +3087,11 @@ void P2RadioConnection::sendCmdGeneral()
                                              m_baseOutboundPort);
     // Sofort lesen, vor jedem weiteren Aufruf: errorString() und
     // alles andere darf errno ueberschreiben.
-    int fehlerNr = errno;
+    int fehlerNr = Netz::letzterFehler();
     if (written != pkt.size()) {
         written = m_socket->writeDatagram(pkt, m_radioInfo.address,
                                           m_baseOutboundPort);
-        fehlerNr = errno;
+        fehlerNr = Netz::letzterFehler();
     }
     if (written != pkt.size()) {
         m_letzterSendeFehler = fehlerNr;
@@ -3116,7 +3116,7 @@ void P2RadioConnection::sendCmdHighPriority()
         m_socket->writeDatagram(pkt, m_radioInfo.address, m_baseOutboundPort + 3);
     // Sofort lesen, vor jedem weiteren Aufruf: errorString() und alles
     // andere darf errno ueberschreiben.
-    int fehlerNr = errno;
+    int fehlerNr = Netz::letzterFehler();
     // 2026-08-27: one immediate retry on failure.  Bench-observed twice in a
     // row (OE5SOS, radio reached over WLAN+router) failing this exact write
     // with "Unable to send a message" on the very first send of a freshly
@@ -3132,7 +3132,7 @@ void P2RadioConnection::sendCmdHighPriority()
     // SendStart() sequencing or timing Thetis's network.c defines.
     if (written != pkt.size()) {
         written = m_socket->writeDatagram(pkt, m_radioInfo.address, m_baseOutboundPort + 3);
-        fehlerNr = errno;
+        fehlerNr = Netz::letzterFehler();
     }
     if (written != pkt.size()) {
         m_letzterSendeFehler = fehlerNr;
@@ -3160,11 +3160,11 @@ void P2RadioConnection::sendCmdRx()
                                              m_baseOutboundPort + 1);
     // Sofort lesen, vor jedem weiteren Aufruf: errorString() und
     // alles andere darf errno ueberschreiben.
-    int fehlerNr = errno;
+    int fehlerNr = Netz::letzterFehler();
     if (written != pkt.size()) {
         written = m_socket->writeDatagram(pkt, m_radioInfo.address,
                                           m_baseOutboundPort + 1);
-        fehlerNr = errno;
+        fehlerNr = Netz::letzterFehler();
     }
     if (written != pkt.size()) {
         m_letzterSendeFehler = fehlerNr;
@@ -3186,11 +3186,11 @@ void P2RadioConnection::sendCmdTx()
                                              m_baseOutboundPort + 2);
     // Sofort lesen, vor jedem weiteren Aufruf: errorString() und
     // alles andere darf errno ueberschreiben.
-    int fehlerNr = errno;
+    int fehlerNr = Netz::letzterFehler();
     if (written != pkt.size()) {
         written = m_socket->writeDatagram(pkt, m_radioInfo.address,
                                           m_baseOutboundPort + 2);
-        fehlerNr = errno;
+        fehlerNr = Netz::letzterFehler();
     }
     if (written != pkt.size()) {
         m_letzterSendeFehler = fehlerNr;
@@ -3513,7 +3513,7 @@ void P2RadioConnection::onConnectTimeout()
                   "Die Pakete verlassen diesen Rechner gar nicht — der "
                   "Versand scheitert hier, nicht unterwegs (%1). Es nützt "
                   "deshalb nichts, am Netz oder am Gerät zu suchen.")
-                  .arg(QString::fromLatin1(std::strerror(m_letzterSendeFehler)));
+                  .arg(Netz::fehlerName(m_letzterSendeFehler));
         if (!deutung.isEmpty()) { rat += QStringLiteral("\n\n") + deutung; }
     } else {
         rat = QStringLiteral(
