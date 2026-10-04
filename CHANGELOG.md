@@ -66,6 +66,25 @@ behaupten, was nicht mehr gilt** — und das Log muss sagen koennen, was war.
   Massstab ist jetzt ueberall `ready`, nie der offene Socket.
 - **P2: erster Verbindungsaufbau ueber WLAN** (#147) — TX-I/Q erst nach dem
   ersten Rahmen des Geraets.
+- **Der Sende-Faden hob seine eigene Echtzeit-Behandlung auf** (#174).
+  `TxWorkerThread` startete mit `QThread::start(QThread::HighPriority)`, und Qt
+  setzt dafuer auf macOS die Ablaufparameter des Fadens — Darwin verweigert
+  danach **jede** QoS-Klasse. Die Prioritaet hob damit genau die Behandlung
+  auf, die `run()` ausdruecklich haben will („audible glitches on the air").
+  Gemessen: `start()` -> USER_INTERACTIVE, `start(HighPriority)` ->
+  UNSPECIFIED. Der Empfangs-Faden war nie betroffen.
+- **Vier Stellen baten um eine Schrift, die es nicht gibt** (#172). `SF Mono`
+  ist auf macOS nicht angemeldet und loest zu `.AppleSystemUIFont` auf —
+  proportional. Die Zustandszeile der Kopfleiste und die Log-Ansicht im
+  Support-Fenster standen deshalb in der falschen Schrift. Dazu `Consolas`
+  (eine Windows-Schrift) und zweimal CSS-Gattungsnamen, die Qt nicht als
+  Familie kennt.
+- **Drei Fehlalarme im Log** (#175). Von 17 Warnungen einer gesunden Sitzung
+  kamen 13 in **jeder** Sitzung — und in diesem Rauschen waere die eine echte
+  (der Sende-Faden) fast untergegangen. `[PanFloatClose]`,
+  `[AppletFloatClose]` und „TX frequency NOT pushed: no connection yet" stehen
+  jetzt auf INFO. Die Schrittmarken des Profilwechsels bleiben unberuehrt; die
+  sind so bestellt.
 
 ### Dokumentation
 
