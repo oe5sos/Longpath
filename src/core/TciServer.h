@@ -625,6 +625,12 @@ private:
     // alive, nobody answering). Clears the owner, unkeys if MOX is still
     // on, logs, emits moxReleasedOnClientLoss.
     void releaseMoxHeldBy(QWebSocket* ws, const QString& peer, const QString& why);
+    // Sagt EINEM Client, dass sein Sendewunsch abgelehnt wurde und warum.
+    // Begruendung an der Umsetzung: ein stummes Nein ist auf einer
+    // Fernbedienung nicht von einem Fehler zu unterscheiden.
+    void sendeAblehnung(const std::shared_ptr<TciClientSession>& session,
+                        const QString& grund);
+
     void startKeyedWatchdog();
     void stopKeyedWatchdog();
 
