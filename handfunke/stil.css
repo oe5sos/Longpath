@@ -336,3 +336,70 @@ footer .warn{color:var(--warn)}
   box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 2px 0 rgba(0,0,0,.45);
 }
 .tonAn[hidden]{display:none}
+
+/* ── QSO eintragen (Entwurf A, Betreiber 2026-10-04) ─────────────────────
+   Dasselbe Muster wie das Frequenz-Blatt (#qsy): ein Blatt ueber dem Bild,
+   nicht ein weiteres Feld im Stapel. Begruendung dort; kurz: wer eintraegt,
+   tut genau das — und danach ist das Band wieder frei.
+
+   Die Knopffarbe folgt der Hausregel: Blau nur, wo man klickt. Messing
+   bleibt dem Gemessenen vorbehalten, und die drei automatischen Zeilen
+   sind genau das — gemessene Werte vom Geraet, keine Eingabe. */
+.logAuf{height:28px;padding:0 11px;border-radius:9px;
+  border:1px solid var(--amber-dim);background:rgba(107,86,48,.22);
+  color:var(--measured);font:600 var(--f-caption)/1 inherit;
+  letter-spacing:.13em;flex:none}
+#qsoBlatt{position:fixed;inset:0;z-index:11;display:none;align-items:center;
+  justify-content:center;padding:0 22px;
+  background:radial-gradient(120% 60% at 50% 18%,rgba(23,33,43,.95) 0%,
+             rgba(11,13,16,.96) 52%,rgba(8,8,10,.975) 100%);
+  -webkit-backdrop-filter:blur(7px);backdrop-filter:blur(7px)}
+#qsoBlatt.an{display:flex}
+#qsoBlatt .karte{width:100%;max-width:332px;display:flex;
+  flex-direction:column;gap:12px}
+#qsoBlatt h1{font-size:var(--f-sub);font-weight:600;letter-spacing:.07em;
+  color:var(--title);text-align:center}
+/* Eingefasst wie die Regler-Bahnen: tief eingelassen, damit man sieht,
+   dass man hineinschreibt. */
+#qsoRuf{width:100%;box-sizing:border-box;height:58px;border-radius:12px;text-align:center;
+  background:#040507;border:1px solid rgba(0,0,0,.8);color:var(--text);
+  font:600 30px/1 var(--mono);letter-spacing:.09em;
+  box-shadow:inset 0 2px 6px rgba(0,0,0,.85);text-transform:uppercase}
+#qsoRuf::placeholder{color:var(--text-inactive);font-weight:500;
+  font-size:19px;letter-spacing:.14em}
+#qsoRuf:focus{outline:none;border-color:var(--accent);
+  box-shadow:inset 0 2px 6px rgba(0,0,0,.85),0 0 0 3px rgba(74,123,168,.22)}
+#qsoBlatt .rstreihe{display:flex;gap:9px}
+/* min-width:0 ist nicht Kosmetik: ohne das weigert sich ein Flex-Kind,
+   unter die EIGENBREITE eines <input> zu schrumpfen (die kommt aus dem
+   size-Attribut, nicht aus dem CSS). Die Reihe lief damit bei 375 px
+   rechts aus dem Bild — am 2026-10-04 am Telefonformat gesehen. */
+#qsoBlatt .rstfeld{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px}
+#qsoBlatt .rstfeld label{font-size:var(--f-caption);letter-spacing:.11em;
+  color:var(--text3);text-transform:uppercase;text-align:center}
+#qsoBlatt .rstfeld input{width:100%;box-sizing:border-box;height:44px;border-radius:11px;text-align:center;
+  background:#040507;border:1px solid rgba(0,0,0,.8);color:var(--text);
+  font:600 19px/1 var(--mono);box-shadow:inset 0 2px 5px rgba(0,0,0,.85)}
+#qsoBlatt .rstfeld input:focus{outline:none;border-color:var(--accent)}
+#qsoBlatt .automatisch{display:flex;flex-direction:column;gap:3px;
+  padding:9px 11px;border-radius:10px;background:rgba(255,255,255,.025);
+  border:1px solid rgba(255,255,255,.05)}
+#qsoBlatt .automatisch .z{display:flex;justify-content:space-between;
+  font-size:var(--f-caption);font-family:var(--mono)}
+#qsoBlatt .automatisch .k{color:var(--text3);letter-spacing:.06em}
+#qsoBlatt .automatisch .v{color:var(--measured)}
+/* Die Meldezeile haelt ihre Hoehe, auch wenn sie leer ist — sonst
+   springt das Blatt, sobald eine Antwort kommt. */
+#qsoMeldung{min-height:16px;font-size:var(--f-small);text-align:center;
+  color:var(--text3)}
+#qsoMeldung.ok{color:var(--ok)}
+#qsoMeldung.warn{color:var(--warn)}
+#qsoBlatt button{height:50px;border-radius:12px;font:600 var(--f-sub)/1 inherit;
+  letter-spacing:.09em;border:1px solid #4886c0;
+  background:linear-gradient(#36699f,#21436a);color:#e2eefb;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.2),
+             0 0 16px rgba(74,123,168,.3),0 2px 6px rgba(0,0,0,.55)}
+#qsoBlatt button.still{height:44px;border:1px solid var(--border);
+  background:rgba(18,19,23,.6);color:var(--text-inactive);box-shadow:none;
+  font-size:var(--f-caption);letter-spacing:.1em;text-transform:uppercase}
+#qsoBlatt button:disabled{opacity:.45}

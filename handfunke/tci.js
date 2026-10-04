@@ -176,6 +176,13 @@ export class TciLink extends EventTarget {
       case 'protocol':        s.protocol = args.join(','); break;
       case 'modulations_list': s.modes = args.filter(Boolean); break;
       case 'ready':           this.ready = true; this._emit('ready'); break;
+      // Longpath-eigen (PR #184): die Antwort auf `log_qso:`. Sie wird
+      // durchgereicht, nicht hier gedeutet — was damit geschieht, entscheidet
+      // die Seite. Wichtig ist nur, dass sie ANKOMMT: ohne Antwort wuesste
+      // das Blatt nicht, ob der Kontakt in der Datei steht, und muesste den
+      // Erfolg behaupten.
+      case 'log_qso_ok':      this._emit('qso', { ok: true,  text: args[0] || '' }); break;
+      case 'log_qso_err':     this._emit('qso', { ok: false, text: args[0] || '' }); break;
       // Der Server bestaetigt eine geglueckte Anmeldung und schickt erst
       // danach den Init-Burst. Bei falschem Token schweigt er und trennt nach
       // dem dritten Versuch — deshalb ist das Ausbleiben dieser Zeile das

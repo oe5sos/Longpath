@@ -1394,6 +1394,123 @@ function hzAusEingabe(roh) {
   return null;
 }
 
+// ── QSO eintragen (Entwurf A, Betreiber 2026-10-04) ───────────────────────
+//
+// Das Blatt schickt NUR Rufzeichen und RST. Frequenz, Betriebsart und Zeit
+// setzt Longpath selbst beim Eintragen (TciServer `log_qso:`), und das ist
+// Absicht: schickte die Seite sie mit, koennte sie etwas anderes eintragen,
+// als das Geraet gerade macht. Die drei Zeilen im Blatt zeigen darum, was
+// Longpath nehmen WIRD — sie sind Auskunft, keine Eingabe, und stehen
+// deshalb in Messing.
+//
+// Die Uhr laeuft, solange das Blatt offen ist. Ein Blatt, das die Zeit von
+// seinem Oeffnen zeigt, waehrend der Kontakt eine Minute spaeter eingetragen
+// wird, behauptet etwas Falsches — dieselbe Regel wie beim S-Meter.
+let qsoUhr = null;
+
+/** 14074000 Hz -> "14.074,00 kHz" — Punkt als Tausender, Komma als Dezimal. */
+function khzText(hz) {
+  const khz = hz / 1000;
+  const ganz = Math.floor(khz);
+  const rest = Math.round((khz - ganz) * 100);
+  const mitPunkt = String(ganz).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return `${mitPunkt},${String(rest).padStart(2, '0')} kHz`;
+}
+
+function qsoAutomatikZeigen() {
+  const v = link.st.vfo[state.trx] ? link.st.vfo[state.trx][0] : null;
+  const m = (link.st.mode[state.trx] || '').toUpperCase();
+  // Von Hand gesetzt statt toLocaleString: das liefert je nach Browser ein
+  // schmales geschuetztes Leerzeichen als Tausendertrennung, und eine
+  // Frequenz mit Leerzeichen liest sich am Funkgeraet falsch. Punkt und
+  // Komma wie ueberall sonst in dieser Seite.
+  $('qsoFreq').textContent = v ? khzText(v) : '—';
+  // ADIF kennt LSB/USB nicht als Betriebsart, sondern als Unterart von SSB.
+  // Die Seite zeigt trotzdem, was am Geraet steht — umgerechnet wird erst
+  // in Longpath, an einer Stelle.
+  $('qsoMode').textContent = m || '—';
+  const d = new Date();
+  const zz = (n) => String(n).padStart(2, '0');
+  $('qsoZeit').textContent =
+    `${zz(d.getUTCDate())}.${zz(d.getUTCMonth() + 1)}.${d.getUTCFullYear()}  `
+    + `${zz(d.getUTCHours())}:${zz(d.getUTCMinutes())}`;
+}
+
+function qsoOeffnen() {
+  $('qsoRuf').value = '';
+  $('qsoMeldung').textContent = '';
+  $('qsoMeldung').className = '';
+  $('qsoOk').disabled = false;
+  qsoAutomatikZeigen();
+  clearInterval(qsoUhr);
+  qsoUhr = setInterval(qsoAutomatikZeigen, 5000);
+  $('qsoBlatt').classList.add('an');
+  // Erst nach dem Einblenden, sonst bleibt die Tastatur auf iOS zu.
+  setTimeout(() => $('qsoRuf').focus(), 50);
+}
+
+function qsoSchliessen() {
+  clearInterval(qsoUhr); qsoUhr = null;
+  $('qsoBlatt').classList.remove('an');
+  $('qsoRuf').blur();
+}
+
+function qsoEintragen() {
+  const ruf = ($('qsoRuf').value || '').trim().toUpperCase();
+  if (!ruf) { $('qsoRuf').focus(); return; }
+  if (!link.ready) {
+    // Nicht senden und so tun als ob: ohne stehende Verbindung kommt der
+    // Kontakt nirgends an, und das Blatt sagt es.
+    $('qsoMeldung').textContent = 'keine Verbindung — nicht eingetragen';
+    $('qsoMeldung').className = 'warn';
+    return;
+  }
+  const rs = ($('qsoRstS').value || '59').trim() || '59';
+  const re = ($('qsoRstE').value || '59').trim() || '59';
+  $('qsoOk').disabled = true;
+  $('qsoMeldung').textContent = 'wird eingetragen…';
+  $('qsoMeldung').className = '';
+  link.send(`log_qso:${ruf},${rs},${re}`);
+  // Kommt keine Antwort, bleibt es nicht bei "wird eingetragen" stehen.
+  // Eine Anzeige, die ewig auf dem Zwischenstand verharrt, liest sich wie
+  // ein Erfolg.
+  clearTimeout(qsoEintragen._frist);
+  qsoEintragen._frist = setTimeout(() => {
+    if (!$('qsoOk').disabled) { return; }
+    $('qsoOk').disabled = false;
+    $('qsoMeldung').textContent = 'keine Antwort — nicht sicher eingetragen';
+    $('qsoMeldung').className = 'warn';
+  }, 4000);
+}
+
+link.addEventListener('qso', (e) => {
+  clearTimeout(qsoEintragen._frist);
+  const d = e.detail || {};
+  $('qsoOk').disabled = false;
+  if (d.ok) {
+    $('qsoMeldung').textContent = `${d.text} eingetragen`;
+    $('qsoMeldung').className = 'ok';
+    $('qsoRuf').value = '';
+    // Offen lassen: im Pile-up kommt der naechste sofort, und ein Blatt,
+    // das nach jedem Kontakt zugeht, kostet zwei Tipper je QSO.
+    setTimeout(() => $('qsoRuf').focus(), 30);
+  } else {
+    $('qsoMeldung').textContent = d.text || 'abgelehnt';
+    $('qsoMeldung').className = 'warn';
+  }
+});
+
+$('logAuf').addEventListener('click', qsoOeffnen);
+$('qsoAb').addEventListener('click', qsoSchliessen);
+$('qsoOk').addEventListener('click', qsoEintragen);
+$('qsoRuf').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); qsoEintragen(); }
+});
+// Tippen auf den Grund schliesst, wie beim Frequenz-Blatt.
+$('qsoBlatt').addEventListener('click', (e) => {
+  if (e.target === $('qsoBlatt')) { qsoSchliessen(); }
+});
+
 function qsyOeffnen() {
   const v = link.st.vfo[state.trx] ? link.st.vfo[state.trx][0] : null;
   $('qsyFeld').value = v ? (v / 1e6).toFixed(5) : '';
