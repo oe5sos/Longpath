@@ -175,6 +175,21 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
   <div class="tune locked" id="tune">TUNE <small>NUR IN DER APP</small></div>
 </div>
 
+<!-- Die Halteleiste (Entwurf 1, gewaehlt am 2026-10-04).
+     Sie TASTET NICHT — sie nimmt das Mikrofon auf, baut die TCI-Rahmen und
+     schickt sie. Longpath verwirft sie, solange dieser Client nicht tastet
+     (m_txAudioActiveClient), und zaehlt sie als verworfen. Das ist der
+     Beleg, dass die ganze Kette steht, ohne dass ein Watt die Antenne sieht.
+     Darum auch kein Messing: Messing ist die Sendefarbe, und hier wird
+     nicht gesendet. -->
+<div class="mikrow" id="mikrow" hidden>
+  <button class="mikhalt" id="mikhalt">
+    <b>MIKROFON PRÜFEN</b><small>GEDRÜCKT HALTEN · TASTET NICHT</small>
+  </button>
+  <div class="pegel"><i id="pegelbalken"></i><u id="pegelspitze"></u></div>
+  <div class="mikmeldung" id="mikmeldung"></div>
+</div>
+
 <footer>
   <span id="fussStatus">—</span>
   <span id="fussBild"></span>
