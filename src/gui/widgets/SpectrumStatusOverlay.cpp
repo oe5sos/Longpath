@@ -169,7 +169,8 @@ void SpectrumStatusOverlay::paintEvent(QPaintEvent*)
     // Zahlenchips im Bandfilter: gelesen, nicht gedrueckt.
     Style::paintGlassChip(p, QRect(x, y + 1, kChTagWidth, 14), 5);
     p.setPen(QColor(Style::kTitleText));
-    p.setFont(QFont(QStringLiteral("monospace"), 9, QFont::Bold));
+    // "monospace" ist ein CSS-Gattungsname, keine Qt-Familie.
+    p.setFont(Style::monoFontPt(9, QFont::Bold));
     p.drawText(QRect(x, y + 1, kChTagWidth, 14), Qt::AlignCenter,
                QStringLiteral("CH %1").arg(m_chainIndex));
     x += kChTagWidth + kInterPillGap;
