@@ -218,6 +218,19 @@ private slots:
         // Rate zur Laufzeit umstellen -- der Weg, den spaeter die
         // Oberflaeche nimmt. LONGPATH_SUNSDR_RATE=96000 schaltet nach dem
         // Verbinden um.
+        // Zwei Empfaenger: der Weg, den die Oberflaeche nimmt. Am
+        // 2026-10-04 belegt, dass der zweite Strom echtes I/Q traegt --
+        // hier wird gemessen, ob er oben auch ANKOMMT statt verworfen zu
+        // werden.
+        if (qEnvironmentVariableIsSet("LONGPATH_SUNSDR_EMPFAENGER")) {
+            const int n =
+                qEnvironmentVariableIntValue("LONGPATH_SUNSDR_EMPFAENGER");
+            conn.setActiveReceiverCount(n);
+            qInfo().noquote()
+                << QStringLiteral("setActiveReceiverCount(%1) gerufen").arg(n);
+            QTest::qWait(1500);
+        }
+
         if (qEnvironmentVariableIsSet("LONGPATH_SUNSDR_RATE")) {
             const int r = qEnvironmentVariableIntValue("LONGPATH_SUNSDR_RATE");
             conn.setSampleRate(r);
