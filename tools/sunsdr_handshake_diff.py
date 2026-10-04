@@ -322,6 +322,91 @@ def vergleiche(a, b):
         print("  keine -- dieselben Rahmen mit denselben Werten")
 
 
+def wiederholungen(pfad, geraet=None):
+    """Zaehlt bytegleiche Wiederholungen im I/Q-Strom eines Mitschnitts.
+
+    Die Frage dahinter (2026-10-04): Longpath bekommt bei 96 kHz rund
+    110 bytegleiche Wiederholungen je Sekunde, bei 48 kHz keine. Drei
+    Gegenmassnahmen sind gemessen und wirkungslos. Wiederholt ExpertSDR2
+    bei 96 kHz AUCH, ist es die Eigenart des Geraets und kein Mangel von
+    Longpath -- und die Frage ist erledigt statt offen.
+
+    Dafuer muss der Mitschnitt von ExpertSDR2 bei 96 kHz stammen.
+    """
+    import hashlib
+    daten = open(pfad, "rb")
+    kopf = daten.read(24)
+    if len(kopf) < 24:
+        print("Datei zu kurz."); return
+    magic = struct.unpack("<I", kopf[:4])[0]
+    if magic not in (0xa1b2c3d4, 0xd4c3b2a1):
+        print("Das sieht nicht nach einem klassischen pcap aus "
+              "(pcapng wird hier nicht gelesen).")
+        return
+
+    jeKanal = {}
+    inhalt = {}
+    dubletten = 0
+    gesamt = 0
+    t0 = t1 = None
+    while True:
+        rh = daten.read(16)
+        if len(rh) < 16:
+            break
+        ts, tus, incl, _orig = struct.unpack("<IIII", rh)
+        d = daten.read(incl)
+        if len(d) < incl:
+            break
+        if incl < 42 or d[12:14] != b"\x08\x00" or d[23] != 17:
+            continue
+        ihl = (d[14] & 0x0F) * 4
+        uo = 14 + ihl
+        sp = struct.unpack(">H", d[uo:uo + 2])[0]
+        src = ".".join(str(b) for b in d[26:30])
+        if sp != 50002:
+            continue
+        if geraet and src != geraet:
+            continue
+        nutz = d[uo + 8:]
+        # Nur echte IQ-Bloecke: 10 Byte Kopf + 1200 Byte Nutzlast.
+        if len(nutz) != 1210 or nutz[2] not in (0xFE, 0xFD):
+            continue
+        t = ts + tus / 1e6
+        if t0 is None:
+            t0 = t
+        t1 = t
+        seq = struct.unpack("<H", nutz[6:8])[0]
+        kanal = nutz[9]
+        gesamt += 1
+        jeKanal[kanal] = jeKanal.get(kanal, 0) + 1
+        h = hashlib.blake2b(nutz[10:], digest_size=8).digest()
+        schluessel = (kanal, seq)
+        if schluessel in inhalt and inhalt[schluessel] == h:
+            dubletten += 1
+        inhalt[schluessel] = h
+        if len(inhalt) > 400000:
+            inhalt.clear()
+    if gesamt == 0:
+        print("Keine I/Q-Bloecke gefunden. Stammt der Mitschnitt vom "
+              "Stromport 50002?")
+        return
+    dauer = max((t1 or 0) - (t0 or 0), 1e-9)
+    print("I/Q-Bloecke: %d ueber %.1f s (%.0f/s)"
+          % (gesamt, dauer, gesamt / dauer))
+    for k in sorted(jeKanal):
+        print("   Kanal %d: %d (%.0f/s)" % (k, jeKanal[k], jeKanal[k] / dauer))
+    print("bytegleiche Wiederholungen: %d  (%.1f/s, %.1f %% der Bloecke)"
+          % (dubletten, dubletten / dauer, 100.0 * dubletten / gesamt))
+    print()
+    if dubletten / dauer > 20:
+        print("-> Das Geraet wiederholt auch hier. Dann ist es seine "
+              "Eigenart und kein Mangel von Longpath.")
+    else:
+        print("-> Praktisch keine Wiederholungen. Dann liegt es NICHT am "
+              "Geraet, und Longpath macht etwas anders als dieses "
+              "Programm -- der Unterschied steckt im Verbindungsablauf.")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -335,6 +420,10 @@ def main():
     ap.add_argument("--vergleich", default="",
                     help="zweiter Mitschnitt: zeigt, welche Rahmen sich "
                          "zwischen beiden unterscheiden (z. B. RX2 ein/aus)")
+    ap.add_argument("--wiederholungen", action="store_true",
+                    help="zaehlt bytegleiche Wiederholungen im I/Q-Strom -- "
+                         "fuer die Frage, ob ExpertSDR2 bei 96 kHz auch "
+                         "wiederholt")
     ap.add_argument("--selftest", action="store_true",
                     help="mit einem selbst gebauten Mitschnitt pruefen, "
                          "dass das Werkzeug tut, was es soll")
@@ -344,6 +433,9 @@ def main():
         return
     if not args.pcap:
         ap.error("Entweder eine pcap-Datei oder --selftest.")
+    if args.wiederholungen:
+        wiederholungen(args.pcap, args.rechner or None)
+        return
     if args.vergleich:
         vergleiche(args.pcap, args.vergleich)
         return
