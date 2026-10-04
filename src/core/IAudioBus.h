@@ -35,6 +35,22 @@ public:
     virtual void close() = 0;
     virtual bool isOpen() const = 0;
 
+    // Lebt der Strom noch -- nicht nur: wurde er einmal geoeffnet?
+    //
+    // Am 2026-10-04 am Mac des Betreibers: Longpath hatte Ton (die
+    // Handy-App bekam ihn ueber TCI), aus den Lautsprechern kam nichts.
+    // Der Ausgang war 33 Minuten vor dem Verbinden geoeffnet worden, und
+    // AudioEngine::ensureSpeakersOpen() prueft mit isOpen() -- das ist bei
+    // PortAudioBus ein ZEIGERVERGLEICH (m_stream != nullptr). Stirbt der
+    // Strom darunter (Geraetewechsel, Ratenwechsel durch einen virtuellen
+    // Treiber wie BoomAudio/DeskFx, Ruhezustand), bleibt der Zeiger
+    // stehen, ensureSpeakersOpen kehrt sofort zurueck, und Longpath
+    // schreibt in einen toten Strom, ohne dass irgendwo etwas auffaellt.
+    //
+    // Vorgabe ist isOpen(), damit jeder Bus, der keine eigene Auskunft
+    // geben kann, sich verhaelt wie bisher.
+    virtual bool isAlive() const { return isOpen(); }
+
     // Producer side (RX taps). Interleaved PCM bytes. Returns bytes actually
     // written, or -1 on error. Must be callable from the audio thread.
     virtual qint64 push(const char* data, qint64 bytes) = 0;

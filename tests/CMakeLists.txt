@@ -1369,6 +1369,7 @@ longpath_add_test(tst_audio_engine_vax_tee)
 # Covers setMasterMuted / masterMuted / masterMutedChanged. Verifies the
 # rxBlockReady mute check gates ONLY the speakers push (VAX taps must keep
 # running so 3rd-party consumer apps don't hear the local monitor mute).
+longpath_add_test(tst_audio_engine_dead_speakers)
 longpath_add_test(tst_audio_engine_master_mute)
 
 # ── Phase 3O Sub-Phase 10 Task 10b: MasterOutputWidget ──────────────────────

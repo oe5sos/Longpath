@@ -297,6 +297,16 @@ void PortAudioBus::setConfig(const PortAudioConfig& cfg) {
     m_cfg = cfg;
 }
 
+// Lebt der Strom noch? Pa_IsStreamActive gibt 1 (laeuft), 0 (steht) oder
+// einen negativen Fehlercode -- zum Beispiel paDeviceUnavailable, wenn das
+// Geraet unter dem Strom weggezogen wurde. Nur 1 heisst "es kommt wirklich
+// etwas heraus"; alles andere behandeln wir als tot, damit der Aufrufer neu
+// oeffnet. Siehe die Begruendung an IAudioBus::isAlive().
+bool PortAudioBus::isAlive() const {
+    if (m_stream == nullptr) { return false; }
+    return Pa_IsStreamActive(m_stream) == 1;
+}
+
 bool PortAudioBus::open(const AudioFormat& format) {
     if (m_stream) {
         close();
