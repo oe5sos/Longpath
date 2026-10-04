@@ -912,3 +912,27 @@ Offen bleibt, ob Longpath das selbst abfangen kann — etwa, indem es nach
 einem Fehlversuch nicht sofort wieder sucht, sondern das Fenster
 abwartet und es dem Betreiber sagt. Das wäre die nächste Änderung an
 dieser Stelle.
+
+### Zweite Vermutung zu den Wiederholungen: auch widerlegt (2026-10-04)
+
+Der im Abschnitt oben als „nächster Versuch" notierte Gedanke war: wenn
+das Gerät **zwei** Ströme schickt, auch **zwei** Stille-Ströme
+zurückschicken (byte8 = 0x02, je ein Paket mit byte9 0x00 und 0x01)
+statt einem. Das ist etwas anderes als den Kopf zu spiegeln — dort ging
+es um ein Paket mit fremdem Kopf, hier um zwei kohärente Ströme.
+
+Eingebaut als Schalter, A/B über je 10 s bei je96:
+
+    eine Antwort:   111 / 115 / 101 Wiederholungen je Sekunde
+    zwei Antworten: 108 / 117 / 106
+
+Ununterscheidbar. Der Schalter wurde wieder entfernt.
+
+**Damit sind beide Vermutungen aus diesem Dokument erledigt.** Die rund
+110 bytegleichen Wiederholungen je Sekunde bei 96 kHz sind Verhalten des
+Geräts, auf das wir von hier aus keinen Hebel gefunden haben. Wer
+weitermacht, soll **nicht** noch einmal am Kopf der Blockantwort drehen
+— beides ist gemessen und negativ. Der nächste sinnvolle Schritt wäre
+ein Mitschnitt von ExpertSDR2 **bei 96 kHz**: wenn es dort auch
+wiederholt, ist es schlicht die Eigenart des Geräts und kein Mangel von
+Longpath.
