@@ -429,18 +429,55 @@ void SunSdrRadioConnection::sendDiscoveryBroadcast()
     // Rueckschleife gibt es keine Rundsendeadresse, also erreichte die
     // Anfrage ein Messgeraet auf 127.0.0.1 nie.
     if (!m_radioInfo.address.isNull()) {
-        m_controlSocket->writeDatagram(query, m_radioInfo.address, ctrlPort);
-        recordBytesSent(static_cast<qint64>(query.size()));
+        // Rueckgabewert pruefen: am 2026-10-04 stand in einem Mitschnitt
+        // waehrend eines Fehlversuchs KEIN einziges Paket an die Adresse
+        // des Geraets -- dieses hier ging nie hinaus, und nichts hat es
+        // gesagt. Eine halbe Stunde Suche spaeter war das der einzige
+        // Hinweis, der uebrig blieb.
+        const qint64 n = m_controlSocket->writeDatagram(
+            query, m_radioInfo.address, ctrlPort);
+        if (n < 0) {
+            qCWarning(lcSunSdr)
+                << "SunSdr: die Anfrage an" << m_radioInfo.address
+                << "ging NICHT hinaus:" << m_controlSocket->errorString();
+        } else {
+            recordBytesSent(n);
+        }
+    } else {
+        qCWarning(lcSunSdr)
+            << "SunSdr: keine Adresse im Geraeteeintrag -- es geht nur "
+               "der Rundruf hinaus. Antwortet das Geraet nicht, fehlt "
+               "hier der direkte Weg.";
     }
 
+    int rundrufe = 0;
     for (const QNetworkInterface& iface : QNetworkInterface::allInterfaces()) {
         if (!(iface.flags() & QNetworkInterface::IsUp)) { continue; }
         for (const QNetworkAddressEntry& entry : iface.addressEntries()) {
             const QHostAddress bcast = entry.broadcast();
             if (bcast.isNull()) { continue; }
-            m_controlSocket->writeDatagram(query, bcast, ctrlPort);
-            recordBytesSent(static_cast<qint64>(query.size()));
+            const qint64 nb =
+                m_controlSocket->writeDatagram(query, bcast, ctrlPort);
+            if (nb < 0) {
+                qCWarning(lcSunSdr)
+                    << "SunSdr: Rundruf an" << bcast << "ging NICHT "
+                       "hinaus:" << m_controlSocket->errorString();
+            } else {
+                recordBytesSent(nb);
+                ++rundrufe;
+            }
         }
+    }
+
+    // Ohne eine einzige Rundsendeadresse kommt die Anfrage nur an das
+    // Geraet, das im Eintrag steht -- und wenn dort nichts steht, nirgends.
+    if (rundrufe == 0) {
+        qCWarning(lcSunSdr)
+            << "SunSdr: keine Schnittstelle hatte eine Rundsendeadresse -- "
+               "die Suche ging nur direkt hinaus.";
+    } else {
+        qCDebug(lcSunSdr) << "SunSdr: Suche hinaus ueber" << rundrufe
+                          << "Rundsendeadresse(n)";
     }
 }
 
