@@ -2072,6 +2072,50 @@ private slots:
         QCOMPARE(conn.stromModusForTest(), 0);
     }
 
+    // Am 2026-10-04 an der echten QRP gefunden: die Oberflaeche stellt
+    // 96 kHz ein, Longpath meldet "Connecting with sampleRate= 96000" --
+    // und das Geraet streamt weiter mit 48 (Stromkopf 0100, 240
+    // Nummern/s). WDSP lief also auf 96 kHz, die Daten kamen mit 48.
+    //
+    // Ursache: RadioModel schiebt setSampleRate AUSDRUECKLICH VOR
+    // connectToRadio (eigener Kommentar dort: sonst liest composeEp2Frame
+    // die Vorgaben) -- und der Sitzungs-Reset in connectToRadio hat die
+    // Rate danach wieder auf die Umgebungsvorgabe zurueckgesetzt.
+    //
+    // Die Prueflinie oben (setSampleRateStelltDenStromstartRahmenUm) hat
+    // das nicht gefangen, weil sie in der Reihenfolge prueft, die GEHT,
+    // nicht in der, die die Anwendung nimmt.
+    void rateVorDemVerbindenUeberlebtDenSitzungsReset()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+
+        // Genau die Reihenfolge aus RadioModel::connectToRadio.
+        conn.setSampleRate(96000);
+        QCOMPARE(conn.stromModusForTest(), 2);   // ZweiStroemeJe96
+        conn.connectToRadio(someQrpInfo());
+
+        // Vor der Behebung stand hier wieder 0 -- und der Stromstart-Rahmen
+        // ging mit 48 kHz hinaus, obwohl die App 96 angesagt hatte.
+        QCOMPARE(conn.stromModusForTest(), 2);
+    }
+
+    // Dasselbe fuer die Zahl der Empfaenger: derselbe Reset setzt sie auf 1.
+    void empfaengerzahlVorDemVerbindenUeberlebtDenSitzungsReset()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+
+        conn.setActiveReceiverCount(2);
+        QCOMPARE(conn.aktiveEmpfaengerForTest(), 2);
+        conn.connectToRadio(someQrpInfo());
+        QCOMPARE(conn.aktiveEmpfaengerForTest(), 2);
+    }
+
     // ── Mikrofon-PTT am Geraet ─────────────────────────────────────────
     //
     // Die zweite Empfangsluecke, geschlossen ohne Protokollwissen: der

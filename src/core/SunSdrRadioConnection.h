@@ -1165,6 +1165,7 @@ public:
     quint64 kanalPaketeForTest(int k) const
     { return (k >= 0 && k < kMaxKanaele) ? m_kanal[k].pakete : 0; }
     int stromModusForTest() const { return int(m_stromModus); }
+    int aktiveEmpfaengerForTest() const { return m_aktiveEmpfaenger; }
     quint64 stoppGeschicktForTest() const { return m_stoppGeschickt; }
     quint64 kanalVerworfenForTest(int k) const
     { return (k >= 0 && k < kMaxKanaele) ? m_kanal[k].verworfen : 0; }

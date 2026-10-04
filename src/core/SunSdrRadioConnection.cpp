@@ -271,10 +271,25 @@ void SunSdrRadioConnection::connectToRadio(const RadioInfo& info)
     m_lastSeq = 0;
     m_seqRing.clear();
     m_seqOutOfPlace = 0;
-    // Die Umgebung ist nur die VORBELEGUNG fuer diese Sitzung; setSampleRate
-    // stellt danach um.
-    m_stromModus = stromModusAusUmgebung();
-    m_aktiveEmpfaenger = 1;
+    // Rate und Empfaengerzahl werden hier ABSICHTLICH NICHT
+    // zurueckgesetzt. RadioModel::connectToRadio schiebt beide
+    // ausdruecklich VOR dem Verbindungsaufruf in die Warteschlange des
+    // Verbindungsfadens (eigene Begruendung dort: sonst liest der
+    // Rahmenbau die Vorgaben statt der Wahl des Betreibers) -- ein Reset
+    // an dieser Stelle wirft also genau das weg, was gerade gesetzt
+    // wurde.
+    //
+    // Am 2026-10-04 an der echten QRP so gesehen: die App meldete
+    // "Connecting with sampleRate= 96000", und das Geraet streamte
+    // weiter mit 48 (Stromkopf 0100, 240 Nummern/s). WDSP lief auf
+    // 96 kHz, die Daten kamen mit 48 -- genau der Fall, vor dem die
+    // Warnung in setSampleRate selbst steht.
+    //
+    // Die Umgebung bleibt eine Vorbelegung, aber nur wenn sie
+    // tatsaechlich gesetzt ist; sonst gilt, was der Aufrufer wollte.
+    if (qEnvironmentVariableIsSet("LONGPATH_SUNSDR_STROMMODUS")) {
+        m_stromModus = stromModusAusUmgebung();
+    }
     m_stoppGeschickt = 0;
     m_iqSeqWndFrames = 0;
     m_iqSeqWndRepeats = 0;
