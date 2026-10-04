@@ -7,6 +7,7 @@
 #include "core/AudioDeviceConfig.h"
 #include "core/BuildIdentity.h"
 #include "core/CNumericLocale.h"
+#include "core/LogDatei.h"
 #include "core/MacMicPermission.h"
 #include "core/audio/RealtimeAudioPriority.h"
 #include "core/RadioConnection.h"
@@ -39,13 +40,17 @@
 #include <QDir>
 #include <QFile>
 #include <QDateTime>
-#include <QTextStream>
 #include <QStandardPaths>
 #include <QRegularExpression>
 #include <QStringList>
 #include "core/SupportBundle.h"
 
 static QFile* s_logFile = nullptr;
+
+// Die Schreibstelle liegt in core/LogDatei.{h,cpp} — mit Schloss, mit einem
+// einzigen Schreibaufruf, und dort pruefbar (main.cpp ist nicht Teil der
+// Pruefstaende). Die Begruendung samt der sechs zerschriebenen Zeilen vom
+// 2026-10-03 steht im Kopf von LogDatei.h.
 
 // Von einer AetherSDR-Sichtung angestossen (2026-09-05): dort gibt es ein
 // umfangreiches SystemInventory, das aber an ihre eigene Whisper/ggml-
@@ -104,12 +109,7 @@ static void messageHandler(QtMsgType type, const QMessageLogContext& ctx, const 
     const QString line = QString("[%1] %2: %3\n")
         .arg(QDateTime::currentDateTime().toString("HH:mm:ss.zzz"), label, safeMsg);
 
-    if (s_logFile && s_logFile->isOpen()) {
-        QTextStream ts(s_logFile);
-        ts << line;
-        ts.flush();
-    }
-    fprintf(stderr, "%s", line.toLocal8Bit().constData());
+    Longpath::Log::schreibe(line);
 
 #ifndef Q_OS_WIN
     // Diagnostic aid (2026-08-11): one field warning has resisted every
@@ -126,12 +126,7 @@ static void messageHandler(QtMsgType type, const QMessageLogContext& ctx, const 
             for (int i = 0; i < n; ++i) {
                 const QString bt = QStringLiteral("  [bt] %1\n")
                                        .arg(QString::fromLocal8Bit(syms[i]));
-                if (s_logFile && s_logFile->isOpen()) {
-                    QTextStream ts(s_logFile);
-                    ts << bt;
-                    ts.flush();
-                }
-                fprintf(stderr, "%s", bt.toLocal8Bit().constData());
+                Longpath::Log::schreibe(bt);
             }
             free(syms);
         }
@@ -292,6 +287,10 @@ int main(int argc, char* argv[])
     s_logFile = new QFile(logPath);
     if (s_logFile->open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text)) {
         s_logFile->setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+        // Erst die Datei bekanntgeben, dann den Umleiter setzen: andersherum
+        // gaebe es ein Fenster, in dem Meldungen schon durch den Umleiter
+        // laufen, aber noch nirgends landen.
+        Longpath::Log::setzeDatei(s_logFile);
         qInstallMessageHandler(messageHandler);
 
         const QString symlink = logDir + "/longpath.log";
@@ -542,6 +541,10 @@ int main(int argc, char* argv[])
     // else in this TU) could already be destroyed. Belt-and-braces
     // for the leaked-regex fix in redactPii().
     qInstallMessageHandler(nullptr);
+    // Umgekehrte Reihenfolge wie beim Oeffnen: erst den Umleiter abhaengen,
+    // dann die Datei abmelden. Ein Faden, der jetzt noch schreibt, findet
+    // keine Datei mehr vor — statt in eine geschlossene zu schreiben.
+    Longpath::Log::setzeDatei(nullptr);
     if (s_logFile) {
         s_logFile->close();
         // Intentionally leaked — Qt may still try to log between
