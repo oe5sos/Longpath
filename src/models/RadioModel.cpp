@@ -8822,7 +8822,21 @@ void RadioModel::connectToRadio(const RadioInfo& info)
     // setActiveReceiverCount on P2 here would enable DDC0..N-1 on top of
     // the DDC2 enable that connectToRadio sets, leaving extra DDCs active.
     // Deferred to Phase 3F (multi-panadapter) which ports UpdateDDCs().
-    if (info.protocol == ProtocolVersion::Protocol1) {
+    //
+    // Die SunSDR gehoert auf dieselbe Seite wie P1 und zwar seit dem
+    // 2026-10-04 zwingend: ihr setActiveReceiverCount() setzt keine DDCs
+    // frei, sondern waehlt den Stromstart-Modus (ein Strom oder zwei,
+    // SunSdrProtocol.h). Ohne diesen Push bleibt im Treiber stehen, was
+    // die VORIGE Sitzung gesetzt hat -- eine Sitzung mit zwei Empfaengern
+    // vererbt den zweiten Strom an die naechste, und ueber die Oberflaeche
+    // laesst sich der zweite Empfaenger beim Verbinden gar nicht
+    // einschalten, nur nachtraeglich.
+    //
+    // Davor hat der Sitzungs-Reset im Treiber das verdeckt (er setzte auf
+    // 1 zurueck); der musste weg, weil er auch die Rate wegwarf, die
+    // RadioModel kurz vorher gesetzt hatte -- siehe 88844941.
+    if (info.protocol == ProtocolVersion::Protocol1
+        || info.protocol == ProtocolVersion::SunSdr) {
         QMetaObject::invokeMethod(m_connection, [conn = m_connection, activeRxCount]() {
             conn->setActiveReceiverCount(activeRxCount);
         });
