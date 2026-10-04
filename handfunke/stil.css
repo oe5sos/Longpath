@@ -403,3 +403,48 @@ footer .warn{color:var(--warn)}
   background:rgba(18,19,23,.6);color:var(--text-inactive);box-shadow:none;
   font-size:var(--f-caption);letter-spacing:.1em;text-transform:uppercase}
 #qsoBlatt button:disabled{opacity:.45}
+
+
+/* ── Die Halteleiste (Entwurf 1, gewaehlt 2026-10-04) ─────────────────────
+   Gedrueckt halten nimmt auf, loslassen hoert auf. Der Finger ist die
+   Sicherung: faellt das Telefon aus der Hand, endet es von selbst, und es
+   bleibt kein Zustand uebrig, der haengen koennte.
+
+   KEIN Messing, obwohl die Taste spaeter einmal die Sendetaste wird.
+   Messing ist die Sendefarbe (--measured), und solange hier nichts getastet
+   wird, waere Messing eine Behauptung. Die Farbe kommt mit dem Tasten. */
+.mikrow{margin:8px 12px 0;display:flex;flex-direction:column;gap:7px}
+.mikhalt{
+  height:58px;border-radius:9px;border:1px solid var(--border);
+  background:linear-gradient(var(--glass-btn-top),var(--glass-btn-bot));
+  color:var(--text2);display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:2px;cursor:pointer;
+  box-shadow:inset 0 1px 0 var(--light),0 2px 0 rgba(0,0,0,.45);
+  -webkit-user-select:none;user-select:none;touch-action:none;
+}
+.mikhalt b{font-weight:700;letter-spacing:.14em;font-size:var(--f-sub)}
+.mikhalt small{font-size:var(--f-caption);font-weight:600;letter-spacing:.1em;
+               opacity:.72}
+/* Gedrueckt: deutlich sichtbar, aber ohne Farbwechsel — der Unterschied
+   zwischen "ich halte" und "es sendet" muss erhalten bleiben. */
+.mikhalt.haelt{
+  background:linear-gradient(#2c2d33,#1d1e23);
+  border-color:var(--accent);color:var(--text);
+  box-shadow:inset 0 2px 5px rgba(0,0,0,.6);
+}
+.mikhalt[disabled]{opacity:.45;cursor:default}
+
+/* Der Pegel. Ohne ihn weiss am Telefon niemand, ob das Mikrofon etwas
+   hoert — und das ist die erste Frage, lange bevor getastet wird. */
+.pegel{position:relative;height:8px;border-radius:4px;overflow:hidden;
+       background:var(--inset);border:1px solid var(--inset-border)}
+.pegel i{position:absolute;left:0;top:0;bottom:0;width:0;
+         background:linear-gradient(90deg,var(--ok),var(--measured) 72%,var(--danger));
+         transition:width .06s linear}
+/* Die Spitze bleibt kurz stehen — ein Balken, der nur mitzittert, zeigt
+   Uebersteuerung nie lange genug, um sie zu bemerken. */
+.pegel u{position:absolute;top:0;bottom:0;width:2px;background:var(--text);
+         opacity:.75;left:0;transition:left .18s ease-out}
+.mikmeldung{font:600 var(--f-caption)/1.3 var(--mono);letter-spacing:.08em;
+            color:var(--text-inactive);text-align:center;min-height:13px}
+.mikmeldung.warn{color:var(--warn)}
