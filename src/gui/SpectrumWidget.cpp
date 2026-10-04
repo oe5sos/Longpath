@@ -7890,7 +7890,11 @@ void SpectrumWidget::drawSpotMarkers(QPainter& p, const QRect& specRect)
 // From AetherSDR src/gui/SpectrumWidget.cpp:4635-4672 [@0cd4559]
 void SpectrumWidget::showSpotClusterPopup(const SpotCluster& cluster, const QPoint& globalPos)
 {
-    auto* menu = new QMenu(this);
+    // Am Fenster, nicht am Panadapter (2026-09-30): der Panadapter ist
+    // nativ, und ein Menue daran bekam von Qt keinen Fensterbezug („...
+    // must be a top level window."). Aufgeraeumt wird weiter mit ihm.
+    auto* menu = new QMenu(window());
+    connect(this, &QObject::destroyed, menu, &QObject::deleteLater);
     // ── Ein Menü ist Bedienung, kein Messwert ────────────────────────
     //
     // OE5SOS, 2026-08-15: alle fünf Werte, auch die zwei Textfarben.
@@ -8922,7 +8926,8 @@ void SpectrumWidget::mousePressEvent(QMouseEvent* event)
                 // popup() instead of exec() — no nested event loop
                 // inside mousePressEvent on the native QRhi surface
                 // (finding #3; same treatment as the spot menu below).
-                QMenu* menu = new QMenu(this);
+                QMenu* menu = new QMenu(window());   // am Fenster, siehe showSpotClusterPopup()
+                connect(this, &QObject::destroyed, menu, &QObject::deleteLater);
                 menu->setAttribute(Qt::WA_DeleteOnClose);
                 buildNotchContextMenu(hitNotch, *menu);
                 connect(menu, &QMenu::aboutToHide, this, [this]() {
@@ -8974,7 +8979,8 @@ void SpectrumWidget::mousePressEvent(QMouseEvent* event)
                 // menu. popup() returns immediately; the lambdas
                 // capture by value and use `this` as context object,
                 // so they stay valid for the menu's async lifetime.
-                QMenu* menu = new QMenu(this);
+                QMenu* menu = new QMenu(window());   // am Fenster, siehe showSpotClusterPopup()
+                connect(this, &QObject::destroyed, menu, &QObject::deleteLater);
                 menu->setAttribute(Qt::WA_DeleteOnClose);
                 connect(menu, &QMenu::aboutToHide, this, [this]() {
                     m_contextMenuClosedMs = QDateTime::currentMSecsSinceEpoch();

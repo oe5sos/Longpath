@@ -323,7 +323,8 @@ void QsoRecorderApplet::buildUI()
         const QString file = item->data(Qt::UserRole).toString();
         if (file.isEmpty()) { return; }
 
-        ScopedChildWidget<QMenu> menuOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+        ScopedChildWidget<QMenu> menuOwner(window());   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+        const QPointer<QsoRecorderApplet> self(this);   // Menue am Fenster: ein nativer Vorfahr gab ihm keinen Fensterbezug (2026-09-30)
         QMenu& menu = *menuOwner.get();
         menu.setStyleSheet(QString::fromLatin1(kPopupMenu));
         QAction* listen = menu.addAction(
@@ -337,7 +338,7 @@ void QsoRecorderApplet::buildUI()
         const QAction* chosen = menu.exec(m_list->mapToGlobal(pos));
         // Das Elternteil kann waehrend exec() gestorben sein — dann ist
         // auch das Menue weg und `this` eine Leiche. Siehe ScopedChildWidget.h.
-        if (!menuOwner) { return; }
+        if (!menuOwner || !self) { return; }
         if (chosen == listen) {
             if (m_player.isPlaying() && m_player.currentPath() == file) {
                 m_player.stop();

@@ -4964,6 +4964,9 @@ longpath_add_test(tst_window_close_stays_closed)
 # -- Rechtsklick-Menues am Fenster, nicht am nativen Feld (2026-09-27):
 #    „ProfileRailClassWindow must be a top level window" im Protokoll. --
 longpath_add_test(tst_menus_of_native_fields)
+# -- Dasselbe im ECHTEN Hauptfenster (2026-09-30): Panadapter, Overlay-
+#    „…", Behaelter, Lautsprecher, Applet-Spalte, Globus. --
+longpath_add_test(tst_real_menus_hang_on_the_window)
 # -- Formatfuellend + Werkzeugfenster passen auf den Schirm (2026-09-27):
 #    Kanalzug 980x1000 auf 849 px Hoehe, unten hinter dem Dock. --
 longpath_add_test(tst_tool_windows_fit_the_screen)

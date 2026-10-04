@@ -233,7 +233,8 @@ void FrequencyApplet::toggleKiwiDisplay()
 
 void FrequencyApplet::contextMenuEvent(QContextMenuEvent* ev)
 {
-    ScopedChildWidget<QMenu> menuOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+    ScopedChildWidget<QMenu> menuOwner(window());   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+    const QPointer<FrequencyApplet> self(this);   // Menue am Fenster: ein nativer Vorfahr gab ihm keinen Fensterbezug; Menuegrau statt des geerbten #08080a (2026-09-30)
     QMenu& menu = *menuOwner.get();
 
     // Haken, keine Punkte: die beiden Zeilen sind unabhaengig. Ein
@@ -298,7 +299,7 @@ void FrequencyApplet::contextMenuEvent(QContextMenuEvent* ev)
     menu.exec(ev->globalPos());
     // Das Elternteil kann waehrend exec() gestorben sein — dann ist
     // auch das Menue weg und `this` eine Leiche. Siehe ScopedChildWidget.h.
-    if (!menuOwner) { return; }
+    if (!menuOwner || !self) { return; }
     ev->accept();
 }
 
