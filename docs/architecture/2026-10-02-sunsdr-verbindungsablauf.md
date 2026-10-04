@@ -958,3 +958,36 @@ zwei Stille-Ströme, Quittung vor dem Verwerfen. Die Wiederholungen bei
 96 kHz haben von hier aus keinen Hebel. Der nächste Schritt ist ein
 Mitschnitt von ExpertSDR2 **bei 96 kHz** — wiederholt es dort auch, ist
 es die Eigenart des Geräts.
+
+### Korrektur: `kill -9` ist NICHT die Ursache (2026-10-04, abends)
+
+Der Abschnitt oben („der Aussetzer dauert etwa eine Minute — und kommt
+vom `kill -9`") ist in der Ursache **falsch**. Die Zahlen darin stimmen,
+aber sie stammen aus **je einem** Durchgang, und daraus wurde eine
+Regel gemacht.
+
+Nachgemessen, drei Durchgänge hintereinander: verbinden, mitten im Strom
+`kill -9`, sofort wieder verbinden —
+
+    Durchgang 1: sofort wieder da
+    Durchgang 2: sofort wieder da
+    Durchgang 3: sofort wieder da
+
+Dazu ein vierter über die ganze Anwendung (verbinden, `kill -9`, neue
+Instanz, verbinden): **6 Sekunden**.
+
+**Was wirklich gilt:**
+
+- Der Aussetzer tritt **manchmal** auf — belegt zweimal am 2026-10-04
+  (Martins Vormittag, und einmal bei mir zwischen 17:28 und 17:34).
+- Er löst sich **von selbst**, gemessen innerhalb einer Minute.
+- **Die Ursache ist unbekannt.** `kill -9` löst ihn nicht zuverlässig
+  aus, ein sauberes Beenden schließt ihn nicht aus.
+
+Das ändert nichts an der Behebung: die selbsttätige Wiederholung der
+Suche (`43747ccc`) hilft unabhängig davon, warum gesperrt wird — sie
+wartet die Sperre einfach ab. Es ändert nur, was wir behaupten dürfen.
+
+Zweimal an einem Tag habe ich aus einer Einzelmessung eine Ursache
+gemacht (vorher: die Wiederholungen bei 96 kHz). Wer hier weitermacht:
+eine Ursache braucht mehr als einen Durchgang.
