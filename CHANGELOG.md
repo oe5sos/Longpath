@@ -2,8 +2,33 @@
 
 ## [Unreleased]
 
-Zwei Tage nach 0.6.5, und sie haben ein Thema: **die Anzeige darf nicht
-behaupten, was nicht mehr gilt** — und das Log muss sagen koennen, was war.
+## [0.6.6] - 2026-10-04
+
+Zwei Tage nach 0.6.5, 103 Commits, und sie haben ein Thema: **eine
+Anzeige, die schweigt, ist so schlimm wie eine, die luegt.**
+
+Vom Telefon laesst sich jetzt **loggen** — ein eigener TCI-Befehl traegt
+das QSO in dasselbe Logbuch ein, das die Oberflaeche schreibt, und holt
+Frequenz, Band, Betriebsart und Zeit selbst aus der aktiven Scheibe. Der
+**Sendeton** ist bis zum fertigen Rahmen gebaut, samt Haltetaste und
+Pegelbalken; getastet wird davon nichts, und das ist Absicht.
+
+Dahinter liegt der Befund des Tages: am Telefon fehlen **Mikrofon,
+AudioWorklet und Opus aus EINEM Grund** — `isSecureContext` ist dort
+`false`. Drei Posten, die als drei verschiedene Eigenheiten in den
+Unterlagen standen. Das Zertifikat dafuer legt jetzt ein Skript an, der
+Seitenserver spricht `https`, und die TCI-Bruecke beendet TLS auf
+demselben Port wie bisher.
+
+Und eine Reihe Stellen, die etwas wussten und nichts sagten: die
+**Einstellungs-Hygiene** prueft bei jedem Verbinden und meldete es
+niemandem; **sieben Audio-Geraete** wurden ohne Zeitlimit geoeffnet und
+konnten die ganze Oberflaeche anhalten; ein **gescheiterter Versand**
+meldete "Unable to send a message" und verschwieg den Grund — jetzt nennt
+er ihn, auf Windows ueber `WSAGetLastError()`, weil Winsock `errno` gar
+nicht setzt; ein **abgelehnter Sendewunsch** wurde stumm verworfen, was
+auf einer Fernbedienung von einem Defekt nicht zu unterscheiden ist. Dazu
+264 fremde Warnungen aus dem Linux-Bau, die die eigenen zudeckten.
 
 ### Hinzugefuegt
 
