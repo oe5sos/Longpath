@@ -7,6 +7,26 @@ behaupten, was nicht mehr gilt** — und das Log muss sagen koennen, was war.
 
 ### Hinzugefuegt
 
+- **Loggen vom Telefon, ganz** (#184, #185). Ein eigener TCI-Befehl
+  `log_qso:<rufzeichen>[,<rst gesendet>[,<rst empfangen>]];` traegt ein QSO
+  in dasselbe Logbuch ein, das die Oberflaeche schreibt — Frequenz, Band,
+  Betriebsart und Zeit holt der Server sich selbst aus der aktiven Scheibe,
+  damit vom Telefon nur kommt, was dort wirklich bekannt ist. Dazu das
+  QSO-Blatt (Entwurf A von vier): Rufzeichen, zweimal RST, drei Zeilen
+  "automatisch". Gesperrt wie jeder andere Netzbefehl — Token noetig,
+  `TciAllowRemoteLog` ab Werk an, aber abschaltbar.
+- **Sendeton vom Telefon: der Rahmenbau** (#186) und **die Halteleiste**
+  — mu-law nach G.711, Ratenwandlung mit uebertragenem Rest, TCI-Binaerkopf
+  genau so, wie der Server ihn liest. **Nichts davon kann tasten**: es gibt
+  weder `trx:` noch `tune:`, und das bleibt so bis zur ausdruecklichen
+  Freigabe an der Dummy-Last. Vier Entwuerfe fuer die Sendetaste lagen vor,
+  gewaehlt wurde die **Haltetaste** (#190) — der Finger ist die Sicherung,
+  und was ohne Finger endet, kann nicht haengenbleiben.
+- **Handfunke: der Tonvorrat wandert nicht mehr** (#181). Er lief mit der
+  Zeit aus dem Ruder und wurde erst am harten Deckel zurechtgerissen — ein
+  hoerbarer Sprung. Jetzt wird der Leseschritt um hoechstens 0,3 Promille
+  nachgezogen; der Deckel bleibt als Netz darunter.
+
 - **Handfunke: ein Zertifikat — und damit ueberhaupt erst ein Mikrofon.**
   Der naechste Baustein beim Senden waere die Mikrofonaufnahme gewesen;
   geschrieben wurde davon keine Zeile, weil `getUserMedia` **[SecureContext]**
@@ -22,6 +42,25 @@ behaupten, was nicht mehr gilt** — und das Log muss sagen koennen, was war.
   Protokoll gesprochen wird, steht im ersten Byte. Der alte Weg ueber `http`
   und `ws://` bleibt unveraendert offen. Am Geraet ist das noch nicht
   geprueft; `kann-das-telefon.html` beantwortet es in einem Blick.
+- **Die Einstellungs-Hygiene prueft bei jedem Verbinden — und sagte es
+  niemandem** (#182). Sie lief seit Monaten, ihr Ergebnis ging nirgendwo
+  hin. Eine Pruefung, deren Ergebnis niemand sieht, ist keine Pruefung.
+- **Ein Geraet, das nicht aufmacht, nimmt nicht mehr alles mit** (#176).
+  `AudioEngine::start()` oeffnet sieben Geraete nacheinander, und zwar in
+  der verschachtelten Ereignisschleife des Verbindungsaufbaus — blieb eines
+  stehen, stand die ganze Oberflaeche. Jetzt oeffnet jedes auf eigenem Faden
+  mit 5000 ms Frist (gemessener Normalfall: 20 ms, also zwei Zehnerpotenzen
+  Abstand), und Schrittmarken `[AudioStart:Step] n/7` nennen im Hangfall das
+  Geraet, statt eine stumme Luecke zu hinterlassen. Die Marke selbst stand
+  anfangs als "3 /7" da, weil Qt zwischen gestreamten Werten ein Leerzeichen
+  setzt (#187).
+- **264 fremde Warnungen aus dem Linux-Bau** (#177, #178), die die eigenen
+  zudeckten. Eine Warnung, die in jedem gesunden Lauf steht, verdeckt die
+  eine, auf die es ankommt.
+- **Ein Messlauf fuer die dBm-Skala** (#180), statt sie anzuschauen.
+- **Entwurf: Senden und Loggen vom Telefon** (#183) — der Gesamtweg, bevor
+  davon etwas gebaut wurde.
+
 - **Handfunke: die Seite sagt, wenn die Station sendet** (#170). `trx:` und
   `tune:` wurden seit dem ersten Tag mitgelesen und nirgends verwendet — die
   Seite wusste es und schwieg. Jetzt steht dort, wo sonst „SENDEN / NUR IN DER
