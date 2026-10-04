@@ -15,6 +15,7 @@
 #include "SunSdrRadioConnection.h"
 
 #include <QLoggingCategory>
+#include <QRegularExpression>
 #include <QStringList>
 
 #include <algorithm>
@@ -237,6 +238,40 @@ void SunSdrRadioConnection::connectToRadio(const RadioInfo& info)
     m_qCheckTimer.invalidate();
     m_qNonZeroInWindow = 0;
     m_qSamplesInWindow = 0;
+    // Das Inventar gehoert zur Sitzung, gleiche Ueberlegung wie bei
+    // m_radioAddr: eine Rahmensorte aus der vorigen Verbindung darf im
+    // Bericht der neuen nicht als "schon gesehen" dastehen.
+    m_controlInventory.clear();
+    m_streamStateInventory.clear();
+    m_controlFramesSeen = 0;
+    m_controlFramesUnparsed = 0;
+    m_inventoryFullWarned = false;
+    m_inventoryReported = false;
+    m_offeneRahmen.clear();
+    m_quittungenGesehen = 0;
+    m_rahmenOhneQuittung = 0;
+    m_letzteAnschlagMeldungMs = -1;
+    m_anschlagProben = 0;
+    m_anschlagMeldungen = 0;
+    m_rahmenWiederholt = 0;
+    m_inventoryClock.invalidate();
+    m_lastStreamStateValid = false;
+    // Die Folgenummern-Zaehlung gehoert zur Sitzung: die erste Nummer der
+    // neuen Verbindung darf nicht gegen die letzte der alten gerechnet
+    // werden, sonst steht eine Luecke im Bericht, die es nie gab.
+    m_seqSeen = false;
+    m_lastSeq = 0;
+    m_seqDeltas.clear();
+    m_iqSeqWndFrames = 0;
+    m_iqSeqWndRepeats = 0;
+    m_iqSeqWndLost = 0;
+    m_iqSeqWndEvents = 0;
+    m_iqSeqWndBackwards = 0;
+    m_iqSeqWndClock.invalidate();
+    m_iqSeqCleanClock.invalidate();
+    m_lastGapSignalMs = -1;
+    m_benchFramesSent = 0;
+    m_benchFramesRejected = 0;
     // Step 3: keep the pacer's own profile pointer (defaulted to
     // kProfileQrp at construction — see SunSdrTxPacer.h's own comment)
     // in sync with whatever this connection actually resolved, so the
@@ -420,6 +455,13 @@ void SunSdrRadioConnection::onConnectTimeout()
 
 void SunSdrRadioConnection::disconnect()
 {
+    // Zuerst der Bericht, dann das Aufraeumen: nach connectToRadio() ist
+    // das Inventar leer, und ein Betreiber, der eine Stunde gefunkt hat,
+    // soll das Ergebnis im Log finden, ohne es waehrenddessen abfragen zu
+    // muessen. Nur wenn ueberhaupt etwas angekommen ist -- eine Zeile
+    // "nichts aufgenommen" bei jedem Programmende waere Laerm.
+    berichteMithoeren();
+
     m_running = false;
     m_awaitingBeacon = false;  // a late beacon reply after this must not
                                // reopen the RX gate — see onControlReadyRead()
@@ -537,8 +579,7 @@ void SunSdrRadioConnection::setReceiverFrequency(int receiverIndex, quint64 freq
     // Nur fuer die QRP -- nur dort gemessen.
     if (m_profile->variant == SunSdr::Variant::Qrp) {
         const QByteArray ddc = ddcFrequencyFrame(0, frequencyHz);
-        m_controlSocket->writeDatagram(ddc, m_radioAddr, m_profile->defaultCtrlPort);
-        recordBytesSent(static_cast<qint64>(ddc.size()));
+        sendeSteuerrahmen(ddc, "DDC-Frequenz 0x07");
     }
 
     // Pruefsumme jetzt gerechnet (SunSdr::withControlFrameCrc) -- vorher
@@ -548,8 +589,7 @@ void SunSdrRadioConnection::setReceiverFrequency(int receiverIndex, quint64 freq
     frame += SunSdr::encodeFrequencyPayload(frequencyHz);
     frame = SunSdr::withControlFrameCrc(frame);
 
-    m_controlSocket->writeDatagram(frame, m_radioAddr, m_profile->defaultCtrlPort);
-    recordBytesSent(static_cast<qint64>(frame.size()));
+    sendeSteuerrahmen(frame, "VFO-Frequenz 0x08");
     qCInfo(lcSunSdr) << "SunSdr: setReceiverFrequency() ->" << frequencyHz << "Hz (DDC 0x07 + VFO 0x08)";
 }
 
@@ -636,8 +676,7 @@ void SunSdrRadioConnection::setPreampModeIndex(int preampModeIdx)
                          << ") -- no such preamp step on the QRP, not sending";
         return;
     }
-    m_controlSocket->writeDatagram(frame, m_radioAddr, m_profile->defaultCtrlPort);
-    recordBytesSent(static_cast<qint64>(frame.size()));
+    sendeSteuerrahmen(frame, "Vorverstaerker 0x04");
     qCInfo(lcSunSdr).noquote() << "SunSdr: preamp step ->"
                                << frame.mid(18, 1).toHex() << "(mode index"
                                << preampModeIdx << ")";
@@ -711,8 +750,7 @@ void SunSdrRadioConnection::setAttenuator(int dB)
         return;
     }
 
-    m_controlSocket->writeDatagram(frame, m_radioAddr, m_profile->defaultCtrlPort);
-    recordBytesSent(static_cast<qint64>(frame.size()));
+    sendeSteuerrahmen(frame, "Daempfung 0x04");
     qCInfo(lcSunSdr) << "SunSdr: setAttenuator() ->" << dB << "dB";
 }
 
@@ -870,13 +908,28 @@ void SunSdrRadioConnection::setActiveReceiverCount(int count)
 
 void SunSdrRadioConnection::setSampleRate(int sampleRate)
 {
-    // The QRP's native rate is fixed at 312,500 Hz (design doc "IQ
-    // stream" section) — not negotiated. A caller requesting a
-    // different rate isn't wrong to ask (Longpath's resampling
-    // infrastructure could in principle adapt), but this connection
-    // has nothing to send to change it on the wire, so the request is
-    // simply not actionable here.
-    Q_UNUSED(sampleRate);
+    // 48 000 Hz, am Geraet gemessen (2026-09-23/24): 240 Bloecke je
+    // Sekunde zu 200 Probenpaaren. Hier stand bis zum 2026-10-02 noch
+    // "fixed at 312,500 Hz" -- diese Zahl war von der SunSDR2 DX
+    // abgeschrieben, fuer die QRP nie geprueft und ist widerlegt. Sie
+    // stehenzulassen heisst, dass der naechste Leser sie glaubt; die
+    // richtige Zahl steht in BoardCapabilities (kSunSdr2Qrp.sampleRates)
+    // und in longpath-qrp-48khz.
+    //
+    // Umstellen kann diese Verbindung die Rate nicht: welcher Opcode das
+    // tut, ist offen -- es braucht einen Mitschnitt, bei dem ExpertSDR2
+    // die Rate umstellt. Eine Anfrage auf etwas anderes wird darum
+    // protokolliert statt still verschluckt: sie ist nicht falsch
+    // gestellt, sie ist hier nur nicht ausfuehrbar, und wer im Log nach
+    // der Ursache einer unerwarteten Rate sucht, soll diese Zeile finden.
+    const double native = m_profile ? m_profile->rxNativeRateHz
+                                   : SunSdr::kProfileQrp.rxNativeRateHz;
+    if (double(sampleRate) != native) {
+        qCDebug(lcSunSdr) << "SunSdr: setSampleRate(" << sampleRate
+                          << ") nicht ausfuehrbar -- das Geraet laeuft auf"
+                          << native
+                          << "Hz, der Opcode zum Umstellen ist unbekannt";
+    }
 }
 
 void SunSdrRadioConnection::onControlReadyRead()
@@ -899,8 +952,26 @@ void SunSdrRadioConnection::feedControlDatagramForTest(
 void SunSdrRadioConnection::processControlDatagram(const QByteArray& data,
                                                      const QHostAddress& sender)
 {
-    if (!m_awaitingBeacon || !m_profile) {
-        return;  // handshake already done, or no session pending — drain only
+    if (!m_profile) {
+        return;  // no session pending — nothing to measure against
+    }
+
+    if (!m_awaitingBeacon) {
+        // Der Handschlag ist durch. Bis zum 2026-10-02 stand hier ein
+        // `return` mit der Begruendung "drain only" -- und damit hat
+        // dieser Treiber jeden Steuerrahmen weggeworfen, den die QRP im
+        // Betrieb von sich aus schickt. Jetzt wird er gezaehlt und
+        // beschrieben (siehe FrameTally im Kopf). Es wird nichts
+        // beantwortet und nichts gesendet: dieser Zweig liest nur.
+        //
+        // Fremde Absender bleiben draussen, gleiche Begruendung wie bei
+        // processStreamDatagram() -- der Steuerport wird mit
+        // ShareAddress gebunden, eine noch laufende Vorsitzung derselben
+        // QRP darf das Inventar nicht mit fuellen.
+        if (sender == m_radioAddr) {
+            noteControlFrame(data);
+        }
+        return;
     }
 
     // Beacon-reply shape (header comment; design doc "the
@@ -932,9 +1003,7 @@ void SunSdrRadioConnection::processControlDatagram(const QByteArray& data,
         sendBenchFrames(QStringLiteral("LONGPATH_SUNSDR_PRE"));
 
         const QByteArray stateSync = stateSyncFrameForTest();
-        m_controlSocket->writeDatagram(stateSync, m_radioAddr,
-                                        m_profile->defaultCtrlPort);
-        recordBytesSent(static_cast<qint64>(stateSync.size()));
+        sendeSteuerrahmen(stateSync, "Zustandsrahmen beim Verbinden");
 
         sendBenchFrames(QStringLiteral("LONGPATH_SUNSDR_EXTRA"));
     }
@@ -1033,9 +1102,18 @@ void SunSdrRadioConnection::processStreamDatagram(const QByteArray& data,
             data.size(), *m_profile, &hdr)) {
         return;
     }
+    // Vor dem Filter, nicht danach: der Opcode (0xFE Empfang / 0xFD
+    // Senden) und die beiden Zustandsbytes [8:9] sind das einzige, was
+    // die QRP waehrend des Betriebs ununterbrochen ueber sich selbst
+    // sagt. Sie hier wegzuwerfen, war der zweite Grund dafuer, dass
+    // dieser Treiber keine Messwerte kennt.
+    noteStreamState(hdr);
+
     if (hdr.opcode != SunSdr::kOpIqRxIdle) {
         return;  // TX-active frames don't apply to a receive-only connection
     }
+
+    auditStreamSeq(hdr.seq);
 
     if (blockReplyEnabled()) {
         replyToBlock(hdr.seq);
@@ -1121,6 +1199,9 @@ void SunSdrRadioConnection::processStreamDatagram(const QByteArray& data,
         reinterpret_cast<const quint8*>(data.constData()) + SunSdr::kIqHeaderSize,
         data.size() - SunSdr::kIqHeaderSize, &samples);
     if (samples.isEmpty()) { return; }
+
+    // Vor der Pegelanhebung weiter unten, siehe kAnschlagSchwelle.
+    pruefeAnschlag(samples);
 
     // TEMPORARY diagnostic, 2026-09-03 (bench session, real antenna,
     // ExpertSDR2 shows the same "waterfall but no station audio" symptom
@@ -1265,6 +1346,11 @@ void SunSdrRadioConnection::onKeepaliveTimeout()
 
 void SunSdrRadioConnection::onDataWatchdogTick()
 {
+    // Gelegenheit, die Quittungsfristen zu pruefen: dieser Tick laeuft
+    // ohnehin regelmaessig, und ein eigener Zeitgeber waere ein zweiter
+    // Takt fuer dieselbe Sache.
+    pruefeOffeneRahmen();
+
     if (!m_running || state() != ConnectionState::Connected) { return; }
     if (!m_lastStreamPacketAt.isValid()) { return; }
     if (m_lastStreamPacketAt.elapsed() <= kDataSilenceTimeoutMs) { return; }
@@ -1310,6 +1396,15 @@ void SunSdrRadioConnection::onDataWatchdogTick()
     m_lastStreamPacketAt.invalidate();
     if (m_controlSocket) { m_controlSocket->close(); }
     if (m_streamSocket) { m_streamSocket->close(); }
+
+    // Der Bericht gehoert AUCH hierher, und das ist der wichtigere Fall:
+    // ein Geraet, das sich ausschaltet (Akku leer, Netzteil weg, Stecker
+    // gezogen), endet nicht ueber disconnect(), sondern hier. Am
+    // 2026-10-03 genau so aufgefallen -- der Betreiber liess die QRP am
+    // Akku mitsammeln und ging weg. Waere der Bericht nur beim
+    // ordentlichen Trennen geschrieben worden, waere die Uebersicht
+    // ausgerechnet in dem Lauf verloren gewesen, fuer den sie gebaut ist.
+    berichteMithoeren();
 
     setState(ConnectionState::LinkLost);
     emit errorOccurred(RadioConnectionError::NoDataTimeout,
@@ -1375,15 +1470,72 @@ void SunSdrRadioConnection::sendBenchFrames(const QString& envName)
     if (list.isEmpty()) { return; }
 
     const QStringList parts = list.split(QLatin1Char(','), Qt::SkipEmptyParts);
-    for (const QString& hex : parts) {
-        const QByteArray frame = QByteArray::fromHex(hex.trimmed().toLatin1());
-        if (frame.isEmpty()) { continue; }
-        m_controlSocket->writeDatagram(frame, m_radioAddr,
-                                        m_profile->defaultCtrlPort);
-        recordBytesSent(static_cast<qint64>(frame.size()));
-        qCInfo(lcSunSdr) << "SunSdr: Werkbank-Rahmen" << envName << "Opcode"
-                         << (frame.size() > 2 ? quint8(frame[2]) : 0)
-                         << "-" << frame.size() << "Byte";
+    for (const QString& rohHex : parts) {
+        const QString hex = rohHex.trimmed();
+
+        // QByteArray::fromHex() UEBERSPRINGT ungueltige Zeichen still.
+        // Ein verrutschtes Zeichen in einer von Hand zusammengesetzten
+        // Zeile ergibt damit einen anderen, kuerzeren Rahmen -- und der
+        // geht ans Funkgeraet, ohne dass irgendwo steht, dass nicht das
+        // hinausging, was dastand. Fuer einen Versuch am Geraet ist das
+        // die schlechteste Art zu scheitern: man sucht die Ursache im
+        // Geraet, und sie liegt in der Zeile. Darum hier streng:
+        // nur Hexziffern, nur gerade Laenge, sonst gar nicht.
+        static const QRegularExpression nurHex(QStringLiteral("^[0-9a-fA-F]+$"));
+        if (!nurHex.match(hex).hasMatch() || (hex.size() % 2) != 0) {
+            qCWarning(lcSunSdr).nospace().noquote()
+                << "SunSdr: Werkbank-Rahmen aus " << envName
+                << " uebersprungen -- keine saubere Hexfolge gerader Laenge: \""
+                << hex << "\"";
+            ++m_benchFramesRejected;
+            continue;
+        }
+
+        const QByteArray frame = QByteArray::fromHex(hex.toLatin1());
+
+        if (frame.size() < SunSdr::kCtlHeaderSize
+            || quint8(frame[0]) != m_profile->magic0
+            || quint8(frame[1]) != SunSdr::kMagic1) {
+            qCWarning(lcSunSdr).nospace().noquote()
+                << "SunSdr: Werkbank-Rahmen aus " << envName
+                << " uebersprungen -- kein Steuerrahmen dieses Geraets ("
+                << frame.size() << " Byte, erwartet mindestens "
+                << SunSdr::kCtlHeaderSize << " mit Magie 0x"
+                << Qt::hex << m_profile->magic0 << " 0x" << SunSdr::kMagic1 << ")";
+            ++m_benchFramesRejected;
+            continue;
+        }
+
+        // Die Pruefsumme nachrechnen und beim Abweichen warnen, aber den
+        // Rahmen UNVERAENDERT schicken: was hinausgeht, entscheidet der
+        // Mensch davor (siehe Kopf dieser Funktion). Die Warnung ist
+        // trotzdem noetig, denn am Geraet gezeigt (2026-09-25): ein
+        // Rahmen mit falschem Ende wird stillschweigend VERWORFEN. Ohne
+        // diese Zeile sucht man den Grund, warum der Versuch nichts
+        // bewirkt hat, ueberall ausser an der richtigen Stelle.
+        QByteArray genullt = frame;
+        genullt[14] = genullt[15] = genullt[16] = genullt[17] = 0;
+        const QByteArray mitCrc = SunSdr::withControlFrameCrc(genullt);
+        if (mitCrc != frame) {
+            qCWarning(lcSunSdr).noquote()
+                << QStringLiteral(
+                       "SunSdr: Werkbank-Rahmen aus %1 hat eine falsche "
+                       "Pruefsumme -- das Geraet wird ihn verwerfen. "
+                       "Dasteht %2, richtig waere %3. Er geht trotzdem "
+                       "unveraendert hinaus.")
+                       .arg(envName)
+                       .arg(QString::fromLatin1(frame.mid(14, 4).toHex()))
+                       .arg(QString::fromLatin1(mitCrc.mid(14, 4).toHex()));
+        }
+
+        sendeSteuerrahmen(frame, "Werkbank-Rahmen", /*nachschickbar=*/false);
+        ++m_benchFramesSent;
+        qCInfo(lcSunSdr).nospace().noquote()
+            << "SunSdr: Werkbank-Rahmen " << envName << " -- op=0x"
+            << Qt::hex << quint8(frame[2]) << Qt::dec
+            << " sub=" << (quint16(quint8(frame[6])) | (quint16(quint8(frame[7])) << 8))
+            << " " << frame.size() << " Byte, Nutzlast "
+            << frame.mid(SunSdr::kCtlHeaderSize).toHex().constData();
     }
 }
 
@@ -1495,6 +1647,560 @@ void SunSdrRadioConnection::probeReportIfDue()
     m_probeDiffer = 0;
     m_probeFirstDiff = -1;
     m_probeCount.clear();
+}
+
+// ---------------------------------------------------------------------------
+// noteControlFrame / noteStreamState / tallyFrame / frameInventoryReport
+//
+// Das Mithoeren. Warum es ueberhaupt gebraucht wird, steht am FrameTally
+// im Kopf; hier stehen nur die Entscheidungen, die man beim Lesen des
+// Codes sonst nachrechnen muesste:
+//
+//  * Ein Rahmen, der sich nicht als Steuerkopf lesen laesst, wird
+//    getrennt gezaehlt und NICHT geraten. Die Beacon-Antwort selbst ist
+//    so ein Fall: sie traegt 0x1a an Byte [3], wo parseControlHeader()
+//    0x00 verlangt (siehe processControlDatagram). Ein Zaehler, der so
+//    etwas unter "unlesbar" fuehrt, ist ehrlicher als ein Parser, der
+//    sich die Regel passend macht.
+//  * Am Strom wird nur das Tripel (Opcode, Byte 8, Byte 9) inventarisiert,
+//    nicht die 1200 Byte Nutzlast. Die Nutzlast ist das I/Q selbst und
+//    aendert sich in jedem Paket; das Messgeraet dafuer gibt es schon
+//    (LONGPATH_SUNSDR_PROBE, siehe probeFeed).
+// ---------------------------------------------------------------------------
+
+void SunSdrRadioConnection::noteControlFrame(const QByteArray& data)
+{
+    ++m_controlFramesSeen;
+
+    SunSdr::ControlHeader hdr;
+    if (!SunSdr::parseControlHeader(
+            reinterpret_cast<const quint8*>(data.constData()),
+            int(data.size()), *m_profile, &hdr)) {
+        ++m_controlFramesUnparsed;
+        return;
+    }
+
+    // Die gelesene Laenge, nicht die angekuendigte: ein Rahmen, dessen
+    // [4:5] etwas anderes behauptet als dasteht, ist genau der Fall, den
+    // man sehen will. Die angekuendigte Laenge steht im Bericht daneben,
+    // sobald sie abweicht.
+    const QByteArray payload = data.mid(SunSdr::kCtlHeaderSize);
+    if (hdr.declaredPayloadLen != payload.size()) {
+        qCInfo(lcSunSdr).nospace()
+            << "SunSdr: Steuerrahmen op=0x" << Qt::hex << hdr.opcode << Qt::dec
+            << " kuendigt " << hdr.declaredPayloadLen
+            << " Byte Nutzlast an, dasteht " << payload.size();
+    }
+    tallyFrame(m_controlInventory, "Steuerkanal", hdr.opcode, hdr.sub,
+               quint16(payload.size()), payload);
+
+    // Quittung zuordnen: gleicher Opcode, und der aelteste offene Rahmen
+    // dieses Opcodes gilt als beantwortet (zwei gleiche Opcodes koennen
+    // dicht hintereinander hinausgehen -- 0x08 geht als Zustandsrahmen UND
+    // als VFO-Frequenz).
+    for (int i = 0; i < m_offeneRahmen.size(); ++i) {
+        if (m_offeneRahmen.at(i).opcode != hdr.opcode) { continue; }
+        const qint64 nach =
+            (m_inventoryClock.isValid() ? m_inventoryClock.elapsed() : 0)
+            - m_offeneRahmen.at(i).beiMs;
+        ++m_quittungenGesehen;
+        m_letzteQuittungMs = nach;
+        qCDebug(lcSunSdr).nospace()
+            << "SunSdr: op=0x" << Qt::hex << hdr.opcode << Qt::dec
+            << " nach " << nach << " ms quittiert";
+        m_offeneRahmen.removeAt(i);
+        break;
+    }
+}
+
+void SunSdrRadioConnection::noteStreamState(const SunSdr::IqHeader& hdr)
+{
+    // Dieser Pfad laeuft 1920 mal je Sekunde, im selben Thread, der die
+    // Proben in den Empfang gibt. Darum zuerst der billige Vergleich auf
+    // drei Bytes: solange sich am Zustand nichts aendert -- und das ist
+    // der Normalfall, millionenfach -- bleibt es bei einem Zaehler und es
+    // wird kein QByteArray gebaut (QByteArray hat keine
+    // Kurzpuffer-Optimierung, jedes waere eine Allokation auf dem Haufen).
+    // Erst eine echte Aenderung kostet etwas.
+    if (m_lastStreamStateValid && hdr.opcode == m_lastStreamOpcode
+        && hdr.byte8 == m_lastStreamByte8 && hdr.byte9 == m_lastStreamByte9) {
+        auto it = m_streamStateInventory.find(frameKey(hdr.opcode, 0, 2));
+        if (it != m_streamStateInventory.end()) {
+            ++it.value().count;
+            if (m_inventoryClock.isValid()) {
+                it.value().lastSeenMs = m_inventoryClock.elapsed();
+            }
+            return;
+        }
+        // Nicht im Inventar, obwohl als "zuletzt gesehen" vermerkt: der
+        // Deckel hat zugeschlagen. Dann faellt es unten durch und
+        // tallyFrame() entscheidet erneut -- nicht hier, damit es genau
+        // eine Stelle gibt, die den Deckel kennt.
+    }
+
+    m_lastStreamOpcode = hdr.opcode;
+    m_lastStreamByte8 = hdr.byte8;
+    m_lastStreamByte9 = hdr.byte9;
+    m_lastStreamStateValid = true;
+
+    const QByteArray state = QByteArray(1, char(hdr.byte8))
+                             + QByteArray(1, char(hdr.byte9));
+    tallyFrame(m_streamStateInventory, "Strom", hdr.opcode, /*sub=*/0,
+               /*len=*/2, state);
+}
+
+void SunSdrRadioConnection::tallyFrame(QHash<quint64, FrameTally>& inventory,
+                                       const char* channel, quint8 opcode,
+                                       quint16 sub, quint16 len,
+                                       const QByteArray& payload)
+{
+    if (!m_inventoryClock.isValid()) {
+        m_inventoryClock.start();
+    }
+    const qint64 now = m_inventoryClock.elapsed();
+    const QByteArray kept = payload.left(kMaxTallyPayloadBytes);
+    const quint64 key = frameKey(opcode, sub, len);
+
+    auto it = inventory.find(key);
+    if (it == inventory.end()) {
+        if (inventory.size() >= kMaxFrameKinds) {
+            if (!m_inventoryFullWarned) {
+                m_inventoryFullWarned = true;
+                qCWarning(lcSunSdr)
+                    << "SunSdr: Mithoeren gedeckelt --" << kMaxFrameKinds
+                    << "Rahmensorten erreicht, weitere werden nicht mehr "
+                       "aufgenommen (Bericht bleibt gueltig fuer die bisherigen)";
+            }
+            return;
+        }
+        FrameTally fresh;
+        fresh.count = 1;
+        fresh.firstPayload = kept;
+        fresh.lastPayload = kept;
+        fresh.firstSeenMs = now;
+        fresh.lastSeenMs = now;
+        fresh.distinctPayloads.append(kept);
+        inventory.insert(key, fresh);
+        qCInfo(lcSunSdr).nospace()
+            << "SunSdr: neue Rahmensorte auf " << channel << " -- op=0x"
+            << Qt::hex << opcode << Qt::dec << " sub=" << sub
+            << " len=" << len << " nutzlast=" << kept.toHex().constData()
+            << " (bei " << now << " ms)";
+        // Beim ERSTEN Auftreten die ganze Nutzlast, wenn sie laenger ist
+        // als die Mitschrift -- siehe kMaxFirstSightBytes.
+        if (payload.size() > kept.size()) {
+            qCInfo(lcSunSdr).nospace()
+                << "SunSdr: ... op=0x" << Qt::hex << opcode << Qt::dec
+                << " ganz (" << payload.size() << " Byte): "
+                << payload.left(kMaxFirstSightBytes).toHex().constData();
+        }
+        return;
+    }
+
+    FrameTally& tally = it.value();
+    ++tally.count;
+    tally.lastSeenMs = now;
+    if (tally.lastPayload == kept) {
+        return;
+    }
+
+    // Hier liegt der eigentliche Gewinn: eine Sorte, deren Nutzlast sich
+    // aendert, waehrend am Geraet gedreht oder getastet wird, ist ein
+    // Messwert oder eine Zustandsmeldung -- das ist der Faden, an dem die
+    // acht unzugeordneten Opcodes haengen.
+    ++tally.payloadChanges;
+    const QByteArray vorher = tally.lastPayload;
+    tally.lastPayload = kept;
+    if (!tally.distinctPayloads.contains(kept)) {
+        if (tally.distinctPayloads.size() < kMaxDistinctPayloads) {
+            tally.distinctPayloads.append(kept);
+        } else {
+            tally.moreThanListed = true;
+        }
+    }
+    if (tally.changesLogged < kMaxChangeLogsPerKind) {
+        ++tally.changesLogged;
+        qCInfo(lcSunSdr).nospace()
+            << "SunSdr: " << channel << " op=0x" << Qt::hex << opcode << Qt::dec
+            << " sub=" << sub << " Nutzlast geaendert: "
+            << vorher.toHex().constData() << " -> " << kept.toHex().constData()
+            << " (bei " << now << " ms)";
+        if (tally.changesLogged == kMaxChangeLogsPerKind) {
+            qCInfo(lcSunSdr).nospace()
+                << "SunSdr: " << channel << " op=0x" << Qt::hex << opcode
+                << Qt::dec << " -- weitere Aenderungen werden nur gezaehlt";
+        }
+    }
+}
+
+QString SunSdrRadioConnection::frameInventoryReport() const
+{
+    QStringList zeilen;
+    const auto abschnitt = [&zeilen](const char* channel,
+                                     const QHash<quint64, FrameTally>& inventory) {
+        QList<quint64> keys = inventory.keys();
+        std::sort(keys.begin(), keys.end());
+        for (const quint64 key : keys) {
+            const FrameTally& t = inventory.value(key);
+            QStringList werte;
+            for (const QByteArray& p : t.distinctPayloads) {
+                werte << QString::fromLatin1(p.toHex());
+            }
+            if (t.moreThanListed) {
+                werte << QStringLiteral("...");
+            }
+            zeilen << QStringLiteral(
+                          "%1 op=0x%2 sub=%3 len=%4 | %5x | Aenderungen %6 "
+                          "| zuerst %7 ms, zuletzt %8 ms | erste %9 letzte %10"
+                          " | Werte: %11")
+                          .arg(QString::fromLatin1(channel))
+                          .arg(quint8(key >> 32), 2, 16, QChar('0'))
+                          .arg(quint16((key >> 16) & 0xFFFF))
+                          .arg(quint16(key & 0xFFFF))
+                          .arg(t.count)
+                          .arg(t.payloadChanges)
+                          .arg(t.firstSeenMs)
+                          .arg(t.lastSeenMs)
+                          .arg(QString::fromLatin1(t.firstPayload.toHex()))
+                          .arg(QString::fromLatin1(t.lastPayload.toHex()))
+                          .arg(werte.join(QStringLiteral(", ")));
+        }
+    };
+    abschnitt("Steuerkanal", m_controlInventory);
+    abschnitt("Strom", m_streamStateInventory);
+
+    if (zeilen.isEmpty()) {
+        return QStringLiteral(
+            "SunSdr: Mithoeren -- nichts aufgenommen (kein Rahmen vom Geraet "
+            "angekommen, seit die Verbindung stand)");
+    }
+    zeilen.prepend(QStringLiteral(
+                       "SunSdr: Mithoeren -- Steuerrahmen %1 (davon unlesbar %2), "
+                       "Sorten: Steuerkanal %3, Strom %4")
+                       .arg(m_controlFramesSeen)
+                       .arg(m_controlFramesUnparsed)
+                       .arg(m_controlInventory.size())
+                       .arg(m_streamStateInventory.size()));
+    return zeilen.join(QLatin1Char('\n'));
+}
+
+// ---------------------------------------------------------------------------
+// auditStreamSeq — Folgenummern auszaehlen
+//
+// Begruendung und die QRP-eigene Regel stehen am Aufruf im Kopf. Hier nur
+// die Rechnung: die Nummern sind 16 Bit breit, also wird die Differenz
+// bewusst als quint16 gebildet -- damit stimmt sie ueber den Umlauf hinweg
+// (65535 -> 0 ergibt 1, nicht -65535).
+// ---------------------------------------------------------------------------
+
+void SunSdrRadioConnection::auditStreamSeq(quint16 seq)
+{
+    if (!m_iqSeqWndClock.isValid()) {
+        m_iqSeqWndClock.start();
+    }
+
+    if (m_probeOn && m_seqDeltas.size() < kMaxSeqDeltas) {
+        m_seqDeltas.append(qMakePair(seq, quint16(seq - m_lastSeq)));
+    }
+
+    // Fenster zuerst schliessen, dann das neue Paket einsortieren: so
+    // gehoert jedes Paket genau zu einem Fenster, und der Bericht steht
+    // nicht mitten in der Buchfuehrung.
+    if (m_iqSeqWndClock.elapsed() >= 5000) {
+        berichteFolgenummern();
+    }
+
+    const auto merken = [this](quint16 n) {
+        m_seqRing.append(n);
+        while (m_seqRing.size() > kSeqRingSize) { m_seqRing.removeFirst(); }
+    };
+
+    if (!m_seqSeen) {
+        m_seqSeen = true;
+        m_lastSeq = seq;
+        merken(seq);
+        ++m_iqSeqWndFrames;
+        return;
+    }
+
+    // 1. Schon gesehen? Dann ist es eine Wiederholung -- die QRP schickt
+    //    bytegleiche Kopien, und zwar mit Abstand, nicht direkt
+    //    hintereinander (am 2026-10-03 gemessen, siehe Kopf).
+    if (m_seqRing.contains(seq)) {
+        ++m_iqSeqWndRepeats;
+        m_seqOutOfPlace = 0;
+        return;
+    }
+
+    const quint16 delta = quint16(seq - m_lastSeq);
+
+    // 2. Der Normalfall: die naechste Nummer.
+    if (delta == 1) {
+        m_lastSeq = seq;
+        merken(seq);
+        ++m_iqSeqWndFrames;
+        m_seqOutOfPlace = 0;
+        return;
+    }
+
+    // 3. Eine plausible Luecke: dazwischen fehlen Pakete.
+    if (delta >= 2 && delta <= kMaxPlausibleGap) {
+        m_iqSeqWndLost += quint64(delta) - 1;
+        ++m_iqSeqWndEvents;
+        m_lastSeq = seq;
+        merken(seq);
+        ++m_iqSeqWndFrames;
+        m_seqOutOfPlace = 0;
+
+        // Gedrosselt wie bei P1/P2 (20 ms): ein schlechter Netzweg darf die
+        // Ereignisschlange nicht fluten. Minus eins heisst "noch nie
+        // gemeldet" -- mit 0 als Startwert verschwand die ERSTE Luecke
+        // einer Verbindung still, weil die Uhr am Anfang selbst 0 ist.
+        const qint64 now = m_iqSeqWndClock.elapsed();
+        if (m_lastGapSignalMs < 0 || now - m_lastGapSignalMs >= 20) {
+            m_lastGapSignalMs = now;
+            emit iqSequenceGap();
+        }
+        return;
+    }
+
+    // 4. Passt zu nichts: ein Spaetling, oder der Strom hat neu angefangen.
+    //    Unterschieden wird nicht an der Groesse der Differenz -- die ist
+    //    bei einem Neuanfang beliebig --, sondern daran, ob es BEI DIESEM
+    //    EINEN Paket bleibt. Ein Spaetling ist ein Einzelfall zwischen
+    //    passenden Paketen; ein Neuanfang betrifft alles, was danach kommt.
+    ++m_seqOutOfPlace;
+    if (m_seqOutOfPlace < kSeqRestartAfter) {
+        ++m_iqSeqWndBackwards;
+        return;  // m_lastSeq NICHT zurueckdrehen
+    }
+
+    // Neuanfang: ab hier gilt die neue Folge. Ohne diesen Zweig hing der
+    // Zaehler nach einem Stromneustart dauerhaft fest (gemessen: 0 neue
+    // Nummern, 1301 rueckwaerts in 5 s).
+    ++m_iqSeqWndRestarts;
+    qCInfo(lcSunSdr).nospace()
+        << "SunSdr: Folgenummern fangen neu an (" << m_lastSeq << " -> "
+        << seq << ") -- der Strom wurde neu gestartet";
+    m_seqRing.clear();
+    m_seqOutOfPlace = 0;
+    m_lastSeq = seq;
+    merken(seq);
+    ++m_iqSeqWndFrames;
+}
+
+void SunSdrRadioConnection::berichteFolgenummern()
+{
+    const double secs = double(m_iqSeqWndClock.elapsed()) / 1000.0;
+    if (secs <= 0.0) { return; }
+    const double nenner = double(m_iqSeqWndFrames + m_iqSeqWndLost);
+    const double verlustProzent =
+        nenner > 0.0 ? 100.0 * double(m_iqSeqWndLost) / nenner : 0.0;
+
+    emit iqPacketLoss(verlustProzent, quint32(m_iqSeqWndLost),
+                      quint32(m_iqSeqWndFrames));
+
+    // Kopien je Nummer: 1,0 heisst, die Blockantwort wirkt; 8,0 heisst, das
+    // Geraet bekommt keine Quittung und wiederholt (gemessen 2026-09-23/24).
+    // Am 2026-10-03 am Geraet gemessen: 1,2 -- rund 50 bytegleiche
+    // Wiederholungen je Sekunde bei 240 Nummern, ein Rest der Achtfachung.
+    const double kopien = m_iqSeqWndFrames > 0
+        ? double(m_iqSeqWndFrames + m_iqSeqWndRepeats) / double(m_iqSeqWndFrames)
+        : 0.0;
+
+    const bool auffaellig = m_iqSeqWndLost > 0 || m_iqSeqWndEvents > 0
+                            || m_iqSeqWndRestarts > 0;
+    if (auffaellig) {
+        qCInfo(lcSunSdr).noquote()
+            << QStringLiteral("SunSdr: Folgenummern -- %1 Nummern in %2 s "
+                              "(%3/s), VERLOREN %4 (%5 %), %6 Luecken, "
+                              "%7 Spaetlinge, %8 Neuanfaenge, "
+                              "%9 Kopien je Nummer")
+                   .arg(m_iqSeqWndFrames).arg(secs, 0, 'f', 1)
+                   .arg(double(m_iqSeqWndFrames) / secs, 0, 'f', 0)
+                   .arg(m_iqSeqWndLost).arg(verlustProzent, 0, 'f', 2)
+                   .arg(m_iqSeqWndEvents).arg(m_iqSeqWndBackwards)
+                   .arg(m_iqSeqWndRestarts).arg(kopien, 0, 'f', 2);
+    } else if (!m_iqSeqCleanClock.isValid()
+               || m_iqSeqCleanClock.elapsed() >= 60000) {
+        // Der saubere Fall gehoert ins Log, nur seltener -- alle 60 s statt
+        // alle 5, dieselbe Taktung wie P2s Folgenummern-Pruefung. Er stand
+        // zuerst auf Debug und war damit unsichtbar, weil die Kategorie im
+        // Betrieb nur INF zeigt -- und ausgerechnet "Kopien je Nummer"
+        // entscheidet den Versuch gegen die Achtfachung.
+        m_iqSeqCleanClock.restart();
+        qCInfo(lcSunSdr).noquote()
+            << QStringLiteral("SunSdr: Folgenummern sauber -- %1 Nummern in "
+                              "%2 s (%3/s), %4 Spaetlinge, "
+                              "%5 Kopien je Nummer")
+                   .arg(m_iqSeqWndFrames).arg(secs, 0, 'f', 1)
+                   .arg(double(m_iqSeqWndFrames) / secs, 0, 'f', 0)
+                   .arg(m_iqSeqWndBackwards).arg(kopien, 0, 'f', 2);
+    }
+
+    m_iqSeqWndClock.restart();
+    m_iqSeqWndFrames = 0;
+    m_iqSeqWndRepeats = 0;
+    m_iqSeqWndLost = 0;
+    m_iqSeqWndEvents = 0;
+    m_iqSeqWndBackwards = 0;
+    m_iqSeqWndRestarts = 0;
+    m_lastGapSignalMs = -1;
+}
+
+void SunSdrRadioConnection::berichteMithoeren()
+{
+    // Nur wenn etwas angekommen ist -- eine Zeile "nichts aufgenommen" bei
+    // jedem Programmende waere Laerm. Und nur EINMAL je Sitzung: ein
+    // Wachhund-Abbruch, dem der Betreiber ein disconnect() nachschiebt,
+    // soll die Uebersicht nicht zweimal ins Log schreiben.
+    if (m_inventoryReported) { return; }
+    if (m_controlInventory.isEmpty() && m_streamStateInventory.isEmpty()
+        && m_offeneRahmen.isEmpty()) {
+        return;
+    }
+    m_inventoryReported = true;
+
+    // Was beim Ende der Sitzung noch offen ist, bleibt offen -- und das
+    // gehoert gesagt. Ohne diese Zeile fiel es stumm unter den Tisch: die
+    // Quittungspruefung haengt am Stillstands-Wachhund, und der stoppt beim
+    // Abbruch. Am 2026-10-03 im eigenen Pruefstand aufgefallen.
+    if (!m_offeneRahmen.isEmpty()) {
+        QStringList offen;
+        for (const OffenerRahmen& r : m_offeneRahmen) {
+            offen << QStringLiteral("0x%1 (%2%3)")
+                         .arg(r.opcode, 2, 16, QChar('0'))
+                         .arg(r.grund)
+                         .arg(r.schonWiederholt ? QStringLiteral(", wiederholt")
+                                                : QString());
+        }
+        m_rahmenOhneQuittung += quint64(m_offeneRahmen.size());
+        qCWarning(lcSunSdr).noquote()
+            << QStringLiteral("SunSdr: beim Verbindungsende noch unquittiert: %1")
+                   .arg(offen.join(QStringLiteral(", ")));
+        m_offeneRahmen.clear();
+    }
+
+    qCInfo(lcSunSdr).noquote() << frameInventoryReport();
+}
+
+QString SunSdrRadioConnection::seqDeltaReport() const
+{
+    if (m_seqDeltas.isEmpty()) {
+        return QStringLiteral("SunSdr: keine Folgenummern-Differenzen "
+                              "mitgeschrieben (LONGPATH_SUNSDR_PROBE nicht an?)");
+    }
+    QStringList teile;
+    for (const auto& paar : m_seqDeltas) {
+        teile << QStringLiteral("%1(+%2)").arg(paar.first).arg(paar.second);
+    }
+    return QStringLiteral("SunSdr: Folgenummern roh, %1 Schritte: %2")
+        .arg(m_seqDeltas.size())
+        .arg(teile.join(QStringLiteral(" ")));
+}
+
+void SunSdrRadioConnection::sendeSteuerrahmen(const QByteArray& frame,
+                                             const char* grund,
+                                             bool nachschickbar)
+{
+    if (!m_controlSocket || !m_profile) { return; }
+    m_controlSocket->writeDatagram(frame, m_radioAddr,
+                                    m_profile->defaultCtrlPort);
+    recordBytesSent(static_cast<qint64>(frame.size()));
+
+    if (frame.size() < SunSdr::kCtlHeaderSize) { return; }
+    if (!m_inventoryClock.isValid()) { m_inventoryClock.start(); }
+    if (m_offeneRahmen.size() >= kMaxOffeneRahmen) {
+        // Nicht weiter sammeln. Dass nichts quittiert wird, hat
+        // pruefeOffeneRahmen() dann schon gemeldet.
+        return;
+    }
+    OffenerRahmen offen;
+    offen.opcode = quint8(frame[2]);
+    offen.beiMs = m_inventoryClock.elapsed();
+    offen.grund = QString::fromLatin1(grund);
+    // Den Rahmen mitnehmen, damit er sich nachschicken laesst -- aber nur,
+    // wenn er dafuer taugt (siehe darfNachgeschicktWerden) und der Aufrufer
+    // es nicht ausdruecklich ausschliesst.
+    if (nachschickbar && darfNachgeschicktWerden(offen.opcode)) {
+        offen.rahmen = frame;
+    }
+    m_offeneRahmen.append(offen);
+}
+
+void SunSdrRadioConnection::pruefeOffeneRahmen()
+{
+    if (m_offeneRahmen.isEmpty() || !m_inventoryClock.isValid()) { return; }
+    const qint64 now = m_inventoryClock.elapsed();
+    for (int i = m_offeneRahmen.size() - 1; i >= 0; --i) {
+        const OffenerRahmen& offen = m_offeneRahmen.at(i);
+        if (now - offen.beiMs < kQuittungsFristMs) { continue; }
+
+        // Einmal nachschicken, wenn der Rahmen dafuer taugt.
+        if (!offen.rahmen.isEmpty() && !offen.schonWiederholt) {
+            const QByteArray nochmal = offen.rahmen;
+            const QString grund = offen.grund;
+            const quint8 op = offen.opcode;
+            m_offeneRahmen.removeAt(i);
+            ++m_rahmenWiederholt;
+            qCInfo(lcSunSdr).nospace().noquote()
+                << "SunSdr: Rahmen op=0x" << QString::number(op, 16)
+                << " (" << grund << ") blieb " << kQuittungsFristMs
+                << " ms unquittiert -- wird einmal nachgeschickt";
+            sendeSteuerrahmen(nochmal, "Wiederholung");
+            // Der neue Eintrag ist der letzte in der Liste; ihn als
+            // Wiederholung kennzeichnen, damit es bei EINEM Versuch bleibt.
+            if (!m_offeneRahmen.isEmpty()) {
+                m_offeneRahmen.last().schonWiederholt = true;
+                m_offeneRahmen.last().grund = grund;
+                m_offeneRahmen.last().rahmen = nochmal;
+            }
+            continue;
+        }
+
+        ++m_rahmenOhneQuittung;
+        qCWarning(lcSunSdr).nospace().noquote()
+            << "SunSdr: Rahmen op=0x" << QString::number(offen.opcode, 16)
+            << " (" << offen.grund << ") wurde nach " << kQuittungsFristMs
+            << " ms nicht quittiert"
+            << (offen.schonWiederholt ? " -- auch die Wiederholung nicht. "
+                                        "Der Weg zum Geraet ist gestoert."
+                                      : " -- das Geraet hat ihn wahrscheinlich "
+                                        "verworfen (am 2026-09-25 gemessen: "
+                                        "eine falsche Pruefsumme wird "
+                                        "stillschweigend verworfen)");
+        m_offeneRahmen.removeAt(i);
+    }
+}
+
+void SunSdrRadioConnection::pruefeAnschlag(const QVector<float>& samples)
+{
+    int amAnschlag = 0;
+    for (const float v : samples) {
+        if (v >= kAnschlagSchwelle || v <= -kAnschlagSchwelle) {
+            ++amAnschlag;
+        }
+    }
+    if (amAnschlag == 0) { return; }
+
+    m_anschlagProben += quint64(amAnschlag);
+    if (amAnschlag < kAnschlagSchwelleAnzahl) { return; }
+
+    const qint64 now = m_iqSeqWndClock.isValid() ? m_iqSeqWndClock.elapsed() : 0;
+    if (m_letzteAnschlagMeldungMs >= 0
+        && now - m_letzteAnschlagMeldungMs < kAnschlagMeldeAbstandMs) {
+        return;
+    }
+    m_letzteAnschlagMeldungMs = now;
+    ++m_anschlagMeldungen;
+
+    // Dieselbe Meldung, die P1 und P2 aus einem Statusbit des Geraets
+    // machen -- hier aus dem Signal selbst. Der Wandler ist einer (adc 0).
+    emit adcOverflow(0);
+    qCWarning(lcSunSdr).nospace()
+        << "SunSdr: Uebersteuerung -- " << amAnschlag << " von "
+        << samples.size() << " Proben am Anschlag. Vorverstaerker "
+           "zurueckdrehen oder Daempfung zuschalten.";
 }
 
 } // namespace Longpath

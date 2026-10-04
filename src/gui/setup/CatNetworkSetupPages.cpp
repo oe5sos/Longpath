@@ -27,6 +27,12 @@
 #include <QComboBox>
 #include <QPushButton>
 #include <QLoggingCategory>
+#include <QLineEdit>          // Fernzugriff: Token-Anzeige
+#include <QMessageBox>        // Rueckfrage vor folgenreichen Schaltern
+#include <QClipboard>         // Token kopieren
+#include <QGuiApplication>
+#include <QHostAddress>       // Loopback-Erkennung fuer den Hinweistext
+#include <QSignalBlocker>
 
 Q_LOGGING_CATEGORY(lcPeripherals, "longpath.peripherals")
 
@@ -121,6 +127,7 @@ void CatTciServerPage::buildUI()
     Longpath::Style::applyDarkPageStyle(this);
 
     buildServerGroup();
+    buildRemoteAccessGroup();
     buildCompatibilityGroup();
     buildIqStreamGroup();
     buildAudioStreamGroup();
@@ -288,6 +295,192 @@ void CatTciServerPage::buildServerGroup()
     form->addRow(tr("Status:"), m_statusLabel);
 
     contentLayout()->addWidget(group);
+}
+
+// ---------------------------------------------------------------------------
+// Gruppe 1b: Fernzugriff (2026-09-30)
+//
+// Token + Sendefreigabe. Beides greift AUSSCHLIESSLICH für Verbindungen, die
+// nicht von Loopback kommen — ein Logger auf demselben Rechner merkt davon
+// nichts. Deshalb steht die Gruppe direkt unter der Bindeauswahl, die darüber
+// entscheidet, und der Hinweis sagt jeweils, ob sie gerade überhaupt wirkt.
+//
+// Das Token liegt im Schlüsselbund (CredentialStore), nicht in den
+// Einstellungen: die Einstellungsdatei liegt im Klartext im Profil und wandert
+// in jedes Support-Bündel.
+//
+// AppSettings: TciAllowRemoteTx (nur der Schalter; das Token nicht).
+// ---------------------------------------------------------------------------
+void CatTciServerPage::buildRemoteAccessGroup()
+{
+    auto* group = new QGroupBox(tr("Remote access"), this);
+    group->setStyleSheet(QString::fromLatin1(Style::kGroupBoxStyle));
+    auto* form = new QFormLayout(group);
+
+    // ── Token ───────────────────────────────────────────────────────────────
+    m_tokenEdit = new QLineEdit(group);
+    m_tokenEdit->setReadOnly(true);       // nie tippen — nur erzeugen
+    m_tokenEdit->setStyleSheet(Style::glassFieldStyle());
+    m_tokenEdit->setFont(Style::monoFont(m_tokenEdit->font(), Style::kFontSmall));
+    m_tokenEdit->setToolTip(tr(
+        "Access token for connections from the network. Needed only when the "
+        "server is not bound to loopback. Stored in the system keychain, never "
+        "in the settings file."));
+    m_tokenEdit->setText(TciServer::remoteToken());
+    m_tokenEdit->setPlaceholderText(tr("no token — remote access is closed"));
+
+    auto* tokenRow = new QWidget(group);
+    auto* tokenLay = new QHBoxLayout(tokenRow);
+    tokenLay->setContentsMargins(0, 0, 0, 0);
+    tokenLay->setSpacing(5);
+    tokenLay->addWidget(m_tokenEdit, 1);
+
+    m_tokenNewBtn = new QPushButton(tr("New"), tokenRow);
+    m_tokenNewBtn->setStyleSheet(Style::buttonBaseStyle());
+    m_tokenNewBtn->setToolTip(tr(
+        "Generate a new token. Any device paired with the old one has to be "
+        "paired again."));
+    connect(m_tokenNewBtn, &QPushButton::clicked, this, [this] {
+        // Ein neues Token macht jedes gekoppelte Gerät aus — das ist kein
+        // Versehen wert, also einmal nachfragen. Nur wenn schon eines da ist:
+        // beim ersten Erzeugen gibt es nichts zu verlieren.
+        if (!m_tokenEdit->text().isEmpty()) {
+            const auto antwort = QMessageBox::question(
+                this, tr("New token"),
+                tr("Generate a new token?\n\n"
+                   "Every device that uses the current token will stop "
+                   "connecting until it is paired again."),
+                QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+            if (antwort != QMessageBox::Yes) { return; }
+        }
+        const QString neu = TciServer::generateRemoteToken();
+        if (TciServer::setRemoteToken(neu)) {
+            m_tokenEdit->setText(neu);
+        } else {
+            QMessageBox::warning(this, tr("New token"),
+                tr("Could not store the token in the keychain."));
+        }
+        refreshRemoteAccessState();
+    });
+    tokenLay->addWidget(m_tokenNewBtn);
+
+    m_tokenCopyBtn = new QPushButton(tr("Copy"), tokenRow);
+    m_tokenCopyBtn->setStyleSheet(Style::buttonBaseStyle());
+    m_tokenCopyBtn->setToolTip(tr("Copy the token to the clipboard."));
+    connect(m_tokenCopyBtn, &QPushButton::clicked, this, [this] {
+        if (auto* cb = QGuiApplication::clipboard()) {
+            cb->setText(m_tokenEdit->text());
+        }
+    });
+    tokenLay->addWidget(m_tokenCopyBtn);
+
+    form->addRow(tr("Token:"), tokenRow);
+
+    // ── Erlaubte Herkünfte (2026-10-01) ─────────────────────────────────────
+    //
+    // Ohne dieses Feld liess sich die Handfunke überhaupt nicht einrichten:
+    // der Server weist eine Verbindung aus einem BROWSER ab, solange deren
+    // Herkunft nicht hier steht (TciServer::start, Origin-Prüfung), und es
+    // gab keinen Weg, sie einzutragen. Am 2026-10-01 beim Einrichten des
+    // Telefons aufgefallen — der Betreiber hatte Token und Bindung gesetzt
+    // und kam trotzdem nicht herein.
+    //
+    // Clients OHNE Herkunft (WSJT-X, Quisk, jedes native Programm) sind von
+    // der Prüfung nicht betroffen; sie schicken keinen Origin-Kopf. Das Feld
+    // betrifft also ausschliesslich Seiten im Browser.
+    m_originsEdit = new QLineEdit(group);
+    m_originsEdit->setStyleSheet(Style::glassFieldStyle());
+    m_originsEdit->setFont(Style::monoFont(m_originsEdit->font(), Style::kFontSmall));
+    m_originsEdit->setPlaceholderText(
+        tr("e.g. http://192.168.1.10:8767 — comma separated"));
+    m_originsEdit->setToolTip(tr(
+        "Web pages that may connect, by their address. A page served from "
+        "anywhere else is refused even with the right token. Native clients "
+        "(WSJT-X, Quisk, loggers) send no origin and are unaffected.\n\n"
+        "This is the address the PAGE is served from — not the address of "
+        "this computer's TCI server."));
+    m_originsEdit->setText(AppSettings::instance()
+        .value(QStringLiteral("TciAllowedOrigins"), QString()).toString());
+    connect(m_originsEdit, &QLineEdit::editingFinished, this, [this] {
+        AppSettings::instance().setValue(QStringLiteral("TciAllowedOrigins"),
+                                         m_originsEdit->text().trimmed());
+        refreshRemoteAccessState();
+    });
+    form->addRow(tr("Allowed pages:"), m_originsEdit);
+
+    // ── Senden aus dem Netz ─────────────────────────────────────────────────
+    m_allowRemoteTxCheck = new QCheckBox(tr("Allow transmit from the network"), group);
+    m_allowRemoteTxCheck->setStyleSheet(QString::fromLatin1(Style::kCheckBoxStyle));
+    m_allowRemoteTxCheck->setToolTip(tr(
+        "Off by default. When off, a client from the network can listen and "
+        "tune but never key the transmitter — neither through trx: nor by "
+        "pushing transmit audio. Clients on this machine (WSJT-X, JTDX, "
+        "loggers) are unaffected either way."));
+    m_allowRemoteTxCheck->setChecked(
+        AppSettings::instance()
+            .value(QStringLiteral("TciAllowRemoteTx"), QStringLiteral("False"))
+            .toString() == QStringLiteral("True"));
+    connect(m_allowRemoteTxCheck, &QCheckBox::toggled, this, [this](bool on) {
+        // Einschalten ist die folgenreiche Richtung: ab dann kann ein Gerät
+        // im Netz die Station tasten. Einmal nachfragen; Ausschalten nie.
+        if (on) {
+            const auto antwort = QMessageBox::question(
+                this, tr("Allow transmit from the network"),
+                tr("Allow clients from the network to key the transmitter?\n\n"
+                   "They still need the token, and the transmit time cap "
+                   "applies — but from then on a device on your network can "
+                   "put your station on the air."),
+                QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+            if (antwort != QMessageBox::Yes) {
+                QSignalBlocker b(m_allowRemoteTxCheck);
+                m_allowRemoteTxCheck->setChecked(false);
+                return;
+            }
+        }
+        AppSettings::instance().setValue(
+            QStringLiteral("TciAllowRemoteTx"),
+            on ? QStringLiteral("True") : QStringLiteral("False"));
+    });
+    form->addRow(QString(), m_allowRemoteTxCheck);
+
+    // ── Hinweis, ob das hier gerade überhaupt etwas bewirkt ─────────────────
+    m_remoteHintLabel = new QLabel(group);
+    m_remoteHintLabel->setStyleSheet(QString::fromLatin1(Style::kSecondaryLabelStyle));
+    m_remoteHintLabel->setWordWrap(true);
+    form->addRow(QString(), m_remoteHintLabel);
+
+    refreshRemoteAccessState();
+    contentLayout()->addWidget(group);
+}
+
+// Der Hinweistext sagt, ob Token und Sendefreigabe gerade wirken. Auf
+// Loopback tun sie es nicht — und das soll dastehen, statt den Bediener ein
+// Token erzeugen zu lassen, das nichts tut.
+void CatTciServerPage::refreshRemoteAccessState()
+{
+    if (!m_remoteHintLabel) { return; }
+
+    const QString bind = AppSettings::instance()
+        .value(QStringLiteral("TciServerBindAddress"), QStringLiteral("127.0.0.1"))
+        .toString();
+    const bool nurLokal = QHostAddress(bind).isLoopback();
+
+    if (nurLokal) {
+        m_remoteHintLabel->setText(tr(
+            "The server is bound to loopback, so nothing here has any effect. "
+            "Set “Bind interface” above to your network address first — and "
+            "note that TCI has no encryption, so keep it inside your own "
+            "network."));
+    } else if (m_tokenEdit && m_tokenEdit->text().isEmpty()) {
+        m_remoteHintLabel->setText(tr(
+            "The server is reachable from the network, but no token is set — "
+            "so every connection from outside this machine is refused. "
+            "Generate one to allow remote access."));
+    } else {
+        m_remoteHintLabel->setText(tr(
+            "Clients from the network must send this token before anything "
+            "else. Clients on this machine are unaffected."));
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -739,12 +932,22 @@ void CatTciServerPage::setTciServer(Longpath::TciServer* server)
         connect(server, &Longpath::TciServer::serverStarted,
                 this, [this](quint16) {
                     m_tciServerRunning = true;
+                    m_tciBindWartet.clear();
                     m_tciClientCount = 0;
+                    refreshTciStatusDisplay();
+                });
+        connect(server, &Longpath::TciServer::bindWartetAufAdresse,
+                this, [this](const QString& adresse, quint16 port,
+                             const QString& grund) {
+                    m_tciServerRunning = false;
+                    m_tciBindWartet = tr("%1:%2 — %3").arg(adresse)
+                                          .arg(port).arg(grund);
                     refreshTciStatusDisplay();
                 });
         connect(server, &Longpath::TciServer::serverStopped,
                 this, [this]() {
                     m_tciServerRunning = false;
+                    m_tciBindWartet.clear();
                     m_tciClientCount = 0;
                     refreshTciStatusDisplay();
                 });
@@ -791,6 +994,19 @@ void CatTciServerPage::refreshTciStatusDisplay()
                 tr("<span style='color:#6fa384'>●</span> Running (%1 %2)")
                     .arg(m_tciClientCount)
                     .arg(m_tciClientCount == 1 ? tr("client") : tr("clients")));
+        } else if (!m_tciBindWartet.isEmpty()) {
+            // Dritter Zustand: der Bind ist gescheitert und wird wiederholt.
+            // Ohne ihn stand hier nur "Stopped", und der Bediener hatte keine
+            // Ahnung, dass die eingestellte Adresse gar nicht existiert — am
+            // 2026-10-02 nach einem Netzwechsel genau so passiert.
+            // Bernstein aus dem Hausstil, nicht als rohe Zahl: #c2924f stand
+            // hier im ersten Wurf und ist obendrein der ABGELOESTE Wert —
+            // "measured #c2924f -> #d8a55f" (StyleConstants.h). Die
+            // Drift-Ratsche hat ihn zu Recht angehalten.
+            m_statusLabel->setText(
+                tr("<span style='color:%1'>●</span> Wartet auf %2")
+                    .arg(QString::fromLatin1(Style::kAmberText),
+                         m_tciBindWartet.toHtmlEscaped()));
         } else {
             m_statusLabel->setText(
                 tr("<span style='color:#c25a5c'>●</span> Stopped"));

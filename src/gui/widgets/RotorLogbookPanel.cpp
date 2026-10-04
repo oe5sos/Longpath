@@ -38,6 +38,7 @@
 
 #include "core/AdifLog.h"
 #include "core/AppSettings.h"
+#include "core/LogbookDatei.h"
 #include "core/CtyDatParser.h"
 #include "core/DxccColorProvider.h"
 #include "core/DxccFlag.h"
@@ -240,10 +241,11 @@ RotorLogbookPanel::RotorLogbookPanel(RadioModel* radio, QrzClient* qrz,
 
 QString RotorLogbookPanel::logbookPath()
 {
-    const QString dir =
-        AppSettings::dataDir();
-    QDir().mkpath(dir);
-    return dir + QStringLiteral("/logbook.adi");
+    // Eine Stelle fuer alle: seit dem QSO-Eintrag vom Telefon (TCI
+    // `log_qso:`) gibt es einen zweiten Anlass, in diese Datei zu
+    // schreiben. Zwei Stellen, die dieselbe Datei anfassen, sind genau die
+    // Lage, die am 2026-10-03 die Logzeilen zerschrieben hat.
+    return LogbookDatei::pfad();
 }
 
 // ── UI ──────────────────────────────────────────────────────────────
@@ -2171,24 +2173,8 @@ void RotorLogbookPanel::setSatellites(SatelliteService* svc)
 
 bool RotorLogbookPanel::appendToLogFile(const LogEntry& entry, QString* error)
 {
-    const QString path = logbookPath();
-    const bool isNew = !QFile::exists(path);
-
-    QFile f(path);
-    if (!f.open(QIODevice::Append | QIODevice::Text)) {
-        if (error) { *error = f.errorString(); }
-        return false;
-    }
-    QTextStream out(&f);
-    if (isNew) {
-        // Strict importers reject a file whose first token is a record
-        // rather than a header terminated by <EOH>.
-        out << "Longpath logbook\n"
-            << "<ADIF_VER:5>3.1.4 <PROGRAMID:8>Longpath <EOH>\n";
-    }
-    out << entry.toAdifRecord() << "\n";
-    out.flush();
-    return true;
+    // Der Rumpf ist nach core/LogbookDatei umgezogen -- siehe logbookPath().
+    return LogbookDatei::anhaengen(entry, error);
 }
 
 bool RotorLogbookPanel::commitEntry(LogEntry e, QWidget* askParent, QString* message)

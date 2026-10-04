@@ -1,0 +1,450 @@
+/* ── Hausstil-Rollen, 1:1 aus StyleConstants.h ───────────────────────────── */
+:root{
+  --app-bg:#08080a; --panel:#0c0c0e; --inset:#050507; --inset-border:#232329;
+  --border:#2c2c31; --border-subtle:#1f1f23;
+  --text:#dcdce1; --text2:#a6a6ac; --text3:#909096; --text-scale:#7e7e85;
+  --text-inactive:#58585e; --title:#c4c4ca;
+  --accent:#4a7ba8;                    /* anfassbar */
+  --measured:#d8a55f; --amber-dim:#6b5630;  /* gemessen */
+  --ok:#6fa384; --warn:#a8853f; --danger:#a86b6d;
+  --tx-top:#a87a3c; --tx-bot:#8a6a30; --tx-border:#c2924f; --tx-text:#17130a;
+  --tune-top:#7a5a2c; --tune-bot:#634c24; --tune-border:#9a763c;
+  --pan-bg:#141e27; --trace:#c2924f; --grid:#8a8f96; --grid-text:#9aa0a8;
+  --glass-btn-top:#222227; --glass-btn-bot:#141417;
+  --glass-sel-top:#2f5f92; --glass-sel-bot:#1e3d5f;
+  --glass-sel-border:#3d78b0; --glass-sel-text:#dbe9f8;
+  --badge-info:#161e27;
+  --light:rgba(255,255,255,.07);       /* kGlassLightAlpha 18/255 */
+  --shade:rgba(0,0,0,.63);             /* kGlassShadeAlpha 160/255 */
+  --instrument:#f2f2ec;
+
+  /* Schriftleiter — VARIANTE A: 1:1 wie am Schreibtisch */
+  --f-caption:9px; --f-small:11px; --f-body:13px;
+  --f-sub:16px; --f-reading:22px; --f-display:38px;
+
+  --r-chip:7px; --r-panel:10px;
+  --mono:ui-monospace,"SF Mono",Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+
+/* iOS: langes Halten auf dem Bild rief die Lupe und markierte die halbe
+   Seite (Betreiber 2026-10-02: "wenn man zu lange am cursor bleibt kommt
+   die lupe und dann ist alles markiert"). Auf einer Fernbedienung gibt es
+   nichts zu markieren — ausser in den Eingabefeldern, und die behalten es. */
+html,body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+input,textarea{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default}
+
+/* Der Durchlassbereich als FLAECHE, nicht als Strich.
+   Betreiber 2026-10-02: "man sollte die bandbreite nun auch nicht nur als
+   strich sehen". Liegt unter dem Abstimmstrich, nimmt keine Beruehrung an. */
+.durchlass{position:absolute;top:0;bottom:0;display:none;pointer-events:none;
+  background:rgba(194,146,79,.12);
+  border-left:1px solid rgba(194,146,79,.42);
+  border-right:1px solid rgba(194,146,79,.42)}
+
+/* Feinschritt rechts oben im Panadapter. Dunkel unterlegt, damit die Tasten
+   auch ueber hellem Wasserfall lesbar bleiben, aber zurueckhaltend genug, um
+   das Bild nicht zu zerschneiden. */
+.feinschritt{position:absolute;top:6px;right:6px;z-index:3;display:flex;
+  align-items:center;gap:2px;padding:2px 4px;border-radius:9px;
+  background:rgba(10,12,16,.62);border:1px solid rgba(138,143,150,.22)}
+.feinschritt span{font:600 9px/1 ui-monospace,Menlo,monospace;
+  letter-spacing:.04em;color:var(--text3);padding:0 1px}
+.feinschritt button{width:30px;height:26px;border:0;border-radius:7px;
+  background:transparent;color:var(--text2);font:400 17px/1 inherit;cursor:pointer}
+.feinschritt button:active{background:rgba(194,146,79,.22);color:var(--accent)}
+
+/* Zoomtasten neben der Spannenanzeige. Kneifen gibt es seit dem 2026-10-01,
+   aber eine Geste, die man nicht sieht, gibt es fuer den Bediener nicht. */
+.zoom{font:inherit;color:var(--text2);background:transparent;border:0;
+  padding:0 7px;line-height:1;cursor:pointer}
+.zoom:active{color:var(--accent)}
+
+/* Frequenz direkt eintippen (Betreiber 2026-10-02). Gleiche Bauart wie das
+   Kopplungsblatt, damit nichts Neues zu lernen ist. */
+#qsy{position:fixed;inset:0;z-index:10;display:none;align-items:center;
+  justify-content:center;padding:22px;background:rgba(6,6,8,.72)}
+#qsy.an{display:flex}
+#qsy .karte{width:100%;max-width:330px;display:flex;flex-direction:column;gap:12px;
+  padding:18px;border-radius:15px;background:var(--panel);border:1px solid var(--line)}
+#qsy h1{font-size:var(--f-sub);font-weight:600;letter-spacing:.07em;color:var(--title)}
+#qsy input{width:100%;height:46px;padding:0 12px;border-radius:11px;text-align:center;
+  font:600 20px/1 ui-monospace,Menlo,monospace;color:var(--title);
+  background:var(--sunk);border:1px solid var(--line)}
+#qsy input:focus{outline:none;border-color:var(--accent)}
+#qsy .reihe{display:flex;gap:9px}
+#qsy button{flex:1;height:46px;border-radius:11px;font:600 14px/1 inherit;
+  letter-spacing:.06em;color:#14100a;background:var(--accent);border:0;cursor:pointer}
+#qsy button.still{color:var(--text2);background:transparent;border:1px solid var(--line)}
+/* 393x852 ist das Mass, an dem die Gestaltung entstanden ist (iPhone 14 Pro).
+   Es steht hier nur noch, damit das Blatt im Browser wie ein Telefon
+   aussieht — index.html ueberschreibt es fuer den echten Einsatz. Waagrecht
+   wird nie gescrollt, senkrecht schon: lieber scrollen als abschneiden.
+   Bis 2026-09-30 stand hier overflow:hidden, und auf jedem Geraet, das
+   nicht genau 852 Punkte hoch ist, lagen Fusszeile und Sendetasten
+   ausserhalb und waren nicht erreichbar. */
+html,body{width:393px;height:852px;overflow-x:hidden}
+/* ── Glas und Tiefe (2026-10-01) ─────────────────────────────────────────
+   Betreiber hat aus drei Richtungen diese gewaehlt — dieselbe, die am
+   2026-09-17 schon fuer Longpath selbst gewaehlt wurde. Der Grundsatz:
+   die ANORDNUNG bleibt, wie sie war (wer die Seite kennt, findet alles am
+   selben Platz), und was sich aendert, ist nur, wie fest die Teile
+   aussehen — Panels schweben mit Schatten und Lichtkante, Gemessenes
+   bekommt einen Hof statt eines Kastens, der Grund traegt ein leises
+   Leuchten.
+
+   Was bewusst NICHT mitkommt: backdrop-filter. Glas heisst hier Schatten
+   und Lichtkante, keine Weichzeichnung — die kostet auf jedem Bild
+   Rechenzeit, und das ist genau das Budget, das der Wasserfall braucht.
+   Die einzige Weichzeichnung der Seite liegt auf dem Kopplungsblatt, das
+   steht still. */
+body{
+  /* Entwurf B, 2026-10-02: der Verlauf lief ueber #17212b — ein deutliches
+     Blaugruen, das es am Pult nirgends gibt. Longpath hat genau EINE blaue
+     Flaeche, den Panadapter (#141e27); alles andere ist neutrales Grau.
+     Der Dunst machte die Seite erkennbar zu einer Telefon-App statt zu
+     Longpath. Jetzt neutral, und die Tiefe kommt aus Licht und Schatten
+     statt aus Farbe. */
+  background:
+    radial-gradient(120% 80% at 50% 0%, #101016 0%, var(--app-bg) 62%);
+  background-attachment:fixed;
+  color:var(--text);
+  font:var(--f-body)/1.3 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;
+  display:flex; flex-direction:column;
+}
+/* Die gemeinsame Rolle aller schwebenden Flaechen. Eine Stelle, nicht
+   fuenf — sonst driften sie beim naechsten Feinschliff auseinander. */
+.schicht{
+  /* Entwurf B: durchscheinendes Weiss (rgba(34,36,42,.88)) ersetzt durch
+     Longpaths eigene Flaechenwerte. Ein Weissschleier ist generisches Glas;
+     #101014 -> #0c0c0e ist kInsetBgTop -> kPanelBg, also dasselbe Paar, mit
+     dem am Schreibtisch jede Gruppe gezeichnet wird. Radius 14 -> 10 und
+     kBorderSubtle als Rahmen bringen die Fugen auf Pultmass. */
+  background:linear-gradient(180deg,#101014 0%,var(--panel) 100%);
+  border:1px solid var(--border-subtle);
+  border-radius:10px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05),
+             0 6px 18px rgba(0,0,0,.45),
+             0 1px 3px rgba(0,0,0,.4);
+}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+/* Versalzeile — Laufweite 0.18em wie kCapsTracking */
+/* Entwurf B: 0.13em statt 0.18em und eine Spur dunkler. Die Gruppenkoepfe
+   am Pult sind Beschriftung, nicht Inhalt — sie sollen sich wegducken. */
+.caps{font-size:var(--f-caption);letter-spacing:.13em;text-transform:uppercase;
+      font-weight:600;color:#6b6b71}
+
+/* ── Kopf: Verbindung + Station ─────────────────────────────────────────── */
+header{
+  height:46px;flex:none;display:flex;align-items:center;gap:9px;padding:0 16px;
+}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--ok);
+     box-shadow:0 0 10px rgba(111,163,132,.9),0 0 3px rgba(111,163,132,1);flex:none}
+header .name{font-size:var(--f-caption);letter-spacing:.17em;text-transform:uppercase;
+             color:var(--text3)}
+header .spacer{flex:1}
+header .rate{font-size:var(--f-caption);color:var(--text-inactive)}
+
+/* ── Frequenz ───────────────────────────────────────────────────────────── */
+.vfo{flex:none;padding:4px 16px 8px;display:flex;align-items:baseline;gap:8px}
+/* Hof statt Kasten: die Zahl leuchtet leise, wie eine Anzeige hinter Glas.
+   Der zweite Schatten ist kein Schmuck — er haelt sie lesbar, wenn der
+   Grund im Verlauf heller wird. */
+.vfo .hz{font-size:var(--f-display);font-family:var(--mono);color:var(--text);
+         letter-spacing:-.015em;line-height:1;
+         text-shadow:0 0 22px rgba(216,165,95,.17),0 2px 6px rgba(0,0,0,.7)}
+.vfo .hz .khz{color:var(--text2)}
+.vfo .hz .dez{color:var(--text-scale);font-size:var(--f-reading)}
+.vfo .unit{font-size:var(--f-small);color:var(--text3)}
+.vfo .spacer{flex:1}
+.vfo .b{font-size:var(--f-small);font-family:var(--mono);color:var(--measured)}
+
+/* ── Panadapter + Wasserfall ────────────────────────────────────────────── */
+.scope{
+  /* Entwurf B: der Panadapter ist das einzige VERSENKTE Element der Seite —
+     man schaut hinein, man fasst ihn nicht an. Darum kInsetBorder als Rahmen
+     und der Schatten nach innen statt nach aussen. */
+  flex:none;margin:0 12px;border:1px solid var(--inset-border);
+  border-radius:8px;overflow:hidden;background:#0b141c;
+  box-shadow:inset 0 2px 10px rgba(0,0,0,.6);
+}
+.scope canvas{display:block;width:100%}
+
+/* ── S-Meter: Licht, nicht Farbe ────────────────────────────────────────── */
+.meter{flex:none;margin:10px 12px 0;padding:8px 12px 9px}
+.meter .row{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.meter .val{margin-left:auto;font-family:var(--mono);font-size:var(--f-small);
+            color:var(--measured);text-shadow:0 0 12px rgba(216,165,95,.3)}
+.bar{height:10px;border-radius:6px;background:#040507;
+     border:1px solid rgba(0,0,0,.8);position:relative;overflow:hidden;
+     box-shadow:inset 0 2px 5px rgba(0,0,0,.85)}
+.bar i{position:absolute;inset:1px auto 1px 1px;border-radius:5px;
+  background:linear-gradient(90deg,#47463b,#817b5c 62%,var(--measured));
+  box-shadow:0 0 12px rgba(216,165,95,.45)}
+.ticks{display:flex;justify-content:space-between;margin-top:3px}
+.ticks span{font-size:var(--f-caption);font-family:var(--mono);color:var(--text-scale)}
+
+/* ── Bedienreihen ───────────────────────────────────────────────────────── */
+/* Zwei Panels statt vier lose Gruppen: die Beschriftungen wandern NACH
+   INNEN, dadurch gehoeren Betriebsart+Band sichtbar zusammen und
+   Filter+Aufbereitung ebenso. Die Gruppen selbst bleiben, was sie waren —
+   app.js fuellt weiterhin #modes/#bands/#filters/#dsp. */
+.feld{margin:10px 12px 0;padding:8px 12px 10px}
+.feld > .caps{margin:0 0 6px}
+.feld .chips + .caps{margin-top:9px}
+.chips{display:flex;gap:6px}
+.chip{
+  flex:1;min-width:0;height:38px;                /* 38 sichtbar, 44 Treffer */
+  display:flex;align-items:center;justify-content:center;
+  font-size:var(--f-small);font-family:var(--mono);color:var(--text2);
+  /* Entwurf B: feste Grauwerte statt Weissschleier, dazu ein sichtbarer
+     Rahmen. Hoehe 36 -> 38, weil die Flaeche durch den engeren Radius
+     optisch schrumpft und der Finger nichts verlieren darf. */
+  background:linear-gradient(180deg,#242429 0%,#141417 100%);
+  border:1px solid #33333a;border-radius:8px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 1px 2px rgba(0,0,0,.5);
+  position:relative;
+}
+.chip::after{content:"";position:absolute;left:0;right:0;top:-4px;bottom:-4px}
+.chip.on{
+  /* Entwurf B: das Blau von kGlassSel (#2f5f92/#1e3d5f/#3d78b0), also genau
+     die Werte, mit denen am Pult eine Auswahl leuchtet. */
+  background:linear-gradient(180deg,#2f5f92 0%,#1e3d5f 100%);
+  border-color:#3d78b0;color:var(--glass-sel-text);
+  box-shadow:0 0 0 1px rgba(61,120,176,.35),
+             0 2px 8px rgba(47,95,146,.35),
+             inset 0 1px 0 rgba(255,255,255,.14);
+}
+.chip.more{flex:0 0 38px;color:var(--text3)}
+/* Zustandsschalter bleiben leise — quietCheckedStyle: im Feld darf genau
+   EINE Stelle kraeftig sein, und das ist die Sendetaste. */
+.chip.quiet.on{background:var(--badge-info);border-color:var(--accent);
+               color:#cfe0f2;box-shadow:inset 0 1px 0 var(--light)}
+
+/* ── Regler ─────────────────────────────────────────────────────────────── */
+.sliders{margin:10px 12px 0;padding:10px 12px;display:flex;flex-direction:column;gap:12px}
+.sl{display:flex;align-items:center;gap:10px}
+.sl .caps{flex:0 0 30px}
+.sl .track{flex:1;height:5px;border-radius:3px;background:#040507;
+  border:1px solid rgba(0,0,0,.8);position:relative;
+  box-shadow:inset 0 1px 3px rgba(0,0,0,.9)}
+.sl .track i{position:absolute;left:0;top:0;bottom:0;border-radius:3px;
+  background:var(--accent);box-shadow:0 0 10px rgba(74,123,168,.55)}
+/* 18 statt 14: der Knopf ist das einzige, was man am Telefon WIRKLICH
+   greifen muss, und 14 px waren schon am Schreibtisch knapp. */
+.sl .track b{position:absolute;top:50%;width:18px;height:18px;margin:-9px 0 0 -9px;
+  border-radius:50%;background:linear-gradient(#6b9cca,#3a648c);
+  border:1px solid #7fb0dd;
+  box-shadow:0 2px 6px rgba(0,0,0,.75),0 0 10px rgba(74,123,168,.35)}
+.sl .v{flex:0 0 54px;text-align:right;white-space:nowrap;font-family:var(--mono);
+       font-size:var(--f-small);color:var(--measured)}
+
+/* ── Sendefeld ──────────────────────────────────────────────────────────── */
+.txrow{margin:auto 12px 0;padding-top:10px;display:flex;gap:7px;align-items:stretch}
+/* Solange ueber Netz nicht gesendet werden kann, schrumpfen die beiden
+   Tasten zu EINER ruhigen Zeile. Vorher belegten sie 58 px im besten
+   Daumenbereich fuer etwas, das dort nie geht — und zwei tote Tasten sehen
+   aus wie ein Fehler, nicht wie eine Absicht.
+   :has() kennt Safari seit 16.4. Fehlt es, greifen nur die .locked-Regeln
+   darunter und es bleibt beim heutigen Bild: zwei erkennbar tote Tasten.
+   Das ist ein Rueckschritt in der Form, kein Verlust an Funktion. */
+.txrow:has(.tx.locked) .tune{display:none}
+.txrow:has(.tx.locked) .tx{
+  height:36px;border-radius:11px;flex-direction:row;gap:6px;
+  background:rgba(18,19,23,.6);border:1px solid rgba(255,255,255,.05);
+  box-shadow:none;font-weight:600;letter-spacing:.13em;font-size:var(--f-caption);
+  text-transform:uppercase;color:var(--text-inactive);
+}
+.txrow:has(.tx.locked) .tx small{margin-top:0;opacity:1;font-size:var(--f-caption)}
+.tx{
+  flex:1;height:58px;border-radius:9px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:linear-gradient(var(--tx-top),var(--tx-bot));
+  border:1px solid var(--tx-border);color:var(--tx-text);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 2px 0 rgba(0,0,0,.45);
+  font-weight:700;letter-spacing:.14em;font-size:var(--f-sub);
+}
+.tx small{font-size:var(--f-caption);font-weight:600;letter-spacing:.1em;
+          opacity:.72;margin-top:2px}
+.tx.locked{
+  background:linear-gradient(#1a1a1e,#141417);border-color:var(--border);
+  color:var(--text-inactive);box-shadow:inset 0 1px 0 var(--light);
+}
+.tune{
+  flex:0 0 84px;border-radius:9px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:linear-gradient(var(--tune-top),var(--tune-bot));
+  border:1px solid var(--tune-border);color:#1a150c;
+  font-weight:700;letter-spacing:.12em;font-size:var(--f-body);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 2px 0 rgba(0,0,0,.45);
+}
+.tune small{font-size:var(--f-caption);font-weight:600;letter-spacing:.06em;
+            opacity:.72;margin-top:2px}
+/* Gesperrt sieht gesperrt aus — dieselbe Behandlung wie bei SENDEN.
+   Bis 2026-09-30 war TUNE in Messing und voll bedienbar, waehrend SENDEN
+   daneben tot dalag. Beide tasten den Sender; der Abstimmtraeger heisst nur
+   nicht so. Eine scharfe Taste neben einer toten ist genau die Art
+   Widerspruch, die irgendwann jemandem die Endstufe kostet. */
+.tune.locked{
+  background:linear-gradient(#1a1a1e,#141417);border-color:var(--border);
+  color:var(--text-inactive);box-shadow:inset 0 1px 0 var(--light);
+}
+
+/* ── Die Station sendet ──────────────────────────────────────────────────
+   Dieselbe Zeile, dieselbe Geometrie, nur in Messing: an dieser Stelle
+   steht sonst "SENDEN / NUR IN DER APP", und genau dort schaut man hin,
+   wenn man wissen will, was der Sender tut.
+
+   Messing und nicht Rot: Rot bleibt der Warnung (Betreiber-Regel), und
+   Senden ist kein Fehler, sondern ein Zustand. Es ist derselbe Ton, in dem
+   die Seite alles Gemessene zeigt (--measured) — denn das ist es: eine
+   Meldung des Geraets, keine Mutmassung der Seite.
+
+   Zweimal notiert, weil der Zusammenbau der Zeile an :has() haengt (Safari
+   ab 16.4): die zweite Regel greift auch ohne :has(), dann eben an den
+   beiden getrennten Tasten. */
+.txrow:has(.tx.locked) .tx.sendet,
+.tx.locked.sendet{
+  color:var(--measured);
+  border-color:var(--amber-dim);
+  background:rgba(107,86,48,.20);
+}
+.txrow:has(.tx.locked) .tx.sendet small,
+.tx.locked.sendet small{color:var(--measured);opacity:.8}
+
+/* ── Fußzeile ───────────────────────────────────────────────────────────── */
+footer{flex:none;height:30px;display:flex;align-items:center;gap:10px;
+  padding:0 16px;margin-top:8px}
+footer span{font-size:var(--f-caption);font-family:var(--mono);color:var(--text-inactive)}
+footer .ok{color:var(--ok)}
+/* Ein fehlender Ton wird in der Fusszeile gemeldet, nicht verschwiegen. */
+footer .warn{color:var(--warn)}
+
+/* ── Tonfreigabe (2026-09-30) ────────────────────────────────────────────
+   iOS gibt Ton erst nach einer Beruehrung frei. Das war bis heute eine
+   UNSICHTBARE Voraussetzung: die Seite wartete auf einen Tipp irgendwohin,
+   und wer das nicht wusste, sass vor einem laufenden Wasserfall ohne Ton
+   und ohne Hinweis. Am echten iPhone genau so erlebt — Betreiber: "sehe
+   wasserfall", "kein ton", und die Selbstmeldung der Seite zeigte dann
+   `weg=keiner, ctx=kein ctx, takte=0`: die Tonkette war nie erzeugt worden.
+   Jetzt steht da ein Knopf, und er verschwindet, sobald der Ton laeuft. */
+.tonAn{
+  flex:none;height:24px;padding:0 11px;border-radius:12px;
+  background:linear-gradient(var(--tune-top),var(--tune-bot));
+  border:1px solid var(--tune-border);color:#1a150c;
+  font:700 var(--f-caption)/1 inherit;letter-spacing:.1em;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 2px 0 rgba(0,0,0,.45);
+}
+.tonAn[hidden]{display:none}
+
+/* ── QSO eintragen (Entwurf A, Betreiber 2026-10-04) ─────────────────────
+   Dasselbe Muster wie das Frequenz-Blatt (#qsy): ein Blatt ueber dem Bild,
+   nicht ein weiteres Feld im Stapel. Begruendung dort; kurz: wer eintraegt,
+   tut genau das — und danach ist das Band wieder frei.
+
+   Die Knopffarbe folgt der Hausregel: Blau nur, wo man klickt. Messing
+   bleibt dem Gemessenen vorbehalten, und die drei automatischen Zeilen
+   sind genau das — gemessene Werte vom Geraet, keine Eingabe. */
+.logAuf{height:28px;padding:0 11px;border-radius:9px;
+  border:1px solid var(--amber-dim);background:rgba(107,86,48,.22);
+  color:var(--measured);font:600 var(--f-caption)/1 inherit;
+  letter-spacing:.13em;flex:none}
+#qsoBlatt{position:fixed;inset:0;z-index:11;display:none;align-items:center;
+  justify-content:center;padding:0 22px;
+  background:radial-gradient(120% 60% at 50% 18%,rgba(23,33,43,.95) 0%,
+             rgba(11,13,16,.96) 52%,rgba(8,8,10,.975) 100%);
+  -webkit-backdrop-filter:blur(7px);backdrop-filter:blur(7px)}
+#qsoBlatt.an{display:flex}
+#qsoBlatt .karte{width:100%;max-width:332px;display:flex;
+  flex-direction:column;gap:12px}
+#qsoBlatt h1{font-size:var(--f-sub);font-weight:600;letter-spacing:.07em;
+  color:var(--title);text-align:center}
+/* Eingefasst wie die Regler-Bahnen: tief eingelassen, damit man sieht,
+   dass man hineinschreibt. */
+#qsoRuf{width:100%;box-sizing:border-box;height:58px;border-radius:12px;text-align:center;
+  background:#040507;border:1px solid rgba(0,0,0,.8);color:var(--text);
+  font:600 30px/1 var(--mono);letter-spacing:.09em;
+  box-shadow:inset 0 2px 6px rgba(0,0,0,.85);text-transform:uppercase}
+#qsoRuf::placeholder{color:var(--text-inactive);font-weight:500;
+  font-size:19px;letter-spacing:.14em}
+#qsoRuf:focus{outline:none;border-color:var(--accent);
+  box-shadow:inset 0 2px 6px rgba(0,0,0,.85),0 0 0 3px rgba(74,123,168,.22)}
+#qsoBlatt .rstreihe{display:flex;gap:9px}
+/* min-width:0 ist nicht Kosmetik: ohne das weigert sich ein Flex-Kind,
+   unter die EIGENBREITE eines <input> zu schrumpfen (die kommt aus dem
+   size-Attribut, nicht aus dem CSS). Die Reihe lief damit bei 375 px
+   rechts aus dem Bild — am 2026-10-04 am Telefonformat gesehen. */
+#qsoBlatt .rstfeld{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px}
+#qsoBlatt .rstfeld label{font-size:var(--f-caption);letter-spacing:.11em;
+  color:var(--text3);text-transform:uppercase;text-align:center}
+#qsoBlatt .rstfeld input{width:100%;box-sizing:border-box;height:44px;border-radius:11px;text-align:center;
+  background:#040507;border:1px solid rgba(0,0,0,.8);color:var(--text);
+  font:600 19px/1 var(--mono);box-shadow:inset 0 2px 5px rgba(0,0,0,.85)}
+#qsoBlatt .rstfeld input:focus{outline:none;border-color:var(--accent)}
+#qsoBlatt .automatisch{display:flex;flex-direction:column;gap:3px;
+  padding:9px 11px;border-radius:10px;background:rgba(255,255,255,.025);
+  border:1px solid rgba(255,255,255,.05)}
+#qsoBlatt .automatisch .z{display:flex;justify-content:space-between;
+  font-size:var(--f-caption);font-family:var(--mono)}
+#qsoBlatt .automatisch .k{color:var(--text3);letter-spacing:.06em}
+#qsoBlatt .automatisch .v{color:var(--measured)}
+/* Die Meldezeile haelt ihre Hoehe, auch wenn sie leer ist — sonst
+   springt das Blatt, sobald eine Antwort kommt. */
+#qsoMeldung{min-height:16px;font-size:var(--f-small);text-align:center;
+  color:var(--text3)}
+#qsoMeldung.ok{color:var(--ok)}
+#qsoMeldung.warn{color:var(--warn)}
+#qsoBlatt button{height:50px;border-radius:12px;font:600 var(--f-sub)/1 inherit;
+  letter-spacing:.09em;border:1px solid #4886c0;
+  background:linear-gradient(#36699f,#21436a);color:#e2eefb;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.2),
+             0 0 16px rgba(74,123,168,.3),0 2px 6px rgba(0,0,0,.55)}
+#qsoBlatt button.still{height:44px;border:1px solid var(--border);
+  background:rgba(18,19,23,.6);color:var(--text-inactive);box-shadow:none;
+  font-size:var(--f-caption);letter-spacing:.1em;text-transform:uppercase}
+#qsoBlatt button:disabled{opacity:.45}
+
+
+/* ── Die Halteleiste (Entwurf 1, gewaehlt 2026-10-04) ─────────────────────
+   Gedrueckt halten nimmt auf, loslassen hoert auf. Der Finger ist die
+   Sicherung: faellt das Telefon aus der Hand, endet es von selbst, und es
+   bleibt kein Zustand uebrig, der haengen koennte.
+
+   KEIN Messing, obwohl die Taste spaeter einmal die Sendetaste wird.
+   Messing ist die Sendefarbe (--measured), und solange hier nichts getastet
+   wird, waere Messing eine Behauptung. Die Farbe kommt mit dem Tasten. */
+.mikrow{margin:8px 12px 0;display:flex;flex-direction:column;gap:7px}
+.mikhalt{
+  height:58px;border-radius:9px;border:1px solid var(--border);
+  background:linear-gradient(var(--glass-btn-top),var(--glass-btn-bot));
+  color:var(--text2);display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:2px;cursor:pointer;
+  box-shadow:inset 0 1px 0 var(--light),0 2px 0 rgba(0,0,0,.45);
+  -webkit-user-select:none;user-select:none;touch-action:none;
+}
+.mikhalt b{font-weight:700;letter-spacing:.14em;font-size:var(--f-sub)}
+.mikhalt small{font-size:var(--f-caption);font-weight:600;letter-spacing:.1em;
+               opacity:.72}
+/* Gedrueckt: deutlich sichtbar, aber ohne Farbwechsel — der Unterschied
+   zwischen "ich halte" und "es sendet" muss erhalten bleiben. */
+.mikhalt.haelt{
+  background:linear-gradient(#2c2d33,#1d1e23);
+  border-color:var(--accent);color:var(--text);
+  box-shadow:inset 0 2px 5px rgba(0,0,0,.6);
+}
+.mikhalt[disabled]{opacity:.45;cursor:default}
+
+/* Der Pegel. Ohne ihn weiss am Telefon niemand, ob das Mikrofon etwas
+   hoert — und das ist die erste Frage, lange bevor getastet wird. */
+.pegel{position:relative;height:8px;border-radius:4px;overflow:hidden;
+       background:var(--inset);border:1px solid var(--inset-border)}
+.pegel i{position:absolute;left:0;top:0;bottom:0;width:0;
+         background:linear-gradient(90deg,var(--ok),var(--measured) 72%,var(--danger));
+         transition:width .06s linear}
+/* Die Spitze bleibt kurz stehen — ein Balken, der nur mitzittert, zeigt
+   Uebersteuerung nie lange genug, um sie zu bemerken. */
+.pegel u{position:absolute;top:0;bottom:0;width:2px;background:var(--text);
+         opacity:.75;left:0;transition:left .18s ease-out}
+.mikmeldung{font:600 var(--f-caption)/1.3 var(--mono);letter-spacing:.08em;
+            color:var(--text-inactive);text-align:center;min-height:13px}
+.mikmeldung.warn{color:var(--warn)}

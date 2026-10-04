@@ -74,6 +74,44 @@ enum class TciSampleType : int {
     Int24   = 1,
     Int32   = 2,
     Float32 = 3,
+
+    // ── Longpath-eigen, nicht in TCI ────────────────────────────────────────
+    // Ein Byte je Wert, dBm + 200 (Bereich -200..+55 dBm, 1 dB Auflösung).
+    // Nur für den Spektrumstrom unten. Das Maß ist von piHPSDR übernommen
+    // (src/server_thread.c: Panadapter-Werte als dBm+200 auf ein Byte), weil
+    // es sich dort über Jahre getragen hat und genau den Bereich abdeckt, den
+    // ein Empfänger zeigt.
+    //
+    // Fremde Server senden das nie, fremde Clients fordern es nie an — wer
+    // den Typ nicht kennt, bekommt ihn nicht zu sehen.
+    UInt8Dbm = 100,
+
+    // Ein Byte je Abtastung, mu-law nach ITU-T G.711 — dieselbe Kennlinie,
+    // die das Telefonnetz seit Jahrzehnten benutzt.
+    //
+    // Warum: der Tonstrom ist mit Abstand der teuerste Teil der Handfunke.
+    // Bei 12 kHz mono Int16 sind das 24,9 kB/s von insgesamt 29,5 — ueber
+    // Mobilfunk 106 MB je Stunde. mu-law halbiert das auf 13,3 kB/s, ohne
+    // eine einzige fremde Zeile Code auf beiden Seiten: die Kennlinie ist
+    // eine Nachschlagetabelle.
+    //
+    // Warum nicht 8 Bit linear: dort liegt das Quantisierungsrauschen als
+    // fester Teppich bei etwa -53 dBFS und ist in CW-Pausen deutlich zu
+    // hoeren. mu-law kompandiert, der Fehler folgt also dem Pegel — an
+    // echtem Kurzwellenton gemessen 37,7 dB Stoerabstand, und abschnittsweise
+    // ebenfalls 37,1 dB. Das liegt unter dem Bandrauschen jedes
+    // Kurzwellenempfaengers.
+    //
+    // Warum nicht Opus: serverseitig waere es zu haben (libopus haengt wegen
+    // RADE ohnehin an der Verknuepfungszeile), aber im Browser nicht. Auf
+    // einer LAN-Adresse ueber http ist der Kontext nicht sicher, und
+    // WebCodecs' AudioDecoder ist [SecureContext] — am 2026-09-30 auf
+    // Martins Telefonpruefseite gemessen: nicht vorhanden. Bliebe eine
+    // WASM-Fremddatei mit ungeklaerter Lizenz fuer weitere 9 kB/s.
+    //
+    // Wie UInt8Dbm ist der Typ selbstverriegelnd: ein fremder Client fordert
+    // "mulaw8" nie an, und wer ihn nicht anfordert, bekommt ihn nie.
+    MuLaw8 = 101,
 };
 
 // Stream type encoding per Thetis enum TCIStreamType (TCIServer.cs:343 [v2.10.3.13])
@@ -83,6 +121,21 @@ enum class TciStreamType : int {
     TxAudioStream = 2,
     TxChrono      = 3,
     LineoutStream = 4,
+
+    // ── Longpath-eigen, nicht in TCI ────────────────────────────────────────
+    // Fertig gerechnetes Spektrum statt rohem I/Q.
+    //
+    // Warum: ein Client, der ein Bild will, muss heute den ganzen I/Q-Strom
+    // ziehen und selbst eine FFT rechnen. Gemessen mit der eigenen
+    // Handfunke: 404 kB/s bei 48 kHz, hochgerechnet rund 1,5 MB/s bei
+    // 192 kHz. Das trägt im WLAN und bricht unterwegs. Der Server hat die
+    // fertigen dBm-Bins ohnehin (FFTEngine::fftReady) — sie auf die
+    // Bildpunktzahl des Clients zu verdichten und als ein Byte je Punkt zu
+    // schicken kostet rund 27 kB/s, also ein Sechzigstel.
+    //
+    // Die Nummer liegt bewusst weit oberhalb der TCI-Typen: käme dort je ein
+    // fünfter Typ dazu, gäbe es keine Kollision.
+    SpectrumStream = 100,
 };
 
 // ── Gelesener Kopf eines eingehenden TCI-Binaerrahmens ───────────────────────
@@ -163,6 +216,27 @@ public:
                                          int sampleType, int length,
                                          int streamType, int channels,
                                          const float* samples);
+
+    // ── Spektrumrahmen (Longpath-eigen, 2026-09-30) ─────────────────────────
+    //
+    // Gleicher 64-Byte-Kopf wie oben, aber ein Byte je Wert statt vier, und
+    // die Werte sind dBm statt Abtastwerte. Deshalb eine eigene Funktion:
+    // buildStreamPayload klemmt auf [-1, +1] und skaliert — für einen Pegel
+    // in dBm ist beides falsch.
+    //
+    // Kodierung: byte = dBm + 200, geklemmt auf 0..255, also -200..+55 dBm
+    // bei 1 dB Auflösung. Von piHPSDR übernommen (src/server_thread.c), wo
+    // sich dasselbe Maß über Jahre getragen hat; es deckt genau den Bereich
+    // ab, den ein Empfänger zeigt, und ein halbes dB sieht am Telefon
+    // ohnehin niemand.
+    //
+    // sampleRate trägt hier NICHT die Abtastrate, sondern die Bildrate — ein
+    // Spektrum hat keine Abtastrate, und das Feld leer zu lassen wäre eine
+    // verschenkte Gelegenheit, dem Client zu sagen, womit er rechnen darf.
+    // Der Client erfährt dasselbe aus der spectrum_start-Bestätigung; hier
+    // steht es, damit auch ein mitgeschnittener Rahmen für sich lesbar ist.
+    static QByteArray buildSpectrumPayload(int receiver, int fps,
+                                           int points, const float* binsDbm);
 
     // From Thetis TCIServer.cs:5264-5305 [v2.10.3.13] — encodeSamples.
     //

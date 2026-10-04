@@ -1,4 +1,8 @@
 # SYNTHETIC GOLDEN -- regenerated 2026-05-22 after the Phase 3J-1 closeout
+# 2026-09-30 erneuert: drive:0/1 und tune_drive:0/1 ergaenzt (110 statt 106
+# Zeilen). Thetis schickt sie in sendInitialisationData mit -- TCIServer.cs
+# 2626-2631 [v2.10.3.13] ruft handleDrive/handleTuneDrive je im Abfragepfad.
+# Ohne sie kennt eine frisch verbundene Fernbedienung die Sendeleistung nicht.
 # init-burst live-state wiring.  Loose-prefix lines reflect TestMockRadioModel
 # defaults (vfoHz=0, mode="" empty, filter=200/2900 SSB baseline, NR off,
 # afLinear=50 -> rx_volume=-6.02 dB via audioGainToDb, volume=-30.0 dB via
@@ -25,7 +29,7 @@
 # Loose-prefix (prefix-only match) lines: all others.
 # Total lines: 106 (8 wrapper + 97 body + 1 ready;)
 protocol:Thetis,2.0;
-device:NereusSDR;
+device:Longpath;
 receive_only:false;
 trx_count:2;
 channels_count:2;
@@ -110,6 +114,10 @@ rx_channel_enable:0,0,true;
 rx_channel_enable:0,1,false;
 rx_channel_enable:1,0,false;
 rx_channel_enable:1,1,false;
+drive:0,0;
+drive:1,0;
+tune_drive:0,0;
+tune_drive:1,0;
 trx:0,false;
 trx:1,false;
 tune:0,false;

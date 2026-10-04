@@ -7,6 +7,7 @@
 #include "core/AudioDeviceConfig.h"
 #include "core/BuildIdentity.h"
 #include "core/CNumericLocale.h"
+#include "core/LogDatei.h"
 #include "core/MacMicPermission.h"
 #include "core/audio/RealtimeAudioPriority.h"
 #include "core/RadioConnection.h"
@@ -39,13 +40,17 @@
 #include <QDir>
 #include <QFile>
 #include <QDateTime>
-#include <QTextStream>
 #include <QStandardPaths>
 #include <QRegularExpression>
 #include <QStringList>
 #include "core/SupportBundle.h"
 
 static QFile* s_logFile = nullptr;
+
+// Die Schreibstelle liegt in core/LogDatei.{h,cpp} — mit Schloss, mit einem
+// einzigen Schreibaufruf, und dort pruefbar (main.cpp ist nicht Teil der
+// Pruefstaende). Die Begruendung samt der sechs zerschriebenen Zeilen vom
+// 2026-10-03 steht im Kopf von LogDatei.h.
 
 // Von einer AetherSDR-Sichtung angestossen (2026-09-05): dort gibt es ein
 // umfangreiches SystemInventory, das aber an ihre eigene Whisper/ggml-
@@ -104,12 +109,7 @@ static void messageHandler(QtMsgType type, const QMessageLogContext& ctx, const 
     const QString line = QString("[%1] %2: %3\n")
         .arg(QDateTime::currentDateTime().toString("HH:mm:ss.zzz"), label, safeMsg);
 
-    if (s_logFile && s_logFile->isOpen()) {
-        QTextStream ts(s_logFile);
-        ts << line;
-        ts.flush();
-    }
-    fprintf(stderr, "%s", line.toLocal8Bit().constData());
+    Longpath::Log::schreibe(line);
 
 #ifndef Q_OS_WIN
     // Diagnostic aid (2026-08-11): one field warning has resisted every
@@ -126,12 +126,7 @@ static void messageHandler(QtMsgType type, const QMessageLogContext& ctx, const 
             for (int i = 0; i < n; ++i) {
                 const QString bt = QStringLiteral("  [bt] %1\n")
                                        .arg(QString::fromLocal8Bit(syms[i]));
-                if (s_logFile && s_logFile->isOpen()) {
-                    QTextStream ts(s_logFile);
-                    ts << bt;
-                    ts.flush();
-                }
-                fprintf(stderr, "%s", bt.toLocal8Bit().constData());
+                Longpath::Log::schreibe(bt);
             }
             free(syms);
         }
@@ -221,26 +216,6 @@ int main(int argc, char* argv[])
     app.setOrganizationName("Longpath");
     app.setWindowIcon(QIcon(":/icons/Longpath.png"));
 
-    // 2026-05-25 KG4VCF bench fix: elevate the main GUI thread to
-    // USER_INTERACTIVE QoS so heavy user-initiated background work
-    // (parallel compiles, mdworker indexing, Time Machine snapshots,
-    // etc.) does not preempt the Qt event loop and produce visibly
-    // choppy spectrum / waterfall rendering.  The audio DSP thread
-    // already gets a stronger elevation (see RxDspWorker::onThreadStarted)
-    // but the GUI thread runs the spectrum paint cycle and was still
-    // being preempted at DEFAULT QoS.  Bench symptom: "whole program
-    // stutters when a build happens".
-    //
-    // Cross-platform via src/core/audio/RealtimeAudioPriority.cpp:
-    //   macOS:   pthread_set_qos_class_self_np(USER_INTERACTIVE)
-    //   Linux:   nice(-5)  (soft-fail without privilege)
-    //   Windows: SetThreadPriority(ABOVE_NORMAL) -- was HIGHEST; dropped
-    //            2026-09-03 after a measured ~85ms periodic Windows-only
-    //            audio glitch traced to this thread contending at the
-    //            same tier as audio-critical work (see
-    //            RealtimeAudioPriority.cpp's elevateGuiMainThreadPriority).
-    Longpath::elevateGuiMainThreadPriority();
-
     // 2026-05-22 bench-finding: pkill / kill / system shutdown sends SIGTERM
     // by default; the OS terminates the process without giving Qt a chance
     // to run aboutToQuit handlers.  Without translation, this skips
@@ -265,12 +240,6 @@ int main(int argc, char* argv[])
                                       "quit", Qt::QueuedConnection);
         }
     });
-
-    // Trigger the macOS microphone permission dialog deterministically
-    // (issue #203). The OS only prompts when something actually engages
-    // TCC; relying on PortAudio's CoreAudio backend to do so is unreliable
-    // on machines without a built-in mic, so call AVCaptureDevice directly.
-    Longpath::requestMicrophonePermission();
 
     // Re-parse properly so --help / --version / unknown options surface
     // via Qt's standard machinery. The earlyProfile pass above already
@@ -318,6 +287,10 @@ int main(int argc, char* argv[])
     s_logFile = new QFile(logPath);
     if (s_logFile->open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text)) {
         s_logFile->setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+        // Erst die Datei bekanntgeben, dann den Umleiter setzen: andersherum
+        // gaebe es ein Fenster, in dem Meldungen schon durch den Umleiter
+        // laufen, aber noch nirgends landen.
+        Longpath::Log::setzeDatei(s_logFile);
         qInstallMessageHandler(messageHandler);
 
         const QString symlink = logDir + "/longpath.log";
@@ -330,6 +303,57 @@ int main(int argc, char* argv[])
     }
 
     logStartupHardwareInventory();
+
+    // Steht hier und nicht direkt hinter dem QApplication-Bau, weil die
+    // Meldung dieses Aufrufs ins Log gehoert: bis zum 2026-10-03 lief er
+    // rund 70 Zeilen VOR dem qInstallMessageHandler, und damit fehlte in
+    // allen fuenf vorliegenden Betriebslogs sowohl das "GUI main thread
+    // elevated to USER_INTERACTIVE QoS" als auch -- schlimmer -- die
+    // Warnung "Failed to elevate GUI main thread", die ein Misslingen
+    // meldet. Ein Ruckeln der Oberflaeche waere damit nicht
+    // nachvollziehbar gewesen.
+    //
+    // Spaeter ist gefahrlos: es existiert noch kein Fenster und keine
+    // Ereignisschleife, die QoS gilt dem Faden, nicht dem Zeitpunkt.
+    // 2026-05-25 KG4VCF bench fix: elevate the main GUI thread to
+    // USER_INTERACTIVE QoS so heavy user-initiated background work
+    // (parallel compiles, mdworker indexing, Time Machine snapshots,
+    // etc.) does not preempt the Qt event loop and produce visibly
+    // choppy spectrum / waterfall rendering.  The audio DSP thread
+    // already gets a stronger elevation (see RxDspWorker::onThreadStarted)
+    // but the GUI thread runs the spectrum paint cycle and was still
+    // being preempted at DEFAULT QoS.  Bench symptom: "whole program
+    // stutters when a build happens".
+    //
+    // Cross-platform via src/core/audio/RealtimeAudioPriority.cpp:
+    //   macOS:   pthread_set_qos_class_self_np(USER_INTERACTIVE)
+    //   Linux:   nice(-5)  (soft-fail without privilege)
+    //   Windows: SetThreadPriority(ABOVE_NORMAL) -- was HIGHEST; dropped
+    //            2026-09-03 after a measured ~85ms periodic Windows-only
+    //            audio glitch traced to this thread contending at the
+    //            same tier as audio-critical work (see
+    //            RealtimeAudioPriority.cpp's elevateGuiMainThreadPriority).
+    Longpath::elevateGuiMainThreadPriority();
+
+    // Trigger the macOS microphone permission dialog deterministically
+    // (issue #203). The OS only prompts when something actually engages
+    // TCC; relying on PortAudio's CoreAudio backend to do so is unreliable
+    // on machines without a built-in mic, so call AVCaptureDevice directly.
+    //
+    // Steht hier und nicht weiter oben, weil die Antwort ins Log gehoert.
+    // Der Aufruf lag bis zum 2026-10-03 rund 45 Zeilen VOR dem Oeffnen der
+    // Log-Datei: er lief, aber seine einzige Ausgabe — "Microphone TCC
+    // status on launch: NotDetermined|Authorized|Denied" — ging ins Leere,
+    // weil der Meldungs-Umleiter erst danach gesetzt wird. Genau diese
+    // Zeile hat am 2026-10-03 gefehlt, als ein unbeantworteter
+    // Berechtigungsdialog den ganzen Verbindungsaufbau einfror; der
+    // Zustand war aus dem Log nicht zu erkennen.
+    //
+    // Spaeter ist hier gefahrlos: der Mikrofon-Eingang wird erst beim
+    // Verbinden geoeffnet (AudioEngine::start), und bis dahin liegen
+    // Fenster und Ereignisschleife laengst.
+    // Siehe docs/architecture/2026-10-03-verbindungshaenger-mikrofon.md.
+    Longpath::requestMicrophonePermission();
 
     // Fusion style as a clean cross-platform base, then layer the
     // Longpath dark palette + minimal baseline QSS on top so every
@@ -517,6 +541,10 @@ int main(int argc, char* argv[])
     // else in this TU) could already be destroyed. Belt-and-braces
     // for the leaked-regex fix in redactPii().
     qInstallMessageHandler(nullptr);
+    // Umgekehrte Reihenfolge wie beim Oeffnen: erst den Umleiter abhaengen,
+    // dann die Datei abmelden. Ein Faden, der jetzt noch schreibt, findet
+    // keine Datei mehr vor — statt in eine geschlossene zu schreiben.
+    Longpath::Log::setzeDatei(nullptr);
     if (s_logFile) {
         s_logFile->close();
         // Intentionally leaked — Qt may still try to log between

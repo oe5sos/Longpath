@@ -180,9 +180,27 @@ void PanFloatingWindow::closeEvent(QCloseEvent* event)
     // ob dieser closeEvent tatsaechlich waehrend eines Vollbild-Uebergangs
     // des Hauptfensters eintrifft (macOS-Fenstermanagement-Nebenwirkung)
     // oder aus einem anderen Grund -- wird nach der Bestaetigung entfernt.
-    qWarning() << "[PanFloatClose]" << panId() << "m_shuttingDown="
-               << m_shuttingDown << "ownWindowState=" << windowState()
-               << "spontaneous=" << event->spontaneous();
+    // 2026-10-04: die Frage von oben ist beantwortet, und zwar aus den
+    // Betriebslogs. In allen vorliegenden Sitzungen kommt diese Zeile
+    // GENAU EINMAL und GENAU beim Beenden -- 19:04:59.635, direkt vor
+    // [ProfileSaveOnQuit] und dem Stoppen der Suchbake, und der Bediener
+    // hat um 19:05:00 beendet. Jedes Mal mit
+    // `spontaneous= false` und `ownWindowState= WindowNoState`.
+    //
+    // Damit ist die Vermutung widerlegt: es ist KEINE Nebenwirkung des
+    // macOS-Fenstermanagements bei einem Vollbildwechsel, sondern ein
+    // ganz gewoehnliches Schliessen beim Programmende. Das Profil behaelt
+    // den Panadapter dabei richtig als schwebend (dieselbe Sitzung:
+    // floatingPans= 1 beim Laden wie beim Sichern).
+    //
+    // Deshalb steht die Zeile jetzt auf INFO statt auf WARNUNG. Sie
+    // bleibt -- falls die Anordnung je wieder verrutscht, will man genau
+    // diese Werte sehen --, aber sie ist kein Fehler und darf nicht
+    // laenger so aussehen. Eine Warnung, die in jeder gesunden Sitzung
+    // auftaucht, erzieht dazu, Warnungen zu ueberlesen.
+    qInfo() << "[PanFloatClose]" << panId() << "m_shuttingDown="
+            << m_shuttingDown << "ownWindowState=" << windowState()
+            << "spontaneous=" << event->spontaneous();
 
     // From AetherSDR PanFloatingWindow.cpp:84-95 [@0cd4559].
     //

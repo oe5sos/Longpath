@@ -704,6 +704,358 @@ private:
     quint16 m_lastBlockReplySeq{0};
     bool blockReplyEnabled();
     void replyToBlock(quint16 seq);
+
+    // ── Mithoeren: was das Geraet von sich aus meldet ────────────────────
+    //
+    // Bis zum 2026-10-02 hat dieser Treiber dem Geraet nur zugehoert,
+    // solange er auf die Beacon-Antwort wartete: processControlDatagram()
+    // stieg mit `if (!m_awaitingBeacon ...) return;` aus, und im Kopf der
+    // Strompakete blieben Opcode und die zwei Zustandsbytes [8:9]
+    // ungelesen -- TX-aktive Rahmen (0xFD) flogen ganz hinaus. Damit fiel
+    // alles auf den Boden, was die QRP ueber ihren eigenen Zustand sagt:
+    // kein Messwert, kein Mikrofon-PTT, keine Spannung, keine
+    // Uebersteuerung. P2RadioConnection meldet davon neun Dinge nach oben
+    // (meterDataReceived, paTelemetryUpdated, adcOverflow,
+    // micPttFromRadio, ...), dieser Treiber vier.
+    //
+    // Und es ist derselbe Grund, aus dem acht Opcodes seit dem
+    // 2026-08-26 unzugeordnet sind (0x03, 0x0c, 0x0d, 0x0f, 0x11, 0x13,
+    // 0x16, 0x1c): der Treiber hat sie nie angesehen. Bisher brauchte
+    // ihre Zuordnung tcpdump mit sudo und ein ExpertSDR2 daneben
+    // (tools/sunsdr_opcode_watch.py) -- also einen Termin an der Bank.
+    //
+    // Diese zwei Inventare aendern am Betrieb nichts und schicken nichts.
+    // Sie halten je Rahmensorte fest, wie oft sie kam und ob die Nutzlast
+    // sich aendert, denn das trennt die beiden interessanten Faelle:
+    // eine Nutzlast, die sich im Betrieb aendert, ist ein Messwert; eine,
+    // die konstant bleibt, ist Ausstattung. Die Zuordnung entsteht damit
+    // im normalen Funkbetrieb.
+    struct FrameTally {
+        quint64 count{0};
+        quint64 payloadChanges{0};
+        QByteArray firstPayload;
+        QByteArray lastPayload;
+        qint64 firstSeenMs{0};
+        qint64 lastSeenMs{0};
+        int changesLogged{0};
+        // Alle verschiedenen Werte dieser Sorte, in der Reihenfolge ihres
+        // ersten Auftretens. Erste und letzte Nutzlast allein genuegen
+        // nicht: wer am Vorverstaerker durch vier Stufen dreht, hat am
+        // Ende wieder den Anfangswert dastehen, und die drei dazwischen
+        // -- also genau die Zuordnung -- waeren weg. Mit der Liste
+        // braucht es EINEN Durchgang am Knopf statt vier.
+        QList<QByteArray> distinctPayloads;
+        bool moreThanListed{false};
+    };
+
+    // Opcode, Unterindex und Nutzlastlaenge in einem Wort. Die Laenge
+    // gehoert in den Schluessel: dieselbe Opcode-Nummer mit anderer
+    // Laenge ist auf diesem Protokoll eine andere Rahmensorte (der
+    // Steuerkopf traegt die Laenge selbst, [4:5]).
+    static constexpr quint64 frameKey(quint8 opcode, quint16 sub, quint16 len)
+    {
+        return (quint64(opcode) << 32) | (quint64(sub) << 16) | quint64(len);
+    }
+
+    // Deckel. 64 Sorten sind mehr als die rund drei Dutzend, die
+    // ExpertSDR2 beim Verbinden ueberhaupt schickt; was darueber kaeme,
+    // waere kein Inventar mehr, sondern eine Gegenstelle, die um sich
+    // streut -- dann steht EINE Warnung im Log und es wird nicht weiter
+    // gesammelt. Je Sorte werden hoechstens drei Aenderungen
+    // ausgeschrieben, danach nur noch gezaehlt: der Strom liefert 1920
+    // Pakete je Sekunde, ein Zustandsbyte, das im Takt wackelt, darf das
+    // Log nicht fuellen.
+    static constexpr int kMaxFrameKinds = 64;
+    static constexpr int kMaxChangeLogsPerKind = 3;
+    // Mitgeschriebene Nutzlast je Sorte. Reicht fuer die vier u32-Werte,
+    // aus denen die bekannten Rahmen bestehen, und haelt das Log lesbar
+    // (ExpertSDR2 schickt beim Verbinden auch ein 1,2-kB-Paket).
+    static constexpr int kMaxTallyPayloadBytes = 32;
+    // Eine Antwort, die zum ersten Mal auftaucht, wird GANZ ins Log
+    // geschrieben -- einmal je Rahmensorte, bis zu dieser Grenze. Grund:
+    // am 2026-10-03 kam auf den Rahmen 0x0c eine Antwort mit 320 Byte
+    // Nutzlast (IEEE-754-Doubles, erkennbar 12,5 und -2,4). Mit den 32
+    // Byte der Mitschrift sieht man, DASS da etwas ist, und nicht WAS --
+    // und ein zweiter Lauf am Geraet kostet mehr als diese Zeile.
+    static constexpr int kMaxFirstSightBytes = 1024;
+    // Acht verschiedene Werte je Sorte. Ein Schalter mit mehr Stellungen
+    // als das hat, ist in diesem Geraet nicht bekannt (der
+    // Vorverstaerker hat vier); ein Rahmen mit mehr ist eher ein
+    // Messwert oder ein Zaehler, und dort sagt die Liste ohnehin nichts
+    // mehr -- dann steht "..." dahinter und die Zahl der Aenderungen
+    // traegt die Aussage.
+    static constexpr int kMaxDistinctPayloads = 8;
+
+    // ── Folgenummern nachzaehlen: Verlust, Luecken, Wiederholungen ───────
+    //
+    // P1 und P2 melden `iqPacketLoss` und `iqSequenceGap` nach oben, dieser
+    // Treiber nicht -- obwohl er die Folgenummern seit dem ersten Tag im
+    // Kopf jedes Strompakets liest. Es fehlte nur das Auszaehlen.
+    //
+    // Die QRP braucht dafuer eine eigene Regel, die es bei P1/P2 nicht
+    // gibt: sie WIEDERHOLT Bloecke. Ohne Blockantwort kam am 2026-09-23
+    // jede Folgenummer achtmal, bytegleich; mit Blockantwort einmal
+    // (gemessen 2026-09-24). Eine Wiederholung ist also kein Verlust und
+    // auch kein Fehler, sondern eine Eigenschaft des Geraets -- sie darf
+    // weder als Luecke gezaehlt werden noch den Nenner der
+    // Verlustrechnung aufblaehen, sonst sieht ein echter Verlust bei
+    // achtfachem Strom achtmal kleiner aus, als er ist.
+    //
+    // Darum drei getrennte Zahlen je Fenster: neue Folgenummern,
+    // Wiederholungen, verlorene. Der Nebengewinn ist eine Diagnose, die
+    // es bisher nur mit LONGPATH_SUNSDR_PROBE gab: im Log steht, ob
+    // gerade eine oder acht Kopien je Nummer ankommen, also ob die
+    // Blockantwort wirkt.
+    void auditStreamSeq(quint16 seq);
+    // Schliesst das 5-s-Fenster: meldet nach oben und schreibt ins Log.
+    void berichteFolgenummern();
+
+    // Eine Differenz darueber wird als Rueckwaerts-Paket gelesen, nicht
+    // als Luecke: die Nummern sind 16 Bit breit und laufen bei 240
+    // Bloecken je Sekunde alle ~273 s um, ein Spaetling ergibt dann eine
+    // riesige Differenz. 1024 Nummern sind bei dieser Rate gut vier
+    // Sekunden -- so lange haelt der Stillstands-Wachhund ohnehin nicht
+    // still (kDataWatchdogTickMs), eine echte Luecke dieser Groesse ist
+    // also kein Zaehlproblem mehr, sondern ein Verbindungsabbruch.
+    static constexpr quint16 kMaxPlausibleGap = 1024;
+
+    // ── Diagnose: die ersten Differenzen der Folgenummern ───────────────
+    //
+    // Am 2026-10-03 am echten Geraet gemessen: nachdem die Frequenz gesetzt
+    // ist (und damit echtes I/Q laeuft), hielt auditStreamSeq() JEDES Paket
+    // fuer einen Rueckwaerts-Laeufer -- 0 neue Nummern, 1300 rueckwaerts in
+    // 5 s -- waehrend das Messgeraet daneben saubere 240 Folgenummern/s
+    // zaehlte. Die Zahlen widersprechen sich, also stimmt eine Annahme
+    // nicht, und zwar meine: dass die Nummern um eins steigen.
+    //
+    // Darum werden hier die ersten Differenzen mitgeschrieben, roh. Nur
+    // unter LONGPATH_SUNSDR_PROBE, damit es im Betrieb nichts kostet.
+    static constexpr int kMaxSeqDeltas = 64;
+    QList<QPair<quint16, quint16>> m_seqDeltas;  // (Nummer, Differenz)
+
+    // ── Was am 2026-10-03 am Geraet gemessen wurde, und warum die erste
+    //    Fassung dieses Zaehlers falsch war ────────────────────────────────
+    //
+    // Erste Fassung: Differenz gegen die ZULETZT gesehene Nummer. Am echten
+    // Geraet faellt sie aus zwei Gruenden um:
+    //
+    //  1. Das Geraet faengt die Folgenummer bei 0 NEU an, sobald der Strom
+    //     neu startet (hier: nach dem Frequenzrahmen 0x07). Gemessen:
+    //     ... 42527 42528 42529 | 0 1 2 3 4 5 ...  Der Zaehler hing danach
+    //     auf 42529 fest, hielt JEDES Paket fuer einen Rueckwaerts-Laeufer
+    //     und meldete "0 Nummern in 5 s, 1301 rueckwaerts" -- waehrend das
+    //     Messgeraet daneben saubere 240 Folgenummern/s zaehlte.
+    //
+    //  2. Die bytegleichen Wiederholungen kommen NICHT direkt hintereinander,
+    //     sondern mit Abstand: gemessen "5 3 6 7 8 9 10 8 11 12 13 14 12".
+    //     Gegen die letzte Nummer gerechnet ist die 3 nach der 5 ein
+    //     Rueckwaerts-Laeufer; sie ist aber eine Wiederholung, und das
+    //     Messgeraet bestaetigt es ueber die ganze Nutzlast (bei 240
+    //     Nummern/s rund 50 Wiederholungen/s, davon GANZ bytegleich 100 %,
+    //     verschieden 0).
+    //
+    // Darum jetzt: ein Ring der letzten gesehenen Nummern (dieselbe Idee wie
+    // der Wiederholungsfilter vom 2026-09-23, nur zaehlt er hier und filtert
+    // nicht), Bezug ist die HOECHSTE gesehene Nummer, und ein Neuanfang wird
+    // erkannt statt in einen Dauerzustand zu laufen.
+    static constexpr int kSeqRingSize = 128;
+    // So viele aufeinanderfolgende Pakete, die zu nichts passen, gelten als
+    // Neuanfang des Stroms. Drei genuegen: bei 240 Nummern/s sind das 12 ms,
+    // und eine echte Stoerung dieser Laenge waere ohnehin eine Luecke.
+    static constexpr int kSeqRestartAfter = 3;
+
+    bool m_seqSeen{false};
+    quint16 m_lastSeq{0};        // hoechste gesehene Nummer
+    QList<quint16> m_seqRing;    // die letzten Nummern, fuer Wiederholungen
+    int m_seqOutOfPlace{0};      // wie viele Pakete in Folge zu nichts passen
+    quint64 m_iqSeqWndRestarts{0};
+    quint64 m_iqSeqWndFrames{0};
+    quint64 m_iqSeqWndRepeats{0};
+    quint64 m_iqSeqWndLost{0};
+    quint64 m_iqSeqWndEvents{0};
+    quint64 m_iqSeqWndBackwards{0};
+    QElapsedTimer m_iqSeqWndClock;
+    // Wann der saubere Bericht zuletzt im Log stand (alle 60 s, siehe dort).
+    QElapsedTimer m_iqSeqCleanClock;
+    // Minus eins heisst "noch nie gemeldet", nicht "bei 0 ms gemeldet".
+    // Die Drosselung rechnet gegen m_iqSeqWndClock.elapsed(), und das ist
+    // am Anfang selbst 0 -- mit einem 0 als Startwert verschwand deshalb
+    // die ERSTE Luecke einer Verbindung still, genau die, die am meisten
+    // sagt. Vom eigenen Pruefstand gefunden, 2026-10-02. P1/P2 haben das
+    // Problem nicht, weil sie gegen die absolute Uhr rechnen.
+    qint64 m_lastGapSignalMs{-1};
+
+    // Wie viele Werkbank-Rahmen in dieser Sitzung hinausgingen und wie
+    // viele abgewiesen wurden. Gezaehlt, nicht nur geloggt: ein Pruefstand
+    // soll belegen koennen, dass eine kaputte Hexzeile WIRKLICH nichts
+    // schickt -- und nicht halb etwas.
+    quint32 m_benchFramesSent{0};
+    quint32 m_benchFramesRejected{0};
+
+    // ── Quittungen: merken, was unbeantwortet blieb ─────────────────────
+    //
+    // Am 2026-10-03 am Geraet gemessen: die QRP quittiert JEDEN
+    // Steuerrahmen, den sie annimmt -- mit demselben Opcode und leerer
+    // Nutzlast, binnen 15 bis 50 ms. Vier geschickte Rahmen, vier
+    // Quittungen; und bei den sechs Rahmen des nachgestellten
+    // Verbindungsablaufs ebenso sechs.
+    //
+    // Damit bekommt ein alter Mangel eine Loesung: bis heute schickte
+    // dieser Treiber jeden Befehl ins Blaue. Am 2026-09-25 wurde gemessen,
+    // dass ein Rahmen mit falscher Pruefsumme stillschweigend VERWORFEN
+    // wird -- "stillschweigend" war dabei unsere Sicht, nicht die des
+    // Geraets: es sagt sehr wohl etwas, naemlich nichts. Wer die
+    // Quittungen zaehlt, sieht den Unterschied.
+    //
+    // Es wird nichts wiederholt und nichts erzwungen: ein unbeantworteter
+    // Rahmen wird EINMAL gemeldet. Ein Treiber, der von selbst
+    // nachschickt, haette am Funkgeraet eine Wirkung, die niemand bestellt
+    // hat.
+    struct OffenerRahmen {
+        quint8 opcode{0};
+        qint64 beiMs{0};
+        QString grund;
+        QByteArray rahmen;      // zum Nachschicken, siehe unten
+        bool schonWiederholt{false};
+    };
+
+    // ── Nachschicken, einmal ────────────────────────────────────────────
+    //
+    // Am 2026-10-03 am Geraet beobachtet: ein VFO-Frequenzrahmen blieb
+    // unquittiert -- er ist unterwegs verloren gegangen. UDP garantiert
+    // nichts, und die Folge ist nicht harmlos: **das Geraet steht dann auf
+    // einer anderen Frequenz, als Longpath anzeigt**, und bis heute haette
+    // das niemand gemerkt.
+    //
+    // Darum wird ein unquittierter Rahmen EINMAL nachgeschickt. Einmal,
+    // nicht in einer Schleife: wiederholt sich der Verlust, ist der Weg
+    // gestoert, und dann hilft kein drittes Paket, sondern eine Meldung.
+    //
+    // Und nur, wo Nachschicken die Lage verbessert: Zustand, Frequenz,
+    // Vorverstaerker, Daempfung. NICHT fuer Werkbank-Rahmen -- was dort
+    // hinausgeht, entscheidet der Mensch davor, und ein Treiber, der dessen
+    // Versuche von selbst verdoppelt, faelscht das Ergebnis.
+    static bool darfNachgeschicktWerden(quint8 opcode)
+    {
+        return opcode == 0x01 || opcode == 0x04
+               || opcode == 0x07 || opcode == 0x08;
+    }
+    quint64 m_rahmenWiederholt{0};
+    // Eine Quittung kam im Messlauf nach 15 bis 50 ms. Eine Sekunde ist
+    // reichlich und trifft keinen gesunden Fall.
+    static constexpr qint64 kQuittungsFristMs = 1000;
+    // Deckel gegen Anwachsen, falls ein Geraet gar nicht quittiert.
+    static constexpr int kMaxOffeneRahmen = 32;
+
+    QList<OffenerRahmen> m_offeneRahmen;
+    quint64 m_quittungenGesehen{0};
+    quint64 m_rahmenOhneQuittung{0};
+    qint64 m_letzteQuittungMs{0};
+
+    // Eine Stelle fuer jeden Steuerrahmen, der an das Geraet geht: senden,
+    // Bytes buchen, auf die Quittung warten. Vorher stand das an sechs
+    // Stellen einzeln, und keine davon sah hin, ob etwas zurueckkam.
+    void sendeSteuerrahmen(const QByteArray& frame, const char* grund,
+                           bool nachschickbar = true);
+    void pruefeOffeneRahmen();
+
+    // ── Uebersteuerung aus dem I/Q erkennen ─────────────────────────────
+    //
+    // P1 und P2 melden `adcOverflow`, weil ihre Geraete ein Statusbit dafuer
+    // schicken. Die QRP schickt nichts: am 2026-10-03 ueber zehn Minuten
+    // gemessen, dass sie von sich aus keinen Steuerrahmen sendet und die
+    // Zustandsbytes im Strom konstant bleiben (0100 ueber 149 691 Pakete).
+    //
+    // Gebraucht wird die Meldung trotzdem -- sie ist eine der zwei echten
+    // Luecken im Empfang. Und sie braucht kein Protokollwissen: eine Probe
+    // am Anschlag ist eine Probe am Anschlag. Die Proben kommen als
+    // 24-Bit-Werte, normalisiert auf +-1,0; der Rauschflur ohne Antenne
+    // liegt bei etwa 2e-05 (am Geraet gemessen), also sechs
+    // Zehnerpotenzen darunter. Eine Schwelle knapp unter eins kann hier
+    // nicht falsch anschlagen.
+    //
+    // Gemessen wird VOR der Pegelanhebung des Profils (rxLevelTrimDb, bei
+    // der QRP 20 dB): danach waere der Anschlag des Wandlers nicht mehr
+    // bei eins, und die Schwelle muesste die Verstaerkung mitrechnen --
+    // eine Abhaengigkeit, die man nicht braucht.
+    static constexpr float kAnschlagSchwelle = 0.999f;
+    // So viele Proben am Anschlag in einem Fenster gelten als
+    // Uebersteuerung. Eine einzelne kann ein Zufall des Rauschens sein;
+    // acht in 200 Probenpaaren sind es nicht.
+    static constexpr int kAnschlagSchwelleAnzahl = 8;
+    // Nicht oefter als so melden -- die Anzeige braucht keine 240
+    // Meldungen je Sekunde.
+    static constexpr qint64 kAnschlagMeldeAbstandMs = 500;
+
+    qint64 m_letzteAnschlagMeldungMs{-1};
+    quint64 m_anschlagProben{0};
+    quint64 m_anschlagMeldungen{0};
+
+    void pruefeAnschlag(const QVector<float>& samples);
+
+    void berichteMithoeren();
+    void noteControlFrame(const QByteArray& data);
+    void noteStreamState(const SunSdr::IqHeader& hdr);
+    void tallyFrame(QHash<quint64, FrameTally>& inventory, const char* channel,
+                    quint8 opcode, quint16 sub, quint16 len,
+                    const QByteArray& payload);
+
+    QHash<quint64, FrameTally> m_controlInventory;
+    QHash<quint64, FrameTally> m_streamStateInventory;
+    quint64 m_controlFramesSeen{0};
+    quint64 m_controlFramesUnparsed{0};
+    bool m_inventoryFullWarned{false};
+    // Ob die Uebersicht in dieser Sitzung schon im Log steht. Sie wird an
+    // zwei Stellen geschrieben -- beim Trennen und beim Wachhund-Abbruch,
+    // siehe berichteMithoeren() -- und darf trotzdem nur einmal kommen.
+    bool m_inventoryReported{false};
+    // Laeuft ab dem Augenblick, in dem die Verbindung steht, damit die
+    // Zeiten im Bericht gegen den Verbindungsbeginn lesbar sind und nicht
+    // gegen die Uhr des Rechners.
+    QElapsedTimer m_inventoryClock;
+    // Der Schnellvergleich aus noteStreamState(): das zuletzt gesehene
+    // Tripel (Opcode, Byte 8, Byte 9) des Stromkopfs.
+    quint8 m_lastStreamOpcode{0};
+    quint8 m_lastStreamByte8{0};
+    quint8 m_lastStreamByte9{0};
+    bool m_lastStreamStateValid{false};
+
+public:
+    // Ein Bericht in Textform, eine Zeile je Rahmensorte. Geht beim
+    // Trennen ins Log und ist der Beleg, den ein Pruefstand liest --
+    // dieselbe Rolle wie probeReportIfDue() fuer das Messgeraet am Strom.
+    QString frameInventoryReport() const;
+    int controlFrameKindsForTest() const { return int(m_controlInventory.size()); }
+    int streamStateKindsForTest() const { return int(m_streamStateInventory.size()); }
+    quint64 controlFramesSeenForTest() const { return m_controlFramesSeen; }
+    quint64 seqFramesForTest() const { return m_iqSeqWndFrames; }
+    quint64 seqRepeatsForTest() const { return m_iqSeqWndRepeats; }
+    quint64 seqLostForTest() const { return m_iqSeqWndLost; }
+    quint64 seqBackwardsForTest() const { return m_iqSeqWndBackwards; }
+    QString seqDeltaReport() const;
+    // Der Anteil der Proben mit Q ungleich null in der letzten
+    // DIAG-Sekunde. 0 % heisst: die QRP liefert nur einen reellen Kanal,
+    // die Seitenbaender liegen uebereinander -- der Zustand, der am
+    // 2026-09-25 am Geraet eingegrenzt wurde.
+    double qNonZeroPercentForTest() const { return m_qNonZeroPercent; }
+    // Rahmen aus einer Umgebungsvariablen ZUR LAUFZEIT schicken, nicht nur
+    // beim Verbinden. Damit laesst sich eine Abfrage stellen, nachdem das
+    // Geraet in einen bestimmten Zustand gebracht wurde -- etwa: dieselbe
+    // Abfrage 0x0c auf zwei verschiedenen Baendern, um zu sehen, ob die
+    // Antwort bandabhaengig ist. Nur fuer die Werkbank; ohne die Variable
+    // geht nichts hinaus, und die Pruefungen aus
+    // sendBenchFrames() gelten unveraendert.
+    void sendBenchFramesForTest(const QString& envName) { sendBenchFrames(envName); }
+    quint64 seqRestartsForTest() const { return m_iqSeqWndRestarts; }
+    quint32 benchFramesSentForTest() const { return m_benchFramesSent; }
+    quint32 benchFramesRejectedForTest() const { return m_benchFramesRejected; }
+    bool inventoryReportedForTest() const { return m_inventoryReported; }
+    quint64 quittungenGesehenForTest() const { return m_quittungenGesehen; }
+    quint64 rahmenOhneQuittungForTest() const { return m_rahmenOhneQuittung; }
+    quint64 anschlagProbenForTest() const { return m_anschlagProben; }
+    quint64 anschlagMeldungenForTest() const { return m_anschlagMeldungen; }
+    quint64 rahmenWiederholtForTest() const { return m_rahmenWiederholt; }
+    int offeneRahmenForTest() const { return int(m_offeneRahmen.size()); }
 };
 
 } // namespace Longpath

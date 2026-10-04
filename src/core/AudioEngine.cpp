@@ -122,8 +122,10 @@
 #include "RxChannel.h"        // afGain() — for VAX AF-bypass
 #include "WdspEngine.h"       // rxChannel(0) lookup
 #include "audio/PortAudioBus.h"
+#include "core/audio/BusMitFrist.h"
 #include "../models/RadioModel.h"
 #include "../models/SliceModel.h"
+#include "core/MacMicPermission.h"   // microphoneAccessGranted()
 
 #ifdef Q_OS_MAC
 #include "audio/CoreAudioHalBus.h"
@@ -453,7 +455,35 @@ void AudioEngine::start()
     // (RadioModel.cpp §"open the WDSP channel pool").
     preregisterSlices(m_radio ? m_radio->boardCapabilities().maxSlices : 1);
 
+    // ── Schrittmarken, damit ein Einfrieren das Geraet nennt ────────────
+    //
+    // Hier werden SIEBEN Geraete nacheinander geoeffnet, jedes ohne
+    // Zeitlimit: Lautsprecher, Mikrofon, VAX RX 1-4, VAX TX. Jedes kann
+    // haengen -- an einer noch offenen Berechtigungsfrage, an einer
+    // Schnittstelle, die ein anderes Programm exklusiv haelt, an einem
+    // traegen Treiber. Und weil start() in der verschachtelten
+    // Ereignisschleife von RadioModel::connectToRadio laeuft, steht dann
+    // nicht nur der Ton, sondern die gesamte Oberflaeche samt
+    // "Abbrechen" (am 2026-10-03 live erlebt, siehe
+    // docs/architecture/2026-10-03-verbindungshaenger-mikrofon.md).
+    //
+    // Bis hierher hinterliess so ein Haenger KEINE Spur: die letzte
+    // Logzeile stand weit davor, und aus ihr war nicht zu erkennen,
+    // welches der sieben Geraete nicht zurueckkam. Genau dagegen helfen
+    // Schrittmarken -- derselbe Griff, den der Betreiber am 2026-09-01
+    // fuer den Profilwechsel bestellt hat ("[ProfileApply:Step] n/6").
+    //
+    // Sie ersetzen kein Zeitlimit. Sie machen aus "eingefroren, niemand
+    // weiss warum" ein "eingefroren beim VAX-TX-Bus" -- und das ist der
+    // Unterschied zwischen einer Fehlersuche und einem Ratespiel.
+    //
+    // Kosten: sieben Zeilen je Verbindungsaufbau. Im Normalfall dauert
+    // das Ganze 20 ms (gemessen am 2026-10-03: Mikrofon 18 ms, alle
+    // fuenf VAX-Busse zusammen unter 1 ms), die Marken fallen also nicht
+    // ins Gewicht.
+    qCInfo(lcAudio) << "[AudioStart:Step] 1/7 Lautsprecher";
     ensureSpeakersOpen();
+    qCInfo(lcAudio) << "[AudioStart:Step] 2/7 Mikrofon (TX-Eingang)";
     ensureTxInputOpen();
 
     // Sub-Phase 8.5: eagerly construct platform-native VAX RX buses + the
@@ -474,6 +504,13 @@ void AudioEngine::start()
             // platform-native bus.
             continue;
         }
+        // In EINEM String zusammenbauen, nicht in den Strom stuecken: qCInfo
+        // setzt zwischen zwei gestreamte Werte ein Leerzeichen, und in
+        // Martins Log stand deshalb "3 /7" statt "3/7". In einer Zeile, die
+        // man liest, waehrend gerade etwas haengt, ist das schlampig.
+        qCInfo(lcAudio).noquote()
+            << QStringLiteral("[AudioStart:Step] %1/7 VAX RX %2")
+                   .arg(2 + channel).arg(channel);
         m_vaxBus[idx] = makeVaxBus(channel);
         if (m_vaxBus[idx]) {
             qCInfo(lcAudio) << "VAX" << channel << "bus opened (eager)"
@@ -482,6 +519,7 @@ void AudioEngine::start()
     }
 
     if (!m_vaxTxBus) {
+        qCInfo(lcAudio) << "[AudioStart:Step] 7/7 VAX TX";
         m_vaxTxBus = makeVaxTxBus();
         if (m_vaxTxBus) {
             qCInfo(lcAudio) << "VAX TX bus opened (eager)"
@@ -497,6 +535,11 @@ void AudioEngine::start()
     }
 
     m_running = true;
+
+    // Die Gegenmarke: steht sie im Log, sind alle sieben zurueckgekommen.
+    // Fehlt sie und die letzte Marke nennt ein Geraet, haengt genau das.
+    qCInfo(lcAudio) << "[AudioStart:Step] fertig -- alle sieben offen oder "
+                       "sauber uebersprungen";
 
     qCInfo(lcAudio) << "AudioEngine started ("
                     << (m_speakersBus && m_speakersBus->isOpen()
@@ -639,11 +682,21 @@ std::unique_ptr<IAudioBus> AudioEngine::makeBus(const AudioDeviceConfig& cfg,
     bus->setConfig(pcfg);
 
     const AudioFormat fmt = toAudioFormat(cfg);
-    if (!bus->open(fmt)) {
-        qCWarning(lcAudio) << "IAudioBus open failed:" << bus->errorString();
-        return nullptr;
+    // Mit Frist oeffnen: ohne sie kann dieser Aufruf die ganze Oberflaeche
+    // einfrieren (siehe oeffneMitFrist). Der Fehlertext muss VOR der
+    // Uebergabe geholt werden -- nach einem Zeitlimit gehoert der Bus dem
+    // Oeffnungsfaden und darf hier nicht mehr angefasst werden.
+    const QString wofuer = QStringLiteral("%1 \"%2\"")
+                               .arg(capture ? QStringLiteral("Aufnahme")
+                                            : QStringLiteral("Wiedergabe"),
+                                    cfg.deviceName.isEmpty()
+                                        ? QStringLiteral("(Vorgabegeraet)")
+                                        : cfg.deviceName);
+    auto geoeffnet = Audio::oeffneMitFrist(std::move(bus), fmt, wofuer);
+    if (!geoeffnet) {
+        return nullptr;   // oeffneMitFrist hat den Grund schon gemeldet
     }
-    return bus;
+    return geoeffnet;
 }
 
 std::unique_ptr<IAudioBus> AudioEngine::makeVaxBus(int channel)
@@ -923,6 +976,31 @@ void AudioEngine::ensureTxInputOpen()
         return;
     }
     if (!m_paInitialized) {
+        return;
+    }
+
+    // Nicht oeffnen, solange die Mikrofon-Berechtigung noch offen ist.
+    //
+    // Ohne diese Pruefung blockiert der Oeffnungsversuch, bis der Bediener
+    // den TCC-Dialog beantwortet — ohne Zeitlimit. Das waere halb so
+    // schlimm, laege der Aufruf nicht in der verschachtelten
+    // Ereignisschleife von RadioModel::connectToRadio: dort friert mit ihm
+    // die GESAMTE Oberflaeche ein, samt Verbindungsdialog und dessen
+    // "Abbrechen". Am 2026-10-03 live erlebt — der Dialog stand auf einem
+    // unsichtbaren Space, Longpath war eine Minute spaeter immer noch tot
+    // (0,2 % Prozessorlast, Log stumm, TCI-Port horcht, nimmt aber nichts
+    // an). Belegt per sample(1); beschrieben in
+    // docs/architecture/2026-10-03-verbindungshaenger-mikrofon.md.
+    //
+    // Empfangen braucht kein Mikrofon. Faellt der Eingang weg, bleibt nur
+    // der Pegelbalken leer — ein Zustand, den der Zweig unten ohnehin kennt
+    // und meldet. Das ist ungleich besser als ein totes Programm.
+    //
+    // Sobald die Berechtigung erteilt ist, oeffnet der naechste Aufruf den
+    // Eingang ganz normal; auf Nicht-macOS ist die Pruefung immer true.
+    if (!microphoneAccessGranted()) {
+        qCInfo(lcAudio) << "TX input bus not opened — microphone permission "
+                           "pending or denied; receiving is unaffected";
         return;
     }
 

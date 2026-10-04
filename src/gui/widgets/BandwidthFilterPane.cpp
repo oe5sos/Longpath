@@ -347,10 +347,20 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
     // ── Das Signal ──────────────────────────────────────────────────
     //
     // Der Ausschnitt kommt vom Panadapter (SpectrumWidget::dbmOverRange)
-    // — dieselbe Abbildung, dieselbe Kalibrierung. Fester Bereich:
-    // Boden ist das 10. Perzentil (ein Ausreisser verschiebt sonst die
-    // Skala), Decke 40 dB darueber — ein starkes Signal fuellt die
-    // Flaeche, ein sehr starkes stoesst oben an, wie in der Vorlage.
+    // — dieselbe Abbildung, dieselbe Kalibrierung. Boden ist das 10.
+    // Perzentil (ein Ausreisser verschiebt sonst die Skala).
+    //
+    // Die Decke lag bis 2026-09-30 fest 40 dB darueber, und ein starkes
+    // Signal stiess oben an — der Gipfel lief flach am Rand entlang, was
+    // aussieht, als schluge die Kurve aus dem Rahmen. Betreiber am
+    // 2026-09-30 an einem S9+12-Signal auf 40 m: "bandwith schlaegt ueber
+    // den rahmen".
+    //
+    // Jetzt geht die Decke mit, sobald die Spitze sie erreicht: 40 dB
+    // bleiben das MINDESTmass, damit ein ruhiges Band nicht zur flachen
+    // Linie zusammenfaellt und die Skala zwischen zwei Baendern
+    // vergleichbar bleibt — aber ein lautes Signal bekommt den Platz, den
+    // es braucht, plus 3 dB Luft, damit der Gipfel nicht am Rahmen klebt.
     const QColor traceLine(Style::role("measured", Style::kAmberText));
     const int top = r.top() + 6;
     const int bot = r.bottom() - 2;
@@ -358,7 +368,8 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
         QVector<float> sorted = m_trace;
         std::sort(sorted.begin(), sorted.end());
         const float lo = sorted.at(sorted.size() / 10);
-        const float hi = lo + 40.0f;
+        const float spitze = sorted.constLast();
+        const float hi = std::max(lo + 40.0f, spitze + 3.0f);
         const double yScale = (bot - top) / static_cast<double>(hi - lo);
 
         QPolygonF poly;

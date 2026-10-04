@@ -27,6 +27,8 @@
 #include "TciClientSession.h"
 #include "TciProtocol.h"
 #include "TciSendQueue.h"
+#include "core/LogbookDatei.h"
+#include "models/LogEntry.h"
 #include "TciBinaryFrame.h"
 #include "TciSensorManager.h"
 #include "LogCategories.h"
@@ -34,6 +36,7 @@
 #include "models/SliceModel.h"  // Phase 3J-1 closeout: SliceModel signal wireup for local broadcast.
 #include "models/NotchModel.h"  // TNF section 6.4: master notch enable broadcast.
 #include "models/TransmitModel.h"  // Phase 3J-1 closeout (review P2): MON / TUN broadcast wireup.
+#include "FFTEngine.h"                // Spektrum-Abgriff: fftReady liefert fertige dBm-Bins
 #include "MoxController.h"         // Phase 3J-1 closeout (review P2): MOX broadcast wireup.
 #include "TxSliceArbiter.h"        // Codex review round 6: tx_frequency follows the TX-bound slice.
 #include "AudioEngine.h"           // Phase 3J-1 closeout (review P1 #1): volume change broadcast.
@@ -43,6 +46,7 @@
 #include "RxChannel.h"
 #include "TxChannel.h"
 #include "AppSettings.h"  // Phase 18: TciIqSwap + TciAlwaysStreamIq flags
+#include "CredentialStore.h"        // Fernzugriffs-Token (Schluesselbund)
 
 // Phase 16 Task 16.3 (sub-commit b): WDSP RESAMPLEF lifecycle.
 // resample.h declares create_resampleF / destroy_resampleF / xresampleF, and
@@ -65,10 +69,88 @@ void  destroy_resampleFV(void* ptr);
 #include <QHostAddress>
 #include <QTimer>
 #include <QWebSocket>
+#include <QNetworkInterface>
+#include <QHostInfo>
+#include <QUrl>
+#include <QWebSocketCorsAuthenticator>  // Herkunftsprüfung, siehe start()
 #include <QWebSocketServer>
 #include <QDateTime>
+#include <QRandomGenerator>          // Token aus der Systemquelle
+
+#include <algorithm>  // std::clamp — drive:/tune_drive:-Broadcasts
 
 namespace Longpath {
+
+// ── rueckstauFrei() (2026-10-01) ─────────────────────────────────────────────
+//
+// Darf an diesen Socket noch ein Binaerrahmen? Qt puffert, was der Client
+// nicht abholt, und der Puffer waechst ohne Grenze.
+//
+// Das trifft genau den Fall, fuer den die Handfunke gebaut ist: ein Telefon,
+// das iOS einfriert, wenn es in die Tasche wandert. Die Verbindung bleibt
+// formal offen, der Client holt aber nichts mehr ab — und der Server
+// schaufelt bei 12 kHz mu-law gut 13 kB in jede Sekunde hinein. Nach einer
+// Viertelstunde in der Tasche waeren das zwölf Megabyte je Strom.
+//
+// Ab der Schwelle wird verworfen statt gepuffert. Das ist die richtige Wahl
+// fuer Ton und Bild: beide sind nur im Augenblick etwas wert. Was der Client
+// verpasst hat, will er beim Zurueckkommen nicht nachgereicht bekommen — er
+// will das JETZT hoeren und sehen, nicht die Viertelstunde von vorhin.
+//
+// 256 kB sind bei 13 kB/s rund zwanzig Sekunden Rueckstand. Wer so weit
+// hinterherhaengt, hat kein Puffer-, sondern ein Leitungsproblem.
+// Gehoert diese Herkunft zu DIESEM Rechner?
+//
+// Vergleicht nur den Hostnamen der Herkunft (Schema und Port sind egal —
+// die Weboberflaeche kann auf jedem Port liegen) gegen:
+//   * localhost / 127.0.0.1 / ::1
+//   * jede IP-Adresse einer laufenden Netzwerkkarte
+//   * den eigenen Rechnernamen, mit und ohne ".local" (Bonjour)
+//
+// Absichtlich NICHT per Namensaufloesung geprueft: ein DNS-Server, auf den
+// Longpath keinen Einfluss hat, duerfte sonst entscheiden, wer an das
+// Funkgeraet darf.
+static bool istEigeneHerkunft(const QString& origin)
+{
+    const QUrl url(origin);
+    const QString host = url.host().trimmed().toLower();
+    if (host.isEmpty()) { return false; }
+
+    if (host == QLatin1String("localhost")
+        || host == QLatin1String("127.0.0.1")
+        || host == QLatin1String("::1")) {
+        return true;
+    }
+
+    // Eigene Adressen
+    const auto alle = QNetworkInterface::allInterfaces();
+    for (const auto& iface : alle) {
+        if (!iface.flags().testFlag(QNetworkInterface::IsRunning)) { continue; }
+        for (const auto& entry : iface.addressEntries()) {
+            if (entry.ip().toString().compare(host, Qt::CaseInsensitive) == 0) {
+                return true;
+            }
+        }
+    }
+
+    // Eigener Rechnername, mit und ohne .local
+    const QString eigen = QHostInfo::localHostName().trimmed().toLower();
+    if (!eigen.isEmpty()) {
+        const QString kurz = eigen.section(QLatin1Char('.'), 0, 0);
+        if (host == eigen || host == kurz
+            || host == kurz + QLatin1String(".local")) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool rueckstauFrei(QWebSocket* ws)
+{
+    static constexpr qint64 kMaxAusstehend = 256 * 1024;
+    return ws && ws->bytesToWrite() < kMaxAusstehend;
+}
+
 
 // ── Constructor / destructor ─────────────────────────────────────────────────
 //
@@ -190,6 +272,14 @@ TciServer::TciServer(RadioModel* model, QObject* parent)
         while (m_protocol->hasPendingNotification()) {
             const QString notif = m_protocol->takePendingNotification();
             for (auto sit = clientsSnapshot.cbegin(); sit != clientsSnapshot.cend(); ++sit) {
+                // Das Anmeldetor hielt bis 2026-09-30 nur EINGEHENDE Befehle
+                // auf. Ausgehend lief alles weiter: Frequenz, Betriebsart,
+                // Sendezustand gingen auch an eine Verbindung aus dem Netz,
+                // die sich nie angemeldet hat. Wer den Port findet, konnte
+                // mitlesen, was die Station gerade macht, ohne das Token zu
+                // kennen — und `trx:`-Meldungen verraten sogar, wann gesendet
+                // wird. Ein Tor, das nur in eine Richtung schliesst, ist keins.
+                if (!sit.value()->authenticated) { continue; }
                 sit.value()->sendQueue.push(TciSendQueue::Priority::Control, notif);
             }
         }
@@ -228,6 +318,65 @@ TciServer::TciServer(RadioModel* model, QObject* parent)
         // From Thetis TCIServer.cs:5444-5512 [v2.10.3.13] — the sendRXAudioStream
         // loop reads samples, resamples, encodes, and calls sendBinaryFrame.
         // Longpath replicates this per drain-tick rather than in a dedicated thread.
+        // ── Verteilen, bevor gelesen wird (2026-09-30) ──────────────────────
+        //
+        // Der Erzeugerring m_audioRing[rx] hat EINEN Verbraucher: diese
+        // Schleife. Frueher popte jeder Client direkt daraus — wer zuerst
+        // kam, nahm die Abtastwerte, der zweite bekam Stille mit Loechern.
+        // Ein Ring, viele Leser, das geht nicht auf.
+        //
+        // Jetzt wird der Ring genau einmal geleert und sein Inhalt an alle
+        // Sitzungen weitergereicht, die diesen Empfaenger abonniert haben.
+        // Danach liest jede aus IHREM Vorrat — mit ihrer Blockgroesse, ihrer
+        // Rate, ihrem Format. Hat niemand abonniert, wird trotzdem geleert,
+        // damit der Ring nicht volllaeuft und der DSP-Faden ins Verwerfen
+        // gerät.
+        {
+            static thread_local std::vector<uint8_t> verteiler;
+            // Ein Stereo-Rahmen sind zwei floats, also acht Byte. NUR ganze
+            // Rahmen weiterreichen: bricht man mitten in einem Paar ab, ist
+            // ab dem naechsten Block links und rechts vertauscht und die
+            // Wertgrenzen verschoben — im Pruefstand kam daraufhin -4,2e14
+            // heraus, weil vier Bytes aus zwei verschiedenen floats als einer
+            // gelesen wurden.
+            static constexpr int kRahmenBytes = 2 * int(sizeof(float));
+            // Portionsweise, hoechstens eine halbe Sitzungskapazitaet je
+            // Runde. tryPushCopy verwirft naemlich die GANZE Eingabe, wenn
+            // sie nicht in den freien Platz passt (bewusst so — ein
+            // Teilschreiben wuerde die Rahmenausrichtung zerstoeren, siehe
+            // AudioRingSpsc.h). Ein Schwung, der groesser ist als der
+            // Sitzungsring, kaeme also nirgends an: im Pruefstand wurden 250
+            // ms auf einmal eingespeist, und der Vorrat blieb leer, waehrend
+            // der Abfluss altes Scratch als Ton verschickte (-4,2e14).
+            //
+            // Im Betrieb kommt das nie vor — der Abfluss laeuft alle 5 ms,
+            // das sind 960 Byte. Die Schranke greift nur, wenn sich etwas
+            // angestaut hat, und laesst den Stau dann ueber mehrere Takte
+            // abfliessen statt ihn zu verwerfen.
+            static constexpr size_t kPortion = 32768;
+            for (int rx = 0; rx < kMaxTciRxSlices; ++rx) {
+                size_t da = std::min(m_audioRing[rx].usedBytes(), kPortion);
+                da -= da % kRahmenBytes;
+                if (da == 0) { continue; }
+                if (verteiler.size() < da) { verteiler.resize(da); }
+                const qint64 gelesen =
+                    m_audioRing[rx].popInto(verteiler.data(), static_cast<int>(da));
+                if (gelesen <= 0) { continue; }
+                for (auto cit = clientsSnapshot.cbegin();
+                     cit != clientsSnapshot.cend(); ++cit) {
+                    const auto& s = cit.value();
+                    if (!s->audioStreamEnabled.contains(rx)) { continue; }
+                    // tryPushCopy verwirft bei Überlauf das Neueste. Ein
+                    // Client, der nicht abholt (eingefrorenes Telefon), staut
+                    // damit niemanden auf — er verliert nur seinen eigenen
+                    // Ton, und das hoert man beim Zurueckkommen als Sprung,
+                    // nicht als wachsende Verzoegerung.
+                    s->audioVorrat[rx].tryPushCopy(verteiler.data(),
+                                                   static_cast<int>(gelesen));
+                }
+            }
+        }
+
         for (auto cit = clientsSnapshot.begin(); cit != clientsSnapshot.end(); ++cit) {
             QWebSocket* ws = cit.key();
             const auto& session  = cit.value();
@@ -235,23 +384,46 @@ TciServer::TciServer(RadioModel* model, QObject* parent)
             for (int rx : session->audioStreamEnabled) {
                 if (rx < 0 || rx >= kMaxTciRxSlices) { continue; }
 
-                // Number of interleaved float samples to pop each tick.
-                // audioStreamSamples is per-channel; multiply by channels.
-                const int channels = session->audioStreamChannels;  // 1 or 2
-                const int perChSamples = session->audioStreamSamples;  // default 2048
-                const int totalSamples = perChSamples * channels;
-                const int wantBytes = totalSamples * static_cast<int>(sizeof(float));
+                // Der Ring traegt IMMER 48 kHz stereo verschraenkt — das legt
+                // onAudioFrameReady() fest, das L und R paarweise hineinlegt,
+                // ohne die Wunschkanalzahl des Clients zu kennen. Die
+                // Kanalzahl unten ist das SENDEFORMAT, nicht das Ringformat.
+                static constexpr int kRingChannels = 2;
 
-                if (m_audioRing[rx].usedBytes() < static_cast<size_t>(wantBytes)) {
-                    continue;  // not enough data yet; wait for next tick
+                const int channels = session->audioStreamChannels;  // 1 oder 2
+                const int perChSamples = session->audioStreamSamples;  // Vorgabe 2048
+
+                // Ein Block ist perChSamples ZEITPUNKTE lang, unabhaengig
+                // davon, wie viele Kanaele der Client haben will.
+                //
+                // From Thetis TCIServer.cs:5896-5911 [v2.10.3.15] — Thetis
+                // haelt getrennte L/R-Warteschlangen, baut bei channels <= 1
+                // ein Feld der Laenge packetSamples nur aus links, sonst
+                // packetSamples * 2 verschraenkt, und ruft danach in BEIDEN
+                // Faellen leftPending.Advance(packetSamples) und
+                // rightPending.Advance(packetSamples). Die Blockdauer haengt
+                // dort also nicht an der Kanalzahl.
+                //
+                // Bis 2026-09-30 rechnete Longpath hier totalSamples =
+                // perChSamples * channels und popte das aus dem Stereoring.
+                // Bei channels == 1 waren das nur perChSamples/2 Zeitpunkte,
+                // und L,R,L,R lief als vermeintliches Mono weiter. Am echten
+                // Geraet (ANVELINA, 20 m) gemessen: 24 064 Werte/s statt
+                // 12 000 bei ausgehandelten 12 kHz — genau Faktor zwei, dazu
+                // vermischte Kanaele und eine Oktave zu tiefer Ton.
+                const int ringSamples = perChSamples * kRingChannels;
+                const int wantBytes = ringSamples * static_cast<int>(sizeof(float));
+
+                if (session->audioVorrat[rx].usedBytes() < static_cast<size_t>(wantBytes)) {
+                    continue;  // noch nicht genug beisammen; naechster Takt
                 }
 
                 // Pop from the ring into the scratch buffer.
                 // Scratch is sized for kMaxDrainSamples = 2048*2 floats.
                 const int maxScratch = kMaxDrainSamples;
-                if (totalSamples > maxScratch) { continue; }  // safety
+                if (ringSamples > maxScratch) { continue; }  // safety
 
-                const qint64 got = m_audioRing[rx].popInto(
+                const qint64 got = session->audioVorrat[rx].popInto(
                     reinterpret_cast<uint8_t*>(m_drainScratch.data()),
                     wantBytes);
                 if (got < wantBytes) { continue; }
@@ -261,18 +433,57 @@ TciServer::TciServer(RadioModel* model, QObject* parent)
                 // domain and the resampler sees clean amplitude).  Item 13:
                 // track block peak |sample| for TciApplet's slice level meter
                 // -- replaces the fake sine-wave placeholder.
-                const float sliceGain =
+                const float sliceGainRoh =
                     m_sliceRxGainLinear[rx].load(std::memory_order_acquire);
+
+                // ── Den lokalen AF-Regler herausrechnen (2026-09-30) ────────
+                //
+                // Der TCI-Abgriff sitzt HINTER WDSPs panel.gain1 (rxa.c:698),
+                // und Longpath speist dort den AF-Regler ein
+                // (RxChannel::setAfGain). Wer am Rechner leise stellt, weil
+                // er dort gerade nicht zuhört, macht damit auch das Telefon
+                // leise — und am Telefon lässt sich nichts dagegen tun: der
+                // TCI-Pegelregler kann ausdrücklich nur dämpfen.
+                //
+                // In Thetis passiert das NICHT. Dort ist PanelGain1 ein
+                // eigener Per-RX-Regler (radio.cs:1079-1090, gespeist von
+                // ptbRX0Gain), auf den die Hauptlautstärke nicht wirkt
+                // (audio.cs:248-258 -> cmaster.cs:954-957); der TCI-Abgriff
+                // liegt davor. Longpath hat beide Regler zu einem
+                // verschmolzen und legt die Dämpfung damit in den Fernton
+                // hinein, den Thetis herausshält. Das ist eine
+                // Portierungslücke, kein Entwurf.
+                //
+                // Longpath kennt das Problem bereits und hat es für den
+                // VAX-Abgriff genauso gelöst — AudioEngine.cpp:1370-1387,
+                // dort steht es wörtlich: VAX erbe sonst "whatever
+                // attenuation the speaker slider is currently applying,
+                // which is wrong". Dieselbe Rechnung, dieselbe Begründung,
+                // derselbe Schutz gegen Division durch fast Null.
+                //
+                // Bei ganz zugedrehtem Regler bleibt es still: die Werte sind
+                // innerhalb von WDSP schon mit ~0 multipliziert worden, da
+                // ist nichts mehr zurückzuholen. Das behebt erst ein Abgriff
+                // vor panel.gain1.
+                float afInverse = 1.0f;
+                if (!m_model.isNull() && m_model->wdspEngine()) {
+                    if (RxChannel* ch = m_model->wdspEngine()->rxChannel(rx)) {
+                        const double af = ch->afGain();
+                        if (af > 0.001) { afInverse = static_cast<float>(1.0 / af); }
+                    }
+                }
+                const float sliceGain = sliceGainRoh * afInverse;
+
                 float blockPeak = 0.0f;
                 if (sliceGain != 1.0f) {
-                    for (int i = 0; i < totalSamples; ++i) {
+                    for (int i = 0; i < ringSamples; ++i) {
                         m_drainScratch[i] *= sliceGain;
                         const float a = std::fabs(m_drainScratch[i]);
                         if (a > blockPeak) { blockPeak = a; }
                     }
                 } else {
                     // No gain adjust -- just track peak without mutating samples.
-                    for (int i = 0; i < totalSamples; ++i) {
+                    for (int i = 0; i < ringSamples; ++i) {
                         const float a = std::fabs(m_drainScratch[i]);
                         if (a > blockPeak) { blockPeak = a; }
                     }
@@ -283,18 +494,84 @@ TciServer::TciServer(RadioModel* model, QObject* parent)
                 // Phase 16: xresampleFV resamples in-place using the per-session
                 // per-slice RESAMPLEF instance created in handleAudioSubscribe.
                 const float* samples = m_drainScratch.data();
-                int outSamples = totalSamples;
+                int outSamples = ringSamples;
 
-                auto rIt = session->audioResamplers.find(rx);
-                if (rIt != session->audioResamplers.end() &&
-                    session->audioSampleRate != 48000) {
-                    // Allocate a temporary output buffer on the stack.
-                    // Max output = totalSamples * max_ratio (48000/8000 = 6).
+                // Nur wenn Ringformat und Sendeformat sich decken, darf der
+                // Block unveraendert weiter: 48 kHz und stereo. Alles andere
+                // muss durch die kanalweise Behandlung darunter — auch reines
+                // Mono bei 48 kHz, das frueher hier durchrutschte und den
+                // verschraenkten Stereoblock als Mono ausgab.
+                const bool ringFormatPasst =
+                    (session->audioSampleRate == 48000) && (channels == kRingChannels);
+
+                if (!ringFormatPasst) {
+                    // KANALWEISE umtasten. Bis 2026-09-30 lief der verschränkte
+                    // Stereopuffer als EIN Strom durch einen einzigen
+                    // Resampler — WDSPs RESAMPLEF rechnet aber einkanalig und
+                    // reell (resample.c: ein Ringpuffer, kein Kanalbegriff).
+                    // Folge: L und R vermischten sich, UND die Tonhöhe stimmte
+                    // nicht, weil der Resampler die doppelte Abtastzahl sah
+                    // und faktisch von 96 kHz herunterrechnete. Betraf jede
+                    // Rate ausser 48000; nur dort wird hier ganz übersprungen.
+                    // Belegt an WDSP selbst in
+                    // tests/tst_tci_audio_resample_channels.cpp.
                     static constexpr int kMaxOutSamples = kMaxDrainSamples * 8;
                     static thread_local std::array<float, kMaxOutSamples> outBuf{};
-                    xresampleFV(m_drainScratch.data(), outBuf.data(),
-                                totalSamples, &outSamples, rIt.value());
-                    samples = outBuf.data();
+                    static thread_local std::array<float, kMaxDrainSamples> chIn{};
+                    static thread_local std::array<float, kMaxOutSamples> chOut{};
+
+                    const bool umtasten = (session->audioSampleRate != 48000);
+
+                    bool ok = true;
+                    int framesOut = 0;
+                    for (int ch = 0; ch < channels && ok; ++ch) {
+                        // Welchen Ringkanal dieser Ausgabekanal traegt. Bei
+                        // Mono ist das der LINKE — nicht die Mischung aus
+                        // beiden. From Thetis TCIServer.cs:5897-5900
+                        // [v2.10.3.15]: `leftPending.CopyTo(interleaved, 0,
+                        // packetSamples)` im Zweig `channels <= 1`.
+                        const int quelle = std::min(ch, kRingChannels - 1);
+
+                        // Auftrennen: nur diesen Kanal, dicht gepackt. Der
+                        // Schritt ist kRingChannels, weil der RING stereo ist
+                        // — nicht `channels`, das Sendeformat.
+                        for (int i = 0; i < perChSamples; ++i) {
+                            chIn[i] = m_drainScratch[i * kRingChannels + quelle];
+                        }
+
+                        int n = 0;
+                        if (umtasten) {
+                            auto rIt = session->audioResamplers.find(
+                                TciClientSession::resamplerKey(rx, ch));
+                            if (rIt == session->audioResamplers.end()) { ok = false; break; }
+                            xresampleFV(chIn.data(), chOut.data(), perChSamples, &n,
+                                        rIt.value());
+                        } else {
+                            // 48 kHz Mono: nur entschraenken, nichts umtasten.
+                            std::copy(chIn.begin(), chIn.begin() + perChSamples,
+                                      chOut.begin());
+                            n = perChSamples;
+                        }
+                        if (ch == 0) {
+                            framesOut = n;
+                        } else if (n != framesOut) {
+                            // Beide Resampler laufen mit denselben Raten und
+                            // derselben Blocklänge; verschiedene Längen wären
+                            // ein Fehler in WDSP. Dann lieber diesen Block
+                            // auslassen als versetzte Kanäle senden.
+                            ok = false;
+                            break;
+                        }
+                        if (framesOut * channels > kMaxOutSamples) { ok = false; break; }
+
+                        // Wieder verschränken.
+                        for (int i = 0; i < framesOut; ++i) {
+                            outBuf[i * channels + ch] = chOut[i];
+                        }
+                    }
+                    if (!ok) { continue; }
+                    outSamples = framesOut * channels;
+                    samples    = outBuf.data();
                 }
 
                 // Encode + send binary frame.
@@ -311,7 +588,14 @@ TciServer::TciServer(RadioModel* model, QObject* parent)
                     channels,
                     samples);
 
-                ws->sendBinaryMessage(frame);
+                // Nur senden, wenn der Client hinterherkommt. Begruendung
+                // an rueckstauFrei(): ein eingefrorenes Telefon haelt die
+                // Verbindung offen und holt nichts ab.
+                if (rueckstauFrei(ws)) {
+                    ws->sendBinaryMessage(frame);
+                } else {
+                    session->framesDropped += 1;
+                }
             }
         }
     });
@@ -594,6 +878,29 @@ void TciServer::hookAudioAndIqTaps()
                 Qt::QueuedConnection);
         m_iqTapConnected = true;
         qCInfo(lcTci) << "TciServer: IQ tap connected to RadioModel::rawIqData";
+
+        // ── Spektrum-Abgriff (Longpath-eigen, 2026-09-30) ────────────────────
+        //
+        // Der Server hat die fertigen dBm-Bins ohnehin: FFTEngine rechnet sie
+        // für den Panadapter und meldet sie über fftReady. Sie an einen
+        // Client weiterzugeben kostet nichts — verglichen damit, ihn den
+        // rohen I/Q-Strom ziehen und selbst eine FFT rechnen zu lassen.
+        //
+        // Ebenfalls QueuedConnection: fftReady kommt vom FFT-Faden, m_clients
+        // und QWebSocket gehören dem Hauptfaden. Der QVector ist implizit
+        // geteilt, die Kopie also billig.
+        // Der Abgriff wird hier NICHT fest verdrahtet: beim Serverstart gibt es
+        // die FFTEngine noch gar nicht. MainWindow startet den TCI-Server
+        // (MainWindow.cpp:987) lange bevor es dem RadioModel seine Engine gibt
+        // (MainWindow.cpp:5054). Ein Versuch an dieser Stelle findet immer
+        // nullptr — beim ersten Livetest an einem echten Gerät stand genau das
+        // im Log ("keine FFTEngine — Spektrumstrom steht nicht bereit"), und
+        // der Spektrumstrom wäre tot geblieben.
+        //
+        // Stattdessen holt ensureFftTap() das nach, sobald ein Client wirklich
+        // ein Spektrum bestellt. Dann steht die Engine längst, und der Fall
+        // "Server läuft, Radio kommt später" ist damit gleich mit erschlagen.
+        ensureFftTap();
     }
 }
 
@@ -1177,6 +1484,27 @@ void TciServer::hookGlobalBroadcasts()
                     QStringLiteral("tune:1,false;"));  // !VFOBTX path
             });
 
+    // ── DRIVE + TUNE_DRIVE (drive: / tune_drive: lines) ────────────────────
+    // Source: Thetis PowerChangedHandlers at TCIServer.cs:1090-1095
+    // [v2.10.3.13] — die Konsole meldet jede Leistungsänderung von sich aus
+    // weiter (sendDrivePower / sendTunePower), damit ein Client, der den
+    // Regler NICHT bewegt hat, den neuen Stand trotzdem sieht.
+    //
+    // Ohne das hier hätte eine Fernbedienung ihren Leistungsregler zwar
+    // setzen können (handleDriveCommand), aber jedes Drehen am Gerät selbst
+    // wäre ihr entgangen — der Schieber am Telefon stünde dann falsch, bis
+    // jemand neu abfragt.
+    connect(&m_model->transmitModel(), &TransmitModel::powerChanged, this,
+            [this](int pct) {
+                m_protocol->enqueueLocalBroadcast(
+                    QStringLiteral("drive:0,%1;").arg(std::clamp(pct, 0, 100)));
+            });
+    connect(&m_model->transmitModel(), &TransmitModel::tunePowerChanged, this,
+            [this](int pct) {
+                m_protocol->enqueueLocalBroadcast(
+                    QStringLiteral("tune_drive:0,%1;").arg(std::clamp(pct, 0, 100)));
+            });
+
     // ── MON enable + volume (mon_enable: / mon_volume: lines) ──────────────
     // Source: Thetis MONChangedHandlers + MONVolumeChangedHandlers at
     // TCIServer.cs:6744-6745 [v2.10.3.15] routed to OnMONChanged /
@@ -1238,6 +1566,9 @@ void TciServer::hookGlobalBroadcasts()
     connect(m_model, &RadioModel::wireSampleRateChanged, this,
             [this](double rateHz) {
                 const int rateInt = static_cast<int>(rateHz);
+                // Fuer den Spektrum-Ausschnitt festhalten: er muss wissen,
+                // wie viele Hertz die Bins zusammen abdecken.
+                m_fftSampleRate.store(rateInt, std::memory_order_release);
                 m_protocol->enqueueLocalBroadcast(
                     QStringLiteral("iq_samplerate:%1;").arg(rateInt));
                 // sendIFLimits follows in Thetis (TCIServer.cs:2535-2536
@@ -1323,6 +1654,36 @@ TciServer::~TciServer()
 //      m_server->isListening(), treating double-start as idempotent-true).
 //      Longpath rejects double-start so the caller can detect misuse early.
 
+// Wie lange bis zum naechsten Versuch. Fuenf Sekunden sind kurz genug, dass
+// ein Netzwechsel sich von selbst heilt, bevor jemand zum Telefon greift, und
+// lang genug, dass im Log keine Wand entsteht.
+static constexpr int kBindWiederversuchMs = 5000;
+
+void TciServer::bindWiederversuchPlanen(const QHostAddress& adresse,
+                                        quint16 port, const QString& grund)
+{
+    m_bindWunschAdresse = adresse;
+    m_bindWunschPort = port;
+    if (!m_bindWiederversuch) {
+        m_bindWiederversuch = new QTimer(this);
+        m_bindWiederversuch->setSingleShot(true);
+        m_bindWiederversuch->setInterval(kBindWiederversuchMs);
+        connect(m_bindWiederversuch, &QTimer::timeout, this, [this]() {
+            // Zwischenzeitlich doch gestartet oder abbestellt? Dann nichts tun.
+            if (m_server || m_bindWunschPort == 0) { return; }
+            start(m_bindWunschAdresse, m_bindWunschPort);
+        });
+    }
+    m_bindWiederversuch->start();
+    emit bindWartetAufAdresse(adresse.toString(), port, grund);
+}
+
+void TciServer::bindWiederversuchAbbrechen()
+{
+    if (m_bindWiederversuch) { m_bindWiederversuch->stop(); }
+    m_bindWunschPort = 0;
+}
+
 bool TciServer::start(quint16 port)
 {
     return start(QHostAddress(QHostAddress::LocalHost), port);
@@ -1353,20 +1714,120 @@ bool TciServer::start(const QHostAddress& bindAddress, quint16 port)
     // Setup UI surfaces a tooltip warning when a non-loopback option is
     // selected.
     if (!m_server->listen(bindAddress, port)) {
-        qCWarning(lcTci) << "TciServer: failed to listen on"
-                         << bindAddress.toString() << "port" << port
-                         << m_server->errorString();
         const QString errStr = m_server->errorString();
+        // Nicht jede Sekunde dasselbe ins Log schreiben: der erste Fehlschlag
+        // und danach einer je Minute reichen, um die Lage zu belegen, ohne
+        // die Datei zuzumuellen.
+        if (m_bindFehlversuche == 0
+            || (m_bindFehlversuche % (60000 / kBindWiederversuchMs)) == 0) {
+            qCWarning(lcTci) << "TciServer: failed to listen on"
+                             << bindAddress.toString() << "port" << port
+                             << errStr
+                             << "— Wiederversuch in"
+                             << (kBindWiederversuchMs / 1000) << "s"
+                             << "(Fehlversuch" << (m_bindFehlversuche + 1) << ")";
+        }
         delete m_server;
         m_server = nullptr;
+        ++m_bindFehlversuche;
+        bindWiederversuchPlanen(bindAddress, port, errStr);
         emit errorOccurred(errStr);
         return false;
+    }
+
+    // Geschafft — ein etwa laufender Wiederversuch hat seine Schuldigkeit getan.
+    bindWiederversuchAbbrechen();
+    if (m_bindFehlversuche > 0) {
+        qCInfo(lcTci) << "TciServer: listen auf" << bindAddress.toString()
+                      << "port" << port << "nach" << m_bindFehlversuche
+                      << "Fehlversuchen doch geglueckt";
+        m_bindFehlversuche = 0;
     }
 
     connect(m_server, &QWebSocketServer::newConnection,
             this, &TciServer::onNewConnection);
 
-    qCInfo(lcTci) << "TciServer: listening on" << m_server->serverPort();
+    // ── Herkunftsprüfung (2026-09-30) ───────────────────────────────────────
+    //
+    // WebSocket-Verbindungen unterliegen NICHT der Gleiche-Herkunft-Regel des
+    // Browsers. Ohne diesen Haken konnte jede beliebige Webseite, die der
+    // Bediener irgendwo im Browser offen hat, `new WebSocket("ws://127.0.0.1:
+    // 50001")` aufmachen und `trx:0,true;` schicken — also die Station tasten.
+    // Die Bindung an 127.0.0.1 hilft dagegen NICHT: sie hält andere Rechner
+    // fern, nicht einen Browser auf genau diesem Rechner. Auch Thetis,
+    // deskHPSDR und AetherSDR haben diese Prüfung nicht; sie ist
+    // Longpath-eigen.
+    //
+    // Die Regel, und warum sie nichts kaputtmacht:
+    //   - Native Clients (WSJT-X, JTDX, N1MM+, Log4OM, Hamlib, TCI Remote)
+    //     senden beim Handschlag KEINEN Origin-Kopf. Sie werden angenommen
+    //     wie bisher.
+    //   - Ein Browser sendet IMMER einen Origin-Kopf. Solche Verbindungen
+    //     werden nur angenommen, wenn die Herkunft in `TciAllowedOrigins`
+    //     steht (Vorgabe: leer, also keine).
+    //
+    // Deshalb ist es ausdrücklich KEINE Erlaubnisliste über alle Clients —
+    // das würde jeden Logger aussperren, der nichts von Herkünften weiß —
+    // sondern genau eine Sperre gegen fremde Webseiten.
+    //
+    // Eine eigene Longpath-Weboberfläche trägt sich später hier ein.
+    connect(m_server, &QWebSocketServer::originAuthenticationRequired,
+            this, [this](QWebSocketCorsAuthenticator* auth) {
+                if (!auth) { return; }
+                const QString origin = auth->origin().trimmed();
+                if (origin.isEmpty()) {
+                    auth->setAllowed(true);   // nativer Client, kein Browser
+                    return;
+                }
+                const QStringList allowed =
+                    AppSettings::instance()
+                        .value(QStringLiteral("TciAllowedOrigins"), QString())
+                        .toString()
+                        .split(QLatin1Char(','), Qt::SkipEmptyParts);
+                bool ok = false;
+                for (const QString& a : allowed) {
+                    if (a.trimmed().compare(origin, Qt::CaseInsensitive) == 0) {
+                        ok = true;
+                        break;
+                    }
+                }
+                // Die EIGENE Weboberfläche gilt ohne Eintrag.
+                //
+                // Hier stand seit dem Bau der Prüfung: "Eine eigene
+                // Longpath-Weboberfläche trägt sich später hier ein." Sie kam
+                // (die Handfunke), nur eingetragen hat sie sich nie — und am
+                // 2026-10-01 stand der Operator eine Stunde vor einer Seite,
+                // die nur "keine Antwort" meldete, während Longpath jede
+                // Verbindung still mit 403 abwies. Eine Liste, die von Hand
+                // gepflegt werden muss, damit das eigene Programm mit sich
+                // selbst reden darf, ist keine Sicherheit, sondern eine Falle.
+                //
+                // Erlaubt ist darum eine Herkunft, die auf DIESEN Rechner
+                // zeigt. Das gibt nichts preis: eine fremde Webseite liegt
+                // immer auf einer fremden Herkunft, und genau die bleibt
+                // draußen. Wogegen die Prüfung gebaut wurde — die
+                // beliebige Seite im Browser des Operators, die heimlich
+                // `trx:0,true;` schickt —, davor schützt sie unverändert.
+                if (!ok) { ok = istEigeneHerkunft(origin); }
+                auth->setAllowed(ok);
+                if (!ok) {
+                    qCWarning(lcTci)
+                        << "TciServer: Verbindung aus dem Browser abgelehnt,"
+                        << "Herkunft" << origin
+                        << "— weder dieser Rechner noch in TciAllowedOrigins";
+                }
+            });
+
+    // Sendezeit-Deckel aus den Einstellungen übernehmen (0 = aus, Vorgabe
+    // 180 s). Beim Start gelesen statt bei jedem Tasten, damit eine Änderung
+    // während eines laufenden Sendevorgangs nicht mitten hinein greift; der
+    // Setter oben zieht sie für den nächsten Start ohnehin nach.
+    setTxTimeCapSeconds(AppSettings::instance()
+                            .value(QStringLiteral("TciMaxTransmitSeconds"), 180)
+                            .toInt());
+
+    qCInfo(lcTci) << "TciServer: listening on" << m_server->serverPort()
+                  << "| Sendezeit-Deckel" << m_txTimeCapSeconds << "s";
     emit serverStarted(m_server->serverPort());
 
     // From Thetis TCIServer.cs:2650-2654 [v2.10.3.13] — 20s server-driven ping
@@ -1418,6 +1879,14 @@ bool TciServer::start(const QHostAddress& bindAddress, quint16 port)
 
 void TciServer::stop()
 {
+    // Ein ausdrueckliches Beenden hebt auch einen laufenden Wiederversuch auf
+    // — und zwar VOR dem Ausstieg unten: nach einem gescheiterten listen() ist
+    // `m_server` null, der Wiederversuch laeuft aber trotzdem. Stuende das
+    // Abbrechen danach, liefe er nach einem stop() munter weiter und holte den
+    // Server hinter dem Ruecken des Bedieners wieder hoch.
+    bindWiederversuchAbbrechen();
+    m_bindFehlversuche = 0;
+
     if (!m_server) { return; }
 
     // Phase 26 review finding #4: explicitly sever DSP-thread signal connections
@@ -1538,6 +2007,53 @@ void TciServer::onNewConnection()
         // User-Agent HTTP header maps to session->userAgent).
         session->connectedAt.start();
 
+        // ── Herkunft feststellen (2026-09-30) ────────────────────────────────
+        //
+        // Begründung an TciClientSession::fromLoopback. Kurz: der Schnitt
+        // läuft entlang der Herkunft, nicht entlang eines globalen Schalters.
+        // Loopback bleibt, wie es war — jeder Logger und jedes Digimode-
+        // Programm verbindet dort und kennt kein auth:. Aus dem Netz muss sich
+        // ein Client anmelden.
+        //
+        // isLoopback() erkennt 127.0.0.0/8 und ::1 zuverlässig; die Adresse
+        // kommt vom Socket, nicht vom Client, also ist sie nicht zu fälschen.
+        session->fromLoopback = !m_alleAlsNetzFuerTest && ws->peerAddress().isLoopback();
+        if (!session->fromLoopback) {
+            const QString token = remoteToken();
+            // Ohne hinterlegtes Token gibt es keinen Fernzugriff. Das ist die
+            // sichere Richtung: lieber niemanden hereinlassen als jeden.
+            session->authenticated = false;
+            if (token.isEmpty()) {
+                qCWarning(lcTci)
+                    << "TciServer: Verbindung aus dem Netz von" << session->peer
+                    << "abgewiesen — kein Token hinterlegt (Setup → TCI Server)";
+                ws->close(QWebSocketProtocol::CloseCodePolicyViolated,
+                          QStringLiteral("kein Token hinterlegt"));
+                // Der Socket landet hier NICHT in m_clients, also raeumt ihn
+                // auch onClientDisconnected() nie weg — er bliebe fuer immer
+                // stehen. Ohne diese Zeile laesst jeder Verbindungsversuch
+                // einen QWebSocket zurueck, unbegrenzt und ohne jede
+                // Anmeldung ausloesbar (Durchsicht 2026-09-30).
+                ws->deleteLater();
+                continue;
+            }
+            // Gesperrte Gegenstelle gar nicht erst annehmen. Begruendung an
+            // m_fehlversuche: der Kopplungscode ist kurz genug zum Abtippen,
+            // also muss das Durchprobieren hier scheitern und nicht an seiner
+            // Laenge.
+            if (istGesperrt(session->peer)) {
+                qCWarning(lcTci) << "TciServer: Verbindung von" << session->peer
+                                 << "abgewiesen — zu viele falsche"
+                                 << "Kopplungscodes, vorerst gesperrt";
+                ws->close(QWebSocketProtocol::CloseCodePolicyViolated,
+                          QStringLiteral("zu viele Fehlversuche"));
+                ws->deleteLater();
+                continue;
+            }
+            qCInfo(lcTci) << "TciServer: Verbindung aus dem Netz von" << session->peer
+                          << "— wartet auf auth:";
+        }
+
         // Phase 26 review finding #3: apply AudioTciPage AppSettings defaults
         // at connect time so that a client that never sends explicit audio
         // config commands inherits the operator's configured preferences.
@@ -1624,7 +2140,11 @@ void TciServer::onNewConnection()
         // wired the session lifecycle but never invoked buildInitBurst()
         // (Phase 4 Task 4.1+4.2 built the burst but no commit wired it to
         // the connect path).
-        if (m_protocol) {
+        // Der Init-Burst geht erst nach der Anmeldung raus. Er verrät sonst
+        // Rufzeichen, Gerätetyp, Frequenz und Betriebsart an jeden, der den
+        // Port findet — noch bevor irgendetwas geprüft wurde. Auf Loopback ist
+        // `authenticated` von vornherein true, dort ändert sich nichts.
+        if (m_protocol && session->authenticated) {
             const QStringList burst = m_protocol->buildInitBurst();
             for (const QString& line : burst) {
                 session->sendQueue.push(TciSendQueue::Priority::Control, line);
@@ -1701,14 +2221,265 @@ void TciServer::releaseMoxHeldBy(QWebSocket* ws, const QString& peer, const QStr
     stopKeyedWatchdog();
     // Without a model (test path) there is nothing to unkey; the signal
     // still reports that the bookkeeping fired.
-    const bool stillKeyed = m_model.isNull() ? true : m_model->mox();
-    if (!stillKeyed) { return; }
+    // Der Abstimmträger ist eigens zu nehmen (2026-09-30). `m_isTuning` ist
+    // gelatcht und wird von setMox(false) NICHT gelöscht — es fällt nur durch
+    // ein ausdrückliches tune-off, den Trennungs-Reset oder completeTuneOff().
+    // Ohne diese Zeilen bliebe ein vom Netz getasteter Träger stehen, obwohl
+    // der Wachhund gerade festgestellt hat, dass niemand mehr zusieht.
+    const bool nochAmTunen = m_model.isNull() ? false : m_model->isTune();
+    const bool stillKeyed  = m_model.isNull() ? true  : m_model->mox();
+    if (!stillKeyed && !nochAmTunen) { return; }
     qCWarning(lcTci) << "TciServer: client" << peer << "keyed the radio and"
-                     << why << "— releasing MOX";
+                     << why << "— releasing MOX"
+                     << (nochAmTunen ? "und Abstimmträger" : "");
     if (!m_model.isNull()) {
+        if (nochAmTunen) { m_model->setTune(false); }
         m_model->setMox(false);
     }
     emit moxReleasedOnClientLoss(peer);
+}
+
+// ── Fernzugriff: Token und Sendefreigabe (2026-09-30) ───────────────────────
+//
+// Begründung an TciClientSession::fromLoopback: der Schnitt läuft entlang der
+// Herkunft. Loopback bleibt unangetastet, damit jeder Logger und jedes
+// Digimode-Programm weiterläuft; aus dem Netz braucht es Token und eine
+// ausdrückliche Sendefreigabe.
+
+namespace {
+// Schlüsselbund-Kennung. "Longpath: …" ist die Form, die das Programm überall
+// benutzt (siehe CLAUDE.md — der alte Nereus-Name wird nur noch beim Lesen
+// erkannt, nie neu geschrieben).
+const char* kTokenKey     = "Longpath: TCI Fernzugriff";
+const char* kTokenAccount = "tci-remote";
+}  // namespace
+
+// ── Rückfall auf die Einstellungsdatei (2026-09-30) ─────────────────────────
+//
+// Der Schlüsselbund ist der erste Weg und bleibt es. Aber er ist nicht
+// überall da:
+//
+//   * Auf Linux und Windows gibt CredentialStore::store() schlicht `false`
+//     zurück (CredentialStore.cpp, #else-Zweig) — dort liess sich bis heute
+//     ÜBERHAUPT KEIN Token setzen, und der ganze Fernzugriff war unbenutzbar.
+//     Die Setup-Seite nahm die Eingabe entgegen und verwarf sie stillschweigend.
+//   * Auf macOS bindet der Schlüsselbund einen Eintrag an die Zugriffsliste
+//     des anlegenden Programms. Am 2026-09-30 live erlebt: ein von aussen
+//     gesetzter Eintrag war für Longpath nicht lesbar, der Server meldete
+//     unverdrossen "kein Token hinterlegt", und von aussen war nicht zu sehen,
+//     warum.
+//
+// Der Rückfall legt das Token im Klartext in die Einstellungsdatei. Das ist
+// schwächer als der Schlüsselbund, und deshalb steht es auch so im Log. Es
+// ist aber deutlich besser als die Lage davor: ohne Token weist der Server
+// JEDE Verbindung aus dem Netz ab, der Fernzugriff ist also nicht etwa
+// unsicher, sondern gar nicht vorhanden. Wer sein Telefon ans eigene Funkgerät
+// lassen will, braucht einen Weg, der auf seinem Rechner funktioniert.
+//
+// Wer es sicherer will, hat weiterhin den Schlüsselbund — er wird zuerst
+// gefragt, und solange er etwas liefert, wird die Datei nicht angefasst.
+namespace {
+const char* kTokenSetting = "TciRemoteTokenPlain";
+}
+
+bool TciServer::istGesperrt(const QString& peer) const
+{
+    const auto it = m_fehlversuche.constFind(peer);
+    if (it == m_fehlversuche.constEnd()) { return false; }
+    if (it->first < kMaxFehl) { return false; }
+    const qint64 seit = QDateTime::currentMSecsSinceEpoch() - it->second;
+    return seit < kSperreMs;
+}
+
+void TciServer::merkeFehlversuch(const QString& peer)
+{
+    auto& e = m_fehlversuche[peer];
+    const qint64 jetzt = QDateTime::currentMSecsSinceEpoch();
+    // Nach Ablauf der Sperre von vorn zaehlen — sonst saesse jemand, der
+    // sich einmal vertippt hat, fuer immer in der Liste.
+    if (e.first >= kMaxFehl
+        && (jetzt - e.second) >= kSperreMs) { e.first = 0; }
+    e.first += 1;
+    e.second = jetzt;
+    if (e.first >= kMaxFehl) {
+        qCWarning(lcTci) << "TciServer:" << peer << "hat" << e.first
+                         << "mal den falschen Kopplungscode geschickt —"
+                         << "gesperrt fuer" << (kSperreMs / 60000) << "Minuten";
+    }
+}
+
+QString TciServer::remoteToken()
+{
+    const QString ausBund = CredentialStore::retrieve(
+        QString::fromLatin1(kTokenKey), QString::fromLatin1(kTokenAccount));
+    if (!ausBund.isEmpty()) { return ausBund; }
+
+    return AppSettings::instance()
+        .value(QString::fromLatin1(kTokenSetting), QString()).toString();
+}
+
+bool TciServer::setRemoteToken(const QString& token)
+{
+    if (token.isEmpty()) {
+        // Die Klartextkopie nur anfassen, wenn es wirklich eine gibt.
+        //
+        // Ein bedingungsloses setValue() schreibt die Einstellungsdatei bei
+        // JEDEM Aufraeumen neu — und im Testbetrieb teilen sich alle
+        // Pruefstaende eine Datei (QStandardPaths::setTestModeEnabled).
+        // Zwei parallel laufende Staende schrieben sich dann gegenseitig
+        // hinein; am 2026-10-01 fiel darueber
+        // tst_tci_remote_auth::loopback_bekommt_den_init_burst_ohne_anmeldung
+        // im Sammellauf, waehrend er einzeln gruen blieb.
+        if (!AppSettings::instance()
+                 .value(QString::fromLatin1(kTokenSetting), QString())
+                 .toString().isEmpty()) {
+            AppSettings::instance().setValue(QString::fromLatin1(kTokenSetting),
+                                             QString());
+        }
+        return CredentialStore::erase(QString::fromLatin1(kTokenKey),
+                                      QString::fromLatin1(kTokenAccount));
+    }
+
+    if (CredentialStore::store(QString::fromLatin1(kTokenKey),
+                               QString::fromLatin1(kTokenAccount), token)) {
+        // Geglückt: eine etwaige Klartextkopie aus einem früheren Rückfall
+        // gehört jetzt weg, sonst veraltet sie unbemerkt. Auch hier nur
+        // anfassen, wenn es eine gibt — Begründung oben.
+        if (!AppSettings::instance()
+                 .value(QString::fromLatin1(kTokenSetting), QString())
+                 .toString().isEmpty()) {
+            AppSettings::instance().setValue(QString::fromLatin1(kTokenSetting),
+                                             QString());
+        }
+        return true;
+    }
+
+    qCWarning(lcTci) << "TciServer: Der Schlüsselbund nimmt das Token nicht an"
+                     << "— es wird im Klartext in den Einstellungen abgelegt."
+                     << "Auf Linux und Windows ist das der Normalfall.";
+    AppSettings::instance().setValue(QString::fromLatin1(kTokenSetting), token);
+    return true;
+}
+
+// ── Der Kopplungscode (2026-10-01) ──────────────────────────────────────────
+//
+// Acht Zeichen, in zwei Vierergruppen gezeigt: ABCD-EFGH.
+//
+// Vorher waren es 32. Das war aus Sicht der Kryptographie schoener und in
+// der Praxis unbrauchbar: niemand tippt 32 Zeichen auf einem Telefon ab,
+// ohne sich zu vertippen, und der Betreiber hat genau das zu Recht
+// reklamiert.
+//
+// Warum acht trotzdem reichen: 32^8 sind rund 1,1 Billionen Moeglichkeiten,
+// und — das ist der eigentliche Schutz — der Server zaehlt Fehlversuche je
+// Gegenstelle und sperrt sie. Durchprobieren scheitert nicht an der Laenge
+// des Codes, sondern daran, dass man es nicht oft genug versuchen darf. Ein
+// langer Code ohne Versuchsgrenze waere die schlechtere Wahl gewesen.
+//
+// Base32 ohne 0/O/1/I: wer abtippt, soll nicht ueber eine Null gegen ein O
+// stolpern.
+QString TciServer::generateRemoteToken()
+{
+    static const char kAlpha[] = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";  // 32 Zeichen
+    QString out;
+    out.reserve(9);
+    for (int i = 0; i < 8; ++i) {
+        if (i == 4) { out.append(QLatin1Char('-')); }
+        out.append(QLatin1Char(kAlpha[QRandomGenerator::system()->bounded(32)]));
+    }
+    return out;
+}
+
+// Vergleichsform: Bindestriche weg, Kleinschreibung hoch. Wer den Code
+// abtippt, soll ihn schreiben duerfen, wie er ihn liest — mit oder ohne
+// Strich, gross oder klein.
+QString TciServer::normalisierterCode(const QString& roh)
+{
+    QString s;
+    s.reserve(roh.size());
+    for (QChar c : roh) {
+        if (c == QLatin1Char('-') || c.isSpace()) { continue; }
+        s.append(c.toUpper());
+    }
+    return s;
+}
+
+bool TciServer::remoteLogAllowed()
+{
+    // Ab Werk JA -- anders als beim Senden, weil hier nichts abstrahlt. Wer
+    // das Loggen aus dem Netz nicht will, schaltet es ab; das Token gilt
+    // ohnehin.
+    return AppSettings::instance()
+               .value(QStringLiteral("TciAllowRemoteLog"), QStringLiteral("True"))
+               .toString() != QStringLiteral("False");
+}
+
+bool TciServer::remoteTxAllowed()
+{
+    // Ab Werk NEIN. Wer aus dem Netz senden will, schaltet es bewusst frei —
+    // und hat dann immer noch Token, Sendezeit-Deckel und Wachhund über sich.
+    return AppSettings::instance()
+               .value(QStringLiteral("TciAllowRemoteTx"), QStringLiteral("False"))
+               .toString() == QStringLiteral("True");
+}
+
+// ── Sendezeit-Deckel (2026-09-30) ───────────────────────────────────────────
+//
+// Begründung am Feld m_txTimeCap in TciServer.h. Kurz: der Wachhund oben
+// fängt einen toten oder eingefrorenen Client; er fängt nicht den Client, der
+// putzmunter weitersendet, weil das Telefon in der Tasche liegt. Dagegen
+// hilft nur eine harte Obergrenze je Sendevorgang.
+//
+// Bewusst NICHT an MOX allgemein gehängt, sondern an den TCI-MOX-Besitzer:
+// wer vor dem Gerät sitzt und selbst tastet, sieht ja, dass er sendet.
+
+void TciServer::setTxTimeCapSeconds(int seconds)
+{
+    m_txTimeCapSeconds = qMax(0, seconds);
+    if (m_txTimeCapSeconds == 0) {
+        stopTxTimeCap();
+        return;
+    }
+    // Läuft gerade ein Sendevorgang, gilt die neue Grenze ab sofort — von
+    // vorn gerechnet. Die Alternative (alte Grenze zu Ende laufen lassen)
+    // wäre schwerer zu erklären als der Neustart.
+    if (m_txTimeCap && m_txTimeCap->isActive()) {
+        m_txTimeCap->start(m_txTimeCapSeconds * 1000);
+    }
+}
+
+void TciServer::startTxTimeCap()
+{
+    if (m_txTimeCapSeconds <= 0) { return; }
+    if (!m_txTimeCap) {
+        m_txTimeCap = new QTimer(this);   // parented — stirbt mit dem Server
+        m_txTimeCap->setSingleShot(true);
+        connect(m_txTimeCap, &QTimer::timeout, this, &TciServer::onTxTimeCapExpired);
+    }
+    // Einmalig und immer von vorn: jeder neue Sendevorgang bekommt die volle
+    // Zeit, auch wenn der vorige kurz zuvor endete.
+    m_txTimeCap->start(m_txTimeCapSeconds * 1000);
+}
+
+void TciServer::stopTxTimeCap()
+{
+    if (m_txTimeCap) { m_txTimeCap->stop(); }
+}
+
+void TciServer::onTxTimeCapExpired()
+{
+    if (m_moxOwner.isNull()) { return; }
+    auto it = m_clients.find(m_moxOwner.data());
+    const QString peer = (it != m_clients.end()) ? it.value()->peer
+                                                 : QStringLiteral("(unbekannt)");
+    qCWarning(lcTci) << "TciServer: Sendezeit-Deckel von" << m_txTimeCapSeconds
+                     << "s erreicht — MOX von" << peer << "wird abgeworfen";
+    // Der gemeinsame Weg macht den Rest: Besitzer löschen, entkeyen, Wachhund
+    // und Deckel stoppen, melden.
+    releaseMoxHeldBy(m_moxOwner.data(), peer,
+                     QStringLiteral("hat den Sendezeit-Deckel von %1 s erreicht")
+                         .arg(m_txTimeCapSeconds));
+    emit moxReleasedOnTimeCap(peer, m_txTimeCapSeconds);
 }
 
 void TciServer::setKeyedWatchdog(int intervalMs, int maxUnanswered)
@@ -1718,6 +2489,35 @@ void TciServer::setKeyedWatchdog(int intervalMs, int maxUnanswered)
     if (m_keyedWatchdog && m_keyedWatchdog->isActive()) {
         m_keyedWatchdog->start(m_keyedWatchdogIntervalMs);
     }
+}
+
+// ── sendeAblehnung() ─────────────────────────────────────────────────────────
+//
+// Ein abgelehnter Sendewunsch war bisher STUMM. Am Pult faellt das nicht auf
+// — dort kommt der Befehl ohnehin von Loopback und geht durch. Auf einer
+// Fernbedienung ist es die unangenehmste Form von Nichts: der Bediener
+// drueckt, es passiert nichts, und nichts erklaert es. Genau dieselbe
+// Gattung Fehler wie eine Pruefung, deren Ergebnis niemand sieht.
+//
+// TCI verwirft abgelehnte Befehle antwortlos, und daran wird nichts
+// geaendert: die Zeile geht AUSSCHLIESSLICH an den ablehnten Client, und nur
+// in den Faellen, in denen bisher gar nichts kam. Fremde Clients (WSJT-X,
+// N1MM, JTDX) sprechen ueber Loopback und laufen nie in diese Sperre; sie
+// bekommen die Zeile also nie zu sehen.
+//
+//     tx_err:<grund>;
+//
+// Dieselbe Form wie log_qso_err: — ein Longpath-eigener Befehl, erkennbar
+// als solcher, von fremden Clients gefahrlos zu ignorieren.
+//
+// Die Sperre selbst bleibt unangetastet. Hier wird nur gesagt, DASS und
+// WARUM sie gegriffen hat.
+void TciServer::sendeAblehnung(const std::shared_ptr<TciClientSession>& session,
+                               const QString& grund)
+{
+    if (!session) { return; }
+    session->sendQueue.push(TciSendQueue::Priority::Control,
+                            QStringLiteral("tx_err:%1;").arg(grund));
 }
 
 void TciServer::startKeyedWatchdog()
@@ -1731,12 +2531,17 @@ void TciServer::startKeyedWatchdog()
         m_ownerPingsUnanswered = 0;
         m_keyedWatchdog->start(m_keyedWatchdogIntervalMs);
     }
+    // Der Sendezeit-Deckel teilt den Lebenszyklus des Wachhunds: er läuft
+    // genau dann, wenn ein TCI-Client den Sender hält. Dadurch greifen beide
+    // Ausstiege (Abbruch, Ping-Ausfall) ohne weitere Verdrahtung auch für ihn.
+    startTxTimeCap();
 }
 
 void TciServer::stopKeyedWatchdog()
 {
     if (m_keyedWatchdog) { m_keyedWatchdog->stop(); }
     m_ownerPingsUnanswered = 0;
+    stopTxTimeCap();   // gemeinsamer Lebenszyklus, siehe startKeyedWatchdog()
 }
 
 void TciServer::onKeyedWatchdogTick()
@@ -1837,7 +2642,17 @@ void TciServer::handleAudioSubscribe(std::shared_ptr<TciClientSession>& session,
     }
     session->audioStreamEnabled.insert(rx);
 
-    if (!session->audioResamplers.contains(rx)) {
+    // JE KANAL ein Resampler — die Begründung steht am Feld audioResamplers
+    // in TciClientSession.h. Kurz: WDSPs RESAMPLEF kennt keine Kanäle, und ein
+    // verschränkter Stereopuffer durch einen einzigen Resampler kommt vermischt
+    // und in der falschen Tonhöhe heraus.
+    //
+    // Beide werden immer angelegt, auch wenn der Client gerade Mono fährt: er
+    // darf jederzeit auf Stereo umschalten (audio_stream_channels), und dann
+    // soll der zweite Kanal nicht erst mit kaltem Filter anlaufen.
+    for (int ch = 0; ch < 2; ++ch) {
+        const int key = TciClientSession::resamplerKey(rx, ch);
+        if (session->audioResamplers.contains(key)) { continue; }
         const int inRate  = 48000;                        // WDSP RX output is always 48 kHz
         const int outRate = session->audioSampleRate;     // negotiated client rate (default 48000)
         // create_resampleFV(in_rate, out_rate) — from resample.c:342-344 [WDSP v1.29]:
@@ -1845,12 +2660,16 @@ void TciServer::handleAudioSubscribe(std::shared_ptr<TciClientSession>& session,
         // size=0 + null buffers are intentional; xresampleFV sets them per-call.
         void* resampler = create_resampleFV(inRate, outRate);
         if (resampler) {
-            session->audioResamplers.insert(rx, resampler);
-            qCInfo(lcTci) << "TciServer: audio resampler created for rx" << rx
-                          << "peer" << session->peer
-                          << "in_rate" << inRate << "out_rate" << outRate;
+            session->audioResamplers.insert(key, resampler);
+            if (ch == 0) {
+                qCInfo(lcTci) << "TciServer: audio resampler created for rx" << rx
+                              << "peer" << session->peer
+                              << "in_rate" << inRate << "out_rate" << outRate
+                              << "(je Kanal einer)";
+            }
         } else {
             qCWarning(lcTci) << "TciServer: create_resampleFV failed for rx" << rx
+                             << "channel" << ch
                              << "in_rate" << inRate << "out_rate" << outRate;
         }
     }
@@ -1870,14 +2689,19 @@ void TciServer::handleAudioUnsubscribe(std::shared_ptr<TciClientSession>& sessio
     }
     session->audioStreamEnabled.remove(rx);
 
-    auto rIt = session->audioResamplers.find(rx);
-    if (rIt != session->audioResamplers.end()) {
-        // destroy_resampleFV — from resample.c:358-360 [WDSP v1.29]:
-        //   destroy_resampleF((RESAMPLEF)ptr);
-        destroy_resampleFV(rIt.value());
-        session->audioResamplers.erase(rIt);
-        qCInfo(lcTci) << "TciServer: audio resampler destroyed for rx" << rx
-                      << "peer" << session->peer;
+    // Beide Kanäle abräumen — sie wurden auch beide angelegt.
+    for (int ch = 0; ch < 2; ++ch) {
+        auto rIt = session->audioResamplers.find(TciClientSession::resamplerKey(rx, ch));
+        if (rIt != session->audioResamplers.end()) {
+            // destroy_resampleFV — from resample.c:358-360 [WDSP v1.29]:
+            //   destroy_resampleF((RESAMPLEF)ptr);
+            destroy_resampleFV(rIt.value());
+            session->audioResamplers.erase(rIt);
+            if (ch == 0) {
+                qCInfo(lcTci) << "TciServer: audio resampler destroyed for rx" << rx
+                              << "peer" << session->peer;
+            }
+        }
     }
 }
 
@@ -1948,14 +2772,64 @@ void TciServer::onAudioFrameReady(int slice, const float* L, const float* R,
         total * static_cast<int>(sizeof(float)));
 }
 
+// ── mitNormalisiertemNamen() (2026-09-30) ────────────────────────────────────
+//
+// Macht aus "  TRX :0,TRUE;" die Form "trx:0,TRUE;" — nur der NAME vor dem
+// ersten Doppelpunkt wird getrimmt und kleingeschrieben. Die Argumente bleiben
+// Zeichen für Zeichen stehen: dort stehen Rufzeichen, Dateinamen und das
+// Token, und eine Kleinschreibung wäre dort ein Fehler.
+//
+// WARUM DAS SEIN MUSS — der Fund, der diese Funktion erzwungen hat:
+//
+// Die Sendesperre fürs Netz (`trx:`, unten) hat bis zum 2026-09-30 mit
+// `trimmed.startsWith("trx:")` geprüft — schreibungsabhängig und ohne den
+// Namen zu trimmen. Der Befehlsverteiler dahinter (TciProtocol.cpp:84) liest
+// denselben Befehl aber als `parts.at(0).toLower().trimmed()`.
+//
+// Zwei Parser, ein Befehl, verschiedene Ergebnisse. Die Folge:
+//
+//     TRX:0,true;     → Sperre sieht "TRX:" ≠ "trx:", greift NICHT
+//                       Verteiler macht toLower() → führt AUS
+//     trx :0,true;    → dasselbe über das Leerzeichen
+//
+// Aus dem Netz liess sich der Sender damit tasten, obwohl Fernsenden gesperrt
+// war. An Martins Station hängt eine echte Antenne; das ist der schlimmste
+// Fehlerfall, den dieser Server hat.
+//
+// Der Fehler ist nicht "eine Sperre hat ein Zeichen falsch verglichen",
+// sondern "die Sperre hat ihren eigenen Parser". Deshalb wird hier EINMAL
+// normalisiert und danach reden alle dreizehn Abfangstellen UND der
+// Verteiler über denselben Text. Eine neue Abfangstelle kann die Divergenz
+// gar nicht mehr einführen.
+static QString mitNormalisiertemNamen(const QString& roh)
+{
+    const int dp = roh.indexOf(QLatin1Char(':'));
+    if (dp < 0) {
+        // Befehl ohne Argumente (z. B. "ready;") — ganz normalisieren, das
+        // abschliessende Semikolon bleibt, wo es ist.
+        QString nurName = roh;
+        const bool semikolon = nurName.trimmed().endsWith(QLatin1Char(';'));
+        nurName = nurName.trimmed();
+        if (semikolon) { nurName.chop(1); }
+        nurName = nurName.trimmed().toLower();
+        return semikolon ? nurName + QLatin1Char(';') : nurName;
+    }
+    return roh.left(dp).trimmed().toLower() + QLatin1Char(':') + roh.mid(dp + 1);
+}
+
 // ── onTextMessageReceived() ──────────────────────────────────────────────────
 
-void TciServer::onTextMessageReceived(const QString& msg)
+void TciServer::onTextMessageReceived(const QString& rohMsg)
 {
     auto* ws = qobject_cast<QWebSocket*>(sender());
     if (!ws) { return; }
     auto it = m_clients.find(ws);
     if (it == m_clients.end()) { return; }
+
+    // Ab hier gibt es nur noch DIESEN Text. Begründung an
+    // mitNormalisiertemNamen(): zwei Parser für denselben Befehl waren ein
+    // Loch in der Sendesperre.
+    const QString msg = mitNormalisiertemNamen(rohMsg);
 
     auto& session = it.value();
     session->lastCommand   = msg;
@@ -1969,8 +2843,79 @@ void TciServer::onTextMessageReceived(const QString& msg)
         if (logLine.endsWith(QLatin1Char(';'))) {
             logLine.chop(1);
         }
+        // Das Token gehoert nicht ins Protokollfenster und nicht in
+        // session->lastCommand — beide sind fuer den Bediener sichtbar, und
+        // das TCI-Fenster wird beim Suchen nach Fehlern gern weitergereicht.
+        // Bis 2026-09-30 stand es dort im Klartext, weil dieser Block VOR dem
+        // Anmeldetor laeuft.
+        if (logLine.startsWith(QLatin1String("auth:"))) {
+            logLine = QStringLiteral("auth:<verdeckt>");
+            session->lastCommand = logLine;
+        }
         emit messageLogged(QStringLiteral("in"), session->peer, logLine,
                            session->lastCommandAt);
+    }
+
+    // ── Anmeldung vor allem anderen (2026-09-30) ─────────────────────────────
+    //
+    // Begründung an TciClientSession::fromLoopback. Solange eine Verbindung
+    // aus dem Netz nicht angemeldet ist, beantwortet der Server ausschließlich
+    // `auth:<token>` — kein Lesen, kein Setzen, kein Strom. Auf Loopback ist
+    // `authenticated` von vornherein true, dieser ganze Block also wirkungslos.
+    if (!session->authenticated) {
+        QString t = msg.trimmed();
+        if (t.endsWith(QLatin1Char(';'))) { t.chop(1); }
+        static const QString kAuth = QStringLiteral("auth:");
+        if (!t.startsWith(kAuth, Qt::CaseInsensitive)) {
+            // Nicht einmal sagen, was fehlt: wer den Port scannt, soll nicht
+            // erfahren, dass hier ein Token erwartet wird.
+            return;
+        }
+        // Beide Seiten in die Vergleichsform bringen: der Code wird als
+        // ABCD-EFGH angezeigt, und wer ihn abtippt, laesst den Strich mal
+        // weg und schreibt mal klein. Das darf nicht ueber die Anmeldung
+        // entscheiden.
+        const QString angeboten = normalisierterCode(t.mid(kAuth.size()));
+        const QString erwartet  = normalisierterCode(remoteToken());
+
+        // Zeitkonstanter Vergleich: ein früher Abbruch bei der ersten falschen
+        // Stelle verrät über die Antwortzeit, wie weit jemand richtig geraten
+        // hat. Der Aufwand ist zwei Zeilen, also gibt es keinen Grund dafür.
+        bool gleich = (angeboten.size() == erwartet.size()) && !erwartet.isEmpty();
+        if (gleich) {
+            QChar diff(0);
+            for (int i = 0; i < erwartet.size(); ++i) {
+                diff = QChar(diff.unicode() | (angeboten.at(i).unicode()
+                                             ^ erwartet.at(i).unicode()));
+            }
+            gleich = (diff.unicode() == 0);
+        }
+
+        if (!gleich) {
+            merkeFehlversuch(session->peer);
+            static constexpr int kMaxAuthAttempts = 3;
+            if (++session->authAttempts >= kMaxAuthAttempts) {
+                qCWarning(lcTci) << "TciServer:" << session->peer
+                                 << "hat sich dreimal falsch angemeldet — getrennt";
+                ws->close(QWebSocketProtocol::CloseCodePolicyViolated,
+                          QStringLiteral("Anmeldung fehlgeschlagen"));
+            }
+            return;
+        }
+
+        session->authenticated = true;
+        m_fehlversuche.remove(session->peer);   // geglueckt: Zaehler weg
+        qCInfo(lcTci) << "TciServer:" << session->peer << "angemeldet";
+        session->sendQueue.push(TciSendQueue::Priority::Urgent,
+                                QStringLiteral("auth:ok;"));
+        // Jetzt erst der Init-Burst — bis hierher wusste die Gegenstelle
+        // nichts über die Station.
+        if (m_protocol) {
+            for (const QString& line : m_protocol->buildInitBurst()) {
+                session->sendQueue.push(TciSendQueue::Priority::Control, line);
+            }
+        }
+        return;
     }
 
     // Phase 16 Task 16.3 (sub-commit b): intercept audio_start/audio_stop for
@@ -1993,6 +2938,299 @@ void TciServer::onTextMessageReceived(const QString& msg)
         const QString kAudioStop  = QStringLiteral("audio_stop:");
         const QString kIqStart    = QStringLiteral("iq_start:");
         const QString kIqStop     = QStringLiteral("iq_stop:");
+        const QString kSpecStart  = QStringLiteral("spectrum_start:");
+        const QString kSpecStop   = QStringLiteral("spectrum_stop:");
+
+        // ── QSO eintragen (2026-10-04) ──────────────────────────────────────
+        //
+        // Longpath-eigener Befehl, so wie `spectrum_span` einer ist. Die
+        // Handfunke schickt ihn, Longpath schreibt den Eintrag.
+        //
+        //     log_qso:<rufzeichen>[,<rst gesendet>[,<rst empfangen>]];
+        //     -> log_qso_ok:<rufzeichen>;   oder   log_qso_err:<grund>;
+        //
+        // WARUM NUR DAS RUFZEICHEN UND RST: Frequenz, Band, Betriebsart und
+        // Zeit nimmt Longpath aus dem laufenden Zustand -- genau wie das Pult
+        // es tut (RotorLogbookPanel). Wuerde die Seite sie mitschicken,
+        // koennte sie etwas anderes eintragen, als das Geraet gerade macht,
+        // und ADIF-Eigenheiten wie "LSB/USB sind keine Betriebsarten, sondern
+        // Unterarten von SSB" muessten an zwei Stellen stimmen. Eine Stelle
+        // reicht.
+        //
+        // WARUM NUR ANHAENGEN: kein Loeschen, kein Aendern ueber diesen Weg.
+        // Wer einen Kontakt korrigieren will, tut das am Pult, wo er ihn
+        // sieht.
+        //
+        // Geschrieben wird durch LogbookDatei -- dieselbe Stelle, die auch
+        // das Pult benutzt. Zwei Programme in derselben Datei waeren genau
+        // die Lage, die am 2026-10-03 die Logzeilen zerschrieben hat; hier
+        // ginge es um Kontakte.
+        {
+            QString t = trimmed;
+            if (t.startsWith(QStringLiteral("log_qso:"), Qt::CaseInsensitive)) {
+                auto antwort = [&](const QString& zeile) {
+                    session->sendQueue.push(TciSendQueue::Priority::Control,
+                                            zeile);
+                };
+                // Token-Pflicht wie bei jedem Netzbefehl.
+                if (!session->authenticated) { return; }
+                if (!session->fromLoopback && !remoteLogAllowed()) {
+                    qCWarning(lcTci)
+                        << "TciServer: QSO-Eintrag von" << session->peer
+                        << "abgelehnt — Loggen aus dem Netz ist abgeschaltet"
+                        << "(TciAllowRemoteLog)";
+                    antwort(QStringLiteral("log_qso_err:nicht freigegeben;"));
+                    return;
+                }
+
+                const QStringList a = t.mid(8).split(QLatin1Char(','));
+                const QString ruf = a.value(0).trimmed().toUpper();
+                // Ein Rufzeichen ohne Inhalt ist kein Kontakt. Die Laenge
+                // begrenzen, damit ein verirrter Rahmen nicht als Rufzeichen
+                // in der Datei landet.
+                if (ruf.isEmpty() || ruf.size() > 20) {
+                    antwort(QStringLiteral("log_qso_err:rufzeichen fehlt;"));
+                    return;
+                }
+
+                LogEntry e;
+                e.call    = ruf;
+                e.timeOn  = QDateTime::currentDateTimeUtc();
+                e.rstSent = a.value(1, QStringLiteral("59")).trimmed().left(8);
+                e.rstRcvd = a.value(2, QStringLiteral("59")).trimmed().left(8);
+                if (e.rstSent.isEmpty()) { e.rstSent = QStringLiteral("59"); }
+                if (e.rstRcvd.isEmpty()) { e.rstRcvd = QStringLiteral("59"); }
+
+                if (SliceModel* sl = m_model ? m_model->activeSlice() : nullptr) {
+                    e.freqMHz = sl->frequency() / 1e6;
+                    e.band    = bandLabel(bandFromFrequency(sl->frequency()));
+                    // ADIF kennt LSB/USB nicht als Betriebsart -- das sind
+                    // Unterarten von SSB, und ein Datensatz mit MODE=LSB wird
+                    // abgelehnt oder stillschweigend umgeschrieben. Gleiche
+                    // Zuordnung wie am Pult.
+                    const QString m = SliceModel::modeName(sl->dspMode());
+                    if (m == QLatin1String("LSB") || m == QLatin1String("USB")) {
+                        e.mode = QStringLiteral("SSB");
+                        e.submode = m;
+                    } else if (m == QLatin1String("CWL")
+                               || m == QLatin1String("CWU")) {
+                        e.mode = QStringLiteral("CW");
+                    } else {
+                        e.mode = m;
+                    }
+                }
+
+                QString fehler;
+                if (!LogbookDatei::anhaengen(e, &fehler)) {
+                    qCWarning(lcTci) << "TciServer: QSO-Eintrag" << ruf
+                                     << "nicht geschrieben —" << fehler;
+                    antwort(QStringLiteral("log_qso_err:%1;").arg(fehler));
+                    return;
+                }
+                qCInfo(lcTci) << "TciServer: QSO eingetragen —" << ruf
+                              << e.rstSent << "/" << e.rstRcvd
+                              << "auf" << (e.band.isEmpty()
+                                               ? QStringLiteral("(kein Band)")
+                                               : e.band)
+                              << "von" << session->peer;
+                antwort(QStringLiteral("log_qso_ok:%1;").arg(ruf));
+                return;
+            }
+        }
+
+        // ── Sendesperre für das Netz, Stelle 3 von 3 (2026-09-30) ───────────
+        //
+        // `tune:N,true` startet den Abstimmträger — der geht auf die Antenne
+        // wie jedes andere Senden. Es lief an den beiden anderen Sperren
+        // vorbei, weil es in TciProtocol behandelt wird und das die Sitzung
+        // nicht kennt: dort ist nicht zu sehen, ob ein Befehl von Loopback
+        // oder aus dem Netz kommt.
+        //
+        // Gefunden bei der Durchsicht vor dem ersten Livetest an einem echten
+        // Gerät, und zwar genau deshalb, weil der Abstimmträger die Stelle
+        // ist, an der man beim Nachdenken über „senden" zuletzt hinschaut:
+        // er heisst nicht so, aber er ist es.
+        {
+            QString t = trimmed;
+            if (t.startsWith(QStringLiteral("tune:"), Qt::CaseInsensitive)) {
+                const QStringList a = t.mid(5).split(QLatin1Char(','));
+                const bool willTune = a.size() >= 2 &&
+                    a.at(1).trimmed().compare(QLatin1String("true"),
+                                              Qt::CaseInsensitive) == 0;
+                // Ausdrueckliches Abschalten — alles andere (Abfrage ohne
+                // Argument, Tippfehler) ist KEIN Abschalten und darf die
+                // Buchfuehrung nicht anfassen.
+                const bool willTuneAus = a.size() >= 2 &&
+                    a.at(1).trimmed().compare(QLatin1String("false"),
+                                              Qt::CaseInsensitive) == 0;
+                if (willTune && !session->fromLoopback && !remoteTxAllowed()) {
+                    qCWarning(lcTci)
+                        << "TciServer: Abstimmträger von" << session->peer
+                        << "abgelehnt — Senden aus dem Netz ist nicht"
+                        << "freigegeben (TciAllowRemoteTx)";
+                    sendeAblehnung(session, QStringLiteral("nicht freigegeben"));
+                    return;
+                }
+
+                // ── Besitzer, Wachhund, Sendezeit-Deckel (2026-09-30) ───────
+                //
+                // Bis hierher war der Abstimmträger der einzige Sendeweg OHNE
+                // diese drei Netze. Sie hängen alle an `m_moxOwner`, und den
+                // setzte nur der `trx:`-Weg: onClientDisconnected() entkeyt
+                // nur bei `m_moxOwner.data() == ws`, onTxTimeCapExpired()
+                // steigt bei `m_moxOwner.isNull()` sofort aus. Ein Träger vom
+                // Telefon stand also unbegrenzt auf der Antenne, sobald das
+                // WLAN abriss oder iOS die Seite einfror — und das Modell hat
+                // keine eigene Zeitgrenze für Tune.
+                //
+                // handfunke/README.md versprach ausdrücklich das Gegenteil
+                // („ganz gleich welcher Client ihn getastet hat"). Genau diese
+                // Zusage macht das Freigeben von TciAllowRemoteTx vertretbar,
+                // also muss sie stimmen.
+                //
+                // Gleiche Buchführung wie im `trx:`-Zweig weiter unten, damit
+                // beide Sendewege dieselben Netze haben.
+                if (willTune) {
+                    if (m_moxOwner.data() != ws) { m_ownerPingsUnanswered = 0; }
+                    m_moxOwner = ws;
+                    startKeyedWatchdog();
+                } else if (willTuneAus && !m_moxOwner.isNull()
+                           && m_moxOwner.data() == ws) {
+                    // Nur bei AUSDRUECKLICHEM `tune:N,false` loslassen, und
+                    // auch dann nur, wenn das Geraet danach wirklich nicht
+                    // mehr sendet.
+                    //
+                    // Beide Bedingungen sind Nachbesserungen vom selben Tag,
+                    // gefunden bei der Durchsicht der eigenen Reparatur:
+                    //
+                    //  1. Der Zweig griff vorher bei JEDEM tune-Rahmen, der
+                    //     nicht `,true` war — also auch bei der reinen
+                    //     Statusabfrage `tune:0;`, die ein fremder Client
+                    //     voellig zu Recht schickt. Der Verteiler laesst den
+                    //     Traeger dabei stehen (TciProtocol.cpp: ein Argument
+                    //     ist der Abfragepfad), die Buchfuehrung gab ihn aber
+                    //     frei.
+                    //
+                    //  2. Die Bedingung lautete `mox() && !isTune()` und war
+                    //     damit WAEHREND des Abstimmtraegers immer falsch —
+                    //     `isTune()` ist ja gerade dann wahr. Losgelassen
+                    //     wurde also genau in dem Zustand, den zu sichern der
+                    //     ganze Block da ist. Richtig ist `mox() || isTune()`:
+                    //     sendet das Geraet in IRGENDEINER Form, bleibt der
+                    //     Besitzer stehen.
+                    //
+                    // Zusammen hoben die beiden den Fix vom selben Tag wieder
+                    // auf: nach einem `tune:0;` mitten im Traeger lief der
+                    // Sender ohne Wachhund, ohne Deckel und ohne Besitzer —
+                    // genau der Zustand, den der Kommentar oben zu schliessen
+                    // behauptet.
+                    const bool sendetNoch = !m_model.isNull()
+                                            && (m_model->mox() || m_model->isTune());
+                    if (!sendetNoch) {
+                        m_moxOwner = nullptr;
+                        stopKeyedWatchdog();
+                    }
+                }
+            }
+        }
+
+        // ── spectrum_start / spectrum_stop (Longpath-eigen) ─────────────────
+        //
+        //   spectrum_start:<rx>[,<punkte>[,<bilder je sekunde>]]
+        //   spectrum_stop:<rx>
+        //
+        // Nicht Teil von TCI. Ein fremder Server kennt es nicht und ein
+        // fremder Client fordert es nie an — beide merken davon nichts, weil
+        // unbekannte Namen ohnehin antwortlos verworfen werden. Der Gegenwert
+        // ist groß: gemessen 404 kB/s für rohes I/Q bei 48 kHz gegen rund
+        // 27 kB/s für ein fertiges Spektrum.
+        //
+        // Die Punktzahl kommt vom CLIENT, nicht vom Server: nur er weiß, wie
+        // breit sein Bildschirm ist. Genau das ist der Hebel — nicht härter zu
+        // komprimieren, sondern gar nicht erst mehr zu schicken, als gezeigt
+        // werden kann.
+        if (trimmed.startsWith(kSpecStart)) {
+            const QStringList args =
+                trimmed.mid(kSpecStart.size()).split(QLatin1Char(','));
+            bool ok = false;
+            const int rx = args.value(0).trimmed().toInt(&ok);
+
+            // Nur Empfaenger 0 (2026-09-30). RadioModel haelt EINE FFTEngine
+            // (RadioModel.h:900), und die traegt eine feste Empfaengernummer,
+            // die sie in jedes fftReady schreibt. Fuer rx 1 kann also nie ein
+            // Bild entstehen.
+            //
+            // Bis heute wurde `spectrum_start:1` trotzdem bestaetigt. Das war
+            // schlimmer als eine Ablehnung: der Client nimmt die Bestaetigung
+            // als Zusage, laesst darum seinen Rueckfall auf rohes I/Q liegen
+            // und wartet dann fuer immer auf Bilder, die nie kommen — mit
+            // schwarzem Wasserfall und ohne jeden Hinweis, woran es liegt.
+            //
+            // Schweigen ist hier die ehrliche Antwort: unbekannte und
+            // abgelehnte Befehle werden in TCI antwortlos verworfen, und
+            // genau daran erkennt ein Client, dass er den anderen Weg nehmen
+            // muss. Kommen eines Tages mehrere FFTEngines, gehoert diese
+            // Schranke erweitert statt entfernt.
+            if (ok && rx != 0) {
+                qCInfo(lcTci) << "TciServer: spectrum_start fuer rx" << rx
+                              << "abgelehnt — es gibt nur einen Spektrum-Abgriff,"
+                              << "peer" << session->peer;
+                return;
+            }
+
+            if (ok && rx >= 0 && rx <= 1) {
+                if (args.size() >= 2) {
+                    bool ok2 = false;
+                    const int p = args.at(1).trimmed().toInt(&ok2);
+                    // 64..1024: darunter ist es kein Spektrum mehr, darüber
+                    // kann kein Handy es zeigen.
+                    if (ok2) { session->spectrumPoints = std::clamp(p, 64, 1024); }
+                }
+                if (args.size() >= 3) {
+                    bool ok3 = false;
+                    const int f = args.at(2).trimmed().toInt(&ok3);
+                    if (ok3) { session->spectrumFps = std::clamp(f, 1, 30); }
+                }
+                if (args.size() >= 4) {
+                    // Vierter Wert: die gewuenschte Bandbreite in Hertz.
+                    // 0 heisst "alles", sonst ein mittiger Ausschnitt.
+                    // Begruendung an TciClientSession::spectrumSpanHz.
+                    bool ok4 = false;
+                    const int hz = args.at(3).trimmed().toInt(&ok4);
+                    if (ok4) {
+                        session->spectrumSpanHz =
+                            (hz <= 0) ? 0 : std::clamp(hz, 2000, 1000000);
+                    }
+                }
+                // Jetzt ist die FFTEngine da, auch wenn sie es beim Serverstart
+                // noch nicht war.
+                ensureFftTap();
+                if (!session->spectrumEnabled.contains(rx)) {
+                    session->spectrumEnabled.insert(rx);
+                    qCInfo(lcTci) << "TciServer: Spektrum abonniert rx" << rx
+                                  << session->spectrumPoints << "Punkte,"
+                                  << session->spectrumFps << "B/s, peer"
+                                  << session->peer;
+                }
+                // Bestätigung mit den TATSÄCHLICH gültigen Werten, nicht mit
+                // den gewünschten — der Client soll wissen, worauf geklemmt
+                // wurde, statt es zu raten.
+                session->sendQueue.push(TciSendQueue::Priority::Control,
+                    QStringLiteral("spectrum_start:%1,%2,%3;")
+                        .arg(rx).arg(session->spectrumPoints).arg(session->spectrumFps));
+            }
+        } else if (trimmed.startsWith(kSpecStop)) {
+            bool ok = false;
+            const int rx = trimmed.mid(kSpecStop.size()).trimmed().toInt(&ok);
+            if (ok && rx >= 0 && rx <= 1) {
+                if (session->spectrumEnabled.remove(rx)) {
+                    qCInfo(lcTci) << "TciServer: Spektrum abbestellt rx" << rx
+                                  << "peer" << session->peer;
+                }
+                session->sendQueue.push(TciSendQueue::Priority::Control,
+                    QStringLiteral("spectrum_stop:%1;").arg(rx));
+            }
+        } else
         if (trimmed.startsWith(kAudioStart)) {
             bool ok = false;
             const int rx = trimmed.mid(kAudioStart.size()).trimmed().toInt(&ok);
@@ -2105,14 +3343,19 @@ void TciServer::onTextMessageReceived(const QString& msg)
                     // Recreate the resampler for any active audio subscriptions,
                     // since the target rate has changed.  Destroy old, rebuild.
                     for (int rx : session->audioStreamEnabled) {
-                        auto rIt = session->audioResamplers.find(rx);
-                        if (rIt != session->audioResamplers.end()) {
-                            destroy_resampleFV(rIt.value());
-                            session->audioResamplers.erase(rIt);
-                        }
-                        void* newResampler = create_resampleFV(48000, sr);
-                        if (newResampler) {
-                            session->audioResamplers.insert(rx, newResampler);
+                        // Beide Kanäle neu — siehe audioResamplers in
+                        // TciClientSession.h.
+                        for (int ch = 0; ch < 2; ++ch) {
+                            const int key = TciClientSession::resamplerKey(rx, ch);
+                            auto rIt = session->audioResamplers.find(key);
+                            if (rIt != session->audioResamplers.end()) {
+                                destroy_resampleFV(rIt.value());
+                                session->audioResamplers.erase(rIt);
+                            }
+                            void* newResampler = create_resampleFV(48000, sr);
+                            if (newResampler) {
+                                session->audioResamplers.insert(key, newResampler);
+                            }
                         }
                     }
                 }
@@ -2142,15 +3385,68 @@ void TciServer::onTextMessageReceived(const QString& msg)
                 // Valid: "int16", "int24", "int32", "float32".  Defaults to float32.
                 // int enum encoding: 0=int16, 1=int24, 2=int32, 3=float32.
                 const QString typeStr = trimmed.mid(kAudioStreamSampleType.size()).trimmed().toLower();
-                int typeInt = 3;  // float32 default (matches TciClientSession default)
+                int typeInt = -1;
                 if (typeStr == QStringLiteral("int16"))   { typeInt = 0; }
                 else if (typeStr == QStringLiteral("int24"))  { typeInt = 1; }
                 else if (typeStr == QStringLiteral("int32"))  { typeInt = 2; }
                 else if (typeStr == QStringLiteral("float32")) { typeInt = 3; }
-                session->audioSampleType = typeInt;
+                // Longpath-eigen, siehe TciSampleType::MuLaw8: ein Byte je
+                // Abtastung, halbiert den Tonstrom gegenueber Int16.
+                else if (typeStr == QStringLiteral("mulaw8")) { typeInt = 101; }
+
+                if (typeInt < 0) {
+                    // ABWEICHUNG von Thetis (TCIServer.cs:5908-5934
+                    // [v2.10.3.13]), das bei unbekanntem Namen stillschweigend
+                    // auf float32 faellt.
+                    //
+                    // Hier nicht: float32 ist das TEUERSTE Format, und ein
+                    // Tippfehler im Client machte den Tonstrom damit achtmal
+                    // so gross, ohne dass irgendwo etwas davon stuende. Fuer
+                    // ein Telefon an einer Mobilfunkleitung ist das der
+                    // falsche Ausgang aus einem Fehler. Der bisherige Wert
+                    // bleibt stehen, und im Protokoll steht, was los war.
+                    qCWarning(lcTci) << "TciServer: audio_stream_sample_type"
+                                     << typeStr << "unbekannt — es bleibt bei"
+                                     << session->audioSampleType
+                                     << "peer" << session->peer;
+                } else {
+                    session->audioSampleType = typeInt;
+                }
                 qCInfo(lcTci) << "TciServer: session audioSampleType set to" << typeStr
-                              << "(" << typeInt << ")"
+                              << "(" << session->audioSampleType << ")"
                               << "peer" << session->peer;
+
+                // ── Hier ist Schluss (2026-09-30) ───────────────────────────
+                //
+                // Der Befehl darf NICHT an TciProtocol weiterlaufen. Dort
+                // (handleAudioStreamSampleTypeCommand) kennt man nur die vier
+                // TCI-Namen, faellt bei allem anderen auf float32, setzt damit
+                // das GLOBALE RadioModel und echot float32 an ALLE Clients.
+                //
+                // Zwei Schaeden. Erstens ein falsches Echo: am 2026-09-30 live
+                // gemessen kamen Rahmen mit Probentyp 101 (mu-law) an,
+                // waehrend das Echo "float32" sagte — der Client schaltete
+                // daraufhin selbst auf int16 zurueck, und der billige Ton kam
+                // nie zum Einsatz. Zweitens, und schwerer: ein Client, der
+                // mulaw8 anfordert, haette damit das globale Format verstellt
+                // und einem gleichzeitig laufenden WSJT-X das Tonformat unter
+                // den Fuessen weggezogen.
+                //
+                // Das Format gehoert in Longpath der SITZUNG, nicht dem
+                // Programm — anders als in Thetis, wo ein Server einen
+                // Zustand hat. Diese Abweichung war schon da (audioSampleType
+                // steht in TciClientSession); sie wird hier nur zu Ende
+                // gefuehrt. Also: selbst bestaetigen, mit dem Wert, der fuer
+                // DIESE Verbindung gilt, und den Befehl schlucken.
+                static const char* kNamen[] = {"int16", "int24", "int32", "float32"};
+                const int st = session->audioSampleType;
+                const QString name = (st >= 0 && st <= 3)
+                                   ? QString::fromLatin1(kNamen[st])
+                                   : (st == 101 ? QStringLiteral("mulaw8")
+                                                : QStringLiteral("float32"));
+                session->sendQueue.push(TciSendQueue::Priority::Control,
+                    QStringLiteral("audio_stream_sample_type:%1;").arg(name));
+                return;
             }
         }
 
@@ -2294,6 +3590,22 @@ void TciServer::onTextMessageReceived(const QString& msg)
                     // onClientDisconnected() uses this to unkey a radio whose
                     // keying client has vanished. See the member note in
                     // TciServer.h.
+                    // ── Sendesperre für das Netz, Stelle 1 von 3 ─────────────
+                    //
+                    // Die andere sitzt bei der Annahme von TX-Ton. Beide sind
+                    // nötig, siehe dort. Ein Client aus dem Netz, der nicht
+                    // senden darf, bekommt sein trx:…,true schlicht nicht
+                    // ausgeführt — und der Zustand wird ihm auch nicht
+                    // bestätigt, damit seine Anzeige nicht behauptet, es liefe.
+                    if (wantsMox && !session->fromLoopback && !remoteTxAllowed()) {
+                        qCWarning(lcTci)
+                            << "TciServer: Sendewunsch von" << session->peer
+                            << "abgelehnt — Senden aus dem Netz ist nicht"
+                            << "freigegeben (TciAllowRemoteTx)";
+                        sendeAblehnung(session, QStringLiteral("nicht freigegeben"));
+                        return;
+                    }
+
                     if (wantsMox) {
                         if (m_moxOwner.data() != ws) { m_ownerPingsUnanswered = 0; }
                         m_moxOwner = ws;
@@ -2374,6 +3686,14 @@ void TciServer::onTextMessageReceived(const QString& msg)
     while (m_protocol->hasPendingNotification()) {
         const QString notif = m_protocol->takePendingNotification();
         for (auto sit = m_clients.cbegin(); sit != m_clients.cend(); ++sit) {
+            // Dasselbe Anmeldetor wie im Abflusstakt. Es gibt ZWEI Stellen,
+            // die Meldungen verteilen — diese hier und die im Takt —, und
+            // beim ersten Einbau bekam nur die andere das Tor. Eine halb
+            // geschlossene Tuer ist keine: wer den Port findet, konnte ueber
+            // genau diesen Weg weiter mitlesen, was die Station tut, ohne
+            // das Token zu kennen. Gefunden bei der Durchsicht der eigenen
+            // Reparatur (2026-09-30).
+            if (!sit.value()->authenticated) { continue; }
             sit.value()->sendQueue.push(TciSendQueue::Priority::Control, notif);
         }
     }
@@ -2433,6 +3753,19 @@ void TciServer::onBinaryMessageReceived(const QByteArray& data)
     //   if (streamType != TCIStreamType.TX_AUDIO_STREAM || length <= 0) return;
     if (streamTypeInt != static_cast<int>(TciStreamType::TxAudioStream)) { return; }
     if (length <= 0) { return; }
+
+    // ── Sendesperre für das Netz, Stelle 2 von 3 (2026-09-30) ────────────────
+    //
+    // Die andere sitzt im trx-Weg. BEIDE sind nötig: sperrte man nur das
+    // Tasten, könnte ein Client weiter TX-Ton einspeisen und über eine andere
+    // Quelle (VOX, lokales MOX) senden; sperrte man nur den Ton, könnte er
+    // tasten und einen Träger stehen lassen. Ein halb gesperrter Sendeweg ist
+    // kein gesperrter Sendeweg.
+    //
+    // Auf Loopback greift das nicht — WSJT-X und JTDX schicken hier ihren
+    // Sendeton, und daran ändert sich nichts.
+    if (!session->authenticated) { return; }
+    if (!session->fromLoopback && !remoteTxAllowed()) { return; }
 
     // ── TX mutex gate ─────────────────────────────────────────────────────────
     //
@@ -2837,7 +4170,153 @@ void TciServer::onRawIqDataReceived(const QVector<float>& interleavedIQ)
             2,             // always 2 channels for IQ (I + Q)
             outBuf.constData());
 
+        // Begruendung an rueckstauFrei(): roher I/Q ist der teuerste Strom,
+        // und was der Client verpasst hat, will er nicht nachgereicht
+        // bekommen — er will das Jetzt sehen.
+        if (!rueckstauFrei(ws)) { continue; }
         ws->sendBinaryMessage(frame);
+    }
+}
+
+// ── onFftBinsReady (Longpath-eigen, 2026-09-30) ──────────────────────────────
+//
+// Das Gegenstück zum I/Q-Abgriff darüber, für Clients, die ein BILD wollen
+// statt Rohdaten. Begründung an TciStreamType::SpectrumStream; die Zahl, um
+// die es geht: gemessen 404 kB/s für rohes I/Q bei 48 kHz gegen rund 27 kB/s
+// für ein fertiges Spektrum.
+//
+// Zwei Dinge passieren hier, und beide sparen mehr als jede Kompression:
+//   1. Verdichten auf die Bildpunktzahl, die der CLIENT genannt hat. Aus
+//      bis zu 16384 Bins werden 256 — nur er weiß, wie breit sein Schirm ist.
+//   2. Drosseln auf die Bildrate, die der Client genannt hat. Die FFTEngine
+//      liefert rund 30 Bilder je Sekunde; ein Telefon will zehn.
+//
+// Verdichtet wird über den SPITZENWERT, nicht den Mittelwert — wie
+// SpectrumWidget::dbmOverRange es am Pult macht. Ein Mittelwert über 64 Bins
+// lässt einen schmalen Träger im Rauschen verschwinden, und genau der ist
+// das, was man sucht.
+// Verdrahtet den Spektrum-Abgriff, sobald die FFTEngine da ist — und nur
+// einmal. Wird beim Serverstart versucht (da meist vergeblich, siehe dort) und
+// bei jedem spectrum_start nachgeholt.
+void TciServer::ensureFftTap()
+{
+    if (m_fftTapConnected) { return; }
+    if (m_model.isNull()) { return; }
+    auto* fft = m_model->fftEngine();
+    if (!fft) { return; }
+
+    // QueuedConnection: fftReady kommt vom FFT-Faden, m_clients und
+    // QWebSocket gehören dem Hauptfaden. Der QVector ist implizit geteilt,
+    // die Kopie also billig.
+    connect(fft, &FFTEngine::fftReady,
+            this, &TciServer::onFftBinsReady,
+            Qt::QueuedConnection);
+    m_fftTapConnected = true;
+    qCInfo(lcTci) << "TciServer: Spektrum-Abgriff an FFTEngine::fftReady";
+}
+
+void TciServer::onFftBinsReady(int receiverId, const QVector<float>& binsDbm)
+{
+    if (binsDbm.isEmpty() || receiverId < 0 || receiverId > 1) { return; }
+    if (m_clients.isEmpty()) { return; }
+
+    // Monotone Uhr, nicht die Wanduhr. Die Wanduhr springt: Zeitumstellung,
+    // ein NTP-Abgleich, ein Anwender, der die Uhr stellt. Springt sie
+    // rueckwaerts, ist `jetzt - lastSpectrumMs` negativ und kleiner als jeder
+    // Abstand — das Bild stuende fuer die Dauer des Sprungs still, ohne dass
+    // irgendetwas kaputt waere (Durchsicht 2026-09-30). QElapsedTimer laeuft
+    // seit Programmstart monoton weiter.
+    static QElapsedTimer uhr;
+    if (!uhr.isValid()) { uhr.start(); }
+    const qint64 jetzt = uhr.elapsed();
+
+    // Gleiche Vorsichtsmaßnahme wie beim I/Q-Abgriff: sendBinaryMessage kann
+    // synchron onClientDisconnected auslösen und damit m_clients ändern,
+    // während wir darüber laufen.
+    const QHash<QWebSocket*, std::shared_ptr<TciClientSession>> schnappschuss = m_clients;
+    const int n = binsDbm.size();
+
+    for (auto it = schnappschuss.cbegin(); it != schnappschuss.cend(); ++it) {
+        QWebSocket* ws      = it.key();
+        const auto& session = it.value();
+        if (!session->spectrumEnabled.contains(receiverId)) { continue; }
+
+        const qint64 abstandMs = 1000 / std::max(1, session->spectrumFps);
+        if (jetzt - session->lastSpectrumMs < abstandMs) { continue; }
+        session->lastSpectrumMs = jetzt;
+
+        const int punkte = std::clamp(session->spectrumPoints, 64, 1024);
+
+        // ── Ausschnitt (2026-10-01) ─────────────────────────────────────────
+        //
+        // Der Client darf eine Bandbreite verlangen; dann wird mittig
+        // beschnitten, BEVOR verdichtet wird. Das ist der Unterschied
+        // zwischen "feiner" und "groesser gemalt": die Punkte decken dann
+        // weniger Hertz ab, statt dieselben Hertz breiter zu zeigen.
+        //
+        // Die Bins decken die volle Abtastrate ab (m_fftSampleRate, vom
+        // Panadapter gesetzt). Ist sie unbekannt, bleibt es bei allem —
+        // lieber die ganze Breite als ein falsch beschnittener Ausschnitt.
+        int erstesBin = 0;
+        int letztesBin = n;   // ausschliesslich
+        const int abtastrate = m_fftSampleRate.load(std::memory_order_acquire);
+        if (session->spectrumSpanHz > 0 && abtastrate > 0
+            && session->spectrumSpanHz < abtastrate) {
+            const double anteil = double(session->spectrumSpanHz) / double(abtastrate);
+            const int breite = std::max(punkte, int(std::lround(n * anteil)));
+            if (breite < n) {
+                erstesBin  = (n - breite) / 2;
+                letztesBin = erstesBin + breite;
+            }
+        }
+        const int sichtbar = letztesBin - erstesBin;
+
+        // ── Die WIRKLICHE Spanne melden, sobald sie sich aendert ────────────
+        //
+        // Begruendung an TciClientSession::spectrumSpanGemeldetHz. Kurz: der
+        // Client rechnet Abstimmstrich, Durchlassband und das Schieben des
+        // Wasserfalls aus SEINEM Wunsch. Der Zuschnitt oben kann davon
+        // abweichen — die Untergrenze `punkte` hebt eine zu schmale Bitte an,
+        // und ohne bekannte Abtastrate wird gar nicht beschnitten. Dann sitzt
+        // beim Bediener alles falsch, ohne dass irgendwo etwas davon steht.
+        //
+        // 0 heisst "volle Breite, Spanne unbekannt" — der Client faellt dann
+        // auf die I/Q-Rate zurueck, die er ohnehin kennt.
+        const int spanneEffektivHz =
+            (abtastrate > 0 && n > 0)
+                ? static_cast<int>(std::lround(double(sichtbar) / double(n)
+                                               * double(abtastrate)))
+                : 0;
+        if (spanneEffektivHz != session->spectrumSpanGemeldetHz) {
+            session->spectrumSpanGemeldetHz = spanneEffektivHz;
+            // Control-Rang, nicht Urgent: das ist eine Auskunft, kein
+            // Sendebefehl. Und nur bei AENDERUNG — sonst haengt an jedem
+            // Bild eine Textzeile, zehnmal je Sekunde.
+            session->sendQueue.push(TciSendQueue::Priority::Control,
+                QStringLiteral("spectrum_span:%1,%2;")
+                    .arg(receiverId).arg(spanneEffektivHz));
+        }
+
+        QVector<float> bild(punkte);
+        for (int i = 0; i < punkte; ++i) {
+            // Bereichsgrenzen in 64 Bit rechnen: 16384 Bins mal 1024 Punkte
+            // läuft in int noch nicht über, aber die Rechnung soll auch dann
+            // stimmen, wenn die FFT einmal größer wird.
+            const int von = erstesBin
+                + static_cast<int>(static_cast<qint64>(i) * sichtbar / punkte);
+            const int bis = std::max(von + 1, erstesBin
+                + static_cast<int>(static_cast<qint64>(i + 1) * sichtbar / punkte));
+            float spitze = -200.0f;
+            for (int b = von; b < bis && b < letztesBin && b < n; ++b) {
+                if (binsDbm[b] > spitze) { spitze = binsDbm[b]; }
+            }
+            bild[i] = spitze;
+        }
+
+        // Ein Bild, das zwanzig Sekunden alt ist, hilft niemandem mehr.
+        if (!rueckstauFrei(ws)) { continue; }
+        ws->sendBinaryMessage(TciBinaryFrame::buildSpectrumPayload(
+            receiverId, session->spectrumFps, punkte, bild.constData()));
     }
 }
 

@@ -1,0 +1,36 @@
+:root{
+  --app-bg:#08080a; --panel:#0c0c0e; --inset:#050507; --inset-border:#232329;
+  --border:#2c2c31; --border-subtle:#1f1f23;
+  --text:#dcdce1; --text2:#a6a6ac; --text3:#909096;
+  --text-inactive:#58585e;
+  --accent:#4a7ba8; --measured:#d8a55f; --amber-dim:#6b5630;
+  --ok:#6fa384; --warn:#a8853f; --danger:#a86b6d;
+  --tx-top:#a87a3c; --tx-bot:#8a6a30; --tx-border:#c2924f; --tx-text:#17130a;
+  --glass-btn-top:#222227; --glass-btn-bot:#141417;
+  --light:rgba(255,255,255,.07); --shade:rgba(0,0,0,.63);
+  --mono:ui-monospace,"SF Mono",Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--app-bg);color:var(--text);width:375px;height:812px;
+  font:400 13px/1.35 -apple-system,"SF Pro Text",system-ui,sans-serif;
+  display:flex;flex-direction:column;overflow:hidden}
+.kopf{display:flex;align-items:center;justify-content:space-between;
+  padding:14px 16px 10px;border-bottom:1px solid var(--border-subtle)}
+.ruf{font:600 13px/1 var(--mono);letter-spacing:.08em;color:var(--text2)}
+.blatt{font:600 9px/1 var(--mono);letter-spacing:.14em;color:var(--amber-dim)}
+.freq{padding:16px 16px 6px;font:300 34px/1 var(--mono);letter-spacing:-.01em;
+  color:var(--measured);font-variant-numeric:tabular-nums}
+.freq small{font-size:14px;color:var(--text3);margin-left:6px;letter-spacing:.1em}
+.unterzeile{padding:0 16px 14px;font:500 11px/1 var(--mono);letter-spacing:.1em;
+  color:var(--text3)}
+.band{flex:1;margin:0 16px;border-radius:10px;border:1px solid var(--inset-border);
+  background:linear-gradient(#0e141b,#070a0e);position:relative;overflow:hidden}
+.band svg{position:absolute;inset:0;width:100%;height:100%}
+.fuss{padding:16px;display:flex;flex-direction:column;gap:12px}
+.hinweis{font:500 10px/1.4 var(--mono);letter-spacing:.06em;color:var(--text-inactive);
+  text-align:center}
+.glas{border-radius:10px;border:1px solid var(--border);
+  background:linear-gradient(var(--glass-btn-top),var(--glass-btn-bot));
+  color:var(--text2)}
+.titel{position:absolute;left:16px;top:10px;font:600 9px/1 var(--mono);
+  letter-spacing:.16em;color:var(--text-inactive)}

@@ -144,6 +144,40 @@ public:
     // for tests; the app keeps the defaults.
     void setKeyedWatchdog(int intervalMs, int maxUnanswered);
 
+    // Sendezeit-Deckel: Obergrenze für einen einzelnen, über TCI getasteten
+    // Sendevorgang. 0 schaltet ihn ab. Der Wert stammt sonst aus der
+    // Einstellung `TciMaxTransmitSeconds` (Vorgabe 180 s) — siehe die
+    // ausführliche Begründung am Feld m_txTimeCap. Für Prüfstände, damit sie
+    // nicht drei Minuten warten müssen.
+    void setTxTimeCapSeconds(int seconds);
+    int  txTimeCapSeconds() const { return m_txTimeCapSeconds; }
+
+    // ── Fernzugriff: Token und Sendefreigabe (2026-09-30) ───────────────────
+    //
+    // Beides greift AUSSCHLIESSLICH für Verbindungen, die nicht von Loopback
+    // kommen — Begründung an TciClientSession::fromLoopback. Ein Logger auf
+    // demselben Rechner merkt von beidem nichts.
+    //
+    // Das Token liegt im CredentialStore (Schlüsselbund), nicht in den
+    // Einstellungen: die Einstellungsdatei liegt im Klartext im Profil und
+    // wandert in jedes Support-Bündel.
+    static QString remoteToken();
+    static bool    setRemoteToken(const QString& token);
+
+    // Ein neues Token aus 160 Zufallsbits, als 32 Zeichen in Base32 ohne die
+    // verwechselbaren 0/O/1/I — es soll notfalls abgetippt werden können.
+    static QString generateRemoteToken();
+
+    // Vergleichsform des Kopplungscodes: ohne Bindestriche, in Grossbuchstaben.
+    // Wer ihn abtippt, soll ihn schreiben duerfen, wie er ihn liest.
+    static QString normalisierterCode(const QString& roh);
+
+    // Darf eine Verbindung aus dem NETZ senden? Ab Werk nein. Der Schalter
+    // wirkt an beiden Stellen, an denen gesendet werden kann: dem trx-Weg und
+    // der Annahme von TX-Ton. Nur eine zu sperren liesse den Sendeweg offen.
+    static bool remoteLogAllowed();
+    static bool remoteTxAllowed();
+
     // Test-only: bypass the RxChannel signal chain and inject audio directly
     // into the per-slice ring buffer.  Used by tst_tci_audio_roundtrip;
     // production code paths go through the Qt::DirectConnection signal at
@@ -183,10 +217,30 @@ public:
     // and this header only forward-declares QWebSocket (gcc refuses).
     QWebSocket* moxOwnerForTest() const;
 
+    // Nur für Prüfstände: behandelt jede Verbindung so, als käme sie aus dem
+    // Netz. Ohne diesen Haken ist die Sendesperre nicht prüfbar — im Testlauf
+    // ist jeder Client Loopback, und `fromLoopback` schaltet die Sperre ab.
+    //
+    // Die Durchsicht am 2026-09-30 fand genau das: keine der drei Sperren
+    // wurde von irgendeinem Prüfpunkt berührt, geprüft war nur der Getter
+    // remoteTxAllowed(). An Martins Station hängt eine Antenne; die Naht, die
+    // den Sender schützt, gehört unter Beobachtung.
+    void setTreatAllClientsAsRemoteForTest(bool on) { m_alleAlsNetzFuerTest = on; }
+
 signals:
     // Emitted after the server begins listening.  port is the actual bound port
     // (useful when start() was called with port=0).
     void serverStarted(quint16 port);
+
+    // Der Bind ist gescheitert und ein Wiederversuch laeuft.
+    //
+    // Gibt es, weil ein gescheiterter Bind sonst nur eine Zeile im Log ist:
+    // am 2026-10-02 wechselte der Rechner das Netz, die eingestellte feste
+    // Adresse gab es nicht mehr, und der TCI-Server kam schlicht nicht hoch.
+    // Fuer den Bediener sah das aus wie ein defektes Programm — die
+    // Fernbedienung am Telefon fand nichts, und nirgends stand warum.
+    void bindWartetAufAdresse(const QString& adresse, quint16 port,
+                              const QString& grund);
 
     // Emitted after stop() completes and all clients have been disconnected.
     void serverStopped();
@@ -210,6 +264,12 @@ signals:
     // Also emitted when no RadioModel is installed (test path), so the
     // ownership bookkeeping can be checked without a radio.
     void moxReleasedOnClientLoss(const QString& peer);
+
+    // Der Sendezeit-Deckel hat zugeschlagen: ein über TCI getasteter
+    // Sendevorgang lief länger als erlaubt und wurde abgeworfen. Trägt die
+    // Gegenstelle und die abgelaufene Grenze, damit die Oberfläche es dem
+    // Bediener sagen kann — ein stiller Abwurf wäre nur ein zweites Rätsel.
+    void moxReleasedOnTimeCap(const QString& peer, int seconds);
 
     // Emitted when the server fails to bind.
     void errorOccurred(const QString& errStr);
@@ -275,9 +335,30 @@ private slots:
     // PublishIQSamples.
     void onRawIqDataReceived(const QVector<float>& interleavedIQ);
 
+    // Fertig gerechnetes Spektrum an die Clients, die eines abonniert haben.
+    // Hängt an FFTEngine::fftReady — der Server rechnet also nichts zusätzlich,
+    // er gibt weiter, was der Panadapter ohnehin bekommt. Verdichtung auf die
+    // Bildpunktzahl des Clients und Drosselung auf dessen Bildrate passieren
+    // dort; Begründung an der Implementierung.
+    void onFftBinsReady(int receiverId, const QVector<float>& binsDbm);
+
     // Destroys all RESAMPLEF instances for the given session and clears the map.
     // Called from onClientDisconnected and stop().
     void cleanupResamplers(std::shared_ptr<TciClientSession>& session);
+
+private:
+    // Ab hier wieder gewöhnliche Mitglieder: der Block darüber ist
+    // `private slots:`, und eine Membervariable darin lässt moc scheitern
+    // ("Not a signal or slot declaration").
+
+    // Verdrahtet den Spektrum-Abgriff, sobald die FFTEngine existiert — und nur
+    // einmal. Beim Serverstart gibt es sie noch nicht: MainWindow startet den
+    // TCI-Server (MainWindow.cpp:987) lange bevor es dem RadioModel seine
+    // Engine gibt (MainWindow.cpp:5054). Beim ersten Livetest an einem echten
+    // Gerät stand deshalb "keine FFTEngine" im Log und der Spektrumstrom wäre
+    // tot geblieben. Wird darum bei jedem spectrum_start nachgeholt.
+    void ensureFftTap();
+    bool m_fftTapConnected{false};
 
     // Phase 3J-1 review P2.3: connect RX audio tap (RxChannel::audioFrameReady
     // → onAudioFrameReady) and IQ tap (RadioModel::rawIqData →
@@ -362,6 +443,22 @@ private:
     // implicit conversion to T* for member access.
     QPointer<RadioModel> m_model;
     QWebSocketServer*  m_server{nullptr};
+
+    // ── Wiederversuch nach gescheitertem listen() ───────────────────────────
+    //
+    // Ein Bind kann aus Gruenden scheitern, die von selbst vergehen: die
+    // Netzadresse ist beim Start noch nicht da (WLAN haengt noch), sie
+    // verschwindet beim Netzwechsel, oder ein anderer Prozess haelt den Port
+    // noch einen Augenblick. Ohne Wiederversuch bleibt der Server fuer immer
+    // unten, auch wenn die Ursache nach zwei Sekunden weg ist.
+    QTimer*      m_bindWiederversuch{nullptr};
+    QHostAddress m_bindWunschAdresse;
+    quint16      m_bindWunschPort{0};
+    int          m_bindFehlversuche{0};
+
+    void bindWiederversuchPlanen(const QHostAddress& adresse, quint16 port,
+                                 const QString& grund);
+    void bindWiederversuchAbbrechen();
     QHash<QWebSocket*, std::shared_ptr<TciClientSession>> m_clients;
 
     QTimer* m_pingTimer{nullptr};
@@ -528,6 +625,12 @@ private:
     // alive, nobody answering). Clears the owner, unkeys if MOX is still
     // on, logs, emits moxReleasedOnClientLoss.
     void releaseMoxHeldBy(QWebSocket* ws, const QString& peer, const QString& why);
+    // Sagt EINEM Client, dass sein Sendewunsch abgelehnt wurde und warum.
+    // Begruendung an der Umsetzung: ein stummes Nein ist auf einer
+    // Fernbedienung nicht von einem Fehler zu unterscheiden.
+    void sendeAblehnung(const std::shared_ptr<TciClientSession>& session,
+                        const QString& grund);
+
     void startKeyedWatchdog();
     void stopKeyedWatchdog();
 
@@ -539,6 +642,38 @@ private:
     int     m_keyedWatchdogIntervalMs{1000};
     int     m_keyedWatchdogMaxUnanswered{3};
     int     m_ownerPingsUnanswered{0};
+
+    // ── Sendezeit-Deckel (2026-09-30) ────────────────────────────────────────
+    //
+    // Der Wachhund darüber deckt zwei Fälle ab: Socket weg (Absturz) und
+    // Socket lebt, aber niemand antwortet (Hänger). Er deckt NICHT den dritten
+    // ab, der bei einer Handy-Fernbedienung der wahrscheinlichste ist: Client
+    // lebt, antwortet brav auf jeden Ping — und sendet trotzdem weiter, weil
+    // das Telefon in der Tasche liegt, die Sendetaste klemmt oder der Bediener
+    // schlicht vergessen hat loszulassen. Gegen diesen Fall hilft nur eine
+    // harte Obergrenze für die Dauer eines einzelnen Sendevorgangs.
+    //
+    // Das ist die klassische Zeitbegrenzung (time-out timer), die jedes
+    // kommerzielle Funkgerät mitbringt; ON7OFF verlangt sie für seine
+    // Fernbedienung ausdrücklich serverseitig (60-120 s empfohlen).
+    //
+    // Der Deckel läuft im gleichen Lebenszyklus wie der Wachhund: er startet,
+    // wenn ein Client MOX erwirbt, und endet bei jeder Freigabe — damit greift
+    // er ohne Zusatzarbeit auch bei Abbruch und Ping-Ausfall.
+    //
+    // Er gilt AUSSCHLIESSLICH für über TCI getastete Sendevorgänge. Ein am
+    // Gerät selbst ausgelöstes MOX fasst er nicht an: wer vor dem Gerät sitzt,
+    // sieht, dass er sendet, und braucht keinen Aufpasser.
+    //
+    // Einstellung `TciMaxTransmitSeconds` (AppSettings), 0 schaltet ihn ab.
+    // Vorgabe 180 s: großzügig genug für einen langen Durchgang in Sprache,
+    // kurz genug, dass ein vergessenes Mikrofon nicht das Band blockiert.
+    void startTxTimeCap();
+    void stopTxTimeCap();
+    void onTxTimeCapExpired();
+
+    QTimer* m_txTimeCap{nullptr};
+    int     m_txTimeCapSeconds{180};
 
     // ── Phase 19: sensor broadcast timers ────────────────────────────────────
     //
@@ -553,6 +688,39 @@ private:
     // RX timer: always-on once start() is called; emits placeholder rx_sensors
     //   frames to subscribed clients (real readings wired in Phase 24+).
     // TX timer: always-on for Phase 19 stub; Phase 24+ gates on MOX state.
+    // Siehe setTreatAllClientsAsRemoteForTest(). Ab Werk false; im laufenden
+    // Programm wird das nie gesetzt.
+    bool m_alleAlsNetzFuerTest{false};
+
+    // ── Sperre gegen Durchprobieren (2026-10-01) ────────────────────────────
+    //
+    // Der Kopplungscode ist seit heute acht Zeichen lang statt 32, damit man
+    // ihn auf einem Telefon abtippen kann. Was ihn schuetzt, ist deshalb
+    // nicht mehr seine Laenge, sondern diese Sperre: wer ihn durchprobieren
+    // will, darf es nicht oft genug.
+    //
+    // Die Zaehlung je Sitzung (authAttempts) genuegte dafuer nicht — nach
+    // drei Fehlversuchen wird getrennt, und danach verbindet man eben neu.
+    // Gezaehlt wird darum je GEGENSTELLE, und zwar ueber Verbindungen
+    // hinweg.
+    //
+    // Adresse -> {Fehlversuche, Zeitpunkt des letzten}. Nach kMaxFehl ist
+    // die Adresse fuer kSperreMs dicht; ein geglueckter Code loescht den
+    // Eintrag sofort.
+    // Abtastrate des I/Q-Stroms, vom Geraet gemeldet. Der Spektrum-Ausschnitt
+    // rechnet damit, wie viele Hertz ein FFT-Bin abdeckt. Atomar, weil
+    // onFftBinsReady aus der Ereignisschleife kommt und der Setter aus einem
+    // Signal des Modells.
+    std::atomic<int> m_fftSampleRate{0};
+
+    QHash<QString, QPair<int, qint64>> m_fehlversuche;
+    static constexpr int   kMaxFehl   = 8;
+    static constexpr qint64 kSperreMs = 5 * 60 * 1000;
+
+    // true, wenn die Gegenstelle gerade gesperrt ist.
+    bool istGesperrt(const QString& peer) const;
+    void merkeFehlversuch(const QString& peer);
+
     QTimer* m_rxSensorTimer{nullptr};   // 200ms default; broadcasts rx_sensors to subscribed clients
     QTimer* m_txSensorTimer{nullptr};   // 200ms default; MOX-gated (Phase 24+ wires real gate)
 

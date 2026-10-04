@@ -103,6 +103,34 @@ BandSeed seedFor(Band b)
         // transverters. Handler must no-op on XVTR first-visit until
         // the XVTR epic lands.
         case Band::XVTR:     return { Band::XVTR,     0.0,         DSPMode::USB, false };
+        // ── Rundfunkbaender: kein Startwert, und das mit Absicht ────────
+        //
+        // Der volle GEN-Unterband-Port (LMF/120m/90m/…) ist auf Phase 3H
+        // verschoben; siehe den Kommentar bei GEN oben. Bis dahin fallen
+        // diese dreizehn auf denselben No-op-Startwert wie XVTR
+        // (`valid = false`), und der Aufrufer tut beim ersten Besuch
+        // nichts.
+        //
+        // Hier ausdruecklich aufgezaehlt und nicht ueber den Ausgang am
+        // Ende abgehandelt, weil sonst -Wswitch bei JEDEM Bau dreizehnmal
+        // meckert — und eine Warnung, die immer da ist, deckt die zu, die
+        // etwas bedeutet. Genau das ist der Zweck von -Wswitch: kommt
+        // morgen ein neues Band dazu, soll der Uebersetzer auf DIESE
+        // Stelle zeigen. Das kann er nur, solange hier nichts
+        // stillschweigend durchfaellt.
+        case Band::Band120m:
+        case Band::Band90m:
+        case Band::Band61m:
+        case Band::Band49m:
+        case Band::Band41m:
+        case Band::Band31m:
+        case Band::Band25m:
+        case Band::Band22m:
+        case Band::Band19m:
+        case Band::Band16m:
+        case Band::Band14m:
+        case Band::Band13m:
+        case Band::Band11m:
         case Band::Count:    break;
     }
     return { Band::GEN, 0.0, DSPMode::USB, false };

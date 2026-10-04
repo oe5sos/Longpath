@@ -1947,6 +1947,57 @@ longpath_add_test(tst_radio_status)
 longpath_add_test(tst_radio_status_follows_mox)
 longpath_add_test(tst_settings_hygiene)
 
+# ── QSO vom Telefon ins Logbuch (2026-10-04) ────────────────────────────────
+# tst_tci_qso_eintragen: der Longpath-eigene TCI-Befehl log_qso:. Prueft die
+#   Zusagen, auf denen er steht — ohne Anmeldung gar nichts, abgeschaltet
+#   abgelehnt ABER mit Antwort, leeres/unsinniges Rufzeichen abgelehnt, ein
+#   gueltiger Eintrag steht wirklich in der Datei, und der ADIF-Kopf steht
+#   genau einmal.
+longpath_add_test(tst_tci_qso_eintragen)
+
+# ── Ein Geraet, das nicht aufmacht, darf nicht alles mitnehmen (2026-10-03) ──
+# tst_bus_mit_frist: gibt einen Bus herein, dessen open() absichtlich
+#   stehenbleibt, und prueft die zwei Zusagen der Behebung — nach der Frist
+#   geht es weiter, und der aufgegebene Bus wird wirklich aufgeraeumt (ueber
+#   einen Lebendzaehler belegt, nicht behauptet).
+longpath_add_test(tst_bus_mit_frist)
+
+# ── Ein gescheiterter Versand muss den Grund NENNEN (2026-10-04) ────────────
+# tst_sendefehler_deutung: haelt auseinander, was auseinandergehalten werden
+#   muss — "das Betriebssystem laesst uns nicht ins lokale Netz" (EHOSTUNREACH,
+#   EPERM) gegen "die Sendewarteschlange ist voll" (ENOBUFS). Grund: am
+#   2026-10-04 verband Anvelina nicht, und der Dialog riet zur Netzstrecke,
+#   waehrend in Wahrheit kein einziges Datagramm den Mac verliess. Werden die
+#   beiden Faelle vertauscht, schickt die Meldung den Bediener an den falschen
+#   Schalter.
+longpath_add_test(tst_sendefehler_deutung)
+
+# ── Logzeilen duerfen sich nicht zerschreiben (2026-10-03) ───────────────────
+# tst_log_schreibt_atomar: acht Faeden schreiben gleichzeitig 250 Zeilen und
+#   danach muss JEDE vollstaendig und genau einmal dastehen. Grund: in den
+#   Betriebslogs vom 2026-10-03 standen sechs zerschriebene Zeilen (vorne
+#   abgeschnitten, hinten ganz), weil main.cpp je Meldung einen eigenen
+#   QTextStream auf dieselbe QFile legte. Zwei davon waren ausgerechnet die
+#   QoS-Meldung, der an dem Tag jemand nachging.
+longpath_add_test(tst_log_schreibt_atomar)
+
+# ── Qt-Prioritaet gegen QoS-Klasse (2026-10-03) ──────────────────────────────
+# tst_audio_faden_qos: haelt die Regel fest, warum Audio-Faeden OHNE
+#   QThread-Prioritaet starten. Qt setzt fuer eine ausdrueckliche Prioritaet
+#   auf macOS die Ablaufparameter, und Darwin verweigert danach jede
+#   QoS-Klasse (EPERM, Faden bleibt auf QOS_CLASS_UNSPECIFIED). Der
+#   Sende-Faden lief deshalb ohne die Erhoehung, die er haben soll.
+longpath_add_test(tst_audio_faden_qos)
+
+# ── Dicktengleiche Schrift muss auch ankommen (2026-10-03) ───────────────────
+# tst_schrift_dicktengleich: prueft nicht den FAMILIENNAMEN, sondern was Qt
+#   nach seiner Auswahl hergibt (QFontInfo::fixedPitch). Vier Stellen nannten
+#   je einen Namen, den es auf der laufenden Plattform nicht gibt ("SF Mono"
+#   auf macOS -- loest hier auf zu .AppleSystemUIFont, also proportional --,
+#   "Consolas" ausserhalb von Windows, dazu die CSS-Gattungsnamen
+#   "monospace"/"sans-serif").
+longpath_add_test(tst_schrift_dicktengleich)
+
 # ── Phase 3P-H Task 4: status-packet parsing + RadioModel ownership ──────────
 # tst_p1_status_telemetry: feeds a hand-crafted 1032-byte ep6 datagram
 #   into P1RadioConnection::parseEp6FrameForTest and asserts the new
@@ -2445,6 +2496,13 @@ target_compile_definitions(tst_p1_watchdog_wire PRIVATE LONGPATH_BUILD_TESTS)
 longpath_add_test(tst_p2_tx_iq_wire)
 target_compile_definitions(tst_p2_tx_iq_wire PRIVATE LONGPATH_BUILD_TESTS)
 
+# ── P2 TX I/Q erst nach dem ersten Rahmen des Geraets (2026-09-30) ─────────
+# Schein-Geraet auf 127.0.0.1:1024/1025/1029: vor dem ersten Status darf an
+# 1029 nichts ankommen (ARP-Warteschlange von macOS verwarf sonst SendStart),
+# danach laeuft der Takt. Ueberspringt sich, wenn die Ports belegt sind.
+longpath_add_test(tst_p2_tx_iq_waits_for_radio)
+target_compile_definitions(tst_p2_tx_iq_waits_for_radio PRIVATE LONGPATH_BUILD_TESTS)
+
 # ── Phase 3M-1a Task E.7: P2 MOX wire byte (byte 4 bit 1 = 0x02) ─────────────
 # 10 tests verify:
 #   1-5. Legacy path (no codec): default=0, setMox(true)→1, setMox(false)→0,
@@ -2879,6 +2937,65 @@ longpath_add_test(tst_app_settings_binary_values)
 # Matrix-test parity against TestMockRadioModel is covered separately by
 # tst_tci_matrix_runner -- this file pins the PRODUCTION-side wiring.
 longpath_add_test(tst_tci_radio_model_shims)
+
+# ── TCI drive / tune_drive / tune (2026-09-30) ──────────────────────────────
+# Die drei Kommandos fehlten vollständig; weil unbekannte Namen still
+# verworfen werden, blieb jeder Leistungsregler einer Fernbedienung wirkungslos,
+# ohne dass irgendwo ein Fehler auftauchte. Der Prüfstand pinnt beide Pfade
+# (Setzen mit Klemmung, Abfrage) und die Regel, dass `tune:` keine eigene
+# Zustandsmeldung erfindet, solange der Träger nicht wirklich steht.
+longpath_add_test(tst_tci_drive_tune_drive)
+
+# ── Herkunftsprüfung + Sendezeit-Deckel (2026-09-30) ────────────────────────
+# Zwei Sicherungen, ohne die der TCI-Server nicht ins Netz darf: eine fremde
+# Webseite im Browser des Bedieners konnte bisher die Station tasten (WebSocket
+# kennt keine Gleiche-Herkunft-Regel, und Loopback hilft dagegen nicht), und
+# ein Sendevorgang hatte überhaupt keine Obergrenze.
+longpath_add_test(tst_tci_origin_and_tx_time_cap)
+
+# ── Spektrumstrom (2026-09-30) ──────────────────────────────────────────────
+# Longpath-eigener sechster Stromtyp: fertig gerechnetes Spektrum statt rohem
+# I/Q. Gemessen kostet I/Q 404 kB/s bei 48 kHz und rund 1,5 MB/s bei 192 kHz;
+# der Spektrumrahmen kostet rund 27 kB/s. Der Prüfstand pinnt Kopf, Kodierung
+# (dBm+200 auf ein Byte), die Randfälle und die Spitzenwert-Verdichtung.
+longpath_add_test(tst_tci_spectrum_stream)
+
+# ── Tonumtaster je Kanal (2026-09-30) ──────────────────────────────────────
+# WDSPs RESAMPLEF rechnet einkanalig und reell. Der verschraenkte
+# Stereopuffer lief bis 2026-09-30 als EIN Strom hindurch: L und R
+# vermischten sich, und die Tonhoehe stimmte nicht, weil der Resampler die
+# doppelte Abtastzahl sah. Betraf jede Rate ausser 48000.
+longpath_add_test(tst_tci_audio_resample_channels)
+
+# ── Fernzugriff: Token + Sendefreigabe (2026-09-30) ────────────────────────
+# TCI kennt weder Anmeldung noch Verschluesselung. Solange der Server auf
+# Loopback lauscht, ist das vertretbar; im Netz nicht. Der Schnitt laeuft
+# entlang der HERKUNFT: Loopback unveraendert (sonst steht jeder Logger
+# still), aus dem Netz Token und ausdrueckliche Sendefreigabe.
+longpath_add_test(tst_tci_remote_auth)
+
+# ── Sendesperre fuers Netz (2026-09-30) ───────────────────────────────────
+# Prueft die NAHT, nicht den Getter: echte Clients schicken `trx:`/`tune:` in
+# den Schreibweisen, die bis 2026-09-30 an der Sperre vorbeiliefen (TRX:,
+# `trx :`), dazu Besitzer und Ruecknahme des Abstimmtraegers beim Trennen.
+longpath_add_test(tst_tci_sendesperre)
+target_compile_definitions(tst_tci_sendesperre PRIVATE LONGPATH_BUILD_TESTS)
+
+longpath_add_test(tst_tci_bind_wiederversuch)
+target_compile_definitions(tst_tci_bind_wiederversuch PRIVATE LONGPATH_BUILD_TESTS)
+# ── mu-law als Tonformat (2026-09-30) ─────────────────────────────────────
+# Misst den Stoerabstand statt nur durchzulaufen, prueft dass der Fehler dem
+# Pegel folgt (der ganze Sinn des Kompandierens), und vergleicht die
+# C++-Kennlinie Byte fuer Byte mit der aus handfunke/tci.js.
+longpath_add_test(tst_tci_mulaw)
+target_compile_definitions(tst_tci_mulaw PRIVATE LONGPATH_BUILD_TESTS)
+
+# ── Fernzugriffs-Gruppe auf der TCI-Setupseite (2026-09-30) ───────────────
+# Prueft, dass die Bedienelemente da sind und der Hinweistext sagt, was
+# gerade gilt — eine Sicherheitsgruppe, die schweigt, wenn sie wirkungslos
+# ist, verleitet dazu, sich auf sie zu verlassen. Zeichnet mit
+# LONGPATH_BLATT_PNG=<pfad> zusaetzlich ein Blatt zum Ansehen.
+longpath_add_test(tst_tci_remote_access_page)
 
 # ── Phase 3J-1 closeout Item 4 (2026-05-12): per-(band, mode) filter ────────
 # Pins the contract that SliceModel::setDspMode saves the current filter
@@ -5441,6 +5558,9 @@ longpath_add_test(tst_sunsdr_radio_connection)
 #    ohne LONGPATH_SUNSDRSIM. Anleitung in
 #    docs/development/sunsdr-simulator-workbench.md --
 longpath_add_test(tst_sunsdr_sim_workbench)
+# Messlauf am echten Geraet, laeuft nur mit LONGPATH_SUNSDR_MESSLAUF
+# (sonst QSKIP) -- siehe Kopf der Datei.
+longpath_add_test(tst_sunsdr_messlauf)
 
 # -- Die QRP muss mit IHRER Abtastrate gefahren werden, nicht mit Atlas'
 #    (2026-09-23: sie steht in keiner HPSDRModel-Liste, darum fiel die
@@ -7397,4 +7517,38 @@ foreach(_asan_gap_target IN ITEMS
     endif()
 endforeach()
 
-
+# ── Gemeinsame Sperre fuer die Fernzugriffs-Pruefstaende (2026-10-01) ──────
+#
+# Diese drei fassen dieselben AppSettings-Schluessel an (TciAllowRemoteTx,
+# TciRemoteTokenPlain), und im Testbetrieb teilen sich ALLE Staende eine
+# Einstellungsdatei: QStandardPaths::setTestModeEnabled(true) gibt ihnen
+# denselben Pfad (TestSandboxInit.cpp).
+#
+# Parallel gestartet schrieben sie sich gegenseitig hinein — der eine setzt
+# die Sendefreigabe auf an, waehrend der andere prueft, dass sie ab Werk aus
+# ist. Ergebnis war ein Flattern, das einzeln nie auftrat: im Sammellauf fiel
+# mal tst_tci_remote_auth, mal tst_tci_sendesperre, in etwa zwei von drei
+# Durchgaengen.
+#
+# Diese Zeilen stehen am DATEIENDE, weil set_tests_properties die Tests
+# bereits kennen muss — vor longpath_add_test() bricht CMake ab
+# ("Can not find test to add properties to").
+#
+# RESOURCE_LOCK statt RUN_SERIAL: nur diese drei laufen nacheinander, alles
+# andere weiter parallel. Das kostet ein paar Sekunden und macht den
+# Sammellauf verlaesslich.
+# Jeden Stand einzeln und nur, wenn er in DIESER Konfiguration ueberhaupt
+# registriert wurde. Ohne die Pruefung bricht CMake ab
+# ("Can not find test to add properties to"), sobald ein Stand fehlt — und
+# das ist der Normalfall: ohne Qt6::WebSockets oder ohne GUI faellt je nach
+# Bauumgebung ein anderer weg. Am 2026-10-01 scheiterte daran der
+# Configure-Schritt auf Linux UND macOS, waehrend er lokal durchlief.
+foreach(stand IN ITEMS
+    tst_tci_remote_auth
+    tst_tci_sendesperre
+    tst_tci_remote_access_page)
+  if(TEST ${stand})
+    set_tests_properties(${stand}
+      PROPERTIES RESOURCE_LOCK longpath_tci_fernzugriff_settings)
+  endif()
+endforeach()

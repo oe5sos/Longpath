@@ -123,6 +123,9 @@ private:
     // tracking is the canonical pattern.
     QPointer<class Longpath::TciServer> m_tciServerRef;
     bool m_tciServerRunning{false};
+    // Gescheiterter Bind mit laufendem Wiederversuch — dritter Zustand neben
+    // laeuft/gestoppt. Leer heisst: kein Wiederversuch im Gange.
+    QString m_tciBindWartet;
     int  m_tciClientCount{0};
     void refreshTciStatusDisplay();
 
@@ -149,13 +152,31 @@ private:
     QCheckBox*   m_useRx1VfoaForRx2Check{nullptr};
     QCheckBox*   m_copyRx2VfobToVfoaCheck{nullptr};
 
+    // ── Fernzugriff (2026-09-30) ────────────────────────────────────────────
+    //
+    // Nur nötig, wenn der Server das Loopback verlässt. Solange er auf
+    // 127.0.0.1 lauscht, sind Token und Sendefreigabe wirkungslos — deshalb
+    // steht die Gruppe unmittelbar unter der Bindeauswahl, die darüber
+    // entscheidet.
+    QLineEdit*   m_tokenEdit{nullptr};        // schreibgeschützt, Monospace
+    QPushButton* m_tokenNewBtn{nullptr};
+    QPushButton* m_tokenCopyBtn{nullptr};
+    QLineEdit*   m_originsEdit{nullptr};     // erlaubte Herkünfte für Browser
+    QCheckBox*   m_allowRemoteTxCheck{nullptr};
+    QLabel*      m_remoteHintLabel{nullptr};
+
     void buildUI();
     void buildServerGroup();
+    void buildRemoteAccessGroup();
     void buildCompatibilityGroup();
     void buildIqStreamGroup();
     void buildAudioStreamGroup();
     void buildSensorsGroup();
     void buildVfoQuirksGroup();
+
+    // Zeigt an, ob der Server gerade ins Netz gebunden ist — davon hängt ab,
+    // ob die Gruppe überhaupt etwas bewirkt, und der Hinweistext sagt es.
+    void refreshRemoteAccessState();
 };
 
 // ---------------------------------------------------------------------------

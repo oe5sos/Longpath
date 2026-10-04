@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Handfunke">
+<meta name="theme-color" content="#08080a">
+<!-- Startbildschirm-Symbol: das Longpath-Logo selbst (Betreiber, 2026-10-01:
+     "verwenden wir das logo wie bei longpath"). Erzeugt aus
+     resources/icons/Longpath.iconset/icon_512x512@2x.png mit
+     docs/design/handfunke-symbol.py.
+     Die macOS-Vorlage bringt ihre eigene gerundete Kachel samt Luft am
+     Rand mit — iOS rundet aber selbst nach und fuellt das Feld randvoll.
+     Unveraendert uebernommen gaebe das eine zweite Rundung um die erste
+     herum und helle Zipfel in den Ecken. Darum ist hier auf die Kachel
+     zugeschnitten und der Grund bis an den Rand gezogen. -->
+<link rel="apple-touch-icon" sizes="180x180" href="symbol-180.png">
+<link rel="apple-touch-icon" sizes="167x167" href="symbol-167.png">
+<link rel="apple-touch-icon" sizes="152x152" href="symbol-152.png">
+<link rel="apple-touch-icon" sizes="120x120" href="symbol-120.png">
+<link rel="icon" type="image/png" sizes="180x180" href="symbol-180.png">
+<link rel="icon" type="image/png" sizes="60x60" href="symbol-60.png">
+<link rel="manifest" href="manifest.webmanifest">
+<title>Longpath Handfunke</title>
+<link rel="stylesheet" href="stil.css">
+<style>
+/* Ergaenzungen, die das Entwurfsblatt nicht brauchte ───────────────────── */
+/* 100dvh statt 100%: auf iOS faehrt Safaris Adresszeile ein und aus, und
+   100% meint die GROSSE Hoehe — der untere Rand liegt dann ausserhalb des
+   sichtbaren Bereichs. 100dvh folgt der Zeile. 100vh davor ist der Rueckfall
+   fuer Browser, die dvh nicht kennen. */
+html,body{width:100%;height:100vh;height:100dvh}
+body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+     overflow-x:hidden;overflow-y:auto}
+.scope{position:relative;touch-action:none}
+.scope canvas{width:100%;height:auto}
+/* Abstimmstrich in der Mitte — dort sitzt die Empfangsfrequenz.
+   Der Kopf leuchtet leise, wie alles Anfassbare in dieser Gestaltung: er
+   ist die einzige Marke im Bild, die man sucht, waehrend man wischt. */
+.cursor{position:absolute;left:50%;top:0;bottom:0;width:1px;
+        background:rgba(230,230,235,.42);pointer-events:none}
+.cursor::before{content:"";position:absolute;left:-4px;top:0;width:9px;height:9px;
+  background:var(--accent);border-radius:50%;transform:translateX(0);
+  box-shadow:0 0 10px rgba(74,123,168,.95)}
+.dot.off{background:var(--text-inactive);box-shadow:none}
+.dot.wait{background:var(--warn);box-shadow:0 0 6px rgba(168,133,63,.6)}
+.chip{cursor:pointer;-webkit-user-select:none;user-select:none}
+.chip:active{background:linear-gradient(var(--glass-btn-bot),var(--glass-btn-top))}
+.sl .track{cursor:pointer}
+/* Kopplungsblatt — nur beim ersten Start oder nach Verbindungsabriss.
+   Zieht mit der Gestaltung "Glas und Tiefe" mit: es ist das ERSTE, was man
+   von der Handfunke sieht, und ein Blatt im alten Stil vor einer Seite im
+   neuen sieht aus wie zwei Programme.
+   Die Weichzeichnung bleibt hier als einzige der Seite — dieses Blatt
+   steht still, es kostet also nichts je Bild. */
+#koppeln{position:fixed;inset:0;z-index:9;display:none;
+  background:
+    radial-gradient(120% 60% at 50% 12%, rgba(23,33,43,.97) 0%, rgba(11,13,16,.97) 52%, rgba(8,8,10,.98) 100%);
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+  flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:0 28px}
+#koppeln.an{display:flex}
+#koppeln h1{font-size:var(--f-sub);font-weight:600;letter-spacing:.07em;color:var(--title);
+  text-shadow:0 0 20px rgba(216,165,95,.15),0 2px 6px rgba(0,0,0,.7)}
+#koppeln p{font-size:var(--f-small);color:var(--text3);text-align:center;line-height:1.5}
+/* Eingefasst wie die Regler-Bahnen: tief eingelassen, damit man sieht, dass
+   man hineinschreibt. */
+#koppeln input{width:100%;height:44px;padding:0 12px;border-radius:11px;
+  background:#040507;border:1px solid rgba(0,0,0,.8);color:var(--text);
+  font:var(--f-sub)/1 var(--mono);text-align:center;
+  box-shadow:inset 0 2px 5px rgba(0,0,0,.85)}
+#koppeln input:focus{outline:none;border-color:var(--accent);
+  box-shadow:inset 0 2px 5px rgba(0,0,0,.85),0 0 0 3px rgba(74,123,168,.22)}
+#koppeln button{width:100%;height:48px;border-radius:11px;
+  background:linear-gradient(#36699f,#21436a);
+  border:1px solid #4886c0;color:#e2eefb;
+  font:600 var(--f-sub)/1 inherit;letter-spacing:.08em;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.2),
+             0 0 16px rgba(74,123,168,.35),0 2px 6px rgba(0,0,0,.55)}
+#koppeln .fehler{color:var(--warn);font-size:var(--f-small);min-height:16px}
+/* Beide gesperrten Sendetasten nehmen auch keine Tipper an — nicht nur
+   optisch tot, sondern wirklich. */
+.tx.locked,.tune.locked{pointer-events:none}
+</style>
+</head>
+<body>
+
+<header>
+  <span class="dot off" id="led"></span>
+  <span class="name" id="station">NICHT VERBUNDEN</span>
+  <span class="spacer"></span>
+  <!-- Der Weg ins Logbuch. Sitzt in der Kopfzeile, weil dort der Daumen
+       hinkommt und weil er dort nichts zudeckt: der Wasserfall bleibt frei,
+       solange man nicht loggt. -->
+  <button id="logAuf" class="logAuf">LOG</button>
+  <button id="tonAn" class="tonAn">TON EIN</button>
+  <span class="rate mono" id="rate"></span>
+</header>
+
+<div class="vfo">
+  <span class="hz mono" id="hz">—<span class="khz"></span><span class="dez"></span></span>
+  <span class="unit">MHz</span>
+  <span class="spacer"></span>
+  <span class="b" id="band"></span>
+  <button class="zoom" id="zoomRaus" aria-label="Ausschnitt vergroessern">−</button>
+  <span class="b" id="spanne"></span>
+  <button class="zoom" id="zoomRein" aria-label="Ausschnitt verkleinern">+</button>
+</div>
+
+<div class="scope" id="scope">
+  <!-- Hoehen am laufenden Geraet nachgemessen (2026-10-01): mit 104/196 war
+       die Seite 973 Punkte hoch bei 852 verfuegbaren, und man musste fuer
+       Band und Regler wischen. Zusammen mit knapperen Polstern passt das
+       Wichtige jetzt wieder ohne Wischen. Der Wasserfall bleibt deutlich
+       hoeher als der Panadapter — gesehen wird vor allem dort. -->
+  <canvas id="pan" width="373" height="96"></canvas>
+  <canvas id="wf"  width="373" height="160"></canvas>
+  <!-- Der Durchlass liegt UNTER dem Abstimmstrich: er sagt, was zu hoeren
+       ist, der Strich sagt, worauf abgestimmt ist. -->
+  <div class="durchlass" id="durchlass"></div>
+  <div class="cursor"></div>
+  <!-- Feinschritt: liegt IM Bild, rechts oben, und haelt seine Beruehrungen
+       von der Abstimmgeste darunter fern (app.js). -->
+  <div class="feinschritt" id="feinschritt">
+    <button id="feinAb"  aria-label="100 Hz tiefer">−</button>
+    <span>100 Hz</span>
+    <button id="feinAuf" aria-label="100 Hz hoeher">+</button>
+  </div>
+</div>
+
+<div class="meter schicht">
+  <div class="row">
+    <span class="caps">Signal</span>
+    <span class="val" id="smeter">—</span>
+  </div>
+  <div class="bar"><i id="sbar" style="width:0%"></i></div>
+  <div class="ticks">
+    <span>1</span><span>3</span><span>5</span><span>7</span><span>9</span><span>+20</span><span>+40</span>
+  </div>
+</div>
+
+<!-- Betriebsart und Band gehoeren zusammen (was hoere ich, und wo) — darum
+     ein Panel. app.js fuellt unveraendert #modes und #bands. -->
+<div class="feld schicht">
+  <div class="caps">Betriebsart</div>
+  <div class="chips" id="modes"></div>
+  <div class="caps">Band</div>
+  <div class="chips" id="bands"></div>
+</div>
+
+<div class="sliders schicht">
+  <div class="sl">
+    <span class="caps">AF</span>
+    <div class="track" id="afTrack"><i id="afFill" style="width:0%"></i><b id="afKnob" style="left:0%"></b></div>
+    <span class="v" id="afVal">—</span>
+  </div>
+  <div class="sl">
+    <span class="caps">PWR</span>
+    <div class="track" id="pwrTrack"><i id="pwrFill" style="width:0%"></i><b id="pwrKnob" style="left:0%"></b></div>
+    <span class="v" id="pwrVal">—</span>
+  </div>
+</div>
+
+<!-- Filter und Aufbereitung gehoeren zusammen (wie raeume ich auf) -->
+<div class="feld schicht">
+  <div class="caps">Filter</div>
+  <div class="chips" id="filters"></div>
+  <div class="caps">Aufbereitung</div>
+  <div class="chips" id="dsp"></div>
+</div>
+
+<div class="txrow">
+  <div class="tx locked" id="tx">SENDEN <small>NUR IN DER APP</small></div>
+  <div class="tune locked" id="tune">TUNE <small>NUR IN DER APP</small></div>
+</div>
+
+<!-- Die Halteleiste (Entwurf 1, gewaehlt am 2026-10-04).
+     Sie TASTET NICHT — sie nimmt das Mikrofon auf, baut die TCI-Rahmen und
+     schickt sie. Longpath verwirft sie, solange dieser Client nicht tastet
+     (m_txAudioActiveClient), und zaehlt sie als verworfen. Das ist der
+     Beleg, dass die ganze Kette steht, ohne dass ein Watt die Antenne sieht.
+     Darum auch kein Messing: Messing ist die Sendefarbe, und hier wird
+     nicht gesendet. -->
+<div class="mikrow" id="mikrow" hidden>
+  <button class="mikhalt" id="mikhalt">
+    <b>MIKROFON PRÜFEN</b><small>GEDRÜCKT HALTEN · TASTET NICHT</small>
+  </button>
+  <div class="pegel"><i id="pegelbalken"></i><u id="pegelspitze"></u></div>
+  <div class="mikmeldung" id="mikmeldung"></div>
+</div>
+
+<footer>
+  <span id="fussStatus">—</span>
+  <span id="fussBild"></span>
+  <span id="fussTon"></span>
+</footer>
+
+<div id="qsy">
+  <div class="karte">
+    <h1>FREQUENZ</h1>
+    <input id="qsyFeld" type="text" inputmode="decimal" autocomplete="off"
+           spellcheck="false" placeholder="7.134.60  ·  7134.6  ·  7.1346">
+    <div class="reihe">
+      <button id="qsyOk">Setzen</button>
+      <button id="qsyAb" class="still">Abbrechen</button>
+    </div>
+  </div>
+</div>
+
+<div id="koppeln" class="an">
+  <h1>LONGPATH HANDFUNKE</h1>
+  <p>Adresse des Mac, auf dem Longpath läuft.<br>
+     Setup&nbsp;→&nbsp;CAT&nbsp;&amp;&nbsp;Network&nbsp;→&nbsp;TCI&nbsp;Server muss
+     eingeschaltet und auf die WLAN-Adresse gebunden sein.</p>
+  <input id="adresse" type="text" inputmode="decimal" autocomplete="off"
+         autocapitalize="off" spellcheck="false" placeholder="192.168.1.20:50001">
+  <input id="token" type="text" autocomplete="off" autocapitalize="characters"
+         spellcheck="false" placeholder="Token (nur über Netz nötig)">
+  <div class="fehler" id="fehler"></div>
+  <button id="verbinden">Verbinden</button>
+</div>
+
+<!-- ton-kern.js zuerst: app.js braucht TonKern fuer den Rueckfall auf
+     ScriptProcessorNode, wenn AudioWorklet fehlt (LAN ueber http). Kein
+     Modul, damit dieselbe Datei auch per addModule ins Worklet passt. -->
+<!-- Stilles Tonelement, damit iOS die Seite als "Playback" einstuft und
+     nicht als "Ambient". Begruendung in app.js bei stummesElementStarten():
+     ohne das schaltet der Stummschalter am iPhone den eingebauten
+     Lautsprecher ab, waehrend Kopfhoerer weiter spielen. Am 2026-10-01 genau
+     so erlebt. Die Datei ist eine eine Sekunde lange Stille in WAV, als
+     data:-URI eingebettet — kein zusaetzlicher Abruf. -->
+<!-- ── QSO eintragen (Entwurf A, vom Betreiber am 2026-10-04 gewaehlt) ──
+     Ein Blatt ueber dem Bild, wie das Frequenz-Blatt. Rufzeichen gross und
+     dicktengleich, RST hin und her mit 59/59 vorbelegt — und darunter in
+     Messing, was AUTOMATISCH mitgeht. Die drei Zeilen sind keine Zierde:
+     sie sagen, dass Frequenz, Betriebsart und Zeit vom Geraet kommen und
+     nicht von der Seite (Longpath setzt sie beim Eintragen selbst, siehe
+     TciServer `log_qso:`). Wer sie sieht, weiss, was er eintraegt. -->
+<div id="qsoBlatt">
+  <div class="karte">
+    <h1>QSO EINTRAGEN</h1>
+    <input id="qsoRuf" type="text" inputmode="text" autocomplete="off"
+           autocapitalize="characters" autocorrect="off" spellcheck="false"
+           placeholder="RUFZEICHEN">
+    <div class="rstreihe">
+      <div class="rstfeld">
+        <label for="qsoRstS">RST gesendet</label>
+        <input id="qsoRstS" type="text" inputmode="numeric" autocomplete="off"
+               value="59" maxlength="6">
+      </div>
+      <div class="rstfeld">
+        <label for="qsoRstE">RST empfangen</label>
+        <input id="qsoRstE" type="text" inputmode="numeric" autocomplete="off"
+               value="59" maxlength="6">
+      </div>
+    </div>
+    <div class="automatisch">
+      <div class="z"><span class="k">FREQUENZ</span><span class="v" id="qsoFreq">—</span></div>
+      <div class="z"><span class="k">BETRIEBSART</span><span class="v" id="qsoMode">—</span></div>
+      <div class="z"><span class="k">ZEIT UTC</span><span class="v" id="qsoZeit">—</span></div>
+    </div>
+    <div class="qsoMeldung" id="qsoMeldung"></div>
+    <button id="qsoOk">Eintragen</button>
+    <button id="qsoAb" class="still">Abbrechen</button>
+  </div>
+</div>
+
+<audio id="stillhalter" loop playsinline preload="auto"
+       src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YQAAAAA="></audio>
+<script src="ton-kern.js"></script>
+<script type="module" src="app.js"></script>
+</body>
+</html>

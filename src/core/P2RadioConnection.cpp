@@ -171,6 +171,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 #include "P2RadioConnection.h"
 #include "LogCategories.h"
+#include "SendeFehler.h"
 #include "OcMatrix.h"
 #include "CalibrationController.h"
 #include "PerfMonitor.h"
@@ -188,8 +189,34 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 #include <algorithm>
 #include <bit>
+#include <cerrno>
+#include <cstring>
 
 namespace Longpath {
+
+namespace {
+
+
+// Eine Zeile, die den Grund NENNT statt ihn zu umschreiben.
+void meldeSendeFehler(const char* was, qint64 geschrieben, qsizetype soll,
+                      QUdpSocket* sock, int fehlerNr)
+{
+    const QString deutung = Netz::sendeFehlerDeutung(fehlerNr);
+    qCWarning(lcConnection).noquote()
+        << QStringLiteral("P2: %1 send failed — wrote %2 of %3 bytes; "
+                          "fehler=%4 (%5); Qt: %6, error=%7, state=%8%9")
+               .arg(QString::fromLatin1(was))
+               .arg(geschrieben)
+               .arg(soll)
+               .arg(fehlerNr)
+               .arg(Netz::fehlerName(fehlerNr))
+               .arg(sock ? sock->errorString() : QStringLiteral("-"))
+               .arg(sock ? int(sock->error()) : -1)
+               .arg(sock ? int(sock->state()) : -1)
+               .arg(deutung.isEmpty() ? QString() : QStringLiteral(" — ") + deutung);
+}
+
+}  // namespace
 
 // primaryRxDdcForBoard — see header.
 //
@@ -413,6 +440,41 @@ void P2RadioConnection::init()
             return;
         }
 
+        // ── Erst senden, wenn das Geraet sich gemeldet hat (2026-09-30) ──
+        //
+        // Bis hierher lief dieser Takt ab SendStart: 4 x 1444 Byte alle
+        // 5 ms an ein Geraet, das noch gar nicht laeuft. Kennt der Mac
+        // die MAC-Adresse des Geraets noch nicht -- die Discovery laeuft
+        // per Rundruf und legt keinen ARP-Eintrag an --, haelt macOS
+        // gezielte Pakete bis zur ARP-Antwort in einer Warteschlange von
+        // 16 fest und verwirft bei Ueberlauf die AELTESTEN (xnu
+        // bsd/netinet/in_arp.c arp_llinfo_addq: Q_DROPHEAD;
+        // net.link.ether.inet.maxhold = 16). Ueber WLAN und Mikrotik
+        // dauert ARP 25-45 ms; so lange fuellte dieser Takt die Schlange,
+        // und vorne fielen General, Rx, Tx und HighPriority(run=1)
+        // heraus. HighPriority wird im RX nicht wiederholt: das Geraet
+        // startete nie, der Watchdog schlug nach 6 s zu, der Reconnect
+        // (ARP inzwischen bekannt) klappte sofort -- am 29.09. zweimal
+        // beim ersten Connect nach Programmstart (ANVELINA PRO 3).
+        // Nachgestellt ohne Geraet: derselbe Takt als ICMP an einen Host
+        // ohne ARP-Eintrag -> die ersten 8 von 40 fehlen, netstat zaehlt
+        // 8 "dropped due to no ARP entry"; mit ARP-Eintrag 40 von 40.
+        //
+        // Thetis sendet an 1029 ohnehin erst, wenn das Geraet streamt:
+        // die TX-Pakete entstehen aus dessen Mikrofonrahmen.
+        // From Thetis ChannelMaster/network.c:772 [@852bf0e] — Inbound(inid(1, 0), ...) je Mikrofonrahmen
+        // From Thetis ChannelMaster/cmaster.c:397 [@852bf0e] — xilv(), "call Outbound()"
+        // From Thetis ChannelMaster/obbuffs.c:169 [@852bf0e] — sendOutbound(id, a->out)
+        // From Thetis ChannelMaster/network.c:1388 [@852bf0e] — sendPacket(..., base_outbound_port + 5) // 1029
+        // Vor dem Start gehen dort nur die vier SendStart-Pakete und der
+        // Keepalive hinaus. m_lastFrameAtMs wird vom ersten Status- oder
+        // I/Q-Rahmen gesetzt und von connectToRadio() geloescht; im RX ist
+        // der Ring leer (TxChannel schiebt nur bei laufendem TX-Kanal),
+        // es geht also nichts verloren.
+        if (m_lastFrameAtMs == 0) {
+            return;
+        }
+
         // Drain kTxFramesPerTick (4) frames per 5 ms tick at 192 kHz.
         // Each frame: 4-byte BE sequence number + 240 samples × 6 bytes = 1444 bytes.
         // Cite: deskhpsdr/src/new_protocol.h:37 [@120188f]
@@ -600,6 +662,7 @@ void P2RadioConnection::connectToRadio(const RadioInfo& info)
     m_intentionalDisconnect = false;
     m_userInitiatedDisconnect = false;
     m_totalIqPackets = 0;
+    m_datagramsSinceConnect = 0;
 
     // Use HardwareProfile for capability lookup (Phase 3I-RP).
     // Fall back to board-byte lookup if setHardwareProfile() was never called.
@@ -725,6 +788,7 @@ void P2RadioConnection::connectToRadio(const RadioInfo& info)
 
     setState(ConnectionState::Connecting);
 
+    m_letzterSendeFehler = 0;
     qCDebug(lcConnection) << "P2: Connecting to" << info.displayName()
                           << "at" << info.address.toString()
                           << "from port" << m_socket->localPort();
@@ -2017,6 +2081,7 @@ void P2RadioConnection::onReadyRead()
 {
     while (m_socket && m_socket->hasPendingDatagrams()) {
         QNetworkDatagram datagram = m_socket->receiveDatagram();
+        ++m_datagramsSinceConnect;
         QByteArray data = datagram.data();
         quint16 sourcePort = datagram.senderPort();
 
@@ -3020,23 +3085,17 @@ void P2RadioConnection::sendCmdGeneral()
     // malformed one -- and CmdGeneral goes out first.
     qint64 written = m_socket->writeDatagram(pkt, m_radioInfo.address,
                                              m_baseOutboundPort);
+    // Sofort lesen, vor jedem weiteren Aufruf: errorString() und
+    // alles andere darf errno ueberschreiben.
+    int fehlerNr = Netz::letzterFehler();
     if (written != pkt.size()) {
         written = m_socket->writeDatagram(pkt, m_radioInfo.address,
                                           m_baseOutboundPort);
+        fehlerNr = Netz::letzterFehler();
     }
     if (written != pkt.size()) {
-        // 2026-09-01: bench-reproduced (OE5SOS) with the send failing on
-        // EVERY retry for the full 6 s watchdog window, not just the first
-        // send of a freshly opened socket as the 2026-08-27 one-shot-retry
-        // fix assumed. errorString() alone ("Unable to send a message") is
-        // Qt's generic wording for the write() syscall failing and does not
-        // say WHICH errno fired -- error() + state() do, and are needed to
-        // tell a real network condition (route/ARP/firewall) apart from a
-        // socket left in a bad state by this object's own lifecycle.
-        qCWarning(lcConnection)
-            << "P2: CmdGeneral send failed — wrote" << written
-            << "of" << pkt.size() << "bytes:" << m_socket->errorString()
-            << "error=" << m_socket->error() << "state=" << m_socket->state();
+        m_letzterSendeFehler = fehlerNr;
+        meldeSendeFehler("CmdGeneral", written, pkt.size(), m_socket, fehlerNr);
     }
 }
 
@@ -3055,6 +3114,9 @@ void P2RadioConnection::sendCmdHighPriority()
     // that line as evidence the stop had been sent.  It was not evidence.
     qint64 written =
         m_socket->writeDatagram(pkt, m_radioInfo.address, m_baseOutboundPort + 3);
+    // Sofort lesen, vor jedem weiteren Aufruf: errorString() und alles
+    // andere darf errno ueberschreiben.
+    int fehlerNr = Netz::letzterFehler();
     // 2026-08-27: one immediate retry on failure.  Bench-observed twice in a
     // row (OE5SOS, radio reached over WLAN+router) failing this exact write
     // with "Unable to send a message" on the very first send of a freshly
@@ -3070,13 +3132,11 @@ void P2RadioConnection::sendCmdHighPriority()
     // SendStart() sequencing or timing Thetis's network.c defines.
     if (written != pkt.size()) {
         written = m_socket->writeDatagram(pkt, m_radioInfo.address, m_baseOutboundPort + 3);
+        fehlerNr = Netz::letzterFehler();
     }
     if (written != pkt.size()) {
-        // 2026-09-01: see the diagnostic comment in sendCmdGeneral() above.
-        qCWarning(lcConnection)
-            << "P2: CmdHighPriority send failed — wrote" << written
-            << "of" << pkt.size() << "bytes:" << m_socket->errorString()
-            << "error=" << m_socket->error() << "state=" << m_socket->state();
+        m_letzterSendeFehler = fehlerNr;
+        meldeSendeFehler("CmdHighPriority", written, pkt.size(), m_socket, fehlerNr);
     }
     // Shell-chrome sub-PR-2 B.1: record egress bytes for ▲ Mbps readout.
     recordBytesSent(static_cast<qint64>(pkt.size()));
@@ -3098,16 +3158,17 @@ void P2RadioConnection::sendCmdRx()
     // the comment there for why.
     qint64 written = m_socket->writeDatagram(pkt, m_radioInfo.address,
                                              m_baseOutboundPort + 1);
+    // Sofort lesen, vor jedem weiteren Aufruf: errorString() und
+    // alles andere darf errno ueberschreiben.
+    int fehlerNr = Netz::letzterFehler();
     if (written != pkt.size()) {
         written = m_socket->writeDatagram(pkt, m_radioInfo.address,
                                           m_baseOutboundPort + 1);
+        fehlerNr = Netz::letzterFehler();
     }
     if (written != pkt.size()) {
-        // 2026-09-01: see the diagnostic comment in sendCmdGeneral() above.
-        qCWarning(lcConnection)
-            << "P2: CmdRx send failed — wrote" << written
-            << "of" << pkt.size() << "bytes:" << m_socket->errorString()
-            << "error=" << m_socket->error() << "state=" << m_socket->state();
+        m_letzterSendeFehler = fehlerNr;
+        meldeSendeFehler("CmdRx", written, pkt.size(), m_socket, fehlerNr);
     }
 }
 
@@ -3123,16 +3184,17 @@ void P2RadioConnection::sendCmdTx()
     // the comment there for why.
     qint64 written = m_socket->writeDatagram(pkt, m_radioInfo.address,
                                              m_baseOutboundPort + 2);
+    // Sofort lesen, vor jedem weiteren Aufruf: errorString() und
+    // alles andere darf errno ueberschreiben.
+    int fehlerNr = Netz::letzterFehler();
     if (written != pkt.size()) {
         written = m_socket->writeDatagram(pkt, m_radioInfo.address,
                                           m_baseOutboundPort + 2);
+        fehlerNr = Netz::letzterFehler();
     }
     if (written != pkt.size()) {
-        // 2026-09-01: see the diagnostic comment in sendCmdGeneral() above.
-        qCWarning(lcConnection)
-            << "P2: CmdTx send failed — wrote" << written
-            << "of" << pkt.size() << "bytes:" << m_socket->errorString()
-            << "error=" << m_socket->error() << "state=" << m_socket->state();
+        m_letzterSendeFehler = fehlerNr;
+        meldeSendeFehler("CmdTx", written, pkt.size(), m_socket, fehlerNr);
     }
 }
 
@@ -3403,7 +3465,10 @@ void P2RadioConnection::onConnectTimeout()
     if (m_totalIqPackets > 0) { return; }
 
     qCWarning(lcConnection) << "P2: Connect watchdog fired — no DDC I/Q frame within"
-                            << kConnectTimeoutMs << "ms; tearing down and emitting connectFailed(Timeout)";
+                            << kConnectTimeoutMs << "ms; datagrams since connectToRadio():"
+                            << m_datagramsSinceConnect << "local port:"
+                            << (m_socket ? m_socket->localPort() : 0)
+                            << "; tearing down and emitting connectFailed(Timeout)";
 
     // Issue #239: tear down to Disconnected so the UI does not claim
     // "Connected" while the radio is unreachable. Stop the keep-alive,
@@ -3435,16 +3500,35 @@ void P2RadioConnection::onConnectTimeout()
     // (sonst staende es gar nicht in der Liste), aber es kommt kein
     // Datenstrom — und genau das trennt "Geraet aus" von "Netz laesst
     // die Pakete nicht durch".
+    // Zwei Faelle, die gegensaetzliche Abhilfen brauchen — und bis zum
+    // 2026-10-04 bekamen beide denselben Rat. An jenem Tag verband Anvelina
+    // nicht, der Dialog riet zur Netzstrecke, und in Wahrheit verliess kein
+    // einziges Datagramm den Rechner: jeder Versand scheiterte an Ort und
+    // Stelle. Ein Rat, der in die falsche Richtung zeigt, kostet mehr Zeit
+    // als gar keiner.
+    QString rat;
+    if (m_letzterSendeFehler != 0) {
+        const QString deutung = Netz::sendeFehlerDeutung(m_letzterSendeFehler);
+        rat = QStringLiteral(
+                  "Die Pakete verlassen diesen Rechner gar nicht — der "
+                  "Versand scheitert hier, nicht unterwegs (%1). Es nützt "
+                  "deshalb nichts, am Netz oder am Gerät zu suchen.")
+                  .arg(Netz::fehlerName(m_letzterSendeFehler));
+        if (!deutung.isEmpty()) { rat += QStringLiteral("\n\n") + deutung; }
+    } else {
+        rat = QStringLiteral(
+            "Die Pakete gehen hinaus, es kommt nur nichts zurück. Das ist "
+            "fast immer die Netzwerkstrecke, nicht das Gerät: über WLAN "
+            "kommen die Pakete oft nicht durch, auch wenn die Suche es "
+            "anzeigt (die läuft per Rundruf). Am zuverlässigsten ist eine "
+            "Kabelverbindung.");
+    }
     emit connectFailed(ConnectFailure::Timeout,
                        QStringLiteral(
                            "Das Gerät wurde gefunden, liefert aber binnen "
-                           "%1 s keinen Datenstrom.\n\n"
-                           "Das ist fast immer die Netzwerkstrecke, nicht "
-                           "das Gerät: über WLAN kommen die Pakete oft "
-                           "nicht durch, auch wenn die Suche es anzeigt "
-                           "(die läuft per Rundruf). Am zuverlässigsten "
-                           "ist eine Kabelverbindung.")
-                           .arg(kConnectTimeoutMs / 1000));
+                           "%1 s keinen Datenstrom.\n\n%2")
+                           .arg(kConnectTimeoutMs / 1000)
+                           .arg(rat));
 }
 
 // Porting from Thetis ReadUDPFrame:519-532 — High Priority C&C status

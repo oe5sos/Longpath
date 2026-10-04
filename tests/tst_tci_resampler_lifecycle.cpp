@@ -78,21 +78,29 @@ void TestTciResamplerLifecycle::resampler_lifecycle()
     // Step 1: no clients yet → 0 resamplers.
     QCOMPARE(server.totalResamplerInstances(), 0);
 
+    // Ab 2026-09-30 zaehlt jedes Abonnement ZWEI Instanzen: je Kanal eine.
+    // WDSPs RESAMPLEF rechnet einkanalig und reell, ein verschraenkter
+    // Stereopuffer durch einen einzigen Resampler kaeme vermischt und in der
+    // falschen Tonhoehe heraus (belegt in tst_tci_audio_resample_channels).
+    // Deshalb hier ueberall 2 je Abonnement statt 1 -- die Lebenszyklus-Regel,
+    // die dieser Pruefstand eigentlich pinnt, ist unveraendert.
+    static constexpr int kJeAbo = 2;
+
     // Step 2: client 1 subscribes to slice 0.
     auto* ws1 = connectClient(server);
     QVERIFY(ws1->state() == QAbstractSocket::ConnectedState);
     sendAndProcess(ws1, QStringLiteral("audio_start:0;"));
-    QTRY_COMPARE_WITH_TIMEOUT(server.totalResamplerInstances(), 1, 2000);
+    QTRY_COMPARE_WITH_TIMEOUT(server.totalResamplerInstances(), kJeAbo, 2000);
 
     // Step 3: client 2 subscribes to the same slice 0.
     auto* ws2 = connectClient(server);
     QVERIFY(ws2->state() == QAbstractSocket::ConnectedState);
     sendAndProcess(ws2, QStringLiteral("audio_start:0;"));
-    QTRY_COMPARE_WITH_TIMEOUT(server.totalResamplerInstances(), 2, 2000);
+    QTRY_COMPARE_WITH_TIMEOUT(server.totalResamplerInstances(), 2 * kJeAbo, 2000);
 
     // Step 4: client 1 unsubscribes.
     sendAndProcess(ws1, QStringLiteral("audio_stop:0;"));
-    QTRY_COMPARE_WITH_TIMEOUT(server.totalResamplerInstances(), 1, 2000);
+    QTRY_COMPARE_WITH_TIMEOUT(server.totalResamplerInstances(), kJeAbo, 2000);
 
     // Step 5: server stop → 0 resamplers.
     ws1->deleteLater();
@@ -109,12 +117,13 @@ void TestTciResamplerLifecycle::audio_start_idempotent()
     auto* ws = connectClient(server);
     QVERIFY(ws->state() == QAbstractSocket::ConnectedState);
 
+    // Zwei je Abonnement, je Kanal eine -- siehe resampler_lifecycle().
     sendAndProcess(ws, QStringLiteral("audio_start:0;"));
-    QTRY_COMPARE_WITH_TIMEOUT(server.totalResamplerInstances(), 1, 2000);
+    QTRY_COMPARE_WITH_TIMEOUT(server.totalResamplerInstances(), 2, 2000);
 
     // Second audio_start for the same rx must not create another resampler.
     sendAndProcess(ws, QStringLiteral("audio_start:0;"));
-    QTRY_COMPARE_WITH_TIMEOUT(server.totalResamplerInstances(), 1, 2000);
+    QTRY_COMPARE_WITH_TIMEOUT(server.totalResamplerInstances(), 2, 2000);
 
     ws->deleteLater();
     server.stop();
