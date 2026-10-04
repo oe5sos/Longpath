@@ -122,6 +122,7 @@
 #include "RxChannel.h"        // afGain() — for VAX AF-bypass
 #include "WdspEngine.h"       // rxChannel(0) lookup
 #include "audio/PortAudioBus.h"
+#include "core/audio/BusMitFrist.h"
 #include "../models/RadioModel.h"
 #include "../models/SliceModel.h"
 #include "core/MacMicPermission.h"   // microphoneAccessGranted()
@@ -676,11 +677,21 @@ std::unique_ptr<IAudioBus> AudioEngine::makeBus(const AudioDeviceConfig& cfg,
     bus->setConfig(pcfg);
 
     const AudioFormat fmt = toAudioFormat(cfg);
-    if (!bus->open(fmt)) {
-        qCWarning(lcAudio) << "IAudioBus open failed:" << bus->errorString();
-        return nullptr;
+    // Mit Frist oeffnen: ohne sie kann dieser Aufruf die ganze Oberflaeche
+    // einfrieren (siehe oeffneMitFrist). Der Fehlertext muss VOR der
+    // Uebergabe geholt werden -- nach einem Zeitlimit gehoert der Bus dem
+    // Oeffnungsfaden und darf hier nicht mehr angefasst werden.
+    const QString wofuer = QStringLiteral("%1 \"%2\"")
+                               .arg(capture ? QStringLiteral("Aufnahme")
+                                            : QStringLiteral("Wiedergabe"),
+                                    cfg.deviceName.isEmpty()
+                                        ? QStringLiteral("(Vorgabegeraet)")
+                                        : cfg.deviceName);
+    auto geoeffnet = Audio::oeffneMitFrist(std::move(bus), fmt, wofuer);
+    if (!geoeffnet) {
+        return nullptr;   // oeffneMitFrist hat den Grund schon gemeldet
     }
-    return bus;
+    return geoeffnet;
 }
 
 std::unique_ptr<IAudioBus> AudioEngine::makeVaxBus(int channel)

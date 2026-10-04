@@ -516,6 +516,7 @@ set(CORE_SOURCES
     src/core/antenna/RadioSweep.cpp
     src/core/AppSettings.cpp
     src/core/LogDatei.cpp
+    src/core/audio/BusMitFrist.cpp
     src/core/SettingsBackup.cpp
     src/core/RxProfileManager.cpp
     src/core/CwDecoder.cpp

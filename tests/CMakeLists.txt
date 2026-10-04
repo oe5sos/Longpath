@@ -1947,6 +1947,13 @@ longpath_add_test(tst_radio_status)
 longpath_add_test(tst_radio_status_follows_mox)
 longpath_add_test(tst_settings_hygiene)
 
+# ── Ein Geraet, das nicht aufmacht, darf nicht alles mitnehmen (2026-10-03) ──
+# tst_bus_mit_frist: gibt einen Bus herein, dessen open() absichtlich
+#   stehenbleibt, und prueft die zwei Zusagen der Behebung — nach der Frist
+#   geht es weiter, und der aufgegebene Bus wird wirklich aufgeraeumt (ueber
+#   einen Lebendzaehler belegt, nicht behauptet).
+longpath_add_test(tst_bus_mit_frist)
+
 # ── Logzeilen duerfen sich nicht zerschreiben (2026-10-03) ───────────────────
 # tst_log_schreibt_atomar: acht Faeden schreiben gleichzeitig 250 Zeilen und
 #   danach muss JEDE vollstaendig und genau einmal dastehen. Grund: in den
