@@ -16,6 +16,25 @@ zugehen. Es ist ein Fahrplan über mehrere Durchgänge, kein Durchgang.
 | Signale nach oben | 13 | 13 | **4** |
 | Leere Pflichtmethoden | 0 | 0 | **16** |
 
+**Diese Tabelle ist vom 2026-10-02 und damit überholt.** Am 2026-10-04
+nachgezählt, nicht geschätzt:
+
+| | ANAN 10E (P1) | Anvelina (P2) | SunSDR2 QRP |
+| --- | --- | --- | --- |
+| Zeilen | 4385 | 3774 | **2692** |
+| Signale nach oben | 10 | 12 | **8** |
+| Leere Rümpfe | 0 | 0 | **14** |
+
+Und die „leeren Rümpfe" sind nicht alle Arbeit: vier davon gibt es an
+diesem Gerät gar nicht (`setTrxRelay`, `setUserDigOut`,
+`setPuresignalRun`, `setWatchdogEnabled`), zwei gehören zum Senden und
+sieben zum Mikrofonweg — beide Gruppen warten nicht auf Arbeit, sondern
+auf **Bestätigung der Opcode-Nummern**. Die Einteilung mit Begründung
+steht seit `6f15428a` im Quelltext selbst.
+
+Die Zahl, die zählt, ist eine andere: **im Empfang ist die QRP
+gleichwertig.** Was noch fehlt, ist Senden.
+
 Die Zeilenzahl ist kein Maß für Güte, die anderen beiden Zeilen sind es:
 jedes Signal ist eine Meldung, die der Betreiber am Bildschirm sieht, und
 jede leere Methode ein Knopf in Longpath, der beim QRP ins Leere greift.
