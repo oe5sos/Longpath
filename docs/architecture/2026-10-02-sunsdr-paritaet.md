@@ -462,3 +462,40 @@ doppelte Netzlast ohne Gegenwert. Sauberer wäre, den Stromstart-Modus an
 die Zahl der **gebundenen Ströme** zu hängen statt an den gespeicherten
 Wert. Bis dahin sagt die Meldung wenigstens, was fehlt, statt nur
 `map="hw0->rx0"`.
+
+
+---
+
+# Bilanz am Ende des 2026-10-04
+
+Der Empfang ist **gleichwertig**. Was heute dazukam, in der Reihenfolge,
+in der es gefunden wurde:
+
+| Was | Wie belegt |
+| --- | --- |
+| Die eingestellte Rate kam beim Verbinden nie am Gerät an | am Gerät: Stromkopf `0100` → `0200`, 240 → 960 Nummern/s |
+| Ein toter Lautsprecher-Ausgang galt als offen | Prüfstand rot gegen die alte Fassung |
+| Der Abmelde-Rahmen wurde nicht nachgeschickt | am Gerät quittiert nach Versuch 1 |
+| **Lautstärke +20 → +40 dB** | vom Betreiber am Gerät eingestellt |
+| **Zwei Empfänger, Ende zu Ende** | am Gerät: 480 statt 240 Nummern/s, 0 verworfen |
+| Das Verbinden erholt sich selbst | fünf Anläufe à 18 s, Prüfstand rot-vor-grün |
+
+**Was noch fehlt — und woran es hängt:**
+
+| Offen | Hängt an |
+| --- | --- |
+| Mikrofon-PTT bestätigen | **50-Ω-Abschluss** (gebaut, aber nie im Sendezustand gesehen) |
+| Senden überhaupt | derselbe Abschluss, davor die Opcode-Bestätigung |
+| Restliche Rahmen des Verbindungsablaufs | **zwei Minuten ExpertSDR2 mit Mitschnitt**, ohne Antenne |
+| Wiederholungen bei 96 kHz | derselbe Mitschnitt, aber **auf 96 kHz** |
+
+**Was keiner mehr versuchen soll** (alles gemessen und wirkungslos):
+
+- den Kopf der Blockantwort spiegeln
+- zwei Stille-Ströme statt einem zurückschicken
+- die Quittung vor das Verwerfen ziehen
+
+**Und eine Mahnung an mich selbst:** zweimal an diesem Tag habe ich aus
+**einer** Messung eine Ursache gemacht — bei den Wiederholungen und beim
+Verbindungsaussetzer. Beide Male war die Zahl richtig und der Schluss
+falsch. Eine Ursache braucht mehr als einen Durchgang.
