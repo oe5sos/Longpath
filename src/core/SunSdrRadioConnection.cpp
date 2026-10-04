@@ -1633,7 +1633,33 @@ void SunSdrRadioConnection::onDataWatchdogTick()
 
 void SunSdrRadioConnection::setTxFrequency(quint64) {}
 void SunSdrRadioConnection::setPreamp(bool) {}
-void SunSdrRadioConnection::setTxDrive(int) {}
+
+// Ein leerer Rumpf, der ein BEDIENELEMENT bedient, ist eine Falle: der
+// Betreiber dreht die Leistung herunter, sieht die Zahl sinken, und am
+// Geraet aendert sich nichts. Beim Senden ist das kein Schoenheitsfehler.
+//
+// Der Rahmenbauer fuer 0x17 liegt fertig, aber die Nummer stammt von der
+// DX/PRO, und die QRP benutzt nachweislich andere (0x04 statt 0x05,
+// 0x07 statt 0x08 -- siehe docs/architecture/2026-10-02-sunsdr-paritaet.md
+// Abschnitt 3a). Verdrahtet wird sie erst, wenn sie am Geraet quittiert
+// wurde; bis dahin sagt Longpath wenigstens, dass es nichts tut --
+// einmal je Sitzung, nicht bei jedem Reglerschritt.
+void SunSdrRadioConnection::setTxDrive(int prozent)
+{
+    if (!m_txDriveGemeldet) {
+        m_txDriveGemeldet = true;
+        qCWarning(lcSunSdr).noquote()
+            << QStringLiteral(
+                   "SunSdr: die Leistung laesst sich an diesem Geraet "
+                   "(noch) nicht aus Longpath stellen -- %1 %% ist NICHT "
+                   "hinausgegangen. Es gilt, was zuletzt in ExpertSDR2 "
+                   "eingestellt war. Der Rahmen 0x17 ist gebaut, aber "
+                   "seine Opcode-Nummer stammt von der DX/PRO und ist an "
+                   "der QRP nicht bestaetigt; siehe "
+                   "docs/development/sunsdr-abschluss-pruefplan.md.")
+                   .arg(prozent);
+    }
+}
 // ── Antennenwahl: gebaut, aber standardmaessig STUMM ────────────────────
 //
 // Der Rahmenbauer (SunSdrProtocol::buildAntennaSelectFrame) liegt seit

@@ -1044,6 +1044,9 @@ private:
     // Die Antennenwahl geht nur hinaus, wenn der Betreiber es
     // ausdruecklich will: die Auswahlbytes stammen von der DX/PRO und
     // sind an der QRP nicht bestaetigt (2026-10-04).
+    // Einmal je Sitzung melden, dass die Leistung nicht gestellt wird.
+    bool m_txDriveGemeldet{false};
+
     bool m_antenneScharf{
         qEnvironmentVariableIntValue("LONGPATH_SUNSDR_ANTENNE") == 1};
 
