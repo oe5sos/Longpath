@@ -1954,6 +1954,16 @@ longpath_add_test(tst_settings_hygiene)
 #   einen Lebendzaehler belegt, nicht behauptet).
 longpath_add_test(tst_bus_mit_frist)
 
+# ── Ein gescheiterter Versand muss den Grund NENNEN (2026-10-04) ────────────
+# tst_sendefehler_deutung: haelt auseinander, was auseinandergehalten werden
+#   muss — "das Betriebssystem laesst uns nicht ins lokale Netz" (EHOSTUNREACH,
+#   EPERM) gegen "die Sendewarteschlange ist voll" (ENOBUFS). Grund: am
+#   2026-10-04 verband Anvelina nicht, und der Dialog riet zur Netzstrecke,
+#   waehrend in Wahrheit kein einziges Datagramm den Mac verliess. Werden die
+#   beiden Faelle vertauscht, schickt die Meldung den Bediener an den falschen
+#   Schalter.
+longpath_add_test(tst_sendefehler_deutung)
+
 # ── Logzeilen duerfen sich nicht zerschreiben (2026-10-03) ───────────────────
 # tst_log_schreibt_atomar: acht Faeden schreiben gleichzeitig 250 Zeilen und
 #   danach muss JEDE vollstaendig und genau einmal dastehen. Grund: in den
