@@ -936,3 +936,25 @@ weitermacht, soll **nicht** noch einmal am Kopf der Blockantwort drehen
 ein Mitschnitt von ExpertSDR2 **bei 96 kHz**: wenn es dort auch
 wiederholt, ist es schlicht die Eigenart des Geräts und kein Mangel von
 Longpath.
+
+### Dritte Vermutung: Quittung vor dem Verwerfen — ebenfalls widerlegt
+
+Beim Durchlesen des eigenen Diffs aufgefallen: `replyToBlock()` steht
+**hinter** dem Verwerfen. Bei zwei Strömen und einem Empfänger wird
+Kanal 1 verworfen und damit **nie quittiert** — und unquittierte Blöcke
+sind genau das, was dieses Gerät wiederholt. Das klang nach der Ursache.
+
+Gemessen (je96, ein Empfänger, je 10 s):
+
+    vorher:  111 / 115 / 101 Wiederholungen je Sekunde
+    nachher: 110 / 109 / 107 / 103
+
+Kein Unterschied. Zurückgenommen, weil die Änderung ohne Nutzen nur
+zusätzliche Pakete nach oben erzeugt (eine Quittung je Paket statt je
+verbrauchtem Paket).
+
+**Damit sind drei Vermutungen gemessen und negativ:** Kopf spiegeln,
+zwei Stille-Ströme, Quittung vor dem Verwerfen. Die Wiederholungen bei
+96 kHz haben von hier aus keinen Hebel. Der nächste Schritt ist ein
+Mitschnitt von ExpertSDR2 **bei 96 kHz** — wiederholt es dort auch, ist
+es die Eigenart des Geräts.
