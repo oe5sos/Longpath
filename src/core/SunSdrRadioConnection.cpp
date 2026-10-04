@@ -1722,74 +1722,29 @@ void SunSdrRadioConnection::setTxDrive(int prozent)
                    .arg(prozent);
     }
 }
-// ── Antennenwahl: gebaut, aber standardmaessig STUMM ────────────────────
+// ── Antennenwahl: bewusst NICHT verdrahtet ─────────────────────────────
 //
-// Der Rahmenbauer (SunSdrProtocol::buildAntennaSelectFrame) liegt seit
-// Langem fertig und ist sauber belegt -- aber seine Auswahlbytes stammen
-// aus ArtemisSDR, also von der DX/PRO, und sind an der QRP NIE bestaetigt
-// worden. Am 2026-10-03 hat sich gezeigt, dass die Opcode-Nummern der QRP
-// nicht die der DX sind (Vorverstaerker 0x04 statt 0x05, DDC 0x07 statt
-// 0x08, erstes Byte 0x03 statt 0x32 -- siehe die Tabelle in
-// docs/architecture/2026-10-02-sunsdr-paritaet.md, Abschnitt 3a). Damit
-// ist auch 0x15 ein Verdachtsfall und kein Fakt.
+// Am 2026-10-04 habe ich sie verdrahtet (gated hinter
+// LONGPATH_SUNSDR_ANTENNE) und bin dabei in einen Waechter gelaufen, den
+// dieses Projekt genau dafuer hat: tst_sunsdr_protocol prueft, dass die
+// DX-staemmigen Sende-Rahmenbauer KEINE Aufrufstelle haben, und meldet
 //
-// Deshalb geht hier standardmaessig NICHTS hinaus. Der Weg ist vollstaendig
-// verdrahtet und im Log nachvollziehbar; scharf wird er erst mit
-// LONGPATH_SUNSDR_ANTENNE=1, und das gehoert an ein Geraet mit
-// 50-Ohm-Abschluss, nicht an eine Antenne.
+//   buildAntennaSelectFrame() traegt eine DX-Opcode-Nummer, die fuer die
+//   QRP nicht bestaetigt ist (bei drei gemessenen Befehlen liegt die QRP
+//   um eins darunter). Erst bestaetigen, dann verdrahten.
 //
-// A3 traegt die Falle, derentwegen die Tabelle ueberhaupt existiert:
-// dasselbe Buchse, derselbe Opcode, ein ANDERES Byte je Richtung
-// (RX 0x03, TX 0x02).
-void SunSdrRadioConnection::setAntennaRouting(AntennaRouting routing)
-{
-    if (!m_profile) { return; }
-
-    // trxAnt ist 1..3 und meint die gemeinsame Buchse. Die QRP hat genau
-    // drei, also ist die Abbildung eins zu eins -- aber ein Wert
-    // ausserhalb waere geraten, und geraten wird hier nicht.
-    SunSdr::AntennaPort buchse;
-    switch (routing.trxAnt) {
-    case 1: buchse = SunSdr::AntennaPort::A1; break;
-    case 2: buchse = SunSdr::AntennaPort::A2; break;
-    case 3: buchse = SunSdr::AntennaPort::A3; break;
-    default:
-        qCWarning(lcSunSdr) << "SunSdr: Antenne" << routing.trxAnt
-                             << "gibt es an diesem Geraet nicht (1..3) --"
-                                " nichts geschickt.";
-        return;
-    }
-
-    QByteArray rahmen;
-    if (!SunSdr::buildAntennaSelectFrame(*m_profile, buchse, routing.tx,
-                                         &rahmen)) {
-        qCWarning(lcSunSdr)
-            << "SunSdr: fuer diese Buchse/Richtung ist kein Auswahlbyte "
-               "belegt -- nichts geschickt.";
-        return;
-    }
-
-    if (!m_antenneScharf) {
-        qCInfo(lcSunSdr).noquote()
-            << QStringLiteral("SunSdr: Antennenwahl A%1 (%2) waere %3 -- "
-                              "NICHT geschickt. Die Auswahlbytes stammen "
-                              "von der DX/PRO und sind an der QRP nicht "
-                              "bestaetigt; scharf mit "
-                              "LONGPATH_SUNSDR_ANTENNE=1 und einem "
-                              "50-Ohm-Abschluss.")
-                   .arg(routing.trxAnt)
-                   .arg(routing.tx ? QStringLiteral("Senden")
-                                   : QStringLiteral("Empfang"),
-                        QString::fromLatin1(rahmen.toHex(' ')));
-        return;
-    }
-
-    if (!m_running || m_awaitingBeacon || m_radioAddr.isNull()) { return; }
-    sendeSteuerrahmen(rahmen, "Antennenwahl 0x15");
-    qCInfo(lcSunSdr) << "SunSdr: Antennenwahl A" << routing.trxAnt
-                      << (routing.tx ? "(Senden)" : "(Empfang)")
-                      << "geschickt -- VERSUCH, nicht bestaetigt.";
-}
+// Der Waechter hat recht, und ein Schalter, der standardmaessig aus ist,
+// hebt ihn nicht auf: verdrahtet ist verdrahtet, und eine Umgebungs-
+// variable ist schnell gesetzt. Die Auswahlbytes stammen aus ArtemisSDR,
+// also von der DX/PRO, und die QRP benutzt nachweislich andere Nummern
+// (Vorverstaerker 0x04 statt 0x05, DDC 0x07 statt 0x08, erstes Byte 0x03
+// statt 0x32).
+//
+// Der Weg dahin steht in docs/development/sunsdr-abschluss-pruefplan.md,
+// Schritt B: die Antennenwahl ist dort der ERSTE Befehl, weil sie als
+// einzige nichts erzeugt -- sie schaltet nur ein Relais. Quittiert das
+// Geraet 0x15, darf diese Methode einen Rumpf bekommen.
+void SunSdrRadioConnection::setAntennaRouting(AntennaRouting) {}
 void SunSdrRadioConnection::sendTxIq(const float*, int) {}
 void SunSdrRadioConnection::setTrxRelay(bool) {}
 void SunSdrRadioConnection::setMicBoost(bool) {}

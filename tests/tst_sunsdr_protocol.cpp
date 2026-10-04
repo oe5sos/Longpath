@@ -93,6 +93,20 @@ class TestSunSdrProtocol : public QObject
     Q_OBJECT
 
 private slots:
+    // Der Pegelabgleich ist keine Geschmacksfrage, sondern eine Messung:
+    // am 2026-10-04 hat der Betreiber am echten Geraet +40,0 dB
+    // eingestellt und bestaetigt ("die lautstaerke passt"), nachdem die
+    // alten +20,0 -- ueber den TCI-Weg geeicht -- am nativen Treiber bei
+    // Weitem nicht reichten ("ich muss voll aufdrehen, dass ich etwas
+    // hoere"). Diese Pruefung haelt die Zahl fest, damit sie nicht
+    // unbemerkt zurueckwandert.
+    void derPegelabgleichDerQrpIstEineMessung()
+    {
+        QCOMPARE(Longpath::SunSdr::kProfileQrp.rxLevelTrimDb, 40.0);
+        // DX und PRO bleiben bei 0 -- nie an dieser Hardware gemessen.
+        QCOMPARE(Longpath::SunSdr::kProfileDx.rxLevelTrimDb, 0.0);
+        QCOMPARE(Longpath::SunSdr::kProfilePro.rxLevelTrimDb, 0.0);
+    }
     // CRC-32 ueber den Rahmen mit genulltem Feld 14..17 -- an 13 echten
     // Rahmen von 10 Befehlen aus ExpertSDR2s Start (2026-09-25) byte-genau.
     void controlFrameCrcReproducesThirteenCapturedFrames()

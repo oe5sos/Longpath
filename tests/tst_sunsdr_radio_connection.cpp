@@ -733,17 +733,29 @@ private slots:
         QCOMPARE(conn.blockRepliesSentForTest(), quint64(0));
     }
 
-    // ── Pegelabgleich QRP, 2026-09-25 ─────────────────────────────
-    // Gemessen gegen ExpertSDR2 am selben Geraet: -127,9 dBm dort,
-    // -147,9 dBm in Longpath ohne Abgleich -> +20,0 dB auf die Proben.
-    void qrpSamplesAreRaisedByTheMeasuredTwentyDb()
+    // ── Pegelabgleich QRP, neu gemessen am 2026-10-04 ──────────────
+    //
+    // Bis dahin standen hier +20,0 dB -- am 2026-09-25 gegen ExpertSDR2
+    // gemessen, aber ueber den TCI-Weg (rx_sensors). Der NATIVE Treiber
+    // ist ein anderer Weg mit anderer Skalierung, und dort reichten die
+    // 20 dB bei Weitem nicht: "ich muss voll aufdrehen, dass ich etwas
+    // hoere" / "bei der haelfte, sprich 50 % faengt man an, etwas zu
+    // hoeren", waehrend ExpertSDR2 am SELBEN Geraet ohne Antenne
+    // "perfekt" laut war -- es lag also nicht an der fehlenden Antenne.
+    //
+    // +40,0 dB (Faktor 100) hat der Betreiber am 2026-10-04 am echten
+    // Geraet selbst eingestellt und bestaetigt: "die lautstaerke passt".
+    // Im Log seines Laufs steht "SunSdr: Pegelabgleich 40.0 dB
+    // (eingestellt)". Seine Anforderung dazu: "rauschen muss immer zu
+    // hoeren sein".
+    void qrpSamplesAreRaisedByTheMeasuredFortyDb()
     {
         SunSdrRadioConnection conn;
         conn.setFixedPortBindingEnabledForTest(false);
         conn.init();
         conn.setDiscoveryBroadcastEnabledForTest(false);
         conn.connectToRadio(someQrpInfo());
-        QCOMPARE(conn.rxLevelGainForTest(), 10.0f);
+        QCOMPARE(conn.rxLevelGainForTest(), 100.0f);   // 10^(40/20)
 
         const QHostAddress radio(QStringLiteral("192.0.2.200"));
         conn.feedControlDatagramForTest(
@@ -764,8 +776,8 @@ private slots:
         const auto samples = iqSpy.first().at(1).value<QVector<float>>();
         QVERIFY(samples.size() >= 2);
         const float raw = 1.0f / 8388608.0f;   // 1 / 2^23
-        QVERIFY(qFuzzyCompare(samples[0], 1000.0f * raw * 10.0f));   // I
-        QVERIFY(qFuzzyCompare(samples[1],  500.0f * raw * 10.0f));   // Q
+        QVERIFY(qFuzzyCompare(samples[0], 1000.0f * raw * 100.0f));   // I
+        QVERIFY(qFuzzyCompare(samples[1],  500.0f * raw * 100.0f));   // Q
     }
 
     // Preamp/Abschwaecher 0x04, am 2026-09-25 in ExpertSDR2 der Reihe
@@ -2148,71 +2160,6 @@ private slots:
         QCOMPARE(conn.aktiveEmpfaengerForTest(), 2);
         conn.connectToRadio(someQrpInfo());
         QCOMPARE(conn.aktiveEmpfaengerForTest(), 2);
-    }
-
-    // ── Antennenwahl 0x15 ──────────────────────────────────────────────
-    //
-    // Gebaut, aber standardmaessig stumm: die Auswahlbytes stammen aus
-    // ArtemisSDR, also von der DX/PRO, und am 2026-10-03 hat sich gezeigt,
-    // dass die Opcode-Nummern der QRP andere sind (0x04 statt 0x05 beim
-    // Vorverstaerker, 0x07 statt 0x08 bei der DDC). Ungepruefte Bytes
-    // gehen nicht ungefragt an fremde Hardware.
-    void antennenwahlIstStandardmaessigStumm()
-    {
-        SunSdrRadioConnection conn;
-        conn.setFixedPortBindingEnabledForTest(false);
-        conn.init();
-        conn.setDiscoveryBroadcastEnabledForTest(false);
-        conn.connectToRadio(someQrpInfo());
-        handshake(conn);
-        const int vorher = conn.offeneRahmenForTest();
-
-        AntennaRouting r;
-        r.trxAnt = 2;
-        r.tx = false;
-        conn.setAntennaRouting(r);
-
-        QCOMPARE(conn.offeneRahmenForTest(), vorher);
-    }
-
-    // Scharf geschaltet geht der Rahmen hinaus -- vor der Verdrahtung war
-    // setAntennaRouting ein leerer Rumpf und hier passierte nie etwas.
-    void antennenwahlScharfSchicktDenRahmen()
-    {
-        SunSdrRadioConnection conn;
-        conn.setFixedPortBindingEnabledForTest(false);
-        conn.init();
-        conn.setDiscoveryBroadcastEnabledForTest(false);
-        conn.connectToRadio(someQrpInfo());
-        handshake(conn);
-        conn.setAntenneScharfForTest(true);
-        const int vorher = conn.offeneRahmenForTest();
-
-        AntennaRouting r;
-        r.trxAnt = 3;
-        r.tx = false;
-        conn.setAntennaRouting(r);
-
-        QCOMPARE(conn.offeneRahmenForTest(), vorher + 1);
-    }
-
-    // Eine Buchse, die es nicht gibt, wird nicht geraten.
-    void antennenwahlAusserhalbDerDreiBuchsenSchicktNichts()
-    {
-        SunSdrRadioConnection conn;
-        conn.setFixedPortBindingEnabledForTest(false);
-        conn.init();
-        conn.setDiscoveryBroadcastEnabledForTest(false);
-        conn.connectToRadio(someQrpInfo());
-        handshake(conn);
-        conn.setAntenneScharfForTest(true);
-        const int vorher = conn.offeneRahmenForTest();
-
-        AntennaRouting r;
-        r.trxAnt = 7;          // gibt es nicht
-        conn.setAntennaRouting(r);
-
-        QCOMPARE(conn.offeneRahmenForTest(), vorher);
     }
 
     // ── Zwei Empfaenger brauchen zwei Stroeme ──────────────────────────

@@ -171,13 +171,32 @@ struct Profile {
     // Pegelabgleich des Empfangswegs in dB, auf die normierten Proben
     // (1/2^23) aufgeschlagen, bevor sie Longpath verlassen.
     //
-    // QRP: +20,0 dB, GEMESSEN am 2026-09-25 gegen ExpertSDR2 am selben
-    // Geraet im selben Zustand (echtes I/Q, Preamp 0 dB, 20 m, 3 kHz,
-    // ohne Antenne): ExpertSDR2 zeigt im Mittel -127,9 dBm Rauschen
-    // (-127,5 / -127,8 / -127,9 / -128,3), Longpath ohne Abgleich
-    // -147,9 dBm (TCI rx_sensors). Ohne diesen Abgleich klingt Longpath
-    // im richtigen I/Q-Betrieb "ganz leise" bis "kein Ton" -- die AGC
-    // hebt Rauschen bei -148 dBm nicht hoerbar an.
+    // QRP: +40,0 dB.
+    //
+    // Die Zahl stand bis zum 2026-10-04 auf +20,0 -- gemessen am
+    // 2026-09-25 gegen ExpertSDR2, aber ueber den TCI-Weg (rx_sensors).
+    // Der NATIVE Treiber ist ein anderer Weg mit anderer Skalierung, und
+    // dort reichten die 20 dB bei Weitem nicht: der Betreiber meldete
+    // den Empfang mehrfach als "sehr sehr leise" ("ich muss voll
+    // aufdrehen, dass ich etwas hoere"; "bei der haelfte, sprich 50 %
+    // faengt man an, etwas zu hoeren"), waehrend ExpertSDR2 am SELBEN
+    // Geraet ohne Antenne "perfekt" laut war -- es lag also nicht an der
+    // fehlenden Antenne.
+    //
+    // +40,0 dB ist nicht geraten, sondern vom Betreiber am 2026-10-04 am
+    // echten Geraet eingestellt worden: der Abgleich wurde ueber
+    // LONGPATH_SUNSDR_PEGEL einstellbar gemacht, er hat 40 gefahren und
+    // bestaetigt "die lautstaerke passt". Im Log seines Laufs steht
+    // "SunSdr: Pegelabgleich 40.0 dB (eingestellt)".
+    //
+    // Die alte Begruendung bleibt gueltig, nur die Groesse war zu klein:
+    // ExpertSDR2 zeigt im Mittel -127,9 dBm Rauschen (-127,5 / -127,8 /
+    // -127,9 / -128,3), Longpath ohne Abgleich -147,9 dBm. Ohne Abgleich
+    // klingt Longpath "ganz leise" bis "kein Ton" -- die AGC hebt
+    // Rauschen bei -148 dBm nicht hoerbar an.
+    //
+    // Seine Anforderung dazu, woertlich: "rauschen muss immer zu hoeren
+    // sein".
     //
     // Vorbild fuer die Groessenordnung: ArtemisSDR gleicht das S-Meter
     // der SunSDR2 DX um +18,98 dB an, ebenfalls gegen die Hersteller-
@@ -205,7 +224,7 @@ inline constexpr Profile kProfilePro{
 // BoardCapabilities' QRP-Zeile.
 inline constexpr Profile kProfileQrp{
     Variant::Qrp, "SunSDR2 QRP", 50001, 50002, 0x03, 48000.0,
-    /*rxLevelTrimDb=*/20.0};
+    /*rxLevelTrimDb=*/40.0};
 
 // From ArtemisSDR sunsdr.h:28 [@f8b01d25c5]. Second magic byte, fixed
 // across every model/profile — only byte[0] varies.
