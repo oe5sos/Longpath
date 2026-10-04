@@ -7,6 +7,7 @@
 // anderes behauptet als das Geraet tut.
 
 import { TciLink, Fft } from './tci.js';
+import { Mikrofon, mikrofonMoeglich } from './mikrofon.js';
 
 const $ = (id) => document.getElementById(id);
 const link = new TciLink();
@@ -2007,3 +2008,108 @@ requestAnimationFrame(schleife);
 
 zeichneKopf();
 zeichneBedienung();
+
+
+// ── Die Halteleiste ────────────────────────────────────────────────────────
+//
+// Entwurf 1, gewaehlt am 2026-10-04: gedrueckt halten nimmt auf, loslassen
+// hoert auf. Der Finger ist die Sicherung.
+//
+// **Sie tastet nicht.** Hier steht kein `trx:` und kein `tune:`, und das
+// bleibt so, bis der Betreiber es ausdruecklich freigibt und die Dummy-Last
+// dranhaengt. Was sie tut: Mikrofon aufnehmen, TCI-Rahmen bauen, abschicken.
+// Longpath verwirft sie, solange dieser Client nicht tastet
+// (`m_txAudioActiveClient` in TciServer.cpp), und zaehlt sie als verworfen —
+// genau das ist der Beleg, dass die Kette steht, ohne dass ein Watt auf die
+// Antenne geht.
+//
+// Nutzen schon heute: der Pegelbalken. Ohne ihn weiss am Telefon niemand, ob
+// das Mikrofon ueberhaupt etwas hoert, und das ist die erste Frage.
+{
+  const reihe   = $('mikrow');
+  const taste   = $('mikhalt');
+  const balken  = $('pegelbalken');
+  const spitzeE = $('pegelspitze');
+  const meldung = $('mikmeldung');
+
+  const mik = new Mikrofon((rahmen) => {
+    // Rohe Rahmen gehen am Textkanal vorbei direkt auf den Socket — `send()`
+    // haengt ein Semikolon an und ist nur fuer Befehle.
+    if (link.ws && link.ws.readyState === 1) { link.ws.send(rahmen); }
+  });
+
+  // Erst sagen, DASS es nicht geht, dann eine Taste anbieten. Eine Taste,
+  // die beim Druecken nichts tut und nichts erklaert, ist schlimmer als
+  // keine. Ueber `http` gibt es `navigator.mediaDevices` gar nicht; dagegen
+  // hilft nur ein Zertifikat (handfunke/tls-einrichten.sh).
+  const moeglich = mikrofonMoeglich();
+  reihe.hidden = false;
+  if (!moeglich) {
+    taste.disabled = true;
+    meldung.className = 'mikmeldung warn';
+    meldung.textContent = window.isSecureContext === false
+      ? 'KEIN MIKROFON ÜBER HTTP — ZERTIFIKAT FEHLT'
+      : 'DIESES GERÄT GIBT KEIN MIKROFON HER';
+  }
+
+  let haelt = false;
+  let spitzeHalten = 0;
+
+  const anfangen = async (ev) => {
+    if (ev) { ev.preventDefault(); }
+    if (haelt || !moeglich) { return; }
+    haelt = true;
+    taste.classList.add('haelt');
+    meldung.className = 'mikmeldung';
+    meldung.textContent = 'NIMMT AUF …';
+    if (!await mik.start()) {
+      haelt = false;
+      taste.classList.remove('haelt');
+      meldung.className = 'mikmeldung warn';
+      meldung.textContent = (mik.fehler || 'MIKROFON GING NICHT').toUpperCase();
+      return;
+    }
+    // Zwischen Druck und Antwort kann der Finger laengst wieder weg sein —
+    // getUserMedia fragt beim ersten Mal nach Erlaubnis und braucht dann
+    // Sekunden. Dann sofort wieder aufhoeren, statt stumm weiterzulaufen.
+    if (!haelt) { mik.stop(); }
+  };
+
+  const aufhoeren = () => {
+    if (!haelt) { return; }
+    haelt = false;
+    taste.classList.remove('haelt');
+    mik.stop();
+    balken.style.width = '0%';
+    spitzeE.style.left = '0%';
+    spitzeHalten = 0;
+    meldung.textContent = mik.strecke
+      ? `${mik.strecke.rahmen} RAHMEN GESCHICKT · VERWORFEN, WEIL NICHT GETASTET`
+      : '';
+  };
+
+  taste.addEventListener('pointerdown', anfangen);
+  taste.addEventListener('pointerup', aufhoeren);
+  taste.addEventListener('pointercancel', aufhoeren);
+  taste.addEventListener('pointerleave', aufhoeren);
+  // Faellt das Fenster in den Hintergrund, ist niemand mehr da, der
+  // loslaesst. Ein Mikrofon, das im Hintergrund weiterlaeuft, waere auf
+  // einer Fernbedienung das Letzte, was jemand erwartet.
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { aufhoeren(); }
+  });
+
+  // Der Balken laeuft in eigener Taktung, nicht je Tonblock: 50 Bilder je
+  // Sekunde zu zeichnen kostet mehr als es zeigt.
+  setInterval(() => {
+    if (!haelt || !mik.strecke) { return; }
+    const sp = mik.strecke.spitzeAblesen();
+    const eff = mik.strecke.effektiv;
+    balken.style.width = Math.min(100, eff * 140).toFixed(0) + '%';
+    spitzeHalten = Math.max(spitzeHalten * 0.93, sp);
+    spitzeE.style.left = Math.min(99, spitzeHalten * 100).toFixed(0) + '%';
+    meldung.textContent = sp >= 0.99 ? 'ÜBERSTEUERT — LEISER SPRECHEN'
+                                     : 'NIMMT AUF …';
+    meldung.className = sp >= 0.99 ? 'mikmeldung warn' : 'mikmeldung';
+  }, 100);
+}
