@@ -12776,6 +12776,35 @@ void RadioModel::onConnectionStateChanged(ConnectionState state)
         // Settings Validation sub-tab (built in Phase H Task 3).
         if (!m_lastRadioInfo.macAddress.isEmpty()) {
             m_settingsHygiene.validate(m_lastRadioInfo.macAddress, boardCapabilities());
+            // ... und sagen, was dabei herauskam.
+            //
+            // Bis 2026-10-04 landete das Ergebnis AUSSCHLIESSLICH auf der
+            // Diagnoseseite. Wer sie nicht aufschlaegt, erfaehrt nie, dass
+            // eine gespeicherte Einstellung nicht zur angeschlossenen
+            // Platine passt -- und niemand schlaegt eine Diagnoseseite auf,
+            // solange nichts auffaellt. Genau das ist aber die Lage, in der
+            // eine geklemmte S-ATT oder ein falsch gemerkter Vorverstaerker
+            // sitzt: unauffaellig.
+            //
+            // Eine Zeile im Log kostet nichts und macht den Befund
+            // auffindbar. Bei null Befunden steht sie auf DBG und stoert
+            // niemanden; ab einem Befund steht sie auf WRN -- dann ist sie
+            // eine Warnung, die etwas bedeutet.
+            const auto befunde = m_settingsHygiene.issues();
+            if (befunde.isEmpty()) {
+                qCDebug(lcConnection)
+                    << "Einstellungs-Hygiene: keine Befunde fuer"
+                    << m_lastRadioInfo.macAddress;
+            } else {
+                qCWarning(lcConnection)
+                    << "Einstellungs-Hygiene:" << befunde.size()
+                    << "Befund(e) fuer" << m_lastRadioInfo.macAddress
+                    << "-- Diagnose > Radio Status > Settings Validation";
+                for (const auto& b : befunde) {
+                    qCWarning(lcConnection)
+                        << "  -" << b.key << ":" << b.summary;
+                }
+            }
         }
         // Per-radio peripherals refactor (2026-05-26): now that the MAC
         // is known and settings have been validated, fire the
