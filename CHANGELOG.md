@@ -2,6 +2,96 @@
 
 ## [Unreleased]
 
+Zwei Tage nach 0.6.5, und sie haben ein Thema: **die Anzeige darf nicht
+behaupten, was nicht mehr gilt** — und das Log muss sagen koennen, was war.
+
+### Hinzugefuegt
+
+- **Handfunke: die Seite sagt, wenn die Station sendet** (#170). `trx:` und
+  `tune:` wurden seit dem ersten Tag mitgelesen und nirgends verwendet — die
+  Seite wusste es und schwieg. Jetzt steht dort, wo sonst „SENDEN / NUR IN DER
+  APP" steht, in Messing: „STATION SENDET · EMPFAENGER STUMM". Dazu werden
+  „nur rauschen — antenne?" und „stockt" waehrend des Sendens unterdrueckt;
+  der Empfaenger ist dann stumm, und beide waeren die falsche Erklaerung. Die
+  Sendetasten bleiben tot wie bisher.
+- **SunSDR2 QRP: der Treiber hoert dem Geraet endlich zu** (#150, #154, #168).
+  Inventar je Rahmensorte, Folgenummern mit Verlust/Luecken/Wiederholungen,
+  Quittungsbuchfuehrung — und ein unquittierter Rahmen wird **einmal**
+  nachgeschickt. Am Geraet beobachtet: ein VFO-Frequenzrahmen ging verloren,
+  und das Geraet stand danach auf einer anderen Frequenz als die Anzeige.
+  Nachgeschickt wird nur, wo es die Lage verbessert (0x01, 0x04, 0x07, 0x08) —
+  nie ein Werkbank-Rahmen, und keiner dieser Opcodes loest HF aus. Dazu
+  Uebersteuerung aus dem I/Q und Mikrofon-PTT aus dem Stromkopf, beide ohne ein
+  einziges geratenes Protokollfeld. Alle vier TX-Encoder sind per Pruefstand
+  gesperrt (#154).
+- **TCI meldet die WIRKLICH gezeigte Spanne** (`spectrum_span`, #151). Der
+  Client rechnete bis dahin mit seinem Wunsch, und der Server hebt eine zu
+  schmale Anforderung an: aus 6 kHz werden bei 373 Punkten und 2048er FFT in
+  Wahrheit 8742 Hz. Daran haengen Abstimmstrich, Durchlassband und
+  Wasserfallversatz.
+- **Ein gescheiterter TCI-Bind wird wiederholt und ist sichtbar** (#149).
+  Vorher blieb der Server nach einem Netzwechsel fuer immer unten, und das
+  Einstellungsfeld sagte nur „Stopped"; jetzt steht dort „Wartet auf …" mit
+  Grund, und der Port wird genommen, sobald er frei ist.
+
+### Behoben
+
+- **Der Verbindungsaufbau konnte am Mikrofon einfrieren** (#166). Nicht der Ton
+  stand still, sondern das ganze Programm — samt „Abbrechen". Ursache: der
+  Mikrofon-Eingang wird eifrig beim Verbinden geoeffnet, und das blockiert ohne
+  Zeitlimit, solange macOS die Berechtigungsfrage stellt; der Aufruf steckt in
+  der verschachtelten Ereignisschleife des Verbindungsaufbaus. Empfangen
+  braucht kein Mikrofon: es wird jetzt nicht mehr geoeffnet, solange die
+  Antwort aussteht. Untersuchung mit allen Zahlen in
+  `docs/architecture/2026-10-03-verbindungshaenger-mikrofon.md` (#165).
+- **Logzeilen zerschrieben sich gegenseitig — und gingen dabei verloren**
+  (#171). Jeder Faden legte einen eigenen QTextStream auf dieselbe Datei.
+  Gemessen gingen bei acht gleichzeitigen Schreibern **7 bis 55 Prozent der
+  Zeilen ganz verloren**; sichtbar waren nur sechs zerschriebene Zeilen in den
+  Betriebslogs. Jetzt ein Schloss und ein einziger Schreibaufruf je Zeile.
+- **Zwei Diagnosezeilen lagen vor dem Log-Umleiter** (#169) und standen darum
+  in keinem einzigen Log: der Mikrofon-Berechtigungszustand beim Start und die
+  Meldung, ob der Oberflaechen-Faden seine Dienstguete bekommen hat — letztere
+  faellt im Misserfolgsfall als Warnung an, und die fehlte damit auch.
+- **Handfunke, Funde vom Geraet** (#148, #153, #163, #164): die iOS-Lupe fror
+  das Bild fuer immer ein; der Wasserfall sass auf dem Mittelwert statt auf dem
+  Rauschboden und blieb dunkel; Kneifen konnte rechnerisch nie zoomen;
+  `ctx.resume()` stand hinter zwei `await` und wurde von iOS verworfen (kein
+  Ton am Lautsprecher); die Rauschgrenze lag mit 10 dB genau auf einem
+  gemessenen Wert und schwieg ausgerechnet dort.
+- **Die Anzeige hielt Messwerte fest, die niemand mehr vornahm** (#155–#162):
+  das S-Meter zeigte nach einem Abriss dreissig Sekunden weiter; bei gar keinem
+  Funkgeraet machte es aus dem Rueckfallwert −140 dBm brav „S1"; das
+  Kopplungsblatt blieb ueber einer laengst wieder stehenden Verbindung liegen.
+  Massstab ist jetzt ueberall `ready`, nie der offene Socket.
+- **P2: erster Verbindungsaufbau ueber WLAN** (#147) — TX-I/Q erst nach dem
+  ersten Rahmen des Geraets.
+- **Der Sende-Faden hob seine eigene Echtzeit-Behandlung auf** (#174).
+  `TxWorkerThread` startete mit `QThread::start(QThread::HighPriority)`, und Qt
+  setzt dafuer auf macOS die Ablaufparameter des Fadens — Darwin verweigert
+  danach **jede** QoS-Klasse. Die Prioritaet hob damit genau die Behandlung
+  auf, die `run()` ausdruecklich haben will („audible glitches on the air").
+  Gemessen: `start()` -> USER_INTERACTIVE, `start(HighPriority)` ->
+  UNSPECIFIED. Der Empfangs-Faden war nie betroffen.
+- **Vier Stellen baten um eine Schrift, die es nicht gibt** (#172). `SF Mono`
+  ist auf macOS nicht angemeldet und loest zu `.AppleSystemUIFont` auf —
+  proportional. Die Zustandszeile der Kopfleiste und die Log-Ansicht im
+  Support-Fenster standen deshalb in der falschen Schrift. Dazu `Consolas`
+  (eine Windows-Schrift) und zweimal CSS-Gattungsnamen, die Qt nicht als
+  Familie kennt.
+- **Drei Fehlalarme im Log** (#175). Von 17 Warnungen einer gesunden Sitzung
+  kamen 13 in **jeder** Sitzung — und in diesem Rauschen waere die eine echte
+  (der Sende-Faden) fast untergegangen. `[PanFloatClose]`,
+  `[AppletFloatClose]` und „TX frequency NOT pushed: no connection yet" stehen
+  jetzt auf INFO. Die Schrittmarken des Profilwechsels bleiben unberuehrt; die
+  sind so bestellt.
+
+### Dokumentation
+
+- Durchgang durch die Handfunke mit allen Messwerten, inklusive der zwei
+  Messfallen, die mich selbst hereingelegt haben (#162, #173).
+- SunSDR-Blaetter: Verbindungsablauf, Paritaetsplan, Mitschnitt-Anleitung.
+
 ## [0.6.5] - 2026-10-02
 
 Zehn Tage Arbeit seit 0.6.4, rund 120 Pull Requests: **Longpath am
