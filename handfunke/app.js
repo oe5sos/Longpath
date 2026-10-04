@@ -2095,6 +2095,16 @@ zeichneBedienung();
       : '';
   };
 
+  // Der Server sagt seit dem 2026-10-04, WARUM er einen Sendewunsch
+  // ablehnt. Die Halteleiste tastet noch nicht, aber sobald sie es tut,
+  // steht hier der Grund statt eines stummen Nichts — und bis dahin fängt
+  // die Zeile jede Ablehnung ab, die aus einer anderen Ecke käme.
+  link.addEventListener('txfehler', (e) => {
+    const grund = (e.detail && e.detail.text) || 'abgelehnt';
+    meldung.className = 'mikmeldung warn';
+    meldung.textContent = ('SENDEN ABGELEHNT — ' + grund).toUpperCase();
+  });
+
   taste.addEventListener('pointerdown', anfangen);
   taste.addEventListener('pointerup', aufhoeren);
   taste.addEventListener('pointercancel', aufhoeren);

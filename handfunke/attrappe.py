@@ -46,6 +46,8 @@ def _zahl_nach(flagge, standard):
     return 0.0
 
 SENDET_ALLE = _zahl_nach('--sendet', 6.0)
+# Ab Werk gesperrt, wie TciAllowRemoteTx. --sendenfrei gibt frei.
+SENDEN_FREI = '--sendenfrei' in sys.argv
 IQ_RATE = 48000          # bewusst klein: die Attrappe soll die Naht pruefen,
 AUDIO_RATE = 48000       # nicht die Bandbreite
 IQ_BLOCK = 4096          # Werte je Rahmen (I und Q zusammen) -> 2048 Paare
@@ -273,6 +275,27 @@ class Verbindung(threading.Thread):
                 re_ = args[2] if len(args) > 2 and args[2] else '59'
                 print(f'  {self.addr[1]}: log_qso {ruf} {rs}/{re_}')
                 self.sende_text(f'log_qso_ok:{ruf};')
+        elif name in ('trx', 'tune'):
+            # Sendesperre, wie der echte Server sie fuehrt (PR #189-Reihe).
+            # Die Attrappe ist dabei absichtlich NICHT gutmuetiger: ohne
+            # ausdrueckliche Freigabe wird abgelehnt, und zwar MIT Grund.
+            #
+            # Bis zum 2026-10-04 verwarf der Server solche Befehle stumm. Auf
+            # einer Fernbedienung ist ein stummes Nein nicht von einem Defekt
+            # zu unterscheiden -- der Bediener drueckt, nichts passiert,
+            # nichts erklaert es. Genau dieser Fall muss sich hier pruefen
+            # lassen, ohne dass irgendwo ein Watt entsteht.
+            #
+            # --sendenfrei schaltet die Freigabe ein; ohne das bleibt es
+            # gesperrt, wie TciAllowRemoteTx ab Werk.
+            will = len(args) >= 2 and args[1].strip().lower() == 'true'
+            if will and not SENDEN_FREI:
+                print(f'  {self.addr[1]}: {name} ABGELEHNT (nicht freigegeben)')
+                self.sende_text('tx_err:nicht freigegeben;')
+            else:
+                nr = args[0].strip() if args else '0'
+                print(f'  {self.addr[1]}: {name}:{nr},{"true" if will else "false"}')
+                self.sende_text(f'{name}:{nr},{"true" if will else "false"};')
         elif name == 'iq_start':
             self.iq_an = True
             print(f'  {self.addr[1]}: IQ an')
