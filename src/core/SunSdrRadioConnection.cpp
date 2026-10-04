@@ -1232,6 +1232,19 @@ void SunSdrRadioConnection::processControlDatagram(const QByteArray& data,
         || quint8(data[0]) != m_profile->magic0
         || quint8(data[1]) != SunSdr::kMagic1
         || quint8(data[2]) != 0x01) {
+        // Nicht still verwerfen. Am 2026-10-04 stand die Frage eine halbe
+        // Stunde im Raum, ob ueberhaupt etwas im Socket ankommt -- ein
+        // tcpdump hat am Ende vier Beacon-Antworten gezeigt, die hier nie
+        // ankamen. Wer das Protokoll einschaltet
+        // (QT_LOGGING_RULES='longpath.sunsdr.debug=true'), soll den
+        // Unterschied zwischen "nichts empfangen" und "etwas empfangen,
+        // aber verworfen" in EINER Zeile sehen.
+        qCDebug(lcSunSdr).noquote()
+            << QStringLiteral("SunSdr: waehrend der Suche verworfen, von "
+                              "%1, %2 Byte: %3")
+                   .arg(sender.toString())
+                   .arg(data.size())
+                   .arg(QString::fromLatin1(data.left(8).toHex(' ')));
         return;
     }
 
