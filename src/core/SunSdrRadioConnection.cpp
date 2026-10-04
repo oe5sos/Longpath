@@ -1814,19 +1814,44 @@ void SunSdrRadioConnection::setTxDrive(int prozent)
 // Schritt B: die Antennenwahl ist dort der ERSTE Befehl, weil sie als
 // einzige nichts erzeugt -- sie schaltet nur ein Relais. Quittiert das
 // Geraet 0x15, darf diese Methode einen Rumpf bekommen.
+// ── Was dieses Geraet NICHT hat (Stand 2026-10-04) ─────────────────────
+//
+// Leer, weil es die Sache an der QRP nicht gibt -- nicht, weil sie fehlt.
+// Die Begruendung je Zeile steht in
+// docs/architecture/2026-10-02-sunsdr-paritaet.md, Abschnitt 1.
+void SunSdrRadioConnection::setTrxRelay(bool) {}          // ocOutputCount = 0, kein OC-Board
+void SunSdrRadioConnection::setUserDigOut(quint8) {}      // dito
+void SunSdrRadioConnection::setPuresignalRun(bool) {}     // hasPureSignal = false
+void SunSdrRadioConnection::setWatchdogEnabled(bool) {}   // HPSDR-FPGA-Wachhund; hier Blockantwort
+
+// ── Was zum Senden gehoert und noch nicht gebaut ist ───────────────────
+//
+// Nicht vergessen, sondern bewusst offen: die Opcode-Nummern dafuer
+// stammen von der DX/PRO, und die QRP benutzt nachweislich andere
+// (0x04 statt 0x05, 0x07 statt 0x08, erstes Byte 0x03 statt 0x32).
+// Erst bestaetigen, dann bauen -- der Weg dahin steht in
+// docs/development/sunsdr-abschluss-pruefplan.md und braucht einen
+// 50-Ohm-Abschluss, keine Antenne.
+//
+// tst_sunsdr_protocol haelt fest, dass die DX-staemmigen Rahmenbauer
+// KEINE Aufrufstelle haben. Am 2026-10-04 habe ich das mit
+// setAntennaRouting verletzt (gated hinter einer Umgebungsvariable) und
+// bin zu Recht aufgelaufen: verdrahtet ist verdrahtet.
 void SunSdrRadioConnection::setAntennaRouting(AntennaRouting) {}
 void SunSdrRadioConnection::sendTxIq(const float*, int) {}
-void SunSdrRadioConnection::setTrxRelay(bool) {}
+
+// ── Mikrofonweg: Opcode bestaetigt, Werte nicht ────────────────────────
+//
+// MIC_SOURCE (0x21) ist bestaetigt, was hineingehoert nicht. Diese
+// Schalter bleiben still, bis ein Mitschnitt zeigt, welche Werte
+// ExpertSDR2 dafuer schickt.
 void SunSdrRadioConnection::setMicBoost(bool) {}
 void SunSdrRadioConnection::setLineIn(bool) {}
 void SunSdrRadioConnection::setMicTipRing(bool) {}
 void SunSdrRadioConnection::setMicBias(bool) {}
 void SunSdrRadioConnection::setLineInGain(int) {}
-void SunSdrRadioConnection::setUserDigOut(quint8) {}
-void SunSdrRadioConnection::setPuresignalRun(bool) {}
 void SunSdrRadioConnection::setMicPTTDisabled(bool) {}
 void SunSdrRadioConnection::setMicXlr(bool) {}
-void SunSdrRadioConnection::setWatchdogEnabled(bool) {}
 
 
 // ---------------------------------------------------------------------------
