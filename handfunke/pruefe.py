@@ -26,6 +26,7 @@ Aufruf:
     python3 pruefe.py ton                  # nur der Tonpegel
     python3 pruefe.py hf                   # nur Rauschboden und Abstand
     python3 pruefe.py pegel                # nur die Messwerte des Servers
+    python3 pruefe.py skala                # Skala gegen Preamp/ATT (40 s)
 
 Das Token braucht es nur fuer Verbindungen AUS DEM NETZ; von Loopback
 verlangt Longpath keines (TciServer.cpp, istEigeneHerkunft).
@@ -322,6 +323,106 @@ def miss_pegel(v, sekunden):
 
 # ── Hauptteil ────────────────────────────────────────────────────────────────
 
+def miss_skala(v, sekunden):
+    """Bleibt die Skala stehen, wenn sich die Vorverstaerkung aendert?
+
+    Fuer den Live-Test, der an PR #102 haengt: Kalibrierung auf die Daten,
+    Achse fest. Der Betreiber schaltet waehrend des Laufs Preamp/ATT durch
+    (+10 / 0 / -10 / -20 dB); richtig ist es, wenn Rauschboden und S-Meter
+    STEHENBLEIBEN -- die Kalibrierung gleicht die Stufe ja gerade aus.
+
+    Bisher war das ein Augenmass-Test ("sieht gleich aus"). Hier sind es
+    Zahlen: springt der Boden um rund die Stufenhoehe, wirkt die
+    Kalibrierung nicht; bleibt er innerhalb von ein, zwei dB, wirkt sie.
+
+    Ein Hinweis zur Lesart, der mich selbst fast hereingelegt haette: ohne
+    Antenne ist der Rauschboden der EIGENE Empfaengerrauschanteil, und der
+    aendert sich mit der Vorverstaerkung wirklich. Der Test braucht ein
+    stehendes Signal -- Traeger oder Bake --, und dann ist die SPITZE die
+    Zahl, auf die es ankommt.
+    """
+    v.sende("rx_sensors_enable:true,200;")
+    v.sende("spectrum_start:0,373,10,12000;")
+    v.leeren()
+
+    print(f"  Jede Sekunde eine Zeile, {sekunden} s lang.")
+    print("  Jetzt Preamp/ATT durchschalten: +10 / 0 / -10 / -20 dB.")
+    print()
+    print("     t   S-Meter      Boden     Spitze    Abstand")
+    print("   ---  --------   --------   --------   --------")
+
+    smeter, boeden, spitzen = [], [], []
+    for t in range(1, int(sekunden) + 1):
+        v.sammle(1.0)
+        rahmen = rahmen_nach_art(v.binaer).get(STREAM_SPEKTRUM, [])
+        sm = None
+        for z in v.zeilen():
+            if z.lower().startswith("rx_sensors"):
+                try:
+                    sm = float(z.rstrip(";").rsplit(",", 1)[1])
+                except (IndexError, ValueError):
+                    pass
+        boden = spitze = None
+        if rahmen:
+            werte = sorted(b - 200 for b in rahmen[-1][HDR:])
+            boden, spitze = werte[len(werte) // 5], werte[-1]
+
+        def z(x):
+            return "    —   " if x is None else f"{x:8.1f}"
+
+        abst = "    —   " if (boden is None or spitze is None) \
+               else f"{spitze - boden:8.1f}"
+        print(f"   {t:3d}  {z(sm)}   {z(boden)}   {z(spitze)}   {abst}")
+
+        # Der Rueckfallwert zaehlt nicht als Messung (siehe KEIN_KANAL_DBM).
+        if sm is not None and abs(sm - KEIN_KANAL_DBM) > 0.5:
+            smeter.append(sm)
+        if boden is not None:
+            boeden.append(boden)
+        if spitze is not None:
+            spitzen.append(spitze)
+        v.leeren()
+
+    print()
+
+    def spanne(name, werte, grenze):
+        if len(werte) < 2:
+            print(f"  {name:12s} zu wenige Messwerte")
+            return
+        d = max(werte) - min(werte)
+        print(f"  {name:12s} {min(werte):7.1f} bis {max(werte):7.1f} dBm"
+              f"   -> Spanne {d:5.1f} dB")
+        return d
+
+    sS = spanne("S-Meter", smeter, 2.0)
+    spanne("Rauschboden", boeden, 2.0)
+    sP = spanne("Spitze", spitzen, 2.0)
+
+    print()
+    if sP is None:
+        print("  -> Kein Spektrum bekommen; ohne Bild sagt der Lauf nichts.")
+        return
+    if sP <= 2.0:
+        print("  -> Die SPITZE blieb innerhalb von 2 dB stehen. Genau so soll")
+        print("     es sein: die Kalibrierung gleicht die Stufe aus.")
+    elif sP < 6.0:
+        print("  -> Die Spitze wanderte um {:.1f} dB. Das ist mehr als".format(sP))
+        print("     Messrauschen und weniger als eine ganze Stufe — zweiter")
+        print("     Lauf mit einem STEHENDEN Traeger, bevor man das deutet.")
+    else:
+        print("  -> Die Spitze wanderte um {:.1f} dB. Das ist die".format(sP))
+        print("     Groessenordnung der Preamp-Stufen selbst: die Kalibrierung")
+        print("     wirkt nicht auf die Ablesung.")
+    if sS is not None and sP is not None and abs(sS - sP) > 6.0:
+        print()
+        print("  -> S-Meter und Spektrum bewegen sich UNTERSCHIEDLICH")
+        print(f"     ({sS:.1f} dB gegen {sP:.1f} dB).")
+        print("     Das IST der Befund hinter #102 -- aber nur, wenn das")
+        print("     Signal selbst stillstand. Schwankt der Traeger (oder ist")
+        print("     es eine Attrappe mit wanderndem S-Meter), sagt der")
+        print("     Unterschied nichts. Erst mit stehendem Traeger deuten.")
+
+
 def eigene_adresse():
     """Die Adresse, unter der dieser Rechner im Heimnetz steht."""
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -338,7 +439,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("was", nargs="?", default="alles",
-                    choices=["alles", "ton", "hf", "pegel"])
+                    choices=["alles", "ton", "hf", "pegel", "skala"])
     ap.add_argument("--host", default=None, help="Vorgabe: die eigene Netzadresse")
     ap.add_argument("--port", type=int, default=50001)
     ap.add_argument("--token", default=None, help="nur aus dem Netz noetig")
@@ -368,8 +469,12 @@ def main():
     teile = ["hf", "pegel", "ton"] if args.was == "alles" else [args.was]
     for teil in teile:
         print({"ton": "── Ton ──", "hf": "── Signal im Bild ──",
-               "pegel": "── Was der Server meldet ──"}[teil])
-        {"ton": miss_ton, "hf": miss_hf, "pegel": miss_pegel}[teil](v, args.dauer)
+               "pegel": "── Was der Server meldet ──",
+               "skala": "── Skala gegen Preamp/ATT ──"}[teil])
+        # Der Skala-Lauf braucht Zeit zum Durchschalten, nicht fuenf Sekunden.
+        dauer = max(args.dauer, 40.0) if teil == "skala" else args.dauer
+        {"ton": miss_ton, "hf": miss_hf, "pegel": miss_pegel,
+         "skala": miss_skala}[teil](v, dauer)
         print()
 
     v.zu()
