@@ -271,3 +271,63 @@ nicht, und geraten wird sie nicht (Abschnitt 3a).
 verbinden lassen und dann **beenden**. Der letzte Rahmen, der hinausgeht,
 bevor der Strom verstummt, ist der Stopp-Befehl. Damit wäre `disconnect()`
 vollständig — und das Gerät nach jedem Longpath-Ende still.
+
+---
+
+# Stand am 2026-10-04 — nach dem ersten Tag in der laufenden App
+
+Bis gestern wurde alles am Prüfstand und am Messlauf gemessen. Heute lief
+Longpath selbst gegen die QRP, über die Automationsbrücke ferngesteuert.
+Das hat drei Fehler aufgedeckt, die kein Prüfstand gezeigt hat — und
+einer davon stand genau an der Stelle, die gestern als „erledigt" galt.
+
+## Was sich an der Liste oben ändert
+
+| Posten | Neuer Stand |
+| --- | --- |
+| Veralteter Kommentar an `setSampleRate` (312 500 Hz) | **erledigt** — beim Umbau am 2026-10-03 verschwunden |
+| `setAntennaRouting` (Opcode `0x15`) | **verdrahtet, aber stumm** (`8e54decb`). Scharf nur mit `LONGPATH_SUNSDR_ANTENNE=1`; die Auswahlbytes stammen von der DX/PRO und sind an der QRP nicht bestätigt — siehe Abschnitt 3a, die Opcodes der QRP sind andere |
+| 96 kHz | kam in der **App** nie am Gerät an: `RadioModel` schiebt die Rate vor dem Verbinden hinein, der Sitzungs-Reset warf sie weg (`88844941`) |
+
+## Die drei Fehler vom 2026-10-04
+
+1. **Die eingestellte Rate wurde beim Verbinden weggeworfen.** Longpath
+   meldete `Connecting with sampleRate= 96000`, stellte WDSP darauf ein —
+   und das Gerät streamte mit 48 (Stromkopf `0100`, 240 Nummern/s). Also
+   Daten einer Rate in einem Kanal einer anderen, derselbe Riss wie am
+   2026-09-24. Behoben; danach `0200` und 960 Nummern/s.
+
+   **Warum kein Prüfstand das fing:** die vorhandene Prüfung rief
+   `setSampleRate` **nach** `connectToRadio` — in der Reihenfolge, die
+   geht, nicht in der, die die Anwendung nimmt.
+
+2. **Ein toter Lautsprecher-Ausgang galt als offen** (`c8761850`).
+   `isOpen()` ist bei PortAudioBus ein Zeigervergleich; stirbt der Strom
+   darunter, schreibt Longpath weiter hinein, ohne dass etwas auffällt.
+   Jetzt fragt `ensureSpeakersOpen` über `Pa_IsStreamActive` nach.
+
+3. **Der Abmelde-Rahmen wurde nicht nachgeschickt** (`9c48cb5c`). Die QRP
+   bedient **einen** Client und hält die Sitzung fest. Blieb der Stopp
+   unquittiert — oder wurde eine Instanz hart beendet —, nahm das Gerät
+   **niemanden mehr an**, und Longpath meldete „no beacon reply". Das hat
+   den Betreiber eine halbe Stunde gekostet; erst Aus- und Einschalten
+   half. Der Stopp geht jetzt bis zu dreimal hinaus, und die
+   Fehlermeldung nennt diesen Fall **zuerst**.
+
+## Was im Empfang jetzt noch fehlt
+
+Unverändert **eines**: `micPttFromRadio`. Dafür braucht es den
+Mitschnitt, weil die QRP den Zustand nirgends von sich aus meldet.
+
+## Zwei offene Beobachtungen, beide ohne Antenne messbar
+
+- **Wiederholungen bei 96 kHz:** 1,2 statt 1,0 — rund 105 überflüssige
+  Pakete je Sekunde. Die Quittung wirkt (401 → 105), ist aber
+  unvollständig. Den Kopf des Geräts zu spiegeln bringt nachweislich
+  nichts. Nächste Versuche stehen im Verbindungsablauf-Dokument.
+- **Lautstärke:** der Betreiber hört die QRP „sehr sehr leise". Die
+  Umrechnung der Proben ist nachgerechnet richtig (24 Bit ins obere Ende
+  eines 32-Bit-Worts, geteilt durch 2³¹), eine geräteeigene Pegel-Eichung
+  gibt es bei keinem der drei Geräte. Offen, ob es an der fehlenden
+  Antenne liegt oder eine echte Lücke ist — der Vergleich gegen die
+  Anvelina steht noch aus und ist auf Wunsch des Betreibers vertagt.
