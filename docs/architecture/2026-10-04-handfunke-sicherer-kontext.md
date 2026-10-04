@@ -122,6 +122,20 @@ Gegenprobe — dieselbe Bruecke OHNE Zertifikat:
 Die Gegenprobe ist der Teil, der etwas wert ist: ohne sie belegte der grüne
 Lauf nur, dass irgendetwas antwortet.
 
+Und die ganze Kette mit einem echten WebSocket-Client,
+`handfunke/pruefe-wss.mjs` — Handschlag, Aufrüstung, Textrahmen, wie die
+Seite es täte:
+
+```
+  ok    wss-Handschlag steht
+  ok    TCI-Begruessung kam durch (32 Zeilen)
+        protocol:Longpath-Attrappe,2.0
+        device:Attrappe
+```
+
+Auch hier eine Gegenprobe: derselbe Lauf **ohne** `NODE_EXTRA_CA_CERTS`
+scheitert. Ein Stand, der jedes Zertifikat nimmt, prüfte nichts.
+
 Am Seitenserver, mit `curl` gegen die eigene Stelle geprüft:
 `https` liefert 200 bei `ssl_verify_result=0`, `/ca.crt` kommt
 bytegleich heraus, und weder `server.key` noch `ca.key` sind über einen
