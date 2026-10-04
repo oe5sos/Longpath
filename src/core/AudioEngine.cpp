@@ -454,7 +454,35 @@ void AudioEngine::start()
     // (RadioModel.cpp §"open the WDSP channel pool").
     preregisterSlices(m_radio ? m_radio->boardCapabilities().maxSlices : 1);
 
+    // ── Schrittmarken, damit ein Einfrieren das Geraet nennt ────────────
+    //
+    // Hier werden SIEBEN Geraete nacheinander geoeffnet, jedes ohne
+    // Zeitlimit: Lautsprecher, Mikrofon, VAX RX 1-4, VAX TX. Jedes kann
+    // haengen -- an einer noch offenen Berechtigungsfrage, an einer
+    // Schnittstelle, die ein anderes Programm exklusiv haelt, an einem
+    // traegen Treiber. Und weil start() in der verschachtelten
+    // Ereignisschleife von RadioModel::connectToRadio laeuft, steht dann
+    // nicht nur der Ton, sondern die gesamte Oberflaeche samt
+    // "Abbrechen" (am 2026-10-03 live erlebt, siehe
+    // docs/architecture/2026-10-03-verbindungshaenger-mikrofon.md).
+    //
+    // Bis hierher hinterliess so ein Haenger KEINE Spur: die letzte
+    // Logzeile stand weit davor, und aus ihr war nicht zu erkennen,
+    // welches der sieben Geraete nicht zurueckkam. Genau dagegen helfen
+    // Schrittmarken -- derselbe Griff, den der Betreiber am 2026-09-01
+    // fuer den Profilwechsel bestellt hat ("[ProfileApply:Step] n/6").
+    //
+    // Sie ersetzen kein Zeitlimit. Sie machen aus "eingefroren, niemand
+    // weiss warum" ein "eingefroren beim VAX-TX-Bus" -- und das ist der
+    // Unterschied zwischen einer Fehlersuche und einem Ratespiel.
+    //
+    // Kosten: sieben Zeilen je Verbindungsaufbau. Im Normalfall dauert
+    // das Ganze 20 ms (gemessen am 2026-10-03: Mikrofon 18 ms, alle
+    // fuenf VAX-Busse zusammen unter 1 ms), die Marken fallen also nicht
+    // ins Gewicht.
+    qCInfo(lcAudio) << "[AudioStart:Step] 1/7 Lautsprecher";
     ensureSpeakersOpen();
+    qCInfo(lcAudio) << "[AudioStart:Step] 2/7 Mikrofon (TX-Eingang)";
     ensureTxInputOpen();
 
     // Sub-Phase 8.5: eagerly construct platform-native VAX RX buses + the
@@ -475,6 +503,8 @@ void AudioEngine::start()
             // platform-native bus.
             continue;
         }
+        qCInfo(lcAudio) << "[AudioStart:Step]" << (2 + channel)
+                        << "/7 VAX RX" << channel;
         m_vaxBus[idx] = makeVaxBus(channel);
         if (m_vaxBus[idx]) {
             qCInfo(lcAudio) << "VAX" << channel << "bus opened (eager)"
@@ -483,6 +513,7 @@ void AudioEngine::start()
     }
 
     if (!m_vaxTxBus) {
+        qCInfo(lcAudio) << "[AudioStart:Step] 7/7 VAX TX";
         m_vaxTxBus = makeVaxTxBus();
         if (m_vaxTxBus) {
             qCInfo(lcAudio) << "VAX TX bus opened (eager)"
@@ -498,6 +529,11 @@ void AudioEngine::start()
     }
 
     m_running = true;
+
+    // Die Gegenmarke: steht sie im Log, sind alle sieben zurueckgekommen.
+    // Fehlt sie und die letzte Marke nennt ein Geraet, haengt genau das.
+    qCInfo(lcAudio) << "[AudioStart:Step] fertig -- alle sieben offen oder "
+                       "sauber uebersprungen";
 
     qCInfo(lcAudio) << "AudioEngine started ("
                     << (m_speakersBus && m_speakersBus->isOpen()
