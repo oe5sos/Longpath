@@ -269,3 +269,44 @@ Wiedereintritts-Falle, gegen die `connectToRadio` seinen Fortschrittsdialog
 modal hält. Aus „für immer eingefroren" wird „einmal kurz stehengeblieben";
 mehr Bedienbarkeit wäre hier mehr Risiko.
 
+### Was sonst noch den Hauptfaden blockieren könnte — durchgesehen (2026-10-04)
+
+Wenn ein unbegrenzter Aufruf auf dem Oberflächen-Faden einmal das ganze
+Programm genommen hat, ist die nächste Frage, ob es noch mehr davon gibt. Also
+durchgesehen: alle `waitFor…`, `->wait(`, `QThread::sleep/msleep` und jede
+verschachtelte `QEventLoop` im Quellbaum.
+
+**Ergebnis: der Audio-Start war der einzige unbegrenzte Fall.** Alles andere
+hat eine Frist:
+
+| Stelle | Frist |
+|---|---|
+| `SupportBundle` (zwei Prozessaufrufe) | 10 s |
+| `UpdateInstaller` | Parameter |
+| `RotctldProcess::stop` | 2 s, dann 1 s |
+| `HamlibInstaller` | Parameter, dann 500 ms / 2 s |
+| `AdifNetworkUploader` | `kTcpTimeoutMs` |
+| `RadioDiscovery` | begrenzte Abfrage |
+| `KiwiSdrManager` | 3 s |
+| `RadioConnectionTeardown` | `kPostQuitWaitMs`, dann `kTerminateWaitMs` |
+
+**Zwei bewusste Ausnahmen, beide mit geschriebener Begründung — und beide
+richtig so:**
+
+* `CwDecoder::stop()` wartet ohne Frist („A JOIN, never a timeout"). Die
+  Schreibzugriffe direkt danach laufen **außerhalb** des Parameter-Mutex und
+  sind nur deshalb sicher, weil der Arbeiter nachweislich tot ist. Eine Frist
+  würde dort ein Wettrennen einbauen.
+* `RttyDecoder::stop()` wartet 2 s und danach ohne Frist, mit derselben
+  Überlegung: lieber länger warten als abbrechen, weil ein Abbruch ein
+  Benutzen-nach-Freigeben öffnet.
+
+Beide Male wäre die Frist die schlechtere Lösung. Das ist der Unterschied zum
+Audio-Start: dort kostete der unbegrenzte Aufruf die ganze Oberfläche und
+brachte dafür nichts als Bequemlichkeit.
+
+**Verschachtelte Ereignisschleifen:** genau zwei. Die Weisheits-Schleife in
+`connectToRadio` (durch einen anwendungsmodalen Fortschrittsdialog gegen
+Wiedereintritt gesichert) und der Netzaufruf in `RemoteAsrBackend` (auf einem
+Arbeitsfaden, mit Frist und Abbruch). Beide in Ordnung.
+
