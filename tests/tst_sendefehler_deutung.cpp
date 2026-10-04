@@ -9,14 +9,24 @@
 // Netz. Ein Hinweis, der in die falsche Richtung zeigt, kostet mehr Zeit
 // als gar keiner.
 //
-// Die beiden Faelle, die hier auseinandergehalten werden MUESSEN:
+// DREI Faelle, die auseinandergehalten werden MUESSEN — jeder mit einer
+// anderen Abhilfe:
 //
-//   EHOSTUNREACH / EPERM  — das Betriebssystem laesst dieses Programm nicht
-//                           ins lokale Netz. Abhilfe: eine Berechtigung.
-//   ENOBUFS / EAGAIN      — die Sendewarteschlange ist voll. Abhilfe: warten
-//                           oder Kabel.
+//   EHOSTUNREACH & Co. — es gibt gerade keinen Weg dorthin. Route, ARP,
+//                        Schnittstelle, Gegenstelle aus. Ein ping trennt es.
+//   EPERM / EACCES     — das Betriebssystem verweigert den Zugriff.
+//                        Berechtigung oder Filter.
+//   ENOBUFS / EAGAIN   — die Sendewarteschlange ist voll. Warten oder Kabel.
 //
-// Werden die vertauscht, schickt die Meldung den Bediener an den falschen
+// Dass die ersten beiden getrennt gehoeren, zeigte derselbe Tag: der erste
+// Entwurf warf sie zusammen und riet bei EHOSTUNREACH zu den
+// Systemeinstellungen. Im selben Protokoll steht aber (11:08:25), dass
+// rotctld — ein eigenes Programm, eigene Identitaet, anderes Teilnetz — in
+// derselben Minute mit "No route to host" scheiterte. Eine Berechtigung, die
+// an der Identitaet der App haengt, erklaert das nicht. Der Rat waere
+// derselbe Fehler gewesen wie der Dialog, den dieser Zweig ersetzt.
+//
+// Werden sie vertauscht, schickt die Meldung den Bediener an den falschen
 // Schalter. Genau dagegen steht dieser Stand.
 
 #include "core/SendeFehler.h"
@@ -33,6 +43,7 @@ class TstSendeFehlerDeutung : public QObject
 
 private slots:
     void berechtigungWirdAlsBerechtigungErkannt();
+    void keinWegIstKeineVerweigerung();
     void warteschlangeWirdNichtMitBerechtigungVerwechselt();
     void eigenerFehlerWirdNichtDemNetzAngelastet();
     void unbekanntesSchweigtLieber();
@@ -40,16 +51,33 @@ private slots:
 
 void TstSendeFehlerDeutung::berechtigungWirdAlsBerechtigungErkannt()
 {
-    for (int nr : {EHOSTUNREACH, ENETUNREACH, EHOSTDOWN, EPERM, EACCES}) {
+    for (int nr : {EPERM, EACCES}) {
         const QString t = sendeFehlerDeutung(nr);
         QVERIFY2(!t.isEmpty(), qPrintable(QString("errno %1 ohne Deutung").arg(nr)));
-        QVERIFY2(t.contains(QStringLiteral("Lokales Netzwerk")),
-                 qPrintable(QString("errno %1 nennt die Berechtigung nicht: %2")
+        QVERIFY2(t.contains(QStringLiteral("verweigert")),
+                 qPrintable(QString("errno %1 nennt die Verweigerung nicht: %2")
                                 .arg(nr).arg(t)));
-        // Und ausdruecklich NICHT in die WLAN-Richtung zeigen.
         QVERIFY2(!t.contains(QStringLiteral("Funkstrecke")),
                  qPrintable(QString("errno %1 schickt an den falschen Schalter: %2")
                                 .arg(nr).arg(t)));
+    }
+}
+
+void TstSendeFehlerDeutung::keinWegIstKeineVerweigerung()
+{
+    // Der wichtigste Punkt dieses Standes. EHOSTUNREACH heisst "ich weiss
+    // keinen Weg", nicht "du darfst nicht" — und wer es als Verweigerung
+    // meldet, schickt den Bediener in die Systemeinstellungen, wo nichts zu
+    // finden ist.
+    for (int nr : {EHOSTUNREACH, ENETUNREACH, EHOSTDOWN}) {
+        const QString t = sendeFehlerDeutung(nr);
+        QVERIFY2(!t.isEmpty(), qPrintable(QString("errno %1 ohne Deutung").arg(nr)));
+        QVERIFY2(t.contains(QStringLiteral("keinen Weg")), qPrintable(t));
+        QVERIFY2(t.contains(QStringLiteral("ping")), qPrintable(t));
+        QVERIFY2(!t.contains(QStringLiteral("Berechtigung")),
+                 qPrintable(QString("errno %1 behauptet eine Verweigerung: %2")
+                                .arg(nr).arg(t)));
+        QVERIFY2(!t.contains(QStringLiteral("Funkstrecke")), qPrintable(t));
     }
 }
 
@@ -59,7 +87,8 @@ void TstSendeFehlerDeutung::warteschlangeWirdNichtMitBerechtigungVerwechselt()
         const QString t = sendeFehlerDeutung(nr);
         QVERIFY(!t.isEmpty());
         QVERIFY2(t.contains(QStringLiteral("Funkstrecke")), qPrintable(t));
-        QVERIFY2(!t.contains(QStringLiteral("Lokales Netzwerk")), qPrintable(t));
+        QVERIFY2(!t.contains(QStringLiteral("verweigert")), qPrintable(t));
+        QVERIFY2(!t.contains(QStringLiteral("keinen Weg")), qPrintable(t));
     }
 }
 

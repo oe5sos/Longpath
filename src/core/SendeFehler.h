@@ -34,18 +34,36 @@ inline QString sendeFehlerDeutung(int nr)
     case EHOSTUNREACH:
     case ENETUNREACH:
     case EHOSTDOWN:
+        // AUSDRUECKLICH NICHT "Berechtigung". Der erste Entwurf dieser Zeile
+        // riet hier zu den Systemeinstellungen, und das waere derselbe
+        // Fehler gewesen wie der Dialog, den sie ersetzt: ein Rat in die
+        // falsche Richtung.
+        //
+        // Beleg aus demselben Protokoll (2026-10-04, 11:08:25): rotctld —
+        // ein eigenes Programm von Homebrew, eigene Identitaet, anderes
+        // Netz (192.168.16.x statt 172.30.30.x) — scheiterte in derselben
+        // Minute mit "Network error 65: No route to host". Zwei Programme,
+        // zwei Teilnetze, ein Fehlerbild. Eine Berechtigung, die an der
+        // Identitaet der App haengt, kann das nicht erklaeren; ein
+        // Netzzustand schon.
+        //
+        // EHOSTUNREACH heisst wortwoertlich: der Kernel weiss gerade keinen
+        // Weg dorthin. Abgelaufener Routen- oder ARP-Eintrag, gewechselte
+        // Schnittstelle, Gegenstelle aus. Was davon, sagt ein ping.
+        return QStringLiteral(
+            "Es gibt gerade keinen Weg zu dieser Adresse — der Kernel weist "
+            "das Paket ab, es geht gar nicht erst hinaus. Meist ein "
+            "abgelaufener Routen- oder ARP-Eintrag, eine gewechselte "
+            "Schnittstelle oder eine abgeschaltete Gegenstelle. Ein ping "
+            "auf dieselbe Adresse trennt die Faelle.");
     case EPERM:
     case EACCES:
-        // Auf macOS 15+ ist das der Normalfall fuer eine App ohne die
-        // Berechtigung "Lokales Netzwerk": das Geraet antwortet auf ping,
-        // aber aus DIESEM Programm geht nichts hinaus. Die Berechtigung
-        // haengt an der Identitaet der App — bei einer ad-hoc signierten
-        // Fassung also am Hash, und der aendert sich mit jedem Neubau.
+        // Hier und NUR hier ist es wirklich eine Verweigerung: das
+        // Betriebssystem sagt nicht "ich weiss keinen Weg", sondern "du
+        // darfst nicht".
         return QStringLiteral(
-            "Das Betriebssystem laesst dieses Programm nicht ins lokale Netz. "
-            "Auf macOS: Systemeinstellungen > Datenschutz & Sicherheit > "
-            "Lokales Netzwerk — steht Longpath dort, und ist der Schalter an? "
-            "Nach einem Neubau kann die Berechtigung verfallen sein.");
+            "Das Betriebssystem verweigert diesem Programm den Zugriff aufs "
+            "Netz — eine Berechtigung oder ein Filter, nicht die Strecke.");
     case ENOBUFS:
     case EAGAIN:
         return QStringLiteral(
