@@ -63,6 +63,36 @@ Dauerträger mit voller Leistung auf der Antenne, der nur nicht „senden"
 heißt. Seither sind beide Tasten tot und sehen auch so aus. Diese drei
 Zeilen sind der Grund, warum dieses Dokument existiert.
 
+### Sendezustand anzeigen (2026-10-03 abends, PR #170)
+
+Die Tasten bleiben tot — aber die Seite **meldet** jetzt, wenn die Station
+sendet. `trx:` und `tune:` wurden seit dem ersten Tag mitgelesen und nirgends
+verwendet: die Seite wusste es und sagte nichts. Für eine Fernbedienung, die
+nur hört, ist das die unangenehmste Form von Stille — Wasserfall leer, Ton
+weg, S-Meter unten, und nichts erklärt es.
+
+Geprüft an der Attrappe (`--sendet 6` schaltet alle sechs Sekunden um; den
+Zustand am echten Gerät herzustellen hieße senden, und das ist ohne Antenne
+verboten).
+
+| Was | Erwartet | Gemessen | |
+|---|---|---|---|
+| `trx:0,true` | Zeile in Messing statt grau | „STATION SENDET · EMPFÄNGER STUMM", Klasse `tx locked sendet` | ✅ |
+| `trx:0,false` | zurück in Grau | „SENDEN NUR IN DER APP" | ✅ |
+| Rauschhinweis beim Senden, Band ohne Träger | **unterdrückt** | Fußzeile nur `4 kB/s bild` | ✅ |
+| derselbe Lauf, im Empfang | Hinweis kommt zurück | `nur rauschen (3 dB) — antenne?` | ✅ |
+| Farbe | kein Rot | `--measured` (Messing), wie alles Gemessene | ✅ |
+
+Die dritte und vierte Zeile gehören zusammen und sind der eigentliche Beleg:
+auf einem Band ohne jede Station muss der Hinweis im Empfang **da** sein und
+im Senden **weg**. Nur so ist gezeigt, dass er unterdrückt und nicht kaputt
+ist.
+
+Nicht angefasst: das S-Meter. Ob Longpath während des Sendens weiter echte
+Empfangswerte meldet, ist nicht geprüft — und das zu prüfen hieße senden.
+Ungeprüft etwas auszublenden wäre genauso geraten wie es ungeprüft
+stehenzulassen.
+
 ## Verhalten, wenn der Server weg ist
 
 Nachgestellt, indem die Attrappe mitten im Betrieb beendet und nach gut
@@ -80,8 +110,15 @@ am 2026-10-03 viermal.
 | S-Meter bei Abriss | zeigt nichts mehr | `—`, Balken 0 % (`4d866388`) | ✅ |
 | Betriebsart / Band / Filter | bleiben stehen, bewegen sich aber nicht auf Tippen | unverändert bei totem Draht | ✅ |
 | Leistungsregler | bewegt sich nicht ohne Server | unverändert | ✅ |
+| **Abriss mitten im Senden** | Sendezeile fällt zurück, bleibt nicht stehen | „SENDEN NUR IN DER APP", Fußzeile `◇ getrennt`, S-Meter `—`, Panadapter „warte auf Longpath…" | ✅ |
 
-Die letzten beiden sind **kein** Mangel, sondern die richtige Unterscheidung:
+Die letzte Zeile ist die Zerstörprobe für den neuen Sendezustand: die
+Attrappe wurde abgeschossen, **während** sie `trx:0,true` gemeldet hatte. Ein
+eingefrorenes „STATION SENDET" wäre genau der Fehler gewesen, gegen den die
+Anzeige gebaut ist — und kein Prüfstand hätte ihn gezeigt, weil ich ihn selbst
+geschrieben hätte.
+
+Die zwei davor sind **kein** Mangel, sondern die richtige Unterscheidung:
 ein eingefrorener **Messwert** lügt, eine eingefrorene **Einstellung** nicht.
 Betriebsart und Filter ändern sich nicht von selbst; das S-Meter schon. Und
 weil die Seite ihren Zustand ausschließlich vom Server übernimmt, gibt ein

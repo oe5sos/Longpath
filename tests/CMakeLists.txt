@@ -1947,6 +1947,15 @@ longpath_add_test(tst_radio_status)
 longpath_add_test(tst_radio_status_follows_mox)
 longpath_add_test(tst_settings_hygiene)
 
+# ── Logzeilen duerfen sich nicht zerschreiben (2026-10-03) ───────────────────
+# tst_log_schreibt_atomar: acht Faeden schreiben gleichzeitig 250 Zeilen und
+#   danach muss JEDE vollstaendig und genau einmal dastehen. Grund: in den
+#   Betriebslogs vom 2026-10-03 standen sechs zerschriebene Zeilen (vorne
+#   abgeschnitten, hinten ganz), weil main.cpp je Meldung einen eigenen
+#   QTextStream auf dieselbe QFile legte. Zwei davon waren ausgerechnet die
+#   QoS-Meldung, der an dem Tag jemand nachging.
+longpath_add_test(tst_log_schreibt_atomar)
+
 # ── Qt-Prioritaet gegen QoS-Klasse (2026-10-03) ──────────────────────────────
 # tst_audio_faden_qos: haelt die Regel fest, warum Audio-Faeden OHNE
 #   QThread-Prioritaet starten. Qt setzt fuer eine ausdrueckliche Prioritaet
