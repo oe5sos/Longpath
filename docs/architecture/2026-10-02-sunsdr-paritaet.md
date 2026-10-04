@@ -349,3 +349,59 @@ das Senden, und das ist ein eigenes Kapitel (Abschnitt 4).
   gibt es bei keinem der drei Geräte. Offen, ob es an der fehlenden
   Antenne liegt oder eine echte Lücke ist — der Vergleich gegen die
   Anvelina steht noch aus und ist auf Wunsch des Betreibers vertagt.
+
+---
+
+# Nachtrag 2026-10-04, Nachmittag — zwei Lücken geschlossen
+
+Beide Funde stammen aus **Richtigstellungen des Betreibers**, nicht aus
+eigener Analyse. Das ist kein Zufall: zu beiden Punkten stand hier eine
+Behauptung, die nie am Gerät geprüft worden war.
+
+## Der zweite Empfänger war nie stumm
+
+Betreiber: *„es waren immer beide rx und rx2"* — in ExpertSDR2 liefen
+also stets beide. Damit war der zweite Datenstrom nie ein Rätsel.
+Nachgerechnet aus seinem Mitschnitt:
+
+| | Effektivwert | Q ungleich null |
+| --- | --- | --- |
+| Kanal 0 | −130,0 dBFS | 21,2 % |
+| Kanal 1 | **−127,9 dBFS** | **31,5 %** |
+
+Kanal 1 trägt echtes I/Q, sogar kräftiger als Kanal 0. Die Zeile
+„wird angenommen, bleibt aber stumm" war falsch — Longpath hat ihn
+weggeworfen, weil `maxReceivers = 1` stand.
+
+Zwei Änderungen (`db9cf495`): Fähigkeiten auf zwei Empfänger, und der
+Stromstart-Modus hängt jetzt an **Empfängerzahl UND Rate** statt nur an
+der Rate. Ohne das hätte ein zweiter Empfänger bei 48 kHz nie Daten
+bekommen können.
+
+Am Gerät bestätigt (`b33072d9`): 480 statt 240 Nummern/s, Kanal 0 und 1
+je **0 verworfen**, 0,00 % Verlust.
+
+## Die Lautstärke war eine falsch geeichte Zahl
+
+Der Betreiber hat es mehrfach gemeldet; entscheidend war sein Satz, dass
+**ExpertSDR2 am selben Gerät ohne Antenne perfekt laut** ist. Damit war
+die fehlende Antenne als Erklärung erledigt.
+
+Der Abgleich `rxLevelTrimDb` stand auf +20,0 dB — am 2026-09-25 gemessen,
+aber über den **TCI-Weg** (`rx_sensors`). Der native Treiber ist ein
+anderer Weg mit anderer Skalierung. Statt eine neue Zahl zu raten wurde
+der Abgleich einstellbar gemacht; der Betreiber hat **+40,0 dB**
+eingestellt und bestätigt. Fest eingetragen in `c8735386`.
+
+## Zurückgenommen: die Antennenwahl
+
+`8e54decb` hatte `setAntennaRouting` verdrahtet (hinter einem Schalter,
+standardmäßig stumm). Beim Bauen schlug ein Wächter an, den dieses
+Projekt genau dafür hat: `tst_sunsdr_protocol` prüft, dass die
+DX-stämmigen Sende-Rahmenbauer **keine** Aufrufstelle haben.
+
+Der Wächter hat recht. Ein Schalter, der standardmäßig aus ist, hebt ihn
+nicht auf — verdrahtet ist verdrahtet, und eine Umgebungsvariable ist
+schnell gesetzt. `setAntennaRouting` ist wieder leer; `0x15` ist im
+Abschluss-Prüfplan der **erste** zu bestätigende Befehl, weil er als
+einziger nichts erzeugt.
