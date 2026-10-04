@@ -1451,7 +1451,22 @@ endif()
 # PipeWire sources compile conditionally.
 if(PIPEWIRE_FOUND)
     target_link_libraries(LongpathObjs PUBLIC ${PIPEWIRE_LIBRARIES})
-    target_include_directories(LongpathObjs PUBLIC ${PIPEWIRE_INCLUDE_DIRS})
+    # SYSTEM: die PipeWire-/SPA-Kopfdateien sind fremde Kopfdateien, und sie
+    # halten sich nicht an -Wpedantic. Ohne dieses Wort meldet der
+    # Linux-Bau bei JEDEM Lauf 264 Warnungen aus /usr/include/spa-0.2 --
+    # "ISO C++ forbids braced-groups within expressions" und
+    # "ISO C++ forbids compound-literals", alle aus parser.h, builder.h,
+    # hook.h und defs.h.
+    #
+    # Das ist kein Schoenheitsfehler: 264 fremde Warnungen decken die
+    # eigenen zu. Im selben Protokoll stehen 27 echte eigene -- die findet
+    # man darin nicht mehr, und genau deshalb hat sie monatelang niemand
+    # angesehen. Eine Warnung, die bei jedem Bau da ist, deckt die zu, die
+    # etwas bedeutet.
+    #
+    # SYSTEM aendert nichts am Bau ausser der Warnstufe fuer DIESE
+    # Kopfdateien; unser eigener Code wird unveraendert streng geprueft.
+    target_include_directories(LongpathObjs SYSTEM PUBLIC ${PIPEWIRE_INCLUDE_DIRS})
     target_compile_options(LongpathObjs PUBLIC ${PIPEWIRE_CFLAGS_OTHER})
     target_compile_definitions(LongpathObjs PUBLIC LONGPATH_HAVE_PIPEWIRE)
     target_sources(LongpathObjs PRIVATE
