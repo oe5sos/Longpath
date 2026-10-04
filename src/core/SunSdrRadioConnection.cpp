@@ -1249,7 +1249,14 @@ void SunSdrRadioConnection::processStreamDatagram(const QByteArray& data,
     // sie traegt die naechsten Proben derselben Nummer. Sie darf also
     // weder als Wiederholung noch als Luecke gezaehlt werden.
     if (!fortsetzung) {
-        auditStreamSeq(kanal, hdr.seq);
+        // Ein billiges Merkmal des Inhalts mitgeben: ohne das galt jede
+        // wiederkehrende Nummer als bytegleiche Kopie, und die Meldung
+        // "Kopien je Nummer" -- an der die Achtfachung haengt -- hatte
+        // eine Grundlast von 1,4, wo auf dem Draht 0 stand
+        // (Mitschnitt vom 2026-10-03, ausgewertet am 2026-10-04).
+        const quint64 inhalt =
+            quint64(qHashBits(nutz, size_t(qMax(0, nutzLen)), 0));
+        auditStreamSeq(kanal, hdr.seq, inhalt);
     }
 
     // Jetzt erst verwerfen, wenn es fuer diesen Kanal oben keinen
@@ -2044,7 +2051,8 @@ QString SunSdrRadioConnection::frameInventoryReport() const
 // (65535 -> 0 ergibt 1, nicht -65535).
 // ---------------------------------------------------------------------------
 
-void SunSdrRadioConnection::auditStreamSeq(int kanal, quint16 seq)
+void SunSdrRadioConnection::auditStreamSeq(int kanal, quint16 seq,
+                                           quint64 inhalt)
 {
     if (!m_iqSeqWndClock.isValid()) {
         m_iqSeqWndClock.start();
@@ -2066,15 +2074,21 @@ void SunSdrRadioConnection::auditStreamSeq(int kanal, quint16 seq)
     // Meldung, damit eine Luecke zuzuordnen ist.
     Q_UNUSED(kanal);
 
-    const auto merken = [this](quint16 n) {
-        m_seqRing.append(n);
+    const auto merken = [this](quint16 n, quint64 h) {
+        m_seqRing.append(qMakePair(n, h));
         while (m_seqRing.size() > kSeqRingSize) { m_seqRing.removeFirst(); }
+    };
+    const auto suchen = [this](quint16 n) -> QPair<quint16, quint64>* {
+        for (int i = m_seqRing.size() - 1; i >= 0; --i) {
+            if (m_seqRing[i].first == n) { return &m_seqRing[i]; }
+        }
+        return nullptr;
     };
 
     if (!m_seqSeen) {
         m_seqSeen = true;
         m_lastSeq = seq;
-        merken(seq);
+        merken(seq, inhalt);
         ++m_iqSeqWndFrames;
         return;
     }
@@ -2082,8 +2096,19 @@ void SunSdrRadioConnection::auditStreamSeq(int kanal, quint16 seq)
     // 1. Schon gesehen? Dann ist es eine Wiederholung -- die QRP schickt
     //    bytegleiche Kopien, und zwar mit Abstand, nicht direkt
     //    hintereinander (am 2026-10-03 gemessen, siehe Kopf).
-    if (m_seqRing.contains(seq)) {
-        ++m_iqSeqWndRepeats;
+    if (QPair<quint16, quint64>* eintrag = suchen(seq)) {
+        if (eintrag->second == inhalt) {
+            // Wirklich bytegleich -- das ist die Wiederholung, an der die
+            // Achtfachung haengt.
+            ++m_iqSeqWndRepeats;
+            m_seqOutOfPlace = 0;
+            return;
+        }
+        // Gleiche Nummer, anderer Inhalt: der Zaehler ist umgelaufen. Das
+        // ist ein neuer Block, keine Kopie -- und auch kein Verlust.
+        eintrag->second = inhalt;
+        m_lastSeq = seq;
+        ++m_iqSeqWndFrames;
         m_seqOutOfPlace = 0;
         return;
     }
@@ -2093,7 +2118,7 @@ void SunSdrRadioConnection::auditStreamSeq(int kanal, quint16 seq)
     // 2. Der Normalfall: die naechste Nummer.
     if (delta == 1) {
         m_lastSeq = seq;
-        merken(seq);
+        merken(seq, inhalt);
         ++m_iqSeqWndFrames;
         m_seqOutOfPlace = 0;
         return;
@@ -2104,7 +2129,7 @@ void SunSdrRadioConnection::auditStreamSeq(int kanal, quint16 seq)
         m_iqSeqWndLost += quint64(delta) - 1;
         ++m_iqSeqWndEvents;
         m_lastSeq = seq;
-        merken(seq);
+        merken(seq, inhalt);
         ++m_iqSeqWndFrames;
         m_seqOutOfPlace = 0;
 
@@ -2136,7 +2161,7 @@ void SunSdrRadioConnection::auditStreamSeq(int kanal, quint16 seq)
     m_seqRing.clear();
     m_seqOutOfPlace = 0;
     m_lastSeq = seq;
-    merken(seq);
+    merken(seq, inhalt);
     ++m_iqSeqWndFrames;
 }
 

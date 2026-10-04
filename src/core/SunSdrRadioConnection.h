@@ -884,7 +884,7 @@ private:
     int m_aktiveEmpfaenger{1};
     quint64 m_stoppGeschickt{0};
 
-    void auditStreamSeq(int kanal, quint16 seq);
+    void auditStreamSeq(int kanal, quint16 seq, quint64 inhalt);
     // Schliesst das 5-s-Fenster: meldet nach oben und schreibt ins Log.
     void berichteFolgenummern();
 
@@ -944,7 +944,11 @@ private:
 
     bool m_seqSeen{false};
     quint16 m_lastSeq{0};        // hoechste gesehene Nummer, ueber alle Stroeme
-    QList<quint16> m_seqRing;    // die letzten Nummern, fuer Wiederholungen
+    // Die letzten Nummern MIT einem Merkmal ihres Inhalts. Ohne das
+    // Merkmal galt jede wiederkehrende Nummer als bytegleiche Kopie --
+    // am 2026-10-04 aus einem Mitschnitt widerlegt (0 % Kopien auf dem
+    // Draht, 1,41 gemeldet).
+    QList<QPair<quint16, quint64>> m_seqRing;
     int m_seqOutOfPlace{0};      // Pakete in Folge, die zu nichts passen
 
     quint64 m_iqSeqWndRestarts{0};

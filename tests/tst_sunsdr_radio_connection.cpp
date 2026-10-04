@@ -2328,6 +2328,55 @@ private slots:
         return pkt;
     }
 
+    // Wie oben, aber mit waehlbarem Inhalt -- fuer die Frage, ob eine
+    // wiederkehrende Nummer wirklich eine bytegleiche Kopie ist.
+    static QByteArray qrpBlockSeqInhalt(quint16 seq, char fuellung)
+    {
+        QByteArray pkt = SunSdr::buildIqHeader(
+            SunSdr::kProfileQrp, SunSdr::kOpIqRxIdle, seq, 0x01, 0x00);
+        pkt.append(QByteArray(SunSdr::kIqPayloadSize, fuellung));
+        return pkt;
+    }
+
+    // Am 2026-10-04 aus Martins Mitschnitt (118 550 Pakete, 0 vom Kern
+    // verworfen) belegt: auf dem Draht sind NULL bytegleiche
+    // Wiederholungen -- und Longpath meldete im selben Betrieb "1,41
+    // Kopien je Nummer". Die Zahl kam aus der eigenen Buchfuehrung.
+    //
+    // Grund: der Ring haelt 128 Nummern, aber verglichen wurde nur die
+    // Nummer, nicht der Inhalt. Die Fortsetzungs-Erkennung in
+    // processStreamDatagram prueft den Inhalt zwar, aber nur gegen die
+    // UNMITTELBAR vorige Nummer desselben Kanals. Kehrt eine Nummer mit
+    // Abstand wieder (der Zaehler laeuft um), galt sie ungeprueft als
+    // Kopie.
+    //
+    // Das ist nicht nur eine schiefe Zahl: an genau dieser Groesse
+    // erkennen wir die Achtfachung (1,0 heisst, die Blockantwort wirkt;
+    // 8,0 heisst, sie wirkt nicht). Eine Grundlast von 1,4 verdeckt eine
+    // echte Verschlechterung.
+    void gleicheNummerMitAnderemInhaltIstKeineKopie()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        handshake(conn);
+
+        for (quint16 n = 1; n <= 5; ++n) {
+            conn.feedStreamDatagramForTest(qrpBlockSeqInhalt(n, char(0)));
+        }
+        // Dieselbe Nummer, ANDERER Inhalt: der Zaehler ist umgelaufen,
+        // das ist ein neuer Block und keine Kopie.
+        conn.feedStreamDatagramForTest(qrpBlockSeqInhalt(3, char(0x5A)));
+        QCOMPARE(conn.seqRepeatsForTest(), quint64(0));
+
+        // Dieselbe Nummer mit GLEICHEM Inhalt bleibt eine Kopie -- sonst
+        // wuerde die Behebung die Achtfachungs-Erkennung abschalten.
+        conn.feedStreamDatagramForTest(qrpBlockSeqInhalt(4, char(0)));
+        QCOMPARE(conn.seqRepeatsForTest(), quint64(1));
+    }
+
     void luekenloseFolgeMeldetKeinenVerlust()
     {
         SunSdrRadioConnection conn;

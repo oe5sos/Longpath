@@ -292,6 +292,7 @@ warren@wpratt.com
 #include "core/RadioConnection.h"
 #include "core/RadioConnectionTeardown.h"
 #include "core/P1RadioConnection.h"
+#include "core/SunSdrRadioConnection.h"
 #include "core/P2RadioConnection.h"
 #include "core/PsccPump.h"   // Phase 3M-4 Task 17 chunk C — pscc() driver
 #include "core/WidebandFftEngine.h"  // Phase 3F Sub-Epic F Task 5 — per-ADC wb FFT
@@ -4245,7 +4246,38 @@ bool RadioModel::sampleRateIsRadioWide() const
     // takes a single sampleRate and encodes it as srBits, so there is no
     // per-receiver rate to set. Protocol 2 carries a per-DDC rate through
     // DdcAssignment::rate[], which the codecs populate per stream.
-    return qobject_cast<Longpath::P1RadioConnection*>(m_connection) != nullptr;
+    if (qobject_cast<Longpath::P1RadioConnection*>(m_connection) != nullptr) {
+        return true;
+    }
+
+    // Die SunSDR gehoert auf dieselbe Seite, und das ist seit dem
+    // 2026-10-04 nicht mehr nur eine Einordnung: der Stromstart-Rahmen 0x01
+    // traegt EINEN Modus fuer das ganze Geraet (SunSdrProtocol.h,
+    // StromModus), den SunSdrRadioConnection::setSampleRate waehlt. Eine
+    // Rate je DDC, die man einzeln stellen koennte, gibt es hier nicht.
+    //
+    // Stand hier nur P1, galt die SunSDR als "Rate je Strom" -- und der Weg
+    // auf den Draht fuer so eine Rate ist der DdcAssignment-Push in
+    // invokeCodecDdcAssignment, der ausdruecklich nur P2 bedient. Also ging
+    // eine Ratenaenderung nach dem Verbinden gar nicht hinaus. An der echten
+    // QRP sah das am 2026-10-04 so aus:
+    //
+    //     INF: Connecting with sampleRate= 96000 inSize= 128
+    //     INF: SunSdr: Abtastrate -> 96000 Hz (Stromstart-Rahmen ...)
+    //     DBG: Connected to "SunSDR2 QRP"
+    //     INF: setRxChannelRate: channel 0 -> 48000 Hz, in_size= 64
+    //
+    // 63 ms nach dem Verbinden zog die Wiederanwendung der je Band
+    // gespeicherten Rate den Empfangskanal auf 48 kHz, waehrend das Geraet
+    // weiter mit 96 streamte (Stromkopf 0200, 960 Folgenummern/s) -- wieder
+    // Daten einer Rate in einem Kanal einer anderen, derselbe Riss wie am
+    // 2026-09-24. Die RATE-Anzeige der Kopfleiste stand danach bernsteinfarben
+    // auf "48 kHz"; sie hat nicht geirrt, sie hat genau das gemeldet.
+    //
+    // "Radio-wide" schickt die Aenderung stattdessen durch setSampleRateLive,
+    // und dessen Schritt 4 ruft conn->setSampleRate() fuer alles, was nicht P1
+    // ist -- bei der SunSDR also den Stromstart-Rahmen.
+    return qobject_cast<Longpath::SunSdrRadioConnection*>(m_connection) != nullptr;
 }
 
 int RadioModel::rx0ChannelRateHz() const
