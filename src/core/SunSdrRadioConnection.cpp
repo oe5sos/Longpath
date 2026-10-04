@@ -195,6 +195,17 @@ void SunSdrRadioConnection::init()
 
     m_connectWatchdog = new QTimer(this);
     m_connectWatchdog->setSingleShot(true);
+
+    // Der Zeitgeber fuer den naechsten Anlauf -- siehe onConnectTimeout().
+    m_erneutTimer = new QTimer(this);
+    m_erneutTimer->setSingleShot(true);
+    connect(m_erneutTimer, &QTimer::timeout, this, [this]() {
+        if (state() != ConnectionState::Connecting) { return; }
+        qCInfo(lcSunSdr) << "SunSdr: neuer Suchversuch";
+        m_awaitingBeacon = true;
+        sendDiscoveryBroadcast();
+        if (m_connectWatchdog) { m_connectWatchdog->start(kConnectTimeoutMs); }
+    });
     connect(m_connectWatchdog, &QTimer::timeout,
             this, &SunSdrRadioConnection::onConnectTimeout);
 
@@ -330,7 +341,18 @@ void SunSdrRadioConnection::connectToRadio(const RadioInfo& info)
     // tatsaechlich gesetzt ist; sonst gilt, was der Aufrufer wollte.
     if (qEnvironmentVariableIsSet("LONGPATH_SUNSDR_STROMMODUS")) {
         m_stromModus = stromModusAusUmgebung();
+        // Rate und Empfaengerzahl mitziehen, sonst widersprechen sie dem
+        // Modus: setSampleRate(48000) kehrte bei unveraenderter Rate frueh
+        // zurueck und liess den Modus auf je96 stehen -- das Geraet
+        // streamt dann 96 kHz, waehrend WDSP auf 48 steht. Nur im
+        // Messbetrieb erreichbar, aber genau dort wird gemessen.
+        m_rateHz = (m_stromModus == SunSdr::StromModus::ZweiStroemeJe96)
+                       ? 96000 : 48000;
+        if (m_stromModus == SunSdr::StromModus::ZweiStroemeJe48) {
+            m_aktiveEmpfaenger = qMax(2, m_aktiveEmpfaenger);
+        }
     }
+    m_sucheVersuch = 0;
     m_stoppGeschickt = 0;
     m_iqSeqWndFrames = 0;
     m_iqSeqWndRepeats = 0;
@@ -495,6 +517,37 @@ void SunSdrRadioConnection::onConnectTimeout()
     // back fine, nothing after it did. m_awaitingBeacon is still true
     // here only when no beacon was ever seen at all.
     const bool gotBeacon = !m_awaitingBeacon;
+
+    // ── Kein Beacon? Dann warten und von selbst noch einmal suchen ──────
+    //
+    // Am 2026-10-04 gemessen: das Geraet sperrt nach einem ABRUPTEN
+    // Programmende rund eine Minute und kommt dann von selbst zurueck
+    // (60 s nach kill -9, sofort nach einem sauberen Beenden). Der
+    // Betreiber hat an dem Vormittag eine halbe Stunde verloren, weil
+    // jeder neue Klick wieder in dasselbe Fenster fiel.
+    //
+    // Darum versucht es die Verbindung jetzt selbst weiter, statt nach
+    // drei Sekunden aufzugeben: kSucheVersuche Anlaeufe im Abstand von
+    // kSuchePauseMs decken die gemessene Minute ab. Der Zustand bleibt
+    // dabei Connecting -- die Oberflaeche zeigt also weiter "verbinde",
+    // und wer nicht warten will, drueckt Trennen.
+    //
+    // Nur wenn ueberhaupt KEIN Beacon kam. Kam einer und nur der Strom
+    // fehlt, ist das ein anderer Fehler und gehoert nicht in diese
+    // Schleife.
+    if (m_sucheWiederholung && !gotBeacon && m_sucheVersuch < kSucheVersuche) {
+        ++m_sucheVersuch;
+        qCInfo(lcSunSdr).noquote()
+            << QStringLiteral(
+                   "SunSdr: keine Antwort -- Versuch %1 von %2. Das Geraet "
+                   "sperrt nach einem abrupten Programmende rund eine "
+                   "Minute; es wird %3 s gewartet und dann von selbst "
+                   "erneut gesucht.")
+                   .arg(m_sucheVersuch).arg(kSucheVersuche)
+                   .arg(kSuchePauseMs / 1000);
+        if (m_erneutTimer) { m_erneutTimer->start(kSuchePauseMs); }
+        return;   // Zustand bleibt Connecting, Sockets bleiben offen
+    }
 
     // Full teardown here, not just a state flip — mirrors
     // P1RadioConnection::onConnectTimeout()'s own "Issue #239" precedent
@@ -1266,13 +1319,24 @@ void SunSdrRadioConnection::processControlDatagram(const QByteArray& data,
         const QByteArray stateSync =
             SunSdr::buildStromStartFrame(*m_profile, modus);
         if (modus != SunSdr::StromModus::EinStrom48) {
+            // Woher der Modus stammt, gehoert in die Zeile: seit dem
+            // 2026-10-04 kommt er im Normalfall aus Rate und
+            // Empfaengerzahl der Oberflaeche, nicht mehr nur aus der
+            // Umgebung. Stand hier pauschal "aus der Umgebung", suchte
+            // der Leser an der falschen Stelle.
+            const bool ausUmgebung =
+                qEnvironmentVariableIsSet("LONGPATH_SUNSDR_STROMMODUS");
             qCWarning(lcSunSdr).noquote()
                 << QStringLiteral(
-                       "SunSdr: Strommodus aus der Umgebung -- %1. Das ist "
-                       "ein VERSUCH: die Rate kommt aus einem Mitschnitt "
-                       "vom 2026-10-03 und ist am Geraet nicht "
-                       "gegengeprueft, und der zweite Kanal hat oben noch "
-                       "keinen Empfaenger.")
+                       "SunSdr: Strommodus %2 -- %1 (Rate %3 Hz, %4 "
+                       "Empfaenger). Der zweite Kanal hat oben nur dann "
+                       "einen Empfaenger, wenn sich eine zweite Scheibe "
+                       "an ihn bindet.")
+                       .arg(QString(),
+                            ausUmgebung ? QStringLiteral("aus der Umgebung")
+                                        : QStringLiteral("aus der Bedienung"))
+                       .arg(m_rateHz)
+                       .arg(m_aktiveEmpfaenger)
                        .arg(modus == SunSdr::StromModus::ZweiStroemeJe48
                                 ? QStringLiteral("zwei Stroeme, je 48 kHz")
                                 : QStringLiteral("zwei Stroeme, je 96 kHz"));

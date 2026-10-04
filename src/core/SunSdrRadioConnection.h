@@ -590,6 +590,9 @@ private:
     QUdpSocket* m_controlSocket{nullptr};
     QUdpSocket* m_streamSocket{nullptr};
     QTimer*     m_connectWatchdog{nullptr};
+    QTimer*     m_erneutTimer{nullptr};   // naechster Suchversuch
+    int         m_sucheVersuch{0};
+    bool        m_sucheWiederholung{true};
 
     static constexpr int kConnectTimeoutMs = 3000;
 
@@ -1049,6 +1052,20 @@ private:
     // Drei Versuche a 150 ms kosten im schlimmsten Fall 450 ms beim
     // Trennen und sind unschaedlich: der Stopp verstellt nichts, er
     // meldet nur ab.
+    // Obergrenze beim Trennen: kStoppVersuche * (kStoppQuittungFristMs +
+    // 200 ms waitForBytesWritten) = rund EINE SEKUNDE, wenn das Geraet
+    // gar nicht mehr antwortet (abgezogen, abgestuerzt). Das blockiert
+    // den Verbindungsfaden und damit auch das Programmende. Bewusst in
+    // Kauf genommen: ein unquittierter Stopp kostet den Betreiber eine
+    // Minute Sperre (siehe die Messung im Verbindungsablauf-Dokument),
+    // eine Sekunde beim Beenden kostet ihn nichts.
+    // Selbsttaetige Wiederholung der Suche. Das Geraet sperrt nach einem
+    // abrupten Programmende rund eine Minute (am 2026-10-04 gemessen);
+    // fuenf Anlaeufe im Abstand von 18 s decken sie ab, ohne dass der
+    // Betreiber klicken muss.
+    static constexpr int kSucheVersuche = 5;
+    static constexpr int kSuchePauseMs = 18000;
+
     static constexpr int kStoppVersuche = 3;
     static constexpr qint64 kStoppQuittungFristMs = 150;
 
@@ -1201,6 +1218,11 @@ public:
     { return (k >= 0 && k < kMaxKanaele) ? m_kanal[k].fortsetzungen : 0; }
     quint64 rahmenWiederholtForTest() const { return m_rahmenWiederholt; }
     int offeneRahmenForTest() const { return int(m_offeneRahmen.size()); }
+
+    /// Pruef-Naht (2026-10-04): die selbsttaetige Wiederholung der Suche
+    /// abschalten. Prueflinien, die den FEHLSCHLAG pruefen, wollen ihn
+    /// sofort sehen und nicht neunzig Sekunden darauf warten.
+    void setSucheWiederholungEnabledForTest(bool an) { m_sucheWiederholung = an; }
 };
 
 } // namespace Longpath

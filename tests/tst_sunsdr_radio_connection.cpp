@@ -156,7 +156,12 @@ private slots:
     // a real QRP that never replies would produce.
     void everyConnectAttemptTimesOutForNow()
     {
+        // Diese Linie prueft den FEHLSCHLAG. Seit dem 2026-10-04
+        // wiederholt die Verbindung die Suche von selbst (das Geraet
+        // sperrt nach einem abrupten Ende rund eine Minute) -- hier
+        // soll sie das nicht, sonst wartet der Pruefstand 90 s.
         SunSdrRadioConnection conn;
+        conn.setSucheWiederholungEnabledForTest(false);
         conn.setFixedPortBindingEnabledForTest(false);
         conn.init();
         conn.setDiscoveryBroadcastEnabledForTest(false);
@@ -195,7 +200,12 @@ private slots:
 
     void stateBecomesDisconnectedOnConnectTimeout()
     {
+        // Diese Linie prueft den FEHLSCHLAG. Seit dem 2026-10-04
+        // wiederholt die Verbindung die Suche von selbst (das Geraet
+        // sperrt nach einem abrupten Ende rund eine Minute) -- hier
+        // soll sie das nicht, sonst wartet der Pruefstand 90 s.
         SunSdrRadioConnection conn;
+        conn.setSucheWiederholungEnabledForTest(false);
         conn.setFixedPortBindingEnabledForTest(false);
         conn.init();
         conn.setDiscoveryBroadcastEnabledForTest(false);
@@ -1423,7 +1433,12 @@ private slots:
     // reaches without ever needing a beacon.
     void pacerStopsAfterConnectTimeoutMidTransmission()
     {
+        // Diese Linie prueft den FEHLSCHLAG. Seit dem 2026-10-04
+        // wiederholt die Verbindung die Suche von selbst (das Geraet
+        // sperrt nach einem abrupten Ende rund eine Minute) -- hier
+        // soll sie das nicht, sonst wartet der Pruefstand 90 s.
         SunSdrRadioConnection conn;
+        conn.setSucheWiederholungEnabledForTest(false);
         conn.setFixedPortBindingEnabledForTest(false);
         conn.init();
         conn.setDiscoveryBroadcastEnabledForTest(false);
@@ -2214,6 +2229,47 @@ private slots:
 
         conn.setActiveReceiverCount(1);
         QCOMPARE(conn.stromModusForTest(), 2);   // bleibt ebenfalls
+    }
+
+    // Die selbsttaetige Wiederholung (2026-10-04): bleibt KEIN Beacon
+    // aus, gibt die Verbindung nicht mehr nach drei Sekunden auf, sondern
+    // wartet und sucht von selbst erneut. Grund ist eine Messung am
+    // Geraet: nach einem abrupten Programmende sperrt es rund eine
+    // Minute und kommt dann von selbst zurueck -- der Betreiber hat an
+    // einem Vormittag eine halbe Stunde verloren, weil jeder neue Klick
+    // wieder in dasselbe Fenster fiel.
+    void ohneBeaconWirdDieSucheWiederholtStattAufzugeben()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+
+        QSignalSpy fail(&conn, &RadioConnection::connectFailed);
+        conn.connectToRadio(someQrpInfo());
+        // Kein Beacon einspeisen -- der Waechter laeuft ab.
+        QTest::qWait(kWaitMs);
+
+        // Frueher stand hier ein Fehlschlag. Jetzt laeuft es weiter.
+        QCOMPARE(fail.count(), 0);
+        QCOMPARE(conn.state(), ConnectionState::Connecting);
+    }
+
+    // Und mit abgeschalteter Wiederholung gibt es ihn sofort -- sonst
+    // koennte die Prueflinie oben auch dann gruen sein, wenn gar kein
+    // Fehlschlag mehr moeglich waere.
+    void ohneWiederholungGibtEsDenFehlschlagSofort()
+    {
+        SunSdrRadioConnection conn;
+        conn.setSucheWiederholungEnabledForTest(false);
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+
+        QSignalSpy fail(&conn, &RadioConnection::connectFailed);
+        conn.connectToRadio(someQrpInfo());
+        QVERIFY(fail.wait(kWaitMs));
+        QCOMPARE(conn.state(), ConnectionState::Disconnected);
     }
 
     // ── Mikrofon-PTT am Geraet ─────────────────────────────────────────
