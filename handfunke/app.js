@@ -133,7 +133,14 @@ function starten(adresse) {
   tokenMerken(state.token);
   $('fehler').textContent = '';
   $('koppeln').classList.remove('an');
-  link.connect('ws://' + mitPort);
+  // Das Schema folgt dem der Seite, es wird nicht gewaehlt. Eine
+  // https-Seite DARF kein ws:// oeffnen — der Browser sperrt das als
+  // gemischten Inhalt, ohne dass die Seite davon etwas mitbekommt, und
+  // der Fehler sieht aus wie "das Funkgeraet antwortet nicht".
+  // Umgekehrt scheitert wss:// an einer Bruecke ohne Zertifikat. Beides
+  // ist keine Entscheidung, die der Bediener treffen soll.
+  const schema = (location.protocol === 'https:') ? 'wss://' : 'ws://';
+  link.connect(schema + mitPort);
 }
 
 $('verbinden').addEventListener('click', () => starten($('adresse').value));
