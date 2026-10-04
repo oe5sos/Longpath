@@ -233,6 +233,7 @@ longpath_add_test(tst_setup_helpers)
 longpath_add_test(tst_smoke)
 
 # ── Issue #75: receiver leak across disconnect/reconnect ──────────────────
+longpath_add_test(tst_sunsdr_zweiter_empfaenger_oben)
 longpath_add_test(tst_receiver_manager_reconnect)
 
 # ── HL2 connect-init parity: spectrum DDC center push (Bug 1) ─────────────
