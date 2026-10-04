@@ -828,3 +828,52 @@ von Anfang an wacklig, und die Messung hat sie erledigt.
 
 Es ist kein Richtigkeitsfehler: der Verlust liegt bei 0,02–0,04 %, der
 Ton läuft. Es ist Netzlast.
+
+---
+
+# Offen: Beacon kommt am Rechner an, aber nicht in der App (2026-10-04)
+
+Am Vormittag kam der Betreiber mehrfach nicht an die QRP: „no beacon
+reply", Abbruch nach 3 s. Ausgeschlossen, jedes einzeln am Gerät geprüft:
+
+- **Gerät und Netz** — mein Prüfstand verbindet in 51–54 ms, Sekunden
+  vorher oder nachher, auf derselben Maschine.
+- **Hängende Sitzung** — der Abmelde-Rahmen der vorigen Instanz war
+  sauber quittiert (`Stopp beim Trennen quittiert nach Versuch 1`),
+  34 s vor dem Fehlversuch.
+- **Port im Eintrag (1024), `MANUAL:`-Schlüssel, TCI-Server auf 50001,
+  seine Einstellungsdatei, seine installierte Fassung** — alle mit
+  SEINEN Dateien und SEINEM Binary nachgefahren, alle verbinden.
+- **Sockets** — ein Beobachter mit 10 Abfragen je Sekunde hat im Moment
+  seines Klicks beide Ports gesehen: `UDP *:50001` und `UDP *:50002`.
+  Kein Bindefehler im Log.
+
+**Der entscheidende Befund** kommt aus einem `tcpdump` während eines
+Fehlversuchs — vier Pakete, alle in dieselbe Richtung:
+
+    10:27:45.327  192.168.16.200:50001 -> 192.168.16.100:50001  24 B  03 ff 01 1a 7c …
+    10:27:50.798  dito
+    10:28:04.804  dito
+    10:28:09.978  dito
+
+Das ist die **Beacon-Antwort**, viermal, korrekt adressiert an den
+Rechner und an Port 50001 — genau den Port, den die App gebunden hat.
+Die App hat trotzdem keine einzige verarbeitet (`beacon reply`-Zeile
+kommt in den Fehlläufen null mal vor, im erfolgreichen Lauf einmal).
+
+Die Datagramme erreichen also den Rechner, aber nicht den Socket der
+App. Beide Ports werden mit `ShareAddress | ReuseAddressHint` gebunden;
+bei `SO_REUSEPORT` stellt der Kern ein Unicast-Datagramm genau **einem**
+Socket zu. Wer der zweite Socket wäre, ist offen — `RadioDiscovery`
+spricht kein SunSDR, der TciServer hört auf TCP.
+
+Zweiter offener Punkt aus demselben Mitschnitt: der Rahmenbau schickt
+die Anfrage laut Code **auch direkt** an `m_radioInfo.address`, nicht
+nur als Rundruf. Im Mitschnitt (Filter `host 192.168.16.200`) steht
+davon **nichts** — dieses Paket ging nie hinaus.
+
+**Wie es weitergeht, wenn es wieder auftritt:** die App mit
+`QT_LOGGING_RULES='longpath.sunsdr.debug=true'` starten. Dann steht
+jedes empfangene Steuerdatagramm im Protokoll, und die Frage „kommt es
+im Socket an?" ist in einer Zeile beantwortet statt in einer halben
+Stunde.
