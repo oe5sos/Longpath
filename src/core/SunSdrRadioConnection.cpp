@@ -565,16 +565,17 @@ void SunSdrRadioConnection::onConnectTimeout()
                            // EINEN Client. Der dritte Fall gehoert also in
                            // den Text, sonst sucht man an den ersten beiden.
                            : QStringLiteral(
-                                 "SunSDR: keine Antwort des Geraets. Drei "
-                                 "Ursachen, in dieser Reihenfolge pruefen: "
-                                 "(1) das Geraet haengt noch an einer "
-                                 "frueheren Sitzung — es bedient nur einen "
-                                 "Client, und nach einem Absturz oder einem "
-                                 "harten Beenden hilft nur Aus- und "
-                                 "Einschalten; (2) ein anderes Programm ist "
-                                 "gerade mit ihm verbunden; (3) es ist "
-                                 "nicht erreichbar oder die Suchmeldung "
-                                 "wird im Netz geblockt."));
+                                 "SunSDR: keine Antwort des Geraets. "
+                                 "HAEUFIGSTE URSACHE: das Geraet sperrt "
+                                 "nach einem abrupten Programmende rund "
+                                 "EINE MINUTE (am 2026-10-04 gemessen: 60 s "
+                                 "nach kill -9, sofort nach einem sauberen "
+                                 "Beenden). Also kurz warten statt gleich "
+                                 "wieder zu verbinden — erneutes Klicken "
+                                 "faellt wieder in dasselbe Fenster. "
+                                 "Sonst: ein anderes Programm ist mit ihm "
+                                 "verbunden (es bedient nur einen Client), "
+                                 "oder es ist nicht erreichbar."));
 }
 
 void SunSdrRadioConnection::disconnect()
