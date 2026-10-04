@@ -7,6 +7,21 @@ behaupten, was nicht mehr gilt** — und das Log muss sagen koennen, was war.
 
 ### Hinzugefuegt
 
+- **Handfunke: ein Zertifikat — und damit ueberhaupt erst ein Mikrofon.**
+  Der naechste Baustein beim Senden waere die Mikrofonaufnahme gewesen;
+  geschrieben wurde davon keine Zeile, weil `getUserMedia` **[SecureContext]**
+  ist und am Telefon ueber `http` gar nicht existiert. Das Telefon meldete
+  das seit Wochen selbst — `sicher=false` in jeder Zeile von 172.30.30.x,
+  `sicher=true` nur von 127.0.0.1, wo ohne Zertifikat alles gruen laeuft.
+  Derselbe Schalter kostet das `AudioWorklet` (deshalb
+  `weg=scriptprocessor`) und WebCodecs/Opus; drei Posten, die als drei
+  Eigenheiten in den Unterlagen standen. `tls-einrichten.sh` legt eine
+  eigene Zertifizierungsstelle und ein Serverzertifikat an, der Seitenserver
+  horcht zusaetzlich mit TLS und reicht die Stelle unter `/ca.crt` heraus,
+  und `tci-bruecke.py` beendet TLS **auf demselben Port** — welches
+  Protokoll gesprochen wird, steht im ersten Byte. Der alte Weg ueber `http`
+  und `ws://` bleibt unveraendert offen. Am Geraet ist das noch nicht
+  geprueft; `kann-das-telefon.html` beantwortet es in einem Blick.
 - **Handfunke: die Seite sagt, wenn die Station sendet** (#170). `trx:` und
   `tune:` wurden seit dem ersten Tag mitgelesen und nirgends verwendet — die
   Seite wusste es und schwieg. Jetzt steht dort, wo sonst „SENDEN / NUR IN DER
