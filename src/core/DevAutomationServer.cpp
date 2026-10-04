@@ -353,6 +353,9 @@ QJsonObject DevAutomationServer::handleLine(const QByteArray& line)
     if (verb == QStringLiteral("connect")) {
         return doConnect(parts.size() >= 2 ? parts.at(1) : QString());
     }
+    if (verb == QStringLiteral("addSlice")) {
+        return doAddSlice();
+    }
     if (verb == QStringLiteral("disconnect")) {
         return doDisconnect();
     }
@@ -367,7 +370,7 @@ QJsonObject DevAutomationServer::handleLine(const QByteArray& line)
     return QJsonObject{{QStringLiteral("ok"), false},
                         {QStringLiteral("error"),
                          QStringLiteral("unknown command: ") + verb +
-                             QStringLiteral(" (known: ping, dumpTree, grab, get, connect, disconnect)")}};
+                             QStringLiteral(" (known: ping, dumpTree, grab, get, connect, disconnect, addSlice)")}};
 }
 
 // ── doConnect / doDisconnect (2026-09-30) ────────────────────────────────────
@@ -380,6 +383,27 @@ QJsonObject DevAutomationServer::handleLine(const QByteArray& line)
 // das Panel: das gespeicherte Radio aus den Einstellungen holen und übergeben.
 // Bewusst NICHT der Discovery-Weg — ein Verb, das sich sein Ziel selbst sucht,
 // könnte am falschen Gerät landen, und in einem Shack steht selten nur eines.
+QJsonObject DevAutomationServer::doAddSlice()
+{
+    if (m_radioModel.isNull()) {
+        return QJsonObject{{QStringLiteral("ok"), false},
+                           {QStringLiteral("error"), QStringLiteral("no radio model")}};
+    }
+    // Direkt rufen: dieser Handler laeuft bereits im Hauptfaden (siehe
+    // die Begruendung an doConnect). Ein BlockingQueuedConnection in
+    // denselben Faden blockiert sich selbst -- am 2026-10-04 beim ersten
+    // Versuch genau so passiert, die Antwort kam nie.
+    const int id = m_radioModel->addSlice();
+
+    if (id < 0) {
+        return QJsonObject{{QStringLiteral("ok"), false},
+                           {QStringLiteral("error"),
+                            QStringLiteral("addSlice refused (pool full?)")}};
+    }
+    return QJsonObject{{QStringLiteral("ok"), true},
+                       {QStringLiteral("slice"), id}};
+}
+
 QJsonObject DevAutomationServer::doConnect(const QString& macKeyOrEmpty)
 {
     if (m_radioModel.isNull()) {
