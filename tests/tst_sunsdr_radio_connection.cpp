@@ -1840,7 +1840,41 @@ private slots:
         QCOMPARE(conn.stoppGeschicktForTest(), quint64(0));
 
         conn.disconnect();
-        QCOMPARE(conn.stoppGeschicktForTest(), quint64(1));
+        // Mindestens einer. Wie viele es werden, wenn niemand quittiert,
+        // sagt bleibtDerStoppUnquittiertWirdErNachgeschickt().
+        QVERIFY(conn.stoppGeschicktForTest() >= quint64(1));
+    }
+
+    // Der Vorfall vom 2026-10-04: der Betreiber konnte eine halbe Stunde
+    // lang nicht mehr verbinden ("no beacon reply"), obwohl Geraet, Netz,
+    // Einstellungen und Programmfassung einzeln geprueft in Ordnung waren.
+    // Ursache: Pruefinstanzen waren hart beendet worden, und in einem Lauf
+    // stand im Log
+    //
+    //   WRN: SunSdr: beim Verbindungsende noch unquittiert: 0x02
+    //
+    // Die QRP bedient EINEN Client und haelt die Sitzung fest. Kommt der
+    // Stopp nicht an, bleibt sie an den Toten gebunden und antwortet auf
+    // neue Suchmeldungen nicht mehr. Erst Aus- und Einschalten half.
+    //
+    // Der Stopp wird deshalb nachgeschickt, solange er unquittiert bleibt.
+    // Er ist eine reine Abmeldung und mehrfach unschaedlich -- anders als
+    // ein Rahmen, der etwas verstellt.
+    void bleibtDerStoppUnquittiertWirdErNachgeschickt()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        handshake(conn);
+
+        // Im Pruefstand antwortet niemand -- genau der Fall, der das
+        // Geraet haengen laesst.
+        conn.disconnect();
+        QVERIFY2(conn.stoppGeschicktForTest() >= quint64(2),
+                 qPrintable(QStringLiteral("nur %1 Stopp-Rahmen geschickt")
+                                .arg(conn.stoppGeschicktForTest())));
     }
 
     // Ohne stehende Verbindung gibt es keine Gegenstelle -- ein Stopp an

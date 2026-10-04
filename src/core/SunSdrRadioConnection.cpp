@@ -479,8 +479,24 @@ void SunSdrRadioConnection::onConnectTimeout()
                        gotBeacon
                            ? QStringLiteral("SunSDR: beacon replied but no "
                                             "I/Q stream followed")
-                           : QStringLiteral("SunSDR: no beacon reply — radio "
-                                            "unreachable or discovery blocked"));
+                           // Am 2026-10-04 hat diese Meldung eine halbe
+                           // Stunde gekostet: Geraet, Netz, Einstellungen
+                           // und Programmfassung waren einzeln geprueft in
+                           // Ordnung, die QRP hing an einer toten Sitzung
+                           // und antwortete deshalb nicht mehr. Sie bedient
+                           // EINEN Client. Der dritte Fall gehoert also in
+                           // den Text, sonst sucht man an den ersten beiden.
+                           : QStringLiteral(
+                                 "SunSDR: keine Antwort des Geraets. Drei "
+                                 "Ursachen, in dieser Reihenfolge pruefen: "
+                                 "(1) das Geraet haengt noch an einer "
+                                 "frueheren Sitzung — es bedient nur einen "
+                                 "Client, und nach einem Absturz oder einem "
+                                 "harten Beenden hilft nur Aus- und "
+                                 "Einschalten; (2) ein anderes Programm ist "
+                                 "gerade mit ihm verbunden; (3) es ist "
+                                 "nicht erreichbar oder die Suchmeldung "
+                                 "wird im Netz geblockt."));
 }
 
 void SunSdrRadioConnection::disconnect()
@@ -513,12 +529,51 @@ void SunSdrRadioConnection::disconnect()
     // kennen, waere ein Paket ins Nichts.
     if (m_running && !m_awaitingBeacon && m_profile && m_controlSocket
         && !m_radioAddr.isNull()) {
-        sendeSteuerrahmen(SunSdr::buildStopFrame(*m_profile),
-                          "Stopp 0x02 beim Trennen");
-        ++m_stoppGeschickt;
-        // Dem Paket einen Augenblick geben, bevor die Sockets zugehen --
-        // sonst raeumt der Socket es mit ab.
-        if (m_controlSocket->waitForBytesWritten(200)) { /* hinaus */ }
+        // Nachschicken, solange er unquittiert bleibt -- siehe
+        // kStoppVersuche im Kopf. Ohne das bleibt die QRP an einer toten
+        // Sitzung haengen und nimmt niemanden mehr an.
+        for (int versuch = 1; versuch <= kStoppVersuche; ++versuch) {
+            sendeSteuerrahmen(SunSdr::buildStopFrame(*m_profile),
+                              "Stopp 0x02 beim Trennen");
+            ++m_stoppGeschickt;
+            // Dem Paket einen Augenblick geben, bevor die Sockets zugehen
+            // -- sonst raeumt der Socket es mit ab.
+            if (m_controlSocket->waitForBytesWritten(200)) { /* hinaus */ }
+
+            // Auf die Quittung warten und dabei wirklich lesen: der
+            // Ereignisschleife laeuft hier nichts mehr zu.
+            QElapsedTimer warte;
+            warte.start();
+            while (warte.elapsed() < kStoppQuittungFristMs
+                   && rahmenNochOffen(0x02)) {
+                const int rest =
+                    int(kStoppQuittungFristMs - warte.elapsed());
+                if (rest > 0 && m_controlSocket->waitForReadyRead(rest)) {
+                    while (m_controlSocket->hasPendingDatagrams()) {
+                        const QNetworkDatagram dg =
+                            m_controlSocket->receiveDatagram();
+                        recordBytesReceived(
+                            static_cast<qint64>(dg.data().size()));
+                        processControlDatagram(dg.data(),
+                                               dg.senderAddress());
+                    }
+                }
+            }
+            if (!rahmenNochOffen(0x02)) {
+                qCInfo(lcSunSdr)
+                    << "SunSdr: Stopp beim Trennen quittiert nach Versuch"
+                    << versuch;
+                break;
+            }
+            if (versuch == kStoppVersuche) {
+                qCWarning(lcSunSdr)
+                    << "SunSdr: der Stopp blieb nach" << kStoppVersuche
+                    << "Versuchen unquittiert. Das Geraet haelt die "
+                       "Sitzung moeglicherweise fest und nimmt den "
+                       "naechsten Verbindungsversuch nicht an -- dann "
+                       "hilft nur Aus- und Einschalten.";
+            }
+        }
     }
 
     berichteMithoeren();
@@ -2302,6 +2357,14 @@ void SunSdrRadioConnection::sendeSteuerrahmen(const QByteArray& frame,
         offen.rahmen = frame;
     }
     m_offeneRahmen.append(offen);
+}
+
+bool SunSdrRadioConnection::rahmenNochOffen(quint8 opcode) const
+{
+    for (const OffenerRahmen& r : m_offeneRahmen) {
+        if (r.opcode == opcode) { return true; }
+    }
+    return false;
 }
 
 void SunSdrRadioConnection::pruefeOffeneRahmen()

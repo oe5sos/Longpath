@@ -1030,6 +1030,20 @@ private:
     // Deckel gegen Anwachsen, falls ein Geraet gar nicht quittiert.
     static constexpr int kMaxOffeneRahmen = 32;
 
+    // Der Stopp beim Trennen wird nachgeschickt, solange er unquittiert
+    // bleibt. Hintergrund (2026-10-04): die QRP bedient EINEN Client und
+    // haelt die Sitzung fest. Geht der Stopp verloren -- oder wird die
+    // Instanz hart beendet --, bleibt sie an den Toten gebunden und
+    // antwortet auf neue Suchmeldungen nicht mehr ("no beacon reply").
+    // Der Betreiber kam eine halbe Stunde nicht mehr herein; erst Aus-
+    // und Einschalten half.
+    //
+    // Drei Versuche a 150 ms kosten im schlimmsten Fall 450 ms beim
+    // Trennen und sind unschaedlich: der Stopp verstellt nichts, er
+    // meldet nur ab.
+    static constexpr int kStoppVersuche = 3;
+    static constexpr qint64 kStoppQuittungFristMs = 150;
+
     QList<OffenerRahmen> m_offeneRahmen;
     quint64 m_quittungenGesehen{0};
     quint64 m_rahmenOhneQuittung{0};
@@ -1041,6 +1055,7 @@ private:
     void sendeSteuerrahmen(const QByteArray& frame, const char* grund,
                            bool nachschickbar = true);
     void pruefeOffeneRahmen();
+    bool rahmenNochOffen(quint8 opcode) const;
 
     // ── Uebersteuerung aus dem I/Q erkennen ─────────────────────────────
     //
