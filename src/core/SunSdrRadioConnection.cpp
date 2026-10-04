@@ -253,6 +253,7 @@ void SunSdrRadioConnection::connectToRadio(const RadioInfo& info)
     m_letzteAnschlagMeldungMs = -1;
     m_anschlagProben = 0;
     m_anschlagMeldungen = 0;
+    m_rahmenWiederholt = 0;
     m_inventoryClock.invalidate();
     m_lastStreamStateValid = false;
     // Die Folgenummern-Zaehlung gehoert zur Sitzung: die erste Nummer der
@@ -1527,7 +1528,7 @@ void SunSdrRadioConnection::sendBenchFrames(const QString& envName)
                        .arg(QString::fromLatin1(mitCrc.mid(14, 4).toHex()));
         }
 
-        sendeSteuerrahmen(frame, "Werkbank-Rahmen");
+        sendeSteuerrahmen(frame, "Werkbank-Rahmen", /*nachschickbar=*/false);
         ++m_benchFramesSent;
         qCInfo(lcSunSdr).nospace().noquote()
             << "SunSdr: Werkbank-Rahmen " << envName << " -- op=0x"
@@ -2054,10 +2055,32 @@ void SunSdrRadioConnection::berichteMithoeren()
     // Wachhund-Abbruch, dem der Betreiber ein disconnect() nachschiebt,
     // soll die Uebersicht nicht zweimal ins Log schreiben.
     if (m_inventoryReported) { return; }
-    if (m_controlInventory.isEmpty() && m_streamStateInventory.isEmpty()) {
+    if (m_controlInventory.isEmpty() && m_streamStateInventory.isEmpty()
+        && m_offeneRahmen.isEmpty()) {
         return;
     }
     m_inventoryReported = true;
+
+    // Was beim Ende der Sitzung noch offen ist, bleibt offen -- und das
+    // gehoert gesagt. Ohne diese Zeile fiel es stumm unter den Tisch: die
+    // Quittungspruefung haengt am Stillstands-Wachhund, und der stoppt beim
+    // Abbruch. Am 2026-10-03 im eigenen Pruefstand aufgefallen.
+    if (!m_offeneRahmen.isEmpty()) {
+        QStringList offen;
+        for (const OffenerRahmen& r : m_offeneRahmen) {
+            offen << QStringLiteral("0x%1 (%2%3)")
+                         .arg(r.opcode, 2, 16, QChar('0'))
+                         .arg(r.grund)
+                         .arg(r.schonWiederholt ? QStringLiteral(", wiederholt")
+                                                : QString());
+        }
+        m_rahmenOhneQuittung += quint64(m_offeneRahmen.size());
+        qCWarning(lcSunSdr).noquote()
+            << QStringLiteral("SunSdr: beim Verbindungsende noch unquittiert: %1")
+                   .arg(offen.join(QStringLiteral(", ")));
+        m_offeneRahmen.clear();
+    }
+
     qCInfo(lcSunSdr).noquote() << frameInventoryReport();
 }
 
@@ -2077,7 +2100,8 @@ QString SunSdrRadioConnection::seqDeltaReport() const
 }
 
 void SunSdrRadioConnection::sendeSteuerrahmen(const QByteArray& frame,
-                                             const char* grund)
+                                             const char* grund,
+                                             bool nachschickbar)
 {
     if (!m_controlSocket || !m_profile) { return; }
     m_controlSocket->writeDatagram(frame, m_radioAddr,
@@ -2095,6 +2119,12 @@ void SunSdrRadioConnection::sendeSteuerrahmen(const QByteArray& frame,
     offen.opcode = quint8(frame[2]);
     offen.beiMs = m_inventoryClock.elapsed();
     offen.grund = QString::fromLatin1(grund);
+    // Den Rahmen mitnehmen, damit er sich nachschicken laesst -- aber nur,
+    // wenn er dafuer taugt (siehe darfNachgeschicktWerden) und der Aufrufer
+    // es nicht ausdruecklich ausschliesst.
+    if (nachschickbar && darfNachgeschicktWerden(offen.opcode)) {
+        offen.rahmen = frame;
+    }
     m_offeneRahmen.append(offen);
 }
 
@@ -2105,13 +2135,40 @@ void SunSdrRadioConnection::pruefeOffeneRahmen()
     for (int i = m_offeneRahmen.size() - 1; i >= 0; --i) {
         const OffenerRahmen& offen = m_offeneRahmen.at(i);
         if (now - offen.beiMs < kQuittungsFristMs) { continue; }
+
+        // Einmal nachschicken, wenn der Rahmen dafuer taugt.
+        if (!offen.rahmen.isEmpty() && !offen.schonWiederholt) {
+            const QByteArray nochmal = offen.rahmen;
+            const QString grund = offen.grund;
+            const quint8 op = offen.opcode;
+            m_offeneRahmen.removeAt(i);
+            ++m_rahmenWiederholt;
+            qCInfo(lcSunSdr).nospace().noquote()
+                << "SunSdr: Rahmen op=0x" << QString::number(op, 16)
+                << " (" << grund << ") blieb " << kQuittungsFristMs
+                << " ms unquittiert -- wird einmal nachgeschickt";
+            sendeSteuerrahmen(nochmal, "Wiederholung");
+            // Der neue Eintrag ist der letzte in der Liste; ihn als
+            // Wiederholung kennzeichnen, damit es bei EINEM Versuch bleibt.
+            if (!m_offeneRahmen.isEmpty()) {
+                m_offeneRahmen.last().schonWiederholt = true;
+                m_offeneRahmen.last().grund = grund;
+                m_offeneRahmen.last().rahmen = nochmal;
+            }
+            continue;
+        }
+
         ++m_rahmenOhneQuittung;
         qCWarning(lcSunSdr).nospace().noquote()
             << "SunSdr: Rahmen op=0x" << QString::number(offen.opcode, 16)
             << " (" << offen.grund << ") wurde nach " << kQuittungsFristMs
-            << " ms nicht quittiert -- das Geraet hat ihn wahrscheinlich "
-               "verworfen (am 2026-09-25 gemessen: eine falsche Pruefsumme "
-               "wird stillschweigend verworfen)";
+            << " ms nicht quittiert"
+            << (offen.schonWiederholt ? " -- auch die Wiederholung nicht. "
+                                        "Der Weg zum Geraet ist gestoert."
+                                      : " -- das Geraet hat ihn wahrscheinlich "
+                                        "verworfen (am 2026-09-25 gemessen: "
+                                        "eine falsche Pruefsumme wird "
+                                        "stillschweigend verworfen)");
         m_offeneRahmen.removeAt(i);
     }
 }
