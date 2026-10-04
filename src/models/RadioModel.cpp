@@ -8835,10 +8835,33 @@ void RadioModel::connectToRadio(const RadioInfo& info)
     // Davor hat der Sitzungs-Reset im Treiber das verdeckt (er setzte auf
     // 1 zurueck); der musste weg, weil er auch die Rate wegwarf, die
     // RadioModel kurz vorher gesetzt hatte -- siehe 88844941.
-    if (info.protocol == ProtocolVersion::Protocol1
-        || info.protocol == ProtocolVersion::SunSdr) {
+    if (info.protocol == ProtocolVersion::Protocol1) {
         QMetaObject::invokeMethod(m_connection, [conn = m_connection, activeRxCount]() {
             conn->setActiveReceiverCount(activeRxCount);
+        });
+    } else if (info.protocol == ProtocolVersion::SunSdr) {
+        // Fuer die SunSDR NICHT der gespeicherte Wert, sondern die Zahl
+        // der Empfaenger, die es oben WIRKLICH gibt.
+        //
+        // Hintergrund (2026-10-04, am Geraet gesehen): mit
+        // activeRxCount = 2 und EINER Scheibe forderte Longpath zwei
+        // Stroeme an, und der zweite fiel eine Ebene hoeher weg --
+        //
+        //   SunSdr: Stromstart-Rahmen -> zwei Stroeme, je 48 kHz
+        //   ReceiverManager: first feedIqData DROPPED; hw= 1  map="hw0->rx0"
+        //
+        // Doppelte Netzlast ohne Gegenwert. Ein Empfaenger entsteht erst,
+        // wenn sich eine Scheibe an den Strom bindet
+        // (syncReceiverToStream), und genau diese Zahl wird hier
+        // geschickt. Waechst sie spaeter, zieht die Verdrahtung ueber
+        // ReceiverManager::hardwareReceiverCountChanged nach -- die gibt
+        // es laengst, mein frueherer Push mit dem gespeicherten Wert hat
+        // sie nur ueberstimmt.
+        const int echte = qMax(1, m_receiverManager
+                                      ? m_receiverManager->activeReceiverCount()
+                                      : 1);
+        QMetaObject::invokeMethod(m_connection, [conn = m_connection, echte]() {
+            conn->setActiveReceiverCount(echte);
         });
     }
     if (m_activeSlice) {

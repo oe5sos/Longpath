@@ -877,3 +877,38 @@ davon **nichts** — dieses Paket ging nie hinaus.
 jedes empfangene Steuerdatagramm im Protokoll, und die Frage „kommt es
 im Socket an?" ist in einer Zeile beantwortet statt in einer halben
 Stunde.
+
+## Aufgeklärt: der Aussetzer dauert etwa eine Minute (2026-10-04, abends)
+
+Der Befund oben („Beacon kommt am Rechner an, aber nicht in der App")
+hatte eine einfachere Ursache, als er aussah — und sie ist messbar.
+
+**Das Gerät sperrt nach einem ABRUPTEN Ende rund eine Minute.** Gemessen:
+
+| Was vorher geschah | Gerät antwortet wieder nach |
+| --- | --- |
+| Prüfstand verbindet und trennt sauber | **3 s** |
+| App: `disconnect`, dann `SIGTERM` | **sofort** |
+| App: `disconnect`, dann `kill -9` | **~60 s** |
+
+In allen drei Fällen war der Abmelde-Rahmen quittiert. Der Unterschied
+ist also nicht der Stopp, sondern das **abrupte Schließen der Sockets**:
+nach `kill -9` schickt das Gerät weiter an einen Port, den der Rechner
+mit ICMP zurückweist — und danach schweigt es eine Weile.
+
+**Damit ist Martins Vormittag erklärt.** Jeder Fehlversuch lag innerhalb
+dieses Fensters; er hat sofort wieder geklickt, also wieder hinein. Das
+Aus- und Einschalten half nicht, weil es den Zustand löste, sondern weil
+es Zeit kostete.
+
+**Zwei Konsequenzen:**
+
+1. Eine verbundene Instanz **nie** mit `kill -9` beenden — `SIGTERM`
+   oder das Fenster. Das gilt für Prüfläufe genauso wie für den Betrieb.
+2. Schlägt eine Verbindung mit „keine Antwort" fehl, hilft **warten**,
+   nicht erneut klicken. Eine Minute reicht.
+
+Offen bleibt, ob Longpath das selbst abfangen kann — etwa, indem es nach
+einem Fehlversuch nicht sofort wieder sucht, sondern das Fenster
+abwartet und es dem Betreiber sagt. Das wäre die nächste Änderung an
+dieser Stelle.
