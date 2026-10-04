@@ -90,6 +90,10 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
   <span class="dot off" id="led"></span>
   <span class="name" id="station">NICHT VERBUNDEN</span>
   <span class="spacer"></span>
+  <!-- Der Weg ins Logbuch. Sitzt in der Kopfzeile, weil dort der Daumen
+       hinkommt und weil er dort nichts zudeckt: der Wasserfall bleibt frei,
+       solange man nicht loggt. -->
+  <button id="logAuf" class="logAuf">LOG</button>
   <button id="tonAn" class="tonAn">TON EIN</button>
   <span class="rate mono" id="rate"></span>
 </header>
@@ -211,6 +215,42 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
      Lautsprecher ab, waehrend Kopfhoerer weiter spielen. Am 2026-10-01 genau
      so erlebt. Die Datei ist eine eine Sekunde lange Stille in WAV, als
      data:-URI eingebettet — kein zusaetzlicher Abruf. -->
+<!-- ── QSO eintragen (Entwurf A, vom Betreiber am 2026-10-04 gewaehlt) ──
+     Ein Blatt ueber dem Bild, wie das Frequenz-Blatt. Rufzeichen gross und
+     dicktengleich, RST hin und her mit 59/59 vorbelegt — und darunter in
+     Messing, was AUTOMATISCH mitgeht. Die drei Zeilen sind keine Zierde:
+     sie sagen, dass Frequenz, Betriebsart und Zeit vom Geraet kommen und
+     nicht von der Seite (Longpath setzt sie beim Eintragen selbst, siehe
+     TciServer `log_qso:`). Wer sie sieht, weiss, was er eintraegt. -->
+<div id="qsoBlatt">
+  <div class="karte">
+    <h1>QSO EINTRAGEN</h1>
+    <input id="qsoRuf" type="text" inputmode="text" autocomplete="off"
+           autocapitalize="characters" autocorrect="off" spellcheck="false"
+           placeholder="RUFZEICHEN">
+    <div class="rstreihe">
+      <div class="rstfeld">
+        <label for="qsoRstS">RST gesendet</label>
+        <input id="qsoRstS" type="text" inputmode="numeric" autocomplete="off"
+               value="59" maxlength="6">
+      </div>
+      <div class="rstfeld">
+        <label for="qsoRstE">RST empfangen</label>
+        <input id="qsoRstE" type="text" inputmode="numeric" autocomplete="off"
+               value="59" maxlength="6">
+      </div>
+    </div>
+    <div class="automatisch">
+      <div class="z"><span class="k">FREQUENZ</span><span class="v" id="qsoFreq">—</span></div>
+      <div class="z"><span class="k">BETRIEBSART</span><span class="v" id="qsoMode">—</span></div>
+      <div class="z"><span class="k">ZEIT UTC</span><span class="v" id="qsoZeit">—</span></div>
+    </div>
+    <div class="qsoMeldung" id="qsoMeldung"></div>
+    <button id="qsoOk">Eintragen</button>
+    <button id="qsoAb" class="still">Abbrechen</button>
+  </div>
+</div>
+
 <audio id="stillhalter" loop playsinline preload="auto"
        src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YQAAAAA="></audio>
 <script src="ton-kern.js"></script>

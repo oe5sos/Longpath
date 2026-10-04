@@ -255,6 +255,24 @@ class Verbindung(threading.Thread):
             # tst_tci_remote_auth).
             print(f'  {self.addr[1]}: auth empfangen ({len(args[0]) if args else 0} Zeichen)')
             self.sende_text('auth:ok;')
+        elif name == 'log_qso':
+            # Longpath-eigener Befehl (PR #184). Die Attrappe schreibt nichts,
+            # sie antwortet nur — damit sich das Blatt auf der Seite pruefen
+            # laesst, ohne Martins Logbuch anzufassen.
+            #
+            # Sie ist dabei absichtlich NICHT gutmuetiger als der echte
+            # Server: leeres oder zu langes Rufzeichen wird genauso
+            # abgelehnt. Eine Attrappe, die mehr durchlaesst als das
+            # Original, verschiebt Fehler nach hinten (siehe rx_sensors).
+            ruf = (args[0].upper() if args else '')
+            if not ruf or len(ruf) > 20:
+                print(f'  {self.addr[1]}: log_qso ABGELEHNT ({ruf!r})')
+                self.sende_text('log_qso_err:rufzeichen fehlt;')
+            else:
+                rs = args[1] if len(args) > 1 and args[1] else '59'
+                re_ = args[2] if len(args) > 2 and args[2] else '59'
+                print(f'  {self.addr[1]}: log_qso {ruf} {rs}/{re_}')
+                self.sende_text(f'log_qso_ok:{ruf};')
         elif name == 'iq_start':
             self.iq_an = True
             print(f'  {self.addr[1]}: IQ an')
