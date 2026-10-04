@@ -88,6 +88,13 @@ wählen, kein Beenden über das Menü. Es bleibt das Abschießen des Programms
 
 ## Richtungen, bewusst nicht entschieden
 
+> **Nachtrag 2026-10-04 — entschieden und gebaut.** Der Betreiber hat Richtung
+> 1 freigegeben („bitte erledigen!"). Gebaut ist sie in PR #176, zusammen mit
+> den Schrittmarken. Was unten steht, ist der Stand der Überlegung von gestern
+> und bleibt als Begründung stehen; der heutige Stand steht im Abschnitt
+> **„Was daraus geworden ist"** ganz unten.
+
+
 1. **Zeitlimit um `PortAudioBus::open()`.** Kleinster Eingriff. Nach N
    Sekunden aufgeben, warnen, ohne Mikrofon weitermachen — empfangen geht
    auch so.
@@ -214,3 +221,51 @@ neue Logdatei anlegen **und die älteste wegwerfen** (die Ablage hält fünf).
 **Belegt, nicht geschätzt:** `grep -l "GUI main thread elevated"` über alle
 fünf Logs → 0 Treffer bei 5 Dateien. Die Zeile existiert im Quellcode
 (`RealtimeAudioPriority.cpp:160`).
+
+---
+
+## Was daraus geworden ist (2026-10-04)
+
+**Richtung 1 ist gebaut** — `src/core/audio/BusMitFrist.{h,cpp}`, eingehängt in
+`AudioEngine::makeBus()` und damit auf allen sieben Aufrufstellen zugleich,
+auch denen aus dem Einstellungsdialog. Geöffnet wird auf einem eigenen Faden,
+gewartet mit **5000 ms** Frist. Läuft sie ab, geht es ohne das Gerät weiter,
+und der Bus gehört ab dann dem Öffnungsfaden, der ihn aufräumt, sobald `open()`
+endlich zurückkommt.
+
+Die Frist ist aus der Messung oben begründet: 20 ms Normalfall, 5000 ms Frist —
+zwei Zehnerpotenzen Abstand, sie kann im gesunden Betrieb nicht auslösen.
+
+**Dazu Schrittmarken** (`[AudioStart:Step] n/7 …` plus eine Gegenmarke), damit
+ein Hänger das Gerät nennt, statt eine stumme Lücke im Log zu hinterlassen.
+
+**Richtung 2 (später öffnen) ist nicht gebaut und auch nicht mehr nötig**, um
+den Hänger zu beseitigen — sie bleibt eine Frage der Bequemlichkeit: ob der
+Pegelbalken schon vor dem ersten MOX Signal haben soll. Das ist eine
+Gestaltungsentscheidung, keine Fehlerbehebung.
+
+### Was weiterhin offen ist
+
+Die **fünf nativen VAX-Busse** (`makeVaxBus` / `makeVaxTxBus`) laufen weiter
+ohne Frist. Zwei Gründe:
+
+* Sie brauchen zusammen **unter 1 ms** (gemessen), tragen also den kleinsten
+  Teil des Risikos.
+* `LinuxPipeBus` hat eine dokumentierte Hauptfaden-Bindung — `QProcess` für
+  `pactl` braucht eine Ereignisschleife auf dem aufrufenden Faden. Ein Öffnen
+  auf einem fremden Faden bräche diesen Vertrag.
+
+Für sie ist vorerst die Schrittmarke der Schutz: ein Hänger dort friert zwar
+weiter ein, nennt aber im Log das Gerät. Wer das schließen will, muss zuerst
+die Hauptfaden-Bindung von `LinuxPipeBus` auflösen — und das ist eine eigene
+Aufgabe, keine Zeile nebenbei.
+
+### Was die Behebung NICHT tut
+
+Sie macht die Oberfläche während der Frist nicht bedienbar. Das wäre durch
+Pumpen der Ereignisschleife zu haben, aber dann könnte der Bediener mitten im
+Verbindungsaufbau ein zweites Mal auf Verbinden tippen — genau die
+Wiedereintritts-Falle, gegen die `connectToRadio` seinen Fortschrittsdialog
+modal hält. Aus „für immer eingefroren" wird „einmal kurz stehengeblieben";
+mehr Bedienbarkeit wäre hier mehr Risiko.
+
