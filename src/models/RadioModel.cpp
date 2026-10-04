@@ -10144,9 +10144,29 @@ void RadioModel::pushTxFrequencyFromTxSlice()
         // frequency is never published and the radio keeps 0 Hz. Logged
         // because a caller running before m_connection is assigned looks
         // identical from the outside to never being called at all.
-        qCWarning(lcConnection)
-            << "TX frequency NOT pushed: no connection yet (caller ran before"
-               " m_connection was assigned).";
+        //
+        // INFO, nicht Warnung (2026-10-04). Nachgezaehlt in Martins
+        // Betriebslog: diese Zeile kommt bei JEDEM gesunden Verbinden
+        // viermal (19:02:41.140 bis .144) -- und danach steht zweimal
+        // "TX frequency pushed: 28350350 Hz (slice 0, xit=0)". Sie meldet
+        // also keinen Fehler, sondern die normale Reihenfolge des
+        // Verbindungsaufbaus: mehrere Stellen wollen die Sendefrequenz
+        // setzen, bevor m_connection steht, und die Stelle danach setzt
+        // sie richtig.
+        //
+        // Eine Meldung, die in jeder gesunden Sitzung erscheint, sagt
+        // ueber den Fehlerfall nichts aus -- sie erzieht nur dazu,
+        // Warnungen zu ueberlesen. Der wirklich gefaehrliche Fall (kein
+        // gebundener Slice -> das Geraet sendet auf 0 Hz) bleibt unten
+        // eine Warnung.
+        //
+        // Gruendlicher waere eine POSITIVE Pruefung: wenn die Verbindung
+        // steht und bis dahin nie eine Sendefrequenz hinausging, warnen.
+        // Das ist nicht gebaut; es braucht einen Zustand ueber den
+        // Verbindungsaufbau hinweg, und der gehoert dem Betreiber.
+        qCInfo(lcConnection)
+            << "TX frequency not pushed yet: no connection (caller ran before"
+               " m_connection was assigned); a later call publishes it.";
         return;
     }
 
