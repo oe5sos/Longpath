@@ -2150,6 +2150,71 @@ private slots:
         QCOMPARE(conn.aktiveEmpfaengerForTest(), 2);
     }
 
+    // ── Antennenwahl 0x15 ──────────────────────────────────────────────
+    //
+    // Gebaut, aber standardmaessig stumm: die Auswahlbytes stammen aus
+    // ArtemisSDR, also von der DX/PRO, und am 2026-10-03 hat sich gezeigt,
+    // dass die Opcode-Nummern der QRP andere sind (0x04 statt 0x05 beim
+    // Vorverstaerker, 0x07 statt 0x08 bei der DDC). Ungepruefte Bytes
+    // gehen nicht ungefragt an fremde Hardware.
+    void antennenwahlIstStandardmaessigStumm()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        handshake(conn);
+        const int vorher = conn.offeneRahmenForTest();
+
+        AntennaRouting r;
+        r.trxAnt = 2;
+        r.tx = false;
+        conn.setAntennaRouting(r);
+
+        QCOMPARE(conn.offeneRahmenForTest(), vorher);
+    }
+
+    // Scharf geschaltet geht der Rahmen hinaus -- vor der Verdrahtung war
+    // setAntennaRouting ein leerer Rumpf und hier passierte nie etwas.
+    void antennenwahlScharfSchicktDenRahmen()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        handshake(conn);
+        conn.setAntenneScharfForTest(true);
+        const int vorher = conn.offeneRahmenForTest();
+
+        AntennaRouting r;
+        r.trxAnt = 3;
+        r.tx = false;
+        conn.setAntennaRouting(r);
+
+        QCOMPARE(conn.offeneRahmenForTest(), vorher + 1);
+    }
+
+    // Eine Buchse, die es nicht gibt, wird nicht geraten.
+    void antennenwahlAusserhalbDerDreiBuchsenSchicktNichts()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        handshake(conn);
+        conn.setAntenneScharfForTest(true);
+        const int vorher = conn.offeneRahmenForTest();
+
+        AntennaRouting r;
+        r.trxAnt = 7;          // gibt es nicht
+        conn.setAntennaRouting(r);
+
+        QCOMPARE(conn.offeneRahmenForTest(), vorher);
+    }
+
     // ── Mikrofon-PTT am Geraet ─────────────────────────────────────────
     //
     // Die zweite Empfangsluecke, geschlossen ohne Protokollwissen: der

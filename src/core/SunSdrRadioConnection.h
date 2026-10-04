@@ -1041,6 +1041,12 @@ private:
     // Drei Versuche a 150 ms kosten im schlimmsten Fall 450 ms beim
     // Trennen und sind unschaedlich: der Stopp verstellt nichts, er
     // meldet nur ab.
+    // Die Antennenwahl geht nur hinaus, wenn der Betreiber es
+    // ausdruecklich will: die Auswahlbytes stammen von der DX/PRO und
+    // sind an der QRP nicht bestaetigt (2026-10-04).
+    bool m_antenneScharf{
+        qEnvironmentVariableIntValue("LONGPATH_SUNSDR_ANTENNE") == 1};
+
     static constexpr int kStoppVersuche = 3;
     static constexpr qint64 kStoppQuittungFristMs = 150;
 
@@ -1192,6 +1198,9 @@ public:
     { return (k >= 0 && k < kMaxKanaele) ? m_kanal[k].fortsetzungen : 0; }
     quint64 rahmenWiederholtForTest() const { return m_rahmenWiederholt; }
     int offeneRahmenForTest() const { return int(m_offeneRahmen.size()); }
+    /// Pruef-Naht (2026-10-04): die Antennenwahl scharf schalten, ohne
+    /// eine Umgebungsvariable zu setzen.
+    void setAntenneScharfForTest(bool scharf) { m_antenneScharf = scharf; }
 };
 
 } // namespace Longpath
