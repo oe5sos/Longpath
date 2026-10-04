@@ -424,3 +424,41 @@ nicht auf — verdrahtet ist verdrahtet, und eine Umgebungsvariable ist
 schnell gesetzt. `setAntennaRouting` ist wieder leer; `0x15` ist im
 Abschluss-Prüfplan der **erste** zu bestätigende Befehl, weil er als
 einziger nichts erzeugt.
+
+---
+
+# Der zweite Empfänger: wo die Kette wirklich endet (2026-10-04, abends)
+
+Der Beleg vom Nachmittag (`b33072d9`) war **halb**. Gemessen war die
+Treiberseite: beide Kanäle kommen an, 0 verworfen. Was er nicht zeigte:
+ob Kanal 1 oben bei einem zweiten Empfänger landet.
+
+Am Gerät nachgeholt, mit `activeRxCount = 2` und **einer** Scheibe:
+
+    Connecting with sampleRate= 48000 ... activeRxCount= 2
+    Created RX channel 0 / Created RX channel 1
+    SunSdr: aktive Empfaenger -> 2
+    SunSdr: Stromstart-Rahmen -> zwei Stroeme, je 48 kHz
+    ReceiverManager: first feedIqData forwarded; hw= 0 -> rx0
+    ReceiverManager: first feedIqData DROPPED; hw= 1  map= "hw0->rx0"
+
+Das Gerät schickt also zwei Ströme (480 Nummern/s), der Treiber reicht
+beide hoch, WDSP hat zwei Kanäle — und `ReceiverManager` kennt nur einen
+Empfänger.
+
+**Das ist kein Fehler, sondern die Bauweise.** Ein Empfänger entsteht in
+`RadioModel::syncReceiverToStream`, und die wird gerufen, wenn sich eine
+**Scheibe** an einen Strom bindet. Mit einer Scheibe gibt es einen
+Empfänger, gleich was `activeRxCount` sagt. RX2 erscheint, sobald eine
+zweite Scheibe da ist — dafür steht `maxSlices` seit heute auf 2.
+
+Die Routenführung selbst ist geprüft (`tst_sunsdr_zweiter_empfaenger_oben`,
+ohne Funkgerät): Kanal 1 landet bei Empfänger 1, mit dessen Daten, und
+fällt weg, wenn es keinen zweiten gibt.
+
+**Was offen bleibt:** mit einer Scheibe und `activeRxCount = 2` fordert
+Longpath zwei Ströme an und wirft den zweiten eine Ebene höher weg —
+doppelte Netzlast ohne Gegenwert. Sauberer wäre, den Stromstart-Modus an
+die Zahl der **gebundenen Ströme** zu hängen statt an den gespeicherten
+Wert. Bis dahin sagt die Meldung wenigstens, was fehlt, statt nur
+`map="hw0->rx0"`.

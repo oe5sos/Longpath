@@ -375,9 +375,17 @@ void ReceiverManager::feedIqData(int hwReceiverIndex, const QVector<float>& samp
             for (auto mi = m_hwToLogical.constBegin(); mi != m_hwToLogical.constEnd(); ++mi) {
                 mapped << QString("hw%1->rx%2").arg(mi.key()).arg(mi.value());
             }
-            qCWarning(lcReceiver) << "ReceiverManager: first feedIqData dropped;"
-                                  << "hwReceiverIndex=" << hwReceiverIndex
-                                  << "map=" << (mapped.isEmpty() ? QStringLiteral("(empty)") : mapped.join(','));
+            qCWarning(lcReceiver).noquote()
+                << QStringLiteral(
+                       "ReceiverManager: Daten von Hardware-Empfaenger %1 "
+                       "fallen weg -- dafuer gibt es oben keinen "
+                       "Empfaenger. Abbildung: %2. Ein Empfaenger entsteht "
+                       "erst, wenn sich eine Scheibe an diesen Strom "
+                       "bindet; bis dahin fordert das Geraet den Strom "
+                       "zwar, aber niemand hoert ihn.")
+                       .arg(hwReceiverIndex)
+                       .arg(mapped.isEmpty() ? QStringLiteral("(leer)")
+                                             : mapped.join(QLatin1Char(',')));
         }
         return;
     }
