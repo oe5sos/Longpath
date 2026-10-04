@@ -49,6 +49,12 @@ class TonKern {
     this.vorratMs = o.vorratMs || 120;
     this.deckelMs = o.deckelMs || 1000;
 
+    // Wie weit der Leseschritt vom Sollwert abweichen darf, um den Vorrat
+    // sanft auf das Ziel zu ziehen. 0,003 = 0,3 %, und das ist mit Absicht
+    // so klein: 0,3 % Tonhoehenfehler sind rund 5 Cent, fuer Sprache und CW
+    // unhoerbar. Groesser waere schneller und faengt an zu eiern.
+    this.maxZugRel = (o.maxZugRel === undefined) ? 0.003 : o.maxZugRel;
+
     this._raten();
     this.l = new Float32Array(this.cap);
     this.r = new Float32Array(this.cap);
@@ -62,7 +68,10 @@ class TonKern {
   _raten() {
     this.cap = Math.max(1024, Math.ceil(this.srcRate * this.deckelMs / 1000));
     this.target = Math.max(64, Math.ceil(this.srcRate * this.vorratMs / 1000));
-    this.schritt = this.srcRate / this.ausgabeRate;
+    // Der Sollschritt. Gelesen wird mit `schritt`, und der weicht gleich
+    // unten kontrolliert davon ab (siehe _gleichlauf).
+    this.schrittSoll = this.srcRate / this.ausgabeRate;
+    this.schritt = this.schrittSoll;
   }
 
   // Die Quellrate darf sich mitten im Betrieb aendern (der Bediener schaltet
@@ -153,15 +162,57 @@ class TonKern {
     this.rd = (this.rd + verbraucht) % this.cap;
     this.have -= verbraucht;
 
+    this._gleichlauf();
+
     // Laeuft der Vorrat weit ueber das Ziel, hat das Netz einen Schub
     // geliefert — dann still ein Stueck ueberspringen, statt die Verzoegerung
-    // mitzuschleppen.
+    // mitzuschleppen. Das bleibt als Notbremse: der sanfte Gleichlauf oben
+    // braucht Zeit, ein Schub von einer halben Sekunde soll nicht eine Minute
+    // lang nachhallen.
     if (this.have > this.target * 4) {
       const skip = this.have - this.target;
       this.rd = (this.rd + skip) % this.cap;
       this.have -= skip;
     }
     return true;
+  }
+
+  // ── Sanfter Gleichlauf: den Vorrat auf das Ziel ziehen, ohne Sprung ──────
+  //
+  // Warum es das braucht: Funkgeraet und Tonkarte haben zwei verschiedene
+  // Uhren. Laufen sie auch nur um wenige Millionstel auseinander, wandert
+  // der Vorrat — und zwar immer in dieselbe Richtung. In Martins
+  // Selbstmeldung vom 2026-10-04, 07:58 stand `vorrat=4769` gegen
+  // `ziel=1440`: das Dreifache, also rund 280 ms Verzoegerung mehr als
+  // gewollt. Zum Mithoeren beim Drehen ist das genau das, was die Seite
+  // nicht sein darf.
+  //
+  // Bis hierher gab es nur die Notbremse weiter unten: ueber dem Vierfachen
+  // wird ein Stueck uebersprungen. Dazwischen — zwischen 120 und 480 ms —
+  // passierte NICHTS. Der Vorrat durfte also dauerhaft irgendwo in diesem
+  // Band stehen, und wo er stand, entschied der Zufall des letzten Schubs.
+  //
+  // Statt zu springen wird jetzt die LESEGESCHWINDIGKEIT ein wenig
+  // nachgezogen: ist zu viel da, lesen wir minimal schneller; ist zu wenig
+  // da, minimal langsamer. Das ist dasselbe Prinzip wie Thetis' `rmatch`
+  // (adaptiver Resampler, Entwurf #131 fuer die Programmseite) — hier in der
+  // kleinen Form, die ohne eigenen Resampler auskommt, weil ohnehin mit
+  // gebrochenem Schritt interpoliert wird.
+  //
+  // Die Begrenzung auf 0,3 % ist der ganze Trick: schnell genug, um eine
+  // Uhrendrift von wenigen Millionstel muehelos einzuholen (0,3 % sind das
+  // Tausendfache), und klein genug, um unhoerbar zu bleiben.
+  _gleichlauf() {
+    if (this.anlauf || this.muted) {
+      // Waehrend des Anlaufs nichts nachziehen: dort ist der Vorrat
+      // absichtlich noch im Aufbau.
+      this.schritt = this.schrittSoll;
+      return;
+    }
+    // Abweichung in Vielfachen des Ziels, auf [-1, +1] begrenzt.
+    const abw = (this.have - this.target) / this.target;
+    const begrenzt = Math.max(-1, Math.min(1, abw));
+    this.schritt = this.schrittSoll * (1 + this.maxZugRel * begrenzt);
   }
 }
 
