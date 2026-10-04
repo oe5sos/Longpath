@@ -1,15 +1,32 @@
 # Zwei Minuten Mitschnitt — die Anleitung
 
-**Wofür:** drei Fragen, an denen die QRP-Arbeit sonst stehen bleibt
-(Stand 2026-10-03, siehe `docs/architecture/2026-10-02-sunsdr-paritaet.md`):
+> **Stand 2026-10-04 — zwei der drei ursprünglichen Fragen sind
+> beantwortet, ohne Mitschnitt.** Die Liste unten ist nachgezogen; wer
+> den Durchgang macht, soll nicht mehr nach Beantwortetem suchen.
+>
+> - ~~Welcher Rahmen schaltet den zweiten Empfänger ein?~~ **Erledigt.**
+>   Es ist derselbe Rahmen `0x01`: sein erstes Byte trägt die Zahl der
+>   Ströme. Zwei Empfänger laufen seit `38988a85` von Ende zu Ende,
+>   am Gerät belegt (480 statt 240 Nummern/s, 0 verworfen).
+> - ~~Welcher Rahmen stellt die Abtastrate?~~ **Erledigt.** Ebenfalls
+>   `0x01`, zweites Byte. Drei Nutzlasten sind durchgemessen.
 
-1. Welcher Rahmen schaltet den **zweiten Empfänger** ein? Der Platz wird
-   akzeptiert und quittiert, bleibt aber stumm.
-2. Welcher Rahmen stellt die **Abtastrate**? `0x18` tut es nicht,
-   obwohl er den Haupttakt trägt.
-3. Welche Rahmen gehören überhaupt noch zum Verbindungsablauf? Die
-   dreizehn bekannten sind unvollständig; gemessen wurden „rund zwei
-   Dutzend".
+**Wofür noch:** zwei Fragen, an denen die QRP-Arbeit wirklich noch steht:
+
+1. **Welche Rahmen gehören zum Verbindungsablauf?** Die dreizehn
+   bekannten sind unvollständig; gemessen wurden „rund zwei Dutzend".
+   Das ist die Grundlage für alles Sendeseitige — die Opcode-Nummern der
+   QRP sind nachweislich **andere** als die der DX/PRO, aus der alle
+   unbestätigten Zahlen stammen.
+2. **Wiederholt ExpertSDR2 bei 96 kHz auch?** Longpath bekommt dort
+   rund 110 bytegleiche Wiederholungen je Sekunde (1,2 Kopien je
+   Nummer statt 1,0 bei 48 kHz). Drei Gegenmaßnahmen sind gemessen und
+   **wirkungslos** (Kopf der Blockantwort spiegeln, zwei Stille-Ströme,
+   Quittung vor dem Verwerfen). Zeigt der Mitschnitt dieselben
+   Wiederholungen bei ExpertSDR2, ist es die Eigenart des Geräts und
+   kein Mangel von Longpath — und die Frage ist erledigt statt offen.
+
+   **Dafür muss ExpertSDR2 auf 96 kHz stehen**, nicht auf der Vorgabe.
 
 **Was dabei nicht gebraucht wird:** keine Antenne, kein Senden, keine
 Freigabe für HF. Es wird nur zugehört.
