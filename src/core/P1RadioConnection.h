@@ -312,6 +312,13 @@ private slots:
     void onConnectTimeout();
 
 private:
+    // errno des letzten gescheiterten Versands seit dem Verbinden, 0 wenn
+    // alles hinausging. Bis zum 2026-10-04 wurde das Ergebnis von
+    // writeDatagram() hier gar nicht angesehen: ein Versand, der an Ort und
+    // Stelle scheitert, war vollkommen stumm, und die Zeitueberschreitung
+    // riet trotzdem zur Netzstrecke.
+    int m_letzterSendeFehler{0};
+
     // ── The announced receiver count has two inputs ──────────────────────
     //
     // Two independent things need a say in how many receivers the wire
