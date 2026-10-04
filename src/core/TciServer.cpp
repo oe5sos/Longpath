@@ -27,6 +27,8 @@
 #include "TciClientSession.h"
 #include "TciProtocol.h"
 #include "TciSendQueue.h"
+#include "core/LogbookDatei.h"
+#include "models/LogEntry.h"
 #include "TciBinaryFrame.h"
 #include "TciSensorManager.h"
 #include "LogCategories.h"
@@ -2402,6 +2404,16 @@ QString TciServer::normalisierterCode(const QString& roh)
     return s;
 }
 
+bool TciServer::remoteLogAllowed()
+{
+    // Ab Werk JA -- anders als beim Senden, weil hier nichts abstrahlt. Wer
+    // das Loggen aus dem Netz nicht will, schaltet es ab; das Token gilt
+    // ohnehin.
+    return AppSettings::instance()
+               .value(QStringLiteral("TciAllowRemoteLog"), QStringLiteral("True"))
+               .toString() != QStringLiteral("False");
+}
+
 bool TciServer::remoteTxAllowed()
 {
     // Ab Werk NEIN. Wer aus dem Netz senden will, schaltet es bewusst frei —
@@ -2899,6 +2911,103 @@ void TciServer::onTextMessageReceived(const QString& rohMsg)
         const QString kIqStop     = QStringLiteral("iq_stop:");
         const QString kSpecStart  = QStringLiteral("spectrum_start:");
         const QString kSpecStop   = QStringLiteral("spectrum_stop:");
+
+        // ── QSO eintragen (2026-10-04) ──────────────────────────────────────
+        //
+        // Longpath-eigener Befehl, so wie `spectrum_span` einer ist. Die
+        // Handfunke schickt ihn, Longpath schreibt den Eintrag.
+        //
+        //     log_qso:<rufzeichen>[,<rst gesendet>[,<rst empfangen>]];
+        //     -> log_qso_ok:<rufzeichen>;   oder   log_qso_err:<grund>;
+        //
+        // WARUM NUR DAS RUFZEICHEN UND RST: Frequenz, Band, Betriebsart und
+        // Zeit nimmt Longpath aus dem laufenden Zustand -- genau wie das Pult
+        // es tut (RotorLogbookPanel). Wuerde die Seite sie mitschicken,
+        // koennte sie etwas anderes eintragen, als das Geraet gerade macht,
+        // und ADIF-Eigenheiten wie "LSB/USB sind keine Betriebsarten, sondern
+        // Unterarten von SSB" muessten an zwei Stellen stimmen. Eine Stelle
+        // reicht.
+        //
+        // WARUM NUR ANHAENGEN: kein Loeschen, kein Aendern ueber diesen Weg.
+        // Wer einen Kontakt korrigieren will, tut das am Pult, wo er ihn
+        // sieht.
+        //
+        // Geschrieben wird durch LogbookDatei -- dieselbe Stelle, die auch
+        // das Pult benutzt. Zwei Programme in derselben Datei waeren genau
+        // die Lage, die am 2026-10-03 die Logzeilen zerschrieben hat; hier
+        // ginge es um Kontakte.
+        {
+            QString t = trimmed;
+            if (t.startsWith(QStringLiteral("log_qso:"), Qt::CaseInsensitive)) {
+                auto antwort = [&](const QString& zeile) {
+                    session->sendQueue.push(TciSendQueue::Priority::Control,
+                                            zeile);
+                };
+                // Token-Pflicht wie bei jedem Netzbefehl.
+                if (!session->authenticated) { return; }
+                if (!session->fromLoopback && !remoteLogAllowed()) {
+                    qCWarning(lcTci)
+                        << "TciServer: QSO-Eintrag von" << session->peer
+                        << "abgelehnt — Loggen aus dem Netz ist abgeschaltet"
+                        << "(TciAllowRemoteLog)";
+                    antwort(QStringLiteral("log_qso_err:nicht freigegeben;"));
+                    return;
+                }
+
+                const QStringList a = t.mid(8).split(QLatin1Char(','));
+                const QString ruf = a.value(0).trimmed().toUpper();
+                // Ein Rufzeichen ohne Inhalt ist kein Kontakt. Die Laenge
+                // begrenzen, damit ein verirrter Rahmen nicht als Rufzeichen
+                // in der Datei landet.
+                if (ruf.isEmpty() || ruf.size() > 20) {
+                    antwort(QStringLiteral("log_qso_err:rufzeichen fehlt;"));
+                    return;
+                }
+
+                LogEntry e;
+                e.call    = ruf;
+                e.timeOn  = QDateTime::currentDateTimeUtc();
+                e.rstSent = a.value(1, QStringLiteral("59")).trimmed().left(8);
+                e.rstRcvd = a.value(2, QStringLiteral("59")).trimmed().left(8);
+                if (e.rstSent.isEmpty()) { e.rstSent = QStringLiteral("59"); }
+                if (e.rstRcvd.isEmpty()) { e.rstRcvd = QStringLiteral("59"); }
+
+                if (SliceModel* sl = m_model ? m_model->activeSlice() : nullptr) {
+                    e.freqMHz = sl->frequency() / 1e6;
+                    e.band    = bandLabel(bandFromFrequency(sl->frequency()));
+                    // ADIF kennt LSB/USB nicht als Betriebsart -- das sind
+                    // Unterarten von SSB, und ein Datensatz mit MODE=LSB wird
+                    // abgelehnt oder stillschweigend umgeschrieben. Gleiche
+                    // Zuordnung wie am Pult.
+                    const QString m = SliceModel::modeName(sl->dspMode());
+                    if (m == QLatin1String("LSB") || m == QLatin1String("USB")) {
+                        e.mode = QStringLiteral("SSB");
+                        e.submode = m;
+                    } else if (m == QLatin1String("CWL")
+                               || m == QLatin1String("CWU")) {
+                        e.mode = QStringLiteral("CW");
+                    } else {
+                        e.mode = m;
+                    }
+                }
+
+                QString fehler;
+                if (!LogbookDatei::anhaengen(e, &fehler)) {
+                    qCWarning(lcTci) << "TciServer: QSO-Eintrag" << ruf
+                                     << "nicht geschrieben —" << fehler;
+                    antwort(QStringLiteral("log_qso_err:%1;").arg(fehler));
+                    return;
+                }
+                qCInfo(lcTci) << "TciServer: QSO eingetragen —" << ruf
+                              << e.rstSent << "/" << e.rstRcvd
+                              << "auf" << (e.band.isEmpty()
+                                               ? QStringLiteral("(kein Band)")
+                                               : e.band)
+                              << "von" << session->peer;
+                antwort(QStringLiteral("log_qso_ok:%1;").arg(ruf));
+                return;
+            }
+        }
 
         // ── Sendesperre für das Netz, Stelle 3 von 3 (2026-09-30) ───────────
         //

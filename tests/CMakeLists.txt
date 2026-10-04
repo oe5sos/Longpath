@@ -1947,6 +1947,14 @@ longpath_add_test(tst_radio_status)
 longpath_add_test(tst_radio_status_follows_mox)
 longpath_add_test(tst_settings_hygiene)
 
+# ── QSO vom Telefon ins Logbuch (2026-10-04) ────────────────────────────────
+# tst_tci_qso_eintragen: der Longpath-eigene TCI-Befehl log_qso:. Prueft die
+#   Zusagen, auf denen er steht — ohne Anmeldung gar nichts, abgeschaltet
+#   abgelehnt ABER mit Antwort, leeres/unsinniges Rufzeichen abgelehnt, ein
+#   gueltiger Eintrag steht wirklich in der Datei, und der ADIF-Kopf steht
+#   genau einmal.
+longpath_add_test(tst_tci_qso_eintragen)
+
 # ── Ein Geraet, das nicht aufmacht, darf nicht alles mitnehmen (2026-10-03) ──
 # tst_bus_mit_frist: gibt einen Bus herein, dessen open() absichtlich
 #   stehenbleibt, und prueft die zwei Zusagen der Behebung — nach der Frist
