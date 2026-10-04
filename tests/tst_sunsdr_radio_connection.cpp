@@ -2215,6 +2215,60 @@ private slots:
         QCOMPARE(conn.offeneRahmenForTest(), vorher);
     }
 
+    // ── Zwei Empfaenger brauchen zwei Stroeme ──────────────────────────
+    //
+    // Am 2026-10-04 belegt: der zweite Strom ist NICHT stumm. Im
+    // Mitschnitt des Betreibers (ExpertSDR2 mit RX und RX2, seine eigene
+    // Richtigstellung "es waren immer beide rx und rx2") traegt Kanal 1
+    // echtes I/Q -- -127,9 dBFS bei 31,5 % Q ungleich null, also etwas
+    // kraeftiger als Kanal 0. Longpath hat ihn weggeworfen, weil in den
+    // Geraetefaehigkeiten EIN Empfaenger stand.
+    //
+    // Der Stromstart-Rahmen traegt beides: erstes Byte die Zahl der
+    // Stroeme, zweites die Ratenstufe. Bis hierher waehlte nur die RATE
+    // den Modus -- ein zweiter Empfaenger bei 48 kHz konnte also gar nie
+    // Daten bekommen.
+    void zweiterEmpfaengerStelltAufZweiStroemeUm()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        handshake(conn);
+        QCOMPARE(conn.stromModusForTest(), 0);   // ein Strom, 48 kHz
+
+        conn.setActiveReceiverCount(2);
+        QCOMPARE(conn.stromModusForTest(), 1);   // zwei Stroeme, je 48 kHz
+        QCOMPARE(conn.aktiveEmpfaengerForTest(), 2);
+
+        // Zurueck auf einen: wieder ein Strom, sonst laeuft die halbe
+        // Datenmenge umsonst durchs Netz.
+        conn.setActiveReceiverCount(1);
+        QCOMPARE(conn.stromModusForTest(), 0);
+    }
+
+    // Bei 96 kHz gibt es auf dem Draht keinen Ein-Strom-Modus -- dort
+    // sind es immer zwei, gleich wie viele Empfaenger oben hoeren.
+    void beiSechsundneunzigSindEsImmerZweiStroeme()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        handshake(conn);
+
+        conn.setSampleRate(96000);
+        QCOMPARE(conn.stromModusForTest(), 2);   // zwei Stroeme, je 96 kHz
+
+        conn.setActiveReceiverCount(2);
+        QCOMPARE(conn.stromModusForTest(), 2);   // bleibt
+
+        conn.setActiveReceiverCount(1);
+        QCOMPARE(conn.stromModusForTest(), 2);   // bleibt ebenfalls
+    }
+
     // ── Mikrofon-PTT am Geraet ─────────────────────────────────────────
     //
     // Die zweite Empfangsluecke, geschlossen ohne Protokollwissen: der

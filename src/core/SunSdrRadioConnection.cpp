@@ -14,6 +14,8 @@
 
 #include "SunSdrRadioConnection.h"
 
+#include "AppSettings.h"
+
 #include <QLoggingCategory>
 #include <QRegularExpression>
 #include <QStringList>
@@ -231,7 +233,46 @@ void SunSdrRadioConnection::connectToRadio(const RadioInfo& info)
 
     m_radioInfo = info;
     m_profile = &resolveProfile(info.boardType);
-    m_rxLevelGain = static_cast<float>(std::pow(10.0, m_profile->rxLevelTrimDb / 20.0));
+    // Pegelabgleich: Vorgabe aus dem Profil, aber ueberschreibbar.
+    //
+    // Warum ueberschreibbar (2026-10-04): die +20,0 dB im QRP-Profil
+    // wurden am 2026-09-25 ueber den TCI-Weg gemessen (rx_sensors), nicht
+    // ueber den nativen Treiber -- ein anderer Weg mit anderer
+    // Skalierung. Der Betreiber meldet den nativen Empfang mehrfach als
+    // "sehr sehr leise", waehrend ExpertSDR2 am SELBEN Geraet ohne
+    // Antenne "perfekt" laut ist. Damit ist belegt, dass es keine Frage
+    // der fehlenden Antenne ist, sondern eine Luecke hier.
+    //
+    // Seine Anforderung, woertlich: "rauschen muss immer zu hoeren sein".
+    //
+    // Statt eine neue Zahl zu RATEN wird sie messbar gemacht: der
+    // Betreiber dreht sie, bis es gegen ExpertSDR2 stimmt, und der
+    // gefundene Wert kommt danach fest ins Profil. Eine geratene Zahl
+    // waere genau der Fehler, der am 2026-09-24 schon einmal "schlechtes
+    // Rauschen" erzeugt hat.
+    double trimDb = m_profile->rxLevelTrimDb;
+    const QString ausEinstellung =
+        AppSettings::instance()
+            .value(QStringLiteral("SunSdrRxLevelTrimDb"), QString())
+            .toString()
+            .trimmed();
+    bool gelesen = false;
+    if (!ausEinstellung.isEmpty()) {
+        const double wert = ausEinstellung.toDouble(&gelesen);
+        if (gelesen) { trimDb = wert; }
+    }
+    if (qEnvironmentVariableIsSet("LONGPATH_SUNSDR_PEGEL")) {
+        bool ok = false;
+        const double wert =
+            qEnvironmentVariable("LONGPATH_SUNSDR_PEGEL").toDouble(&ok);
+        if (ok) { trimDb = wert; gelesen = true; }
+    }
+    m_rxLevelGain = static_cast<float>(std::pow(10.0, trimDb / 20.0));
+    qCInfo(lcSunSdr).noquote()
+        << QStringLiteral("SunSdr: Pegelabgleich %1 dB (%2)")
+               .arg(trimDb, 0, 'f', 1)
+               .arg(gelesen ? QStringLiteral("eingestellt")
+                            : QStringLiteral("Vorgabe aus dem Profil"));
     m_singleChannelWarned = false;
     m_singleChannelSeen = false;
     m_iqConfirmed = false;
@@ -1027,8 +1068,46 @@ void SunSdrRadioConnection::setActiveReceiverCount(int count)
     const int neu = qBound(1, count, kMaxKanaele);
     if (neu == m_aktiveEmpfaenger) { return; }
     m_aktiveEmpfaenger = neu;
-    qCInfo(lcSunSdr) << "SunSdr: aktive Empfaenger ->" << m_aktiveEmpfaenger
-                     << "(Kanaele darueber werden verworfen)";
+    qCInfo(lcSunSdr) << "SunSdr: aktive Empfaenger ->" << m_aktiveEmpfaenger;
+
+    // Und jetzt der Teil, der bis zum 2026-10-04 fehlte: ein zweiter
+    // Empfaenger braucht den zweiten STROM. Der Stromstart-Rahmen traegt
+    // beides -- erstes Byte die Zahl der Stroeme, zweites die Ratenstufe
+    // (SunSdrProtocol.h, StromModus). Bisher waehlte nur die Rate den
+    // Modus, also konnte RX2 gar nie Daten bekommen.
+    stromModusNachziehen();
+}
+
+// Der Modus ergibt sich aus BEIDEM: Zahl der Empfaenger und Rate.
+//
+//   1 Empfaenger, 48 kHz  -> ein Strom
+//   2 Empfaenger, 48 kHz  -> zwei Stroeme, je 48
+//   1 oder 2,     96 kHz  -> zwei Stroeme, je 96 (einen Strom mit 96 kHz
+//                            gibt es auf dem Draht nicht)
+//
+// Am 2026-10-04 aus einem Mitschnitt des Betreibers belegt, in dem
+// ExpertSDR2 mit RX UND RX2 lief: der zweite Kanal traegt echtes I/Q
+// (-127,9 dBFS, 31,5 % Q ungleich null) -- er ist nicht stumm, Longpath
+// hat ihn nur weggeworfen.
+void SunSdrRadioConnection::stromModusNachziehen()
+{
+    const SunSdr::StromModus gewuenscht =
+        (m_rateHz >= 96000)
+            ? SunSdr::StromModus::ZweiStroemeJe96
+            : (m_aktiveEmpfaenger >= 2 ? SunSdr::StromModus::ZweiStroemeJe48
+                                       : SunSdr::StromModus::EinStrom48);
+    if (gewuenscht == m_stromModus) { return; }
+    m_stromModus = gewuenscht;
+    qCInfo(lcSunSdr) << "SunSdr: Stromstart-Rahmen ->"
+                     << (gewuenscht == SunSdr::StromModus::EinStrom48
+                             ? "ein Strom, 48 kHz"
+                             : gewuenscht == SunSdr::StromModus::ZweiStroemeJe48
+                                   ? "zwei Stroeme, je 48 kHz"
+                                   : "zwei Stroeme, je 96 kHz");
+    if (m_running && !m_awaitingBeacon && m_profile) {
+        sendeSteuerrahmen(SunSdr::buildStromStartFrame(*m_profile, m_stromModus),
+                          "Stromstart 0x01 (Modus umgestellt)");
+    }
 }
 
 void SunSdrRadioConnection::setSampleRate(int sampleRate)
@@ -1042,40 +1121,23 @@ void SunSdrRadioConnection::setSampleRate(int sampleRate)
     // nicht "geht nicht", sondern Daten einer Rate in einem Kanal einer
     // anderen. Genau das ist am 2026-09-24 passiert (48k-Daten in einem
     // 192k-Kanal) und wurde am Geraet als "schlechtes Rauschen" gehoert.
-    SunSdr::StromModus modus;
-    if (sampleRate == 48000) {
-        modus = SunSdr::StromModus::EinStrom48;
-    } else if (sampleRate == 96000) {
-        // Zwei Stroeme je 96 kHz; der erste geht an den Empfaenger, der
-        // zweite wird verworfen, solange es keinen zweiten gibt (siehe
-        // processStreamDatagram).
-        modus = SunSdr::StromModus::ZweiStroemeJe96;
-    } else {
+    if (sampleRate != 48000 && sampleRate != 96000) {
         qCWarning(lcSunSdr)
             << "SunSdr: setSampleRate(" << sampleRate
             << ") -- fuer diese Rate ist kein Stromstart-Rahmen belegt. Es "
-               "bleibt bei" << (m_stromModus == SunSdr::StromModus::EinStrom48
-                                    ? 48000 : 96000)
+               "bleibt bei" << m_rateHz
             << "Hz. Belegt sind 48000 und 96000 (am Geraet gemessen "
                "2026-10-03).";
         return;
     }
+    if (sampleRate == m_rateHz) { return; }
+    m_rateHz = sampleRate;
 
-    if (modus == m_stromModus) {
-        return;
-    }
-    m_stromModus = modus;
-    qCInfo(lcSunSdr) << "SunSdr: Abtastrate ->" << sampleRate
-                     << "Hz (Stromstart-Rahmen wird umgestellt)";
-
-    // Steht die Verbindung schon, geht der Rahmen jetzt hinaus -- das
-    // Geraet startet den Strom dann neu und faengt die Folgenummern bei
-    // null an (am 2026-10-03 gemessen; auditStreamSeq erkennt das als
-    // Neuanfang).
-    if (m_running && !m_awaitingBeacon && m_profile) {
-        sendeSteuerrahmen(SunSdr::buildStromStartFrame(*m_profile, m_stromModus),
-                          "Stromstart 0x01 (Rate umgestellt)");
-    }
+    // Den Modus leitet stromModusNachziehen() aus Rate UND Empfaengerzahl
+    // ab und schickt den Stromstart-Rahmen, wenn die Verbindung schon
+    // steht. Das Geraet faengt die Folgenummern dann bei null an (am
+    // 2026-10-03 gemessen; auditStreamSeq erkennt das als Neuanfang).
+    stromModusNachziehen();
 }
 
 

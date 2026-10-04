@@ -1254,8 +1254,15 @@ const BoardCapabilities kSunSdr2Qrp = {
     // Revisit if/when a second-receiver capability is confirmed on the
     // bench.
     .adcCount         = 1,
-    .maxReceivers     = 1,
-    .maxSlices        = 1,
+    // Zwei Empfaenger -- am 2026-10-04 aus einem Mitschnitt des Betreibers
+    // belegt, in dem ExpertSDR2 mit RX UND RX2 lief ("es waren immer beide
+    // rx und rx2"). Der zweite Strom traegt echtes I/Q: -127,9 dBFS,
+    // 31,5 % Q ungleich null, also etwas KRAEFTIGER als der erste
+    // (-130,0 dBFS / 21,2 %). Bis dahin stand hier 1, und der Treiber hat
+    // den zweiten Kanal weggeworfen -- die Lueckenliste nannte ihn
+    // faelschlich "stumm".
+    .maxReceivers     = 2,
+    .maxSlices        = 2,
     .userDdcCount     = 1,
     .widebandAdcs     = 0,   // no wideband/panadapter-bypass stream documented
     // 48 000 Hz — am Geraet gemessen (2026-09-23/24), nicht uebernommen.

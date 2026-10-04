@@ -882,6 +882,10 @@ private:
     SunSdr::StromModus m_stromModus{SunSdr::StromModus::EinStrom48};
     // Wie viele Kanaele oben ueberhaupt einen Empfaenger haben.
     int m_aktiveEmpfaenger{1};
+
+    // Die zuletzt gewuenschte Rate; zusammen mit der Empfaengerzahl
+    // ergibt sie den Stromstart-Modus (stromModusNachziehen).
+    int m_rateHz{48000};
     quint64 m_stoppGeschickt{0};
 
     void auditStreamSeq(int kanal, quint16 seq, quint64 inhalt);
@@ -1065,6 +1069,7 @@ private:
                            bool nachschickbar = true);
     void pruefeOffeneRahmen();
     bool rahmenNochOffen(quint8 opcode) const;
+    void stromModusNachziehen();
 
     // ── Uebersteuerung aus dem I/Q erkennen ─────────────────────────────
     //
