@@ -175,6 +175,7 @@ public:
     // Darf eine Verbindung aus dem NETZ senden? Ab Werk nein. Der Schalter
     // wirkt an beiden Stellen, an denen gesendet werden kann: dem trx-Weg und
     // der Annahme von TX-Ton. Nur eine zu sperren liesse den Sendeweg offen.
+    static bool remoteLogAllowed();
     static bool remoteTxAllowed();
 
     // Test-only: bypass the RxChannel signal chain and inject audio directly
