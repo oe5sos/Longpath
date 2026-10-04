@@ -889,6 +889,7 @@ private:
 
     // Einmal je Sitzung melden, dass die Leistung nicht gestellt wird.
     bool m_txDriveGemeldet{false};
+    bool m_preampSchalterGemeldet{false};
     quint64 m_stoppGeschickt{0};
 
     void auditStreamSeq(int kanal, quint16 seq, quint64 inhalt);

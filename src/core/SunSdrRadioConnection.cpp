@@ -1744,7 +1744,27 @@ void SunSdrRadioConnection::onDataWatchdogTick()
 // setAttenuator() out of this block.
 
 void SunSdrRadioConnection::setTxFrequency(quint64) {}
-void SunSdrRadioConnection::setPreamp(bool) {}
+// Der Vorverstaerker dieses Geraets ist KEIN Schalter, sondern vier feste
+// Stufen (-20 / -10 / 0 / +10 dB, Opcode 0x04, am 2026-09-25 in
+// ExpertSDR2 durchgeschaltet und bestaetigt). Gebaut ist er als
+// setPreampModeIndex(); der An/Aus-Weg der OpenHPSDR-Geraete passt hier
+// nicht.
+//
+// Ein leerer Rumpf blieb bis zum 2026-10-04 still -- derselbe Fehler wie
+// bei setTxDrive: ein Bedienelement, das nichts tut und nichts sagt.
+// Einmal je Sitzung melden, nicht bei jedem Klick.
+void SunSdrRadioConnection::setPreamp(bool an)
+{
+    if (m_preampSchalterGemeldet) { return; }
+    m_preampSchalterGemeldet = true;
+    qCInfo(lcSunSdr).noquote()
+        << QStringLiteral("SunSdr: dieses Geraet kennt keinen "
+                          "Vorverstaerker-Schalter -- \"%1\" ist nicht "
+                          "hinausgegangen. Es hat vier feste Stufen "
+                          "(-20/-10/0/+10 dB), zu stellen ueber die "
+                          "Stufenauswahl.")
+               .arg(an ? QStringLiteral("ein") : QStringLiteral("aus"));
+}
 
 // Ein leerer Rumpf, der ein BEDIENELEMENT bedient, ist eine Falle: der
 // Betreiber dreht die Leistung herunter, sieht die Zahl sinken, und am
