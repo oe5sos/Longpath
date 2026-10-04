@@ -316,8 +316,26 @@ einer davon stand genau an der Stelle, die gestern als „erledigt" galt.
 
 ## Was im Empfang jetzt noch fehlt
 
-Unverändert **eines**: `micPttFromRadio`. Dafür braucht es den
-Mitschnitt, weil die QRP den Zustand nirgends von sich aus meldet.
+**Nichts mehr — der Empfang ist funktional vollständig.**
+
+Die Zeile, die hier zuerst stand („unverändert eines: `micPttFromRadio`,
+dafür braucht es den Mitschnitt"), war falsch: ich hatte eine ältere
+Aussage abgeschrieben, ohne den Code zu prüfen. `micPttFromRadio` ist am
+2026-10-02 gebaut worden (`1e4eb060`) und wird **ohne Protokollwissen**
+aus dem Stromkopf abgeleitet — `0xFD` heißt, das Gerät sendet, `0xFE`
+heißt Empfang. Mit Flankenerkennung (240 Pakete je Sekunde dürfen nicht
+240 Meldungen ergeben) und mit Abgrenzung gegen eigenes MOX. Geprüft in
+`sendezustandAmGeraetMeldetPtt`.
+
+Offen ist nur die **Bestätigung am Gerät**, und die braucht keinen
+Mitschnitt, sondern einen **50-Ω-Abschluss**: wer die Mikrofontaste
+drückt, bringt das Gerät in den Sendezustand, und das gehört nicht an
+eine offene Buchse.
+
+Damit ist Martins Auftrag vom 2026-10-02 — „er soll am stand von
+anvelina und anan sein, absolut gleichwertig" — **für den Empfang
+erfüllt**, vorbehaltlich dieser einen Live-Bestätigung. Was bleibt, ist
+das Senden, und das ist ein eigenes Kapitel (Abschnitt 4).
 
 ## Zwei offene Beobachtungen, beide ohne Antenne messbar
 
