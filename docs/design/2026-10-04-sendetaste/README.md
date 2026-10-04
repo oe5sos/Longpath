@@ -11,6 +11,17 @@ passiert, wenn das Telefon stirbt, während gesendet wird.
 Messing ist die Sendefarbe. Rot bleibt der Warnung — die Regel steht seit
 dem Entwurf der Sendetaste am Schreibtisch.
 
+## Entschieden: **1 · Haltetaste** (Martin, 2026-10-04)
+
+Damit ist auch der Rest festgelegt:
+
+* Es gibt **keinen** Sendezustand, der ohne Finger weiterbesteht. Fällt die
+  Verbindung, das Telefon oder die Hand aus, endet das Senden von selbst.
+* Der Wachhund im Funkgerät bleibt trotzdem Pflicht — er fängt den Fall ab,
+  dass das Telefon mitten im Halten verstummt und das Loslassen nie ankommt.
+* Die Entwürfe 2 bis 4 bleiben als Vergleich stehen und werden nicht
+  überschrieben.
+
 ## 1 · Haltetaste
 
 Gedrückt halten sendet, loslassen beendet. Wie eine Handtaste.
