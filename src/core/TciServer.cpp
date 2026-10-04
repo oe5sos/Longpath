@@ -2491,6 +2491,35 @@ void TciServer::setKeyedWatchdog(int intervalMs, int maxUnanswered)
     }
 }
 
+// ── sendeAblehnung() ─────────────────────────────────────────────────────────
+//
+// Ein abgelehnter Sendewunsch war bisher STUMM. Am Pult faellt das nicht auf
+// — dort kommt der Befehl ohnehin von Loopback und geht durch. Auf einer
+// Fernbedienung ist es die unangenehmste Form von Nichts: der Bediener
+// drueckt, es passiert nichts, und nichts erklaert es. Genau dieselbe
+// Gattung Fehler wie eine Pruefung, deren Ergebnis niemand sieht.
+//
+// TCI verwirft abgelehnte Befehle antwortlos, und daran wird nichts
+// geaendert: die Zeile geht AUSSCHLIESSLICH an den ablehnten Client, und nur
+// in den Faellen, in denen bisher gar nichts kam. Fremde Clients (WSJT-X,
+// N1MM, JTDX) sprechen ueber Loopback und laufen nie in diese Sperre; sie
+// bekommen die Zeile also nie zu sehen.
+//
+//     tx_err:<grund>;
+//
+// Dieselbe Form wie log_qso_err: — ein Longpath-eigener Befehl, erkennbar
+// als solcher, von fremden Clients gefahrlos zu ignorieren.
+//
+// Die Sperre selbst bleibt unangetastet. Hier wird nur gesagt, DASS und
+// WARUM sie gegriffen hat.
+void TciServer::sendeAblehnung(const std::shared_ptr<TciClientSession>& session,
+                               const QString& grund)
+{
+    if (!session) { return; }
+    session->sendQueue.push(TciSendQueue::Priority::Control,
+                            QStringLiteral("tx_err:%1;").arg(grund));
+}
+
 void TciServer::startKeyedWatchdog()
 {
     if (!m_keyedWatchdog) {
@@ -3039,6 +3068,7 @@ void TciServer::onTextMessageReceived(const QString& rohMsg)
                         << "TciServer: Abstimmträger von" << session->peer
                         << "abgelehnt — Senden aus dem Netz ist nicht"
                         << "freigegeben (TciAllowRemoteTx)";
+                    sendeAblehnung(session, QStringLiteral("nicht freigegeben"));
                     return;
                 }
 
@@ -3572,6 +3602,7 @@ void TciServer::onTextMessageReceived(const QString& rohMsg)
                             << "TciServer: Sendewunsch von" << session->peer
                             << "abgelehnt — Senden aus dem Netz ist nicht"
                             << "freigegeben (TciAllowRemoteTx)";
+                        sendeAblehnung(session, QStringLiteral("nicht freigegeben"));
                         return;
                     }
 

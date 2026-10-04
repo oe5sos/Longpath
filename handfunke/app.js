@@ -2049,13 +2049,25 @@ zeichneBedienung();
   // die beim Druecken nichts tut und nichts erklaert, ist schlimmer als
   // keine. Ueber `http` gibt es `navigator.mediaDevices` gar nicht; dagegen
   // hilft nur ein Zertifikat (handfunke/tls-einrichten.sh).
+  // Wo es kein Mikrofon GEBEN kann, steht auch keine Taste dafuer.
+  //
+  // Erst stand hier eine abgeblendete Taste mit einer Warnung darunter. Das
+  // war gut gemeint und im Alltag falsch: ueber `http` — also genau dort, wo
+  // das Telefon die Seite holt — kann sie NIE etwas tun. Eine dauerhaft tote
+  // Taste im besten Daumenbereich sieht aus wie ein Defekt und nimmt Platz
+  // fuer etwas, das dort nicht geht. Dieselbe Ueberlegung wie bei den beiden
+  // Sendetasten, die zu einer ruhigen Zeile geschrumpft sind.
+  //
+  // Der Grund bleibt lesbar — aber als eine Zeile, nicht als Bedienelement,
+  // das zum Druecken einlaedt.
   const moeglich = mikrofonMoeglich();
   reihe.hidden = false;
   if (!moeglich) {
-    taste.disabled = true;
+    taste.hidden = true;
+    balken.parentElement.hidden = true;
     meldung.className = 'mikmeldung warn';
     meldung.textContent = window.isSecureContext === false
-      ? 'KEIN MIKROFON ÜBER HTTP — ZERTIFIKAT FEHLT'
+      ? 'MIKROFON BRAUCHT EIN ZERTIFIKAT (HTTPS)'
       : 'DIESES GERÄT GIBT KEIN MIKROFON HER';
   }
 
@@ -2094,6 +2106,16 @@ zeichneBedienung();
       ? `${mik.strecke.rahmen} RAHMEN GESCHICKT · VERWORFEN, WEIL NICHT GETASTET`
       : '';
   };
+
+  // Der Server sagt seit dem 2026-10-04, WARUM er einen Sendewunsch
+  // ablehnt. Die Halteleiste tastet noch nicht, aber sobald sie es tut,
+  // steht hier der Grund statt eines stummen Nichts — und bis dahin fängt
+  // die Zeile jede Ablehnung ab, die aus einer anderen Ecke käme.
+  link.addEventListener('txfehler', (e) => {
+    const grund = (e.detail && e.detail.text) || 'abgelehnt';
+    meldung.className = 'mikmeldung warn';
+    meldung.textContent = ('SENDEN ABGELEHNT — ' + grund).toUpperCase();
+  });
 
   taste.addEventListener('pointerdown', anfangen);
   taste.addEventListener('pointerup', aufhoeren);
