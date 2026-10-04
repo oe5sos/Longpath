@@ -779,3 +779,52 @@ nicht. Der Rest bleibt offen. Es ist **kein** Verlust: die
 Folgenummernprüfung meldet 0 von 4797 über denselben Zeitraum. Wer hier
 weitermacht, soll die Zähler erst ab dem Umstellen laufen lassen und
 dann neu messen, statt diese Zahl zu deuten.
+
+---
+
+# Die Wiederholungen bei 96 kHz (gemessen 2026-10-04)
+
+Bei 48 kHz meldet der Treiber 1,00 Kopien je Nummer, bei 96 kHz 1,2 bis
+1,5. Das sind rund 105 bytegleiche Pakete je Sekunde, die niemand
+braucht — und der Grund, warum die Verbindung 13,2 Mbit/s zieht.
+
+**Die Quittung wirkt, sie ist nur nicht vollständig.** A/B am Gerät, je
+8 s, `STROMMODUS=je96`:
+
+| | Pakete/s | Wiederholungen/s | Kopien je Nummer |
+| --- | --- | --- | --- |
+| `BLOCKANTWORT=0` (aus) | 877 | 401 | 1,84 |
+| Vorgabe (an) | 582 | 105 | 1,22 |
+
+Sie nimmt also drei Viertel weg. Nebenbei: ohne Quittung sind es bei
+96 kHz 1,84 Kopien, nicht die 8,1 von 48 kHz — das Wiederholverhalten
+des Geräts hängt selbst von der Betriebsart ab.
+
+**Widerlegt: den Kopf des Geräts spiegeln.** Die Blockantwort trägt fest
+`byte8=0x01, byte9=0x00` (ein Strom, Kanal 0), während das Gerät bei
+96 kHz mit `byte8=0x02` und wechselndem `byte9` sendet. Naheliegende
+Vermutung: das Gerät ordnet die Quittung dem falschen Strom zu. Als
+Schalter eingebaut und gemessen — **kein Unterschied**:
+
+    fest:       147 → 117 → 104 → 99 Wiederholungen/s
+    gespiegelt: 150 → 127 → 101 → 100
+
+Der Schalter wurde danach wieder entfernt. `byte8`/`byte9` beschreiben
+im Hinweg unseren eigenen Strom, nicht den des Geräts; die Vermutung war
+von Anfang an wacklig, und die Messung hat sie erledigt.
+
+**Noch offen, mit Hinweisen für den Nächsten:**
+
+- Die Wiederholungen **fallen** über die ersten Sekunden (147 → 99) und
+  pendeln sich bei ~100/s ein. Ein Teil ist also Einschwingen, nicht
+  Dauerzustand. Wer hier misst, soll die erste Sekunde wegwerfen.
+- Der Antwort-Ring hält 32 Nummern. Bei 96 kHz sind das nur ~54 ms, und
+  die Nummern laufen innerhalb davon um. Ob dadurch Quittungen
+  ausbleiben, die das Gerät noch erwartet, ist nicht gemessen — das wäre
+  der nächste Versuch (Ring vergrößern, dieselbe A/B-Messung).
+- Ungeprüft: ob das Gerät erwartet, dass wir bei zwei Strömen auch ZWEI
+  Stille-Ströme zurückschicken statt einen. Das ist etwas anderes als
+  den Kopf zu spiegeln und wäre der Versuch danach.
+
+Es ist kein Richtigkeitsfehler: der Verlust liegt bei 0,02–0,04 %, der
+Ton läuft. Es ist Netzlast.
