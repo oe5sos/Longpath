@@ -118,6 +118,45 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(g_lebende.load() == 0, 3000);
     }
 
+    /// Solange ein aufgegebener Versuch noch hängt, wird kein zweiter
+    /// gestartet — und sobald er durch ist, geht es wieder.
+    ///
+    /// Das ist die Sicherung, die mir beim Nachlesen des eigenen Codes
+    /// aufgefallen ist: `Pa_OpenStream` darf nicht von zwei Fäden gleichzeitig
+    /// laufen. Ohne sie wäre genau das die Folge der Frist — der erste Versuch
+    /// hängt noch, der Hauptfaden geht weiter zum nächsten Gerät und öffnet
+    /// parallel. Die Frist hätte den Hänger gegen etwas Schlimmeres
+    /// eingetauscht.
+    void waehrendEinerHaengtWirdKeinZweiterGestartet()
+    {
+        // Erster: hängt 1,5 s, Frist 200 ms -> wird aufgegeben.
+        auto a = Audio::oeffneMitFrist(std::make_unique<LahmerBus>(1500), {},
+                                       QStringLiteral("erster"), 200);
+        QVERIFY(!a);
+
+        // Zweiter: würde in 0 ms aufmachen — darf aber gar nicht erst
+        // starten, solange der erste hängt. Und zwar SOFORT abgelehnt, nicht
+        // erst nach einer weiteren Frist.
+        QElapsedTimer uhr;
+        uhr.start();
+        auto b = Audio::oeffneMitFrist(std::make_unique<LahmerBus>(0), {},
+                                       QStringLiteral("zweiter"), 3000);
+        const qint64 gebraucht = uhr.elapsed();
+        QVERIFY2(!b, "Ein zweiter Versuch lief, waehrend der erste noch haengt");
+        QVERIFY2(gebraucht < 150,
+                 qPrintable(QStringLiteral("Die Ablehnung dauerte %1 ms — sie "
+                                           "soll sofort kommen")
+                                .arg(gebraucht)));
+
+        // Sobald der erste durch ist, muss es wieder gehen. Ohne diese
+        // Haelfte waere eine Sperre denkbar, die nie wieder aufgeht.
+        QTRY_VERIFY_WITH_TIMEOUT(g_lebende.load() == 0, 8000);
+        auto c = Audio::oeffneMitFrist(std::make_unique<LahmerBus>(0), {},
+                                       QStringLiteral("danach"), 2000);
+        QVERIFY2(c, "Nach dem Ende des haengenden Versuchs blieb die Sperre zu");
+        c.reset();
+    }
+
     /// Kein Bus hinein, kein Absturz heraus.
     void ohneBusKeinAbsturz()
     {
