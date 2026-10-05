@@ -66,15 +66,27 @@ benutzt als die DX/PRO, aus der alle unbestätigten Zahlen stammen:
 | VFO-Frequenz | `0x08` | `0x09` |
 | erstes Byte des Rahmens | `0x03` | `0x32` |
 
-Jede Zahl, die wir für das Senden benutzen, stammt aus derselben Quelle
-wie die rechte Spalte. Sie ist also **Verdacht, nicht Fakt**:
+**Nachtrag 2026-10-05 — drei davon sind keine Vermutung mehr.** Im
+Mitschnitt `expert-96k.pcap` schickt ExpertSDR2 bei **jedem** Verbinden
+`0x06` (MOX/PTT), `0x15` (Antennenwahl) und `0x17` (Drive) an die QRP,
+jeweils mit Wert `00000000`, und das Gerät **quittiert jeden davon**.
+Damit steht fest: die Opcodes existieren auf der QRP, und der Wert 0 ist
+nachweislich harmlos. Offen bleibt, was ein Wert ≠ 0 bewirkt — und genau
+dafür ist dieser Durchgang da.
 
-| Zweck | Vermuteter Opcode | Gebaut? |
-| --- | --- | --- |
-| MOX / PTT | `0x06` | Rahmenbauer fertig, nicht verdrahtet |
-| Leistung | `0x17` | Rahmenbauer fertig, `setTxDrive` leer |
-| PA freigeben | `0x24` | Rahmenbauer fertig, nicht verdrahtet |
-| Antennenwahl | `0x15` | verdrahtet, **stumm** (`LONGPATH_SUNSDR_ANTENNE=1`) |
+`0x24` (PA freigeben) kommt im ganzen Verbindungsablauf **nicht** vor;
+diese Nummer bleibt reiner Verdacht aus der DX-Quelle.
+
+Für die übrigen gilt weiter: jede Zahl, die wir für das Senden benutzen,
+stammt aus derselben Quelle wie die rechte Spalte, ist also **Verdacht,
+nicht Fakt**:
+
+| Zweck | Opcode | Stand 2026-10-05 | Gebaut? |
+| --- | --- | --- | --- |
+| MOX / PTT | `0x06` | **an der QRP quittiert** (Wert 0) | Rahmenbauer fertig, nicht verdrahtet |
+| Leistung | `0x17` | **an der QRP quittiert** (Wert 0) | Rahmenbauer fertig, `setTxDrive` leer |
+| PA freigeben | `0x24` | **nie gesehen** — reiner Verdacht | Rahmenbauer fertig, nicht verdrahtet |
+| Antennenwahl | `0x15` | **an der QRP quittiert** (Wert 0) | verdrahtet, **stumm** (`LONGPATH_SUNSDR_ANTENNE=1`) |
 
 **Vorgehen: einer nach dem anderen, und nach jedem nachsehen.** Das
 Gerät quittiert jeden angenommenen Steuerrahmen binnen 15–50 ms
@@ -88,8 +100,13 @@ Im Log steht beides von selbst (`nach N ms quittiert` bzw. beim Trennen
 `noch unquittiert: 0x..`).
 
 **Die Antennenwahl zuerst**, weil sie als einzige nichts erzeugt: sie
-schaltet nur ein Relais. Erst wenn `0x15` quittiert wird, hat die
-Vermutung „die QRP teilt die Opcodes der DX" überhaupt Grundlage.
+schaltet nur ein Relais.
+
+~~Erst wenn `0x15` quittiert wird, hat die Vermutung „die QRP teilt die
+Opcodes der DX" überhaupt Grundlage.~~ — **erledigt am 2026-10-05**, ohne
+Abschluss und ohne Senden: `0x15` wird quittiert, `0x06` und `0x17` auch.
+Dieser Durchgang fängt damit nicht mehr bei der Frage an, ob die Nummern
+stimmen, sondern bei der, was ein Wert ≠ 0 bewirkt.
 
 ---
 

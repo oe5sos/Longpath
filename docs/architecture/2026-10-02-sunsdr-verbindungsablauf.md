@@ -1135,3 +1135,84 @@ Wiederholung.
 **Kein Richtigkeitsfehler:** Verlust 0,00–0,04 %, Folgenummern sauber,
 der Ton läuft. Es ist Netzlast, und sie ist mit der Kopfantwort um ein
 Viertel kleiner geworden.
+
+---
+
+# Der Verbindungsablauf aus `expert-96k.pcap` (2026-10-05)
+
+57 Steuerrahmen, 29 hinaus und 28 herein, alles vor dem ersten
+Strompaket bei 0,290 s. Der vollständigste Mitschnitt, den wir haben —
+und er beantwortet die Frage, die seit dem 2026-10-03 offen war.
+
+## Der Befund, der die Sendevorbereitung ändert
+
+Bis heute galt: die TX-Opcodes stammen aus der DX/PRO, die QRP benutzt
+nachweislich andere Nummern, also sind sie **Verdacht, nicht Fakt**.
+Dieser Mitschnitt zeigt sie **an der QRP selbst**, von ExpertSDR2
+geschickt und vom Gerät quittiert:
+
+| Opcode | Nutzlast | Quittiert | bisher |
+| --- | --- | --- | --- |
+| `0x06` MOX/PTT | `00000000` | ja | „Kandidat" |
+| `0x15` Antennenwahl | `00000000` | ja | „Kandidat" |
+| `0x17` Ansteuerung/Drive | `00000000` | ja | „Kandidat" |
+
+Alle drei gehen bei **jedem** Verbinden hinaus, mit Wert 0, und das
+Gerät antwortet auf jeden mit dem leeren Echo. Damit steht fest:
+
+- **Die Opcodes existieren auf der QRP** und werden angenommen. Die
+  Sorge „zwei Nummern neben der PA-Freigabe" ist für diese drei
+  ausgeräumt.
+- **Der Wert 0 ist nachweislich harmlos** — ExpertSDR2 schickt ihn
+  jedes Mal, ohne Antenne und ohne Sendezustand.
+
+Was damit **nicht** feststeht: was die Opcodes bedeuten. Dass `0x06`
+angenommen wird, macht es noch nicht zu MOX, und was ein Wert ≠ 0
+bewirkt, steht in keinem Mitschnitt, in dem niemand gesendet hat. Dafür
+bleibt es beim Abschluss am Ausgang.
+
+**`0x24` (PA freigeben) kommt im ganzen Verbindungsablauf NICHT vor.**
+Diese Nummer bleibt also reiner Verdacht aus der DX-Quelle.
+
+## Die sechzehn Rahmen, die Longpath nie schickt
+
+Mit Nutzlast, wie sie auf dem Draht stehen:
+
+    0x03   4 B   01000000
+    0x05  1200 B c80600600000...      (siehe unten)
+    0x06   4 B   00000000             MOX/PTT, Wert 0
+    0x0c   0 B                        ABFRAGE, Antwort 320 B
+    0x0d   0 B                        ABFRAGE, Antwort 320 B
+    0x0f   4 B   0a000000
+    0x10   4 B   00000000
+    0x11   4 B   fe000000
+    0x12  1024 B 64000000...
+    0x13   4 B   00000000
+    0x15   4 B   00000000             Antennenwahl, Wert 0
+    0x16  36 B   0100000001000000...  Konfigurationsblock, zweimal
+    0x17   4 B   00000000             Drive, Wert 0
+    0x18  12 B   0000000000804f12...  Haupttakt 307,2 MHz
+    0x1a   4 B   00000000
+    0x1c  16 B   13370c0414490401...  Kalibrierwerte
+
+Das Gerät quittiert **jeden** davon. Keiner ist also für den Empfang
+nötig — Longpath hört ohne sie —, aber die Reihenfolge ist jetzt
+vollständig bekannt.
+
+## Eine Beobachtung zu `0x05`, die nicht zu uns gehört
+
+Die 1200 Byte, die ExpertSDR2 in `0x05` schickt, sind erkennbar
+**nicht initialisierter Speicher**: darin stehen Zeigerwerte der Form
+`…ef7f0000` und Textreste wie `de_AT`, `POSIX`, `en_GB`, `es_US`,
+`pt_BR`. ExpertSDR2 schickt also Teile seines eigenen Stapelspeichers
+ans Funkgerät. Für uns ist das nur insofern wichtig, als **der Inhalt
+offensichtlich egal ist** — niemand sollte versuchen, diese Bytes
+nachzubauen. Wenn `0x05` je gebraucht wird, tut es jede Füllung.
+
+## Was das für den Abschluss-Durchgang ändert
+
+Der Prüfplan sah vor, mit der Antennenwahl `0x15` anzufangen, um
+überhaupt erst zu klären, ob die DX-Nummern auf der QRP gelten. **Dieser
+Schritt ist erledigt** — sie gelten für `0x06`, `0x15` und `0x17`.
+Der Durchgang mit dem Abschluss beginnt damit direkt bei der Frage, die
+nur dort zu beantworten ist: was ein Wert ≠ 0 bewirkt.
