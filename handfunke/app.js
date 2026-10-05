@@ -12,6 +12,7 @@ import { Sammelstelle, zeileLesen, befundLesen, zeitKurz, dupeSatz }
   from './logbuch.js';
 import { spotLesen, marken, trefferBei } from './spots.js';
 import { Zeichenbremse } from './ton-vorrang.js';
+import { bildIstAlt } from './aufwachen.js';
 
 const $ = (id) => document.getElementById(id);
 const link = new TciLink();
@@ -2016,6 +2017,66 @@ link.addEventListener('spectrum', (e) => {
 });
 link.addEventListener('ready', () => zeichneBedienung());
 link.addEventListener('ready', () => spotsBaldHolen(300));
+
+// ── Zurueck aus dem Hintergrund (2026-10-05) ──────────────────────────────
+//
+// Bis hierher behandelte die Seite das Entsperren GAR NICHT. Was dabei
+// wirklich passiert:
+//
+//   * Der WebSocket ist tot, aber `onclose` kommt erst, wenn das System die
+//     Seite wieder auftaut -- und der Wiederholungsabstand ist inzwischen
+//     auf 10 s gewachsen. Man sieht sekundenlang nichts, obwohl das
+//     Funkgeraet bereit ist.
+//   * Der AudioContext ist von iOS angehalten; niemand weckt ihn.
+//   * Wasserfall und S-Meter zeigen den Stand von VOR dem Sperren, ohne das
+//     zu sagen. Das ist dieselbe Gattung Luege wie ein stehender
+//     Wasserfall: er behauptet ein leeres Band, und danach wird nicht
+//     gerufen.
+//
+// Die Abonnements selbst muessen hier nicht erneuert werden -- sie haengen
+// am `open`-Ereignis und kommen mit der neuen Verbindung von selbst.
+let warVerborgen = false;
+
+function aufwachen() {
+  const stille = performance.now() - letzteIq;
+
+  // 1. Das Bild als alt kennzeichnen, BEVOR etwas anderes passiert. Der
+  //    Strich ist derselbe, den ein Bandwechsel zieht: oben das Neue, unten
+  //    das Alte. Ohne ihn sieht ein zehn Minuten alter Wasserfall aus wie
+  //    ein lebendiger.
+  if (bildIstAlt(stille)) {
+    wasserfallSchnitt();
+    state.hatSpektrumstrom = false;
+  }
+
+  // 2. Sofort neu verbinden, wenn noetig (Entscheidung in aufwachen.js).
+  link.nachDemAufwachen(stille);
+
+  // 3. Den Ton wecken. iOS haelt den AudioContext beim Sperren an, und ein
+  //    angehaltener Kontext ruft seinen Rueckruf nie wieder auf -- der Ton
+  //    bliebe stumm, bis jemand TON AUS und wieder EIN drueckt.
+  if (state.audio && state.audio.state === 'suspended') {
+    state.audio.resume().catch(() => { /* ohne Zutun des Bedieners nicht erlaubt */ });
+  }
+
+  // 4. Die Spots gehoeren ebenfalls aufgefrischt: waehrend des Schlafens
+  //    sind welche abgelaufen und neue gekommen.
+  spotsBaldHolen(400);
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { warVerborgen = true; return; }
+  if (!warVerborgen) { return; }
+  warVerborgen = false;
+  aufwachen();
+});
+
+// Nicht jedes System meldet `visibilitychange` zuverlaessig, wenn die Seite
+// aus dem Ruhezustand kommt -- `pageshow` mit `persisted` ist der zweite
+// Weg, und `focus` der dritte. Mehrfaches Aufwachen schadet nicht: die
+// Entscheidung in aufwachen.js wirft eine lebendige Verbindung nicht weg.
+window.addEventListener('pageshow', (e) => { if (e.persisted) { aufwachen(); } });
+window.addEventListener('focus', () => { if (warVerborgen) { warVerborgen = false; aufwachen(); } });
 link.addEventListener('state', () => {
   // Der Server hat das letzte Wort über die Rate. Weicht sie von unserer
   // Bitte ab, muss das Worklet es erfahren — sonst stimmt die Tonhöhe nicht.
