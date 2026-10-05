@@ -127,6 +127,27 @@ private slots:
         s.save();
     }
 
+    void cleanupTestCase()
+    {
+        // Die Einstellungsdatei des Pruefsandkastens ist GEMEINSAM
+        // (~/.qttest/.../Longpath.settings, der Pfad traegt den
+        // Programmnamen, nicht den Testnamen) — anders als etwa der
+        // recordings-Ordner, der pro Pruefprogramm liegt. Ein Geraet mit
+        // einem Protokoll, das es nicht gibt, darf dort nicht liegen
+        // bleiben und den naechsten Prueflauf eines anderen Programms
+        // begruessen.
+        AppSettings& s = AppSettings::instance();
+        const QString mac = makeInfo().macAddress;
+        s.forgetRadio(mac);
+        // Der Knopfdruck hat das Geraet nebenbei als "zuletzt verbunden"
+        // vermerkt (ConnectionPanel::onConnectClicked). Ohne das Folgende
+        // zeigt der Vermerk auf ein Geraet, das es nicht mehr gibt.
+        if (s.lastConnected() == mac) {
+            s.setLastConnected(QString());
+        }
+        s.save();
+    }
+
     void derKnopfWaehrendDerErzeugung()
     {
         RadioModel model;
