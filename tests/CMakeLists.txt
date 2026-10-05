@@ -1955,6 +1955,18 @@ longpath_add_test(tst_settings_hygiene)
 #   genau einmal.
 longpath_add_test(tst_tci_qso_eintragen)
 
+# ── Ins Logbuch SEHEN, vom Telefon aus (2026-10-04) ─────────────────────────
+# tst_tci_logbuch_lesen: die Gegenstuecke zu log_qso: — log_last: und
+#   log_dup:. Geprueft wird vor allem die ANZAHL in der Abschlusszeile: die
+#   Seite zeigt eine Liste nur, wenn sie mit den gesendeten Zeilen
+#   uebereinstimmt, weil eine kuerzere Liste wie ein kuerzeres Logbuch
+#   aussieht und niemand es merkt. Dazu: juengster zuerst (auf einem Telefon
+#   sieht man drei Zeilen), Ablehnung MIT Grund statt stumm (ein stummes Nein
+#   ist auf einer Fernbedienung nicht von einem Defekt zu unterscheiden), und
+#   der Deckel auf log_last: — 100000 Zeilen wuerden die Steuerleitung
+#   fluten, hinter der jede Bedienung wartet.
+longpath_add_test(tst_tci_logbuch_lesen)
+
 # ── Ein Geraet, das nicht aufmacht, darf nicht alles mitnehmen (2026-10-03) ──
 # tst_bus_mit_frist: gibt einen Bus herein, dessen open() absichtlich
 #   stehenbleibt, und prueft die zwei Zusagen der Behebung — nach der Frist
@@ -1971,6 +1983,20 @@ longpath_add_test(tst_bus_mit_frist)
 #   beiden Faelle vertauscht, schickt die Meldung den Bediener an den falschen
 #   Schalter.
 longpath_add_test(tst_sendefehler_deutung)
+
+# ── Vom Dateiende lesen darf keinen Kontakt ERFINDEN (2026-10-04) ───────────
+# tst_logbuch_rueckschau: die App kann seit #184 loggen, aber nicht nachsehen.
+#   Die letzten Kontakte kommen deshalb aus dem DATEIENDE (gemessen an Martins
+#   Logbuch: 6,6 MB / 9271 Datensaetze — voller Durchlauf 4,1 ms, letzte 64 kB
+#   0,04 ms). Genau daraus entsteht die Gefahr: ein Schnitt an einer
+#   willkuerlichen Bytestelle beginnt mitten in einem Datensatz, und der
+#   ADIF-Parser macht aus der hinteren Haelfte einen eigenen Kontakt — ein
+#   Rufzeichen, das niemand gearbeitet hat, in einem Logbuch, das fuer Diplome
+#   eingereicht wird. Der Stand fuehrt denselben Schnitt ohne und mit
+#   Grenzschnitt vor; ohne entsteht der erfundene Datensatz wirklich.
+#   Zweitens: eine Dupe-Warnung, die bei unbekanntem Band auf Verdacht wahr
+#   wird, verhindert unbemerkt einen Kontakt, den es noch nicht gibt.
+longpath_add_test(tst_logbuch_rueckschau)
 
 # ── Logzeilen duerfen sich nicht zerschreiben (2026-10-03) ───────────────────
 # tst_log_schreibt_atomar: acht Faeden schreiben gleichzeitig 250 Zeilen und

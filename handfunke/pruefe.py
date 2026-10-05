@@ -423,6 +423,75 @@ def miss_skala(v, sekunden):
         print("     Unterschied nichts. Erst mit stehendem Traeger deuten.")
 
 
+def miss_logbuch(v, sekunden):
+    """Was die App im Logbuch sieht — und wie lange Longpath dafuer braucht.
+
+    LIEST NUR. `log_last:` und `log_dup:` haengen nichts an und aendern
+    nichts; der Schreibbefehl `log_qso:` wird hier bewusst nicht benutzt,
+    damit dieses Werkzeug an Martins echtem Logbuch laufen kann.
+
+    Gemessen wird die ANTWORTZEIT, nicht nur das Zustandekommen. Die
+    Entwurfsentscheidung "kein zweiter Index, nur ein Durchlauf" steht und
+    faellt damit: bei 6,6 MB kostet ein Durchlauf gemessene 3,8 ms, und
+    wenn daraus im Betrieb einmal 300 ms werden, gehoert das gesehen und
+    nicht geraten.
+    """
+    v.leeren()
+    t0 = time.time()
+    v.sende("log_last:10;")
+    v.sammle(min(sekunden, 3.0))
+    ms = (time.time() - t0) * 1000.0
+    zeilen = [z for z in v.zeilen() if z.startswith("log_qso_zeile:")]
+    ende = [z for z in v.zeilen() if z.startswith("log_last_")]
+
+    if not ende:
+        print("  log_last: keine Abschlusszeile — der Server kennt den "
+              "Befehl nicht (vor 2026-10-04) oder schweigt.")
+        return
+    if ende[-1].startswith("log_last_err:"):
+        print(f"  log_last abgelehnt: {ende[-1].split(':', 1)[1]}")
+        print("  Aus dem Netz verlangt Longpath TciAllowRemoteLog.")
+        return
+
+    angesagt = ende[-1].split(":", 1)[1]
+    print(f"  {len(zeilen)} Zeilen, angesagt {angesagt}, in {ms:.0f} ms")
+    # Die Zahl MUSS stimmen. Eine kuerzere Liste sieht aus wie ein
+    # kuerzeres Logbuch, und genau das darf nicht unbemerkt bleiben.
+    if angesagt.strip() != str(len(zeilen)):
+        print("  ACHTUNG: Anzahl und Zeilen stimmen nicht ueberein.")
+    for z in zeilen[:5]:
+        f = z.split(":", 1)[1].split(",")
+        while len(f) < 8:
+            f.append("")
+        print(f"    {f[1]} {f[2]}  {f[3]:<10} {f[4]:>4} {f[5]:<5} "
+              f"{f[6]}/{f[7]}")
+
+    # Und die Dupe-Frage, mit dem jüngsten Rufzeichen aus der Liste: eines,
+    # das garantiert im Logbuch steht. Ein erfundenes Rufzeichen wuerde nur
+    # belegen, dass "nie gearbeitet" funktioniert.
+    if not zeilen:
+        return
+    ruf = zeilen[0].split(":", 1)[1].split(",")[3].strip()
+    if not ruf:
+        return
+    v.leeren()
+    t0 = time.time()
+    v.sende(f"log_dup:{ruf};")
+    v.sammle(min(sekunden, 3.0))
+    ms = (time.time() - t0) * 1000.0
+    antwort = [z for z in v.zeilen() if z.startswith("log_dup_")]
+    if not antwort:
+        print(f"  log_dup:{ruf} — keine Antwort")
+        return
+    print(f"  log_dup:{ruf} in {ms:.0f} ms -> {antwort[-1]}")
+    if antwort[-1].startswith("log_dup_ok:"):
+        f = antwort[-1].split(":", 1)[1].split(",")
+        if len(f) >= 2 and f[1].strip() in ("", "0"):
+            print("  ACHTUNG: ein Rufzeichen AUS der Liste gilt als nie "
+                  "gearbeitet — das Vorsieb findet seinen eigenen Eintrag "
+                  "nicht.")
+
+
 def eigene_adresse():
     """Die Adresse, unter der dieser Rechner im Heimnetz steht."""
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -439,7 +508,8 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("was", nargs="?", default="alles",
-                    choices=["alles", "ton", "hf", "pegel", "skala"])
+                    choices=["alles", "ton", "hf", "pegel", "skala",
+                             "logbuch"])
     ap.add_argument("--host", default=None, help="Vorgabe: die eigene Netzadresse")
     ap.add_argument("--port", type=int, default=50001)
     ap.add_argument("--token", default=None, help="nur aus dem Netz noetig")
@@ -466,15 +536,17 @@ def main():
     vfo = [z for z in v.zeilen() if z.startswith("vfo:0,0")]
     print(f"Verbunden. {vfo[-1] if vfo else 'keine VFO-Meldung'}\n")
 
-    teile = ["hf", "pegel", "ton"] if args.was == "alles" else [args.was]
+    teile = (["hf", "pegel", "ton", "logbuch"] if args.was == "alles"
+             else [args.was])
     for teil in teile:
         print({"ton": "── Ton ──", "hf": "── Signal im Bild ──",
                "pegel": "── Was der Server meldet ──",
-               "skala": "── Skala gegen Preamp/ATT ──"}[teil])
+               "skala": "── Skala gegen Preamp/ATT ──",
+               "logbuch": "── Logbuch, wie die App es sieht ──"}[teil])
         # Der Skala-Lauf braucht Zeit zum Durchschalten, nicht fuenf Sekunden.
         dauer = max(args.dauer, 40.0) if teil == "skala" else args.dauer
         {"ton": miss_ton, "hf": miss_hf, "pegel": miss_pegel,
-         "skala": miss_skala}[teil](v, dauer)
+         "skala": miss_skala, "logbuch": miss_logbuch}[teil](v, dauer)
         print()
 
     v.zu()

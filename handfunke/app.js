@@ -8,6 +8,8 @@
 
 import { TciLink, Fft } from './tci.js';
 import { Mikrofon, mikrofonMoeglich } from './mikrofon.js';
+import { Sammelstelle, zeileLesen, befundLesen, zeitKurz, dupeSatz }
+  from './logbuch.js';
 
 const $ = (id) => document.getElementById(id);
 const link = new TciLink();
@@ -1444,11 +1446,120 @@ function qsoAutomatikZeigen() {
     + `${zz(d.getUTCHours())}:${zz(d.getUTCMinutes())}`;
 }
 
+// ── Ins Logbuch sehen (2026-10-04) ────────────────────────────────────────
+//
+// Zwei Fragen, zwei Befehle: `log_last:` fuer die letzten Kontakte,
+// `log_dup:` fuer "hatte ich den schon?". Gesammelt und gedeutet wird in
+// logbuch.js — hier steht nur, wann gefragt wird und wo es landet.
+//
+// WARUM ENTPRELLT: `log_dup:` laeuft in Longpath ueber die ganze Datei
+// (gemessen 3,8 ms bei 6,6 MB). Je Tastendruck waere das ein Durchlauf fuer
+// jeden Zwischenstand eines Rufzeichens — acht Durchlaeufe fuer OE5SOS, und
+// sieben Antworten, die niemand lesen will. 350 ms nach dem letzten Tipper
+// reicht; wer fertig getippt hat, wartet keine halbe Sekunde.
+const sammler = new Sammelstelle();
+let dupeFrist = null;
+let dupeOffen = '';      // welches Rufzeichen gerade gefragt ist
+
+function logListeZeigen(liste) {
+  const el = $('logListe');
+  el.textContent = '';
+  if (!liste || !liste.length) {
+    const d = document.createElement('div');
+    d.className = 'leer';
+    d.textContent = '—';
+    el.appendChild(d);
+    return;
+  }
+  for (const z of liste) {
+    const r = document.createElement('div');
+    r.className = 'r';
+    const w = document.createElement('span');
+    w.className = 'wann';
+    w.textContent = zeitKurz(z.datum, z.zeit) || '—';
+    const ruf = document.createElement('span');
+    ruf.className = 'ruf';
+    ruf.textContent = z.ruf;
+    const wo = document.createElement('span');
+    wo.className = 'wo';
+    wo.textContent = [z.band, z.mode].filter(Boolean).join(' ');
+    r.append(w, ruf, wo);
+    el.appendChild(r);
+  }
+}
+
+function logListeHolen() {
+  if (!link.ready) { return; }
+  sammler.beginnen();
+  link.send('log_last:10');
+}
+
+function dupeZeigen(satz) {
+  const el = $('qsoDupe');
+  el.textContent = satz.text;
+  el.className = `dupe${satz.art ? ' d-' + satz.art : ''}`;
+}
+
+function dupeFragen() {
+  const ruf = ($('qsoRuf').value || '').trim().toUpperCase();
+  clearTimeout(dupeFrist);
+  if (ruf.length < 3) {
+    // Unter drei Zeichen ist jedes Rufzeichen noch jedes andere. Eine
+    // Auskunft darueber waere beliebig.
+    dupeOffen = '';
+    dupeZeigen({ text: '', art: '' });
+    return;
+  }
+  dupeFrist = setTimeout(() => {
+    if (!link.ready) { return; }
+    dupeOffen = ruf;
+    link.send(`log_dup:${ruf}`);
+  }, 350);
+}
+
+link.addEventListener('logzeile', (e) => {
+  sammler.zeile(zeileLesen((e.detail || {}).args || []));
+});
+
+link.addEventListener('logende', (e) => {
+  const d = e.detail || {};
+  if (d.anzahl === null || d.anzahl === undefined) {
+    // Abgelehnt (z. B. Logbuch aus dem Netz abgeschaltet). Die Liste bleibt
+    // leer und sagt, warum — statt still leer zu bleiben und wie ein leeres
+    // Logbuch zu wirken.
+    sammler.abschluss(-1);
+    const el = $('logListe');
+    el.textContent = '';
+    const x = document.createElement('div');
+    x.className = 'leer';
+    x.textContent = d.text || 'nicht freigegeben';
+    el.appendChild(x);
+    return;
+  }
+  const liste = sammler.abschluss(d.anzahl);
+  // null heisst: es fehlen Zeilen. Dann NICHT zeigen — eine kuerzere Liste
+  // sieht aus wie ein kuerzeres Logbuch.
+  if (liste) { logListeZeigen(liste); }
+});
+
+link.addEventListener('logdupe', (e) => {
+  const d = e.detail || {};
+  if (!d.args) { dupeZeigen({ text: d.text || '', art: '' }); return; }
+  const b = befundLesen(d.args);
+  // Eine Antwort auf ein Rufzeichen, das inzwischen weitergetippt wurde,
+  // gehoert nicht mehr unter das Feld.
+  if (!b || b.ruf !== dupeOffen) { return; }
+  dupeZeigen(dupeSatz(b));
+});
+
 function qsoOeffnen() {
   $('qsoRuf').value = '';
   $('qsoMeldung').textContent = '';
   $('qsoMeldung').className = '';
   $('qsoOk').disabled = false;
+  dupeZeigen({ text: '', art: '' });
+  dupeOffen = '';
+  logListeHolen();
   qsoAutomatikZeigen();
   clearInterval(qsoUhr);
   qsoUhr = setInterval(qsoAutomatikZeigen, 5000);
@@ -1499,6 +1610,11 @@ link.addEventListener('qso', (e) => {
     $('qsoMeldung').textContent = `${d.text} eingetragen`;
     $('qsoMeldung').className = 'ok';
     $('qsoRuf').value = '';
+    dupeZeigen({ text: '', art: '' });
+    dupeOffen = '';
+    // Der Beleg: der eigene Kontakt steht jetzt als erste Zeile in der
+    // Liste. Die Erfolgsmeldung kann das nur behaupten.
+    logListeHolen();
     // Offen lassen: im Pile-up kommt der naechste sofort, und ein Blatt,
     // das nach jedem Kontakt zugeht, kostet zwei Tipper je QSO.
     setTimeout(() => $('qsoRuf').focus(), 30);
@@ -1514,6 +1630,8 @@ $('qsoOk').addEventListener('click', qsoEintragen);
 $('qsoRuf').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') { e.preventDefault(); qsoEintragen(); }
 });
+$('qsoRuf').addEventListener('input', dupeFragen);
+$('logFrisch').addEventListener('click', logListeHolen);
 // Tippen auf den Grund schliesst, wie beim Frequenz-Blatt.
 $('qsoBlatt').addEventListener('click', (e) => {
   if (e.target === $('qsoBlatt')) { qsoSchliessen(); }

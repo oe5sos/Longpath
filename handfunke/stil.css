@@ -404,6 +404,49 @@ footer .warn{color:var(--warn)}
   font-size:var(--f-caption);letter-spacing:.1em;text-transform:uppercase}
 #qsoBlatt button:disabled{opacity:.45}
 
+/* ── Was das Logbuch ueber dieses Rufzeichen weiss ────────────────────────
+   Messing, weil es GEMESSEN ist — es kommt aus der Datei, nicht aus einer
+   Schaetzung. Kein kraeftiges Rot: Rot bleibt dem Fehler, und ein Dupe ist
+   kein Fehler, sondern eine Auskunft (Hausregel, 2026-10-01).
+
+   Die Zeile haelt ihre Hoehe, auch leer. Ohne das wandern RST-Felder und
+   Knopf beim Tippen nach unten — und ein Knopf, der unter dem Finger
+   wegrutscht, traegt im Pile-up das falsche QSO ein. */
+#qsoBlatt .dupe{min-height:15px;font:500 var(--f-caption)/1.25 var(--mono);
+  letter-spacing:.04em;text-align:center;color:var(--text-inactive);
+  margin-top:-4px}
+/* Die Zustandsklassen heissen ABSICHTLICH nicht wie die Grundklasse:
+   `.dupe.dupe` trifft jedes Element mit class="dupe" und schlaegt per
+   Spezifitaet die beiden anderen Regeln. Am 2026-10-04 kamen damit alle
+   drei Zustaende in Messing heraus — am Telefon gesehen, nicht im Code. */
+#qsoBlatt .dupe.d-neu{color:var(--text3)}
+#qsoBlatt .dupe.d-bekannt{color:var(--amber-dim)}
+#qsoBlatt .dupe.d-dupe{color:var(--measured);font-weight:600}
+
+/* ── Die letzten Kontakte ─────────────────────────────────────────────────
+   Dicktengleich und eng, damit acht Zeilen auf ein Telefon passen, ohne
+   dass der Eintragen-Knopf aus dem Bild rutscht. Hoehe begrenzt und
+   scrollbar: die Liste darf wachsen, das Blatt nicht. */
+#qsoBlatt .letzte{display:flex;flex-direction:column;gap:6px}
+#qsoBlatt .letzteKopf{display:flex;align-items:center;
+  justify-content:space-between;
+  font:600 var(--f-caption)/1 inherit;letter-spacing:.13em;
+  color:var(--text3)}
+#qsoBlatt button.klein{height:28px;padding:0 10px;font-size:10px;
+  letter-spacing:.09em}
+#qsoBlatt .logListe{max-height:150px;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  border-radius:10px;background:rgba(255,255,255,.02);
+  border:1px solid rgba(255,255,255,.05);padding:5px 7px;
+  display:flex;flex-direction:column;gap:2px}
+#qsoBlatt .logListe .r{display:flex;gap:8px;align-items:baseline;
+  font:500 var(--f-caption)/1.5 var(--mono);white-space:nowrap}
+#qsoBlatt .logListe .wann{color:var(--text-inactive);flex:none}
+#qsoBlatt .logListe .ruf{color:var(--text);font-weight:600;
+  flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+#qsoBlatt .logListe .wo{color:var(--amber-dim);flex:none}
+#qsoBlatt .logListe .leer{font:500 var(--f-caption)/1.5 var(--mono);
+  color:var(--text-inactive);text-align:center}
+
 
 /* ── Die Halteleiste (Entwurf 1, gewaehlt 2026-10-04) ─────────────────────
    Gedrueckt halten nimmt auf, loslassen hoert auf. Der Finger ist die

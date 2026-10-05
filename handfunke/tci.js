@@ -183,6 +183,16 @@ export class TciLink extends EventTarget {
       // Erfolg behaupten.
       case 'log_qso_ok':      this._emit('qso', { ok: true,  text: args[0] || '' }); break;
       case 'log_qso_err':     this._emit('qso', { ok: false, text: args[0] || '' }); break;
+      // Ins Logbuch SEHEN (2026-10-04). Je Kontakt eine Zeile, dann der
+      // Abschluss mit der Anzahl — die Seite darf eine Liste erst zeigen,
+      // wenn beide uebereinstimmen (siehe Sammelstelle in logbuch.js).
+      // Durchgereicht, nicht gedeutet: hier wird nichts gezaehlt und
+      // nichts gesammelt, damit es EINE Stelle bleibt.
+      case 'log_qso_zeile':   this._emit('logzeile', { args }); break;
+      case 'log_last_ok':     this._emit('logende', { anzahl: int(0) }); break;
+      case 'log_last_err':    this._emit('logende', { anzahl: null, text: args[0] || '' }); break;
+      case 'log_dup_ok':      this._emit('logdupe', { args }); break;
+      case 'log_dup_err':     this._emit('logdupe', { args: null, text: args[0] || '' }); break;
       // Ein abgelehnter Sendewunsch, mit Grund. Bis zum 2026-10-04 kam
       // hier gar nichts, und ein stummes Nein ist auf einer
       // Fernbedienung nicht von einem Defekt zu unterscheiden.
