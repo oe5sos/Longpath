@@ -1984,6 +1984,21 @@ longpath_add_test(tst_bus_mit_frist)
 #   Schalter.
 longpath_add_test(tst_sendefehler_deutung)
 
+# ── Uhrendrift zwischen Funkgeraet und Tonkarte (#131, 2026-10-05) ──────────
+# tst_audio_rate_matcher: das Regelgesetz aus Thetis' rmatch, auf die
+#   Erzeugerseite geholt (CLAUDE.md verbietet eine Sperre im Tonrueckruf;
+#   Thetis nimmt dort `cs_var`). Gemessen am 2026-09-27: der Ausgangsring
+#   fuellt sich um 0,23 ms je Minute = rund 4 ppm, und laeuft mit dem
+#   100-ms-Ring nach fuenf Stunden ueber.
+#   Geprueft auf einer virtuellen Uhr ueber acht simulierte Stunden -- anders
+#   ist acht Stunden Drift nicht zu pruefen. ENTSCHEIDEND ist die Gegenprobe
+#   `ohneRegelungLaeuftDerRingUeber`: dieselbe Simulation mit festem
+#   Verhaeltnis MUSS ueberlaufen, sonst belegt das gruene Ergebnis nur, dass
+#   die Simulation zu gutmuetig ist.
+#   Der Resampler und die Verdrahtung in den Tonweg sind NICHT dabei; die
+#   kommen getrennt zur Durchsicht (Entwurf 2026-09-27, §4).
+longpath_add_test(tst_audio_rate_matcher)
+
 # ── Vom Dateiende lesen darf keinen Kontakt ERFINDEN (2026-10-04) ───────────
 # tst_logbuch_rueckschau: die App kann seit #184 loggen, aber nicht nachsehen.
 #   Die letzten Kontakte kommen deshalb aus dem DATEIENDE (gemessen an Martins
