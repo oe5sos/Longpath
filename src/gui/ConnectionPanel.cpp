@@ -759,7 +759,46 @@ void ConnectionPanel::updateStatusStrip()
     const ConnectionState state = m_radioModel->connectionState();
     const bool connected = (state == ConnectionState::Connected);
 
-    if (connected) {
+    // ── Dazwischen ist nicht "Disconnected" ──────────────────────────────
+    //
+    // Befund 2026-10-05 (Wisdom-Tor, siehe RadioModel::connectToRadio):
+    // diese Leiste kannte genau zwei Faelle, Connected und alles andere.
+    // Alles andere las sich als "Disconnected" — auch waehrend des Probens,
+    // waehrend des Verbindens und waehrend die FFTW-Tabellen gebaut werden
+    // (bei frischem Profil bis zu ~15 Minuten). Wer da hinsieht, liest
+    // "nichts passiert", obwohl gerade genau das Gegenteil stimmt, und das
+    // war die Haelfte des gemeldeten Befunds.
+    //
+    // Bernstein, nicht Rot: Rot ist hier die Warnung, nicht der Hinweis.
+    const bool working = (state == ConnectionState::Probing
+                          || state == ConnectionState::Connecting);
+    if (working) {
+        m_stripPillLabel->setStyleSheet(QStringLiteral(
+            "QLabel { color: %1; font-size: 16px; }").arg(QLatin1String(kPillStaleColor)));
+
+        const QString who = m_radioModel->connectTargetName();
+        QString text;
+        if (m_radioModel->isWaitingForWdspWisdom()) {
+            // Der Fortschritt in Prozent steht im modalen Wisdom-Dialog;
+            // hier steht, WARUM noch nichts passiert und dass es weitergeht.
+            text = who.isEmpty()
+                ? QStringLiteral("Preparing DSP engine (FFT plans) — connecting afterwards")
+                : QStringLiteral("Preparing DSP engine (FFT plans) — then connecting to %1")
+                      .arg(who);
+        } else if (state == ConnectionState::Probing) {
+            text = who.isEmpty() ? QStringLiteral("Probing…")
+                                 : QStringLiteral("Probing %1…").arg(who);
+        } else {
+            text = who.isEmpty() ? QStringLiteral("Connecting…")
+                                 : QStringLiteral("Connecting to %1…").arg(who);
+        }
+        m_stripInfoLabel->setText(text);
+        m_stripInfoLabel->setStyleSheet(Style::themed(QStringLiteral(
+            "QLabel { color: #c8d8e8; font-size: 13px; }")));
+
+        m_stripDisconnectBtn->setVisible(false);
+        m_stripReconnectLabel->setVisible(false);
+    } else if (connected) {
         // Show green pill + radio name + IP
         m_stripPillLabel->setStyleSheet(QStringLiteral(
             "QLabel { color: %1; font-size: 16px; }").arg(QLatin1String(kPillConnectedColor)));

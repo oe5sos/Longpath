@@ -6680,6 +6680,13 @@ longpath_add_test(tst_connect_routes_first_iq)
 # RadioConnection-Objekte auf dasselbe Geraet, das erste verwaist.
 longpath_add_test(tst_connect_during_wisdom)
 
+# Schwester des obigen Prueffalls, eine Ebene hoeher: hier wird der
+# Connect-Knopf des Verbindungsfelds gedrueckt statt connectToRadio()
+# gerufen. Deckt die zweite Haelfte des Befunds vom 2026-10-05 ab — die
+# Statusleiste las sich waehrend der ~15 Minuten als "Disconnected",
+# obwohl gerade gerechnet wurde.
+longpath_add_test(tst_connect_button_during_wisdom)
+
 # Bench report 2026-07-30, second half: pans past the first did not honour the
 # display settings. A pan opening for the first time has no per-pan keys, so
 # every read fell through to the ship defaults instead of looking like the pan

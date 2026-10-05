@@ -1446,6 +1446,18 @@ public:
     // Der Zustand steht dabei auf Connecting, nicht auf Disconnected.
     bool isWaitingForWdspWisdom() const { return m_pendingConnect.has_value(); }
 
+    // Das Geraet, um das sich der laufende Verbindungsversuch dreht: der
+    // geparkte Wunsch, solange einer wartet, sonst das zuletzt gewaehlte.
+    // Waehrend ein Wunsch geparkt ist, steht m_lastRadioInfo absichtlich
+    // noch auf dem vorigen Geraet — gesetzt wird es erst, wenn der Wunsch
+    // tatsaechlich ausgefuehrt wird. Die Statusleiste braucht trotzdem
+    // einen Namen zum Anzeigen, und zwar den richtigen.
+    QString connectTargetName() const
+    {
+        return m_pendingConnect.has_value() ? m_pendingConnect->displayName()
+                                            : m_lastRadioInfo.displayName();
+    }
+
     // Test-only: allow tests to drive transitions without standing up
     // a fake RadioConnection. Production transitions go through the
     // private setConnectionState() called from connection signals.
