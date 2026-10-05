@@ -270,6 +270,74 @@ def selftest():
     print()
     auswerten(pfad, alle=True)
     os.unlink(pfad)
+    print()
+    print("Selbsttest -- Wiederholungen und Abtastrate")
+    print()
+    selftestWiederholungen()
+
+
+def _iqBlock(kanal, seq, fuellung):
+    kopf = bytearray(10)
+    kopf[0] = 0x03
+    kopf[1] = 0xFF
+    kopf[2] = 0xFE
+    kopf[4] = 1200 & 0xFF
+    kopf[5] = (1200 >> 8) & 0xFF
+    kopf[6] = seq & 0xFF
+    kopf[7] = (seq >> 8) & 0xFF
+    kopf[8] = 2
+    kopf[9] = kanal
+    return bytes(kopf) + bytes([fuellung]) * 1200
+
+
+def _schreibeStrom(rateHz, kopienJeNteBlock):
+    """Baut einen Mitschnitt mit GEBAUTER Abtastrate und gebauten Kopien.
+
+    Damit ist beides bekannt, was das Werkzeug herausrechnen soll: die
+    Rate (ueber die Blockrate) und die Zahl der bytegleichen
+    Wiederholungen.
+    """
+    host, radio = "192.0.2.1", "192.0.2.200"
+    jeKanalJeSek = rateHz / PROBEN
+    dauer = 2.0
+    anzahl = int(jeKanalJeSek * dauer)
+    pakete = []
+    kopien = 0
+    for i in range(anzahl):
+        t = i / jeKanalJeSek
+        for kanal in (0, 1):
+            pakete.append((t, _udpPaket(radio, host, STREAM_PORT, 54001,
+                                        _iqBlock(kanal, i, i & 0xFF))))
+            if kopienJeNteBlock and i % kopienJeNteBlock == 0:
+                # Dasselbe noch einmal: gleiche Nummer, gleicher Inhalt.
+                pakete.append((t + 0.0001,
+                               _udpPaket(radio, host, STREAM_PORT, 54001,
+                                         _iqBlock(kanal, i, i & 0xFF))))
+                kopien += 1
+    fd, pfad = tempfile.mkstemp(suffix=".pcap")
+    with os.fdopen(fd, "wb") as fh:
+        fh.write(struct.pack("<IHHiIII", 0xa1b2c3d4, 2, 4, 0, 0, 65535, 1))
+        for t, paket in pakete:
+            sek = int(t)
+            usek = int(round((t - sek) * 1_000_000))
+            fh.write(struct.pack("<IIII", 1_700_000_000 + sek, usek,
+                                 len(paket), len(paket)))
+            fh.write(paket)
+    return pfad, kopien
+
+
+def selftestWiederholungen():
+    """Prueft, dass --wiederholungen die Rate erkennt UND an ihr festhaelt.
+
+    Der eigentliche Fehler, den das verhindern soll: aus einem Mitschnitt
+    in der falschen Betriebsart einen Schluss ueber 96 kHz ziehen.
+    """
+    for rateHz, nte, erwartet in ((96000, 5, "96 kHz"), (48000, 0, "48 kHz")):
+        pfad, kopien = _schreibeStrom(rateHz, nte)
+        print("--- gebaut: %d Hz, %d gebaute Kopien ---" % (rateHz, kopien))
+        wiederholungen(pfad)
+        print()
+        os.unlink(pfad)
 
 
 def vergleiche(a, b):
@@ -322,6 +390,41 @@ def vergleiche(a, b):
         print("  keine -- dieselben Rahmen mit denselben Werten")
 
 
+PROBEN = 200  # Proben je I/Q-Block (1200 Byte Nutzlast, 24 bit I + 24 bit Q)
+
+
+def abtastratenJeKanal(jeKanalEinzig, dauer):
+    """Abtastrate JE KANAL, hergeleitet aus der Blockrate.
+
+    Ein Block tragt PROBEN Proben, also ist die Rate gleich (Bloecke je
+    Sekunde) x PROBEN: 240/s -> 48 kHz, 480/s -> 96 kHz. Gezaehlt werden
+    nur die NICHT wiederholten Bloecke, sonst wuerde genau die
+    Wiederholung, um die es hier geht, die Rate hochrechnen -- in
+    Martins 96-kHz-Mitschnitt sind es rohe 577/s, einzeln 481/s.
+
+    Je Kanal, nicht im Mittel, und das ist keine Feinheit: in Martins
+    Mitschnitten vom 2026-10-04 laeuft Kanal 0 mit 48 kHz und Kanal 1
+    mit 96 kHz. ExpertSDR2 fahrt die beiden Empfaenger also mit
+    VERSCHIEDENEN Raten -- eine Betriebsart, die Longpath gar nicht
+    kennt. Wer nur das Maximum ansieht, haelt so einen Mitschnitt fuer
+    "96 kHz" und zieht denselben falschen Schluss wie ich am
+    2026-10-04.
+
+    Rueckgabe: {Kanal: (Rate in Hz oder 0, Bloecke/s)}.
+    """
+    ergebnis = {}
+    for kanal, n in jeKanalEinzig.items():
+        jeSek = n / max(dauer, 1e-9)
+        gemessen = jeSek * PROBEN
+        rate = 0
+        for kandidat in (48000, 96000, 192000, 384000):
+            if abs(gemessen - kandidat) <= 0.15 * kandidat:
+                rate = kandidat
+                break
+        ergebnis[kanal] = (rate, jeSek)
+    return ergebnis
+
+
 def wiederholungen(pfad, geraet=None):
     """Zaehlt bytegleiche Wiederholungen im I/Q-Strom eines Mitschnitts.
 
@@ -345,6 +448,7 @@ def wiederholungen(pfad, geraet=None):
         return
 
     jeKanal = {}
+    jeKanalEinzig = {}
     inhalt = {}
     dubletten = 0
     gesamt = 0
@@ -383,6 +487,11 @@ def wiederholungen(pfad, geraet=None):
         schluessel = (kanal, seq)
         if schluessel in inhalt and inhalt[schluessel] == h:
             dubletten += 1
+        else:
+            # Nur die NICHT wiederholten Bloecke verraten die Abtastrate --
+            # Wiederholungen blasen die Blockrate auf und wuerden 96 kHz
+            # vorspiegeln, wo 80 kHz gemeint waren.
+            jeKanalEinzig[kanal] = jeKanalEinzig.get(kanal, 0) + 1
         inhalt[schluessel] = h
         if len(inhalt) > 400000:
             inhalt.clear()
@@ -397,6 +506,36 @@ def wiederholungen(pfad, geraet=None):
         print("   Kanal %d: %d (%.0f/s)" % (k, jeKanal[k], jeKanal[k] / dauer))
     print("bytegleiche Wiederholungen: %d  (%.1f/s, %.1f %% der Bloecke)"
           % (dubletten, dubletten / dauer, 100.0 * dubletten / gesamt))
+
+    raten = abtastratenJeKanal(jeKanalEinzig, dauer)
+    print()
+    print("Abtastrate je Kanal (aus %d einzelnen Proben je Block):" % PROBEN)
+    for kanal in sorted(raten):
+        rate, jeSek = raten[kanal]
+        print("   Kanal %d: %s  (%.0f einzelne Bloecke/s)"
+              % (kanal, ("%d kHz" % (rate // 1000)) if rate
+                 else "nicht eindeutig", jeSek))
+
+    gefunden = sorted({r for r, _ in raten.values()})
+    if gefunden != [96000]:
+        print()
+        print("-> Diese Betriebsart ist NICHT Longpaths 96 kHz, und damit "
+              "beantwortet")
+        print("   dieser Mitschnitt die offene Frage NICHT -- egal wie die "
+              "Zahl oben")
+        print("   aussieht. Longpath fahrt bei 96 kHz BEIDE Stroeme mit "
+              "96 kHz.")
+        if len(gefunden) > 1:
+            print()
+            print("   Hier laufen die Kanaele mit VERSCHIEDENEN Raten. Das "
+                  "ist selbst ein")
+            print("   Befund: das Geraet kann gemischt, Longpath kann es "
+                  "nicht. Fuer die")
+            print("   Wiederholungsfrage braucht es aber einen Mitschnitt "
+                  "mit beiden")
+            print("   Stroemen auf 96 kHz.")
+        return
+
     print()
     if dubletten / dauer > 20:
         print("-> Das Geraet wiederholt auch hier. Dann ist es seine "
