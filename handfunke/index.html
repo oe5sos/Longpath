@@ -170,6 +170,37 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
   <div class="chips" id="dsp"></div>
 </div>
 
+<!-- ── Der Rotor (2026-10-05) ────────────────────────────────────────────
+     BLEIBT VERSTECKT, bis Longpath einen Rotor meldet. An der QRP gibt es
+     keinen; ein leeres Feld, das nichts kann, ist auf einem Telefon reiner
+     Platzverbrauch.
+
+     Die Scheibe WAEHLT nur. Gedreht wird erst mit dem Knopf darunter —
+     dieselbe Entscheidung wie bei der Sendetaste: ein Tipp, der sofort
+     einen Mast dreht, ist in einer Hosentasche eine schlechte Idee. -->
+<div class="feld schicht rotor" id="rotorFeld" hidden>
+  <div class="caps">Rotor</div>
+  <div class="rotorreihe">
+    <svg id="rotorScheibe" class="scheibe" viewBox="-110 -110 220 220"
+         aria-label="Rotorscheibe, antippen waehlt eine Richtung">
+      <circle class="ring" cx="0" cy="0" r="92"/>
+      <g class="striche" id="rotorStriche"></g>
+      <text class="himmel" x="0"    y="-70">N</text>
+      <text class="himmel" x="74"   y="7">O</text>
+      <text class="himmel" x="0"    y="82">S</text>
+      <text class="himmel" x="-74"  y="7">W</text>
+      <line class="nadel" id="rotorNadel" x1="0" y1="0" x2="0" y2="-82"/>
+      <line class="ziel"  id="rotorZiel"  x1="0" y1="0" x2="0" y2="-92" hidden/>
+      <circle class="nabe" cx="0" cy="0" r="5"/>
+    </svg>
+    <div class="rotorwerte">
+      <div class="gradAn" id="rotorGrad">—</div>
+      <div class="rotorMeldung" id="rotorMeldung"></div>
+      <button id="rotorDreh" class="rotorDreh" disabled>RICHTUNG WÄHLEN</button>
+    </div>
+  </div>
+</div>
+
 <div class="txrow">
   <div class="tx locked" id="tx">SENDEN <small>NUR IN DER APP</small></div>
   <div class="tune locked" id="tune">TUNE <small>NUR IN DER APP</small></div>
