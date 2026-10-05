@@ -75,6 +75,24 @@ VORRAT = [
 ]
 EINGETRAGEN = []
 
+
+# ── Spots (2026-10-05) ───────────────────────────────────────────────────
+#
+# Je Eintrag: (Versatz zur Mitte in Hz, Rufzeichen, Mode, Quelle, Alter s).
+# Die Versaetze sind so gewaehlt, dass sich ALLE Faelle am Telefon ansehen
+# lassen: zwei dicht beieinander (die Beschriftungen muessen ausweichen),
+# einer am Rand, einer frisch und einer so alt, dass er sichtbar blasser
+# steht -- und einer weit draussen, der gar nicht kommen darf.
+SPOT_VORRAT = [
+    (-18000, 'OE3AAA', 'CW',   'CLUSTER',   30),
+    ( -2300, 'DL1BBB', 'SSB',  'CLUSTER',  240),
+    ( -2000, 'S57CCC', 'CW',   'RBN',      900),
+    ( -1700, 'OK2DDD', 'CW',   'RBN',     1700),
+    (  6400, 'OE5SOS', 'SSB',  'POTA',      60),
+    ( 21000, 'IK4EEE', 'FT8',  'CLUSTER',  600),
+    (120000, 'WEITWEG','CW',   'CLUSTER',   10),   # ausserhalb jeder Spanne
+]
+
 INIT_BURST = [
     'protocol:Longpath-Attrappe,2.0;',
     'device:Attrappe;',
@@ -184,6 +202,10 @@ class Verbindung(threading.Thread):
         self.rx_sensors_an = False
         self.rx_sensors_ms = 200
         self.spec_spanne = 0          # 0 = volle Breite
+        # Die Mitte zieht beim Abstimmen mit (siehe `dds:` weiter unten).
+        # Die Spots haengen daran: sie sind relativ zur Mitte angelegt, damit
+        # sie beim Bandwechsel nicht ploetzlich alle ausserhalb liegen.
+        self.mitte_hz = 14074000
         self.spec_zeit = 0.0
         # Vom Client ausgehandelt (audio_samplerate / _channels / _sample_type).
         self.audio_rate = AUDIO_RATE
@@ -319,6 +341,24 @@ class Verbindung(threading.Thread):
                     f'{band},{mode},{rs},{re_};')
             print(f'  {self.addr[1]}: log_last {n} -> {len(liste)} Zeilen')
             self.sende_text(f'log_last_ok:{len(liste)};')
+        elif name == 'spots':
+            # Longpath filtert auf den sichtbaren Ausschnitt. Die Attrappe
+            # ist dabei absichtlich NICHT gutmuetiger: was ausserhalb der
+            # Spanne laege, kommt auch hier nicht mit. Eine Attrappe, die
+            # mehr durchlaesst als das Original, verschiebt Fehler nach
+            # hinten.
+            spanne = self.spec_spanne or 48000
+            halb = spanne // 2
+            mitte = self.mitte_hz
+            drin = [e for e in SPOT_VORRAT if abs(e[0]) <= halb]
+            drin.sort(key=lambda e: e[0])
+            for i, (versatz, ruf, mode, quelle, alter) in enumerate(drin):
+                self.sende_text(
+                    f'spot_zeile:{i},{mitte + versatz},{ruf},{mode},'
+                    f'{quelle},{alter};')
+            print(f'  {self.addr[1]}: spots -> {len(drin)} von '
+                  f'{len(SPOT_VORRAT)} (Spanne {spanne} Hz)')
+            self.sende_text(f'spots_ok:{len(drin)};')
         elif name == 'log_dup':
             ruf = (args[0].strip().upper() if args else '')
             if not ruf or len(ruf) > 20:
@@ -433,6 +473,7 @@ class Verbindung(threading.Thread):
                 try:
                     trx = int(args[0]); kanal = int(args[1]); hz = int(args[2])
                     if kanal == 0:
+                        self.mitte_hz = hz
                         self.sende_text(f'dds:{trx},{hz};')
                 except ValueError:
                     pass
