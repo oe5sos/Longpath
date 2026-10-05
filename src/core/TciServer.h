@@ -176,6 +176,8 @@ public:
     // wirkt an beiden Stellen, an denen gesendet werden kann: dem trx-Weg und
     // der Annahme von TX-Ton. Nur eine zu sperren liesse den Sendeweg offen.
     static bool remoteLogAllowed();
+    /// Darf aus dem Netz der ROTOR gedreht werden? Ab Werk NEIN.
+    static bool remoteRotorAllowed();
     static bool remoteTxAllowed();
 
     // Test-only: bypass the RxChannel signal chain and inject audio directly

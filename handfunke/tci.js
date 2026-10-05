@@ -225,6 +225,10 @@ export class TciLink extends EventTarget {
       case 'spot_zeile':      this._emit('spotzeile', { args }); break;
       case 'spots_ok':        this._emit('spotsende', { anzahl: int(0) }); break;
       case 'spots_err':       this._emit('spotsende', { anzahl: null, text: args[0] || '' }); break;
+      // Der Rotor (2026-10-05). Durchgereicht, nicht gedeutet.
+      case 'rotor_ist':       this._emit('rotor', { args }); break;
+      case 'rotor_ok':        this._emit('rotorok', { text: args[0] || '' }); break;
+      case 'rotor_err':       this._emit('rotorfehler', { text: args[0] || '' }); break;
       // Ein abgelehnter Sendewunsch, mit Grund. Bis zum 2026-10-04 kam
       // hier gar nichts, und ein stummes Nein ist auf einer
       // Fernbedienung nicht von einem Defekt zu unterscheiden.

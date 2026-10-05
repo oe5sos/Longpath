@@ -30,6 +30,8 @@
 #include "core/LogbookDatei.h"
 #include "core/LogbuchRueckschau.h"
 #include "core/SpotAuswahl.h"
+#include "core/RotorPeilung.h"
+#include "core/RotorController.h"
 #include "models/SpotModel.h"
 #include "models/LogEntry.h"
 #include "TciBinaryFrame.h"
@@ -2417,6 +2419,17 @@ bool TciServer::remoteLogAllowed()
                .toString() != QStringLiteral("False");
 }
 
+bool TciServer::remoteRotorAllowed()
+{
+    // Ab Werk NEIN -- wie beim Senden, und aus demselben Grund: am anderen
+    // Ende haengt echtes Metall. Ein Rotor strahlt zwar nicht, aber er
+    // dreht einen Mast, an dem Kabel haengen, und er tut es minutenlang
+    // ohne Zutun. Wer das aus dem Netz will, schaltet es bewusst frei.
+    return AppSettings::instance()
+               .value(QStringLiteral("TciAllowRemoteRotor"), QStringLiteral("False"))
+               .toString() == QStringLiteral("True");
+}
+
 bool TciServer::remoteTxAllowed()
 {
     // Ab Werk NEIN. Wer aus dem Netz senden will, schaltet es bewusst frei —
@@ -3244,6 +3257,96 @@ void TciServer::onTextMessageReceived(const QString& rohMsg)
                                 .arg(x.alterSek));
                 }
                 antwort(QStringLiteral("spots_ok:%1;").arg(z.size()));
+                return;
+            }
+        }
+
+        // ── Der Rotor (2026-10-05) ──────────────────────────────────────────
+        //
+        //     rotor:;           -> rotor_ist:<grad>,<zustand>,<frisch 0|1>;
+        //     rotor_to:<grad>;  -> rotor_ok:<grad>;   oder rotor_err:<grund>;
+        //     rotor_stop:;      -> rotor_ok:stop;     oder rotor_err:<grund>;
+        //
+        // ABFRAGEN darf jeder angemeldete Client. DREHEN nur, wenn
+        // TciAllowRemoteRotor ausdruecklich auf True steht -- ab Werk nicht.
+        // Am anderen Ende haengt ein Mast mit Kabeln daran, und er dreht
+        // minutenlang ohne weiteres Zutun.
+        //
+        // `frisch` ist kein Beiwerk: der Rotor ist langsame Mechanik am Ende
+        // eines Drahtes. Eine Nadel, die eine alte Stellung zeigt, ohne das
+        // zu sagen, ist schlimmer als eine, die nichts zeigt (so steht es
+        // schon im Kopf von RotorController.h). Die Seite bekommt beides und
+        // kann es unterscheiden.
+        //
+        // Erreicht wird der Rotor ueber RadioModel::rotor() -- eine
+        // Registrierung, kein Besitz. Angelegt wird er weiter im Fenster;
+        // der Netzdienst greift nur nicht hinein.
+        {
+            QString t = trimmed;
+            const bool istAbfrage =
+                t.compare(QStringLiteral("rotor"), Qt::CaseInsensitive) == 0
+                || t.startsWith(QStringLiteral("rotor:"), Qt::CaseInsensitive);
+            const bool istDrehen =
+                t.startsWith(QStringLiteral("rotor_to:"), Qt::CaseInsensitive);
+            const bool istHalt =
+                t.compare(QStringLiteral("rotor_stop"), Qt::CaseInsensitive) == 0
+                || t.startsWith(QStringLiteral("rotor_stop:"), Qt::CaseInsensitive);
+
+            if (istAbfrage || istDrehen || istHalt) {
+                auto antwort = [&](const QString& zeile) {
+                    session->sendQueue.push(TciSendQueue::Priority::Control,
+                                            zeile);
+                };
+                if (!session->authenticated) { return; }
+
+                RotorController* rot = m_model ? m_model->rotor() : nullptr;
+                if (!rot) {
+                    // "Es gibt hier keinen Rotor" ist eine andere Auskunft
+                    // als "er steht auf 0 Grad". Nur eine davon heisst:
+                    // such nicht weiter.
+                    antwort(QStringLiteral("rotor_err:kein rotor;"));
+                    return;
+                }
+
+                if (istAbfrage) {
+                    const int zustand = static_cast<int>(rot->state());
+                    antwort(QStringLiteral("rotor_ist:%1,%2,%3;")
+                                .arg(rot->azimuth(), 0, 'f', 1)
+                                .arg(zustand)
+                                .arg(rot->hasFreshPosition() ? 1 : 0));
+                    return;
+                }
+
+                // Ab hier wird gedreht -- und dafuer gilt die Freigabe.
+                if (!session->fromLoopback && !remoteRotorAllowed()) {
+                    qCWarning(lcTci)
+                        << "TciServer: Rotorbefehl von" << session->peer
+                        << "abgelehnt — Drehen aus dem Netz ist abgeschaltet"
+                        << "(TciAllowRemoteRotor)";
+                    antwort(QStringLiteral("rotor_err:nicht freigegeben;"));
+                    return;
+                }
+
+                if (istHalt) {
+                    rot->stop();
+                    qCInfo(lcTci) << "TciServer: Rotor angehalten von"
+                                  << session->peer;
+                    antwort(QStringLiteral("rotor_ok:stop;"));
+                    return;
+                }
+
+                double grad = 0.0;
+                if (!RotorPeilung::lies(t.mid(9), &grad)) {
+                    // Keine brauchbare Zahl. NICHT auf 0 zurueckfallen --
+                    // 0 Grad ist Nord, und die Antenne wuerde sich auf eine
+                    // leere Zeile hin drehen.
+                    antwort(QStringLiteral("rotor_err:peilung unbrauchbar;"));
+                    return;
+                }
+                rot->moveTo(grad);
+                qCInfo(lcTci) << "TciServer: Rotor auf" << grad << "Grad von"
+                              << session->peer;
+                antwort(QStringLiteral("rotor_ok:%1;").arg(grad, 0, 'f', 1));
                 return;
             }
         }

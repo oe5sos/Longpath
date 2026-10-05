@@ -1984,6 +1984,29 @@ longpath_add_test(tst_bus_mit_frist)
 #   Schalter.
 longpath_add_test(tst_sendefehler_deutung)
 
+# ── Eine Peilung vom Netz dreht echtes Metall (2026-10-05) ──────────────────
+# tst_rotor_peilung: am anderen Ende der Leitung steht ein Mast mit einer
+#   Antenne darauf. Drei Faelle, gegen die der Stand steht: `toDouble()` macht
+#   aus "" und "abc" eine 0, und NULL GRAD IST NORD -- eine leere Zeile wuerde
+#   die Antenne nach Norden drehen. NaN besteht jeden Bereichsvergleich, weil
+#   jeder Vergleich mit NaN falsch ist. Und 360 ist dieselbe Richtung wie 0
+#   und gehoert angenommen, 361 ist ein Tippfehler. Ausserhalb wird ABGELEHNT
+#   statt umgerechnet: wer -90 schickt, hat sich vertan, und 270 Grad sind
+#   eine andere Antwort als "ich habe mich vertan".
+longpath_add_test(tst_rotor_peilung)
+
+# ── Den Rotor vom Telefon drehen -- und wann NICHT (2026-10-05) ─────────────
+# tst_tci_rotor: am anderen Ende steht ein Mast, der minutenlang ohne Zutun
+#   dreht, und niemand steht daneben. Darum dieselbe Strenge wie beim Senden:
+#   ABFRAGEN darf jeder angemeldete Client (hinsehen bewegt nichts), DREHEN
+#   nur mit TciAllowRemoteRotor=True -- ab Werk False, und wer die Vorgabe
+#   versehentlich umdreht, faellt hier auf. Dazu: Ablehnung MIT Grund (ein
+#   stummes Nein ist von einem Defekt nicht zu unterscheiden, und beim Rotor
+#   sieht man ohnehin zehn Sekunden nichts), "kein Rotor" ist eine andere
+#   Auskunft als "0 Grad", und eine unbrauchbare Peilung dreht NICHT nach
+#   Norden.
+longpath_add_test(tst_tci_rotor)
+
 # ── Vom Dateiende lesen darf keinen Kontakt ERFINDEN (2026-10-04) ───────────
 # tst_logbuch_rueckschau: die App kann seit #184 loggen, aber nicht nachsehen.
 #   Die letzten Kontakte kommen deshalb aus dem DATEIENDE (gemessen an Martins

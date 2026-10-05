@@ -1133,6 +1133,10 @@ void RotorLogbookPanel::ensureRotor()
 {
     if (m_rotor) { return; }
     m_rotor = new RotctldClient(this);
+    // Beim Modell anmelden, damit der TCI-Server ihn erreicht, ohne in
+    // dieses Fenster zu greifen (RadioModel::rotor()). Angelegt und
+    // bedient wird er weiter hier; das Modell haelt nur einen QPointer.
+    if (m_radio) { m_radio->setRotor(m_rotor); }
 
     AppSettings& s = AppSettings::instance();
     m_rotor->setTarget(

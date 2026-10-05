@@ -13,6 +13,8 @@ import { Sammelstelle, zeileLesen, befundLesen, zeitKurz, dupeSatz }
 import { spotLesen, marken, trefferBei } from './spots.js';
 import { Zeichenbremse } from './ton-vorrang.js';
 import { bildIstAlt } from './aufwachen.js';
+import { standLesen, zustandText, peilungAus, Sicherung as RotorSicherung,
+         DREHT } from './rotor.js';
 
 const $ = (id) => document.getElementById(id);
 const link = new TciLink();
@@ -2017,6 +2019,139 @@ link.addEventListener('spectrum', (e) => {
 });
 link.addEventListener('ready', () => zeichneBedienung());
 link.addEventListener('ready', () => spotsBaldHolen(300));
+
+// ── Der Rotor (2026-10-05) ────────────────────────────────────────────────
+//
+// Das Feld BLEIBT VERSTECKT, bis Longpath einen Rotor meldet. An der QRP
+// gibt es keinen, und ein leeres Feld, das nichts kann, ist auf einem
+// Telefon reiner Platzverbrauch.
+//
+// Die Scheibe WAEHLT nur. Gedreht wird erst mit dem Knopf -- dieselbe
+// Entscheidung wie bei der Sendetaste: ein Tipp, der sofort einen Mast
+// dreht, ist in einer Hosentasche eine schlechte Idee. Und Longpath
+// verweigert es ohnehin, solange TciAllowRemoteRotor nicht steht; die
+// Ablehnung kommt als `rotor_err:` hier an und wird gezeigt, statt
+// verschluckt zu werden.
+const rotorSicherung = new RotorSicherung();
+let rotorStand = null;
+let rotorFeldAn = false;
+let rotorTakt = null;
+
+function rotorStricheZeichnen() {
+  const g = $('rotorStriche');
+  if (!g || g.childElementCount) { return; }
+  // Alle 10 Grad ein Strich, alle 30 ein laengerer. Das ist die Teilung
+  // jedes Kompasses; eine feinere kann ein Finger ohnehin nicht treffen.
+  for (let a = 0; a < 360; a += 10) {
+    const haupt = (a % 30) === 0;
+    const r1 = haupt ? 78 : 84, r2 = 92;
+    const rad = a * Math.PI / 180;
+    const l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    l.setAttribute('x1', (Math.sin(rad) * r1).toFixed(2));
+    l.setAttribute('y1', (-Math.cos(rad) * r1).toFixed(2));
+    l.setAttribute('x2', (Math.sin(rad) * r2).toFixed(2));
+    l.setAttribute('y2', (-Math.cos(rad) * r2).toFixed(2));
+    if (haupt) { l.setAttribute('class', 'haupt'); }
+    g.appendChild(l);
+  }
+}
+
+function rotorZeichnen() {
+  const nadel = $('rotorNadel'), ziel = $('rotorZiel');
+  const alt = rotorStand && !rotorStand.frisch;
+  if (rotorStand) {
+    const rad = rotorStand.grad * Math.PI / 180;
+    nadel.setAttribute('x2', (Math.sin(rad) * 82).toFixed(2));
+    nadel.setAttribute('y2', (-Math.cos(rad) * 82).toFixed(2));
+    nadel.classList.toggle('alt', !!alt);
+    $('rotorGrad').textContent = `${Math.round(rotorStand.grad)}°`;
+    $('rotorGrad').classList.toggle('alt', !!alt);
+  }
+  const z = rotorSicherung.gilt(performance.now()) ? rotorSicherung.ziel : null;
+  if (z === null) { ziel.setAttribute('hidden', ''); }
+  else {
+    const rad = z * Math.PI / 180;
+    ziel.setAttribute('x2', (Math.sin(rad) * 92).toFixed(2));
+    ziel.setAttribute('y2', (-Math.cos(rad) * 92).toFixed(2));
+    ziel.removeAttribute('hidden');
+  }
+  const knopf = $('rotorDreh');
+  knopf.disabled = (z === null);
+  knopf.textContent = (z === null) ? 'RICHTUNG WÄHLEN' : `AUF ${z}° DREHEN`;
+  const t = zustandText(rotorStand);
+  if (!$('rotorMeldung').classList.contains('warn')) {
+    $('rotorMeldung').textContent = t;
+  }
+}
+
+function rotorHolen() { if (link.ready) { link.send(`rotor:${state.trx}`); } }
+
+link.addEventListener('rotor', (e) => {
+  const st = standLesen((e.detail || {}).args || []);
+  if (!st) { return; }
+  rotorStand = st;
+  if (!rotorFeldAn) {
+    // Erst jetzt zeigen: davor wussten wir nicht, ob es ueberhaupt einen gibt.
+    rotorFeldAn = true;
+    rotorStricheZeichnen();
+    $('rotorFeld').removeAttribute('hidden');
+  }
+  rotorZeichnen();
+});
+
+link.addEventListener('rotorok', () => {
+  $('rotorMeldung').classList.remove('warn');
+  $('rotorMeldung').textContent = 'ANGENOMMEN';
+  // Gleich nachfragen: der Rotor meldet den Zustand `dreht` erst, wenn er
+  // wirklich anlaeuft.
+  setTimeout(rotorHolen, 400);
+});
+
+link.addEventListener('rotorfehler', (e) => {
+  const t = ((e.detail || {}).text || '').trim();
+  // "kein rotor" ist kein Fehler des Bedieners -- dann gibt es hier einfach
+  // keinen, und das Feld bleibt weg.
+  if (/kein rotor/i.test(t)) { return; }
+  $('rotorMeldung').textContent = t || 'abgelehnt';
+  $('rotorMeldung').classList.add('warn');
+  rotorSicherung.verwerfen();
+  rotorZeichnen();
+});
+
+$('rotorScheibe').addEventListener('pointerup', (e) => {
+  const r = $('rotorScheibe').getBoundingClientRect();
+  if (!r.width) { return; }
+  // In die Koordinaten der Scheibe umrechnen: Mitte ist 0/0, y nach unten.
+  const x = (e.clientX - r.left) - r.width / 2;
+  const y = (e.clientY - r.top) - r.height / 2;
+  // Der Mindestradius ist in Bildpunkten der ANZEIGE, nicht des viewBox --
+  // darum auf die tatsaechliche Breite bezogen.
+  const g = peilungAus(x, y, r.width * 0.12);
+  if (g === null) { return; }
+  rotorSicherung.waehle(g, performance.now());
+  $('rotorMeldung').classList.remove('warn');
+  $('rotorMeldung').textContent = '';
+  rotorZeichnen();
+});
+
+$('rotorDreh').addEventListener('click', () => {
+  const z = rotorSicherung.bestaetige(performance.now());
+  if (z === null) { rotorZeichnen(); return; }
+  if (!link.ready) {
+    $('rotorMeldung').textContent = 'keine Verbindung — nicht gedreht';
+    $('rotorMeldung').classList.add('warn');
+    return;
+  }
+  link.send(`rotor_to:${z}`);
+  $('rotorMeldung').classList.remove('warn');
+  $('rotorMeldung').textContent = 'wird gesendet …';
+  rotorZeichnen();
+});
+
+// Zwei Sekunden: ein Rotor braucht fuer ein Grad laenger als das, und
+// haeufiger zu fragen kostet nur Leitung.
+rotorTakt = setInterval(rotorHolen, 2000);
+link.addEventListener('ready', () => setTimeout(rotorHolen, 500));
 
 // ── Zurueck aus dem Hintergrund (2026-10-05) ──────────────────────────────
 //

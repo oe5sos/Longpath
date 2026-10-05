@@ -76,6 +76,32 @@ VORRAT = [
 EINGETRAGEN = []
 
 
+# ── Rotor aus Pappe (2026-10-05) ─────────────────────────────────────────
+# --rotorfrei schaltet das Drehen frei; ohne das wird abgelehnt, genau wie
+# TciAllowRemoteRotor ab Werk.
+ROTOR_FREI = '--rotorfrei' in sys.argv
+ROTOR = {'ist': 143.0, 'ziel': 143.0, 'zustand': 2, 'frisch': True}
+
+
+def _rotor_nachziehen():
+    """Zieht die gemeldete Stellung dem Ziel nach, 6 Grad je Sekunde --
+    etwa so schnell wie ein echter Rotor."""
+    while True:
+        time.sleep(0.25)
+        d = ROTOR['ziel'] - ROTOR['ist']
+        if d > 180:
+            d -= 360
+        elif d < -180:
+            d += 360
+        if abs(d) < 0.3:
+            ROTOR['ist'] = ROTOR['ziel']
+            if ROTOR['zustand'] == 3:
+                ROTOR['zustand'] = 2
+        else:
+            schritt = 1.5 if d > 0 else -1.5
+            ROTOR['ist'] = (ROTOR['ist'] + schritt) % 360
+
+
 # ── Spots (2026-10-05) ───────────────────────────────────────────────────
 #
 # Je Eintrag: (Versatz zur Mitte in Hz, Rufzeichen, Mode, Quelle, Alter s).
@@ -341,6 +367,42 @@ class Verbindung(threading.Thread):
                     f'{band},{mode},{rs},{re_};')
             print(f'  {self.addr[1]}: log_last {n} -> {len(liste)} Zeilen')
             self.sende_text(f'log_last_ok:{len(liste)};')
+        elif name in ('rotor', 'rotor_to', 'rotor_stop'):
+            # Ein Rotor aus Pappe. Er dreht nicht wirklich, aber er zieht
+            # seine gemeldete Stellung langsam nach -- sonst liesse sich am
+            # Telefon nicht ansehen, ob die Nadel ueberhaupt folgt.
+            #
+            # Die Attrappe ist dabei NICHT gutmuetiger als der echte Server:
+            # ohne --rotorfrei wird jedes Drehen abgelehnt, genau wie
+            # TciAllowRemoteRotor ab Werk.
+            if name == 'rotor':
+                self.sende_text(
+                    f'rotor_ist:{ROTOR["ist"]:.1f},{ROTOR["zustand"]},'
+                    f'{1 if ROTOR["frisch"] else 0};')
+            elif not ROTOR_FREI:
+                print(f'  {self.addr[1]}: {name} ABGELEHNT (nicht freigegeben)')
+                self.sende_text('rotor_err:nicht freigegeben;')
+            elif name == 'rotor_stop':
+                ROTOR['ziel'] = ROTOR['ist']
+                ROTOR['zustand'] = 2
+                print(f'  {self.addr[1]}: Rotor angehalten')
+                self.sende_text('rotor_ok:stop;')
+            else:
+                roh = (args[0].strip() if args else '')
+                try:
+                    g = float(roh)
+                except ValueError:
+                    g = None
+                if g is None or g != g or g < 0 or g > 360:
+                    print(f'  {self.addr[1]}: rotor_to ABGELEHNT ({roh!r})')
+                    self.sende_text('rotor_err:peilung unbrauchbar;')
+                else:
+                    if g == 360:
+                        g = 0.0
+                    ROTOR['ziel'] = g
+                    ROTOR['zustand'] = 3          # dreht
+                    print(f'  {self.addr[1]}: Rotor auf {g:.1f} Grad')
+                    self.sende_text(f'rotor_ok:{g:.1f};')
         elif name == 'spots':
             # Longpath filtert auf den sichtbaren Ausschnitt. Die Attrappe
             # ist dabei absichtlich NICHT gutmuetiger: was ausserhalb der
@@ -606,6 +668,7 @@ class Verbindung(threading.Thread):
 
 
 def main():
+    threading.Thread(target=_rotor_nachziehen, daemon=True).start()
     # Ab Werk nur auf dem eigenen Rechner. Mit `--alle` (oder HOST=0.0.0.0)
     # auch aus dem LAN erreichbar — das braucht man, sobald man die Handfunke
     # von einem echten Telefon aus prueft.
