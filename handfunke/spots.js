@@ -103,6 +103,31 @@ export function marken(zeilen, mitteHz, spanneHz, breitePx,
 }
 
 /**
+ * Die Marke, deren BESCHRIFTUNG unter dem Finger liegt — oder `null`.
+ *
+ * Getrennt von `trefferBei`, und das ist der ganze Punkt: auf dem
+ * Rufzeichen steht das Rufzeichen (QRZ, ins Logblatt), auf dem Strich steht
+ * die Frequenz (abstimmen). Wer beides auf denselben Tipp legt, muss sich
+ * für eines entscheiden und nimmt dem Bediener das andere weg.
+ *
+ * Geprüft wird gegen den Kasten, den das Zeichnen WIRKLICH gesetzt hat
+ * (`m.kasten`), nicht gegen eine zweite Rechnung. Zwei Rechnungen laufen
+ * auseinander, und dann trifft der Finger etwas anderes als das Auge sieht.
+ * Marken ohne Kasten (noch nie gezeichnet) zählen nicht.
+ */
+export function trefferAufSchrift(marken, x, y, luft = 4) {
+  for (const m of marken || []) {
+    const k = m && m.kasten;
+    if (!k) continue;
+    if (x >= k.x - luft && x <= k.x + k.b + luft
+        && y >= k.y - luft && y <= k.y + k.h + luft) {
+      return m;
+    }
+  }
+  return null;
+}
+
+/**
  * Die Marke unter dem Finger, oder `null`.
  *
  * `radiusPx` ist grosszuegig: ein Finger ist breiter als ein Strich. Bei

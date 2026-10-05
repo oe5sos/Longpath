@@ -10,7 +10,7 @@ import { TciLink, Fft } from './tci.js';
 import { Mikrofon, mikrofonMoeglich } from './mikrofon.js';
 import { Sammelstelle, zeileLesen, befundLesen, zeitKurz, dupeSatz }
   from './logbuch.js';
-import { spotLesen, marken, trefferBei } from './spots.js';
+import { spotLesen, marken, trefferBei, trefferAufSchrift } from './spots.js';
 import { Zeichenbremse } from './ton-vorrang.js';
 import { bildIstAlt } from './aufwachen.js';
 
@@ -813,9 +813,19 @@ function zeichneBild() {
           sperrBisY = (rr.bottom - rPan.top) * k;
         }
       }
+      // Wie hoch die Schrift ueber ihrer Grundlinie steht -- GEMESSEN, nicht
+      // geschaetzt. `fillText` zeichnet NACH OBEN von der Grundlinie weg;
+      // wer die Grundlinie auf 4 setzt, schiebt den halben Buchstaben aus
+      // dem Bild. Genau das ist am 2026-10-05 am Telefon passiert: "die
+      // Spots stehen sehr weit oben, so kann man diese nicht komplett
+      // sehen". Im Werkzeugbrowser fiel es nicht auf, weil dort mehr Platz
+      // ueber dem Panadapter ist.
+      const mass = panCtx.measureText('OE5SOS');
+      const hoch = Math.ceil(mass.actualBoundingBoxAscent || 7);
+      const ersteZeile = hoch + 2;         // zwei Punkte Luft zum Rand
       for (const m of spotMarken) {
         const unterDemRegler = (m.x + 27) > sperrVonX;
-        const oben = unterDemRegler ? sperrBisY + 10 : 4;
+        const oben = unterDemRegler ? sperrBisY + ersteZeile : ersteZeile;
         const y = oben + m.reihe * 11;       // Schriftgrundlinie
         panCtx.globalAlpha = m.deckung;
         panCtx.strokeStyle = '#c2924f';
@@ -827,9 +837,14 @@ function zeichneBild() {
         // Der Schriftzug bekommt einen dunklen Grund, sonst verschwindet er
         // ueber einem hellen Traeger.
         const b = panCtx.measureText(m.ruf).width + 6;
+        // Den Kasten festhalten, in DENSELBEN Einheiten, in denen gezeichnet
+        // wird. Der Finger prueft spaeter dagegen -- eine zweite Rechnung
+        // waere eine zweite Wahrheit.
+        m.kasten = { x: m.x - b / 2, y: y - hoch - 1, b, h: hoch + 3 };
         panCtx.globalAlpha = m.deckung * .72;
         panCtx.fillStyle = '#0b0d10';
-        panCtx.fillRect(m.x - b / 2, y - 8, b, 10);
+        // Der dunkle Grund folgt derselben Messung statt einer festen 8.
+        panCtx.fillRect(m.x - b / 2, y - hoch - 1, b, hoch + 3);
         panCtx.globalAlpha = m.deckung;
         panCtx.fillStyle = '#d8a55f';
         panCtx.fillText(m.ruf, m.x, y);
@@ -1834,6 +1849,41 @@ $('scope').addEventListener('pointerup', (e) => {
     const r = $('scope').getBoundingClientRect();
     const xCanvas = r.width
       ? (e.clientX - r.left) / r.width * pan.width : -1;
+    // Der Panadapter ist nur der OBERE Teil des Feldes; darunter liegt der
+    // Wasserfall. Die y-Umrechnung muss darum auf die Hoehe des Canvas
+    // gehen und nicht auf die des ganzen Feldes.
+    const rPan2 = pan.getBoundingClientRect();
+    const yCanvas = rPan2.height
+      ? (e.clientY - rPan2.top) / rPan2.height * pan.height : -1;
+
+    // ── Auf der SCHRIFT: das Rufzeichen ist gemeint, nicht die Frequenz ──
+    //
+    // Ein Tipp schlaegt es bei QRZ nach, zwei tragen es ins QSO-Blatt. Der
+    // einzelne Tipp muss darum kurz warten, ob ein zweiter kommt -- anders
+    // ist beides auf einem Telefon nicht zu unterscheiden. 280 ms ist das
+    // uebliche Mass; darunter trennt es Doppeltipps von zittrigen Fingern
+    // nicht mehr.
+    const schrift = (r.width && rPan2.height)
+      ? trefferAufSchrift(spotMarken, xCanvas, yCanvas) : null;
+    if (schrift) {
+      wischVon = null;
+      const jetzt = performance.now();
+      if (spotTipp.ruf === schrift.ruf && (jetzt - spotTipp.wann) < 280) {
+        clearTimeout(spotTipp.frist);
+        spotTipp.ruf = null;
+        qsoOeffnenMit(schrift.ruf);
+      } else {
+        spotTipp.ruf = schrift.ruf;
+        spotTipp.wann = jetzt;
+        clearTimeout(spotTipp.frist);
+        spotTipp.frist = setTimeout(() => {
+          spotTipp.ruf = null;
+          qrzOeffnen(schrift.ruf);
+        }, 280);
+      }
+      return;
+    }
+
     const treffer = r.width ? trefferBei(spotMarken, xCanvas) : null;
     if (treffer) {
       link.send(`vfo:${state.trx},0,${treffer.hz}`);
@@ -2228,6 +2278,35 @@ async function melde(anlass) {
 setTimeout(() => melde('start'), 12000);
 
 // ── Bildschleife ────────────────────────────────────────────────────────────
+// ── Was ein Tipp auf ein Rufzeichen bedeutet (2026-10-05) ────────────────
+//
+// Betreiber am 2026-10-05: einmal tippen schlaegt bei QRZ nach, zweimal
+// traegt ins Logblatt ein. Auf dem STRICH bleibt es beim Abstimmen -- dort
+// steht die Frequenz, auf der Schrift steht das Rufzeichen.
+const spotTipp = { ruf: null, wann: 0, frist: null };
+
+/** QRZ in einem neuen Reiter. Verlaesst die App -- das ist dem Bediener
+ *  bewusst, er hat danach gefragt. */
+function qrzOeffnen(ruf) {
+  if (!ruf) { return; }
+  // `noopener` ist kein Beiwerk: ohne das bekaeme die fremde Seite ueber
+  // `window.opener` einen Griff auf diese hier.
+  window.open(`https://www.qrz.com/db/${encodeURIComponent(ruf)}`,
+              '_blank', 'noopener,noreferrer');
+}
+
+/** Das QSO-Blatt mit schon eingetragenem Rufzeichen. */
+function qsoOeffnenMit(ruf) {
+  qsoOeffnen();
+  if (!ruf) { return; }
+  const feld = $('qsoRuf');
+  feld.value = ruf;
+  // Die Dupe-Abfrage lebt am `input`-Ereignis -- von Hand gesetzte Werte
+  // loesen das nicht aus. Ohne diese Zeile stuende das Rufzeichen da und
+  // niemand haette nachgesehen, ob es schon im Logbuch steht.
+  feld.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
 // Der Ton hat Vorrang vor dem Bild.
 //
 // Am Telefon ist die Seite kein sicherer Kontext, also laeuft der Ton ueber
