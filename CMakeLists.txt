@@ -517,6 +517,7 @@ set(CORE_SOURCES
     src/core/AppSettings.cpp
     src/core/LogDatei.cpp
     src/core/audio/BusMitFrist.cpp
+    src/core/audio/AudioRateMatcher.cpp
     src/core/LogbookDatei.cpp
     src/core/LogbuchRueckschau.cpp
     src/core/SettingsBackup.cpp
