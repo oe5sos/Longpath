@@ -15,7 +15,7 @@
 //
 //     node pruefe-spots.mjs
 
-import { spotLesen, marken, trefferBei, deckung,
+import { spotLesen, marken, trefferBei, trefferAufSchrift, deckung,
          kFrischBis, kVerblasstAb, kMindestDeckung } from './spots.js';
 
 let fehler = 0;
@@ -151,6 +151,34 @@ console.log('\nTippen');
          trefferBei(m, m[1].x - 8, 40).ruf === 'RECHTS');
   pruefe('ohne Marken kein Treffer', trefferBei([], 100) === null);
   pruefe('null vertraegt sich', trefferBei(null, 100) === null);
+}
+
+console.log('\nTippen auf die Schrift');
+{
+  // Der Kasten kommt vom ZEICHNEN, nicht aus einer zweiten Rechnung. Wer
+  // ihn nie gesetzt hat, darf auch nicht getroffen werden -- sonst faengt
+  // eine Marke Tipper ab, die noch gar nicht auf dem Schirm steht.
+  const ohne = { ruf: 'OHNE', x: 100 };
+  pruefe('ohne gezeichneten Kasten kein Treffer',
+         trefferAufSchrift([ohne], 100, 10) === null);
+
+  const m = { ruf: 'OE5SOS', x: 100, kasten: { x: 80, y: 4, b: 40, h: 11 } };
+  pruefe('mitten auf der Schrift trifft', trefferAufSchrift([m], 100, 9).ruf === 'OE5SOS');
+  pruefe('linke obere Ecke trifft', trefferAufSchrift([m], 80, 4) !== null);
+  pruefe('rechte untere Ecke trifft', trefferAufSchrift([m], 120, 15) !== null);
+  pruefe('etwas Luft darum trifft noch', trefferAufSchrift([m], 77, 2) !== null);
+  pruefe('weit daneben trifft nicht', trefferAufSchrift([m], 100, 60) === null);
+  pruefe('weit rechts trifft nicht', trefferAufSchrift([m], 200, 9) === null);
+  pruefe('ohne Marken kein Treffer', trefferAufSchrift([], 100, 9) === null);
+  pruefe('null vertraegt sich', trefferAufSchrift(null, 1, 1) === null);
+
+  // DER Punkt der Trennung: tief unten am Strich ist die FREQUENZ gemeint,
+  // nicht das Rufzeichen. Dort darf der Schrifttreffer nichts melden,
+  // waehrend der Strichtreffer sehr wohl greift.
+  const marke = { ruf: 'OE5SOS', x: 100, kasten: { x: 80, y: 4, b: 40, h: 11 } };
+  pruefe('unten am Strich: keine Schrift, aber eine Marke',
+         trefferAufSchrift([marke], 100, 70) === null
+         && trefferBei([marke], 100) !== null);
 }
 
 console.log(fehler === 0 ? '\nAlles gut.' : `\n${fehler} Punkt(e) offen.`);
