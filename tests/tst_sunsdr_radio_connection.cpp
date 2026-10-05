@@ -743,6 +743,87 @@ private slots:
         QCOMPARE(conn.blockRepliesSentForTest(), quint64(0));
     }
 
+    // 2026-10-05, aus Martins Mitschnitten: ExpertSDR2 beantwortet JEDEN
+    // Block, aber abwechselnd -- ungerade Nummer voll (1210 Byte, Laengenfeld
+    // 1200), gerade Nummer nur der KOPF (10 Byte, Laengenfeld 0). Gemessen
+    // als 240/s + 240/s gegen 480/s vom Geraet, in allen drei Mitschnitten
+    // gleich. Longpath schickt bisher immer den vollen Block.
+    //
+    // Geprueft wird die GROESSE, nicht die Zahl: die Zahl der Antworten
+    // aendert sich nicht, nur ihr Gewicht. Eine Pruefung auf
+    // blockRepliesSentForTest() allein waere in beiden Fassungen gruen.
+    void jedeZweiteAntwortIstNurDerKopf()
+    {
+        qunsetenv("LONGPATH_SUNSDR_BLOCKANTWORT");
+        qputenv("LONGPATH_SUNSDR_KOPFANTWORT", "1");
+        auto restore = qScopeGuard([] { qunsetenv("LONGPATH_SUNSDR_KOPFANTWORT"); });
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+
+        const QHostAddress radio(QStringLiteral("192.0.2.200"));
+        conn.feedControlDatagramForTest(
+            QByteArray::fromHex("03ff011a7c0000004119c0a810c8c0a810c851c300004928"),
+            radio);
+        QVERIFY(conn.isRxReadyForTest());
+
+        auto block = [](quint16 seq) {
+            QByteArray pkt = SunSdr::buildIqHeader(
+                SunSdr::kProfileQrp, SunSdr::kOpIqRxIdle, seq, 0x01, 0x00);
+            pkt.append(SunSdr::kIqPayloadSize, char(0));
+            return pkt;
+        };
+        for (quint16 seq = 0; seq < 4; ++seq) {
+            conn.feedStreamDatagramFromSenderForTest(block(seq), radio);
+        }
+
+        QTRY_COMPARE_WITH_TIMEOUT(conn.blockRepliesSentForTest(), quint64(4), 500);
+        // 0 und 2 sind gerade -> blosser Kopf; 1 und 3 ungerade -> voll.
+        QCOMPARE(conn.bareBlockRepliesSentForTest(), quint64(2));
+        // Die letzte Nummer war 3, also ungerade, also die volle Antwort.
+        QCOMPARE(conn.lastBlockReplySeqForTest(), quint16(3));
+        QCOMPARE(conn.lastBlockReplyBytesForTest(),
+                 SunSdr::kIqHeaderSize + SunSdr::kIqPayloadSize);
+    }
+
+    // Waechter, nicht Faenger: ohne den Schalter bleibt JEDE Antwort der
+    // volle Block. Diese Pruefung ist in beiden Fassungen gruen und soll das
+    // auch -- sie haelt die Vorgabe fest, solange die A/B-Messung am Geraet
+    // nicht entschieden hat.
+    void ohneSchalterBleibtJedeAntwortDerVolleBlock()
+    {
+        qunsetenv("LONGPATH_SUNSDR_BLOCKANTWORT");
+        qunsetenv("LONGPATH_SUNSDR_KOPFANTWORT");
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+
+        const QHostAddress radio(QStringLiteral("192.0.2.200"));
+        conn.feedControlDatagramForTest(
+            QByteArray::fromHex("03ff011a7c0000004119c0a810c8c0a810c851c300004928"),
+            radio);
+        QVERIFY(conn.isRxReadyForTest());
+
+        auto block = [](quint16 seq) {
+            QByteArray pkt = SunSdr::buildIqHeader(
+                SunSdr::kProfileQrp, SunSdr::kOpIqRxIdle, seq, 0x01, 0x00);
+            pkt.append(SunSdr::kIqPayloadSize, char(0));
+            return pkt;
+        };
+        for (quint16 seq = 0; seq < 4; ++seq) {
+            conn.feedStreamDatagramFromSenderForTest(block(seq), radio);
+        }
+
+        QTRY_COMPARE_WITH_TIMEOUT(conn.blockRepliesSentForTest(), quint64(4), 500);
+        QCOMPARE(conn.bareBlockRepliesSentForTest(), quint64(0));
+        QCOMPARE(conn.lastBlockReplyBytesForTest(),
+                 SunSdr::kIqHeaderSize + SunSdr::kIqPayloadSize);
+    }
+
     // ── Pegelabgleich QRP, neu gemessen am 2026-10-04 ──────────────
     //
     // Bis dahin standen hier +20,0 dB -- am 2026-09-25 gegen ExpertSDR2

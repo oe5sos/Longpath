@@ -134,7 +134,7 @@ bool parseControlHeader(const quint8* data, int len, const Profile& profile,
 }
 
 QByteArray buildIqHeader(const Profile& profile, quint8 opcode, quint16 seq,
-                         quint8 byte8, quint8 byte9)
+                         quint8 byte8, quint8 byte9, int payloadLen)
 {
     // Mirrors sunsdr_build_iq_header, sunsdr.c:1678-1690 [@f8b01d25c5].
     QByteArray out(kIqHeaderSize, char(0));
@@ -144,8 +144,8 @@ QByteArray buildIqHeader(const Profile& profile, quint8 opcode, quint16 seq,
     buf[1] = kMagic1;
     buf[2] = opcode;
     buf[3] = 0xFF;
-    buf[4] = static_cast<uchar>(kIqPayloadSize & 0xFF);
-    buf[5] = static_cast<uchar>((kIqPayloadSize >> 8) & 0xFF);
+    buf[4] = static_cast<uchar>(payloadLen & 0xFF);
+    buf[5] = static_cast<uchar>((payloadLen >> 8) & 0xFF);
     buf[6] = static_cast<uchar>(seq & 0xFF);
     buf[7] = static_cast<uchar>((seq >> 8) & 0xFF);
     buf[8] = byte8;

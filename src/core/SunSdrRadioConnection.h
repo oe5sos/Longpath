@@ -205,6 +205,11 @@ public:
     // oder 1 (RX2) -- der Rahmen, der die QRP auf echtes I/Q schaltet.
     static QByteArray ddcFrequencyFrame(int subReceiver, quint64 frequencyHz);
     quint16 lastBlockReplySeqForTest() const { return m_lastBlockReplySeq; }
+    // Wie viele der Antworten blosse Koepfe waren (10 Byte statt 1210) und
+    // wie gross die letzte Antwort war -- die Kopfantwort laesst sich nur
+    // an der GROESSE pruefen, nicht an der Zahl.
+    quint64 bareBlockRepliesSentForTest() const { return m_bareBlockRepliesSent; }
+    int lastBlockReplyBytesForTest() const { return m_lastBlockReplyBytes; }
 
     // Exposes the private data-watchdog silence threshold, same
     // rationale as connectTimeoutMsForTest() above.
@@ -705,7 +710,33 @@ private:
     QElapsedTimer m_streamStartTimer;
     int m_singleChannelHoldMs{2000};
     quint16 m_lastBlockReplySeq{0};
+    quint64 m_bareBlockRepliesSent{0};
+    int m_lastBlockReplyBytes{0};
     bool blockReplyEnabled();
+
+    // ── Kopfantwort: jeden ZWEITEN Block nur mit dem Kopf beantworten ──
+    //
+    // Am 2026-10-05 aus Martins Mitschnitten herausgelesen (expert-A/B und
+    // expert-96k, alle drei gleich): ExpertSDR2 beantwortet jeden Block des
+    // Geraets, aber abwechselnd
+    //
+    //   ungerade Nummer -> voller Stilleblock, Laengenfeld 1200 (1210 Byte)
+    //   gerade Nummer   -> BLOSSER KOPF,       Laengenfeld 0    (10 Byte)
+    //
+    // gemessen als 240/s + 240/s gegen 480/s vom Geraet. Longpath schickt
+    // bisher auf JEDEN Block den vollen Block, also rund das Doppelte an
+    // Rueckweg-Bytes.
+    //
+    // Warum das hier steht und nicht gleich die Vorgabe ist: es ist die
+    // erste konkrete Spur zu den ~110 Wiederholungen je Sekunde bei 96 kHz
+    // (drei andere Vermutungen sind gemessen und widerlegt, siehe
+    // docs/architecture/2026-10-02-sunsdr-verbindungsablauf.md). Gemessen
+    // ist aber nur, was ExpertSDR2 TUT -- nicht, dass es hilft. Also als
+    // Schalter gebaut, Vorgabe AUS, und die A/B-Messung am Geraet
+    // entscheidet. LONGPATH_SUNSDR_KOPFANTWORT=1 schaltet ein.
+    bool kopfAntwortEnabled();
+    bool m_kopfAntwortChecked{false};
+    bool m_kopfAntwortOn{false};
     void replyToBlock(quint16 seq);
 
     // ── Mithoeren: was das Geraet von sich aus meldet ────────────────────

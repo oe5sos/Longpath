@@ -2056,13 +2056,39 @@ void SunSdrRadioConnection::replyToBlock(quint16 seq)
     // Kopf wie ExpertSDR2 im Leerlauf und wie ArtemisSDRs
     // sunsdr_build_tx_silence(), sunsdr.c:4105-4115 [@f8b01d25c5]:
     // op=0xFE, byte8=0x01, byte9=0x00, Nutzlast Null (Stille).
-    QByteArray pkt = SunSdr::buildIqHeader(*m_profile, SunSdr::kOpIqRxIdle,
-                                           seq, /*byte8=*/0x01, /*byte9=*/0x00);
-    pkt.append(SunSdr::kIqPayloadSize, char(0));
+    //
+    // Mit Kopfantwort: GERADE Nummern bekommen nur den Kopf, Laengenfeld 0.
+    // Die Parität ist nicht ausgedacht, sie steht so im Mitschnitt --
+    // ExpertSDR2 antwortet auf 3, 5, 7, 9 ... voll und auf 0, 2, 4, 6 ...
+    // mit dem blossen Kopf (expert-96k.pcap, 2026-10-05).
+    const bool nurKopf = kopfAntwortEnabled() && (seq % 2 == 0);
+    QByteArray pkt = SunSdr::buildIqHeader(
+        *m_profile, SunSdr::kOpIqRxIdle, seq, /*byte8=*/0x01, /*byte9=*/0x00,
+        nurKopf ? 0 : SunSdr::kIqPayloadSize);
+    if (!nurKopf) {
+        pkt.append(SunSdr::kIqPayloadSize, char(0));
+    }
     m_streamSocket->writeDatagram(pkt, m_radioAddr, m_profile->defaultStreamPort);
     recordBytesSent(static_cast<qint64>(pkt.size()));
     ++m_blockRepliesSent;
+    if (nurKopf) { ++m_bareBlockRepliesSent; }
+    m_lastBlockReplyBytes = int(pkt.size());
     m_lastBlockReplySeq = seq;
+}
+
+bool SunSdrRadioConnection::kopfAntwortEnabled()
+{
+    if (!m_kopfAntwortChecked) {
+        m_kopfAntwortChecked = true;
+        // Vorgabe AUS: gemessen ist, was ExpertSDR2 tut, nicht dass es hilft.
+        // Die A/B-Messung am Geraet entscheidet (Begruendung im Kopf).
+        m_kopfAntwortOn = qgetenv("LONGPATH_SUNSDR_KOPFANTWORT").trimmed() == "1";
+        if (m_kopfAntwortOn) {
+            qCInfo(lcSunSdr) << "SunSdr: Kopfantwort an -- jede zweite Antwort "
+                                "nur 10 Byte (LONGPATH_SUNSDR_KOPFANTWORT=1)";
+        }
+    }
+    return m_kopfAntwortOn;
 }
 
 void SunSdrRadioConnection::probeFeed(quint16 seq, const QByteArray& payload)

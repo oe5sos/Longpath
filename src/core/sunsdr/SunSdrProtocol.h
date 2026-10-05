@@ -311,8 +311,13 @@ struct IqHeader {
 // themselves; this function only builds the header ArtemisSDR itself
 // builds separately from the payload (sunsdr_build_iq_header takes no
 // payload pointer at all).
+// payloadLen ist das LAENGENFELD des Kopfes, nicht die Groesse des
+// Rueckgabewerts -- der ist immer die 10 Byte des Kopfes. Standard ist die
+// volle Nutzlast; 0 baut den BLOSSEN KOPF, den ExpertSDR2 am 2026-10-05 im
+// Mitschnitt auf jeden zweiten Block schickt (03 ff fe ff 00 00 .. .. 01 00).
 QByteArray buildIqHeader(const Profile& profile, quint8 opcode, quint16 seq,
-                         quint8 byte8, quint8 byte9);
+                         quint8 byte8, quint8 byte9,
+                         int payloadLen = kIqPayloadSize);
 
 // Parses a 10-byte IQ-stream header. Same magic-byte validation
 // discipline as parseControlHeader.
