@@ -277,6 +277,16 @@ private slots:
             .arg(conn.rahmenOhneQuittungForTest())
             .arg(conn.rahmenWiederholtForTest())
             .arg(conn.offeneRahmenForTest());
+        // Was WIR zurueckschicken -- der Gegenstand der A/B-Messung vom
+        // 2026-10-05. Ohne diese Zeile sieht man am Ergebnis nicht, ob der
+        // Schalter ueberhaupt gegriffen hat.
+        qInfo().noquote() << QStringLiteral(
+            "Rueckweg: %1 Antworten (%2/s), davon %3 blosse Koepfe, "
+            "letzte %4 Byte")
+            .arg(conn.blockRepliesSentForTest())
+            .arg(double(conn.blockRepliesSentForTest()) / secs, 0, 'f', 0)
+            .arg(conn.bareBlockRepliesSentForTest())
+            .arg(conn.lastBlockReplyBytesForTest());
         qInfo().noquote() << QStringLiteral(
             "Uebersteuerung: %1 Proben am Anschlag, %2 Meldungen")
             .arg(conn.anschlagProbenForTest())

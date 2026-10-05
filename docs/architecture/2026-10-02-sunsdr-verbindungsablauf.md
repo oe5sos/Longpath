@@ -1080,3 +1080,58 @@ Dokument.
 **Die Lehre, dreimal in zwei Tagen dieselbe:** eine Zahl aus einem
 Mitschnitt ist erst eine Aussage, wenn feststeht, **wer** gesendet hat
 und in **welcher** Betriebsart.
+
+---
+
+# A/B am Gerät, 2026-10-05: die vierte widerlegte Vermutung
+
+Drei Durchgänge à 60 s an der echten QRP, 96 kHz, Messgerät an. Der
+Betreiber hatte das Gerät freigegeben; ExpertSDR2 war sauber beendet.
+
+| Durchgang | Rückweg | Wiederholungen/s |
+| --- | --- | --- |
+| A — ein Empfänger (Kanal 1 wird verworfen) | 492/s, alle 1210 B | 103–113 (Mittel **110**) |
+| B — zwei Empfänger | 996/s, alle 1210 B | 193–219 (Mittel **207**) |
+| C — zwei Empfänger **+ Kopfantwort** | 996/s, 504/s davon 10 B | 200–222 (Mittel **214**) |
+
+## Was A gegen B sagt — die Quittung VOR dem Verwerfen ist nicht die Ursache
+
+In A stand `m_aktiveEmpfaenger` auf 1, also wurde **Kanal 1 vollständig
+verworfen — und zwar vor `replyToBlock`**, 53522 Pakete ohne eine
+einzige Antwort. Das sah nach der Ursache aus: unbeantwortete Blöcke,
+also wiederholt das Gerät.
+
+Falsch. Mit zwei Empfängern wird jeder Block beantwortet, und die
+Wiederholungen **verdoppeln sich mit der Blockzahl** (110 → 207) statt zu
+verschwinden. Der Anteil bleibt gleich: rund **1,2 Pakete je Nummer** in
+beiden Fällen, bei ~960 Nummern/s. Es ist eine Quote, keine Folge
+fehlender Quittungen.
+
+## Was C sagt — der bloße Kopf ändert an den Wiederholungen nichts
+
+Die Kopfantwort hat nachweislich gegriffen (30265 bloße Köpfe in 60 s),
+und die Wiederholungen bleiben, wo sie waren: 207 gegen 214/s, das ist
+Rauschen. **Vierte Vermutung, vierte Widerlegung.**
+
+Sie bleibt trotzdem eingeschaltet, aus einem anderen Grund: 30265 × 1200
+Byte sind rund **36 MB in 60 s**, also knapp **5 Mbit/s** weniger auf dem
+Rückweg — und ExpertSDR2 macht es genauso. Vorgabe seit diesem Tag AN,
+`LONGPATH_SUNSDR_KOPFANTWORT=0` schaltet aus.
+
+## Was damit über die Wiederholungen feststeht
+
+Widerlegt sind jetzt: den Kopf des Geräts spiegeln · zwei Stille-Ströme ·
+vor dem Verwerfen quittieren · den bloßen Kopf schicken. Und aus A/B
+zusätzlich: es hängt **nicht** an unbeantworteten Kanälen.
+
+Was übrig bleibt, ist eine Quote von ~1,2 Paketen je Nummer, die **mit
+der Blockzahl skaliert** und bei 48 kHz nicht auftritt. Das sieht nach
+einer Eigenschaft des Geräts bei hoher Blockrate aus, nicht nach einem
+fehlenden Rahmen von uns. Belegen ließe sich das nur mit einem
+Mitschnitt, in dem ExpertSDR2 **zwei** Ströme auf 96 kHz fährt —
+`expert-96k.pcap` hatte einen, und dort gab es über 192 s keine einzige
+Wiederholung.
+
+**Kein Richtigkeitsfehler:** Verlust 0,00–0,04 %, Folgenummern sauber,
+der Ton läuft. Es ist Netzlast, und sie ist mit der Kopfantwort um ein
+Viertel kleiner geworden.

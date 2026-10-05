@@ -2080,13 +2080,14 @@ bool SunSdrRadioConnection::kopfAntwortEnabled()
 {
     if (!m_kopfAntwortChecked) {
         m_kopfAntwortChecked = true;
-        // Vorgabe AUS: gemessen ist, was ExpertSDR2 tut, nicht dass es hilft.
-        // Die A/B-Messung am Geraet entscheidet (Begruendung im Kopf).
-        m_kopfAntwortOn = qgetenv("LONGPATH_SUNSDR_KOPFANTWORT").trimmed() == "1";
-        if (m_kopfAntwortOn) {
-            qCInfo(lcSunSdr) << "SunSdr: Kopfantwort an -- jede zweite Antwort "
-                                "nur 10 Byte (LONGPATH_SUNSDR_KOPFANTWORT=1)";
-        }
+        // Vorgabe AN -- am 2026-10-05 am Geraet gemessen (Begruendung im
+        // Kopf): die Wiederholungen bleiben unveraendert, der Rueckweg
+        // halbiert sich. LONGPATH_SUNSDR_KOPFANTWORT=0 schaltet aus.
+        const QByteArray env = qgetenv("LONGPATH_SUNSDR_KOPFANTWORT").trimmed();
+        m_kopfAntwortOn = env.isEmpty() ? true : (env != "0");
+        qCInfo(lcSunSdr) << "SunSdr: Kopfantwort"
+                         << (m_kopfAntwortOn ? "an" : "aus")
+                         << (env.isEmpty() ? "(Vorgabe)" : "(LONGPATH_SUNSDR_KOPFANTWORT)");
     }
     return m_kopfAntwortOn;
 }

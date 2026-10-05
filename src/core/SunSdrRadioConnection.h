@@ -731,9 +731,21 @@ private:
     // erste konkrete Spur zu den ~110 Wiederholungen je Sekunde bei 96 kHz
     // (drei andere Vermutungen sind gemessen und widerlegt, siehe
     // docs/architecture/2026-10-02-sunsdr-verbindungsablauf.md). Gemessen
-    // ist aber nur, was ExpertSDR2 TUT -- nicht, dass es hilft. Also als
-    // Schalter gebaut, Vorgabe AUS, und die A/B-Messung am Geraet
-    // entscheidet. LONGPATH_SUNSDR_KOPFANTWORT=1 schaltet ein.
+    // ist aber nur, was ExpertSDR2 TUT -- nicht, dass es hilft.
+    //
+    // Am 2026-10-05 am Geraet A/B gemessen, je 60 s bei 96 kHz mit zwei
+    // Empfaengern:
+    //
+    //     ohne Kopfantwort:  996 Antworten/s, alle 1210 Byte
+    //                        Wiederholungen 193..219/s (Mittel 207)
+    //     mit Kopfantwort:   996 Antworten/s, 504/s davon 10 Byte
+    //                        Wiederholungen 200..222/s (Mittel 214)
+    //
+    // Ergebnis in einem Satz: an den Wiederholungen aendert es NICHTS --
+    // das ist die vierte widerlegte Vermutung. Es spart aber den halben
+    // Rueckweg: 30265 blosse Koepfe in 60 s sind rund 36 MB, also knapp
+    // 5 Mbit/s weniger. Deshalb ist die Vorgabe seitdem AN;
+    // LONGPATH_SUNSDR_KOPFANTWORT=0 schaltet aus.
     bool kopfAntwortEnabled();
     bool m_kopfAntwortChecked{false};
     bool m_kopfAntwortOn{false};

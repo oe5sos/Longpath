@@ -788,14 +788,47 @@ private slots:
                  SunSdr::kIqHeaderSize + SunSdr::kIqPayloadSize);
     }
 
-    // Waechter, nicht Faenger: ohne den Schalter bleibt JEDE Antwort der
-    // volle Block. Diese Pruefung ist in beiden Fassungen gruen und soll das
-    // auch -- sie haelt die Vorgabe fest, solange die A/B-Messung am Geraet
-    // nicht entschieden hat.
-    void ohneSchalterBleibtJedeAntwortDerVolleBlock()
+    // Seit der Messung am 2026-10-05 ist die Kopfantwort die VORGABE: an
+    // den Wiederholungen aendert sie nichts (207/s gegen 214/s, also
+    // nichts), sie halbiert aber den Rueckweg. Diese Pruefung haelt die
+    // Vorgabe fest -- ohne sie koennte sie jemand unbemerkt zurueckdrehen.
+    void ohneSchalterIstDieKopfantwortAn()
     {
         qunsetenv("LONGPATH_SUNSDR_BLOCKANTWORT");
         qunsetenv("LONGPATH_SUNSDR_KOPFANTWORT");
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+
+        const QHostAddress radio(QStringLiteral("192.0.2.200"));
+        conn.feedControlDatagramForTest(
+            QByteArray::fromHex("03ff011a7c0000004119c0a810c8c0a810c851c300004928"),
+            radio);
+        QVERIFY(conn.isRxReadyForTest());
+
+        auto block = [](quint16 seq) {
+            QByteArray pkt = SunSdr::buildIqHeader(
+                SunSdr::kProfileQrp, SunSdr::kOpIqRxIdle, seq, 0x01, 0x00);
+            pkt.append(SunSdr::kIqPayloadSize, char(0));
+            return pkt;
+        };
+        for (quint16 seq = 0; seq < 4; ++seq) {
+            conn.feedStreamDatagramFromSenderForTest(block(seq), radio);
+        }
+
+        QTRY_COMPARE_WITH_TIMEOUT(conn.blockRepliesSentForTest(), quint64(4), 500);
+        QCOMPARE(conn.bareBlockRepliesSentForTest(), quint64(2));
+    }
+
+    // Und sie laesst sich abschalten -- der Rueckweg ist dann wieder
+    // durchgehend der volle Block.
+    void mitNullBleibtJedeAntwortDerVolleBlock()
+    {
+        qunsetenv("LONGPATH_SUNSDR_BLOCKANTWORT");
+        qputenv("LONGPATH_SUNSDR_KOPFANTWORT", "0");
+        auto restore = qScopeGuard([] { qunsetenv("LONGPATH_SUNSDR_KOPFANTWORT"); });
         SunSdrRadioConnection conn;
         conn.setFixedPortBindingEnabledForTest(false);
         conn.init();
