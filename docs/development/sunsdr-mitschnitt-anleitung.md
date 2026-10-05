@@ -26,7 +26,13 @@
    Wiederholungen bei ExpertSDR2, ist es die Eigenart des Geräts und
    kein Mangel von Longpath — und die Frage ist erledigt statt offen.
 
-   **Dafür muss ExpertSDR2 auf 96 kHz stehen**, nicht auf der Vorgabe.
+   **Dafür müssen BEIDE Empfänger auf 96 kHz stehen**, nicht nur einer
+   und nicht die Vorgabe. Am 2026-10-05 nachgezählt: in den Mitschnitten
+   A und B läuft **Kanal 0 mit 48 kHz und Kanal 1 mit 96 kHz** — das
+   Gerät kann gemischte Raten, und in dieser Betriebsart liegt die Last
+   bei 720 Blöcken/s statt 960. Damit beantworten diese Mitschnitte die
+   Frage nicht. Das Werkzeug prüft das jetzt selbst und verweigert die
+   Aussage, wenn nicht jeder Kanal auf 96 kHz steht.
 
 **Was dabei nicht gebraucht wird:** keine Antenne, kein Senden, keine
 Freigabe für HF. Es wird nur zugehört.
@@ -64,6 +70,21 @@ sudo tcpdump -i en9 -s 0 -w ~/Desktop/expert-C.pcap host 192.168.16.200
 ExpertSDR2 starten, verbinden, dann **die Abtastrate umstellen** (eine
 andere Bandbreite wählen), zehn Sekunden warten, beenden.
 
+## Durchgang D: beide Empfänger auf 96 kHz — der für die Wiederholungsfrage
+
+```bash
+sudo tcpdump -i en9 -s 0 -w ~/Desktop/expert-96k.pcap host 192.168.16.200
+```
+
+ExpertSDR2 starten, verbinden, **RX2 einschalten und beide Empfänger auf
+96 kHz stellen**, zwanzig Sekunden zuhören, beenden. `tcpdump` mit
+Strg-C beenden.
+
+Zur Kontrolle, dass es wirklich die richtige Betriebsart war: die
+Auswertung muss für **jeden** Kanal 96 kHz melden, also je 480 einzelne
+Blöcke je Sekunde. Steht bei einem Kanal 48 kHz, war es wieder die
+gemischte Betriebsart.
+
 ## Auswerten — ein Befehl je Frage
 
 Der Ablauf im Überblick, und welche Rahmen Longpath nie schickt:
@@ -87,6 +108,27 @@ python3 ~/Longpath/NereusSDR/tools/sunsdr_handshake_diff.py ~/Desktop/expert-A.p
 
 Beide Befehle geben am Ende fertige `LONGPATH_SUNSDR_PRE`/`_EXTRA`-Zeilen
 aus, mit denen sich derselbe Ablauf **ohne Neubau** ausprobieren lässt.
+
+**Die Wiederholungen** — Frage 2, mit Durchgang D:
+
+```bash
+python3 ~/Longpath/NereusSDR/tools/sunsdr_handshake_diff.py --wiederholungen ~/Desktop/expert-96k.pcap
+```
+
+Dieser Befehl nennt zuerst die Abtastrate **je Kanal** und sagt dann
+selbst, ob der Mitschnitt die Frage beantworten kann. Steht nicht bei
+jedem Kanal 96 kHz, verweigert er die Aussage — absichtlich: am
+2026-10-04 habe ich aus einem Mitschnitt in der falschen Betriebsart den
+falschen Schluss gezogen, und am 2026-10-05 wäre es mit den gemischten
+Raten fast wieder passiert.
+
+**Den Rahmen für die gemischten Raten** findet derselbe Vergleich, mit
+dem `0x01` als Ratenrahmen gefunden wurde — A (gemischt) gegen D (beide
+96 kHz):
+
+```bash
+python3 ~/Longpath/NereusSDR/tools/sunsdr_handshake_diff.py ~/Desktop/expert-A.pcap --vergleich ~/Desktop/expert-96k.pcap
+```
 
 ## Warum der Weg über den Vergleich geht und nicht über Probieren
 

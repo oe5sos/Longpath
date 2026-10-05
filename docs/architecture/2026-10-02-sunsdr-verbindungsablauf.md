@@ -991,3 +991,80 @@ wartet die Sperre einfach ab. Es ändert nur, was wir behaupten dürfen.
 Zweimal an einem Tag habe ich aus einer Einzelmessung eine Ursache
 gemacht (vorher: die Wiederholungen bei 96 kHz). Wer hier weitermacht:
 eine Ursache braucht mehr als einen Durchgang.
+
+---
+
+# ExpertSDR2 fährt die Empfänger mit VERSCHIEDENEN Raten (2026-10-05)
+
+Die Mitschnitte vom 2026-10-04 lagen schon da; ich hatte aus ihnen nur
+die Rahmenfolge gelesen, nie die Blockraten je Kanal. Nachgezählt
+(`sunsdr_handshake_diff.py --wiederholungen`, `bb400f1b`):
+
+| Mitschnitt | Kanal 0 | Kanal 1 |
+| --- | --- | --- |
+| `expert-A.pcap` (75,2 s) | 240 Blöcke/s → **48 kHz** | 480 Blöcke/s → **96 kHz** |
+| `expert-B.pcap` (23,5 s) | 240 Blöcke/s → **48 kHz** | 480 Blöcke/s → **96 kHz** |
+
+Ein Block trägt 200 Proben, also ist die Rate gleich Blockrate × 200.
+Beide Mitschnitte zeigen dasselbe Bild, über zwei verschieden lange
+Läufe — es ist kein Ausreißer.
+
+**Das Gerät kann gemischte Raten.** Die beiden Ströme sind in der Rate
+unabhängig; `byte9` im Stromkopf unterscheidet sie, und offenbar auch
+ihre Abtastung. Longpath kann das nicht: `StromModus` kennt nur
+`EinStrom48`, `ZweiStroemeJe48`, `ZweiStroemeJe96` — beide Ströme immer
+gleich. Der Rahmen `0x01` trägt die Ratenstufe als **ein** Byte
+(zweites Nutzbyte), also ist noch unklar, wie ExpertSDR2 zwei
+verschiedene Raten anmeldet: ein zweites Byte, ein zweiter Rahmen je
+Kanal, oder eine Stufe, die „48/96" bedeutet. Die drei gemessenen
+Nutzlasten geben es nicht her:
+
+    010000000c08040302020202   1 Strom,  48k
+    020000000c08040302020202   2 × 48k
+    020100000a06040302020201   2 × 96k
+
+Keine davon ist die gemischte Betriebsart. Sie steht im Mitschnitt, nur
+habe ich den Rahmen dazu noch nicht herausgelesen.
+
+## Warum das die Wiederholungsfrage NICHT beantwortet
+
+Verlockend war es: Kanal 1 läuft in beiden Mitschnitten mit 96 kHz und
+zeigt über 75 s **eine** bytegleiche Wiederholung. Daraus „ExpertSDR2
+wiederholt bei 96 kHz nicht, also macht Longpath etwas falsch" zu lesen,
+wäre derselbe Fehler wie am 2026-10-04 — nur eine Ebene feiner: die
+Betriebsart ist nicht Longpaths 96 kHz. Dort laufen **beide** Ströme mit
+96 kHz, also 960 Blöcke/s; hier sind es 720/s. Das ist weniger als drei
+Viertel der Last, und genau die Last stand im Verdacht.
+
+Das Werkzeug sagt das jetzt von selbst: es leitet die Rate **je Kanal**
+her und verweigert die Aussage, wenn nicht jeder Kanal auf 96 kHz steht.
+Zwei Entscheidungen dahinter, beide nötig:
+
+- **Nur nicht-wiederholte Blöcke zählen.** Die Wiederholungen blasen die
+  Blockrate auf — im gebauten Prüffall rohe 577/s je Kanal (das wäre
+  „nicht eindeutig"), einzeln 481/s → 96 kHz. Wer die Rate aus der rohen
+  Blockrate herleitet, bekommt sie bei genau dem Mitschnitt falsch, für
+  den er sie braucht.
+- **Je Kanal, nicht als Maximum.** Mit dem Maximum hätte das Werkzeug
+  beide Mitschnitte als „96 kHz" gemeldet und die Fehlinterpretation
+  oben als Antwort angeboten.
+
+Gegenprobe gegen die alte Fassung (Kopie der Datei, nicht Stash):
+
+    ALT, 48-kHz-Mitschnitt:  „-> Praktisch keine Wiederholungen. Dann
+                              liegt es NICHT am Geraet [...]"
+    NEU, derselbe:           „-> ACHTUNG: [...] beantwortet sie NICHT"
+
+Die alte Fassung zieht den Fehlschluss, um den es geht.
+
+## Was daraus zu tun ist
+
+1. **Für die Wiederholungsfrage:** ein Mitschnitt mit **beiden** Strömen
+   auf 96 kHz. Das ist der einzige, der sie beantwortet.
+2. **Für die gemischten Raten:** in demselben Mitschnitt steckt der
+   Rahmen, der sie anmeldet. `--vergleich` gegen einen Mitschnitt mit
+   beiden auf 96 kHz zeigt ihn — dieselbe Methode, mit der `0x01` als
+   Ratenrahmen gefunden wurde.
+3. **Ob Longpath das braucht**, ist eine andere Frage. Der Betreiber hat
+   es nie verlangt; es ist ein Protokollbefund, keine Lücke in der
+   Gleichwertigkeit. Nicht von selbst bauen.
