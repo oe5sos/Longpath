@@ -11,6 +11,7 @@ import { Mikrofon, mikrofonMoeglich } from './mikrofon.js';
 import { Sammelstelle, zeileLesen, befundLesen, zeitKurz, dupeSatz }
   from './logbuch.js';
 import { spotLesen, marken, trefferBei } from './spots.js';
+import { Zeichenbremse } from './ton-vorrang.js';
 
 const $ = (id) => document.getElementById(id);
 const link = new TciLink();
@@ -1019,6 +1020,7 @@ async function tonStarten() {
         }
       };
       weg = 'worklet';
+      state.tonImHauptfaden = false;
     } else {
       // ── Rueckfall: ScriptProcessorNode ───────────────────────────────────
       //
@@ -1045,12 +1047,18 @@ async function tonStarten() {
       // dazu. Der Knoten haengt dann stumm im Graphen, und niemand sieht,
       // warum. Deshalb bekommt er unten eine stille Quelle vorgeschaltet —
       // sie liefert Nullen und dient nur dem Takt.
+      state.tonImHauptfaden = true;
       const sp = ctx.createScriptProcessor(2048, 1, 2);
       let leerZaehler = 0;
       sp.onaudioprocess = (ev) => {
         state.tonTakte = (state.tonTakte || 0) + 1;
         const out = ev.outputBuffer;
         const voll = kern.zieh(out.getChannelData(0), out.getChannelData(1), out.length);
+        // Fuellstand nach draussen melden: die Bildschleife laeuft auf
+        // DEMSELBEN Faden wie dieser Rueckruf und muss ihm ausweichen
+        // koennen, bevor es knackt. Zwei Zuweisungen je Block.
+        state.tonVorrat = kern.have;
+        state.tonZiel = kern.target;
         // Denselben Leerlauf melden wie das Worklet, damit die Fusszeile auf
         // beiden Wegen dasselbe sagt.
         if (!voll && !kern.muted && (++leerZaehler & 31) === 0) {
@@ -2159,9 +2167,29 @@ async function melde(anlass) {
 setTimeout(() => melde('start'), 12000);
 
 // ── Bildschleife ────────────────────────────────────────────────────────────
+// Der Ton hat Vorrang vor dem Bild.
+//
+// Am Telefon ist die Seite kein sicherer Kontext, also laeuft der Ton ueber
+// einen ScriptProcessorNode -- im HAUPTFADEN, demselben, der hier zeichnet.
+// Wer dort 20 ms lang malt, waehrend der Tonblock faellig ist, bekommt eine
+// Luecke. Der Tonkern kann dagegen nichts tun: seine Anlaufsperre, der
+// sanfte Gleichlauf und die Notbremse setzen alle voraus, dass er ueberhaupt
+// aufgerufen WIRD.
+//
+// Die Bremse laesst Bilder aus, solange der Vorrat knapp ist -- aber nie mehr
+// als 15 am Stueck. Ein Wasserfall, der stehenbleibt, ist von einem toten
+// Empfang nicht zu unterscheiden, und das waere der schlimmere Fehler.
+const zeichenbremse = new Zeichenbremse();
+
 function schleife(t) {
   mitteVerfolgen();
-  zeichneBild();
+  if (zeichenbremse.darfZeichnen({
+        vorrat: state.tonVorrat,
+        ziel: state.tonZiel,
+        imHauptfaden: state.tonImHauptfaden === true,
+      })) {
+    zeichneBild();
+  }
   const r = link.tickRates(t);
   // Alles zusammen, was die Leitung kostet — auch das Spektrum, das anfangs
   // fehlte und die Anzeige zu günstig aussehen liess.
