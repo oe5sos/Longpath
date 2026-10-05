@@ -108,18 +108,42 @@ def findeRechner(path):
     fuenf Quittungen des Geraets.
 
     Belastbar ist die Suchanfrage: Opcode 0x00 geht immer VOM Rechner aus.
-    Fehlt sie im Mitschnitt, entscheidet der Datenstrom -- die
-    1210-Byte-Pakete kommen aus dem Geraet. Bleibt auch das offen, muss es
-    --rechner sagen.
+    Fehlt sie im Mitschnitt, bleibt nur --rechner.
+
+    Der frueher hier stehende Rueckfall "die 1210-Byte-Pakete kommen aus
+    dem Geraet" ist am 2026-10-05 widerlegt: ExpertSDR2 schickt SELBST
+    1210-Byte-Bloecke zurueck (Stille), und zwar fast so viele wie es
+    empfaengt. Wer danach geht, haelt die eigenen Antworten fuer
+    Geraetedaten -- genau der Fehler, der mich an dem Tag eine falsche
+    Behauptung gekostet hat.
     """
-    stromQuelle = None
+    bloecke = {}
     for ts, src, sport, dst, dport, pl in udpMitRichtung(path):
-        k = kopf(pl)
+        # Nur auf dem STEUERweg. Auf dem Stromport schickt das GERAET
+        # 77-Byte-Rahmen, die ebenfalls mit Opcode 0x00 beginnen -- ohne
+        # diese Einschraenkung liefert die Suche genau verkehrt herum
+        # (2026-10-05 an expert-96k.pcap gesehen). Geprueft wird auf
+        # "beruehrt den Steuerport und nicht den Stromport", nicht auf
+        # sport == CTRL_PORT: der Rechner darf einen beliebigen Quellport
+        # benutzen (ExpertSDR2 nimmt 50001, der Pruefstand 54000).
+        amSteuerweg = (sport == CTRL_PORT or dport == CTRL_PORT) \
+            and sport != STREAM_PORT and dport != STREAM_PORT
+        k = kopf(pl) if amSteuerweg else None
         if k is not None and k[0] == 0x00:
             return src
-        if (sport == STREAM_PORT or dport == STREAM_PORT) and len(pl) > 1000:
-            stromQuelle = stromQuelle or dst      # Ziel des Stroms = Rechner
-    return stromQuelle
+        if sport == STREAM_PORT and len(pl) == 1210:
+            bloecke[src] = bloecke.get(src, 0) + 1
+    # Rueckfall: BEIDE Seiten schicken 1210-Byte-Bloecke, aber nicht gleich
+    # viele -- das Geraet sendet je Block, ExpertSDR2 antwortet nur auf
+    # jeden zweiten (2026-10-05 gemessen: 480/s gegen 240/s, und in den
+    # 48-kHz-Mitschnitten 2 x 240/s gegen 240/s). Die SCHWAECHERE Quelle
+    # ist also der Rechner. Eine Heuristik, kein Beweis; bei Gleichstand
+    # gibt es keine Antwort.
+    if len(bloecke) == 2:
+        a, b = sorted(bloecke.items(), key=lambda kv: kv[1])
+        if a[1] * 4 < b[1] * 3:
+            return a[0]
+    return None
 
 
 def auswerten(path, alle, rechner=None):
@@ -447,8 +471,21 @@ def wiederholungen(pfad, geraet=None):
               "(pcapng wird hier nicht gelesen).")
         return
 
+    # Die Richtung MUSS gefiltert werden. Beide Seiten sprechen Port 50002,
+    # und ExpertSDR2 schickt selbst 1210-Byte-Bloecke zurueck -- ohne Filter
+    # zaehlt man die eigenen Antworten als Geraetedaten mit. Am 2026-10-05
+    # hat mich genau das eine falsche Behauptung gekostet ("die Kanaele
+    # laufen mit verschiedenen Raten"): Kanal 1 schien mit 480/s zu laufen,
+    # es waren 240/s Geraet plus 240/s eigene Antworten.
+    if geraet is None:
+        rechner = findeRechner(pfad)
+    else:
+        rechner = None
+
     jeKanal = {}
     jeKanalEinzig = {}
+    pcAntworten = {}
+    pcLeer = 0
     inhalt = {}
     dubletten = 0
     gesamt = 0
@@ -469,9 +506,17 @@ def wiederholungen(pfad, geraet=None):
         src = ".".join(str(b) for b in d[26:30])
         if sp != 50002:
             continue
-        if geraet and src != geraet:
-            continue
         nutz = d[uo + 8:]
+        vomRechner = (geraet is not None and src != geraet) \
+            or (rechner is not None and src == rechner)
+        if vomRechner:
+            # Was die Gegenstelle zurueckschickt, interessiert auch -- aber
+            # getrennt. Zwei Sorten: voller Stilleblock und blosser Kopf.
+            if len(nutz) == 10:
+                pcLeer += 1
+            elif len(nutz) == 1210 and nutz[2] in (0xFE, 0xFD):
+                pcAntworten[nutz[9]] = pcAntworten.get(nutz[9], 0) + 1
+            continue
         # Nur echte IQ-Bloecke: 10 Byte Kopf + 1200 Byte Nutzlast.
         if len(nutz) != 1210 or nutz[2] not in (0xFE, 0xFD):
             continue
@@ -498,7 +543,17 @@ def wiederholungen(pfad, geraet=None):
     if gesamt == 0:
         print("Keine I/Q-Bloecke gefunden. Stammt der Mitschnitt vom "
               "Stromport 50002?")
+        if rechner is None and geraet is None:
+            print("Moeglich auch: die Richtung liess sich nicht bestimmen "
+                  "(keine Suchanfrage im Mitschnitt). Dann --rechner "
+                  "angeben.")
         return
+    if rechner is None and geraet is None:
+        print("ACHTUNG: die Richtung liess sich NICHT bestimmen -- die "
+              "Zahlen unten enthalten")
+        print("         vermutlich auch die eigenen Antworten. "
+              "--rechner <IP> angeben.")
+        print()
     dauer = max((t1 or 0) - (t0 or 0), 1e-9)
     print("I/Q-Bloecke: %d ueber %.1f s (%.0f/s)"
           % (gesamt, dauer, gesamt / dauer))
@@ -506,6 +561,12 @@ def wiederholungen(pfad, geraet=None):
         print("   Kanal %d: %d (%.0f/s)" % (k, jeKanal[k], jeKanal[k] / dauer))
     print("bytegleiche Wiederholungen: %d  (%.1f/s, %.1f %% der Bloecke)"
           % (dubletten, dubletten / dauer, 100.0 * dubletten / gesamt))
+
+    if pcAntworten or pcLeer:
+        gesamtAntw = sum(pcAntworten.values())
+        print("zurueck an das Geraet: %d volle Bloecke (%.0f/s) + %d blosse "
+              "Koepfe (%.0f/s)"
+              % (gesamtAntw, gesamtAntw / dauer, pcLeer, pcLeer / dauer))
 
     raten = abtastratenJeKanal(jeKanalEinzig, dauer)
     print()
@@ -544,6 +605,12 @@ def wiederholungen(pfad, geraet=None):
         print("-> Praktisch keine Wiederholungen. Dann liegt es NICHT am "
               "Geraet, und Longpath macht etwas anders als dieses "
               "Programm -- der Unterschied steckt im Verbindungsablauf.")
+    if len(raten) != 2:
+        print()
+        print("   Mit Vorbehalt: hier laeuft %d Strom, Longpath faehrt bei "
+              "96 kHz ZWEI." % len(raten))
+        print("   Das ist ein starker Hinweis, aber noch nicht dieselbe "
+              "Betriebsart.")
 
 
 def main():

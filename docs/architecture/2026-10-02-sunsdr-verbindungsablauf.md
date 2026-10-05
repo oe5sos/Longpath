@@ -994,77 +994,89 @@ eine Ursache braucht mehr als einen Durchgang.
 
 ---
 
-# ExpertSDR2 fährt die Empfänger mit VERSCHIEDENEN Raten (2026-10-05)
+# ~~ExpertSDR2 fährt die Empfänger mit VERSCHIEDENEN Raten~~ — FALSCH, am selben Tag widerlegt (2026-10-05)
 
-Die Mitschnitte vom 2026-10-04 lagen schon da; ich hatte aus ihnen nur
-die Rahmenfolge gelesen, nie die Blockraten je Kanal. Nachgezählt
-(`sunsdr_handshake_diff.py --wiederholungen`, `bb400f1b`):
+**Die Behauptung ist zurückgenommen.** Sie stand ein paar Stunden lang hier
+und in `ae3a06fd`. Sie war falsch, und zwar aus demselben Grund wie zwei
+Fehlschlüsse davor: **die Richtung war nicht gefiltert.**
 
-| Mitschnitt | Kanal 0 | Kanal 1 |
+Beide Seiten sprechen Port 50002, und — das ist das Neue — **ExpertSDR2
+schickt selbst 1210-Byte-Blöcke zurück**. Ohne Richtungsfilter zählt man
+die eigenen Antworten als Gerätedaten mit. Genau das ergab die
+„verschiedenen Raten": Kanal 1 schien mit 480/s zu laufen, es waren
+240/s vom Gerät plus 240/s eigene Antworten, die zufällig `byte9 = 1`
+tragen.
+
+Mit Richtungsfilter, dieselben Dateien:
+
+| Mitschnitt | Gerät → PC | zurück an das Gerät |
 | --- | --- | --- |
-| `expert-A.pcap` (75,2 s) | 240 Blöcke/s → **48 kHz** | 480 Blöcke/s → **96 kHz** |
-| `expert-B.pcap` (23,5 s) | 240 Blöcke/s → **48 kHz** | 480 Blöcke/s → **96 kHz** |
+| `expert-A.pcap` (75,2 s) | Kanal 0: 240/s → 48 kHz<br>Kanal 1: 240/s → 48 kHz | 240/s volle Blöcke + 240/s bloße Köpfe |
+| `expert-B.pcap` (23,5 s) | Kanal 0: 240/s → 48 kHz<br>Kanal 1: 240/s → 48 kHz | 240/s volle Blöcke + 240/s bloße Köpfe |
+| `expert-96k.pcap` (192,1 s) | Kanal 0: 480/s → **96 kHz** | 240/s volle Blöcke + 240/s bloße Köpfe |
 
-Ein Block trägt 200 Proben, also ist die Rate gleich Blockrate × 200.
-Beide Mitschnitte zeigen dasselbe Bild, über zwei verschieden lange
-Läufe — es ist kein Ausreißer.
+Beide Kanäle laufen also **gleich schnell**. Es gibt keine gemischten
+Raten; es gab nur eine ungefilterte Zählung.
 
-**Das Gerät kann gemischte Raten.** Die beiden Ströme sind in der Rate
-unabhängig; `byte9` im Stromkopf unterscheidet sie, und offenbar auch
-ihre Abtastung. Longpath kann das nicht: `StromModus` kennt nur
-`EinStrom48`, `ZweiStroemeJe48`, `ZweiStroemeJe96` — beide Ströme immer
-gleich. Der Rahmen `0x01` trägt die Ratenstufe als **ein** Byte
-(zweites Nutzbyte), also ist noch unklar, wie ExpertSDR2 zwei
-verschiedene Raten anmeldet: ein zweites Byte, ein zweiter Rahmen je
-Kanal, oder eine Stufe, die „48/96" bedeutet. Die drei gemessenen
-Nutzlasten geben es nicht her:
+Die Nebenwirkung desselben Fehlers steckte auch in `findeRechner`: der
+Rückfall lautete „die 1210-Byte-Pakete kommen aus dem Gerät". Das ist
+widerlegt. Und die Suchanfrage-Regel (`0x00` geht vom Rechner aus) griff
+auf dem **Strom**port, wo das Gerät 77-Byte-Rahmen schickt, die ebenfalls
+mit `0x00` beginnen — damit lieferte die Erkennung genau verkehrt herum.
+Beides korrigiert; geprüft wird jetzt „berührt den Steuerport und nicht
+den Stromport", nicht `sport == 50001` (der Rechner darf einen beliebigen
+Quellport nehmen, der Prüfstand nimmt 54000).
 
-    010000000c08040302020202   1 Strom,  48k
-    020000000c08040302020202   2 × 48k
-    020100000a06040302020201   2 × 96k
+---
 
-Keine davon ist die gemischte Betriebsart. Sie steht im Mitschnitt, nur
-habe ich den Rahmen dazu noch nicht herausgelesen.
+# Was die Mitschnitte WIRKLICH zeigen (2026-10-05)
 
-## Warum das die Wiederholungsfrage NICHT beantwortet
+## 1. ExpertSDR2 antwortet nur auf jeden zweiten Block — und halb so groß
 
-Verlockend war es: Kanal 1 läuft in beiden Mitschnitten mit 96 kHz und
-zeigt über 75 s **eine** bytegleiche Wiederholung. Daraus „ExpertSDR2
-wiederholt bei 96 kHz nicht, also macht Longpath etwas falsch" zu lesen,
-wäre derselbe Fehler wie am 2026-10-04 — nur eine Ebene feiner: die
-Betriebsart ist nicht Longpaths 96 kHz. Dort laufen **beide** Ströme mit
-96 kHz, also 960 Blöcke/s; hier sind es 720/s. Das ist weniger als drei
-Viertel der Last, und genau die Last stand im Verdacht.
+Das ist der Fund, der die Netzlast erklärt. Je Block des Geräts schickt
+ExpertSDR2 abwechselnd:
 
-Das Werkzeug sagt das jetzt von selbst: es leitet die Rate **je Kanal**
-her und verweigert die Aussage, wenn nicht jeder Kanal auf 96 kHz steht.
-Zwei Entscheidungen dahinter, beide nötig:
+- einen **vollen Stilleblock** (1210 Byte), und
+- einen **bloßen Kopf** (10 Byte, Längenfeld 0) — `03 ff fe ff 00 00 00 00 01 00`
 
-- **Nur nicht-wiederholte Blöcke zählen.** Die Wiederholungen blasen die
-  Blockrate auf — im gebauten Prüffall rohe 577/s je Kanal (das wäre
-  „nicht eindeutig"), einzeln 481/s → 96 kHz. Wer die Rate aus der rohen
-  Blockrate herleitet, bekommt sie bei genau dem Mitschnitt falsch, für
-  den er sie braucht.
-- **Je Kanal, nicht als Maximum.** Mit dem Maximum hätte das Werkzeug
-  beide Mitschnitte als „96 kHz" gemeldet und die Fehlinterpretation
-  oben als Antwort angeboten.
+In allen drei Mitschnitten dasselbe Verhältnis: 240/s voll + 240/s Kopf
+gegen 480/s vom Gerät. **Longpath schickt auf jeden Block einen vollen
+1210-Byte-Stilleblock.** Das ist rund das Doppelte an Rückweg-Bytes.
 
-Gegenprobe gegen die alte Fassung (Kopie der Datei, nicht Stash):
+Der bloße Kopf ist ein Rahmen, den Longpath **nie** schickt und den
+niemand bisher gesehen hat.
 
-    ALT, 48-kHz-Mitschnitt:  „-> Praktisch keine Wiederholungen. Dann
-                              liegt es NICHT am Geraet [...]"
-    NEU, derselbe:           „-> ACHTUNG: [...] beantwortet sie NICHT"
+## 2. Bei 96 kHz wiederholt das Gerät gegenüber ExpertSDR2 nicht
 
-Die alte Fassung zieht den Fehlschluss, um den es geht.
+`expert-96k.pcap`: 92197 Blöcke über 192 s, **0 bytegleiche
+Wiederholungen**. Longpath bekommt in seiner 96-kHz-Betriebsart rund 110
+je Sekunde.
 
-## Was daraus zu tun ist
+**Vorbehalt, und er ist wichtig:** hier läuft **ein** Strom, Longpath
+fährt bei 96 kHz **zwei**. Das ist noch nicht dieselbe Betriebsart, also
+noch keine Antwort — aber ein starker Hinweis, und zusammen mit Fund 1
+zeigt er zum ersten Mal in eine konkrete Richtung: **nicht mehr
+zurückschicken, sondern weniger und anders.**
 
-1. **Für die Wiederholungsfrage:** ein Mitschnitt mit **beiden** Strömen
-   auf 96 kHz. Das ist der einzige, der sie beantwortet.
-2. **Für die gemischten Raten:** in demselben Mitschnitt steckt der
-   Rahmen, der sie anmeldet. `--vergleich` gegen einen Mitschnitt mit
-   beiden auf 96 kHz zeigt ihn — dieselbe Methode, mit der `0x01` als
-   Ratenrahmen gefunden wurde.
-3. **Ob Longpath das braucht**, ist eine andere Frage. Der Betreiber hat
-   es nie verlangt; es ist ein Protokollbefund, keine Lücke in der
-   Gleichwertigkeit. Nicht von selbst bauen.
+## 3. Woran der nächste ansetzen sollte
+
+In dieser Reihenfolge, weil die erste Messung die billigste ist:
+
+1. **Den bloßen Kopf nachbauen.** Jeden zweiten Block mit 10 Byte statt
+   1210 beantworten, A/B bei 96 kHz messen. Kostet nichts, ändert nur
+   `replyToBlock`.
+2. Bleibt es dabei: ein Mitschnitt mit **zwei** Strömen auf 96 kHz, damit
+   der Vorbehalt oben fällt.
+
+## 4. Für das Werkzeug
+
+`--wiederholungen` filtert jetzt die Richtung, meldet die Abtastrate je
+Kanal, zählt beide Sorten Rückweg-Pakete und **nennt die Stromzahl beim
+Urteil**. Die Gegenprobe gegen die alte Fassung steht in `bb400f1b`; die
+Richtungskorrektur fängt einen Fehler, den die alte Fassung nachweislich
+gemacht hat — sie steht als Behauptung und als Rücknahme in diesem
+Dokument.
+
+**Die Lehre, dreimal in zwei Tagen dieselbe:** eine Zahl aus einem
+Mitschnitt ist erst eine Aussage, wenn feststeht, **wer** gesendet hat
+und in **welcher** Betriebsart.

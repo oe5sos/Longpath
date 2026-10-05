@@ -27,12 +27,15 @@
    kein Mangel von Longpath — und die Frage ist erledigt statt offen.
 
    **Dafür müssen BEIDE Empfänger auf 96 kHz stehen**, nicht nur einer
-   und nicht die Vorgabe. Am 2026-10-05 nachgezählt: in den Mitschnitten
-   A und B läuft **Kanal 0 mit 48 kHz und Kanal 1 mit 96 kHz** — das
-   Gerät kann gemischte Raten, und in dieser Betriebsart liegt die Last
-   bei 720 Blöcken/s statt 960. Damit beantworten diese Mitschnitte die
-   Frage nicht. Das Werkzeug prüft das jetzt selbst und verweigert die
-   Aussage, wenn nicht jeder Kanal auf 96 kHz steht.
+   und nicht die Vorgabe. Der Mitschnitt vom 2026-10-05 (`expert-96k`)
+   hatte **einen** Strom auf 96 kHz und zeigt dort **0 bytegleiche
+   Wiederholungen** über 192 s — ein starker Hinweis, aber noch nicht
+   dieselbe Betriebsart. Das Werkzeug prüft die Rate je Kanal selbst und
+   nennt die Stromzahl beim Urteil.
+
+   (Die hier zwischenzeitlich behaupteten „gemischten Raten" waren ein
+   Zählfehler ohne Richtungsfilter und sind zurückgenommen — siehe
+   `docs/architecture/2026-10-02-sunsdr-verbindungsablauf.md`.)
 
 **Was dabei nicht gebraucht wird:** keine Antenne, kein Senden, keine
 Freigabe für HF. Es wird nur zugehört.
@@ -122,13 +125,10 @@ jedem Kanal 96 kHz, verweigert er die Aussage — absichtlich: am
 falschen Schluss gezogen, und am 2026-10-05 wäre es mit den gemischten
 Raten fast wieder passiert.
 
-**Den Rahmen für die gemischten Raten** findet derselbe Vergleich, mit
-dem `0x01` als Ratenrahmen gefunden wurde — A (gemischt) gegen D (beide
-96 kHz):
-
-```bash
-python3 ~/Longpath/NereusSDR/tools/sunsdr_handshake_diff.py ~/Desktop/expert-A.pcap --vergleich ~/Desktop/expert-96k.pcap
-```
+Er nennt außerdem, **was zurückgeschickt wird**. Darin steckt der Fund
+vom 2026-10-05: ExpertSDR2 antwortet je Block abwechselnd mit einem
+vollen Stilleblock (1210 Byte) und einem **bloßen Kopf** (10 Byte) —
+Longpath schickt immer den vollen Block.
 
 ## Warum der Weg über den Vergleich geht und nicht über Probieren
 
