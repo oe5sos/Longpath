@@ -631,6 +631,14 @@ private:
     void sendeAblehnung(const std::shared_ptr<TciClientSession>& session,
                         const QString& grund);
 
+    // Band und Betriebsart der aktiven Scheibe, in ADIF-Schreibweise.
+    // EINE Stelle: `log_qso:` traegt damit ein, `log_dup:` fragt damit
+    // nach. Wuerden beide das selbst entscheiden, koennte die Dupe-Antwort
+    // "schon gearbeitet" sagen und der Eintrag danach ein anderes Band
+    // nennen -- und ADIF-Eigenheiten wie "LSB/USB sind Unterarten von SSB"
+    // muessten an zwei Stellen stimmen.
+    void bandUndModeDerScheibe(QString* band, QString* mode) const;
+
     void startKeyedWatchdog();
     void stopKeyedWatchdog();
 

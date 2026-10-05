@@ -28,6 +28,7 @@
 #include "TciProtocol.h"
 #include "TciSendQueue.h"
 #include "core/LogbookDatei.h"
+#include "core/LogbuchRueckschau.h"
 #include "models/LogEntry.h"
 #include "TciBinaryFrame.h"
 #include "TciSensorManager.h"
@@ -2520,6 +2521,31 @@ void TciServer::sendeAblehnung(const std::shared_ptr<TciClientSession>& session,
                             QStringLiteral("tx_err:%1;").arg(grund));
 }
 
+void TciServer::bandUndModeDerScheibe(QString* band, QString* mode) const
+{
+    if (band) { band->clear(); }
+    if (mode) { mode->clear(); }
+
+    SliceModel* sl = m_model ? m_model->activeSlice() : nullptr;
+    if (!sl) { return; }
+
+    if (band) { *band = bandLabel(bandFromFrequency(sl->frequency())); }
+    if (!mode) { return; }
+
+    // ADIF kennt LSB/USB nicht als Betriebsart -- das sind Unterarten von
+    // SSB, und ein Datensatz mit MODE=LSB wird abgelehnt oder
+    // stillschweigend umgeschrieben. CWL/CWU genauso. Gleiche Zuordnung
+    // wie am Pult.
+    const QString m = SliceModel::modeName(sl->dspMode());
+    if (m == QLatin1String("LSB") || m == QLatin1String("USB")) {
+        *mode = QStringLiteral("SSB");
+    } else if (m == QLatin1String("CWL") || m == QLatin1String("CWU")) {
+        *mode = QStringLiteral("CW");
+    } else {
+        *mode = m;
+    }
+}
+
 void TciServer::startKeyedWatchdog()
 {
     if (!m_keyedWatchdog) {
@@ -3003,20 +3029,15 @@ void TciServer::onTextMessageReceived(const QString& rohMsg)
 
                 if (SliceModel* sl = m_model ? m_model->activeSlice() : nullptr) {
                     e.freqMHz = sl->frequency() / 1e6;
-                    e.band    = bandLabel(bandFromFrequency(sl->frequency()));
-                    // ADIF kennt LSB/USB nicht als Betriebsart -- das sind
-                    // Unterarten von SSB, und ein Datensatz mit MODE=LSB wird
-                    // abgelehnt oder stillschweigend umgeschrieben. Gleiche
-                    // Zuordnung wie am Pult.
+                    // Band und Betriebsart kommen aus bandUndModeDerScheibe()
+                    // -- derselben Stelle, die `log_dup:` fragt. Siehe dort,
+                    // warum das EINE Stelle sein muss.
+                    bandUndModeDerScheibe(&e.band, &e.mode);
                     const QString m = SliceModel::modeName(sl->dspMode());
-                    if (m == QLatin1String("LSB") || m == QLatin1String("USB")) {
-                        e.mode = QStringLiteral("SSB");
+                    if (e.mode == QLatin1String("SSB")
+                        && (m == QLatin1String("LSB")
+                            || m == QLatin1String("USB"))) {
                         e.submode = m;
-                    } else if (m == QLatin1String("CWL")
-                               || m == QLatin1String("CWU")) {
-                        e.mode = QStringLiteral("CW");
-                    } else {
-                        e.mode = m;
                     }
                 }
 
@@ -3034,6 +3055,117 @@ void TciServer::onTextMessageReceived(const QString& rohMsg)
                                                : e.band)
                               << "von" << session->peer;
                 antwort(QStringLiteral("log_qso_ok:%1;").arg(ruf));
+                return;
+            }
+        }
+
+        // ── Ins Logbuch SEHEN (2026-10-04) ──────────────────────────────────
+        //
+        // Seit #184 kann die App loggen, aber nicht nachsehen. Das ist die
+        // schlechtere Haelfte: ein Eintrag, der unbemerkt daneben ging, faellt
+        // erst am Pult auf, und "hatte ich den schon?" ist die Frage, die in
+        // den zwei Sekunden zwischen Rufzeichen und Anruf beantwortet werden
+        // muss -- danach ist sie wertlos.
+        //
+        //     log_last:<n>;      -> log_qso_zeile:<nr>,<yyyymmdd>,<hhmmss>,
+        //                              <ruf>,<band>,<mode>,<rst_s>,<rst_r>;
+        //                           ... je Kontakt, juengster zuerst
+        //                           log_last_ok:<anzahl>;
+        //     log_dup:<ruf>;     -> log_dup_ok:<ruf>,<anzahl>,<yyyymmdd>,
+        //                              <hhmmss>,<letztes band>,<letzter mode>,
+        //                              <gleiches band 0|1>,<dupe 0|1>;
+        //
+        // WARUM DAS BAND NICHT MITGESCHICKT WIRD: `log_dup:` nimmt Band und
+        // Betriebsart aus der aktiven Scheibe -- genau wie `log_qso:` es beim
+        // Eintragen tut, und durch dieselbe Stelle. Sonst koennte die Antwort
+        // "schon gearbeitet" auf ein Band beziehen, das das Geraet gar nicht
+        // eingestellt hat.
+        //
+        // WARUM EINE OBERGRENZE: `log_last:100000` wuerde die Steuerleitung
+        // mit Zeilen fuellen, hinter denen jede Bedienung wartet. 50 ist mehr,
+        // als auf ein Telefon passt.
+        //
+        // Gelesen wird durch LogbuchRueckschau -- vom DATEIENDE, nicht ueber
+        // die ganze Datei. Gemessen an Martins Logbuch (6,6 MB / 9271
+        // Datensaetze): letzte 64 kB 0,04 ms gegen 4,1 ms fuer alles.
+        {
+            QString t = trimmed;
+            const bool istLast =
+                t.startsWith(QStringLiteral("log_last:"), Qt::CaseInsensitive);
+            const bool istDup =
+                t.startsWith(QStringLiteral("log_dup:"), Qt::CaseInsensitive);
+            if (istLast || istDup) {
+                const QString art = istLast ? QStringLiteral("log_last")
+                                            : QStringLiteral("log_dup");
+                auto antwort = [&](const QString& zeile) {
+                    session->sendQueue.push(TciSendQueue::Priority::Control,
+                                            zeile);
+                };
+                if (!session->authenticated) { return; }
+                // Dieselbe Sperre wie beim Eintragen. Wer im Logbuch LESEN
+                // darf, sieht jedes Rufzeichen, jede Zeit und jeden Standort
+                // darin -- das ist nicht weniger heikel als anhaengen.
+                if (!session->fromLoopback && !remoteLogAllowed()) {
+                    qCWarning(lcTci)
+                        << "TciServer: Logbuch-Abfrage von" << session->peer
+                        << "abgelehnt — Logbuch aus dem Netz ist abgeschaltet"
+                        << "(TciAllowRemoteLog)";
+                    antwort(QStringLiteral("%1_err:nicht freigegeben;").arg(art));
+                    return;
+                }
+
+                if (istLast) {
+                    constexpr int kMax = 50;
+                    bool ok = false;
+                    int n = t.mid(9).split(QLatin1Char(',')).value(0)
+                                .trimmed().toInt(&ok);
+                    if (!ok || n <= 0) { n = 10; }
+                    n = qMin(n, kMax);
+
+                    const QVector<LogEntry> l = LogbuchRueckschau::letzte(n);
+                    for (int i = 0; i < l.size(); ++i) {
+                        const LogEntry& e = l.at(i);
+                        const QDateTime u = e.timeOn.toUTC();
+                        antwort(QStringLiteral("log_qso_zeile:%1,%2,%3,%4,%5,%6,%7,%8;")
+                                    .arg(i)
+                                    .arg(u.isValid()
+                                             ? u.toString(QStringLiteral("yyyyMMdd"))
+                                             : QString())
+                                    .arg(u.isValid()
+                                             ? u.toString(QStringLiteral("hhmmss"))
+                                             : QString())
+                                    .arg(e.call, e.band, e.mode,
+                                         e.rstSent, e.rstRcvd));
+                    }
+                    antwort(QStringLiteral("log_last_ok:%1;").arg(l.size()));
+                    return;
+                }
+
+                const QString ruf =
+                    t.mid(8).split(QLatin1Char(',')).value(0).trimmed().toUpper();
+                if (ruf.isEmpty() || ruf.size() > 20) {
+                    antwort(QStringLiteral("log_dup_err:rufzeichen fehlt;"));
+                    return;
+                }
+                QString band, mode;
+                bandUndModeDerScheibe(&band, &mode);
+                const LogbuchRueckschau::Befund b =
+                    LogbuchRueckschau::rueckschau(ruf, band, mode);
+                const QDateTime u = b.zuletzt.toUTC();
+                antwort(QStringLiteral("log_dup_ok:%1,%2,%3,%4,%5,%6,%7,%8;")
+                            .arg(ruf)
+                            .arg(b.anzahl)
+                            .arg(u.isValid()
+                                     ? u.toString(QStringLiteral("yyyyMMdd"))
+                                     : QString())
+                            .arg(u.isValid()
+                                     ? u.toString(QStringLiteral("hhmmss"))
+                                     : QString())
+                            .arg(b.letztesBand, b.letzterMode,
+                                 b.gleichesBand ? QStringLiteral("1")
+                                                : QStringLiteral("0"),
+                                 b.gleicherMode ? QStringLiteral("1")
+                                                : QStringLiteral("0")));
                 return;
             }
         }

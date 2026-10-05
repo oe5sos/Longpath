@@ -243,6 +243,11 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
     <input id="qsoRuf" type="text" inputmode="text" autocomplete="off"
            autocapitalize="characters" autocorrect="off" spellcheck="false"
            placeholder="RUFZEICHEN">
+    <!-- Was im Logbuch ueber dieses Rufzeichen steht. Erscheint beim
+         Tippen (TciServer `log_dup:`) und ist LEER, solange nichts
+         bekannt ist — eine Zeile, die auf Verdacht "schon gearbeitet"
+         sagt, verhindert einen Kontakt, den es noch nicht gibt. -->
+    <div class="dupe" id="qsoDupe"></div>
     <div class="rstreihe">
       <div class="rstfeld">
         <label for="qsoRstS">RST gesendet</label>
@@ -262,6 +267,19 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
     </div>
     <div class="qsoMeldung" id="qsoMeldung"></div>
     <button id="qsoOk">Eintragen</button>
+    <!-- ── Die letzten Kontakte, im SELBEN Blatt ───────────────────────
+         Kein eigener Schirm: nach dem Eintragen steht der eigene Kontakt
+         als erste Zeile da. Das ist der Beleg, den die Erfolgsmeldung
+         nur behaupten kann — und der Grund, warum die Liste hier und
+         nicht woanders steht. Gelesen wird vom DATEIENDE (TciServer
+         `log_last:`), nicht ueber das ganze Logbuch. -->
+    <div class="letzte">
+      <div class="letzteKopf">
+        <span>LETZTE KONTAKTE</span>
+        <button id="logFrisch" class="still klein">neu laden</button>
+      </div>
+      <div id="logListe" class="logListe"><div class="leer">—</div></div>
+    </div>
     <button id="qsoAb" class="still">Abbrechen</button>
   </div>
 </div>

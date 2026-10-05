@@ -55,6 +55,26 @@ AUDIO_BLOCK = 2048       # Werte je Rahmen (L und R zusammen) -> 1024 Paare
 
 MAGIC = b'258EAFA5-E914-47DA-95CA-C5AB0DC85B11'
 
+
+def _jetzt_utc():
+    """("20261004", "213000") — so wie Longpath es in log_qso_zeile schickt."""
+    t = time.gmtime()
+    return (time.strftime('%Y%m%d', t), time.strftime('%H%M%S', t))
+
+
+# Ein kleiner Vorrat, damit die Liste nicht leer anfaengt, und damit sich
+# ALLE vier Faelle des Dupe-Satzes am Telefon ansehen lassen:
+#   OE1AAA  20m CW  -> echtes Dupe (Attrappe steht auf 20m CW)
+#   OE2BBB  20m SSB -> gleiches Band, andere Betriebsart
+#   OE3CCC  40m SSB -> bekannt, dieses Band noch nicht
+#   alles andere    -> NEU
+VORRAT = [
+    (('20261001', '081500'), 'OE3CCC', '40m', 'SSB', '59', '59'),
+    (('20261002', '143000'), 'OE2BBB', '20m', 'SSB', '59', '57'),
+    (('20261002', '191200'), 'OE1AAA', '20m', 'CW',  '599', '599'),
+]
+EINGETRAGEN = []
+
 INIT_BURST = [
     'protocol:Longpath-Attrappe,2.0;',
     'device:Attrappe;',
@@ -275,6 +295,52 @@ class Verbindung(threading.Thread):
                 re_ = args[2] if len(args) > 2 and args[2] else '59'
                 print(f'  {self.addr[1]}: log_qso {ruf} {rs}/{re_}')
                 self.sende_text(f'log_qso_ok:{ruf};')
+                # Eingetragenes merken, damit `log_last` und `log_dup`
+                # etwas zu sagen haben. Nur im Speicher dieser Attrappe —
+                # Martins Logbuch wird hier nicht angefasst.
+                EINGETRAGEN.append((_jetzt_utc(), ruf, '20m', 'CW', rs, re_))
+        elif name == 'log_last':
+            # Longpath-eigener Befehl (2026-10-04). Je Kontakt eine Zeile,
+            # dann der Abschluss mit der Anzahl.
+            #
+            # Die Attrappe deckelt wie der echte Server auf 50 — eine
+            # Attrappe, die mehr durchlaesst, verschiebt Fehler nach hinten.
+            try:
+                n = int(args[0]) if args and args[0].strip() else 10
+            except ValueError:
+                n = 10
+            if n <= 0:
+                n = 10
+            n = min(n, 50)
+            liste = (VORRAT + EINGETRAGEN)[::-1][:n]
+            for i, (zeit, ruf, band, mode, rs, re_) in enumerate(liste):
+                self.sende_text(
+                    f'log_qso_zeile:{i},{zeit[0]},{zeit[1]},{ruf},'
+                    f'{band},{mode},{rs},{re_};')
+            print(f'  {self.addr[1]}: log_last {n} -> {len(liste)} Zeilen')
+            self.sende_text(f'log_last_ok:{len(liste)};')
+        elif name == 'log_dup':
+            ruf = (args[0].strip().upper() if args else '')
+            if not ruf or len(ruf) > 20:
+                print(f'  {self.addr[1]}: log_dup ABGELEHNT ({ruf!r})')
+                self.sende_text('log_dup_err:rufzeichen fehlt;')
+            else:
+                # Band und Betriebsart kommen beim echten Server aus der
+                # aktiven Scheibe. Die Attrappe steht auf 20m CW.
+                treffer = [e for e in (VORRAT + EINGETRAGEN) if e[1] == ruf]
+                anzahl = len(treffer)
+                letzter = treffer[-1] if treffer else None
+                gleiches_band = any(e[2] == '20m' for e in treffer)
+                dupe = any(e[2] == '20m' and e[3] == 'CW' for e in treffer)
+                dat = letzter[0][0] if letzter else ''
+                zei = letzter[0][1] if letzter else ''
+                band = letzter[2] if letzter else ''
+                mode = letzter[3] if letzter else ''
+                print(f'  {self.addr[1]}: log_dup {ruf} -> {anzahl}× '
+                      f'(Band {int(gleiches_band)}, Dupe {int(dupe)})')
+                self.sende_text(
+                    f'log_dup_ok:{ruf},{anzahl},{dat},{zei},{band},{mode},'
+                    f'{int(gleiches_band)},{int(dupe)};')
         elif name in ('trx', 'tune'):
             # Sendesperre, wie der echte Server sie fuehrt (PR #189-Reihe).
             # Die Attrappe ist dabei absichtlich NICHT gutmuetiger: ohne
