@@ -1998,6 +1998,29 @@ longpath_add_test(tst_sendefehler_deutung)
 #   wird, verhindert unbemerkt einen Kontakt, den es noch nicht gibt.
 longpath_add_test(tst_logbuch_rueckschau)
 
+# ── Spots fuer die App: was ins Bild passt, und NUR das (2026-10-05) ────────
+# tst_spot_auswahl: Longpath sammelt Cluster, RBN, POTA und SpotCollector in
+#   EINEM SpotModel; die Filter des Spot-Hub-Dialogs sitzen im Dialog, nicht
+#   im Modell. RBN allein liefert in einer guten Stunde Hunderte Meldungen.
+#   Ungefiltert ueber die TCI-Steuerleitung geschoben blockieren sie jede
+#   Bedienung dahinter -- dieselbe Leitung traegt Frequenz, Betriebsart und
+#   den Abbruch eines Sendewunsches. Gefiltert wird darum nach dem einzigen
+#   Kriterium, das auf einem Telefon zaehlt: passt der Spot ins Bild.
+#   Festgehalten: nichts von ausserhalb, abgelaufene fallen weg (der
+#   Kehrbesen im SpotModel laeuft nur alle 30 s, und ein toter Spot kostet
+#   einen Anruf ins Leere), und beim Kuerzen bleiben die NAHE DER MITTE.
+longpath_add_test(tst_spot_auswahl)
+
+# ── Der Weg der Spots durch den Server (2026-10-05) ─────────────────────────
+# tst_tci_spots: `spots:<rx>;` ueber den echten WebSocket. Die Auswahl selbst
+#   steht in tst_spot_auswahl; hier zaehlen die Zusagen des Wegs: ohne
+#   Anmeldung gar nichts, die Anzahl in der Abschlusszeile stimmt mit den
+#   gesendeten Zeilen ueberein (sonst sieht eine kuerzere Liste aus wie ein
+#   leereres Band), und ein fehlender Empfaenger wird als FEHLER gemeldet
+#   statt als leere Liste -- "ich kann gerade nicht" und "da ist nichts" sind
+#   zwei Auskuenfte, und nur eine heisst: weiterdrehen.
+longpath_add_test(tst_tci_spots)
+
 # ── Logzeilen duerfen sich nicht zerschreiben (2026-10-03) ───────────────────
 # tst_log_schreibt_atomar: acht Faeden schreiben gleichzeitig 250 Zeilen und
 #   danach muss JEDE vollstaendig und genau einmal dastehen. Grund: in den

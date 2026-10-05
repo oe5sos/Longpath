@@ -193,6 +193,12 @@ export class TciLink extends EventTarget {
       case 'log_last_err':    this._emit('logende', { anzahl: null, text: args[0] || '' }); break;
       case 'log_dup_ok':      this._emit('logdupe', { args }); break;
       case 'log_dup_err':     this._emit('logdupe', { args: null, text: args[0] || '' }); break;
+      // Spots im Bild (2026-10-05). Gleiche Form wie log_last: je Spot eine
+      // Zeile, dann der Abschluss mit der Anzahl. Auch hier wird hier nichts
+      // gesammelt und nichts gedeutet -- das macht die Sammelstelle.
+      case 'spot_zeile':      this._emit('spotzeile', { args }); break;
+      case 'spots_ok':        this._emit('spotsende', { anzahl: int(0) }); break;
+      case 'spots_err':       this._emit('spotsende', { anzahl: null, text: args[0] || '' }); break;
       // Ein abgelehnter Sendewunsch, mit Grund. Bis zum 2026-10-04 kam
       // hier gar nichts, und ein stummes Nein ist auf einer
       // Fernbedienung nicht von einem Defekt zu unterscheiden.

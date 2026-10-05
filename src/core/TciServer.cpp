@@ -29,6 +29,8 @@
 #include "TciSendQueue.h"
 #include "core/LogbookDatei.h"
 #include "core/LogbuchRueckschau.h"
+#include "core/SpotAuswahl.h"
+#include "models/SpotModel.h"
 #include "models/LogEntry.h"
 #include "TciBinaryFrame.h"
 #include "TciSensorManager.h"
@@ -3166,6 +3168,82 @@ void TciServer::onTextMessageReceived(const QString& rohMsg)
                                                 : QStringLiteral("0"),
                                  b.gleicherMode ? QStringLiteral("1")
                                                 : QStringLiteral("0")));
+                return;
+            }
+        }
+
+        // ── Spots im Bild (2026-10-05) ──────────────────────────────────────
+        //
+        // Longpath kennt Cluster, RBN, POTA und SpotCollector; die App zeigte
+        // davon nichts. Auf dem Telefon ist genau das stark: Spot antippen,
+        // abgestimmt.
+        //
+        //     spots:<rx>;  -> spot_zeile:<nr>,<hz>,<ruf>,<mode>,<quelle>,
+        //                         <alter sek>;   je Spot, nach Frequenz
+        //                     spots_ok:<anzahl>;
+        //
+        // EINMALIGE ABFRAGE, kein Abonnement. Ein Abonnement muesste beim
+        // Drehen des Knopfes staendig neu entscheiden, was sichtbar ist, und
+        // die Unterschiede dazwischen fuehren -- Deltas ueber einem
+        // wandernden Fenster sind die Stelle, an der solche Dinge schieflaufen.
+        // Die Seite fragt beim Oeffnen und danach alle paar Sekunden; das
+        // kostet eine Zeile und kann nicht veralten.
+        //
+        // GEFILTERT WIRD AUF DEN SICHTBAREN AUSSCHNITT, und das ist kein
+        // Schoenheitsfilter: die Filter des Spot-Hub-Dialogs (Band, Land,
+        // Quelle) sitzen im DIALOG, nicht im Modell. Im Modell liegt alles,
+        // und RBN allein liefert in einer guten Stunde Hunderte Meldungen.
+        // Ungefiltert verstopfen die dieselbe Steuerleitung, die Frequenz,
+        // Betriebsart und den Abbruch eines Sendewunsches traegt.
+        //
+        // Keine eigene Freigabe: anders als das Logbuch sind Spots keine
+        // eigenen Daten, sondern das, was das halbe Band gerade meldet.
+        {
+            QString t = trimmed;
+            if (t.startsWith(QStringLiteral("spots:"), Qt::CaseInsensitive)
+                || t.compare(QStringLiteral("spots"), Qt::CaseInsensitive) == 0) {
+                auto antwort = [&](const QString& zeile) {
+                    session->sendQueue.push(TciSendQueue::Priority::Control,
+                                            zeile);
+                };
+                if (!session->authenticated) { return; }
+
+                bool ok = false;
+                const int rx = t.contains(QLatin1Char(':'))
+                    ? t.section(QLatin1Char(':'), 1).split(QLatin1Char(','))
+                          .value(0).trimmed().toInt(&ok)
+                    : 0;
+                const int empfaenger = ok ? rx : 0;
+
+                SpotModel* modell = m_model ? m_model->spotModel() : nullptr;
+                const QList<SliceModel*> sl =
+                    m_model ? m_model->slices() : QList<SliceModel*>{};
+                SliceModel* scheibe =
+                    (empfaenger >= 0 && empfaenger < sl.size())
+                        ? sl.at(empfaenger) : nullptr;
+                if (!modell || !scheibe) {
+                    // Kein Modell heisst nicht "keine Spots" -- es heisst,
+                    // dass die Frage gerade nicht zu beantworten ist. Die
+                    // Seite soll das unterscheiden koennen.
+                    antwort(QStringLiteral("spots_err:kein empfaenger;"));
+                    return;
+                }
+
+                const QVector<SpotAuswahl::Zeile> z = SpotAuswahl::sichtbare(
+                    modell->spots(),
+                    static_cast<qint64>(std::llround(scheibe->frequency())),
+                    session->spectrumSpanGemeldetHz,
+                    QDateTime::currentMSecsSinceEpoch());
+
+                for (int i = 0; i < z.size(); ++i) {
+                    const SpotAuswahl::Zeile& x = z.at(i);
+                    antwort(QStringLiteral("spot_zeile:%1,%2,%3,%4,%5,%6;")
+                                .arg(i)
+                                .arg(x.hz)
+                                .arg(x.ruf, x.mode, x.quelle)
+                                .arg(x.alterSek));
+                }
+                antwort(QStringLiteral("spots_ok:%1;").arg(z.size()));
                 return;
             }
         }

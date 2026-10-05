@@ -10,6 +10,7 @@ import { TciLink, Fft } from './tci.js';
 import { Mikrofon, mikrofonMoeglich } from './mikrofon.js';
 import { Sammelstelle, zeileLesen, befundLesen, zeitKurz, dupeSatz }
   from './logbuch.js';
+import { spotLesen, marken, trefferBei } from './spots.js';
 
 const $ = (id) => document.getElementById(id);
 const link = new TciLink();
@@ -613,6 +614,11 @@ function mitteVerfolgen() {
   if (jetzt === letzteMitteHz) { return; }
   wasserfallSchieben(jetzt - letzteMitteHz);
   letzteMitteHz = jetzt;
+  // Der Ausschnitt hat sich verschoben: die alten Spotmarken sitzen jetzt
+  // falsch, und was vorher ausserhalb lag, kann hereingekommen sein. Nicht
+  // sofort nachfragen -- beim Drehen des Knopfes kaeme sonst je
+  // Zwischenstand eine eigene Liste.
+  spotsBaldHolen();
 }
 
 /** Zieht eine Trennlinie statt zu loeschen: oben das Neue, unten das Alte.
@@ -762,6 +768,73 @@ function zeichneBild() {
   for (let i = 0; i <= 3; i++) {
     const db = Math.round(hi - (hi - lo) * i / 3);
     panCtx.fillText(String(db), 3, 10 + i * (H - 14) / 3);
+  }
+
+  // ── Spots ───────────────────────────────────────────────────────────────
+  //
+  // Messing, weil ein Spot eine MELDUNG ist und keine Messung des eigenen
+  // Empfaengers -- aber gedaempft, damit er die Kurve nicht uebertoent. Alte
+  // Spots werden blasser (spots.js: deckung); sie verschwinden nicht, das
+  // entscheidet Longpath anhand der Lebenszeit.
+  //
+  // Die Marken werden HIER gerechnet und in `spotMarken` abgelegt, weil der
+  // Fingerzeiger dieselben Stellen braucht. Zweimal rechnen hiesse: zwei
+  // Rechnungen, die auseinanderlaufen koennen, und dann trifft der Finger
+  // etwas anderes, als das Auge sieht.
+  {
+    const mitteSpot = link.st.vfo[state.trx] ? link.st.vfo[state.trx][0] : 0;
+    spotMarken = mitteSpot
+      ? marken(spotZeilen, mitteSpot, bildSpanneHz(192000), W)
+      : [];
+    if (spotMarken.length) {
+      panCtx.font = '9px ui-monospace,Menlo,monospace';
+      panCtx.textAlign = 'center';
+      // ── Wohin die Beschriftung darf ──────────────────────────────────
+      //
+      // Am Telefonformat gemessen (2026-10-05): der Panadapter ist 96 px
+      // hoch, und der Schrittregler deckt davon oben rechts 118 x 34 ab.
+      // Er ist ein HTML-Element UEBER dem Canvas -- das Zeichnen merkt
+      // nichts davon, die Marke ist einfach weg. Unten ist auch nichts
+      // gewonnen: dort laeuft die Kurve.
+      //
+      // Also oben, und unter dem Regler ausweichen. Das Rechteck wird
+      // GELESEN statt angenommen: eine Zahl, die hier steht und sich dort
+      // aendert, ist genau die Art Fehler, die niemandem auffaellt.
+      const rPan = pan.getBoundingClientRect();
+      let sperrVonX = Infinity, sperrBisY = 0;
+      if (rPan.width) {
+        const el = document.querySelector('.feinschritt');
+        const rr = el ? el.getBoundingClientRect() : null;
+        if (rr && rr.width) {
+          const k = pan.width / rPan.width;
+          sperrVonX = (rr.left - rPan.left) * k;
+          sperrBisY = (rr.bottom - rPan.top) * k;
+        }
+      }
+      for (const m of spotMarken) {
+        const unterDemRegler = (m.x + 27) > sperrVonX;
+        const oben = unterDemRegler ? sperrBisY + 10 : 4;
+        const y = oben + m.reihe * 11;       // Schriftgrundlinie
+        panCtx.globalAlpha = m.deckung;
+        panCtx.strokeStyle = '#c2924f';
+        panCtx.lineWidth = 1;
+        panCtx.beginPath();
+        panCtx.moveTo(m.x + .5, y + 2);
+        panCtx.lineTo(m.x + .5, H);
+        panCtx.stroke();
+        // Der Schriftzug bekommt einen dunklen Grund, sonst verschwindet er
+        // ueber einem hellen Traeger.
+        const b = panCtx.measureText(m.ruf).width + 6;
+        panCtx.globalAlpha = m.deckung * .72;
+        panCtx.fillStyle = '#0b0d10';
+        panCtx.fillRect(m.x - b / 2, y - 8, b, 10);
+        panCtx.globalAlpha = m.deckung;
+        panCtx.fillStyle = '#d8a55f';
+        panCtx.fillText(m.ruf, m.x, y);
+      }
+      panCtx.globalAlpha = 1;
+      panCtx.textAlign = 'left';
+    }
   }
 
   // Wasserfall: je eingetroffenem Spektrum eine Zeile — nicht je Bild.
@@ -1404,6 +1477,62 @@ function hzAusEingabe(roh) {
   return null;
 }
 
+// ── Spots im Bild (2026-10-05) ────────────────────────────────────────────
+//
+// Longpath kennt Cluster, RBN und POTA; die App zeigte davon nichts. Mit
+// `spots:<rx>` liefert es die Spots im SICHTBAREN Ausschnitt -- gefiltert
+// dort, nicht hier: im SpotModel liegen auch die Hunderte, die RBN in einer
+// guten Stunde meldet, und die wuerden dieselbe Steuerleitung verstopfen,
+// die Frequenz, Betriebsart und den Abbruch eines Sendewunsches traegt.
+//
+// EINMALIGE ABFRAGE, kein Abonnement. Gefragt wird beim Verbinden, danach
+// alle paar Sekunden, und nach einem Frequenzwechsel einmal zusaetzlich --
+// dann hat sich der Ausschnitt verschoben und die alten Marken sitzen falsch.
+const spotSammler = new Sammelstelle();
+let spotZeilen = [];      // zuletzt vollstaendig empfangene Liste
+let spotMarken = [];      // daraus gerechnet, in Canvas-Einheiten
+let spotFrist = null;
+
+/** Alle so viele Millisekunden nachfragen, solange die Verbindung steht. */
+const kSpotTakt = 12000;
+/** Nach einem Frequenzwechsel: nicht sofort, sonst fragt jeder Zwischenstand
+ *  beim Drehen des Knopfes eine eigene Liste an. */
+const kSpotNachQsy = 700;
+
+function spotsHolen() {
+  if (!link.ready) { return; }
+  spotSammler.beginnen();
+  link.send(`spots:${state.trx}`);
+}
+
+function spotsBaldHolen(verzug = kSpotNachQsy) {
+  clearTimeout(spotFrist);
+  spotFrist = setTimeout(spotsHolen, verzug);
+}
+
+link.addEventListener('spotzeile', (e) => {
+  spotSammler.zeile(spotLesen((e.detail || {}).args || []));
+});
+
+link.addEventListener('spotsende', (e) => {
+  const d = e.detail || {};
+  if (d.anzahl === null || d.anzahl === undefined) {
+    // `spots_err:` heisst "kann ich gerade nicht", nicht "da ist nichts".
+    // Die alten Marken stehen lassen waere falsch (sie koennten zu einem
+    // anderen Ausschnitt gehoeren), eine leere Liste zeigen auch -- aber
+    // leer ist die ehrlichere von beiden: nichts zu behaupten.
+    spotSammler.abschluss(-1);
+    spotZeilen = [];
+    return;
+  }
+  const liste = spotSammler.abschluss(d.anzahl);
+  // null heisst: es fehlen Zeilen. Dann die alte Liste behalten statt eine
+  // halbe zu zeigen -- eine kuerzere Liste sieht aus wie ein leereres Band.
+  if (liste) { spotZeilen = liste; }
+});
+
+setInterval(() => { if (link.ready) { spotsHolen(); } }, kSpotTakt);
+
 // ── QSO eintragen (Entwurf A, Betreiber 2026-10-04) ───────────────────────
 //
 // Das Blatt schickt NUR Rufzeichen und RST. Frequenz, Betriebsart und Zeit
@@ -1688,6 +1817,21 @@ function frequenzAnStelle(clientX) {
 $('scope').addEventListener('pointerup', (e) => {
   // Kein Wisch gewesen und nur ein Finger im Spiel? Dann war es ein Tipp.
   if (!wischAktiv && zeiger.size <= 1 && wischVon !== null) {
+    // Zuerst die Spots: liegt eine Marke unter dem Finger, gilt IHRE
+    // Frequenz und nicht die getippte Stelle. Sonst landet man je nach
+    // Fingerbreite ein paar hundert Hertz daneben -- genau das, was der
+    // Spot verhindern soll. Gerechnet wird in Canvas-Einheiten, weil
+    // `spotMarken` beim Zeichnen so entstanden ist.
+    const r = $('scope').getBoundingClientRect();
+    const xCanvas = r.width
+      ? (e.clientX - r.left) / r.width * pan.width : -1;
+    const treffer = r.width ? trefferBei(spotMarken, xCanvas) : null;
+    if (treffer) {
+      link.send(`vfo:${state.trx},0,${treffer.hz}`);
+      spotsBaldHolen();
+      wischVon = null;
+      return;
+    }
     const ziel = frequenzAnStelle(e.clientX);
     if (ziel) {
       const vorher = link.st.vfo[state.trx] ? link.st.vfo[state.trx][0] : ziel;
@@ -1863,6 +2007,7 @@ link.addEventListener('spectrum', (e) => {
   hatSpektrum = true;
 });
 link.addEventListener('ready', () => zeichneBedienung());
+link.addEventListener('ready', () => spotsBaldHolen(300));
 link.addEventListener('state', () => {
   // Der Server hat das letzte Wort über die Rate. Weicht sie von unserer
   // Bitte ab, muss das Worklet es erfahren — sonst stimmt die Tonhöhe nicht.
