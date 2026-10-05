@@ -1,3 +1,61 @@
+
+// =================================================================
+// src/core/audio/AudioRateMatcher.cpp  (Longpath)
+// =================================================================
+//
+// Ported from WDSP source:
+//   third_party/wdsp/src/rmatch.c (mirrors Thetis Project Files/
+//   Source/wdsp/rmatch.c at v2.10.3.13). Portiert sind das
+//   Regelgesetz control() (rmatch.c:256-272), die beiden gleitenden
+//   Mittelwerte xmav (:56-69) und xaamav (:101-126), die Parameter
+//   aus create_rmatchV (:500-526) und die Umrechnung der
+//   Verstaerkung auf die Nennrate (:147).
+//
+//   NICHT portiert: der Resampler varsamp, der Ringpuffer, das
+//   Ausblenden bei Ueber-/Unterlauf und die beiden kritischen
+//   Abschnitte. Longpath fuehrt das Regelgesetz nur auf der
+//   Erzeugerseite aus, weil im Tonrueckruf keine Sperre genommen
+//   werden darf (CLAUDE.md); Thetis nimmt dort cs_var.
+//
+//   Original WDSP source license preserved verbatim below.
+//
+// =================================================================
+// Modification history (Longpath):
+//   2026-10-05 — Created in C++20 for Longpath, operator Martin
+//                 Fischer (OE5SOS), AI-assisted via Anthropic Claude
+//                 Code. Abweichung von der Vorlage: die proportionale
+//                 Verstaerkung steht auf 4,0e-7 statt Thetis' 4,0e-6
+//                 (rmatch.c:521) — mit 4,0e-6 divergiert der
+//                 Regelkreis bei Longpaths Aufrufrate, gemessen ueber
+//                 5,5 simulierte Stunden. Begruendung und Messreihe
+//                 stehen bei der Einstellung selbst.
+// =================================================================
+
+// /*  rmatch.c
+//
+// This file is part of a program that implements a Software-Defined Radio.
+//
+// Copyright (C) 2017, 2018, 2022 Warren Pratt, NR0V
+//
+// This program is free software; you can redistribute it and/or
+// modify it under the terms of the GNU General Public License
+// as published by the Free Software Foundation; either version 2
+// of the License, or (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program; if not, write to the Free Software
+// Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+//
+// The author can be reached by email at
+//
+// warren@wpratt.com
+//
+// */
 #include "core/audio/AudioRateMatcher.h"
 
 #include <algorithm>
