@@ -16,6 +16,8 @@
 
 export const HDR = 64;
 
+import { sollNeuVerbinden } from './aufwachen.js';
+
 export class TciLink extends EventTarget {
   constructor() {
     super();
@@ -144,6 +146,30 @@ export class TciLink extends EventTarget {
         this._onBinary(ev.data);
       }
     };
+  }
+
+  /**
+   * Zurueck aus dem Hintergrund: sofort wieder versuchen, ohne den
+   * gewachsenen Abstand abzuwarten.
+   *
+   * Entschieden wird in aufwachen.js -- und zwar NICHT am `readyState`
+   * allein: iOS friert die Seite ein, die Gegenseite raeumt auf, und der
+   * Socket meldet noch OFFEN. Wer darauf wartet, dass `onclose` kommt,
+   * wartet unter Umstaenden ewig.
+   *
+   * @param {number} stilleMs wie lange schon nichts mehr ankam
+   * @returns {boolean} true, wenn neu verbunden wurde
+   */
+  nachDemAufwachen(stilleMs) {
+    const zustand = this.ws ? this.ws.readyState : null;
+    if (!sollNeuVerbinden({ gewollt: this.wanted, zustand, stilleMs })) {
+      return false;
+    }
+    // Den Abstand zuruecksetzen: er ist beim Schlafen gewachsen, und das
+    // Telefon ist gerade JETZT in der Hand.
+    this.retryMs = 500;
+    this._open();
+    return true;
   }
 
   _retry() {
