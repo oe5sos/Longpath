@@ -805,15 +805,23 @@ MainWindow::MainWindow(QWidget* parent)
 
     // WDSP wisdom progress dialog — shown as a modal window during first-run
     // wisdom generation. Pattern from AetherSDR MainWindow::enableNr2WithWisdom().
+    static const QString kWisdomWaitText = QStringLiteral(
+        "Building the FFT plans for the DSP engine.\n\n"
+        "This happens once, on a new profile, and can take up to about\n"
+        "15 minutes on a laptop. The radio connection you asked for is\n"
+        "waiting and will be made as soon as this finishes.");
     connect(m_radioModel->wdspEngine(), &WdspEngine::wisdomProgress,
             this, [this](int percent, const QString& status) {
         // Create dialog on first progress signal
         if (!m_wisdomDialog && percent < 100) {
             m_wisdomDialog = new QProgressDialog(this);
             m_wisdomDialog->setWindowTitle(QStringLiteral("Longpath — FFTW Wisdom"));
-            m_wisdomDialog->setLabelText(
-                QStringLiteral("Optimizing FFT plans for DSP engine...\n\n"
-                               "This only happens on first run."));
+            // Befund 2026-10-05: der Dialog sagte nur "This only happens on
+            // first run" und nichts darueber, wie lange das dauert oder was
+            // mit dem Verbindungswunsch passiert, den der Betreiber gerade
+            // abgeschickt hat.  Gemessen auf einem MacBook Air: rund 15
+            // Minuten.  Wer das nicht liest, haelt die App fuer tot.
+            m_wisdomDialog->setLabelText(kWisdomWaitText);
             m_wisdomDialog->setRange(0, 100);
             m_wisdomDialog->setValue(0);
             m_wisdomDialog->setCancelButton(nullptr);
@@ -838,7 +846,7 @@ MainWindow::MainWindow(QWidget* parent)
             m_wisdomDialog->setValue(percent);
             if (!status.isEmpty() && percent < 100) {
                 m_wisdomDialog->setLabelText(
-                    QStringLiteral("Optimizing FFT plans for DSP engine...\n\n%1").arg(status));
+                    kWisdomWaitText + QStringLiteral("\n\n%1").arg(status));
             }
             if (percent >= 100) {
                 m_wisdomDialog->setLabelText(QStringLiteral("FFTW planning complete!"));

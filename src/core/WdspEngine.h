@@ -186,6 +186,35 @@ public:
 
     bool isInitialized() const { return m_initialized; }
 
+    // True between "wisdom worker started" and "m_initialized flipped true".
+    // On a fresh profile that window is the full FFTW planning run — measured
+    // at ~15 minutes on a MacBook Air (sizes up to 262144, ~60 % CPU).  Every
+    // connect request that lands inside it has to be parked rather than
+    // carried out, so RadioModel needs to be able to see the window from the
+    // outside instead of inferring it from the initialize() return value
+    // (which is `true` both for "started" and for "rejected as re-entrant").
+    bool isWisdomInProgress() const { return m_wisdomInProgress; }
+
+#ifdef LONGPATH_BUILD_TESTS
+    // Pruefstand-Naht.  The defect this exists for only shows up while the
+    // wisdom worker is running, and the real run costs ~15 minutes — far past
+    // the suite's 120 s TIMEOUT.  These two calls put the engine into, and
+    // take it out of, exactly the state the worker produces (in-progress ->
+    // initialized + initializedChanged(true)) without touching FFTW, so the
+    // test can drive the application's own ordering on a 400 ms budget.
+    void beginWisdomForTests()
+    {
+        m_initialized = false;
+        m_wisdomInProgress = true;
+    }
+    void completeWisdomForTests()
+    {
+        m_wisdomInProgress = false;
+        m_initialized = true;
+        emit initializedChanged(true);
+    }
+#endif
+
     // --- WDSP channel-id map (Phase 3F) --------------------------------
     //
     // WDSP keys every channel off one global array, `struct _ch

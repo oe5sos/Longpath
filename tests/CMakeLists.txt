@@ -6670,6 +6670,16 @@ longpath_add_test(tst_suspended_stream_has_no_receiver)
 # Every ep6 frame was then dropped for want of a hardware mapping.
 longpath_add_test(tst_connect_routes_first_iq)
 
+# Befund 2026-10-05, frisches Profil (also jede Erstinstallation): ein
+# Verbindungswunsch, der WAEHREND der FFTW-Wisdom-Erzeugung eintrifft, kam
+# nicht zum Zug. connectToRadio() wartete mittendrin in einer
+# GESCHACHTELTEN Ereignisschleife auf initializedChanged(true) — rund 15
+# Minuten auf einem MacBook Air. Die Schleife pumpt weiter, also lief der
+# zweite Wunsch die ganze Vorbereitung ein zweites Mal durch und legte
+# sich in eine zweite Schachtelung; beim Abwickeln entstanden zwei
+# RadioConnection-Objekte auf dasselbe Geraet, das erste verwaist.
+longpath_add_test(tst_connect_during_wisdom)
+
 # Bench report 2026-07-30, second half: pans past the first did not honour the
 # display settings. A pan opening for the first time has no per-pan keys, so
 # every read fell through to the ship defaults instead of looking like the pan

@@ -90,6 +90,28 @@
 
 ### Fixed
 
+- **Erstinstallation: der Verbindungswunsch ging verloren, solange die
+  FFTW-Tabellen gebaut wurden.** Befund 2026-10-05 mit frischem Profil
+  (ohne `wdspWisdom00`) -- also jede Erstinstallation. Im Protokoll
+  stand `wisdom generation already in progress; ignoring re-entrant
+  initialize()`, in der Oberflaeche "Disconnected", sonst nichts. Die
+  Erzeugung lief auf einem MacBook Air rund 15 Minuten; in diesem
+  Fenster fiel jeder Verbindungsversuch hinein. Ursache war eine
+  GESCHACHTELTE Ereignisschleife mitten in `connectToRadio()`: sie
+  pumpte waehrend der 15 Minuten weiter Ereignisse zu, ein zweiter
+  Wunsch (zweiter Klick, Discovery-Antwort) fuhr die ganze
+  Verbindungsfolge ein zweites Mal und legte sich in eine zweite
+  Schachtelung -- beim Abwickeln entstanden zwei RadioConnection-
+  Objekte auf dasselbe Geraet, das erste verwaist und nie abgebaut.
+  Jetzt wird der Wunsch vor der Vorbereitung geparkt, der Hauptfaden
+  sofort freigegeben und der Wunsch nachgeholt, sobald die Tabellen
+  stehen; der zuletzt geaeusserte gewinnt, Trennen verwirft ihn. Der
+  Zustand steht dabei auf "Connecting" statt "Disconnected", und der
+  Fortschrittsdialog sagt jetzt, wie lange es dauert und dass die
+  Verbindung danach von selbst zustande kommt.
+  Prueffall `tst_connect_during_wisdom` (gegen die alte Fassung
+  gemessen: 2403 ms festgehalten, zwei Rumpfdurchlaeufe).
+
 - **Bandfilter: die Kurve war flach, weil das Zeichenfeld sie auf
   27 Punkte drueckte.** Betreiber 2026-09-17 mit Bildschirmfoto: "der
   bandfilter könnte noch genauer und besser sein, schaut eher flach

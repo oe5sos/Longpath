@@ -1441,6 +1441,11 @@ public:
     // read this instead of deriving state from RadioConnection directly.
     ConnectionState connectionState() const { return m_connectionState; }
 
+    // True solange ein Verbindungswunsch darauf wartet, dass die
+    // FFTW-Wisdom-Erzeugung fertig wird (frisches Profil: bis ~15 min).
+    // Der Zustand steht dabei auf Connecting, nicht auf Disconnected.
+    bool isWaitingForWdspWisdom() const { return m_pendingConnect.has_value(); }
+
     // Test-only: allow tests to drive transitions without standing up
     // a fake RadioConnection. Production transitions go through the
     // private setConnectionState() called from connection signals.
@@ -2532,6 +2537,14 @@ signals:
 private slots:
     void onConnectionStateChanged(Longpath::ConnectionState state);
 
+    // ── Wisdom-Tor: der geparkte Verbindungswunsch wird nachgeholt ───────
+    //
+    // Fest in den Konstruktor verdrahtet, einmal pro RadioModel, auf
+    // WdspEngine::initializedChanged.  Holt den in m_pendingConnect
+    // geparkten Wunsch nach, sobald die FFTW-Tabellen stehen.  Siehe
+    // connectToRadio() fuer den Befund vom 2026-10-05.
+    void onWdspInitializedChanged(bool initialized);
+
     // ── #202 deep-fix: Audio.RadioVolume setter analogue ─────────────────────
     //
     // Mirrors Thetis audio.cs:262-271 [v2.10.3.13]:
@@ -3318,6 +3331,16 @@ private:
     // Phase 3Q-1: RadioModel-level connection state machine.
     // Drives UI (TitleBar, ConnectionPanel, status bar, spectrum overlay).
     ConnectionState m_connectionState{ConnectionState::Disconnected};
+
+    // ── Geparkter Verbindungswunsch, Befund 2026-10-05 ──────────────────
+    //
+    // Gesetzt, solange die FFTW-Wisdom-Erzeugung laeuft und deshalb noch
+    // keine Verbindungsfolge gefahren werden kann.  Der zuletzt geaeusserte
+    // Wunsch gewinnt: ein zweiter Klick (oder die Discovery-Antwort des
+    // zuletzt verbundenen Geraets) ueberschreibt den geparkten, statt eine
+    // zweite Verbindungsfolge anzustossen.  onWdspInitializedChanged()
+    // holt ihn nach.  Siehe connectToRadio().
+    std::optional<RadioInfo> m_pendingConnect;
 
     // Phase 3Q sub-PR-3: uptime tracking for NetworkDiagnosticsDialog.
     // Set to current time on Connected transition, cleared (default-constructed)

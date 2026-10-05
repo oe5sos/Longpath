@@ -348,7 +348,6 @@ warren@wpratt.com
 #include <QCryptographicHash>
 #include <QDateTime>
 #include <QElapsedTimer>
-#include <QEventLoop>
 #include <QMetaObject>
 #include <QScopeGuard>
 #include <QStandardPaths>
@@ -548,6 +547,14 @@ RadioModel::RadioModel(QObject* parent)
     // treats a null as a safe no-op (tests that build AudioEngine
     // standalone).
     m_audioEngine->setRadioModel(this);
+
+    // Wisdom-Tor: EINE feste Verbindung fuers ganze Leben dieses Modells.
+    // connectToRadio() parkt einen Wunsch, der waehrend der FFTW-Wisdom-
+    // Erzeugung eintrifft; dieser Slot holt ihn nach.  Hier und nicht in
+    // connectToRadio(), damit teardownConnection() ihn nicht mitreisst und
+    // damit er sich ueber Wiederaufbauten nicht haeufen kann.
+    connect(m_wdspEngine, &WdspEngine::initializedChanged,
+            this, &RadioModel::onWdspInitializedChanged);
 
     // Sprachspeicher: Ordner neben die Einstellungsdatei legen und
     // laden. Neben die Einstellungen und nicht in den Programmordner —
@@ -5982,6 +5989,68 @@ void RadioModel::connectToRadio(const RadioInfo& info)
         teardownConnection();
     }
 
+    // ── Wisdom-Tor ───────────────────────────────────────────────────────
+    //
+    // Befund 2026-10-05, frisches LONGPATH_CONFIG_DIR (Profil ohne
+    // wdspWisdom00) — also jede Erstinstallation:
+    //
+    //   INF: Initializing WDSP wisdom on background thread ... needsGeneration= true
+    //   INF: Connecting with sampleRate= 48000 inSize= 64 activeRxCount= 1
+    //   INF: Sub-Epic I: streams= 2 channels= 2
+    //   WRN: WdspEngine wisdom generation already in progress; ignoring
+    //        re-entrant initialize()
+    //
+    // und danach blieb die Oberflaeche ohne jede Meldung auf
+    // "Disconnected" stehen.  Die Erzeugung lief auf einem MacBook Air
+    // rund 15 Minuten (FFT-Groessen bis 262144, ~60 % CPU).
+    //
+    // Bis hierher rief diese Funktion WdspEngine::initialize() erst
+    // mittendrin (nach der ganzen Vorbereitung) und wartete anschliessend
+    // in einem GESCHACHTELTEN QEventLoop auf initializedChanged(true).
+    // Eine geschachtelte Ereignisschleife pumpt alles weiter — Zeitgeber,
+    // Discovery-Antworten, Menueeintraege.  Der zweite Wunsch lief deshalb
+    // nicht ins Leere: er fuhr die gesamte Vorbereitung ein ZWEITES Mal
+    // und legte sich in eine ZWEITE Schachtelung.  Beim Abwickeln nach den
+    // 15 Minuten lief der Rumpf zweimal durch, und das zweite
+    // `m_connection = conn.release()` ueberschrieb die vom ersten
+    // Durchlauf schon gestartete Verbindung, ohne sie abzubauen: zwei
+    // RadioConnection-Objekte, zwei Sockets, zwei metis-start auf dasselbe
+    // Geraet, das erste verwaist.  tst_connect_during_wisdom hat das gegen
+    // die alte Fassung gemessen: 2403 ms festgehalten (in echt die volle
+    // Wisdom-Laufzeit) und zwei Rumpfdurchlaeufe.
+    //
+    // Stattdessen wird der Wunsch jetzt geparkt und der Hauptfaden sofort
+    // freigegeben.  initialize() ist in sich gegen Mehrfachaufruf
+    // abgesichert und stoesst die Erzeugung genau einmal an; dabei faellt
+    // wisdomProgress, woran der Fortschrittsdialog in MainWindow haengt.
+    // onWdspInitializedChanged() holt den Wunsch nach, sobald die Tabellen
+    // stehen.
+    //
+    // Das Tor steht ABSICHTLICH nach teardownConnection(): dessen
+    // WdspEngine::shutdown() setzt m_initialized zurueck, ein Wiederaufbau
+    // muss also durch dasselbe Tor.
+    if (m_wdspEngine && !m_wdspEngine->isInitialized()) {
+        const bool first = !m_pendingConnect.has_value();
+        m_pendingConnect = info;   // der zuletzt geaeusserte Wunsch gewinnt
+
+        if (!m_wdspEngine->isWisdomInProgress()) {
+            m_wdspEngine->initialize(
+                QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation));
+        }
+
+        // Nicht "Disconnected": es passiert etwas, es dauert nur.
+        setConnectionState(ConnectionState::Connecting);
+
+        qCInfo(lcConnection)
+            << (first ? "Connect request parked: WDSP FFTW wisdom still "
+                        "building — will be carried out when it finishes;"
+                      : "Connect request parked (replaces the previous "
+                        "parked one);")
+            << "radio=" << info.displayName();
+        return;
+    }
+    m_pendingConnect.reset();
+
     m_lastRadioInfo = info;
     m_intentionalDisconnect = false;
 
@@ -6239,9 +6308,9 @@ void RadioModel::connectToRadio(const RadioInfo& info)
     // Activate receiver (this sends hardwareReceiverCountChanged to RadioConnection)
     m_receiverManager->activateReceiver(rxIdx);
 
-    // Initialize WDSP DSP engine (wisdom runs async — channel creation
-    // is deferred until initializedChanged fires)
-    QString configDir = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
+    // Die WDSP-Engine ist an dieser Stelle schon initialisiert — das
+    // Wisdom-Tor am Kopf dieser Funktion laesst niemanden hier durch,
+    // solange die FFTW-Tabellen noch gebaut werden.
     // Sample rate + active RX count come from Hardware Config (per-MAC).
     // Falls back to Thetis default (192000, setup.cs:866) when nothing
     // is persisted, and to the board-cap first-entry if 192000 isn't
@@ -6294,17 +6363,16 @@ void RadioModel::connectToRadio(const RadioInfo& info)
     qCInfo(lcConnection) << "Sub-Epic I: streams=" << caps.userDdcCount
                          << "channels=" << poolSlices;
 
-    // 3M-1a G.1 fixup: explicit disconnect in teardownConnection() prevents
-    // accumulation across reconnect cycles.  Qt::UniqueConnection can't be
-    // used with lambdas, so we rely on the matching disconnect there.
-    // Without that disconnect, every connectToRadio() would add another copy
-    // of this lambda; on the second connect, both copies would call
-    // createRxChannel + createTxChannel(kTxChannelId) (idempotent today, but doubled work).
-    connect(m_wdspEngine, &WdspEngine::initializedChanged, this,
-            [this, wdspInputRate, wdspInSize](bool ok) {
-        if (!ok) {
-            return;
-        }
+    // Fruehere Fassung: dieser Block hing als Einmal-Lambda an
+    // WdspEngine::initializedChanged und lief damit effektiv erst in der
+    // geschachtelten Warteschleife ein paar Zeilen weiter unten.  Seit dem
+    // Wisdom-Tor am Kopf dieser Funktion ist die Engine hier GARANTIERT
+    // initialisiert (das Tor parkt den Wunsch sonst und holt ihn nach), und
+    // der Block laeuft direkt — an genau derselben Stelle der Reihenfolge,
+    // an der er vorher ueber das Signal lief.  Damit faellt auch der
+    // Zaehl-Abbau in teardownConnection() weg: es gibt kein Lambda mehr,
+    // das sich ueber Wiederaufbauten haeufen koennte.
+    {
         // Create primary RX channel once WDSP is ready. in_size follows
         // Thetis cmaster.c create_rcvr: 64 * input_rate / 48000. WDSP
         // decimates input_rate -> 48000 internally and outputs 64 samples
@@ -6571,43 +6639,26 @@ void RadioModel::connectToRadio(const RadioInfo& info)
         // Start audio output
         m_audioEngine->start();
         qCInfo(lcDsp) << "WDSP ready — RX channel 0 active, audio started";
-    }, Qt::SingleShotConnection);
-    m_wdspEngine->initialize(configDir);
-
-    // WDSP wisdom now ALWAYS runs on a worker thread (WdspEngine::initialize
-    // dropped its sync fast path so the user gets a progress dialog whenever
-    // FFTW regenerates plans).  But the rest of this function — TX channel
-    // creation at line ~1452, the SingleShot lambda above that creates the
-    // RX channel, etc. — was written against the old sync contract where
-    // m_initialized was true by the time initialize() returned.
-    //
-    // Block here while the wisdom worker finishes, pumping the Qt event loop
-    // so the MainWindow wisdom progress dialog (connected to wisdomProgress)
-    // renders and updates.  The dialog is Qt::ApplicationModal (see
-    // MainWindow.cpp:600) so other windows are blocked from interaction
-    // during the wait — no re-entrant Connect-clicks or similar.
-    //
-    // Order: register the listener BEFORE checking isInitialized().  Qt's
-    // current threading semantics make the check-then-connect race
-    // theoretically impossible (no event pump between the read and the
-    // connect), but the canonical wait-for-signal idiom is connect → check
-    // → exec — robust against future Qt internals changes and trivially
-    // race-proof regardless of when the worker's QThread::finished posts.
-    QEventLoop wisdomLoop;
-    QMetaObject::Connection waitConn = QObject::connect(
-        m_wdspEngine, &WdspEngine::initializedChanged,
-        &wisdomLoop, [&wisdomLoop](bool ok) {
-            if (ok) wisdomLoop.quit();
-        });
-    if (!m_wdspEngine->isInitialized()) {
-        wisdomLoop.exec();
     }
-    QObject::disconnect(waitConn);
+
+    // Hier stand bis 2026-10-05 eine geschachtelte Warteschleife
+    // (QEventLoop wisdomLoop) auf WdspEngine::initializedChanged.  Sie hat
+    // den Hauptfaden bei frischem Profil rund 15 Minuten lang in dieser
+    // Funktion gehalten und dabei weiter Ereignisse zugestellt — jeder
+    // Verbindungswunsch, der in diesem Fenster eintraf, fuhr die ganze
+    // Funktion ein zweites Mal und ueberschrieb am Ende m_connection.
+    // Das Warten liegt jetzt vor der Vorbereitung, im Wisdom-Tor am Kopf
+    // dieser Funktion, und ohne Schachtelung.  Der Fortschrittsdialog
+    // haengt unveraendert an WdspEngine::wisdomProgress (MainWindow.cpp).
 
     // Factory-create the connection (no parent — will be moved to thread)
     auto conn = RadioConnection::create(info);
     if (!conn) {
         qCWarning(lcConnection) << "Failed to create connection for" << info.displayName();
+        // Den Zustand nicht auf Connecting stehen lassen: ueber das
+        // Wisdom-Tor kann er hier schon so stehen, und dann haengt die
+        // Anzeige auf "Connecting", obwohl nichts mehr laeuft.
+        setConnectionState(ConnectionState::Disconnected);
         return;
     }
     m_connection = conn.release();
@@ -8326,17 +8377,20 @@ void RadioModel::connectToRadio(const RadioInfo& info)
         if (!m_txChannel) {
             // Issue #153 sub-bug 1 — cold-start retry hook.
             //
-            // WDSP not yet initialized at connectToRadio time (typical
-            // first-launch case with no cached FFTW wisdom — async wisdom
-            // build can take ~15 minutes on a fresh install).  Register a
-            // one-shot connect to WdspEngine::initializedChanged(true)
-            // that re-runs the captured txSetup lambda.  receiver=this so
-            // the slot runs on RadioModel's main thread; QMetaObject
-            // disconnects automatically when this RadioModel is destroyed.
+            // Rueckhalt, kein Regelweg mehr.  Der Haken entstand, weil
+            // connectToRadio() bei kaltem Start (keine FFTW-Wisdom im
+            // Profil) hier mit nicht initialisierter WDSP-Engine ankam und
+            // createTxChannel() nullptr gab — TUN und MOX blieben dann bis
+            // zum naechsten Aufbau stumm.  Seit dem Wisdom-Tor am Kopf
+            // dieser Funktion kommt niemand mehr mit uninitialisierter
+            // Engine hier an, und createTxChannel() gibt genau in diesem
+            // Fall nullptr (WdspEngine.cpp, !m_initialized-Wache).  Der
+            // Zweig ist damit unerreichbar; er bleibt als Netz stehen,
+            // nicht weil er noch gebraucht wird.
             //
-            // The retry self-disconnects on first successful run.  If WDSP
-            // never initializes (e.g. wisdom build aborted) the connection
-            // remains harmlessly attached until RadioModel teardown.
+            // Der Nachholversuch loest sich beim ersten Erfolg selbst ab.
+            // Kaeme WDSP nie hoch, bliebe er harmlos haengen bis zum Abbau
+            // des RadioModel.
             auto retry = std::make_shared<QMetaObject::Connection>();
             *retry = connect(m_wdspEngine, &WdspEngine::initializedChanged,
                              this,
@@ -8617,6 +8671,21 @@ void RadioModel::connectToRadio(const RadioInfo& info)
 void RadioModel::disconnectFromRadio()
 {
     m_intentionalDisconnect = true;
+
+    // Einen Wunsch, der noch auf das Ende der FFTW-Wisdom-Erzeugung wartet,
+    // mit wegwerfen.  Sonst wuerde er Minuten spaeter von
+    // onWdspInitializedChanged() nachgeholt und die App verbindet sich gegen
+    // den ausdruecklichen Willen des Betreibers — bei frischem Profil ist
+    // dieses Fenster rund 15 Minuten breit, da drueckt jemand durchaus
+    // einmal auf Trennen.
+    if (m_pendingConnect.has_value()) {
+        qCInfo(lcConnection) << "Parked connect request dropped on explicit "
+                                "disconnect; radio="
+                             << m_pendingConnect->displayName();
+        m_pendingConnect.reset();
+        setConnectionState(ConnectionState::Disconnected);
+    }
+
     teardownConnection();
 }
 
@@ -11796,15 +11865,16 @@ void RadioModel::teardownConnection()
         m_flexBroadcaster->stop();
     }
 
-    // 3M-1a G.1 fixup: drop any prior WdspEngine::initializedChanged subscribers
-    // we registered in connectToRadio(). Without this, each reconnect cycle
-    // accumulates another copy of the WDSP-init lambda, causing duplicate
-    // createRxChannel + createTxChannel(kTxChannelId) calls on the next initializedChanged.
-    // Qt::UniqueConnection can't be used with lambdas, so we disconnect by hand
-    // here, on the matching teardown path.
-    if (m_wdspEngine != nullptr) {
-        disconnect(m_wdspEngine, &WdspEngine::initializedChanged, this, nullptr);
-    }
+    // Hier stand bis 2026-10-05 ein pauschales
+    //   disconnect(m_wdspEngine, &WdspEngine::initializedChanged, this, nullptr)
+    // (3M-1a G.1), weil connectToRadio() bei jedem Aufbau ein Einmal-Lambda
+    // an dieses Signal haengte und sich die Kopien sonst gehaeuft haetten.
+    // Dieses Lambda gibt es nicht mehr — der RX-Block laeuft seit dem
+    // Wisdom-Tor direkt in connectToRadio().  Der Pauschal-Abbau ist damit
+    // nicht nur unnoetig, er waere schaedlich: er wuerde die EINE feste
+    // Verbindung aus dem Konstruktor mitreissen
+    // (onWdspInitializedChanged), und damit genau den geparkten
+    // Verbindungswunsch verlieren, um den es hier geht.
 
     // Flush any pending AlexController writes before the MAC-scoped
     // keys become unreachable (save() keys off m_mac, which stays set
@@ -12232,6 +12302,36 @@ void RadioModel::setConnectionState(ConnectionState s)
         m_connectionActiveRxCount = 0;       // Task 1.7: reset on disconnect
     }
     emit connectionStateChanged(s);
+}
+
+// ── Wisdom-Tor, zweite Haelfte: den geparkten Wunsch nachholen ──────────
+//
+// Fest im Konstruktor verdrahtet, einmal pro RadioModel.  Ohne diesen Weg
+// war der Verbindungswunsch, der waehrend der FFTW-Wisdom-Erzeugung eintraf,
+// verloren (Befund 2026-10-05, jede Erstinstallation) — siehe den
+// Tor-Kommentar in connectToRadio().
+//
+// Die Ausfuehrung geht ABSICHTLICH ueber die Ereignisschlange: dieses Signal
+// faellt tief in WdspEngine::finishInitialization(), aufgerufen aus dem
+// QThread::finished-Lambda des Wisdom-Arbeiters.  Die komplette
+// Verbindungsfolge von dort aus zu fahren hiesse, die halbe Anwendung in
+// einem fremden Aufrufstapel aufzubauen, waehrend WdspEngine noch mitten in
+// seiner eigenen Initialisierung steht.
+void RadioModel::onWdspInitializedChanged(bool initialized)
+{
+    if (!initialized || !m_pendingConnect.has_value()) {
+        return;
+    }
+    const RadioInfo info = *m_pendingConnect;
+    m_pendingConnect.reset();
+
+    qCInfo(lcConnection) << "WDSP FFTW wisdom finished — carrying out the "
+                            "parked connect request; radio="
+                         << info.displayName();
+
+    QMetaObject::invokeMethod(this, [this, info]() {
+        connectToRadio(info);
+    }, Qt::QueuedConnection);
 }
 
 void RadioModel::onConnectionStateChanged(ConnectionState state)
