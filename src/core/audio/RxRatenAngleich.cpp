@@ -1,3 +1,87 @@
+
+// =================================================================
+// src/core/audio/RxRatenAngleich.cpp  (Longpath)
+// =================================================================
+//
+// Ported from WDSP source (zwei Quellen, darum zwei Koepfe unten):
+//   third_party/wdsp/src/rmatch.c  — die Parameterwahl, mit der der
+//     Umtaster aufgesetzt wird (rmatch.c:142-143 und create_rmatchV,
+//     :500-526 [v2.10.3.13]): fc_high 0,0 (automatisch), fc_low -1,0
+//     (keine untere Grenze), gain 1,0, R 1024, varmode 1 (Verhaeltnis
+//     je Probe linear gefuehrt).
+//   third_party/wdsp/src/varsamp.c — der Umtaster selbst, ueber seine
+//     C-Schnittstelle aufgerufen (create_varsamp / xvarsamp /
+//     flush_varsamp / destroy_varsamp, varsamp.h:64-80). Der Code
+//     wurde NICHT abgeschrieben; er wird benutzt.
+//
+//   Beide Original-Lizenzkoepfe folgen woertlich.
+//
+// ABWEICHUNG: Thetis fuehrt das Regelgesetz von BEIDEN Seiten aus und
+// nimmt dabei `cs_var` im Geraeterueckruf. Longpath darf im Tonrueckruf
+// keine Sperre nehmen (CLAUDE.md), und sein Ring ist absichtlich
+// sperrfrei — hier laeuft alles auf dem Erzeugerfaden, und die
+// verbrauchten Rahmen werden am Fuellstand abgelesen statt gezaehlt.
+//
+// =================================================================
+// Modification history (Longpath):
+//   2026-10-06 — Created in C++20/Qt6 for Longpath, operator Martin
+//                 Fischer (OE5SOS), AI-assisted via Anthropic Claude
+//                 Code. Zielverzoegerung 50 ms (halber Ring, wie
+//                 Thetis) und nur der Lautsprecherweg — beides
+//                 Entscheidungen des Betreibers vom 2026-10-06.
+// =================================================================
+
+// /*  rmatch.c
+//
+// This file is part of a program that implements a Software-Defined Radio.
+//
+// Copyright (C) 2017, 2018, 2022 Warren Pratt, NR0V
+//
+// This program is free software; you can redistribute it and/or
+// modify it under the terms of the GNU General Public License
+// as published by the Free Software Foundation; either version 2
+// of the License, or (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program; if not, write to the Free Software
+// Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+//
+// The author can be reached by email at
+//
+// warren@wpratt.com
+//
+// */
+//
+// /*  varsamp.c
+//
+// This file is part of a program that implements a Software-Defined Radio.
+//
+// Copyright (C) 2017 Warren Pratt, NR0V
+//
+// This program is free software; you can redistribute it and/or
+// modify it under the terms of the GNU General Public License
+// as published by the Free Software Foundation; either version 2
+// of the License, or (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program; if not, write to the Free Software
+// Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+//
+// The author can be reached by email at
+//
+// warren@wpratt.com
+//
+// */
 #include "core/audio/RxRatenAngleich.h"
 
 #include <algorithm>
