@@ -2021,6 +2021,25 @@ longpath_add_test(tst_tci_rotor)
 #   kommen getrennt zur Durchsicht (Entwurf 2026-09-27, §4).
 longpath_add_test(tst_audio_rate_matcher)
 
+# ── Der Driftausgleich am Tonweg: die Verdrahtung (2026-10-06) ─────────────
+# tst_rx_raten_angleich: das Regelgesetz steht in tst_audio_rate_matcher,
+#   hier zaehlen die Zusagen der Verdrahtung. Die wichtigste: meldet der Bus
+#   "Fuellstand unbekannt" (-1), gehen die Rahmen UNVERAENDERT durch, mit
+#   demselben Zeiger. Nicht jeder Hintergrund hat einen Ring, den man fragen
+#   kann (HAL-Shm, PipeWire, FIFO); wer -1 als 0 liest, sieht einen dauerhaft
+#   leeren Puffer und regelt dagegen an, bis der Ton verstimmt ist.
+#   Dazu die Gegenprobe ohne Ausgleich, die leerlaufen MUSS.
+longpath_add_test(tst_rx_raten_angleich)
+
+# ── Der Schalter fuer den Driftausgleich (2026-10-06) ───────────────────────
+# tst_rx_drift_schalter: ein Haekchen, das nichts schaltet, ist schlimmer als
+#   keines -- man legt es um, hoert hin, hoert keinen Unterschied und schliesst
+#   daraus auf den Regler statt auf die Verdrahtung. Geprueft wird die
+#   BEDIENUNG (toggle) und der Rueckweg: ab Werk aus, Klick schreibt die
+#   Einstellung, und ein gesetzter Wert kommt beim naechsten Aufbau wieder
+#   heraus.
+longpath_add_test(tst_rx_drift_schalter)
+
 # ── Vom Dateiende lesen darf keinen Kontakt ERFINDEN (2026-10-04) ───────────
 # tst_logbuch_rueckschau: die App kann seit #184 loggen, aber nicht nachsehen.
 #   Die letzten Kontakte kommen deshalb aus dem DATEIENDE (gemessen an Martins

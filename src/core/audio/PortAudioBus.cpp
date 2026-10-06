@@ -607,6 +607,24 @@ void PortAudioBus::flush() {
     m_ringRead.store(w, std::memory_order_release);
 }
 
+qint64 PortAudioBus::queuedFrames() const {
+    if (!m_stream) { return -1; }
+    // Der Ring zaehlt FLOATS, nicht Rahmen -- m_ring ist 4800 Rahmen mal
+    // zwei Kanaelen gross. Wer hier die Differenz der Zeiger
+    // zurueckgibt, meldet bei Stereo den doppelten Fuellstand, und der
+    // Driftausgleich regelte auf die halbe Zielverzoegerung.
+    const int kanaele = (m_negFormat.channels > 0) ? m_negFormat.channels : 1;
+    // Zuerst den Lesezeiger, dann den Schreibzeiger: in dieser Reihenfolge
+    // kann die Differenz hoechstens zu KLEIN ausfallen, nie negativ.
+    // Andersherum koennte zwischen den beiden Ladevorgaengen geschrieben
+    // werden und der Fuellstand groesser erscheinen, als er je war.
+    const qint64 r = m_ringRead.load(std::memory_order_acquire);
+    const qint64 w = m_ringWrite.load(std::memory_order_acquire);
+    const qint64 floats = w - r;
+    if (floats <= 0) { return 0; }
+    return floats / kanaele;
+}
+
 qint64 PortAudioBus::pull(char* data, qint64 maxBytes) {
     if (!m_stream) { return 0; }
     if (m_cfg.direction != AudioDirection::Input) { return 0; }

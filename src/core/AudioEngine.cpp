@@ -218,6 +218,26 @@ void waitForTapQuiescence(std::atomic<unsigned>& busy)
 AudioEngine::AudioEngine(QObject* parent)
     : QObject(parent)
 {
+    // ── Driftausgleich am Lautsprecherweg (#131, 2026-10-06) ─────────────
+    //
+    // AB WERK AUS. Ein neuer Umtaster im Hoerweg einer laufenden Station
+    // gehoert nicht ungefragt eingeschaltet -- `RxDriftAusgleich=True`
+    // schaltet ihn ein, und danach entscheidet das Ohr
+    // (feedback-messung-schlaegt-nicht-das-geraet).
+    //
+    // Einmal hier angelegt und nicht spaeter im Tonweg: eine Zuteilung
+    // auf dem DSP-Faden mitten im Betrieb waere genau das, was man dort
+    // nicht will. Der Umtaster selbst entsteht beim ersten Durchlauf nach
+    // der Anlaufzeit -- einmalig, drei Sekunden nach dem Start, und auf
+    // dem DSP-Faden, nicht im Geraeterueckruf.
+    if (AppSettings::instance()
+            .value(QStringLiteral("RxDriftAusgleich"), QStringLiteral("False"))
+            .toString() == QStringLiteral("True")) {
+        m_rxDrift = std::make_unique<RxRatenAngleich>(48000, 2);
+        qCInfo(lcAudio) << "RX-Driftausgleich eingeschaltet (RxDriftAusgleich)"
+                        << "— Ziel" << RxRatenAngleich::kZielMs << "ms";
+    }
+
 #if defined(Q_OS_LINUX)
     // Cache the Linux audio backend detection result up front so Task 14's
     // dispatch (PipeWireBus vs. LinuxPipeBus pactl path) has a stable
@@ -1635,9 +1655,22 @@ void AudioEngine::rxBlockReady(int sliceId, const float* samples, int frames)
         if (speakersLk.owns_lock()) {
             IAudioBus* speakersBus = m_speakersBus.get();
             if (speakersBus != nullptr && speakersBus->isOpen()) {
+                const float* rahmen = mix.data();
+                int anzahl = stereoFloats / 2;
+                // Driftausgleich (#131). Meldet der Bus -1, gibt
+                // `verarbeite` denselben Zeiger unveraendert zurueck --
+                // dann kostet das hier eine Abfrage und sonst nichts.
+                if (m_rxDrift) {
+                    const auto ang = m_rxDrift->verarbeite(
+                        rahmen, anzahl, speakersBus->queuedFrames(),
+                        RxRatenAngleich::ringRahmenFuer(
+                            speakersBus->negotiatedFormat().sampleRate));
+                    rahmen = ang.rahmen;
+                    anzahl = ang.anzahl;
+                }
                 speakersBus->push(
-                    reinterpret_cast<const char*>(mix.data()),
-                    static_cast<qint64>(stereoFloats) * sizeof(float));
+                    reinterpret_cast<const char*>(rahmen),
+                    static_cast<qint64>(anzahl) * 2 * sizeof(float));
             }
         }
         // A contending writer holding m_speakersBusMutex

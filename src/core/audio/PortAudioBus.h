@@ -101,6 +101,7 @@ public:
 
     QString     backendName() const override { return m_backendName; }
     AudioFormat negotiatedFormat() const override { return m_negFormat; }
+    qint64 queuedFrames() const override;
     QString     errorString() const override { return m_err; }
 
     // Diagnostics: drop-oldest overrun accounting.  Output-mode push()
