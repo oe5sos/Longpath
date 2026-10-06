@@ -6034,8 +6034,7 @@ void RadioModel::connectToRadio(const RadioInfo& info)
         m_pendingConnect = info;   // der zuletzt geaeusserte Wunsch gewinnt
 
         if (!m_wdspEngine->isWisdomInProgress()) {
-            m_wdspEngine->initialize(
-                QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation));
+            m_wdspEngine->initialize(WdspEngine::wisdomDir());
         }
 
         // Nicht "Disconnected": es passiert etwas, es dauert nur.

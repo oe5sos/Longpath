@@ -90,6 +90,19 @@
 
 ### Fixed
 
+- **Die FFTW-Wisdom folgt jetzt `LONGPATH_CONFIG_DIR`.** Sie lief bisher
+  an der Variablen vorbei, weil sie nicht ueber `AppSettings` geht,
+  sondern direkt ueber `QStandardPaths`: eine Pruef-Instanz mit eigenem
+  Konfigurationsordner las und SCHRIEB trotzdem
+  `~/Library/Preferences/Longpath/Longpath/wdspWisdom00`, also die Datei
+  des Betreibers. Damit war ein "frisches Profil" nie wirklich frisch —
+  der Erstlauf (rund 15 Minuten FFTW) liess sich ohne Eingriff in seine
+  echten Daten gar nicht nachstellen — und eine Pruef-Instanz, die neu
+  rechnete, ueberschrieb seine Datei. Ohne die Variable bleibt alles am
+  alten Ort; jede bestehende Installation findet ihre Wisdom weiter, wo
+  sie liegt. Prueffall `tst_wisdom_dir_follows_config_dir` nagelt beide
+  Richtungen fest.
+
 - **Erstinstallation: der Verbindungswunsch ging verloren, solange die
   FFTW-Tabellen gebaut wurden.** Befund 2026-10-05 mit frischem Profil
   (ohne `wdspWisdom00`) -- also jede Erstinstallation. Im Protokoll

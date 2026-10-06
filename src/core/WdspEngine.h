@@ -172,6 +172,31 @@ public:
 
     // --- System lifecycle ---
 
+    // Der Ordner, in dem wdspWisdom00 und impulse_cache.bin liegen.
+    //
+    // Ohne LONGPATH_CONFIG_DIR unveraendert
+    // QStandardPaths::AppConfigLocation — jede bestehende Installation
+    // findet ihre Wisdom-Datei genau dort wieder, wo sie liegt.
+    //
+    // MIT der Variablen aber dort, und das ist der Punkt: die Variable
+    // gibt es, damit eine Pruef-Instanz den Konfigurationsordner des
+    // Betreibers nicht anfasst (Roadmap-Schritt 13 — eine Sandbox mit
+    // HOME= las auf macOS trotzdem die echten Einstellungen, meldete
+    // sich mit seinem Rufzeichen am DX-Cluster an und warf damit seine
+    // eigene Sitzung hinaus). Die Wisdom-Datei war von dieser Trennung
+    // bisher ausgenommen, weil sie nicht ueber AppSettings laeuft,
+    // sondern direkt ueber QStandardPaths: eine Pruef-Instanz mit
+    // "frischem Profil" las und schrieb weiter in
+    // ~/Library/Preferences/Longpath/Longpath/wdspWisdom00. Damit war
+    // ein frisches Profil nie wirklich frisch, und der Fall "Erstlauf,
+    // 15 Minuten FFTW" liess sich ohne Eingriff in die echten Daten des
+    // Betreibers gar nicht nachstellen.
+    //
+    // Preis dafuer: eine Pruef-Instanz mit eigenem Ordner rechnet ihre
+    // Wisdom einmal selbst. Das ist genau der Zustand, den sie pruefen
+    // soll.
+    static QString wisdomDir();
+
     // Check if wisdom file needs to be generated (first run).
     // If true, initialize() will take 30-60s and emit wisdomProgress.
     static bool needsWisdomGeneration(const QString& configDir);

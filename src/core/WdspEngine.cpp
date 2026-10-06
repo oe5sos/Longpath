@@ -94,6 +94,17 @@ WdspEngine::~WdspEngine()
     shutdown();
 }
 
+// Siehe den Kommentar an der Deklaration (WdspEngine.h) fuer das Warum.
+QString WdspEngine::wisdomDir()
+{
+    const QString override =
+        qEnvironmentVariable("LONGPATH_CONFIG_DIR").trimmed();
+    if (!override.isEmpty()) {
+        return override;
+    }
+    return QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
+}
+
 // Check if wisdom file needs generation (first run detection).
 // From AetherSDR AudioEngine::needsWisdomGeneration() pattern.
 bool WdspEngine::needsWisdomGeneration(const QString& configDir)

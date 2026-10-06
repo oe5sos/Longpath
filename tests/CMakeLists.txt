@@ -6687,6 +6687,14 @@ longpath_add_test(tst_connect_during_wisdom)
 # obwohl gerade gerechnet wurde.
 longpath_add_test(tst_connect_button_during_wisdom)
 
+# Die FFTW-Wisdom lief bis 2026-10-06 an LONGPATH_CONFIG_DIR vorbei: eine
+# Pruef-Instanz mit eigenem Konfigurationsordner las und schrieb trotzdem
+# die Wisdom-Datei des Betreibers. Ein "frisches Profil" war damit nie
+# wirklich frisch, und eine Pruef-Instanz, die neu rechnet, ueberschrieb
+# seine Datei. Der Prueffall nagelt beide Richtungen fest — vor allem
+# die, dass OHNE die Variable alles am alten Ort bleibt.
+longpath_add_test(tst_wisdom_dir_follows_config_dir)
+
 # Bench report 2026-07-30, second half: pans past the first did not honour the
 # display settings. A pan opening for the first time has no per-pan keys, so
 # every read fell through to the ship defaults instead of looking like the pan

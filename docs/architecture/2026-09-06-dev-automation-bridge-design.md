@@ -177,10 +177,26 @@ LONGPATH_AUTOMATION=1 ./build/Longpath.app/Contents/MacOS/Longpath
 `AppSettings::resolveConfigDir` returns that directory verbatim
 (settings, profiles, logs; no legacy-folder migration). Proof that it
 took: `longpath-<stamp>.log` appears in the sandbox directory and no
-`DxClusterClient: connecting` line follows. Still unredirected (caches
-only, read-mostly): DxClusterClient, FreeDVReporterClient, SotaClient,
-SupportBundle, ModelPaths resolve their folders straight from
-`QStandardPaths`. Applet visibility in a probe comes from the layout
+`DxClusterClient: connecting` line follows.
+
+Since 2026-10-06 the FFTW wisdom follows too (`WdspEngine::wisdomDir`).
+It did not before, because it never went through `AppSettings` — it read
+`QStandardPaths::AppConfigLocation` directly, so a probe instance with
+its own config directory still read *and wrote* the operator's
+`~/Library/Preferences/Longpath/Longpath/wdspWisdom00`. Two consequences,
+both now closed: a "fresh profile" was never actually fresh (the
+first-run case — roughly 15 minutes of FFTW planning on a MacBook Air —
+could not be reproduced without moving the operator's own file aside),
+and a probe instance that did rebuild wisdom overwrote his. The price is
+that a probe instance with its own directory now computes its wisdom
+once; that is precisely the state it exists to exercise. Without the
+variable nothing moves — `tst_wisdom_dir_follows_config_dir` pins that
+half specifically, since every existing installation has to keep finding
+its file where it lies.
+
+Still unredirected (caches only, read-mostly): DxClusterClient,
+FreeDVReporterClient, SotaClient, SupportBundle, ModelPaths resolve their
+folders straight from `QStandardPaths`. Applet visibility in a probe comes from the layout
 profile (`LayoutProfiles` JSON, `profiles[].state.visible`), not only
 from `Applet<Id>Visible` — set both when you need an applet on screen.
 
