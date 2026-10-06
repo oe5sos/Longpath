@@ -119,7 +119,7 @@ void SupportDialog::buildUI()
     auto* logInfoLayout = new QHBoxLayout();
     m_logPathLabel = new QLabel(this);
     m_logPathLabel->setStyleSheet(
-        QStringLiteral("QLabel { color: %1; font-family: monospace; font-size: 11px; }")
+        QStringLiteral("QLabel { color: %1; font-family: " LP_MONO_QSS "; font-size: 11px; }")
         .arg(Style::kTextScale));
     logInfoLayout->addWidget(m_logPathLabel, 1);
 

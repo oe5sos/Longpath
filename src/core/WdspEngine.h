@@ -123,6 +123,10 @@ class TstNrBackendsProcessAudio;
 // 2026-09-27: same pattern for the PB-SNR noise probe, which pushes
 // Gaussian noise through a real channel and reads the S meter.
 class TstPbsnrNoiseProbe;
+// 2026-10-04: same pattern for the SunSDR rate pruefstand, which drives
+// RadioModel::setStreamSampleRate through setSampleRateLive and therefore
+// has to get past its !isInitialized() guard without a wisdom load.
+class TstSunSdrBoardCaps;
 // Phase 3F Sub-Epic I closeout, defect H1: the per-stream drain-geometry
 // test primes the engine so createRxChannel can seed real RX channels.
 class TestStreamPoolBinding;
@@ -796,6 +800,8 @@ private:
     // Phase 3F: same friendship for the channel-id map test, which drives
     // RadioModel::openRxChannelPool and asserts on the ids it opened.
     friend class ::TestWdspChannelIdMap;
+    // 2026-10-04: same friendship for the SunSDR rate pruefstand.
+    friend class ::TstSunSdrBoardCaps;
     // Authoritative-TX regression: seed nonzero RX channels without the
     // asynchronous wisdom lifecycle so MOX can prove which exact ID moves.
     friend class ::TestRadioModelMoxHardwareFlip;

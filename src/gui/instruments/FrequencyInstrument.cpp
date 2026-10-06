@@ -148,7 +148,7 @@ FrequencyInstrument::FrequencyInstrument(QWidget* parent)
     m_edit->setPlaceholderText(QStringLiteral("MHz"));
     m_edit->setStyleSheet(Style::themed(QStringLiteral(
         "QLineEdit { background: %1; color: %2; border: 1px solid %3;"
-        " border-radius: 6px; font-family: Menlo; font-size: %4px; }")
+        " border-radius: 6px; font-family: " LP_MONO_QSS "; font-size: %4px; }")
         .arg(Style::kInsetBg, Style::kAmberText, Style::kBorder)
         .arg(Style::kFontReading)));
     connect(m_edit, &QLineEdit::editingFinished,

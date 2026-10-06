@@ -171,13 +171,32 @@ struct Profile {
     // Pegelabgleich des Empfangswegs in dB, auf die normierten Proben
     // (1/2^23) aufgeschlagen, bevor sie Longpath verlassen.
     //
-    // QRP: +20,0 dB, GEMESSEN am 2026-09-25 gegen ExpertSDR2 am selben
-    // Geraet im selben Zustand (echtes I/Q, Preamp 0 dB, 20 m, 3 kHz,
-    // ohne Antenne): ExpertSDR2 zeigt im Mittel -127,9 dBm Rauschen
-    // (-127,5 / -127,8 / -127,9 / -128,3), Longpath ohne Abgleich
-    // -147,9 dBm (TCI rx_sensors). Ohne diesen Abgleich klingt Longpath
-    // im richtigen I/Q-Betrieb "ganz leise" bis "kein Ton" -- die AGC
-    // hebt Rauschen bei -148 dBm nicht hoerbar an.
+    // QRP: +40,0 dB.
+    //
+    // Die Zahl stand bis zum 2026-10-04 auf +20,0 -- gemessen am
+    // 2026-09-25 gegen ExpertSDR2, aber ueber den TCI-Weg (rx_sensors).
+    // Der NATIVE Treiber ist ein anderer Weg mit anderer Skalierung, und
+    // dort reichten die 20 dB bei Weitem nicht: der Betreiber meldete
+    // den Empfang mehrfach als "sehr sehr leise" ("ich muss voll
+    // aufdrehen, dass ich etwas hoere"; "bei der haelfte, sprich 50 %
+    // faengt man an, etwas zu hoeren"), waehrend ExpertSDR2 am SELBEN
+    // Geraet ohne Antenne "perfekt" laut war -- es lag also nicht an der
+    // fehlenden Antenne.
+    //
+    // +40,0 dB ist nicht geraten, sondern vom Betreiber am 2026-10-04 am
+    // echten Geraet eingestellt worden: der Abgleich wurde ueber
+    // LONGPATH_SUNSDR_PEGEL einstellbar gemacht, er hat 40 gefahren und
+    // bestaetigt "die lautstaerke passt". Im Log seines Laufs steht
+    // "SunSdr: Pegelabgleich 40.0 dB (eingestellt)".
+    //
+    // Die alte Begruendung bleibt gueltig, nur die Groesse war zu klein:
+    // ExpertSDR2 zeigt im Mittel -127,9 dBm Rauschen (-127,5 / -127,8 /
+    // -127,9 / -128,3), Longpath ohne Abgleich -147,9 dBm. Ohne Abgleich
+    // klingt Longpath "ganz leise" bis "kein Ton" -- die AGC hebt
+    // Rauschen bei -148 dBm nicht hoerbar an.
+    //
+    // Seine Anforderung dazu, woertlich: "rauschen muss immer zu hoeren
+    // sein".
     //
     // Vorbild fuer die Groessenordnung: ArtemisSDR gleicht das S-Meter
     // der SunSDR2 DX um +18,98 dB an, ebenfalls gegen die Hersteller-
@@ -205,7 +224,7 @@ inline constexpr Profile kProfilePro{
 // BoardCapabilities' QRP-Zeile.
 inline constexpr Profile kProfileQrp{
     Variant::Qrp, "SunSDR2 QRP", 50001, 50002, 0x03, 48000.0,
-    /*rxLevelTrimDb=*/20.0};
+    /*rxLevelTrimDb=*/40.0};
 
 // From ArtemisSDR sunsdr.h:28 [@f8b01d25c5]. Second magic byte, fixed
 // across every model/profile — only byte[0] varies.
@@ -292,8 +311,13 @@ struct IqHeader {
 // themselves; this function only builds the header ArtemisSDR itself
 // builds separately from the payload (sunsdr_build_iq_header takes no
 // payload pointer at all).
+// payloadLen ist das LAENGENFELD des Kopfes, nicht die Groesse des
+// Rueckgabewerts -- der ist immer die 10 Byte des Kopfes. Standard ist die
+// volle Nutzlast; 0 baut den BLOSSEN KOPF, den ExpertSDR2 am 2026-10-05 im
+// Mitschnitt auf jeden zweiten Block schickt (03 ff fe ff 00 00 .. .. 01 00).
 QByteArray buildIqHeader(const Profile& profile, quint8 opcode, quint16 seq,
-                         quint8 byte8, quint8 byte9);
+                         quint8 byte8, quint8 byte9,
+                         int payloadLen = kIqPayloadSize);
 
 // Parses a 10-byte IQ-stream header. Same magic-byte validation
 // discipline as parseControlHeader.
@@ -477,6 +501,69 @@ enum class AntennaPort { A1, A2, A3 };
 // three ports alike, per the design doc's own closing caveat.
 bool buildAntennaSelectFrame(const Profile& profile, AntennaPort port,
                               bool forTx, QByteArray* out);
+
+// ── Der Stromstart 0x01: hier steht die Abtastrate ──────────────────
+//
+// Am 2026-10-03 aus einem ExpertSDR2-Mitschnitt gemessen, in dem die Rate
+// zweimal umgeschaltet wurde (docs/architecture/
+// 2026-10-02-sunsdr-verbindungsablauf.md): der EINZIGE Rahmen, der sich
+// dabei aendert, ist 0x01 -- derselbe, den Longpath beim Verbinden schon
+// schickt. Drei Nutzlasten sind belegt:
+//
+//   01000000 0c080403 02020202   ein Strom,    48 kHz   (Longpath heute)
+//   02000000 0c080403 02020202   zwei Stroeme, je  48 kHz
+//   02010000 0a060403 02020201   zwei Stroeme, je  96 kHz
+//
+// Am 2026-10-03 am echten Geraet durchgemessen, alle drei, Verlust null:
+//
+//   01...  239 Folgenummern/s  -> ein Strom,   48 kHz    (1x Daten)
+//   0200.. 480 Folgenummern/s  -> zwei Stroeme, je 48 kHz (2x)
+//   0201.. 958 Folgenummern/s  -> zwei Stroeme, je 96 kHz (4x)
+//
+// Erstes Byte = Zahl der Stroeme, zweites = Ratenstufe. Im Mitschnitt von
+// ExpertSDR2 standen die Kanaele auf verschiedenen Raten (48+96 bzw.
+// 96+144); mit NUR diesem Rahmen kommen beide gleich schnell. Was den
+// Unterschied macht, steht in einem der anderen sechzehn Rahmen, die
+// ExpertSDR2 schickt -- fuer die vierfache Datenmenge braucht man es
+// nicht.
+//
+// Das erste Byte ist die Zahl der Stroeme; es erscheint im Stromkopf als
+// byte8 wieder, und byte9 traegt dort den Index (gemessen: Longpath sieht
+// 0100, ExpertSDR2 0200/0201).
+//
+// Was die Bytes 0c 08 04 03 gegen 0a 06 04 03 codieren, ist NICHT
+// entschluesselt. Darum gibt es hier keine Funktion, die aus einer
+// gewuenschten Rate einen Rahmen RECHNET -- nur die drei gemessenen
+// Zustaende, byte-fuer-byte wie aufgezeichnet. Eine gerechnete Rate waere
+// geraten, und das geht an ein Funkgeraet nicht hinaus.
+enum class StromModus {
+    EinStrom48,        // Longpath heute
+    ZweiStroemeJe48,
+    ZweiStroemeJe96,
+};
+
+// Die Nutzlast (12 Byte) zum Modus. Der vollstaendige Rahmen entsteht mit
+// buildControlHeader(profile, 0x01, 0, 12) + Nutzlast + withControlFrameCrc;
+// gegengeprueft, dass das byte-fuer-byte den aufgezeichneten Rahmen ergibt
+// (tst_sunsdr_protocol).
+QByteArray stromModusPayload(StromModus modus);
+
+// Der fertige Rahmen zum Modus.
+QByteArray buildStromStartFrame(const Profile& profile, StromModus modus);
+
+// ── Der Stopp-Befehl 0x02 ───────────────────────────────────────────
+//
+// Am 2026-10-03 aus dem Mitschnitt rate-umschalten.pcap gelesen: beim
+// Beenden schickt ExpertSDR2 zwei Rahmen, 0x06 mit 0 (MOX aus) und 0x02
+// mit 0 -- und das LETZTE Strompaket liegt in derselben Millisekunde wie
+// 0x02. Danach ist die QRP still. ArtemisSDR fuehrt 0x02 als
+// SUNSDR_OP_POWER_OFF (sunsdr.h:32 [@f8b01d25c5]), was dazu passt.
+//
+// Warum das zaehlt: Longpaths disconnect() sagt dem Geraet bis heute
+// NICHTS. Gemessen am 2026-10-03: die QRP streamt danach unbegrenzt
+// weiter, 1940 Pakete/s und 2,3 MB/s ins Leere, bis sie ausgeschaltet
+// wird -- und in diesem Zustand laesst sie sich schlecht neu verbinden.
+QByteArray buildStopFrame(const Profile& profile);
 
 // Builds the 0x17 drive-byte control frame: a bare 0-255 passthrough,
 // u32 payload = raw0to255 (design doc line 984: "u32, low byte =

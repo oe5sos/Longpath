@@ -38,6 +38,38 @@
 
 namespace Longpath::Style {
 
+/// Dieselbe Schriftwahl wie monoFont(), aber fuer Stilvorlagen (QSS).
+///
+/// Warum es das geben muss: am 2026-10-06 stand im Protokoll
+///
+///     Populating font family aliases took N ms. Replace uses of missing
+///     font family "SF Mono" with one that exists.
+///
+/// Nachgezaehlt gab es dann ACHT verschiedene Schreibweisen fuer
+/// dieselbe Absicht, und auf dem Mac des Betreibers kamen dabei VIER
+/// verschiedene Schriften heraus:
+///
+///     'SF Mono', Menlo, monospace        12x  -> Menlo
+///     monospace                          12x  -> Qt-Vorgabe
+///     'ui-monospace','Menlo','Consolas'   3x  -> Menlo
+///     Menlo                               2x  -> Menlo
+///     Menlo, monospace                    1x  -> Menlo
+///     Menlo, Consolas, monospace          1x  -> Menlo
+///     Consolas, 'Courier New', monospace  1x  -> COURIER NEW
+///     'Monaco','Menlo',monospace          1x  -> MONACO
+///     QFont("SF Mono") ohne Rueckfall     1x  -> gar nicht Monospace
+///     QFont("Consolas") ohne Rueckfall    1x  -> gar nicht Monospace
+///
+/// SF Mono ist auf dem Mac NICHT als Familie ansprechbar (geprueft:
+/// 0 Treffer in system_profiler, Menlo 26). Consolas ist Windows. Wer
+/// sie ohne Rueckfall nennt, bekommt die proportionale Vorgabeschrift --
+/// und genau das sah der Betreiber.
+///
+/// Als Makro, damit es sich an Zeichenkettenliterale anfuegen laesst:
+///     "QLabel { font-family: " LP_MONO_QSS "; }"
+#define LP_MONO_QSS "Menlo, 'DejaVu Sans Mono', monospace"
+
+
 // ── Entblaut, 2026-08-15 ──────────────────────────────────────────────
 //
 // „nach [der Vorlage] sieht das aber nicht aus" — OE5SOS, mit einem Screenshot,
@@ -1005,7 +1037,7 @@ inline QString insetValueStyle()
     // die dunkle Kante, unten Licht, Monospace fuer die Zahl (Regel 4).
     return QStringLiteral(
         "QLabel {"
-        "  font-size: 11px; font-family: Menlo; background: %1; border: 1px solid %2;"
+        "  font-size: 11px; font-family: " LP_MONO_QSS "; background: %1; border: 1px solid %2;"
         "  border-top-color: %4; border-bottom-color: %5;"
         "  border-radius: %6px; padding: 1px 4px; color: %3;"
         "}"
@@ -1325,14 +1357,24 @@ inline QFont capsFont(const QFont& base, int px = kFontCaption)
     return f;
 }
 
+
 /// Eine Zahl, die sich aendert: Monospace, damit Stellen untereinander
 /// stehen. HAUSSTIL.md §Die acht Regeln, Regel 2.
+///
+/// Haelt dieselbe Familie wie LP_MONO_QSS. Wer eine aendert, aendert
+/// beide -- tst_schriftfamilien faengt das Auseinanderlaufen.
 inline QFont monoFont(const QFont& base, int px, QFont::Weight w = QFont::Normal)
 {
     QFont f = base;
     f.setPixelSize(px);
     f.setWeight(w);
-    f.setFamily(QStringLiteral("Menlo"));
+    // setFamilies statt setFamily: die ganze Rueckfallkette, dieselbe wie
+    // LP_MONO_QSS. Mit setFamily() stand hier nur "Menlo" -- auf einem
+    // Rechner ohne Menlo nahm Qt die naechstbeste Schrift, und das war
+    // nicht zwingend eine dicktengleiche.
+    f.setFamilies({QStringLiteral("Menlo"),
+                   QStringLiteral("DejaVu Sans Mono"),
+                   QStringLiteral("monospace")});
     // Menlo gibt es nur auf dem Mac. Ohne diesen Hinweis nahm Qt unter
     // Windows/Linux eine proportionale Schrift, und die Stellen tanzten
     // doch (2026-09-27).
@@ -1367,7 +1409,15 @@ inline QFont monoFontPt(int pt, QFont::Weight w = QFont::Normal)
     QFont f;
     f.setPointSize(pt);
     f.setWeight(w);
-    f.setFamily(QStringLiteral("Menlo"));
+    // setFamilies statt setFamily, dieselbe Kette wie monoFont() und
+    // LP_MONO_QSS. Mit setFamily stand hier nur "Menlo" -- auf einem
+    // Rechner ohne Menlo nahm Qt die naechstbeste Schrift, und die muss
+    // keine dicktengleiche sein. Der Pruefstand
+    // tst_schrift_dicktengleich misst auf DIESEM Mac, auf dem es Menlo
+    // gibt; die Kette ist fuer die anderen.
+    f.setFamilies({QStringLiteral("Menlo"),
+                   QStringLiteral("DejaVu Sans Mono"),
+                   QStringLiteral("monospace")});
     f.setStyleHint(QFont::TypeWriter);
     f.setFixedPitch(true);
     return f;

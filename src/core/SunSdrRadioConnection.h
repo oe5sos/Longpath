@@ -205,6 +205,11 @@ public:
     // oder 1 (RX2) -- der Rahmen, der die QRP auf echtes I/Q schaltet.
     static QByteArray ddcFrequencyFrame(int subReceiver, quint64 frequencyHz);
     quint16 lastBlockReplySeqForTest() const { return m_lastBlockReplySeq; }
+    // Wie viele der Antworten blosse Koepfe waren (10 Byte statt 1210) und
+    // wie gross die letzte Antwort war -- die Kopfantwort laesst sich nur
+    // an der GROESSE pruefen, nicht an der Zahl.
+    quint64 bareBlockRepliesSentForTest() const { return m_bareBlockRepliesSent; }
+    int lastBlockReplyBytesForTest() const { return m_lastBlockReplyBytes; }
 
     // Exposes the private data-watchdog silence threshold, same
     // rationale as connectTimeoutMsForTest() above.
@@ -590,6 +595,9 @@ private:
     QUdpSocket* m_controlSocket{nullptr};
     QUdpSocket* m_streamSocket{nullptr};
     QTimer*     m_connectWatchdog{nullptr};
+    QTimer*     m_erneutTimer{nullptr};   // naechster Suchversuch
+    int         m_sucheVersuch{0};
+    bool        m_sucheWiederholung{true};
 
     static constexpr int kConnectTimeoutMs = 3000;
 
@@ -702,7 +710,45 @@ private:
     QElapsedTimer m_streamStartTimer;
     int m_singleChannelHoldMs{2000};
     quint16 m_lastBlockReplySeq{0};
+    quint64 m_bareBlockRepliesSent{0};
+    int m_lastBlockReplyBytes{0};
     bool blockReplyEnabled();
+
+    // ── Kopfantwort: jeden ZWEITEN Block nur mit dem Kopf beantworten ──
+    //
+    // Am 2026-10-05 aus Martins Mitschnitten herausgelesen (expert-A/B und
+    // expert-96k, alle drei gleich): ExpertSDR2 beantwortet jeden Block des
+    // Geraets, aber abwechselnd
+    //
+    //   ungerade Nummer -> voller Stilleblock, Laengenfeld 1200 (1210 Byte)
+    //   gerade Nummer   -> BLOSSER KOPF,       Laengenfeld 0    (10 Byte)
+    //
+    // gemessen als 240/s + 240/s gegen 480/s vom Geraet. Longpath schickt
+    // bisher auf JEDEN Block den vollen Block, also rund das Doppelte an
+    // Rueckweg-Bytes.
+    //
+    // Warum das hier steht und nicht gleich die Vorgabe ist: es ist die
+    // erste konkrete Spur zu den ~110 Wiederholungen je Sekunde bei 96 kHz
+    // (drei andere Vermutungen sind gemessen und widerlegt, siehe
+    // docs/architecture/2026-10-02-sunsdr-verbindungsablauf.md). Gemessen
+    // ist aber nur, was ExpertSDR2 TUT -- nicht, dass es hilft.
+    //
+    // Am 2026-10-05 am Geraet A/B gemessen, je 60 s bei 96 kHz mit zwei
+    // Empfaengern:
+    //
+    //     ohne Kopfantwort:  996 Antworten/s, alle 1210 Byte
+    //                        Wiederholungen 193..219/s (Mittel 207)
+    //     mit Kopfantwort:   996 Antworten/s, 504/s davon 10 Byte
+    //                        Wiederholungen 200..222/s (Mittel 214)
+    //
+    // Ergebnis in einem Satz: an den Wiederholungen aendert es NICHTS --
+    // das ist die vierte widerlegte Vermutung. Es spart aber den halben
+    // Rueckweg: 30265 blosse Koepfe in 60 s sind rund 36 MB, also knapp
+    // 5 Mbit/s weniger. Deshalb ist die Vorgabe seitdem AN;
+    // LONGPATH_SUNSDR_KOPFANTWORT=0 schaltet aus.
+    bool kopfAntwortEnabled();
+    bool m_kopfAntwortChecked{false};
+    bool m_kopfAntwortOn{false};
     void replyToBlock(quint16 seq);
 
     // ── Mithoeren: was das Geraet von sich aus meldet ────────────────────
@@ -806,7 +852,93 @@ private:
     // es bisher nur mit LONGPATH_SUNSDR_PROBE gab: im Log steht, ob
     // gerade eine oder acht Kopien je Nummer ankommen, also ob die
     // Blockantwort wirkt.
-    void auditStreamSeq(quint16 seq);
+    // ── Zwei Stroeme, und mehrere Pakete je Folgenummer ─────────────────
+    //
+    // Am 2026-10-03 aus einem ExpertSDR2-Mitschnitt gemessen (Blatt
+    // 2026-10-02-sunsdr-verbindungsablauf.md): die QRP kann ZWEI Stroeme
+    // gleichzeitig schicken, mit verschiedenen Raten, und sie
+    // unterscheidet sie im Stromkopf an byte9:
+    //
+    //   0x01-Nutzlast 02000000 ...:  byte9=0 -> 48 kHz, byte9=1 ->  96 kHz
+    //   0x01-Nutzlast 02010000 ...:  byte9=0 -> 96 kHz, byte9=1 -> 144 kHz
+    //
+    // Dazu traegt ein Strom ueber 48 kHz MEHRERE Pakete je Folgenummer
+    // (bei 96 kHz zwei, bei 144 kHz im Mittel 1,5) -- und die tragen
+    // VERSCHIEDENE Proben. Longpath bekommt heute einen Strom mit 48 kHz
+    // (byte8=1, byte9=0), weil es im 0x01-Rahmen 01000000 schickt.
+    //
+    // Dieser Umbau macht den Weg bereit, OHNE am heutigen Betrieb etwas
+    // zu aendern: bei byte8 = 1 ist der Kanal immer 0 und jede
+    // Wiederholung bleibt eine Wiederholung. Erst wenn der 0x01-Rahmen
+    // umgestellt wird, treten die neuen Faelle auf.
+    //
+    // Wiederholung oder Fortsetzung? Das entscheidet der INHALT, nicht die
+    // Nummer -- und zwar belegt: bei 48 kHz sind die Kopien einer Nummer
+    // GANZ bytegleich (2026-09-23: 1683 von 1683), bei 96 kHz tragen die
+    // zwei Pakete einer Nummer verschiedene Proben. Verglichen wird nur,
+    // wenn die Nummer wiederkehrt, also selten.
+    static constexpr int kMaxKanaele = 4;
+    struct KanalZustand {
+        bool gesehen{false};
+        quint16 letzteNummer{0};
+        QByteArray letzteNutzlast;   // nur fuer den Vergleich bei gleicher Nummer
+        quint64 pakete{0};
+        quint64 fortsetzungen{0};
+        quint64 verworfen{0};        // kein Empfaenger fuer diesen Kanal
+        // KEINE eigenen Folgenummern je Kanal -- am 2026-10-03 am Geraet
+        // widerlegt. Der Pruefstand hatte angenommen, zwei Stroeme haetten
+        // eigene Nummernraeume; der Versuch mit zwei Stroemen zeigt das
+        // Gegenteil:
+        //
+        //   0(1) 1(2) 2(1) 3(2) 4(1) 5(2) 6(1) 7(2) ...
+        //
+        // Die Nummern laufen GLOBAL fortlaufend, und byte9 sagt nur, zu
+        // welchem Strom ein Paket gehoert. Je Kanal gezaehlt sah jeder
+        // Kanal nur jede zweite Nummer -- und der Zaehler meldete 50 %
+        // Verlust bei einem vollkommen gesunden Strom.
+    };
+    KanalZustand m_kanal[kMaxKanaele];
+
+    // Welcher Kanal gehoert zu diesem Stromkopf? byte8 ist die Zahl der
+    // Stroeme (1 bei Longpath heute, 2 bei ExpertSDR2), byte9 der Index.
+    static int kanalVon(const SunSdr::IqHeader& hdr)
+    {
+        if (hdr.byte8 < 2) { return 0; }
+        return (hdr.byte9 < kMaxKanaele) ? int(hdr.byte9) : 0;
+    }
+
+    // ── Welcher Strommodus beim Verbinden gesetzt wird ──────────────────
+    //
+    // Vorgabe ist EinStrom48, also genau das, was dieser Treiber seit dem
+    // 2026-08-26 schickt. Umgestellt wird NUR ueber die Umgebung:
+    //
+    //   LONGPATH_SUNSDR_STROMMODUS=48       (Vorgabe)
+    //   LONGPATH_SUNSDR_STROMMODUS=je48     zwei Stroeme, je 48 kHz  (2x Daten)
+    //   LONGPATH_SUNSDR_STROMMODUS=je96     zwei Stroeme, je 96 kHz  (4x Daten)
+    //
+    // Warum nicht als Einstellung in der Oberflaeche: die Rate ist am
+    // 2026-10-03 aus einem Mitschnitt gewonnen und am Geraet noch NICHT
+    // gegengeprueft. Was oben mit dem zweiten Kanal passiert, ist auch
+    // noch offen -- BoardCapabilities fuehrt weiter maxReceivers = 1.
+    // Erst wenn beides steht, gehoert das in die Oberflaeche; bis dahin
+    // ist es ein Versuch, und ein Versuch wird ausdruecklich gewaehlt.
+    SunSdr::StromModus stromModusAusUmgebung() const;
+    // Der Modus dieser Sitzung. Vorbelegt aus der Umgebung, umgestellt von
+    // setSampleRate.
+    SunSdr::StromModus m_stromModus{SunSdr::StromModus::EinStrom48};
+    // Wie viele Kanaele oben ueberhaupt einen Empfaenger haben.
+    int m_aktiveEmpfaenger{1};
+
+    // Die zuletzt gewuenschte Rate; zusammen mit der Empfaengerzahl
+    // ergibt sie den Stromstart-Modus (stromModusNachziehen).
+    int m_rateHz{48000};
+
+    // Einmal je Sitzung melden, dass die Leistung nicht gestellt wird.
+    bool m_txDriveGemeldet{false};
+    bool m_preampSchalterGemeldet{false};
+    quint64 m_stoppGeschickt{0};
+
+    void auditStreamSeq(int kanal, quint16 seq, quint64 inhalt);
     // Schliesst das 5-s-Fenster: meldet nach oben und schreibt ins Log.
     void berichteFolgenummern();
 
@@ -865,9 +997,14 @@ private:
     static constexpr int kSeqRestartAfter = 3;
 
     bool m_seqSeen{false};
-    quint16 m_lastSeq{0};        // hoechste gesehene Nummer
-    QList<quint16> m_seqRing;    // die letzten Nummern, fuer Wiederholungen
-    int m_seqOutOfPlace{0};      // wie viele Pakete in Folge zu nichts passen
+    quint16 m_lastSeq{0};        // hoechste gesehene Nummer, ueber alle Stroeme
+    // Die letzten Nummern MIT einem Merkmal ihres Inhalts. Ohne das
+    // Merkmal galt jede wiederkehrende Nummer als bytegleiche Kopie --
+    // am 2026-10-04 aus einem Mitschnitt widerlegt (0 % Kopien auf dem
+    // Draht, 1,41 gemeldet).
+    QList<QPair<quint16, quint64>> m_seqRing;
+    int m_seqOutOfPlace{0};      // Pakete in Folge, die zu nichts passen
+
     quint64 m_iqSeqWndRestarts{0};
     quint64 m_iqSeqWndFrames{0};
     quint64 m_iqSeqWndRepeats{0};
@@ -947,6 +1084,34 @@ private:
     // Deckel gegen Anwachsen, falls ein Geraet gar nicht quittiert.
     static constexpr int kMaxOffeneRahmen = 32;
 
+    // Der Stopp beim Trennen wird nachgeschickt, solange er unquittiert
+    // bleibt. Hintergrund (2026-10-04): die QRP bedient EINEN Client und
+    // haelt die Sitzung fest. Geht der Stopp verloren -- oder wird die
+    // Instanz hart beendet --, bleibt sie an den Toten gebunden und
+    // antwortet auf neue Suchmeldungen nicht mehr ("no beacon reply").
+    // Der Betreiber kam eine halbe Stunde nicht mehr herein; erst Aus-
+    // und Einschalten half.
+    //
+    // Drei Versuche a 150 ms kosten im schlimmsten Fall 450 ms beim
+    // Trennen und sind unschaedlich: der Stopp verstellt nichts, er
+    // meldet nur ab.
+    // Obergrenze beim Trennen: kStoppVersuche * (kStoppQuittungFristMs +
+    // 200 ms waitForBytesWritten) = rund EINE SEKUNDE, wenn das Geraet
+    // gar nicht mehr antwortet (abgezogen, abgestuerzt). Das blockiert
+    // den Verbindungsfaden und damit auch das Programmende. Bewusst in
+    // Kauf genommen: ein unquittierter Stopp kostet den Betreiber eine
+    // Minute Sperre (siehe die Messung im Verbindungsablauf-Dokument),
+    // eine Sekunde beim Beenden kostet ihn nichts.
+    // Selbsttaetige Wiederholung der Suche. Das Geraet sperrt nach einem
+    // abrupten Programmende rund eine Minute (am 2026-10-04 gemessen);
+    // fuenf Anlaeufe im Abstand von 18 s decken sie ab, ohne dass der
+    // Betreiber klicken muss.
+    static constexpr int kSucheVersuche = 5;
+    static constexpr int kSuchePauseMs = 18000;
+
+    static constexpr int kStoppVersuche = 3;
+    static constexpr qint64 kStoppQuittungFristMs = 150;
+
     QList<OffenerRahmen> m_offeneRahmen;
     quint64 m_quittungenGesehen{0};
     quint64 m_rahmenOhneQuittung{0};
@@ -958,6 +1123,8 @@ private:
     void sendeSteuerrahmen(const QByteArray& frame, const char* grund,
                            bool nachschickbar = true);
     void pruefeOffeneRahmen();
+    bool rahmenNochOffen(quint8 opcode) const;
+    void stromModusNachziehen();
 
     // ── Uebersteuerung aus dem I/Q erkennen ─────────────────────────────
     //
@@ -992,6 +1159,33 @@ private:
     quint64 m_anschlagMeldungen{0};
 
     void pruefeAnschlag(const QVector<float>& samples);
+
+    // ── Mikrofon-PTT am Geraet erkennen ─────────────────────────────────
+    //
+    // Die zweite der zwei Empfangsluecken, und sie geht genauso ohne
+    // Protokollwissen wie die Uebersteuerung: P1 und P2 lesen das PTT aus
+    // einem Statusbit, die QRP schickt keine Statusrahmen -- aber ihr
+    // Stromkopf traegt den Betriebszustand. 0xFE heisst Empfang, 0xFD
+    // heisst SENDEN (SunSdrProtocol.h: "0xFE = RX-state/idle-TX,
+    // 0xFD = TX-active"). Drueckt jemand am Geraet die Mikrofontaste,
+    // wechselt der Opcode -- und dieser Treiber hat ihn bisher nur dazu
+    // benutzt, solche Pakete wegzuwerfen.
+    //
+    // Gemeldet wird die FLANKE, nicht jedes Paket. P1/P2 melden den
+    // Zustand mit jedem Statusrahmen, und MoxController::onMicPttFromRadio
+    // ist gegen Wiederholungen gleichgueltig -- bei 240 Strompaketen je
+    // Sekunde waeren 240 Signale ueber eine QueuedConnection aber nichts
+    // als Last.
+    //
+    // Nicht gemeldet wird, was Longpath selbst ausgeloest hat: steht MOX
+    // auf uns, ist der Sendezustand unser eigener und kein PTT vom Geraet.
+    // Heute kann der Fall nicht eintreten (kein Byte des Sendepfads
+    // erreicht den Draht), aber die Unterscheidung gehoert an die Stelle,
+    // die sie trifft -- nicht in den Empfaenger.
+    bool m_geraetSendet{false};
+    quint64 m_mikrofonPttFlanken{0};
+
+    void pruefeMikrofonPtt(quint8 streamOpcode);
 
     void berichteMithoeren();
     void noteControlFrame(const QByteArray& data);
@@ -1054,8 +1248,24 @@ public:
     quint64 rahmenOhneQuittungForTest() const { return m_rahmenOhneQuittung; }
     quint64 anschlagProbenForTest() const { return m_anschlagProben; }
     quint64 anschlagMeldungenForTest() const { return m_anschlagMeldungen; }
+    bool geraetSendetForTest() const { return m_geraetSendet; }
+    quint64 mikrofonPttFlankenForTest() const { return m_mikrofonPttFlanken; }
+    quint64 kanalPaketeForTest(int k) const
+    { return (k >= 0 && k < kMaxKanaele) ? m_kanal[k].pakete : 0; }
+    int stromModusForTest() const { return int(m_stromModus); }
+    int aktiveEmpfaengerForTest() const { return m_aktiveEmpfaenger; }
+    quint64 stoppGeschicktForTest() const { return m_stoppGeschickt; }
+    quint64 kanalVerworfenForTest(int k) const
+    { return (k >= 0 && k < kMaxKanaele) ? m_kanal[k].verworfen : 0; }
+    quint64 kanalFortsetzungenForTest(int k) const
+    { return (k >= 0 && k < kMaxKanaele) ? m_kanal[k].fortsetzungen : 0; }
     quint64 rahmenWiederholtForTest() const { return m_rahmenWiederholt; }
     int offeneRahmenForTest() const { return int(m_offeneRahmen.size()); }
+
+    /// Pruef-Naht (2026-10-04): die selbsttaetige Wiederholung der Suche
+    /// abschalten. Prueflinien, die den FEHLSCHLAG pruefen, wollen ihn
+    /// sofort sehen und nicht neunzig Sekunden darauf warten.
+    void setSucheWiederholungEnabledForTest(bool an) { m_sucheWiederholung = an; }
 };
 
 } // namespace Longpath

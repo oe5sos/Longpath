@@ -964,8 +964,20 @@ std::unique_ptr<IAudioBus> AudioEngine::makeMonitorOut(const QString& targetNode
 
 void AudioEngine::ensureSpeakersOpen()
 {
-    if (m_speakersBus && m_speakersBus->isOpen()) {
+    if (m_speakersBus && m_speakersBus->isAlive()) {
         return;
+    }
+    if (m_speakersBus) {
+        // Geoeffnet, aber tot: das ist der Fall vom 2026-10-04 -- Ton im
+        // Programm, nichts aus den Lautsprechern. Vorher hat isOpen() hier
+        // "ja" gesagt und der tote Strom blieb stehen. Jetzt wird er
+        // weggeraeumt und darunter neu geoeffnet.
+        qCWarning(lcAudio)
+            << "Lautsprecher: der Ausgang war geoeffnet, lebt aber nicht "
+               "mehr (Geraet gewechselt, Rate umgestellt oder Ruhezustand) "
+               "-- er wird neu geoeffnet.";
+        m_speakersBus->close();
+        m_speakersBus.reset();
     }
     if (!m_paInitialized) {
         return;

@@ -233,6 +233,7 @@ longpath_add_test(tst_setup_helpers)
 longpath_add_test(tst_smoke)
 
 # ── Issue #75: receiver leak across disconnect/reconnect ──────────────────
+longpath_add_test(tst_sunsdr_zweiter_empfaenger_oben)
 longpath_add_test(tst_receiver_manager_reconnect)
 
 # ── HL2 connect-init parity: spectrum DDC center push (Bug 1) ─────────────
@@ -342,6 +343,17 @@ longpath_add_test(tst_fft_window_after_gap)
 longpath_add_test(tst_nnr_without_model)
 if(TEST tst_nnr_without_model)
     set_tests_properties(tst_nnr_without_model PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
+
+# ── Waechter gegen das Auseinanderlaufen der Schriftwahl (2026-10-06) ──
+# Liest den Quelltext: jede Stilvorlage muss LP_MONO_QSS benutzen, und
+# keine QFont darf eine Familie ohne Rueckfallkette nennen. Anlass war
+# die Protokollzeile "missing font family SF Mono" -- dahinter steckten
+# acht Schreibweisen und vier verschiedene Schriften auf dem Schirm.
+longpath_add_test(tst_schriftfamilien)
+if(TEST tst_schriftfamilien)
+    set_tests_properties(tst_schriftfamilien PROPERTIES
         ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
 endif()
 
@@ -1369,6 +1381,7 @@ longpath_add_test(tst_audio_engine_vax_tee)
 # Covers setMasterMuted / masterMuted / masterMutedChanged. Verifies the
 # rxBlockReady mute check gates ONLY the speakers push (VAX taps must keep
 # running so 3rd-party consumer apps don't hear the local monitor mute).
+longpath_add_test(tst_audio_engine_dead_speakers)
 longpath_add_test(tst_audio_engine_master_mute)
 
 # ── Phase 3O Sub-Phase 10 Task 10b: MasterOutputWidget ──────────────────────

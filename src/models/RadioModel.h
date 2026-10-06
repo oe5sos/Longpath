@@ -706,9 +706,19 @@ public:
     /// Protocol 1 encodes the rate as srBits in C&C bank 0
     /// (P1RadioConnection::composeCcBank0 takes a single sampleRate), so every
     /// stream shares it and setStreamSampleRate fans a change across all of
-    /// them. Protocol 2 carries a per-DDC rate in DdcAssignment::rate[]. UI
-    /// that offers the rate from a per-slice surface has to disclose the P1
-    /// scope rather than imply a private rate. False when disconnected.
+    /// them. Die SunSDR ebenso: ihr Stromstart-Rahmen 0x01 traegt einen Modus
+    /// fuer das ganze Geraet (SunSdrProtocol.h, StromModus). Protocol 2
+    /// carries a per-DDC rate in DdcAssignment::rate[]. UI that offers the
+    /// rate from a per-slice surface has to disclose the radio-wide scope
+    /// rather than imply a private rate. False when disconnected.
+    ///
+    /// Das ist nicht nur eine Beschriftung: nur fuer "radio-wide" schickt
+    /// setStreamSampleRate die Aenderung ueber setSampleRateLive auf den
+    /// Draht. Der Weg fuer eine Rate je DDC ist der DdcAssignment-Push, und
+    /// der bedient ausschliesslich P2 (invokeCodecDdcAssignment). Eine
+    /// Verbindung, die hier faelschlich false meldet, stellt ihren
+    /// Empfangskanal um und laesst das Geraet auf der alten Rate stehen
+    /// (2026-10-04 an der SunSDR2 QRP gemessen).
     bool sampleRateIsRadioWide() const;
 
     /// Sample rates the connected radio accepts, ascending; empty when

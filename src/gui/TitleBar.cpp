@@ -586,7 +586,7 @@ TitleBar::TitleBar(AudioEngine* audio, QWidget* parent)
     m_utcLabel->setToolTip(tr("UTC time"));
     m_utcLabel->setStyleSheet(Style::themed(QStringLiteral(
         "QLabel { color: %1; font-size: 11px;"
-        " font-family: 'SF Mono', Menlo, monospace; }")
+        " font-family: " LP_MONO_QSS "; }")
             .arg(QString::fromLatin1(Style::kTextSecondary))));
     m_hbox->addWidget(m_utcLabel);
     m_hbox->addSpacing(24);

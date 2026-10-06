@@ -137,6 +137,18 @@ private:
     QJsonObject doConnect(const QString& macKeyOrEmpty);
     QJsonObject doDisconnect();
 
+    /// Eine Scheibe anlegen (2026-10-04). Ohne das haengt jede
+    /// Live-Pruefung mit zwei Empfaengern an einem Mausklick auf das
+    /// Plus -- und genau die stand heute an: der zweite Strom der QRP
+    /// kommt oben erst an, wenn sich eine zweite Scheibe an ihn bindet.
+    QJsonObject doAddSlice();
+
+    /// Die Frequenz einer Scheibe stellen (2026-10-04). Zusammen mit
+    /// doAddSlice() macht das den Live-Beleg fuer zwei Empfaenger ohne
+    /// Mausklick moeglich: eine zweite Scheibe weit genug weg zwingt
+    /// einen zweiten Strom, statt sich den ersten zu teilen.
+    QJsonObject doSetFrequency(int sliceId, double hz);
+
     QLocalServer* m_server{nullptr};
     QPointer<RadioModel> m_radioModel;
 };

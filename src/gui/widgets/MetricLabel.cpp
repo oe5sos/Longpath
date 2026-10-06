@@ -1,4 +1,5 @@
 #include "MetricLabel.h"
+#include "gui/StyleConstants.h"   // LP_MONO_QSS
 #include "gui/styles/ThemeQss.h"
 
 #include <QHBoxLayout>
@@ -43,10 +44,10 @@ void MetricLabel::applyStyle()
 {
     setStyleSheet(Style::themed(QStringLiteral(
         "QLabel#MetricLabel_Label { color: #607080;"
-        " font-family: 'SF Mono', Menlo, monospace;"
+        " font-family: " LP_MONO_QSS ";"
         " font-size: 9px; font-weight: 500; letter-spacing: 0.5px; }"
         "QLabel#MetricLabel_Value { color: #8aa8c0;"
-        " font-family: 'SF Mono', Menlo, monospace;"
+        " font-family: " LP_MONO_QSS ";"
         " font-size: 11px; font-weight: 600; }"
     )));
 }

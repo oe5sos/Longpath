@@ -35,7 +35,10 @@
 #include "core/HpsdrModel.h"
 #include "core/RadioDiscovery.h"
 #include "core/AppSettings.h"
+#include "core/SampleRateCatalog.h"
 #include "core/SunSdrRadioConnection.h"
+#include "core/RxChannel.h"
+#include "core/WdspEngine.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
 
@@ -79,7 +82,12 @@ private slots:
             infoFor(HPSDRHW::SunSdr2Qrp, ProtocolVersion::SunSdr));
 
         QCOMPARE(model.boardCapabilities().board, HPSDRHW::SunSdr2Qrp);
-        QCOMPARE(model.boardCapabilities().maxSampleRate, 48000);
+        // 96 000 seit dem 2026-10-03: am Geraet gemessen, dass der
+        // Stromstart-Rahmen 0x01 die Rate stellt und Kanal 0 dann mit 480
+        // Folgenummern je Sekunde ankommt. Bis dahin stand hier 48 000 --
+        // mit dem Vermerk "nicht verhandelt", und das war schlicht die
+        // Grenze unseres Wissens, nicht die des Geraets.
+        QCOMPARE(model.boardCapabilities().maxSampleRate, 96000);
     }
 
     void withoutTheExceptionItIsAtlasAgain()
@@ -121,9 +129,15 @@ private slots:
         model.injectConnectionForTest(&conn);
         auto detach = qScopeGuard([&] { model.injectConnectionForTest(nullptr); });
 
-        QCOMPARE(model.allowedStreamSampleRates(), QVector<int>{48000});
+        QCOMPARE(model.allowedStreamSampleRates(), (QVector<int>{48000, 96000}));
         QVERIFY(model.restoredRateAllowed(48000));
+        QVERIFY(model.restoredRateAllowed(96000));
+        // Und was die QRP NICHT kann, bleibt gesperrt -- darum geht es in
+        // diesem Pruefpunkt. Am 2026-09-24 hat eine wiederhergestellte
+        // 192-kHz-Rate 48k-Daten in einen 192k-Kanal gelegt, und der
+        // Betreiber hat es als "schlechtes Rauschen" gehoert.
         QVERIFY(!model.restoredRateAllowed(192000));
+        QVERIFY(!model.restoredRateAllowed(144000));
     }
 
     void theConnectedRestoreKeepsTheQrpAt48k()
@@ -153,6 +167,118 @@ private slots:
         model.onConnectionStateChangedForTest(ConnectionState::Connected);
 
         QCOMPARE(model.streamSampleRateHzForTest(stream), 48000);
+    }
+
+    // ── Die Rate muss auch das GERAET erreichen ──────────────────────────
+    //
+    // Gefunden am 2026-10-04 an der echten QRP, im Protokoll der Sitzung
+    // von 06:59:53:
+    //
+    //     INF: Connecting with sampleRate= 96000 inSize= 128
+    //     INF: SunSdr: Abtastrate -> 96000 Hz (Stromstart-Rahmen ...)
+    //     DBG: Connected to "SunSDR2 QRP"
+    //     INF: setRxChannelRate: channel 0 -> 48000 Hz, in_size= 64
+    //
+    // 63 ms nach dem Verbinden zog die Wiederanwendung der je Band
+    // gespeicherten Rate den WDSP-Kanal auf 48 kHz -- und NICHTS schickte
+    // das an das Geraet. Das streamte weiter mit 96 (Stromkopf 0200, 960
+    // Folgenummern/s). Die RATE-Anzeige der Kopfleiste stand danach auf
+    // "48 kHz" und bernsteinfarben; sie hat nicht gelogen, sie hat genau
+    // diesen Riss gemeldet.
+    //
+    // Warum er entstand: setStreamSampleRate schickt die Rate nur dann auf
+    // den Draht, wenn sampleRateIsRadioWide() gilt -- und das war bis
+    // heute ausschliesslich Protokoll 1. Alles andere galt als "Rate je
+    // DDC", und DEREN Weg auf den Draht ist der DdcAssignment-Push in
+    // invokeCodecDdcAssignment, der ausdruecklich nur P2 bedient. Die
+    // SunSDR hat aber gar keine Rate je DDC: der Stromstart-Rahmen 0x01
+    // traegt EINEN Modus fuer das ganze Geraet (SunSdrProtocol.h,
+    // StromModus).
+    //
+    // Das Gegenstueck fuer P1 steht in tst_stream_pool_binding
+    // (on_protocol1_the_rate_change_reaches_the_wire); dieser Pruefpunkt
+    // ist dieselbe Frage fuer die SunSDR.
+    void theRestoredRateAlsoReachesTheRadio()
+    {
+        RadioModel model;
+        model.applyHardwareProfileForTest(
+            infoFor(HPSDRHW::SunSdr2Qrp, ProtocolVersion::SunSdr));
+
+        SunSdrRadioConnection conn;
+        model.injectConnectionForTest(&conn);
+        auto detach = qScopeGuard([&] { model.injectConnectionForTest(nullptr); });
+
+        // Genau der Stand nach connectToRadio: Geraet und Kanal auf 96 kHz.
+        conn.setSampleRate(96000);
+        QCOMPARE(conn.stromModusForTest(), 2);   // ZweiStroemeJe96
+        model.setConnectionRateForTest(96000, 1);
+
+        WdspEngine* engine = model.wdspEngine();
+        engine->m_initialized = true;   // friend access (LONGPATH_BUILD_TESTS)
+
+        model.configureStreamPool(/*userDdcCount*/ 1, /*maxSlices*/ 1, 96000);
+        const int id = model.addSlice();
+        SliceModel* slice = model.sliceById(id);
+        QVERIFY(slice);
+        const int stream = slice->streamIndex();
+        QVERIFY2(stream >= 0, "precondition: the slice is bound to a stream");
+        engine->createRxChannel(id, bufferSizeForRate(96000), 4096,
+                                96000, 48000, 48000);
+
+        // Der Stand aus einer frueheren Sitzung: dieses Band lief auf 48 kHz.
+        // Die QRP kann die Rate, also gilt sie (restoredRateAllowed).
+        slice->setSampleRateHz(48000);
+        model.applyRestoredSampleRate(slice);
+
+        // setSampleRateLive schiebt den Draht-Schreibvorgang als Ereignis an
+        // die Verbindung; hier liegt sie auf demselben Faden, also von Hand
+        // abarbeiten (wie im P1-Gegenstueck).
+        QCoreApplication::processEvents();
+
+        // Die Client-Seite ist mitgegangen -- das tat sie vorher auch.
+        QCOMPARE(model.streamSampleRateHzForTest(stream), 48000);
+        QCOMPARE(engine->rxChannel(id)->sampleRate(), 48000);
+
+        // Und das hier ist der Fund: vor der Behebung stand hier weiter 2,
+        // das Geraet also auf 96 kHz, waehrend der Kanal auf 48 lief.
+        QCOMPARE(conn.stromModusForTest(), 0);   // EinStrom48
+    }
+
+    // Gegenprobe: eine Rate, die das Geraet schon faehrt, darf keinen
+    // Stromstart-Rahmen ausloesen. Sonst wuerde jeder Bandwechsel den Strom
+    // neu starten -- die Folgenummern fangen dabei bei null an, und der
+    // Betreiber hoert eine Luecke, wo nichts zu tun war.
+    void aRestoreToTheRateAlreadyRunningLeavesTheRadioAlone()
+    {
+        RadioModel model;
+        model.applyHardwareProfileForTest(
+            infoFor(HPSDRHW::SunSdr2Qrp, ProtocolVersion::SunSdr));
+
+        SunSdrRadioConnection conn;
+        model.injectConnectionForTest(&conn);
+        auto detach = qScopeGuard([&] { model.injectConnectionForTest(nullptr); });
+
+        conn.setSampleRate(96000);
+        model.setConnectionRateForTest(96000, 1);
+
+        WdspEngine* engine = model.wdspEngine();
+        engine->m_initialized = true;   // friend access (LONGPATH_BUILD_TESTS)
+
+        model.configureStreamPool(/*userDdcCount*/ 1, /*maxSlices*/ 1, 96000);
+        const int id = model.addSlice();
+        SliceModel* slice = model.sliceById(id);
+        QVERIFY(slice);
+        engine->createRxChannel(id, bufferSizeForRate(96000), 4096,
+                                96000, 48000, 48000);
+
+        QSignalSpy rejected(&model, &RadioModel::sliceRetuneRejected);
+
+        slice->setSampleRateHz(96000);
+        model.applyRestoredSampleRate(slice);
+        QCoreApplication::processEvents();
+
+        QCOMPARE(conn.stromModusForTest(), 2);   // unveraendert
+        QCOMPARE(rejected.count(), 0);
     }
 };
 

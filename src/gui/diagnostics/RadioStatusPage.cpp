@@ -527,7 +527,7 @@ void RadioStatusPage::buildPttCard(QFrame* card)
     m_pttHistoryList->setStyleSheet(QStringLiteral(
         "QListWidget {"
         "  background: %1; border: 1px solid %2;"
-        "  font-family: monospace; font-size: 9px; color: %3;"
+        "  font-family: " LP_MONO_QSS "; font-size: 9px; color: %3;"
         "}"
         "QListWidget::item { padding: 1px 2px; }"
     ).arg(QLatin1String(Style::kInsetBg),

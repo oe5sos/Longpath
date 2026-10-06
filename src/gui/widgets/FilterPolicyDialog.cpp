@@ -58,7 +58,7 @@ FilterPolicyDialog::FilterPolicyDialog(int chainIndex, AlexController* alex, QWi
     auto* stateLbl = new QLabel(
         QStringLiteral("Effective: %1\nReason: %2").arg(effectiveText, state.reasonText),
         stateGroup);
-    stateLbl->setStyleSheet(QStringLiteral("font-family: monospace; font-size: 11px;"));
+    stateLbl->setStyleSheet(QStringLiteral("font-family: " LP_MONO_QSS "; font-size: 11px;"));
     stateLbl->setWordWrap(true);
     stateLayout->addWidget(stateLbl);
     main->addWidget(stateGroup);

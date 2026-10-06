@@ -91,6 +91,7 @@ public:
     bool open(const AudioFormat& format) override;
     void close() override;
     bool isOpen() const override { return m_stream != nullptr; }
+    bool isAlive() const override;
 
     qint64 push(const char* data, qint64 bytes) override;
     qint64 pull(char* data, qint64 maxBytes) override;

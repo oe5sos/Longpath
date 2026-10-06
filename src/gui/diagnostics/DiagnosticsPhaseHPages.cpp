@@ -13,6 +13,7 @@
 // =================================================================
 
 #include "DiagnosticsPhaseHPages.h"
+#include "gui/StyleConstants.h"   // LP_MONO_QSS
 #include "gui/styles/ThemeQss.h"
 
 #include "core/AppSettings.h"
@@ -308,7 +309,7 @@ void LogsPage::buildUI()
     m_logView->setReadOnly(true);
     m_logView->setStyleSheet(Style::themed(QStringLiteral(
         "QPlainTextEdit { background: #0a0a18; color: #c8d8e8; "
-        "border: 1px solid #304050; font-family: 'Monaco','Menlo',monospace; }")));
+        "border: 1px solid #304050; font-family: " LP_MONO_QSS "; }")));
     m_logView->setPlaceholderText(QStringLiteral(
         "qCWarning / qCDebug capture is wired in a follow-up phase. "
         "For now, run with QT_LOGGING_TO_CONSOLE=1 and read stderr."));
