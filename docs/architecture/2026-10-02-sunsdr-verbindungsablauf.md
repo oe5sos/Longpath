@@ -1205,9 +1205,21 @@ Die 1200 Byte, die ExpertSDR2 in `0x05` schickt, sind erkennbar
 **nicht initialisierter Speicher**: darin stehen Zeigerwerte der Form
 `…ef7f0000` und Textreste wie `de_AT`, `POSIX`, `en_GB`, `es_US`,
 `pt_BR`. ExpertSDR2 schickt also Teile seines eigenen Stapelspeichers
-ans Funkgerät. Für uns ist das nur insofern wichtig, als **der Inhalt
-offensichtlich egal ist** — niemand sollte versuchen, diese Bytes
-nachzubauen. Wenn `0x05` je gebraucht wird, tut es jede Füllung.
+ans Funkgerät.
+
+~~Für uns ist das nur insofern wichtig, als der Inhalt offensichtlich
+egal ist — wenn `0x05` je gebraucht wird, tut es jede Füllung.~~
+
+**Das war ein Schluss, keine Messung, und am selben Tag am Gerät
+widerlegt.** Mit Nutzlast aus lauter Nullen (richtige Prüfsumme, selbe
+Stelle im Ablauf) **quittiert das Gerät `0x05` und `0x12` nicht** — es
+verwirft sie. ExpertSDR2s Fassungen werden quittiert. Der Inhalt ist
+also **nicht** beliebig, oder es hängt an etwas anderem, das die
+Nullfassung mitverändert (Längenfeld 0 bei 1200 Byte Nutzlast ist bei
+beiden gleich, scheidet also aus).
+
+Wer diese beiden Rahmen braucht, braucht einen Mitschnitt mit ihren
+echten Bytes. Nachbauen aus dem Kopf geht nicht.
 
 ## Was das für den Abschluss-Durchgang ändert
 
@@ -1216,3 +1228,43 @@ Der Prüfplan sah vor, mit der Antennenwahl `0x15` anzufangen, um
 Schritt ist erledigt** — sie gelten für `0x06`, `0x15` und `0x17`.
 Der Durchgang mit dem Abschluss beginnt damit direkt bei der Frage, die
 nur dort zu beantworten ist: was ein Wert ≠ 0 bewirkt.
+
+
+---
+
+# Versuch: die sechzehn Rahmen nachschicken (2026-10-06)
+
+Anlass ist ein Widerspruch, der mir an Martins Schirm aufgefallen ist.
+ExpertSDR2 zeigt, solange es verbunden ist:
+
+    U: 13,1 V     I: 0,3 A     35,5 °C
+
+und nach dem Verbindungsverlust `0,0 V / 0,0 A / 0,0 °C`. Das sind
+**Messwerte aus dem Gerät**. Dieses Dokument behauptet ein paar
+Abschnitte weiter oben das Gegenteil: „Im Empfang gibt es bei der QRP
+keine Gerätemesswerte." Beides kann nicht stimmen.
+
+Die Vermutung: die Werte stecken in den **77-Byte-Rahmen**, die das
+Gerät im Mitschnitt während des Stroms rund dreimal je Sekunde schickt
+(612 Stück über 192 s) und die Longpath wegwirft — und man muss sie
+vielleicht mit einem der sechzehn Rahmen anfordern, die ExpertSDR2
+schickt und Longpath nie.
+
+**Gefahren, 60 s und 45 s, ohne Antenne, nichts getastet:** die dreizehn
+kleinen Rahmen über `LONGPATH_SUNSDR_PRE`, alle mit ihren echten
+Nutzlasten aus dem Mitschnitt. `0x24` ist nicht darunter, und `0x15`
+wie `0x17` tragen den Wert 0 — es kann nichts senden.
+
+**Ergebnis: negativ.** Alle dreizehn werden quittiert, `0x0c` antwortet
+mit denselben 320 Byte wie vor zehn Tagen (`10748be4…294033333333`), und
+auf dem Stromweg erscheint **kein einziger 77-Byte-Rahmen**. Die
+Telemetrie lässt sich damit nicht einschalten.
+
+Der zweite Versuch mit den beiden großen Rahmen (`0x05`, `0x12`) scheitert
+daran, dass das Gerät sie mit Nullnutzlast verwirft (siehe oben).
+
+**Damit bleibt offen**, und zwar als echter Lückenposten in der
+Gleichwertigkeit: ExpertSDR2 zeigt Spannung, Strom und Temperatur,
+Longpath zeigt dort nichts. Was es braucht, ist ein Mitschnitt, in dem
+sichtbar wird, **wann** die 77-Byte-Rahmen einsetzen — und die echten
+Bytes von `0x05` und `0x12` gleich mit.
