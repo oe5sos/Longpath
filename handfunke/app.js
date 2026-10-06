@@ -7,6 +7,14 @@
 // anderes behauptet als das Geraet tut.
 
 import { TciLink, Fft } from './tci.js';
+import { Mikrofon, mikrofonMoeglich } from './mikrofon.js';
+import { Sammelstelle, zeileLesen, befundLesen, zeitKurz, dupeSatz }
+  from './logbuch.js';
+import { spotLesen, marken, trefferBei, trefferAufSchrift } from './spots.js';
+import { Zeichenbremse } from './ton-vorrang.js';
+import { bildIstAlt } from './aufwachen.js';
+import { standLesen, zustandText, peilungAus, Sicherung as RotorSicherung,
+         DREHT } from './rotor.js';
 
 const $ = (id) => document.getElementById(id);
 const link = new TciLink();
@@ -61,6 +69,10 @@ const state = {
   tonWeg: null,              // 'worklet' | 'scriptprocessor'
   tonFehler: null,           // Text fuer die Fusszeile, wenn kein Ton geht
   hatSpektrumstrom: false,   // Server liefert fertige Bins
+  // Zuletzt angezeigter Sendezustand. Nicht die Wahrheit, sondern was
+  // auf dem Schirm steht — damit die Zeile nur bei einer FLANKE neu
+  // geschrieben wird und nicht sechzigmal je Sekunde.
+  sendetGezeigt: false,
   rueckfall: false,          // wir rechnen selbst aus rohem I/Q
   iqRueckfall: null,
   audio: null, node: null,
@@ -129,7 +141,14 @@ function starten(adresse) {
   tokenMerken(state.token);
   $('fehler').textContent = '';
   $('koppeln').classList.remove('an');
-  link.connect('ws://' + mitPort);
+  // Das Schema folgt dem der Seite, es wird nicht gewaehlt. Eine
+  // https-Seite DARF kein ws:// oeffnen — der Browser sperrt das als
+  // gemischten Inhalt, ohne dass die Seite davon etwas mitbekommt, und
+  // der Fehler sieht aus wie "das Funkgeraet antwortet nicht".
+  // Umgekehrt scheitert wss:// an einer Bruecke ohne Zertifikat. Beides
+  // ist keine Entscheidung, die der Bediener treffen soll.
+  const schema = (location.protocol === 'https:') ? 'wss://' : 'ws://';
+  link.connect(schema + mitPort);
 }
 
 $('verbinden').addEventListener('click', () => starten($('adresse').value));
@@ -599,6 +618,11 @@ function mitteVerfolgen() {
   if (jetzt === letzteMitteHz) { return; }
   wasserfallSchieben(jetzt - letzteMitteHz);
   letzteMitteHz = jetzt;
+  // Der Ausschnitt hat sich verschoben: die alten Spotmarken sitzen jetzt
+  // falsch, und was vorher ausserhalb lag, kann hereingekommen sein. Nicht
+  // sofort nachfragen -- beim Drehen des Knopfes kaeme sonst je
+  // Zwischenstand eine eigene Liste.
+  spotsBaldHolen();
 }
 
 /** Zieht eine Trennlinie statt zu loeschen: oben das Neue, unten das Alte.
@@ -748,6 +772,88 @@ function zeichneBild() {
   for (let i = 0; i <= 3; i++) {
     const db = Math.round(hi - (hi - lo) * i / 3);
     panCtx.fillText(String(db), 3, 10 + i * (H - 14) / 3);
+  }
+
+  // ── Spots ───────────────────────────────────────────────────────────────
+  //
+  // Messing, weil ein Spot eine MELDUNG ist und keine Messung des eigenen
+  // Empfaengers -- aber gedaempft, damit er die Kurve nicht uebertoent. Alte
+  // Spots werden blasser (spots.js: deckung); sie verschwinden nicht, das
+  // entscheidet Longpath anhand der Lebenszeit.
+  //
+  // Die Marken werden HIER gerechnet und in `spotMarken` abgelegt, weil der
+  // Fingerzeiger dieselben Stellen braucht. Zweimal rechnen hiesse: zwei
+  // Rechnungen, die auseinanderlaufen koennen, und dann trifft der Finger
+  // etwas anderes, als das Auge sieht.
+  {
+    const mitteSpot = link.st.vfo[state.trx] ? link.st.vfo[state.trx][0] : 0;
+    spotMarken = mitteSpot
+      ? marken(spotZeilen, mitteSpot, bildSpanneHz(192000), W)
+      : [];
+    if (spotMarken.length) {
+      panCtx.font = '9px ui-monospace,Menlo,monospace';
+      panCtx.textAlign = 'center';
+      // ── Wohin die Beschriftung darf ──────────────────────────────────
+      //
+      // Am Telefonformat gemessen (2026-10-05): der Panadapter ist 96 px
+      // hoch, und der Schrittregler deckt davon oben rechts 118 x 34 ab.
+      // Er ist ein HTML-Element UEBER dem Canvas -- das Zeichnen merkt
+      // nichts davon, die Marke ist einfach weg. Unten ist auch nichts
+      // gewonnen: dort laeuft die Kurve.
+      //
+      // Also oben, und unter dem Regler ausweichen. Das Rechteck wird
+      // GELESEN statt angenommen: eine Zahl, die hier steht und sich dort
+      // aendert, ist genau die Art Fehler, die niemandem auffaellt.
+      const rPan = pan.getBoundingClientRect();
+      let sperrVonX = Infinity, sperrBisY = 0;
+      if (rPan.width) {
+        const el = document.querySelector('.feinschritt');
+        const rr = el ? el.getBoundingClientRect() : null;
+        if (rr && rr.width) {
+          const k = pan.width / rPan.width;
+          sperrVonX = (rr.left - rPan.left) * k;
+          sperrBisY = (rr.bottom - rPan.top) * k;
+        }
+      }
+      // Wie hoch die Schrift ueber ihrer Grundlinie steht -- GEMESSEN, nicht
+      // geschaetzt. `fillText` zeichnet NACH OBEN von der Grundlinie weg;
+      // wer die Grundlinie auf 4 setzt, schiebt den halben Buchstaben aus
+      // dem Bild. Genau das ist am 2026-10-05 am Telefon passiert: "die
+      // Spots stehen sehr weit oben, so kann man diese nicht komplett
+      // sehen". Im Werkzeugbrowser fiel es nicht auf, weil dort mehr Platz
+      // ueber dem Panadapter ist.
+      const mass = panCtx.measureText('OE5SOS');
+      const hoch = Math.ceil(mass.actualBoundingBoxAscent || 7);
+      const ersteZeile = hoch + 2;         // zwei Punkte Luft zum Rand
+      for (const m of spotMarken) {
+        const unterDemRegler = (m.x + 27) > sperrVonX;
+        const oben = unterDemRegler ? sperrBisY + ersteZeile : ersteZeile;
+        const y = oben + m.reihe * 11;       // Schriftgrundlinie
+        panCtx.globalAlpha = m.deckung;
+        panCtx.strokeStyle = '#c2924f';
+        panCtx.lineWidth = 1;
+        panCtx.beginPath();
+        panCtx.moveTo(m.x + .5, y + 2);
+        panCtx.lineTo(m.x + .5, H);
+        panCtx.stroke();
+        // Der Schriftzug bekommt einen dunklen Grund, sonst verschwindet er
+        // ueber einem hellen Traeger.
+        const b = panCtx.measureText(m.ruf).width + 6;
+        // Den Kasten festhalten, in DENSELBEN Einheiten, in denen gezeichnet
+        // wird. Der Finger prueft spaeter dagegen -- eine zweite Rechnung
+        // waere eine zweite Wahrheit.
+        m.kasten = { x: m.x - b / 2, y: y - hoch - 1, b, h: hoch + 3 };
+        panCtx.globalAlpha = m.deckung * .72;
+        panCtx.fillStyle = '#0b0d10';
+        // Der dunkle Grund folgt derselben Messung statt einer festen 8.
+        panCtx.fillRect(m.x - b / 2, y - hoch - 1, b, hoch + 3);
+        panCtx.globalAlpha = m.deckung;
+        panCtx.fillStyle = '#d8a55f';
+        panCtx.fillText(m.ruf, m.x, y);
+      }
+      panCtx.globalAlpha = 1;
+      panCtx.textAlign = 'left';
+    }
   }
 
   // Wasserfall: je eingetroffenem Spektrum eine Zeile — nicht je Bild.
@@ -932,6 +1038,7 @@ async function tonStarten() {
         }
       };
       weg = 'worklet';
+      state.tonImHauptfaden = false;
     } else {
       // ── Rueckfall: ScriptProcessorNode ───────────────────────────────────
       //
@@ -958,12 +1065,18 @@ async function tonStarten() {
       // dazu. Der Knoten haengt dann stumm im Graphen, und niemand sieht,
       // warum. Deshalb bekommt er unten eine stille Quelle vorgeschaltet —
       // sie liefert Nullen und dient nur dem Takt.
+      state.tonImHauptfaden = true;
       const sp = ctx.createScriptProcessor(2048, 1, 2);
       let leerZaehler = 0;
       sp.onaudioprocess = (ev) => {
         state.tonTakte = (state.tonTakte || 0) + 1;
         const out = ev.outputBuffer;
         const voll = kern.zieh(out.getChannelData(0), out.getChannelData(1), out.length);
+        // Fuellstand nach draussen melden: die Bildschleife laeuft auf
+        // DEMSELBEN Faden wie dieser Rueckruf und muss ihm ausweichen
+        // koennen, bevor es knackt. Zwei Zuweisungen je Block.
+        state.tonVorrat = kern.have;
+        state.tonZiel = kern.target;
         // Denselben Leerlauf melden wie das Worklet, damit die Fusszeile auf
         // beiden Wegen dasselbe sagt.
         if (!voll && !kern.muted && (++leerZaehler & 31) === 0) {
@@ -1390,6 +1503,295 @@ function hzAusEingabe(roh) {
   return null;
 }
 
+// ── Spots im Bild (2026-10-05) ────────────────────────────────────────────
+//
+// Longpath kennt Cluster, RBN und POTA; die App zeigte davon nichts. Mit
+// `spots:<rx>` liefert es die Spots im SICHTBAREN Ausschnitt -- gefiltert
+// dort, nicht hier: im SpotModel liegen auch die Hunderte, die RBN in einer
+// guten Stunde meldet, und die wuerden dieselbe Steuerleitung verstopfen,
+// die Frequenz, Betriebsart und den Abbruch eines Sendewunsches traegt.
+//
+// EINMALIGE ABFRAGE, kein Abonnement. Gefragt wird beim Verbinden, danach
+// alle paar Sekunden, und nach einem Frequenzwechsel einmal zusaetzlich --
+// dann hat sich der Ausschnitt verschoben und die alten Marken sitzen falsch.
+const spotSammler = new Sammelstelle();
+let spotZeilen = [];      // zuletzt vollstaendig empfangene Liste
+let spotMarken = [];      // daraus gerechnet, in Canvas-Einheiten
+let spotFrist = null;
+
+/** Alle so viele Millisekunden nachfragen, solange die Verbindung steht. */
+const kSpotTakt = 12000;
+/** Nach einem Frequenzwechsel: nicht sofort, sonst fragt jeder Zwischenstand
+ *  beim Drehen des Knopfes eine eigene Liste an. */
+const kSpotNachQsy = 700;
+
+function spotsHolen() {
+  if (!link.ready) { return; }
+  spotSammler.beginnen();
+  link.send(`spots:${state.trx}`);
+}
+
+function spotsBaldHolen(verzug = kSpotNachQsy) {
+  clearTimeout(spotFrist);
+  spotFrist = setTimeout(spotsHolen, verzug);
+}
+
+link.addEventListener('spotzeile', (e) => {
+  spotSammler.zeile(spotLesen((e.detail || {}).args || []));
+});
+
+link.addEventListener('spotsende', (e) => {
+  const d = e.detail || {};
+  if (d.anzahl === null || d.anzahl === undefined) {
+    // `spots_err:` heisst "kann ich gerade nicht", nicht "da ist nichts".
+    // Die alten Marken stehen lassen waere falsch (sie koennten zu einem
+    // anderen Ausschnitt gehoeren), eine leere Liste zeigen auch -- aber
+    // leer ist die ehrlichere von beiden: nichts zu behaupten.
+    spotSammler.abschluss(-1);
+    spotZeilen = [];
+    return;
+  }
+  const liste = spotSammler.abschluss(d.anzahl);
+  // null heisst: es fehlen Zeilen. Dann die alte Liste behalten statt eine
+  // halbe zu zeigen -- eine kuerzere Liste sieht aus wie ein leereres Band.
+  if (liste) { spotZeilen = liste; }
+});
+
+setInterval(() => { if (link.ready) { spotsHolen(); } }, kSpotTakt);
+
+// ── QSO eintragen (Entwurf A, Betreiber 2026-10-04) ───────────────────────
+//
+// Das Blatt schickt NUR Rufzeichen und RST. Frequenz, Betriebsart und Zeit
+// setzt Longpath selbst beim Eintragen (TciServer `log_qso:`), und das ist
+// Absicht: schickte die Seite sie mit, koennte sie etwas anderes eintragen,
+// als das Geraet gerade macht. Die drei Zeilen im Blatt zeigen darum, was
+// Longpath nehmen WIRD — sie sind Auskunft, keine Eingabe, und stehen
+// deshalb in Messing.
+//
+// Die Uhr laeuft, solange das Blatt offen ist. Ein Blatt, das die Zeit von
+// seinem Oeffnen zeigt, waehrend der Kontakt eine Minute spaeter eingetragen
+// wird, behauptet etwas Falsches — dieselbe Regel wie beim S-Meter.
+let qsoUhr = null;
+
+/** 14074000 Hz -> "14.074,00 kHz" — Punkt als Tausender, Komma als Dezimal. */
+function khzText(hz) {
+  const khz = hz / 1000;
+  const ganz = Math.floor(khz);
+  const rest = Math.round((khz - ganz) * 100);
+  const mitPunkt = String(ganz).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return `${mitPunkt},${String(rest).padStart(2, '0')} kHz`;
+}
+
+function qsoAutomatikZeigen() {
+  const v = link.st.vfo[state.trx] ? link.st.vfo[state.trx][0] : null;
+  const m = (link.st.mode[state.trx] || '').toUpperCase();
+  // Von Hand gesetzt statt toLocaleString: das liefert je nach Browser ein
+  // schmales geschuetztes Leerzeichen als Tausendertrennung, und eine
+  // Frequenz mit Leerzeichen liest sich am Funkgeraet falsch. Punkt und
+  // Komma wie ueberall sonst in dieser Seite.
+  $('qsoFreq').textContent = v ? khzText(v) : '—';
+  // ADIF kennt LSB/USB nicht als Betriebsart, sondern als Unterart von SSB.
+  // Die Seite zeigt trotzdem, was am Geraet steht — umgerechnet wird erst
+  // in Longpath, an einer Stelle.
+  $('qsoMode').textContent = m || '—';
+  const d = new Date();
+  const zz = (n) => String(n).padStart(2, '0');
+  $('qsoZeit').textContent =
+    `${zz(d.getUTCDate())}.${zz(d.getUTCMonth() + 1)}.${d.getUTCFullYear()}  `
+    + `${zz(d.getUTCHours())}:${zz(d.getUTCMinutes())}`;
+}
+
+// ── Ins Logbuch sehen (2026-10-04) ────────────────────────────────────────
+//
+// Zwei Fragen, zwei Befehle: `log_last:` fuer die letzten Kontakte,
+// `log_dup:` fuer "hatte ich den schon?". Gesammelt und gedeutet wird in
+// logbuch.js — hier steht nur, wann gefragt wird und wo es landet.
+//
+// WARUM ENTPRELLT: `log_dup:` laeuft in Longpath ueber die ganze Datei
+// (gemessen 3,8 ms bei 6,6 MB). Je Tastendruck waere das ein Durchlauf fuer
+// jeden Zwischenstand eines Rufzeichens — acht Durchlaeufe fuer OE5SOS, und
+// sieben Antworten, die niemand lesen will. 350 ms nach dem letzten Tipper
+// reicht; wer fertig getippt hat, wartet keine halbe Sekunde.
+const sammler = new Sammelstelle();
+let dupeFrist = null;
+let dupeOffen = '';      // welches Rufzeichen gerade gefragt ist
+
+function logListeZeigen(liste) {
+  const el = $('logListe');
+  el.textContent = '';
+  if (!liste || !liste.length) {
+    const d = document.createElement('div');
+    d.className = 'leer';
+    d.textContent = '—';
+    el.appendChild(d);
+    return;
+  }
+  for (const z of liste) {
+    const r = document.createElement('div');
+    r.className = 'r';
+    const w = document.createElement('span');
+    w.className = 'wann';
+    w.textContent = zeitKurz(z.datum, z.zeit) || '—';
+    const ruf = document.createElement('span');
+    ruf.className = 'ruf';
+    ruf.textContent = z.ruf;
+    const wo = document.createElement('span');
+    wo.className = 'wo';
+    wo.textContent = [z.band, z.mode].filter(Boolean).join(' ');
+    r.append(w, ruf, wo);
+    el.appendChild(r);
+  }
+}
+
+function logListeHolen() {
+  if (!link.ready) { return; }
+  sammler.beginnen();
+  link.send('log_last:10');
+}
+
+function dupeZeigen(satz) {
+  const el = $('qsoDupe');
+  el.textContent = satz.text;
+  el.className = `dupe${satz.art ? ' d-' + satz.art : ''}`;
+}
+
+function dupeFragen() {
+  const ruf = ($('qsoRuf').value || '').trim().toUpperCase();
+  clearTimeout(dupeFrist);
+  if (ruf.length < 3) {
+    // Unter drei Zeichen ist jedes Rufzeichen noch jedes andere. Eine
+    // Auskunft darueber waere beliebig.
+    dupeOffen = '';
+    dupeZeigen({ text: '', art: '' });
+    return;
+  }
+  dupeFrist = setTimeout(() => {
+    if (!link.ready) { return; }
+    dupeOffen = ruf;
+    link.send(`log_dup:${ruf}`);
+  }, 350);
+}
+
+link.addEventListener('logzeile', (e) => {
+  sammler.zeile(zeileLesen((e.detail || {}).args || []));
+});
+
+link.addEventListener('logende', (e) => {
+  const d = e.detail || {};
+  if (d.anzahl === null || d.anzahl === undefined) {
+    // Abgelehnt (z. B. Logbuch aus dem Netz abgeschaltet). Die Liste bleibt
+    // leer und sagt, warum — statt still leer zu bleiben und wie ein leeres
+    // Logbuch zu wirken.
+    sammler.abschluss(-1);
+    const el = $('logListe');
+    el.textContent = '';
+    const x = document.createElement('div');
+    x.className = 'leer';
+    x.textContent = d.text || 'nicht freigegeben';
+    el.appendChild(x);
+    return;
+  }
+  const liste = sammler.abschluss(d.anzahl);
+  // null heisst: es fehlen Zeilen. Dann NICHT zeigen — eine kuerzere Liste
+  // sieht aus wie ein kuerzeres Logbuch.
+  if (liste) { logListeZeigen(liste); }
+});
+
+link.addEventListener('logdupe', (e) => {
+  const d = e.detail || {};
+  if (!d.args) { dupeZeigen({ text: d.text || '', art: '' }); return; }
+  const b = befundLesen(d.args);
+  // Eine Antwort auf ein Rufzeichen, das inzwischen weitergetippt wurde,
+  // gehoert nicht mehr unter das Feld.
+  if (!b || b.ruf !== dupeOffen) { return; }
+  dupeZeigen(dupeSatz(b));
+});
+
+function qsoOeffnen() {
+  $('qsoRuf').value = '';
+  $('qsoMeldung').textContent = '';
+  $('qsoMeldung').className = '';
+  $('qsoOk').disabled = false;
+  dupeZeigen({ text: '', art: '' });
+  dupeOffen = '';
+  logListeHolen();
+  qsoAutomatikZeigen();
+  clearInterval(qsoUhr);
+  qsoUhr = setInterval(qsoAutomatikZeigen, 5000);
+  $('qsoBlatt').classList.add('an');
+  // Erst nach dem Einblenden, sonst bleibt die Tastatur auf iOS zu.
+  setTimeout(() => $('qsoRuf').focus(), 50);
+}
+
+function qsoSchliessen() {
+  clearInterval(qsoUhr); qsoUhr = null;
+  $('qsoBlatt').classList.remove('an');
+  $('qsoRuf').blur();
+}
+
+function qsoEintragen() {
+  const ruf = ($('qsoRuf').value || '').trim().toUpperCase();
+  if (!ruf) { $('qsoRuf').focus(); return; }
+  if (!link.ready) {
+    // Nicht senden und so tun als ob: ohne stehende Verbindung kommt der
+    // Kontakt nirgends an, und das Blatt sagt es.
+    $('qsoMeldung').textContent = 'keine Verbindung — nicht eingetragen';
+    $('qsoMeldung').className = 'warn';
+    return;
+  }
+  const rs = ($('qsoRstS').value || '59').trim() || '59';
+  const re = ($('qsoRstE').value || '59').trim() || '59';
+  $('qsoOk').disabled = true;
+  $('qsoMeldung').textContent = 'wird eingetragen…';
+  $('qsoMeldung').className = '';
+  link.send(`log_qso:${ruf},${rs},${re}`);
+  // Kommt keine Antwort, bleibt es nicht bei "wird eingetragen" stehen.
+  // Eine Anzeige, die ewig auf dem Zwischenstand verharrt, liest sich wie
+  // ein Erfolg.
+  clearTimeout(qsoEintragen._frist);
+  qsoEintragen._frist = setTimeout(() => {
+    if (!$('qsoOk').disabled) { return; }
+    $('qsoOk').disabled = false;
+    $('qsoMeldung').textContent = 'keine Antwort — nicht sicher eingetragen';
+    $('qsoMeldung').className = 'warn';
+  }, 4000);
+}
+
+link.addEventListener('qso', (e) => {
+  clearTimeout(qsoEintragen._frist);
+  const d = e.detail || {};
+  $('qsoOk').disabled = false;
+  if (d.ok) {
+    $('qsoMeldung').textContent = `${d.text} eingetragen`;
+    $('qsoMeldung').className = 'ok';
+    $('qsoRuf').value = '';
+    dupeZeigen({ text: '', art: '' });
+    dupeOffen = '';
+    // Der Beleg: der eigene Kontakt steht jetzt als erste Zeile in der
+    // Liste. Die Erfolgsmeldung kann das nur behaupten.
+    logListeHolen();
+    // Offen lassen: im Pile-up kommt der naechste sofort, und ein Blatt,
+    // das nach jedem Kontakt zugeht, kostet zwei Tipper je QSO.
+    setTimeout(() => $('qsoRuf').focus(), 30);
+  } else {
+    $('qsoMeldung').textContent = d.text || 'abgelehnt';
+    $('qsoMeldung').className = 'warn';
+  }
+});
+
+$('logAuf').addEventListener('click', qsoOeffnen);
+$('qsoAb').addEventListener('click', qsoSchliessen);
+$('qsoOk').addEventListener('click', qsoEintragen);
+$('qsoRuf').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); qsoEintragen(); }
+});
+$('qsoRuf').addEventListener('input', dupeFragen);
+$('logFrisch').addEventListener('click', logListeHolen);
+// Tippen auf den Grund schliesst, wie beim Frequenz-Blatt.
+$('qsoBlatt').addEventListener('click', (e) => {
+  if (e.target === $('qsoBlatt')) { qsoSchliessen(); }
+});
+
 function qsyOeffnen() {
   const v = link.st.vfo[state.trx] ? link.st.vfo[state.trx][0] : null;
   $('qsyFeld').value = v ? (v / 1e6).toFixed(5) : '';
@@ -1441,6 +1843,56 @@ function frequenzAnStelle(clientX) {
 $('scope').addEventListener('pointerup', (e) => {
   // Kein Wisch gewesen und nur ein Finger im Spiel? Dann war es ein Tipp.
   if (!wischAktiv && zeiger.size <= 1 && wischVon !== null) {
+    // Zuerst die Spots: liegt eine Marke unter dem Finger, gilt IHRE
+    // Frequenz und nicht die getippte Stelle. Sonst landet man je nach
+    // Fingerbreite ein paar hundert Hertz daneben -- genau das, was der
+    // Spot verhindern soll. Gerechnet wird in Canvas-Einheiten, weil
+    // `spotMarken` beim Zeichnen so entstanden ist.
+    const r = $('scope').getBoundingClientRect();
+    const xCanvas = r.width
+      ? (e.clientX - r.left) / r.width * pan.width : -1;
+    // Der Panadapter ist nur der OBERE Teil des Feldes; darunter liegt der
+    // Wasserfall. Die y-Umrechnung muss darum auf die Hoehe des Canvas
+    // gehen und nicht auf die des ganzen Feldes.
+    const rPan2 = pan.getBoundingClientRect();
+    const yCanvas = rPan2.height
+      ? (e.clientY - rPan2.top) / rPan2.height * pan.height : -1;
+
+    // ── Auf der SCHRIFT: das Rufzeichen ist gemeint, nicht die Frequenz ──
+    //
+    // Ein Tipp schlaegt es bei QRZ nach, zwei tragen es ins QSO-Blatt. Der
+    // einzelne Tipp muss darum kurz warten, ob ein zweiter kommt -- anders
+    // ist beides auf einem Telefon nicht zu unterscheiden. 280 ms ist das
+    // uebliche Mass; darunter trennt es Doppeltipps von zittrigen Fingern
+    // nicht mehr.
+    const schrift = (r.width && rPan2.height)
+      ? trefferAufSchrift(spotMarken, xCanvas, yCanvas) : null;
+    if (schrift) {
+      wischVon = null;
+      const jetzt = performance.now();
+      if (spotTipp.ruf === schrift.ruf && (jetzt - spotTipp.wann) < 280) {
+        clearTimeout(spotTipp.frist);
+        spotTipp.ruf = null;
+        qsoOeffnenMit(schrift.ruf);
+      } else {
+        spotTipp.ruf = schrift.ruf;
+        spotTipp.wann = jetzt;
+        clearTimeout(spotTipp.frist);
+        spotTipp.frist = setTimeout(() => {
+          spotTipp.ruf = null;
+          qrzOeffnen(schrift.ruf);
+        }, 280);
+      }
+      return;
+    }
+
+    const treffer = r.width ? trefferBei(spotMarken, xCanvas) : null;
+    if (treffer) {
+      link.send(`vfo:${state.trx},0,${treffer.hz}`);
+      spotsBaldHolen();
+      wischVon = null;
+      return;
+    }
     const ziel = frequenzAnStelle(e.clientX);
     if (ziel) {
       const vorher = link.st.vfo[state.trx] ? link.st.vfo[state.trx][0] : ziel;
@@ -1616,6 +2068,200 @@ link.addEventListener('spectrum', (e) => {
   hatSpektrum = true;
 });
 link.addEventListener('ready', () => zeichneBedienung());
+link.addEventListener('ready', () => spotsBaldHolen(300));
+
+// ── Der Rotor (2026-10-05) ────────────────────────────────────────────────
+//
+// Das Feld BLEIBT VERSTECKT, bis Longpath einen Rotor meldet. An der QRP
+// gibt es keinen, und ein leeres Feld, das nichts kann, ist auf einem
+// Telefon reiner Platzverbrauch.
+//
+// Die Scheibe WAEHLT nur. Gedreht wird erst mit dem Knopf -- dieselbe
+// Entscheidung wie bei der Sendetaste: ein Tipp, der sofort einen Mast
+// dreht, ist in einer Hosentasche eine schlechte Idee. Und Longpath
+// verweigert es ohnehin, solange TciAllowRemoteRotor nicht steht; die
+// Ablehnung kommt als `rotor_err:` hier an und wird gezeigt, statt
+// verschluckt zu werden.
+const rotorSicherung = new RotorSicherung();
+let rotorStand = null;
+let rotorFeldAn = false;
+let rotorTakt = null;
+
+function rotorStricheZeichnen() {
+  const g = $('rotorStriche');
+  if (!g || g.childElementCount) { return; }
+  // Alle 10 Grad ein Strich, alle 30 ein laengerer. Das ist die Teilung
+  // jedes Kompasses; eine feinere kann ein Finger ohnehin nicht treffen.
+  for (let a = 0; a < 360; a += 10) {
+    const haupt = (a % 30) === 0;
+    const r1 = haupt ? 78 : 84, r2 = 92;
+    const rad = a * Math.PI / 180;
+    const l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    l.setAttribute('x1', (Math.sin(rad) * r1).toFixed(2));
+    l.setAttribute('y1', (-Math.cos(rad) * r1).toFixed(2));
+    l.setAttribute('x2', (Math.sin(rad) * r2).toFixed(2));
+    l.setAttribute('y2', (-Math.cos(rad) * r2).toFixed(2));
+    if (haupt) { l.setAttribute('class', 'haupt'); }
+    g.appendChild(l);
+  }
+}
+
+function rotorZeichnen() {
+  const nadel = $('rotorNadel'), ziel = $('rotorZiel');
+  const alt = rotorStand && !rotorStand.frisch;
+  if (rotorStand) {
+    const rad = rotorStand.grad * Math.PI / 180;
+    nadel.setAttribute('x2', (Math.sin(rad) * 82).toFixed(2));
+    nadel.setAttribute('y2', (-Math.cos(rad) * 82).toFixed(2));
+    nadel.classList.toggle('alt', !!alt);
+    $('rotorGrad').textContent = `${Math.round(rotorStand.grad)}°`;
+    $('rotorGrad').classList.toggle('alt', !!alt);
+  }
+  const z = rotorSicherung.gilt(performance.now()) ? rotorSicherung.ziel : null;
+  if (z === null) { ziel.setAttribute('hidden', ''); }
+  else {
+    const rad = z * Math.PI / 180;
+    ziel.setAttribute('x2', (Math.sin(rad) * 92).toFixed(2));
+    ziel.setAttribute('y2', (-Math.cos(rad) * 92).toFixed(2));
+    ziel.removeAttribute('hidden');
+  }
+  const knopf = $('rotorDreh');
+  knopf.disabled = (z === null);
+  knopf.textContent = (z === null) ? 'RICHTUNG WÄHLEN' : `AUF ${z}° DREHEN`;
+  const t = zustandText(rotorStand);
+  if (!$('rotorMeldung').classList.contains('warn')) {
+    $('rotorMeldung').textContent = t;
+  }
+}
+
+function rotorHolen() { if (link.ready) { link.send(`rotor:${state.trx}`); } }
+
+link.addEventListener('rotor', (e) => {
+  const st = standLesen((e.detail || {}).args || []);
+  if (!st) { return; }
+  rotorStand = st;
+  if (!rotorFeldAn) {
+    // Erst jetzt zeigen: davor wussten wir nicht, ob es ueberhaupt einen gibt.
+    rotorFeldAn = true;
+    rotorStricheZeichnen();
+    $('rotorFeld').removeAttribute('hidden');
+  }
+  rotorZeichnen();
+});
+
+link.addEventListener('rotorok', () => {
+  $('rotorMeldung').classList.remove('warn');
+  $('rotorMeldung').textContent = 'ANGENOMMEN';
+  // Gleich nachfragen: der Rotor meldet den Zustand `dreht` erst, wenn er
+  // wirklich anlaeuft.
+  setTimeout(rotorHolen, 400);
+});
+
+link.addEventListener('rotorfehler', (e) => {
+  const t = ((e.detail || {}).text || '').trim();
+  // "kein rotor" ist kein Fehler des Bedieners -- dann gibt es hier einfach
+  // keinen, und das Feld bleibt weg.
+  if (/kein rotor/i.test(t)) { return; }
+  $('rotorMeldung').textContent = t || 'abgelehnt';
+  $('rotorMeldung').classList.add('warn');
+  rotorSicherung.verwerfen();
+  rotorZeichnen();
+});
+
+$('rotorScheibe').addEventListener('pointerup', (e) => {
+  const r = $('rotorScheibe').getBoundingClientRect();
+  if (!r.width) { return; }
+  // In die Koordinaten der Scheibe umrechnen: Mitte ist 0/0, y nach unten.
+  const x = (e.clientX - r.left) - r.width / 2;
+  const y = (e.clientY - r.top) - r.height / 2;
+  // Der Mindestradius ist in Bildpunkten der ANZEIGE, nicht des viewBox --
+  // darum auf die tatsaechliche Breite bezogen.
+  const g = peilungAus(x, y, r.width * 0.12);
+  if (g === null) { return; }
+  rotorSicherung.waehle(g, performance.now());
+  $('rotorMeldung').classList.remove('warn');
+  $('rotorMeldung').textContent = '';
+  rotorZeichnen();
+});
+
+$('rotorDreh').addEventListener('click', () => {
+  const z = rotorSicherung.bestaetige(performance.now());
+  if (z === null) { rotorZeichnen(); return; }
+  if (!link.ready) {
+    $('rotorMeldung').textContent = 'keine Verbindung — nicht gedreht';
+    $('rotorMeldung').classList.add('warn');
+    return;
+  }
+  link.send(`rotor_to:${z}`);
+  $('rotorMeldung').classList.remove('warn');
+  $('rotorMeldung').textContent = 'wird gesendet …';
+  rotorZeichnen();
+});
+
+// Zwei Sekunden: ein Rotor braucht fuer ein Grad laenger als das, und
+// haeufiger zu fragen kostet nur Leitung.
+rotorTakt = setInterval(rotorHolen, 2000);
+link.addEventListener('ready', () => setTimeout(rotorHolen, 500));
+
+// ── Zurueck aus dem Hintergrund (2026-10-05) ──────────────────────────────
+//
+// Bis hierher behandelte die Seite das Entsperren GAR NICHT. Was dabei
+// wirklich passiert:
+//
+//   * Der WebSocket ist tot, aber `onclose` kommt erst, wenn das System die
+//     Seite wieder auftaut -- und der Wiederholungsabstand ist inzwischen
+//     auf 10 s gewachsen. Man sieht sekundenlang nichts, obwohl das
+//     Funkgeraet bereit ist.
+//   * Der AudioContext ist von iOS angehalten; niemand weckt ihn.
+//   * Wasserfall und S-Meter zeigen den Stand von VOR dem Sperren, ohne das
+//     zu sagen. Das ist dieselbe Gattung Luege wie ein stehender
+//     Wasserfall: er behauptet ein leeres Band, und danach wird nicht
+//     gerufen.
+//
+// Die Abonnements selbst muessen hier nicht erneuert werden -- sie haengen
+// am `open`-Ereignis und kommen mit der neuen Verbindung von selbst.
+let warVerborgen = false;
+
+function aufwachen() {
+  const stille = performance.now() - letzteIq;
+
+  // 1. Das Bild als alt kennzeichnen, BEVOR etwas anderes passiert. Der
+  //    Strich ist derselbe, den ein Bandwechsel zieht: oben das Neue, unten
+  //    das Alte. Ohne ihn sieht ein zehn Minuten alter Wasserfall aus wie
+  //    ein lebendiger.
+  if (bildIstAlt(stille)) {
+    wasserfallSchnitt();
+    state.hatSpektrumstrom = false;
+  }
+
+  // 2. Sofort neu verbinden, wenn noetig (Entscheidung in aufwachen.js).
+  link.nachDemAufwachen(stille);
+
+  // 3. Den Ton wecken. iOS haelt den AudioContext beim Sperren an, und ein
+  //    angehaltener Kontext ruft seinen Rueckruf nie wieder auf -- der Ton
+  //    bliebe stumm, bis jemand TON AUS und wieder EIN drueckt.
+  if (state.audio && state.audio.state === 'suspended') {
+    state.audio.resume().catch(() => { /* ohne Zutun des Bedieners nicht erlaubt */ });
+  }
+
+  // 4. Die Spots gehoeren ebenfalls aufgefrischt: waehrend des Schlafens
+  //    sind welche abgelaufen und neue gekommen.
+  spotsBaldHolen(400);
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { warVerborgen = true; return; }
+  if (!warVerborgen) { return; }
+  warVerborgen = false;
+  aufwachen();
+});
+
+// Nicht jedes System meldet `visibilitychange` zuverlaessig, wenn die Seite
+// aus dem Ruhezustand kommt -- `pageshow` mit `persisted` ist der zweite
+// Weg, und `focus` der dritte. Mehrfaches Aufwachen schadet nicht: die
+// Entscheidung in aufwachen.js wirft eine lebendige Verbindung nicht weg.
+window.addEventListener('pageshow', (e) => { if (e.persisted) { aufwachen(); } });
+window.addEventListener('focus', () => { if (warVerborgen) { warVerborgen = false; aufwachen(); } });
 link.addEventListener('state', () => {
   // Der Server hat das letzte Wort über die Rate. Weicht sie von unserer
   // Bitte ab, muss das Worklet es erfahren — sonst stimmt die Tonhöhe nicht.
@@ -1767,9 +2413,58 @@ async function melde(anlass) {
 setTimeout(() => melde('start'), 12000);
 
 // ── Bildschleife ────────────────────────────────────────────────────────────
+// ── Was ein Tipp auf ein Rufzeichen bedeutet (2026-10-05) ────────────────
+//
+// Betreiber am 2026-10-05: einmal tippen schlaegt bei QRZ nach, zweimal
+// traegt ins Logblatt ein. Auf dem STRICH bleibt es beim Abstimmen -- dort
+// steht die Frequenz, auf der Schrift steht das Rufzeichen.
+const spotTipp = { ruf: null, wann: 0, frist: null };
+
+/** QRZ in einem neuen Reiter. Verlaesst die App -- das ist dem Bediener
+ *  bewusst, er hat danach gefragt. */
+function qrzOeffnen(ruf) {
+  if (!ruf) { return; }
+  // `noopener` ist kein Beiwerk: ohne das bekaeme die fremde Seite ueber
+  // `window.opener` einen Griff auf diese hier.
+  window.open(`https://www.qrz.com/db/${encodeURIComponent(ruf)}`,
+              '_blank', 'noopener,noreferrer');
+}
+
+/** Das QSO-Blatt mit schon eingetragenem Rufzeichen. */
+function qsoOeffnenMit(ruf) {
+  qsoOeffnen();
+  if (!ruf) { return; }
+  const feld = $('qsoRuf');
+  feld.value = ruf;
+  // Die Dupe-Abfrage lebt am `input`-Ereignis -- von Hand gesetzte Werte
+  // loesen das nicht aus. Ohne diese Zeile stuende das Rufzeichen da und
+  // niemand haette nachgesehen, ob es schon im Logbuch steht.
+  feld.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+// Der Ton hat Vorrang vor dem Bild.
+//
+// Am Telefon ist die Seite kein sicherer Kontext, also laeuft der Ton ueber
+// einen ScriptProcessorNode -- im HAUPTFADEN, demselben, der hier zeichnet.
+// Wer dort 20 ms lang malt, waehrend der Tonblock faellig ist, bekommt eine
+// Luecke. Der Tonkern kann dagegen nichts tun: seine Anlaufsperre, der
+// sanfte Gleichlauf und die Notbremse setzen alle voraus, dass er ueberhaupt
+// aufgerufen WIRD.
+//
+// Die Bremse laesst Bilder aus, solange der Vorrat knapp ist -- aber nie mehr
+// als 15 am Stueck. Ein Wasserfall, der stehenbleibt, ist von einem toten
+// Empfang nicht zu unterscheiden, und das waere der schlimmere Fehler.
+const zeichenbremse = new Zeichenbremse();
+
 function schleife(t) {
   mitteVerfolgen();
-  zeichneBild();
+  if (zeichenbremse.darfZeichnen({
+        vorrat: state.tonVorrat,
+        ziel: state.tonZiel,
+        imHauptfaden: state.tonImHauptfaden === true,
+      })) {
+    zeichneBild();
+  }
   const r = link.tickRates(t);
   // Alles zusammen, was die Leitung kostet — auch das Spektrum, das anfangs
   // fehlte und die Anzeige zu günstig aussehen liess.
@@ -1794,7 +2489,12 @@ function schleife(t) {
   // stillen Tonstrom. Eine Kante an der falschen Stelle ist schlimmer als
   // keine.
   const bildLaeuft = r.spec > 0 || r.iq > 0;
-  const nurRauschen = bildLaeuft && state.hfAbstand !== null
+  // Waehrend gesendet wird, ist der Empfaenger stumm. "nur rauschen —
+  // antenne?" waere dann die falsche Erklaerung fuer etwas, das die
+  // Sendezeile daneben schon richtig benennt; dieselbe Regel wie bei
+  // "stockt" ohne Tonstrom.
+  const sendetGerade = link.ready && (link.st.mox || link.st.tune);
+  const nurRauschen = bildLaeuft && !sendetGerade && state.hfAbstand !== null
                       && state.hfAbstand < 15;
   $('fussBild').className = (!bildLaeuft || nurRauschen) ? 'warn' : '';
   $('fussBild').textContent =
@@ -1824,7 +2524,8 @@ function schleife(t) {
   // Erklaerung fuer "es kommt nichts", und sie stuende dauerhaft da. Die
   // Pruefung auf link.ready allein genuegte nicht: die Verbindung kann
   // stehen, ohne dass Ton abonniert ist.
-  if (link.ready && r.audio > 0 && !state.tonFehler && state.tonLeerlaufZuletzt
+  if (link.ready && !sendetGerade && r.audio > 0 && !state.tonFehler
+      && state.tonLeerlaufZuletzt
       && performance.now() - state.tonLeerlaufZuletzt < 2000) {
     $('fussTon').textContent += ' ⚠ stockt';
   }
@@ -1841,9 +2542,169 @@ function schleife(t) {
                               : link.ready ? '◆ gekoppelt'
                               : (link.ws && link.ws.readyState === 1) ? '◆ verbinde…' : '◇ getrennt';
   $('fussStatus').className = still ? 'warn' : (link.ready ? 'ok' : '');
+
+  // ── Wenn die Station sendet, darf die Seite das nicht verschweigen ──────
+  //
+  // `trx:` und `tune:` werden seit dem Anfang mitgelesen (tci.js) und waren
+  // bis hierher nirgends verwendet: die Seite WUSSTE, dass gesendet wird,
+  // und sagte nichts. Fuer eine Fernbedienung, die nur hoert, ist das die
+  // unangenehmste Form von Stille — Wasserfall leer, Ton weg, S-Meter
+  // unten, und nichts erklaert es. Genau dieselbe Gattung Fehler wie das
+  // eingefrorene S-Meter, nur umgekehrt: dort behauptete die Anzeige etwas
+  // Falsches, hier laesst sie etwas Richtiges weg.
+  //
+  // Seit dem Mikrofon-PTT der SunSDR QRP kann das auch ohne Zutun am Pult
+  // passieren: Taste am Mikrofon gedrueckt -> Longpath meldet `trx:0,true`
+  // -> hier steht es.
+  //
+  // Die Zeile sitzt dort, wo sonst "SENDEN / NUR IN DER APP" steht: gleiche
+  // Geometrie, gleicher Platz, nur in Messing. Kein Rot — Rot bleibt der
+  // Warnung, und Senden ist keine Warnung, sondern ein Zustand.
+  //
+  // Was hier bewusst NICHT passiert: das S-Meter wird nicht geleert. Ob
+  // Longpath waehrend des Sendens weiter echte Empfangswerte meldet, ist
+  // nicht geprueft — und das zu pruefen hiesse senden. Ungeprueft etwas
+  // ausblenden waere genauso geraten wie es ungeprueft stehenzulassen.
+  // `sendetGerade` ist weiter oben in derselben Runde schon bestimmt.
+  const txEl = $('tx');
+  if (sendetGerade !== state.sendetGezeigt) {
+    state.sendetGezeigt = sendetGerade;
+    txEl.classList.toggle('sendet', sendetGerade);
+    txEl.innerHTML = sendetGerade
+      ? (link.st.tune ? 'STATION STIMMT AB <small>EMPFÄNGER STUMM</small>'
+                      : 'STATION SENDET <small>EMPFÄNGER STUMM</small>')
+      : 'SENDEN <small>NUR IN DER APP</small>';
+  }
   requestAnimationFrame(schleife);
 }
 requestAnimationFrame(schleife);
 
 zeichneKopf();
 zeichneBedienung();
+
+
+// ── Die Halteleiste ────────────────────────────────────────────────────────
+//
+// Entwurf 1, gewaehlt am 2026-10-04: gedrueckt halten nimmt auf, loslassen
+// hoert auf. Der Finger ist die Sicherung.
+//
+// **Sie tastet nicht.** Hier steht kein `trx:` und kein `tune:`, und das
+// bleibt so, bis der Betreiber es ausdruecklich freigibt und die Dummy-Last
+// dranhaengt. Was sie tut: Mikrofon aufnehmen, TCI-Rahmen bauen, abschicken.
+// Longpath verwirft sie, solange dieser Client nicht tastet
+// (`m_txAudioActiveClient` in TciServer.cpp), und zaehlt sie als verworfen —
+// genau das ist der Beleg, dass die Kette steht, ohne dass ein Watt auf die
+// Antenne geht.
+//
+// Nutzen schon heute: der Pegelbalken. Ohne ihn weiss am Telefon niemand, ob
+// das Mikrofon ueberhaupt etwas hoert, und das ist die erste Frage.
+{
+  const reihe   = $('mikrow');
+  const taste   = $('mikhalt');
+  const balken  = $('pegelbalken');
+  const spitzeE = $('pegelspitze');
+  const meldung = $('mikmeldung');
+
+  const mik = new Mikrofon((rahmen) => {
+    // Rohe Rahmen gehen am Textkanal vorbei direkt auf den Socket — `send()`
+    // haengt ein Semikolon an und ist nur fuer Befehle.
+    if (link.ws && link.ws.readyState === 1) { link.ws.send(rahmen); }
+  });
+
+  // Erst sagen, DASS es nicht geht, dann eine Taste anbieten. Eine Taste,
+  // die beim Druecken nichts tut und nichts erklaert, ist schlimmer als
+  // keine. Ueber `http` gibt es `navigator.mediaDevices` gar nicht; dagegen
+  // hilft nur ein Zertifikat (handfunke/tls-einrichten.sh).
+  // Wo es kein Mikrofon GEBEN kann, steht auch keine Taste dafuer.
+  //
+  // Erst stand hier eine abgeblendete Taste mit einer Warnung darunter. Das
+  // war gut gemeint und im Alltag falsch: ueber `http` — also genau dort, wo
+  // das Telefon die Seite holt — kann sie NIE etwas tun. Eine dauerhaft tote
+  // Taste im besten Daumenbereich sieht aus wie ein Defekt und nimmt Platz
+  // fuer etwas, das dort nicht geht. Dieselbe Ueberlegung wie bei den beiden
+  // Sendetasten, die zu einer ruhigen Zeile geschrumpft sind.
+  //
+  // Der Grund bleibt lesbar — aber als eine Zeile, nicht als Bedienelement,
+  // das zum Druecken einlaedt.
+  const moeglich = mikrofonMoeglich();
+  reihe.hidden = false;
+  if (!moeglich) {
+    taste.hidden = true;
+    balken.parentElement.hidden = true;
+    meldung.className = 'mikmeldung warn';
+    meldung.textContent = window.isSecureContext === false
+      ? 'MIKROFON BRAUCHT EIN ZERTIFIKAT (HTTPS)'
+      : 'DIESES GERÄT GIBT KEIN MIKROFON HER';
+  }
+
+  let haelt = false;
+  let spitzeHalten = 0;
+
+  const anfangen = async (ev) => {
+    if (ev) { ev.preventDefault(); }
+    if (haelt || !moeglich) { return; }
+    haelt = true;
+    taste.classList.add('haelt');
+    meldung.className = 'mikmeldung';
+    meldung.textContent = 'NIMMT AUF …';
+    if (!await mik.start()) {
+      haelt = false;
+      taste.classList.remove('haelt');
+      meldung.className = 'mikmeldung warn';
+      meldung.textContent = (mik.fehler || 'MIKROFON GING NICHT').toUpperCase();
+      return;
+    }
+    // Zwischen Druck und Antwort kann der Finger laengst wieder weg sein —
+    // getUserMedia fragt beim ersten Mal nach Erlaubnis und braucht dann
+    // Sekunden. Dann sofort wieder aufhoeren, statt stumm weiterzulaufen.
+    if (!haelt) { mik.stop(); }
+  };
+
+  const aufhoeren = () => {
+    if (!haelt) { return; }
+    haelt = false;
+    taste.classList.remove('haelt');
+    mik.stop();
+    balken.style.width = '0%';
+    spitzeE.style.left = '0%';
+    spitzeHalten = 0;
+    meldung.textContent = mik.strecke
+      ? `${mik.strecke.rahmen} RAHMEN GESCHICKT · VERWORFEN, WEIL NICHT GETASTET`
+      : '';
+  };
+
+  // Der Server sagt seit dem 2026-10-04, WARUM er einen Sendewunsch
+  // ablehnt. Die Halteleiste tastet noch nicht, aber sobald sie es tut,
+  // steht hier der Grund statt eines stummen Nichts — und bis dahin fängt
+  // die Zeile jede Ablehnung ab, die aus einer anderen Ecke käme.
+  link.addEventListener('txfehler', (e) => {
+    const grund = (e.detail && e.detail.text) || 'abgelehnt';
+    meldung.className = 'mikmeldung warn';
+    meldung.textContent = ('SENDEN ABGELEHNT — ' + grund).toUpperCase();
+  });
+
+  taste.addEventListener('pointerdown', anfangen);
+  taste.addEventListener('pointerup', aufhoeren);
+  taste.addEventListener('pointercancel', aufhoeren);
+  taste.addEventListener('pointerleave', aufhoeren);
+  // Faellt das Fenster in den Hintergrund, ist niemand mehr da, der
+  // loslaesst. Ein Mikrofon, das im Hintergrund weiterlaeuft, waere auf
+  // einer Fernbedienung das Letzte, was jemand erwartet.
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { aufhoeren(); }
+  });
+
+  // Der Balken laeuft in eigener Taktung, nicht je Tonblock: 50 Bilder je
+  // Sekunde zu zeichnen kostet mehr als es zeigt.
+  setInterval(() => {
+    if (!haelt || !mik.strecke) { return; }
+    const sp = mik.strecke.spitzeAblesen();
+    const eff = mik.strecke.effektiv;
+    balken.style.width = Math.min(100, eff * 140).toFixed(0) + '%';
+    spitzeHalten = Math.max(spitzeHalten * 0.93, sp);
+    spitzeE.style.left = Math.min(99, spitzeHalten * 100).toFixed(0) + '%';
+    meldung.textContent = sp >= 0.99 ? 'ÜBERSTEUERT — LEISER SPRECHEN'
+                                     : 'NIMMT AUF …';
+    meldung.className = sp >= 0.99 ? 'mikmeldung warn' : 'mikmeldung';
+  }, 100);
+}

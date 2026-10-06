@@ -290,6 +290,28 @@ header .rate{font-size:var(--f-caption);color:var(--text-inactive)}
   color:var(--text-inactive);box-shadow:inset 0 1px 0 var(--light);
 }
 
+/* ── Die Station sendet ──────────────────────────────────────────────────
+   Dieselbe Zeile, dieselbe Geometrie, nur in Messing: an dieser Stelle
+   steht sonst "SENDEN / NUR IN DER APP", und genau dort schaut man hin,
+   wenn man wissen will, was der Sender tut.
+
+   Messing und nicht Rot: Rot bleibt der Warnung (Betreiber-Regel), und
+   Senden ist kein Fehler, sondern ein Zustand. Es ist derselbe Ton, in dem
+   die Seite alles Gemessene zeigt (--measured) — denn das ist es: eine
+   Meldung des Geraets, keine Mutmassung der Seite.
+
+   Zweimal notiert, weil der Zusammenbau der Zeile an :has() haengt (Safari
+   ab 16.4): die zweite Regel greift auch ohne :has(), dann eben an den
+   beiden getrennten Tasten. */
+.txrow:has(.tx.locked) .tx.sendet,
+.tx.locked.sendet{
+  color:var(--measured);
+  border-color:var(--amber-dim);
+  background:rgba(107,86,48,.20);
+}
+.txrow:has(.tx.locked) .tx.sendet small,
+.tx.locked.sendet small{color:var(--measured);opacity:.8}
+
 /* ── Fußzeile ───────────────────────────────────────────────────────────── */
 footer{flex:none;height:30px;display:flex;align-items:center;gap:10px;
   padding:0 16px;margin-top:8px}
@@ -314,3 +336,194 @@ footer .warn{color:var(--warn)}
   box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 2px 0 rgba(0,0,0,.45);
 }
 .tonAn[hidden]{display:none}
+
+/* ── QSO eintragen (Entwurf A, Betreiber 2026-10-04) ─────────────────────
+   Dasselbe Muster wie das Frequenz-Blatt (#qsy): ein Blatt ueber dem Bild,
+   nicht ein weiteres Feld im Stapel. Begruendung dort; kurz: wer eintraegt,
+   tut genau das — und danach ist das Band wieder frei.
+
+   Die Knopffarbe folgt der Hausregel: Blau nur, wo man klickt. Messing
+   bleibt dem Gemessenen vorbehalten, und die drei automatischen Zeilen
+   sind genau das — gemessene Werte vom Geraet, keine Eingabe. */
+.logAuf{height:28px;padding:0 11px;border-radius:9px;
+  border:1px solid var(--amber-dim);background:rgba(107,86,48,.22);
+  color:var(--measured);font:600 var(--f-caption)/1 inherit;
+  letter-spacing:.13em;flex:none}
+#qsoBlatt{position:fixed;inset:0;z-index:11;display:none;align-items:center;
+  justify-content:center;padding:0 22px;
+  background:radial-gradient(120% 60% at 50% 18%,rgba(23,33,43,.95) 0%,
+             rgba(11,13,16,.96) 52%,rgba(8,8,10,.975) 100%);
+  -webkit-backdrop-filter:blur(7px);backdrop-filter:blur(7px)}
+#qsoBlatt.an{display:flex}
+#qsoBlatt .karte{width:100%;max-width:332px;display:flex;
+  flex-direction:column;gap:12px}
+#qsoBlatt h1{font-size:var(--f-sub);font-weight:600;letter-spacing:.07em;
+  color:var(--title);text-align:center}
+/* Eingefasst wie die Regler-Bahnen: tief eingelassen, damit man sieht,
+   dass man hineinschreibt. */
+#qsoRuf{width:100%;box-sizing:border-box;height:58px;border-radius:12px;text-align:center;
+  background:#040507;border:1px solid rgba(0,0,0,.8);color:var(--text);
+  font:600 30px/1 var(--mono);letter-spacing:.09em;
+  box-shadow:inset 0 2px 6px rgba(0,0,0,.85);text-transform:uppercase}
+#qsoRuf::placeholder{color:var(--text-inactive);font-weight:500;
+  font-size:19px;letter-spacing:.14em}
+#qsoRuf:focus{outline:none;border-color:var(--accent);
+  box-shadow:inset 0 2px 6px rgba(0,0,0,.85),0 0 0 3px rgba(74,123,168,.22)}
+#qsoBlatt .rstreihe{display:flex;gap:9px}
+/* min-width:0 ist nicht Kosmetik: ohne das weigert sich ein Flex-Kind,
+   unter die EIGENBREITE eines <input> zu schrumpfen (die kommt aus dem
+   size-Attribut, nicht aus dem CSS). Die Reihe lief damit bei 375 px
+   rechts aus dem Bild — am 2026-10-04 am Telefonformat gesehen. */
+#qsoBlatt .rstfeld{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px}
+#qsoBlatt .rstfeld label{font-size:var(--f-caption);letter-spacing:.11em;
+  color:var(--text3);text-transform:uppercase;text-align:center}
+#qsoBlatt .rstfeld input{width:100%;box-sizing:border-box;height:44px;border-radius:11px;text-align:center;
+  background:#040507;border:1px solid rgba(0,0,0,.8);color:var(--text);
+  font:600 19px/1 var(--mono);box-shadow:inset 0 2px 5px rgba(0,0,0,.85)}
+#qsoBlatt .rstfeld input:focus{outline:none;border-color:var(--accent)}
+#qsoBlatt .automatisch{display:flex;flex-direction:column;gap:3px;
+  padding:9px 11px;border-radius:10px;background:rgba(255,255,255,.025);
+  border:1px solid rgba(255,255,255,.05)}
+#qsoBlatt .automatisch .z{display:flex;justify-content:space-between;
+  font-size:var(--f-caption);font-family:var(--mono)}
+#qsoBlatt .automatisch .k{color:var(--text3);letter-spacing:.06em}
+#qsoBlatt .automatisch .v{color:var(--measured)}
+/* Die Meldezeile haelt ihre Hoehe, auch wenn sie leer ist — sonst
+   springt das Blatt, sobald eine Antwort kommt. */
+#qsoMeldung{min-height:16px;font-size:var(--f-small);text-align:center;
+  color:var(--text3)}
+#qsoMeldung.ok{color:var(--ok)}
+#qsoMeldung.warn{color:var(--warn)}
+#qsoBlatt button{height:50px;border-radius:12px;font:600 var(--f-sub)/1 inherit;
+  letter-spacing:.09em;border:1px solid #4886c0;
+  background:linear-gradient(#36699f,#21436a);color:#e2eefb;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.2),
+             0 0 16px rgba(74,123,168,.3),0 2px 6px rgba(0,0,0,.55)}
+#qsoBlatt button.still{height:44px;border:1px solid var(--border);
+  background:rgba(18,19,23,.6);color:var(--text-inactive);box-shadow:none;
+  font-size:var(--f-caption);letter-spacing:.1em;text-transform:uppercase}
+#qsoBlatt button:disabled{opacity:.45}
+
+/* ── Was das Logbuch ueber dieses Rufzeichen weiss ────────────────────────
+   Messing, weil es GEMESSEN ist — es kommt aus der Datei, nicht aus einer
+   Schaetzung. Kein kraeftiges Rot: Rot bleibt dem Fehler, und ein Dupe ist
+   kein Fehler, sondern eine Auskunft (Hausregel, 2026-10-01).
+
+   Die Zeile haelt ihre Hoehe, auch leer. Ohne das wandern RST-Felder und
+   Knopf beim Tippen nach unten — und ein Knopf, der unter dem Finger
+   wegrutscht, traegt im Pile-up das falsche QSO ein. */
+#qsoBlatt .dupe{min-height:15px;font:500 var(--f-caption)/1.25 var(--mono);
+  letter-spacing:.04em;text-align:center;color:var(--text-inactive);
+  margin-top:-4px}
+/* Die Zustandsklassen heissen ABSICHTLICH nicht wie die Grundklasse:
+   `.dupe.dupe` trifft jedes Element mit class="dupe" und schlaegt per
+   Spezifitaet die beiden anderen Regeln. Am 2026-10-04 kamen damit alle
+   drei Zustaende in Messing heraus — am Telefon gesehen, nicht im Code. */
+#qsoBlatt .dupe.d-neu{color:var(--text3)}
+#qsoBlatt .dupe.d-bekannt{color:var(--amber-dim)}
+#qsoBlatt .dupe.d-dupe{color:var(--measured);font-weight:600}
+
+/* ── Die letzten Kontakte ─────────────────────────────────────────────────
+   Dicktengleich und eng, damit acht Zeilen auf ein Telefon passen, ohne
+   dass der Eintragen-Knopf aus dem Bild rutscht. Hoehe begrenzt und
+   scrollbar: die Liste darf wachsen, das Blatt nicht. */
+#qsoBlatt .letzte{display:flex;flex-direction:column;gap:6px}
+#qsoBlatt .letzteKopf{display:flex;align-items:center;
+  justify-content:space-between;
+  font:600 var(--f-caption)/1 inherit;letter-spacing:.13em;
+  color:var(--text3)}
+#qsoBlatt button.klein{height:28px;padding:0 10px;font-size:10px;
+  letter-spacing:.09em}
+#qsoBlatt .logListe{max-height:150px;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  border-radius:10px;background:rgba(255,255,255,.02);
+  border:1px solid rgba(255,255,255,.05);padding:5px 7px;
+  display:flex;flex-direction:column;gap:2px}
+#qsoBlatt .logListe .r{display:flex;gap:8px;align-items:baseline;
+  font:500 var(--f-caption)/1.5 var(--mono);white-space:nowrap}
+#qsoBlatt .logListe .wann{color:var(--text-inactive);flex:none}
+#qsoBlatt .logListe .ruf{color:var(--text);font-weight:600;
+  flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+#qsoBlatt .logListe .wo{color:var(--amber-dim);flex:none}
+#qsoBlatt .logListe .leer{font:500 var(--f-caption)/1.5 var(--mono);
+  color:var(--text-inactive);text-align:center}
+
+
+/* ── Die Halteleiste (Entwurf 1, gewaehlt 2026-10-04) ─────────────────────
+   Gedrueckt halten nimmt auf, loslassen hoert auf. Der Finger ist die
+   Sicherung: faellt das Telefon aus der Hand, endet es von selbst, und es
+   bleibt kein Zustand uebrig, der haengen koennte.
+
+   KEIN Messing, obwohl die Taste spaeter einmal die Sendetaste wird.
+   Messing ist die Sendefarbe (--measured), und solange hier nichts getastet
+   wird, waere Messing eine Behauptung. Die Farbe kommt mit dem Tasten. */
+.mikrow{margin:8px 12px 0;display:flex;flex-direction:column;gap:7px}
+.mikhalt{
+  height:58px;border-radius:9px;border:1px solid var(--border);
+  background:linear-gradient(var(--glass-btn-top),var(--glass-btn-bot));
+  color:var(--text2);display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:2px;cursor:pointer;
+  box-shadow:inset 0 1px 0 var(--light),0 2px 0 rgba(0,0,0,.45);
+  -webkit-user-select:none;user-select:none;touch-action:none;
+}
+.mikhalt b{font-weight:700;letter-spacing:.14em;font-size:var(--f-sub)}
+.mikhalt small{font-size:var(--f-caption);font-weight:600;letter-spacing:.1em;
+               opacity:.72}
+/* Gedrueckt: deutlich sichtbar, aber ohne Farbwechsel — der Unterschied
+   zwischen "ich halte" und "es sendet" muss erhalten bleiben. */
+.mikhalt.haelt{
+  background:linear-gradient(#2c2d33,#1d1e23);
+  border-color:var(--accent);color:var(--text);
+  box-shadow:inset 0 2px 5px rgba(0,0,0,.6);
+}
+.mikhalt[disabled]{opacity:.45;cursor:default}
+
+/* Der Pegel. Ohne ihn weiss am Telefon niemand, ob das Mikrofon etwas
+   hoert — und das ist die erste Frage, lange bevor getastet wird. */
+.pegel{position:relative;height:8px;border-radius:4px;overflow:hidden;
+       background:var(--inset);border:1px solid var(--inset-border)}
+.pegel i{position:absolute;left:0;top:0;bottom:0;width:0;
+         background:linear-gradient(90deg,var(--ok),var(--measured) 72%,var(--danger));
+         transition:width .06s linear}
+/* Die Spitze bleibt kurz stehen — ein Balken, der nur mitzittert, zeigt
+   Uebersteuerung nie lange genug, um sie zu bemerken. */
+.pegel u{position:absolute;top:0;bottom:0;width:2px;background:var(--text);
+         opacity:.75;left:0;transition:left .18s ease-out}
+.mikmeldung{font:600 var(--f-caption)/1.3 var(--mono);letter-spacing:.08em;
+            color:var(--text-inactive);text-align:center;min-height:13px}
+.mikmeldung.warn{color:var(--warn)}
+
+
+/* ── Der Rotor (2026-10-05) ───────────────────────────────────────────────
+   Die Scheibe ist ein Messinstrument, kein Zierrat: die Nadel zeigt, was
+   das Geraet MELDET, der zweite Strich, was gewaehlt ist. Messing fuer das
+   Gemessene, Blau fuer das Anfassbare -- dieselbe Rollenverteilung wie
+   ueberall sonst in dieser Seite. */
+.rotor .rotorreihe{display:flex;gap:14px;align-items:center}
+.rotor .scheibe{width:132px;height:132px;flex:none}
+.rotor .scheibe .ring{fill:rgba(255,255,255,.02);stroke:var(--border);stroke-width:1}
+.rotor .scheibe .striche line{stroke:var(--text-inactive);stroke-width:1}
+.rotor .scheibe .striche line.haupt{stroke:var(--text3);stroke-width:1.5}
+.rotor .scheibe .himmel{fill:var(--text3);font:600 13px var(--mono);
+  text-anchor:middle;dominant-baseline:middle;letter-spacing:.04em}
+/* Die Nadel ist GEMESSEN -> Messing. Steht die Meldung still, blasst sie ab
+   (Klasse `alt`), statt eine Richtung zu behaupten, die niemand bestaetigt. */
+.rotor .scheibe .nadel{stroke:var(--measured);stroke-width:2.5;stroke-linecap:round}
+.rotor .scheibe .nadel.alt{stroke:var(--amber-dim)}
+/* Das Ziel ist ANGEFASST -> Blau, gestrichelt, damit es nie mit der
+   gemessenen Stellung zu verwechseln ist. */
+.rotor .scheibe .ziel{stroke:var(--accent);stroke-width:2;stroke-dasharray:4 3;
+  stroke-linecap:round}
+.rotor .scheibe .nabe{fill:var(--text3)}
+.rotor .rotorwerte{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+.rotor .gradAn{font:600 28px/1 var(--mono);color:var(--measured);
+  letter-spacing:.02em}
+.rotor .gradAn.alt{color:var(--amber-dim)}
+.rotor .rotorMeldung{min-height:14px;font:500 var(--f-caption)/1.3 var(--mono);
+  color:var(--text3);letter-spacing:.04em}
+.rotor .rotorMeldung.warn{color:var(--warn)}
+.rotor .rotorDreh{height:42px;border-radius:11px;font:600 var(--f-caption)/1 inherit;
+  letter-spacing:.1em;border:1px solid #4886c0;
+  background:linear-gradient(#36699f,#21436a);color:#e2eefb;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 2px 6px rgba(0,0,0,.55)}
+.rotor .rotorDreh:disabled{opacity:.4;border-color:var(--border);
+  background:rgba(18,19,23,.6);color:var(--text-inactive);box-shadow:none}

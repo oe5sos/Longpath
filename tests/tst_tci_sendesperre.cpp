@@ -209,6 +209,91 @@ private slots:
         server.stop();
     }
 
+    // ── Ein abgelehnter Sendewunsch sagt, DASS und WARUM ───────────────────
+    //
+    // Bis zum 2026-10-04 war das Nein stumm. Am Pult faellt das nicht auf —
+    // dort kommt der Befehl von Loopback und geht durch. Auf einer
+    // Fernbedienung ist ein stummes Nein nicht von einem Fehler zu
+    // unterscheiden: der Bediener drueckt, nichts passiert, nichts erklaert
+    // es. Fuer die Halteleiste am Telefon ist genau das der Unterschied
+    // zwischen "nicht freigegeben" und "kaputt".
+    //
+    // Die Sperre selbst bleibt unangetastet — geprueft wird, dass sie
+    // weiterhin greift UND dass sie sich meldet.
+    void abgelehnt_wird_dem_client_gesagt_data()
+    {
+        QTest::addColumn<QString>("befehl");
+        QTest::newRow("trx")  << QStringLiteral("trx:0,true;");
+        QTest::newRow("tune") << QStringLiteral("tune:0,true;");
+    }
+
+    void abgelehnt_wird_dem_client_gesagt()
+    {
+        QFETCH(QString, befehl);
+
+        TciServer server(nullptr);
+        QWebSocket client;
+        QVERIFY2(aufbauen(server, client, /*sendenFrei=*/false),
+                 "Aufbau gescheitert — der Prüfpunkt hätte nichts bewiesen");
+
+        QStringList antworten;
+        connect(&client, &QWebSocket::textMessageReceived,
+                [&antworten](const QString& s) { antworten << s; });
+
+        schicke(client, befehl);
+        QVERIFY2(TciTest::warteAufAntwort(antworten, QStringLiteral("tx_err")),
+                 qPrintable(QStringLiteral(
+                     "»%1« wurde stumm verworfen — am Telefon ist das von "
+                     "einem Fehler nicht zu unterscheiden (Antwort: %2)")
+                     .arg(befehl, antworten.join(QLatin1Char(' ')))));
+
+        const QString zeile = [&]() {
+            for (const QString& a : antworten) {
+                for (const QString& teil : a.split(QLatin1Char(';'))) {
+                    if (teil.trimmed().startsWith(QStringLiteral("tx_err"))) {
+                        return teil.trimmed();
+                    }
+                }
+            }
+            return QString();
+        }();
+        QVERIFY2(zeile.contains(QStringLiteral("nicht freigegeben")),
+                 qPrintable(QStringLiteral("Grund fehlt oder ist unbrauchbar: »%1«")
+                                .arg(zeile)));
+
+        // Und die Sperre muss trotzdem gegriffen haben — eine hoefliche
+        // Absage, die den Sender tastet, waere das Schlimmste von beidem.
+        QVERIFY2(server.moxOwnerForTest() == nullptr,
+                 "Trotz Absage wurde ein Besitzer gesetzt");
+
+        client.close();
+        server.stop();
+    }
+
+    // ── Freigegeben darf KEINE Absage kommen ───────────────────────────────
+    //
+    // Ohne diesen Punkt waere ein Server, der immer `tx_err` schickt, gruen.
+    void mit_freigabe_kommt_keine_absage()
+    {
+        TciServer server(nullptr);
+        QWebSocket client;
+        QVERIFY(aufbauen(server, client, /*sendenFrei=*/true));
+
+        QStringList antworten;
+        connect(&client, &QWebSocket::textMessageReceived,
+                [&antworten](const QString& s) { antworten << s; });
+
+        schicke(client, QStringLiteral("trx:0,true;"));
+        QVERIFY(warteAufBesitzer(server, true));
+        QVERIFY2(!antworten.join(QLatin1Char(' ')).contains(QStringLiteral("tx_err")),
+                 qPrintable(QStringLiteral(
+                     "Mit Freigabe darf keine Absage kommen (Antwort: %1)")
+                     .arg(antworten.join(QLatin1Char(' ')))));
+
+        client.close();
+        server.stop();
+    }
+
     // ── Freigegeben muss es durchgehen, sonst prüft das obige nichts ────────
     void mit_freigabe_geht_senden_durch()
     {

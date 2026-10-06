@@ -389,7 +389,8 @@ void GlobeWidget::resetView()
 // Bedienflaeche — hier steht jetzt, dass die Kugel zoomt.
 void GlobeWidget::contextMenuEvent(QContextMenuEvent* e)
 {
-    ScopedChildWidget<QMenu> menuOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+    ScopedChildWidget<QMenu> menuOwner(window());   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+    const QPointer<GlobeWidget> self(this);   // Menue am Fenster: ein nativer Vorfahr gab ihm keinen Fensterbezug (2026-09-30)
     QMenu& menu = *menuOwner.get();
     // Dieselbe Menue-Optik wie ueberall sonst (RxApplet, VFO-Flagge,
     // Panadapter): sonst sieht ein Menue nach einem anderen Programm aus.
@@ -413,7 +414,7 @@ void GlobeWidget::contextMenuEvent(QContextMenuEvent* e)
     const QAction* chosen = menu.exec(e->globalPos());
     // Das Elternteil kann waehrend exec() gestorben sein — dann ist
     // auch das Menue weg und `this` eine Leiche. Siehe ScopedChildWidget.h.
-    if (!menuOwner) { return; }
+    if (!menuOwner || !self) { return; }
     if (chosen == in)        { zoomBy(1.3); }
     else if (chosen == out)  { zoomBy(1.0 / 1.3); }
     else if (chosen == toTx && m_hasTarget) { flyTo(m_targetLat, m_targetLon); }

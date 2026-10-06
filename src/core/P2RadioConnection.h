@@ -546,6 +546,13 @@ private:
     // legitimately 0.
     qint64 m_lastFrameAtMs{0};
 
+    // errno des letzten gescheiterten Versands seit connectToRadio(), 0 wenn
+    // alles hinausging. Entscheidet, WELCHEN Rat die Zeitueberschreitung
+    // gibt: "die Pakete kommen nicht an" und "die Pakete gehen gar nicht
+    // erst hinaus" brauchen gegensaetzliche Abhilfen, und bis zum
+    // 2026-10-04 gab der Dialog immer den ersten.
+    int m_letzterSendeFehler{0};
+
     // --- Mic-stream sequence audit (network investigation 2026-08-11) ---
     //
     // The TX-monitor bench measured 3-15% of mic BLOCKS missing from

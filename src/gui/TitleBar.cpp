@@ -347,11 +347,9 @@ void ConnectionSegment::paintEvent(QPaintEvent*)
     p.setBrush(QColor(Style::hexRole(Style::kAppBg)));   // war das rohe #08080a
     p.drawRoundedRect(rect(), 3, 3);
 
-    // War QFont("SF Mono") OHNE Rueckfall. SF Mono ist auf dem Mac nicht
-    // als Familie ansprechbar, also nahm Qt die proportionale
-    // Vorgabeschrift -- dieses Feld war damit das einzige "Monospace" im
-    // Programm, das gar keines war (2026-10-06 im Protokoll gefunden).
-    p.setFont(Longpath::Style::monoFont(font(), 13, QFont::DemiBold));
+    // Vorher QFont("SF Mono", ...) mit nur diesem einen Namen -- und die
+    // Schrift ist auf macOS nicht angemeldet, Qt nahm also irgendeine.
+    p.setFont(Style::monoFontPt(10, QFont::DemiBold));
 
     // ── 1. State-encoding dot ──────────────────────────────────────────────
     const QRect dotRect(8, height() / 2 - 5, 10, 10);

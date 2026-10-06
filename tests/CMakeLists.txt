@@ -1960,6 +1960,143 @@ longpath_add_test(tst_radio_status)
 longpath_add_test(tst_radio_status_follows_mox)
 longpath_add_test(tst_settings_hygiene)
 
+# ── QSO vom Telefon ins Logbuch (2026-10-04) ────────────────────────────────
+# tst_tci_qso_eintragen: der Longpath-eigene TCI-Befehl log_qso:. Prueft die
+#   Zusagen, auf denen er steht — ohne Anmeldung gar nichts, abgeschaltet
+#   abgelehnt ABER mit Antwort, leeres/unsinniges Rufzeichen abgelehnt, ein
+#   gueltiger Eintrag steht wirklich in der Datei, und der ADIF-Kopf steht
+#   genau einmal.
+longpath_add_test(tst_tci_qso_eintragen)
+
+# ── Ins Logbuch SEHEN, vom Telefon aus (2026-10-04) ─────────────────────────
+# tst_tci_logbuch_lesen: die Gegenstuecke zu log_qso: — log_last: und
+#   log_dup:. Geprueft wird vor allem die ANZAHL in der Abschlusszeile: die
+#   Seite zeigt eine Liste nur, wenn sie mit den gesendeten Zeilen
+#   uebereinstimmt, weil eine kuerzere Liste wie ein kuerzeres Logbuch
+#   aussieht und niemand es merkt. Dazu: juengster zuerst (auf einem Telefon
+#   sieht man drei Zeilen), Ablehnung MIT Grund statt stumm (ein stummes Nein
+#   ist auf einer Fernbedienung nicht von einem Defekt zu unterscheiden), und
+#   der Deckel auf log_last: — 100000 Zeilen wuerden die Steuerleitung
+#   fluten, hinter der jede Bedienung wartet.
+longpath_add_test(tst_tci_logbuch_lesen)
+
+# ── Ein Geraet, das nicht aufmacht, darf nicht alles mitnehmen (2026-10-03) ──
+# tst_bus_mit_frist: gibt einen Bus herein, dessen open() absichtlich
+#   stehenbleibt, und prueft die zwei Zusagen der Behebung — nach der Frist
+#   geht es weiter, und der aufgegebene Bus wird wirklich aufgeraeumt (ueber
+#   einen Lebendzaehler belegt, nicht behauptet).
+longpath_add_test(tst_bus_mit_frist)
+
+# ── Ein gescheiterter Versand muss den Grund NENNEN (2026-10-04) ────────────
+# tst_sendefehler_deutung: haelt auseinander, was auseinandergehalten werden
+#   muss — "das Betriebssystem laesst uns nicht ins lokale Netz" (EHOSTUNREACH,
+#   EPERM) gegen "die Sendewarteschlange ist voll" (ENOBUFS). Grund: am
+#   2026-10-04 verband Anvelina nicht, und der Dialog riet zur Netzstrecke,
+#   waehrend in Wahrheit kein einziges Datagramm den Mac verliess. Werden die
+#   beiden Faelle vertauscht, schickt die Meldung den Bediener an den falschen
+#   Schalter.
+longpath_add_test(tst_sendefehler_deutung)
+
+# ── Eine Peilung vom Netz dreht echtes Metall (2026-10-05) ──────────────────
+# tst_rotor_peilung: am anderen Ende der Leitung steht ein Mast mit einer
+#   Antenne darauf. Drei Faelle, gegen die der Stand steht: `toDouble()` macht
+#   aus "" und "abc" eine 0, und NULL GRAD IST NORD -- eine leere Zeile wuerde
+#   die Antenne nach Norden drehen. NaN besteht jeden Bereichsvergleich, weil
+#   jeder Vergleich mit NaN falsch ist. Und 360 ist dieselbe Richtung wie 0
+#   und gehoert angenommen, 361 ist ein Tippfehler. Ausserhalb wird ABGELEHNT
+#   statt umgerechnet: wer -90 schickt, hat sich vertan, und 270 Grad sind
+#   eine andere Antwort als "ich habe mich vertan".
+longpath_add_test(tst_rotor_peilung)
+
+# ── Den Rotor vom Telefon drehen -- und wann NICHT (2026-10-05) ─────────────
+# tst_tci_rotor: am anderen Ende steht ein Mast, der minutenlang ohne Zutun
+#   dreht, und niemand steht daneben. Darum dieselbe Strenge wie beim Senden:
+#   ABFRAGEN darf jeder angemeldete Client (hinsehen bewegt nichts), DREHEN
+#   nur mit TciAllowRemoteRotor=True -- ab Werk False, und wer die Vorgabe
+#   versehentlich umdreht, faellt hier auf. Dazu: Ablehnung MIT Grund (ein
+#   stummes Nein ist von einem Defekt nicht zu unterscheiden, und beim Rotor
+#   sieht man ohnehin zehn Sekunden nichts), "kein Rotor" ist eine andere
+#   Auskunft als "0 Grad", und eine unbrauchbare Peilung dreht NICHT nach
+#   Norden.
+longpath_add_test(tst_tci_rotor)
+# ── Uhrendrift zwischen Funkgeraet und Tonkarte (#131, 2026-10-05) ──────────
+# tst_audio_rate_matcher: das Regelgesetz aus Thetis' rmatch, auf die
+#   Erzeugerseite geholt (CLAUDE.md verbietet eine Sperre im Tonrueckruf;
+#   Thetis nimmt dort `cs_var`). Gemessen am 2026-09-27: der Ausgangsring
+#   fuellt sich um 0,23 ms je Minute = rund 4 ppm, und laeuft mit dem
+#   100-ms-Ring nach fuenf Stunden ueber.
+#   Geprueft auf einer virtuellen Uhr ueber acht simulierte Stunden -- anders
+#   ist acht Stunden Drift nicht zu pruefen. ENTSCHEIDEND ist die Gegenprobe
+#   `ohneRegelungLaeuftDerRingUeber`: dieselbe Simulation mit festem
+#   Verhaeltnis MUSS ueberlaufen, sonst belegt das gruene Ergebnis nur, dass
+#   die Simulation zu gutmuetig ist.
+#   Der Resampler und die Verdrahtung in den Tonweg sind NICHT dabei; die
+#   kommen getrennt zur Durchsicht (Entwurf 2026-09-27, §4).
+longpath_add_test(tst_audio_rate_matcher)
+
+# ── Vom Dateiende lesen darf keinen Kontakt ERFINDEN (2026-10-04) ───────────
+# tst_logbuch_rueckschau: die App kann seit #184 loggen, aber nicht nachsehen.
+#   Die letzten Kontakte kommen deshalb aus dem DATEIENDE (gemessen an Martins
+#   Logbuch: 6,6 MB / 9271 Datensaetze — voller Durchlauf 4,1 ms, letzte 64 kB
+#   0,04 ms). Genau daraus entsteht die Gefahr: ein Schnitt an einer
+#   willkuerlichen Bytestelle beginnt mitten in einem Datensatz, und der
+#   ADIF-Parser macht aus der hinteren Haelfte einen eigenen Kontakt — ein
+#   Rufzeichen, das niemand gearbeitet hat, in einem Logbuch, das fuer Diplome
+#   eingereicht wird. Der Stand fuehrt denselben Schnitt ohne und mit
+#   Grenzschnitt vor; ohne entsteht der erfundene Datensatz wirklich.
+#   Zweitens: eine Dupe-Warnung, die bei unbekanntem Band auf Verdacht wahr
+#   wird, verhindert unbemerkt einen Kontakt, den es noch nicht gibt.
+longpath_add_test(tst_logbuch_rueckschau)
+
+# ── Spots fuer die App: was ins Bild passt, und NUR das (2026-10-05) ────────
+# tst_spot_auswahl: Longpath sammelt Cluster, RBN, POTA und SpotCollector in
+#   EINEM SpotModel; die Filter des Spot-Hub-Dialogs sitzen im Dialog, nicht
+#   im Modell. RBN allein liefert in einer guten Stunde Hunderte Meldungen.
+#   Ungefiltert ueber die TCI-Steuerleitung geschoben blockieren sie jede
+#   Bedienung dahinter -- dieselbe Leitung traegt Frequenz, Betriebsart und
+#   den Abbruch eines Sendewunsches. Gefiltert wird darum nach dem einzigen
+#   Kriterium, das auf einem Telefon zaehlt: passt der Spot ins Bild.
+#   Festgehalten: nichts von ausserhalb, abgelaufene fallen weg (der
+#   Kehrbesen im SpotModel laeuft nur alle 30 s, und ein toter Spot kostet
+#   einen Anruf ins Leere), und beim Kuerzen bleiben die NAHE DER MITTE.
+longpath_add_test(tst_spot_auswahl)
+
+# ── Der Weg der Spots durch den Server (2026-10-05) ─────────────────────────
+# tst_tci_spots: `spots:<rx>;` ueber den echten WebSocket. Die Auswahl selbst
+#   steht in tst_spot_auswahl; hier zaehlen die Zusagen des Wegs: ohne
+#   Anmeldung gar nichts, die Anzahl in der Abschlusszeile stimmt mit den
+#   gesendeten Zeilen ueberein (sonst sieht eine kuerzere Liste aus wie ein
+#   leereres Band), und ein fehlender Empfaenger wird als FEHLER gemeldet
+#   statt als leere Liste -- "ich kann gerade nicht" und "da ist nichts" sind
+#   zwei Auskuenfte, und nur eine heisst: weiterdrehen.
+longpath_add_test(tst_tci_spots)
+
+# ── Logzeilen duerfen sich nicht zerschreiben (2026-10-03) ───────────────────
+# tst_log_schreibt_atomar: acht Faeden schreiben gleichzeitig 250 Zeilen und
+#   danach muss JEDE vollstaendig und genau einmal dastehen. Grund: in den
+#   Betriebslogs vom 2026-10-03 standen sechs zerschriebene Zeilen (vorne
+#   abgeschnitten, hinten ganz), weil main.cpp je Meldung einen eigenen
+#   QTextStream auf dieselbe QFile legte. Zwei davon waren ausgerechnet die
+#   QoS-Meldung, der an dem Tag jemand nachging.
+longpath_add_test(tst_log_schreibt_atomar)
+
+# ── Qt-Prioritaet gegen QoS-Klasse (2026-10-03) ──────────────────────────────
+# tst_audio_faden_qos: haelt die Regel fest, warum Audio-Faeden OHNE
+#   QThread-Prioritaet starten. Qt setzt fuer eine ausdrueckliche Prioritaet
+#   auf macOS die Ablaufparameter, und Darwin verweigert danach jede
+#   QoS-Klasse (EPERM, Faden bleibt auf QOS_CLASS_UNSPECIFIED). Der
+#   Sende-Faden lief deshalb ohne die Erhoehung, die er haben soll.
+longpath_add_test(tst_audio_faden_qos)
+
+# ── Dicktengleiche Schrift muss auch ankommen (2026-10-03) ───────────────────
+# tst_schrift_dicktengleich: prueft nicht den FAMILIENNAMEN, sondern was Qt
+#   nach seiner Auswahl hergibt (QFontInfo::fixedPitch). Vier Stellen nannten
+#   je einen Namen, den es auf der laufenden Plattform nicht gibt ("SF Mono"
+#   auf macOS -- loest hier auf zu .AppleSystemUIFont, also proportional --,
+#   "Consolas" ausserhalb von Windows, dazu die CSS-Gattungsnamen
+#   "monospace"/"sans-serif").
+longpath_add_test(tst_schrift_dicktengleich)
+
 # ── Phase 3P-H Task 4: status-packet parsing + RadioModel ownership ──────────
 # tst_p1_status_telemetry: feeds a hand-crafted 1032-byte ep6 datagram
 #   into P1RadioConnection::parseEp6FrameForTest and asserts the new
@@ -4926,6 +5063,9 @@ longpath_add_test(tst_window_close_stays_closed)
 # -- Rechtsklick-Menues am Fenster, nicht am nativen Feld (2026-09-27):
 #    „ProfileRailClassWindow must be a top level window" im Protokoll. --
 longpath_add_test(tst_menus_of_native_fields)
+# -- Dasselbe im ECHTEN Hauptfenster (2026-09-30): Panadapter, Overlay-
+#    „…", Behaelter, Lautsprecher, Applet-Spalte, Globus. --
+longpath_add_test(tst_real_menus_hang_on_the_window)
 # -- Formatfuellend + Werkzeugfenster passen auf den Schirm (2026-09-27):
 #    Kanalzug 980x1000 auf 849 px Hoehe, unten hinter dem Dock. --
 longpath_add_test(tst_tool_windows_fit_the_screen)

@@ -33,6 +33,16 @@ int assumedChannelsForStream(TciStreamType type)
         return 2;
     case TciStreamType::TxChrono:
         return 0;
+    case TciStreamType::SpectrumStream:
+        // Longpath-eigen, nicht Teil von TCI: ein fremder Server (ExpertSDR2)
+        // schickt das nie, und dieser Client spricht ausschliesslich mit
+        // einem fremden Server. Trotzdem ausdruecklich aufgefuehrt, damit
+        // -Wswitch nicht bei jedem Bau meckert -- und damit beim naechsten
+        // neuen Stromtyp wieder genau hierher gezeigt wird.
+        //
+        // Der Wert waere ohnehin falsch gewesen: ein Spektrumrahmen traegt
+        // EIN Byte je Punkt, keine verschraenkten Paare. 1, nicht 2.
+        return 1;
     }
     return 2;
 }

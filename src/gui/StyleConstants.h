@@ -1383,4 +1383,44 @@ inline QFont monoFont(const QFont& base, int px, QFont::Weight w = QFont::Normal
     return f;
 }
 
+/// Dieselbe Entscheidung, aber fuer Aufrufstellen mit PUNKT-Groesse.
+///
+/// Vier Stellen bauten ihre Schrift selbst zusammen und nannten dabei je
+/// EINEN Familiennamen, den es auf der laufenden Plattform nicht gibt:
+/// `QFont("SF Mono", 10, DemiBold)` in TitleBar, `QFont("Consolas", 9)`
+/// im SupportDialog (eine Windows-Schrift!), dazu zweimal die
+/// CSS-Gattungsnamen "monospace" und "sans-serif", die Qt nicht als
+/// Familie kennt. Qt sucht sich dann selbst etwas aus — und das ist
+/// nicht zwangslaeufig dicktengleich, womit genau das zurueckkommt, was
+/// die Schwesterfunktion oben 2026-09-27 abgestellt hat.
+///
+/// Belegt im Betriebslog vom 2026-10-03, bei jedem Start:
+///
+///   WRN: Populating font family aliases took 35 ms. Replace uses of
+///        missing font family "SF Mono" with one that exists ...
+///
+/// Punktgroesse statt Pixelgroesse, weil die Aufrufstellen sie so
+/// angeben: 10 pt und 10 px sind auf dem Mac dasselbe, unter Windows
+/// (96 dpi) nicht — die Groesse umzurechnen waere eine Aenderung am
+/// Bild, und die steht hier nicht an. Familie, Hinweis und fixedPitch
+/// sind dieselben wie oben.
+inline QFont monoFontPt(int pt, QFont::Weight w = QFont::Normal)
+{
+    QFont f;
+    f.setPointSize(pt);
+    f.setWeight(w);
+    // setFamilies statt setFamily, dieselbe Kette wie monoFont() und
+    // LP_MONO_QSS. Mit setFamily stand hier nur "Menlo" -- auf einem
+    // Rechner ohne Menlo nahm Qt die naechstbeste Schrift, und die muss
+    // keine dicktengleiche sein. Der Pruefstand
+    // tst_schrift_dicktengleich misst auf DIESEM Mac, auf dem es Menlo
+    // gibt; die Kette ist fuer die anderen.
+    f.setFamilies({QStringLiteral("Menlo"),
+                   QStringLiteral("DejaVu Sans Mono"),
+                   QStringLiteral("monospace")});
+    f.setStyleHint(QFont::TypeWriter);
+    f.setFixedPitch(true);
+    return f;
+}
+
 } // namespace Longpath::Style

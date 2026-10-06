@@ -134,10 +134,9 @@ void SupportDialog::buildUI()
     m_logViewer = new QPlainTextEdit(this);
     m_logViewer->setReadOnly(true);
     m_logViewer->setMaximumBlockCount(kMaxLogViewLines);
-    // War QFont("Consolas") -- eine Windows-Schrift, ohne Rueckfall. Auf
-    // dem Mac zeigte der Protokollbetrachter damit eine proportionale
-    // Schrift, in der Protokollzeilen nicht untereinander stehen.
-    m_logViewer->setFont(Longpath::Style::monoFont(m_logViewer->font(), 12));
+    // Vorher "Consolas" -- eine WINDOWS-Schrift, auf macOS/Linux nicht
+    // vorhanden: das Log stand dort in einer proportionalen Schrift.
+    m_logViewer->setFont(Style::monoFontPt(9));
     // §D: #0a0a14 = Style::kStatusBarBg, #203040 = Style::kBorderSubtle, #00b4d8 = Style::kAccent.
     // §D exception: fg #8aa8c0 (off-palette warm-blue for log text readability).
     m_logViewer->setStyleSheet(Style::themed(

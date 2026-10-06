@@ -175,6 +175,9 @@ public:
     // Darf eine Verbindung aus dem NETZ senden? Ab Werk nein. Der Schalter
     // wirkt an beiden Stellen, an denen gesendet werden kann: dem trx-Weg und
     // der Annahme von TX-Ton. Nur eine zu sperren liesse den Sendeweg offen.
+    static bool remoteLogAllowed();
+    /// Darf aus dem Netz der ROTOR gedreht werden? Ab Werk NEIN.
+    static bool remoteRotorAllowed();
     static bool remoteTxAllowed();
 
     // Test-only: bypass the RxChannel signal chain and inject audio directly
@@ -624,6 +627,20 @@ private:
     // alive, nobody answering). Clears the owner, unkeys if MOX is still
     // on, logs, emits moxReleasedOnClientLoss.
     void releaseMoxHeldBy(QWebSocket* ws, const QString& peer, const QString& why);
+    // Sagt EINEM Client, dass sein Sendewunsch abgelehnt wurde und warum.
+    // Begruendung an der Umsetzung: ein stummes Nein ist auf einer
+    // Fernbedienung nicht von einem Fehler zu unterscheiden.
+    void sendeAblehnung(const std::shared_ptr<TciClientSession>& session,
+                        const QString& grund);
+
+    // Band und Betriebsart der aktiven Scheibe, in ADIF-Schreibweise.
+    // EINE Stelle: `log_qso:` traegt damit ein, `log_dup:` fragt damit
+    // nach. Wuerden beide das selbst entscheiden, koennte die Dupe-Antwort
+    // "schon gearbeitet" sagen und der Eintrag danach ein anderes Band
+    // nennen -- und ADIF-Eigenheiten wie "LSB/USB sind Unterarten von SSB"
+    // muessten an zwei Stellen stimmen.
+    void bandUndModeDerScheibe(QString* band, QString* mode) const;
+
     void startKeyedWatchdog();
     void stopKeyedWatchdog();
 

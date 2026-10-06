@@ -108,6 +108,11 @@
 #include "core/safety/BandPlanGuard.h"
 
 #include <QDateTime>
+#include <QPointer>
+
+// Vollstaendig noetig: QPointer<T> kann T nicht vorwaerts deklariert
+// benutzen (static_cast auf QObject*). Der Kopf ist winzig.
+#include "core/RotorController.h"
 #include <QHash>
 #include <QObject>
 #include <QMap>
@@ -1076,6 +1081,26 @@ public:
     // Constructed in RadioModel ctor with identity / endpoint defaults from
     // AppSettings; startConnection() is NOT called at construction time.
     SpotModel*            spotModel()           const { return m_spotModel.get(); }
+
+    // ── Der Rotor, ohne Fenster dazwischen (2026-10-05) ──────────────────
+    //
+    // Hier steht eine REGISTRIERUNG, kein Besitz: angelegt wird der
+    // RotctldClient weiterhin von `RotorLogbookPanel`, das ihn auch
+    // bedient. Diese Stelle gibt es nur, damit der TCI-Server ihn
+    // erreichen kann, ohne in ein Fenster zu greifen -- derselbe Grund,
+    // aus dem `WorkedBefore` beim Logbuch nicht angefasst wurde: ein
+    // Netzdienst, der an einem Fenster haengt, stirbt mit dem Fenster.
+    //
+    // DER SAUBERERE WEG waere, den Besitz hierher zu holen (wie bei
+    // `m_spotModel`, das 2026-05-12 aus `SpotHubDialog` hierher kam).
+    // Das ist eine Architekturaenderung an einem Geraet, das an Martins
+    // Mast haengt, und CLAUDE.md verlangt dafuer den Betreiber. Bis
+    // dahin ist dies der kleine, umkehrbare Schritt.
+    //
+    // QPointer, nicht roher Zeiger: wird das Fenster geschlossen, steht
+    // hier nachher nullptr statt einer Leiche.
+    RotorController*      rotor()               const { return m_rotor; }
+    void setRotor(RotorController* r)                 { m_rotor = r; }
     // 2026-05-12 bench fix: moved from SpotHubDialog ownership so the
     // table stays populated from app start regardless of whether the
     // dialog is open.  Spots from auto-connected sources were
@@ -3869,6 +3894,8 @@ private:
     // startConnection() / startListening() / startPolling() is the M3
     // follow-up task. H2 only wires the in-process signal graph.
     std::unique_ptr<SpotModel>            m_spotModel;
+    // Registriert von RotorLogbookPanel, nicht besessen -- siehe rotor().
+    QPointer<RotorController>             m_rotor;
     std::unique_ptr<SpotTableModel>       m_spotTableModel;
     std::unique_ptr<FreeDVStationModel>   m_freeDvStationModel;
     std::unique_ptr<RxDecodeModel>        m_rxDecodeModel;

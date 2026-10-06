@@ -27,6 +27,13 @@
 #include "TciClientSession.h"
 #include "TciProtocol.h"
 #include "TciSendQueue.h"
+#include "core/LogbookDatei.h"
+#include "core/LogbuchRueckschau.h"
+#include "core/SpotAuswahl.h"
+#include "core/RotorPeilung.h"
+#include "core/RotorController.h"
+#include "models/SpotModel.h"
+#include "models/LogEntry.h"
 #include "TciBinaryFrame.h"
 #include "TciSensorManager.h"
 #include "LogCategories.h"
@@ -2402,6 +2409,27 @@ QString TciServer::normalisierterCode(const QString& roh)
     return s;
 }
 
+bool TciServer::remoteLogAllowed()
+{
+    // Ab Werk JA -- anders als beim Senden, weil hier nichts abstrahlt. Wer
+    // das Loggen aus dem Netz nicht will, schaltet es ab; das Token gilt
+    // ohnehin.
+    return AppSettings::instance()
+               .value(QStringLiteral("TciAllowRemoteLog"), QStringLiteral("True"))
+               .toString() != QStringLiteral("False");
+}
+
+bool TciServer::remoteRotorAllowed()
+{
+    // Ab Werk NEIN -- wie beim Senden, und aus demselben Grund: am anderen
+    // Ende haengt echtes Metall. Ein Rotor strahlt zwar nicht, aber er
+    // dreht einen Mast, an dem Kabel haengen, und er tut es minutenlang
+    // ohne Zutun. Wer das aus dem Netz will, schaltet es bewusst frei.
+    return AppSettings::instance()
+               .value(QStringLiteral("TciAllowRemoteRotor"), QStringLiteral("False"))
+               .toString() == QStringLiteral("True");
+}
+
 bool TciServer::remoteTxAllowed()
 {
     // Ab Werk NEIN. Wer aus dem Netz senden will, schaltet es bewusst frei —
@@ -2476,6 +2504,60 @@ void TciServer::setKeyedWatchdog(int intervalMs, int maxUnanswered)
     m_keyedWatchdogMaxUnanswered = qMax(1, maxUnanswered);
     if (m_keyedWatchdog && m_keyedWatchdog->isActive()) {
         m_keyedWatchdog->start(m_keyedWatchdogIntervalMs);
+    }
+}
+
+// ── sendeAblehnung() ─────────────────────────────────────────────────────────
+//
+// Ein abgelehnter Sendewunsch war bisher STUMM. Am Pult faellt das nicht auf
+// — dort kommt der Befehl ohnehin von Loopback und geht durch. Auf einer
+// Fernbedienung ist es die unangenehmste Form von Nichts: der Bediener
+// drueckt, es passiert nichts, und nichts erklaert es. Genau dieselbe
+// Gattung Fehler wie eine Pruefung, deren Ergebnis niemand sieht.
+//
+// TCI verwirft abgelehnte Befehle antwortlos, und daran wird nichts
+// geaendert: die Zeile geht AUSSCHLIESSLICH an den ablehnten Client, und nur
+// in den Faellen, in denen bisher gar nichts kam. Fremde Clients (WSJT-X,
+// N1MM, JTDX) sprechen ueber Loopback und laufen nie in diese Sperre; sie
+// bekommen die Zeile also nie zu sehen.
+//
+//     tx_err:<grund>;
+//
+// Dieselbe Form wie log_qso_err: — ein Longpath-eigener Befehl, erkennbar
+// als solcher, von fremden Clients gefahrlos zu ignorieren.
+//
+// Die Sperre selbst bleibt unangetastet. Hier wird nur gesagt, DASS und
+// WARUM sie gegriffen hat.
+void TciServer::sendeAblehnung(const std::shared_ptr<TciClientSession>& session,
+                               const QString& grund)
+{
+    if (!session) { return; }
+    session->sendQueue.push(TciSendQueue::Priority::Control,
+                            QStringLiteral("tx_err:%1;").arg(grund));
+}
+
+void TciServer::bandUndModeDerScheibe(QString* band, QString* mode) const
+{
+    if (band) { band->clear(); }
+    if (mode) { mode->clear(); }
+
+    SliceModel* sl = m_model ? m_model->activeSlice() : nullptr;
+    if (!sl) { return; }
+
+    if (band) { *band = bandLabel(bandFromFrequency(sl->frequency())); }
+    if (!mode) { return; }
+
+    // ADIF kennt LSB/USB nicht als Betriebsart -- das sind Unterarten von
+    // SSB, und ein Datensatz mit MODE=LSB wird abgelehnt oder
+    // stillschweigend umgeschrieben. CWL/CWU genauso. Gleiche Zuordnung
+    // wie am Pult.
+    const QString m = SliceModel::modeName(sl->dspMode());
+    if (m == QLatin1String("LSB") || m == QLatin1String("USB")) {
+        *mode = QStringLiteral("SSB");
+    } else if (m == QLatin1String("CWL") || m == QLatin1String("CWU")) {
+        *mode = QStringLiteral("CW");
+    } else {
+        *mode = m;
     }
 }
 
@@ -2900,6 +2982,375 @@ void TciServer::onTextMessageReceived(const QString& rohMsg)
         const QString kSpecStart  = QStringLiteral("spectrum_start:");
         const QString kSpecStop   = QStringLiteral("spectrum_stop:");
 
+        // ── QSO eintragen (2026-10-04) ──────────────────────────────────────
+        //
+        // Longpath-eigener Befehl, so wie `spectrum_span` einer ist. Die
+        // Handfunke schickt ihn, Longpath schreibt den Eintrag.
+        //
+        //     log_qso:<rufzeichen>[,<rst gesendet>[,<rst empfangen>]];
+        //     -> log_qso_ok:<rufzeichen>;   oder   log_qso_err:<grund>;
+        //
+        // WARUM NUR DAS RUFZEICHEN UND RST: Frequenz, Band, Betriebsart und
+        // Zeit nimmt Longpath aus dem laufenden Zustand -- genau wie das Pult
+        // es tut (RotorLogbookPanel). Wuerde die Seite sie mitschicken,
+        // koennte sie etwas anderes eintragen, als das Geraet gerade macht,
+        // und ADIF-Eigenheiten wie "LSB/USB sind keine Betriebsarten, sondern
+        // Unterarten von SSB" muessten an zwei Stellen stimmen. Eine Stelle
+        // reicht.
+        //
+        // WARUM NUR ANHAENGEN: kein Loeschen, kein Aendern ueber diesen Weg.
+        // Wer einen Kontakt korrigieren will, tut das am Pult, wo er ihn
+        // sieht.
+        //
+        // Geschrieben wird durch LogbookDatei -- dieselbe Stelle, die auch
+        // das Pult benutzt. Zwei Programme in derselben Datei waeren genau
+        // die Lage, die am 2026-10-03 die Logzeilen zerschrieben hat; hier
+        // ginge es um Kontakte.
+        {
+            QString t = trimmed;
+            if (t.startsWith(QStringLiteral("log_qso:"), Qt::CaseInsensitive)) {
+                auto antwort = [&](const QString& zeile) {
+                    session->sendQueue.push(TciSendQueue::Priority::Control,
+                                            zeile);
+                };
+                // Token-Pflicht wie bei jedem Netzbefehl.
+                if (!session->authenticated) { return; }
+                if (!session->fromLoopback && !remoteLogAllowed()) {
+                    qCWarning(lcTci)
+                        << "TciServer: QSO-Eintrag von" << session->peer
+                        << "abgelehnt — Loggen aus dem Netz ist abgeschaltet"
+                        << "(TciAllowRemoteLog)";
+                    antwort(QStringLiteral("log_qso_err:nicht freigegeben;"));
+                    return;
+                }
+
+                const QStringList a = t.mid(8).split(QLatin1Char(','));
+                const QString ruf = a.value(0).trimmed().toUpper();
+                // Ein Rufzeichen ohne Inhalt ist kein Kontakt. Die Laenge
+                // begrenzen, damit ein verirrter Rahmen nicht als Rufzeichen
+                // in der Datei landet.
+                if (ruf.isEmpty() || ruf.size() > 20) {
+                    antwort(QStringLiteral("log_qso_err:rufzeichen fehlt;"));
+                    return;
+                }
+
+                LogEntry e;
+                e.call    = ruf;
+                e.timeOn  = QDateTime::currentDateTimeUtc();
+                e.rstSent = a.value(1, QStringLiteral("59")).trimmed().left(8);
+                e.rstRcvd = a.value(2, QStringLiteral("59")).trimmed().left(8);
+                if (e.rstSent.isEmpty()) { e.rstSent = QStringLiteral("59"); }
+                if (e.rstRcvd.isEmpty()) { e.rstRcvd = QStringLiteral("59"); }
+
+                if (SliceModel* sl = m_model ? m_model->activeSlice() : nullptr) {
+                    e.freqMHz = sl->frequency() / 1e6;
+                    // Band und Betriebsart kommen aus bandUndModeDerScheibe()
+                    // -- derselben Stelle, die `log_dup:` fragt. Siehe dort,
+                    // warum das EINE Stelle sein muss.
+                    bandUndModeDerScheibe(&e.band, &e.mode);
+                    const QString m = SliceModel::modeName(sl->dspMode());
+                    if (e.mode == QLatin1String("SSB")
+                        && (m == QLatin1String("LSB")
+                            || m == QLatin1String("USB"))) {
+                        e.submode = m;
+                    }
+                }
+
+                QString fehler;
+                if (!LogbookDatei::anhaengen(e, &fehler)) {
+                    qCWarning(lcTci) << "TciServer: QSO-Eintrag" << ruf
+                                     << "nicht geschrieben —" << fehler;
+                    antwort(QStringLiteral("log_qso_err:%1;").arg(fehler));
+                    return;
+                }
+                qCInfo(lcTci) << "TciServer: QSO eingetragen —" << ruf
+                              << e.rstSent << "/" << e.rstRcvd
+                              << "auf" << (e.band.isEmpty()
+                                               ? QStringLiteral("(kein Band)")
+                                               : e.band)
+                              << "von" << session->peer;
+                antwort(QStringLiteral("log_qso_ok:%1;").arg(ruf));
+                return;
+            }
+        }
+
+        // ── Ins Logbuch SEHEN (2026-10-04) ──────────────────────────────────
+        //
+        // Seit #184 kann die App loggen, aber nicht nachsehen. Das ist die
+        // schlechtere Haelfte: ein Eintrag, der unbemerkt daneben ging, faellt
+        // erst am Pult auf, und "hatte ich den schon?" ist die Frage, die in
+        // den zwei Sekunden zwischen Rufzeichen und Anruf beantwortet werden
+        // muss -- danach ist sie wertlos.
+        //
+        //     log_last:<n>;      -> log_qso_zeile:<nr>,<yyyymmdd>,<hhmmss>,
+        //                              <ruf>,<band>,<mode>,<rst_s>,<rst_r>;
+        //                           ... je Kontakt, juengster zuerst
+        //                           log_last_ok:<anzahl>;
+        //     log_dup:<ruf>;     -> log_dup_ok:<ruf>,<anzahl>,<yyyymmdd>,
+        //                              <hhmmss>,<letztes band>,<letzter mode>,
+        //                              <gleiches band 0|1>,<dupe 0|1>;
+        //
+        // WARUM DAS BAND NICHT MITGESCHICKT WIRD: `log_dup:` nimmt Band und
+        // Betriebsart aus der aktiven Scheibe -- genau wie `log_qso:` es beim
+        // Eintragen tut, und durch dieselbe Stelle. Sonst koennte die Antwort
+        // "schon gearbeitet" auf ein Band beziehen, das das Geraet gar nicht
+        // eingestellt hat.
+        //
+        // WARUM EINE OBERGRENZE: `log_last:100000` wuerde die Steuerleitung
+        // mit Zeilen fuellen, hinter denen jede Bedienung wartet. 50 ist mehr,
+        // als auf ein Telefon passt.
+        //
+        // Gelesen wird durch LogbuchRueckschau -- vom DATEIENDE, nicht ueber
+        // die ganze Datei. Gemessen an Martins Logbuch (6,6 MB / 9271
+        // Datensaetze): letzte 64 kB 0,04 ms gegen 4,1 ms fuer alles.
+        {
+            QString t = trimmed;
+            const bool istLast =
+                t.startsWith(QStringLiteral("log_last:"), Qt::CaseInsensitive);
+            const bool istDup =
+                t.startsWith(QStringLiteral("log_dup:"), Qt::CaseInsensitive);
+            if (istLast || istDup) {
+                const QString art = istLast ? QStringLiteral("log_last")
+                                            : QStringLiteral("log_dup");
+                auto antwort = [&](const QString& zeile) {
+                    session->sendQueue.push(TciSendQueue::Priority::Control,
+                                            zeile);
+                };
+                if (!session->authenticated) { return; }
+                // Dieselbe Sperre wie beim Eintragen. Wer im Logbuch LESEN
+                // darf, sieht jedes Rufzeichen, jede Zeit und jeden Standort
+                // darin -- das ist nicht weniger heikel als anhaengen.
+                if (!session->fromLoopback && !remoteLogAllowed()) {
+                    qCWarning(lcTci)
+                        << "TciServer: Logbuch-Abfrage von" << session->peer
+                        << "abgelehnt — Logbuch aus dem Netz ist abgeschaltet"
+                        << "(TciAllowRemoteLog)";
+                    antwort(QStringLiteral("%1_err:nicht freigegeben;").arg(art));
+                    return;
+                }
+
+                if (istLast) {
+                    constexpr int kMax = 50;
+                    bool ok = false;
+                    int n = t.mid(9).split(QLatin1Char(',')).value(0)
+                                .trimmed().toInt(&ok);
+                    if (!ok || n <= 0) { n = 10; }
+                    n = qMin(n, kMax);
+
+                    const QVector<LogEntry> l = LogbuchRueckschau::letzte(n);
+                    for (int i = 0; i < l.size(); ++i) {
+                        const LogEntry& e = l.at(i);
+                        const QDateTime u = e.timeOn.toUTC();
+                        antwort(QStringLiteral("log_qso_zeile:%1,%2,%3,%4,%5,%6,%7,%8;")
+                                    .arg(i)
+                                    .arg(u.isValid()
+                                             ? u.toString(QStringLiteral("yyyyMMdd"))
+                                             : QString())
+                                    .arg(u.isValid()
+                                             ? u.toString(QStringLiteral("hhmmss"))
+                                             : QString())
+                                    .arg(e.call, e.band, e.mode,
+                                         e.rstSent, e.rstRcvd));
+                    }
+                    antwort(QStringLiteral("log_last_ok:%1;").arg(l.size()));
+                    return;
+                }
+
+                const QString ruf =
+                    t.mid(8).split(QLatin1Char(',')).value(0).trimmed().toUpper();
+                if (ruf.isEmpty() || ruf.size() > 20) {
+                    antwort(QStringLiteral("log_dup_err:rufzeichen fehlt;"));
+                    return;
+                }
+                QString band, mode;
+                bandUndModeDerScheibe(&band, &mode);
+                const LogbuchRueckschau::Befund b =
+                    LogbuchRueckschau::rueckschau(ruf, band, mode);
+                const QDateTime u = b.zuletzt.toUTC();
+                antwort(QStringLiteral("log_dup_ok:%1,%2,%3,%4,%5,%6,%7,%8;")
+                            .arg(ruf)
+                            .arg(b.anzahl)
+                            .arg(u.isValid()
+                                     ? u.toString(QStringLiteral("yyyyMMdd"))
+                                     : QString())
+                            .arg(u.isValid()
+                                     ? u.toString(QStringLiteral("hhmmss"))
+                                     : QString())
+                            .arg(b.letztesBand, b.letzterMode,
+                                 b.gleichesBand ? QStringLiteral("1")
+                                                : QStringLiteral("0"),
+                                 b.gleicherMode ? QStringLiteral("1")
+                                                : QStringLiteral("0")));
+                return;
+            }
+        }
+
+        // ── Spots im Bild (2026-10-05) ──────────────────────────────────────
+        //
+        // Longpath kennt Cluster, RBN, POTA und SpotCollector; die App zeigte
+        // davon nichts. Auf dem Telefon ist genau das stark: Spot antippen,
+        // abgestimmt.
+        //
+        //     spots:<rx>;  -> spot_zeile:<nr>,<hz>,<ruf>,<mode>,<quelle>,
+        //                         <alter sek>;   je Spot, nach Frequenz
+        //                     spots_ok:<anzahl>;
+        //
+        // EINMALIGE ABFRAGE, kein Abonnement. Ein Abonnement muesste beim
+        // Drehen des Knopfes staendig neu entscheiden, was sichtbar ist, und
+        // die Unterschiede dazwischen fuehren -- Deltas ueber einem
+        // wandernden Fenster sind die Stelle, an der solche Dinge schieflaufen.
+        // Die Seite fragt beim Oeffnen und danach alle paar Sekunden; das
+        // kostet eine Zeile und kann nicht veralten.
+        //
+        // GEFILTERT WIRD AUF DEN SICHTBAREN AUSSCHNITT, und das ist kein
+        // Schoenheitsfilter: die Filter des Spot-Hub-Dialogs (Band, Land,
+        // Quelle) sitzen im DIALOG, nicht im Modell. Im Modell liegt alles,
+        // und RBN allein liefert in einer guten Stunde Hunderte Meldungen.
+        // Ungefiltert verstopfen die dieselbe Steuerleitung, die Frequenz,
+        // Betriebsart und den Abbruch eines Sendewunsches traegt.
+        //
+        // Keine eigene Freigabe: anders als das Logbuch sind Spots keine
+        // eigenen Daten, sondern das, was das halbe Band gerade meldet.
+        {
+            QString t = trimmed;
+            if (t.startsWith(QStringLiteral("spots:"), Qt::CaseInsensitive)
+                || t.compare(QStringLiteral("spots"), Qt::CaseInsensitive) == 0) {
+                auto antwort = [&](const QString& zeile) {
+                    session->sendQueue.push(TciSendQueue::Priority::Control,
+                                            zeile);
+                };
+                if (!session->authenticated) { return; }
+
+                bool ok = false;
+                const int rx = t.contains(QLatin1Char(':'))
+                    ? t.section(QLatin1Char(':'), 1).split(QLatin1Char(','))
+                          .value(0).trimmed().toInt(&ok)
+                    : 0;
+                const int empfaenger = ok ? rx : 0;
+
+                SpotModel* modell = m_model ? m_model->spotModel() : nullptr;
+                const QList<SliceModel*> sl =
+                    m_model ? m_model->slices() : QList<SliceModel*>{};
+                SliceModel* scheibe =
+                    (empfaenger >= 0 && empfaenger < sl.size())
+                        ? sl.at(empfaenger) : nullptr;
+                if (!modell || !scheibe) {
+                    // Kein Modell heisst nicht "keine Spots" -- es heisst,
+                    // dass die Frage gerade nicht zu beantworten ist. Die
+                    // Seite soll das unterscheiden koennen.
+                    antwort(QStringLiteral("spots_err:kein empfaenger;"));
+                    return;
+                }
+
+                const QVector<SpotAuswahl::Zeile> z = SpotAuswahl::sichtbare(
+                    modell->spots(),
+                    static_cast<qint64>(std::llround(scheibe->frequency())),
+                    session->spectrumSpanGemeldetHz,
+                    QDateTime::currentMSecsSinceEpoch());
+
+                for (int i = 0; i < z.size(); ++i) {
+                    const SpotAuswahl::Zeile& x = z.at(i);
+                    antwort(QStringLiteral("spot_zeile:%1,%2,%3,%4,%5,%6;")
+                                .arg(i)
+                                .arg(x.hz)
+                                .arg(x.ruf, x.mode, x.quelle)
+                                .arg(x.alterSek));
+                }
+                antwort(QStringLiteral("spots_ok:%1;").arg(z.size()));
+                return;
+            }
+        }
+
+        // ── Der Rotor (2026-10-05) ──────────────────────────────────────────
+        //
+        //     rotor:;           -> rotor_ist:<grad>,<zustand>,<frisch 0|1>;
+        //     rotor_to:<grad>;  -> rotor_ok:<grad>;   oder rotor_err:<grund>;
+        //     rotor_stop:;      -> rotor_ok:stop;     oder rotor_err:<grund>;
+        //
+        // ABFRAGEN darf jeder angemeldete Client. DREHEN nur, wenn
+        // TciAllowRemoteRotor ausdruecklich auf True steht -- ab Werk nicht.
+        // Am anderen Ende haengt ein Mast mit Kabeln daran, und er dreht
+        // minutenlang ohne weiteres Zutun.
+        //
+        // `frisch` ist kein Beiwerk: der Rotor ist langsame Mechanik am Ende
+        // eines Drahtes. Eine Nadel, die eine alte Stellung zeigt, ohne das
+        // zu sagen, ist schlimmer als eine, die nichts zeigt (so steht es
+        // schon im Kopf von RotorController.h). Die Seite bekommt beides und
+        // kann es unterscheiden.
+        //
+        // Erreicht wird der Rotor ueber RadioModel::rotor() -- eine
+        // Registrierung, kein Besitz. Angelegt wird er weiter im Fenster;
+        // der Netzdienst greift nur nicht hinein.
+        {
+            QString t = trimmed;
+            const bool istAbfrage =
+                t.compare(QStringLiteral("rotor"), Qt::CaseInsensitive) == 0
+                || t.startsWith(QStringLiteral("rotor:"), Qt::CaseInsensitive);
+            const bool istDrehen =
+                t.startsWith(QStringLiteral("rotor_to:"), Qt::CaseInsensitive);
+            const bool istHalt =
+                t.compare(QStringLiteral("rotor_stop"), Qt::CaseInsensitive) == 0
+                || t.startsWith(QStringLiteral("rotor_stop:"), Qt::CaseInsensitive);
+
+            if (istAbfrage || istDrehen || istHalt) {
+                auto antwort = [&](const QString& zeile) {
+                    session->sendQueue.push(TciSendQueue::Priority::Control,
+                                            zeile);
+                };
+                if (!session->authenticated) { return; }
+
+                RotorController* rot = m_model ? m_model->rotor() : nullptr;
+                if (!rot) {
+                    // "Es gibt hier keinen Rotor" ist eine andere Auskunft
+                    // als "er steht auf 0 Grad". Nur eine davon heisst:
+                    // such nicht weiter.
+                    antwort(QStringLiteral("rotor_err:kein rotor;"));
+                    return;
+                }
+
+                if (istAbfrage) {
+                    const int zustand = static_cast<int>(rot->state());
+                    antwort(QStringLiteral("rotor_ist:%1,%2,%3;")
+                                .arg(rot->azimuth(), 0, 'f', 1)
+                                .arg(zustand)
+                                .arg(rot->hasFreshPosition() ? 1 : 0));
+                    return;
+                }
+
+                // Ab hier wird gedreht -- und dafuer gilt die Freigabe.
+                if (!session->fromLoopback && !remoteRotorAllowed()) {
+                    qCWarning(lcTci)
+                        << "TciServer: Rotorbefehl von" << session->peer
+                        << "abgelehnt — Drehen aus dem Netz ist abgeschaltet"
+                        << "(TciAllowRemoteRotor)";
+                    antwort(QStringLiteral("rotor_err:nicht freigegeben;"));
+                    return;
+                }
+
+                if (istHalt) {
+                    rot->stop();
+                    qCInfo(lcTci) << "TciServer: Rotor angehalten von"
+                                  << session->peer;
+                    antwort(QStringLiteral("rotor_ok:stop;"));
+                    return;
+                }
+
+                double grad = 0.0;
+                if (!RotorPeilung::lies(t.mid(9), &grad)) {
+                    // Keine brauchbare Zahl. NICHT auf 0 zurueckfallen --
+                    // 0 Grad ist Nord, und die Antenne wuerde sich auf eine
+                    // leere Zeile hin drehen.
+                    antwort(QStringLiteral("rotor_err:peilung unbrauchbar;"));
+                    return;
+                }
+                rot->moveTo(grad);
+                qCInfo(lcTci) << "TciServer: Rotor auf" << grad << "Grad von"
+                              << session->peer;
+                antwort(QStringLiteral("rotor_ok:%1;").arg(grad, 0, 'f', 1));
+                return;
+            }
+        }
+
         // ── Sendesperre für das Netz, Stelle 3 von 3 (2026-09-30) ───────────
         //
         // `tune:N,true` startet den Abstimmträger — der geht auf die Antenne
@@ -2930,6 +3381,7 @@ void TciServer::onTextMessageReceived(const QString& rohMsg)
                         << "TciServer: Abstimmträger von" << session->peer
                         << "abgelehnt — Senden aus dem Netz ist nicht"
                         << "freigegeben (TciAllowRemoteTx)";
+                    sendeAblehnung(session, QStringLiteral("nicht freigegeben"));
                     return;
                 }
 
@@ -3463,6 +3915,7 @@ void TciServer::onTextMessageReceived(const QString& rohMsg)
                             << "TciServer: Sendewunsch von" << session->peer
                             << "abgelehnt — Senden aus dem Netz ist nicht"
                             << "freigegeben (TciAllowRemoteTx)";
+                        sendeAblehnung(session, QStringLiteral("nicht freigegeben"));
                         return;
                     }
 

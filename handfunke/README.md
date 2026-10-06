@@ -37,6 +37,7 @@ bevor sie stimmte; jetzt hält sie.
 | `rx-worklet.js` | Empfangston im Audio-Faden. Hülle um `ton-kern.js`. |
 | `ton-kern.js`   | Ringpuffer und Hochtastung. Wird von BEIDEN Tonwegen benutzt — dem Worklet und dem Ersatzweg (siehe unten), damit die Rechnung nicht zweimal dasteht und auseinanderläuft. |
 | `attrappe.py`   | Prüfstand: ein TCI-Server aus Pappe, für Läufe ohne Funkgerät. |
+| `tls-einrichten.sh` | Legt die Zertifikate an, mit denen die Seite ein sicherer Kontext wird. Ohne sie gibt es am Telefon weder Mikrofon noch AudioWorklet. |
 | `kann-das-telefon.html` | Selbstauskunft eines Geräts: sicherer Kontext, AudioWorklet, WebCodecs, Bildschirmmaße. Meldet das Ergebnis an den Webserver, statt es abtippen zu lassen. |
 
 ### Zwei Tonwege
@@ -53,6 +54,60 @@ Zwei Fallen dabei, beide am echten Gerät gefunden:
 * iOS stuft Web-Audio als *Ambient* ein, und diese Kategorie gehorcht dem
   Stummschalter am Gerät — Kopfhörer ausgenommen. Ein stilles `<audio>`-
   Element bringt die Seite in die Kategorie *Playback*, die ihn ignoriert.
+
+### Der sichere Kontext
+
+Lange war das nur eine Fußnote beim Ton — bis sich herausstellte, dass
+derselbe Schalter das Senden vom Telefon ganz verhindert. `getUserMedia`,
+der einzige Weg an ein Mikrofon im Browser, ist ebenfalls
+**[SecureContext]**. Über `http` ist `navigator.mediaDevices` schlicht
+`undefined`; einen Ersatzweg wie beim ScriptProcessor gibt es nicht.
+
+**Das Telefon hat es die ganze Zeit selbst gemeldet**, und niemand hat
+hingesehen. In `~/Library/Logs/handfunke-server.log`, Zeile um Zeile:
+
+```
+172.30.30.115 … sicher=false … weg=scriptprocessor
+127.0.0.1     … sicher=true
+```
+
+Am Mac ging alles, denn `127.0.0.1` gilt ohne Zertifikat als sicher. Die
+eine Stelle, an der es zählt, ist die, an der niemand eine Konsole hat.
+
+Abhilfe ist ein Zertifikat, und es behebt beides auf einmal — Mikrofon
+**und** den Tonweg im eigenen Faden:
+
+```bash
+./handfunke/tls-einrichten.sh
+```
+
+Das Skript legt eine kleine eigene Zertifizierungsstelle an und darunter
+ein Serverzertifikat. Zwei Stufen, damit am Telefon **einmal** etwas
+einzurichten ist und nie wieder: das Serverzertifikat darf danach jederzeit
+erneuert werden — neue Adresse, Ablauf — ohne dass dort jemand etwas
+antippt. Die Schlüssel liegen außerhalb des Quellbaums, unter
+`~/Longpath/werkzeug/handfunke-tls`.
+
+Am Telefon, einmalig:
+
+1. `http://<rechner>.local:8771/ca.crt` aufrufen und das Profil laden.
+2. **Einstellungen > Allgemein > Info > Zertifikatsvertrauenseinstellungen**
+   — „Longpath Handfunke CA" einschalten. Ohne diesen zweiten Schritt ist
+   das Profil installiert und trotzdem wirkungslos; iOS sagt das nirgends.
+3. Die Seite künftig über `https://<rechner>.local:8772/` aufrufen.
+4. `kann-das-telefon.html` muss `isSecureContext = ja` zeigen.
+
+`http` bleibt daneben bestehen — über `https` käme das Telefon ja gar nicht
+erst an die Zertifizierungsstelle heran, der es vertrauen soll.
+
+**Die Brücke muss mit.** Eine `https`-Seite darf kein `ws://` mehr öffnen;
+der Browser sperrt das als gemischten Inhalt, und der Fehler sieht aus wie
+„das Funkgerät antwortet nicht". Longpaths TCI-Server spricht kein TLS und
+soll es auch nicht lernen müssen — WSJT-X, N1MM und JTDX sprechen keines.
+Deshalb beendet `tci-bruecke.py` das TLS, **auf demselben Port wie bisher**:
+welches Protokoll gesprochen wird, steht im ersten Byte (`0x16` für TLS,
+`G` für `GET`). Der alte Weg über `ws://` bleibt dadurch unverändert offen.
+Die Seite wählt nicht, sie folgt ihrem eigenen Schema.
 
 ### Die eine Regel
 
@@ -133,5 +188,9 @@ wanderndes S-Meter. Sie ersetzt Longpath nicht — sie prüft die Naht.
   wird abgelehnt — es gibt nur einen Spektrum-Abgriff.
 * **Opus** würde den Ton von 13 auf 4 kB/s drücken. Serverseitig wäre es zu
   haben (libopus hängt wegen RADE ohnehin an der Verknüpfungszeile), im
-  Browser nicht: WebCodecs' `AudioDecoder` ist ebenfalls [SecureContext] und
-  fehlt über `http`. Bliebe eine WASM-Fremddatei — für 9 kB/s zu teuer.
+  Browser scheiterte es bisher daran, dass WebCodecs' `AudioDecoder`
+  ebenfalls [SecureContext] ist — und eine WASM-Fremddatei für 9 kB/s zu
+  teuer wäre. **Mit dem Zertifikat fällt dieser Grund weg.** Der dritte
+  Posten, den derselbe Schalter aufhält; nachgesehen wurde er nie, weil er
+  wie eine Eigenheit von WebCodecs aussah und nicht wie ein gemeinsamer
+  Nenner. Geprüft am Gerät ist er noch nicht.

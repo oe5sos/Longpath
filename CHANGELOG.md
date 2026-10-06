@@ -2,6 +2,175 @@
 
 ## [Unreleased]
 
+## [0.6.6] - 2026-10-04
+
+Zwei Tage nach 0.6.5, 103 Commits, und sie haben ein Thema: **eine
+Anzeige, die schweigt, ist so schlimm wie eine, die luegt.**
+
+Vom Telefon laesst sich jetzt **loggen** — ein eigener TCI-Befehl traegt
+das QSO in dasselbe Logbuch ein, das die Oberflaeche schreibt, und holt
+Frequenz, Band, Betriebsart und Zeit selbst aus der aktiven Scheibe. Der
+**Sendeton** ist bis zum fertigen Rahmen gebaut, samt Haltetaste und
+Pegelbalken; getastet wird davon nichts, und das ist Absicht.
+
+Dahinter liegt der Befund des Tages: am Telefon fehlen **Mikrofon,
+AudioWorklet und Opus aus EINEM Grund** — `isSecureContext` ist dort
+`false`. Drei Posten, die als drei verschiedene Eigenheiten in den
+Unterlagen standen. Das Zertifikat dafuer legt jetzt ein Skript an, der
+Seitenserver spricht `https`, und die TCI-Bruecke beendet TLS auf
+demselben Port wie bisher.
+
+Und eine Reihe Stellen, die etwas wussten und nichts sagten: die
+**Einstellungs-Hygiene** prueft bei jedem Verbinden und meldete es
+niemandem; **sieben Audio-Geraete** wurden ohne Zeitlimit geoeffnet und
+konnten die ganze Oberflaeche anhalten; ein **gescheiterter Versand**
+meldete "Unable to send a message" und verschwieg den Grund — jetzt nennt
+er ihn, auf Windows ueber `WSAGetLastError()`, weil Winsock `errno` gar
+nicht setzt; ein **abgelehnter Sendewunsch** wurde stumm verworfen, was
+auf einer Fernbedienung von einem Defekt nicht zu unterscheiden ist. Dazu
+264 fremde Warnungen aus dem Linux-Bau, die die eigenen zudeckten.
+
+### Hinzugefuegt
+
+- **Loggen vom Telefon, ganz** (#184, #185). Ein eigener TCI-Befehl
+  `log_qso:<rufzeichen>[,<rst gesendet>[,<rst empfangen>]];` traegt ein QSO
+  in dasselbe Logbuch ein, das die Oberflaeche schreibt — Frequenz, Band,
+  Betriebsart und Zeit holt der Server sich selbst aus der aktiven Scheibe,
+  damit vom Telefon nur kommt, was dort wirklich bekannt ist. Dazu das
+  QSO-Blatt (Entwurf A von vier): Rufzeichen, zweimal RST, drei Zeilen
+  "automatisch". Gesperrt wie jeder andere Netzbefehl — Token noetig,
+  `TciAllowRemoteLog` ab Werk an, aber abschaltbar.
+- **Sendeton vom Telefon: der Rahmenbau** (#186) und **die Halteleiste**
+  — mu-law nach G.711, Ratenwandlung mit uebertragenem Rest, TCI-Binaerkopf
+  genau so, wie der Server ihn liest. **Nichts davon kann tasten**: es gibt
+  weder `trx:` noch `tune:`, und das bleibt so bis zur ausdruecklichen
+  Freigabe an der Dummy-Last. Vier Entwuerfe fuer die Sendetaste lagen vor,
+  gewaehlt wurde die **Haltetaste** (#190) — der Finger ist die Sicherung,
+  und was ohne Finger endet, kann nicht haengenbleiben.
+- **Handfunke: der Tonvorrat wandert nicht mehr** (#181). Er lief mit der
+  Zeit aus dem Ruder und wurde erst am harten Deckel zurechtgerissen — ein
+  hoerbarer Sprung. Jetzt wird der Leseschritt um hoechstens 0,3 Promille
+  nachgezogen; der Deckel bleibt als Netz darunter.
+
+- **Handfunke: ein Zertifikat — und damit ueberhaupt erst ein Mikrofon.**
+  Der naechste Baustein beim Senden waere die Mikrofonaufnahme gewesen;
+  geschrieben wurde davon keine Zeile, weil `getUserMedia` **[SecureContext]**
+  ist und am Telefon ueber `http` gar nicht existiert. Das Telefon meldete
+  das seit Wochen selbst — `sicher=false` in jeder Zeile von 172.30.30.x,
+  `sicher=true` nur von 127.0.0.1, wo ohne Zertifikat alles gruen laeuft.
+  Derselbe Schalter kostet das `AudioWorklet` (deshalb
+  `weg=scriptprocessor`) und WebCodecs/Opus; drei Posten, die als drei
+  Eigenheiten in den Unterlagen standen. `tls-einrichten.sh` legt eine
+  eigene Zertifizierungsstelle und ein Serverzertifikat an, der Seitenserver
+  horcht zusaetzlich mit TLS und reicht die Stelle unter `/ca.crt` heraus,
+  und `tci-bruecke.py` beendet TLS **auf demselben Port** — welches
+  Protokoll gesprochen wird, steht im ersten Byte. Der alte Weg ueber `http`
+  und `ws://` bleibt unveraendert offen. Am Geraet ist das noch nicht
+  geprueft; `kann-das-telefon.html` beantwortet es in einem Blick.
+- **Die Einstellungs-Hygiene prueft bei jedem Verbinden — und sagte es
+  niemandem** (#182). Sie lief seit Monaten, ihr Ergebnis ging nirgendwo
+  hin. Eine Pruefung, deren Ergebnis niemand sieht, ist keine Pruefung.
+- **Ein Geraet, das nicht aufmacht, nimmt nicht mehr alles mit** (#176).
+  `AudioEngine::start()` oeffnet sieben Geraete nacheinander, und zwar in
+  der verschachtelten Ereignisschleife des Verbindungsaufbaus — blieb eines
+  stehen, stand die ganze Oberflaeche. Jetzt oeffnet jedes auf eigenem Faden
+  mit 5000 ms Frist (gemessener Normalfall: 20 ms, also zwei Zehnerpotenzen
+  Abstand), und Schrittmarken `[AudioStart:Step] n/7` nennen im Hangfall das
+  Geraet, statt eine stumme Luecke zu hinterlassen. Die Marke selbst stand
+  anfangs als "3 /7" da, weil Qt zwischen gestreamten Werten ein Leerzeichen
+  setzt (#187).
+- **264 fremde Warnungen aus dem Linux-Bau** (#177, #178), die die eigenen
+  zudeckten. Eine Warnung, die in jedem gesunden Lauf steht, verdeckt die
+  eine, auf die es ankommt.
+- **Ein Messlauf fuer die dBm-Skala** (#180), statt sie anzuschauen.
+- **Entwurf: Senden und Loggen vom Telefon** (#183) — der Gesamtweg, bevor
+  davon etwas gebaut wurde.
+
+- **Handfunke: die Seite sagt, wenn die Station sendet** (#170). `trx:` und
+  `tune:` wurden seit dem ersten Tag mitgelesen und nirgends verwendet — die
+  Seite wusste es und schwieg. Jetzt steht dort, wo sonst „SENDEN / NUR IN DER
+  APP" steht, in Messing: „STATION SENDET · EMPFAENGER STUMM". Dazu werden
+  „nur rauschen — antenne?" und „stockt" waehrend des Sendens unterdrueckt;
+  der Empfaenger ist dann stumm, und beide waeren die falsche Erklaerung. Die
+  Sendetasten bleiben tot wie bisher.
+- **SunSDR2 QRP: der Treiber hoert dem Geraet endlich zu** (#150, #154, #168).
+  Inventar je Rahmensorte, Folgenummern mit Verlust/Luecken/Wiederholungen,
+  Quittungsbuchfuehrung — und ein unquittierter Rahmen wird **einmal**
+  nachgeschickt. Am Geraet beobachtet: ein VFO-Frequenzrahmen ging verloren,
+  und das Geraet stand danach auf einer anderen Frequenz als die Anzeige.
+  Nachgeschickt wird nur, wo es die Lage verbessert (0x01, 0x04, 0x07, 0x08) —
+  nie ein Werkbank-Rahmen, und keiner dieser Opcodes loest HF aus. Dazu
+  Uebersteuerung aus dem I/Q und Mikrofon-PTT aus dem Stromkopf, beide ohne ein
+  einziges geratenes Protokollfeld. Alle vier TX-Encoder sind per Pruefstand
+  gesperrt (#154).
+- **TCI meldet die WIRKLICH gezeigte Spanne** (`spectrum_span`, #151). Der
+  Client rechnete bis dahin mit seinem Wunsch, und der Server hebt eine zu
+  schmale Anforderung an: aus 6 kHz werden bei 373 Punkten und 2048er FFT in
+  Wahrheit 8742 Hz. Daran haengen Abstimmstrich, Durchlassband und
+  Wasserfallversatz.
+- **Ein gescheiterter TCI-Bind wird wiederholt und ist sichtbar** (#149).
+  Vorher blieb der Server nach einem Netzwechsel fuer immer unten, und das
+  Einstellungsfeld sagte nur „Stopped"; jetzt steht dort „Wartet auf …" mit
+  Grund, und der Port wird genommen, sobald er frei ist.
+
+### Behoben
+
+- **Der Verbindungsaufbau konnte am Mikrofon einfrieren** (#166). Nicht der Ton
+  stand still, sondern das ganze Programm — samt „Abbrechen". Ursache: der
+  Mikrofon-Eingang wird eifrig beim Verbinden geoeffnet, und das blockiert ohne
+  Zeitlimit, solange macOS die Berechtigungsfrage stellt; der Aufruf steckt in
+  der verschachtelten Ereignisschleife des Verbindungsaufbaus. Empfangen
+  braucht kein Mikrofon: es wird jetzt nicht mehr geoeffnet, solange die
+  Antwort aussteht. Untersuchung mit allen Zahlen in
+  `docs/architecture/2026-10-03-verbindungshaenger-mikrofon.md` (#165).
+- **Logzeilen zerschrieben sich gegenseitig — und gingen dabei verloren**
+  (#171). Jeder Faden legte einen eigenen QTextStream auf dieselbe Datei.
+  Gemessen gingen bei acht gleichzeitigen Schreibern **7 bis 55 Prozent der
+  Zeilen ganz verloren**; sichtbar waren nur sechs zerschriebene Zeilen in den
+  Betriebslogs. Jetzt ein Schloss und ein einziger Schreibaufruf je Zeile.
+- **Zwei Diagnosezeilen lagen vor dem Log-Umleiter** (#169) und standen darum
+  in keinem einzigen Log: der Mikrofon-Berechtigungszustand beim Start und die
+  Meldung, ob der Oberflaechen-Faden seine Dienstguete bekommen hat — letztere
+  faellt im Misserfolgsfall als Warnung an, und die fehlte damit auch.
+- **Handfunke, Funde vom Geraet** (#148, #153, #163, #164): die iOS-Lupe fror
+  das Bild fuer immer ein; der Wasserfall sass auf dem Mittelwert statt auf dem
+  Rauschboden und blieb dunkel; Kneifen konnte rechnerisch nie zoomen;
+  `ctx.resume()` stand hinter zwei `await` und wurde von iOS verworfen (kein
+  Ton am Lautsprecher); die Rauschgrenze lag mit 10 dB genau auf einem
+  gemessenen Wert und schwieg ausgerechnet dort.
+- **Die Anzeige hielt Messwerte fest, die niemand mehr vornahm** (#155–#162):
+  das S-Meter zeigte nach einem Abriss dreissig Sekunden weiter; bei gar keinem
+  Funkgeraet machte es aus dem Rueckfallwert −140 dBm brav „S1"; das
+  Kopplungsblatt blieb ueber einer laengst wieder stehenden Verbindung liegen.
+  Massstab ist jetzt ueberall `ready`, nie der offene Socket.
+- **P2: erster Verbindungsaufbau ueber WLAN** (#147) — TX-I/Q erst nach dem
+  ersten Rahmen des Geraets.
+- **Der Sende-Faden hob seine eigene Echtzeit-Behandlung auf** (#174).
+  `TxWorkerThread` startete mit `QThread::start(QThread::HighPriority)`, und Qt
+  setzt dafuer auf macOS die Ablaufparameter des Fadens — Darwin verweigert
+  danach **jede** QoS-Klasse. Die Prioritaet hob damit genau die Behandlung
+  auf, die `run()` ausdruecklich haben will („audible glitches on the air").
+  Gemessen: `start()` -> USER_INTERACTIVE, `start(HighPriority)` ->
+  UNSPECIFIED. Der Empfangs-Faden war nie betroffen.
+- **Vier Stellen baten um eine Schrift, die es nicht gibt** (#172). `SF Mono`
+  ist auf macOS nicht angemeldet und loest zu `.AppleSystemUIFont` auf —
+  proportional. Die Zustandszeile der Kopfleiste und die Log-Ansicht im
+  Support-Fenster standen deshalb in der falschen Schrift. Dazu `Consolas`
+  (eine Windows-Schrift) und zweimal CSS-Gattungsnamen, die Qt nicht als
+  Familie kennt.
+- **Drei Fehlalarme im Log** (#175). Von 17 Warnungen einer gesunden Sitzung
+  kamen 13 in **jeder** Sitzung — und in diesem Rauschen waere die eine echte
+  (der Sende-Faden) fast untergegangen. `[PanFloatClose]`,
+  `[AppletFloatClose]` und „TX frequency NOT pushed: no connection yet" stehen
+  jetzt auf INFO. Die Schrittmarken des Profilwechsels bleiben unberuehrt; die
+  sind so bestellt.
+
+### Dokumentation
+
+- Durchgang durch die Handfunke mit allen Messwerten, inklusive der zwei
+  Messfallen, die mich selbst hereingelegt haben (#162, #173).
+- SunSDR-Blaetter: Verbindungsablauf, Paritaetsplan, Mitschnitt-Anleitung.
+
 ## [0.6.5] - 2026-10-02
 
 Zehn Tage Arbeit seit 0.6.4, rund 120 Pull Requests: **Longpath am

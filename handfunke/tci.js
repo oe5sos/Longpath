@@ -16,6 +16,8 @@
 
 export const HDR = 64;
 
+import { sollNeuVerbinden } from './aufwachen.js';
+
 export class TciLink extends EventTarget {
   constructor() {
     super();
@@ -146,6 +148,30 @@ export class TciLink extends EventTarget {
     };
   }
 
+  /**
+   * Zurueck aus dem Hintergrund: sofort wieder versuchen, ohne den
+   * gewachsenen Abstand abzuwarten.
+   *
+   * Entschieden wird in aufwachen.js -- und zwar NICHT am `readyState`
+   * allein: iOS friert die Seite ein, die Gegenseite raeumt auf, und der
+   * Socket meldet noch OFFEN. Wer darauf wartet, dass `onclose` kommt,
+   * wartet unter Umstaenden ewig.
+   *
+   * @param {number} stilleMs wie lange schon nichts mehr ankam
+   * @returns {boolean} true, wenn neu verbunden wurde
+   */
+  nachDemAufwachen(stilleMs) {
+    const zustand = this.ws ? this.ws.readyState : null;
+    if (!sollNeuVerbinden({ gewollt: this.wanted, zustand, stilleMs })) {
+      return false;
+    }
+    // Den Abstand zuruecksetzen: er ist beim Schlafen gewachsen, und das
+    // Telefon ist gerade JETZT in der Hand.
+    this.retryMs = 500;
+    this._open();
+    return true;
+  }
+
   _retry() {
     if (!this.wanted) return;
     clearTimeout(this.retryTimer);
@@ -176,6 +202,37 @@ export class TciLink extends EventTarget {
       case 'protocol':        s.protocol = args.join(','); break;
       case 'modulations_list': s.modes = args.filter(Boolean); break;
       case 'ready':           this.ready = true; this._emit('ready'); break;
+      // Longpath-eigen (PR #184): die Antwort auf `log_qso:`. Sie wird
+      // durchgereicht, nicht hier gedeutet — was damit geschieht, entscheidet
+      // die Seite. Wichtig ist nur, dass sie ANKOMMT: ohne Antwort wuesste
+      // das Blatt nicht, ob der Kontakt in der Datei steht, und muesste den
+      // Erfolg behaupten.
+      case 'log_qso_ok':      this._emit('qso', { ok: true,  text: args[0] || '' }); break;
+      case 'log_qso_err':     this._emit('qso', { ok: false, text: args[0] || '' }); break;
+      // Ins Logbuch SEHEN (2026-10-04). Je Kontakt eine Zeile, dann der
+      // Abschluss mit der Anzahl — die Seite darf eine Liste erst zeigen,
+      // wenn beide uebereinstimmen (siehe Sammelstelle in logbuch.js).
+      // Durchgereicht, nicht gedeutet: hier wird nichts gezaehlt und
+      // nichts gesammelt, damit es EINE Stelle bleibt.
+      case 'log_qso_zeile':   this._emit('logzeile', { args }); break;
+      case 'log_last_ok':     this._emit('logende', { anzahl: int(0) }); break;
+      case 'log_last_err':    this._emit('logende', { anzahl: null, text: args[0] || '' }); break;
+      case 'log_dup_ok':      this._emit('logdupe', { args }); break;
+      case 'log_dup_err':     this._emit('logdupe', { args: null, text: args[0] || '' }); break;
+      // Spots im Bild (2026-10-05). Gleiche Form wie log_last: je Spot eine
+      // Zeile, dann der Abschluss mit der Anzahl. Auch hier wird hier nichts
+      // gesammelt und nichts gedeutet -- das macht die Sammelstelle.
+      case 'spot_zeile':      this._emit('spotzeile', { args }); break;
+      case 'spots_ok':        this._emit('spotsende', { anzahl: int(0) }); break;
+      case 'spots_err':       this._emit('spotsende', { anzahl: null, text: args[0] || '' }); break;
+      // Der Rotor (2026-10-05). Durchgereicht, nicht gedeutet.
+      case 'rotor_ist':       this._emit('rotor', { args }); break;
+      case 'rotor_ok':        this._emit('rotorok', { text: args[0] || '' }); break;
+      case 'rotor_err':       this._emit('rotorfehler', { text: args[0] || '' }); break;
+      // Ein abgelehnter Sendewunsch, mit Grund. Bis zum 2026-10-04 kam
+      // hier gar nichts, und ein stummes Nein ist auf einer
+      // Fernbedienung nicht von einem Defekt zu unterscheiden.
+      case 'tx_err':          this._emit('txfehler', { text: args[0] || '' }); break;
       // Der Server bestaetigt eine geglueckte Anmeldung und schickt erst
       // danach den Init-Burst. Bei falschem Token schweigt er und trennt nach
       // dem dritten Versuch — deshalb ist das Ausbleiben dieser Zeile das

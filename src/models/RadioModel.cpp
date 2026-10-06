@@ -10213,9 +10213,29 @@ void RadioModel::pushTxFrequencyFromTxSlice()
         // frequency is never published and the radio keeps 0 Hz. Logged
         // because a caller running before m_connection is assigned looks
         // identical from the outside to never being called at all.
-        qCWarning(lcConnection)
-            << "TX frequency NOT pushed: no connection yet (caller ran before"
-               " m_connection was assigned).";
+        //
+        // INFO, nicht Warnung (2026-10-04). Nachgezaehlt in Martins
+        // Betriebslog: diese Zeile kommt bei JEDEM gesunden Verbinden
+        // viermal (19:02:41.140 bis .144) -- und danach steht zweimal
+        // "TX frequency pushed: 28350350 Hz (slice 0, xit=0)". Sie meldet
+        // also keinen Fehler, sondern die normale Reihenfolge des
+        // Verbindungsaufbaus: mehrere Stellen wollen die Sendefrequenz
+        // setzen, bevor m_connection steht, und die Stelle danach setzt
+        // sie richtig.
+        //
+        // Eine Meldung, die in jeder gesunden Sitzung erscheint, sagt
+        // ueber den Fehlerfall nichts aus -- sie erzieht nur dazu,
+        // Warnungen zu ueberlesen. Der wirklich gefaehrliche Fall (kein
+        // gebundener Slice -> das Geraet sendet auf 0 Hz) bleibt unten
+        // eine Warnung.
+        //
+        // Gruendlicher waere eine POSITIVE Pruefung: wenn die Verbindung
+        // steht und bis dahin nie eine Sendefrequenz hinausging, warnen.
+        // Das ist nicht gebaut; es braucht einen Zustand ueber den
+        // Verbindungsaufbau hinweg, und der gehoert dem Betreiber.
+        qCInfo(lcConnection)
+            << "TX frequency not pushed yet: no connection (caller ran before"
+               " m_connection was assigned); a later call publishes it.";
         return;
     }
 
@@ -12825,6 +12845,35 @@ void RadioModel::onConnectionStateChanged(ConnectionState state)
         // Settings Validation sub-tab (built in Phase H Task 3).
         if (!m_lastRadioInfo.macAddress.isEmpty()) {
             m_settingsHygiene.validate(m_lastRadioInfo.macAddress, boardCapabilities());
+            // ... und sagen, was dabei herauskam.
+            //
+            // Bis 2026-10-04 landete das Ergebnis AUSSCHLIESSLICH auf der
+            // Diagnoseseite. Wer sie nicht aufschlaegt, erfaehrt nie, dass
+            // eine gespeicherte Einstellung nicht zur angeschlossenen
+            // Platine passt -- und niemand schlaegt eine Diagnoseseite auf,
+            // solange nichts auffaellt. Genau das ist aber die Lage, in der
+            // eine geklemmte S-ATT oder ein falsch gemerkter Vorverstaerker
+            // sitzt: unauffaellig.
+            //
+            // Eine Zeile im Log kostet nichts und macht den Befund
+            // auffindbar. Bei null Befunden steht sie auf DBG und stoert
+            // niemanden; ab einem Befund steht sie auf WRN -- dann ist sie
+            // eine Warnung, die etwas bedeutet.
+            const auto befunde = m_settingsHygiene.issues();
+            if (befunde.isEmpty()) {
+                qCDebug(lcConnection)
+                    << "Einstellungs-Hygiene: keine Befunde fuer"
+                    << m_lastRadioInfo.macAddress;
+            } else {
+                qCWarning(lcConnection)
+                    << "Einstellungs-Hygiene:" << befunde.size()
+                    << "Befund(e) fuer" << m_lastRadioInfo.macAddress
+                    << "-- Diagnose > Radio Status > Settings Validation";
+                for (const auto& b : befunde) {
+                    qCWarning(lcConnection)
+                        << "  -" << b.key << ":" << b.summary;
+                }
+            }
         }
         // Per-radio peripherals refactor (2026-05-26): now that the MAC
         // is known and settings have been validated, fire the

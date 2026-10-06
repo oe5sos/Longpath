@@ -244,7 +244,11 @@ void AmpApplet::setPgxlConnected(bool connected)
 //   Copy diagnostics to clipboard -> diagnosticsCopyRequested()
 void AmpApplet::contextMenuEvent(QContextMenuEvent* ev)
 {
-    QMenu* menu = buildContextMenu(this);
+    // Am Fenster, nicht am Applet (2026-09-30): der Behaelter der Applet-
+    // Spalte ist nativ, und ein Menue daran bekam von Qt keinen Fensterbezug
+    // („... must be a top level window."). Damit traegt es das Menuegrau
+    // #1a1a1e statt des geerbten #08080a -- Martin: „hell wie alle anderen".
+    QMenu* menu = buildContextMenu(window());
     menu->exec(ev->globalPos());
     menu->deleteLater();
 }

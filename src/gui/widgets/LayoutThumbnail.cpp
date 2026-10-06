@@ -119,11 +119,12 @@ void LayoutThumbnail::paintEvent(QPaintEvent*)
 
         if (i < static_cast<int>(sizeof(kLetters) - 1)) {
             p.setPen(textColor);
-            // War QFont("sans-serif") -- ein CSS-Gattungsname, keine
-            // Qt-Familie. Hier ist ohnehin die Oberflaechenschrift
-            // gemeint, nur groesser und fett.
+            // "sans-serif" ist ein CSS-Gattungsname, keine Qt-Familie:
+            // Qt suchte sich hier selbst eine Schrift aus, statt die
+            // des Programms zu nehmen. Gewollt war immer nur "die
+            // normale Schrift, 14 pt, fett".
             QFont beschriftung = p.font();
-            beschriftung.setPixelSize(14);
+            beschriftung.setPointSize(14);
             beschriftung.setWeight(QFont::Bold);
             p.setFont(beschriftung);
             p.drawText(cells[i], Qt::AlignCenter, QString(QLatin1Char(kLetters[i])));

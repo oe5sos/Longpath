@@ -661,7 +661,8 @@ void SpectrumOverlayPanel::updateLayout()
             m_moreBtn->setToolTip(
                 QStringLiteral("Weitere Gruppen — hier ist der Platz zu Ende"));
             connect(m_moreBtn, &QPushButton::clicked, this, [this]() {
-                ScopedChildWidget<QMenu> menuOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+                ScopedChildWidget<QMenu> menuOwner(window());   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+                const QPointer<SpectrumOverlayPanel> self(this);   // Menue am Fenster: ein nativer Vorfahr gab ihm keinen Fensterbezug (2026-09-30)
                 QMenu& menu = *menuOwner.get();
                 int g = 0;
                 for (int i = 0; i < m_menuBtns.size(); ++i) {
@@ -687,7 +688,7 @@ void SpectrumOverlayPanel::updateLayout()
                 menu.exec(mapToGlobal(m_moreBtn->geometry().bottomLeft()));
                 // Das Elternteil kann waehrend exec() gestorben sein — dann ist
                 // auch das Menue weg und `this` eine Leiche. Siehe ScopedChildWidget.h.
-                if (!menuOwner) { return; }
+                if (!menuOwner || !self) { return; }
             });
         }
         m_moreBtn->setVisible(true);

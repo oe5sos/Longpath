@@ -248,7 +248,8 @@ void MasterOutputWidget::setCurrentOutputDevice(const QString& name)
 
 void MasterOutputWidget::onSpeakerContextMenu(const QPoint& pos)
 {
-    ScopedChildWidget<QMenu> menuOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+    ScopedChildWidget<QMenu> menuOwner(window());   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+    const QPointer<MasterOutputWidget> self(this);   // Menue am Fenster: ein nativer Vorfahr gab ihm keinen Fensterbezug (2026-09-30)
     QMenu& menu = *menuOwner.get();
     menu.setTitle(QStringLiteral("Output device"));
 
@@ -296,7 +297,7 @@ void MasterOutputWidget::onSpeakerContextMenu(const QPoint& pos)
     menu.exec(m_speakerBtn->mapToGlobal(pos));
     // Das Elternteil kann waehrend exec() gestorben sein — dann ist
     // auch das Menue weg und `this` eine Leiche. Siehe ScopedChildWidget.h.
-    if (!menuOwner) { return; }
+    if (!menuOwner || !self) { return; }
 }
 
 void MasterOutputWidget::onAudioEngineVolumeChanged(float v)

@@ -16,15 +16,108 @@ Der Binaerrahmen ist derselbe wie in TciBinaryFrame.h:
 
 import base64, hashlib, math, os, random, socket, struct, threading, time, sys
 
+# --port N: fuer den Fall, dass schon eine Attrappe laeuft. Am 2026-10-03
+# hing eine seit elf Stunden auf 50099 -- sie abzuschiessen waere die
+# bequeme und die falsche Antwort gewesen (sie koennte zu einer anderen
+# Sitzung gehoeren).
 PORT = 50099
+if '--port' in sys.argv:
+    _i = sys.argv.index('--port')
+    if _i + 1 < len(sys.argv):
+        PORT = int(sys.argv[_i + 1])
 # Ein Band ohne Stationen — siehe die Begruendung bei `traeger`.
 STILL = '--still' in sys.argv
+# --sendet N: alle N Sekunden den Sendezustand umschalten (trx:0,true/false).
+#
+# Warum als Schalter der Attrappe und nicht am echten Geraet geprueft: den
+# Sendezustand am echten Geraet herzustellen heisst SENDEN, und das ist ohne
+# Antenne verboten. Die Seite muss aber zeigen koennen, dass die Station
+# sendet -- sonst ist der leere Wasserfall waehrend einer Durchsage nicht von
+# einem Fehler zu unterscheiden. Also hier.
+def _zahl_nach(flagge, standard):
+    if flagge in sys.argv:
+        i = sys.argv.index(flagge)
+        if i + 1 < len(sys.argv):
+            try:
+                return float(sys.argv[i + 1])
+            except ValueError:
+                pass
+        return standard
+    return 0.0
+
+SENDET_ALLE = _zahl_nach('--sendet', 6.0)
+# Ab Werk gesperrt, wie TciAllowRemoteTx. --sendenfrei gibt frei.
+SENDEN_FREI = '--sendenfrei' in sys.argv
 IQ_RATE = 48000          # bewusst klein: die Attrappe soll die Naht pruefen,
 AUDIO_RATE = 48000       # nicht die Bandbreite
 IQ_BLOCK = 4096          # Werte je Rahmen (I und Q zusammen) -> 2048 Paare
 AUDIO_BLOCK = 2048       # Werte je Rahmen (L und R zusammen) -> 1024 Paare
 
 MAGIC = b'258EAFA5-E914-47DA-95CA-C5AB0DC85B11'
+
+
+def _jetzt_utc():
+    """("20261004", "213000") — so wie Longpath es in log_qso_zeile schickt."""
+    t = time.gmtime()
+    return (time.strftime('%Y%m%d', t), time.strftime('%H%M%S', t))
+
+
+# Ein kleiner Vorrat, damit die Liste nicht leer anfaengt, und damit sich
+# ALLE vier Faelle des Dupe-Satzes am Telefon ansehen lassen:
+#   OE1AAA  20m CW  -> echtes Dupe (Attrappe steht auf 20m CW)
+#   OE2BBB  20m SSB -> gleiches Band, andere Betriebsart
+#   OE3CCC  40m SSB -> bekannt, dieses Band noch nicht
+#   alles andere    -> NEU
+VORRAT = [
+    (('20261001', '081500'), 'OE3CCC', '40m', 'SSB', '59', '59'),
+    (('20261002', '143000'), 'OE2BBB', '20m', 'SSB', '59', '57'),
+    (('20261002', '191200'), 'OE1AAA', '20m', 'CW',  '599', '599'),
+]
+EINGETRAGEN = []
+
+
+# ── Rotor aus Pappe (2026-10-05) ─────────────────────────────────────────
+# --rotorfrei schaltet das Drehen frei; ohne das wird abgelehnt, genau wie
+# TciAllowRemoteRotor ab Werk.
+ROTOR_FREI = '--rotorfrei' in sys.argv
+ROTOR = {'ist': 143.0, 'ziel': 143.0, 'zustand': 2, 'frisch': True}
+
+
+def _rotor_nachziehen():
+    """Zieht die gemeldete Stellung dem Ziel nach, 6 Grad je Sekunde --
+    etwa so schnell wie ein echter Rotor."""
+    while True:
+        time.sleep(0.25)
+        d = ROTOR['ziel'] - ROTOR['ist']
+        if d > 180:
+            d -= 360
+        elif d < -180:
+            d += 360
+        if abs(d) < 0.3:
+            ROTOR['ist'] = ROTOR['ziel']
+            if ROTOR['zustand'] == 3:
+                ROTOR['zustand'] = 2
+        else:
+            schritt = 1.5 if d > 0 else -1.5
+            ROTOR['ist'] = (ROTOR['ist'] + schritt) % 360
+
+
+# ── Spots (2026-10-05) ───────────────────────────────────────────────────
+#
+# Je Eintrag: (Versatz zur Mitte in Hz, Rufzeichen, Mode, Quelle, Alter s).
+# Die Versaetze sind so gewaehlt, dass sich ALLE Faelle am Telefon ansehen
+# lassen: zwei dicht beieinander (die Beschriftungen muessen ausweichen),
+# einer am Rand, einer frisch und einer so alt, dass er sichtbar blasser
+# steht -- und einer weit draussen, der gar nicht kommen darf.
+SPOT_VORRAT = [
+    (-18000, 'OE3AAA', 'CW',   'CLUSTER',   30),
+    ( -2300, 'DL1BBB', 'SSB',  'CLUSTER',  240),
+    ( -2000, 'S57CCC', 'CW',   'RBN',      900),
+    ( -1700, 'OK2DDD', 'CW',   'RBN',     1700),
+    (  6400, 'OE5SOS', 'SSB',  'POTA',      60),
+    ( 21000, 'IK4EEE', 'FT8',  'CLUSTER',  600),
+    (120000, 'WEITWEG','CW',   'CLUSTER',   10),   # ausserhalb jeder Spanne
+]
 
 INIT_BURST = [
     'protocol:Longpath-Attrappe,2.0;',
@@ -135,6 +228,10 @@ class Verbindung(threading.Thread):
         self.rx_sensors_an = False
         self.rx_sensors_ms = 200
         self.spec_spanne = 0          # 0 = volle Breite
+        # Die Mitte zieht beim Abstimmen mit (siehe `dds:` weiter unten).
+        # Die Spots haengen daran: sie sind relativ zur Mitte angelegt, damit
+        # sie beim Bandwechsel nicht ploetzlich alle ausserhalb liegen.
+        self.mitte_hz = 14074000
         self.spec_zeit = 0.0
         # Vom Client ausgehandelt (audio_samplerate / _channels / _sample_type).
         self.audio_rate = AUDIO_RATE
@@ -142,6 +239,8 @@ class Verbindung(threading.Thread):
         self.audio_typ = 3        # Float32
         self.phase = 0.0
         self.tonphase = 0.0
+        # Letzter gemeldeter Sendezustand (nur fuer --sendet).
+        self.sendet = False
 
     # ── Handschlag ────────────────────────────────────────────────────────
     def handschlag(self):
@@ -226,6 +325,145 @@ class Verbindung(threading.Thread):
             # tst_tci_remote_auth).
             print(f'  {self.addr[1]}: auth empfangen ({len(args[0]) if args else 0} Zeichen)')
             self.sende_text('auth:ok;')
+        elif name == 'log_qso':
+            # Longpath-eigener Befehl (PR #184). Die Attrappe schreibt nichts,
+            # sie antwortet nur — damit sich das Blatt auf der Seite pruefen
+            # laesst, ohne Martins Logbuch anzufassen.
+            #
+            # Sie ist dabei absichtlich NICHT gutmuetiger als der echte
+            # Server: leeres oder zu langes Rufzeichen wird genauso
+            # abgelehnt. Eine Attrappe, die mehr durchlaesst als das
+            # Original, verschiebt Fehler nach hinten (siehe rx_sensors).
+            ruf = (args[0].upper() if args else '')
+            if not ruf or len(ruf) > 20:
+                print(f'  {self.addr[1]}: log_qso ABGELEHNT ({ruf!r})')
+                self.sende_text('log_qso_err:rufzeichen fehlt;')
+            else:
+                rs = args[1] if len(args) > 1 and args[1] else '59'
+                re_ = args[2] if len(args) > 2 and args[2] else '59'
+                print(f'  {self.addr[1]}: log_qso {ruf} {rs}/{re_}')
+                self.sende_text(f'log_qso_ok:{ruf};')
+                # Eingetragenes merken, damit `log_last` und `log_dup`
+                # etwas zu sagen haben. Nur im Speicher dieser Attrappe —
+                # Martins Logbuch wird hier nicht angefasst.
+                EINGETRAGEN.append((_jetzt_utc(), ruf, '20m', 'CW', rs, re_))
+        elif name == 'log_last':
+            # Longpath-eigener Befehl (2026-10-04). Je Kontakt eine Zeile,
+            # dann der Abschluss mit der Anzahl.
+            #
+            # Die Attrappe deckelt wie der echte Server auf 50 — eine
+            # Attrappe, die mehr durchlaesst, verschiebt Fehler nach hinten.
+            try:
+                n = int(args[0]) if args and args[0].strip() else 10
+            except ValueError:
+                n = 10
+            if n <= 0:
+                n = 10
+            n = min(n, 50)
+            liste = (VORRAT + EINGETRAGEN)[::-1][:n]
+            for i, (zeit, ruf, band, mode, rs, re_) in enumerate(liste):
+                self.sende_text(
+                    f'log_qso_zeile:{i},{zeit[0]},{zeit[1]},{ruf},'
+                    f'{band},{mode},{rs},{re_};')
+            print(f'  {self.addr[1]}: log_last {n} -> {len(liste)} Zeilen')
+            self.sende_text(f'log_last_ok:{len(liste)};')
+        elif name in ('rotor', 'rotor_to', 'rotor_stop'):
+            # Ein Rotor aus Pappe. Er dreht nicht wirklich, aber er zieht
+            # seine gemeldete Stellung langsam nach -- sonst liesse sich am
+            # Telefon nicht ansehen, ob die Nadel ueberhaupt folgt.
+            #
+            # Die Attrappe ist dabei NICHT gutmuetiger als der echte Server:
+            # ohne --rotorfrei wird jedes Drehen abgelehnt, genau wie
+            # TciAllowRemoteRotor ab Werk.
+            if name == 'rotor':
+                self.sende_text(
+                    f'rotor_ist:{ROTOR["ist"]:.1f},{ROTOR["zustand"]},'
+                    f'{1 if ROTOR["frisch"] else 0};')
+            elif not ROTOR_FREI:
+                print(f'  {self.addr[1]}: {name} ABGELEHNT (nicht freigegeben)')
+                self.sende_text('rotor_err:nicht freigegeben;')
+            elif name == 'rotor_stop':
+                ROTOR['ziel'] = ROTOR['ist']
+                ROTOR['zustand'] = 2
+                print(f'  {self.addr[1]}: Rotor angehalten')
+                self.sende_text('rotor_ok:stop;')
+            else:
+                roh = (args[0].strip() if args else '')
+                try:
+                    g = float(roh)
+                except ValueError:
+                    g = None
+                if g is None or g != g or g < 0 or g > 360:
+                    print(f'  {self.addr[1]}: rotor_to ABGELEHNT ({roh!r})')
+                    self.sende_text('rotor_err:peilung unbrauchbar;')
+                else:
+                    if g == 360:
+                        g = 0.0
+                    ROTOR['ziel'] = g
+                    ROTOR['zustand'] = 3          # dreht
+                    print(f'  {self.addr[1]}: Rotor auf {g:.1f} Grad')
+                    self.sende_text(f'rotor_ok:{g:.1f};')
+        elif name == 'spots':
+            # Longpath filtert auf den sichtbaren Ausschnitt. Die Attrappe
+            # ist dabei absichtlich NICHT gutmuetiger: was ausserhalb der
+            # Spanne laege, kommt auch hier nicht mit. Eine Attrappe, die
+            # mehr durchlaesst als das Original, verschiebt Fehler nach
+            # hinten.
+            spanne = self.spec_spanne or 48000
+            halb = spanne // 2
+            mitte = self.mitte_hz
+            drin = [e for e in SPOT_VORRAT if abs(e[0]) <= halb]
+            drin.sort(key=lambda e: e[0])
+            for i, (versatz, ruf, mode, quelle, alter) in enumerate(drin):
+                self.sende_text(
+                    f'spot_zeile:{i},{mitte + versatz},{ruf},{mode},'
+                    f'{quelle},{alter};')
+            print(f'  {self.addr[1]}: spots -> {len(drin)} von '
+                  f'{len(SPOT_VORRAT)} (Spanne {spanne} Hz)')
+            self.sende_text(f'spots_ok:{len(drin)};')
+        elif name == 'log_dup':
+            ruf = (args[0].strip().upper() if args else '')
+            if not ruf or len(ruf) > 20:
+                print(f'  {self.addr[1]}: log_dup ABGELEHNT ({ruf!r})')
+                self.sende_text('log_dup_err:rufzeichen fehlt;')
+            else:
+                # Band und Betriebsart kommen beim echten Server aus der
+                # aktiven Scheibe. Die Attrappe steht auf 20m CW.
+                treffer = [e for e in (VORRAT + EINGETRAGEN) if e[1] == ruf]
+                anzahl = len(treffer)
+                letzter = treffer[-1] if treffer else None
+                gleiches_band = any(e[2] == '20m' for e in treffer)
+                dupe = any(e[2] == '20m' and e[3] == 'CW' for e in treffer)
+                dat = letzter[0][0] if letzter else ''
+                zei = letzter[0][1] if letzter else ''
+                band = letzter[2] if letzter else ''
+                mode = letzter[3] if letzter else ''
+                print(f'  {self.addr[1]}: log_dup {ruf} -> {anzahl}× '
+                      f'(Band {int(gleiches_band)}, Dupe {int(dupe)})')
+                self.sende_text(
+                    f'log_dup_ok:{ruf},{anzahl},{dat},{zei},{band},{mode},'
+                    f'{int(gleiches_band)},{int(dupe)};')
+        elif name in ('trx', 'tune'):
+            # Sendesperre, wie der echte Server sie fuehrt (PR #189-Reihe).
+            # Die Attrappe ist dabei absichtlich NICHT gutmuetiger: ohne
+            # ausdrueckliche Freigabe wird abgelehnt, und zwar MIT Grund.
+            #
+            # Bis zum 2026-10-04 verwarf der Server solche Befehle stumm. Auf
+            # einer Fernbedienung ist ein stummes Nein nicht von einem Defekt
+            # zu unterscheiden -- der Bediener drueckt, nichts passiert,
+            # nichts erklaert es. Genau dieser Fall muss sich hier pruefen
+            # lassen, ohne dass irgendwo ein Watt entsteht.
+            #
+            # --sendenfrei schaltet die Freigabe ein; ohne das bleibt es
+            # gesperrt, wie TciAllowRemoteTx ab Werk.
+            will = len(args) >= 2 and args[1].strip().lower() == 'true'
+            if will and not SENDEN_FREI:
+                print(f'  {self.addr[1]}: {name} ABGELEHNT (nicht freigegeben)')
+                self.sende_text('tx_err:nicht freigegeben;')
+            else:
+                nr = args[0].strip() if args else '0'
+                print(f'  {self.addr[1]}: {name}:{nr},{"true" if will else "false"}')
+                self.sende_text(f'{name}:{nr},{"true" if will else "false"};')
         elif name == 'iq_start':
             self.iq_an = True
             print(f'  {self.addr[1]}: IQ an')
@@ -297,6 +535,7 @@ class Verbindung(threading.Thread):
                 try:
                     trx = int(args[0]); kanal = int(args[1]); hz = int(args[2])
                     if kanal == 0:
+                        self.mitte_hz = hz
                         self.sende_text(f'dds:{trx},{hz};')
                 except ValueError:
                     pass
@@ -407,6 +646,16 @@ class Verbindung(threading.Thread):
             # Eine Attrappe, die gutmuetiger ist als das Original, ist keine
             # Hilfe — sie verschiebt Fehler nach hinten, dorthin wo sie teurer
             # sind.
+            # Sendezustand umschalten, wenn --sendet gesetzt ist. Der echte
+            # Server meldet `trx:<rx>,<bool>` genauso, aus demselben Anlass
+            # (eigenes MOX, Mikrofontaste am Geraet, CAT).
+            if SENDET_ALLE > 0:
+                soll = int(jetzt / SENDET_ALLE) % 2 == 1
+                if soll != self.sendet:
+                    self.sendet = soll
+                    self.sende_text(f'trx:0,{"true" if soll else "false"};')
+                    print(f'  trx:0,{"true" if soll else "false"} (--sendet)')
+
             if self.rx_sensors_an and jetzt - smeter_zeit > self.rx_sensors_ms / 1000.0:
                 smeter_zeit = jetzt
                 dbm = -83 + 9 * math.sin(jetzt / 2.2) + random.gauss(0, 1.2)
@@ -419,6 +668,7 @@ class Verbindung(threading.Thread):
 
 
 def main():
+    threading.Thread(target=_rotor_nachziehen, daemon=True).start()
     # Ab Werk nur auf dem eigenen Rechner. Mit `--alle` (oder HOST=0.0.0.0)
     # auch aus dem LAN erreichbar — das braucht man, sobald man die Handfunke
     # von einem echten Telefon aus prueft.

@@ -270,9 +270,16 @@ void AppletFloatingWindow::closeEvent(QCloseEvent* ev)
     // versteckt das Fenster nur; es bleibt in m_floatingApplets, das
     // Profil bleibt richtig, und der Auswaehler (+) zeigt es wieder.
     // Die Zeile darunter sagt im Log, wann und woher es kam.
-    qWarning() << "[AppletFloatClose]" << appletId()
-               << "spontaneous=" << ev->spontaneous()
-               << "-- nicht angedockt, siehe closeEvent()";
+    // INFO, nicht Warnung (2026-10-04): die Zeile sagt, WANN und WOHER
+    // ein Schliessen kam -- das ist Auskunft, kein Fehler. In Martins
+    // Betriebslogs kommt sie nur beim Beenden, und dort gehoert sie hin.
+    // Als Warnung stellte sie zusammen mit den Profil-Schrittmarken den
+    // groessten Teil der Warnungen einer voellig gesunden Sitzung, und
+    // genau darin ist mir am 2026-10-03 die echte Warnung ueber die
+    // Dienstguete des Sende-Fadens fast durchgerutscht.
+    qInfo() << "[AppletFloatClose]" << appletId()
+            << "spontaneous=" << ev->spontaneous()
+            << "-- nicht angedockt, siehe closeEvent()";
 
     // Vor dem Weggehen durchschreiben: der Zug, dem sofort das
     // Schliessen folgt, darf nicht in der Wartezeit hängen bleiben.

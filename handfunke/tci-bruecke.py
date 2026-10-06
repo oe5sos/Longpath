@@ -24,15 +24,49 @@ Grund: so lautet die Adresse fuer die Handfunke immer `<rechner>:50001`,
 ob die Bruecke nun laeuft oder nicht. Eine zweite Portnummer, die der
 Operator sich merken und spaeter wieder vergessen muss, entfaellt.
 
+Seit dem 2026-10-04 beendet sie auf Wunsch auch TLS. Der Grund liegt
+nicht bei der Bruecke, sondern eine Ebene hoeher: `getUserMedia` und
+`AudioWorklet` brauchen einen sicheren Kontext, die Seite muss also ueber
+`https` kommen -- und eine `https`-Seite darf kein `ws://` mehr oeffnen,
+der Browser sperrt das als gemischten Inhalt. Longpaths TCI-Server selbst
+spricht kein TLS, und er soll es auch nicht lernen muessen: WSJT-X, N1MM
+und JTDX sprechen keines.
+
+Dieselbe Portnummer traegt beides. Welches von beidem gesprochen wird,
+steht im ERSTEN BYTE -- ein TLS-ClientHello beginnt mit 0x16, ein
+WebSocket-Handschlag mit dem `G` von `GET`. Das wird vorsichtig abgelauscht
+(MSG_PEEK, das Byte bleibt liegen) und entscheidet. So bleibt der alte Weg
+unveraendert offen: wer noch ueber `http` und `ws://` kommt, merkt von der
+Umstellung nichts.
+
 Beenden mit Strg-C. Die Bruecke oeffnet das Geraet fuers lokale Netz,
 solange sie laeuft, und keine Sekunde laenger.
 """
 
-import socket, sys, threading, time
+import os, socket, ssl, sys, threading, time
 
 HORCH_PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 50001
 ZIEL_PORT  = int(sys.argv[2]) if len(sys.argv) > 2 else 50001
 ZIEL = ("127.0.0.1", ZIEL_PORT)
+
+# Dieselben Dateien, die handfunke-server.py benutzt; tls-einrichten.sh legt
+# sie an. Fehlen sie, laeuft die Bruecke wie bisher rein unverschluesselt.
+TLS_ORDNER = os.environ.get(
+    "HANDFUNKE_TLS_DIR",
+    os.path.expanduser("~/Longpath/werkzeug/handfunke-tls"))
+
+
+def tls_kontext():
+    kette = os.path.join(TLS_ORDNER, "server-kette.crt")
+    schluessel = os.path.join(TLS_ORDNER, "server.key")
+    if not (os.path.exists(kette) and os.path.exists(schluessel)):
+        return None
+    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    ctx.load_cert_chain(kette, schluessel)
+    return ctx
+
+
+TLS = tls_kontext()
 
 
 def schaufeln(von, nach, zaehler, i):
@@ -49,10 +83,17 @@ def schaufeln(von, nach, zaehler, i):
     finally:
         # Nur die eigene Richtung schliessen, damit die Gegenrichtung noch
         # zu Ende senden kann — sonst reisst die Antwort mitten im Rahmen ab.
-        try:
-            nach.shutdown(socket.SHUT_WR)
-        except OSError:
-            pass
+        #
+        # Auf einem TLS-Socket geht das nicht: dort ist "halb zu" kein
+        # Zustand, den das Protokoll kennt. Ein SHUT_WR schickte das FIN
+        # ohne close_notify, und der Browser meldete einen Abbruch statt
+        # eines Endes. Dort bleibt der Socket offen, bis die Gegenrichtung
+        # ihn ohnehin schliesst.
+        if not isinstance(nach, ssl.SSLSocket):
+            try:
+                nach.shutdown(socket.SHUT_WR)
+            except OSError:
+                pass
 
 
 def ohne_origin(kopf: bytes) -> bytes:
@@ -78,9 +119,51 @@ def ohne_origin(kopf: bytes) -> bytes:
     return b"\r\n".join(behalten)
 
 
-def bedienen(klient, adresse):
+def vielleicht_tls(klient, adresse):
+    """Laesst TLS zu, ohne es zu erzwingen.
+
+    Entschieden wird am ersten Byte, und es wird nur angeschaut, nicht
+    verbraucht (MSG_PEEK) -- der Handschlag, der gleich folgt, braucht es
+    vollstaendig. 0x16 ist der Satztyp `handshake` aus TLS; alles andere
+    ist der Klartextweg, wie bisher.
+    """
+    if TLS is None:
+        return klient
+    try:
+        klient.settimeout(8)
+        erst = klient.recv(1, socket.MSG_PEEK)
+    except OSError:
+        return klient
+    finally:
+        try:
+            klient.settimeout(None)
+        except OSError:
+            pass
+    if not erst or erst[0] != 0x16:
+        return klient
+    try:
+        return TLS.wrap_socket(klient, server_side=True)
+    except (ssl.SSLError, OSError) as e:
+        # Haeufigster Fall: das Telefon vertraut der Stelle noch nicht und
+        # bricht ab. Als Zeile im Protokoll ist das die Antwort auf "warum
+        # verbindet sie nicht"; als stiller Abbruch waere es eine Stunde
+        # Suche. tls-einrichten.sh sagt, was am Telefon zu tun ist.
+        print(f"  {adresse[0]}: TLS-Handschlag abgebrochen ({e}) — "
+              f"vertraut das Geraet der Longpath-Handfunke-CA schon?",
+              flush=True)
+        try:
+            klient.close()
+        except OSError:
+            pass
+        return None
+
+
+def bedienen(roh, adresse):
     t0 = time.time()
     zaehler = [0, 0]
+    klient = vielleicht_tls(roh, adresse)
+    if klient is None:
+        return
     try:
         ziel = socket.create_connection(ZIEL, timeout=5)
     except OSError as e:
@@ -111,6 +194,11 @@ def bedienen(klient, adresse):
     except OSError as e:
         print(f"  {adresse[0]}: Handschlag fehlgeschlagen ({e})", flush=True)
         klient.close(); ziel.close(); return
+    # Auf dem UMHUELLTEN Socket, nicht auf dem rohen: `wrap_socket`
+    # uebernimmt den Dateideskriptor, und das urspruengliche Objekt ist
+    # danach leer. Ein setsockopt darauf endet mit EBADF, und zwar in
+    # einem Nebenfaden, also als Spur im Protokoll statt als Absturz —
+    # genau die Sorte Fehler, die man ohne Gegenprobe nicht sieht.
     for s in (klient, ziel):
         s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
     print(f"  {adresse[0]} verbunden", flush=True)
@@ -186,7 +274,14 @@ if __name__ == "__main__":
         raise SystemExit(1)
     for _, wo in offen:
         print(f"Bruecke offen auf {wo}", flush=True)
-    print(f"weitergereicht an {ZIEL[0]}:{ZIEL[1]} · Strg-C beendet sie\n", flush=True)
+    print(f"weitergereicht an {ZIEL[0]}:{ZIEL[1]} · Strg-C beendet sie", flush=True)
+    if TLS is not None:
+        print("TLS liegt bereit — derselbe Port nimmt ws:// und wss://; "
+              "das erste Byte entscheidet.\n", flush=True)
+    else:
+        print("Ohne Zertifikat, also nur ws://. Eine https-Seite kann sich "
+              "damit nicht verbinden (gemischter Inhalt); "
+              "handfunke/tls-einrichten.sh legt eines an.\n", flush=True)
     try:
         while True:
             bereit, _, _ = select.select([s for s, _ in offen], [], [], 1.0)

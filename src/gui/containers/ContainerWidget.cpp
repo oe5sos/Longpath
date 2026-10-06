@@ -426,7 +426,8 @@ void ContainerWidget::addTab(QWidget* widget, const QString& title)
                 [this](const QPoint& p) {
             const int i = m_tabBar->tabAt(p);
             if (i < 0) { return; }
-            ScopedChildWidget<QMenu> menuOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+            ScopedChildWidget<QMenu> menuOwner(window());   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+            const QPointer<ContainerWidget> self(this);   // Menue am Fenster: ein nativer Vorfahr gab ihm keinen Fensterbezug (2026-09-30)
             QMenu& menu = *menuOwner.get();
             menu.setStyleSheet(QString::fromLatin1(kPopupMenu));
             QAction* out = menu.addAction(
@@ -435,7 +436,7 @@ void ContainerWidget::addTab(QWidget* widget, const QString& title)
             const QAction* chosen = menu.exec(m_tabBar->mapToGlobal(p));
             // Das Elternteil kann waehrend exec() gestorben sein — dann ist
             // auch das Menue weg und `this` eine Leiche. Siehe ScopedChildWidget.h.
-            if (!menuOwner) { return; }
+            if (!menuOwner || !self) { return; }
             if (chosen == out) {
                 emit tabDetachRequested(m_id, i);
             }
@@ -741,7 +742,8 @@ void ContainerWidget::updateLockButton()
 //                    ueber den sich der Betreiber beschwert hat
 void ContainerWidget::contextMenuEvent(QContextMenuEvent* event)
 {
-    ScopedChildWidget<QMenu> menuOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+    ScopedChildWidget<QMenu> menuOwner(window());   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+    const QPointer<ContainerWidget> self(this);   // Menue am Fenster: ein nativer Vorfahr gab ihm keinen Fensterbezug (2026-09-30)
     QMenu& menu = *menuOwner.get();
     menu.setStyleSheet(QString::fromLatin1(kPopupMenu));
 
@@ -775,7 +777,7 @@ void ContainerWidget::contextMenuEvent(QContextMenuEvent* event)
     const QAction* chosen = menu.exec(event->globalPos());
     // Das Elternteil kann waehrend exec() gestorben sein — dann ist
     // auch das Menue weg und `this` eine Leiche. Siehe ScopedChildWidget.h.
-    if (!menuOwner) { return; }
+    if (!menuOwner || !self) { return; }
     if (chosen == move && !isOverlayDocked())        { emit overlayRequested(); }
     else if (chosen == window && !isFloating())      { emit floatRequested(); }
     else if (chosen == edge && !isPanelDocked())     { emit dockRequested(); }
