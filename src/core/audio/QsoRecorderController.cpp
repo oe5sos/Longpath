@@ -11,6 +11,10 @@
 //   2026-09-02 — Speicherplatz-Wache statt Dauer-Deckel, von Martin
 //                 Fischer, KI-gestuetzt ueber Anthropic Claude
 //                 (Cowork). Begruendung im Header.
+//   2026-10-06 — Die Platzfrage antwortet im Prueflauf der Pruefstand,
+//                 nicht die Platte, von Martin Fischer, KI-gestuetzt
+//                 ueber Anthropic Claude (Cowork). Begruendung im
+//                 Header.
 // =================================================================
 
 #include "core/audio/QsoRecorderController.h"
@@ -19,6 +23,7 @@
 #include "core/TxWorkerThread.h"
 
 #include <QFileInfo>
+#include <QStandardPaths>
 #include <QStorageInfo>
 
 #include <algorithm>
@@ -133,8 +138,21 @@ void QsoRecorderController::drainNow() { drain(); }
 //
 // Independently implemented from Thetis clsAudioRecordPlayback.cs --
 // see QsoRecorderController.h for what carried over and what didn't.
+// Im Prueflauf antwortet der Pruefstand, nicht die Platte -- siehe
+// setHasEnoughDiskSpaceForTests() im Header fuer das Warum.
+static bool s_hasEnoughDiskSpaceForTests = true;
+
+void QsoRecorderController::setHasEnoughDiskSpaceForTests(bool enough)
+{
+    s_hasEnoughDiskSpaceForTests = enough;
+}
+
 bool QsoRecorderController::hasEnoughDiskSpace(const QString& forPath)
 {
+    if (QStandardPaths::isTestModeEnabled()) {
+        return s_hasEnoughDiskSpaceForTests;
+    }
+
     const QStorageInfo disk(QFileInfo(forPath).absolutePath());
     if (!disk.isValid() || disk.bytesTotal() <= 0) { return true; }
     const qint64 percentFree = (disk.bytesAvailable() * 100) / disk.bytesTotal();

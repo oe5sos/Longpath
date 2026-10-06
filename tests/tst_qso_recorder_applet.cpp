@@ -21,6 +21,9 @@
 //   2026-09-02 — Deckel-Anzeige entfernt (zeitlich unbegrenzt, siehe
 //                 QsoRecorder.h), von Martin Fischer, KI-gestuetzt
 //                 ueber Anthropic Claude (Cowork).
+//   2026-10-06 — Prueffall fuer einen abgelehnten Start, von Martin
+//                 Fischer, KI-gestuetzt ueber Anthropic Claude
+//                 (Cowork). Begruendung am Prueffall.
 // =================================================================
 
 // no-port-check: Longpath-original test file.
@@ -30,6 +33,7 @@
 #include <QPushButton>
 #include <vector>
 
+#include "core/audio/QsoRecorderController.h"
 #include "gui/applets/QsoRecorderApplet.h"
 #include "models/RadioModel.h"
 
@@ -120,6 +124,62 @@ private slots:
 
         b->click();
         QVERIFY(!model.qsoRecorder().isRecording());
+    }
+
+    // ── Der Grund fuer einen fehlgeschlagenen Start muss im
+    //    Prueflauf SICHTBAR werden, nicht als Timeout enden.
+    //
+    // Am 2026-10-05 lief dieser Prueffall nicht, aber der darueber:
+    // Martins Platte hatte 9 % frei, der Boden ist 10 — die
+    // Platz-Wache in onRecordClicked() oeffnete ein modales
+    // QMessageBox::warning, und QDialog::exec() wartete auf einen
+    // Klick, den im Prueflauf niemand macht. Ergebnis: 120-s-Timeout
+    // statt einer Meldung. Dieselbe Klasse wie der CI-Hänger in
+    // docs/architecture/2026-09-09-ci-discovery-hang-investigation.md.
+    //
+    // Geprueft wird deshalb beides: dass der Klick ZURUECKKOMMT (haengt
+    // er, laeuft dieser Prueffall in den Timeout, und genau das ist
+    // der Fang), und dass der Grund danach an der Flaeche steht.
+    void aRefusedStartSaysSoInsteadOfBlocking()
+    {
+        RadioModel model;
+        QsoRecorderApplet a(&model);
+
+        QsoRecorderController::setHasEnoughDiskSpaceForTests(false);
+        // Auch wenn hier etwas schiefgeht: der naechste Prueffall darf
+        // die Platte nicht voll vorfinden.
+        struct Restore {
+            ~Restore()
+            { QsoRecorderController::setHasEnoughDiskSpaceForTests(true); }
+        } restore;
+
+        QPushButton* b = recordButtonOf(a);
+        QVERIFY(b);
+
+        b->click();
+
+        QVERIFY2(!model.qsoRecorder().isRecording(),
+                 "bei zu wenig Platz wird nicht aufgenommen");
+        QVERIFY2(b->text().contains(QStringLiteral("Record")),
+                 "und der Knopf bietet es weiter an, statt \"Stop\" "
+                 "zu behaupten");
+
+        // Der Grund gehoert an die Flaeche — sonst steht der Bediener
+        // vor einem Knopf, der nichts tut.
+        // isVisibleTo(&a), nicht isVisible(): das Applet wird hier nie
+        // gezeigt, und ohne gezeigtes Fenster ist isVisible() immer
+        // falsch — auch fuer eine Zeile, die im Betrieb dasteht.
+        // Gefragt ist, ob sie ausgeblendet ist, nicht ob ein Schirm da
+        // ist.
+        bool said = false;
+        for (QLabel* l : a.findChildren<QLabel*>()) {
+            if (l->isVisibleTo(&a)
+                && l->text().contains(QStringLiteral("disk space"),
+                                      Qt::CaseInsensitive)) {
+                said = true;
+            }
+        }
+        QVERIFY2(said, "der Grund muss dastehen, nicht nur im Protokoll");
     }
 
     // Die Uhr muss dem folgen, was wirklich in der Aufnahme liegt.

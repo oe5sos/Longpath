@@ -60,6 +60,10 @@
 //   2026-09-02 — Speicherplatz-Wache statt Dauer-Deckel, von Martin
 //                 Fischer, KI-gestuetzt ueber Anthropic Claude
 //                 (Cowork). Begruendung oben.
+//   2026-10-06 — Die Platzfrage antwortet im Prueflauf der Pruefstand,
+//                 nicht die Platte, von Martin Fischer, KI-gestuetzt
+//                 ueber Anthropic Claude (Cowork). Begruendung bei
+//                 setHasEnoughDiskSpaceForTests().
 // =================================================================
 
 #include <QObject>
@@ -119,6 +123,23 @@ public:
     // wavPath liegen wuerde? Prozentual, siehe Header — Thetis
     // OkToRecord (clsAudioRecordPlayback.cs:630-641 [@852bf0e]).
     static bool hasEnoughDiskSpace(const QString& forPath);
+
+    // Nur fuer Pruefstaende, ohne Wirkung im ausgelieferten Programm
+    // (die Wache unten greift nur, wenn
+    // QStandardPaths::isTestModeEnabled() wahr ist — das ist in jedem
+    // Pruefprogramm so und in keiner Installation).
+    //
+    // Warum ueberhaupt: die Platzfrage ist eine Frage an die Platte,
+    // nicht an das Programm. Wer sie im Prueflauf messen laesst, laesst
+    // die Fuellung des Entwicklerrechners entscheiden, ob ein
+    // Pruefstand gruen ist. Am 2026-10-05 hatte Martins Platte 9 %
+    // frei, der Boden ist 10 — der Knopf-Pruefstand in
+    // tst_qso_recorder_applet lief dadurch in den 120-s-Timeout, auf
+    // einem Rechner mit 46 GB frei und einer tadellosen Aufnahme.
+    // Im Prueflauf antwortet deshalb der Pruefstand, nicht die Platte;
+    // die Vorgabe ist "genug", und wer die Wache selbst pruefen will,
+    // stellt sie hier auf false.
+    static void setHasEnoughDiskSpaceForTests(bool enough);
 
     // Nur fuer Tests und fuer den Notfall: holt jetzt ab, statt auf den
     // Zeitgeber zu warten.

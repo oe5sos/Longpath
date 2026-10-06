@@ -61,6 +61,10 @@ mw0lge@grange-lane.co.uk
 // Modification history (Longpath):
 //   2026-08-19 — Original fuer NereusSDR von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
+//   2026-10-06 — Kein modaler Kasten im Prueflauf (er haengt dort auf
+//                 einem Klick, den niemand macht), von Martin Fischer,
+//                 KI-gestuetzt ueber Anthropic Claude (Cowork).
+//                 Begruendung bei warnHere().
 // =================================================================
 
 #include "QsoRecorderApplet.h"
@@ -105,6 +109,37 @@ QString clockText(double seconds)
     return QStringLiteral("%1:%2")
         .arg(total / 60, 2, 10, QLatin1Char('0'))
         .arg(total % 60, 2, 10, QLatin1Char('0'));
+}
+
+// ── Warnen, ohne den Prueflauf anzuhalten ────────────────────────
+//
+// Ein modales QMessageBox::warning haengt in QDialog::exec() auf einem
+// Klick, den im Prueflauf niemand macht. Am 2026-10-05 lief
+// tst_qso_recorder_applet genau daran in den 120-s-Timeout: Martins
+// Platte hatte 9 % frei, der Boden ist 10, die Platz-Wache oeffnete
+// den Kasten — und ein Fehlschlag, der als Timeout erscheint, sagt
+// nicht, WAS schiefging. Dieselbe Klasse wie der CI-Haenger in
+// docs/architecture/2026-09-09-ci-discovery-hang-investigation.md,
+// dort ueber dieselbe Wache geloest.
+//
+// Der Text geht immer in die Zeile unter den Balken — auch im Betrieb,
+// denn dort bleibt er lesbar, nachdem der Kasten weggeklickt ist. Nur
+// der Kasten selbst entfaellt im Prueflauf.
+void warnHere(QWidget* parent, QLabel* line, const QString& text)
+{
+    if (line) {
+        line->setText(text);
+        line->setVisible(true);
+    }
+
+    if (QStandardPaths::isTestModeEnabled()) {
+        // Wahr in jedem Pruefprogramm (TestSandboxInit.cpp setzt es vor
+        // main()), falsch in jeder Installation.
+        qWarning("QSO Recorder: %s", qPrintable(text));
+        return;
+    }
+
+    QMessageBox::warning(parent, QStringLiteral("QSO Recorder"), text);
 }
 
 } // namespace
@@ -348,6 +383,12 @@ void QsoRecorderApplet::buildUI()
             QDesktopServices::openUrl(
                 QUrl::fromLocalFile(recordingFolder()));
         } else if (chosen == del) {
+            // Im Prueflauf wird nicht geloescht: die Frage haengt
+            // sonst in QDialog::exec() wie die Warnung oben, und von
+            // zwei Antworten ist "nicht loeschen" die, die keine
+            // Aufnahme kostet. Wer den Loeschweg einmal pruefen will,
+            // braucht hier einen eigenen Haken.
+            if (QStandardPaths::isTestModeEnabled()) { return; }
             if (QMessageBox::question(this, QStringLiteral("QSO Recorder"),
                     QStringLiteral("Delete this recording and its "
                                    "description? This cannot be undone."))
@@ -437,11 +478,10 @@ void QsoRecorderApplet::onRecordClicked()
         // gilt dieselbe Pruefung wie bei Thetis auch hier — die
         // laufende Wache ist QsoRecorderController::checkDiskSpace().
         if (!QsoRecorderController::hasEnoughDiskSpace(recordingFolder())) {
-            QMessageBox::warning(this, QStringLiteral("QSO Recorder"),
-                QStringLiteral(
-                    "Not enough free disk space to start recording "
-                    "(less than %1% free).")
-                    .arg(QsoRecorderController::kFreeSpacePercentFloor));
+            warnHere(this, m_lossLabel, QStringLiteral(
+                "Not enough free disk space to start recording "
+                "(less than %1% free).")
+                .arg(QsoRecorderController::kFreeSpacePercentFloor));
             return;
         }
 
@@ -476,8 +516,8 @@ void QsoRecorderApplet::onRecordClicked()
 
         QString err;
         if (!rec.start(path, info, &err)) {
-            QMessageBox::warning(this, QStringLiteral("QSO Recorder"),
-                QStringLiteral("Could not start recording: %1").arg(err));
+            warnHere(this, m_lossLabel, QStringLiteral(
+                "Could not start recording: %1").arg(err));
             return;
         }
     }
