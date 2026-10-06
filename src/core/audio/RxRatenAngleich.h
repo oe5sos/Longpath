@@ -134,8 +134,7 @@
 
 #include "core/audio/AudioRateMatcher.h"
 
-#include <QtGlobal>
-
+#include <cstdint>
 #include <vector>
 
 namespace Longpath {
@@ -153,7 +152,7 @@ public:
     /// eines bestimmten Hintergrunds. `PortAudioBus` haelt 100 ms, also
     /// faellt beides zusammen; ein Bus mit anderem Ring bekaeme sonst
     /// stillschweigend eine andere Verzoegerung.
-    static constexpr qint64 ringRahmenFuer(int rate)
+    static constexpr std::int64_t ringRahmenFuer(int rate)
     {
         return (rate > 0 ? rate : 48000) * 2LL * kZielMs / 1000;
     }
@@ -176,13 +175,13 @@ public:
     /// dann wird nichts kopiert und nichts gerechnet.
     struct Ausgabe { const float* rahmen; int anzahl; };
     Ausgabe verarbeite(const float* ein, int rahmen,
-                       qint64 fuellungRahmen, qint64 ringRahmen);
+                       std::int64_t fuellungRahmen, std::int64_t ringRahmen);
 
     double verhaeltnis() const { return m_regler.verhaeltnis(); }
     bool   regeltSchon() const { return m_regler.regeltSchon(); }
     /// Wie viele Rahmen der Umtaster insgesamt mehr (oder weniger)
     /// ausgegeben hat, als hineingingen. Fuer die Diagnose.
-    qint64 versatz() const { return m_versatz; }
+    std::int64_t versatz() const { return m_versatz; }
 
     void zuruecksetzen();
 
@@ -197,12 +196,12 @@ private:
     std::vector<double> m_aus;
     std::vector<float>  m_ausFloat;
     AudioRateMatcher m_regler;
-    qint64 m_versatz{0};
+    std::int64_t m_versatz{0};
     // Fuellstand und Ausgabe des letzten Durchlaufs. Daraus liest der
     // Erzeuger ab, wie viele Rahmen das Geraet inzwischen verbraucht
     // hat -- ohne dass der Rueckruf mitzaehlen oder eine Sperre nehmen
     // muesste. -1 heisst: noch kein Durchlauf.
-    qint64 m_letzteFuellung{-1};
+    std::int64_t m_letzteFuellung{-1};
     int    m_letzteAusgabe{0};
 };
 

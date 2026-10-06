@@ -85,6 +85,7 @@
 #include "core/audio/RxRatenAngleich.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <cmath>
 
 extern "C" {
@@ -155,7 +156,7 @@ void RxRatenAngleich::baueUmtaster(int blockRahmen)
 }
 
 RxRatenAngleich::Ausgabe RxRatenAngleich::verarbeite(
-    const float* ein, int rahmen, qint64 fuellungRahmen, qint64 ringRahmen)
+    const float* ein, int rahmen, std::int64_t fuellungRahmen, std::int64_t ringRahmen)
 {
     if (!ein || rahmen <= 0) { return { ein, 0 }; }
 
@@ -169,9 +170,9 @@ RxRatenAngleich::Ausgabe RxRatenAngleich::verarbeite(
     // Fuellstand ab -- so muss der Rueckruf nichts mitfuehren und keine
     // Sperre nehmen (ebendas unterscheidet diesen Weg von Thetis).
     if (m_letzteFuellung >= 0) {
-        const qint64 verbraucht = m_letzteFuellung + m_letzteAusgabe - fuellungRahmen;
+        const std::int64_t verbraucht = m_letzteFuellung + m_letzteAusgabe - fuellungRahmen;
         if (verbraucht > 0) {
-            m_regler.melde(-static_cast<int>(std::min<qint64>(verbraucht, 1 << 20)),
+            m_regler.melde(-static_cast<int>(std::min<std::int64_t>(verbraucht, 1 << 20)),
                            fuellungRahmen, ringRahmen);
         }
     }
@@ -206,7 +207,7 @@ RxRatenAngleich::Ausgabe RxRatenAngleich::verarbeite(
         }
     }
 
-    m_versatz += static_cast<qint64>(sicher) - rahmen;
+    m_versatz += static_cast<std::int64_t>(sicher) - rahmen;
     m_letzteFuellung = fuellungRahmen;
     m_letzteAusgabe = sicher;
     return { m_ausFloat.data(), sicher };
