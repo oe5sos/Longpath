@@ -309,6 +309,48 @@ void AudioAdvancedPage::buildFeatureFlagsSection()
 
     auto& s = AppSettings::instance();
 
+    // ── Driftausgleich am Lautsprecherweg (#131, 2026-10-06) ─────────────
+    //
+    // Funkgerät und Tonkarte haben zwei Quarze. Gemessen am 2026-09-27
+    // (SunSDR2 QRP + MacBook Air): der Ausgangsring füllt sich um 0,23 ms
+    // je Minute, also rund 4 ppm — nach etwa fünf Stunden läuft er über
+    // oder leer, und dann knackt es.
+    //
+    // Der Schalter steht hier und nicht nur in der Einstellungsdatei,
+    // damit im laufenden Betrieb verglichen werden kann: der Regler
+    // braucht drei Sekunden Anlauf, danach entscheidet das Ohr.
+    //
+    // Greift erst beim nächsten Start der Tonausgabe — das Stück wird
+    // beim Aufbau der Tonmaschine angelegt, nicht je Block. Das steht
+    // als Hinweis daneben, statt dass jemand vergeblich hinhört.
+    {
+        auto* row = new QHBoxLayout;
+        m_rxDriftCheck = new QCheckBox(
+            QStringLiteral("Uhrendrift am Empfangston ausgleichen"), box);
+        const bool on =
+            s.value(QStringLiteral("RxDriftAusgleich"),
+                    QStringLiteral("False")).toString() == QStringLiteral("True");
+        m_rxDriftCheck->setChecked(on);
+        auto* note = new QLabel(
+            QStringLiteral("(Ziel 50 ms · wirkt beim nächsten Start der Tonausgabe)"),
+            box);
+        note->setStyleSheet(QLatin1String(kNoteStyle));
+        row->addWidget(m_rxDriftCheck);
+        row->addWidget(note);
+        row->addStretch();
+        layout->addLayout(row);
+
+        connect(m_rxDriftCheck, &QCheckBox::toggled,
+                this, [](bool checked) {
+                    AppSettings::instance().setValue(
+                        QStringLiteral("RxDriftAusgleich"),
+                        checked ? QStringLiteral("True") : QStringLiteral("False"));
+                    qCInfo(lcAudio)
+                        << "RX-Driftausgleich" << (checked ? "ein" : "aus")
+                        << "— wirkt beim naechsten Start der Tonausgabe";
+                });
+    }
+
     // SendIqToVax — Phase 3M deferred.
     {
         auto* row = new QHBoxLayout;

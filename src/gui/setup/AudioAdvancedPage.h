@@ -74,6 +74,7 @@ private:
     bool             m_vacLoading        = false;
 
     // Feature-flag checkboxes.
+    QCheckBox* m_rxDriftCheck{nullptr};
     QCheckBox* m_sendIqToVaxCheck          = nullptr;
     QCheckBox* m_txMonitorToVaxCheck       = nullptr;
     QCheckBox* m_muteVaxDuringTxOtherCheck = nullptr;
