@@ -351,6 +351,12 @@ endif()
 # keine QFont darf eine Familie ohne Rueckfallkette nennen. Anlass war
 # die Protokollzeile "missing font family SF Mono" -- dahinter steckten
 # acht Schreibweisen und vier verschiedene Schriften auf dem Schirm.
+# ── Profilschiene: waagrecht in der Leiste oder senkrecht am Rand ──
+# Betreiber 2026-10-06: erst „neben 48 khz", dann „macht sinn, dass man
+# dies individuell verschieben und anpassen kann". Beide Lagen muessen
+# dieselben Abzeichen tragen.
+longpath_add_test(tst_profilschiene_richtung)
+
 longpath_add_test(tst_schriftfamilien)
 if(TEST tst_schriftfamilien)
     set_tests_properties(tst_schriftfamilien PROPERTIES

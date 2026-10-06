@@ -48,7 +48,7 @@
 #include <QString>
 #include <QWidget>
 
-class QVBoxLayout;
+class QBoxLayout;
 class QPushButton;
 
 namespace Longpath {
@@ -58,7 +58,26 @@ class LayoutProfiles;
 class ProfileRail : public QWidget {
     Q_OBJECT
 public:
-    explicit ProfileRail(LayoutProfiles* profiles, QWidget* parent = nullptr);
+    /// Waagrecht oder senkrecht. Senkrecht ist die Schiene am linken
+    /// Rand, wie seit 2026-08-15; waagrecht sitzt sie in der
+    /// Kommandoleiste neben der Rate.
+    ///
+    /// Betreiber am 2026-10-06: „meine profile links im eck sollten oben
+    /// in die taksleite neben 48 khz". Es ist DASSELBE Bauteil, nur
+    /// anders gelegt -- damit bleiben Rechtsklickmenue, das X am
+    /// Abzeichen und das gestrichelte Plus erhalten, statt sie in einer
+    /// zweiten Fassung nachzubauen.
+    /// Die Richtung hat KEINEN Vorgabewert, mit Absicht: mit einem
+    /// band der alte Aufruf ProfileRail(profiles, parent) das Elternteil
+    /// stillschweigend an die Richtung, und der Fehler faellt erst im
+    /// Bild auf. Ohne Vorgabe meldet ihn der Uebersetzer
+    /// (2026-10-06 in tst_menus_of_native_fields genau so passiert).
+    explicit ProfileRail(LayoutProfiles* profiles,
+                         Qt::Orientation richtung,
+                         QWidget* parent = nullptr);
+
+    /// Wie die Schiene gerade liegt.
+    Qt::Orientation richtung() const { return m_richtung; }
 
     /// Abzeichen neu aufbauen. Wird auf profilesChanged() gerufen.
     void rebuild();
@@ -82,6 +101,12 @@ signals:
     /// Der Betreiber will ein neues Profil. Den Namen erfragt der
     /// Empfänger — die Schiene kennt keinen Dialog, damit sie ohne
     /// Oberfläche prüfbar bleibt.
+    /// Der Betreiber will die Schiene woanders haben. Die Schiene legt
+    /// sich NICHT selbst um -- sie haengt im Aufbau des Hauptfensters,
+    /// und ein Bauteil, das sich im Rechtsklick selbst umhaengt, waere
+    /// an zwei Stellen gleichzeitig zustaendig. Also meldet sie nur.
+    void placementToggleRequested(Qt::Orientation neueRichtung);
+
     void newProfileRequested();
     void renameRequested(const QString& name);
     void duplicateRequested(const QString& name);
@@ -117,7 +142,15 @@ private:
     QHash<QString, QPushButton*> m_closers;
 
     QPointer<LayoutProfiles> m_profiles;
-    QVBoxLayout* m_column{nullptr};
+    /// Quer zur Laufrichtung mittig: senkrecht waagrecht zentriert,
+    /// waagrecht senkrecht zentriert.
+    Qt::Alignment mittig() const
+    {
+        return m_richtung == Qt::Vertical ? Qt::AlignHCenter : Qt::AlignVCenter;
+    }
+
+    QBoxLayout*  m_column{nullptr};   // VBox oder HBox, je nach Richtung
+    Qt::Orientation m_richtung{Qt::Vertical};
     QPushButton* m_plus{nullptr};
     QHash<QString, QPushButton*> m_badges;
     QStringList m_order;

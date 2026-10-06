@@ -134,6 +134,22 @@ CommandBar::CommandBar(QWidget* parent) : QWidget(parent)
     row->addStretch(1);
 }
 
+void CommandBar::addGroupWidget(const QString& caption, QWidget* w)
+{
+    if (!w || !m_row) { return; }
+    // Wie addGroup(): Versalzeile oben, Inhalt darunter -- damit das
+    // Bauteil auf derselben Linie sitzt wie die Pillen daneben und die
+    // Ueberschrift mit BAND/MODE/FILTER/RATE fluchtet.
+    auto* box = new QVBoxLayout;
+    box->setContentsMargins(0, 0, 0, 0);
+    box->setSpacing(5);
+    box->addWidget(captionLabel(caption, this), 0, Qt::AlignLeft);
+    box->addWidget(w, 0, Qt::AlignLeft);
+    // Vor der Dehnung einsetzen: buildGroups() haengt sie als letztes an,
+    // also ist sie das letzte Element.
+    m_row->insertLayout(m_row->count() - 1, box);
+}
+
 void CommandBar::addTrailing(QWidget* w)
 {
     if (!w || !m_row) { return; }

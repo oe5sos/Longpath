@@ -83,6 +83,7 @@
 #include <QMap>
 #include <QVector>
 
+class QHBoxLayout;
 class QProgressDialog;
 class QThread;
 class QSplitter;
@@ -880,6 +881,14 @@ private:
     /// Die Profilschiene an ihre Dialoge hängen (Anlegen, Umbenennen,
     /// Duplizieren, Löschen) und den Stand beim Beenden sichern.
     void wireProfileRail();
+
+    /// Die Profilschiene an ihren Platz setzen -- waagrecht in die
+    /// Kommandoleiste oder senkrecht an den linken Rand. Baut sie dabei
+    /// neu auf (die Richtung steht im Aufbau des Bauteils) und haengt
+    /// die Verdrahtung wieder an.
+    void setzeProfilschiene(Qt::Orientation richtung);
+    /// Was in den Einstellungen steht; Vorgabe ist die Leiste.
+    Qt::Orientation profilschienenRichtungAusEinstellung() const;
 
     /// Das schwebende „+" unten rechts an seinen Platz setzen. Es hat
     /// keine Anordnung, die es mitzieht, also von Hand bei jeder
@@ -1865,6 +1874,15 @@ private:
     class CommandBar* m_commandBar{nullptr};
     class AddWidgetButton* m_addWidget{nullptr};
     class ProfileRail* m_profileRail{nullptr};
+    /// Die Reihe ganz links im Mittelteil -- dort haengt die Schiene,
+    /// wenn sie senkrecht steht.
+    ///
+    /// OHNE das Schluesselwort "class" davor: eine Deklaration der Form
+    /// "class QHBoxLayout* x" legt im Klassenbereich einen NEUEN,
+    /// unvollstaendigen Typ dieses Namens an und verdeckt den echten --
+    /// der ganze Rest der Datei bekam dann "incomplete type".
+    QHBoxLayout* m_profileRailRow{nullptr};
+    QWidget*     m_profileRailHome{nullptr};
     class AddWidgetButton* m_addWidgetBtn{nullptr};
 
     /// Welche Applets als freie Kachel auf der Flaeche liegen:

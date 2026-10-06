@@ -20,6 +20,8 @@
 #include <QMenu>
 #include <QPointer>
 #include <QPushButton>
+#include <QBoxLayout>
+#include <QHBoxLayout>
 #include <QVBoxLayout>
 
 namespace Longpath {
@@ -58,19 +60,31 @@ QString ProfileRail::initialFor(const QString& name)
     return QStringLiteral("?");
 }
 
-ProfileRail::ProfileRail(LayoutProfiles* profiles, QWidget* parent)
-    : QWidget(parent), m_profiles(profiles)
+ProfileRail::ProfileRail(LayoutProfiles* profiles,
+                         Qt::Orientation richtung, QWidget* parent)
+    : QWidget(parent), m_profiles(profiles), m_richtung(richtung)
 {
     setAttribute(Qt::WA_StyledBackground, true);
-    setFixedWidth(kWidth);
-    setStyleSheet(QStringLiteral(
-        "ProfileRail { background: %1; border-right: 1px solid %2; }")
-        .arg(QString::fromLatin1(Style::kPanelBg),
-             QString::fromLatin1(Style::kBorderSubtle)));
 
-    m_column = new QVBoxLayout(this);
-    m_column->setContentsMargins(7, 9, 7, 9);
-    m_column->setSpacing(7);
+    if (m_richtung == Qt::Vertical) {
+        setFixedWidth(kWidth);
+        // Die Trennlinie steht rechts, zum Fensterinhalt hin.
+        setStyleSheet(QStringLiteral(
+            "ProfileRail { background: %1; border-right: 1px solid %2; }")
+            .arg(QString::fromLatin1(Style::kPanelBg),
+                 QString::fromLatin1(Style::kBorderSubtle)));
+        m_column = new QVBoxLayout(this);
+        m_column->setContentsMargins(7, 9, 7, 9);
+    } else {
+        // In der Leiste: keine eigene Flaeche und keine Trennlinie. Die
+        // Abzeichen sollen wie die Pillen daneben auf dem Leistengrund
+        // sitzen, sonst liegt ein Kasten im Kasten.
+        setFixedHeight(kBadgeSide);
+        setStyleSheet(QStringLiteral("ProfileRail { background: transparent; }"));
+        m_column = new QHBoxLayout(this);
+        m_column->setContentsMargins(0, 0, 0, 0);
+    }
+    m_column->setSpacing(m_richtung == Qt::Vertical ? 7 : 5);
 
     m_plus = new QPushButton(QStringLiteral("+"), this);
     m_plus->setFixedSize(kBadgeSide, kBadgeSide);
@@ -115,7 +129,7 @@ void ProfileRail::rebuild()
     while (QLayoutItem* it = m_column->takeAt(0)) { delete it; }
 
     if (!m_profiles) {
-        m_column->addWidget(m_plus, 0, Qt::AlignHCenter);
+        m_column->addWidget(m_plus, 0, mittig());
         m_column->addStretch(1);
         return;
     }
@@ -169,13 +183,16 @@ void ProfileRail::rebuild()
             });
         }
 
-        m_column->addWidget(b, 0, Qt::AlignHCenter);
+        m_column->addWidget(b, 0, mittig());
         m_badges.insert(name, b);
         m_order << name;
     }
 
-    m_column->addWidget(m_plus, 0, Qt::AlignHCenter);
-    m_column->addStretch(1);
+    m_column->addWidget(m_plus, 0, mittig());
+    // Senkrecht schiebt die Dehnung die Abzeichen nach oben. Waagrecht
+    // darf sie NICHT dazu: die Leiste setzt die Breite, und eine Dehnung
+    // darin wuerde die Abzeichen auseinanderziehen.
+    if (m_richtung == Qt::Vertical) { m_column->addStretch(1); }
 }
 
 // Das X erscheint, solange der Zeiger auf dem Abzeichen steht.
@@ -227,6 +244,19 @@ void ProfileRail::showMenuFor(const QString& name, const QPoint& globalPos)
     // das Fenster keinem, und die nächste Umgestaltung landete nirgends.
     del->setEnabled(m_profiles && m_profiles->names().size() > 1);
 
+    // ── Wohin die Schiene gehoert, entscheidet der Betreiber ─────────
+    //
+    // 2026-10-06, nachdem sie von links in die Leiste gewandert war:
+    // „macht sinn, dass man dies individuell verschieben und anpassen
+    // kann". Also nicht neu festgenagelt, sondern hier umschaltbar --
+    // an der Stelle, an der man ohnehin rechtsklickt, statt in einer
+    // Einstellungsseite, die man erst finden muss.
+    menu.addSeparator();
+    QAction* verschieben = menu.addAction(
+        m_richtung == Qt::Horizontal
+            ? QStringLiteral("Schiene an den linken Rand")
+            : QStringLiteral("Schiene in die Leiste oben"));
+
     QAction* chosen = menu.exec(globalPos);
     // Das Elternteil kann waehrend exec() gestorben sein — dann ist
     // auch das Menue weg und `this` eine Leiche. Siehe ScopedChildWidget.h.
@@ -239,6 +269,10 @@ void ProfileRail::showMenuFor(const QString& name, const QPoint& globalPos)
     else if (chosen == ren)  { emit renameRequested(name); }
     else if (chosen == dup)  { emit duplicateRequested(name); }
     else if (chosen == del)  { emit removeRequested(name); }
+    else if (chosen == verschieben) {
+        emit placementToggleRequested(m_richtung == Qt::Horizontal
+                                          ? Qt::Vertical : Qt::Horizontal);
+    }
 }
 
 QStringList ProfileRail::badges() const { return m_order; }
