@@ -5112,6 +5112,16 @@ longpath_add_test(tst_surface_gradients)
 longpath_add_test(tst_stilblatt)
 longpath_add_test(tst_logbook_import)
 
+# ── Das Logbuch traegt denselben Rahmen wie alle (2026-10-06) ───────────────
+# tst_logbuch_rahmenlos: Betreiber mit Bildschirmfoto -- "die fensterecken sind
+#   rund, alle anderen widget sind doch eckig?!?!". Er hatte recht, und der
+#   Grund war strukturell: das Logbuch war das EINZIGE Fenster mit dem Rahmen
+#   des Betriebssystems, waehrend Rotor, abgeloeste Applets, schwebender
+#   Panadapter und Seitenbereich seit 2026-08-20 rahmenlos mit WindowChrome
+#   laufen. macOS rundet jedes Fenster mit Systemrahmen; dagegen hilft kein
+#   Stilblatt, nur der Verzicht auf den Rahmen.
+longpath_add_test(tst_logbuch_rahmenlos)
+
 # -- Sync QRZ (2026-09-21): der Abholer (Antwort-Parser, Blaettern gegen
 #    einen HTTP-Mock) und das Zusammenfuehren im Logbuchfenster ohne Netz --
 longpath_add_test(tst_qrz_logbook_fetcher)
