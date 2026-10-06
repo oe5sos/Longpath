@@ -100,6 +100,7 @@ private slots:
     void mitAusgleichBleibtErStehen();
     void unsinnGehtUnveraendertDurch();
     void dieMeldungLaeuftNichtZu();
+    void einGeleerterRingIstKeinVerbrauch();
 };
 
 void TstRxRatenAngleich::unbekannterFuellstandGehtUnveraendertDurch()
@@ -218,6 +219,58 @@ void TstRxRatenAngleich::dieMeldungLaeuftNichtZu()
     t += 60'000;
     QVERIFY(!a.protokollZeile(t).isEmpty());
     QVERIFY(a.protokollZeile(t).isEmpty());
+}
+
+void TstRxRatenAngleich::einGeleerterRingIstKeinVerbrauch()
+{
+    // `AudioEngine::setMasterMuted(true)` ruft `IAudioBus::flush()`, und
+    // PortAudioBus setzt dabei den Lese- auf den Schreibzeiger: der
+    // Fuellstand faellt in einem Schritt auf null.
+    //
+    // Aus dem Unterschied gelesen sieht das aus wie ein Verbrauch von
+    // 2880 statt 480 Rahmen. Das Geraet hat davon nichts gehoert -- die
+    // Rahmen wurden WEGGEWORFEN. Wer so eine Zahl in die Regelung gibt,
+    // verschiebt das gemittelte Verhaeltnis bei JEDEM Stummschalten, und
+    // der Fehler ist leise: kein Knacken, kein Aussetzer, nur ein Regler,
+    // der mit der Zeit auf eine falsche Rate zieht.
+    //
+    // Dass der Ring danach WIRKLICH leer ist und die Rueckfuehrung darauf
+    // reagiert, ist dagegen richtig -- das ist kein Fehler, sondern die
+    // Aufgabe des Reglers. Geprueft wird deshalb der Unterschied zwischen
+    // MIT und OHNE Schutz, nicht ein Absolutwert.
+    auto fahreMitStummschalten = [&](int faktor) {
+        RxRatenAngleich a(kRate, 2);
+        a.setzePlausibelFaktor(faktor);
+        const std::vector<float> block = stereoBlock(kBlock);
+        double f = kZiel;
+        for (int i = 0; i < 2000; ++i) {
+            const auto aus = a.verarbeite(block.data(), kBlock,
+                                          std::int64_t(f + 0.5), kRing);
+            f += aus.anzahl; f -= kBlock;
+        }
+        const double vorher = a.verhaeltnis();
+        // Zehnmal stummschalten und wieder auffuellen.
+        for (int i = 0; i < 10; ++i) {
+            a.verarbeite(block.data(), kBlock, 0, kRing);
+            for (int k = 0; k < 20; ++k) {
+                a.verarbeite(block.data(), kBlock, kZiel, kRing);
+            }
+        }
+        return std::pair<double, std::int64_t>(
+            std::abs(a.verhaeltnis() - vorher), a.spruenge());
+    };
+
+    const auto mit  = fahreMitStummschalten(4);          // mit Schutz
+    const auto ohne = fahreMitStummschalten(1 << 20);    // alte Fassung
+
+    qInfo("Verhaeltnis wandert: mit Schutz %.9f, ohne %.9f (Spruenge %lld/%lld)",
+          mit.first, ohne.first, (long long)mit.second, (long long)ohne.second);
+
+    QVERIFY2(mit.second > 0, "Der geleerte Ring wurde nicht als Sprung erkannt");
+    QCOMPARE(ohne.second, std::int64_t(0));   // alte Fassung laesst nichts aus
+    // DER Punkt: mit Schutz wandert das Verhaeltnis deutlich weniger.
+    QVERIFY2(mit.first < ohne.first,
+             "Der Schutz macht keinen Unterschied -- dann belegt er nichts");
 }
 
 QTEST_MAIN(TstRxRatenAngleich)

@@ -185,7 +185,20 @@ public:
     /// ausgegeben hat, als hineingingen. Fuer die Diagnose.
     std::int64_t versatz() const { return m_versatz; }
 
+    /// Wie oft ein unplausibler Fuellstandssprung ausgelassen wurde --
+    /// im Regelfall das Stummschalten, das den Ring leert. Steht die
+    /// Zahl still, ist nichts passiert; waechst sie dauernd, stimmt mit
+    /// dem Bus etwas nicht.
+    std::int64_t spruenge() const { return m_spruenge; }
+
     void zuruecksetzen();
+
+    /// Ab welchem Vielfachen der Blockgroesse ein Fuellstandssprung als
+    /// unplausibel gilt und AUSGELASSEN wird. Nur fuer den Pruefstand
+    /// veraenderbar: mit einem riesigen Wert verhaelt sich die Klasse wie
+    /// vor dem 2026-10-06, und erst dieser Vergleich belegt, dass der
+    /// Schutz etwas taugt.
+    void setzePlausibelFaktor(int faktor) { m_plausibelFaktor = faktor; }
 
     /// Eine Zeile fuer das Protokoll, oder leer, wenn nichts zu sagen ist.
     ///
@@ -211,6 +224,8 @@ private:
     std::vector<float>  m_ausFloat;
     AudioRateMatcher m_regler;
     std::int64_t m_versatz{0};
+    std::int64_t m_spruenge{0};
+    int          m_plausibelFaktor{4};
     // Fuellstand und Ausgabe des letzten Durchlaufs. Daraus liest der
     // Erzeuger ab, wie viele Rahmen das Geraet inzwischen verbraucht
     // hat -- ohne dass der Rueckruf mitzaehlen oder eine Sperre nehmen

@@ -171,9 +171,32 @@ RxRatenAngleich::Ausgabe RxRatenAngleich::verarbeite(
     // Sperre nehmen (ebendas unterscheidet diesen Weg von Thetis).
     if (m_letzteFuellung >= 0) {
         const std::int64_t verbraucht = m_letzteFuellung + m_letzteAusgabe - fuellungRahmen;
-        if (verbraucht > 0) {
-            m_regler.melde(-static_cast<int>(std::min<std::int64_t>(verbraucht, 1 << 20)),
+
+        // ── Ein geleerter Ring ist kein Verbrauch (2026-10-06) ───────────
+        //
+        // `AudioEngine::setMasterMuted(true)` ruft `IAudioBus::flush()`,
+        // und PortAudioBus setzt dabei den Lese- auf den Schreibzeiger:
+        // der Fuellstand faellt in einem Schritt auf null. Aus dem
+        // Unterschied gelesen sieht das aus wie ein Verbrauch von 2880
+        // statt 480 Rahmen -- das Sechsfache, und es stimmt nicht: das
+        // Geraet hat nichts davon gehoert, die Rahmen wurden weggeworfen.
+        //
+        // So eine Zahl in die Regelung zu geben verschiebt das gemittelte
+        // Verhaeltnis, und zwar bei JEDEM Stummschalten. Der Fehler
+        // waere leise: kein Knacken, kein Aussetzer, nur ein Regler, der
+        // mit der Zeit auf eine falsche Rate zieht.
+        //
+        // Darum eine Plausibilitaetsgrenze. Mehr als das Vierfache des
+        // Blocks kann in der Zeit zwischen zwei Bloecken nicht verbraucht
+        // worden sein; was darueber liegt, ist ein Sprung und keine
+        // Messung. Er wird AUSGELASSEN, nicht gekappt -- ein gekappter
+        // Sprung waere immer noch falsch, nur weniger.
+        const std::int64_t plausibel = std::int64_t(rahmen) * m_plausibelFaktor;
+        if (verbraucht > 0 && verbraucht <= plausibel) {
+            m_regler.melde(-static_cast<int>(verbraucht),
                            fuellungRahmen, ringRahmen);
+        } else if (verbraucht > plausibel) {
+            m_spruenge++;
         }
     }
     m_regler.melde(rahmen, fuellungRahmen, ringRahmen);
@@ -230,11 +253,12 @@ QString RxRatenAngleich::protokollZeile(std::int64_t jetztMs, int abstandSek)
     const double ppm = (m_regler.verhaeltnis() - 1.0) * 1e6;
     return QStringLiteral(
         "RX-Driftausgleich: Verhaeltnis %1 (%2 ppm), Fuellstand %3 Rahmen, "
-        "Versatz %4 Rahmen seit dem Start")
+        "Versatz %4 Rahmen seit dem Start, %5 Spruenge ausgelassen")
         .arg(m_regler.verhaeltnis(), 0, 'f', 9)
         .arg(ppm, 0, 'f', 2)
         .arg(m_letzteFuellung)
-        .arg(m_versatz);
+        .arg(m_versatz)
+        .arg(m_spruenge);
 }
 
 void RxRatenAngleich::zuruecksetzen()
@@ -242,6 +266,7 @@ void RxRatenAngleich::zuruecksetzen()
     m_regler.zuruecksetzen();
     if (m_varsamp) { flush_varsamp(m_varsamp); }
     m_versatz = 0;
+    m_spruenge = 0;
     m_letzteMeldungMs = 0;
     m_letzteFuellung = -1;
     m_letzteAusgabe = 0;
