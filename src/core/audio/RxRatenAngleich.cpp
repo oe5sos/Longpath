@@ -213,11 +213,36 @@ RxRatenAngleich::Ausgabe RxRatenAngleich::verarbeite(
     return { m_ausFloat.data(), sicher };
 }
 
+QString RxRatenAngleich::protokollZeile(std::int64_t jetztMs, int abstandSek)
+{
+    // Vor der Anlaufzeit gibt es nichts zu melden -- da regelt noch
+    // niemand, und eine Zeile "var = 1,0" waere eine Aussage ueber nichts.
+    if (!m_regler.regeltSchon()) { return {}; }
+    if (m_letzteMeldungMs != 0
+        && (jetztMs - m_letzteMeldungMs) < std::int64_t(abstandSek) * 1000) {
+        return {};
+    }
+    m_letzteMeldungMs = jetztMs;
+
+    // Der Versatz ist die eigentliche Zahl: so viele Rahmen hat der
+    // Ausgleich bis jetzt zugelegt oder weggenommen. Laeuft er richtig,
+    // waechst er stetig und langsam; springt er, stimmt etwas nicht.
+    const double ppm = (m_regler.verhaeltnis() - 1.0) * 1e6;
+    return QStringLiteral(
+        "RX-Driftausgleich: Verhaeltnis %1 (%2 ppm), Fuellstand %3 Rahmen, "
+        "Versatz %4 Rahmen seit dem Start")
+        .arg(m_regler.verhaeltnis(), 0, 'f', 9)
+        .arg(ppm, 0, 'f', 2)
+        .arg(m_letzteFuellung)
+        .arg(m_versatz);
+}
+
 void RxRatenAngleich::zuruecksetzen()
 {
     m_regler.zuruecksetzen();
     if (m_varsamp) { flush_varsamp(m_varsamp); }
     m_versatz = 0;
+    m_letzteMeldungMs = 0;
     m_letzteFuellung = -1;
     m_letzteAusgabe = 0;
 }

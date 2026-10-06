@@ -130,6 +130,30 @@ class Verbindung:
                 return True
         return not bis_ready
 
+    def sammle_bis(self, praefix, grenze=3.0):
+        """Sammelt, bis eine Zeile mit diesem Anfang da ist -- hoechstens
+        `grenze` Sekunden. Gibt die verstrichene Zeit in Millisekunden.
+
+        Ohne das misst `sammle(n)` immer n Sekunden und meldet die als
+        Antwortzeit. Genau das stand hier zuerst: "6 Spots in 8002 ms",
+        obwohl der Server in Wahrheit sofort geantwortet hatte. Eine
+        erfundene Zahl ist schlimmer als keine.
+        """
+        t0 = time.time()
+        ende = t0 + grenze
+        while time.time() < ende:
+            if any(z.startswith(praefix) for z in self.zeilen()):
+                return (time.time() - t0) * 1000.0
+            try:
+                stueck = self.sock.recv(262144)
+            except socket.timeout:
+                break
+            if not stueck:
+                break
+            self.puffer += stueck
+            self._entpacke()
+        return (time.time() - t0) * 1000.0
+
     def zeilen(self):
         return [z for z in "".join(self.texte).split(";") if z.strip()]
 
@@ -437,10 +461,8 @@ def miss_logbuch(v, sekunden):
     nicht geraten.
     """
     v.leeren()
-    t0 = time.time()
     v.sende("log_last:10;")
-    v.sammle(min(sekunden, 3.0))
-    ms = (time.time() - t0) * 1000.0
+    ms = v.sammle_bis("log_last_", min(sekunden, 3.0))
     zeilen = [z for z in v.zeilen() if z.startswith("log_qso_zeile:")]
     ende = [z for z in v.zeilen() if z.startswith("log_last_")]
 
@@ -475,10 +497,8 @@ def miss_logbuch(v, sekunden):
     if not ruf:
         return
     v.leeren()
-    t0 = time.time()
     v.sende(f"log_dup:{ruf};")
-    v.sammle(min(sekunden, 3.0))
-    ms = (time.time() - t0) * 1000.0
+    ms = v.sammle_bis("log_dup_", min(sekunden, 3.0))
     antwort = [z for z in v.zeilen() if z.startswith("log_dup_")]
     if not antwort:
         print(f"  log_dup:{ruf} — keine Antwort")
@@ -490,6 +510,84 @@ def miss_logbuch(v, sekunden):
             print("  ACHTUNG: ein Rufzeichen AUS der Liste gilt als nie "
                   "gearbeitet — das Vorsieb findet seinen eigenen Eintrag "
                   "nicht.")
+
+
+def miss_spots(v, sekunden):
+    """Was die App vom Band sieht -- und wie teuer das ist.
+
+    LIEST NUR. `spots:` bewegt nichts; der einzige Befehl in dieser Datei,
+    der etwas aendern koennte, waere `rotor_to:`, und den schickt
+    miss_rotor ausdruecklich NICHT.
+
+    Geprueft wird dasselbe wie beim Logbuch: die Anzahl in der
+    Abschlusszeile MUSS mit den gesendeten Zeilen uebereinstimmen. Eine
+    kuerzere Liste sieht aus wie ein leereres Band, und das faellt
+    niemandem auf.
+    """
+    v.leeren()
+    v.sende("spots:0;")
+    ms = v.sammle_bis("spots_", min(sekunden, 3.0))
+    zeilen = [z for z in v.zeilen() if z.startswith("spot_zeile:")]
+    ende = [z for z in v.zeilen() if z.startswith("spots_")]
+
+    if not ende:
+        print("  spots: keine Antwort — der Server kennt den Befehl nicht "
+              "(vor 2026-10-05).")
+        return
+    if ende[-1].startswith("spots_err:"):
+        print(f"  spots abgelehnt: {ende[-1].split(':', 1)[1]}")
+        return
+
+    angesagt = ende[-1].split(":", 1)[1].strip().rstrip(";")
+    print(f"  {len(zeilen)} Spots im Bild, angesagt {angesagt}, in {ms:.0f} ms")
+    if angesagt != str(len(zeilen)):
+        print("  ACHTUNG: Anzahl und Zeilen stimmen nicht ueberein.")
+    for z in zeilen[:8]:
+        f = z.split(":", 1)[1].rstrip(";").split(",")
+        while len(f) < 6:
+            f.append("")
+        try:
+            khz = int(f[1]) / 1000.0
+        except ValueError:
+            khz = 0.0
+        print(f"    {khz:10.2f} kHz  {f[2]:<10} {f[3]:<5} {f[4]:<8} "
+              f"{f[5]:>5} s alt")
+    if not zeilen:
+        print("    (nichts im Ausschnitt — das ist kein Fehler, nur ein "
+              "ruhiges Band oder eine enge Spanne)")
+
+
+def miss_rotor(v, sekunden):
+    """Was der Rotor meldet. FRAGT NUR — es wird nichts gedreht.
+
+    `rotor_to:` und `rotor_stop:` schickt dieses Werkzeug bewusst nicht:
+    am anderen Ende haengt ein Mast, und ein Messwerkzeug, das Metall
+    bewegt, ist keines.
+    """
+    v.leeren()
+    v.sende("rotor:0;")
+    v.sammle_bis("rotor_", min(sekunden, 3.0))
+    antwort = [z for z in v.zeilen() if z.startswith("rotor_")]
+    if not antwort:
+        print("  rotor: keine Antwort — der Server kennt den Befehl nicht "
+              "(vor 2026-10-05).")
+        return
+    if antwort[-1].startswith("rotor_err:"):
+        grund = antwort[-1].split(":", 1)[1].rstrip(";")
+        print(f"  kein Rotor erreichbar: {grund}")
+        print("  (\"kein rotor\" heisst: hier ist keiner angemeldet — das ist "
+              "eine Auskunft, kein Fehler.)")
+        return
+    f = antwort[-1].split(":", 1)[1].rstrip(";").split(",")
+    while len(f) < 3:
+        f.append("")
+    zustand = {"0": "nicht verbunden", "1": "verbindet", "2": "bereit",
+               "3": "dreht", "4": "Fehler"}.get(f[1].strip(), f[1])
+    frisch = "frisch" if f[2].strip() == "1" else "VON VORHIN"
+    print(f"  Stellung {f[0]}°, {zustand}, Meldung {frisch}")
+    if f[2].strip() != "1":
+        print("  Eine Stellung von vorhin ist keine Stellung — so meldet es "
+              "die App auch.")
 
 
 def eigene_adresse():
@@ -509,7 +607,7 @@ def main():
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("was", nargs="?", default="alles",
                     choices=["alles", "ton", "hf", "pegel", "skala",
-                             "logbuch"])
+                             "logbuch", "spots", "rotor"])
     ap.add_argument("--host", default=None, help="Vorgabe: die eigene Netzadresse")
     ap.add_argument("--port", type=int, default=50001)
     ap.add_argument("--token", default=None, help="nur aus dem Netz noetig")
@@ -536,17 +634,20 @@ def main():
     vfo = [z for z in v.zeilen() if z.startswith("vfo:0,0")]
     print(f"Verbunden. {vfo[-1] if vfo else 'keine VFO-Meldung'}\n")
 
-    teile = (["hf", "pegel", "ton", "logbuch"] if args.was == "alles"
-             else [args.was])
+    teile = (["hf", "pegel", "ton", "logbuch", "spots", "rotor"]
+             if args.was == "alles" else [args.was])
     for teil in teile:
         print({"ton": "── Ton ──", "hf": "── Signal im Bild ──",
                "pegel": "── Was der Server meldet ──",
                "skala": "── Skala gegen Preamp/ATT ──",
-               "logbuch": "── Logbuch, wie die App es sieht ──"}[teil])
+               "logbuch": "── Logbuch, wie die App es sieht ──",
+               "spots": "── Spots im Bild ──",
+               "rotor": "── Rotor (nur gefragt, nicht gedreht) ──"}[teil])
         # Der Skala-Lauf braucht Zeit zum Durchschalten, nicht fuenf Sekunden.
         dauer = max(args.dauer, 40.0) if teil == "skala" else args.dauer
         {"ton": miss_ton, "hf": miss_hf, "pegel": miss_pegel,
-         "skala": miss_skala, "logbuch": miss_logbuch}[teil](v, dauer)
+         "skala": miss_skala, "logbuch": miss_logbuch,
+         "spots": miss_spots, "rotor": miss_rotor}[teil](v, dauer)
         print()
 
     v.zu()

@@ -1667,6 +1667,13 @@ void AudioEngine::rxBlockReady(int sliceId, const float* samples, int frames)
                             speakersBus->negotiatedFormat().sampleRate));
                     rahmen = ang.rahmen;
                     anzahl = ang.anzahl;
+                    // Einmal je Minute eine Zeile: "im Auge behalten"
+                    // (Betreiber, 2026-10-06) geht nur, wenn man etwas
+                    // sieht. Die Zeile entsteht nur, wenn die Minute um
+                    // ist -- sonst kostet sie einen Vergleich.
+                    const QString zeile = m_rxDrift->protokollZeile(
+                        QDateTime::currentMSecsSinceEpoch());
+                    if (!zeile.isEmpty()) { qCInfo(lcAudio).noquote() << zeile; }
                 }
                 speakersBus->push(
                     reinterpret_cast<const char*>(rahmen),

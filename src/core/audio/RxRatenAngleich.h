@@ -134,6 +134,8 @@
 
 #include "core/audio/AudioRateMatcher.h"
 
+#include <QString>
+
 #include <cstdint>
 #include <vector>
 
@@ -185,6 +187,18 @@ public:
 
     void zuruecksetzen();
 
+    /// Eine Zeile fuer das Protokoll, oder leer, wenn nichts zu sagen ist.
+    ///
+    /// Betreiber am 2026-10-06, zu den gemessenen 4,2 % eines Kerns:
+    /// „stören nicht, im auge behalten". Beobachten laesst sich aber nur,
+    /// was man sieht -- zur Laufzeit war von diesem Regler bisher nichts
+    /// zu bemerken, weder im Guten noch im Schlechten.
+    ///
+    /// Gibt hoechstens alle `abstandSek` Sekunden etwas zurueck: eine
+    /// Zeile je Tonblock waeren hundert je Sekunde, und ein Protokoll,
+    /// das zulaeuft, liest niemand.
+    QString protokollZeile(std::int64_t jetztMs, int abstandSek = 60);
+
 private:
     void baueUmtaster(int blockRahmen);
 
@@ -201,6 +215,7 @@ private:
     // Erzeuger ab, wie viele Rahmen das Geraet inzwischen verbraucht
     // hat -- ohne dass der Rueckruf mitzaehlen oder eine Sperre nehmen
     // muesste. -1 heisst: noch kein Durchlauf.
+    std::int64_t m_letzteMeldungMs{0};
     std::int64_t m_letzteFuellung{-1};
     int    m_letzteAusgabe{0};
 };

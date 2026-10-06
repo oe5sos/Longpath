@@ -99,6 +99,7 @@ private slots:
     void ohneAusgleichLaeuftDerPufferLeer();     // Gegenprobe
     void mitAusgleichBleibtErStehen();
     void unsinnGehtUnveraendertDurch();
+    void dieMeldungLaeuftNichtZu();
 };
 
 void TstRxRatenAngleich::unbekannterFuellstandGehtUnveraendertDurch()
@@ -177,6 +178,46 @@ void TstRxRatenAngleich::unsinnGehtUnveraendertDurch()
     const auto aus = a.verarbeite(block.data(), kBlock, kZiel, 0);
     QCOMPARE(aus.rahmen, block.data());
     QCOMPARE(aus.anzahl, kBlock);
+}
+
+void TstRxRatenAngleich::dieMeldungLaeuftNichtZu()
+{
+    // "Im Auge behalten" geht nur, wenn man etwas sieht -- aber eine Zeile
+    // je Tonblock waeren HUNDERT JE SEKUNDE, und ein Protokoll, das
+    // zulaeuft, liest niemand. Genau diese beiden Fehler haelt der Stand
+    // auseinander.
+    RxRatenAngleich a(kRate, 2);
+    const std::vector<float> block = stereoBlock(kBlock);
+
+    // Vor der Anlaufzeit: gar nichts. Eine Zeile "Verhaeltnis 1,0" waere
+    // eine Aussage ueber nichts -- da regelt noch niemand.
+    std::int64_t t = 1'000'000;
+    for (int i = 0; i < 100; ++i) {
+        a.verarbeite(block.data(), kBlock, kZiel, kRing);
+        QVERIFY2(a.protokollZeile(t).isEmpty(), "vor dem Anlauf gemeldet");
+        t += 10;
+    }
+
+    // Anlauf vorbei.
+    for (int i = 0; i < 400; ++i) { a.verarbeite(block.data(), kBlock, kZiel, kRing); }
+    QVERIFY(a.regeltSchon());
+
+    const QString erste = a.protokollZeile(t);
+    QVERIFY2(!erste.isEmpty(), "nach dem Anlauf kam keine Zeile");
+    QVERIFY2(erste.contains(QStringLiteral("Verhaeltnis")), qPrintable(erste));
+    QVERIFY2(erste.contains(QStringLiteral("ppm")), qPrintable(erste));
+    QVERIFY2(erste.contains(QStringLiteral("Versatz")), qPrintable(erste));
+
+    // Danach eine Minute lang Ruhe -- auch bei tausend Aufrufen.
+    for (int i = 0; i < 1000; ++i) {
+        t += 50;
+        QVERIFY2(a.protokollZeile(t).isEmpty(),
+                 "innerhalb der Minute wurde ein zweites Mal gemeldet");
+    }
+    // Und nach der Minute wieder genau eine.
+    t += 60'000;
+    QVERIFY(!a.protokollZeile(t).isEmpty());
+    QVERIFY(a.protokollZeile(t).isEmpty());
 }
 
 QTEST_MAIN(TstRxRatenAngleich)
