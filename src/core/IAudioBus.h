@@ -51,6 +51,22 @@ public:
     // its ring read/write cursors.  Safe to call from any thread.
     virtual void flush() {}
 
+    // Wie viele Rahmen liegen gerade im Puffer des Busses -- geschoben,
+    // aber noch nicht abgespielt?
+    //
+    // -1 heisst UNBEKANNT, und das ist kein Platzhalter: nicht jeder
+    // Hintergrund hat einen eigenen Ring, den man befragen kann (HAL-Shm,
+    // PipeWire, FIFO reichen die Rahmen weiter, ohne sie zu halten). Ein
+    // Aufrufer, der -1 als 0 liest, sieht einen dauerhaft leeren Puffer
+    // und regelt dagegen an -- darum muss die Unterscheidung bis nach
+    // oben durchkommen. Der Driftausgleich laesst die Rahmen bei -1
+    // unveraendert durch (Entwurf 2026-09-27, §4.1).
+    //
+    // Darf vom ERZEUGERfaden gelesen werden, ohne eine Sperre zu nehmen;
+    // Umsetzungen bauen das aus denselben Atomics, die Lesen und
+    // Schreiben ohnehin fuehren.
+    virtual qint64 queuedFrames() const { return -1; }
+
     // Metering (RMS of last block). 0.0–1.0. Published atomically for UI.
     virtual float rxLevel() const = 0;
     virtual float txLevel() const = 0;

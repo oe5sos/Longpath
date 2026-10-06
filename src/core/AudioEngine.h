@@ -109,6 +109,7 @@
 #include "AudioDeviceConfig.h"
 #include "IAudioBus.h"
 #include "audio/MasterMixer.h"
+#include "audio/RxRatenAngleich.h"
 #include "strip/MicSpectrum.h"
 
 #if defined(Q_OS_LINUX)
@@ -119,6 +120,7 @@
 // Forward-declare only — AudioEngine.h must not drag in libpipewire types.
 // The full type is available in AudioEngine.cpp via
 // #include "core/audio/PipeWireThreadLoop.h".
+
 namespace Longpath {
 
 class PipeWireThreadLoop;
@@ -956,6 +958,22 @@ private:
     std::mutex m_headphonesBusMutex;
 
     std::unique_ptr<IAudioBus> m_speakersBus;
+
+    // ── Driftausgleich am Lautsprecherweg (#131, 2026-10-06) ─────────────
+    //
+    // Funkgeraet und Tonkarte haben zwei Quarze; gemessen 4 ppm, was den
+    // 100-ms-Ring in rund fuenf Stunden zum Ueberlaufen bringt. Der
+    // Angleich sitzt VOR dem push und laeuft damit auf dem DSP-Faden --
+    // kein Rueckruf, keine Sperre (CLAUDE.md).
+    //
+    // NUR hier, nicht am Kopfhoererweg: der hat im MasterMixer schon ein
+    // eigenes nachgefuehrtes Polster, und zwei Regelungen auf demselben
+    // Strom arbeiten gegeneinander. Betreiberentscheidung 2026-10-06.
+    //
+    // Ab Werk AUS. Ein neuer Umtaster im Hoerweg einer laufenden Station
+    // gehoert nicht ungefragt eingeschaltet; `RxDriftAusgleich=True`
+    // schaltet ihn ein, und danach entscheidet das Ohr.
+    std::unique_ptr<RxRatenAngleich> m_rxDrift;
     std::unique_ptr<IAudioBus> m_headphonesBus;
     std::unique_ptr<IAudioBus> m_txInputBus;
 
