@@ -191,6 +191,22 @@ public:
     /// dem Bus etwas nicht.
     std::int64_t spruenge() const { return m_spruenge; }
 
+    /// Wie viele Kanaele ein Rahmen hat. Der Aufrufer braucht das, um aus
+    /// der Rahmenzahl die Byteszahl zu rechnen -- und zwar aus DIESER
+    /// Quelle, nicht aus einer eigenen 2. Zwei Stellen, die dieselbe Zahl
+    /// kennen, laufen auseinander, und hier hiesse das: der doppelte
+    /// Puffer wird in den Bus geschoben.
+    int kanaele() const { return m_kanaele; }
+
+    /// Wie oft der Umtaster neu angelegt werden musste, weil sich die
+    /// Blockgroesse geaendert hat.
+    ///
+    /// Sollte 1 sein und bleiben. Waechst die Zahl, wechselt die
+    /// Blockgroesse im Betrieb -- dann wird bei JEDEM Wechsel neu
+    /// zugeteilt und der innere Zustand des Umtasters verworfen, was man
+    /// hoert. Lieber sichtbar als still.
+    std::int64_t umtasterNeubauten() const { return m_neubauten; }
+
     void zuruecksetzen();
 
     /// Ab welchem Vielfachen der Blockgroesse ein Fuellstandssprung als
@@ -225,6 +241,7 @@ private:
     AudioRateMatcher m_regler;
     std::int64_t m_versatz{0};
     std::int64_t m_spruenge{0};
+    std::int64_t m_neubauten{0};
     int          m_plausibelFaktor{4};
     // Fuellstand und Ausgabe des letzten Durchlaufs. Daraus liest der
     // Erzeuger ab, wie viele Rahmen das Geraet inzwischen verbraucht

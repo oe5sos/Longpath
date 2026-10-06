@@ -1675,9 +1675,14 @@ void AudioEngine::rxBlockReady(int sliceId, const float* samples, int frames)
                         QDateTime::currentMSecsSinceEpoch());
                     if (!zeile.isEmpty()) { qCInfo(lcAudio).noquote() << zeile; }
                 }
+                // Die Kanalzahl kommt vom Angleich, nicht aus einer
+                // eigenen 2: zwei Stellen, die dieselbe Zahl kennen,
+                // laufen auseinander -- hier hiesse das, den doppelten
+                // Puffer in den Bus zu schieben.
+                const int kan = m_rxDrift ? m_rxDrift->kanaele() : 2;
                 speakersBus->push(
                     reinterpret_cast<const char*>(rahmen),
-                    static_cast<qint64>(anzahl) * 2 * sizeof(float));
+                    static_cast<qint64>(anzahl) * kan * sizeof(float));
             }
         }
         // A contending writer holding m_speakersBusMutex

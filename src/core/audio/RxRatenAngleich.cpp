@@ -140,6 +140,7 @@ void RxRatenAngleich::baueUmtaster(int blockRahmen)
 {
     if (m_varsamp) { destroy_varsamp(m_varsamp); m_varsamp = nullptr; }
     m_blockRahmen = blockRahmen;
+    m_neubauten++;
 
     // varsamp rechnet KOMPLEX: zwei doubles je Probe. Fuer Stereo faellt
     // das zusammen (links/rechts auf die beiden Teile); bei Mono wird der
@@ -253,12 +254,14 @@ QString RxRatenAngleich::protokollZeile(std::int64_t jetztMs, int abstandSek)
     const double ppm = (m_regler.verhaeltnis() - 1.0) * 1e6;
     return QStringLiteral(
         "RX-Driftausgleich: Verhaeltnis %1 (%2 ppm), Fuellstand %3 Rahmen, "
-        "Versatz %4 Rahmen seit dem Start, %5 Spruenge ausgelassen")
+        "Versatz %4 Rahmen seit dem Start, %5 Spruenge ausgelassen, "
+        "%6 Umtaster-Neubauten")
         .arg(m_regler.verhaeltnis(), 0, 'f', 9)
         .arg(ppm, 0, 'f', 2)
         .arg(m_letzteFuellung)
         .arg(m_versatz)
-        .arg(m_spruenge);
+        .arg(m_spruenge)
+        .arg(m_neubauten);
 }
 
 void RxRatenAngleich::zuruecksetzen()
@@ -267,6 +270,7 @@ void RxRatenAngleich::zuruecksetzen()
     if (m_varsamp) { flush_varsamp(m_varsamp); }
     m_versatz = 0;
     m_spruenge = 0;
+    m_neubauten = 0;
     m_letzteMeldungMs = 0;
     m_letzteFuellung = -1;
     m_letzteAusgabe = 0;
