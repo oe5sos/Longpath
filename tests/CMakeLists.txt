@@ -5122,6 +5122,16 @@ longpath_add_test(tst_logbook_import)
 #   Stilblatt, nur der Verzicht auf den Rahmen.
 longpath_add_test(tst_logbuch_rahmenlos)
 
+# ── Die Profilschiene quer (2026-10-06) ─────────────────────────────────────
+# tst_profilschiene_quer: Betreiber wollte die Profile "oben in die leiste ...
+#   um links mehr platz zu haben". Waagrecht ist bewusst KEINE zweite
+#   Umsetzung, sondern dieselbe Schiene gedreht -- zwei Umsetzungen waeren
+#   zwei Stellen, an denen ein neues Abzeichen einzutragen waere, und eine
+#   davon wuerde man vergessen. Festgehalten: quer hat feste HOEHE (eine quer
+#   liegende Schiene mit fester Breite wuerde die Leiste beschneiden), und
+#   beide Lagen zeigen dieselben Abzeichen.
+longpath_add_test(tst_profilschiene_quer)
+
 # -- Sync QRZ (2026-09-21): der Abholer (Antwort-Parser, Blaettern gegen
 #    einen HTTP-Mock) und das Zusammenfuehren im Logbuchfenster ohne Netz --
 longpath_add_test(tst_qrz_logbook_fetcher)

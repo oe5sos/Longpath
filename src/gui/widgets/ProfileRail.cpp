@@ -20,6 +20,8 @@
 #include <QMenu>
 #include <QPointer>
 #include <QPushButton>
+#include <QBoxLayout>
+#include <QHBoxLayout>
 #include <QVBoxLayout>
 
 namespace Longpath {
@@ -58,18 +60,28 @@ QString ProfileRail::initialFor(const QString& name)
     return QStringLiteral("?");
 }
 
-ProfileRail::ProfileRail(LayoutProfiles* profiles, QWidget* parent)
-    : QWidget(parent), m_profiles(profiles)
+ProfileRail::ProfileRail(LayoutProfiles* profiles, Ausrichtung ausrichtung,
+                         QWidget* parent)
+    : QWidget(parent), m_profiles(profiles), m_ausrichtung(ausrichtung)
 {
-    setAttribute(Qt::WA_StyledBackground, true);
-    setFixedWidth(kWidth);
-    setStyleSheet(QStringLiteral(
-        "ProfileRail { background: %1; border-right: 1px solid %2; }")
-        .arg(QString::fromLatin1(Style::kPanelBg),
-             QString::fromLatin1(Style::kBorderSubtle)));
+    const bool quer = (m_ausrichtung == Ausrichtung::Waagrecht);
 
-    m_column = new QVBoxLayout(this);
-    m_column->setContentsMargins(7, 9, 7, 9);
+    setAttribute(Qt::WA_StyledBackground, true);
+    // Dieselbe Dicke in beiden Lagen: die Schiene ist so breit wie hoch,
+    // damit ein Abzeichen in der Leiste genauso gross wirkt wie am Rand.
+    if (quer) { setFixedHeight(kWidth); } else { setFixedWidth(kWidth); }
+    setStyleSheet(QStringLiteral(
+        "ProfileRail { background: %1; border-%3: 1px solid %2; }")
+        .arg(QString::fromLatin1(Style::kPanelBg),
+             QString::fromLatin1(Style::kBorderSubtle),
+             quer ? QStringLiteral("bottom") : QStringLiteral("right")));
+
+    m_column = quer ? static_cast<QBoxLayout*>(new QHBoxLayout(this))
+                    : static_cast<QBoxLayout*>(new QVBoxLayout(this));
+    // Raender mitdrehen: quer gehoert die Luft nach links/rechts, laengs
+    // nach oben/unten.
+    if (quer) { m_column->setContentsMargins(9, 7, 9, 7); }
+    else      { m_column->setContentsMargins(7, 9, 7, 9); }
     m_column->setSpacing(7);
 
     m_plus = new QPushButton(QStringLiteral("+"), this);
@@ -99,6 +111,14 @@ ProfileRail::ProfileRail(LayoutProfiles* profiles, QWidget* parent)
     }
 }
 
+// Quer mittet man senkrecht, laengs waagrecht -- sonst klebt das
+// Abzeichen am Rand der Leiste.
+Qt::Alignment ProfileRail::mittig() const
+{
+    return (m_ausrichtung == Ausrichtung::Waagrecht) ? Qt::AlignVCenter
+                                                     : Qt::AlignHCenter;
+}
+
 void ProfileRail::rebuild()
 {
     // Abzeichen einsammeln und wegwerfen, das Plus bleibt. Es unten neu
@@ -115,7 +135,7 @@ void ProfileRail::rebuild()
     while (QLayoutItem* it = m_column->takeAt(0)) { delete it; }
 
     if (!m_profiles) {
-        m_column->addWidget(m_plus, 0, Qt::AlignHCenter);
+        m_column->addWidget(m_plus, 0, mittig());
         m_column->addStretch(1);
         return;
     }
@@ -169,12 +189,12 @@ void ProfileRail::rebuild()
             });
         }
 
-        m_column->addWidget(b, 0, Qt::AlignHCenter);
+        m_column->addWidget(b, 0, mittig());
         m_badges.insert(name, b);
         m_order << name;
     }
 
-    m_column->addWidget(m_plus, 0, Qt::AlignHCenter);
+    m_column->addWidget(m_plus, 0, mittig());
     m_column->addStretch(1);
 }
 

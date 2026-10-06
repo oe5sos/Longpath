@@ -48,7 +48,7 @@
 #include <QString>
 #include <QWidget>
 
-class QVBoxLayout;
+class QBoxLayout;
 class QPushButton;
 
 namespace Longpath {
@@ -58,7 +58,23 @@ class LayoutProfiles;
 class ProfileRail : public QWidget {
     Q_OBJECT
 public:
-    explicit ProfileRail(LayoutProfiles* profiles, QWidget* parent = nullptr);
+    // ── Wo die Schiene liegt (2026-10-06) ────────────────────────────
+    //
+    // Betreiber: „weiters würde ich gerne die profile von mir oben in die
+    // leiste einfügen um links mehr platz zu haben." Die Vorlage hat sie
+    // links; auf einem breiten Schirm kostet eine 44 Punkte breite Spalte
+    // über die volle Höhe mehr, als sie einbringt.
+    //
+    // WAAGRECHT ist darum keine zweite Schiene, sondern dieselbe gedreht:
+    // aus der Spalte wird eine Zeile, aus der festen Breite eine feste
+    // Höhe, und aus dem Strich rechts einer unten. Zwei Umsetzungen
+    // nebeneinander wären zwei Stellen, an denen ein neues Abzeichen
+    // einzutragen wäre.
+    enum class Ausrichtung { Senkrecht, Waagrecht };
+
+    explicit ProfileRail(LayoutProfiles* profiles,
+                         Ausrichtung ausrichtung = Ausrichtung::Senkrecht,
+                         QWidget* parent = nullptr);
 
     /// Abzeichen neu aufbauen. Wird auf profilesChanged() gerufen.
     void rebuild();
@@ -117,7 +133,12 @@ private:
     QHash<QString, QPushButton*> m_closers;
 
     QPointer<LayoutProfiles> m_profiles;
-    QVBoxLayout* m_column{nullptr};
+    // QBoxLayout, nicht QVBoxLayout: die Richtung entscheidet der
+    // Aufrufer (siehe Ausrichtung).
+    Qt::Alignment mittig() const;
+
+    QBoxLayout*  m_column{nullptr};
+    Ausrichtung  m_ausrichtung{Ausrichtung::Senkrecht};
     QPushButton* m_plus{nullptr};
     QHash<QString, QPushButton*> m_badges;
     QStringList m_order;
