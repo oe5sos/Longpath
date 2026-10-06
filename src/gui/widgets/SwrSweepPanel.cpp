@@ -577,7 +577,7 @@ void SwrSweepPanel::refreshTunePowerLabel()
             // should be visible before a sweep rather than after.
             const bool quiet = (raw.first < 100 || raw.second < 20);
             m_couplerLabel->setStyleSheet(
-                QStringLiteral("color:%1; font-family: monospace;")
+                QStringLiteral("color:%1; font-family: " LP_MONO_QSS ";")
                     .arg(QString::fromLatin1(
                         quiet ? Style::kTextSecondary : Style::kGreenText)));
         } else {

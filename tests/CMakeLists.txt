@@ -346,6 +346,17 @@ if(TEST tst_nnr_without_model)
         ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
 endif()
 
+# ── Waechter gegen das Auseinanderlaufen der Schriftwahl (2026-10-06) ──
+# Liest den Quelltext: jede Stilvorlage muss LP_MONO_QSS benutzen, und
+# keine QFont darf eine Familie ohne Rueckfallkette nennen. Anlass war
+# die Protokollzeile "missing font family SF Mono" -- dahinter steckten
+# acht Schreibweisen und vier verschiedene Schriften auf dem Schirm.
+longpath_add_test(tst_schriftfamilien)
+if(TEST tst_schriftfamilien)
+    set_tests_properties(tst_schriftfamilien PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
+
 # ── Phase 3M-4 Task 3: TxChannel PureSignal API wrappers (22 functions) ──
 # Smoke tests for the 22 PS API wrappers added in Task 3:
 #   19 calcc setters/readers (setPSRunCal, setPSMox, setPSReset, setPSMancal,

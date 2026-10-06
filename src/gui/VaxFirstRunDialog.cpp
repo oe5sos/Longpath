@@ -150,7 +150,7 @@ QWidget* makeDetRow(int vaxSlot,
     vaxLabel->setFixedWidth(70);
     vaxLabel->setStyleSheet(QStringLiteral(
         "QLabel { color: %1; font-weight: bold;"
-        " font-family: 'ui-monospace','Menlo','Consolas',monospace;"
+        " font-family: " LP_MONO_QSS ";"
         " font-size: 11px; }")
         .arg(Style::kTextPrimary));
     layout->addWidget(vaxLabel, 0, Qt::AlignTop);
@@ -166,7 +166,7 @@ QWidget* makeDetRow(int vaxSlot,
     devLabel->setWordWrap(true);
     devLabel->setStyleSheet(QStringLiteral(
         "QLabel { color: %1;"
-        " font-family: 'ui-monospace','Menlo','Consolas',monospace;"
+        " font-family: " LP_MONO_QSS ";"
         " font-size: 11px; }")
         .arg(Style::kTextSecondary));
     devLayout->addWidget(devLabel);

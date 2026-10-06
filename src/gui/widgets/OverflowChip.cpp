@@ -1,5 +1,6 @@
 // src/gui/widgets/OverflowChip.cpp
 #include "OverflowChip.h"
+#include "gui/StyleConstants.h"   // LP_MONO_QSS
 #include "gui/styles/ThemeQss.h"
 
 #include <QHBoxLayout>
@@ -29,7 +30,7 @@ OverflowChip::OverflowChip(QWidget* parent) : QWidget(parent)
         "}"
         "QLabel#OverflowChip_Glyph {"
         " color: #8aa8c0;"
-        " font-family: 'SF Mono', Menlo, monospace;"
+        " font-family: " LP_MONO_QSS ";"
         " font-size: 16px; font-weight: 700;"
         " background: transparent; border: none;"
         " padding: 0 2px;"

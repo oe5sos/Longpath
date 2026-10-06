@@ -317,7 +317,7 @@ void Hl2IoBoardTab::buildStatusBar(QVBoxLayout* outer)
     row->addWidget(m_ocBandLabel);
     m_ocByteLabel = new QLabel(QStringLiteral("0x00"), m_statusFrame);
     m_ocByteLabel->setStyleSheet(QStringLiteral(
-        "color: #ddd; font-family: monospace; font-weight: bold;"));
+        "color: #ddd; font-family: " LP_MONO_QSS "; font-weight: bold;"));
     row->addWidget(m_ocByteLabel);
     m_ocMoxLabel = new QLabel(QStringLiteral("RX"), m_statusFrame);
     m_ocMoxLabel->setStyleSheet(QStringLiteral(
@@ -391,7 +391,7 @@ void Hl2IoBoardTab::buildConfigAndRegisterRow(QVBoxLayout* outer)
         lbl->setStyleSheet(QStringLiteral("color: #aaa; font-size: 11px;"));
         lbl->setFixedWidth(160);
         valueLabel = new QLabel(QStringLiteral("—"), rowW);
-        valueLabel->setStyleSheet(QStringLiteral("font-size: 11px; font-family: monospace;"));
+        valueLabel->setStyleSheet(QStringLiteral("font-size: 11px; font-family: " LP_MONO_QSS ";"));
         rowL->addWidget(lbl);
         rowL->addWidget(valueLabel);
         rowL->addStretch();
@@ -558,7 +558,7 @@ void Hl2IoBoardTab::buildI2cAndBandwidthRow(QVBoxLayout* outer)
     m_ep6Bar->setTextVisible(false);
     m_ep6Bar->setFixedHeight(14);
     m_ep6RateLabel = new QLabel(QStringLiteral("0.0 Mbps"), bwGroup);
-    m_ep6RateLabel->setStyleSheet(QStringLiteral("font-size: 11px; font-family: monospace;"));
+    m_ep6RateLabel->setStyleSheet(QStringLiteral("font-size: 11px; font-family: " LP_MONO_QSS ";"));
     m_ep6RateLabel->setFixedWidth(70);
     ep6Row->addWidget(ep6Lbl);
     ep6Row->addWidget(m_ep6Bar, 1);
@@ -576,7 +576,7 @@ void Hl2IoBoardTab::buildI2cAndBandwidthRow(QVBoxLayout* outer)
     m_ep2Bar->setTextVisible(false);
     m_ep2Bar->setFixedHeight(14);
     m_ep2RateLabel = new QLabel(QStringLiteral("0.0 Mbps"), bwGroup);
-    m_ep2RateLabel->setStyleSheet(QStringLiteral("font-size: 11px; font-family: monospace;"));
+    m_ep2RateLabel->setStyleSheet(QStringLiteral("font-size: 11px; font-family: " LP_MONO_QSS ";"));
     m_ep2RateLabel->setFixedWidth(70);
     ep2Row->addWidget(ep2Lbl);
     ep2Row->addWidget(m_ep2Bar, 1);
@@ -603,7 +603,7 @@ void Hl2IoBoardTab::buildI2cAndBandwidthRow(QVBoxLayout* outer)
     droppedLbl->setStyleSheet(QStringLiteral("font-size: 11px;"));
     m_throttleEventLabel = new QLabel(QStringLiteral("0"), bwGroup);
     m_throttleEventLabel->setStyleSheet(
-        QStringLiteral("font-size: 11px; font-family: monospace;"));
+        QStringLiteral("font-size: 11px; font-family: " LP_MONO_QSS ";"));
     droppedRow->addWidget(droppedLbl);
     droppedRow->addWidget(m_throttleEventLabel);
     droppedRow->addStretch();

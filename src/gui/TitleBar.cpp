@@ -347,7 +347,11 @@ void ConnectionSegment::paintEvent(QPaintEvent*)
     p.setBrush(QColor(Style::hexRole(Style::kAppBg)));   // war das rohe #08080a
     p.drawRoundedRect(rect(), 3, 3);
 
-    p.setFont(QFont(QStringLiteral("SF Mono"), 10, QFont::DemiBold));
+    // War QFont("SF Mono") OHNE Rueckfall. SF Mono ist auf dem Mac nicht
+    // als Familie ansprechbar, also nahm Qt die proportionale
+    // Vorgabeschrift -- dieses Feld war damit das einzige "Monospace" im
+    // Programm, das gar keines war (2026-10-06 im Protokoll gefunden).
+    p.setFont(Longpath::Style::monoFont(font(), 13, QFont::DemiBold));
 
     // ── 1. State-encoding dot ──────────────────────────────────────────────
     const QRect dotRect(8, height() / 2 - 5, 10, 10);
@@ -584,7 +588,7 @@ TitleBar::TitleBar(AudioEngine* audio, QWidget* parent)
     m_utcLabel->setToolTip(tr("UTC time"));
     m_utcLabel->setStyleSheet(Style::themed(QStringLiteral(
         "QLabel { color: %1; font-size: 11px;"
-        " font-family: 'SF Mono', Menlo, monospace; }")
+        " font-family: " LP_MONO_QSS "; }")
             .arg(QString::fromLatin1(Style::kTextSecondary))));
     m_hbox->addWidget(m_utcLabel);
     m_hbox->addSpacing(24);

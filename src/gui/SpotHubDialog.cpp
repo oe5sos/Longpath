@@ -208,7 +208,7 @@ constexpr const char* kConsoleStyle =
     "QPlainTextEdit {"
     "  background: #0a0a14;"
     "  color: #8aa8c0;"
-    "  font-family: monospace;"
+    "  font-family: " LP_MONO_QSS ";"
     "  font-size: 11px;"
     "  border: 1px solid #203040;"
     "  padding: 4px;"

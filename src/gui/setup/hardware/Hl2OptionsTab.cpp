@@ -57,6 +57,7 @@
 //============================================================================================//
 
 #include "Hl2OptionsTab.h"
+#include "gui/StyleConstants.h"   // LP_MONO_QSS
 
 #include "core/BoardCapabilities.h"
 #include "core/Hl2OptionsModel.h"
@@ -346,7 +347,7 @@ void Hl2OptionsTab::buildI2cControl(QWidget* parent)
         lbl->setAlignment(Qt::AlignCenter);
         lbl->setStyleSheet(QStringLiteral(
             "QLabel { background: white; color: black; "
-            "font-family: monospace; border: 1px solid #555; padding: 2px; }"));
+            "font-family: " LP_MONO_QSS "; border: 1px solid #555; padding: 2px; }"));
         return lbl;
     };
     m_byte0Label = makeByteLbl();
