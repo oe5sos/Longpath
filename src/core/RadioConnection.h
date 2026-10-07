@@ -651,6 +651,18 @@ signals:
                             quint16 userAdc0Raw, quint16 userAdc1Raw,
                             quint16 supplyRaw);
 
+    /// Temperaturen, die das Geraet von sich aus meldet.
+    ///
+    /// Heute sendet das nur die SunSDR2 QRP: 20 Rahmen je Sekunde mit
+    /// 77 Byte, darin zwei Gleitkommazahlen in halben Schritten
+    /// (2026-10-07 am Geraet gemessen, siehe
+    /// docs/architecture/2026-10-02-sunsdr-verbindungsablauf.md).
+    ///
+    /// Zwei Werte und nicht einer, weil das Geraet zwei liefert und
+    /// nicht feststeht, welcher wo sitzt. Wer nur einen braucht, nimmt
+    /// den ersten.
+    void deviceTemperaturesUpdated(double ersterCelsius, double zweiterCelsius);
+
     // ADC overflow detected.
     void adcOverflow(int adc);
 

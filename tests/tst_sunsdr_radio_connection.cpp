@@ -788,6 +788,193 @@ private slots:
                  SunSdr::kIqHeaderSize + SunSdr::kIqPayloadSize);
     }
 
+    // ── Der 77-Byte-Messwertrahmen (2026-10-07) ──────────────────────
+    //
+    // Bis heute fiel er an der Laengenpruefung heraus: alles unter 1210
+    // Byte galt als unbrauchbar. Darin stehen die EINZIGEN Messwerte,
+    // die die QRP im Empfang liefert -- deshalb zeigte ExpertSDR2 eine
+    // Temperatur und Longpath nichts.
+    void messwertrahmenWirdNichtMehrWeggeworfen()
+    {
+        qunsetenv("LONGPATH_SUNSDR_BLOCKANTWORT");
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+
+        const QHostAddress radio(QStringLiteral("192.0.2.200"));
+        conn.feedControlDatagramForTest(
+            QByteArray::fromHex("03ff011a7c0000004119c0a810c8c0a810c851c300004928"),
+            radio);
+        QVERIFY(conn.isRxReadyForTest());
+
+        // Genau der Rahmen vom Draht (expert-telemetrie.pcap, 2026-10-07),
+        // mit 38,0 an [15] und 28,5 an [19].
+        const QByteArray rahmen = QByteArray::fromHex(
+            "03ff001f00002b0f38930000001d8300"   // Kopf + Zaehler
+            "0018420000e441"                     // 38,0 bei [15], 28,5 bei [19]
+            "00000000000000000000803f"
+            "00000010010020130500802406002013050080"
+            "380b0020130500804c1000201305008060150020130500");
+        QCOMPARE(rahmen.size(), 77);
+
+        conn.feedStreamDatagramFromSenderForTest(rahmen, radio);
+        QTRY_COMPARE_WITH_TIMEOUT(conn.messwertRahmenForTest(), quint64(1), 500);
+        QCOMPARE(conn.messwertAForTest(), 38.0f);
+        QCOMPARE(conn.messwertBForTest(), 28.5f);
+    }
+
+    // Der Weg nach OBEN, nicht nur der Entschluessler.
+    //
+    // Beim Gegenlesen am 2026-10-07 gefunden: die beiden vorhandenen
+    // Pruefungen sehen nur in den Treiber hinein (messwertAForTest).
+    // Nimmt man den emit heraus, bleiben beide gruen -- und der Betreiber
+    // saehe in der Statusseite weiter nichts. Also auch das Signal selbst
+    // pruefen, und zwar dass es NUR bei Aenderung kommt.
+    void dieMesswerteGehenAuchHinaus()
+    {
+        qunsetenv("LONGPATH_SUNSDR_BLOCKANTWORT");
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+
+        const QHostAddress radio(QStringLiteral("192.0.2.200"));
+        conn.feedControlDatagramForTest(
+            QByteArray::fromHex("03ff011a7c0000004119c0a810c8c0a810c851c300004928"),
+            radio);
+        QVERIFY(conn.isRxReadyForTest());
+
+        QSignalSpy spy(&conn, &RadioConnection::deviceTemperaturesUpdated);
+        QVERIFY(spy.isValid());
+
+        auto rahmenMit = [](float a, float b) {
+            QByteArray r = QByteArray::fromHex(
+                "03ff001f00002b0f38930000001d8300"
+                "00000000000000"
+                "00000000000000000000803f"
+                "00000010010020130500802406002013050080"
+                "380b0020130500804c1000201305008060150020130500");
+            std::memcpy(r.data() + 15, &a, sizeof(float));
+            std::memcpy(r.data() + 19, &b, sizeof(float));
+            return r;
+        };
+
+        conn.feedStreamDatagramFromSenderForTest(rahmenMit(43.0f, 33.0f), radio);
+        QTRY_COMPARE_WITH_TIMEOUT(spy.count(), 1, 500);
+        QCOMPARE(spy.at(0).at(0).toDouble(), 43.0);
+        QCOMPARE(spy.at(0).at(1).toDouble(), 33.0);
+
+        // Derselbe Wert noch dreimal: KEIN weiteres Signal. Bei 20
+        // Rahmen je Sekunde waere alles andere Last ohne Inhalt.
+        for (int i = 0; i < 3; ++i) {
+            conn.feedStreamDatagramFromSenderForTest(rahmenMit(43.0f, 33.0f), radio);
+        }
+        QTest::qWait(60);
+        QCOMPARE(spy.count(), 1);
+
+        // Ein neuer Wert meldet sich.
+        conn.feedStreamDatagramFromSenderForTest(rahmenMit(43.5f, 33.0f), radio);
+        QTRY_COMPARE_WITH_TIMEOUT(spy.count(), 2, 500);
+        QCOMPARE(spy.at(1).at(0).toDouble(), 43.5);
+    }
+
+    // -200 ist kein Messwert, sondern "gerade keiner". Am 2026-10-07 in
+    // beiden Laeufen aufgetaucht, einzeln je Wert. Wer das durchreicht,
+    // zeigt minus zweihundert Grad an.
+    void minusZweihundertIstKeinMesswert()
+    {
+        qunsetenv("LONGPATH_SUNSDR_BLOCKANTWORT");
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+
+        const QHostAddress radio(QStringLiteral("192.0.2.200"));
+        conn.feedControlDatagramForTest(
+            QByteArray::fromHex("03ff011a7c0000004119c0a810c8c0a810c851c300004928"),
+            radio);
+        QVERIFY(conn.isRxReadyForTest());
+
+        auto rahmenMit = [](float a, float b) {
+            QByteArray r = QByteArray::fromHex(
+                "03ff001f00002b0f38930000001d8300"
+                "00000000000000"
+                "00000000000000000000803f"
+                "00000010010020130500802406002013050080"
+                "380b0020130500804c1000201305008060150020130500");
+            std::memcpy(r.data() + 15, &a, sizeof(float));
+            std::memcpy(r.data() + 19, &b, sizeof(float));
+            return r;
+        };
+        // Erst ein gueltiges Paar.
+        conn.feedStreamDatagramFromSenderForTest(rahmenMit(43.0f, 33.0f), radio);
+        QTRY_COMPARE_WITH_TIMEOUT(conn.messwertAForTest(), 43.0f, 500);
+        QCOMPARE(conn.messwertBForTest(), 33.0f);
+
+        // Dann einer mit -200 bei A: B wird uebernommen, A bleibt stehen.
+        conn.feedStreamDatagramFromSenderForTest(rahmenMit(-200.0f, 32.5f), radio);
+        QTRY_COMPARE_WITH_TIMEOUT(conn.messwertBForTest(), 32.5f, 500);
+        QCOMPARE(conn.messwertAForTest(), 43.0f);
+
+        // Und einer, in dem BEIDE fehlen: nichts aendert sich.
+        conn.feedStreamDatagramFromSenderForTest(rahmenMit(-200.0f, -200.0f), radio);
+        QTest::qWait(50);
+        QCOMPARE(conn.messwertAForTest(), 43.0f);
+        QCOMPARE(conn.messwertBForTest(), 32.5f);
+    }
+
+    // Der Zustand VOR dem ersten gueltigen Wert.
+    //
+    // Traegt der allererste Rahmen bei A ein -200, stand A noch auf dem
+    // Anfangswert 0,0 -- und der ging als "0 Grad" hinaus. Null Grad ist
+    // ein plausibler Messwert und faellt niemandem auf. Am 2026-10-07
+    // vom Lueckenkritiker gefunden: die -200-Behandlung war geprueft,
+    // der Zustand davor nicht.
+    void vorDemErstenGueltigenWertWirdNichtsGemeldet()
+    {
+        qunsetenv("LONGPATH_SUNSDR_BLOCKANTWORT");
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+
+        const QHostAddress radio(QStringLiteral("192.0.2.200"));
+        conn.feedControlDatagramForTest(
+            QByteArray::fromHex("03ff011a7c0000004119c0a810c8c0a810c851c300004928"),
+            radio);
+        QVERIFY(conn.isRxReadyForTest());
+
+        QSignalSpy spy(&conn, &RadioConnection::deviceTemperaturesUpdated);
+        auto rahmenMit = [](float a, float b) {
+            QByteArray r = QByteArray::fromHex(
+                "03ff001f00002b0f38930000001d8300"
+                "00000000000000"
+                "00000000000000000000803f"
+                "00000010010020130500802406002013050080"
+                "380b0020130500804c1000201305008060150020130500");
+            std::memcpy(r.data() + 15, &a, sizeof(float));
+            std::memcpy(r.data() + 19, &b, sizeof(float));
+            return r;
+        };
+
+        // Erster Rahmen: A fehlt. Es darf NICHTS hinausgehen -- weder
+        // der Anfangswert 0,0 noch sonst etwas.
+        conn.feedStreamDatagramFromSenderForTest(rahmenMit(-200.0f, 33.0f), radio);
+        QTest::qWait(60);
+        QCOMPARE(spy.count(), 0);
+
+        // Sobald A da ist, geht das Paar hinaus.
+        conn.feedStreamDatagramFromSenderForTest(rahmenMit(43.0f, 33.0f), radio);
+        QTRY_COMPARE_WITH_TIMEOUT(spy.count(), 1, 500);
+        QCOMPARE(spy.at(0).at(0).toDouble(), 43.0);
+        QCOMPARE(spy.at(0).at(1).toDouble(), 33.0);
+    }
+
     // Seit der Messung am 2026-10-05 ist die Kopfantwort die VORGABE: an
     // den Wiederholungen aendert sie nichts (207/s gegen 214/s, also
     // nichts), sie halbiert aber den Rueckweg. Diese Pruefung haelt die
@@ -2234,7 +2421,11 @@ private slots:
         QCOMPARE(conn.stromModusForTest(), 0);
 
         conn.setSampleRate(96000);
-        QCOMPARE(conn.stromModusForTest(), 2);   // ZweiStroemeJe96
+        // Mit EINEM Empfaenger ist 96 kHz seit dem 2026-10-07 EinStrom96
+        // (= 3) und nicht mehr ZweiStroemeJe96: die vierte Nutzlast gibt
+        // es, und ein zweiter Strom ohne Empfaenger ist halbe Datenmenge
+        // umsonst.
+        QCOMPARE(conn.stromModusForTest(), 3);   // EinStrom96
 
         conn.setSampleRate(48000);
         QCOMPARE(conn.stromModusForTest(), 0);
@@ -2269,12 +2460,16 @@ private slots:
 
         // Genau die Reihenfolge aus RadioModel::connectToRadio.
         conn.setSampleRate(96000);
-        QCOMPARE(conn.stromModusForTest(), 2);   // ZweiStroemeJe96
+        // Mit EINEM Empfaenger ist 96 kHz seit dem 2026-10-07 EinStrom96
+        // (= 3) und nicht mehr ZweiStroemeJe96: die vierte Nutzlast gibt
+        // es, und ein zweiter Strom ohne Empfaenger ist halbe Datenmenge
+        // umsonst.
+        QCOMPARE(conn.stromModusForTest(), 3);   // EinStrom96
         conn.connectToRadio(someQrpInfo());
 
         // Vor der Behebung stand hier wieder 0 -- und der Stromstart-Rahmen
         // ging mit 48 kHz hinaus, obwohl die App 96 angesagt hatte.
-        QCOMPARE(conn.stromModusForTest(), 2);
+        QCOMPARE(conn.stromModusForTest(), 3);
     }
 
     // Dasselbe fuer die Zahl der Empfaenger: derselbe Reset setzt sie auf 1.
@@ -2324,9 +2519,15 @@ private slots:
         QCOMPARE(conn.stromModusForTest(), 0);
     }
 
-    // Bei 96 kHz gibt es auf dem Draht keinen Ein-Strom-Modus -- dort
-    // sind es immer zwei, gleich wie viele Empfaenger oben hoeren.
-    void beiSechsundneunzigSindEsImmerZweiStroeme()
+    // ~~Bei 96 kHz gibt es keinen Ein-Strom-Modus~~ -- am 2026-10-07
+    // widerlegt. Die Annahme stammte daher, dass nur drei der vier
+    // Nutzlasten gemessen waren; ExpertSDR2 schickt die vierte (ein
+    // Strom, 96 kHz), und das Geraet nimmt sie an.
+    //
+    // Die Pruefung bleibt stehen, mit umgedrehter Erwartung: Rate und
+    // Empfaengerzahl entscheiden GETRENNT, und genau das soll niemand
+    // versehentlich wieder zusammenlegen.
+    void beiSechsundneunzigEntscheidetDieEmpfaengerzahlMit()
     {
         SunSdrRadioConnection conn;
         conn.setFixedPortBindingEnabledForTest(false);
@@ -2335,14 +2536,15 @@ private slots:
         conn.connectToRadio(someQrpInfo());
         handshake(conn);
 
+        // Ein Empfaenger ist der Ausgangszustand -> ein Strom, 96 kHz.
         conn.setSampleRate(96000);
-        QCOMPARE(conn.stromModusForTest(), 2);   // zwei Stroeme, je 96 kHz
+        QCOMPARE(conn.stromModusForTest(), 3);   // EinStrom96
 
         conn.setActiveReceiverCount(2);
-        QCOMPARE(conn.stromModusForTest(), 2);   // bleibt
+        QCOMPARE(conn.stromModusForTest(), 2);   // zwei Stroeme, je 96 kHz
 
         conn.setActiveReceiverCount(1);
-        QCOMPARE(conn.stromModusForTest(), 2);   // bleibt ebenfalls
+        QCOMPARE(conn.stromModusForTest(), 3);   // und wieder zurueck
     }
 
     // Die selbsttaetige Wiederholung (2026-10-04): bleibt KEIN Beacon

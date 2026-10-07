@@ -1268,3 +1268,309 @@ Gleichwertigkeit: ExpertSDR2 zeigt Spannung, Strom und Temperatur,
 Longpath zeigt dort nichts. Was es braucht, ist ein Mitschnitt, in dem
 sichtbar wird, **wann** die 77-Byte-Rahmen einsetzen — und die echten
 Bytes von `0x05` und `0x12` gleich mit.
+
+---
+
+# Die Wiederholungen hängen an der RATE, nicht an der Strömezahl (2026-10-06, Nacht)
+
+Alle bisherigen Zahlen stammten aus 60-Sekunden-Läufen, und in jedem
+davon wurden Rate **und** Strömezahl gemeinsam verändert — damit ließ
+sich nicht trennen, woran die überzähligen Pakete hängen. Fünf Läufe à
+fünf Minuten, je rund 290 ausgewertete Messfenster, erste zehn
+weggeworfen (Einschwingen):
+
+| Betriebsart | Pakete/s | Nummern/s | Wdh./s | Pakete je Nummer |
+| --- | ---: | ---: | ---: | ---: |
+| 48 kHz, 1 Strom | 255 | 240 | 15,1 | **1,061** |
+| 48 kHz, 2 Ströme | 553 | 480 | 73,2 | **1,150** |
+| 96 kHz, 1 Strom | 610 | 480 | 131,5 | **1,272** |
+| 96 kHz, 2 Ströme | 1249 | 961 | 290,5 | **1,300** |
+| 96 kHz, 2 Ströme, Kopfantwort AUS | 1245 | 961 | 287,1 | 1,297 |
+
+## Der entscheidende Vergleich steht in der Mitte
+
+**48 kHz mit zwei Strömen und 96 kHz mit einem Strom liefern dieselben
+480 Nummern je Sekunde** — und wiederholen völlig verschieden: 73 gegen
+132 je Sekunde, 1,150 gegen 1,272 Pakete je Nummer.
+
+Damit ist es **nicht die Blockrate** und **nicht die Strömezahl**,
+sondern die **Abtastrate je Strom**. Ein zweiter Strom legt innerhalb
+derselben Rate noch etwas drauf (1,061 → 1,150 bzw. 1,272 → 1,300), aber
+der Sprung zwischen den Raten ist bei gleicher Blockrate fast doppelt so
+groß wie der durch den zweiten Strom.
+
+## Zwei Nebenbefunde
+
+**Auch bei 48 kHz wird wiederholt.** Bisher stand hier „bei 48 kHz 1,00
+Kopien je Nummer". Über fünf Minuten gemessen sind es **1,061** — 15
+überzählige Pakete je Sekunde. Wenig, aber nicht null, und die runde
+1,00 kam aus zu kurzen Läufen.
+
+**Die Kopfantwort ändert nichts**, jetzt mit fünffacher Datenmenge
+bestätigt: 290,5 gegen 287,1 Wiederholungen je Sekunde. Sie bleibt an,
+weil sie den Rückweg halbiert, nicht weil sie hier hülfe.
+
+## Was der nächste wissen muss, bevor er misst
+
+**QtTest bricht eine Prüfmethode nach 300 Sekunden ab.** Der Lauf war
+auf 1200 s gestellt; alle fünf starben nach genau fünf Minuten mit
+„Test function timed out", **mitten im Messen und damit ohne den
+Schlussbericht**. Gerettet hat die Reihe nur, dass die Fensterzeilen
+sekündlich ins Protokoll gehen — daraus sind die Zahlen oben gerechnet.
+
+Wer länger messen will, startet mit `QTEST_FUNCTION_TIMEOUT` in
+Millisekunden. Der Messlauf warnt seit heute selbst, wenn mehr als 290
+Sekunden gewünscht sind und die Variable fehlt.
+
+---
+
+# `0x0c` und `0x0d` tragen keine Messwerte — jetzt wiederholt abgefragt (2026-10-07)
+
+Der Verdacht stand seit gestern: ExpertSDR2 zeigt Spannung, Strom und
+Temperatur, Longpath nichts, und unser Dokument behauptet, die QRP gebe
+keine Messwerte heraus. Der Beleg dafür war bisher schwach — fünf
+Antworten aus **Verbindungsaufbauten**, also fünf Momentaufnahmen
+desselben Zustands. Ein Wert, der sich langsam ändert (Temperatur),
+wäre darin gar nicht aufgefallen.
+
+Jetzt sauber nachgemessen: **280 Sekunden Dauerlauf bei 96 kHz, `0x0c`
+und `0x0d` alle 10 Sekunden erneut abgefragt**, 54 Abfragen, jede binnen
+13 ms quittiert.
+
+**Keine einzige Änderung.** Das Rahmen-Inventar meldet Nutzlastwechsel
+von selbst — in denselben Läufen meldet es sie für den Stromkopf
+(`0200 → 0201`), hier für `0x0c`/`0x0d` kein einziges Mal.
+
+Damit ist die Frage für diese beiden Abfragen **entschieden**, und zwar
+mit einem Verfahren, das eine Änderung auch gesehen hätte:
+
+> `0x0c` und `0x0d` sind Werksdaten. Dort stehen keine Messwerte, auch
+> keine langsam driftenden.
+
+## Was damit übrig bleibt
+
+Die Werte, die ExpertSDR2 anzeigt, können nur aus den **77-Byte-Rahmen**
+kommen, die das Gerät im Mitschnitt während des Stroms rund dreimal je
+Sekunde schickt (612 über 192 s) und die Longpath nie zu sehen bekommt.
+Sie erscheinen nicht, wenn man ExpertSDR2s dreizehn kleine Steuerrahmen
+nachschickt (am 2026-10-06 gemessen) — es bleiben `0x05` und `0x12`, die
+sich mit Nullnutzlast nicht nachbauen lassen.
+
+**Der nächste Schritt ist damit eindeutig und braucht den Betreiber:**
+ein Mitschnitt mit ExpertSDR2, aus dem die echten Bytes von `0x05` und
+`0x12` hervorgehen — und der zeigt, ab wann die 77-Byte-Rahmen
+einsetzen.
+
+## Nebenbei: der Messlauf kann jetzt wiederholt abfragen
+
+`LONGPATH_SUNSDR_WIEDERHOLT` schickt eine Rahmenliste alle
+`LONGPATH_SUNSDR_WIEDERHOLT_MS` erneut (Vorgabe 10 s). `…_PRE` schickt
+nur einmal beim Verbinden, und für die Frage „steht da ein Messwert
+drin" nützt ein einzelner Abzug nichts.
+
+Der Lauf über 280 s lief dank `QTEST_FUNCTION_TIMEOUT` diesmal
+vollständig durch, mit Schlussbericht: 335 574 Blöcke, 1198/s,
+Verlust 0,00–0,04 %.
+
+---
+
+# Gefunden: die QRP liefert doch Messwerte — im 77-Byte-Rahmen (2026-10-07)
+
+Der Mitschnitt, der gefehlt hat, liegt vor (`expert-telemetrie.pcap`,
+78 s, 76 082 Pakete). Darin:
+
+| Richtung | Port | Länge | Anzahl |
+| --- | --- | ---: | ---: |
+| Gerät → PC | 50002 | 1210 | 37 236 |
+| PC → Gerät | 50002 | 10 | 18 622 |
+| PC → Gerät | 50002 | 1210 | 18 614 |
+| **Gerät → PC** | **50002** | **77** | **1 552** |
+
+**1552 Rahmen à 77 Byte, 20 je Sekunde, 23 verschiedene Inhalte.** Das
+ist die lebende Information, die wir gesucht haben. Longpath hat sie
+bisher an der Längenprüfung weggeworfen — alles unter 1210 Byte galt als
+unbrauchbar.
+
+## Aufbau
+
+Opcode `0x00`, `byte3 = 0x1f`, Längenfeld 0. Alle Felder stehen still
+bis auf einen Zähler und **zwei Gleitkommazahlen**:
+
+    [ 6..9]   Zähler
+    [15..18]  float   38,0 … 38,5
+    [19..22]  float   28,0 … 29,0
+
+Beide in **halben Schritten** — das Muster eines Fühlers mit 0,5 Grad
+Auflösung. Alle 74 Versatzpositionen wurden abgesucht; es gibt keine
+weiteren veränderlichen Zahlen in einem plausiblen Bereich.
+
+## Was NICHT drinsteht: Spannung und Strom
+
+ExpertSDR2 zeigt `U 13,1 V` und `I 0,3 A`. Im **ganzen Mitschnitt** steht
+nirgends ein Wert in dieser Größenordnung:
+
+- nicht im 77-Byte-Rahmen (alle Versätze abgesucht),
+- nicht in `0x0c` — die 39 Doubles sind zwölf Paare (12,5 / −2,4), also
+  Eichwerte, wie seit dem 2026-10-03 vermutet und am 2026-10-07 durch
+  wiederholtes Abfragen über 280 s bestätigt,
+- nicht in `0x12` (24 Byte, einmalig beim Verbinden),
+- und auf dem Steuerweg schickt das Gerät **nichts von sich aus** — alle
+  Antworten dort sind Quittungen auf unsere Rahmen.
+
+**Woher ExpertSDR2 Spannung und Strom nimmt, bleibt damit offen.** Das
+ist ein ehrliches „offen", kein „gibt es nicht": der Mitschnitt zeigt,
+dass es im Empfangsbetrieb über diesen Weg nicht kommt.
+
+## Was gebaut ist
+
+`processStreamDatagram()` erkennt den Rahmen und liest die beiden Werte;
+gemeldet wird nur bei **Änderung** (bei 20 Rahmen je Sekunde wären es
+sonst 72 000 Logzeilen je Stunde, und die Werte stehen minutenlang
+still).
+
+Sie heißen bewusst **Wert A** und **Wert B**, nicht „PA-Temperatur":
+dass es Temperaturen sind, ist aus dem Muster geschlossen, nicht
+belegt, und welcher welcher ist, schon gar nicht. Das entscheidet der
+Betreiber, indem er die Zahlen neben die Anzeige von ExpertSDR2 legt.
+Erst danach gehören sie beschriftet in die Oberfläche.
+
+Gegenprobe: die Prüfung `messwertrahmenWirdNichtMehrWeggeworfen` wird
+gegen die zurückgebaute Fassung rot und mit der Behebung grün.
+
+---
+
+# Die Messwerte kommen in JEDER Betriebsart — und eine Selbstkorrektur (2026-10-07)
+
+Nachdem Longpath den 77-Byte-Rahmen liest, kommen die Werte bei allen
+vier Stromarten an, je 45–60 s gemessen:
+
+| Betriebsart | Meldungen (Wertwechsel) |
+| --- | ---: |
+| 1 Strom, 48 kHz | 182 |
+| 2 Ströme, 48 kHz | 203 |
+| 1 Strom, 96 kHz | 266 |
+| 2 Ströme, 96 kHz | 108 |
+
+**Zwischendurch stand hier das Gegenteil.** Zwei Läufe meldeten *null*
+Messwerte, und ich hatte daraus geschlossen, das Gerät schicke sie nur
+in der Betriebsart, die ExpertSDR2 benutzt. Das war falsch: beide Läufe
+liefen mit einem **Prüfprogramm von vor dem Einbau** — gebaut 06:41:36,
+gefahren 06:36:53 und 06:39:10. Ich hatte nach der Änderung `Longpath`
+und `tst_sunsdr_radio_connection` gebaut, aber nicht den Messlauf.
+
+Dasselbe Muster wie am 2026-10-04 („kein 96 kHz" aus einem 13 Stunden
+alten Binärprogramm). **Vor jedem Lauf am Gerät prüfen, ob das benutzte
+Programm die Änderung überhaupt enthält** — der Zeitstempel genügt.
+
+## Was trotzdem bleibt: die vierte Betriebsart
+
+Beim Suchen ist eine echte Lücke aufgefallen, unabhängig von den
+Messwerten. Der Stromstart-Rahmen `0x01` trägt die Stromzahl im **ersten**
+Byte und die Ratenstufe im **zweiten**, der Schwanz hängt an der Rate.
+Longpath kannte davon nur drei Kombinationen:
+
+    01 00 00 00 0c 08 04 03 02 02 02 02   ein Strom,  48 kHz
+    02 00 00 00 0c 08 04 03 02 02 02 02   zwei Stroeme, 48 kHz
+    02 01 00 00 0a 06 04 03 02 02 02 01   zwei Stroeme, 96 kHz
+    01 01 00 00 0a 06 04 03 02 02 02 01   ein Strom,  96 kHz   <- NEU
+
+Bei 96 kHz stellte Longpath **immer** auf zwei Ströme, auch mit einem
+Empfänger. ExpertSDR2 benutzt die vierte Kombination (Mitschnitt vom
+2026-10-07: RX2 aus, Spanne 96 kHz), das Gerät nimmt sie an, und
+gemessen liefert sie 590 Blöcke je Sekunde auf Kanal 0 — ein Strom mit
+voller Rate, ohne den zweiten, der niemandem gehört.
+
+Damit ist die Tabelle der `0x01`-Nutzlasten **vollständig**.
+
+---
+
+# Der Lastwechsel ist ergebnislos — und ein Ausreißer, der wichtiger war (2026-10-07)
+
+Die Zuordnung „welcher Fühler sitzt wo" sollte eine Messung klären
+statt eine abgelesene Zahl: zwölf Minuten Leerlauf (48 kHz, ein Strom)
+gegen zwölf Minuten Last (96 kHz, zwei Ströme). Der Fühler am
+arbeitenden Teil müsste davonziehen.
+
+**Er tut es nicht.** Über 24 Minuten:
+
+| Phase | Wert A | Wert B |
+| --- | --- | --- |
+| Leerlauf | 42,5 … 43,5 | 32,5 … 33,0 |
+| Last | 43,0 … 43,5 | 33,0 |
+
+Beide stehen. Die Auflösung beträgt 0,5 Grad, der Lastunterschied
+bewegt sie nicht — **die Zuordnung lässt sich so nicht entscheiden.**
+
+Dass die Werte über den Vormittag von 38,0/28,5 auf 43,0/33,0 gestiegen
+sind, ist das Aufwärmen aus dem kalten Zustand, nicht die Last. Genau
+deshalb war die zweite Ruhephase eingeplant: ein Anstieg allein hätte
+nichts belegt.
+
+## Der Ausreißer: −200
+
+In beiden Läufen tauchen Rahmen auf, in denen **einer** der beiden Werte
+`-200,0` trägt — `A=-200.0 B=33.0` ebenso wie `A=43.0 B=-200.0` —, und
+unmittelbar danach wieder richtige Zahlen. Ein Fühler bei minus
+zweihundert Grad existiert nicht: das ist das Zeichen für **„gerade kein
+Messwert"**.
+
+Ohne Behandlung hätte Longpath das durchgereicht und dem Betreiber
+−200 °C angezeigt, womöglich samt Abschaltschwelle. Jetzt wird der
+Ausreißer verworfen und der **alte Wert bleibt stehen** — eine Lücke in
+der Messung ist keine Änderung der Temperatur. Je Wert getrennt, denn
+das Gerät meldet sie getrennt.
+
+Gefunden wurde das nur, weil die Messung lang genug lief: in den ersten
+Läufen von 45–60 s kam kein einziger −200-Rahmen vor.
+
+## Belegt bis ins Modell (2026-10-07)
+
+Nicht nur verdrahtet, sondern am laufenden Programm nachgesehen —
+Longpath offscreen, mit der QRP verbunden:
+
+    {"connectionState":"Connected", "model":"SunSDR2 QRP",
+     "paTemperatureCelsius":43}
+
+Damit ist der ganze Weg belegt: 77-Byte-Rahmen vom Draht → Treiber →
+`deviceTemperaturesUpdated` → `RadioModel` → `RadioStatus`, und das ist
+das Modell, an das die Statusseite gebunden ist.
+
+Die Automationsbrücke gibt den Wert dafür jetzt mit aus. Ohne das ließe
+sich der Weg nicht ohne Menschen prüfen: die Statusseite entsteht erst,
+wenn jemand den Diagnosedialog öffnet, und bis dahin ist der Wert
+unsichtbar — man sähe nur, dass das Protokoll ihn nennt, nicht, dass er
+ankommt.
+
+---
+
+# Die Übergänge im laufenden Strom (2026-10-07)
+
+Der Lückenkritiker des Gegenlesens hatte recht: alle vier Stromarten
+waren **kalt** gemessen, jede von Anfang an über
+`LONGPATH_SUNSDR_STROMMODUS`. Nie gemessen war der Weg, den die
+**Bedienung** tatsächlich nimmt — eine zweite Scheibe kommt dazu,
+während der Strom läuft, oder die Rate wird umgestellt. Dabei schickt
+`stromModusNachziehen()` einen neuen Stromstart-Rahmen in einen
+laufenden Strom hinein, und ob das Gerät das verträgt, stand nirgends.
+
+Nachgefahren, 75 s, ein Lauf, zwei Wechsel mittendrin:
+
+    verbunden                 ein Strom, 48 kHz
+    setActiveReceiverCount(2) -> zwei Stroeme, je 48 kHz
+    setSampleRate(96000)      -> zwei Stroeme, je 96 kHz
+
+**Es trägt.** Alle drei `0x01`-Rahmen binnen **11–12 ms quittiert**;
+danach kommen beide Kanäle mit 612 und 607 Paketen je Sekunde, und
+zwar **ohne ein einziges verworfenes Paket** — der zweite Empfänger
+bekommt seine Daten also auch dann, wenn er erst im laufenden Betrieb
+dazukommt.
+
+| | |
+| --- | --- |
+| Verlust | 0,00 – 0,03 % |
+| Folgenummern | 4806 in 5,0 s (959/s), **0 Spätlinge** |
+| Rückweg | 1000/s, davon 37501 bloße Köpfe (**50 %**) |
+| Kopien je Nummer | 1,22 – 1,26 (wie im kalten 96-kHz-Lauf) |
+
+Damit ist auch die letzte Lücke der Abnahme geschlossen: die Stromarten
+stimmen nicht nur beim Verbinden, sondern auch im Übergang.

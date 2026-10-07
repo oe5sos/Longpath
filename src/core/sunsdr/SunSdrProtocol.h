@@ -315,6 +315,10 @@ struct IqHeader {
 // Rueckgabewerts -- der ist immer die 10 Byte des Kopfes. Standard ist die
 // volle Nutzlast; 0 baut den BLOSSEN KOPF, den ExpertSDR2 am 2026-10-05 im
 // Mitschnitt auf jeden zweiten Block schickt (03 ff fe ff 00 00 .. .. 01 00).
+/// Der Messwertrahmen des Geraets: 77 Byte, Opcode 0x00, byte3 = 0x1f,
+/// 20 Stueck je Sekunde (2026-10-07 im Mitschnitt gemessen).
+inline constexpr int kMesswertPaketSize = 77;
+
 QByteArray buildIqHeader(const Profile& profile, quint8 opcode, quint16 seq,
                          quint8 byte8, quint8 byte9,
                          int payloadLen = kIqPayloadSize);
@@ -540,6 +544,15 @@ enum class StromModus {
     EinStrom48,        // Longpath heute
     ZweiStroemeJe48,
     ZweiStroemeJe96,
+    /// EIN Strom mit 96 kHz. Am 2026-10-07 im Mitschnitt gesehen:
+    /// ExpertSDR2 schickt genau das, wenn RX2 aus ist und die Spanne auf
+    /// 96 kHz steht -- Nutzlast 01 01 00 00 0a 06 04 03 02 02 02 01.
+    ///
+    /// Longpath konnte diese Kombination bis dahin nicht ausdruecken:
+    /// die Stufe (zweites Byte) und der Schwanz haengen an der RATE, die
+    /// Stromzahl am ersten Byte, und es gab nur drei der vier
+    /// Kombinationen.
+    EinStrom96,
 };
 
 // Die Nutzlast (12 Byte) zum Modus. Der vollstaendige Rahmen entsteht mit

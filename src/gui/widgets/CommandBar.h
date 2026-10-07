@@ -115,6 +115,18 @@ public:
     /// Leiste nicht auf ihn warten soll.
     void addTrailing(QWidget* w);
 
+    /// Ein Bauteil als eigene Gruppe ans Ende der Gruppen haengen --
+    /// also NACH der Rate und VOR der Dehnung, damit es neben der Rate
+    /// steht und nicht am rechten Rand.
+    ///
+    /// Betreiber am 2026-10-06: „meine profile links im eck sollten oben
+    /// in die taksleite neben 48 khz".
+    void addGroupWidget(const QString& caption, QWidget* w);
+
+    /// Das Gegenstueck: nimmt das Bauteil UND seine Versalzeile wieder
+    /// aus der Leiste. Das Bauteil selbst wird nicht geloescht.
+    void removeGroupWidget(QWidget* w);
+
     /// Woher das „…" der Filtergruppe seine Vorgaben nimmt: aus dem
     /// Vorgabenspeicher, also mit den Thetis-Namen („1.0k", „800" …)
     /// und mit dem, was der Betreiber unter Setup › Filter Presets
@@ -168,6 +180,11 @@ public:
     static constexpr int kVisiblePerGroup = 3;
 
 private:
+    /// Wo die Dehnung steht -- gesucht, nicht geraten (siehe .cpp).
+    int dehnungsPlatz() const;
+    /// Bauteil -> die Gruppe, in der es steckt (fuer removeGroupWidget).
+    QHash<QWidget*, QLayout*> m_gruppenWidgets;
+
     struct Group {
         QString name;
         QHBoxLayout* row{nullptr};   // wo die Pillen hineinwandern

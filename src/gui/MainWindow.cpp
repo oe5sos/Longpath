@@ -2160,9 +2160,68 @@ void MainWindow::positionAddWidgetButton()
     m_addWidgetBtn->raise();
 }
 
+Qt::Orientation MainWindow::profilschienenRichtungAusEinstellung() const
+{
+    const QString wahl = AppSettings::instance()
+        .value(QStringLiteral("ProfileRailPlacement"),
+               QStringLiteral("bar")).toString();
+    return wahl == QStringLiteral("left") ? Qt::Vertical : Qt::Horizontal;
+}
+
+void MainWindow::setzeProfilschiene(Qt::Orientation richtung)
+{
+    if (!m_layoutProfiles || !m_commandBar || !m_profileRailRow) { return; }
+    if (m_profileRail && m_profileRail->richtung() == richtung) { return; }
+
+    // Die alte Schiene geht weg. Neu aufbauen statt umlegen: die
+    // Richtung steckt im Aufbau (Breite, Raender, Ausrichtung,
+    // Hintergrund), und ein Bauteil, das sich zur Laufzeit umkrempelt,
+    // haette drei Zustaende statt zwei.
+    if (m_profileRail) {
+        // Erst aus der Leiste nehmen, dann weg: setParent(nullptr) allein
+        // raeumt nur das Bauteil aus dem Teil-Layout, die Versalzeile
+        // "PROFIL" und das leere Layout blieben stehen -- und beim
+        // naechsten Hinzufuegen kam eine zweite dazu (2026-10-07 beim
+        // Gegenlesen gefunden, offscreen nachgemessen: drei Wechsel,
+        // drei Ueberschriften).
+        if (m_profileRail->richtung() == Qt::Horizontal && m_commandBar) {
+            m_commandBar->removeGroupWidget(m_profileRail);
+        } else if (m_profileRailRow) {
+            m_profileRailRow->removeWidget(m_profileRail);
+        }
+        m_profileRail->setParent(nullptr);
+        m_profileRail->deleteLater();
+        m_profileRail = nullptr;
+    }
+
+    if (richtung == Qt::Horizontal) {
+        m_profileRail = new ProfileRail(m_layoutProfiles, Qt::Horizontal,
+                                        m_commandBar);
+        m_commandBar->addGroupWidget(QStringLiteral("Profil"), m_profileRail);
+    } else {
+        m_profileRail = new ProfileRail(m_layoutProfiles, Qt::Vertical,
+                                        m_profileRailHome);
+        m_profileRailRow->insertWidget(0, m_profileRail, 0);
+    }
+
+    AppSettings::instance().setValue(
+        QStringLiteral("ProfileRailPlacement"),
+        richtung == Qt::Vertical ? QStringLiteral("left")
+                                 : QStringLiteral("bar"));
+
+    wireProfileRail();
+}
+
 void MainWindow::wireProfileRail()
 {
     if (!m_profileRail || !m_layoutProfiles) { return; }
+
+    // Umhaengen auf Wunsch. Die Schiene meldet nur, umgehaengt wird hier
+    // -- sie haengt im Aufbau des Fensters und darf ihn nicht selbst
+    // umbauen.
+    connect(m_profileRail, &ProfileRail::placementToggleRequested, this,
+            [this](Qt::Orientation neue) { setzeProfilschiene(neue); },
+            Qt::QueuedConnection);
 
     auto askName = [this](const QString& title, const QString& preset)
                    -> QString {
@@ -4354,15 +4413,28 @@ void MainWindow::buildUI()
     });
     auto* centre = new QWidget(this);
 
-    // Profilschiene ganz links über die volle Höhe, wie in der Vorlage.
-    // Daneben die Säule aus Kommandoleiste und Splitter.
+    // Profilschiene: seit dem 2026-10-06 WAAGRECHT in der Kommandoleiste,
+    // direkt neben der Rate, statt senkrecht am linken Rand.
+    //
+    // Betreiber: „meine profile links im eck sollten oben in die
+    // taksleite neben 48 khz". Es ist dasselbe Bauteil, nur anders
+    // gelegt -- Rechtsklickmenue, das X am Abzeichen und das
+    // gestrichelte Plus bleiben damit erhalten, und wireProfileRail()
+    // haengt unveraendert daran.
+    //
+    // Nebenwirkung, und sie ist erwuenscht: die 44 Pixel der linken
+    // Schiene werden frei und gehoeren jetzt dem Panadapter.
+    // Wohin sie gehoert, entscheidet der Betreiber (2026-10-06: „macht
+    // sinn, dass man dies individuell verschieben und anpassen kann").
+    // Gemerkt wird es in ProfileRailPlacement; Vorgabe ist die Leiste,
+    // weil er sie dorthin haben wollte.
     m_layoutProfiles = new LayoutProfiles(this);
-    m_profileRail = new ProfileRail(m_layoutProfiles, centre);
-
     auto* centreRow = new QHBoxLayout(centre);
     centreRow->setContentsMargins(0, 0, 0, 0);
     centreRow->setSpacing(0);
-    centreRow->addWidget(m_profileRail, 0);
+    m_profileRailRow = centreRow;
+    m_profileRailHome = centre;
+    setzeProfilschiene(profilschienenRichtungAusEinstellung());
 
     auto* centreCol = new QVBoxLayout;
     centreCol->setContentsMargins(6, 6, 6, 0);
@@ -8615,7 +8687,18 @@ void MainWindow::populateDefaultMeter()
         // formatfuellend (Betreiber 2026-09-27, siehe die Profil-
         // Anwendung oben). Nach applyCurrent() ist das schon geschehen.
         if (!m_borderlessFullSize) { enterBorderlessFullSize(); }
-        wireProfileRail();
+        // KEIN wireProfileRail() mehr an dieser Stelle.
+        //
+        // Seit die Schiene umhaengbar ist (2026-10-06), verdrahtet
+        // setzeProfilschiene() sie selbst -- und das laeuft beim Aufbau
+        // des Fensters schon. Der Aufruf hier kam danach ein zweites Mal
+        // und legte JEDE Verbindung doppelt an: ein Klick auf das
+        // gestrichelte Plus oeffnete den Namensdialog zweimal, der zweite
+        // Durchgang meldete dann "'Neu' gibt es schon". Dasselbe bei
+        // Umbenennen, Duplizieren und Loeschen.
+        //
+        // Gefunden am 2026-10-07 beim Gegenlesen; eingebaut hatte ich es
+        // am 2026-10-06, ohne die alte Aufrufstelle zu entfernen.
 
         // Der Rotor/Log-Dock kommt erst mit der ERSTEN Verbindung nach
         // diesem Start auf den vom Profil gewuenschten Sichtbarkeitsstand

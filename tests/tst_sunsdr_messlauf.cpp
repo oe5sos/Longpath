@@ -81,6 +81,25 @@ private slots:
                 ? qEnvironmentVariableIntValue("LONGPATH_SUNSDR_SEKUNDEN")
                 : 70;
 
+        // QtTest bricht eine Pruefmethode nach 5 Minuten ab. In der Nacht
+        // vom 2026-10-06 standen hier 1200 Sekunden, und alle fuenf
+        // Laeufe starben nach genau 300 s mit "Test function timed out" --
+        // MITTEN im Messen, also OHNE den Schlussbericht. Die
+        // Fensterzeilen waren noch da und liessen sich retten, der
+        // Bericht nicht.
+        //
+        // QTEST_FUNCTION_TIMEOUT wird beim Start von QtTest gelesen, also
+        // reicht Setzen hier nicht -- es muss von aussen kommen. Darum
+        // hier nur die WARNUNG, damit der naechste es sofort sieht,
+        // statt es wie ich aus den Zeitstempeln zu erschliessen.
+        if (sekunden > 290 && !qEnvironmentVariableIsSet("QTEST_FUNCTION_TIMEOUT")) {
+            qWarning().noquote() << QStringLiteral(
+                "ACHTUNG: %1 s gewuenscht, aber QtTest bricht nach 300 s ab "
+                "und der Schlussbericht faellt aus. Mit "
+                "QTEST_FUNCTION_TIMEOUT=%2 starten (Millisekunden).")
+                .arg(sekunden).arg((sekunden + 60) * 1000);
+        }
+
         SunSdrRadioConnection conn;
         // Das echte Geraet antwortet nur auf Port 50001 (am 2026-08-26 live
         // gelernt), also feste Ports -- und nichts anderes darf sie halten.
@@ -238,10 +257,39 @@ private slots:
             QTest::qWait(2000);
         }
 
+        // ── Eine Abfrage WAEHREND des Laufs wiederholen ──────────────
+        //
+        // LONGPATH_SUNSDR_PRE schickt seine Rahmen einmal beim Verbinden.
+        // Fuer die Frage, ob eine Antwort MESSWERTE traegt, nuetzt das
+        // nichts: ein einzelner Abzug sieht immer gleich aus. Erst wenn
+        // dieselbe Abfrage ueber Minuten wiederholt wird und die Antwort
+        // sich NICHT aendert, ist belegt, dass nichts Lebendes drinsteht
+        // -- und wenn sie sich aendert, hat man gefunden, wonach wir
+        // suchen (2026-10-06: ExpertSDR2 zeigt Spannung, Strom und
+        // Temperatur, Longpath nichts).
+        //
+        // Das Rahmen-Inventar meldet Aenderungen der Nutzlast von selbst.
+        const QByteArray wiederholt = qgetenv("LONGPATH_SUNSDR_WIEDERHOLT");
+        const int wiederholtMs =
+            qEnvironmentVariableIntValue("LONGPATH_SUNSDR_WIEDERHOLT_MS") > 0
+                ? qEnvironmentVariableIntValue("LONGPATH_SUNSDR_WIEDERHOLT_MS")
+                : 10000;
+        QElapsedTimer abfrageUhr;
+        if (!wiederholt.isEmpty()) {
+            qInfo().noquote() << QStringLiteral(
+                "Abfrage wird alle %1 ms wiederholt").arg(wiederholtMs);
+            abfrageUhr.start();
+        }
+
         const int bloeckeVorher = iq.count();
         QElapsedTimer fenster;
         fenster.start();
         while (fenster.elapsed() < sekunden * 1000) {
+            if (!wiederholt.isEmpty() && abfrageUhr.elapsed() >= wiederholtMs) {
+                abfrageUhr.restart();
+                conn.sendBenchFramesForTest(
+                    QStringLiteral("LONGPATH_SUNSDR_WIEDERHOLT"));
+            }
             // 20 ms, nicht 500: mit groben Bloecken laeuft die
             // Ereignisschleife zu selten, die Blockantworten gehen
             // verspaetet hinaus, und das Geraet WIEDERHOLT -- am

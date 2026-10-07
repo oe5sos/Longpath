@@ -346,10 +346,23 @@ void SunSdrRadioConnection::connectToRadio(const RadioInfo& info)
         // zurueck und liess den Modus auf je96 stehen -- das Geraet
         // streamt dann 96 kHz, waehrend WDSP auf 48 steht. Nur im
         // Messbetrieb erreichbar, aber genau dort wird gemessen.
-        m_rateHz = (m_stromModus == SunSdr::StromModus::ZweiStroemeJe96)
+        m_rateHz = (m_stromModus == SunSdr::StromModus::ZweiStroemeJe96
+                    || m_stromModus == SunSdr::StromModus::EinStrom96)
                        ? 96000 : 48000;
-        if (m_stromModus == SunSdr::StromModus::ZweiStroemeJe48) {
+        // Die Empfaengerzahl MUSS zum Modus passen, sonst widersprechen
+        // sich die beiden: bei ein96 mit zwei gebundenen Scheiben zog
+        // RadioModel vor dem Verbinden setActiveReceiverCount(2) nach,
+        // der Modus blieb aber auf einem Strom stehen -- RX2 bekam
+        // stumm keine Daten (2026-10-07 beim Gegenlesen gefunden).
+        switch (m_stromModus) {
+        case SunSdr::StromModus::ZweiStroemeJe48:
+        case SunSdr::StromModus::ZweiStroemeJe96:
             m_aktiveEmpfaenger = qMax(2, m_aktiveEmpfaenger);
+            break;
+        case SunSdr::StromModus::EinStrom48:
+        case SunSdr::StromModus::EinStrom96:
+            m_aktiveEmpfaenger = 1;
+            break;
         }
     }
     m_sucheVersuch = 0;
@@ -1171,30 +1184,58 @@ void SunSdrRadioConnection::setActiveReceiverCount(int count)
 
 // Der Modus ergibt sich aus BEIDEM: Zahl der Empfaenger und Rate.
 //
-//   1 Empfaenger, 48 kHz  -> ein Strom
-//   2 Empfaenger, 48 kHz  -> zwei Stroeme, je 48
-//   1 oder 2,     96 kHz  -> zwei Stroeme, je 96 (einen Strom mit 96 kHz
-//                            gibt es auf dem Draht nicht)
+//   1 Empfaenger, 48 kHz  -> ein Strom,    48 kHz
+//   2 Empfaenger, 48 kHz  -> zwei Stroeme, je 48 kHz
+//   1 Empfaenger, 96 kHz  -> ein Strom,    96 kHz
+//   2 Empfaenger, 96 kHz  -> zwei Stroeme, je 96 kHz
+//
+// Hier stand bis zum 2026-10-07 "einen Strom mit 96 kHz gibt es auf dem
+// Draht nicht". Das war falsch und hat der Code darunter seit 073b8f7a
+// auch nicht mehr getan -- ExpertSDR2 benutzt genau diese vierte
+// Nutzlast, und das Geraet nimmt sie an. Beim Gegenlesen gefunden.
 //
 // Am 2026-10-04 aus einem Mitschnitt des Betreibers belegt, in dem
 // ExpertSDR2 mit RX UND RX2 lief: der zweite Kanal traegt echtes I/Q
 // (-127,9 dBFS, 31,5 % Q ungleich null) -- er ist nicht stumm, Longpath
 // hat ihn nur weggeworfen.
+QString SunSdrRadioConnection::stromModusName(SunSdr::StromModus m)
+{
+    // EINE Stelle, an der die Stromarten Namen bekommen. Vorher standen
+    // zwei Kaskaden im Code, beide mit einem Sonst-Zweig "zwei Stroeme,
+    // je 96 kHz" -- als am 2026-10-07 die vierte Art dazukam, fiel sie in
+    // genau diesen Zweig und wurde im Protokoll falsch benannt. Die
+    // Abnahme hat es gefunden: ein Lauf mit EINEM Strom bei 96 kHz
+    // meldete "zwei Stroeme".
+    //
+    // Mit switch statt Kaskade warnt der Uebersetzer beim naechsten Mal.
+    switch (m) {
+    case SunSdr::StromModus::EinStrom48:      return QStringLiteral("ein Strom, 48 kHz");
+    case SunSdr::StromModus::ZweiStroemeJe48: return QStringLiteral("zwei Stroeme, je 48 kHz");
+    case SunSdr::StromModus::ZweiStroemeJe96: return QStringLiteral("zwei Stroeme, je 96 kHz");
+    case SunSdr::StromModus::EinStrom96:      return QStringLiteral("ein Strom, 96 kHz");
+    }
+    return QStringLiteral("unbekannt");
+}
+
 void SunSdrRadioConnection::stromModusNachziehen()
 {
+    // Beide Groessen entscheiden getrennt: die Rate die Stufe, die
+    // Empfaengerzahl die Stromzahl. Bis zum 2026-10-07 wurde bei 96 kHz
+    // IMMER auf zwei Stroeme gestellt, auch mit einem Empfaenger -- die
+    // vierte Kombination gab es schlicht nicht. ExpertSDR2 benutzt sie
+    // (Mitschnitt vom 2026-10-07: ein Strom, 96 kHz).
+    const bool zwei = m_aktiveEmpfaenger >= 2;
     const SunSdr::StromModus gewuenscht =
         (m_rateHz >= 96000)
-            ? SunSdr::StromModus::ZweiStroemeJe96
-            : (m_aktiveEmpfaenger >= 2 ? SunSdr::StromModus::ZweiStroemeJe48
-                                       : SunSdr::StromModus::EinStrom48);
+            ? (zwei ? SunSdr::StromModus::ZweiStroemeJe96
+                    : SunSdr::StromModus::EinStrom96)
+            : (zwei ? SunSdr::StromModus::ZweiStroemeJe48
+                    : SunSdr::StromModus::EinStrom48);
     if (gewuenscht == m_stromModus) { return; }
     m_stromModus = gewuenscht;
-    qCInfo(lcSunSdr) << "SunSdr: Stromstart-Rahmen ->"
-                     << (gewuenscht == SunSdr::StromModus::EinStrom48
-                             ? "ein Strom, 48 kHz"
-                             : gewuenscht == SunSdr::StromModus::ZweiStroemeJe48
-                                   ? "zwei Stroeme, je 48 kHz"
-                                   : "zwei Stroeme, je 96 kHz");
+    qCInfo(lcSunSdr).noquote()
+        << QStringLiteral("SunSdr: Stromstart-Rahmen -> %1")
+               .arg(stromModusName(gewuenscht));
     if (m_running && !m_awaitingBeacon && m_profile) {
         sendeSteuerrahmen(SunSdr::buildStromStartFrame(*m_profile, m_stromModus),
                           "Stromstart 0x01 (Modus umgestellt)");
@@ -1328,18 +1369,21 @@ void SunSdrRadioConnection::processControlDatagram(const QByteArray& data,
                 qEnvironmentVariableIsSet("LONGPATH_SUNSDR_STROMMODUS");
             qCWarning(lcSunSdr).noquote()
                 << QStringLiteral(
-                       "SunSdr: Strommodus %2 -- %1 (Rate %3 Hz, %4 "
-                       "Empfaenger). Der zweite Kanal hat oben nur dann "
+                       // %1 steht VORNE und nennt die Stromart. Vorher
+                       // stand hier ein leeres %1 und die Art wurde als
+                       // zweiter Wert hinter die Meldung gehaengt -- im
+                       // Protokoll las sich das als zwei Zeichenketten,
+                       // und beim Umbau fiel sie ganz heraus. Die Abnahme
+                       // am 2026-10-07 hat beides gefunden.
+                       "SunSdr: Strommodus %1 (%2) -- Rate %3 Hz, %4 "
+                       "Empfaenger. Der zweite Kanal hat oben nur dann "
                        "einen Empfaenger, wenn sich eine zweite Scheibe "
                        "an ihn bindet.")
-                       .arg(QString(),
+                       .arg(stromModusName(modus),
                             ausUmgebung ? QStringLiteral("aus der Umgebung")
                                         : QStringLiteral("aus der Bedienung"))
                        .arg(m_rateHz)
-                       .arg(m_aktiveEmpfaenger)
-                       .arg(modus == SunSdr::StromModus::ZweiStroemeJe48
-                                ? QStringLiteral("zwei Stroeme, je 48 kHz")
-                                : QStringLiteral("zwei Stroeme, je 96 kHz"));
+                       .arg(m_aktiveEmpfaenger);
         }
         sendeSteuerrahmen(stateSync, "Stromstart 0x01");
 
@@ -1430,7 +1474,41 @@ void SunSdrRadioConnection::processStreamDatagram(const QByteArray& data,
     if (!m_rxReady.load(std::memory_order_acquire)) {
         return;  // discarded, not buffered — see header rationale
     }
-    if (!m_profile || data.size() < SunSdr::kIqPacketSize) {
+    if (!m_profile) { return; }
+
+    // ── Der 77-Byte-Rahmen: die einzigen Messwerte, die die QRP liefert ──
+    //
+    // Am 2026-10-07 aus einem Mitschnitt mit ExpertSDR2 herausgelesen.
+    // Das Geraet schickt waehrend des Stroms 20 Rahmen je Sekunde mit
+    // 77 Byte Nutzlast, Opcode 0x00 und byte3 = 0x1f. Longpath hat sie
+    // bis heute an der Laengenpruefung unten weggeworfen -- deshalb
+    // zeigte ExpertSDR2 eine Temperatur und wir nichts.
+    //
+    // Darin zwei Gleitkommazahlen (little endian), die sich aendern:
+    //
+    //     [15..18]   38,0 .. 38,5
+    //     [19..22]   28,0 .. 29,0
+    //
+    // Beide in halben Schritten, ueber 78 s gemessen -- das Muster eines
+    // Temperaturfuehlers mit 0,5 Grad Aufloesung. ALLE anderen Felder
+    // des Rahmens stehen still.
+    //
+    // Was NICHT drinsteht: Spannung und Strom. ExpertSDR2 zeigt beides
+    // an, im ganzen Mitschnitt steht aber nirgends ein Wert um 13 V oder
+    // 0,3 A -- auch nicht in 0x0c (zwoelf Paare 12,5 / -2,4, also
+    // Eichwerte) und nicht in 0x12. Woher ExpertSDR2 sie nimmt, ist
+    // offen; siehe docs/architecture/2026-10-02-sunsdr-verbindungsablauf.md.
+    //
+    // Welcher der beiden Werte WAS ist, ist ebenfalls nicht belegt --
+    // dafuer muss der Betreiber sie neben ExpertSDR2 legen. Darum heissen
+    // sie hier Wert A und Wert B und nicht "PA-Temperatur".
+    if (data.size() == SunSdr::kMesswertPaketSize
+        && quint8(data.at(2)) == 0x00 && quint8(data.at(3)) == 0x1f) {
+        verarbeiteMesswertrahmen(data);
+        return;
+    }
+
+    if (data.size() < SunSdr::kIqPacketSize) {
         return;
     }
 
@@ -2074,6 +2152,55 @@ void SunSdrRadioConnection::replyToBlock(quint16 seq)
     if (nurKopf) { ++m_bareBlockRepliesSent; }
     m_lastBlockReplyBytes = int(pkt.size());
     m_lastBlockReplySeq = seq;
+}
+
+void SunSdrRadioConnection::verarbeiteMesswertrahmen(const QByteArray& data)
+{
+    ++m_messwertRahmen;
+    float a = 0.0f;
+    float b = 0.0f;
+    std::memcpy(&a, data.constData() + 15, sizeof(float));
+    std::memcpy(&b, data.constData() + 19, sizeof(float));
+    if (!std::isfinite(a) || !std::isfinite(b)) { return; }
+
+    // -200 ist kein Messwert, sondern das Zeichen "gerade keiner".
+    // Am 2026-10-07 in beiden Laeufen aufgetaucht, einzeln je Wert:
+    // "A=-200.0 B=33.0" und "A=43.0 B=-200.0", dazwischen wieder
+    // richtige Zahlen. Ein Fuehler bei minus zweihundert Grad gibt es
+    // nicht; wer das durchreicht, zeigt dem Betreiber Unsinn an und
+    // loest womoeglich eine Schwelle aus.
+    //
+    // Der ALTE Wert bleibt dabei stehen, statt auf null zu fallen: eine
+    // Luecke in der Messung ist keine Aenderung der Temperatur.
+    constexpr float kKeinWert = -100.0f;
+    if (a > kKeinWert) { m_messwertA = a; m_messwertAGueltig = true; }
+    if (b > kKeinWert) { m_messwertB = b; m_messwertBGueltig = true; }
+    // Solange noch gar kein gueltiger Wert kam, gibt es NICHTS zu melden.
+    //
+    // Ohne das wurde der Anfangswert 0,0 gemeldet, sobald nur EINER der
+    // beiden gueltig war -- traegt der erste Rahmen A = -200 und B = 33,
+    // ging "A = 0,0 Grad" hinaus. Null Grad ist ein plausibler Messwert
+    // und faellt niemandem auf. Am 2026-10-07 vom Lueckenkritiker
+    // gefunden: die -200-Behandlung war geprueft, der Zustand DAVOR
+    // nicht.
+    if (!m_messwertAGueltig || !m_messwertBGueltig) { return; }
+
+    // Nur bei AENDERUNG melden. Bei 20 Rahmen je Sekunde waeren es sonst
+    // 72000 Zeilen je Stunde, und die Werte stehen minutenlang still.
+    const bool neu = (m_gemeldetA != m_messwertA) || (m_gemeldetB != m_messwertB);
+    m_gemeldetA = m_messwertA;
+    m_gemeldetB = m_messwertB;
+    if (neu) {
+        qCInfo(lcSunSdr).noquote()
+            << QStringLiteral("SunSdr: Messwerte vom Geraet: A=%1 B=%2 "
+                              "(77-Byte-Rahmen, 20/s)")
+                   .arg(double(m_messwertA), 0, 'f', 1)
+                   .arg(double(m_messwertB), 0, 'f', 1);
+        // Nur bei Aenderung weitergeben, aus demselben Grund wie oben:
+        // zwanzigmal je Sekunde dasselbe Signal waere Last ohne Inhalt.
+        emit deviceTemperaturesUpdated(double(m_messwertA),
+                                       double(m_messwertB));
+    }
 }
 
 bool SunSdrRadioConnection::kopfAntwortEnabled()
@@ -2771,11 +2898,14 @@ SunSdr::StromModus SunSdrRadioConnection::stromModusAusUmgebung() const
     if (wahl == QStringLiteral("je96")) {
         return SunSdr::StromModus::ZweiStroemeJe96;
     }
+    if (wahl == QStringLiteral("ein96")) {
+        return SunSdr::StromModus::EinStrom96;
+    }
     if (!wahl.isEmpty() && wahl != QStringLiteral("48")) {
         qCWarning(lcSunSdr).noquote()
             << QStringLiteral("SunSdr: LONGPATH_SUNSDR_STROMMODUS=\"%1\" "
                               "kenne ich nicht -- es bleibt bei einem Strom "
-                              "mit 48 kHz. Erlaubt: 48, 48_96, 96_144.")
+                              "mit 48 kHz. Erlaubt: 48, je48, je96, ein96.")
                    .arg(wahl);
     }
     return SunSdr::StromModus::EinStrom48;

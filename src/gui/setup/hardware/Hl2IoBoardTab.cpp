@@ -527,7 +527,7 @@ void Hl2IoBoardTab::buildI2cAndBandwidthRow(QVBoxLayout* outer)
 
     m_i2cLog = new QListWidget(i2cGroup);
     QFont mono;
-    mono.setFamily(QStringLiteral("Monospace"));
+    Longpath::Style::setzeMonoFamilien(mono);
     mono.setStyleHint(QFont::TypeWriter);
     mono.setPointSize(9);
     m_i2cLog->setFont(mono);

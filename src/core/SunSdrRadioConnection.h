@@ -205,6 +205,9 @@ public:
     // oder 1 (RX2) -- der Rahmen, der die QRP auf echtes I/Q schaltet.
     static QByteArray ddcFrequencyFrame(int subReceiver, quint64 frequencyHz);
     quint16 lastBlockReplySeqForTest() const { return m_lastBlockReplySeq; }
+    float   messwertAForTest() const { return m_messwertA; }
+    float   messwertBForTest() const { return m_messwertB; }
+    quint64 messwertRahmenForTest() const { return m_messwertRahmen; }
     // Wie viele der Antworten blosse Koepfe waren (10 Byte statt 1210) und
     // wie gross die letzte Antwort war -- die Kopfantwort laesst sich nur
     // an der GROESSE pruefen, nicht an der Zahl.
@@ -746,6 +749,20 @@ private:
     // Rueckweg: 30265 blosse Koepfe in 60 s sind rund 36 MB, also knapp
     // 5 Mbit/s weniger. Deshalb ist die Vorgabe seitdem AN;
     // LONGPATH_SUNSDR_KOPFANTWORT=0 schaltet aus.
+    /// Den 77-Byte-Messwertrahmen auswerten (Begruendung an der
+    /// Aufrufstelle in processStreamDatagram).
+    void verarbeiteMesswertrahmen(const QByteArray& data);
+    float   m_messwertA{0.0f};
+    float   m_messwertB{0.0f};
+    float   m_gemeldetA{0.0f};   // zuletzt gemeldet, fuer die Aenderungspruefung
+    float   m_gemeldetB{0.0f};
+    bool    m_messwertAGueltig{false};   // kam schon je ein echter Wert?
+    bool    m_messwertBGueltig{false};
+    quint64 m_messwertRahmen{0};
+
+    /// Der Name einer Stromart fuers Protokoll -- an EINER Stelle.
+    static QString stromModusName(SunSdr::StromModus m);
+
     bool kopfAntwortEnabled();
     bool m_kopfAntwortChecked{false};
     bool m_kopfAntwortOn{false};
@@ -859,8 +876,15 @@ private:
     // gleichzeitig schicken, mit verschiedenen Raten, und sie
     // unterscheidet sie im Stromkopf an byte9:
     //
-    //   0x01-Nutzlast 02000000 ...:  byte9=0 -> 48 kHz, byte9=1 ->  96 kHz
-    //   0x01-Nutzlast 02010000 ...:  byte9=0 -> 96 kHz, byte9=1 -> 144 kHz
+    //   0x01-Nutzlast 02000000 ...:  beide Stroeme 48 kHz
+    //   0x01-Nutzlast 02010000 ...:  beide Stroeme 96 kHz
+    //
+    // ACHTUNG: hier stand bis zum 2026-10-07 eine Tabelle, nach der die
+    // beiden Stroeme VERSCHIEDENE Raten tragen (byte9=0 -> 48, byte9=1
+    // -> 96 bzw. 144 kHz). Die stammt aus einer Zaehlung OHNE
+    // Richtungsfilter und ist am 2026-10-05 widerrufen (9061a810): beide
+    // Seiten sprechen Port 50002, und die eigenen Antworten wurden als
+    // Geraetedaten mitgezaehlt. Beide Stroeme laufen gleich schnell.
     //
     // Dazu traegt ein Strom ueber 48 kHz MEHRERE Pakete je Folgenummer
     // (bei 96 kHz zwei, bei 144 kHz im Mittel 1,5) -- und die tragen
@@ -915,6 +939,7 @@ private:
     //   LONGPATH_SUNSDR_STROMMODUS=48       (Vorgabe)
     //   LONGPATH_SUNSDR_STROMMODUS=je48     zwei Stroeme, je 48 kHz  (2x Daten)
     //   LONGPATH_SUNSDR_STROMMODUS=je96     zwei Stroeme, je 96 kHz  (4x Daten)
+    //   LONGPATH_SUNSDR_STROMMODUS=ein96    ein Strom,    96 kHz  (2x Daten)
     //
     // Warum nicht als Einstellung in der Oberflaeche: die Rate ist am
     // 2026-10-03 aus einem Mitschnitt gewonnen und am Geraet noch NICHT
@@ -1142,7 +1167,8 @@ private:
     // nicht falsch anschlagen.
     //
     // Gemessen wird VOR der Pegelanhebung des Profils (rxLevelTrimDb, bei
-    // der QRP 20 dB): danach waere der Anschlag des Wandlers nicht mehr
+    // der QRP 40 dB -- am 2026-10-04 vom Betreiber nach Gehoer gesetzt,
+    // davor standen hier 20): danach waere der Anschlag des Wandlers nicht mehr
     // bei eins, und die Schwelle muesste die Verstaerkung mitrechnen --
     // eine Abhaengigkeit, die man nicht braucht.
     static constexpr float kAnschlagSchwelle = 0.999f;

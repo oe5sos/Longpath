@@ -96,7 +96,7 @@ QFrame* tile(QWidget* parent, QLabel** cap, QLabel** val,
     *val = new QLabel(QStringLiteral("—"), f);
     QFont vf = (*val)->font();
     vf.setPixelSize(22);
-    vf.setFamily(QStringLiteral("Menlo"));
+    Longpath::Style::setzeMonoFamilien(vf);
     (*val)->setFont(vf);
     (*val)->setStyleSheet(QStringLiteral(
         "QLabel { color: %1; border: none; }")
@@ -570,7 +570,7 @@ void AntennaWindow::buildUi()
     {
         QFont f = m_action->font();
         f.setPixelSize(38);
-        f.setFamily(QStringLiteral("Menlo"));
+        Longpath::Style::setzeMonoFamilien(f);
         m_action->setFont(f);
     }
     m_action->setStyleSheet(QStringLiteral(

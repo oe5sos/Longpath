@@ -411,7 +411,7 @@ void DxRadarWidget::paintRotor(QPainter& p, const QPointF& c, double R) const
     }
 
     QFont big = p.font();
-    big.setFamily(QStringLiteral("Menlo"));
+    Longpath::Style::setzeMonoFamilien(big);
     big.setBold(true);
     QFont sm = big;
     sm.setBold(false);

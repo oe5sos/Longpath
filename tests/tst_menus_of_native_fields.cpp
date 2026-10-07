@@ -80,7 +80,10 @@ private slots:
 
         QWidget top;
         top.resize(400, 300);
-        auto* rail = new ProfileRail(&profiles, &top);
+        // Ausdruecklich senkrecht: diese Pruefung geht um das native
+        // Fenster der Schiene am linken Rand (2026-09-27), und das gibt
+        // es nur in dieser Lage.
+        auto* rail = new ProfileRail(&profiles, Qt::Vertical, &top);
         rail->setAttribute(Qt::WA_NativeWindow);   // wie neben dem Panadapter
         rail->setGeometry(0, 0, 60, 300);
         top.show();

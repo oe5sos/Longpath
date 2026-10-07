@@ -150,7 +150,7 @@ MasterOutputWidget::MasterOutputWidget(AudioEngine* audio, QWidget* parent)
     // 2026-09-22 im 0.6.4-Paket gesehen, seit dem Glaschip vom 17.09.
     {
         QFont chip = m_dbLabel->font();
-        chip.setFamily(QStringLiteral("Menlo"));
+        Longpath::Style::setzeMonoFamilien(chip);
         chip.setPixelSize(11);
         m_dbLabel->setFixedWidth(QFontMetrics(chip).horizontalAdvance(QStringLiteral("100")) + 10);
     }

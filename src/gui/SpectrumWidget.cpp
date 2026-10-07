@@ -11364,7 +11364,7 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
                                  / (1024.0 * 1024.0), 0, 'f', 1);
                 QFont pf = p.font();
                 pf.setPixelSize(11);
-                pf.setFamily(QStringLiteral("Menlo"));
+                Longpath::Style::setzeMonoFamilien(pf);
                 p.setFont(pf);
                 const QFontMetrics fm(pf);
                 const int lineH = fm.height();

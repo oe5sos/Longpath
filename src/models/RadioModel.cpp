@@ -9268,6 +9268,20 @@ void RadioModel::wireConnectionSignals(int wdspInSize)
         Q_UNUSED(rev);
     });
 
+    // Temperaturen, die das Geraet von sich aus meldet → RadioStatus.
+    //
+    // Heute nur die SunSDR2 QRP (2026-10-07): sie schickt 20 Rahmen je
+    // Sekunde mit zwei Werten. Welcher von beiden wo im Geraet sitzt,
+    // ist noch nicht belegt -- weitergereicht wird der ERSTE, weil er
+    // der hoehere ist und damit der, an dem eine Abschaltschwelle
+    // haengen wuerde. Sobald die Zuordnung steht, gehoert hier die
+    // richtige Wahl hin und keine Begruendung mehr.
+    connect(m_connection, &RadioConnection::deviceTemperaturesUpdated,
+            this, [this](double erster, double zweiter) {
+        Q_UNUSED(zweiter);
+        m_radioStatus.setPaTemperature(erster);
+    });
+
     // Phase 3P-H Task 4: PA telemetry → RadioStatus.
     // Apply per-board scaling (console.cs computeAlexFwdPower / computeRefPower
     // / convertToVolts / convertToAmps [@501e3f5]) and push the physical

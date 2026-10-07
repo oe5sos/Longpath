@@ -167,7 +167,7 @@ void QsoDetailPane::buildUi()
     {
         QFont f = m_call->font();
         f.setPixelSize(22);
-        f.setFamily(QStringLiteral("Menlo"));
+        Longpath::Style::setzeMonoFamilien(f);
         f.setLetterSpacing(QFont::AbsoluteSpacing, 1.0);
         m_call->setFont(f);
     }
@@ -221,7 +221,7 @@ void QsoDetailPane::buildUi()
     auto valueLabel = [this]() {
         auto* l = new QLabel(this);
         QFont f = l->font();
-        f.setFamily(QStringLiteral("Menlo"));
+        Longpath::Style::setzeMonoFamilien(f);
         f.setPixelSize(11);
         l->setFont(f);
         l->setStyleSheet(QStringLiteral("QLabel { color: %1; }")
@@ -720,7 +720,7 @@ void QsoDetailPane::refreshExtras()
                              .arg(QLatin1String(Style::kTextScale)));
         auto* v = new QLabel(kv.second, m_extrasBox);
         QFont f = v->font();
-        f.setFamily(QStringLiteral("Menlo"));
+        Longpath::Style::setzeMonoFamilien(f);
         f.setPixelSize(11);
         v->setFont(f);
         v->setStyleSheet(QStringLiteral("QLabel { color: %1; }")
