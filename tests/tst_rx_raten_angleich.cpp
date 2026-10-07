@@ -156,8 +156,20 @@ void TstRxRatenAngleich::ohneAusgleichLaeuftDerPufferLeer()
 
 void TstRxRatenAngleich::mitAusgleichBleibtErStehen()
 {
-    for (double ppm : {4.0, -4.0}) {
-        const Lauf r = fahre(ppm, 200000, /*mitAusgleich=*/true);
+    // ── Haerter und kuerzer (2026-10-07) ──────────────────────────────────
+    //
+    // Hier standen +-4 ppm ueber 200 000 Bloecke: 33 simulierte Minuten,
+    // 41 Sekunden Rechenzeit auf einem M-Mac -- und auf dem Linux-Laeufer
+    // der CI genug, um CTests 120-Sekunden-Grenze zu reissen. Am 2026-10-07
+    // ist genau das passiert, in einem Ast, der diese Datei gar nicht
+    // anfasst.
+    //
+    // +-100 ppm ueber 40 000 Bloecke ist das FUENFUNDZWANZIGFACHE der
+    // gemessenen Drift in einem Fuenftel der Zeit. Wer das haelt, haelt
+    // 4 ppm erst recht -- und dieselbe Abkuerzung nimmt die Gegenprobe
+    // darueber schon seit dem 2026-10-06.
+    for (double ppm : {100.0, -100.0}) {
+        const Lauf r = fahre(ppm, 40000, /*mitAusgleich=*/true);
         qInfo("%+.0f ppm: Fuellstand %.0f..%.0f (Ziel %d), Ende %.0f, "
               "var %.9f, Ueber %ld Leer %ld",
               ppm, r.minFuell, r.maxFuell, kZiel, r.endeFuell,
