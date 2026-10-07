@@ -346,7 +346,8 @@ void SunSdrRadioConnection::connectToRadio(const RadioInfo& info)
         // zurueck und liess den Modus auf je96 stehen -- das Geraet
         // streamt dann 96 kHz, waehrend WDSP auf 48 steht. Nur im
         // Messbetrieb erreichbar, aber genau dort wird gemessen.
-        m_rateHz = (m_stromModus == SunSdr::StromModus::ZweiStroemeJe96)
+        m_rateHz = (m_stromModus == SunSdr::StromModus::ZweiStroemeJe96
+                    || m_stromModus == SunSdr::StromModus::EinStrom96)
                        ? 96000 : 48000;
         if (m_stromModus == SunSdr::StromModus::ZweiStroemeJe48) {
             m_aktiveEmpfaenger = qMax(2, m_aktiveEmpfaenger);
@@ -1182,11 +1183,18 @@ void SunSdrRadioConnection::setActiveReceiverCount(int count)
 // hat ihn nur weggeworfen.
 void SunSdrRadioConnection::stromModusNachziehen()
 {
+    // Beide Groessen entscheiden getrennt: die Rate die Stufe, die
+    // Empfaengerzahl die Stromzahl. Bis zum 2026-10-07 wurde bei 96 kHz
+    // IMMER auf zwei Stroeme gestellt, auch mit einem Empfaenger -- die
+    // vierte Kombination gab es schlicht nicht. ExpertSDR2 benutzt sie
+    // (Mitschnitt vom 2026-10-07: ein Strom, 96 kHz).
+    const bool zwei = m_aktiveEmpfaenger >= 2;
     const SunSdr::StromModus gewuenscht =
         (m_rateHz >= 96000)
-            ? SunSdr::StromModus::ZweiStroemeJe96
-            : (m_aktiveEmpfaenger >= 2 ? SunSdr::StromModus::ZweiStroemeJe48
-                                       : SunSdr::StromModus::EinStrom48);
+            ? (zwei ? SunSdr::StromModus::ZweiStroemeJe96
+                    : SunSdr::StromModus::EinStrom96)
+            : (zwei ? SunSdr::StromModus::ZweiStroemeJe48
+                    : SunSdr::StromModus::EinStrom48);
     if (gewuenscht == m_stromModus) { return; }
     m_stromModus = gewuenscht;
     qCInfo(lcSunSdr) << "SunSdr: Stromstart-Rahmen ->"
@@ -2826,6 +2834,9 @@ SunSdr::StromModus SunSdrRadioConnection::stromModusAusUmgebung() const
     }
     if (wahl == QStringLiteral("je96")) {
         return SunSdr::StromModus::ZweiStroemeJe96;
+    }
+    if (wahl == QStringLiteral("ein96")) {
+        return SunSdr::StromModus::EinStrom96;
     }
     if (!wahl.isEmpty() && wahl != QStringLiteral("48")) {
         qCWarning(lcSunSdr).noquote()

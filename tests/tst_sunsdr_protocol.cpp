@@ -93,6 +93,31 @@ class TestSunSdrProtocol : public QObject
     Q_OBJECT
 
 private slots:
+    // Die vierte Nutzlast des Stromstart-Rahmens: EIN Strom mit 96 kHz.
+    //
+    // Bis zum 2026-10-07 gab es nur drei der vier Kombinationen -- bei
+    // 96 kHz stellte Longpath IMMER auf zwei Stroeme, auch mit einem
+    // Empfaenger. ExpertSDR2 benutzt die vierte (Mitschnitt 2026-10-07,
+    // RX2 aus, Spanne 96 kHz), und das Geraet nimmt sie an.
+    //
+    // Erstes Byte = Stromzahl, zweites = Ratenstufe, Schwanz haengt an
+    // der Rate. Genau so steht es auf dem Draht.
+    void einStromMitSechsundneunzigHatDieVierteNutzlast()
+    {
+        const QByteArray f = Longpath::SunSdr::buildStromStartFrame(
+            Longpath::SunSdr::kProfileQrp, Longpath::SunSdr::StromModus::EinStrom96);
+        const QByteArray nutz = f.mid(Longpath::SunSdr::kCtlHeaderSize);
+        QCOMPARE(nutz.toHex(), QByteArray("010100000a06040302020201"));
+        // Zur Abgrenzung: zwei Stroeme bei derselben Rate unterscheiden
+        // sich NUR im ersten Byte.
+        const QByteArray zwei = Longpath::SunSdr::buildStromStartFrame(
+            Longpath::SunSdr::kProfileQrp, Longpath::SunSdr::StromModus::ZweiStroemeJe96)
+            .mid(Longpath::SunSdr::kCtlHeaderSize);
+        QCOMPARE(zwei.toHex(), QByteArray("020100000a06040302020201"));
+        QCOMPARE(nutz.mid(1), zwei.mid(1));
+        QVERIFY(nutz.at(0) != zwei.at(0));
+    }
+
     // Der Pegelabgleich ist keine Geschmacksfrage, sondern eine Messung:
     // am 2026-10-04 hat der Betreiber am echten Geraet +40,0 dB
     // eingestellt und bestaetigt ("die lautstaerke passt"), nachdem die

@@ -1436,3 +1436,48 @@ Erst danach gehören sie beschriftet in die Oberfläche.
 
 Gegenprobe: die Prüfung `messwertrahmenWirdNichtMehrWeggeworfen` wird
 gegen die zurückgebaute Fassung rot und mit der Behebung grün.
+
+---
+
+# Die Messwerte kommen in JEDER Betriebsart — und eine Selbstkorrektur (2026-10-07)
+
+Nachdem Longpath den 77-Byte-Rahmen liest, kommen die Werte bei allen
+vier Stromarten an, je 45–60 s gemessen:
+
+| Betriebsart | Meldungen (Wertwechsel) |
+| --- | ---: |
+| 1 Strom, 48 kHz | 182 |
+| 2 Ströme, 48 kHz | 203 |
+| 1 Strom, 96 kHz | 266 |
+| 2 Ströme, 96 kHz | 108 |
+
+**Zwischendurch stand hier das Gegenteil.** Zwei Läufe meldeten *null*
+Messwerte, und ich hatte daraus geschlossen, das Gerät schicke sie nur
+in der Betriebsart, die ExpertSDR2 benutzt. Das war falsch: beide Läufe
+liefen mit einem **Prüfprogramm von vor dem Einbau** — gebaut 06:41:36,
+gefahren 06:36:53 und 06:39:10. Ich hatte nach der Änderung `Longpath`
+und `tst_sunsdr_radio_connection` gebaut, aber nicht den Messlauf.
+
+Dasselbe Muster wie am 2026-10-04 („kein 96 kHz" aus einem 13 Stunden
+alten Binärprogramm). **Vor jedem Lauf am Gerät prüfen, ob das benutzte
+Programm die Änderung überhaupt enthält** — der Zeitstempel genügt.
+
+## Was trotzdem bleibt: die vierte Betriebsart
+
+Beim Suchen ist eine echte Lücke aufgefallen, unabhängig von den
+Messwerten. Der Stromstart-Rahmen `0x01` trägt die Stromzahl im **ersten**
+Byte und die Ratenstufe im **zweiten**, der Schwanz hängt an der Rate.
+Longpath kannte davon nur drei Kombinationen:
+
+    01 00 00 00 0c 08 04 03 02 02 02 02   ein Strom,  48 kHz
+    02 00 00 00 0c 08 04 03 02 02 02 02   zwei Stroeme, 48 kHz
+    02 01 00 00 0a 06 04 03 02 02 02 01   zwei Stroeme, 96 kHz
+    01 01 00 00 0a 06 04 03 02 02 02 01   ein Strom,  96 kHz   <- NEU
+
+Bei 96 kHz stellte Longpath **immer** auf zwei Ströme, auch mit einem
+Empfänger. ExpertSDR2 benutzt die vierte Kombination (Mitschnitt vom
+2026-10-07: RX2 aus, Spanne 96 kHz), das Gerät nimmt sie an, und
+gemessen liefert sie 590 Blöcke je Sekunde auf Kanal 0 — ein Strom mit
+voller Rate, ohne den zweiten, der niemandem gehört.
+
+Damit ist die Tabelle der `0x01`-Nutzlasten **vollständig**.

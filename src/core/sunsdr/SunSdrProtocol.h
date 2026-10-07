@@ -544,6 +544,15 @@ enum class StromModus {
     EinStrom48,        // Longpath heute
     ZweiStroemeJe48,
     ZweiStroemeJe96,
+    /// EIN Strom mit 96 kHz. Am 2026-10-07 im Mitschnitt gesehen:
+    /// ExpertSDR2 schickt genau das, wenn RX2 aus ist und die Spanne auf
+    /// 96 kHz steht -- Nutzlast 01 01 00 00 0a 06 04 03 02 02 02 01.
+    ///
+    /// Longpath konnte diese Kombination bis dahin nicht ausdruecken:
+    /// die Stufe (zweites Byte) und der Schwanz haengen an der RATE, die
+    /// Stromzahl am ersten Byte, und es gab nur drei der vier
+    /// Kombinationen.
+    EinStrom96,
 };
 
 // Die Nutzlast (12 Byte) zum Modus. Der vollstaendige Rahmen entsteht mit

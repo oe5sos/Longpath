@@ -232,6 +232,12 @@ QByteArray stromModusPayload(StromModus modus)
         return QByteArray::fromHex("020000000c08040302020202");
     case StromModus::ZweiStroemeJe96:
         return QByteArray::fromHex("020100000a06040302020201");
+    case StromModus::EinStrom96:
+        // Vom Draht, 2026-10-07: erstes Byte 01 (ein Strom), zweites 01
+        // (Stufe 96 kHz), Schwanz wie bei allen 96ern. Die drei anderen
+        // Nutzlasten sind seit dem 2026-10-03 gemessen; diese ist die
+        // vierte und schliesst die Tabelle.
+        return QByteArray::fromHex("010100000a06040302020201");
     }
     return QByteArray::fromHex("010000000c08040302020202");
 }
