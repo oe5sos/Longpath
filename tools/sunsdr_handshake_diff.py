@@ -98,10 +98,66 @@ def deuten(op):
     return KNOWN.get(op, "unbekannt")
 
 
-def auswerten(path, alle):
+def findeRechner(path):
+    """Welche Adresse ist der RECHNER (nicht das Geraet)?
+
+    Die Richtung laesst sich NICHT am Zielport ablesen: beide Seiten
+    sprechen Port 50001, also ist dport immer 50001. Die erste Fassung
+    dieses Werkzeugs tat genau das und hielt deshalb am 2026-10-03 im
+    ersten echten Mitschnitt alle zehn Rahmen fuer ausgehend -- auch die
+    fuenf Quittungen des Geraets.
+
+    Belastbar ist die Suchanfrage: Opcode 0x00 geht immer VOM Rechner aus.
+    Fehlt sie im Mitschnitt, bleibt nur --rechner.
+
+    Der frueher hier stehende Rueckfall "die 1210-Byte-Pakete kommen aus
+    dem Geraet" ist am 2026-10-05 widerlegt: ExpertSDR2 schickt SELBST
+    1210-Byte-Bloecke zurueck (Stille), und zwar fast so viele wie es
+    empfaengt. Wer danach geht, haelt die eigenen Antworten fuer
+    Geraetedaten -- genau der Fehler, der mich an dem Tag eine falsche
+    Behauptung gekostet hat.
+    """
+    bloecke = {}
+    for ts, src, sport, dst, dport, pl in udpMitRichtung(path):
+        # Nur auf dem STEUERweg. Auf dem Stromport schickt das GERAET
+        # 77-Byte-Rahmen, die ebenfalls mit Opcode 0x00 beginnen -- ohne
+        # diese Einschraenkung liefert die Suche genau verkehrt herum
+        # (2026-10-05 an expert-96k.pcap gesehen). Geprueft wird auf
+        # "beruehrt den Steuerport und nicht den Stromport", nicht auf
+        # sport == CTRL_PORT: der Rechner darf einen beliebigen Quellport
+        # benutzen (ExpertSDR2 nimmt 50001, der Pruefstand 54000).
+        amSteuerweg = (sport == CTRL_PORT or dport == CTRL_PORT) \
+            and sport != STREAM_PORT and dport != STREAM_PORT
+        k = kopf(pl) if amSteuerweg else None
+        if k is not None and k[0] == 0x00:
+            return src
+        if sport == STREAM_PORT and len(pl) == 1210:
+            bloecke[src] = bloecke.get(src, 0) + 1
+    # Rueckfall: BEIDE Seiten schicken 1210-Byte-Bloecke, aber nicht gleich
+    # viele -- das Geraet sendet je Block, ExpertSDR2 antwortet nur auf
+    # jeden zweiten (2026-10-05 gemessen: 480/s gegen 240/s, und in den
+    # 48-kHz-Mitschnitten 2 x 240/s gegen 240/s). Die SCHWAECHERE Quelle
+    # ist also der Rechner. Eine Heuristik, kein Beweis; bei Gleichstand
+    # gibt es keine Antwort.
+    if len(bloecke) == 2:
+        a, b = sorted(bloecke.items(), key=lambda kv: kv[1])
+        if a[1] * 4 < b[1] * 3:
+            return a[0]
+    return None
+
+
+def auswerten(path, alle, rechner=None):
     rahmen = []
     ersterStrom = None
     t0 = None
+    if rechner is None:
+        rechner = findeRechner(path)
+    if rechner is None:
+        raise SystemExit(
+            "Die Richtung laesst sich nicht bestimmen: im Mitschnitt fehlen "
+            "sowohl die Suchanfrage (0x00) als auch der Datenstrom. Mit "
+            "--rechner <IP> angeben, welche Adresse der Rechner ist.")
+    print("Rechner: %s (alles andere ist das Geraet)" % rechner)
     for ts, src, sport, dst, dport, pl in udpMitRichtung(path):
         if dport == STREAM_PORT or sport == STREAM_PORT:
             if ersterStrom is None:
@@ -111,7 +167,7 @@ def auswerten(path, alle):
             continue
         if t0 is None:
             t0 = ts
-        raus = (dport == CTRL_PORT)
+        raus = (src == rechner)
         rahmen.append((ts - t0, raus, pl))
 
     if not rahmen:
@@ -238,6 +294,74 @@ def selftest():
     print()
     auswerten(pfad, alle=True)
     os.unlink(pfad)
+    print()
+    print("Selbsttest -- Wiederholungen und Abtastrate")
+    print()
+    selftestWiederholungen()
+
+
+def _iqBlock(kanal, seq, fuellung):
+    kopf = bytearray(10)
+    kopf[0] = 0x03
+    kopf[1] = 0xFF
+    kopf[2] = 0xFE
+    kopf[4] = 1200 & 0xFF
+    kopf[5] = (1200 >> 8) & 0xFF
+    kopf[6] = seq & 0xFF
+    kopf[7] = (seq >> 8) & 0xFF
+    kopf[8] = 2
+    kopf[9] = kanal
+    return bytes(kopf) + bytes([fuellung]) * 1200
+
+
+def _schreibeStrom(rateHz, kopienJeNteBlock):
+    """Baut einen Mitschnitt mit GEBAUTER Abtastrate und gebauten Kopien.
+
+    Damit ist beides bekannt, was das Werkzeug herausrechnen soll: die
+    Rate (ueber die Blockrate) und die Zahl der bytegleichen
+    Wiederholungen.
+    """
+    host, radio = "192.0.2.1", "192.0.2.200"
+    jeKanalJeSek = rateHz / PROBEN
+    dauer = 2.0
+    anzahl = int(jeKanalJeSek * dauer)
+    pakete = []
+    kopien = 0
+    for i in range(anzahl):
+        t = i / jeKanalJeSek
+        for kanal in (0, 1):
+            pakete.append((t, _udpPaket(radio, host, STREAM_PORT, 54001,
+                                        _iqBlock(kanal, i, i & 0xFF))))
+            if kopienJeNteBlock and i % kopienJeNteBlock == 0:
+                # Dasselbe noch einmal: gleiche Nummer, gleicher Inhalt.
+                pakete.append((t + 0.0001,
+                               _udpPaket(radio, host, STREAM_PORT, 54001,
+                                         _iqBlock(kanal, i, i & 0xFF))))
+                kopien += 1
+    fd, pfad = tempfile.mkstemp(suffix=".pcap")
+    with os.fdopen(fd, "wb") as fh:
+        fh.write(struct.pack("<IHHiIII", 0xa1b2c3d4, 2, 4, 0, 0, 65535, 1))
+        for t, paket in pakete:
+            sek = int(t)
+            usek = int(round((t - sek) * 1_000_000))
+            fh.write(struct.pack("<IIII", 1_700_000_000 + sek, usek,
+                                 len(paket), len(paket)))
+            fh.write(paket)
+    return pfad, kopien
+
+
+def selftestWiederholungen():
+    """Prueft, dass --wiederholungen die Rate erkennt UND an ihr festhaelt.
+
+    Der eigentliche Fehler, den das verhindern soll: aus einem Mitschnitt
+    in der falschen Betriebsart einen Schluss ueber 96 kHz ziehen.
+    """
+    for rateHz, nte, erwartet in ((96000, 5, "96 kHz"), (48000, 0, "48 kHz")):
+        pfad, kopien = _schreibeStrom(rateHz, nte)
+        print("--- gebaut: %d Hz, %d gebaute Kopien ---" % (rateHz, kopien))
+        wiederholungen(pfad)
+        print()
+        os.unlink(pfad)
 
 
 def vergleiche(a, b):
@@ -249,9 +373,10 @@ def vergleiche(a, b):
     zuordnen, ohne ihn am Funkgeraet zu erraten.
     """
     def sammle(path):
+        rechner = findeRechner(path)
         aus = {}
         for ts, src, sport, dst, dport, pl in udpMitRichtung(path):
-            if dport != CTRL_PORT:
+            if dport != CTRL_PORT or src != rechner:
                 continue          # nur, was der Rechner hinausschickt
             k = kopf(pl)
             if k is None:
@@ -289,16 +414,222 @@ def vergleiche(a, b):
         print("  keine -- dieselben Rahmen mit denselben Werten")
 
 
+PROBEN = 200  # Proben je I/Q-Block (1200 Byte Nutzlast, 24 bit I + 24 bit Q)
+
+
+def abtastratenJeKanal(jeKanalEinzig, dauer):
+    """Abtastrate JE KANAL, hergeleitet aus der Blockrate.
+
+    Ein Block tragt PROBEN Proben, also ist die Rate gleich (Bloecke je
+    Sekunde) x PROBEN: 240/s -> 48 kHz, 480/s -> 96 kHz. Gezaehlt werden
+    nur die NICHT wiederholten Bloecke, sonst wuerde genau die
+    Wiederholung, um die es hier geht, die Rate hochrechnen -- in
+    Martins 96-kHz-Mitschnitt sind es rohe 577/s, einzeln 481/s.
+
+    Je Kanal, nicht im Mittel, und das ist keine Feinheit: in Martins
+    Mitschnitten vom 2026-10-04 laeuft Kanal 0 mit 48 kHz und Kanal 1
+    mit 96 kHz. ExpertSDR2 fahrt die beiden Empfaenger also mit
+    VERSCHIEDENEN Raten -- eine Betriebsart, die Longpath gar nicht
+    kennt. Wer nur das Maximum ansieht, haelt so einen Mitschnitt fuer
+    "96 kHz" und zieht denselben falschen Schluss wie ich am
+    2026-10-04.
+
+    Rueckgabe: {Kanal: (Rate in Hz oder 0, Bloecke/s)}.
+    """
+    ergebnis = {}
+    for kanal, n in jeKanalEinzig.items():
+        jeSek = n / max(dauer, 1e-9)
+        gemessen = jeSek * PROBEN
+        rate = 0
+        for kandidat in (48000, 96000, 192000, 384000):
+            if abs(gemessen - kandidat) <= 0.15 * kandidat:
+                rate = kandidat
+                break
+        ergebnis[kanal] = (rate, jeSek)
+    return ergebnis
+
+
+def wiederholungen(pfad, geraet=None):
+    """Zaehlt bytegleiche Wiederholungen im I/Q-Strom eines Mitschnitts.
+
+    Die Frage dahinter (2026-10-04): Longpath bekommt bei 96 kHz rund
+    110 bytegleiche Wiederholungen je Sekunde, bei 48 kHz keine. Drei
+    Gegenmassnahmen sind gemessen und wirkungslos. Wiederholt ExpertSDR2
+    bei 96 kHz AUCH, ist es die Eigenart des Geraets und kein Mangel von
+    Longpath -- und die Frage ist erledigt statt offen.
+
+    Dafuer muss der Mitschnitt von ExpertSDR2 bei 96 kHz stammen.
+    """
+    import hashlib
+    daten = open(pfad, "rb")
+    kopf = daten.read(24)
+    if len(kopf) < 24:
+        print("Datei zu kurz."); return
+    magic = struct.unpack("<I", kopf[:4])[0]
+    if magic not in (0xa1b2c3d4, 0xd4c3b2a1):
+        print("Das sieht nicht nach einem klassischen pcap aus "
+              "(pcapng wird hier nicht gelesen).")
+        return
+
+    # Die Richtung MUSS gefiltert werden. Beide Seiten sprechen Port 50002,
+    # und ExpertSDR2 schickt selbst 1210-Byte-Bloecke zurueck -- ohne Filter
+    # zaehlt man die eigenen Antworten als Geraetedaten mit. Am 2026-10-05
+    # hat mich genau das eine falsche Behauptung gekostet ("die Kanaele
+    # laufen mit verschiedenen Raten"): Kanal 1 schien mit 480/s zu laufen,
+    # es waren 240/s Geraet plus 240/s eigene Antworten.
+    if geraet is None:
+        rechner = findeRechner(pfad)
+    else:
+        rechner = None
+
+    jeKanal = {}
+    jeKanalEinzig = {}
+    pcAntworten = {}
+    pcLeer = 0
+    inhalt = {}
+    dubletten = 0
+    gesamt = 0
+    t0 = t1 = None
+    while True:
+        rh = daten.read(16)
+        if len(rh) < 16:
+            break
+        ts, tus, incl, _orig = struct.unpack("<IIII", rh)
+        d = daten.read(incl)
+        if len(d) < incl:
+            break
+        if incl < 42 or d[12:14] != b"\x08\x00" or d[23] != 17:
+            continue
+        ihl = (d[14] & 0x0F) * 4
+        uo = 14 + ihl
+        sp = struct.unpack(">H", d[uo:uo + 2])[0]
+        src = ".".join(str(b) for b in d[26:30])
+        if sp != 50002:
+            continue
+        nutz = d[uo + 8:]
+        vomRechner = (geraet is not None and src != geraet) \
+            or (rechner is not None and src == rechner)
+        if vomRechner:
+            # Was die Gegenstelle zurueckschickt, interessiert auch -- aber
+            # getrennt. Zwei Sorten: voller Stilleblock und blosser Kopf.
+            if len(nutz) == 10:
+                pcLeer += 1
+            elif len(nutz) == 1210 and nutz[2] in (0xFE, 0xFD):
+                pcAntworten[nutz[9]] = pcAntworten.get(nutz[9], 0) + 1
+            continue
+        # Nur echte IQ-Bloecke: 10 Byte Kopf + 1200 Byte Nutzlast.
+        if len(nutz) != 1210 or nutz[2] not in (0xFE, 0xFD):
+            continue
+        t = ts + tus / 1e6
+        if t0 is None:
+            t0 = t
+        t1 = t
+        seq = struct.unpack("<H", nutz[6:8])[0]
+        kanal = nutz[9]
+        gesamt += 1
+        jeKanal[kanal] = jeKanal.get(kanal, 0) + 1
+        h = hashlib.blake2b(nutz[10:], digest_size=8).digest()
+        schluessel = (kanal, seq)
+        if schluessel in inhalt and inhalt[schluessel] == h:
+            dubletten += 1
+        else:
+            # Nur die NICHT wiederholten Bloecke verraten die Abtastrate --
+            # Wiederholungen blasen die Blockrate auf und wuerden 96 kHz
+            # vorspiegeln, wo 80 kHz gemeint waren.
+            jeKanalEinzig[kanal] = jeKanalEinzig.get(kanal, 0) + 1
+        inhalt[schluessel] = h
+        if len(inhalt) > 400000:
+            inhalt.clear()
+    if gesamt == 0:
+        print("Keine I/Q-Bloecke gefunden. Stammt der Mitschnitt vom "
+              "Stromport 50002?")
+        if rechner is None and geraet is None:
+            print("Moeglich auch: die Richtung liess sich nicht bestimmen "
+                  "(keine Suchanfrage im Mitschnitt). Dann --rechner "
+                  "angeben.")
+        return
+    if rechner is None and geraet is None:
+        print("ACHTUNG: die Richtung liess sich NICHT bestimmen -- die "
+              "Zahlen unten enthalten")
+        print("         vermutlich auch die eigenen Antworten. "
+              "--rechner <IP> angeben.")
+        print()
+    dauer = max((t1 or 0) - (t0 or 0), 1e-9)
+    print("I/Q-Bloecke: %d ueber %.1f s (%.0f/s)"
+          % (gesamt, dauer, gesamt / dauer))
+    for k in sorted(jeKanal):
+        print("   Kanal %d: %d (%.0f/s)" % (k, jeKanal[k], jeKanal[k] / dauer))
+    print("bytegleiche Wiederholungen: %d  (%.1f/s, %.1f %% der Bloecke)"
+          % (dubletten, dubletten / dauer, 100.0 * dubletten / gesamt))
+
+    if pcAntworten or pcLeer:
+        gesamtAntw = sum(pcAntworten.values())
+        print("zurueck an das Geraet: %d volle Bloecke (%.0f/s) + %d blosse "
+              "Koepfe (%.0f/s)"
+              % (gesamtAntw, gesamtAntw / dauer, pcLeer, pcLeer / dauer))
+
+    raten = abtastratenJeKanal(jeKanalEinzig, dauer)
+    print()
+    print("Abtastrate je Kanal (aus %d einzelnen Proben je Block):" % PROBEN)
+    for kanal in sorted(raten):
+        rate, jeSek = raten[kanal]
+        print("   Kanal %d: %s  (%.0f einzelne Bloecke/s)"
+              % (kanal, ("%d kHz" % (rate // 1000)) if rate
+                 else "nicht eindeutig", jeSek))
+
+    gefunden = sorted({r for r, _ in raten.values()})
+    if gefunden != [96000]:
+        print()
+        print("-> Diese Betriebsart ist NICHT Longpaths 96 kHz, und damit "
+              "beantwortet")
+        print("   dieser Mitschnitt die offene Frage NICHT -- egal wie die "
+              "Zahl oben")
+        print("   aussieht. Longpath fahrt bei 96 kHz BEIDE Stroeme mit "
+              "96 kHz.")
+        if len(gefunden) > 1:
+            print()
+            print("   Hier laufen die Kanaele mit VERSCHIEDENEN Raten. Das "
+                  "ist selbst ein")
+            print("   Befund: das Geraet kann gemischt, Longpath kann es "
+                  "nicht. Fuer die")
+            print("   Wiederholungsfrage braucht es aber einen Mitschnitt "
+                  "mit beiden")
+            print("   Stroemen auf 96 kHz.")
+        return
+
+    print()
+    if dubletten / dauer > 20:
+        print("-> Das Geraet wiederholt auch hier. Dann ist es seine "
+              "Eigenart und kein Mangel von Longpath.")
+    else:
+        print("-> Praktisch keine Wiederholungen. Dann liegt es NICHT am "
+              "Geraet, und Longpath macht etwas anders als dieses "
+              "Programm -- der Unterschied steckt im Verbindungsablauf.")
+    if len(raten) != 2:
+        print()
+        print("   Mit Vorbehalt: hier laeuft %d Strom, Longpath faehrt bei "
+              "96 kHz ZWEI." % len(raten))
+        print("   Das ist ein starker Hinweis, aber noch nicht dieselbe "
+              "Betriebsart.")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("pcap", nargs="?", default="",
                     help="Mitschnitt (pcap oder pcapng)")
+    ap.add_argument("--rechner", default="",
+                    help="IP des Rechners, falls sie sich nicht aus dem "
+                         "Mitschnitt ergibt (siehe findeRechner)")
     ap.add_argument("--alle", action="store_true",
                     help="auch die Rahmen nach dem Verbindungsablauf zeigen")
     ap.add_argument("--vergleich", default="",
                     help="zweiter Mitschnitt: zeigt, welche Rahmen sich "
                          "zwischen beiden unterscheiden (z. B. RX2 ein/aus)")
+    ap.add_argument("--wiederholungen", action="store_true",
+                    help="zaehlt bytegleiche Wiederholungen im I/Q-Strom -- "
+                         "fuer die Frage, ob ExpertSDR2 bei 96 kHz auch "
+                         "wiederholt")
     ap.add_argument("--selftest", action="store_true",
                     help="mit einem selbst gebauten Mitschnitt pruefen, "
                          "dass das Werkzeug tut, was es soll")
@@ -308,10 +639,13 @@ def main():
         return
     if not args.pcap:
         ap.error("Entweder eine pcap-Datei oder --selftest.")
+    if args.wiederholungen:
+        wiederholungen(args.pcap, args.rechner or None)
+        return
     if args.vergleich:
         vergleiche(args.pcap, args.vergleich)
         return
-    auswerten(args.pcap, args.alle)
+    auswerten(args.pcap, args.alle, args.rechner or None)
 
 
 if __name__ == "__main__":

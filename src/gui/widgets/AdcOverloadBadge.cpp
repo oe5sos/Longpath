@@ -1,6 +1,7 @@
 // src/gui/widgets/AdcOverloadBadge.cpp
 // no-port-check: Longpath-original Qt widget — see header for rationale.
 #include "AdcOverloadBadge.h"
+#include "gui/StyleConstants.h"   // LP_MONO_QSS
 
 #include <QLabel>
 #include <QVBoxLayout>
@@ -103,7 +104,7 @@ void AdcOverloadBadge::applyStyle()
         // a label rather than a value.
         "QLabel#AdcOverloadBadge_Top {"
         " color: %2;"
-        " font-family: 'SF Mono', Menlo, monospace;"
+        " font-family: " LP_MONO_QSS ";"
         " font-size: 9px; font-weight: 600;"
         " letter-spacing: 1px;"
         " background: transparent; border: none;"
@@ -112,7 +113,7 @@ void AdcOverloadBadge::applyStyle()
         // alarm word that the user reads first.
         "QLabel#AdcOverloadBadge_Bottom {"
         " color: %2;"
-        " font-family: 'SF Mono', Menlo, monospace;"
+        " font-family: " LP_MONO_QSS ";"
         " font-size: 11px; font-weight: 800;"
         " letter-spacing: 0.5px;"
         " background: transparent; border: none;"

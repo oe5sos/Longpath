@@ -134,7 +134,7 @@ bool parseControlHeader(const quint8* data, int len, const Profile& profile,
 }
 
 QByteArray buildIqHeader(const Profile& profile, quint8 opcode, quint16 seq,
-                         quint8 byte8, quint8 byte9)
+                         quint8 byte8, quint8 byte9, int payloadLen)
 {
     // Mirrors sunsdr_build_iq_header, sunsdr.c:1678-1690 [@f8b01d25c5].
     QByteArray out(kIqHeaderSize, char(0));
@@ -144,8 +144,8 @@ QByteArray buildIqHeader(const Profile& profile, quint8 opcode, quint16 seq,
     buf[1] = kMagic1;
     buf[2] = opcode;
     buf[3] = 0xFF;
-    buf[4] = static_cast<uchar>(kIqPayloadSize & 0xFF);
-    buf[5] = static_cast<uchar>((kIqPayloadSize >> 8) & 0xFF);
+    buf[4] = static_cast<uchar>(payloadLen & 0xFF);
+    buf[5] = static_cast<uchar>((payloadLen >> 8) & 0xFF);
     buf[6] = static_cast<uchar>(seq & 0xFF);
     buf[7] = static_cast<uchar>((seq >> 8) & 0xFF);
     buf[8] = byte8;
@@ -221,6 +221,36 @@ void decodeIqSamples(const quint8* payload, int payloadLen,
 // See the header's comment: candidate only, not bench-confirmed.
 namespace {
 constexpr quint64 kFreqScaleCandidate = 10;
+}
+
+QByteArray stromModusPayload(StromModus modus)
+{
+    switch (modus) {
+    case StromModus::EinStrom48:
+        return QByteArray::fromHex("010000000c08040302020202");
+    case StromModus::ZweiStroemeJe48:
+        return QByteArray::fromHex("020000000c08040302020202");
+    case StromModus::ZweiStroemeJe96:
+        return QByteArray::fromHex("020100000a06040302020201");
+    }
+    return QByteArray::fromHex("010000000c08040302020202");
+}
+
+QByteArray buildStromStartFrame(const Profile& profile, StromModus modus)
+{
+    const QByteArray nutz = stromModusPayload(modus);
+    QByteArray frame = buildControlHeader(profile, 0x01, 0,
+                                          quint16(nutz.size()));
+    frame += nutz;
+    return withControlFrameCrc(frame);
+}
+
+QByteArray buildStopFrame(const Profile& profile)
+{
+    // Vier Byte Nutzlast, alle null -- byte-fuer-byte wie im Mitschnitt.
+    QByteArray frame = buildControlHeader(profile, 0x02, 0, 4);
+    frame += QByteArray(4, char(0));
+    return withControlFrameCrc(frame);
 }
 
 quint32 controlFrameCrc(const QByteArray& frame)

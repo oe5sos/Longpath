@@ -75,7 +75,7 @@ QString monoLabelStyle()
 {
     return QStringLiteral(
         "QLabel { color: %1;"
-        " font-family: 'ui-monospace','Menlo','Consolas',monospace;"
+        " font-family: " LP_MONO_QSS ";"
         " font-size: 11px; }")
         .arg(Style::kTextSecondary);
 }

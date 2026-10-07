@@ -467,7 +467,7 @@ void SpectrumDefaultsPage::buildUI()
     const QString readoutStyle = QStringLiteral(
         "QLabel { background-color: #0a0a18; color: #4a7ba8; "
         "border: 1px solid #1e2e3e; padding: 1px 6px; "
-        "font-family: Menlo, Consolas, monospace; }");
+        "font-family: " LP_MONO_QSS "; }");
 
     // Row 0: centered "Size" header label.  Mirrors Thetis labelTS139
     // ("Size") at (118, 13) [v2.10.3.13] -- centered horizontally over

@@ -1,5 +1,6 @@
 // src/gui/widgets/StationBlock.cpp
 #include "StationBlock.h"
+#include "gui/StyleConstants.h"   // LP_MONO_QSS
 #include "gui/styles/ThemeQss.h"
 
 #include <QHBoxLayout>
@@ -104,14 +105,14 @@ void StationBlock::applyStyle()
         setStyleSheet(Style::themed(QStringLiteral(
             "Longpath--StationBlock { border: 1px solid rgba(0,180,216,80);"
             " background: #0a0a14; border-radius: 6px; }"
-            "QLabel { color: #c8d8e8; font-family: 'SF Mono', Menlo, monospace;"
+            "QLabel { color: #c8d8e8; font-family: " LP_MONO_QSS ";"
             " font-size: 13px; font-weight: bold; background: transparent; border: none; }"
         )));
     } else {
         setStyleSheet(Style::themed(QStringLiteral(
             "Longpath--StationBlock { border: 1px dashed rgba(255,96,96,102);"
             " background: #0a0a14; border-radius: 6px; }"
-            "QLabel { color: #607080; font-family: 'SF Mono', Menlo, monospace;"
+            "QLabel { color: #607080; font-family: " LP_MONO_QSS ";"
             " font-size: 13px; font-style: italic; background: transparent; border: none; }"
         )));
     }

@@ -142,6 +142,7 @@
 
 #include <QDateTime>
 #include <QStandardPaths>
+#include <QTimer>
 
 #include <algorithm>
 #include <vector>
@@ -236,6 +237,24 @@ AudioEngine::AudioEngine(QObject* parent)
         m_rxDrift = std::make_unique<RxRatenAngleich>(48000, 2);
         qCInfo(lcAudio) << "RX-Driftausgleich eingeschaltet (RxDriftAusgleich)"
                         << "— Ziel" << RxRatenAngleich::kZielMs << "ms";
+
+        // „stören nicht, im auge behalten" (Betreiber, 2026-10-06) --
+        // beobachten laesst sich nur, was man sieht. Einmal je Minute
+        // eine Zeile, und zwar von HIER, nicht aus `rxBlockReady`:
+        // `QString` teilt Speicher zu und `qCInfo` nimmt eine Sperre.
+        // Im Tonweg war genau das der Fehler, den dieser Zeitgeber
+        // behebt -- dort haette er einmal je Minute einen Aussetzer
+        // kosten koennen, und niemand haette gewusst, woher er kommt.
+        auto* protokoll = new QTimer(this);
+        protokoll->setInterval(60 * 1000);
+        protokoll->setTimerType(Qt::VeryCoarseTimer);
+        connect(protokoll, &QTimer::timeout, this, [this] {
+            if (!m_rxDrift) { return; }
+            const QString zeile = m_rxDrift->protokollZeile(
+                QDateTime::currentMSecsSinceEpoch(), 0);
+            if (!zeile.isEmpty()) { qCInfo(lcAudio).noquote() << zeile; }
+        });
+        protokoll->start();
     }
 
 #if defined(Q_OS_LINUX)
@@ -964,8 +983,20 @@ std::unique_ptr<IAudioBus> AudioEngine::makeMonitorOut(const QString& targetNode
 
 void AudioEngine::ensureSpeakersOpen()
 {
-    if (m_speakersBus && m_speakersBus->isOpen()) {
+    if (m_speakersBus && m_speakersBus->isAlive()) {
         return;
+    }
+    if (m_speakersBus) {
+        // Geoeffnet, aber tot: das ist der Fall vom 2026-10-04 -- Ton im
+        // Programm, nichts aus den Lautsprechern. Vorher hat isOpen() hier
+        // "ja" gesagt und der tote Strom blieb stehen. Jetzt wird er
+        // weggeraeumt und darunter neu geoeffnet.
+        qCWarning(lcAudio)
+            << "Lautsprecher: der Ausgang war geoeffnet, lebt aber nicht "
+               "mehr (Geraet gewechselt, Rate umgestellt oder Ruhezustand) "
+               "-- er wird neu geoeffnet.";
+        m_speakersBus->close();
+        m_speakersBus.reset();
     }
     if (!m_paInitialized) {
         return;
@@ -1667,13 +1698,6 @@ void AudioEngine::rxBlockReady(int sliceId, const float* samples, int frames)
                             speakersBus->negotiatedFormat().sampleRate));
                     rahmen = ang.rahmen;
                     anzahl = ang.anzahl;
-                    // Einmal je Minute eine Zeile: "im Auge behalten"
-                    // (Betreiber, 2026-10-06) geht nur, wenn man etwas
-                    // sieht. Die Zeile entsteht nur, wenn die Minute um
-                    // ist -- sonst kostet sie einen Vergleich.
-                    const QString zeile = m_rxDrift->protokollZeile(
-                        QDateTime::currentMSecsSinceEpoch());
-                    if (!zeile.isEmpty()) { qCInfo(lcAudio).noquote() << zeile; }
                 }
                 // Die Kanalzahl kommt vom Angleich, nicht aus einer
                 // eigenen 2: zwei Stellen, die dieselbe Zahl kennen,

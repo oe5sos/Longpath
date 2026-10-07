@@ -292,6 +292,7 @@ warren@wpratt.com
 #include "core/RadioConnection.h"
 #include "core/RadioConnectionTeardown.h"
 #include "core/P1RadioConnection.h"
+#include "core/SunSdrRadioConnection.h"
 #include "core/P2RadioConnection.h"
 #include "core/PsccPump.h"   // Phase 3M-4 Task 17 chunk C — pscc() driver
 #include "core/WidebandFftEngine.h"  // Phase 3F Sub-Epic F Task 5 — per-ADC wb FFT
@@ -4245,7 +4246,38 @@ bool RadioModel::sampleRateIsRadioWide() const
     // takes a single sampleRate and encodes it as srBits, so there is no
     // per-receiver rate to set. Protocol 2 carries a per-DDC rate through
     // DdcAssignment::rate[], which the codecs populate per stream.
-    return qobject_cast<Longpath::P1RadioConnection*>(m_connection) != nullptr;
+    if (qobject_cast<Longpath::P1RadioConnection*>(m_connection) != nullptr) {
+        return true;
+    }
+
+    // Die SunSDR gehoert auf dieselbe Seite, und das ist seit dem
+    // 2026-10-04 nicht mehr nur eine Einordnung: der Stromstart-Rahmen 0x01
+    // traegt EINEN Modus fuer das ganze Geraet (SunSdrProtocol.h,
+    // StromModus), den SunSdrRadioConnection::setSampleRate waehlt. Eine
+    // Rate je DDC, die man einzeln stellen koennte, gibt es hier nicht.
+    //
+    // Stand hier nur P1, galt die SunSDR als "Rate je Strom" -- und der Weg
+    // auf den Draht fuer so eine Rate ist der DdcAssignment-Push in
+    // invokeCodecDdcAssignment, der ausdruecklich nur P2 bedient. Also ging
+    // eine Ratenaenderung nach dem Verbinden gar nicht hinaus. An der echten
+    // QRP sah das am 2026-10-04 so aus:
+    //
+    //     INF: Connecting with sampleRate= 96000 inSize= 128
+    //     INF: SunSdr: Abtastrate -> 96000 Hz (Stromstart-Rahmen ...)
+    //     DBG: Connected to "SunSDR2 QRP"
+    //     INF: setRxChannelRate: channel 0 -> 48000 Hz, in_size= 64
+    //
+    // 63 ms nach dem Verbinden zog die Wiederanwendung der je Band
+    // gespeicherten Rate den Empfangskanal auf 48 kHz, waehrend das Geraet
+    // weiter mit 96 streamte (Stromkopf 0200, 960 Folgenummern/s) -- wieder
+    // Daten einer Rate in einem Kanal einer anderen, derselbe Riss wie am
+    // 2026-09-24. Die RATE-Anzeige der Kopfleiste stand danach bernsteinfarben
+    // auf "48 kHz"; sie hat nicht geirrt, sie hat genau das gemeldet.
+    //
+    // "Radio-wide" schickt die Aenderung stattdessen durch setSampleRateLive,
+    // und dessen Schritt 4 ruft conn->setSampleRate() fuer alles, was nicht P1
+    // ist -- bei der SunSDR also den Stromstart-Rahmen.
+    return qobject_cast<Longpath::SunSdrRadioConnection*>(m_connection) != nullptr;
 }
 
 int RadioModel::rx0ChannelRateHz() const
@@ -8790,9 +8822,46 @@ void RadioModel::connectToRadio(const RadioInfo& info)
     // setActiveReceiverCount on P2 here would enable DDC0..N-1 on top of
     // the DDC2 enable that connectToRadio sets, leaving extra DDCs active.
     // Deferred to Phase 3F (multi-panadapter) which ports UpdateDDCs().
+    //
+    // Die SunSDR gehoert auf dieselbe Seite wie P1 und zwar seit dem
+    // 2026-10-04 zwingend: ihr setActiveReceiverCount() setzt keine DDCs
+    // frei, sondern waehlt den Stromstart-Modus (ein Strom oder zwei,
+    // SunSdrProtocol.h). Ohne diesen Push bleibt im Treiber stehen, was
+    // die VORIGE Sitzung gesetzt hat -- eine Sitzung mit zwei Empfaengern
+    // vererbt den zweiten Strom an die naechste, und ueber die Oberflaeche
+    // laesst sich der zweite Empfaenger beim Verbinden gar nicht
+    // einschalten, nur nachtraeglich.
+    //
+    // Davor hat der Sitzungs-Reset im Treiber das verdeckt (er setzte auf
+    // 1 zurueck); der musste weg, weil er auch die Rate wegwarf, die
+    // RadioModel kurz vorher gesetzt hatte -- siehe 88844941.
     if (info.protocol == ProtocolVersion::Protocol1) {
         QMetaObject::invokeMethod(m_connection, [conn = m_connection, activeRxCount]() {
             conn->setActiveReceiverCount(activeRxCount);
+        });
+    } else if (info.protocol == ProtocolVersion::SunSdr) {
+        // Fuer die SunSDR NICHT der gespeicherte Wert, sondern die Zahl
+        // der Empfaenger, die es oben WIRKLICH gibt.
+        //
+        // Hintergrund (2026-10-04, am Geraet gesehen): mit
+        // activeRxCount = 2 und EINER Scheibe forderte Longpath zwei
+        // Stroeme an, und der zweite fiel eine Ebene hoeher weg --
+        //
+        //   SunSdr: Stromstart-Rahmen -> zwei Stroeme, je 48 kHz
+        //   ReceiverManager: first feedIqData DROPPED; hw= 1  map="hw0->rx0"
+        //
+        // Doppelte Netzlast ohne Gegenwert. Ein Empfaenger entsteht erst,
+        // wenn sich eine Scheibe an den Strom bindet
+        // (syncReceiverToStream), und genau diese Zahl wird hier
+        // geschickt. Waechst sie spaeter, zieht die Verdrahtung ueber
+        // ReceiverManager::hardwareReceiverCountChanged nach -- die gibt
+        // es laengst, mein frueherer Push mit dem gespeicherten Wert hat
+        // sie nur ueberstimmt.
+        const int echte = qMax(1, m_receiverManager
+                                      ? m_receiverManager->activeReceiverCount()
+                                      : 1);
+        QMetaObject::invokeMethod(m_connection, [conn = m_connection, echte]() {
+            conn->setActiveReceiverCount(echte);
         });
     }
     if (m_activeSlice) {

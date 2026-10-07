@@ -16,6 +16,25 @@ zugehen. Es ist ein Fahrplan über mehrere Durchgänge, kein Durchgang.
 | Signale nach oben | 13 | 13 | **4** |
 | Leere Pflichtmethoden | 0 | 0 | **16** |
 
+**Diese Tabelle ist vom 2026-10-02 und damit überholt.** Am 2026-10-04
+nachgezählt, nicht geschätzt:
+
+| | ANAN 10E (P1) | Anvelina (P2) | SunSDR2 QRP |
+| --- | --- | --- | --- |
+| Zeilen | 4385 | 3774 | **2692** |
+| Signale nach oben | 10 | 12 | **8** |
+| Leere Rümpfe | 0 | 0 | **14** |
+
+Und die „leeren Rümpfe" sind nicht alle Arbeit: vier davon gibt es an
+diesem Gerät gar nicht (`setTrxRelay`, `setUserDigOut`,
+`setPuresignalRun`, `setWatchdogEnabled`), zwei gehören zum Senden und
+sieben zum Mikrofonweg — beide Gruppen warten nicht auf Arbeit, sondern
+auf **Bestätigung der Opcode-Nummern**. Die Einteilung mit Begründung
+steht seit `6f15428a` im Quelltext selbst.
+
+Die Zahl, die zählt, ist eine andere: **im Empfang ist die QRP
+gleichwertig.** Was noch fehlt, ist Senden.
+
 Die Zeilenzahl ist kein Maß für Güte, die anderen beiden Zeilen sind es:
 jedes Signal ist eine Meldung, die der Betreiber am Bildschirm sieht, und
 jede leere Methode ein Knopf in Longpath, der beim QRP ins Leere greift.
@@ -230,3 +249,253 @@ Zustand nirgends von sich aus meldet.
    ein echter Mangel gefunden wurde (eine verlorene Frequenz bleibt
    unbemerkt). Braucht eine Entscheidung, weil der Treiber dann von
    selbst Rahmen wiederholt.
+
+---
+
+# Neuer Mangel, am 2026-10-03 abends gemessen: Longpath sagt beim Trennen nichts
+
+`SunSdrRadioConnection::disconnect()` schickt dem Gerät **keinen einzigen
+Rahmen** — es schließt Sockets, hält Timer an, räumt auf. Dem Funkgerät
+wird nie gesagt, dass der Strom aufhören soll.
+
+**Was das in Zahlen heißt**, mit `tcpdump` nach einem Longpath-Ende
+gemessen (46 Sekunden Mitschnitt, niemand hörte zu):
+
+| | Pakete/s | Kopien je Folgenummer |
+| --- | --- | --- |
+| Reststrom, niemand quittiert | **1940** | **8,1** |
+| Longpath im Betrieb, mit Blockantwort | 240 | 1,00 |
+
+Zwei Dinge auf einmal:
+
+1. **Die Achtfachung ist abschließend erklärt.** Sie ist keine Eigenart
+   des Geräts, sondern genau die Folge fehlender Quittierung — 8,1 Kopien
+   ohne, 1,00 mit Blockantwort. Damit ist die Frage vom 2026-09-23 zu.
+2. **Die QRP streamt nach dem Trennen unbegrenzt weiter**, mit 2,3 MB/s
+   ins Leere, und der Mac antwortet auf jedes Paket mit ICMP „port
+   unreachable". Bekannt war das als Kuriosum („85 leftover I/Q packets",
+   `setFixedPortBindingEnabledForTest`) — es sind aber nicht 85 Pakete,
+   sondern ein Dauerzustand bis zum Ausschalten des Geräts.
+
+Und sehr wahrscheinlich ist das der Grund, warum ExpertSDR2 am selben
+Abend nicht verbinden konnte: das Gerät stand noch im Streaming-Zustand
+der vorigen Sitzung.
+
+**Was fehlt, ist der Stopp-Befehl.** ArtemisSDR führt für die DX
+`SUNSDR_OP_POWER_OFF 0x02`, und die Boot-Folge dort ruft ihn beim Umbau
+der Empfangswege auf. Welche Nummer das bei der QRP ist, wissen wir
+nicht, und geraten wird sie nicht (Abschnitt 3a).
+
+**Der Mitschnitt dafür ist der leichteste von allen:** ExpertSDR2
+verbinden lassen und dann **beenden**. Der letzte Rahmen, der hinausgeht,
+bevor der Strom verstummt, ist der Stopp-Befehl. Damit wäre `disconnect()`
+vollständig — und das Gerät nach jedem Longpath-Ende still.
+
+---
+
+# Stand am 2026-10-04 — nach dem ersten Tag in der laufenden App
+
+Bis gestern wurde alles am Prüfstand und am Messlauf gemessen. Heute lief
+Longpath selbst gegen die QRP, über die Automationsbrücke ferngesteuert.
+Das hat drei Fehler aufgedeckt, die kein Prüfstand gezeigt hat — und
+einer davon stand genau an der Stelle, die gestern als „erledigt" galt.
+
+## Was sich an der Liste oben ändert
+
+| Posten | Neuer Stand |
+| --- | --- |
+| Veralteter Kommentar an `setSampleRate` (312 500 Hz) | **erledigt** — beim Umbau am 2026-10-03 verschwunden |
+| `setAntennaRouting` (Opcode `0x15`) | **verdrahtet, aber stumm** (`8e54decb`). Scharf nur mit `LONGPATH_SUNSDR_ANTENNE=1`; die Auswahlbytes stammen von der DX/PRO und sind an der QRP nicht bestätigt — siehe Abschnitt 3a, die Opcodes der QRP sind andere |
+| 96 kHz | kam in der **App** nie am Gerät an: `RadioModel` schiebt die Rate vor dem Verbinden hinein, der Sitzungs-Reset warf sie weg (`88844941`) |
+
+## Die drei Fehler vom 2026-10-04
+
+1. **Die eingestellte Rate wurde beim Verbinden weggeworfen.** Longpath
+   meldete `Connecting with sampleRate= 96000`, stellte WDSP darauf ein —
+   und das Gerät streamte mit 48 (Stromkopf `0100`, 240 Nummern/s). Also
+   Daten einer Rate in einem Kanal einer anderen, derselbe Riss wie am
+   2026-09-24. Behoben; danach `0200` und 960 Nummern/s.
+
+   **Warum kein Prüfstand das fing:** die vorhandene Prüfung rief
+   `setSampleRate` **nach** `connectToRadio` — in der Reihenfolge, die
+   geht, nicht in der, die die Anwendung nimmt.
+
+2. **Ein toter Lautsprecher-Ausgang galt als offen** (`c8761850`).
+   `isOpen()` ist bei PortAudioBus ein Zeigervergleich; stirbt der Strom
+   darunter, schreibt Longpath weiter hinein, ohne dass etwas auffällt.
+   Jetzt fragt `ensureSpeakersOpen` über `Pa_IsStreamActive` nach.
+
+3. **Der Abmelde-Rahmen wurde nicht nachgeschickt** (`9c48cb5c`). Die QRP
+   bedient **einen** Client und hält die Sitzung fest. Blieb der Stopp
+   unquittiert — oder wurde eine Instanz hart beendet —, nahm das Gerät
+   **niemanden mehr an**, und Longpath meldete „no beacon reply". Das hat
+   den Betreiber eine halbe Stunde gekostet; erst Aus- und Einschalten
+   half. Der Stopp geht jetzt bis zu dreimal hinaus, und die
+   Fehlermeldung nennt diesen Fall **zuerst**.
+
+## Was im Empfang jetzt noch fehlt
+
+**Nichts mehr — der Empfang ist funktional vollständig.**
+
+Die Zeile, die hier zuerst stand („unverändert eines: `micPttFromRadio`,
+dafür braucht es den Mitschnitt"), war falsch: ich hatte eine ältere
+Aussage abgeschrieben, ohne den Code zu prüfen. `micPttFromRadio` ist am
+2026-10-02 gebaut worden (`1e4eb060`) und wird **ohne Protokollwissen**
+aus dem Stromkopf abgeleitet — `0xFD` heißt, das Gerät sendet, `0xFE`
+heißt Empfang. Mit Flankenerkennung (240 Pakete je Sekunde dürfen nicht
+240 Meldungen ergeben) und mit Abgrenzung gegen eigenes MOX. Geprüft in
+`sendezustandAmGeraetMeldetPtt`.
+
+Offen ist nur die **Bestätigung am Gerät**, und die braucht keinen
+Mitschnitt, sondern einen **50-Ω-Abschluss**: wer die Mikrofontaste
+drückt, bringt das Gerät in den Sendezustand, und das gehört nicht an
+eine offene Buchse.
+
+Damit ist Martins Auftrag vom 2026-10-02 — „er soll am stand von
+anvelina und anan sein, absolut gleichwertig" — **für den Empfang
+erfüllt**, vorbehaltlich dieser einen Live-Bestätigung. Was bleibt, ist
+das Senden, und das ist ein eigenes Kapitel (Abschnitt 4).
+
+## Zwei offene Beobachtungen, beide ohne Antenne messbar
+
+- **Wiederholungen bei 96 kHz:** 1,2 statt 1,0 — rund 105 überflüssige
+  Pakete je Sekunde. Die Quittung wirkt (401 → 105), ist aber
+  unvollständig. Den Kopf des Geräts zu spiegeln bringt nachweislich
+  nichts. Nächste Versuche stehen im Verbindungsablauf-Dokument.
+- **Lautstärke:** der Betreiber hört die QRP „sehr sehr leise". Die
+  Umrechnung der Proben ist nachgerechnet richtig (24 Bit ins obere Ende
+  eines 32-Bit-Worts, geteilt durch 2³¹), eine geräteeigene Pegel-Eichung
+  gibt es bei keinem der drei Geräte. Offen, ob es an der fehlenden
+  Antenne liegt oder eine echte Lücke ist — der Vergleich gegen die
+  Anvelina steht noch aus und ist auf Wunsch des Betreibers vertagt.
+
+---
+
+# Nachtrag 2026-10-04, Nachmittag — zwei Lücken geschlossen
+
+Beide Funde stammen aus **Richtigstellungen des Betreibers**, nicht aus
+eigener Analyse. Das ist kein Zufall: zu beiden Punkten stand hier eine
+Behauptung, die nie am Gerät geprüft worden war.
+
+## Der zweite Empfänger war nie stumm
+
+Betreiber: *„es waren immer beide rx und rx2"* — in ExpertSDR2 liefen
+also stets beide. Damit war der zweite Datenstrom nie ein Rätsel.
+Nachgerechnet aus seinem Mitschnitt:
+
+| | Effektivwert | Q ungleich null |
+| --- | --- | --- |
+| Kanal 0 | −130,0 dBFS | 21,2 % |
+| Kanal 1 | **−127,9 dBFS** | **31,5 %** |
+
+Kanal 1 trägt echtes I/Q, sogar kräftiger als Kanal 0. Die Zeile
+„wird angenommen, bleibt aber stumm" war falsch — Longpath hat ihn
+weggeworfen, weil `maxReceivers = 1` stand.
+
+Zwei Änderungen (`db9cf495`): Fähigkeiten auf zwei Empfänger, und der
+Stromstart-Modus hängt jetzt an **Empfängerzahl UND Rate** statt nur an
+der Rate. Ohne das hätte ein zweiter Empfänger bei 48 kHz nie Daten
+bekommen können.
+
+Am Gerät bestätigt (`b33072d9`): 480 statt 240 Nummern/s, Kanal 0 und 1
+je **0 verworfen**, 0,00 % Verlust.
+
+## Die Lautstärke war eine falsch geeichte Zahl
+
+Der Betreiber hat es mehrfach gemeldet; entscheidend war sein Satz, dass
+**ExpertSDR2 am selben Gerät ohne Antenne perfekt laut** ist. Damit war
+die fehlende Antenne als Erklärung erledigt.
+
+Der Abgleich `rxLevelTrimDb` stand auf +20,0 dB — am 2026-09-25 gemessen,
+aber über den **TCI-Weg** (`rx_sensors`). Der native Treiber ist ein
+anderer Weg mit anderer Skalierung. Statt eine neue Zahl zu raten wurde
+der Abgleich einstellbar gemacht; der Betreiber hat **+40,0 dB**
+eingestellt und bestätigt. Fest eingetragen in `c8735386`.
+
+## Zurückgenommen: die Antennenwahl
+
+`8e54decb` hatte `setAntennaRouting` verdrahtet (hinter einem Schalter,
+standardmäßig stumm). Beim Bauen schlug ein Wächter an, den dieses
+Projekt genau dafür hat: `tst_sunsdr_protocol` prüft, dass die
+DX-stämmigen Sende-Rahmenbauer **keine** Aufrufstelle haben.
+
+Der Wächter hat recht. Ein Schalter, der standardmäßig aus ist, hebt ihn
+nicht auf — verdrahtet ist verdrahtet, und eine Umgebungsvariable ist
+schnell gesetzt. `setAntennaRouting` ist wieder leer; `0x15` ist im
+Abschluss-Prüfplan der **erste** zu bestätigende Befehl, weil er als
+einziger nichts erzeugt.
+
+---
+
+# Der zweite Empfänger: wo die Kette wirklich endet (2026-10-04, abends)
+
+Der Beleg vom Nachmittag (`b33072d9`) war **halb**. Gemessen war die
+Treiberseite: beide Kanäle kommen an, 0 verworfen. Was er nicht zeigte:
+ob Kanal 1 oben bei einem zweiten Empfänger landet.
+
+Am Gerät nachgeholt, mit `activeRxCount = 2` und **einer** Scheibe:
+
+    Connecting with sampleRate= 48000 ... activeRxCount= 2
+    Created RX channel 0 / Created RX channel 1
+    SunSdr: aktive Empfaenger -> 2
+    SunSdr: Stromstart-Rahmen -> zwei Stroeme, je 48 kHz
+    ReceiverManager: first feedIqData forwarded; hw= 0 -> rx0
+    ReceiverManager: first feedIqData DROPPED; hw= 1  map= "hw0->rx0"
+
+Das Gerät schickt also zwei Ströme (480 Nummern/s), der Treiber reicht
+beide hoch, WDSP hat zwei Kanäle — und `ReceiverManager` kennt nur einen
+Empfänger.
+
+**Das ist kein Fehler, sondern die Bauweise.** Ein Empfänger entsteht in
+`RadioModel::syncReceiverToStream`, und die wird gerufen, wenn sich eine
+**Scheibe** an einen Strom bindet. Mit einer Scheibe gibt es einen
+Empfänger, gleich was `activeRxCount` sagt. RX2 erscheint, sobald eine
+zweite Scheibe da ist — dafür steht `maxSlices` seit heute auf 2.
+
+Die Routenführung selbst ist geprüft (`tst_sunsdr_zweiter_empfaenger_oben`,
+ohne Funkgerät): Kanal 1 landet bei Empfänger 1, mit dessen Daten, und
+fällt weg, wenn es keinen zweiten gibt.
+
+**Was offen bleibt:** mit einer Scheibe und `activeRxCount = 2` fordert
+Longpath zwei Ströme an und wirft den zweiten eine Ebene höher weg —
+doppelte Netzlast ohne Gegenwert. Sauberer wäre, den Stromstart-Modus an
+die Zahl der **gebundenen Ströme** zu hängen statt an den gespeicherten
+Wert. Bis dahin sagt die Meldung wenigstens, was fehlt, statt nur
+`map="hw0->rx0"`.
+
+
+---
+
+# Bilanz am Ende des 2026-10-04
+
+Der Empfang ist **gleichwertig**. Was heute dazukam, in der Reihenfolge,
+in der es gefunden wurde:
+
+| Was | Wie belegt |
+| --- | --- |
+| Die eingestellte Rate kam beim Verbinden nie am Gerät an | am Gerät: Stromkopf `0100` → `0200`, 240 → 960 Nummern/s |
+| Ein toter Lautsprecher-Ausgang galt als offen | Prüfstand rot gegen die alte Fassung |
+| Der Abmelde-Rahmen wurde nicht nachgeschickt | am Gerät quittiert nach Versuch 1 |
+| **Lautstärke +20 → +40 dB** | vom Betreiber am Gerät eingestellt |
+| **Zwei Empfänger, Ende zu Ende** | am Gerät: 480 statt 240 Nummern/s, 0 verworfen |
+| Das Verbinden erholt sich selbst | fünf Anläufe à 18 s, Prüfstand rot-vor-grün |
+
+**Was noch fehlt — und woran es hängt:**
+
+| Offen | Hängt an |
+| --- | --- |
+| Mikrofon-PTT bestätigen | **50-Ω-Abschluss** (gebaut, aber nie im Sendezustand gesehen) |
+| Senden überhaupt | derselbe Abschluss, davor die Opcode-Bestätigung |
+| Restliche Rahmen des Verbindungsablaufs | **zwei Minuten ExpertSDR2 mit Mitschnitt**, ohne Antenne |
+| Wiederholungen bei 96 kHz | derselbe Mitschnitt, aber **auf 96 kHz** |
+
+**Was keiner mehr versuchen soll** (alles gemessen und wirkungslos):
+
+- den Kopf der Blockantwort spiegeln
+- zwei Stille-Ströme statt einem zurückschicken
+- die Quittung vor das Verwerfen ziehen
+
+**Und eine Mahnung an mich selbst:** zweimal an diesem Tag habe ich aus
+**einer** Messung eine Ursache gemacht — bei den Wiederholungen und beim
+Verbindungsaussetzer. Beide Male war die Zahl richtig und der Schluss
+falsch. Eine Ursache braucht mehr als einen Durchgang.

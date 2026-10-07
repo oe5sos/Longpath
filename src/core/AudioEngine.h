@@ -354,6 +354,13 @@ public:
     /// nach setSpeakersConfig() steht hier nichts mehr.
     bool hasSpeakersBusForTest() const { return m_speakersBus != nullptr; }
 
+    /// Pruef-Naht (2026-10-04) — welcher Bus liegt gerade an, und einmal
+    /// die Pruefung "lebt er noch?" anstossen. Fuer den Fall vom Mac des
+    /// Betreibers: Ton im Programm, nichts aus den Lautsprechern, weil ein
+    /// toter Strom als "geoeffnet" durchging.
+    const IAudioBus* speakersBusForTest() const { return m_speakersBus.get(); }
+    void ensureSpeakersOpenForTest() { ensureSpeakersOpen(); }
+
     // Test seam — inject a fake IAudioBus into the TX-input slot so unit
     // tests can exercise pullTxMic without standing up a real PortAudio
     // capture device. Takes ownership of `bus`.

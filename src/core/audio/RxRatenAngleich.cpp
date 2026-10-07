@@ -140,7 +140,7 @@ void RxRatenAngleich::baueUmtaster(int blockRahmen)
 {
     if (m_varsamp) { destroy_varsamp(m_varsamp); m_varsamp = nullptr; }
     m_blockRahmen = blockRahmen;
-    m_neubauten++;
+    m_neubauten.fetch_add(1, std::memory_order_relaxed);
 
     // varsamp rechnet KOMPLEX: zwei doubles je Probe. Fuer Stereo faellt
     // das zusammen (links/rechts auf die beiden Teile); bei Mono wird der
@@ -170,8 +170,10 @@ RxRatenAngleich::Ausgabe RxRatenAngleich::verarbeite(
     // Geraet verbrauchten negativ. Die verbrauchten liest der Erzeuger am
     // Fuellstand ab -- so muss der Rueckruf nichts mitfuehren und keine
     // Sperre nehmen (ebendas unterscheidet diesen Weg von Thetis).
-    if (m_letzteFuellung >= 0) {
-        const std::int64_t verbraucht = m_letzteFuellung + m_letzteAusgabe - fuellungRahmen;
+    const std::int64_t letzteFuellung =
+        m_letzteFuellung.load(std::memory_order_relaxed);
+    if (letzteFuellung >= 0) {
+        const std::int64_t verbraucht = letzteFuellung + m_letzteAusgabe - fuellungRahmen;
 
         // ── Ein geleerter Ring ist kein Verbrauch (2026-10-06) ───────────
         //
@@ -197,13 +199,13 @@ RxRatenAngleich::Ausgabe RxRatenAngleich::verarbeite(
             m_regler.melde(-static_cast<int>(verbraucht),
                            fuellungRahmen, ringRahmen);
         } else if (verbraucht > plausibel) {
-            m_spruenge++;
+            m_spruenge.fetch_add(1, std::memory_order_relaxed);
         }
     }
     m_regler.melde(rahmen, fuellungRahmen, ringRahmen);
 
     if (!m_regler.regeltSchon()) {
-        m_letzteFuellung = fuellungRahmen;
+        m_letzteFuellung.store(fuellungRahmen, std::memory_order_relaxed);
         m_letzteAusgabe = rahmen;
         return { ein, rahmen };
     }
@@ -231,8 +233,9 @@ RxRatenAngleich::Ausgabe RxRatenAngleich::verarbeite(
         }
     }
 
-    m_versatz += static_cast<std::int64_t>(sicher) - rahmen;
-    m_letzteFuellung = fuellungRahmen;
+    m_versatz.fetch_add(static_cast<std::int64_t>(sicher) - rahmen,
+                        std::memory_order_relaxed);
+    m_letzteFuellung.store(fuellungRahmen, std::memory_order_relaxed);
     m_letzteAusgabe = sicher;
     return { m_ausFloat.data(), sicher };
 }
@@ -258,21 +261,21 @@ QString RxRatenAngleich::protokollZeile(std::int64_t jetztMs, int abstandSek)
         "%6 Umtaster-Neubauten")
         .arg(m_regler.verhaeltnis(), 0, 'f', 9)
         .arg(ppm, 0, 'f', 2)
-        .arg(m_letzteFuellung)
-        .arg(m_versatz)
-        .arg(m_spruenge)
-        .arg(m_neubauten);
+        .arg(m_letzteFuellung.load(std::memory_order_relaxed))
+        .arg(versatz())
+        .arg(spruenge())
+        .arg(umtasterNeubauten());
 }
 
 void RxRatenAngleich::zuruecksetzen()
 {
     m_regler.zuruecksetzen();
     if (m_varsamp) { flush_varsamp(m_varsamp); }
-    m_versatz = 0;
-    m_spruenge = 0;
-    m_neubauten = 0;
+    m_versatz.store(0, std::memory_order_relaxed);
+    m_spruenge.store(0, std::memory_order_relaxed);
+    m_neubauten.store(0, std::memory_order_relaxed);
     m_letzteMeldungMs = 0;
-    m_letzteFuellung = -1;
+    m_letzteFuellung.store(-1, std::memory_order_relaxed);
     m_letzteAusgabe = 0;
 }
 

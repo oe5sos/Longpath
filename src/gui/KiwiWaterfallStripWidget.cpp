@@ -60,7 +60,7 @@ KiwiWaterfallStripWidget::KiwiWaterfallStripWidget(const QString& profileId,
     m_peakLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
     m_peakLabel->setStyleSheet(
         QStringLiteral("QLabel { color: %1; font-size: 10.5px; "
-                        "font-family: monospace; }").arg(trace()));
+                        "font-family: " LP_MONO_QSS "; }").arg(trace()));
     header->addWidget(m_peakLabel, 0);
 
     layout->addLayout(header);

@@ -1416,7 +1416,7 @@ void RotorLogbookPanel::openRotorSetupDialog()
     installLog->setVisible(false);
     installLog->setStyleSheet(
         QStringLiteral("QPlainTextEdit { background: %1; color: %2; "
-                       "font-family: Menlo, monospace; font-size: 11px; "
+                       "font-family: " LP_MONO_QSS "; font-size: 11px; "
                        "border: 1px solid %3; }")
             .arg(QString::fromLatin1(Style::kInsetBg),
                  QString::fromLatin1(Style::kTextSecondary),
