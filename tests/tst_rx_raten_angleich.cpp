@@ -101,6 +101,7 @@ private slots:
     void unsinnGehtUnveraendertDurch();
     void dieMeldungLaeuftNichtZu();
     void einGeleerterRingIstKeinVerbrauch();
+    void derZeitgeberMeldetJedenAufruf();
 };
 
 void TstRxRatenAngleich::unbekannterFuellstandGehtUnveraendertDurch()
@@ -271,6 +272,38 @@ void TstRxRatenAngleich::einGeleerterRingIstKeinVerbrauch()
     // DER Punkt: mit Schutz wandert das Verhaeltnis deutlich weniger.
     QVERIFY2(mit.first < ohne.first,
              "Der Schutz macht keinen Unterschied -- dann belegt er nichts");
+}
+
+
+void TstRxRatenAngleich::derZeitgeberMeldetJedenAufruf()
+{
+    // Die Zeile haengt jetzt an einem QTimer auf dem Faden des AudioEngine
+    // und nicht mehr im Tonweg -- dort teilte `QString` Speicher zu und
+    // `qCInfo` nahm eine Sperre, einmal je Minute, auf dem DSP-Faden.
+    //
+    // Damit wandert aber auch die Taktung: nicht mehr die Klasse entscheidet,
+    // wann eine Minute um ist, sondern der Zeitgeber. Die Klasse muss dafuer
+    // auf Verlangen JEDEN Aufruf melden -- sonst verschluckt ihre eigene
+    // Minutensperre die Zeile des Zeitgebers, und das Protokoll bliebe leer,
+    // obwohl beide Seiten "richtig" arbeiten.
+    RxRatenAngleich a(kRate, 2);
+    const std::vector<float> block = stereoBlock(kBlock);
+    for (int i = 0; i < 500; ++i) { a.verarbeite(block.data(), kBlock, kZiel, kRing); }
+    QVERIFY(a.regeltSchon());
+
+    std::int64_t t = 5'000'000;
+    for (int i = 0; i < 5; ++i) {
+        t += 60'000;
+        QVERIFY2(!a.protokollZeile(t, 0).isEmpty(),
+                 "mit abstandSek=0 muss jeder Aufruf melden");
+    }
+    // Und ohne dass die Zeit weitergeht: auch dann, denn das Mass ist der
+    // Zeitgeber und nicht die Uhr.
+    QVERIFY(!a.protokollZeile(t, 0).isEmpty());
+    QVERIFY(!a.protokollZeile(t, 0).isEmpty());
+
+    // Die Vorgabe bleibt die Minute -- der alte Weg ist nicht verlorengegangen.
+    QVERIFY(a.protokollZeile(t).isEmpty());
 }
 
 QTEST_MAIN(TstRxRatenAngleich)
