@@ -754,6 +754,8 @@ private:
     void verarbeiteMesswertrahmen(const QByteArray& data);
     float   m_messwertA{0.0f};
     float   m_messwertB{0.0f};
+    float   m_gemeldetA{0.0f};   // zuletzt gemeldet, fuer die Aenderungspruefung
+    float   m_gemeldetB{0.0f};
     quint64 m_messwertRahmen{0};
 
     bool kopfAntwortEnabled();

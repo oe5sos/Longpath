@@ -1481,3 +1481,44 @@ gemessen liefert sie 590 Blöcke je Sekunde auf Kanal 0 — ein Strom mit
 voller Rate, ohne den zweiten, der niemandem gehört.
 
 Damit ist die Tabelle der `0x01`-Nutzlasten **vollständig**.
+
+---
+
+# Der Lastwechsel ist ergebnislos — und ein Ausreißer, der wichtiger war (2026-10-07)
+
+Die Zuordnung „welcher Fühler sitzt wo" sollte eine Messung klären
+statt eine abgelesene Zahl: zwölf Minuten Leerlauf (48 kHz, ein Strom)
+gegen zwölf Minuten Last (96 kHz, zwei Ströme). Der Fühler am
+arbeitenden Teil müsste davonziehen.
+
+**Er tut es nicht.** Über 24 Minuten:
+
+| Phase | Wert A | Wert B |
+| --- | --- | --- |
+| Leerlauf | 42,5 … 43,5 | 32,5 … 33,0 |
+| Last | 43,0 … 43,5 | 33,0 |
+
+Beide stehen. Die Auflösung beträgt 0,5 Grad, der Lastunterschied
+bewegt sie nicht — **die Zuordnung lässt sich so nicht entscheiden.**
+
+Dass die Werte über den Vormittag von 38,0/28,5 auf 43,0/33,0 gestiegen
+sind, ist das Aufwärmen aus dem kalten Zustand, nicht die Last. Genau
+deshalb war die zweite Ruhephase eingeplant: ein Anstieg allein hätte
+nichts belegt.
+
+## Der Ausreißer: −200
+
+In beiden Läufen tauchen Rahmen auf, in denen **einer** der beiden Werte
+`-200,0` trägt — `A=-200.0 B=33.0` ebenso wie `A=43.0 B=-200.0` —, und
+unmittelbar danach wieder richtige Zahlen. Ein Fühler bei minus
+zweihundert Grad existiert nicht: das ist das Zeichen für **„gerade kein
+Messwert"**.
+
+Ohne Behandlung hätte Longpath das durchgereicht und dem Betreiber
+−200 °C angezeigt, womöglich samt Abschaltschwelle. Jetzt wird der
+Ausreißer verworfen und der **alte Wert bleibt stehen** — eine Lücke in
+der Messung ist keine Änderung der Temperatur. Je Wert getrennt, denn
+das Gerät meldet sie getrennt.
+
+Gefunden wurde das nur, weil die Messung lang genug lief: in den ersten
+Läufen von 45–60 s kam kein einziger −200-Rahmen vor.

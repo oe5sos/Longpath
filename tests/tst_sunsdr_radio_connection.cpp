@@ -825,6 +825,52 @@ private slots:
         QCOMPARE(conn.messwertBForTest(), 28.5f);
     }
 
+    // -200 ist kein Messwert, sondern "gerade keiner". Am 2026-10-07 in
+    // beiden Laeufen aufgetaucht, einzeln je Wert. Wer das durchreicht,
+    // zeigt minus zweihundert Grad an.
+    void minusZweihundertIstKeinMesswert()
+    {
+        qunsetenv("LONGPATH_SUNSDR_BLOCKANTWORT");
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+
+        const QHostAddress radio(QStringLiteral("192.0.2.200"));
+        conn.feedControlDatagramForTest(
+            QByteArray::fromHex("03ff011a7c0000004119c0a810c8c0a810c851c300004928"),
+            radio);
+        QVERIFY(conn.isRxReadyForTest());
+
+        auto rahmenMit = [](float a, float b) {
+            QByteArray r = QByteArray::fromHex(
+                "03ff001f00002b0f38930000001d8300"
+                "00000000000000"
+                "00000000000000000000803f"
+                "00000010010020130500802406002013050080"
+                "380b0020130500804c1000201305008060150020130500");
+            std::memcpy(r.data() + 15, &a, sizeof(float));
+            std::memcpy(r.data() + 19, &b, sizeof(float));
+            return r;
+        };
+        // Erst ein gueltiges Paar.
+        conn.feedStreamDatagramFromSenderForTest(rahmenMit(43.0f, 33.0f), radio);
+        QTRY_COMPARE_WITH_TIMEOUT(conn.messwertAForTest(), 43.0f, 500);
+        QCOMPARE(conn.messwertBForTest(), 33.0f);
+
+        // Dann einer mit -200 bei A: B wird uebernommen, A bleibt stehen.
+        conn.feedStreamDatagramFromSenderForTest(rahmenMit(-200.0f, 32.5f), radio);
+        QTRY_COMPARE_WITH_TIMEOUT(conn.messwertBForTest(), 32.5f, 500);
+        QCOMPARE(conn.messwertAForTest(), 43.0f);
+
+        // Und einer, in dem BEIDE fehlen: nichts aendert sich.
+        conn.feedStreamDatagramFromSenderForTest(rahmenMit(-200.0f, -200.0f), radio);
+        QTest::qWait(50);
+        QCOMPARE(conn.messwertAForTest(), 43.0f);
+        QCOMPARE(conn.messwertBForTest(), 32.5f);
+    }
+
     // Seit der Messung am 2026-10-05 ist die Kopfantwort die VORGABE: an
     // den Wiederholungen aendert sie nichts (207/s gegen 214/s, also
     // nichts), sie halbiert aber den Rueckweg. Diese Pruefung haelt die

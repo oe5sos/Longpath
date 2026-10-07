@@ -2127,16 +2127,35 @@ void SunSdrRadioConnection::verarbeiteMesswertrahmen(const QByteArray& data)
     std::memcpy(&b, data.constData() + 19, sizeof(float));
     if (!std::isfinite(a) || !std::isfinite(b)) { return; }
 
+    // -200 ist kein Messwert, sondern das Zeichen "gerade keiner".
+    // Am 2026-10-07 in beiden Laeufen aufgetaucht, einzeln je Wert:
+    // "A=-200.0 B=33.0" und "A=43.0 B=-200.0", dazwischen wieder
+    // richtige Zahlen. Ein Fuehler bei minus zweihundert Grad gibt es
+    // nicht; wer das durchreicht, zeigt dem Betreiber Unsinn an und
+    // loest womoeglich eine Schwelle aus.
+    //
+    // Der ALTE Wert bleibt dabei stehen, statt auf null zu fallen: eine
+    // Luecke in der Messung ist keine Aenderung der Temperatur.
+    constexpr float kKeinWert = -100.0f;
+    if (a > kKeinWert) { m_messwertA = a; }
+    if (b > kKeinWert) { m_messwertB = b; }
+    if (a <= kKeinWert && b <= kKeinWert) { return; }
+
     // Nur bei AENDERUNG melden. Bei 20 Rahmen je Sekunde waeren es sonst
     // 72000 Zeilen je Stunde, und die Werte stehen minutenlang still.
-    const bool neu = (m_messwertA != a) || (m_messwertB != b);
-    m_messwertA = a;
-    m_messwertB = b;
+    const bool neu = (m_gemeldetA != m_messwertA) || (m_gemeldetB != m_messwertB);
+    m_gemeldetA = m_messwertA;
+    m_gemeldetB = m_messwertB;
     if (neu) {
         qCInfo(lcSunSdr).noquote()
             << QStringLiteral("SunSdr: Messwerte vom Geraet: A=%1 B=%2 "
                               "(77-Byte-Rahmen, 20/s)")
-                   .arg(double(a), 0, 'f', 1).arg(double(b), 0, 'f', 1);
+                   .arg(double(m_messwertA), 0, 'f', 1)
+                   .arg(double(m_messwertB), 0, 'f', 1);
+        // Nur bei Aenderung weitergeben, aus demselben Grund wie oben:
+        // zwanzigmal je Sekunde dasselbe Signal waere Last ohne Inhalt.
+        emit deviceTemperaturesUpdated(double(m_messwertA),
+                                       double(m_messwertB));
     }
 }
 
