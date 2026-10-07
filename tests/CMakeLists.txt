@@ -2008,6 +2008,18 @@ longpath_add_test(tst_sendefehler_deutung)
 #   eine andere Antwort als "ich habe mich vertan".
 longpath_add_test(tst_rotor_peilung)
 
+# ── Ein Feld, das die Zeile beendet, ist ein Einbruch (2026-10-07) ──────────
+# tst_tci_feld: Longpaths eigene Antworten sind zeilenweise und durch Kommas
+#   geteilt (`spot_zeile:`, `log_qso_zeile:`, `log_dup_ok:`) -- und die Felder
+#   darin kommen NICHT von uns. `ruf`, `mode` und `quelle` stammen aus den
+#   Spotquellen, und eine davon ist ein Telnet-Strom von einem fremden Rechner
+#   im Internet; `call`, `band`, `mode` und die RST-Felder stammen aus der
+#   ADIF-Datei, in der auch Einfuhren aus anderen Programmen liegen.
+#   Ein Komma verschiebt alle folgenden Felder, ein Semikolon beendet die
+#   Zeile -- und was danach kommt, liest die Gegenseite als NEUEN BEFEHL.
+#   `derEinbruchGehtNichtMehr` fuehrt genau das vor: "OE5SOS;trx:0,true;".
+longpath_add_test(tst_tci_feld)
+
 # ── Den Rotor vom Telefon drehen -- und wann NICHT (2026-10-05) ─────────────
 # tst_tci_rotor: am anderen Ende steht ein Mast, der minutenlang ohne Zutun
 #   dreht, und niemand steht daneben. Darum dieselbe Strenge wie beim Senden:

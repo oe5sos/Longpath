@@ -31,6 +31,7 @@
 #include "core/LogbuchRueckschau.h"
 #include "core/SpotAuswahl.h"
 #include "core/RotorPeilung.h"
+#include "core/TciFeld.h"
 #include "core/RotorController.h"
 #include "models/SpotModel.h"
 #include "models/LogEntry.h"
@@ -3069,7 +3070,8 @@ void TciServer::onTextMessageReceived(const QString& rohMsg)
                                                ? QStringLiteral("(kein Band)")
                                                : e.band)
                               << "von" << session->peer;
-                antwort(QStringLiteral("log_qso_ok:%1;").arg(ruf));
+                antwort(QStringLiteral("log_qso_ok:%1;")
+                            .arg(TciFeld::sicher(ruf)));
                 return;
             }
         }
@@ -3149,8 +3151,15 @@ void TciServer::onTextMessageReceived(const QString& rohMsg)
                                     .arg(u.isValid()
                                              ? u.toString(QStringLiteral("hhmmss"))
                                              : QString())
-                                    .arg(e.call, e.band, e.mode,
-                                         e.rstSent, e.rstRcvd));
+                                    // Durch TciFeld::sicher: diese Felder
+                                    // kommen aus der ADIF-Datei, in der
+                                    // auch Einfuhren aus anderen
+                                    // Programmen liegen.
+                                    .arg(TciFeld::sicher(e.call),
+                                         TciFeld::sicher(e.band),
+                                         TciFeld::sicher(e.mode),
+                                         TciFeld::sicher(e.rstSent),
+                                         TciFeld::sicher(e.rstRcvd)));
                     }
                     antwort(QStringLiteral("log_last_ok:%1;").arg(l.size()));
                     return;
@@ -3168,7 +3177,7 @@ void TciServer::onTextMessageReceived(const QString& rohMsg)
                     LogbuchRueckschau::rueckschau(ruf, band, mode);
                 const QDateTime u = b.zuletzt.toUTC();
                 antwort(QStringLiteral("log_dup_ok:%1,%2,%3,%4,%5,%6,%7,%8;")
-                            .arg(ruf)
+                            .arg(TciFeld::sicher(ruf))
                             .arg(b.anzahl)
                             .arg(u.isValid()
                                      ? u.toString(QStringLiteral("yyyyMMdd"))
@@ -3176,7 +3185,9 @@ void TciServer::onTextMessageReceived(const QString& rohMsg)
                             .arg(u.isValid()
                                      ? u.toString(QStringLiteral("hhmmss"))
                                      : QString())
-                            .arg(b.letztesBand, b.letzterMode,
+                            // Band und Mode kommen aus der ADIF-Datei.
+                            .arg(TciFeld::sicher(b.letztesBand),
+                                 TciFeld::sicher(b.letzterMode),
                                  b.gleichesBand ? QStringLiteral("1")
                                                 : QStringLiteral("0"),
                                  b.gleicherMode ? QStringLiteral("1")
@@ -3250,10 +3261,18 @@ void TciServer::onTextMessageReceived(const QString& rohMsg)
 
                 for (int i = 0; i < z.size(); ++i) {
                     const SpotAuswahl::Zeile& x = z.at(i);
+                    // Die Felder durch TciFeld::sicher: `ruf`, `mode` und
+                    // `quelle` kommen aus den Spotquellen, und eine davon
+                    // ist ein Telnet-Strom von einem fremden Rechner im
+                    // Internet. Ein Semikolon darin wuerde die Zeile
+                    // vorzeitig beenden -- und was danach kommt, liest die
+                    // Gegenseite als neuen Befehl.
                     antwort(QStringLiteral("spot_zeile:%1,%2,%3,%4,%5,%6;")
                                 .arg(i)
                                 .arg(x.hz)
-                                .arg(x.ruf, x.mode, x.quelle)
+                                .arg(TciFeld::sicher(x.ruf),
+                                     TciFeld::sicher(x.mode),
+                                     TciFeld::sicher(x.quelle))
                                 .arg(x.alterSek));
                 }
                 antwort(QStringLiteral("spots_ok:%1;").arg(z.size()));
