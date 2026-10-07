@@ -122,8 +122,19 @@ private slots:
         }
         // QFont("Irgendeine Schrift" ...) -- nur benannte Familien, nicht
         // QFont(), QFont(base), QFont(f) usw.
+        // ZWEI Wege, eine Familie ohne Rueckfall zu nennen -- das Muster
+        // sah bis zum 2026-10-07 nur den ersten:
+        //
+        //   QFont("SF Mono", 10)          <- Konstruktor
+        //   f.setFamily("SF Mono")        <- Setzer, 11 Fundstellen
+        //
+        // Der Ausgangsfall vom 2026-10-06 (Titelleiste, Protokoll-
+        // betrachter) haette sich also als setFamily() an derselben
+        // Pruefung vorbeigeschrieben. setFamilies() mit der Kette ist
+        // ausdruecklich erlaubt.
         static const QRegularExpression ohneKette(
-            QStringLiteral("QFont\\s*\\(\\s*(QStringLiteral\\s*\\(\\s*)?\""));
+            QStringLiteral("QFont\\s*\\(\\s*(QStringLiteral\\s*\\(\\s*)?\""
+                           "|\\bsetFamily\\s*\\(\\s*(QStringLiteral\\s*\\(\\s*)?\""));
 
         QStringList funde;
         QDirIterator it(wurzel, QStringList{QStringLiteral("*.cpp"),

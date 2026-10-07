@@ -86,6 +86,15 @@ public:
 
     /// Die Namen der Abzeichen, von oben nach unten.
     QStringList badges() const;
+    /// Das Umhaengen melden, ohne das Menue zu oeffnen -- damit ein
+    /// Pruefstand den INHALT der Meldung sehen kann und nicht nur, dass
+    /// es das Signal gibt.
+    void meldeUmhaengenForTest()
+    {
+        emit placementToggleRequested(m_richtung == Qt::Horizontal
+                                          ? Qt::Vertical : Qt::Horizontal);
+    }
+
     /// Der Name des hervorgehobenen Abzeichens, oder leer.
     QString activeBadge() const;
     /// Ein Abzeichen anklicken. false, wenn es das nicht gibt.

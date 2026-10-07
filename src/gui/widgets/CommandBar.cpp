@@ -145,9 +145,53 @@ void CommandBar::addGroupWidget(const QString& caption, QWidget* w)
     box->setSpacing(5);
     box->addWidget(captionLabel(caption, this), 0, Qt::AlignLeft);
     box->addWidget(w, 0, Qt::AlignLeft);
-    // Vor der Dehnung einsetzen: buildGroups() haengt sie als letztes an,
-    // also ist sie das letzte Element.
-    m_row->insertLayout(m_row->count() - 1, box);
+    m_row->insertLayout(dehnungsPlatz(), box);
+    m_gruppenWidgets.insert(w, box);
+}
+
+int CommandBar::dehnungsPlatz() const
+{
+    // Die Stelle der Dehnung SUCHEN, nicht raten.
+    //
+    // Hier stand m_row->count() - 1 mit der Begruendung "buildGroups()
+    // haengt sie als letztes an". Das stimmt nur, solange niemand
+    // addTrailing() gerufen hat -- das haengt WEITER hinten an. Danach
+    // ist das letzte Element der Plus-Knopf, und die Gruppe landete
+    // zwischen Dehnung und Plus, also ganz rechts statt neben der Rate.
+    //
+    // Am 2026-10-07 beim Gegenlesen gefunden: schon der erste Wechsel von
+    // links zurueck in die Leiste setzte die Abzeichen an den rechten
+    // Rand, weil das Plus beim Aufbau laengst angehaengt war.
+    if (!m_row) { return 0; }
+    for (int i = 0; i < m_row->count(); ++i) {
+        if (m_row->itemAt(i) && m_row->itemAt(i)->spacerItem()) { return i; }
+    }
+    return m_row->count();
+}
+
+void CommandBar::removeGroupWidget(QWidget* w)
+{
+    // Das Gegenstueck zu addGroupWidget. Ohne das blieb die Versalzeile
+    // ("PROFIL") samt leerem Teil-Layout in der Leiste stehen, wenn das
+    // Bauteil wegging -- und beim naechsten Hinzufuegen kam eine zweite
+    // dazu. Nach drei Wechseln standen drei Ueberschriften nebeneinander
+    // (2026-10-07 offscreen nachgemessen).
+    if (!w || !m_row) { return; }
+    const auto it = m_gruppenWidgets.constFind(w);
+    if (it == m_gruppenWidgets.constEnd()) { return; }
+    QLayout* box = it.value();
+    m_gruppenWidgets.erase(it);
+    if (!box) { return; }
+    // Das Bauteil selbst gehoert dem Aufrufer -- nur aus der Anordnung
+    // nehmen, nicht loeschen. Alles andere darin (die Versalzeile) ist
+    // unser und geht mit.
+    box->removeWidget(w);
+    while (QLayoutItem* item = box->takeAt(0)) {
+        delete item->widget();
+        delete item;
+    }
+    m_row->removeItem(box);
+    delete box;
 }
 
 void CommandBar::addTrailing(QWidget* w)

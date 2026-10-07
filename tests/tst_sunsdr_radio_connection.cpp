@@ -825,6 +825,62 @@ private slots:
         QCOMPARE(conn.messwertBForTest(), 28.5f);
     }
 
+    // Der Weg nach OBEN, nicht nur der Entschluessler.
+    //
+    // Beim Gegenlesen am 2026-10-07 gefunden: die beiden vorhandenen
+    // Pruefungen sehen nur in den Treiber hinein (messwertAForTest).
+    // Nimmt man den emit heraus, bleiben beide gruen -- und der Betreiber
+    // saehe in der Statusseite weiter nichts. Also auch das Signal selbst
+    // pruefen, und zwar dass es NUR bei Aenderung kommt.
+    void dieMesswerteGehenAuchHinaus()
+    {
+        qunsetenv("LONGPATH_SUNSDR_BLOCKANTWORT");
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+
+        const QHostAddress radio(QStringLiteral("192.0.2.200"));
+        conn.feedControlDatagramForTest(
+            QByteArray::fromHex("03ff011a7c0000004119c0a810c8c0a810c851c300004928"),
+            radio);
+        QVERIFY(conn.isRxReadyForTest());
+
+        QSignalSpy spy(&conn, &RadioConnection::deviceTemperaturesUpdated);
+        QVERIFY(spy.isValid());
+
+        auto rahmenMit = [](float a, float b) {
+            QByteArray r = QByteArray::fromHex(
+                "03ff001f00002b0f38930000001d8300"
+                "00000000000000"
+                "00000000000000000000803f"
+                "00000010010020130500802406002013050080"
+                "380b0020130500804c1000201305008060150020130500");
+            std::memcpy(r.data() + 15, &a, sizeof(float));
+            std::memcpy(r.data() + 19, &b, sizeof(float));
+            return r;
+        };
+
+        conn.feedStreamDatagramFromSenderForTest(rahmenMit(43.0f, 33.0f), radio);
+        QTRY_COMPARE_WITH_TIMEOUT(spy.count(), 1, 500);
+        QCOMPARE(spy.at(0).at(0).toDouble(), 43.0);
+        QCOMPARE(spy.at(0).at(1).toDouble(), 33.0);
+
+        // Derselbe Wert noch dreimal: KEIN weiteres Signal. Bei 20
+        // Rahmen je Sekunde waere alles andere Last ohne Inhalt.
+        for (int i = 0; i < 3; ++i) {
+            conn.feedStreamDatagramFromSenderForTest(rahmenMit(43.0f, 33.0f), radio);
+        }
+        QTest::qWait(60);
+        QCOMPARE(spy.count(), 1);
+
+        // Ein neuer Wert meldet sich.
+        conn.feedStreamDatagramFromSenderForTest(rahmenMit(43.5f, 33.0f), radio);
+        QTRY_COMPARE_WITH_TIMEOUT(spy.count(), 2, 500);
+        QCOMPARE(spy.at(1).at(0).toDouble(), 43.5);
+    }
+
     // -200 ist kein Messwert, sondern "gerade keiner". Am 2026-10-07 in
     // beiden Laeufen aufgetaucht, einzeln je Wert. Wer das durchreicht,
     // zeigt minus zweihundert Grad an.

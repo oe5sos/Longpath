@@ -1358,6 +1358,23 @@ inline QFont capsFont(const QFont& base, int px = kFontCaption)
 }
 
 
+/// Die Rueckfallkette auf eine bestehende Schrift legen.
+///
+/// Fuer die Stellen, die sich die Schrift selbst zusammenbauen und nur
+/// die Familie setzen wollen. setFamily() nimmt EINE Familie: fehlt sie,
+/// sucht Qt sich klaglos irgendeine -- und die muss nicht dicktengleich
+/// sein. Am 2026-10-07 beim Gegenlesen an zehn Stellen gefunden, alle
+/// mit setFamily("Menlo"), also genau der Schwaeche, die monoFont() und
+/// monoFontPt() einen Tag vorher losgeworden waren.
+inline void setzeMonoFamilien(QFont& f)
+{
+    f.setFamilies({QStringLiteral("Menlo"),
+                   QStringLiteral("DejaVu Sans Mono"),
+                   QStringLiteral("monospace")});
+    f.setStyleHint(QFont::TypeWriter);
+    f.setFixedPitch(true);
+}
+
 /// Eine Zahl, die sich aendert: Monospace, damit Stellen untereinander
 /// stehen. HAUSSTIL.md §Die acht Regeln, Regel 2.
 ///

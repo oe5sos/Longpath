@@ -349,8 +349,20 @@ void SunSdrRadioConnection::connectToRadio(const RadioInfo& info)
         m_rateHz = (m_stromModus == SunSdr::StromModus::ZweiStroemeJe96
                     || m_stromModus == SunSdr::StromModus::EinStrom96)
                        ? 96000 : 48000;
-        if (m_stromModus == SunSdr::StromModus::ZweiStroemeJe48) {
+        // Die Empfaengerzahl MUSS zum Modus passen, sonst widersprechen
+        // sich die beiden: bei ein96 mit zwei gebundenen Scheiben zog
+        // RadioModel vor dem Verbinden setActiveReceiverCount(2) nach,
+        // der Modus blieb aber auf einem Strom stehen -- RX2 bekam
+        // stumm keine Daten (2026-10-07 beim Gegenlesen gefunden).
+        switch (m_stromModus) {
+        case SunSdr::StromModus::ZweiStroemeJe48:
+        case SunSdr::StromModus::ZweiStroemeJe96:
             m_aktiveEmpfaenger = qMax(2, m_aktiveEmpfaenger);
+            break;
+        case SunSdr::StromModus::EinStrom48:
+        case SunSdr::StromModus::EinStrom96:
+            m_aktiveEmpfaenger = 1;
+            break;
         }
     }
     m_sucheVersuch = 0;
@@ -1172,10 +1184,15 @@ void SunSdrRadioConnection::setActiveReceiverCount(int count)
 
 // Der Modus ergibt sich aus BEIDEM: Zahl der Empfaenger und Rate.
 //
-//   1 Empfaenger, 48 kHz  -> ein Strom
-//   2 Empfaenger, 48 kHz  -> zwei Stroeme, je 48
-//   1 oder 2,     96 kHz  -> zwei Stroeme, je 96 (einen Strom mit 96 kHz
-//                            gibt es auf dem Draht nicht)
+//   1 Empfaenger, 48 kHz  -> ein Strom,    48 kHz
+//   2 Empfaenger, 48 kHz  -> zwei Stroeme, je 48 kHz
+//   1 Empfaenger, 96 kHz  -> ein Strom,    96 kHz
+//   2 Empfaenger, 96 kHz  -> zwei Stroeme, je 96 kHz
+//
+// Hier stand bis zum 2026-10-07 "einen Strom mit 96 kHz gibt es auf dem
+// Draht nicht". Das war falsch und hat der Code darunter seit 073b8f7a
+// auch nicht mehr getan -- ExpertSDR2 benutzt genau diese vierte
+// Nutzlast, und das Geraet nimmt sie an. Beim Gegenlesen gefunden.
 //
 // Am 2026-10-04 aus einem Mitschnitt des Betreibers belegt, in dem
 // ExpertSDR2 mit RX UND RX2 lief: der zweite Kanal traegt echtes I/Q
@@ -2880,7 +2897,7 @@ SunSdr::StromModus SunSdrRadioConnection::stromModusAusUmgebung() const
         qCWarning(lcSunSdr).noquote()
             << QStringLiteral("SunSdr: LONGPATH_SUNSDR_STROMMODUS=\"%1\" "
                               "kenne ich nicht -- es bleibt bei einem Strom "
-                              "mit 48 kHz. Erlaubt: 48, 48_96, 96_144.")
+                              "mit 48 kHz. Erlaubt: 48, je48, je96, ein96.")
                    .arg(wahl);
     }
     return SunSdr::StromModus::EinStrom48;

@@ -2178,6 +2178,17 @@ void MainWindow::setzeProfilschiene(Qt::Orientation richtung)
     // Hintergrund), und ein Bauteil, das sich zur Laufzeit umkrempelt,
     // haette drei Zustaende statt zwei.
     if (m_profileRail) {
+        // Erst aus der Leiste nehmen, dann weg: setParent(nullptr) allein
+        // raeumt nur das Bauteil aus dem Teil-Layout, die Versalzeile
+        // "PROFIL" und das leere Layout blieben stehen -- und beim
+        // naechsten Hinzufuegen kam eine zweite dazu (2026-10-07 beim
+        // Gegenlesen gefunden, offscreen nachgemessen: drei Wechsel,
+        // drei Ueberschriften).
+        if (m_profileRail->richtung() == Qt::Horizontal && m_commandBar) {
+            m_commandBar->removeGroupWidget(m_profileRail);
+        } else if (m_profileRailRow) {
+            m_profileRailRow->removeWidget(m_profileRail);
+        }
         m_profileRail->setParent(nullptr);
         m_profileRail->deleteLater();
         m_profileRail = nullptr;
@@ -8676,7 +8687,18 @@ void MainWindow::populateDefaultMeter()
         // formatfuellend (Betreiber 2026-09-27, siehe die Profil-
         // Anwendung oben). Nach applyCurrent() ist das schon geschehen.
         if (!m_borderlessFullSize) { enterBorderlessFullSize(); }
-        wireProfileRail();
+        // KEIN wireProfileRail() mehr an dieser Stelle.
+        //
+        // Seit die Schiene umhaengbar ist (2026-10-06), verdrahtet
+        // setzeProfilschiene() sie selbst -- und das laeuft beim Aufbau
+        // des Fensters schon. Der Aufruf hier kam danach ein zweites Mal
+        // und legte JEDE Verbindung doppelt an: ein Klick auf das
+        // gestrichelte Plus oeffnete den Namensdialog zweimal, der zweite
+        // Durchgang meldete dann "'Neu' gibt es schon". Dasselbe bei
+        // Umbenennen, Duplizieren und Loeschen.
+        //
+        // Gefunden am 2026-10-07 beim Gegenlesen; eingebaut hatte ich es
+        // am 2026-10-06, ohne die alte Aufrufstelle zu entfernen.
 
         // Der Rotor/Log-Dock kommt erst mit der ERSTEN Verbindung nach
         // diesem Start auf den vom Profil gewuenschten Sichtbarkeitsstand
