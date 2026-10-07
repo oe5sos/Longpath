@@ -788,6 +788,43 @@ private slots:
                  SunSdr::kIqHeaderSize + SunSdr::kIqPayloadSize);
     }
 
+    // ── Der 77-Byte-Messwertrahmen (2026-10-07) ──────────────────────
+    //
+    // Bis heute fiel er an der Laengenpruefung heraus: alles unter 1210
+    // Byte galt als unbrauchbar. Darin stehen die EINZIGEN Messwerte,
+    // die die QRP im Empfang liefert -- deshalb zeigte ExpertSDR2 eine
+    // Temperatur und Longpath nichts.
+    void messwertrahmenWirdNichtMehrWeggeworfen()
+    {
+        qunsetenv("LONGPATH_SUNSDR_BLOCKANTWORT");
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+
+        const QHostAddress radio(QStringLiteral("192.0.2.200"));
+        conn.feedControlDatagramForTest(
+            QByteArray::fromHex("03ff011a7c0000004119c0a810c8c0a810c851c300004928"),
+            radio);
+        QVERIFY(conn.isRxReadyForTest());
+
+        // Genau der Rahmen vom Draht (expert-telemetrie.pcap, 2026-10-07),
+        // mit 38,0 an [15] und 28,5 an [19].
+        const QByteArray rahmen = QByteArray::fromHex(
+            "03ff001f00002b0f38930000001d8300"   // Kopf + Zaehler
+            "0018420000e441"                     // 38,0 bei [15], 28,5 bei [19]
+            "00000000000000000000803f"
+            "00000010010020130500802406002013050080"
+            "380b0020130500804c1000201305008060150020130500");
+        QCOMPARE(rahmen.size(), 77);
+
+        conn.feedStreamDatagramFromSenderForTest(rahmen, radio);
+        QTRY_COMPARE_WITH_TIMEOUT(conn.messwertRahmenForTest(), quint64(1), 500);
+        QCOMPARE(conn.messwertAForTest(), 38.0f);
+        QCOMPARE(conn.messwertBForTest(), 28.5f);
+    }
+
     // Seit der Messung am 2026-10-05 ist die Kopfantwort die VORGABE: an
     // den Wiederholungen aendert sie nichts (207/s gegen 214/s, also
     // nichts), sie halbiert aber den Rueckweg. Diese Pruefung haelt die

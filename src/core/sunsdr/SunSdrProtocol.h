@@ -315,6 +315,10 @@ struct IqHeader {
 // Rueckgabewerts -- der ist immer die 10 Byte des Kopfes. Standard ist die
 // volle Nutzlast; 0 baut den BLOSSEN KOPF, den ExpertSDR2 am 2026-10-05 im
 // Mitschnitt auf jeden zweiten Block schickt (03 ff fe ff 00 00 .. .. 01 00).
+/// Der Messwertrahmen des Geraets: 77 Byte, Opcode 0x00, byte3 = 0x1f,
+/// 20 Stueck je Sekunde (2026-10-07 im Mitschnitt gemessen).
+inline constexpr int kMesswertPaketSize = 77;
+
 QByteArray buildIqHeader(const Profile& profile, quint8 opcode, quint16 seq,
                          quint8 byte8, quint8 byte9,
                          int payloadLen = kIqPayloadSize);

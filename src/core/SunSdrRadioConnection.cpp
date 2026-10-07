@@ -1430,7 +1430,41 @@ void SunSdrRadioConnection::processStreamDatagram(const QByteArray& data,
     if (!m_rxReady.load(std::memory_order_acquire)) {
         return;  // discarded, not buffered — see header rationale
     }
-    if (!m_profile || data.size() < SunSdr::kIqPacketSize) {
+    if (!m_profile) { return; }
+
+    // ── Der 77-Byte-Rahmen: die einzigen Messwerte, die die QRP liefert ──
+    //
+    // Am 2026-10-07 aus einem Mitschnitt mit ExpertSDR2 herausgelesen.
+    // Das Geraet schickt waehrend des Stroms 20 Rahmen je Sekunde mit
+    // 77 Byte Nutzlast, Opcode 0x00 und byte3 = 0x1f. Longpath hat sie
+    // bis heute an der Laengenpruefung unten weggeworfen -- deshalb
+    // zeigte ExpertSDR2 eine Temperatur und wir nichts.
+    //
+    // Darin zwei Gleitkommazahlen (little endian), die sich aendern:
+    //
+    //     [15..18]   38,0 .. 38,5
+    //     [19..22]   28,0 .. 29,0
+    //
+    // Beide in halben Schritten, ueber 78 s gemessen -- das Muster eines
+    // Temperaturfuehlers mit 0,5 Grad Aufloesung. ALLE anderen Felder
+    // des Rahmens stehen still.
+    //
+    // Was NICHT drinsteht: Spannung und Strom. ExpertSDR2 zeigt beides
+    // an, im ganzen Mitschnitt steht aber nirgends ein Wert um 13 V oder
+    // 0,3 A -- auch nicht in 0x0c (zwoelf Paare 12,5 / -2,4, also
+    // Eichwerte) und nicht in 0x12. Woher ExpertSDR2 sie nimmt, ist
+    // offen; siehe docs/architecture/2026-10-02-sunsdr-verbindungsablauf.md.
+    //
+    // Welcher der beiden Werte WAS ist, ist ebenfalls nicht belegt --
+    // dafuer muss der Betreiber sie neben ExpertSDR2 legen. Darum heissen
+    // sie hier Wert A und Wert B und nicht "PA-Temperatur".
+    if (data.size() == SunSdr::kMesswertPaketSize
+        && quint8(data.at(2)) == 0x00 && quint8(data.at(3)) == 0x1f) {
+        verarbeiteMesswertrahmen(data);
+        return;
+    }
+
+    if (data.size() < SunSdr::kIqPacketSize) {
         return;
     }
 
@@ -2074,6 +2108,28 @@ void SunSdrRadioConnection::replyToBlock(quint16 seq)
     if (nurKopf) { ++m_bareBlockRepliesSent; }
     m_lastBlockReplyBytes = int(pkt.size());
     m_lastBlockReplySeq = seq;
+}
+
+void SunSdrRadioConnection::verarbeiteMesswertrahmen(const QByteArray& data)
+{
+    ++m_messwertRahmen;
+    float a = 0.0f;
+    float b = 0.0f;
+    std::memcpy(&a, data.constData() + 15, sizeof(float));
+    std::memcpy(&b, data.constData() + 19, sizeof(float));
+    if (!std::isfinite(a) || !std::isfinite(b)) { return; }
+
+    // Nur bei AENDERUNG melden. Bei 20 Rahmen je Sekunde waeren es sonst
+    // 72000 Zeilen je Stunde, und die Werte stehen minutenlang still.
+    const bool neu = (m_messwertA != a) || (m_messwertB != b);
+    m_messwertA = a;
+    m_messwertB = b;
+    if (neu) {
+        qCInfo(lcSunSdr).noquote()
+            << QStringLiteral("SunSdr: Messwerte vom Geraet: A=%1 B=%2 "
+                              "(77-Byte-Rahmen, 20/s)")
+                   .arg(double(a), 0, 'f', 1).arg(double(b), 0, 'f', 1);
+    }
 }
 
 bool SunSdrRadioConnection::kopfAntwortEnabled()

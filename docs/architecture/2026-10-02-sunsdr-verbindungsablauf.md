@@ -1371,3 +1371,68 @@ drin" nützt ein einzelner Abzug nichts.
 Der Lauf über 280 s lief dank `QTEST_FUNCTION_TIMEOUT` diesmal
 vollständig durch, mit Schlussbericht: 335 574 Blöcke, 1198/s,
 Verlust 0,00–0,04 %.
+
+---
+
+# Gefunden: die QRP liefert doch Messwerte — im 77-Byte-Rahmen (2026-10-07)
+
+Der Mitschnitt, der gefehlt hat, liegt vor (`expert-telemetrie.pcap`,
+78 s, 76 082 Pakete). Darin:
+
+| Richtung | Port | Länge | Anzahl |
+| --- | --- | ---: | ---: |
+| Gerät → PC | 50002 | 1210 | 37 236 |
+| PC → Gerät | 50002 | 10 | 18 622 |
+| PC → Gerät | 50002 | 1210 | 18 614 |
+| **Gerät → PC** | **50002** | **77** | **1 552** |
+
+**1552 Rahmen à 77 Byte, 20 je Sekunde, 23 verschiedene Inhalte.** Das
+ist die lebende Information, die wir gesucht haben. Longpath hat sie
+bisher an der Längenprüfung weggeworfen — alles unter 1210 Byte galt als
+unbrauchbar.
+
+## Aufbau
+
+Opcode `0x00`, `byte3 = 0x1f`, Längenfeld 0. Alle Felder stehen still
+bis auf einen Zähler und **zwei Gleitkommazahlen**:
+
+    [ 6..9]   Zähler
+    [15..18]  float   38,0 … 38,5
+    [19..22]  float   28,0 … 29,0
+
+Beide in **halben Schritten** — das Muster eines Fühlers mit 0,5 Grad
+Auflösung. Alle 74 Versatzpositionen wurden abgesucht; es gibt keine
+weiteren veränderlichen Zahlen in einem plausiblen Bereich.
+
+## Was NICHT drinsteht: Spannung und Strom
+
+ExpertSDR2 zeigt `U 13,1 V` und `I 0,3 A`. Im **ganzen Mitschnitt** steht
+nirgends ein Wert in dieser Größenordnung:
+
+- nicht im 77-Byte-Rahmen (alle Versätze abgesucht),
+- nicht in `0x0c` — die 39 Doubles sind zwölf Paare (12,5 / −2,4), also
+  Eichwerte, wie seit dem 2026-10-03 vermutet und am 2026-10-07 durch
+  wiederholtes Abfragen über 280 s bestätigt,
+- nicht in `0x12` (24 Byte, einmalig beim Verbinden),
+- und auf dem Steuerweg schickt das Gerät **nichts von sich aus** — alle
+  Antworten dort sind Quittungen auf unsere Rahmen.
+
+**Woher ExpertSDR2 Spannung und Strom nimmt, bleibt damit offen.** Das
+ist ein ehrliches „offen", kein „gibt es nicht": der Mitschnitt zeigt,
+dass es im Empfangsbetrieb über diesen Weg nicht kommt.
+
+## Was gebaut ist
+
+`processStreamDatagram()` erkennt den Rahmen und liest die beiden Werte;
+gemeldet wird nur bei **Änderung** (bei 20 Rahmen je Sekunde wären es
+sonst 72 000 Logzeilen je Stunde, und die Werte stehen minutenlang
+still).
+
+Sie heißen bewusst **Wert A** und **Wert B**, nicht „PA-Temperatur":
+dass es Temperaturen sind, ist aus dem Muster geschlossen, nicht
+belegt, und welcher welcher ist, schon gar nicht. Das entscheidet der
+Betreiber, indem er die Zahlen neben die Anzeige von ExpertSDR2 legt.
+Erst danach gehören sie beschriftet in die Oberfläche.
+
+Gegenprobe: die Prüfung `messwertrahmenWirdNichtMehrWeggeworfen` wird
+gegen die zurückgebaute Fassung rot und mit der Behebung grün.

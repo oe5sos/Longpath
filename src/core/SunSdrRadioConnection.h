@@ -205,6 +205,9 @@ public:
     // oder 1 (RX2) -- der Rahmen, der die QRP auf echtes I/Q schaltet.
     static QByteArray ddcFrequencyFrame(int subReceiver, quint64 frequencyHz);
     quint16 lastBlockReplySeqForTest() const { return m_lastBlockReplySeq; }
+    float   messwertAForTest() const { return m_messwertA; }
+    float   messwertBForTest() const { return m_messwertB; }
+    quint64 messwertRahmenForTest() const { return m_messwertRahmen; }
     // Wie viele der Antworten blosse Koepfe waren (10 Byte statt 1210) und
     // wie gross die letzte Antwort war -- die Kopfantwort laesst sich nur
     // an der GROESSE pruefen, nicht an der Zahl.
@@ -746,6 +749,13 @@ private:
     // Rueckweg: 30265 blosse Koepfe in 60 s sind rund 36 MB, also knapp
     // 5 Mbit/s weniger. Deshalb ist die Vorgabe seitdem AN;
     // LONGPATH_SUNSDR_KOPFANTWORT=0 schaltet aus.
+    /// Den 77-Byte-Messwertrahmen auswerten (Begruendung an der
+    /// Aufrufstelle in processStreamDatagram).
+    void verarbeiteMesswertrahmen(const QByteArray& data);
+    float   m_messwertA{0.0f};
+    float   m_messwertB{0.0f};
+    quint64 m_messwertRahmen{0};
+
     bool kopfAntwortEnabled();
     bool m_kopfAntwortChecked{false};
     bool m_kopfAntwortOn{false};
