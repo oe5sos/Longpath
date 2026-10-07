@@ -758,6 +758,9 @@ private:
     float   m_gemeldetB{0.0f};
     quint64 m_messwertRahmen{0};
 
+    /// Der Name einer Stromart fuers Protokoll -- an EINER Stelle.
+    static QString stromModusName(SunSdr::StromModus m);
+
     bool kopfAntwortEnabled();
     bool m_kopfAntwortChecked{false};
     bool m_kopfAntwortOn{false};

@@ -210,7 +210,11 @@ private slots:
 
         // Genau der Stand nach connectToRadio: Geraet und Kanal auf 96 kHz.
         conn.setSampleRate(96000);
-        QCOMPARE(conn.stromModusForTest(), 2);   // ZweiStroemeJe96
+        // Mit EINEM Empfaenger ist das seit dem 2026-10-07 EinStrom96
+        // (= 3), nicht mehr ZweiStroemeJe96: die vierte Nutzlast gibt es,
+        // und ein zweiter Strom ohne Empfaenger ist halbe Datenmenge
+        // umsonst. Siehe 073b8f7a.
+        QCOMPARE(conn.stromModusForTest(), 3);   // EinStrom96
         model.setConnectionRateForTest(96000, 1);
 
         WdspEngine* engine = model.wdspEngine();
@@ -277,7 +281,7 @@ private slots:
         model.applyRestoredSampleRate(slice);
         QCoreApplication::processEvents();
 
-        QCOMPARE(conn.stromModusForTest(), 2);   // unveraendert
+        QCOMPARE(conn.stromModusForTest(), 3);   // unveraendert (EinStrom96)
         QCOMPARE(rejected.count(), 0);
     }
 };

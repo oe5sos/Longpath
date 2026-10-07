@@ -539,3 +539,60 @@ und dieser Ort stand nirgends dabei.
 Alles andere im Empfang steht. Die Zuordnung der beiden Werte ist der
 nächste Schritt und braucht entweder den Betreiber (Zahl neben
 ExpertSDR2 legen) oder eine Messung, in der sich die Last ändert.
+
+---
+
+# Abnahme am 2026-10-07: alles nachgefahren
+
+Auf Ansage des Betreibers („teste bitte alles, was wir bis dato erledigt
+haben, genauest") die ganze Arbeit einmal gegen die Wirklichkeit
+gestellt — erst alle Prüfstände, dann jede Behauptung am echten Gerät.
+
+## Prüfstände: 943 Stück
+
+**942 grün, einer rot** — `tst_sunsdr_board_caps`. Ursache: zwei
+Erwartungen hielten fest, dass 96 kHz immer zwei Ströme bedeutet, was
+seit `073b8f7a` nicht mehr gilt. Dieselbe Sache hatte ich einen Commit
+vorher schon an drei Stellen gerichtet und dabei **nur die
+Verbindungsreihe gefahren**; diese beiden lagen in einer anderen Datei.
+
+Das ist der Wert des vollständigen Laufs: eine Änderung an einer
+Annahme schlägt an Stellen durch, die man nicht im Kopf hat.
+
+## Am Gerät, je 90 s, nur Empfang
+
+| Betriebsart | Kanäle | Rückweg | davon bloße Köpfe | Verlust |
+| --- | --- | --- | ---: | ---: |
+| 1 Strom, 48 kHz | K0 279/s | 248/s | **50 %** | 0,00 % |
+| 2 Ströme, 48 kHz | K0 278, K1 278/s | 496/s | **50 %** | 0,00 % |
+| 1 Strom, 96 kHz | K0 626/s | 496/s | **50 %** | 0,04 % |
+| 2 Ströme, 96 kHz | K0 716, K1 729/s | 984/s | **50 %** | 0,06 % |
+
+Alle vier Stromarten tun, was sie sollen; die Kopfantwort halbiert den
+Rückweg in jeder von ihnen; der Verlust bleibt weit unter 0,1 %.
+
+Die Blockraten liegen über den nominellen 240/480/960 — das ist die
+bekannte Wiederholungsquote des Geräts (1,06 bis 1,45 Pakete je Nummer),
+nicht ein Fehler der Einstellung. Die Folgenummern selbst sind sauber:
+„4808 Nummern in 5,0 s (960/s), 0 Spätlinge".
+
+Dazu bestätigt: Pegelabgleich **40,0 dB**, Abmelde-Rahmen **nach Versuch
+1 quittiert**, Messwerte in **allen vier** Betriebsarten.
+
+## Ein Fehler, den erst die Abnahme gezeigt hat
+
+Der Lauf mit **einem** Strom bei 96 kHz meldete im Protokoll „zwei
+Ströme, je 96 kHz". Der Rahmen auf dem Draht war richtig (nur Kanal 0
+kam), **die Meldung war falsch**: zwei Kaskaden benannten die Stromarten,
+beide mit einem Sonst-Zweig „zwei Ströme, je 96 kHz" — die vierte Art
+fiel genau dort hinein.
+
+Jetzt gibt es `stromModusName()` an **einer** Stelle, mit `switch` statt
+Kaskade, damit der Übersetzer beim nächsten Mal warnt. Beim Richten kam
+ein zweiter Fund dazu: die Meldung hatte ein leeres `%1`, und die
+Stromart hing als zweiter Wert hinten dran.
+
+**Kein Prüfstand hätte das gefunden** — eine falsche Protokollzeile ist
+kein falsches Verhalten. Nur das Lesen des Protokolls aus einem echten
+Lauf zeigt sie. Am Gerät gegengeprüft: jetzt steht dort „ein Strom,
+96 kHz (aus der Umgebung) -- Rate 96000 Hz, 1 Empfaenger".

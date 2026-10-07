@@ -1181,6 +1181,25 @@ void SunSdrRadioConnection::setActiveReceiverCount(int count)
 // ExpertSDR2 mit RX UND RX2 lief: der zweite Kanal traegt echtes I/Q
 // (-127,9 dBFS, 31,5 % Q ungleich null) -- er ist nicht stumm, Longpath
 // hat ihn nur weggeworfen.
+QString SunSdrRadioConnection::stromModusName(SunSdr::StromModus m)
+{
+    // EINE Stelle, an der die Stromarten Namen bekommen. Vorher standen
+    // zwei Kaskaden im Code, beide mit einem Sonst-Zweig "zwei Stroeme,
+    // je 96 kHz" -- als am 2026-10-07 die vierte Art dazukam, fiel sie in
+    // genau diesen Zweig und wurde im Protokoll falsch benannt. Die
+    // Abnahme hat es gefunden: ein Lauf mit EINEM Strom bei 96 kHz
+    // meldete "zwei Stroeme".
+    //
+    // Mit switch statt Kaskade warnt der Uebersetzer beim naechsten Mal.
+    switch (m) {
+    case SunSdr::StromModus::EinStrom48:      return QStringLiteral("ein Strom, 48 kHz");
+    case SunSdr::StromModus::ZweiStroemeJe48: return QStringLiteral("zwei Stroeme, je 48 kHz");
+    case SunSdr::StromModus::ZweiStroemeJe96: return QStringLiteral("zwei Stroeme, je 96 kHz");
+    case SunSdr::StromModus::EinStrom96:      return QStringLiteral("ein Strom, 96 kHz");
+    }
+    return QStringLiteral("unbekannt");
+}
+
 void SunSdrRadioConnection::stromModusNachziehen()
 {
     // Beide Groessen entscheiden getrennt: die Rate die Stufe, die
@@ -1197,12 +1216,9 @@ void SunSdrRadioConnection::stromModusNachziehen()
                     : SunSdr::StromModus::EinStrom48);
     if (gewuenscht == m_stromModus) { return; }
     m_stromModus = gewuenscht;
-    qCInfo(lcSunSdr) << "SunSdr: Stromstart-Rahmen ->"
-                     << (gewuenscht == SunSdr::StromModus::EinStrom48
-                             ? "ein Strom, 48 kHz"
-                             : gewuenscht == SunSdr::StromModus::ZweiStroemeJe48
-                                   ? "zwei Stroeme, je 48 kHz"
-                                   : "zwei Stroeme, je 96 kHz");
+    qCInfo(lcSunSdr).noquote()
+        << QStringLiteral("SunSdr: Stromstart-Rahmen -> %1")
+               .arg(stromModusName(gewuenscht));
     if (m_running && !m_awaitingBeacon && m_profile) {
         sendeSteuerrahmen(SunSdr::buildStromStartFrame(*m_profile, m_stromModus),
                           "Stromstart 0x01 (Modus umgestellt)");
@@ -1336,18 +1352,21 @@ void SunSdrRadioConnection::processControlDatagram(const QByteArray& data,
                 qEnvironmentVariableIsSet("LONGPATH_SUNSDR_STROMMODUS");
             qCWarning(lcSunSdr).noquote()
                 << QStringLiteral(
-                       "SunSdr: Strommodus %2 -- %1 (Rate %3 Hz, %4 "
-                       "Empfaenger). Der zweite Kanal hat oben nur dann "
+                       // %1 steht VORNE und nennt die Stromart. Vorher
+                       // stand hier ein leeres %1 und die Art wurde als
+                       // zweiter Wert hinter die Meldung gehaengt -- im
+                       // Protokoll las sich das als zwei Zeichenketten,
+                       // und beim Umbau fiel sie ganz heraus. Die Abnahme
+                       // am 2026-10-07 hat beides gefunden.
+                       "SunSdr: Strommodus %1 (%2) -- Rate %3 Hz, %4 "
+                       "Empfaenger. Der zweite Kanal hat oben nur dann "
                        "einen Empfaenger, wenn sich eine zweite Scheibe "
                        "an ihn bindet.")
-                       .arg(QString(),
+                       .arg(stromModusName(modus),
                             ausUmgebung ? QStringLiteral("aus der Umgebung")
                                         : QStringLiteral("aus der Bedienung"))
                        .arg(m_rateHz)
-                       .arg(m_aktiveEmpfaenger)
-                       .arg(modus == SunSdr::StromModus::ZweiStroemeJe48
-                                ? QStringLiteral("zwei Stroeme, je 48 kHz")
-                                : QStringLiteral("zwei Stroeme, je 96 kHz"));
+                       .arg(m_aktiveEmpfaenger);
         }
         sendeSteuerrahmen(stateSync, "Stromstart 0x01");
 
