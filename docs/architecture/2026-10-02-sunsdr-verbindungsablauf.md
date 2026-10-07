@@ -1522,3 +1522,21 @@ das Gerät meldet sie getrennt.
 
 Gefunden wurde das nur, weil die Messung lang genug lief: in den ersten
 Läufen von 45–60 s kam kein einziger −200-Rahmen vor.
+
+## Belegt bis ins Modell (2026-10-07)
+
+Nicht nur verdrahtet, sondern am laufenden Programm nachgesehen —
+Longpath offscreen, mit der QRP verbunden:
+
+    {"connectionState":"Connected", "model":"SunSDR2 QRP",
+     "paTemperatureCelsius":43}
+
+Damit ist der ganze Weg belegt: 77-Byte-Rahmen vom Draht → Treiber →
+`deviceTemperaturesUpdated` → `RadioModel` → `RadioStatus`, und das ist
+das Modell, an das die Statusseite gebunden ist.
+
+Die Automationsbrücke gibt den Wert dafür jetzt mit aus. Ohne das ließe
+sich der Weg nicht ohne Menschen prüfen: die Statusseite entsteht erst,
+wenn jemand den Diagnosedialog öffnet, und bis dahin ist der Wert
+unsichtbar — man sähe nur, dass das Protokoll ihn nennt, nicht, dass er
+ankommt.

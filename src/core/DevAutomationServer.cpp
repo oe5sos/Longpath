@@ -591,6 +591,12 @@ QJsonObject DevAutomationServer::doGet(const QString& model, const QString& sele
         if (SliceModel* active = radio->activeSlice()) {
             o[QStringLiteral("activeSliceIndex")] = active->sliceIndex();
         }
+        // Die Temperatur, die das Geraet meldet. Ohne sie laesst sich der
+        // Weg vom Draht bis in die Oberflaeche nicht ohne Mensch pruefen:
+        // die Statusseite entsteht erst, wenn jemand den Diagnosedialog
+        // oeffnet, und bis dahin ist der Wert unsichtbar (2026-10-07).
+        o[QStringLiteral("paTemperatureCelsius")] =
+            radio->radioStatus().paTemperatureCelsius();
         return o;
     }
 
