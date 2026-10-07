@@ -356,11 +356,23 @@ private slots:
             }
             return -1;
         };
-        auto platzDerDehnung = [&leiste]() {
+        // ── Wogegen diese Pruefung wirklich schuetzt ────────────────
+        //
+        // Hier stand "vor der ERSTEN Dehnung". Das war richtig, solange
+        // genau eine Dehnung ganz hinten stand. Seit verteileGruppen()
+        // (2026-10-07) steht zwischen jedem Gruppenpaar eine -- die
+        // erste ist jetzt die zwischen BAND und MODE, und "davor" hiesse
+        // "ganz links".
+        //
+        // Der Fehler, den die Pruefung gefangen hat, war nie "hinter der
+        // Dehnung", sondern "hinter dem Plus", also am rechten Rand
+        // statt neben der Rate. Genau das steht jetzt da -- und es bleibt
+        // richtig, wie viele Dehnungen auch dazwischenstehen.
+        auto platzDesPlus = [&leiste, plus]() {
             auto* row = leiste.findChild<QHBoxLayout*>();
             if (!row) { return -1; }
             for (int i = 0; i < row->count(); ++i) {
-                if (row->itemAt(i) && row->itemAt(i)->spacerItem()) { return i; }
+                if (row->itemAt(i) && row->itemAt(i)->widget() == plus) { return i; }
             }
             return -1;
         };
@@ -368,10 +380,10 @@ private slots:
         leiste.addGroupWidget(QStringLiteral("Profil"), bauteil);
         QCOMPARE(zaehleVersalzeilen(), 1);
         const int platz = platzVon(bauteil);
-        const int dehnung = platzDerDehnung();
-        QVERIFY2(platz >= 0 && dehnung >= 0, "Gruppe oder Dehnung nicht gefunden");
-        QVERIFY2(platz < dehnung,
-                 "die Gruppe muss VOR der Dehnung sitzen, sonst steht sie "
+        const int plusPlatz = platzDesPlus();
+        QVERIFY2(platz >= 0 && plusPlatz >= 0, "Gruppe oder Plus nicht gefunden");
+        QVERIFY2(platz < plusPlatz,
+                 "die Gruppe muss VOR dem Plus sitzen, sonst steht sie "
                  "am rechten Rand statt neben der Rate");
 
         // Dreimal hin und her: es darf genau eine Versalzeile bleiben.
@@ -380,7 +392,7 @@ private slots:
             QCOMPARE(zaehleVersalzeilen(), 0);
             leiste.addGroupWidget(QStringLiteral("Profil"), bauteil);
             QCOMPARE(zaehleVersalzeilen(), 1);
-            QVERIFY(platzVon(bauteil) < platzDerDehnung());
+            QVERIFY(platzVon(bauteil) < platzDesPlus());
         }
     }
 

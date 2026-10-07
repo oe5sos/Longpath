@@ -173,11 +173,19 @@ public:
     // „gleich" aussehen sollen und ihre Farben getrennt fuehren, sehen
     // nach dem naechsten Feinschliff wieder verschieden aus.
     static QString pillStyle();
+    /// Dieselbe Pille, nur leise: fuer eine Gruppe, die ohne Funkgeraet
+    /// nichts anzuzeigen hat. Gleiche Masse wie pillStyle(), damit beim
+    /// Verbinden nichts springt -- nur Fuellung, Rand und Schrift
+    /// treten zurueck.
+    static QString pillStyleGedaempft();
 
     static constexpr int kPillHeight = 27;
     static constexpr int kPillRadius = 6;
     /// Sichtbare Einträge je Gruppe, bevor das „…" übernimmt.
     static constexpr int kVisiblePerGroup = 3;
+
+protected:
+    void paintEvent(QPaintEvent* e) override;
 
 private:
     /// Wo die Dehnung steht -- gesucht, nicht geraten (siehe .cpp).
@@ -190,7 +198,36 @@ private:
         QHBoxLayout* row{nullptr};   // wo die Pillen hineinwandern
         QVector<QPushButton*> pills;
         QPushButton* overflow{nullptr};
+        /// Die Versalzeile ueber den Pillen. Gemerkt, damit eine Gruppe
+        /// ohne Inhalt samt ihrer Ueberschrift zuruecktreten kann --
+        /// eine helle Ueberschrift ueber gedaempften Pillen saehe aus
+        /// wie ein halb geladener Zustand.
+        QLabel* caption{nullptr};
     };
+
+    /// ── Die Leiste als Reihe lesbar machen (2026-10-07) ────────────
+    ///
+    /// Betreiber: "suche das, welches am besten harmonisch dazu passt".
+    /// Drei Dinge zusammen, alle drei folgen dem, was im Fenster schon
+    /// gilt:
+    ///
+    ///   Trennstriche  -- jedes andere Bauteil ist eingefasst
+    ///                    (BANDWIDTH FILTER, PANADAPTER, S-METER, TX).
+    ///                    Die Leiste war die einzige Stelle ohne Grenze.
+    ///   Verteilen     -- rechts standen 168 Pixel tot. Dafuer gibt es
+    ///                    im Fenster kein Gegenstueck.
+    ///   Zuruecknehmen -- die "—" bei POWER/SWR/SIGNAL AVERAGE stehen
+    ///                    gedaempft da. FILTER und RATE schrien dagegen
+    ///                    in voller Helligkeit "hier ist nichts".
+    void verteileGruppen();
+    void zieheLeereGruppenZurueck();
+    /// Hat die Gruppe ohne Funkgeraet nichts zu zeigen? Nicht statisch,
+    /// weil RATE seinen Wert in einem eigenen Schild traegt und nicht
+    /// in Pillen.
+    bool gruppeIstLeer(const Group& g) const;
+    /// Die Gruppenkaesten in der Reihenfolge der Reihe. Alles andere
+    /// darin (Dehnungen, das angehaengte Plus) faellt heraus.
+    QVector<QLayout*> gruppenKaesten() const;
 
     Group* group(const QString& name);
     const Group* group(const QString& name) const;

@@ -26,6 +26,8 @@
 #include "models/SliceModel.h"
 
 #include <QHBoxLayout>
+#include <QPainter>
+#include <QStyleOption>
 #include <QInputDialog>
 #include <QLabel>
 #include <QMenu>
@@ -131,7 +133,34 @@ CommandBar::CommandBar(QWidget* parent) : QWidget(parent)
     buildStepGroup(row);
     buildNrGroup(row);
     buildRateGroup(row);
-    row->addStretch(1);
+    verteileGruppen();
+    zieheLeereGruppenZurueck();
+}
+
+// ── Die leise Pille (2026-10-07) ─────────────────────────────────────
+//
+// Gleiche Masse wie pillStyle(), damit beim Verbinden nichts springt:
+// derselbe Innenabstand, dieselbe min-/max-Hoehe. Nur Fuellung, Rand
+// und Schrift treten zurueck. Kein Verlauf -- "Glas & Tiefe" heisst
+// erhaben, und etwas, das gerade nichts kann, soll nicht erhaben sein.
+QString CommandBar::pillStyleGedaempft()
+{
+    return QStringLiteral(
+        "QPushButton {"
+        "  background: %1;"
+        "  border: 1px solid %2;"
+        "  color: %3; font-size: 11px; font-weight: 600;"
+        "  padding: 0 11px; min-height: %4px; max-height: %4px;"
+        "  border-radius: %5px;"
+        "}"
+        "QPushButton:hover { color: %6; border: 1px solid %7; }")
+        .arg(QString::fromLatin1(Style::kPanelBg),
+             QString::fromLatin1(Style::kBorderSubtle),
+             QString::fromLatin1(Style::kTextScale))
+        .arg(CommandBar::kPillHeight)
+        .arg(CommandBar::kPillRadius)
+        .arg(QString::fromLatin1(Style::kTextSecondary),
+             QString::fromLatin1(Style::kBorder));
 }
 
 void CommandBar::addGroupWidget(const QString& caption, QWidget* w)
@@ -147,6 +176,7 @@ void CommandBar::addGroupWidget(const QString& caption, QWidget* w)
     box->addWidget(w, 0, Qt::AlignLeft);
     m_row->insertLayout(dehnungsPlatz(), box);
     m_gruppenWidgets.insert(w, box);
+    verteileGruppen();
 }
 
 int CommandBar::dehnungsPlatz() const
@@ -162,11 +192,68 @@ int CommandBar::dehnungsPlatz() const
     // Am 2026-10-07 beim Gegenlesen gefunden: schon der erste Wechsel von
     // links zurueck in die Leiste setzte die Abzeichen an den rechten
     // Rand, weil das Plus beim Aufbau laengst angehaengt war.
+    // 2026-10-07, zweite Fassung: seit verteileGruppen() steht zwischen
+    // JEDEM Gruppenpaar eine Dehnung. "Die erste Dehnung" waere jetzt
+    // die zwischen BAND und MODE -- die Profile landeten gleich hinter
+    // dem Band. Also nicht mehr nach der Dehnung suchen, sondern nach
+    // der letzten Gruppe: dort gehoert eine neue Gruppe hin, und das
+    // bleibt richtig, wie viele Dehnungen auch dazwischenstehen.
     if (!m_row) { return 0; }
-    for (int i = 0; i < m_row->count(); ++i) {
-        if (m_row->itemAt(i) && m_row->itemAt(i)->spacerItem()) { return i; }
+    for (int i = m_row->count() - 1; i >= 0; --i) {
+        if (m_row->itemAt(i) && m_row->itemAt(i)->layout()) { return i + 1; }
     }
-    return m_row->count();
+    // Keine Gruppe da: ganz nach vorne. NICHT ans Ende -- dort haengt
+    // schon das Plus, und dahinter waere wieder der rechte Rand.
+    return 0;
+}
+
+QVector<QLayout*> CommandBar::gruppenKaesten() const
+{
+    QVector<QLayout*> k;
+    if (!m_row) { return k; }
+    for (int i = 0; i < m_row->count(); ++i) {
+        QLayoutItem* it = m_row->itemAt(i);
+        if (it && it->layout()) { k.append(it->layout()); }
+    }
+    return k;
+}
+
+// ── Die Gruppen ueber die Breite verteilen ───────────────────────────
+//
+// Vorher: eine einzige Dehnung ganz hinten. Folge: alle Gruppen klebten
+// links zusammen, und rechts standen 168 Pixel tot, in denen allein das
+// Plus schwebte.
+//
+// Jetzt eine Dehnung hinter jeder Gruppe, die nicht das letzte Element
+// der Reihe ist. Damit verteilt Qt den uebrigen Platz gleichmaessig --
+// und wenn das Fenster schmal wird, schrumpfen alle Dehnungen auf null,
+// und es bleibt beim Grundabstand von 22. Eine gerechnete Weite haette
+// bei schmalem Fenster ueberlaufen; eine Dehnung kann das nicht.
+//
+// Die letzte Gruppe bekommt bewusst eine Dehnung, SOLANGE hinter ihr
+// noch das Plus haengt -- das schiebt das Plus an den rechten Rand, wo
+// es hingehoert. Haengt nichts dahinter, bekommt sie keine, sonst
+// ruecke alles nach links und die Verteilung waere dahin.
+void CommandBar::verteileGruppen()
+{
+    if (!m_row) { return; }
+
+    for (int i = m_row->count() - 1; i >= 0; --i) {
+        QLayoutItem* it = m_row->itemAt(i);
+        if (it && it->spacerItem()) { delete m_row->takeAt(i); }
+    }
+
+    QVector<int> kaesten;
+    for (int i = 0; i < m_row->count(); ++i) {
+        QLayoutItem* it = m_row->itemAt(i);
+        if (it && it->layout()) { kaesten.append(i); }
+    }
+    const int letztes = m_row->count() - 1;
+    for (int k = kaesten.size() - 1; k >= 0; --k) {
+        const int i = kaesten.at(k);
+        if (i == letztes) { continue; }
+        m_row->insertStretch(i + 1, 1);
+    }
 }
 
 void CommandBar::removeGroupWidget(QWidget* w)
@@ -192,6 +279,48 @@ void CommandBar::removeGroupWidget(QWidget* w)
     }
     m_row->removeItem(box);
     delete box;
+    verteileGruppen();
+}
+
+// ── Die Trennstriche ─────────────────────────────────────────────────
+//
+// Jedes andere Bauteil im Fenster ist eingefasst: BANDWIDTH FILTER,
+// PANADAPTER, S-METER, TX, FREQUENZ, ROTOR/LOG -- alle mit Rahmen und
+// Versalzeile. Die Kommandoleiste war die einzige Stelle, an der
+// Gruppen ueberhaupt keine Grenze hatten; vierundzwanzig fast gleiche
+// Pillen in einer Reihe, und das Auge hat keinen Halt.
+//
+// Der Haarstrich ist die leiseste Form derselben Aussage. kGlassEdgeLight
+// ist dafuer die Hausfarbe (Lichtkante auf kBorder) -- kein neuer Ton.
+//
+// Gezeichnet, nicht gebaut: ein Strich-Widget waere ein weiteres Element
+// in der Reihe, an dem dehnungsPlatz(), addGroupWidget() und
+// removeGroupWidget() vorbeizielen koennten.
+void CommandBar::paintEvent(QPaintEvent* e)
+{
+    // Erst das Stilblatt zeichnen lassen -- die Leiste traegt
+    // WA_StyledBackground, und ohne diesen Aufruf bliebe ihr Grund leer.
+    QStyleOption opt;
+    opt.initFrom(this);
+    QPainter p(this);
+    style()->drawPrimitive(QStyle::PE_Widget, &opt, &p, this);
+    QWidget::paintEvent(e);
+
+    const QVector<QLayout*> k = gruppenKaesten();
+    if (k.size() < 2) { return; }
+
+    p.setPen(QPen(QColor(QString::fromLatin1(Style::kGlassEdgeLight)), 1));
+    for (int i = 0; i + 1 < k.size(); ++i) {
+        const QRect a = k.at(i)->geometry();
+        const QRect b = k.at(i + 1)->geometry();
+        if (!a.isValid() || !b.isValid()) { continue; }
+        // Genau in die Mitte der Luecke. Am Rand einer Gruppe klebend
+        // waere er ihr Rahmen und gehoerte dann auch ringsum.
+        const int x = (a.right() + b.left()) / 2;
+        const int oben  = qMin(a.top(), b.top());
+        const int unten = qMax(a.bottom(), b.bottom());
+        p.drawLine(x, oben, x, unten);
+    }
 }
 
 void CommandBar::addTrailing(QWidget* w)
@@ -201,6 +330,10 @@ void CommandBar::addTrailing(QWidget* w)
     // dahinter. Die Ausrichtung unten hält das Plus auf einer Linie mit
     // den Pillen und nicht mit den Versalzeilen darüber.
     m_row->addWidget(w, 0, Qt::AlignBottom);
+    // Erst jetzt steht fest, dass hinter der letzten Gruppe noch etwas
+    // haengt -- sie braucht also doch eine Dehnung, damit das Plus an
+    // den rechten Rand wandert. Siehe verteileGruppen().
+    verteileGruppen();
 }
 
 // ── Gruppen bauen ────────────────────────────────────────────────────
@@ -211,7 +344,8 @@ CommandBar::Group& CommandBar::addGroup(const QString& caption,
     auto* box = new QVBoxLayout;
     box->setContentsMargins(0, 0, 0, 0);
     box->setSpacing(5);
-    box->addWidget(captionLabel(caption, this), 0, Qt::AlignLeft);
+    QLabel* versal = captionLabel(caption, this);
+    box->addWidget(versal, 0, Qt::AlignLeft);
 
     auto* pills = new QHBoxLayout;
     pills->setContentsMargins(0, 0, 0, 0);
@@ -219,7 +353,7 @@ CommandBar::Group& CommandBar::addGroup(const QString& caption,
     box->addLayout(pills);
     row->addLayout(box);
 
-    auto* g = new Group{caption, pills, {}, nullptr};
+    auto* g = new Group{caption, pills, {}, nullptr, versal};
     m_groups.append(g);
     return *g;
 }
@@ -246,6 +380,54 @@ QPushButton* CommandBar::addPill(Group& g, const QString& label)
     g.pills.append(b);
     if (g.row) { g.row->addWidget(b); }
     return b;
+}
+
+// ── Ohne Funkgeraet tritt eine leere Gruppe zurueck ──────────────────
+//
+// Die Regel steht schon im Fenster: POWER, SWR und SIGNAL AVERAGE
+// zeigen ihre "—" gedaempft. FILTER und RATE taten es nicht -- drei
+// helle Pillen mit einem Strich darin sehen nicht nach "noch nichts"
+// aus, sondern nach kaputt.
+//
+// Die Masse bleiben gleich (siehe pillStyleGedaempft), es springt also
+// nichts, wenn das Geraet kommt.
+bool CommandBar::gruppeIstLeer(const Group& g) const
+{
+    // RATE traegt seinen Wert in einem eigenen Schild, nicht in Pillen
+    // -- ohne diese Abzweigung waere die Gruppe immer "leer", auch mit
+    // "48 kHz" darin.
+    if (g.pills.isEmpty()) {
+        return !m_rateLabel || m_rateLabel->text() == QStringLiteral("—");
+    }
+    for (QPushButton* b : g.pills) {
+        if (!b) { continue; }
+        const QString t = b->text();
+        // Das "…" ist kein Inhalt, es ist der Weg zu mehr davon.
+        if (t == QStringLiteral("…") || t == QStringLiteral("—")) { continue; }
+        return false;
+    }
+    return true;
+}
+
+void CommandBar::zieheLeereGruppenZurueck()
+{
+    for (Group* g : m_groups) {
+        if (!g) { continue; }
+        const bool leer = gruppeIstLeer(*g);
+        for (QPushButton* b : g->pills) {
+            if (b) { b->setStyleSheet(leer ? pillStyleGedaempft() : pillStyle()); }
+        }
+        if (g->caption) {
+            // Zurueck auf kTextScale, nicht auf einen leeren Stil:
+            // captionLabel() setzt die Farbe selbst, und ein leeres
+            // Stilblatt haette die Versalzeile auf die Vorgabefarbe
+            // gestellt -- heller als vorher statt gleich.
+            g->caption->setStyleSheet(
+                QStringLiteral("QLabel { color: %1; }")
+                    .arg(QString::fromLatin1(leer ? Style::kBorderMuted
+                                                  : Style::kTextScale)));
+        }
+    }
 }
 
 void CommandBar::setActive(Group& g, const QString& label)
@@ -612,6 +794,7 @@ void CommandBar::relabelFilterPills()
             b->setToolTip(QString{});
         }
     }
+    zieheLeereGruppenZurueck();
 }
 
 void CommandBar::pushFilterToModel(int low, int high)
@@ -807,6 +990,7 @@ void CommandBar::setRateReadout(int channelRateHz, int measuredRateHz)
         m_rateWarn = warn;
         applyRateStyle(warn);
     }
+    zieheLeereGruppenZurueck();
 }
 
 QString CommandBar::rateReadoutText() const
@@ -1007,6 +1191,7 @@ void CommandBar::pullFromModel()
         // leuchten.
         setActive(*g, label);
     }
+    zieheLeereGruppenZurueck();
 }
 
 CommandBar::~CommandBar() { qDeleteAll(m_groups); }
