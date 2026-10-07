@@ -59,6 +59,52 @@ RotctldProcess::RotctldProcess(QObject* parent) : QObject(parent)
     });
 }
 
+QString RotctldProcess::grundAus(const QString& stderrText)
+{
+    // Begruendung im Kopf. Hamlibs stderr ist ein Ablaufprotokoll; die
+    // letzte Zeile ist die Folge, nicht die Ursache.
+    static const QStringList kUrsachen = {
+        QStringLiteral("timed out"), QStringLiteral("refused"),
+        QStringLiteral("no such"),   QStringLiteral("in use"),
+        QStringLiteral("permission"),QStringLiteral("not permitted"),
+        QStringLiteral("unavailable"),
+    };
+    static const QStringList kFehlschlag = {
+        QStringLiteral("failed"), QStringLiteral("error"),
+        QStringLiteral("cannot"), QStringLiteral("unable"),
+    };
+
+    const QStringList zeilen = stderrText.split(QLatin1Char('\n'));
+    QString ursache, fehlschlag, letzte;
+    for (const QString& rohe : zeilen) {
+        const QString z = rohe.trimmed();
+        if (z.isEmpty()) { continue; }
+        letzte = z;
+        for (const QString& w : kUrsachen) {
+            if (z.contains(w, Qt::CaseInsensitive)) { ursache = z; break; }
+        }
+        // Eine Zeile zaehlt nur als Auskunft, wenn sie auch etwas BENENNT:
+        // einen Rechner, einen Port, einen Pfad, eine Nummer. Der Pruefstand
+        // hat diese Bedingung erzwungen -- "IO error" steht bei Hamlib immer
+        // zuletzt und enthaelt das Wort "error", also gewann es jedes Mal
+        // gegen die Zeile, die tatsaechlich etwas sagte.
+        bool benennt = z.contains(QLatin1Char(':'));
+        if (!benennt) {
+            for (const QChar c : z) {
+                if (c.isDigit()) { benennt = true; break; }
+            }
+        }
+        if (benennt) {
+            for (const QString& w : kFehlschlag) {
+                if (z.contains(w, Qt::CaseInsensitive)) { fehlschlag = z; break; }
+            }
+        }
+    }
+    if (!ursache.isEmpty())    { return ursache; }
+    if (!fehlschlag.isEmpty()) { return fehlschlag; }
+    return letzte;
+}
+
 RotctldProcess::~RotctldProcess()
 {
     stop();

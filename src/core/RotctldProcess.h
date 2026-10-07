@@ -67,6 +67,32 @@ public:
 
     bool isRunning() const;
 
+    // Der GRUND aus Hamlibs stderr, in einer Zeile fuer die Statusleiste.
+    //
+    // Warum nicht einfach die letzte Zeile: Hamlib schliesst mit „IO
+    // error" ab, und genau das stand am 2026-10-06 in Martins Protokoll
+    // unter „Rotator: rotctld exited". Die Zeile darueber hiess
+    //
+    //     connect to 192.168.x.16:4001 failed, (trying next interface):
+    //     Network error 60: Operation timed out
+    //
+    // -- also Adresse UND Ursache. „IO error" sagt nichts, und wer nichts
+    // erfaehrt, sucht beim Programm statt beim Kabel.
+    //
+    // Darum in zwei Stufen: zuerst die letzte Zeile, die eine Ursache
+    // nennt (zeitueberschritten, abgewiesen, nicht vorhanden, belegt,
+    // keine Berechtigung), dann die letzte, die von einem Fehlschlag
+    // spricht UND dabei etwas benennt (Rechner, Port, Pfad, Nummer), und
+    // erst zuletzt die letzte nichtleere Zeile.
+    //
+    // Die Bedingung „benennt etwas" hat der Pruefstand erzwungen: „IO
+    // error" steht bei Hamlib immer zuletzt und enthaelt das Wort
+    // „error", also gewann es in der zweiten Stufe jedes Mal gegen die
+    // Zeile, die tatsaechlich etwas sagte.
+    // Oeffentlich und ohne Zustand, damit es ohne Oberflaeche und ohne
+    // laufenden Prozess pruefbar ist.
+    static QString grundAus(const QString& stderrText);
+
     // Start rotctld. Returns false and fills `error` if the binary is
     // missing or the process refuses to start; a rotctld that starts
     // and then exits reports through exited() instead, because that

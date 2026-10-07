@@ -24,6 +24,7 @@ private slots:
     void the_model_list_has_no_duplicates();
     void the_model_list_covers_the_controllers_asked_about();
     void every_model_explains_itself();
+    void der_grund_steht_nicht_in_der_letzten_zeile();
 };
 
 void TstRotctldProcess::a_serial_rotator_gets_model_device_and_speed()
@@ -123,6 +124,57 @@ void TstRotctldProcess::every_model_explains_itself()
     }
     QVERIFY2(arcoNamed, "no entry mentions ARCO");
     QVERIFY2(ercNamed, "no entry mentions ERC");
+}
+
+
+// Hamlibs stderr ist ein Ablaufprotokoll, und die letzte Zeile ist die
+// FOLGE, nicht die Ursache. Am 2026-10-06 stand in Martins Protokoll
+// unter "Rotator: rotctld exited" genau ein Wort: "IO error". Wer nichts
+// erfaehrt, sucht beim Programm statt beim Kabel.
+//
+// Die Vorlage unten ist die echte Ausgabe aus jenem Protokoll, gekuerzt
+// um die rot_register-Zeilen, die nichts sagen.
+void TstRotctldProcess::der_grund_steht_nicht_in_der_letzten_zeile()
+{
+    const QString echt = QStringLiteral(
+        "rot_open: error = rot_register (609)\n"
+        "gs232a_rot_init called\n"
+        "rot_open called\n"
+        "rot_open: using network address 192.168.1.16:4001:TCP\n"
+        "network_open: TCP connect\n"
+        "network_open: hoststr=192.168.1.16, portstr=4001\n"
+        "connect to 192.168.1.16:4001 failed, (trying next interface): "
+        "Network error 60: Operation timed out\n"
+        "network_open: failed to connect to 192.168.1.16:4001\n"
+        "IO error\n");
+
+    const QString grund = RotctldProcess::grundAus(echt);
+    // Die Ursache, nicht die Folge -- und mit der Adresse daran, denn genau
+    // die war hier falsch.
+    QVERIFY2(grund.contains(QStringLiteral("timed out")), qPrintable(grund));
+    QVERIFY2(grund.contains(QStringLiteral("192.168.1.16:4001")), qPrintable(grund));
+    QVERIFY2(grund != QStringLiteral("IO error"), qPrintable(grund));
+
+    // Zweite Stufe: nennt keine Zeile eine Ursache, nimmt er die letzte, die
+    // ueberhaupt von einem Fehlschlag spricht.
+    const QString ohneUrsache = QStringLiteral(
+        "rot_open called\n"
+        "network_open: failed to connect to 10.0.0.9:4533\n"
+        "IO error\n");
+    QCOMPARE(RotctldProcess::grundAus(ohneUrsache),
+             QStringLiteral("network_open: failed to connect to 10.0.0.9:4533"));
+
+    // Dritte Stufe: sagt gar nichts etwas aus, bleibt die letzte nichtleere
+    // Zeile -- lieber wenig als nichts.
+    QCOMPARE(RotctldProcess::grundAus(QStringLiteral("abc\ndef\n\n")),
+             QStringLiteral("def"));
+    QCOMPARE(RotctldProcess::grundAus(QString()), QString());
+
+    // Ein belegter Port ist der zweite Fall, der Martin schon einmal
+    // getroffen hat (2026-09-16, verwaister rotctld auf 4533).
+    QVERIFY(RotctldProcess::grundAus(QStringLiteral(
+                "bind: Address already in use\nIO error\n"))
+                .contains(QStringLiteral("in use")));
 }
 
 QTEST_MAIN(TstRotctldProcess)

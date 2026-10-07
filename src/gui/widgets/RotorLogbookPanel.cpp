@@ -1228,9 +1228,14 @@ void RotorLogbookPanel::ensureRotor()
     connect(&m_rotorProc, &RotctldProcess::exited, this,
             [this](int code, const QString& stderrText) {
         m_rotor->disconnectFromRotor();
+        // Nicht die letzte Zeile: Hamlib schliesst mit „IO error" ab, und
+        // genau das stand am 2026-10-06 in Martins Protokoll -- waehrend
+        // die Zeile darueber Adresse UND Ursache nannte
+        // („connect to ...:4001 failed ... Operation timed out"). Wer
+        // nichts erfaehrt, sucht beim Programm statt beim Kabel.
         const QString why = stderrText.isEmpty()
             ? QStringLiteral("exit code %1").arg(code)
-            : stderrText.section(QLatin1Char('\n'), -1).trimmed();
+            : RotctldProcess::grundAus(stderrText);
         setStatus(QStringLiteral("Rotator: rotctld exited — %1").arg(why),
                   true);
     });
