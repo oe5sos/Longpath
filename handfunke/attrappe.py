@@ -80,7 +80,8 @@ EINGETRAGEN = []
 # --rotorfrei schaltet das Drehen frei; ohne das wird abgelehnt, genau wie
 # TciAllowRemoteRotor ab Werk.
 ROTOR_FREI = '--rotorfrei' in sys.argv
-ROTOR = {'ist': 143.0, 'ziel': 143.0, 'zustand': 2, 'frisch': True}
+# Zustand als NAME, wie `rotor_ist:` ihn seit dem 2026-10-07 sendet.
+ROTOR = {'ist': 143.0, 'ziel': 143.0, 'zustand': 'bereit', 'frisch': True}
 
 
 def _rotor_nachziehen():
@@ -95,8 +96,8 @@ def _rotor_nachziehen():
             d += 360
         if abs(d) < 0.3:
             ROTOR['ist'] = ROTOR['ziel']
-            if ROTOR['zustand'] == 3:
-                ROTOR['zustand'] = 2
+            if ROTOR['zustand'] == 'dreht':
+                ROTOR['zustand'] = 'bereit'
         else:
             schritt = 1.5 if d > 0 else -1.5
             ROTOR['ist'] = (ROTOR['ist'] + schritt) % 360
@@ -384,7 +385,7 @@ class Verbindung(threading.Thread):
                 self.sende_text('rotor_err:nicht freigegeben;')
             elif name == 'rotor_stop':
                 ROTOR['ziel'] = ROTOR['ist']
-                ROTOR['zustand'] = 2
+                ROTOR['zustand'] = 'bereit'
                 print(f'  {self.addr[1]}: Rotor angehalten')
                 self.sende_text('rotor_ok:stop;')
             else:
@@ -400,7 +401,7 @@ class Verbindung(threading.Thread):
                     if g == 360:
                         g = 0.0
                     ROTOR['ziel'] = g
-                    ROTOR['zustand'] = 3          # dreht
+                    ROTOR['zustand'] = 'dreht'
                     print(f'  {self.addr[1]}: Rotor auf {g:.1f} Grad')
                     self.sende_text(f'rotor_ok:{g:.1f};')
         elif name == 'spots':

@@ -3264,6 +3264,16 @@ void TciServer::onTextMessageReceived(const QString& rohMsg)
         // ── Der Rotor (2026-10-05) ──────────────────────────────────────────
         //
         //     rotor:;           -> rotor_ist:<grad>,<zustand>,<frisch 0|1>;
+        //
+        // `<zustand>` ist ein NAME, keine Zahl: getrennt, verbindet, bereit,
+        // dreht, fehler. Vorher stand dort die Nummer aus
+        // RotorController::State, und damit kannten zwei Stellen dieselbe
+        // Zaehlung -- die Aufzaehlung hier und `rotor.js` am Telefon. Wer
+        // einen Zustand in die Mitte der Aufzaehlung einfuegt, verschiebt
+        // alle darueber, und das Telefon meldet dann "dreht", wo "fehler"
+        // steht. Am anderen Ende haengt ein Mast; ein Name, den die
+        // Gegenseite nicht kennt, ist sichtbar falsch, eine verschobene
+        // Nummer nicht.
         //     rotor_to:<grad>;  -> rotor_ok:<grad>;   oder rotor_err:<grund>;
         //     rotor_stop:;      -> rotor_ok:stop;     oder rotor_err:<grund>;
         //
@@ -3309,7 +3319,29 @@ void TciServer::onTextMessageReceived(const QString& rohMsg)
                 }
 
                 if (istAbfrage) {
-                    const int zustand = static_cast<int>(rot->state());
+                    // Name statt Nummer -- Begruendung am Kopf dieses Blocks.
+                    // Vorbelegt mit "unbekannt": kommt ein neuer Zustand
+                    // dazu, geht ein NAME hinaus, den die Gegenseite nicht
+                    // kennt -- und das sieht man. Ein leeres Feld sähe wie
+                    // ein Formfehler aus, eine falsche Nummer wie eine
+                    // Auskunft.
+                    QString zustand = QStringLiteral("unbekannt");
+                    switch (rot->state()) {
+                    case RotorController::State::Disconnected:
+                        zustand = QStringLiteral("getrennt");  break;
+                    case RotorController::State::Connecting:
+                        zustand = QStringLiteral("verbindet"); break;
+                    case RotorController::State::Idle:
+                        zustand = QStringLiteral("bereit");    break;
+                    case RotorController::State::Moving:
+                        zustand = QStringLiteral("dreht");      break;
+                    case RotorController::State::Error:
+                        zustand = QStringLiteral("fehler");     break;
+                    }
+                    // Kein `default:` oben, damit -Wswitch einen neuen
+                    // Zustand beim Uebersetzen anmerkt. Ein Fehler ist es
+                    // nicht -- der Baum uebersetzt ohne -Werror --, darum
+                    // traegt die Vorbelegung oben den zweiten Riegel.
                     antwort(QStringLiteral("rotor_ist:%1,%2,%3;")
                                 .arg(rot->azimuth(), 0, 'f', 1)
                                 .arg(zustand)

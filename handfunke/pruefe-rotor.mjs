@@ -24,15 +24,23 @@ const pruefe = (name, ok, text = '') => {
 
 console.log('Stand lesen\n');
 {
-  const s = standLesen(['143.5', '2', '1']);
+  const s = standLesen(['143.5', 'bereit', '1']);
   pruefe('Grad, Zustand und Frische kommen an',
          s.grad === 143.5 && s.zustand === BEREIT && s.frisch === true);
   pruefe('nicht frisch wird nicht verschluckt',
-         standLesen(['10', '2', '0']).frisch === false);
-  pruefe('ueber 360 wird eingefangen', standLesen(['370', '2', '1']).grad === 10);
-  pruefe('negativ wird eingefangen', standLesen(['-10', '2', '1']).grad === 350);
-  pruefe('ohne Zahl -> null', standLesen(['', '2', '1']) === null);
+         standLesen(['10', 'bereit', '0']).frisch === false);
+  pruefe('ueber 360 wird eingefangen', standLesen(['370', 'bereit', '1']).grad === 10);
+  pruefe('negativ wird eingefangen', standLesen(['-10', 'bereit', '1']).grad === 350);
+  pruefe('ohne Zahl -> null', standLesen(['', 'bereit', '1']) === null);
   pruefe('Unfug -> null', standLesen(['abc']) === null);
+  // Der Zustand kommt als Name, nicht als Nummer. Beides sieht in einer
+  // Protokollzeile gleich harmlos aus -- darum beides hier festgehalten.
+  pruefe('Grossschreibung und Rand werden eingefangen',
+         standLesen(['143.5', ' Dreht ', '1']).zustand === DREHT);
+  pruefe('ohne Zustand -> getrennt, nicht bereit',
+         standLesen(['143.5', '', '1']).zustand === GETRENNT);
+  pruefe('eine ZAHL ist kein Zustand mehr',
+         standLesen(['143.5', '2', '1']).zustand !== BEREIT);
 }
 
 console.log('\nWas darunter steht');
@@ -45,6 +53,14 @@ console.log('\nWas darunter steht');
   pruefe('getrennt -> sagt es', /NICHT VERBUNDEN/.test(zustandText({ zustand: GETRENNT })));
   pruefe('Fehler -> sagt es', /FEHLER/.test(zustandText({ zustand: FEHLER })));
   pruefe('gar kein Rotor -> sagt es', /KEIN ROTOR/.test(zustandText(null)));
+  pruefe('verbindet -> sagt es', /VERBINDET/.test(zustandText({ zustand: VERBINDET })));
+  // Vorher fiel jeder unbekannte Zustand in denselben Zweig wie "bereit"
+  // und zeigte bei frischer Stellung GAR NICHTS -- ein unbekannter Zustand
+  // las sich also wie "alles in Ordnung". Am anderen Ende haengt ein Mast.
+  pruefe('ein unbekannter Zustand wird gesagt, nicht verschluckt',
+         /UNBEKANNT/.test(zustandText({ zustand: 'nochniegesehen', frisch: true })));
+  pruefe('und eine alte Nummer gilt als unbekannt',
+         /UNBEKANNT/.test(zustandText({ zustand: '3', frisch: true })));
 }
 
 console.log('\nDie Peilung unter dem Finger');

@@ -581,8 +581,14 @@ def miss_rotor(v, sekunden):
     f = antwort[-1].split(":", 1)[1].rstrip(";").split(",")
     while len(f) < 3:
         f.append("")
-    zustand = {"0": "nicht verbunden", "1": "verbindet", "2": "bereit",
-               "3": "dreht", "4": "Fehler"}.get(f[1].strip(), f[1])
+    # Der Zustand kommt als NAME, seit 2026-10-07 (vorher die Nummer aus
+    # RotorController::State -- zwei Stellen mit derselben Zaehlung, und
+    # dieses Feld pruefte niemand). Ein Name, den wir nicht kennen, wird
+    # GESAGT und nicht in "bereit" uebersetzt.
+    namen = {"getrennt": "nicht verbunden", "verbindet": "verbindet",
+             "bereit": "bereit", "dreht": "dreht", "fehler": "Fehler"}
+    roh = f[1].strip().lower()
+    zustand = namen.get(roh) or f"UNBEKANNTER ZUSTAND {f[1].strip()!r}"
     frisch = "frisch" if f[2].strip() == "1" else "VON VORHIN"
     print(f"  Stellung {f[0]}°, {zustand}, Meldung {frisch}")
     if f[2].strip() != "1":

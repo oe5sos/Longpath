@@ -5,6 +5,11 @@
 // gilt hier dieselbe Strenge wie beim Senden und nicht die beim Loggen:
 //
 //     rotor:;           -> rotor_ist:<grad>,<zustand>,<frisch 0|1>;
+//
+// `<zustand>` ist seit dem 2026-10-07 ein NAME (getrennt, verbindet, bereit,
+// dreht, fehler). Vorher war es die Nummer aus RotorController::State, und
+// damit kannten zwei Stellen dieselbe Zaehlung -- diese Aufzaehlung und
+// `handfunke/rotor.js`. Geprueft wurde das Feld ueberhaupt nicht.
 //     rotor_to:<grad>;  -> rotor_ok:<grad>;   oder rotor_err:<grund>;
 //     rotor_stop:;      -> rotor_ok:stop;     oder rotor_err:<grund>;
 //
@@ -132,6 +137,7 @@ private slots:
                                   .chopped(1).split(QLatin1Char(','));
         QCOMPARE(f.size(), 3);
         QCOMPARE(f.at(0), QStringLiteral("143.5"));
+        QCOMPARE(f.at(1), QStringLiteral("bereit"));     // ein NAME, keine Zahl
         QCOMPARE(f.at(2), QStringLiteral("1"));          // frisch
         QVERIFY(rot.m_ziele.isEmpty());                  // nichts gedreht
     }
@@ -153,6 +159,45 @@ private slots:
         QVERIFY(warteAuf(QStringLiteral("rotor_ist:")));
         QVERIFY2(ersteMit(QStringLiteral("rotor_ist:")).endsWith(QStringLiteral(",0;")),
                  qPrintable(ersteMit(QStringLiteral("rotor_ist:"))));
+    }
+
+
+    /// Jeder Zustand hat seinen eigenen Namen -- und zwar den, den die
+    /// Gegenseite erwartet.
+    ///
+    /// Vorher stand hier eine Nummer, dieses Feld wurde von KEINEM
+    /// Pruefpunkt angesehen, und `handfunke/rotor.js` fuehrte dieselbe
+    /// Zaehlung ein zweites Mal. Wer einen Zustand in die Mitte der
+    /// Aufzaehlung einfuegt, verschiebt alles darueber: unter der Scheibe
+    /// am Telefon stand dann "DREHT", wenn der Rotor einen Fehler meldet.
+    /// Am anderen Ende haengt ein Mast.
+    void jederZustandHatSeinenNamen()
+    {
+        const QVector<QPair<RotorController::State, QString>> paare = {
+            { RotorController::State::Disconnected, QStringLiteral("getrennt") },
+            { RotorController::State::Connecting,   QStringLiteral("verbindet") },
+            { RotorController::State::Idle,         QStringLiteral("bereit") },
+            { RotorController::State::Moving,       QStringLiteral("dreht") },
+            { RotorController::State::Error,        QStringLiteral("fehler") },
+        };
+        for (const auto& [zustand, name] : paare) {
+            m_antworten.clear();
+            RadioModel model;
+            RotorAttrappe rot;
+            rot.m_state = zustand;
+            model.setRotor(&rot);
+
+            TciServer server(&model);
+            QWebSocket client;
+            QVERIFY2(aufbauen(server, client, false), qPrintable(name));
+            client.sendTextMessage(QStringLiteral("rotor:;"));
+            QVERIFY2(warteAuf(QStringLiteral("rotor_ist:")), qPrintable(name));
+            const QStringList f = ersteMit(QStringLiteral("rotor_ist:"))
+                                      .mid(QStringLiteral("rotor_ist:").size())
+                                      .chopped(1).split(QLatin1Char(','));
+            QCOMPARE(f.size(), 3);
+            QCOMPARE(f.at(1), name);
+        }
     }
 
     /// DER Punkt: ab Werk wird aus dem Netz NICHT gedreht.

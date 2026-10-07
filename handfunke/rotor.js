@@ -24,16 +24,23 @@
 export function standLesen(args) {
   const grad = parseFloat(args[0]);
   if (isNaN(grad)) return null;
-  const zustand = parseInt(args[1], 10);
+  // Der Zustand kommt als NAME, nicht als Zahl. Vorher stand hier eine
+  // Nummer aus RotorController::State, und damit kannten zwei Stellen
+  // dieselbe Zaehlung: die Aufzaehlung im Programm und diese Datei. Wer
+  // einen Zustand in die Mitte einfuegt, verschiebt alles darueber -- und
+  // dann stand unter der Scheibe "DREHT", wenn der Rotor einen Fehler
+  // meldet. Am anderen Ende haengt ein Mast.
+  const zustand = (args[1] || '').trim().toLowerCase();
   return {
     grad: ((grad % 360) + 360) % 360,
-    zustand: isNaN(zustand) ? 0 : zustand,
+    zustand: zustand || GETRENNT,
     frisch: (args[2] || '') === '1',
   };
 }
 
-/** Zustandszahlen aus RotorController::State. */
-export const GETRENNT = 0, VERBINDET = 1, BEREIT = 2, DREHT = 3, FEHLER = 4;
+/** Zustandsnamen aus `rotor_ist:` (TciServer.cpp, Rotorblock). */
+export const GETRENNT = 'getrennt', VERBINDET = 'verbindet',
+             BEREIT = 'bereit', DREHT = 'dreht', FEHLER = 'fehler';
 
 /** Was unter der Scheibe steht. Kein Rot: Rot bleibt der Warnung. */
 export function zustandText(stand) {
@@ -43,7 +50,12 @@ export function zustandText(stand) {
     case VERBINDET: return 'VERBINDET …';
     case DREHT:     return 'DREHT …';
     case FEHLER:    return 'ROTOR MELDET EINEN FEHLER';
-    default:        return stand.frisch ? '' : 'STELLUNG VON VORHIN';
+    case BEREIT:    return stand.frisch ? '' : 'STELLUNG VON VORHIN';
+    // Ein Name, den diese Seite nicht kennt, wird GESAGT und nicht
+    // verschluckt. Vorher fiel jeder unbekannte Zustand in denselben Zweig
+    // wie "bereit" und zeigte bei frischer Stellung gar nichts -- also las
+    // sich ein unbekannter Zustand wie "alles in Ordnung".
+    default:        return 'ZUSTAND UNBEKANNT';
   }
 }
 
