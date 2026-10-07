@@ -262,12 +262,18 @@ QString RxRatenAngleich::protokollZeile(std::int64_t jetztMs, int abstandSek)
     // Der Versatz ist die eigentliche Zahl: so viele Rahmen hat der
     // Ausgleich bis jetzt zugelegt oder weggenommen. Laeuft er richtig,
     // waechst er stetig und langsam; springt er, stimmt etwas nicht.
-    const double ppm = (m_regler.verhaeltnis() - 1.0) * 1e6;
+    // EINMAL lesen, nicht zweimal: das Verhaeltnis ist ein `atomic`, das
+    // der Tonfaden hundertmal je Sekunde neu setzt. Zwei Lesevorgaenge
+    // ergaeben eine Zeile, in der die ppm-Zahl nicht zum Verhaeltnis
+    // daneben passt -- und wer so eine Zeile prueft, sucht den Fehler in
+    // der Regelung statt in der Meldung.
+    const double var = m_regler.verhaeltnis();
+    const double ppm = (var - 1.0) * 1e6;
     return QStringLiteral(
         "RX-Driftausgleich: Verhaeltnis %1 (%2 ppm), Fuellstand %3 Rahmen, "
         "Versatz %4 Rahmen seit dem Start, %5 Spruenge ausgelassen, "
         "%6 Umtaster-Neubauten")
-        .arg(m_regler.verhaeltnis(), 0, 'f', 9)
+        .arg(var, 0, 'f', 9)
         .arg(ppm, 0, 'f', 2)
         .arg(m_letzteFuellung.load(std::memory_order_relaxed))
         .arg(versatz())
