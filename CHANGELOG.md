@@ -2,6 +2,117 @@
 
 ## [Unreleased]
 
+## [0.6.7] - 2026-10-07
+
+76 Commits seit 0.6.6, drei Tage. Thema: **die Instrumente haben
+geantwortet.**
+
+0.6.6 hat an einer Reihe Stellen das Schweigen abgestellt. Diese Fassung
+zeigt, was dabei herauskommt, wenn man danach hinsieht.
+
+Der **Driftausgleich am Empfangston** bekam eine Minutenmeldung ins
+Protokoll — und meldete beim ersten echten Lauf an der SunSDR2 QRP nach
+genau einer Minute, dass er am unteren Anschlag klebt: Verhaeltnis
+0,960000000 statt der erwarteten 4 ppm, nach einer Stunde zwei Minuten
+Ton weggeworfen. Ursache war eine Plausibilitaetsgrenze aus dem Tag
+davor, die ueber Netz ankommende Tonschuebe fuer Stoerungen hielt. Der
+Bus **zaehlt** den Verbrauch jetzt, statt ihn aus zwei Fuellstaenden zu
+erschliessen.
+
+Die **Compilerwarnungen des Linux-Laufs** — 156 in eigenen Dateien, von
+denen niemand je eine gelesen hat, weil der Baum ohne `-Werror`
+uebersetzt — hielten zwei echte Funde: eine Sicherheitsdecke fuer die
+Sendeleistung, die wegen `std::clamp` **gar nicht scheitern konnte**, und
+eine Schleife, die bei REDPITAYA endete und die danach hinzugekommene
+ANAN-G2E deshalb nie geprueft hat.
+
+Die **Protokolle der Station** sagten, warum `rotctld` 75 Sekunden lang
+versuchte und starb — die Zeile darueber nannte Adresse und Ursache,
+waehrend die Statusleiste nur „IO error" zeigte.
+
+Und zwei Luecken, die eine Fernbedienung betreffen: die **Bruecke**
+(`tci-bruecke.py`) hob den Token-Schutz und alle drei Freigaben auf, weil
+sie eine eigene Verbindung nach 127.0.0.1 aufbaut und damit jeder Client
+der App aus Loopback kam; und ein **Feld in einer Antwortzeile** konnte
+die Zeile beenden und einen zweiten Befehl anhaengen — aus einem
+Telnet-Strom von einem fremden Rechner.
+
+An der **SunSDR2 QRP** ist der Empfang fertig: zweiter Empfaenger, 96 kHz,
+zwei Stroeme, Mikrofon-PTT, Antennenwahl, Erholung beim Verbinden — alles
+am echten Geraet gemessen.
+
+### Hinzugefuegt
+
+- **Spots im Bild am Telefon** (#197, #201). Longpath kennt Cluster, RBN,
+  POTA und SpotCollector; die App zeigte davon nichts. Jetzt stehen sie im
+  Spektrum, verblassen mit dem Alter, und ein Tipp auf das Rufzeichen
+  schlaegt es bei QRZ nach — zwei Tipps tragen es ins QSO-Blatt.
+- **Ins Logbuch sehen, nicht nur hineinschreiben** (#196). `log_last:` und
+  `log_dup:` am TCI-Weg; die App zeigt die letzten Verbindungen und sagt
+  beim Eintragen, ob die Station auf diesem Band und in dieser Betriebsart
+  schon im Buch steht.
+- **Den Rotor vom Telefon drehen** (#200), hinter `TciAllowRemoteRotor` —
+  ab Werk aus, mit eigenem Schalter in Setup > CAT & Network > TCI Server
+  (#205). Abfragen darf jeder angemeldete Client, drehen nur mit Freigabe.
+- **Zurueck aus dem Hintergrund** (#199). Die App wartete nach dem
+  Aufwachen bis zu acht Sekunden auf den ersten Spot; gemessen bei gleich
+  langer Unterbrechung sind es jetzt null.
+- **Driftausgleich am Empfangston** (#131, #198, #202, #208), portiert aus
+  WDSP `rmatch.c` und `varsamp.c`. Ab Werk aus.
+- **Die Profilschiene liegt wahlweise oben in der Kommandoleiste** (#204),
+  umschaltbar im Rechtsklickmenue; in der Leistenlage gehoeren die 44 px
+  am linken Rand dem Panadapter.
+- **SunSDR2 QRP: zweiter Empfaenger, 96 kHz, zwei Stroeme, Mikrofon-PTT,
+  Antennenwahl 0x15** — am echten Geraet gemessen.
+
+### Geaendert
+
+- **Das Logbuchfenster traegt denselben Rahmen wie alle anderen Fenster**
+  (#203) — rahmenlos, eckig, mit eigener Titelzeile.
+- **Der Rotorzustand geht als NAME hinaus**, nicht als Nummer (#203).
+  Vorher kannten zwei Stellen dieselbe Zaehlung; ein eingefuegter Zustand
+  haette am Telefon „DREHT" angezeigt, wo der Rotor einen Fehler meldet.
+- **Eine Ablehnung sagt, wo der Schalter sitzt** (#206):
+  „NICHT FREIGEGEBEN — Setup > CAT & Network > TCI Server".
+- **Eine Schriftwahl statt acht** (c048a9b7). Auf dem Mac kamen dabei vier
+  verschiedene Schriften heraus, zwei davon gar keine Monospace.
+
+### Behoben
+
+- **Der Driftausgleich lief in den Anschlag** (#208). Der Verbrauch wird
+  gezaehlt statt geschaetzt; `flush()` faelscht ihn nicht mehr, und
+  Tonschuebe ueber Netz werfen ihn nicht mehr aus der Bahn.
+- **Ein geleerter Ring ist kein Verbrauch** (#203). `setMasterMuted(true)`
+  leert den Ring; aus dem Unterschied gelesen sah das aus wie der
+  sechsfache Verbrauch — bei JEDEM Stummschalten.
+- **Die Bruecke hebelte alle drei Freigaben aus** (#205). `TciAllowRemoteTx`
+  und `TciAllowRemoteRotor` schuetzten nicht, solange sie lief, und das
+  fuer jedes Geraet im Heimnetz.
+- **Ein Feld konnte die Antwortzeile beenden** (#203). `spot_zeile:` und
+  `log_qso_zeile:` fuehren Text aus Spotquellen und ADIF-Dateien; ein
+  Semikolon darin haengte der Gegenseite einen zweiten Befehl an. Beide
+  Richtungen sichern jetzt.
+- **Eine Sicherheitsdecke, die nie scheitern konnte** (#207).
+  `computeAudioVolume` endet auf jedem Weg in `std::clamp(..., 0.0, 1.0)`;
+  `QVERIFY(v <= 1.0)` war damit eine Tautologie. Die 16 Zellen, in denen
+  die Klammer wirklich kappt, sind jetzt festgehalten.
+- **Die ANAN-G2E stand ausserhalb der Pruefschleife** (#207), weil deren
+  Obergrenze ein Geraet NANNTE statt die Aufzaehlung zu Ende zu gehen.
+- **„IO error" ist keine Auskunft** (#203). Der Grund steht eine Zeile
+  hoeher: Adresse und Ursache statt der letzten Zeile von Hamlibs stderr.
+- **Ein toter Ausgang galt als offen** (c8761850) — Ton im Programm,
+  nichts am Lautsprecher.
+- **Eine Protokollzeile stand auf dem DSP-Faden** (#203). `QString` teilt
+  Speicher zu, `qCInfo` nimmt eine Sperre; beides hat im Tonweg nichts zu
+  suchen.
+- **Vier Pruefstaende haetten eine fehlende Vorlage nicht bemerkt** (#207)
+  und danach das Nichts gemessen — gruen.
+- **Der Driftpruefstand war eine Zeitbombe** (#208): 83,7 s von 120 s
+  CTest-Grenze. Jetzt +-100 ppm ueber 40 000 Bloecke statt +-4 ppm ueber
+  200 000 — haerter, und 9,8 s.
+- **43 von 156 Warnungen** (#209) liegen jetzt an einer Stelle statt an
+  zweiundzwanzig (`core/ZeitUtc.h`), ohne den Bau mit Qt 6.4 zu brechen.
+
 ## [0.6.6] - 2026-10-04
 
 Zwei Tage nach 0.6.5, 103 Commits, und sie haben ein Thema: **eine
