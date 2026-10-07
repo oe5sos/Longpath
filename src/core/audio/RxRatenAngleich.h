@@ -178,7 +178,8 @@ public:
     /// dann wird nichts kopiert und nichts gerechnet.
     struct Ausgabe { const float* rahmen; int anzahl; };
     Ausgabe verarbeite(const float* ein, int rahmen,
-                       std::int64_t fuellungRahmen, std::int64_t ringRahmen);
+                       std::int64_t fuellungRahmen, std::int64_t ringRahmen,
+                       std::int64_t verbrauchtGesamt = -1);
 
     double verhaeltnis() const { return m_regler.verhaeltnis(); }
     bool   regeltSchon() const { return m_regler.regeltSchon(); }
@@ -266,6 +267,11 @@ private:
     // muesste. -1 heisst: noch kein Durchlauf.
     std::int64_t m_letzteMeldungMs{0};
     std::atomic<std::int64_t> m_letzteFuellung{-1};
+    // Der zuletzt gesehene Stand von `IAudioBus::consumedFrames()`. -1
+    // heisst: noch keiner. Der Zaehler ist die bessere Quelle; der
+    // Fuellstand bleibt daneben stehen, weil die Regelung ihn fuer den
+    // Rueckfuehrungsteil ohnehin braucht.
+    std::atomic<std::int64_t> m_letzterVerbrauch{-1};
     int    m_letzteAusgabe{0};
 };
 

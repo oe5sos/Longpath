@@ -617,6 +617,13 @@ void PortAudioBus::flush() {
     m_ringRead.store(w, std::memory_order_release);
 }
 
+qint64 PortAudioBus::consumedFrames() const {
+    if (!m_stream) { return -1; }
+    // Derselbe Kanalteiler wie bei queuedFrames: der Ring zaehlt FLOATS.
+    const int kanaele = (m_negFormat.channels > 0) ? m_negFormat.channels : 1;
+    return m_verbrauchteFloats.load(std::memory_order_relaxed) / kanaele;
+}
+
 qint64 PortAudioBus::queuedFrames() const {
     if (!m_stream) { return -1; }
     // Der Ring zaehlt FLOATS, nicht Rahmen -- m_ring ist 4800 Rahmen mal
@@ -688,6 +695,10 @@ int PortAudioBus::paCallback(const void* in, void* out,
         const int want = static_cast<int>(frames) * self->m_negFormat.channels;
 
         qint64 r = self->m_ringRead.load(std::memory_order_relaxed);
+        // Anfangsstand merken: die Differenz am Ende ist das, was dieser
+        // Rueckruf WIRKLICH aus dem Ring geholt hat. Siehe
+        // m_verbrauchteFloats -- `m_ringRead` allein luegt nach `flush()`.
+        const qint64 rAnfang = r;
         const qint64 w = self->m_ringWrite.load(std::memory_order_acquire);
 
         // 2026-05-26 KG4VCF perf instrumentation: report the ring fill
@@ -791,6 +802,12 @@ int PortAudioBus::paCallback(const void* in, void* out,
             last = o[i];
         }
         self->m_ringRead.store(r, std::memory_order_release);
+        // Entspannte Ordnung genuegt: an dieser Zahl haengt keine
+        // Entscheidung im Rueckruf, sie wird nur von aussen angesehen.
+        if (r > rAnfang) {
+            self->m_verbrauchteFloats.fetch_add(r - rAnfang,
+                                                std::memory_order_relaxed);
+        }
         self->m_lastOutL = lastL;
         self->m_lastOutR = lastR;
         self->m_crossfadeFramesRem = crossfadeRem;
