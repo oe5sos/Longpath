@@ -927,6 +927,54 @@ private slots:
         QCOMPARE(conn.messwertBForTest(), 32.5f);
     }
 
+    // Der Zustand VOR dem ersten gueltigen Wert.
+    //
+    // Traegt der allererste Rahmen bei A ein -200, stand A noch auf dem
+    // Anfangswert 0,0 -- und der ging als "0 Grad" hinaus. Null Grad ist
+    // ein plausibler Messwert und faellt niemandem auf. Am 2026-10-07
+    // vom Lueckenkritiker gefunden: die -200-Behandlung war geprueft,
+    // der Zustand davor nicht.
+    void vorDemErstenGueltigenWertWirdNichtsGemeldet()
+    {
+        qunsetenv("LONGPATH_SUNSDR_BLOCKANTWORT");
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+
+        const QHostAddress radio(QStringLiteral("192.0.2.200"));
+        conn.feedControlDatagramForTest(
+            QByteArray::fromHex("03ff011a7c0000004119c0a810c8c0a810c851c300004928"),
+            radio);
+        QVERIFY(conn.isRxReadyForTest());
+
+        QSignalSpy spy(&conn, &RadioConnection::deviceTemperaturesUpdated);
+        auto rahmenMit = [](float a, float b) {
+            QByteArray r = QByteArray::fromHex(
+                "03ff001f00002b0f38930000001d8300"
+                "00000000000000"
+                "00000000000000000000803f"
+                "00000010010020130500802406002013050080"
+                "380b0020130500804c1000201305008060150020130500");
+            std::memcpy(r.data() + 15, &a, sizeof(float));
+            std::memcpy(r.data() + 19, &b, sizeof(float));
+            return r;
+        };
+
+        // Erster Rahmen: A fehlt. Es darf NICHTS hinausgehen -- weder
+        // der Anfangswert 0,0 noch sonst etwas.
+        conn.feedStreamDatagramFromSenderForTest(rahmenMit(-200.0f, 33.0f), radio);
+        QTest::qWait(60);
+        QCOMPARE(spy.count(), 0);
+
+        // Sobald A da ist, geht das Paar hinaus.
+        conn.feedStreamDatagramFromSenderForTest(rahmenMit(43.0f, 33.0f), radio);
+        QTRY_COMPARE_WITH_TIMEOUT(spy.count(), 1, 500);
+        QCOMPARE(spy.at(0).at(0).toDouble(), 43.0);
+        QCOMPARE(spy.at(0).at(1).toDouble(), 33.0);
+    }
+
     // Seit der Messung am 2026-10-05 ist die Kopfantwort die VORGABE: an
     // den Wiederholungen aendert sie nichts (207/s gegen 214/s, also
     // nichts), sie halbiert aber den Rueckweg. Diese Pruefung haelt die

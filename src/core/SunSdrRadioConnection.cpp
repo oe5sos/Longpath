@@ -2173,9 +2173,17 @@ void SunSdrRadioConnection::verarbeiteMesswertrahmen(const QByteArray& data)
     // Der ALTE Wert bleibt dabei stehen, statt auf null zu fallen: eine
     // Luecke in der Messung ist keine Aenderung der Temperatur.
     constexpr float kKeinWert = -100.0f;
-    if (a > kKeinWert) { m_messwertA = a; }
-    if (b > kKeinWert) { m_messwertB = b; }
-    if (a <= kKeinWert && b <= kKeinWert) { return; }
+    if (a > kKeinWert) { m_messwertA = a; m_messwertAGueltig = true; }
+    if (b > kKeinWert) { m_messwertB = b; m_messwertBGueltig = true; }
+    // Solange noch gar kein gueltiger Wert kam, gibt es NICHTS zu melden.
+    //
+    // Ohne das wurde der Anfangswert 0,0 gemeldet, sobald nur EINER der
+    // beiden gueltig war -- traegt der erste Rahmen A = -200 und B = 33,
+    // ging "A = 0,0 Grad" hinaus. Null Grad ist ein plausibler Messwert
+    // und faellt niemandem auf. Am 2026-10-07 vom Lueckenkritiker
+    // gefunden: die -200-Behandlung war geprueft, der Zustand DAVOR
+    // nicht.
+    if (!m_messwertAGueltig || !m_messwertBGueltig) { return; }
 
     // Nur bei AENDERUNG melden. Bei 20 Rahmen je Sekunde waeren es sonst
     // 72000 Zeilen je Stunde, und die Werte stehen minutenlang still.

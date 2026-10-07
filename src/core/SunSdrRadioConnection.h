@@ -756,6 +756,8 @@ private:
     float   m_messwertB{0.0f};
     float   m_gemeldetA{0.0f};   // zuletzt gemeldet, fuer die Aenderungspruefung
     float   m_gemeldetB{0.0f};
+    bool    m_messwertAGueltig{false};   // kam schon je ein echter Wert?
+    bool    m_messwertBGueltig{false};
     quint64 m_messwertRahmen{0};
 
     /// Der Name einer Stromart fuers Protokoll -- an EINER Stelle.
