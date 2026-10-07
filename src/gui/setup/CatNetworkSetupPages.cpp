@@ -443,6 +443,45 @@ void CatTciServerPage::buildRemoteAccessGroup()
     });
     form->addRow(QString(), m_allowRemoteTxCheck);
 
+    // ── Drehen aus dem Netz ─────────────────────────────────────────────────
+    //
+    // Eigener Schalter, nicht an den Sendeschalter gehaengt: ein Rotor
+    // strahlt nicht, und wer vom Telefon aus drehen will, soll dafuer nicht
+    // das Senden freigeben muessen.
+    m_allowRemoteRotorCheck =
+        new QCheckBox(tr("Allow turning the rotator from the network"), group);
+    m_allowRemoteRotorCheck->setStyleSheet(QString::fromLatin1(Style::kCheckBoxStyle));
+    m_allowRemoteRotorCheck->setToolTip(tr(
+        "Off by default. Asking where the rotator points is always allowed; "
+        "turning it is not. Clients on this machine are unaffected — but a "
+        "phone reaching Longpath through tci-bruecke.py counts as network "
+        "since 2026-10-07 and needs this switch."));
+    m_allowRemoteRotorCheck->setChecked(
+        AppSettings::instance()
+            .value(QStringLiteral("TciAllowRemoteRotor"), QStringLiteral("False"))
+            .toString() == QStringLiteral("True"));
+    connect(m_allowRemoteRotorCheck, &QCheckBox::toggled, this, [this](bool on) {
+        // Wie beim Senden: einschalten ist die folgenreiche Richtung,
+        // ausschalten nie.
+        if (on) {
+            const auto antwort = QMessageBox::question(
+                this, tr("Allow turning the rotator from the network"),
+                tr("Allow clients from the network to turn the rotator?\n\n"
+                   "At the other end is a mast with cables on it, and it "
+                   "keeps turning for minutes after a single command."),
+                QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+            if (antwort != QMessageBox::Yes) {
+                QSignalBlocker b(m_allowRemoteRotorCheck);
+                m_allowRemoteRotorCheck->setChecked(false);
+                return;
+            }
+        }
+        AppSettings::instance().setValue(
+            QStringLiteral("TciAllowRemoteRotor"),
+            on ? QStringLiteral("True") : QStringLiteral("False"));
+    });
+    form->addRow(QString(), m_allowRemoteRotorCheck);
+
     // ── Hinweis, ob das hier gerade überhaupt etwas bewirkt ─────────────────
     m_remoteHintLabel = new QLabel(group);
     m_remoteHintLabel->setStyleSheet(QString::fromLatin1(Style::kSecondaryLabelStyle));

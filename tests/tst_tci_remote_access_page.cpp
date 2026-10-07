@@ -38,6 +38,8 @@ private slots:
         TciServer::setRemoteToken(QString());
         AppSettings::instance().setValue(QStringLiteral("TciAllowRemoteTx"),
                                          QStringLiteral("False"));
+        AppSettings::instance().setValue(QStringLiteral("TciAllowRemoteRotor"),
+                                         QStringLiteral("False"));
     }
 
     void seite_traegt_die_bedienelemente() {
@@ -61,6 +63,42 @@ private slots:
             }
         }
         QVERIFY2(sahSendefreigabe, "Der Sendeschalter muss auf der Seite sein");
+    }
+
+    /// Der Rotorschalter gehoert auf dieselbe Seite wie der Sendeschalter.
+    ///
+    /// Seit dem 2026-10-07 gilt eine Verbindung ueber `tci-bruecke.py` als
+    /// aus dem Netz -- also braucht das Telefon fuer den Rotor diese
+    /// Freigabe. Ohne Schalter in der Oberflaeche bliebe nur, die
+    /// Einstellungsdatei von Hand zu aendern, und das ist keine Bedienung.
+    ///
+    /// Eigener Schalter, nicht an den Sendeschalter gehaengt: ein Rotor
+    /// strahlt nicht, und wer drehen will, soll dafuer nicht das Senden
+    /// freigeben muessen.
+    void die_rotorfreigabe_steht_neben_der_sendefreigabe() {
+        CatTciServerPage page;
+
+        QCheckBox* senden = nullptr;
+        QCheckBox* drehen = nullptr;
+        for (auto* c : page.findChildren<QCheckBox*>()) {
+            if (c->text().contains(QStringLiteral("transmit"), Qt::CaseInsensitive)) {
+                senden = c;
+            }
+            if (c->text().contains(QStringLiteral("rotator"), Qt::CaseInsensitive)) {
+                drehen = c;
+            }
+        }
+        QVERIFY2(senden != nullptr, "Der Sendeschalter fehlt");
+        QVERIFY2(drehen != nullptr, "Der Rotorschalter fehlt");
+        QVERIFY2(senden != drehen, "Es muessen ZWEI Schalter sein");
+
+        // Ab Werk aus -- wie das Senden, und aus demselben Grund: am anderen
+        // Ende haengt echtes Metall.
+        QVERIFY2(!drehen->isChecked(), "Drehen aus dem Netz muss ab Werk aus sein");
+
+        // Und er erklaert sich. Ein Schalter ohne Hinweistext ist an dieser
+        // Stelle eine Zumutung: was er anrichtet, sieht man erst am Mast.
+        QVERIFY2(!drehen->toolTip().isEmpty(), "Der Rotorschalter erklaert sich nicht");
     }
 
     void hinweis_sagt_dass_loopback_nichts_bewirkt() {

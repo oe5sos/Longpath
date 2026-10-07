@@ -12,37 +12,31 @@ WLAN und reicht jedes Byte unveraendert an 127.0.0.1:50001 weiter.
 Das ist ein reiner TCP-Weiterleiter. TCI laeuft ueber WebSocket, WebSocket
 ueber TCP — es muss nichts verstanden, nur durchgereicht werden.
 
-ACHTUNG, und hier stand bis zum 2026-10-07 das Gegenteil: die Bruecke hebt
-den Token-Schutz und die drei Freigaben AUS. Nicht aus Absicht, sondern aus
-Bauart. Sie nimmt die Verbindung des Telefons im WLAN an und baut eine
-EIGENE nach 127.0.0.1 auf -- fuer Longpath kommt damit jeder Client der App
-aus Loopback. Loopback ist dort aber das Vertrauen selbst (siehe
-TciClientSession::fromLoopback): kein Token, und keine der drei Freigaben
-greift.
+Was die Bruecke frueher aushebelte -- und jetzt nicht mehr: sie nimmt die
+Verbindung des Telefons im WLAN an und baut eine EIGENE nach 127.0.0.1 auf.
+Fuer Longpath kam damit jeder Client der App aus Loopback, und Loopback ist
+dort das Vertrauen selbst (siehe TciClientSession::fromLoopback): keine der
+drei Freigaben griff. `TciAllowRemoteTx=False` schuetzte nicht, obwohl an
+der Station eine Antenne haengt, und `TciAllowRemoteRotor=False` auch
+nicht -- fuer JEDES Geraet im Heimnetz, nicht nur fuer das Telefon.
 
-Was das praktisch heisst, solange die Bruecke laeuft:
+Hier stand bis zum 2026-10-07 das Gegenteil („Damit gilt auch der
+Token-Schutz des Servers unveraendert"), und das war die schlimmere
+Haelfte: eine Luecke, die im Code als geschlossen beschrieben steht, sucht
+niemand mehr.
 
-  * `TciAllowRemoteTx=False` schuetzt nicht. An der Station haengt eine
-    Antenne.
-  * `TciAllowRemoteRotor=False` schuetzt nicht.
-  * Ein Token wird nicht verlangt, auch wenn eines hinterlegt ist.
-  * Es gilt fuer JEDES Geraet im Heimnetz, nicht nur fuer das Telefon.
+Seit dem 2026-10-07 traegt der Handschlag `X-Longpath-Weitergeleitet` mit
+der echten Adresse des Klienten (siehe `mit_herkunft`), und Longpath
+behandelt solche Sitzungen bei Senden, Drehen und Loggen wie jede andere
+aus dem Netz. Der Eintrag kann nur NEHMEN.
 
-Zwei Wege, das zu schliessen -- die Entscheidung gehoert dem Betreiber,
-weil beide ihn etwas kosten:
+Was das NICHT aendert: das Token. Eine Verbindung aus Loopback brauchte nie
+eines und braucht auch jetzt keines -- der Schnitt verlaeuft an den
+Freigaben, nicht an der Anmeldung. Wer auch das Token will, geht den
+vorgesehenen Weg: Setup > CAT & Network > TCI Server > „Bind interface" auf
+die Netzadresse, Token setzen, Bruecke weglassen.
 
-  1. Den vorgesehenen Weg gehen: Setup > CAT & Network > TCI Server >
-     "Bind interface" auf die Netzadresse, Token setzen, Bruecke weglassen.
-     Dann greift alles wie gedacht. Kostet: das Token muss am Telefon
-     eingetippt werden.
-  2. Die Bruecke sagt im Handschlag, fuer wen sie kommt (ein Kopfeintrag,
-     den der Server nur als EINSCHRAENKUNG liest), und Longpath behandelt
-     solche Verbindungen als aus dem Netz. Kostet: eine Aenderung im
-     Server, und das Telefon braucht danach ebenfalls ein Token -- oder
-     eine ausdrueckliche Ausnahme dafuer.
-
-Bis dahin gilt: die Bruecke nur im eigenen Heimnetz starten und nur,
-solange sie gebraucht wird.
+Und unveraendert gilt: die Bruecke nur im eigenen Heimnetz starten.
 
   python3 tci-bruecke.py                  # <Netzadresse>:50001 -> 127.0.0.1:50001
   python3 tci-bruecke.py 50010            # auf einem anderen Port horchen
@@ -151,6 +145,32 @@ def ohne_origin(kopf: bytes) -> bytes:
     return b"\r\n".join(behalten)
 
 
+def mit_herkunft(kopf: bytes, adresse) -> bytes:
+    """Traegt in den Handschlag ein, FUER WEN die Bruecke kommt.
+
+    Der Grund steht im Kopf dieser Datei: die Bruecke baut eine eigene
+    Verbindung nach 127.0.0.1 auf, und damit kam jeder Client der App fuer
+    Longpath aus Loopback -- an allen drei Freigaben vorbei.
+
+    Mit `X-Longpath-Weitergeleitet` behandelt Longpath die Sitzung bei
+    Senden, Drehen und Loggen wie eine aus dem Netz. Der Eintrag kann nur
+    NEHMEN: am Handschlag und am Token aendert er nichts, nur die Freigaben
+    greifen danach. Deshalb muss auch niemand pruefen, wer ihn gesetzt hat.
+
+    Ein vom Klienten selbst mitgeschickter Eintrag wird vorher entfernt --
+    nicht aus Sicherheitsgruenden (zweimal derselbe Kopf waere hoechstens
+    unordentlich), sondern damit in der Zeile die Adresse steht, die die
+    Bruecke wirklich gesehen hat.
+    """
+    marke = b"x-longpath-weitergeleitet:"
+    zeilen = [z for z in kopf.split(b"\r\n")
+              if not z.lower().startswith(marke)]
+    wer = str(adresse[0]).encode("ascii", "replace")[:64]
+    # Hinter die erste Zeile (die Anfragezeile), nicht davor.
+    zeilen.insert(1, b"X-Longpath-Weitergeleitet: " + wer)
+    return b"\r\n".join(zeilen)
+
+
 def vielleicht_tls(klient, adresse):
     """Laesst TLS zu, ohne es zu erzwingen.
 
@@ -222,7 +242,10 @@ def bedienen(roh, adresse):
         # Client zu tarnen. Nur gegen eine aeltere Fassung, die das noch
         # nicht kann, wird er entfernt; das zeigt sich daran, dass sie mit
         # 403 antwortet.
-        ziel.sendall(erst)
+        # Den Handschlag mit der echten Herkunft weiterreichen -- siehe
+        # mit_herkunft(). Ohne das greift keine der drei Freigaben,
+        # solange die Bruecke laeuft.
+        ziel.sendall(mit_herkunft(kopf, adresse) + b"\r\n\r\n" + rest)
     except OSError as e:
         print(f"  {adresse[0]}: Handschlag fehlgeschlagen ({e})", flush=True)
         klient.close(); ziel.close(); return
