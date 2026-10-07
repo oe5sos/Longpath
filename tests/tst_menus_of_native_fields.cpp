@@ -80,12 +80,7 @@ private slots:
 
         QWidget top;
         top.resize(400, 300);
-        // Ausrichtung seit 2026-10-06 ausdruecklich: der Konstruktor nimmt sie
-        // jetzt als zweites Argument, und ein QWidget* wandelt sich nicht
-        // dorthin. Hier bleibt es senkrecht -- der Stand prueft das Menue,
-        // nicht die Lage.
-        auto* rail = new ProfileRail(&profiles,
-                                     ProfileRail::Ausrichtung::Senkrecht, &top);
+        auto* rail = new ProfileRail(&profiles, &top);
         rail->setAttribute(Qt::WA_NativeWindow);   // wie neben dem Panadapter
         rail->setGeometry(0, 0, 60, 300);
         top.show();

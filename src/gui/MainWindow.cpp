@@ -4354,37 +4354,20 @@ void MainWindow::buildUI()
     });
     auto* centre = new QWidget(this);
 
-    // ── Profilschiene OBEN statt links (2026-10-06) ──────────────────
-    //
-    // Betreiber: „weiters würde ich gerne die profile von mir oben in die
-    // leiste einfügen um links mehr platz zu haben." Die Vorlage hat die
-    // Schiene am linken Rand über die volle Höhe; das kostet auf einem
-    // breiten Schirm 44 Punkte über das ganze Fenster, für drei Abzeichen.
-    //
-    // Jetzt liegt sie quer vor der Kommandoleiste: dieselben Abzeichen,
-    // dieselbe Dicke, nur gedreht — und die linke Spalte ist frei.
+    // Profilschiene ganz links über die volle Höhe, wie in der Vorlage.
+    // Daneben die Säule aus Kommandoleiste und Splitter.
     m_layoutProfiles = new LayoutProfiles(this);
-    m_profileRail = new ProfileRail(m_layoutProfiles,
-                                    ProfileRail::Ausrichtung::Waagrecht,
-                                    centre);
+    m_profileRail = new ProfileRail(m_layoutProfiles, centre);
 
     auto* centreRow = new QHBoxLayout(centre);
     centreRow->setContentsMargins(0, 0, 0, 0);
     centreRow->setSpacing(0);
+    centreRow->addWidget(m_profileRail, 0);
 
     auto* centreCol = new QVBoxLayout;
     centreCol->setContentsMargins(6, 6, 6, 0);
     centreCol->setSpacing(6);
-
-    // Die Schiene VOR der Kommandoleiste, in derselben Zeile: links die
-    // Profile, rechts daneben Band/Mode/Filter. So bleibt der Blick, der
-    // vorher nach links ging, in derselben Ecke.
-    auto* obenRow = new QHBoxLayout;
-    obenRow->setContentsMargins(0, 0, 0, 0);
-    obenRow->setSpacing(6);
-    obenRow->addWidget(m_profileRail, 0);
-    obenRow->addWidget(m_commandBar, 1);
-    centreCol->addLayout(obenRow, 0);
+    centreCol->addWidget(m_commandBar, 0);
 
     // ── Panadapter in BEIDE Richtungen veraenderbar (2026-08-19) ──────
     //
