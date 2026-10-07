@@ -29,6 +29,7 @@
 // unbemerkt, weil nichts passiert.
 
 #include "core/AdifLog.h"
+#include "core/ZeitUtc.h"
 #include "core/LogbuchRueckschau.h"
 #include "models/LogEntry.h"
 
@@ -69,7 +70,7 @@ QString schreibeLogbuch(const QString& pfad, const QStringList& datensaetze)
     return pfad;
 }
 
-const QDateTime kStart{QDate(2026, 1, 1), QTime(0, 0), Qt::UTC};
+const QDateTime kStart = Longpath::Zeit::utc(QDate(2026, 1, 1), QTime(0, 0));
 
 }  // namespace
 

@@ -18,6 +18,7 @@
 // no-port-check: Longpath-original test file.
 
 #include <QtTest>
+#include "core/ZeitUtc.h"
 #include <QTemporaryDir>
 
 #include "core/audio/WavFile.h"
@@ -35,7 +36,7 @@ QVector<float> rxBlock(int frames, float value)
 WavRecordingInfo someRecording()
 {
     WavRecordingInfo i;
-    i.utcStart  = QDateTime(QDate(2026, 8, 25), QTime(19, 0), Qt::UTC);
+    i.utcStart  = Longpath::Zeit::utc(QDate(2026, 8, 25), QTime(19, 0));
     i.frequency = QStringLiteral("7.165.000");
     i.mode      = QStringLiteral("LSB");
     i.band      = QStringLiteral("40m");

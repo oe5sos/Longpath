@@ -18,6 +18,7 @@
 // =================================================================
 
 #include <QtTest/QtTest>
+#include "core/ZeitUtc.h"
 #include <QApplication>
 #include <QDialog>
 #include <QDir>
@@ -39,7 +40,7 @@ using namespace Longpath;
 
 namespace {
 
-const QDateTime kNow = QDateTime(QDate(2026, 9, 18), QTime(12, 0), Qt::UTC);
+const QDateTime kNow = Longpath::Zeit::utc(QDate(2026, 9, 18), QTime(12, 0));
 
 LogEntry qso(const QString& call, int daysAgo, const QString& band,
              const QString& mode, const QString& grid = {})
