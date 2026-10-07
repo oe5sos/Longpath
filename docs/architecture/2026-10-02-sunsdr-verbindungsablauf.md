@@ -1321,3 +1321,53 @@ sekündlich ins Protokoll gehen — daraus sind die Zahlen oben gerechnet.
 Wer länger messen will, startet mit `QTEST_FUNCTION_TIMEOUT` in
 Millisekunden. Der Messlauf warnt seit heute selbst, wenn mehr als 290
 Sekunden gewünscht sind und die Variable fehlt.
+
+---
+
+# `0x0c` und `0x0d` tragen keine Messwerte — jetzt wiederholt abgefragt (2026-10-07)
+
+Der Verdacht stand seit gestern: ExpertSDR2 zeigt Spannung, Strom und
+Temperatur, Longpath nichts, und unser Dokument behauptet, die QRP gebe
+keine Messwerte heraus. Der Beleg dafür war bisher schwach — fünf
+Antworten aus **Verbindungsaufbauten**, also fünf Momentaufnahmen
+desselben Zustands. Ein Wert, der sich langsam ändert (Temperatur),
+wäre darin gar nicht aufgefallen.
+
+Jetzt sauber nachgemessen: **280 Sekunden Dauerlauf bei 96 kHz, `0x0c`
+und `0x0d` alle 10 Sekunden erneut abgefragt**, 54 Abfragen, jede binnen
+13 ms quittiert.
+
+**Keine einzige Änderung.** Das Rahmen-Inventar meldet Nutzlastwechsel
+von selbst — in denselben Läufen meldet es sie für den Stromkopf
+(`0200 → 0201`), hier für `0x0c`/`0x0d` kein einziges Mal.
+
+Damit ist die Frage für diese beiden Abfragen **entschieden**, und zwar
+mit einem Verfahren, das eine Änderung auch gesehen hätte:
+
+> `0x0c` und `0x0d` sind Werksdaten. Dort stehen keine Messwerte, auch
+> keine langsam driftenden.
+
+## Was damit übrig bleibt
+
+Die Werte, die ExpertSDR2 anzeigt, können nur aus den **77-Byte-Rahmen**
+kommen, die das Gerät im Mitschnitt während des Stroms rund dreimal je
+Sekunde schickt (612 über 192 s) und die Longpath nie zu sehen bekommt.
+Sie erscheinen nicht, wenn man ExpertSDR2s dreizehn kleine Steuerrahmen
+nachschickt (am 2026-10-06 gemessen) — es bleiben `0x05` und `0x12`, die
+sich mit Nullnutzlast nicht nachbauen lassen.
+
+**Der nächste Schritt ist damit eindeutig und braucht den Betreiber:**
+ein Mitschnitt mit ExpertSDR2, aus dem die echten Bytes von `0x05` und
+`0x12` hervorgehen — und der zeigt, ab wann die 77-Byte-Rahmen
+einsetzen.
+
+## Nebenbei: der Messlauf kann jetzt wiederholt abfragen
+
+`LONGPATH_SUNSDR_WIEDERHOLT` schickt eine Rahmenliste alle
+`LONGPATH_SUNSDR_WIEDERHOLT_MS` erneut (Vorgabe 10 s). `…_PRE` schickt
+nur einmal beim Verbinden, und für die Frage „steht da ein Messwert
+drin" nützt ein einzelner Abzug nichts.
+
+Der Lauf über 280 s lief dank `QTEST_FUNCTION_TIMEOUT` diesmal
+vollständig durch, mit Schlussbericht: 335 574 Blöcke, 1198/s,
+Verlust 0,00–0,04 %.

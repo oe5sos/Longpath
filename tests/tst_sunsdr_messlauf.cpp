@@ -257,10 +257,39 @@ private slots:
             QTest::qWait(2000);
         }
 
+        // ── Eine Abfrage WAEHREND des Laufs wiederholen ──────────────
+        //
+        // LONGPATH_SUNSDR_PRE schickt seine Rahmen einmal beim Verbinden.
+        // Fuer die Frage, ob eine Antwort MESSWERTE traegt, nuetzt das
+        // nichts: ein einzelner Abzug sieht immer gleich aus. Erst wenn
+        // dieselbe Abfrage ueber Minuten wiederholt wird und die Antwort
+        // sich NICHT aendert, ist belegt, dass nichts Lebendes drinsteht
+        // -- und wenn sie sich aendert, hat man gefunden, wonach wir
+        // suchen (2026-10-06: ExpertSDR2 zeigt Spannung, Strom und
+        // Temperatur, Longpath nichts).
+        //
+        // Das Rahmen-Inventar meldet Aenderungen der Nutzlast von selbst.
+        const QByteArray wiederholt = qgetenv("LONGPATH_SUNSDR_WIEDERHOLT");
+        const int wiederholtMs =
+            qEnvironmentVariableIntValue("LONGPATH_SUNSDR_WIEDERHOLT_MS") > 0
+                ? qEnvironmentVariableIntValue("LONGPATH_SUNSDR_WIEDERHOLT_MS")
+                : 10000;
+        QElapsedTimer abfrageUhr;
+        if (!wiederholt.isEmpty()) {
+            qInfo().noquote() << QStringLiteral(
+                "Abfrage wird alle %1 ms wiederholt").arg(wiederholtMs);
+            abfrageUhr.start();
+        }
+
         const int bloeckeVorher = iq.count();
         QElapsedTimer fenster;
         fenster.start();
         while (fenster.elapsed() < sekunden * 1000) {
+            if (!wiederholt.isEmpty() && abfrageUhr.elapsed() >= wiederholtMs) {
+                abfrageUhr.restart();
+                conn.sendBenchFramesForTest(
+                    QStringLiteral("LONGPATH_SUNSDR_WIEDERHOLT"));
+            }
             // 20 ms, nicht 500: mit groben Bloecken laeuft die
             // Ereignisschleife zu selten, die Blockantworten gehen
             // verspaetet hinaus, und das Geraet WIEDERHOLT -- am
