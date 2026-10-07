@@ -109,6 +109,19 @@ welches Protokoll gesprochen wird, steht im ersten Byte (`0x16` für TLS,
 `G` für `GET`). Der alte Weg über `ws://` bleibt dadurch unverändert offen.
 Die Seite wählt nicht, sie folgt ihrem eigenen Schema.
 
+> **Was die Brücke kostet (gefunden am 2026-10-07).** Sie nimmt die
+> Verbindung im WLAN an und baut eine **eigene** nach `127.0.0.1` auf. Für
+> Longpath kommt damit jeder Client der App aus Loopback — und Loopback ist
+> dort das Vertrauen selbst: **kein Token, und keine der drei Freigaben
+> greift** (`TciAllowRemoteTx`, `TciAllowRemoteRotor`,
+> `TciAllowRemoteLog`). Das gilt für jedes Gerät im Heimnetz, nicht nur für
+> das Telefon. An der Station hängt eine Antenne.
+>
+> Im Kopf von `tci-bruecke.py` stand bis dahin das Gegenteil; dort steht
+> jetzt auch, welche zwei Wege es schließen. Der saubere ist der unter
+> **Benutzen** beschriebene: *Bind interface* auf die Netzadresse, Token
+> setzen, Brücke weglassen.
+
 ### Die eine Regel
 
 **Die Seite hält keinen eigenen Zustand.** Alles, was angezeigt wird, kommt
