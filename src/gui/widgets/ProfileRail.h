@@ -105,6 +105,24 @@ public:
 
     static constexpr int kWidth      = 44;
     static constexpr int kBadgeSide  = 30;
+    /// Die Hoehe der SCHIENE in der Leiste. Dort steht sie neben den
+    /// Pillen von CommandBar, und Scheiben von 30 px zwischen
+    /// Rechtecken liessen sich als Fremdkoerper lesen -- genau das war
+    /// am 2026-10-07 der Befund am Bildschirm.
+    ///
+    /// Es sind zwei Pixel mehr als CommandBar::kPillHeight, und das ist
+    /// kein Versehen: in Qt gilt `min-height` im Stilblatt fuer die
+    /// INHALTSflaeche, der 1 px starke Rand kommt oben und unten dazu.
+    /// Eine Pille mit kPillHeight = 27 ist also 29 Pixel hoch. Die
+    /// Schiene auf 27 festzunageln hiesse, die Abzeichen zwei Pixel
+    /// flacher als ihre Nachbarn zu machen.
+    ///
+    /// Die Abzeichen selbst bekommen hier KEINE Hoehe gesetzt -- die
+    /// kommt aus pillStyle(), damit sie gar nicht erst abweichen kann.
+    /// tst_profilschiene_richtung stellt Schiene, Abzeichen und eine
+    /// echte Pille nebeneinander, damit diese Zahl nicht stillschweigend
+    /// verrutscht.
+    static constexpr int kLeistenSeite = 29;
 
 signals:
     /// Der Betreiber will ein neues Profil. Den Namen erfragt der
@@ -157,6 +175,18 @@ private:
     {
         return m_richtung == Qt::Vertical ? Qt::AlignHCenter : Qt::AlignVCenter;
     }
+
+    /// Die Kantenlaenge eines Abzeichens am jetzigen Platz. Am Rand die
+    /// Scheibe, in der Leiste die Pillenhoehe -- siehe kLeistenSeite.
+    int seite() const
+    {
+        return m_richtung == Qt::Vertical ? kBadgeSide : kLeistenSeite;
+    }
+
+    /// Hoehe und Breite eines Knopfes am jetzigen Platz. Begruendung
+    /// an der Umsetzung -- kurz: in der Leiste darf die Breite NICHT
+    /// fest sein, sonst schneidet der geerbte Innenabstand die Schrift ab.
+    void setzeMasse(QPushButton* b) const;
 
     QBoxLayout*  m_column{nullptr};   // VBox oder HBox, je nach Richtung
     Qt::Orientation m_richtung{Qt::Vertical};
