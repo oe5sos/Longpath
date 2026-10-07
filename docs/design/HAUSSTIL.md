@@ -376,3 +376,81 @@ nichts zu tun hat.
 **Wenn eine Maßangabe nicht wirkt, ist die Ursache selten dort, wo sie
 steht.** Bei Qt-Stylesheets ist die erste Frage nicht „stimmt der
 Wert?", sondern „wer überschreibt ihn von oben?".
+
+## Dieselbe Falle, eine Etage tiefer: der geerbte Innenabstand
+
+*Dreimal zugeschlagen: 2026-09-25 an den Zoomknöpfen, 2026-10-07 an der
+Profilschiene — rückwirkend seit dem 2026-09-18.*
+
+Der app-weite Grundstil `Style::kButtonStyle` („Glas & Tiefe", seit
+18.09.) enthält:
+
+```
+QPushButton { … padding: 4px 12px; }
+```
+
+Er gilt für **jeden** `QPushButton` im Fenster — auch für einen mit
+eigenem Stilblatt, solange dieses zum Innenabstand schweigt. Qt mischt
+die Blätter je Eigenschaft, nicht als Ganzes: wer `background` und
+`border` selbst setzt, erbt `padding` trotzdem von oben.
+
+Die Rechnung dazu ist unerbittlich, weil `min-height`/`max-height` in
+Qt für die **Inhaltsfläche** gelten und Abstand und Rand außen
+draufkommen:
+
+| | Kante | − Abstand | − Rand | = Platz fürs Zeichen |
+|---|---|---|---|---|
+| Zoomknopf (2026-09-25) | 24 px | 24 | 2 | **−2** → leeres Kästchen |
+| Abzeichen am Rand (2026-09-18 bis 10-07) | 30 px | 24 | 2 | **4** → aus „N" wird ein Schrägstrich |
+| Plus in der Leiste (2026-10-07) | 27 px hoch | 8 | 2 | **37 statt 29** → acht Pixel zu hoch |
+
+### Die Regel
+
+> **Ein eigenes Stilblatt auf einem Knopf muss `padding` mitbringen.**
+> Entweder `padding: 0`, oder denselben Wert wie die Nachbarn.
+
+`CommandBar::pillStyle()` macht es richtig (`padding: 0 11px`) — darum
+sind die Pillen 29 Pixel hoch und die Schrift steht drin.
+
+### Woran man es erkennt
+
+Am Bildschirm, nicht im Quelltext: Zeichen, von denen nur ein Strich
+übrig ist, und Knöpfe, die aus einer Reihe nach oben ausbrechen. Beides
+sieht nach „Schriftfehler" aus und ist keiner.
+
+```sh
+grep -rn "setStyleSheet" src | grep QPushButton | grep -v padding
+```
+
+### Warum keine Prüfung es gemerkt hat
+
+Weil keine das app-weite Blatt trug. Ein `ProfileRail` allein im
+Prüfstand erbt nichts und ist grün — drei Wochen lang. Seit dem
+2026-10-07 ruft `tst_profilschiene_richtung` in `initTestCase()`
+`applyAppBaselineQss(*qApp)` und misst mit demselben Maß wie
+`tst_zoom_buttons_legible`: die Textfläche, die der Stil übrig lässt,
+gegen das, was das Zeichen wirklich braucht.
+
+> **Ein Oberflächen-Prüfstand ohne das app-weite Blatt prüft eine
+> Oberfläche, die es nicht gibt.**
+
+### Nachtrag 2026-10-07: der dritte und vierte Fall
+
+Am selben Tag noch zweimal gefunden, beide mit derselben Rechnung:
+
+| | Kante | − Abstand | − Rand | = Platz |
+|---|---|---|---|---|
+| Fensterknöpfe ✕ ↙ ⤢ (`WindowChrome`) | 16 px | 24 | 0 | **−8** |
+| Kreuz am Profil-Abzeichen | 14 px | 24 | 0 | **−10** |
+
+Die Fensterknöpfe trugen das seit dem 18.09. in **jedem** schwebenden
+Fenster. Gemessen, nicht gerechnet: `tst_fensterknoepfe_lesbar`.
+
+Das Plus des Widget-Auswählers (`WidgetPicker::kSide`) war mit 34 px
+knapp davongekommen — 34 − 24 − 2 = 8, und genau 8 braucht ein „+".
+Beim Angleichen auf Pillenhöhe (29) wären daraus 3 geworden; `padding: 0`
+steht jetzt auch dort.
+
+> **Vier Fälle in drei Wochen.** Wer einem `QPushButton` ein eigenes
+> Stilblatt gibt, schreibt `padding` dazu — immer, auch wenn es gerade
+> passt.

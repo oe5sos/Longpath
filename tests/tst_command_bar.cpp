@@ -29,6 +29,9 @@
 #include "gui/widgets/DspQuickPopups.h"
 
 #include <QApplication>
+#include <QHBoxLayout>
+#include <QImage>
+#include <QLabel>
 #include <QMenu>
 #include <QPushButton>
 #include <QRegularExpression>
@@ -42,6 +45,126 @@ class TestCommandBar : public QObject
     Q_OBJECT
 
 private slots:
+    // ════════════════════════════════════════════════════════════════
+    // Die Leiste als Reihe lesbar machen (2026-10-07)
+    //
+    // Betreiber zum Bild der Leiste: „die leiste oben passt aber noch
+    // immer nicht", und nach fuenf Entwuerfen: „suche das, welches am
+    // besten harmonisch dazu passt". Gewaehlt wurden drei Dinge, die
+    // alle dem folgen, was im Fenster schon gilt. Hier steht je eine
+    // Pruefung dafuer.
+    // ════════════════════════════════════════════════════════════════
+
+    /// A — zwischen den Gruppen steht ein Strich. Am BILD gemessen,
+    /// nicht an der Absicht: der Strich wird gezeichnet, nicht gebaut,
+    /// also kann kein Bauteil ihn bezeugen.
+    void zwischenDenGruppenStehtEinStrich()
+    {
+        CommandBar bar;
+        bar.resize(1400, 70);
+        bar.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&bar));
+        for (int i = 0; i < 4; ++i) { QCoreApplication::processEvents(); }
+
+        const QImage bild = bar.grab().toImage();
+        auto* row = bar.findChild<QHBoxLayout*>();
+        QVERIFY(row);
+
+        QVector<QRect> kaesten;
+        for (int i = 0; i < row->count(); ++i) {
+            QLayoutItem* it = row->itemAt(i);
+            if (it && it->layout() && it->layout()->geometry().isValid()) {
+                kaesten.append(it->layout()->geometry());
+            }
+        }
+        QVERIFY2(kaesten.size() >= 2, "weniger als zwei Gruppen in der Leiste");
+
+        const QRgb grund = bild.pixel(2, 2);
+        int striche = 0;
+        for (int i = 0; i + 1 < kaesten.size(); ++i) {
+            // Nur die Luecke absuchen, nicht die Gruppen selbst.
+            const int von  = kaesten.at(i).right() + 2;
+            const int bis  = kaesten.at(i + 1).left() - 2;
+            const int mitteY = kaesten.at(i).center().y();
+            bool gefunden = false;
+            for (int x = von; x <= bis && x < bild.width(); ++x) {
+                if (x < 0) { continue; }
+                if (bild.pixel(x, mitteY) != grund) { gefunden = true; break; }
+            }
+            if (gefunden) { ++striche; }
+        }
+        QCOMPARE(striche, kaesten.size() - 1);
+    }
+
+    /// B — hinter jeder Gruppe steht eine Dehnung, solange noch etwas
+    /// dahinter haengt. Nur so verteilt Qt den Platz gleichmaessig,
+    /// statt alles links zusammenzuschieben und rechts 168 Pixel tot
+    /// stehen zu lassen.
+    void dieGruppenVerteilenSichUeberDieBreite()
+    {
+        CommandBar bar;
+        auto* plus = new QPushButton(QStringLiteral("+"), &bar);
+        bar.addTrailing(plus);
+        auto* row = bar.findChild<QHBoxLayout*>();
+        QVERIFY(row);
+
+        int kaesten = 0, dehnungen = 0;
+        bool letzterKastenHatDehnung = false;
+        for (int i = 0; i < row->count(); ++i) {
+            QLayoutItem* it = row->itemAt(i);
+            if (!it) { continue; }
+            if (it->layout()) {
+                ++kaesten;
+                QLayoutItem* next = (i + 1 < row->count()) ? row->itemAt(i + 1) : nullptr;
+                letzterKastenHatDehnung = next && next->spacerItem();
+                QVERIFY2(letzterKastenHatDehnung,
+                         "hinter jeder Gruppe muss eine Dehnung stehen");
+            } else if (it->spacerItem()) { ++dehnungen; }
+        }
+        QVERIFY2(kaesten >= 6, "zu wenige Gruppen gefunden");
+        // Eine je Gruppe -- auch hinter der letzten, denn dahinter
+        // haengt das Plus und soll an den rechten Rand.
+        QCOMPARE(dehnungen, kaesten);
+        QVERIFY2(letzterKastenHatDehnung,
+                 "auch hinter der letzten Gruppe muss eine stehen, sonst "
+                 "klebt das Plus an der Rate statt am rechten Rand");
+    }
+
+    /// D — ohne Funkgeraet traegt eine leere Gruppe den leisen Stil,
+    /// eine volle nicht. FILTER zeigt ohne Geraet nur „—", BAND immer
+    /// seine Baender -- an dem Paar laesst es sich entscheiden.
+    void ohneFunkgeraetTretenLeereGruppenZurueck()
+    {
+        CommandBar bar;
+
+        // Die Pillen einer Gruppe ueber ihre Beschriftung finden.
+        auto pillenMit = [&bar](const QStringList& texte) {
+            QVector<QPushButton*> gefunden;
+            for (QPushButton* b : bar.findChildren<QPushButton*>()) {
+                if (texte.contains(b->text())) { gefunden.append(b); }
+            }
+            return gefunden;
+        };
+
+        const QVector<QPushButton*> baender =
+            pillenMit({QStringLiteral("40m"), QStringLiteral("20m")});
+        QVERIFY2(!baender.isEmpty(), "keine Band-Pillen gefunden");
+        for (QPushButton* b : baender) {
+            QCOMPARE(b->styleSheet(), CommandBar::pillStyle());
+        }
+
+        const QVector<QPushButton*> leere = pillenMit({QStringLiteral("—")});
+        QVERIFY2(!leere.isEmpty(), "keine leeren Pillen gefunden");
+        for (QPushButton* b : leere) {
+            QVERIFY2(b->styleSheet() == CommandBar::pillStyleGedaempft(),
+                     "eine Gruppe ohne Inhalt muss den leisen Stil tragen");
+        }
+
+        // Und die beiden Stile duerfen sich nicht gleichen, sonst
+        // belegt die Pruefung oben nichts.
+        QVERIFY(CommandBar::pillStyle() != CommandBar::pillStyleGedaempft());
+    }
+
     void noPillIsNarrowerThanItsText()
     {
         // Der Betreiber sah am 2026-08-23 live "I0 Hz" statt "10 Hz"
