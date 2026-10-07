@@ -1268,3 +1268,56 @@ Gleichwertigkeit: ExpertSDR2 zeigt Spannung, Strom und Temperatur,
 Longpath zeigt dort nichts. Was es braucht, ist ein Mitschnitt, in dem
 sichtbar wird, **wann** die 77-Byte-Rahmen einsetzen — und die echten
 Bytes von `0x05` und `0x12` gleich mit.
+
+---
+
+# Die Wiederholungen hängen an der RATE, nicht an der Strömezahl (2026-10-06, Nacht)
+
+Alle bisherigen Zahlen stammten aus 60-Sekunden-Läufen, und in jedem
+davon wurden Rate **und** Strömezahl gemeinsam verändert — damit ließ
+sich nicht trennen, woran die überzähligen Pakete hängen. Fünf Läufe à
+fünf Minuten, je rund 290 ausgewertete Messfenster, erste zehn
+weggeworfen (Einschwingen):
+
+| Betriebsart | Pakete/s | Nummern/s | Wdh./s | Pakete je Nummer |
+| --- | ---: | ---: | ---: | ---: |
+| 48 kHz, 1 Strom | 255 | 240 | 15,1 | **1,061** |
+| 48 kHz, 2 Ströme | 553 | 480 | 73,2 | **1,150** |
+| 96 kHz, 1 Strom | 610 | 480 | 131,5 | **1,272** |
+| 96 kHz, 2 Ströme | 1249 | 961 | 290,5 | **1,300** |
+| 96 kHz, 2 Ströme, Kopfantwort AUS | 1245 | 961 | 287,1 | 1,297 |
+
+## Der entscheidende Vergleich steht in der Mitte
+
+**48 kHz mit zwei Strömen und 96 kHz mit einem Strom liefern dieselben
+480 Nummern je Sekunde** — und wiederholen völlig verschieden: 73 gegen
+132 je Sekunde, 1,150 gegen 1,272 Pakete je Nummer.
+
+Damit ist es **nicht die Blockrate** und **nicht die Strömezahl**,
+sondern die **Abtastrate je Strom**. Ein zweiter Strom legt innerhalb
+derselben Rate noch etwas drauf (1,061 → 1,150 bzw. 1,272 → 1,300), aber
+der Sprung zwischen den Raten ist bei gleicher Blockrate fast doppelt so
+groß wie der durch den zweiten Strom.
+
+## Zwei Nebenbefunde
+
+**Auch bei 48 kHz wird wiederholt.** Bisher stand hier „bei 48 kHz 1,00
+Kopien je Nummer". Über fünf Minuten gemessen sind es **1,061** — 15
+überzählige Pakete je Sekunde. Wenig, aber nicht null, und die runde
+1,00 kam aus zu kurzen Läufen.
+
+**Die Kopfantwort ändert nichts**, jetzt mit fünffacher Datenmenge
+bestätigt: 290,5 gegen 287,1 Wiederholungen je Sekunde. Sie bleibt an,
+weil sie den Rückweg halbiert, nicht weil sie hier hülfe.
+
+## Was der nächste wissen muss, bevor er misst
+
+**QtTest bricht eine Prüfmethode nach 300 Sekunden ab.** Der Lauf war
+auf 1200 s gestellt; alle fünf starben nach genau fünf Minuten mit
+„Test function timed out", **mitten im Messen und damit ohne den
+Schlussbericht**. Gerettet hat die Reihe nur, dass die Fensterzeilen
+sekündlich ins Protokoll gehen — daraus sind die Zahlen oben gerechnet.
+
+Wer länger messen will, startet mit `QTEST_FUNCTION_TIMEOUT` in
+Millisekunden. Der Messlauf warnt seit heute selbst, wenn mehr als 290
+Sekunden gewünscht sind und die Variable fehlt.
