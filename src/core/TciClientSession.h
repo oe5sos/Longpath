@@ -215,6 +215,28 @@ struct TciClientSession {
     // soll es sein.
     bool fromLoopback{true};
 
+    // ── Über die Brücke hereingekommen (2026-10-07) ─────────────────────────
+    //
+    // `handfunke/tci-bruecke.py` nimmt die Verbindung des Telefons im WLAN an
+    // und baut eine EIGENE nach 127.0.0.1 auf. Für Longpath kam damit jeder
+    // Client der App aus Loopback — und Loopback ist oben das Vertrauen
+    // selbst. Die drei Freigaben (TciAllowRemoteTx, TciAllowRemoteRotor,
+    // TciAllowRemoteLog) griffen also nicht, obwohl das Telefon genau der
+    // Fall ist, für den sie gebaut wurden. Im Kopf der Brücke stand bis
+    // dahin das Gegenteil.
+    //
+    // Darum sagt die Brücke jetzt im Handschlag, für wen sie kommt
+    // (`X-Longpath-Weitergeleitet`). Dieses Feld NIMMT nur: eine Sitzung,
+    // die es trägt, muss sich für Senden, Drehen und Loggen an dieselben
+    // Freigaben halten wie jeder Client aus dem Netz. Mehr darf sie dadurch
+    // nirgends — wer den Kopfeintrag selbst setzt, verliert Rechte, statt
+    // welche zu bekommen.
+    //
+    // Am Handschlag und am Token ändert es NICHTS: eine Verbindung aus
+    // Loopback brauchte nie ein Token und braucht auch jetzt keines. Der
+    // Schnitt verläuft hier an den Freigaben, nicht an der Anmeldung.
+    bool ueberBruecke{false};
+
     // Angemeldet? Auf Loopback von vornherein true. Aus dem Netz erst, wenn
     // ein `auth:<token>` mit dem richtigen Token kam. Bis dahin beantwortet
     // der Server ausschließlich auth: und hält auch den Init-Burst zurück —

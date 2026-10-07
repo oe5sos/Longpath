@@ -109,18 +109,22 @@ welches Protokoll gesprochen wird, steht im ersten Byte (`0x16` für TLS,
 `G` für `GET`). Der alte Weg über `ws://` bleibt dadurch unverändert offen.
 Die Seite wählt nicht, sie folgt ihrem eigenen Schema.
 
-> **Was die Brücke kostet (gefunden am 2026-10-07).** Sie nimmt die
+> **Was die Brücke kostete — und seit 2026-10-07 nicht mehr.** Sie nimmt die
 > Verbindung im WLAN an und baut eine **eigene** nach `127.0.0.1` auf. Für
-> Longpath kommt damit jeder Client der App aus Loopback — und Loopback ist
-> dort das Vertrauen selbst: **kein Token, und keine der drei Freigaben
-> greift** (`TciAllowRemoteTx`, `TciAllowRemoteRotor`,
-> `TciAllowRemoteLog`). Das gilt für jedes Gerät im Heimnetz, nicht nur für
-> das Telefon. An der Station hängt eine Antenne.
+> Longpath kam damit jeder Client der App aus Loopback — und Loopback ist
+> dort das Vertrauen selbst: **keine der drei Freigaben griff**
+> (`TciAllowRemoteTx`, `TciAllowRemoteRotor`, `TciAllowRemoteLog`), und das
+> für jedes Gerät im Heimnetz. An der Station hängt eine Antenne.
 >
-> Im Kopf von `tci-bruecke.py` stand bis dahin das Gegenteil; dort steht
-> jetzt auch, welche zwei Wege es schließen. Der saubere ist der unter
-> **Benutzen** beschriebene: *Bind interface* auf die Netzadresse, Token
-> setzen, Brücke weglassen.
+> Jetzt trägt der Handschlag `X-Longpath-Weitergeleitet`, und Longpath
+> behandelt solche Sitzungen bei Senden, Drehen und Loggen wie jede andere
+> aus dem Netz.
+>
+> **Was das heißt, wenn du die Brücke benutzt:** Loggen geht weiter
+> (`TciAllowRemoteLog` steht ab Werk auf True). **Den Rotor vom Telefon zu
+> drehen braucht ab jetzt `TciAllowRemoteRotor=True`** — bewusst, denn am
+> anderen Ende dreht sich ein Mast. Das Token verlangt die Brücke
+> weiterhin nicht; wer auch das will, geht den Weg unter **Benutzen**.
 
 ### Die eine Regel
 

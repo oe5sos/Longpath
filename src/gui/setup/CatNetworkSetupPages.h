@@ -163,6 +163,10 @@ private:
     QPushButton* m_tokenCopyBtn{nullptr};
     QLineEdit*   m_originsEdit{nullptr};     // erlaubte Herkünfte für Browser
     QCheckBox*   m_allowRemoteTxCheck{nullptr};
+    // Drehen aus dem Netz. Eigener Schalter, nicht an den Sendeschalter
+    // gehaengt: ein Rotor strahlt nicht, und wer vom Telefon aus drehen
+    // will, soll dafuer nicht das Senden freigeben muessen.
+    QCheckBox*   m_allowRemoteRotorCheck{nullptr};
     QLabel*      m_remoteHintLabel{nullptr};
 
     void buildUI();

@@ -2024,6 +2024,32 @@ void TciServer::onNewConnection()
         // isLoopback() erkennt 127.0.0.0/8 und ::1 zuverlässig; die Adresse
         // kommt vom Socket, nicht vom Client, also ist sie nicht zu fälschen.
         session->fromLoopback = !m_alleAlsNetzFuerTest && ws->peerAddress().isLoopback();
+
+        // ── Die Bruecke sagt, fuer wen sie kommt (2026-10-07) ────────────────
+        //
+        // Begruendung an TciClientSession::ueberBruecke. Kurz: die Bruecke
+        // baut eine eigene Verbindung nach 127.0.0.1 auf, und damit kam
+        // jeder Client der App aus Loopback -- an allen drei Freigaben
+        // vorbei. Mit diesem Kopfeintrag muss er sich an sie halten.
+        //
+        // Der Eintrag kann nur NEHMEN. `fromLoopback`, der Handschlag und
+        // das Token bleiben unberuehrt; nur `giltAlsNetz()` sagt danach
+        // "ja". Wer ihn selbst setzt, verliert also Rechte, statt welche zu
+        // bekommen -- deshalb braucht er keine Pruefung, wer ihn gesetzt hat.
+        const QByteArray weiterFuer =
+            ws->request().rawHeader("X-Longpath-Weitergeleitet");
+        if (!weiterFuer.isEmpty()) {
+            session->ueberBruecke = true;
+            // Die echte Gegenstelle mitschreiben: ohne das steht in jeder
+            // Protokollzeile 127.0.0.1, und man sieht nicht, welches Geraet
+            // im Heimnetz es war.
+            session->peer += QStringLiteral(" (Bruecke fuer %1)")
+                                 .arg(QString::fromUtf8(weiterFuer).left(64));
+            qCInfo(lcTci) << "TciServer: Verbindung ueber die Bruecke —"
+                          << session->peer
+                          << "— die Freigaben gelten wie aus dem Netz";
+        }
+
         if (!session->fromLoopback) {
             const QString token = remoteToken();
             // Ohne hinterlegtes Token gibt es keinen Fernzugriff. Das ist die
@@ -2419,6 +2445,30 @@ bool TciServer::remoteLogAllowed()
                .value(QStringLiteral("TciAllowRemoteLog"), QStringLiteral("True"))
                .toString() != QStringLiteral("False");
 }
+
+namespace {
+
+// Gilt diese Sitzung als „aus dem Netz"?
+//
+// Zwei Wege fuehren hierher, und beide sollen dieselben Freigaben
+// durchlaufen:
+//
+//   * eine echte Verbindung aus dem Netz (`!fromLoopback`), und
+//   * eine, die ueber `handfunke/tci-bruecke.py` hereinkam. Die Bruecke
+//     baut eine EIGENE Verbindung nach 127.0.0.1 auf, also kommt das
+//     Telefon fuer Longpath aus Loopback -- und Loopback ist hier das
+//     Vertrauen selbst. Genau der Fall, fuer den die Freigaben gebaut
+//     wurden, lief bis zum 2026-10-07 an ihnen vorbei.
+//
+// Diese Funktion kann nur NEHMEN: sie gibt true zurueck, wo vorher
+// `!fromLoopback` stand, und true heisst „Freigabe noetig". Am
+// Handschlag und am Token aendert sie nichts.
+bool giltAlsNetz(const TciClientSession& s)
+{
+    return !s.fromLoopback || s.ueberBruecke;
+}
+
+}  // namespace
 
 bool TciServer::remoteRotorAllowed()
 {
@@ -3016,7 +3066,7 @@ void TciServer::onTextMessageReceived(const QString& rohMsg)
                 };
                 // Token-Pflicht wie bei jedem Netzbefehl.
                 if (!session->authenticated) { return; }
-                if (!session->fromLoopback && !remoteLogAllowed()) {
+                if (giltAlsNetz(*session) && !remoteLogAllowed()) {
                     qCWarning(lcTci)
                         << "TciServer: QSO-Eintrag von" << session->peer
                         << "abgelehnt — Loggen aus dem Netz ist abgeschaltet"
@@ -3122,7 +3172,7 @@ void TciServer::onTextMessageReceived(const QString& rohMsg)
                 // Dieselbe Sperre wie beim Eintragen. Wer im Logbuch LESEN
                 // darf, sieht jedes Rufzeichen, jede Zeit und jeden Standort
                 // darin -- das ist nicht weniger heikel als anhaengen.
-                if (!session->fromLoopback && !remoteLogAllowed()) {
+                if (giltAlsNetz(*session) && !remoteLogAllowed()) {
                     qCWarning(lcTci)
                         << "TciServer: Logbuch-Abfrage von" << session->peer
                         << "abgelehnt — Logbuch aus dem Netz ist abgeschaltet"
@@ -3369,7 +3419,7 @@ void TciServer::onTextMessageReceived(const QString& rohMsg)
                 }
 
                 // Ab hier wird gedreht -- und dafuer gilt die Freigabe.
-                if (!session->fromLoopback && !remoteRotorAllowed()) {
+                if (giltAlsNetz(*session) && !remoteRotorAllowed()) {
                     qCWarning(lcTci)
                         << "TciServer: Rotorbefehl von" << session->peer
                         << "abgelehnt — Drehen aus dem Netz ist abgeschaltet"
@@ -3427,7 +3477,7 @@ void TciServer::onTextMessageReceived(const QString& rohMsg)
                 const bool willTuneAus = a.size() >= 2 &&
                     a.at(1).trimmed().compare(QLatin1String("false"),
                                               Qt::CaseInsensitive) == 0;
-                if (willTune && !session->fromLoopback && !remoteTxAllowed()) {
+                if (willTune && giltAlsNetz(*session) && !remoteTxAllowed()) {
                     qCWarning(lcTci)
                         << "TciServer: Abstimmträger von" << session->peer
                         << "abgelehnt — Senden aus dem Netz ist nicht"
@@ -3961,7 +4011,7 @@ void TciServer::onTextMessageReceived(const QString& rohMsg)
                     // senden darf, bekommt sein trx:…,true schlicht nicht
                     // ausgeführt — und der Zustand wird ihm auch nicht
                     // bestätigt, damit seine Anzeige nicht behauptet, es liefe.
-                    if (wantsMox && !session->fromLoopback && !remoteTxAllowed()) {
+                    if (wantsMox && giltAlsNetz(*session) && !remoteTxAllowed()) {
                         qCWarning(lcTci)
                             << "TciServer: Sendewunsch von" << session->peer
                             << "abgelehnt — Senden aus dem Netz ist nicht"
@@ -4129,7 +4179,7 @@ void TciServer::onBinaryMessageReceived(const QByteArray& data)
     // Auf Loopback greift das nicht — WSJT-X und JTDX schicken hier ihren
     // Sendeton, und daran ändert sich nichts.
     if (!session->authenticated) { return; }
-    if (!session->fromLoopback && !remoteTxAllowed()) { return; }
+    if (giltAlsNetz(*session) && !remoteTxAllowed()) { return; }
 
     // ── TX mutex gate ─────────────────────────────────────────────────────────
     //

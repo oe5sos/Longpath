@@ -32,6 +32,7 @@
 #include <QtTest>
 #include <QSignalSpy>
 #include <QWebSocket>
+#include <QNetworkRequest>
 
 #include "core/AppSettings.h"
 #include "core/RotorController.h"
@@ -171,6 +172,9 @@ private slots:
     /// Aufzaehlung einfuegt, verschiebt alles darueber: unter der Scheibe
     /// am Telefon stand dann "DREHT", wenn der Rotor einen Fehler meldet.
     /// Am anderen Ende haengt ein Mast.
+    void dieBrueckeDarfNichtDrehen();
+    void ohneDenKopfeintragDrehtLoopbackWeiter();
+
     void jederZustandHatSeinenNamen()
     {
         const QVector<QPair<RotorController::State, QString>> paare = {
@@ -305,6 +309,80 @@ private slots:
     }
 };
 
+// ── Die Bruecke gilt als Netz (2026-10-07) ──────────────────────────────────
+//
+// `handfunke/tci-bruecke.py` nimmt die Verbindung des Telefons im WLAN an und
+// baut eine EIGENE nach 127.0.0.1 auf. Fuer Longpath kam damit jeder Client
+// der App aus Loopback -- und Loopback ist in TciServer das Vertrauen selbst.
+// Also lief genau der Fall, fuer den die Freigaben gebaut wurden, an ihnen
+// vorbei: `TciAllowRemoteRotor=False` schuetzte nicht, solange die Bruecke
+// lief, und das fuer jedes Geraet im Heimnetz.
+//
+// Diese beiden Pruefpunkte gehoeren zusammen. Der erste zeigt, dass der
+// Kopfeintrag die Sperre greifen laesst; der zweite, dass eine Sitzung OHNE
+// ihn unveraendert weiterlaeuft -- WSJT-X, N1MM und jeder andere Logger auf
+// demselben Rechner kennen kein `auth:` und sollen es nicht lernen muessen.
+void TestTciRotor::dieBrueckeDarfNichtDrehen()
+{
+    RadioModel model;
+    RotorAttrappe rot;
+    model.setRotor(&rot);
+
+    AppSettings::instance().setValue(QStringLiteral("TciAllowRemoteRotor"),
+                                     QStringLiteral("False"));
+    TciServer server(&model);
+    // KEIN setTreatAllClientsAsRemoteForTest: das hier ist eine echte
+    // Loopback-Sitzung, so wie die Bruecke sie aufbaut.
+    QVERIFY(server.start(0));
+
+    QWebSocket client;
+    connect(&client, &QWebSocket::textMessageReceived, this,
+            [this](const QString& m) {
+                if (m.startsWith(QStringLiteral("rotor"))) { m_antworten << m; }
+            });
+
+    QNetworkRequest anfrage{
+        QUrl(QStringLiteral("ws://127.0.0.1:%1").arg(server.port()))};
+    anfrage.setRawHeader("X-Longpath-Weitergeleitet", "172.30.30.77");
+    QSignalSpy verbunden(&client, &QWebSocket::connected);
+    client.open(anfrage);
+    QVERIFY2(verbunden.wait(2000), "nicht verbunden");
+
+    client.sendTextMessage(QStringLiteral("rotor_to:120;"));
+    QVERIFY2(warteAuf(QStringLiteral("rotor_err:")), "keine Antwort");
+    QCOMPARE(ersteMit(QStringLiteral("rotor_err:")),
+             QStringLiteral("rotor_err:nicht freigegeben;"));
+    // Und, der Punkt: nichts hat sich gedreht.
+    QVERIFY2(rot.m_ziele.isEmpty(), "der Rotor wurde trotzdem gedreht");
+}
+
+void TestTciRotor::ohneDenKopfeintragDrehtLoopbackWeiter()
+{
+    RadioModel model;
+    RotorAttrappe rot;
+    model.setRotor(&rot);
+
+    AppSettings::instance().setValue(QStringLiteral("TciAllowRemoteRotor"),
+                                     QStringLiteral("False"));
+    TciServer server(&model);
+    QVERIFY(server.start(0));
+
+    QWebSocket client;
+    connect(&client, &QWebSocket::textMessageReceived, this,
+            [this](const QString& m) {
+                if (m.startsWith(QStringLiteral("rotor"))) { m_antworten << m; }
+            });
+
+    QSignalSpy verbunden(&client, &QWebSocket::connected);
+    client.open(QUrl(QStringLiteral("ws://127.0.0.1:%1").arg(server.port())));
+    QVERIFY2(verbunden.wait(2000), "nicht verbunden");
+
+    client.sendTextMessage(QStringLiteral("rotor_to:120;"));
+    QVERIFY2(warteAuf(QStringLiteral("rotor_ok:")), "Loopback wurde gesperrt");
+    QCOMPARE(rot.m_ziele.size(), 1);
+    QCOMPARE(rot.m_ziele.first(), 120.0);
+}
+
 QTEST_MAIN(TestTciRotor)
 #include "tst_tci_rotor.moc"
 
@@ -312,6 +390,7 @@ QTEST_MAIN(TestTciRotor)
 
 #include <QtTest>
 class TestTciRotor : public QObject { Q_OBJECT };
+
 QTEST_MAIN(TestTciRotor)
 #include "tst_tci_rotor.moc"
 
