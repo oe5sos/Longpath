@@ -1540,3 +1540,37 @@ sich der Weg nicht ohne Menschen prüfen: die Statusseite entsteht erst,
 wenn jemand den Diagnosedialog öffnet, und bis dahin ist der Wert
 unsichtbar — man sähe nur, dass das Protokoll ihn nennt, nicht, dass er
 ankommt.
+
+---
+
+# Die Übergänge im laufenden Strom (2026-10-07)
+
+Der Lückenkritiker des Gegenlesens hatte recht: alle vier Stromarten
+waren **kalt** gemessen, jede von Anfang an über
+`LONGPATH_SUNSDR_STROMMODUS`. Nie gemessen war der Weg, den die
+**Bedienung** tatsächlich nimmt — eine zweite Scheibe kommt dazu,
+während der Strom läuft, oder die Rate wird umgestellt. Dabei schickt
+`stromModusNachziehen()` einen neuen Stromstart-Rahmen in einen
+laufenden Strom hinein, und ob das Gerät das verträgt, stand nirgends.
+
+Nachgefahren, 75 s, ein Lauf, zwei Wechsel mittendrin:
+
+    verbunden                 ein Strom, 48 kHz
+    setActiveReceiverCount(2) -> zwei Stroeme, je 48 kHz
+    setSampleRate(96000)      -> zwei Stroeme, je 96 kHz
+
+**Es trägt.** Alle drei `0x01`-Rahmen binnen **11–12 ms quittiert**;
+danach kommen beide Kanäle mit 612 und 607 Paketen je Sekunde, und
+zwar **ohne ein einziges verworfenes Paket** — der zweite Empfänger
+bekommt seine Daten also auch dann, wenn er erst im laufenden Betrieb
+dazukommt.
+
+| | |
+| --- | --- |
+| Verlust | 0,00 – 0,03 % |
+| Folgenummern | 4806 in 5,0 s (959/s), **0 Spätlinge** |
+| Rückweg | 1000/s, davon 37501 bloße Köpfe (**50 %**) |
+| Kopien je Nummer | 1,22 – 1,26 (wie im kalten 96-kHz-Lauf) |
+
+Damit ist auch die letzte Lücke der Abnahme geschlossen: die Stromarten
+stimmen nicht nur beim Verbinden, sondern auch im Übergang.
