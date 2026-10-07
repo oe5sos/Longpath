@@ -16,6 +16,33 @@
 
 export const HDR = 64;
 
+/**
+ * Ein Feld fuer einen TCI-Befehl sicher machen.
+ *
+ * Befehle sind durch `;` getrennt und ihre Felder durch `,`. Steht eines
+ * dieser Zeichen in einem Wert, wird aus EINEM Befehl ZWEI:
+ *
+ *     log_qso:OE5SOS;trx:0,true   ->   log_qso:OE5SOS   +   trx:0,true
+ *
+ * Der zweite ist der Sendebefehl. Am anderen Ende haengt eine Antenne.
+ *
+ * Erreichbar ist das nicht nur mit der Tastatur: `qsoOeffnenMit()` fuellt
+ * das Rufzeichenfeld aus einem SPOT, und Spots kommen aus einem Telnet-Strom
+ * von einem fremden Rechner. Longpath sichert seine Seite seit dem
+ * 2026-10-07 (`TciFeld::sicher`) -- das hier ist die andere Seite derselben
+ * Naht, und beide gehoeren gesichert: wer sich auf die Gegenseite verlaesst,
+ * verlaesst sich darauf, dass sie nie aelter ist als man selbst.
+ *
+ * 64 Zeichen, wie `TciFeld::kMaxZeichen`. Das laengste Rufzeichen der Welt
+ * hat elf.
+ */
+export function feld(wert) {
+  return String(wert === undefined || wert === null ? '' : wert)
+    .replace(/[;,\r\n\t\x00-\x1f]/g, '')
+    .trim()
+    .slice(0, 64);
+}
+
 import { sollNeuVerbinden } from './aufwachen.js';
 
 export class TciLink extends EventTarget {

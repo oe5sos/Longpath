@@ -16,6 +16,7 @@
 
 import { Sammelstelle, zeileLesen, befundLesen, zeitKurz, dupeSatz }
   from './logbuch.js';
+import { feld } from './tci.js';
 
 let fehler = 0;
 const pruefe = (name, ok, text = '') => {
@@ -155,6 +156,39 @@ const bef = (o) => befundLesen([
   pruefe('leeres Rufzeichen -> kein Satz',
          dupeSatz({ ruf: '', anzahl: 0 }).text === '');
   pruefe('befundLesen ohne Rufzeichen -> null', befundLesen(['']) === null);
+}
+
+console.log('\nWas in einen Befehl hinausgeht');
+{
+  // Befehle sind durch `;` getrennt, ihre Felder durch `,`. Steht eines
+  // dieser Zeichen in einem Wert, wird aus EINEM Befehl ZWEI -- und der
+  // zweite in der Zeile unten ist der Sendebefehl. Am anderen Ende haengt
+  // eine Antenne.
+  //
+  // Erreichbar ist das nicht nur mit der Tastatur: `qsoOeffnenMit()` fuellt
+  // das Rufzeichenfeld aus einem SPOT, und Spots kommen aus einem
+  // Telnet-Strom von einem fremden Rechner.
+  pruefe('ein echtes Rufzeichen bleibt, wie es ist', feld('OE5SOS') === 'OE5SOS');
+  pruefe('ein Strich im Rufzeichen bleibt', feld('DL1YCF/P') === 'DL1YCF/P');
+  pruefe('RST bleibt, wie es ist', feld('599 TU') === '599 TU');
+
+  pruefe('das Semikolon geht hinaus', !feld('OE5SOS;trx:0,true').includes(';'));
+  pruefe('das Komma geht hinaus', !feld('OE5SOS;trx:0,true').includes(','));
+  pruefe('und der Sendebefehl ist kein Befehl mehr',
+         feld('OE5SOS;trx:0,true') === 'OE5SOStrx:0true');
+
+  pruefe('Zeilenumbruch geht hinaus', feld('OE5\nSOS') === 'OE5SOS');
+  pruefe('Rand wird abgeschnitten', feld('  59  ') === '59');
+  pruefe('nichts gibt nichts', feld(undefined) === '' && feld(null) === '');
+  // Dieselbe Grenze wie TciFeld::kMaxZeichen auf der anderen Seite.
+  pruefe('ein Unfall wird gekuerzt', feld('X'.repeat(5000)).length === 64);
+
+  // Und der zusammengebaute Befehl bleibt EIN Befehl.
+  const ruf = feld('OE5SOS;trx:0,true');
+  const befehl = `log_qso:${ruf},${feld('59')},${feld('59')}`;
+  pruefe('der Befehl bleibt einer', !befehl.includes(';'));
+  pruefe('mit genau drei Feldern',
+         befehl.slice('log_qso:'.length).split(',').length === 3);
 }
 
 console.log(fehler === 0 ? '\nAlles gut.' : `\n${fehler} Punkt(e) offen.`);
