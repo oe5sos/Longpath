@@ -119,16 +119,24 @@ constexpr int    kVarmode = 1;      // Verhaeltnis je Probe linear fuehren
 // nachliefert.
 constexpr double kPlatzFaktor = 1.1;
 
+// Der Regler traegt seit dem Protokollzeiger `atomic`-Felder und laesst
+// sich darum nicht mehr zuweisen. Also wird er gleich richtig gebaut --
+// das war ohnehin die sauberere Form.
+AudioRateMatcher::Einstellungen einstellungenFuer(int rate)
+{
+    AudioRateMatcher::Einstellungen e;
+    e.nennRateEin = rate;
+    e.nennRateAus = rate;
+    return e;
+}
+
 }  // namespace
 
 RxRatenAngleich::RxRatenAngleich(int rate, int kanaele)
     : m_rate(rate > 0 ? rate : 48000)
     , m_kanaele(std::clamp(kanaele, 1, 2))
+    , m_regler(einstellungenFuer(m_rate))
 {
-    AudioRateMatcher::Einstellungen e;
-    e.nennRateEin = m_rate;
-    e.nennRateAus = m_rate;
-    m_regler = AudioRateMatcher(e);
 }
 
 RxRatenAngleich::~RxRatenAngleich()
