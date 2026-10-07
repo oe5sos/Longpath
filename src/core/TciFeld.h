@@ -57,11 +57,16 @@ namespace Longpath::TciFeld {
 constexpr int kMaxZeichen = 64;
 
 /// Macht `rohes` fuer eine Feldliste sicher: ohne Komma, ohne
-/// Semikolon, ohne Zeilenumbruch, gekuerzt auf `kMaxZeichen`.
-inline QString sicher(const QString& rohes)
+/// Semikolon, ohne Zeilenumbruch, gekuerzt auf `hoechstens`.
+///
+/// `hoechstens` ist fuer die wenigen Felder gedacht, die kein Rufzeichen
+/// sind, sondern ein Satz: ein Fehlertext etwa, der am Zeilenende allein
+/// steht. 64 Zeichen wuerden ihn mitten im Wort abschneiden, und eine
+/// halbe Fehlermeldung ist schlechter als keine.
+inline QString sicher(const QString& rohes, int hoechstens = kMaxZeichen)
 {
     QString raus;
-    raus.reserve(qMin(rohes.size(), kMaxZeichen));
+    raus.reserve(qMin(rohes.size(), hoechstens));
     for (const QChar c : rohes) {
         if (c == QLatin1Char(',') || c == QLatin1Char(';')
             || c == QLatin1Char('\n') || c == QLatin1Char('\r')) {
@@ -73,7 +78,7 @@ inline QString sicher(const QString& rohes)
         // auf der Gegenseite.
         if (c.category() == QChar::Other_Control) { continue; }
         raus.append(c);
-        if (raus.size() >= kMaxZeichen) { break; }
+        if (raus.size() >= hoechstens) { break; }
     }
     return raus.trimmed();
 }

@@ -60,6 +60,34 @@ export function zustandText(stand) {
 }
 
 /**
+ * Was bei einer Ablehnung unter der Scheibe steht.
+ *
+ * „nicht freigegeben" ist richtig und reicht nicht: auf einem Telefon
+ * steht man damit vor einer Scheibe, die sich nicht dreht, und weiss
+ * nicht, ob der Rotor kaputt ist, das Netz weg ist oder ein Schalter
+ * fehlt. Am 2026-10-01 stand der Betreiber eine Stunde vor einer Seite,
+ * die nur „keine Antwort" meldete, waehrend Longpath jede Verbindung
+ * still abwies — dieselbe Sorte Auskunft, derselbe verlorene Abend.
+ *
+ * Seit dem 2026-10-07 gilt eine Verbindung ueber die Bruecke als aus dem
+ * Netz, also trifft genau diese Ablehnung jeden, der vom Telefon drehen
+ * will, bis der Schalter steht. Dann soll dort stehen, WO er steht.
+ */
+export function fehlerText(roh) {
+  const t = (roh || '').trim();
+  if (/nicht freigegeben/i.test(t)) {
+    return 'NICHT FREIGEGEBEN \u2014 Setup \u203A CAT & Network \u203A TCI Server';
+  }
+  if (/peilung unbrauchbar/i.test(t)) {
+    // Kommt nur bei einer Zahl, die keine ist. Der Bediener kann hier
+    // nichts richten, aber er soll sehen, dass es an der Zahl lag und
+    // nicht am Mast.
+    return 'PEILUNG UNBRAUCHBAR';
+  }
+  return t ? t.toUpperCase() : 'ABGELEHNT';
+}
+
+/**
  * Welche Peilung liegt unter dem Finger?
  *
  * `x`/`y` sind relativ zur Mitte der Scheibe, in Bildpunkten, mit y nach

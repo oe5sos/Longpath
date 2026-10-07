@@ -29,6 +29,7 @@ private slots:
     void derEinbruchGehtNichtMehr();
     void unsichtbaresGehtHinaus();
     void einUnfallWirdGekuerzt();
+    void einSatzDarfLaengerSein();
 };
 
 void TstTciFeld::einEchtesRufzeichenBleibtWieEsIst()
@@ -99,6 +100,31 @@ void TstTciFeld::einUnfallWirdGekuerzt()
     // Das laengste echte Rufzeichen der Welt hat elf Zeichen -- die Grenze
     // schneidet also nur, was ohnehin kein Rufzeichen ist.
     QVERIFY(TciFeld::kMaxZeichen > 11);
+}
+
+
+void TstTciFeld::einSatzDarfLaengerSein()
+{
+    // Die wenigen Felder, die kein Rufzeichen sind, sondern ein Satz --
+    // ein Fehlertext etwa, der am Zeilenende allein steht. 64 Zeichen
+    // schnitten ihn mitten im Wort ab, und eine halbe Fehlermeldung ist
+    // schlechter als keine.
+    const QString meldung = QStringLiteral(
+        "Das Logbuch laesst sich nicht oeffnen: /Users/jemand/Library/"
+        "Preferences/Longpath/logbuch.adi, Zugriff verweigert");
+    const QString raus = TciFeld::sicher(meldung, 200);
+
+    QVERIFY2(raus.contains(QStringLiteral("Zugriff verweigert")), qPrintable(raus));
+    // Das Komma muss trotzdem weg: `tci.js` teilt an Kommas und nimmt das
+    // erste Stueck -- mit Komma saehe der Bediener nur die halbe Meldung.
+    QVERIFY2(!raus.contains(QLatin1Char(',')), qPrintable(raus));
+    QVERIFY2(!raus.contains(QLatin1Char(';')), qPrintable(raus));
+
+    // Und die Vorgabe bleibt die kurze: ein Rufzeichenfeld wird nicht
+    // heimlich laenger.
+    QCOMPARE(TciFeld::sicher(QString(500, QLatin1Char('X'))).size(),
+             TciFeld::kMaxZeichen);
+    QCOMPARE(TciFeld::sicher(QString(500, QLatin1Char('X')), 200).size(), 200);
 }
 
 QTEST_MAIN(TstTciFeld)
