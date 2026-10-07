@@ -67,6 +67,18 @@ int specMaxWattsFor(HPSDRModel m) noexcept {
         case HPSDRModel::ANVELINAPRO3:
             return 200;
         case HPSDRModel::ANAN_G2:
+        // ANAN-G2E, nachgetragen 2026-10-07. Sie fehlte seit dem Port der
+        // SKU, und `specMaxWattsFor` fiel fuer sie auf `return 0` durch --
+        // was der Aufrufer als Platzhalter liest und UEBERSPRINGT. Die
+        // Sicherheitsdecke fuer die Leistung wurde an diesem Geraet also
+        // nie geprueft, und niemand hat es gemerkt: der Pruefstand war
+        // gruen, er sah nur nicht hin.
+        //
+        // 100 W, dieselbe PA-Stufe wie die G2 (HpsdrModel.h:221). Die
+        // Zahl steht hier ABSICHTLICH noch einmal und wird nicht von dort
+        // geholt: eine Pruefung, die ihren Sollwert aus dem Prueflingen
+        // nimmt, kann nicht scheitern.
+        case HPSDRModel::ANAN_G2E:
             return 100;
         case HPSDRModel::ANAN_G2_1K:
             return 1000;
@@ -95,6 +107,7 @@ const char* hpsdrModelName(HPSDRModel m) noexcept {
         case HPSDRModel::ANAN7000D:    return "ANAN7000D";
         case HPSDRModel::ANAN8000D:    return "ANAN8000D";
         case HPSDRModel::ANAN_G2:      return "ANAN_G2";
+        case HPSDRModel::ANAN_G2E:     return "ANAN_G2E";
         case HPSDRModel::ANAN_G2_1K:   return "ANAN_G2_1K";
         case HPSDRModel::ANVELINAPRO3: return "ANVELINAPRO3";
         case HPSDRModel::HERMESLITE:   return "HERMESLITE";
@@ -322,10 +335,53 @@ private slots:
     // a tiny dBm value, well under 1.0.
     void safety_ceiling_matrix_no_band_exceeds_rail() {
         TransmitModel t;
-        // Iterate the 16 production HPSDRModel values (FIRST/LAST are
-        // sentinels — skipped via specMaxWattsFor returning 0).
+
+        // ── Was dieser Pruefpunkt vorher NICHT konnte (2026-10-07) ─────────
+        //
+        // `computeAudioVolume` endet auf JEDEM Weg in
+        // `std::clamp(..., 0.0, 1.0)` (TransmitModel.cpp). `v <= 1.0` und
+        // `v >= 0.0` konnten damit nie scheitern: geprueft wurde die
+        // Klammer, nicht die Rechnung darunter. Ein Kern, der 5,0
+        // ausrechnet, haette ein gruenes Haekchen bekommen -- und daneben
+        // haette weiter "safety ceiling exceeded" gestanden.
+        //
+        // Was bleibt und wirklich etwas sagt: `std::isfinite`. `std::clamp`
+        // reicht NaN unveraendert durch.
+        //
+        // Dazu jetzt das hier: genau 1,0 heisst, die Klammer hat GEKAPPT.
+        // Gemessen am 2026-10-07 trifft das 16 von 238 Zellen, und zwar nur
+        // zwei Geraete. Die Liste ist festgehalten, damit beides auffaellt:
+        // eine Zelle, die neu kappt (Rechnung oder Verstaerkungstabelle hat
+        // sich bewegt), und eine, die aufhoert zu kappen.
+        //
+        // Die engste NICHT gekappte Zelle ist ANAN8000D/Band10m@200W mit
+        // 0,992910 -- dieselbe, die der Pruefpunkt darunter festhaelt.
+        static const QSet<QString> kGekappt = {
+            QStringLiteral("ORIONMKII/Band160m"), QStringLiteral("ORIONMKII/Band80m"),
+            QStringLiteral("ORIONMKII/Band60m"),  QStringLiteral("ORIONMKII/Band40m"),
+            QStringLiteral("ORIONMKII/Band30m"),  QStringLiteral("ORIONMKII/Band20m"),
+            QStringLiteral("ORIONMKII/Band17m"),  QStringLiteral("ORIONMKII/Band15m"),
+            QStringLiteral("ORIONMKII/Band12m"),  QStringLiteral("ORIONMKII/Band10m"),
+            QStringLiteral("ORIONMKII/Band6m"),
+            QStringLiteral("ANAN_G2_1K/Band160m"), QStringLiteral("ANAN_G2_1K/Band15m"),
+            QStringLiteral("ANAN_G2_1K/Band12m"),  QStringLiteral("ANAN_G2_1K/Band10m"),
+            QStringLiteral("ANAN_G2_1K/Band6m"),
+        };
+        QSet<QString> gesehen;
+        // Bis `LAST`, nicht bis zu einem benannten Geraet.
+        //
+        // Hier stand `mi <= REDPITAYA`, und REDPITAYA war einmal das letzte
+        // Geraet der Aufzaehlung. Dann kam die ANAN-G2E dahinter (16), und
+        // damit lief die Sicherheitsdecke fuer die Sendeleistung an ihr
+        // vorbei -- ohne ein Wort. Der Pruefstand blieb gruen, er sah nur
+        // nicht mehr hin, und die Zeile darueber behauptete weiterhin "die
+        // 16 Geraete".
+        //
+        // Eine Obergrenze, die ein Geraet NENNT, altert mit jedem neuen
+        // Geraet. `LAST` altert nicht; die Platzhalter faengt `maxW <= 0`
+        // ab, wie bisher.
         for (int mi = static_cast<int>(HPSDRModel::HPSDR);
-             mi <= static_cast<int>(HPSDRModel::REDPITAYA); ++mi) {
+             mi < static_cast<int>(HPSDRModel::LAST); ++mi) {
             const auto model = static_cast<HPSDRModel>(mi);
             const int maxW = specMaxWattsFor(model);
             if (maxW <= 0) {
@@ -343,13 +399,19 @@ private slots:
                     qPrintable(QStringLiteral("non-finite v for %1 / %2")
                                    .arg(QString::fromLatin1(hpsdrModelName(model)),
                                         QString::fromLatin1(bandName(band)))));
-                QVERIFY2(v <= 1.0,
-                    qPrintable(QStringLiteral("safety ceiling exceeded: "
-                                              "%1 / %2 @ %3W -> %4")
-                                   .arg(QString::fromLatin1(hpsdrModelName(model)),
-                                        QString::fromLatin1(bandName(band)))
-                                   .arg(maxW)
-                                   .arg(v, 0, 'f', 6)));
+                const QString zelle =
+                    QStringLiteral("%1/%2")
+                        .arg(QString::fromLatin1(hpsdrModelName(model)),
+                             QString::fromLatin1(bandName(band)));
+                if (v >= 1.0) {
+                    gesehen.insert(zelle);
+                    QVERIFY2(kGekappt.contains(zelle),
+                        qPrintable(QStringLiteral("NEU gekappt: %1 @ %2W -> %3 "
+                                                  "— die Rechnung will mehr als "
+                                                  "die Schiene hergibt, und nur "
+                                                  "die Klammer haelt es auf")
+                                       .arg(zelle).arg(maxW).arg(v, 0, 'f', 6)));
+                }
                 QVERIFY2(v >= 0.0,
                     qPrintable(QStringLiteral("audio_volume negative: "
                                               "%1 / %2 @ %3W -> %4")
@@ -359,6 +421,10 @@ private slots:
                                    .arg(v, 0, 'f', 6)));
             }
         }
+
+        // Und andersherum: hoert eine Zelle auf zu kappen, hat sich auch
+        // etwas bewegt. Beide Richtungen gehoeren gesehen.
+        QCOMPARE(gesehen, kGekappt);
     }
 
     // Pin the ANAN-8000D B10M @ 200W tightest-cell value.  If this number
