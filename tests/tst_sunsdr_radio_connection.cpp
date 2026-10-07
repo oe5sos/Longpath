@@ -2317,7 +2317,11 @@ private slots:
         QCOMPARE(conn.stromModusForTest(), 0);
 
         conn.setSampleRate(96000);
-        QCOMPARE(conn.stromModusForTest(), 2);   // ZweiStroemeJe96
+        // Mit EINEM Empfaenger ist 96 kHz seit dem 2026-10-07 EinStrom96
+        // (= 3) und nicht mehr ZweiStroemeJe96: die vierte Nutzlast gibt
+        // es, und ein zweiter Strom ohne Empfaenger ist halbe Datenmenge
+        // umsonst.
+        QCOMPARE(conn.stromModusForTest(), 3);   // EinStrom96
 
         conn.setSampleRate(48000);
         QCOMPARE(conn.stromModusForTest(), 0);
@@ -2352,12 +2356,16 @@ private slots:
 
         // Genau die Reihenfolge aus RadioModel::connectToRadio.
         conn.setSampleRate(96000);
-        QCOMPARE(conn.stromModusForTest(), 2);   // ZweiStroemeJe96
+        // Mit EINEM Empfaenger ist 96 kHz seit dem 2026-10-07 EinStrom96
+        // (= 3) und nicht mehr ZweiStroemeJe96: die vierte Nutzlast gibt
+        // es, und ein zweiter Strom ohne Empfaenger ist halbe Datenmenge
+        // umsonst.
+        QCOMPARE(conn.stromModusForTest(), 3);   // EinStrom96
         conn.connectToRadio(someQrpInfo());
 
         // Vor der Behebung stand hier wieder 0 -- und der Stromstart-Rahmen
         // ging mit 48 kHz hinaus, obwohl die App 96 angesagt hatte.
-        QCOMPARE(conn.stromModusForTest(), 2);
+        QCOMPARE(conn.stromModusForTest(), 3);
     }
 
     // Dasselbe fuer die Zahl der Empfaenger: derselbe Reset setzt sie auf 1.
@@ -2407,9 +2415,15 @@ private slots:
         QCOMPARE(conn.stromModusForTest(), 0);
     }
 
-    // Bei 96 kHz gibt es auf dem Draht keinen Ein-Strom-Modus -- dort
-    // sind es immer zwei, gleich wie viele Empfaenger oben hoeren.
-    void beiSechsundneunzigSindEsImmerZweiStroeme()
+    // ~~Bei 96 kHz gibt es keinen Ein-Strom-Modus~~ -- am 2026-10-07
+    // widerlegt. Die Annahme stammte daher, dass nur drei der vier
+    // Nutzlasten gemessen waren; ExpertSDR2 schickt die vierte (ein
+    // Strom, 96 kHz), und das Geraet nimmt sie an.
+    //
+    // Die Pruefung bleibt stehen, mit umgedrehter Erwartung: Rate und
+    // Empfaengerzahl entscheiden GETRENNT, und genau das soll niemand
+    // versehentlich wieder zusammenlegen.
+    void beiSechsundneunzigEntscheidetDieEmpfaengerzahlMit()
     {
         SunSdrRadioConnection conn;
         conn.setFixedPortBindingEnabledForTest(false);
@@ -2418,14 +2432,15 @@ private slots:
         conn.connectToRadio(someQrpInfo());
         handshake(conn);
 
+        // Ein Empfaenger ist der Ausgangszustand -> ein Strom, 96 kHz.
         conn.setSampleRate(96000);
-        QCOMPARE(conn.stromModusForTest(), 2);   // zwei Stroeme, je 96 kHz
+        QCOMPARE(conn.stromModusForTest(), 3);   // EinStrom96
 
         conn.setActiveReceiverCount(2);
-        QCOMPARE(conn.stromModusForTest(), 2);   // bleibt
+        QCOMPARE(conn.stromModusForTest(), 2);   // zwei Stroeme, je 96 kHz
 
         conn.setActiveReceiverCount(1);
-        QCOMPARE(conn.stromModusForTest(), 2);   // bleibt ebenfalls
+        QCOMPARE(conn.stromModusForTest(), 3);   // und wieder zurueck
     }
 
     // Die selbsttaetige Wiederholung (2026-10-04): bleibt KEIN Beacon
