@@ -165,7 +165,8 @@ void RxRatenAngleich::baueUmtaster(int blockRahmen)
 }
 
 RxRatenAngleich::Ausgabe RxRatenAngleich::verarbeite(
-    const float* ein, int rahmen, std::int64_t fuellungRahmen, std::int64_t ringRahmen)
+    const float* ein, int rahmen, std::int64_t fuellungRahmen,
+    std::int64_t ringRahmen, std::int64_t verbrauchtGesamt)
 {
     if (!ein || rahmen <= 0) { return { ein, 0 }; }
 
@@ -174,40 +175,66 @@ RxRatenAngleich::Ausgabe RxRatenAngleich::verarbeite(
     // kostet Rechenzeit und Tonqualitaet fuer nichts.
     if (fuellungRahmen < 0 || ringRahmen <= 0) { return { ein, rahmen }; }
 
-    // Dem Regler beide Richtungen melden: erzeugte Rahmen positiv, die vom
-    // Geraet verbrauchten negativ. Die verbrauchten liest der Erzeuger am
-    // Fuellstand ab -- so muss der Rueckruf nichts mitfuehren und keine
-    // Sperre nehmen (ebendas unterscheidet diesen Weg von Thetis).
-    const std::int64_t letzteFuellung =
-        m_letzteFuellung.load(std::memory_order_relaxed);
-    if (letzteFuellung >= 0) {
-        const std::int64_t verbraucht = letzteFuellung + m_letzteAusgabe - fuellungRahmen;
+    // ── Verbrauch: gezaehlt, wenn es geht; geschaetzt, wenn es sein muss ──
+    //
+    // Gezaehlt (`verbrauchtGesamt >= 0`): der Bus fuehrt einen fortlaufenden
+    // Zaehler der Rahmen, die wirklich an das Geraet gegangen sind. Die
+    // Differenz zum letzten Durchlauf IST der Verbrauch -- keine Annahme
+    // darueber, wie viel Zeit vergangen ist, und kein Sprung beim Leeren
+    // des Rings, weil weggeworfene Rahmen nicht gezaehlt werden.
+    //
+    // Geschaetzt (der alte Weg, wenn der Bus nicht zaehlt): aus der
+    // Differenz zweier Fuellstaende. Das setzt voraus, dass zwischen zwei
+    // Bloecken immer ungefaehr gleich viel Zeit vergeht -- und genau das
+    // stimmt nicht, wenn der Ton in Schueben kommt.
+    //
+    // WARUM das hier steht: am 2026-10-07 lief der Ausgleich an Martins
+    // SunSDR2 QRP (Ton ueber TCI, also ueber Netz) in seinen unteren
+    // Anschlag -- Verhaeltnis 0,96 statt 1,000004, 115 000 Rahmen je
+    // Minute weggeworfen, Ring fast leer. Ursache: die Schaetzung sah
+    // fuenfzehnmal je Sekunde einen "unplausiblen" Verbrauch, die Grenze
+    // warf ihn weg, und der Regler bekam nur noch "erzeugt" ohne
+    // "verbraucht". Ein Mittelwert ueber eine Haelfte ist kein Mittelwert.
+    const std::int64_t letzterVerbrauch =
+        m_letzterVerbrauch.load(std::memory_order_relaxed);
+    if (verbrauchtGesamt >= 0) {
+        if (letzterVerbrauch >= 0) {
+            const std::int64_t verbraucht = verbrauchtGesamt - letzterVerbrauch;
+            // Ein Zaehler laeuft nur vorwaerts. Geht er zurueck, wurde der
+            // Bus neu geoeffnet -- dann ist die Differenz keine Messung.
+            if (verbraucht > 0) {
+                m_regler.melde(
+                    -static_cast<int>(std::min<std::int64_t>(verbraucht, 1 << 20)),
+                    fuellungRahmen, ringRahmen);
+            } else if (verbraucht < 0) {
+                m_spruenge.fetch_add(1, std::memory_order_relaxed);
+            }
+        }
+        m_letzterVerbrauch.store(verbrauchtGesamt, std::memory_order_relaxed);
+    } else {
+        const std::int64_t letzteFuellung =
+            m_letzteFuellung.load(std::memory_order_relaxed);
+        if (letzteFuellung >= 0) {
+            const std::int64_t verbraucht =
+                letzteFuellung + m_letzteAusgabe - fuellungRahmen;
 
-        // ── Ein geleerter Ring ist kein Verbrauch (2026-10-06) ───────────
-        //
-        // `AudioEngine::setMasterMuted(true)` ruft `IAudioBus::flush()`,
-        // und PortAudioBus setzt dabei den Lese- auf den Schreibzeiger:
-        // der Fuellstand faellt in einem Schritt auf null. Aus dem
-        // Unterschied gelesen sieht das aus wie ein Verbrauch von 2880
-        // statt 480 Rahmen -- das Sechsfache, und es stimmt nicht: das
-        // Geraet hat nichts davon gehoert, die Rahmen wurden weggeworfen.
-        //
-        // So eine Zahl in die Regelung zu geben verschiebt das gemittelte
-        // Verhaeltnis, und zwar bei JEDEM Stummschalten. Der Fehler
-        // waere leise: kein Knacken, kein Aussetzer, nur ein Regler, der
-        // mit der Zeit auf eine falsche Rate zieht.
-        //
-        // Darum eine Plausibilitaetsgrenze. Mehr als das Vierfache des
-        // Blocks kann in der Zeit zwischen zwei Bloecken nicht verbraucht
-        // worden sein; was darueber liegt, ist ein Sprung und keine
-        // Messung. Er wird AUSGELASSEN, nicht gekappt -- ein gekappter
-        // Sprung waere immer noch falsch, nur weniger.
-        const std::int64_t plausibel = std::int64_t(rahmen) * m_plausibelFaktor;
-        if (verbraucht > 0 && verbraucht <= plausibel) {
-            m_regler.melde(-static_cast<int>(verbraucht),
-                           fuellungRahmen, ringRahmen);
-        } else if (verbraucht > plausibel) {
-            m_spruenge.fetch_add(1, std::memory_order_relaxed);
+            // Die Plausibilitaetsgrenze vom 2026-10-06. Sie gilt NUR noch
+            // auf dem geschaetzten Weg: `flush()` setzt den Lese- auf den
+            // Schreibzeiger, der Fuellstand faellt in einem Schritt auf
+            // null, und aus dem Unterschied gelesen sieht das aus wie ein
+            // Verbrauch des Sechsfachen. Das Geraet hat davon nichts
+            // gehoert.
+            //
+            // Auf dem gezaehlten Weg braucht es sie nicht -- dort kann der
+            // Zaehler gar nicht springen.
+            const std::int64_t plausibel =
+                std::int64_t(rahmen) * m_plausibelFaktor;
+            if (verbraucht > 0 && verbraucht <= plausibel) {
+                m_regler.melde(-static_cast<int>(verbraucht),
+                               fuellungRahmen, ringRahmen);
+            } else if (verbraucht > plausibel) {
+                m_spruenge.fetch_add(1, std::memory_order_relaxed);
+            }
         }
     }
     m_regler.melde(rahmen, fuellungRahmen, ringRahmen);
@@ -286,6 +313,7 @@ void RxRatenAngleich::zuruecksetzen()
     m_regler.zuruecksetzen();
     if (m_varsamp) { flush_varsamp(m_varsamp); }
     m_versatz.store(0, std::memory_order_relaxed);
+    m_letzterVerbrauch.store(-1, std::memory_order_relaxed);
     m_spruenge.store(0, std::memory_order_relaxed);
     m_neubauten.store(0, std::memory_order_relaxed);
     m_letzteMeldungMs = 0;
