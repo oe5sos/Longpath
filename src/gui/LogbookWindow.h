@@ -71,6 +71,8 @@ class QsoUploader;
 class QrzLogbookUploader;
 class QrzLogbookFetcher;
 
+class WindowTitleBar;
+
 class LogbookWindow : public QDialog {
     Q_OBJECT
 public:
@@ -102,6 +104,15 @@ public:
     // oder vom Aufrufer gesetzt) noch einmal anwenden, sobald die
     // umbrechenden Leisten ihre wirkliche Breite kennen -- siehe .cpp.
     void setVisible(bool visible) override;
+
+
+private:
+    // Eigene Titelleiste statt des Systemrahmens -- das Logbuch war das
+    // letzte Fenster mit runden Ecken des Betriebssystems, waehrend alle
+    // anderen (Rotor, abgeloeste Applets, Panadapter) laengst rahmenlos
+    // mit WindowChrome laufen. Betreiber am 2026-10-06: "die fensterecken
+    // sind rund, alle anderen widget sind doch eckig?!?!"
+    WindowTitleBar* m_titleBar{nullptr};
 
 private:
     bool m_shownOnce{false};

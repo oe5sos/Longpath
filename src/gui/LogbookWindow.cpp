@@ -28,7 +28,9 @@
 #include "core/QsoUploader.h"
 #include "gui/QsoMapWindow.h"
 #include "gui/widgets/FlowLayout.h"
+#include "gui/FramelessResizer.h"
 #include "gui/StyleConstants.h"
+#include "gui/WindowChrome.h"
 #include "gui/widgets/QsoDetailPane.h"
 #include "core/Maidenhead.h"
 #include "models/Band.h"
@@ -113,6 +115,10 @@ LogbookWindow::LogbookWindow(const QString& adifPath, QWidget* parent)
     : QDialog(parent), m_path(adifPath)
 {
     setWindowTitle(QStringLiteral("Logbook"));
+    // Rahmenlos wie jedes andere Longpath-Fenster. Bis hierher war das
+    // Logbuch das einzige mit dem Rahmen des Betriebssystems -- und damit
+    // das einzige mit runden Ecken, waehrend alles andere eckig ist.
+    setWindowFlags(windowFlags() | Qt::FramelessWindowHint);
     // Not modal: you look things up in the log *while* working a
     // station, which is exactly when a modal dialog would be in the way.
     setModal(false);
@@ -127,6 +133,13 @@ LogbookWindow::LogbookWindow(const QString& adifPath, QWidget* parent)
     // ersten Knopf -- Return in der Suche oeffnete "Edit..." (gefunden
     // 2026-09-26 an einem haengenden Test: modaler Bearbeiten-Dialog).
     for (QPushButton* b : findChildren<QPushButton*>()) { b->setAutoDefault(false); b->setDefault(false); }
+    // Ziehen an der Leiste, Groesse an den Kanten und am Griff unten
+    // rechts -- dieselben drei Teile, die ToolWindow installiert. Der
+    // obere Streifen gehoert dem Ziehen, sonst schnappt der Resizer den
+    // Griff weg (AetherSDR #4266).
+    FramelessResizer::install(this, 6, m_titleBar->height());
+    attachResizeGrip(this);
+
     restoreHeaderState();
     restoreSplitState();
     restoreGeometryState();
@@ -267,7 +280,30 @@ void LogbookWindow::buildUi()
     setStyleSheet(QStringLiteral("QDialog { background: %1; }")
                       .arg(QString::fromLatin1(Style::kAppBg)));
 
-    auto* col = new QVBoxLayout(this);
+    // ── Eigene Titelleiste, buendig am Rand ──────────────────────────
+    //
+    // Das aeussere Layout traegt KEINE Raender, damit die Leiste von Kante
+    // zu Kante geht wie bei jedem anderen Longpath-Fenster. Die bisherigen
+    // zehn Punkte Rand sitzen jetzt am Inhalt darunter -- `col` bleibt
+    // dadurch genau das, was es vorher war, und alles Folgende
+    // unveraendert.
+    auto* aussen = new QVBoxLayout(this);
+    aussen->setContentsMargins(0, 0, 0, 0);
+    aussen->setSpacing(0);
+
+    m_titleBar = new WindowTitleBar(QStringLiteral("Logbuch"), this);
+    // Das Logbuch gehoert in kein Dock -- das × schliesst, und der
+    // Andockwunsch (Doppelklick auf die Leiste) tut dasselbe, statt ins
+    // Leere zu laufen.
+    connect(m_titleBar, &WindowTitleBar::closeRequested, this, &QDialog::close);
+    connect(m_titleBar, &WindowTitleBar::dockRequested, this, &QDialog::close);
+    m_titleBar->setLockKey(QStringLiteral("Tool_Logbook"));
+    aussen->addWidget(m_titleBar);
+
+    auto* inhalt = new QWidget(this);
+    aussen->addWidget(inhalt, 1);
+
+    auto* col = new QVBoxLayout(inhalt);
     col->setContentsMargins(10, 10, 10, 10);
     col->setSpacing(8);
 

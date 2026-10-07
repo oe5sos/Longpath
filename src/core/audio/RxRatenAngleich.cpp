@@ -85,6 +85,7 @@
 #include "core/audio/RxRatenAngleich.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <cmath>
 
 extern "C" {
@@ -118,16 +119,24 @@ constexpr int    kVarmode = 1;      // Verhaeltnis je Probe linear fuehren
 // nachliefert.
 constexpr double kPlatzFaktor = 1.1;
 
+// Der Regler traegt seit dem Protokollzeiger `atomic`-Felder und laesst
+// sich darum nicht mehr zuweisen. Also wird er gleich richtig gebaut --
+// das war ohnehin die sauberere Form.
+AudioRateMatcher::Einstellungen einstellungenFuer(int rate)
+{
+    AudioRateMatcher::Einstellungen e;
+    e.nennRateEin = rate;
+    e.nennRateAus = rate;
+    return e;
+}
+
 }  // namespace
 
 RxRatenAngleich::RxRatenAngleich(int rate, int kanaele)
     : m_rate(rate > 0 ? rate : 48000)
     , m_kanaele(std::clamp(kanaele, 1, 2))
+    , m_regler(einstellungenFuer(m_rate))
 {
-    AudioRateMatcher::Einstellungen e;
-    e.nennRateEin = m_rate;
-    e.nennRateAus = m_rate;
-    m_regler = AudioRateMatcher(e);
 }
 
 RxRatenAngleich::~RxRatenAngleich()
@@ -139,6 +148,7 @@ void RxRatenAngleich::baueUmtaster(int blockRahmen)
 {
     if (m_varsamp) { destroy_varsamp(m_varsamp); m_varsamp = nullptr; }
     m_blockRahmen = blockRahmen;
+    m_neubauten.fetch_add(1, std::memory_order_relaxed);
 
     // varsamp rechnet KOMPLEX: zwei doubles je Probe. Fuer Stereo faellt
     // das zusammen (links/rechts auf die beiden Teile); bei Mono wird der
@@ -155,7 +165,7 @@ void RxRatenAngleich::baueUmtaster(int blockRahmen)
 }
 
 RxRatenAngleich::Ausgabe RxRatenAngleich::verarbeite(
-    const float* ein, int rahmen, qint64 fuellungRahmen, qint64 ringRahmen)
+    const float* ein, int rahmen, std::int64_t fuellungRahmen, std::int64_t ringRahmen)
 {
     if (!ein || rahmen <= 0) { return { ein, 0 }; }
 
@@ -168,17 +178,42 @@ RxRatenAngleich::Ausgabe RxRatenAngleich::verarbeite(
     // Geraet verbrauchten negativ. Die verbrauchten liest der Erzeuger am
     // Fuellstand ab -- so muss der Rueckruf nichts mitfuehren und keine
     // Sperre nehmen (ebendas unterscheidet diesen Weg von Thetis).
-    if (m_letzteFuellung >= 0) {
-        const qint64 verbraucht = m_letzteFuellung + m_letzteAusgabe - fuellungRahmen;
-        if (verbraucht > 0) {
-            m_regler.melde(-static_cast<int>(std::min<qint64>(verbraucht, 1 << 20)),
+    const std::int64_t letzteFuellung =
+        m_letzteFuellung.load(std::memory_order_relaxed);
+    if (letzteFuellung >= 0) {
+        const std::int64_t verbraucht = letzteFuellung + m_letzteAusgabe - fuellungRahmen;
+
+        // ── Ein geleerter Ring ist kein Verbrauch (2026-10-06) ───────────
+        //
+        // `AudioEngine::setMasterMuted(true)` ruft `IAudioBus::flush()`,
+        // und PortAudioBus setzt dabei den Lese- auf den Schreibzeiger:
+        // der Fuellstand faellt in einem Schritt auf null. Aus dem
+        // Unterschied gelesen sieht das aus wie ein Verbrauch von 2880
+        // statt 480 Rahmen -- das Sechsfache, und es stimmt nicht: das
+        // Geraet hat nichts davon gehoert, die Rahmen wurden weggeworfen.
+        //
+        // So eine Zahl in die Regelung zu geben verschiebt das gemittelte
+        // Verhaeltnis, und zwar bei JEDEM Stummschalten. Der Fehler
+        // waere leise: kein Knacken, kein Aussetzer, nur ein Regler, der
+        // mit der Zeit auf eine falsche Rate zieht.
+        //
+        // Darum eine Plausibilitaetsgrenze. Mehr als das Vierfache des
+        // Blocks kann in der Zeit zwischen zwei Bloecken nicht verbraucht
+        // worden sein; was darueber liegt, ist ein Sprung und keine
+        // Messung. Er wird AUSGELASSEN, nicht gekappt -- ein gekappter
+        // Sprung waere immer noch falsch, nur weniger.
+        const std::int64_t plausibel = std::int64_t(rahmen) * m_plausibelFaktor;
+        if (verbraucht > 0 && verbraucht <= plausibel) {
+            m_regler.melde(-static_cast<int>(verbraucht),
                            fuellungRahmen, ringRahmen);
+        } else if (verbraucht > plausibel) {
+            m_spruenge.fetch_add(1, std::memory_order_relaxed);
         }
     }
     m_regler.melde(rahmen, fuellungRahmen, ringRahmen);
 
     if (!m_regler.regeltSchon()) {
-        m_letzteFuellung = fuellungRahmen;
+        m_letzteFuellung.store(fuellungRahmen, std::memory_order_relaxed);
         m_letzteAusgabe = rahmen;
         return { ein, rahmen };
     }
@@ -206,18 +241,55 @@ RxRatenAngleich::Ausgabe RxRatenAngleich::verarbeite(
         }
     }
 
-    m_versatz += static_cast<qint64>(sicher) - rahmen;
-    m_letzteFuellung = fuellungRahmen;
+    m_versatz.fetch_add(static_cast<std::int64_t>(sicher) - rahmen,
+                        std::memory_order_relaxed);
+    m_letzteFuellung.store(fuellungRahmen, std::memory_order_relaxed);
     m_letzteAusgabe = sicher;
     return { m_ausFloat.data(), sicher };
+}
+
+QString RxRatenAngleich::protokollZeile(std::int64_t jetztMs, int abstandSek)
+{
+    // Vor der Anlaufzeit gibt es nichts zu melden -- da regelt noch
+    // niemand, und eine Zeile "var = 1,0" waere eine Aussage ueber nichts.
+    if (!m_regler.regeltSchon()) { return {}; }
+    if (m_letzteMeldungMs != 0
+        && (jetztMs - m_letzteMeldungMs) < std::int64_t(abstandSek) * 1000) {
+        return {};
+    }
+    m_letzteMeldungMs = jetztMs;
+
+    // Der Versatz ist die eigentliche Zahl: so viele Rahmen hat der
+    // Ausgleich bis jetzt zugelegt oder weggenommen. Laeuft er richtig,
+    // waechst er stetig und langsam; springt er, stimmt etwas nicht.
+    // EINMAL lesen, nicht zweimal: das Verhaeltnis ist ein `atomic`, das
+    // der Tonfaden hundertmal je Sekunde neu setzt. Zwei Lesevorgaenge
+    // ergaeben eine Zeile, in der die ppm-Zahl nicht zum Verhaeltnis
+    // daneben passt -- und wer so eine Zeile prueft, sucht den Fehler in
+    // der Regelung statt in der Meldung.
+    const double var = m_regler.verhaeltnis();
+    const double ppm = (var - 1.0) * 1e6;
+    return QStringLiteral(
+        "RX-Driftausgleich: Verhaeltnis %1 (%2 ppm), Fuellstand %3 Rahmen, "
+        "Versatz %4 Rahmen seit dem Start, %5 Spruenge ausgelassen, "
+        "%6 Umtaster-Neubauten")
+        .arg(var, 0, 'f', 9)
+        .arg(ppm, 0, 'f', 2)
+        .arg(m_letzteFuellung.load(std::memory_order_relaxed))
+        .arg(versatz())
+        .arg(spruenge())
+        .arg(umtasterNeubauten());
 }
 
 void RxRatenAngleich::zuruecksetzen()
 {
     m_regler.zuruecksetzen();
     if (m_varsamp) { flush_varsamp(m_varsamp); }
-    m_versatz = 0;
-    m_letzteFuellung = -1;
+    m_versatz.store(0, std::memory_order_relaxed);
+    m_spruenge.store(0, std::memory_order_relaxed);
+    m_neubauten.store(0, std::memory_order_relaxed);
+    m_letzteMeldungMs = 0;
+    m_letzteFuellung.store(-1, std::memory_order_relaxed);
     m_letzteAusgabe = 0;
 }
 

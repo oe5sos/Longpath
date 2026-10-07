@@ -306,6 +306,54 @@ private slots:
                                    .arg(QString(64, QLatin1Char('X'))));
         QVERIFY(warteAuf(QStringLiteral("log_dup_err:")));
     }
+
+    /// Ein Semikolon im Logbuch beendet die Zeile -- und was danach kommt,
+    /// liest die Gegenseite als NEUEN BEFEHL.
+    ///
+    /// Die Felder dieser Zeilen kommen aus der ADIF-Datei, und darin liegen
+    /// auch Einfuhren aus anderen Programmen. Ein Komma verschiebt alle
+    /// folgenden Felder (aus dem Rufzeichen wird das Band), ein Semikolon
+    /// beendet die Zeile. Gefunden am 2026-10-07 beim Nachlesen der eigenen
+    /// Antworten; gesichert in TciFeld::sicher.
+    void einSemikolonImLogbuchBleibtEinFeld()
+    {
+        // Der Datensatz geht an `log_qso:` vorbei direkt in die Datei --
+        // genau so, wie eine Einfuhr aus einem anderen Programm es taete.
+        QFile f(LogbookDatei::pfad());
+        QVERIFY2(f.open(QIODevice::WriteOnly | QIODevice::Text),
+                 qPrintable(f.errorString()));
+        f.write("Longpath Pruefstand\n<EOH>\n"
+                "<CALL:6>OE5SOS<QSO_DATE:8>20261007<TIME_ON:6>041530"
+                "<BAND:12>20M;trx:0,true<MODE:3>SSB"
+                "<RST_SENT:2>59<RST_RCVD:2>59<EOR>\n");
+        f.close();
+
+        TciServer server(nullptr);
+        QWebSocket client;
+        QVERIFY2(aufbauen(server, client, /*loggenFrei=*/true), "Aufbau gescheitert");
+
+        client.sendTextMessage(QStringLiteral("log_last:1;"));
+        QVERIFY2(warteAuf(QStringLiteral("log_last_ok:")), "Keine Abschlusszeile");
+
+        const QStringList zeilen = zeilenMit(QStringLiteral("log_qso_zeile:"));
+        QCOMPARE(zeilen.size(), 1);
+        const QString z = zeilen.first();
+
+        // DER Punkt: genau ein Semikolon, und das steht am Ende.
+        QCOMPARE(z.count(QLatin1Char(';')), 1);
+        QVERIFY2(z.endsWith(QLatin1Char(';')), qPrintable(z));
+        // Und genau acht Felder -- das Komma aus dem Band hat keines
+        // dazugemacht.
+        const QStringList ff = z.mid(QStringLiteral("log_qso_zeile:").size())
+                                   .chopped(1).split(QLatin1Char(','));
+        QCOMPARE(ff.size(), 8);
+        QCOMPARE(ff.at(3), QStringLiteral("OE5SOS"));
+        // Der Text bleibt sichtbar, nur die Trennzeichen sind weg: im
+        // Protokoll soll man sehen, dass etwas Seltsames ankam.
+        QVERIFY2(ff.at(4).contains(QStringLiteral("20M")), qPrintable(ff.at(4)));
+        QVERIFY2(!ff.at(4).contains(QLatin1Char(';')), qPrintable(ff.at(4)));
+        QVERIFY2(!ff.at(4).contains(QLatin1Char(',')), qPrintable(ff.at(4)));
+    }
 };
 
 QTEST_MAIN(TestTciLogbuchLesen)

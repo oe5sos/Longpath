@@ -107,6 +107,7 @@
 //
 // =================================================================
 
+#include <atomic>
 #include <cstdint>
 #include <vector>
 
@@ -211,10 +212,21 @@ public:
 
     /// Das Verhältnis, mit dem resampelt werden soll. 1,0 bis die
     /// Anlaufzeit vorbei ist.
-    double verhaeltnis() const { return m_var; }
+    ///
+    /// Lesbar von jedem Faden. Geschrieben wird es auf dem Tonfaden, und
+    /// das Protokoll liest es eine Minute später von einem anderen --
+    /// ohne `atomic` wäre das ein Wettlauf, und zwar einer, den kein
+    /// Prüfstand zeigt.
+    double verhaeltnis() const
+    {
+        return m_var.load(std::memory_order_relaxed);
+    }
 
     /// Geregelt wird erst nach der Anlaufzeit — vorher sagt das hier false.
-    bool regeltSchon() const { return m_regelt; }
+    bool regeltSchon() const
+    {
+        return m_regelt.load(std::memory_order_relaxed);
+    }
 
     double vorsteuerung() const { return m_vorsteuerung; }
     double mittlereAbweichung() const { return m_mittlereAbweichung; }
@@ -232,11 +244,11 @@ private:
 
     double m_vorsteuerung{1.0};
     double m_mittlereAbweichung{0.0};
-    double m_var{1.0};
+    std::atomic<double> m_var{1.0};
 
     std::int64_t m_erzeugteRahmen{0};
     std::int64_t m_anlaufRahmen{0};
-    bool   m_regelt{false};
+    std::atomic<bool> m_regelt{false};
 };
 
 }  // namespace Longpath

@@ -6,7 +6,7 @@
 // Wimpernschlag und erspart die Klasse von Fehlern, bei der das Telefon etwas
 // anderes behauptet als das Geraet tut.
 
-import { TciLink, Fft } from './tci.js';
+import { TciLink, Fft, feld } from './tci.js';
 import { Mikrofon, mikrofonMoeglich } from './mikrofon.js';
 import { Sammelstelle, zeileLesen, befundLesen, zeitKurz, dupeSatz }
   from './logbuch.js';
@@ -1668,7 +1668,7 @@ function dupeFragen() {
   dupeFrist = setTimeout(() => {
     if (!link.ready) { return; }
     dupeOffen = ruf;
-    link.send(`log_dup:${ruf}`);
+    link.send(`log_dup:${feld(ruf)}`);
   }, 350);
 }
 
@@ -1744,7 +1744,10 @@ function qsoEintragen() {
   $('qsoOk').disabled = true;
   $('qsoMeldung').textContent = 'wird eingetragen…';
   $('qsoMeldung').className = '';
-  link.send(`log_qso:${ruf},${rs},${re}`);
+  // Durch feld(): ein Semikolon im Rufzeichen macht aus dem Eintrag
+  // einen zweiten Befehl -- und der naechste in der Zeile waere der
+  // Sendebefehl. Begruendung bei feld() in tci.js.
+  link.send(`log_qso:${feld(ruf)},${feld(rs)},${feld(re)}`);
   // Kommt keine Antwort, bleibt es nicht bei "wird eingetragen" stehen.
   // Eine Anzeige, die ewig auf dem Zwischenstand verharrt, liest sich wie
   // ein Erfolg.
@@ -1962,7 +1965,7 @@ link.addEventListener('open', () => {
   // keines und verwirft die Zeile stillschweigend — schadet also nicht.
   // Aus dem Netz beantwortet er BIS DAHIN nichts, deshalb muss das hier ganz
   // vorne stehen, vor jeder Anforderung.
-  if (state.token) { link.send(`auth:${state.token}`); }
+  if (state.token) { link.send(`auth:${feld(state.token)}`); }
 
   // ── Tonformat aushandeln, BEVOR der Strom startet ────────────────────────
   //

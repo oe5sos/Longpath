@@ -99,6 +99,9 @@ private slots:
     void ohneAusgleichLaeuftDerPufferLeer();     // Gegenprobe
     void mitAusgleichBleibtErStehen();
     void unsinnGehtUnveraendertDurch();
+    void dieMeldungLaeuftNichtZu();
+    void einGeleerterRingIstKeinVerbrauch();
+    void derZeitgeberMeldetJedenAufruf();
 };
 
 void TstRxRatenAngleich::unbekannterFuellstandGehtUnveraendertDurch()
@@ -177,6 +180,130 @@ void TstRxRatenAngleich::unsinnGehtUnveraendertDurch()
     const auto aus = a.verarbeite(block.data(), kBlock, kZiel, 0);
     QCOMPARE(aus.rahmen, block.data());
     QCOMPARE(aus.anzahl, kBlock);
+}
+
+void TstRxRatenAngleich::dieMeldungLaeuftNichtZu()
+{
+    // "Im Auge behalten" geht nur, wenn man etwas sieht -- aber eine Zeile
+    // je Tonblock waeren HUNDERT JE SEKUNDE, und ein Protokoll, das
+    // zulaeuft, liest niemand. Genau diese beiden Fehler haelt der Stand
+    // auseinander.
+    RxRatenAngleich a(kRate, 2);
+    const std::vector<float> block = stereoBlock(kBlock);
+
+    // Vor der Anlaufzeit: gar nichts. Eine Zeile "Verhaeltnis 1,0" waere
+    // eine Aussage ueber nichts -- da regelt noch niemand.
+    std::int64_t t = 1'000'000;
+    for (int i = 0; i < 100; ++i) {
+        a.verarbeite(block.data(), kBlock, kZiel, kRing);
+        QVERIFY2(a.protokollZeile(t).isEmpty(), "vor dem Anlauf gemeldet");
+        t += 10;
+    }
+
+    // Anlauf vorbei.
+    for (int i = 0; i < 400; ++i) { a.verarbeite(block.data(), kBlock, kZiel, kRing); }
+    QVERIFY(a.regeltSchon());
+
+    const QString erste = a.protokollZeile(t);
+    QVERIFY2(!erste.isEmpty(), "nach dem Anlauf kam keine Zeile");
+    QVERIFY2(erste.contains(QStringLiteral("Verhaeltnis")), qPrintable(erste));
+    QVERIFY2(erste.contains(QStringLiteral("ppm")), qPrintable(erste));
+    QVERIFY2(erste.contains(QStringLiteral("Versatz")), qPrintable(erste));
+
+    // Danach eine Minute lang Ruhe -- auch bei tausend Aufrufen.
+    for (int i = 0; i < 1000; ++i) {
+        t += 50;
+        QVERIFY2(a.protokollZeile(t).isEmpty(),
+                 "innerhalb der Minute wurde ein zweites Mal gemeldet");
+    }
+    // Und nach der Minute wieder genau eine.
+    t += 60'000;
+    QVERIFY(!a.protokollZeile(t).isEmpty());
+    QVERIFY(a.protokollZeile(t).isEmpty());
+}
+
+void TstRxRatenAngleich::einGeleerterRingIstKeinVerbrauch()
+{
+    // `AudioEngine::setMasterMuted(true)` ruft `IAudioBus::flush()`, und
+    // PortAudioBus setzt dabei den Lese- auf den Schreibzeiger: der
+    // Fuellstand faellt in einem Schritt auf null.
+    //
+    // Aus dem Unterschied gelesen sieht das aus wie ein Verbrauch von
+    // 2880 statt 480 Rahmen. Das Geraet hat davon nichts gehoert -- die
+    // Rahmen wurden WEGGEWORFEN. Wer so eine Zahl in die Regelung gibt,
+    // verschiebt das gemittelte Verhaeltnis bei JEDEM Stummschalten, und
+    // der Fehler ist leise: kein Knacken, kein Aussetzer, nur ein Regler,
+    // der mit der Zeit auf eine falsche Rate zieht.
+    //
+    // Dass der Ring danach WIRKLICH leer ist und die Rueckfuehrung darauf
+    // reagiert, ist dagegen richtig -- das ist kein Fehler, sondern die
+    // Aufgabe des Reglers. Geprueft wird deshalb der Unterschied zwischen
+    // MIT und OHNE Schutz, nicht ein Absolutwert.
+    auto fahreMitStummschalten = [&](int faktor) {
+        RxRatenAngleich a(kRate, 2);
+        a.setzePlausibelFaktor(faktor);
+        const std::vector<float> block = stereoBlock(kBlock);
+        double f = kZiel;
+        for (int i = 0; i < 2000; ++i) {
+            const auto aus = a.verarbeite(block.data(), kBlock,
+                                          std::int64_t(f + 0.5), kRing);
+            f += aus.anzahl; f -= kBlock;
+        }
+        const double vorher = a.verhaeltnis();
+        // Zehnmal stummschalten und wieder auffuellen.
+        for (int i = 0; i < 10; ++i) {
+            a.verarbeite(block.data(), kBlock, 0, kRing);
+            for (int k = 0; k < 20; ++k) {
+                a.verarbeite(block.data(), kBlock, kZiel, kRing);
+            }
+        }
+        return std::pair<double, std::int64_t>(
+            std::abs(a.verhaeltnis() - vorher), a.spruenge());
+    };
+
+    const auto mit  = fahreMitStummschalten(4);          // mit Schutz
+    const auto ohne = fahreMitStummschalten(1 << 20);    // alte Fassung
+
+    qInfo("Verhaeltnis wandert: mit Schutz %.9f, ohne %.9f (Spruenge %lld/%lld)",
+          mit.first, ohne.first, (long long)mit.second, (long long)ohne.second);
+
+    QVERIFY2(mit.second > 0, "Der geleerte Ring wurde nicht als Sprung erkannt");
+    QCOMPARE(ohne.second, std::int64_t(0));   // alte Fassung laesst nichts aus
+    // DER Punkt: mit Schutz wandert das Verhaeltnis deutlich weniger.
+    QVERIFY2(mit.first < ohne.first,
+             "Der Schutz macht keinen Unterschied -- dann belegt er nichts");
+}
+
+
+void TstRxRatenAngleich::derZeitgeberMeldetJedenAufruf()
+{
+    // Die Zeile haengt jetzt an einem QTimer auf dem Faden des AudioEngine
+    // und nicht mehr im Tonweg -- dort teilte `QString` Speicher zu und
+    // `qCInfo` nahm eine Sperre, einmal je Minute, auf dem DSP-Faden.
+    //
+    // Damit wandert aber auch die Taktung: nicht mehr die Klasse entscheidet,
+    // wann eine Minute um ist, sondern der Zeitgeber. Die Klasse muss dafuer
+    // auf Verlangen JEDEN Aufruf melden -- sonst verschluckt ihre eigene
+    // Minutensperre die Zeile des Zeitgebers, und das Protokoll bliebe leer,
+    // obwohl beide Seiten "richtig" arbeiten.
+    RxRatenAngleich a(kRate, 2);
+    const std::vector<float> block = stereoBlock(kBlock);
+    for (int i = 0; i < 500; ++i) { a.verarbeite(block.data(), kBlock, kZiel, kRing); }
+    QVERIFY(a.regeltSchon());
+
+    std::int64_t t = 5'000'000;
+    for (int i = 0; i < 5; ++i) {
+        t += 60'000;
+        QVERIFY2(!a.protokollZeile(t, 0).isEmpty(),
+                 "mit abstandSek=0 muss jeder Aufruf melden");
+    }
+    // Und ohne dass die Zeit weitergeht: auch dann, denn das Mass ist der
+    // Zeitgeber und nicht die Uhr.
+    QVERIFY(!a.protokollZeile(t, 0).isEmpty());
+    QVERIFY(!a.protokollZeile(t, 0).isEmpty());
+
+    // Die Vorgabe bleibt die Minute -- der alte Weg ist nicht verlorengegangen.
+    QVERIFY(a.protokollZeile(t).isEmpty());
 }
 
 QTEST_MAIN(TstRxRatenAngleich)

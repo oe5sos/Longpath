@@ -142,6 +142,7 @@
 
 #include <QDateTime>
 #include <QStandardPaths>
+#include <QTimer>
 
 #include <algorithm>
 #include <vector>
@@ -236,6 +237,24 @@ AudioEngine::AudioEngine(QObject* parent)
         m_rxDrift = std::make_unique<RxRatenAngleich>(48000, 2);
         qCInfo(lcAudio) << "RX-Driftausgleich eingeschaltet (RxDriftAusgleich)"
                         << "— Ziel" << RxRatenAngleich::kZielMs << "ms";
+
+        // „stören nicht, im auge behalten" (Betreiber, 2026-10-06) --
+        // beobachten laesst sich nur, was man sieht. Einmal je Minute
+        // eine Zeile, und zwar von HIER, nicht aus `rxBlockReady`:
+        // `QString` teilt Speicher zu und `qCInfo` nimmt eine Sperre.
+        // Im Tonweg war genau das der Fehler, den dieser Zeitgeber
+        // behebt -- dort haette er einmal je Minute einen Aussetzer
+        // kosten koennen, und niemand haette gewusst, woher er kommt.
+        auto* protokoll = new QTimer(this);
+        protokoll->setInterval(60 * 1000);
+        protokoll->setTimerType(Qt::VeryCoarseTimer);
+        connect(protokoll, &QTimer::timeout, this, [this] {
+            if (!m_rxDrift) { return; }
+            const QString zeile = m_rxDrift->protokollZeile(
+                QDateTime::currentMSecsSinceEpoch(), 0);
+            if (!zeile.isEmpty()) { qCInfo(lcAudio).noquote() << zeile; }
+        });
+        protokoll->start();
     }
 
 #if defined(Q_OS_LINUX)
@@ -1680,9 +1699,14 @@ void AudioEngine::rxBlockReady(int sliceId, const float* samples, int frames)
                     rahmen = ang.rahmen;
                     anzahl = ang.anzahl;
                 }
+                // Die Kanalzahl kommt vom Angleich, nicht aus einer
+                // eigenen 2: zwei Stellen, die dieselbe Zahl kennen,
+                // laufen auseinander -- hier hiesse das, den doppelten
+                // Puffer in den Bus zu schieben.
+                const int kan = m_rxDrift ? m_rxDrift->kanaele() : 2;
                 speakersBus->push(
                     reinterpret_cast<const char*>(rahmen),
-                    static_cast<qint64>(anzahl) * 2 * sizeof(float));
+                    static_cast<qint64>(anzahl) * kan * sizeof(float));
             }
         }
         // A contending writer holding m_speakersBusMutex

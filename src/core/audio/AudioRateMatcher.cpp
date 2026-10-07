@@ -198,9 +198,9 @@ void AudioRateMatcher::melde(int aenderung, std::int64_t ringFuellung,
     // (rmatch.c, startup delay). Vorher wird GAR NICHT geregelt -- auch die
     // Mittelwerte bleiben leer. Ein Regler, der auf die ersten Blöcke nach
     // dem Start anspringt, regelt auf den Anlauf und nicht auf die Drift.
-    if (!m_regelt) {
+    if (!m_regelt.load(std::memory_order_relaxed)) {
         if (m_erzeugteRahmen < m_anlaufRahmen) { return; }
-        m_regelt = true;
+        m_regelt.store(true, std::memory_order_relaxed);
     }
 
     // Vorsteuerung: das gemittelte Verhältnis verbraucht/erzeugt, auf die
@@ -220,8 +220,10 @@ void AudioRateMatcher::melde(int aenderung, std::int64_t ringFuellung,
     m_mittlereAbweichung = m_propMav.schiebe(abwInt);
 
     // rmatch.c:268-271
-    m_var = m_vorsteuerung - m_prVerstaerkung * m_mittlereAbweichung;
-    m_var = std::clamp(m_var, m_e.untereGrenze, m_e.obereGrenze);
+    const double var = std::clamp(
+        m_vorsteuerung - m_prVerstaerkung * m_mittlereAbweichung,
+        m_e.untereGrenze, m_e.obereGrenze);
+    m_var.store(var, std::memory_order_relaxed);
 }
 
 void AudioRateMatcher::zuruecksetzen()
@@ -230,9 +232,9 @@ void AudioRateMatcher::zuruecksetzen()
     m_propMav.zuruecksetzen();
     m_vorsteuerung = 1.0;
     m_mittlereAbweichung = 0.0;
-    m_var = 1.0;
+    m_var.store(1.0, std::memory_order_relaxed);
     m_erzeugteRahmen = 0;
-    m_regelt = false;
+    m_regelt.store(false, std::memory_order_relaxed);
 }
 
 }  // namespace Longpath

@@ -2008,6 +2008,18 @@ longpath_add_test(tst_sendefehler_deutung)
 #   eine andere Antwort als "ich habe mich vertan".
 longpath_add_test(tst_rotor_peilung)
 
+# ── Ein Feld, das die Zeile beendet, ist ein Einbruch (2026-10-07) ──────────
+# tst_tci_feld: Longpaths eigene Antworten sind zeilenweise und durch Kommas
+#   geteilt (`spot_zeile:`, `log_qso_zeile:`, `log_dup_ok:`) -- und die Felder
+#   darin kommen NICHT von uns. `ruf`, `mode` und `quelle` stammen aus den
+#   Spotquellen, und eine davon ist ein Telnet-Strom von einem fremden Rechner
+#   im Internet; `call`, `band`, `mode` und die RST-Felder stammen aus der
+#   ADIF-Datei, in der auch Einfuhren aus anderen Programmen liegen.
+#   Ein Komma verschiebt alle folgenden Felder, ein Semikolon beendet die
+#   Zeile -- und was danach kommt, liest die Gegenseite als NEUEN BEFEHL.
+#   `derEinbruchGehtNichtMehr` fuehrt genau das vor: "OE5SOS;trx:0,true;".
+longpath_add_test(tst_tci_feld)
+
 # ── Den Rotor vom Telefon drehen -- und wann NICHT (2026-10-05) ─────────────
 # tst_tci_rotor: am anderen Ende steht ein Mast, der minutenlang ohne Zutun
 #   dreht, und niemand steht daneben. Darum dieselbe Strenge wie beim Senden:
@@ -5124,6 +5136,16 @@ longpath_add_test(tst_theme_form_knobs)
 longpath_add_test(tst_surface_gradients)
 longpath_add_test(tst_stilblatt)
 longpath_add_test(tst_logbook_import)
+
+# ── Das Logbuch traegt denselben Rahmen wie alle (2026-10-06) ───────────────
+# tst_logbuch_rahmenlos: Betreiber mit Bildschirmfoto -- "die fensterecken sind
+#   rund, alle anderen widget sind doch eckig?!?!". Er hatte recht, und der
+#   Grund war strukturell: das Logbuch war das EINZIGE Fenster mit dem Rahmen
+#   des Betriebssystems, waehrend Rotor, abgeloeste Applets, schwebender
+#   Panadapter und Seitenbereich seit 2026-08-20 rahmenlos mit WindowChrome
+#   laufen. macOS rundet jedes Fenster mit Systemrahmen; dagegen hilft kein
+#   Stilblatt, nur der Verzicht auf den Rahmen.
+longpath_add_test(tst_logbuch_rahmenlos)
 
 # -- Sync QRZ (2026-09-21): der Abholer (Antwort-Parser, Blaettern gegen
 #    einen HTTP-Mock) und das Zusammenfuehren im Logbuchfenster ohne Netz --

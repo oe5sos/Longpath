@@ -134,8 +134,10 @@
 
 #include "core/audio/AudioRateMatcher.h"
 
-#include <QtGlobal>
+#include <atomic>
+#include <QString>
 
+#include <cstdint>
 #include <vector>
 
 namespace Longpath {
@@ -153,7 +155,7 @@ public:
     /// eines bestimmten Hintergrunds. `PortAudioBus` haelt 100 ms, also
     /// faellt beides zusammen; ein Bus mit anderem Ring bekaeme sonst
     /// stillschweigend eine andere Verzoegerung.
-    static constexpr qint64 ringRahmenFuer(int rate)
+    static constexpr std::int64_t ringRahmenFuer(int rate)
     {
         return (rate > 0 ? rate : 48000) * 2LL * kZielMs / 1000;
     }
@@ -176,15 +178,69 @@ public:
     /// dann wird nichts kopiert und nichts gerechnet.
     struct Ausgabe { const float* rahmen; int anzahl; };
     Ausgabe verarbeite(const float* ein, int rahmen,
-                       qint64 fuellungRahmen, qint64 ringRahmen);
+                       std::int64_t fuellungRahmen, std::int64_t ringRahmen);
 
     double verhaeltnis() const { return m_regler.verhaeltnis(); }
     bool   regeltSchon() const { return m_regler.regeltSchon(); }
     /// Wie viele Rahmen der Umtaster insgesamt mehr (oder weniger)
     /// ausgegeben hat, als hineingingen. Fuer die Diagnose.
-    qint64 versatz() const { return m_versatz; }
+    std::int64_t versatz() const
+    {
+        return m_versatz.load(std::memory_order_relaxed);
+    }
+
+    /// Wie oft ein unplausibler Fuellstandssprung ausgelassen wurde --
+    /// im Regelfall das Stummschalten, das den Ring leert. Steht die
+    /// Zahl still, ist nichts passiert; waechst sie dauernd, stimmt mit
+    /// dem Bus etwas nicht.
+    std::int64_t spruenge() const
+    {
+        return m_spruenge.load(std::memory_order_relaxed);
+    }
+
+    /// Wie viele Kanaele ein Rahmen hat. Der Aufrufer braucht das, um aus
+    /// der Rahmenzahl die Byteszahl zu rechnen -- und zwar aus DIESER
+    /// Quelle, nicht aus einer eigenen 2. Zwei Stellen, die dieselbe Zahl
+    /// kennen, laufen auseinander, und hier hiesse das: der doppelte
+    /// Puffer wird in den Bus geschoben.
+    int kanaele() const { return m_kanaele; }
+
+    /// Wie oft der Umtaster neu angelegt werden musste, weil sich die
+    /// Blockgroesse geaendert hat.
+    ///
+    /// Sollte 1 sein und bleiben. Waechst die Zahl, wechselt die
+    /// Blockgroesse im Betrieb -- dann wird bei JEDEM Wechsel neu
+    /// zugeteilt und der innere Zustand des Umtasters verworfen, was man
+    /// hoert. Lieber sichtbar als still.
+    std::int64_t umtasterNeubauten() const
+    {
+        return m_neubauten.load(std::memory_order_relaxed);
+    }
 
     void zuruecksetzen();
+
+    /// Ab welchem Vielfachen der Blockgroesse ein Fuellstandssprung als
+    /// unplausibel gilt und AUSGELASSEN wird. Nur fuer den Pruefstand
+    /// veraenderbar: mit einem riesigen Wert verhaelt sich die Klasse wie
+    /// vor dem 2026-10-06, und erst dieser Vergleich belegt, dass der
+    /// Schutz etwas taugt.
+    void setzePlausibelFaktor(int faktor) { m_plausibelFaktor = faktor; }
+
+    /// Eine Zeile fuer das Protokoll, oder leer, wenn nichts zu sagen ist.
+    ///
+    /// Betreiber am 2026-10-06, zu den gemessenen 4,2 % eines Kerns:
+    /// „stören nicht, im auge behalten". Beobachten laesst sich aber nur,
+    /// was man sieht -- zur Laufzeit war von diesem Regler bisher nichts
+    /// zu bemerken, weder im Guten noch im Schlechten.
+    ///
+    /// Gibt hoechstens alle `abstandSek` Sekunden etwas zurueck: eine
+    /// Zeile je Tonblock waeren hundert je Sekunde, und ein Protokoll,
+    /// das zulaeuft, liest niemand.
+    /// NICHT vom Tonfaden rufen. `QString` teilt Speicher zu, und
+    /// `qCInfo` nimmt eine Sperre -- beides hat im Rueckruf nichts zu
+    /// suchen. Gedacht ist die Zeile fuer einen Zeitgeber auf dem
+    /// Hauptfaden; die Zahlen darin sind `atomic` und von aussen lesbar.
+    QString protokollZeile(std::int64_t jetztMs, int abstandSek = 60);
 
 private:
     void baueUmtaster(int blockRahmen);
@@ -197,12 +253,19 @@ private:
     std::vector<double> m_aus;
     std::vector<float>  m_ausFloat;
     AudioRateMatcher m_regler;
-    qint64 m_versatz{0};
+    // Von aussen gelesen (Protokollzeile auf einem anderen Faden),
+    // darum `atomic`. Entspannte Ordnung genuegt: es haengt keine
+    // Entscheidung an diesen Zahlen, sie werden nur angesehen.
+    std::atomic<std::int64_t> m_versatz{0};
+    std::atomic<std::int64_t> m_spruenge{0};
+    std::atomic<std::int64_t> m_neubauten{0};
+    int          m_plausibelFaktor{4};
     // Fuellstand und Ausgabe des letzten Durchlaufs. Daraus liest der
     // Erzeuger ab, wie viele Rahmen das Geraet inzwischen verbraucht
     // hat -- ohne dass der Rueckruf mitzaehlen oder eine Sperre nehmen
     // muesste. -1 heisst: noch kein Durchlauf.
-    qint64 m_letzteFuellung{-1};
+    std::int64_t m_letzteMeldungMs{0};
+    std::atomic<std::int64_t> m_letzteFuellung{-1};
     int    m_letzteAusgabe{0};
 };
 

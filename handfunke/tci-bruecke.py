@@ -10,9 +10,39 @@ nicht gehen kann oder will, startet stattdessen diese Bruecke: sie horcht im
 WLAN und reicht jedes Byte unveraendert an 127.0.0.1:50001 weiter.
 
 Das ist ein reiner TCP-Weiterleiter. TCI laeuft ueber WebSocket, WebSocket
-ueber TCP — es muss nichts verstanden, nur durchgereicht werden. Damit gilt
-auch der Token-Schutz des Servers unveraendert: die Bruecke sieht den
-Handschlag nie, sie kopiert ihn nur.
+ueber TCP — es muss nichts verstanden, nur durchgereicht werden.
+
+ACHTUNG, und hier stand bis zum 2026-10-07 das Gegenteil: die Bruecke hebt
+den Token-Schutz und die drei Freigaben AUS. Nicht aus Absicht, sondern aus
+Bauart. Sie nimmt die Verbindung des Telefons im WLAN an und baut eine
+EIGENE nach 127.0.0.1 auf -- fuer Longpath kommt damit jeder Client der App
+aus Loopback. Loopback ist dort aber das Vertrauen selbst (siehe
+TciClientSession::fromLoopback): kein Token, und keine der drei Freigaben
+greift.
+
+Was das praktisch heisst, solange die Bruecke laeuft:
+
+  * `TciAllowRemoteTx=False` schuetzt nicht. An der Station haengt eine
+    Antenne.
+  * `TciAllowRemoteRotor=False` schuetzt nicht.
+  * Ein Token wird nicht verlangt, auch wenn eines hinterlegt ist.
+  * Es gilt fuer JEDES Geraet im Heimnetz, nicht nur fuer das Telefon.
+
+Zwei Wege, das zu schliessen -- die Entscheidung gehoert dem Betreiber,
+weil beide ihn etwas kosten:
+
+  1. Den vorgesehenen Weg gehen: Setup > CAT & Network > TCI Server >
+     "Bind interface" auf die Netzadresse, Token setzen, Bruecke weglassen.
+     Dann greift alles wie gedacht. Kostet: das Token muss am Telefon
+     eingetippt werden.
+  2. Die Bruecke sagt im Handschlag, fuer wen sie kommt (ein Kopfeintrag,
+     den der Server nur als EINSCHRAENKUNG liest), und Longpath behandelt
+     solche Verbindungen als aus dem Netz. Kostet: eine Aenderung im
+     Server, und das Telefon braucht danach ebenfalls ein Token -- oder
+     eine ausdrueckliche Ausnahme dafuer.
+
+Bis dahin gilt: die Bruecke nur im eigenen Heimnetz starten und nur,
+solange sie gebraucht wird.
 
   python3 tci-bruecke.py                  # <Netzadresse>:50001 -> 127.0.0.1:50001
   python3 tci-bruecke.py 50010            # auf einem anderen Port horchen
@@ -111,8 +141,10 @@ def ohne_origin(kopf: bytes) -> bytes:
     geschehen ist, nimmt die Bruecke den Kopf heraus und die Verbindung
     sieht fuer Longpath aus wie die eines nativen Clients.
 
-    Was das NICHT aushebelt: den Token. Wer ueber Netz hereinkommt, muss ihn
-    weiterhin nennen — dieser Schutz liegt im Protokoll, nicht im Handschlag.
+    Was das Streichen selbst nicht aushebelt: den Token. Was die Bruecke als
+    GANZES aushebelt, sehr wohl — siehe den Kopf dieser Datei. Hier stand
+    bis zum 2026-10-07 "den Token hebelt das nicht aus", und das war richtig
+    fuer diese Funktion und falsch fuer die Bruecke.
     """
     zeilen = kopf.split(b"\r\n")
     behalten = [z for z in zeilen if not z.lower().startswith(b"origin:")]
