@@ -83,6 +83,21 @@ public:
     // Schreiben ohnehin fuehren.
     virtual qint64 queuedFrames() const { return -1; }
 
+    /// Wie viele Rahmen seit dem Oeffnen WIRKLICH an das Geraet gegangen
+    /// sind -- monoton wachsend. -1 heisst „weiss ich nicht", wie oben.
+    ///
+    /// Warum zusaetzlich zu `queuedFrames()`: aus zwei Fuellstaenden laesst
+    /// sich der Verbrauch nur schaetzen, und die Schaetzung setzt voraus,
+    /// dass zwischen zwei Fragen immer gleich viel Zeit vergeht. Kommt der
+    /// Ton in Schueben (TCI ueber Netz), stimmt das nicht -- am 2026-10-07
+    /// lief der Driftausgleich an der SunSDR2 QRP deshalb in seinen
+    /// Anschlag und warf zwei Sekunden Ton je Minute weg.
+    ///
+    /// Ein Zaehler kennt keine Schuebe. Und er luegt auch beim Leeren des
+    /// Rings nicht: weggeworfene Rahmen hat das Geraet nicht gehoert, also
+    /// zaehlt er sie nicht.
+    virtual qint64 consumedFrames() const { return -1; }
+
     // Metering (RMS of last block). 0.0–1.0. Published atomically for UI.
     virtual float rxLevel() const = 0;
     virtual float txLevel() const = 0;

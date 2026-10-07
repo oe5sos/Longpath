@@ -1695,7 +1695,11 @@ void AudioEngine::rxBlockReady(int sliceId, const float* samples, int frames)
                     const auto ang = m_rxDrift->verarbeite(
                         rahmen, anzahl, speakersBus->queuedFrames(),
                         RxRatenAngleich::ringRahmenFuer(
-                            speakersBus->negotiatedFormat().sampleRate));
+                            speakersBus->negotiatedFormat().sampleRate),
+                        // Gezaehlter Verbrauch, wenn der Bus einen fuehrt.
+                        // -1 heisst "weiss ich nicht", dann bleibt es beim
+                        // geschaetzten Weg -- siehe RxRatenAngleich.
+                        speakersBus->consumedFrames());
                     rahmen = ang.rahmen;
                     anzahl = ang.anzahl;
                 }

@@ -102,6 +102,8 @@ private slots:
     void dieMeldungLaeuftNichtZu();
     void einGeleerterRingIstKeinVerbrauch();
     void derZeitgeberMeldetJedenAufruf();
+    void inSchuebenLaeuftDieSchaetzungInDenAnschlag();   // Gegenprobe
+    void derGezaehlteVerbrauchHaeltSchuebeAus();
 };
 
 void TstRxRatenAngleich::unbekannterFuellstandGehtUnveraendertDurch()
@@ -304,6 +306,103 @@ void TstRxRatenAngleich::derZeitgeberMeldetJedenAufruf()
 
     // Die Vorgabe bleibt die Minute -- der alte Weg ist nicht verlorengegangen.
     QVERIFY(a.protokollZeile(t).isEmpty());
+}
+
+
+namespace {
+
+// Ein Lauf, bei dem der Ton in SCHUEBEN kommt -- so wie ueber TCI an der
+// SunSDR2 QRP. Zwischen zwei Bloecken vergeht mal viel, mal gar keine Zeit;
+// das Geraet holt sich derweil seine Rahmen in seinem eigenen, gleichmaessigen
+// Takt.
+//
+// `gezaehlt` schaltet zwischen den beiden Wegen um: mit Zaehler bekommt der
+// Regler den Verbrauch genau, ohne Zaehler muss er ihn aus zwei Fuellstaenden
+// schaetzen.
+struct SchubLauf {
+    double verhaeltnis{0.0};
+    std::int64_t spruenge{0};
+    double endeFuell{0.0};
+};
+
+SchubLauf schublauf(bool gezaehlt, long bloecke)
+{
+    RxRatenAngleich a(kRate, 2);
+    const std::vector<float> block = stereoBlock(kBlock);
+
+    double fuellung = kZiel;
+    std::int64_t verbrauchtGesamt = 0;
+    double schuld = 0.0;
+
+    for (long i = 0; i < bloecke; ++i) {
+        // Der Schub: jeder zehnte Block traegt die Arbeit von zehn, dazwischen
+        // kommt nichts. Die Summe ueber die Zeit bleibt dieselbe -- nur die
+        // Verteilung ist eine andere.
+        const int takte = (i % 10 == 0) ? 10 : 0;
+
+        const auto aus = a.verarbeite(
+            block.data(), kBlock,
+            static_cast<std::int64_t>(std::llround(fuellung)), kRing,
+            gezaehlt ? verbrauchtGesamt : -1);
+        fuellung += aus.anzahl;
+        if (fuellung > kRing) { fuellung = kRing; }
+
+        for (int t = 0; t < takte; ++t) {
+            schuld += kBlock;
+            const int holt = static_cast<int>(schuld);
+            schuld -= holt;
+            const int wirklich =
+                (fuellung < holt) ? static_cast<int>(fuellung) : holt;
+            fuellung -= wirklich;
+            verbrauchtGesamt += wirklich;   // nur, was das Geraet WIRKLICH holt
+        }
+    }
+    return { a.verhaeltnis(), a.spruenge(), fuellung };
+}
+
+}  // namespace
+
+// DER Befund vom 2026-10-07, als Pruefstand.
+//
+// An Martins SunSDR2 QRP kommt der Empfangston ueber TCI, also ueber Netz,
+// und damit in Schueben. Der geschaetzte Weg sah fuenfzehnmal je Sekunde
+// einen "unplausiblen" Verbrauch, die Grenze warf ihn weg -- und der Regler
+// bekam nur noch "erzeugt" ohne "verbraucht". Im Protokoll stand nach einer
+// Minute: Verhaeltnis 0,960000000, also der untere ANSCHLAG, und 115 000
+// weggeworfene Rahmen je Minute.
+void TstRxRatenAngleich::inSchuebenLaeuftDieSchaetzungInDenAnschlag()
+{
+    const SchubLauf r = schublauf(/*gezaehlt=*/false, 4000);
+
+    // Das ist der Kern: die Verbrauchsmeldungen gehen VERLOREN. Der Regler
+    // bekommt die grossen Schuebe nie zu sehen, weil die
+    // Plausibilitaetsgrenze sie fuer Stoerungen haelt.
+    QVERIFY2(r.spruenge > 100,
+             qPrintable(QStringLiteral("nur %1 Spruenge — der Schub kam nicht an")
+                            .arg(r.spruenge)));
+
+    // Was dieser Pruefstand NICHT zeigt: den Anschlag selbst. Live lief der
+    // Regler auf 0,960000000, hier bleibt er bei 1,0. Die Verteilung der
+    // Schuebe an der echten Station ist eine andere als die hier
+    // nachgebaute, und ich baue sie nicht so lange um, bis die Zahl passt
+    // -- das waere kein Beleg, sondern eine Bestellung.
+    //
+    // Belegt ist damit die URSACHE (die Meldungen gehen verloren), nicht
+    // die ganze Wirkungskette. Der Beleg fuer die Wirkung steht im
+    // Protokoll der Station vom 2026-10-07, 11:29 und 11:30.
+}
+
+void TstRxRatenAngleich::derGezaehlteVerbrauchHaeltSchuebeAus()
+{
+    const SchubLauf r = schublauf(/*gezaehlt=*/true, 4000);
+
+    // Ein Zaehler kennt keine Schuebe: er sagt, wie viel das Geraet geholt
+    // hat, nicht wie viel es in der Zwischenzeit geholt haben KOENNTE.
+    QCOMPARE(r.spruenge, std::int64_t(0));
+    QVERIFY2(r.verhaeltnis > 0.99 && r.verhaeltnis < 1.01,
+             qPrintable(QStringLiteral("Verhaeltnis %1 — der Regler ist "
+                                       "trotzdem weggelaufen")
+                            .arg(r.verhaeltnis, 0, 'f', 9)));
 }
 
 QTEST_MAIN(TstRxRatenAngleich)
