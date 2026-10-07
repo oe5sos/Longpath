@@ -161,7 +161,12 @@ ProfileRail::ProfileRail(LayoutProfiles* profiles,
             : QStringLiteral(
                   "QPushButton { background: transparent; color: %1;"
                   "  border: 1px dashed %2; border-radius: %3px;"
-                  "  font-size: 14px; padding: 0 11px;"
+                  // 13, nicht 14: die Schriftleiter kennt
+                  // [7, 9, 11, 13, 16, 22, 38, 48], und eine Stufe
+                  // daneben waere eine namenlose Groesse mehr
+                  // (verify-style-drift). 11 waere die der Pillen --
+                  // fuer ein Zeichen statt eines Wortes zu klein.
+                  "  font-size: 13px; padding: 0 11px;"
                   "  min-height: %5px; max-height: %5px; }"
                   "QPushButton:hover { color: %4; border: 1px dashed %4; }")
                   .arg(QString::fromLatin1(Style::kTextScale),

@@ -433,3 +433,24 @@ gegen das, was das Zeichen wirklich braucht.
 
 > **Ein Oberflächen-Prüfstand ohne das app-weite Blatt prüft eine
 > Oberfläche, die es nicht gibt.**
+
+### Nachtrag 2026-10-07: der dritte und vierte Fall
+
+Am selben Tag noch zweimal gefunden, beide mit derselben Rechnung:
+
+| | Kante | − Abstand | − Rand | = Platz |
+|---|---|---|---|---|
+| Fensterknöpfe ✕ ↙ ⤢ (`WindowChrome`) | 16 px | 24 | 0 | **−8** |
+| Kreuz am Profil-Abzeichen | 14 px | 24 | 0 | **−10** |
+
+Die Fensterknöpfe trugen das seit dem 18.09. in **jedem** schwebenden
+Fenster. Gemessen, nicht gerechnet: `tst_fensterknoepfe_lesbar`.
+
+Das Plus des Widget-Auswählers (`WidgetPicker::kSide`) war mit 34 px
+knapp davongekommen — 34 − 24 − 2 = 8, und genau 8 braucht ein „+".
+Beim Angleichen auf Pillenhöhe (29) wären daraus 3 geworden; `padding: 0`
+steht jetzt auch dort.
+
+> **Vier Fälle in drei Wochen.** Wer einem `QPushButton` ein eigenes
+> Stilblatt gibt, schreibt `padding` dazu — immer, auch wenn es gerade
+> passt.

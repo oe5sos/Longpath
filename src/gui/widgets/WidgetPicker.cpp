@@ -406,9 +406,14 @@ AddWidgetButton::AddWidgetButton(AppletVisibilityController* vis,
     // nichts, hier kann etwas hin". Ein durchgezogener Rahmen sähe aus
     // wie ein Knopf, der schon etwas ist.
     plus->setStyleSheet(QStringLiteral(
+        // `padding: 0` ist Pflicht: Style::kButtonStyle gilt app-weit
+        // und bringt `padding: 4px 12px` mit. Bei 34 Pixeln blieben
+        // dafuer gerade noch 8 -- genau die Breite eines „+", darum ist
+        // es nie aufgefallen. Bei 29 waeren es 3, und das Zeichen waere
+        // weg. Siehe HAUSSTIL.md, „der geerbte Innenabstand".
         "QPushButton { background: transparent; color: %1;"
         "  border: 1px dashed %2; border-radius: 6px;"
-        "  font-size: 16px; }"
+        "  font-size: 16px; padding: 0; }"
         "QPushButton:hover { color: %3; border-color: %4; background: %5; }")
         .arg(QString::fromLatin1(Style::kTextScale),
              QString::fromLatin1(Style::kBorder),

@@ -102,9 +102,19 @@ WindowTitleBar::WindowTitleBar(const QString& title, QWidget* parent)
         "Volle Groesse — noch einmal klicken stellt die vorige "
         "Groesse wieder her"));
     m_zoomBtn->setCursor(Qt::ArrowCursor);
+    // ── `padding: 0` an allen drei Knoepfen (2026-10-07) ────────────
+    //
+    // Style::kButtonStyle gilt app-weit und bringt `padding: 4px 12px`
+    // mit -- auch fuer einen Knopf mit eigenem Stilblatt, solange das
+    // zum Innenabstand schweigt. Bei 16 Pixeln Kantenlaenge blieben
+    // damit -8 Pixel fuer das Zeichen: gemessen, nicht gerechnet, in
+    // tst_fensterknoepfe_lesbar.
+    //
+    // Dritter Fall derselben Falle (Zoomknoepfe 2026-09-25,
+    // Profilschiene 2026-10-07). Siehe HAUSSTIL.md.
     m_zoomBtn->setStyleSheet(
         QStringLiteral("QPushButton { color: %1; background: transparent;"
-                       " border: none; font-size: 11px; }"
+                       " border: none; font-size: 11px; padding: 0; }"
                        "QPushButton:hover { background: %2; }")
             .arg(Style::kTextPrimary, Style::kButtonHover));
     connect(m_zoomBtn, &QPushButton::clicked, this, &WindowTitleBar::toggleZoom);
@@ -116,7 +126,7 @@ WindowTitleBar::WindowTitleBar(const QString& title, QWidget* parent)
     dock->setCursor(Qt::ArrowCursor);
     dock->setStyleSheet(
         QStringLiteral("QPushButton { color: %1; background: transparent;"
-                       " border: none; font-size: 11px; }"
+                       " border: none; font-size: 11px; padding: 0; }"
                        "QPushButton:hover { background: %2; }")
             .arg(Style::kTextPrimary, Style::kButtonHover));
     connect(dock, &QPushButton::clicked, this, &WindowTitleBar::dockRequested);
@@ -127,7 +137,7 @@ WindowTitleBar::WindowTitleBar(const QString& title, QWidget* parent)
     close->setCursor(Qt::ArrowCursor);
     close->setStyleSheet(
         QStringLiteral("QPushButton { color: %1; background: transparent;"
-                       " border: none; font-size: 11px; }"
+                       " border: none; font-size: 11px; padding: 0; }"
                        "QPushButton:hover { background: %2; color: #fff; }")
             .arg(QLatin1String(Style::kTextPrimary),
                  QLatin1String(Style::kRedBorder)));

@@ -352,6 +352,7 @@ endif()
 # dieselben Abzeichen tragen, und die Gruppe in der Leiste muss sich
 # wieder wegraeumen.
 longpath_add_test(tst_profilschiene_richtung)
+longpath_add_test(tst_fensterknoepfe_lesbar)
 if(TEST tst_profilschiene_richtung)
     # nichts weiter noetig -- nur damit der Eintrag nicht im naechsten
     # Kommentarblock landet wie beim ersten Mal (2026-10-07 gefunden).
