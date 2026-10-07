@@ -13,7 +13,7 @@
 //
 //     node pruefe-rotor.mjs
 
-import { standLesen, zustandText, peilungAus, Sicherung,
+import { standLesen, zustandText, fehlerText, peilungAus, Sicherung,
          GETRENNT, VERBINDET, BEREIT, DREHT, FEHLER } from './rotor.js';
 
 let fehler = 0;
@@ -61,6 +61,28 @@ console.log('\nWas darunter steht');
          /UNBEKANNT/.test(zustandText({ zustand: 'nochniegesehen', frisch: true })));
   pruefe('und eine alte Nummer gilt als unbekannt',
          /UNBEKANNT/.test(zustandText({ zustand: '3', frisch: true })));
+}
+
+console.log('\nWas bei einer Ablehnung dasteht');
+{
+  // „nicht freigegeben" ist richtig und reicht nicht: auf einem Telefon
+  // steht man vor einer Scheibe, die sich nicht dreht, und weiss nicht, ob
+  // der Rotor kaputt ist, das Netz weg ist oder ein Schalter fehlt.
+  const t = fehlerText('nicht freigegeben');
+  pruefe('die Ablehnung sagt, dass es die Freigabe ist', /NICHT FREIGEGEBEN/.test(t));
+  pruefe('und wo der Schalter sitzt', /TCI Server/.test(t) && /Setup/.test(t));
+  pruefe('Gross-/Kleinschreibung des Servers ist egal',
+         /TCI Server/.test(fehlerText('Nicht Freigegeben')));
+
+  pruefe('eine unbrauchbare Peilung wird als solche gesagt',
+         /PEILUNG UNBRAUCHBAR/.test(fehlerText('peilung unbrauchbar')));
+  // Ein Grund, den diese Seite nicht kennt, wird GEZEIGT und nicht durch
+  // ein allgemeines „abgelehnt" ersetzt -- sonst geht die einzige Spur
+  // verloren, die es gibt.
+  pruefe('ein unbekannter Grund wird durchgereicht',
+         fehlerText('irgendwas neues') === 'IRGENDWAS NEUES');
+  pruefe('ohne Grund steht wenigstens, dass abgelehnt wurde',
+         fehlerText('') === 'ABGELEHNT' && fehlerText(undefined) === 'ABGELEHNT');
 }
 
 console.log('\nDie Peilung unter dem Finger');

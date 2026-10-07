@@ -13,7 +13,8 @@ import { Sammelstelle, zeileLesen, befundLesen, zeitKurz, dupeSatz }
 import { spotLesen, marken, trefferBei, trefferAufSchrift } from './spots.js';
 import { Zeichenbremse } from './ton-vorrang.js';
 import { bildIstAlt } from './aufwachen.js';
-import { standLesen, zustandText, peilungAus, Sicherung as RotorSicherung,
+import { standLesen, zustandText, fehlerText as rotorFehlerText,
+         peilungAus, Sicherung as RotorSicherung,
          DREHT } from './rotor.js';
 
 const $ = (id) => document.getElementById(id);
@@ -2165,7 +2166,9 @@ link.addEventListener('rotorfehler', (e) => {
   // "kein rotor" ist kein Fehler des Bedieners -- dann gibt es hier einfach
   // keinen, und das Feld bleibt weg.
   if (/kein rotor/i.test(t)) { return; }
-  $('rotorMeldung').textContent = t || 'abgelehnt';
+  // Nicht nur DASS es abgelehnt wurde, sondern wo der Schalter sitzt.
+  // Siehe fehlerText() in rotor.js.
+  $('rotorMeldung').textContent = rotorFehlerText(t);
   $('rotorMeldung').classList.add('warn');
   rotorSicherung.verwerfen();
   rotorZeichnen();

@@ -1778,7 +1778,10 @@ bool TciServer::start(const QHostAddress& bindAddress, quint16 port)
     //
     // Eine eigene Longpath-Weboberfläche trägt sich später hier ein.
     connect(m_server, &QWebSocketServer::originAuthenticationRequired,
-            this, [this](QWebSocketCorsAuthenticator* auth) {
+            // Kein `this` in der Erfassung: `istEigeneHerkunft` ist eine
+            // freie Funktion in dieser Datei. Die Erfassung war ungenutzt
+            // und die einzige Warnung, die diese Datei noch erzeugte.
+            this, [](QWebSocketCorsAuthenticator* auth) {
                 if (!auth) { return; }
                 const QString origin = auth->origin().trimmed();
                 if (origin.isEmpty()) {
@@ -3111,7 +3114,14 @@ void TciServer::onTextMessageReceived(const QString& rohMsg)
                 if (!LogbookDatei::anhaengen(e, &fehler)) {
                     qCWarning(lcTci) << "TciServer: QSO-Eintrag" << ruf
                                      << "nicht geschrieben —" << fehler;
-                    antwort(QStringLiteral("log_qso_err:%1;").arg(fehler));
+                    // Auch dieser Text geht durch TciFeld::sicher. Er kommt
+                    // zwar von Qt und nicht von draussen -- aber er enthaelt
+                    // einen Dateipfad, und ein Komma darin schneidet die
+                    // Meldung auf der Gegenseite ab (`tci.js` teilt an
+                    // Kommas und nimmt das erste Stueck). Mehr Zeichen als
+                    // sonst: ein Satz ist kein Rufzeichen.
+                    antwort(QStringLiteral("log_qso_err:%1;")
+                                .arg(TciFeld::sicher(fehler, 200)));
                     return;
                 }
                 qCInfo(lcTci) << "TciServer: QSO eingetragen —" << ruf
