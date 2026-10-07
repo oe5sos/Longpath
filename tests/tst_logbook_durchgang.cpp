@@ -523,7 +523,15 @@ private slots:
         QVERIFY(QTest::qWaitForWindowExposed(&w));
         QTableWidget* table = logTable(&w);
         QVERIFY(table->rowCount() > 10);
-        auto readFile = [this]() { QFile f(m_log); f.open(QIODevice::ReadOnly); return f.readAll(); };
+        // Scheitert das Oeffnen, kommt ein leerer Puffer zurueck und die
+        // Vergleiche darunter laufen gegen nichts.
+        auto readFile = [this]() {
+            QFile f(m_log);
+            if (!f.open(QIODevice::ReadOnly)) {
+                qFatal("Logbuch nicht lesbar: %s", qPrintable(f.errorString()));
+            }
+            return f.readAll();
+        };
         auto flat = [](QMap<QByteArray, QByteArray> m, bool dropComment) {
             if (dropComment) { m.remove("COMMENT"); }
             QByteArray out;
@@ -777,7 +785,13 @@ private slots:
         // ADIF
         const QString adi = exportTo(QStringLiteral("Export ADIF…"), QStringLiteral("export.adi"));
         QVERIFY2(QFile::exists(adi), "keine ADIF-Datei");
-        const QList<Record> out = rawRecords([&]() { QFile f(adi); f.open(QIODevice::ReadOnly); return f.readAll(); }());
+        const QList<Record> out = rawRecords([&]() {
+            QFile f(adi);
+            if (!f.open(QIODevice::ReadOnly)) {
+                qFatal("Ausfuhr nicht lesbar: %s", qPrintable(f.errorString()));
+            }
+            return f.readAll();
+        }());
         QCOMPARE(out.size(), shown);
         QMap<QByteArray, int> pool;
         auto flat = [](const Record& r) {
@@ -787,7 +801,13 @@ private slots:
         };
         // Gegen den Stand der Datei jetzt (fruehere Schritte haben
         // bearbeitet, geloescht, eingelesen).
-        const QByteArray now = [this]() { QFile f(m_log); f.open(QIODevice::ReadOnly); return f.readAll(); }();
+        const QByteArray now = [this]() {
+            QFile f(m_log);
+            if (!f.open(QIODevice::ReadOnly)) {
+                qFatal("Logbuch nicht lesbar: %s", qPrintable(f.errorString()));
+            }
+            return f.readAll();
+        }();
         for (const Record& r : rawRecords(now)) { ++pool[flat(r)]; }
         int notVerbatim = 0;
         for (const Record& r : out) {
@@ -980,7 +1000,13 @@ private slots:
         auto writeLog = [&path]() {
             QFile::remove(path);
             QFile f(path);
-            f.open(QIODevice::WriteOnly);
+            // Ohne diese Pruefung legt der Pruefstand sein Logbuch gar nicht
+            // an und prueft danach das Verhalten an einer FEHLENDEN Datei --
+            // gruen, und ueber nichts.
+            if (!f.open(QIODevice::WriteOnly)) {
+                qFatal("Logbuch-Vorlage laesst sich nicht schreiben: %s",
+                       qPrintable(f.errorString()));
+            }
             f.write("t\n<EOH>\n"
                     "<CALL:5>K1ABC <QSO_DATE:8>20260920 <TIME_ON:6>101500 <BAND:3>20m <MODE:3>SSB <EOR>\n"
                     "<CALL:5>G4ABC <QSO_DATE:8>20260921 <TIME_ON:6>111500 <BAND:3>40m <MODE:2>CW <EOR>\n");

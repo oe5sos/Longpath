@@ -208,7 +208,12 @@ void RxDspWorker::setExternalDiversityRoute(
 
 void RxDspWorker::clearExternalDiversityRoute()
 {
-    const ExternalDiversityRoute oldRoute = m_externalDiversityRoute;
+    // Nur im Pruefbau benutzt (der Haken weiter unten). Ohne die Marke
+    // warnt der Auslieferungsbau ueber eine Variable, die dort wirklich
+    // niemand liest -- und eine Warnung, die bei jedem Bau steht, liest
+    // irgendwann auch niemand mehr.
+    [[maybe_unused]] const ExternalDiversityRoute oldRoute =
+        m_externalDiversityRoute;
     m_externalDiversityPrimary.i.clear();
     m_externalDiversityPrimary.q.clear();
     m_externalDiversitySecondary.i.clear();

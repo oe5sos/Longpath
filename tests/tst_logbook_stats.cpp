@@ -52,7 +52,11 @@ QString writeCty()
 {
     auto* f = new QTemporaryFile;
     f->setAutoRemove(false);
-    f->open();
+    // Siehe tst_cty_latlon: eine leere Vorlage misst das Nichts.
+    if (!f->open()) {
+        qFatal("Vorlage laesst sich nicht anlegen: %s",
+               qPrintable(f->errorString()));
+    }
     f->write(kCty);
     f->close();
     return f->fileName();

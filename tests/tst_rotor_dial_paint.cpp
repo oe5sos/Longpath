@@ -203,7 +203,17 @@ private slots:
             w->resize(600, 220);
             w->setActualBearing(45);
             w->show();
-            QTest::qWaitForWindowExposed(w);
+            // Ohne diese Pruefung malt der Pruefstand unter Umstaenden auf
+            // ein Fenster, das nie gezeigt wurde -- und die Aussagen ueber
+            // das Bild handeln dann von einer leeren Flaeche.
+            //
+            // `qFatal` und nicht `QVERIFY`: wir stehen in einer Lambda, die
+            // ein QImage zurueckgibt, und QVERIFY kehrt mit `return;`
+            // zurueck. Das liesse sich hier gar nicht uebersetzen -- und
+            // genau deshalb stand hier vorher nichts.
+            if (!QTest::qWaitForWindowExposed(w)) {
+                qFatal("Fenster wurde nie gezeigt — das Bild darunter waere leer");
+            }
             QTest::qWait(60);
             QImage img(w->size(), QImage::Format_ARGB32);
             img.fill(Qt::black);

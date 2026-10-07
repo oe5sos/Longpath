@@ -29,7 +29,13 @@ QString writeSample()
 {
     auto* f = new QTemporaryFile;
     f->setAutoRemove(false);
-    f->open();
+    // Scheitert das Oeffnen, bleibt die Vorlage LEER -- und der Pruefstand
+    // misst danach das Nichts, ohne dass jemand es merkt. Hier abbrechen
+    // ist richtig: eine Vorlage, die nicht entsteht, ist kein Ergebnis.
+    if (!f->open()) {
+        qFatal("Vorlage laesst sich nicht anlegen: %s",
+               qPrintable(f->errorString()));
+    }
     f->write(kSample);
     f->close();
     return f->fileName();
