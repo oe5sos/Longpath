@@ -41,6 +41,7 @@
 //                                    tooling: Anthropic Claude Code.
 
 #include "SpotModel.h"
+#include "core/ZeitUtc.h"
 #include <QDateTime>
 #include <cmath>
 
@@ -109,7 +110,7 @@ void SpotModel::applySpotStatus(int index, const QMap<QString, QString>& kvs)
             bool ok;
             qint64 ts = val.toLongLong(&ok);
             if (ok)
-                spot.timestamp = QDateTime::fromSecsSinceEpoch(ts, Qt::UTC);
+                spot.timestamp = Longpath::Zeit::ausSekunden(ts);
         }
         else if (key == "lifetime_seconds")
             spot.lifetimeSeconds = val.toInt();

@@ -23,6 +23,7 @@
 // no-port-check: Longpath-original test file.
 
 #include <QtTest>
+#include "core/ZeitUtc.h"
 
 #include "core/AppSettings.h"
 #include "core/audio/RecordingScheduler.h"
@@ -94,7 +95,7 @@ private slots:
     void survivesASaveLoadRoundTrip()
     {
         const QDateTime start =
-            QDateTime(QDate(2026, 9, 1), QTime(6, 0), Qt::UTC);
+            Longpath::Zeit::utc(QDate(2026, 9, 1), QTime(6, 0));
 
         int id;
         {
@@ -133,7 +134,7 @@ private slots:
     {
         RecordingScheduler sched;
         const QDateTime start =
-            QDateTime(QDate(2026, 9, 1), QTime(6, 0), Qt::UTC);
+            Longpath::Zeit::utc(QDate(2026, 9, 1), QTime(6, 0));
         const int id = sched.add(someEntry(start));
 
         QSignalSpy dueSpy(&sched, &RecordingScheduler::recordingDue);
@@ -150,7 +151,7 @@ private slots:
     {
         RecordingScheduler sched;
         const QDateTime start =
-            QDateTime(QDate(2026, 9, 1), QTime(6, 0), Qt::UTC);
+            Longpath::Zeit::utc(QDate(2026, 9, 1), QTime(6, 0));
         sched.add(someEntry(start));
 
         QSignalSpy dueSpy(&sched, &RecordingScheduler::recordingDue);
@@ -165,7 +166,7 @@ private slots:
     {
         RecordingScheduler sched;
         const QDateTime start =
-            QDateTime(QDate(2026, 9, 1), QTime(6, 0), Qt::UTC);
+            Longpath::Zeit::utc(QDate(2026, 9, 1), QTime(6, 0));
         const int id = sched.add(someEntry(start, /*durationMin=*/10));
 
         QSignalSpy stopSpy(&sched, &RecordingScheduler::recordingShouldStop);
@@ -183,7 +184,7 @@ private slots:
     {
         RecordingScheduler sched;
         const QDateTime start =
-            QDateTime(QDate(2026, 9, 1), QTime(6, 0), Qt::UTC);
+            Longpath::Zeit::utc(QDate(2026, 9, 1), QTime(6, 0));
         sched.add(someEntry(start, /*durationMin=*/0));
 
         QSignalSpy stopSpy(&sched, &RecordingScheduler::recordingShouldStop);
@@ -196,7 +197,7 @@ private slots:
     {
         RecordingScheduler sched;
         const QDateTime start =
-            QDateTime(QDate(2026, 9, 1), QTime(6, 0), Qt::UTC);
+            Longpath::Zeit::utc(QDate(2026, 9, 1), QTime(6, 0));
         const int id = sched.add(someEntry(start));
         sched.setEnabled(id, false);
 
@@ -212,7 +213,7 @@ private slots:
     {
         RecordingScheduler sched;
         const QDateTime start =
-            QDateTime(QDate(2026, 9, 1), QTime(6, 0), Qt::UTC);
+            Longpath::Zeit::utc(QDate(2026, 9, 1), QTime(6, 0));
         const int id = sched.add(someEntry(start));
 
         QSignalSpy dueSpy(&sched, &RecordingScheduler::recordingDue);

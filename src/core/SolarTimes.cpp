@@ -11,6 +11,7 @@
 // =================================================================
 
 #include "SolarTimes.h"
+#include "core/ZeitUtc.h"
 
 #include <algorithm>
 #include <cmath>
@@ -33,10 +34,11 @@ double julianDate(const QDateTime& utc)
 QDateTime fromJulian(double jd)
 {
     const double ms = (jd - kUnixEpochJd) * 86400000.0;
-    // Qt::UTC (not QTimeZone::UTC, which is Qt 6.7+) so this keeps
-    // compiling on the ubuntu-24.04-arm release runner's system Qt 6.4.2.
-    return QDateTime::fromMSecsSinceEpoch(static_cast<qint64>(std::llround(ms)),
-                                          Qt::UTC);
+    // UTC ueber Longpath::Zeit (core/ZeitUtc.h). Dort steht, warum:
+    // `Qt::TimeSpec` ist seit Qt 6.7 veraltet, `QTimeZone::UTC` gibt
+    // es erst ab 6.7 -- und von Hand uebersetzt wird auch auf Ubuntu
+    // 24.04 mit Qt 6.4.2. Die Fallunterscheidung steht an EINER Stelle.
+    return Longpath::Zeit::ausMillisekunden(static_cast<qint64>(std::llround(ms)));
 }
 
 double normDeg(double d)
