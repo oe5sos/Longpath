@@ -499,3 +499,43 @@ in der es gefunden wurde:
 **einer** Messung eine Ursache gemacht — bei den Wiederholungen und beim
 Verbindungsaussetzer. Beide Male war die Zahl richtig und der Schluss
 falsch. Eine Ursache braucht mehr als einen Durchgang.
+
+---
+
+# Bilanz am 2026-10-07 — eine Zeile dieser Liste war falsch
+
+Zwei Zeilen weiter oben stehen so:
+
+> | Meldet das Gerät von sich aus Messwerte? | **Nein.** |
+> | Gibt es einen Weg, etwas abzufragen? | `0x0c` → statisch, keine Messwertquelle |
+
+**Die zweite stimmt, die erste nicht.** Das Gerät meldet sehr wohl von
+sich aus — nur nicht auf dem Steuerweg, auf dem gesucht wurde, sondern
+im **Datenstrom**: 20 Rahmen je Sekunde mit 77 Byte, darin zwei
+Gleitkommazahlen, die sich ändern. Longpath hat sie an der
+Längenprüfung weggeworfen (alles unter 1210 Byte galt als unbrauchbar),
+und genau deshalb konnte die Suche sie nicht finden: sie kamen die ganze
+Zeit an.
+
+Seit `032aa953` liest Longpath sie. Einzelheiten im
+Verbindungsablauf-Dokument.
+
+**Warum der Fehler zehn Tage überlebt hat**, und das ist die Lehre: die
+Frage lautete „meldet das Gerät von sich aus etwas?", gesucht wurde aber
+nur dort, wo Meldungen erwartet wurden — auf dem Steuerport. Der
+Datenstrom galt als „I/Q und sonst nichts", weil er so gebaut war. Eine
+Verneinung ist nur so weit gültig wie der Ort, an dem gesucht wurde,
+und dieser Ort stand nirgends dabei.
+
+## Was im Empfang damit jetzt wirklich fehlt
+
+| Punkt | Stand |
+| --- | --- |
+| Messwerte **lesen** | gebaut (`032aa953`) |
+| Messwerte **beschriftet anzeigen** | fehlt — erst wenn feststeht, welcher Wert was ist |
+| Spannung und Strom | **offen**: ExpertSDR2 zeigt sie, im Mitschnitt stehen sie nirgends |
+| Mikrofon-PTT am Gerät bestätigen | braucht den 50-Ω-Abschluss |
+
+Alles andere im Empfang steht. Die Zuordnung der beiden Werte ist der
+nächste Schritt und braucht entweder den Betreiber (Zahl neben
+ExpertSDR2 legen) oder eine Messung, in der sich die Last ändert.
