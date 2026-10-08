@@ -460,21 +460,27 @@ private slots:
 
     // ── MOX/PTT (opcode 0x06) ────────────────────────────────────────
 
+    // Die Erwartungen unten wickeln die Hexfolge in withControlFrameCrc:
+    // seit dem 2026-10-08 liefert JEDER Rahmenbauer einen sendefertigen
+    // Rahmen. Die Pruefsumme als Literal einzumauern waere schlechter --
+    // vier Byte, die niemand im Kopf nachrechnet, und bei jeder Aenderung
+    // am Kopf muss sie jemand von Hand nachziehen. So bleibt in der Zeile
+    // stehen, worum es hier geht: das AUSWAHLbyte.
     void buildMoxFrameEncodesOnAsOne()
     {
         const QByteArray built = buildMoxFrame(kProfileQrp, /*on=*/true);
-        const QByteArray expected = hexBytes(
+        const QByteArray expected = withControlFrameCrc(hexBytes(
             "03 ff 06 00 04 00 00 00 00 00 01 00 00 00 00 00 00 00 "
-            "01 00 00 00");
+            "01 00 00 00"));
         QCOMPARE(built, expected);
     }
 
     void buildMoxFrameEncodesOffAsZero()
     {
         const QByteArray built = buildMoxFrame(kProfileQrp, /*on=*/false);
-        const QByteArray expected = hexBytes(
+        const QByteArray expected = withControlFrameCrc(hexBytes(
             "03 ff 06 00 04 00 00 00 00 00 01 00 00 00 00 00 00 00 "
-            "00 00 00 00");
+            "00 00 00 00"));
         QCOMPARE(built, expected);
     }
 
@@ -486,14 +492,69 @@ private slots:
     // exist specifically to catch a future edit that collapses the
     // lookup table back into a single shared literal.
 
+    // ── Der Waechter: sendefertig heisst MIT Pruefsumme ─────────────
+    //
+    // Am 2026-10-08 gefunden: buildMoxFrame, buildAntennaSelectFrame,
+    // buildDriveFrame und buildPaEnableFrame lieferten Bytes 14..17 als
+    // null, waehrend buildStromStartFrame und buildStopFrame die
+    // Pruefsumme setzten. Die vier ohne sind genau die, die (zu Recht)
+    // keine Aufrufstelle haben -- der Fehler war also latent und haette
+    // beim ERSTEN Verdrahten zugeschlagen.
+    //
+    // Am Geraet gezeigt (2026-09-25): ein Rahmen mit falschem Ende wird
+    // STILLSCHWEIGEND verworfen. Kein Fehler, keine Antwort. Man sucht
+    // die Ursache dann im Funkgeraet statt in der Zeile -- und zwar am
+    // 50-Ohm-Abschluss, wo die Zeit am Geraet teuer ist.
+    //
+    // Diese Pruefung nennt die Rahmenbauer EINZELN statt eine Schleife
+    // ueber eine Liste zu fahren: ein neuer Bauer faellt hier nicht
+    // automatisch durch, aber er faellt beim Lesen auf, und das ist
+    // mehr wert als eine Liste, die jemand zu pflegen vergisst.
+    void jederRahmenbauerLiefertEineRichtigePruefsumme()
+    {
+        auto stimmt = [](const QByteArray& rahmen, const char* wer) {
+            QVERIFY2(rahmen.size() >= 18,
+                     qPrintable(QStringLiteral("%1: zu kurz").arg(
+                         QString::fromLatin1(wer))));
+            QByteArray genullt = rahmen;
+            genullt[14] = genullt[15] = genullt[16] = genullt[17] = 0;
+            QVERIFY2(withControlFrameCrc(genullt) == rahmen,
+                     qPrintable(QStringLiteral(
+                         "%1 liefert keinen sendefertigen Rahmen: Bytes "
+                         "14..17 sind %2, richtig waere %3. Das Geraet "
+                         "verwirft so einen Rahmen stillschweigend.")
+                         .arg(QString::fromLatin1(wer),
+                              QString::fromLatin1(rahmen.mid(14, 4).toHex()),
+                              QString::fromLatin1(
+                                  withControlFrameCrc(genullt).mid(14, 4).toHex()))));
+        };
+
+        stimmt(buildStopFrame(kProfileQrp), "buildStopFrame");
+        stimmt(buildStromStartFrame(kProfileQrp, StromModus::EinStrom48),
+               "buildStromStartFrame");
+        stimmt(buildMoxFrame(kProfileQrp, true),  "buildMoxFrame(an)");
+        stimmt(buildMoxFrame(kProfileQrp, false), "buildMoxFrame(aus)");
+        stimmt(buildDriveFrame(kProfileQrp, 0),   "buildDriveFrame");
+        stimmt(buildPaEnableFrame(kProfileQrp, false), "buildPaEnableFrame");
+
+        for (AntennaPort port : {AntennaPort::A1, AntennaPort::A2,
+                                 AntennaPort::A3}) {
+            for (bool tx : {false, true}) {
+                QByteArray gebaut;
+                QVERIFY(buildAntennaSelectFrame(kProfileQrp, port, tx, &gebaut));
+                stimmt(gebaut, "buildAntennaSelectFrame");
+            }
+        }
+    }
+
     void antennaA3SelectorByteIs0x03OnRx()
     {
         QByteArray built;
         QVERIFY(buildAntennaSelectFrame(kProfileQrp, AntennaPort::A3,
                                         /*forTx=*/false, &built));
-        const QByteArray expected = hexBytes(
+        const QByteArray expected = withControlFrameCrc(hexBytes(
             "03 ff 15 00 04 00 00 00 00 00 01 00 00 00 00 00 00 00 "
-            "03 00 00 00");
+            "03 00 00 00"));
         QCOMPARE(built, expected);
     }
 
@@ -502,9 +563,9 @@ private slots:
         QByteArray built;
         QVERIFY(buildAntennaSelectFrame(kProfileQrp, AntennaPort::A3,
                                         /*forTx=*/true, &built));
-        const QByteArray expected = hexBytes(
+        const QByteArray expected = withControlFrameCrc(hexBytes(
             "03 ff 15 00 04 00 00 00 00 00 01 00 00 00 00 00 00 00 "
-            "02 00 00 00");
+            "02 00 00 00"));
         QCOMPARE(built, expected);
 
         // Restated as a direct byte comparison, independent of the
@@ -538,9 +599,9 @@ private slots:
         QVERIFY(buildAntennaSelectFrame(kProfileQrp, AntennaPort::A2,
                                         /*forTx=*/true, &a2Tx));
 
-        const QByteArray expected = hexBytes(
+        const QByteArray expected = withControlFrameCrc(hexBytes(
             "03 ff 15 00 04 00 00 00 00 00 01 00 00 00 00 00 00 00 "
-            "01 00 00 00");
+            "01 00 00 00"));
         QCOMPARE(a1Rx, expected);
         QCOMPARE(a1Tx, expected);
         QCOMPARE(a2Rx, expected);
@@ -552,14 +613,14 @@ private slots:
     void buildDriveFrameIsABarePassthrough()
     {
         QCOMPARE(buildDriveFrame(kProfileQrp, 0x00),
-                 hexBytes("03 ff 17 00 04 00 00 00 00 00 01 00 00 00 "
-                           "00 00 00 00 00 00 00 00"));
+                 withControlFrameCrc(hexBytes("03 ff 17 00 04 00 00 00 00 00 01 00 00 00 "
+                           "00 00 00 00 00 00 00 00")));
         QCOMPARE(buildDriveFrame(kProfileQrp, 0x80),
-                 hexBytes("03 ff 17 00 04 00 00 00 00 00 01 00 00 00 "
-                           "00 00 00 00 80 00 00 00"));
+                 withControlFrameCrc(hexBytes("03 ff 17 00 04 00 00 00 00 00 01 00 00 00 "
+                           "00 00 00 00 80 00 00 00")));
         QCOMPARE(buildDriveFrame(kProfileQrp, 0xFF),
-                 hexBytes("03 ff 17 00 04 00 00 00 00 00 01 00 00 00 "
-                           "00 00 00 00 ff 00 00 00"));
+                 withControlFrameCrc(hexBytes("03 ff 17 00 04 00 00 00 00 00 01 00 00 00 "
+                           "00 00 00 00 ff 00 00 00")));
     }
 
     // Step 1 scope guard: this byte must never reach a real caller
@@ -703,18 +764,18 @@ private slots:
     void buildPaEnableFrameEncodesEnabledAsOne()
     {
         const QByteArray built = buildPaEnableFrame(kProfileQrp, /*enabled=*/true);
-        const QByteArray expected = hexBytes(
+        const QByteArray expected = withControlFrameCrc(hexBytes(
             "03 ff 24 00 04 00 00 00 00 00 01 00 00 00 00 00 00 00 "
-            "01 00 00 00");
+            "01 00 00 00"));
         QCOMPARE(built, expected);
     }
 
     void buildPaEnableFrameEncodesDisabledAsZero()
     {
         const QByteArray built = buildPaEnableFrame(kProfileQrp, /*enabled=*/false);
-        const QByteArray expected = hexBytes(
+        const QByteArray expected = withControlFrameCrc(hexBytes(
             "03 ff 24 00 04 00 00 00 00 00 01 00 00 00 00 00 00 00 "
-            "00 00 00 00");
+            "00 00 00 00"));
         QCOMPARE(built, expected);
     }
 };

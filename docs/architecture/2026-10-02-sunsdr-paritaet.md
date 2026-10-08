@@ -739,3 +739,60 @@ warnings exceeded"). Der 45-Minuten-Lauf lief sauber durch und
 protokollierte trotzdem nur die ersten Minuten. Wer eine lange Reihe
 braucht, startet mit `-maxwarnings 0` — zusätzlich zu
 `QTEST_FUNCTION_TIMEOUT`, das eine andere Grenze zieht.
+
+---
+
+# Die Antennenwahl braucht ZWEI Opcodes, nicht einen (2026-10-08)
+
+Die Antennenwahl stand auf der Liste als „Rahmenbauer liegt fertig,
+Live-Prüfung nötig" — Opcode `0x15`, Selektorbytes aus ArtemisSDR. Beim
+Nachlesen in der Quelle, bevor etwas hinausgeht, zwei Funde.
+
+## Fund 1: A1 und A2 erzeugen byteidentische Rahmen
+
+`kAntennaByteTable` trägt für A1 und A2 denselben Wert `0x01`. Zwei von
+drei Ports wären damit nicht unterscheidbar. Das sah nach einem Fehler
+in der Tabelle aus — ist aber keiner.
+
+## Fund 2: der Port hängt am BAND, nicht am Byte
+
+ArtemisSDR `ChannelMaster/sunsdr.c:3737-3758` [@f8b01d2], aus eigenen
+Mitschnitten (`ant_a1_to_adc_on_2m`, `ant_adc_to_a1_on_2m`, 2026-04-18):
+
+```
+VHF:  0x1E = 0x00, 0x15 = 0x01   ->  A1 (hinterer VHF-Port)
+      0x1E = 0x01, 0x15 = 0x01   ->  ADC-Pfad
+HF:   0x1E = 0 (Praeambel), 0x15 traegt die Wahl
+```
+
+Und `Console/HPSDR/SunSdrAntenna.cs:16-31` [@f8b01d2] sagt es im
+Klartext: *„the native layer applies its own HF-vs-VHF and RX-vs-TX byte
+mapping on top."*
+
+**A1 ist der 2-m-Port und gilt nur auf VHF; A2/A3 sind HF.** Sie teilen
+sich den Selektorbyte, weil sie sich nie im selben Band begegnen. Was
+sie trennt, ist das Band — und auf VHF trägt sogar `0x1E` die
+eigentliche Wahl, nicht `0x15`.
+
+## Was daraus folgt
+
+`AntennaPort` kennt kein Band, und `0x1E` kommt in Longpath nirgends
+vor. `setAntennaRouting` jetzt zu verdrahten hiesse: auf HF nach A1
+schalten zu wollen und in Wahrheit A2 zu treffen, lautlos.
+
+**Die Methode bleibt leer** — aus einem zweiten Grund zusätzlich zu dem,
+der schon dastand (die Opcode-Nummer stammt von der DX). Das ist keine
+Vertagung, sondern das Ergebnis: die Lücke ist jetzt benannt statt
+vermutet.
+
+## Was der Durchgang mit dem Abschluss dafür klären muss
+
+1. Quittiert die QRP **`0x1E`**? Die Nummer stammt von der DX, und die
+   QRP liegt bei drei gemessenen Befehlen um eins darunter — `0x1D` ist
+   genauso wahrscheinlich. Ohne Antenne prüfbar.
+2. Hat die QRP den VHF/ADC-Pfad überhaupt? Sie ist ein HF-Gerät mit
+   2-m-Option; der ADC-Bypass könnte entfallen.
+3. Erst danach: `AntennaPort` um das Band erweitern und verdrahten.
+
+Schritt 1 und 2 brauchen **keinen** Abschluss und keine Antenne — sie
+können beim nächsten Gerätelauf nebenbei mitlaufen.
