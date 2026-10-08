@@ -69,6 +69,7 @@
 #include <QVector>
 #include <QMap>
 #include <QMutex>
+#include <QSet>
 
 #include <atomic>
 
@@ -345,8 +346,27 @@ private:
     mutable QRecursiveMutex m_routingMutex;
 
     // Diagnostic: one-shot logging of first successful and first dropped feedIqData
-    bool m_firstForwardLogged{false};
-    bool m_firstDropLogged{false};
+    // ── Je Hardware-Index, nicht global (2026-10-08) ────────────────
+    //
+    // Hier standen zwei bool. Kanal 0 kommt immer zuerst, also war der
+    // Merker gesetzt, bevor hw1 ueberhaupt auftauchte -- fuer den
+    // zweiten Empfaenger erschien nie eine Zeile, weder beim
+    // Durchreichen noch beim Wegfall.
+    //
+    // Das ist genau die Zeile, die der naechste Zweiempfaenger-Lauf
+    // braucht: ohne sie belegt nichts, dass Kanal 1 ankommt, und
+    // Abwesenheit wuerde wieder als Befund gelesen. Dieses Projekt hat
+    // dazu eine eigene Regel.
+    QSet<int> m_forwardLogged;
+    QSet<int> m_dropLogged;
+
+public:
+    /// Wie viele verschiedene Hardware-Indizes haben schon eine
+    /// Durchreich- bzw. Wegfall-Zeile erzeugt. Nur fuer Pruefstaende.
+    int geloggteDurchreichenForTest() const { return m_forwardLogged.size(); }
+    int geloggteWegfaelleForTest() const { return m_dropLogged.size(); }
+
+private:
 
     // -------------------------------------------------------------------
     // Phase 3M-4 Task 6: PureSignal DDC orchestration state

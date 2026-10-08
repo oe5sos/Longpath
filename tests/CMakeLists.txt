@@ -353,6 +353,7 @@ endif()
 # wieder wegraeumen.
 longpath_add_test(tst_profilschiene_richtung)
 longpath_add_test(tst_fensterknoepfe_lesbar)
+longpath_add_test(tst_receiver_manager_log_je_kanal)
 if(TEST tst_profilschiene_richtung)
     # nichts weiter noetig -- nur damit der Eintrag nicht im naechsten
     # Kommentarblock landet wie beim ersten Mal (2026-10-07 gefunden).
