@@ -502,6 +502,47 @@ private slots:
     // darf auch nichts hinausgehen -- ein Paket ins Nichts waere die
     // Begruendung, die vor dem 2026-10-08 hier den Stopp ganz verhindert
     // hat. Sie ist richtig, sie trifft nur diesen Fall.
+    // ── Empfaenger 1 darf Empfaenger 0 nicht verstimmen (2026-10-08) ──
+    //
+    // In der ausgelieferten Fassung warf setReceiverFrequency den Index
+    // weg (Q_UNUSED) und stellte immer Unterempfaenger 0 -- plus den
+    // Haupt-VFO-Rahmen 0x08. Die Kette dorthin ist unvermeidlich:
+    // ReceiverManager sendet hardwareFrequencyChanged fuer JEDEN aktiven
+    // Empfaenger neu, RadioModel reicht jeden ungefiltert weiter, und
+    // Empfaenger 1 traegt vor der ersten Bindung die Vorbelegung
+    // 14 225 000 Hz.
+    //
+    // Eine zweite Scheibe anzulegen zog damit die Frequenz des ersten
+    // Empfaengers UND die VFO des Geraets auf 14,225 MHz -- fuer den
+    // Betreiber als Sprung sichtbar.
+    void einZweiterEmpfaengerVerstimmtDenErstenNicht()
+    {
+        SunSdrRadioConnection conn;
+        conn.setSucheWiederholungEnabledForTest(false);
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+
+        // Suchantwort einspeisen: erst damit hat der Treiber eine
+        // Adresse und schickt ueberhaupt Steuerrahmen.
+        conn.feedControlDatagramForTest(
+            QByteArray::fromHex("03ff011a7c0000004119c0a810c8c0a810c851c300004928"),
+            QHostAddress(QStringLiteral("192.0.2.200")));
+        QVERIFY(conn.hasRadioAddrForTest());
+
+        const int vorher = conn.offeneRahmenForTest();
+        conn.setReceiverFrequency(1, 7100000);
+        QCOMPARE(conn.offeneRahmenForTest(), vorher);
+
+        // Gegenstueck in derselben Pruefung: Kanal 0 MUSS weiterhin
+        // durchgehen. Ohne diese Zeile waere "gar nichts mehr senden"
+        // auch gruen, und das waere die schlechtere Behebung.
+        conn.setReceiverFrequency(0, 7100000);
+        QVERIFY2(conn.offeneRahmenForTest() > vorher,
+                 "Kanal 0 muss weiterhin abstimmbar sein");
+    }
+
     void ohneSuchantwortGehtKeinStoppHinaus()
     {
         SunSdrRadioConnection conn;

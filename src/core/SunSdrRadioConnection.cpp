@@ -855,11 +855,42 @@ void SunSdrRadioConnection::setRxReady(bool ready)
 
 void SunSdrRadioConnection::setReceiverFrequency(int receiverIndex, quint64 frequencyHz)
 {
-    // receiverIndex is accepted but unused: the QRP profile's
-    // RX-channel-count story is one of the items the boot-macro
-    // research left unattributed, and this class only ever streams one
-    // receiver.
-    Q_UNUSED(receiverIndex);
+    // ── Ein fremder Index darf NICHT auf Empfaenger 0 durchschlagen ──
+    //
+    // Hier stand "receiverIndex is accepted but unused ... this class
+    // only ever streams one receiver" und ein Q_UNUSED. Beides ist seit
+    // dem 2026-10-07 ueberholt: der Treiber faehrt nachweislich zwei
+    // Stroeme zu je 96 kHz.
+    //
+    // Mit dem Q_UNUSED war es schlimmer als unvollstaendig, es war
+    // falsch. Die Kette, am 2026-10-08 im Quelltext nachgegangen:
+    //
+    //   ReceiverManager   sendet hardwareFrequencyChanged fuer JEDEN
+    //                     aktiven Empfaenger neu (Re-emit-Schleife in
+    //                     rebuildHardwareMapping)
+    //   RadioModel:9339   reicht jeden davon ungefiltert hierher
+    //   hier             warf den Index weg und stellte unten DDC 0 --
+    //                     PLUS den Haupt-VFO-Rahmen 0x08
+    //
+    // Empfaenger 1 traegt vor der ersten Bindung die Vorbelegung
+    // 14 225 000 Hz (ReceiverManager.h). Eine zweite Scheibe anzulegen
+    // zog damit die Frequenz des ERSTEN Empfaengers und die VFO des
+    // Geraets auf 14,225 MHz. Fuer den Betreiber sichtbar als Sprung.
+    //
+    // Abgewiesen, nicht auf 0 abgebildet: ein Unterempfaenger-Rahmen
+    // fuer Kanal 1 liegt byte-genau aus dem ExpertSDR2-Mitschnitt vor
+    // (ddcFrequencyFrame nimmt den Index), aber ob die QRP ihn annimmt,
+    // ist nie am Geraet geprueft worden. Raten geht an ein Funkgeraet
+    // nicht hinaus. Bis zu dieser Messung ist Stille die richtige
+    // Antwort -- und eine Protokollzeile, damit sie nicht stumm bleibt.
+    if (receiverIndex != 0) {
+        qCInfo(lcSunSdr).noquote()
+            << QStringLiteral("SunSdr: setReceiverFrequency(%1, %2) verworfen "
+                              "-- Unterempfaenger-Abstimmung ist an der QRP "
+                              "nicht geprueft. Kanal 0 bleibt unberuehrt.")
+                   .arg(receiverIndex).arg(frequencyHz);
+        return;
+    }
 
     if (!m_controlSocket || !m_profile || m_radioAddr.isNull()) {
         // No open session to send this to yet — nothing meaningful to
