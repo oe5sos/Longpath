@@ -603,3 +603,74 @@ Stromart hing als zweiter Wert hinten dran.
 kein falsches Verhalten. Nur das Lesen des Protokolls aus einem echten
 Lauf zeigt sie. Am Gerät gegengeprüft: jetzt steht dort „ein Strom,
 96 kHz (aus der Umgebung) -- Rate 96000 Hz, 1 Empfaenger".
+
+---
+
+# „ExpertSDR2 zeigt Spannung und Strom" — am Bildschirm nachgesehen, stimmt nicht (2026-10-08)
+
+Seit dem 2026-10-04 stand hier:
+
+> | Spannung und Strom | **offen**: ExpertSDR2 zeigt sie, im Mitschnitt
+> | stehen sie nirgends |
+
+Und als nächster Schritt für die Temperaturen: *„der Betreiber legt die
+Zahl neben ExpertSDR2"* — ist es die 43 oder die 33?
+
+**Beides geht nicht, weil die Voraussetzung falsch ist.** Heute zum
+ersten Mal in ExpertSDR2 selbst nachgesehen, bei verbundenem und
+streamendem Gerät (257 MB über die Schnittstelle, 1878 Blöcke/s):
+
+```
+U: 0.0 V        I: 0.0 A        🌡 0.0 °C
+```
+
+**Alle drei null.** ExpertSDR2 hat die Felder, und sie stehen auf Null.
+
+## Was das klärt
+
+* Der Mitschnitt schweigt zu Spannung und Strom **nicht, weil wir die
+  Rahmen nicht gefunden haben**, sondern weil die QRP sie in diesem
+  Zustand nicht meldet. Die Zeile oben beschrieb eine Lücke, die es
+  nicht gibt.
+* Die geplante Zuordnung der zwei Messwerte über einen Blick auf
+  ExpertSDR2 **kann nicht funktionieren**: dort steht 0,0 °C, nicht 43
+  und nicht 33. Es gibt nichts zu vergleichen.
+
+## Was das NICHT klärt — und was dadurch riskanter wird
+
+Offen bleibt, ob die Werte beim **Senden** von null verschieden werden.
+Der Zustand oben ist Empfang mit abgeschalteter PA; dass eine
+PA-Spannung dann 0 V meldet, ist plausibel. Das zu prüfen braucht den
+50-Ω-Abschluss — also wieder den einen Punkt, an dem ohnehin alles hängt.
+
+**Wichtiger ist die Folgerung für das, was wir anzeigen.** `RadioModel`
+schiebt den ersten der beiden Werte nach `RadioStatus::setPaTemperature()`
+— mit dem ausdrücklichen Kommentar, dass die Zuordnung eine Wahl ist und
+kein Beleg. Dieser Befund macht sie **schwächer, nicht stärker**:
+ExpertSDR2 meldet für dieselbe Lage 0,0 °C, Longpath zeigte 43.
+
+Eine Zahl, die plausibel aussieht und falsch ist, ist schlechter als
+keine Zahl. Solange die Zuordnung nicht belegt ist, gehört der Wert
+nicht als „PA-Temperatur" beschriftet.
+
+## Nebenbefund aus derselben Messung: der Rückweg
+
+Auf Betriebssystemebene über 31 s gezählt (`netstat -i -b`, en9 trägt
+nur das Gerätenetz):
+
+| | eingehend | ausgehend |
+| --- | ---: | ---: |
+| ExpertSDR2 | 1878 Pakete/s (1240 B/Paket) | **9 Pakete/s** |
+| Longpath, 96 kHz, 2 Ströme | 1249 Pakete/s | ~1000 Pakete/s |
+
+ExpertSDR2 fährt das Gerät mit **höherer** Blockrate als Longpath und
+antwortet mit einem Hundertstel des Rückwegs. Das ist noch kein Beleg
+gegen die These „die Wiederholungen sind eine Eigenschaft des Geräts bei
+hoher Blockrate" — dafür fehlen ExpertSDR2s Folgenummern, und die gibt
+nur ein Mitschnitt her. Aber es ist das erste Mal, dass die These an
+einer höheren Blockrate überhaupt geprüft werden könnte.
+
+Die Schnittstelle selbst ist sauber: en9 ist ein USB-Ethernet-Adapter,
+100baseTX voll-duplex, **0 Fehler, 0 Kollisionen**, und die QRP ist nur
+über diesen einen Weg erreichbar — ein Netzschleifen-Artefakt als
+Ursache der Doppel-Pakete ist damit ausgeschlossen.
