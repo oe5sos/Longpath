@@ -2228,6 +2228,30 @@ void SunSdrRadioConnection::replyToBlock(quint16 seq)
 void SunSdrRadioConnection::verarbeiteMesswertrahmen(const QByteArray& data)
 {
     ++m_messwertRahmen;
+
+    // ── Den GANZEN Rahmen mitschreiben, wenn sich etwas darin ruehrt ──
+    //
+    // Wir lesen zwei von siebenundsiebzig Byte. Am 2026-10-08 steht
+    // fest, dass die QRP auch Spannung und Strom meldet -- ExpertSDR2
+    // zeigt 13,0 V und 0,3 A, waehrend wir an denselben Rahmen nur die
+    // zwei Temperaturen herausholen. Wo die beiden anderen Werte
+    // stecken, ist unbekannt.
+    //
+    // Statt zu raten: unter LONGPATH_SUNSDR_ROHMESSWERT faellt jeder
+    // Rahmen ins Protokoll, dessen Nutzlast sich von der vorigen
+    // unterscheidet. Zwei, drei Minuten Laufzeit genuegen dann, um zu
+    // sehen, welche Bytes sich ueberhaupt bewegen -- und ein Wert, der
+    // sich nie aendert, ist keiner von beiden.
+    //
+    // Hinter einer Umgebungsvariable, weil 20 Rahmen je Sekunde ein
+    // Protokoll sonst unbrauchbar machen.
+    if (m_rohMesswertProtokoll && data != m_letzterMesswertRahmen) {
+        m_letzterMesswertRahmen = data;
+        qCInfo(lcSunSdr).noquote()
+            << QStringLiteral("SunSdr: Messwertrahmen roh: %1")
+                   .arg(QString::fromLatin1(data.toHex(' ')));
+    }
+
     float a = 0.0f;
     float b = 0.0f;
     std::memcpy(&a, data.constData() + 15, sizeof(float));

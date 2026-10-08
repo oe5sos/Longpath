@@ -975,6 +975,13 @@ private:
     /// die Begruendung an der Umsetzung.
     void sendeStoppFallsMoeglich();
 
+    /// Jeden Messwertrahmen roh protokollieren, dessen Nutzlast sich
+    /// geaendert hat (LONGPATH_SUNSDR_ROHMESSWERT). Sucht Spannung und
+    /// Strom in den 75 Byte, die wir nicht lesen.
+    bool m_rohMesswertProtokoll{
+        qEnvironmentVariableIsSet("LONGPATH_SUNSDR_ROHMESSWERT")};
+    QByteArray m_letzterMesswertRahmen;
+
     quint64 m_stoppGeschickt{0};
 
     void auditStreamSeq(int kanal, quint16 seq, quint64 inhalt);
