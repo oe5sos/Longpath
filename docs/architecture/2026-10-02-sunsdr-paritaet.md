@@ -811,3 +811,35 @@ dann nach hinten gemusst.
 Gerät war schlicht wieder in dem Zustand, in dem es den Strom nicht
 hergibt. Ohne die Gegenprobe stünde hier jetzt eine Ursache, die keine
 ist — zum dritten Mal in dieser Woche dieselbe Falle.
+
+## Die Behebung am Gerät bestätigt (2026-10-08, nach dem Aus/Ein)
+
+Drei Verbindungszyklen hintereinander, dazwischen je gemessen, ob das
+Gerät noch sendet:
+
+| Zyklus | Ergebnis | danach |
+| --- | --- | ---: |
+| 1 (erster Griff nach dem Hochfahren) | kam durch, Strom blieb | 1981 Pakete/s |
+| 2 | verbunden nach 50 ms | **0 Pakete/s** |
+| 3 | verbunden nach 50 ms | **0 Pakete/s** |
+
+Und der Ablauf im Protokoll, vollständig:
+
+```
+verbunden nach 51 ms
+op=0x2 nach 0 ms quittiert
+Stopp beim Trennen quittiert nach Versuch 1
+```
+
+**Der Stopp wird sofort quittiert**, die Sitzung schließt, das Gerät
+geht auf null. Zyklus 1 — der allererste Verbindungsversuch nach dem
+Einschalten — ließ den Strom stehen, aber der nächste Versuch kam
+trotzdem herein. Das ist kein Hängen; das Hängen von heute früh war der
+Zustand, in dem `0x1E` und `0x15` quittiert wurden und `0x02` nicht.
+
+Was damit belegt ist: auf einem gesunden Gerät schließt Longpath die
+Sitzung sauber. Was NICHT belegt ist: dass der Zeitablauf-Pfad das
+Hängen wirklich verhindert — dafür müsste der Fall eintreten, und er
+tritt auf einem gesunden Gerät nicht ein. Der Prüfstand
+`einStoppGehtAuchHinausWennNurDieSucheBeantwortetWurde` stellt ihn
+nach; am Gerät steht der Beleg aus.
