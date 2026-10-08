@@ -674,3 +674,68 @@ Die Schnittstelle selbst ist sauber: en9 ist ein USB-Ethernet-Adapter,
 100baseTX voll-duplex, **0 Fehler, 0 Kollisionen**, und die QRP ist nur
 über diesen einen Weg erreichbar — ein Netzschleifen-Artefakt als
 Ursache der Doppel-Pakete ist damit ausgeschlossen.
+
+---
+
+# Die zwei Messwerte sind BEIDE Temperaturen — an der Aufwärmkurve gemessen (2026-10-08)
+
+Nachdem der Vergleich mit ExpertSDR2 ausgefallen ist (dort steht 0,0 °C,
+siehe oben), blieb nur eine Messung, die das Gerät selbst liefert: eine
+Temperatur **muss driften**, während die QRP warm wird. Etwas anderes
+tut das nicht.
+
+Der Betreiber hat das Gerät für diesen Zweck aus- und wieder
+eingeschaltet. Gemessen wurde von kalt an, 45 Minuten Dauerempfang bei
+96 kHz, danach noch einmal im eingeschwungenen Zustand:
+
+| Zeitpunkt | Wert A | Wert B | Abstand |
+| --- | ---: | ---: | ---: |
+| kalt, direkt nach dem Einschalten | 39,5 | 30,5 | 9,0 |
+| nach ~2 Minuten | 41,0–41,5 | 31,0–31,5 | ~10,0 |
+| nach ~50 Minuten, eingeschwungen | 42,0–42,5 | 32,0–32,5 | ~10,0 |
+
+**Beide steigen um rund 2,5 Grad und bleiben dann stehen.** Im warmen
+Zustand pendelt A nur noch zwischen 42,0 und 42,5 (105 zu 104 Proben
+von 209), B liegt in 198 von 209 Proben auf 32,5.
+
+## Was damit belegt ist
+
+* **Beide Werte sind Temperaturen.** Eine Aufwärmkurve von kalt auf
+  eingeschwungen, mit Sättigung, ist nichts anderes. Bisher stand im
+  Dokument nur „zwei Messwerte, Zuordnung unbekannt".
+* **Es sind zwei unabhängige Fühler**, nicht einer und eine Ableitung:
+  der Abstand ist nicht konstant (9,0 kalt gegen 10,0 warm).
+* Die Halbgrad-Rasterung bestätigt sich über 2172 Proben — es kommt
+  ausschließlich X,0 und X,5 vor.
+* **ExpertSDR2 zeigt diese Werte nicht an.** Während das Gerät 42,5 und
+  32,5 meldet, steht dort 0,0 °C. Longpath liest also etwas, das
+  ExpertSDR2 verwirft — nicht umgekehrt.
+
+## Was weiter offen bleibt
+
+**Welcher Fühler wo sitzt.** Dass beide Temperaturen sind, sagt nicht,
+ob einer davon die PA ist. Ohne Senden erwärmt sich keine Endstufe
+nennenswert, also trennt dieser Lauf die beiden nicht. Der Weg dahin ist
+derselbe wie bisher: ein Durchgang mit dem 50-Ω-Abschluss. Unter Last
+muss der PA-Fühler deutlich stärker ausschlagen als der andere — und
+dann ist die Zuordnung in einer Minute entschieden.
+
+Bis dahin gilt, was schon vorher galt: die Zuordnung des ersten Werts
+nach `RadioStatus::setPaTemperature()` ist eine Wahl. Sie ist jetzt
+besser begründet als gestern (es IST eine Temperatur), aber immer noch
+nicht belegt (welche).
+
+## Zwei Fallen auf dem Weg dahin, für den nächsten
+
+**`LONGPATH_SUNSDR_FIXED_PORTS` ist Pflicht.** Ohne die Variable bindet
+der Treiber zufällige Ports, das Gerät antwortet auf die Suche und
+quittiert den Zustandsrahmen — und schickt den Strom trotzdem an
+50001/50002. Ergebnis: `connectFailed(Timeout)` nach drei Sekunden, was
+wie eine Gerätesperre aussieht und keine ist. Am 2026-10-08 dreimal
+hintereinander falsch gedeutet, mit einem unnötigen Aus/Ein als Folge.
+
+**QtTest kappt die Ausgabe bei 2000 Zeilen** („Maximum amount of
+warnings exceeded"). Der 45-Minuten-Lauf lief sauber durch und
+protokollierte trotzdem nur die ersten Minuten. Wer eine lange Reihe
+braucht, startet mit `-maxwarnings 0` — zusätzlich zu
+`QTEST_FUNCTION_TIMEOUT`, das eine andere Grenze zieht.
