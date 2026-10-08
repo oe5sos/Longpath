@@ -787,12 +787,27 @@ vermutet.
 
 ## Was der Durchgang mit dem Abschluss dafür klären muss
 
-1. Quittiert die QRP **`0x1E`**? Die Nummer stammt von der DX, und die
-   QRP liegt bei drei gemessenen Befehlen um eins darunter — `0x1D` ist
-   genauso wahrscheinlich. Ohne Antenne prüfbar.
+1. ~~Quittiert die QRP `0x1E`?~~ **Erledigt am 2026-10-08: ja.** Dreimal
+   hintereinander gemessen, je 10–12 ms, mit Nutzlast 0 (dem HF-Normal).
+   Die QRP benutzt hier also die DX-Nummer und **nicht** die um eins
+   niedrigere — der „QRP liegt eins darunter"-Befund gilt für
+   Vorverstärker und DDC, aber nicht pauschal. Ohne Antenne gemessen.
 2. Hat die QRP den VHF/ADC-Pfad überhaupt? Sie ist ein HF-Gerät mit
    2-m-Option; der ADC-Bypass könnte entfallen.
 3. Erst danach: `AntennaPort` um das Band erweitern und verdrahten.
 
-Schritt 1 und 2 brauchen **keinen** Abschluss und keine Antenne — sie
-können beim nächsten Gerätelauf nebenbei mitlaufen.
+Schritt 2 braucht **keinen** Abschluss und keine Antenne — er kann beim
+nächsten Gerätelauf nebenbei mitlaufen.
+
+## Eine Vermutung, die die Gegenprobe gekillt hat
+
+Zwischendurch sah es so aus, als brächte ein Vorab-Rahmen
+(`LONGPATH_SUNSDR_PRE`) den Stromstart zum Scheitern: jeder Lauf mit
+einem endete in `connectFailed(Timeout)`, der Lauf davor ohne lief in
+50 ms durch. Das wäre für den Prüfplan wichtig gewesen — Proben hätten
+dann nach hinten gemusst.
+
+**Stimmt nicht.** Der Lauf ohne Vorab-Rahmen scheiterte genauso. Das
+Gerät war schlicht wieder in dem Zustand, in dem es den Strom nicht
+hergibt. Ohne die Gegenprobe stünde hier jetzt eine Ursache, die keine
+ist — zum dritten Mal in dieser Woche dieselbe Falle.
