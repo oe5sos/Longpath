@@ -356,6 +356,12 @@ void ReceiverManager::setAdcForReceiver(int receiverIndex, int adcIndex)
     qCDebug(lcReceiver) << "Receiver" << receiverIndex << "using ADC" << adcIndex;
 }
 
+int ReceiverManager::logischerEmpfaengerFuer(int hwReceiverIndex) const
+{
+    QMutexLocker locker(&m_routingMutex);
+    return m_hwToLogical.value(hwReceiverIndex, -1);
+}
+
 void ReceiverManager::feedIqData(int hwReceiverIndex, const QVector<float>& samples)
 {
     // Lever 2 (2026-05-24): this function now runs on the Connection thread

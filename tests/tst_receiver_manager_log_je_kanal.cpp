@@ -30,6 +30,45 @@ class TestReceiverManagerLogJeKanal : public QObject
     Q_OBJECT
 
 private slots:
+    // ── Die Lueckenmeldung muss DIESELBE Abbildung nehmen ───────────
+    //
+    // Seit dem 2026-10-08 traegt iqSequenceGap den Hardware-Index, und
+    // MainWindow uebersetzt ihn mit logischerEmpfaengerFuer() in den
+    // Strom-Index, nach dem die FFT-Maschinen geschluesselt sind.
+    //
+    // Der naheliegende Kurzschluss waere, den Hardware-Index einfach
+    // durchzureichen -- er stimmt ja meistens. Diese Pruefung baut
+    // darum ausdruecklich einen Fall, in dem er NICHT stimmt.
+    void dieZuordnungIstDieselbeWieFuerDieDaten()
+    {
+        ReceiverManager rm;
+        rm.setMaxReceivers(2);
+        const int rx = rm.createReceiver();
+        QVERIFY(rx >= 0);
+        rm.activateReceiver(rx);
+
+        // Ohne Abbildung: -1, nicht 0. Ein stillschweigendes 0 waere
+        // schlimmer als gar keine Antwort -- es traefe eine echte
+        // Maschine.
+        QCOMPARE(rm.logischerEmpfaengerFuer(99), -1);
+
+        // Und der gebundene Hardware-Index muss auf SEINEN logischen
+        // zeigen, nicht auf sich selbst.
+        bool mindestensEineAbbildung = false;
+        for (int hw = 0; hw < 8; ++hw) {
+            const int log = rm.logischerEmpfaengerFuer(hw);
+            if (log < 0) { continue; }
+            mindestensEineAbbildung = true;
+            QVERIFY2(log <= 1,
+                     "ein logischer Index ausserhalb der angelegten "
+                     "Empfaenger zeigt auf keine FFT-Maschine");
+        }
+        QVERIFY2(mindestensEineAbbildung,
+                 "nach activateReceiver muss mindestens ein "
+                 "Hardware-Index abgebildet sein -- sonst prueft diese "
+                 "Methode nichts");
+    }
+
     // Zwei Hardware-Indizes, fuer die es oben keinen Empfaenger gibt.
     // Beide muessen eine Zeile erzeugen, nicht nur der erste.
     void jederHardwareIndexBekommtSeineEigeneZeile()

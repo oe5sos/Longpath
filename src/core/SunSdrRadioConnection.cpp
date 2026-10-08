@@ -2744,7 +2744,7 @@ void SunSdrRadioConnection::auditStreamSeq(int kanal, quint16 seq,
         const qint64 now = m_iqSeqWndClock.elapsed();
         if (m_lastGapSignalMs < 0 || now - m_lastGapSignalMs >= 20) {
             m_lastGapSignalMs = now;
-            emit iqSequenceGap();
+            emit iqSequenceGap(kanal);
         }
         return;
     }

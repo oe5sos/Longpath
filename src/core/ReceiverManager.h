@@ -170,6 +170,12 @@ public:
     // Routes to the correct logical receiver.
     void feedIqData(int hwReceiverIndex, const QVector<float>& samples);
 
+    /// Welcher logische Empfaenger haengt an diesem Hardware-Index?
+    /// -1, wenn keiner. Dieselbe Abbildung, die auch feedIqData nimmt --
+    /// darum landet eine Lueckenmeldung zwangslaeufig bei derselben
+    /// FFT-Maschine wie die Daten, die sie betrifft.
+    int logischerEmpfaengerFuer(int hwReceiverIndex) const;
+
     // -------------------------------------------------------------------
     // Phase 3M-4 Task 6: PureSignal DDC orchestration
     //

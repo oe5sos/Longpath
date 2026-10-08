@@ -3240,7 +3240,7 @@ void P2RadioConnection::processIqPacket(const QByteArray& data, int ddcIndex)
             const qint64 nowGap = QDateTime::currentMSecsSinceEpoch();
             if (nowGap - m_lastGapSignalMs >= 20) {
                 m_lastGapSignalMs = nowGap;
-                emit iqSequenceGap();
+                emit iqSequenceGap(ddcIndex);
             }
         }
     }

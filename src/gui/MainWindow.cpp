@@ -14560,10 +14560,41 @@ void MainWindow::noteWindowClosedByOperator(const QString& id)
     });
 }
 
-void MainWindow::onIqSequenceGap()
+// ── Nur das Fenster, das die Luecke wirklich traf (2026-10-08) ───────
+//
+// Hier wurde JEDE FFT-Maschine zurueckgesetzt. Mit einem Empfaenger war
+// das richtig; mit zweien riss ein Aussetzer in Kanal 1 auch das Bild
+// von Kanal 0 auf -- und ein verworfenes Fenster ist ein sichtbarer
+// Aussetzer im Wasserfall, kein Schoenheitsfehler.
+//
+// Der Index, den das Signal jetzt traegt, ist der HARDWARE-Empfaenger
+// (derselbe, den der Treiber an iqDataReceived haengt). Die FFT-Maschinen
+// sind nach dem LOGISCHEN Index geschluesselt. Uebersetzt wird mit
+// derselben Abbildung, die auch die Daten nehmen -- sonst koennte die
+// Meldung bei einer anderen Maschine landen als die Proben, um die es
+// geht.
+//
+// -1 heisst "betrifft alle" und kommt von P1: dessen EP6-Folge traegt
+// alle Empfaenger verschachtelt. Unbekannte Zuordnung ebenso -- lieber
+// ein Fenster zu viel verwerfen als den Schmierer stehen lassen.
+void MainWindow::onIqSequenceGap(int hwReceiverIndex)
 {
-    for (FFTEngine* e : std::as_const(m_fftEngines)) {
-        if (e) { e->requestWindowReset(); }
+    int strom = -1;
+    if (hwReceiverIndex >= 0 && m_radioModel) {
+        if (ReceiverManager* rm = m_radioModel->receiverManager()) {
+            strom = rm->logischerEmpfaengerFuer(hwReceiverIndex);
+        }
+    }
+
+    if (strom < 0) {
+        for (FFTEngine* e : std::as_const(m_fftEngines)) {
+            if (e) { e->requestWindowReset(); }
+        }
+        return;
+    }
+
+    if (FFTEngine* e = m_fftEngines.value(strom, nullptr)) {
+        e->requestWindowReset();
     }
 }
 
