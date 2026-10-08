@@ -2,7 +2,42 @@
 
 ## [Unreleased]
 
-### Panadapter: weiche Kante und Hof an der Kurve
+## [0.6.8] - 2026-10-08
+
+Zwei Commits seit 0.6.7, einen Tag. Thema: **die Oberflaeche, nicht die
+Technik.**
+
+Beide Stuecke haben denselben Hergang: der Betreiber hat auf etwas
+gezeigt, das nicht passt, und beide Male stand die Ursache nicht da, wo
+sie vermutet wurde. Die Leiste sah falsch aus, weil ein app-weites
+Stilblatt vom 2026-09-18 jedem Knopf 24 Pixel Innenabstand vererbt, der
+nicht widerspricht — aus dem „N" eines Abzeichens wurde ein
+Schraegstrich. Die Kurve sah treppig aus, weil die GPU sie als Band mit
+harten Kanten zeichnet, nicht wegen der Linienbreite.
+
+### Die Kommandoleiste passt (#210)
+
+Die Profilschiene traegt in der Leiste jetzt `CommandBar::pillStyle()` —
+denselben Aufruf wie BAND und MODE, nicht etwas Aehnliches, damit es
+beim naechsten Stilblatt nicht wieder auseinanderlaeuft. Dazu
+Trennstriche und verteilte Gruppen: die Kommandoleiste war die einzige
+Stelle im Fenster ohne jede Grenze, waehrend BANDWIDTH FILTER,
+PANADAPTER, S-METER, TX, FREQUENZ und ROTOR/LOG alle eingefasst sind.
+
+**Der geerbte Innenabstand** traf drei Stellen (Abzeichen am Rand, Kreuz
+am Abzeichen, Plus in der Leiste) und war seit drei Wochen zu sehen.
+Keine Pruefung hat ihn gemerkt, weil keine das app-weite Blatt trug: ein
+Bauteil allein im Pruefstand erbt nichts und ist gruen.
+`tst_profilschiene_richtung` ruft jetzt `applyAppBaselineQss(*qApp)` und
+misst gegen eine leibhaftige Pille aus einer echten `CommandBar` statt
+gegen eine Zahl — `kPillHeight` ist 27, eine Pille auf dem Schirm aber
+29, weil `min-height` in Qt der Inhaltsflaeche gilt.
+
+**Diese Fassung traegt die Leiste zum ersten Mal in einem Paket.** Das
+Etikett v0.6.7 wurde 40 Minuten vor dem Merge von #210 gesetzt; wer
+0.6.7 geladen hat, hat die alte Leiste.
+
+### Die Kurve bekommt eine weiche Kante (#101)
 
 Zwei Zutaten der am 2026-09-17 gewaehlten Gestaltungsrichtung „Glas &
 Tiefe" (dort: „Kurven mit Hof") sind jetzt gebaut und schaltbar in
