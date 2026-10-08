@@ -2721,7 +2721,9 @@ void P1RadioConnection::onReadyRead()
                     const qint64 nowGap = QDateTime::currentMSecsSinceEpoch();
                     if (nowGap - m_lastGapSignalMs >= 20) {
                         m_lastGapSignalMs = nowGap;
-                        emit iqSequenceGap();
+                        // -1: die EP6-Folge traegt alle Empfaenger verschachtelt, eine
+                        // Luecke dort trifft wirklich jeden.
+                        emit iqSequenceGap(-1);
                     }
                 }
                 m_ep6LastSeq = seq;

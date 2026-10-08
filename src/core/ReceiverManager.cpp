@@ -133,8 +133,8 @@ void ReceiverManager::reset()
     m_receivers.clear();
     m_hwToLogical.clear();
     m_nextWdspChannel = 0;
-    m_firstForwardLogged = false;
-    m_firstDropLogged = false;
+    m_forwardLogged.clear();
+    m_dropLogged.clear();
 
     // Phase 3M-4 Task 6: clear codec pointers + PS state on disconnect.
     // The codecs are owned by P1/P2RadioConnection, which is destroyed
@@ -356,6 +356,12 @@ void ReceiverManager::setAdcForReceiver(int receiverIndex, int adcIndex)
     qCDebug(lcReceiver) << "Receiver" << receiverIndex << "using ADC" << adcIndex;
 }
 
+int ReceiverManager::logischerEmpfaengerFuer(int hwReceiverIndex) const
+{
+    QMutexLocker locker(&m_routingMutex);
+    return m_hwToLogical.value(hwReceiverIndex, -1);
+}
+
 void ReceiverManager::feedIqData(int hwReceiverIndex, const QVector<float>& samples)
 {
     // Lever 2 (2026-05-24): this function now runs on the Connection thread
@@ -369,8 +375,8 @@ void ReceiverManager::feedIqData(int hwReceiverIndex, const QVector<float>& samp
     QMutexLocker locker(&m_routingMutex);
     auto it = m_hwToLogical.constFind(hwReceiverIndex);
     if (it == m_hwToLogical.constEnd()) {
-        if (!m_firstDropLogged) {
-            m_firstDropLogged = true;
+        if (!m_dropLogged.contains(hwReceiverIndex)) {
+            m_dropLogged.insert(hwReceiverIndex);
             QStringList mapped;
             for (auto mi = m_hwToLogical.constBegin(); mi != m_hwToLogical.constEnd(); ++mi) {
                 mapped << QString("hw%1->rx%2").arg(mi.key()).arg(mi.value());
@@ -393,8 +399,8 @@ void ReceiverManager::feedIqData(int hwReceiverIndex, const QVector<float>& samp
     int logicalIndex = it.value();
     auto rxIt = m_receivers.constFind(logicalIndex);
     if (rxIt != m_receivers.constEnd()) {
-        if (!m_firstForwardLogged) {
-            m_firstForwardLogged = true;
+        if (!m_forwardLogged.contains(hwReceiverIndex)) {
+            m_forwardLogged.insert(hwReceiverIndex);
             qCInfo(lcReceiver) << "ReceiverManager: first feedIqData forwarded;"
                                << "hw=" << hwReceiverIndex
                                << "logical=" << logicalIndex

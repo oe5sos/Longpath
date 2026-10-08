@@ -9271,11 +9271,24 @@ void RadioModel::wireConnectionSignals(int wdspInSize)
     // Temperaturen, die das Geraet von sich aus meldet → RadioStatus.
     //
     // Heute nur die SunSDR2 QRP (2026-10-07): sie schickt 20 Rahmen je
-    // Sekunde mit zwei Werten. Welcher von beiden wo im Geraet sitzt,
-    // ist noch nicht belegt -- weitergereicht wird der ERSTE, weil er
-    // der hoehere ist und damit der, an dem eine Abschaltschwelle
-    // haengen wuerde. Sobald die Zuordnung steht, gehoert hier die
-    // richtige Wahl hin und keine Begruendung mehr.
+    // Sekunde mit zwei Werten.
+    //
+    // Der ERSTE ist richtig, und das ist seit dem 2026-10-08 belegt
+    // statt gewaehlt. Zwei Messungen zusammen:
+    //
+    //   Aufwaermkurve von kalt: A 39,5 -> 42,5 ueber 50 Minuten, B
+    //   30,5 -> 32,5. Beide saettigen, der Abstand ist nicht konstant
+    //   (9,0 kalt, 10,0 warm) -- also zwei unabhaengige Fuehler und
+    //   beide Temperaturen.
+    //
+    //   ExpertSDR2, mit demselben Geraet im selben warmen Zustand
+    //   verbunden, zeigt in seiner Statuszeile 42,5 Grad. Das ist
+    //   derselbe Wert wie A, nicht ein aehnlicher.
+    //
+    // Der zweite Wert bleibt vorerst ungenutzt: wo sein Fuehler sitzt,
+    // trennt erst Last am Ausgang (ohne Senden erwaermt sich keine
+    // Endstufe). Begruendung und Zahlen:
+    // docs/architecture/2026-10-02-sunsdr-paritaet.md.
     connect(m_connection, &RadioConnection::deviceTemperaturesUpdated,
             this, [this](double erster, double zweiter) {
         Q_UNUSED(zweiter);

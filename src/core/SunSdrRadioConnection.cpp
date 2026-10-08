@@ -203,6 +203,7 @@ void SunSdrRadioConnection::init()
         if (state() != ConnectionState::Connecting) { return; }
         qCInfo(lcSunSdr) << "SunSdr: neuer Suchversuch";
         m_awaitingBeacon = true;
+    m_geraetHatGeantwortet = false;
         sendDiscoveryBroadcast();
         if (m_connectWatchdog) { m_connectWatchdog->start(kConnectTimeoutMs); }
     });
@@ -389,6 +390,7 @@ void SunSdrRadioConnection::connectToRadio(const RadioInfo& info)
     m_running = true;
     m_txSeq = 0;
     m_awaitingBeacon = true;
+    m_geraetHatGeantwortet = false;
     m_radioAddr.clear();
     setRxReady(false);
 
@@ -581,6 +583,22 @@ void SunSdrRadioConnection::onConnectTimeout()
     // goes through a brand-new instance in production (RadioModel
     // creates one per connect via RadioConnection::create()), so there
     // is no "reopen after close" case this needs to also handle.
+    // ── Erst der Stopp, DANN vergessen, mit wem wir sprachen ────────
+    //
+    // Die Reihenfolge ist der ganze Punkt. Drei Zeilen weiter unten
+    // werden m_awaitingBeacon und m_radioAddr zurueckgesetzt; ein Stopp
+    // danach hat keine Gegenstelle mehr -- und schlimmer: er sieht dann
+    // aus, als DUERFTE er hinausgehen, weil m_awaitingBeacon jetzt false
+    // ist. Beim ersten Anlauf am 2026-10-08 stand der Aufruf unten, und
+    // prompt ging ein Stopp auch dann hinaus, wenn nie eine Suchantwort
+    // kam. Ein Pruefstand hat es gefangen
+    // (ohneSuchantwortGehtKeinStoppHinaus).
+    //
+    // Hier oben stimmt der Zustand noch: m_awaitingBeacon sagt, ob das
+    // Geraet geantwortet hat, m_radioAddr sagt wohin, und die Sockets
+    // sind offen.
+    sendeStoppFallsMoeglich();
+
     m_running = false;
     m_awaitingBeacon = false;
     m_radioAddr.clear();
@@ -615,6 +633,7 @@ void SunSdrRadioConnection::onConnectTimeout()
     if (m_keepaliveTimer) { m_keepaliveTimer->stop(); }
     if (m_dataWatchdog) { m_dataWatchdog->stop(); }
     m_lastStreamPacketAt.invalidate();
+
     if (m_controlSocket) { m_controlSocket->close(); }
     if (m_streamSocket) { m_streamSocket->close(); }
 
@@ -644,36 +663,34 @@ void SunSdrRadioConnection::onConnectTimeout()
                                  "oder es ist nicht erreichbar."));
 }
 
-void SunSdrRadioConnection::disconnect()
+// ── Den Stopp schicken, sobald wir die Adresse kennen ────────────────
+//
+// Herausgezogen am 2026-10-08, weil es ZWEI Wege gibt, auf denen eine
+// Sitzung endet, und nur einer davon hier vorbeikam:
+//
+//   disconnect()        -- der geordnete Weg, schickte den Stopp
+//   Zeitablauf beim     -- schliesst die Sockets und meldet
+//   Verbinden              connectFailed(Timeout), schickte NICHTS
+//
+// Der zweite ist der haeufigere, und er ist genau der, nach dem das
+// Geraet haengenbleibt: Suche beantwortet (Adresse steht fest),
+// Zustandsrahmen in 12 ms quittiert, Strom kommt nicht. Danach schickte
+// die QRP ihre Messwerte mit 20/s ins Leere weiter und nahm niemanden
+// mehr an -- auch ExpertSDR2 nicht. Der Betreiber musste am 2026-10-08
+// dreimal den Kippschalter benutzen, bevor die Ursache hier lag.
+void SunSdrRadioConnection::sendeStoppFallsMoeglich()
 {
-    // Zuerst der Bericht, dann das Aufraeumen: nach connectToRadio() ist
-    // das Inventar leer, und ein Betreiber, der eine Stunde gefunkt hat,
-    // soll das Ergebnis im Log finden, ohne es waehrenddessen abfragen zu
-    // muessen. Nur wenn ueberhaupt etwas angekommen ist -- eine Zeile
-    // "nichts aufgenommen" bei jedem Programmende waere Laerm.
-    // Ein haengendes PTT darf eine Sitzung nicht ueberleben: bricht die
-    // Verbindung ab, waehrend das Geraet sendet, bliebe Longpath sonst im
-    // Zustand "Taste gedrueckt" -- und das ist der falsche Zustand, in dem
-    // man einen Sender in Erinnerung behaelt.
-    if (m_geraetSendet) {
-        m_geraetSendet = false;
-        qCInfo(lcSunSdr) << "SunSdr: Verbindung endet, waehrend das Geraet "
-                            "sendete -- PTT wird zurueckgenommen";
-        emit micPttFromRadio(false);
+    // Nur wenn das Geraet in DIESER Sitzung geantwortet hat.
+    //
+    // m_awaitingBeacon taugt dafuer nicht: bei abgeschalteter Suche ist
+    // es von Anfang an false, obwohl nie etwas kam -- beim ersten Anlauf
+    // am 2026-10-08 ging darum ein Stopp auch ohne jede Antwort hinaus.
+    // Gefangen hat das ohneSuchantwortGehtKeinStoppHinaus.
+    if (!m_geraetHatGeantwortet || !m_profile || !m_controlSocket
+        || m_radioAddr.isNull()) {
+        return;
     }
 
-    // Dem Geraet sagen, dass der Strom aufhoeren soll -- bis zum
-    // 2026-10-03 hat dieser Treiber beim Trennen GAR NICHTS geschickt, und
-    // die QRP streamte danach unbegrenzt weiter (gemessen: 1940 Pakete/s,
-    // 2,3 MB/s ins Leere, bis zum Ausschalten). Der Rahmen steht im
-    // Mitschnitt vom selben Tag: 0x02 mit vier Nullbytes, und das letzte
-    // Strompaket liegt in derselben Millisekunde.
-    //
-    // Nur wenn die Verbindung wirklich stand: vor dem Handschlag gibt es
-    // keine Gegenstelle, und ein Stopp an eine Adresse, die wir nicht
-    // kennen, waere ein Paket ins Nichts.
-    if (m_running && !m_awaitingBeacon && m_profile && m_controlSocket
-        && !m_radioAddr.isNull()) {
         // Nachschicken, solange er unquittiert bleibt -- siehe
         // kStoppVersuche im Kopf. Ohne das bleibt die QRP an einer toten
         // Sitzung haengen und nimmt niemanden mehr an.
@@ -720,6 +737,56 @@ void SunSdrRadioConnection::disconnect()
             }
         }
     }
+
+void SunSdrRadioConnection::disconnect()
+{
+    // Zuerst der Bericht, dann das Aufraeumen: nach connectToRadio() ist
+    // das Inventar leer, und ein Betreiber, der eine Stunde gefunkt hat,
+    // soll das Ergebnis im Log finden, ohne es waehrenddessen abfragen zu
+    // muessen. Nur wenn ueberhaupt etwas angekommen ist -- eine Zeile
+    // "nichts aufgenommen" bei jedem Programmende waere Laerm.
+    // Ein haengendes PTT darf eine Sitzung nicht ueberleben: bricht die
+    // Verbindung ab, waehrend das Geraet sendet, bliebe Longpath sonst im
+    // Zustand "Taste gedrueckt" -- und das ist der falsche Zustand, in dem
+    // man einen Sender in Erinnerung behaelt.
+    if (m_geraetSendet) {
+        m_geraetSendet = false;
+        qCInfo(lcSunSdr) << "SunSdr: Verbindung endet, waehrend das Geraet "
+                            "sendete -- PTT wird zurueckgenommen";
+        emit micPttFromRadio(false);
+    }
+
+    // Dem Geraet sagen, dass der Strom aufhoeren soll -- bis zum
+    // 2026-10-03 hat dieser Treiber beim Trennen GAR NICHTS geschickt, und
+    // die QRP streamte danach unbegrenzt weiter (gemessen: 1940 Pakete/s,
+    // 2,3 MB/s ins Leere, bis zum Ausschalten). Der Rahmen steht im
+    // Mitschnitt vom selben Tag: 0x02 mit vier Nullbytes, und das letzte
+    // Strompaket liegt in derselben Millisekunde.
+    //
+    // Sobald wir die ADRESSE kennen -- nicht erst, wenn der Strom lief.
+    //
+    // Hier stand bis zum 2026-10-08 zusaetzlich `m_running`, mit der
+    // Begruendung: "vor dem Handschlag gibt es keine Gegenstelle, und ein
+    // Stopp an eine Adresse, die wir nicht kennen, waere ein Paket ins
+    // Nichts." Das Argument ist richtig -- es trifft nur den haeufigsten
+    // Fehlerfall nicht.
+    //
+    // Am 2026-10-08 dreimal am Geraet gesehen: die Suche wird beantwortet
+    // (die Adresse steht also fest), der Zustandsrahmen wird in 12 ms
+    // quittiert, und der Strom kommt trotzdem nicht. Dann meldet der
+    // Treiber connectFailed(Timeout), `m_running` war nie wahr -- und
+    // genau deshalb ging KEIN Stopp hinaus. Das Geraet blieb mit einer
+    // halboffenen Sitzung zurueck und schickte seine Messwerte mit 20/s
+    // weiter ins Leere; der naechste Client (auch ExpertSDR2) kam nicht
+    // mehr herein. Der Betreiber musste an diesem einen Tag dreimal den
+    // Kippschalter benutzen.
+    //
+    // `m_awaitingBeacon` deckt den Fall, den die alte Begruendung meinte,
+    // bereits ab: ohne Antwort auf die Suche gibt es keine Adresse, und
+    // dann wird hier nichts geschickt. `m_running` zusaetzlich zu
+    // verlangen hiess, den Stopp ausgerechnet dann zu unterlassen, wenn
+    // er am noetigsten ist.
+    sendeStoppFallsMoeglich();
 
     berichteMithoeren();
 
@@ -788,11 +855,42 @@ void SunSdrRadioConnection::setRxReady(bool ready)
 
 void SunSdrRadioConnection::setReceiverFrequency(int receiverIndex, quint64 frequencyHz)
 {
-    // receiverIndex is accepted but unused: the QRP profile's
-    // RX-channel-count story is one of the items the boot-macro
-    // research left unattributed, and this class only ever streams one
-    // receiver.
-    Q_UNUSED(receiverIndex);
+    // ── Ein fremder Index darf NICHT auf Empfaenger 0 durchschlagen ──
+    //
+    // Hier stand "receiverIndex is accepted but unused ... this class
+    // only ever streams one receiver" und ein Q_UNUSED. Beides ist seit
+    // dem 2026-10-07 ueberholt: der Treiber faehrt nachweislich zwei
+    // Stroeme zu je 96 kHz.
+    //
+    // Mit dem Q_UNUSED war es schlimmer als unvollstaendig, es war
+    // falsch. Die Kette, am 2026-10-08 im Quelltext nachgegangen:
+    //
+    //   ReceiverManager   sendet hardwareFrequencyChanged fuer JEDEN
+    //                     aktiven Empfaenger neu (Re-emit-Schleife in
+    //                     rebuildHardwareMapping)
+    //   RadioModel:9339   reicht jeden davon ungefiltert hierher
+    //   hier             warf den Index weg und stellte unten DDC 0 --
+    //                     PLUS den Haupt-VFO-Rahmen 0x08
+    //
+    // Empfaenger 1 traegt vor der ersten Bindung die Vorbelegung
+    // 14 225 000 Hz (ReceiverManager.h). Eine zweite Scheibe anzulegen
+    // zog damit die Frequenz des ERSTEN Empfaengers und die VFO des
+    // Geraets auf 14,225 MHz. Fuer den Betreiber sichtbar als Sprung.
+    //
+    // Abgewiesen, nicht auf 0 abgebildet: ein Unterempfaenger-Rahmen
+    // fuer Kanal 1 liegt byte-genau aus dem ExpertSDR2-Mitschnitt vor
+    // (ddcFrequencyFrame nimmt den Index), aber ob die QRP ihn annimmt,
+    // ist nie am Geraet geprueft worden. Raten geht an ein Funkgeraet
+    // nicht hinaus. Bis zu dieser Messung ist Stille die richtige
+    // Antwort -- und eine Protokollzeile, damit sie nicht stumm bleibt.
+    if (receiverIndex != 0) {
+        qCInfo(lcSunSdr).noquote()
+            << QStringLiteral("SunSdr: setReceiverFrequency(%1, %2) verworfen "
+                              "-- Unterempfaenger-Abstimmung ist an der QRP "
+                              "nicht geprueft. Kanal 0 bleibt unberuehrt.")
+                   .arg(receiverIndex).arg(frequencyHz);
+        return;
+    }
 
     if (!m_controlSocket || !m_profile || m_radioAddr.isNull()) {
         // No open session to send this to yet — nothing meaningful to
@@ -1342,6 +1440,10 @@ void SunSdrRadioConnection::processControlDatagram(const QByteArray& data,
                    .arg(QString::fromLatin1(data.left(8).toHex(' ')));
         return;
     }
+
+    // Ab hier steht fest: das Geraet hat geantwortet. Nur dann darf beim
+    // Ende ein Stopp hinausgehen -- siehe sendeStoppFallsMoeglich().
+    m_geraetHatGeantwortet = true;
 
     qCInfo(lcSunSdr) << "SunSdr: beacon reply from" << sender
                       << "- replaying state-sync frame "
@@ -2157,6 +2259,30 @@ void SunSdrRadioConnection::replyToBlock(quint16 seq)
 void SunSdrRadioConnection::verarbeiteMesswertrahmen(const QByteArray& data)
 {
     ++m_messwertRahmen;
+
+    // ── Den GANZEN Rahmen mitschreiben, wenn sich etwas darin ruehrt ──
+    //
+    // Wir lesen zwei von siebenundsiebzig Byte. Am 2026-10-08 steht
+    // fest, dass die QRP auch Spannung und Strom meldet -- ExpertSDR2
+    // zeigt 13,0 V und 0,3 A, waehrend wir an denselben Rahmen nur die
+    // zwei Temperaturen herausholen. Wo die beiden anderen Werte
+    // stecken, ist unbekannt.
+    //
+    // Statt zu raten: unter LONGPATH_SUNSDR_ROHMESSWERT faellt jeder
+    // Rahmen ins Protokoll, dessen Nutzlast sich von der vorigen
+    // unterscheidet. Zwei, drei Minuten Laufzeit genuegen dann, um zu
+    // sehen, welche Bytes sich ueberhaupt bewegen -- und ein Wert, der
+    // sich nie aendert, ist keiner von beiden.
+    //
+    // Hinter einer Umgebungsvariable, weil 20 Rahmen je Sekunde ein
+    // Protokoll sonst unbrauchbar machen.
+    if (m_rohMesswertProtokoll && data != m_letzterMesswertRahmen) {
+        m_letzterMesswertRahmen = data;
+        qCInfo(lcSunSdr).noquote()
+            << QStringLiteral("SunSdr: Messwertrahmen roh: %1")
+                   .arg(QString::fromLatin1(data.toHex(' ')));
+    }
+
     float a = 0.0f;
     float b = 0.0f;
     std::memcpy(&a, data.constData() + 15, sizeof(float));
@@ -2618,7 +2744,7 @@ void SunSdrRadioConnection::auditStreamSeq(int kanal, quint16 seq,
         const qint64 now = m_iqSeqWndClock.elapsed();
         if (m_lastGapSignalMs < 0 || now - m_lastGapSignalMs >= 20) {
             m_lastGapSignalMs = now;
-            emit iqSequenceGap();
+            emit iqSequenceGap(kanal);
         }
         return;
     }

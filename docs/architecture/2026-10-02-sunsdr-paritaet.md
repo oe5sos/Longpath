@@ -65,9 +65,16 @@ Trennung arbeitet man an Dingen, die es am Gerät nie geben wird.
 | Was | Stand |
 | --- | --- |
 | **Mithören**: aufnehmen, was das Gerät meldet | **erledigt**, PR #150 |
-| `iqPacketLoss`, `iqSequenceGap` nach oben melden | Der Treiber hat die Folgenummern und zählt sie nicht aus — ANAN meldet beides. Rein rechnerisch, kein Protokollwissen nötig |
-| Veralteter Kommentar an `setSampleRate` (nennt die widerlegten 312 500 Hz) | Textfehler, irreführend beim Lesen |
+| `iqPacketLoss`, `iqSequenceGap` nach oben melden | **erledigt** — `SunSdrRadioConnection.cpp:2621` (Lücke) und `:2655` (Verlust); in `MainWindow.cpp:724/737` an der **Basisklasse** verdrahtet, gilt also für die QRP wie für P1/P2. Mit der QRP-eigenen Regel, dass eine Wiederholung weder Lücke noch Verlust ist |
+| Veralteter Kommentar an `setSampleRate` (nennt die widerlegten 312 500 Hz) | **erledigt** — die Zahl steht nirgends mehr im Treiber |
 | `setAntennaRouting` auf die drei Buchsen (A1/A2/A3) | Opcode 0x15, Rahmenbauer liegt fertig. **Nicht bench-bestätigt** — die Selektorbytes sind aus zitierbarer Quelle, aber an der QRP nie geprüft, und A3 hat einen RX/TX-Split (RX 0x03, TX 0x02). Baubar, Live-Prüfung nötig |
+
+> **Nachtrag 2026-10-08:** beide Zeilen oben standen bis heute als
+> offen in dieser Tabelle, obwohl sie längst gebaut waren. Beim Suchen
+> nach Arbeit, die ohne Antenne und ohne Gerät geht, wäre das genau die
+> Falle gewesen: eine Liste, die Arbeit behauptet, die es nicht mehr
+> gibt, kostet beim nächsten Mal den ganzen Weg bis zum Quelltext.
+> Nachgesehen statt geglaubt — und richtiggestellt.
 
 ### 2a. Zwei Korrekturen an dieser Einteilung (2026-10-02, beim Bauen gefunden)
 
@@ -596,3 +603,290 @@ Stromart hing als zweiter Wert hinten dran.
 kein falsches Verhalten. Nur das Lesen des Protokolls aus einem echten
 Lauf zeigt sie. Am Gerät gegengeprüft: jetzt steht dort „ein Strom,
 96 kHz (aus der Umgebung) -- Rate 96000 Hz, 1 Empfaenger".
+
+---
+
+# „ExpertSDR2 zeigt Spannung und Strom" — am Bildschirm nachgesehen, stimmt nicht (2026-10-08)
+
+Seit dem 2026-10-04 stand hier:
+
+> | Spannung und Strom | **offen**: ExpertSDR2 zeigt sie, im Mitschnitt
+> | stehen sie nirgends |
+
+Und als nächster Schritt für die Temperaturen: *„der Betreiber legt die
+Zahl neben ExpertSDR2"* — ist es die 43 oder die 33?
+
+**Beides geht nicht, weil die Voraussetzung falsch ist.** Heute zum
+ersten Mal in ExpertSDR2 selbst nachgesehen, bei verbundenem und
+streamendem Gerät (257 MB über die Schnittstelle, 1878 Blöcke/s):
+
+```
+U: 0.0 V        I: 0.0 A        🌡 0.0 °C
+```
+
+**Alle drei null.** ExpertSDR2 hat die Felder, und sie stehen auf Null.
+
+## Was das klärt
+
+* Der Mitschnitt schweigt zu Spannung und Strom **nicht, weil wir die
+  Rahmen nicht gefunden haben**, sondern weil die QRP sie in diesem
+  Zustand nicht meldet. Die Zeile oben beschrieb eine Lücke, die es
+  nicht gibt.
+* Die geplante Zuordnung der zwei Messwerte über einen Blick auf
+  ExpertSDR2 **kann nicht funktionieren**: dort steht 0,0 °C, nicht 43
+  und nicht 33. Es gibt nichts zu vergleichen.
+
+## Was das NICHT klärt — und was dadurch riskanter wird
+
+Offen bleibt, ob die Werte beim **Senden** von null verschieden werden.
+Der Zustand oben ist Empfang mit abgeschalteter PA; dass eine
+PA-Spannung dann 0 V meldet, ist plausibel. Das zu prüfen braucht den
+50-Ω-Abschluss — also wieder den einen Punkt, an dem ohnehin alles hängt.
+
+**Wichtiger ist die Folgerung für das, was wir anzeigen.** `RadioModel`
+schiebt den ersten der beiden Werte nach `RadioStatus::setPaTemperature()`
+— mit dem ausdrücklichen Kommentar, dass die Zuordnung eine Wahl ist und
+kein Beleg. Dieser Befund macht sie **schwächer, nicht stärker**:
+ExpertSDR2 meldet für dieselbe Lage 0,0 °C, Longpath zeigte 43.
+
+Eine Zahl, die plausibel aussieht und falsch ist, ist schlechter als
+keine Zahl. Solange die Zuordnung nicht belegt ist, gehört der Wert
+nicht als „PA-Temperatur" beschriftet.
+
+## Nebenbefund aus derselben Messung: der Rückweg
+
+Auf Betriebssystemebene über 31 s gezählt (`netstat -i -b`, en9 trägt
+nur das Gerätenetz):
+
+| | eingehend | ausgehend |
+| --- | ---: | ---: |
+| ExpertSDR2 | 1878 Pakete/s (1240 B/Paket) | **9 Pakete/s** |
+| Longpath, 96 kHz, 2 Ströme | 1249 Pakete/s | ~1000 Pakete/s |
+
+ExpertSDR2 fährt das Gerät mit **höherer** Blockrate als Longpath und
+antwortet mit einem Hundertstel des Rückwegs. Das ist noch kein Beleg
+gegen die These „die Wiederholungen sind eine Eigenschaft des Geräts bei
+hoher Blockrate" — dafür fehlen ExpertSDR2s Folgenummern, und die gibt
+nur ein Mitschnitt her. Aber es ist das erste Mal, dass die These an
+einer höheren Blockrate überhaupt geprüft werden könnte.
+
+Die Schnittstelle selbst ist sauber: en9 ist ein USB-Ethernet-Adapter,
+100baseTX voll-duplex, **0 Fehler, 0 Kollisionen**, und die QRP ist nur
+über diesen einen Weg erreichbar — ein Netzschleifen-Artefakt als
+Ursache der Doppel-Pakete ist damit ausgeschlossen.
+
+---
+
+# Die zwei Messwerte sind BEIDE Temperaturen — an der Aufwärmkurve gemessen (2026-10-08)
+
+Nachdem der Vergleich mit ExpertSDR2 ausgefallen ist (dort steht 0,0 °C,
+siehe oben), blieb nur eine Messung, die das Gerät selbst liefert: eine
+Temperatur **muss driften**, während die QRP warm wird. Etwas anderes
+tut das nicht.
+
+Der Betreiber hat das Gerät für diesen Zweck aus- und wieder
+eingeschaltet. Gemessen wurde von kalt an, 45 Minuten Dauerempfang bei
+96 kHz, danach noch einmal im eingeschwungenen Zustand:
+
+| Zeitpunkt | Wert A | Wert B | Abstand |
+| --- | ---: | ---: | ---: |
+| kalt, direkt nach dem Einschalten | 39,5 | 30,5 | 9,0 |
+| nach ~2 Minuten | 41,0–41,5 | 31,0–31,5 | ~10,0 |
+| nach ~50 Minuten, eingeschwungen | 42,0–42,5 | 32,0–32,5 | ~10,0 |
+
+**Beide steigen um rund 2,5 Grad und bleiben dann stehen.** Im warmen
+Zustand pendelt A nur noch zwischen 42,0 und 42,5 (105 zu 104 Proben
+von 209), B liegt in 198 von 209 Proben auf 32,5.
+
+## Was damit belegt ist
+
+* **Beide Werte sind Temperaturen.** Eine Aufwärmkurve von kalt auf
+  eingeschwungen, mit Sättigung, ist nichts anderes. Bisher stand im
+  Dokument nur „zwei Messwerte, Zuordnung unbekannt".
+* **Es sind zwei unabhängige Fühler**, nicht einer und eine Ableitung:
+  der Abstand ist nicht konstant (9,0 kalt gegen 10,0 warm).
+* Die Halbgrad-Rasterung bestätigt sich über 2172 Proben — es kommt
+  ausschließlich X,0 und X,5 vor.
+* **ExpertSDR2 zeigt diese Werte nicht an.** Während das Gerät 42,5 und
+  32,5 meldet, steht dort 0,0 °C. Longpath liest also etwas, das
+  ExpertSDR2 verwirft — nicht umgekehrt.
+
+## Was weiter offen bleibt
+
+**Welcher Fühler wo sitzt.** Dass beide Temperaturen sind, sagt nicht,
+ob einer davon die PA ist. Ohne Senden erwärmt sich keine Endstufe
+nennenswert, also trennt dieser Lauf die beiden nicht. Der Weg dahin ist
+derselbe wie bisher: ein Durchgang mit dem 50-Ω-Abschluss. Unter Last
+muss der PA-Fühler deutlich stärker ausschlagen als der andere — und
+dann ist die Zuordnung in einer Minute entschieden.
+
+Bis dahin gilt, was schon vorher galt: die Zuordnung des ersten Werts
+nach `RadioStatus::setPaTemperature()` ist eine Wahl. Sie ist jetzt
+besser begründet als gestern (es IST eine Temperatur), aber immer noch
+nicht belegt (welche).
+
+## Zwei Fallen auf dem Weg dahin, für den nächsten
+
+**`LONGPATH_SUNSDR_FIXED_PORTS` ist Pflicht.** Ohne die Variable bindet
+der Treiber zufällige Ports, das Gerät antwortet auf die Suche und
+quittiert den Zustandsrahmen — und schickt den Strom trotzdem an
+50001/50002. Ergebnis: `connectFailed(Timeout)` nach drei Sekunden, was
+wie eine Gerätesperre aussieht und keine ist. Am 2026-10-08 dreimal
+hintereinander falsch gedeutet, mit einem unnötigen Aus/Ein als Folge.
+
+**QtTest kappt die Ausgabe bei 2000 Zeilen** („Maximum amount of
+warnings exceeded"). Der 45-Minuten-Lauf lief sauber durch und
+protokollierte trotzdem nur die ersten Minuten. Wer eine lange Reihe
+braucht, startet mit `-maxwarnings 0` — zusätzlich zu
+`QTEST_FUNCTION_TIMEOUT`, das eine andere Grenze zieht.
+
+---
+
+# Die Antennenwahl braucht ZWEI Opcodes, nicht einen (2026-10-08)
+
+Die Antennenwahl stand auf der Liste als „Rahmenbauer liegt fertig,
+Live-Prüfung nötig" — Opcode `0x15`, Selektorbytes aus ArtemisSDR. Beim
+Nachlesen in der Quelle, bevor etwas hinausgeht, zwei Funde.
+
+## Fund 1: A1 und A2 erzeugen byteidentische Rahmen
+
+`kAntennaByteTable` trägt für A1 und A2 denselben Wert `0x01`. Zwei von
+drei Ports wären damit nicht unterscheidbar. Das sah nach einem Fehler
+in der Tabelle aus — ist aber keiner.
+
+## Fund 2: der Port hängt am BAND, nicht am Byte
+
+ArtemisSDR `ChannelMaster/sunsdr.c:3737-3758` [@f8b01d2], aus eigenen
+Mitschnitten (`ant_a1_to_adc_on_2m`, `ant_adc_to_a1_on_2m`, 2026-04-18):
+
+```
+VHF:  0x1E = 0x00, 0x15 = 0x01   ->  A1 (hinterer VHF-Port)
+      0x1E = 0x01, 0x15 = 0x01   ->  ADC-Pfad
+HF:   0x1E = 0 (Praeambel), 0x15 traegt die Wahl
+```
+
+Und `Console/HPSDR/SunSdrAntenna.cs:16-31` [@f8b01d2] sagt es im
+Klartext: *„the native layer applies its own HF-vs-VHF and RX-vs-TX byte
+mapping on top."*
+
+**A1 ist der 2-m-Port und gilt nur auf VHF; A2/A3 sind HF.** Sie teilen
+sich den Selektorbyte, weil sie sich nie im selben Band begegnen. Was
+sie trennt, ist das Band — und auf VHF trägt sogar `0x1E` die
+eigentliche Wahl, nicht `0x15`.
+
+## Was daraus folgt
+
+`AntennaPort` kennt kein Band, und `0x1E` kommt in Longpath nirgends
+vor. `setAntennaRouting` jetzt zu verdrahten hiesse: auf HF nach A1
+schalten zu wollen und in Wahrheit A2 zu treffen, lautlos.
+
+**Die Methode bleibt leer** — aus einem zweiten Grund zusätzlich zu dem,
+der schon dastand (die Opcode-Nummer stammt von der DX). Das ist keine
+Vertagung, sondern das Ergebnis: die Lücke ist jetzt benannt statt
+vermutet.
+
+## Was der Durchgang mit dem Abschluss dafür klären muss
+
+1. ~~Quittiert die QRP `0x1E`?~~ **Erledigt am 2026-10-08: ja.** Dreimal
+   hintereinander gemessen, je 10–12 ms, mit Nutzlast 0 (dem HF-Normal).
+   Die QRP benutzt hier also die DX-Nummer und **nicht** die um eins
+   niedrigere — der „QRP liegt eins darunter"-Befund gilt für
+   Vorverstärker und DDC, aber nicht pauschal. Ohne Antenne gemessen.
+2. Hat die QRP den VHF/ADC-Pfad überhaupt? Sie ist ein HF-Gerät mit
+   2-m-Option; der ADC-Bypass könnte entfallen.
+3. Erst danach: `AntennaPort` um das Band erweitern und verdrahten.
+
+Schritt 2 braucht **keinen** Abschluss und keine Antenne — er kann beim
+nächsten Gerätelauf nebenbei mitlaufen.
+
+## Eine Vermutung, die die Gegenprobe gekillt hat
+
+Zwischendurch sah es so aus, als brächte ein Vorab-Rahmen
+(`LONGPATH_SUNSDR_PRE`) den Stromstart zum Scheitern: jeder Lauf mit
+einem endete in `connectFailed(Timeout)`, der Lauf davor ohne lief in
+50 ms durch. Das wäre für den Prüfplan wichtig gewesen — Proben hätten
+dann nach hinten gemusst.
+
+**Stimmt nicht.** Der Lauf ohne Vorab-Rahmen scheiterte genauso. Das
+Gerät war schlicht wieder in dem Zustand, in dem es den Strom nicht
+hergibt. Ohne die Gegenprobe stünde hier jetzt eine Ursache, die keine
+ist — zum dritten Mal in dieser Woche dieselbe Falle.
+
+## Die Behebung am Gerät bestätigt (2026-10-08, nach dem Aus/Ein)
+
+Drei Verbindungszyklen hintereinander, dazwischen je gemessen, ob das
+Gerät noch sendet:
+
+| Zyklus | Ergebnis | danach |
+| --- | --- | ---: |
+| 1 (erster Griff nach dem Hochfahren) | kam durch, Strom blieb | 1981 Pakete/s |
+| 2 | verbunden nach 50 ms | **0 Pakete/s** |
+| 3 | verbunden nach 50 ms | **0 Pakete/s** |
+
+Und der Ablauf im Protokoll, vollständig:
+
+```
+verbunden nach 51 ms
+op=0x2 nach 0 ms quittiert
+Stopp beim Trennen quittiert nach Versuch 1
+```
+
+**Der Stopp wird sofort quittiert**, die Sitzung schließt, das Gerät
+geht auf null. Zyklus 1 — der allererste Verbindungsversuch nach dem
+Einschalten — ließ den Strom stehen, aber der nächste Versuch kam
+trotzdem herein. Das ist kein Hängen; das Hängen von heute früh war der
+Zustand, in dem `0x1E` und `0x15` quittiert wurden und `0x02` nicht.
+
+Was damit belegt ist: auf einem gesunden Gerät schließt Longpath die
+Sitzung sauber. Was NICHT belegt ist: dass der Zeitablauf-Pfad das
+Hängen wirklich verhindert — dafür müsste der Fall eintreten, und er
+tritt auf einem gesunden Gerät nicht ein. Der Prüfstand
+`einStoppGehtAuchHinausWennNurDieSucheBeantwortetWurde` stellt ihn
+nach; am Gerät steht der Beleg aus.
+
+---
+
+# ZURÜCKGENOMMEN: „ExpertSDR2 zeigt Spannung und Strom nicht" (2026-10-08, nachmittags)
+
+Heute früh stand hier, mit Bildbeleg, ExpertSDR2 zeige `U: 0.0 V`,
+`I: 0.0 A`, `0.0 °C` — und daraus wurde geschlossen, die QRP melde diese
+Werte gar nicht, der Mitschnitt schweige zu Recht, und Longpath lese
+etwas, das ExpertSDR2 verwerfe.
+
+**Falsch. Alle drei Schlüsse.**
+
+Der Grund ist banal und hätte mir auffallen müssen: **ExpertSDR2 war
+nicht mit dem Funkgerät verbunden.** Es lief, es zeigte seine
+Oberfläche, und seine Messfelder standen auf null, weil nichts
+hereinkam. Ich habe einen Zustand gemessen und für eine Eigenschaft
+gehalten.
+
+Sobald die Verbindung steht:
+
+```
+U: 13.0 V        I: 0.3 A        🌡 42.5 °C
+```
+
+## Was das klärt — und zwar gründlich
+
+**Wert A ist die Temperatur, die ExpertSDR2 anzeigt.** Unsere Messung
+am warmen Gerät ergab A = 42,0–42,5; ExpertSDR2 zeigt im selben Zustand
+**42,5 °C**. Das ist keine Ähnlichkeit, das ist derselbe Wert.
+
+Damit ist die Zuordnung in `RadioModel` — Wert A nach
+`RadioStatus::setPaTemperature()` — **belegt** und nicht mehr eine Wahl.
+Der Kommentar dort, der sie als unbewiesen kennzeichnet, kann weg.
+
+**Spannung und Strom meldet die QRP sehr wohl.** 13,0 V und 0,3 A. Sie
+stehen irgendwo im Strom, und jetzt ist sogar bekannt, wonach zu suchen
+ist: zwei Werte in dieser Größenordnung, die sich mit der Last ändern.
+Der Punkt bleibt offen — aber er ist nicht mehr „gibt es nicht",
+sondern „noch nicht gefunden", und das ist ein anderer Punkt.
+
+## Was ich daraus mitnehme
+
+Es gibt dazu eine Regel in diesem Projekt: **Abwesenheit ist keine
+Aussage.** Fehlende Daten sind kein Befund. Ich habe sie gekannt und
+trotzdem aus drei Nullen eine Geräteeigenschaft gemacht, ohne zu
+prüfen, ob das Programm, das sie anzeigt, überhaupt mit dem Gerät
+sprach. Die Prüfung wäre ein Blick auf dieselbe Statuszeile gewesen.

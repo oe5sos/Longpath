@@ -535,7 +535,17 @@ signals:
     /// Schmierer). Gedrosselt gesendet: hoechstens alle 20 ms, sonst
     /// flutet ein schlechter Funkweg die Ereignisschlange. Empfaenger:
     /// RadioModel, das es an die Panadapter weiterreicht.
-    void iqSequenceGap();
+    /// `hwReceiverIndex` ist derselbe Index, den dieser Treiber auch an
+    /// iqDataReceived haengt -- der Hardware-Empfaenger. **-1 heisst
+    /// "betrifft alle"**: P1 zaehlt die Folge des EP6-Stroms, und der
+    /// traegt alle Empfaenger verschachtelt, eine Luecke dort trifft
+    /// also wirklich jeden.
+    ///
+    /// Vor dem 2026-10-08 trug das Signal keinen Index, und der
+    /// Empfaenger setzte JEDE FFT-Maschine zurueck. Bei zwei
+    /// Empfaengern riss ein Aussetzer in Kanal 1 damit auch das Bild
+    /// von Kanal 0 auf.
+    void iqSequenceGap(int hwReceiverIndex);
 
     // PSU supply voltage (V) from supply_volts (P1 AIN6 / P2 bytes 45-46).
     // Converted via Hermes DC-volts formula (console.cs computeHermesDCVoltage()

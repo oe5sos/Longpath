@@ -313,12 +313,31 @@ quint64 decodeFrequencyPayload(const QByteArray& payload)
 // the full citation and the "zero wire reachability" scope this Step 1
 // sits behind.
 
+// ── Jeder Rahmenbauer liefert einen SENDEFERTIGEN Rahmen (2026-10-08) ──
+//
+// buildStromStartFrame und buildStopFrame -- die beiden, die verdrahtet
+// sind -- riefen withControlFrameCrc selbst. Die vier darunter, die
+// bewusst KEINE Aufrufstelle haben, taten es nicht: sie lieferten Bytes
+// 14..17 als null.
+//
+// Das ist kein Schoenheitsfehler. Dieses Projekt hat am 2026-09-25 am
+// Geraet gezeigt, dass ein Rahmen mit falschem Ende STILLSCHWEIGEND
+// verworfen wird -- kein Fehler, keine Antwort, nichts. Wer einen dieser
+// vier als Erster verdrahtet, schickt einen toten Rahmen hinaus und
+// sucht die Ursache im Funkgeraet statt in der Zeile. Das waere beim
+// Durchgang mit dem 50-Ohm-Abschluss passiert, wo die Zeit am Geraet
+// teuer ist.
+//
+// Darum tragen jetzt alle sechs die Pruefsumme, und ein Waechter in
+// tst_sunsdr_protocol haelt fest, dass JEDER Rahmenbauer einen Rahmen
+// liefert, dessen Pruefsumme stimmt -- auch der naechste, den jemand
+// dazuschreibt.
 QByteArray buildMoxFrame(const Profile& profile, bool on)
 {
     QByteArray out = buildControlHeader(profile, kOpMoxPtt, /*sub=*/0,
                                         /*declaredPayloadLen=*/4);
     appendU32Le(out, on ? 1u : 0u);
-    return out;
+    return withControlFrameCrc(out);
 }
 
 namespace {
@@ -400,7 +419,7 @@ bool buildAntennaSelectFrame(const Profile& profile, AntennaPort port,
                                               /*sub=*/0,
                                               /*declaredPayloadLen=*/4);
         appendU32Le(frame, entry.byteValue);
-        *out = frame;
+        *out = withControlFrameCrc(frame);
         return true;
     }
     return false;
@@ -411,7 +430,7 @@ QByteArray buildDriveFrame(const Profile& profile, quint8 raw0to255)
     QByteArray out = buildControlHeader(profile, kOpDrive, /*sub=*/0,
                                         /*declaredPayloadLen=*/4);
     appendU32Le(out, static_cast<quint32>(raw0to255));
-    return out;
+    return withControlFrameCrc(out);
 }
 
 QByteArray buildPaEnableFrame(const Profile& profile, bool enabled)
@@ -419,7 +438,7 @@ QByteArray buildPaEnableFrame(const Profile& profile, bool enabled)
     QByteArray out = buildControlHeader(profile, kOpPaEnable, /*sub=*/0,
                                         /*declaredPayloadLen=*/4);
     appendU32Le(out, enabled ? 1u : 0u);
-    return out;
+    return withControlFrameCrc(out);
 }
 
 } // namespace SunSdr

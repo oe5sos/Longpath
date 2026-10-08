@@ -501,7 +501,7 @@ private slots:
     /// und an einem Lambda verweigerte Qt6 genau diesen connect ("unique
     /// connections require a pointer to member function", stand bei
     /// jedem Verbinden im Protokoll). Das Verwerfen geschah also nie.
-    void onIqSequenceGap();
+    void onIqSequenceGap(int hwReceiverIndex);
 
     /// TNF: surface a rejected add. Without this a +TNF press inside the
     /// 10 Hz dedupe window is silently ignored and the button reads as dead.
