@@ -181,6 +181,20 @@ Gemessen am echten Gerät (ANVELINA Pro 3, 12 kHz mono mu-law):
 
 Roher I/Q wäre an derselben Stelle über 400 kB/s.
 
+## Die blaue Fassung
+
+Panadapter und Wasserfall tragen seit dem 2026-10-08 Longpaths eigene
+Flächen, Wert für Wert (`app-bg` #08080a, Rampe wie `mutedStops` in
+`SpectrumWidget.cpp`). Die blaue Fassung davor — für das Telefon im
+Hellen gebaut — bleibt als eine Zeile in `app.js`:
+
+```js
+const WASSERFALL_BLAU = false;   // true = die blaue Fassung
+```
+
+Sie schaltet die Rampe und über `data-wasserfall` auch die Fläche im
+Stilblatt. Blätter und Messung: `docs/design/2026-10-08-app-farben-wie-longpath/`.
+
 ## Ohne Funkgerät prüfen
 
 ```

@@ -9,7 +9,10 @@
   --ok:#6fa384; --warn:#a8853f; --danger:#a86b6d;
   --tx-top:#a87a3c; --tx-bot:#8a6a30; --tx-border:#c2924f; --tx-text:#17130a;
   --tune-top:#7a5a2c; --tune-bot:#634c24; --tune-border:#9a763c;
-  --pan-bg:#141e27; --trace:#c2924f; --grid:#8a8f96; --grid-text:#9aa0a8;
+  /* Panadapter-Flaeche: Longpaths app-bg, Wert fuer Wert (StyleConstants.h
+     kAppBg). Die blaue Fassung steht eine Zeile tiefer -- siehe
+     WASSERFALL_BLAU in app.js. */
+  --pan-bg:#08080a; --trace:#c2924f; --grid:#8a8f96; --grid-text:#9aa0a8;
   --glass-btn-top:#222227; --glass-btn-bot:#141417;
   --glass-sel-top:#2f5f92; --glass-sel-bot:#1e3d5f;
   --glass-sel-border:#3d78b0; --glass-sel-text:#dbe9f8;
@@ -25,6 +28,11 @@
   --r-chip:7px; --r-panel:10px;
   --mono:ui-monospace,"SF Mono",Menlo,monospace;
 }
+
+/* Die blaue Fassung des Panadapters -- bis 2026-10-08 die einzige, jetzt
+   die Ausweichfassung. Geschaltet von WASSERFALL_BLAU in app.js, das
+   data-wasserfall setzt; dieselbe Zeile waehlt auch die Rampe. */
+:root[data-wasserfall="blau"]{ --pan-bg:#141e27; }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 
 /* iOS: langes Halten auf dem Bild rief die Lupe und markierte die halbe
@@ -100,11 +108,13 @@ html,body{width:393px;height:852px;overflow-x:hidden}
    steht still. */
 body{
   /* Entwurf B, 2026-10-02: der Verlauf lief ueber #17212b — ein deutliches
-     Blaugruen, das es am Pult nirgends gibt. Longpath hat genau EINE blaue
-     Flaeche, den Panadapter (#141e27); alles andere ist neutrales Grau.
-     Der Dunst machte die Seite erkennbar zu einer Telefon-App statt zu
-     Longpath. Jetzt neutral, und die Tiefe kommt aus Licht und Schatten
-     statt aus Farbe. */
+     Blaugruen, das es am Pult nirgends gibt. Jetzt neutral, und die Tiefe
+     kommt aus Licht und Schatten statt aus Farbe.
+     RICHTIGSTELLUNG 2026-10-08: hier stand "Longpath hat genau EINE blaue
+     Flaeche, den Panadapter (#141e27)". Das stimmte nicht. Longpath fuellt
+     Panadapter UND Wasserfall mit app-bg (#08080a); das blaue #0f0f1a ist
+     dort seit dem 2026-08-15 weg und steht nur noch als "// war" im
+     Kommentar. Die blaue Flaeche gab es nur in dieser App. */
   background:
     radial-gradient(120% 80% at 50% 0%, #101016 0%, var(--app-bg) 62%);
   background-attachment:fixed;
@@ -165,7 +175,7 @@ header .rate{font-size:var(--f-caption);color:var(--text-inactive)}
      man schaut hinein, man fasst ihn nicht an. Darum kInsetBorder als Rahmen
      und der Schatten nach innen statt nach aussen. */
   flex:none;margin:0 12px;border:1px solid var(--inset-border);
-  border-radius:8px;overflow:hidden;background:#0b141c;
+  border-radius:8px;overflow:hidden;background:var(--pan-bg);
   box-shadow:inset 0 2px 10px rgba(0,0,0,.6);
 }
 .scope canvas{display:block;width:100%}

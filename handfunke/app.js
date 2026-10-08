@@ -492,9 +492,16 @@ const glatt = new Float32Array(N);        // eigene FFT (Rückfall)
 let specServer = new Float32Array(0);     // fertig vom Server (Regelfall)
 let hatSpektrum = false;
 
-// Die Wasserfallrampe „Gedaempft" aus SpectrumWidget.cpp, mit EINER
-// Abweichung: ihr dunkler Teil liegt hier auf dem Panel-Blau (--pan-bg
-// #141e27) statt auf Grau.
+// ── Die Wasserfallrampe „Gedaempft" ────────────────────────────────────────
+//
+// Seit 2026-10-08 Wert fuer Wert dieselbe wie in SpectrumWidget.cpp
+// (mutedStops): dieselben sieben Stuetzpunkte an denselben Stellen, aus
+// denselben Rollen. Betreiber: "die grafik vom longpath software 1:1 auf
+// das app in bezug auf farben und hintergrund".
+//
+// Die blaue Fassung bleibt als EINE Zeile erhalten (WASSERFALL_BLAU) --
+// sie wurde fuer das Telefon im Hellen gebaut, und das laesst sich nur
+// draussen entscheiden, nicht hier. Was dabei zu bedenken ist:
 //
 // Warum: am Schreibtisch fuellt der Wasserfall ein halbes Fenster, da traegt
 // Grau. Am Telefon ist er eine Handflaeche gross und wird oft im Hellen
@@ -521,8 +528,26 @@ let hatSpektrum = false;
 // Teil ist jetzt auf 18 % gestaucht und der Boden eine Spur heller, damit man
 // SIEHT, dass dort Rauschen ist und nicht etwa nichts ankommt. Der Aufbau
 // bleibt: Blau unten, Waerme oben, Weiss ganz oben, kein Rot.
-const STOPS = [[0,[13,17,23]],[.18,[24,36,49]],[.34,[38,62,88]],[.50,[104,100,82]],
-               [.68,[172,133,83]],[.86,[214,164,95]],[1,[244,244,238]]];
+// EINE Zeile, zwei Fassungen. true = die blaue von vor dem 2026-10-08.
+const WASSERFALL_BLAU = false;
+document.documentElement.dataset.wasserfall = WASSERFALL_BLAU ? 'blau' : 'longpath';
+
+// Longpath, SpectrumWidget.cpp mutedStops: app-bg / panel / border /
+// text-inactive / instrument-glow-hi / measured / instrument-face, an den
+// Stellen 0 / .30 / .48 / .64 / .78 / .92 / 1.
+const STOPS_LONGPATH = [[0,[8,8,10]],[.30,[12,12,14]],[.48,[44,44,49]],[.64,[88,88,94]],
+                        [.78,[129,123,92]],[.92,[216,165,95]],[1,[242,242,236]]];
+const STOPS_BLAU     = [[0,[13,17,23]],[.18,[24,36,49]],[.34,[38,62,88]],[.50,[104,100,82]],
+                        [.68,[172,133,83]],[.86,[214,164,95]],[1,[244,244,238]]];
+const STOPS = WASSERFALL_BLAU ? STOPS_BLAU : STOPS_LONGPATH;
+
+// Flaechen aus EINER Quelle: die Panadapter-Flaeche steht im Stilblatt
+// (--pan-bg, von data-wasserfall geschaltet), der leere Wasserfall ist der
+// Boden der Rampe selbst. Zwei Zahlen fuer dieselbe Flaeche laufen sonst
+// beim naechsten Feinschliff auseinander.
+const PAN_BG = getComputedStyle(document.documentElement)
+                 .getPropertyValue('--pan-bg').trim() || '#08080a';
+const WF_BG  = 'rgb(' + STOPS[0][1].join(',') + ')';
 function rampe(t) {
   t = t < 0 ? 0 : t > 1 ? 1 : t;
   for (let i = 1; i < STOPS.length; i++) {
@@ -565,7 +590,7 @@ let neueZeilen = 0;      // vom Datenstrom gefuellt, von der Zeichenschleife gel
 
 function wasserfallLeeren() {
   try {
-    wfCtx.fillStyle = '#0c0c0e';
+    wfCtx.fillStyle = WF_BG;
     wfCtx.fillRect(0, 0, wf.width, wf.height);
   } catch (e) { /* vor dem ersten Zeichnen */ }
   neueZeilen = 0;
@@ -596,7 +621,7 @@ function wasserfallSchieben(dHz) {
     // selbst als Quelle zeichnet, schiebt nicht verlaesslich.
     wfPuffCtx.clearRect(0, 0, wf.width, wf.height);
     wfPuffCtx.drawImage(wf, 0, 0);
-    wfCtx.fillStyle = '#0c0c0e';
+    wfCtx.fillStyle = WF_BG;
     wfCtx.fillRect(0, 0, wf.width, wf.height);
     wfCtx.drawImage(wfPuff, dx, 0);
   } catch (e) { /* vor dem ersten Zeichnen */ }
@@ -672,8 +697,8 @@ function zeichneBild() {
     state.wfBoden = null;
   }
   if (still) {
-    panCtx.fillStyle = '#141e27'; panCtx.fillRect(0, 0, W, H);
-    wfCtx.fillStyle = '#0c0c0e';  wfCtx.fillRect(0, 0, wf.width, wf.height);
+    panCtx.fillStyle = PAN_BG; panCtx.fillRect(0, 0, W, H);
+    wfCtx.fillStyle = WF_BG;  wfCtx.fillRect(0, 0, wf.width, wf.height);
     panCtx.fillStyle = '#7e7e85';
     panCtx.font = '11px -apple-system,system-ui,sans-serif';
     panCtx.textAlign = 'center';
@@ -704,7 +729,7 @@ function zeichneBild() {
   const lo = state.specMin, hi = Math.max(state.specMax, lo + 20);
   const y = (db) => H - ((db - lo) / (hi - lo)) * H;
 
-  panCtx.fillStyle = '#141e27'; panCtx.fillRect(0, 0, W, H);
+  panCtx.fillStyle = PAN_BG; panCtx.fillRect(0, 0, W, H);
   panCtx.strokeStyle = 'rgba(138,143,150,.16)'; panCtx.lineWidth = 1;
   for (let i = 1; i < 6; i++) { const yy = Math.round(H*i/6)+.5;
     panCtx.beginPath(); panCtx.moveTo(0, yy); panCtx.lineTo(W, yy); panCtx.stroke(); }
