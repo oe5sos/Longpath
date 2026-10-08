@@ -65,9 +65,16 @@ Trennung arbeitet man an Dingen, die es am Gerät nie geben wird.
 | Was | Stand |
 | --- | --- |
 | **Mithören**: aufnehmen, was das Gerät meldet | **erledigt**, PR #150 |
-| `iqPacketLoss`, `iqSequenceGap` nach oben melden | Der Treiber hat die Folgenummern und zählt sie nicht aus — ANAN meldet beides. Rein rechnerisch, kein Protokollwissen nötig |
-| Veralteter Kommentar an `setSampleRate` (nennt die widerlegten 312 500 Hz) | Textfehler, irreführend beim Lesen |
+| `iqPacketLoss`, `iqSequenceGap` nach oben melden | **erledigt** — `SunSdrRadioConnection.cpp:2621` (Lücke) und `:2655` (Verlust); in `MainWindow.cpp:724/737` an der **Basisklasse** verdrahtet, gilt also für die QRP wie für P1/P2. Mit der QRP-eigenen Regel, dass eine Wiederholung weder Lücke noch Verlust ist |
+| Veralteter Kommentar an `setSampleRate` (nennt die widerlegten 312 500 Hz) | **erledigt** — die Zahl steht nirgends mehr im Treiber |
 | `setAntennaRouting` auf die drei Buchsen (A1/A2/A3) | Opcode 0x15, Rahmenbauer liegt fertig. **Nicht bench-bestätigt** — die Selektorbytes sind aus zitierbarer Quelle, aber an der QRP nie geprüft, und A3 hat einen RX/TX-Split (RX 0x03, TX 0x02). Baubar, Live-Prüfung nötig |
+
+> **Nachtrag 2026-10-08:** beide Zeilen oben standen bis heute als
+> offen in dieser Tabelle, obwohl sie längst gebaut waren. Beim Suchen
+> nach Arbeit, die ohne Antenne und ohne Gerät geht, wäre das genau die
+> Falle gewesen: eine Liste, die Arbeit behauptet, die es nicht mehr
+> gibt, kostet beim nächsten Mal den ganzen Weg bis zum Quelltext.
+> Nachgesehen statt geglaubt — und richtiggestellt.
 
 ### 2a. Zwei Korrekturen an dieser Einteilung (2026-10-02, beim Bauen gefunden)
 
