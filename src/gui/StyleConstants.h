@@ -516,6 +516,12 @@ constexpr auto kGaugePeak       = "#c4c4c9";
 // Die Grundregeln des Hausstils bleiben (zwei Prozent Farbe, Blau ist
 // anfassbar, Warm ist gemessen); das hier ist ihre Ausformung.
 //
+// "Kurven mit Hof" steht NICHT hier, sondern in `gui/KurvenStreifen.h`:
+// es ist Geometrie fuer die GPU, keine Farbe. Dort auch die Deckkraft
+// des Hofs -- 22 %, derselbe Wert, mit dem docs/design/HAUSSTIL.md
+// §Weiche Uebergaenge die Fuellung unter der Kurve auslaufen laesst,
+// damit nicht zwei Deckkraft-Vokabulare nebeneinander stehen.
+//
 // Licht und Schatten sind ALPHA-Werte auf Weiss bzw. Schwarz, keine
 // Farben: dieselbe Kante liegt auf jedem Grund richtig.
 constexpr auto kGlassPanelTop   = "#17171b";   // Panelverlauf oben

@@ -165,6 +165,7 @@ mw0lge@grange-lane.co.uk
 #include <QPropertyAnimation>
 
 #include "gui/DssRenderer.h"
+#include "gui/KurvenStreifen.h"   // Streifen der Kurve: weiche Kante, Hof
 #include "gui/StyleConstants.h"   // kAmberText — Vorgabe des Spot-Tons
 #include "gui/WaterfallHistoryBuffer.h"
 #include "spectrum/ActivePeakHoldTrace.h"
@@ -585,6 +586,39 @@ public:
     // default width until commit 5 renderer additions.
     void setLineWidth(float w);
     float lineWidth() const { return m_lineWidth; }
+
+    // ── Weiche Kante und Hof ("Kurven mit Hof", Glas & Tiefe) ────────
+    //
+    // Zwei Zutaten der am 2026-09-17 gewaehlten Gestaltungsrichtung, an
+    // der GPU-Kurve und an der Spitzenhaltelinie.
+    //
+    // VORGABE: weiche Kante AN, Hof AUS. Gewaehlt vom Betreiber am
+    // 2026-10-08 ("entscheide selbst") nach den drei Blaettern in
+    // docs/design/2026-10-08-kurve-weiche-kante/. Die weiche Kante nimmt
+    // die Treppe an steilen Flanken weg und sonst nichts; der Hof machte
+    // das Band im Rauschen merklich dicker und nebliger und bleibt
+    // deshalb ein Schalter, keine Vorgabe.
+    //
+    // Mit BEIDEN aus zeichnet die GPU weiterhin genau einen Streifen mit
+    // den alten Werten, bitgleich -- Geometrie in
+    // `gui/KurvenStreifen.h`, gepinnt in tst_kurven_streifen. Wer die
+    // alte Kurve zurueck will, schaltet die weiche Kante ab.
+    //
+    // Der Hof gilt nur fuer die lebende Kurve. Die Spitzenhaltelinie
+    // bekommt die weiche Kante mit (das ist die Treppenbehebung), aber
+    // keinen zweiten Hof: zwei Hoefe uebereinander sind Nebel, und der
+    // Hof soll die lebende Kurve heben, nicht die Merklinie.
+    //
+    // BEIDES WIRKT AUF DEM GPU-WEG. Der QPainter-Rueckfall (greift nur,
+    // wenn QRhi nicht aufsetzt) malt die Kurve als `QPen` -- der hat
+    // seine weiche Kante vom Antialiasing schon und kennt keinen Hof.
+    // Dort sehen die Schalter deshalb nach nichts aus. Das ist eine
+    // bewusste Luecke und keine Vergessenheit: der Rueckfall ist kein
+    // Weg, auf dem jemand Gestaltung beurteilt.
+    void setTraceSoftEdge(bool on);
+    bool traceSoftEdge() const { return m_traceSoftEdge; }
+    void setTraceHalo(bool on);
+    bool traceHalo() const { return m_traceHalo; }
 
     // Trace gradient: when enabled, the QPainter fill gradient ramps
     // from transparent at baseline to the fill color at the trace,
@@ -2545,6 +2579,13 @@ private:
     // DisplaySetupPages.cpp), which the old 1.6f default couldn't even
     // reach (the slider casts to int).
     float       m_lineWidth{1.0f};
+    bool        m_traceSoftEdge{true};    // AN ab Werk, siehe setTraceSoftEdge
+    bool        m_traceHalo{false};       // AUS ab Werk, siehe setTraceHalo
+    // Wie viele Streifen im jeweiligen Puffer stehen. Gesetzt beim Bauen
+    // der Scheitelpunkte, gelesen beim Zeichnen -- zwei Stellen, eine
+    // Zahl, sonst zeichnet die GPU aus einem halb gefuellten Puffer.
+    int         m_lineStripCount{1};
+    int         m_peakStripCount{1};
     // ── Warum das zwei Fahnen sind und nicht eine ────────────────────
     //
     // Es war eine, und sie bedeutete auf den beiden Malwegen etwas
@@ -3309,6 +3350,11 @@ private:
     // From AetherSDR: kMaxFftBins = 8192, kFftVertStride = 6
     static constexpr int kMaxFftBins = 65536;
     static constexpr int kFftVertStride = 6;  // x, y, r, g, b, a
+    // Kurve als bis zu fuenf Streifen: Hof oben/unten, Kante oben,
+    // Kern, Kante unten. Ohne Kante und Hof bleibt es bei einem
+    // Streifen; die Puffer sind trotzdem fuer fuenf angelegt, damit das
+    // Umschalten im Betrieb keine Zuteilung auf dem Malweg braucht.
+    static constexpr int kLineStrips = Kurve::kStreifenHoechstens;
 
 #endif
 

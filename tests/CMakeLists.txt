@@ -7505,6 +7505,27 @@ longpath_add_test(tst_rendering_werkbank)
 longpath_add_test(tst_waterfall_column_reduce)
 longpath_add_test(tst_freq_scale_labels)
 
+# ── Weiche Kante und Hof: die Zusage "beide aus = wie vorher" (2026-10-08) ──
+# tst_kurven_streifen: `Kurve::baue` entscheidet, aus wie vielen Baendern die
+#   GPU die Kurve zeichnet. Die Vorgabe beider Schalter ist AUS, und sie taugt
+#   nur, solange dann GENAU EIN Streifen mit den alten Werten herauskommt --
+#   +halbPx / -halbPx, Deckkraft 0,9 (Kurve) bzw. 0,55 (Spitzenhaltelinie).
+#   Die Zahlen im Prueffall stammen aus dem Malcode VOR dem Umbau, nicht aus
+#   der neuen Funktion; damit prueft er gegen die alte Fassung und nicht gegen
+#   sich selbst. Dazu: Kern verschwindet nicht bei Linienbreite 1 ohne Retina,
+#   Hof skaliert mit der Pixeldichte und der Auslauf nicht, und keine
+#   Schalterkombination schreibt mehr Streifen, als der GPU-Puffer hat.
+#   Reine Geometrie -- kein Fenster, keine GPU, laeuft offscreen im CI.
+longpath_add_test(tst_kurven_streifen)
+
+# tst_kurve_setup_schalter: der haeufigste Fehler an einem neuen Schalter ist
+#   nicht, dass er falsch rechnet, sondern dass er NICHTS tut -- Kaestchen
+#   gebaut, Signal vergessen -- oder dass er beim Oeffnen der Seite seinen
+#   eigenen Zustand nicht zurueckliest und falsch dasteht. Beide Richtungen,
+#   dazu die Vorgabe selbst (beide AUS, am Widget und am Kaestchen) und die
+#   Unabhaengigkeit der zwei Schalter voneinander.
+longpath_add_test(tst_kurve_setup_schalter)
+
 # --------------------------------------------------------------------------
 # Aggregate "all_tests" target  (2026-05-26 KG4VCF dev-loop fix, from PR #291)
 # --------------------------------------------------------------------------

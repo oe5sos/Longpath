@@ -202,6 +202,13 @@ namespace {
 const QColor kPassbandWash(0xdc, 0xe6, 0xf0, 60);
 const QColor kPassbandEdgeLight(0xdc, 0xe6, 0xf0, 165);
 
+// Deckkraft der beiden GPU-Baender. Standen bis 2026-10-08 als
+// Zahlenliteral je zweimal im Malcode; jetzt an einer Stelle, weil
+// `Kurve::baue` sie als Wert bekommt und sonst zwei Zahlen
+// auseinanderlaufen koennten, die dasselbe bedeuten.
+constexpr float kTraceAlpha = 0.9f;
+constexpr float kPeakAlpha  = 0.55f;
+
 } // namespace
 
 // ── Flächen, Gitter und Rahmen kommen aus dem Theme ──────────────────
@@ -1038,6 +1045,10 @@ void SpectrumWidget::loadSettings()
     // und aus einem gespeicherten Wert laesst sich nicht ablesen,
     // welches von beidem gemeint war.
     m_heatmapEnabled  = readBool(QStringLiteral("DisplaySpectrumHeatmap"), false);
+    // Weiche Kante AN, Hof AUS -- Wahl des Betreibers vom 2026-10-08
+    // nach den drei Blaettern. Siehe setTraceSoftEdge im Header.
+    m_traceSoftEdge   = readBool(QStringLiteral("DisplayTraceSoftEdge"), true);
+    m_traceHalo       = readBool(QStringLiteral("DisplayTraceHalo"), false);
     // Delay the peak hold enable path until the timer infra is ready.
     if (peakOn) {
         setPeakHoldEnabled(true);
@@ -1385,6 +1396,10 @@ void SpectrumWidget::saveSettings()
               m_gradientEnabled ? QStringLiteral("True") : QStringLiteral("False"));
     s.setValue(settingsKey(QStringLiteral("DisplaySpectrumHeatmap"), m_panIndex),
               m_heatmapEnabled ? QStringLiteral("True") : QStringLiteral("False"));
+    s.setValue(settingsKey(QStringLiteral("DisplayTraceSoftEdge"), m_panIndex),
+              m_traceSoftEdge ? QStringLiteral("True") : QStringLiteral("False"));
+    s.setValue(settingsKey(QStringLiteral("DisplayTraceHalo"), m_panIndex),
+              m_traceHalo ? QStringLiteral("True") : QStringLiteral("False"));
 
     // Phase 3G-8 commit 4: waterfall renderer state.
     s.setValue(settingsKey(QStringLiteral("DisplayWfAgc"), m_panIndex),
@@ -2156,6 +2171,26 @@ void SpectrumWidget::setGradientEnabled(bool on)
     m_gradientEnabled = on;
     scheduleSettingsSave();
     update();  // Fuellung: Verlauf statt flach, beim naechsten Rahmen
+}
+
+void SpectrumWidget::setTraceSoftEdge(bool on)
+{
+    if (m_traceSoftEdge == on) {
+        return;
+    }
+    m_traceSoftEdge = on;
+    scheduleSettingsSave();
+    update();  // Streifenzahl aendert sich beim naechsten Rahmen
+}
+
+void SpectrumWidget::setTraceHalo(bool on)
+{
+    if (m_traceHalo == on) {
+        return;
+    }
+    m_traceHalo = on;
+    scheduleSettingsSave();
+    update();
 }
 
 void SpectrumWidget::setHeatmapEnabled(bool on)
@@ -10643,7 +10678,7 @@ void SpectrumWidget::initSpectrumPipeline()
     // Setup slider previously only reached the QPainter fallback path,
     // never the GPU one -- see m_lineWidth's other call sites).
     m_fftLineVbo = r->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer,
-                                 kMaxFftBins * 2 * kFftVertStride * sizeof(float));
+                                 kMaxFftBins * 2 * kFftVertStride * kLineStrips * sizeof(float));
     if (!rhiCreate(m_fftLineVbo, "spectrum line vertex buffer", &m_gpuInitFailure)) { return; }
 
     m_fftFillVbo = r->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer,
@@ -10653,7 +10688,7 @@ void SpectrumWidget::initSpectrumPipeline()
     // Phase 3G-8 commit 10: peak hold VBO (same layout as line VBO --
     // now the ribbon layout, same reason as m_fftLineVbo above).
     m_fftPeakVbo = r->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer,
-                                 kMaxFftBins * 2 * kFftVertStride * sizeof(float));
+                                 kMaxFftBins * 2 * kFftVertStride * kLineStrips * sizeof(float));
     if (!rhiCreate(m_fftPeakVbo, "spectrum peak vertex buffer", &m_gpuInitFailure)) { return; }
 
     m_fftSrb = r->newShaderResourceBindings();
@@ -11674,8 +11709,43 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
         // symmetric ribbon (offset applied on both sides of the centre).
         const float lineHalfWidthPx = (m_lineWidth * dpr) * 0.5f;
 
-        QVector<float> lineVerts(n * 2 * kFftVertStride);
+        // ── Weiche Kante und Hof ───────────────────────────────────────
+        //
+        // Geometrie steht in `gui/KurvenStreifen.h`, damit sie ohne
+        // Fenster und ohne GPU geprueft werden kann. Mit beiden
+        // Schaltern aus kommt hier GENAU EIN Streifen heraus, Wert fuer
+        // Wert wie vor diesem Umbau.
+        Kurve::Streifen streifen[Kurve::kStreifenHoechstens];
+        const int nStrips = Kurve::baue(m_traceSoftEdge, m_traceHalo,
+                                        lineHalfWidthPx, dpr,
+                                        kTraceAlpha, streifen);
+        m_lineStripCount = nStrips;
+
+        QVector<float> lineVerts(static_cast<qsizetype>(n) * 2 * kFftVertStride * nStrips);
         QVector<float> fillVerts(n * 2 * kFftVertStride);
+        // Zwei Punkte eines Streifens. `nxPx`/`nyPx` ist die Normale in
+        // Geraete-Pixeln (nicht normiert in NDC) und die Teilung durch
+        // die halbe Fenstergroesse passiert HIER -- so steht beim
+        // Ein-Streifen-Fall dieselbe Rechenfolge wie vorher, und der
+        // Puffer wird bitgleich.
+        auto putStrip = [&](int strip, int j, float x, float y,
+                            float nxPx, float nyPx,
+                            const Kurve::Streifen& st,
+                            float r, float g, float b) {
+            const qsizetype k = (static_cast<qsizetype>(strip) * n + j) * 2 * kFftVertStride;
+            lineVerts[k]     = x + (nxPx * st.o1) / (vpWpx * 0.5f);
+            lineVerts[k + 1] = y + (nyPx * st.o1) / (vpHpx * 0.5f);
+            lineVerts[k + 2] = r;
+            lineVerts[k + 3] = g;
+            lineVerts[k + 4] = b;
+            lineVerts[k + 5] = st.a1;
+            lineVerts[k + 6] = x + (nxPx * st.o2) / (vpWpx * 0.5f);
+            lineVerts[k + 7] = y + (nyPx * st.o2) / (vpHpx * 0.5f);
+            lineVerts[k + 8]  = r;
+            lineVerts[k + 9]  = g;
+            lineVerts[k + 10] = b;
+            lineVerts[k + 11] = st.a2;
+        };
 
         for (int j = 0; j < n; ++j) {
             float x = (n > 1) ? 2.0f * j / (n - 1) - 1.0f : 0.0f;
@@ -11703,11 +11773,10 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
             // ribbon rather than dividing by ~zero.
             const float uxPx = (segLenPx > 1e-6f) ? dxPx / segLenPx : 1.0f;
             const float uyPx = (segLenPx > 1e-6f) ? dyPx / segLenPx : 0.0f;
-            // Rotate the unit tangent 90 degrees for the perpendicular,
-            // scale to the half-width, convert back from device px to
-            // NDC using the same vpWpx/vpHpx the tangent itself used.
-            const float offXNdc = (-uyPx * lineHalfWidthPx) / (vpWpx * 0.5f);
-            const float offYNdc = ( uxPx * lineHalfWidthPx) / (vpHpx * 0.5f);
+            // Die Normale ist der um 90 Grad gedrehte Einheitstangens,
+            // in Geraete-Pixeln: (-uyPx, uxPx). Auf die halbe Breite
+            // skaliert und von Pixeln nach NDC gerechnet wird sie in
+            // `putStrip`, mit demselben vpWpx/vpHpx wie der Tangens.
 
             float cr, cg, cb2;
             if (m_heatmapEnabled) {
@@ -11736,23 +11805,13 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
             // Line vertex -- ribbon: two vertices per point (offset +/-
             // perpendicular from centre), same alternating-edge order
             // the fill strip below already uses so both form a valid
-            // connected TriangleStrip.  Same alpha on both edges (0.9f,
-            // unchanged from the old single-vertex value) -- a solid
-            // ribbon, no feather in this pass (see the block comment
-            // above the loop).
-            int li = j * 2 * kFftVertStride;
-            lineVerts[li]     = x + offXNdc;
-            lineVerts[li + 1] = y + offYNdc;
-            lineVerts[li + 2] = cr;
-            lineVerts[li + 3] = cg;
-            lineVerts[li + 4] = cb2;
-            lineVerts[li + 5] = 0.9f;
-            lineVerts[li + 6] = x - offXNdc;
-            lineVerts[li + 7] = y - offYNdc;
-            lineVerts[li + 8]  = cr;
-            lineVerts[li + 9]  = cg;
-            lineVerts[li + 10] = cb2;
-            lineVerts[li + 11] = 0.9f;
+            // connected TriangleStrip.  Beide Kanten tragen dieselbe
+            // Deckkraft (kTraceAlpha), solange keine weiche Kante
+            // eingeschaltet ist -- dann ist es genau ein solides Band
+            // wie vorher.
+            for (int s = 0; s < nStrips; ++s) {
+                putStrip(s, j, x, y, -uyPx, uxPx, streifen[s], cr, cg, cb2);
+            }
 
             // ── Fuellung: dicht an der Kurve, weg zur Grundlinie ─────
             //
@@ -11786,7 +11845,7 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
         }
 
         batch->updateDynamicBuffer(m_fftLineVbo, 0,
-            n * 2 * kFftVertStride * sizeof(float), lineVerts.constData());
+            static_cast<size_t>(n) * 2 * kFftVertStride * nStrips * sizeof(float), lineVerts.constData());
         batch->updateDynamicBuffer(m_fftFillVbo, 0,
             n * 2 * kFftVertStride * sizeof(float), fillVerts.constData());
 
@@ -11803,7 +11862,32 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
             // QPainter fallback's own convention (drawSpectrum():
             // QPen peakPen(peakCol, qMax(1.0f, m_lineWidth * 0.75f))).
             const float peakHalfWidthPx = (m_lineWidth * 0.75f * dpr) * 0.5f;
-            QVector<float> peakVerts(n * 2 * kFftVertStride);
+            // Weiche Kante ja, Hof nein -- siehe setTraceHalo im Header.
+            Kurve::Streifen pStreifen[Kurve::kStreifenHoechstens];
+            const int nPeakStrips = Kurve::baue(m_traceSoftEdge, /*hof*/ false,
+                                                peakHalfWidthPx, dpr,
+                                                kPeakAlpha, pStreifen);
+            m_peakStripCount = nPeakStrips;
+            QVector<float> peakVerts(
+                static_cast<qsizetype>(n) * 2 * kFftVertStride * nPeakStrips);
+            auto putPeakStrip = [&](int strip, int j, float x, float y,
+                                    float nxPx, float nyPx,
+                                    const Kurve::Streifen& st) {
+                const qsizetype k =
+                    (static_cast<qsizetype>(strip) * n + j) * 2 * kFftVertStride;
+                peakVerts[k]     = x + (nxPx * st.o1) / (vpWpx * 0.5f);
+                peakVerts[k + 1] = y + (nyPx * st.o1) / (vpHpx * 0.5f);
+                peakVerts[k + 2] = flatR;
+                peakVerts[k + 3] = flatG;
+                peakVerts[k + 4] = flatB;
+                peakVerts[k + 5] = st.a1;
+                peakVerts[k + 6] = x + (nxPx * st.o2) / (vpWpx * 0.5f);
+                peakVerts[k + 7] = y + (nyPx * st.o2) / (vpHpx * 0.5f);
+                peakVerts[k + 8]  = flatR;
+                peakVerts[k + 9]  = flatG;
+                peakVerts[k + 10] = flatB;
+                peakVerts[k + 11] = st.a2;
+            };
             for (int j = 0; j < n; ++j) {
                 float x = (n > 1) ? 2.0f * j / (n - 1) - 1.0f : 0.0f;
                 float t = qBound(0.0f, ((m_pxPeakHold[j] + cal) - minDbm) / range, 1.0f);
@@ -11823,25 +11907,14 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
                 const float segLenPx = std::sqrt(dxPx * dxPx + dyPx * dyPx);
                 const float uxPx = (segLenPx > 1e-6f) ? dxPx / segLenPx : 1.0f;
                 const float uyPx = (segLenPx > 1e-6f) ? dyPx / segLenPx : 0.0f;
-                const float offXNdc = (-uyPx * peakHalfWidthPx) / (vpWpx * 0.5f);
-                const float offYNdc = ( uxPx * peakHalfWidthPx) / (vpHpx * 0.5f);
-
-                int li = j * 2 * kFftVertStride;
-                peakVerts[li]     = x + offXNdc;
-                peakVerts[li + 1] = y + offYNdc;
-                peakVerts[li + 2] = flatR;
-                peakVerts[li + 3] = flatG;
-                peakVerts[li + 4] = flatB;
-                peakVerts[li + 5] = 0.55f;
-                peakVerts[li + 6] = x - offXNdc;
-                peakVerts[li + 7] = y - offYNdc;
-                peakVerts[li + 8]  = flatR;
-                peakVerts[li + 9]  = flatG;
-                peakVerts[li + 10] = flatB;
-                peakVerts[li + 11] = 0.55f;
+                for (int s = 0; s < nPeakStrips; ++s) {
+                    putPeakStrip(s, j, x, y, -uyPx, uxPx, pStreifen[s]);
+                }
             }
             batch->updateDynamicBuffer(m_fftPeakVbo, 0,
-                n * 2 * kFftVertStride * sizeof(float), peakVerts.constData());
+                static_cast<size_t>(n) * 2 * kFftVertStride * nPeakStrips
+                    * sizeof(float),
+                peakVerts.constData());
             m_peakHoldHasData = true;
         }
     }
@@ -11994,7 +12067,10 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
             cb->setViewport(specVp);
             const QRhiCommandBuffer::VertexInput peakVbuf(m_fftPeakVbo, 0);
             cb->setVertexInput(0, 1, &peakVbuf);
-            cb->draw(m_visibleBinCount * 2);  // ribbon: 2 vertices per point
+            // Je Streifen ein Zug, wie bei der Kurve unten.
+            for (int s = 0; s < m_peakStripCount; ++s) {
+                cb->draw(m_visibleBinCount * 2, 1, s * m_visibleBinCount * 2);
+            }
         }
 
         // Line pass
@@ -12003,7 +12079,11 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
         cb->setViewport(specVp);
         const QRhiCommandBuffer::VertexInput lineVbuf(m_fftLineVbo, 0);
         cb->setVertexInput(0, 1, &lineVbuf);
-        cb->draw(m_visibleBinCount * 2);  // ribbon: 2 vertices per point
+        // Je Streifen ein eigener Zug aus demselben Puffer: Hof,
+        // Kanten, Kern -- ohne sie genau einer wie bisher.
+        for (int s = 0; s < m_lineStripCount; ++s) {
+            cb->draw(m_visibleBinCount * 2, 1, s * m_visibleBinCount * 2);
+        }
     }
 
     // Draw overlay -- static chrome layer first, then dynamic

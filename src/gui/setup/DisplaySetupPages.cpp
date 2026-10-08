@@ -171,6 +171,8 @@ void SpectrumDefaultsPage::loadFromRenderer()
     QSignalBlocker b6(m_fillAlphaSlider);
     QSignalBlocker b7(m_lineWidthSlider);
     QSignalBlocker b8(m_gradientToggle);
+    QSignalBlocker b8a(m_softEdgeToggle);
+    QSignalBlocker b8b(m_haloToggle);
     QSignalBlocker b9(m_calOffsetSpin);
     QSignalBlocker b10(m_peakHoldToggle);
     QSignalBlocker b11(m_peakHoldDelaySpin);
@@ -244,6 +246,8 @@ void SpectrumDefaultsPage::loadFromRenderer()
         m_lineWidthSpin->setValue(qBound(1, static_cast<int>(sw->lineWidth()), 3));
     }
     m_gradientToggle->setChecked(sw->gradientEnabled());
+    m_softEdgeToggle->setChecked(sw->traceSoftEdge());
+    m_haloToggle->setChecked(sw->traceHalo());
     m_calOffsetSpin->setValue(static_cast<double>(sw->dbmCalOffset()));
     m_peakHoldToggle->setChecked(sw->peakHoldEnabled());
     m_peakHoldDelaySpin->setValue(sw->peakHoldDelayMs());
@@ -860,6 +864,34 @@ void SpectrumDefaultsPage::buildUI()
         }
     });
     renderForm->addRow(QString(), m_gradientToggle);
+
+    // ── Weiche Kante und Hof (Glas & Tiefe, 2026-09-17) ──────────────
+    //
+    // Kein Thetis-Vorbild: beides ist Longpath-eigen. Beide ab Werk aus
+    // -- wie die Kurve aussieht, entscheidet der Betreiber am Schirm.
+    m_softEdgeToggle = new QCheckBox(QStringLiteral("Soft trace edge"), renderGroup);
+    m_softEdgeToggle->setToolTip(QStringLiteral(
+        "Fades the outermost device pixel of the trace (and of the peak hold "
+        "line) to transparent. Removes the stair-stepping on steep slopes "
+        "without widening the line."));
+    connect(m_softEdgeToggle, &QCheckBox::toggled, this, [this](bool on) {
+        if (auto* w = model() ? model()->spectrumWidget() : nullptr) {
+            w->setTraceSoftEdge(on);
+        }
+    });
+    renderForm->addRow(QString(), m_softEdgeToggle);
+
+    m_haloToggle = new QCheckBox(QStringLiteral("Trace halo"), renderGroup);
+    m_haloToggle->setToolTip(QStringLiteral(
+        "Draws a faint glow around the live trace (22 % at the line, 0 at "
+        "2.5 px out). Gives the curve depth over the waterfall; in heavy "
+        "noise it can read as haze. Peak hold is left without a halo."));
+    connect(m_haloToggle, &QCheckBox::toggled, this, [this](bool on) {
+        if (auto* w = model() ? model()->spectrumWidget() : nullptr) {
+            w->setTraceHalo(on);
+        }
+    });
+    renderForm->addRow(QString(), m_haloToggle);
 
     contentLayout()->addWidget(renderGroup);
 
