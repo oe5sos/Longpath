@@ -2,6 +2,39 @@
 
 ## [Unreleased]
 
+### Panadapter: weiche Kante und Hof an der Kurve
+
+Zwei Zutaten der am 2026-09-17 gewaehlten Gestaltungsrichtung „Glas &
+Tiefe" (dort: „Kurven mit Hof") sind jetzt gebaut und schaltbar in
+Setup › Display › Render:
+
+* **Soft trace edge** — die GPU zeichnet die Kurve als Band aus zwei
+  Scheitelpunkten je Bildspalte; an steilen Flanken ergibt das eine
+  Treppe, weil das Band harte Kanten hat. Der Kern wird jetzt einen
+  halben Geraete-Pixel schmaler gerechnet, und aussen laeuft je ein
+  Streifen von voller Deckkraft auf 0 aus. Das ist ein Gouraud-Verlauf,
+  also **kein neuer Shader**. Die Linienbreite bleibt, wie sie ist
+  (1 px, Entscheidung des Betreibers vom 2026-08-26). Gilt auch fuer die
+  **Spitzenhaltelinie** — dieselbe Treppe, dieselbe Behebung.
+* **Trace halo** — ein schwaches Band um die lebende Kurve, 22 % an der
+  Linie und 0 bei 2,5 px, unter ihr gezeichnet. Nur an der lebenden
+  Kurve, nicht an der Spitzenhaltelinie: zwei Hoefe uebereinander sind
+  Nebel. Die 22 % sind geborgt, nicht gewaehlt — derselbe Wert, mit dem
+  `docs/design/HAUSSTIL.md` §Weiche Uebergaenge die Fuellung unter der
+  Kurve auslaufen laesst.
+
+**Beide ab Werk AUS.** Wie die Kurve aussieht, entscheidet der Betreiber
+am Schirm; mit beiden aus zeichnet die GPU **genau einen Streifen mit den
+alten Werten**, bitgleich zum Stand davor. Diese Zusage ist der ganze
+Grund fuer die Vorgabe, deshalb steht sie als Pruefung: die Geometrie
+liegt als reine Funktion in `src/gui/KurvenStreifen.h`, und
+`tst_kurven_streifen` vergleicht sie gegen die Zahlen, die vor dem Umbau
+als Literal im Malcode standen — nicht gegen sich selbst.
+
+Vergleichsbilder (drei Fassungen desselben Ausschnitts, Martins
+Anzeige-Einstellungen) erzeugt `tst_rendering_werkbank` mit
+`LONGPATH_RENDER_VARIANTS=k_kurve_heute,l_kurve_weich,m_kurve_weich_hof`.
+
 ## [0.6.7] - 2026-10-07
 
 76 Commits seit 0.6.6, drei Tage. Thema: **die Instrumente haben
