@@ -843,3 +843,50 @@ Hängen wirklich verhindert — dafür müsste der Fall eintreten, und er
 tritt auf einem gesunden Gerät nicht ein. Der Prüfstand
 `einStoppGehtAuchHinausWennNurDieSucheBeantwortetWurde` stellt ihn
 nach; am Gerät steht der Beleg aus.
+
+---
+
+# ZURÜCKGENOMMEN: „ExpertSDR2 zeigt Spannung und Strom nicht" (2026-10-08, nachmittags)
+
+Heute früh stand hier, mit Bildbeleg, ExpertSDR2 zeige `U: 0.0 V`,
+`I: 0.0 A`, `0.0 °C` — und daraus wurde geschlossen, die QRP melde diese
+Werte gar nicht, der Mitschnitt schweige zu Recht, und Longpath lese
+etwas, das ExpertSDR2 verwerfe.
+
+**Falsch. Alle drei Schlüsse.**
+
+Der Grund ist banal und hätte mir auffallen müssen: **ExpertSDR2 war
+nicht mit dem Funkgerät verbunden.** Es lief, es zeigte seine
+Oberfläche, und seine Messfelder standen auf null, weil nichts
+hereinkam. Ich habe einen Zustand gemessen und für eine Eigenschaft
+gehalten.
+
+Sobald die Verbindung steht:
+
+```
+U: 13.0 V        I: 0.3 A        🌡 42.5 °C
+```
+
+## Was das klärt — und zwar gründlich
+
+**Wert A ist die Temperatur, die ExpertSDR2 anzeigt.** Unsere Messung
+am warmen Gerät ergab A = 42,0–42,5; ExpertSDR2 zeigt im selben Zustand
+**42,5 °C**. Das ist keine Ähnlichkeit, das ist derselbe Wert.
+
+Damit ist die Zuordnung in `RadioModel` — Wert A nach
+`RadioStatus::setPaTemperature()` — **belegt** und nicht mehr eine Wahl.
+Der Kommentar dort, der sie als unbewiesen kennzeichnet, kann weg.
+
+**Spannung und Strom meldet die QRP sehr wohl.** 13,0 V und 0,3 A. Sie
+stehen irgendwo im Strom, und jetzt ist sogar bekannt, wonach zu suchen
+ist: zwei Werte in dieser Größenordnung, die sich mit der Last ändern.
+Der Punkt bleibt offen — aber er ist nicht mehr „gibt es nicht",
+sondern „noch nicht gefunden", und das ist ein anderer Punkt.
+
+## Was ich daraus mitnehme
+
+Es gibt dazu eine Regel in diesem Projekt: **Abwesenheit ist keine
+Aussage.** Fehlende Daten sind kein Befund. Ich habe sie gekannt und
+trotzdem aus drei Nullen eine Geräteeigenschaft gemacht, ohne zu
+prüfen, ob das Programm, das sie anzeigt, überhaupt mit dem Gerät
+sprach. Die Prüfung wäre ein Blick auf dieselbe Statuszeile gewesen.
