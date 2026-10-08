@@ -10,9 +10,10 @@
 // seinen eigenen Zustand nicht zurueck und steht dann falsch da.
 // Beides wird hier gefahren, in beide Richtungen.
 //
-// Dazu die Vorgabe selbst: BEIDE AUS. Sie ist eine Zusage an den
-// Betreiber (wie die Kurve aussieht, entscheidet er), und eine Vorgabe
-// ohne Pruefung haelt keinen Umbau aus.
+// Dazu die Vorgabe selbst: weiche Kante AN, Hof AUS -- so hat der
+// Betreiber am 2026-10-08 nach den drei Blaettern entschieden. Eine
+// Vorgabe ohne Pruefung haelt keinen Umbau aus, und eine, die die Seite
+// anders anzeigt als sie wirkt, waere schlimmer als gar keine.
 
 #include <QtTest/QtTest>
 #include <QApplication>
@@ -82,19 +83,23 @@ private slots:
         QVERIFY(!hof->toolTip().isEmpty());
     }
 
-    // Ab Werk aus, am Widget UND am Kaestchen.
-    void abWerkSindBeideAus()
+    // Die Vorgabe des Betreibers (2026-10-08): weiche Kante AN, Hof AUS.
+    // Am Widget UND am Kaestchen -- eine Vorgabe, die die Seite anders
+    // anzeigt als sie wirkt, waere schlimmer als gar keine.
+    void dieVorgabeIstWeicheKanteOhneHof()
     {
         Stand s;
-        QVERIFY(!s.kurve.traceSoftEdge());
+        QVERIFY(s.kurve.traceSoftEdge());
         QVERIFY(!s.kurve.traceHalo());
 
         SpectrumDefaultsPage seite(&s.modell);
-        QVERIFY(!kaestchen(&seite, QStringLiteral("Soft trace edge"))->isChecked());
+        QVERIFY(kaestchen(&seite, QStringLiteral("Soft trace edge"))->isChecked());
         QVERIFY(!kaestchen(&seite, QStringLiteral("Trace halo"))->isChecked());
     }
 
-    // Hinweg: Klick im Setup erreicht den Malweg.
+    // Hinweg: Klick im Setup erreicht den Malweg -- in beide Richtungen,
+    // also auch das ABschalten der Vorgabe. Wer die alte Kurve zurueck
+    // will, muss sie zurueckbekommen.
     void dasKaestchenErreichtDieKurve()
     {
         Stand s;
@@ -103,15 +108,16 @@ private slots:
         QCheckBox* weich = kaestchen(&seite, QStringLiteral("Soft trace edge"));
         QCheckBox* hof   = kaestchen(&seite, QStringLiteral("Trace halo"));
 
-        weich->setChecked(true);
-        QVERIFY(s.kurve.traceSoftEdge());
+        weich->setChecked(false);
+        QVERIFY(!s.kurve.traceSoftEdge());
         QVERIFY(!s.kurve.traceHalo());   // der eine schaltet nicht den anderen
 
         hof->setChecked(true);
         QVERIFY(s.kurve.traceHalo());
-
-        weich->setChecked(false);
         QVERIFY(!s.kurve.traceSoftEdge());
+
+        weich->setChecked(true);
+        QVERIFY(s.kurve.traceSoftEdge());
         QVERIFY(s.kurve.traceHalo());    // und nimmt ihn auch nicht mit
     }
 
@@ -133,11 +139,11 @@ private slots:
     void derSetterKenntDenLeerlauf()
     {
         SpectrumWidget sw;
-        sw.setTraceSoftEdge(false);   // war schon aus
-        QVERIFY(!sw.traceSoftEdge());
-        sw.setTraceSoftEdge(true);
-        sw.setTraceSoftEdge(true);    // zweimal dasselbe
+        sw.setTraceSoftEdge(true);    // war schon an (Vorgabe)
         QVERIFY(sw.traceSoftEdge());
+        sw.setTraceSoftEdge(false);
+        sw.setTraceSoftEdge(false);   // zweimal dasselbe
+        QVERIFY(!sw.traceSoftEdge());
     }
 };
 

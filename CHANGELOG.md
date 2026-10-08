@@ -23,13 +23,22 @@ Setup › Display › Render:
   `docs/design/HAUSSTIL.md` §Weiche Uebergaenge die Fuellung unter der
   Kurve auslaufen laesst.
 
-**Beide ab Werk AUS.** Wie die Kurve aussieht, entscheidet der Betreiber
-am Schirm; mit beiden aus zeichnet die GPU **genau einen Streifen mit den
-alten Werten**, bitgleich zum Stand davor. Diese Zusage ist der ganze
-Grund fuer die Vorgabe, deshalb steht sie als Pruefung: die Geometrie
-liegt als reine Funktion in `src/gui/KurvenStreifen.h`, und
+**Vorgabe: weiche Kante AN, Hof AUS.** So hat der Betreiber am
+2026-10-08 nach den drei Blaettern entschieden. Die weiche Kante nimmt
+die Treppe weg und sonst nichts; der Hof blieb ein Schalter, weil er das
+Band im Rauschen merklich dicker und nebliger macht.
+
+**Die alte Kurve ist einen Haken weit entfernt.** Mit beiden Schaltern
+aus zeichnet die GPU **genau einen Streifen mit den alten Werten**,
+bitgleich zum Stand davor — nachgerechnet ueber 48 000 Scheitelwerte,
+drei Linienbreiten und zwei Pixeldichten, 0 abweichend. Die Geometrie
+liegt dafuer als reine Funktion in `src/gui/KurvenStreifen.h`, und
 `tst_kurven_streifen` vergleicht sie gegen die Zahlen, die vor dem Umbau
 als Literal im Malcode standen — nicht gegen sich selbst.
+
+Die Kurve **verschiebt sich nicht**: `tst_spectrum_trace_on_grid` liest
+mit echter GPU nach, dass sie weiter auf ihrer Gitterlinie liegt (6/6,
+auch mit Bandplan, 1-Hz-Normierung und +15 dB Kalibrierung).
 
 Vergleichsbilder (drei Fassungen desselben Ausschnitts, Martins
 Anzeige-Einstellungen) erzeugt `tst_rendering_werkbank` mit

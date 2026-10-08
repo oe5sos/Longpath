@@ -590,11 +590,19 @@ public:
     // ── Weiche Kante und Hof ("Kurven mit Hof", Glas & Tiefe) ────────
     //
     // Zwei Zutaten der am 2026-09-17 gewaehlten Gestaltungsrichtung, an
-    // der GPU-Kurve und an der Spitzenhaltelinie. BEIDE AB WERK AUS:
-    // wie die Kurve aussieht, entscheidet der Betreiber am Schirm, nicht
-    // ich im Quelltext. Mit beiden aus zeichnet die GPU genau einen
-    // Streifen mit den alten Werten -- Geometrie in
-    // `gui/KurvenStreifen.h`, gepinnt in tst_kurven_streifen.
+    // der GPU-Kurve und an der Spitzenhaltelinie.
+    //
+    // VORGABE: weiche Kante AN, Hof AUS. Gewaehlt vom Betreiber am
+    // 2026-10-08 ("entscheide selbst") nach den drei Blaettern in
+    // docs/design/2026-10-08-kurve-weiche-kante/. Die weiche Kante nimmt
+    // die Treppe an steilen Flanken weg und sonst nichts; der Hof machte
+    // das Band im Rauschen merklich dicker und nebliger und bleibt
+    // deshalb ein Schalter, keine Vorgabe.
+    //
+    // Mit BEIDEN aus zeichnet die GPU weiterhin genau einen Streifen mit
+    // den alten Werten, bitgleich -- Geometrie in
+    // `gui/KurvenStreifen.h`, gepinnt in tst_kurven_streifen. Wer die
+    // alte Kurve zurueck will, schaltet die weiche Kante ab.
     //
     // Der Hof gilt nur fuer die lebende Kurve. Die Spitzenhaltelinie
     // bekommt die weiche Kante mit (das ist die Treppenbehebung), aber
@@ -2571,8 +2579,8 @@ private:
     // DisplaySetupPages.cpp), which the old 1.6f default couldn't even
     // reach (the slider casts to int).
     float       m_lineWidth{1.0f};
-    bool        m_traceSoftEdge{false};   // siehe setTraceSoftEdge
-    bool        m_traceHalo{false};       // siehe setTraceHalo
+    bool        m_traceSoftEdge{true};    // AN ab Werk, siehe setTraceSoftEdge
+    bool        m_traceHalo{false};       // AUS ab Werk, siehe setTraceHalo
     // Wie viele Streifen im jeweiligen Puffer stehen. Gesetzt beim Bauen
     // der Scheitelpunkte, gelesen beim Zeichnen -- zwei Stellen, eine
     // Zahl, sonst zeichnet die GPU aus einem halb gefuellten Puffer.

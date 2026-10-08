@@ -1,8 +1,13 @@
-# Kurve: weiche Kante und Hof — drei Blätter zur Wahl
+# Kurve: weiche Kante und Hof — drei Blätter, Blatt 2 gewählt
 
 **2026-10-08.** Zwei Zutaten der am 2026-09-17 gewählten Richtung
 **„Glas & Tiefe"** (dort wörtlich: „Kurven mit Hof"), gebaut und
-schaltbar. **Beide ab Werk aus** — diese Seite ist die Entscheidung.
+schaltbar.
+
+> **Entschieden am 2026-10-08 (Betreiber: „entscheide selbst"):
+> Blatt 2.** Weiche Kante ist jetzt Vorgabe, der Hof bleibt ein
+> Schalter. Die alte Kurve ist einen Haken weit entfernt — *Soft trace
+> edge* abschalten, dann zeichnet die GPU wieder bitgleich wie vorher.
 
 Schalter: **Setup › Display › Render** → *Soft trace edge* / *Trace halo*.
 
@@ -16,11 +21,11 @@ Linienbreite 1 px wie von ihm am 2026-08-26 entschieden.
 Die Ausschnitte sind 1:1 in Gerätepixeln — dort entscheidet sich das,
 nicht im ganzen Bild.
 
-| Blatt | Beide Schalter | Ausschnitt |
-| --- | --- | --- |
-| [1 — heute](1-heute.png) | aus / aus | [Ausschnitt](1-heute-ausschnitt.png) |
-| [2 — weiche Kante](2-weiche-kante.png) | **an** / aus | [Ausschnitt](2-weiche-kante-ausschnitt.png) |
-| [3 — weiche Kante + Hof](3-weiche-kante-und-hof.png) | **an** / **an** | [Ausschnitt](3-weiche-kante-und-hof-ausschnitt.png) |
+| Blatt | Kante / Hof | Ausschnitt | |
+| --- | --- | --- | --- |
+| [1 — heute](1-heute.png) | aus / aus | [Ausschnitt](1-heute-ausschnitt.png) | der Stand vor diesem Umbau |
+| [2 — weiche Kante](2-weiche-kante.png) | **an** / aus | [Ausschnitt](2-weiche-kante-ausschnitt.png) | **gewählt, jetzt Vorgabe** |
+| [3 — weiche Kante + Hof](3-weiche-kante-und-hof.png) | **an** / **an** | [Ausschnitt](3-weiche-kante-und-hof-ausschnitt.png) | als Schalter vorhanden |
 
 ## Was jede Zutat tut
 
@@ -38,10 +43,12 @@ Gilt auch für die Spitzenhaltelinie.
 unter der Kurve auslaufen lässt. Nur an der lebenden Kurve; zwei Höfe
 übereinander (Kurve + Spitzenhaltelinie) wären Nebel.
 
-## Mein Rat
+## Mein Rat — und die Entscheidung
 
-**Blatt 2.** Die weiche Kante allein ist die ruhigere Verbesserung: die
-Treppe verschwindet, sonst ändert sich nichts.
+**Blatt 2**, so umgesetzt. Die weiche Kante allein ist die ruhigere
+Verbesserung: die Treppe verschwindet, sonst ändert sich nichts. Dass
+sie nichts verschiebt, liest `tst_spectrum_trace_on_grid` mit echter GPU
+nach — die Kurve liegt weiter auf ihrer Gitterlinie.
 
 Der Hof macht das Band in diesem Rauschen **merklich dicker und
 nebliger** — im Ausschnitt 3 sieht man es deutlich. Er würde in einem

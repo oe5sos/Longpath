@@ -1045,9 +1045,9 @@ void SpectrumWidget::loadSettings()
     // und aus einem gespeicherten Wert laesst sich nicht ablesen,
     // welches von beidem gemeint war.
     m_heatmapEnabled  = readBool(QStringLiteral("DisplaySpectrumHeatmap"), false);
-    // Beide ab Werk AUS. Wie die Kurve aussieht, entscheidet der
-    // Betreiber am Schirm -- siehe setTraceSoftEdge im Header.
-    m_traceSoftEdge   = readBool(QStringLiteral("DisplayTraceSoftEdge"), false);
+    // Weiche Kante AN, Hof AUS -- Wahl des Betreibers vom 2026-10-08
+    // nach den drei Blaettern. Siehe setTraceSoftEdge im Header.
+    m_traceSoftEdge   = readBool(QStringLiteral("DisplayTraceSoftEdge"), true);
     m_traceHalo       = readBool(QStringLiteral("DisplayTraceHalo"), false);
     // Delay the peak hold enable path until the timer infra is ready.
     if (peakOn) {
