@@ -450,6 +450,74 @@ private slots:
         QVERIFY(conn.isRxReadyForTest());
     }
 
+    // ── Der Stopp beim Zeitablauf (2026-10-08) ──────────────────────
+    //
+    // Es gibt ZWEI Wege, auf denen eine Sitzung endet, und nur einer
+    // schickte den Stopp 0x02:
+    //
+    //   disconnect()          geordnet, schickte ihn
+    //   Zeitablauf beim       schloss die Sockets und meldete
+    //   Verbinden             connectFailed(Timeout) -- schickte NICHTS
+    //
+    // Der zweite ist der haeufigere und genau der, nach dem die QRP
+    // haengenbleibt: Suche beantwortet (die Adresse steht fest),
+    // Zustandsrahmen quittiert, Strom kommt nicht. Danach schickt das
+    // Geraet seine Messwerte mit 20/s ins Leere weiter und nimmt
+    // niemanden mehr an -- auch ExpertSDR2 nicht. Am 2026-10-08 hat das
+    // den Betreiber dreimal den Kippschalter gekostet, bevor die Ursache
+    // hier lag.
+    //
+    // Hier mit einer eingespeisten Suchantwort nachgestellt: danach ist
+    // die Adresse bekannt, der Strom bleibt aus, und beim Zeitablauf MUSS
+    // ein Stopp hinausgehen.
+    void einStoppGehtAuchHinausWennNurDieSucheBeantwortetWurde()
+    {
+        SunSdrRadioConnection conn;
+        conn.setSucheWiederholungEnabledForTest(false);
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+
+        const QHostAddress radio(QStringLiteral("192.0.2.200"));  // RFC 5737
+        conn.feedControlDatagramForTest(
+            QByteArray::fromHex("03ff011a7c0000004119c0a810c8c0a810c851c300004928"),
+            radio);
+        QVERIFY2(conn.hasRadioAddrForTest(),
+                 "nach der Suchantwort muss die Adresse feststehen");
+        QCOMPARE(conn.stoppGeschicktForTest(), quint64(0));
+
+        QSignalSpy spy(&conn, &RadioConnection::connectFailed);
+        QVERIFY2(spy.wait(kWaitMs), "der Zeitablauf muss zuschlagen");
+        QCOMPARE(spy.takeFirst().at(0).value<ConnectFailure>(),
+                 ConnectFailure::Timeout);
+
+        QVERIFY2(conn.stoppGeschicktForTest() > 0,
+                 "beim Zeitablauf MUSS ein Stopp hinausgehen -- sonst "
+                 "behaelt das Geraet die halboffene Sitzung und nimmt "
+                 "den naechsten Client nicht an");
+    }
+
+    // Der Waechter dazu: ohne Suchantwort gibt es keine Adresse, und dann
+    // darf auch nichts hinausgehen -- ein Paket ins Nichts waere die
+    // Begruendung, die vor dem 2026-10-08 hier den Stopp ganz verhindert
+    // hat. Sie ist richtig, sie trifft nur diesen Fall.
+    void ohneSuchantwortGehtKeinStoppHinaus()
+    {
+        SunSdrRadioConnection conn;
+        conn.setSucheWiederholungEnabledForTest(false);
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+
+        QSignalSpy spy(&conn, &RadioConnection::connectFailed);
+        QVERIFY(spy.wait(kWaitMs));
+        QVERIFY2(!conn.hasRadioAddrForTest(),
+                 "ohne Suchantwort darf keine Adresse feststehen");
+        QCOMPARE(conn.stoppGeschicktForTest(), quint64(0));
+    }
+
     void echoOfOwnDiscoveryBroadcastIsIgnoredNotTreatedAsABeacon()
     {
         SunSdrRadioConnection conn;

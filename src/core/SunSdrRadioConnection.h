@@ -961,6 +961,20 @@ private:
     // Einmal je Sitzung melden, dass die Leistung nicht gestellt wird.
     bool m_txDriveGemeldet{false};
     bool m_preampSchalterGemeldet{false};
+    /// Hat das Geraet uns in DIESER Sitzung je geantwortet?
+    ///
+    /// m_awaitingBeacon taugt dafuer nicht: bei abgeschalteter Suche
+    /// (Pruefstaende) ist es von Anfang an false, obwohl nie etwas kam.
+    /// Dieser Merker wird NUR dort gesetzt, wo eine Suchantwort
+    /// tatsaechlich verarbeitet wird -- und nur er entscheidet, ob beim
+    /// Ende ein Stopp hinausgeht.
+    bool m_geraetHatGeantwortet{false};
+
+    /// Schickt den Stopp 0x02, sobald die Adresse des Geraets feststeht.
+    /// Von BEIDEN Wegen gerufen, auf denen eine Sitzung endet -- siehe
+    /// die Begruendung an der Umsetzung.
+    void sendeStoppFallsMoeglich();
+
     quint64 m_stoppGeschickt{0};
 
     void auditStreamSeq(int kanal, quint16 seq, quint64 inhalt);
