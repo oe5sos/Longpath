@@ -294,7 +294,36 @@ void restoreFrom(const QString& prefix, StripChain& c)
     EqBandLayout::ensureSeeded(c.eq());
     {
         const QVariant g = getV(key(prefix, "EqMasterGain"));
-        if (g.isValid()) { c.eq().setMasterGain(float(g.toDouble())); }
+        if (g.isValid()) {
+            // ── Eine gespeicherte Null wird nicht uebernommen ────────
+            //
+            // setMasterGain nimmt einen LINEAREN Faktor. Null heisst
+            // dort „mal null", also vollstaendige Stille -- und zwar
+            // dauerhaft, denn der Wert wird gespeichert und ueberlebt
+            // jeden Profilwechsel. Danach ist nichts mehr zu hoeren,
+            // egal welche Kurve, welches Profil, welcher Schalter.
+            //
+            // Dass hier repariert und nicht nur gewarnt wird, hat
+            // einen nachpruefbaren Grund: der Ausgangssteller des
+            // Entzerrers reicht nur bis -60 dB
+            // (ClientEqOutputFader::kMeterMinDb). Eine echte Null ist
+            // ueber die Oberflaeche GAR NICHT einstellbar -- sie kann
+            // nur aus einem Fehler stammen, und sie stammt aus einem
+            // (mein „Flat"-Knopf, 2026-10-09). Ein gueltiger Wert
+            // waere hinter dem Ruecken des Betreibers nicht
+            // anzutasten; dieser ist keiner.
+            const double linear = g.toDouble();
+            if (linear < 1e-6) {
+                qWarning("StripSettings: gespeicherter Entzerrer-"
+                         "Ausgangspegel ist 0 (voellige Stille) -- auf 1,0 "
+                         "zurueckgesetzt. Ueber die Oberflaeche ist dieser "
+                         "Wert nicht erreichbar; er stammt aus einem "
+                         "Fehler.");
+                c.eq().setMasterGain(1.0f);
+            } else {
+                c.eq().setMasterGain(float(linear));
+            }
+        }
         const QVariant fam = getV(key(prefix, "EqFamily"));
         if (fam.isValid()) {
             c.eq().setFilterFamily(

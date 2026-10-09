@@ -29,6 +29,7 @@
 #include "core/strip/ClientEq.h"
 #include "core/strip/EqBandLayout.h"
 #include "core/strip/StripChain.h"
+#include "core/strip/StripSettings.h"
 
 #include <cmath>
 #include <vector>
@@ -50,6 +51,37 @@ private slots:
         QCOMPARE(double(eq.masterGain()), 0.0);
         eq.setMasterGain(1.0f);
         QCOMPARE(double(eq.masterGain()), 1.0);
+    }
+
+    // Eine gespeicherte Null wird beim Wiederherstellen repariert.
+    //
+    // Sonst ueberlebt sie jeden Profilwechsel und jeden Neustart --
+    // „die profile kann ich auch nicht mehr aktivieren" war genau
+    // das. Erreichbar ist eine echte Null ueber die Oberflaeche
+    // nicht: der Ausgangssteller reicht bis -60 dB. Sie kann nur aus
+    // einem Fehler stammen.
+    void aStoredZeroIsRepairedOnRestore()
+    {
+        QStandardPaths::setTestModeEnabled(true);
+
+        StripChain a;
+        a.prepare(48000.0);
+        EqBandLayout::ensureSeeded(a.eq());
+        a.eq().setMasterGain(0.0f);
+        StripSettings::save(a);
+
+        StripChain b;
+        b.prepare(48000.0);
+        StripSettings::restore(b);
+        QCOMPARE(double(b.eq().masterGain()), 1.0);
+
+        // Ein gueltiger Wert bleibt unangetastet.
+        a.eq().setMasterGain(0.5f);
+        StripSettings::save(a);
+        StripChain c;
+        c.prepare(48000.0);
+        StripSettings::restore(c);
+        QCOMPARE(double(c.eq().masterGain()), 0.5);
     }
 
     // Und das Ganze am Ton: eine flache Kette laesst durch.
@@ -88,5 +120,5 @@ private slots:
     }
 };
 
-QTEST_APPLESS_MAIN(TstEqFlatDoesNotMute)
+QTEST_MAIN(TstEqFlatDoesNotMute)
 #include "tst_eq_flat_does_not_mute.moc"
