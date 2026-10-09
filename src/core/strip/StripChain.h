@@ -57,9 +57,11 @@
 #include "core/strip/ClientPudu.h"
 #include "core/strip/ClientReverb.h"
 #include "core/strip/ClientTube.h"
+#include "core/strip/AudioPlugin.h"
 #include "core/strip/MicSpectrum.h"
 
 #include <array>
+#include <memory>
 #include <atomic>
 #include <cstdint>
 #include <vector>
@@ -98,6 +100,40 @@ public:
     bool stageEnabled(Stage s) const noexcept;
 
     static const char* stageName(Stage s) noexcept;
+
+    // ── Einschubplaetze fuer fremde Effekte ──────────────────────────
+    //
+    // ZUSATZ, nicht Weg. Beide Plaetze sind leer, solange sie niemand
+    // befuellt, und ein leerer Platz kostet im Block eine atomare
+    // Ladung und sonst nichts -- siehe die drei Regeln in
+    // AudioPlugin.h.
+    //
+    // Die Stelle in der Kette waehlt der Betreiber: 0 heisst vor dem
+    // Gate, kStageCount heisst hinter dem Begrenzer, dazwischen vor
+    // der Stufe mit diesem Index. Das ist der ganze Grund, warum es
+    // Einschuebe sind und keine neunte Stufe -- ein Kompressor vor dem
+    // Entzerrer ist ein anderes Geraet als einer dahinter, und das
+    // gehoert dem gewaehlt, der es hoert.
+    static constexpr int kInsertCount = 2;
+
+    // Hauptfaden. Uebernimmt das Plugin, bereitet es auf die laufende
+    // Rate vor und haengt es ein. nullptr leert den Platz. Die
+    // Uebergabe wartet, bis der Audiofaden das alte Plugin sicher
+    // nicht mehr in der Hand hat.
+    void setInsertPlugin(int slot, std::unique_ptr<AudioPlugin> plugin);
+    AudioPlugin* insertPlugin(int slot) const noexcept;
+
+    void setInsertPosition(int slot, int position) noexcept;
+    int  insertPosition(int slot) const noexcept;
+
+    void setInsertEnabled(int slot, bool on) noexcept;
+    bool insertEnabled(int slot) const noexcept;
+
+    // Wie oft dieser Einschub etwas geliefert hat, das keine Zahl war.
+    // Ein fremdes Plugin ist das einzige Stueck dieser Kette, das wir
+    // nicht gelesen haben; was es tut, wird gezaehlt wie bei jeder
+    // eigenen Stufe.
+    uint32_t nonFiniteInsertBlocks(int slot) const noexcept;
 
     // Audio thread. Mono, in place. Returns immediately when the
     // master switch is off, so bypass costs one atomic load and the
@@ -195,6 +231,32 @@ private:
     // to ask questions it could answer from one cache line — and
     // tst_strip_chain holds the two in step.
     std::array<std::atomic<bool>, kStageCount> m_stageOn;
+
+    // Ein Einschubplatz. m_owned haelt das Plugin, m_live ist das, was
+    // der Audiofaden sehen darf, und m_busy ist der Handschlag
+    // zwischen beiden: der Audiofaden setzt ihn, BEVOR er den Zeiger
+    // liest, der Hauptfaden leert den Zeiger und wartet dann, bis
+    // m_busy null ist. Danach kann kein Durchlauf das alte Plugin
+    // mehr in die Hand bekommen.
+    struct Insert {
+        std::unique_ptr<AudioPlugin> owned;
+        std::atomic<AudioPlugin*> live{nullptr};
+        std::atomic<int>  busy{0};
+        std::atomic<bool> on{true};
+        std::atomic<int>  position{0};
+        std::atomic<uint32_t> nonFinite{0};
+    };
+    std::array<Insert, kInsertCount> m_inserts;
+
+    // Groesster Block, den ein Einschub vorbereiten muss. Die
+    // Sendepumpe rechnet in 64 Rahmen, der Mithoerer auch; der
+    // Spielraum ist da, damit ein Offline-Durchlauf mit groesseren
+    // Haeppchen kein Plugin ueberfaehrt.
+    static constexpr int kMaxInsertFrames = 2048;
+
+    // Laeuft die Einschuebe, die an dieser Stelle der Kette haengen.
+    void runInserts(int position, float* samples, int frames) noexcept;
+    static void waitUntilIdle(Insert& in) noexcept;
 
     // Written on the audio thread once per block, read by the meter.
     // Plain relaxed stores: a meter that is one block stale is a meter,

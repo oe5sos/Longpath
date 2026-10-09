@@ -14,6 +14,7 @@
 #include "core/strip/StripLiveMonitor.h"
 
 #include "core/LogCategories.h"
+#include "core/strip/MicSpectrum.h"
 #include "core/strip/StripChain.h"
 #include "core/strip/StripSettings.h"
 
@@ -258,6 +259,12 @@ void StripLiveMonitor::pump()
         m_mono.resize(usable);
     }
     if (m_mono.empty()) { return; }
+
+    // Erst der Kurve geben, dann rechnen: die Entzerreranzeige will
+    // das Signal, wie es hereinkommt. Siehe setSpectrumSink().
+    if (m_spectrum != nullptr) {
+        m_spectrum->feed(m_mono.data(), int(m_mono.size()));
+    }
 
     if (!m_bypass.load(std::memory_order_acquire)) {
         for (size_t at = 0; at + kChainBlock <= m_mono.size(); at += kChainBlock) {

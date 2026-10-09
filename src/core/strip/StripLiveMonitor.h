@@ -64,6 +64,7 @@ class QThread;
 
 namespace Longpath {
 
+class MicSpectrum;
 class StripChain;
 
 class StripLiveMonitor : public QObject {
@@ -101,6 +102,22 @@ public:
     // Der Kanalzug, durch den gehoert wird. Gehoert diesem Objekt.
     StripChain* chain() const { return m_chain.get(); }
 
+    // Wohin das ROHE Mikrofonsignal zusaetzlich geschrieben wird.
+    //
+    // Dafuer: die Entzerrerkurve und ihr Peak-Hold. Die zeichnen aus
+    // `StripChain::micSpectrum()`, und das fuellte bisher allein die
+    // Sendepumpe -- ohne Funkgeraet also gar nichts, und eine
+    // Entzerrerkurve ohne Spektrum darunter ist genau die Hilfe, die
+    // fehlt, wenn man von Hand einstellt (Betreiber, 2026-10-09:
+    // „beim eq seine eigene kurve mit hold visuell zu sehen um zu
+    // erkennen, wo die eq kurve angehoben oder gesenkt werden muss").
+    //
+    // Roh und nicht bearbeitet, weil EqHost die Kurve ueber ein
+    // Spektrum VOR dem Entzerrer legt -- eine Kurve auf ein Spektrum
+    // zu richten, das sie selbst schon verbogen hat, heisst dem
+    // eigenen Schwanz nachlaufen.
+    void setSpectrumSink(MicSpectrum* sink) { m_spectrum = sink; }
+
 public slots:
     // Mikrofon und Lautsprecher aufmachen und loslaufen. Ruft
     // started() oder failed(grund).
@@ -137,6 +154,7 @@ private:
     QIODevice*    m_sinkIo{nullptr};
 
     std::unique_ptr<StripChain> m_chain;
+    MicSpectrum* m_spectrum{nullptr};   // nicht besessen
 
     int m_inRate{48000};
     int m_inChannels{1};

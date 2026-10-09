@@ -19,6 +19,7 @@
 #include "gui/StyleConstants.h"
 #include "core/strip/StripSettings.h"
 #include "core/strip/StripLiveMonitor.h"
+#include "core/strip/AudioPlugin.h"
 #include "core/AppSettings.h"
 #include "gui/applets/eq/EqHost.h"
 #include "gui/applets/eq/StripEqPanel.h"
@@ -338,6 +339,13 @@ void StripWindow::toggleLiveMonitor(bool on)
             connect(m_live, &StripLiveMonitor::stopped,
                     this, &StripWindow::updateLiveNote);
         }
+        // Die Entzerrerkurve mitversorgen. Ohne Funkgeraet fuellt
+        // niemand sonst das Mikrofonspektrum, und eine Kurve ohne
+        // Spektrum darunter ist beim Einstellen von Hand das
+        // Entscheidende, was fehlt.
+        if (StripChain* c = chain()) {
+            m_live->setSpectrumSink(&c->micSpectrum());
+        }
         m_live->setVolume(m_liveVol ? m_liveVol->value() / 100.0 : 0.7);
         m_live->start();
         if (!m_liveSync) {
@@ -368,7 +376,9 @@ void StripWindow::updateLiveNote()
     }
     QString t = QStringLiteral(
         "Listening. About %1 ms of delay inside Longpath; the sound "
-        "card adds its own on each side. Headphones.")
+        "card adds its own on each side. Headphones. While this is on, "
+        "the EQ tab draws your own voice — speak a few sentences, then "
+        "press Peak Hold there to freeze the shape you are aiming at.")
         .arg(m_live->latencyMs(), 0, 'f', 0);
     const int drop = m_live->overruns() + m_live->underruns();
     if (drop > 0) {
@@ -600,6 +610,11 @@ void StripWindow::buildUi()
     // normal. Found at the bench, 2026-10-09.
     m_tabs->addTab(new StagePageScroll(m_voiceCheck),
                    QStringLiteral("Voice check"));
+
+    // Zuletzt, und das ist die Aussage: Einschuebe sind ein Zusatz,
+    // kein Weg. Siehe buildInsertsPanel().
+    m_tabs->addTab(new StagePageScroll(buildInsertsPanel()),
+                   QStringLiteral("Plugins"));
 
     // ── From a profile straight to its curve ─────────────────────────
     //
@@ -1791,6 +1806,8 @@ void StripWindow::reloadControls()
         m_tabs->addTab(new StagePageScroll(m_voiceCheck),
                        QStringLiteral("Voice check"));
     }
+    m_tabs->addTab(new StagePageScroll(buildInsertsPanel()),
+                   QStringLiteral("Plugins"));
     if (StripChain* c = chain()) {
         for (int i = 0; i < StripChain::kStageCount; ++i) {
             QCheckBox* box = m_stageBoxes[static_cast<size_t>(i)];
@@ -2093,6 +2110,324 @@ void StripWindow::refreshChainRow()
     // chain is enough for every widget inside it.
     if (m_eqHost) { m_eqHost->setChain(chain()); }
     if (m_eqPanel) { m_eqPanel->refreshFromEngine(); }
+}
+
+
+// ── Einschubplaetze: fremde Effekte, als Zusatz ──────────────────────
+//
+// Die Ansage dazu war unmissverstaendlich: "plugins koennen nur als
+// option zusaetzlich gelten, wenn gewollt. ist nicht der standard."
+// Diese Seite ist deshalb die letzte im Fenster, sie ist beim ersten
+// Aufschlagen leer, und sie sucht erst dann nach Plugins -- wer sie
+// nie aufmacht, hat auf seinem Rechner nie eine fremde Bibliothek
+// geladen.
+//
+// Gezeichnet werden die Regler des Plugins in UNSEREN Reglern, nicht
+// in seiner Oberflaeche. Warum, steht in core/strip/AudioPlugin.h;
+// der Preis ebenfalls.
+QWidget* StripWindow::buildInsertsPanel()
+{
+    auto* page = new QWidget(this);
+    auto* col = new QVBoxLayout(page);
+    col->setContentsMargins(0, 0, 0, 0);
+    col->setSpacing(12);
+
+    m_insertsNote = new QLabel(page);
+    m_insertsNote->setWordWrap(true);
+    m_insertsNote->setStyleSheet(dimStyle());
+    col->addWidget(m_insertsNote);
+
+    m_insertScanBtn = new QPushButton(
+        QStringLiteral("Look for plugins on this computer"), page);
+    m_insertScanBtn->setStyleSheet(Style::buttonBaseStyle());
+    connect(m_insertScanBtn, &QPushButton::clicked,
+            this, &StripWindow::scanPlugins);
+    {
+        auto* row = new QHBoxLayout;
+        row->addWidget(m_insertScanBtn);
+        row->addStretch(1);
+        col->addLayout(row);
+    }
+
+    for (int slot = 0; slot < StripChain::kInsertCount; ++slot) {
+        auto& ui = m_insertUi[static_cast<size_t>(slot)];
+
+        auto* card = new QWidget(page);
+        card->setStyleSheet(QStringLiteral(
+            "QWidget { background: %1; border: 1px solid %2;"
+            " border-radius: 6px; }")
+            .arg(QString::fromLatin1(Style::kPanelBg),
+                 QString::fromLatin1(Style::kBorderSubtle)));
+        auto* inner = new QVBoxLayout(card);
+        inner->setContentsMargins(12, 10, 12, 12);
+        inner->setSpacing(8);
+
+        auto* head = new QHBoxLayout;
+        auto* title = new QLabel(QStringLiteral("INSERT %1").arg(slot + 1), card);
+        title->setStyleSheet(QStringLiteral(
+            "QLabel { color: %1; letter-spacing: 1px; font-weight: 600;"
+            " border: none; }").arg(QString::fromLatin1(Style::kTextSecondary)));
+        head->addWidget(title);
+        head->addStretch(1);
+
+        ui.on = new QCheckBox(QStringLiteral("On"), card);
+        ui.on->setStyleSheet(QStringLiteral("QCheckBox { border: none; }"));
+        connect(ui.on, &QCheckBox::toggled, this, [this, slot](bool v) {
+            if (StripChain* c = chain()) { c->setInsertEnabled(slot, v); }
+            persist();
+            refreshInsertCard(slot);
+        });
+        head->addWidget(ui.on);
+        inner->addLayout(head);
+
+        auto* pick = new QHBoxLayout;
+        ui.plugin = new QComboBox(card);
+        ui.plugin->setMinimumWidth(260);
+        ui.plugin->addItem(QStringLiteral("— empty —"), QString());
+        connect(ui.plugin, &QComboBox::activated, this, [this, slot](int) {
+            chooseInsertPlugin(slot);
+        });
+        pick->addWidget(ui.plugin, 1);
+
+        pick->addWidget(new QLabel(QStringLiteral("at"), card));
+        ui.position = new QComboBox(card);
+        for (int at = 0; at <= StripChain::kStageCount; ++at) {
+            ui.position->addItem(insertPositionName(at), at);
+        }
+        connect(ui.position, &QComboBox::activated, this, [this, slot](int i) {
+            if (StripChain* c = chain()) {
+                c->setInsertPosition(
+                    slot, m_insertUi[static_cast<size_t>(slot)]
+                              .position->itemData(i).toInt());
+            }
+            persist();
+            refreshInsertCard(slot);
+        });
+        pick->addWidget(ui.position);
+        inner->addLayout(pick);
+
+        ui.note = new QLabel(card);
+        ui.note->setWordWrap(true);
+        ui.note->setStyleSheet(dimStyle() + QStringLiteral("QLabel{border:none;}"));
+        inner->addWidget(ui.note);
+
+        ui.params = new QWidget(card);
+        ui.paramForm = new QFormLayout(ui.params);
+        ui.paramForm->setContentsMargins(0, 4, 0, 0);
+        ui.paramForm->setSpacing(4);
+        inner->addWidget(ui.params);
+
+        col->addWidget(card);
+        refreshInsertCard(slot);
+    }
+
+    col->addStretch(1);
+    return page;
+}
+
+QString StripWindow::insertPositionName(int at)
+{
+    if (at >= StripChain::kStageCount) {
+        return QStringLiteral("after the limiter");
+    }
+    return QStringLiteral("before %1").arg(
+        QString::fromLatin1(
+            StripChain::stageName(static_cast<StripChain::Stage>(at))));
+}
+
+// Der Suchlauf. Nur auf Knopfdruck, und das ist Absicht: ein Programm,
+// das beim Start jede installierte Audio Unit oeffnet, laedt fremden
+// Code, den niemand bestellt hat, und braucht dafuer Sekunden.
+void StripWindow::scanPlugins()
+{
+    if (!PluginHost::available()) {
+        m_pluginsScanned = true;
+        refreshInsertCards();
+        return;
+    }
+    m_plugins = PluginHost::scan();
+    m_pluginsScanned = true;
+
+    for (int slot = 0; slot < StripChain::kInsertCount; ++slot) {
+        QComboBox* box = m_insertUi[static_cast<size_t>(slot)].plugin;
+        if (!box) { continue; }
+        const QSignalBlocker block(box);
+        box->clear();
+        box->addItem(QStringLiteral("— empty —"), QString());
+        for (const PluginDescriptor& d : m_plugins) {
+            box->addItem(d.vendor.isEmpty()
+                             ? d.name
+                             : QStringLiteral("%1 — %2").arg(d.vendor, d.name),
+                         d.identifier);
+        }
+    }
+    refreshInsertCards();
+}
+
+void StripWindow::chooseInsertPlugin(int slot)
+{
+    StripChain* c = chain();
+    QComboBox* box = m_insertUi[static_cast<size_t>(slot)].plugin;
+    if (!c || !box) { return; }
+
+    const QString id = box->currentData().toString();
+    if (id.isEmpty()) {
+        c->setInsertPlugin(slot, nullptr);
+    } else {
+        std::unique_ptr<AudioPlugin> p = PluginHost::load(id);
+        // Ein Plugin, das sich nicht oeffnen laesst, laesst den Platz
+        // leer. Keine Meldung mit OK-Knopf: die Karte sagt es, und
+        // zwar dort, wo man gerade hinsieht.
+        c->setInsertPlugin(slot, std::move(p));
+    }
+    persist();
+    refreshInsertCard(slot);
+}
+
+void StripWindow::refreshInsertCards()
+{
+    for (int slot = 0; slot < StripChain::kInsertCount; ++slot) {
+        refreshInsertCard(slot);
+    }
+    if (!m_insertsNote) { return; }
+    if (!PluginHost::available()) {
+        m_insertsNote->setText(QStringLiteral(
+            "Longpath hosts Audio Units on macOS. This build has no "
+            "host for this platform, so the slots stay empty — the "
+            "eight stages above are the whole strip here."));
+        if (m_insertScanBtn) { m_insertScanBtn->setEnabled(false); }
+        return;
+    }
+    if (!m_pluginsScanned) {
+        m_insertsNote->setText(QStringLiteral(
+            "Two slots for a plugin of your own, anywhere in the chain "
+            "you like. Nothing is loaded and nothing is searched for "
+            "until you ask — the eight stages above are what Longpath "
+            "does on its own, and they stay that way."));
+        return;
+    }
+    m_insertsNote->setText(QStringLiteral(
+        "%1 effect(s) found. A slot you leave empty costs nothing. "
+        "A plugin that reports delay adds it to the transmit path and "
+        "to Hear myself — that is the one thing to watch.")
+        .arg(m_plugins.size()));
+}
+
+void StripWindow::refreshInsertCard(int slot)
+{
+    if (slot < 0 || slot >= StripChain::kInsertCount) { return; }
+    auto& ui = m_insertUi[static_cast<size_t>(slot)];
+    StripChain* c = chain();
+    if (!ui.note || !ui.params) { return; }
+
+    AudioPlugin* p = c != nullptr ? c->insertPlugin(slot) : nullptr;
+
+    if (ui.on) {
+        const QSignalBlocker b(ui.on);
+        ui.on->setChecked(c != nullptr && c->insertEnabled(slot));
+        ui.on->setEnabled(p != nullptr);
+    }
+    if (ui.position && c != nullptr) {
+        const QSignalBlocker b(ui.position);
+        const int at = c->insertPosition(slot);
+        const int idx = ui.position->findData(at);
+        if (idx >= 0) { ui.position->setCurrentIndex(idx); }
+    }
+    if (ui.plugin) {
+        const QSignalBlocker b(ui.plugin);
+        const QString id = p != nullptr ? p->descriptor().identifier : QString();
+        const int idx = ui.plugin->findData(id);
+        ui.plugin->setCurrentIndex(idx >= 0 ? idx : 0);
+    }
+
+    // Die Regler neu aufbauen. Ein Plugin wechselt seine Parameter
+    // nicht im Betrieb, also geschieht das nur beim Wechsel -- und
+    // dann vollstaendig, statt zu versuchen, alte Regler umzuwidmen.
+    while (QLayoutItem* item = ui.paramForm->takeAt(0)) {
+        if (QWidget* w = item->widget()) { w->deleteLater(); }
+        delete item;
+    }
+
+    if (p == nullptr) {
+        ui.note->setText(m_pluginsScanned
+            ? QStringLiteral("Empty. Pick one above.")
+            : QStringLiteral("Empty."));
+        return;
+    }
+
+    const PluginDescriptor d = p->descriptor();
+    const int lat = p->latencyFrames();
+    QString t = QStringLiteral("%1 · %2").arg(d.format, d.vendor.isEmpty()
+                                                  ? QStringLiteral("—")
+                                                  : d.vendor);
+    if (lat > 0 && c != nullptr && c->sampleRate() > 0.0) {
+        t += QStringLiteral("  ·  adds %1 ms of delay")
+                 .arg(1000.0 * lat / c->sampleRate(), 0, 'f', 1);
+    }
+    const uint32_t bad = c != nullptr ? c->nonFiniteInsertBlocks(slot) : 0;
+    if (bad > 0) {
+        t += QStringLiteral("  ·  %1 block(s) came back as not-a-number "
+                            "and were discarded").arg(bad);
+    }
+    ui.note->setText(t);
+
+    // Hoechstens vierzig Regler. Darueber ist eine Liste kein
+    // Bedienelement mehr, und ein Plugin mit hundert Parametern will
+    // ohnehin in seiner eigenen Oberflaeche bedient werden -- die wir
+    // bewusst nicht laden.
+    const QVector<PluginParameter> params = p->parameters();
+    constexpr int kMaxShown = 40;
+    const int shown = std::min(int(params.size()), kMaxShown);
+    for (int i = 0; i < shown; ++i) {
+        const PluginParameter& pp = params.at(i);
+        auto* row = new QWidget(ui.params);
+        auto* h = new QHBoxLayout(row);
+        h->setContentsMargins(0, 0, 0, 0);
+        h->setSpacing(8);
+
+        auto* value = new QLabel(row);
+        value->setMinimumWidth(96);
+        value->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+        value->setStyleSheet(QStringLiteral(
+            "QLabel { font-family: monospace; color: %1; border: none; }")
+            .arg(QString::fromLatin1(Style::kTextPrimary)));
+
+        const float span = pp.maxValue - pp.minValue;
+        auto* slider = new QSlider(Qt::Horizontal, row);
+        slider->setRange(0, 1000);
+        const float now = p->parameterValue(pp.id);
+        slider->setValue(span > 0.0f
+            ? int(std::lround(1000.0 * double(now - pp.minValue) / double(span)))
+            : 0);
+        value->setText(QStringLiteral("%1 %2")
+            .arg(double(now), 0, 'f', 2).arg(pp.unit));
+
+        const quint32 id = pp.id;
+        const float lo = pp.minValue, hi = pp.maxValue;
+        const QString unit = pp.unit;
+        connect(slider, &QSlider::valueChanged, this,
+                [this, slot, id, lo, hi, unit, value](int v) {
+            StripChain* cc = chain();
+            AudioPlugin* pl = cc != nullptr ? cc->insertPlugin(slot) : nullptr;
+            if (pl == nullptr) { return; }
+            const float val = lo + (hi - lo) * float(v) / 1000.0f;
+            pl->setParameterValue(id, val);
+            value->setText(QStringLiteral("%1 %2")
+                .arg(double(val), 0, 'f', 2).arg(unit));
+            persist();
+        });
+
+        h->addWidget(slider, 1);
+        h->addWidget(value);
+        ui.paramForm->addRow(pp.name, row);
+    }
+    if (params.size() > shown) {
+        auto* more = new QLabel(
+            QStringLiteral("%1 further parameters are not shown.")
+                .arg(params.size() - shown), ui.params);
+        more->setStyleSheet(dimStyle() + QStringLiteral("QLabel{border:none;}"));
+        ui.paramForm->addRow(QString(), more);
+    }
 }
 
 void StripWindow::refreshMeters()

@@ -53,12 +53,15 @@
 #include <QPointer>
 #include <QVector>
 
+#include "core/strip/AudioPlugin.h"
+
 #include <array>
 #include <functional>
 
 class QCheckBox;
 class QComboBox;
 class QLabel;
+class QFormLayout;
 class QSlider;
 class QTableWidget;
 class QTabWidget;
@@ -221,6 +224,33 @@ private:
     // core/strip/StripLiveMonitor.h.
     void toggleLiveMonitor(bool on);
     void updateLiveNote();
+
+    // ── Einschubplaetze (2026-10-09) ────────────────────────────────
+    //
+    // Fremde Effekte als ZUSATZ. „plugins koennen nur als option
+    // zusaetzlich gelten, wenn gewollt. ist nicht der standard."
+    // Deshalb: letzter Reiter, leer beim ersten Aufschlagen, Suchlauf
+    // erst auf Knopfdruck.
+    QWidget* buildInsertsPanel();
+    void scanPlugins();
+    void chooseInsertPlugin(int slot);
+    void refreshInsertCard(int slot);
+    void refreshInsertCards();
+    static QString insertPositionName(int at);
+
+    struct InsertUi {
+        QComboBox*   plugin{nullptr};
+        QComboBox*   position{nullptr};
+        QCheckBox*   on{nullptr};
+        QLabel*      note{nullptr};
+        QWidget*     params{nullptr};
+        QFormLayout* paramForm{nullptr};
+    };
+    std::array<InsertUi, 2> m_insertUi{};
+    QVector<PluginDescriptor> m_plugins;
+    bool m_pluginsScanned{false};
+    QLabel*      m_insertsNote{nullptr};
+    QPushButton* m_insertScanBtn{nullptr};
 
     StripLiveMonitor* m_live{nullptr};
     QCheckBox*  m_liveBtn{nullptr};

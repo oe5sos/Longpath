@@ -1133,6 +1133,7 @@ set(GUI_SOURCES
     # operator's A/B comparison depends on.
     src/core/strip/MicSpectrum.cpp
     src/core/strip/StripChain.cpp
+    src/core/strip/AudioPluginAu.cpp
     src/core/strip/StripLiveMonitor.cpp
     src/core/strip/StripSettings.cpp
     src/core/strip/BroadcastOptimizer.cpp
@@ -1428,6 +1429,12 @@ if(APPLE)
     # APIs themselves come from libSystem (already linked) but the
     # property-query helpers and AudioDeviceID type live in CoreAudio.
     target_link_libraries(LongpathObjs PUBLIC "-framework CoreAudio")
+
+    # AudioToolbox traegt den Audio-Unit-Wirt fuer die Einschubplaetze
+    # der Sendetonkette (src/core/strip/AudioPluginAu.cpp). Systemsache,
+    # kein fremdes SDK im Baum -- und genau deshalb zuerst AU und nicht
+    # VST3.
+    target_link_libraries(LongpathObjs PUBLIC "-framework AudioToolbox")
 endif()
 
 if(WIN32)

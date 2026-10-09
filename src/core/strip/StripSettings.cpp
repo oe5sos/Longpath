@@ -164,6 +164,28 @@ void saveTo(const QString& prefix, const StripChain& chain)
     putF(prefix, "PuduDooTuneHz",      c.pudu().dooTuneHz());
     putF(prefix, "PuduDooHarmonicsDb", c.pudu().dooHarmonicsDb());
     putF(prefix, "PuduDooMix",         c.pudu().dooMix());
+
+    // ── Die Einschuebe ──────────────────────────────────────────────
+    //
+    // Geschrieben wird der Bezeichner, die Stelle, der Schalter und
+    // der Zustand des Plugins als Base64. Ein leerer Platz schreibt
+    // einen leeren Bezeichner -- also nichts, was auf einem anderen
+    // Rechner etwas zu suchen anfaengt.
+    for (int i = 0; i < StripChain::kInsertCount; ++i) {
+        const QString at = QString::number(i);
+        const AudioPlugin* p = c.insertPlugin(i);
+        AppSettings::instance().setValue(
+            key(prefix, "InsertId") + at,
+            p != nullptr ? p->descriptor().identifier : QString());
+        AppSettings::instance().setValue(
+            key(prefix, "InsertAt") + at, c.insertPosition(i));
+        AppSettings::instance().setValue(
+            key(prefix, "InsertOn") + at, c.insertEnabled(i));
+        AppSettings::instance().setValue(
+            key(prefix, "InsertState") + at,
+            p != nullptr ? QString::fromLatin1(p->saveState().toBase64())
+                         : QString());
+    }
 }
 
 void restoreFrom(const QString& prefix, StripChain& c)
@@ -287,6 +309,45 @@ void restoreFrom(const QString& prefix, StripChain& c)
             s.value(key(prefix, "Stage") + QString::number(i), false).toBool());
     }
     // And the master stays where it is — off. See StripSettings.h.
+
+    // ── Die Einschuebe ──────────────────────────────────────────────
+    //
+    // Regel 2 aus AudioPlugin.h steht hier in Code: ein Plugin, das
+    // auf diesem Rechner nicht installiert ist, laesst den Platz leer
+    // und sonst nichts geschehen. Keine Warnung, keine Sperre -- die
+    // Kette klingt dann wie ohne ihn, und das ist die einzige
+    // Antwort, die auf einem fremden Rechner zu geben ist.
+    //
+    // Nachgeladen wird NUR, wenn ein Bezeichner dasteht. Wer nie
+    // einen Einschub befuellt hat, loest hier keinen Suchlauf aus und
+    // laedt keine fremde Bibliothek (Regel 1).
+    for (int i = 0; i < StripChain::kInsertCount; ++i) {
+        const QString at = QString::number(i);
+        c.setInsertPosition(i,
+            s.value(key(prefix, "InsertAt") + at, 0).toInt());
+        c.setInsertEnabled(i,
+            s.value(key(prefix, "InsertOn") + at, true).toBool());
+
+        const QString id =
+            s.value(key(prefix, "InsertId") + at, QString()).toString();
+        const AudioPlugin* have = c.insertPlugin(i);
+        if (id.isEmpty()) {
+            if (have != nullptr) { c.setInsertPlugin(i, nullptr); }
+            continue;
+        }
+        // Schon das richtige drin? Dann nicht neu laden -- sonst
+        // verliert jeder Abgleichtakt des Mithoerers den Zustand des
+        // Plugins und faengt von vorne an.
+        if (have != nullptr && have->descriptor().identifier == id) { continue; }
+
+        std::unique_ptr<AudioPlugin> loaded = PluginHost::load(id);
+        if (!loaded) { continue; }
+        const QByteArray blob = QByteArray::fromBase64(
+            s.value(key(prefix, "InsertState") + at, QString())
+                .toString().toLatin1());
+        if (!blob.isEmpty()) { loaded->restoreState(blob); }
+        c.setInsertPlugin(i, std::move(loaded));
+    }
 }
 
 // ── The live settings ────────────────────────────────────────────────

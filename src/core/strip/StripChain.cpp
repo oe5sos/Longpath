@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <thread>
 
 namespace Longpath {
 
@@ -60,6 +61,121 @@ void StripChain::prepare(double sampleRate)
     m_pudu.prepare(sampleRate);
     m_reverb.prepare(sampleRate);
     m_limiter.prepare(sampleRate);
+
+    // Die Einschuebe mit. Ein Plugin, das die neue Rate nicht mag,
+    // wird ausgehaengt statt stillschweigend falsch gerechnet -- der
+    // Platz ist dann leer, und das ist eine Tatsache, die man sehen
+    // kann, kein Klang, den man suchen muss.
+    for (Insert& in : m_inserts) {
+        if (!in.owned) { continue; }
+        in.live.store(nullptr, std::memory_order_release);
+        waitUntilIdle(in);
+        if (in.owned->prepare(sampleRate, kMaxInsertFrames)) {
+            in.live.store(in.owned.get(), std::memory_order_release);
+        }
+    }
+}
+
+// Warten, bis der Audiofaden diesen Platz sicher nicht mehr anfasst.
+// Kein Schloss: der Audiofaden darf nie blockieren, also dreht der
+// Hauptfaden die Schleife. In der Praxis ist das ein Block, also
+// Mikrosekunden; die Obergrenze ist nur da, damit ein haengender
+// Audiofaden nicht die Oberflaeche mitnimmt.
+void StripChain::waitUntilIdle(Insert& in) noexcept
+{
+    for (int spins = 0; spins < 100000; ++spins) {
+        if (in.busy.load(std::memory_order_acquire) == 0) { return; }
+        std::this_thread::yield();
+    }
+}
+
+void StripChain::setInsertPlugin(int slot, std::unique_ptr<AudioPlugin> plugin)
+{
+    if (slot < 0 || slot >= kInsertCount) { return; }
+    Insert& in = m_inserts[static_cast<size_t>(slot)];
+
+    in.live.store(nullptr, std::memory_order_release);
+    waitUntilIdle(in);
+    in.owned = std::move(plugin);
+    in.nonFinite.store(0, std::memory_order_relaxed);
+    if (in.owned && in.owned->prepare(m_sampleRate, kMaxInsertFrames)) {
+        in.live.store(in.owned.get(), std::memory_order_release);
+    } else {
+        in.owned.reset();
+    }
+}
+
+AudioPlugin* StripChain::insertPlugin(int slot) const noexcept
+{
+    if (slot < 0 || slot >= kInsertCount) { return nullptr; }
+    return m_inserts[static_cast<size_t>(slot)].owned.get();
+}
+
+void StripChain::setInsertPosition(int slot, int position) noexcept
+{
+    if (slot < 0 || slot >= kInsertCount) { return; }
+    m_inserts[static_cast<size_t>(slot)].position.store(
+        std::clamp(position, 0, kStageCount), std::memory_order_release);
+}
+
+int StripChain::insertPosition(int slot) const noexcept
+{
+    if (slot < 0 || slot >= kInsertCount) { return 0; }
+    return m_inserts[static_cast<size_t>(slot)].position.load(
+        std::memory_order_acquire);
+}
+
+void StripChain::setInsertEnabled(int slot, bool on) noexcept
+{
+    if (slot < 0 || slot >= kInsertCount) { return; }
+    m_inserts[static_cast<size_t>(slot)].on.store(on, std::memory_order_release);
+}
+
+bool StripChain::insertEnabled(int slot) const noexcept
+{
+    if (slot < 0 || slot >= kInsertCount) { return false; }
+    return m_inserts[static_cast<size_t>(slot)].on.load(std::memory_order_acquire);
+}
+
+uint32_t StripChain::nonFiniteInsertBlocks(int slot) const noexcept
+{
+    if (slot < 0 || slot >= kInsertCount) { return 0; }
+    return m_inserts[static_cast<size_t>(slot)].nonFinite.load(
+        std::memory_order_relaxed);
+}
+
+// Derselbe Schutz wie runStage(), und aus demselben Grund nur
+// strenger: hier laeuft Code, den wir nicht gelesen haben. Liefert er
+// etwas, das keine Zahl ist, bekommt die Kette den Block zurueck, wie
+// er hereinkam, das Plugin wird zurueckgesetzt und der Vorfall
+// gezaehlt.
+void StripChain::runInserts(int position, float* samples, int frames) noexcept
+{
+    for (Insert& in : m_inserts) {
+        if (in.position.load(std::memory_order_acquire) != position) { continue; }
+        if (!in.on.load(std::memory_order_acquire)) { continue; }
+
+        in.busy.store(1, std::memory_order_seq_cst);
+        AudioPlugin* p = in.live.load(std::memory_order_seq_cst);
+        if (p != nullptr) {
+            const bool canRestore = frames <= kSnapshotFrames;
+            if (canRestore) { std::copy_n(samples, frames, m_snapshot.data()); }
+
+            p->processMono(samples, frames);
+
+            if (!allFinite(samples, frames)) {
+                if (canRestore) {
+                    std::copy_n(m_snapshot.data(), frames, samples);
+                } else {
+                    zeroNonFinite(samples, frames);
+                }
+                p->reset();
+                in.nonFinite.fetch_add(1, std::memory_order_relaxed);
+                m_nonFiniteTotal.fetch_add(1, std::memory_order_relaxed);
+            }
+        }
+        in.busy.store(0, std::memory_order_seq_cst);
+    }
 }
 
 void StripChain::setEnabled(bool on) noexcept
@@ -164,18 +280,30 @@ void StripChain::processMono(float* samples, int frames) noexcept
     // anyway would rest the guarantee on eight separate bypasses being
     // bit-exact rather than on not calling them. runStage() does the
     // skip, and wraps each call in the non-finite guard.
+    runInserts(0, samples, frames);
     runStage(Stage::Gate,   m_gate,   samples, frames);
+    runInserts(1, samples, frames);
     runStage(Stage::Eq,     m_eq,     samples, frames);
+    runInserts(2, samples, frames);
     runStage(Stage::DeEss,  m_deEss,  samples, frames);
+    runInserts(3, samples, frames);
     runStage(Stage::Comp,   m_comp,   samples, frames);
+    runInserts(4, samples, frames);
     runStage(Stage::Tube,   m_tube,   samples, frames);
+    runInserts(5, samples, frames);
     runStage(Stage::Pudu,   m_pudu,   samples, frames);
+    runInserts(6, samples, frames);
     runStage(Stage::Reverb, m_reverb, samples, frames);
+    runInserts(7, samples, frames);
     // Last, and for a reason: a brickwall that anything runs after is
     // not a brickwall. Everything above can add gain — the tube, the
     // exciter, the compressor's make-up — and this is what stops the
     // sum reaching the modulator hotter than it should.
     runStage(Stage::Limiter, m_limiter, samples, frames);
+    // Hinter dem Begrenzer. Erlaubt, aber mit Ansage: was hier noch
+    // Pegel addiert, hebt die Deckelung auf, die eine Zeile darueber
+    // gerade gesetzt wurde.
+    runInserts(kStageCount, samples, frames);
 
     m_outPeakDb.store(peakDb(samples, frames), std::memory_order_relaxed);
 }
