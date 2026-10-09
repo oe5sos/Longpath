@@ -252,6 +252,25 @@ struct Plan {
     //   natuerlicherweise; das flachzubuegeln nimmt ihr den Koerper.
     //   Darum hoechstens wenige Dezibel, und das breite Profil
     //   bewegt unten gar nichts.
+    // ── Die Korrekturkurve ───────────────────────────────────────────
+    //
+    // "wichtig ist vor allem die eq kurve zu analysieren, das kann das
+    // programm ja und dann dort anzuheben bzw. zu senken, wo die
+    // stimme zu stark oder zu schwach ist" (Betreiber, 2026-10-09).
+    //
+    // Sieben Glocken auf den Frequenzen, die EqBandLayout als freie
+    // Griffe fuehrt (300, 450, 650, 950, 1400, 2500, 3800 Hz).
+    //
+    // Gemessen wird gegen den GEGLAETTETEN eigenen Verlauf, nicht
+    // gegen eine fremde Zielkurve. Das ist der Unterschied zwischen
+    // Korrigieren und Flachbuegeln: eine Ueberhoehung bei 650 Hz ist
+    // eine Ueberhoehung, der allgemeine Abfall zu hohen Frequenzen
+    // hin ist dagegen die Stimme selbst. Gegen eine absolute Kurve
+    // gemessen sah beides gleich aus, und das Ergebnis hiess "hier
+    // ist kein Bass, hier fehlt es einfach an allem".
+    static constexpr int kCorrectionBands = 7;
+    double  correctionDb[kCorrectionBands]{};
+
     double  lowShelfDb{0.0};
     double  lowShelfHz{250.0};
     double  presenceDb{0.0};

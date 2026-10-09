@@ -231,7 +231,7 @@ QVector<Plan> plan(const VoiceAnalysis& a)
         // Reihenfolge abgelegt, in der die Stufen im Kanalzug
         // stehen. Was man liest, ist dann der Weg, den das Signal
         // nimmt.
-        QString nGate, nEq, nDeEss, nComp, nLimiter, nColour, nRange;
+        QString nGate, nEqCurve, nEq, nDeEss, nComp, nLimiter, nColour, nRange;
 
         Plan p;
         p.widthHz = rule.widthHz;
@@ -398,6 +398,90 @@ QVector<Plan> plan(const VoiceAnalysis& a)
             .arg(p.limiterCeilingDb, 0, 'f', 0)
             .arg(p.phaseRotatorStages);
 
+        // ── Die Korrekturkurve: Ueberhoehungen und Senken ───────────
+        //
+        // Das Gemessene an jeder der sieben Griff-Frequenzen, minus
+        // der eigene geglaettete Verlauf an derselben Stelle. Was
+        // uebrig bleibt, ist eine Resonanz oder ein Loch -- und genau
+        // das wird gegengesteuert.
+        {
+            const double snrForLift = a.speechDbFs - a.noiseFloorDbFs;
+            const bool mayLift = snrForLift > kBoostNeedsSnrDb;
+
+            // Das Gemessene an einer beliebigen Frequenz, log-
+            // interpoliert zwischen den zehn Baendern.
+            const auto measuredAt = [&](double hz) {
+                if (hz <= kVoiceBandHz[0]) { return a.bandDb[0]; }
+                for (int i = 1; i < kVoiceBandCount; ++i) {
+                    if (hz <= kVoiceBandHz[i]) {
+                        const double t =
+                            (std::log(hz) - std::log(kVoiceBandHz[i - 1]))
+                          / (std::log(kVoiceBandHz[i])
+                             - std::log(kVoiceBandHz[i - 1]));
+                        return a.bandDb[i - 1]
+                             + t * (a.bandDb[i] - a.bandDb[i - 1]);
+                    }
+                }
+                return a.bandDb[kVoiceBandCount - 1];
+            };
+
+            // Der eigene Verlauf, ueber zwei Oktaven geglaettet: breit
+            // genug, dass eine einzelne Resonanz ihn nicht mitzieht,
+            // schmal genug, dass er der Neigung der Stimme folgt.
+            const auto trendAt = [&](double hz) {
+                double acc = 0.0;
+                int    n   = 0;
+                for (double f = hz / 4.0; f <= hz * 4.0; f *= 1.25) {
+                    if (f < 60.0 || f > 8000.0) { continue; }
+                    acc += measuredAt(f);
+                    ++n;
+                }
+                return n > 0 ? acc / n : measuredAt(hz);
+            };
+
+            QStringList moved;
+            for (int i = 0; i < Plan::kCorrectionBands; ++i) {
+                const double hz = double(
+                    EqBandLayout::spareFrequencyHz(i));
+                const double deviation = measuredAt(hz) - trendAt(hz);
+
+                // Gegengesteuert wird zur Haelfte. Voll ausgeglichen
+                // klingt eine Stimme wie durch ein Rohr -- ihre
+                // Unebenheiten SIND sie zu einem guten Teil.
+                double g = std::clamp(-deviation * 0.5, -5.0, 5.0);
+                if (!mayLift) { g = std::min(g, 0.0); }
+                // Unter einem Dezibel ist es kein Fund, sondern
+                // Messrauschen.
+                if (std::abs(g) < 1.0) { g = 0.0; }
+                p.correctionDb[i] = g;
+
+                if (g != 0.0) {
+                    moved << QStringLiteral("%1 Hz %2%3")
+                        .arg(hz, 0, 'f', 0)
+                        .arg(g > 0.0 ? QStringLiteral("+") : QString())
+                        .arg(g, 0, 'f', 1);
+                }
+            }
+
+            nEqCurve = moved.isEmpty()
+                ? QStringLiteral(
+                    "Curve: nothing to correct. Measured against your "
+                    "own smoothed response, no band is more than a "
+                    "decibel off its own trend.")
+                : QStringLiteral(
+                    "Curve: %1 dB. Each one is where your voice sits "
+                    "above or below its OWN smoothed response — a "
+                    "resonance or a hole, not a deviation from "
+                    "somebody else's target curve. Corrected halfway: "
+                    "fully flattened, a voice sounds like a pipe.%2")
+                    .arg(moved.join(QStringLiteral(", ")))
+                    .arg(mayLift
+                         ? QString()
+                         : QStringLiteral(" Only cuts here — your room "
+                                          "is too close to lift a band "
+                                          "without lifting it too."));
+        }
+
         // ── Klang, gedeckelt ────────────────────────────────────────
         {
             const double measuredLow  = 0.5 * (a.bandDb[2] + a.bandDb[3]);
@@ -478,7 +562,7 @@ QVector<Plan> plan(const VoiceAnalysis& a)
         // Gate, EQ, De-Esser, Kompressor (mit dem Trimm, der vor
         // dessen Detektor sitzt), dann Phasendreher und Begrenzer,
         // dann was abgeschaltet bleibt.
-        for (const QString& line : {nGate, nEq, nDeEss, nTrim, nComp,
+        for (const QString& line : {nGate, nEqCurve, nEq, nDeEss, nTrim, nComp,
                                     nLimiter, nColour, nRange}) {
             if (!line.isEmpty()) { p.notes << line; }
         }
@@ -510,7 +594,21 @@ bool apply(const Plan& p, StripChain& chain)
 {
     if (p.name.isEmpty()) { return false; }
 
-    // ── The equaliser is not touched. At all. ────────────────────────
+    // ── Der Entzerrer wird wieder gesetzt ────────────────────────────
+    //
+    // Zwischenzeitlich lag er ganz draussen -- nach Zeus' Vorbild,
+    // dessen Stile keinen Klangregler anfassen. Der Betreiber hat das
+    // am 2026-10-09 zweimal korrigiert: erst mit einem Bild der
+    // Reiterreihe ("du siehst hier alles, was die optimierung
+    // durchlaufen sollte"), dann ausdruecklich: "wichtig ist vor
+    // allem die eq kurve zu analysieren ... und dann dort anzuheben
+    // bzw. zu senken, wo die stimme zu stark oder zu schwach ist".
+    //
+    // Was davon bleibt: KEIN Hochpass (Kanalschnitt), KEINE
+    // Brummkerben (nehmen den Grundton), und gemessen wird gegen den
+    // eigenen geglaetteten Verlauf, nie gegen eine fremde Zielkurve.
+    //
+    // ── Alt: der Entzerrer wurde nicht angefasst ─────────────────────
     //
     // Not seeded, not enabled, not disabled, not read. Whatever the
     // operator has on their curve stays exactly as they left it.
@@ -541,6 +639,57 @@ bool apply(const Plan& p, StripChain& chain)
     if (!p.limiterCharacter.isEmpty()) {
         StripCharacters::apply(chain, StripChain::Stage::Limiter,
                                p.limiterCharacter);
+    }
+
+    // ── Der Entzerrer: die Korrekturkurve ───────────────────────────
+    //
+    // Sieben Glocken auf den freien Griffen, die EqBandLayout fuehrt
+    // -- dieselben, die der Kanalzug zeichnet und die der Bediener
+    // danach mit der Maus nachziehen kann.
+    //
+    // Band 0 (Hochpass) und 1 bis 3 (Brummkerben) werden NICHT
+    // angefasst: den Tiefschnitt macht der Kanal, und die Kerben
+    // nehmen bei einer tiefen Stimme den Grundton mit. Beides waren
+    // Fehler dieses Tages.
+    EqBandLayout::ensureSeeded(chain.eq());
+    {
+        bool anyEq = false;
+        for (int i = 0; i < Plan::kCorrectionBands; ++i) {
+            const int idx = EqBandLayout::kFirstSpare + i;
+            ClientEq::BandParams b = chain.eq().band(idx);
+            b.type    = ClientEq::FilterType::Peak;
+            b.freqHz  = EqBandLayout::spareFrequencyHz(i);
+            // Q 1,4: schmal genug, eine Resonanz zu treffen, breit
+            // genug, dass sieben davon zusammen eine Kurve ergeben
+            // und keine Zinken.
+            b.q       = 1.4f;
+            b.gainDb  = float(p.correctionDb[i]);
+            b.enabled = p.correctionDb[i] != 0.0;
+            chain.eq().setBand(idx, b);
+            anyEq = anyEq || b.enabled;
+        }
+
+        ClientEq::BandParams lo = chain.eq().band(kBandLow);
+        lo.type    = ClientEq::FilterType::LowShelf;
+        lo.freqHz  = float(p.lowShelfHz);
+        lo.gainDb  = float(p.lowShelfDb);
+        lo.enabled = p.lowShelfDb != 0.0;
+        chain.eq().setBand(kBandLow, lo);
+
+        ClientEq::BandParams pr = chain.eq().band(kBandPresence);
+        pr.gainDb  = float(p.presenceDb);
+        pr.enabled = p.presenceDb != 0.0;
+        chain.eq().setBand(kBandPresence, pr);
+
+        ClientEq::BandParams hi = chain.eq().band(kBandHigh);
+        hi.type    = ClientEq::FilterType::HighShelf;
+        hi.freqHz  = float(p.highShelfHz);
+        hi.gainDb  = float(p.highShelfDb);
+        hi.enabled = p.highShelfDb != 0.0;
+        chain.eq().setBand(kBandHigh, hi);
+
+        anyEq = anyEq || lo.enabled || pr.enabled || hi.enabled;
+        chain.setStageEnabled(StripChain::Stage::Eq, anyEq);
     }
 
     // ── Expander ─────────────────────────────────────────────────────

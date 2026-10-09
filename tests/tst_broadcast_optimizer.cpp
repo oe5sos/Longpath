@@ -23,6 +23,7 @@
 #include "core/VoiceAnalyzer.h"
 #include "core/strip/BroadcastOptimizer.h"
 #include "core/strip/ClientEq.h"
+#include "core/strip/EqBandLayout.h"
 #include "core/strip/StripChain.h"
 
 #include <cmath>
@@ -239,48 +240,113 @@ private slots:
     // The high-pass has to follow the voice, not a constant. Two
     // measurements identical but for the fundamental must not produce
     // the same filter — that was the entire reason for measuring it.
-    // ── Der Entzerrer wird nicht angefasst ───────────────────────────
+    // ── Der Entzerrer wird gesetzt -- aber nicht ueberall ────────────
     //
-    // Der neue Vertrag, und der wichtigste. Jeder Fehler vom
-    // 2026-10-09 -- Brummkerbe auf dem Grundton, Hochpass darueber,
-    // zwei Schnitte uebereinander, De-Esser ohne Zischen -- war
-    // dieser Code, der an einem Klangregler drehte. Zeus Link dreht
-    // in keinem seiner drei Stile an einem.
-    void applyTouchesNoEqualiser()
+    // Der Vertrag nach der Korrektur des Betreibers, 2026-10-09:
+    // "wichtig ist vor allem die eq kurve zu analysieren ... und dann
+    // dort anzuheben bzw. zu senken, wo die stimme zu stark oder zu
+    // schwach ist."
+    //
+    // Zwei Stellen bleiben trotzdem tabu, und beide haben an diesem
+    // Tag Schaden angerichtet: Band 0 ist der Hochpass (den macht der
+    // Kanalschnitt, zwei Stufen auf derselben Oktave nahmen den Bass)
+    // und 1 bis 3 sind die Brummkerben (die nehmen bei einer tiefen
+    // Stimme den Grundton).
+    void theCurveIsSetButNeverTheHighPassOrTheNotches()
     {
         StripChain chain;
         chain.prepare(48000.0);
 
-        // Eine Kurve, wie der Bediener sie hinterlassen haben koennte.
-        ClientEq::BandParams mine = chain.eq().band(4);
-        mine.type    = ClientEq::FilterType::LowShelf;
-        mine.freqHz  = 180.0f;
-        mine.gainDb  = 4.5f;
-        mine.enabled = true;
-        chain.eq().setBand(4, mine);
-        chain.eq().setActiveBandCount(7);
-        chain.setStageEnabled(StripChain::Stage::Eq, true);
+        // Erst die Belegung saeen, dann setzen -- so sieht eine
+        // Kette aus, die aus den Einstellungen kam. (Ohne das
+        // ueberschreibt ensureSeeded() die Baender wieder, weil eine
+        // frische ClientEq null aktive Baender hat. Das ist richtig
+        // so: dort gibt es nichts zu bewahren.)
+        EqBandLayout::ensureSeeded(chain.eq());
 
-        const int bandsBefore = chain.eq().activeBandCount();
+        // Ein Hochpass und eine Kerbe, wie der Bediener sie gesetzt
+        // haben koennte.
+        ClientEq::BandParams hp = chain.eq().band(0);
+        hp.type = ClientEq::FilterType::HighPass;
+        hp.freqHz = 70.0f;
+        hp.enabled = true;
+        chain.eq().setBand(0, hp);
+        ClientEq::BandParams notch = chain.eq().band(1);
+        notch.gainDb = -6.0f;
+        notch.enabled = true;
+        chain.eq().setBand(1, notch);
 
         const QVector<BroadcastOptimizer::Plan> p =
             BroadcastOptimizer::plan(ordinary());
-        QVERIFY(BroadcastOptimizer::apply(p[0], chain));
+        QVERIFY(BroadcastOptimizer::apply(p[1], chain));
 
-        const ClientEq::BandParams after = chain.eq().band(4);
-        QCOMPARE(after.gainDb, 4.5f);
-        QCOMPARE(after.freqHz, 180.0f);
-        QVERIFY(after.enabled);
-        QCOMPARE(chain.eq().activeBandCount(), bandsBefore);
-        QVERIFY2(chain.stageEnabled(StripChain::Stage::Eq),
-                 "der Entzerrer bleibt an, wenn er an war");
+        // Unberuehrt.
+        QCOMPARE(chain.eq().band(0).freqHz, 70.0f);
+        QVERIFY(chain.eq().band(0).enabled);
+        QCOMPARE(chain.eq().band(1).gainDb, -6.0f);
 
-        // Und auch nicht eingeschaltet, wenn er aus war.
-        StripChain off;
-        off.prepare(48000.0);
-        QVERIFY(BroadcastOptimizer::apply(p[0], off));
-        QVERIFY2(!off.stageEnabled(StripChain::Stage::Eq),
-                 "und aus, wenn er aus war");
+        // Die Korrekturgriffe stehen dagegen auf den Frequenzen, die
+        // EqBandLayout fuehrt, und tragen genau die Werte des Plans.
+        for (int i = 0; i < BroadcastOptimizer::Plan::kCorrectionBands; ++i) {
+            const ClientEq::BandParams b =
+                chain.eq().band(EqBandLayout::kFirstSpare + i);
+            QCOMPARE(b.freqHz, EqBandLayout::spareFrequencyHz(i));
+            QCOMPARE(b.gainDb, float(p[1].correctionDb[i]));
+            QCOMPARE(b.enabled, p[1].correctionDb[i] != 0.0);
+        }
+    }
+
+    // Die Korrektur misst gegen den EIGENEN geglaetteten Verlauf, nicht
+    // gegen eine fremde Kurve. Eine Stimme mit sauberer Neigung und
+    // ohne Resonanz darf daher gar nicht korrigiert werden -- genau
+    // das trennt Korrigieren von Flachbuegeln.
+    void aSmoothVoiceGetsNoCorrection()
+    {
+        VoiceAnalysis smooth = ordinary();
+        // Gleichmaessig fallend, keine Beule, kein Loch.
+        for (int i = 0; i < kVoiceBandCount; ++i) {
+            smooth.bandDb[static_cast<size_t>(i)] = 12.0 - 2.4 * i;
+        }
+        for (const BroadcastOptimizer::Plan& p :
+             BroadcastOptimizer::plan(smooth)) {
+            for (int i = 0; i < BroadcastOptimizer::Plan::kCorrectionBands;
+                 ++i) {
+                QVERIFY2(std::abs(p.correctionDb[i]) < 1.5,
+                         qPrintable(QStringLiteral(
+                             "%1: %2 Hz um %3 dB korrigiert, obwohl die "
+                             "Stimme glatt ist")
+                             .arg(p.name)
+                             .arg(EqBandLayout::spareFrequencyHz(i))
+                             .arg(p.correctionDb[i])));
+            }
+        }
+    }
+
+    // Und eine echte Ueberhoehung MUSS gefunden werden -- sonst
+    // prueft der Fall darueber nur, dass nichts passiert.
+    void aResonanceIsFoundAndCut()
+    {
+        VoiceAnalysis bumpy = ordinary();
+        for (int i = 0; i < kVoiceBandCount; ++i) {
+            bumpy.bandDb[static_cast<size_t>(i)] = 12.0 - 2.4 * i;
+        }
+        // +8 dB auf das 1-kHz-Band: eine Resonanz, wie ein Raum oder
+        // ein Mikrofon sie macht.
+        bumpy.bandDb[5] += 8.0;
+
+        const QVector<BroadcastOptimizer::Plan> p =
+            BroadcastOptimizer::plan(bumpy);
+        QVERIFY(!p.isEmpty());
+
+        bool cutNearTheBump = false;
+        for (int i = 0; i < BroadcastOptimizer::Plan::kCorrectionBands; ++i) {
+            const double hz = EqBandLayout::spareFrequencyHz(i);
+            if (hz > 600.0 && hz < 1600.0 && p[0].correctionDb[i] < -1.0) {
+                cutNearTheBump = true;
+            }
+        }
+        QVERIFY2(cutNearTheBump,
+                 "eine 8-dB-Ueberhoehung bei 1 kHz wurde nicht gefunden");
     }
 
     // A microphone that stops before the channel does must be said
