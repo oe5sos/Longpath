@@ -100,6 +100,35 @@ public:
     int resets{0};
 };
 
+// Merkt sich, was ihm an Zustand gegeben wurde.
+class Stateful final : public AudioPlugin {
+public:
+    PluginDescriptor descriptor() const override
+    {
+        PluginDescriptor d;
+        d.identifier = QStringLiteral("test:stateful");
+        d.name = QStringLiteral("Stateful");
+        d.format = QStringLiteral("TEST");
+        return d;
+    }
+    bool prepare(double, int) override { return true; }
+    void processMono(float*, int) noexcept override {}
+    void reset() noexcept override {}
+    QVector<PluginParameter> parameters() const override { return {}; }
+    float parameterValue(quint32) const override { return 0.0f; }
+    void  setParameterValue(quint32, float) override {}
+    QByteArray saveState() const override { return blob; }
+    bool restoreState(const QByteArray& b) override
+    {
+        blob = b;
+        ++restores;
+        return true;
+    }
+
+    QByteArray blob;
+    int restores{0};
+};
+
 std::vector<float> sine(double amp, int frames, double hz = 700.0)
 {
     std::vector<float> x(static_cast<size_t>(frames));
@@ -261,6 +290,42 @@ private slots:
         QVERIFY(PluginHost::scan().isEmpty());
         QVERIFY(PluginHost::load(QStringLiteral("au:1:2:3")) == nullptr);
 #endif
+    }
+
+    // Der gespeicherte Zustand kommt an der zweiten Instanz an.
+    //
+    // Der Mithoerer hat einen EIGENEN Kanalzug und damit eine eigene
+    // Instanz desselben Plugins. Ohne diesen Weg bliebe sie auf dem
+    // Stand vom Laden: man draeht an einem Regler und hoert nichts --
+    // also genau dort nutzlos, wo Mithoeren gebraucht wird. Und die
+    // Gegenrichtung zaehlt ebenso: ein unveraenderter Zustand darf
+    // NICHT durchgereicht werden, sonst haelt der halbsekuendige
+    // Abgleichtakt zweimal je Sekunde den Audiofaden an.
+    void aChangedStateReachesASecondInstance()
+    {
+        StripChain c;
+        c.prepare(48000.0);
+
+        auto plugin = std::make_unique<Stateful>();
+        Stateful* raw = plugin.get();
+        c.setInsertPlugin(0, std::move(plugin));
+        QVERIFY(c.insertPlugin(0) != nullptr);
+        const int afterLoad = raw->restores;
+
+        c.applyInsertState(0, QByteArrayLiteral("neu"));
+        QCOMPARE(raw->restores, afterLoad + 1);
+        QCOMPARE(raw->blob, QByteArrayLiteral("neu"));
+
+        // Zweimal dasselbe ist kein Grund, irgendetwas anzuhalten.
+        c.applyInsertState(0, QByteArrayLiteral("neu"));
+        QCOMPARE(raw->restores, afterLoad + 1);
+
+        c.applyInsertState(0, QByteArrayLiteral("noch neuer"));
+        QCOMPARE(raw->restores, afterLoad + 2);
+
+        // Und ein leerer Zustand ist kein Zustand.
+        c.applyInsertState(0, QByteArray());
+        QCOMPARE(raw->restores, afterLoad + 2);
     }
 
     // Ausgeschaltet heisst ausgeschaltet -- auch mit geladenem Plugin.

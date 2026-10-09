@@ -135,6 +135,22 @@ public:
     // eigenen Stufe.
     uint32_t nonFiniteInsertBlocks(int slot) const noexcept;
 
+    // Den gespeicherten Zustand eines Plugins uebernehmen, falls er
+    // sich geaendert hat.
+    //
+    // Gebraucht vom Mithoerer: er hat seinen EIGENEN Kanalzug und
+    // damit eine eigene Instanz desselben Plugins. Ohne das hier
+    // bliebe sie auf dem Stand, den sie beim Laden hatte -- man
+    // drehte an einem Regler und hoerte nichts, was die ganze
+    // Uebung sinnlos macht.
+    //
+    // Haelt den Audiofaden kurz an (derselbe Handschlag wie
+    // setInsertPlugin): einem fremden Plugin den Zustand zu setzen,
+    // waehrend es rechnet, ist nichts, was man ihm zutrauen darf.
+    // Kostet also einen Block, wenn sich wirklich etwas geaendert
+    // hat -- und nur dann, darum der Vergleich.
+    void applyInsertState(int slot, const QByteArray& blob);
+
     // Audio thread. Mono, in place. Returns immediately when the
     // master switch is off, so bypass costs one atomic load and the
     // samples are untouched.
@@ -245,6 +261,7 @@ private:
         std::atomic<bool> on{true};
         std::atomic<int>  position{0};
         std::atomic<uint32_t> nonFinite{0};
+        QByteArray lastState;   // nur Hauptfaden
     };
     std::array<Insert, kInsertCount> m_inserts;
 

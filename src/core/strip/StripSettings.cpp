@@ -335,16 +335,27 @@ void restoreFrom(const QString& prefix, StripChain& c)
             if (have != nullptr) { c.setInsertPlugin(i, nullptr); }
             continue;
         }
-        // Schon das richtige drin? Dann nicht neu laden -- sonst
-        // verliert jeder Abgleichtakt des Mithoerers den Zustand des
-        // Plugins und faengt von vorne an.
-        if (have != nullptr && have->descriptor().identifier == id) { continue; }
-
-        std::unique_ptr<AudioPlugin> loaded = PluginHost::load(id);
-        if (!loaded) { continue; }
         const QByteArray blob = QByteArray::fromBase64(
             s.value(key(prefix, "InsertState") + at, QString())
                 .toString().toLatin1());
+
+        // Schon das richtige drin? Dann nicht neu laden -- sonst
+        // verliert jeder Abgleichtakt des Mithoerers den Zustand des
+        // Plugins und faengt von vorne an. Aber den gespeicherten
+        // Zustand uebernehmen, WENN er sich geaendert hat: der
+        // Mithoerer hat seine eigene Instanz desselben Plugins, und
+        // ohne das bliebe sie auf dem Stand vom Laden. Man draehte an
+        // einem Regler und hoerte nichts -- womit das Mithoeren beim
+        // Einstellen eines Plugins genau dort nutzlos waere, wo es
+        // gebraucht wird. applyInsertState() vergleicht erst und
+        // haelt den Audiofaden nur an, wenn wirklich etwas anders ist.
+        if (have != nullptr && have->descriptor().identifier == id) {
+            c.applyInsertState(i, blob);
+            continue;
+        }
+
+        std::unique_ptr<AudioPlugin> loaded = PluginHost::load(id);
+        if (!loaded) { continue; }
         if (!blob.isEmpty()) { loaded->restoreState(blob); }
         c.setInsertPlugin(i, std::move(loaded));
     }

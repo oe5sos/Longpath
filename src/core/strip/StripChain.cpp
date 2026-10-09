@@ -99,9 +99,11 @@ void StripChain::setInsertPlugin(int slot, std::unique_ptr<AudioPlugin> plugin)
     in.owned = std::move(plugin);
     in.nonFinite.store(0, std::memory_order_relaxed);
     if (in.owned && in.owned->prepare(m_sampleRate, kMaxInsertFrames)) {
+        in.lastState = in.owned->saveState();
         in.live.store(in.owned.get(), std::memory_order_release);
     } else {
         in.owned.reset();
+        in.lastState.clear();
     }
 }
 
@@ -135,6 +137,19 @@ bool StripChain::insertEnabled(int slot) const noexcept
 {
     if (slot < 0 || slot >= kInsertCount) { return false; }
     return m_inserts[static_cast<size_t>(slot)].on.load(std::memory_order_acquire);
+}
+
+void StripChain::applyInsertState(int slot, const QByteArray& blob)
+{
+    if (slot < 0 || slot >= kInsertCount) { return; }
+    Insert& in = m_inserts[static_cast<size_t>(slot)];
+    if (!in.owned || blob.isEmpty()) { return; }
+    if (in.lastState == blob) { return; }
+
+    in.live.store(nullptr, std::memory_order_release);
+    waitUntilIdle(in);
+    if (in.owned->restoreState(blob)) { in.lastState = blob; }
+    in.live.store(in.owned.get(), std::memory_order_release);
 }
 
 uint32_t StripChain::nonFiniteInsertBlocks(int slot) const noexcept
