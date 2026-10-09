@@ -56,10 +56,14 @@ int bytesPerSample(QAudioFormat::SampleFormat f)
 StripLiveMonitor::StripLiveMonitor(QObject* parent)
     : QObject(parent)
     , m_chain(std::make_unique<StripChain>())
+    , m_inRing(std::make_unique<MicSpectrum>())
+    , m_outRing(std::make_unique<MicSpectrum>())
 {
     m_chain->prepare(double(kRateHz));
     StripSettings::restore(*m_chain);
     m_chain->setEnabled(true);
+    m_inRing->setSampleRate(kRateHz);
+    m_outRing->setSampleRate(kRateHz);
 
     // Ein eigener Faden, und zwar ein hoch eingestufter.
     //
@@ -165,6 +169,8 @@ void StripLiveMonitor::doStart()
     }
 
     m_inRate     = inFmt.sampleRate();
+    m_inRing->setSampleRate(m_inRate);
+    m_outRing->setSampleRate(m_inRate);
     m_inChannels = std::max(1, inFmt.channelCount());
     m_inFormat   = int(inFmt.sampleFormat());
     m_outChannels = std::max(1, outFmt.channelCount());
@@ -424,6 +430,7 @@ void StripLiveMonitor::pump()
     if (m_spectrum != nullptr) {
         m_spectrum->feed(m_mono.data(), int(m_mono.size()));
     }
+    m_inRing->feed(m_mono.data(), int(m_mono.size()));
 
     // Was hereinkommt, vor der Kette.
     float peakIn = 0.0f;
@@ -437,6 +444,8 @@ void StripLiveMonitor::pump()
     // Ohne diese Zeile ist „ich hoere nichts" von „die Kette macht
     // nichts" nicht zu unterscheiden, und man raet. Dieser Abend hat
     // genug geraten.
+    m_outRing->feed(m_mono.data(), int(m_mono.size()));
+
     float peakOut = 0.0f;
     for (float v : m_mono) { peakOut = std::max(peakOut, std::fabs(v)); }
     m_logFrames += int(m_mono.size());

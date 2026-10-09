@@ -413,6 +413,9 @@ void StripWindow::toggleLiveMonitor(bool on)
         if (!m_radio || !m_radio->isConnected()) {
             useChainForDisplay(m_live->chain());
         }
+        if (m_transfer) {
+            m_transfer->setRings(&m_live->inputRing(), &m_live->outputRing());
+        }
         if (!m_liveSync) {
             m_liveSync = new QTimer(this);
             // Zehnmal in der Sekunde. Das geht nur, weil seit dem
@@ -428,6 +431,7 @@ void StripWindow::toggleLiveMonitor(bool on)
     } else {
         if (m_liveSync) { m_liveSync->stop(); }
         if (m_live) { m_live->stop(); }
+        if (m_transfer) { m_transfer->setRings(nullptr, nullptr); }
         useChainForDisplay(chain());
     }
     updateLiveNote();
@@ -1828,10 +1832,25 @@ void StripWindow::applyPreset(const QString& name)
 QWidget* StripWindow::buildAllStagesSurface()
 {
     auto* host = new QWidget(this);
-    auto* grid = new QGridLayout(host);
+    auto* col = new QVBoxLayout(host);
+    col->setContentsMargins(0, 0, 0, 0);
+    col->setSpacing(10);
+
+    // ── Was die Kette tut, gemessen ─────────────────────────────────
+    //
+    // Ganz oben, vor den Karten. Die Karten sagen, was EINGESTELLT
+    // ist; dieses Bild sagt, was davon ankommt -- Einschuebe
+    // eingerechnet. Einen Tag lang wurde diese Frage beantwortet,
+    // indem jemand hingehoert und etwas vermutet hat.
+    m_transfer = new StripTransferCurve(host);
+    col->addWidget(m_transfer);
+
+    auto* cards = new QWidget(host);
+    auto* grid = new QGridLayout(cards);
     grid->setContentsMargins(0, 0, 0, 0);
     grid->setHorizontalSpacing(10);
     grid->setVerticalSpacing(10);
+    col->addWidget(cards, 1);
 
     // ── Warum Karten und nicht die Seiten selbst ────────────────────
     //
@@ -3068,6 +3087,11 @@ void StripWindow::refreshMeters()
         else if (auto* sh = qobject_cast<StripShaperCurve*>(w)) { sh->refresh(); }
         else if (auto* b = qobject_cast<StripBandCurve*>(w))  { b->refresh(); }
     }
+    // Das gemessene Bild. Rechnet nur, wenn es sichtbar ist -- eine
+    // Langzeitmessung ueber zwei Sekunden zehnmal in der Sekunde fuer
+    // einen verdeckten Reiter waere reine Heizung.
+    if (m_transfer) { m_transfer->refresh(); }
+
     refreshStageText();
     if (m_chainView) {
         m_chainView->setReduction(StripChain::Stage::Gate,

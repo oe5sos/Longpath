@@ -14,6 +14,7 @@
 #include "gui/applets/StripGraphics.h"
 
 #include "core/strip/AudioPlugin.h"
+#include "core/strip/LtasSpectrum.h"
 
 #include "gui/styles/ThemeQss.h"
 
@@ -418,6 +419,169 @@ void StripChainView::dropEvent(QDropEvent* ev)
     emit pluginDropped(QString::fromUtf8(
         ev->mimeData()->data(QLatin1String(kPluginMime))), at);
     ev->acceptProposedAction();
+}
+
+
+// ── StripTransferCurve ───────────────────────────────────────────────
+
+StripTransferCurve::StripTransferCurve(QWidget* parent)
+    : QWidget(parent)
+{
+    setMinimumHeight(132);
+    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+}
+
+void StripTransferCurve::setRings(MicSpectrum* in, MicSpectrum* out)
+{
+    m_in = in;
+    m_out = out;
+    m_before.clear();
+    m_after.clear();
+    update();
+}
+
+QSize StripTransferCurve::sizeHint() const { return QSize(640, 132); }
+
+void StripTransferCurve::refresh()
+{
+    if (!isVisible() || m_in == nullptr || m_out == nullptr) { return; }
+    if (++m_tick < kEveryNthTick) { return; }
+    m_tick = 0;
+
+    const int rate = m_in->sampleRate();
+    const int want = kWindowSeconds * rate;
+    if (int(m_scratch.size()) < want) {
+        m_scratch.assign(static_cast<size_t>(want), 0.0f);
+    }
+
+    const int gotIn = m_in->snapshot(m_scratch.data(), want);
+    std::vector<double> before = Ltas::analyse(m_scratch.data(), gotIn, rate);
+    const int gotOut = m_out->snapshot(m_scratch.data(), want);
+    std::vector<double> after = Ltas::analyse(m_scratch.data(), gotOut, rate);
+
+    // Stille ist keine Messung. Eine Kurve, die aus Raumrauschen
+    // gerechnet wurde, sieht genauso aus wie eine aus Sprache -- und
+    // waere eine Aussage ueber das Zimmer.
+    if (before.empty() || after.empty()) {
+        if (++m_quietTicks > 20) { m_before.clear(); m_after.clear(); update(); }
+        return;
+    }
+    m_quietTicks = 0;
+    m_before.swap(before);
+    m_after.swap(after);
+    update();
+}
+
+void StripTransferCurve::paintEvent(QPaintEvent*)
+{
+    QPainter p(this);
+    p.setRenderHint(QPainter::Antialiasing, true);
+
+    const QRect r = rect().adjusted(0, 0, -1, -1);
+    p.setPen(QPen(c(Style::kBorderSubtle), 1));
+    p.setBrush(c(Style::kInsetBg));
+    p.drawRoundedRect(r, 4, 4);
+
+    const QRect plot = r.adjusted(34, 10, -8, -16);
+    if (plot.width() < 60 || plot.height() < 40) { return; }
+
+    const std::vector<double>& grid = Ltas::centresHz();
+    const double loHz = grid.front();
+    const double hiHz = grid.back();
+    const auto xOf = [&](double hz) {
+        const double t = std::log(hz / loHz) / std::log(hiHz / loHz);
+        return plot.left() + t * plot.width();
+    };
+    const auto yOf = [&](double db) {
+        const double t = std::clamp(db / kRangeDb, -1.0, 1.0);
+        return plot.center().y() - t * (plot.height() / 2.0);
+    };
+
+    // Gitter: die Nulllinie kraeftiger, denn sie ist die Aussage
+    // „hier wird nichts gemacht".
+    QFont f = p.font();
+    f.setPointSizeF(8.0);
+    p.setFont(f);
+    for (const double db : {-12.0, -6.0, 6.0, 12.0}) {
+        p.setPen(QPen(c(Style::kInsetBorder), 1, Qt::DotLine));
+        p.drawLine(QPointF(plot.left(), yOf(db)), QPointF(plot.right(), yOf(db)));
+        p.setPen(c(Style::kTextInactive));
+        p.drawText(QRect(r.left() + 2, int(yOf(db)) - 7, 30, 14),
+                   Qt::AlignRight | Qt::AlignVCenter,
+                   QStringLiteral("%1").arg(db, 0, 'f', 0));
+    }
+    p.setPen(QPen(c(Style::kBorderSubtle), 1));
+    p.drawLine(QPointF(plot.left(), yOf(0.0)), QPointF(plot.right(), yOf(0.0)));
+
+    for (const double hz : {100.0, 300.0, 1000.0, 3000.0, 6000.0}) {
+        if (hz < loHz || hz > hiHz) { continue; }
+        p.setPen(QPen(c(Style::kInsetBorder), 1, Qt::DotLine));
+        p.drawLine(QPointF(xOf(hz), plot.top()), QPointF(xOf(hz), plot.bottom()));
+        p.setPen(c(Style::kTextInactive));
+        p.drawText(QRect(int(xOf(hz)) - 24, plot.bottom() + 1, 48, 14),
+                   Qt::AlignCenter,
+                   hz >= 1000.0 ? QStringLiteral("%1k").arg(hz / 1000.0, 0, 'f', 0)
+                                : QStringLiteral("%1").arg(hz, 0, 'f', 0));
+    }
+
+    if (m_before.empty() || m_after.empty()
+        || m_before.size() != grid.size() || m_after.size() != grid.size()) {
+        p.setPen(c(Style::kTextInactive));
+        p.drawText(plot, Qt::AlignCenter,
+                   m_in == nullptr
+                       ? QStringLiteral("Switch Hear myself on to measure "
+                                        "what the strip does.")
+                       : QStringLiteral("Speak — this draws the difference "
+                                        "between what goes in and what "
+                                        "comes out."));
+        return;
+    }
+
+    // Die Differenz als gefuellte Flaeche um die Nulllinie. Das ist
+    // die eigentliche Aussage; die beiden Spektren selbst stehen nur
+    // dahinter, damit man sieht, WO ueberhaupt Signal ist.
+    QPainterPath area;
+    QPainterPath line;
+    for (size_t i = 0; i < grid.size(); ++i) {
+        const double d = m_after[i] - m_before[i];
+        const QPointF pt(xOf(grid[i]), yOf(d));
+        if (i == 0) {
+            area.moveTo(QPointF(pt.x(), yOf(0.0)));
+            area.lineTo(pt);
+            line.moveTo(pt);
+        } else {
+            area.lineTo(pt);
+            line.lineTo(pt);
+        }
+    }
+    area.lineTo(QPointF(xOf(grid.back()), yOf(0.0)));
+    area.closeSubpath();
+
+    QColor fill = c(Style::kAccent);
+    fill.setAlpha(60);
+    p.setPen(Qt::NoPen);
+    p.setBrush(fill);
+    p.drawPath(area);
+    p.setPen(QPen(c(Style::kAccent), 1.6));
+    p.setBrush(Qt::NoBrush);
+    p.drawPath(line);
+
+    // Und die groesste Aenderung als Zahl. Eine Kurve sagt „hier
+    // passiert etwas", eine Zahl sagt wie viel -- und nur die laesst
+    // sich mit der von gestern vergleichen.
+    double worst = 0.0;
+    double worstHz = 0.0;
+    for (size_t i = 0; i < grid.size(); ++i) {
+        const double d = m_after[i] - m_before[i];
+        if (std::abs(d) > std::abs(worst)) { worst = d; worstHz = grid[i]; }
+    }
+    p.setPen(c(Style::kTextSecondary));
+    p.drawText(QRect(plot.left(), r.top() + 1, plot.width(), 14),
+               Qt::AlignRight | Qt::AlignVCenter,
+               QStringLiteral("largest change %1%2 dB at %3 Hz")
+                   .arg(worst >= 0.0 ? QStringLiteral("+") : QString())
+                   .arg(worst, 0, 'f', 1)
+                   .arg(worstHz, 0, 'f', 0));
 }
 
 // ── StripLevelBars ───────────────────────────────────────────────────

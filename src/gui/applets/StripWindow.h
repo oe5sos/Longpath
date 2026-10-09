@@ -259,6 +259,7 @@ private:
     QWidget*     m_catalogue{nullptr};
     QLabel*      m_insertsNote{nullptr};
     QLabel*      m_eqMuteWarning{nullptr};
+    class StripTransferCurve* m_transfer{nullptr};
     QPushButton* m_insertScanBtn{nullptr};
 
     StripLiveMonitor* m_live{nullptr};

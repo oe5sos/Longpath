@@ -38,6 +38,7 @@
 
 #include "core/strip/MicSpectrum.h"
 
+#include "core/strip/MicSpectrum.h"
 #include "core/strip/StripChain.h"
 
 #include <QWidget>
@@ -134,6 +135,65 @@ private:
     // the row readable as one picture — a bar that means -12 on one
     // tile and -40 on the next is decoration.
     static constexpr double kBarFullScaleDb = 24.0;
+};
+
+// ── Was die Kette tut, gemessen ──────────────────────────────────────
+//
+// Die Frage, die den 2026-10-09 getragen hat, war nie „welche Werte
+// habe ich eingestellt" -- die stehen in den Reglern. Sie war: WAS
+// MACHT DAS. Einen ganzen Tag lang wurde sie beantwortet, indem
+// jemand hingehoert und etwas vermutet hat.
+//
+// Dieses Bild beantwortet sie mit einer Messung: das Langzeitspektrum
+// VOR der Kette und das DANACH, uebereinandergelegt, und dazwischen
+// ihre Differenz als gefuellte Kurve. Angehoben ist oben, gesenkt ist
+// unten, und wo nichts gemacht wird, ist es eine gerade Linie.
+//
+// Es kommt aus dem Mithoerer, also aus demselben Ton, den man im
+// Kopfhoerer hat -- einschliesslich der Einschuebe. Ein Plugin, das
+// etwas tut, ist hier zu SEHEN, auch wenn seine eigene Oberflaeche
+// nichts darueber verraet.
+class StripTransferCurve : public QWidget {
+    Q_OBJECT
+public:
+    explicit StripTransferCurve(QWidget* parent = nullptr);
+
+    // Nicht besessen. Null heisst „es laeuft kein Mithoeren" und
+    // wird als Satz gezeichnet, nicht als leeres Gitter.
+    void setRings(MicSpectrum* in, MicSpectrum* out);
+
+    // Vom Messtakt des Fensters. Rechnet nur, wenn sichtbar.
+    void refresh();
+
+    QSize sizeHint() const override;
+
+protected:
+    void paintEvent(QPaintEvent*) override;
+
+private:
+    MicSpectrum* m_in{nullptr};
+    MicSpectrum* m_out{nullptr};
+    std::vector<double> m_before;
+    std::vector<double> m_after;
+    std::vector<float>  m_scratch;
+    int m_quietTicks{0};
+    int m_tick{0};
+
+    // Zwei Sekunden Material je Messung. Kuerzer und das
+    // Langzeitspektrum einer Stimme ist noch die Silbe, die gerade
+    // gesprochen wurde.
+    static constexpr int kWindowSeconds = 2;
+
+    // Nur jeder fuenfte Messtakt, also rund zweimal in der Sekunde.
+    //
+    // Ausgerechnet statt geschaetzt, und das ist die Lehre desselben
+    // Abends: zwei Langzeitspektren ueber je zwei Sekunden sind rund
+    // 190 Durchlaeufe einer 2048er FFT. Zehnmal in der Sekunde waeren
+    // das 1900 in der Sekunde -- fuer ein Bild, das sich ueber zwei
+    // Sekunden mittelt und sich in einem Zehntel ohnehin nicht
+    // sichtbar aendert. Zweimal reicht und ist noch fluessig.
+    static constexpr int kEveryNthTick = 5;
+    static constexpr double kRangeDb = 18.0;
 };
 
 // ── In, out, and the difference ──────────────────────────────────────

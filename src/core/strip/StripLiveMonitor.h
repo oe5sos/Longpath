@@ -150,6 +150,19 @@ public:
     // eigenen Schwanz nachlaufen.
     void setSpectrumSink(MicSpectrum* sink) { m_spectrum = sink; }
 
+    // ── Vorher und nachher, zum Ansehen ─────────────────────────────
+    //
+    // Zwei eigene Ringe: was hereinkommt und was nach der Kette
+    // herausgeht. Daraus zeichnet StripTransferCurve die Antwort auf
+    // die Frage, die diesen ganzen Tag getragen hat -- nicht „was
+    // habe ich eingestellt", sondern WAS MACHT DIE KETTE.
+    //
+    // Eigene Ringe und nicht der des Kanalzugs: der traegt das rohe
+    // Mikrofonsignal fuer die Entzerrerkurve und darf nicht zweimal
+    // etwas anderes bedeuten.
+    MicSpectrum&       inputRing()        { return *m_inRing; }
+    MicSpectrum&       outputRing()       { return *m_outRing; }
+
     // Die Kette, von der abgeschrieben wird.
     //
     // Ohne sie holt sich resync() die Einstellung aus den
@@ -208,6 +221,8 @@ private:
 
     std::unique_ptr<StripChain> m_chain;
     MicSpectrum* m_spectrum{nullptr};   // nicht besessen
+    std::unique_ptr<MicSpectrum> m_inRing;
+    std::unique_ptr<MicSpectrum> m_outRing;
     const StripChain* m_mirror{nullptr};   // nicht besessen
     int m_mirrorTick{0};
     // Der Uhrenausgleich: ein gleitendes Leseverhaeltnis statt
