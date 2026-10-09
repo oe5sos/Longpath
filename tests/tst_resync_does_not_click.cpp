@@ -26,6 +26,7 @@
 
 #include "core/strip/StripChain.h"
 #include "core/strip/StripSettings.h"
+#include "core/strip/EqBandLayout.h"
 
 #include <cmath>
 #include <vector>
@@ -122,6 +123,51 @@ private slots:
         StripChain busy;
         arm(busy);
         const Run with = runSine(busy, 375);  // 375 Bloecke = 500 ms
+
+        // Und derselbe Lauf mit dem SPIEGELN, zehnmal in der Sekunde
+        // -- so laeuft es seit dem 2026-10-09 abends wirklich.
+        StripChain src;
+        arm(src);
+        EqBandLayout::ensureSeeded(src.eq());
+        StripChain mirror;
+        arm(mirror);
+        {
+            const int blocks = 2 * kRate / kBlock;
+            double phase = 0.0;
+            const double stepP = 2.0 * M_PI * 700.0 / kRate;
+            std::vector<float> buf(kBlock);
+            float previous = 0.0f;
+            bool havePrevious = false;
+            int jumps = 0;
+            double worst = 0.0;
+            for (int b = 0; b < blocks; ++b) {
+                for (int i = 0; i < kBlock; ++i) {
+                    buf[static_cast<size_t>(i)] = float(0.3 * std::sin(phase));
+                    phase += stepP;
+                }
+                mirror.processMono(buf.data(), kBlock);
+                const bool settled = b > (kRate / kBlock) / 5;
+                for (int i = 0; i < kBlock; ++i) {
+                    const float v = buf[static_cast<size_t>(i)];
+                    if (havePrevious && settled) {
+                        const double d = std::abs(double(v) - double(previous));
+                        worst = std::max(worst, d);
+                        if (d > 0.02) { ++jumps; }
+                    }
+                    previous = v;
+                    havePrevious = true;
+                }
+                if (b % 75 == 0) {   // 75 Bloecke = 100 ms
+                    StripSettings::copyParameters(src, mirror);
+                    mirror.setEnabled(true);
+                }
+            }
+            qInfo() << "mit  Spiegeln (10 Hz): groesster Schritt" << worst
+                    << "Spruenge" << jumps;
+            QVERIFY2(jumps == 0,
+                     qPrintable(QStringLiteral("das Spiegeln erzeugt %1 "
+                                               "Nahtstellen").arg(jumps)));
+        }
 
         qInfo() << "ohne Abgleich: groesster Schritt" << without.worstStep
                 << "Spruenge" << without.jumps;

@@ -204,6 +204,7 @@ void StripLiveMonitor::doStart()
     connect(m_srcIo, &QIODevice::readyRead, this, &StripLiveMonitor::pump);
 
     m_carry.clear();
+    m_sinceCorrection = 0;
     m_underruns.store(0, std::memory_order_release);
     m_overruns.store(0, std::memory_order_release);
 
@@ -214,8 +215,12 @@ void StripLiveMonitor::doStart()
     // erste Knacken jedes Starts, und es hatte mit der Puffergroesse
     // gar nichts zu tun.
     {
+        // Auf den vollen Sollwert anfuellen, nicht einen Block
+        // darunter. Mit einem darunter steht der Vorrat von Anfang an
+        // unter der Korrekturschwelle, und die Korrektur laeuft
+        // sofort los und hoert nie auf.
         const int priming = m_blockFrames * m_outBytesPerFrame
-                          * (kTargetBlocks - 1);
+                          * kTargetBlocks;
         const std::vector<char> stille(size_t(std::max(0, priming)), 0);
         if (!stille.empty()) {
             m_sinkIo->write(stille.data(), qint64(stille.size()));
@@ -436,12 +441,35 @@ void StripLiveMonitor::pump()
     // Die Totzone ist breit: korrigiert wird erst, wenn der Vorrat um
     // mehr als einen halben Block von seinem Soll abweicht. Ohne sie
     // korrigierte man dauernd gegen das eigene Rauschen.
+    // ── Wie oft korrigiert werden darf ──────────────────────────────
+    //
+    // Das war der zweite Anlauf, und er war immer noch falsch: ein
+    // Abtastwert je Durchgang klingt harmlos, bei rund zweihundert
+    // Durchgaengen in der Sekunde sind es aber zweihundert Werte --
+    // 0,4 Prozent, in kleinen Rucken verteilt. Das ist das Kratzen,
+    // das gemeldet wurde.
+    //
+    // Schlimmer: es lief DAUERND. Angefuellt wurde mit zwei Bloecken,
+    // gewollt waren drei, und wenn die Soundkarte nie drei
+    // ansammelt, steht der Vorrat fuer immer unter der Schwelle --
+    // also wurde bei jedem einzelnen Durchgang ein Wert verdoppelt.
+    //
+    // Jetzt drei Dinge: angefuellt wird auf den vollen Sollwert, die
+    // Totzone ist einen GANZEN Block breit statt einen halben, und
+    // korrigiert wird hoechstens bei jedem zwanzigsten Durchgang --
+    // rund zehnmal in der Sekunde. Realer Uhrenversatz zwischen zwei
+    // Geraeten liegt unter hundert Millionstel, also unter fuenf
+    // Werten je Sekunde; zehn sind reichlich und unhoerbar.
     const int queued     = m_sink->bufferSize() - m_sink->bytesFree();
     const int blockBytes = m_blockFrames * m_outBytesPerFrame;
     const int wanted     = blockBytes * kTargetBlocks;
-    const int slack      = blockBytes / 2;
+    const int slack      = blockBytes;
 
-    if (queued > wanted + slack && m_mono.size() > 1) {
+    const bool mayCorrect = (++m_sinceCorrection >= 20);
+    if (!mayCorrect) {
+        // nichts; der naechste Durchgang darf wieder
+    } else if (queued > wanted + slack && m_mono.size() > 1) {
+        m_sinceCorrection = 0;
         // Zu viel Vorrat: der Eingang ist schneller. Einen Wert
         // weglassen, und zwar den leisesten im Block -- dort faellt
         // ein fehlender Schritt am wenigsten auf.
@@ -454,6 +482,7 @@ void StripLiveMonitor::pump()
         m_mono.erase(m_mono.begin() + qsizetype(quietest));
         m_overruns.fetch_add(1, std::memory_order_acq_rel);
     } else if (queued < wanted - slack && !m_mono.empty()) {
+        m_sinceCorrection = 0;
         // Zu wenig Vorrat: den leisesten Wert verdoppeln.
         size_t quietest = 0;
         float  lowest = std::fabs(m_mono[0]);
@@ -461,8 +490,12 @@ void StripLiveMonitor::pump()
             const float a = std::fabs(m_mono[i]);
             if (a < lowest) { lowest = a; quietest = i; }
         }
-        m_mono.insert(m_mono.begin() + qsizetype(quietest),
-                      m_mono[quietest]);
+        // Erst in eine eigene Variable. Ein insert(), dessen Wert
+        // eine Referenz in denselben Vektor ist, muss zwar laut Norm
+        // funktionieren -- aber wer das hier liest, soll nicht erst
+        // nachschlagen muessen.
+        const float keep = m_mono[quietest];
+        m_mono.insert(m_mono.begin() + qsizetype(quietest), keep);
         m_underruns.fetch_add(1, std::memory_order_acq_rel);
     }
 

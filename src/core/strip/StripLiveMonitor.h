@@ -210,6 +210,7 @@ private:
     MicSpectrum* m_spectrum{nullptr};   // nicht besessen
     const StripChain* m_mirror{nullptr};   // nicht besessen
     int m_mirrorTick{0};
+    int m_sinceCorrection{0};
 
     Latency m_preset{Latency::Safe};
     int m_blockFrames{256};
