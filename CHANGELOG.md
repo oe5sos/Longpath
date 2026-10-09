@@ -2,6 +2,40 @@
 
 ## [Unreleased]
 
+### Der Kanalzug steht auch ohne Funkgeraet -- und man hoert sich dabei selbst
+
+Zwei Dinge vom 2026-10-09, dieselbe Wurzel: eine Stimme stellt man am
+Schreibtisch ein, nicht auf Sendung.
+
+* **Der Kanalzug haengt nicht mehr an der Sendepumpe.** Er entstand in
+  `connectToRadio()` und starb in der Teardown; ohne Verbindung war
+  damit das ganze Fenster tot -- Hauptschalter ohne Wirkung, acht
+  Stufenseiten ohne Werte, Uebersichtskarten mit acht Strichen,
+  „Through your strip" im Stimmcheck durch gar nichts. Am Geraet, mit
+  offenem Fenster: *„kann diese nicht aktivieren."* Jetzt entsteht er
+  im Konstruktor und bleibt; beim Pumpenstart nur noch `prepare()`
+  (loescht Filterzustaende, laesst Einstellungen stehen) und die
+  Uebergabe an den Worker.
+* **Mithoeren, Fassung 2.** Das Haekchen „Hear myself" flog am
+  2026-08-11 hinaus, weil sein Weg am Mikrofonstrom des Funkgeraets
+  hing -- 3 bis 15 % verlorene Bloecke, unheilbares Stottern. Diese
+  Fassung beruehrt das Geraet nicht: Soundkarte ein, eigener
+  `StripChain`, Soundkarte aus. Ein Taktgeber, keine Netzstrecke.
+  Eigener Kanalzug statt des Sendekanalzugs, weil zwei Audiofaeden in
+  denselben Filterzustaenden ein Datenrennen waeren; gehoert wird
+  trotzdem dasselbe, weil er aus derselben gespeicherten Einstellung
+  wiederhergestellt wird.
+* **Ueber die Latenz wird nicht geschwindelt.** Angezeigt wird nur der
+  eigene Anteil (rund 21 ms bei 48 kHz und 256 Rahmen); was Soundkarte
+  und CoreAudio darunter dazulegen, sieht das Modul nicht, und der
+  Text sagt das auch. Ueber- und Unterlaeufe werden gezaehlt und
+  angezeigt. Verschiedene Abtastraten auf beiden Seiten werden
+  abgelehnt statt umgerechnet -- ein Mithoeren, das die Tonhoehe
+  verschiebt, faellt beim Beurteilen einer Stimme nicht auf.
+
+Prueftand `tst_strip_works_without_radio`; Gegenprobe gegen die alte
+Fassung gefahren, drei von vier Faellen fallen dort.
+
 ### Sendeton-Optimierer: vier Profile aus einem Durchgang
 
 > **Endstand 2026-10-09.** Das automatische Herleiten von Ketten ist
