@@ -529,6 +529,7 @@ set(CORE_SOURCES
     src/core/DcsDetector.cpp
     src/core/UiScale.cpp
     src/core/StartWatch.cpp
+    src/core/SpeProtocol.cpp
     src/core/CwDecoder.cpp
     src/core/BeamHeading.cpp
     src/core/BoardCapabilities.cpp
