@@ -524,6 +524,7 @@ set(CORE_SOURCES
     src/core/SpotAuswahl.cpp
     src/core/SettingsBackup.cpp
     src/core/RxProfileManager.cpp
+    src/core/CtcssDetector.cpp
     src/core/CwDecoder.cpp
     src/core/BeamHeading.cpp
     src/core/BoardCapabilities.cpp
