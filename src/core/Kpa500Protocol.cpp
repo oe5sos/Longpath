@@ -154,6 +154,16 @@ void ReplyParser::feed(const QByteArray& bytes)
         // Die Befehlsbuchstaben sind zwei oder drei -- und drei nur bei
         // RVM, BRP, BRX, DMO. Statt eine Liste zu pflegen: alles von
         // vorn, solange es Buchstaben sind.
+        //
+        // DAS TRAEGT, WEIL KEINE ANTWORT BUCHSTABEN IN DEN DATEN HAT:
+        // durchgezaehlt ueber alle RSP-Formate in Elecraft Rev A2 sind
+        // die Daten ausschliesslich Ziffern und bei ^RVM ein Punkt.
+        // Buchstaben in den Daten gibt es nur in einer Richtung -- im
+        // SET `^FLC;` --, und SETs kommen nie herein. Waere das anders,
+        // waere diese Regel falsch und es braeuchte die Liste.
+        // (Im Pruefstand hat genau diese Verwechslung zugeschlagen: der
+        // Kunstverstaerker las `^FLC;` als Verb "FLC" und das Loeschen
+        // des Fehlers lief ins Leere.)
         int i = 0;
         while (i < text.size() && text.at(i).isLetter()) {
             ++i;
