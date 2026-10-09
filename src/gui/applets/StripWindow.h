@@ -248,6 +248,7 @@ private:
         QComboBox*   plugin{nullptr};
         QComboBox*   position{nullptr};
         QCheckBox*   on{nullptr};
+        QPushButton* editor{nullptr};
         QLabel*      note{nullptr};
         QWidget*     params{nullptr};
         QFormLayout* paramForm{nullptr};

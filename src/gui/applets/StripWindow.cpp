@@ -712,6 +712,12 @@ void StripWindow::buildUi()
     connect(m_chainView, &StripChainView::insertClicked, this, [this](int) {
         if (m_tabs) { m_tabs->setCurrentIndex(m_tabs->count() - 1); }
     });
+    connect(m_chainView, &StripChainView::insertEditorRequested,
+            this, [this](int slot) {
+        StripChain* c = chain();
+        AudioPlugin* p = c != nullptr ? c->insertPlugin(slot) : nullptr;
+        if (p != nullptr) { p->showEditor(p->descriptor().name); }
+    });
     col->addWidget(m_chainView);
 
     // In, out, and the difference. Directly under the chain, because
@@ -2595,6 +2601,34 @@ QWidget* StripWindow::buildInsertsPanel()
             refreshInsertCard(slot);
         });
         pick->addWidget(ui.position);
+
+        // ── Das eigene Fenster des Plugins ──────────────────────────
+        //
+        // „haette gehofft, dass die plugins ev. graphisch vorhanden
+        // sind." Hier ist es. Die Regler darunter bleiben trotzdem
+        // stehen -- sie sind das, was auch dann noch da ist, wenn ein
+        // Plugin keine eigene Oberflaeche mitbringt, und das
+        // Einzige, was spaeter auf Windows und Linux gleich aussieht.
+        ui.editor = new QPushButton(QStringLiteral("Open window"), card);
+        ui.editor->setStyleSheet(Style::buttonBaseStyle());
+        ui.editor->setToolTip(QStringLiteral(
+            "Open the plugin's own window — the one you know from a "
+            "DAW. Plugins without one get Apple's parameter sheet "
+            "instead. The sliders below keep working either way."));
+        connect(ui.editor, &QPushButton::clicked, this, [this, slot]() {
+            StripChain* c = chain();
+            AudioPlugin* p = c != nullptr ? c->insertPlugin(slot) : nullptr;
+            if (p == nullptr) { return; }
+            if (!p->showEditor(p->descriptor().name)) {
+                auto& ui2 = m_insertUi[static_cast<size_t>(slot)];
+                if (ui2.note) {
+                    ui2.note->setText(QStringLiteral(
+                        "This plugin would not open a window. The "
+                        "sliders below are the way in."));
+                }
+            }
+        });
+        pick->addWidget(ui.editor);
         inner->addLayout(pick);
 
         ui.note = new QLabel(card);
@@ -2886,6 +2920,9 @@ void StripWindow::refreshInsertCard(int slot)
         const QSignalBlocker b(ui.on);
         ui.on->setChecked(c != nullptr && c->insertEnabled(slot));
         ui.on->setEnabled(p != nullptr);
+    }
+    if (ui.editor) {
+        ui.editor->setEnabled(p != nullptr && p->hasEditor());
     }
     if (ui.position && c != nullptr) {
         const QSignalBlocker b(ui.position);

@@ -27,7 +27,10 @@
 
 #include <QtTest>
 
+#include <QGuiApplication>
+
 #include "core/strip/AudioPlugin.h"
+#include "core/strip/AuPluginEditor.h"
 #include "core/strip/StripChain.h"
 
 #include <QtGlobal>
@@ -98,6 +101,28 @@ public:
 
     int calls{0};
     int resets{0};
+};
+
+// Ein Nichts-Plugin mit Namen.
+class Dummy final : public AudioPlugin {
+public:
+    explicit Dummy(QString name) : m_name(std::move(name)) {}
+    PluginDescriptor descriptor() const override
+    {
+        PluginDescriptor d;
+        d.identifier = QStringLiteral("test:") + m_name;
+        d.name = m_name;
+        d.format = QStringLiteral("TEST");
+        return d;
+    }
+    bool prepare(double, int) override { return true; }
+    void processMono(float*, int) noexcept override {}
+    void reset() noexcept override {}
+    QVector<PluginParameter> parameters() const override { return {}; }
+    float parameterValue(quint32) const override { return 0.0f; }
+    void  setParameterValue(quint32, float) override {}
+private:
+    QString m_name;
 };
 
 // Merkt sich, was ihm an Zustand gegeben wurde.
@@ -326,6 +351,30 @@ private slots:
         // Und ein leerer Zustand ist kein Zustand.
         c.applyInsertState(0, QByteArray());
         QCOMPARE(raw->restores, afterLoad + 2);
+    }
+
+    // Das eigene Fenster eines Plugins -- und die Zusage, dass es im
+    // Prueflauf NICHTS aufmacht.
+    //
+    // Unter QT_QPA_PLATFORM=offscreen gibt es keinen Fensterserver.
+    // Ein NSWindow dort kostete im ersten macOS-CI-Lauf jeden
+    // Fensterkonstruktor einen SIGSEGV (siehe die Warnung in
+    // MacFloatingWindowBehavior.mm). Deshalb faengt available() das
+    // eine Etage frueher ab, und dieser Fall haelt es fest.
+    void theEditorStaysShutWhenThereIsNoScreen()
+    {
+        const bool headless =
+            QGuiApplication::platformName() == QLatin1String("offscreen");
+        QCOMPARE(AuPluginEditor::available(), !headless);
+
+        // Ein Nullzeiger ist nie ein Fenster, auf keiner Plattform.
+        QVERIFY(!AuPluginEditor::show(nullptr, QStringLiteral("nichts")));
+        AuPluginEditor::close(nullptr);   // darf nicht knallen
+
+        // Und ein Dummy-Plugin behauptet kein Fenster zu haben.
+        Dummy d(QStringLiteral("ohne Fenster"));
+        QVERIFY(!d.hasEditor());
+        QVERIFY(!d.showEditor(QStringLiteral("x")));
     }
 
     // Ausgeschaltet heisst ausgeschaltet -- auch mit geladenem Plugin.

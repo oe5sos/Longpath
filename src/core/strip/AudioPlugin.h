@@ -107,6 +107,23 @@ public:
     virtual QByteArray saveState() const { return {}; }
     virtual bool restoreState(const QByteArray&) { return false; }
 
+    // ── Die eigene Oberflaeche des Plugins ──────────────────────────
+    //
+    // Nachgereicht am 2026-10-09: „haette gehofft, dass die plugins
+    // ev. graphisch vorhanden sind." Der Einwand ist berechtigt --
+    // bei einem Entzerrer steckt das halbe Werkzeug in der
+    // Zeichnung.
+    //
+    // Die Entscheidung oben bleibt trotzdem stehen: unsere eigenen
+    // Regler sind nicht das schlechtere Fenster, sondern das, was
+    // auch dann noch da ist, wenn ein Plugin keine Oberflaeche
+    // mitbringt -- und das Einzige, was spaeter auf Windows und
+    // Linux gleich aussieht. Das Fenster kommt DANEBEN, nicht an
+    // ihre Stelle.
+    virtual bool hasEditor() const { return false; }
+    virtual bool showEditor(const QString& /*title*/) { return false; }
+    virtual void closeEditor() {}
+
     // Wie viele Rahmen Verzoegerung das Plugin meldet. Beim Senden
     // belanglos, beim Mithoeren nicht -- deshalb wird es angezeigt.
     virtual int latencyFrames() const { return 0; }

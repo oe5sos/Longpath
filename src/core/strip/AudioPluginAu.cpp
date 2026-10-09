@@ -28,6 +28,7 @@
 #include "core/strip/AudioPlugin.h"
 
 #include "core/LogCategories.h"
+#include "core/strip/AuPluginEditor.h"
 
 #include <QtGlobal>
 
@@ -86,10 +87,27 @@ public:
     ~AuPlugin() override
     {
         if (m_unit != nullptr) {
+            // ZUERST das Fenster, dann die Audio Unit. Ein Fenster,
+            // dessen Ansicht auf eine freigegebene Unit zeigt,
+            // stuerzt beim naechsten Mausklick ab -- irgendwo tief in
+            // fremdem Code, mit einem Protokoll, das nichts erklaert.
+            AuPluginEditor::close(m_unit);
             AudioUnitUninitialize(m_unit);
             AudioComponentInstanceDispose(m_unit);
         }
     }
+
+    bool hasEditor() const override
+    {
+        return m_unit != nullptr && AuPluginEditor::available();
+    }
+
+    bool showEditor(const QString& title) override
+    {
+        return AuPluginEditor::show(m_unit, title);
+    }
+
+    void closeEditor() override { AuPluginEditor::close(m_unit); }
 
     PluginDescriptor descriptor() const override { return m_desc; }
 

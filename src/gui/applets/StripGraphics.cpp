@@ -368,6 +368,17 @@ void StripChainView::mousePressEvent(QMouseEvent* ev)
     }
 }
 
+void StripChainView::mouseDoubleClickEvent(QMouseEvent* ev)
+{
+    const Cell* cell = cellAt(ev->pos());
+    if (cell != nullptr && cell->kind == Cell::Kind::Insert
+        && !removeBoxOf(*cell).contains(ev->pos())) {
+        emit insertEditorRequested(cell->index);
+        return;
+    }
+    QWidget::mouseDoubleClickEvent(ev);
+}
+
 // ── Hineinziehen ─────────────────────────────────────────────────────
 //
 // „diese sollte man dann in der timeline oben reinziehen koennen. aber

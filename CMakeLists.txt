@@ -716,6 +716,8 @@ set(CORE_SOURCES
 if(APPLE)
     list(APPEND CORE_SOURCES src/core/audio/CoreAudioHalBus.cpp)
     list(APPEND CORE_SOURCES src/core/MacMicPermission.mm)
+    # Das eigene Fenster einer Audio Unit (CoreAudioKit).
+    list(APPEND CORE_SOURCES src/core/strip/AuPluginEditor.mm)
 endif()
 
 # LinuxPipeBus — Linux-only IAudioBus implementation bridging to PulseAudio /
@@ -1436,6 +1438,11 @@ if(APPLE)
     # kein fremdes SDK im Baum -- und genau deshalb zuerst AU und nicht
     # VST3.
     target_link_libraries(LongpathObjs PUBLIC "-framework AudioToolbox")
+
+    # CoreAudioKit traegt AUGenericView -- Apples Reglertafel fuer
+    # jede Audio Unit ohne eigene Oberflaeche
+    # (src/core/strip/AuPluginEditor.mm).
+    target_link_libraries(LongpathObjs PUBLIC "-framework CoreAudioKit")
 endif()
 
 if(WIN32)
@@ -1939,6 +1946,9 @@ option(LONGPATH_USE_PCH "Use precompiled headers to speed up builds" ON)
 # SKIP_PRECOMPILE_HEADERS bypasses the include for that single file
 # without disabling PCH for the whole target.
 if(APPLE)
+    set_source_files_properties(src/core/strip/AuPluginEditor.mm
+                                PROPERTIES SKIP_PRECOMPILE_HEADERS ON
+                                           SKIP_UNITY_BUILD_INCLUSION ON)
     set_source_files_properties(src/core/MacMicPermission.mm
         PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
     set_source_files_properties(src/gui/MacFloatingWindowBehavior.mm

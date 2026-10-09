@@ -90,10 +90,14 @@ signals:
     void insertRemoveRequested(int slot);
     // Sonst irgendwo auf eine Einschubkachel.
     void insertClicked(int slot);
+    // Doppelklick auf eine Einschubkachel: das eigene Fenster des
+    // Plugins. Dieselbe Geste wie in jeder Aufnahmesoftware.
+    void insertEditorRequested(int slot);
 
 protected:
     void paintEvent(QPaintEvent*) override;
     void mousePressEvent(QMouseEvent* ev) override;
+    void mouseDoubleClickEvent(QMouseEvent* ev) override;
     void dragEnterEvent(QDragEnterEvent* ev) override;
     void dragMoveEvent(QDragMoveEvent* ev) override;
     void dragLeaveEvent(QDragLeaveEvent* ev) override;
