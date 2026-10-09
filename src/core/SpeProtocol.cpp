@@ -4,6 +4,10 @@
 // Ported from AetherSDR src/core/SpeProtocol.cpp at d58e2b8a -- see the
 // full attribution block and the list of deviations at the head of
 // core/SpeProtocol.h.
+//
+// Modification history (Longpath):
+//   2026-10-09 — Portiert fuer Longpath von Martin Fischer (OE5SOS),
+//                KI-gestuetzt mit Claude Code.
 // =================================================================
 
 #include "core/SpeProtocol.h"

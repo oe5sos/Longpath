@@ -6,6 +6,10 @@
 // nackten main(), Longpath nimmt QTest; die geprueften Faelle und die
 // erwarteten Werte sind dieselben, dazu drei eigene (Bemerkung unten).
 //
+// Modification history (Longpath):
+//   2026-10-09 — Portiert fuer Longpath von Martin Fischer (OE5SOS),
+//                KI-gestuetzt mit Claude Code.
+//
 // Was dieser Pruefstand WIRKLICH belegt -- und was nicht:
 //
 //   Belegt ist, dass diese Schicht die Byte-Folgen baut und liest, die
