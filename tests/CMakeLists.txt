@@ -5451,6 +5451,7 @@ longpath_add_test(tst_plus_glyph_renders)
 longpath_add_test(tst_hum_is_not_the_voice)
 longpath_add_test(tst_resync_does_not_click)
 longpath_add_test(tst_eq_reaches_the_monitor)
+longpath_add_test(tst_eq_flat_does_not_mute)
 longpath_add_test(tst_strip_tuner)
 
 # -- The ring behind the EQ picture: oldest-first, newest-kept, and

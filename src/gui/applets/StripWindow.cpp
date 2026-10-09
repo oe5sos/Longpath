@@ -1002,12 +1002,37 @@ QWidget* StripWindow::buildEqPanel()
             p.enabled = false;
             c->eq().setBand(i, p);
         }
-        c->eq().setMasterGain(0.0f);
+        // EINS, nicht null. setMasterGain nimmt einen LINEAREN
+        // Faktor (Vorgabe 1,0, gedeckelt auf 0..4), keine Dezibel.
+        // Hier stand 0.0f -- damit multiplizierte der Entzerrer alles
+        // mit null, und der Betreiber meldete zu Recht: „wenn ich
+        // channel strip aktiviere hoere ich gar nichts". Das Protokoll
+        // zeigte es unmissverstaendlich: in -33 dBFS, out -120 dBFS.
+        //
+        // Der Fehler ist die naheliegendste Verwechslung in diesem
+        // ganzen Fenster: jeder andere Pegel hier ist in Dezibel, wo
+        // null „unveraendert" heisst. Genau bei dem einen, der es
+        // nicht ist, heisst null „aus".
+        c->eq().setMasterGain(1.0f);
         if (m_eqHost) { m_eqHost->saveClientEqSettings(); }
         if (m_eqPanel) { m_eqPanel->refreshFromEngine(); }
         refreshStageCards();
         persist();
     });
+
+    // ── Wenn der Ausgangssteller unten steht ─────────────────────────
+    //
+    // Der Entzerrer hat einen eigenen Ausgangspegel (den Schieber
+    // rechts im portierten Panel). Steht er auf null, ist die ganze
+    // Kette stumm, und nichts sagt es -- man sucht den Fehler
+    // ueberall sonst. Ich weiss das, weil ich ihn selbst auf null
+    // gesetzt habe und eine Stunde lang woanders gesucht wurde.
+    m_eqMuteWarning = new QLabel(page);
+    m_eqMuteWarning->setWordWrap(true);
+    m_eqMuteWarning->setStyleSheet(QStringLiteral(
+        "QLabel { color: %1; }")
+        .arg(QString::fromLatin1(Style::kAmberText)));
+    m_eqMuteWarning->hide();
 
     auto* head = new QHBoxLayout;
     head->setContentsMargins(0, 0, 0, 0);
@@ -1016,6 +1041,7 @@ QWidget* StripWindow::buildEqPanel()
     head->addWidget(flat);
     head->addStretch(1);
     col->addLayout(head);
+    col->addWidget(m_eqMuteWarning);
     col->addWidget(m_eqPanel, 1);
     return page;
 }
@@ -1873,6 +1899,20 @@ QWidget* StripWindow::buildStageCard(StripChain::Stage stage)
 
 void StripWindow::refreshStageCards()
 {
+    // Der Ausgangssteller des Entzerrers, falls er unten steht.
+    if (m_eqMuteWarning != nullptr) {
+        StripChain* c = chain();
+        const bool mute = c != nullptr && c->eq().masterGain() < 0.001f;
+        m_eqMuteWarning->setVisible(mute);
+        if (mute) {
+            m_eqMuteWarning->setText(QStringLiteral(
+                "The equaliser's own output is at zero — everything "
+                "through it is silent, whatever the curve says. Press "
+                "Flat above, or raise the output fader on the right of "
+                "the panel below."));
+        }
+    }
+
     StripChain* c = chain();
     for (int i = 0; i < StripChain::kStageCount; ++i) {
         const auto stage = static_cast<StripChain::Stage>(i);

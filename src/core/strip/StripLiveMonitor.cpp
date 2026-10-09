@@ -536,14 +536,29 @@ void StripLiveMonitor::pump()
             m_resampled.push_back(float(a + (b - a) * f));
             at += m_ratio;
         }
-        // Was vom Bruchteil uebrig bleibt, geht in den naechsten
-        // Durchgang -- sonst entsteht an jeder Blockgrenze genau der
-        // Sprung, den das hier vermeiden soll.
+        // ── Die Blockgrenze, und warum sie ein Sample gekostet hat ──
+        //
+        // Der naechste Block beginnt bei der alten Stelle N, nicht
+        // bei N-1. Hier stand `at - (N-1)`, also eins zu viel --
+        // damit fiel je Block ein Abtastwert unter den Tisch. Bei 256
+        // Rahmen sind das 0,39 Prozent, und genau so stand es im
+        // Protokoll: der Vorrat am Ausgang lief stetig leer (968,
+        // 824, 704, 600 ... Bytes), waehrend das Leseverhaeltnis mit
+        // 0,9981 am unteren Anschlag klebte und vergeblich
+        // dagegenhielt.
+        //
+        // Das ist auch die Erklaerung fuer „wenn ich channel strip
+        // aktiviere hoere ich gar nichts": der Vorrat war da schon
+        // fast aufgebraucht.
+        //
+        // Und die Grenze darf NEGATIV werden: eine Stelle zwischen
+        // -1 und 0 liegt zwischen dem letzten Wert des vorigen Blocks
+        // (m_lastOut) und dem ersten des neuen. Genau dafuer wird
+        // m_lastOut aufgehoben; das alte Abschneiden bei 0 hat den
+        // Uebergang jedes Mal verschluckt.
         if (!in.empty()) {
             m_lastOut = in.back();
-            m_readPos = at - double(in.size() - 1);
-            if (m_readPos < 0.0) { m_readPos = 0.0; }
-            if (m_readPos > 2.0) { m_readPos = 2.0; }
+            m_readPos = std::clamp(at - double(in.size()), -1.0, 1.0);
         }
         m_mono.swap(m_resampled);
     }
