@@ -42,6 +42,11 @@
 
 #include <QWidget>
 
+class QDragEnterEvent;
+class QDragLeaveEvent;
+class QDragMoveEvent;
+class QDropEvent;
+
 #include <QElapsedTimer>
 #include <QTimer>
 
@@ -68,15 +73,54 @@ public:
 
     QSize sizeHint() const override;
 
+    // Die Reihe muss nach einem Einschubwechsel neu gelegt werden --
+    // sie wird breiter oder schmaler.
+    void refreshInserts();
+
+    static constexpr const char* kPluginMime =
+        "application/x-longpath-plugin";
+
 signals:
     void stageClicked(int stageIndex);
+    // Ein Plugin wurde auf die Reihe gezogen und an dieser Stelle
+    // fallen gelassen (0 = vor dem Gate, kStageCount = hinter dem
+    // Begrenzer).
+    void pluginDropped(const QString& identifier, int position);
+    // Das Kreuz auf einer Einschubkachel.
+    void insertRemoveRequested(int slot);
+    // Sonst irgendwo auf eine Einschubkachel.
+    void insertClicked(int slot);
 
 protected:
     void paintEvent(QPaintEvent*) override;
     void mousePressEvent(QMouseEvent* ev) override;
+    void dragEnterEvent(QDragEnterEvent* ev) override;
+    void dragMoveEvent(QDragMoveEvent* ev) override;
+    void dragLeaveEvent(QDragLeaveEvent* ev) override;
+    void dropEvent(QDropEvent* ev) override;
 
 private:
-    QRect tileRect(int index) const;
+    // ── Die Reihe als Folge ──────────────────────────────────────────
+    //
+    // Frueher war sie acht Kacheln mit fester Breite, und tileRect(i)
+    // konnte sie ausrechnen. Jetzt haengen Einschuebe dazwischen, also
+    // wird sie einmal gelegt und danach nur noch abgelesen. Das ist
+    // nicht nur Buchhaltung: wer ein Plugin an eine STELLE ziehen
+    // soll, muss die Stellen sehen -- und sie sieht man nur, wenn die
+    // Reihe wirklich die Kette ist und nicht ein Bild davon.
+    struct Cell {
+        enum class Kind { Stage, Insert, Gap } kind{Kind::Stage};
+        int  index{0};      // Stufennummer, Einschubplatz, oder Stelle
+        int  position{0};   // Stelle in der Kette, fuer Gap und Insert
+        QRect rect;
+    };
+    void relayout();
+    const Cell* cellAt(const QPoint& p) const;
+    int  dropPositionAt(const QPoint& p) const;
+    QRect removeBoxOf(const Cell& c) const;
+
+    std::vector<Cell> m_cells;
+    int  m_dropPosition{-1};   // -1 = kein Ziehen im Gange
 
     StripChain* m_chain{nullptr};
     std::array<double, StripChain::kStageCount> m_reduction{};

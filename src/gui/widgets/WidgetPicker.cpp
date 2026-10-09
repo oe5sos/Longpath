@@ -29,6 +29,7 @@
 #include <QAbstractButton>
 #include <QEasingCurve>
 #include <QEvent>
+#include <QLinearGradient>
 #include <QPainter>
 #include <QPropertyAnimation>
 #include <QPushButton>
@@ -507,7 +508,10 @@ protected:
         const qreal wachheit = std::max(m_hover, m_turn);
 
         const QColor rand    = mix(ruhe, wach, wachheit);
-        const QColor zeichen = mix(zeichenRuhe, zeichenWach, wachheit);
+        const QColor zeichen = m_turn > 0.01
+            ? mix(mix(zeichenRuhe, zeichenWach, wachheit),
+                  QColor(QString::fromLatin1(Style::kGlassSelText)), m_turn)
+            : mix(zeichenRuhe, zeichenWach, wachheit);
 
         const qreal schrumpf = 1.0 - 0.06 * m_press;
         const QRectF voll(rect());
@@ -515,9 +519,29 @@ protected:
         feld.moveCenter(voll.center());
         feld.adjust(0.5, 0.5, -0.5, -0.5);
 
-        if (wachheit > 0.0) {
-            QColor flaeche(QString::fromLatin1(Style::kButtonBg));
-            flaeche.setAlphaF(float(wachheit) * flaeche.alphaF());
+        // Die Fuellung sagt zwei verschiedene Dinge, und sie duerfen
+        // nicht gleich aussehen: ein Zeiger darauf ist eine Andeutung,
+        // ein offener Auswaehler ist ein ZUSTAND. Hausstil Regel 2 --
+        // „genau ein Knopf leuchtet, aktiv gefuellt".
+        //
+        // Am gerenderten Blatt nachgebessert: erst stand hier fuer
+        // beides dieselbe Flaeche aus kButtonBg, und die liegt so
+        // dicht am Grund, dass auf dem Bild kein Unterschied zu sehen
+        // war. Jetzt traegt der offene Zustand den gedeckten
+        // Auswahlverlauf der Kommandoleiste (kGlassSel*) -- dieselbe
+        // Antwort, die jede aktive Pille im Fenster gibt.
+        if (m_turn > 0.01) {
+            QLinearGradient sel(feld.topLeft(), feld.bottomLeft());
+            QColor top(QString::fromLatin1(Style::kGlassSelTop));
+            QColor bot(QString::fromLatin1(Style::kGlassSelBot));
+            top.setAlphaF(float(m_turn));
+            bot.setAlphaF(float(m_turn));
+            sel.setColorAt(0.0, top);
+            sel.setColorAt(1.0, bot);
+            g.setBrush(sel);
+        } else if (m_hover > 0.0) {
+            QColor flaeche(QString::fromLatin1(Style::kButtonHover));
+            flaeche.setAlphaF(float(m_hover));
             g.setBrush(flaeche);
         } else {
             g.setBrush(Qt::NoBrush);

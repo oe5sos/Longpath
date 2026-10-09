@@ -20,6 +20,7 @@
 #include "core/strip/StripSettings.h"
 #include "core/strip/StripLiveMonitor.h"
 #include "core/strip/AudioPlugin.h"
+#include "core/strip/PluginPlacement.h"
 #include "core/AppSettings.h"
 #include "gui/applets/eq/EqHost.h"
 #include "gui/applets/eq/StripEqPanel.h"
@@ -38,6 +39,12 @@
 #include "models/RadioModel.h"
 #include "models/TransmitModel.h"
 
+#include <QApplication>
+#include <QDrag>
+#include <QFrame>
+#include <QMimeData>
+#include <QMap>
+#include <QMouseEvent>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QFormLayout>
@@ -607,7 +614,15 @@ void StripWindow::buildUi()
     m_chainView = new StripChainView(this);
     m_chainView->setChain(chain());
     connect(m_chainView, &StripChainView::stageClicked, this, [this](int i) {
-        if (m_tabs) { m_tabs->setCurrentIndex(i); }
+        // +1: vorne steht jetzt der Uebersichtsreiter.
+        if (m_tabs) { m_tabs->setCurrentIndex(i + 1); }
+    });
+    connect(m_chainView, &StripChainView::pluginDropped,
+            this, &StripWindow::dropPluginAt);
+    connect(m_chainView, &StripChainView::insertRemoveRequested,
+            this, &StripWindow::clearInsert);
+    connect(m_chainView, &StripChainView::insertClicked, this, [this](int) {
+        if (m_tabs) { m_tabs->setCurrentIndex(m_tabs->count() - 1); }
     });
     col->addWidget(m_chainView);
 
@@ -2165,6 +2180,88 @@ void StripWindow::refreshChainRow()
 }
 
 
+
+// ── Eine Plugin-Karte, die man anfassen kann ─────────────────────────
+//
+// „diese sollte man dann in der timeline oben reinziehen koennen."
+//
+// Also keine Auswahlliste, sondern etwas, das man in die Hand nimmt.
+// Der Mime-Typ traegt nur den Bezeichner; die Kachel oben entscheidet,
+// WO es landet, und das ist genau die richtige Arbeitsteilung -- die
+// Stelle gehoert der Kette, nicht der Liste.
+class PluginChip : public QFrame {
+public:
+    PluginChip(const PluginDescriptor& d, QWidget* parent)
+        : QFrame(parent), m_id(d.identifier)
+    {
+        setCursor(Qt::OpenHandCursor);
+        setStyleSheet(QStringLiteral(
+            "QFrame { background: %1; border: 1px solid %2;"
+            " border-radius: 5px; }"
+            "QFrame:hover { border-color: %3; }")
+            .arg(QString::fromLatin1(Style::kInsetBg),
+                 QString::fromLatin1(Style::kBorderSubtle),
+                 QString::fromLatin1(Style::kBlueBorder)));
+
+        auto* row = new QHBoxLayout(this);
+        row->setContentsMargins(9, 6, 9, 6);
+        row->setSpacing(8);
+
+        auto* grip = new QLabel(QStringLiteral("⠿"), this);
+        grip->setStyleSheet(QStringLiteral(
+            "QLabel { color: %1; border: none; }")
+            .arg(QString::fromLatin1(Style::kTextInactive)));
+        row->addWidget(grip);
+
+        auto* name = new QLabel(d.name, this);
+        name->setStyleSheet(QStringLiteral(
+            "QLabel { color: %1; border: none; }")
+            .arg(QString::fromLatin1(Style::kTextPrimary)));
+        row->addWidget(name);
+        row->addStretch(1);
+
+        if (!d.vendor.isEmpty()) {
+            auto* vendor = new QLabel(d.vendor, this);
+            vendor->setStyleSheet(QStringLiteral(
+                "QLabel { color: %1; border: none; }")
+                .arg(QString::fromLatin1(Style::kTextInactive)));
+            row->addWidget(vendor);
+        }
+
+        setToolTip(QStringLiteral(
+            "Drag onto the chain at the top of this window and drop it "
+            "where you want it. The gap you are over lights up."));
+    }
+
+protected:
+    void mousePressEvent(QMouseEvent* ev) override
+    {
+        if (ev->button() == Qt::LeftButton) { m_from = ev->pos(); }
+        QFrame::mousePressEvent(ev);
+    }
+
+    void mouseMoveEvent(QMouseEvent* ev) override
+    {
+        if (!(ev->buttons() & Qt::LeftButton)) { return; }
+        if ((ev->pos() - m_from).manhattanLength()
+            < QApplication::startDragDistance()) {
+            return;
+        }
+        auto* mime = new QMimeData;
+        mime->setData(QLatin1String(StripChainView::kPluginMime),
+                      m_id.toUtf8());
+        auto* drag = new QDrag(this);
+        drag->setMimeData(mime);
+        drag->setPixmap(grab());
+        drag->setHotSpot(ev->pos());
+        drag->exec(Qt::CopyAction);
+    }
+
+private:
+    QString m_id;
+    QPoint  m_from;
+};
+
 // ── Einschubplaetze: fremde Effekte, als Zusatz ──────────────────────
 //
 // Die Ansage dazu war unmissverstaendlich: "plugins koennen nur als
@@ -2200,6 +2297,12 @@ QWidget* StripWindow::buildInsertsPanel()
         row->addStretch(1);
         col->addLayout(row);
     }
+
+    // Der Katalog steht VOR den Plaetzen: erst sieht man, was es gibt
+    // und wohin es gehoert, dann was gerade haengt.
+    m_catalogue = new QWidget(page);
+    col->addWidget(m_catalogue);
+    rebuildPluginCatalogue();
 
     for (int slot = 0; slot < StripChain::kInsertCount; ++slot) {
         auto& ui = m_insertUi[static_cast<size_t>(slot)];
@@ -2253,6 +2356,7 @@ QWidget* StripWindow::buildInsertsPanel()
                               .position->itemData(i).toInt());
             }
             persist();
+            if (m_chainView) { m_chainView->refreshInserts(); }
             refreshInsertCard(slot);
         });
         pick->addWidget(ui.position);
@@ -2294,6 +2398,7 @@ void StripWindow::scanPlugins()
 {
     if (!PluginHost::available()) {
         m_pluginsScanned = true;
+        rebuildPluginCatalogue();
         refreshInsertCards();
         return;
     }
@@ -2313,7 +2418,81 @@ void StripWindow::scanPlugins()
                          d.identifier);
         }
     }
+    rebuildPluginCatalogue();
     refreshInsertCards();
+}
+
+// Der Katalog: nach Gruppen, und jede Gruppe sagt, wohin sie gehoert.
+//
+// „wichtig ist, dass man weiss, wo man diese einbauen soll. das muss
+// deutlich markiert sein, vielleicht in gruppen oder so."
+//
+// Die Zuordnung ist geraten -- eine Audio Unit nennt ihre Gattung
+// nicht. Geraten wird mit Netz (core/strip/PluginPlacement.h), und was
+// nicht zuzuordnen ist, steht sichtbar unter „noch nicht eingeordnet"
+// statt stillschweigend in der erstbesten Gruppe.
+void StripWindow::rebuildPluginCatalogue()
+{
+    if (!m_catalogue) { return; }
+
+    auto* old = m_catalogue->layout();
+    if (old != nullptr) {
+        while (QLayoutItem* it = old->takeAt(0)) {
+            if (QWidget* w = it->widget()) { w->deleteLater(); }
+            delete it;
+        }
+        delete old;
+    }
+    auto* col = new QVBoxLayout(m_catalogue);
+    col->setContentsMargins(0, 0, 0, 0);
+    col->setSpacing(14);
+
+    if (m_plugins.isEmpty()) { return; }
+
+    using PluginPlacement::Group;
+    QMap<int, QVector<PluginDescriptor>> byGroup;
+    for (const PluginDescriptor& d : m_plugins) {
+        byGroup[int(PluginPlacement::guess(d.name, d.vendor))].push_back(d);
+    }
+
+    static const Group kOrder[] = {
+        Group::Clean, Group::Eq, Group::DeEss, Group::Compress,
+        Group::Colour, Group::Final, Group::Measure, Group::Unknown
+    };
+
+    for (const Group g : kOrder) {
+        const auto at = byGroup.constFind(int(g));
+        if (at == byGroup.constEnd() || at->isEmpty()) { continue; }
+
+        auto* head = new QHBoxLayout;
+        auto* title = new QLabel(PluginPlacement::groupName(g), m_catalogue);
+        title->setStyleSheet(QStringLiteral(
+            "QLabel { color: %1; font-size: 11px; letter-spacing: 0.16em; }")
+            .arg(QString::fromLatin1(Style::kTextPrimary)));
+        head->addWidget(title);
+
+        const int at2 = PluginPlacement::suggestedPosition(g);
+        if (at2 >= 0) {
+            auto* where = new QLabel(
+                QStringLiteral("→  %1").arg(insertPositionName(at2)),
+                m_catalogue);
+            where->setStyleSheet(QStringLiteral(
+                "QLabel { color: %1; }")
+                .arg(QString::fromLatin1(Style::kBlueBorder)));
+            head->addWidget(where);
+        }
+        head->addStretch(1);
+        col->addLayout(head);
+
+        auto* hint = new QLabel(PluginPlacement::groupHint(g), m_catalogue);
+        hint->setWordWrap(true);
+        hint->setStyleSheet(dimStyle());
+        col->addWidget(hint);
+
+        for (const PluginDescriptor& d : *at) {
+            col->addWidget(new PluginChip(d, m_catalogue));
+        }
+    }
 }
 
 void StripWindow::chooseInsertPlugin(int slot)
@@ -2333,6 +2512,64 @@ void StripWindow::chooseInsertPlugin(int slot)
         c->setInsertPlugin(slot, std::move(p));
     }
     persist();
+    if (m_chainView) { m_chainView->refreshInserts(); }
+    refreshInsertCard(slot);
+}
+
+// Ein Plugin ist auf der Kette gelandet.
+//
+// Welcher der zwei Plaetze es aufnimmt, entscheidet nicht der
+// Betreiber -- er hat auf eine STELLE gezielt, nicht auf einen Platz.
+// Also: ein freier Platz, sonst der, der schon an dieser Stelle
+// haengt (dann ist es ein Austausch, und das ist offensichtlich das
+// Gemeinte), sonst gar nichts und ein Satz dazu.
+void StripWindow::dropPluginAt(const QString& identifier, int position)
+{
+    StripChain* c = chain();
+    if (!c || identifier.isEmpty()) { return; }
+
+    int slot = -1;
+    for (int i = 0; i < StripChain::kInsertCount; ++i) {
+        if (c->insertPlugin(i) == nullptr) { slot = i; break; }
+    }
+    if (slot < 0) {
+        for (int i = 0; i < StripChain::kInsertCount; ++i) {
+            if (c->insertPosition(i) == position) { slot = i; break; }
+        }
+    }
+    if (slot < 0) {
+        if (m_insertsNote) {
+            m_insertsNote->setText(QStringLiteral(
+                "Both slots are full. Take one out with the × on its "
+                "tile, then drop this one in."));
+        }
+        if (m_tabs) { m_tabs->setCurrentIndex(m_tabs->count() - 1); }
+        return;
+    }
+
+    std::unique_ptr<AudioPlugin> p = PluginHost::load(identifier);
+    if (!p) {
+        if (m_insertsNote) {
+            m_insertsNote->setText(QStringLiteral(
+                "That plugin would not open. The slot is left empty."));
+        }
+        return;
+    }
+    c->setInsertPosition(slot, position);
+    c->setInsertEnabled(slot, true);
+    c->setInsertPlugin(slot, std::move(p));
+    persist();
+    if (m_chainView) { m_chainView->refreshInserts(); }
+    refreshInsertCard(slot);
+}
+
+void StripWindow::clearInsert(int slot)
+{
+    StripChain* c = chain();
+    if (!c) { return; }
+    c->setInsertPlugin(slot, nullptr);
+    persist();
+    if (m_chainView) { m_chainView->refreshInserts(); }
     refreshInsertCard(slot);
 }
 
@@ -2359,9 +2596,11 @@ void StripWindow::refreshInsertCards()
         return;
     }
     m_insertsNote->setText(QStringLiteral(
-        "%1 effect(s) found. A slot you leave empty costs nothing. "
-        "A plugin that reports delay adds it to the transmit path and "
-        "to Hear myself — that is the one thing to watch.")
+        "%1 effect(s) found, sorted by where they usually belong. "
+        "Drag one onto the chain at the top of this window — the gap "
+        "you are over lights up, and that is where it lands. The × on "
+        "its tile takes it out again. The groups are a suggestion, not "
+        "a rule: the position is yours to pick.")
         .arg(m_plugins.size()));
 }
 

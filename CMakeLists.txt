@@ -1134,6 +1134,7 @@ set(GUI_SOURCES
     src/core/strip/MicSpectrum.cpp
     src/core/strip/StripChain.cpp
     src/core/strip/AudioPluginAu.cpp
+    src/core/strip/PluginPlacement.cpp
     src/core/strip/StripLiveMonitor.cpp
     src/core/strip/StripSettings.cpp
     src/core/strip/BroadcastOptimizer.cpp

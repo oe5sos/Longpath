@@ -236,6 +236,9 @@ private:
     void chooseInsertPlugin(int slot);
     void refreshInsertCard(int slot);
     void refreshInsertCards();
+    void rebuildPluginCatalogue();
+    void dropPluginAt(const QString& identifier, int position);
+    void clearInsert(int slot);
     static QString insertPositionName(int at);
 
     struct InsertUi {
@@ -249,6 +252,7 @@ private:
     std::array<InsertUi, 2> m_insertUi{};
     QVector<PluginDescriptor> m_plugins;
     bool m_pluginsScanned{false};
+    QWidget*     m_catalogue{nullptr};
     QLabel*      m_insertsNote{nullptr};
     QPushButton* m_insertScanBtn{nullptr};
 

@@ -13,6 +13,8 @@
 
 #include "gui/applets/StripGraphics.h"
 
+#include "core/strip/AudioPlugin.h"
+
 #include "gui/styles/ThemeQss.h"
 
 #include "core/VoiceAnalyzer.h"
@@ -25,7 +27,12 @@
 
 #include "gui/StyleConstants.h"
 
+#include <QDragEnterEvent>
+#include <QDragLeaveEvent>
+#include <QDragMoveEvent>
+#include <QDropEvent>
 #include <QEvent>
+#include <QMimeData>
 #include <QMouseEvent>
 #include <QContextMenuEvent>
 #include <QWheelEvent>
@@ -34,15 +41,24 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <complex>
 
 namespace Longpath {
 
 namespace {
 
-constexpr int kTileW   = 84;
-constexpr int kTileH   = 46;
-constexpr int kTileGap = 6;
+constexpr int kTileW    = 84;
+constexpr int kTileH    = 46;
+constexpr int kTileGap  = 6;
+// Einschubkacheln sind schmaler als Stufen. Absichtlich: sie gehoeren
+// nicht zur Kette, sie haengen darin.
+constexpr int kInsertW  = 92;
+// Die Fuge zwischen zwei Stufen, in die man etwas fallen lassen kann.
+// Breit genug, um sie zu treffen, schmal genug, dass die Reihe nicht
+// auseinanderfaellt.
+constexpr int kGapW     = 14;
+constexpr int kRemoveBox = 13;
 
 // ── Farben durch die Palette, nicht am ihr vorbei ────────────────────
 //
@@ -69,12 +85,97 @@ StripChainView::StripChainView(QWidget* parent)
     m_reduction.fill(0.0);
     setMinimumHeight(kTileH + 8);
     setCursor(Qt::PointingHandCursor);
+    setAcceptDrops(true);
+    relayout();
 }
 
 void StripChainView::setChain(StripChain* chain)
 {
     m_chain = chain;
+    relayout();
     update();
+}
+
+void StripChainView::refreshInserts()
+{
+    relayout();
+    updateGeometry();
+    update();
+}
+
+// Die Reihe einmal legen: Fuge, Stufe, Fuge, Stufe ... und ueberall
+// dort, wo ein Einschub haengt, seine Kachel statt der leeren Fuge.
+void StripChainView::relayout()
+{
+    m_cells.clear();
+    int x = 0;
+
+    const auto addGapOrInserts = [&](int position) {
+        bool any = false;
+        for (int slot = 0; m_chain != nullptr
+                           && slot < StripChain::kInsertCount; ++slot) {
+            if (m_chain->insertPosition(slot) != position) { continue; }
+            if (m_chain->insertPlugin(slot) == nullptr)    { continue; }
+            Cell c;
+            c.kind = Cell::Kind::Insert;
+            c.index = slot;
+            c.position = position;
+            c.rect = QRect(x, 4, kInsertW, kTileH);
+            m_cells.push_back(c);
+            x += kInsertW + kTileGap;
+            any = true;
+        }
+        if (!any) {
+            Cell c;
+            c.kind = Cell::Kind::Gap;
+            c.index = position;
+            c.position = position;
+            c.rect = QRect(x, 4, kGapW, kTileH);
+            m_cells.push_back(c);
+            x += kGapW;
+        }
+    };
+
+    for (int i = 0; i < StripChain::kStageCount; ++i) {
+        addGapOrInserts(i);
+        Cell c;
+        c.kind = Cell::Kind::Stage;
+        c.index = i;
+        c.position = i;
+        c.rect = QRect(x, 4, kTileW, kTileH);
+        m_cells.push_back(c);
+        x += kTileW;
+    }
+    addGapOrInserts(StripChain::kStageCount);
+}
+
+const StripChainView::Cell* StripChainView::cellAt(const QPoint& p) const
+{
+    for (const Cell& c : m_cells) {
+        if (c.rect.contains(p)) { return &c; }
+    }
+    return nullptr;
+}
+
+QRect StripChainView::removeBoxOf(const Cell& c) const
+{
+    return QRect(c.rect.right() - kRemoveBox - 2, c.rect.top() + 2,
+                 kRemoveBox, kRemoveBox);
+}
+
+// Wohin faellt es? Die naechstgelegene Fuge oder Einschubstelle --
+// nicht die Kachel, auf der der Zeiger gerade steht. Wer ueber der
+// Mitte einer Stufe loslaesst, meint nicht „in die Stufe hinein".
+int StripChainView::dropPositionAt(const QPoint& p) const
+{
+    int best = 0;
+    int bestDist = std::numeric_limits<int>::max();
+    for (const Cell& c : m_cells) {
+        if (c.kind == Cell::Kind::Stage) { continue; }
+        const int d = std::abs(c.rect.center().x() - p.x());
+        if (d < bestDist) { bestDist = d; best = c.position; }
+    }
+    return best;
 }
 
 void StripChainView::setReduction(StripChain::Stage s, double db)
@@ -86,18 +187,18 @@ void StripChainView::setReduction(StripChain::Stage s, double db)
     // whole row for a number that moved by a hundredth of a decibel.
     if (std::abs(m_reduction[static_cast<size_t>(i)] - db) < 0.05) { return; }
     m_reduction[static_cast<size_t>(i)] = db;
-    update(tileRect(i));
+    for (const Cell& c : m_cells) {
+        if (c.kind == Cell::Kind::Stage && c.index == i) {
+            update(c.rect);
+            return;
+        }
+    }
 }
 
 QSize StripChainView::sizeHint() const
 {
-    const int n = StripChain::kStageCount;
-    return QSize(n * kTileW + (n - 1) * kTileGap, kTileH + 8);
-}
-
-QRect StripChainView::tileRect(int index) const
-{
-    return QRect(index * (kTileW + kTileGap), 4, kTileW, kTileH);
+    const int right = m_cells.empty() ? 0 : m_cells.back().rect.right();
+    return QSize(right + 1, kTileH + 8);
 }
 
 void StripChainView::paintEvent(QPaintEvent*)
@@ -107,10 +208,80 @@ void StripChainView::paintEvent(QPaintEvent*)
 
     const bool master = m_chain && m_chain->isEnabled();
 
-    for (int i = 0; i < StripChain::kStageCount; ++i) {
+    for (const Cell& cell : m_cells) {
+        const QRect r = cell.rect;
+
+        // ── Die Fuge ────────────────────────────────────────────────
+        //
+        // Im Ruhezustand nur das Kettenzeichen. Waehrend etwas
+        // gezogen wird, leuchtet die Stelle auf, auf die es faellt --
+        // das ist die ganze Erklaerung, die ein Zielplatz braucht,
+        // und sie steht genau dort, wo hingesehen wird.
+        if (cell.kind == Cell::Kind::Gap) {
+            if (m_dropPosition == cell.position) {
+                p.setPen(QPen(c(Style::kBlueBorder), 1, Qt::DashLine));
+                p.setBrush(QColor(c(Style::kBlueBorder).red(),
+                                  c(Style::kBlueBorder).green(),
+                                  c(Style::kBlueBorder).blue(), 60));
+                p.drawRoundedRect(r.adjusted(1, 0, -2, -1), 3, 3);
+            } else if (cell.position < StripChain::kStageCount) {
+                p.setPen(c(Style::kTextInactive));
+                p.drawText(r, Qt::AlignCenter, QStringLiteral("›"));
+            }
+            continue;
+        }
+
+        // ── Eine Einschubkachel ─────────────────────────────────────
+        //
+        // Gestrichelt, weil sie nicht uns gehoert -- dieselbe Zusage
+        // wie beim Plus: ein gestrichelter Rand heisst „hier steht
+        // etwas, das hinzugefuegt wurde". Mit Kreuz rechts oben, weil
+        // „relativ leicht auch wieder loeschen" ausdruecklich verlangt
+        // war und ein Loeschweg, der durch einen Reiter fuehrt, das
+        // nicht ist.
+        if (cell.kind == Cell::Kind::Insert) {
+            AudioPlugin* pl = m_chain != nullptr
+                            ? m_chain->insertPlugin(cell.index) : nullptr;
+            const bool on = m_chain != nullptr
+                         && m_chain->insertEnabled(cell.index);
+
+            QColor edge = (on && master) ? c(Style::kBlueBorder)
+                                         : c(Style::kInsetBorder);
+            p.setPen(QPen(edge, 1, Qt::DashLine));
+            p.setBrush(c(Style::kInsetBg));
+            p.drawRoundedRect(r.adjusted(0, 0, -1, -1), 3, 3);
+
+            QFont f = p.font();
+            f.setPointSizeF(8.0);
+            p.setFont(f);
+            p.setPen(c(Style::kTextInactive));
+            p.drawText(QRect(r.left(), r.top() + 3, r.width() - kRemoveBox - 4,
+                             11),
+                       Qt::AlignLeft | Qt::AlignVCenter,
+                       QStringLiteral("  PLUGIN"));
+
+            f.setPointSizeF(9.0);
+            p.setFont(f);
+            p.setPen((on && master) ? c(Style::kTextPrimary)
+                                    : c(Style::kTextSecondary));
+            const QString name = pl != nullptr ? pl->descriptor().name
+                                               : QStringLiteral("—");
+            p.drawText(r.adjusted(4, 12, -4, -4),
+                       Qt::AlignCenter | Qt::TextWordWrap,
+                       p.fontMetrics().elidedText(
+                           name, Qt::ElideRight, r.width() - 10));
+
+            const QRect x = removeBoxOf(cell);
+            p.setPen(QPen(c(Style::kTextInactive), 1.2));
+            p.drawLine(x.left() + 4, x.top() + 4, x.right() - 4, x.bottom() - 4);
+            p.drawLine(x.right() - 4, x.top() + 4, x.left() + 4, x.bottom() - 4);
+            continue;
+        }
+
+        // ── Eine Stufe ──────────────────────────────────────────────
+        const int i = cell.index;
         const auto st = static_cast<StripChain::Stage>(i);
         const bool on = m_chain && m_chain->stageEnabled(st);
-        const QRect r = tileRect(i);
 
         // Three states, drawn as three states. A stage can be switched
         // on and doing nothing because the master is off, and painting
@@ -163,27 +334,70 @@ void StripChainView::paintEvent(QPaintEvent*)
                        Qt::AlignCenter,
                        QStringLiteral("-%1 dB").arg(gr, 0, 'f', 1));
         }
-
-        if (i < StripChain::kStageCount - 1) {
-            p.setPen(c(Style::kTextInactive));
-            p.drawText(QRect(r.right(), r.top(), kTileGap, r.height()),
-                       Qt::AlignCenter, QStringLiteral("›"));
-        }
     }
 }
 
 void StripChainView::mousePressEvent(QMouseEvent* ev)
 {
-    for (int i = 0; i < StripChain::kStageCount; ++i) {
-        if (tileRect(i).contains(ev->pos())) {
-            // Opens the stage. Deliberately not a bypass toggle: the
-            // row is the thing an operator's eye rests on while
-            // speaking, and a click that changes the audio is a click
-            // that happens by accident.
-            emit stageClicked(i);
-            return;
+    const Cell* cell = cellAt(ev->pos());
+    if (cell == nullptr) { return; }
+
+    if (cell->kind == Cell::Kind::Insert) {
+        if (removeBoxOf(*cell).contains(ev->pos())) {
+            emit insertRemoveRequested(cell->index);
+        } else {
+            emit insertClicked(cell->index);
         }
+        return;
     }
+    if (cell->kind == Cell::Kind::Stage) {
+        // Opens the stage. Deliberately not a bypass toggle: the
+        // row is the thing an operator's eye rests on while
+        // speaking, and a click that changes the audio is a click
+        // that happens by accident.
+        emit stageClicked(cell->index);
+    }
+}
+
+// ── Hineinziehen ─────────────────────────────────────────────────────
+//
+// „diese sollte man dann in der timeline oben reinziehen koennen. aber
+// relativ leicht auch wieder loeschen."
+//
+// Die Reihe ist die Kette. Was man hier fallen laesst, haengt danach
+// an genau dieser Stelle -- nicht an einer, die eine Auswahlliste in
+// einem Reiter nennt. Das ist der Unterschied zwischen „man kann die
+// Stelle einstellen" und „man sieht, wo es hinkommt".
+
+void StripChainView::dragEnterEvent(QDragEnterEvent* ev)
+{
+    if (!ev->mimeData()->hasFormat(QLatin1String(kPluginMime))) { return; }
+    ev->acceptProposedAction();
+}
+
+void StripChainView::dragMoveEvent(QDragMoveEvent* ev)
+{
+    if (!ev->mimeData()->hasFormat(QLatin1String(kPluginMime))) { return; }
+    const int at = dropPositionAt(ev->position().toPoint());
+    if (at != m_dropPosition) { m_dropPosition = at; update(); }
+    ev->acceptProposedAction();
+}
+
+void StripChainView::dragLeaveEvent(QDragLeaveEvent*)
+{
+    m_dropPosition = -1;
+    update();
+}
+
+void StripChainView::dropEvent(QDropEvent* ev)
+{
+    if (!ev->mimeData()->hasFormat(QLatin1String(kPluginMime))) { return; }
+    const int at = dropPositionAt(ev->position().toPoint());
+    m_dropPosition = -1;
+    update();
+    emit pluginDropped(QString::fromUtf8(
+        ev->mimeData()->data(QLatin1String(kPluginMime))), at);
+    ev->acceptProposedAction();
 }
 
 // ── StripLevelBars ───────────────────────────────────────────────────
