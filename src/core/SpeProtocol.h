@@ -302,3 +302,6 @@ GaugeRange levelGaugeRange(const ModelSpec& spec, QChar level);
 }  // namespace Longpath
 
 Q_DECLARE_METATYPE(Longpath::Spe::Status)
+// Longpath-Zusatz: SpeConnection reicht die Zusage des Vermittlers als
+// Signal heraus, und QSignalSpy braucht dafuer den Metatyp.
+Q_DECLARE_METATYPE(Longpath::Spe::Rfc2217::OptionReply)

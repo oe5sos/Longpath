@@ -991,6 +991,7 @@ longpath_add_test(tst_dcs_detector)
 longpath_add_test(tst_dcs_squelch_anbindung)
 longpath_add_test(tst_empfaengerwahl)
 longpath_add_test(tst_spe_protokoll)
+longpath_add_test(tst_spe_verbindung)
 longpath_add_test(tst_ui_scale)
 # Der Pruefstand liest src/main.cpp, um die Kopplung ueber den
 # Einstellungsschluessel zu belegen. `if(TEST ...)` wie bei
