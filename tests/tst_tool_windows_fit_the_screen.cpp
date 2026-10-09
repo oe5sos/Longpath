@@ -32,6 +32,7 @@
 #include "gui/LayoutProfiles.h"
 #include "gui/MainWindow.h"
 #include "gui/WindowPlacement.h"
+#include "gui/applets/BroadcastOptimizerPanel.h"
 #include "gui/applets/StripWindow.h"
 #include "models/RadioModel.h"
 
@@ -99,6 +100,53 @@ private slots:
             QCOMPARE(sa->sizeHint(), sa->widget()->sizeHint());
         }
         QVERIFY2(wrapped >= 8, "die acht Stufenseiten scrollen");
+    }
+
+    // ── Der Stimmcheck war die eine Ausnahme ─────────────────────────
+    //
+    // Acht Stufenseiten in einer Scrollflaeche, der Stimmcheck-Reiter
+    // ohne — und damit kam er durch, solange er kurz genug war. Am
+    // 2026-10-09 kam der Sendeton-Optimierer ans Ende dieses Reiters,
+    // und der ganze Abschnitt lag unter der Fensterkante: unsichtbar,
+    // nicht erreichbar, und der Reiter sah voellig normal aus. Der
+    // Betreiber am Geraet: „das ist aber nichts neues."
+    //
+    // Geprueft wird beides, weil eines allein nichts belegt: dass der
+    // Reiter scrollt, UND dass der Optimierer wirklich darin haengt.
+    // Ein Reiter mit Scrollflaeche und ohne Panel waere genauso leer.
+    void theVoiceCheckTabScrollsAndCarriesTheOptimizer()
+    {
+        RadioModel radio;
+        StripWindow w(&radio);
+
+        auto* tabs = w.findChild<QTabWidget*>();
+        QVERIFY(tabs);
+
+        int voiceTab = -1;
+        for (int i = 0; i < tabs->count(); ++i) {
+            if (tabs->tabText(i) == QLatin1String("Voice check")) {
+                voiceTab = i;
+                break;
+            }
+        }
+        QVERIFY2(voiceTab >= 0, "der Stimmcheck-Reiter ist da");
+
+        auto* sa = qobject_cast<QScrollArea*>(tabs->widget(voiceTab));
+        QVERIFY2(sa != nullptr,
+                 "der Stimmcheck haengt in einer Scrollflaeche wie jede "
+                 "Stufenseite -- sonst faellt sein unteres Ende hinter "
+                 "den Dock");
+        QVERIFY(sa->widget() != nullptr);
+
+        auto* panel = w.findChild<BroadcastOptimizerPanel*>();
+        QVERIFY2(panel != nullptr,
+                 "der Sendeton-Optimierer haengt im Stimmcheck");
+        QVERIFY2(sa->widget()->isAncestorOf(panel),
+                 "und zwar INNERHALB der Scrollflaeche, nicht daneben");
+
+        // Die Seite ist hoeher als der Platz -- genau deshalb muss sie
+        // scrollen. Waere sie es nicht, pruefte dieser Fall nichts.
+        QVERIFY(sa->widget()->sizeHint().height() > 600);
     }
 
     void theMainWindowAlwaysFillsTheScreen()

@@ -472,7 +472,16 @@ void StripWindow::buildUi()
     // parented to the window (see the member note), then handed to the
     // tab bar.
     m_voiceCheck = new TxVoiceCheckDialog(m_radio, this, /*embedded=*/true);
-    m_tabs->addTab(m_voiceCheck, QStringLiteral("Voice check"));
+    // In a scroll area like every stage page, and for the same reason
+    // the comment on StagePageScroll gives: a page taller than the
+    // window loses its bottom behind the Dock with no way to reach
+    // it. This tab was the one exception, and it got away with it
+    // until the broadcast optimiser added a section to the end of it
+    // — at which point the whole optimiser was simply off the bottom
+    // of the window, invisible, with the tab looking perfectly
+    // normal. Found at the bench, 2026-10-09.
+    m_tabs->addTab(new StagePageScroll(m_voiceCheck),
+                   QStringLiteral("Voice check"));
 
     col->addWidget(m_tabs, 1);
 
@@ -1432,7 +1441,8 @@ void StripWindow::reloadControls()
     m_tabs->addTab(buildTxSpectrumPanel(), QStringLiteral("On air"));
     // Back where buildUi() put it, same instance, recording intact.
     if (m_voiceCheck) {
-        m_tabs->addTab(m_voiceCheck, QStringLiteral("Voice check"));
+        m_tabs->addTab(new StagePageScroll(m_voiceCheck),
+                       QStringLiteral("Voice check"));
     }
     if (StripChain* c = chain()) {
         for (int i = 0; i < StripChain::kStageCount; ++i) {
