@@ -178,11 +178,14 @@ void StripLiveMonitor::doStart()
     StripSettings::restore(*m_chain);
     m_chain->setEnabled(true);
 
+    m_blockFrames = blockFramesFor(m_preset);
+
     m_src = new QAudioSource(in, inFmt, this);
-    m_src->setBufferSize(kBlockFrames * m_inChannels
+    m_src->setBufferSize(m_blockFrames * m_inChannels
                          * bytesPerSample(inFmt.sampleFormat()) * 2);
     m_sink = new QAudioSink(out, outFmt, this);
-    m_sink->setBufferSize(kBlockFrames * m_outBytesPerFrame * kTargetBlocks);
+    // Grosszuegig, damit write() nie abschneidet -- siehe kSinkBlocks.
+    m_sink->setBufferSize(m_blockFrames * m_outBytesPerFrame * kSinkBlocks);
     m_sink->setVolume(float(m_volume));
 
     m_sinkIo = m_sink->start();            // Schiebebetrieb: wir fuettern
@@ -203,6 +206,21 @@ void StripLiveMonitor::doStart()
     m_underruns.store(0, std::memory_order_release);
     m_overruns.store(0, std::memory_order_release);
 
+    // Mit Vorrat anfangen statt mit nichts.
+    //
+    // Ohne das ist der Ausgang in dem Augenblick leer, in dem er zu
+    // spielen beginnt, und laeuft erst einmal unter -- das war das
+    // erste Knacken jedes Starts, und es hatte mit der Puffergroesse
+    // gar nichts zu tun.
+    {
+        const int priming = m_blockFrames * m_outBytesPerFrame
+                          * (kTargetBlocks - 1);
+        const std::vector<char> stille(size_t(std::max(0, priming)), 0);
+        if (!stille.empty()) {
+            m_sinkIo->write(stille.data(), qint64(stille.size()));
+        }
+    }
+
     // Der eigene Anteil: ein Eingangsblock plus der Vorrat am Ausgang.
     // Bei 128 Rahmen und zwei Bloecken Vorrat sind das 8 ms. Darunter
     // kommt man mit Qts Audioklassen nicht mehr weit -- der naechste
@@ -210,7 +228,7 @@ void StripLiveMonitor::doStart()
     // einem Ring dazwischen; dann waeren auch die Zahlen der Geraete
     // selbst (kAudioDevicePropertyLatency, SafetyOffset) abzulesen,
     // statt sie als „kommt noch dazu" zu umschreiben.
-    const double perBlockMs = 1000.0 * kBlockFrames / double(m_inRate);
+    const double perBlockMs = 1000.0 * m_blockFrames / double(m_inRate);
     m_latencyMs.store(perBlockMs * (1 + kTargetBlocks),
                       std::memory_order_release);
 
@@ -218,7 +236,7 @@ void StripLiveMonitor::doStart()
     qCInfo(lcAudio) << "strip live monitor:" << in.description()
                     << "->" << out.description()
                     << "rate" << m_inRate
-                    << "block" << kBlockFrames
+                    << "block" << m_blockFrames
                     << "own latency ~" << m_latencyMs.load() << "ms";
     emit started();
 }
@@ -255,6 +273,23 @@ void StripLiveMonitor::doSetVolume(double v)
 {
     m_volume = std::clamp(v, 0.0, 1.0);
     if (m_sink) { m_sink->setVolume(float(m_volume)); }
+}
+
+void StripLiveMonitor::setLatencyPreset(Latency l)
+{
+    QMetaObject::invokeMethod(this, "doSetLatencyPreset", Qt::QueuedConnection,
+                              Q_ARG(int, int(l)));
+}
+
+void StripLiveMonitor::doSetLatencyPreset(int l)
+{
+    const Latency want = static_cast<Latency>(std::clamp(l, 0, 2));
+    if (want == m_preset) { return; }
+    m_preset = want;
+    if (m_running.load(std::memory_order_acquire)) {
+        doStop();
+        doStart();
+    }
 }
 
 void StripLiveMonitor::setStripBypassed(bool bypassed)
@@ -332,13 +367,25 @@ void StripLiveMonitor::pump()
     // ein Block weggeworfen, laeuft er leer, legt die Soundkarte von
     // sich aus Stille nach. Beides wird gezaehlt, damit man es sagen
     // kann, statt es zu ahnen.
-    const int queued = m_sink->bufferSize() - m_sink->bytesFree();
-    const int maxQueued = kBlockFrames * m_outBytesPerFrame * kTargetBlocks;
-    if (queued > maxQueued) {
+    const int queued    = m_sink->bufferSize() - m_sink->bytesFree();
+    const int blockBytes = m_blockFrames * m_outBytesPerFrame;
+    const int wanted     = blockBytes * kTargetBlocks;
+
+    // Zwei Uhren, die nicht dieselbe sind. Steht mehr als der doppelte
+    // Vorrat an, laeuft der Eingang schneller als der Ausgang: dann
+    // faellt ein GANZER Block weg, nicht ein angeschnittener -- ein
+    // ganzer fehlender Block knackt leiser als ein abgeschnittener.
+    // Steht fast nichts mehr an, wird eine halbe Blocklaenge Stille
+    // nachgelegt, bevor der Ausgang trockenfaellt.
+    if (queued > wanted * 2) {
         m_overruns.fetch_add(1, std::memory_order_acq_rel);
         return;
     }
-    if (queued <= 0) { m_underruns.fetch_add(1, std::memory_order_acq_rel); }
+    if (queued < blockBytes) {
+        m_underruns.fetch_add(1, std::memory_order_acq_rel);
+        const std::vector<char> stille(size_t(blockBytes / 2), 0);
+        m_sinkIo->write(stille.data(), qint64(stille.size()));
+    }
 
     const auto outFmt = static_cast<QAudioFormat::SampleFormat>(m_outFormat);
     m_outBytes.resize(m_mono.size() * size_t(m_outBytesPerFrame));

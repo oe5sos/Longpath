@@ -256,6 +256,7 @@ private:
     QCheckBox*  m_liveBtn{nullptr};
     QLabel*     m_liveNote{nullptr};
     QSlider*    m_liveVol{nullptr};
+    QComboBox*  m_liveLatency{nullptr};
     QTimer*     m_liveSync{nullptr};
 
     // ── The radio's own processing, while listening ──────────────────

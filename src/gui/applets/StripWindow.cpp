@@ -360,6 +360,9 @@ void StripWindow::toggleLiveMonitor(bool on)
         if (StripChain* c = chain()) {
             m_live->setSpectrumSink(&c->micSpectrum());
         }
+        m_live->setLatencyPreset(static_cast<StripLiveMonitor::Latency>(
+            AppSettings::instance()
+                .value(QStringLiteral("StripMonitorLatency"), 0).toInt()));
         m_live->setVolume(m_liveVol ? m_liveVol->value() / 100.0 : 0.7);
         m_live->start();
         if (!m_liveSync) {
@@ -396,8 +399,10 @@ void StripWindow::updateLiveNote()
         .arg(m_live->latencyMs(), 0, 'f', 0);
     const int drop = m_live->overruns() + m_live->underruns();
     if (drop > 0) {
-        t += QStringLiteral("  %1 block(s) dropped — input and output "
-                            "clocks are drifting apart.").arg(drop);
+        t += QStringLiteral("  %1 block(s) patched or dropped — if that "
+                            "number keeps climbing, this computer will "
+                            "not carry the latency setting you picked.")
+                 .arg(drop);
     }
     m_liveNote->setText(t);
 }
@@ -468,6 +473,39 @@ void StripWindow::buildUi()
         connect(m_liveBtn, &QCheckBox::toggled,
                 this, &StripWindow::toggleLiveMonitor);
         row->addWidget(m_liveBtn);
+
+        // Wie knapp es laufen darf, waehlt der Rechner nicht und ich
+        // auch nicht -- es waehlt, wer es hoert. Vorgabe ist die
+        // sichere Stufe; die knappen stehen daneben, und der Zaehler
+        // unter dem Haekchen sagt sofort, ob die Maschine sie traegt.
+        m_liveLatency = new QComboBox(this);
+        m_liveLatency->addItem(QStringLiteral("Safe"),
+                               int(StripLiveMonitor::Latency::Safe));
+        m_liveLatency->addItem(QStringLiteral("Low"),
+                               int(StripLiveMonitor::Latency::Low));
+        m_liveLatency->addItem(QStringLiteral("Lowest"),
+                               int(StripLiveMonitor::Latency::Lowest));
+        m_liveLatency->setToolTip(QStringLiteral(
+            "How tight the monitor is allowed to run. Safe first — if "
+            "the count of dropped blocks below stays at zero, try the "
+            "next one down. Crackling means this computer will not "
+            "carry that setting, and nothing but trying tells you."));
+        connect(m_liveLatency, &QComboBox::activated, this, [this](int i) {
+            const int v = m_liveLatency->itemData(i).toInt();
+            AppSettings::instance().setValue(
+                QStringLiteral("StripMonitorLatency"), v);
+            if (m_live) {
+                m_live->setLatencyPreset(
+                    static_cast<StripLiveMonitor::Latency>(v));
+            }
+        });
+        {
+            const int saved = AppSettings::instance()
+                .value(QStringLiteral("StripMonitorLatency"), 0).toInt();
+            const int at = m_liveLatency->findData(saved);
+            if (at >= 0) { m_liveLatency->setCurrentIndex(at); }
+        }
+        row->addWidget(m_liveLatency);
 
         m_liveVol = new QSlider(Qt::Horizontal, this);
         m_liveVol->setRange(0, 100);

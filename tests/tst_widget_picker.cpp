@@ -28,6 +28,7 @@
 //     als eines, das sie grau zeigt.
 
 #include <QtTest>
+#include <QAbstractButton>
 
 #include "gui/applets/AppletVisibilityController.h"
 #include "gui/widgets/WidgetPicker.h"
@@ -335,6 +336,29 @@ private slots:
         b.openPicker();
         QVERIFY(b.picker() != nullptr);
         QCOMPARE(b.picker()->entries().size(), 3);
+    }
+
+    // Derselbe Knopf schliesst wieder.
+    //
+    // Vorher war das Plus eine Einbahn: zweimal druecken hiess
+    // zweimal oeffnen, und das Fenster stand schon da. Seit es sich
+    // beim Oeffnen in ein Kreuz dreht, WIRD das versprochen -- ein
+    // Kreuz, das nicht schliesst, ist eine Luege in der Oberflaeche.
+    void theSameButtonClosesWhatItOpened()
+    {
+        AppletVisibilityController vis;
+        registerThree(vis);
+        AddWidgetButton b(&vis);
+        auto* glyph = b.findChild<QAbstractButton*>();
+        QVERIFY2(glyph != nullptr, "kein anklickbares Plus im Knopf");
+
+        glyph->click();
+        QVERIFY(b.picker() != nullptr);
+        QVERIFY2(b.picker()->isVisible(), "der erste Druck oeffnete nicht");
+
+        glyph->click();
+        QVERIFY2(!b.picker()->isVisible(),
+                 "der zweite Druck schloss nicht -- das Kreuz luegt");
     }
 };
 

@@ -71,24 +71,44 @@ class StripLiveMonitor : public QObject {
     Q_OBJECT
 
 public:
-    // Blockgroesse des Durchlaufs. 128 Rahmen sind bei 48 kHz 2,67 ms.
+    // ── Wie knapp es laufen darf ────────────────────────────────────
     //
-    // Es waren 256 bei drei Bloecken Vorrat, also rund 21 ms eigener
-    // Anteil. Der Betreiber am 2026-10-09: „arbeite auch daran, dass
-    // latenz noch geringer wird." Halbiert und der Vorrat von drei
-    // auf zwei -- das sind rund 8 ms, und es geht nur, weil dieses
-    // Objekt seit derselben Aenderung auf einem EIGENEN Faden laeuft.
-    // Auf dem Bedienfaden war das nicht zu machen: dort haengt die
-    // Antwortzeit an Zeichenarbeit und 100-ms-Zeitgebern, und ein
-    // Vorrat von 5 ms waere regelmaessig leergelaufen.
-    static constexpr int kBlockFrames = 128;
+    // Das war einmal fest: 256 Rahmen, drei Bloecke Vorrat, 21 ms.
+    // Dann fest auf 128 und zwei, 8 ms -- und beim Betreiber im
+    // Kopfhoerer "komplettes krachen", ohne dass er etwas getan
+    // haette. Das war kein Ausrutscher, sondern der vorhersehbare
+    // Ausgang: wie knapp ein Rechner laufen KANN, haengt an seinen
+    // Geraeten, seinen Treibern und daran, was sonst noch laeuft --
+    // und nichts davon weiss der, der die Zahl in den Quelltext
+    // schreibt.
+    //
+    // Also wird sie nicht mehr im Quelltext entschieden. Drei Stufen,
+    // und die sichere ist die Vorgabe. Wer weniger will, nimmt sie
+    // sich und sieht am Zaehler daneben sofort, ob sein Rechner sie
+    // traegt.
+    enum class Latency { Safe = 0, Low = 1, Lowest = 2 };
 
-    // Soviel Vorrat haelt die Ausgabe. Zwei Bloecke sind 5,3 ms Spiel
-    // gegen den Auseinanderlauf zweier Soundkartenuhren -- Eingang und
-    // Ausgang koennen verschiedene Geraete sein und laufen dann
-    // garantiert nicht gleich schnell. Weniger als zwei geht nicht:
-    // einer wird gerade ausgegeben, der zweite ist der Vorrat.
-    static constexpr int kTargetBlocks = 2;
+    static int blockFramesFor(Latency l)
+    {
+        switch (l) {
+        case Latency::Lowest: return 128;
+        case Latency::Low:    return 192;
+        default:              return 256;
+        }
+    }
+    // Drei. Nie zwei: einer wird gerade ausgegeben, einer ist
+    // unterwegs, und der dritte ist der eigentliche Vorrat gegen zwei
+    // Soundkartenuhren, die nie gleich schnell laufen. Mit zweien war
+    // jeder Zeitgeberhuepfer ein Loch.
+    static constexpr int kTargetBlocks = 3;
+
+    // Der Puffer der Ausgabe ist absichtlich GROESSER als der Vorrat,
+    // den wir halten wollen. Sonst kann write() nicht alles
+    // unterbringen und schneidet mitten im Block ab -- und ein
+    // abgeschnittener Block knackt lauter als ein ganzer, der fehlt.
+    // Gesteuert wird die Verzoegerung dann nicht ueber die
+    // Puffergroesse, sondern darueber, wie viel wir stehen lassen.
+    static constexpr int kSinkBlocks = 8;
 
     explicit StripLiveMonitor(QObject* parent = nullptr);
     ~StripLiveMonitor() override;
@@ -100,6 +120,10 @@ public:
     // Soundkarte und Treiber kommen oben drauf und sind von hier aus
     // nicht messbar.
     double latencyMs() const { return m_latencyMs.load(std::memory_order_acquire); }
+
+    Latency latencyPreset() const { return m_preset; }
+    // Im Lauf umschaltbar: haelt an, stellt um, laeuft wieder an.
+    void setLatencyPreset(Latency l);
 
     // Wie viele Bloecke seit dem Start nachgelegt (Unterlauf) oder
     // weggeworfen (Ueberlauf) werden mussten. Null bleibt es nie ganz;
@@ -148,6 +172,7 @@ private slots:
     void doStop();
     void doResync();
     void doSetVolume(double v);
+    void doSetLatencyPreset(int l);
 
 private:
     void teardown();
@@ -162,6 +187,8 @@ private:
     std::unique_ptr<StripChain> m_chain;
     MicSpectrum* m_spectrum{nullptr};   // nicht besessen
 
+    Latency m_preset{Latency::Safe};
+    int m_blockFrames{256};
     int m_inRate{48000};
     int m_inChannels{1};
     int m_inFormat{0};          // QAudioFormat::SampleFormat
