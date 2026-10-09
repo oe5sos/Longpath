@@ -656,6 +656,63 @@ niemand, wenn nur die Mechanik geprüft wird.
   Anteils.
 * **VST3 für Windows und Linux.** Die Schnittstelle ist dafür gebaut;
   es fehlt der zweite Wirt.
-* **Der Brummdetektor** in `VoiceAnalyzer` hält bei einer 110-Hz-Stimme
-  weiter den Grundton für Netzbrumm. Unverändert, `StripTuner` hängt
-  daran.
+* ~~**Der Brummdetektor** hält bei einer 110-Hz-Stimme den Grundton für
+  Netzbrumm.~~ **Behoben**, noch am selben Abend — siehe unten.
+
+---
+
+## Nachtrag: der Brummdetektor, behoben
+
+Der letzte offene Defekt vom Vormittag, und der einzige, den ich
+damals stehen ließ, weil `StripTuner` daran hängt.
+
+Gemessen am Gerät: eine Männerstimme mit rund 110 Hz Grundton wurde
+als „Netzbrumm, 12,5 dB unter der Stimme" gemeldet, woraufhin
+`StripTuner` 50, 100 und 150 Hz mit bis zu −18 dB auskerbte — also den
+Grundton und die zweite Oberwelle der Stimme selbst.
+
+Die Ursache ist Arithmetik: die Brummfenster sind ±2 Fächer breit,
+bei dieser FFT-Länge rund 23 Hz. Das 100-Hz-Fenster reicht von 77 bis
+123 Hz und fängt jede Stimme dazwischen.
+
+**Zwei verschieden weite Abstandsregeln**, und der Unterschied ist
+gemessen, nicht geschätzt:
+
+| | Abstand | warum |
+|---|---|---|
+| Oberwellen der Stimme | 2,5 Fächer (~29 Hz) | die Fensterbreite selbst reicht |
+| **Grundton** | 8 Fächer (~93 Hz) | er ist das Lauteste im Spektrum, und die Silbenflanken verschmieren seine Linie weit nach unten: bei 110 Hz liegt das 63-Hz-Band nur rund 23 dB unter ihm |
+
+Mit der engen Regel allein meldete der Detektor bei 110 Hz weiter
+−9,5 dB „Brumm", wo keiner ist. Mit der weiten sperrt eine
+110-Hz-Stimme das 50-Hz-Fenster, eine 210-Hz-Stimme (160 Hz entfernt)
+gibt es frei.
+
+Ist das **erste** Fenster gesperrt — das, in dem Netzbrumm lebt —,
+gibt es keine Messung: `humMeasurable = false`, `humDb = −120`.
+Hausstil Regel 7. Eine Zahl, die man nicht verteidigen kann, ist
+schlimmer als keine; auf genau so eine Zahl hin wurde gekerbt.
+
+Zwei Folgefunde:
+
+* **Die Brummmessung läuft ein zweites Mal, nach der Tonhöhe.** Der
+  erste Durchgang steht vor ihr, dort war `r.pitchHz` null und der
+  Wachhund wirkungslos. Der eigene Prüfstand hätte sonst grün
+  gemeldet, ohne etwas zu prüfen — er fiel an der Zeile, die prüft,
+  dass die Stimme überhaupt ein Fenster belegt.
+* **`StripTuner` lässt einzelne Kerben aus,** die auf einer Oberwelle
+  sitzen. Bei 210 Hz Grundton fällt die 200-Hz-Kerbe praktisch darauf,
+  auch wenn das erste Fenster sauber war.
+
+`tst_hum_is_not_the_voice` prüft beide Richtungen: die tiefe Stimme
+ohne Brumm, und — ebenso wichtig — eine hohe Stimme **mit** echtem
+50-Hz-Brumm, der weiter gefunden werden muss. Ohne den zweiten Fall
+wäre „keine Brummmeldung mehr" trivial zu erreichen und wertlos.
+
+Der Prüffall selbst musste zweimal nachgebessert werden, und beide
+Male lag es am Generator, nicht am Detektor: hart geschaltete Silben
+sind Knalle mit Energie bei 50 Hz, und eine Kunststimme mit
+Oberwellen nur bis 1,5 kHz hat nichts zwischen 1 und 3 kHz — genau
+dort, wogegen der Brummwert gemessen wird. Das ist der Grund, warum
+ein Prüfstand mit synthetischem Material einen eigenen Durchgang
+Misstrauen verdient.
