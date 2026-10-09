@@ -1267,6 +1267,7 @@ RadioModel::RadioModel(QObject* parent)
     // die ganze Laufzeit, verbindet sich aber erst, wenn der per-MAC-
     // Bereich da ist (applyPeripheralsForCurrentMac).
     m_speConnection = std::make_unique<SpeConnection>(this);
+    m_kpa500Connection = std::make_unique<Kpa500Connection>(this);
 
     // Per-radio peripherals refactor (2026-05-26): the ctor-time RF-Kit
     // auto-connect from globals was removed.  The lifecycle now runs in
@@ -3034,6 +3035,77 @@ void RadioModel::setSpeEnabled(bool enabled)
     emit speEnabledChanged(enabled);
 }
 
+// ── Elecraft KPA500 (Zeus-Punkt 7) ─────────────────────────────────────────
+
+bool RadioModel::kpa500Enabled() const
+{
+    return peripheralValue(QStringLiteral("Kpa500_Enabled"),
+                           QStringLiteral("False"))
+        == QStringLiteral("True");
+}
+
+void RadioModel::applyKpa500Connection()
+{
+    if (!m_kpa500Connection) {
+        return;
+    }
+    if (!kpa500Enabled()) {
+        m_kpa500Connection->disconnect();
+        return;
+    }
+
+    const bool autoRe = peripheralValue(QStringLiteral("Kpa500_AutoReconnect"),
+                                        QStringLiteral("True"))
+        == QStringLiteral("True");
+    m_kpa500Connection->setAutoReconnect(autoRe);
+
+    const QString modus = peripheralValue(QStringLiteral("Kpa500_Mode"),
+                                          QStringLiteral("Network"));
+    if (modus == QStringLiteral("Serial")) {
+#ifdef HAVE_SERIALPORT
+        const QString anschluss = peripheralValue(QStringLiteral("Kpa500_SerialPort"));
+        if (anschluss.isEmpty()) {
+            qCInfo(lcConnection) << "KPA500 auf seriell gestellt, aber kein "
+                                    "Anschluss angegeben -- nicht verbunden";
+            return;
+        }
+        // Die Datenrate wird NICHT geraten: an der falschen kommt nichts
+        // durch, und das Dokument nennt keine Vorgabe. 38400 ist die
+        // hoechste der vier moeglichen und damit der beste erste Versuch.
+        const int baud = peripheralValue(QStringLiteral("Kpa500_Baud"),
+                                         QStringLiteral("38400")).toInt();
+        m_kpa500Connection->connectSerial(anschluss, baud > 0 ? baud : 38400);
+#else
+        qCWarning(lcConnection) << "KPA500 auf seriell gestellt, aber dieser Bau "
+                                   "hat kein Qt6::SerialPort -- nicht verbunden";
+#endif
+        return;
+    }
+
+    const QString rechner = peripheralValue(QStringLiteral("Kpa500_Host"));
+    const quint16 anschluss = static_cast<quint16>(
+        peripheralValue(QStringLiteral("Kpa500_Port"),
+                        QStringLiteral("4001")).toUInt());
+    if (rechner.isEmpty()) {
+        qCInfo(lcConnection) << "KPA500 ueber Netz, aber kein Rechner angegeben "
+                                "-- nicht verbunden";
+        return;
+    }
+    m_kpa500Connection->connectNetwork(rechner, anschluss);
+}
+
+void RadioModel::setKpa500Enabled(bool enabled)
+{
+    const bool jetzt = kpa500Enabled();
+    if (enabled == jetzt) {
+        return;
+    }
+    setPeripheralValue(QStringLiteral("Kpa500_Enabled"),
+                       enabled ? QStringLiteral("True") : QStringLiteral("False"));
+    applyKpa500Connection();
+    emit kpa500EnabledChanged(enabled);
+}
+
 // ── CW-Tonhoehe ────────────────────────────────────────────────────────────
 //
 // Porting from Thetis console.cs:18142-18242 [@852bf0e] — public int
@@ -3218,6 +3290,18 @@ void RadioModel::applyPeripheralsForCurrentMac()
         emit fourO3AEnabledChanged(false);
     }
 
+    // ── Elecraft KPA500 ─────────────────────────────────────────────────
+    if (kpa500Enabled() && m_kpa500Connection) {
+        applyKpa500Connection();
+        if (m_kpa500Connection->isConnected()
+            || !m_kpa500Connection->description().isEmpty()) {
+            qCInfo(lcConnection)
+                << "KPA500 auto-connect for MAC" << mac
+                << ":" << m_kpa500Connection->description();
+            ++started;
+        }
+    }
+
     // ── SPE Expert ──────────────────────────────────────────────────────
     if (speEnabled() && m_speConnection) {
         applySpeConnection();
@@ -3306,6 +3390,10 @@ void RadioModel::teardownPeripherals()
     if (m_rfKitConnection) {
         m_rfKitConnection->disconnect();
         qCInfo(lcConnection) << "Peripherals teardown: RF-Kit disconnected";
+    }
+    if (m_kpa500Connection) {
+        m_kpa500Connection->disconnect();
+        qCInfo(lcConnection) << "Peripherals teardown: KPA500 disconnected";
     }
     if (m_speConnection) {
         // Wie beim RF2K-S bedingungslos: disconnect() ist folgenlos, wenn

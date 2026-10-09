@@ -995,6 +995,7 @@ longpath_add_test(tst_spe_verbindung)
 longpath_add_test(tst_spe_anbindung)
 longpath_add_test(tst_kpa500_protokoll)
 longpath_add_test(tst_kpa500_verbindung)
+longpath_add_test(tst_kpa500_anbindung)
 longpath_add_test(tst_fensterabbau_ohne_closeevent)
 longpath_add_test(tst_ui_scale)
 # Der Pruefstand liest src/main.cpp, um die Kopplung ueber den

@@ -76,6 +76,7 @@
 #include "core/PgxlConnection.h"
 #include "core/Rf2ksConnection.h"
 #include "core/SpeConnection.h"
+#include "core/Kpa500Connection.h"
 #include "core/TgxlConnection.h"
 #include "core/FaultLog.h"
 #include "core/TxInterlockPolicy.h"
@@ -249,6 +250,8 @@ class RadioModel : public QObject {
     // wie rfKitEnabled, eigener Schluessel.
     Q_PROPERTY(bool speEnabled READ speEnabled WRITE setSpeEnabled
                NOTIFY speEnabledChanged)
+    Q_PROPERTY(bool kpa500Enabled READ kpa500Enabled WRITE setKpa500Enabled
+               NOTIFY kpa500EnabledChanged)
 
 public:
     explicit RadioModel(QObject* parent = nullptr);
@@ -1239,6 +1242,7 @@ public:
     // Der SPE-Treiber lebt wie der RF2K-S fuer die ganze Laufzeit; das
     // Fenster verbindet sich einmal darauf und nie neu.
     SpeConnection* speConnection() const { return m_speConnection.get(); }
+    Kpa500Connection* kpa500Connection() const { return m_kpa500Connection.get(); }
     TgxlConnection* tgxlConnection() { return m_tgxlConnection; }
     TunerModel*     tunerModel()     { return m_tunerModel;     }
     // SmartSDR API server on TCP 4992. Owned by RadioModel; lifetime matches.
@@ -1294,6 +1298,22 @@ public:
     // Umschalter, von der Einstellseite nach einer Aenderung und beim
     // Verbinden eines Funkgeraets (dann ist der per-MAC-Bereich erst da).
     void applySpeConnection();
+
+    // ── Elecraft KPA500 (Zeus-Punkt 7) ───────────────────────────────────
+    //
+    // Wie der SPE: Netz ODER seriell, Umschalter in Spe_Mode's Gegenstueck
+    // Kpa500_Mode. EIN Unterschied, und er ist wichtig: die Datenrate des
+    // seriellen Anschlusses laesst sich beim KPA500 NICHT erraten (vier
+    // Werte, Vorgabe nicht dokumentiert -- siehe core/Kpa500Connection.h).
+    // Sie steht darum in Kpa500_Baud und gehoert dem Betreiber.
+    //
+    // Schluessel im per-MAC-Bereich:
+    //   Kpa500_Enabled "True"|"False", Kpa500_Mode "Serial"|"Network",
+    //   Kpa500_SerialPort, Kpa500_Baud, Kpa500_Host, Kpa500_Port,
+    //   Kpa500_AutoReconnect
+    void setKpa500Enabled(bool enabled);
+    bool kpa500Enabled() const;
+    void applyKpa500Connection();
 
     // ── Per-radio peripherals scope (RF-Kit / 4O3A / PGXL / TGXL) ────────
     //
@@ -2487,6 +2507,7 @@ signals:
     // react to show/hide the RF2K-S applet.
     void rfKitEnabledChanged(bool enabled);
     void speEnabledChanged(bool enabled);
+    void kpa500EnabledChanged(bool enabled);
     // Die CW-Tonhoehe hat sich geaendert (setCwPitch). Thetis:
     // CWPitchChangedHandlers (console.cs:18241). Abnehmer: CW-Decoder
     // (Suchband), KiwiSDR-Nachfuehrung, Setup-Feld.
@@ -4053,6 +4074,7 @@ private:
     // Constructed once in the ctor; non-null from that point.
     std::unique_ptr<Rf2ksConnection> m_rfKitConnection;
     std::unique_ptr<SpeConnection>   m_speConnection;
+    std::unique_ptr<Kpa500Connection> m_kpa500Connection;
 
     // Phase 3P-III review fix I2: last-seen RF-Kit operate state, used to gate
     // externalAmpOperateChanged so the cross-vendor signal fires only on actual

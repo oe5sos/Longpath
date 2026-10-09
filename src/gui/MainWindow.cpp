@@ -338,6 +338,7 @@ warren@wpratt.com
 #include "applets/AmpApplet.h"
 #include "applets/Rf2ksApplet.h"
 #include "applets/SpeApplet.h"
+#include "applets/Kpa500Applet.h"
 #include "applets/AppletVisibilityController.h"
 #include "applets/RxApplet.h"
 #include "core/PgxlConnection.h"
@@ -7520,6 +7521,76 @@ void MainWindow::populateDefaultMeter()
         });
     }
 
+    // ── Elecraft KPA500 (Zeus-Punkt 7) ──────────────────────────────────
+    //
+    // Wie der SPE einmal angelegt und einmal verdrahtet. Der Unterschied
+    // steckt in livenessChanged: der KPA500 kann melden „aus, aber am
+    // Draht erreichbar", und genau dann hat sein ON-Knopf einen Sinn.
+    m_kpa500Applet = new Kpa500Applet(m_radioModel, nullptr);
+    panel->addApplet(m_kpa500Applet);
+
+    if (Kpa500Connection* kpaConn = m_radioModel ? m_radioModel->kpa500Connection()
+                                                 : nullptr) {
+        connect(kpaConn, &Kpa500Connection::connected, this, [this, kpaConn]() {
+            if (!m_kpa500Applet) { return; }
+            m_kpa500Applet->setConnected(true);
+            m_kpa500Applet->setSource(kpaConn->sourceLabel());
+        });
+        connect(kpaConn, &Kpa500Connection::disconnected, this, [this]() {
+            if (m_kpa500Applet) { m_kpa500Applet->setConnected(false); }
+        });
+        connect(kpaConn, &Kpa500Connection::livenessChanged, this,
+                [this](Kpa500Connection::Liveness s) {
+            if (m_kpa500Applet) { m_kpa500Applet->setLiveness(s); }
+        });
+        connect(kpaConn, &Kpa500Connection::telemetryUpdated,
+                this, [this, kpaConn]() {
+            if (!m_kpa500Applet) { return; }
+            m_kpa500Applet->setPowerSwr(kpaConn->lastPowerSwr());
+            m_kpa500Applet->setVoltsAmps(kpaConn->lastVoltsAmps());
+            m_kpa500Applet->setTemperature(kpaConn->lastTemperature());
+            m_kpa500Applet->setBand(Kpa500::bandName(kpaConn->lastBandIndex()));
+            m_kpa500Applet->setIdentity(kpaConn->firmware(), kpaConn->serialNumber());
+            // ── Betriebszustand und Fehler GEHOEREN HIERHER, nicht nur
+            //    in die Aenderungsmeldungen ──────────────────────────
+            //
+            // Der erste Anlauf hat sie allein operateChanged/faultChanged
+            // ueberlassen. Die feuern aber nur bei AENDERUNG -- und das
+            // Feld leert bei Stille oder im Boot-Zustand ALLE Messwerte.
+            // Kommt der Verstaerker dann im GLEICHEN Zustand zurueck,
+            // aendert sich nichts, es feuert nichts, und das Feld zeigt
+            // dauerhaft „STANDBY", obwohl er auf OPERATE steht.
+            // Deterministisch gefallen in
+            // tst_kpa500_anbindung::derUmschalterSchicktDasGegenteil,
+            // nachdem der Fall davor einen Boot-Ausflug gemacht hatte.
+            //
+            // So macht es auch die SPE-Verdrahtung daneben: dort traegt
+            // statusUpdated den GANZEN Zustand und schiebt jedes Mal
+            // alles nach. Genau diese Unstimmigkeit war der Fehler.
+            m_kpa500Applet->setOperate(kpaConn->isOperate());
+            m_kpa500Applet->setFault(kpaConn->lastFaultCode());
+        });
+        connect(kpaConn, &Kpa500Connection::operateChanged, this, [this](bool op) {
+            if (m_kpa500Applet) { m_kpa500Applet->setOperate(op); }
+        });
+        connect(kpaConn, &Kpa500Connection::faultChanged, this, [this](int code) {
+            if (m_kpa500Applet) { m_kpa500Applet->setFault(code); }
+        });
+
+        // Fenster -> Verbindung.
+        connect(m_kpa500Applet, &Kpa500Applet::powerOnClicked,
+                kpaConn, &Kpa500Connection::powerOn);
+        connect(m_kpa500Applet, &Kpa500Applet::offClicked,
+                kpaConn, &Kpa500Connection::powerOff);
+        connect(m_kpa500Applet, &Kpa500Applet::clearFaultClicked,
+                kpaConn, &Kpa500Connection::clearFault);
+        // Der Umschalter schickt das GEGENTEIL des gemeldeten Zustands --
+        // das Geraet bestaetigt mit der naechsten Antwort, und erst dann
+        // wechselt die Anzeige.
+        connect(m_kpa500Applet, &Kpa500Applet::operateClicked,
+                kpaConn, [kpaConn]() { kpaConn->setOperate(!kpaConn->isOperate()); });
+    }
+
     // Antenna labels: load operator-set labels from AppSettings at startup.
     // Keys: RfKit_Ant1_Label .. RfKit_Ant4_Label (stored by RfKitPage.cpp).
     // If a key is absent or empty the applet already shows "ANT N" by default.
@@ -7587,6 +7658,7 @@ void MainWindow::populateDefaultMeter()
     m_appletsById[QStringLiteral("Tuner")]      = m_tunerApplet;
     m_appletsById[QStringLiteral("RfKit")]      = m_rfKitApplet;
     m_appletsById[QStringLiteral("Spe")]        = m_speApplet;
+    m_appletsById[QStringLiteral("Kpa500")]     = m_kpa500Applet;
     m_appletsById[QStringLiteral("Frequency")]        = m_frequencyApplet;
     m_appletsById[QStringLiteral("SwrInstrument")]    = m_swrInstrument;
     m_appletsById[QStringLiteral("SignalInstrument")] = m_signalInstrument;
@@ -7668,6 +7740,8 @@ void MainWindow::populateDefaultMeter()
                                 QStringLiteral("RF-Kit RF2K-S"), true);
     m_appletVis->registerApplet(QStringLiteral("Spe"),
                                 QStringLiteral("SPE Expert"),   true);
+    m_appletVis->registerApplet(QStringLiteral("Kpa500"),
+                                QStringLiteral("Elecraft KPA500"), true);
     // Die beiden Instrumente. defaultVisible=true, damit sie beim
     // ersten Start dastehen und angesehen werden können — das ist der
     // Zweck dieses Schritts. Wer sie nicht will, blendet sie über das
@@ -7826,6 +7900,11 @@ void MainWindow::populateDefaultMeter()
     m_appletVis->describeApplet(QStringLiteral("RfKit"),
         QStringLiteral("Endstufen"),
         {QStringLiteral("rf-kit"), QStringLiteral("rf2k"),
+         QStringLiteral("verstaerker"), QStringLiteral("endstufe")});
+    m_appletVis->describeApplet(QStringLiteral("Kpa500"),
+        QStringLiteral("Endstufen"),
+        {QStringLiteral("kpa500"), QStringLiteral("kpa"),
+         QStringLiteral("elecraft"), QStringLiteral("500 w"),
          QStringLiteral("verstaerker"), QStringLiteral("endstufe")});
     m_appletVis->describeApplet(QStringLiteral("Spe"),
         QStringLiteral("Endstufen"),
@@ -7990,6 +8069,9 @@ void MainWindow::populateDefaultMeter()
     // SPE Expert: dasselbe, eigener Umschalter.
     const bool speOn = m_radioModel && m_radioModel->speEnabled();
     m_appletVis->setAvailable(QStringLiteral("Spe"), speOn);
+
+    const bool kpaOn = m_radioModel && m_radioModel->kpa500Enabled();
+    m_appletVis->setAvailable(QStringLiteral("Kpa500"), kpaOn);
 
 
     // ── Die Reihenfolge im Stapel ────────────────────────────────────
@@ -9031,6 +9113,12 @@ void MainWindow::populateDefaultMeter()
                 this, [this](bool enabled) {
             if (!m_appletVis) { return; }
             m_appletVis->setAvailable(QStringLiteral("Spe"), enabled);
+        });
+
+        connect(m_radioModel, &RadioModel::kpa500EnabledChanged,
+                this, [this](bool enabled) {
+            if (!m_appletVis) { return; }
+            m_appletVis->setAvailable(QStringLiteral("Kpa500"), enabled);
         });
     }
 

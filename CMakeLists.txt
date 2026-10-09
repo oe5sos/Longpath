@@ -1067,6 +1067,7 @@ set(GUI_SOURCES
     src/gui/setup/FourO3APage.cpp
     src/gui/setup/RfKitPage.cpp
     src/gui/setup/SpePage.cpp
+    src/gui/setup/Kpa500Page.cpp
     src/gui/setup/TciLogWindow.cpp
     src/gui/setup/KeyboardSetupPages.cpp
     src/gui/setup/DiagnosticsSetupPages.cpp
@@ -1196,6 +1197,7 @@ set(GUI_SOURCES
     src/gui/applets/AmpApplet.cpp
     src/gui/applets/Rf2ksApplet.cpp
     src/gui/applets/SpeApplet.cpp
+    src/gui/applets/Kpa500Applet.cpp
     src/gui/applets/TciApplet.cpp
     src/gui/applets/ClientChainApplet.cpp
 )
