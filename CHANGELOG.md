@@ -2,6 +2,39 @@
 
 ## [Unreleased]
 
+### Was macht die Kette? Ein Bild, das es misst
+
+Die Frage, die den 2026-10-09 getragen hat, war nie „welche Werte habe
+ich eingestellt" -- die stehen in den Reglern. Sie war: **was macht
+das.** Oben im Uebersichtsreiter steht jetzt eine Messung statt einer
+Vermutung: das Langzeitspektrum **vor** der Kette und das **danach**,
+dazwischen ihre Differenz als gefuellte Kurve, dazu die groesste
+Aenderung als Zahl.
+
+* Es kommt aus dem Mithoerer -- also aus demselben Ton, den man im
+  Kopfhoerer hat, **Einschuebe eingerechnet**. Ein Plugin, das etwas
+  tut, ist hier zu sehen, auch wenn seine eigene Oberflaeche nichts
+  darueber verraet.
+* `core/strip/LtasSpectrum`: Sechstel-Oktaven von 50 Hz bis 8 kHz auf
+  einem **festen** Raster -- die Differenz zweier Spektren waere sonst
+  eine Differenz zweier Rasterungen. Stille Faenster fallen heraus.
+* Geprueft gegen einen Filter mit bekannter Antwort, nicht gegen das
+  Auge: eine Glocke von +10 dB bei 2 kHz wird aus der Differenz mit
+  +7,1 dB wiedergefunden, eine Oktave tiefer bleibt es unter 3 dB.
+
+### Plugins bekommen ihr eigenes Fenster
+
+Die Parameter in unseren Reglern zu zeichnen war zu eng gedacht: bei
+einem Entzerrer steckt das halbe Werkzeug in der Zeichnung. Die
+Ansicht kommt jetzt in ein **eigenes Cocoa-Fenster** (eigene Ansicht
+des Plugins ueber `kAudioUnitProperty_CocoaUI`, sonst Apples
+`AUGenericView`) -- nicht in ein Qt-Widget, denn genau das Einbetten
+ist die Stelle, an der solche Vorhaben scheitern. „Open window" auf
+der Einschubkarte oder Doppelklick auf die Kachel in der Kette. Die
+eigenen Regler bleiben daneben: sie sind das, was auch ohne
+Plugin-Oberflaeche da ist, und das Einzige, was spaeter auf Windows
+und Linux gleich aussieht.
+
 ### Werkbank statt Automatik: Mithoeren, eigene Kurve, fremde Effekte
 
 Vier Wuensche an einem Abend, alle in dieselbe Richtung. Aus einem
