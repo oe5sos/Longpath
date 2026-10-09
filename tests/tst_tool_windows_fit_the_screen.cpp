@@ -34,6 +34,7 @@
 #include "gui/MainWindow.h"
 #include "gui/WindowPlacement.h"
 #include "gui/applets/BroadcastOptimizerPanel.h"
+#include "core/strip/StripChain.h"
 #include "gui/applets/StripWindow.h"
 #include "models/RadioModel.h"
 
@@ -125,6 +126,29 @@ private slots:
         w.resize(1180, 900);
         w.grab().save(QString::fromUtf8(dir)
                       + QStringLiteral("/kanalzug-eine-flaeche.png"));
+    }
+
+    // Ein Klick auf eine Kachel der Kette oeffnet DIESE Stufe.
+    //
+    // Die Reihe meldet eine Stufennummer 0..7, die Reiterleiste traegt
+    // seit dem Uebersichtsreiter aber vorne noch „Strip". Das Fenster
+    // rechnet deshalb +1 -- eine Annahme, die beim naechsten
+    // eingeschobenen Reiter still danebenliegt und sich als „der
+    // Klick oeffnet die falsche Stufe" zeigt, was niemand einem
+    // Indexversatz zuordnet. (Genau das war zwischen dem
+    // Uebersichtsreiter und heute Abend der Fall.)
+    void theTabAfterTheOverviewIsTheFirstStage()
+    {
+        RadioModel radio;
+        StripWindow w(&radio);
+        auto* tabs = w.findChild<QTabWidget*>();
+        QVERIFY(tabs != nullptr);
+        QCOMPARE(tabs->tabText(0), QStringLiteral("Strip"));
+        for (int i = 0; i < StripChain::kStageCount; ++i) {
+            const auto st = static_cast<StripChain::Stage>(i);
+            QCOMPARE(tabs->tabText(i + 1),
+                     QString::fromLatin1(StripChain::stageName(st)));
+        }
     }
 
     // Der Einschubreiter, mit echtem Suchlauf.
