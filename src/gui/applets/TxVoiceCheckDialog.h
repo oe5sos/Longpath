@@ -117,14 +117,6 @@ signals:
     // standalone, and was for months.
     void curveEditRequested();
 
-    // Der Optimierer hat in die lebende Kette geschrieben. Die
-    // Stufenseiten zeigen jeden Regler aus einem Abbild, das beim
-    // Aufbau gelesen wurde -- ohne dieses Signal bleiben sie auf den
-    // alten Werten stehen, und die EQ-Kurve ist nach dem Optimieren
-    // leer, obwohl die Baender gesetzt sind. Am Geraet gemeldet,
-    // 2026-10-09: "eq kurve keine zu sehen".
-    void chainChangedExternally(
-        const Longpath::BroadcastOptimizer::Plan& plan);
 
 public:
     // embedded=true turns the dialog into a plain widget for hosting
@@ -170,7 +162,12 @@ private:
     // Rendering and not applying is the point. Hearing a profile must
     // not require putting it into the live chain first — that would
     // make "listen before you decide" into "decide, then listen".
-    void playPlan(const BroadcastOptimizer::Plan& plan);
+    // throughStrip=false spielt den rohen Durchgang nur durch den
+    // Kanal dieser Breite; true schickt ihn vorher durch die Kette,
+    // wie der Bediener sie eingestellt hat. Das ist das A/B, das
+    // geblieben ist -- es vergleicht seine Arbeit mit dem Original,
+    // nicht eine Herleitung mit seiner Arbeit.
+    void playPlan(const BroadcastOptimizer::Plan& plan, bool throughStrip);
 
     // The three playback paths all end up here. Mono float in, sink
     // out; the caller has already decided what the samples are.

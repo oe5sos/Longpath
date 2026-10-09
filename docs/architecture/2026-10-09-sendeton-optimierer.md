@@ -16,7 +16,112 @@ gezeichnet — ohne Funkgeraet fuellt sich das Panel nicht.*
 
 ---
 
-## Der Auftrag
+## Wie es ausging
+
+Der Auftrag war ein Optimierer: fünfzehn Sekunden sprechen, daraus vier
+fertige Profile. Einen Tag lang wurde das gegen Martins Stimme gefahren.
+Fünf echte Fehler kamen dabei heraus und sind behoben — sie stehen
+unten, weil jeder von ihnen etwas über diese Art Arbeit sagt. Der
+Befund darunter blieb bestehen:
+
+> „Das Original-Audio ist gut, nur sämtliche Bearbeitungen sind eine
+> Katastrophe." · „also besser wird das audio nicht." ·
+> **„ich glaube, wir lassen das automatische verbessern."**
+
+Daraufhin umgebaut, auf Ansage und nach AetherSDRs Vorbild
+(`~/Longpath/AetherSDR/src/gui/AetherialAudioStrip.cpp`):
+
+> „bei aether konnte ich es allein sehr gut machen … schaue bitte, wie
+> aether es gemacht hat. so werden wir es auch machen."
+
+**Was der Unterschied war.** Aether zeigt alle Stufen gleichzeitig in
+einem zweispaltigen Raster. Longpath zeigte eine Stufe je Reiter. Wer
+von Hand einstellt, muss die ganze Kette sehen, während er an einer
+Stufe dreht — sonst stellt er acht Dinge nacheinander ein und hört erst
+am Ende, dass sie sich widersprechen.
+
+Nebenbei richtiggestellt: **Aether kann Profile speichern.** Martin
+erinnerte es anders; `ChannelStripPresets` hat Speichern, Laden,
+Löschen, Export einzeln, Export der Bibliothek und Import.
+
+---
+
+## Was es jetzt ist
+
+**Ein Übersichtsreiter „Strip"** vor den acht Stufenseiten, mit einer
+Karte je Stufe: Name versal, Zustand als Kapsel, die drei Zahlen dieser
+Stufe monospaced, ein Knopf in die volle Seite. Leserichtung = Ketten­
+reihenfolge (Gate, EQ, De-Esser, Kompressor, Röhre, PUDU, Nachhall,
+Begrenzer).
+
+> Erster Versuch, verworfen: Longpaths Stufenseiten direkt ins Raster.
+> Aethers Panels sind kompakt, Longpaths sind für eine ganze Reiterseite
+> gebaut — allein das Gate bringt ein 280 px hohes Kennlinienfeld mit.
+> Zwei Spalten davon erzeugten waagrechtes Scrollen und zeigten
+> trotzdem eine Stufe. Im gezeichneten Bild gesehen, nicht am Gerät.
+
+**Ein Messblatt** im Reiter „Voice check" — was die Aufnahme ergab,
+nicht was daraus gemacht wird: Grundton, LUFS/LRA, Störabstand,
+Zischfrequenz samt Pegel, der Punkt an dem das Mikrofon aufhört, und
+der gewählte Kanal. Dazu je Breite ein paar Sätze, was das für sie
+heißt.
+
+**Vier Kanäle**, mit Martins Zahlen: Contest 200–2500, dann 150–2700,
+100–3200, breit 50–4050. Unten liegt der größere Teil des Unterschieds
+— 50 gegen 200 Hz sind zwei Oktaven Körper.
+
+**Zwei Knöpfe zum Hören:** *Raw* spielt den Durchgang nur durch den
+Kanal, *Through your strip* durch die eigene Einstellung und dann den
+Kanal. Das A/B vergleicht also seine Arbeit mit dem Original, nicht
+eine Herleitung mit seiner Arbeit.
+
+**Ein Knopf zum Ablegen:** die Kette, wie sie gerade steht, unter dem
+Namen dieser Breite. Das ist die ganze verbliebene Automatik, und sie
+erfindet nichts.
+
+---
+
+## Die fünf Fehler, und was sie gemeinsam hatten
+
+Alle fünf waren dasselbe: eine Entscheidung, für die die Messung nicht
+trug.
+
+1. **Eine Contest-Zielkurve für alle vier Breiten.**
+   `VoiceAnalyzer::targetDb` verlangt 125 Hz bei −12 dB gegen 1 kHz.
+2. **Überhaupt ein absolutes Ziel.** Das Spektrum einer Stimme fällt
+   natürlicherweise; darauf zu zielen bügelt sie flach. Gemessen:
+   8,3 dB Körper weg beim *breiten* Profil.
+3. **Gestapelte Schnitte.** Hochpass beim 1,8-fachen des Grundtons
+   (bei 110 Hz also 198 Hz, mitten in der Stimme) plus Tiefenfilter
+   knapp darüber.
+4. **Brummkerben auf dem Grundton.** Der Detektor summiert ±23 Hz um
+   50/100/150/200 Hz; eine 110-Hz-Stimme legt Grundton und zweite
+   Oberwelle hinein. Ohne jeden Brumm gemessen: 110 Hz −12,5 dB,
+   150 Hz −17,6 dB, 220 Hz −3,7 dB. **Der Detektor ist unverändert —
+   `StripTuner` hängt an derselben Funktion.**
+5. **Stufen, die ungefragt mitliefen.** De-Esser klammerte auf
+   mindestens 3 dB, lief also immer; Rauschsperre lief in jedem leisen
+   Raum.
+
+Dazu zwei Fehler im Hören selbst, die den Vergleich wertlos machten:
+das Kanalfilter wurde beim Abhören gar nicht angewandt (alle vier
+klangen gleich), und als es angewandt wurde, war es zweimal dieselbe
+zweite Ordnung statt eines Butterworth vierter — −6 dB schon auf der
+Ecke, Abfall eine Oktave darunter.
+
+---
+
+## Was aus der Zeus-Durchsicht blieb
+
+Am Gerät abgelesen (siehe Gedächtnis-Eintrag). Übernommen und
+geblieben: die **gemessene** Zischfrequenz statt einer festen, LUFS und
+LRA als Maß, und die Erkenntnis, dass Zeus' drei Stile **keinen
+Klangregler** anfassen. Nicht geblieben: alles, was daraus eine
+Automatik machen sollte.
+
+---
+
+## Historie: der ursprüngliche Auftrag
 
 Martin, 2026-10-09, in drei Nachrichten:
 

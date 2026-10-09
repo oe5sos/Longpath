@@ -91,16 +91,17 @@ private slots:
                 || anyLabelSays(&dlg, QStringLiteral("microphone")));
     }
 
-    // Der Optimierer haengt auch ohne Funkgeraet im Fenster -- sonst
+    // Das Messblatt haengt auch ohne Funkgeraet im Fenster -- sonst
     // waere der ganze Weg oben fuer nichts.
-    void theOptimizerIsThereWithoutARadioToo()
+    void theMeasurementSheetIsThereWithoutARadioToo()
     {
         RadioModel radio;
         TxVoiceCheckDialog dlg(&radio, nullptr, /*embedded=*/true);
         QVERIFY(dlg.findChild<QWidget*>(
                     QString(), Qt::FindChildrenRecursively) != nullptr);
-        QVERIFY2(anyLabelSays(&dlg, QStringLiteral("four transmit bandwidths")),
-                 "der Optimierer-Abschnitt ist im Fenster");
+        QVERIFY2(anyLabelSays(&dlg,
+                     QStringLiteral("each transmit channel")),
+                 "das Messblatt ist im Fenster");
     }
 
     // Ein Bild, fuer die Durchsicht. Schreibt nur, wenn

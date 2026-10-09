@@ -47,6 +47,11 @@
 // Modification history (Longpath):
 //   2026-10-09 — Created in C++20/Qt6 for Longpath by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
+//   2026-10-09 — Vom Profilgenerator zum Messbericht: die
+//                 Herleitung von Ketten ist entfallen (Entscheidung
+//                 des Betreibers nach einem Tag Gegenproben), es
+//                 bleiben Kanal, Vergleich und das Ablegen der von
+//                 Hand eingestellten Kette.
 // =================================================================
 
 #include "core/VoiceAnalyzer.h"
@@ -66,74 +71,39 @@ class BroadcastOptimizerPanel : public QWidget {
 public:
     explicit BroadcastOptimizerPanel(QWidget* parent = nullptr);
 
-    // Hand it a measurement. An invalid or clipped one clears the
-    // panel back to dashes rather than leaving the previous take's
-    // four profiles on screen next to a new recording — which would
-    // be the most quietly misleading thing this window could do.
+    // Die Messung. Ungueltig oder uebersteuert raeumt zurueck auf
+    // Striche, statt die Werte der vorigen Aufnahme stehen zu lassen.
     void setAnalysis(const VoiceAnalysis& a);
 
-    // Which width is showing, or -1 before there is anything.
     int selectedIndex() const { return m_selected; }
     const QVector<BroadcastOptimizer::Plan>& plans() const { return m_plans; }
 
-    // The audition buttons go back to their un-pressed wording when
-    // playback stops. The host owns the audio, so the host says when.
     void setAuditioning(bool on);
 
-    // ── Comparing honestly ───────────────────────────────────────────
-    //
-    // Whether the audition should be matched to the raw take's
-    // loudness before it is played. ON by default, and that default
-    // is the whole point.
-    //
-    // An A/B between processed and unprocessed audio is won by
-    // whichever is louder, every time, by anybody — it is the oldest
-    // and best-documented trap in audio, and it is exactly the trap a
-    // transmit-audio optimiser walks the operator into: the profile
-    // adds several dB of make-up gain, so of course it sounds better.
-    // Matched, the comparison is about tone and density, which is the
-    // only thing worth deciding by ear.
-    //
-    // It can be switched off, because the gain IS part of what the
-    // profile buys and hearing it is sometimes the point — but it has
-    // to be switched off deliberately.
+    // Pegelabgleich beim Vergleich. Aus: man hoert, was die
+    // Einstellung an Lautheit bringt. An: beide Seiten gleich laut,
+    // dann vergleicht man den Klang -- ein A/B ohne Abgleich gewinnt
+    // immer das Lautere.
     bool levelMatched() const;
 
 signals:
-    // Play this plan: the raw take rendered through it, off the
-    // real-time path. The host does the rendering — it is the one
-    // holding the recording.
-    void auditionRequested(const Longpath::BroadcastOptimizer::Plan& plan);
+    // Den rohen Durchgang abspielen, durch den Kanal dieser Breite.
+    void beforeRequested(const Longpath::BroadcastOptimizer::Plan& plan);
 
-    // Play the same take untouched, to compare against.
-    void rawRequested();
+    // Und denselben durch die EIGENE Kette des Bedieners, ebenfalls
+    // durch diesen Kanal. "Nachher" heisst hier nicht "was ein
+    // Optimierer daraus macht", sondern "was deine Einstellung in
+    // diesem Kanal macht".
+    void afterRequested(const Longpath::BroadcastOptimizer::Plan& plan);
 
-    // Put this plan into the live channel strip.
-    void loadRequested(const Longpath::BroadcastOptimizer::Plan& plan);
+    // Die Kette, wie sie gerade eingestellt ist, unter dem Namen
+    // dieser Breite ablegen.
+    void saveProfileRequested(const Longpath::BroadcastOptimizer::Plan& plan);
 
-    // Write all four out as named presets.
-    void saveAllRequested();
-
-    // ── Into the curves ──────────────────────────────────────────────
-    //
-    // Double-click a width, or press the button: put that profile
-    // into the channel strip and go there, so the curve is on screen
-    // and can be dragged.
-    //
-    // Asked for in those terms, 2026-10-09: "anschließend möchte ich
-    // aber mit Doppelklick in dieses Profil reingehen, so dass ich
-    // meine Kurven sehe und diese dann automatisch leicht verändere.
-    // Hier sollte ein Button gesetzt sein, wie ich dann automatisch
-    // zum Channel Strip komme."
-    //
-    // A double-click IS saying so, so this one does apply — unlike
-    // every other control on this panel. The status line says it has.
-    void editRequested(const Longpath::BroadcastOptimizer::Plan& plan);
+    // Zur Kette, um dort weiterzudrehen.
+    void openStripRequested();
 
 protected:
-    // The width pills are plain buttons; QPushButton has no
-    // doubleClicked. One filter over the four of them is cheaper and
-    // less code than a subclass per pill.
     bool eventFilter(QObject* watched, QEvent* event) override;
 
 private:
@@ -147,28 +117,23 @@ private:
     bool m_auditioning{false};
 
     QLabel* m_state{nullptr};
-    QLabel* m_headline{nullptr};
     QVector<QPushButton*> m_widthPills;
 
-    // The readout grid, in the order they are built.
-    QLabel* m_cellDensity{nullptr};
-    QLabel* m_cellHpf{nullptr};
-    QLabel* m_cellTone{nullptr};
-    QLabel* m_cellComp{nullptr};
-    QLabel* m_cellChannel{nullptr};
-    QLabel* m_cellGain{nullptr};
-    QLabel* m_cellForgets{nullptr};
+    QLabel* m_cellPitch{nullptr};
     QLabel* m_cellLoudness{nullptr};
+    QLabel* m_cellRoom{nullptr};
+    QLabel* m_cellSibilance{nullptr};
+    QLabel* m_cellTop{nullptr};
+    QLabel* m_cellChannel{nullptr};
 
+    QLabel* m_headline{nullptr};
     QLabel* m_notes{nullptr};
     QLabel* m_caveat{nullptr};
 
-    QPushButton* m_optimizeBtn{nullptr};
-    QPushButton* m_hearBtn{nullptr};
-    QPushButton* m_rawBtn{nullptr};
-    QPushButton* m_loadBtn{nullptr};
-    QPushButton* m_saveAllBtn{nullptr};
-    QPushButton* m_editBtn{nullptr};
+    QPushButton* m_beforeBtn{nullptr};
+    QPushButton* m_afterBtn{nullptr};
+    QPushButton* m_saveBtn{nullptr};
+    QPushButton* m_stripBtn{nullptr};
     QCheckBox*   m_matchBox{nullptr};
 };
 

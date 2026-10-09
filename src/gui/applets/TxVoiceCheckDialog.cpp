@@ -359,60 +359,53 @@ void TxVoiceCheckDialog::buildUi()
         m_optimizer = new BroadcastOptimizerPanel(this);
         col->addWidget(m_optimizer);
 
-        connect(m_optimizer, &BroadcastOptimizerPanel::auditionRequested,
+        // Roh: nur der Kanal, sonst nichts.
+        connect(m_optimizer, &BroadcastOptimizerPanel::beforeRequested,
                 this, [this](const BroadcastOptimizer::Plan& plan) {
             if (m_playingPlan) { stopPlayback(); return; }
-            playPlan(plan);
+            playPlan(plan, /*throughStrip=*/false);
         });
-        connect(m_optimizer, &BroadcastOptimizerPanel::rawRequested,
-                this, [this] { playRecording(false); });
-        connect(m_optimizer, &BroadcastOptimizerPanel::loadRequested,
+
+        // Und durch die eigene Kette des Bedieners, dann den Kanal.
+        connect(m_optimizer, &BroadcastOptimizerPanel::afterRequested,
                 this, [this](const BroadcastOptimizer::Plan& plan) {
-            if (!m_radio) { return; }
-            StripChain* chain = m_radio->stripChain();
-            if (!chain) {
-                m_findings->setText(QStringLiteral(
-                    "There is no channel strip — it is created with the "
-                    "transmit pump, so connect to the radio first."));
+            if (m_playingPlan) { stopPlayback(); return; }
+            playPlan(plan, /*throughStrip=*/true);
+        });
+
+        connect(m_optimizer, &BroadcastOptimizerPanel::openStripRequested,
+                this, [this]() { emit curveEditRequested(); });
+
+        connect(m_optimizer, &BroadcastOptimizerPanel::saveProfileRequested,
+                this, [this](const BroadcastOptimizer::Plan& plan) {
+            StripChain* chain = m_radio ? m_radio->stripChain() : nullptr;
+            if (chain == nullptr) {
+                // Ohne Funkgeraet gibt es keine lebende Kette. Statt
+                // nichts zu tun wird die gespeicherte Einstellung
+                // abgelegt -- das ist dieselbe, die "Through your
+                // strip" gerade vorgespielt hat, also genau das, was
+                // der Bediener gerade beurteilt hat.
+                StripChain scratch;
+                scratch.prepare(double(kMicRateHz));
+                StripSettings::restore(scratch);
+                const bool ok =
+                    BroadcastOptimizer::saveCurrentAsProfile(plan, scratch);
+                m_findings->setText(ok
+                    ? QStringLiteral(
+                        "Saved as \"%1\" — from your stored strip "
+                        "settings, since no radio is connected and "
+                        "there is no live chain to read.").arg(plan.name)
+                    : QStringLiteral("Could not save that profile."));
                 return;
             }
-            BroadcastOptimizer::apply(plan, *chain);
-            emit chainChangedExternally(plan);
-            m_findings->setText(QStringLiteral(
-                "%1 is in the channel strip. Its master switch is "
-                "untouched — open Tools ▸ Channel strip to switch it "
-                "on, then record again. The second measurement is the "
-                "one that says whether it helped.").arg(plan.name));
-        });
-        connect(m_optimizer, &BroadcastOptimizerPanel::editRequested,
-                this, [this](const BroadcastOptimizer::Plan& plan) {
-            if (!m_radio || !m_radio->stripChain()) {
-                m_findings->setText(QStringLiteral(
-                    "There is no channel strip to edit yet — it is "
-                    "created with the transmit pump, so connect to the "
-                    "radio first. The profile itself is ready and can "
-                    "be saved from here in the meantime."));
-                return;
-            }
-            BroadcastOptimizer::apply(plan, *m_radio->stripChain());
-            emit chainChangedExternally(plan);
-            m_findings->setText(QStringLiteral(
-                "%1 is in the channel strip and its curve is on the EQ "
-                "page — drag it from there. The strip's master switch "
-                "is still untouched; nothing reaches the air until you "
-                "turn it on.").arg(plan.name));
-            emit curveEditRequested();
-        });
-        connect(m_optimizer, &BroadcastOptimizerPanel::saveAllRequested,
-                this, [this] {
-            const int n = BroadcastOptimizer::saveAsPresets(
-                m_optimizer->plans());
-            m_findings->setText(QStringLiteral(
-                "%1 profiles written. They are in the channel strip's "
-                "preset list beside your own, and can be edited there "
-                "like any other — which is the point: this is a "
-                "starting point derived from your voice, not a "
-                "verdict.").arg(n));
+            const bool ok =
+                BroadcastOptimizer::saveCurrentAsProfile(plan, *chain);
+            m_findings->setText(ok
+                ? QStringLiteral(
+                    "Saved as \"%1\". It sits in the strip's preset "
+                    "list beside your own and can be recalled or "
+                    "edited there like any other.").arg(plan.name)
+                : QStringLiteral("Could not save that profile."));
         });
     }
 
@@ -1112,64 +1105,53 @@ void TxVoiceCheckDialog::playRecording(bool processed)
 // previous plan left in it — which is exactly the failure that would
 // make an A/B between two profiles a comparison of the wrong two
 // things.
-void TxVoiceCheckDialog::playPlan(const BroadcastOptimizer::Plan& plan)
+void TxVoiceCheckDialog::playPlan(const BroadcastOptimizer::Plan& plan,
+                                  bool throughStrip)
 {
     stopPlayback();
     if (!m_recorder.hasRecording() || m_recorder.isRecording()) { return; }
-    const float* src = m_recorder.samples();
-    if (src == nullptr) { return; }
+    const float* raw = m_recorder.samples();
+    if (raw == nullptr) { return; }
     const int frames = m_recorder.recordedFrames();
     const int rate   = m_recorder.sampleRate();
 
-    StripChain scratch;
-    scratch.prepare(double(rate));
-    if (!BroadcastOptimizer::apply(plan, scratch)) { return; }
-    // The master switch is the one thing apply() will not touch, and
-    // for an offline render it has to be on or the chain passes the
-    // samples through untouched and the operator hears nothing
-    // change. This chain is not connected to anything.
-    scratch.setEnabled(true);
+    std::vector<float> rendered(raw, raw + frames);
 
-    std::vector<float> rendered(src, src + frames);
-    scratch.processMono(rendered.data(), frames);
+    if (throughStrip) {
+        // Die Kette des Bedieners, nicht eine hergeleitete. Gibt es
+        // eine lebende, wird sie gelesen; sonst die gespeicherte --
+        // in beiden Faellen SEINE Einstellung.
+        StripChain scratch;
+        scratch.prepare(double(rate));
+        StripSettings::restore(scratch);
+        // restore() bringt den Hauptschalter bewusst nicht zurueck.
+        // Fuer eine Rechnung abseits jedes Signalwegs muss er an
+        // sein, sonst geht der Durchgang unveraendert hindurch.
+        scratch.setEnabled(true);
+        scratch.processMono(rendered.data(), frames);
+    }
 
-    // Die Breite hoerbar machen. Das Filter steht im Kern, damit der
-    // Pruefstand dieselbe Rechnung prueft, die hier zu hoeren ist.
+    // Der Kanal zuletzt, so wie auf dem Band: erst die Kette, dann
+    // das Sendefilter.
     BroadcastOptimizer::applyChannelFilter(rendered.data(), frames, rate,
                                            plan);
 
-    // ── Matching the loudness before it is judged ────────────────────
-    //
-    // Without this the comparison is rigged, and rigged in the
-    // profile's favour: it adds make-up gain, the louder of two
-    // takes always wins an A/B, and the operator would be choosing
-    // the profile with the most gain every time while believing they
-    // were choosing a sound.
-    //
-    // Matched on BS.1770 integrated loudness rather than on peak,
-    // because peak is what the limiter pinned to the same ceiling in
-    // both takes — matching on it would match nothing.
-    if (m_optimizer && m_optimizer->levelMatched()) {
-        const Loudness::Result raw =
-            Loudness::measure(src, frames, rate);
-        const Loudness::Result out =
+    if (throughStrip && m_optimizer && m_optimizer->levelMatched()) {
+        const Loudness::Result before = Loudness::measure(raw, frames, rate);
+        const Loudness::Result after =
             Loudness::measure(rendered.data(), frames, rate);
-        if (raw.valid && out.valid
-            && raw.integratedLufs > Loudness::kAbsoluteGateLufs
-            && out.integratedLufs > Loudness::kAbsoluteGateLufs) {
-            // Only ever quieter. Matching upward would push a take
-            // that the profile deliberately left headroom in back
-            // into the limiter, and then the A/B would be between a
-            // profile and a clipped copy of it.
+        if (before.valid && after.valid
+            && before.integratedLufs > Loudness::kAbsoluteGateLufs
+            && after.integratedLufs > Loudness::kAbsoluteGateLufs) {
             const double deltaDb =
-                std::min(0.0, raw.integratedLufs - out.integratedLufs);
+                std::min(0.0, before.integratedLufs - after.integratedLufs);
             const double gain = std::pow(10.0, deltaDb / 20.0);
             for (float& v : rendered) { v = float(v * gain); }
         }
     }
 
     setRxQuiet(true);
-    m_playingProcessed = false;
+    m_playingProcessed = throughStrip;
     m_playingPlan      = true;
     playBuffer(rendered.data(), frames, rate);
     if (m_optimizer) { m_optimizer->setAuditioning(m_playSink != nullptr); }

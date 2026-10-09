@@ -498,20 +498,6 @@ void StripWindow::buildUi()
     // remembered index: the tabs are built in a loop over the stages,
     // and an index captured here would quietly point at the wrong
     // page the first time a stage is added or reordered.
-    // Der Optimierer schreibt in die Kette; die Stufenseiten lesen
-    // ihre Regler beim Aufbau. reloadControls() baut sie neu auf --
-    // dieselbe Stelle, die nach einem Preset oder Charakter laeuft.
-    // Ohne das blieb die EQ-Kurve nach dem Optimieren leer, obwohl
-    // die Baender gesetzt waren (Betreiber, 2026-10-09).
-    connect(m_voiceCheck, &TxVoiceCheckDialog::chainChangedExternally,
-            this, [this](const BroadcastOptimizer::Plan& plan) {
-        for (int i = 0; i < StripChain::kStageCount; ++i) {
-            m_optimizerNotes[static_cast<size_t>(i)] = plan.stageNotes[i];
-        }
-        reloadControls();
-        showOptimizerNotes();
-    });
-
     connect(m_voiceCheck, &TxVoiceCheckDialog::curveEditRequested,
             this, [this]() {
         if (!m_tabs) { return; }
@@ -1571,9 +1557,11 @@ void StripWindow::refreshStageCards()
         card.values->setText(c != nullptr ? stageSummary(stage)
                                           : QStringLiteral("——"));
 
-        const QString& note = m_optimizerNotes[static_cast<size_t>(i)];
-        card.note->setText(note.section(QLatin1Char('\n'), 0, 0));
-        card.note->setVisible(!note.isEmpty());
+        // Frueher stand hier, was der Optimierer an dieser Stufe
+        // gesetzt hatte. Seit die Herleitung entfallen ist, setzt
+        // niemand mehr etwas von aussen -- die Karte zeigt nur noch
+        // den Zustand und die Zahlen, und das ist die Wahrheit.
+        card.note->hide();
     }
 }
 
@@ -1614,18 +1602,6 @@ QString StripWindow::stageSummary(StripChain::Stage stage) const
     // auf der Seite selbst. Ein Strich ist dafuer die ehrliche
     // Anzeige (Hausstil Regel 7).
     return dash;
-}
-
-void StripWindow::showOptimizerNotes()
-{
-    refreshStageCards();
-    for (int i = 0; i < StripChain::kStageCount; ++i) {
-        StageText& st = m_stageText[static_cast<size_t>(i)];
-        if (!st.optimizerNote) { continue; }
-        const QString& line = m_optimizerNotes[static_cast<size_t>(i)];
-        st.optimizerNote->setText(line);
-        st.optimizerNote->setVisible(!line.isEmpty());
-    }
 }
 
 void StripWindow::reloadControls()
@@ -1766,20 +1742,6 @@ QWidget* StripWindow::buildStageCard(QWidget* page, QWidget* picture,
     const int idx = static_cast<int>(stage);
     StageText& st = m_stageText[static_cast<size_t>(idx)];
     st.picture = picture;
-
-    // Die Zeile des Optimierers. Steht ueber allem anderen, weil sie
-    // sagt, warum die Regler darunter so stehen, wie sie stehen.
-    st.optimizerNote = new QLabel(words);
-    st.optimizerNote->setWordWrap(true);
-    st.optimizerNote->setAlignment(Qt::AlignTop | Qt::AlignLeft);
-    st.optimizerNote->setStyleSheet(QStringLiteral(
-        "QLabel { color: %1; background: %2; border: 1px solid %3; "
-        "border-radius: 6px; padding: 8px; font-size: 12px; }")
-        .arg(QString::fromLatin1(Style::kAmberText),
-             QString::fromLatin1(Style::kInsetBg),
-             QString::fromLatin1(Style::kInsetBorder)));
-    st.optimizerNote->hide();
-    col->addWidget(st.optimizerNote);
 
     st.live = new QLabel(words);
     st.live->setWordWrap(true);

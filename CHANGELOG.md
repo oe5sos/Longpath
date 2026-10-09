@@ -4,7 +4,18 @@
 
 ### Sendeton-Optimierer: vier Profile aus einem Durchgang
 
-> **Stand am Ende des Tages, 2026-10-09.** Der Optimierer wurde noch am
+> **Endstand 2026-10-09.** Das automatische Herleiten von Ketten ist
+> **entfallen** — Entscheidung des Betreibers nach einem Tag
+> Gegenproben, in denen seine eigene Einstellung jedes Mal besser
+> klang. Geblieben sind: eine **Uebersicht ueber alle acht Stufen**
+> nach AetherSDRs Vorbild, ein **Messblatt** (Grundton, LUFS/LRA,
+> Stoerabstand, Zischfrequenz, Mikrofonende), **vier Sendekanaele**
+> mit seinen Zahlen (200-2500 bis 50-4050), das **Hoeren** beider
+> Seiten durch den jeweiligen Kanal, und das **Ablegen der von Hand
+> eingestellten Kette** unter dem Namen einer Breite. Die Abschnitte
+> unten beschreiben Zwischenstaende desselben Tages.
+>
+> **Frueherer Zwischenstand, 2026-10-09.** Der Optimierer wurde noch am
 > selben Tag auf Zeus' Form umgebaut, nachdem der Betreiber die erste
 > Fassung gehoert hatte: **er fasst den Entzerrer nicht mehr an.** Ein
 > Profil ist Expander + Pegeltrimm auf −20 dBFS + De-Esser auf der

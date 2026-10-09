@@ -334,11 +334,6 @@ private:
     static QString characterKeyFor(StripChain::Stage s);
     static void    rememberCharacter(StripChain::Stage s, const QString& name);
 
-    // Die Zeilen des zuletzt angewandten Profils, je Stufe. Ueberlebt
-    // reloadControls(), damit die Reiter nach dem Neuaufbau immer noch
-    // sagen, was der Optimierer dort gesetzt hat.
-    std::array<QString, StripChain::kStageCount> m_optimizerNotes{};
-    void showOptimizerNotes();
 
     // ── Alle Stufen auf einer Flaeche ────────────────────────────────
     //
@@ -388,10 +383,6 @@ private:
         // Recognising a character means trying every one of them, which
         // is cheap but not free, and the answer can only change when a
         // parameter does — so the comparison is the guard.
-        // Was der Sendeton-Optimierer an DIESER Stufe getan hat.
-        // Leer und versteckt, solange keiner gelaufen ist.
-        QLabel*        optimizerNote{nullptr};
-
         QComboBox*     charBox{nullptr};
         QLabel*        charMark{nullptr};
         QVector<float> lastSeen;

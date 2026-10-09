@@ -6,67 +6,48 @@
 //
 // Longpath-original.
 //
-// One recording, four transmit bandwidths, four finished profiles.
+// Vier Sendekanaele, die Messung dazu -- und sonst nichts.
 //
-// ── The job, in the operator's words ─────────────────────────────────
+// ── Was dieses Stueck einmal war, und warum es das nicht mehr ist ────
 //
-// "Speak for fifteen seconds with no settings as a baseline, have all
-// of it analysed automatically and as carefully as possible to get the
-// best possible profile. That can then be adjusted afterwards if
-// wanted. The other profiles should fall out of it automatically."
-//                                           — OE5SOS, 2026-10-09
+// Es begann als Optimierer: eine Messung hinein, vier vollstaendig
+// hergeleitete Ketten heraus (Hochpass, Kuhschwaenze, Kompressor,
+// Expander, Charaktere). Einen Tag lang, am 2026-10-09, wurde das
+// gegen die Stimme des Betreibers gefahren und jedes Mal verworfen:
 //
-// So: 2.3, 2.7, 3.5 and 4.0 kHz, each a complete chain, all four
-// derived from the same measurement, none of them a preset somebody
-// guessed in advance.
+//   "Das Original-Audio ist gut, nur saemtliche Bearbeitungen sind
+//    eine Katastrophe." · "hier ist kein Bass, hier fehlt es einfach
+//    an allem." · "also besser wird das audio nicht."
 //
-// ── Why the bandwidth changes the answer at all ──────────────────────
+// Fuenf echte Fehler kamen dabei heraus und sind behoben (sie stehen
+// im Entwurfsblatt), aber der Befund darunter blieb: eine
+// hergeleitete Kette klang nie besser als die, die er sich selbst
+// eingestellt hatte. Sein Schluss, und damit die Entscheidung:
 //
-// It is tempting to think one good sound can be sent through any
-// filter, and that a narrow channel simply gets less of it. That is
-// wrong in both directions:
+//   "ich glaube, wir lassen das automatische verbessern."
 //
-//   Too wide for the channel. Energy above the transmit filter does
-//   not vanish politely. It reaches the compressor and the ALC first,
-//   where it takes gain reduction with it — so a 4 kHz-shaped voice
-//   sent through a 2.3 kHz filter is quieter AND duller than the same
-//   voice shaped for 2.3 kHz. The operator pays twice for audio
-//   nobody hears.
+// ── Was geblieben ist ────────────────────────────────────────────────
 //
-//   Too narrow for the channel. A 2.3 kHz shape in a 4 kHz channel
-//   leaves the top one and a half octaves empty and the low end cut
-//   for no reason. It sounds like a telephone on a band that had room
-//   for a voice.
+// Die drei Dinge, die sich an demselben Tag als tragfaehig erwiesen
+// haben:
 //
-// The high-pass moves for the same reason, and it moves against the
-// operator's own pitch rather than against a fixed number: the first
-// harmonics of a 95 Hz voice and a 180 Hz voice sit an octave apart,
-// so one high-pass cannot be right for both. That is what the new
-// pitch measurement in VoiceAnalyzer is for.
+//   DER KANAL. Vier Breiten mit den Zahlen des Betreibers: Contest
+//   200-2500, dann 150-2700, 100-3200, und breit 50-4050. Unten liegt
+//   der groessere Teil des hoerbaren Unterschieds -- 50 gegen 200 Hz
+//   sind zwei Oktaven Koerper.
 //
-// ── What this will not do ────────────────────────────────────────────
+//   DAS HOEREN. applyChannelFilter() bildet den Sendeweg auf einem
+//   Puffer nach, damit "wie klingt meine Einstellung bei 2,3 k" eine
+//   Frage ist, die man beantworten kann, ohne zu senden.
 //
-//   Boost. Same rule as VoiceAnalyzer::suggestEq and StripTuner: every
-//   EQ move here is a cut, and the level comes back as make-up gain.
-//   An optimiser that reaches a target by boosting is an optimiser
-//   that amplifies whatever the microphone does worst.
+//   DIE MESSUNG. Was VoiceAnalyzer findet, wird berichtet und nicht
+//   angewandt: Grundton, Stoerabstand, Zischfrequenz, der Punkt, an
+//   dem das Mikrofon aufhoert. Beobachtungen, aus denen der Bediener
+//   seine Schluesse zieht.
 //
-//   Touch the live chain. plan() is a pure function of the
-//   measurement; saveAsPresets() writes named presets and nothing
-//   else. The chain only changes when the operator picks one and
-//   apply() is called — which is the whole reason this can sit beside
-//   the existing voice-check path instead of replacing it (operator,
-//   2026-10-09: "build it parallel to our current audio setup and we
-//   decide later, or we keep using the current one").
-//
-//   Switch the strip on. Nothing in core/strip/ ever does. The
-//   operator decides when their transmit audio changes.
-//
-//   Promise. Every plan carries what it costs as well as what it
-//   buys, and a plan that is not worth taking says so in `caveat`
-//   rather than being quietly offered as an equal. A 4 kHz profile
-//   built from a microphone that stops at 3 kHz is an empty promise,
-//   and the measurement can see that.
+// Und saveCurrentAsProfile(): die von Hand eingestellte Kette unter
+// dem Namen einer Breite ablegen. Das ist die ganze Automatik, die
+// uebrig ist, und sie erfindet nichts.
 //
 // =================================================================
 // Modification history (Longpath):
@@ -107,298 +88,28 @@ inline constexpr double kTargetLevelDbFs = -20.0;
 // order, and says where it came from.
 QString presetName(double widthHz);
 
-// ── Density, the second axis ─────────────────────────────────────────
-//
-// Taken from Zeus, which is the benchmark here (operator, 2026-10-09:
-// "Zeus with all its tools is surely the measure"). Zeus carries a
-// single `TargetSpectralDensity` on every TX audio profile — an
-// integer 0..100, default 55 (`Station.Engine.Hosting/
-// TxFidelityPolicyStore.cs:DefaultTargetn`) — rather than exposing a
-// ratio and a threshold. That is the better control and it is adopted
-// wholesale: one number the operator can move, with the compressor
-// derived from it instead of the other way round.
-//
-// The four named stops are Longpath's own placement on Zeus's scale.
-// Zeus Link shows the same four words over its density row; the
-// numbers behind them live in its client, which is not in the engine
-// source here, so these are chosen to put Broadcast on Zeus's
-// documented default and spread the rest evenly around it.
-inline constexpr int kDensityNatural   = 40;   // Zeus shows 40
-inline constexpr int kDensityBroadcast = 55;   // Zeus's own default
-inline constexpr int kDensityDense     = 75;
-inline constexpr int kDensityMaximum   = 92;
-
-// The name for a density value — the nearest stop, so a hand-edited
-// 58 still reads as "Broadcast" rather than as a bare number.
-QString densityName(int density);
-
-// What the compressor is aiming at: the crest factor the voice should
-// still have AFTER processing, in dB. This is the whole density axis
-// in one function, and it is exposed so it can be tested on numbers
-// and drawn on a scale.
-//
-// At 0 the voice keeps its own dynamics. At 100 it is squeezed to
-// about 6 dB, which is as far as speech goes before it stops sounding
-// like a person. Nothing here clips.
-double targetCrestDb(int density);
-
-// Everything the optimiser decided for one width, and why.
-//
-// Kept as plain numbers rather than as a half-applied chain so the
-// whole thing can be tested without a StripChain, drawn before it is
-// applied, and shown side by side with its three siblings.
+// Was ueber eine Breite zu sagen ist: ihr Kanal und was die Messung
+// dazu beobachtet hat. Keine Einstellungen -- die macht der Bediener
+// von Hand, siehe saveCurrentAsProfile().
 struct Plan {
     double  widthHz{2700.0};
     QString name;
-
-    // ── The transmit filter the profile is FOR ───────────────────────
-    //
-    // Carried on the plan because Zeus carries it on the profile:
-    // `TxAudioProfileDto` holds `LowCutHz` / `HighCutHz` alongside the
-    // chain, so a named profile in Zeus is the whole answer — shaping
-    // and channel together — not a shape that hopes the filter happens
-    // to match. A "2.3 k profile" whose transmit filter is still at
-    // 2.7 kHz is not a 2.3 k profile.
-    //
-    // These are reported, not applied: the transmit bandpass is WDSP's
-    // and belongs to TransmitModel, which is deliberately out of reach
-    // from core/strip/. apply() sets the chain; whoever offers the
-    // plan to the operator is the one that may also move the filter,
-    // visibly and on purpose.
-    int     lowCutHz{100};
-    int     highCutHz{2700};
-
-    // Zeus's axis, 0..100. See kDensityBroadcast.
-    int     density{kDensityBroadcast};
-
-    // ── Dynamics, and nothing else ───────────────────────────────────
-    //
-    // No equaliser. Not a gentler one — none.
-    //
-    // This is the shape Zeus Link uses, read off its own panel on
-    // 2026-10-09 while the operator sat at it. Each of its three
-    // voice styles is three statements and not one of them is a
-    // tone control:
-    //
-    //   NATURAL    Expander -40 dB (SNR 28 dB), trim +9.5 dB to
-    //              -20 dBFS, AGC -22
-    //   BROADCAST  Expander -38 dB (SNR 28 dB), trim +9.5 dB to
-    //              -20 dBFS, wide to 2.9 kHz
-    //   DX PUNCH   Expander -38 dB (SNR 28 dB), trim +9.5 dB to
-    //              -20 dBFS, comp 4:1
-    //
-    // Expander threshold from the measured signal-to-noise, a level
-    // trim onto a fixed target, and exactly ONE characteristic move.
-    // The voice's own spectrum is left alone.
-    //
-    // The version before this one derived a high-pass, two shelves
-    // and a presence bell per width, and the operator's verdict
-    // after hearing it was "Das Original-Audio ist gut, nur
-    // saemtliche Bearbeitungen sind eine Katastrophe". Every defect
-    // found that day — a hum notch sitting on the fundamental, a
-    // high-pass above it, two cuts stacked over the same octave, a
-    // de-esser firing with nothing to de-ess — was a tone control
-    // moving on evidence too thin to move it on.
-    //
-    // Here the width IS the characteristic move, which is exactly
-    // what Zeus's BROADCAST does with "wide to 2.9 kHz".
-
-    // Expander, not a gate: it leans on quiet passages instead of
-    // slamming shut, and Zeus runs one in every style including the
-    // gentlest. Threshold from the measured noise floor.
-    bool    expanderOn{false};
-    double  expanderThresholdDbFs{-45.0};
-
-    // Wie tief der Expander zwischen den Woertern absenkt.
-    //
-    // Stand 2026-10-09 vom Betreiber: "die hintergrundgeraeusche
-    // werden viel zu viel aufgenommen, es hallt vom raum, das sollte
-    // generell bei mir weg kommen." Der erste Boden war -8 dB -- zu
-    // zahm dafuer.
-    //
-    // Jetzt aus dem gemessenen Stoerabstand: je weiter der Raum unter
-    // der Stimme liegt, desto tiefer darf abgesenkt werden, ohne dass
-    // die Absenkung selbst hoerbar wird. Bei 34 dB Abstand sind das
-    // 17 dB, und die Pausen werden still.
-    //
-    // Was das NICHT kann, und was ehrlich dazugehoert: Hall WAEHREND
-    // des Sprechens. Ein Expander arbeitet am Pegel, und waehrend
-    // gesprochen wird ist der oben -- die Raumfahne liegt dann unter
-    // der Stimme und kommt mit durch. Dagegen hilft naeher ans
-    // Mikrofon, eine Richtcharakteristik oder der Raum selbst, kein
-    // Regler in dieser Kette.
-    double  expanderFloorDb{-8.0};
-
-    // ── Klang: wieder dabei, aber gedeckelt ──────────────────────────
-    //
-    // Nach dem Umbau auf Zeus' Form lag der Entzerrer ganz draussen.
-    // Der Betreiber hat das am 2026-10-09 korrigiert, indem er auf
-    // die Reiterreihe des Kanalzugs zeigte: "du siehst hier alles,
-    // was die optimierung durchlaufen sollte." Die Optimierung soll
-    // die ganze Kette durchlaufen, nicht nur deren Dynamik.
-    //
-    // Sie tut es jetzt wieder -- mit den drei Lehren desselben Tages
-    // eingebaut, denn jeder Fehler davor sass genau hier:
-    //
-    //   KEIN Hochpass. Den macht der Kanalschnitt (50 bis 200 Hz je
-    //   Breite). Zwei Stufen, die dieselbe Oktave beschneiden, waren
-    //   die Haelfte von "hier ist kein Bass".
-    //
-    //   KEINE Brummkerben. Der Detektor haelt bei einer tiefen
-    //   Stimme deren Grundton fuer Netzbrumm.
-    //
-    //   Eine VERSCHIEBUNG von der eigenen Balance aus, nicht ein Ziel,
-    //   auf das gezogen wird. Das Spektrum einer Stimme faellt
-    //   natuerlicherweise; das flachzubuegeln nimmt ihr den Koerper.
-    //   Darum hoechstens wenige Dezibel, und das breite Profil
-    //   bewegt unten gar nichts.
-    // ── Die Korrekturkurve ───────────────────────────────────────────
-    //
-    // "wichtig ist vor allem die eq kurve zu analysieren, das kann das
-    // programm ja und dann dort anzuheben bzw. zu senken, wo die
-    // stimme zu stark oder zu schwach ist" (Betreiber, 2026-10-09).
-    //
-    // Sieben Glocken auf den Frequenzen, die EqBandLayout als freie
-    // Griffe fuehrt (300, 450, 650, 950, 1400, 2500, 3800 Hz).
-    //
-    // Gemessen wird gegen den GEGLAETTETEN eigenen Verlauf, nicht
-    // gegen eine fremde Zielkurve. Das ist der Unterschied zwischen
-    // Korrigieren und Flachbuegeln: eine Ueberhoehung bei 650 Hz ist
-    // eine Ueberhoehung, der allgemeine Abfall zu hohen Frequenzen
-    // hin ist dagegen die Stimme selbst. Gegen eine absolute Kurve
-    // gemessen sah beides gleich aus, und das Ergebnis hiess "hier
-    // ist kein Bass, hier fehlt es einfach an allem".
-    static constexpr int kCorrectionBands = 7;
-    double  correctionDb[kCorrectionBands]{};
-
-    double  lowShelfDb{0.0};
-    double  lowShelfHz{250.0};
-    double  presenceDb{0.0};
-    double  highShelfDb{0.0};
-    double  highShelfHz{2400.0};
-
-    // The level trim, onto kTargetLevelDbFs. Shown as its own number
-    // rather than hidden inside a make-up gain, because it is the
-    // one change that is purely arithmetic and the operator should
-    // be able to see it is not doing anything clever.
-    double  trimDb{0.0};
-
-    // De-esser, at the frequency the analysis found rather than at a
-    // fixed one. Off when there is nothing to de-ess.
-    bool    deEssOn{false};
-    double  deEssHz{6000.0};
-    double  deEssAmountDb{0.0};     // negative = reduction
-
-    // Compressor. The ratio is solved for from the density target,
-    // not chosen; see targetCrestDb().
-    double  compRatio{1.0};
-    double  compThresholdDbFs{-20.0};
-    double  compMakeupDb{0.0};
-
-    double  limiterCeilingDb{-1.0};
-
-    // ── The phase rotator ────────────────────────────────────────────
-    //
-    // The one move that makes a voice stronger AND cleaner without
-    // touching its tone, which is exactly what was asked for:
-    // "meine stimme ... kräftiger, klarer und besser zu machen"
-    // (operator, 2026-10-09).
-    //
-    // Speech is asymmetric — the waveform's positive and negative
-    // peaks differ, often by several decibels — so the loudest peak
-    // hits the limiter long before the average level has earned it.
-    // A cascade of all-pass filters leaves the spectrum alone (every
-    // frequency comes through at the same level) and only moves the
-    // phases, which pulls the two peaks together. The headroom that
-    // frees goes straight into average level.
-    //
-    // This is also what Zeus Link's own optimiser chose when it ran
-    // on this operator's voice, and it reported the choice as
-    // measured rather than assumed: "applied 1 bounded change: phase
-    // rotator 474 Hz / 8 stages measured best".
-    //
-    // Longpath does not yet search for the best stage count per
-    // voice — it takes the eight Zeus measured as best and says so.
-    // Searching it needs the recording, which plan() does not have;
-    // that is the next step, not a pretence here.
-    int     phaseRotatorStages{8};
-
-    // ── Die Farbstufen, als benannte Charaktere ──────────────────────
-    //
-    // "ziel ist es, broadcast oder voodoo zu haben. das maximale aus
-    // allen sachen zu holen" (Betreiber, 2026-10-09).
-    //
-    // Beides gibt es im Haus bereits als Charakter: der Kompressor
-    // kennt Gentle/Balanced/Contest/Voodoo, die Roehre
-    // Clean/Warm/Full/Broadcast/Voodoo, der Begrenzer
-    // Transparent/Safety/Broadcast/Loud. Ein Charakter ist ein Satz
-    // zusammengehoeriger Werte mit einem Satz dazu, warum.
-    //
-    // Darum waehlt das Profil CHARAKTERE statt Zahlen. Was gemessen
-    // werden kann -- Schwelle, Verhaeltnis, Trimm -- wird danach
-    // ueberschrieben: der Charakter ist die Stimmung, die Messung die
-    // Anpassung an diese Stimme. Eine Zahl, die ich fuer die Roehre
-    // erfinde, waere beides nicht.
-    QString compCharacter;
-    QString tubeCharacter;      // leer = Stufe bleibt aus
-    QString puduCharacter;      // leer = Stufe bleibt aus
-    QString limiterCharacter;
-
-    // ── The stages this profile deliberately forgets ─────────────────
-    //
-    // Operator, 2026-10-09: "for contest various filters have to be
-    // forgotten; you'd use those from the 2.7 k profile upward." The
-    // same stages NU9N's transmit-chain guide marks optional.
-    bool    characterStages{true};   // tube, exciter, reverb
-    QString forgotten;
-
-    // ── What it is worth ─────────────────────────────────────────────
-    //
-    // An estimate, clearly labelled as one wherever it is shown. It is
-    // the average-level gain the chain is expected to produce against
-    // the unprocessed take: make-up plus the part of the crest factor
-    // the compressor actually takes. It is NOT a measurement of the
-    // result, and the only honest measurement of the result is the
-    // next recording.
-    double  densityGainDb{0.0};
-
-    // ── Eine Zeile, nicht sieben ─────────────────────────────────────
-    //
-    // Was dieses Profil ist, in einem Satz. Betreiber, 2026-10-09:
-    // "mich interessiert der ganze text nicht, es steht viel zu viel
-    // in der beschreibung. kurz und knackig waere besser."
-    //
-    // Die Zahlen stehen ohnehin im Ablesegitter darueber; der
-    // Fliesstext daneben war Doppelung mit Begruendung. Die
-    // Begruendung ist nicht geloescht, sie ist in `notes` geblieben
-    // und haengt als Hinweistext am Kasten -- einen Mauszeiger
-    // entfernt statt dauerhaft im Weg.
     QString headline;
 
-    // Die ausfuehrliche Fassung. Nicht mehr die Hauptanzeige.
+    // ── Der Kanal ────────────────────────────────────────────────────
+    //
+    // Die Zahlen des Betreibers, 2026-10-09: "ein dx oder contest
+    // profil ist im bereich 200-2500(2700), ein 4 k profil ist von ca
+    // 50-4050." Unten liegt der groessere Teil des Unterschieds.
+    int     lowCutHz{150};
+    int     highCutHz{2700};
+
+    // Was die Messung ueber diese Breite sagt -- Beobachtungen, keine
+    // Einstellungen. Eine Zeile oben, die Einzelheiten darunter.
     QStringList notes;
 
-    // ── Je Stufe eine Zeile, fuer deren eigenen Reiter ───────────────
-    //
-    // "Gut waere, wenn ich nach dem Anklicken des gewuenschten
-    // Profils und nach dem Optimize eine eigene Reitergalerie sehe,
-    // was genau bei diesem Profil wie geaendert worden ist und
-    // anschliessend dort persoenlich individuell weitermachen zu
-    // koennen" (Betreiber, 2026-10-09).
-    //
-    // Die Reiter des Kanalzugs SIND diese Galerie -- es fehlte nur,
-    // dass in jedem steht, was der Optimierer dort getan hat. Der
-    // Index ist StripChain::Stage; acht, weil die Kette acht Stufen
-    // hat (im .cpp per static_assert an kStageCount gebunden, damit
-    // eine neunte diese Stelle nicht still ueberholt).
-    static constexpr int kStageCount = 8;
-    QString stageNotes[kStageCount];
-
-    // Empty when the plan is worth taking as it stands. Set when the
-    // measurement says this width cannot deliver what its name claims
-    // — a microphone that rolls off below the channel, a room too
-    // noisy to open the top end. The plan is still produced, because
-    // refusing to produce it would hide the reason.
+    // Gesetzt, wenn die Messung sagt, dass diese Breite nicht haelt,
+    // was ihr Name verspricht: ein Mikrofon, das vorher aufhoert.
     QString caveat;
 };
 
@@ -415,15 +126,6 @@ QVector<Plan> plan(const VoiceAnalysis& a);
 // into plan()'s result, or -1 when there are no plans.
 int bestIndex(const QVector<Plan>& plans, double currentTxWidthHz);
 
-// ── Putting one into the chain ───────────────────────────────────────
-//
-// Sets every stage the plan names and switches those stages on. Does
-// NOT touch the master switch, and does not save anything. After this
-// the operator can adjust from there, which is the point — the plan is
-// a starting point that happens to be derived from their own voice
-// rather than from somebody else's taste.
-bool apply(const Plan& p, StripChain& chain);
-
 // ── Das Kanalfilter, zum Hoeren ──────────────────────────────────────
 //
 // Bildet das Sendefilter des Plans auf einem Puffer nach: Hochpass auf
@@ -437,16 +139,19 @@ bool apply(const Plan& p, StripChain& chain);
 void applyChannelFilter(float* samples, int frames, int sampleRate,
                         const Plan& p);
 
-// ── Writing all four out ─────────────────────────────────────────────
+// ── Das Profil speichern ─────────────────────────────────────────────
 //
-// Applies each plan to a scratch chain and saves it through
-// StripSettings::saveUserPreset, so an optimiser profile and a
-// hand-made one are the same kind of thing and appear in the same
-// list. Returns how many were written.
+// Nimmt die Kette, wie sie GERADE ist -- von Hand eingestellt -- und
+// legt sie unter dem Namen dieser Breite ab. Das ist die ganze
+// Automatik, die geblieben ist, und sie erfindet nichts: sie haelt
+// fest, was der Bediener selbst gemacht hat.
 //
-// The caller's own chain is never touched: the four profiles exist to
-// be chosen from, not to be imposed.
-int saveAsPresets(const QVector<Plan>& plans);
+// Betreiber, 2026-10-09: "ich glaube, wir lassen das automatische
+// verbessern" -- nachdem ein Tag Herleitung von Ketten aus der
+// Messung nichts ergeben hat, was besser klang als seine eigene
+// Einstellung. Was die Messung weiter beitraegt, steht in `notes`:
+// Beobachtungen, keine Eingriffe.
+bool saveCurrentAsProfile(const Plan& p, const StripChain& chain);
 
 } // namespace BroadcastOptimizer
 } // namespace Longpath
