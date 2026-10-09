@@ -26,6 +26,7 @@
 #include <QtTest>
 #include <QAction>
 #include <QScrollArea>
+#include <QCheckBox>
 #include <QTabWidget>
 
 #include "gui/ConnectionPanel.h"
@@ -148,6 +149,52 @@ private slots:
             const auto st = static_cast<StripChain::Stage>(i);
             QCOMPARE(tabs->tabText(i + 1),
                      QString::fromLatin1(StripChain::stageName(st)));
+        }
+    }
+
+    // Jede Stufe hat ihren eigenen Schalter -- auch der Entzerrer.
+    //
+    // „den EQ kann man eigentlich nicht on und off schalten." Stimmte:
+    // die anderen Stufenseiten tragen oben ihr Haekchen, die
+    // Entzerrerseite ist als ganzes Panel von AetherSDR uebernommen
+    // und hatte dort keines. Gerade beim Entzerren ist es der
+    // wichtigste Knopf -- eine Kurve beurteilt man, indem man sie
+    // wegnimmt.
+    //
+    // Geprueft wird die WIRKUNG, nicht die Beschriftung. Der erste
+    // Anlauf suchte nach „<Stufe> on" und fiel ueber PUDU, dessen
+    // Haekchen „Exciter on" heisst -- ein Prueftand, der Namen
+    // vergleicht, prueft die Namen.
+    void everyStagePageCarriesItsOwnSwitch()
+    {
+        RadioModel radio;
+        StripWindow w(&radio);
+        StripChain* c = radio.stripChain();
+        QVERIFY(c != nullptr);
+        auto* tabs = w.findChild<QTabWidget*>();
+        QVERIFY(tabs != nullptr);
+
+        for (int i = 0; i < StripChain::kStageCount; ++i) {
+            const auto st = static_cast<StripChain::Stage>(i);
+            const QString name = QString::fromLatin1(StripChain::stageName(st));
+            QWidget* page = tabs->widget(i + 1);
+            QVERIFY2(page != nullptr, qPrintable(name));
+
+            bool works = false;
+            for (QCheckBox* b : page->findChildren<QCheckBox*>()) {
+                const bool before = c->stageEnabled(st);
+                b->setChecked(!before);
+                if (c->stageEnabled(st) == !before) {
+                    b->setChecked(before);
+                    works = c->stageEnabled(st) == before;
+                    break;
+                }
+                b->setChecked(before);
+            }
+            QVERIFY2(works,
+                     qPrintable(QStringLiteral("die Stufenseite %1 hat "
+                                               "kein Haekchen, das diese "
+                                               "Stufe schaltet").arg(name)));
         }
     }
 

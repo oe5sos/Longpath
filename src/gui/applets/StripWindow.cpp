@@ -758,6 +758,10 @@ void StripWindow::buildUi()
         // unter dem Haekchen versprach das Richtige („switch the strip
         // off and on to hear what it is doing") -- nur tat es niemand.
         if (m_live) { m_live->setStripBypassed(!on); }
+        // Und die Zeile darunter nachziehen, sonst steht dort weiter
+        // „through the strip", waehrend der Schalter aus ist -- und
+        // dann glaubt man dem Schalter nicht mehr.
+        updateLiveNote();
         refreshChainRow();
         persist();
     });
@@ -901,7 +905,43 @@ QWidget* StripWindow::buildEqPanel()
 
     m_eqPanel = new StripEqPanel(m_eqHost.get(), this);
     m_eqPanel->showForPath(ClientEqApplet::Path::Tx);
-    return m_eqPanel;
+
+    // ── Ein Schalter, wie ihn jede andere Stufe hat ──────────────────
+    //
+    // „den EQ kann man eigentlich nicht on und off schalten." Stimmt:
+    // die sieben anderen Stufenseiten tragen oben ihr Haekchen, diese
+    // nicht -- sie ist als ganzes Panel von AetherSDR uebernommen und
+    // hat dort keines, weil der Entzerrer dort das ganze Werkzeug ist
+    // und nicht eine Stufe von acht.
+    //
+    // Gerade beim Entzerren ist es aber der wichtigste Knopf: eine
+    // Kurve beurteilt man, indem man sie wegnimmt. Also davor
+    // gesetzt, mit demselben Namen und demselben Verhalten wie bei
+    // Gate und Kompressor -- und in dasselbe m_stageBoxes-Feld, damit
+    // reloadControls() ihn mitzieht.
+    auto* page = new QWidget(this);
+    auto* col = new QVBoxLayout(page);
+    col->setContentsMargins(0, 0, 0, 0);
+    col->setSpacing(6);
+
+    const int idx = static_cast<int>(StripChain::Stage::Eq);
+    auto* on = new QCheckBox(QStringLiteral("EQ on"), page);
+    on->setToolTip(QStringLiteral(
+        "Off, the curve is drawn but not applied — the audio passes "
+        "through untouched. That is how you judge a curve: by taking "
+        "it away."));
+    m_stageBoxes[static_cast<size_t>(idx)] = on;
+    connect(on, &QCheckBox::toggled, this, [this](bool v) {
+        if (StripChain* c = chain()) {
+            c->setStageEnabled(StripChain::Stage::Eq, v);
+        }
+        refreshChainRow();
+        refreshStageCards();
+        persist();
+    });
+    col->addWidget(on);
+    col->addWidget(m_eqPanel, 1);
+    return page;
 }
 
 // ── What actually goes out ───────────────────────────────────────────

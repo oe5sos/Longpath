@@ -160,6 +160,16 @@ public:
     void resync();
     void setVolume(double v);
     void setStripBypassed(bool bypassed);
+    bool stripBypassed() const { return m_bypass.load(std::memory_order_acquire); }
+
+    // Genau der Schritt, den pump() mit jedem Block macht -- als
+    // eigene Methode, damit er ohne Soundkarte geprueft werden kann.
+    //
+    // Gebraucht, weil „ich hoere keinen Unterschied, ob an oder aus"
+    // zwei voellig verschiedene Ursachen haben kann: der Schalter
+    // wirkt nicht, oder die Kette tut nichts. Das ist von aussen
+    // nicht zu unterscheiden und von innen in drei Zeilen.
+    void applyStrip(float* samples, int frames) noexcept;
 
 signals:
     void started();

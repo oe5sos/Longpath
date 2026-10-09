@@ -107,6 +107,52 @@ private slots:
     // ebenfalls kein Geraet. Gestartet wird hier nichts -- im CI gibt
     // es weder Mikrofon noch Lautsprecher, und ein Pruefstand, der
     // Geraete verlangt, prueft die Maschine statt den Code.
+    // Der Hauptschalter muss beim Mithoeren wirklich ankommen.
+    //
+    // Er kam lange nicht an: setStripBypassed() existierte und wurde
+    // von niemandem gerufen, also lief das Mithoeren durch die ganze
+    // Kette, obwohl der Schalter aus stand. Am Geraet hoerte sich das
+    // an wie „komische modulation [...] wie ueberschlagen" -- ein Gate
+    // auf dem eingebauten Mikrofon eines MacBook.
+    void theMasterSwitchReachesTheMonitor()
+    {
+        StripLiveMonitor m;
+        StripChain* c = m.chain();
+        QVERIFY(c != nullptr);
+        c->prepare(48000.0);
+        c->setEnabled(true);
+        for (int i = 0; i < StripChain::kStageCount; ++i) {
+            c->setStageEnabled(static_cast<StripChain::Stage>(i), false);
+        }
+        c->setStageEnabled(StripChain::Stage::Limiter, true);
+        c->limiter().setCeilingDb(-20.0f);
+
+        const auto peakOf = [&](bool bypassed) {
+            m.setStripBypassed(bypassed);
+            std::vector<float> x(4800);
+            for (size_t i = 0; i < x.size(); ++i) {
+                x[i] = float(0.9 * std::sin(2.0 * M_PI * 700.0
+                                            * double(i) / 48000.0));
+            }
+            m.applyStrip(x.data(), int(x.size()));
+            double p = 0.0;
+            for (size_t i = x.size() / 2; i < x.size(); ++i) {
+                p = std::max(p, std::abs(double(x[i])));
+            }
+            return p;
+        };
+
+        const double raw = peakOf(true);
+        const double through = peakOf(false);
+        QVERIFY2(std::abs(raw - 0.9) < 0.01,
+                 qPrintable(QStringLiteral("ueberbrueckt wurde doch "
+                                           "gerechnet: %1").arg(raw)));
+        QVERIFY2(through < raw * 0.5,
+                 qPrintable(QStringLiteral("eingeschaltet aendert sich "
+                                           "nichts: %1 gegen %2")
+                                .arg(through).arg(raw)));
+    }
+
     void theLiveMonitorBringsItsOwnChain()
     {
         StripLiveMonitor m;

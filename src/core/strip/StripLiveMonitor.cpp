@@ -294,7 +294,20 @@ void StripLiveMonitor::doSetLatencyPreset(int l)
 
 void StripLiveMonitor::setStripBypassed(bool bypassed)
 {
+    if (m_bypass.load(std::memory_order_acquire) == bypassed) { return; }
     m_bypass.store(bypassed, std::memory_order_release);
+    qCInfo(lcAudio) << "strip live monitor:"
+                    << (bypassed ? "bypassed (raw microphone)"
+                                 : "through the strip");
+}
+
+void StripLiveMonitor::applyStrip(float* samples, int frames) noexcept
+{
+    if (samples == nullptr || frames <= 0) { return; }
+    if (m_bypass.load(std::memory_order_acquire)) { return; }
+    for (int at = 0; at + kChainBlock <= frames; at += kChainBlock) {
+        m_chain->processMono(samples + at, kChainBlock);
+    }
 }
 
 void StripLiveMonitor::pump()
@@ -355,11 +368,7 @@ void StripLiveMonitor::pump()
         m_spectrum->feed(m_mono.data(), int(m_mono.size()));
     }
 
-    if (!m_bypass.load(std::memory_order_acquire)) {
-        for (size_t at = 0; at + kChainBlock <= m_mono.size(); at += kChainBlock) {
-            m_chain->processMono(m_mono.data() + at, kChainBlock);
-        }
-    }
+    applyStrip(m_mono.data(), int(m_mono.size()));
 
     // ── Hinaus ───────────────────────────────────────────────────────
     //
