@@ -117,6 +117,15 @@ signals:
     // standalone, and was for months.
     void curveEditRequested();
 
+    // Der Optimierer hat in die lebende Kette geschrieben. Die
+    // Stufenseiten zeigen jeden Regler aus einem Abbild, das beim
+    // Aufbau gelesen wurde -- ohne dieses Signal bleiben sie auf den
+    // alten Werten stehen, und die EQ-Kurve ist nach dem Optimieren
+    // leer, obwohl die Baender gesetzt sind. Am Geraet gemeldet,
+    // 2026-10-09: "eq kurve keine zu sehen".
+    void chainChangedExternally(
+        const Longpath::BroadcastOptimizer::Plan& plan);
+
 public:
     // embedded=true turns the dialog into a plain widget for hosting
     // inside the channel strip's tab bar (2026-08-11, asked for at the

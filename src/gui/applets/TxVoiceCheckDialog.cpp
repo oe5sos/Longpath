@@ -377,6 +377,7 @@ void TxVoiceCheckDialog::buildUi()
                 return;
             }
             BroadcastOptimizer::apply(plan, *chain);
+            emit chainChangedExternally(plan);
             m_findings->setText(QStringLiteral(
                 "%1 is in the channel strip. Its master switch is "
                 "untouched — open Tools ▸ Channel strip to switch it "
@@ -394,6 +395,7 @@ void TxVoiceCheckDialog::buildUi()
                 return;
             }
             BroadcastOptimizer::apply(plan, *m_radio->stripChain());
+            emit chainChangedExternally(plan);
             m_findings->setText(QStringLiteral(
                 "%1 is in the channel strip and its curve is on the EQ "
                 "page — drag it from there. The strip's master switch "

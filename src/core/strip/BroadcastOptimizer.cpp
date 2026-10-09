@@ -26,6 +26,10 @@
 
 namespace Longpath::BroadcastOptimizer {
 
+static_assert(Plan::kStageCount == StripChain::kStageCount,
+              "Plan::stageNotes ist nach StripChain::Stage indiziert; "
+              "eine neue Stufe muss hier mitgezaehlt werden");
+
 namespace {
 
 // The same band indices StripTuner uses, and duplicated here for the
@@ -567,6 +571,37 @@ QVector<Plan> plan(const VoiceAnalysis& a)
             if (!line.isEmpty()) { p.notes << line; }
         }
 
+        // Dieselben Zeilen, aber jede an ihrer Stufe -- damit der
+        // Reiter, in dem der Bediener weiterdreht, auch sagt, was
+        // dort gerade gesetzt wurde.
+        const auto at = [&](StripChain::Stage st) -> QString& {
+            return p.stageNotes[static_cast<int>(st)];
+        };
+        at(StripChain::Stage::Gate)  = nGate;
+        at(StripChain::Stage::Eq)    = nEqCurve.isEmpty()
+            ? nEq
+            : (nEq.isEmpty() ? nEqCurve
+                             : nEqCurve + QStringLiteral("\n\n") + nEq);
+        at(StripChain::Stage::DeEss) = nDeEss;
+        at(StripChain::Stage::Comp)  = nTrim.isEmpty()
+            ? nComp
+            : nTrim + QStringLiteral("\n\n") + nComp;
+        at(StripChain::Stage::Limiter) = nLimiter;
+        if (!p.tubeCharacter.isEmpty()) {
+            at(StripChain::Stage::Tube) = QStringLiteral(
+                "Character \"%1\", chosen by the %2 profile.")
+                .arg(p.tubeCharacter, p.name);
+        }
+        if (!p.puduCharacter.isEmpty()) {
+            at(StripChain::Stage::Pudu) = QStringLiteral(
+                "Character \"%1\", chosen by the %2 profile.")
+                .arg(p.puduCharacter, p.name);
+        }
+        at(StripChain::Stage::Reverb) = QStringLiteral(
+            "Left off. No measurement asks for reverb, and on a "
+            "transmit path it is the one stage in this chain that is "
+            "understood WORSE at the far end rather than better.");
+
         out.push_back(p);
     }
 
@@ -688,8 +723,13 @@ bool apply(const Plan& p, StripChain& chain)
         hi.enabled = p.highShelfDb != 0.0;
         chain.eq().setBand(kBandHigh, hi);
 
-        anyEq = anyEq || lo.enabled || pr.enabled || hi.enabled;
-        chain.setStageEnabled(StripChain::Stage::Eq, anyEq);
+        // Die Stufe wird eingeschaltet, auch wenn die Korrektur
+        // nirgends ein Dezibel erreicht hat. Eine abgeschaltete
+        // Stufe sieht aus wie ein Fehler, und die Aussage "an deiner
+        // Kurve war nichts zu korrigieren" ist eine Aussage -- sie
+        // gehoert sichtbar gemacht, nicht durch Abwesenheit.
+        (void)anyEq;
+        chain.setStageEnabled(StripChain::Stage::Eq, true);
     }
 
     // ── Expander ─────────────────────────────────────────────────────

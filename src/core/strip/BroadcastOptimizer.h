@@ -378,6 +378,22 @@ struct Plan {
     // Die ausfuehrliche Fassung. Nicht mehr die Hauptanzeige.
     QStringList notes;
 
+    // ── Je Stufe eine Zeile, fuer deren eigenen Reiter ───────────────
+    //
+    // "Gut waere, wenn ich nach dem Anklicken des gewuenschten
+    // Profils und nach dem Optimize eine eigene Reitergalerie sehe,
+    // was genau bei diesem Profil wie geaendert worden ist und
+    // anschliessend dort persoenlich individuell weitermachen zu
+    // koennen" (Betreiber, 2026-10-09).
+    //
+    // Die Reiter des Kanalzugs SIND diese Galerie -- es fehlte nur,
+    // dass in jedem steht, was der Optimierer dort getan hat. Der
+    // Index ist StripChain::Stage; acht, weil die Kette acht Stufen
+    // hat (im .cpp per static_assert an kStageCount gebunden, damit
+    // eine neunte diese Stelle nicht still ueberholt).
+    static constexpr int kStageCount = 8;
+    QString stageNotes[kStageCount];
+
     // Empty when the plan is worth taking as it stands. Set when the
     // measurement says this width cannot deliver what its name claims
     // — a microphone that rolls off below the channel, a room too
