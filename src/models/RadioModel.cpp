@@ -11197,6 +11197,15 @@ void RadioModel::wireSliceSignals(SliceModel* slice)
     connect(slice, &SliceModel::dspModeChanged, this, [this, slice](Longpath::DSPMode) {
         pushCtcssSquelchForSlice(slice);
     });
+    // Und der Rueckweg: was der Detektor sieht, landet im Slice, damit die
+    // Oberflaeche es anzeigen kann. Das Signal kommt aus dem DSP-Thread --
+    // darum QueuedConnection, sonst liefe die Anzeige dort.
+    if (RxChannel* rxCh = m_wdspEngine ? m_wdspEngine->rxChannel(slice->sliceIndex())
+                                       : nullptr) {
+        connect(rxCh, &RxChannel::ctcssTonePresenceChanged, slice,
+                [slice](bool present) { slice->setFmCtcssToneDetected(present); },
+                Qt::QueuedConnection);
+    }
 
     // Audio panel — mute / pan / binaural → WDSP PatchPanel
     // From Thetis Project Files/Source/Console/radio.cs:1386-1403 (pan)

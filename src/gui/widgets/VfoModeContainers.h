@@ -108,6 +108,7 @@ warren@wpratt.com
 //============================================================================================//
 
 #include <QWidget>
+#include <QLabel>
 #include <QPointer>
 #include <QSpinBox>
 #include <QPushButton>
@@ -147,6 +148,11 @@ private:
 
     GuardedComboBox* m_toneModeCmb{nullptr};
     GuardedComboBox* m_toneValueCmb{nullptr};
+    /// Leuchtet, solange der eingestellte Subton anliegt. Nur bei
+    /// "CTCSS Decode" und "CTCSS Enc+Dec" sichtbar -- in den anderen
+    /// Stellungen hoert niemand auf einen Ton, eine dunkle Leuchte waere
+    /// dort nur eine Behauptung.
+    QLabel*          m_toneLamp{nullptr};
     QSpinBox*        m_offsetKhzSpin{nullptr};  // FM repeater offset in kHz
     QPushButton*     m_txLowBtn{nullptr};       // "Low" repeater direction (TX below RX)
     QPushButton*     m_simplexBtn{nullptr};     // no repeater offset

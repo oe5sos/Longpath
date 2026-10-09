@@ -119,6 +119,7 @@
 #include "ScrollableLabel.h"
 #include "TriBtn.h"
 #include "VfoStyles.h"
+#include "../StyleConstants.h"
 #include "models/SliceModel.h"
 #include "core/WdspTypes.h"
 
@@ -194,6 +195,20 @@ void FmOptContainer::buildUi()
         m_toneValueCmb->setToolTip(QStringLiteral("CTCSS sub-audible tone frequency (Hz)"));
         row->addWidget(m_toneModeCmb, 1);
         row->addWidget(m_toneValueCmb, 1);
+
+        // Tonleuchte: an, solange der eingestellte Subton anliegt.
+        // kLiveGreen, nicht kGreenText -- ein anliegender Subton ist ein
+        // echter Live-Zustand, keine ruhige Erfolgsmeldung (siehe die
+        // Begruendung an der Konstante). Aus ist sie kBorderMuted, das
+        // dokumentierte Gegenstueck bei LED-artigen Zustaenden: KEIN Rot,
+        // denn "gerade kein Ton" ist der Normalfall zwischen zwei
+        // Durchgaengen und kein Fehler.
+        m_toneLamp = new QLabel(this);
+        m_toneLamp->setObjectName("toneLamp");
+        m_toneLamp->setFixedSize(10, 10);
+        m_toneLamp->setToolTip(QStringLiteral(
+            "Leuchtet, solange der eingestellte CTCSS-Subton anliegt"));
+        row->addWidget(m_toneLamp, 0, Qt::AlignVCenter);
         vbox->addLayout(row);
     }
 
@@ -251,11 +266,18 @@ void FmOptContainer::buildUi()
 
     // CTCSS Encode (und Enc+Dec) setzt den Ton beim Senden:
     // RadioModel::pushFmToneFromTxSlice (2026-09-27).
-    // Decode braucht weiterhin einen Tondetektor -- Thetis/WDSP haben keinen:
-    // (bandpass at ctcssValueHz + threshold). WDSP FMSQ handles noise-level
-    // squelch only, not tone-coded squelch. The SliceModel properties
-    // (fmCtcssMode, fmCtcssValueHz) store the user's selection for when
-    // the tone detector is implemented.
+    //
+    // Decode (und Enc+Dec) wirkt seit 2026-10-09 ebenfalls. Hier stand
+    // vorher, die Einstellung werde nur gespeichert, "for when the tone
+    // detector is implemented" -- er ist jetzt da: `CtcssDetector` samt
+    // Abgriff auf das FM-Basisband, verdrahtet ueber
+    // `RadioModel::pushCtcssSquelchForSlice` und
+    // `RxChannel::setCtcssSquelch`.
+    //
+    // Thetis/WDSP haben dafuer weiterhin nichts: `wdsp/fmd.c` filtert den
+    // Subton mit `snotch` nur aus dem Hoerbaren heraus, und WDSPs FMSQ
+    // ist eine Rausch-, keine Tonsperre. Der Detektor ist darum
+    // Longpath-eigen und nach TIA-603-D gebaut.
 
     connect(m_toneModeCmb,   QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, [this](int idx) {
@@ -324,6 +346,7 @@ void FmOptContainer::setSlice(SliceModel* s)
         // before, the flag only read the slice once.
         connect(s, &SliceModel::fmCtcssModeChanged,    this, [this](int)      { syncFromSlice(); });
         connect(s, &SliceModel::fmCtcssValueHzChanged, this, [this](double)   { syncFromSlice(); });
+        connect(s, &SliceModel::fmCtcssToneDetectedChanged, this, [this](bool) { syncFromSlice(); });
         connect(s, &SliceModel::fmOffsetHzChanged,     this, [this](int)      { syncFromSlice(); });
         connect(s, &SliceModel::fmTxModeChanged,       this, [this](FmTxMode) { syncFromSlice(); });
         connect(s, &SliceModel::fmReverseChanged,      this, [this](bool)     { syncFromSlice(); });
@@ -354,6 +377,24 @@ void FmOptContainer::syncFromSlice()
     const int toneIdx = m_toneValueCmb->findText(wantedTone);
     if (toneIdx >= 0) {
         m_toneValueCmb->setCurrentIndex(toneIdx);
+    }
+
+    // Tonleuchte. Sichtbar nur, wo auch jemand auf einen Ton hoert
+    // (Decode = 2, Enc+Dec = 3) -- in "Off" und "Encode" waere eine
+    // dunkle Leuchte eine Behauptung ueber etwas, das gar nicht laeuft.
+    if (m_toneLamp) {
+        const bool hoertZu = (mode == 2 || mode == 3);
+        m_toneLamp->setVisible(hoertZu);
+        if (hoertZu) {
+            const bool tonDa = m_slice->fmCtcssToneDetected();
+            m_toneLamp->setStyleSheet(QStringLiteral(
+                "QLabel { background: %1; border-radius: 5px; }"
+            ).arg(QLatin1String(tonDa ? Style::kLiveGreen : Style::kBorderMuted)));
+            m_toneLamp->setToolTip(tonDa
+                ? QStringLiteral("Der CTCSS-Subton %1 Hz liegt an").arg(wantedTone)
+                : QStringLiteral("Warten auf den CTCSS-Subton %1 Hz -- "
+                                 "der Ton fehlt, der Kanal ist stumm").arg(wantedTone));
+        }
     }
 
     // Offset: stored Hz → display kHz

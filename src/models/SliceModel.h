@@ -392,6 +392,12 @@ class SliceModel : public QObject {
     Q_PROPERTY(bool   binauralEnabled READ binauralEnabled WRITE setBinauralEnabled NOTIFY binauralEnabledChanged)
     Q_PROPERTY(int    fmCtcssMode     READ fmCtcssMode     WRITE setFmCtcssMode     NOTIFY fmCtcssModeChanged)
     Q_PROPERTY(double fmCtcssValueHz  READ fmCtcssValueHz  WRITE setFmCtcssValueHz  NOTIFY fmCtcssValueHzChanged)
+    // Liegt der eingestellte Subton gerade an? Keine Einstellung, sondern
+    // eine Meldung aus dem Empfangsweg: `RadioModel` schreibt sie aus
+    // `RxChannel::ctcssTonePresenceChanged`. Longpath-eigen, kein
+    // Thetis-Port -- dort gibt es keinen Tondetektor und darum auch
+    // nichts anzuzeigen.
+    Q_PROPERTY(bool fmCtcssToneDetected READ fmCtcssToneDetected NOTIFY fmCtcssToneDetectedChanged)
     Q_PROPERTY(int    fmOffsetHz      READ fmOffsetHz      WRITE setFmOffsetHz      NOTIFY fmOffsetHzChanged)
     Q_PROPERTY(Longpath::FmTxMode fmTxMode READ fmTxMode WRITE setFmTxMode NOTIFY fmTxModeChanged)
     Q_PROPERTY(bool   fmReverse       READ fmReverse       WRITE setFmReverse       NOTIFY fmReverseChanged)
@@ -1051,6 +1057,10 @@ public:
     void   setFmCtcssMode(int mode);
 
     double fmCtcssValueHz()  const { return m_fmCtcssValueHz; }
+    bool   fmCtcssToneDetected() const { return m_fmCtcssToneDetected; }
+    /// Nur fuer `RadioModel`: meldet, was der Tondetektor gerade sieht.
+    /// Keine Benutzereinstellung, wird nicht gespeichert.
+    void setFmCtcssToneDetected(bool detected);
     void   setFmCtcssValueHz(double hz);
 
     int    fmOffsetHz()      const { return m_fmOffsetHz; }
@@ -1327,6 +1337,7 @@ signals:
     void binauralEnabledChanged(bool v);
     void fmCtcssModeChanged(int mode);
     void fmCtcssValueHzChanged(double hz);
+    void fmCtcssToneDetectedChanged(bool detected);
     void fmOffsetHzChanged(int hz);
     void fmTxModeChanged(Longpath::FmTxMode mode);
     void fmReverseChanged(bool v);
@@ -1536,6 +1547,10 @@ private:
     bool   m_binauralEnabled{false};  // Neutral default — feature off at start
     int    m_fmCtcssMode{0};          // Neutral default — Off (0 = disabled)
     double m_fmCtcssValueHz{100.0};   // From Thetis console.cs:40500 — ctcss_freq = 100.0; radio.cs:2899 — ctcss_freq_hz = 100.0
+    // Meldung aus dem Empfangsweg, keine Einstellung. Vorgabe true: ohne
+    // laufende Tonsperre sperrt nichts, und die Anzeige soll dann nicht
+    // behaupten, ein Ton fehle.
+    bool   m_fmCtcssToneDetected{true};
     int      m_fmOffsetHz{0};           // Neutral default — zero offset
     FmTxMode m_fmTxMode{FmTxMode::Simplex};  // From Thetis console.cs:20873 — current_fm_tx_mode = FMTXMode.Simplex
     bool     m_fmReverse{false};        // Neutral default — normal direction
