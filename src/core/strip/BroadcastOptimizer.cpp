@@ -52,6 +52,8 @@ struct WidthRule {
     double topShiftDb;      // at three quarters of the channel
     int    density;         // where this width sits on Zeus's 0..100 axis
     bool   character;       // may this width run tube / exciter / reverb?
+    int    lowCutHz;        // der Kanal, unten
+    int    highCutHz;       // und oben
     const char* headline;   // what this profile is, in one line
 };
 
@@ -94,24 +96,24 @@ constexpr WidthRule kRules[kWidthCount] = {
     // headroom the channel cannot repay, presence is what gets you
     // answered. It will not sound like the operator's living room,
     // and that is the trade being made on purpose.
-    {2300.0, 0.85, 180.0, -4.0, +3.0, -4.0, kDensityDense,     false,
+    {2300.0, 0.85, 180.0, -4.0, +3.0, -4.0, kDensityDense,     false, 200, 2500,
      "Lean and dense for a crowded band. Cuts through; will not sound like your living room."},
 
     // 2.7 kHz — what most of the band is listening on, so this is the
     // one that should sound right by default rather than clever.
-    {2700.0, 0.85, 150.0, -2.0, +2.0, -3.0, kDensityBroadcast, true,
+    {2700.0, 0.85, 150.0, -2.0, +2.0, -3.0, kDensityBroadcast, true,  150, 2700,
      "The everyday setting — what most of the band is listening on."},
 
     // 3.2 kHz — room for the voice's own body again. Nearly flat at
     // the bottom; the reason to be this wide is fidelity, and cutting
     // the bass would spend the extra kilohertz on nothing.
-    {3200.0, 0.85, 120.0, -1.0, +1.5, -1.5, 42,                true,
+    {3200.0, 0.85, 120.0, -1.0, +1.5, -1.5, 42,                true,  100, 3200,
      "Room for the body of your voice. Polite when the band is quiet."},
 
     // 4.0 kHz — lightest hand of the four. Flat bottom, a touch of
     // presence, nothing else. Only pays off when the other operator
     // has opened their filter to match.
-    {4000.0, 0.85, 100.0,  0.0, +1.0,  0.0, kDensityNatural,   true,
+    {4000.0, 0.85, 100.0,  0.0, +1.0,  0.0, kDensityNatural,   true,   50, 4050,
      "Lightest hand of the four. Closest to how you actually sound."},
 };
 
@@ -222,8 +224,21 @@ QVector<Plan> plan(const VoiceAnalysis& a)
         // BROADCAST style states it: "wide to 2.9 kHz". The low cut
         // is the transmit filter's, not an equaliser's — it belongs
         // to the channel, and the chain below never touches tone.
-        p.lowCutHz  = 150;
-        p.highCutHz = int(std::lround(rule.widthHz));
+        // ── Der Kanal, unten UND oben ───────────────────────────────
+        //
+        // Der Tiefschnitt lag vorher bei allen vier fest auf 150 Hz.
+        // Damit verlor das 4-k-Profil unten genau dasselbe wie das
+        // schmale, und der Betreiber hoerte, was davon zu erwarten
+        // war: "das 4k profil hoert sich an als waeren es 2,7"
+        // (2026-10-09).
+        //
+        // Die Zahlen hier sind seine, aus derselben Nachricht: "ein
+        // dx oder contest profil ist im bereich 200-2500(2700), ein
+        // 4 k profil ist von ca 50-4050." Dazwischen gestuft. Unten
+        // liegt der groessere Teil des Unterschieds -- 50 gegen 200
+        // Hz sind zwei Oktaven Koerper.
+        p.lowCutHz  = rule.lowCutHz;
+        p.highCutHz = rule.highCutHz;
 
         // ── Expander, from the measured signal-to-noise ─────────────
         //
@@ -479,6 +494,67 @@ bool apply(const Plan& p, StripChain& chain)
     // Deliberately absent: the master switch. The operator decides
     // when their transmit audio changes.
     return true;
+}
+
+void applyChannelFilter(float* samples, int frames, int sampleRate,
+                        const Plan& p)
+{
+    if (samples == nullptr || frames <= 0 || sampleRate <= 0) { return; }
+
+    struct Bq { double b0, b1, b2, a1, a2; };
+    const auto run = [&](const Bq& f) {
+        double x1 = 0.0, x2 = 0.0, y1 = 0.0, y2 = 0.0;
+        for (int i = 0; i < frames; ++i) {
+            const double in = samples[i];
+            const double out = f.b0 * in + f.b1 * x1 + f.b2 * x2
+                             - f.a1 * y1 - f.a2 * y2;
+            x2 = x1; x1 = in;
+            y2 = y1; y1 = out;
+            samples[i] = float(out);
+        }
+    };
+    // ── Butterworth vierter Ordnung, richtig gestuft ────────────────
+    //
+    // Zwei zweite Ordnungen mit DEMSELBEN Q (0,7071) sind kein
+    // Butterworth vierter Ordnung, sondern zwei gestapelte zweiter:
+    // -6 dB schon AUF der Ecke und merklicher Abfall eine Oktave
+    // darunter. Bei 4000 Hz faellt das ab etwa 2 kHz -- und genau so
+    // klang es: „das 4k profil hoert sich an als waeren es 2,7"
+    // (Betreiber, 2026-10-09).
+    //
+    // Ein echter Butterworth braucht zwei VERSCHIEDENE Guetefaktoren,
+    // 0,5412 und 1,3066. Dann ist der Durchlassbereich flach bis zur
+    // Ecke, dort -3 dB, und danach 24 dB je Oktave -- was ein
+    // Sendefilter tatsaechlich tut.
+    static constexpr double kButterQ[2] = {0.54119610, 1.30656296};
+
+    const auto lowPassAt = [&](double hz, double q) {
+        const double w  = 2.0 * M_PI * hz / sampleRate;
+        const double cs = std::cos(w);
+        const double al = std::sin(w) / (2.0 * q);
+        const double a0 = 1.0 + al;
+        return Bq{(1.0 - cs) / 2.0 / a0, (1.0 - cs) / a0,
+                  (1.0 - cs) / 2.0 / a0, -2.0 * cs / a0, (1.0 - al) / a0};
+    };
+    const auto highPassAt = [&](double hz, double q) {
+        const double w  = 2.0 * M_PI * hz / sampleRate;
+        const double cs = std::cos(w);
+        const double al = std::sin(w) / (2.0 * q);
+        const double a0 = 1.0 + al;
+        return Bq{(1.0 + cs) / 2.0 / a0, -(1.0 + cs) / a0,
+                  (1.0 + cs) / 2.0 / a0, -2.0 * cs / a0, (1.0 - al) / a0};
+    };
+
+    if (p.lowCutHz > 20) {
+        for (double q : kButterQ) {
+            run(highPassAt(double(p.lowCutHz), q));
+        }
+    }
+    if (p.highCutHz > 100 && double(p.highCutHz) < sampleRate * 0.45) {
+        for (double q : kButterQ) {
+            run(lowPassAt(double(p.highCutHz), q));
+        }
+    }
 }
 
 int saveAsPresets(const QVector<Plan>& plans)

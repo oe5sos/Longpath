@@ -166,11 +166,24 @@ private slots:
         QCOMPARE(p[0].name, QStringLiteral("Broadcast 2.3k"));
         QCOMPARE(p[3].name, QStringLiteral("Broadcast 4.0k"));
 
-        // The profile is for a channel, so it carries the channel.
-        for (const BroadcastOptimizer::Plan& one : p) {
-            QCOMPARE(double(one.highCutHz), one.widthHz);
-            QVERIFY(one.lowCutHz > 0);
-            QVERIFY(double(one.lowCutHz) < one.widthHz);
+        // Das Profil ist fuer einen Kanal, also traegt es den Kanal
+        // -- oben UND unten. Die Zahlen sind die des Betreibers:
+        // Contest 200-2500, das breite 50-4050.
+        QCOMPARE(p[0].lowCutHz,   200);
+        QCOMPARE(p[0].highCutHz, 2500);
+        QCOMPARE(p[3].lowCutHz,    50);
+        QCOMPARE(p[3].highCutHz, 4050);
+
+        // Und der Kanal oeffnet sich an BEIDEN Enden, Zeile fuer
+        // Zeile. Der Tiefschnitt lag einmal bei allen vier fest auf
+        // 150 Hz -- dann verliert das breite Profil unten dasselbe
+        // wie das schmale und klingt wie dieses.
+        for (int i = 1; i < p.size(); ++i) {
+            QVERIFY2(p[i].lowCutHz < p[i - 1].lowCutHz,
+                     qPrintable(QStringLiteral("%1 schneidet unten nicht "
+                                               "tiefer als %2")
+                         .arg(p[i].name, p[i - 1].name)));
+            QVERIFY(p[i].highCutHz > p[i - 1].highCutHz);
         }
     }
 

@@ -339,6 +339,19 @@ int bestIndex(const QVector<Plan>& plans, double currentTxWidthHz);
 // rather than from somebody else's taste.
 bool apply(const Plan& p, StripChain& chain);
 
+// ── Das Kanalfilter, zum Hoeren ──────────────────────────────────────
+//
+// Bildet das Sendefilter des Plans auf einem Puffer nach: Hochpass auf
+// lowCutHz, Tiefpass zweiter Ordnung ZWEIMAL auf highCutHz.
+//
+// Es steht hier und nicht im Fenster, weil es sonst DSP waere, an die
+// kein Pruefstand herankommt -- und die Frage "klingt 4,0 k wirklich
+// breiter als 2,7 k" ist genau die, die ein Pruefstand beantworten
+// muss statt ein Ohr. Ohne diese zwei Filter ist die Vorschau eines
+// schmalen Profils die Vorschau von etwas, das so nie gesendet wird.
+void applyChannelFilter(float* samples, int frames, int sampleRate,
+                        const Plan& p);
+
 // ── Writing all four out ─────────────────────────────────────────────
 //
 // Applies each plan to a scratch chain and saves it through

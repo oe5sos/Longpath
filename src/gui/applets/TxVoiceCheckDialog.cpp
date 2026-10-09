@@ -1131,56 +1131,10 @@ void TxVoiceCheckDialog::playPlan(const BroadcastOptimizer::Plan& plan)
     std::vector<float> rendered(src, src + frames);
     scratch.processMono(rendered.data(), frames);
 
-    // ── Die Breite hoerbar machen ────────────────────────────────────
-    //
-    // Das Profil sagt, die Breite SEI die kennzeichnende Aenderung --
-    // und beim Abhoeren kam sie nicht vor. Das Sendefilter gehoert
-    // WDSP, nicht dieser Kette, also klangen alle vier Profile fast
-    // gleich, und der Betreiber sagte genau das: "aber aendern tut
-    // sich da nicht viel" (2026-10-09).
-    //
-    // Hier wird es nachgebildet: ein Butterworth-Paar auf lowCut und
-    // highCut des Plans. Das ist keine Verzierung, sondern das, was
-    // auf dem Band tatsaechlich passiert -- ohne diese zwei Filter
-    // ist die Vorschau eines 2,3-k-Profils die Vorschau von etwas,
-    // das so nie gesendet wird.
-    {
-        struct Bq { double b0, b1, b2, a1, a2; };
-        const auto run = [&](const Bq& f) {
-            double x1 = 0.0, x2 = 0.0, y1 = 0.0, y2 = 0.0;
-            for (float& v : rendered) {
-                const double in = v;
-                const double out = f.b0 * in + f.b1 * x1 + f.b2 * x2
-                                 - f.a1 * y1 - f.a2 * y2;
-                x2 = x1; x1 = in;
-                y2 = y1; y1 = out;
-                v = float(out);
-            }
-        };
-        constexpr double kQ = 0.7071;
-        if (plan.lowCutHz > 20) {
-            const double w  = 2.0 * M_PI * double(plan.lowCutHz) / rate;
-            const double cs = std::cos(w);
-            const double al = std::sin(w) / (2.0 * kQ);
-            const double a0 = 1.0 + al;
-            run(Bq{(1.0 + cs) / 2.0 / a0, -(1.0 + cs) / a0,
-                   (1.0 + cs) / 2.0 / a0, -2.0 * cs / a0, (1.0 - al) / a0});
-        }
-        if (plan.highCutHz > 100 && double(plan.highCutHz) < rate * 0.45) {
-            const double w  = 2.0 * M_PI * double(plan.highCutHz) / rate;
-            const double cs = std::cos(w);
-            const double al = std::sin(w) / (2.0 * kQ);
-            const double a0 = 1.0 + al;
-            // Zweimal durch: eine zweite Ordnung allein laesst
-            // oberhalb der Ecke zu viel stehen, um den Unterschied
-            // zwischen 3,2 und 4,0 kHz hoerbar zu machen.
-            const Bq lp{(1.0 - cs) / 2.0 / a0, (1.0 - cs) / a0,
-                        (1.0 - cs) / 2.0 / a0, -2.0 * cs / a0,
-                        (1.0 - al) / a0};
-            run(lp);
-            run(lp);
-        }
-    }
+    // Die Breite hoerbar machen. Das Filter steht im Kern, damit der
+    // Pruefstand dieselbe Rechnung prueft, die hier zu hoeren ist.
+    BroadcastOptimizer::applyChannelFilter(rendered.data(), frames, rate,
+                                           plan);
 
     // ── Matching the loudness before it is judged ────────────────────
     //
