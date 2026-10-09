@@ -182,8 +182,16 @@ void StripLiveMonitor::doStart()
     m_blockFrames = blockFramesFor(m_preset);
 
     m_src = new QAudioSource(in, inFmt, this);
+    // Grosszuegig, und das kostet NICHTS an Verzoegerung: der Eingang
+    // wird bei jedem Weckruf vollstaendig leergelesen, der Puffer ist
+    // also nur die Reserve fuer den Fall, dass ein Weckruf spaet
+    // kommt. Zwei Bloecke -- gut zehn Millisekunden -- waren dafuer
+    // zu knapp; was in dieser Zeit nicht abgeholt wird, ist beim
+    // Eingang unwiederbringlich weg und klingt wie Kratzen. Die
+    // Verzoegerung macht allein der Vorrat am Ausgang.
     m_src->setBufferSize(m_blockFrames * m_inChannels
-                         * bytesPerSample(inFmt.sampleFormat()) * 2);
+                         * bytesPerSample(inFmt.sampleFormat())
+                         * kSinkBlocks);
     m_sink = new QAudioSink(out, outFmt, this);
     // Grosszuegig, damit write() nie abschneidet -- siehe kSinkBlocks.
     m_sink->setBufferSize(m_blockFrames * m_outBytesPerFrame * kSinkBlocks);
@@ -204,7 +212,9 @@ void StripLiveMonitor::doStart()
     connect(m_srcIo, &QIODevice::readyRead, this, &StripLiveMonitor::pump);
 
     m_carry.clear();
-    m_sinceCorrection = 0;
+    m_ratio = 1.0;
+    m_readPos = 0.0;
+    m_lastOut = 0.0f;
     m_underruns.store(0, std::memory_order_release);
     m_overruns.store(0, std::memory_order_release);
 
@@ -406,7 +416,35 @@ void StripLiveMonitor::pump()
         m_spectrum->feed(m_mono.data(), int(m_mono.size()));
     }
 
+    // Was hereinkommt, vor der Kette.
+    float peakIn = 0.0f;
+    for (float v : m_mono) { peakIn = std::max(peakIn, std::fabs(v)); }
+
     applyStrip(m_mono.data(), int(m_mono.size()));
+
+    // Was herauskommt, nach der Kette. Einmal je Sekunde ins
+    // Protokoll, mit dem Vorrat am Ausgang und dem Leseverhaeltnis.
+    //
+    // Ohne diese Zeile ist „ich hoere nichts" von „die Kette macht
+    // nichts" nicht zu unterscheiden, und man raet. Dieser Abend hat
+    // genug geraten.
+    float peakOut = 0.0f;
+    for (float v : m_mono) { peakOut = std::max(peakOut, std::fabs(v)); }
+    m_logFrames += int(m_mono.size());
+    if (m_logFrames >= m_inRate) {
+        m_logFrames = 0;
+        const auto dB = [](float p) {
+            return p > 1e-6f ? 20.0f * std::log10(p) : -120.0f;
+        };
+        qCInfo(lcAudio) << "strip live monitor: in" << dB(peakIn) << "dBFS"
+                        << "out" << dB(peakOut) << "dBFS"
+                        << (m_bypass.load(std::memory_order_acquire)
+                                ? "(bypassed)" : "(through strip)")
+                        << "queued" << (m_sink->bufferSize()
+                                        - m_sink->bytesFree())
+                        << "of" << m_sink->bufferSize()
+                        << "ratio" << m_ratio;
+    }
 
     // ── Hinaus ───────────────────────────────────────────────────────
     //
@@ -441,62 +479,73 @@ void StripLiveMonitor::pump()
     // Die Totzone ist breit: korrigiert wird erst, wenn der Vorrat um
     // mehr als einen halben Block von seinem Soll abweicht. Ohne sie
     // korrigierte man dauernd gegen das eigene Rauschen.
-    // ── Wie oft korrigiert werden darf ──────────────────────────────
+    // ── Zwei Uhren, dritter und letzter Anlauf ──────────────────────
     //
-    // Das war der zweite Anlauf, und er war immer noch falsch: ein
-    // Abtastwert je Durchgang klingt harmlos, bei rund zweihundert
-    // Durchgaengen in der Sekunde sind es aber zweihundert Werte --
-    // 0,4 Prozent, in kleinen Rucken verteilt. Das ist das Kratzen,
-    // das gemeldet wurde.
+    // Die beiden davor haben Loecher gestanzt: erst ganze Bloecke
+    // weggeworfen (5,3 ms Loch, alle paar Sekunden), dann einzelne
+    // Abtastwerte verdoppelt oder weggelassen. Das zweite klang nach
+    // Kratzen, weil es bei rund zweihundert Durchgaengen in der
+    // Sekunde zweihundert Werte waren; nach dem Deckeln auf zehn
+    // klang es immer noch schlecht.
     //
-    // Schlimmer: es lief DAUERND. Angefuellt wurde mit zwei Bloecken,
-    // gewollt waren drei, und wenn die Soundkarte nie drei
-    // ansammelt, steht der Vorrat fuer immer unter der Schwelle --
-    // also wurde bei jedem einzelnen Durchgang ein Wert verdoppelt.
+    // Der Fehler war nicht die Haeufigkeit, sondern die Methode. Ein
+    // fehlender oder doppelter Abtastwert ist ein SPRUNG in der
+    // Wellenform -- ein Knacks, egal wie selten. Und selten macht ihn
+    // nicht leiser, nur seltener.
     //
-    // Jetzt drei Dinge: angefuellt wird auf den vollen Sollwert, die
-    // Totzone ist einen GANZEN Block breit statt einen halben, und
-    // korrigiert wird hoechstens bei jedem zwanzigsten Durchgang --
-    // rund zehnmal in der Sekunde. Realer Uhrenversatz zwischen zwei
-    // Geraeten liegt unter hundert Millionstel, also unter fuenf
-    // Werten je Sekunde; zehn sind reichlich und unhoerbar.
+    // Richtig ist, was Thetis fuer dasselbe Problem tut (rmatch, siehe
+    // docs/architecture/2026-09-27-rx-audio-rate-match-design.md):
+    // nicht schneiden, sondern die Abtastrate ein Haar verstellen.
+    // Hier als einfacher Interpolator mit gleitendem Verhaeltnis --
+    // laeuft der Vorrat voll, wird minimal schneller gelesen, laeuft
+    // er leer, minimal langsamer. Gedeckelt auf zwei Promille, also
+    // weit jenseits jedes realen Uhrenversatzes (der liegt unter
+    // hundert Millionstel) und dabei noch unhoerbar: zwei Promille
+    // sind drei Tausendstel eines Halbtons.
+    //
+    // Es gibt keinen Sprung mehr. Nirgends.
     const int queued     = m_sink->bufferSize() - m_sink->bytesFree();
     const int blockBytes = m_blockFrames * m_outBytesPerFrame;
     const int wanted     = blockBytes * kTargetBlocks;
-    const int slack      = blockBytes;
 
-    const bool mayCorrect = (++m_sinceCorrection >= 20);
-    if (!mayCorrect) {
-        // nichts; der naechste Durchgang darf wieder
-    } else if (queued > wanted + slack && m_mono.size() > 1) {
-        m_sinceCorrection = 0;
-        // Zu viel Vorrat: der Eingang ist schneller. Einen Wert
-        // weglassen, und zwar den leisesten im Block -- dort faellt
-        // ein fehlender Schritt am wenigsten auf.
-        size_t quietest = 0;
-        float  lowest = std::fabs(m_mono[0]);
-        for (size_t i = 1; i < m_mono.size(); ++i) {
-            const float a = std::fabs(m_mono[i]);
-            if (a < lowest) { lowest = a; quietest = i; }
+    if (wanted > 0) {
+        const double error = double(queued - wanted) / double(wanted);
+        const double target = std::clamp(1.0 + 0.002 * error,
+                                         1.0 - 0.002, 1.0 + 0.002);
+        // Traege nachgefuehrt. Ein Verhaeltnis, das jedem Zappeln der
+        // Puffermeldung folgt, ist selbst eine Modulation.
+        m_ratio += 0.02 * (target - m_ratio);
+    }
+
+    // Lineare Interpolation. Bei einem Verhaeltnis von 1,000 plus
+    // minus zwei Promille liegt ihr Hoehenverlust bei 5 kHz unter
+    // einem fuenftel Dezibel -- messbar, nicht hoerbar, und um
+    // Groessenordnungen harmloser als ein einziger Sprung.
+    {
+        std::vector<float>& in = m_mono;
+        m_resampled.clear();
+        m_resampled.reserve(in.size() + 2);
+        double at = m_readPos;
+        while (true) {
+            const double idx = at;
+            const auto i0 = qsizetype(std::floor(idx));
+            if (i0 + 1 >= qsizetype(in.size())) { break; }
+            const double f = idx - double(i0);
+            const float a = (i0 < 0) ? m_lastOut : in[size_t(i0)];
+            const float b = in[size_t(i0 + 1)];
+            m_resampled.push_back(float(a + (b - a) * f));
+            at += m_ratio;
         }
-        m_mono.erase(m_mono.begin() + qsizetype(quietest));
-        m_overruns.fetch_add(1, std::memory_order_acq_rel);
-    } else if (queued < wanted - slack && !m_mono.empty()) {
-        m_sinceCorrection = 0;
-        // Zu wenig Vorrat: den leisesten Wert verdoppeln.
-        size_t quietest = 0;
-        float  lowest = std::fabs(m_mono[0]);
-        for (size_t i = 1; i < m_mono.size(); ++i) {
-            const float a = std::fabs(m_mono[i]);
-            if (a < lowest) { lowest = a; quietest = i; }
+        // Was vom Bruchteil uebrig bleibt, geht in den naechsten
+        // Durchgang -- sonst entsteht an jeder Blockgrenze genau der
+        // Sprung, den das hier vermeiden soll.
+        if (!in.empty()) {
+            m_lastOut = in.back();
+            m_readPos = at - double(in.size() - 1);
+            if (m_readPos < 0.0) { m_readPos = 0.0; }
+            if (m_readPos > 2.0) { m_readPos = 2.0; }
         }
-        // Erst in eine eigene Variable. Ein insert(), dessen Wert
-        // eine Referenz in denselben Vektor ist, muss zwar laut Norm
-        // funktionieren -- aber wer das hier liest, soll nicht erst
-        // nachschlagen muessen.
-        const float keep = m_mono[quietest];
-        m_mono.insert(m_mono.begin() + qsizetype(quietest), keep);
-        m_underruns.fetch_add(1, std::memory_order_acq_rel);
+        m_mono.swap(m_resampled);
     }
 
     const auto outFmt = static_cast<QAudioFormat::SampleFormat>(m_outFormat);

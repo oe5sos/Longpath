@@ -210,7 +210,13 @@ private:
     MicSpectrum* m_spectrum{nullptr};   // nicht besessen
     const StripChain* m_mirror{nullptr};   // nicht besessen
     int m_mirrorTick{0};
-    int m_sinceCorrection{0};
+    // Der Uhrenausgleich: ein gleitendes Leseverhaeltnis statt
+    // gestanzter Loecher. Siehe pump().
+    double m_ratio{1.0};
+    double m_readPos{0.0};
+    float  m_lastOut{0.0f};
+    std::vector<float> m_resampled;
+    int m_logFrames{0};
 
     Latency m_preset{Latency::Safe};
     int m_blockFrames{256};
