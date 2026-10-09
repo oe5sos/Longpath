@@ -153,6 +153,27 @@ private slots:
                                 .arg(through).arg(raw)));
     }
 
+    // Die eigene Kette des Mithoerers folgt dem Hauptschalter -- auch
+    // in ihrem Schalterzustand, nicht nur in der Rechnung.
+    //
+    // Ohne Funkgeraet lesen die Kachelreihe und die Pegelbalken
+    // DIESE Kette. Eine Kette, die als „eingeschaltet" dasteht,
+    // waehrend sie ueberbrueckt wird, ist eine Falschaussage an
+    // genau der Stelle, an der man beim Suchen hinsieht.
+    void theMonitorChainShowsWhetherItIsRunning()
+    {
+        StripLiveMonitor m;
+        QVERIFY(m.chain() != nullptr);
+
+        m.setStripBypassed(false);
+        QVERIFY2(m.chain()->isEnabled(),
+                 "durchgeschaltet, aber die Kette meldet sich als aus");
+
+        m.setStripBypassed(true);
+        QVERIFY2(!m.chain()->isEnabled(),
+                 "ueberbrueckt, aber die Kette meldet sich als an");
+    }
+
     void theLiveMonitorBringsItsOwnChain()
     {
         StripLiveMonitor m;

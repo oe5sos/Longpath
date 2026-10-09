@@ -314,7 +314,9 @@ void StripLiveMonitor::doResync()
     } else {
         StripSettings::restore(*m_chain);
     }
-    m_chain->setEnabled(true);
+    // Dem Ueberbrueckungsschalter folgen, nicht blind einschalten --
+    // siehe setStripBypassed().
+    m_chain->setEnabled(!m_bypass.load(std::memory_order_acquire));
 }
 
 void StripLiveMonitor::doSetVolume(double v)
@@ -344,6 +346,13 @@ void StripLiveMonitor::setStripBypassed(bool bypassed)
 {
     if (m_bypass.load(std::memory_order_acquire) == bypassed) { return; }
     m_bypass.store(bypassed, std::memory_order_release);
+    // Den Hauptschalter der eigenen Kette mitfuehren. Nicht wegen der
+    // Rechnung -- applyStrip() fragt m_bypass ohnehin --, sondern
+    // wegen der ANZEIGE: ohne Funkgeraet lesen die Kachelreihe und
+    // die Pegelbalken diese Kette, und eine Kette, die als
+    // „eingeschaltet" dasteht, waehrend sie ueberbrueckt wird, ist
+    // eine Falschaussage an genau der Stelle, an der man hinsieht.
+    m_chain->setEnabled(!bypassed);
     qCInfo(lcAudio) << "strip live monitor:"
                     << (bypassed ? "bypassed (raw microphone)"
                                  : "through the strip");

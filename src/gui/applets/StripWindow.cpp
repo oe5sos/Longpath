@@ -335,6 +335,37 @@ void StripWindow::persist()
 // persist() deckt die 49 Stellen ab, die durch dieses Fenster gehen,
 // der halbsekuendige Takt faengt die, die es nicht tun (der portierte
 // Entzerrer speichert selbst, ueber EqHost).
+// ── Welche Kette die ANZEIGEN lesen ─────────────────────────────────
+//
+// Normalerweise die des Funkgeraets. Laeuft aber das Mithoeren und
+// ist kein Geraet da, rechnet NUR der Kanalzug des Mithoerers -- und
+// die Anzeigen standen trotzdem auf der leeren Sendekette. Am Geraet
+// sah das so aus: Mithoeren an, Stimme hoerbar, und die Gate-Seite
+// meldete „Silent -- Nothing is arriving at the gate", dazu
+// „in -120.0 dBFS" und zwei leere Pegelbalken.
+//
+// Das ist die schlimmste Sorte Anzeige: sie ist nicht leer, sie
+// BEHAUPTET etwas Falsches, und zwar genau das, was man beim Suchen
+// nach einem Tonproblem als erstes glaubt.
+//
+// Verstellt wird nur, WORAUS gelesen wird. Geschrieben wird
+// unveraendert in die Kette des Funkgeraets (chain()) -- sie bleibt
+// die Vorlage, der Mithoerer spiegelt sie zehnmal in der Sekunde.
+// Ein Regler, der in die Spiegelung schriebe, waere beim naechsten
+// Takt wieder ueberschrieben.
+void StripWindow::useChainForDisplay(StripChain* c)
+{
+    if (m_chainView)     { m_chainView->setChain(c); }
+    if (m_levels)        { m_levels->setChain(c); }
+    if (m_gateCurve)     { m_gateCurve->setChain(c); }
+    if (m_deEssCurve)    { m_deEssCurve->setChain(c); }
+    if (m_compCurve)     { m_compCurve->setChain(c); }
+    if (m_tubeCurve)     { m_tubeCurve->setChain(c); }
+    if (m_puduCurve)     { m_puduCurve->setChain(c); }
+    if (m_limiterCurve)  { m_limiterCurve->setChain(c); }
+    refreshStageCards();
+}
+
 void StripWindow::toggleLiveMonitor(bool on)
 {
     if (on) {
@@ -381,6 +412,11 @@ void StripWindow::toggleLiveMonitor(bool on)
         // beim naechsten Umlegen.
         m_live->setStripBypassed(!(m_master && m_master->isChecked()));
         m_live->start();
+        // Ohne Funkgeraet rechnet nur der Mithoerer -- dann sollen
+        // die Anzeigen auch IHN lesen. Siehe useChainForDisplay().
+        if (!m_radio || !m_radio->isConnected()) {
+            useChainForDisplay(m_live->chain());
+        }
         if (!m_liveSync) {
             m_liveSync = new QTimer(this);
             // Zehnmal in der Sekunde. Das geht nur, weil seit dem
@@ -396,6 +432,7 @@ void StripWindow::toggleLiveMonitor(bool on)
     } else {
         if (m_liveSync) { m_liveSync->stop(); }
         if (m_live) { m_live->stop(); }
+        useChainForDisplay(chain());
     }
     updateLiveNote();
 }

@@ -223,6 +223,7 @@ private:
     // Rechners und ruehrt das Funkgeraet nicht an. Siehe
     // core/strip/StripLiveMonitor.h.
     void toggleLiveMonitor(bool on);
+    void useChainForDisplay(StripChain* c);
     void updateLiveNote();
 
     // ── Einschubplaetze (2026-10-09) ────────────────────────────────
