@@ -990,6 +990,16 @@ longpath_add_test(tst_ctcss_tonleuchte_bild)
 longpath_add_test(tst_dcs_detector)
 longpath_add_test(tst_dcs_squelch_anbindung)
 longpath_add_test(tst_empfaengerwahl)
+longpath_add_test(tst_ui_scale)
+# Der Pruefstand liest src/main.cpp, um die Kopplung ueber den
+# Einstellungsschluessel zu belegen. `if(TEST ...)` wie bei
+# tst_nnr_without_model: longpath_add_test legt den Test nicht auf jeder
+# Plattform an.
+if(TEST tst_ui_scale)
+    set_tests_properties(tst_ui_scale PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
+longpath_add_test(tst_ui_scale_menue)
 longpath_add_test(tst_rtty_decoder)
 longpath_add_test(tst_rtty_decoder_sensitivity)
 longpath_add_test(tst_rtty_decoder_applet)

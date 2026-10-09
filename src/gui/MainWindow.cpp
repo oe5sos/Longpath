@@ -298,6 +298,7 @@ warren@wpratt.com
 #include "core/TxChannel.h"  // H.2: setTxChannel wiring
 #include "core/ReceiverManager.h"
 #include "core/AppSettings.h"
+#include "core/UiScale.h"
 #include "core/BuildIdentity.h"
 #include "core/PaTempUnit.h"
 #include "core/RadioStatus.h"
@@ -9417,24 +9418,40 @@ void MainWindow::buildMenuBar()
     }
 
     {
-        QMenu* uiScaleMenu = viewMenu->addMenu(QStringLiteral("&UI Scale"));
+        // Darstellungsgroesse (2026-10-09). Der Unterbau stand schon:
+        // `main.cpp` liest `UiScalePercent` aus den Einstellungen und
+        // setzt daraus `QT_SCALE_FACTOR` -- und zwar VOR dem
+        // QApplication-Konstruktor, weil Qt den Faktor nur dort liest.
+        // Nur das Menue war tot (jeder Eintrag `setEnabled(false)`,
+        // Tooltip "NYI"), man konnte die Groesse also ueberhaupt nicht
+        // einstellen; sie haette von Hand in die Einstellungsdatei
+        // gemusst.
+        //
+        // Genau daraus folgt auch, warum eine Aenderung erst nach einem
+        // Neustart greift: `QT_SCALE_FACTOR` wirkt nur beim Start. Das
+        // sagen wir dem Benutzer, statt eine Aenderung vorzutaeuschen,
+        // die er nicht sieht.
+        //
+        // Die Stufen: 75 bis 200 wie bisher vorgesehen, dazu 115 und 130
+        // als feine Zwischenstufen -- von 100 auf 125 ist ein grosser
+        // Sprung, und genau dort liegt der Bedarf.
+        QMenu* uiScaleMenu = viewMenu->addMenu(QStringLiteral("&Darstellungsgröße"));
         QActionGroup* scaleGroup = new QActionGroup(this);
         scaleGroup->setExclusive(true);
-        const struct { const char* label; bool isDefault; } scales[] = {
-            { "&75%",  false },
-            { "&100%", true  },
-            { "&125%", false },
-            { "&150%", false },
-            { "&175%", false },
-            { "&200%", false },
-        };
-        for (const auto& s : scales) {
-            QAction* a = uiScaleMenu->addAction(QString::fromUtf8(s.label));
+
+        const int aktuell = UiScale::current();
+        for (int pct : UiScale::steps()) {
+            QAction* a = uiScaleMenu->addAction(QStringLiteral("%1 %").arg(pct));
             a->setCheckable(true);
-            a->setEnabled(false);
-            a->setToolTip(QStringLiteral("NYI — Phase X"));
-            if (s.isDefault) { a->setChecked(true); }
+            a->setChecked(pct == aktuell);
+            a->setData(pct);
             scaleGroup->addAction(a);
+            connect(a, &QAction::triggered, this, [this, pct]() {
+                if (!UiScale::store(pct)) { return; }
+                QMessageBox::information(this,
+                                         QStringLiteral("Darstellungsgröße"),
+                                         UiScale::restartHint(pct));
+            });
         }
     }
 
@@ -10556,6 +10573,7 @@ void MainWindow::buildMenuBar()
 // same badge through the same opacity-only state change -- a plain
 // setVisible() no longer represents "inactive" once a badge lives in a
 // permanently allocated slot.
+
 void MainWindow::dimSafetyBadge(QWidget* w, bool active)
 {
     auto* fx = qobject_cast<QGraphicsOpacityEffect*>(w->graphicsEffect());
