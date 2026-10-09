@@ -77,6 +77,22 @@ struct VoiceAnalysis {
     double crestFactorDb{0.0};
     double humDb{-120.0};           // hum against speech, dB
     int    humBaseHz{0};            // 50 or 60, whichever was found
+
+    // Ob die Brummmessung ueberhaupt etwas messen konnte.
+    //
+    // Die Fenster um 50/100/150/200 Hz (bzw. 60/120/...) sind rund
+    // 23 Hz breit. Eine Stimme mit 110 Hz Grundton legt ihren eigenen
+    // Grundton in das 100-Hz-Fenster und ihre zweite Oberwelle in das
+    // 200-Hz-Fenster -- am Geraet gemessen (2026-10-09): 110 Hz bei
+    // -12,5 dB als „Netzbrumm", woraufhin StripTuner den Grundton mit
+    // -18 dB auskerbte.
+    //
+    // Fenster, in denen eine Oberwelle der Stimme liegt, werden jetzt
+    // uebersprungen. Bleibt keines uebrig, ist humDb KEINE Messung und
+    // dieses Feld false. Wer es ignoriert und humDb trotzdem liest,
+    // bekommt -120 -- also „kein Brumm", was die sichere Seite ist.
+    bool   humMeasurable{true};
+    int    humMaskedHarmonics{0};   // wie viele Fenster die Stimme belegt
     double sibilanceDb{0.0};        // 5-8k against 1-3k
 
     // Where the sibilance actually sits, in Hz — the loudest point

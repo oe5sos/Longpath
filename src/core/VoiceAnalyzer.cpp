@@ -333,10 +333,72 @@ VoiceAnalysis VoiceAnalyzer::analyse(const float* samples, int frames,
     // Both mains frequencies are tried and the stronger wins, rather
     // than assuming the operator's country. Harmonics are included
     // because a transformer hum is rarely a clean sine.
+    // ── Der Wachhund vor dem Brummfenster (2026-10-09) ───────────────
+    //
+    // Die Fenster sind plus/minus zwei Faecher breit, das sind bei
+    // dieser Laenge rund 23 Hz. Eine Maennerstimme mit 110 Hz
+    // Grundton legt damit IHREN Grundton in das 100-Hz-Fenster (77 bis
+    // 123 Hz) und ihre zweite Oberwelle in das 200-Hz-Fenster. Das
+    // Ergebnis war am Geraet gemessen: 110 Hz bei -12,5 dB, 150 Hz bei
+    // -17,6 dB -- „Netzbrumm", der in Wahrheit die Stimme selbst war.
+    // Und weil StripTuner daran haengt, kerbte die Automatik den
+    // Grundton mit -18 dB aus.
+    //
+    // Also: ein Brummfenster, in dem eine Oberwelle der STIMME liegt,
+    // wird uebersprungen. Trennen laesst sich beides bei dieser
+    // Aufloesung nicht -- ein 100-Hz-Brumm und eine 110-Hz-Stimme
+    // teilen sich dasselbe Fach. Was sich machen laesst, ist nicht so
+    // zu tun, als ginge es: was uebersprungen wurde, wird gezaehlt,
+    // und bleibt nichts uebrig, gibt es keine Zahl (siehe
+    // VoiceAnalysis::humMeasurable).
+    const auto masksAVoiceHarmonic = [&](double hz) {
+        const double voiceF0 = r.pitchHz;   // beim AUFRUF gelesen
+        if (voiceF0 < 40.0) { return false; }   // keine stabile Tonhoehe
+
+        // Zwei verschieden weite Abstandsregeln, und der Unterschied
+        // ist gemessen, nicht geschaetzt.
+        //
+        // Fuer die OBERWELLEN der Stimme reicht die Fensterbreite
+        // selbst: liegt eine darin, ist das Fenster hin.
+        //
+        // Fuer den GRUNDTON nicht. Er ist das Lauteste im ganzen
+        // Spektrum, und die Silbenflanken verschmieren seine Linie
+        // weit nach unten -- bei einer 110-Hz-Stimme liegt das
+        // 63-Hz-Band nur rund 23 dB unter ihm, und das 50-Hz-Fenster
+        // faengt den Ausläufer. Mit der engen Regel allein meldete
+        // der Detektor dort weiter -9,5 dB „Brumm", wo keiner ist.
+        // Acht Faecher sind rund 93 Hz: weit genug, dass eine
+        // 110-Hz-Stimme das 50-Hz-Fenster sperrt, und eng genug, dass
+        // eine 210-Hz-Stimme es freigibt (160 Hz entfernt).
+        const double nearHarmonic = 2.5 * binHz;
+        const double nearF0       = 8.0 * binHz;
+        if (std::abs(voiceF0 - hz) <= nearF0) { return true; }
+        for (int n = 2; n <= 12; ++n) {
+            const double v = voiceF0 * n;
+            if (v > hz + nearHarmonic + binHz) { break; }
+            if (std::abs(v - hz) <= nearHarmonic) { return true; }
+        }
+        return false;
+    };
+
+    int  humWindowsUsed = 0;
+    int  humWindowsMasked = 0;
+    bool humBaseMasked = false;
     auto humAt = [&](double base) {
         double total = 0.0;
+        humWindowsUsed = 0;
+        humWindowsMasked = 0;
+        humBaseMasked = false;
         for (int h = 1; h <= 4; ++h) {
             const double hz = base * h;
+            if (masksAVoiceHarmonic(hz)) {
+                ++humWindowsMasked;
+                // Das erste Fenster ist das, in dem Netzbrumm lebt.
+                // Ist es hin, gibt es keine Messung -- die restlichen
+                // Oberwellen sind beim Brumm ohnehin die schwaecheren.
+                if (h == 1) { humBaseMasked = true; }
+                continue;
+            }
             const int k = int(std::lround(hz / binHz));
             if (k > 0 && k <= kFft / 2) {
                 // Two bins either side, so a mains frequency that is
@@ -347,6 +409,7 @@ VoiceAnalysis VoiceAnalyzer::analyse(const float* samples, int frames,
                         total += power[static_cast<size_t>(kk)];
                     }
                 }
+                ++humWindowsUsed;
             }
         }
         return total;
@@ -388,6 +451,9 @@ VoiceAnalysis VoiceAnalyzer::analyse(const float* samples, int frames,
     }
     r.humBaseHz =
         (std::abs(fPeak - 60.0) < std::abs(fPeak - 50.0)) ? 60 : 50;
+    // Vorlaeufig: der Wachhund braucht die Tonhoehe, und die wird
+    // weiter unten gemessen. Nach ihr wird das hier noch einmal
+    // gerechnet -- siehe „Brumm, zweiter Durchgang".
     r.humDb = toDb(humAt(double(r.humBaseHz))) - toDb(mid);
 
     // ── Crest factor ─────────────────────────────────────────────────
@@ -459,6 +525,45 @@ VoiceAnalysis VoiceAnalyzer::analyse(const float* samples, int frames,
         if (!pitches.empty()) {
             std::sort(pitches.begin(), pitches.end());
             r.pitchHz = pitches[pitches.size() / 2];
+        }
+    }
+
+    // ── Brumm, zweiter Durchgang ─────────────────────────────────────
+    //
+    // Jetzt erst, weil der Wachhund die Tonhoehe braucht und die
+    // Tonhoehe aus der Zeitreihe kommt, nicht aus dem Spektrum. Beim
+    // ersten Durchgang oben war r.pitchHz noch null, der Wachhund
+    // also wirkungslos -- genau der Fehler, den dieser zweite
+    // Durchgang behebt (gefunden vom eigenen Prueftand, der sonst
+    // gruen geworden waere, ohne etwas zu pruefen).
+    {
+        const double humPower = humAt(double(r.humBaseHz));
+        r.humMaskedHarmonics = humWindowsMasked;
+
+        // Entscheidend ist das ERSTE Fenster, nicht die Zahl der
+        // belegten.
+        //
+        // Das war der zweite Anlauf. Der erste rechnete mit den
+        // uebriggebliebenen Fenstern weiter und meldete bei einer
+        // 110-Hz-Stimme immer noch -9,5 dB „Brumm", wo keiner ist.
+        // Der Grund steht am Messwert: das 63-Hz-Band liegt bei so
+        // einer Stimme nur rund 23 dB unter dem Grundton -- die
+        // Silbenflanken verschmieren die Grundtonlinie weit nach
+        // unten, und das 50-Hz-Fenster faengt den Ausläufer. Sauber
+        // trennen laesst sich das bei 11,7 Hz je Fach nicht.
+        //
+        // Also wird nicht geschaetzt. Liegt auch nur eine Oberwelle
+        // der Stimme in einem der Fenster, ist das Ergebnis keine
+        // Messung -- Hausstil Regel 7: Unbekannt ist ein Strich,
+        // keine Null. Eine Zahl, die man nicht verteidigen kann, ist
+        // schlimmer als keine: StripTuner hat auf genau so eine Zahl
+        // hin den Grundton mit -18 dB ausgekerbt.
+        if (humWindowsUsed == 0 || humBaseMasked) {
+            r.humMeasurable = false;
+            r.humDb = -120.0;
+        } else {
+            r.humMeasurable = true;
+            r.humDb = toDb(humPower) - toDb(mid);
         }
     }
 
@@ -564,7 +669,7 @@ VoiceAnalysis VoiceAnalyzer::analyse(const float* samples, int frames,
             "gain down and record again; nothing below this can be "
             "trusted until it is fixed.").arg(r.clippedSamples);
     }
-    if (r.humDb > -35.0) {
+    if (r.humMeasurable && r.humDb > -35.0) {
         r.findings << QStringLiteral(
             "Mains hum at %1 Hz, %2 dB under your voice. Check the "
             "microphone cable and the earth before anything else — "

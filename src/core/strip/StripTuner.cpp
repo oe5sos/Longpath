@@ -88,7 +88,19 @@ double compressorRatio(const VoiceAnalysis& a)
 
 bool humWorthNotching(const VoiceAnalysis& a)
 {
-    return a.humBaseHz > 0 && -a.humDb < kHumWorthNotchingDb;
+    // humMeasurable zuerst, und das ist keine Formalie: ohne diese
+    // Abfrage kerbte die Automatik bei einer 110-Hz-Stimme deren
+    // eigenen Grundton mit -18 dB aus, weil das 100-Hz-Brummfenster
+    // ihn mitmass (2026-10-09 am Geraet: 110 Hz bei -12,5 dB,
+    // 150 Hz bei -17,6 dB). Siehe VoiceAnalysis::humMeasurable.
+    //
+    // Und wenn die Stimme auch nur EIN Fenster belegt hat, wird nicht
+    // gekerbt. Die Kerben sitzen auf base, 2*base und 3*base -- eine
+    // davon laege dann auf der Stimme, und eine Kerbe von -18 dB auf
+    // dem Grundton hoert man sofort, nur merkt niemand, woher sie
+    // kommt.
+    return a.humMeasurable && a.humBaseHz > 0
+        && -a.humDb < kHumWorthNotchingDb;
 }
 
 // ── Applying ─────────────────────────────────────────────────────────
@@ -134,10 +146,29 @@ Result applyAnalysis(const VoiceAnalysis& a, StripChain& c)
 
     // ── Mains hum ────────────────────────────────────────────────────
     if (humWorthNotching(a)) {
+        // Eine Kerbe, die auf einer Oberwelle der Stimme sitzt, wird
+        // ausgelassen. Der Analysator hat das erste Brummfenster als
+        // sauber gemeldet, aber die zweite und dritte Oberwelle des
+        // Netzbrumms koennen trotzdem genau dort liegen, wo die
+        // Stimme etwas hat -- bei 210 Hz Grundton etwa faellt die
+        // 200-Hz-Kerbe praktisch auf den Grundton. Minus 18 dB dort
+        // hoert man sofort, und niemand kaeme auf die Idee, dass eine
+        // Brummkerbe schuld ist.
+        const auto sitsOnTheVoice = [&](double hz) {
+            if (a.pitchHz < 40.0) { return false; }
+            for (int n = 1; n <= 12; ++n) {
+                const double v = a.pitchHz * n;
+                if (v > hz * 1.25) { break; }
+                if (std::abs(v - hz) < hz * 0.2) { return true; }
+            }
+            return false;
+        };
         for (int h = 1; h <= 3; ++h) {
+            const double hz = double(a.humBaseHz) * h;
+            if (sitsOnTheVoice(hz)) { continue; }
             ClientEq::BandParams p = c.eq().band(kBandHum1 + h - 1);
             p.type = ClientEq::FilterType::Peak;
-            p.freqHz = float(a.humBaseHz * h);
+            p.freqHz = float(hz);
             p.q = 8.0f;
             p.gainDb = float(-18.0 + 3.0 * (h - 1));
             p.enabled = true;

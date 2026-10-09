@@ -1348,7 +1348,7 @@ void TxVoiceCheckDialog::fillAdvancedTable()
                 .arg(m_result.speechDbFs - m_result.noiseFloorDbFs, 0, 'f', 1);
     bits << QStringLiteral("Crest factor %1 dB")
                 .arg(m_result.crestFactorDb, 0, 'f', 1);
-    if (m_result.humBaseHz > 0) {
+    if (m_result.humBaseHz > 0 && m_result.humMeasurable) {
         bits << QStringLiteral("Hum at %1 Hz, %2 dB below speech")
                     .arg(m_result.humBaseHz).arg(-m_result.humDb, 0, 'f', 1);
     } else {
