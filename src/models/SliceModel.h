@@ -390,6 +390,19 @@ class SliceModel : public QObject {
     Q_PROPERTY(bool   apfEnabled      READ apfEnabled      WRITE setApfEnabled      NOTIFY apfEnabledChanged)
     Q_PROPERTY(int    apfTuneHz       READ apfTuneHz       WRITE setApfTuneHz       NOTIFY apfTuneHzChanged)
     Q_PROPERTY(bool   binauralEnabled READ binauralEnabled WRITE setBinauralEnabled NOTIFY binauralEnabledChanged)
+    // Der Tonmodus des FM-Kanals. Werte 0..3 sind Thetis' CTCSS-Werte
+    // und bleiben unveraendert; 4 ist Longpaths DCS-Erweiterung:
+    //
+    //   0  Off
+    //   1  CTCSS Encode        (senden)
+    //   2  CTCSS Decode        (Tonsquelch)
+    //   3  CTCSS Encode+Decode
+    //   4  DCS Decode          (Longpath, nur Empfang)
+    //
+    // DCS SENDEN gibt es nicht und ist nicht geplant: WDSPs `fmmod.c`
+    // kann einen Ton einspeisen, aber kein Datenwort. Der Name der
+    // Eigenschaft ist historisch -- es ist EIN Waehler in der
+    // Oberflaeche, und darum ein Feld.
     Q_PROPERTY(int    fmCtcssMode     READ fmCtcssMode     WRITE setFmCtcssMode     NOTIFY fmCtcssModeChanged)
     Q_PROPERTY(double fmCtcssValueHz  READ fmCtcssValueHz  WRITE setFmCtcssValueHz  NOTIFY fmCtcssValueHzChanged)
     // Liegt der eingestellte Subton gerade an? Keine Einstellung, sondern
@@ -398,6 +411,11 @@ class SliceModel : public QObject {
     // Thetis-Port -- dort gibt es keinen Tondetektor und darum auch
     // nichts anzuzeigen.
     Q_PROPERTY(bool fmCtcssToneDetected READ fmCtcssToneDetected NOTIFY fmCtcssToneDetectedChanged)
+    /// Der DCS-Code als Oktalzahl, wie ihn jedes Geraet im Menue fuehrt
+    /// ("023", "754").
+    Q_PROPERTY(int  fmDcsCode     READ fmDcsCode     WRITE setFmDcsCode     NOTIFY fmDcsCodeChanged)
+    /// Die Polaritaet: 0 normal ("023N"), 1 invertiert ("023I").
+    Q_PROPERTY(int  fmDcsPolarity READ fmDcsPolarity WRITE setFmDcsPolarity NOTIFY fmDcsPolarityChanged)
     Q_PROPERTY(int    fmOffsetHz      READ fmOffsetHz      WRITE setFmOffsetHz      NOTIFY fmOffsetHzChanged)
     Q_PROPERTY(Longpath::FmTxMode fmTxMode READ fmTxMode WRITE setFmTxMode NOTIFY fmTxModeChanged)
     Q_PROPERTY(bool   fmReverse       READ fmReverse       WRITE setFmReverse       NOTIFY fmReverseChanged)
@@ -1058,6 +1076,10 @@ public:
 
     double fmCtcssValueHz()  const { return m_fmCtcssValueHz; }
     bool   fmCtcssToneDetected() const { return m_fmCtcssToneDetected; }
+    int    fmDcsCode()     const { return m_fmDcsCode; }
+    int    fmDcsPolarity() const { return m_fmDcsPolarity; }
+    void   setFmDcsCode(int oktal);
+    void   setFmDcsPolarity(int polarity);
     /// Nur fuer `RadioModel`: meldet, was der Tondetektor gerade sieht.
     /// Keine Benutzereinstellung, wird nicht gespeichert.
     void setFmCtcssToneDetected(bool detected);
@@ -1338,6 +1360,8 @@ signals:
     void fmCtcssModeChanged(int mode);
     void fmCtcssValueHzChanged(double hz);
     void fmCtcssToneDetectedChanged(bool detected);
+    void fmDcsCodeChanged(int oktal);
+    void fmDcsPolarityChanged(int polarity);
     void fmOffsetHzChanged(int hz);
     void fmTxModeChanged(Longpath::FmTxMode mode);
     void fmReverseChanged(bool v);
@@ -1551,6 +1575,8 @@ private:
     // laufende Tonsperre sperrt nichts, und die Anzeige soll dann nicht
     // behaupten, ein Ton fehle.
     bool   m_fmCtcssToneDetected{true};
+    int    m_fmDcsCode{23};        // erster Eintrag der Standardliste
+    int    m_fmDcsPolarity{0};     // 0 = normal, 1 = invertiert
     int      m_fmOffsetHz{0};           // Neutral default — zero offset
     FmTxMode m_fmTxMode{FmTxMode::Simplex};  // From Thetis console.cs:20873 — current_fm_tx_mode = FMTXMode.Simplex
     bool     m_fmReverse{false};        // Neutral default — normal direction

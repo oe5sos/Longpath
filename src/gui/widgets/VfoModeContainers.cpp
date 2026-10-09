@@ -120,6 +120,7 @@
 #include "TriBtn.h"
 #include "VfoStyles.h"
 #include "../StyleConstants.h"
+#include "core/DcsCode.h"
 #include "models/SliceModel.h"
 #include "core/WdspTypes.h"
 
@@ -183,6 +184,11 @@ void FmOptContainer::buildUi()
         m_toneModeCmb->addItem(QStringLiteral("CTCSS Encode"), QVariant(1));
         m_toneModeCmb->addItem(QStringLiteral("CTCSS Decode"), QVariant(2));
         m_toneModeCmb->addItem(QStringLiteral("CTCSS Enc+Dec"),QVariant(3));
+        // DCS nur als Decode: senden kann Longpath es nicht. WDSPs
+        // `fmmod.c` speist einen Ton ein, aber kein Datenwort -- und ein
+        // Menueeintrag, hinter dem nichts passiert, ist schlimmer als
+        // keiner.
+        m_toneModeCmb->addItem(QStringLiteral("DCS Decode"),   QVariant(4));
 
         m_toneValueCmb = new GuardedComboBox(this);
         m_toneValueCmb->setObjectName("toneValueCmb");
@@ -191,7 +197,8 @@ void FmOptContainer::buildUi()
             m_toneValueCmb->addItem(text, QVariant(text));
         }
 
-        m_toneModeCmb->setToolTip(QStringLiteral("CTCSS tone mode (Off / Encode / Decode / Enc+Dec)"));
+        m_toneModeCmb->setToolTip(QStringLiteral(
+            "Tonmodus: Off / CTCSS Encode / Decode / Enc+Dec / DCS Decode"));
         m_toneValueCmb->setToolTip(QStringLiteral("CTCSS sub-audible tone frequency (Hz)"));
         row->addWidget(m_toneModeCmb, 1);
         row->addWidget(m_toneValueCmb, 1);
@@ -287,7 +294,15 @@ void FmOptContainer::buildUi()
 
     connect(m_toneValueCmb, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, [this](int idx) {
-        if (!m_slice) { return; }
+        if (!m_slice || idx < 0) { return; }
+        if (m_toneValueZeigtDcs) {
+            // "023N" / "023I"
+            const QString v = m_toneValueCmb->itemData(idx).toString();
+            if (v.size() < 4) { return; }
+            m_slice->setFmDcsCode(v.left(3).toInt());
+            m_slice->setFmDcsPolarity(v.endsWith(QLatin1Char('I')) ? 1 : 0);
+            return;
+        }
         const double hz = m_toneValueCmb->itemData(idx).toString().toDouble();
         m_slice->setFmCtcssValueHz(hz);
     });
@@ -372,28 +387,68 @@ void FmOptContainer::syncFromSlice()
         }
     }
 
-    // Tone value: find the index whose text matches formatted fmCtcssValueHz
-    const QString wantedTone = QString::number(m_slice->fmCtcssValueHz(), 'f', 1);
-    const int toneIdx = m_toneValueCmb->findText(wantedTone);
-    if (toneIdx >= 0) {
-        m_toneValueCmb->setCurrentIndex(toneIdx);
+    // Der Wertewaehler zeigt je nach Modus zweierlei: bei CTCSS die
+    // Subtoene in Hz, bei DCS die Codes als Oktalzahl mit Polaritaet
+    // ("023 N", "023 I") -- so, wie Geraete sie im Menue fuehren. Die
+    // Liste wird nur umgefuellt, wenn sie wirklich wechselt; ein
+    // Neuaufbau bei jedem Aufruf wuerde die Auswahl staendig verwerfen.
+    const bool dcsModus = (mode == 4);
+    if (dcsModus != m_toneValueZeigtDcs) {
+        m_toneValueZeigtDcs = dcsModus;
+        m_toneValueCmb->clear();
+        if (dcsModus) {
+            for (int oktal : dcsStandardCodes()) {
+                const QString basis = QStringLiteral("%1").arg(oktal, 3, 10, QLatin1Char('0'));
+                m_toneValueCmb->addItem(basis + QStringLiteral(" N"),
+                                        QStringLiteral("%1N").arg(basis));
+                m_toneValueCmb->addItem(basis + QStringLiteral(" I"),
+                                        QStringLiteral("%1I").arg(basis));
+            }
+            m_toneValueCmb->setToolTip(QStringLiteral(
+                "DCS-Code als Oktalzahl, N = normal, I = invertiert"));
+        } else {
+            for (int i = 0; i < kCtcssCount; ++i) {
+                const QString text = QString::number(kCtcssTones[i], 'f', 1);
+                m_toneValueCmb->addItem(text, QVariant(text));
+            }
+            m_toneValueCmb->setToolTip(
+                QStringLiteral("CTCSS sub-audible tone frequency (Hz)"));
+        }
+    }
+
+    if (dcsModus) {
+        const QString gesucht = QStringLiteral("%1%2")
+            .arg(m_slice->fmDcsCode(), 3, 10, QLatin1Char('0'))
+            .arg(m_slice->fmDcsPolarity() != 0 ? QLatin1Char('I') : QLatin1Char('N'));
+        const int idx = m_toneValueCmb->findData(gesucht);
+        if (idx >= 0) { m_toneValueCmb->setCurrentIndex(idx); }
+    } else {
+        const QString wantedTone = QString::number(m_slice->fmCtcssValueHz(), 'f', 1);
+        const int toneIdx = m_toneValueCmb->findText(wantedTone);
+        if (toneIdx >= 0) { m_toneValueCmb->setCurrentIndex(toneIdx); }
     }
 
     // Tonleuchte. Sichtbar nur, wo auch jemand auf einen Ton hoert
     // (Decode = 2, Enc+Dec = 3) -- in "Off" und "Encode" waere eine
     // dunkle Leuchte eine Behauptung ueber etwas, das gar nicht laeuft.
     if (m_toneLamp) {
-        const bool hoertZu = (mode == 2 || mode == 3);
+        const bool hoertZu = (mode == 2 || mode == 3 || mode == 4);
         m_toneLamp->setVisible(hoertZu);
         if (hoertZu) {
             const bool tonDa = m_slice->fmCtcssToneDetected();
             m_toneLamp->setStyleSheet(QStringLiteral(
                 "QLabel { background: %1; border-radius: 5px; }"
             ).arg(QLatin1String(tonDa ? Style::kLiveGreen : Style::kBorderMuted)));
+            const QString was = dcsModus
+                ? QStringLiteral("DCS-Code %1%2")
+                      .arg(m_slice->fmDcsCode(), 3, 10, QLatin1Char('0'))
+                      .arg(m_slice->fmDcsPolarity() != 0 ? QLatin1Char('I') : QLatin1Char('N'))
+                : QStringLiteral("CTCSS-Subton %1 Hz")
+                      .arg(QString::number(m_slice->fmCtcssValueHz(), 'f', 1));
             m_toneLamp->setToolTip(tonDa
-                ? QStringLiteral("Der CTCSS-Subton %1 Hz liegt an").arg(wantedTone)
-                : QStringLiteral("Warten auf den CTCSS-Subton %1 Hz -- "
-                                 "der Ton fehlt, der Kanal ist stumm").arg(wantedTone));
+                ? QStringLiteral("Der %1 liegt an").arg(was)
+                : QStringLiteral("Warten auf den %1 -- er fehlt, der Kanal ist stumm")
+                      .arg(was));
         }
     }
 

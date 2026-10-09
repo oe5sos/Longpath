@@ -211,6 +211,7 @@ warren@wpratt.com
 #endif
 
 #include "core/CtcssDetector.h"
+#include "core/DcsDetector.h"
 
 #include <QList>
 #include <QObject>
@@ -675,6 +676,18 @@ public:
     // `muted()` falsch anzeigen lassen. Stumm ist der Kanal, wenn der
     // Benutzer stumm geschaltet hat ODER die Tonsperre zu ist.
     void setCtcssSquelch(bool enabled, double toneHz);
+
+    /// Dasselbe fuer DCS: `oktal` ist der Code wie im Geraetemenue
+    /// ("023"), `inverted` die Polaritaet. CTCSS- und DCS-Sperre
+    /// schliessen einander aus -- die eine einzuschalten schaltet die
+    /// andere ab, denn sie teilen sich denselben Basisband-Abgriff und
+    /// denselben Weg zum Audiopanel.
+    void setDcsSquelch(bool enabled, int oktal, bool inverted);
+    bool dcsSquelchEnabled() const { return m_dcsSquelchEnabled.load(); }
+    /// Die beste Uebereinstimmung im letzten Wortfenster, 0..23.
+    int  dcsLastAgreement() const;
+    /// Nur fuer den Pruefstand, wie feedCtcssBasebandForTest.
+    void feedDcsBasebandForTest(const double* audio, int frames);
     bool ctcssSquelchEnabled() const { return m_ctcssSquelchEnabled.load(); }
     /// Liegt der eingestellte Subton gerade an? Bei abgeschalteter
     /// Tonsperre immer true -- dann sperrt sie nichts.
@@ -1076,6 +1089,8 @@ private:
     /// Der Detektor wird nur aus dem DSP-Thread angefasst, solange der
     /// Abgriff haengt; `m_ctcssMutex` deckt das Anlegen und Verwerfen ab.
     std::unique_ptr<CtcssDetector> m_ctcssDetector;
+    std::atomic<bool> m_dcsSquelchEnabled{false};
+    std::unique_ptr<DcsDetector> m_dcsDetector;
     mutable std::mutex m_ctcssMutex;
     /// Der Abgriff liefert double und stereo-verschraenkt, der Detektor
     /// will float und einkanalig. Dieser Puffer liegt dauerhaft hier,
@@ -1087,6 +1102,9 @@ private:
     /// Der Weg, den WDSP im DSP-Thread aufruft.
     static void ctcssBasebandTapThunk(void* user, const double* audio, int frames);
     void onCtcssBaseband(const double* audio, int frames);
+    /// Haengt den WDSP-Abgriff an oder ab, je nachdem ob eine der beiden
+    /// Tonsperren laeuft. Beide teilen sich denselben Abgriff.
+    void applyBasebandTap();
     // afGain: 0.0..1.0 linear, mirrors Thetis radio.cs:1078 rx_output_gain
     // [v2.10.3.14] (default 1.0 = unity panel gain). The WDSP RX panel
     // initializes its internal gain1 to 4.0 in rxa.c:538, so setActive()

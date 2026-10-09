@@ -10240,14 +10240,31 @@ void RadioModel::pushCtcssSquelchForSlice(const SliceModel* slice)
     RxChannel* rxCh = m_wdspEngine->rxChannel(slice->sliceIndex());
     if (!rxCh) { return; }
 
-    const int  mode    = slice->fmCtcssMode();   // 0 Off, 1 Enc, 2 Dec, 3 Enc+Dec
-    const bool decodes = (mode == 2 || mode == 3);
+    // 0 Off, 1 CTCSS Enc, 2 CTCSS Dec, 3 CTCSS Enc+Dec, 4 DCS Dec
+    const int mode = slice->fmCtcssMode();
     // Nur in FM. In jeder anderen Betriebsart gibt es kein Subtonband,
     // und eine Sperre, die dort auf einen Ton wartet, wuerde den Kanal
     // einfach stumm halten.
     const bool istFm = (slice->dspMode() == DSPMode::FM);
 
-    rxCh->setCtcssSquelch(decodes && istFm, slice->fmCtcssValueHz());
+    const bool ctcssHoert = istFm && (mode == 2 || mode == 3);
+    const bool dcsHoert   = istFm && (mode == 4);
+
+    // Reihenfolge: erst die abschalten, die nicht gilt. Beide teilen
+    // sich den Basisband-Abgriff, und `RxChannel` schaltet die jeweils
+    // andere beim Einschalten ohnehin ab -- aber so bleibt der Zustand
+    // auch dann richtig, wenn beide aus sind.
+    if (!dcsHoert) {
+        rxCh->setDcsSquelch(false, 0, false);
+    }
+    if (!ctcssHoert) {
+        rxCh->setCtcssSquelch(false, 0.0);
+    }
+    if (ctcssHoert) {
+        rxCh->setCtcssSquelch(true, slice->fmCtcssValueHz());
+    } else if (dcsHoert) {
+        rxCh->setDcsSquelch(true, slice->fmDcsCode(), slice->fmDcsPolarity() != 0);
+    }
 }
 
 void RadioModel::pushTxFrequencyFromTxSlice()
@@ -11196,6 +11213,14 @@ void RadioModel::wireSliceSignals(SliceModel* slice)
     });
     connect(slice, &SliceModel::dspModeChanged, this, [this, slice](Longpath::DSPMode) {
         pushCtcssSquelchForSlice(slice);
+    });
+    connect(slice, &SliceModel::fmDcsCodeChanged, this, [this, slice](int) {
+        pushCtcssSquelchForSlice(slice);
+        scheduleSettingsSave();
+    });
+    connect(slice, &SliceModel::fmDcsPolarityChanged, this, [this, slice](int) {
+        pushCtcssSquelchForSlice(slice);
+        scheduleSettingsSave();
     });
     // Und der Rueckweg: was der Detektor sieht, landet im Slice, damit die
     // Oberflaeche es anzeigen kann. Das Signal kommt aus dem DSP-Thread --

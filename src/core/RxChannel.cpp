@@ -1589,21 +1589,12 @@ void RxChannel::setCtcssSquelch(bool enabled, double toneHz)
     // sein, BEVOR der Detektor verschwindet. Dazwischen laeuft der
     // DSP-Thread.
     if (!enabled || toneHz <= 0.0) {
-#ifdef HAVE_WDSP
-        // Erst abhaengen: SetRXAFMBasebandTap haelt ch[].csDSP und deckt
-        // damit den Blockdurchlauf mit ab -- nach der Rueckkehr kann der
-        // Abnehmer nicht mehr laufen, der Detektor darf also weg.
-        // Engine guard wie in applyEffectiveMute: ohne OpenChannel ist
-        // rxa[].fmd.p ein Nullzeiger.
-        if (m_wdspEngine) {
-            SetRXAFMBasebandTap(m_channelId, nullptr, nullptr);
-        }
-#endif
+        m_ctcssSquelchEnabled.store(false);
+        applyBasebandTap();          // haengt ab, wenn auch DCS aus ist
         {
             const std::lock_guard<std::mutex> halt(m_ctcssMutex);
             m_ctcssDetector.reset();
         }
-        m_ctcssSquelchEnabled.store(false);
         // Sperre aus heisst: nichts gesperrt. Sonst bliebe der Kanal
         // stumm, wenn man die Tonsperre bei fehlendem Ton abschaltet.
         const bool vorher = m_ctcssTonePresent.exchange(true);
@@ -1614,6 +1605,8 @@ void RxChannel::setCtcssSquelch(bool enabled, double toneHz)
 
     {
         const std::lock_guard<std::mutex> halt(m_ctcssMutex);
+        // Die beiden Sperren schliessen einander aus.
+        m_dcsDetector.reset();
         if (m_ctcssDetector) {
             m_ctcssDetector->setToneHz(toneHz);
             m_ctcssDetector->reset();
@@ -1622,6 +1615,7 @@ void RxChannel::setCtcssSquelch(bool enabled, double toneHz)
             m_ctcssDetector = std::make_unique<CtcssDetector>(48000.0, toneHz);
         }
     }
+    m_dcsSquelchEnabled.store(false);
 
     // Beim Einschalten gilt der Ton als nicht anliegend -- der Detektor
     // braucht sein erstes Fenster (250 ms). Zu beginnen heisst also:
@@ -1632,13 +1626,83 @@ void RxChannel::setCtcssSquelch(bool enabled, double toneHz)
     applyEffectiveMute();
     if (vorher) { emit ctcssTonePresenceChanged(false); }
 
-#ifdef HAVE_WDSP
     // Zuletzt anhaengen, wenn alles andere steht: ab hier kann der
     // DSP-Thread hereinkommen.
-    if (m_wdspEngine) {
-        SetRXAFMBasebandTap(m_channelId, &RxChannel::ctcssBasebandTapThunk, this);
+    applyBasebandTap();
+}
+
+void RxChannel::applyBasebandTap()
+{
+    // Beide Tonsperren teilen sich denselben Abgriff: er haengt, solange
+    // mindestens eine laeuft.
+    const bool gebraucht = m_ctcssSquelchEnabled.load() || m_dcsSquelchEnabled.load();
+#ifdef HAVE_WDSP
+    // Engine guard wie in applyEffectiveMute: ohne OpenChannel ist
+    // rxa[].fmd.p ein Nullzeiger.
+    if (!m_wdspEngine) {
+        return;
     }
+    if (gebraucht) {
+        SetRXAFMBasebandTap(m_channelId, &RxChannel::ctcssBasebandTapThunk, this);
+    } else {
+        // SetRXAFMBasebandTap haelt ch[].csDSP und deckt damit den
+        // Blockdurchlauf mit ab -- nach der Rueckkehr kann der Abnehmer
+        // nicht mehr laufen, die Detektoren duerfen also weg.
+        SetRXAFMBasebandTap(m_channelId, nullptr, nullptr);
+    }
+#else
+    Q_UNUSED(gebraucht);
 #endif
+}
+
+void RxChannel::setDcsSquelch(bool enabled, int oktal, bool inverted)
+{
+    if (!enabled || oktal <= 0) {
+        m_dcsSquelchEnabled.store(false);
+        applyBasebandTap();
+        {
+            const std::lock_guard<std::mutex> halt(m_ctcssMutex);
+            m_dcsDetector.reset();
+        }
+        const bool vorher = m_ctcssTonePresent.exchange(true);
+        applyEffectiveMute();
+        if (!vorher) { emit ctcssTonePresenceChanged(true); }
+        return;
+    }
+
+    const DcsPolarity pol = inverted ? DcsPolarity::Inverted : DcsPolarity::Normal;
+    {
+        const std::lock_guard<std::mutex> halt(m_ctcssMutex);
+        m_ctcssDetector.reset();          // die beiden schliessen einander aus
+        if (m_dcsDetector) {
+            m_dcsDetector->setCode(oktal, pol);
+            m_dcsDetector->reset();
+        } else {
+            m_dcsDetector = std::make_unique<DcsDetector>(48000.0, oktal, pol);
+        }
+    }
+    m_ctcssSquelchEnabled.store(false);
+
+    // Wie bei CTCSS: zu beginnen heisst Sperre ZU. Bei DCS dauert das
+    // laenger -- zwei Woerter sind 342 ms -- und genau darum darf sie
+    // nicht offen anfangen.
+    const bool vorher = m_ctcssTonePresent.exchange(false);
+    m_dcsSquelchEnabled.store(true);
+    applyEffectiveMute();
+    if (vorher) { emit ctcssTonePresenceChanged(false); }
+
+    applyBasebandTap();
+}
+
+int RxChannel::dcsLastAgreement() const
+{
+    const std::lock_guard<std::mutex> halt(m_ctcssMutex);
+    return m_dcsDetector ? m_dcsDetector->lastAgreement() : 0;
+}
+
+void RxChannel::feedDcsBasebandForTest(const double* audio, int frames)
+{
+    onCtcssBaseband(audio, frames);
 }
 
 double RxChannel::ctcssLastRatio() const
@@ -1662,7 +1726,12 @@ void RxChannel::feedCtcssBasebandForTest(const double* audio, int frames)
 void RxChannel::onCtcssBaseband(const double* audio, int frames)
 {
     // DSP-Thread. Kurz bleiben, nichts belegen, nichts blockieren.
-    if (!audio || frames <= 0 || !m_ctcssSquelchEnabled.load()) {
+    if (!audio || frames <= 0) {
+        return;
+    }
+    const bool ctcssLaeuft = m_ctcssSquelchEnabled.load();
+    const bool dcsLaeuft   = m_dcsSquelchEnabled.load();
+    if (!ctcssLaeuft && !dcsLaeuft) {
         return;
     }
 
@@ -1685,11 +1754,18 @@ void RxChannel::onCtcssBaseband(const double* audio, int frames)
         // entscheidet. Besser ein ausgelassener Block als eine Pause im
         // Audioweg.
         std::unique_lock<std::mutex> halt(m_ctcssMutex, std::try_to_lock);
-        if (!halt.owns_lock() || !m_ctcssDetector) {
+        if (!halt.owns_lock()) {
             return;
         }
-        wechsel = m_ctcssDetector->process(m_ctcssScratch.data(), frames);
-        jetzt   = m_ctcssDetector->detected();
+        if (ctcssLaeuft && m_ctcssDetector) {
+            wechsel = m_ctcssDetector->process(m_ctcssScratch.data(), frames);
+            jetzt   = m_ctcssDetector->detected();
+        } else if (dcsLaeuft && m_dcsDetector) {
+            wechsel = m_dcsDetector->process(m_ctcssScratch.data(), frames);
+            jetzt   = m_dcsDetector->detected();
+        } else {
+            return;
+        }
     }
 
     if (wechsel) {

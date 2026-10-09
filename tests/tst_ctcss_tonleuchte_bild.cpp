@@ -41,11 +41,14 @@ void TstCtcssTonleuchteBild::bilderSchreiben()
         {2, false, "3-decode-kein-ton"},
         {2, true,  "4-decode-ton-liegt-an"},
         {3, true,  "5-encdec-ton-liegt-an"},
+        {4, false, "6-dcs-kein-code"},
+        {4, true,  "7-dcs-code-liegt-an"},
     };
 
     for (const Fall& f : faelle) {
         SliceModel s;
         s.setFmCtcssValueHz(123.0);
+        s.setFmDcsCode(131);
         FmOptContainer c;
         c.setSlice(&s);
         s.setFmCtcssMode(f.modus);

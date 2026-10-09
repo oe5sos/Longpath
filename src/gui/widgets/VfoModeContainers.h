@@ -153,6 +153,8 @@ private:
     /// Stellungen hoert niemand auf einen Ton, eine dunkle Leuchte waere
     /// dort nur eine Behauptung.
     QLabel*          m_toneLamp{nullptr};
+    /// Zeigt der Wertewaehler gerade DCS-Codes statt CTCSS-Toene?
+    bool             m_toneValueZeigtDcs{false};
     QSpinBox*        m_offsetKhzSpin{nullptr};  // FM repeater offset in kHz
     QPushButton*     m_txLowBtn{nullptr};       // "Low" repeater direction (TX below RX)
     QPushButton*     m_simplexBtn{nullptr};     // no repeater offset
