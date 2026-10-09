@@ -71,16 +71,24 @@ class StripLiveMonitor : public QObject {
     Q_OBJECT
 
 public:
-    // Blockgroesse des Durchlaufs. 256 Rahmen sind bei 48 kHz 5,33 ms;
-    // kleiner bringt hier nichts mehr, weil die Soundkarte darunter
-    // ohnehin in groesseren Haeppchen denkt, und kostet nur Weckrufe.
-    static constexpr int kBlockFrames = 256;
+    // Blockgroesse des Durchlaufs. 128 Rahmen sind bei 48 kHz 2,67 ms.
+    //
+    // Es waren 256 bei drei Bloecken Vorrat, also rund 21 ms eigener
+    // Anteil. Der Betreiber am 2026-10-09: „arbeite auch daran, dass
+    // latenz noch geringer wird." Halbiert und der Vorrat von drei
+    // auf zwei -- das sind rund 8 ms, und es geht nur, weil dieses
+    // Objekt seit derselben Aenderung auf einem EIGENEN Faden laeuft.
+    // Auf dem Bedienfaden war das nicht zu machen: dort haengt die
+    // Antwortzeit an Zeichenarbeit und 100-ms-Zeitgebern, und ein
+    // Vorrat von 5 ms waere regelmaessig leergelaufen.
+    static constexpr int kBlockFrames = 128;
 
-    // Soviel Vorrat haelt die Ausgabe. Drei Bloecke sind 16 ms Spiel
+    // Soviel Vorrat haelt die Ausgabe. Zwei Bloecke sind 5,3 ms Spiel
     // gegen den Auseinanderlauf zweier Soundkartenuhren -- Eingang und
     // Ausgang koennen verschiedene Geraete sein und laufen dann
-    // garantiert nicht gleich schnell.
-    static constexpr int kTargetBlocks = 3;
+    // garantiert nicht gleich schnell. Weniger als zwei geht nicht:
+    // einer wird gerade ausgegeben, der zweite ist der Vorrat.
+    static constexpr int kTargetBlocks = 2;
 
     explicit StripLiveMonitor(QObject* parent = nullptr);
     ~StripLiveMonitor() override;
@@ -118,23 +126,15 @@ public:
     // eigenen Schwanz nachlaufen.
     void setSpectrumSink(MicSpectrum* sink) { m_spectrum = sink; }
 
-public slots:
-    // Mikrofon und Lautsprecher aufmachen und loslaufen. Ruft
-    // started() oder failed(grund).
+    // ── Von aussen, vom Bedienfaden ──────────────────────────────────
+    //
+    // Alles hier reicht nur weiter: die Arbeit geschieht auf dem
+    // eigenen Faden dieses Objekts. Das ist der Grund, warum die
+    // Puffer so klein sein duerfen.
     void start();
     void stop();
-
-    // Die gespeicherte Einstellung erneut in den eigenen Kanalzug
-    // holen. Das Fenster ruft es nach jeder Aenderung -- so hoert man
-    // den Griff, waehrend man ihn macht.
     void resync();
-
-    // Abhoerlautstaerke, 0..1.
     void setVolume(double v);
-
-    // Hauptschalter des Mithoerens getrennt vom Kanalzug-Hauptschalter:
-    // ausgeschaltet laeuft das Signal unbearbeitet durch, und genau das
-    // ist das A des A/B.
     void setStripBypassed(bool bypassed);
 
 signals:
@@ -144,9 +144,15 @@ signals:
 
 private slots:
     void pump();
+    void doStart();
+    void doStop();
+    void doResync();
+    void doSetVolume(double v);
 
 private:
     void teardown();
+
+    QThread* m_thread{nullptr};
 
     QAudioSource* m_src{nullptr};
     QAudioSink*   m_sink{nullptr};

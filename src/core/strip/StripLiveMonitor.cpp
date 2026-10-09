@@ -22,6 +22,7 @@
 #include <QAudioSource>
 #include <QIODevice>
 #include <QMediaDevices>
+#include <QThread>
 
 #include <algorithm>
 #include <cmath>
@@ -58,14 +59,61 @@ StripLiveMonitor::StripLiveMonitor(QObject* parent)
     m_chain->prepare(double(kRateHz));
     StripSettings::restore(*m_chain);
     m_chain->setEnabled(true);
+
+    // Ein eigener Faden, und zwar ein hoch eingestufter.
+    //
+    // Ohne ihn haengt die Antwortzeit des Mithoerens an allem, was
+    // das Bedienfenster sonst noch tut -- Kurven zeichnen, Zeiger
+    // nachziehen, Zeitgeber alle 100 ms. Mit 5 ms Vorrat am Ausgang
+    // waere das ein Knacken je Zeichenvorgang. Hier schlaeft der
+    // Faden zwischen zwei Mikrofonbloecken und tut sonst nichts.
+    //
+    // Das Objekt selbst zieht mit um: start/stop/resync/setVolume
+    // reichen deshalb nur weiter, statt selbst zu arbeiten.
+    m_thread = new QThread;
+    m_thread->setObjectName(QStringLiteral("StripLiveMonitor"));
+    moveToThread(m_thread);
+    m_thread->start(QThread::TimeCriticalPriority);
 }
 
 StripLiveMonitor::~StripLiveMonitor()
 {
-    teardown();
+    // Erst anhalten -- und zwar DORT, wo die Geraete aufgemacht
+    // wurden; ein QAudioSource gehoert seinem Faden. Dann den Faden
+    // beenden und auf ihn warten, bevor irgendetwas hier zerfaellt.
+    if (m_thread != nullptr) {
+        QMetaObject::invokeMethod(this, "doStop", Qt::BlockingQueuedConnection);
+        m_thread->quit();
+        m_thread->wait();
+        delete m_thread;
+        m_thread = nullptr;
+    } else {
+        teardown();
+    }
 }
 
 void StripLiveMonitor::start()
+{
+    QMetaObject::invokeMethod(this, "doStart", Qt::QueuedConnection);
+}
+
+void StripLiveMonitor::stop()
+{
+    QMetaObject::invokeMethod(this, "doStop", Qt::QueuedConnection);
+}
+
+void StripLiveMonitor::resync()
+{
+    QMetaObject::invokeMethod(this, "doResync", Qt::QueuedConnection);
+}
+
+void StripLiveMonitor::setVolume(double v)
+{
+    QMetaObject::invokeMethod(this, "doSetVolume", Qt::QueuedConnection,
+                              Q_ARG(double, v));
+}
+
+void StripLiveMonitor::doStart()
 {
     if (m_running.load(std::memory_order_acquire)) { return; }
 
@@ -156,6 +204,12 @@ void StripLiveMonitor::start()
     m_overruns.store(0, std::memory_order_release);
 
     // Der eigene Anteil: ein Eingangsblock plus der Vorrat am Ausgang.
+    // Bei 128 Rahmen und zwei Bloecken Vorrat sind das 8 ms. Darunter
+    // kommt man mit Qts Audioklassen nicht mehr weit -- der naechste
+    // Schritt waere CoreAudio von Hand, mit zwei AUHAL-Einheiten und
+    // einem Ring dazwischen; dann waeren auch die Zahlen der Geraete
+    // selbst (kAudioDevicePropertyLatency, SafetyOffset) abzulesen,
+    // statt sie als „kommt noch dazu" zu umschreiben.
     const double perBlockMs = 1000.0 * kBlockFrames / double(m_inRate);
     m_latencyMs.store(perBlockMs * (1 + kTargetBlocks),
                       std::memory_order_release);
@@ -169,7 +223,7 @@ void StripLiveMonitor::start()
     emit started();
 }
 
-void StripLiveMonitor::stop()
+void StripLiveMonitor::doStop()
 {
     if (!m_running.load(std::memory_order_acquire)) { return; }
     teardown();
@@ -188,7 +242,7 @@ void StripLiveMonitor::teardown()
     m_sinkIo = nullptr;
 }
 
-void StripLiveMonitor::resync()
+void StripLiveMonitor::doResync()
 {
     // Parameter, keine Zustaende. Siehe die Kopfdatei: dafuer sind die
     // Atomaren mit Versionszaehler in jeder Stufe da, und das Fenster
@@ -197,7 +251,7 @@ void StripLiveMonitor::resync()
     m_chain->setEnabled(true);
 }
 
-void StripLiveMonitor::setVolume(double v)
+void StripLiveMonitor::doSetVolume(double v)
 {
     m_volume = std::clamp(v, 0.0, 1.0);
     if (m_sink) { m_sink->setVolume(float(m_volume)); }

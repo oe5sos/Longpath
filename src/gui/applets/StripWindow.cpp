@@ -243,6 +243,11 @@ double StripWindow::cur(const std::function<float()>& read,
 
 StripWindow::~StripWindow()
 {
+    // Der Mithoerer hat kein Elternobjekt (siehe toggleLiveMonitor):
+    // sein Destruktor haelt seinen Faden an und wartet auf ihn.
+    delete m_live;
+    m_live = nullptr;
+
     // If the window is destroyed with the apply-path bypass engaged,
     // the radio would keep a bypass it never asked for.
     setRadioBypass(false);
@@ -325,7 +330,16 @@ void StripWindow::toggleLiveMonitor(bool on)
 {
     if (on) {
         if (!m_live) {
-            m_live = new StripLiveMonitor(this);
+            // OHNE Elternobjekt, und das ist kein Versehen: das Ding
+            // zieht auf einen eigenen Faden um, und Qt verschiebt
+            // kein Objekt, das an einem Elternobjekt auf einem
+            // anderen Faden haengt. Mit `this` als Eltern waere
+            // moveToThread() stillschweigend fehlgeschlagen -- der
+            // Mithoerer liefe weiter auf dem Bedienfaden, und die
+            // kleinen Puffer, derentwegen er umgezogen ist, waeren
+            // dann genau das Knacken, das sie vermeiden sollen.
+            // Abgeraeumt wird er im Destruktor dieses Fensters.
+            m_live = new StripLiveMonitor(nullptr);
             connect(m_live, &StripLiveMonitor::failed, this,
                     [this](const QString& why) {
                 if (m_liveBtn) {
