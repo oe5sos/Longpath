@@ -402,15 +402,34 @@ void StripWindow::updateLiveNote()
             "the strip off and on to hear what it is doing."));
         return;
     }
+    // ── Was gerade zu hoeren ist, und was dafuer an sein muss ───────
+    //
+    // Zum Hoeren der eigenen Einstellung muessen ZWEI Schalter an
+    // sein: dieser hier und der Hauptschalter des Kanalzugs. Das hat
+    // niemand irgendwo stehen, und es kostete den Betreiber zwei
+    // Runden -- erst „unterschied hoere ich keinen ob on oder off",
+    // dann „wenn ich die EQ Kurve veraendere tut sich gar nichts".
+    // Beides war richtig beobachtet: der Kanalzug stand aus.
+    //
+    // Also sagt die Zeile es im Klartext, samt dem Namen des
+    // Knopfes, der fehlt. Ein Hinweis, der das Gegenmittel nicht
+    // nennt, ist eine halbe Antwort.
     const bool through = m_master && m_master->isChecked();
-    QString t = QStringLiteral(
-        "Listening — %1. About %2 ms of delay inside Longpath; the "
-        "sound card adds its own on each side. Headphones. While this "
-        "is on, the EQ tab draws your own voice — speak a few "
-        "sentences, then press Peak Hold there to freeze the shape you "
-        "are aiming at.")
-        .arg(through ? QStringLiteral("through the strip")
-                     : QStringLiteral("raw microphone, strip switched off"))
+    QString t;
+    if (!through) {
+        t = QStringLiteral(
+            "Listening to the raw microphone. The strip is switched "
+            "off, so nothing you set — EQ curve included — is audible "
+            "right now. Tick “Channel strip” at the top left to hear "
+            "it, and untick it again to compare. ");
+    } else {
+        t = QStringLiteral("Listening through the strip. ");
+    }
+    t += QStringLiteral(
+        "About %1 ms of delay inside Longpath; the sound card adds its "
+        "own on each side. Headphones. While this is on, the EQ tab "
+        "draws your own voice — speak a few sentences, then press Peak "
+        "Hold there to freeze the shape you are aiming at.")
         .arg(m_live->latencyMs(), 0, 'f', 0);
     // Der Zaehler steht jetzt fuer EINZELNE Abtastwerte, nicht mehr
     // fuer Bloecke. Dass er laeuft, ist der Normalfall und kein
