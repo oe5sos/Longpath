@@ -249,8 +249,59 @@ QVector<Plan> plan(const VoiceAnalysis& a)
         p.lowCutHz  = int(std::lround(p.highPassHz));
         p.highCutHz = int(std::lround(rule.widthHz));
 
-        // ── Hum ──────────────────────────────────────────────────────
-        p.humNotches = StripTuner::humWorthNotching(a);
+        // ── Hum, and why it is so often not hum ──────────────────────
+        //
+        // VoiceAnalyzer measures hum by summing +/-2 FFT bins around
+        // the mains frequency and its first three harmonics. At the
+        // analyser's 4096-point FFT and 48 kHz that window is about
+        // +/-23 Hz wide — so the window around 100 Hz spans roughly
+        // 77 to 123 Hz, and the one around 200 Hz spans 177 to 223.
+        //
+        // A male voice at 110 Hz puts its FUNDAMENTAL in the first
+        // window and its second harmonic in the second. The detector
+        // then reports hum that is not there, and notches at 50, 100
+        // and 150 Hz with -18, -15 and -12 dB take out the bottom of
+        // the voice instead.
+        //
+        // Measured on a synthetic 110 Hz voice with no hum at all:
+        // 110 Hz came out 8.7 dB down and 150 Hz 14.3 dB down, while
+        // 220 Hz was untouched. That notch is most of what "kein
+        // Bass ... wie ein Handy-Mikrofon" was (bench, 2026-10-09).
+        //
+        // So the notches are refused whenever one of them would sit
+        // on a harmonic of the measured fundamental. A real hum on a
+        // voice whose harmonics happen to coincide is then left
+        // alone too — which is the right way round: an un-notched
+        // hum is audible and fixable at the cable, while a notched-
+        // out fundamental cannot be recovered anywhere.
+        const auto notchHitsTheVoice = [&]() {
+            if (a.pitchHz <= 0.0 || a.humBaseHz <= 0) { return false; }
+            for (int n = 1; n <= 3; ++n) {
+                const double notch = double(a.humBaseHz) * n;
+                const double nearest =
+                    std::round(notch / a.pitchHz) * a.pitchHz;
+                if (nearest <= 0.0) { continue; }
+                // Within a sixth of an octave of a harmonic: the
+                // notch is Q 8, so anything this close is sitting on
+                // the voice rather than beside it.
+                if (std::abs(notch - nearest) < notch * 0.12) {
+                    return true;
+                }
+            }
+            return false;
+        };
+
+        p.humNotches = StripTuner::humWorthNotching(a) && !notchHitsTheVoice();
+        if (StripTuner::humWorthNotching(a) && !p.humNotches) {
+            p.notes << QStringLiteral(
+                "No hum notches, although the measurement reports hum "
+                "at %1 Hz: its harmonics land on your own voice "
+                "(fundamental %2 Hz), and a notch there would take out "
+                "the bottom of you rather than the mains. If there "
+                "really is hum, the cable and the earth are the fix — "
+                "no filter here can tell the two apart.")
+                .arg(a.humBaseHz).arg(a.pitchHz, 0, 'f', 0);
+        }
         p.humBaseHz  = a.humBaseHz;
         if (p.humNotches) {
             p.notes << QStringLiteral(

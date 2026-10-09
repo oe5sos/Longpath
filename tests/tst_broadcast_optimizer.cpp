@@ -348,6 +348,11 @@ private slots:
         VoiceAnalysis hummy = ordinary();
         hummy.humDb = -10.0;          // far too close — notches wanted
         hummy.humBaseHz = 50;
+        // Eine hoehere Stimme, damit die Kerben NICHT auf ihren
+        // Oberwellen landen: bei 110 Hz weigert sich der Optimierer
+        // inzwischen zu kerben, und dann prueft dieser Fall nichts
+        // mehr. Siehe noNotchSitsOnTheFundamental().
+        hummy.pitchHz = 180.0;
 
         StripChain chain;
         chain.prepare(48000.0);
@@ -569,6 +574,97 @@ private slots:
                      qPrintable(QStringLiteral(
                          "%1 nimmt der Stimme %2 dB bei 220 Hz")
                          .arg(p.name).arg(lost, 0, 'f', 1)));
+        }
+    }
+
+    // ── Keine Kerbe auf dem Grundton ─────────────────────────────────
+    //
+    // Der Brummdetektor in VoiceAnalyzer summiert +/-2 FFT-Bins um
+    // 50/100/150/200 Hz. Bei 4096 Punkten und 48 kHz sind das rund
+    // +/-23 Hz, also spannt das Fenster um 100 Hz etwa 77 bis 123 Hz.
+    // Eine Maennerstimme mit 110 Hz legt ihren GRUNDTON hinein, der
+    // Detektor meldet Brumm, und die Kerben nehmen die Stimme heraus.
+    //
+    // Gemessen an einer synthetischen Stimme ohne jeden Brumm: 110 Hz
+    // lag 8,7 dB und 150 Hz 14,3 dB unten, waehrend 220 Hz unberuehrt
+    // blieb. Das war der groesste Teil von „kein Bass ... wie ein
+    // Handy-Mikrofon" (Betreiber, 2026-10-09).
+    void noNotchSitsOnTheFundamental()
+    {
+        constexpr int kRate = 48000;
+        constexpr int kSeconds = 6;
+        constexpr int kFrames = kRate * kSeconds;
+
+        std::vector<float> voice(kFrames, 0.0f);
+        for (int i = 0; i < kFrames; ++i) {
+            const double t = double(i) / kRate;
+            if (std::fmod(t, 1.2) >= 0.9) {
+                voice[static_cast<size_t>(i)] =
+                    float(0.0002 * std::sin(2.0 * M_PI * 3000.0 * t));
+                continue;
+            }
+            double v = 0.0;
+            for (int h = 1; h <= 24; ++h) {
+                const double f = 110.0 * h;
+                if (f > 7000.0) { break; }
+                double amp = 1.0 / h;
+                if (f > 400.0 && f < 900.0)   { amp *= 2.0; }
+                if (f > 1600.0 && f < 2600.0) { amp *= 1.6; }
+                v += amp * std::sin(2.0 * M_PI * f * t + 0.7 * h);
+            }
+            voice[static_cast<size_t>(i)] = float(0.08 * v);
+        }
+
+        const VoiceAnalysis a =
+            VoiceAnalyzer::analyse(voice.data(), kFrames, kRate);
+        QVERIFY2(a.valid, qPrintable(a.problem));
+        QVERIFY(a.pitchHz > 100.0 && a.pitchHz < 120.0);
+
+        const auto responseDb = [&](const BroadcastOptimizer::Plan& p,
+                                    double hz) {
+            const int n = kRate;
+            std::vector<float> x(static_cast<size_t>(n));
+            for (int i = 0; i < n; ++i) {
+                x[static_cast<size_t>(i)] =
+                    float(0.02 * std::sin(2.0 * M_PI * hz * double(i) / kRate));
+            }
+            StripChain c;
+            c.prepare(double(kRate));
+            BroadcastOptimizer::apply(p, c);
+            c.setEnabled(true);
+            std::vector<float> y = x;
+            c.processMono(y.data(), int(y.size()));
+            const auto rms = [](const std::vector<float>& v) {
+                double s = 0.0;
+                for (size_t i = v.size() / 2; i < v.size(); ++i) {
+                    s += double(v[i]) * double(v[i]);
+                }
+                return std::sqrt(s / double(v.size() / 2));
+            };
+            return 20.0 * std::log10(std::max(1e-12, rms(y))
+                                   / std::max(1e-12, rms(x)));
+        };
+
+        for (const BroadcastOptimizer::Plan& p : BroadcastOptimizer::plan(a)) {
+            const double atF0  = responseDb(p, a.pitchHz);
+            const double at150 = responseDb(p, 150.0);
+            const double at220 = responseDb(p, 2.0 * a.pitchHz);
+
+            // Eine Kerbe faellt AUF und wieder ab. Liegt der Grundton
+            // oder die Gegend knapp darueber deutlich tiefer als die
+            // zweite Oberwelle, steht dort eine.
+            QVERIFY2(atF0 > at220 - 5.0,
+                     qPrintable(QStringLiteral(
+                         "%1: Grundton %2 dB, zweite Oberwelle %3 dB "
+                         "-- da steht eine Kerbe auf der Stimme")
+                         .arg(p.name).arg(atF0, 0, 'f', 1)
+                         .arg(at220, 0, 'f', 1)));
+            QVERIFY2(at150 > at220 - 5.0,
+                     qPrintable(QStringLiteral(
+                         "%1: 150 Hz %2 dB gegen %3 dB bei der zweiten "
+                         "Oberwelle -- Kerbe")
+                         .arg(p.name).arg(at150, 0, 'f', 1)
+                         .arg(at220, 0, 'f', 1)));
         }
     }
 
