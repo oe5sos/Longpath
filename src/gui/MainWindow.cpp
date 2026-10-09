@@ -1122,6 +1122,38 @@ MainWindow::MainWindow(QWidget* parent)
 
 MainWindow::~MainWindow()
 {
+    // ── Erst die Abbau-Fahne, dann alles andere ──────────────────────
+    //
+    // 2026-10-09: ein MainWindow, das OHNE closeEvent() zerstoert wird,
+    // hat m_shuttingDown nie gesetzt -- gesetzt wird es in closeEvent(),
+    // im Signal-Weg (SIGTERM) und beim Beenden, nirgends hier. Damit
+    // laufen alle 26 Waechter, die auf diese Fahne hoeren, beim Abbau
+    // INS LEERE.
+    //
+    // Gefunden an einem Absturz, der aussah wie ein fremdes Problem:
+    //
+    //   MainWindow::restoreFloatingWindowsHiddenBehindConnectMask()
+    //     <- doActivate <- QObject::destroyed(QObject*)
+    //     <- QWidget::~QWidget <- ConnectionPanel::~ConnectionPanel
+    //     <- QObjectPrivate::deleteChildren <- QWidget::~QWidget
+    //     <- MainWindow::~MainWindow
+    //
+    // Also: ~MainWindow baut seine Kinder ab, das ConnectionPanel meldet
+    // destroyed(), der Handler greift in ein MainWindow, dessen eigene
+    // Mitglieder schon weg sind -- namentlich
+    // m_floatingContainersHiddenPreConnect, ueber das der Rumpf
+    // iteriert. SIGSEGV, in zwei von vierzehn Laeufen; im Normalbetrieb
+    // schliesst closeEvent() das Fenster und die Fahne steht, darum
+    // faellt es nur auf, wenn ein Pruefstand ein MainWindow direkt
+    // loescht.
+    //
+    // Der Kommentar unten kennt genau diesen Ausnahmepfad schon
+    // („Wird ein MainWindow aber OHNE closeEvent() zerstoert") und
+    // faengt dort einen laufenden Faden ab. Die Fahne gehoert
+    // daneben, und sie gehoert VOR jede andere Zeile dieses
+    // Destruktors.
+    m_shuttingDown = true;
+
     // Sicherheitsnetz, 2026-09-03: regulaer haelt closeEvent() den
     // SpectrumThread an, lange bevor es hierher kommt. Wird ein
     // MainWindow aber OHNE closeEvent() zerstoert (Ausnahmepfad, Test-
