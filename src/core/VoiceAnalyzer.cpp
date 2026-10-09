@@ -498,13 +498,32 @@ VoiceAnalysis VoiceAnalyzer::analyse(const float* samples, int frames,
             }
         }
         if (!smoothDb.empty()) {
-            size_t peak = 0;
-            for (size_t i = 1; i < smoothDb.size(); ++i) {
-                if (smoothDb[i] > smoothDb[peak]) { peak = i; }
+            // ── Gemessen gegen 1 kHz, nicht gegen die lauteste
+            //    Stelle ─────────────────────────────────────────────
+            //
+            // Die erste Fassung suchte den Abfall von der lautesten
+            // Sechstel-Oktave aus. Die liegt bei jeder Stimme um
+            // 200-500 Hz, und von dort sind 20 dB bis 2,4 kHz keine
+            // Mikrofongrenze, sondern die natuerliche Neigung einer
+            // Stimme. Am Geraet meldete das dem Betreiber bei 2,7 k,
+            // 3,2 k UND 4,0 k, sein Mikrofon sei bei 2397 Hz am Ende
+            // (2026-10-09) -- und redete ihm damit genau die Profile
+            // aus, die in Ordnung waren.
+            //
+            // Derselbe Fehler wie beim Klangziel: die Neigung einer
+            // Stimme ist kein Mangel. Der Bezug ist deshalb 1 kHz,
+            // mitten im Sprachband, und gesucht wird ab dort
+            // aufwaerts.
+            size_t ref = 0;
+            for (size_t i = 0; i < smoothHz.size(); ++i) {
+                if (std::abs(smoothHz[i] - 1000.0)
+                    < std::abs(smoothHz[ref] - 1000.0)) {
+                    ref = i;
+                }
             }
-            const double floorDb = smoothDb[peak] - kRolloffDownDb;
+            const double floorDb = smoothDb[ref] - kRolloffDownDb;
             r.rolloffHz = smoothHz.back();
-            for (size_t i = peak + 1; i < smoothDb.size(); ++i) {
+            for (size_t i = ref + 1; i < smoothDb.size(); ++i) {
                 if (smoothDb[i] >= floorDb) { continue; }
                 bool recovers = false;
                 for (size_t j = i + 1; j <= i + 2 && j < smoothDb.size(); ++j) {

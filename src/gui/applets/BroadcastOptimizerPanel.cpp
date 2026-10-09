@@ -188,7 +188,9 @@ void BroadcastOptimizerPanel::buildUi()
         m_notes->setWordWrap(true);
         m_notes->setTextInteractionFlags(Qt::TextSelectableByMouse);
         m_notes->setAlignment(Qt::AlignTop | Qt::AlignLeft);
-        m_notes->setMinimumHeight(96);
+        // Eine Zeile, nicht sieben. Die ausfuehrliche Fassung haengt
+        // als Hinweistext daran.
+        m_notes->setMinimumHeight(0);
         m_notes->setStyleSheet(QStringLiteral(
             "QLabel { color: %1; background: %2; border: 1px solid %3; "
             "padding: 10px; }")
@@ -461,7 +463,8 @@ void BroadcastOptimizerPanel::refresh()
         ? QStringLiteral("nothing")
         : QStringLiteral("valve · exciter · reverb"));
 
-    m_notes->setText(p.notes.join(QStringLiteral("\n\n")));
+    m_notes->setText(p.headline);
+    m_notes->setToolTip(p.notes.join(QStringLiteral("\n\n")));
 
     if (p.caveat.isEmpty()) {
         m_caveat->hide();

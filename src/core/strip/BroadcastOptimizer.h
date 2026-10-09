@@ -209,6 +209,26 @@ struct Plan {
     bool    expanderOn{false};
     double  expanderThresholdDbFs{-45.0};
 
+    // Wie tief der Expander zwischen den Woertern absenkt.
+    //
+    // Stand 2026-10-09 vom Betreiber: "die hintergrundgeraeusche
+    // werden viel zu viel aufgenommen, es hallt vom raum, das sollte
+    // generell bei mir weg kommen." Der erste Boden war -8 dB -- zu
+    // zahm dafuer.
+    //
+    // Jetzt aus dem gemessenen Stoerabstand: je weiter der Raum unter
+    // der Stimme liegt, desto tiefer darf abgesenkt werden, ohne dass
+    // die Absenkung selbst hoerbar wird. Bei 34 dB Abstand sind das
+    // 17 dB, und die Pausen werden still.
+    //
+    // Was das NICHT kann, und was ehrlich dazugehoert: Hall WAEHREND
+    // des Sprechens. Ein Expander arbeitet am Pegel, und waehrend
+    // gesprochen wird ist der oben -- die Raumfahne liegt dann unter
+    // der Stimme und kommt mit durch. Dagegen hilft naeher ans
+    // Mikrofon, eine Richtcharakteristik oder der Raum selbst, kein
+    // Regler in dieser Kette.
+    double  expanderFloorDb{-8.0};
+
     // The level trim, onto kTargetLevelDbFs. Shown as its own number
     // rather than hidden inside a make-up gain, because it is the
     // one change that is purely arithmetic and the operator should
@@ -273,7 +293,20 @@ struct Plan {
     // next recording.
     double  densityGainDb{0.0};
 
-    // One line each, in the order they matter. Written to be read.
+    // ── Eine Zeile, nicht sieben ─────────────────────────────────────
+    //
+    // Was dieses Profil ist, in einem Satz. Betreiber, 2026-10-09:
+    // "mich interessiert der ganze text nicht, es steht viel zu viel
+    // in der beschreibung. kurz und knackig waere besser."
+    //
+    // Die Zahlen stehen ohnehin im Ablesegitter darueber; der
+    // Fliesstext daneben war Doppelung mit Begruendung. Die
+    // Begruendung ist nicht geloescht, sie ist in `notes` geblieben
+    // und haengt als Hinweistext am Kasten -- einen Mauszeiger
+    // entfernt statt dauerhaft im Weg.
+    QString headline;
+
+    // Die ausfuehrliche Fassung. Nicht mehr die Hauptanzeige.
     QStringList notes;
 
     // Empty when the plan is worth taking as it stands. Set when the

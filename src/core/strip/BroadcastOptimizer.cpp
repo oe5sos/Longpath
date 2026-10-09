@@ -52,6 +52,7 @@ struct WidthRule {
     double topShiftDb;      // at three quarters of the channel
     int    density;         // where this width sits on Zeus's 0..100 axis
     bool   character;       // may this width run tube / exciter / reverb?
+    const char* headline;   // what this profile is, in one line
 };
 
 // ── Shaping is a SHIFT, not a target ─────────────────────────────────
@@ -93,21 +94,25 @@ constexpr WidthRule kRules[kWidthCount] = {
     // headroom the channel cannot repay, presence is what gets you
     // answered. It will not sound like the operator's living room,
     // and that is the trade being made on purpose.
-    {2300.0, 0.85, 180.0, -4.0, +3.0, -4.0, kDensityDense,     false},
+    {2300.0, 0.85, 180.0, -4.0, +3.0, -4.0, kDensityDense,     false,
+     "Lean and dense for a crowded band. Cuts through; will not sound like your living room."},
 
     // 2.7 kHz — what most of the band is listening on, so this is the
     // one that should sound right by default rather than clever.
-    {2700.0, 0.85, 150.0, -2.0, +2.0, -3.0, kDensityBroadcast, true},
+    {2700.0, 0.85, 150.0, -2.0, +2.0, -3.0, kDensityBroadcast, true,
+     "The everyday setting — what most of the band is listening on."},
 
     // 3.2 kHz — room for the voice's own body again. Nearly flat at
     // the bottom; the reason to be this wide is fidelity, and cutting
     // the bass would spend the extra kilohertz on nothing.
-    {3200.0, 0.85, 120.0, -1.0, +1.5, -1.5, 42,                true},
+    {3200.0, 0.85, 120.0, -1.0, +1.5, -1.5, 42,                true,
+     "Room for the body of your voice. Polite when the band is quiet."},
 
     // 4.0 kHz — lightest hand of the four. Flat bottom, a touch of
     // presence, nothing else. Only pays off when the other operator
     // has opened their filter to match.
-    {4000.0, 0.85, 100.0,  0.0, +1.0,  0.0, kDensityNatural,   true},
+    {4000.0, 0.85, 100.0,  0.0, +1.0,  0.0, kDensityNatural,   true,
+     "Lightest hand of the four. Closest to how you actually sound."},
 };
 
 // Below this much distance between the voice and the room, nothing is
@@ -208,7 +213,8 @@ QVector<Plan> plan(const VoiceAnalysis& a)
         Plan p;
         p.widthHz = rule.widthHz;
         p.name    = presetName(rule.widthHz);
-        p.density = rule.density;
+        p.density  = rule.density;
+        p.headline = QString::fromUtf8(rule.headline);
 
         // ── The channel this profile is for ─────────────────────────
         //
@@ -233,12 +239,16 @@ QVector<Plan> plan(const VoiceAnalysis& a)
                 p.expanderOn = true;
                 p.expanderThresholdDbFs =
                     std::clamp(a.noiseFloorDbFs + 0.65 * snr, -80.0, -10.0);
+                p.expanderFloorDb = -std::clamp(snr * 0.5, 8.0, 20.0);
                 p.notes << QStringLiteral(
-                    "Expander at %1 dBFS, from your measured %2 dB of "
-                    "signal-to-noise. It leans on the room between "
-                    "words rather than shutting on it — nothing here "
-                    "reaches for the ends of what you say.")
+                    "Expander at %1 dBFS with a %2 dB floor, both from "
+                    "your measured %3 dB of signal-to-noise. The "
+                    "pauses go quiet. What it cannot do is remove the "
+                    "room WHILE you speak — the reverb tail sits under "
+                    "your voice then, and no level-driven stage can "
+                    "tell the two apart.")
                     .arg(p.expanderThresholdDbFs, 0, 'f', 0)
+                    .arg(p.expanderFloorDb, 0, 'f', 0)
                     .arg(snr, 0, 'f', 0);
             } else {
                 p.notes << QStringLiteral(
@@ -417,10 +427,8 @@ bool apply(const Plan& p, StripChain& chain)
     if (p.expanderOn) {
         chain.gate().setThresholdDb(float(p.expanderThresholdDbFs));
         chain.gate().setMode(ClientGate::Mode::Expander);
-        // A shallow floor: this leans on the room, it does not shut
-        // the door on it. The old -15 dB floor was a gate wearing an
-        // expander's name.
-        chain.gate().setFloorDb(-8.0f);
+        // Der Boden kommt aus der Messung, siehe Plan::expanderFloorDb.
+        chain.gate().setFloorDb(float(p.expanderFloorDb));
         chain.gate().setHoldMs(40.0f);
         chain.gate().setReleaseMs(250.0f);
     }
