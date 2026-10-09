@@ -17,6 +17,7 @@
 #include "gui/widgets/CommandBar.h"
 
 #include <QCheckBox>
+#include <QEvent>
 #include <QFrame>
 #include <QGridLayout>
 #include <QHBoxLayout>
@@ -138,6 +139,7 @@ void BroadcastOptimizerPanel::buildUi()
             pill->setCursor(Qt::PointingHandCursor);
             connect(pill, &QPushButton::clicked, this,
                     [this, i] { select(i); });
+            pill->installEventFilter(this);
             m_widthPills.push_back(pill);
             row->addWidget(pill);
         }
@@ -271,6 +273,20 @@ void BroadcastOptimizerPanel::buildUi()
         });
         row->addWidget(m_loadBtn);
 
+        m_editBtn = new QPushButton(
+            QStringLiteral("Edit curves…"), this);
+        m_editBtn->setStyleSheet(Style::buttonBaseStyle());
+        m_editBtn->setToolTip(QStringLiteral(
+            "Put this profile into the channel strip and go to its "
+            "equaliser, where the curve is drawn and can be dragged. "
+            "Double-clicking a width does the same thing."));
+        connect(m_editBtn, &QPushButton::clicked, this, [this] {
+            if (m_selected >= 0 && m_selected < m_plans.size()) {
+                emit editRequested(m_plans[m_selected]);
+            }
+        });
+        row->addWidget(m_editBtn);
+
         m_saveAllBtn = new QPushButton(
             QStringLiteral("Save all four"), this);
         m_saveAllBtn->setStyleSheet(Style::buttonBaseStyle());
@@ -307,6 +323,22 @@ void BroadcastOptimizerPanel::select(int index)
     refresh();
 }
 
+bool BroadcastOptimizerPanel::eventFilter(QObject* watched, QEvent* event)
+{
+    if (event->type() == QEvent::MouseButtonDblClick) {
+        for (int i = 0; i < m_widthPills.size(); ++i) {
+            if (m_widthPills[i] != watched) { continue; }
+            // Select first: double-clicking a width that is not the
+            // current one must edit THAT one, not whatever happened
+            // to be lit before the first of the two clicks landed.
+            select(i);
+            if (i < m_plans.size()) { emit editRequested(m_plans[i]); }
+            return true;
+        }
+    }
+    return QWidget::eventFilter(watched, event);
+}
+
 bool BroadcastOptimizerPanel::levelMatched() const
 {
     return m_matchBox != nullptr && m_matchBox->isChecked();
@@ -339,6 +371,7 @@ void BroadcastOptimizerPanel::refresh()
     m_hearBtn->setEnabled(have);
     m_rawBtn->setEnabled(have);
     m_loadBtn->setEnabled(have);
+    m_editBtn->setEnabled(have);
     m_saveAllBtn->setEnabled(!m_plans.isEmpty());
     m_optimizeBtn->setEnabled(m_analysis.valid
                               && m_analysis.clippedSamples == 0);

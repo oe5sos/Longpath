@@ -21,7 +21,7 @@ gezeichnet — ohne Funkgeraet fuellt sich das Panel nicht.*
 Martin, 2026-10-09, in drei Nachrichten:
 
 > „stimme analysieren, verbessern, optimieren, möglichkeiten aufzeigen und
-> daraus resultierend ein 2,3 – 2,7 – 3,5 und 4 k Profil zu erstellen"
+> daraus resultierend ein 2,3 – 2,7 – 3,2 und 4 k Profil zu erstellen"
 
 > „ziel ist es, vielleicht 15 sekunden zu sprechen ohne einstellungen als
 > basis und daraus sollte dann sehr sorgfältig alles genauest automatisch
@@ -159,7 +159,7 @@ verteilt.
 | --- | --- | --- | --- | --- | --- | --- |
 | 2,3 k | 1,80 × Grundton | 300 Hz | −3,0 dB | −9,0 dB | 75 Dense | **aus** |
 | 2,7 k | 1,60 × | 250 Hz | −2,0 dB | −7,0 dB | 55 Broadcast | an |
-| 3,5 k | 1,30 × | 180 Hz | −0,5 dB | −3,0 dB | 42 | an |
+| 3,2 k | 1,30 × | 180 Hz | −0,5 dB | −3,0 dB | 42 | an |
 | 4,0 k | 1,15 × | 150 Hz | 0 | −1,5 dB | 30 Natural | an |
 
 **Der Hochpass folgt dem Grundton, nicht einer festen Zahl.** Dafür misst

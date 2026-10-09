@@ -5,7 +5,7 @@
 ### Sendeton-Optimierer: vier Profile aus einem Durchgang
 
 Fuenfzehn Sekunden sprechen, ohne Einstellungen. Daraus entstehen vier
-vollstaendige Profile fuer 2,3 / 2,7 / 3,5 / 4,0 kHz — jedes mit seinem
+vollstaendige Profile fuer 2,3 / 2,7 / 3,2 / 4,0 kHz — jedes mit seinem
 eigenen Hochpass, Klang, Kompressor und Sendefilter, jedes einzeln
 hoerbar, und keines wird angewendet, bevor es jemand auswaehlt.
 

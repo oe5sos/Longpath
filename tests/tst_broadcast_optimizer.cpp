@@ -160,7 +160,7 @@ private slots:
         QCOMPARE(p.size(), BroadcastOptimizer::kWidthCount);
         QCOMPARE(p[0].widthHz, 2300.0);
         QCOMPARE(p[1].widthHz, 2700.0);
-        QCOMPARE(p[2].widthHz, 3500.0);
+        QCOMPARE(p[2].widthHz, 3200.0);
         QCOMPARE(p[3].widthHz, 4000.0);
         QCOMPARE(p[0].name, QStringLiteral("Broadcast 2.3k"));
         QCOMPARE(p[3].name, QStringLiteral("Broadcast 4.0k"));
@@ -255,7 +255,7 @@ private slots:
         const QVector<BroadcastOptimizer::Plan> p =
             BroadcastOptimizer::plan(dull);
         QVERIFY(p[0].caveat.isEmpty());    // 2.3k — the microphone covers it
-        QVERIFY(!p[2].caveat.isEmpty());   // 3.5k — it does not
+        QVERIFY(!p[2].caveat.isEmpty());   // 3.2k — it does not
         QVERIFY(!p[3].caveat.isEmpty());   // 4.0k — still less
     }
 
@@ -339,13 +339,109 @@ private slots:
         QVERIFY(!chain.eq().band(3).enabled);
     }
 
+    // ── Klingen die vier wirklich verschieden? ───────────────────────
+    //
+    // Der Fall, der gefehlt hat. narrowIsLeanerThanWide() prueft die
+    // ZAHLEN im Plan, und die waren immer richtig -- der Ton war es
+    // nicht. Eine frische ClientEq hat activeBandCount 0, process()
+    // steigt darauf sofort aus, also wurden alle vier Profile ohne
+    // jeden Entzerrer gerechnet: kein Hochpass, kein Klang. Uebrig
+    // blieben Kompressor und Begrenzer, und die gleicht der
+    // Pegelabgleich beim Abhoeren fast weg.
+    //
+    // Betreiber am Geraet, 2026-10-09, in fuenf Worten: „alle profile
+    // hören sich gleich an". Sie taten es.
+    //
+    // Deshalb misst dieser Fall am Ergebnis: derselbe Dreiklang durch
+    // zwei Profile, und was unten und oben herauskommt, muss sich
+    // unterscheiden -- und zwar in der behaupteten Richtung.
+    void theProfilesActuallySoundDifferent()
+    {
+        constexpr int kRate = 48000;
+        constexpr int kFrames = kRate;            // eine Sekunde
+
+        // Leise (-40 dBFS je Ton), damit der Kompressor kaum eingreift
+        // und der Entzerrer die Antwort bestimmt. Ein lauter Eingang
+        // wuerde die Frage mit Pegelregelung beantworten.
+        std::vector<float> input(kFrames, 0.0f);
+        for (int i = 0; i < kFrames; ++i) {
+            const double t = double(i) / kRate;
+            input[static_cast<size_t>(i)] = float(0.01 * (
+                  std::sin(2.0 * M_PI *   80.0 * t)
+                + std::sin(2.0 * M_PI * 1000.0 * t)
+                + std::sin(2.0 * M_PI * 4000.0 * t)));
+        }
+
+        const QVector<BroadcastOptimizer::Plan> plans =
+            BroadcastOptimizer::plan(ordinary());
+        QCOMPARE(plans.size(), 4);
+
+        // Goertzel: Leistung bei einer Frequenz, ohne eine FFT dafuer
+        // zu bauen.
+        const auto toneLevel = [](const std::vector<float>& x,
+                                  double hz) {
+            const double w = 2.0 * M_PI * hz / kRate;
+            const double c = 2.0 * std::cos(w);
+            double s1 = 0.0, s2 = 0.0;
+            for (float v : x) {
+                const double s0 = double(v) + c * s1 - s2;
+                s2 = s1;
+                s1 = s0;
+            }
+            return std::sqrt(std::max(0.0,
+                s1 * s1 + s2 * s2 - c * s1 * s2)) / x.size();
+        };
+
+        const auto render = [&](const BroadcastOptimizer::Plan& p) {
+            StripChain chain;
+            chain.prepare(double(kRate));
+            BroadcastOptimizer::apply(p, chain);
+            chain.setEnabled(true);
+            std::vector<float> out = input;
+            chain.processMono(out.data(), int(out.size()));
+            return out;
+        };
+
+        const std::vector<float> narrow = render(plans[0]);   // 2.3k
+        const std::vector<float> wide   = render(plans[3]);   // 4.0k
+
+        // Gegen den eigenen 1-kHz-Ton gemessen, damit die
+        // Aufholverstaerkung -- die sich je Profil unterscheidet und
+        // beim Abhoeren ohnehin weggeglichen wird -- die Frage nicht
+        // beantwortet.
+        const double narrowHigh = toneLevel(narrow, 4000.0)
+                                / std::max(1e-12, toneLevel(narrow, 1000.0));
+        const double wideHigh   = toneLevel(wide,   4000.0)
+                                / std::max(1e-12, toneLevel(wide,   1000.0));
+        const double narrowLow  = toneLevel(narrow,   80.0)
+                                / std::max(1e-12, toneLevel(narrow, 1000.0));
+        const double wideLow    = toneLevel(wide,     80.0)
+                                / std::max(1e-12, toneLevel(wide,   1000.0));
+
+        // Das schmale Profil wirft oben weg, was ausserhalb seines
+        // Kanals liegt. Mindestens 3 dB Unterschied, sonst ist es
+        // keiner, den ein Ohr findet.
+        QVERIFY2(narrowHigh < wideHigh * 0.7,
+                 qPrintable(QStringLiteral(
+                     "4 kHz gegen 1 kHz: schmal %1, breit %2 -- die "
+                     "Profile klingen gleich")
+                     .arg(narrowHigh, 0, 'f', 4).arg(wideHigh, 0, 'f', 4)));
+
+        // Und unten nimmt es mehr weg, weil der Hochpass hoeher sitzt.
+        QVERIFY2(narrowLow < wideLow * 0.7,
+                 qPrintable(QStringLiteral(
+                     "80 Hz gegen 1 kHz: schmal %1, breit %2 -- der "
+                     "Hochpass wirkt nicht")
+                     .arg(narrowLow, 0, 'f', 4).arg(wideLow, 0, 'f', 4)));
+    }
+
     void bestIndexPicksTheNearestWidth()
     {
         const QVector<BroadcastOptimizer::Plan> p =
             BroadcastOptimizer::plan(ordinary());
         QCOMPARE(BroadcastOptimizer::bestIndex(p, 2400.0), 0);
         QCOMPARE(BroadcastOptimizer::bestIndex(p, 2800.0), 1);
-        QCOMPARE(BroadcastOptimizer::bestIndex(p, 3600.0), 2);
+        QCOMPARE(BroadcastOptimizer::bestIndex(p, 3300.0), 2);
         QCOMPARE(BroadcastOptimizer::bestIndex(p, 9000.0), 3);
         QCOMPARE(BroadcastOptimizer::bestIndex({}, 2700.0), -1);
     }

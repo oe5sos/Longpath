@@ -383,6 +383,24 @@ void TxVoiceCheckDialog::buildUi()
                 "on, then record again. The second measurement is the "
                 "one that says whether it helped.").arg(plan.name));
         });
+        connect(m_optimizer, &BroadcastOptimizerPanel::editRequested,
+                this, [this](const BroadcastOptimizer::Plan& plan) {
+            if (!m_radio || !m_radio->stripChain()) {
+                m_findings->setText(QStringLiteral(
+                    "There is no channel strip to edit yet — it is "
+                    "created with the transmit pump, so connect to the "
+                    "radio first. The profile itself is ready and can "
+                    "be saved from here in the meantime."));
+                return;
+            }
+            BroadcastOptimizer::apply(plan, *m_radio->stripChain());
+            m_findings->setText(QStringLiteral(
+                "%1 is in the channel strip and its curve is on the EQ "
+                "page — drag it from there. The strip's master switch "
+                "is still untouched; nothing reaches the air until you "
+                "turn it on.").arg(plan.name));
+            emit curveEditRequested();
+        });
         connect(m_optimizer, &BroadcastOptimizerPanel::saveAllRequested,
                 this, [this] {
             const int n = BroadcastOptimizer::saveAsPresets(
@@ -901,6 +919,15 @@ void TxVoiceCheckDialog::startRecording()
         m_procRecorder.clear();
         m_micBlocksAtStart = m_micBlocks.load(std::memory_order_acquire);
         m_peakSeenDb = -60.0;
+
+        // The band goes quiet for the take, exactly as on the radio
+        // path. Forgetting it here is why the receiver's hiss was
+        // audible all the way through a recording (bench, 2026-10-09:
+        // "beim aufnehmen hört man das rauschen des funkgerätes") —
+        // and worse than being unpleasant, a loudspeaker playing band
+        // noise into the room is noise the microphone records and the
+        // analyser then measures as the operator's noise floor.
+        setRxQuiet(true);
 
         m_recorder.start();
         m_secondsLeft = kRecordSeconds;

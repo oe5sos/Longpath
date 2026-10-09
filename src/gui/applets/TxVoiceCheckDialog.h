@@ -107,6 +107,17 @@ class RadioModel;
 class TxVoiceCheckDialog : public QDialog {
     Q_OBJECT
 public:
+signals:
+    // The operator wants to see and drag this profile's curve. The
+    // profile is already in the channel strip by the time this is
+    // emitted; the host's job is only to go to the equaliser.
+    //
+    // A signal rather than a direct call because this window has no
+    // business knowing it lives in a tab bar — it is also usable
+    // standalone, and was for months.
+    void curveEditRequested();
+
+public:
     // embedded=true turns the dialog into a plain widget for hosting
     // inside the channel strip's tab bar (2026-08-11, asked for at the
     // bench: one window for the change-record-listen loop). Same code,

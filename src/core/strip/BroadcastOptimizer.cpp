@@ -14,6 +14,7 @@
 #include "core/strip/BroadcastOptimizer.h"
 
 #include "core/strip/ClientEq.h"
+#include "core/strip/EqBandLayout.h"
 #include "core/strip/ClientGate.h"
 #include "core/strip/StripChain.h"
 #include "core/strip/StripSettings.h"
@@ -68,10 +69,10 @@ constexpr WidthRule kRules[kWidthCount] = {
     // one that should sound right by default rather than clever.
     {2700.0, 1.60, 250.0, -2.0, -7.0, kDensityBroadcast, true},
 
-    // 3.5 kHz — room for the voice's own body again. Less density,
+    // 3.2 kHz — room for the voice's own body again. Less density,
     // because the reason to be this wide is fidelity and compressing
     // it hard would spend the extra kilohertz on nothing.
-    {3500.0, 1.30, 180.0, -0.5, -3.0, 42,                true},
+    {3200.0, 1.30, 180.0, -0.5, -3.0, 42,                true},
 
     // 4.0 kHz — only pays off when the other operator has opened their
     // filter to match. Lightest hand of the four.
@@ -242,15 +243,28 @@ QVector<Plan> plan(const VoiceAnalysis& a)
             p.highShelfDb = std::clamp(std::min(0.0, high) + rule.highExtraDb,
                                        -18.0, 0.0);
 
+            // Three quarters of the channel: the roll-off begins
+            // inside it, which is what makes a 2.3 k profile sound
+            // narrow rather than merely quieter at 4 kHz. Above the
+            // edge the transmit filter would do the work anyway, and
+            // a shelf placed there shapes only what is thrown away.
+            p.highShelfHz = rule.widthHz * 0.75;
+            // Just above the high-pass, so the two are not pulling
+            // against each other over the same octave.
+            p.lowShelfHz  = std::clamp(p.highPassHz * 1.5, 100.0, 400.0);
+
             p.notes << QStringLiteral(
-                "Tone for %1: low %2 dB, presence %3 dB, high %4 dB. All "
+                "Tone for %1: low shelf %2 dB from %5 Hz, presence "
+                "%3 dB, high shelf %4 dB from %6 Hz. All "
                 "cuts — the level comes back as make-up gain, because "
                 "reaching a shape by boosting raises whatever the "
                 "microphone does worst in that band along with the voice.")
                 .arg(widthLabel(rule.widthHz))
                 .arg(p.lowShelfDb,  0, 'f', 1)
                 .arg(p.presenceDb,  0, 'f', 1)
-                .arg(p.highShelfDb, 0, 'f', 1);
+                .arg(p.highShelfDb, 0, 'f', 1)
+                .arg(p.lowShelfHz,  0, 'f', 0)
+                .arg(p.highShelfHz, 0, 'f', 0);
         }
 
         // ── Gate ─────────────────────────────────────────────────────
@@ -283,7 +297,7 @@ QVector<Plan> plan(const VoiceAnalysis& a)
             // Wide channels get the heavier hand because there the
             // sibilance is also audible at the far end, not merely
             // expensive.
-            const double audible = rule.widthHz >= 3500.0 ? 1.0 : 0.8;
+            const double audible = rule.widthHz >= 3200.0 ? 1.0 : 0.8;
             p.deEssOn       = true;
             p.deEssHz       = 6000.0;
             p.deEssAmountDb = -std::clamp(a.sibilanceDb, 3.0, 12.0) * audible;
@@ -402,6 +416,23 @@ bool apply(const Plan& p, StripChain& chain)
 {
     if (p.name.isEmpty()) { return false; }
 
+    // ── Seed the band layout FIRST ───────────────────────────────────
+    //
+    // A freshly constructed ClientEq has activeBandCount 0, and
+    // ClientEq::process returns immediately on that — so every band
+    // written below would be stored, read back correctly by any test
+    // that asks for it, and do absolutely nothing to audio.
+    //
+    // That is exactly what happened: the four profiles were rendered
+    // with no equaliser at all, which left them differing only by
+    // compressor and limiter — and the loudness-matched audition
+    // flattens most of that. Reported from the bench in five words,
+    // 2026-10-09: "alle profile hören sich gleich an". They did.
+    //
+    // ensureSeeded only ever appends; a chain the operator has
+    // already shaped keeps every band it had.
+    EqBandLayout::ensureSeeded(chain.eq());
+
     // High-pass.
     {
         ClientEq::BandParams b = chain.eq().band(kBandHighPass);
@@ -429,9 +460,26 @@ bool apply(const Plan& p, StripChain& chain)
         chain.eq().setBand(kBandHum1 + h, b);
     }
 
-    setBandGain(chain, kBandLow,      p.lowShelfDb,  true);
+    // The two shelves carry their corner AND their type, because the
+    // default layout has a peak at 800 Hz in slot 4 and a peak at
+    // 3 kHz in slot 6 — writing only a gain into those shapes the
+    // wrong part of the voice and barely separates the widths.
+    {
+        ClientEq::BandParams lo = chain.eq().band(kBandLow);
+        lo.type    = ClientEq::FilterType::LowShelf;
+        lo.freqHz  = float(p.lowShelfHz);
+        lo.gainDb  = float(p.lowShelfDb);
+        lo.enabled = true;
+        chain.eq().setBand(kBandLow, lo);
+
+        ClientEq::BandParams hi = chain.eq().band(kBandHigh);
+        hi.type    = ClientEq::FilterType::HighShelf;
+        hi.freqHz  = float(p.highShelfHz);
+        hi.gainDb  = float(p.highShelfDb);
+        hi.enabled = true;
+        chain.eq().setBand(kBandHigh, hi);
+    }
     setBandGain(chain, kBandPresence, p.presenceDb,  true);
-    setBandGain(chain, kBandHigh,     p.highShelfDb, true);
     chain.setStageEnabled(StripChain::Stage::Eq, true);
 
     if (p.gateOn) {

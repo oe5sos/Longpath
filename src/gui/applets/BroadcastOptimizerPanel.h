@@ -114,6 +114,28 @@ signals:
     // Write all four out as named presets.
     void saveAllRequested();
 
+    // ── Into the curves ──────────────────────────────────────────────
+    //
+    // Double-click a width, or press the button: put that profile
+    // into the channel strip and go there, so the curve is on screen
+    // and can be dragged.
+    //
+    // Asked for in those terms, 2026-10-09: "anschließend möchte ich
+    // aber mit Doppelklick in dieses Profil reingehen, so dass ich
+    // meine Kurven sehe und diese dann automatisch leicht verändere.
+    // Hier sollte ein Button gesetzt sein, wie ich dann automatisch
+    // zum Channel Strip komme."
+    //
+    // A double-click IS saying so, so this one does apply — unlike
+    // every other control on this panel. The status line says it has.
+    void editRequested(const Longpath::BroadcastOptimizer::Plan& plan);
+
+protected:
+    // The width pills are plain buttons; QPushButton has no
+    // doubleClicked. One filter over the four of them is cheaper and
+    // less code than a subclass per pill.
+    bool eventFilter(QObject* watched, QEvent* event) override;
+
 private:
     void buildUi();
     void select(int index);
@@ -146,6 +168,7 @@ private:
     QPushButton* m_rawBtn{nullptr};
     QPushButton* m_loadBtn{nullptr};
     QPushButton* m_saveAllBtn{nullptr};
+    QPushButton* m_editBtn{nullptr};
     QCheckBox*   m_matchBox{nullptr};
 };
 

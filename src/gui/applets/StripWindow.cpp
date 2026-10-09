@@ -483,6 +483,31 @@ void StripWindow::buildUi()
     m_tabs->addTab(new StagePageScroll(m_voiceCheck),
                    QStringLiteral("Voice check"));
 
+    // ── From a profile straight to its curve ─────────────────────────
+    //
+    // Double-clicking a width in the broadcast optimiser, or its
+    // "Edit curves…" button, puts that profile into the chain and
+    // then wants the equaliser on screen. The dialog has already done
+    // the applying by the time this arrives; all that is left is to
+    // go there. Asked for 2026-10-09.
+    //
+    // The tab is found by the stage's own name rather than by a
+    // remembered index: the tabs are built in a loop over the stages,
+    // and an index captured here would quietly point at the wrong
+    // page the first time a stage is added or reordered.
+    connect(m_voiceCheck, &TxVoiceCheckDialog::curveEditRequested,
+            this, [this]() {
+        if (!m_tabs) { return; }
+        const QString eq = QString::fromLatin1(
+            StripChain::stageName(StripChain::Stage::Eq));
+        for (int i = 0; i < m_tabs->count(); ++i) {
+            if (m_tabs->tabText(i) == eq) {
+                m_tabs->setCurrentIndex(i);
+                return;
+            }
+        }
+    });
+
     col->addWidget(m_tabs, 1);
 
     // The enable boxes are created unchecked and the chain may already

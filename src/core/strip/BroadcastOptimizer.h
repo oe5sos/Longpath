@@ -96,7 +96,7 @@ namespace BroadcastOptimizer {
 // operator has opened their filter to match.
 inline constexpr int kWidthCount = 4;
 inline constexpr double kWidthHz[kWidthCount] = {
-    2300.0, 2700.0, 3500.0, 4000.0,
+    2300.0, 2700.0, 3200.0, 4000.0,
 };
 
 // The name a profile is saved and listed under. Short, sorts in width
@@ -169,9 +169,25 @@ struct Plan {
 
     // ── The chain ────────────────────────────────────────────────────
     double  highPassHz{120.0};
+    // ── The two shelves follow the channel, not a constant ───────────
+    //
+    // Their CORNERS are per-width, and that is the whole point: a
+    // profile that differs from its sibling only in how much it cuts
+    // at a fixed 3 kHz is barely a different profile. The top shelf
+    // sits below the channel edge so the roll-off starts inside the
+    // channel rather than after it, and the bottom one just above the
+    // high-pass so the two do not fight.
+    //
+    // This was found the hard way. The first version wrote only the
+    // gains and left the default layout's corners alone — where band
+    // 6 is a PEAK at 3 kHz, not a shelf at all. Four profiles whose
+    // top-end difference was two decibels at 4 kHz, which is what
+    // "alle profile hören sich gleich an" sounded like.
     double  lowShelfDb{0.0};        // never above 0 — cuts only
+    double  lowShelfHz{180.0};
     double  presenceDb{0.0};
     double  highShelfDb{0.0};
+    double  highShelfHz{2000.0};
 
     bool    humNotches{false};
     int     humBaseHz{0};
