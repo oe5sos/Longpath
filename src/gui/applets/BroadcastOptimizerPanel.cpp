@@ -171,8 +171,8 @@ void BroadcastOptimizerPanel::buildUi()
         grid->setVerticalSpacing(10);
 
         m_cellDensity  = gridCell(grid, 0, 0, QStringLiteral("Density"), frame);
-        m_cellHpf      = gridCell(grid, 0, 1, QStringLiteral("High-pass"), frame);
-        m_cellTone     = gridCell(grid, 0, 2, QStringLiteral("Tone L/P/H"), frame);
+        m_cellHpf      = gridCell(grid, 0, 1, QStringLiteral("Expander"), frame);
+        m_cellTone     = gridCell(grid, 0, 2, QStringLiteral("Trim / De-ess"), frame);
         m_cellComp     = gridCell(grid, 0, 3, QStringLiteral("Compressor"), frame);
         m_cellChannel  = gridCell(grid, 1, 0, QStringLiteral("TX filter"), frame);
         m_cellGain     = gridCell(grid, 1, 1, QStringLiteral("Est. gain"), frame);
@@ -221,6 +221,14 @@ void BroadcastOptimizerPanel::buildUi()
         auto* row = new QHBoxLayout;
         row->setSpacing(5);
 
+        m_rawBtn = new QPushButton(QStringLiteral("▶ Before"), this);
+        m_rawBtn->setStyleSheet(Style::buttonBaseStyle());
+        m_rawBtn->setToolTip(QStringLiteral(
+            "The take exactly as recorded, with nothing done to it."));
+        connect(m_rawBtn, &QPushButton::clicked, this,
+                [this] { emit rawRequested(); });
+        row->addWidget(m_rawBtn);
+
         m_hearBtn = new QPushButton(this);
         m_hearBtn->setStyleSheet(Style::buttonBaseStyle());
         m_hearBtn->setToolTip(QStringLiteral(
@@ -234,33 +242,29 @@ void BroadcastOptimizerPanel::buildUi()
         });
         row->addWidget(m_hearBtn);
 
-        m_rawBtn = new QPushButton(QStringLiteral("▶ Without"), this);
-        m_rawBtn->setStyleSheet(Style::buttonBaseStyle());
-        m_rawBtn->setToolTip(QStringLiteral(
-            "The same words with no processing at all, to compare "
-            "against."));
-        connect(m_rawBtn, &QPushButton::clicked, this,
-                [this] { emit rawRequested(); });
-        row->addWidget(m_rawBtn);
-
-        // Default ON. See levelMatched() in the header for why this
-        // particular default is not a preference but a correctness
-        // matter.
+        // Default OFF, reversed on 2026-10-09. The argument for ON is
+        // real — an unmatched A/B is won by whichever side is louder,
+        // and this adds level deliberately. But the operator's goal
+        // is "kräftiger, klarer und besser", and the loudness IS part
+        // of what the profile buys; matching it away hides the half
+        // of the answer that was asked for. The switch stays, because
+        // judging TONE still needs it.
         m_matchBox = new QCheckBox(QStringLiteral("Level-matched"), this);
-        m_matchBox->setChecked(true);
+        m_matchBox->setChecked(false);
         m_matchBox->setStyleSheet(QStringLiteral("QCheckBox { color: %1; }")
             .arg(QString::fromLatin1(Style::kTextSecondary)));
         m_matchBox->setToolTip(QStringLiteral(
-            "Play the profile at the same loudness as the raw take, so "
-            "the comparison is about tone and density rather than "
-            "about which one is louder. Switch it off to hear the "
-            "level the profile actually buys."));
+            "Off: you hear the level the profile actually buys, which "
+            "is most of what it is for. On: both sides play at the "
+            "same loudness, so the comparison is about tone alone — "
+            "an unmatched A/B is always won by the louder side, and "
+            "that is worth switching on before judging a sound."));
         row->addWidget(m_matchBox);
 
         row->addStretch(1);
 
         m_loadBtn = new QPushButton(
-            QStringLiteral("Load into strip"), this);
+            QStringLiteral("Use this profile"), this);
         m_loadBtn->setStyleSheet(Style::buttonBaseStyle());
         m_loadBtn->setToolTip(QStringLiteral(
             "Set the channel strip to this profile. The strip's own "
@@ -385,7 +389,7 @@ void BroadcastOptimizerPanel::refresh()
 
     m_hearBtn->setText(m_auditioning
         ? QStringLiteral("■ Stop")
-        : QStringLiteral("▶ With this profile"));
+        : QStringLiteral("▶ After"));
 
     m_hearBtn->setEnabled(have);
     m_rawBtn->setEnabled(have);
@@ -425,11 +429,16 @@ void BroadcastOptimizerPanel::refresh()
 
     m_cellDensity->setText(QStringLiteral("%1  %2")
         .arg(p.density).arg(BroadcastOptimizer::densityName(p.density)));
-    m_cellHpf->setText(QStringLiteral("%1 Hz").arg(p.highPassHz, 0, 'f', 0));
-    m_cellTone->setText(QStringLiteral("%1 / %2 / %3")
-        .arg(p.lowShelfDb,  0, 'f', 1)
-        .arg(p.presenceDb,  0, 'f', 1)
-        .arg(p.highShelfDb, 0, 'f', 1));
+    m_cellHpf->setText(p.expanderOn
+        ? QStringLiteral("%1 dBFS").arg(p.expanderThresholdDbFs, 0, 'f', 0)
+        : QStringLiteral("off"));
+    m_cellTone->setText(QStringLiteral("%1%2 dB / %3")
+        .arg(p.trimDb >= 0.0 ? QStringLiteral("+") : QString())
+        .arg(p.trimDb, 0, 'f', 1)
+        .arg(p.deEssOn
+             ? QStringLiteral("%1 Hz %2 dB")
+                   .arg(p.deEssHz, 0, 'f', 0).arg(p.deEssAmountDb, 0, 'f', 1)
+             : QStringLiteral("no de-ess")));
     m_cellComp->setText(QStringLiteral("%1:1  %2 dB")
         .arg(p.compRatio, 0, 'f', 1)
         .arg(p.compThresholdDbFs, 0, 'f', 0));

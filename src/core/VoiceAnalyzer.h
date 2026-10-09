@@ -78,6 +78,12 @@ struct VoiceAnalysis {
     double humDb{-120.0};           // hum against speech, dB
     int    humBaseHz{0};            // 50 or 60, whichever was found
     double sibilanceDb{0.0};        // 5-8k against 1-3k
+
+    // Where the sibilance actually sits, in Hz — the loudest point
+    // between 4 and 9 kHz. A de-esser aimed at a fixed frequency is
+    // aimed at somebody else's voice; Zeus measures this and shows
+    // it ("Sib 4.0k"), and the de-esser follows it.
+    double sibilanceHz{6000.0};
     int    clippedSamples{0};
 
     // ── Three more, added for the broadcast optimiser ────────────────

@@ -99,6 +99,10 @@ inline constexpr double kWidthHz[kWidthCount] = {
     2300.0, 2700.0, 3200.0, 4000.0,
 };
 
+// What every profile trims the voice onto, in dBFS. Zeus's own
+// target, read off its panel: "trim +9.5 dB to -20 dBFS".
+inline constexpr double kTargetLevelDbFs = -20.0;
+
 // The name a profile is saved and listed under. Short, sorts in width
 // order, and says where it came from.
 QString presetName(double widthHz);
@@ -119,7 +123,7 @@ QString presetName(double widthHz);
 // numbers behind them live in its client, which is not in the engine
 // source here, so these are chosen to put Broadcast on Zeus's
 // documented default and spread the rest evenly around it.
-inline constexpr int kDensityNatural   = 30;
+inline constexpr int kDensityNatural   = 40;   // Zeus shows 40
 inline constexpr int kDensityBroadcast = 55;   // Zeus's own default
 inline constexpr int kDensityDense     = 75;
 inline constexpr int kDensityMaximum   = 92;
@@ -167,69 +171,96 @@ struct Plan {
     // Zeus's axis, 0..100. See kDensityBroadcast.
     int     density{kDensityBroadcast};
 
-    // ── The chain ────────────────────────────────────────────────────
-    double  highPassHz{120.0};
-    // ── The two shelves follow the channel, not a constant ───────────
+    // ── Dynamics, and nothing else ───────────────────────────────────
     //
-    // Their CORNERS are per-width, and that is the whole point: a
-    // profile that differs from its sibling only in how much it cuts
-    // at a fixed 3 kHz is barely a different profile. The top shelf
-    // sits below the channel edge so the roll-off starts inside the
-    // channel rather than after it, and the bottom one just above the
-    // high-pass so the two do not fight.
+    // No equaliser. Not a gentler one — none.
     //
-    // This was found the hard way. The first version wrote only the
-    // gains and left the default layout's corners alone — where band
-    // 6 is a PEAK at 3 kHz, not a shelf at all. Four profiles whose
-    // top-end difference was two decibels at 4 kHz, which is what
-    // "alle profile hören sich gleich an" sounded like.
-    double  lowShelfDb{0.0};        // never above 0 — cuts only
-    double  lowShelfHz{180.0};
-    double  presenceDb{0.0};
-    double  highShelfDb{0.0};
-    double  highShelfHz{2000.0};
+    // This is the shape Zeus Link uses, read off its own panel on
+    // 2026-10-09 while the operator sat at it. Each of its three
+    // voice styles is three statements and not one of them is a
+    // tone control:
+    //
+    //   NATURAL    Expander -40 dB (SNR 28 dB), trim +9.5 dB to
+    //              -20 dBFS, AGC -22
+    //   BROADCAST  Expander -38 dB (SNR 28 dB), trim +9.5 dB to
+    //              -20 dBFS, wide to 2.9 kHz
+    //   DX PUNCH   Expander -38 dB (SNR 28 dB), trim +9.5 dB to
+    //              -20 dBFS, comp 4:1
+    //
+    // Expander threshold from the measured signal-to-noise, a level
+    // trim onto a fixed target, and exactly ONE characteristic move.
+    // The voice's own spectrum is left alone.
+    //
+    // The version before this one derived a high-pass, two shelves
+    // and a presence bell per width, and the operator's verdict
+    // after hearing it was "Das Original-Audio ist gut, nur
+    // saemtliche Bearbeitungen sind eine Katastrophe". Every defect
+    // found that day — a hum notch sitting on the fundamental, a
+    // high-pass above it, two cuts stacked over the same octave, a
+    // de-esser firing with nothing to de-ess — was a tone control
+    // moving on evidence too thin to move it on.
+    //
+    // Here the width IS the characteristic move, which is exactly
+    // what Zeus's BROADCAST does with "wide to 2.9 kHz".
 
-    bool    humNotches{false};
-    int     humBaseHz{0};
+    // Expander, not a gate: it leans on quiet passages instead of
+    // slamming shut, and Zeus runs one in every style including the
+    // gentlest. Threshold from the measured noise floor.
+    bool    expanderOn{false};
+    double  expanderThresholdDbFs{-45.0};
 
-    bool    gateOn{false};
-    double  gateThresholdDbFs{-60.0};
+    // The level trim, onto kTargetLevelDbFs. Shown as its own number
+    // rather than hidden inside a make-up gain, because it is the
+    // one change that is purely arithmetic and the operator should
+    // be able to see it is not doing anything clever.
+    double  trimDb{0.0};
 
+    // De-esser, at the frequency the analysis found rather than at a
+    // fixed one. Off when there is nothing to de-ess.
     bool    deEssOn{false};
     double  deEssHz{6000.0};
     double  deEssAmountDb{0.0};     // negative = reduction
 
-    double  compRatio{2.5};
-    double  compThresholdDbFs{-24.0};
+    // Compressor. The ratio is solved for from the density target,
+    // not chosen; see targetCrestDb().
+    double  compRatio{1.0};
+    double  compThresholdDbFs{-20.0};
     double  compMakeupDb{0.0};
 
     double  limiterCeilingDb{-1.0};
 
+    // ── The phase rotator ────────────────────────────────────────────
+    //
+    // The one move that makes a voice stronger AND cleaner without
+    // touching its tone, which is exactly what was asked for:
+    // "meine stimme ... kräftiger, klarer und besser zu machen"
+    // (operator, 2026-10-09).
+    //
+    // Speech is asymmetric — the waveform's positive and negative
+    // peaks differ, often by several decibels — so the loudest peak
+    // hits the limiter long before the average level has earned it.
+    // A cascade of all-pass filters leaves the spectrum alone (every
+    // frequency comes through at the same level) and only moves the
+    // phases, which pulls the two peaks together. The headroom that
+    // frees goes straight into average level.
+    //
+    // This is also what Zeus Link's own optimiser chose when it ran
+    // on this operator's voice, and it reported the choice as
+    // measured rather than assumed: "applied 1 bounded change: phase
+    // rotator 474 Hz / 8 stages measured best".
+    //
+    // Longpath does not yet search for the best stage count per
+    // voice — it takes the eight Zeus measured as best and says so.
+    // Searching it needs the recording, which plan() does not have;
+    // that is the next step, not a pretence here.
+    int     phaseRotatorStages{8};
+
     // ── The stages this profile deliberately forgets ─────────────────
     //
     // Operator, 2026-10-09: "for contest various filters have to be
-    // forgotten; you'd use those from the 2.7 k profile upward."
-    //
-    // That is not only a preference, it is the published practice.
-    // NU9N's transmit-chain guide marks the noise gate, the soft
-    // compressor, the spectral enhancer, the peak limiter and the
-    // effects as OPTIONAL, and leaves exactly two stages unmarked —
-    // the equaliser and the compressor. The same page is blunt about
-    // the other end: broadcast processors "are not specific enough
-    // unless you are transmitting at 6 kHz of audio bandwidth or
-    // more. Their flexibility is very limited below 6 kHz."
-    // (https://www.nu9n.com/tx.html)
-    //
-    // So the narrow profiles run the two stages that earn their
-    // place and switch the rest OFF rather than leaving them as they
-    // were. Left alone, a valve stage from a previous profile would
-    // keep colouring a contest signal that wanted none of it, and
-    // the operator would have no way to tell which profile they were
-    // actually hearing.
+    // forgotten; you'd use those from the 2.7 k profile upward." The
+    // same stages NU9N's transmit-chain guide marks optional.
     bool    characterStages{true};   // tube, exciter, reverb
-
-    // What the operator is told about that decision, so a stage
-    // going dark is never a surprise.
     QString forgotten;
 
     // ── What it is worth ─────────────────────────────────────────────

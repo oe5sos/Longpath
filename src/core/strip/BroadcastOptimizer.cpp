@@ -210,283 +210,110 @@ QVector<Plan> plan(const VoiceAnalysis& a)
         p.name    = presetName(rule.widthHz);
         p.density = rule.density;
 
-        // ── High-pass, kept BELOW the fundamental ────────────────────
+        // ── The channel this profile is for ─────────────────────────
         //
-        // The first version multiplied the fundamental by 1.15 to
-        // 1.80 and took the HIGHER of that and the rumble-driven
-        // value. On a 110 Hz voice that put a 24 dB/octave filter at
-        // 198 Hz — above the fundamental, which is to say through the
-        // middle of the voice. Together with a shelf cut just above
-        // it, that is where the bass went.
-        //
-        // Now it is a fraction, and the LOWER of the two wins. The
-        // fundamental is the voice's own bottom note; a transmit
-        // filter will deal with what is under it, and a high-pass
-        // that eats it cannot be made up for anywhere downstream.
-        const double measured = StripTuner::highPassHz(a);
-        const double belowPitch =
-            a.pitchHz > 0.0 ? a.pitchHz * rule.pitchFactor : measured;
-        p.highPassHz = std::clamp(std::min(measured, belowPitch),
-                                  60.0, rule.highPassCapHz);
-
-        if (a.pitchHz > 0.0) {
-            p.notes << QStringLiteral(
-                "High-pass at %1 Hz — below your own fundamental of "
-                "%2 Hz, deliberately. What is under it is rumble and "
-                "proximity bass that reaches the compressor before the "
-                "transmit filter throws it away; what is above it is "
-                "your voice, and no later stage can put that back.")
-                .arg(p.highPassHz, 0, 'f', 0)
-                .arg(a.pitchHz, 0, 'f', 0);
-        } else {
-            p.notes << QStringLiteral(
-                "High-pass at %1 Hz, set from the low-end energy — no "
-                "stable pitch was found in the take, so the fundamental "
-                "could not be used to place it.").arg(p.highPassHz, 0, 'f', 0);
-        }
-
-        // ── The transmit channel this profile is for ─────────────────
-        p.lowCutHz  = int(std::lround(p.highPassHz));
+        // The width IS the characteristic move, exactly as Zeus's
+        // BROADCAST style states it: "wide to 2.9 kHz". The low cut
+        // is the transmit filter's, not an equaliser's — it belongs
+        // to the channel, and the chain below never touches tone.
+        p.lowCutHz  = 150;
         p.highCutHz = int(std::lround(rule.widthHz));
 
-        // ── Hum, and why it is so often not hum ──────────────────────
+        // ── Expander, from the measured signal-to-noise ─────────────
         //
-        // VoiceAnalyzer measures hum by summing +/-2 FFT bins around
-        // the mains frequency and its first three harmonics. At the
-        // analyser's 4096-point FFT and 48 kHz that window is about
-        // +/-23 Hz wide — so the window around 100 Hz spans roughly
-        // 77 to 123 Hz, and the one around 200 Hz spans 177 to 223.
-        //
-        // A male voice at 110 Hz puts its FUNDAMENTAL in the first
-        // window and its second harmonic in the second. The detector
-        // then reports hum that is not there, and notches at 50, 100
-        // and 150 Hz with -18, -15 and -12 dB take out the bottom of
-        // the voice instead.
-        //
-        // Measured on a synthetic 110 Hz voice with no hum at all:
-        // 110 Hz came out 8.7 dB down and 150 Hz 14.3 dB down, while
-        // 220 Hz was untouched. That notch is most of what "kein
-        // Bass ... wie ein Handy-Mikrofon" was (bench, 2026-10-09).
-        //
-        // So the notches are refused whenever one of them would sit
-        // on a harmonic of the measured fundamental. A real hum on a
-        // voice whose harmonics happen to coincide is then left
-        // alone too — which is the right way round: an un-notched
-        // hum is audible and fixable at the cable, while a notched-
-        // out fundamental cannot be recovered anywhere.
-        const auto notchHitsTheVoice = [&]() {
-            if (a.pitchHz <= 0.0 || a.humBaseHz <= 0) { return false; }
-            for (int n = 1; n <= 3; ++n) {
-                const double notch = double(a.humBaseHz) * n;
-                const double nearest =
-                    std::round(notch / a.pitchHz) * a.pitchHz;
-                if (nearest <= 0.0) { continue; }
-                // Within a sixth of an octave of a harmonic: the
-                // notch is Q 8, so anything this close is sitting on
-                // the voice rather than beside it.
-                if (std::abs(notch - nearest) < notch * 0.12) {
-                    return true;
-                }
-            }
-            return false;
-        };
-
-        p.humNotches = StripTuner::humWorthNotching(a) && !notchHitsTheVoice();
-        if (StripTuner::humWorthNotching(a) && !p.humNotches) {
-            p.notes << QStringLiteral(
-                "No hum notches, although the measurement reports hum "
-                "at %1 Hz: its harmonics land on your own voice "
-                "(fundamental %2 Hz), and a notch there would take out "
-                "the bottom of you rather than the mains. If there "
-                "really is hum, the cable and the earth are the fix — "
-                "no filter here can tell the two apart.")
-                .arg(a.humBaseHz).arg(a.pitchHz, 0, 'f', 0);
-        }
-        p.humBaseHz  = a.humBaseHz;
-        if (p.humNotches) {
-            p.notes << QStringLiteral(
-                "Notches at %1, %2 and %3 Hz. The hum is only %4 dB "
-                "under your voice — these hide it, they do not fix it, "
-                "and finding what is picking up the mains is worth more "
-                "than any setting here.")
-                .arg(a.humBaseHz).arg(a.humBaseHz * 2).arg(a.humBaseHz * 3)
-                .arg(-a.humDb, 0, 'f', 1);
-        }
-
-        // ── Tone ─────────────────────────────────────────────────────
-        //
-        // Measured against THIS width's target, not against one
-        // curve for all four, and the difference may go either way.
-        //
-        // The measurement is a.bandDb — the voice's own spectrum in
-        // dB relative to its 1 kHz band. The target is what this
-        // channel wants there. Subtract, and the shelf gain is what
-        // closes the gap: negative where the voice has more than the
-        // channel can use, POSITIVE where it has less.
-        //
-        // That positive half is new and it is the whole repair. Under
-        // the old cuts-only rule a profile could only ever take away,
-        // so the bottom of every voice went with it.
+        // Zeus runs one in every style, gentlest included, and names
+        // the threshold with the SNR it came from: "Expander -38 dB
+        // (SNR 28 dB)". On its own numbers the threshold sat about
+        // two thirds of the way up from the noise floor to the
+        // voice, which is where an expander leans on the room
+        // without reaching for the ends of words.
         {
-            const double measuredLow  =
-                0.5 * (a.bandDb[2] + a.bandDb[3]);   // 125 + 250 Hz
-            const double measuredTop  = a.bandDb[7]; // 4 kHz
-
-            // The one guard that made cuts-only right in the first
-            // place: lifting a band lifts whatever noise is in it.
-            // With the room close to the voice there is nothing there
-            // worth lifting.
             const double snr = a.speechDbFs - a.noiseFloorDbFs;
-            const bool mayLift = snr > kBoostNeedsSnrDb;
-
-            // ── The bounded correction ──────────────────────────────
-            //
-            // A voice that is genuinely boomy, or genuinely thin,
-            // still gets helped — but by at most three decibels, and
-            // measured against what a voice normally does rather than
-            // against a flat line. Around +9 dB at 125-250 Hz
-            // relative to 1 kHz is ordinary for speech; the
-            // correction only answers the distance from THAT.
-            //
-            // The bound is the point. Unbounded, this term is exactly
-            // the absolute target that flattened the voice, wearing a
-            // different name.
-            constexpr double kOrdinaryLowTiltDb = 9.0;
-            constexpr double kMaxCorrectionDb   = 3.0;
-            const double lowCorrection = std::clamp(
-                -(measuredLow - kOrdinaryLowTiltDb) * 0.5,
-                -kMaxCorrectionDb, kMaxCorrectionDb);
-
-            const double lift = mayLift ? 6.0 : 0.0;
-
-            p.lowShelfDb  = std::clamp(rule.lowShiftDb + lowCorrection,
-                                       -6.0, std::min(lift, 4.0));
-            p.presenceDb  = std::clamp(rule.presenceShiftDb,
-                                       -6.0, std::min(lift, 4.0));
-            // The top shift is a roll-off toward the channel edge and
-            // is applied as given; a microphone that is already dull
-            // up there is told about it in `caveat` rather than being
-            // dulled further by a correction term.
-            p.highShelfDb = std::clamp(
-                rule.topShiftDb + (measuredTop > 0.0 ? -1.0 : 0.0),
-                -8.0, std::min(lift, 2.0));
-
-            // Three quarters of the channel: the roll-off begins
-            // inside it, which is what makes a 2.3 k profile sound
-            // narrow rather than merely quieter at 4 kHz. Above the
-            // edge the transmit filter would do the work anyway, and
-            // a shelf placed there shapes only what is thrown away.
-            p.highShelfHz = rule.widthHz * 0.75;
-
-            // Clear of the high-pass by an octave and a half. The two
-            // used to sit on top of each other — a 24 dB/octave
-            // high-pass at 198 Hz with an 8 dB shelf cut at 297 Hz on
-            // top of it, both working on the same part of the voice.
-            // That stacking is half of why there was no bass left.
-            p.lowShelfHz  = std::clamp(p.highPassHz * 2.5, 150.0, 500.0);
-
-            p.notes << QStringLiteral(
-                "Tone for %1: low shelf %2 dB from %5 Hz, presence "
-                "%3 dB, high shelf %4 dB from %6 Hz. These MOVE your "
-                "voice from where it already is rather than dragging "
-                "it onto a curve — your own balance is the starting "
-                "point, and they lift as readily as they cut%7.")
-                .arg(widthLabel(rule.widthHz))
-                .arg(p.lowShelfDb,  0, 'f', 1)
-                .arg(p.presenceDb,  0, 'f', 1)
-                .arg(p.highShelfDb, 0, 'f', 1)
-                .arg(p.lowShelfHz,  0, 'f', 0)
-                .arg(p.highShelfHz, 0, 'f', 0)
-                .arg(mayLift
-                     ? QString()
-                     : QStringLiteral(" — except that nothing is lifted "
-                                      "here: your voice is only %1 dB "
-                                      "above the room, and lifting a "
-                                      "band lifts the room with it")
-                           .arg(snr, 0, 'f', 0));
+            if (snr >= StripTuner::kMinGateSeparationDb) {
+                p.expanderOn = true;
+                p.expanderThresholdDbFs =
+                    std::clamp(a.noiseFloorDbFs + 0.65 * snr, -80.0, -10.0);
+                p.notes << QStringLiteral(
+                    "Expander at %1 dBFS, from your measured %2 dB of "
+                    "signal-to-noise. It leans on the room between "
+                    "words rather than shutting on it — nothing here "
+                    "reaches for the ends of what you say.")
+                    .arg(p.expanderThresholdDbFs, 0, 'f', 0)
+                    .arg(snr, 0, 'f', 0);
+            } else {
+                p.notes << QStringLiteral(
+                    "No expander. Your voice is only %1 dB above the "
+                    "room, and anything set that close takes the ends "
+                    "off quiet words. A quieter room is the fix.")
+                    .arg(snr, 0, 'f', 0);
+            }
         }
 
-        // ── Gate ─────────────────────────────────────────────────────
+        // ── The trim, onto one target ───────────────────────────────
+        p.trimDb = std::clamp(kTargetLevelDbFs - a.speechDbFs, -12.0, 12.0);
+        p.notes << QStringLiteral(
+            "Trim %1%2 dB to %3 dBFS. Pure arithmetic: your take "
+            "measured %4 dBFS and every profile starts from the same "
+            "level, so what you hear between them is the processing "
+            "and not the volume.")
+            .arg(p.trimDb >= 0.0 ? QStringLiteral("+") : QString())
+            .arg(p.trimDb, 0, 'f', 1)
+            .arg(kTargetLevelDbFs, 0, 'f', 0)
+            .arg(a.speechDbFs, 0, 'f', 1);
+
+        // ── De-esser, at the frequency that was measured ────────────
         //
-        // Only when the room is actually audible. A gate costs the
-        // ends of quiet words and buys nothing in a quiet room, and
-        // switching one on by default is the sort of thing that makes
-        // a profile sound worse than no profile at all.
-        {
-            const double sep = a.speechDbFs - a.noiseFloorDbFs;
-            constexpr double kRoomIsQuietDb = 30.0;
-            if (sep < StripTuner::kMinGateSeparationDb) {
-                p.gateOn = false;
-                p.notes << QStringLiteral(
-                    "No gate. Your voice is only %1 dB above the room, "
-                    "and a gate set that close chews the ends off quiet "
-                    "words. A quieter room is the fix.")
-                    .arg(sep, 0, 'f', 0);
-            } else if (sep >= kRoomIsQuietDb) {
-                p.gateOn = false;
-                p.notes << QStringLiteral(
-                    "No gate — your room is %1 dB below your voice, "
-                    "which is quiet enough that a gate would only risk "
-                    "the ends of words.").arg(sep, 0, 'f', 0);
-            } else {
-                p.gateOn = true;
-                p.gateThresholdDbFs =
-                    std::clamp(StripTuner::gateThresholdDbFs(a), -80.0, 0.0);
-            }
+        // Zeus shows the sibilance frequency it found ("Sib 4.0k")
+        // and puts the de-esser there. The previous version here was
+        // wired to 6 kHz, which is somebody else's voice.
+        constexpr double kSibilantAboveDb = -3.0;
+        if (a.sibilanceDb > kSibilantAboveDb) {
+            const double over = a.sibilanceDb - kSibilantAboveDb;
+            p.deEssOn       = true;
+            p.deEssHz       = std::clamp(a.sibilanceHz, 3500.0, 9000.0);
+            p.deEssAmountDb = -std::clamp(over * 1.2, 2.0, 8.0);
+            p.notes << QStringLiteral(
+                "De-esser at %1 Hz, %2 dB — that is where your "
+                "sibilance actually sits, not a fixed frequency. It "
+                "measures %3 dB against the midrange.")
+                .arg(p.deEssHz, 0, 'f', 0)
+                .arg(p.deEssAmountDb, 0, 'f', 1)
+                .arg(a.sibilanceDb, 0, 'f', 1);
         }
 
         p.limiterCeilingDb = -1.0;
 
-        // ── Compressor, derived from the density target ──────────────
+        // ── Compressor, derived from the density target ─────────────
         //
-        // The ratio is not chosen, it is solved for. With the
-        // threshold at the speech average, the peaks sit the measured
-        // crest factor above it and come out crest/ratio above it. So
-        // the ratio that lands on the target crest is measured
-        // divided by target, and nothing here is a taste.
+        // The ratio is solved for, not chosen: with the threshold at
+        // the speech average the peaks sit the measured crest factor
+        // above it and leave crest/ratio above it, so the ratio that
+        // lands on the target crest is measured divided by target.
         {
             const double target = targetCrestDb(p.density);
             const double measuredCrest = std::max(a.crestFactorDb, 1.0);
             p.compRatio = std::clamp(measuredCrest / std::max(target, 1.0),
                                      1.0, 6.0);
-            p.compThresholdDbFs = std::clamp(a.speechDbFs, -60.0, -6.0);
+            p.compThresholdDbFs = std::clamp(a.speechDbFs + p.trimDb,
+                                             -60.0, -6.0);
 
-            // What the compression took off the peaks is what may be
-            // put back, plus the make-up the EQ cuts earned. Capped
-            // so the limiter is a safety net and not a stage.
             const double fromComp =
                 measuredCrest - measuredCrest / std::max(p.compRatio, 1.0);
-            // ── Make-up, bounded by the headroom there actually is ──
-            //
-            // The old line added the analyser's suggested preamp on
-            // top of what the compressor took and clamped at 18 dB —
-            // a number with no relation to this take. With the
-            // measured peak known, the honest bound is arithmetic:
-            // a peak P entering a compressor with threshold T and
-            // ratio R leaves at T + (P - T) / R, and whatever is
-            // added after that has to still fit under the limiter.
-            //
-            // Leaving a decibel of margin means the limiter catches
-            // transients, which is its job, instead of riding the
-            // whole take, which is what makes a voice sound crushed.
-            const double peak = a.samplePeakDbFs > -120.0
-                ? a.samplePeakDbFs
-                : a.speechDbFs + measuredCrest;
+            const double peak = (a.samplePeakDbFs > -120.0
+                                 ? a.samplePeakDbFs
+                                 : a.speechDbFs + measuredCrest) + p.trimDb;
             const double afterComp = p.compThresholdDbFs
                 + (peak - p.compThresholdDbFs) / std::max(p.compRatio, 1.0);
-            const double headroom =
-                (p.limiterCeilingDb - 1.0) - afterComp;
+            const double headroom = (p.limiterCeilingDb - 1.0) - afterComp;
 
-            p.compMakeupDb   = std::clamp(std::min(fromComp, headroom),
-                                          0.0, 12.0);
-            p.densityGainDb  = p.compMakeupDb;
+            p.compMakeupDb  = std::clamp(std::min(fromComp, headroom),
+                                         0.0, 12.0);
+            p.densityGainDb = p.trimDb + p.compMakeupDb;
 
             p.notes << QStringLiteral(
                 "Compressor %1:1 at %2 dBFS, make-up %3 dB. Density "
                 "%4 (%5) aims your peaks at %6 dB over the average; "
-                "they measure %7 dB now. Expect roughly %3 dB more "
-                "average level — an estimate, not a measurement. The "
-                "next recording is the measurement.")
+                "they measure %7 dB now.")
                 .arg(p.compRatio, 0, 'f', 1)
                 .arg(p.compThresholdDbFs, 0, 'f', 0)
                 .arg(p.compMakeupDb, 0, 'f', 1)
@@ -496,7 +323,22 @@ QVector<Plan> plan(const VoiceAnalysis& a)
                 .arg(measuredCrest, 0, 'f', 0);
         }
 
-        // ── What this width forgets ──────────────────────────────────
+        p.notes << QStringLiteral(
+            "Phase rotator, %1 stages. Your voice's waveform is "
+            "lopsided — speech always is — so its loudest peak "
+            "reaches the limiter well before the average level has "
+            "earned it. An all-pass cascade leaves every frequency at "
+            "the same level and only moves phase, which pulls the two "
+            "peaks together. That is headroom turned into loudness "
+            "without a single tone control being touched.")
+            .arg(p.phaseRotatorStages);
+
+        p.notes << QStringLiteral(
+            "No equaliser. Your voice's own balance is left exactly "
+            "as it is — the width is the difference between these "
+            "four profiles, and the only things moved are dynamics.");
+
+        // ── What this width forgets ─────────────────────────────────
         p.characterStages = rule.character;
         if (!p.characterStages) {
             p.forgotten = QStringLiteral(
@@ -508,7 +350,7 @@ QVector<Plan> plan(const VoiceAnalysis& a)
             p.notes << p.forgotten;
         }
 
-        // ── What the measurement says this width cannot deliver ──────
+        // ── What the measurement says this width cannot deliver ─────
         if (a.rolloffHz > 0.0 && a.rolloffHz < rule.widthHz * 0.95) {
             p.caveat = QStringLiteral(
                 "Your microphone is already 20 dB down by %1 Hz, below "
@@ -519,18 +361,11 @@ QVector<Plan> plan(const VoiceAnalysis& a)
                 .arg(rule.widthHz, 0, 'f', 0);
         }
 
-        // ── The thing a compressor cannot fix ────────────────────────
-        //
-        // Loudness range, not crest. A wide LRA is the operator
-        // moving between sentences, and a compressor set from the
-        // crest factor will chase it and pump instead of fixing it.
-        // Tech 3342 calls a range above about 10 LU wide for speech.
         if (a.loudnessRangeValid && a.loudnessRangeLu > 10.0) {
             p.notes << QStringLiteral(
                 "Your loudness range is %1 LU — that is you moving "
                 "between sentences, not your peaks, and no compressor "
-                "setting here answers it. Keep a steady distance from "
-                "the microphone, or let the leveller take it.")
+                "setting here answers it.")
                 .arg(a.loudnessRangeLu, 0, 'f', 1);
         }
 
@@ -561,81 +396,37 @@ bool apply(const Plan& p, StripChain& chain)
 {
     if (p.name.isEmpty()) { return false; }
 
-    // ── Seed the band layout FIRST ───────────────────────────────────
+    // ── The equaliser is not touched. At all. ────────────────────────
     //
-    // A freshly constructed ClientEq has activeBandCount 0, and
-    // ClientEq::process returns immediately on that — so every band
-    // written below would be stored, read back correctly by any test
-    // that asks for it, and do absolutely nothing to audio.
+    // Not seeded, not enabled, not disabled, not read. Whatever the
+    // operator has on their curve stays exactly as they left it.
     //
-    // That is exactly what happened: the four profiles were rendered
-    // with no equaliser at all, which left them differing only by
-    // compressor and limiter — and the loudness-matched audition
-    // flattens most of that. Reported from the bench in five words,
-    // 2026-10-09: "alle profile hören sich gleich an". They did.
+    // This is the single biggest difference from the version before,
+    // and it is the benchmark's shape: Zeus Link's three voice styles
+    // state an expander, a trim and one characteristic move, and not
+    // one of them is a tone control. Every fault found on 2026-10-09
+    // — a hum notch on the fundamental, a high-pass above it, two
+    // cuts stacked over one octave, a de-esser with nothing to
+    // de-ess — was this code moving a tone control it had no business
+    // moving.
+
+    // ── Expander ─────────────────────────────────────────────────────
     //
-    // ensureSeeded only ever appends; a chain the operator has
-    // already shaped keeps every band it had.
-    EqBandLayout::ensureSeeded(chain.eq());
-
-    // High-pass.
-    {
-        ClientEq::BandParams b = chain.eq().band(kBandHighPass);
-        b.type          = ClientEq::FilterType::HighPass;
-        b.freqHz        = float(p.highPassHz);
-        b.slopeDbPerOct = 24;
-        b.enabled       = true;
-        chain.eq().setBand(kBandHighPass, b);
-    }
-
-    // Hum notches — written when they are wanted and switched off
-    // when they are not, so applying a second plan cannot leave the
-    // first one's notches behind.
-    for (int h = 0; h < 3; ++h) {
-        ClientEq::BandParams b = chain.eq().band(kBandHum1 + h);
-        if (p.humNotches && p.humBaseHz > 0) {
-            b.type    = ClientEq::FilterType::Peak;
-            b.freqHz  = float(p.humBaseHz * (h + 1));
-            b.q       = 8.0f;
-            b.gainDb  = float(-18.0 + 3.0 * h);
-            b.enabled = true;
-        } else {
-            b.enabled = false;
-        }
-        chain.eq().setBand(kBandHum1 + h, b);
-    }
-
-    // The two shelves carry their corner AND their type, because the
-    // default layout has a peak at 800 Hz in slot 4 and a peak at
-    // 3 kHz in slot 6 — writing only a gain into those shapes the
-    // wrong part of the voice and barely separates the widths.
-    {
-        ClientEq::BandParams lo = chain.eq().band(kBandLow);
-        lo.type    = ClientEq::FilterType::LowShelf;
-        lo.freqHz  = float(p.lowShelfHz);
-        lo.gainDb  = float(p.lowShelfDb);
-        lo.enabled = true;
-        chain.eq().setBand(kBandLow, lo);
-
-        ClientEq::BandParams hi = chain.eq().band(kBandHigh);
-        hi.type    = ClientEq::FilterType::HighShelf;
-        hi.freqHz  = float(p.highShelfHz);
-        hi.gainDb  = float(p.highShelfDb);
-        hi.enabled = true;
-        chain.eq().setBand(kBandHigh, hi);
-    }
-    setBandGain(chain, kBandPresence, p.presenceDb,  true);
-    chain.setStageEnabled(StripChain::Stage::Eq, true);
-
-    if (p.gateOn) {
-        chain.gate().setThresholdDb(float(p.gateThresholdDbFs));
+    // The chain's gate stage, run as an expander, which is what Zeus
+    // puts in every style including the gentlest.
+    if (p.expanderOn) {
+        chain.gate().setThresholdDb(float(p.expanderThresholdDbFs));
         chain.gate().setMode(ClientGate::Mode::Expander);
-        chain.gate().setFloorDb(-15.0f);
-        chain.gate().setHoldMs(25.0f);
-        chain.gate().setReleaseMs(180.0f);
+        // A shallow floor: this leans on the room, it does not shut
+        // the door on it. The old -15 dB floor was a gate wearing an
+        // expander's name.
+        chain.gate().setFloorDb(-8.0f);
+        chain.gate().setHoldMs(40.0f);
+        chain.gate().setReleaseMs(250.0f);
     }
-    chain.setStageEnabled(StripChain::Stage::Gate, p.gateOn);
+    chain.setStageEnabled(StripChain::Stage::Gate, p.expanderOn);
 
+    // ── De-esser, where the sibilance was measured ───────────────────
     if (p.deEssOn) {
         chain.deEss().setFrequencyHz(float(p.deEssHz));
         chain.deEss().setThresholdDb(float(std::clamp(
@@ -644,12 +435,23 @@ bool apply(const Plan& p, StripChain& chain)
     }
     chain.setStageEnabled(StripChain::Stage::DeEss, p.deEssOn);
 
+    // ── Trim and compressor ──────────────────────────────────────────
+    //
+    // The trim goes in as the compressor's DRIVE, which is a gain
+    // ahead of the detector — the right place for it, because a
+    // threshold only means something once the level it is measuring
+    // has been set. A take that arrives already louder than the
+    // target cannot be driven down there (drive starts at 0 dB), so a
+    // negative trim comes off the make-up instead.
+    chain.comp().setDriveDb(float(std::clamp(p.trimDb, 0.0, 18.0)));
     chain.comp().setRatio(float(p.compRatio));
     chain.comp().setThresholdDb(float(p.compThresholdDbFs));
     chain.comp().setAttackMs(8.0f);
     chain.comp().setReleaseMs(150.0f);
     chain.comp().setKneeDb(8.0f);
-    chain.comp().setMakeupDb(float(p.compMakeupDb));
+    chain.comp().setPhaseRotatorStages(p.phaseRotatorStages);
+    chain.comp().setMakeupDb(float(std::clamp(
+        p.compMakeupDb + std::min(0.0, p.trimDb), 0.0, 12.0)));
     chain.setStageEnabled(StripChain::Stage::Comp, true);
 
     chain.limiter().setCeilingDb(float(p.limiterCeilingDb));
@@ -657,18 +459,9 @@ bool apply(const Plan& p, StripChain& chain)
 
     // ── The character stages ─────────────────────────────────────────
     //
-    // Switched OFF when the profile forgets them, and otherwise left
+    // Switched OFF when the profile forgets them, otherwise left
     // exactly as the operator had them. Never switched ON: there is
-    // no measurement that says a voice wants a valve, and an
-    // optimiser that turns one on is making a decision it cannot
-    // justify from the recording.
-    //
-    // Off, rather than left alone, is the asymmetry and it is
-    // deliberate. A profile that claims to be lean while a reverb
-    // from the previous profile is still running is a profile the
-    // operator cannot trust, and the one thing an A/B between two
-    // profiles must mean is that the difference heard is the
-    // difference between them.
+    // no measurement that says a voice wants a valve.
     if (!p.characterStages) {
         chain.setStageEnabled(StripChain::Stage::Tube,   false);
         chain.setStageEnabled(StripChain::Stage::Pudu,   false);

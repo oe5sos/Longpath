@@ -199,29 +199,23 @@ private slots:
         const BroadcastOptimizer::Plan& narrow = p[0];   // 2.3k
         const BroadcastOptimizer::Plan& wide   = p[3];   // 4.0k
 
-        // Der Hochpass ist KEIN Breitenwerkzeug mehr. Er sitzt unter
-        // dem Grundton und raeumt Rumpeln weg, mehr nicht -- das
-        // Ausduennen fuer den schmalen Kanal macht das Tiefenfilter.
-        // Beides zu benutzen war genau das Stapeln, das der Stimme
-        // den Koerper nahm (Betreiber, 2026-10-09). Er darf beim
-        // schmalen Profil hoeher liegen, muss aber nicht.
-        QVERIFY(narrow.highPassHz >= wide.highPassHz);
-
-        // Schlanker unten ist jetzt Sache des Tiefenfilters.
-        QVERIFY(narrow.lowShelfDb < wide.lowShelfDb);
-
-        // Harder top cut, because the top is outside the channel.
-        QVERIFY(narrow.highShelfDb < wide.highShelfDb);
-
-        // More density, because punching through is the job.
+        // Schlanker heisst jetzt: dichter und ohne Farbe, nicht
+        // beschnitten. Der Klang bleibt unberuehrt -- siehe
+        // applyTouchesNoEqualiser().
         QVERIFY(narrow.density > wide.density);
         QVERIFY(narrow.compRatio > wide.compRatio);
-
-        // And it forgets the stages that only cost it something.
         QVERIFY(!narrow.characterStages);
         QVERIFY(wide.characterStages);
         QVERIFY(!narrow.forgotten.isEmpty());
         QVERIFY(wide.forgotten.isEmpty());
+
+        // Die Breite selbst ist die kennzeichnende Aenderung.
+        QVERIFY(narrow.highCutHz < wide.highCutHz);
+
+        // Und der Pegel startet fuer alle vier gleich, damit ein A/B
+        // zwischen ihnen die Verarbeitung vergleicht und nicht die
+        // Lautstaerke.
+        QCOMPARE(narrow.trimDb, wide.trimDb);
 
         // Every plan explains itself.
         for (const BroadcastOptimizer::Plan& one : p) {
@@ -232,43 +226,48 @@ private slots:
     // The high-pass has to follow the voice, not a constant. Two
     // measurements identical but for the fundamental must not produce
     // the same filter — that was the entire reason for measuring it.
-    // Der Grundton ist die OBERGRENZE des Hochpasses, nicht sein
-    // Antrieb. Die alte Fassung multiplizierte ihn mit 1,15 bis 1,80
-    // und nahm den hoeheren der beiden Werte -- bei einer 110-Hz-
-    // Stimme landete ein Filter mit 24 dB/Oktave bei 198 Hz, also
-    // mitten in der Stimme. Jetzt gewinnt der niedrigere.
-    void thePitchCapsTheHighPass()
+    // ── Der Entzerrer wird nicht angefasst ───────────────────────────
+    //
+    // Der neue Vertrag, und der wichtigste. Jeder Fehler vom
+    // 2026-10-09 -- Brummkerbe auf dem Grundton, Hochpass darueber,
+    // zwei Schnitte uebereinander, De-Esser ohne Zischen -- war
+    // dieser Code, der an einem Klangregler drehte. Zeus Link dreht
+    // in keinem seiner drei Stile an einem.
+    void applyTouchesNoEqualiser()
     {
-        VoiceAnalysis low = ordinary();
-        low.pitchHz = 95.0;
-        const QVector<BroadcastOptimizer::Plan> a =
-            BroadcastOptimizer::plan(low);
-        for (const BroadcastOptimizer::Plan& p : a) {
-            QVERIFY2(p.highPassHz < low.pitchHz,
-                     qPrintable(QStringLiteral(
-                         "%1: Hochpass %2 Hz liegt auf oder ueber dem "
-                         "Grundton %3 Hz")
-                         .arg(p.name).arg(p.highPassHz, 0, 'f', 0)
-                         .arg(low.pitchHz, 0, 'f', 0)));
-        }
+        StripChain chain;
+        chain.prepare(48000.0);
 
-        // Eine hoehere Stimme darf einen hoeheren Hochpass bekommen,
-        // aber nie einen niedrigeren -- und nie ueber dem Deckel der
-        // Breite.
-        VoiceAnalysis high = ordinary();
-        high.pitchHz = 185.0;
-        const QVector<BroadcastOptimizer::Plan> b =
-            BroadcastOptimizer::plan(high);
-        for (int i = 0; i < a.size(); ++i) {
-            QVERIFY(b[i].highPassHz >= a[i].highPassHz);
-        }
+        // Eine Kurve, wie der Bediener sie hinterlassen haben koennte.
+        ClientEq::BandParams mine = chain.eq().band(4);
+        mine.type    = ClientEq::FilterType::LowShelf;
+        mine.freqHz  = 180.0f;
+        mine.gainDb  = 4.5f;
+        mine.enabled = true;
+        chain.eq().setBand(4, mine);
+        chain.eq().setActiveBandCount(7);
+        chain.setStageEnabled(StripChain::Stage::Eq, true);
 
-        VoiceAnalysis veryHigh = ordinary();
-        veryHigh.pitchHz = 320.0;
-        const QVector<BroadcastOptimizer::Plan> c =
-            BroadcastOptimizer::plan(veryHigh);
-        QVERIFY(c[0].highPassHz <= 180.0);
-        QVERIFY(c[3].highPassHz <= 100.0);
+        const int bandsBefore = chain.eq().activeBandCount();
+
+        const QVector<BroadcastOptimizer::Plan> p =
+            BroadcastOptimizer::plan(ordinary());
+        QVERIFY(BroadcastOptimizer::apply(p[0], chain));
+
+        const ClientEq::BandParams after = chain.eq().band(4);
+        QCOMPARE(after.gainDb, 4.5f);
+        QCOMPARE(after.freqHz, 180.0f);
+        QVERIFY(after.enabled);
+        QCOMPARE(chain.eq().activeBandCount(), bandsBefore);
+        QVERIFY2(chain.stageEnabled(StripChain::Stage::Eq),
+                 "der Entzerrer bleibt an, wenn er an war");
+
+        // Und auch nicht eingeschaltet, wenn er aus war.
+        StripChain off;
+        off.prepare(48000.0);
+        QVERIFY(BroadcastOptimizer::apply(p[0], off));
+        QVERIFY2(!off.stageEnabled(StripChain::Stage::Eq),
+                 "und aus, wenn er aus war");
     }
 
     // A microphone that stops before the channel does must be said
@@ -323,349 +322,45 @@ private slots:
             BroadcastOptimizer::plan(ordinary());
         QVERIFY(BroadcastOptimizer::apply(p[0], chain));
 
-        QVERIFY(chain.stageEnabled(StripChain::Stage::Eq));
         QVERIFY(chain.stageEnabled(StripChain::Stage::Comp));
         QVERIFY(chain.stageEnabled(StripChain::Stage::Limiter));
         QVERIFY(!chain.stageEnabled(StripChain::Stage::Tube));
         QVERIFY(!chain.stageEnabled(StripChain::Stage::Reverb));
         QVERIFY(!chain.stageEnabled(StripChain::Stage::Pudu));
 
-        // The high-pass really is where the plan said.
-        const ClientEq::BandParams hp = chain.eq().band(0);
-        QVERIFY(hp.enabled);
-        QVERIFY(std::abs(double(hp.freqHz) - p[0].highPassHz) < 1.0);
+        // Der Trimm steht als Vorverstaerkung des Kompressors da,
+        // also vor dessen Detektor -- dort, wo eine Schwelle erst
+        // eine Bedeutung bekommt.
+        QVERIFY(std::abs(double(chain.comp().driveDb())
+                         - std::clamp(p[0].trimDb, 0.0, 18.0)) < 0.1);
 
         // And the master switch is NOT touched — the operator decides
         // when their transmit audio changes.
         QVERIFY(!chain.isEnabled());
     }
 
-    // Applying a second plan must not leave the first one's notches
-    // behind. This is the failure that would make an A/B between two
-    // profiles a comparison of the wrong two things.
+    // Ein zweites Profil darf nichts vom ersten stehen lassen. Mit
+    // dem Entzerrer aussen vor sind die Stufenschalter die Stelle,
+    // an der das noch passieren kann.
     void applyingTwiceLeavesNothingBehind()
     {
-        VoiceAnalysis hummy = ordinary();
-        hummy.humDb = -10.0;          // far too close — notches wanted
-        hummy.humBaseHz = 50;
-        // Eine hoehere Stimme, damit die Kerben NICHT auf ihren
-        // Oberwellen landen: bei 110 Hz weigert sich der Optimierer
-        // inzwischen zu kerben, und dann prueft dieser Fall nichts
-        // mehr. Siehe noNotchSitsOnTheFundamental().
-        hummy.pitchHz = 180.0;
-
         StripChain chain;
         chain.prepare(48000.0);
-        const QVector<BroadcastOptimizer::Plan> withHum =
-            BroadcastOptimizer::plan(hummy);
-        QVERIFY(BroadcastOptimizer::apply(withHum[1], chain));
-        QVERIFY(chain.eq().band(1).enabled);
 
-        const QVector<BroadcastOptimizer::Plan> clean =
+        const QVector<BroadcastOptimizer::Plan> p =
             BroadcastOptimizer::plan(ordinary());
-        QVERIFY(BroadcastOptimizer::apply(clean[1], chain));
-        QVERIFY(!chain.eq().band(1).enabled);
-        QVERIFY(!chain.eq().band(2).enabled);
-        QVERIFY(!chain.eq().band(3).enabled);
-    }
 
-    // ── Klingen die vier wirklich verschieden? ───────────────────────
-    //
-    // Der Fall, der gefehlt hat. narrowIsLeanerThanWide() prueft die
-    // ZAHLEN im Plan, und die waren immer richtig -- der Ton war es
-    // nicht. Eine frische ClientEq hat activeBandCount 0, process()
-    // steigt darauf sofort aus, also wurden alle vier Profile ohne
-    // jeden Entzerrer gerechnet: kein Hochpass, kein Klang. Uebrig
-    // blieben Kompressor und Begrenzer, und die gleicht der
-    // Pegelabgleich beim Abhoeren fast weg.
-    //
-    // Betreiber am Geraet, 2026-10-09, in fuenf Worten: „alle profile
-    // hören sich gleich an". Sie taten es.
-    //
-    // Deshalb misst dieser Fall am Ergebnis: derselbe Dreiklang durch
-    // zwei Profile, und was unten und oben herauskommt, muss sich
-    // unterscheiden -- und zwar in der behaupteten Richtung.
-    void theProfilesActuallySoundDifferent()
-    {
-        constexpr int kRate = 48000;
-        constexpr int kFrames = kRate;            // eine Sekunde
+        // Erst das schmale: es schaltet die Farbstufen ab.
+        QVERIFY(BroadcastOptimizer::apply(p[0], chain));
+        QVERIFY(!chain.stageEnabled(StripChain::Stage::Tube));
 
-        // Leise (-40 dBFS je Ton), damit der Kompressor kaum eingreift
-        // und der Entzerrer die Antwort bestimmt. Ein lauter Eingang
-        // wuerde die Frage mit Pegelregelung beantworten.
-        std::vector<float> input(kFrames, 0.0f);
-        for (int i = 0; i < kFrames; ++i) {
-            const double t = double(i) / kRate;
-            input[static_cast<size_t>(i)] = float(0.01 * (
-                  std::sin(2.0 * M_PI *   80.0 * t)
-                + std::sin(2.0 * M_PI * 1000.0 * t)
-                + std::sin(2.0 * M_PI * 4000.0 * t)));
-        }
+        // Dann das breite: es schaltet sie NICHT wieder ein -- dafuer
+        // gibt es keine Messung.
+        QVERIFY(BroadcastOptimizer::apply(p[3], chain));
+        QVERIFY(!chain.stageEnabled(StripChain::Stage::Tube));
 
-        const QVector<BroadcastOptimizer::Plan> plans =
-            BroadcastOptimizer::plan(ordinary());
-        QCOMPARE(plans.size(), 4);
-
-        // Goertzel: Leistung bei einer Frequenz, ohne eine FFT dafuer
-        // zu bauen.
-        const auto toneLevel = [](const std::vector<float>& x,
-                                  double hz) {
-            const double w = 2.0 * M_PI * hz / kRate;
-            const double c = 2.0 * std::cos(w);
-            double s1 = 0.0, s2 = 0.0;
-            for (float v : x) {
-                const double s0 = double(v) + c * s1 - s2;
-                s2 = s1;
-                s1 = s0;
-            }
-            return std::sqrt(std::max(0.0,
-                s1 * s1 + s2 * s2 - c * s1 * s2)) / x.size();
-        };
-
-        const auto render = [&](const BroadcastOptimizer::Plan& p) {
-            StripChain chain;
-            chain.prepare(double(kRate));
-            BroadcastOptimizer::apply(p, chain);
-            chain.setEnabled(true);
-            std::vector<float> out = input;
-            chain.processMono(out.data(), int(out.size()));
-            return out;
-        };
-
-        const std::vector<float> narrow = render(plans[0]);   // 2.3k
-        const std::vector<float> wide   = render(plans[3]);   // 4.0k
-
-        // Gegen den eigenen 1-kHz-Ton gemessen, damit die
-        // Aufholverstaerkung -- die sich je Profil unterscheidet und
-        // beim Abhoeren ohnehin weggeglichen wird -- die Frage nicht
-        // beantwortet.
-        const double narrowHigh = toneLevel(narrow, 4000.0)
-                                / std::max(1e-12, toneLevel(narrow, 1000.0));
-        const double wideHigh   = toneLevel(wide,   4000.0)
-                                / std::max(1e-12, toneLevel(wide,   1000.0));
-        const double narrowLow  = toneLevel(narrow,   80.0)
-                                / std::max(1e-12, toneLevel(narrow, 1000.0));
-        const double wideLow    = toneLevel(wide,     80.0)
-                                / std::max(1e-12, toneLevel(wide,   1000.0));
-
-        // Das schmale Profil wirft oben weg, was ausserhalb seines
-        // Kanals liegt. Mindestens 3 dB Unterschied, sonst ist es
-        // keiner, den ein Ohr findet.
-        QVERIFY2(narrowHigh < wideHigh * 0.7,
-                 qPrintable(QStringLiteral(
-                     "4 kHz gegen 1 kHz: schmal %1, breit %2 -- die "
-                     "Profile klingen gleich")
-                     .arg(narrowHigh, 0, 'f', 4).arg(wideHigh, 0, 'f', 4)));
-
-        // Und unten nimmt es mehr weg, weil der Hochpass hoeher sitzt.
-        QVERIFY2(narrowLow < wideLow * 0.7,
-                 qPrintable(QStringLiteral(
-                     "80 Hz gegen 1 kHz: schmal %1, breit %2 -- der "
-                     "Hochpass wirkt nicht")
-                     .arg(narrowLow, 0, 'f', 4).arg(wideLow, 0, 'f', 4)));
-    }
-
-    // ── Nimmt ein Profil der Stimme den Koerper? ─────────────────────
-    //
-    // Der Befund, der alles andere ausgeloest hat. Betreiber, 2026-10-09:
-    // „Das Original-Audio ist gut, nur saemtliche Bearbeitungen sind
-    // eine Katastrophe" und „hier ist kein Bass, hier fehlt es einfach
-    // an allem."
-    //
-    // Entscheidend war ein zweiter Satz: „play mic hoert sich anders
-    // an, als play after strip, hier passt alles sehr gut." Die
-    // gespeicherten Strip-Einstellungen des Betreibers klingen durch
-    // dieselbe Rechenkette gut -- schlecht waren ausschliesslich die
-    // Zahlen, die dieser Code erzeugt.
-    //
-    // Gemessen wird an einer ECHT analysierten Stimme, nicht an
-    // ordinary(): die Handwerte dort koennen die Kurve treffen, an der
-    // der Entwurf gerade scheitert, und dann prueft der Fall nichts.
-    void theWideProfileKeepsTheBody()
-    {
-        constexpr int kRate = 48000;
-        constexpr int kSeconds = 6;
-        constexpr int kFrames = kRate * kSeconds;
-
-        // Eine stimmaehnliche Anregung: Grundton 110 Hz mit
-        // Oberwellen, zwei Formanten, und Pausen dazwischen, damit
-        // VoiceAnalyzer einen Rauschteppich messen kann.
-        std::vector<float> input(kFrames, 0.0f);
-        for (int i = 0; i < kFrames; ++i) {
-            const double t = double(i) / kRate;
-            const bool speaking = std::fmod(t, 1.2) < 0.9;
-            if (!speaking) {
-                // Sehr leise Pause: weit genug unter der Stimme, dass
-                // Anheben erlaubt ist.
-                input[static_cast<size_t>(i)] =
-                    float(0.0002 * std::sin(2.0 * M_PI * 3000.0 * t));
-                continue;
-            }
-            double v = 0.0;
-            for (int h = 1; h <= 24; ++h) {
-                const double f = 110.0 * h;
-                if (f > 7000.0) { break; }
-                // Fallende Oberwellen plus zwei Formantbuckel.
-                double amp = 1.0 / h;
-                if (f > 400.0 && f < 900.0)   { amp *= 2.0; }
-                if (f > 1600.0 && f < 2600.0) { amp *= 1.6; }
-                v += amp * std::sin(2.0 * M_PI * f * t + 0.7 * h);
-            }
-            input[static_cast<size_t>(i)] = float(0.08 * v);
-        }
-
-        const VoiceAnalysis a =
-            VoiceAnalyzer::analyse(input.data(), kFrames, kRate);
-        QVERIFY2(a.valid, qPrintable(a.problem));
-
-        const QVector<BroadcastOptimizer::Plan> plans =
-            BroadcastOptimizer::plan(a);
-        QCOMPARE(plans.size(), 4);
-
-        const auto toneLevel = [&](const std::vector<float>& x, double hz) {
-            const double w = 2.0 * M_PI * hz / kRate;
-            const double c = 2.0 * std::cos(w);
-            double s1 = 0.0, s2 = 0.0;
-            for (float v : x) {
-                const double s0 = double(v) + c * s1 - s2;
-                s2 = s1;
-                s1 = s0;
-            }
-            return std::sqrt(std::max(0.0,
-                s1 * s1 + s2 * s2 - c * s1 * s2)) / x.size();
-        };
-        const auto tiltDb = [&](const std::vector<float>& x, double hz) {
-            return 20.0 * std::log10(
-                std::max(1e-12, toneLevel(x, hz))
-                / std::max(1e-12, toneLevel(x, 1100.0)));
-        };
-
-        const auto render = [&](const BroadcastOptimizer::Plan& p) {
-            StripChain chain;
-            chain.prepare(double(kRate));
-            BroadcastOptimizer::apply(p, chain);
-            chain.setEnabled(true);
-            std::vector<float> out = input;
-            chain.processMono(out.data(), int(out.size()));
-            return out;
-        };
-
-        // 220 Hz: die zweite Oberwelle, der Koerper der Stimme. Sie
-        // darf das breite Profil nicht verlassen.
-        const double inBody = tiltDb(input, 220.0);
-        for (const BroadcastOptimizer::Plan& p : plans) {
-            const std::vector<float> out = render(p);
-            const double outBody = tiltDb(out, 220.0);
-            const double lost = inBody - outBody;
-            qInfo("%s: Koerper bei 220 Hz %+.1f dB gegenueber dem Original",
-                  qPrintable(p.name), -lost);
-
-            // Das breite Profil ist das, bei dem „kein Bass" keine
-            // Entwurfsentscheidung sein darf. Vier Dezibel sind
-            // reichlich bemessen; es waren zehn und mehr.
-            if (p.widthHz >= 3200.0) {
-                QVERIFY2(lost < 4.0,
-                         qPrintable(QStringLiteral(
-                             "%1 nimmt der Stimme %2 dB bei 220 Hz")
-                             .arg(p.name).arg(lost, 0, 'f', 1)));
-            }
-            // Und keines der vier darf den Koerper ganz wegnehmen.
-            QVERIFY2(lost < 12.0,
-                     qPrintable(QStringLiteral(
-                         "%1 nimmt der Stimme %2 dB bei 220 Hz")
-                         .arg(p.name).arg(lost, 0, 'f', 1)));
-        }
-    }
-
-    // ── Keine Kerbe auf dem Grundton ─────────────────────────────────
-    //
-    // Der Brummdetektor in VoiceAnalyzer summiert +/-2 FFT-Bins um
-    // 50/100/150/200 Hz. Bei 4096 Punkten und 48 kHz sind das rund
-    // +/-23 Hz, also spannt das Fenster um 100 Hz etwa 77 bis 123 Hz.
-    // Eine Maennerstimme mit 110 Hz legt ihren GRUNDTON hinein, der
-    // Detektor meldet Brumm, und die Kerben nehmen die Stimme heraus.
-    //
-    // Gemessen an einer synthetischen Stimme ohne jeden Brumm: 110 Hz
-    // lag 8,7 dB und 150 Hz 14,3 dB unten, waehrend 220 Hz unberuehrt
-    // blieb. Das war der groesste Teil von „kein Bass ... wie ein
-    // Handy-Mikrofon" (Betreiber, 2026-10-09).
-    void noNotchSitsOnTheFundamental()
-    {
-        constexpr int kRate = 48000;
-        constexpr int kSeconds = 6;
-        constexpr int kFrames = kRate * kSeconds;
-
-        std::vector<float> voice(kFrames, 0.0f);
-        for (int i = 0; i < kFrames; ++i) {
-            const double t = double(i) / kRate;
-            if (std::fmod(t, 1.2) >= 0.9) {
-                voice[static_cast<size_t>(i)] =
-                    float(0.0002 * std::sin(2.0 * M_PI * 3000.0 * t));
-                continue;
-            }
-            double v = 0.0;
-            for (int h = 1; h <= 24; ++h) {
-                const double f = 110.0 * h;
-                if (f > 7000.0) { break; }
-                double amp = 1.0 / h;
-                if (f > 400.0 && f < 900.0)   { amp *= 2.0; }
-                if (f > 1600.0 && f < 2600.0) { amp *= 1.6; }
-                v += amp * std::sin(2.0 * M_PI * f * t + 0.7 * h);
-            }
-            voice[static_cast<size_t>(i)] = float(0.08 * v);
-        }
-
-        const VoiceAnalysis a =
-            VoiceAnalyzer::analyse(voice.data(), kFrames, kRate);
-        QVERIFY2(a.valid, qPrintable(a.problem));
-        QVERIFY(a.pitchHz > 100.0 && a.pitchHz < 120.0);
-
-        const auto responseDb = [&](const BroadcastOptimizer::Plan& p,
-                                    double hz) {
-            const int n = kRate;
-            std::vector<float> x(static_cast<size_t>(n));
-            for (int i = 0; i < n; ++i) {
-                x[static_cast<size_t>(i)] =
-                    float(0.02 * std::sin(2.0 * M_PI * hz * double(i) / kRate));
-            }
-            StripChain c;
-            c.prepare(double(kRate));
-            BroadcastOptimizer::apply(p, c);
-            c.setEnabled(true);
-            std::vector<float> y = x;
-            c.processMono(y.data(), int(y.size()));
-            const auto rms = [](const std::vector<float>& v) {
-                double s = 0.0;
-                for (size_t i = v.size() / 2; i < v.size(); ++i) {
-                    s += double(v[i]) * double(v[i]);
-                }
-                return std::sqrt(s / double(v.size() / 2));
-            };
-            return 20.0 * std::log10(std::max(1e-12, rms(y))
-                                   / std::max(1e-12, rms(x)));
-        };
-
-        for (const BroadcastOptimizer::Plan& p : BroadcastOptimizer::plan(a)) {
-            const double atF0  = responseDb(p, a.pitchHz);
-            const double at150 = responseDb(p, 150.0);
-            const double at220 = responseDb(p, 2.0 * a.pitchHz);
-
-            // Eine Kerbe faellt AUF und wieder ab. Liegt der Grundton
-            // oder die Gegend knapp darueber deutlich tiefer als die
-            // zweite Oberwelle, steht dort eine.
-            QVERIFY2(atF0 > at220 - 5.0,
-                     qPrintable(QStringLiteral(
-                         "%1: Grundton %2 dB, zweite Oberwelle %3 dB "
-                         "-- da steht eine Kerbe auf der Stimme")
-                         .arg(p.name).arg(atF0, 0, 'f', 1)
-                         .arg(at220, 0, 'f', 1)));
-            QVERIFY2(at150 > at220 - 5.0,
-                     qPrintable(QStringLiteral(
-                         "%1: 150 Hz %2 dB gegen %3 dB bei der zweiten "
-                         "Oberwelle -- Kerbe")
-                         .arg(p.name).arg(at150, 0, 'f', 1)
-                         .arg(at220, 0, 'f', 1)));
-        }
+        // Aber seine eigenen Werte stehen jetzt da.
+        QVERIFY(std::abs(double(chain.comp().ratio()) - p[3].compRatio) < 0.1);
     }
 
     void bestIndexPicksTheNearestWidth()

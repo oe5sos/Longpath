@@ -303,6 +303,32 @@ VoiceAnalysis VoiceAnalyzer::analyse(const float* samples, int frames,
     }
     r.sibilanceDb = toDb(sib) - toDb(mid);
 
+    // Und wo es sitzt: die lauteste Stelle zwischen 4 und 9 kHz,
+    // ueber Drittel-Oktaven geglaettet, damit nicht eine einzelne
+    // Spitze die Frequenz bestimmt.
+    {
+        double best = 0.0;
+        double bestHz = 6000.0;
+        const double step = std::pow(2.0, 1.0 / 3.0);
+        for (double lo = 4000.0; lo < 9000.0; lo *= step) {
+            const double hi = std::min(9000.0, lo * step);
+            double acc = 0.0;
+            int    cnt = 0;
+            for (int k = 1; k <= kFft / 2; ++k) {
+                const double hz = k * binHz;
+                if (hz >= lo && hz < hi) {
+                    acc += power[static_cast<size_t>(k)];
+                    ++cnt;
+                }
+            }
+            if (cnt > 0 && acc / cnt > best) {
+                best   = acc / cnt;
+                bestHz = std::sqrt(lo * hi);
+            }
+        }
+        r.sibilanceHz = bestHz;
+    }
+
     // ── Hum ──────────────────────────────────────────────────────────
     // Both mains frequencies are tried and the stronger wins, rather
     // than assuming the operator's country. Harmonics are included

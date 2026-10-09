@@ -215,7 +215,7 @@ private slots:
         QVERIFY(spy.isValid());
 
         for (QPushButton* b : panel.findChildren<QPushButton*>()) {
-            if (b->text().contains(QStringLiteral("With this profile"))) {
+            if (b->text().contains(QStringLiteral("After"))) {
                 b->click();
                 break;
             }
@@ -270,18 +270,19 @@ private slots:
                           + QStringLiteral("/optimierer-4000-warnung.png"));
     }
 
-    // Level matching is on unless somebody turns it off. The default
+    // Pegelabgleich ist AUS, bis jemand ihn einschaltet. The default
     // is not a preference: an unmatched A/B is won by whichever side
     // is louder, and the optimiser is the side adding make-up gain.
-    void levelMatchingDefaultsOn()
+    void levelMatchingDefaultsOff()
     {
         BroadcastOptimizerPanel panel;
-        QVERIFY(panel.levelMatched());
+        QVERIFY2(!panel.levelMatched(),
+                 "aus, damit das Lautere hoerbar ist -- das ist der Zweck");
 
         QCheckBox* box = panel.findChild<QCheckBox*>();
         QVERIFY(box != nullptr);
-        box->setChecked(false);
-        QVERIFY(!panel.levelMatched());
+        box->setChecked(true);
+        QVERIFY(panel.levelMatched());
     }
 };
 
