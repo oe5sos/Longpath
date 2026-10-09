@@ -1268,6 +1268,7 @@ RadioModel::RadioModel(QObject* parent)
     // Bereich da ist (applyPeripheralsForCurrentMac).
     m_speConnection = std::make_unique<SpeConnection>(this);
     m_kpa500Connection = std::make_unique<Kpa500Connection>(this);
+    m_acomConnection = std::make_unique<AcomConnection>(this);
 
     // Per-radio peripherals refactor (2026-05-26): the ctor-time RF-Kit
     // auto-connect from globals was removed.  The lifecycle now runs in
@@ -3106,6 +3107,74 @@ void RadioModel::setKpa500Enabled(bool enabled)
     emit kpa500EnabledChanged(enabled);
 }
 
+// ── ACOM S-Serie (Betreiberwunsch 2026-10-09) ──────────────────────────────
+
+bool RadioModel::acomEnabled() const
+{
+    return peripheralValue(QStringLiteral("Acom_Enabled"),
+                           QStringLiteral("False"))
+        == QStringLiteral("True");
+}
+
+void RadioModel::applyAcomConnection()
+{
+    if (!m_acomConnection) {
+        return;
+    }
+    if (!acomEnabled()) {
+        m_acomConnection->disconnect();
+        return;
+    }
+
+    const bool autoRe = peripheralValue(QStringLiteral("Acom_AutoReconnect"),
+                                        QStringLiteral("True"))
+        == QStringLiteral("True");
+    m_acomConnection->setAutoReconnect(autoRe);
+
+    const QString modus = peripheralValue(QStringLiteral("Acom_Mode"),
+                                          QStringLiteral("Network"));
+    if (modus == QStringLiteral("Serial")) {
+#ifdef HAVE_SERIALPORT
+        const QString anschluss = peripheralValue(QStringLiteral("Acom_SerialPort"));
+        if (anschluss.isEmpty()) {
+            qCInfo(lcConnection) << "ACOM auf seriell gestellt, aber kein "
+                                    "Anschluss angegeben -- nicht verbunden";
+            return;
+        }
+        // Die Datenrate ist FEST 9600 8N1 -- die Beschreibung des
+        // Herstellers schreibt sie vor, es gibt nichts einzustellen
+        // (anders als beim KPA500, wo sie vier Werte kennt).
+        m_acomConnection->connectSerial(anschluss);
+#else
+        qCWarning(lcConnection) << "ACOM auf seriell gestellt, aber dieser Bau "
+                                   "hat kein Qt6::SerialPort -- nicht verbunden";
+#endif
+        return;
+    }
+
+    const QString rechner = peripheralValue(QStringLiteral("Acom_Host"));
+    const quint16 anschluss = static_cast<quint16>(
+        peripheralValue(QStringLiteral("Acom_Port"), QStringLiteral("4001")).toUInt());
+    if (rechner.isEmpty()) {
+        qCInfo(lcConnection) << "ACOM ueber Netz, aber kein Rechner angegeben "
+                                "-- nicht verbunden";
+        return;
+    }
+    m_acomConnection->connectNetwork(rechner, anschluss);
+}
+
+void RadioModel::setAcomEnabled(bool enabled)
+{
+    const bool jetzt = acomEnabled();
+    if (enabled == jetzt) {
+        return;
+    }
+    setPeripheralValue(QStringLiteral("Acom_Enabled"),
+                       enabled ? QStringLiteral("True") : QStringLiteral("False"));
+    applyAcomConnection();
+    emit acomEnabledChanged(enabled);
+}
+
 // ── CW-Tonhoehe ────────────────────────────────────────────────────────────
 //
 // Porting from Thetis console.cs:18142-18242 [@852bf0e] — public int
@@ -3290,6 +3359,18 @@ void RadioModel::applyPeripheralsForCurrentMac()
         emit fourO3AEnabledChanged(false);
     }
 
+    // ── ACOM S-Serie ────────────────────────────────────────────────────
+    if (acomEnabled() && m_acomConnection) {
+        applyAcomConnection();
+        if (m_acomConnection->isConnected()
+            || !m_acomConnection->description().isEmpty()) {
+            qCInfo(lcConnection)
+                << "ACOM auto-connect for MAC" << mac
+                << ":" << m_acomConnection->description();
+            ++started;
+        }
+    }
+
     // ── Elecraft KPA500 ─────────────────────────────────────────────────
     if (kpa500Enabled() && m_kpa500Connection) {
         applyKpa500Connection();
@@ -3394,6 +3475,10 @@ void RadioModel::teardownPeripherals()
     if (m_kpa500Connection) {
         m_kpa500Connection->disconnect();
         qCInfo(lcConnection) << "Peripherals teardown: KPA500 disconnected";
+    }
+    if (m_acomConnection) {
+        m_acomConnection->disconnect();
+        qCInfo(lcConnection) << "Peripherals teardown: ACOM disconnected";
     }
     if (m_speConnection) {
         // Wie beim RF2K-S bedingungslos: disconnect() ist folgenlos, wenn

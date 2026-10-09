@@ -339,6 +339,7 @@ warren@wpratt.com
 #include "applets/Rf2ksApplet.h"
 #include "applets/SpeApplet.h"
 #include "applets/Kpa500Applet.h"
+#include "applets/AcomApplet.h"
 #include "applets/AppletVisibilityController.h"
 #include "applets/RxApplet.h"
 #include "core/PgxlConnection.h"
@@ -7591,6 +7592,99 @@ void MainWindow::populateDefaultMeter()
                 kpaConn, [kpaConn]() { kpaConn->setOperate(!kpaConn->isOperate()); });
     }
 
+    // ── ACOM S-Serie (Betreiberwunsch 2026-10-09) ───────────────────────
+    //
+    // Der ACOM SCHIEBT seine Telemetrie -- es gibt hier keinen
+    // Abfragetakt, auf den sich die Anzeige stuetzen koennte, sondern
+    // einen Strom von Rahmen. telemetryUpdated traegt den GANZEN Rahmen
+    // mit, darum wird bei jedem alles nachgeschoben; die Lehre aus dem
+    // KPA500 (Aenderungsmeldungen allein reichen nicht, wenn das Feld
+    // zwischendurch geleert wird) ist hier von Anfang an eingebaut.
+    m_acomApplet = new AcomApplet(m_radioModel, nullptr);
+    panel->addApplet(m_acomApplet);
+
+    if (AcomConnection* acomConn = m_radioModel ? m_radioModel->acomConnection()
+                                                : nullptr) {
+        connect(acomConn, &AcomConnection::connected, this, [this, acomConn]() {
+            if (!m_acomApplet) { return; }
+            m_acomApplet->setConnected(true);
+            m_acomApplet->setSource(acomConn->sourceLabel());
+        });
+        connect(acomConn, &AcomConnection::disconnected, this, [this]() {
+            if (m_acomApplet) { m_acomApplet->setConnected(false); }
+        });
+
+        connect(acomConn, &AcomConnection::telemetryUpdated, this,
+                [this, acomConn](const Acom::Telemetry& t) {
+            if (!m_acomApplet) { return; }
+            const auto& spec = Acom::modelSpec(acomConn->currentModel());
+            m_acomApplet->setForwardPower(t.forwardPowerW);
+            m_acomApplet->setReflectedPower(t.reflectedPowerW);
+            m_acomApplet->setSwr(t.swr_x100 / 100.0f);
+            // Die Temperatur kommt in ROHEN Sensoreinheiten -- der
+            // Modellversatz muss abgezogen werden, und der haengt an der
+            // erkannten Stufe. Darum hier und nicht in der Protokollschicht:
+            // die kennt kein Modell.
+            m_acomApplet->setTemp(static_cast<float>(t.paTempRaw)
+                                  - static_cast<float>(spec.temperatureOffset));
+            m_acomApplet->setDrainVoltage(t.hv1_x10V / 10.0f);
+            m_acomApplet->setDrainCurrent(t.id1_mA / 1000.0f);
+            m_acomApplet->setBand(Acom::bandName(t.activeBand));
+            m_acomApplet->setUptime(t.systemClockSec);
+            m_acomApplet->setMode(t.mode);
+
+            // 0xFF heisst „kein Fehler" -- und nur dann ist der
+            // Loeschknopf sinnlos.
+            const bool fehlerAn = (t.errorCode != 0xFF);
+            m_acomApplet->setFaultText(
+                fehlerAn ? Acom::errorCodeName(t.errorCode) : QString());
+            m_acomApplet->setClearFaultEnabled(fehlerAn);
+        });
+
+        connect(acomConn, &AcomConnection::modelChanged, this,
+                [this](const QString& name, const QString& grund) {
+            if (!m_acomApplet) { return; }
+            const auto& spec = Acom::modelSpec(name);
+            m_acomApplet->setPowerRange(spec.nominalForwardW, spec.maxForwardW);
+            m_acomApplet->setReflectedRange(spec.nominalReflectedW, spec.maxReflectedW);
+            m_acomApplet->setModelName(name);
+            // „Warum ist die Skala, wie sie ist" -- als Sprechblase, nicht
+            // als Feld. Der Grund ist die halbe Auskunft: „default" heisst
+            // geraten, „confirmed" heisst vom Geraet bestaetigt,
+            // „auto-scaled" heisst aus der beobachteten Leistung
+            // geschlossen.
+            m_acomApplet->setDiagnosticTooltip(
+                tr("Leistungsklasse %1 (%2). Nennleistung %3 W, Skalenende "
+                   "%4 W.\n\nDie Beschreibung des Herstellers dokumentiert nur "
+                   "einen Typcode, darum wird die Klasse aus der beobachteten "
+                   "Leistung geschlossen, wenn das Gerät sie nicht bestätigt.")
+                    .arg(name, grund)
+                    .arg(spec.nominalForwardW, 0, 'f', 0)
+                    .arg(spec.maxForwardW, 0, 'f', 0));
+        });
+
+        connect(acomConn, &AcomConnection::systemConfigReceived, this,
+                [](const Acom::SystemConfig& cfg) {
+            // Nur ins Protokoll -- der Zweck ist, eine unbekannte
+            // Typkennung melden zu koennen (siehe AcomProtocol.h).
+            qCInfo(lcConnection) << "ACOM SystemConfig: Typ" << cfg.amplifierType
+                                 << "Firmware" << cfg.fwVersion << "." << cfg.fwSubVersion
+                                 << "Seriennummer" << cfg.serialNumberHex;
+        });
+
+        // Fenster -> Verbindung. Drei Zielzustaende, drei Knoepfe.
+        connect(m_acomApplet, &AcomApplet::standbyClicked, acomConn, [acomConn]() {
+            acomConn->setOperate(false);
+        });
+        connect(m_acomApplet, &AcomApplet::operateClicked, acomConn, [acomConn]() {
+            acomConn->setOperate(true);
+        });
+        connect(m_acomApplet, &AcomApplet::offClicked,
+                acomConn, &AcomConnection::powerOff);
+        connect(m_acomApplet, &AcomApplet::clearFaultClicked,
+                acomConn, &AcomConnection::clearFaults);
+    }
+
     // Antenna labels: load operator-set labels from AppSettings at startup.
     // Keys: RfKit_Ant1_Label .. RfKit_Ant4_Label (stored by RfKitPage.cpp).
     // If a key is absent or empty the applet already shows "ANT N" by default.
@@ -7659,6 +7753,7 @@ void MainWindow::populateDefaultMeter()
     m_appletsById[QStringLiteral("RfKit")]      = m_rfKitApplet;
     m_appletsById[QStringLiteral("Spe")]        = m_speApplet;
     m_appletsById[QStringLiteral("Kpa500")]     = m_kpa500Applet;
+    m_appletsById[QStringLiteral("Acom")]       = m_acomApplet;
     m_appletsById[QStringLiteral("Frequency")]        = m_frequencyApplet;
     m_appletsById[QStringLiteral("SwrInstrument")]    = m_swrInstrument;
     m_appletsById[QStringLiteral("SignalInstrument")] = m_signalInstrument;
@@ -7742,6 +7837,8 @@ void MainWindow::populateDefaultMeter()
                                 QStringLiteral("SPE Expert"),   true);
     m_appletVis->registerApplet(QStringLiteral("Kpa500"),
                                 QStringLiteral("Elecraft KPA500"), true);
+    m_appletVis->registerApplet(QStringLiteral("Acom"),
+                                QStringLiteral("ACOM"),          true);
     // Die beiden Instrumente. defaultVisible=true, damit sie beim
     // ersten Start dastehen und angesehen werden können — das ist der
     // Zweck dieses Schritts. Wer sie nicht will, blendet sie über das
@@ -7901,6 +7998,12 @@ void MainWindow::populateDefaultMeter()
         QStringLiteral("Endstufen"),
         {QStringLiteral("rf-kit"), QStringLiteral("rf2k"),
          QStringLiteral("verstaerker"), QStringLiteral("endstufe")});
+    m_appletVis->describeApplet(QStringLiteral("Acom"),
+        QStringLiteral("Endstufen"),
+        {QStringLiteral("acom"), QStringLiteral("600s"),
+         QStringLiteral("700s"), QStringLiteral("1200s"),
+         QStringLiteral("2020s"), QStringLiteral("verstaerker"),
+         QStringLiteral("endstufe")});
     m_appletVis->describeApplet(QStringLiteral("Kpa500"),
         QStringLiteral("Endstufen"),
         {QStringLiteral("kpa500"), QStringLiteral("kpa"),
@@ -8072,6 +8175,9 @@ void MainWindow::populateDefaultMeter()
 
     const bool kpaOn = m_radioModel && m_radioModel->kpa500Enabled();
     m_appletVis->setAvailable(QStringLiteral("Kpa500"), kpaOn);
+
+    const bool acomOn = m_radioModel && m_radioModel->acomEnabled();
+    m_appletVis->setAvailable(QStringLiteral("Acom"), acomOn);
 
 
     // ── Die Reihenfolge im Stapel ────────────────────────────────────
@@ -9119,6 +9225,12 @@ void MainWindow::populateDefaultMeter()
                 this, [this](bool enabled) {
             if (!m_appletVis) { return; }
             m_appletVis->setAvailable(QStringLiteral("Kpa500"), enabled);
+        });
+
+        connect(m_radioModel, &RadioModel::acomEnabledChanged,
+                this, [this](bool enabled) {
+            if (!m_appletVis) { return; }
+            m_appletVis->setAvailable(QStringLiteral("Acom"), enabled);
         });
     }
 

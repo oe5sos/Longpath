@@ -101,6 +101,7 @@
 #include "setup/RfKitPage.h"
 #include "setup/SpePage.h"
 #include "setup/Kpa500Page.h"
+#include "setup/AcomPage.h"
 // Keyboard
 #include "setup/KeyboardSetupPages.h"
 // Diagnostics
@@ -804,6 +805,7 @@ void SetupDialog::buildTree()
     // eine gemeinsame Zubehoerseite -- jedes Geraet hat hier seine eigene.
     registerPage(cat, "SPE Expert",   [this] { return new SpePage(m_model); });
     registerPage(cat, "KPA500",       [this] { return new Kpa500Page(m_model); });
+    registerPage(cat, "ACOM",         [this] { return new AcomPage(m_model); });
     registerPage(cat, "TCP/IP CAT",   [] { return new CatTcpIpPage;       });
     registerPage(cat, "MIDI Control", [] { return new CatMidiControlPage;  });
 

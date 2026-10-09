@@ -1754,6 +1754,7 @@ private:
     class Rf2ksApplet*      m_rfKitApplet{nullptr};
     class SpeApplet*        m_speApplet{nullptr};
     class Kpa500Applet*    m_kpa500Applet{nullptr};
+    class AcomApplet*      m_acomApplet{nullptr};
 
     // Phase 23: TCI server + applets.
     // m_tciServer is nullptr in non-WebSocket builds (HAVE_WEBSOCKETS not defined).
