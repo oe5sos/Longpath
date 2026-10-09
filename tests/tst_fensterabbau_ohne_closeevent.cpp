@@ -54,10 +54,22 @@
 //   * die Absturzrate von tst_spe_anbindung: 2 von 14 vorher,
 //     0 von 20 nachher.
 //
-// Deterministisch faellt es nur im Debug-Bau mit AddressSanitizer --
-// dort ist der Zugriff auf die zerstoerte Liste ein
-// heap-use-after-free und bricht immer ab. Wer diesen Fall schaerfen
-// will, fuehrt ihn dort; der normale Bau kann das nicht.
+// Deterministisch faellt es im Debug-Bau mit AddressSanitizer -- und
+// das ist am 2026-10-09 NACHGEMESSEN, nicht vermutet:
+//
+//   ohne die Behebung, build-asan:  2 von 2 Laeufen
+//     ==64685==ERROR: AddressSanitizer: heap-use-after-free
+//       on address 0x606000338af0
+//   mit der Behebung, build-asan:   3 von 3 Laeufen sauber
+//
+// Der Zugriff auf die zerstoerte Liste IST ein heap-use-after-free, und
+// der Sanitizer bricht darauf immer ab. Wer diesen Fall schaerfen will,
+// fuehrt ihn dort; der normale Bau kann das nicht.
+//
+// (Nebenbei: ein frischer Debug-Bauordner haengt erst am Opus-Modell --
+// 183 MB von media.xiph.org. Der pruefsummenrichtige Tarball liegt
+// schon unter build/third_party/rade/build_opus-prefix/src/build_opus/
+// und laesst sich hineinkopieren; der Dateiname IST die Pruefsumme.)
 //
 // Was dieser Fall hier dennoch tut: er faehrt den Weg ab (Maske
 // oeffnen, Fenster ohne closeEvent loeschen) und schlaegt an, wenn der
