@@ -1263,6 +1263,10 @@ RadioModel::RadioModel(QObject* parent)
     // RfKit_ManualIp / RfKit_ManualPort from per-MAC peripherals scope at
     // that point).
     m_rfKitConnection = std::make_unique<Rf2ksConnection>(this);
+    // SPE Expert (Zeus-Punkt 7). Wie der RF2K-S: einmal angelegt, lebt
+    // die ganze Laufzeit, verbindet sich aber erst, wenn der per-MAC-
+    // Bereich da ist (applyPeripheralsForCurrentMac).
+    m_speConnection = std::make_unique<SpeConnection>(this);
 
     // Per-radio peripherals refactor (2026-05-26): the ctor-time RF-Kit
     // auto-connect from globals was removed.  The lifecycle now runs in
@@ -2950,6 +2954,86 @@ void RadioModel::setRfKitEnabled(bool enabled)
     emit rfKitEnabledChanged(enabled);
 }
 
+// ── SPE Expert (Zeus-Punkt 7) ──────────────────────────────────────────────
+
+bool RadioModel::speEnabled() const
+{
+    return peripheralValue(QStringLiteral("Spe_Enabled"),
+                           QStringLiteral("False"))
+        == QStringLiteral("True");
+}
+
+void RadioModel::applySpeOperatorSettings()
+{
+    if (!m_speConnection) {
+        return;
+    }
+    // Vorgabe AN: ein Verstaerker, der aus- und wieder eingeschaltet wird,
+    // soll von selbst wieder auftauchen. Derselbe Wert wie beim RF2K-S.
+    const bool autoRe = peripheralValue(QStringLiteral("Spe_AutoReconnect"),
+                                        QStringLiteral("True"))
+        == QStringLiteral("True");
+    m_speConnection->setAutoReconnect(autoRe);
+}
+
+void RadioModel::applySpeConnection()
+{
+    if (!m_speConnection) {
+        return;
+    }
+    if (!speEnabled()) {
+        m_speConnection->disconnect();
+        return;
+    }
+
+    applySpeOperatorSettings();
+
+    const QString modus = peripheralValue(QStringLiteral("Spe_Mode"),
+                                          QStringLiteral("Network"));
+    if (modus == QStringLiteral("Serial")) {
+#ifdef HAVE_SERIALPORT
+        const QString anschluss = peripheralValue(QStringLiteral("Spe_SerialPort"));
+        if (anschluss.isEmpty()) {
+            // Kein Erraten: ein serieller Anschlussname laesst sich nicht
+            // ableiten, und den falschen zu oeffnen heisst, ein fremdes
+            // Geraet zu beschreiben.
+            qCInfo(lcConnection) << "SPE auf seriell gestellt, aber kein "
+                                    "Anschluss angegeben -- nicht verbunden";
+            return;
+        }
+        m_speConnection->connectSerial(anschluss);
+#else
+        qCWarning(lcConnection) << "SPE auf seriell gestellt, aber dieser Bau "
+                                   "hat kein Qt6::SerialPort -- nicht verbunden";
+#endif
+        return;
+    }
+
+    const QString rechner = peripheralValue(QStringLiteral("Spe_Host"));
+    const quint16 anschluss = static_cast<quint16>(
+        peripheralValue(QStringLiteral("Spe_Port"), QStringLiteral("4001")).toUInt());
+    if (rechner.isEmpty()) {
+        // Auch hier kein Erraten: ser2net antwortet auf keine Rundfrage,
+        // es gibt also nichts zu suchen.
+        qCInfo(lcConnection) << "SPE ueber Netz, aber kein Rechner angegeben "
+                                "-- nicht verbunden";
+        return;
+    }
+    m_speConnection->connectNetwork(rechner, anschluss);
+}
+
+void RadioModel::setSpeEnabled(bool enabled)
+{
+    const bool jetzt = speEnabled();
+    if (enabled == jetzt) {
+        return;
+    }
+    setPeripheralValue(QStringLiteral("Spe_Enabled"),
+                       enabled ? QStringLiteral("True") : QStringLiteral("False"));
+    applySpeConnection();
+    emit speEnabledChanged(enabled);
+}
+
 // ── CW-Tonhoehe ────────────────────────────────────────────────────────────
 //
 // Porting from Thetis console.cs:18142-18242 [@852bf0e] — public int
@@ -3134,6 +3218,18 @@ void RadioModel::applyPeripheralsForCurrentMac()
         emit fourO3AEnabledChanged(false);
     }
 
+    // ── SPE Expert ──────────────────────────────────────────────────────
+    if (speEnabled() && m_speConnection) {
+        applySpeConnection();
+        if (m_speConnection->isConnected()
+            || !m_speConnection->description().isEmpty()) {
+            qCInfo(lcConnection)
+                << "SPE auto-connect for MAC" << mac
+                << ":" << m_speConnection->description();
+            ++started;
+        }
+    }
+
     // ── RF-Kit RF2K-S ───────────────────────────────────────────────────
     if (rfKitEnabled() && m_rfKitConnection) {
         const QString host =
@@ -3210,6 +3306,13 @@ void RadioModel::teardownPeripherals()
     if (m_rfKitConnection) {
         m_rfKitConnection->disconnect();
         qCInfo(lcConnection) << "Peripherals teardown: RF-Kit disconnected";
+    }
+    if (m_speConnection) {
+        // Wie beim RF2K-S bedingungslos: disconnect() ist folgenlos, wenn
+        // nichts stand, und entscharft dabei den Wiederverbinder. Nur
+        // isConnected() abzufragen liesse ihn armiert zurueck.
+        m_speConnection->disconnect();
+        qCInfo(lcConnection) << "Peripherals teardown: SPE disconnected";
     }
     if (m_smartSdrListener && m_smartSdrListener->isListening()) {
         m_smartSdrListener->stop();

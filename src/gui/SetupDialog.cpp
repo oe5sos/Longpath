@@ -99,6 +99,7 @@
 #include "setup/FourO3APage.h"
 // RF-Kit RF2K-S integration page (Settings -> CAT & Network -> RF-Kit).
 #include "setup/RfKitPage.h"
+#include "setup/SpePage.h"
 // Keyboard
 #include "setup/KeyboardSetupPages.h"
 // Diagnostics
@@ -798,6 +799,9 @@ void SetupDialog::buildTree()
         return fourO3A;
     });
     registerPage(cat, "RF-Kit",       [this] { return new RfKitPage(m_model); });
+    // Zeus-Punkt 7: SPE Expert. Neben den anderen Verstaerkern, nicht in
+    // eine gemeinsame Zubehoerseite -- jedes Geraet hat hier seine eigene.
+    registerPage(cat, "SPE Expert",   [this] { return new SpePage(m_model); });
     registerPage(cat, "TCP/IP CAT",   [] { return new CatTcpIpPage;       });
     registerPage(cat, "MIDI Control", [] { return new CatMidiControlPage;  });
 

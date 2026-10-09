@@ -75,6 +75,7 @@
 #include "core/audio/QsoRecorderController.h"
 #include "core/PgxlConnection.h"
 #include "core/Rf2ksConnection.h"
+#include "core/SpeConnection.h"
 #include "core/TgxlConnection.h"
 #include "core/FaultLog.h"
 #include "core/TxInterlockPolicy.h"
@@ -244,6 +245,10 @@ class RadioModel : public QObject {
     Q_PROPERTY(bool    connected   READ isConnected NOTIFY connectionStateChanged)
     Q_PROPERTY(bool rfKitEnabled READ rfKitEnabled WRITE setRfKitEnabled
                NOTIFY rfKitEnabledChanged)
+    // Zeus-Punkt 7: SPE Expert (1.3K-FA / 1.5K-FA / 2K-FA). Gleiche Form
+    // wie rfKitEnabled, eigener Schluessel.
+    Q_PROPERTY(bool speEnabled READ speEnabled WRITE setSpeEnabled
+               NOTIFY speEnabledChanged)
 
 public:
     explicit RadioModel(QObject* parent = nullptr);
@@ -1231,6 +1236,9 @@ public:
     // All three accessors return non-null pointers from construction time.
     PgxlConnection* pgxlConnection() { return m_pgxlConnection; }
     Rf2ksConnection* rfKitConnection() const { return m_rfKitConnection.get(); }
+    // Der SPE-Treiber lebt wie der RF2K-S fuer die ganze Laufzeit; das
+    // Fenster verbindet sich einmal darauf und nie neu.
+    SpeConnection* speConnection() const { return m_speConnection.get(); }
     TgxlConnection* tgxlConnection() { return m_tgxlConnection; }
     TunerModel*     tunerModel()     { return m_tunerModel;     }
     // SmartSDR API server on TCP 4992. Owned by RadioModel; lifetime matches.
@@ -1263,6 +1271,30 @@ public:
     void applyRfKitOperatorSettings();
     bool rfKitEnabled() const;
 
+    // ── SPE Expert (Zeus-Punkt 7) ────────────────────────────────────────
+    //
+    // Gleiche Form wie der RF2K-S darueber, ein Unterschied: der SPE kann
+    // ueber Netz ODER seriell angeschlossen sein, und welches von beiden
+    // steht in Spe_Mode. Die Schluessel liegen im selben per-MAC-Bereich:
+    //   Spe_Enabled "True"|"False", Spe_Mode "Serial"|"Network",
+    //   Spe_SerialPort, Spe_Host, Spe_Port, Spe_AutoReconnect
+    //
+    // Default AUS beim ersten Start. Ohne Anschlussangabe (leerer Rechner
+    // bzw. leerer Anschlussname) wird NICHT verbunden -- es gibt keine
+    // Suche im Netz: ser2net antwortet auf keine Rundfrage, und ein
+    // serieller Anschluss laesst sich nicht erraten.
+    void setSpeEnabled(bool enabled);
+    bool speEnabled() const;
+    // Schiebt Spe_AutoReconnect aus dem per-MAC-Bereich in die lebende
+    // Verbindung. Vor jedem Verbinden gerufen -- derselbe Grund wie bei
+    // applyRfKitOperatorSettings(): ein Schalter, den niemand zurueckliest,
+    // ist ein Schalter, der nichts tut.
+    void applySpeOperatorSettings();
+    // Verbindet nach den gespeicherten Angaben, oder trennt. Gerufen vom
+    // Umschalter, von der Einstellseite nach einer Aenderung und beim
+    // Verbinden eines Funkgeraets (dann ist der per-MAC-Bereich erst da).
+    void applySpeConnection();
+
     // ── Per-radio peripherals scope (RF-Kit / 4O3A / PGXL / TGXL) ────────
     //
     // The four external-amp accessories used to read GLOBAL AppSettings
@@ -1279,6 +1311,12 @@ public:
     //   hardware/<mac>/peripherals/PGXL_ManualPort     int (string-encoded)
     //   hardware/<mac>/peripherals/TGXL_ManualIp       string
     //   hardware/<mac>/peripherals/TGXL_ManualPort     int (string-encoded)
+    //   hardware/<mac>/peripherals/Spe_Enabled         "True" | "False"
+    //   hardware/<mac>/peripherals/Spe_Mode            "Serial" | "Network"
+    //   hardware/<mac>/peripherals/Spe_SerialPort      string
+    //   hardware/<mac>/peripherals/Spe_Host            string
+    //   hardware/<mac>/peripherals/Spe_Port            int (string-encoded)
+    //   hardware/<mac>/peripherals/Spe_AutoReconnect   "True" | "False"
     //
     // peripheralValue(key, default):
     //   Returns the per-MAC value when connected, defaultValue otherwise.
@@ -2448,6 +2486,7 @@ signals:
     // RF-Kit -> General). Consumers (e.g. MainWindow applet visibility)
     // react to show/hide the RF2K-S applet.
     void rfKitEnabledChanged(bool enabled);
+    void speEnabledChanged(bool enabled);
     // Die CW-Tonhoehe hat sich geaendert (setCwPitch). Thetis:
     // CWPitchChangedHandlers (console.cs:18241). Abnehmer: CW-Decoder
     // (Suchband), KiwiSDR-Nachfuehrung, Setup-Feld.
@@ -4013,6 +4052,7 @@ private:
     // so destruction order is deterministic and QObject hierarchy is intact.
     // Constructed once in the ctor; non-null from that point.
     std::unique_ptr<Rf2ksConnection> m_rfKitConnection;
+    std::unique_ptr<SpeConnection>   m_speConnection;
 
     // Phase 3P-III review fix I2: last-seen RF-Kit operate state, used to gate
     // externalAmpOperateChanged so the cross-vendor signal fires only on actual

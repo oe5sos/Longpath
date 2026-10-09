@@ -1090,6 +1090,27 @@ constexpr auto kGroupBoxStyle =
 constexpr auto kSecondaryLabelStyle =
     "QLabel { color: #8090a0; font-size: 11px; }";
 
+// ── Der OPERATE/STANDBY-Knopf der Verstaerkerfelder ───────────────────
+//
+// Stand als Literal zweimal in Rf2ksApplet::setOperateMode (dort seit
+// dem Prueflauf vom 2026-05-25: „standby operate button does not change
+// the color of the glowing dot on mode change"). Beim SPE-Feld
+// (2026-10-09) waere es ein drittes und viertes Mal geworden, und
+// scripts/verify-style-drift.py hat genau das gemeldet -- nicht weil
+// eine neue FARBE dazukam (alle vier Werte sind Hausfarben), sondern
+// weil acht neue Literale dazukamen.
+//
+// Darum hier ein Name. Beide Felder nehmen ihn; wer einen dritten
+// Verstaerker anbindet, nimmt ihn auch.
+constexpr auto kAmpOperateActiveBtnStyle =
+    "QPushButton { background: #1a6030; border: 1px solid #6fa384; "
+    "border-radius: 6px; color: #ffffff; font-size: 11px; font-weight: bold; }"
+    "QPushButton:hover { background: #33684c; }";
+constexpr auto kAmpNeutralBtnStyle =
+    "QPushButton { background: #204060; border: 1px solid #205070; "
+    "border-radius: 6px; color: #c8d8e8; font-size: 11px; font-weight: bold; }"
+    "QPushButton:hover { background: #204060; }";
+
 // ── Formularstil: Glas & Tiefe (2026-09-18) ───────────────────────────
 //
 // Roadmap C/F, Betreiber am 17.09.: "kannst ruhig weiter designen".

@@ -337,6 +337,7 @@ warren@wpratt.com
 #include "core/SettingsBackup.h"
 #include "applets/AmpApplet.h"
 #include "applets/Rf2ksApplet.h"
+#include "applets/SpeApplet.h"
 #include "applets/AppletVisibilityController.h"
 #include "applets/RxApplet.h"
 #include "core/PgxlConnection.h"
@@ -7422,6 +7423,103 @@ void MainWindow::populateDefaultMeter()
         });
     }
 
+    // ── SPE Expert (Zeus-Punkt 7) ───────────────────────────────────────
+    //
+    // Wie der RF2K-S hier einmal angelegt und einmal verdrahtet: die
+    // Verbindung (RadioModel::speConnection) lebt die ganze Laufzeit und
+    // wird nie neu gebaut. Sichtbar ist das Fenster nur, wenn der
+    // Umschalter in Setup -> Network -> SPE Expert an ist (gesetzt weiter
+    // unten, nachgezogen ueber speEnabledChanged).
+    m_speApplet = new SpeApplet(m_radioModel, nullptr);
+    panel->addApplet(m_speApplet);
+
+    if (SpeConnection* speConn = m_radioModel ? m_radioModel->speConnection()
+                                              : nullptr) {
+        // Verbindung -> Fenster.
+        connect(speConn, &SpeConnection::connected, this, [this, speConn]() {
+            if (!m_speApplet) { return; }
+            m_speApplet->setConnected(true);
+            m_speApplet->setSource(speConn->sourceLabel());
+        });
+        connect(speConn, &SpeConnection::disconnected, this, [this]() {
+            if (m_speApplet) { m_speApplet->setConnected(false); }
+        });
+        connect(speConn, &SpeConnection::respondingChanged,
+                this, [this](bool responding) {
+            if (m_speApplet) { m_speApplet->setResponding(responding); }
+        });
+        connect(speConn, &SpeConnection::modelChanged,
+                this, [this](const QString& id) {
+            if (m_speApplet) {
+                m_speApplet->setModelName(Spe::modelSpec(id).displayName);
+            }
+        });
+        connect(speConn, &SpeConnection::statusUpdated,
+                this, [this](const Spe::Status& s) {
+            if (!m_speApplet) { return; }
+            // Die Balkenachse folgt der GEWAEHLTEN Leistungsstufe, nicht
+            // nur dem Geraet -- so wie das Display des Verstaerkers selbst.
+            // setPowerRange() verwirft Wiederholungen, darum darf das hier
+            // bei jedem Rahmen stehen (zehnmal je Sekunde).
+            const auto& spec = Spe::modelSpec(s.id);
+            const auto achse = Spe::levelGaugeRange(spec, s.powerLevel);
+            m_speApplet->setPowerRange(achse.nominalW, achse.warnW, achse.maxW);
+
+            m_speApplet->setForwardPower(s.outputPowerW);
+            m_speApplet->setSwrAnt(s.swrAnt);
+            m_speApplet->setSwrAtu(s.swrAtu);
+            m_speApplet->setSupplyVoltage(s.paVoltageV);
+            m_speApplet->setSupplyCurrent(s.paCurrentA);
+            m_speApplet->setTemps(s.tempUpper, s.tempLower, s.tempCombiner,
+                                  spec.hasCombiner);
+            m_speApplet->setBand(Spe::bandName(s.bandIndex));
+            m_speApplet->setAntenna(s.txAntenna, s.atuState);
+            m_speApplet->setInputPort(s.input);
+            m_speApplet->setPowerLevel(Spe::powerLevelName(s.powerLevel));
+            m_speApplet->setMode(s.operate, s.transmitting);
+
+            // Alarm schlaegt Warnung: beides zugleich zu zeigen hiesse, die
+            // ernstere Meldung neben einer harmlosen zu verstecken. Der
+            // Farbton haengt daran (Hausstil: das kraeftige Rot bleibt der
+            // Gefahr).
+            const QString alarm = Spe::alarmText(s.alarm);
+            if (!alarm.isEmpty()) {
+                m_speApplet->setFaultText(tr("ALARM: %1").arg(alarm), true);
+            } else {
+                const QString warnung = Spe::warningText(s.warning);
+                m_speApplet->setFaultText(
+                    warnung.isEmpty() ? QString()
+                                      : tr("Warnung: %1").arg(warnung), false);
+            }
+        });
+
+        // Fenster -> Verbindung. Jeder Knopf ist ein Tastendruck.
+        connect(m_speApplet, &SpeApplet::powerOnClicked,
+                speConn, &SpeConnection::powerOn);
+        connect(m_speApplet, &SpeApplet::operateClicked,
+                speConn, &SpeConnection::toggleOperate);
+        connect(m_speApplet, &SpeApplet::powerLevelClicked,
+                speConn, &SpeConnection::cyclePowerLevel);
+        connect(m_speApplet, &SpeApplet::tuneClicked,
+                speConn, &SpeConnection::tune);
+        connect(m_speApplet, &SpeApplet::offClicked,
+                speConn, &SpeConnection::switchOff);
+        connect(m_speApplet, &SpeApplet::inputClicked, speConn, [speConn]() {
+            speConn->sendKey(Spe::Key::Input);
+        });
+        connect(m_speApplet, &SpeApplet::antennaClicked, speConn, [speConn]() {
+            speConn->sendKey(Spe::Key::Antenna);
+        });
+        // Die Pfeiltasten stellen die Vorlaufleistung ein, die der
+        // Verstaerker vom Funkgeraet ueber CAT anfordert.
+        connect(m_speApplet, &SpeApplet::driveUpClicked, speConn, [speConn]() {
+            speConn->sendKey(Spe::Key::RightArrow);
+        });
+        connect(m_speApplet, &SpeApplet::driveDownClicked, speConn, [speConn]() {
+            speConn->sendKey(Spe::Key::LeftArrow);
+        });
+    }
+
     // Antenna labels: load operator-set labels from AppSettings at startup.
     // Keys: RfKit_Ant1_Label .. RfKit_Ant4_Label (stored by RfKitPage.cpp).
     // If a key is absent or empty the applet already shows "ANT N" by default.
@@ -7488,6 +7586,7 @@ void MainWindow::populateDefaultMeter()
     m_appletsById[QStringLiteral("Amp")]        = m_ampApplet;
     m_appletsById[QStringLiteral("Tuner")]      = m_tunerApplet;
     m_appletsById[QStringLiteral("RfKit")]      = m_rfKitApplet;
+    m_appletsById[QStringLiteral("Spe")]        = m_speApplet;
     m_appletsById[QStringLiteral("Frequency")]        = m_frequencyApplet;
     m_appletsById[QStringLiteral("SwrInstrument")]    = m_swrInstrument;
     m_appletsById[QStringLiteral("SignalInstrument")] = m_signalInstrument;
@@ -7567,6 +7666,8 @@ void MainWindow::populateDefaultMeter()
                                 QStringLiteral("Tuner Genius"), true);
     m_appletVis->registerApplet(QStringLiteral("RfKit"),
                                 QStringLiteral("RF-Kit RF2K-S"), true);
+    m_appletVis->registerApplet(QStringLiteral("Spe"),
+                                QStringLiteral("SPE Expert"),   true);
     // Die beiden Instrumente. defaultVisible=true, damit sie beim
     // ersten Start dastehen und angesehen werden können — das ist der
     // Zweck dieses Schritts. Wer sie nicht will, blendet sie über das
@@ -7726,6 +7827,12 @@ void MainWindow::populateDefaultMeter()
         QStringLiteral("Endstufen"),
         {QStringLiteral("rf-kit"), QStringLiteral("rf2k"),
          QStringLiteral("verstaerker"), QStringLiteral("endstufe")});
+    m_appletVis->describeApplet(QStringLiteral("Spe"),
+        QStringLiteral("Endstufen"),
+        {QStringLiteral("spe"), QStringLiteral("expert"),
+         QStringLiteral("taurus"), QStringLiteral("1.3k"),
+         QStringLiteral("1.5k"), QStringLiteral("2k-fa"),
+         QStringLiteral("verstaerker"), QStringLiteral("endstufe")});
 #ifdef HAVE_WEBSOCKETS
     if (m_tciApplet) {
         m_appletVis->registerApplet(QStringLiteral("Tci"),
@@ -7879,6 +7986,11 @@ void MainWindow::populateDefaultMeter()
     // Default OFF; live-updated via rfKitEnabledChanged below.
     const bool rfKitOn = m_radioModel && m_radioModel->rfKitEnabled();
     m_appletVis->setAvailable(QStringLiteral("RfKit"), rfKitOn);
+
+    // SPE Expert: dasselbe, eigener Umschalter.
+    const bool speOn = m_radioModel && m_radioModel->speEnabled();
+    m_appletVis->setAvailable(QStringLiteral("Spe"), speOn);
+
 
     // ── Die Reihenfolge im Stapel ────────────────────────────────────
     //
@@ -8913,6 +9025,12 @@ void MainWindow::populateDefaultMeter()
                 this, [this](bool enabled) {
             if (!m_appletVis) { return; }
             m_appletVis->setAvailable(QStringLiteral("RfKit"), enabled);
+        });
+
+        connect(m_radioModel, &RadioModel::speEnabledChanged,
+                this, [this](bool enabled) {
+            if (!m_appletVis) { return; }
+            m_appletVis->setAvailable(QStringLiteral("Spe"), enabled);
         });
     }
 
