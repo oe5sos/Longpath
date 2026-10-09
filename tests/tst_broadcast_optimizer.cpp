@@ -20,6 +20,7 @@
 #include <QtTest/QtTest>
 
 #include "core/Loudness.h"
+#include "core/VoiceAnalyzer.h"
 #include "core/strip/BroadcastOptimizer.h"
 #include "core/strip/ClientEq.h"
 #include "core/strip/StripChain.h"
@@ -198,9 +199,16 @@ private slots:
         const BroadcastOptimizer::Plan& narrow = p[0];   // 2.3k
         const BroadcastOptimizer::Plan& wide   = p[3];   // 4.0k
 
-        // Higher high-pass, because the fundamental is cost in a
-        // narrow channel and body in a wide one.
-        QVERIFY(narrow.highPassHz > wide.highPassHz);
+        // Der Hochpass ist KEIN Breitenwerkzeug mehr. Er sitzt unter
+        // dem Grundton und raeumt Rumpeln weg, mehr nicht -- das
+        // Ausduennen fuer den schmalen Kanal macht das Tiefenfilter.
+        // Beides zu benutzen war genau das Stapeln, das der Stimme
+        // den Koerper nahm (Betreiber, 2026-10-09). Er darf beim
+        // schmalen Profil hoeher liegen, muss aber nicht.
+        QVERIFY(narrow.highPassHz >= wide.highPassHz);
+
+        // Schlanker unten ist jetzt Sache des Tiefenfilters.
+        QVERIFY(narrow.lowShelfDb < wide.lowShelfDb);
 
         // Harder top cut, because the top is outside the channel.
         QVERIFY(narrow.highShelfDb < wide.highShelfDb);
@@ -224,26 +232,43 @@ private slots:
     // The high-pass has to follow the voice, not a constant. Two
     // measurements identical but for the fundamental must not produce
     // the same filter — that was the entire reason for measuring it.
-    void highPassFollowsThePitch()
+    // Der Grundton ist die OBERGRENZE des Hochpasses, nicht sein
+    // Antrieb. Die alte Fassung multiplizierte ihn mit 1,15 bis 1,80
+    // und nahm den hoeheren der beiden Werte -- bei einer 110-Hz-
+    // Stimme landete ein Filter mit 24 dB/Oktave bei 198 Hz, also
+    // mitten in der Stimme. Jetzt gewinnt der niedrigere.
+    void thePitchCapsTheHighPass()
     {
         VoiceAnalysis low = ordinary();
         low.pitchHz = 95.0;
-        VoiceAnalysis high = ordinary();
-        high.pitchHz = 185.0;
-
         const QVector<BroadcastOptimizer::Plan> a =
             BroadcastOptimizer::plan(low);
+        for (const BroadcastOptimizer::Plan& p : a) {
+            QVERIFY2(p.highPassHz < low.pitchHz,
+                     qPrintable(QStringLiteral(
+                         "%1: Hochpass %2 Hz liegt auf oder ueber dem "
+                         "Grundton %3 Hz")
+                         .arg(p.name).arg(p.highPassHz, 0, 'f', 0)
+                         .arg(low.pitchHz, 0, 'f', 0)));
+        }
+
+        // Eine hoehere Stimme darf einen hoeheren Hochpass bekommen,
+        // aber nie einen niedrigeren -- und nie ueber dem Deckel der
+        // Breite.
+        VoiceAnalysis high = ordinary();
+        high.pitchHz = 185.0;
         const QVector<BroadcastOptimizer::Plan> b =
             BroadcastOptimizer::plan(high);
-        QVERIFY(b[0].highPassHz > a[0].highPassHz);
+        for (int i = 0; i < a.size(); ++i) {
+            QVERIFY(b[i].highPassHz >= a[i].highPassHz);
+        }
 
-        // And it stays inside the width's cap however high the voice.
         VoiceAnalysis veryHigh = ordinary();
         veryHigh.pitchHz = 320.0;
         const QVector<BroadcastOptimizer::Plan> c =
             BroadcastOptimizer::plan(veryHigh);
-        QVERIFY(c[0].highPassHz <= 300.0);
-        QVERIFY(c[3].highPassHz <= 150.0);
+        QVERIFY(c[0].highPassHz <= 180.0);
+        QVERIFY(c[3].highPassHz <= 100.0);
     }
 
     // A microphone that stops before the channel does must be said
@@ -433,6 +458,118 @@ private slots:
                      "80 Hz gegen 1 kHz: schmal %1, breit %2 -- der "
                      "Hochpass wirkt nicht")
                      .arg(narrowLow, 0, 'f', 4).arg(wideLow, 0, 'f', 4)));
+    }
+
+    // ── Nimmt ein Profil der Stimme den Koerper? ─────────────────────
+    //
+    // Der Befund, der alles andere ausgeloest hat. Betreiber, 2026-10-09:
+    // „Das Original-Audio ist gut, nur saemtliche Bearbeitungen sind
+    // eine Katastrophe" und „hier ist kein Bass, hier fehlt es einfach
+    // an allem."
+    //
+    // Entscheidend war ein zweiter Satz: „play mic hoert sich anders
+    // an, als play after strip, hier passt alles sehr gut." Die
+    // gespeicherten Strip-Einstellungen des Betreibers klingen durch
+    // dieselbe Rechenkette gut -- schlecht waren ausschliesslich die
+    // Zahlen, die dieser Code erzeugt.
+    //
+    // Gemessen wird an einer ECHT analysierten Stimme, nicht an
+    // ordinary(): die Handwerte dort koennen die Kurve treffen, an der
+    // der Entwurf gerade scheitert, und dann prueft der Fall nichts.
+    void theWideProfileKeepsTheBody()
+    {
+        constexpr int kRate = 48000;
+        constexpr int kSeconds = 6;
+        constexpr int kFrames = kRate * kSeconds;
+
+        // Eine stimmaehnliche Anregung: Grundton 110 Hz mit
+        // Oberwellen, zwei Formanten, und Pausen dazwischen, damit
+        // VoiceAnalyzer einen Rauschteppich messen kann.
+        std::vector<float> input(kFrames, 0.0f);
+        for (int i = 0; i < kFrames; ++i) {
+            const double t = double(i) / kRate;
+            const bool speaking = std::fmod(t, 1.2) < 0.9;
+            if (!speaking) {
+                // Sehr leise Pause: weit genug unter der Stimme, dass
+                // Anheben erlaubt ist.
+                input[static_cast<size_t>(i)] =
+                    float(0.0002 * std::sin(2.0 * M_PI * 3000.0 * t));
+                continue;
+            }
+            double v = 0.0;
+            for (int h = 1; h <= 24; ++h) {
+                const double f = 110.0 * h;
+                if (f > 7000.0) { break; }
+                // Fallende Oberwellen plus zwei Formantbuckel.
+                double amp = 1.0 / h;
+                if (f > 400.0 && f < 900.0)   { amp *= 2.0; }
+                if (f > 1600.0 && f < 2600.0) { amp *= 1.6; }
+                v += amp * std::sin(2.0 * M_PI * f * t + 0.7 * h);
+            }
+            input[static_cast<size_t>(i)] = float(0.08 * v);
+        }
+
+        const VoiceAnalysis a =
+            VoiceAnalyzer::analyse(input.data(), kFrames, kRate);
+        QVERIFY2(a.valid, qPrintable(a.problem));
+
+        const QVector<BroadcastOptimizer::Plan> plans =
+            BroadcastOptimizer::plan(a);
+        QCOMPARE(plans.size(), 4);
+
+        const auto toneLevel = [&](const std::vector<float>& x, double hz) {
+            const double w = 2.0 * M_PI * hz / kRate;
+            const double c = 2.0 * std::cos(w);
+            double s1 = 0.0, s2 = 0.0;
+            for (float v : x) {
+                const double s0 = double(v) + c * s1 - s2;
+                s2 = s1;
+                s1 = s0;
+            }
+            return std::sqrt(std::max(0.0,
+                s1 * s1 + s2 * s2 - c * s1 * s2)) / x.size();
+        };
+        const auto tiltDb = [&](const std::vector<float>& x, double hz) {
+            return 20.0 * std::log10(
+                std::max(1e-12, toneLevel(x, hz))
+                / std::max(1e-12, toneLevel(x, 1100.0)));
+        };
+
+        const auto render = [&](const BroadcastOptimizer::Plan& p) {
+            StripChain chain;
+            chain.prepare(double(kRate));
+            BroadcastOptimizer::apply(p, chain);
+            chain.setEnabled(true);
+            std::vector<float> out = input;
+            chain.processMono(out.data(), int(out.size()));
+            return out;
+        };
+
+        // 220 Hz: die zweite Oberwelle, der Koerper der Stimme. Sie
+        // darf das breite Profil nicht verlassen.
+        const double inBody = tiltDb(input, 220.0);
+        for (const BroadcastOptimizer::Plan& p : plans) {
+            const std::vector<float> out = render(p);
+            const double outBody = tiltDb(out, 220.0);
+            const double lost = inBody - outBody;
+            qInfo("%s: Koerper bei 220 Hz %+.1f dB gegenueber dem Original",
+                  qPrintable(p.name), -lost);
+
+            // Das breite Profil ist das, bei dem „kein Bass" keine
+            // Entwurfsentscheidung sein darf. Vier Dezibel sind
+            // reichlich bemessen; es waren zehn und mehr.
+            if (p.widthHz >= 3200.0) {
+                QVERIFY2(lost < 4.0,
+                         qPrintable(QStringLiteral(
+                             "%1 nimmt der Stimme %2 dB bei 220 Hz")
+                             .arg(p.name).arg(lost, 0, 'f', 1)));
+            }
+            // Und keines der vier darf den Koerper ganz wegnehmen.
+            QVERIFY2(lost < 12.0,
+                     qPrintable(QStringLiteral(
+                         "%1 nimmt der Stimme %2 dB bei 220 Hz")
+                         .arg(p.name).arg(lost, 0, 'f', 1)));
+        }
     }
 
     void bestIndexPicksTheNearestWidth()

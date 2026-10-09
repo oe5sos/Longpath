@@ -43,41 +43,79 @@ constexpr int kBandHigh     = 6;
 // function. Every column is explained where it is used.
 struct WidthRule {
     double widthHz;
-    double pitchFactor;     // high-pass as a multiple of the fundamental
+    double pitchFactor;     // high-pass as a FRACTION of the fundamental
     double highPassCapHz;   // and never above this, whatever the pitch
-    double lowExtraDb;      // extra low-shelf cut, on top of the measured one
-    double highExtraDb;     // extra high-shelf cut, likewise
+    // How far this width MOVES the voice from where it already is,
+    // in dB. Not a target to drag it onto — see the note below.
+    double lowShiftDb;      // around 125-250 Hz, the body of the voice
+    double presenceShiftDb; // around 2 kHz
+    double topShiftDb;      // at three quarters of the channel
     int    density;         // where this width sits on Zeus's 0..100 axis
     bool   character;       // may this width run tube / exciter / reverb?
 };
 
-// Where the character stages start being allowed. Below this the
-// channel is too narrow for them to be anything but cost — see
-// Plan::characterStages for the operator's instruction and the
-// published practice behind it.
-constexpr double kCharacterFromHz = 2700.0;
-
+// ── Shaping is a SHIFT, not a target ─────────────────────────────────
+//
+// Two wrong turns were taken here before this, and the second was
+// subtler than the first.
+//
+// The first: one curve for all four widths — VoiceAnalyzer's, which
+// asks for 125 Hz at -12 dB relative to 1 kHz. That is a contest
+// curve and it is the right answer for exactly one of these four.
+//
+// The second, and the one that actually gutted the sound: expressing
+// the answer as an absolute target at all. A voice's long-term
+// spectrum FALLS with frequency — the 250 Hz band of any natural
+// voice sits well above its 1 kHz band, and that is not a defect, it
+// is what a person sounds like. Aiming at "250 Hz shall be 1.5 dB
+// under 1 kHz" therefore does not correct anything; it flattens the
+// voice's own tilt, and the measured cost on a synthetic voice was
+// 8.3 dB of body on the WIDE profile, which is supposed to be the
+// gentle one.
+//
+// Bench, 2026-10-09: "Das Original-Audio ist gut, nur saemtliche
+// Bearbeitungen sind eine Katastrophe", "hier ist kein Bass, hier
+// fehlt es einfach an allem."
+//
+// So the table below says how far each width MOVES the voice from
+// where it already is. 4.0 kHz moves the bottom by nothing at all:
+// the operator's own balance is the starting point, and the widest
+// channel has no reason to argue with it. The narrow ones lean it
+// forward, by an amount an ear would call a change rather than a
+// different voice.
+//
+// A genuinely boomy microphone still gets corrected, but under a
+// bound — see the shaping block in plan(). Unbounded correction is
+// what this comment exists to prevent happening a third time.
 constexpr WidthRule kRules[kWidthCount] = {
-    // 2.3 kHz — a crowded receiver's filter. The fundamental is pure
-    // cost here: it carries no intelligibility the harmonics do not,
-    // and it is the loudest thing the compressor has to swallow. Cut
-    // high, lean the voice forward, and accept that it will not sound
-    // like the operator's living room.
-    {2300.0, 1.80, 300.0, -3.0, -9.0, kDensityDense,     false},
+    // 2.3 kHz — a crowded receiver's filter. This is the one the old
+    // contest curve was actually written for: body costs compressor
+    // headroom the channel cannot repay, presence is what gets you
+    // answered. It will not sound like the operator's living room,
+    // and that is the trade being made on purpose.
+    {2300.0, 0.85, 180.0, -4.0, +3.0, -4.0, kDensityDense,     false},
 
     // 2.7 kHz — what most of the band is listening on, so this is the
     // one that should sound right by default rather than clever.
-    {2700.0, 1.60, 250.0, -2.0, -7.0, kDensityBroadcast, true},
+    {2700.0, 0.85, 150.0, -2.0, +2.0, -3.0, kDensityBroadcast, true},
 
-    // 3.2 kHz — room for the voice's own body again. Less density,
-    // because the reason to be this wide is fidelity and compressing
-    // it hard would spend the extra kilohertz on nothing.
-    {3200.0, 1.30, 180.0, -0.5, -3.0, 42,                true},
+    // 3.2 kHz — room for the voice's own body again. Nearly flat at
+    // the bottom; the reason to be this wide is fidelity, and cutting
+    // the bass would spend the extra kilohertz on nothing.
+    {3200.0, 0.85, 120.0, -1.0, +1.5, -1.5, 42,                true},
 
-    // 4.0 kHz — only pays off when the other operator has opened their
-    // filter to match. Lightest hand of the four.
-    {4000.0, 1.15, 150.0,  0.0, -1.5, kDensityNatural,   true},
+    // 4.0 kHz — lightest hand of the four. Flat bottom, a touch of
+    // presence, nothing else. Only pays off when the other operator
+    // has opened their filter to match.
+    {4000.0, 0.85, 100.0,  0.0, +1.0,  0.0, kDensityNatural,   true},
 };
+
+// Below this much distance between the voice and the room, nothing is
+// lifted — anywhere. Boosting a band is boosting whatever noise lives
+// in it, and that is the whole reason the no-boost rule existed.
+// Twenty-five decibels is the same separation StripTuner already
+// treats as "a gate will help; a quieter room will help more".
+constexpr double kBoostNeedsSnrDb = 25.0;
 
 const WidthRule& ruleFor(double widthHz)
 {
@@ -172,35 +210,39 @@ QVector<Plan> plan(const VoiceAnalysis& a)
         p.name    = presetName(rule.widthHz);
         p.density = rule.density;
 
-        // ── High-pass, against the operator's own pitch ──────────────
+        // ── High-pass, kept BELOW the fundamental ────────────────────
         //
-        // max() of the two: the measurement-driven value already
-        // knows about rumble and proximity bass, and the pitch-driven
-        // one knows where this particular voice begins. Taking the
-        // higher of the two means neither can be the reason the
-        // filter lands somewhere wrong — then the width's own cap
-        // pulls it back, which is what makes the wide profiles keep
-        // the bottom of the voice.
+        // The first version multiplied the fundamental by 1.15 to
+        // 1.80 and took the HIGHER of that and the rumble-driven
+        // value. On a 110 Hz voice that put a 24 dB/octave filter at
+        // 198 Hz — above the fundamental, which is to say through the
+        // middle of the voice. Together with a shelf cut just above
+        // it, that is where the bass went.
+        //
+        // Now it is a fraction, and the LOWER of the two wins. The
+        // fundamental is the voice's own bottom note; a transmit
+        // filter will deal with what is under it, and a high-pass
+        // that eats it cannot be made up for anywhere downstream.
         const double measured = StripTuner::highPassHz(a);
-        const double fromPitch =
+        const double belowPitch =
             a.pitchHz > 0.0 ? a.pitchHz * rule.pitchFactor : measured;
-        p.highPassHz = std::clamp(std::max(measured, fromPitch),
+        p.highPassHz = std::clamp(std::min(measured, belowPitch),
                                   60.0, rule.highPassCapHz);
 
         if (a.pitchHz > 0.0) {
             p.notes << QStringLiteral(
-                "High-pass at %1 Hz — %2 times your own fundamental of "
-                "%3 Hz. Below that is rumble and proximity bass: it "
-                "reaches the compressor before the transmit filter "
-                "throws it away, so it costs headroom and buys nothing.")
+                "High-pass at %1 Hz — below your own fundamental of "
+                "%2 Hz, deliberately. What is under it is rumble and "
+                "proximity bass that reaches the compressor before the "
+                "transmit filter throws it away; what is above it is "
+                "your voice, and no later stage can put that back.")
                 .arg(p.highPassHz, 0, 'f', 0)
-                .arg(rule.pitchFactor, 0, 'f', 2)
                 .arg(a.pitchHz, 0, 'f', 0);
         } else {
             p.notes << QStringLiteral(
                 "High-pass at %1 Hz, set from the low-end energy — no "
                 "stable pitch was found in the take, so the fundamental "
-                "could not be used.").arg(p.highPassHz, 0, 'f', 0);
+                "could not be used to place it.").arg(p.highPassHz, 0, 'f', 0);
         }
 
         // ── The transmit channel this profile is for ─────────────────
@@ -222,26 +264,61 @@ QVector<Plan> plan(const VoiceAnalysis& a)
 
         // ── Tone ─────────────────────────────────────────────────────
         //
-        // The measured ten-band suggestion folded onto the three
-        // controls the panel has — pairs averaged, exactly as
-        // StripTuner does it, so a hand-tuned chain and an optimised
-        // one are shaped by the same arithmetic — and then the
-        // width's own extra cut on top.
+        // Measured against THIS width's target, not against one
+        // curve for all four, and the difference may go either way.
         //
-        // Presence is NOT lifted for the narrow profiles. It does not
-        // need to be: cutting the low shelf and the high shelf around
-        // it is what "forward" means, and it costs no gain on a band
-        // the microphone may be noisy in.
+        // The measurement is a.bandDb — the voice's own spectrum in
+        // dB relative to its 1 kHz band. The target is what this
+        // channel wants there. Subtract, and the shelf gain is what
+        // closes the gap: negative where the voice has more than the
+        // channel can use, POSITIVE where it has less.
+        //
+        // That positive half is new and it is the whole repair. Under
+        // the old cuts-only rule a profile could only ever take away,
+        // so the bottom of every voice went with it.
         {
-            const double low  = 0.5 * (a.suggestedEqDb[2] + a.suggestedEqDb[3]);
-            const double pres = a.suggestedEqDb[6];
-            const double high = 0.5 * (a.suggestedEqDb[7] + a.suggestedEqDb[8]);
+            const double measuredLow  =
+                0.5 * (a.bandDb[2] + a.bandDb[3]);   // 125 + 250 Hz
+            const double measuredTop  = a.bandDb[7]; // 4 kHz
 
-            p.lowShelfDb  = std::clamp(std::min(0.0, low) + rule.lowExtraDb,
-                                       -18.0, 0.0);
-            p.presenceDb  = std::min(0.0, pres);
-            p.highShelfDb = std::clamp(std::min(0.0, high) + rule.highExtraDb,
-                                       -18.0, 0.0);
+            // The one guard that made cuts-only right in the first
+            // place: lifting a band lifts whatever noise is in it.
+            // With the room close to the voice there is nothing there
+            // worth lifting.
+            const double snr = a.speechDbFs - a.noiseFloorDbFs;
+            const bool mayLift = snr > kBoostNeedsSnrDb;
+
+            // ── The bounded correction ──────────────────────────────
+            //
+            // A voice that is genuinely boomy, or genuinely thin,
+            // still gets helped — but by at most three decibels, and
+            // measured against what a voice normally does rather than
+            // against a flat line. Around +9 dB at 125-250 Hz
+            // relative to 1 kHz is ordinary for speech; the
+            // correction only answers the distance from THAT.
+            //
+            // The bound is the point. Unbounded, this term is exactly
+            // the absolute target that flattened the voice, wearing a
+            // different name.
+            constexpr double kOrdinaryLowTiltDb = 9.0;
+            constexpr double kMaxCorrectionDb   = 3.0;
+            const double lowCorrection = std::clamp(
+                -(measuredLow - kOrdinaryLowTiltDb) * 0.5,
+                -kMaxCorrectionDb, kMaxCorrectionDb);
+
+            const double lift = mayLift ? 6.0 : 0.0;
+
+            p.lowShelfDb  = std::clamp(rule.lowShiftDb + lowCorrection,
+                                       -6.0, std::min(lift, 4.0));
+            p.presenceDb  = std::clamp(rule.presenceShiftDb,
+                                       -6.0, std::min(lift, 4.0));
+            // The top shift is a roll-off toward the channel edge and
+            // is applied as given; a microphone that is already dull
+            // up there is told about it in `caveat` rather than being
+            // dulled further by a correction term.
+            p.highShelfDb = std::clamp(
+                rule.topShiftDb + (measuredTop > 0.0 ? -1.0 : 0.0),
+                -8.0, std::min(lift, 2.0));
 
             // Three quarters of the channel: the roll-off begins
             // inside it, which is what makes a 2.3 k profile sound
@@ -249,67 +326,65 @@ QVector<Plan> plan(const VoiceAnalysis& a)
             // edge the transmit filter would do the work anyway, and
             // a shelf placed there shapes only what is thrown away.
             p.highShelfHz = rule.widthHz * 0.75;
-            // Just above the high-pass, so the two are not pulling
-            // against each other over the same octave.
-            p.lowShelfHz  = std::clamp(p.highPassHz * 1.5, 100.0, 400.0);
+
+            // Clear of the high-pass by an octave and a half. The two
+            // used to sit on top of each other — a 24 dB/octave
+            // high-pass at 198 Hz with an 8 dB shelf cut at 297 Hz on
+            // top of it, both working on the same part of the voice.
+            // That stacking is half of why there was no bass left.
+            p.lowShelfHz  = std::clamp(p.highPassHz * 2.5, 150.0, 500.0);
 
             p.notes << QStringLiteral(
                 "Tone for %1: low shelf %2 dB from %5 Hz, presence "
-                "%3 dB, high shelf %4 dB from %6 Hz. All "
-                "cuts — the level comes back as make-up gain, because "
-                "reaching a shape by boosting raises whatever the "
-                "microphone does worst in that band along with the voice.")
+                "%3 dB, high shelf %4 dB from %6 Hz. These MOVE your "
+                "voice from where it already is rather than dragging "
+                "it onto a curve — your own balance is the starting "
+                "point, and they lift as readily as they cut%7.")
                 .arg(widthLabel(rule.widthHz))
                 .arg(p.lowShelfDb,  0, 'f', 1)
                 .arg(p.presenceDb,  0, 'f', 1)
                 .arg(p.highShelfDb, 0, 'f', 1)
                 .arg(p.lowShelfHz,  0, 'f', 0)
-                .arg(p.highShelfHz, 0, 'f', 0);
+                .arg(p.highShelfHz, 0, 'f', 0)
+                .arg(mayLift
+                     ? QString()
+                     : QStringLiteral(" — except that nothing is lifted "
+                                      "here: your voice is only %1 dB "
+                                      "above the room, and lifting a "
+                                      "band lifts the room with it")
+                           .arg(snr, 0, 'f', 0));
         }
 
         // ── Gate ─────────────────────────────────────────────────────
+        //
+        // Only when the room is actually audible. A gate costs the
+        // ends of quiet words and buys nothing in a quiet room, and
+        // switching one on by default is the sort of thing that makes
+        // a profile sound worse than no profile at all.
         {
             const double sep = a.speechDbFs - a.noiseFloorDbFs;
-            if (sep >= StripTuner::kMinGateSeparationDb) {
-                p.gateOn = true;
-                p.gateThresholdDbFs =
-                    std::clamp(StripTuner::gateThresholdDbFs(a), -80.0, 0.0);
-            } else {
+            constexpr double kRoomIsQuietDb = 30.0;
+            if (sep < StripTuner::kMinGateSeparationDb) {
                 p.gateOn = false;
                 p.notes << QStringLiteral(
                     "No gate. Your voice is only %1 dB above the room, "
                     "and a gate set that close chews the ends off quiet "
                     "words. A quieter room is the fix.")
                     .arg(sep, 0, 'f', 0);
+            } else if (sep >= kRoomIsQuietDb) {
+                p.gateOn = false;
+                p.notes << QStringLiteral(
+                    "No gate — your room is %1 dB below your voice, "
+                    "which is quiet enough that a gate would only risk "
+                    "the ends of words.").arg(sep, 0, 'f', 0);
+            } else {
+                p.gateOn = true;
+                p.gateThresholdDbFs =
+                    std::clamp(StripTuner::gateThresholdDbFs(a), -80.0, 0.0);
             }
         }
 
-        // ── De-esser ─────────────────────────────────────────────────
-        //
-        // On for every width when there is sibilance to take, narrow
-        // channels included — and that is worth saying, because the
-        // obvious objection is that a 2.3 kHz filter removes 6 kHz
-        // anyway. It does, but the strip runs BEFORE the transmit
-        // filter: the sibilance reaches this compressor first and
-        // takes gain reduction with it. Removing it here is how the
-        // narrow profiles get their headroom back.
-        if (a.sibilanceDb > -8.0) {
-            // Wide channels get the heavier hand because there the
-            // sibilance is also audible at the far end, not merely
-            // expensive.
-            const double audible = rule.widthHz >= 3200.0 ? 1.0 : 0.8;
-            p.deEssOn       = true;
-            p.deEssHz       = 6000.0;
-            p.deEssAmountDb = -std::clamp(a.sibilanceDb, 3.0, 12.0) * audible;
-            p.notes << QStringLiteral(
-                "De-esser at 6 kHz, %1 dB. Your sibilance measures %2 dB "
-                "against the midrange. The strip runs before the "
-                "transmit filter, so this energy costs compressor "
-                "headroom even at %3.")
-                .arg(p.deEssAmountDb, 0, 'f', 1)
-                .arg(a.sibilanceDb, 0, 'f', 1)
-                .arg(widthLabel(rule.widthHz));
-        }
+        p.limiterCeilingDb = -1.0;
 
         // ── Compressor, derived from the density target ──────────────
         //
@@ -330,8 +405,29 @@ QVector<Plan> plan(const VoiceAnalysis& a)
             // so the limiter is a safety net and not a stage.
             const double fromComp =
                 measuredCrest - measuredCrest / std::max(p.compRatio, 1.0);
-            const double fromEq = std::clamp(a.suggestedPreampDb, 0.0, 12.0);
-            p.compMakeupDb   = std::clamp(fromComp + fromEq, 0.0, 18.0);
+            // ── Make-up, bounded by the headroom there actually is ──
+            //
+            // The old line added the analyser's suggested preamp on
+            // top of what the compressor took and clamped at 18 dB —
+            // a number with no relation to this take. With the
+            // measured peak known, the honest bound is arithmetic:
+            // a peak P entering a compressor with threshold T and
+            // ratio R leaves at T + (P - T) / R, and whatever is
+            // added after that has to still fit under the limiter.
+            //
+            // Leaving a decibel of margin means the limiter catches
+            // transients, which is its job, instead of riding the
+            // whole take, which is what makes a voice sound crushed.
+            const double peak = a.samplePeakDbFs > -120.0
+                ? a.samplePeakDbFs
+                : a.speechDbFs + measuredCrest;
+            const double afterComp = p.compThresholdDbFs
+                + (peak - p.compThresholdDbFs) / std::max(p.compRatio, 1.0);
+            const double headroom =
+                (p.limiterCeilingDb - 1.0) - afterComp;
+
+            p.compMakeupDb   = std::clamp(std::min(fromComp, headroom),
+                                          0.0, 12.0);
             p.densityGainDb  = p.compMakeupDb;
 
             p.notes << QStringLiteral(
@@ -348,8 +444,6 @@ QVector<Plan> plan(const VoiceAnalysis& a)
                 .arg(target, 0, 'f', 0)
                 .arg(measuredCrest, 0, 'f', 0);
         }
-
-        p.limiterCeilingDb = -1.0;
 
         // ── What this width forgets ──────────────────────────────────
         p.characterStages = rule.character;
