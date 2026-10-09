@@ -12,6 +12,8 @@
 
 #include "VoiceAnalyzer.h"
 
+#include "core/Loudness.h"
+
 #include "models/TransmitModel.h"
 
 #include <algorithm>
@@ -377,6 +379,136 @@ VoiceAnalysis VoiceAnalyzer::analyse(const float* samples, int frames,
     const double rms = n > 0 ? std::sqrt(sumSq / n) : 0.0;
     r.crestFactorDb = 20.0 * std::log10(std::max(peak, kEps)
                                         / std::max(rms, kEps));
+
+    // ── Pitch ────────────────────────────────────────────────────────
+    //
+    // Normalised autocorrelation per speech frame, median over the
+    // frames that had a clear peak. The median and not the mean: one
+    // octave error on one frame — the classic autocorrelation failure
+    // — would drag a mean by tens of hertz and leaves a median alone.
+    //
+    // Only frames whose best lag scores above kPitchConfidence are
+    // counted. An unvoiced frame has no periodicity to find, and a
+    // number produced from one is noise wearing a unit.
+    {
+        constexpr double kPitchLowHz  = 60.0;    // below any speaking voice
+        constexpr double kPitchHighHz = 350.0;   // above any speaking voice
+        constexpr double kPitchConfidence = 0.30;
+
+        const int frame = std::min(frames, std::max(1024, sampleRate / 20));
+        const int lagMin = std::max(1, int(sampleRate / kPitchHighHz));
+        const int lagMax = std::min(frame / 2, int(sampleRate / kPitchLowHz));
+
+        std::vector<double> pitches;
+        for (int start = 0; start + frame <= frames; start += frame / 2) {
+            const int w = start / win;
+            if (w >= windows || energy[static_cast<size_t>(w)] <= gate) {
+                continue;
+            }
+            double zero = 0.0;
+            for (int i = 0; i < frame; ++i) {
+                const double v = samples[start + i];
+                zero += v * v;
+            }
+            if (zero <= kEps) { continue; }
+
+            double bestScore = 0.0;
+            int    bestLag   = 0;
+            for (int lag = lagMin; lag <= lagMax; ++lag) {
+                double acc = 0.0;
+                for (int i = 0; i + lag < frame; ++i) {
+                    acc += double(samples[start + i])
+                         * double(samples[start + i + lag]);
+                }
+                const double score = acc / zero;
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestLag   = lag;
+                }
+            }
+            if (bestLag > 0 && bestScore >= kPitchConfidence) {
+                pitches.push_back(double(sampleRate) / bestLag);
+            }
+        }
+        if (!pitches.empty()) {
+            std::sort(pitches.begin(), pitches.end());
+            r.pitchHz = pitches[pitches.size() / 2];
+        }
+    }
+
+    // ── Roll-off ─────────────────────────────────────────────────────
+    //
+    // Smoothed into sixth-octave bins before being read. A single
+    // narrow notch — a room mode, a comb from a reflection — is not a
+    // roll-off, and reading the raw spectrum would let one bin decide
+    // whether a 4 kHz profile is worth building.
+    //
+    // Scanned upward from the loudest bin. The first sixth-octave that
+    // is more than 20 dB down AND is not recovered by the next two is
+    // where the microphone has stopped; recovering is what a notch
+    // does and a roll-off does not.
+    {
+        constexpr double kRolloffDownDb = 20.0;
+        constexpr double kBinsPerOctave = 6.0;
+        constexpr double kScanLowHz  = 200.0;
+        constexpr double kScanHighHz = 10000.0;
+
+        std::vector<double> smoothHz, smoothDb;
+        const double step = std::pow(2.0, 1.0 / kBinsPerOctave);
+        for (double lo = kScanLowHz; lo < kScanHighHz; lo *= step) {
+            const double hi = lo * step;
+            double acc = 0.0;
+            int    n2  = 0;
+            for (int k = 1; k <= kFft / 2; ++k) {
+                const double hz = k * binHz;
+                if (hz >= lo && hz < hi) {
+                    acc += power[static_cast<size_t>(k)];
+                    ++n2;
+                }
+            }
+            if (n2 > 0) {
+                smoothHz.push_back(std::sqrt(lo * hi));
+                smoothDb.push_back(toDb(acc / n2));
+            }
+        }
+        if (!smoothDb.empty()) {
+            size_t peak = 0;
+            for (size_t i = 1; i < smoothDb.size(); ++i) {
+                if (smoothDb[i] > smoothDb[peak]) { peak = i; }
+            }
+            const double floorDb = smoothDb[peak] - kRolloffDownDb;
+            r.rolloffHz = smoothHz.back();
+            for (size_t i = peak + 1; i < smoothDb.size(); ++i) {
+                if (smoothDb[i] >= floorDb) { continue; }
+                bool recovers = false;
+                for (size_t j = i + 1; j <= i + 2 && j < smoothDb.size(); ++j) {
+                    if (smoothDb[j] >= floorDb) { recovers = true; }
+                }
+                if (!recovers) {
+                    r.rolloffHz = smoothHz[i];
+                    break;
+                }
+            }
+        }
+    }
+
+    // ── Loudness and loudness range ──────────────────────────────────
+    //
+    // Measured over the WHOLE take, pauses included, and that is not
+    // an oversight: BS.1770's two-stage gate is what removes the
+    // pauses, and it does it the same way in every tool that reports
+    // the number. Pre-filtering the take to the speech windows here
+    // would quietly produce a figure that no other meter agrees with.
+    {
+        const Loudness::Result l =
+            Loudness::measure(samples, frames, sampleRate);
+        if (l.valid) {
+            r.loudnessLufs       = l.integratedLufs;
+            r.loudnessRangeLu    = l.rangeLu;
+            r.loudnessRangeValid = l.rangeValid;
+            r.samplePeakDbFs     = l.samplePeakDbFs;
+        }
+    }
 
     suggestEq(r.bandDb, r.suggestedEqDb, r.suggestedPreampDb);
 

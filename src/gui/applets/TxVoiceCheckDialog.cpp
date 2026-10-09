@@ -13,10 +13,13 @@
 
 #include "gui/applets/TxVoiceCheckDialog.h"
 
+#include "gui/applets/BroadcastOptimizerPanel.h"
+
 #include "core/AudioEngine.h"
 #include "core/audio/CompositeTxMicRouter.h"
 #include "core/TxChannel.h"
 #include "core/TxWorkerThread.h"
+#include "core/Loudness.h"
 #include "core/strip/StripChain.h"
 #include "core/strip/StripTuner.h"
 #include "gui/StyleConstants.h"
@@ -41,6 +44,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <vector>
 
 namespace Longpath {
 
@@ -212,6 +216,59 @@ void TxVoiceCheckDialog::buildUi()
             .arg(QString::fromLatin1(Style::kInsetBg),
                  QString::fromLatin1(Style::kInsetBorder)));
     col->addWidget(m_findings);
+
+    // ── The broadcast optimiser, beside the existing path ────────────
+    //
+    // Deliberately AFTER the findings and before the apply buttons:
+    // the order on screen is the order of the decision. What the
+    // measurement found, then the four profiles it suggests, then
+    // the two older buttons that set WDSP's equaliser and the strip
+    // the way they always did.
+    //
+    // Nothing above it changed. The operator asked for this to run
+    // alongside the current audio setup so that either can be chosen
+    // later (2026-10-09), and a section that can be deleted in one
+    // block is what that promise looks like in code.
+    {
+        m_optimizer = new BroadcastOptimizerPanel(this);
+        col->addWidget(m_optimizer);
+
+        connect(m_optimizer, &BroadcastOptimizerPanel::auditionRequested,
+                this, [this](const BroadcastOptimizer::Plan& plan) {
+            if (m_playingPlan) { stopPlayback(); return; }
+            playPlan(plan);
+        });
+        connect(m_optimizer, &BroadcastOptimizerPanel::rawRequested,
+                this, [this] { playRecording(false); });
+        connect(m_optimizer, &BroadcastOptimizerPanel::loadRequested,
+                this, [this](const BroadcastOptimizer::Plan& plan) {
+            if (!m_radio) { return; }
+            StripChain* chain = m_radio->stripChain();
+            if (!chain) {
+                m_findings->setText(QStringLiteral(
+                    "There is no channel strip — it is created with the "
+                    "transmit pump, so connect to the radio first."));
+                return;
+            }
+            BroadcastOptimizer::apply(plan, *chain);
+            m_findings->setText(QStringLiteral(
+                "%1 is in the channel strip. Its master switch is "
+                "untouched — open Tools ▸ Channel strip to switch it "
+                "on, then record again. The second measurement is the "
+                "one that says whether it helped.").arg(plan.name));
+        });
+        connect(m_optimizer, &BroadcastOptimizerPanel::saveAllRequested,
+                this, [this] {
+            const int n = BroadcastOptimizer::saveAsPresets(
+                m_optimizer->plans());
+            m_findings->setText(QStringLiteral(
+                "%1 profiles written. They are in the channel strip's "
+                "preset list beside your own, and can be edited there "
+                "like any other — which is the point: this is a "
+                "starting point derived from your voice, not a "
+                "verdict.").arg(n));
+        });
+    }
 
     {
         auto* row = new QHBoxLayout;
@@ -620,6 +677,80 @@ void TxVoiceCheckDialog::playRecording(bool processed)
     if (src == nullptr) { return; }
     const int frames = rec.recordedFrames();
 
+    m_playingProcessed = processed;
+    m_playingPlan      = false;
+    playBuffer(src, frames, rec.sampleRate());
+}
+
+// ── Rendering a profile that is not in the chain ─────────────────────
+//
+// A scratch chain per press rather than one kept around: a StripChain
+// is cheap to build, and a reused one would carry whatever the
+// previous plan left in it — which is exactly the failure that would
+// make an A/B between two profiles a comparison of the wrong two
+// things.
+void TxVoiceCheckDialog::playPlan(const BroadcastOptimizer::Plan& plan)
+{
+    stopPlayback();
+    if (!m_recorder.hasRecording() || m_recorder.isRecording()) { return; }
+    const float* src = m_recorder.samples();
+    if (src == nullptr) { return; }
+    const int frames = m_recorder.recordedFrames();
+    const int rate   = m_recorder.sampleRate();
+
+    StripChain scratch;
+    scratch.prepare(double(rate));
+    if (!BroadcastOptimizer::apply(plan, scratch)) { return; }
+    // The master switch is the one thing apply() will not touch, and
+    // for an offline render it has to be on or the chain passes the
+    // samples through untouched and the operator hears nothing
+    // change. This chain is not connected to anything.
+    scratch.setEnabled(true);
+
+    std::vector<float> rendered(src, src + frames);
+    scratch.processMono(rendered.data(), frames);
+
+    // ── Matching the loudness before it is judged ────────────────────
+    //
+    // Without this the comparison is rigged, and rigged in the
+    // profile's favour: it adds make-up gain, the louder of two
+    // takes always wins an A/B, and the operator would be choosing
+    // the profile with the most gain every time while believing they
+    // were choosing a sound.
+    //
+    // Matched on BS.1770 integrated loudness rather than on peak,
+    // because peak is what the limiter pinned to the same ceiling in
+    // both takes — matching on it would match nothing.
+    if (m_optimizer && m_optimizer->levelMatched()) {
+        const Loudness::Result raw =
+            Loudness::measure(src, frames, rate);
+        const Loudness::Result out =
+            Loudness::measure(rendered.data(), frames, rate);
+        if (raw.valid && out.valid
+            && raw.integratedLufs > Loudness::kAbsoluteGateLufs
+            && out.integratedLufs > Loudness::kAbsoluteGateLufs) {
+            // Only ever quieter. Matching upward would push a take
+            // that the profile deliberately left headroom in back
+            // into the limiter, and then the A/B would be between a
+            // profile and a clipped copy of it.
+            const double deltaDb =
+                std::min(0.0, raw.integratedLufs - out.integratedLufs);
+            const double gain = std::pow(10.0, deltaDb / 20.0);
+            for (float& v : rendered) { v = float(v * gain); }
+        }
+    }
+
+    setRxQuiet(true);
+    m_playingProcessed = false;
+    m_playingPlan      = true;
+    playBuffer(rendered.data(), frames, rate);
+    if (m_optimizer) { m_optimizer->setAuditioning(m_playSink != nullptr); }
+}
+
+void TxVoiceCheckDialog::playBuffer(const float* src, int frames, int rate)
+{
+    if (src == nullptr || frames <= 0) { return; }
+
     // Mono float → mono int16, once, into a member the QBuffer wraps
     // without copying.
     m_playPcm.resize(frames * int(sizeof(qint16)));
@@ -630,7 +761,7 @@ void TxVoiceCheckDialog::playRecording(bool processed)
     }
 
     QAudioFormat fmt;
-    fmt.setSampleRate(rec.sampleRate());
+    fmt.setSampleRate(rate);
     fmt.setChannelCount(1);
     fmt.setSampleFormat(QAudioFormat::Int16);
 
@@ -646,7 +777,6 @@ void TxVoiceCheckDialog::playRecording(bool processed)
     m_playBuf = new QBuffer(&m_playPcm, this);
     m_playBuf->open(QIODevice::ReadOnly);
     m_playSink = new QAudioSink(dev, fmt, this);
-    m_playingProcessed = processed;
     connect(m_playSink, &QAudioSink::stateChanged, this,
             [this](QAudio::State s) {
         if (s == QAudio::IdleState || s == QAudio::StoppedState) {
@@ -677,6 +807,8 @@ void TxVoiceCheckDialog::stopPlayback()
         m_playBuf->deleteLater();
         m_playBuf = nullptr;
     }
+    m_playingPlan = false;
+    if (m_optimizer) { m_optimizer->setAuditioning(false); }
     // Buttons exist for every call after buildUi(); the destructor path
     // may arrive here with the UI already half-gone.
     if (m_playRawBtn && m_playProcBtn) { refreshButtons(); }
@@ -708,6 +840,11 @@ void TxVoiceCheckDialog::runAnalysis()
     m_haveResult = m_result.valid;
 
     showFindings();
+    // The optimiser is fed the same measurement, every time. Handing
+    // it an invalid or clipped one is not skipped: that is how it
+    // clears itself back to dashes instead of leaving the previous
+    // take's four profiles on screen beside a new recording.
+    if (m_optimizer) { m_optimizer->setAnalysis(m_result); }
     fillAdvancedTable();
 }
 

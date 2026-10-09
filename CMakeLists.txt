@@ -1134,6 +1134,7 @@ set(GUI_SOURCES
     src/core/strip/MicSpectrum.cpp
     src/core/strip/StripChain.cpp
     src/core/strip/StripSettings.cpp
+    src/core/strip/BroadcastOptimizer.cpp
     src/core/strip/StripTuner.cpp
     src/core/strip/EqLoudness.cpp
     src/core/strip/StripCharacters.cpp
@@ -1141,6 +1142,7 @@ set(GUI_SOURCES
     src/core/strip/TargetFromFile.cpp
     src/core/strip/TxSpectrumAnalysis.cpp
     src/core/TxAudioRecorder.cpp
+    src/core/Loudness.cpp
     src/core/VoiceAnalyzer.cpp
     # Header-only Q_OBJECT: AUTOMOC needs the explicit listing, same as
     # QsoUploader above.
@@ -1154,6 +1156,7 @@ set(GUI_SOURCES
     src/gui/applets/RxApplet.cpp
     src/gui/applets/TxApplet.cpp
     src/gui/applets/TxEqDialog.cpp
+    src/gui/applets/BroadcastOptimizerPanel.cpp
     src/gui/applets/TxVoiceCheckDialog.cpp
     src/gui/applets/eq/ClientEqCurveWidget.cpp
     src/gui/applets/eq/ClientEqOutputFader.cpp

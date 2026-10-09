@@ -79,6 +79,7 @@
 
 #include "core/TxAudioRecorder.h"
 #include "core/VoiceAnalyzer.h"
+#include "core/strip/BroadcastOptimizer.h"
 
 #include <QDialog>
 #include <QMetaObject>
@@ -97,6 +98,7 @@ class QWidget;
 
 namespace Longpath {
 
+class BroadcastOptimizerPanel;
 class RadioModel;
 
 class TxVoiceCheckDialog : public QDialog {
@@ -133,6 +135,24 @@ private:
     // post-strip/EQ monitor signal. Pressing the active button again
     // stops. See the header note for why this exists.
     void playRecording(bool processed);
+
+    // ── Hearing a profile that is not in the chain ───────────────────
+    //
+    // The broadcast optimiser's four profiles are not applied to
+    // anything, so there is no post-strip tap to record them from.
+    // They are rendered instead: the raw take copied, pushed through
+    // a scratch StripChain set to the plan, and played from memory
+    // like the other two.
+    //
+    // Rendering and not applying is the point. Hearing a profile must
+    // not require putting it into the live chain first — that would
+    // make "listen before you decide" into "decide, then listen".
+    void playPlan(const BroadcastOptimizer::Plan& plan);
+
+    // The three playback paths all end up here. Mono float in, sink
+    // out; the caller has already decided what the samples are.
+    void playBuffer(const float* src, int frames, int rate);
+
     void stopPlayback();
     void runAnalysis();
     void applySuggestion();       // WDSP's own equaliser
@@ -211,6 +231,11 @@ private:
     QBuffer*    m_playBuf{nullptr};
     QByteArray  m_playPcm;
     bool        m_playingProcessed{false};
+    // Playing one of the optimiser's profiles rather than either of
+    // the two recorded takes. Kept apart from m_playingProcessed so
+    // the panel's own button can show "Stop" without the strip's
+    // playback button also claiming to be running.
+    bool        m_playingPlan{false};
 
     // The band-quiet gate (setRxQuiet). True from record start until
     // playback ends — the AetherSDR record/listen contract.
@@ -236,6 +261,11 @@ private:
     QWidget*      m_advanced{nullptr};
     QTableWidget* m_bands{nullptr};
     QLabel*       m_numbers{nullptr};
+
+    // The broadcast optimiser, hosted. It knows nothing about the
+    // radio or the recorder — see BroadcastOptimizerPanel.h for why
+    // it is a separate widget and not another section down here.
+    BroadcastOptimizerPanel* m_optimizer{nullptr};
 };
 
 } // namespace Longpath

@@ -2,6 +2,54 @@
 
 ## [Unreleased]
 
+### Sendeton-Optimierer: vier Profile aus einem Durchgang
+
+Fuenfzehn Sekunden sprechen, ohne Einstellungen. Daraus entstehen vier
+vollstaendige Profile fuer 2,3 / 2,7 / 3,5 / 4,0 kHz — jedes mit seinem
+eigenen Hochpass, Klang, Kompressor und Sendefilter, jedes einzeln
+hoerbar, und keines wird angewendet, bevor es jemand auswaehlt.
+
+**Laeuft neben dem bisherigen Stimmcheck, nicht an seiner Stelle.** Die
+zwei alten Knoepfe (WDSP-Entzerrer, Strip) tun unveraendert, was sie
+taten; der Optimierer ist ein Abschnitt darunter, der in einem Stueck
+wieder verschwinden kann.
+
+* **Zeus ist der Maszstab.** Aus `zeus-station-engine` uebernommen: ein
+  Profil traegt die ganze Kette **samt** Low/High-Cut (`TxAudioProfileDto`),
+  und die Dichte ist **eine** Achse 0..100 statt Verhaeltnis und Schwelle
+  einzeln (`TargetSpectralDensity`, Vorgabe 55). Der Kompressor wird aus
+  der Dichte *gerechnet*: Verhaeltnis = gemessener Scheitelfaktor geteilt
+  durch den angezielten. Nichts daran ist Geschmack.
+* **Die schmalen Profile vergessen Stufen.** 2,3 k schaltet Roehre,
+  Exciter und Nachhall **ab** statt sie zu lassen; ab 2,7 k bleiben sie.
+  Betreiberregel, und NU9N kennzeichnet dieselben Stufen als optional,
+  waehrend Entzerrer und Kompressor unmarkiert bleiben.
+* **Drei neue Messgroeszen** in `VoiceAnalyzer`: Grundton (der Hochpass
+  folgt jetzt der Stimme statt einer festen Zahl — dieselben 40 Hz
+  Rumpeln liegen unter einer 95- und einer 185-Hz-Stimme), Abfallpunkt
+  des Mikrofons (ein 4-kHz-Profil aus einer Kapsel, die bei 3,1 kHz
+  schon 20 dB unten ist, sagt das jetzt), und **LUFS + LRA** nach
+  BS.1770 / EBU Tech 3342 (`src/core/Loudness.{h,cpp}`, eigener Code).
+  Die LUFS/LRA ersetzen die hausgemachte Pegelstreuung — zwei Zahlen
+  fuer eine Rolle sind schlimmer als die falschere von beiden.
+* **Hoeren, mit Pegelabgleich.** Jedes Profil spielt den rohen Durchgang
+  durch eine Wegwerfkette gerechnet ab, „Ohne" liegt daneben — und
+  beides standardmaeszig auf gleiche Lautheit gebracht. Ein A/B ohne
+  Abgleich gewinnt immer das Lautere, und der Optimierer legt gerade
+  mehrere dB Aufholverstaerkung dazu.
+
+`tests/tst_broadcast_optimizer.cpp`, 12 Faelle. Zwei davon tragen: die
+K-Gewichtung wird gegen die veroeffentlichte 48-kHz-Tabelle gestellt
+(gerechnet, nicht abgeschrieben, damit sie bei jeder Abtastrate gilt),
+und die vier Profile muessen sich wirklich unterscheiden — eine
+Breitentabelle so zu verdrahten, dass jede Zeile dieselbe Kette erzeugt,
+saehe im Fenster voellig plausibel aus.
+
+Entwurfsblatt: [`docs/architecture/2026-10-09-sendeton-optimierer.md`](docs/architecture/2026-10-09-sendeton-optimierer.md)
+— dort auch, was bewusst **nicht** gebaut wurde (Airwindows `ClipOnly2`
+als letzter Clipper, ein echter Mehrbaender) und warum.
+
+
 ## [0.6.8] - 2026-10-08
 
 Zwei Commits seit 0.6.7, einen Tag. Thema: **die Oberflaeche, nicht die
