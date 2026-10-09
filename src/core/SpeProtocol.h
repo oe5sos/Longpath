@@ -17,12 +17,32 @@
 // Herkunft des PROTOKOLLS (nicht des Codes): "Application Programmer's
 // Guide -- Expert 1.3K-FA, Expert 1.5K-FA, Expert 2K-FA", Rev 1.1
 // (2015-10-15), SPE s.r.l. -- die Anleitung des Herstellers selbst.
-// Die Zahlen und Tabellen hier stammen von dort; AetherSDR hat sie
-// gelesen und in diese Form gebracht, und genau diese Form wird hier
-// uebernommen. Was AetherSDR zusaetzlich am echten Geraet (1.5K-FA
-// ueber ser2net) gemessen hat, steht unten an der jeweiligen Stelle
-// und ist als gemessen gekennzeichnet -- das kann Longpath nicht
-// nachpruefen, solange hier kein SPE am Kabel haengt.
+// AetherSDR hat sie gelesen und in diese Form gebracht, und genau
+// diese Form wird hier uebernommen.
+//
+// WAS LONGPATH DAVON SELBST GESEHEN HAT: nichts. Am 2026-10-09 wurde
+// versucht, das Dokument zu beschaffen -- es ist oeffentlich nicht
+// auffindbar (SPE gibt es offenbar nur direkt heraus). Damit ist
+// ALLES in dieser Datei zweite Hand: die Byte-Folgen, die
+// Tastendruck-Codes, der Aufbau des Zustandsstrings und die
+// Warn-/Alarmtabellen. Der Pruefstand nagelt sie fest, damit sie nicht
+// unbemerkt verrutschen; er bestaetigt sie nicht gegen das Dokument.
+// Wer die Anleitung in die Hand bekommt, sollte Tabellen und Codes
+// einmal dagegen lesen -- das ist die eine offene Gegenprobe hier.
+//
+// Dazu AetherSDRs eigene Messungen am echten Geraet (1.5K-FA ueber
+// ser2net): abschliessendes CR LF noetig, Balkenschwellen
+// 450/500/600 usw., DTR-high als harmlose Ruhelage. Stehen unten an
+// der jeweiligen Stelle und sind als gemessen gekennzeichnet -- auch
+// das kann Longpath nicht nachpruefen, solange hier kein SPE am Kabel
+// haengt.
+//
+// NICHT VERWECHSELN mit dem CAT-Anschluss des Verstaerkers. Der SPE hat
+// zwei Wege nach draussen: einen CAT-Anschluss, mit dem er das
+// FUNKGERAET abhorcht (Kenwood- oder Flex-Nachbildung, in Forenbeitraegen
+// mit 9600 8N1 genannt), und einen Steuer-/PC-Anschluss, auf dem das
+// hier beschriebene Protokoll laeuft (115200 8N1). Wer die beiden
+// verwechselt, sucht den Fehler am falschen Stecker.
 //
 // Diese Datei ist die REINE Protokollschicht: kein QObject, kein
 // Netzwerk, kein Zeitgeber, kein Geraet. Darum ist sie zuerst dran --
