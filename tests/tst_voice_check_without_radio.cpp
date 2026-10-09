@@ -102,6 +102,21 @@ private slots:
         QVERIFY2(anyLabelSays(&dlg, QStringLiteral("four transmit bandwidths")),
                  "der Optimierer-Abschnitt ist im Fenster");
     }
+
+    // Ein Bild, fuer die Durchsicht. Schreibt nur, wenn
+    // LONGPATH_RENDER_DIR gesetzt ist -- im CI also gar nicht.
+    void rendersForTheRecord()
+    {
+        const QByteArray dir = qgetenv("LONGPATH_RENDER_DIR");
+        if (dir.isEmpty()) { QSKIP("LONGPATH_RENDER_DIR nicht gesetzt"); }
+
+        RadioModel radio;
+        TxVoiceCheckDialog dlg(&radio, nullptr, /*embedded=*/true);
+        dlg.setStyleSheet(QStringLiteral("background: #0c0c0e; color: #dcdce1;"));
+        dlg.resize(1000, 980);
+        dlg.grab().save(QString::fromUtf8(dir)
+                        + QStringLiteral("/stimmcheck-schritte.png"));
+    }
 };
 
 QTEST_MAIN(TstVoiceCheckWithoutRadio)

@@ -83,6 +83,7 @@
 
 #include <QDialog>
 #include <QMetaObject>
+#include <QVector>
 #include <QPointer>
 
 #include <atomic>
@@ -160,6 +161,25 @@ private:
     void applySuggestion();       // WDSP's own equaliser
     void applyToStrip();          // the channel strip, whole chain
     void saveRecording();
+
+    // ── Saying what to do next ───────────────────────────────────────
+    //
+    // Three numbered steps with exactly one lit, and one line under
+    // them naming the single next action. Taken from Zeus Link, which
+    // carries the same thing over its processing panel as a "NEXT"
+    // line — the operator there is never left reading four paragraphs
+    // to work out which button is theirs.
+    //
+    // This tab had grown into exactly those four paragraphs. Bench,
+    // 2026-10-09: "das ganze sollte uebersichtlicher gestaltet werden,
+    // sodass man weiss, was man tun soll."
+    //
+    // The prose is not deleted, it is moved: every step chip carries
+    // the paragraph it replaced as its tooltip, so the reasoning is
+    // one hover away instead of permanently in the way.
+    enum class Step { Speak = 0, Listen, Choose };
+    QWidget* buildGuide();
+    void     updateGuide();
 
     void showFindings();
     void fillAdvancedTable();
@@ -279,6 +299,8 @@ private:
     int           m_micSourceChannels{1};
     int           m_micSourceFormat{0};   // QAudioFormat::SampleFormat
 
+    QVector<QLabel*> m_stepChips;
+    QLabel*       m_nextLine{nullptr};
     QLabel*       m_liveStatus{nullptr};
     QProgressBar* m_levelBar{nullptr};
     QPushButton*  m_recordBtn{nullptr};
