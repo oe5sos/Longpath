@@ -5449,6 +5449,7 @@ longpath_add_test(tst_plugin_placement)
 longpath_add_test(tst_strip_chain_row_drops)
 longpath_add_test(tst_plus_glyph_renders)
 longpath_add_test(tst_hum_is_not_the_voice)
+longpath_add_test(tst_resync_does_not_click)
 longpath_add_test(tst_strip_tuner)
 
 # -- The ring behind the EQ picture: oldest-first, newest-kept, and

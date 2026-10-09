@@ -372,6 +372,9 @@ void StripWindow::toggleLiveMonitor(bool on)
             AppSettings::instance()
                 .value(QStringLiteral("StripMonitorLatency"), 0).toInt()));
         m_live->setVolume(m_liveVol ? m_liveVol->value() / 100.0 : 0.7);
+        // Beim Einschalten den Hauptschalter uebernehmen, nicht erst
+        // beim naechsten Umlegen.
+        m_live->setStripBypassed(!(m_master && m_master->isChecked()));
         m_live->start();
         if (!m_liveSync) {
             m_liveSync = new QTimer(this);
@@ -399,18 +402,29 @@ void StripWindow::updateLiveNote()
             "the strip off and on to hear what it is doing."));
         return;
     }
+    const bool through = m_master && m_master->isChecked();
     QString t = QStringLiteral(
-        "Listening. About %1 ms of delay inside Longpath; the sound "
-        "card adds its own on each side. Headphones. While this is on, "
-        "the EQ tab draws your own voice — speak a few sentences, then "
-        "press Peak Hold there to freeze the shape you are aiming at.")
+        "Listening — %1. About %2 ms of delay inside Longpath; the "
+        "sound card adds its own on each side. Headphones. While this "
+        "is on, the EQ tab draws your own voice — speak a few "
+        "sentences, then press Peak Hold there to freeze the shape you "
+        "are aiming at.")
+        .arg(through ? QStringLiteral("through the strip")
+                     : QStringLiteral("raw microphone, strip switched off"))
         .arg(m_live->latencyMs(), 0, 'f', 0);
-    const int drop = m_live->overruns() + m_live->underruns();
-    if (drop > 0) {
-        t += QStringLiteral("  %1 block(s) patched or dropped — if that "
-                            "number keeps climbing, this computer will "
-                            "not carry the latency setting you picked.")
-                 .arg(drop);
+    // Der Zaehler steht jetzt fuer EINZELNE Abtastwerte, nicht mehr
+    // fuer Bloecke. Dass er laeuft, ist der Normalfall und kein
+    // Fehler: Mikrofon und Kopfhoerer sind zwei Geraete mit zwei
+    // Quarzen. Der Text sagt das, sonst liest man einen Alarm, wo
+    // eine Selbstverstaendlichkeit steht.
+    const int slipped = m_live->overruns() + m_live->underruns();
+    if (slipped > 0) {
+        t += QStringLiteral("  %1 single sample(s) slipped so far, "
+                            "keeping two sound-card clocks together — "
+                            "that is normal and inaudible. Crackling is "
+                            "something else: then the latency setting is "
+                            "too tight for this computer.")
+                 .arg(slipped);
     }
     m_liveNote->setText(t);
 }
@@ -735,6 +749,15 @@ void StripWindow::buildUi()
         // The master itself is not saved — it loads off every time, on
         // purpose — but toggling it is a good moment to flush the rest.
         if (StripChain* c = chain()) { c->setEnabled(on); }
+        // Und das Mithoeren mit. Das fehlte, und es war der Fehler, den
+        // der Betreiber als „komische modulation im lautsprecher [...]
+        // wie ueberschlagen" gehoert hat: der Hauptschalter stand AUS,
+        // der Mithoerer lief trotzdem durch die ganze Kette, und ein
+        // Gate mit -38 dBFS Schwelle und 320 ms Nachlauf auf dem
+        // eingebauten Mikrofon eines MacBook pumpt genau so. Der Satz
+        // unter dem Haekchen versprach das Richtige („switch the strip
+        // off and on to hear what it is doing") -- nur tat es niemand.
+        if (m_live) { m_live->setStripBypassed(!on); }
         refreshChainRow();
         persist();
     });

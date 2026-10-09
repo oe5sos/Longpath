@@ -367,24 +367,61 @@ void StripLiveMonitor::pump()
     // ein Block weggeworfen, laeuft er leer, legt die Soundkarte von
     // sich aus Stille nach. Beides wird gezaehlt, damit man es sagen
     // kann, statt es zu ahnen.
-    const int queued    = m_sink->bufferSize() - m_sink->bytesFree();
+    // ── Zwei Uhren, die nicht dieselbe sind ─────────────────────────
+    //
+    // Am Geraet abgelesen (Protokoll, 2026-10-09 21:20):
+    //
+    //     strip live monitor: "MacBook Air-Mikrofon"
+    //                      -> "Teufel Gaming Headset"
+    //
+    // Zwei verschiedene Geraete, beide mit 48000 angeschrieben, jedes
+    // mit seinem eigenen Quarz. Ein Auseinanderlaufen ist damit nicht
+    // die Ausnahme, sondern der Normalfall, und es MUSS ausgeglichen
+    // werden. Die Frage ist nur, ob man es hoert.
+    //
+    // Die erste Fassung glich in GANZEN Bloecken aus: bei Ueberlauf
+    // einen Block von 256 Rahmen wegwerfen, bei Unterlauf eine halbe
+    // Blocklaenge Stille nachlegen. Das sind 5,3 bzw. 2,7 Millisekunden
+    // Loch, alle paar Sekunden, immer wieder -- eine Modulation, und
+    // genau so klang es auch.
+    //
+    // Jetzt je Durchgang hoechstens EIN Abtastwert: einer zu viel wird
+    // weggelassen, einer zu wenig wird verdoppelt. Bei rund 200
+    // Durchgaengen in der Sekunde reicht das fuer ein Vielfaches
+    // jedes realen Uhrenversatzes, und ein einzelner Wert von 48000
+    // ist nichts, was ein Ohr als Ereignis wahrnimmt.
+    //
+    // Die Totzone ist breit: korrigiert wird erst, wenn der Vorrat um
+    // mehr als einen halben Block von seinem Soll abweicht. Ohne sie
+    // korrigierte man dauernd gegen das eigene Rauschen.
+    const int queued     = m_sink->bufferSize() - m_sink->bytesFree();
     const int blockBytes = m_blockFrames * m_outBytesPerFrame;
     const int wanted     = blockBytes * kTargetBlocks;
+    const int slack      = blockBytes / 2;
 
-    // Zwei Uhren, die nicht dieselbe sind. Steht mehr als der doppelte
-    // Vorrat an, laeuft der Eingang schneller als der Ausgang: dann
-    // faellt ein GANZER Block weg, nicht ein angeschnittener -- ein
-    // ganzer fehlender Block knackt leiser als ein abgeschnittener.
-    // Steht fast nichts mehr an, wird eine halbe Blocklaenge Stille
-    // nachgelegt, bevor der Ausgang trockenfaellt.
-    if (queued > wanted * 2) {
+    if (queued > wanted + slack && m_mono.size() > 1) {
+        // Zu viel Vorrat: der Eingang ist schneller. Einen Wert
+        // weglassen, und zwar den leisesten im Block -- dort faellt
+        // ein fehlender Schritt am wenigsten auf.
+        size_t quietest = 0;
+        float  lowest = std::fabs(m_mono[0]);
+        for (size_t i = 1; i < m_mono.size(); ++i) {
+            const float a = std::fabs(m_mono[i]);
+            if (a < lowest) { lowest = a; quietest = i; }
+        }
+        m_mono.erase(m_mono.begin() + qsizetype(quietest));
         m_overruns.fetch_add(1, std::memory_order_acq_rel);
-        return;
-    }
-    if (queued < blockBytes) {
+    } else if (queued < wanted - slack && !m_mono.empty()) {
+        // Zu wenig Vorrat: den leisesten Wert verdoppeln.
+        size_t quietest = 0;
+        float  lowest = std::fabs(m_mono[0]);
+        for (size_t i = 1; i < m_mono.size(); ++i) {
+            const float a = std::fabs(m_mono[i]);
+            if (a < lowest) { lowest = a; quietest = i; }
+        }
+        m_mono.insert(m_mono.begin() + qsizetype(quietest),
+                      m_mono[quietest]);
         m_underruns.fetch_add(1, std::memory_order_acq_rel);
-        const std::vector<char> stille(size_t(blockBytes / 2), 0);
-        m_sinkIo->write(stille.data(), qint64(stille.size()));
     }
 
     const auto outFmt = static_cast<QAudioFormat::SampleFormat>(m_outFormat);
