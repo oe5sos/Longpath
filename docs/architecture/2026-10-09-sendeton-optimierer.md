@@ -149,60 +149,76 @@ bauen**, bis jemand breiter als 6 kHz sendet.
 
 ---
 
-## Die Entscheidungen, Spalte für Spalte
+## Was ein Profil ist — nach dem Umbau vom selben Tag
 
-`kRules` in `BroadcastOptimizer.cpp` — eine Zeile je Breite, damit die
-vier Unterschiede an einer Stelle lesbar sind statt über vier Zweige
-verteilt.
+**Dynamik. Kein Entzerrer.** `apply()` fasst die Klangregelung nicht
+an: nicht gesät, nicht ein-, nicht ausgeschaltet, nicht gelesen. Die
+Kurve des Bedieners bleibt, wie sie ist.
 
-| Breite | Hochpass | Deckel | Tiefe extra | Höhen extra | Dichte | Klangstufen |
-| --- | --- | --- | --- | --- | --- | --- |
-| 2,3 k | 1,80 × Grundton | 300 Hz | −3,0 dB | −9,0 dB | 75 Dense | **aus** |
-| 2,7 k | 1,60 × | 250 Hz | −2,0 dB | −7,0 dB | 55 Broadcast | an |
-| 3,2 k | 1,30 × | 180 Hz | −0,5 dB | −3,0 dB | 42 | an |
-| 4,0 k | 1,15 × | 150 Hz | 0 | −1,5 dB | 30 Natural | an |
+Das ist Zeus' Form, am 2026-10-09 am laufenden Gerät abgelesen. Seine
+drei Stimmstile sind je drei Angaben:
 
-**Der Hochpass folgt dem Grundton, nicht einer festen Zahl.** Dafür misst
-`VoiceAnalyzer` jetzt die Tonhöhe (Autokorrelation je Rahmen, Median über
-die Rahmen mit klarer Spitze). Bisher wurde der Hochpass aus der Energie
-unterhalb des Sprachbandes gewählt — die richtige Frage, falsch herum
-gestellt: dieselben 40 Hz Rumpeln liegen unter einer 95-Hz- und einer
-185-Hz-Stimme, aber ein Filter, das für die eine stimmt, nimmt der anderen
-die unterste Oktave.
+| | |
+|---|---|
+| NATURAL | Expander −40 dB (SNR 28 dB), trim +9,5 dB auf −20 dBFS, AGC −22 |
+| BROADCAST | Expander −38 dB (SNR 28 dB), trim +9,5 dB auf −20 dBFS, breit auf 2,9 kHz |
+| DX PUNCH | Expander −38 dB (SNR 28 dB), trim +9,5 dB auf −20 dBFS, Komp 4:1 |
 
-**Die Präsenz wird nie angehoben.** Sie muss nicht: Tiefen und Höhen
-ringsum abzusenken *ist* „nach vorne", und es kostet keine Verstärkung auf
-einem Band, auf dem das Mikrofon rauschen könnte. Gleiche Regel wie in
-`VoiceAnalyzer::suggestEq` und `StripTuner` — nur Absenkungen, der Pegel
-kommt als Aufholverstärkung zurück.
+Expander aus dem gemessenen Störabstand, ein Pegeltrimm auf ein festes
+Ziel, genau **eine** kennzeichnende Änderung. Kein Klangregler.
 
-**Das Verhältnis wird gelöst, nicht gewählt.** Steht die Schwelle auf dem
-Sprachmittel, liegen die Spitzen den gemessenen Scheitelfaktor darüber und
-kommen mit Scheitelfaktor/Verhältnis heraus. Das Verhältnis, das auf den
-Zielscheitelfaktor führt, ist also gemessen ÷ Ziel. Nichts daran ist
-Geschmack.
+Longpath macht es ebenso:
 
-**Der De-Esser läuft auch bei 2,3 k** — der naheliegende Einwand ist, ein
-2,3-kHz-Filter entferne 6 kHz ohnehin. Tut es, aber der Strip steht **vor**
-dem Sendefilter: das Zischen erreicht diesen Kompressor zuerst und nimmt
-Pegelabsenkung mit. Genau so holen die schmalen Profile ihren Spielraum
-zurück.
+| Stufe | Woher |
+|---|---|
+| Expander | Schwelle = Rauschteppich + 0,65 × Störabstand, Boden −8 dB |
+| Trimm | auf −20 dBFS, als Drive **vor** dem Kompressor |
+| De-Esser | auf der gemessenen Zischfrequenz (`VoiceAnalysis::sibilanceHz`) |
+| Kompressor | Verhältnis = gemessener Scheitelfaktor ÷ angezielter (Dichte) |
+| Phasendreher | 8 Stufen — Zeus' gemessene Wahl an derselben Stimme |
+| Breite | **ist** die kennzeichnende Änderung |
 
-### Was die schmalen Profile vergessen
+Je Breite unterscheiden sich nur Dichte, Kompression, die Breite selbst
+und ob die Farbstufen laufen:
 
-Martins Regel, und sie hat eine veröffentlichte Entsprechung: NU9Ns
-Kettenvorschlag kennzeichnet Rauschsperre, weichen Kompressor, Exciter,
-Spitzenbegrenzer und Effekte ausdrücklich als **optional** — unmarkiert
-bleiben genau zwei, Entzerrer und Kompressor.
+| Breite | Dichte | Farbstufen |
+| --- | --- | --- |
+| 2,3 k | 75 Dense | **aus** |
+| 2,7 k | 55 Broadcast | an |
+| 3,2 k | 42 | an |
+| 4,0 k | 40 Natural | an |
 
-Das 2,3-k-Profil schaltet Röhre, Exciter und Nachhall darum **ab**, statt
-sie zu lassen, wie sie waren. Die Unsymmetrie ist Absicht: eingeschaltet
-wird nie etwas (dafür gibt es keine Messung), ausgeschaltet schon. Ein
-Profil, das sich schlank nennt, während der Nachhall des vorigen noch
-läuft, ist eines, dem man nicht trauen kann — und ein A/B zwischen zwei
-Profilen muss den Unterschied *zwischen ihnen* hörbar machen.
+### Warum der Entzerrer draußen bleibt
 
----
+Die erste Fassung leitete je Breite einen Hochpass, zwei Kuhschwänze
+und eine Präsenzglocke ab. Das Urteil nach dem Hören war eindeutig:
+
+> „Das Original-Audio ist gut, nur sämtliche Bearbeitungen sind eine
+> Katastrophe." · „hier ist kein Bass, hier fehlt es einfach an allem."
+
+Vier Fehler, alle derselben Art — Code, der an einem Klangregler dreht,
+für den die Messung nicht trägt:
+
+1. **Eine Contest-Kurve für alle vier Breiten.** `VoiceAnalyzer::targetDb`
+   verlangt 125 Hz bei −12 dB gegen 1 kHz.
+2. **Überhaupt ein absolutes Ziel.** Das Spektrum einer Stimme fällt
+   natürlicherweise; 250 Hz liegt bei jeder Stimme weit über 1 kHz.
+   Darauf zu zielen bügelt die Neigung flach — gemessen 8,3 dB Körper
+   weg beim *breiten* Profil.
+3. **Gestapelte Schnitte.** Hochpass beim 1,15- bis 1,8-**fachen** des
+   Grundtons (bei 110 Hz also 198 Hz, mitten in der Stimme) und direkt
+   darüber ein Tiefenfilter auf dieselbe Gegend.
+4. **Die Brummkerbe auf dem Grundton.** `VoiceAnalyzer` summiert ±2
+   FFT-Bins um 50/100/150/200 Hz — bei 4096 Punkten und 48 kHz rund
+   ±23 Hz. Eine Männerstimme mit 110 Hz legt ihren Grundton in das
+   Fenster um 100 Hz und ihre zweite Oberwelle in das um 200. Der
+   Detektor meldete Brumm, der nicht da war, und die Kerben nahmen das
+   Fundament heraus. Gemessen ohne jeden Brumm: 110 Hz −12,5 dB,
+   150 Hz −17,6 dB, 220 Hz −3,7 dB.
+
+Der Detektor selbst ist unverändert — `StripTuner` hängt an derselben
+Funktion, das wäre eine eigene Änderung mit eigener Gegenprobe. Der
+Optimierer folgt ihm nur nicht mehr.
 
 ## Hören, ohne zu entscheiden
 
@@ -265,6 +281,10 @@ lässt nichts stehen, der Hochpass folgt der Tonhöhe und bleibt im Deckel,
   Durchgang mit echter Stimme nein.
 * **`ClipOnly2` und der Mehrbänder** — siehe oben, beides Martins
   Entscheidung.
+* **Die Stufenzahl des Phasendrehers je Stimme suchen.** Zeus misst sie
+  („8 stages measured best") und meldet sie als eine begrenzte
+  Änderung mit UNDO daneben; wir nehmen seine 8. Dafür braucht es die
+  Aufnahme, die `plan()` nicht hat — ein eigener Schritt.
 * **Dichte von Hand verstellen.** Die Achse ist da und wird angezeigt,
   aber noch ohne Regler: `Plan::density` ändern und neu rechnen wäre
   wenige Zeilen. Bewusst nicht mitgebaut, bis die vier Vorgaben an einer

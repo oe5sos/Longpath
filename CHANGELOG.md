@@ -4,6 +4,16 @@
 
 ### Sendeton-Optimierer: vier Profile aus einem Durchgang
 
+> **Stand am Ende des Tages, 2026-10-09.** Der Optimierer wurde noch am
+> selben Tag auf Zeus' Form umgebaut, nachdem der Betreiber die erste
+> Fassung gehoert hatte: **er fasst den Entzerrer nicht mehr an.** Ein
+> Profil ist Expander + Pegeltrimm auf −20 dBFS + De-Esser auf der
+> gemessenen Zischfrequenz + Kompressor + Phasendreher, und die Breite
+> ist die kennzeichnende Aenderung. Die Abschnitte unten, die von
+> Kuhschwaenzen, Hochpass und Zielkurven sprechen, beschreiben die
+> verworfene erste Fassung; die Begruendung steht im Entwurfsblatt
+> unter „Warum der Entzerrer draussen bleibt".
+
 Fuenfzehn Sekunden sprechen, ohne Einstellungen. Daraus entstehen vier
 vollstaendige Profile fuer 2,3 / 2,7 / 3,2 / 4,0 kHz — jedes mit seinem
 eigenen Hochpass, Klang, Kompressor und Sendefilter, jedes einzeln
