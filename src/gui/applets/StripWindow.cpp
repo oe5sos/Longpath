@@ -18,6 +18,7 @@
 
 #include "gui/StyleConstants.h"
 #include "core/strip/StripSettings.h"
+#include "core/strip/StripLiveMonitor.h"
 #include "core/AppSettings.h"
 #include "gui/applets/eq/EqHost.h"
 #include "gui/applets/eq/StripEqPanel.h"
@@ -174,6 +175,33 @@ StripWindow::StripWindow(RadioModel* radio, QWidget* parent)
     refreshChainRow();
 }
 
+// Was oben unter dem Hauptschalter steht.
+//
+// Drei Lagen, und die mittlere ist neu: bis zum 2026-10-09 entstand
+// der Kanalzug mit der Sendepumpe, also war ohne Funkgeraet nichts
+// einzustellen und der Hinweis sagte das auch. Jetzt steht der
+// Kanalzug immer -- einstellen und abhoeren geht am Schreibtisch,
+// nur auf Sendung geht es eben erst mit Geraet.
+QString StripWindow::noteText() const
+{
+    if (!chain()) {
+        return QStringLiteral(
+            "No strip available in this window.");
+    }
+    if (!m_radio || !m_radio->isConnected()) {
+        return QStringLiteral(
+            "No radio connected — set the strip up here anyway. Record "
+            "and Play above run your voice through it off the sound "
+            "card, so every stage can be heard and judged at the desk. "
+            "The moment a radio comes up, this is what it transmits.");
+    }
+    return QStringLiteral(
+        "Sits in front of the radio's own processing, on the "
+        "microphone before WDSP sees it. Switched off, the audio is "
+        "bit-for-bit what it was before this window existed — so "
+        "switching off is a real comparison, not an approximate one.");
+}
+
 void StripWindow::adoptChainIfArrived()
 {
     const bool have = chain() != nullptr;
@@ -191,14 +219,7 @@ void StripWindow::adoptChainIfArrived()
     reloadControls();
     refreshStagePictures();
     refreshChainRow();
-    if (m_note) {
-        m_note->setText(QStringLiteral(
-            "Sits in front of the radio's own processing, on the "
-            "microphone before WDSP sees it. Switched off, the audio is "
-            "bit-for-bit what it was before this window existed — so "
-            "switching off is a real comparison, not an approximate "
-            "one."));
-    }
+    if (m_note) { m_note->setText(noteText()); }
     if (m_master) {
         const QSignalBlocker block(m_master);
         m_master->setChecked(c->isEnabled());
@@ -287,6 +308,74 @@ void StripWindow::persist()
     StripChain* c = chain();
     if (!c) { return; }
     StripSettings::save(*c);
+    // Sofort, nicht erst beim naechsten Abgleichtakt: wer an einem
+    // Regler zieht, soll es hoeren, waehrend er zieht.
+    if (m_live) { m_live->resync(); }
+}
+
+// Mithoeren an und aus.
+//
+// Der eigene Kanalzug des Mithoerers wird aus derselben gespeicherten
+// Einstellung geholt wie die Sendekette -- deshalb der Abgleichtakt:
+// persist() deckt die 49 Stellen ab, die durch dieses Fenster gehen,
+// der halbsekuendige Takt faengt die, die es nicht tun (der portierte
+// Entzerrer speichert selbst, ueber EqHost).
+void StripWindow::toggleLiveMonitor(bool on)
+{
+    if (on) {
+        if (!m_live) {
+            m_live = new StripLiveMonitor(this);
+            connect(m_live, &StripLiveMonitor::failed, this,
+                    [this](const QString& why) {
+                if (m_liveBtn) {
+                    const QSignalBlocker b(m_liveBtn);
+                    m_liveBtn->setChecked(false);
+                }
+                if (m_liveNote) { m_liveNote->setText(why); }
+            });
+            connect(m_live, &StripLiveMonitor::started,
+                    this, &StripWindow::updateLiveNote);
+            connect(m_live, &StripLiveMonitor::stopped,
+                    this, &StripWindow::updateLiveNote);
+        }
+        m_live->setVolume(m_liveVol ? m_liveVol->value() / 100.0 : 0.7);
+        m_live->start();
+        if (!m_liveSync) {
+            m_liveSync = new QTimer(this);
+            m_liveSync->setInterval(500);
+            connect(m_liveSync, &QTimer::timeout, this, [this]() {
+                if (m_live && m_live->isRunning()) { m_live->resync(); }
+                updateLiveNote();
+            });
+        }
+        m_liveSync->start();
+    } else {
+        if (m_liveSync) { m_liveSync->stop(); }
+        if (m_live) { m_live->stop(); }
+    }
+    updateLiveNote();
+}
+
+void StripWindow::updateLiveNote()
+{
+    if (!m_liveNote) { return; }
+    if (!m_live || !m_live->isRunning()) {
+        m_liveNote->setText(QStringLiteral(
+            "Hear myself runs your microphone through the strip and "
+            "back out of this computer — use headphones, and switch "
+            "the strip off and on to hear what it is doing."));
+        return;
+    }
+    QString t = QStringLiteral(
+        "Listening. About %1 ms of delay inside Longpath; the sound "
+        "card adds its own on each side. Headphones.")
+        .arg(m_live->latencyMs(), 0, 'f', 0);
+    const int drop = m_live->overruns() + m_live->underruns();
+    if (drop > 0) {
+        t += QStringLiteral("  %1 block(s) dropped — input and output "
+                            "clocks are drifting apart.").arg(drop);
+    }
+    m_liveNote->setText(t);
 }
 
 StripChain* StripWindow::chain() const
@@ -337,22 +426,48 @@ void StripWindow::buildUi()
                 this, &StripWindow::monitorPlayClicked);
         row->addWidget(m_monPlayBtn);
 
+        // ── Mithoeren ───────────────────────────────────────────────
+        //
+        // Das Haekchen, das am 2026-08-11 hinausflog, in einer
+        // Fassung, die nicht am Funkgeraet haengt. Siehe
+        // core/strip/StripLiveMonitor.h -- und toggleLiveMonitor()
+        // fuer die Rueckkopplungswarnung, die kein Schmuck ist:
+        // Mikrofon und Lautsprecher im selben Raum pfeifen, und zwar
+        // laut.
+        m_liveBtn = new QCheckBox(QStringLiteral("Hear myself"), this);
+        m_liveBtn->setToolTip(QStringLiteral(
+            "Runs the microphone through the strip and straight back "
+            "out of this computer's sound output, so every change is "
+            "heard while it is made. Headphones — a loudspeaker here "
+            "feeds back. The radio is not touched and nothing is "
+            "transmitted."));
+        connect(m_liveBtn, &QCheckBox::toggled,
+                this, &StripWindow::toggleLiveMonitor);
+        row->addWidget(m_liveBtn);
+
+        m_liveVol = new QSlider(Qt::Horizontal, this);
+        m_liveVol->setRange(0, 100);
+        m_liveVol->setValue(70);
+        m_liveVol->setFixedWidth(110);
+        m_liveVol->setToolTip(QStringLiteral("Monitor level."));
+        connect(m_liveVol, &QSlider::valueChanged, this, [this](int v) {
+            if (m_live) { m_live->setVolume(v / 100.0); }
+        });
+        row->addWidget(m_liveVol);
+
         row->addStretch(1);
         col->addLayout(row);
+
+        m_liveNote = new QLabel(this);
+        m_liveNote->setWordWrap(true);
+        m_liveNote->setStyleSheet(dimStyle());
+        col->addWidget(m_liveNote);
+        updateLiveNote();
 
         m_note = new QLabel(this);
         m_note->setWordWrap(true);
         m_note->setStyleSheet(dimStyle());
-        m_note->setText(chain()
-            ? QStringLiteral(
-                  "Sits in front of the radio's own processing, on the "
-                  "microphone before WDSP sees it. Switched off, the audio "
-                  "is bit-for-bit what it was before this window existed — "
-                  "so switching off is a real comparison, not an "
-                  "approximate one.")
-            : QStringLiteral(
-                  "Not connected to a radio. The strip is created with the "
-                  "transmit pump, so there is nothing to set up yet."));
+        m_note->setText(noteText());
         col->addWidget(m_note);
     }
 
@@ -1983,6 +2098,15 @@ void StripWindow::refreshChainRow()
 void StripWindow::refreshMeters()
 {
     adoptChainIfArrived();
+
+    // Der Hinweistext haengt jetzt an der Verbindung, nicht mehr am
+    // Vorhandensein des Kanalzugs -- also hier nachziehen, wenn das
+    // Geraet kommt oder geht.
+    const bool connected = m_radio != nullptr && m_radio->isConnected();
+    if (connected != m_wasConnected) {
+        m_wasConnected = connected;
+        if (m_note) { m_note->setText(noteText()); }
+    }
 
     StripChain* c = chain();
     if (!c) { return; }

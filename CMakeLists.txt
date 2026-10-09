@@ -1133,6 +1133,7 @@ set(GUI_SOURCES
     # operator's A/B comparison depends on.
     src/core/strip/MicSpectrum.cpp
     src/core/strip/StripChain.cpp
+    src/core/strip/StripLiveMonitor.cpp
     src/core/strip/StripSettings.cpp
     src/core/strip/BroadcastOptimizer.cpp
     src/core/strip/StripTuner.cpp

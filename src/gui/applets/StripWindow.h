@@ -59,6 +59,7 @@
 class QCheckBox;
 class QComboBox;
 class QLabel;
+class QSlider;
 class QTableWidget;
 class QTabWidget;
 class QVBoxLayout;
@@ -69,6 +70,7 @@ namespace Longpath {
 
 class EqHost;
 class RadioModel;
+class StripLiveMonitor;
 class StripEqPanel;
 class TxVoiceCheckDialog;
 
@@ -201,11 +203,30 @@ private:
     // is a panel that is wrong for the rest of the session in the one
     // case where the operator most needs it.
     void adoptChainIfArrived();
+    QString noteText() const;
+    bool m_wasConnected{false};
     bool m_hadChain{false};
 
-    // setSelfMonitor is gone (2026-08-11): live listening left this
-    // window with the "Hear myself" checkbox. The record-then-listen
-    // monitor (buttons above) replaced it — the AetherSDR way.
+    // ── Mithoeren, Fassung 2 (2026-10-09) ────────────────────────────
+    //
+    // Am 2026-08-11 flog das Haekchen "Hear myself" hinaus, weil sein
+    // Weg ueber den Mikrofonstrom des Funkgeraets lief und dieser
+    // 3-15 % seiner Bloecke verliert -- es stotterte unheilbar. Der
+    // Wunsch selbst war nie falsch, und er kam am 2026-10-09 wieder:
+    // "ohne und mit nur minimaler latenz selbst zu hoeren. hat den
+    // vorteil, aenderung sofort wahr zu nehmen."
+    //
+    // Diese Fassung laeuft ausschliesslich ueber die Soundkarte des
+    // Rechners und ruehrt das Funkgeraet nicht an. Siehe
+    // core/strip/StripLiveMonitor.h.
+    void toggleLiveMonitor(bool on);
+    void updateLiveNote();
+
+    StripLiveMonitor* m_live{nullptr};
+    QCheckBox*  m_liveBtn{nullptr};
+    QLabel*     m_liveNote{nullptr};
+    QSlider*    m_liveVol{nullptr};
+    QTimer*     m_liveSync{nullptr};
 
     // ── The radio's own processing, while listening ──────────────────
     //
