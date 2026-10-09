@@ -17,6 +17,7 @@
 #include "gui/applets/StripWindow.h"
 
 #include "gui/StyleConstants.h"
+#include "core/strip/EqBandLayout.h"
 #include "core/strip/StripSettings.h"
 #include "core/strip/StripLiveMonitor.h"
 #include "core/strip/AudioPlugin.h"
@@ -367,6 +368,10 @@ void StripWindow::toggleLiveMonitor(bool on)
         // Entscheidende, was fehlt.
         if (StripChain* c = chain()) {
             m_live->setSpectrumSink(&c->micSpectrum());
+            // Von der lebenden Kette abschreiben, nicht aus der
+            // gespeicherten Datei -- sonst hoert man eine Aenderung
+            // erst, wenn die Maus losgelassen wurde.
+            m_live->setMirrorSource(c);
         }
         m_live->setLatencyPreset(static_cast<StripLiveMonitor::Latency>(
             AppSettings::instance()
@@ -378,7 +383,10 @@ void StripWindow::toggleLiveMonitor(bool on)
         m_live->start();
         if (!m_liveSync) {
             m_liveSync = new QTimer(this);
-            m_liveSync->setInterval(500);
+            // Zehnmal in der Sekunde. Das geht nur, weil seit dem
+            // Spiegeln nichts mehr ueber die Einstellungsdatei laeuft
+            // -- es ist eine Tabelle im Arbeitsspeicher und zurueck.
+            m_liveSync->setInterval(100);
             connect(m_liveSync, &QTimer::timeout, this, [this]() {
                 if (m_live && m_live->isRunning()) { m_live->resync(); }
                 updateLiveNote();
@@ -958,7 +966,56 @@ QWidget* StripWindow::buildEqPanel()
         refreshStageCards();
         persist();
     });
-    col->addWidget(on);
+    // ── „Flat" -- die Kurve wirklich loeschen ────────────────────────
+    //
+    // „ein loeschen der kurve sollte auch im EQ vorhanden sein."
+    //
+    // Den portierten Knopf „Reset" gibt es, aber er tut etwas
+    // anderes: er stellt die VORGABEKURVE her (Hochpass bei 100 Hz,
+    // Kuhschwanz unten, eine Glocke bei 2 kHz). Das ist nicht nichts.
+    // Und er steht am rechten Ende der uebernommenen Knopfreihe, wo
+    // er bei schmalem Fenster als erstes verschwindet.
+    //
+    // Dieser hier macht die Kurve flach: jedes Band auf 0 dB und
+    // ueberbrueckt. Danach geht wirklich nichts mehr durch den
+    // Entzerrer, und man faengt von vorne an. Ein Zug an einem
+    // Punkt schaltet das Band von selbst wieder ein
+    // (ClientEqEditorCanvas.cpp:143), also ist der Weg zurueck ein
+    // Handgriff.
+    //
+    // Ueber EqHost gespeichert und damit EIN Widerrufsschritt wie
+    // jeder andere -- eine Loeschung, die man nicht zuruecknehmen
+    // kann, traut sich niemand zu druecken.
+    auto* flat = new QPushButton(QStringLiteral("Flat"), page);
+    flat->setStyleSheet(Style::buttonBaseStyle());
+    flat->setToolTip(QStringLiteral(
+        "Clear the curve: every band to 0 dB and bypassed, so the "
+        "equaliser does nothing at all. One undo step. “Reset” in the "
+        "row below is different — that brings back the default curve, "
+        "which is not the same as none."));
+    connect(flat, &QPushButton::clicked, this, [this]() {
+        StripChain* c = chain();
+        if (!c) { return; }
+        for (int i = 0; i < EqBandLayout::kBandCount; ++i) {
+            ClientEq::BandParams p = c->eq().band(i);
+            p.gainDb = 0.0f;
+            p.enabled = false;
+            c->eq().setBand(i, p);
+        }
+        c->eq().setMasterGain(0.0f);
+        if (m_eqHost) { m_eqHost->saveClientEqSettings(); }
+        if (m_eqPanel) { m_eqPanel->refreshFromEngine(); }
+        refreshStageCards();
+        persist();
+    });
+
+    auto* head = new QHBoxLayout;
+    head->setContentsMargins(0, 0, 0, 0);
+    head->addWidget(on);
+    head->addSpacing(12);
+    head->addWidget(flat);
+    head->addStretch(1);
+    col->addLayout(head);
     col->addWidget(m_eqPanel, 1);
     return page;
 }

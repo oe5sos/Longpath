@@ -58,6 +58,13 @@ void save(const StripChain& chain);
 // enables are restored; the master switch is not — see the header note.
 void restore(StripChain& chain);
 
+// Alle Parameter einer Kette in eine andere, ohne die Einstellungen
+// anzufassen. Fuer den Mithoerer, der eine eigene Kette hat und sie
+// SOFORT nachziehen muss -- nicht erst, wenn jemand die Maus
+// loslaesst. Ohne Hauptschalter und ohne Einschuebe; Begruendung in
+// der .cpp. Nur vom Bedienfaden.
+void copyParameters(const StripChain& from, StripChain& to);
+
 // ── The operator's own presets ───────────────────────────────────────
 //
 // Stored through exactly the same reader and writer as the live

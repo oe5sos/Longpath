@@ -16,6 +16,7 @@
 #include "core/LogCategories.h"
 #include "core/strip/MicSpectrum.h"
 #include "core/strip/StripChain.h"
+#include "core/strip/AudioPlugin.h"
 #include "core/strip/StripSettings.h"
 
 #include <QAudioSink>
@@ -265,7 +266,39 @@ void StripLiveMonitor::doResync()
     // Parameter, keine Zustaende. Siehe die Kopfdatei: dafuer sind die
     // Atomaren mit Versionszaehler in jeder Stufe da, und das Fenster
     // schreibt auf demselben Weg auch in die Sendekette.
-    StripSettings::restore(*m_chain);
+    if (m_mirror != nullptr) {
+        // Direkt von der lebenden Kette. Das ist der Weg, der eine
+        // Aenderung WAEHREND des Ziehens hoerbar macht.
+        StripSettings::copyParameters(*m_mirror, *m_chain);
+
+        // Die Einschuebe nur jeden zehnten Durchgang: ein Plugin
+        // laedt man nicht zehnmal in der Sekunde, und seinen Zustand
+        // abzufragen kostet jedes Mal eine Serialisierung.
+        if (++m_mirrorTick >= 10) {
+            m_mirrorTick = 0;
+            for (int i = 0; i < StripChain::kInsertCount; ++i) {
+                const AudioPlugin* src = m_mirror->insertPlugin(i);
+                AudioPlugin* mine = m_chain->insertPlugin(i);
+                m_chain->setInsertPosition(i, m_mirror->insertPosition(i));
+                m_chain->setInsertEnabled(i, m_mirror->insertEnabled(i));
+                if (src == nullptr) {
+                    if (mine != nullptr) { m_chain->setInsertPlugin(i, nullptr); }
+                    continue;
+                }
+                const QString id = src->descriptor().identifier;
+                if (mine == nullptr || mine->descriptor().identifier != id) {
+                    std::unique_ptr<AudioPlugin> loaded = PluginHost::load(id);
+                    if (!loaded) { continue; }
+                    loaded->restoreState(src->saveState());
+                    m_chain->setInsertPlugin(i, std::move(loaded));
+                } else {
+                    m_chain->applyInsertState(i, src->saveState());
+                }
+            }
+        }
+    } else {
+        StripSettings::restore(*m_chain);
+    }
     m_chain->setEnabled(true);
 }
 

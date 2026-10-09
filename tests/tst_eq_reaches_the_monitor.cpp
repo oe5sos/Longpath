@@ -29,6 +29,7 @@
 #include "core/strip/StripChain.h"
 #include "core/strip/StripSettings.h"
 #include "core/strip/EqBandLayout.h"
+#include "core/AppSettings.h"
 #include <cmath>
 #include <vector>
 using namespace Longpath;
@@ -114,6 +115,46 @@ private slots:
                  qPrintable(QStringLiteral("der Mithoerer bekommt die "
                                            "Kurve nicht: nur %1 dB")
                                 .arg(g2)));
+    }
+
+    // Und derselbe Weg OHNE die Einstellungsdatei.
+    //
+    // „waere besser, dass sobald ich eine aenderung vorgenommen habe,
+    // die auch sofort zu hoeren ist." Der Weg ueber die gespeicherten
+    // Werte kann das nicht: gespeichert wird erst beim Loslassen der
+    // Maus. copyParameters() geht direkt von Kette zu Kette, und
+    // dieser Fall besteht darauf, dass dabei NICHTS in den
+    // Einstellungen landet -- sonst waere es derselbe Weg mit einem
+    // anderen Namen.
+    void copyParametersGoesStraightAcross()
+    {
+        StripChain a;
+        a.prepare(48000.0);
+        EqBandLayout::ensureSeeded(a.eq());
+        a.setStageEnabled(StripChain::Stage::Eq, true);
+        ClientEq::BandParams p = a.eq().band(5);
+        p.freqHz = 2000.0f; p.gainDb = 9.0f; p.q = 1.0f;
+        p.type = ClientEq::FilterType::Peak; p.enabled = true;
+        a.eq().setBand(5, p);
+
+        // Eine Marke in den Einstellungen, die unangetastet bleiben
+        // muss.
+        AppSettings::instance().setValue(QStringLiteral("EqBand5Gain"),
+                                         -99.0);
+
+        StripChain b;
+        b.prepare(48000.0);
+        StripSettings::copyParameters(a, b);
+
+        const ClientEq::BandParams q = b.eq().band(5);
+        QCOMPARE(double(q.gainDb), 9.0);
+        QCOMPARE(double(q.freqHz), 2000.0);
+        QVERIFY(q.enabled);
+        QVERIFY(b.stageEnabled(StripChain::Stage::Eq));
+
+        QCOMPARE(AppSettings::instance()
+                     .value(QStringLiteral("EqBand5Gain")).toDouble(),
+                 -99.0);
     }
 };
 QTEST_MAIN(TstEqReachesTheMonitor)

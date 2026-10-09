@@ -31,9 +31,51 @@ QString key(const QString& prefix, const char* name)
     return prefix + QString::fromLatin1(name);
 }
 
+// ── Wohin geschrieben und woraus gelesen wird ────────────────────────
+//
+// Normalerweise in die Einstellungen. Fuer EINEN Zweck aber nicht:
+// copyParameters() schiebt eine ganze Kette in eine andere, und das
+// soll weder die Einstellungsdatei anfassen noch den Weg ueber die
+// Platte nehmen.
+//
+// Der Umweg ueber eine Umleitung statt ueber eine zweite Liste aller
+// Felder ist Absicht. Die Liste in saveTo()/restoreFrom() ist lang und
+// waechst mit jeder Stufe; eine zweite Fassung davon waere genau die
+// Sorte Doppelung, die irgendwann auseinanderlaeuft und dann heisst:
+// „beim Mithoeren fehlt der Kompressor-Vorhalt" und niemand weiss
+// warum.
+//
+// Nur vom Bedienfaden aus zu benutzen -- es ist ein globaler Zeiger,
+// und er wird fuer die Dauer EINES Kopiervorgangs gesetzt.
+using Map = QHash<QString, QVariant>;
+Map* g_redirect = nullptr;
+
+// Waehrend eines Kopiervorgangs bleiben die Einschuebe aussen vor.
+// Ein Plugin laedt man nicht zehnmal in der Sekunde neu, und sein
+// Zustand als Base64 kostet bei jedem Abruf eine Serialisierung.
+bool g_skipInserts = false;
+
+void putV(const QString& k, const QVariant& v)
+{
+    if (g_redirect != nullptr) { g_redirect->insert(k, v); return; }
+    AppSettings::instance().setValue(k, v);
+}
+
+QVariant getV(const QString& k)
+{
+    if (g_redirect != nullptr) { return g_redirect->value(k); }
+    return AppSettings::instance().value(k);
+}
+
+QVariant getV(const QString& k, const QVariant& fallback)
+{
+    const QVariant v = getV(k);
+    return v.isValid() ? v : fallback;
+}
+
 void putF(const QString& prefix, const char* name, float v)
 {
-    AppSettings::instance().setValue(key(prefix, name), double(v));
+    putV(key(prefix, name), double(v));
 }
 
 // Read a float, falling back to whatever the stage itself already
@@ -43,7 +85,7 @@ void putF(const QString& prefix, const char* name, float v)
 // these, so "missing" and "set to nothing" must not look alike.
 float getF(const QString& prefix, const char* name, float fallback)
 {
-    const QVariant v = AppSettings::instance().value(key(prefix, name));
+    const QVariant v = getV(key(prefix, name));
     if (!v.isValid()) { return fallback; }
     bool ok = false;
     const double d = v.toDouble(&ok);
@@ -52,7 +94,7 @@ float getF(const QString& prefix, const char* name, float fallback)
 
 int getI(const QString& prefix, const char* name, int fallback)
 {
-    const QVariant v = AppSettings::instance().value(key(prefix, name));
+    const QVariant v = getV(key(prefix, name));
     if (!v.isValid()) { return fallback; }
     bool ok = false;
     const int i = v.toInt(&ok);
@@ -61,7 +103,7 @@ int getI(const QString& prefix, const char* name, int fallback)
 
 bool getB(const QString& prefix, const char* name, bool fallback)
 {
-    const QVariant v = AppSettings::instance().value(key(prefix, name));
+    const QVariant v = getV(key(prefix, name));
     return v.isValid() ? v.toBool() : fallback;
 }
 
@@ -77,14 +119,13 @@ QString userPrefix(const QString& name)
 
 void saveTo(const QString& prefix, const StripChain& chain)
 {
-    AppSettings& s = AppSettings::instance();
     auto& c = const_cast<StripChain&>(chain);   // accessors are non-const
 
     // Per-stage enables. The master switch is not written — it loads
     // off every time, on purpose.
     for (int i = 0; i < StripChain::kStageCount; ++i) {
         const auto st = static_cast<StripChain::Stage>(i);
-        s.setValue(key(prefix, "Stage") + QString::number(i), c.stageEnabled(st));
+        putV(key(prefix, "Stage") + QString::number(i), c.stageEnabled(st));
     }
 
     putF(prefix, "GateThresholdDb", c.gate().thresholdDb());
@@ -95,7 +136,7 @@ void saveTo(const QString& prefix, const StripChain& chain)
     putF(prefix, "GateFloorDb",     c.gate().floorDb());
     putF(prefix, "GateReturnDb",    c.gate().returnDb());
     putF(prefix, "GateLookaheadMs", c.gate().lookaheadMs());
-    s.setValue(key(prefix, "GateMode"), int(c.gate().mode()));
+    putV(key(prefix, "GateMode"), int(c.gate().mode()));
 
     putF(prefix, "CompThresholdDb", c.comp().thresholdDb());
     putF(prefix, "CompRatio",       c.comp().ratio());
@@ -104,8 +145,8 @@ void saveTo(const QString& prefix, const StripChain& chain)
     putF(prefix, "CompKneeDb",      c.comp().kneeDb());
     putF(prefix, "CompMakeupDb",    c.comp().makeupDb());
     putF(prefix, "CompDriveDb",     c.comp().driveDb());
-    s.setValue(key(prefix, "CompPhaseStages"), c.comp().phaseRotatorStages());
-    s.setValue(key(prefix, "CompLimiterOn"),   c.comp().limiterEnabled());
+    putV(key(prefix, "CompPhaseStages"), c.comp().phaseRotatorStages());
+    putV(key(prefix, "CompLimiterOn"),   c.comp().limiterEnabled());
     putF(prefix, "CompLimiterCeilingDb", c.comp().limiterCeilingDb());
 
     putF(prefix, "DeEssFrequencyHz", c.deEss().frequencyHz());
@@ -114,35 +155,35 @@ void saveTo(const QString& prefix, const StripChain& chain)
     putF(prefix, "DeEssAmountDb",    c.deEss().amountDb());
     putF(prefix, "DeEssAttackMs",    c.deEss().attackMs());
     putF(prefix, "DeEssReleaseMs",   c.deEss().releaseMs());
-    s.setValue(key(prefix, "DeEssSlopeStages"), c.deEss().slopeStages());
+    putV(key(prefix, "DeEssSlopeStages"), c.deEss().slopeStages());
 
     // EQ: the bands are the whole setting, so all of them go, with the
     // active count so a shorter set does not leave stale bands behind.
     const int bands = c.eq().activeBandCount();
-    s.setValue(key(prefix, "EqBandCount"), bands);
-    s.setValue(key(prefix, "EqMasterGain"), double(c.eq().masterGain()));
-    s.setValue(key(prefix, "EqFamily"), int(c.eq().filterFamily()));
+    putV(key(prefix, "EqBandCount"), bands);
+    putV(key(prefix, "EqMasterGain"), double(c.eq().masterGain()));
+    putV(key(prefix, "EqFamily"), int(c.eq().filterFamily()));
     for (int i = 0; i < bands; ++i) {
         const ClientEq::BandParams p = c.eq().band(i);
         const QString b = key(prefix, "EqBand") + QString::number(i);
-        s.setValue(b + QStringLiteral("Freq"),    double(p.freqHz));
-        s.setValue(b + QStringLiteral("Gain"),    double(p.gainDb));
-        s.setValue(b + QStringLiteral("Q"),       double(p.q));
-        s.setValue(b + QStringLiteral("Type"),    int(p.type));
-        s.setValue(b + QStringLiteral("On"),      p.enabled);
-        s.setValue(b + QStringLiteral("Slope"),   p.slopeDbPerOct);
+        putV(b + QStringLiteral("Freq"),    double(p.freqHz));
+        putV(b + QStringLiteral("Gain"),    double(p.gainDb));
+        putV(b + QStringLiteral("Q"),       double(p.q));
+        putV(b + QStringLiteral("Type"),    int(p.type));
+        putV(b + QStringLiteral("On"),      p.enabled);
+        putV(b + QStringLiteral("Slope"),   p.slopeDbPerOct);
     }
 
     putF(prefix, "LimiterCeilingDb",    c.limiter().ceilingDb());
     putF(prefix, "LimiterOutputTrimDb", c.limiter().outputTrimDb());
-    s.setValue(key(prefix, "LimiterDcBlock"), c.limiter().dcBlockEnabled());
+    putV(key(prefix, "LimiterDcBlock"), c.limiter().dcBlockEnabled());
 
     // Tube, Reverb, Pudu (2026-08-11). These three stages arrived after
     // this serializer was written and never joined it — so their knobs
     // silently reset on every restart AND fell out of user presets,
     // which is how tst_strip_chain's round-trip caught it: a preset
     // with 9 dB of tube drive came back with 0.
-    s.setValue(key(prefix, "TubeModel"), int(c.tube().model()));
+    putV(key(prefix, "TubeModel"), int(c.tube().model()));
     putF(prefix, "TubeDriveDb",        c.tube().driveDb());
     putF(prefix, "TubeBiasAmount",     c.tube().biasAmount());
     putF(prefix, "TubeTone",           c.tube().tone());
@@ -171,7 +212,7 @@ void saveTo(const QString& prefix, const StripChain& chain)
     // der Zustand des Plugins als Base64. Ein leerer Platz schreibt
     // einen leeren Bezeichner -- also nichts, was auf einem anderen
     // Rechner etwas zu suchen anfaengt.
-    for (int i = 0; i < StripChain::kInsertCount; ++i) {
+    for (int i = 0; !g_skipInserts && i < StripChain::kInsertCount; ++i) {
         const QString at = QString::number(i);
         const AudioPlugin* p = c.insertPlugin(i);
         AppSettings::instance().setValue(
@@ -190,7 +231,6 @@ void saveTo(const QString& prefix, const StripChain& chain)
 
 void restoreFrom(const QString& prefix, StripChain& c)
 {
-    AppSettings& s = AppSettings::instance();
 
     c.gate().setThresholdDb(getF(prefix, "GateThresholdDb", c.gate().thresholdDb()));
     c.gate().setRatio      (getF(prefix, "GateRatio",       c.gate().ratio()));
@@ -234,16 +274,16 @@ void restoreFrom(const QString& prefix, StripChain& c)
         for (int i = 0; i < bands; ++i) {
             const QString b = key(prefix, "EqBand") + QString::number(i);
             ClientEq::BandParams p = c.eq().band(i);
-            const QVariant f = s.value(b + QStringLiteral("Freq"));
+            const QVariant f = getV(b + QStringLiteral("Freq"));
             if (!f.isValid()) { continue; }
             p.freqHz = float(f.toDouble());
-            p.gainDb = float(s.value(b + QStringLiteral("Gain"), 0.0).toDouble());
-            p.q      = float(s.value(b + QStringLiteral("Q"), 0.707).toDouble());
+            p.gainDb = float(getV(b + QStringLiteral("Gain"), 0.0).toDouble());
+            p.q      = float(getV(b + QStringLiteral("Q"), 0.707).toDouble());
             p.type   = static_cast<ClientEq::FilterType>(
-                s.value(b + QStringLiteral("Type"), 0).toInt());
-            p.enabled = s.value(b + QStringLiteral("On"), true).toBool();
+                getV(b + QStringLiteral("Type"), 0).toInt());
+            p.enabled = getV(b + QStringLiteral("On"), true).toBool();
             p.slopeDbPerOct =
-                s.value(b + QStringLiteral("Slope"), 12).toInt();
+                getV(b + QStringLiteral("Slope"), 12).toInt();
             c.eq().setBand(i, p);
         }
         c.eq().setActiveBandCount(bands);
@@ -253,9 +293,9 @@ void restoreFrom(const QString& prefix, StripChain& c)
     // Appends, never overwrites; see the note on ensureSeeded.
     EqBandLayout::ensureSeeded(c.eq());
     {
-        const QVariant g = s.value(key(prefix, "EqMasterGain"));
+        const QVariant g = getV(key(prefix, "EqMasterGain"));
         if (g.isValid()) { c.eq().setMasterGain(float(g.toDouble())); }
-        const QVariant fam = s.value(key(prefix, "EqFamily"));
+        const QVariant fam = getV(key(prefix, "EqFamily"));
         if (fam.isValid()) {
             c.eq().setFilterFamily(
                 static_cast<ClientEq::FilterFamily>(fam.toInt()));
@@ -306,7 +346,7 @@ void restoreFrom(const QString& prefix, StripChain& c)
     for (int i = 0; i < StripChain::kStageCount; ++i) {
         const auto st = static_cast<StripChain::Stage>(i);
         c.setStageEnabled(st,
-            s.value(key(prefix, "Stage") + QString::number(i), false).toBool());
+            getV(key(prefix, "Stage") + QString::number(i), false).toBool());
     }
     // And the master stays where it is — off. See StripSettings.h.
 
@@ -321,22 +361,22 @@ void restoreFrom(const QString& prefix, StripChain& c)
     // Nachgeladen wird NUR, wenn ein Bezeichner dasteht. Wer nie
     // einen Einschub befuellt hat, loest hier keinen Suchlauf aus und
     // laedt keine fremde Bibliothek (Regel 1).
-    for (int i = 0; i < StripChain::kInsertCount; ++i) {
+    for (int i = 0; !g_skipInserts && i < StripChain::kInsertCount; ++i) {
         const QString at = QString::number(i);
         c.setInsertPosition(i,
-            s.value(key(prefix, "InsertAt") + at, 0).toInt());
+            getV(key(prefix, "InsertAt") + at, 0).toInt());
         c.setInsertEnabled(i,
-            s.value(key(prefix, "InsertOn") + at, true).toBool());
+            getV(key(prefix, "InsertOn") + at, true).toBool());
 
         const QString id =
-            s.value(key(prefix, "InsertId") + at, QString()).toString();
+            getV(key(prefix, "InsertId") + at, QString()).toString();
         const AudioPlugin* have = c.insertPlugin(i);
         if (id.isEmpty()) {
             if (have != nullptr) { c.setInsertPlugin(i, nullptr); }
             continue;
         }
         const QByteArray blob = QByteArray::fromBase64(
-            s.value(key(prefix, "InsertState") + at, QString())
+            getV(key(prefix, "InsertState") + at, QString())
                 .toString().toLatin1());
 
         // Schon das richtige drin? Dann nicht neu laden -- sonst
@@ -359,6 +399,39 @@ void restoreFrom(const QString& prefix, StripChain& c)
         if (!blob.isEmpty()) { loaded->restoreState(blob); }
         c.setInsertPlugin(i, std::move(loaded));
     }
+}
+
+// ── Eine Kette in eine andere, ohne Umweg ueber die Platte ──────────
+//
+// „waere besser, dass sobald ich eine aenderung vorgenommen habe, die
+// auch sofort zu hoeren ist."
+//
+// Der Mithoerer hat einen EIGENEN Kanalzug (zwei Audiofaeden in
+// denselben Filterzustaenden waeren ein Datenrennen) und holte sich
+// die Einstellung bisher aus den GESPEICHERTEN Werten. Gespeichert
+// wird aber erst beim Loslassen der Maus -- also hoerte man eine
+// Kurvenaenderung erst danach, und dann noch bis zu einer halben
+// Sekunde spaeter. Genau so wurde es berichtet: „leider hoere ich
+// beim EQ erst den unterschied, wenn ich per drag and drop
+// ausgelassen habe."
+//
+// Hier wird deshalb direkt von Kette zu Kette kopiert, ueber eine
+// Tabelle im Arbeitsspeicher. Dieselbe Feldliste wie beim Speichern,
+// nur mit umgelegter Schreibrichtung -- siehe g_redirect.
+//
+// NICHT mitkopiert: der Hauptschalter (den fuehrt der Mithoerer
+// selbst, als Ueberbrueckung) und die Einschuebe (ein Plugin laedt
+// man nicht zehnmal in der Sekunde; dafuer gibt es
+// StripChain::applyInsertState).
+void copyParameters(const StripChain& from, StripChain& to)
+{
+    Map scratch;
+    g_redirect = &scratch;
+    g_skipInserts = true;
+    saveTo(QString(), from);
+    restoreFrom(QString(), to);
+    g_skipInserts = false;
+    g_redirect = nullptr;
 }
 
 // ── The live settings ────────────────────────────────────────────────

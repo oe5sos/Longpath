@@ -150,6 +150,18 @@ public:
     // eigenen Schwanz nachlaufen.
     void setSpectrumSink(MicSpectrum* sink) { m_spectrum = sink; }
 
+    // Die Kette, von der abgeschrieben wird.
+    //
+    // Ohne sie holt sich resync() die Einstellung aus den
+    // GESPEICHERTEN Werten -- und gespeichert wird erst, wenn die
+    // Maus losgelassen wird. „leider hoere ich beim EQ erst den
+    // unterschied, wenn ich per drag and drop ausgelassen habe."
+    //
+    // Mit ihr wird direkt von Kette zu Kette kopiert, im
+    // Arbeitsspeicher, und zwar waehrend des Ziehens. Nicht besessen;
+    // das Fenster setzt sie und raeumt den Mithoerer vor ihr ab.
+    void setMirrorSource(const StripChain* live) { m_mirror = live; }
+
     // ── Von aussen, vom Bedienfaden ──────────────────────────────────
     //
     // Alles hier reicht nur weiter: die Arbeit geschieht auf dem
@@ -196,6 +208,8 @@ private:
 
     std::unique_ptr<StripChain> m_chain;
     MicSpectrum* m_spectrum{nullptr};   // nicht besessen
+    const StripChain* m_mirror{nullptr};   // nicht besessen
+    int m_mirrorTick{0};
 
     Latency m_preset{Latency::Safe};
     int m_blockFrames{256};
