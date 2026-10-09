@@ -3360,6 +3360,7 @@ target_compile_definitions(tst_mox_controller_mic_ptt_extraction PRIVATE LONGPAT
 #   RX channel 0 and TX channel 1 co-exist without aliasing.
 #   Channel ID: WDSP.id(1, 0) = CMsubrcvr * CMrcvr = 1 with single-RX layout.
 longpath_add_test(tst_wdsp_engine_tx_channel)
+longpath_add_test(tst_maxbin_hold_decay)
 
 # ── Phase 3M-3a-iii Task 20: WdspEngine DEXP DSP-instance lifecycle ──────────
 # The bench-failing fix: before Task 20, pdexp[1] was permanently nullptr

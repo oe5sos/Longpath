@@ -1776,8 +1776,36 @@ void WdspEngine::onSpectrumBinsForMaxBin(int receiverId, const QVector<float>& b
     // For voice / modulated signals this rides peak frames at the
     // signal level and only falls between peaks, producing the
     // expected "pumping" behavior.
-    d.maxDb -= std::abs((1.0 - d.decay) * d.maxDb);
-    if (static_cast<double>(newMaxDb) > d.maxDb) { d.maxDb = static_cast<double>(newMaxDb); }
+    d.maxDb = maxBinHoldNextDbm(d.maxDb, static_cast<double>(newMaxDb), d.decay);
+}
+
+// Siehe die Herleitung im Kopf (WdspEngine.h): Abfall gegen einen Boden
+// statt gegen 0 dBm, sonst bleibt der Haltewert oberhalb 0 dBm fuer
+// immer stehen.
+double WdspEngine::maxBinHoldNextDbm(double heldDbm, double liveDbm, double decay)
+{
+    // Der Abzug je Takt bleibt der von Thetis -- (1 - decay) mal dem
+    // Betrag des Haltewerts -- bekommt aber einen Mindestbezug. Ohne
+    // ihn schrumpft der Abzug oberhalb 0 dBm mit dem Wert selbst und
+    // der Haltewert kommt nie unter null (Thetis #2681).
+    //
+    // 20 dB als Mindestbezug: eine S-Stufe sind 6 dB, zwanzig also gut
+    // drei Stufen je Zeitkonstante. Weniger waere im starken Bereich
+    // traeger als jede sinnvolle Ablesung, mehr wuerde den Haltewert
+    // dort wegreissen, wo er gebraucht wird. Unterhalb -20 dBm -- also
+    // im ganzen Arbeitsbereich dieses Instruments -- rechnet das Zeile
+    // fuer Zeile wie bisher.
+    //
+    // Ein frueherer Versuch mit einem Boden bei -160 dBm statt eines
+    // Mindestbezugs ist am Pruefstand gescheitert: er liess den
+    // Haltewert bei -42 dBm dreimal so schnell fallen wie bisher.
+    constexpr double kMinFallReferenceDb = 20.0;
+    // Nicht unter den Sentinel aus Init_DetectMaxBin laufen lassen.
+    constexpr double kUnsetDbm = -400.0;
+
+    double next = heldDbm - (1.0 - decay) * std::max(std::abs(heldDbm), kMinFallReferenceDb);
+    if (next < kUnsetDbm) { next = kUnsetDbm; }
+    return liveDbm > next ? liveDbm : next;
 }
 
 } // namespace Longpath
