@@ -397,3 +397,265 @@ lässt nichts stehen, der Hochpass folgt der Tonhöhe und bleibt im Deckel,
   die noch niemand beurteilt hat.
 * **Die vier Dichte-Stufenwerte** sind Longpaths Setzung, nicht Zeus'.
   Wenn Zeus Link sie sichtbar macht, nachziehen.
+
+---
+
+# Nachtrag 2026-10-09, Abend: Werkbank statt Automatik
+
+Vier Wünsche in Folge, alle am selben Abend, alle in dieselbe Richtung.
+Sie gehören zusammen und ergeben erst zusammen etwas: aus einem
+Fenster, das Profile *herleitet*, ist eine Werkbank geworden, an der
+man eine Stimme von Hand einstellt und dabei hört und sieht, was man
+tut.
+
+## 1. Der Kanalzug hängt nicht mehr an der Sendepumpe
+
+`m_stripChain` entstand in `connectToRadio()` und starb in der
+Teardown. Ohne Verbindung war das ganze Fenster tot — Hauptschalter
+ohne Wirkung, acht Stufenseiten ohne Werte, Übersichtskarten mit acht
+Strichen, „Through your strip" im Stimmcheck durch gar nichts. Am
+Gerät, mit offenem Fenster: *„kann diese nicht aktivieren."*
+
+Jetzt `RadioModel::ensureStripChain()` im Konstruktor. Beim Pumpenstart
+nur noch `prepare()` (löscht Filterzustände, lässt Einstellungen
+stehen) und die Übergabe an den Worker; in der Teardown wird er nicht
+mehr gelöscht. Die Reihenfolge stimmt weiter, weil er **vor**
+`m_txWorker` deklariert ist und Mitglieder in umgekehrter Reihenfolge
+sterben.
+
+Das war kein Versehen in einer Zeile, sondern eine falsche Annahme:
+eine Stimme stellt man am Schreibtisch ein, nicht auf Sendung.
+
+## 2. Mithören, Fassung 2
+
+Das Häkchen „Hear myself" flog am 2026-08-11 hinaus (49d10dc8), und der
+Grund war gut: sein Weg hing am Mikrofonstrom des **Funkgeräts**, und
+dessen eigene Taktmessung zeigte 3190–3639 Pumpentakte je 5 s, wo 3755
+hingehören — 3 bis 15 % verlorene Blöcke. Ein Sample, das nie ankam,
+lässt sich nicht zurückpuffern.
+
+`src/core/strip/StripLiveMonitor.{h,cpp}` berührt das Gerät nicht:
+
+    Soundkarte ein → eigener StripChain → Soundkarte aus
+
+Ein Taktgeber, der des Rechners, keine Netzstrecke — genau der Grund,
+aus dem AetherSDRs Kette nie stotterte.
+
+**Eigener Kanalzug, nicht der der Sendekette.** Dessen Stufen halten
+Filterzustände, und die Sendepumpe läuft darauf auf ihrem Faden; zwei
+Audiofäden in denselben Zuständen sind ein Datenrennen, das nur im
+Betrieb und nur manchmal knackt. Gehört wird trotzdem dasselbe, weil
+der Mithör-Kanalzug aus derselben gespeicherten Einstellung
+wiederhergestellt wird: `persist()` deckt die 49 Stellen ab, die durch
+dieses Fenster gehen, ein halbsekündiger Takt die, die es nicht tun
+(der portierte Entzerrer speichert über `EqHost` selbst).
+
+**Eigener Faden, hoch eingestuft.** Am Bedienfaden bestimmen
+Zeichenarbeit und 100-ms-Zeitgeber die Antwortzeit. Ohne Elternobjekt,
+und das ist der Punkt, an dem so etwas sonst stillschweigend misslingt:
+Qt verschiebt kein Objekt, das an einem Elternobjekt auf einem anderen
+Faden hängt.
+
+### Die Latenz, und was daran schiefging
+
+Erst 256 Rahmen und drei Blöcke Vorrat, rund 21 ms. Auf die Ansage
+*„arbeite auch daran, dass latenz noch geringer wird"* halbiert auf
+128/2 und „8 ms" genannt — woraufhin im Kopfhörer **komplettes
+Krachen** stand, ohne dass der Betreiber irgendetwas getan hätte.
+
+Das war dieselbe Fehlerform wie am Vormittag: eine Zahl ohne tragende
+Messung. Wie knapp ein Rechner laufen kann, hängt an seinen Geräten,
+seinen Treibern und daran, was sonst läuft.
+
+Drei echte Fehler steckten mit drin:
+
+| Fehler | Warum er knackt |
+|---|---|
+| Zwei Blöcke Vorrat | Einer wird ausgegeben, einer ist unterwegs — erst der dritte ist Vorrat |
+| Ausgabepuffer = gewollter Vorrat | `write()` schneidet mitten im Block ab; ein angeschnittener Block knackt lauter als ein ganzer, der fehlt |
+| Ausgang fing leer an | Unterlauf beim ersten Ton — das Knacken bei jedem Start, unabhängig von der Puffergröße |
+
+Jetzt: Puffer acht Blöcke groß (write() schneidet nie ab), gesteuert
+wird über den **stehengebliebenen** Vorrat, Start mit zwei Blöcken
+Stille, bei Unterlauf eine halbe Blocklänge Stille nachlegen, bei
+Überlauf einen **ganzen** Block fallen lassen. Und die Stufe wählt der,
+der es hört: **Safe / Low / Lowest**, Vorgabe Safe, mit dem Zähler
+daneben.
+
+## 3. Die Entzerrerkurve zeigt die eigene Stimme — und hält sie
+
+Der Peak-Hold-Knopf war längst da, portiert mit Aethers Entzerrer. Was
+fehlte, war das Spektrum darunter: `StripChain::micSpectrum()` füllte
+allein die Sendepumpe. Jetzt schreibt der Mithörer das **rohe**
+Mikrofonsignal mit hinein — roh, weil `EqHost` die Kurve bewusst über
+ein Spektrum **vor** dem Entzerrer legt.
+
+Dann: *„die eigene kurve sollte auch längere zeit mit hold stehen
+bleiben und standhaft bleiben."* Nachgesehen, wie Aether es macht — er
+ist hier der Maßstab. Ergebnis: `AetherSDR/src/gui/ClientEqCurveWidget.cpp:118-125`
+ist wortgleich das Portierte und tut **nicht**, was der Name
+verspricht:
+
+```cpp
+const float decayStep = m_peakHoldFrozen ? 0.0f : kPeakDecayDb;
+m_peakHoldDb[i] = std::max(decayed, m_fftBinsDb[i]);
+```
+
+Eingefroren hält dort nur der Abfall an; das Maximum wird weiter
+nachgezogen. Jedes Geräusch hebt die Linie weiter an, und weil sie nie
+wieder fällt, ist sie nach einer Minute nicht mehr die Stimme, sondern
+die Höchstmarke von allem, was seither im Zimmer passiert ist. Ein
+Bezug, der sich unter der Hand ändert, ist schlimmer als keiner.
+
+Longpath-Abweichung, beide Richtungen:
+
+* **eingefroren** — es wird nichts mehr angefasst, auch die Größe
+  nicht (ein Ratenwechsel während des Haltens hätte die Linie sonst
+  gelöscht).
+* **frei** — je Fach zwei Sekunden halten, dann mit 3 dB/s fallen.
+  Upstream fiel mit 12,5 dB/s: wer einen Satz spricht und danach
+  **hinsieht**, sah nichts mehr.
+
+Gegenprobe gegen Aethers Fassung gefahren: eingefroren zieht sie dort
+von −40 auf −20 nach, frei steht nach einer Sekunde statt −20 nur noch
+−32,5 dB.
+
+## 4. Einschübe für fremde Effekte — als Zusatz, nie als Weg
+
+Die Ansage, wörtlich, weil sie jede spätere Änderung bindet: *„will das
+unabhängig machen […] plugins können nur als option zusätzlich gelten,
+wenn gewollt. ist nicht der standard."*
+
+Drei Regeln, in `core/strip/AudioPlugin.h` festgehalten:
+
+1. **Leer ist der Normalfall.** Kein Suchlauf beim Start, kein Reiter,
+   der sich aufdrängt, keine Rechenzeit. Ein leerer Platz kostet im
+   Block eine atomare Ladung.
+2. **Ein fehlendes Plugin ist kein Fehler.** Auf einem Rechner ohne
+   dieses Plugin bleibt der Platz leer und die Kette klingt wie ohne
+   ihn. Keine Warnung, keine Sperre.
+3. **Fremder Code steht unter demselben Verdacht wie der
+   Mikrofoneingang** — nur stärker: er ist das einzige Stück dieser
+   Kette, das wir nicht gelesen haben. Liefert er etwas, das keine Zahl
+   ist, bekommt die Kette den Block zurück, wie er hereinkam, das
+   Plugin wird zurückgesetzt, der Vorfall gezählt.
+
+**Audio Units zuerst**, nicht VST3: AU ist auf dem Mac Systemsache —
+kein fremdes SDK im Baum, kein zweites Lizenzverhältnis, eine
+C-Schnittstelle, die seit zwanzig Jahren steht. VST3 ist seit Ende 2025
+MIT-lizenziert (SDK 3.8.0) und kommt damit für Windows und Linux
+daneben, nicht an diese Stelle. Auf anderen Plattformen übersetzt der
+Wirt zu drei leeren Antworten, und `available()` sagt „hier gibt es das
+nicht" — was etwas anderes ist als „hier ist nichts installiert".
+
+**Keine fremde Oberfläche.** Die Parameter werden ausgelesen und in
+unseren Reglern gezeichnet. Das ist die Entscheidung, nicht der
+Notbehelf: es hält den Hausstil, läuft plattformgleich und umgeht das
+Einbetten fremder Ansichten in Qt, an dem solche Vorhaben üblicherweise
+scheitern. Der Preis gehört genannt: ein Plugin, dessen Können in
+seiner Oberfläche steckt, ist hier eine Liste von Zahlen.
+
+**Der Austausch im Betrieb.** Audiofaden setzt `busy`, *dann* liest er
+den Zeiger. Hauptfaden leert den Zeiger, *dann* wartet er auf
+`busy == 0`. Danach kann kein Durchlauf das alte Plugin mehr in die
+Hand bekommen. Kein Schloss — der Audiofaden darf nie blockieren, also
+dreht der Hauptfaden die Schleife.
+
+**Zwei Plätze, Stelle frei wählbar** (0 = vor dem Gate,
+`kStageCount` = hinter dem Begrenzer). Nicht eine neunte Stufe: ein
+Kompressor vor dem Entzerrer ist ein anderes Gerät als einer dahinter,
+und das gehört dem gewählt, der es hört.
+
+### Hineinziehen statt einstellen
+
+*„wichtig ist, dass man weiß, wo man diese einbauen soll […] diese
+sollte man dann in der timeline oben reinziehen können. aber relativ
+leicht auch wieder löschen."*
+
+Die Reihe oben **ist** die Kette: Fuge, Stufe, Fuge, Stufe — und wo ein
+Einschub hängt, steht seine Kachel statt der leeren Fuge. Beim Ziehen
+leuchtet die Fuge auf, auf die es fällt. Gezielt wird auf die
+nächstgelegene Fuge, nie auf eine Stufe: wer über der Mitte des
+Kompressors loslässt, meint nicht „in den Kompressor hinein". Die
+Kachel ist gestrichelt (dieselbe Zusage wie beim Plus) und trägt ein
+Kreuz rechts oben.
+
+`core/strip/PluginPlacement.{h,cpp}` gruppiert den Katalog nach dem
+Platz, an den das Plugin gehört — mit einer Warnung im Klartext: das
+ist **geraten**. Eine Audio Unit nennt ihre Gattung nicht. Geraten wird
+mit Netz (Wortstämme), und was nicht zuzuordnen ist, landet sichtbar
+unter „noch nicht eingeordnet" statt stillschweigend in der erstbesten
+Gruppe — ein falsch einsortiertes Plugin wäre schlimmer als ein nicht
+einsortiertes, weil es etwas behauptet.
+
+### Das Loch, das beim Durchdenken auffiel
+
+Der Mithörer hat seinen eigenen Kanalzug und damit eine eigene Instanz
+desselben Plugins. Die blieb auf dem Stand vom Laden: man hätte an
+einem Plugin-Regler gedreht und nichts gehört — also wäre das Mithören
+genau dort nutzlos gewesen, wo es gebraucht wird.
+`StripChain::applyInsertState()` nimmt den gespeicherten Zustand an,
+**wenn er sich geändert hat**, mit demselben Handschlag. Der Vergleich
+davor ist Pflicht, nicht Geiz: ohne ihn hielte der halbsekündige
+Abgleichtakt zweimal je Sekunde den Audiofaden an.
+
+## 5. Das Plus, angesehen statt behauptet
+
+*„vergesse nicht auf das rendering des + für das hinzufügen der
+widgets."*
+
+Es war ein `QPushButton` mit einem „+" und einem gestrichelten Rand aus
+dem Stilblatt; jetzt malt es sich selbst. Was es **nicht** geworden
+ist: ein hüpfendes Zierstück. Der Hausstil hat zu Bewegung genau einen
+Satz, und der ist eine Grenze — *„Zustandswechsel: 150 ms ease. Nichts
+springt."* Also bewegt sich nichts von selbst; bewegt wird nur, was
+etwas aussagt: offen dreht es sich in 180 ms um 45 Grad und steht als
+Kreuz da (Regel 5 in Bewegung), Zeiger darauf 150 ms, Druck 90 ms.
+Dazu die Zusage, die ein Kreuz macht — derselbe Knopf schließt wieder,
+und ein Ereignisfilter dreht zurück, wenn der Auswähler an uns vorbei
+zugeht.
+
+Selbst gemalt aus zwei Gründen: drehen lässt sich ein Textzeichen im
+Stilblatt nicht, und der geerbte Innenabstand aus `Style::kButtonStyle`
+— der genau diesem Knopf schon einmal fast das Zeichen weggefressen
+hätte — kann in einem eigenen `paintEvent` gar nicht mehr zuschlagen.
+
+**Am Bild nachgebessert, dreimal, und keines davon beim Lesen des Codes
+sichtbar:** offen und „Zeiger darauf" trugen dieselbe Fläche aus
+`kButtonBg`, die so dicht am Grund liegt, dass kein Unterschied zu sehen
+war (jetzt der gedeckte Auswahlverlauf `kGlassSel*`, Hausstil Regel 2);
+die Einschubkachel klebte an der Stufe davor; und vor der ersten Stufe
+stand ein Kettenzeichen, das „fließt hinein" heißt.
+
+`tst_plus_glyph_renders` und `tst_strip_chain_row_drops::theRowIsOnFile`
+legen die Bilder ab (`LONGPATH_RENDER_DIR`) **und** halten fest, dass
+die Zustände überhaupt verschieden aussehen — eine Zustandsanimation,
+die in jedem Zustand dasselbe Bild liefert, ist keine, und das merkt
+niemand, wenn nur die Mechanik geprüft wird.
+
+## Prüfstände dieses Abends
+
+| | |
+|---|---|
+| `tst_strip_works_without_radio` | 4 Fälle; Gegenprobe: 3 fallen ohne die Behebung |
+| `tst_strip_plugin_inserts` | 8 Fälle; findet auf dieser Maschine 26 Audio Units, lädt die erste und schickt Ton hindurch |
+| `tst_eq_peak_hold_stands_still` | 2 Fälle; Gegenprobe gegen **Aethers** Fassung: beide fallen |
+| `tst_plugin_placement` | 6 Fälle |
+| `tst_strip_chain_row_drops` | 6 Fälle, darunter einer, der jeden Punkt der Reihe durchgeht |
+| `tst_plus_glyph_renders` | 3 Fälle |
+| `tst_widget_picker` | + `theSameButtonClosesWhatItOpened` |
+
+## Was offen bleibt
+
+* **Live noch nicht gehört.** Gebaut, geprüft, gerendert — aber die
+  Werkbank hat noch niemand benutzt.
+* **CoreAudio von Hand** für das Mithören: zwei AUHAL-Einheiten mit
+  einem Ring dazwischen. Erst damit ließen sich
+  `kAudioDevicePropertyLatency` und der SafetyOffset der Geräte ablesen
+  und die angezeigte Zahl wäre die ganze Wahrheit statt nur unseres
+  Anteils.
+* **VST3 für Windows und Linux.** Die Schnittstelle ist dafür gebaut;
+  es fehlt der zweite Wirt.
+* **Der Brummdetektor** in `VoiceAnalyzer` hält bei einer 110-Hz-Stimme
+  weiter den Grundton für Netzbrumm. Unverändert, `StripTuner` hängt
+  daran.

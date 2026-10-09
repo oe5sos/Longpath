@@ -2,6 +2,37 @@
 
 ## [Unreleased]
 
+### Werkbank statt Automatik: Mithoeren, eigene Kurve, fremde Effekte
+
+Vier Wuensche an einem Abend, alle in dieselbe Richtung. Aus einem
+Fenster, das Profile herleitet, ist eine Werkbank geworden.
+
+* **Mithoeren mit waehlbarer Latenz.** Soundkarte ein, eigener
+  Kanalzug, Soundkarte aus -- das Funkgeraet wird nicht angeruehrt.
+  **Safe / Low / Lowest** statt einer Zahl im Quelltext: wie knapp ein
+  Rechner laufen kann, weiss der nicht, der die Zahl schreibt. Der
+  Zaehler daneben sagt, ob die Maschine traegt, was gewaehlt wurde.
+* **Die Entzerrerkurve zeigt die eigene Stimme und HAELT sie.** Der
+  Mithoerer fuellt das Mikrofonspektrum, das bisher allein die
+  Sendepumpe fuellte. Und „eingefroren" friert jetzt wirklich ein:
+  Aethers Fassung (wortgleich portiert) hielt nur den Abfall an und
+  zog das Maximum weiter nach -- nach einer Minute war die Linie nicht
+  mehr die Stimme, sondern die Hoechstmarke des Raums. Frei laufend
+  haelt sie zwei Sekunden und faellt dann mit 3 statt 12,5 dB/s.
+* **Zwei Einschubplaetze fuer fremde Effekte**, Stelle frei waehlbar,
+  zum Hineinziehen in die Kette oben und mit einem Kreuz wieder
+  heraus. Audio Units auf dem Mac (Systemsache, kein fremdes SDK);
+  der Katalog ist nach dem Platz gruppiert, an den ein Plugin gehoert.
+  **Zusatz, nicht Weg:** leer ist der Normalfall, ein fehlendes Plugin
+  ist kein Fehler, und was keine Zahlen liefert, bekommt den Block
+  weggenommen.
+* **Das Plus fuer neue Widgets dreht sich** beim Oeffnen in 180 ms zum
+  Kreuz -- und das Kreuz schliesst auch wieder. Von selbst bewegt sich
+  nichts; bewegt wird nur, was etwas aussagt.
+
+Entwurfsblatt: `docs/architecture/2026-10-09-sendeton-optimierer.md`,
+Nachtrag „Werkbank statt Automatik".
+
 ### Der Kanalzug steht auch ohne Funkgeraet -- und man hoert sich dabei selbst
 
 Zwei Dinge vom 2026-10-09, dieselbe Wurzel: eine Stimme stellt man am
