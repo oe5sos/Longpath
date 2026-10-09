@@ -26,6 +26,12 @@ struct Rule { const char* needle; Group group; };
 constexpr Rule kRules[] = {
     // Eindeutige Namen zuerst -- die bekannten Verdaechtigen aus der
     // Liste, die dem Betreiber vorgelegt wurde.
+    // Apples eigene Stimmfreistellung. Am laufenden Fenster gesehen:
+    // sie landete unter „noch nicht eingeordnet", obwohl sie genau
+    // das tut, wonach der Betreiber heute Vormittag gefragt hat
+    // („die hintergrundgeraeusche werden viel zu viel aufgenommen,
+    // es hallt vom raum").
+    {"isolation",  Group::Clean},
     {"denoiser",   Group::Clean},
     {"rnnoise",    Group::Clean},
     {"noise",      Group::Clean},

@@ -52,6 +52,10 @@ private slots:
                  Group::DeEss);
         QCOMPARE(PluginPlacement::guess("Denoiser Classic", "Bertom"),
                  Group::Clean);
+        // Apples eigene Stimmfreistellung -- am laufenden Fenster
+        // gesehen, dass sie unter „noch nicht eingeordnet" landete.
+        QCOMPARE(PluginPlacement::guess("AUSoundIsolation", "Apple"),
+                 Group::Clean);
         QCOMPARE(PluginPlacement::guess("ClipOnly2", "Airwindows"),
                  Group::Final);
         QCOMPARE(PluginPlacement::guess("SPAN", "Voxengo"), Group::Measure);

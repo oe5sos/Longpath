@@ -2302,12 +2302,6 @@ QWidget* StripWindow::buildInsertsPanel()
         col->addLayout(row);
     }
 
-    // Der Katalog steht VOR den Plaetzen: erst sieht man, was es gibt
-    // und wohin es gehoert, dann was gerade haengt.
-    m_catalogue = new QWidget(page);
-    col->addWidget(m_catalogue);
-    rebuildPluginCatalogue();
-
     for (int slot = 0; slot < StripChain::kInsertCount; ++slot) {
         auto& ui = m_insertUi[static_cast<size_t>(slot)];
 
@@ -2380,6 +2374,26 @@ QWidget* StripWindow::buildInsertsPanel()
         col->addWidget(card);
         refreshInsertCard(slot);
     }
+
+    // Der Katalog steht UNTER den Plaetzen.
+    //
+    // Erst stand er darueber -- erst sehen, was es gibt, dann was
+    // haengt. Am laufenden Fenster war das falsch herum: nach dem
+    // Suchlauf schob sich eine Auslage mit sechsundzwanzig Eintraegen
+    // dazwischen, und wer die Regler eines geladenen Plugins
+    // erreichen wollte, scrollte daran vorbei. Was man eingestellt
+    // hat, gehoert naeher an den Anfang als das, was man noch
+    // einbauen koennte.
+    m_catalogue = new QWidget(page);
+    col->addWidget(m_catalogue);
+    rebuildPluginCatalogue();
+
+    // Den Hinweistext jetzt erst setzen, wo alles steht. Vorher war
+    // er beim ersten Aufschlagen LEER -- refreshInsertCards() lief
+    // nur im Suchlauf, also sah man den Satz, der erklaert, was
+    // dieser Reiter ueberhaupt ist, erst nachdem man ihn benutzt
+    // hatte. Am laufenden Fenster gesehen.
+    refreshInsertCards();
 
     col->addStretch(1);
     return page;
