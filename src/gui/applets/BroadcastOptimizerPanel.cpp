@@ -304,15 +304,34 @@ void BroadcastOptimizerPanel::buildUi()
 
 void BroadcastOptimizerPanel::setAnalysis(const VoiceAnalysis& a)
 {
+    // ── Keep the width the operator chose ────────────────────────────
+    //
+    // Remembered BEFORE the re-plan and restored after it. Without
+    // this, every press of Optimize threw the selection back to
+    // 2.7 kHz — which is exactly what it looked like from the
+    // outside: "nach optimize hüpft er immer auf 2,7 k zurück"
+    // (bench, 2026-10-09).
+    //
+    // 2.7 kHz is still the right ANSWER when there is no previous
+    // choice: it is where an operator who has not said otherwise is
+    // transmitting. It is the wrong answer when they have said
+    // otherwise, and re-running the same measurement is not them
+    // changing their mind.
+    const double previousWidth =
+        (m_selected >= 0 && m_selected < m_plans.size())
+            ? m_plans[m_selected].widthHz
+            : 0.0;
+
     m_analysis = a;
     m_plans    = BroadcastOptimizer::plan(a);
 
-    // 2.7 kHz is where an operator who has not said otherwise is
-    // transmitting, so that is the one that comes up selected. The
-    // host overrides it by calling select() if it knows better.
-    m_selected = m_plans.isEmpty()
-        ? -1
-        : BroadcastOptimizer::bestIndex(m_plans, 2700.0);
+    if (m_plans.isEmpty()) {
+        m_selected = -1;
+    } else if (previousWidth > 0.0) {
+        m_selected = BroadcastOptimizer::bestIndex(m_plans, previousWidth);
+    } else {
+        m_selected = BroadcastOptimizer::bestIndex(m_plans, 2700.0);
+    }
     refresh();
 }
 

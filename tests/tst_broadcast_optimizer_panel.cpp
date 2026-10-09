@@ -152,6 +152,37 @@ private slots:
         QVERIFY(pills[3]->isChecked());
     }
 
+    // Optimieren rechnet neu -- es waehlt nicht fuer den Bediener.
+    //
+    // Der Knopf ruft setAnalysis() mit derselben Messung auf, und das
+    // setzte die Auswahl bedingungslos auf 2,7 k. Wer 4,0 k hoerte
+    // und auf Optimize drueckte, stand wieder bei 2,7 k.
+    void optimizeKeepsTheChosenWidth()
+    {
+        BroadcastOptimizerPanel panel;
+        panel.setAnalysis(ordinary());
+        QCOMPARE(panel.selectedIndex(), 1);          // 2,7 k als Vorgabe
+
+        widthPills(&panel)[3]->click();              // 4,0 k gewaehlt
+        QCOMPARE(panel.selectedIndex(), 3);
+
+        panel.setAnalysis(ordinary());               // = Optimize
+        QCOMPARE(panel.selectedIndex(), 3);
+        QCOMPARE(panel.plans()[panel.selectedIndex()].widthHz, 4000.0);
+
+        // Eine neue, unbrauchbare Messung raeumt trotzdem auf -- die
+        // gemerkte Breite darf keine Auswahl am Leben halten, zu der
+        // es kein Profil mehr gibt.
+        VoiceAnalysis clipped = ordinary();
+        clipped.clippedSamples = 1;
+        panel.setAnalysis(clipped);
+        QCOMPARE(panel.selectedIndex(), -1);
+
+        // Und danach wieder von vorn: ohne vorherige Wahl gilt 2,7 k.
+        panel.setAnalysis(ordinary());
+        QCOMPARE(panel.selectedIndex(), 1);
+    }
+
     // A new recording that cannot be used must CLEAR the panel, not
     // leave the last good take's profiles standing.
     void aClippedTakeClearsIt()
