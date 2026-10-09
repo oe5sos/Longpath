@@ -81,10 +81,21 @@ public:
     void setFftBinsDb(const std::vector<float>& binsDb,
                       double sampleRate);
 
-    // When true, the per-bin peak-hold trace stops decaying — peaks
-    // stick at whatever maximum has been observed so far.  Toggling
-    // back to false resumes the normal decay.
+    // Eingefroren wird die Linie NICHT MEHR ANGEFASST -- sie steht,
+    // bis jemand sie loest. Upstream hielt hier nur den Abfall an und
+    // zog das Maximum weiter nach, womit die eingefrorene Linie bei
+    // jedem Geraeusch nach oben kroch; nach einer Minute war sie
+    // nicht mehr die Stimme, sondern alles, was der Raum hergegeben
+    // hat. Begruendung in voller Laenge in der .cpp
+    // (Longpath-Abweichung, 2026-10-09).
     void setPeakHoldFrozen(bool frozen);
+    bool peakHoldFrozen() const { return m_peakHoldFrozen; }
+
+    // Nur fuer Prueffaelle: die rohe Spitzenwertlinie. Ein Prueftand
+    // kann nicht in ein gezeichnetes Bild sehen, und genau dieses
+    // Verhalten -- steht sie wirklich still? -- verschwindet sonst
+    // beim naechsten Umbau unbemerkt.
+    const std::vector<float>& peakHoldDbForTest() const { return m_peakHoldDb; }
 
     // Fractional-octave smoothing for the analyzer trace (display-only;
     // does not affect EQ math).  Value is N where the smoothing window
@@ -172,6 +183,7 @@ protected:
     std::vector<float> m_fftBinsDb;      // empty = no analyzer drawn
     std::vector<float> m_fftBinsDbSmoothed;  // fractional-octave smoothed copy used for drawing
     std::vector<float> m_peakHoldDb;     // per-bin peak-hold trail (raw, used for max tracking)
+    std::vector<int>   m_peakHoldAge;    // Bilder seit der letzten Spitze je Fach
     std::vector<float> m_peakHoldDbSmoothed;  // smoothed copy of peak-hold used for drawing
     bool               m_peakHoldFrozen{false};
     double             m_fftSampleRate{24000.0};
