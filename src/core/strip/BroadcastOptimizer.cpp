@@ -283,7 +283,22 @@ QVector<Plan> plan(const VoiceAnalysis& a)
                 p.expanderOn = true;
                 p.expanderThresholdDbFs =
                     std::clamp(a.noiseFloorDbFs + 0.65 * snr, -80.0, -10.0);
-                p.expanderFloorDb = -std::clamp(snr * 0.5, 8.0, 20.0);
+                // Die Haelfte des Stoerabstands, gedeckelt bei 12 dB.
+                //
+                // Kurz auf 20 dB gestellt, nachdem der Betreiber "die
+                // hintergrundgeraeusche werden viel zu viel
+                // aufgenommen" meldete -- und danach hiess es "war ein
+                // Schritt zurueck", ohne dass sich noch sagen liess,
+                // welcher Schritt. Von den Aenderungen dieser Runde
+                // ist diese die einzige, die Wortenden kosten KANN,
+                // also geht sie zurueck.
+                //
+                // Zwoelf Dezibel raeumen die Pausen hoerbar auf und
+                // lassen genug stehen, dass ein leises Wortende nicht
+                // abreisst. Wem das zu wenig ist, findet die Zahl im
+                // Gate-Reiter samt Regler daneben -- was der bessere
+                // Ort dafuer ist als eine Konstante hier.
+                p.expanderFloorDb = -std::clamp(snr * 0.5, 8.0, 12.0);
                 nGate = QStringLiteral(
                     "Expander at %1 dBFS with a %2 dB floor, both from "
                     "your measured %3 dB of signal-to-noise. The "
