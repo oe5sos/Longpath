@@ -81,6 +81,15 @@ RttyDecoderApplet::RttyDecoderApplet(RadioModel* model, QWidget* parent)
     // MainWindow::rebindRttyRadeAvailability(), which re-calls setSlice()
     // on every RadioModel::activeSliceChanged (bench-found 2026-09-07;
     // this applet used to be bound once, for the whole session).
+    // Empfaengerwahl: liest die gemerkte Wahl, haengt sich an den
+    // Empfaengerwechsel und schreibt den Zusatz ("RTTY DECODER · RX2") in
+    // die Titelleiste. Die Reihenfolge zu buildUI() ist egal --
+    // `initReceiverBinding()` setzt den Zusatz selbst nach.
+    initReceiverBinding();
+    connect(this, &AppletWidget::boundSliceChanged, this, [this](SliceModel* s) {
+        setSlice(s);
+    });
+
     if (m_model) {
         connect(m_model, &RadioModel::sliceRemoved, this, [this](int index) {
             if (m_slice && m_slice->sliceIndex() == index) {
@@ -304,7 +313,33 @@ void RttyDecoderApplet::updateAudioTap()
 
 void RttyDecoderApplet::syncFromModel()
 {
-    setSlice(m_model ? m_model->activeSlice() : nullptr);
+    // `boundSlice()` statt `activeSlice()`: steht die Empfaengerwahl auf
+    // "folgt dem aktiven" (Vorgabe), ist das dasselbe wie frueher. Hat
+    // jemand einen festen Empfaenger gewaehlt, bleibt der RTTY-Decoder
+    // an seinem, auch waehrend woanders gearbeitet wird.
+    setSlice(boundSlice());
+}
+
+bool RttyDecoderApplet::hasExtendedSettings() const
+{
+    return true;
+}
+
+void RttyDecoderApplet::openExtendedSettings()
+{
+    // Ein frisches Blatt bei jedem Oeffnen, wie bei RxApplet: Qt::Popup
+    // schliesst beim Klick daneben, WA_DeleteOnClose raeumt auf.
+    auto* popup = new QWidget(this, Qt::Popup);
+    popup->setAttribute(Qt::WA_DeleteOnClose);
+    popup->setStyleSheet(QStringLiteral(
+        "QWidget { background: %1; border: 1px solid %2; }")
+        .arg(Style::kPanelBg, Style::kBorder));
+    auto* vbox = new QVBoxLayout(popup);
+    vbox->setContentsMargins(10, 10, 10, 10);
+    vbox->addWidget(receiverChoiceWidget(popup));
+    popup->adjustSize();
+    popup->move(mapToGlobal(QPoint(width() - popup->width(), 0)));
+    popup->show();
 }
 
 void RttyDecoderApplet::onTextDecoded(const QString& text, float confidence)

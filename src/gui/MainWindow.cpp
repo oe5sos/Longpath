@@ -12292,16 +12292,23 @@ void MainWindow::rebindRttyRadeAvailability(SliceModel* slice)
     for (const auto& c : m_rttyRadeLinks) { disconnect(c); }
     m_rttyRadeLinks.clear();
 
-    // RttyDecoderApplet is a single global widget, not per-flag -- it
-    // follows whichever slice is CURRENTLY active. setSlice() already
-    // disconnects its own old mark/shift links and re-points the audio
-    // tap (RttyDecoderApplet::setSlice), so calling it again here with the
-    // (possibly unchanged) active slice is cheap and safe.
+    // Die Decoder sind einzelne, globale Fenster, keine je Flagge.
+    // setSlice() loest die eigenen alten Verbindungen und richtet den
+    // Audio-Abgriff neu aus, der Aufruf ist also auch mit unveraendertem
+    // Empfaenger billig und gefahrlos.
+    //
+    // NICHT den aktiven Empfaenger uebergeben, sondern den GEBUNDENEN
+    // (2026-10-09): seit der Empfaengerwahl kann ein Decoder an einem
+    // festen Empfaenger haengen. Wer hier `slice` durchreichte, zoege ihn
+    // bei jedem Wechsel doch wieder auf den aktiven -- die Wahl waere
+    // wirkungslos, und zwar auf eine Art, die man erst im Betrieb merkt.
+    // Steht die Wahl auf "folgt dem aktiven" (Vorgabe), liefert
+    // boundSlice() genau `slice`.
     if (m_rttyDecoderApplet) {
-        m_rttyDecoderApplet->setSlice(slice);
+        m_rttyDecoderApplet->setSlice(m_rttyDecoderApplet->boundSlice());
     }
     if (m_cwDecoderApplet) {
-        m_cwDecoderApplet->setSlice(slice);
+        m_cwDecoderApplet->setSlice(m_cwDecoderApplet->boundSlice());
     }
 
     if (!m_appletVis) { return; }

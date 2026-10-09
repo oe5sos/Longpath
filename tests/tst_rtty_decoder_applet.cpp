@@ -12,6 +12,7 @@
 #include <QLabel>
 
 #include "gui/applets/RttyDecoderApplet.h"
+#include "core/AppSettings.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
 
@@ -51,10 +52,74 @@ private slots:
 
         radio.removeSlice(idA);
 
-        QVERIFY2(label->text().contains(QChar(0x2014)),  // em dash, HAUSSTIL.md rule 7
-                  qPrintable(QStringLiteral("expected the placeholder (em dash) after the bound slice was removed, got: ") + label->text()));
+        // Verhaltensaenderung mit der Empfaengerwahl (2026-10-09):
+        //
+        // Frueher stand hier der Platzhalter. Das Applet liess seinen
+        // Abgriff los und blieb leer, bis irgendwo geklickt wurde -- der
+        // Grund war, dass ein veralteter sliceIndex im Abgriff den
+        // naechsten Empfaenger hereingeroutet haette, der diesen Index
+        // wiederverwendet.
+        //
+        // Mit der Empfaengerwahl steht die Bindung auf "folgt dem
+        // aktiven" (Vorgabe), und das Applet bindet beim Wegfall sofort
+        // auf den jetzt aktiven Empfaenger um. Die alte Gefahr ist damit
+        // gebannt -- der Abgriff zeigt auf etwas Gueltiges statt auf
+        // einen toten Index -- und im Betrieb laeuft der Decoder weiter,
+        // statt bis zum naechsten Klick stillzustehen.
+        //
+        // Der Fall, fuer den der Platzhalter gedacht war, lebt eine Zeile
+        // weiter unten weiter: bei einer FESTEN Wahl auf den entfernten
+        // Empfaenger gibt es nichts, worauf umzubinden waere.
+        QVERIFY2(!label->text().contains(QChar(0x2014)),
+                 qPrintable(QStringLiteral("erwartet: Umbindung auf den noch "
+                                           "vorhandenen Empfaenger, bekommen: ")
+                                + label->text()));
+        QVERIFY2(label->text().contains(QStringLiteral("Mark")),
+                 qPrintable(QStringLiteral("erwartet Mark/Shift des neuen "
+                                           "Empfaengers, bekommen: ") + label->text()));
 
         Q_UNUSED(idB);
+    }
+
+    void placeholderWhenTheFIXEDReceiverIsRemoved()
+    {
+        // Die Absicht des Falls darueber, auf dem Stand der
+        // Empfaengerwahl: haengt das Applet FEST an einem Empfaenger und
+        // der verschwindet, gibt es nichts, worauf umzubinden waere --
+        // dann und nur dann steht der Platzhalter da.
+        AppSettings::instance().remove(
+            QStringLiteral("Applet/rtty-decoder/Receiver"));
+
+        RadioModel radio;
+        const int idA = radio.addSlice();
+        const int idB = radio.addSlice();
+        SliceModel* sliceA = radio.sliceById(idA);
+        QVERIFY(sliceA);
+        sliceA->setRttyMarkHz(2400);
+
+        RttyDecoderApplet applet(&radio);
+        // Fest auf den ERSTEN Empfaenger, nicht "folgt dem aktiven".
+        // Die Wahl ist seine KENNUNG, keine Listenposition -- genau
+        // darum ueberlebt sie das Nachruecken der anderen.
+        applet.setReceiverChoice(sliceA->sliceIndex());
+        applet.setSlice(applet.boundSlice());
+
+        QLabel* label = markShiftLabelOf(applet);
+        QVERIFY(label);
+        QVERIFY2(label->text().contains(QStringLiteral("2400")),
+                 qPrintable(QStringLiteral("erwartet Mark des fest gewaehlten "
+                                           "Empfaengers, bekommen: ") + label->text()));
+
+        radio.removeSlice(idA);
+
+        QVERIFY2(label->text().contains(QChar(0x2014)),
+                 qPrintable(QStringLiteral("erwartet den Platzhalter, nachdem der "
+                                           "FEST gewaehlte Empfaenger weg ist, "
+                                           "bekommen: ") + label->text()));
+        Q_UNUSED(idB);
+
+        AppSettings::instance().remove(
+            QStringLiteral("Applet/rtty-decoder/Receiver"));
     }
 
     // Regression for a second, related bug found live 2026-09-07 against a
