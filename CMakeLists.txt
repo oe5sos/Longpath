@@ -534,6 +534,7 @@ set(CORE_SOURCES
     src/core/Kpa500Protocol.cpp
     src/core/Kpa500Connection.cpp
     src/core/AcomProtocol.cpp
+    src/core/AcomConnection.cpp
     src/core/CwDecoder.cpp
     src/core/BeamHeading.cpp
     src/core/BoardCapabilities.cpp
