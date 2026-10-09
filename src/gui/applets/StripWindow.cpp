@@ -442,8 +442,11 @@ void StripWindow::buildUi()
 
     // ── One tab per stage ────────────────────────────────────────────
     m_tabs = new QTabWidget(this);
-    // Built below; each panel registers its own enable box, and they are
-    // synced to the chain immediately afterwards.
+    // Die Uebersicht steht vorn, die acht Stufenseiten dahinter --
+    // siehe buildAllStagesSurface(). Die Karten springen per Klick in
+    // ihre Seite, die unveraendert weiterlebt.
+    m_tabs->addTab(new StagePageScroll(buildAllStagesSurface()),
+                   QStringLiteral("Strip"));
     for (int i = 0; i < StripChain::kStageCount; ++i) {
         const auto s = static_cast<StripChain::Stage>(i);
         QWidget* page = nullptr;
@@ -1418,8 +1421,204 @@ void StripWindow::applyPreset(const QString& name)
     persist();
 }
 
+
+// ── Alle Stufen auf einer Flaeche ────────────────────────────────────
+
+QWidget* StripWindow::buildAllStagesSurface()
+{
+    auto* host = new QWidget(this);
+    auto* grid = new QGridLayout(host);
+    grid->setContentsMargins(0, 0, 0, 0);
+    grid->setHorizontalSpacing(10);
+    grid->setVerticalSpacing(10);
+
+    // ── Warum Karten und nicht die Seiten selbst ────────────────────
+    //
+    // Der erste Versuch stellte Longpaths acht Stufenseiten in ein
+    // zweispaltiges Raster, wie Aether es tut. Das ging nicht auf:
+    // Aethers Panels sind von Haus aus kompakt, Longpaths sind fuer
+    // eine ganze Reiterseite gebaut -- allein das Gate bringt ein
+    // 280 px hohes Kennlinienfeld und sechs Regler ueber die volle
+    // Breite mit. Zwei Spalten davon erzeugten waagrechtes Scrollen
+    // und zeigten trotzdem eine Stufe.
+    //
+    // Was Aether wirklich gibt, ist nicht das Raster, sondern der
+    // UEBERBLICK: die ganze Kette im Blick, waehrend man an einer
+    // Stufe dreht. Den geben diese Karten -- Name, Zustand,
+    // Charakter und die drei Zahlen, die diese Stufe ausmachen. Ein
+    // Klick oeffnet die volle Seite, die unveraendert daneben
+    // weiterlebt.
+    //
+    // Das Ablesegitter ist das des Hausstils (§Instrumente): gleich
+    // grosse Felder, Ueberschrift versal klein, Wert monospaced.
+    int r = 0;
+    int c = 0;
+    for (int i = 0; i < StripChain::kStageCount; ++i) {
+        const auto st = static_cast<StripChain::Stage>(i);
+        grid->addWidget(buildStageCard(st), r, c);
+        if (++c == 2) { c = 0; ++r; }
+    }
+    grid->setColumnStretch(0, 1);
+    grid->setColumnStretch(1, 1);
+    grid->setRowStretch(r + 1, 1);
+
+    // Einmal fuellen, sonst stehen die Karten bis zum ersten Takt des
+    // Messzeigers leer da -- und beim ersten Blick auf das Fenster
+    // sieht eine leere Karte wie ein Fehler aus, nicht wie eine
+    // Stufe, die noch nichts gemessen hat.
+    refreshStageCards();
+
+    return host;
+}
+
+QWidget* StripWindow::buildStageCard(StripChain::Stage stage)
+{
+    const int idx = static_cast<int>(stage);
+    StageCard& card = m_stageCards[static_cast<size_t>(idx)];
+
+    auto* frame = new QFrame(this);
+    frame->setCursor(Qt::PointingHandCursor);
+    frame->setStyleSheet(QStringLiteral(
+        "QFrame { background: %1; border: 1px solid %2; "
+        "border-radius: 8px; }")
+        .arg(QString::fromLatin1(Style::kPanelBg),
+             QString::fromLatin1(Style::kBorderSubtle)));
+
+    auto* col = new QVBoxLayout(frame);
+    col->setContentsMargins(12, 10, 12, 12);
+    col->setSpacing(7);
+
+    // Kopf: Name versal links, Zustand als Kapsel rechts (Hausstil
+    // Regel 5 -- Zustand immer an derselben Stelle).
+    {
+        auto* head = new QHBoxLayout;
+        auto* name = new QLabel(
+            QString::fromLatin1(StripChain::stageName(stage)).toUpper(),
+            frame);
+        name->setStyleSheet(QStringLiteral(
+            "QLabel { color: %1; font-size: 11px; letter-spacing: "
+            "0.16em; border: none; }")
+            .arg(QString::fromLatin1(Style::kTextPrimary)));
+        head->addWidget(name);
+        head->addStretch(1);
+
+        card.state = new QLabel(frame);
+        card.state->setAlignment(Qt::AlignCenter);
+        head->addWidget(card.state);
+        col->addLayout(head);
+    }
+
+    // Was der Optimierer hier gesetzt hat, einzeilig.
+    card.note = new QLabel(frame);
+    card.note->setWordWrap(true);
+    card.note->setStyleSheet(QStringLiteral(
+        "QLabel { color: %1; font-size: 11px; border: none; }")
+        .arg(QString::fromLatin1(Style::kTextSecondary)));
+    card.note->hide();
+    col->addWidget(card.note);
+
+    // Die drei Zahlen dieser Stufe.
+    card.values = new QLabel(frame);
+    card.values->setFont(Style::monoFontPt(11));
+    card.values->setStyleSheet(QStringLiteral(
+        "QLabel { color: %1; border: none; }")
+        .arg(QString::fromLatin1(Style::kAmberText)));
+    col->addWidget(card.values);
+
+    auto* open = new QPushButton(QStringLiteral("Open"), frame);
+    open->setStyleSheet(Style::buttonBaseStyle());
+    open->setToolTip(QStringLiteral(
+        "Open this stage's own page, with every control it has."));
+    connect(open, &QPushButton::clicked, this, [this, stage]() {
+        if (!m_tabs) { return; }
+        const QString want =
+            QString::fromLatin1(StripChain::stageName(stage));
+        for (int i = 0; i < m_tabs->count(); ++i) {
+            if (m_tabs->tabText(i) == want) {
+                m_tabs->setCurrentIndex(i);
+                return;
+            }
+        }
+    });
+    auto* row = new QHBoxLayout;
+    row->addStretch(1);
+    row->addWidget(open);
+    col->addLayout(row);
+
+    return frame;
+}
+
+void StripWindow::refreshStageCards()
+{
+    StripChain* c = chain();
+    for (int i = 0; i < StripChain::kStageCount; ++i) {
+        const auto stage = static_cast<StripChain::Stage>(i);
+        StageCard& card = m_stageCards[static_cast<size_t>(i)];
+        if (card.state == nullptr) { continue; }
+
+        const bool on = c != nullptr && c->stageEnabled(stage);
+        card.state->setText(on ? QStringLiteral("ON")
+                               : QStringLiteral("OFF"));
+        card.state->setStyleSheet(QStringLiteral(
+            "QLabel { color: %1; border: 1px solid %2; "
+            "border-radius: 6px; padding: 1px 8px; font-size: 9px; "
+            "letter-spacing: 0.14em; }")
+            .arg(QString::fromLatin1(on ? Style::kGreenText
+                                        : Style::kTextInactive),
+                 QString::fromLatin1(on ? Style::kGreenText
+                                        : Style::kBorderSubtle)));
+
+        card.values->setText(c != nullptr ? stageSummary(stage)
+                                          : QStringLiteral("——"));
+
+        const QString& note = m_optimizerNotes[static_cast<size_t>(i)];
+        card.note->setText(note.section(QLatin1Char('\n'), 0, 0));
+        card.note->setVisible(!note.isEmpty());
+    }
+}
+
+// Die drei Zahlen, die eine Stufe ausmachen. Sie stehen hier und nicht
+// in den Panels, weil eine Uebersicht eine eigene Auswahl braucht: auf
+// der Karte ist Platz fuer das, wonach man sucht, nicht fuer alles.
+QString StripWindow::stageSummary(StripChain::Stage stage) const
+{
+    StripChain* c = chain();
+    if (c == nullptr) { return QStringLiteral("——"); }
+
+    const auto dash = QStringLiteral("——");
+    switch (stage) {
+    case StripChain::Stage::Gate:
+        return QStringLiteral("%1 dBFS · floor %2 dB · rel %3 ms")
+            .arg(double(c->gate().thresholdDb()), 0, 'f', 0)
+            .arg(double(c->gate().floorDb()),     0, 'f', 0)
+            .arg(double(c->gate().releaseMs()),   0, 'f', 0);
+    case StripChain::Stage::Eq:
+        return QStringLiteral("%1 bands").arg(c->eq().activeBandCount());
+    case StripChain::Stage::DeEss:
+        return QStringLiteral("%1 Hz · %2 dB")
+            .arg(double(c->deEss().frequencyHz()), 0, 'f', 0)
+            .arg(double(c->deEss().amountDb()),    0, 'f', 1);
+    case StripChain::Stage::Comp:
+        return QStringLiteral("%1:1 · %2 dBFS · mk %3 dB")
+            .arg(double(c->comp().ratio()),       0, 'f', 1)
+            .arg(double(c->comp().thresholdDb()), 0, 'f', 0)
+            .arg(double(c->comp().makeupDb()),    0, 'f', 1);
+    case StripChain::Stage::Limiter:
+        return QStringLiteral("ceiling %1 dB")
+            .arg(double(c->limiter().ceilingDb()), 0, 'f', 1);
+    default:
+        break;
+    }
+    // Roehre, PUDU und Nachhall haben keine Zahl, die fuer sich
+    // sprechen wuerde -- ihr Charakter IST die Angabe, und der steht
+    // auf der Seite selbst. Ein Strich ist dafuer die ehrliche
+    // Anzeige (Hausstil Regel 7).
+    return dash;
+}
+
 void StripWindow::showOptimizerNotes()
 {
+    refreshStageCards();
     for (int i = 0; i < StripChain::kStageCount; ++i) {
         StageText& st = m_stageText[static_cast<size_t>(i)];
         if (!st.optimizerNote) { continue; }
@@ -1471,6 +1670,13 @@ void StripWindow::reloadControls()
     m_stageText.fill(StageText{});
     m_stageBoxes.fill(nullptr);
 
+    // Derselbe Aufbau wie in buildUi() -- Uebersicht, dann die acht
+    // Seiten. Beide Stellen muessen dasselbe erzeugen; dass hier eine
+    // zweite Fassung stand, war schon die Quelle zweier Fehler (siehe
+    // die Hinweise oben ueber "On air" und die haengenden Zeiger).
+    m_stageCards.fill(StageCard{});
+    m_tabs->addTab(new StagePageScroll(buildAllStagesSurface()),
+                   QStringLiteral("Strip"));
     for (int i = 0; i < StripChain::kStageCount; ++i) {
         const auto s = static_cast<StripChain::Stage>(i);
         QWidget* page = nullptr;
@@ -1703,6 +1909,10 @@ QWidget* StripWindow::buildStageCard(QWidget* page, QWidget* picture,
 
 void StripWindow::refreshStageText()
 {
+    // Die Uebersichtskarten leben vom selben Takt: sie zeigen
+    // dieselben Werte wie die Seiten, nur in Auswahl.
+    refreshStageCards();
+
     StripChain* c = chain();
     for (int i = 0; i < StripChain::kStageCount; ++i) {
         StageText& st = m_stageText[static_cast<size_t>(i)];

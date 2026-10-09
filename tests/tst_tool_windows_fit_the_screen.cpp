@@ -99,7 +99,31 @@ private slots:
             ++wrapped;
             QCOMPARE(sa->sizeHint(), sa->widget()->sizeHint());
         }
-        QVERIFY2(wrapped >= 8, "die acht Stufenseiten scrollen");
+        // Seit dem Umbau auf Aethers Form sind die acht Stufen EINE
+        // Flaeche ("Strip") statt acht Reiter -- wer von Hand
+        // einstellt, muss die ganze Kette sehen, waehrend er an einer
+        // Stufe dreht. Entscheidend bleibt, dass sie scrollt: das
+        // Raster ist hoeher als ein MacBook Air, und ohne Rollflaeche
+        // liegt sein unteres Ende hinter dem Dock.
+        QVERIFY2(wrapped >= 1, "die Stufenflaeche scrollt");
+        QVERIFY2(tabs->count() >= 3,
+                 "Strip, On air und Voice check sind da");
+        QVERIFY2(tabs->tabText(0) == QLatin1String("Strip"),
+                 "die Stufenflaeche steht vorn");
+    }
+
+    // Ein Bild der Stufenflaeche, zur Durchsicht. Nur mit
+    // LONGPATH_RENDER_DIR; im CI also nicht.
+    void rendersTheStripSurface()
+    {
+        const QByteArray dir = qgetenv("LONGPATH_RENDER_DIR");
+        if (dir.isEmpty()) { QSKIP("LONGPATH_RENDER_DIR nicht gesetzt"); }
+
+        RadioModel radio;
+        StripWindow w(&radio);
+        w.resize(1180, 900);
+        w.grab().save(QString::fromUtf8(dir)
+                      + QStringLiteral("/kanalzug-eine-flaeche.png"));
     }
 
     // ── Der Stimmcheck war die eine Ausnahme ─────────────────────────

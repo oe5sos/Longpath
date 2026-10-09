@@ -340,6 +340,36 @@ private:
     std::array<QString, StripChain::kStageCount> m_optimizerNotes{};
     void showOptimizerNotes();
 
+    // ── Alle Stufen auf einer Flaeche ────────────────────────────────
+    //
+    // Nach AetherSDRs Kanalzug gebaut (src/gui/AetherialAudioStrip.cpp,
+    // Raster ab Zeile 447). Betreiber, 2026-10-09: "bei aether konnte
+    // ich es allein sehr gut machen ... schaue bitte, wie aether es
+    // gemacht hat. so werden wir es auch machen."
+    //
+    // Der Unterschied ist genau das: Aether zeigt alle Stufen
+    // gleichzeitig in einem zweispaltigen Raster, Longpath zeigte eine
+    // je Reiter. Wer von Hand einstellt, muss die ganze Kette sehen,
+    // waehrend er an einer Stufe dreht -- sonst stellt er acht Dinge
+    // nacheinander ein und hoert erst am Ende, dass sie sich
+    // widersprechen.
+    //
+    // Die Leserichtung ist die Kettenreihenfolge (Betreiber,
+    // 2026-10-09: "nach der reihen"): links nach rechts, oben nach
+    // unten ergibt Gate, EQ, De-Esser, Kompressor, Roehre, PUDU,
+    // Nachhall, Begrenzer.
+    QWidget* buildAllStagesSurface();
+    QWidget* buildStageCard(StripChain::Stage stage);
+    void     refreshStageCards();
+    QString  stageSummary(StripChain::Stage stage) const;
+
+    struct StageCard {
+        QLabel* state{nullptr};
+        QLabel* values{nullptr};
+        QLabel* note{nullptr};
+    };
+    std::array<StageCard, StripChain::kStageCount> m_stageCards{};
+
     struct StageText {
         QWidget* picture{nullptr};
         QLabel*  live{nullptr};
