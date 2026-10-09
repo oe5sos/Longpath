@@ -1191,6 +1191,10 @@ public:
     TxChannel* txChannel() const { return m_txChannel; }
     /// FM-CTCSS des Sende-Slices an den Sendekanal (2026-09-27).
     void pushFmToneFromTxSlice();
+    /// Schaltet den CTCSS-Tonsquelch dieses Slices nach `fmCtcssMode`,
+    /// `fmCtcssValueHz` und der Betriebsart. Longpath-eigen, kein
+    /// Thetis-Port -- siehe RxChannel::setCtcssSquelch.
+    void pushCtcssSquelchForSlice(const SliceModel* slice);
 
     /// FM-Deviation fuer Senden und Empfang aller Kanaele, 5000 oder
     /// 2500 Hz (Thetis console FMDeviation_Hz, radFMDeviation5kHz /

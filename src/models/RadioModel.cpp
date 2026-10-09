@@ -10233,6 +10233,23 @@ void RadioModel::pushFmToneFromTxSlice()
     m_txChannel->setCtcssRun(mode == 1 || mode == 3);
 }
 
+void RadioModel::pushCtcssSquelchForSlice(const SliceModel* slice)
+{
+    // Longpath-eigen, kein Thetis-Port. Siehe RxChannel::setCtcssSquelch.
+    if (!slice || !m_wdspEngine) { return; }
+    RxChannel* rxCh = m_wdspEngine->rxChannel(slice->sliceIndex());
+    if (!rxCh) { return; }
+
+    const int  mode    = slice->fmCtcssMode();   // 0 Off, 1 Enc, 2 Dec, 3 Enc+Dec
+    const bool decodes = (mode == 2 || mode == 3);
+    // Nur in FM. In jeder anderen Betriebsart gibt es kein Subtonband,
+    // und eine Sperre, die dort auf einen Ton wartet, wuerde den Kanal
+    // einfach stumm halten.
+    const bool istFm = (slice->dspMode() == DSPMode::FM);
+
+    rxCh->setCtcssSquelch(decodes && istFm, slice->fmCtcssValueHz());
+}
+
 void RadioModel::pushTxFrequencyFromTxSlice()
 {
     if (!m_connection) {
@@ -11155,6 +11172,30 @@ void RadioModel::wireSliceSignals(SliceModel* slice)
             rxCh->setFmsqThresh(dB);
         }
         scheduleSettingsSave();
+    });
+
+    // CTCSS-Tonsquelch — Longpath-eigen, kein Thetis-Port.
+    //
+    // `fmCtcssMode` kennt 0 Off, 1 Encode, 2 Decode, 3 Encode+Decode.
+    // Senden (1 und 3) geht seit jeher ueber `pushFmToneFromTxSlice`;
+    // empfangsseitig (2 und 3) geschah bisher nichts, weil Thetis dafuer
+    // nichts hat -- `wdsp/fmd.c` filtert den Subton mit `snotch` nur aus
+    // dem Hoerbaren heraus, erkannt wird er nie. `RxChannel::
+    // setCtcssSquelch` schliesst das.
+    //
+    // Beide Eigenschaften muessen hier haengen: der Modus schaltet die
+    // Sperre ein und aus, der Tonwert stellt sie um. Und der Betriebsart
+    // auch -- ein Tonsquelch hat nur in FM einen Sinn.
+    connect(slice, &SliceModel::fmCtcssModeChanged, this, [this, slice](int) {
+        pushCtcssSquelchForSlice(slice);
+        scheduleSettingsSave();
+    });
+    connect(slice, &SliceModel::fmCtcssValueHzChanged, this, [this, slice](double) {
+        pushCtcssSquelchForSlice(slice);
+        scheduleSettingsSave();
+    });
+    connect(slice, &SliceModel::dspModeChanged, this, [this, slice](Longpath::DSPMode) {
+        pushCtcssSquelchForSlice(slice);
     });
 
     // Audio panel — mute / pan / binaural → WDSP PatchPanel

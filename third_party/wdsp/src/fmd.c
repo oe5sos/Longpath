@@ -83,6 +83,14 @@ FMD create_fmd( int run, int size, double* in, double* out, int rate, double dev
 {
 	FMD a = (FMD) malloc0 (sizeof (fmd));
 	double* impulse;
+	// Longpath-Zusatz (kein Thetis-Port): der Basisband-Abgriff ist
+	// zunaechst aus. malloc0 nullt die Struktur schon, aber die beiden
+	// Zeilen halten fest, dass der Abgriff HIER gehoert und NICHT in
+	// calc_fmd -- calc_fmd laeuft bei jeder Raten- und
+	// Groessenaenderung erneut (setSamplerate_fmd, setSize_fmd) und
+	// wuerde einen gesetzten Abgriff dort stillschweigend abschalten.
+	a->baseband_tap = 0;
+	a->baseband_tap_user = 0;
 	a->run = run;
 	a->size = size;
 	a->in = in;
@@ -170,6 +178,14 @@ void xfmd (FMD a)
 			a->audio[2 * i + 0] = a->again * (a->fil_out - a->fmdc);
 			a->audio[2 * i + 1] = a->audio[2 * i + 0];
 		}
+		// Longpath-Zusatz (kein Thetis-Port): der Basisband-Abgriff sitzt
+		// GENAU hier -- nach der PLL, vor De-Emphase, Audiofilter und
+		// snotch. Weiter unten im Weg ist ein CTCSS-Subton nicht mehr
+		// vollstaendig vorhanden (Audiofilter ab 0.8 * f_low, dann der
+		// snotch). Der Aufruf laeuft im DSP-Thread; der Abnehmer muss
+		// entsprechend kurz sein und darf nichts belegen.
+		if (a->baseband_tap)
+			a->baseband_tap (a->baseband_tap_user, a->audio, a->size);
 		// de-emphasis
 		xfircore (a->pde);
 		// audio filter
@@ -272,6 +288,31 @@ void SetRXACTCSSRun (int channel, int run)
 	a = rxa[channel].fmd.p;
 	a->sntch_run = run;
 	SetSNCTCSSRun (a->sntch, a->sntch_run);
+	LeaveCriticalSection (&ch[channel].csDSP);
+}
+
+// Longpath-Zusatz, kein Thetis-Port. Siehe baseband_tap in fmd.h.
+PORT
+void SetRXAFMBasebandTap (int channel, void (*fn)(void*, const double*, int), void* user)
+{
+	FMD a;
+	EnterCriticalSection (&ch[channel].csDSP);
+	a = rxa[channel].fmd.p;
+	// Reihenfolge: beim Einschalten erst die Nutzerdaten, dann die
+	// Funktion; beim Abschalten erst die Funktion. So sieht der
+	// DSP-Thread nie eine Funktion ohne ihre Daten. Die kritische
+	// Sektion deckt den Blockdurchlauf selbst mit ab, der Abnehmer kann
+	// also nach dem Abschalten nicht mehr aufgerufen werden.
+	if (fn)
+	{
+		a->baseband_tap_user = user;
+		a->baseband_tap = fn;
+	}
+	else
+	{
+		a->baseband_tap = 0;
+		a->baseband_tap_user = 0;
+	}
 	LeaveCriticalSection (&ch[channel].csDSP);
 }
 
