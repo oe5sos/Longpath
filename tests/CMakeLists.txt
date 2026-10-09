@@ -5441,6 +5441,7 @@ longpath_add_test(tst_strip_chain)
 #    decisions as pure functions, and the rule that it explains itself --
 longpath_add_test(tst_broadcast_optimizer)
 longpath_add_test(tst_broadcast_optimizer_panel)
+longpath_add_test(tst_voice_check_without_radio)
 longpath_add_test(tst_strip_tuner)
 
 # -- The ring behind the EQ picture: oldest-first, newest-kept, and

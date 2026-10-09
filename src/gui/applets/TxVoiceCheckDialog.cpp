@@ -29,6 +29,7 @@
 #include <QAudio>
 #include <QAudioFormat>
 #include <QAudioSink>
+#include <QAudioSource>
 #include <QBuffer>
 #include <QFileDialog>
 #include <QHBoxLayout>
@@ -98,8 +99,13 @@ TxVoiceCheckDialog::~TxVoiceCheckDialog()
     if (m_radio && m_radio->txWorker()) {
         m_radio->txWorker()->setVoiceTapEnabled(false);
     }
+    closeDirectMic();
     QObject::disconnect(m_micTap);
     QObject::disconnect(m_procTap);
+    // The direct source stays OPEN on purpose: it is also what drives
+    // the level meter, and closing it here would leave the bar dead
+    // until the next take — which is exactly the state that makes
+    // "is my microphone live" unanswerable.
     QObject::disconnect(m_levelTap);
     stopPlayback();   // also lifts the RX quiet gate
 }
@@ -433,11 +439,24 @@ QString TxVoiceCheckDialog::micSourceName() const
 void TxVoiceCheckDialog::startLevelWatch()
 {
     if (!m_radio || !m_radio->txChannel()) {
-        m_liveStatus->setText(QStringLiteral(
-            "Not connected to a radio. The microphone is read through the "
-            "radio's transmit chain, so there is nothing to listen to "
-            "yet — connect first. This window will pick it up on its own "
-            "once you do."));
+        // No radio is no longer a dead end: the system microphone is
+        // opened for metering right here, so the bar moves and a take
+        // can be recorded. Connecting later still wins — the timer
+        // below notices it and switches to the transmit tap, which
+        // measures what the radio actually gets.
+        if (openDirectMic()) {
+            m_liveStatus->setText(QStringLiteral(
+                "No radio — recording straight from the microphone. "
+                "That is enough to measure your voice and build the "
+                "four profiles. Connect later and this window switches "
+                "to the radio's own transmit chain by itself, which is "
+                "what it actually sends."));
+        } else {
+            m_liveStatus->setText(QStringLiteral(
+                "Not connected to a radio, and no microphone of this "
+                "computer could be opened either — so there is nothing "
+                "to record yet."));
+        }
         // The timer still runs. It is the only thing that will notice
         // the radio arriving: this window has no other way to hear
         // about a connection, and the version without this sat dead for
@@ -501,8 +520,17 @@ void TxVoiceCheckDialog::updateLevel()
 {
     // Arm late if the radio was connected after this window opened.
     if (!m_tapsArmed) {
-        if (m_radio && m_radio->txChannel()) { startLevelWatch(); }
-        return;
+        if (m_radio && m_radio->txChannel()) {
+            // The radio wins over the direct source: it measures what
+            // is actually transmitted, after mic source and mic gain.
+            closeDirectMic();
+            startLevelWatch();
+            return;
+        }
+        // On the direct path there are no taps to arm, and the meter
+        // below is fed by pullDirectMic(). Falling through is the
+        // point; returning here is what would leave the bar dead.
+        if (!directMicActive()) { return; }
     }
 
     const unsigned micros = m_micPeakMicros.exchange(
@@ -524,6 +552,11 @@ void TxVoiceCheckDialog::updateLevel()
 
     // First broken link, not the last. Each of these is a different
     // thing to go and do, and naming two at once helps nobody.
+    if (mic == 0 && directMicActive()) {
+        m_liveStatus->setText(QStringLiteral(
+            "The microphone is open but no audio is arriving from it."));
+        return;
+    }
     if (mic == 0) {
         m_liveStatus->setText(QStringLiteral(
             "No microphone blocks are arriving. The transmit chain is "
@@ -555,24 +588,218 @@ void TxVoiceCheckDialog::updateLevel()
         "Hearing you through %1 — ready to record.").arg(micSourceName()));
 }
 
+
+// ── The system microphone, when there is no radio ────────────────────
+
+bool TxVoiceCheckDialog::openDirectMic()
+{
+    if (m_micSource) { return true; }
+
+    const QAudioDevice dev = QMediaDevices::defaultAudioInput();
+    if (dev.isNull()) {
+        m_liveStatus->setText(QStringLiteral(
+            "No microphone is available to this computer at all, so "
+            "there is nothing to record. Connecting to the radio is the "
+            "other way in — then the microphone is read through its "
+            "transmit chain."));
+        return false;
+    }
+
+    // Float mono at the transmit rate if the device will take it,
+    // because that is what the recorder and the analyser both want and
+    // every conversion in between is a chance to be wrong. Otherwise
+    // Int16, otherwise whatever the device prefers — the analyser is
+    // given the real rate either way, so none of this changes the
+    // measurement, only how much arithmetic happens first.
+    QAudioFormat fmt;
+    fmt.setSampleRate(kMicRateHz);
+    fmt.setChannelCount(1);
+    fmt.setSampleFormat(QAudioFormat::Float);
+    if (!dev.isFormatSupported(fmt)) {
+        fmt.setSampleFormat(QAudioFormat::Int16);
+    }
+    if (!dev.isFormatSupported(fmt)) {
+        fmt = dev.preferredFormat();
+    }
+
+    m_micSourceRate     = fmt.sampleRate();
+    m_micSourceChannels = std::max(1, fmt.channelCount());
+    m_micSourceFormat   = int(fmt.sampleFormat());
+
+    m_micSource = new QAudioSource(dev, fmt, this);
+    m_micIo = m_micSource->start();
+    if (!m_micIo) {
+        m_micSource->deleteLater();
+        m_micSource = nullptr;
+        m_liveStatus->setText(QStringLiteral(
+            "The microphone would not open. Nothing was recorded."));
+        return false;
+    }
+    connect(m_micIo, &QIODevice::readyRead,
+            this, &TxVoiceCheckDialog::pullDirectMic);
+
+    // The recorder is told the REAL rate, not the one that was asked
+    // for. A device that hands back 44.1 kHz while the buffer thinks
+    // it is 48 produces an analysis whose every frequency is out by
+    // nine percent — and it looks entirely plausible.
+    m_recorder.setSampleRate(m_micSourceRate);
+    return true;
+}
+
+void TxVoiceCheckDialog::closeDirectMic()
+{
+    if (m_micIo) {
+        QObject::disconnect(m_micIo, nullptr, this, nullptr);
+        m_micIo = nullptr;
+    }
+    if (m_micSource) {
+        m_micSource->stop();
+        m_micSource->deleteLater();
+        m_micSource = nullptr;
+    }
+}
+
+void TxVoiceCheckDialog::pullDirectMic()
+{
+    if (!m_micIo) { return; }
+    const QByteArray chunk = m_micIo->readAll();
+    if (chunk.isEmpty()) { return; }
+
+    const int channels = m_micSourceChannels;
+    std::vector<float> mono;
+
+    const auto format =
+        static_cast<QAudioFormat::SampleFormat>(m_micSourceFormat);
+    if (format == QAudioFormat::Float) {
+        const auto* in = reinterpret_cast<const float*>(chunk.constData());
+        const int frames = int(chunk.size() / sizeof(float)) / channels;
+        mono.resize(static_cast<size_t>(std::max(0, frames)));
+        for (int i = 0; i < frames; ++i) {
+            double acc = 0.0;
+            for (int c = 0; c < channels; ++c) {
+                acc += in[i * channels + c];
+            }
+            mono[static_cast<size_t>(i)] = float(acc / channels);
+        }
+    } else if (format == QAudioFormat::Int16) {
+        const auto* in = reinterpret_cast<const qint16*>(chunk.constData());
+        const int frames = int(chunk.size() / sizeof(qint16)) / channels;
+        mono.resize(static_cast<size_t>(std::max(0, frames)));
+        for (int i = 0; i < frames; ++i) {
+            double acc = 0.0;
+            for (int c = 0; c < channels; ++c) {
+                acc += double(in[i * channels + c]) / 32768.0;
+            }
+            mono[static_cast<size_t>(i)] = float(acc / channels);
+        }
+    } else {
+        // An exotic format from preferredFormat(). Rather than guess at
+        // its layout and feed the analyser noise, say so once.
+        m_liveStatus->setText(QStringLiteral(
+            "This microphone offers a sample format this window cannot "
+            "read. Connecting to the radio is the other way in."));
+        closeDirectMic();
+        return;
+    }
+    if (mono.empty()) { return; }
+
+    // Same two atomics the radio path writes, so the meter, the
+    // watchdog and the "was there ever any signal" report all work
+    // unchanged whichever way the microphone arrived.
+    float peak = 0.0f;
+    for (float v : mono) { peak = std::max(peak, std::abs(v)); }
+    const unsigned micros = unsigned(std::lround(
+        std::clamp(double(peak), 0.0, 1.0) * 1'000'000.0));
+    unsigned prev = m_micPeakMicros.load(std::memory_order_relaxed);
+    while (micros > prev
+           && !m_micPeakMicros.compare_exchange_weak(
+                  prev, micros, std::memory_order_acq_rel)) {
+    }
+    m_micBlocks.fetch_add(1, std::memory_order_acq_rel);
+
+    if (m_recorder.isRecording()) {
+        m_recorder.feed(mono.data(), int(mono.size()));
+    }
+}
+
 // ── Recording ────────────────────────────────────────────────────────
 
 void TxVoiceCheckDialog::startRecording()
 {
-    if (!m_radio || !m_radio->txChannel()) {
-        m_findings->setText(QStringLiteral(
-            "No transmit channel. Connect to the radio first — the "
-            "microphone is read through it."));
+    // ── No radio? Then the system microphone ─────────────────────────
+    //
+    // Measuring your own voice does not need a transceiver, and
+    // making it depend on one put a connection in front of the one
+    // thing the broadcast optimiser asks for: fifteen seconds of
+    // speech with nothing set up. Reported at the bench, 2026-10-09
+    // ("aufnahme geht nicht"), with the radio off.
+    //
+    // Only the RAW take exists on this path — there is no strip
+    // running to record the far side of — so the analysis, which
+    // reads the raw take anyway, is unaffected, and the processed
+    // playback button stays dark.
+    // ── Which microphone, decided on evidence ────────────────────────
+    //
+    // The transmit chain wins WHEN IT DELIVERS. It measures what the
+    // radio actually gets, after the mic source selection and the mic
+    // gain, and that is what goes on the air.
+    //
+    // But "the chain exists" and "the chain is delivering" are two
+    // different facts, and treating the first as the second is what
+    // produced a fifteen-second take of pure silence and the message
+    // "Nothing was recorded — check that the mic isn't muted"
+    // (bench, 2026-10-09, radio connected, pump running, mic open,
+    // and not one block reaching the tap).
+    //
+    // The level watch has been counting blocks since this window
+    // opened, so by the time anybody presses record the answer is
+    // already known. A chain that has delivered nothing does not get
+    // the take; the system microphone does, and the operator is told
+    // which one is being used rather than being sent to go and check
+    // a setting.
+    const bool haveChain = m_radio && m_radio->txChannel()
+                           && m_radio->txWorker();
+    //
+    // The !directMicActive() term is not belt-and-braces, it is the
+    // whole correctness of the test: pullDirectMic() counts into the
+    // SAME block counter, so once the fallback has run once, a second
+    // take would read its own blocks as proof that the transmit chain
+    // had come alive and switch back to a tap that is still silent.
+    const bool chainDelivering =
+        haveChain && !directMicActive()
+        && m_micBlocks.load(std::memory_order_acquire) > 0;
+    if (!chainDelivering) {
+        if (!openDirectMic()) { return; }
+
+        m_haveResult = false;
+        stopPlayback();
+        m_recorder.clear();
+        m_procRecorder.clear();
+        m_micBlocksAtStart = m_micBlocks.load(std::memory_order_acquire);
+        m_peakSeenDb = -60.0;
+
+        m_recorder.start();
+        m_secondsLeft = kRecordSeconds;
+        m_progress->setValue(0);
+        m_countdown->start();
+        refreshButtons();
+        m_findings->setText(haveChain
+            ? QStringLiteral(
+                "The radio is connected, but no microphone blocks have "
+                "reached its transmit chain since this window opened — "
+                "so this take comes straight from the microphone "
+                "instead. Good enough to measure your voice and build "
+                "the four profiles; it is not what the radio sends. "
+                "Speak for %1 seconds.").arg(kRecordSeconds)
+            : QStringLiteral(
+                "Recording from the microphone directly — no radio "
+                "needed for this. Speak for %1 seconds.")
+                .arg(kRecordSeconds));
         return;
     }
+
     TxChannel* tx = m_radio->txChannel();
     TxWorkerThread* worker = m_radio->txWorker();
-    if (!worker) {
-        m_findings->setText(QStringLiteral(
-            "The transmit pump is not running yet — connect to the radio "
-            "first."));
-        return;
-    }
 
     m_haveResult = false;
     stopPlayback();

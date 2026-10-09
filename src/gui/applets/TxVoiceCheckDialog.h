@@ -88,7 +88,9 @@
 #include <atomic>
 
 class QAudioSink;
+class QAudioSource;
 class QBuffer;
+class QIODevice;
 class QLabel;
 class QProgressBar;
 class QPushButton;
@@ -174,6 +176,33 @@ private:
     //
     // So the taps are always listening while this window is open, and
     // the watchdog reports the first broken link rather than the last.
+    // ── Recording without a radio ────────────────────────────────────
+    //
+    // The transmit chain is the right place to tap the microphone when
+    // there IS one: it measures what the radio actually gets, after
+    // the mic source selection and the mic gain, which is what the
+    // operator transmits. But it made measuring your own voice depend
+    // on a connected radio, and the broadcast optimiser's whole
+    // premise is "speak for fifteen seconds with no settings as a
+    // baseline" — which needs a microphone and nothing else.
+    //
+    // So when there is no transmit channel, this window opens the
+    // system input itself. Same recorder, same analysis, same four
+    // profiles. What it cannot give is the POST-strip take, because
+    // there is no strip running to record the other side of — so
+    // "Play after strip & EQ" stays dark, and the optimiser's own
+    // audition (which renders the raw take through a scratch chain)
+    // does that job instead.
+    //
+    // Opened for metering as soon as the window notices there is no
+    // radio, so the level bar moves before anybody presses record —
+    // without that, "is my microphone even live" is unanswerable
+    // until after a fifteen-second take.
+    bool directMicActive() const { return m_micSource != nullptr; }
+    bool openDirectMic();
+    void closeDirectMic();
+    void pullDirectMic();
+
     void startLevelWatch();
     void stopLevelWatch();
     void updateLevel();
@@ -242,6 +271,13 @@ private:
     bool m_rxQuiet{false};
 
     QMetaObject::Connection m_micTap;
+
+    // The system input, used only when there is no transmit chain.
+    QAudioSource* m_micSource{nullptr};
+    QIODevice*    m_micIo{nullptr};
+    int           m_micSourceRate{48000};
+    int           m_micSourceChannels{1};
+    int           m_micSourceFormat{0};   // QAudioFormat::SampleFormat
 
     QLabel*       m_liveStatus{nullptr};
     QProgressBar* m_levelBar{nullptr};
