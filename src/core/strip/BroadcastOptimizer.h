@@ -229,6 +229,35 @@ struct Plan {
     // Regler in dieser Kette.
     double  expanderFloorDb{-8.0};
 
+    // ── Klang: wieder dabei, aber gedeckelt ──────────────────────────
+    //
+    // Nach dem Umbau auf Zeus' Form lag der Entzerrer ganz draussen.
+    // Der Betreiber hat das am 2026-10-09 korrigiert, indem er auf
+    // die Reiterreihe des Kanalzugs zeigte: "du siehst hier alles,
+    // was die optimierung durchlaufen sollte." Die Optimierung soll
+    // die ganze Kette durchlaufen, nicht nur deren Dynamik.
+    //
+    // Sie tut es jetzt wieder -- mit den drei Lehren desselben Tages
+    // eingebaut, denn jeder Fehler davor sass genau hier:
+    //
+    //   KEIN Hochpass. Den macht der Kanalschnitt (50 bis 200 Hz je
+    //   Breite). Zwei Stufen, die dieselbe Oktave beschneiden, waren
+    //   die Haelfte von "hier ist kein Bass".
+    //
+    //   KEINE Brummkerben. Der Detektor haelt bei einer tiefen
+    //   Stimme deren Grundton fuer Netzbrumm.
+    //
+    //   Eine VERSCHIEBUNG von der eigenen Balance aus, nicht ein Ziel,
+    //   auf das gezogen wird. Das Spektrum einer Stimme faellt
+    //   natuerlicherweise; das flachzubuegeln nimmt ihr den Koerper.
+    //   Darum hoechstens wenige Dezibel, und das breite Profil
+    //   bewegt unten gar nichts.
+    double  lowShelfDb{0.0};
+    double  lowShelfHz{250.0};
+    double  presenceDb{0.0};
+    double  highShelfDb{0.0};
+    double  highShelfHz{2400.0};
+
     // The level trim, onto kTargetLevelDbFs. Shown as its own number
     // rather than hidden inside a make-up gain, because it is the
     // one change that is purely arithmetic and the operator should
@@ -274,6 +303,27 @@ struct Plan {
     // Searching it needs the recording, which plan() does not have;
     // that is the next step, not a pretence here.
     int     phaseRotatorStages{8};
+
+    // ── Die Farbstufen, als benannte Charaktere ──────────────────────
+    //
+    // "ziel ist es, broadcast oder voodoo zu haben. das maximale aus
+    // allen sachen zu holen" (Betreiber, 2026-10-09).
+    //
+    // Beides gibt es im Haus bereits als Charakter: der Kompressor
+    // kennt Gentle/Balanced/Contest/Voodoo, die Roehre
+    // Clean/Warm/Full/Broadcast/Voodoo, der Begrenzer
+    // Transparent/Safety/Broadcast/Loud. Ein Charakter ist ein Satz
+    // zusammengehoeriger Werte mit einem Satz dazu, warum.
+    //
+    // Darum waehlt das Profil CHARAKTERE statt Zahlen. Was gemessen
+    // werden kann -- Schwelle, Verhaeltnis, Trimm -- wird danach
+    // ueberschrieben: der Charakter ist die Stimmung, die Messung die
+    // Anpassung an diese Stimme. Eine Zahl, die ich fuer die Roehre
+    // erfinde, waere beides nicht.
+    QString compCharacter;
+    QString tubeCharacter;      // leer = Stufe bleibt aus
+    QString puduCharacter;      // leer = Stufe bleibt aus
+    QString limiterCharacter;
 
     // ── The stages this profile deliberately forgets ─────────────────
     //

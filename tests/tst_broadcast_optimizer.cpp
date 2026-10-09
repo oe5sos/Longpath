@@ -337,9 +337,16 @@ private slots:
 
         QVERIFY(chain.stageEnabled(StripChain::Stage::Comp));
         QVERIFY(chain.stageEnabled(StripChain::Stage::Limiter));
+        // Das schmale Profil traegt keine Farbe und schaltet sie ab.
+        QVERIFY(p[0].tubeCharacter.isEmpty());
         QVERIFY(!chain.stageEnabled(StripChain::Stage::Tube));
         QVERIFY(!chain.stageEnabled(StripChain::Stage::Reverb));
         QVERIFY(!chain.stageEnabled(StripChain::Stage::Pudu));
+
+        // Und jede Stufe, die ein Profil belegt, traegt einen
+        // benannten Charakter statt hier erfundener Zahlen.
+        QVERIFY(!p[0].compCharacter.isEmpty());
+        QVERIFY(!p[0].limiterCharacter.isEmpty());
 
         // Der Trimm steht als Vorverstaerkung des Kompressors da,
         // also vor dessen Detektor -- dort, wo eine Schwelle erst
@@ -367,10 +374,18 @@ private slots:
         QVERIFY(BroadcastOptimizer::apply(p[0], chain));
         QVERIFY(!chain.stageEnabled(StripChain::Stage::Tube));
 
-        // Dann das breite: es schaltet sie NICHT wieder ein -- dafuer
-        // gibt es keine Messung.
+        // Dann das breite: es schaltet sie wieder EIN, mit seinem
+        // eigenen Charakter. Das war bis zum 2026-10-09 anders --
+        // damals fasste der Optimierer die Farbstufen nur zum
+        // Abschalten an. Der Betreiber hat das korrigiert: "ziel ist
+        // es, broadcast oder voodoo zu haben. das maximale aus allen
+        // sachen zu holen."
         QVERIFY(BroadcastOptimizer::apply(p[3], chain));
-        QVERIFY(!chain.stageEnabled(StripChain::Stage::Tube));
+        QVERIFY(chain.stageEnabled(StripChain::Stage::Tube));
+        QVERIFY(!p[3].tubeCharacter.isEmpty());
+
+        // Der Nachhall bleibt in jedem Fall aus.
+        QVERIFY(!chain.stageEnabled(StripChain::Stage::Reverb));
 
         // Aber seine eigenen Werte stehen jetzt da.
         QVERIFY(std::abs(double(chain.comp().ratio()) - p[3].compRatio) < 0.1);

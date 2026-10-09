@@ -17,6 +17,7 @@
 #include "core/strip/EqBandLayout.h"
 #include "core/strip/ClientGate.h"
 #include "core/strip/StripChain.h"
+#include "core/strip/StripCharacters.h"
 #include "core/strip/StripSettings.h"
 #include "core/strip/StripTuner.h"
 
@@ -54,6 +55,10 @@ struct WidthRule {
     bool   character;       // may this width run tube / exciter / reverb?
     int    lowCutHz;        // der Kanal, unten
     int    highCutHz;       // und oben
+    const char* compChar;
+    const char* tubeChar;   // "" = Roehre bleibt aus
+    const char* puduChar;   // "" = Exciter bleibt aus
+    const char* limiterChar;
     const char* headline;   // what this profile is, in one line
 };
 
@@ -97,23 +102,27 @@ constexpr WidthRule kRules[kWidthCount] = {
     // answered. It will not sound like the operator's living room,
     // and that is the trade being made on purpose.
     {2300.0, 0.85, 180.0, -4.0, +3.0, -4.0, kDensityDense,     false, 200, 2500,
+     "Voodoo",   "",          "",         "Loud",
      "Lean and dense for a crowded band. Cuts through; will not sound like your living room."},
 
     // 2.7 kHz — what most of the band is listening on, so this is the
     // one that should sound right by default rather than clever.
     {2700.0, 0.85, 150.0, -2.0, +2.0, -3.0, kDensityBroadcast, true,  150, 2700,
+     "Contest",  "Broadcast", "Presence", "Broadcast",
      "The everyday setting — what most of the band is listening on."},
 
     // 3.2 kHz — room for the voice's own body again. Nearly flat at
     // the bottom; the reason to be this wide is fidelity, and cutting
     // the bass would spend the extra kilohertz on nothing.
     {3200.0, 0.85, 120.0, -1.0, +1.5, -1.5, 42,                true,  100, 3200,
+     "Balanced", "Warm",      "Both",     "Broadcast",
      "Room for the body of your voice. Polite when the band is quiet."},
 
     // 4.0 kHz — lightest hand of the four. Flat bottom, a touch of
     // presence, nothing else. Only pays off when the other operator
     // has opened their filter to match.
     {4000.0, 0.85, 100.0,  0.0, +1.0,  0.0, kDensityNatural,   true,   50, 4050,
+     "Gentle",   "Warm",      "Warmth",   "Transparent",
      "Lightest hand of the four. Closest to how you actually sound."},
 };
 
@@ -212,11 +221,27 @@ QVector<Plan> plan(const VoiceAnalysis& a)
 
     out.reserve(kWidthCount);
     for (const WidthRule& rule : kRules) {
+        // ── Die Notizen stehen in der Reihenfolge der Kette ─────────
+        //
+        // Betreiber, 2026-10-09: "nach der reihen. gate, dann eq,
+        // dann de-esser, dann kompressor....." Gerechnet wird in
+        // einer anderen Reihenfolge -- der Trimm muss vor dem
+        // Kompressor feststehen, der Kanal vor dem Klang -- also
+        // werden die Zeilen eingesammelt und am Ende in der
+        // Reihenfolge abgelegt, in der die Stufen im Kanalzug
+        // stehen. Was man liest, ist dann der Weg, den das Signal
+        // nimmt.
+        QString nGate, nEq, nDeEss, nComp, nLimiter, nColour, nRange;
+
         Plan p;
         p.widthHz = rule.widthHz;
         p.name    = presetName(rule.widthHz);
         p.density  = rule.density;
         p.headline = QString::fromUtf8(rule.headline);
+        p.compCharacter    = QString::fromUtf8(rule.compChar);
+        p.tubeCharacter    = QString::fromUtf8(rule.tubeChar);
+        p.puduCharacter    = QString::fromUtf8(rule.puduChar);
+        p.limiterCharacter = QString::fromUtf8(rule.limiterChar);
 
         // ── The channel this profile is for ─────────────────────────
         //
@@ -255,7 +280,7 @@ QVector<Plan> plan(const VoiceAnalysis& a)
                 p.expanderThresholdDbFs =
                     std::clamp(a.noiseFloorDbFs + 0.65 * snr, -80.0, -10.0);
                 p.expanderFloorDb = -std::clamp(snr * 0.5, 8.0, 20.0);
-                p.notes << QStringLiteral(
+                nGate = QStringLiteral(
                     "Expander at %1 dBFS with a %2 dB floor, both from "
                     "your measured %3 dB of signal-to-noise. The "
                     "pauses go quiet. What it cannot do is remove the "
@@ -266,7 +291,7 @@ QVector<Plan> plan(const VoiceAnalysis& a)
                     .arg(p.expanderFloorDb, 0, 'f', 0)
                     .arg(snr, 0, 'f', 0);
             } else {
-                p.notes << QStringLiteral(
+                nGate = QStringLiteral(
                     "No expander. Your voice is only %1 dB above the "
                     "room, and anything set that close takes the ends "
                     "off quiet words. A quieter room is the fix.")
@@ -276,7 +301,7 @@ QVector<Plan> plan(const VoiceAnalysis& a)
 
         // ── The trim, onto one target ───────────────────────────────
         p.trimDb = std::clamp(kTargetLevelDbFs - a.speechDbFs, -12.0, 12.0);
-        p.notes << QStringLiteral(
+        const QString nTrim = QStringLiteral(
             "Trim %1%2 dB to %3 dBFS. Pure arithmetic: your take "
             "measured %4 dBFS and every profile starts from the same "
             "level, so what you hear between them is the processing "
@@ -297,7 +322,7 @@ QVector<Plan> plan(const VoiceAnalysis& a)
             p.deEssOn       = true;
             p.deEssHz       = std::clamp(a.sibilanceHz, 3500.0, 9000.0);
             p.deEssAmountDb = -std::clamp(over * 1.2, 2.0, 8.0);
-            p.notes << QStringLiteral(
+            nDeEss = QStringLiteral(
                 "De-esser at %1 Hz, %2 dB — that is where your "
                 "sibilance actually sits, not a fixed frequency. It "
                 "measures %3 dB against the midrange.")
@@ -335,7 +360,7 @@ QVector<Plan> plan(const VoiceAnalysis& a)
                                          0.0, 12.0);
             p.densityGainDb = p.trimDb + p.compMakeupDb;
 
-            p.notes << QStringLiteral(
+            nComp = QStringLiteral(
                 "Compressor %1:1 at %2 dBFS, make-up %3 dB. Density "
                 "%4 (%5) aims your peaks at %6 dB over the average; "
                 "they measure %7 dB now.")
@@ -348,20 +373,76 @@ QVector<Plan> plan(const VoiceAnalysis& a)
                 .arg(measuredCrest, 0, 'f', 0);
         }
 
-        p.notes << QStringLiteral(
-            "Phase rotator, %1 stages. Your voice's waveform is "
+        nColour = p.tubeCharacter.isEmpty()
+            ? QStringLiteral(
+                "Valve, exciter and reverb stay off. At %1 there is no "
+                "room for colour: it costs compressor headroom and the "
+                "far end hears none of it.").arg(widthLabel(rule.widthHz))
+            : QStringLiteral(
+                "Valve \"%1\", exciter \"%2\". Named characters, not "
+                "numbers invented here — each is a set of values that "
+                "belong together, with a sentence saying what it is "
+                "for. Reverb stays off; there is no measurement that "
+                "asks for it.")
+                .arg(p.tubeCharacter, p.puduCharacter);
+
+        nLimiter = QStringLiteral(
+            "Limiter \"%1\" at %2 dB. Phase rotator, %3 stages. Your voice's waveform is "
             "lopsided — speech always is — so its loudest peak "
             "reaches the limiter well before the average level has "
             "earned it. An all-pass cascade leaves every frequency at "
             "the same level and only moves phase, which pulls the two "
             "peaks together. That is headroom turned into loudness "
             "without a single tone control being touched.")
+            .arg(p.limiterCharacter)
+            .arg(p.limiterCeilingDb, 0, 'f', 0)
             .arg(p.phaseRotatorStages);
 
-        p.notes << QStringLiteral(
-            "No equaliser. Your voice's own balance is left exactly "
-            "as it is — the width is the difference between these "
-            "four profiles, and the only things moved are dynamics.");
+        // ── Klang, gedeckelt ────────────────────────────────────────
+        {
+            const double measuredLow  = 0.5 * (a.bandDb[2] + a.bandDb[3]);
+            const double measuredTop  = a.bandDb[7];
+            const double snr = a.speechDbFs - a.noiseFloorDbFs;
+            const bool mayLift = snr > kBoostNeedsSnrDb;
+            const double lift = mayLift ? 4.0 : 0.0;
+
+            // Rund +9 dB bei 125-250 Hz gegen 1 kHz ist fuer Sprache
+            // gewoehnlich; korrigiert wird nur der Abstand DAVON, und
+            // hoechstens um drei Dezibel.
+            constexpr double kOrdinaryLowTiltDb = 9.0;
+            constexpr double kMaxCorrectionDb   = 3.0;
+            const double lowCorrection = std::clamp(
+                -(measuredLow - kOrdinaryLowTiltDb) * 0.5,
+                -kMaxCorrectionDb, kMaxCorrectionDb);
+
+            p.lowShelfDb  = std::clamp(rule.lowShiftDb + lowCorrection,
+                                       -6.0, lift);
+            p.presenceDb  = std::clamp(rule.presenceShiftDb, -6.0, lift);
+            p.highShelfDb = std::clamp(
+                rule.topShiftDb + (measuredTop > 0.0 ? -1.0 : 0.0),
+                -8.0, std::min(lift, 2.0));
+
+            // Das Tiefenfilter sitzt ueber dem Kanalschnitt, nicht
+            // auf ihm: der schneidet schon, und zwei Stufen auf
+            // derselben Oktave waren der Fehler von vorhin.
+            p.lowShelfHz  = std::clamp(double(p.lowCutHz) * 2.5,
+                                       150.0, 500.0);
+            p.highShelfHz = rule.widthHz * 0.75;
+
+            nEq = QStringLiteral(
+                "Tone: low shelf %1 dB from %2 Hz, presence %3 dB, "
+                "high shelf %4 dB from %5 Hz. These MOVE your voice "
+                "from where it already is — your own balance is the "
+                "starting point, never a curve it gets dragged onto. "
+                "No high-pass here and no hum notches: the channel "
+                "cut does the first, and the second takes out the "
+                "fundamental of a low voice.")
+                .arg(p.lowShelfDb,  0, 'f', 1)
+                .arg(p.lowShelfHz,  0, 'f', 0)
+                .arg(p.presenceDb,  0, 'f', 1)
+                .arg(p.highShelfDb, 0, 'f', 1)
+                .arg(p.highShelfHz, 0, 'f', 0);
+        }
 
         // ── What this width forgets ─────────────────────────────────
         p.characterStages = rule.character;
@@ -372,7 +453,7 @@ QVector<Plan> plan(const VoiceAnalysis& a)
                 "costs compressor headroom and the far end hears none "
                 "of it. They come back from the 2.7k profile upward.")
                 .arg(widthLabel(rule.widthHz));
-            p.notes << p.forgotten;
+
         }
 
         // ── What the measurement says this width cannot deliver ─────
@@ -387,11 +468,19 @@ QVector<Plan> plan(const VoiceAnalysis& a)
         }
 
         if (a.loudnessRangeValid && a.loudnessRangeLu > 10.0) {
-            p.notes << QStringLiteral(
+            nRange = QStringLiteral(
                 "Your loudness range is %1 LU — that is you moving "
                 "between sentences, not your peaks, and no compressor "
                 "setting here answers it.")
                 .arg(a.loudnessRangeLu, 0, 'f', 1);
+        }
+
+        // Gate, EQ, De-Esser, Kompressor (mit dem Trimm, der vor
+        // dessen Detektor sitzt), dann Phasendreher und Begrenzer,
+        // dann was abgeschaltet bleibt.
+        for (const QString& line : {nGate, nEq, nDeEss, nTrim, nComp,
+                                    nLimiter, nColour, nRange}) {
+            if (!line.isEmpty()) { p.notes << line; }
         }
 
         out.push_back(p);
@@ -434,6 +523,25 @@ bool apply(const Plan& p, StripChain& chain)
     // cuts stacked over one octave, a de-esser with nothing to
     // de-ess — was this code moving a tone control it had no business
     // moving.
+
+    // ── Die Charaktere zuerst, die Messung darueber ──────────────────
+    //
+    // Reihenfolge der Kette, wie der Kanalzug sie zeigt: Gate, EQ,
+    // De-Esser, Kompressor, Roehre, PUDU, Nachhall, Begrenzer
+    // (Betreiber, 2026-10-09: "nach der reihen").
+    //
+    // Der Charakter kommt vor der Messung, nie danach: er ist die
+    // Stimmung, und was gemessen werden kann -- Schwelle, Boden,
+    // Verhaeltnis, Trimm -- gehoert dieser Stimme und ueberschreibt
+    // ihn anschliessend.
+    if (!p.compCharacter.isEmpty()) {
+        StripCharacters::apply(chain, StripChain::Stage::Comp,
+                               p.compCharacter);
+    }
+    if (!p.limiterCharacter.isEmpty()) {
+        StripCharacters::apply(chain, StripChain::Stage::Limiter,
+                               p.limiterCharacter);
+    }
 
     // ── Expander ─────────────────────────────────────────────────────
     //
@@ -485,11 +593,24 @@ bool apply(const Plan& p, StripChain& chain)
     // Switched OFF when the profile forgets them, otherwise left
     // exactly as the operator had them. Never switched ON: there is
     // no measurement that says a voice wants a valve.
-    if (!p.characterStages) {
-        chain.setStageEnabled(StripChain::Stage::Tube,   false);
-        chain.setStageEnabled(StripChain::Stage::Pudu,   false);
-        chain.setStageEnabled(StripChain::Stage::Reverb, false);
+    if (p.tubeCharacter.isEmpty()) {
+        chain.setStageEnabled(StripChain::Stage::Tube, false);
+    } else {
+        StripCharacters::apply(chain, StripChain::Stage::Tube,
+                               p.tubeCharacter);
+        chain.setStageEnabled(StripChain::Stage::Tube, true);
     }
+    if (p.puduCharacter.isEmpty()) {
+        chain.setStageEnabled(StripChain::Stage::Pudu, false);
+    } else {
+        StripCharacters::apply(chain, StripChain::Stage::Pudu,
+                               p.puduCharacter);
+        chain.setStageEnabled(StripChain::Stage::Pudu, true);
+    }
+    // Nachhall bleibt aus. Es gibt keine Messung, die danach fragt,
+    // und auf einem Sendeweg ist er das Einzige in dieser Kette, das
+    // am anderen Ende schlechter verstanden wird statt besser.
+    chain.setStageEnabled(StripChain::Stage::Reverb, false);
 
     // Deliberately absent: the master switch. The operator decides
     // when their transmit audio changes.
