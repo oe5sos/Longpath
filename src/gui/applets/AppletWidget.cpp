@@ -202,8 +202,12 @@ QWidget* AppletWidget::receiverChoiceWidget(QWidget* parent)
     vbox->setSpacing(4);
 
     auto* titel = new QLabel(QStringLiteral("Empfänger"), box);
+    // Schriftstufen aus der Leiter in StyleConstants.h -- eine eigene
+    // Groesse dazwischen faellt in scripts/verify-style-drift.py.
     titel->setStyleSheet(QStringLiteral(
-        "QLabel { color: %1; font-size: 10px; }").arg(Style::kTextTertiary));
+        "QLabel { color: %1; font-size: %2px; }")
+                             .arg(QLatin1String(Style::kTextTertiary))
+                             .arg(Style::kFontCaption));
     vbox->addWidget(titel);
 
     auto* waehler = new QComboBox(box);
@@ -239,7 +243,9 @@ QWidget* AppletWidget::receiverChoiceWidget(QWidget* parent)
                        "Empfänger, auch wenn woanders gearbeitet wird."), box);
     hinweis->setWordWrap(true);
     hinweis->setStyleSheet(QStringLiteral(
-        "QLabel { color: %1; font-size: 10px; }").arg(Style::kTextTertiary));
+        "QLabel { color: %1; font-size: %2px; }")
+                               .arg(QLatin1String(Style::kTextTertiary))
+                               .arg(Style::kFontSmall));
     vbox->addWidget(hinweis);
 
     return box;
