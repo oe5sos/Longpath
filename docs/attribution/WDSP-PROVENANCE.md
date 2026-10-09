@@ -17,6 +17,8 @@ WDSP (Warren Pratt NR0V's DSP library) is vendored in `third_party/wdsp/`.
 | --- | --- | --- | --- |
 | `third_party/wdsp/src/cfcomp.c` | Partial sync to Thetis v2.10.3.13 (commit `501e3f5`) | `../Thetis/Project Files/Source/wdsp/cfcomp.c` | 2026-04-30 |
 | `third_party/wdsp/src/cfcomp.h` | Partial sync to Thetis v2.10.3.13 (commit `501e3f5`) | `../Thetis/Project Files/Source/wdsp/cfcomp.h` | 2026-04-30 |
+| `third_party/wdsp/src/fmd.c` | TAPR v1.29 + Longpath-original Basisband-Abgriff (`baseband_tap`, gesetzt ueber `SetRXAFMBasebandTap`) fuer den CTCSS-Tonsquelch; die Demodulation selbst unveraendert | — (eigener Zusatz, keine Vorlage) | 2026-10-09 |
+| `third_party/wdsp/src/fmd.h` | TAPR v1.29 + die beiden Felder und der Prototyp zum Abgriff in `fmd.c` | — (eigener Zusatz, keine Vorlage) | 2026-10-09 |
 | `third_party/wdsp/src/delay.c` | TAPR v1.29 + NereusSDR-original bound on the requested delay (`honourable_delay()`, see the file's modification history); upstream arithmetic unchanged | — (own fix, no upstream source) | 2026-09-20 |
 | `third_party/wdsp/src/linux_port.c` | NereusSDR-original POSIX port file + `wdsp_dprintf()` shim for the NNR port (see "dprintf" below) | — (own shim, no upstream source) | 2026-09-14 |
 | `third_party/wdsp/src/utilities.c` | TAPR v1.29 + `dprintf()` for Windows taken from WDSP 2.10 (`utilities.c:587-597`), see "dprintf" below | `wdsp 2.10/Source/utilities.c` (that function only) | 2026-09-21 |

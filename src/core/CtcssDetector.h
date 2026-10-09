@@ -1,3 +1,11 @@
+// no-port-check: Longpath-original file. Es gibt nichts zu portieren --
+// Thetis kennt auf der Empfangsseite nur den NOTCH (`wdsp/fmd.c`,
+// `snotch`) und hat keinen Tondetektor. Das Verfahren hier ist nach
+// TIA-603-D gebaut. Der einzige Thetis-Verweis in dieser Datei und in
+// der zugehoerigen .cpp betrifft die Liste der 49 Normtoene: die steht
+// in der Norm, und `console.cs:236-241` ist als Fundstelle genannt,
+// weil ich sie dort gegengelesen habe -- eine Normtabelle, kein Code.
+
 #pragma once
 
 // CTCSS-Tonerkennung fuer den Empfang (Tonsquelch).

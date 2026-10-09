@@ -1,3 +1,7 @@
+// no-port-check: Longpath-original file; siehe den Kopf von
+// CtcssDetector.h. Der Verweis auf `console.cs:236-241` unten ist die
+// Fundstelle fuer die TIA-603-D-Normtonliste, kein portierter Code.
+
 #include "core/CtcssDetector.h"
 
 #include <QtMath>
