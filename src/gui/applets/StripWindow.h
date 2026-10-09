@@ -224,6 +224,8 @@ private:
     // core/strip/StripLiveMonitor.h.
     void toggleLiveMonitor(bool on);
     void useChainForDisplay(StripChain* c);
+    StripChain* displayChain() const;
+    StripChain* m_displayChain{nullptr};   // nicht besessen
     void updateLiveNote();
 
     // ── Einschubplaetze (2026-10-09) ────────────────────────────────

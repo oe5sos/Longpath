@@ -355,14 +355,10 @@ void StripWindow::persist()
 // Takt wieder ueberschrieben.
 void StripWindow::useChainForDisplay(StripChain* c)
 {
-    if (m_chainView)     { m_chainView->setChain(c); }
-    if (m_levels)        { m_levels->setChain(c); }
-    if (m_gateCurve)     { m_gateCurve->setChain(c); }
-    if (m_deEssCurve)    { m_deEssCurve->setChain(c); }
-    if (m_compCurve)     { m_compCurve->setChain(c); }
-    if (m_tubeCurve)     { m_tubeCurve->setChain(c); }
-    if (m_puduCurve)     { m_puduCurve->setChain(c); }
-    if (m_limiterCurve)  { m_limiterCurve->setChain(c); }
+    m_displayChain = (c == chain()) ? nullptr : c;
+    if (m_chainView) { m_chainView->setChain(displayChain()); }
+    if (m_levels)    { m_levels->setChain(displayChain()); }
+    refreshStagePictures();
     refreshStageCards();
 }
 
@@ -496,6 +492,19 @@ void StripWindow::updateLiveNote()
 StripChain* StripWindow::chain() const
 {
     return m_radio ? m_radio->stripChain() : nullptr;
+}
+
+// Woraus die ANZEIGEN lesen. Siehe useChainForDisplay() -- ohne
+// Funkgeraet rechnet nur der Mithoerer, und eine Anzeige, die
+// stattdessen die stille Sendekette liest, behauptet „es kommt
+// nichts an".
+//
+// Geschrieben wird immer in chain(). Die beiden Namen stehen bewusst
+// nebeneinander: wer hier versehentlich den falschen nimmt, soll es
+// beim Lesen sehen.
+StripChain* StripWindow::displayChain() const
+{
+    return m_displayChain != nullptr ? m_displayChain : chain();
 }
 
 void StripWindow::buildUi()
@@ -2101,6 +2110,14 @@ void StripWindow::reloadControls()
         }
     }
     if (keep >= 0 && keep < m_tabs->count()) { m_tabs->setCurrentIndex(keep); }
+
+    // Die Seiten sind NEU gebaut, also haengen ihre Bilder wieder an
+    // chain(). Laeuft der Mithoerer ohne Funkgeraet, muessen sie
+    // zurueck auf ihn -- sonst sind die Anzeigen nach jedem
+    // Profilwechsel wieder tot, und das sieht aus wie „das Profil hat
+    // etwas kaputtgemacht".
+    refreshStagePictures();
+    refreshStageCards();
 }
 
 void StripWindow::showVoiceCheckTab()
@@ -2291,7 +2308,7 @@ void StripWindow::refreshStageText()
     // dieselben Werte wie die Seiten, nur in Auswahl.
     refreshStageCards();
 
-    StripChain* c = chain();
+    StripChain* c = displayChain();
     for (int i = 0; i < StripChain::kStageCount; ++i) {
         StageText& st = m_stageText[static_cast<size_t>(i)];
         if (!st.picture || !st.picture->isVisible()) { continue; }
@@ -2372,7 +2389,11 @@ void StripWindow::refreshCharacter(StageText& st, StripChain::Stage stage,
 
 void StripWindow::refreshStagePictures()
 {
-    StripChain* ch = chain();
+    // displayChain(), nicht chain(): sonst haengt diese Funktion die
+    // Stufenbilder beim naechsten Aufruf wieder auf die stille
+    // Sendekette zurueck. Genau so ist mein erster Anlauf
+    // wirkungslos geblieben.
+    StripChain* ch = displayChain();
     if (m_gateCurve)     { m_gateCurve->setChain(ch); }
     if (m_compCurve)     { m_compCurve->setChain(ch); }
     if (m_limiterCurve)  { m_limiterCurve->setChain(ch); }
@@ -2385,10 +2406,10 @@ void StripWindow::refreshStagePictures()
 void StripWindow::refreshChainRow()
 {
     if (m_chainView) {
-        m_chainView->setChain(chain());
+        m_chainView->setChain(displayChain());
         m_chainView->update();
     }
-    if (m_levels) { m_levels->setChain(chain()); }
+    if (m_levels) { m_levels->setChain(displayChain()); }
     // Same late-binding trap as before, now one line: the host is what
     // the ported panel reaches through, so pointing it at the current
     // chain is enough for every widget inside it.
@@ -2982,7 +3003,12 @@ void StripWindow::refreshMeters()
         if (m_note) { m_note->setText(noteText()); }
     }
 
-    StripChain* c = chain();
+    // Die Kette, die wirklich rechnet -- ohne Funkgeraet ist das die
+    // des Mithoerers. Hier stand chain(), und deshalb meldete die
+    // Gate-Seite „Silent ... in -120.0 dBFS", waehrend die Stimme im
+    // Kopfhoerer stand: die Widgets waren umgehaengt, dieser Zeiger
+    // nicht. Ein halber Umbau sieht aus wie gar keiner.
+    StripChain* c = displayChain();
     if (!c) { return; }
 
     // The tiles are the primary reading; the text below each panel is
