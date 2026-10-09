@@ -531,6 +531,7 @@ set(CORE_SOURCES
     src/core/StartWatch.cpp
     src/core/SpeProtocol.cpp
     src/core/SpeConnection.cpp
+    src/core/Kpa500Protocol.cpp
     src/core/CwDecoder.cpp
     src/core/BeamHeading.cpp
     src/core/BoardCapabilities.cpp
