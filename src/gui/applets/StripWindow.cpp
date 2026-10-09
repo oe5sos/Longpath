@@ -48,6 +48,7 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QFormLayout>
+#include <QGridLayout>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
@@ -2278,7 +2279,10 @@ QWidget* StripWindow::buildInsertsPanel()
 {
     auto* page = new QWidget(this);
     auto* col = new QVBoxLayout(page);
-    col->setContentsMargins(0, 0, 0, 0);
+    // Rechts Platz lassen. Am gerenderten Blatt gesehen: ohne ihn
+    // schob der Rollbalken der Seite die dritte Spalte und das Ende
+    // jeder Zeile unter sich -- „Apple" endete als „Appl".
+    col->setContentsMargins(0, 0, 14, 0);
     col->setSpacing(12);
 
     m_insertsNote = new QLabel(page);
@@ -2489,9 +2493,23 @@ void StripWindow::rebuildPluginCatalogue()
         hint->setStyleSheet(dimStyle());
         col->addWidget(hint);
 
+        // Drei nebeneinander. Eine Spalte waere eine Liste; am
+        // gerenderten Blatt waren sechsundzwanzig volle Zeilen genau
+        // das -- etwas, durch das man scrollt, statt einer Auslage,
+        // die man ueberblickt.
+        auto* grid = new QGridLayout;
+        grid->setContentsMargins(0, 0, 0, 0);
+        grid->setHorizontalSpacing(6);
+        grid->setVerticalSpacing(5);
+        int n = 0;
         for (const PluginDescriptor& d : *at) {
-            col->addWidget(new PluginChip(d, m_catalogue));
+            grid->addWidget(new PluginChip(d, m_catalogue), n / 3, n % 3);
+            ++n;
         }
+        for (int column = 0; column < 3; ++column) {
+            grid->setColumnStretch(column, 1);
+        }
+        col->addLayout(grid);
     }
 }
 

@@ -30,6 +30,7 @@
 
 #include "gui/ConnectionPanel.h"
 #include "gui/LayoutProfiles.h"
+#include <QPushButton>
 #include "gui/MainWindow.h"
 #include "gui/WindowPlacement.h"
 #include "gui/applets/BroadcastOptimizerPanel.h"
@@ -124,6 +125,47 @@ private slots:
         w.resize(1180, 900);
         w.grab().save(QString::fromUtf8(dir)
                       + QStringLiteral("/kanalzug-eine-flaeche.png"));
+    }
+
+    // Der Einschubreiter, mit echtem Suchlauf.
+    //
+    // Gerendert und nicht beschrieben, weil die Gruppierung GERATEN
+    // ist (siehe core/strip/PluginPlacement.h) -- ob das Raten auf
+    // dieser Maschine brauchbar aussieht, sagt nur das Bild. Und
+    // geprueft wird dabei eines, das kein Bild zeigt: dass der
+    // Suchlauf ueberhaupt etwas findet und nichts davon in der
+    // Oberflaeche verschwindet.
+    void thePluginsTabRendersWithWhateverIsInstalled()
+    {
+        const QByteArray dir = qgetenv("LONGPATH_RENDER_DIR");
+        if (dir.isEmpty()) { QSKIP("LONGPATH_RENDER_DIR nicht gesetzt"); }
+
+        RadioModel radio;
+        StripWindow w(&radio);
+        w.resize(1180, 900);
+
+        auto* tabs = w.findChild<QTabWidget*>();
+        QVERIFY(tabs != nullptr);
+        int at = -1;
+        for (int i = 0; i < tabs->count(); ++i) {
+            if (tabs->tabText(i) == QLatin1String("Plugins")) { at = i; break; }
+        }
+        QVERIFY2(at >= 0, "kein Reiter „Plugins\"");
+        tabs->setCurrentIndex(at);
+
+        QPushButton* scan = nullptr;
+        for (QPushButton* b : w.findChildren<QPushButton*>()) {
+            if (b->text().contains(QLatin1String("Look for plugins"))) {
+                scan = b;
+                break;
+            }
+        }
+        QVERIFY(scan != nullptr);
+        scan->click();
+        QCoreApplication::processEvents();
+
+        w.grab().save(QString::fromUtf8(dir)
+                      + QStringLiteral("/kanalzug-plugins.png"));
     }
 
     // ── Der Stimmcheck war die eine Ausnahme ─────────────────────────
