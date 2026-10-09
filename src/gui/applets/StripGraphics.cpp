@@ -116,6 +116,10 @@ void StripChainView::relayout()
                            && slot < StripChain::kInsertCount; ++slot) {
             if (m_chain->insertPosition(slot) != position) { continue; }
             if (m_chain->insertPlugin(slot) == nullptr)    { continue; }
+            // Luft auf BEIDEN Seiten. Am gerenderten Blatt gesehen:
+            // ohne die vordere klebte die Einschubkachel an der Stufe
+            // davor, und zwei Kacheln ohne Fuge lesen sich als eine.
+            if (position > 0) { x += kTileGap; }
             Cell c;
             c.kind = Cell::Kind::Insert;
             c.index = slot;
@@ -224,7 +228,12 @@ void StripChainView::paintEvent(QPaintEvent*)
                                   c(Style::kBlueBorder).green(),
                                   c(Style::kBlueBorder).blue(), 60));
                 p.drawRoundedRect(r.adjusted(1, 0, -2, -1), 3, 3);
-            } else if (cell.position < StripChain::kStageCount) {
+            } else if (cell.position > 0
+                       && cell.position < StripChain::kStageCount) {
+                // Das Kettenzeichen heisst „fliesst hinein“.
+                // Vor der ersten Stufe fliesst nichts hinein --
+                // dort stand es trotzdem, bis es auf dem
+                // gerenderten Blatt auffiel.
                 p.setPen(c(Style::kTextInactive));
                 p.drawText(r, Qt::AlignCenter, QStringLiteral("›"));
             }
@@ -255,10 +264,10 @@ void StripChainView::paintEvent(QPaintEvent*)
             f.setPointSizeF(8.0);
             p.setFont(f);
             p.setPen(c(Style::kTextInactive));
-            p.drawText(QRect(r.left(), r.top() + 3, r.width() - kRemoveBox - 4,
-                             11),
+            p.drawText(QRect(r.left() + 6, r.top() + 3,
+                             r.width() - kRemoveBox - 10, 11),
                        Qt::AlignLeft | Qt::AlignVCenter,
-                       QStringLiteral("  PLUGIN"));
+                       QStringLiteral("PLUGIN"));
 
             f.setPointSizeF(9.0);
             p.setFont(f);

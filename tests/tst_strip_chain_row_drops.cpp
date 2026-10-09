@@ -19,10 +19,13 @@
 // =================================================================
 
 #include <QtTest>
+#include <QDragMoveEvent>
 #include <QDropEvent>
+#include <QImage>
 #include <QMimeData>
 #include <QSignalSpy>
 
+#include "core/strip/AudioPlugin.h"
 #include "core/strip/StripChain.h"
 #include "gui/applets/StripGraphics.h"
 
@@ -38,6 +41,30 @@ namespace {
 class Probe : public StripChainView {
 public:
     using StripChainView::dropEvent;
+    using StripChainView::dragMoveEvent;
+};
+
+// Ein Nichts-Plugin, nur damit ein Einschubplatz belegt ist.
+class Dummy final : public AudioPlugin {
+public:
+    explicit Dummy(QString name) : m_name(std::move(name)) {}
+    PluginDescriptor descriptor() const override
+    {
+        PluginDescriptor d;
+        d.identifier = QStringLiteral("test:") + m_name;
+        d.name = m_name;
+        d.vendor = QStringLiteral("Test");
+        d.format = QStringLiteral("TEST");
+        return d;
+    }
+    bool prepare(double, int) override { return true; }
+    void processMono(float*, int) noexcept override {}
+    void reset() noexcept override {}
+    QVector<PluginParameter> parameters() const override { return {}; }
+    float parameterValue(quint32) const override { return 0.0f; }
+    void  setParameterValue(quint32, float) override {}
+private:
+    QString m_name;
 };
 
 void dropAt(Probe& v, const QString& id, int x)
@@ -126,6 +153,56 @@ private slots:
         v.refreshInserts();
         QCOMPARE(v.sizeHint().width(), bare);
         QVERIFY(bare > 8 * 84);   // acht Kacheln plus Fugen
+
+        c.setInsertPosition(0, 1);
+        c.setInsertPlugin(0, std::make_unique<Dummy>(QStringLiteral("Nova")));
+        v.refreshInserts();
+        QVERIFY2(v.sizeHint().width() > bare,
+                 "die Reihe wuchs nicht -- die Kachel liegt auf einer Stufe");
+    }
+
+    // Und so sieht sie dabei aus. Beurteilt wird Gestaltung an einem
+    // Bild in wirklicher Groesse, nicht an einer Beschreibung.
+    void theRowIsOnFile()
+    {
+        const QByteArray dir = qgetenv("LONGPATH_RENDER_DIR");
+        if (dir.isEmpty()) { QSKIP("kein LONGPATH_RENDER_DIR"); }
+
+        StripChain c;
+        c.prepare(48000.0);
+        c.setEnabled(true);
+        for (int i = 0; i < StripChain::kStageCount; ++i) {
+            c.setStageEnabled(static_cast<StripChain::Stage>(i), i % 2 == 0);
+        }
+        c.setInsertPosition(0, 1);
+        c.setInsertEnabled(0, true);
+        c.setInsertPlugin(0, std::make_unique<Dummy>(QStringLiteral("TDR Nova")));
+        c.setInsertPosition(1, StripChain::kStageCount);
+        c.setInsertEnabled(1, true);
+        c.setInsertPlugin(1, std::make_unique<Dummy>(QStringLiteral("ClipOnly2")));
+
+        Probe v;
+        v.setChain(&c);
+        v.refreshInserts();
+        v.resize(v.sizeHint());
+
+        const auto shot = [&](const QString& file) {
+            QImage img(v.size(), QImage::Format_ARGB32_Premultiplied);
+            img.fill(QColor(0x0c, 0x0c, 0x0e));
+            v.render(&img);
+            QVERIFY(img.save(QString::fromUtf8(dir) + QLatin1Char('/') + file));
+        };
+        shot(QStringLiteral("chain-row.png"));
+
+        // Und mit einem Plugin ueber der dritten Fuge: die Stelle, auf
+        // die es faellt, leuchtet.
+        QMimeData mime;
+        mime.setData(QLatin1String(StripChainView::kPluginMime),
+                     QByteArrayLiteral("test:x"));
+        QDragMoveEvent ev(QPoint(v.width() / 2, 20), Qt::CopyAction, &mime,
+                          Qt::LeftButton, Qt::NoModifier);
+        v.dragMoveEvent(&ev);
+        shot(QStringLiteral("chain-row-dragging.png"));
     }
 };
 
