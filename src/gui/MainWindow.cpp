@@ -298,6 +298,7 @@ warren@wpratt.com
 #include "core/TxChannel.h"  // H.2: setTxChannel wiring
 #include "core/ReceiverManager.h"
 #include "core/AppSettings.h"
+#include "core/StartWatch.h"
 #include "core/UiScale.h"
 #include "core/BuildIdentity.h"
 #include "core/PaTempUnit.h"
@@ -4706,7 +4707,39 @@ void MainWindow::buildUI()
         });
     });
 
-    m_containerManager->restoreState();
+    // Sicherer Start (2026-10-09): blieb Longpath zweimal hintereinander
+    // beim Hochfahren stecken, faehrt es ohne die gespeicherte Anordnung
+    // hoch. Genau hier ist die Stelle -- `restoreState()` baut die
+    // Fenster aus dem Gespeicherten auf, und wenn dort etwas faul ist
+    // (ein Applet, das auf Verschwundenes zeigt), kommt man ohne diesen
+    // Ausweg nicht mehr an die Einstellungen heran, um es zu
+    // reparieren. Siehe core/StartWatch.h.
+    if (StartWatch::shouldStartSafely()) {
+        m_startedSafely     = true;
+        m_failedStartCount  = StartWatch::failedStarts();
+        qCWarning(lcContainer) << "Sicherer Start: die gespeicherte Anordnung wird"
+                               << "uebersprungen, weil" << m_failedStartCount
+                               << "Starts hintereinander nicht durchkamen";
+        createDefaultContainers();
+
+        // Den Hinweis erst zeigen, wenn das Fenster steht -- ein Dialog
+        // mitten im Aufbau haette keinen Elternrahmen und koennte
+        // hinter dem Hauptfenster landen.
+        //
+        // Im Pruefstand bleibt er weg: ein modaler Dialog haelt den Lauf
+        // an, bis jemand klickt, und es klickt niemand. Die Entscheidung
+        // selbst (`startedSafely()`) ist davon unberuehrt und bleibt
+        // pruefbar -- das Zeigen ist nur die Ausgabe.
+        if (!qEnvironmentVariableIsSet("LONGPATH_NO_DIALOGS")) {
+            const int anzahl = m_failedStartCount;
+            QTimer::singleShot(0, this, [this, anzahl]() {
+                QMessageBox::information(this, QStringLiteral("Sicherer Start"),
+                                         StartWatch::safeStartNotice(anzahl));
+            });
+        }
+    } else {
+        m_containerManager->restoreState();
+    }
     if (m_containerManager->containerCount() == 0) {
         createDefaultContainers();
     }
