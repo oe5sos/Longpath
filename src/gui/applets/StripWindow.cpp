@@ -414,6 +414,22 @@ void StripWindow::toggleLiveMonitor(bool on)
         m_live->setVolume(m_liveVol ? m_liveVol->value() / 100.0 : 0.7);
         m_live->setMonitorChannel(
             m_liveChannel ? m_liveChannel->currentData().toInt() : -1);
+        // ── Und die Geraete, VOR dem Start ───────────────────────
+        //
+        // Der Mithoerer wird hier erst erzeugt. Die
+        // Wiederherstellung der Auswahlfelder lief beim Bau der
+        // Seite, als es ihn noch nicht gab -- sie hat ins Leere
+        // gesetzt. Am Geraet sah das so aus: beide Felder standen
+        // auf „Universal Audio Thunderbolt", und die Zeile darunter
+        // meldete „Ein: MacBook Air-Mikrofon". Zwei Angaben, die
+        // einander widersprechen, und die falsche ist die, nach der
+        // gehoert wird.
+        if (m_liveIn) {
+            m_live->setInputDeviceId(m_liveIn->currentData().toByteArray());
+        }
+        if (m_liveOut) {
+            m_live->setOutputDeviceId(m_liveOut->currentData().toByteArray());
+        }
         // Beim Einschalten den Hauptschalter uebernehmen, nicht erst
         // beim naechsten Umlegen.
         m_live->setStripBypassed(!(m_master && m_master->isChecked()));
