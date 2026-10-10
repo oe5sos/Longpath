@@ -1263,6 +1263,12 @@ RadioModel::RadioModel(QObject* parent)
     // RfKit_ManualIp / RfKit_ManualPort from per-MAC peripherals scope at
     // that point).
     m_rfKitConnection = std::make_unique<Rf2ksConnection>(this);
+    // SPE Expert (Zeus-Punkt 7). Wie der RF2K-S: einmal angelegt, lebt
+    // die ganze Laufzeit, verbindet sich aber erst, wenn der per-MAC-
+    // Bereich da ist (applyPeripheralsForCurrentMac).
+    m_speConnection = std::make_unique<SpeConnection>(this);
+    m_kpa500Connection = std::make_unique<Kpa500Connection>(this);
+    m_acomConnection = std::make_unique<AcomConnection>(this);
 
     // Per-radio peripherals refactor (2026-05-26): the ctor-time RF-Kit
     // auto-connect from globals was removed.  The lifecycle now runs in
@@ -2950,6 +2956,225 @@ void RadioModel::setRfKitEnabled(bool enabled)
     emit rfKitEnabledChanged(enabled);
 }
 
+// ── SPE Expert (Zeus-Punkt 7) ──────────────────────────────────────────────
+
+bool RadioModel::speEnabled() const
+{
+    return peripheralValue(QStringLiteral("Spe_Enabled"),
+                           QStringLiteral("False"))
+        == QStringLiteral("True");
+}
+
+void RadioModel::applySpeOperatorSettings()
+{
+    if (!m_speConnection) {
+        return;
+    }
+    // Vorgabe AN: ein Verstaerker, der aus- und wieder eingeschaltet wird,
+    // soll von selbst wieder auftauchen. Derselbe Wert wie beim RF2K-S.
+    const bool autoRe = peripheralValue(QStringLiteral("Spe_AutoReconnect"),
+                                        QStringLiteral("True"))
+        == QStringLiteral("True");
+    m_speConnection->setAutoReconnect(autoRe);
+}
+
+void RadioModel::applySpeConnection()
+{
+    if (!m_speConnection) {
+        return;
+    }
+    if (!speEnabled()) {
+        m_speConnection->disconnect();
+        return;
+    }
+
+    applySpeOperatorSettings();
+
+    const QString modus = peripheralValue(QStringLiteral("Spe_Mode"),
+                                          QStringLiteral("Network"));
+    if (modus == QStringLiteral("Serial")) {
+#ifdef HAVE_SERIALPORT
+        const QString anschluss = peripheralValue(QStringLiteral("Spe_SerialPort"));
+        if (anschluss.isEmpty()) {
+            // Kein Erraten: ein serieller Anschlussname laesst sich nicht
+            // ableiten, und den falschen zu oeffnen heisst, ein fremdes
+            // Geraet zu beschreiben.
+            qCInfo(lcConnection) << "SPE auf seriell gestellt, aber kein "
+                                    "Anschluss angegeben -- nicht verbunden";
+            return;
+        }
+        m_speConnection->connectSerial(anschluss);
+#else
+        qCWarning(lcConnection) << "SPE auf seriell gestellt, aber dieser Bau "
+                                   "hat kein Qt6::SerialPort -- nicht verbunden";
+#endif
+        return;
+    }
+
+    const QString rechner = peripheralValue(QStringLiteral("Spe_Host"));
+    const quint16 anschluss = static_cast<quint16>(
+        peripheralValue(QStringLiteral("Spe_Port"), QStringLiteral("4001")).toUInt());
+    if (rechner.isEmpty()) {
+        // Auch hier kein Erraten: ser2net antwortet auf keine Rundfrage,
+        // es gibt also nichts zu suchen.
+        qCInfo(lcConnection) << "SPE ueber Netz, aber kein Rechner angegeben "
+                                "-- nicht verbunden";
+        return;
+    }
+    m_speConnection->connectNetwork(rechner, anschluss);
+}
+
+void RadioModel::setSpeEnabled(bool enabled)
+{
+    const bool jetzt = speEnabled();
+    if (enabled == jetzt) {
+        return;
+    }
+    setPeripheralValue(QStringLiteral("Spe_Enabled"),
+                       enabled ? QStringLiteral("True") : QStringLiteral("False"));
+    applySpeConnection();
+    emit speEnabledChanged(enabled);
+}
+
+// ── Elecraft KPA500 (Zeus-Punkt 7) ─────────────────────────────────────────
+
+bool RadioModel::kpa500Enabled() const
+{
+    return peripheralValue(QStringLiteral("Kpa500_Enabled"),
+                           QStringLiteral("False"))
+        == QStringLiteral("True");
+}
+
+void RadioModel::applyKpa500Connection()
+{
+    if (!m_kpa500Connection) {
+        return;
+    }
+    if (!kpa500Enabled()) {
+        m_kpa500Connection->disconnect();
+        return;
+    }
+
+    const bool autoRe = peripheralValue(QStringLiteral("Kpa500_AutoReconnect"),
+                                        QStringLiteral("True"))
+        == QStringLiteral("True");
+    m_kpa500Connection->setAutoReconnect(autoRe);
+
+    const QString modus = peripheralValue(QStringLiteral("Kpa500_Mode"),
+                                          QStringLiteral("Network"));
+    if (modus == QStringLiteral("Serial")) {
+#ifdef HAVE_SERIALPORT
+        const QString anschluss = peripheralValue(QStringLiteral("Kpa500_SerialPort"));
+        if (anschluss.isEmpty()) {
+            qCInfo(lcConnection) << "KPA500 auf seriell gestellt, aber kein "
+                                    "Anschluss angegeben -- nicht verbunden";
+            return;
+        }
+        // Die Datenrate wird NICHT geraten: an der falschen kommt nichts
+        // durch, und das Dokument nennt keine Vorgabe. 38400 ist die
+        // hoechste der vier moeglichen und damit der beste erste Versuch.
+        const int baud = peripheralValue(QStringLiteral("Kpa500_Baud"),
+                                         QStringLiteral("38400")).toInt();
+        m_kpa500Connection->connectSerial(anschluss, baud > 0 ? baud : 38400);
+#else
+        qCWarning(lcConnection) << "KPA500 auf seriell gestellt, aber dieser Bau "
+                                   "hat kein Qt6::SerialPort -- nicht verbunden";
+#endif
+        return;
+    }
+
+    const QString rechner = peripheralValue(QStringLiteral("Kpa500_Host"));
+    const quint16 anschluss = static_cast<quint16>(
+        peripheralValue(QStringLiteral("Kpa500_Port"),
+                        QStringLiteral("4001")).toUInt());
+    if (rechner.isEmpty()) {
+        qCInfo(lcConnection) << "KPA500 ueber Netz, aber kein Rechner angegeben "
+                                "-- nicht verbunden";
+        return;
+    }
+    m_kpa500Connection->connectNetwork(rechner, anschluss);
+}
+
+void RadioModel::setKpa500Enabled(bool enabled)
+{
+    const bool jetzt = kpa500Enabled();
+    if (enabled == jetzt) {
+        return;
+    }
+    setPeripheralValue(QStringLiteral("Kpa500_Enabled"),
+                       enabled ? QStringLiteral("True") : QStringLiteral("False"));
+    applyKpa500Connection();
+    emit kpa500EnabledChanged(enabled);
+}
+
+// ── ACOM S-Serie (Betreiberwunsch 2026-10-09) ──────────────────────────────
+
+bool RadioModel::acomEnabled() const
+{
+    return peripheralValue(QStringLiteral("Acom_Enabled"),
+                           QStringLiteral("False"))
+        == QStringLiteral("True");
+}
+
+void RadioModel::applyAcomConnection()
+{
+    if (!m_acomConnection) {
+        return;
+    }
+    if (!acomEnabled()) {
+        m_acomConnection->disconnect();
+        return;
+    }
+
+    const bool autoRe = peripheralValue(QStringLiteral("Acom_AutoReconnect"),
+                                        QStringLiteral("True"))
+        == QStringLiteral("True");
+    m_acomConnection->setAutoReconnect(autoRe);
+
+    const QString modus = peripheralValue(QStringLiteral("Acom_Mode"),
+                                          QStringLiteral("Network"));
+    if (modus == QStringLiteral("Serial")) {
+#ifdef HAVE_SERIALPORT
+        const QString anschluss = peripheralValue(QStringLiteral("Acom_SerialPort"));
+        if (anschluss.isEmpty()) {
+            qCInfo(lcConnection) << "ACOM auf seriell gestellt, aber kein "
+                                    "Anschluss angegeben -- nicht verbunden";
+            return;
+        }
+        // Die Datenrate ist FEST 9600 8N1 -- die Beschreibung des
+        // Herstellers schreibt sie vor, es gibt nichts einzustellen
+        // (anders als beim KPA500, wo sie vier Werte kennt).
+        m_acomConnection->connectSerial(anschluss);
+#else
+        qCWarning(lcConnection) << "ACOM auf seriell gestellt, aber dieser Bau "
+                                   "hat kein Qt6::SerialPort -- nicht verbunden";
+#endif
+        return;
+    }
+
+    const QString rechner = peripheralValue(QStringLiteral("Acom_Host"));
+    const quint16 anschluss = static_cast<quint16>(
+        peripheralValue(QStringLiteral("Acom_Port"), QStringLiteral("4001")).toUInt());
+    if (rechner.isEmpty()) {
+        qCInfo(lcConnection) << "ACOM ueber Netz, aber kein Rechner angegeben "
+                                "-- nicht verbunden";
+        return;
+    }
+    m_acomConnection->connectNetwork(rechner, anschluss);
+}
+
+void RadioModel::setAcomEnabled(bool enabled)
+{
+    const bool jetzt = acomEnabled();
+    if (enabled == jetzt) {
+        return;
+    }
+    setPeripheralValue(QStringLiteral("Acom_Enabled"),
+                       enabled ? QStringLiteral("True") : QStringLiteral("False"));
+    applyAcomConnection();
+    emit acomEnabledChanged(enabled);
+}
+
 // ── CW-Tonhoehe ────────────────────────────────────────────────────────────
 //
 // Porting from Thetis console.cs:18142-18242 [@852bf0e] — public int
@@ -3134,6 +3359,42 @@ void RadioModel::applyPeripheralsForCurrentMac()
         emit fourO3AEnabledChanged(false);
     }
 
+    // ── ACOM S-Serie ────────────────────────────────────────────────────
+    if (acomEnabled() && m_acomConnection) {
+        applyAcomConnection();
+        if (m_acomConnection->isConnected()
+            || !m_acomConnection->description().isEmpty()) {
+            qCInfo(lcConnection)
+                << "ACOM auto-connect for MAC" << mac
+                << ":" << m_acomConnection->description();
+            ++started;
+        }
+    }
+
+    // ── Elecraft KPA500 ─────────────────────────────────────────────────
+    if (kpa500Enabled() && m_kpa500Connection) {
+        applyKpa500Connection();
+        if (m_kpa500Connection->isConnected()
+            || !m_kpa500Connection->description().isEmpty()) {
+            qCInfo(lcConnection)
+                << "KPA500 auto-connect for MAC" << mac
+                << ":" << m_kpa500Connection->description();
+            ++started;
+        }
+    }
+
+    // ── SPE Expert ──────────────────────────────────────────────────────
+    if (speEnabled() && m_speConnection) {
+        applySpeConnection();
+        if (m_speConnection->isConnected()
+            || !m_speConnection->description().isEmpty()) {
+            qCInfo(lcConnection)
+                << "SPE auto-connect for MAC" << mac
+                << ":" << m_speConnection->description();
+            ++started;
+        }
+    }
+
     // ── RF-Kit RF2K-S ───────────────────────────────────────────────────
     if (rfKitEnabled() && m_rfKitConnection) {
         const QString host =
@@ -3210,6 +3471,21 @@ void RadioModel::teardownPeripherals()
     if (m_rfKitConnection) {
         m_rfKitConnection->disconnect();
         qCInfo(lcConnection) << "Peripherals teardown: RF-Kit disconnected";
+    }
+    if (m_kpa500Connection) {
+        m_kpa500Connection->disconnect();
+        qCInfo(lcConnection) << "Peripherals teardown: KPA500 disconnected";
+    }
+    if (m_acomConnection) {
+        m_acomConnection->disconnect();
+        qCInfo(lcConnection) << "Peripherals teardown: ACOM disconnected";
+    }
+    if (m_speConnection) {
+        // Wie beim RF2K-S bedingungslos: disconnect() ist folgenlos, wenn
+        // nichts stand, und entscharft dabei den Wiederverbinder. Nur
+        // isConnected() abzufragen liesse ihn armiert zurueck.
+        m_speConnection->disconnect();
+        qCInfo(lcConnection) << "Peripherals teardown: SPE disconnected";
     }
     if (m_smartSdrListener && m_smartSdrListener->isListening()) {
         m_smartSdrListener->stop();
@@ -10233,6 +10509,40 @@ void RadioModel::pushFmToneFromTxSlice()
     m_txChannel->setCtcssRun(mode == 1 || mode == 3);
 }
 
+void RadioModel::pushCtcssSquelchForSlice(const SliceModel* slice)
+{
+    // Longpath-eigen, kein Thetis-Port. Siehe RxChannel::setCtcssSquelch.
+    if (!slice || !m_wdspEngine) { return; }
+    RxChannel* rxCh = m_wdspEngine->rxChannel(slice->sliceIndex());
+    if (!rxCh) { return; }
+
+    // 0 Off, 1 CTCSS Enc, 2 CTCSS Dec, 3 CTCSS Enc+Dec, 4 DCS Dec
+    const int mode = slice->fmCtcssMode();
+    // Nur in FM. In jeder anderen Betriebsart gibt es kein Subtonband,
+    // und eine Sperre, die dort auf einen Ton wartet, wuerde den Kanal
+    // einfach stumm halten.
+    const bool istFm = (slice->dspMode() == DSPMode::FM);
+
+    const bool ctcssHoert = istFm && (mode == 2 || mode == 3);
+    const bool dcsHoert   = istFm && (mode == 4);
+
+    // Reihenfolge: erst die abschalten, die nicht gilt. Beide teilen
+    // sich den Basisband-Abgriff, und `RxChannel` schaltet die jeweils
+    // andere beim Einschalten ohnehin ab -- aber so bleibt der Zustand
+    // auch dann richtig, wenn beide aus sind.
+    if (!dcsHoert) {
+        rxCh->setDcsSquelch(false, 0, false);
+    }
+    if (!ctcssHoert) {
+        rxCh->setCtcssSquelch(false, 0.0);
+    }
+    if (ctcssHoert) {
+        rxCh->setCtcssSquelch(true, slice->fmCtcssValueHz());
+    } else if (dcsHoert) {
+        rxCh->setDcsSquelch(true, slice->fmDcsCode(), slice->fmDcsPolarity() != 0);
+    }
+}
+
 void RadioModel::pushTxFrequencyFromTxSlice()
 {
     if (!m_connection) {
@@ -11156,6 +11466,47 @@ void RadioModel::wireSliceSignals(SliceModel* slice)
         }
         scheduleSettingsSave();
     });
+
+    // CTCSS-Tonsquelch — Longpath-eigen, kein Thetis-Port.
+    //
+    // `fmCtcssMode` kennt 0 Off, 1 Encode, 2 Decode, 3 Encode+Decode.
+    // Senden (1 und 3) geht seit jeher ueber `pushFmToneFromTxSlice`;
+    // empfangsseitig (2 und 3) geschah bisher nichts, weil Thetis dafuer
+    // nichts hat -- `wdsp/fmd.c` filtert den Subton mit `snotch` nur aus
+    // dem Hoerbaren heraus, erkannt wird er nie. `RxChannel::
+    // setCtcssSquelch` schliesst das.
+    //
+    // Beide Eigenschaften muessen hier haengen: der Modus schaltet die
+    // Sperre ein und aus, der Tonwert stellt sie um. Und der Betriebsart
+    // auch -- ein Tonsquelch hat nur in FM einen Sinn.
+    connect(slice, &SliceModel::fmCtcssModeChanged, this, [this, slice](int) {
+        pushCtcssSquelchForSlice(slice);
+        scheduleSettingsSave();
+    });
+    connect(slice, &SliceModel::fmCtcssValueHzChanged, this, [this, slice](double) {
+        pushCtcssSquelchForSlice(slice);
+        scheduleSettingsSave();
+    });
+    connect(slice, &SliceModel::dspModeChanged, this, [this, slice](Longpath::DSPMode) {
+        pushCtcssSquelchForSlice(slice);
+    });
+    connect(slice, &SliceModel::fmDcsCodeChanged, this, [this, slice](int) {
+        pushCtcssSquelchForSlice(slice);
+        scheduleSettingsSave();
+    });
+    connect(slice, &SliceModel::fmDcsPolarityChanged, this, [this, slice](int) {
+        pushCtcssSquelchForSlice(slice);
+        scheduleSettingsSave();
+    });
+    // Und der Rueckweg: was der Detektor sieht, landet im Slice, damit die
+    // Oberflaeche es anzeigen kann. Das Signal kommt aus dem DSP-Thread --
+    // darum QueuedConnection, sonst liefe die Anzeige dort.
+    if (RxChannel* rxCh = m_wdspEngine ? m_wdspEngine->rxChannel(slice->sliceIndex())
+                                       : nullptr) {
+        connect(rxCh, &RxChannel::ctcssTonePresenceChanged, slice,
+                [slice](bool present) { slice->setFmCtcssToneDetected(present); },
+                Qt::QueuedConnection);
+    }
 
     // Audio panel — mute / pan / binaural → WDSP PatchPanel
     // From Thetis Project Files/Source/Console/radio.cs:1386-1403 (pan)

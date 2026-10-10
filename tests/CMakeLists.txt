@@ -983,6 +983,34 @@ longpath_add_test(tst_radio_model_band_click)
 longpath_add_test(tst_about_dialog)
 longpath_add_test(tst_support_dialog)
 longpath_add_test(tst_dev_automation_server)
+longpath_add_test(tst_ctcss_detector)
+longpath_add_test(tst_ctcss_squelch_anbindung)
+longpath_add_test(tst_ctcss_tonleuchte)
+longpath_add_test(tst_ctcss_tonleuchte_bild)
+longpath_add_test(tst_dcs_detector)
+longpath_add_test(tst_dcs_squelch_anbindung)
+longpath_add_test(tst_empfaengerwahl)
+longpath_add_test(tst_spe_protokoll)
+longpath_add_test(tst_spe_verbindung)
+longpath_add_test(tst_spe_anbindung)
+longpath_add_test(tst_kpa500_protokoll)
+longpath_add_test(tst_kpa500_verbindung)
+longpath_add_test(tst_kpa500_anbindung)
+longpath_add_test(tst_acom_protokoll)
+longpath_add_test(tst_acom_verbindung)
+longpath_add_test(tst_acom_anbindung)
+longpath_add_test(tst_fensterabbau_ohne_closeevent)
+longpath_add_test(tst_ui_scale)
+# Der Pruefstand liest src/main.cpp, um die Kopplung ueber den
+# Einstellungsschluessel zu belegen. `if(TEST ...)` wie bei
+# tst_nnr_without_model: longpath_add_test legt den Test nicht auf jeder
+# Plattform an.
+if(TEST tst_ui_scale)
+    set_tests_properties(tst_ui_scale PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
+longpath_add_test(tst_ui_scale_menue)
+longpath_add_test(tst_start_watch)
 longpath_add_test(tst_rtty_decoder)
 longpath_add_test(tst_rtty_decoder_sensitivity)
 longpath_add_test(tst_rtty_decoder_applet)
@@ -6893,6 +6921,18 @@ longpath_add_test(tst_tgxl_connection_ping)
 # reconnectAttempt signals with delays 1000/2000/5000/10000/30000/60000/
 # 60000/60000 ms.
 longpath_add_test(tst_pgxl_connection_reconnect)
+
+# 2026-10-10: Abbau ohne Rueckruf in schon zerstoerte Mitglieder.
+# `QTcpSocket m_socket` steht in beiden Klassen VOR fuenf QTimern, also
+# stirbt er NACH ihnen, und sein ~QTcpSocket loest disconnected() in ein
+# onDisconnected() aus, das nach den abgebauten Zeitgebern greift.
+# Dritte und vierte Stelle derselben Form (SpeConnection und MainWindow
+# waren die ersten zwei). Die eine Haelfte ist ein TOR: ohne die Behebung
+# meldet das halb abgebaute Objekt disconnected() nach aussen, messbar in
+# jedem Lauf (1 statt 0). Die andere -- der Griff in die abgebauten
+# Zeitgeber -- ist unbestimmt und zeigt sich deterministisch nur unter
+# AddressSanitizer. Siehe den Kopf der Datei.
+longpath_add_test(tst_pgxl_tgxl_abbau)
 
 # Task 61: ConnectionDiagnostics 1 Hz coalesced metrics aggregator.
 # Tests: tracksFrameCount (2 injectLineForTesting calls -> framesIn==2);

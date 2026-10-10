@@ -2103,7 +2103,22 @@ void SliceModel::setBinauralEnabled(bool v)
 void SliceModel::setFmCtcssMode(int mode)
 {
     if (m_fmCtcssMode != mode) {
+        // Decode (2), Enc+Dec (3) und DCS Decode (4) hoeren alle auf
+        // etwas -- in allen dreien ist der Kanal stumm, bis das Erwartete
+        // anliegt.
+        const bool hoertZu = (mode == 2 || mode == 3 || mode == 4);
         m_fmCtcssMode = mode;
+        // Die Tonmeldung mitziehen, und zwar in dieselbe Richtung, die
+        // `RxChannel::setCtcssSquelch` einschlaegt: beim Einschalten gilt
+        // der Ton als FEHLEND (der Detektor braucht sein erstes Fenster),
+        // beim Abschalten als ANLIEGEND (dann sperrt nichts).
+        //
+        // Ohne das zeigte die Tonleuchte im Moment des Einschaltens gruen,
+        // weil die Vorgabe true ist -- waehrend die Sperre in Wahrheit zu
+        // war und der Kanal stumm. Eine Anzeige, die im Einschaltmoment
+        // das Gegenteil behauptet, ist schlimmer als keine.
+        // (Vom Pruefstand gefangen: sieFolgtDerMeldungOhneUmweg.)
+        setFmCtcssToneDetected(!hoertZu);
         emit fmCtcssModeChanged(mode);
     }
 }
@@ -2116,6 +2131,44 @@ void SliceModel::setFmCtcssValueHz(double hz)
     }
     m_fmCtcssValueHz = hz;
     emit fmCtcssValueHzChanged(hz);
+}
+
+void SliceModel::setFmCtcssToneDetected(bool detected)
+{
+    // Meldung aus dem Empfangsweg, keine Einstellung -- darum kein
+    // scheduleSettingsSave beim Aufrufer und nichts Gespeichertes hier.
+    if (m_fmCtcssToneDetected == detected) {
+        return;
+    }
+    m_fmCtcssToneDetected = detected;
+    emit fmCtcssToneDetectedChanged(detected);
+}
+
+void SliceModel::setFmDcsCode(int oktal)
+{
+    if (m_fmDcsCode == oktal) {
+        return;
+    }
+    m_fmDcsCode = oktal;
+    // Wie beim Tonwechsel in setFmCtcssMode: der Detektor faengt von
+    // vorne an, also gilt der Code bis auf Weiteres als nicht erkannt.
+    if (m_fmCtcssMode == 4) {
+        setFmCtcssToneDetected(false);
+    }
+    emit fmDcsCodeChanged(oktal);
+}
+
+void SliceModel::setFmDcsPolarity(int polarity)
+{
+    const int p = (polarity != 0) ? 1 : 0;
+    if (m_fmDcsPolarity == p) {
+        return;
+    }
+    m_fmDcsPolarity = p;
+    if (m_fmCtcssMode == 4) {
+        setFmCtcssToneDetected(false);
+    }
+    emit fmDcsPolarityChanged(p);
 }
 
 void SliceModel::setFmOffsetHz(int hz)

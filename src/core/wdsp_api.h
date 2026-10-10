@@ -863,6 +863,32 @@ void SetRXACTCSSRun(int channel, int run);
 void SetRXAFMDeviation(int channel, double deviation);
 
 // ---------------------------------------------------------------------------
+// FM baseband tap — Longpath addition, NOT a Thetis port
+//
+// WDSP: third_party/wdsp/src/fmd.c (baseband_tap in struct _fmd, set via
+// SetRXAFMBasebandTap). There is no Thetis counterpart: Thetis never needs
+// the FM baseband, because it has no CTCSS tone squelch — wdsp/fmd.c only
+// NOTCHES the subtone out of the audible band (snotch), it never detects it.
+//
+// The tap sits right after the PLL loop in xfmd, BEFORE de-emphasis, the
+// audio filter and the snotch. That position is not a preference, it is the
+// only one that works: the audio filter is a bandpass from 0.8 * f_low
+// (240 Hz with WDSP's f_low = 300.0 default, RXA.c:200) and cuts away 46 of
+// the 49 TIA-603-D standard subtones, and the snotch removes what is left.
+// It is the same point fmsq takes its trigger from (RXA.c, "pointer to
+// trigger buffer").
+//
+// `fn` is called ON THE DSP THREAD with the baseband as a stereo-interleaved
+// double array (both channels carry the same value) at the channel's DSP
+// rate (48 kHz for Longpath's RX path). It must be short and must not
+// allocate. Pass fn == nullptr to switch the tap off; the setter holds
+// ch[channel].csDSP, which also covers the block pass, so after it returns
+// the callback can no longer run.
+// ---------------------------------------------------------------------------
+
+void SetRXAFMBasebandTap(int channel, void (*fn)(void*, const double*, int), void* user);
+
+// ---------------------------------------------------------------------------
 // Metering (meter.h)
 // ---------------------------------------------------------------------------
 

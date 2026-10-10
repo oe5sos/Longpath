@@ -109,3 +109,49 @@ def test_sgp4_is_classified_as_vendored():
     assert {r["classification"] for r in sgp4} == {"sgp4-vendored"}
     for r in sgp4:
         assert not r["missing_markers"], f"{r['path']} missing {r['missing_markers']}"
+
+
+def test_aethersdr_whole_file_ports_classified_from_their_table():
+    """AETHERSDR-PORTS.md is the SECOND table of AetherSDR derivation claims,
+    and until 2026-10-09 the inventory read only the first one
+    (aethersdr-reconciliation.md, Bucket A). Every port made in the five
+    months after that reconciliation — the channel strip, the equaliser UI,
+    KiwiSDR, the ASR backend, DssRenderer, the SPE amplifier driver — was
+    therefore counted as 'nereussdr-original', and the per-bucket header
+    marker check never looked at any of them. This pins the table to the
+    bucket so that cannot come back silently."""
+    import sys
+    sys.path.insert(0, str(REPO / "scripts"))
+    import provenance_tables
+
+    registered = provenance_tables.aethersdr_port_paths(
+        REPO / "docs" / "attribution" / "AETHERSDR-PORTS.md"
+    )
+    assert len(registered) > 80, (
+        f"only {len(registered)} paths read out of AETHERSDR-PORTS.md — "
+        "the first-column extractor is broken, not the table"
+    )
+    by_path = {r["path"]: r for r in _inventory_json()}
+    wrong = {
+        p: by_path[p]["classification"]
+        for p in registered
+        if p in by_path and by_path[p]["classification"] != "aethersdr-port"
+    }
+    assert not wrong, f"registered AetherSDR ports misclassified: {wrong}"
+
+
+def test_aethersdr_non_port_rows_stay_longpath_original():
+    """The same table also carries rows whose second column names no upstream
+    source — registration-only bookkeeping for files it calls 'Kein Port' /
+    '(none — …)'. Claiming those as 'aethersdr-port' would demand an
+    AetherSDR attribution header on Longpath-original code, i.e. a false
+    claim. `tests/tst_spe_verbindung.cpp` is the clearest case: AetherSDR has
+    no test for SpeConnection at all, the file is ours, and it is listed only
+    because it explains the four test hooks in the ported driver."""
+    by_path = {r["path"]: r for r in _inventory_json()}
+    for path in ("tests/tst_spe_verbindung.cpp", "src/gui/setup/SpePage.cpp"):
+        assert path in by_path, f"{path} not in inventory"
+        assert by_path[path]["classification"] != "aethersdr-port", (
+            f"{path} is listed in AETHERSDR-PORTS.md as a non-port, but the "
+            "inventory counts it as an AetherSDR port"
+        )

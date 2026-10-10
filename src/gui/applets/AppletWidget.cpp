@@ -32,7 +32,13 @@
 #include "gui/StyleConstants.h"
 #include "gui/ComboStyle.h"
 
+#include "core/AppSettings.h"
+#include "models/SliceModel.h"
+
+#include <QComboBox>
+#include <QLabel>
 #include <QPushButton>
+#include <QVBoxLayout>
 #include <QSlider>
 #include <QFrame>
 #include <QHBoxLayout>
@@ -76,6 +82,185 @@ AppletWidget::AppletWidget(RadioModel* model, QWidget* parent)
 
 QIcon AppletWidget::appletIcon() const { return {}; }
 
+// --- Empfaengerbindung ---------------------------------------------------
+
+namespace {
+/// Wo die Wahl gemerkt wird. Je Applet eine Zeile.
+QString receiverKey(const QString& appletId)
+{
+    return QStringLiteral("Applet/%1/Receiver").arg(appletId);
+}
+} // namespace
+
+void AppletWidget::initReceiverBinding()
+{
+    m_receiverChoice = AppSettings::instance()
+                           .value(receiverKey(appletId()), kFollowsActive)
+                           .toInt();
+
+    if (m_model) {
+        // Folgen wir dem aktiven, muessen wir bei jedem Wechsel neu
+        // aufloesen. Haengen wir fest, aendert ein Wechsel nichts -- die
+        // Pruefung in refreshBoundSlice merkt das und meldet nichts.
+        connect(m_model, &RadioModel::activeSliceChanged,
+                this, [this](int) { refreshBoundSlice(); });
+        // Verschwindet der Empfaenger, auf den wir zeigen, faellt
+        // boundSlice() auf nullptr -- auch das ist eine Aenderung.
+        connect(m_model, &RadioModel::sliceRemoved,
+                this, [this](int) { refreshBoundSlice(); });
+        // Und andersherum: wer RX2 waehlt, BEVOR es RX2 gibt, zeigt auf
+        // nullptr. Kommt der Empfaenger spaeter dazu, muss die Bindung
+        // nachziehen -- sonst bleibt das Applet stumm, obwohl sein
+        // Empfaenger laengst da ist, und man sucht den Fehler im
+        // Decoder.
+        connect(m_model, &RadioModel::sliceAdded,
+                this, [this](int) { refreshBoundSlice(); });
+    }
+    m_lastBound = boundSlice();
+    // Den Zusatz hier noch einmal setzen, nicht nur in appletTitleBar():
+    // die abgeleiteten Klassen bauen ihre Oberflaeche teils VOR diesem
+    // Aufruf (CwDecoderApplet ruft buildUI() als erstes im Konstruktor).
+    // Ohne das stuende nach dem Start "CW DECODER" in der Leiste, obwohl
+    // ein fester Empfaenger gewaehlt ist, und der Zusatz kaeme erst beim
+    // naechsten Wechsel. setTitleBarSuffix tut nichts, solange es die
+    // Leiste noch nicht gibt -- die Reihenfolge ist damit egal.
+    setTitleBarSuffix(receiverChoiceLabel());
+}
+
+void AppletWidget::setReceiverChoice(int sliceId)
+{
+    if (m_receiverChoice == sliceId) {
+        return;
+    }
+    m_receiverChoice = sliceId;
+    AppSettings::instance().setValue(receiverKey(appletId()), sliceId);
+    setTitleBarSuffix(receiverChoiceLabel());
+    refreshBoundSlice();
+}
+
+SliceModel* AppletWidget::boundSlice() const
+{
+    if (!m_model) {
+        return nullptr;
+    }
+    if (m_receiverChoice == kFollowsActive) {
+        return m_model->activeSlice();
+    }
+    // Die Wahl ist eine KENNUNG, keine Listenposition. Mit einer
+    // Position haengt das Applet nach dem Loeschen eines Empfaengers
+    // ploetzlich an einem anderen Geraet -- die Ueberlebenden ruecken
+    // nach, "RX2" meint dann jemand anderen. sliceById liefert nullptr,
+    // wenn es den Empfaenger nicht mehr gibt, und genau das ist richtig.
+    return m_model->sliceById(m_receiverChoice);
+}
+
+QString AppletWidget::receiverChoiceLabel() const
+{
+    if (m_receiverChoice == kFollowsActive) {
+        return {};
+    }
+    // Die Beschriftung zaehlt Positionen ("RX2" ist der zweite in der
+    // Liste), die Wahl selbst ist eine Kennung. Gibt es den Empfaenger
+    // nicht mehr, sagt die Leiste das -- besser als eine Zahl, die auf
+    // nichts zeigt.
+    if (!m_model) {
+        return {};
+    }
+    const QList<SliceModel*> liste = m_model->slices();
+    for (int i = 0; i < liste.size(); ++i) {
+        if (liste.at(i) && liste.at(i)->sliceIndex() == m_receiverChoice) {
+            return QStringLiteral("RX%1").arg(i + 1);
+        }
+    }
+    return QStringLiteral("RX? (fehlt)");
+}
+
+void AppletWidget::refreshBoundSlice()
+{
+    // Die Beschriftung ZUERST, und vor der Pruefung unten: sie rechnet
+    // sich aus der Listenposition, und die aendert sich auch dann, wenn
+    // die Bindung selbst gleich bleibt. Faellt RX1 weg, heisst der
+    // gewaehlte Empfaenger ploetzlich RX1 statt RX2 -- der gebundene
+    // Zeiger ist derselbe, die Leiste zeigte sonst weiter die alte
+    // Nummer. (Vom Pruefstand gefangen:
+    // dieWahlHaengtAmGeraetNichtAmListenplatz.)
+    setTitleBarSuffix(receiverChoiceLabel());
+
+    SliceModel* jetzt = boundSlice();
+    if (jetzt == m_lastBound) {
+        return;
+    }
+    m_lastBound = jetzt;
+    emit boundSliceChanged(jetzt);
+}
+
+QWidget* AppletWidget::receiverChoiceWidget(QWidget* parent)
+{
+    auto* box = new QWidget(parent);
+    auto* vbox = new QVBoxLayout(box);
+    vbox->setContentsMargins(0, 0, 0, 0);
+    vbox->setSpacing(4);
+
+    auto* titel = new QLabel(QStringLiteral("Empfänger"), box);
+    // Schriftstufen aus der Leiter in StyleConstants.h -- eine eigene
+    // Groesse dazwischen faellt in scripts/verify-style-drift.py.
+    titel->setStyleSheet(QStringLiteral(
+        "QLabel { color: %1; font-size: %2px; }")
+                             .arg(QLatin1String(Style::kTextTertiary))
+                             .arg(Style::kFontCaption));
+    vbox->addWidget(titel);
+
+    auto* waehler = new QComboBox(box);
+    waehler->setObjectName(QStringLiteral("receiverChoiceCmb"));
+    waehler->addItem(QStringLiteral("folgt dem aktiven"), kFollowsActive);
+    const QList<SliceModel*> liste = m_model ? m_model->slices() : QList<SliceModel*>{};
+    bool wahlDabei = (m_receiverChoice == kFollowsActive);
+    for (int i = 0; i < liste.size(); ++i) {
+        SliceModel* sm = liste.at(i);
+        if (!sm) { continue; }
+        // Beschriftung nach Position, Wert ist die Kennung.
+        waehler->addItem(QStringLiteral("RX%1").arg(i + 1), sm->sliceIndex());
+        if (sm->sliceIndex() == m_receiverChoice) { wahlDabei = true; }
+    }
+    // Zeigt die Wahl auf einen Empfaenger, den es nicht mehr gibt, steht
+    // sie trotzdem in der Liste -- sonst faende man nicht mehr heraus,
+    // worauf das Applet wartet.
+    if (!wahlDabei) {
+        waehler->addItem(QStringLiteral("RX? (fehlt)"), m_receiverChoice);
+    }
+    const int idx = waehler->findData(m_receiverChoice);
+    if (idx >= 0) { waehler->setCurrentIndex(idx); }
+
+    connect(waehler, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, [this, waehler](int i) {
+        if (i < 0) { return; }
+        setReceiverChoice(waehler->itemData(i).toInt());
+    });
+    vbox->addWidget(waehler);
+
+    auto* hinweis = new QLabel(
+        QStringLiteral("Fest gewählt bleibt dieses Fenster an seinem "
+                       "Empfänger, auch wenn woanders gearbeitet wird."), box);
+    hinweis->setWordWrap(true);
+    hinweis->setStyleSheet(QStringLiteral(
+        "QLabel { color: %1; font-size: %2px; }")
+                               .arg(QLatin1String(Style::kTextTertiary))
+                               .arg(Style::kFontSmall));
+    vbox->addWidget(hinweis);
+
+    return box;
+}
+
+void AppletWidget::setTitleBarSuffix(const QString& suffix)
+{
+    if (!m_titleBarLabel) {
+        return;
+    }
+    m_titleBarLabel->setText(suffix.isEmpty()
+                                 ? m_titleBarText
+                                 : QStringLiteral("%1 · %2").arg(m_titleBarText, suffix));
+}
+
 QWidget* AppletWidget::appletTitleBar(const QString& text)
 {
     auto* bar = new QWidget(this);
@@ -98,6 +283,10 @@ QWidget* AppletWidget::appletTitleBar(const QString& text)
         " background: transparent; }"
     ).arg(Style::kTitleText));
     hbox->addWidget(label);
+    // Merken, damit der Empfaenger-Zusatz spaeter dazukann.
+    m_titleBarText  = text;
+    m_titleBarLabel = label;
+    setTitleBarSuffix(receiverChoiceLabel());
     hbox->addStretch();
 
     return bar;

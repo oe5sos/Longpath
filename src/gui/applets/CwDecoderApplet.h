@@ -75,6 +75,10 @@ public:
     QString appletId()    const override { return QStringLiteral("CwDecoder"); }
     QString appletTitle() const override { return QStringLiteral("CW Decoder"); }
     void    syncFromModel() override;
+    /// Das geteilte Zahnrad der Zelle oeffnet die Empfaengerwahl: dem
+    /// aktiven folgen (Vorgabe) oder an einem festen haengen bleiben.
+    bool    hasExtendedSettings() const override;
+    void    openExtendedSettings() override;
 
     // Bound from MainWindow on construction and again on every active-slice
     // change (mirrors RttyDecoderApplet::setSlice).

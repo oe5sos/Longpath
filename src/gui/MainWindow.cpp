@@ -298,6 +298,8 @@ warren@wpratt.com
 #include "core/TxChannel.h"  // H.2: setTxChannel wiring
 #include "core/ReceiverManager.h"
 #include "core/AppSettings.h"
+#include "core/StartWatch.h"
+#include "core/UiScale.h"
 #include "core/BuildIdentity.h"
 #include "core/PaTempUnit.h"
 #include "core/RadioStatus.h"
@@ -335,6 +337,9 @@ warren@wpratt.com
 #include "core/SettingsBackup.h"
 #include "applets/AmpApplet.h"
 #include "applets/Rf2ksApplet.h"
+#include "applets/SpeApplet.h"
+#include "applets/Kpa500Applet.h"
+#include "applets/AcomApplet.h"
 #include "applets/AppletVisibilityController.h"
 #include "applets/RxApplet.h"
 #include "core/PgxlConnection.h"
@@ -1120,6 +1125,38 @@ MainWindow::MainWindow(QWidget* parent)
 
 MainWindow::~MainWindow()
 {
+    // ── Erst die Abbau-Fahne, dann alles andere ──────────────────────
+    //
+    // 2026-10-09: ein MainWindow, das OHNE closeEvent() zerstoert wird,
+    // hat m_shuttingDown nie gesetzt -- gesetzt wird es in closeEvent(),
+    // im Signal-Weg (SIGTERM) und beim Beenden, nirgends hier. Damit
+    // laufen alle 26 Waechter, die auf diese Fahne hoeren, beim Abbau
+    // INS LEERE.
+    //
+    // Gefunden an einem Absturz, der aussah wie ein fremdes Problem:
+    //
+    //   MainWindow::restoreFloatingWindowsHiddenBehindConnectMask()
+    //     <- doActivate <- QObject::destroyed(QObject*)
+    //     <- QWidget::~QWidget <- ConnectionPanel::~ConnectionPanel
+    //     <- QObjectPrivate::deleteChildren <- QWidget::~QWidget
+    //     <- MainWindow::~MainWindow
+    //
+    // Also: ~MainWindow baut seine Kinder ab, das ConnectionPanel meldet
+    // destroyed(), der Handler greift in ein MainWindow, dessen eigene
+    // Mitglieder schon weg sind -- namentlich
+    // m_floatingContainersHiddenPreConnect, ueber das der Rumpf
+    // iteriert. SIGSEGV, in zwei von vierzehn Laeufen; im Normalbetrieb
+    // schliesst closeEvent() das Fenster und die Fahne steht, darum
+    // faellt es nur auf, wenn ein Pruefstand ein MainWindow direkt
+    // loescht.
+    //
+    // Der Kommentar unten kennt genau diesen Ausnahmepfad schon
+    // („Wird ein MainWindow aber OHNE closeEvent() zerstoert") und
+    // faengt dort einen laufenden Faden ab. Die Fahne gehoert
+    // daneben, und sie gehoert VOR jede andere Zeile dieses
+    // Destruktors.
+    m_shuttingDown = true;
+
     // Sicherheitsnetz, 2026-09-03: regulaer haelt closeEvent() den
     // SpectrumThread an, lange bevor es hierher kommt. Wird ein
     // MainWindow aber OHNE closeEvent() zerstoert (Ausnahmepfad, Test-
@@ -4705,7 +4742,39 @@ void MainWindow::buildUI()
         });
     });
 
-    m_containerManager->restoreState();
+    // Sicherer Start (2026-10-09): blieb Longpath zweimal hintereinander
+    // beim Hochfahren stecken, faehrt es ohne die gespeicherte Anordnung
+    // hoch. Genau hier ist die Stelle -- `restoreState()` baut die
+    // Fenster aus dem Gespeicherten auf, und wenn dort etwas faul ist
+    // (ein Applet, das auf Verschwundenes zeigt), kommt man ohne diesen
+    // Ausweg nicht mehr an die Einstellungen heran, um es zu
+    // reparieren. Siehe core/StartWatch.h.
+    if (StartWatch::shouldStartSafely()) {
+        m_startedSafely     = true;
+        m_failedStartCount  = StartWatch::failedStarts();
+        qCWarning(lcContainer) << "Sicherer Start: die gespeicherte Anordnung wird"
+                               << "uebersprungen, weil" << m_failedStartCount
+                               << "Starts hintereinander nicht durchkamen";
+        createDefaultContainers();
+
+        // Den Hinweis erst zeigen, wenn das Fenster steht -- ein Dialog
+        // mitten im Aufbau haette keinen Elternrahmen und koennte
+        // hinter dem Hauptfenster landen.
+        //
+        // Im Pruefstand bleibt er weg: ein modaler Dialog haelt den Lauf
+        // an, bis jemand klickt, und es klickt niemand. Die Entscheidung
+        // selbst (`startedSafely()`) ist davon unberuehrt und bleibt
+        // pruefbar -- das Zeigen ist nur die Ausgabe.
+        if (!qEnvironmentVariableIsSet("LONGPATH_NO_DIALOGS")) {
+            const int anzahl = m_failedStartCount;
+            QTimer::singleShot(0, this, [this, anzahl]() {
+                QMessageBox::information(this, QStringLiteral("Sicherer Start"),
+                                         StartWatch::safeStartNotice(anzahl));
+            });
+        }
+    } else {
+        m_containerManager->restoreState();
+    }
     if (m_containerManager->containerCount() == 0) {
         createDefaultContainers();
     }
@@ -7356,6 +7425,266 @@ void MainWindow::populateDefaultMeter()
         });
     }
 
+    // ── SPE Expert (Zeus-Punkt 7) ───────────────────────────────────────
+    //
+    // Wie der RF2K-S hier einmal angelegt und einmal verdrahtet: die
+    // Verbindung (RadioModel::speConnection) lebt die ganze Laufzeit und
+    // wird nie neu gebaut. Sichtbar ist das Fenster nur, wenn der
+    // Umschalter in Setup -> Network -> SPE Expert an ist (gesetzt weiter
+    // unten, nachgezogen ueber speEnabledChanged).
+    m_speApplet = new SpeApplet(m_radioModel, nullptr);
+    panel->addApplet(m_speApplet);
+
+    if (SpeConnection* speConn = m_radioModel ? m_radioModel->speConnection()
+                                              : nullptr) {
+        // Verbindung -> Fenster.
+        connect(speConn, &SpeConnection::connected, this, [this, speConn]() {
+            if (!m_speApplet) { return; }
+            m_speApplet->setConnected(true);
+            m_speApplet->setSource(speConn->sourceLabel());
+        });
+        connect(speConn, &SpeConnection::disconnected, this, [this]() {
+            if (m_speApplet) { m_speApplet->setConnected(false); }
+        });
+        connect(speConn, &SpeConnection::respondingChanged,
+                this, [this](bool responding) {
+            if (m_speApplet) { m_speApplet->setResponding(responding); }
+        });
+        connect(speConn, &SpeConnection::modelChanged,
+                this, [this](const QString& id) {
+            if (m_speApplet) {
+                m_speApplet->setModelName(Spe::modelSpec(id).displayName);
+            }
+        });
+        connect(speConn, &SpeConnection::statusUpdated,
+                this, [this](const Spe::Status& s) {
+            if (!m_speApplet) { return; }
+            // Die Balkenachse folgt der GEWAEHLTEN Leistungsstufe, nicht
+            // nur dem Geraet -- so wie das Display des Verstaerkers selbst.
+            // setPowerRange() verwirft Wiederholungen, darum darf das hier
+            // bei jedem Rahmen stehen (zehnmal je Sekunde).
+            const auto& spec = Spe::modelSpec(s.id);
+            const auto achse = Spe::levelGaugeRange(spec, s.powerLevel);
+            m_speApplet->setPowerRange(achse.nominalW, achse.warnW, achse.maxW);
+
+            m_speApplet->setForwardPower(s.outputPowerW);
+            m_speApplet->setSwrAnt(s.swrAnt);
+            m_speApplet->setSwrAtu(s.swrAtu);
+            m_speApplet->setSupplyVoltage(s.paVoltageV);
+            m_speApplet->setSupplyCurrent(s.paCurrentA);
+            m_speApplet->setTemps(s.tempUpper, s.tempLower, s.tempCombiner,
+                                  spec.hasCombiner);
+            m_speApplet->setBand(Spe::bandName(s.bandIndex));
+            m_speApplet->setAntenna(s.txAntenna, s.atuState);
+            m_speApplet->setInputPort(s.input);
+            m_speApplet->setPowerLevel(Spe::powerLevelName(s.powerLevel));
+            m_speApplet->setMode(s.operate, s.transmitting);
+
+            // Alarm schlaegt Warnung: beides zugleich zu zeigen hiesse, die
+            // ernstere Meldung neben einer harmlosen zu verstecken. Der
+            // Farbton haengt daran (Hausstil: das kraeftige Rot bleibt der
+            // Gefahr).
+            const QString alarm = Spe::alarmText(s.alarm);
+            if (!alarm.isEmpty()) {
+                m_speApplet->setFaultText(tr("ALARM: %1").arg(alarm), true);
+            } else {
+                const QString warnung = Spe::warningText(s.warning);
+                m_speApplet->setFaultText(
+                    warnung.isEmpty() ? QString()
+                                      : tr("Warnung: %1").arg(warnung), false);
+            }
+        });
+
+        // Fenster -> Verbindung. Jeder Knopf ist ein Tastendruck.
+        connect(m_speApplet, &SpeApplet::powerOnClicked,
+                speConn, &SpeConnection::powerOn);
+        connect(m_speApplet, &SpeApplet::operateClicked,
+                speConn, &SpeConnection::toggleOperate);
+        connect(m_speApplet, &SpeApplet::powerLevelClicked,
+                speConn, &SpeConnection::cyclePowerLevel);
+        connect(m_speApplet, &SpeApplet::tuneClicked,
+                speConn, &SpeConnection::tune);
+        connect(m_speApplet, &SpeApplet::offClicked,
+                speConn, &SpeConnection::switchOff);
+        connect(m_speApplet, &SpeApplet::inputClicked, speConn, [speConn]() {
+            speConn->sendKey(Spe::Key::Input);
+        });
+        connect(m_speApplet, &SpeApplet::antennaClicked, speConn, [speConn]() {
+            speConn->sendKey(Spe::Key::Antenna);
+        });
+        // Die Pfeiltasten stellen die Vorlaufleistung ein, die der
+        // Verstaerker vom Funkgeraet ueber CAT anfordert.
+        connect(m_speApplet, &SpeApplet::driveUpClicked, speConn, [speConn]() {
+            speConn->sendKey(Spe::Key::RightArrow);
+        });
+        connect(m_speApplet, &SpeApplet::driveDownClicked, speConn, [speConn]() {
+            speConn->sendKey(Spe::Key::LeftArrow);
+        });
+    }
+
+    // ── Elecraft KPA500 (Zeus-Punkt 7) ──────────────────────────────────
+    //
+    // Wie der SPE einmal angelegt und einmal verdrahtet. Der Unterschied
+    // steckt in livenessChanged: der KPA500 kann melden „aus, aber am
+    // Draht erreichbar", und genau dann hat sein ON-Knopf einen Sinn.
+    m_kpa500Applet = new Kpa500Applet(m_radioModel, nullptr);
+    panel->addApplet(m_kpa500Applet);
+
+    if (Kpa500Connection* kpaConn = m_radioModel ? m_radioModel->kpa500Connection()
+                                                 : nullptr) {
+        connect(kpaConn, &Kpa500Connection::connected, this, [this, kpaConn]() {
+            if (!m_kpa500Applet) { return; }
+            m_kpa500Applet->setConnected(true);
+            m_kpa500Applet->setSource(kpaConn->sourceLabel());
+        });
+        connect(kpaConn, &Kpa500Connection::disconnected, this, [this]() {
+            if (m_kpa500Applet) { m_kpa500Applet->setConnected(false); }
+        });
+        connect(kpaConn, &Kpa500Connection::livenessChanged, this,
+                [this](Kpa500Connection::Liveness s) {
+            if (m_kpa500Applet) { m_kpa500Applet->setLiveness(s); }
+        });
+        connect(kpaConn, &Kpa500Connection::telemetryUpdated,
+                this, [this, kpaConn]() {
+            if (!m_kpa500Applet) { return; }
+            m_kpa500Applet->setPowerSwr(kpaConn->lastPowerSwr());
+            m_kpa500Applet->setVoltsAmps(kpaConn->lastVoltsAmps());
+            m_kpa500Applet->setTemperature(kpaConn->lastTemperature());
+            m_kpa500Applet->setBand(Kpa500::bandName(kpaConn->lastBandIndex()));
+            m_kpa500Applet->setIdentity(kpaConn->firmware(), kpaConn->serialNumber());
+            // ── Betriebszustand und Fehler GEHOEREN HIERHER, nicht nur
+            //    in die Aenderungsmeldungen ──────────────────────────
+            //
+            // Der erste Anlauf hat sie allein operateChanged/faultChanged
+            // ueberlassen. Die feuern aber nur bei AENDERUNG -- und das
+            // Feld leert bei Stille oder im Boot-Zustand ALLE Messwerte.
+            // Kommt der Verstaerker dann im GLEICHEN Zustand zurueck,
+            // aendert sich nichts, es feuert nichts, und das Feld zeigt
+            // dauerhaft „STANDBY", obwohl er auf OPERATE steht.
+            // Deterministisch gefallen in
+            // tst_kpa500_anbindung::derUmschalterSchicktDasGegenteil,
+            // nachdem der Fall davor einen Boot-Ausflug gemacht hatte.
+            //
+            // So macht es auch die SPE-Verdrahtung daneben: dort traegt
+            // statusUpdated den GANZEN Zustand und schiebt jedes Mal
+            // alles nach. Genau diese Unstimmigkeit war der Fehler.
+            m_kpa500Applet->setOperate(kpaConn->isOperate());
+            m_kpa500Applet->setFault(kpaConn->lastFaultCode());
+        });
+        connect(kpaConn, &Kpa500Connection::operateChanged, this, [this](bool op) {
+            if (m_kpa500Applet) { m_kpa500Applet->setOperate(op); }
+        });
+        connect(kpaConn, &Kpa500Connection::faultChanged, this, [this](int code) {
+            if (m_kpa500Applet) { m_kpa500Applet->setFault(code); }
+        });
+
+        // Fenster -> Verbindung.
+        connect(m_kpa500Applet, &Kpa500Applet::powerOnClicked,
+                kpaConn, &Kpa500Connection::powerOn);
+        connect(m_kpa500Applet, &Kpa500Applet::offClicked,
+                kpaConn, &Kpa500Connection::powerOff);
+        connect(m_kpa500Applet, &Kpa500Applet::clearFaultClicked,
+                kpaConn, &Kpa500Connection::clearFault);
+        // Der Umschalter schickt das GEGENTEIL des gemeldeten Zustands --
+        // das Geraet bestaetigt mit der naechsten Antwort, und erst dann
+        // wechselt die Anzeige.
+        connect(m_kpa500Applet, &Kpa500Applet::operateClicked,
+                kpaConn, [kpaConn]() { kpaConn->setOperate(!kpaConn->isOperate()); });
+    }
+
+    // ── ACOM S-Serie (Betreiberwunsch 2026-10-09) ───────────────────────
+    //
+    // Der ACOM SCHIEBT seine Telemetrie -- es gibt hier keinen
+    // Abfragetakt, auf den sich die Anzeige stuetzen koennte, sondern
+    // einen Strom von Rahmen. telemetryUpdated traegt den GANZEN Rahmen
+    // mit, darum wird bei jedem alles nachgeschoben; die Lehre aus dem
+    // KPA500 (Aenderungsmeldungen allein reichen nicht, wenn das Feld
+    // zwischendurch geleert wird) ist hier von Anfang an eingebaut.
+    m_acomApplet = new AcomApplet(m_radioModel, nullptr);
+    panel->addApplet(m_acomApplet);
+
+    if (AcomConnection* acomConn = m_radioModel ? m_radioModel->acomConnection()
+                                                : nullptr) {
+        connect(acomConn, &AcomConnection::connected, this, [this, acomConn]() {
+            if (!m_acomApplet) { return; }
+            m_acomApplet->setConnected(true);
+            m_acomApplet->setSource(acomConn->sourceLabel());
+        });
+        connect(acomConn, &AcomConnection::disconnected, this, [this]() {
+            if (m_acomApplet) { m_acomApplet->setConnected(false); }
+        });
+
+        connect(acomConn, &AcomConnection::telemetryUpdated, this,
+                [this, acomConn](const Acom::Telemetry& t) {
+            if (!m_acomApplet) { return; }
+            const auto& spec = Acom::modelSpec(acomConn->currentModel());
+            m_acomApplet->setForwardPower(t.forwardPowerW);
+            m_acomApplet->setReflectedPower(t.reflectedPowerW);
+            m_acomApplet->setSwr(t.swr_x100 / 100.0f);
+            // Die Temperatur kommt in ROHEN Sensoreinheiten -- der
+            // Modellversatz muss abgezogen werden, und der haengt an der
+            // erkannten Stufe. Darum hier und nicht in der Protokollschicht:
+            // die kennt kein Modell.
+            m_acomApplet->setTemp(static_cast<float>(t.paTempRaw)
+                                  - static_cast<float>(spec.temperatureOffset));
+            m_acomApplet->setDrainVoltage(t.hv1_x10V / 10.0f);
+            m_acomApplet->setDrainCurrent(t.id1_mA / 1000.0f);
+            m_acomApplet->setBand(Acom::bandName(t.activeBand));
+            m_acomApplet->setUptime(t.systemClockSec);
+            m_acomApplet->setMode(t.mode);
+
+            // 0xFF heisst „kein Fehler" -- und nur dann ist der
+            // Loeschknopf sinnlos.
+            const bool fehlerAn = (t.errorCode != 0xFF);
+            m_acomApplet->setFaultText(
+                fehlerAn ? Acom::errorCodeName(t.errorCode) : QString());
+            m_acomApplet->setClearFaultEnabled(fehlerAn);
+        });
+
+        connect(acomConn, &AcomConnection::modelChanged, this,
+                [this](const QString& name, const QString& grund) {
+            if (!m_acomApplet) { return; }
+            const auto& spec = Acom::modelSpec(name);
+            m_acomApplet->setPowerRange(spec.nominalForwardW, spec.maxForwardW);
+            m_acomApplet->setReflectedRange(spec.nominalReflectedW, spec.maxReflectedW);
+            m_acomApplet->setModelName(name);
+            // „Warum ist die Skala, wie sie ist" -- als Sprechblase, nicht
+            // als Feld. Der Grund ist die halbe Auskunft: „default" heisst
+            // geraten, „confirmed" heisst vom Geraet bestaetigt,
+            // „auto-scaled" heisst aus der beobachteten Leistung
+            // geschlossen.
+            m_acomApplet->setDiagnosticTooltip(
+                tr("Leistungsklasse %1 (%2). Nennleistung %3 W, Skalenende "
+                   "%4 W.\n\nDie Beschreibung des Herstellers dokumentiert nur "
+                   "einen Typcode, darum wird die Klasse aus der beobachteten "
+                   "Leistung geschlossen, wenn das Gerät sie nicht bestätigt.")
+                    .arg(name, grund)
+                    .arg(spec.nominalForwardW, 0, 'f', 0)
+                    .arg(spec.maxForwardW, 0, 'f', 0));
+        });
+
+        connect(acomConn, &AcomConnection::systemConfigReceived, this,
+                [](const Acom::SystemConfig& cfg) {
+            // Nur ins Protokoll -- der Zweck ist, eine unbekannte
+            // Typkennung melden zu koennen (siehe AcomProtocol.h).
+            qCInfo(lcConnection) << "ACOM SystemConfig: Typ" << cfg.amplifierType
+                                 << "Firmware" << cfg.fwVersion << "." << cfg.fwSubVersion
+                                 << "Seriennummer" << cfg.serialNumberHex;
+        });
+
+        // Fenster -> Verbindung. Drei Zielzustaende, drei Knoepfe.
+        connect(m_acomApplet, &AcomApplet::standbyClicked, acomConn, [acomConn]() {
+            acomConn->setOperate(false);
+        });
+        connect(m_acomApplet, &AcomApplet::operateClicked, acomConn, [acomConn]() {
+            acomConn->setOperate(true);
+        });
+        connect(m_acomApplet, &AcomApplet::offClicked,
+                acomConn, &AcomConnection::powerOff);
+        connect(m_acomApplet, &AcomApplet::clearFaultClicked,
+                acomConn, &AcomConnection::clearFaults);
+    }
+
     // Antenna labels: load operator-set labels from AppSettings at startup.
     // Keys: RfKit_Ant1_Label .. RfKit_Ant4_Label (stored by RfKitPage.cpp).
     // If a key is absent or empty the applet already shows "ANT N" by default.
@@ -7422,6 +7751,9 @@ void MainWindow::populateDefaultMeter()
     m_appletsById[QStringLiteral("Amp")]        = m_ampApplet;
     m_appletsById[QStringLiteral("Tuner")]      = m_tunerApplet;
     m_appletsById[QStringLiteral("RfKit")]      = m_rfKitApplet;
+    m_appletsById[QStringLiteral("Spe")]        = m_speApplet;
+    m_appletsById[QStringLiteral("Kpa500")]     = m_kpa500Applet;
+    m_appletsById[QStringLiteral("Acom")]       = m_acomApplet;
     m_appletsById[QStringLiteral("Frequency")]        = m_frequencyApplet;
     m_appletsById[QStringLiteral("SwrInstrument")]    = m_swrInstrument;
     m_appletsById[QStringLiteral("SignalInstrument")] = m_signalInstrument;
@@ -7501,6 +7833,12 @@ void MainWindow::populateDefaultMeter()
                                 QStringLiteral("Tuner Genius"), true);
     m_appletVis->registerApplet(QStringLiteral("RfKit"),
                                 QStringLiteral("RF-Kit RF2K-S"), true);
+    m_appletVis->registerApplet(QStringLiteral("Spe"),
+                                QStringLiteral("SPE Expert"),   true);
+    m_appletVis->registerApplet(QStringLiteral("Kpa500"),
+                                QStringLiteral("Elecraft KPA500"), true);
+    m_appletVis->registerApplet(QStringLiteral("Acom"),
+                                QStringLiteral("ACOM"),          true);
     // Die beiden Instrumente. defaultVisible=true, damit sie beim
     // ersten Start dastehen und angesehen werden können — das ist der
     // Zweck dieses Schritts. Wer sie nicht will, blendet sie über das
@@ -7660,6 +7998,23 @@ void MainWindow::populateDefaultMeter()
         QStringLiteral("Endstufen"),
         {QStringLiteral("rf-kit"), QStringLiteral("rf2k"),
          QStringLiteral("verstaerker"), QStringLiteral("endstufe")});
+    m_appletVis->describeApplet(QStringLiteral("Acom"),
+        QStringLiteral("Endstufen"),
+        {QStringLiteral("acom"), QStringLiteral("600s"),
+         QStringLiteral("700s"), QStringLiteral("1200s"),
+         QStringLiteral("2020s"), QStringLiteral("verstaerker"),
+         QStringLiteral("endstufe")});
+    m_appletVis->describeApplet(QStringLiteral("Kpa500"),
+        QStringLiteral("Endstufen"),
+        {QStringLiteral("kpa500"), QStringLiteral("kpa"),
+         QStringLiteral("elecraft"), QStringLiteral("500 w"),
+         QStringLiteral("verstaerker"), QStringLiteral("endstufe")});
+    m_appletVis->describeApplet(QStringLiteral("Spe"),
+        QStringLiteral("Endstufen"),
+        {QStringLiteral("spe"), QStringLiteral("expert"),
+         QStringLiteral("taurus"), QStringLiteral("1.3k"),
+         QStringLiteral("1.5k"), QStringLiteral("2k-fa"),
+         QStringLiteral("verstaerker"), QStringLiteral("endstufe")});
 #ifdef HAVE_WEBSOCKETS
     if (m_tciApplet) {
         m_appletVis->registerApplet(QStringLiteral("Tci"),
@@ -7813,6 +8168,17 @@ void MainWindow::populateDefaultMeter()
     // Default OFF; live-updated via rfKitEnabledChanged below.
     const bool rfKitOn = m_radioModel && m_radioModel->rfKitEnabled();
     m_appletVis->setAvailable(QStringLiteral("RfKit"), rfKitOn);
+
+    // SPE Expert: dasselbe, eigener Umschalter.
+    const bool speOn = m_radioModel && m_radioModel->speEnabled();
+    m_appletVis->setAvailable(QStringLiteral("Spe"), speOn);
+
+    const bool kpaOn = m_radioModel && m_radioModel->kpa500Enabled();
+    m_appletVis->setAvailable(QStringLiteral("Kpa500"), kpaOn);
+
+    const bool acomOn = m_radioModel && m_radioModel->acomEnabled();
+    m_appletVis->setAvailable(QStringLiteral("Acom"), acomOn);
+
 
     // ── Die Reihenfolge im Stapel ────────────────────────────────────
     //
@@ -8848,6 +9214,24 @@ void MainWindow::populateDefaultMeter()
             if (!m_appletVis) { return; }
             m_appletVis->setAvailable(QStringLiteral("RfKit"), enabled);
         });
+
+        connect(m_radioModel, &RadioModel::speEnabledChanged,
+                this, [this](bool enabled) {
+            if (!m_appletVis) { return; }
+            m_appletVis->setAvailable(QStringLiteral("Spe"), enabled);
+        });
+
+        connect(m_radioModel, &RadioModel::kpa500EnabledChanged,
+                this, [this](bool enabled) {
+            if (!m_appletVis) { return; }
+            m_appletVis->setAvailable(QStringLiteral("Kpa500"), enabled);
+        });
+
+        connect(m_radioModel, &RadioModel::acomEnabledChanged,
+                this, [this](bool enabled) {
+            if (!m_appletVis) { return; }
+            m_appletVis->setAvailable(QStringLiteral("Acom"), enabled);
+        });
     }
 
     // ── Das ☰-Menue am Panel ist weggefallen (2026-08-18) ───────────
@@ -9417,24 +9801,40 @@ void MainWindow::buildMenuBar()
     }
 
     {
-        QMenu* uiScaleMenu = viewMenu->addMenu(QStringLiteral("&UI Scale"));
+        // Darstellungsgroesse (2026-10-09). Der Unterbau stand schon:
+        // `main.cpp` liest `UiScalePercent` aus den Einstellungen und
+        // setzt daraus `QT_SCALE_FACTOR` -- und zwar VOR dem
+        // QApplication-Konstruktor, weil Qt den Faktor nur dort liest.
+        // Nur das Menue war tot (jeder Eintrag `setEnabled(false)`,
+        // Tooltip "NYI"), man konnte die Groesse also ueberhaupt nicht
+        // einstellen; sie haette von Hand in die Einstellungsdatei
+        // gemusst.
+        //
+        // Genau daraus folgt auch, warum eine Aenderung erst nach einem
+        // Neustart greift: `QT_SCALE_FACTOR` wirkt nur beim Start. Das
+        // sagen wir dem Benutzer, statt eine Aenderung vorzutaeuschen,
+        // die er nicht sieht.
+        //
+        // Die Stufen: 75 bis 200 wie bisher vorgesehen, dazu 115 und 130
+        // als feine Zwischenstufen -- von 100 auf 125 ist ein grosser
+        // Sprung, und genau dort liegt der Bedarf.
+        QMenu* uiScaleMenu = viewMenu->addMenu(QStringLiteral("&Darstellungsgröße"));
         QActionGroup* scaleGroup = new QActionGroup(this);
         scaleGroup->setExclusive(true);
-        const struct { const char* label; bool isDefault; } scales[] = {
-            { "&75%",  false },
-            { "&100%", true  },
-            { "&125%", false },
-            { "&150%", false },
-            { "&175%", false },
-            { "&200%", false },
-        };
-        for (const auto& s : scales) {
-            QAction* a = uiScaleMenu->addAction(QString::fromUtf8(s.label));
+
+        const int aktuell = UiScale::current();
+        for (int pct : UiScale::steps()) {
+            QAction* a = uiScaleMenu->addAction(QStringLiteral("%1 %").arg(pct));
             a->setCheckable(true);
-            a->setEnabled(false);
-            a->setToolTip(QStringLiteral("NYI — Phase X"));
-            if (s.isDefault) { a->setChecked(true); }
+            a->setChecked(pct == aktuell);
+            a->setData(pct);
             scaleGroup->addAction(a);
+            connect(a, &QAction::triggered, this, [this, pct]() {
+                if (!UiScale::store(pct)) { return; }
+                QMessageBox::information(this,
+                                         QStringLiteral("Darstellungsgröße"),
+                                         UiScale::restartHint(pct));
+            });
         }
     }
 
@@ -10556,6 +10956,7 @@ void MainWindow::buildMenuBar()
 // same badge through the same opacity-only state change -- a plain
 // setVisible() no longer represents "inactive" once a badge lives in a
 // permanently allocated slot.
+
 void MainWindow::dimSafetyBadge(QWidget* w, bool active)
 {
     auto* fx = qobject_cast<QGraphicsOpacityEffect*>(w->graphicsEffect());
@@ -12292,16 +12693,23 @@ void MainWindow::rebindRttyRadeAvailability(SliceModel* slice)
     for (const auto& c : m_rttyRadeLinks) { disconnect(c); }
     m_rttyRadeLinks.clear();
 
-    // RttyDecoderApplet is a single global widget, not per-flag -- it
-    // follows whichever slice is CURRENTLY active. setSlice() already
-    // disconnects its own old mark/shift links and re-points the audio
-    // tap (RttyDecoderApplet::setSlice), so calling it again here with the
-    // (possibly unchanged) active slice is cheap and safe.
+    // Die Decoder sind einzelne, globale Fenster, keine je Flagge.
+    // setSlice() loest die eigenen alten Verbindungen und richtet den
+    // Audio-Abgriff neu aus, der Aufruf ist also auch mit unveraendertem
+    // Empfaenger billig und gefahrlos.
+    //
+    // NICHT den aktiven Empfaenger uebergeben, sondern den GEBUNDENEN
+    // (2026-10-09): seit der Empfaengerwahl kann ein Decoder an einem
+    // festen Empfaenger haengen. Wer hier `slice` durchreichte, zoege ihn
+    // bei jedem Wechsel doch wieder auf den aktiven -- die Wahl waere
+    // wirkungslos, und zwar auf eine Art, die man erst im Betrieb merkt.
+    // Steht die Wahl auf "folgt dem aktiven" (Vorgabe), liefert
+    // boundSlice() genau `slice`.
     if (m_rttyDecoderApplet) {
-        m_rttyDecoderApplet->setSlice(slice);
+        m_rttyDecoderApplet->setSlice(m_rttyDecoderApplet->boundSlice());
     }
     if (m_cwDecoderApplet) {
-        m_cwDecoderApplet->setSlice(slice);
+        m_cwDecoderApplet->setSlice(m_cwDecoderApplet->boundSlice());
     }
 
     if (!m_appletVis) { return; }

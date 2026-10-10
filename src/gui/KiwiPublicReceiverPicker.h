@@ -7,6 +7,7 @@
 // Das KiwiSDR-Protokoll stammt von John Seamons (ZL/KF6VO),
 // http://kiwisdr.com.
 //
+// Modification history (Longpath):
 //   2026-08-23 — Portiert (Stufe 4: Bedienflaeche).
 //                EINE Abweichung von der Vorlage, und sie ist
 //                bewusst: dort erbt der Dialog von PersistentDialog,

@@ -38,10 +38,12 @@ class QSlider;
 class QPushButton;
 class QFrame;
 class QHBoxLayout;
+class QLabel;
 
 namespace Longpath {
 
 class RadioModel;
+class SliceModel;
 
 class AppletWidget : public QWidget {
     Q_OBJECT
@@ -64,9 +66,65 @@ public:
     virtual bool hasExtendedSettings() const { return false; }
     virtual void openExtendedSettings() {}
 
+    // --- Empfaengerbindung (Longpath, 2026-10-09) -----------------------
+    //
+    // Bis hierher hingen die Decoder-Applets am AKTIVEN Empfaenger
+    // (`RadioModel::activeSlice()`). Wer den Empfaenger wechselte, nahm
+    // den Decoder mit -- RX1 auf Sprache lassen und RX2 nebenher CW
+    // dekodieren ging nicht.
+    //
+    // Mit der Bindung bekommt jedes Applet eine eigene Wahl: dem
+    // aktiven folgen (Vorgabe, also genau das bisherige Verhalten) oder
+    // an einem festen Empfaenger haengen bleiben. Die Wahl liegt im
+    // geteilten Zahnrad der Zelle (`openExtendedSettings`), der Zustand
+    // steht in der Titelleiste -- man soll sehen, welcher Empfaenger
+    // dekodiert wird, ohne ein Menue aufzuklappen.
+
+    /// Wahl "dem aktiven Empfaenger folgen".
+    static constexpr int kFollowsActive = -1;
+
+public:
+    /// Die gewaehlte Empfaenger-KENNUNG, oder `kFollowsActive`.
+    ///
+    /// Eine Kennung, keine Listenposition, und das ist der Kern der
+    /// Sache: Positionen rutschen. Wer "RX2" waehlt und dann RX1
+    /// loescht, haengt mit einer Position ploetzlich an einem anderen
+    /// Geraet -- vom Pruefstand gefangen
+    /// (`placeholderWhenTheFIXEDReceiverIsRemoved`). Kennungen bleiben
+    /// (`RadioModel::sliceById`: "stable for the life of a slice"), und
+    /// Martin meint beim Waehlen den Empfaenger, nicht den Listenplatz.
+    /// Die Beschriftung "RX2" rechnet sich aus der aktuellen Position.
+    int receiverChoice() const { return m_receiverChoice; }
+    /// Setzt die Wahl (eine Empfaenger-Kennung) und merkt sie sich unter
+    /// `appletId()`.
+    void setReceiverChoice(int sliceId);
+    /// Der Empfaenger, der jetzt gilt: der gewaehlte, oder der aktive,
+    /// wenn die Wahl `kFollowsActive` ist. Nullptr, wenn es ihn nicht
+    /// (mehr) gibt -- ein Empfaenger kann verschwinden, waehrend ein
+    /// Applet auf ihn zeigt.
+    SliceModel* boundSlice() const;
+    /// Kurzform fuer die Titelleiste: leer beim Folgen, sonst "RX2".
+    QString receiverChoiceLabel() const;
+
+signals:
+    /// Der gebundene Empfaenger hat gewechselt -- entweder weil die Wahl
+    /// geaendert wurde, oder weil der aktive wechselte und wir ihm
+    /// folgen.
+    void boundSliceChanged(SliceModel* slice);
+
 protected:
+    /// Liest die gemerkte Wahl und haengt sich an
+    /// `RadioModel::activeSliceChanged`. Aus dem Konstruktor der
+    /// abgeleiteten Klasse aufrufen, sobald `appletId()` benutzbar ist.
+    void initReceiverBinding();
+    /// Ein fertiges Menue zur Empfaengerwahl, zum Einhaengen in das
+    /// Zahnrad-Popup der abgeleiteten Klasse.
+    QWidget* receiverChoiceWidget(QWidget* parent);
+
     // Call from subclass constructor to add the gradient title bar
     QWidget* appletTitleBar(const QString& text);
+    /// Schreibt den Zusatz hinter den Titel ("CW DECODER · RX2").
+    void setTitleBarSuffix(const QString& suffix);
 
     // Create standard slider row: [Label(labelWidth) | Slider(stretch) | ValueLabel(36px)]
     QHBoxLayout* sliderRow(const QString& label, QSlider* slider,
@@ -95,6 +153,16 @@ protected:
     // greifen damit von selbst.
     QPointer<RadioModel> m_model;
     bool m_updatingFromModel = false;
+
+private:
+    int      m_receiverChoice{kFollowsActive};
+    QString  m_titleBarText;
+    QPointer<QLabel> m_titleBarLabel;
+    /// Der zuletzt gemeldete Empfaenger -- damit `boundSliceChanged`
+    /// nur feuert, wenn sich wirklich etwas aendert.
+    QPointer<SliceModel> m_lastBound;
+    /// Prueft, ob sich `boundSlice()` geaendert hat, und meldet es.
+    void refreshBoundSlice();
 };
 
 } // namespace Longpath

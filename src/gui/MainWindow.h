@@ -329,6 +329,14 @@ public:
     /// pinned without standing MainWindow up.
     static QString tnfAddRejectedNotice(const QString& reason);
 
+    /// Ist dieses Fenster OHNE die gespeicherte Anordnung hochgefahren,
+    /// weil zuvor zwei Starts hintereinander steckenblieben? Siehe
+    /// core/StartWatch.h.
+    bool startedSafely() const { return m_startedSafely; }
+    /// Wieviele Starts davor nicht durchkamen (0, wenn normal
+    /// hochgefahren).
+    int  failedStartCount() const { return m_failedStartCount; }
+
 public slots:
     // ── Phase 3M-0 Task 14 helper slots ──────────────────────────────────
     // Update PA status badge state. Wired by Task 17 to
@@ -709,6 +717,8 @@ private:
     // Start: das offene Logbuch vor Panadapter und Rotor/Log (2026-09-26).
     void raiseLogbookIfOpen();
     // Start mit offenem Logbuch: nach dem Verbinden-Fenster nach vorne.
+    bool m_startedSafely{false};
+    int  m_failedStartCount{0};
     bool m_raiseLogbookAfterConnectMask{false};
     void openRotorSetup();
     void openVoiceCheck();
@@ -1742,6 +1752,9 @@ private:
 
     // Phase 3P-III Task 14: RF-Kit RF2K-S applet.
     class Rf2ksApplet*      m_rfKitApplet{nullptr};
+    class SpeApplet*        m_speApplet{nullptr};
+    class Kpa500Applet*    m_kpa500Applet{nullptr};
+    class AcomApplet*      m_acomApplet{nullptr};
 
     // Phase 23: TCI server + applets.
     // m_tciServer is nullptr in non-WebSocket builds (HAVE_WEBSOCKETS not defined).
