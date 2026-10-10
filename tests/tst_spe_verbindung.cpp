@@ -494,6 +494,17 @@ void TstSpeVerbindung::einZweiterImpulsWaehrendDesErstenWirdNichtAngefangen()
     m_amp->antwortet = false;
     m_amp->empfangenLeeren();
 
+    // Dieser Fall laeuft in der ECHTEN Impulszeit, nicht in der
+    // gestauchten aus init(). Grund: er braucht ein Zeitfenster, in dem
+    // die Folge nachweislich mitten drin steht, und dieses Fenster ist
+    // bei 0,02 genau 20 ms lang -- QTRY_VERIFY prueft aber in Stufen
+    // von bis zu 50 ms. Auf dem Bauknecht ist er darum am 2026-10-09
+    // gefallen (macOS-Lauf 37988533368): das Byte war da, die Folge
+    // aber schon fertig. Mit Faktor 1,0 ist das Fenster 1000 ms lang
+    // und haengt nicht mehr an der Last der Maschine. Kostet 1,9 s --
+    // der einzige Fall in dieser Datei, der sich das nimmt.
+    m_verb->setPowerOnPulseScale(1.0);
+
     const QByteArray will  = Spe::Rfc2217::buildWillComPortOption();
     const QByteArray rtsAn = Spe::Rfc2217::buildSetControl(Spe::Rfc2217::kRtsOn);
 
@@ -502,7 +513,7 @@ void TstSpeVerbindung::einZweiterImpulsWaehrendDesErstenWirdNichtAngefangen()
 
     // Warten, bis Schritt 2 heraus ist -- jetzt ist die Folge mitten
     // drin (Schritt 3 steht noch aus).
-    QTRY_VERIFY_WITH_TIMEOUT(m_amp->empfangen().contains(rtsAn), 2000);
+    QTRY_VERIFY_WITH_TIMEOUT(m_amp->empfangen().contains(rtsAn), 3000);
     QVERIFY2(fertig.isEmpty(), "Die Folge war schon fertig -- der Fall prueft "
                                "dann nichts");
 
@@ -511,6 +522,10 @@ void TstSpeVerbindung::einZweiterImpulsWaehrendDesErstenWirdNichtAngefangen()
 
     QVERIFY2(fertig.wait(3000), "Die Impulsfolge wurde nie fertig");
     QVERIFY2(!fertig.wait(300), "Eine zweite Impulsfolge lief an");
+    // Der eigentliche Faenger ist die Zaehlung unten: ohne den Waechter
+    // setzt jeder weitere Aufruf den Schrittzaehler zurueck und schickt
+    // ein weiteres WILL -- die Folge wird dann trotzdem nur EINMAL
+    // fertig, nur spaeter. Darum entscheidet das WILL auf der Leitung.
     QCOMPARE(fertig.size(), 1);
     QCOMPARE(m_amp->empfangen().count(will), 1);
 }
