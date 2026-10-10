@@ -1246,7 +1246,7 @@ QWidget* StripWindow::buildTxSpectrumPanel()
         // number is stated rather than assumed silently.
         const QString a = TxSpectrumAnalysis::advice(occ, 2700.0);
         advice->setText(a.isEmpty()
-            ? QStringLiteral("Within a normal 2.7 kHz SSB filter.")
+            ? Sprache::T(QStringLiteral("Within a normal 2.7 kHz SSB filter."))
             : a);
         advice->setVisible(true);
     });
@@ -2012,8 +2012,8 @@ void StripWindow::saveUserPreset()
 
     if (!StripSettings::saveUserPreset(name, *c)) {
         QMessageBox::warning(this, QStringLiteral("Save preset"),
-            QStringLiteral("That name can't be used. It needs at least one "
-                           "character and no slashes."));
+            Sprache::T(QStringLiteral("That name can't be used. It needs at least one "
+                           "character and no slashes.")));
         return;
     }
     rebuildPresetBox(name.trimmed());
@@ -2052,7 +2052,7 @@ void StripWindow::applyPreset(const QString& name)
     if (!applied) { applied = StripSettings::applyBuiltIn(name, *c); }
     if (!applied) { return; }
 
-    m_presetNote->setText(QStringLiteral("Your own setting: %1").arg(name));
+    m_presetNote->setText(Sprache::T(QStringLiteral("Your own setting: %1")).arg(name));
     for (const auto& p : StripSettings::builtInPresets()) {
         if (p.name == name) { m_presetNote->setText(p.description); break; }
     }
@@ -2670,11 +2670,16 @@ void StripWindow::refreshCharacter(StageText& st, StripChain::Stage stage,
         // between a label describing the STAGE and one describing a
         // button somebody pressed once — without it the description
         // below explains settings the stage no longer has.
+        // Name UND Beschreibung durch die Sprache: beide kommen aus
+        // dem Katalog in core/strip/StripCharacters und stehen dort
+        // englisch -- wie jeder Quelltext in diesem Baum.
         st.charNote->setText(edited
-            ? QStringLiteral("Started from %1, adjusted since — what follows "
-                             "is where you began, not where you are.\n\n%2")
-                  .arg(ch.name, ch.description)
-            : ch.description);
+            ? Sprache::T(
+                  QStringLiteral("Started from %1, adjusted since — what "
+                                 "follows is where you began, not where "
+                                 "you are.\n\n%2"))
+                  .arg(Sprache::T(ch.name), Sprache::T(ch.description))
+            : Sprache::T(ch.description));
         return;
     }
     // Matches nothing and nothing was ever chosen: a hand-built stage,
@@ -3232,12 +3237,12 @@ void StripWindow::refreshInsertCards()
             "does on its own, and they stay that way."));
         return;
     }
-    m_insertsNote->setText(QStringLiteral(
+    m_insertsNote->setText(Sprache::T(QStringLiteral(
         "%1 effect(s) found, sorted by where they usually belong. "
         "Drag one onto the chain at the top of this window — the gap "
         "you are over lights up, and that is where it lands. The × on "
         "its tile takes it out again. The groups are a suggestion, not "
-        "a rule: the position is yours to pick.")
+        "a rule: the position is yours to pick."))
         .arg(m_plugins.size()));
 }
 
@@ -3292,13 +3297,13 @@ void StripWindow::refreshInsertCard(int slot)
                                                   ? QStringLiteral("—")
                                                   : d.vendor);
     if (lat > 0 && c != nullptr && c->sampleRate() > 0.0) {
-        t += QStringLiteral("  ·  adds %1 ms of delay")
+        t += Sprache::T(QStringLiteral("  ·  adds %1 ms of delay"))
                  .arg(1000.0 * lat / c->sampleRate(), 0, 'f', 1);
     }
     const uint32_t bad = c != nullptr ? c->nonFiniteInsertBlocks(slot) : 0;
     if (bad > 0) {
-        t += QStringLiteral("  ·  %1 block(s) came back as not-a-number "
-                            "and were discarded").arg(bad);
+        t += Sprache::T(QStringLiteral("  ·  %1 block(s) came back as not-a-number "
+                            "and were discarded")).arg(bad);
     }
     ui.note->setText(t);
 

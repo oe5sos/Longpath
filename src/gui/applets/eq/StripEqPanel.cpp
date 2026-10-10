@@ -673,22 +673,22 @@ void StripEqPanel::refreshHistoryButtons()
         // the curve, which is the thing being looked at.
         m_undoBtn->setToolTip(
             canUndo
-                ? QStringLiteral("Undo the last change  (%1 step%2 back, "
-                                 "%3)")
+                ? Sprache::T(QStringLiteral("Undo the last change  (%1 step%2 back, "
+                                 "%3)"))
                       .arg(m_audio->undoDepth())
                       .arg(m_audio->undoDepth() == 1 ? QString()
                                                      : QStringLiteral("s"))
                       .arg(QKeySequence(QKeySequence::Undo)
                                .toString(QKeySequence::NativeText))
-                : QStringLiteral("Nothing to undo yet"));
+                : Sprache::T(QStringLiteral("Nothing to undo yet")));
     }
     if (m_redoBtn) {
         m_redoBtn->setEnabled(canRedo);
         m_redoBtn->setToolTip(canRedo
-            ? QStringLiteral("Redo the step just undone  (%1)")
+            ? Sprache::T(QStringLiteral("Redo the step just undone  (%1)"))
                   .arg(QKeySequence(QKeySequence::Redo)
                            .toString(QKeySequence::NativeText))
-            : QStringLiteral("Nothing to redo"));
+            : Sprache::T(QStringLiteral("Nothing to redo")));
     }
 }
 

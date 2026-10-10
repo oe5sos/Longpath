@@ -2,6 +2,43 @@
 
 ## [Unreleased]
 
+### Deutsch als Sprache des Hauses
+
+> „generell sollte für mich primär alles in deutsch sein, eine
+>  englische version sollte es natürlich auch geben."
+
+`core/Sprache`: Englisch bleibt im Quelltext, Deutsch steht in einer
+Tabelle (**239 Einträge**), und ein Durchgang durch den fertigen
+Widget-Baum tauscht aus, was er findet — Beschriftungen, Knöpfe,
+Haken, Gruppen, Auswahlfelder, Reiter, Kurzhilfen, Fenstertitel. Ein
+Aufruf je Fenster statt zweihundert Änderungen an den Aufrufstellen.
+
+Texte, die erst zur Laufzeit entstehen, erwischt kein Durchgang: die
+Messzeilen, die Erklärtexte unter den Kurven, die Hinweiszeilen oben,
+der ganze Charakter-Katalog. Die haben ein `Sprache::T()` um ihre
+Vorlage bekommen — rund 50 Stellen, einzeln eingefasst.
+
+Fehlt ein Eintrag, erscheint der englische Text: sichtbar und damit
+auffindbar, statt einer leeren Zeile. Umschaltbar über die
+Einstellung `Sprache` (`de`/`en`).
+
+### Plugins: von selbst gefunden, und sie erklären sich
+
+> „ich muss auch immer auf look for plugins klicken … ggf auch beim
+>  drüber scrollen eine kurze beschreibung"
+
+Gesucht wird, sobald der Reiter aufgeht — der Knopf heißt jetzt
+„Erneut suchen" und ist keine Voraussetzung mehr. Beim Programmstart
+wird weiterhin nicht gesucht: wer die Seite nie öffnet, lädt nie
+fremden Code.
+
+`PluginPlacement::beschreibung()` sagt in einem Satz, was ein Plugin
+tut — aus einer Tabelle der Stücke, die wir kennen, einschließlich
+der Warnungen (AUNetSend ist kein Effekt, AURogerBeep ein Scherz).
+Was nicht darin steht, bekommt die geratene Gruppe, und dass sie
+geraten ist, steht dabei. Zu lesen in einer festen Zeile unter der
+Liste statt in einer Kurzhilfe, auf die man warten muss.
+
 ### Raum und Mikrofon messen — da, wo Software aufhört zu helfen
 
 Ein Entzerrer legt keinen Raum trocken, ein Kompressor repariert
