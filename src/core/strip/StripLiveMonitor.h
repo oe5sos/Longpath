@@ -51,6 +51,7 @@
 #include <QAudioDevice>
 #include <QAudioFormat>
 #include "core/strip/BandLimit.h"
+#include "core/strip/ClientFinalLimiter.h"
 
 #include <QObject>
 #include <QString>
@@ -238,6 +239,28 @@ private:
     MicSpectrum* m_spectrum{nullptr};   // nicht besessen
     // Der Kanal, durch den gehoert wird. Hinter der Kette.
     BandLimit m_band;
+    // ── Der Begrenzer HINTER dem Kanal ───────────────────────────
+    //
+    // Clippen erzeugt Energie weit ausserhalb des Kanals, und das
+    // Kanalfilter nimmt sie wieder weg -- genau die Energie, die die
+    // Spitzen flach gehalten hat. Der Begrenzer in der Kette sieht
+    // also eine andere Wellenform als die, die herauskommt.
+    //
+    // Am Geraet gemessen (2026-10-10, echte Sprache durch die
+    // Empfehlung, Kanal 50-4050):
+    //
+    //   Kette -> Kanal                     Spitze +3,35 dBFS · -16,8 LUFS
+    //   Kette ohne Begrenzer -> Kanal
+    //     -> Begrenzer                     Spitze -2,00 dBFS · -12,3 LUFS
+    //
+    // Die zweite Reihenfolge haelt die Spitze UND ist 4,5 dB dichter.
+    // Sie ist ausserdem die ehrlichere Nachbildung: im Sender steht
+    // hinter dem Bandfilter auch eine Regelung, nicht davor.
+    //
+    // Nur aktiv, wenn ein Kanal gewaehlt ist. Bei „roh" haelt der
+    // Begrenzer der Kette selbst, und ein zweiter waere eine Stufe
+    // ohne Aufgabe.
+    ClientFinalLimiter m_kanalBegrenzer;
     std::unique_ptr<MicSpectrum> m_inRing;
     std::unique_ptr<MicSpectrum> m_outRing;
     const StripChain* m_mirror{nullptr};   // nicht besessen

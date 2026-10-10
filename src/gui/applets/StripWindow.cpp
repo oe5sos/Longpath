@@ -1430,6 +1430,29 @@ QWidget* StripWindow::buildCompPanel()
             if (StripChain* c = chain()) { c->comp().setMakeupDb(float(v)); }
         }, 1, [this]{ persist(); });
 
+    // ── Der Ausgleich ────────────────────────────────────────────────
+    //
+    // Direkt unter dem Makeup, weil er dasselbe tut -- nur
+    // ausgerechnet statt geraten. Ohne ihn macht mehr Kompression die
+    // Stimme DUENNER: der Kompressor nimmt den Pegel weg, den der
+    // Clipper braucht, und der Clipper ist die Stufe, die Druck
+    // macht. Gemessen am 2026-10-10 ueber vier Einstellungen
+    // (tst_bandbreiten_genau::autoMakeupWouldStopTheInversion).
+    auto* autoMk = new QCheckBox(
+        QStringLiteral("Make-up follows threshold and ratio"), page);
+    autoMk->setChecked(chain() ? chain()->comp().autoMakeup() : false);
+    autoMk->setToolTip(QStringLiteral(
+        "Adds back exactly what the curve takes off a −12 dBFS peak: "
+        "(−12 − threshold) × (1 − 1/ratio). Without it, turning the "
+        "compressor up makes the voice thinner, because it steals the "
+        "level the clipper needs — measured −15.9 → −19.4 LUFS across "
+        "3:1 to 8:1. With it, the same range reads −13.0 → −10.0."));
+    form->addRow(autoMk);
+    connect(autoMk, &QCheckBox::toggled, this, [this](bool v) {
+        if (StripChain* c = chain()) { c->comp().setAutoMakeup(v); }
+        persist();
+    });
+
     // The phase rotator earns its own row and its own sentence: it is
     // the one control here that raises average power without making
     // anything louder, and nobody guesses that from the name.
@@ -3741,9 +3764,15 @@ void StripWindow::refreshMeters()
                 .arg(c->deEss().sidechainPeakDb(), 0, 'f', 1));
     }
     if (m_compMeter) {
+        // Der ausgerechnete Ausgleich gehoert hierher und nicht in
+        // eine Hilfe: er ist der Unterschied zwischen „der Regler tut
+        // nichts" und „der Regler tut genau das".
         m_compMeter->setText(Sprache::T(QStringLiteral(
-            "Compressor: %1 dB of reduction · in %2 dBFS · out %3 dBFS"))
+            "Compressor: %1 dB of reduction · %2 dB made up · "
+            "in %3 dBFS · out %4 dBFS"))
                 .arg(c->comp().gainReductionDb(), 0, 'f', 1)
+                .arg(c->comp().makeupDb() + c->comp().autoMakeupDb(),
+                     0, 'f', 1)
                 .arg(c->comp().inputPeakDb(), 0, 'f', 1)
                 .arg(c->comp().outputPeakDb(), 0, 'f', 1));
     }

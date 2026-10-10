@@ -40,6 +40,8 @@
 #include "core/strip/BandLimit.h"
 #include "core/strip/ClientDeEss.h"
 #include "core/strip/ClientEq.h"
+#include "core/Loudness.h"
+#include "core/strip/ClientFinalLimiter.h"
 #include "core/strip/StripChain.h"
 #include "core/strip/StripSettings.h"
 
@@ -1592,8 +1594,21 @@ private slots:
         // Was ohne Zweifel falsch ist: durch irgendeinen Kanal über
         // Vollaussteuerung zu kommen. Dort schneidet die Soundkarte
         // ab, und im Sender die Endstufe.
+        //
+        // Die Decke der Kette allein reicht dafuer NICHT -- siehe
+        // clipThenFilterThenLimit(). Deshalb steht im Mithoerweg
+        // hinter dem Kanalfilter ein zweiter Begrenzer, und hier
+        // wird dieselbe Reihenfolge nachgestellt.
         for (int ch = 0; ch < BandLimit::kChannelCount; ++ch) {
-            const double nach = spitze(durchKanal(ch, kette));
+            auto nachKanal = durchKanal(ch, kette);
+            ClientFinalLimiter lim;
+            lim.prepare(kRate);
+            lim.setEnabled(true);
+            lim.setCeilingDb(-2.0f);
+            for (size_t at = 0; at + 240 <= nachKanal.size(); at += 240) {
+                lim.process(nachKanal.data() + at, 240, 1);
+            }
+            const double nach = spitze(nachKanal);
             QVERIFY2(nach < 0.0,
                      qPrintable(QStringLiteral("%1: %2 dBFS nach dem Kanal")
                                     .arg(QString::fromUtf8(
@@ -1672,6 +1687,396 @@ private slots:
                        .arg(vor, 6, 'f', 2).arg(nach, 6, 'f', 2)
                        .arg(nach - vor, 5, 'f', 2);
         }
+    }
+
+    // ── Wo der Druck verloren geht ──────────────────────────────────
+    //
+    // „zu wenig druck in der stimme."
+    //
+    // Druck ist keine Lautstärke. Druck ist LAUTHEIT BEI GLEICHER
+    // SPITZE -- wie viel Stimme pro Dezibel Aussteuerung ankommt. Die
+    // Zahl dafür ist die Lautheit nach BS.1770, gemessen NACHDEM
+    // beide Fassungen auf dieselbe Spitze gebracht wurden. Alles
+    // andere vergleicht Äpfel mit lauteren Äpfeln.
+    //
+    // Hier geht jede Stufe kumulativ dazu, in Kettenreihenfolge, und
+    // es wird sichtbar, welche davon Druck macht und welche nur
+    // lauter.
+    void whereTheDensityIsLost()
+    {
+        QString warum;
+        const auto sauber = echteRede(&warum);
+        if (sauber.empty()) { QSKIP(qPrintable(warum)); }
+        const Rede rede = redeMitRauschen(sauber, -48.0);
+
+        // Auf -2 dBFS Spitze normieren, DANN Lautheit messen. So
+        // vergleicht man Dichte und nicht Verstärkung.
+        const auto druck = [](const std::vector<float>& v) {
+            double p = 0.0;
+            for (float x : v) { p = std::max(p, double(std::fabs(x))); }
+            std::vector<float> n = v;
+            if (p > 1e-9) {
+                const float g = float(std::pow(10.0, -2.0 / 20.0) / p);
+                for (float& x : n) { x *= g; }
+            }
+            return Loudness::measure(n.data(), int(n.size()), int(kRate));
+        };
+
+        const auto scheitel = [&rede](const std::vector<float>& v) {
+            double p = 0.0;
+            double s = 0.0;
+            size_t n = 0;
+            for (size_t i = 0; i < v.size(); ++i) {
+                if (rede.spricht[i] == 0) { continue; }
+                p = std::max(p, double(std::fabs(v[i])));
+                s += double(v[i]) * double(v[i]); ++n;
+            }
+            return dB(p) - dB(std::sqrt(s / std::max<size_t>(1, n)));
+        };
+
+        const auto r0 = druck(rede.signal);
+        qInfo().noquote()
+            << QStringLiteral("ROH                 Lautheit %1 LUFS bei "
+                              "-2 dBFS · Scheitelfaktor %2 dB · Umfang "
+                              "%3 LU")
+                   .arg(r0.integratedLufs, 6, 'f', 1)
+                   .arg(scheitel(rede.signal), 5, 'f', 1)
+                   .arg(r0.rangeLu, 4, 'f', 1);
+
+        qInfo().noquote() << QStringLiteral(
+            "                    Lautheit   Δ Druck   Scheitel   Umfang");
+        double vorher = r0.integratedLufs;
+        for (int bis = 0; bis < StripChain::kStageCount; ++bis) {
+            StripChain c;
+            empfehlung(c);
+            // Alles ABSCHALTEN, was hinter `bis` steht; was davor
+            // steht, bleibt so, wie die Empfehlung es gesetzt hat.
+            for (int i = bis + 1; i < StripChain::kStageCount; ++i) {
+                c.setStageEnabled(static_cast<StripChain::Stage>(i), false);
+            }
+            const auto y = durch(c, rede.signal);
+            const auto m = druck(y);
+            qInfo().noquote()
+                << QStringLiteral("  + %1   %2   %3   %4   %5")
+                       .arg(QString::fromLatin1(StripChain::stageName(
+                                static_cast<StripChain::Stage>(bis))), -14)
+                       .arg(m.integratedLufs, 7, 'f', 1)
+                       .arg(m.integratedLufs - vorher, 7, 'f', 1)
+                       .arg(scheitel(y), 7, 'f', 1)
+                       .arg(m.rangeLu, 6, 'f', 1);
+            vorher = m.integratedLufs;
+        }
+
+        // Was ohne Zweifel falsch wäre: eine Kette, die bei gleicher
+        // Spitze NICHT lauter ist als das rohe Signal. Dann wäre
+        // jede Stufe darin Zierde.
+        StripChain ganz;
+        empfehlung(ganz);
+        const auto fertig = druck(durch(ganz, rede.signal));
+        qInfo().noquote()
+            << QStringLiteral("GANZE KETTE: %1 -> %2 LUFS, also %3 dB mehr "
+                              "Druck bei gleicher Spitze")
+                   .arg(r0.integratedLufs, 0, 'f', 1)
+                   .arg(fertig.integratedLufs, 0, 'f', 1)
+                   .arg(fertig.integratedLufs - r0.integratedLufs, 0, 'f', 1);
+        QVERIFY2(fertig.integratedLufs > r0.integratedLufs + 3.0,
+                 qPrintable(QStringLiteral("die Kette bringt nur %1 dB "
+                                           "mehr Druck")
+                                .arg(fertig.integratedLufs
+                                     - r0.integratedLufs, 0, 'f', 1)));
+    }
+
+    // ── Wieviel Druck noch auf dem Tisch liegt ──────────────────────
+    //
+    // Dieselbe Kette, nur mit anderen Zahlen an den drei Hebeln, die
+    // überhaupt Dichte machen: Kompressorschwelle, Clipper-Drive und
+    // der Eingangspegel in den Begrenzer. Gemessen wird wieder
+    // Lautheit bei -2 dBFS Spitze.
+    void howMuchDensityIsStillOnTheTable()
+    {
+        QString warum;
+        const auto sauber = echteRede(&warum);
+        if (sauber.empty()) { QSKIP(qPrintable(warum)); }
+        const Rede rede = redeMitRauschen(sauber, -48.0);
+
+        const auto druck = [](const std::vector<float>& v) {
+            double p = 0.0;
+            for (float x : v) { p = std::max(p, double(std::fabs(x))); }
+            std::vector<float> n = v;
+            if (p > 1e-9) {
+                const float g = float(std::pow(10.0, -2.0 / 20.0) / p);
+                for (float& x : n) { x *= g; }
+            }
+            return Loudness::measure(n.data(), int(n.size()),
+                                     int(kRate)).integratedLufs;
+        };
+        const auto scheitel = [&rede](const std::vector<float>& v) {
+            double p = 0.0;
+            double s = 0.0;
+            size_t n = 0;
+            for (size_t i = 0; i < v.size(); ++i) {
+                if (rede.spricht[i] == 0) { continue; }
+                p = std::max(p, double(std::fabs(v[i])));
+                s += double(v[i]) * double(v[i]); ++n;
+            }
+            return dB(p) - dB(std::sqrt(s / std::max<size_t>(1, n)));
+        };
+
+        qInfo().noquote() << QStringLiteral(
+            "  Schwelle  Verhältnis  Drive   Lautheit   Scheitel");
+        struct Fall { double schwelle; double verh; double drive; };
+        const Fall faelle[] = {
+            { -22.0, 3.0, 12.0 },     // die Empfehlung von heute
+            { -22.0, 3.0, 18.0 },
+            { -28.0, 4.0, 12.0 },
+            { -28.0, 4.0, 18.0 },
+            { -34.0, 6.0, 18.0 },
+            { -34.0, 6.0, 24.0 },
+            { -40.0, 8.0, 24.0 },
+        };
+        for (const Fall& f : faelle) {
+            StripChain c;
+            empfehlung(c);
+            c.comp().setThresholdDb(float(f.schwelle));
+            c.comp().setRatio(float(f.verh));
+            c.clipper().setDriveDb(float(f.drive));
+            const auto y = durch(c, rede.signal);
+            qInfo().noquote()
+                << QStringLiteral("   %1 dB      %2:1    %3 dB   %4 LUFS   "
+                                  "%5 dB")
+                       .arg(f.schwelle, 5, 'f', 0).arg(f.verh, 3, 'f', 0)
+                       .arg(f.drive, 4, 'f', 0)
+                       .arg(druck(y), 7, 'f', 1)
+                       .arg(scheitel(y), 6, 'f', 1);
+        }
+    }
+
+    // ── Die Umkehrung: mehr Kompression, weniger Druck ──────────────
+    //
+    // Die Reihe oben zeigt etwas, das nicht sein darf: Schwelle -40
+    // mit 8:1 ist DÜNNER als Schwelle -22 mit 3:1. Der Regler tut das
+    // Gegenteil von dem, was draufsteht.
+    //
+    // Die Ursache steht in zwei Zeilen Quelltext:
+    //   ClientComp:    makeupDb hat die Vorgabe 0,0 und wird nicht
+    //                  nachgeführt -- Kompression macht also leiser.
+    //   ClientClipper: `const float x = samples[i] * drive;` und die
+    //                  Kante liegt bei VOLLAUSSTEUERUNG. Wieviel der
+    //                  Clipper abschneidet, hängt also vollständig am
+    //                  Pegel, der bei ihm ankommt.
+    //
+    // Zusammen: wer den Kompressor aufdreht, nimmt dem Clipper den
+    // Pegel weg, und der Clipper ist die Stufe, die den Druck macht.
+    //
+    // Hier die Gegenprobe: dieselben Einstellungen, nur mit einem
+    // Makeup, das die Rücknahme ausgleicht.
+    void autoMakeupWouldStopTheInversion()
+    {
+        QString warum;
+        const auto sauber = echteRede(&warum);
+        if (sauber.empty()) { QSKIP(qPrintable(warum)); }
+        const Rede rede = redeMitRauschen(sauber, -48.0);
+
+        const auto druck = [](const std::vector<float>& v) {
+            double p = 0.0;
+            for (float x : v) { p = std::max(p, double(std::fabs(x))); }
+            std::vector<float> n = v;
+            if (p > 1e-9) {
+                const float g = float(std::pow(10.0, -2.0 / 20.0) / p);
+                for (float& x : n) { x *= g; }
+            }
+            return Loudness::measure(n.data(), int(n.size()),
+                                     int(kRate)).integratedLufs;
+        };
+
+        qInfo().noquote() << QStringLiteral(
+            "  Schwelle  Verh.   Makeup fest 3 dB   Makeup ausgeglichen");
+        struct Fall { double schwelle; double verh; };
+        const Fall faelle[] = {
+            { -22.0, 3.0 }, { -28.0, 4.0 }, { -34.0, 6.0 }, { -40.0, 8.0 },
+        };
+        for (const Fall& f : faelle) {
+            double werte[2] = { 0.0, 0.0 };
+            for (int art = 0; art < 2; ++art) {
+                StripChain c;
+                empfehlung(c);
+                c.comp().setThresholdDb(float(f.schwelle));
+                c.comp().setRatio(float(f.verh));
+                if (art == 1) {
+                    // Der Ausgleich, den ein Auto-Makeup rechnen
+                    // würde: was die Kennlinie einer Spitze von
+                    // -12 dBFS wegnimmt, kommt wieder drauf.
+                    const double ueber = -12.0 - f.schwelle;
+                    const double weg = ueber * (1.0 - 1.0 / f.verh);
+                    c.comp().setMakeupDb(float(std::max(0.0, weg)));
+                }
+                werte[art] = druck(durch(c, rede.signal));
+            }
+            qInfo().noquote()
+                << QStringLiteral("   %1 dB   %2:1        %3 LUFS            "
+                                  "%4 LUFS")
+                       .arg(f.schwelle, 5, 'f', 0).arg(f.verh, 3, 'f', 0)
+                       .arg(werte[0], 6, 'f', 1).arg(werte[1], 6, 'f', 1);
+        }
+    }
+
+    // ── Wieviel Drive der Clipper verträgt ──────────────────────────
+    //
+    // Druck gegen Klirr. Der Clipper ist die Stufe, die Dichte macht;
+    // die Frage ist nur, wo es anfängt weh zu tun.
+    void howMuchDriveTheClipperTakes()
+    {
+        QString warum;
+        const auto sauber = echteRede(&warum);
+        if (sauber.empty()) { QSKIP(qPrintable(warum)); }
+        const Rede rede = redeMitRauschen(sauber, -48.0);
+
+        const auto druck = [](const std::vector<float>& v) {
+            double p = 0.0;
+            for (float x : v) { p = std::max(p, double(std::fabs(x))); }
+            std::vector<float> n = v;
+            if (p > 1e-9) {
+                const float g = float(std::pow(10.0, -2.0 / 20.0) / p);
+                for (float& x : n) { x *= g; }
+            }
+            return Loudness::measure(n.data(), int(n.size()),
+                                     int(kRate)).integratedLufs;
+        };
+        const auto scheitel = [&rede](const std::vector<float>& v) {
+            double p = 0.0;
+            double s = 0.0;
+            size_t n = 0;
+            for (size_t i = 0; i < v.size(); ++i) {
+                if (rede.spricht[i] == 0) { continue; }
+                p = std::max(p, double(std::fabs(v[i])));
+                s += double(v[i]) * double(v[i]); ++n;
+            }
+            return dB(p) - dB(std::sqrt(s / std::max<size_t>(1, n)));
+        };
+
+        qInfo().noquote() << QStringLiteral(
+            "  Drive   Lautheit   Scheitel   abgeschnitten   Klirr bei 1 kHz");
+        for (double drive : { 0.0, 6.0, 12.0, 15.0, 18.0, 21.0, 24.0 }) {
+            StripChain c;
+            empfehlung(c);
+            c.clipper().setDriveDb(float(drive));
+
+            std::vector<float> y = rede.signal;
+            double schnitt = 0.0;
+            for (size_t at = 0; at + 240 <= y.size(); at += 240) {
+                c.processMono(y.data() + at, 240);
+                schnitt = std::max(schnitt,
+                                   double(c.clipper().clippedDb()));
+            }
+
+            // Klirr: ein Ton auf dem Pegel, auf dem die Sprache
+            // steht, durch dieselbe Kette.
+            StripChain t;
+            empfehlung(t);
+            t.clipper().setDriveDb(float(drive));
+            const int n = int(kRate);
+            std::vector<float> ton(size_t(n), 0.0f);
+            for (int i = 0; i < n; ++i) {
+                ton[size_t(i)] = float(0.25 * std::sin(2.0 * M_PI * 1000.0
+                                                       * i / kRate));
+            }
+            const auto ty = durch(t, ton);
+            const auto pT = spektrum(ty);
+            const double grund = bandDb(pT, 950.0, 1050.0);
+            double rest = 0.0;
+            for (int h = 2; h <= 8; ++h) {
+                const double f = 1000.0 * h;
+                rest += std::pow(10.0, bandDb(pT, f - 60.0, f + 60.0) / 10.0);
+            }
+            const double klirr = 10.0 * std::log10(std::max(rest, 1e-20))
+                                 - grund;
+
+            qInfo().noquote()
+                << QStringLiteral("  %1 dB   %2 LUFS   %3 dB   %4 dB   %5 dB")
+                       .arg(drive, 5, 'f', 0)
+                       .arg(druck(y), 7, 'f', 1)
+                       .arg(scheitel(y), 7, 'f', 1)
+                       .arg(schnitt, 10, 'f', 1)
+                       .arg(klirr, 12, 'f', 1);
+        }
+    }
+
+    // ── Clippen, filtern, DANN begrenzen ────────────────────────────
+    //
+    // Der Ueberschwinger ist mit der Dichte mitgewachsen: 1,89 dB bei
+    // Scheitelfaktor 12,9, aber 5,35 dB bei 8,2. Das ist kein Fehler,
+    // sondern die Folge: je haerter geclippt wird, desto mehr Energie
+    // entsteht ausserhalb des Kanals, und desto mehr nimmt das Filter
+    // des Senders anschliessend wieder weg -- und genau diese Energie
+    // hat die Spitzen flach gehalten.
+    //
+    // Der Rundfunk macht es deshalb in dieser Reihenfolge: clippen,
+    // bandbegrenzen, DANN begrenzen. Der Begrenzer sieht dann die
+    // Wellenform, die wirklich gesendet wird, und kann sie halten.
+    //
+    // Hier wird nur gemessen, ob das traegt. Gebaut wird es nicht von
+    // selbst: eine Bandgrenze in der Kette macht das Mithoeren
+    // dunkler, und das ist eine Entscheidung des Betreibers.
+    void clipThenFilterThenLimit()
+    {
+        QString warum;
+        const auto sauber = echteRede(&warum);
+        if (sauber.empty()) { QSKIP(qPrintable(warum)); }
+        const Rede rede = redeMitRauschen(sauber, -48.0);
+
+        const auto spitze = [](const std::vector<float>& v) {
+            double p = 0.0;
+            for (float x : v) { p = std::max(p, double(std::fabs(x))); }
+            return dB(p);
+        };
+        const auto druck = [](const std::vector<float>& v) {
+            double p = 0.0;
+            for (float x : v) { p = std::max(p, double(std::fabs(x))); }
+            std::vector<float> n = v;
+            if (p > 1e-9) {
+                const float g = float(std::pow(10.0, -2.0 / 20.0) / p);
+                for (float& x : n) { x *= g; }
+            }
+            return Loudness::measure(n.data(), int(n.size()),
+                                     int(kRate)).integratedLufs;
+        };
+
+        // A: wie jetzt -- Begrenzer in der Kette, Kanal danach.
+        StripChain a;
+        empfehlung(a);
+        const auto wieJetzt = durchKanal(3, durch(a, rede.signal));
+
+        // B: Kette OHNE Begrenzer -> Kanal -> Begrenzer.
+        StripChain b;
+        empfehlung(b);
+        b.setStageEnabled(StripChain::Stage::Limiter, false);
+        auto roh = durchKanal(3, durch(b, rede.signal));
+        {
+            ClientFinalLimiter lim;
+            lim.prepare(kRate);
+            lim.setEnabled(true);
+            lim.setCeilingDb(-2.0f);
+            for (size_t at = 0; at + 240 <= roh.size(); at += 240) {
+                lim.process(roh.data() + at, 240, 1);
+            }
+        }
+
+        qInfo().noquote()
+            << QStringLiteral("A  Kette -> Kanal:            Spitze %1 dBFS "
+                              "· Druck %2 LUFS")
+                   .arg(spitze(wieJetzt), 6, 'f', 2)
+                   .arg(druck(wieJetzt), 6, 'f', 1);
+        qInfo().noquote()
+            << QStringLiteral("B  Kette ohne Begrenzer -> Kanal -> "
+                              "Begrenzer: Spitze %1 dBFS · Druck %2 LUFS")
+                   .arg(spitze(roh), 6, 'f', 2)
+                   .arg(druck(roh), 6, 'f', 1);
+
+        // Keine Pruefung mit Urteil -- das ist eine Messung fuer eine
+        // Entscheidung, nicht eine Zusicherung.
+        qInfo().noquote() << QStringLiteral(
+            "   (B ist die Reihenfolge, die der Rundfunk benutzt; A ist "
+            "die, die wir haben)");
     }
 
     // ── Die eigene Verzögerung ──────────────────────────────────────

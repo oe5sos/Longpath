@@ -79,6 +79,41 @@ public:
     void  setMakeupDb(float db) noexcept;
     float makeupDb() const noexcept;
 
+    // ── Auto-Makeup ──────────────────────────────────────────────────
+    //
+    // Gemessen am 2026-10-10 an echter Sprache, Lautheit bei gleicher
+    // Spitze (tst_bandbreiten_genau::autoMakeupWouldStopTheInversion):
+    //
+    //   Schwelle  Verhaeltnis   Makeup fest 3 dB   ausgeglichen
+    //     -22        3:1           -15,9 LUFS       -13,0 LUFS
+    //     -28        4:1           -18,2 LUFS       -11,2 LUFS
+    //     -34        6:1           -19,1 LUFS       -10,1 LUFS
+    //     -40        8:1           -19,4 LUFS       -10,0 LUFS
+    //
+    // Mit festem Makeup wird die Stimme DUENNER, je mehr man
+    // komprimiert -- der Regler tut das Gegenteil von dem, was
+    // draufsteht. Der Grund liegt eine Stufe weiter: der Clipper
+    // schneidet an der Vollaussteuerung ab, also haengt seine Wirkung
+    // allein am Pegel, der bei ihm ankommt. Wer komprimiert, ohne
+    // auszugleichen, nimmt dem Clipper den Pegel weg -- und der
+    // Clipper ist die Stufe, die den Druck macht.
+    //
+    // Der Ausgleich ist die Rechnung, die jeder Kompressor macht: was
+    // die Kennlinie einer Spitze von kReferenzDbFs wegnimmt, kommt
+    // wieder drauf. Keine Regelschleife, keine Messung des Signals --
+    // eine Zahl aus Schwelle und Verhaeltnis, damit dieselbe
+    // Einstellung immer dasselbe tut.
+    //
+    // Beim Einschalten wird makeupDb NICHT ueberschrieben: beide
+    // addieren sich, der ausgerechnete Teil und der von Hand
+    // eingestellte.
+    static constexpr float kReferenzDbFs = -12.0f;
+    void  setAutoMakeup(bool on) noexcept;
+    bool  autoMakeup() const noexcept;
+    // Was der Ausgleich gerade beitraegt, in dB. Fuer die Anzeige --
+    // ein Betreiber soll sehen, woher seine Lautstaerke kommt.
+    float autoMakeupDb() const noexcept;
+
     // Brickwall limiter on the output.  Ceiling in dBFS (negative).
     void  setLimiterEnabled(bool on) noexcept;
     bool  limiterEnabled() const noexcept;
@@ -125,6 +160,11 @@ private:
         std::atomic<float>    releaseMs{200.0f};
         std::atomic<float>    kneeDb{6.0f};
         std::atomic<float>    makeupDb{0.0f};
+        // Vorgabe AUS: eine Stufe mit Vorgabewerten muss ein Draht
+        // sein, und gespeicherte Ketten aus der Zeit davor duerfen
+        // nicht ploetzlich lauter werden. Die Empfehlung schaltet es
+        // ein, und StripSettings schreibt den Schluessel mit.
+        std::atomic<bool>     autoMakeup{false};
         std::atomic<bool>     limEnabled{true};
         std::atomic<float>    limCeilingDb{-1.0f};
         std::atomic<float>    driveDb{0.0f};
@@ -139,6 +179,7 @@ private:
         float releaseCoeff{0.0f};
         float kneeDb{6.0f};
         float makeupLin{1.0f};
+        float autoMakeupDb{0.0f};
         bool  limEnabled{true};
         float limCeilingLin{0.891f};       // 10^(-1/20)
         float limAttackCoeff{0.0f};

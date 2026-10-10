@@ -80,6 +80,13 @@ private slots:
         // Sprachspitzen von -12 dBFS und einer Kante bei
         // Vollaussteuerung schneidet der Clipper unter 12 dB Drive
         // nachweislich NICHTS ab -- er war nur eine Verstaerkung.
+        // Der Ausgleich MUSS an sein: ohne ihn nimmt der Kompressor
+        // dem Clipper 6,7 dB weg, und der Clipper ist die Stufe, die
+        // den Druck macht. Gemessen: Lautheit bei gleicher Spitze
+        // -15,9 gegen -13,0 LUFS, allein an diesem Haken.
+        QVERIFY2(c.comp().autoMakeup(),
+                 "der Makeup-Ausgleich ist aus -- dann macht mehr "
+                 "Kompression die Stimme duenner");
         QVERIFY2(std::abs(c.clipper().driveDb() - 12.0f) < 0.01f,
                  qPrintable(QStringLiteral("Drive %1 statt 12 dB")
                                 .arg(double(c.clipper().driveDb()))));

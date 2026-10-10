@@ -2,6 +2,85 @@
 
 ## [Unreleased]
 
+### „mir geht die Kraft als Vorverstärker ab · zu wenig Druck in der Stimme"
+
+Druck ist nicht Lautstärke. Druck ist **Lautheit bei gleicher Spitze** —
+wie viel Stimme pro Dezibel Aussteuerung ankommt. Gemessen wird er
+jetzt so: beide Fassungen auf −2 dBFS normieren, dann BS.1770
+(`src/core/Loudness.h`, lag seit Oktober da und wurde nie benutzt).
+
+**Die Kette lieferte 4,2 dB Druck. Jetzt sind es 8,9 dB,** und der
+Scheitelfaktor fällt von 12,9 auf **8,2 dB** — der Bereich, in dem ein
+Sendekanalzug arbeitet.
+
+Stufe für Stufe, Lautheit bei gleicher Spitze (vorher → nachher):
+
+| Stufe | Δ Druck vorher | Δ Druck nachher |
+| --- | --- | --- |
+| Entrauschen | −0,1 | −0,1 |
+| Gate | 0,0 | 0,0 |
+| Entzerrer | +0,7 | +0,7 |
+| De-Esser | 0,0 | 0,0 |
+| Kompressor | +1,4 | +1,4 |
+| **Clipper** | **+0,7** | **+6,3** |
+| Begrenzer | +1,6 | +0,7 |
+
+**Befund 1: der Kompressor machte die Stimme dünner, je mehr man ihn
+aufdrehte.** `ClientClipper` schneidet an der Vollaussteuerung ab —
+`samples[i] * drive`, Kante fest bei 1,0. Wie viel der Clipper tut,
+hängt also vollständig am Pegel, der bei ihm ankommt. Und der
+Kompressor hatte kein Auto-Makeup (Vorgabe 0 dB), nahm dem Clipper
+also genau den Pegel weg, den der braucht. Gemessen:
+
+| Schwelle | Verhältnis | Makeup fest | ausgeglichen |
+| --- | --- | --- | --- |
+| −22 | 3:1 | −15,9 LUFS | **−13,0** |
+| −28 | 4:1 | −18,2 LUFS | **−11,2** |
+| −34 | 6:1 | −19,1 LUFS | **−10,1** |
+| −40 | 8:1 | −19,4 LUFS | **−10,0** |
+
+Links läuft es rückwärts, rechts vorwärts. `ClientComp::setAutoMakeup`
+rechnet `(−12 − Schwelle) × (1 − 1/Verhältnis)` und addiert es zum
+Makeup von Hand; Haken auf der Kompressorseite, Beitrag in der
+laufenden Zeile. Vorgabe **aus** — eine Stufe mit Vorgabewerten ist
+ein Draht, und gespeicherte Ketten dürfen nicht über Nacht lauter
+werden. Die Empfehlung schaltet ihn ein.
+
+**Befund 2: der Clipper-Drive musste neu gewählt werden.** Die erste
+Messreihe sagte 18 dB — entstanden, bevor der Ausgleich an war. Der
+schickt 6,7 dB mehr in den Clipper und verschiebt dessen besten Punkt
+um genau diese 6,7 dB. Neu gemessen, mit Klirr an einem 1-kHz-Ton
+durch dieselbe Kette:
+
+| Drive | Lautheit | Scheitelfaktor | Klirr |
+| --- | --- | --- | --- |
+| 12 | −11,1 LUFS | 8,2 dB | −49,3 dB (0,34 %) |
+| 15 | −9,6 LUFS | 6,7 dB | −21,1 dB (9 %) |
+| 18 | −8,4 LUFS | 5,7 dB | −14,2 dB (19 %) |
+
+12 bleibt. Oberhalb ist es kein Druck mehr, sondern Verzerrung.
+
+**Befund 3: durch den Kanal kam die Kette auf +3,35 dBFS.** Der
+Überschwinger wächst mit der Dichte — 1,89 dB bei Scheitelfaktor 12,9,
+aber **5,35 dB** bei 8,2: härteres Clippen erzeugt mehr Energie
+außerhalb des Kanals, und genau die hat die Spitzen flach gehalten.
+Gegen die Reihenfolge hilft keine Decke:
+
+```
+A  Kette -> Kanal                        Spitze +3,35 dBFS · -16,8 LUFS
+B  Kette ohne Begrenzer -> Kanal
+     -> Begrenzer                        Spitze -2,00 dBFS · -12,3 LUFS
+```
+
+B hält die Spitze **und** ist 4,5 dB dichter. Der Mithörweg hat jetzt
+einen Begrenzer **hinter** dem Kanalfilter (`StripLiveMonitor`), mit
+der Decke aus der Kette. Das ist zugleich die ehrlichere Nachbildung:
+im Sender steht hinter dem Bandfilter auch eine Regelung.
+
+Nebenbei widerlegt und als Widerlegung festgehalten: ein Tiefpass
+**vor** dem Clipper senkt den Überschwinger nur von 1,89 auf 1,70 dB —
+die Oberwellen entstehen hinter ihm.
+
 ### Noch einmal ganz genau — und das Prüfsignal war der Fehler
 
 > „teste bitte nochmals ganz genau"

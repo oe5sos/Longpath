@@ -171,6 +171,7 @@ void saveTo(const QString& prefix, const StripChain& chain)
     putF(prefix, "CompReleaseMs",   c.comp().releaseMs());
     putF(prefix, "CompKneeDb",      c.comp().kneeDb());
     putF(prefix, "CompMakeupDb",    c.comp().makeupDb());
+    putV(key(prefix, "CompAutoMakeup"), c.comp().autoMakeup());
     putF(prefix, "CompDriveDb",     c.comp().driveDb());
     putV(key(prefix, "CompPhaseStages"), c.comp().phaseRotatorStages());
     putV(key(prefix, "CompLimiterOn"),   c.comp().limiterEnabled());
@@ -280,6 +281,10 @@ void restoreFrom(const QString& prefix, StripChain& c)
     c.comp().setReleaseMs  (getF(prefix, "CompReleaseMs",   c.comp().releaseMs()));
     c.comp().setKneeDb     (getF(prefix, "CompKneeDb",      c.comp().kneeDb()));
     c.comp().setMakeupDb   (getF(prefix, "CompMakeupDb",    c.comp().makeupDb()));
+    // Fehlt der Schluessel, ist die Kette aelter als der Ausgleich --
+    // dann bleibt er aus, damit eine gespeicherte Einstellung nicht
+    // ueber Nacht um mehrere Dezibel lauter wird.
+    c.comp().setAutoMakeup (getB(prefix, "CompAutoMakeup", false));
     c.comp().setDriveDb    (getF(prefix, "CompDriveDb",     c.comp().driveDb()));
     c.comp().setPhaseRotatorStages(
         getI(prefix, "CompPhaseStages", c.comp().phaseRotatorStages()));
@@ -767,7 +772,16 @@ bool applyBuiltIn(const QString& name, StripChain& c)
         c.comp().setAttackMs(8.0f);
         c.comp().setReleaseMs(150.0f);
         c.comp().setKneeDb(8.0f);
+        // ── Drei von Hand, der Rest gerechnet ────────────────────
+        //
+        // Der Ausgleich steuert bei dieser Schwelle und diesem
+        // Verhaeltnis 6,7 dB bei: (-12 - (-22)) * (1 - 1/3). Ohne ihn
+        // nahm der Kompressor dem Clipper genau diese 6,7 dB weg --
+        // und der Clipper ist die Stufe, die den Druck macht. Allein
+        // das Einschalten bringt die Lautheit bei gleicher Spitze von
+        // -15,9 auf -13,0 LUFS.
         c.comp().setMakeupDb(3.0f);
+        c.comp().setAutoMakeup(true);
         c.comp().setPhaseRotatorStages(4);
         c.setStageEnabled(StripChain::Stage::Comp, true);
 
@@ -785,6 +799,38 @@ bool applyBuiltIn(const QString& name, StripChain& c)
         // an der der Begrenzer dahinter (Decke -1 dB) die Spitze
         // uebernimmt. Mehr ist eine Entscheidung des Betreibers, die
         // er an der Zahl auf der Seite ablesen kann.
+        // ── 18, nicht 12 ────────────────────────────────────────
+        //
+        // ── 12, und zwar MIT dem Ausgleich darueber ─────────────
+        //
+        // Hier stand zuerst 18. Das war richtig gemessen und trotzdem
+        // falsch: die Reihe entstand, BEVOR der Ausgleich im
+        // Kompressor eingeschaltet war. Der schickt jetzt 6,7 dB mehr
+        // in den Clipper, und damit verschiebt sich dessen bester
+        // Punkt um genau diese 6,7 dB nach unten. Zwei Aenderungen,
+        // die einander bedingen -- deshalb wurde nach der ersten neu
+        // gemessen.
+        //
+        // Mit Ausgleich, an echter Sprache
+        // (tst_bandbreiten_genau::howMuchDriveTheClipperTakes):
+        //
+        //   Drive   Lautheit   Scheitelfaktor   abgeschnitten   Klirr
+        //     0     -18,1 LUFS     15,1 dB          0,0 dB      -80,9
+        //     6     -15,3 LUFS     12,3 dB          1,2 dB      -80,8
+        //    12     -11,1 LUFS      8,2 dB          7,0 dB      -49,3
+        //    15      -9,6 LUFS      6,7 dB         10,0 dB      -21,1
+        //    18      -8,4 LUFS      5,7 dB         13,0 dB      -14,2
+        //
+        // Den Ausschlag gibt der Klirr: -49 dB sind 0,34 % und bei
+        // einem Clipper in Ordnung, -21 dB sind 9 % und -14 dB sind
+        // 19 %. Das ist kein Druck mehr, das ist Verzerrung.
+        //
+        // 12 dB bringen 8,2 dB Scheitelfaktor -- genau der Bereich,
+        // in dem ein Sendekanalzug arbeitet -- und gegenueber dem
+        // Stand von heute Mittag 4,8 dB mehr Lautheit bei gleicher
+        // Spitze. Der Klirr am Ton ist dabei der schlimmste Fall: ein
+        // Sinus steht dauernd an der Kante, eine Stimme nur in den
+        // Spitzen.
         c.clipper().setDriveDb(12.0f);
         c.clipper().setKnee(0.2f);
         c.clipper().setLevelMatch(false);

@@ -172,6 +172,8 @@ void StripLiveMonitor::doStart()
     m_inRing->setSampleRate(m_inRate);
     m_outRing->setSampleRate(m_inRate);
     m_band.prepare(m_inRate);
+    m_kanalBegrenzer.prepare(m_inRate);
+    m_kanalBegrenzer.setEnabled(true);
     m_inChannels = std::max(1, inFmt.channelCount());
     m_inFormat   = int(inFmt.sampleFormat());
     m_outChannels = std::max(1, outFmt.channelCount());
@@ -462,6 +464,14 @@ void StripLiveMonitor::pump()
     // Kanal, das Auge die Kette -- und das steht auch so an der
     // Auswahl.
     m_band.process(m_mono.data(), int(m_mono.size()));
+
+    // Und erst jetzt begrenzen -- siehe die Messreihe am
+    // m_kanalBegrenzer im Header. Die Decke kommt aus der Kette
+    // selbst, damit nicht zwei Zahlen gepflegt werden muessen.
+    if (m_band.channel() >= 0) {
+        m_kanalBegrenzer.setCeilingDb(m_chain->limiter().ceilingDb());
+        m_kanalBegrenzer.process(m_mono.data(), int(m_mono.size()), 1);
+    }
 
     float peakOut = 0.0f;
     for (float v : m_mono) { peakOut = std::max(peakOut, std::fabs(v)); }
