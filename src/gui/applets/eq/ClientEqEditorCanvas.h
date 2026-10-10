@@ -115,6 +115,10 @@ private:
     // Groesse der Zug meint, entscheiden ⇧ und ⌥ -- laufend gelesen,
     // nicht beim Druecken festgehalten.
     bool m_dragMoved{false};
+    // Welche Achse dieser Zug meint. Entschieden an den ersten
+    // Pixeln, danach fest -- siehe mouseMoveEvent.
+    enum class Achse { Offen, Senkrecht, Waagrecht };
+    Achse m_achse{Achse::Offen};
     bool m_simpleMode{false};
     QPointF m_dragStart;
     float   m_dragStartFreqHz{0};

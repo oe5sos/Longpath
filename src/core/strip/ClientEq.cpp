@@ -351,6 +351,23 @@ void sectionMagSq(ClientEq::FilterType type,
         den2 = diff * diff + cross * cross;
         break;
     }
+    // Ohne diese beiden zeichnete die Kurve eine Kerbe als gerade
+    // Linie -- das Bild haette etwas anderes gesagt als der Ton, und
+    // das ist die schlimmste Sorte Fehler in diesem Fenster.
+    case FT::Notch: {
+        const double diff = w0sq - wsq;
+        const double cross = w0w / q;
+        num2 = diff * diff;
+        den2 = diff * diff + cross * cross;
+        break;
+    }
+    case FT::BandPass: {
+        const double diff = w0sq - wsq;
+        const double cross = w0w / q;
+        num2 = cross * cross;
+        den2 = diff * diff + cross * cross;
+        break;
+    }
     }
 }
 
@@ -516,6 +533,29 @@ void ClientEq::computeCoefficients(Runtime& runtime) noexcept
             b0 =  (1.0f + cosW) * 0.5f;
             b1 = -(1.0f + cosW);
             b2 =  (1.0f + cosW) * 0.5f;
+            a0 =  1.0f + alpha;
+            a1 = -2.0f * cosW;
+            a2 =  1.0f - alpha;
+            break;
+        // Kerbe und Bandpass, beide aus demselben Kochbuch (RBJ) wie
+        // alles darüber. Die Kerbe ist die einzige Art hier, die die
+        // Frequenz wirklich auf null bringt -- eine Glocke mit viel
+        // Güte kommt immer nur in die Nähe.
+        case FilterType::Notch:
+            b0 =  1.0f;
+            b1 = -2.0f * cosW;
+            b2 =  1.0f;
+            a0 =  1.0f + alpha;
+            a1 = -2.0f * cosW;
+            a2 =  1.0f - alpha;
+            break;
+        case FilterType::BandPass:
+            // Mit Spitzenverstärkung 1, nicht mit Q -- sonst wird der
+            // Durchlass lauter, je schmaler man ihn macht, und das
+            // ist beim Hören eine Falle.
+            b0 =  alpha;
+            b1 =  0.0f;
+            b2 = -alpha;
             a0 =  1.0f + alpha;
             a1 = -2.0f * cosW;
             a2 =  1.0f - alpha;

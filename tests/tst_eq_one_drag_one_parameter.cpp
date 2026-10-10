@@ -118,6 +118,47 @@ private slots:
         QVERIFY(m_eq.band(kBand).enabled);
     }
 
+    // Waagrecht ziehen verschiebt die Frequenz -- ohne Taste.
+    // („man muss die punkte beim EQ auch horizontal verschieben
+    //   können.") Der Pegel bleibt dabei stehen: die Richtung der
+    //   ersten Pixel entscheidet, und danach ist die Achse fest.
+    void draggingSidewaysMovesOnlyTheFrequency()
+    {
+        Probe v;
+        build(v);
+        const float g0 = m_eq.band(kBand).gainDb;
+        const float f0 = m_eq.band(kBand).freqHz;
+
+        const QPointF h = handleOf(v, kBand);
+        press(v, h);
+        move(v, h + QPointF(60, -25));     // überwiegend waagrecht
+        release(v, h + QPointF(60, -25));
+
+        QCOMPARE(m_eq.band(kBand).gainDb, g0);
+        QVERIFY2(m_eq.band(kBand).freqHz > f0 * 1.2f,
+                 qPrintable(QStringLiteral("%1 -> %2 Hz")
+                                .arg(double(f0))
+                                .arg(double(m_eq.band(kBand).freqHz))));
+    }
+
+    // Und die Achse bleibt stehen, auch wenn die Hand danach in die
+    // andere Richtung wandert -- sonst waere der Zug wieder schraeg.
+    void theAxisStaysWhereItWasDecided()
+    {
+        Probe v;
+        build(v);
+        const float f0 = m_eq.band(kBand).freqHz;
+
+        const QPointF h = handleOf(v, kBand);
+        press(v, h);
+        move(v, h + QPointF(2, -40));      // senkrecht entschieden
+        move(v, h + QPointF(80, -60));     // jetzt weit zur Seite
+        release(v, h + QPointF(80, -60));
+
+        QCOMPARE(m_eq.band(kBand).freqHz, f0);
+        QVERIFY(m_eq.band(kBand).gainDb > 2.0f);
+    }
+
     // Mit ⌥ ist es umgekehrt: die Frequenz wandert, der Pegel bleibt.
     void altDragMovesOnlyTheFrequency()
     {

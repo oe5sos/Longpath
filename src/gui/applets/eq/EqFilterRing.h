@@ -51,7 +51,7 @@ namespace Longpath::EqFilterRing {
 // How many entries the ring has. A static_assert cannot check an enum's
 // size, so this is the one place the count lives and step() is written
 // against it.
-inline constexpr int kTypeCount = 5;
+inline constexpr int kTypeCount = 7;
 
 // Move `direction` places round the ring. +1 is forward, -1 back;
 // anything else is taken modulo the ring, so a mouse wheel can be
@@ -75,6 +75,8 @@ inline const char* name(ClientEq::FilterType t)
     case ClientEq::FilterType::HighShelf: return "High Shelf";
     case ClientEq::FilterType::LowPass:   return "Low Pass";
     case ClientEq::FilterType::HighPass:  return "High Pass";
+    case ClientEq::FilterType::Notch:     return "Notch";
+    case ClientEq::FilterType::BandPass:  return "Band Pass";
     }
     return "Peak";
 }
@@ -103,8 +105,19 @@ inline void applyTo(ClientEq& eq, int bandIdx, ClientEq::FilterType t)
     ClientEq::BandParams p = eq.band(bandIdx);
     p.type    = t;
     p.enabled = true;
-    if (t != ClientEq::FilterType::Peak && p.q > 1.0f) {
+    // Die Güte zähmen -- aber nicht bei den Arten, deren ganzer Sinn
+    // eine hohe Güte IST. Eine Kerbe mit Güte 0,707 ist keine Kerbe,
+    // sondern eine Mulde, und ein Bandpass mit 0,707 lässt die halbe
+    // Stimme durch.
+    const bool brauchtGuete = t == ClientEq::FilterType::Peak
+                           || t == ClientEq::FilterType::Notch
+                           || t == ClientEq::FilterType::BandPass;
+    if (!brauchtGuete && p.q > 1.0f) {
         p.q = 0.707f;
+    }
+    // Und eine frische Kerbe soll eine sein.
+    if (t == ClientEq::FilterType::Notch && p.q < 4.0f) {
+        p.q = 8.0f;
     }
     eq.setBand(bandIdx, p);
 }

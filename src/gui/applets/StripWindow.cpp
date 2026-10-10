@@ -953,6 +953,29 @@ void StripWindow::buildUi()
 
 // ── Gate ─────────────────────────────────────────────────────────────
 
+// ── Eine Beschriftung, die sich laufend ändert ───────────────────────
+//
+// „schrift springt noch immer herum."
+//
+// Jede Beschriftung, deren Text sich zehnmal je Sekunde ändert, ist
+// eine Gefahr für das Fensterlayout: Qt rechnet aus ihrem Text eine
+// Wunschbreite, und sobald aus „-9.1 dB" ein „-29.1 dB" wird, wächst
+// die Spalte, in der sie steht -- und alles daneben rutscht. Zehnmal
+// je Sekunde sieht man das als Zittern.
+//
+// Ignored als waagrechte Grösse heisst: diese Beschriftung meldet
+// KEINEN Platzbedarf an. Sie bekommt, was da ist, und schneidet ab,
+// was nicht hineinpasst. Dazu eine feste Höhe, damit auch ein
+// Umbruch nichts verschieben kann, und die Hausschrift für Zahlen.
+void lebendeZeile(QLabel* l)
+{
+    if (l == nullptr) { return; }
+    l->setWordWrap(false);
+    l->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
+    l->setFixedHeight(18);
+    l->setTextInteractionFlags(Qt::NoTextInteraction);
+}
+
 QWidget* StripWindow::buildGatePanel()
 {
     auto* page = new QWidget(this);
@@ -1024,6 +1047,7 @@ QWidget* StripWindow::buildGatePanel()
 
     m_gateMeter = new QLabel(page);
     m_gateMeter->setStyleSheet(dimStyle());
+    lebendeZeile(m_gateMeter);
     form->addRow(m_gateMeter);
 
     return page;
@@ -1330,6 +1354,7 @@ QWidget* StripWindow::buildDeEssPanel()
 
     m_deEssMeter = new QLabel(page);
     m_deEssMeter->setStyleSheet(dimStyle());
+    lebendeZeile(m_deEssMeter);
     form->addRow(m_deEssMeter);
 
     return page;
@@ -1464,6 +1489,7 @@ QWidget* StripWindow::buildCompPanel()
 
     m_compMeter = new QLabel(page);
     m_compMeter->setStyleSheet(dimStyle());
+    lebendeZeile(m_compMeter);
     form->addRow(m_compMeter);
 
     return page;
@@ -1532,6 +1558,7 @@ QWidget* StripWindow::buildDenoisePanel()
 
     m_nrMeter = new QLabel(page);
     m_nrMeter->setStyleSheet(dimStyle());
+    lebendeZeile(m_nrMeter);
     form->addRow(m_nrMeter);
 
     return page;
@@ -1616,6 +1643,7 @@ QWidget* StripWindow::buildClipperPanel()
 
     m_clipMeter = new QLabel(page);
     m_clipMeter->setStyleSheet(dimStyle());
+    lebendeZeile(m_clipMeter);
     form->addRow(m_clipMeter);
 
     return page;
@@ -2116,9 +2144,8 @@ QWidget* StripWindow::buildAllStagesSurface()
         // die Höhe wird festgenagelt, damit auch ein längerer Satz
         // nichts verschiebt.
         m_eingangNote = new QLabel(box);
-        m_eingangNote->setWordWrap(false);
-        m_eingangNote->setFixedHeight(18);
         m_eingangNote->setStyleSheet(dimStyle());
+        lebendeZeile(m_eingangNote);
         z->addWidget(m_eingangNote);
 
         auto* row = new QHBoxLayout;
@@ -2183,8 +2210,7 @@ QWidget* StripWindow::buildAllStagesSurface()
     m_crestNote->setStyleSheet(dimStyle());
     // Kein Umbruch, feste Hoehe -- siehe die Begruendung bei
     // m_eingangNote. Dasselbe Springen, dieselbe Ursache.
-    m_crestNote->setWordWrap(false);
-    m_crestNote->setFixedHeight(18);
+    lebendeZeile(m_crestNote);
     col->addWidget(m_crestNote);
 
     auto* cards = new QWidget(host);

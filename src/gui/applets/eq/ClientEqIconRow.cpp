@@ -137,6 +137,27 @@ protected:
                          gx + gw,        gy + gh * 0.85f);
             break;
         }
+        case ClientEq::FilterType::Notch: {
+            // Eine schmale Senke, die bis auf den Grund geht.
+            path.moveTo(gx,            midY);
+            path.lineTo(gx + gw * 0.40f, midY);
+            path.lineTo(gx + gw * 0.50f, gy + gh * 0.88f);
+            path.lineTo(gx + gw * 0.60f, midY);
+            path.lineTo(gx + gw,        midY);
+            break;
+        }
+        case ClientEq::FilterType::BandPass: {
+            // Nur dieser Bereich kommt durch, links und rechts faellt
+            // alles weg.
+            path.moveTo(gx,            gy + gh * 0.88f);
+            path.cubicTo(gx + gw * 0.30f, gy + gh * 0.88f,
+                         gx + gw * 0.38f, gy + gh * 0.15f,
+                         gx + gw * 0.50f, gy + gh * 0.15f);
+            path.cubicTo(gx + gw * 0.62f, gy + gh * 0.15f,
+                         gx + gw * 0.70f, gy + gh * 0.88f,
+                         gx + gw,        gy + gh * 0.88f);
+            break;
+        }
         case ClientEq::FilterType::HighPass: {
             // Rises on the left, flat passband on the right at the shelf-
             // top level.  End-point matches the LS icon's start-point so
