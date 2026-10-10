@@ -89,6 +89,9 @@ protected:
     void mouseReleaseEvent(QMouseEvent* ev) override;
     void mouseDoubleClickEvent(QMouseEvent* ev) override;
     void contextMenuEvent(QContextMenuEvent* ev) override;
+    // Rad über einem Griff = Breite. Siehe die Begründung an der
+    // Umsetzung.
+    void wheelEvent(QWheelEvent* ev) override;
 
 private:
     // Hit-test pixel point against all active handles.  Returns band index

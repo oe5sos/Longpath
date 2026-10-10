@@ -26,6 +26,7 @@
 
 #include <QtTest>
 #include <QMouseEvent>
+#include <QWheelEvent>
 
 #include "core/strip/ClientEq.h"
 #include "gui/applets/eq/ClientEqEditorCanvas.h"
@@ -42,6 +43,7 @@ public:
     using ClientEqEditorCanvas::mousePressEvent;
     using ClientEqEditorCanvas::mouseMoveEvent;
     using ClientEqEditorCanvas::mouseReleaseEvent;
+    using ClientEqEditorCanvas::wheelEvent;
     using ClientEqCurveWidget::freqToX;
     using ClientEqCurveWidget::dbToY;
 };
@@ -152,6 +154,50 @@ private slots:
         QVERIFY2(!after.enabled, "ein Klick hat das Band eingeschaltet");
         QCOMPARE(after.gainDb, before.gainDb);
         QCOMPARE(after.freqHz, before.freqHz);
+    }
+
+    // Das Rad über einem Griff macht ihn schmaler oder breiter --
+    // ohne Taste, weil eine Taste, die man kennen muss, keine
+    // Bedienung ist. („man sollte das auch minimaler erhöhen
+    // können, nicht sooo breit.")
+    void theWheelNarrowsTheBand()
+    {
+        Probe v;
+        build(v);
+        const QPointF h = handleOf(v, kBand);
+        const float vorher = m_eq.band(kBand).q;
+
+        QWheelEvent rauf(h, h, QPoint(), QPoint(0, 360), Qt::NoButton,
+                         Qt::NoModifier, Qt::NoScrollPhase, false);
+        v.wheelEvent(&rauf);
+        const float enger = m_eq.band(kBand).q;
+
+        QWheelEvent runter(h, h, QPoint(), QPoint(0, -720), Qt::NoButton,
+                           Qt::NoModifier, Qt::NoScrollPhase, false);
+        v.wheelEvent(&runter);
+        const float weiter = m_eq.band(kBand).q;
+
+        qInfo() << "Güte" << vorher << "->" << enger << "->" << weiter;
+        QVERIFY2(enger > vorher * 1.3f,
+                 qPrintable(QStringLiteral("%1 -> %2").arg(double(vorher))
+                                .arg(double(enger))));
+        QVERIFY2(weiter < enger * 0.8f,
+                 qPrintable(QStringLiteral("%1 -> %2").arg(double(enger))
+                                .arg(double(weiter))));
+    }
+
+    // Neben einem Griff tut das Rad nichts -- sonst verstellt ein
+    // Rollen über der Kurve zufällig irgendein Band.
+    void theWheelDoesNothingBesideAHandle()
+    {
+        Probe v;
+        build(v);
+        const auto vorher = m_eq.band(kBand);
+        const QPointF weitweg = handleOf(v, kBand) + QPointF(0, 90);
+        QWheelEvent w(weitweg, weitweg, QPoint(), QPoint(0, 360),
+                      Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false);
+        v.wheelEvent(&w);
+        QCOMPARE(m_eq.band(kBand).q, vorher.q);
     }
 
     // Und der Zug rechnet vom Griffpunkt aus, nicht vom Zeiger: wer

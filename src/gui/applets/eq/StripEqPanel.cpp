@@ -296,7 +296,7 @@ StripEqPanel::StripEqPanel(EqHost* engine, QWidget* parent)
         auto* hint = new QLabel(
             "Ziehen = lauter/leiser · "
             "⌥ + ziehen = Frequenz · "
-            "⇧ + ziehen = Breite · "
+            "Rad = Breite · "
             "Doppelklick = Filterart · "
             "Rechtsklick = ganzes Menü");
         applyThemed(hint, "QLabel { color: {{color.background.3}}; font-size: 11px; }");
@@ -748,7 +748,7 @@ void StripEqPanel::setSimpleView(bool simple)
                              "Drittel einer Oktave breit.")
             : QStringLiteral("Ziehen = lauter/leiser · "
                              "⌥ + ziehen = Frequenz · "
-                             "⇧ + ziehen = Breite · "
+                             "Rad = Breite · "
                              "Doppelklick = Filterart · "
                              "Rechtsklick = ganzes Menü"));
     }

@@ -87,7 +87,25 @@ inline ClientEq::BandParams spare(int n)
     ClientEq::BandParams p;
     p.type    = ClientEq::FilterType::Peak;
     p.freqHz  = spareFrequencyHz(n);
-    p.q       = 0.707f;   // Butterworth, the neutral default
+    // ── Warum 2,0 und nicht 0,707 ────────────────────────────────────
+    //
+    // „ich habe hier die orange linie angehoben, aber dies ist viel zu
+    //  breit. man sollte das auch minimaler erhöhen können."
+    //
+    // 0,707 (Butterworth) war der geerbte Vorgabewert und ist rund
+    // ZWEI OKTAVEN breit: wer bei 650 Hz anhebt, hebt von 300 bis
+    // 1300 an. Als Klangregler richtig, als Griff zum Formen einer
+    // Stimme viel zu grob -- und genau diese Griffe sind zum Formen
+    // da.
+    //
+    // 2,0 sind rund zwei Drittel einer Oktave. Die Griffe stehen im
+    // Abstand von etwa 0,58 Oktaven, greifen also noch ineinander.
+    //
+    // Gefahrlos zu ändern: die Griffe kommen flach UND ausgeschaltet
+    // auf die Welt. Solange sie niemand anfasst, ist ihre Güte ohne
+    // Wirkung -- es ändert sich also kein einziges gespeichertes
+    // Profil im Klang.
+    p.q       = 2.0f;
     p.gainDb  = 0.0f;
     p.enabled = false;
     return p;

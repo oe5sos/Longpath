@@ -32,6 +32,7 @@
 #include "core/strip/ClientEq.h"
 
 #include <QMouseEvent>
+#include <QWheelEvent>
 #include <QContextMenuEvent>
 #include <QMenu>
 #include <QAction>
@@ -309,6 +310,42 @@ void ClientEqEditorCanvas::mouseReleaseEvent(QMouseEvent* ev)
     m_draggingBand = -1;
     m_dragMoved = false;
     setCursor(Qt::CrossCursor);
+    persist();
+    ev->accept();
+}
+
+// ── Das Rad ist die Breite ───────────────────────────────────────────
+//
+// „man sollte das auch minimaler erhöhen können, nicht sooo breit."
+//
+// Die Breite liess sich bisher nur mit ⇧ + ziehen ändern. Das steht
+// zwar in der Zeile darüber, aber eine Taste, die man kennen muss,
+// ist keine Bedienung -- und wer eine Glocke zu breit findet, greift
+// als Erstes zum Rad. In jedem Entzerrer, den er kennt, tut das
+// genau das hier.
+//
+// Nur über einem Griff, und nur in der Profi-Ansicht: in der
+// einfachen ist die Breite absichtlich festgelegt.
+void ClientEqEditorCanvas::wheelEvent(QWheelEvent* ev)
+{
+    if (!m_eq || m_simpleMode) { QWidget::wheelEvent(ev); return; }
+
+    const int idx = hitTestHandle(ev->position());
+    if (idx < 0) { QWidget::wheelEvent(ev); return; }
+
+    const int stufen = ev->angleDelta().y() / 120;
+    if (stufen == 0) { QWidget::wheelEvent(ev); return; }
+
+    auto bp = m_eq->band(idx);
+    // Je Rastung ein Achtel Oktave enger oder weiter -- fein genug,
+    // um zu treffen, grob genug, um in drei Rastungen anzukommen.
+    const float faktor = std::pow(1.25f, float(stufen));
+    bp.q = std::clamp(bp.q * faktor, 0.3f, 18.0f);
+    if (!bp.enabled) { bp.enabled = true; }
+    m_eq->setBand(idx, bp);
+    setSelectedBand(idx);
+    emit bandsChanged();
+    update();
     persist();
     ev->accept();
 }
