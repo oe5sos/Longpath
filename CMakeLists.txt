@@ -1134,6 +1134,7 @@ set(GUI_SOURCES
     # The runner: the eight stages in order, with the master bypass the
     # operator's A/B comparison depends on.
     src/core/strip/MicSpectrum.cpp
+    src/core/strip/NoiseReduction.cpp
     src/core/strip/StripChain.cpp
     src/core/strip/AudioPluginAu.cpp
     src/core/strip/PluginPlacement.cpp
@@ -1512,6 +1513,13 @@ if(WDSP_FOUND)
     add_subdirectory(third_party/wdsp)
     target_link_libraries(LongpathObjs PUBLIC wdsp_static)
     target_compile_definitions(LongpathObjs PUBLIC HAVE_WDSP)
+
+    # Der Kanalzug ruft rnnoise direkt (src/core/strip/NoiseReduction),
+    # nicht ueber WDSPs rnnr.c wie der Empfang. Dieselbe Bibliothek,
+    # dasselbe Modell -- nur ohne den Umweg ueber eine WDSP-Kette, die
+    # es im Sendeweg gar nicht gibt.
+    target_link_libraries(LongpathObjs PUBLIC rnnoise_static)
+    target_compile_definitions(LongpathObjs PUBLIC HAVE_RNNOISE)
 
     # NNR (WDSP 2.10) weights — same treatment as the DeepFilterNet3 model
     # below: ModelPaths::probeModel("nnr", …) looks next to the binary, in

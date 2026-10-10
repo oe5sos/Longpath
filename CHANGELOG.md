@@ -2,6 +2,39 @@
 
 ## [Unreleased]
 
+### Entrauschen im Sendeweg — die neunte Stufe
+
+Aus dem ESSB-Plugin-Paket, das der Betreiber mitbrachte (KC1EGU),
+waren **fünf von rund zwanzig Stücken Entrauscher**. Alles andere
+darin — Entzerrer, Kompressoren, Begrenzer, Anreicherer — hatte in
+unserer Kette längst eine Entsprechung. Die Entrauscher nicht.
+
+`core/strip/NoiseReduction` schließt die Lücke: rnnoise (Xiph.Org,
+BSD-3) direkt gerufen, dasselbe Netz und dasselbe Modell, das im
+Empfang als NR3 läuft. Die Stufe steht **vorn in der Kette**, damit
+das Gate seine Schwelle auf einem sauberen Signal setzt und der
+Kompressor den Lüfter gar nicht erst anhebt.
+
+* Was das Gate nicht kann: es duckt die Pausen zwischen den Wörtern.
+  Entrauschen arbeitet auch **während** gesprochen wird.
+* **Preis: 10 ms Laufzeit**, solange die Stufe an ist — rnnoise
+  rechnet in 480er-Blöcken. Steht auf der Seite, nicht in einer
+  Anleitung, und die Stufe ist aus, bis jemand sie einschaltet.
+* Bei einer anderen Rate als 48 kHz arbeitet sie **nicht** statt
+  stillschweigend umzutasten.
+* Mischung 0…1 statt Schalter; der trockene Anteil läuft durch
+  dieselbe Verzögerung, sonst löschen sich beide aus.
+
+`tests/tst_strip_denoise_removes_noise.cpp` misst statt zu behaupten:
+Rauschen geht um **51,9 dB** zurück, bei Mischung 0 kommt das Signal
+**bitgleich** wieder heraus (nur um 480 Werte verzögert), und
+ausgeschaltet ist die Stufe bitgleich ohne Verzögerung.
+
+Das gespeicherte Format bleibt heil: die alten acht Stufen stehen
+weiter unter `Stage0…7` in ihrer alten Reihenfolge, das Entrauschen
+unter eigenem Schlüssel. Sonst wäre aus jedem gespeicherten „Gate an"
+ein „Entrauschen an" geworden.
+
 ### Entzerrer: zwei Ansichten, eine Seite
 
 > „ja baue es, ev generell 2 varianten, einen leichtere und eine für

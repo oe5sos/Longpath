@@ -12,6 +12,8 @@
 // =================================================================
 
 #include "core/strip/StripSettings.h"
+
+#include <iterator>
 #include "core/strip/EqBandLayout.h"
 
 #include "core/AppSettings.h"
@@ -107,6 +109,16 @@ bool getB(const QString& prefix, const char* name, bool fallback)
     return v.isValid() ? v.toBool() : fallback;
 }
 
+// Die Reihenfolge, in der die Stufen bis zum 2026-10-10 gespeichert
+// wurden. Teil des Dateiformats -- nichts darf hier eingefuegt oder
+// umgestellt werden, nur hinten angehaengt.
+constexpr StripChain::Stage kLegacyStageOrder[] = {
+    StripChain::Stage::Gate,   StripChain::Stage::Eq,
+    StripChain::Stage::DeEss,  StripChain::Stage::Comp,
+    StripChain::Stage::Tube,   StripChain::Stage::Pudu,
+    StripChain::Stage::Reverb, StripChain::Stage::Limiter,
+};
+
 // Where the list of the operator's own presets lives.
 const char kUserIndexKey[] = "ChannelStrip/UserPresets";
 
@@ -123,10 +135,20 @@ void saveTo(const QString& prefix, const StripChain& chain)
 
     // Per-stage enables. The master switch is not written — it loads
     // off every time, on purpose.
-    for (int i = 0; i < StripChain::kStageCount; ++i) {
-        const auto st = static_cast<StripChain::Stage>(i);
-        putV(key(prefix, "Stage") + QString::number(i), c.stageEnabled(st));
+    //
+    // Ueber kLegacyStageOrder, nicht ueber den Aufzaehlungswert: am
+    // 2026-10-10 kam das Entrauschen als neue erste Stufe dazu, und
+    // damit waere aus jedem gespeicherten „Stage0" (Gate) ploetzlich
+    // das Entrauschen geworden. Die Reihenfolge unten ist Teil des
+    // Dateiformats und bewegt sich nicht mehr; was neu dazukommt,
+    // bekommt einen eigenen Schluessel.
+    for (int i = 0; i < int(std::size(kLegacyStageOrder)); ++i) {
+        putV(key(prefix, "Stage") + QString::number(i),
+             c.stageEnabled(kLegacyStageOrder[i]));
     }
+    putV(key(prefix, "DenoiseOn"),
+         c.stageEnabled(StripChain::Stage::Denoise));
+    putF(prefix, "DenoiseAmount", c.nr().amount());
 
     putF(prefix, "GateThresholdDb", c.gate().thresholdDb());
     putF(prefix, "GateRatio",       c.gate().ratio());
@@ -372,11 +394,13 @@ void restoreFrom(const QString& prefix, StripChain& c)
     // restored. On a fast machine the difference is a few microseconds;
     // on the transmit path it is the difference between a clean start
     // and one burst of whatever the defaults happened to be.
-    for (int i = 0; i < StripChain::kStageCount; ++i) {
-        const auto st = static_cast<StripChain::Stage>(i);
-        c.setStageEnabled(st,
+    for (int i = 0; i < int(std::size(kLegacyStageOrder)); ++i) {
+        c.setStageEnabled(kLegacyStageOrder[i],
             getV(key(prefix, "Stage") + QString::number(i), false).toBool());
     }
+    c.setStageEnabled(StripChain::Stage::Denoise,
+                      getV(key(prefix, "DenoiseOn"), false).toBool());
+    c.nr().setAmount(getF(prefix, "DenoiseAmount", 0.8f));
     // And the master stays where it is — off. See StripSettings.h.
 
     // ── Die Einschuebe ──────────────────────────────────────────────

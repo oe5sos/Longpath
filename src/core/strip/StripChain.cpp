@@ -53,6 +53,7 @@ StripChain::StripChain()
 void StripChain::prepare(double sampleRate)
 {
     m_sampleRate = sampleRate;
+    m_nr.prepare(sampleRate);
     m_gate.prepare(sampleRate);
     m_eq.prepare(sampleRate);
     m_deEss.prepare(sampleRate);
@@ -213,6 +214,7 @@ void StripChain::setStageEnabled(Stage s, bool on) noexcept
     // in step means there is a single answer to "is the compressor on",
     // whether it is asked of the chain or of the compressor.
     switch (s) {
+    case Stage::Denoise: m_nr.setEnabled(on);  break;
     case Stage::Gate:  m_gate.setEnabled(on);  break;
     case Stage::Eq:    m_eq.setEnabled(on);    break;
     case Stage::DeEss: m_deEss.setEnabled(on); break;
@@ -244,6 +246,7 @@ bool StripChain::stageEnabled(Stage s) const noexcept
 const char* StripChain::stageName(Stage s) noexcept
 {
     switch (s) {
+    case Stage::Denoise: return "Denoise";
     case Stage::Gate:    return "Gate";
     case Stage::Eq:      return "EQ";
     case Stage::DeEss:   return "De-Esser";
@@ -296,20 +299,24 @@ void StripChain::processMono(float* samples, int frames) noexcept
     // bit-exact rather than on not calling them. runStage() does the
     // skip, and wraps each call in the non-finite guard.
     runInserts(0, samples, frames);
-    runStage(Stage::Gate,   m_gate,   samples, frames);
+    // Zuerst, damit alles danach eine saubere Stimme bekommt -- siehe
+    // die Begruendung am Stage-Aufzaehlungstyp.
+    runStage(Stage::Denoise, m_nr,    samples, frames);
     runInserts(1, samples, frames);
-    runStage(Stage::Eq,     m_eq,     samples, frames);
+    runStage(Stage::Gate,   m_gate,   samples, frames);
     runInserts(2, samples, frames);
-    runStage(Stage::DeEss,  m_deEss,  samples, frames);
+    runStage(Stage::Eq,     m_eq,     samples, frames);
     runInserts(3, samples, frames);
-    runStage(Stage::Comp,   m_comp,   samples, frames);
+    runStage(Stage::DeEss,  m_deEss,  samples, frames);
     runInserts(4, samples, frames);
-    runStage(Stage::Tube,   m_tube,   samples, frames);
+    runStage(Stage::Comp,   m_comp,   samples, frames);
     runInserts(5, samples, frames);
-    runStage(Stage::Pudu,   m_pudu,   samples, frames);
+    runStage(Stage::Tube,   m_tube,   samples, frames);
     runInserts(6, samples, frames);
-    runStage(Stage::Reverb, m_reverb, samples, frames);
+    runStage(Stage::Pudu,   m_pudu,   samples, frames);
     runInserts(7, samples, frames);
+    runStage(Stage::Reverb, m_reverb, samples, frames);
+    runInserts(8, samples, frames);
     // Last, and for a reason: a brickwall that anything runs after is
     // not a brickwall. Everything above can add gain — the tube, the
     // exciter, the compressor's make-up — and this is what stops the

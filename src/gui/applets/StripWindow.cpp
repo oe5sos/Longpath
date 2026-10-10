@@ -745,6 +745,7 @@ void StripWindow::buildUi()
         case StripChain::Stage::Eq:    page = buildEqPanel();    break;
         case StripChain::Stage::DeEss: page = buildDeEssPanel(); break;
         case StripChain::Stage::Comp:    page = buildCompPanel();    break;
+        case StripChain::Stage::Denoise: page = buildDenoisePanel(); break;
         case StripChain::Stage::Tube:    page = buildTubePanel();    break;
         case StripChain::Stage::Pudu:    page = buildPuduPanel();    break;
         case StripChain::Stage::Reverb:  page = buildReverbPanel();  break;
@@ -1395,6 +1396,74 @@ QWidget* StripWindow::buildCompPanel()
     m_compMeter = new QLabel(page);
     m_compMeter->setStyleSheet(dimStyle());
     form->addRow(m_compMeter);
+
+    return page;
+}
+
+// ── Denoise ──────────────────────────────────────────────────────────
+//
+// Die neunte Stufe, und die einzige mit einer Laufzeit, die man
+// hoert. Deshalb steht der Preis auf der Seite und nicht in einer
+// Anleitung: 10 ms, solange sie an ist.
+
+QWidget* StripWindow::buildDenoisePanel()
+{
+    auto* page = new QWidget(this);
+    auto* form = new QFormLayout(page);
+
+    const int idx = static_cast<int>(StripChain::Stage::Denoise);
+    auto* on = new QCheckBox(QStringLiteral("Denoise on"), page);
+    m_stageBoxes[static_cast<size_t>(idx)] = on;
+    form->addRow(on);
+    connect(on, &QCheckBox::toggled, this, [this](bool v) {
+        if (StripChain* c = chain()) {
+            c->setStageEnabled(StripChain::Stage::Denoise, v);
+        }
+        refreshChainRow();
+        updateLiveNote();
+        persist();
+    });
+
+    auto* what = new QLabel(
+        QStringLiteral(
+            "Takes steady room noise out of the voice — fan, hum, traffic — "
+            "and it keeps working while you speak. That is what the gate "
+            "cannot do: the gate only ducks the gaps between words.\n\n"
+            "It runs first in the chain, so everything after it sees a "
+            "clean voice. That matters most for the compressor: 10 dB of "
+            "make-up on a quiet fan is a fan on the air."),
+        page);
+    what->setWordWrap(true);
+    what->setStyleSheet(dimStyle());
+    form->addRow(what);
+
+    auto* cost = new QLabel(
+        QStringLiteral("Costs 10 ms of delay while it is on — audible when "
+                       "you listen to yourself, and the only stage in the "
+                       "strip that costs any."),
+        page);
+    cost->setWordWrap(true);
+    cost->setStyleSheet(QStringLiteral("QLabel { color: %1; }")
+                            .arg(QLatin1String(Style::kAmberText)));
+    form->addRow(cost);
+
+    addKnob(form, QStringLiteral("Amount"), 0.0, 1.0, 0.05,
+        cur([this]{ return double(chain()->nr().amount()); }, 0.8),
+        QString(), [this](double v) {
+            if (StripChain* c = chain()) { c->nr().setAmount(float(v)); }
+        }, 2, [this]{ persist(); });
+
+    auto* hint = new QLabel(
+        QStringLiteral("Fully up can sound processed on speech. Around "
+                       "0.6–0.8 the noise is gone and the voice is whole."),
+        page);
+    hint->setWordWrap(true);
+    hint->setStyleSheet(dimStyle());
+    form->addRow(hint);
+
+    m_nrMeter = new QLabel(page);
+    m_nrMeter->setStyleSheet(dimStyle());
+    form->addRow(m_nrMeter);
 
     return page;
 }
@@ -2097,6 +2166,7 @@ void StripWindow::reloadControls()
     // survives, so the rebuilt panel gets a live engine rather than a
     // dangling one.
     m_eqPanel = nullptr;
+    m_nrMeter = nullptr;
     m_gateMeter = m_deEssMeter = m_compMeter = nullptr;
     // Owned by the pages just removed. Left dangling, the next
     // refreshMeters() would call isVisible() on freed memory — the same
@@ -2130,6 +2200,7 @@ void StripWindow::reloadControls()
         case StripChain::Stage::Eq:    page = buildEqPanel();    break;
         case StripChain::Stage::DeEss: page = buildDeEssPanel(); break;
         case StripChain::Stage::Comp:    page = buildCompPanel();    break;
+        case StripChain::Stage::Denoise: page = buildDenoisePanel(); break;
         case StripChain::Stage::Tube:    page = buildTubePanel();    break;
         case StripChain::Stage::Pudu:    page = buildPuduPanel();    break;
         case StripChain::Stage::Reverb:  page = buildReverbPanel();  break;
@@ -3123,6 +3194,16 @@ void StripWindow::refreshMeters()
                                   c->deEss().gainReductionDb());
     }
 
+    if (m_nrMeter) {
+        const auto& nr = c->nr();
+        m_nrMeter->setText(
+            !nr.isUsable()
+                ? QStringLiteral("Denoise: not available — needs 48 kHz "
+                                 "and the bundled model")
+                : QStringLiteral("Denoise: %1 dB taken out · voice %2 %")
+                      .arg(nr.reductionDb(), 0, 'f', 1)
+                      .arg(int(nr.voiceProbability() * 100.0f + 0.5f)));
+    }
     if (m_gateMeter) {
         m_gateMeter->setText(QStringLiteral(
             "Gate: %1 · %2 dB of attenuation · in %3 dBFS")

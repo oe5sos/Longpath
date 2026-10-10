@@ -54,6 +54,7 @@
 #include "core/strip/ClientEq.h"
 #include "core/strip/ClientFinalLimiter.h"
 #include "core/strip/ClientGate.h"
+#include "core/strip/NoiseReduction.h"
 #include "core/strip/ClientPudu.h"
 #include "core/strip/ClientReverb.h"
 #include "core/strip/ClientTube.h"
@@ -73,8 +74,13 @@ public:
     // Order matches AetherSDR's defaultChain(); the limiter is not in
     // that list because upstream applies it separately at the very end
     // of the output path, and it is last here for the same reason.
+    // Entrauschen steht VORN. Nicht aus Geschmack: das Gate soll
+    // seine Schwelle auf einem sauberen Signal setzen, und alles, was
+    // danach Pegel anhebt -- Kompressor, Roehre, Anreicherer -- soll
+    // das Raumgeraeusch gar nicht erst mitbekommen.
     enum class Stage : uint8_t {
-        Gate = 0, Eq, DeEss, Comp, Tube, Pudu, Reverb, Limiter, Count
+        Denoise = 0, Gate, Eq, DeEss, Comp, Tube, Pudu, Reverb, Limiter,
+        Count
     };
     static constexpr int kStageCount = static_cast<int>(Stage::Count);
 
@@ -215,6 +221,7 @@ public:
 
     // The stages themselves, for the panels to bind to. Not owned by
     // the caller and not valid across a prepare().
+    NoiseReduction&     nr()      noexcept { return m_nr; }
     ClientGate&         gate()    noexcept { return m_gate; }
     ClientEq&           eq()      noexcept { return m_eq; }
     ClientDeEss&        deEss()   noexcept { return m_deEss; }
@@ -229,6 +236,7 @@ public:
     // compares a stage against every character and must not be able to
     // change one by accident — the stage it is inspecting is being read
     // by the audio thread at the same time.
+    const NoiseReduction&     nr()      const noexcept { return m_nr; }
     const ClientGate&         gate()    const noexcept { return m_gate; }
     const ClientEq&           eq()      const noexcept { return m_eq; }
     const ClientDeEss&        deEss()   const noexcept { return m_deEss; }
@@ -304,6 +312,7 @@ private:
     std::atomic<uint32_t> m_nonFiniteInputBlocks{0};
     std::atomic<uint32_t> m_nonFiniteTotal{0};
 
+    NoiseReduction     m_nr;
     ClientGate         m_gate;
     ClientEq           m_eq;
     ClientDeEss        m_deEss;

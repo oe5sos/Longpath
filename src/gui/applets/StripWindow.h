@@ -108,6 +108,7 @@ private:
     QWidget* buildEqPanel();
     QWidget* buildDeEssPanel();
     QWidget* buildCompPanel();
+    QWidget* buildDenoisePanel();
     QWidget* buildTubePanel();
     QWidget* buildPuduPanel();
     QWidget* buildReverbPanel();
@@ -458,6 +459,7 @@ private:
                           const StripChain& c);
 
     QLabel* m_presetNote{nullptr};
+    QLabel* m_nrMeter{nullptr};
     QLabel* m_gateMeter{nullptr};
     QLabel* m_deEssMeter{nullptr};
     QLabel* m_compMeter{nullptr};
