@@ -508,6 +508,16 @@ const QHash<QString, QString>& tabelle()
           QStringLiteral("Ziel: Sprache. Gemessen an deiner eigenen Stimme, solange „Mich hören“ läuft — die Zeile über jedem Regler sagt, wie weit du davon weg bist. Verstellt wird nichts.") },
         { QStringLiteral("passt"),
           QStringLiteral("passt") },
+        { QStringLiteral("Recommended — speech"),
+          QStringLiteral("Empfehlung — Sprache") },
+        { QStringLiteral("What I would set, and why each part is there. Denoise first so the compressor never lifts the room; a gentle gate behind it; a small, honest EQ; 3:1 compression; 3 dB of clipping for the talk power, and a brickwall above it. Tube, exciter and reverb stay OFF — they colour, and on SSB colour costs bandwidth you do not have. A starting point like any other: adjust from it."),
+          QStringLiteral("Was ich einstellen würde, und warum jedes Stück dabei ist. Entrauschen zuerst, damit der Kompressor den Raum nie mit anhebt; ein sanftes Gate dahinter; ein kleiner, ehrlicher Entzerrer; 3:1 Kompression; 3 dB Abschneiden für die Sprechleistung, und eine Mauer darüber. Röhre, Exciter und Hall bleiben AUS — sie färben, und auf SSB kostet Farbe Bandbreite, die man nicht hat. Ein Ausgangspunkt wie jeder andere: davon aus weiterdrehen.") },
+        { QStringLiteral("Clean voice"),
+          QStringLiteral("Saubere Stimme") },
+        { QStringLiteral("DX — punchy"),
+          QStringLiteral("DX — druckvoll") },
+        { QStringLiteral("Ragchew — easy"),
+          QStringLiteral("Plauderrunde — entspannt") },
     };
     return t;
 }

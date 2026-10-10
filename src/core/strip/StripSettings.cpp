@@ -575,6 +575,15 @@ QVector<Preset> builtInPresets()
                         "cut further. Costs naturalness and buys "
                         "intelligibility through noise. For working "
                         "stations you can barely hear.")},
+        {QStringLiteral("Recommended — speech"),
+         QStringLiteral("What I would set, and why each part is there. "
+                        "Denoise first so the compressor never lifts the "
+                        "room; a gentle gate behind it; a small, honest "
+                        "EQ; 3:1 compression; 3 dB of clipping for the "
+                        "talk power, and a brickwall above it. Tube, "
+                        "exciter and reverb stay OFF — they colour, and "
+                        "on SSB colour costs bandwidth you do not have. "
+                        "A starting point like any other: adjust from it.")},
         {QStringLiteral("Ragchew — easy"),
          QStringLiteral("Gentle throughout, gate as an expander rather "
                         "than a gate, more low end. For a long contact "
@@ -597,6 +606,100 @@ bool applyBuiltIn(const QString& name, StripChain& c)
             c.setStageEnabled(static_cast<StripChain::Stage>(i), false);
         }
     };
+
+    // ── Die Empfehlung ──────────────────────────────────────────────
+    //
+    // „kannst du mal deine empfehlung bei allem eingeben?"
+    //
+    // Hier steht sie, als Ausgangspunkt wie jeder andere -- nicht als
+    // Automatik. Jede Zeile hat einen Grund, und die Gründe stammen
+    // aus der Arbeit dieses Tages:
+    //
+    //   * Entrauschen VOR allem: ein Kompressor mit Anhebung macht
+    //     aus einem leisen Lüfter ein Rauschen, das mitsendet.
+    //   * Das Gate darf deshalb sanft sein -- es muss den Raum nicht
+    //     mehr alleine wegräumen.
+    //   * Der Entzerrer bleibt klein. Drei Griffe, keine Kurve aus
+    //     sieben Bergen; was dort zuviel ist, hört die Gegenseite als
+    //     Anstrengung.
+    //   * 3:1 ist die Alltagseinstellung: hörbar ruhiger und immer
+    //     noch erkennbar eine Stimme.
+    //   * Der Clipper bringt die Sprechleistung, nicht der
+    //     Kompressor. 3 dB sind der vorsichtige Anfang.
+    //   * Röhre, Exciter und Hall AUS. Sie färben, und auf SSB kostet
+    //     Farbe Bandbreite, die man nicht hat. Wer sie will, schaltet
+    //     sie einzeln dazu und hört hin.
+    // QStringLiteral, nicht QLatin1String: der Gedankenstrich ist in
+    // UTF-8 drei Bytes, und QLatin1String liest sie einzeln als
+    // Latin-1 -- der Vergleich ist dann immer falsch, und das Profil
+    // tut gar nichts. Genau so ist es beim ersten Lauf passiert.
+    if (name == QStringLiteral("Recommended — speech")) {
+        allOff();
+
+        c.nr().setAmount(0.70f);
+        c.setStageEnabled(StripChain::Stage::Denoise, true);
+
+        c.gate().setThresholdDb(-38.0f);
+        c.gate().setFloorDb(-18.0f);
+        c.gate().setAttackMs(3.0f);
+        c.gate().setHoldMs(40.0f);
+        c.gate().setReleaseMs(180.0f);
+        c.gate().setReturnDb(5.0f);
+        c.setStageEnabled(StripChain::Stage::Gate, true);
+
+        // Hochpass, drei Kerben aus (wie bei den anderen Profilen),
+        // Tiefenregal neutral, und die geformten Bänder klein.
+        band(0, ClientEq::FilterType::HighPass, 110.0f, 0.0f, 0.707f, true, 24);
+        band(1, ClientEq::FilterType::Peak,  50.0f, -18.0f, 8.0f, false, 12);
+        band(2, ClientEq::FilterType::Peak, 100.0f, -12.0f, 8.0f, false, 12);
+        band(3, ClientEq::FilterType::Peak, 150.0f,  -9.0f, 8.0f, false, 12);
+        band(4, ClientEq::FilterType::LowShelf,   200.0f, -1.5f, 0.707f, true, 12);
+        band(5, ClientEq::FilterType::Peak,      2000.0f,  2.0f, 1.2f,   true, 12);
+        band(6, ClientEq::FilterType::HighShelf, 3000.0f,  0.0f, 0.707f, true, 12);
+        // Die sieben freien Griffe: zwei davon benutzt, der Rest
+        // flach und aus -- so steht in der einfachen Ansicht etwas,
+        // das man nachvollziehen kann, und nicht ein Berg aus sieben.
+        for (int i = EqBandLayout::kFirstSpare;
+             i < EqBandLayout::kBandCount; ++i) {
+            c.eq().setBand(i, EqBandLayout::spare(i - EqBandLayout::kFirstSpare));
+        }
+        {
+            // MULM 650 Hz leicht zurück, PRÄSENZ 2,5 kHz leicht vor.
+            ClientEq::BandParams mulm = EqBandLayout::spare(2);
+            mulm.gainDb = -2.0f; mulm.q = 2.0f; mulm.enabled = true;
+            c.eq().setBand(EqBandLayout::kFirstSpare + 2, mulm);
+            ClientEq::BandParams prae = EqBandLayout::spare(5);
+            prae.gainDb = 2.5f; prae.q = 2.0f; prae.enabled = true;
+            c.eq().setBand(EqBandLayout::kFirstSpare + 5, prae);
+        }
+        c.eq().setActiveBandCount(EqBandLayout::kBandCount);
+        c.setStageEnabled(StripChain::Stage::Eq, true);
+
+        c.deEss().setFrequencyHz(6000.0f);
+        c.deEss().setThresholdDb(-28.0f);
+        c.setStageEnabled(StripChain::Stage::DeEss, true);
+
+        c.comp().setThresholdDb(-22.0f);
+        c.comp().setRatio(3.0f);
+        c.comp().setAttackMs(8.0f);
+        c.comp().setReleaseMs(150.0f);
+        c.comp().setKneeDb(8.0f);
+        c.comp().setMakeupDb(3.0f);
+        c.comp().setPhaseRotatorStages(4);
+        c.setStageEnabled(StripChain::Stage::Comp, true);
+
+        c.clipper().setDriveDb(3.0f);
+        c.clipper().setKnee(0.2f);
+        c.clipper().setLevelMatch(false);
+        c.setStageEnabled(StripChain::Stage::Clip, true);
+
+        c.limiter().setCeilingDb(-1.0f);
+        c.setStageEnabled(StripChain::Stage::Limiter, true);
+
+        // Röhre, PUDU und Hall bleiben aus -- allOff() hat sie
+        // ausgeschaltet, und hier steht ausdrücklich nichts.
+        return true;
+    }
 
     if (name == QLatin1String("Clean voice")) {
         allOff();

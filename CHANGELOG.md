@@ -2,6 +2,30 @@
 
 ## [Unreleased]
 
+### Ein Ausgangsprofil: „Empfehlung — Sprache"
+
+> „kannst du mal deine empfehlung bei allem eingeben?"
+> „mache bitte ein gutes profil für mich als ausgangswert"
+
+Als **Ausgangspunkt** im Profilfeld, nicht als Automatik — jede
+Zeile hat einen Grund, und die Gründe stammen aus der Arbeit dieses
+Tages:
+
+| Stufe | Einstellung | Warum |
+|---|---|---|
+| Entrauschen | an, 0,70 | zuerst, sonst hebt der Kompressor den Raum mit |
+| Gate | −38 dB, Boden −18 | darf sanft sein, der Raum ist schon weg |
+| Entzerrer | HP 110 Hz, Mulm −2, Präsenz +2,5 | drei Griffe, keine Kurve aus sieben Bergen |
+| De-Esser | 6 kHz, −28 dB | im 4-kHz-Kanal hörbar, sonst harmlos |
+| Kompressor | 3:1, 8 ms, 150 ms | die Alltagseinstellung |
+| Clipper | 3 dB, Knie 0,2 | hier kommt die Sprechleistung her |
+| Begrenzer | Decke −1 dB | die Mauer darüber |
+| **Röhre, PUDU, Hall** | **aus** | sie färben, und auf SSB kostet Farbe Bandbreite |
+
+Der Prüfstand hält fest, dass es die genannten Stufen einschaltet —
+**und die anderen auslässt**. Ein Profil, das den Hall anlässt, weil
+niemand nachgesehen hat, ist schlimmer als keines.
+
 ### Die drei Punkte links oben — auch an den Werkzeugfenstern
 
 > „bei apple sind links oben 3 farbige symbole, rot, gelb und grün …
