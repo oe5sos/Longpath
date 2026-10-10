@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <utility>
 
 namespace Longpath {
 
@@ -143,6 +144,7 @@ void ClientClipper::process(float* samples, int frames, int channels) noexcept
 
     float peakBefore = 0.0f;
     float peakAfter  = 0.0f;
+    float abgeschnitten = 0.0f;
     double sumBefore = 0.0;
     double sumAfter  = 0.0;
 
@@ -174,8 +176,28 @@ void ClientClipper::process(float* samples, int frames, int channels) noexcept
         b *= 2.0f;
 
         // ── Dort abschneiden ─────────────────────────────────────
+        //
+        // Und hier, an der Kante selbst, wird auch gemessen: wieviel
+        // der Wert durch das Abschneiden verloren hat. Vorher wurde
+        // der Blockspitzenwert vorher gegen nachher gehalten -- das
+        // ist unbrauchbar, weil die Ueberabtastung rund sechzehn
+        // Abtastwerte verzoegert: die beiden Spitzen in einem Block
+        // gehoeren gar nicht zusammen. Gemessen wurden so stur
+        // 0,7 dB, bei jedem Drive derselbe Wert, und das war die
+        // Filterflanke und nicht die Kante.
+        const float aVor = a;
+        const float bVor = b;
         a = shape(a, kneeV);
         b = shape(b, kneeV);
+        for (const auto& paar : {std::pair<float,float>{aVor, a},
+                                 std::pair<float,float>{bVor, b}}) {
+            const float vor  = std::fabs(paar.first);
+            const float nach = std::fabs(paar.second);
+            if (vor > 1e-6f && nach > 1e-9f && vor > nach) {
+                abgeschnitten = std::max(abgeschnitten,
+                                         20.0f * std::log10(vor / nach));
+            }
+        }
 
         // ── Und zurück auf die halbe Rate ────────────────────────
         m_down[static_cast<size_t>(m_downPos)] = a;
@@ -213,12 +235,32 @@ void ClientClipper::process(float* samples, int frames, int channels) noexcept
         if (std::fabs(m_matchGain - 1.0f) < 1e-4f) { m_matchGain = 1.0f; }
     }
 
-    // Wieviel Spitze weg ist. Bei eingeschalteter Nachregelung ist
-    // das direkt der Gewinn an Scheitelfaktor.
-    if (peakBefore > 1e-5f && peakAfter > 1e-9f) {
-        const float db = 20.0f * std::log10(peakBefore / peakAfter);
-        m_clippedDb.store(std::max(0.0f, db), std::memory_order_relaxed);
-    }
+    // ── Wieviel wirklich abgeschnitten wurde ────────────────────────
+    //
+    // Hier stand peakBefore / peakAfter, also EINGANG gegen AUSGANG.
+    // Das ist bei ausgeschaltetem Abgleich immer kleiner als eins --
+    // der Ausgang ist ja um die Verstaerkung lauter --, und
+    // max(0, …) machte daraus stur eine Null. Der Messlauf vom
+    // 2026-10-10 zeigte es in einer Zeile: Drive 15 dB, der
+    // Scheitelfaktor faellt von 11,7 auf 9,0, und die Anzeige sagte
+    // „abgeschnitten 0,0 dB".
+    //
+    // Gemessen gehoert, was die KANTE weggenommen hat: wohin die
+    // Spitze ohne sie gekommen waere (Eingang mal Verstaerkung)
+    // gegen das, was herauskam.
+    //
+    // Und mit HALTEN, nicht als Augenblickswert. Der zweite Anlauf
+    // rechnete richtig und zeigte trotzdem null: ein Block ist fuenf
+    // Millisekunden lang, die meisten davon liegen in einer
+    // Sprechpause, und der letzte Block vor dem Ablesen ist fast
+    // immer still. Jede Ruecknahmeanzeige der Welt haelt deshalb den
+    // Hoechstwert und laesst ihn langsam fallen -- hier 20 dB je
+    // Sekunde.
+    float gehalten = m_clippedDb.load(std::memory_order_relaxed);
+    const float zerfall = 20.0f * float(frames) / float(m_rate);
+    gehalten = std::max(0.0f, gehalten - zerfall);
+    gehalten = std::max(gehalten, abgeschnitten);
+    m_clippedDb.store(gehalten, std::memory_order_relaxed);
 }
 
 } // namespace Longpath

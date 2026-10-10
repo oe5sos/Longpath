@@ -638,10 +638,45 @@ bool applyBuiltIn(const QString& name, StripChain& c)
     if (name == QStringLiteral("Recommended — speech")) {
         allOff();
 
-        c.nr().setAmount(0.70f);
+        // ── Gemessen, nicht geschaetzt ──────────────────────────
+        //
+        // Der Messlauf vom 2026-10-10 (tst_kanalzug_messlauf) hat den
+        // Preis des Entrauschens in Zahlen gefasst:
+        //
+        //   Anteil   4 kHz    6 kHz   Pausen   Sprache
+        //    0,20    -0,2     -0,3     -1,9     -1,6
+        //    0,35    -0,6     -0,7     -3,7     -2,6
+        //    0,50    -1,7     -1,9     -6,0     -2,9
+        //    0,70    -6,7     -7,6    -10,5     -2,4
+        //    1,00   -13,1    -23,9    -66,9     -0,1
+        //
+        // Oberhalb von 0,5 explodiert der Preis: 0,70 kostet SIEBEN
+        // Dezibel Hoehen fuer zehn Dezibel weniger Rauschen. Genau
+        // das war der Grund, aus dem „das rohe audiosignal besser
+        // ist als alles andere" -- die Stimme wurde stumpf, und das
+        // hoert man sofort, waehrend man das fehlende Rauschen erst
+        // vermisst, wenn man darauf achtet.
+        //
+        // 0,35 ist der Punkt, an dem das Verhaeltnis noch stimmt:
+        // 3,7 dB weniger Rauschen fuer 0,7 dB Hoehen.
+        c.nr().setAmount(0.35f);
         c.setStageEnabled(StripChain::Stage::Denoise, true);
 
-        c.gate().setThresholdDb(-38.0f);
+        // Gemessen: bei einem Grundgeräusch von -48 dBFS EFFEKTIV
+        // liegen dessen Spitzen um -38, und genau dort stand die
+        // Schwelle -- das Gate hat deshalb gar nichts getan.
+        //
+        //   Schwelle   Pausen gegen roh
+        //    -50 dB        0,0
+        //    -42 dB        0,0
+        //    -38 dB        0,0   <- war eingestellt
+        //    -34 dB       -3,0
+        //    -28 dB       -7,5
+        //
+        // Eine Schwelle gehört über die SPITZEN des Raums, nicht
+        // über seinen Effektivwert. -34 ist der Anfang der Wirkung
+        // und liegt immer noch elf Dezibel unter der Sprache.
+        c.gate().setThresholdDb(-34.0f);
         c.gate().setFloorDb(-18.0f);
         c.gate().setAttackMs(3.0f);
         c.gate().setHoldMs(40.0f);
@@ -690,7 +725,21 @@ bool applyBuiltIn(const QString& name, StripChain& c)
         c.comp().setPhaseRotatorStages(4);
         c.setStageEnabled(StripChain::Stage::Comp, true);
 
-        c.clipper().setDriveDb(3.0f);
+        // Ebenfalls gemessen: bei Sprachspitzen von -12 dBFS und
+        // einer Kante bei Vollaussteuerung passiert unter 12 dB
+        // Drive GAR NICHTS -- der Clipper war nur eine Verstaerkung.
+        //
+        //   Drive   Spitze  Scheitelfaktor
+        //     3 dB   -8,7    11,7 -> 11,6
+        //     9 dB   -2,7    11,7 -> 11,6
+        //    12 dB   -0,3    11,7 -> 11,1
+        //    15 dB    0,0    11,7 ->  9,0
+        //
+        // 12 dB ist der Anfang der Wirkung und zugleich die Stelle,
+        // an der der Begrenzer dahinter (Decke -1 dB) die Spitze
+        // uebernimmt. Mehr ist eine Entscheidung des Betreibers, die
+        // er an der Zahl auf der Seite ablesen kann.
+        c.clipper().setDriveDb(12.0f);
         c.clipper().setKnee(0.2f);
         c.clipper().setLevelMatch(false);
         c.setStageEnabled(StripChain::Stage::Clip, true);
@@ -751,7 +800,21 @@ bool applyBuiltIn(const QString& name, StripChain& c)
             c.eq().setBand(i, EqBandLayout::spare(i - EqBandLayout::kFirstSpare));
         }
         c.eq().setActiveBandCount(EqBandLayout::kBandCount);
-        c.gate().setThresholdDb(-38.0f);
+        // Gemessen: bei einem Grundgeräusch von -48 dBFS EFFEKTIV
+        // liegen dessen Spitzen um -38, und genau dort stand die
+        // Schwelle -- das Gate hat deshalb gar nichts getan.
+        //
+        //   Schwelle   Pausen gegen roh
+        //    -50 dB        0,0
+        //    -42 dB        0,0
+        //    -38 dB        0,0   <- war eingestellt
+        //    -34 dB       -3,0
+        //    -28 dB       -7,5
+        //
+        // Eine Schwelle gehört über die SPITZEN des Raums, nicht
+        // über seinen Effektivwert. -34 ist der Anfang der Wirkung
+        // und liegt immer noch elf Dezibel unter der Sprache.
+        c.gate().setThresholdDb(-34.0f);
         c.gate().setFloorDb(-18.0f);
         c.gate().setHoldMs(30.0f);
         c.gate().setReleaseMs(150.0f);

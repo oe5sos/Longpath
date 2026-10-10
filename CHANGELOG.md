@@ -2,6 +2,41 @@
 
 ## [Unreleased]
 
+### Der Kanalzug, Stufe für Stufe nachgemessen
+
+> „bitte teste nun unseren kanalzug ganz genau. mit den ergebnissen
+>  bin ich nicht wirklich zufrieden, das rohe audiosignal ist besser
+>  als alles andere."
+
+`tests/tst_kanalzug_messlauf.cpp`: eine nachgebaute Stimme (Pulszug
+mit drei Formanten, Silben, Pausen, Grundgeräusch, auf −12 dBFS) geht
+durch jede Stufe **einzeln**. Gemessen werden Pegel, Scheitelfaktor,
+Spektrum in Sechstel-Oktaven, Klirr und das Rauschen in den Pausen.
+
+**Drei Befunde, drei Fehler von mir:**
+
+1. **Das Entrauschen nahm sieben Dezibel Höhen weg.** Bei Anteil 0,70:
+   −6,7 dB bei 4 kHz, −7,6 dB bei 6 kHz. Das war der Grund, aus dem
+   das rohe Signal besser klang — eine stumpfe Stimme hört man
+   sofort, fehlendes Rauschen erst, wenn man darauf achtet. Der Preis
+   explodiert oberhalb von 0,5; **0,35** kostet 0,7 dB Höhen für
+   3,7 dB weniger Rauschen. Die Empfehlung steht jetzt dort.
+2. **Der Clipper tat bei 3 dB Drive nichts** außer lauter machen —
+   bei Sprachspitzen von −12 dBFS beginnt die Wirkung erst bei 12 dB.
+   Die Empfehlung steht jetzt auf 12.
+3. **Die Gate-Schwelle saß auf den Rauschspitzen.** Ein Grundgeräusch
+   von −48 dBFS *effektiv* hat Spitzen um −38 — und genau dort stand
+   die Schwelle. Das Gate tat deshalb exakt nichts. Jetzt −34.
+
+Dazu ein Messfehler in der Anzeige: der Clipper meldete **immer
+0,0 dB**, weil er Blockspitzen vorher gegen nachher verglich — durch
+ein Filter mit sechzehn Abtastwerten Verzögerung gehören die beiden
+gar nicht zusammen. Gemessen wird jetzt **an der Kante selbst**, mit
+Halten und 20 dB/s Zerfall wie jede Rücknahmeanzeige.
+
+**Die Kette nach den Korrekturen:** Scheitelfaktor 11,7 → 7,6 dB,
+Störabstand **24,7 → 30,3 dB**, Spitze bleibt unter Vollaussteuerung.
+
 ### Warum das rohe Signal jedes Profil geschlagen hat
 
 > „die rohdaten (natürlich mit voller bandbreite) sind bei allen
