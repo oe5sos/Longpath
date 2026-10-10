@@ -32,6 +32,8 @@
 #include <QtTest>
 
 #include <QByteArray>
+#include <QDir>
+#include <QPixmap>
 #include <QHostAddress>
 #include <QSignalSpy>
 #include <QTcpServer>
@@ -172,6 +174,7 @@ private slots:
     void dieSelbstskalierungZiehtDieBalkenMit();
     void dieDreiZustandsknoepfeGehenHinaus();
     void einFehlerSchaltetDenLoeschknopfFrei();
+    void dasFeldAlsBild();
 
 private:
     bool verbinden();
@@ -387,6 +390,98 @@ void TstAcomAnbindung::einFehlerSchaltetDenLoeschknopfFrei()
     QVERIFY2(!m_applet->clearFaultEnabledForTesting(),
              "Ohne Fehler hat der Loeschknopf keinen Anlass -- er bleibt "
              "sichtbar, aber grau");
+}
+
+void TstAcomAnbindung::dasFeldAlsBild()
+{
+    // Kein Prueffall, ein BILD. Bis hierher ist ueber dieses Feld
+    // berichtet worden, ohne dass es je einer gesehen hat -- und
+    // „gruene Prueffaelle" sind kein Beleg dafuer, wie etwas AUSSIEHT.
+    // Darum wird es hier abgezogen, aus derselben Verdrahtung, die auch
+    // im Betrieb laeuft: echtes MainWindow, echte AcomConnection,
+    // Kunstverstaerker auf 127.0.0.1.
+    //
+    // Was auf dem Bild NICHT steht: eine Bestaetigung am Geraet. Hier
+    // haengt kein ACOM am Kabel. Die Zahlen sind die des
+    // Kunstverstaerkers -- allerdings mit einer, die gegen eine fremde
+    // Messung passt: 459.797 Betriebssekunden zeigen „5 d 7 h", und
+    // dieselbe Zahl hat AetherSDR als 127:43:17 von der Frontplatte
+    // eines echten 600S abgelesen.
+    //
+    // Ziel: LONGPATH_BILD_DIR, sonst ein temporaerer Ordner -- damit
+    // der Lauf in der CI nichts ins Arbeitsverzeichnis streut (gleiche
+    // Form wie tst_ctcss_tonleuchte_bild).
+    const QString dir = qEnvironmentVariable(
+        "LONGPATH_BILD_DIR",
+        QDir(QDir::tempPath()).filePath(QStringLiteral("longpath-verstaerker")));
+    QDir().mkpath(dir);
+
+    struct Lage {
+        const char* name;
+        quint16     fwd;
+        quint16     refl;
+        quint16     swrX100;
+        quint16     tempRoh;
+        quint8      modus;
+        quint8      fehler;
+    };
+    // Drei Lagen, die ein Betreiber wirklich sieht: Ruhe, Senden,
+    // Stoerung. Die Temperaturen sind roh (600S: minus 273).
+    const Lage lagen[] = {
+        {"1-standby",  0,   0,  100, 298, 0x5, 0xFF},  //  25 °C, STANDBY
+        {"2-senden", 585,   9,  112, 338, 0x6, 0xFF},  //  65 °C, OPR/RX mit Leistung
+        {"3-fehler", 120, 140, 310, 352, 0x6, 0x05},   //  79 °C, SWR 3.1, Alarm
+    };
+
+    // ERST TRENNEN. Der Fall vorher hat die Selbstskalierung nach oben
+    // gezogen, und die geht nur beim Verbinden wieder auf 600S zurueck
+    // -- mit einer hoeheren Stufe stimmt der Temperaturversatz nicht
+    // mehr (600S: 273, 1200S: 281), und das Bild haette eine falsche
+    // Temperatur gezeigt. Beim ersten Anlauf dieses Falls ist genau das
+    // passiert: 298 - 281 = 17 statt der erwarteten 25 Grad.
+    if (m_verb->isConnected()) {
+        // disconnect() meldet SOFORT, nicht ueber die Ereignisschleife --
+        // ein wait() darauf wartet auf ein Signal, das schon da war.
+        m_verb->disconnect();
+        QVERIFY2(!m_verb->isConnected(), "Die Verbindung ging nicht runter");
+        m_amp->empfangenLeeren();
+    }
+    QVERIFY(verbinden());
+    QTRY_VERIFY_WITH_TIMEOUT(m_amp->schiebtGerade(), 3000);
+
+    for (const Lage& l : lagen) {
+        m_amp->forwardW      = l.fwd;
+        m_amp->reflectedW    = l.refl;
+        m_amp->swrMalHundert = l.swrX100;
+        m_amp->tempRaw       = l.tempRoh;
+        m_amp->modeNibble    = l.modus;
+        m_amp->errorCode     = l.fehler;
+
+        // Warten, bis die Lage wirklich IM Feld steht -- sonst zeigt das
+        // Bild die vorige. Die Temperatur ist der zuverlaessigste
+        // Anker, weil sie in jeder Lage anders ist.
+        const QString tempErwartet =
+            QStringLiteral("TEMP  %1°C").arg(l.tempRoh - 273);
+        QTRY_VERIFY_WITH_TIMEOUT(
+            m_applet->infoTextForTesting().contains(tempErwartet), 3000);
+
+        const QPixmap bild = m_applet->grab();
+        const QString pfad = QStringLiteral("%1/acom-%2.png")
+                                 .arg(dir, QLatin1String(l.name));
+        QVERIFY2(bild.save(pfad),
+                 qPrintable(QStringLiteral("konnte %1 nicht schreiben").arg(pfad)));
+        qInfo() << "geschrieben:" << pfad << bild.size()
+                << "| Pille:" << m_applet->statusPillTextForTesting();
+    }
+
+    // Aufgeraeumt zuruecklassen, auch wenn dieser Fall der letzte ist:
+    // wer einen weiteren dahinter haengt, soll nicht die Stoerung erben.
+    m_amp->errorCode     = 0xFF;
+    m_amp->forwardW      = 450;
+    m_amp->reflectedW    = 80;
+    m_amp->swrMalHundert = 130;
+    m_amp->tempRaw       = 305;
+    m_amp->modeNibble    = 0x6;
 }
 
 QTEST_MAIN(TstAcomAnbindung)

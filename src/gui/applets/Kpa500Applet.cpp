@@ -60,8 +60,23 @@ Kpa500Applet::Kpa500Applet(RadioModel* model, QWidget* parent)
     m_statusPill = new QLabel(QStringLiteral("—"), this);
     m_statusPill->setAlignment(Qt::AlignCenter);
 
+    // In der Breite, die das Feld im Anwendungsfenster wirklich hat
+    // (327 px, gemessen am Bild aus `dasFeldAlsBild`), passte die
+    // Kopfzeile nicht: Qt hat alle Beschriftungen gleichmaessig
+    // gestaucht, und auf dem Bild stand „Elecraft KPA50" -- der
+    // Geraetename selbst war abgeschnitten. Aufgefallen ist das erst
+    // beim HINSEHEN, nicht in sieben gruenen Prueffaellen.
+    //
+    // Also eine Rangfolge statt gleichmaessigem Stauchen: der
+    // Geraetename weicht NIE, die Kennung (Firmware/Seriennummer) weicht
+    // zuerst -- sie ist die am wenigsten dringende Auskunft der Zeile und
+    // steht vollstaendig in der Sprechblase.
+    auto* nameLabel = new QLabel(QStringLiteral("Elecraft KPA500"), this);
+    nameLabel->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
+    m_identityLabel->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+
     auto* kopf = new QHBoxLayout;
-    kopf->addWidget(new QLabel(QStringLiteral("Elecraft KPA500"), this));
+    kopf->addWidget(nameLabel);
     kopf->addSpacing(8);
     kopf->addWidget(m_sourceLabel);
     kopf->addSpacing(8);
@@ -207,7 +222,12 @@ void Kpa500Applet::setIdentity(const QString& firmware, const QString& serial)
         m_identityLabel->clear();
         return;
     }
-    m_identityLabel->setText(QStringLiteral("v%1 · #%2").arg(firmware, serial));
+    const QString kennung = QStringLiteral("v%1 · #%2").arg(firmware, serial);
+    m_identityLabel->setText(kennung);
+    // Vollstaendig in der Sprechblase, weil die Beschriftung in schmalen
+    // Feldern bewusst als erste weicht (siehe die Kopfzeile oben).
+    m_identityLabel->setToolTip(tr("Firmware %1, Seriennummer %2")
+                                    .arg(firmware, serial));
 }
 
 void Kpa500Applet::setPowerSwr(const Kpa500::PowerSwr& ps)

@@ -23,6 +23,8 @@
 //                 Claude (Claude Code).
 // =================================================================
 
+#include <QDir>
+#include <QPixmap>
 #include <QtTest>
 
 #include <QByteArray>
@@ -166,6 +168,7 @@ private slots:
     void derBootZustandMachtDenEinschaltknopfSinnvoll();
     void einFehlerKommtAlsZahlUndLaesstSichLoeschen();
     void derUmschalterSchicktDasGegenteil();
+    void dasFeldAlsBild();
 
 private:
     bool verbinden();
@@ -330,6 +333,49 @@ void TstKpa500Anbindung::derUmschalterSchicktDasGegenteil()
         m_amp->empfangen().contains(QByteArrayLiteral("^OS1;")), 3000);
     QTRY_COMPARE_WITH_TIMEOUT(m_applet->statusPillTextForTesting(),
                               QStringLiteral("OPERATE"), 3000);
+}
+
+void TstKpa500Anbindung::dasFeldAlsBild()
+{
+    // Kein Prueffall, ein BILD -- siehe die gleichnamige Stelle bei
+    // ACOM, wo derselbe Abzug einen abgeschnittenen Knopf gezeigt hat.
+    //
+    // Hier ist die Herkunft die beste der drei: die Beschreibung liegt
+    // frei bei Elecraft und ist gelesen. An einem echten KPA500 ist
+    // trotzdem nichts davon gelaufen.
+    const QString dir = qEnvironmentVariable(
+        "LONGPATH_BILD_DIR",
+        QDir(QDir::tempPath()).filePath(QStringLiteral("longpath-verstaerker")));
+    QDir().mkpath(dir);
+
+    struct Lage { const char* name; int watt; int swrX10; int temp; bool opr; int fehler; };
+    const Lage lagen[] = {
+        {"1-betrieb", 480, 13, 48, true,  0},
+        {"2-fehler",    0, 10, 71, false, 3},
+    };
+
+    QVERIFY(verbinden());
+    for (const Lage& l : lagen) {
+        m_amp->watt       = l.watt;
+        m_amp->swrMalZehn = l.swrX10;
+        m_amp->tempC      = l.temp;
+        m_amp->operate    = l.opr;
+        m_amp->fehler     = l.fehler;
+        // Die Temperatur taugt hier NICHT als Anker: beim KPA500 ist sie
+        // ein Balken, kein Text (die Beschreibung gibt Bereich und
+        // Einheit her, darum durfte sie einer werden). Also die Pille.
+        QTRY_COMPARE_WITH_TIMEOUT(m_applet->statusPillTextForTesting(),
+                                  l.opr ? QStringLiteral("OPERATE")
+                                        : QStringLiteral("STANDBY"), 3000);
+        QTest::qWait(60);
+        const QPixmap bild = m_applet->grab();
+        const QString pfad = QStringLiteral("%1/kpa500-%2.png").arg(dir, QLatin1String(l.name));
+        QVERIFY2(bild.save(pfad),
+                 qPrintable(QStringLiteral("konnte %1 nicht schreiben").arg(pfad)));
+        qInfo() << "geschrieben:" << pfad << bild.size();
+    }
+    m_amp->fehler = 0;
+    m_amp->operate = true;
 }
 
 QTEST_MAIN(TstKpa500Anbindung)

@@ -190,9 +190,25 @@ AcomApplet::AcomApplet(RadioModel* model, QWidget* parent)
     m_offBtn->setToolTip(tr("Verstärker ausschalten"));
     connect(m_offBtn, &QPushButton::clicked, this, &AcomApplet::offClicked);
 
+    // Der Loeschknopf bekommt eine EIGENE Zeile. Zu viert in einer
+    // Reihe passten sie nicht: in der Breite, die das Feld im
+    // Anwendungsfenster wirklich hat (327 px, gemessen am Bild aus
+    // `dasFeldAlsBild`), stand auf dem ersten Knopf „-HLER LÖSCH" statt
+    // „FEHLER LÖSCHEN". Qt schneidet dann wortlos ab -- auffallen kann
+    // das nur, wenn man HINSIEHT, und bis zum 2026-10-10 hatte das
+    // niemand getan.
+    //
+    // Die Absicht von oben bleibt dabei unangetastet: der Knopf ist
+    // weiter immer DA und wird nur bedienbar, die Reihe springt also
+    // bei einem Fehler nicht.
+    auto* loeschReihe = new QHBoxLayout;
+    loeschReihe->setSpacing(6);
+    loeschReihe->addWidget(m_clearBtn);
+    loeschReihe->addStretch();
+    vbox->addLayout(loeschReihe);
+
     auto* reihe = new QHBoxLayout;
     reihe->setSpacing(6);
-    reihe->addWidget(m_clearBtn);
     reihe->addStretch();
     reihe->addWidget(m_standbyBtn);
     reihe->addWidget(m_operateBtn);

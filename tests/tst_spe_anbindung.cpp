@@ -28,6 +28,8 @@
 //                 Anthropic Claude (Claude Code).
 // =================================================================
 
+#include <QDir>
+#include <QPixmap>
 #include <QtTest>
 
 #include <QByteArray>
@@ -142,6 +144,7 @@ private slots:
     void einAlarmSchlaegtDieWarnung();
     void einKnopfdruckGehtAufDenDraht();
     void dieStilleLeertDasFeld();
+    void dasFeldAlsBild();
 
 private:
     bool verbinden();
@@ -360,6 +363,47 @@ void TstSpeAnbindung::dieStilleLeertDasFeld()
     QTRY_VERIFY_WITH_TIMEOUT(
         m_applet->infoTextForTesting().contains(QStringLiteral("47.5V")), 3000);
     QVERIFY(m_applet->commandsEnabledForTesting());
+}
+
+void TstSpeAnbindung::dasFeldAlsBild()
+{
+    // Kein Prueffall, ein BILD -- siehe die gleichnamige Stelle bei
+    // ACOM. Dort hat genau dieser Abzug einen abgeschnittenen Knopf
+    // gezeigt, den sieben gruene Prueffaelle nicht gesehen hatten.
+    //
+    // Was hier NICHT belegt wird: dass sich ein echter 1.5K-FA so
+    // verhaelt. Die Zustandsstrings stammen aus der Anleitung, die ich
+    // nie in der Hand hatte (zweite Hand ueber AetherSDR).
+    const QString dir = qEnvironmentVariable(
+        "LONGPATH_BILD_DIR",
+        QDir(QDir::tempPath()).filePath(QStringLiteral("longpath-verstaerker")));
+    QDir().mkpath(dir);
+
+    struct Lage { const char* name; const char* zustand; };
+    const Lage lagen[] = {
+        {"1-sendet", kSendet15K},
+        {"2-alarm",  kAlarm15K},
+    };
+
+    QVERIFY(verbinden());
+    for (const Lage& l : lagen) {
+        m_amp->zustand = QString::fromLatin1(l.zustand);
+        // Abwarten, bis die Lage wirklich im Feld steht: der
+        // Alarmzustand sendet nicht mehr, der andere schon.
+        const QString pilleErwartet = QLatin1String(l.name) == QLatin1String("1-sendet")
+                                          ? QStringLiteral("OPR · TX")
+                                          : QStringLiteral("OPR · RX");
+        QTRY_COMPARE_WITH_TIMEOUT(m_applet->statusPillTextForTesting(),
+                                  pilleErwartet, 3000);
+        QTest::qWait(60);   // ein Takt mehr, damit auch die gedrosselten
+                            // Anzeigen nachgezogen sind
+        const QPixmap bild = m_applet->grab();
+        const QString pfad = QStringLiteral("%1/spe-%2.png").arg(dir, QLatin1String(l.name));
+        QVERIFY2(bild.save(pfad),
+                 qPrintable(QStringLiteral("konnte %1 nicht schreiben").arg(pfad)));
+        qInfo() << "geschrieben:" << pfad << bild.size();
+    }
+    m_amp->zustand = QString::fromLatin1(kSendet15K);
 }
 
 QTEST_MAIN(TstSpeAnbindung)
