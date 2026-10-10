@@ -171,6 +171,18 @@ public:
     // und sieht dieselbe Reihenfolge in 32 ms statt in 1,6 s.
     double powerOnPulseScale() const { return m_powerOnPulseScale; }
     void   setPowerOnPulseScale(double scale);
+    // Loest EINEN Takt von Hand aus, ohne den Zeitgeber. Vierte
+    // Pruefnaht, und sie ist aus einem roten Lauf entstanden: die
+    // Stilleerkennung zaehlt AUFEINANDERFOLGENDE unbeantwortete Takte,
+    // und ob Takt und Antwort sich abwechseln, haengt im Pruefstand an
+    // der Ereignisschleife, nicht am Treiber. Ein Verstaerker und ein
+    // Treiber in EINEM Programm bekommen unter Last neun Abfragen in
+    // einem Stueck und drei Antworten in einem Schwung -- der Fall
+    // flattert dann, obwohl nichts falsch ist. Mit diesem Einstieg
+    // setzt der Pruefstand den Takt selbst und holt jede faellige
+    // Antwort ab, bevor der naechste laeuft. Im Betrieb ruft das
+    // niemand; dort treibt m_pollTimer.
+    void pollOnceForTesting() { pollTick(); }
 
 signals:
     void connected();

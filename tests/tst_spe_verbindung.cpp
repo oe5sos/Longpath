@@ -341,34 +341,64 @@ void TstSpeVerbindung::derTaktZaehltNurUnbeantworteteTakte()
     // unbeantwortete Takte, nicht Takte -- und der Zaehler muss bei
     // jeder Antwort zurueckgesetzt werden.
     //
-    // Nicht auf Wanduhrzeiten gewettet: der Kunstverstaerker antwortet
-    // auf jeden dritten Takt, die Schwelle steht auf fuenf. Egal wie
-    // viele Takte in der Wartezeit durchlaufen, es koennen nie fuenf
-    // hintereinander unbeantwortet bleiben. (Der erste Anlauf dieses
-    // Falls liess vier Takte verstreichen und wartete dann -- bei 10 ms
-    // Takt und 50 ms Abfragekorn des Pruefrahmens waren es in
-    // Wirklichkeit laengst mehr als fuenf, und der Fall fiel, ohne dass
-    // am Code etwas falsch war.)
+    // DRITTER ANLAUF. Die beiden ersten sind gefallen, und der zweite
+    // ist der lehrreiche:
+    //
+    //   1. Anlauf: liess vier Takte verstreichen und wartete dann. Bei
+    //      10 ms Takt und 50 ms Abfragekorn waren es laengst mehr als
+    //      fuenf. Auf die DAUER gewettet.
+    //   2. Anlauf: Verhaeltnis statt Dauer -- der Kunstverstaerker
+    //      antwortet auf jeden dritten Takt, die Schwelle steht auf
+    //      fuenf, "also koennen nie fuenf hintereinander unbeantwortet
+    //      bleiben". Der Satz ist falsch, und zwar nicht knapp: er
+    //      wettet unbemerkt auf die VERSCHRAENKUNG, nicht auf das
+    //      Verhaeltnis. Verstaerker und Treiber laufen hier in EINER
+    //      Ereignisschleife. Unter Last treffen neun Abfragen in einem
+    //      Stueck ein, der Kunstverstaerker zaehlt alle neun und
+    //      schiebt drei Antworten in einem Schwung zurueck -- dazwischen
+    //      liegen neun Takte ohne Antwort. Linux-Lauf 38025634350:
+    //      29 Meldungen statt einer, die Stille-Warnung 14 mal.
+    //
+    // Das ist KEIN Fehler im Treiber. Im Betrieb taktet er 100 ms; fuenf
+    // unbeantwortete Takte heissen dann, dass eine halbe Sekunde lang
+    // nichts kam -- und dann ist "antwortet nicht" die richtige Auskunft,
+    // auch wenn gleich darauf ein Schwung Antworten eintrifft. Falsch war
+    // die Behauptung des Prueffalls, nicht das Verhalten.
+    //
+    // Darum jetzt OHNE Zeitgeber: der Takt wird von Hand ausgeloest und
+    // jede faellige Antwort abgewartet, bevor der naechste laeuft. Damit
+    // haengt nichts mehr an der Last, und die Zahlen sind exakt statt
+    // "mindestens": 31 Abfragen, davon 10 beantwortet, genau eine
+    // Meldung.
+    m_verb->setPollIntervalMs(600000);   // der eigene Takt feuert nie
     m_amp->antwortJedeNte = 3;
 
     QSignalSpy antwortet(m_verb, &SpeConnection::respondingChanged);
     QSignalSpy zustand(m_verb, &SpeConnection::statusUpdated);
     QVERIFY(verbinden());
-    while (antwortet.isEmpty()) {
-        QVERIFY(antwortet.wait(2000));
+
+    // Der Rahmen beim Verbinden ist Abfrage 1 und laeuft nicht ueber
+    // pollTick() -- er zaehlt also auch nicht in die Stille hinein.
+    QTRY_VERIFY_WITH_TIMEOUT(m_amp->abfragen() >= 1, 2000);
+    QCOMPARE(m_amp->abfragen(), 1);
+    QVERIFY(zustand.isEmpty());
+
+    // Takte 2 bis 31 von Hand, jede faellige Antwort abgeholt.
+    for (int abfrage = 2; abfrage <= 31; ++abfrage) {
+        m_verb->pollOnceForTesting();
+        QTRY_VERIFY_WITH_TIMEOUT(m_amp->abfragen() >= abfrage, 2000);
+        if (abfrage % 3 == 0) {
+            const int faellig = abfrage / 3;
+            QTRY_VERIFY_WITH_TIMEOUT(zustand.size() >= faellig, 2000);
+        }
     }
-    QCOMPARE(antwortet.at(0).at(0).toBool(), true);
 
-    // Lange genug laufen lassen, dass ein nicht zurueckgesetzter Zaehler
-    // die Schwelle vielfach gerissen haette: mindestens 90 Takte.
-    const int zielTakte = m_amp->abfragen() + 90;
-    QTRY_VERIFY_WITH_TIMEOUT(m_amp->abfragen() >= zielTakte, 5000);
-
-    QVERIFY2(zustand.size() >= 20,
-             qPrintable(QStringLiteral("nur %1 Antworten -- der Pruefstand "
-                                       "hat nicht wirklich gelaufen")
-                            .arg(zustand.size())));
+    // Ein Zaehler, der bei der Antwort NICHT zurueckgesetzt wird, reisst
+    // die Schwelle von fuenf spaetestens beim achten Takt.
+    QCOMPARE(m_amp->abfragen(), 31);
+    QCOMPARE(zustand.size(), 10);
     QCOMPARE(antwortet.size(), 1);
+    QCOMPARE(antwortet.at(0).at(0).toBool(), true);
     QVERIFY2(m_verb->isResponding(),
              "Ein antwortender Verstaerker wurde fuer stumm erklaert");
 }
