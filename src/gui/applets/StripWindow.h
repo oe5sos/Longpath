@@ -266,6 +266,11 @@ private:
     QLabel*      m_eqMuteWarning{nullptr};
     class StripTransferCurve* m_transfer{nullptr};
     QLabel* m_crestNote{nullptr};
+    // Fuer die Zielanzeige im einfachen Entzerrer: Zaehler und
+    // Arbeitsspeicher, damit nicht zehnmal je Sekunde ein
+    // Langzeitspektrum gerechnet wird.
+    int                m_zielTick{0};
+    std::vector<float> m_zielScratch;
     QPushButton* m_insertScanBtn{nullptr};
 
     StripLiveMonitor* m_live{nullptr};

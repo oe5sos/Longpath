@@ -31,6 +31,7 @@
 #pragma once
 
 #include "gui/applets/eq/ClientEqApplet.h"  // for Path enum
+#include <QVector>
 #include <QWidget>
 #include <memory>
 #include <vector>
@@ -86,6 +87,11 @@ public:
     // engine without going through the canvas's own gestures, so the
     // text labels would otherwise stay stale.
     void refreshFromEngine();
+
+    // Je Regler die Abweichung der gemessenen Stimme vom Sprachziel,
+    // in dB. Leer heisst „noch nichts gemessen". Siehe
+    // StripEqSimpleBar::setZiel.
+    void setZiel(const QVector<double>& abweichungDb);
 
 signals:
     // Fired when the bypass button is toggled in the editor. The docked
@@ -171,6 +177,7 @@ private:
     ClientEqEditorCanvas*      m_canvas{nullptr};
     ClientEqParamRow*          m_paramRow{nullptr};
     StripEqSimpleBar*          m_simpleBar{nullptr};
+    QLabel*                    m_zielNote{nullptr};
     QPushButton*               m_simpleBtn{nullptr};
     QPushButton*               m_proBtn{nullptr};
     QLabel*                    m_hint{nullptr};

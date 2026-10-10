@@ -23,6 +23,7 @@
 
 #include <QtTest>
 #include <QPushButton>
+#include <QLabel>
 #include <QSlider>
 #include <QLayout>
 
@@ -228,6 +229,50 @@ private slots:
             QVERIFY2(std::abs(bp.gainDb - 3.0f) < 0.01f,
                      "Ordnen hat einen Pegel verstellt");
         }
+    }
+
+    // Das Ziel: die Zeile über jedem Regler muss sagen, wo man
+    // steht -- und zwar so, dass „kein Messwert" nicht wie „null
+    // Abweichung" aussieht.
+    void theTargetRowSaysWhereYouStand()
+    {
+        build();
+        auto* bar = m_panel->findChild<StripEqSimpleBar*>();
+        QVERIFY(bar != nullptr);
+
+        const auto zeilen = [&]() {
+            QStringList t;
+            for (QLabel* l : bar->findChildren<QLabel*>()) {
+                const QString s = l->text();
+                if (s == QStringLiteral("—") || s.contains(QStringLiteral("passt"))
+                    || s.contains(QStringLiteral("zuviel"))
+                    || s.contains(QStringLiteral("fehlt"))) {
+                    t << s;
+                }
+            }
+            return t;
+        };
+
+        // Ohne Messung: Striche, keine Nullen.
+        m_panel->setZiel({});
+        QVERIFY2(zeilen().count(QStringLiteral("—"))
+                     >= StripEqSimpleBar::kCount,
+                 "ohne Messung steht dort nicht ueberall ein Strich");
+
+        // Mit Messung: zuviel, passt, zuwenig -- jeweils benannt.
+        QVector<double> abw;
+        for (int i = 0; i < StripEqSimpleBar::kCount; ++i) {
+            abw.push_back(i == 0 ? 8.0 : (i == 1 ? -8.0 : 0.5));
+        }
+        m_panel->setZiel(abw);
+        const QStringList z = zeilen();
+        QVERIFY2(z.filter(QStringLiteral("zuviel")).size() == 1,
+                 qPrintable(z.join(QStringLiteral(" | "))));
+        QVERIFY2(z.filter(QStringLiteral("fehlt")).size() == 1,
+                 qPrintable(z.join(QStringLiteral(" | "))));
+        QVERIFY2(z.filter(QStringLiteral("passt")).size()
+                     == StripEqSimpleBar::kCount - 2,
+                 qPrintable(z.join(QStringLiteral(" | "))));
     }
 
     // Und so sieht es aus -- beide Ansichten, wirkliche Groesse.

@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <QVector>
 #include <QWidget>
 #include <array>
 
@@ -71,6 +72,20 @@ public:
     // Rueckgaengig, geladenes Profil.
     void reload();
 
+    // ── Das Ziel ─────────────────────────────────────────────────────
+    //
+    // „Ich weiss nicht, welche Kurve richtig waere."
+    //
+    // Je Regler die Abweichung der GEMESSENEN Stimme vom Sprachziel,
+    // in dB: positiv heisst zuviel, negativ heisst zuwenig. Leer
+    // heisst „noch nichts gemessen" -- dann steht dort ein Strich
+    // und keine Null.
+    //
+    // Es wird NICHTS verstellt. Der Unterschied zur verworfenen
+    // Automatik ist genau der: die hat gedreht, das hier sagt nur,
+    // wo du stehst. Die Hand bleibt deine.
+    void setZiel(const QVector<double>& abweichungDb);
+
 signals:
     // Ein Regler wurde bewegt; die Kurve darueber muss neu gezeichnet
     // werden.
@@ -86,6 +101,7 @@ private:
     std::array<QSlider*, kCount> m_sliders{};
     std::array<QLabel*,  kCount> m_freqLabels{};
     std::array<QLabel*,  kCount> m_valueLabels{};
+    std::array<QLabel*,  kCount> m_zielLabels{};
 };
 
 } // namespace Longpath

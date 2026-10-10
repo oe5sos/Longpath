@@ -2,6 +2,34 @@
 
 ## [Unreleased]
 
+### Ein Ziel für den Entzerrer
+
+> „das mit dem eq bekomme ich leider nicht so hin, wie es sein sollte"
+> — und auf Nachfrage: ich weiß nicht, welche Kurve richtig wäre, und
+> es klingt danach nicht besser.
+
+Beides dasselbe Problem: ohne Ziel ist „besser" nicht zu beurteilen.
+Über jedem der sieben Regler steht jetzt, **wo du stehst** —
+`3 zuviel` · `passt` · `+4 fehlt`.
+
+* Gemessen wird die eigene Stimme **vor** der Kette, als
+  Langzeitspektrum aus dem Eingangsring des Mithörers.
+* Verglichen wird mit `VoiceAnalyzer::targetDb` — **derselben**
+  Meinung, die das Messblatt benutzt. Zwei Ziele in einem Programm
+  wären eines zuviel.
+* Beide liegen auf derselben Bezugsgröße (Mittel 300–3000 Hz = 0 dB),
+  verglichen wird die **Form**, nicht die Lautstärke: die hängt an der
+  Mikrofonverstärkung und sagt über die Kurve nichts.
+* ±3 dB heißt „passt". Enger wäre eine Genauigkeit, die weder die
+  Messung noch das Ohr hergibt — und sie lüde zur Jagd nach einer
+  Zahl ein, die nichts bedeutet.
+* **Es wird nichts verstellt.** Das ist der Unterschied zur
+  verworfenen Automatik, und er ist der ganze Punkt: sie hat gedreht,
+  das hier sagt nur, wo du stehst.
+
+Ohne Messung steht dort ein Strich und keine Null (HAUSSTIL §7); der
+Prüfstand hält genau das fest.
+
 ### Deutsch als Sprache des Hauses
 
 > „generell sollte für mich primär alles in deutsch sein, eine

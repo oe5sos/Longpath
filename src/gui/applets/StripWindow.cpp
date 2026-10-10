@@ -25,6 +25,9 @@
 #include "core/strip/PluginPlacement.h"
 #include "core/AppSettings.h"
 #include "core/Sprache.h"
+#include "gui/applets/eq/StripEqSimpleBar.h"
+#include "core/VoiceAnalyzer.h"
+#include "core/strip/LtasSpectrum.h"
 #include "core/strip/PluginPlacement.h"
 #include "gui/applets/eq/EqHost.h"
 #include "gui/applets/eq/StripEqPanel.h"
@@ -3411,6 +3414,76 @@ void StripWindow::refreshMeters()
     // Langzeitmessung ueber zwei Sekunden zehnmal in der Sekunde fuer
     // einen verdeckten Reiter waere reine Heizung.
     if (m_transfer) { m_transfer->refresh(); }
+
+    // ── Wo stehst du gegenüber dem Sprachziel ────────────────────────
+    //
+    // „Ich weiss nicht, welche Kurve richtig waere."
+    //
+    // Gemessen wird die eigene Stimme VOR der Kette (der Eingangsring
+    // des Mithoerers), als Langzeitspektrum. Verglichen wird mit dem
+    // Sprachziel aus VoiceAnalyzer::targetDb -- derselben Meinung,
+    // die auch das Messblatt benutzt; zwei Ziele in einem Programm
+    // waeren eines zuviel.
+    //
+    // Beide werden auf dieselbe Bezugsgroesse gebracht: das
+    // Langzeitspektrum liegt im Mittel von 300..3000 Hz auf null, das
+    // Ziel wird genauso verschoben. Verglichen wird damit die FORM
+    // und nicht die Lautstaerke -- die haengt an der
+    // Mikrofonverstaerkung und sagt ueber die Kurve nichts.
+    //
+    // Es wird nichts verstellt. Das ist der Unterschied zur
+    // verworfenen Automatik, und er ist der ganze Punkt.
+    if (m_eqPanel != nullptr) {
+        if (++m_zielTick >= 5) {          // zweimal je Sekunde reicht
+            m_zielTick = 0;
+            QVector<double> abw;
+            if (m_live != nullptr && m_live->isRunning()) {
+                const int rate = int(m_live->inputRate());
+                const int want = rate * 2;      // zwei Sekunden
+                if (m_zielScratch.size() < size_t(want)) {
+                    m_zielScratch.resize(size_t(want));
+                }
+                const int got = m_live->inputRing().snapshot(
+                    m_zielScratch.data(), want);
+                const std::vector<double> ltas =
+                    Ltas::analyse(m_zielScratch.data(), got, rate);
+                const std::vector<double>& mitten = Ltas::centresHz();
+                if (!ltas.empty() && ltas.size() == mitten.size()) {
+                    // Das Ziel auf dieselbe Bezugsgroesse legen.
+                    double sum = 0.0;
+                    int    n   = 0;
+                    for (double hz : mitten) {
+                        if (hz >= 300.0 && hz <= 3000.0) {
+                            sum += VoiceAnalyzer::targetDb(hz);
+                            ++n;
+                        }
+                    }
+                    const double tMean = n > 0 ? sum / n : 0.0;
+
+                    const auto gemessenBei = [&](double hz) {
+                        if (hz <= mitten.front()) { return ltas.front(); }
+                        if (hz >= mitten.back())  { return ltas.back(); }
+                        for (size_t i = 1; i < mitten.size(); ++i) {
+                            if (hz <= mitten[i]) {
+                                const double t = std::log(hz / mitten[i - 1])
+                                               / std::log(mitten[i] / mitten[i - 1]);
+                                return ltas[i - 1]
+                                     + t * (ltas[i] - ltas[i - 1]);
+                            }
+                        }
+                        return ltas.back();
+                    };
+
+                    for (const auto& sl : StripEqSimpleBar::bandSlots()) {
+                        const double hz = double(sl.freqHz);
+                        abw.push_back(gemessenBei(hz)
+                                      - (VoiceAnalyzer::targetDb(hz) - tMean));
+                    }
+                }
+            }
+            m_eqPanel->setZiel(abw);
+        }
+    }
     if (m_crestNote) {
         StripChain* cc = displayChain();
         const float in  = cc ? cc->inputCrestDb()  : 0.0f;

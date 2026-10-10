@@ -504,6 +504,10 @@ const QHash<QString, QString>& tabelle()
           QStringLiteral("Nichts zu wiederholen") },
         { QStringLiteral("%1 effect(s) found, sorted by where they usually belong. Drag one onto the chain at the top of this window — the gap you are over lights up, and that is where it lands. The × on its tile takes it out again. The groups are a suggestion, not a rule: the position is yours to pick."),
           QStringLiteral("%1 Effekt(e) gefunden, sortiert danach, wohin sie üblicherweise gehören. Zieh einen auf die Kette oben in diesem Fenster — die Fuge, über der du bist, leuchtet auf, und dort landet er. Das × auf seiner Kachel nimmt ihn wieder heraus. Die Gruppen sind ein Vorschlag, keine Regel: die Stelle wählst du.") },
+        { QStringLiteral("Target: speech. Measured against your own voice while Hear myself runs — the line over each fader says how far you are from it. Nothing is changed for you."),
+          QStringLiteral("Ziel: Sprache. Gemessen an deiner eigenen Stimme, solange „Mich hören“ läuft — die Zeile über jedem Regler sagt, wie weit du davon weg bist. Verstellt wird nichts.") },
+        { QStringLiteral("passt"),
+          QStringLiteral("passt") },
     };
     return t;
 }

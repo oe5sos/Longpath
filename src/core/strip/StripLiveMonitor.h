@@ -195,6 +195,9 @@ public:
     // was die KETTE tut, und das Ohr hoert, was der KANAL davon
     // uebriglaesst. Zwei verschiedene Fragen, zwei verschiedene
     // Antworten, beide gleichzeitig sichtbar.
+    // Die Abtastrate, mit der der Mithoerer gerade laeuft.
+    int  inputRate() const { return m_inRate; }
+
     void setMonitorChannel(int index);
     int  monitorChannel() const;
     bool stripBypassed() const { return m_bypass.load(std::memory_order_acquire); }

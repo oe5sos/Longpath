@@ -168,6 +168,14 @@ StripEqSimpleBar::StripEqSimpleBar(QWidget* parent)
         col->addWidget(sl, 1, Qt::AlignHCenter);
         m_sliders[static_cast<size_t>(i)] = sl;
 
+        // Die Zielzeile steht ZWISCHEN Name und Regler, nicht unten:
+        // dort schaut man hin, bevor man anfasst.
+        auto* ziel = new QLabel(QStringLiteral("—"), this);
+        ziel->setAlignment(Qt::AlignCenter);
+        ziel->setStyleSheet(freqCss);
+        col->addWidget(ziel);
+        m_zielLabels[static_cast<size_t>(i)] = ziel;
+
         auto* val = new QLabel(QStringLiteral("0 dB"), this);
         val->setAlignment(Qt::AlignCenter);
         val->setStyleSheet(valueCss);
@@ -231,6 +239,44 @@ void StripEqSimpleBar::tidy()
     if (m_host != nullptr) { m_host->saveClientEqSettings(); }
     reload();
     emit changed();
+}
+
+void StripEqSimpleBar::setZiel(const QVector<double>& abweichungDb)
+{
+    const bool gueltig = abweichungDb.size() == kCount;
+    for (int i = 0; i < kCount; ++i) {
+        QLabel* l = m_zielLabels[static_cast<size_t>(i)];
+        if (l == nullptr) { continue; }
+        if (!gueltig) {
+            // „Unbekannt ist ein Strich, keine Null" (HAUSSTIL §7).
+            l->setText(QStringLiteral("—"));
+            l->setStyleSheet(QStringLiteral(
+                "QLabel { color: %1; font-size: 9px;"
+                " background: transparent; }")
+                .arg(QString::fromLatin1(Style::kTextInactive)));
+            continue;
+        }
+        const double d = abweichungDb[i];
+        QString text;
+        const char* farbe = Style::kTextInactive;
+        // Drei Dezibel Spielraum. Enger wäre eine Genauigkeit, die
+        // weder die Messung noch das Ohr hergibt -- und sie würde zu
+        // einer Jagd nach einer Zahl einladen, die nichts bedeutet.
+        if (d > 3.0) {
+            text  = QStringLiteral("%1 zuviel").arg(-d, 0, 'f', 0);
+            farbe = Style::kAmberText;
+        } else if (d < -3.0) {
+            text  = QStringLiteral("+%1 fehlt").arg(-d, 0, 'f', 0);
+            farbe = Style::kGlassSelBorder;
+        } else {
+            text  = QStringLiteral("passt");
+            farbe = Style::kGreenText;
+        }
+        l->setText(text);
+        l->setStyleSheet(QStringLiteral(
+            "QLabel { color: %1; font-size: 9px; background: transparent; }")
+            .arg(QString::fromLatin1(farbe)));
+    }
 }
 
 void StripEqSimpleBar::applyBand(int i, int sliderValue)

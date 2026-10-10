@@ -546,6 +546,19 @@ StripEqPanel::StripEqPanel(EqHost* engine, QWidget* parent)
     // Die einfache Ansicht steht an derselben Stelle wie die
     // Zahlenzeile der Profi-Ansicht: unter der Kurve. Dieselbe Kurve
     // darueber, dieselbe Hoehe -- beim Umschalten springt nichts.
+    // Eine Zeile, die sagt, woran gemessen wird -- sonst steht über
+    // den Reglern eine Wertung ohne Maßstab, und das ist schlimmer
+    // als keine.
+    m_zielNote = new QLabel(
+        QStringLiteral("Target: speech. Measured against your own voice "
+                       "while Hear myself runs — the line over each fader "
+                       "says how far you are from it. Nothing is changed "
+                       "for you."));
+    m_zielNote->setWordWrap(true);
+    applyThemed(m_zielNote,
+                "QLabel { color: {{color.background.3}}; font-size: 11px; }");
+    eqColumn->addWidget(m_zielNote);
+
     m_simpleBar = new StripEqSimpleBar;
     m_simpleBar->setHost(m_audio);
     eqColumn->addWidget(m_simpleBar);
@@ -720,6 +733,7 @@ void StripEqPanel::setSimpleView(bool simple)
     }
     if (m_iconRow)   { m_iconRow->setVisible(!simple); }
     if (m_paramRow)  { m_paramRow->setVisible(!simple); }
+    if (m_zielNote)  { m_zielNote->setVisible(simple); }
     if (m_simpleBar) {
         m_simpleBar->setVisible(simple);
         m_simpleBar->reload();
@@ -884,6 +898,11 @@ void StripEqPanel::setRxFilterCutoffs(int audioLowHz, int audioHighHz)
     m_rxFilterHighCutHz = audioHighHz;
     if (m_canvas && m_path == ClientEqApplet::Path::Rx)
         m_canvas->setFilterCutoffs(audioLowHz, audioHighHz);
+}
+
+void StripEqPanel::setZiel(const QVector<double>& abweichungDb)
+{
+    if (m_simpleBar != nullptr) { m_simpleBar->setZiel(abweichungDb); }
 }
 
 void StripEqPanel::refreshFromEngine()
