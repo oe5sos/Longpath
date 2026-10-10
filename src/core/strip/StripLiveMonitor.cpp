@@ -122,8 +122,21 @@ void StripLiveMonitor::doStart()
 {
     if (m_running.load(std::memory_order_acquire)) { return; }
 
-    const QAudioDevice in  = QMediaDevices::defaultAudioInput();
-    const QAudioDevice out = QMediaDevices::defaultAudioOutput();
+    // Gewuenschtes Geraet, sonst die Systemvorgabe. Eine Kennung,
+    // die es nicht mehr gibt (Geraet abgezogen), faellt still auf
+    // die Vorgabe zurueck -- besser als gar kein Mithoeren.
+    const auto finde = [](const QList<QAudioDevice>& liste,
+                          const QByteArray& id, const QAudioDevice& vorgabe) {
+        if (id.isEmpty()) { return vorgabe; }
+        for (const QAudioDevice& d : liste) {
+            if (d.id() == id) { return d; }
+        }
+        return vorgabe;
+    };
+    const QAudioDevice in  = finde(QMediaDevices::audioInputs(), m_wunschIn,
+                                   QMediaDevices::defaultAudioInput());
+    const QAudioDevice out = finde(QMediaDevices::audioOutputs(), m_wunschOut,
+                                   QMediaDevices::defaultAudioOutput());
     if (in.isNull()) {
         emit failed(QStringLiteral("No microphone this computer can open."));
         return;
@@ -168,6 +181,8 @@ void StripLiveMonitor::doStart()
         return;
     }
 
+    m_inName     = in.description();
+    m_outName    = out.description();
     m_inRate     = inFmt.sampleRate();
     m_inRing->setSampleRate(m_inRate);
     m_outRing->setSampleRate(m_inRate);
@@ -377,6 +392,16 @@ void StripLiveMonitor::setStripBypassed(bool bypassed)
     qCInfo(lcAudio) << "strip live monitor:"
                     << (bypassed ? "bypassed (raw microphone)"
                                  : "through the strip");
+}
+
+void StripLiveMonitor::setInputDeviceId(const QByteArray& id)
+{
+    m_wunschIn = id;
+}
+
+void StripLiveMonitor::setOutputDeviceId(const QByteArray& id)
+{
+    m_wunschOut = id;
 }
 
 void StripLiveMonitor::setMonitorChannel(int index)

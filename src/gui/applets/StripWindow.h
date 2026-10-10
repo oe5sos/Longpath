@@ -287,6 +287,8 @@ private:
     QLabel*      m_eingangWert{nullptr};
     QPushButton* m_eingangBtn{nullptr};
     QCheckBox*   m_eingangAuto{nullptr};
+    QComboBox*   m_liveIn{nullptr};
+    QComboBox*   m_liveOut{nullptr};
     // Fuer die Zielanzeige im einfachen Entzerrer: Zaehler und
     // Arbeitsspeicher, damit nicht zehnmal je Sekunde ein
     // Langzeitspektrum gerechnet wird.

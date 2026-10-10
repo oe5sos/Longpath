@@ -54,6 +54,8 @@
 #include <QMouseEvent>
 #include <QCheckBox>
 #include <QComboBox>
+#include <QAudioDevice>
+#include <QMediaDevices>
 #include <QFormLayout>
 #include <QGridLayout>
 #include <QHBoxLayout>
@@ -484,6 +486,29 @@ void StripWindow::updateLiveNote()
         "draws your own voice — speak a few sentences, then press Peak "
         "Hold there to freeze the shape you are aiming at."))
         .arg(m_live->latencyMs(), 0, 'f', 0);
+
+    // ── Welche Geraete, und mit welcher Rate ────────────────────────
+    //
+    // Der Mithoerer nimmt die SYSTEMVORGABE und hat keine eigene
+    // Geraetewahl. Wer ein Audiogeraet anschliesst und es nicht zur
+    // Vorgabe macht, hoert weiter das eingebaute Mikrofon und sucht
+    // den Fehler in der Kette.
+    t += QStringLiteral(" ") + Sprache::T(QStringLiteral(
+        "In: %1 · out: %2 · %3 Hz."))
+        .arg(m_live->inputName(), m_live->outputName())
+        .arg(m_live->inputRate());
+
+    // Und die eine Rate, an der eine ganze Stufe haengt. rnnoise ist
+    // auf 48 kHz trainiert; bei jeder anderen reicht das Entrauschen
+    // unveraendert durch -- die Kachel steht auf „an" und die Stufe
+    // tut nichts. Eine Falschaussage an genau der Stelle, an der man
+    // hinsieht, und ohne diesen Satz faellt sie niemandem auf.
+    if (m_live->inputRate() != 48000) {
+        t += QStringLiteral(" ") + Sprache::T(QStringLiteral(
+            "⚠ Denoise needs exactly 48000 Hz and is passing through "
+            "untouched at this rate — set the interface to 48 kHz in "
+            "Audio MIDI Setup."));
+    }
     // Der Zaehler steht jetzt fuer EINZELNE Abtastwerte, nicht mehr
     // fuer Bloecke. Dass er laeuft, ist der Normalfall und kein
     // Fehler: Mikrofon und Kopfhoerer sind zwei Geraete mit zwei
@@ -648,6 +673,80 @@ void StripWindow::buildUi()
             if (at >= 0) { m_liveChannel->setCurrentIndex(at); }
         }
         row->addWidget(m_liveChannel);
+
+        // ── Geraetewahl ──────────────────────────────────────────
+        //
+        // Ohne sie nimmt der Mithoerer die SYSTEMVORGABE. Am Geraet
+        // des Betreibers hing ein Apollo Twin X am Thunderbolt und
+        // Longpath hoerte trotzdem das eingebaute MacBook-Mikrofon,
+        // weil die Vorgabe nie umgestellt war -- jede Beurteilung
+        // der Kette lief ueber das falsche Mikrofon.
+        const auto baueGeraete = [this](QComboBox* box, bool eingang) {
+            box->clear();
+            box->addItem(Sprache::T(QStringLiteral("System default")),
+                         QByteArray());
+            const auto liste = eingang ? QMediaDevices::audioInputs()
+                                       : QMediaDevices::audioOutputs();
+            for (const QAudioDevice& d : liste) {
+                box->addItem(d.description(), d.id());
+            }
+        };
+
+        m_liveIn = new QComboBox(this);
+        baueGeraete(m_liveIn, true);
+        m_liveIn->setToolTip(Sprache::T(QStringLiteral(
+            "Which microphone the strip listens to. Without this it "
+            "takes whatever macOS has as the default — plug in an "
+            "interface and forget to make it the default, and you "
+            "judge the chain through the wrong microphone.")));
+        row->addWidget(m_liveIn);
+
+        m_liveOut = new QComboBox(this);
+        baueGeraete(m_liveOut, false);
+        m_liveOut->setToolTip(Sprache::T(QStringLiteral(
+            "Where you hear it. Use the headphone output of the same "
+            "interface: a different device means a second clock, and "
+            "speakers mean the microphone hears itself.")));
+        row->addWidget(m_liveOut);
+
+        {
+            auto& st = AppSettings::instance();
+            const QByteArray inId = st.value(
+                QStringLiteral("StripMonitorInput")).toByteArray();
+            const QByteArray outId = st.value(
+                QStringLiteral("StripMonitorOutput")).toByteArray();
+            const int ai = m_liveIn->findData(inId);
+            const int ao = m_liveOut->findData(outId);
+            if (ai >= 0) { m_liveIn->setCurrentIndex(ai); }
+            if (ao >= 0) { m_liveOut->setCurrentIndex(ao); }
+            if (m_live) {
+                m_live->setInputDeviceId(inId);
+                m_live->setOutputDeviceId(outId);
+            }
+        }
+
+        // Ein Geraetewechsel im Lauf: anhalten, umstellen, anlaufen.
+        // Eine Soundkarte laesst sich nicht unter einem laufenden
+        // Strom austauschen.
+        const auto wechsle = [this]() {
+            const QByteArray inId  = m_liveIn->currentData().toByteArray();
+            const QByteArray outId = m_liveOut->currentData().toByteArray();
+            AppSettings::instance().setValue(
+                QStringLiteral("StripMonitorInput"), QString::fromLatin1(inId));
+            AppSettings::instance().setValue(
+                QStringLiteral("StripMonitorOutput"), QString::fromLatin1(outId));
+            if (!m_live) { return; }
+            const bool lief = m_live->isRunning();
+            if (lief) { m_live->stop(); }
+            m_live->setInputDeviceId(inId);
+            m_live->setOutputDeviceId(outId);
+            if (lief) { m_live->start(); }
+            updateLiveNote();
+        };
+        connect(m_liveIn, &QComboBox::activated, this,
+                [wechsle](int) { wechsle(); });
+        connect(m_liveOut, &QComboBox::activated, this,
+                [wechsle](int) { wechsle(); });
 
         m_liveVol = new QSlider(Qt::Horizontal, this);
         // 0..200 statt 0..100: die obere Haelfte ist Verstaerkung bis

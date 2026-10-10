@@ -54,6 +54,7 @@
 #include "core/strip/ClientFinalLimiter.h"
 
 #include <QObject>
+#include <QByteArray>
 #include <QString>
 
 #include <atomic>
@@ -199,6 +200,26 @@ public:
     // Die Abtastrate, mit der der Mithoerer gerade laeuft.
     int  inputRate() const { return m_inRate; }
 
+    QString inputName()  const { return m_inName; }
+    QString outputName() const { return m_outName; }
+
+    // ── Eigene Geraetewahl ───────────────────────────────────────────
+    //
+    // Bis zum 2026-10-10 nahm der Mithoerer stur die SYSTEMVORGABE.
+    // Am Geraet des Betreibers hiess das: ein Apollo Twin X haengt
+    // am Thunderbolt, laeuft auf 48 kHz, und Longpath hoerte
+    // trotzdem das eingebaute MacBook-Mikrofon -- weil die Vorgabe
+    // nie umgestellt war. Jede Beurteilung der Kette lief damit
+    // ueber das falsche Mikrofon, ohne dass irgendwo etwas davon
+    // stand.
+    //
+    // Leer heisst weiterhin „Systemvorgabe". Wirkt beim naechsten
+    // Start; das Fenster haelt dafuer an und laeuft wieder an.
+    void setInputDeviceId(const QByteArray& id);
+    void setOutputDeviceId(const QByteArray& id);
+    QByteArray inputDeviceId()  const { return m_wunschIn; }
+    QByteArray outputDeviceId() const { return m_wunschOut; }
+
     void setMonitorChannel(int index);
     int  monitorChannel() const;
     bool stripBypassed() const { return m_bypass.load(std::memory_order_acquire); }
@@ -238,6 +259,11 @@ private:
     std::unique_ptr<StripChain> m_chain;
     MicSpectrum* m_spectrum{nullptr};   // nicht besessen
     // Der Kanal, durch den gehoert wird. Hinter der Kette.
+    QString m_inName;
+    QString m_outName;
+    QByteArray m_wunschIn;
+    QByteArray m_wunschOut;
+
     BandLimit m_band;
     // ── Der Begrenzer HINTER dem Kanal ───────────────────────────
     //
