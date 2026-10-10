@@ -518,6 +518,22 @@ const QHash<QString, QString>& tabelle()
           QStringLiteral("DX — druckvoll") },
         { QStringLiteral("Ragchew — easy"),
           QStringLiteral("Plauderrunde — entspannt") },
+        { QStringLiteral("Input"),
+          QStringLiteral("Eingang") },
+        { QStringLiteral("Set it"),
+          QStringLiteral("Übernehmen") },
+        { QStringLiteral("Sets the gain so your speech peaks land near -12 dBFS — the level every threshold in this strip was written for."),
+          QStringLiteral("Setzt die Verstärkung so, dass deine Sprachspitzen bei etwa −12 dBFS liegen — der Pegel, für den jede Schwelle in dieser Kette geschrieben ist.") },
+        { QStringLiteral("Input: —— · speak, and this says whether the level is right for the thresholds below"),
+          QStringLiteral("Eingang: —— · sprich, dann steht hier, ob der Pegel zu den Schwellen darunter passt") },
+        { QStringLiteral("Input: %1 dBFS peak — right where every threshold in this strip expects it."),
+          QStringLiteral("Eingang: %1 dBFS Spitze — genau dort, wo jede Schwelle dieser Kette es erwartet.") },
+        { QStringLiteral("Input: %1 dBFS peak — %2 dB %3. Every threshold here is in dBFS, so at this level the gate closes on your voice and the compressor never works."),
+          QStringLiteral("Eingang: %1 dBFS Spitze — %2 dB %3. Jede Schwelle hier ist in dBFS, also macht das Gate bei diesem Pegel auf deiner Stimme zu und der Kompressor greift nie.") },
+        { QStringLiteral("too low"),
+          QStringLiteral("zu wenig") },
+        { QStringLiteral("too hot"),
+          QStringLiteral("zu viel") },
     };
     return t;
 }

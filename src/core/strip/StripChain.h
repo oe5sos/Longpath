@@ -177,6 +177,31 @@ public:
     // Held at -120 while the strip is off rather than reporting the
     // input twice. A gain change of zero and a strip that is not
     // running are different facts and should not read the same.
+    // ── Eingangsverstärkung ──────────────────────────────────────────
+    //
+    // „die rohdaten sind bei allen profilen um weiten voraus."
+    //
+    // Der Grund stand in seinen eigenen Zahlen: die Stimme kam mit
+    // -25 bis -35 dBFS an. JEDE Schwelle in dieser Kette ist aber in
+    // dBFS angegeben -- Gate, Kompressor, De-Esser, Begrenzer. Bei
+    // 15 dB zu wenig Pegel heisst das: das Gate hält die Stimme für
+    // den Raum und macht zu, der Kompressor greift nie, der Clipper
+    // schneidet nichts ab. Die Kette tut dann genau zwei Dinge --
+    // sie verschluckt Wörter und sie färbt --, und gegen das rohe
+    // Signal verliert sie zu Recht.
+    //
+    // Keine Schwelle der Welt hilft dagegen, solange der Pegel nicht
+    // stimmt. Also sitzt hier, VOR allem anderen, eine einfache
+    // Verstärkung -- und die Oberfläche sagt, welche Zahl gebraucht
+    // wird. Gemessen, nicht geraten; gesetzt vom Betreiber, nicht
+    // von selbst.
+    void  setInputGainDb(float db) noexcept;   // -12 .. +36 dB
+    float inputGainDb() const noexcept;
+
+    // Was AM EINGANG ankommt, vor der Verstärkung -- also das, was
+    // das Mikrofon liefert. Die Empfehlung rechnet damit.
+    float rawInputPeakDb() const noexcept;
+
     float inputPeakDb() const noexcept;
 
     // ── Scheitelfaktor ───────────────────────────────────────────────
@@ -317,6 +342,8 @@ private:
     float  m_crestPeakOut{0.0f};
     int    m_crestFrames{0};
 
+    std::atomic<float> m_inputGainDb{0.0f};
+    std::atomic<float> m_rawInPeakDb{-120.0f};
     std::atomic<float> m_inPeakDb{-120.0f};
     std::atomic<float> m_outPeakDb{-120.0f};
 

@@ -293,6 +293,19 @@ void StripChain::processMono(float* samples, int frames) noexcept
         for (int i = 0; i < n; ++i) { p = std::max(p, std::fabs(s[i])); }
         return p > 1e-6f ? 20.0f * std::log10(p) : -120.0f;
     };
+    // Erst messen, was ANKOMMT -- das ist die Zahl, aus der die
+    // Oberfläche die Empfehlung rechnet.
+    m_rawInPeakDb.store(peakDb(samples, frames), std::memory_order_relaxed);
+
+    // Dann verstärken, und zwar vor allem anderen: alle Schwellen
+    // dahinter sind in dBFS, und sie sind nur dann richtig, wenn der
+    // Pegel stimmt.
+    const float gainDb = m_inputGainDb.load(std::memory_order_relaxed);
+    if (std::fabs(gainDb) > 0.01f) {
+        const float g = std::pow(10.0f, gainDb / 20.0f);
+        for (int i = 0; i < frames; ++i) { samples[i] *= g; }
+    }
+
     m_inPeakDb.store(peakDb(samples, frames), std::memory_order_relaxed);
 
     // Scheitelfaktor, Eingangsseite: Summe und Spitze mitführen, die
@@ -428,6 +441,22 @@ uint32_t StripChain::nonFiniteInputBlocks() const noexcept
 uint32_t StripChain::nonFiniteBlocksTotal() const noexcept
 {
     return m_nonFiniteTotal.load(std::memory_order_relaxed);
+}
+
+void StripChain::setInputGainDb(float db) noexcept
+{
+    m_inputGainDb.store(std::clamp(db, -12.0f, 36.0f),
+                        std::memory_order_relaxed);
+}
+
+float StripChain::inputGainDb() const noexcept
+{
+    return m_inputGainDb.load(std::memory_order_relaxed);
+}
+
+float StripChain::rawInputPeakDb() const noexcept
+{
+    return m_rawInPeakDb.load(std::memory_order_relaxed);
 }
 
 float StripChain::inputPeakDb() const noexcept

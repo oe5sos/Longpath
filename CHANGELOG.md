@@ -2,6 +2,34 @@
 
 ## [Unreleased]
 
+### Warum das rohe Signal jedes Profil geschlagen hat
+
+> „die rohdaten (natürlich mit voller bandbreite) sind bei allen
+>  profilen um weiten voraus."
+
+Der Grund stand in seinen eigenen Zahlen, auf zwei Bildschirmfotos:
+die Stimme kam mit **−25 bis −35 dBFS** an. Jede Schwelle dieser
+Kette ist aber in **dBFS** angegeben — Gate, Kompressor, De-Esser,
+Begrenzer. Bei 15 dB zu wenig Pegel hält das Gate die Stimme für den
+Raum und macht zu, der Kompressor greift nie, der Clipper schneidet
+nichts ab. Die Kette tut dann genau zwei Dinge: sie **verschluckt
+Wörter** und sie **färbt** — und das rohe Signal gewinnt zu Recht.
+
+Gemessen (`tst_eingangspegel`): ein −26-dBFS-Ton durch ein Gate mit
+Schwelle −20 kommt bei **−32 dB** heraus. Mit +14 dB Eingang bei
+**−12 dB**.
+
+`StripChain::setInputGainDb` sitzt jetzt **vor allem anderen**, und
+die Übersichtsseite sagt als Erstes, wo man steht:
+
+> Eingang: −26,0 dBFS Spitze — 14 dB zu wenig. Jede Schwelle hier ist
+> in dBFS, also macht das Gate bei diesem Pegel auf deiner Stimme zu
+> und der Kompressor greift nie.
+
+Daneben ein Regler und **„Übernehmen"**, das die Differenz auf
+−12 dBFS setzt. Gemessen statt geraten, gesetzt vom Betreiber statt
+von selbst.
+
 ### Ein Ausgangsprofil: „Empfehlung — Sprache"
 
 > „kannst du mal deine empfehlung bei allem eingeben?"

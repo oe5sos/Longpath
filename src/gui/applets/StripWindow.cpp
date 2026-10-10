@@ -2085,6 +2085,79 @@ QWidget* StripWindow::buildAllStagesSurface()
     // ist; dieses Bild sagt, was davon ankommt -- Einschuebe
     // eingerechnet. Einen Tag lang wurde diese Frage beantwortet,
     // indem jemand hingehoert und etwas vermutet hat.
+    // ── Der Eingang, ganz oben ──────────────────────────────────────
+    //
+    // „die rohdaten sind bei allen profilen um weiten voraus."
+    //
+    // Der Grund stand in seinen eigenen Zahlen: die Stimme kam mit
+    // -25 bis -35 dBFS an. Jede Schwelle der Kette ist in dBFS --
+    // bei 15 dB zu wenig Pegel macht das Gate zu, der Kompressor
+    // greift nie, der Clipper schneidet nichts. Die Kette verschluckt
+    // dann Wörter und färbt, und das rohe Signal gewinnt zu Recht.
+    //
+    // Darum steht das hier als Erstes auf der Übersicht: die
+    // gemessene Zahl, die gebrauchte Zahl, und ein Knopf, der die
+    // Differenz setzt. Gemessen statt geraten, gesetzt vom
+    // Betreiber statt von selbst.
+    {
+        auto* box = new QWidget(host);
+        auto* z = new QVBoxLayout(box);
+        z->setContentsMargins(0, 0, 0, 0);
+        z->setSpacing(4);
+
+        m_eingangNote = new QLabel(box);
+        m_eingangNote->setWordWrap(true);
+        m_eingangNote->setStyleSheet(dimStyle());
+        z->addWidget(m_eingangNote);
+
+        auto* row = new QHBoxLayout;
+        auto* lbl = new QLabel(QStringLiteral("Input"), box);
+        lbl->setStyleSheet(dimStyle());
+        row->addWidget(lbl);
+
+        m_eingangSlider = new QSlider(Qt::Horizontal, box);
+        m_eingangSlider->setRange(-120, 360);      // -12 .. +36 dB
+        m_eingangSlider->setValue(0);
+        m_eingangSlider->setStyleSheet(Style::sliderHStyle());
+        row->addWidget(m_eingangSlider, 1);
+
+        m_eingangWert = new QLabel(QStringLiteral("0.0 dB"), box);
+        m_eingangWert->setMinimumWidth(64);
+        m_eingangWert->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+        m_eingangWert->setStyleSheet(dimStyle());
+        row->addWidget(m_eingangWert);
+
+        m_eingangBtn = new QPushButton(QStringLiteral("Set it"), box);
+        m_eingangBtn->setStyleSheet(Style::buttonBaseStyle());
+        m_eingangBtn->setToolTip(QStringLiteral(
+            "Sets the gain so your speech peaks land near -12 dBFS — "
+            "the level every threshold in this strip was written for."));
+        row->addWidget(m_eingangBtn);
+        z->addLayout(row);
+        col->addWidget(box);
+
+        connect(m_eingangSlider, &QSlider::valueChanged, this, [this](int v) {
+            if (StripChain* c = chain()) {
+                c->setInputGainDb(float(v) / 10.0f);
+            }
+            if (m_eingangWert) {
+                m_eingangWert->setText(QStringLiteral("%1 dB")
+                                           .arg(v / 10.0, 0, 'f', 1));
+            }
+            persist();
+        });
+        connect(m_eingangBtn, &QPushButton::clicked, this, [this]() {
+            StripChain* c = displayChain();
+            if (c == nullptr || m_eingangSlider == nullptr) { return; }
+            const double roh = double(c->rawInputPeakDb());
+            if (roh < -90.0) { return; }           // nichts gemessen
+            const double soll = -12.0;
+            const int v = int(std::lround(
+                std::clamp(soll - roh, -12.0, 36.0) * 10.0));
+            m_eingangSlider->setValue(v);
+        });
+    }
+
     m_transfer = new StripTransferCurve(host);
     col->addWidget(m_transfer);
 
@@ -2358,6 +2431,10 @@ void StripWindow::reloadControls()
     // weil die Ringe des Mithoerers am alten Bild hingen.
     m_transfer = nullptr;
     m_crestNote = nullptr;
+    m_eingangNote = nullptr;
+    m_eingangSlider = nullptr;
+    m_eingangWert = nullptr;
+    m_eingangBtn = nullptr;
     m_stageText.fill(StageText{});
     m_stageBoxes.fill(nullptr);
 
@@ -3482,6 +3559,31 @@ void StripWindow::refreshMeters()
                 }
             }
             m_eqPanel->setZiel(abw);
+        }
+    }
+    if (m_eingangNote) {
+        const double roh = double(c->rawInputPeakDb());
+        if (roh < -90.0) {
+            m_eingangNote->setText(Sprache::T(QStringLiteral(
+                "Input: —— · speak, and this says whether the level is "
+                "right for the thresholds below")));
+        } else {
+            const double fehlt = -12.0 - roh;
+            m_eingangNote->setText(
+                std::fabs(fehlt) < 4.0
+                    ? Sprache::T(QStringLiteral(
+                          "Input: %1 dBFS peak — right where every "
+                          "threshold in this strip expects it."))
+                          .arg(roh, 0, 'f', 1)
+                    : Sprache::T(QStringLiteral(
+                          "Input: %1 dBFS peak — %2 dB %3. Every "
+                          "threshold here is in dBFS, so at this level "
+                          "the gate closes on your voice and the "
+                          "compressor never works."))
+                          .arg(roh, 0, 'f', 1)
+                          .arg(std::fabs(fehlt), 0, 'f', 0)
+                          .arg(fehlt > 0 ? Sprache::T(QStringLiteral("too low"))
+                                         : Sprache::T(QStringLiteral("too hot"))));
         }
     }
     if (m_crestNote) {

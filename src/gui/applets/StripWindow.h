@@ -266,6 +266,11 @@ private:
     QLabel*      m_eqMuteWarning{nullptr};
     class StripTransferCurve* m_transfer{nullptr};
     QLabel* m_crestNote{nullptr};
+    // Der Eingangspegel: gemessen, gebraucht, und der Knopf dazwischen.
+    QLabel*      m_eingangNote{nullptr};
+    QSlider*     m_eingangSlider{nullptr};
+    QLabel*      m_eingangWert{nullptr};
+    QPushButton* m_eingangBtn{nullptr};
     // Fuer die Zielanzeige im einfachen Entzerrer: Zaehler und
     // Arbeitsspeicher, damit nicht zehnmal je Sekunde ein
     // Langzeitspektrum gerechnet wird.

@@ -149,6 +149,7 @@ void saveTo(const QString& prefix, const StripChain& chain)
     putV(key(prefix, "DenoiseOn"),
          c.stageEnabled(StripChain::Stage::Denoise));
     putF(prefix, "DenoiseAmount", c.nr().amount());
+    putF(prefix, "InputGainDb",   c.inputGainDb());
     putV(key(prefix, "ClipOn"), c.stageEnabled(StripChain::Stage::Clip));
     putF(prefix, "ClipDriveDb", c.clipper().driveDb());
     putF(prefix, "ClipKnee",    c.clipper().knee());
@@ -405,6 +406,7 @@ void restoreFrom(const QString& prefix, StripChain& c)
     c.setStageEnabled(StripChain::Stage::Denoise,
                       getV(key(prefix, "DenoiseOn"), false).toBool());
     c.nr().setAmount(getF(prefix, "DenoiseAmount", 0.8f));
+    c.setInputGainDb(getF(prefix, "InputGainDb", 0.0f));
     c.setStageEnabled(StripChain::Stage::Clip,
                       getV(key(prefix, "ClipOn"), false).toBool());
     c.clipper().setDriveDb(getF(prefix, "ClipDriveDb", 0.0f));
