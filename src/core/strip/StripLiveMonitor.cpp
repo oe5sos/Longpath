@@ -171,6 +171,7 @@ void StripLiveMonitor::doStart()
     m_inRate     = inFmt.sampleRate();
     m_inRing->setSampleRate(m_inRate);
     m_outRing->setSampleRate(m_inRate);
+    m_band.prepare(m_inRate);
     m_inChannels = std::max(1, inFmt.channelCount());
     m_inFormat   = int(inFmt.sampleFormat());
     m_outChannels = std::max(1, outFmt.channelCount());
@@ -364,6 +365,16 @@ void StripLiveMonitor::setStripBypassed(bool bypassed)
                                  : "through the strip");
 }
 
+void StripLiveMonitor::setMonitorChannel(int index)
+{
+    m_band.setChannel(index);
+}
+
+int StripLiveMonitor::monitorChannel() const
+{
+    return m_band.channel();
+}
+
 void StripLiveMonitor::applyStrip(float* samples, int frames) noexcept
 {
     if (samples == nullptr || frames <= 0) { return; }
@@ -445,6 +456,12 @@ void StripLiveMonitor::pump()
     // nichts" nicht zu unterscheiden, und man raet. Dieser Abend hat
     // genug geraten.
     m_outRing->feed(m_mono.data(), int(m_mono.size()));
+
+    // Erst NACH dem Messabgriff: die Kurve oben zeigt, was die Kette
+    // tut, nicht was der Kanal davon durchlaesst. Das Ohr bekommt den
+    // Kanal, das Auge die Kette -- und das steht auch so an der
+    // Auswahl.
+    m_band.process(m_mono.data(), int(m_mono.size()));
 
     float peakOut = 0.0f;
     for (float v : m_mono) { peakOut = std::max(peakOut, std::fabs(v)); }

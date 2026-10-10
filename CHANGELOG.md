@@ -2,6 +2,36 @@
 
 ## [Unreleased]
 
+### Mithören durch den Sendekanal — und der Scheitelfaktor als Zahl
+
+Im Kopfhörer lief bisher die **volle Bandbreite** der Soundkarte,
+20 Hz bis 20 kHz. Der Sender macht daraus 200–2500 Hz oder 50–4050.
+Wer „Wärme bei 300" und „Schärfe bei 3,8 k" nach Gehör einstellt,
+stellt damit zum Teil Energie ein, die der Sender anschließend
+wegwirft — jedes einzelne Urteil richtig, nur über das falsche
+Signal. Das ist die stillste Art, eine Einstellung falsch zu machen.
+
+`core/strip/BandLimit`: Butterworth achter Ordnung (48 dB/Okt) hoch
+und tief, die vier Kanäle des Betreibers (200–2500, 150–2700,
+100–3200, 50–4050) plus „roh". Im Mithörweg wählbar, **hinter** dem
+Messabgriff: das Bild oben zeigt weiter, was die KETTE tut, das Ohr
+hört, was der KANAL davon durchlässt.
+
+Gemessen (`tst_monitor_hears_the_channel`): im engen Kanal 1 kHz
+±0,0 dB, 100 Hz −48,2 dB, 4 kHz −33,7 dB; bei 3,5 kHz eng −24,0 dB
+gegen weit −0,4 dB.
+
+**Scheitelfaktor** auf der Übersichtsseite, vor und nach der Kette.
+Bei SSB entscheidet er über die Reichweite: die Endstufe wird von der
+Spitze begrenzt, gehört wird der Effektivwert. Die Zahl steckte
+bisher nur im verworfenen Automatikteil.
+
+Dabei gefunden und behoben: `m_transfer` wurde beim Umbau der Reiter
+nicht genullt — dieselbe Fehlerform, die direkt darüber in drei
+Absätzen beschrieben steht. Sichtbar wurde sie andersherum: nach
+einem Profilwechsel blieb das Messbild leer, weil die Ringe des
+Mithörers am alten Bild hingen.
+
 ### Entrauschen im Sendeweg — die neunte Stufe
 
 Aus dem ESSB-Plugin-Paket, das der Betreiber mitbrachte (KC1EGU),

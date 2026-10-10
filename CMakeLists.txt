@@ -1134,6 +1134,7 @@ set(GUI_SOURCES
     # The runner: the eight stages in order, with the master bypass the
     # operator's A/B comparison depends on.
     src/core/strip/MicSpectrum.cpp
+    src/core/strip/BandLimit.cpp
     src/core/strip/NoiseReduction.cpp
     src/core/strip/StripChain.cpp
     src/core/strip/AudioPluginAu.cpp

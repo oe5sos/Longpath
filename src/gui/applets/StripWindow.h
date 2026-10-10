@@ -261,6 +261,7 @@ private:
     QLabel*      m_insertsNote{nullptr};
     QLabel*      m_eqMuteWarning{nullptr};
     class StripTransferCurve* m_transfer{nullptr};
+    QLabel* m_crestNote{nullptr};
     QPushButton* m_insertScanBtn{nullptr};
 
     StripLiveMonitor* m_live{nullptr};
@@ -268,6 +269,8 @@ private:
     QLabel*     m_liveNote{nullptr};
     QSlider*    m_liveVol{nullptr};
     QComboBox*  m_liveLatency{nullptr};
+    // Durch welchen Sendekanal gehoert wird; -1 = roh.
+    QComboBox*  m_liveChannel{nullptr};
     QTimer*     m_liveSync{nullptr};
 
     // ── The radio's own processing, while listening ──────────────────

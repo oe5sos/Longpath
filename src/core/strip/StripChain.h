@@ -177,6 +177,24 @@ public:
     // input twice. A gain change of zero and a strip that is not
     // running are different facts and should not read the same.
     float inputPeakDb() const noexcept;
+
+    // ── Scheitelfaktor ───────────────────────────────────────────────
+    //
+    // Der Abstand zwischen Spitze und Effektivwert, über eine Sekunde.
+    // Bei SSB ist das die Zahl, die über die Reichweite entscheidet:
+    // die Endstufe wird von der SPITZE begrenzt, gehört wird der
+    // EFFEKTIVWERT. 18 dB Abstand heissen, dass die Spitzenleistung
+    // kaum als Lautstärke ankommt.
+    //
+    // Zwei Werte, weil nur der Vergleich etwas sagt: was die Stimme
+    // mitbringt, und was die Kette daraus macht. Eine einzelne Zahl
+    // wäre nicht zu beurteilen.
+    //
+    // 0 heisst „noch nicht gemessen" -- es gibt keinen Scheitelfaktor
+    // von null, also kann die Null nicht mit einer Messung verwechselt
+    // werden.
+    float inputCrestDb() const noexcept;
+    float outputCrestDb() const noexcept;
     float outputPeakDb() const noexcept;
 
     // ── Values that are not numbers ──────────────────────────────────
@@ -287,6 +305,15 @@ private:
     // Plain relaxed stores: a meter that is one block stale is a meter,
     // and paying for ordering on the transmit path to make a picture
     // slightly fresher is the wrong trade.
+    std::atomic<float> m_inCrestDb{0.0f};
+    std::atomic<float> m_outCrestDb{0.0f};
+    // Sammelt über eine Sekunde, dann einmal veröffentlichen.
+    double m_crestSumIn{0.0};
+    double m_crestSumOut{0.0};
+    float  m_crestPeakIn{0.0f};
+    float  m_crestPeakOut{0.0f};
+    int    m_crestFrames{0};
+
     std::atomic<float> m_inPeakDb{-120.0f};
     std::atomic<float> m_outPeakDb{-120.0f};
 

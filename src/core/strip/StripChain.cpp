@@ -292,6 +292,14 @@ void StripChain::processMono(float* samples, int frames) noexcept
     };
     m_inPeakDb.store(peakDb(samples, frames), std::memory_order_relaxed);
 
+    // Scheitelfaktor, Eingangsseite: Summe und Spitze mitführen, die
+    // Division kommt einmal je Sekunde.
+    for (int i = 0; i < frames; ++i) {
+        const float v = samples[i];
+        m_crestSumIn += double(v) * double(v);
+        m_crestPeakIn = std::max(m_crestPeakIn, std::fabs(v));
+    }
+
     // Every stage has its own enable and the chain mirrors it, so the
     // two always agree. Skipping the call as well is not redundant: a
     // stage that is off should cost nothing, and going through it
@@ -328,6 +336,39 @@ void StripChain::processMono(float* samples, int frames) noexcept
     runInserts(kStageCount, samples, frames);
 
     m_outPeakDb.store(peakDb(samples, frames), std::memory_order_relaxed);
+
+    for (int i = 0; i < frames; ++i) {
+        const float v = samples[i];
+        m_crestSumOut += double(v) * double(v);
+        m_crestPeakOut = std::max(m_crestPeakOut, std::fabs(v));
+    }
+    m_crestFrames += frames;
+    if (m_crestFrames >= int(m_sampleRate > 1000.0 ? m_sampleRate : 48000.0)) {
+        const auto crest = [](double sum, float peak, int n) {
+            const double rms = std::sqrt(sum / std::max(1, n));
+            // Unter -60 dBFS ist das Stille, und der Scheitelfaktor
+            // von Stille ist keine Aussage über eine Stimme.
+            if (peak < 0.001f || rms < 1e-7) { return 0.0f; }
+            return float(20.0 * std::log10(double(peak) / rms));
+        };
+        m_inCrestDb.store(crest(m_crestSumIn, m_crestPeakIn, m_crestFrames),
+                          std::memory_order_relaxed);
+        m_outCrestDb.store(crest(m_crestSumOut, m_crestPeakOut, m_crestFrames),
+                           std::memory_order_relaxed);
+        m_crestSumIn = m_crestSumOut = 0.0;
+        m_crestPeakIn = m_crestPeakOut = 0.0f;
+        m_crestFrames = 0;
+    }
+}
+
+float StripChain::inputCrestDb() const noexcept
+{
+    return m_inCrestDb.load(std::memory_order_relaxed);
+}
+
+float StripChain::outputCrestDb() const noexcept
+{
+    return m_outCrestDb.load(std::memory_order_relaxed);
 }
 
 template <typename S>

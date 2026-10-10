@@ -19,6 +19,7 @@
 #include "gui/StyleConstants.h"
 #include "core/strip/EqBandLayout.h"
 #include "core/strip/StripSettings.h"
+#include "core/strip/BandLimit.h"
 #include "core/strip/StripLiveMonitor.h"
 #include "core/strip/AudioPlugin.h"
 #include "core/strip/PluginPlacement.h"
@@ -404,6 +405,8 @@ void StripWindow::toggleLiveMonitor(bool on)
             AppSettings::instance()
                 .value(QStringLiteral("StripMonitorLatency"), 0).toInt()));
         m_live->setVolume(m_liveVol ? m_liveVol->value() / 100.0 : 0.7);
+        m_live->setMonitorChannel(
+            m_liveChannel ? m_liveChannel->currentData().toInt() : -1);
         // Beim Einschalten den Hauptschalter uebernehmen, nicht erst
         // beim naechsten Umlegen.
         m_live->setStripBypassed(!(m_master && m_master->isChecked()));
@@ -605,6 +608,41 @@ void StripWindow::buildUi()
             if (at >= 0) { m_liveLatency->setCurrentIndex(at); }
         }
         row->addWidget(m_liveLatency);
+
+        // ── Durch welchen Kanal gehoert wird ─────────────────────
+        //
+        // Bisher lief im Kopfhoerer die volle Bandbreite der
+        // Soundkarte, 20 Hz bis 20 kHz. Der Sender macht daraus 200
+        // bis 2500 Hz, oder 50 bis 4050. Wer „Waerme bei 300" und
+        // „Schaerfe bei 3,8 k" nach Gehoer einstellt, stellt damit
+        // zum Teil Energie ein, die der Sender anschliessend
+        // wegwirft -- jedes einzelne Urteil richtig, nur ueber das
+        // falsche Signal.
+        m_liveChannel = new QComboBox(this);
+        m_liveChannel->addItem(QStringLiteral("roh (volle Bandbreite)"), -1);
+        for (int i = 0; i < BandLimit::kChannelCount; ++i) {
+            m_liveChannel->addItem(
+                QString::fromUtf8(BandLimit::channels()[size_t(i)].name), i);
+        }
+        m_liveChannel->setToolTip(QStringLiteral(
+            "Legt die Bandgrenze des Senders in den Mithörweg — so "
+            "klingt es auf der Gegenseite, nicht im Studio. Das "
+            "Messbild oben bleibt davon unberührt: es zeigt weiter, "
+            "was die KETTE tut, nicht was der Kanal davon durchlässt."));
+        connect(m_liveChannel, &QComboBox::activated, this, [this](int i) {
+            const int v = m_liveChannel->itemData(i).toInt();
+            AppSettings::instance().setValue(
+                QStringLiteral("StripMonitorChannel"), v);
+            if (m_live) { m_live->setMonitorChannel(v); }
+            updateLiveNote();
+        });
+        {
+            const int saved = AppSettings::instance()
+                .value(QStringLiteral("StripMonitorChannel"), -1).toInt();
+            const int at = m_liveChannel->findData(saved);
+            if (at >= 0) { m_liveChannel->setCurrentIndex(at); }
+        }
+        row->addWidget(m_liveChannel);
 
         m_liveVol = new QSlider(Qt::Horizontal, this);
         m_liveVol->setRange(0, 100);
@@ -1935,6 +1973,18 @@ QWidget* StripWindow::buildAllStagesSurface()
     m_transfer = new StripTransferCurve(host);
     col->addWidget(m_transfer);
 
+    // ── Der Scheitelfaktor, als Zahl ─────────────────────────────────
+    //
+    // Bei SSB entscheidet er über die Reichweite: die Endstufe wird
+    // von der Spitze begrenzt, gehört wird der Effektivwert. Die
+    // Zahl stand bisher nur im verworfenen Automatikteil und war
+    // nirgends zu sehen -- dabei macht gerade sie aus „stärker
+    // komprimieren?" eine Entscheidung statt eines Gefühls.
+    m_crestNote = new QLabel(host);
+    m_crestNote->setStyleSheet(dimStyle());
+    m_crestNote->setWordWrap(true);
+    col->addWidget(m_crestNote);
+
     auto* cards = new QWidget(host);
     auto* grid = new QGridLayout(cards);
     grid->setContentsMargins(0, 0, 0, 0);
@@ -2182,6 +2232,17 @@ void StripWindow::reloadControls()
     // below. Anything buildUi() puts in the tab bar has to be put back
     // here too — the loop covers the eight stages and nothing else.
     m_txSpectrum = nullptr;
+    // Gehoeren der Uebersichtsseite, die gleich neu gebaut wird.
+    //
+    // m_transfer stand hier nicht, und das war derselbe Fehler, den
+    // die drei Absaetze darueber beschreiben -- nur juenger: das
+    // Messbild wird in buildAllStagesSurface() erzeugt, also bei
+    // JEDEM Umbau neu, und der Zeiger zeigte bis zur naechsten
+    // Zuweisung auf eine geloeschte Anzeige. Sichtbar wurde es
+    // anders herum: nach einem Profilwechsel blieb die Kurve leer,
+    // weil die Ringe des Mithoerers am alten Bild hingen.
+    m_transfer = nullptr;
+    m_crestNote = nullptr;
     m_stageText.fill(StageText{});
     m_stageBoxes.fill(nullptr);
 
@@ -2235,6 +2296,13 @@ void StripWindow::reloadControls()
     // etwas kaputtgemacht".
     refreshStagePictures();
     refreshStageCards();
+
+    // Und das Messbild bekommt seine Ringe zurueck. Ohne diese drei
+    // Zeilen blieb es nach jedem Profilwechsel leer, obwohl der
+    // Mithoerer weiterlief.
+    if (m_transfer != nullptr && m_live != nullptr && m_live->isRunning()) {
+        m_transfer->setRings(&m_live->inputRing(), &m_live->outputRing());
+    }
 }
 
 void StripWindow::showVoiceCheckTab()
@@ -3183,6 +3251,28 @@ void StripWindow::refreshMeters()
     // Langzeitmessung ueber zwei Sekunden zehnmal in der Sekunde fuer
     // einen verdeckten Reiter waere reine Heizung.
     if (m_transfer) { m_transfer->refresh(); }
+    if (m_crestNote) {
+        StripChain* cc = displayChain();
+        const float in  = cc ? cc->inputCrestDb()  : 0.0f;
+        const float out = cc ? cc->outputCrestDb() : 0.0f;
+        if (in <= 0.0f) {
+            // „Unbekannt ist ein Strich, keine Null" (HAUSSTIL §7).
+            m_crestNote->setText(QStringLiteral(
+                "Scheitelfaktor —— · sprechen, dann steht hier, wieviel "
+                "Spitze über dem Effektivwert liegt"));
+        } else {
+            m_crestNote->setText(QStringLiteral(
+                "Scheitelfaktor: vor der Kette %1 dB · danach %2 dB · "
+                "%3 — die Endstufe begrenzt die Spitze, gehört wird der "
+                "Effektivwert")
+                    .arg(double(in),  0, 'f', 1)
+                    .arg(double(out), 0, 'f', 1)
+                    .arg(out > 0.0f && out < in - 0.5f
+                             ? QStringLiteral("%1 dB mehr Sprechleistung")
+                                   .arg(double(in - out), 0, 'f', 1)
+                             : QStringLiteral("die Kette gewinnt hier nichts")));
+        }
+    }
 
     refreshStageText();
     if (m_chainView) {

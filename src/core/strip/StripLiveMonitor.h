@@ -50,6 +50,8 @@
 
 #include <QAudioDevice>
 #include <QAudioFormat>
+#include "core/strip/BandLimit.h"
+
 #include <QObject>
 #include <QString>
 
@@ -185,6 +187,16 @@ public:
     void resync();
     void setVolume(double v);
     void setStripBypassed(bool bypassed);
+
+    // ── Durch den Kanal hoeren ───────────────────────────────────────
+    //
+    // -1 = roh, sonst ein Index in BandLimit::channels(). Steht hinter
+    // der Kette UND hinter dem Messabgriff: das Messbild sagt weiter,
+    // was die KETTE tut, und das Ohr hoert, was der KANAL davon
+    // uebriglaesst. Zwei verschiedene Fragen, zwei verschiedene
+    // Antworten, beide gleichzeitig sichtbar.
+    void setMonitorChannel(int index);
+    int  monitorChannel() const;
     bool stripBypassed() const { return m_bypass.load(std::memory_order_acquire); }
 
     // Genau der Schritt, den pump() mit jedem Block macht -- als
@@ -221,6 +233,8 @@ private:
 
     std::unique_ptr<StripChain> m_chain;
     MicSpectrum* m_spectrum{nullptr};   // nicht besessen
+    // Der Kanal, durch den gehoert wird. Hinter der Kette.
+    BandLimit m_band;
     std::unique_ptr<MicSpectrum> m_inRing;
     std::unique_ptr<MicSpectrum> m_outRing;
     const StripChain* m_mirror{nullptr};   // nicht besessen
