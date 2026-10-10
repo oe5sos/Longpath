@@ -107,6 +107,35 @@ public:
     // Beim Einschalten wird makeupDb NICHT ueberschrieben: beide
     // addieren sich, der ausgerechnete Teil und der von Hand
     // eingestellte.
+    // ── Warum Drive KEINEN Knopf bekommt ─────────────────────────────
+    //
+    // AetherSDR hat genau einen Dichtesteller, und es ist dieser:
+    // Drive, 0..18 dB, nach dem Optimod-Modell -- hinein verstaerken,
+    // am Ausgang denselben Faktor zurueck, netto also keine
+    // Lautstaerke, sondern mehr Material in der Kennlinie. Longpath
+    // rechnet das identisch, hat aber keinen Regler dafuer, und das
+    // bleibt so. Gemessen am 2026-10-10 an echter Sprache, Lautheit
+    // bei gleicher Spitze, Klirr an einem 1-kHz-Ton durch dieselbe
+    // Kette (tst_bandbreiten_genau::theCompressorsHiddenDrive):
+    //
+    //   Drive  Lautheit  Scheitel  Kennlinie  Brickwall   Klirr
+    //     0    -10,8       7,8       -1,6       0,0      -42,8 dB
+    //     3     -8,5       5,8       -3,5      -1,5      -15,5 dB
+    //     6     -7,2       4,8       -5,5      -6,1      -11,0 dB
+    //     9     -6,3       4,2       -7,5     -10,2       -9,5 dB
+    //    18     -5,4       3,7      -13,5     -22,3       -9,5 dB
+    //
+    // Drei Dezibel Drive sind bereits SIEBZEHN PROZENT Klirr. Der
+    // Clipper holt bei 12 dB dieselbe Groessenordnung Dichte fuer
+    // 0,34 %. Der Grund steht in der vierten Spalte: die Dichte
+    // kommt nicht aus der Kennlinie, sondern aus dem Brickwall
+    // unten in dieser Klasse -- Abtastwert fuer Abtastwert, 0,1 ms
+    // Anstieg, OHNE Ueberabtastung. Der Clipper rechnet mit
+    // doppelter Rate und einem Halbbandfilter, genau damit das
+    // nicht passiert.
+    //
+    // Ein Knopf „Drive" waere also ein Verzerrungsregler mit der
+    // Aufschrift „mehr Druck". Wer Dichte will, nimmt den Clipper.
     static constexpr float kReferenzDbFs = -12.0f;
     void  setAutoMakeup(bool on) noexcept;
     bool  autoMakeup() const noexcept;

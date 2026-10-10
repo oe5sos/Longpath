@@ -68,6 +68,7 @@ private slots:
     void the_stage_flag_and_the_stages_own_flag_agree();
     void the_whole_chain_stays_finite();
     void every_stage_has_a_name();
+    void reset_empties_every_stage();
     void the_limiter_is_last();
     void a_nan_at_the_input_becomes_silence_and_is_counted();
     void a_stage_that_returns_nan_is_bypassed_for_that_block();
@@ -376,6 +377,54 @@ void TstStripChain::every_stage_has_a_name()
         QVERIFY2(n != nullptr && *n != '\0',
                  qPrintable(QStringLiteral("stage %1 has no name").arg(i)));
     }
+}
+
+// ── reset() muss ALLE Stufen treffen ────────────────────────────────
+//
+// Hier fehlten das Entrauschen und der Clipper -- die beiden, die nach
+// der urspruenglichen Acht dazugekommen sind. Beide halten Zustand:
+// der Entrauscher eine Verzoegerungsleitung ueber 1440 Abtastwerte,
+// der Clipper die Vorgeschichte seines Halbbandfilters. Folge: die
+// naechste Durchsage beginnt mit einem Rest der vorigen.
+//
+// Hier der Clipper. Das Entrauschen braucht sein Modell und damit ein
+// QApplication, das diese Datei nicht hat (QTEST_APPLESS_MAIN) -- es
+// wird in tests/tst_bandbreiten_genau geprueft, und zwar mit den
+// vollen 1440 Abtastwerten.
+//
+// Geprueft wird die WIRKUNG, nicht die Anwesenheit eines Aufrufs.
+void TstStripChain::reset_empties_every_stage()
+{
+    StripChain c;
+    c.prepare(48000.0);
+    c.setEnabled(true);
+    for (int i = 0; i < StripChain::kStageCount; ++i) {
+        c.setStageEnabled(static_cast<StripChain::Stage>(i), false);
+    }
+    c.clipper().setDriveDb(12.0f);
+    c.setStageEnabled(StripChain::Stage::Clip, true);
+
+    std::vector<float> laut(2400, 0.0f);
+    for (size_t i = 0; i < laut.size(); ++i) {
+        laut[i] = float(0.5 * std::sin(2.0 * M_PI * 1000.0
+                                       * double(i) / 48000.0));
+    }
+    for (size_t at = 0; at + 240 <= laut.size(); at += 240) {
+        c.processMono(laut.data() + at, 240);
+    }
+
+    c.reset();
+
+    std::vector<float> stille(960, 0.0f);
+    for (size_t at = 0; at + 240 <= stille.size(); at += 240) {
+        c.processMono(stille.data() + at, 240);
+    }
+    float p = 0.0f;
+    for (float v : stille) { p = std::max(p, std::fabs(v)); }
+    QVERIFY2(p < 1e-6f,
+             qPrintable(QStringLiteral("nach dem Zuruecksetzen kommt noch "
+                                       "%1 heraus -- der Clipper haelt "
+                                       "seinen Zustand").arg(double(p))));
 }
 
 void TstStripChain::the_limiter_is_last()

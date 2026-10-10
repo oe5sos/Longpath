@@ -2341,6 +2341,146 @@ private slots:
                                 .arg(durchKette).arg(rohWeg)));
     }
 
+    // ── Der versteckte Dichtehebel: Drive im Kompressor ─────────────
+    //
+    // AetherSDR hat genau einen Dichtesteller, und es ist nicht der
+    // Clipper: Drive im Kompressor, 0..18 dB, nach dem Optimod-Modell
+    // -- hinein verstärken, am Ausgang gleich viel zurück. Netto also
+    // keine Lautstärke, sondern mehr Material in der Kennlinie.
+    // Longpaths Kompressor kann das Stück für Stück identisch
+    // (ClientComp.cpp: driveLin vor der Schleife, derselbe Faktor
+    // wieder in gainLin), aber es gibt keinen Knopf dafür und kein
+    // Profil setzt den Wert.
+    //
+    // Bevor einer gebaut wird: was bringt er, und was kostet er?
+    void theCompressorsHiddenDrive()
+    {
+        QString warum;
+        const auto sauber = echteRede(&warum);
+        if (sauber.empty()) { QSKIP(qPrintable(warum)); }
+        const Rede rede = redeMitRauschen(sauber, -48.0);
+
+        const auto druck = [](const std::vector<float>& v) {
+            double p = 0.0;
+            for (float x : v) { p = std::max(p, double(std::fabs(x))); }
+            std::vector<float> n = v;
+            if (p > 1e-9) {
+                const float gg = float(std::pow(10.0, -2.0 / 20.0) / p);
+                for (float& x : n) { x *= gg; }
+            }
+            return Loudness::measure(n.data(), int(n.size()),
+                                     int(kRate)).integratedLufs;
+        };
+        const auto scheitel = [&rede](const std::vector<float>& v) {
+            double p = 0.0;
+            double s = 0.0;
+            size_t n = 0;
+            for (size_t i = 0; i < v.size(); ++i) {
+                if (rede.spricht[i] == 0) { continue; }
+                p = std::max(p, double(std::fabs(v[i])));
+                s += double(v[i]) * double(v[i]); ++n;
+            }
+            return dB(p) - dB(std::sqrt(s / std::max<size_t>(1, n)));
+        };
+
+        // Klirr an einem Ton auf Sprachpegel, durch dieselbe Kette --
+        // derselbe Maßstab wie beim Clipper, damit die beiden
+        // Dichtewege vergleichbar sind.
+        const auto klirr = [](StripChain& c) {
+            const int n = int(kRate);
+            std::vector<float> ton(size_t(n), 0.0f);
+            for (int i = 0; i < n; ++i) {
+                ton[size_t(i)] = float(0.25 * std::sin(2.0 * M_PI * 1000.0
+                                                       * i / kRate));
+            }
+            const auto p = spektrum(durch(c, ton));
+            const double grund = bandDb(p, 950.0, 1050.0);
+            double rest = 0.0;
+            for (int h = 2; h <= 8; ++h) {
+                const double f = 1000.0 * h;
+                rest += std::pow(10.0, bandDb(p, f - 60.0, f + 60.0) / 10.0);
+            }
+            return 10.0 * std::log10(std::max(rest, 1e-20)) - grund;
+        };
+
+        qInfo().noquote() << QStringLiteral(
+            "  Drive   Lautheit   Scheitel   Rücknahme   verst. Begrenzer   "
+            "Klirr");
+        for (double drive : { 0.0, 3.0, 6.0, 9.0, 12.0, 18.0 }) {
+            StripChain c;
+            empfehlung(c);
+            c.comp().setDriveDb(float(drive));
+            std::vector<float> y = rede.signal;
+            double gr = 0.0;
+            double limGr = 0.0;
+            for (size_t at = 0; at + 240 <= y.size(); at += 240) {
+                c.processMono(y.data() + at, 240);
+                gr = std::min(gr, double(c.comp().gainReductionDb()));
+                limGr = std::min(limGr,
+                                 double(c.comp().limiterGrDb()));
+            }
+            StripChain t;
+            empfehlung(t);
+            t.comp().setDriveDb(float(drive));
+            qInfo().noquote()
+                << QStringLiteral("  %1 dB   %2 LUFS   %3 dB   %4 dB   "
+                                  "%5 dB   %6 dB")
+                       .arg(drive, 5, 'f', 0)
+                       .arg(druck(y), 7, 'f', 1)
+                       .arg(scheitel(y), 7, 'f', 1)
+                       .arg(gr, 8, 'f', 1).arg(limGr, 13, 'f', 1)
+                       .arg(klirr(t), 7, 'f', 1);
+        }
+        qInfo().noquote() << QStringLiteral(
+            "   (die letzte Spalte ist das versteckte Brickwall IM "
+            "Kompressor, Decke -1 dBFS, ohne Knopf)");
+    }
+
+    // ── Nach dem Zurücksetzen darf nichts nachlaufen ────────────────
+    //
+    // Das Entrauschen hält eine Verzögerungsleitung über drei Rahmen,
+    // also 1440 Abtastwerte. StripChain::reset() hat es bis zum
+    // 2026-10-10 nicht angefasst -- die nächste Durchsage begann
+    // deshalb mit 30 ms der vorigen. Das hört man nicht als Fehler,
+    // sondern als Knacken, das niemand zuordnet.
+    void nothingRunsOnAfterAReset()
+    {
+        StripChain c;
+        c.prepare(kRate);
+        c.setEnabled(true);
+        for (int i = 0; i < StripChain::kStageCount; ++i) {
+            c.setStageEnabled(static_cast<StripChain::Stage>(i), false);
+        }
+        c.nr().setAmount(0.0f);
+        c.setStageEnabled(StripChain::Stage::Denoise, true);
+        if (c.nr().latencySamples() <= 0) { QSKIP("kein rnnoise-Modell"); }
+
+        std::vector<float> laut(size_t(kRate / 4), 0.0f);
+        for (size_t i = 0; i < laut.size(); ++i) {
+            laut[i] = float(0.5 * std::sin(2.0 * M_PI * 1000.0
+                                           * double(i) / kRate));
+        }
+        for (size_t at = 0; at + 240 <= laut.size(); at += 240) {
+            c.processMono(laut.data() + at, 240);
+        }
+
+        c.reset();
+
+        std::vector<float> stille(size_t(kRate / 4), 0.0f);
+        for (size_t at = 0; at + 240 <= stille.size(); at += 240) {
+            c.processMono(stille.data() + at, 240);
+        }
+        double p = 0.0;
+        for (float v : stille) { p = std::max(p, double(std::fabs(v))); }
+        qInfo().noquote()
+            << QStringLiteral("Nach dem Zurücksetzen läuft noch %1 dBFS "
+                              "nach").arg(dB(p), 0, 'f', 1);
+        QVERIFY2(p < 1e-6,
+                 qPrintable(QStringLiteral("%1 dBFS laufen nach -- eine "
+                                           "Stufe hält ihren Zustand")
+                                .arg(dB(p), 0, 'f', 1)));
+    }
+
     // ── Die eigene Verzögerung ──────────────────────────────────────
     //
     // Das Entrauschen rechnet in Blöcken von 480 Werten, also 10 ms,

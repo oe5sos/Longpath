@@ -3831,10 +3831,11 @@ void StripWindow::refreshMeters()
         // nichts" und „der Regler tut genau das".
         m_compMeter->setText(Sprache::T(QStringLiteral(
             "Compressor: %1 dB of reduction · %2 dB made up · "
-            "in %3 dBFS · out %4 dBFS"))
+            "%3 dB caught by its own brickwall · in %4 dBFS · out %5 dBFS"))
                 .arg(c->comp().gainReductionDb(), 0, 'f', 1)
                 .arg(c->comp().makeupDb() + c->comp().autoMakeupDb(),
                      0, 'f', 1)
+                .arg(c->comp().limiterGrDb(), 0, 'f', 1)
                 .arg(c->comp().inputPeakDb(), 0, 'f', 1)
                 .arg(c->comp().outputPeakDb(), 0, 'f', 1));
     }

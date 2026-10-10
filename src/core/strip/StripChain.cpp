@@ -535,6 +535,20 @@ float StripChain::outputPeakDb() const noexcept
 
 void StripChain::reset() noexcept
 {
+    // ── Alle zehn, nicht acht ────────────────────────────────────
+    //
+    // Hier fehlten das Entrauschen und der Clipper -- die beiden
+    // Stufen, die nach der urspruenglichen Acht dazugekommen sind.
+    // Beide halten Zustand: der Entrauscher eine
+    // Verzoegerungsleitung ueber drei Rahmen (1440 Abtastwerte,
+    // 30 ms) plus den Zustand des Netzes, der Clipper die
+    // Vorgeschichte seines Halbbandfilters. Ohne Ruecksetzen
+    // beginnt die naechste Durchsage mit 30 ms der vorigen.
+    //
+    // Eine Stufe, die beim Hinzufuegen in processMono() eingetragen
+    // wird, aber nicht hier, faellt erst im Betrieb auf -- und dann
+    // als Knacken, das niemand zuordnet.
+    m_nr.reset();
     m_gate.reset();
     m_eq.reset();
     m_deEss.reset();
@@ -542,7 +556,17 @@ void StripChain::reset() noexcept
     m_tube.reset();
     m_pudu.reset();
     m_reverb.reset();
+    m_clip.reset();
     m_limiter.reset();
+
+    // Und die Summierer des Scheitelfaktors: ohne das mischt die
+    // einzige Dichtezahl der Oberflaeche ueber die Sendepause
+    // hinweg und zeigt einen Wert, den es nie gab.
+    m_crestSumIn = 0.0;
+    m_crestSumOut = 0.0;
+    m_crestPeakIn = 0.0f;
+    m_crestPeakOut = 0.0f;
+    m_crestFrames = 0;
 }
 
 } // namespace Longpath

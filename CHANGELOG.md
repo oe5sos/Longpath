@@ -2,6 +2,56 @@
 
 ## [Unreleased]
 
+### Jede Durchsage begann mit 30 ms der vorigen
+
+`StripChain::reset()` traf acht der zehn Stufen. Es fehlten genau die
+beiden, die nach der ursprünglichen Acht dazugekommen sind — das
+Entrauschen und der Clipper —, und beide halten Zustand: eine
+Verzögerungsleitung über 1440 Abtastwerte und die Vorgeschichte eines
+Halbbandfilters.
+
+Gegenprobe gegen die alte Fassung, laut hinein, zurücksetzen, dann
+Stille messen:
+
+```
+Clipper        0,9999 kommt noch heraus   (Vollaussteuerung, ein Knacken)
+Entrauschen    −6,0 dBFS laufen 30 ms nach
+```
+
+Nach der Behebung: −240 dBFS, also nichts. Zwei Prüfungen halten es
+fest, getrennt nach Stufe — das Entrauschen braucht sein Modell und
+damit ein QApplication, das `tst_strip_chain` nicht hat.
+
+Dazu laufen die Summierer des Scheitelfaktors jetzt mit zurück. Ohne
+das mischte die einzige Dichtezahl der Oberfläche über die Sendepause
+hinweg und zeigte einen Wert, den es nie gegeben hat.
+
+### Drive im Kompressor bekommt keinen Knopf — gemessen, warum
+
+AetherSDR hat genau einen Dichtesteller, und es ist nicht der Clipper:
+Drive im Kompressor, 0–18 dB, nach dem Optimod-Modell. Longpaths
+Kompressor rechnet das identisch, hat aber keinen Regler dafür. Bevor
+einer gebaut wurde, die Messung:
+
+| Drive | Lautheit | Scheitel | Kennlinie | verstecktes Brickwall | Klirr |
+| --- | --- | --- | --- | --- | --- |
+| 0 | −10,8 | 7,8 | −1,6 | 0,0 | −42,8 dB |
+| 3 | −8,5 | 5,8 | −3,5 | −1,5 | **−15,5 dB** |
+| 6 | −7,2 | 4,8 | −5,5 | −6,1 | −11,0 dB |
+| 18 | −5,4 | 3,7 | −13,5 | −22,3 | −9,5 dB |
+
+**Drei Dezibel Drive sind siebzehn Prozent Klirr.** Der Clipper holt
+dieselbe Größenordnung Dichte für 0,34 %. Der Grund steht in der
+vorletzten Spalte: die Dichte kommt nicht aus der Kennlinie, sondern
+aus einem Brickwall mitten im Kompressor — Abtastwert für Abtastwert,
+0,1 ms Anstieg, **ohne Überabtastung**. Der Clipper rechnet mit
+doppelter Rate und Halbbandfilter, genau dagegen.
+
+Ein Knopf „Drive" wäre ein Verzerrungsregler mit der Aufschrift „mehr
+Druck". Er kommt nicht. Stattdessen steht das versteckte Glied jetzt in
+der laufenden Zeile des Kompressors (`%1 dB caught by its own
+brickwall`) — unsichtbar war es schlimmer als vorhanden.
+
 ### Der Hochpass stand auf dem Grundton — und der A/B-Vergleich war unfair
 
 > „also roh, volle bandbreite — auf dem signal sollte man aufbauen …
