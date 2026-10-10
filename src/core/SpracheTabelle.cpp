@@ -534,6 +534,14 @@ const QHash<QString, QString>& tabelle()
           QStringLiteral("zu wenig") },
         { QStringLiteral("too hot"),
           QStringLiteral("zu viel") },
+        { QStringLiteral("Input: ——  ·  target −12 dBFS  ·  speak"),
+          QStringLiteral("Eingang: ——  ·  Ziel −12 dBFS  ·  sprich") },
+        { QStringLiteral("Input: %1 dBFS  ·  target −12 dBFS  ·  fits"),
+          QStringLiteral("Eingang: %1 dBFS  ·  Ziel −12 dBFS  ·  passt") },
+        { QStringLiteral("Input: %1 dBFS  ·  target −12 dBFS  ·  %2 dB %3"),
+          QStringLiteral("Eingang: %1 dBFS  ·  Ziel −12 dBFS  ·  %2 dB %3") },
+        { QStringLiteral("missing"),
+          QStringLiteral("fehlen") },
     };
     return t;
 }

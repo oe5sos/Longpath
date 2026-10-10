@@ -2105,8 +2105,19 @@ QWidget* StripWindow::buildAllStagesSurface()
         z->setContentsMargins(0, 0, 0, 0);
         z->setSpacing(4);
 
+        // ── Warum hier KEIN Zeilenumbruch steht ──────────────────
+        //
+        // „die schriften springen herum."
+        //
+        // Eine umbrechende Beschriftung, deren Text sich zehnmal je
+        // Sekunde ändert, wechselt zwischen einer und zwei Zeilen --
+        // und schiebt bei jedem Wechsel alles darunter. Also: eine
+        // Zeile, fester Satzbau, nur die Zahlen ändern sich. Und
+        // die Höhe wird festgenagelt, damit auch ein längerer Satz
+        // nichts verschiebt.
         m_eingangNote = new QLabel(box);
-        m_eingangNote->setWordWrap(true);
+        m_eingangNote->setWordWrap(false);
+        m_eingangNote->setFixedHeight(18);
         m_eingangNote->setStyleSheet(dimStyle());
         z->addWidget(m_eingangNote);
 
@@ -2170,7 +2181,10 @@ QWidget* StripWindow::buildAllStagesSurface()
     // komprimieren?" eine Entscheidung statt eines Gefühls.
     m_crestNote = new QLabel(host);
     m_crestNote->setStyleSheet(dimStyle());
-    m_crestNote->setWordWrap(true);
+    // Kein Umbruch, feste Hoehe -- siehe die Begruendung bei
+    // m_eingangNote. Dasselbe Springen, dieselbe Ursache.
+    m_crestNote->setWordWrap(false);
+    m_crestNote->setFixedHeight(18);
     col->addWidget(m_crestNote);
 
     auto* cards = new QWidget(host);
@@ -3510,9 +3524,12 @@ void StripWindow::refreshMeters()
     //
     // Es wird nichts verstellt. Das ist der Unterschied zur
     // verworfenen Automatik, und er ist der ganze Punkt.
+    // Der Takt steht ausserhalb: an ihm haengen auch die Eingangs-
+    // und Scheitelfaktorzeile weiter unten, und die gibt es auch
+    // ohne Entzerrerseite.
+    if (++m_zielTick >= 5) { m_zielTick = 0; }   // zweimal je Sekunde
     if (m_eqPanel != nullptr) {
-        if (++m_zielTick >= 5) {          // zweimal je Sekunde reicht
-            m_zielTick = 0;
+        if (m_zielTick == 0) {
             QVector<double> abw;
             if (m_live != nullptr && m_live->isRunning()) {
                 const int rate = int(m_live->inputRate());
@@ -3561,32 +3578,29 @@ void StripWindow::refreshMeters()
             m_eqPanel->setZiel(abw);
         }
     }
-    if (m_eingangNote) {
+    // Zweimal je Sekunde reicht fuer einen Pegel, und es ist ruhiger
+    // anzusehen als zehnmal. Derselbe Takt wie die Zielanzeige.
+    if (m_eingangNote && m_zielTick == 0) {
         const double roh = double(c->rawInputPeakDb());
         if (roh < -90.0) {
             m_eingangNote->setText(Sprache::T(QStringLiteral(
-                "Input: —— · speak, and this says whether the level is "
-                "right for the thresholds below")));
+                "Input: ——  ·  target −12 dBFS  ·  speak")));
         } else {
             const double fehlt = -12.0 - roh;
             m_eingangNote->setText(
                 std::fabs(fehlt) < 4.0
                     ? Sprache::T(QStringLiteral(
-                          "Input: %1 dBFS peak — right where every "
-                          "threshold in this strip expects it."))
+                          "Input: %1 dBFS  ·  target −12 dBFS  ·  fits"))
                           .arg(roh, 0, 'f', 1)
                     : Sprache::T(QStringLiteral(
-                          "Input: %1 dBFS peak — %2 dB %3. Every "
-                          "threshold here is in dBFS, so at this level "
-                          "the gate closes on your voice and the "
-                          "compressor never works."))
+                          "Input: %1 dBFS  ·  target −12 dBFS  ·  %2 dB %3"))
                           .arg(roh, 0, 'f', 1)
                           .arg(std::fabs(fehlt), 0, 'f', 0)
-                          .arg(fehlt > 0 ? Sprache::T(QStringLiteral("too low"))
+                          .arg(fehlt > 0 ? Sprache::T(QStringLiteral("missing"))
                                          : Sprache::T(QStringLiteral("too hot"))));
         }
     }
-    if (m_crestNote) {
+    if (m_crestNote && m_zielTick == 0) {
         StripChain* cc = displayChain();
         const float in  = cc ? cc->inputCrestDb()  : 0.0f;
         const float out = cc ? cc->outputCrestDb() : 0.0f;
