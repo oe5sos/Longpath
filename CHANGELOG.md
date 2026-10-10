@@ -2,6 +2,29 @@
 
 ## [Unreleased]
 
+### Entzerrer: zwei Ansichten, eine Seite
+
+> „ja baue es, ev generell 2 varianten, einen leichtere und eine für
+>  profi im gleichen design?"
+
+**Einfach** ist jetzt der Standard: sieben benannte Regler — WÄRME 300
+· FÜLLE 450 · MULM 650 · NASAL 950 · KLARHEIT 1,4k · PRÄSENZ 2,5k ·
+SCHÄRFE 3,8k. **Profi** ist ein Knopf daneben und zeigt die heutige
+Seite unverändert. Dieselbe Kurve an derselben Stelle; beim
+Umschalten springt nichts.
+
+Die Regler hängen an den **sieben freien Griffen** des Bandsatzes,
+nicht an den Bändern eines Ausgangspunkts: wer „Clean voice" gewählt
+hat, hört weiter Clean voice, und die Regler stehen beim ersten
+Öffnen auf null — das ist, was man selbst dazugetan hat. Unter jedem
+Namen steht die wirkliche Frequenz des Bandes. In der einfachen
+Ansicht zeichnet die Kurve nur die Punkte, die sich auch ziehen
+lassen.
+
+Umschalten ist ausschließlich Zeigen und Verbergen —
+`tests/tst_eq_two_views.cpp` hält fest, dass hin und zurück kein Band
+bewegt. Blätter: `docs/design/2026-10-10-eq-einfach/`.
+
 ### Entzerrer: ein Zug, eine Größe
 
 > „das klicken der linie bewegt teilweise die komplette kurve, was ich
