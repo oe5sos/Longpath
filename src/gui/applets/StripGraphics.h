@@ -44,6 +44,7 @@
 #include <QWidget>
 
 class QDragEnterEvent;
+class QResizeEvent;
 class QDragLeaveEvent;
 class QDragMoveEvent;
 class QDropEvent;
@@ -73,6 +74,7 @@ public:
     void setReduction(StripChain::Stage s, double db);
 
     QSize sizeHint() const override;
+    QSize minimumSizeHint() const override;
 
     // Welche Stufenseite gerade offen ist, oder -1. Die Kachel bekommt
     // dann einen hellen Ring. Zwei Fragen, zwei Zeichen: die Farbe
@@ -102,6 +104,7 @@ signals:
 
 protected:
     void paintEvent(QPaintEvent*) override;
+    void resizeEvent(QResizeEvent* ev) override;
     void mousePressEvent(QMouseEvent* ev) override;
     void mouseDoubleClickEvent(QMouseEvent* ev) override;
     void dragEnterEvent(QDragEnterEvent* ev) override;
@@ -125,6 +128,10 @@ private:
         QRect rect;
     };
     void relayout();
+    // Wie breit eine Stufenkachel bei der aktuellen Fensterbreite
+    // sein darf. Mit zehn Stufen passt die feste Breite nicht mehr
+    // auf den Schirm -- siehe den Kommentar in relayout().
+    int  tileWidth() const;
     const Cell* cellAt(const QPoint& p) const;
     int  dropPositionAt(const QPoint& p) const;
     QRect removeBoxOf(const Cell& c) const;

@@ -54,6 +54,7 @@ void StripChain::prepare(double sampleRate)
 {
     m_sampleRate = sampleRate;
     m_nr.prepare(sampleRate);
+    m_clip.prepare(sampleRate);
     m_gate.prepare(sampleRate);
     m_eq.prepare(sampleRate);
     m_deEss.prepare(sampleRate);
@@ -215,6 +216,7 @@ void StripChain::setStageEnabled(Stage s, bool on) noexcept
     // whether it is asked of the chain or of the compressor.
     switch (s) {
     case Stage::Denoise: m_nr.setEnabled(on);  break;
+    case Stage::Clip:    m_clip.setEnabled(on); break;
     case Stage::Gate:  m_gate.setEnabled(on);  break;
     case Stage::Eq:    m_eq.setEnabled(on);    break;
     case Stage::DeEss: m_deEss.setEnabled(on); break;
@@ -247,6 +249,7 @@ const char* StripChain::stageName(Stage s) noexcept
 {
     switch (s) {
     case Stage::Denoise: return "Denoise";
+    case Stage::Clip:    return "Clipper";
     case Stage::Gate:    return "Gate";
     case Stage::Eq:      return "EQ";
     case Stage::DeEss:   return "De-Esser";
@@ -325,6 +328,12 @@ void StripChain::processMono(float* samples, int frames) noexcept
     runInserts(7, samples, frames);
     runStage(Stage::Reverb, m_reverb, samples, frames);
     runInserts(8, samples, frames);
+    // Direkt vor dem Begrenzer: das Abschneiden nimmt die Spitze
+    // weg, der Begrenzer faengt, was danach noch darueber liegt.
+    // Umgekehrt waere der Begrenzer schon am Arbeiten, bevor die
+    // Spitze ueberhaupt kleiner geworden ist.
+    runStage(Stage::Clip,   m_clip,   samples, frames);
+    runInserts(9, samples, frames);
     // Last, and for a reason: a brickwall that anything runs after is
     // not a brickwall. Everything above can add gain — the tube, the
     // exciter, the compressor's make-up — and this is what stops the

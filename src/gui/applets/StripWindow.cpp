@@ -784,6 +784,7 @@ void StripWindow::buildUi()
         case StripChain::Stage::DeEss: page = buildDeEssPanel(); break;
         case StripChain::Stage::Comp:    page = buildCompPanel();    break;
         case StripChain::Stage::Denoise: page = buildDenoisePanel(); break;
+        case StripChain::Stage::Clip:    page = buildClipperPanel(); break;
         case StripChain::Stage::Tube:    page = buildTubePanel();    break;
         case StripChain::Stage::Pudu:    page = buildPuduPanel();    break;
         case StripChain::Stage::Reverb:  page = buildReverbPanel();  break;
@@ -1506,6 +1507,90 @@ QWidget* StripWindow::buildDenoisePanel()
     return page;
 }
 
+// ── Clipper ──────────────────────────────────────────────────────────
+//
+// Die Stufe, die bei SSB wirklich Sprechleistung bringt -- und die
+// einzige, deren Nebenwirkung Verzerrung ist. Deshalb steht auf der
+// Seite, wieviel sie gerade wegnimmt, und daneben auf der Übersicht
+// der Scheitelfaktor. Nach Gefühl einzustellen ist hier besonders
+// verführerisch und besonders falsch.
+
+QWidget* StripWindow::buildClipperPanel()
+{
+    auto* page = new QWidget(this);
+    auto* form = new QFormLayout(page);
+
+    const int idx = static_cast<int>(StripChain::Stage::Clip);
+    auto* on = new QCheckBox(QStringLiteral("Clipper on"), page);
+    m_stageBoxes[static_cast<size_t>(idx)] = on;
+    form->addRow(on);
+    connect(on, &QCheckBox::toggled, this, [this](bool v) {
+        if (StripChain* c = chain()) {
+            c->setStageEnabled(StripChain::Stage::Clip, v);
+        }
+        refreshChainRow();
+        persist();
+    });
+
+    auto* what = new QLabel(
+        QStringLiteral(
+            "Your amplifier is limited by the PEAK; what is heard is the "
+            "AVERAGE. The gap between the two — the crest factor, on the "
+            "Strip tab — is power you paid for and did not send. A "
+            "compressor evens out the loudness but leaves the single peak "
+            "in the waveform standing. This takes it off.\n\n"
+            "3 dB clipped is roughly 3 dB more average power at the same "
+            "peak, and that is more than any EQ curve will ever give you."),
+        page);
+    what->setWordWrap(true);
+    what->setStyleSheet(dimStyle());
+    form->addRow(what);
+
+    auto* cost = new QLabel(
+        QStringLiteral("The cost is distortion, and it is deliberate. "
+                       "Start at 3 dB, listen through the channel, and "
+                       "watch the crest factor on the Strip tab — not "
+                       "your ear alone: clipped audio flatters."),
+        page);
+    cost->setWordWrap(true);
+    cost->setStyleSheet(QStringLiteral("QLabel { color: %1; }")
+                            .arg(QLatin1String(Style::kAmberText)));
+    form->addRow(cost);
+
+    addKnob(form, QStringLiteral("Drive"), 0.0, 18.0, 0.5,
+        cur([this]{ return double(chain()->clipper().driveDb()); }, 0.0),
+        QStringLiteral("dB"), [this](double v) {
+            if (StripChain* c = chain()) { c->clipper().setDriveDb(float(v)); }
+        }, 1, [this]{ persist(); });
+    addKnob(form, QStringLiteral("Knee"), 0.0, 1.0, 0.05,
+        cur([this]{ return double(chain()->clipper().knee()); }, 0.3),
+        QString(), [this](double v) {
+            if (StripChain* c = chain()) { c->clipper().setKnee(float(v)); }
+        }, 2, [this]{ persist(); });
+
+    auto* makeup = new QCheckBox(
+        QStringLiteral("Level-matched — for judging, not for air"), page);
+    makeup->setChecked(chain() ? chain()->clipper().levelMatch() : false);
+    makeup->setToolTip(QStringLiteral(
+        "Matches the measured loudness so switching the stage on and off "
+        "compares the SOUND of the clipping, not the volume — otherwise "
+        "you compare loud against quiet and call loud better, which is "
+        "the commonest way to fool yourself here. Switch it off again "
+        "before you transmit: matched, the stage gives away exactly the "
+        "power it just won."));
+    form->addRow(makeup);
+    connect(makeup, &QCheckBox::toggled, this, [this](bool v) {
+        if (StripChain* c = chain()) { c->clipper().setLevelMatch(v); }
+        persist();
+    });
+
+    m_clipMeter = new QLabel(page);
+    m_clipMeter->setStyleSheet(dimStyle());
+    form->addRow(m_clipMeter);
+
+    return page;
+}
+
 // ── Tube ─────────────────────────────────────────────────────────────
 
 QWidget* StripWindow::buildTubePanel()
@@ -2216,7 +2301,7 @@ void StripWindow::reloadControls()
     // survives, so the rebuilt panel gets a live engine rather than a
     // dangling one.
     m_eqPanel = nullptr;
-    m_nrMeter = nullptr;
+    m_nrMeter = m_clipMeter = nullptr;
     m_gateMeter = m_deEssMeter = m_compMeter = nullptr;
     // Owned by the pages just removed. Left dangling, the next
     // refreshMeters() would call isVisible() on freed memory — the same
@@ -2262,6 +2347,7 @@ void StripWindow::reloadControls()
         case StripChain::Stage::DeEss: page = buildDeEssPanel(); break;
         case StripChain::Stage::Comp:    page = buildCompPanel();    break;
         case StripChain::Stage::Denoise: page = buildDenoisePanel(); break;
+        case StripChain::Stage::Clip:    page = buildClipperPanel(); break;
         case StripChain::Stage::Tube:    page = buildTubePanel();    break;
         case StripChain::Stage::Pudu:    page = buildPuduPanel();    break;
         case StripChain::Stage::Reverb:  page = buildReverbPanel();  break;
@@ -3284,6 +3370,15 @@ void StripWindow::refreshMeters()
                                   c->deEss().gainReductionDb());
     }
 
+    if (m_clipMeter) {
+        m_clipMeter->setText(QStringLiteral(
+            "Clipper: %1 dB of peak taken off · crest now %2 dB")
+                .arg(c->clipper().clippedDb(), 0, 'f', 1)
+                .arg(c->outputCrestDb() > 0.0f
+                         ? QString::number(double(c->outputCrestDb()),
+                                           'f', 1)
+                         : QStringLiteral("——")));
+    }
     if (m_nrMeter) {
         const auto& nr = c->nr();
         m_nrMeter->setText(

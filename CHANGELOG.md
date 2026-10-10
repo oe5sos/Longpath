@@ -2,6 +2,43 @@
 
 ## [Unreleased]
 
+### Der Clipper — die Stufe, die bei SSB wirklich Leistung bringt
+
+Die Endstufe wird von der **Spitze** begrenzt, gehört wird der
+**Effektivwert**. Der Abstand dazwischen ist verschenkte Leistung.
+Ein Kompressor macht den Pegelverlauf gleichmäßiger, lässt die
+einzelne Spitze im Wellenzug aber stehen — und genau die legt die
+Endstufe fest. Abschneiden nimmt sie weg.
+
+`core/strip/ClientClipper`, neunte… zehnte Stufe, direkt vor dem
+Begrenzer. **Zweifach überabgetastet**: Abschneiden erzeugt
+Oberwellen bis ins Unendliche, und bei 48 kHz faltet sich alles über
+24 kHz zurück *ins* Sprachband — die 15. Oberwelle eines 3,1-kHz-Tons
+landet bei 1,5 kHz mitten in der Stimme, und kein Filter holt sie je
+wieder heraus. Gemessen: **−72,9 dB** statt hörbarem Störton.
+
+Gemessen bei 6 dB Drive, Knie 0,2: Scheitelfaktor **16,0 → 13,6 dB**,
+Effektivwert **+3,4 dB**, Spitze **+0,9 dB**.
+
+Zwei Entwurfsfehler hat erst der Prüfstand aufgedeckt, nicht das Ohr:
+
+* Die erste Fassung nahm nach dem Abschneiden die Verstärkung wieder
+  heraus — Spitze −5,1 dB, Effektivwert −2,6 dB. Der Scheitelfaktor
+  wurde besser, aber alles wurde leiser, und **niemand in der Kette
+  holt den Gewinn zurück**. Ein Clipper arbeitet andersherum.
+* Der Lautstärkeabgleich zum Vergleichen war ein Regelkreis und hatte
+  eine **bleibende** Abweichung von 1,30 dB: das Mittel vieler
+  Augenblicksverhältnisse ist nicht das Verhältnis der Mittel. Jetzt
+  zwei getrennt geglättete Leistungen, danach geteilt — Rest
+  **0,007 dB**.
+
+### Die Kettenreihe passt sich der Fensterbreite an
+
+Mit zehn Stufen sind 10 × 84 plus elf Fugen 994 Punkte, und der
+Inhalt des Fensters hat rund 960. Die Kachelbreite ist jetzt eine
+Obergrenze; die Reihe wird dichter statt länger, Namen werden
+gekürzt statt überzulaufen.
+
 ### Mithören durch den Sendekanal — und der Scheitelfaktor als Zahl
 
 Im Kopfhörer lief bisher die **volle Bandbreite** der Soundkarte,

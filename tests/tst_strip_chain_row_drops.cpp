@@ -191,7 +191,10 @@ private slots:
         v.setAutoFillBackground(true);
         v.setChain(&c);
         v.refreshInserts();
-        v.resize(v.sizeHint());
+        // So breit wie der Inhalt des Fensters wirklich ist -- die
+        // Reihe passt sich an, also zeigt ein Blatt in Wunschbreite
+        // etwas, das es am Schirm nicht gibt.
+        v.resize(960, v.sizeHint().height());
         // Die Seite, die gerade offen waere: ihre Kachel traegt den Ring.
         v.setOpenStage(0);
 

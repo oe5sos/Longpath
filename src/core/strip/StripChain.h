@@ -53,6 +53,7 @@
 #include "core/strip/ClientDeEss.h"
 #include "core/strip/ClientEq.h"
 #include "core/strip/ClientFinalLimiter.h"
+#include "core/strip/ClientClipper.h"
 #include "core/strip/ClientGate.h"
 #include "core/strip/NoiseReduction.h"
 #include "core/strip/ClientPudu.h"
@@ -79,8 +80,8 @@ public:
     // danach Pegel anhebt -- Kompressor, Roehre, Anreicherer -- soll
     // das Raumgeraeusch gar nicht erst mitbekommen.
     enum class Stage : uint8_t {
-        Denoise = 0, Gate, Eq, DeEss, Comp, Tube, Pudu, Reverb, Limiter,
-        Count
+        Denoise = 0, Gate, Eq, DeEss, Comp, Tube, Pudu, Reverb, Clip,
+        Limiter, Count
     };
     static constexpr int kStageCount = static_cast<int>(Stage::Count);
 
@@ -240,6 +241,7 @@ public:
     // The stages themselves, for the panels to bind to. Not owned by
     // the caller and not valid across a prepare().
     NoiseReduction&     nr()      noexcept { return m_nr; }
+    ClientClipper&      clipper() noexcept { return m_clip; }
     ClientGate&         gate()    noexcept { return m_gate; }
     ClientEq&           eq()      noexcept { return m_eq; }
     ClientDeEss&        deEss()   noexcept { return m_deEss; }
@@ -255,6 +257,7 @@ public:
     // change one by accident — the stage it is inspecting is being read
     // by the audio thread at the same time.
     const NoiseReduction&     nr()      const noexcept { return m_nr; }
+    const ClientClipper&      clipper() const noexcept { return m_clip; }
     const ClientGate&         gate()    const noexcept { return m_gate; }
     const ClientEq&           eq()      const noexcept { return m_eq; }
     const ClientDeEss&        deEss()   const noexcept { return m_deEss; }
@@ -340,6 +343,7 @@ private:
     std::atomic<uint32_t> m_nonFiniteTotal{0};
 
     NoiseReduction     m_nr;
+    ClientClipper      m_clip;
     ClientGate         m_gate;
     ClientEq           m_eq;
     ClientDeEss        m_deEss;

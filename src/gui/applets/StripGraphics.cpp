@@ -49,7 +49,14 @@ namespace Longpath {
 
 namespace {
 
-constexpr int kTileW    = 84;
+// Die Wunschbreite einer Stufenkachel. Bei acht Stufen ging sie
+// immer aus; seit es zehn sind (Entrauschen vorn, Clipper vor dem
+// Begrenzer) wird die Reihe damit breiter als das Fenster -- 10 x 84
+// plus elf Fugen sind 994 Punkte, und der Inhalt des Fensters hat
+// rund 960. Also ist sie jetzt eine OBERGRENZE, und tileWidth()
+// rechnet aus, was wirklich hineinpasst.
+constexpr int kTileWMax = 84;
+constexpr int kTileWMin = 52;
 constexpr int kTileH    = 46;
 constexpr int kTileGap  = 6;
 // Einschubkacheln sind schmaler als Stufen. Absichtlich: sie gehoeren
@@ -127,9 +134,27 @@ void StripChainView::refreshInserts()
 
 // Die Reihe einmal legen: Fuge, Stufe, Fuge, Stufe ... und ueberall
 // dort, wo ein Einschub haengt, seine Kachel statt der leeren Fuge.
+int StripChainView::tileWidth() const
+{
+    // Was die Fugen und die Einschuebe schon belegen.
+    int inserts = 0;
+    for (int slot = 0; m_chain != nullptr
+                       && slot < StripChain::kInsertCount; ++slot) {
+        if (m_chain->insertPlugin(slot) != nullptr) {
+            inserts += kInsertW + 2 * kTileGap;
+        }
+    }
+    const int gaps = (StripChain::kStageCount + 1) * kGapW;
+    const int have = width() - inserts - gaps - 2;
+    if (have <= 0) { return kTileWMax; }
+    const int each = have / StripChain::kStageCount;
+    return std::clamp(each, kTileWMin, kTileWMax);
+}
+
 void StripChainView::relayout()
 {
     m_cells.clear();
+    const int kTileW = tileWidth();
     int x = 0;
 
     const auto addGapOrInserts = [&](int position) {
@@ -225,6 +250,34 @@ QSize StripChainView::sizeHint() const
 {
     const int right = m_cells.empty() ? 0 : m_cells.back().rect.right();
     return QSize(right + 1, kTileH + 8);
+}
+
+QSize StripChainView::minimumSizeHint() const
+{
+    // Die schmalste Reihe, die noch alle Stufen zeigt. Damit kann das
+    // Fenster schmaler werden, ohne dass die Reihe abgeschnitten wird
+    // -- sie wird dichter statt laenger.
+    int inserts = 0;
+    for (int slot = 0; m_chain != nullptr
+                       && slot < StripChain::kInsertCount; ++slot) {
+        if (m_chain->insertPlugin(slot) != nullptr) {
+            inserts += kInsertW + 2 * kTileGap;
+        }
+    }
+    return QSize(StripChain::kStageCount * kTileWMin
+                     + (StripChain::kStageCount + 1) * kGapW + inserts,
+                 kTileH + 8);
+}
+
+void StripChainView::resizeEvent(QResizeEvent* ev)
+{
+    // Die Kachelbreite haengt an der Fensterbreite, also muss die
+    // Reihe bei jeder Aenderung neu gelegt werden -- sonst stimmen
+    // die Trefferflaechen nicht mehr mit dem ueberein, was zu sehen
+    // ist, und ein Klick oeffnet die Nachbarstufe.
+    QWidget::resizeEvent(ev);
+    relayout();
+    update();
 }
 
 void StripChainView::paintEvent(QPaintEvent*)
@@ -379,8 +432,18 @@ void StripChainView::paintEvent(QPaintEvent*)
         QFont f = p.font();
         f.setPointSizeF(9.5);
         p.setFont(f);
-        p.drawText(r.adjusted(2, 2, -2, -14), Qt::AlignCenter,
-                   QString::fromLatin1(StripChain::stageName(st)));
+        // Kuerzen statt ueberlaufen. Bei zehn Stufen in einem
+        // Fenster von 960 Punkten wird die Kachel schmaler als
+        // „Compressor" -- und ein Name, der ueber den Rand
+        // hinauslaeuft, sieht aus wie ein Fehler und verdeckt
+        // ausserdem die Nachbarkachel.
+        {
+            const QRect nameBox = r.adjusted(2, 2, -2, -14);
+            p.drawText(nameBox, Qt::AlignCenter,
+                       p.fontMetrics().elidedText(
+                           QString::fromLatin1(StripChain::stageName(st)),
+                           Qt::ElideRight, nameBox.width()));
+        }
 
         if (on && master && gr > 0.1) {
             QFont sf = f;

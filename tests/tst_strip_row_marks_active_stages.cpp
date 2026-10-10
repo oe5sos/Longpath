@@ -35,7 +35,7 @@ namespace {
 // Dieselben Masse wie in StripGraphics.cpp. Sie stehen dort in einem
 // anonymen Namensraum; hier nachgebaut statt freigelegt, damit die
 // Anzeige ihre Innereien nicht fuer einen Prueftand oeffnen muss.
-constexpr int kTileW   = 84;
+constexpr int kTileW   = 84;   // Wunschbreite; gilt ab 1400 px Reihe
 constexpr int kTileH   = 46;
 constexpr int kGapW    = 14;
 constexpr int kTileTop = 4;
@@ -80,7 +80,11 @@ private slots:
         StripChainView v;
         darkBackground(v);
         v.setChain(&c);
-        v.resize(v.sizeHint());
+        // Breit genug, dass die Kacheln ihre Wunschbreite bekommen --
+        // seit die Reihe zehn Stufen hat, macht sie sich in einem
+        // engen Fenster schmaler, und dann stimmen die Masse unten
+        // nicht mehr.
+        v.resize(1400, v.sizeHint().height());
 
         QImage img(v.size(), QImage::Format_ARGB32_Premultiplied);
         img.fill(QColor(0x0c, 0x0c, 0x0e));
@@ -122,7 +126,7 @@ private slots:
             StripChainView v;
             darkBackground(v);
             v.setChain(&c);
-            v.resize(v.sizeHint());
+            v.resize(1400, v.sizeHint().height());
             QImage img(v.size(), QImage::Format_ARGB32_Premultiplied);
             img.fill(QColor(0x0c, 0x0c, 0x0e));
             v.render(&img);
@@ -169,7 +173,7 @@ private slots:
             StripChainView v;
             darkBackground(v);
             v.setChain(&c);
-            v.resize(v.sizeHint());
+            v.resize(1400, v.sizeHint().height());
             v.setOpenStage(0);
             QImage img(v.size(), QImage::Format_ARGB32_Premultiplied);
             img.fill(QColor(0x0c, 0x0c, 0x0e));
@@ -192,7 +196,11 @@ private slots:
         StripChainView v;
         darkBackground(v);
         v.setChain(&c);
-        v.resize(v.sizeHint());
+        // Breit genug, dass die Kacheln ihre Wunschbreite bekommen --
+        // seit die Reihe zehn Stufen hat, macht sie sich in einem
+        // engen Fenster schmaler, und dann stimmen die Masse unten
+        // nicht mehr.
+        v.resize(1400, v.sizeHint().height());
 
         const auto ringAt = [&](int stage) {
             QImage img(v.size(), QImage::Format_ARGB32_Premultiplied);

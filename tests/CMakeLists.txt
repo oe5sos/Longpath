@@ -5458,6 +5458,7 @@ longpath_add_test(tst_eq_one_drag_one_parameter)
 longpath_add_test(tst_eq_two_views)
 longpath_add_test(tst_strip_denoise_removes_noise)
 longpath_add_test(tst_monitor_hears_the_channel)
+longpath_add_test(tst_clipper_buys_talk_power)
 longpath_add_test(tst_strip_tuner)
 
 # -- The ring behind the EQ picture: oldest-first, newest-kept, and

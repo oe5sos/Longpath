@@ -1135,6 +1135,7 @@ set(GUI_SOURCES
     # operator's A/B comparison depends on.
     src/core/strip/MicSpectrum.cpp
     src/core/strip/BandLimit.cpp
+    src/core/strip/ClientClipper.cpp
     src/core/strip/NoiseReduction.cpp
     src/core/strip/StripChain.cpp
     src/core/strip/AudioPluginAu.cpp
