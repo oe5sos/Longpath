@@ -572,11 +572,31 @@ jobs:
         # tell tests/CMakeLists.txt's longpath_add_test() to register
         # only the slice of tests whose name-MD5 modulo SHARDS matches
         # SHARD.  See tests/CMakeLists.txt for the dispatch rules.
+        #
+        # 2026-10-10 (-gsplit-dwarf): the Linux shard 2/4 died twice in a
+        # row with the runner itself unable to write its own diagnostic
+        # log -- "No space left on device" -- which is why those two jobs
+        # have no log at all.  Same failure as run #25835957362 noted in
+        # the disk-cleanup step above, and the cheap lever there (docker
+        # image prune) was already pulled, so this one goes at the cause.
+        #
+        # The cause is duplication, not volume.  Every test executable
+        # statically links LongpathObjs, and with plain RelWithDebInfo
+        # each of the ~113 executables in a shard carries its OWN copy of
+        # the same DWARF.  -gsplit-dwarf leaves that DWARF in .dwo files
+        # beside the object files -- written ONCE -- and puts only a
+        # skeleton in the executables.  Nothing is lost on the runner:
+        # gdb (the hang-diagnostics step below) resolves .dwo through the
+        # skeleton as long as the build tree is present, which it is.
+        # This is also why macOS never hit the wall -- it keeps debug
+        # info in the object files by default and its binaries are ~30 MB.
         run: |
           cmake -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=RelWithDebInfo \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_C_FLAGS_INIT=-gsplit-dwarf \
+            -DCMAKE_CXX_FLAGS_INIT=-gsplit-dwarf \
             -DCMAKE_EXE_LINKER_FLAGS_INIT=-fuse-ld=mold \
             -DCMAKE_SHARED_LINKER_FLAGS_INIT=-fuse-ld=mold \
             -DCMAKE_MODULE_LINKER_FLAGS_INIT=-fuse-ld=mold \
@@ -652,7 +672,20 @@ jobs:
       # fail with "No rule to make target".
       - name: Build test executables (Linux)
         if: runner.os == 'Linux'
-        run: cmake --build build -j$(nproc) --target all_tests
+        # Der Platz wird VOR und NACH diesem Schritt gemeldet. Ohne das
+        # war am 2026-10-10 nicht ablesbar, wie knapp es wirklich ist --
+        # nur, dass es nicht reichte, und das auch nur aus einer
+        # Ausnahme des Laeufers selbst. Faellt es wieder, steht die Zahl
+        # da, statt geschaetzt werden zu muessen.
+        run: |
+          echo "── Platz vor dem Bau der Pruefprogramme ──"
+          df -h /
+          cmake --build build -j$(nproc) --target all_tests
+          echo "── Platz danach ──"
+          df -h /
+          echo "── Fussabdruck ──"
+          du -sh build 2>/dev/null || true
+          du -sh build/tests 2>/dev/null || true
 
       - name: Build test executables (macOS)
         if: runner.os == 'macOS'
