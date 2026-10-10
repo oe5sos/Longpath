@@ -67,6 +67,14 @@ public:
     // edit.  The ClientEq pointer itself is set via setEq() on the base.
     void setAudioEngine(EqHost* engine);
 
+    // Die einfache Ansicht. Dann sind nur die sechs benannten Baender
+    // anfassbar, ein Zug aendert ausschliesslich den Pegel, und die
+    // Wege in die Tiefe (Filterart, Rechtsklickmenue, Filterkanten)
+    // sind zu. Nichts davon aendert den Ton -- es aendert, was man
+    // aus Versehen tun kann.
+    void setSimpleMode(bool on);
+    bool simpleMode() const noexcept { return m_simpleMode; }
+
     // The ring itself lives in EqFilterRing.h, shared with the icon row
     // — see the note there for why it is not defined in this class.
 
@@ -104,6 +112,7 @@ private:
     // Groesse der Zug meint, entscheiden ⇧ und ⌥ -- laufend gelesen,
     // nicht beim Druecken festgehalten.
     bool m_dragMoved{false};
+    bool m_simpleMode{false};
     QPointF m_dragStart;
     float   m_dragStartFreqHz{0};
     float   m_dragStartGainDb{0};

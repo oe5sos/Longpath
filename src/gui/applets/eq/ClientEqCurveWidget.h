@@ -63,6 +63,12 @@ public:
     // Null is allowed — widget draws the grid with no response data.
     void setEq(ClientEq* eq);
 
+    // Welche Griffe ueberhaupt gezeichnet werden -- ein Bit je Band,
+    // alle an ist der Normalfall. Die einfache Ansicht blendet damit
+    // die Baender aus, die sie nicht anfassen laesst: ein Punkt, der
+    // sich nicht ziehen laesst, ist schlimmer als kein Punkt.
+    void setHandleMask(quint32 mask);
+
     // -1 means "nothing selected" — the default in the docked applet view.
     // The editor canvas sets this as the user interacts with handles /
     // icons / param columns so all three UI layers stay in sync.
@@ -178,6 +184,7 @@ protected:
     float yToDb(float y) const;
 
     ClientEq*          m_eq{nullptr};
+    quint32            m_handleMask{0xffffffffu};
     int                m_selectedBand{-1};
     bool               m_showFilled{true};
     std::vector<float> m_fftBinsDb;      // empty = no analyzer drawn
@@ -226,6 +233,7 @@ private:
         int filterFamily{0};
         double sampleRate{0.0};
         int activeBandCount{0};
+        quint32 handleMask{0xffffffffu};
         // Keep in sync with ClientEq::kMaxBands. responseCacheKey() pins
         // the relationship with a static_assert where ClientEq is complete.
         // ── 16 upstream, ClientEq::kMaxBands here ────────────────

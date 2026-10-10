@@ -17,7 +17,37 @@ Die beiden Ursachen des Rutschens, nachgelesen statt geraten:
 Jetzt: ziehen = Pegel, ⌥ = Frequenz, ⇧ = Breite; ein Klick allein
 schaltet nichts mehr ein; der Zug rechnet relativ zum Griffpunkt.
 
-## Vorschlag (offen, Entscheidung des Betreibers)
+## Gebaut (Commit „Entzerrer: zwei Ansichten, eine Seite")
+
+`eq-einfach-echt.png` und `eq-profi-echt.png` — die wirkliche Seite,
+aus dem Prüfstand gerendert.
+
+**Einfach** ist der Standard. Sieben benannte Regler: WÄRME 300 ·
+FÜLLE 450 · MULM 650 · NASAL 950 · KLARHEIT 1,4k · PRÄSENZ 2,5k ·
+SCHÄRFE 3,8k. **Profi** ist ein Knopf daneben und zeigt die heutige
+Seite unverändert.
+
+Entscheidend ist, woran die sieben Regler hängen: an den **sieben
+freien Griffen** des Bandsatzes (`EqBandLayout::kFirstSpare`…), nicht
+an den Bändern, die ein Ausgangspunkt geformt hat. Folgen:
+
+* Wer „Clean voice" gewählt hat, hört weiter Clean voice — die Regler
+  legen sich darüber, statt es zu überschreiben.
+* Die Regler stehen beim ersten Öffnen auf null. Das ist die ehrliche
+  Aussage: das hier ist, was *du* dazugetan hast.
+* Die Griffe sind in beiden Wegen dieselben — nach einem Profil
+  genauso wie nach Zurücksetzen.
+
+Unter jedem Namen steht die **wirkliche** Frequenz des Bandes, nicht
+die, die der Name verspricht. In der einfachen Ansicht zeichnet die
+Kurve nur die sieben Punkte, die sich auch ziehen lassen: ein Punkt,
+der auf einen Zug nicht reagiert, ist schlimmer als kein Punkt.
+
+`tests/tst_eq_two_views.cpp` hält die Zusage fest, die das Ganze erst
+vertretbar macht: **Umschalten ändert den Ton nicht** — hin und
+zurück, und kein Band hat sich bewegt.
+
+## Der erste Vorschlag (überholt)
 
 `eq-einfach.png` — die Seite als **sechs benannte Regler** auf festen
 Frequenzen, in der Sprache der Sache statt in Hertz:

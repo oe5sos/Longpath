@@ -33,6 +33,7 @@
 #include "gui/applets/eq/ClientEqApplet.h"  // for Path enum
 #include <QWidget>
 #include <memory>
+#include <vector>
 
 class QComboBox;
 class QLabel;
@@ -47,6 +48,7 @@ class ClientEqFftAnalyzer;
 class ClientEqIconRow;
 class ClientEqOutputFader;
 class ClientEqParamRow;
+class StripEqSimpleBar;
 
 // Floating editor window for the client-side parametric EQ. One single
 // instance lives on MainWindow; calling showForPath() swaps its bound
@@ -136,6 +138,18 @@ private:
     void afterHistoryStep();
     void refreshHistoryButtons();
 
+    // ── Zwei Ansichten, eine Seite ───────────────────────────────────
+    //
+    // „ev generell 2 varianten, einen leichtere und eine für profi im
+    //  gleichen design?"
+    //
+    // Es gibt KEINE zweite Seite und keinen zweiten Entzerrer. Die
+    // Umschaltung zeigt und verbirgt; die Kurve steht in beiden
+    // Ansichten an derselben Stelle und zeigt dasselbe. Was die
+    // einfache Ansicht wegnimmt, ist nicht Klang, sondern das, was
+    // man aus Versehen tun kann.
+    void setSimpleView(bool simple);
+
     EqHost*               m_audio{nullptr};
     ClientEqApplet::Path       m_path{ClientEqApplet::Path::Rx};
     int                        m_txFilterLowCutHz{0};
@@ -156,6 +170,15 @@ private:
     ClientEqIconRow*           m_iconRow{nullptr};
     ClientEqEditorCanvas*      m_canvas{nullptr};
     ClientEqParamRow*          m_paramRow{nullptr};
+    StripEqSimpleBar*          m_simpleBar{nullptr};
+    QPushButton*               m_simpleBtn{nullptr};
+    QPushButton*               m_proBtn{nullptr};
+    QLabel*                    m_hint{nullptr};
+    // Alles, was nur die Profi-Ansicht zeigt. Als Liste, damit das
+    // Umschalten eine Schleife ist und nicht zwoelf Zeilen, von denen
+    // beim naechsten Knopf eine vergessen wird.
+    std::vector<QWidget*>      m_proOnly;
+    bool                       m_simpleView{true};
     ClientEqOutputFader*       m_outFader{nullptr};
     QTimer*                    m_fftTimer{nullptr};
 

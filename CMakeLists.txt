@@ -1173,6 +1173,7 @@ set(GUI_SOURCES
     src/gui/applets/eq/ClientEqFftAnalyzer.cpp
     src/gui/applets/eq/ClientEqIconRow.cpp
     src/gui/applets/eq/ClientEqParamRow.cpp
+    src/gui/applets/eq/StripEqSimpleBar.cpp
     src/gui/applets/StripGraphics.cpp
     src/gui/applets/StripWindow.cpp
     src/gui/applets/TxCfcDialog.cpp

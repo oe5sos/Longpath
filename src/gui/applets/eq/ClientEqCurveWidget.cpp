@@ -348,6 +348,13 @@ ClientEqCurveWidget::BackgroundCacheKey ClientEqCurveWidget::backgroundCacheKey(
     return {size(), devicePixelRatioF(), font(), m_filterLowCutHz, m_filterHighCutHz};
 }
 
+void ClientEqCurveWidget::setHandleMask(quint32 mask)
+{
+    if (m_handleMask == mask) { return; }
+    m_handleMask = mask;
+    update();
+}
+
 ClientEqCurveWidget::ResponseCacheKey ClientEqCurveWidget::responseCacheKey() const
 {
     static_assert(std::tuple_size_v<decltype(ResponseCacheKey::bands)>
@@ -361,6 +368,7 @@ ClientEqCurveWidget::ResponseCacheKey ClientEqCurveWidget::responseCacheKey() co
     key.selectedBand = m_selectedBand;
     key.showFilled = m_showFilled;
     key.referencePreset = m_referencePreset;
+    key.handleMask = m_handleMask;
     if (!m_eq) {
         return key;
     }
@@ -714,6 +722,7 @@ void ClientEqCurveWidget::drawResponse(QPainter& p, const QRect& r,
     // Selected band renders a halo ring to match the icon-row highlight.
     p.setRenderHint(QPainter::Antialiasing, true);
     for (int i = 0; i < bandCount; ++i) {
+        if ((key.handleMask >> i & 1u) == 0u) { continue; }
         const BandCacheState& bp = key.bands[static_cast<size_t>(i)];
         const bool isSlope = (bp.type == static_cast<int>(ClientEq::FilterType::LowPass)
                            || bp.type == static_cast<int>(ClientEq::FilterType::HighPass));

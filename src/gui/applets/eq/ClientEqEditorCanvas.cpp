@@ -28,6 +28,7 @@
 #include "gui/ScopedChildWidget.h"
 #include "gui/applets/eq/EqFilterRing.h"
 #include "gui/applets/eq/EqHost.h"
+#include "gui/applets/eq/StripEqSimpleBar.h"
 #include "core/strip/ClientEq.h"
 
 #include <QMouseEvent>
@@ -57,6 +58,41 @@ void ClientEqEditorCanvas::setAudioEngine(EqHost* engine)
     m_audio = engine;
 }
 
+void ClientEqEditorCanvas::setSimpleMode(bool on)
+{
+    if (m_simpleMode == on) { return; }
+    m_simpleMode = on;
+    m_draggingBand = -1;
+    m_draggingCutoff = CutoffEdge::None;
+    setSelectedBand(-1);
+    // Nur zeichnen, was sich auch anfassen laesst. Ein Punkt, der auf
+    // einen Zug nicht reagiert, ist schlimmer als kein Punkt.
+    quint32 mask = 0xffffffffu;
+    if (on) {
+        mask = 0u;
+        for (const auto& sl : StripEqSimpleBar::bandSlots()) {
+            if (sl.band >= 0 && sl.band < 32) {
+                mask |= (1u << sl.band);
+            }
+        }
+    }
+    setHandleMask(mask);
+    update();
+}
+
+namespace {
+
+// Gehoert dieses Band zu den sechs benannten Reglern?
+bool isSimpleBand(int idx)
+{
+    for (const auto& s : StripEqSimpleBar::bandSlots()) {
+        if (s.band == idx) { return true; }
+    }
+    return false;
+}
+
+} // namespace
+
 int ClientEqEditorCanvas::hitTestHandle(const QPointF& pos) const
 {
     if (!m_eq) return -1;
@@ -64,6 +100,7 @@ int ClientEqEditorCanvas::hitTestHandle(const QPointF& pos) const
     int best = -1;
     float bestDist = kHandleHitRadius * kHandleHitRadius;
     for (int i = 0; i < n; ++i) {
+        if (m_simpleMode && !isSimpleBand(i)) { continue; }
         const auto bp = m_eq->band(i);
         const bool isSlope = (bp.type == ClientEq::FilterType::LowPass
                            || bp.type == ClientEq::FilterType::HighPass);
@@ -84,6 +121,7 @@ ClientEqEditorCanvas::CutoffEdge
 ClientEqEditorCanvas::hitTestCutoffEdge(const QPointF& pos) const
 {
     constexpr int kHitTol = 5;
+    if (m_simpleMode) { return CutoffEdge::None; }
     // Don't intercept clicks in the bottom band-plan strip area.
     if (pos.y() > height() - kAudioBandStripPx) return CutoffEdge::None;
 
@@ -234,8 +272,10 @@ void ClientEqEditorCanvas::mouseMoveEvent(QMouseEvent* ev)
     // festgehalten: wer mitten im Zug merkt, dass er doch die
     // Frequenz meint, soll ⌥ druecken koennen, statt loszulassen und
     // neu anzusetzen.
-    const bool wantQ    = (ev->modifiers() & Qt::ShiftModifier) != 0;
-    const bool wantFreq = (ev->modifiers() & Qt::AltModifier) != 0;
+    const bool wantQ    = !m_simpleMode
+                       && (ev->modifiers() & Qt::ShiftModifier) != 0;
+    const bool wantFreq = !m_simpleMode
+                       && (ev->modifiers() & Qt::AltModifier) != 0;
 
     if (wantQ) {
         // Shift-drag = vertical Q control. Map vertical delta to
@@ -275,7 +315,7 @@ void ClientEqEditorCanvas::mouseReleaseEvent(QMouseEvent* ev)
 
 void ClientEqEditorCanvas::mouseDoubleClickEvent(QMouseEvent* ev)
 {
-    if (!m_eq) { QWidget::mouseDoubleClickEvent(ev); return; }
+    if (!m_eq || m_simpleMode) { QWidget::mouseDoubleClickEvent(ev); return; }
     if (ev->button() != Qt::LeftButton) {
         QWidget::mouseDoubleClickEvent(ev); return;
     }
@@ -310,6 +350,9 @@ void ClientEqEditorCanvas::mouseDoubleClickEvent(QMouseEvent* ev)
 
 void ClientEqEditorCanvas::contextMenuEvent(QContextMenuEvent* ev)
 {
+    // In der einfachen Ansicht gibt es kein Menue. Wer es braucht,
+    // schaltet auf Profi -- das ist ein Knopf, kein Umweg.
+    if (m_simpleMode) { QWidget::contextMenuEvent(ev); return; }
     if (!m_eq) { QWidget::contextMenuEvent(ev); return; }
 
     const int idx = hitTestHandle(ev->pos());
