@@ -297,10 +297,50 @@ void StripChain::processMono(float* samples, int frames) noexcept
     // Oberfläche die Empfehlung rechnet.
     m_rawInPeakDb.store(peakDb(samples, frames), std::memory_order_relaxed);
 
+    // ── Den Arbeitspunkt suchen, wenn er gesucht werden soll ────
+    //
+    // Zwei Sekunden sammeln, dann einen Schritt. Nur wenn in diesen
+    // zwei Sekunden etwas war, das nach Sprache aussieht; in der
+    // Stille bleibt die Zahl stehen. Der Schritt ist ein Drittel des
+    // Fehlers, gedeckelt auf 4 dB -- aus zwanzig Dezibel daneben
+    // wird so in gut einer Viertelminute null, ohne dass man eine
+    // Regelung hört.
+    if (m_inputAuto.load(std::memory_order_relaxed)) {
+        for (int i = 0; i < frames; ++i) {
+            m_autoPeak = std::max(m_autoPeak, std::fabs(samples[i]));
+        }
+        m_autoFrames += frames;
+        const int fenster = int(m_sampleRate * 2.0);
+        if (m_autoFrames >= fenster && fenster > 0) {
+            const float spitzeDb = m_autoPeak > 1e-7f
+                ? 20.0f * std::log10(m_autoPeak) : -120.0f;
+            if (spitzeDb > kSpracheAbDbFs) {
+                // Gemessen wird hier die ROHE Spitze -- die
+                // Verstaerkung kommt erst danach. Die gesuchte Zahl
+                // ist deshalb schlicht der Abstand zum Ziel, und
+                // nicht der Abstand abzueglich dessen, was schon
+                // eingestellt ist. Die erste Fassung zog die eigene
+                // Verstaerkung ab, rechnete sie sich damit jedes
+                // Fenster erneut dazu und lief in den Anschlag: 36 dB
+                // statt der gebrauchten 27,6.
+                const float ist  = m_autoGainDb.load(std::memory_order_relaxed);
+                const float soll = kZielSpitzeDbFs - spitzeDb;
+                const float schritt = std::clamp((soll - ist) / 3.0f,
+                                                 -4.0f, 4.0f);
+                m_autoGainDb.store(std::clamp(ist + schritt, -12.0f, 36.0f),
+                                   std::memory_order_relaxed);
+            }
+            m_autoPeak = 0.0f;
+            m_autoFrames = 0;
+        }
+    }
+
     // Dann verstärken, und zwar vor allem anderen: alle Schwellen
     // dahinter sind in dBFS, und sie sind nur dann richtig, wenn der
     // Pegel stimmt.
-    const float gainDb = m_inputGainDb.load(std::memory_order_relaxed);
+    const float gainDb = m_inputAuto.load(std::memory_order_relaxed)
+                       ? m_autoGainDb.load(std::memory_order_relaxed)
+                       : m_inputGainDb.load(std::memory_order_relaxed);
     if (std::fabs(gainDb) > 0.01f) {
         const float g = std::pow(10.0f, gainDb / 20.0f);
         for (int i = 0; i < frames; ++i) { samples[i] *= g; }
@@ -452,6 +492,30 @@ void StripChain::setInputGainDb(float db) noexcept
 float StripChain::inputGainDb() const noexcept
 {
     return m_inputGainDb.load(std::memory_order_relaxed);
+}
+
+void StripChain::setInputAuto(bool on) noexcept
+{
+    if (on && !m_inputAuto.load(std::memory_order_relaxed)) {
+        // Vom Wert des Betreibers aus loslaufen, nicht von null --
+        // wer schon einmal „Übernehmen" gedrückt hat, soll nicht
+        // zusehen muessen, wie die Kette seinen Wert neu erfindet.
+        m_autoGainDb.store(m_inputGainDb.load(std::memory_order_relaxed),
+                           std::memory_order_relaxed);
+    }
+    m_inputAuto.store(on, std::memory_order_relaxed);
+}
+
+bool StripChain::inputAuto() const noexcept
+{
+    return m_inputAuto.load(std::memory_order_relaxed);
+}
+
+float StripChain::effectiveInputGainDb() const noexcept
+{
+    return m_inputAuto.load(std::memory_order_relaxed)
+         ? m_autoGainDb.load(std::memory_order_relaxed)
+         : m_inputGainDb.load(std::memory_order_relaxed);
 }
 
 float StripChain::rawInputPeakDb() const noexcept

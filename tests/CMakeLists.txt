@@ -5467,6 +5467,7 @@ longpath_add_test(tst_eingangspegel)
 longpath_add_test(tst_plugin_auswahl_bleibt)
 longpath_add_test(tst_kanalzug_messlauf)
 longpath_add_test(tst_bandbreiten_genau)
+longpath_add_test(tst_profil_schluessel)
 longpath_add_test(tst_strip_tuner)
 
 # -- The ring behind the EQ picture: oldest-first, newest-kept, and

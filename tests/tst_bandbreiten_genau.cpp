@@ -2079,6 +2079,118 @@ private slots:
             "die, die wir haben)");
     }
 
+    // ── Der Eingangspegel, von selbst ───────────────────────────────
+    //
+    // „mir geht die kraft als vorverstärker ab."
+    //
+    // Am Gerät des Betreibers stand: Eingang -39,6 dBFS · Ziel
+    // -12 dBFS · 28 dB fehlen · Regler auf 0,0 dB. Jede Schwelle der
+    // Kette ist auf -12 gerechnet; bei -39,6 liegt die Gate-Schwelle
+    // ÜBER der Stimme. Die Kette konnte gar nicht arbeiten.
+    //
+    // Hier wird geprüft, dass sie den Punkt allein findet -- und,
+    // genauso wichtig, dass sie in der Stille stillsteht.
+    void theInputFindsItsOwnWorkingPoint()
+    {
+        QString warum;
+        const auto sauber = echteRede(&warum);
+        if (sauber.empty()) { QSKIP(qPrintable(warum)); }
+
+        // Die Rede 28 dB zu leise, so wie sie bei ihm ankommt.
+        Rede rede = redeMitRauschen(sauber, -48.0);
+        const float zuLeise = float(std::pow(10.0, -27.6 / 20.0));
+        for (float& x : rede.signal) { x *= zuLeise; }
+
+        StripChain c;
+        c.prepare(kRate);
+        c.setEnabled(true);
+        c.setInputAuto(true);
+
+        // Mehrfach durchlaufen lassen: 12,3 s Rede sind sechs
+        // Zeitfenster, und der Schritt ist ein Drittel des Fehlers.
+        std::vector<double> verlauf;
+        for (int runde = 0; runde < 4; ++runde) {
+            std::vector<float> y = rede.signal;
+            for (size_t at = 0; at + 240 <= y.size(); at += 240) {
+                c.processMono(y.data() + at, 240);
+            }
+            verlauf.push_back(double(c.effectiveInputGainDb()));
+        }
+        qInfo().noquote()
+            << QStringLiteral("Gefundene Verstärkung je Durchlauf: "
+                              "%1 · %2 · %3 · %4 dB (gebraucht: 27,6)")
+                   .arg(verlauf[0], 0, 'f', 1).arg(verlauf[1], 0, 'f', 1)
+                   .arg(verlauf[2], 0, 'f', 1).arg(verlauf[3], 0, 'f', 1);
+
+        QVERIFY2(std::fabs(verlauf.back() - 27.6) < 3.0,
+                 qPrintable(QStringLiteral("landet bei %1 dB statt bei "
+                                           "27,6").arg(verlauf.back())));
+
+        // Und jetzt Stille. Die gefundene Zahl darf sich nicht mehr
+        // rühren -- sonst zieht sie das Grundgeräusch hoch, bis die
+        // Kette es für eine Stimme hält.
+        const double vorStille = double(c.effectiveInputGainDb());
+        std::vector<float> stille(size_t(kRate * 20), 0.0f);
+        std::mt19937 w(31337u);
+        std::normal_distribution<double> g(0.0, 1.0);
+        const double rausch = std::pow(10.0, -75.0 / 20.0);
+        for (float& x : stille) { x = float(g(w) * rausch); }
+        for (size_t at = 0; at + 240 <= stille.size(); at += 240) {
+            c.processMono(stille.data() + at, 240);
+        }
+        const double nachStille = double(c.effectiveInputGainDb());
+        qInfo().noquote()
+            << QStringLiteral("Nach 20 s Stille: %1 -> %2 dB")
+                   .arg(vorStille, 0, 'f', 2).arg(nachStille, 0, 'f', 2);
+        QVERIFY2(std::fabs(nachStille - vorStille) < 0.01,
+                 "die Automatik läuft in der Stille weiter");
+    }
+
+    // ── Und was sie an der ganzen Kette ändert ──────────────────────
+    void theQuietMicrophoneThroughTheWholeChain()
+    {
+        QString warum;
+        const auto sauber = echteRede(&warum);
+        if (sauber.empty()) { QSKIP(qPrintable(warum)); }
+        Rede rede = redeMitRauschen(sauber, -48.0);
+        const float zuLeise = float(std::pow(10.0, -27.6 / 20.0));
+        for (float& x : rede.signal) { x *= zuLeise; }
+
+        const auto druck = [](const std::vector<float>& v) {
+            double p = 0.0;
+            for (float x : v) { p = std::max(p, double(std::fabs(x))); }
+            std::vector<float> n = v;
+            if (p > 1e-9) {
+                const float gg = float(std::pow(10.0, -2.0 / 20.0) / p);
+                for (float& x : n) { x *= gg; }
+            }
+            return Loudness::measure(n.data(), int(n.size()),
+                                     int(kRate)).integratedLufs;
+        };
+        const auto spitze = [](const std::vector<float>& v) {
+            double p = 0.0;
+            for (float x : v) { p = std::max(p, double(std::fabs(x))); }
+            return dB(p);
+        };
+
+        for (int autoAn = 0; autoAn < 2; ++autoAn) {
+            StripChain c;
+            empfehlung(c);
+            c.setInputAuto(autoAn != 0);
+            // Zweimal durch, damit die Automatik ihren Punkt hat.
+            std::vector<float> y;
+            for (int runde = 0; runde < 3; ++runde) { y = durch(c, rede.signal); }
+            qInfo().noquote()
+                << QStringLiteral("Mikrofon 28 dB zu leise, Automatik %1: "
+                                  "Spitze %2 dBFS · Druck %3 LUFS · "
+                                  "Verstärkung %4 dB")
+                       .arg(autoAn != 0 ? QStringLiteral("AN ")
+                                        : QStringLiteral("AUS"))
+                       .arg(spitze(y), 6, 'f', 1).arg(druck(y), 6, 'f', 1)
+                       .arg(double(c.effectiveInputGainDb()), 5, 'f', 1);
+        }
+    }
+
     // ── Die eigene Verzögerung ──────────────────────────────────────
     //
     // Das Entrauschen rechnet in Blöcken von 480 Werten, also 10 ms,

@@ -2,6 +2,60 @@
 
 ## [Unreleased]
 
+### Der Eingangsregler stand bei jedem Öffnen auf Null
+
+Ein Bildschirmabzug vom Gerät hat es gezeigt: **Eingang −39,6 dBFS ·
+Ziel −12 dBFS · 28 dB fehlen** — und der Regler darunter auf 0,0 dB.
+Die Ursache steht in einer Zeile, und zwei unabhängige Durchsichten
+haben sie am selben Tag gefunden:
+
+```cpp
+m_eingangSlider->setValue(0);        // statt: Wert der Kette lesen
+```
+
+Der Schieber zeigte bei **jedem** Öffnen des Fensters 0,0 dB, egal was
+gespeichert war, und die erste Berührung schrieb diese angezeigte Null
+in die Kette zurück. Wer einmal „Übernehmen" gedrückt hatte, verlor
+seine Einstellung beim nächsten Anfassen — stumm.
+
+**Und das ist die kleinere Hälfte.** Ein Vorverstärker, bei dem man
+erst einen Knopf drücken muss, ehe er verstärkt, ist keiner.
+`StripChain::setInputAuto()` sucht den Arbeitspunkt jetzt selbst: alle
+zwei Sekunden ein Schritt von einem Drittel des Fehlers, gedeckelt auf
+4 dB, und **nur wenn in diesen zwei Sekunden gesprochen wurde** — in
+der Stille rührt er sich nicht, sonst zöge er den Raum hoch, bis die
+Kette ihn für eine Stimme hält. Gemessen an echter Sprache, 28 dB zu
+leise eingespeist:
+
+| | Spitze | Druck | gefundene Verstärkung |
+| --- | --- | --- | --- |
+| Automatik aus | −27,2 dBFS | −21,2 LUFS | 0,0 dB |
+| Automatik an | **−2,0 dBFS** | **−10,7 LUFS** | 29,0 dB |
+
+Nach 20 s Stille: 28,91 → 28,91 dB. Vorgabe **an**, auch für
+gespeicherte Ketten ohne den Schlüssel — ein Profil, das die Schwellen
+setzt, aber den Pegel nicht, setzt gar nichts.
+
+Die erste Fassung der Regel lief in den Anschlag (36 statt 27,6 dB):
+sie zog die eigene Verstärkung von einer Spitze ab, die noch gar nicht
+verstärkt war, und rechnete sie sich so jedes Fenster erneut dazu.
+
+**Drei weitere Funde aus derselben Durchsicht:**
+
+* **„Output trim" konnte den Ausgang nicht lauter machen.** Der Kopf
+  der Datei sagte „applied AFTER the limiter … trim sets RMS"; der
+  Quelltext wendet ihn VOR der Hüllkurve an und schneidet danach hart
+  auf die Decke. Heißt jetzt **„Antrieb in den Begrenzer"**, weil das
+  ist, was er tut. Genau der Regler, nach dem man greift, wenn die
+  Kraft fehlt — und genau der, der sie nicht liefert.
+* **Der Mithörweg konnte nur dämpfen.** Lautstärke hart auf 0…1
+  geklemmt, Vorgabe 0,7: wer seine Kette am Kopfhörer beurteilte,
+  hörte sie grundsätzlich 3 dB unter dem, was sie liefert, und hatte
+  keinen Weg, das zu ändern. Jetzt bis +6 dB.
+* **„DX — punchy" hatte den Clipper nicht eingeschaltet** — die eine
+  Stufe, die 6,3 der 8,9 dB Dichte macht. Ein Profil für DX ohne
+  Clipper ist ein Profil ohne das, wofür man es wählt.
+
 ### „mir geht die Kraft als Vorverstärker ab · zu wenig Druck in der Stimme"
 
 Druck ist nicht Lautstärke. Druck ist **Lautheit bei gleicher Spitze** —

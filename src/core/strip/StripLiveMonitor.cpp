@@ -330,7 +330,19 @@ void StripLiveMonitor::doResync()
 
 void StripLiveMonitor::doSetVolume(double v)
 {
-    m_volume = std::clamp(v, 0.0, 1.0);
+    // ── Bis 4, nicht bis 1 ───────────────────────────────────────
+    //
+    // Die Kappung bei 1,0 hiess: der Mithoerweg konnte nur DAEMPFEN.
+    // Wer seine Kette am Kopfhoerer beurteilt und sie zu leise
+    // findet, hatte keinen Weg, das zu aendern -- und bei einer
+    // Vorgabe von 0,7 hoerte er sie grundsaetzlich 3 dB unter dem,
+    // was die Kette liefert. Als Antwort auf „mir geht die Kraft als
+    // Vorverstaerker ab" ist das die Haelfte der Geschichte.
+    //
+    // Vier ist +12 dB. Darueber faengt QAudioSink selbst an zu
+    // schneiden, und lauter als die eigene Kette soll der Mithoerweg
+    // ohnehin nicht machen: er zeigt, was sie tut, er macht es nicht.
+    m_volume = std::clamp(v, 0.0, 4.0);
     if (m_sink) { m_sink->setVolume(float(m_volume)); }
 }
 

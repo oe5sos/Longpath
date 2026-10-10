@@ -286,6 +286,7 @@ private:
     QSlider*     m_eingangSlider{nullptr};
     QLabel*      m_eingangWert{nullptr};
     QPushButton* m_eingangBtn{nullptr};
+    QCheckBox*   m_eingangAuto{nullptr};
     // Fuer die Zielanzeige im einfachen Entzerrer: Zaehler und
     // Arbeitsspeicher, damit nicht zehnmal je Sekunde ein
     // Langzeitspektrum gerechnet wird.

@@ -198,6 +198,37 @@ public:
     void  setInputGainDb(float db) noexcept;   // -12 .. +36 dB
     float inputGainDb() const noexcept;
 
+    // ── Und derselbe Pegel, von selbst ───────────────────────────────
+    //
+    // „mir geht die kraft als vorverstärker ab."
+    //
+    // Darüber stand: „gesetzt vom Betreiber, nicht von selbst." Das
+    // war als Tugend gemeint und war ein Fehler. Ein Vorverstärker,
+    // bei dem man erst einen Knopf drücken muss, ehe er verstärkt,
+    // ist keiner -- und wer ihn nicht drückt, hört eine Kette, in der
+    // JEDE Schwelle am falschen Platz steht, ohne dass ihm irgendwo
+    // gesagt würde, warum.
+    //
+    // Also sucht sie den Arbeitspunkt selbst. Kein Regelkreis über
+    // den Ton: die Verstärkung ist weiterhin eine einzige Zahl, sie
+    // wird nur alle zwei Sekunden um einen Schritt nachgezogen --
+    // und ausschliesslich dann, wenn in diesen zwei Sekunden
+    // gesprochen wurde. In der Stille rührt sie sich nicht, sonst
+    // zöge sie das Grundgeräusch hoch, bis die Kette es für eine
+    // Stimme hält.
+    //
+    // Der Zielwert ist kZielSpitzeDbFs: dort liegen alle Schwellen
+    // der Kette, dort rechnet der Ausgleich des Kompressors, und
+    // dort beginnt der Clipper zu arbeiten.
+    static constexpr float kZielSpitzeDbFs = -12.0f;
+    // Unter diesem Pegel gilt ein Zeitfenster als Pause.
+    static constexpr float kSpracheAbDbFs  = -45.0f;
+    void  setInputAuto(bool on) noexcept;
+    bool  inputAuto() const noexcept;
+    // Was gerade WIRKLICH verstärkt wird -- von Hand oder gefunden.
+    // Die Anzeige liest diese Zahl, nicht inputGainDb().
+    float effectiveInputGainDb() const noexcept;
+
     // Was AM EINGANG ankommt, vor der Verstärkung -- also das, was
     // das Mikrofon liefert. Die Empfehlung rechnet damit.
     float rawInputPeakDb() const noexcept;
@@ -343,6 +374,18 @@ private:
     int    m_crestFrames{0};
 
     std::atomic<float> m_inputGainDb{0.0f};
+    // ── Der gefundene Pegel ──────────────────────────────────────
+    //
+    // Getrennt vom Wert des Betreibers, und zwar mit Absicht: der
+    // Mithörer spiegelt die Einstellungen der Sendekette, und wenn
+    // beide dieselbe Zahl benutzten, würde jede Spiegelung die
+    // gefundene Verstärkung der anderen überschreiben. So sucht
+    // jede Kette ihren eigenen Pegel aus ihrem eigenen Strom, und
+    // kopiert wird nur, was der Betreiber eingestellt hat.
+    std::atomic<bool>  m_inputAuto{false};
+    std::atomic<float> m_autoGainDb{0.0f};
+    float m_autoPeak{0.0f};        // Spitze im laufenden Zeitfenster
+    int   m_autoFrames{0};
     std::atomic<float> m_rawInPeakDb{-120.0f};
     std::atomic<float> m_inPeakDb{-120.0f};
     std::atomic<float> m_outPeakDb{-120.0f};

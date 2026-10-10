@@ -650,10 +650,17 @@ void StripWindow::buildUi()
         row->addWidget(m_liveChannel);
 
         m_liveVol = new QSlider(Qt::Horizontal, this);
-        m_liveVol->setRange(0, 100);
-        m_liveVol->setValue(70);
+        // 0..200 statt 0..100: die obere Haelfte ist Verstaerkung bis
+        // +6 dB. Bisher endete der Regler bei „so laut wie die Kette"
+        // und stand ab Werk 3 dB darunter -- wer dann sagte, die
+        // Kette habe zu wenig Kraft, hatte recht und meinte diesen
+        // Regler.
+        m_liveVol->setRange(0, 200);
+        m_liveVol->setValue(100);
         m_liveVol->setFixedWidth(110);
-        m_liveVol->setToolTip(QStringLiteral("Monitor level."));
+        m_liveVol->setToolTip(QStringLiteral(
+            "Monitor level. Above the middle it amplifies — up to "
+            "+6 dB. It changes what you hear, never what is sent."));
         connect(m_liveVol, &QSlider::valueChanged, this, [this](int v) {
             if (m_live) { m_live->setVolume(v / 100.0); }
         });
@@ -1971,7 +1978,13 @@ QWidget* StripWindow::buildLimiterPanel()
         QStringLiteral("dB"), [this](double v) {
             if (StripChain* c = chain()) { c->limiter().setCeilingDb(float(v)); }
         }, 1, [this]{ persist(); });
-    addKnob(form, QStringLiteral("Output trim"), -12.0, 12.0, 0.5,
+    // Hiess „Output trim". Der Quelltext wendet den Wert VOR der
+    // Huellkurve an und schneidet danach hart auf die Decke
+    // (ClientFinalLimiter.cpp) -- ein positiver Wert macht den Ausgang
+    // also nicht lauter, er treibt staerker in die Deckelung. Genau
+    // der Regler, nach dem man greift, wenn „die Kraft fehlt", und
+    // genau der, der sie nicht liefert. Jetzt heisst er, was er tut.
+    addKnob(form, QStringLiteral("Drive into limiter"), -12.0, 12.0, 0.5,
         cur([this]{ return chain()->limiter().outputTrimDb(); }, 0.0),
         QStringLiteral("dB"), [this](double v) {
             if (StripChain* c = chain()) {
@@ -2203,11 +2216,28 @@ QWidget* StripWindow::buildAllStagesSurface()
 
         m_eingangSlider = new QSlider(Qt::Horizontal, box);
         m_eingangSlider->setRange(-120, 360);      // -12 .. +36 dB
-        m_eingangSlider->setValue(0);
+        // ── Den Wert der Kette, nicht die Zahl Null ──────────────
+        //
+        // Hier stand setValue(0). Der Schieber zeigte also bei JEDEM
+        // Öffnen des Fensters 0,0 dB, egal was gespeichert war und
+        // was die Kette gerade fuhr -- und die erste Berührung
+        // schrieb diese angezeigte Null in die Kette zurück. Wer
+        // einmal „Übernehmen" gedrückt und das Fenster wieder
+        // geöffnet hatte, verlor seine Einstellung beim nächsten
+        // Anfassen, ohne dass irgendwo etwas davon stand.
+        //
+        // Zwei unabhängige Durchsichten am 2026-10-10 haben das als
+        // die wahrscheinlichste Einzelursache für „mir geht die
+        // Kraft als Vorverstärker ab" benannt.
+        m_eingangSlider->setValue(
+            chain() ? int(std::lround(chain()->inputGainDb() * 10.0f)) : 0);
         m_eingangSlider->setStyleSheet(Style::sliderHStyle());
         row->addWidget(m_eingangSlider, 1);
 
-        m_eingangWert = new QLabel(QStringLiteral("0.0 dB"), box);
+        m_eingangWert = new QLabel(
+            QStringLiteral("%1 dB")
+                .arg(chain() ? double(chain()->inputGainDb()) : 0.0,
+                     0, 'f', 1), box);
         m_eingangWert->setMinimumWidth(64);
         m_eingangWert->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
         m_eingangWert->setStyleSheet(dimStyle());
@@ -2219,6 +2249,37 @@ QWidget* StripWindow::buildAllStagesSurface()
             "Sets the gain so your speech peaks land near -12 dBFS — "
             "the level every threshold in this strip was written for."));
         row->addWidget(m_eingangBtn);
+
+        // ── Und derselbe Pegel, von selbst ───────────────────────
+        //
+        // Ein Vorverstärker, bei dem man erst einen Knopf drücken
+        // muss, ehe er verstärkt, ist keiner. Mit dem Haken sucht
+        // die Kette den Arbeitspunkt selbst: alle zwei Sekunden ein
+        // Schritt, und nur wenn in diesen zwei Sekunden gesprochen
+        // wurde.
+        m_eingangAuto = new QCheckBox(QStringLiteral("automatic"), box);
+        m_eingangAuto->setChecked(chain() ? chain()->inputAuto() : false);
+        m_eingangAuto->setToolTip(QStringLiteral(
+            "Finds the level by itself and holds it: one step every two "
+            "seconds, and only while someone is talking — in silence it "
+            "does not move, or it would pull the room up until the "
+            "chain mistakes it for a voice. Every threshold in this "
+            "strip is written for speech peaking at −12 dBFS."));
+        row->addWidget(m_eingangAuto);
+        connect(m_eingangAuto, &QCheckBox::toggled, this, [this](bool v) {
+            if (StripChain* c = chain()) { c->setInputAuto(v); }
+            if (StripChain* d = displayChain(); d != nullptr && d != chain()) {
+                d->setInputAuto(v);
+            }
+            if (m_eingangSlider) { m_eingangSlider->setEnabled(!v); }
+            if (m_eingangBtn)    { m_eingangBtn->setEnabled(!v); }
+            persist();
+        });
+        if (m_eingangSlider) {
+            m_eingangSlider->setEnabled(!m_eingangAuto->isChecked());
+        }
+        m_eingangBtn->setEnabled(!m_eingangAuto->isChecked());
+
         z->addLayout(row);
         col->addWidget(box);
 
@@ -2523,6 +2584,7 @@ void StripWindow::reloadControls()
     m_eingangSlider = nullptr;
     m_eingangWert = nullptr;
     m_eingangBtn = nullptr;
+    m_eingangAuto = nullptr;
     m_stageText.fill(StageText{});
     m_stageBoxes.fill(nullptr);
 

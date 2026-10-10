@@ -150,6 +150,7 @@ void saveTo(const QString& prefix, const StripChain& chain)
          c.stageEnabled(StripChain::Stage::Denoise));
     putF(prefix, "DenoiseAmount", c.nr().amount());
     putF(prefix, "InputGainDb",   c.inputGainDb());
+    putV(key(prefix, "InputAuto"), c.inputAuto());
     putV(key(prefix, "ClipOn"), c.stageEnabled(StripChain::Stage::Clip));
     putF(prefix, "ClipDriveDb", c.clipper().driveDb());
     putF(prefix, "ClipKnee",    c.clipper().knee());
@@ -412,6 +413,12 @@ void restoreFrom(const QString& prefix, StripChain& c)
                       getV(key(prefix, "DenoiseOn"), false).toBool());
     c.nr().setAmount(getF(prefix, "DenoiseAmount", 0.8f));
     c.setInputGainDb(getF(prefix, "InputGainDb", 0.0f));
+    // Vorgabe AN. Jede Schwelle dieser Kette ist auf eine Spitze von
+    // -12 dBFS gerechnet, und wer den Pegel nicht von Hand setzt,
+    // hoert eine Kette, in der nichts greift -- das war der Zustand,
+    // in dem der Betreiber sie beurteilt hat. Ein Vorverstaerker, der
+    // erst nach einem Knopfdruck verstaerkt, ist keiner.
+    c.setInputAuto(getB(prefix, "InputAuto", true));
     c.setStageEnabled(StripChain::Stage::Clip,
                       getV(key(prefix, "ClipOn"), false).toBool());
     c.clipper().setDriveDb(getF(prefix, "ClipDriveDb", 0.0f));
@@ -688,6 +695,19 @@ bool applyBuiltIn(const QString& name, StripChain& c)
         c.nr().setAmount(0.70f);
         c.setStageEnabled(StripChain::Stage::Denoise, true);
 
+        // ── Der Pegel zuerst, und von selbst ────────────────────
+        //
+        // Jede Zahl, die danach kommt, steht in dBFS und ist auf eine
+        // Sprachspitze von -12 dBFS gerechnet. Am Geraet des
+        // Betreibers kamen -39,6 dBFS an -- 28 dB zu wenig. Dann
+        // liegt die Gate-Schwelle UEBER der Stimme, der Kompressor
+        // greift nie, der Clipper schneidet nichts ab, und die Kette
+        // tut genau zwei Dinge: Woerter verschlucken und faerben.
+        //
+        // Ein Profil, das die Schwellen setzt, aber den Pegel nicht,
+        // setzt deshalb gar nichts.
+        c.setInputAuto(true);
+
         // Gemessen: bei einem Grundgeräusch von -48 dBFS EFFEKTIV
         // liegen dessen Spitzen um -38, und genau dort stand die
         // Schwelle -- das Gate hat deshalb gar nichts getan.
@@ -943,8 +963,21 @@ bool applyBuiltIn(const QString& name, StripChain& c)
         // this much presence lift makes sibilance that was not a problem
         // before into one, and a preset that creates a fault it does not
         // then fix is a bad preset.
+        // ── Der Clipper fehlte ──────────────────────────────────
+        //
+        // „DX — punchy" hiess bis zum 2026-10-10 punchy und hatte die
+        // einzige Stufe nicht eingeschaltet, die den Scheitelfaktor
+        // wirklich senkt. Gemessen traegt der Clipper 6,3 der 8,9 dB
+        // Dichte; alles andere zusammen 2,6. Ein Profil fuer DX ohne
+        // Clipper ist ein Profil ohne das, wofuer man es waehlt.
+        c.setInputAuto(true);
+        c.clipper().setDriveDb(12.0f);
+        c.clipper().setKnee(0.2f);
+        c.clipper().setLevelMatch(false);
+        c.comp().setAutoMakeup(true);
         for (auto st : {StripChain::Stage::Gate, StripChain::Stage::Eq,
                         StripChain::Stage::DeEss, StripChain::Stage::Comp,
+                        StripChain::Stage::Clip,
                         StripChain::Stage::Limiter}) {
             c.setStageEnabled(st, true);
         }
