@@ -238,6 +238,119 @@ VoiceAnalysis VoiceAnalyzer::analyse(const float* samples, int frames,
         return r;
     }
 
+    // ── Der Raum: wie lange es nach dem Sprechen weiterklingt ────────
+    //
+    // Keine Messung nach Norm -- dafür bräuchte es einen Impuls und
+    // einen stillen Raum. Hier wird das genommen, was die Aufnahme
+    // ohnehin hergibt: die Stellen, an denen die Stimme aufhört. Der
+    // Pegel fällt danach in den Raumhall hinein, und die Steigung
+    // dieses Falls ist die Abklingzeit.
+    //
+    // Mehrere Abklingvorgänge, und genommen wird der MITTLERE (der
+    // Median), nicht der Durchschnitt: ein einziges Türknallen im
+    // falschen Moment würde einen Durchschnitt verderben.
+    {
+        // Gesucht wird nicht die Stelle, an der die Hüllkurve unter
+        // eine Schwelle rutscht -- im halligen Raum kommt sie dort
+        // zwischen zwei Silben nie an, und im trockenen ist sie
+        // schon beim ersten Fenster am Grundgeräusch. Beides hat der
+        // erste Entwurf übersehen und für BEIDE Räume „nichts
+        // gefunden" gemeldet.
+        //
+        // Gesucht wird stattdessen jeder Gipfel, dem ein
+        // ununterbrochenes Fallen folgt. Was danach zählt, ist die
+        // STEIGUNG dieses Falls: ein trockener Raum fällt in zwei
+        // Fenstern ins Grundgeräusch (sehr steil, kurze Abklingzeit),
+        // ein halliger braucht zwanzig.
+        std::vector<double> perSecond;
+        const double floorE = std::max(quiet, kEps) * 4.0;   // 6 dB drüber
+        for (int w = 1; w + 2 < windows; ++w) {
+            const double here = energy[static_cast<size_t>(w)];
+            // Kein „örtlicher Gipfel" als Bedingung: in einem
+            // halligen Raum ist die Hüllkurve während der Silbe ein
+            // Plateau mit Kräuselung, und der eine Punkt, an dem das
+            // Abklingen beginnt, ist dann zufällig kein Gipfel. Der
+            // zweite Entwurf hat daran genau das Signal nicht
+            // gefunden, für das die Messung gedacht ist.
+            //
+            // Es reicht: laut genug, und das nächste Fenster ist
+            // leiser. Mehrfachfunde auf derselben Flanke verhindert
+            // das Weiterspringen am Ende.
+            if (here <= gate) { continue; }
+            if (energy[static_cast<size_t>(w + 1)] >= here) { continue; }
+
+            const double first = 10.0 * std::log10(std::max(here, kEps));
+            double last = first;
+            int n = 0;
+            for (int k = w + 1; k < windows && k < w + 60; ++k) {
+                const double e = energy[static_cast<size_t>(k)];
+                if (e >= energy[static_cast<size_t>(k - 1)]) { break; }
+                last = 10.0 * std::log10(std::max(e, kEps));
+                n = k - w;
+                if (e < floorE) { break; }
+            }
+            const double fall = first - last;
+            if (n >= 2 && fall >= 10.0) {
+                const double seconds = double(n) * win / sampleRate;
+                perSecond.push_back(fall / seconds);
+                w += n;                      // nicht zweimal dieselbe Flanke
+            }
+        }
+        if (perSecond.size() >= 3) {
+            std::sort(perSecond.begin(), perSecond.end());
+            const double mid = perSecond[perSecond.size() / 2];
+            if (mid > 1.0) {
+                r.reverbMs = 60.0 / mid * 1000.0;         // auf 60 dB
+                r.reverbValid = true;
+            }
+        }
+    }
+
+    // ── Poppen: kurze Stösse unter 80 Hz ─────────────────────────────
+    //
+    // Ein P oder B direkt ins Mikrofon setzt einen Luftstoss, der im
+    // Spektrum ganz unten als kurzer, kräftiger Berg erscheint. Ein
+    // Hochpass nimmt ihn weg -- aber nur, wenn jemand weiss, dass er
+    // da ist. Deshalb gezählt statt stillschweigend gefiltert.
+    {
+        // Einpoliger Tiefpass bei 80 Hz, zweimal durchlaufen: steil
+        // genug, um den Grundton einer tiefen Stimme (um 100 Hz)
+        // schon deutlich zu dämpfen.
+        const double a = std::exp(-2.0 * M_PI * 80.0 / sampleRate);
+        double z1 = 0.0;
+        double z2 = 0.0;
+        std::vector<double> lf(static_cast<size_t>(windows), 0.0);
+        for (int w = 0; w < windows; ++w) {
+            double sum = 0.0;
+            for (int i = 0; i < win; ++i) {
+                z1 = (1.0 - a) * samples[w * win + i] + a * z1;
+                z2 = (1.0 - a) * z1 + a * z2;
+                sum += z2 * z2;
+            }
+            lf[static_cast<size_t>(w)] = sum / win;
+        }
+
+        std::vector<double> during;
+        for (int w = 0; w < windows; ++w) {
+            if (energy[static_cast<size_t>(w)] > gate) {
+                during.push_back(lf[static_cast<size_t>(w)]);
+            }
+        }
+        if (during.size() >= 10) {
+            std::sort(during.begin(), during.end());
+            const double usual = std::max(during[during.size() / 2], kEps);
+            double worst = 0.0;
+            for (int w = 0; w < windows; ++w) {
+                if (energy[static_cast<size_t>(w)] <= gate) { continue; }
+                const double over = 10.0 * std::log10(
+                    std::max(lf[static_cast<size_t>(w)], kEps) / usual);
+                if (over >= 12.0) { ++r.plosiveCount; }
+                worst = std::max(worst, over);
+            }
+            r.plosiveDb = worst;
+        }
+    }
+
     // ── Spectrum of the speech windows only ──────────────────────────
     constexpr int kFft = 4096;
     std::vector<double> power(kFft / 2 + 1, 0.0);

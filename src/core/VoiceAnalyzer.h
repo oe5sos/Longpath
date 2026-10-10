@@ -102,6 +102,26 @@ struct VoiceAnalysis {
     double sibilanceHz{6000.0};
     int    clippedSamples{0};
 
+    // ── Der Raum, und das Mikrofon darin ─────────────────────────────
+    //
+    // Die drei Zahlen, bei denen Software aufhört zu helfen. Ein
+    // Entzerrer kann einen Raum nicht trockenlegen, ein Kompressor
+    // kein Poppen reparieren, und beide machen es schlimmer, weil sie
+    // anheben.
+    //
+    // Geschätzt aus dem Abklingen nach Sprachenden, nicht aus einem
+    // Impuls -- also eine Hausnummer und keine Messung nach Norm.
+    // Darum reverbValid: unter drei brauchbaren Abklingvorgängen wird
+    // gar nichts behauptet.
+    double reverbMs{0.0};
+    bool   reverbValid{false};
+
+    // Poppen: kurze Stösse unter 80 Hz, wie sie ein P oder B direkt
+    // ins Mikrofon setzt. Gezählt wird, wie oft, und wie weit der
+    // stärkste über dem sonst üblichen Tiefton lag.
+    int    plosiveCount{0};
+    double plosiveDb{0.0};
+
     // ── Three more, added for the broadcast optimiser ────────────────
     //
     // Each exists because a decision downstream was being made without

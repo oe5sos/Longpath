@@ -1357,6 +1357,60 @@ void TxVoiceCheckDialog::fillAdvancedTable()
     bits << QStringLiteral("Sibilance %1 dB (5-8 kHz against 1-3 kHz)")
                 .arg(m_result.sibilanceDb, 0, 'f', 1);
     bits << QStringLiteral("Clipped samples: %1").arg(m_result.clippedSamples);
+
+    // ── Der Raum und das Mikrofon ────────────────────────────────────
+    //
+    // Die Zeilen, bei denen Software aufhört zu helfen. Ein Entzerrer
+    // legt keinen Raum trocken, ein Kompressor repariert kein Poppen
+    // -- beide machen es schlimmer, weil sie anheben. Also steht hier
+    // kein Vorschlag, sondern ein Befund und ein Handgriff.
+    if (m_result.reverbValid) {
+        const double ms = m_result.reverbMs;
+        bits << QStringLiteral("Room: about %1 ms of decay — %2")
+                    .arg(ms, 0, 'f', 0)
+                    .arg(ms < 300.0
+                             ? QStringLiteral("dry, nothing to do")
+                         : ms < 600.0
+                             ? QStringLiteral("audible; closer to the "
+                                              "microphone helps more than "
+                                              "any setting")
+                             : QStringLiteral("this is the biggest thing "
+                                              "between you and clean audio "
+                                              "— soft furnishings, or speak "
+                                              "closer"));
+    } else {
+        bits << QStringLiteral("Room: not enough clean speech endings to "
+                               "judge the decay");
+    }
+    if (m_result.plosiveCount > 0) {
+        bits << QStringLiteral("Pops: %1 bursts below 80 Hz, worst %2 dB "
+                               "over the usual low end — a pop filter, or "
+                               "speak past the microphone instead of into "
+                               "it")
+                    .arg(m_result.plosiveCount)
+                    .arg(m_result.plosiveDb, 0, 'f', 0);
+    } else {
+        bits << QStringLiteral("Pops: none found below 80 Hz");
+    }
+    {
+        // Nähe zum Mikrofon: die Tiefe gegen die Mitte. Die Bandwerte
+        // sind schon auf 1 kHz bezogen, also IST der unterste Wert
+        // der Nahbesprechungseffekt -- es braucht keine zweite
+        // Rechnung, nur die richtige Lesart.
+        const double lf = m_result.bandDb[1];
+        bits << QStringLiteral("Microphone distance: low end %1 dB against "
+                               "1 kHz — %2")
+                    .arg(lf, 0, 'f', 1)
+                    .arg(lf > 8.0
+                             ? QStringLiteral("very close; a hand's width "
+                                              "back takes the boom out "
+                                              "without an equaliser")
+                         : lf < -6.0
+                             ? QStringLiteral("far off, or a thin "
+                                              "microphone; closer gives you "
+                                              "body for free")
+                             : QStringLiteral("about right"));
+    }
     bits << QStringLiteral("Suggested make-up gain %1 dB")
                 .arg(m_result.suggestedPreampDb, 0, 'f', 1);
     bits << QStringLiteral("Levels are relative to the 1 kHz band; the "

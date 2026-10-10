@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+### Raum und Mikrofon messen — da, wo Software aufhört zu helfen
+
+Ein Entzerrer legt keinen Raum trocken, ein Kompressor repariert
+kein Poppen; beide machen es schlimmer, weil sie anheben. Das
+Messblatt sagt jetzt, wann das der Fall ist.
+
+* **Nachhall**, geschätzt aus dem Abklingen nach Sprachenden — keine
+  Messung nach Norm, und das steht auch so da. Gegen einen
+  künstlichen Raum mit eingestellten 800 ms geprüft: **827 ms**
+  gemessen; ein trockenes Signal liest **25 ms**.
+* **Poppen**: kurze Stösse unter 80 Hz gezählt, dazu der stärkste in
+  dB über dem sonst üblichen Tiefton. Drei eingebaute Stösse werden
+  gefunden, im sauberen Signal keiner erfunden.
+* **Mikrofonabstand** aus der Tiefe gegen 1 kHz — keine neue
+  Rechnung, nur die richtige Lesart der Bandwerte.
+
+Jede Zeile nennt einen Handgriff, keinen Vorschlag zum Anklicken:
+näher ans Mikrofon, Poppschutz, Vorhang.
+
 ### Der Clipper — die Stufe, die bei SSB wirklich Leistung bringt
 
 Die Endstufe wird von der **Spitze** begrenzt, gehört wird der
