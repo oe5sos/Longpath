@@ -15025,18 +15025,55 @@ void MainWindow::scheduleStartupUpdateCheck()
     auto& s = AppSettings::instance();
     const bool enabled = s.value(UpdateDialog::startupCheckKey(), QStringLiteral("True")).toString()
                          == QStringLiteral("True");
-    const QDateTime last = QDateTime::fromString(
-        s.value(UpdateDialog::lastCheckKey(), QString()).toString(), Qt::ISODate);
-    if (!UpdateDialog::startupCheckDue(enabled, last, QDateTime::currentDateTimeUtc())) { return; }
+
+    // ── Bei JEDEM Start, und das Ergebnis steht da ───────────────────
+    //
+    // „checking for update sollte auch immer automatisch angezeigt
+    //  werden nach dem neustart!"
+    //
+    // Vorher lagen hier zwei Sperren: eine Wartezeit von 20 Stunden
+    // seit der letzten Prüfung, und eine Anzeige, die sich NUR
+    // meldete, wenn es etwas Neueres gab. Damit hiess „nichts
+    // gesehen" zweierlei -- alles aktuell, oder gar nicht
+    // nachgesehen. Genau diese Unsicherheit hat heute früh eine
+    // Stunde gekostet.
+    //
+    // Jetzt: jeder Start prüft (eine Abfrage an GitHub, einmal je
+    // Programmlauf, das ist nichts), und der Stand steht neben der
+    // Version im Kopf -- auch wenn alles aktuell ist. Der Haken in
+    // den Einstellungen schaltet es weiterhin ganz ab.
+    if (!enabled) {
+        if (m_titleBar) {
+            m_titleBar->setUpdateState(QStringLiteral("· Prüfung aus"),
+                                       TitleBar::AktualisierungsStand::Unbekannt);
+        }
+        return;
+    }
     // Ein Testbau (leere Version) hat nichts zu vergleichen.
-    if (UpdateChecker::numericVersion(QCoreApplication::applicationVersion()).isEmpty()) { return; }
-    QTimer::singleShot(20000, this, [this]() {
+    if (UpdateChecker::numericVersion(QCoreApplication::applicationVersion()).isEmpty()) {
+        if (m_titleBar) {
+            m_titleBar->setUpdateState(QStringLiteral("· Eigenbau"),
+                                       TitleBar::AktualisierungsStand::Unbekannt);
+        }
+        return;
+    }
+    // Fünf Sekunden statt zwanzig: der Start soll nicht darauf
+    // warten, aber man soll auch nicht erst weggehen müssen, bevor
+    // die Antwort kommt.
+    QTimer::singleShot(5000, this, [this]() {
         auto* checker = new UpdateChecker(QCoreApplication::applicationVersion(), this);
         connect(checker, &UpdateChecker::latestKnown, this,
                 [this, checker](const ReleaseInfo& release, bool newer) {
             checker->deleteLater();
             AppSettings::instance().setValue(UpdateDialog::lastCheckKey(),
                                              QDateTime::currentDateTimeUtc().toString(Qt::ISODate));
+            if (m_titleBar) {
+                m_titleBar->setUpdateState(
+                    newer ? QStringLiteral("· %1 verfügbar").arg(release.version)
+                          : QStringLiteral("· aktuell"),
+                    newer ? TitleBar::AktualisierungsStand::Neuer
+                          : TitleBar::AktualisierungsStand::Aktuell);
+            }
             if (!newer) { return; }
             if (!m_updateDialog) {
                 m_updateDialog = new UpdateDialog(QCoreApplication::applicationVersion(), this);
@@ -15047,7 +15084,14 @@ void MainWindow::scheduleStartupUpdateCheck()
             m_updateDialog->show();
             m_updateDialog->raise();
         });
-        connect(checker, &UpdateChecker::checkFailed, checker, &QObject::deleteLater);
+        connect(checker, &UpdateChecker::checkFailed, this, [this, checker]() {
+            checker->deleteLater();
+            // Offline ist kein Fehler, aber es ist auch kein „aktuell".
+            if (m_titleBar) {
+                m_titleBar->setUpdateState(QStringLiteral("· nicht erreichbar"),
+                                           TitleBar::AktualisierungsStand::Unbekannt);
+            }
+        });
         checker->checkLatest();
     });
 }

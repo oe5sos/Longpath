@@ -515,6 +515,7 @@ set(CORE_SOURCES
     src/core/antenna/AntennaTrim.cpp
     src/core/antenna/RadioSweep.cpp
     src/core/AppSettings.cpp
+    src/gui/FensterKnoepfe.cpp
     src/core/Sprache.cpp
     src/core/SpracheTabelle.cpp
     src/core/LogDatei.cpp

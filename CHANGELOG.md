@@ -2,6 +2,41 @@
 
 ## [Unreleased]
 
+### Die drei Punkte links oben — auch an den Werkzeugfenstern
+
+> „bei apple sind links oben 3 farbige symbole, rot, gelb und grün …
+>  diese sollte auch in longpath zu sehen sein"
+
+Fast jedes Fenster ausser dem Hauptfenster ist ein `QDialog`, und
+ein QDialog bekommt von Qt auf macOS nur den Schliessknopf. Das
+System zeichnet die anderen beiden grau und tot — und ein Fenster,
+das man nicht ins Dock legen kann, muss man schliessen, womit die
+Einstellungsarbeit darin weg ist.
+
+`gui/FensterKnoepfe`: ein Filter, der die Flaggen bei `QEvent::Polish`
+nachrüstet, also bevor das Fenster angelegt wird. **Nicht** bei
+modalen Fenstern (die im Dock sperren das Programm), nicht bei
+Popups, Werkzeugfenstern, rahmenlosen und Sheets.
+
+### Das Plus atmet
+
+Die Drehung beim Öffnen sieht nur, wer das Plus schon gefunden hat.
+Jetzt atmet es: drei Sekunden je Atemzug, Sinus, kleine Amplitude —
+der Rand wandert zwischen ruhig und einem Hauch Blau. Es hält an,
+sobald der Zeiger darauf liegt oder der Auswähler offen ist.
+
+### Der Stand der Aktualisierung steht da
+
+> „checking for update sollte auch immer automatisch angezeigt werden
+>  nach dem neustart!"
+
+Die stille Prüfung beim Start meldete sich nur, wenn es etwas
+Neueres gab — „nichts gesehen" hiess damit *alles aktuell* oder *gar
+nicht nachgesehen*. Jetzt prüft jeder Start, und der Stand steht
+neben der Version: **aktuell** · **v0.7.0 verfügbar** · **nicht
+erreichbar**. Kein Fenster, das bei jedem Start aufgeht — eines, das
+jedes Mal „alles in Ordnung" sagt, wird nach drei Tagen weggeklickt.
+
 ### Ein Ziel für den Entzerrer
 
 > „das mit dem eq bekomme ich leider nicht so hin, wie es sein sollte"

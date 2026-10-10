@@ -435,6 +435,8 @@ class PlusGlyph : public QAbstractButton {
     Q_PROPERTY(qreal turn  READ turn  WRITE setTurn)
     Q_PROPERTY(qreal hover READ hover WRITE setHover)
     Q_PROPERTY(qreal press READ press WRITE setPress)
+    // Das ruhige Atmen, damit man das Plus ueberhaupt findet.
+    Q_PROPERTY(qreal puls  READ puls  WRITE setPuls)
 
 public:
     explicit PlusGlyph(QWidget* parent = nullptr)
@@ -455,14 +457,46 @@ public:
         m_pressAnim = new QPropertyAnimation(this, "press", this);
         m_pressAnim->setDuration(90);
         m_pressAnim->setEasingCurve(QEasingCurve::OutQuad);
+
+        // ── Warum es atmet ───────────────────────────────────────
+        //
+        // „das plus symbol sollte eine animation sein, dann kann man
+        //  es leichter sehen."
+        //
+        // Die Drehung beim Oeffnen gab es schon -- die sieht aber
+        // nur, wer das Plus bereits gefunden hat. Gesucht war das
+        // Gegenteil: etwas, das den Blick AUF es lenkt, bevor man es
+        // kennt.
+        //
+        // Drei Sekunden je Atemzug, Sinus, und die Amplitude
+        // absichtlich klein: ein Rand, der zwischen ruhig und einem
+        // Hauch Blau wandert, dazu ein weicher Schein. Keine
+        // Groessenaenderung, kein Blinken. „Nichts springt"
+        // (HAUSSTIL) gilt auch fuer etwas, das auffallen soll --
+        // eine Ecke, die eine Stunde lang zuckt, schaltet man ab,
+        // und dann hat man nichts gewonnen.
+        //
+        // Es haelt an, sobald der Zeiger darauf liegt oder der
+        // Auswaehler offen ist: dann ist es gefunden, und das Atmen
+        // haette seine Aufgabe erfuellt.
+        m_pulsAnim = new QPropertyAnimation(this, "puls", this);
+        m_pulsAnim->setDuration(3000);
+        m_pulsAnim->setEasingCurve(QEasingCurve::InOutSine);
+        m_pulsAnim->setKeyValueAt(0.0, 0.0);
+        m_pulsAnim->setKeyValueAt(0.5, 1.0);
+        m_pulsAnim->setKeyValueAt(1.0, 0.0);
+        m_pulsAnim->setLoopCount(-1);
+        m_pulsAnim->start();
     }
 
     qreal turn()  const { return m_turn; }
     qreal hover() const { return m_hover; }
     qreal press() const { return m_press; }
+    qreal puls()  const { return m_puls; }
     void setTurn (qreal v) { m_turn  = v; update(); }
     void setHover(qreal v) { m_hover = v; update(); }
     void setPress(qreal v) { m_press = v; update(); }
+    void setPuls (qreal v) { m_puls  = v; update(); }
 
     // Offen heisst Kreuz. Gerufen vom Auswaehler, nicht vom Klick --
     // er kann auch ueber sein eigenes Schliesskreuz zugehen, und dann
@@ -475,11 +509,20 @@ public:
         m_turnAnim->setStartValue(m_turn);
         m_turnAnim->setEndValue(open ? 1.0 : 0.0);
         m_turnAnim->start();
+        atmen(!open);
     }
 
 protected:
-    void enterEvent(QEnterEvent*) override      { glide(m_hoverAnim, m_hover, 1.0); }
-    void leaveEvent(QEvent*) override           { glide(m_hoverAnim, m_hover, 0.0); }
+    void enterEvent(QEnterEvent*) override
+    {
+        glide(m_hoverAnim, m_hover, 1.0);
+        atmen(false);
+    }
+    void leaveEvent(QEvent*) override
+    {
+        glide(m_hoverAnim, m_hover, 0.0);
+        atmen(!m_open);
+    }
     void mousePressEvent(QMouseEvent* e) override
     {
         glide(m_pressAnim, m_press, 1.0);
@@ -489,6 +532,18 @@ protected:
     {
         glide(m_pressAnim, m_press, 0.0);
         QAbstractButton::mouseReleaseEvent(e);
+    }
+
+    void atmen(bool an)
+    {
+        if (an) {
+            if (m_pulsAnim->state() != QAbstractAnimation::Running) {
+                m_pulsAnim->start();
+            }
+        } else {
+            m_pulsAnim->stop();
+            setPuls(0.0);
+        }
     }
 
     void paintEvent(QPaintEvent*) override
@@ -507,7 +562,12 @@ protected:
         // aus wie ein ausgegrauter Knopf.
         const qreal wachheit = std::max(m_hover, m_turn);
 
-        const QColor rand    = mix(ruhe, wach, wachheit);
+        // Der Ruf: nur solange nichts anderes wach ist, und hoechstens
+        // ein knappes Drittel des Weges zum wachen Rand. Mehr waere
+        // ein Blinken.
+        const qreal ruf = (1.0 - wachheit) * m_puls;
+
+        const QColor rand    = mix(ruhe, wach, wachheit + 0.30 * ruf);
         const QColor zeichen = m_turn > 0.01
             ? mix(mix(zeichenRuhe, zeichenWach, wachheit),
                   QColor(QString::fromLatin1(Style::kGlassSelText)), m_turn)
@@ -588,10 +648,12 @@ private:
     }
 
     qreal m_turn{0.0}, m_hover{0.0}, m_press{0.0};
+    qreal m_puls{0.0};
     bool  m_open{false};
     QPropertyAnimation* m_turnAnim{nullptr};
     QPropertyAnimation* m_hoverAnim{nullptr};
     QPropertyAnimation* m_pressAnim{nullptr};
+    QPropertyAnimation* m_pulsAnim{nullptr};
 };
 
 AddWidgetButton::AddWidgetButton(AppletVisibilityController* vis,
