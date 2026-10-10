@@ -6921,6 +6921,18 @@ longpath_add_test(tst_tgxl_connection_ping)
 # 60000/60000 ms.
 longpath_add_test(tst_pgxl_connection_reconnect)
 
+# 2026-10-10: Abbau ohne Rueckruf in schon zerstoerte Mitglieder.
+# `QTcpSocket m_socket` steht in beiden Klassen VOR fuenf QTimern, also
+# stirbt er NACH ihnen, und sein ~QTcpSocket loest disconnected() in ein
+# onDisconnected() aus, das nach den abgebauten Zeitgebern greift.
+# Dritte und vierte Stelle derselben Form (SpeConnection und MainWindow
+# waren die ersten zwei). Die eine Haelfte ist ein TOR: ohne die Behebung
+# meldet das halb abgebaute Objekt disconnected() nach aussen, messbar in
+# jedem Lauf (1 statt 0). Die andere -- der Griff in die abgebauten
+# Zeitgeber -- ist unbestimmt und zeigt sich deterministisch nur unter
+# AddressSanitizer. Siehe den Kopf der Datei.
+longpath_add_test(tst_pgxl_tgxl_abbau)
+
 # Task 61: ConnectionDiagnostics 1 Hz coalesced metrics aggregator.
 # Tests: tracksFrameCount (2 injectLineForTesting calls -> framesIn==2);
 # countsReconnectsFromSignal (3x testForceDisconnect -> reconnectCount==3);
