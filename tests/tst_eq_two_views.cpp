@@ -175,6 +175,61 @@ private slots:
         QVERIFY(!canvas->simpleMode());
     }
 
+    // „ich denke, dass die bereiche teilweise viel zu groß sind, die
+    //  geändert werden." Ein Regler, an dem gezogen wird, setzt
+    //  seinen Griff auf SEINE Frequenz und SEINE Breite -- sonst
+    //  heisst „Präsenz" zwei Oktaven.
+    void draggingAFaderNarrowsAndPlacesItsBand()
+    {
+        build();
+        const auto& sl = StripEqSimpleBar::bandSlots()[5];   // Präsenz
+
+        // Vorher in der Profi-Ansicht verschoben und breit gemacht.
+        auto bp = m_chain.eq().band(sl.band);
+        bp.freqHz = 2000.0f;
+        bp.q      = 0.707f;
+        m_chain.eq().setBand(sl.band, bp);
+
+        auto* bar = m_panel->findChild<StripEqSimpleBar*>();
+        QVERIFY(bar != nullptr);
+        bar->findChildren<QSlider*>().at(5)->setValue(30);
+
+        const auto after = m_chain.eq().band(sl.band);
+        QVERIFY2(std::abs(after.freqHz - sl.freqHz) < 0.01f,
+                 qPrintable(QStringLiteral("steht auf %1 Hz statt %2")
+                                .arg(double(after.freqHz))
+                                .arg(double(sl.freqHz))));
+        QVERIFY2(after.q > 1.5f,
+                 qPrintable(QStringLiteral("immer noch breit: Q = %1")
+                                .arg(double(after.q))));
+    }
+
+    // Ordnen raeumt alle sieben auf und laesst die Pegel stehen.
+    void tidyPlacesEveryHandleAndKeepsTheLevels()
+    {
+        build();
+        for (const auto& sl : StripEqSimpleBar::bandSlots()) {
+            auto bp = m_chain.eq().band(sl.band);
+            bp.freqHz = sl.freqHz * 1.7f;   // irgendwo daneben
+            bp.q      = 0.707f;
+            bp.gainDb = 3.0f;
+            bp.enabled = true;
+            m_chain.eq().setBand(sl.band, bp);
+        }
+
+        auto* bar = m_panel->findChild<StripEqSimpleBar*>();
+        QVERIFY(bar != nullptr);
+        bar->tidy();
+
+        for (const auto& sl : StripEqSimpleBar::bandSlots()) {
+            const auto bp = m_chain.eq().band(sl.band);
+            QVERIFY(std::abs(bp.freqHz - sl.freqHz) < 0.01f);
+            QVERIFY(std::abs(bp.q - sl.q) < 0.01f);
+            QVERIFY2(std::abs(bp.gainDb - 3.0f) < 0.01f,
+                     "Ordnen hat einen Pegel verstellt");
+        }
+    }
+
     // Und so sieht es aus -- beide Ansichten, wirkliche Groesse.
     void bothViewsOnFile()
     {
@@ -184,13 +239,16 @@ private slots:
         build();
         // Eine Einstellung, damit das Blatt etwas zeigt und nicht die
         // flache Null.
-        const float set[StripEqSimpleBar::kCount] =
-            { 1.5f, 0.0f, -3.0f, -1.5f, 2.0f, 4.0f, -2.5f };
+        // Ueber die REGLER, nicht an den Baendern vorbei -- sonst
+        // zeigt das Blatt eine Kurve, die so nie entsteht (die
+        // Breite setzt der Regler beim Ziehen).
+        auto* setBar = m_panel->findChild<StripEqSimpleBar*>();
+        QVERIFY(setBar != nullptr);
+        const int set[StripEqSimpleBar::kCount] =
+            { 15, 0, -30, -15, 20, 40, -25 };
+        const auto setSliders = setBar->findChildren<QSlider*>();
         for (int i = 0; i < StripEqSimpleBar::kCount; ++i) {
-            auto bp = m_chain.eq().band(StripEqSimpleBar::bandSlots()[i].band);
-            bp.gainDb = set[i];
-            bp.enabled = true;
-            m_chain.eq().setBand(StripEqSimpleBar::bandSlots()[i].band, bp);
+            setSliders.at(i)->setValue(set[i]);
         }
         m_panel->refreshFromEngine();
         m_panel->resize(940, 470);

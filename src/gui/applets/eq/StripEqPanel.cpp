@@ -267,6 +267,28 @@ StripEqPanel::StripEqPanel(EqHost* engine, QWidget* parent)
         connect(m_proBtn, &QPushButton::clicked,
                 this, [this]() { setSimpleView(false); });
 
+        // ── Ordnen ───────────────────────────────────────────────────
+        //
+        // Ein Regler setzt seinen Griff erst beim Ziehen auf seine
+        // Frequenz und Breite -- sonst waere das Umschalten der
+        // Ansicht ein Eingriff in den Ton, und das soll es nicht
+        // sein. Wer aber vorher in der Profi-Ansicht geschoben hat,
+        // findet die Reihe durcheinander: am Geraet gesehen stand
+        // NASAL auf 2 kHz, oberhalb von KLARHEIT auf 1,5 kHz.
+        // Dieser Knopf raeumt das in einem Griff auf und laesst die
+        // Pegel stehen.
+        auto* tidyBtn = new QPushButton(QStringLiteral("Ordnen"));
+        tidyBtn->setFixedHeight(24);
+        applyThemed(tidyBtn, kRowButtonStyle);
+        tidyBtn->setToolTip(QStringLiteral(
+            "Setzt die sieben Regler zurück auf ihre Frequenz und "
+            "Breite — die Pegel bleiben, wie sie stehen."));
+        connect(tidyBtn, &QPushButton::clicked, this, [this]() {
+            if (m_simpleBar) { m_simpleBar->tidy(); }
+        });
+        row->addWidget(tidyBtn);
+        m_simpleOnly.push_back(tidyBtn);
+
         // Eine Geste, eine Groesse -- und das muss dastehen, sonst
         // ist es keine Regel, sondern ein Geheimnis. Siehe
         // ClientEqEditorCanvas::mouseMoveEvent.
@@ -691,6 +713,9 @@ void StripEqPanel::setSimpleView(bool simple)
     for (QWidget* w : m_proOnly) {
         if (w != nullptr) { w->setVisible(!simple); }
     }
+    for (QWidget* w : m_simpleOnly) {
+        if (w != nullptr) { w->setVisible(simple); }
+    }
     if (m_iconRow)   { m_iconRow->setVisible(!simple); }
     if (m_paramRow)  { m_paramRow->setVisible(!simple); }
     if (m_simpleBar) {
@@ -702,7 +727,9 @@ void StripEqPanel::setSimpleView(bool simple)
     if (m_hint != nullptr) {
         m_hint->setText(simple
             ? QStringLiteral("Regler ziehen — oder einen Punkt in der "
-                             "Kurve, der geht nur hoch und runter.")
+                             "Kurve, der geht nur hoch und runter. "
+                             "Jeder Regler greift rund zwei "
+                             "Drittel einer Oktave breit.")
             : QStringLiteral("Ziehen = lauter/leiser · "
                              "⌥ + ziehen = Frequenz · "
                              "⇧ + ziehen = Breite · "

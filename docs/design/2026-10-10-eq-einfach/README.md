@@ -47,6 +47,29 @@ der auf einen Zug nicht reagiert, ist schlimmer als kein Punkt.
 vertretbar macht: **Umschalten ändert den Ton nicht** — hin und
 zurück, und kein Band hat sich bewegt.
 
+## Nachtrag: die Breite (2026-10-10, am Gerät)
+
+> „ich denke, dass die bereiche teilweise viel zu groß sind, die
+>  geändert werden."
+
+Stimmt, und es war eine geerbte Zahl. Die freien Griffe kommen mit
+**Q = 0,707** auf die Welt (Butterworth, ClientEqs neutraler
+Vorgabewert) — das sind rund **zwei Oktaven**. Wer bei 1,4 kHz
+anhebt, hebt von 600 Hz bis 5 kHz an; als „Klarheit" ist das die
+halbe Stimme.
+
+Jetzt **Q = 2,0**, rund zwei Drittel einer Oktave. Die Griffe stehen
+im Abstand von etwa 0,58 Oktaven, greifen also noch ineinander — bei
+Q = 2,5 würden sie sich gerade berühren und die Summe bekäme Wellen.
+
+Gesetzt wird das **beim Ziehen**, nicht beim Umschalten der Ansicht:
+die Zusage „Umschalten ändert den Ton nicht" bleibt. Gleichzeitig
+setzt der Regler seinen Griff auf **seine** Frequenz — am Gerät stand
+NASAL auf 2 kHz, oberhalb von KLARHEIT auf 1,5 kHz, weil in der
+Profi-Ansicht geschoben worden war. Für genau diesen Fall gibt es
+**„Ordnen"**: ein Griff, alle sieben zurück auf Frequenz und Breite,
+Pegel bleiben.
+
 ## Der erste Vorschlag (überholt)
 
 `eq-einfach.png` — die Seite als **sechs benannte Regler** auf festen

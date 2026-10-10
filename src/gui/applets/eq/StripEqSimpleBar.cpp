@@ -74,22 +74,44 @@ StripEqSimpleBar::bandSlots()
     //
     // Die Frequenzen sind die der Griffe, nicht umgekehrt -- hier wird
     // benannt, nicht gesetzt.
+    // ── Wie breit ein Regler greift ──────────────────────────────────
+    //
+    // „ich denke, dass die bereiche teilweise viel zu groß sind, die
+    //  geändert werden."
+    //
+    // Stimmt, und es war eine geerbte Zahl: die Griffe kommen mit
+    // Q = 0,707 auf die Welt (Butterworth, der neutrale Vorgabewert
+    // aus ClientEq). Das sind rund ZWEI OKTAVEN -- wer bei 1,4 kHz
+    // anhebt, hebt von 600 Hz bis 5 kHz an. Als Klangregler ist das
+    // richtig, als „Praesenz" ist es die halbe Stimme.
+    //
+    // Q = 2,0 sind rund 0,7 Oktaven. Die Griffe stehen im Abstand von
+    // etwa 0,58 Oktaven, also greifen Nachbarn noch ineinander (bei
+    // Q = 2,5 wuerden sie sich gerade beruehren und die Summe bekaeme
+    // Wellen) -- aber jeder Regler meint jetzt seine Gegend und nicht
+    // die halbe Stimme.
+    //
+    // Gesetzt wird das erst, wenn an einem Regler GEZOGEN wird, nicht
+    // beim Umschalten der Ansicht. Die Zusage „Umschalten aendert den
+    // Ton nicht" gilt weiter.
+    static constexpr float kQ = 2.0f;
+
     static const std::array<Slot, kCount> kSlots = {{
-        { EqBandLayout::kFirstSpare + 0, "WÄRME",
+        { EqBandLayout::kFirstSpare + 0, "WÄRME",     300.0f,  kQ,
           "300 Hz. Hoch macht die Stimme voller, runter nimmt das"
           " Dumpfe." },
-        { EqBandLayout::kFirstSpare + 1, "FÜLLE",
+        { EqBandLayout::kFirstSpare + 1, "FÜLLE",     450.0f,  kQ,
           "450 Hz. Der Unterbau der Stimme." },
-        { EqBandLayout::kFirstSpare + 2, "MULM",
+        { EqBandLayout::kFirstSpare + 2, "MULM",      650.0f,  kQ,
           "650 Hz. Runter, wenn es nach Pappkarton klingt." },
-        { EqBandLayout::kFirstSpare + 3, "NASAL",
+        { EqBandLayout::kFirstSpare + 3, "NASAL",     950.0f,  kQ,
           "950 Hz. Runter, wenn es durch die Nase klingt." },
-        { EqBandLayout::kFirstSpare + 4, "KLARHEIT",
+        { EqBandLayout::kFirstSpare + 4, "KLARHEIT", 1400.0f,  kQ,
           "1,4 kHz. Verständlichkeit — das, was im Pile-up"
           " durchkommt." },
-        { EqBandLayout::kFirstSpare + 5, "PRÄSENZ",
+        { EqBandLayout::kFirstSpare + 5, "PRÄSENZ",  2500.0f,  kQ,
           "2,5 kHz. Das „vorne“. Zuviel davon wird anstrengend." },
-        { EqBandLayout::kFirstSpare + 6, "SCHÄRFE",
+        { EqBandLayout::kFirstSpare + 6, "SCHÄRFE",  3800.0f,  kQ,
           "3,8 kHz. Biss und S-Laute. Runter, wenn es zischt." },
     }};
     return kSlots;
@@ -197,6 +219,20 @@ void StripEqSimpleBar::reload()
     m_reloading = false;
 }
 
+void StripEqSimpleBar::tidy()
+{
+    if (m_eq == nullptr) { return; }
+    for (const Slot& s : bandSlots()) {
+        auto bp = m_eq->band(s.band);
+        bp.freqHz = s.freqHz;
+        bp.q      = s.q;
+        m_eq->setBand(s.band, bp);
+    }
+    if (m_host != nullptr) { m_host->saveClientEqSettings(); }
+    reload();
+    emit changed();
+}
+
 void StripEqSimpleBar::applyBand(int i, int sliderValue)
 {
     if (m_eq == nullptr) { return; }
@@ -205,6 +241,14 @@ void StripEqSimpleBar::applyBand(int i, int sliderValue)
 
     auto bp = m_eq->band(s.band);
     bp.gainDb  = db;
+    // Angefasst heisst auch: dieser Griff ist jetzt das, was sein
+    // Name sagt -- auf seiner Frequenz und in seiner Breite. Ohne das
+    // bleibt ein in der Profi-Ansicht verschobener Griff unter einem
+    // Namen stehen, der nicht mehr stimmt (gesehen: NASAL auf 2 kHz,
+    // oberhalb von KLARHEIT auf 1,5 kHz -- die Reihe stand nicht mehr
+    // der Reihe nach).
+    bp.freqHz  = s.freqHz;
+    bp.q       = s.q;
     // Angefasst heisst eingeschaltet. Bei 0 dB ist das hoerbar
     // dasselbe wie aus, und es erspart den Fall „Regler steht auf +4,
     // Band ist aus".

@@ -178,6 +178,8 @@ private:
     // Umschalten eine Schleife ist und nicht zwoelf Zeilen, von denen
     // beim naechsten Knopf eine vergessen wird.
     std::vector<QWidget*>      m_proOnly;
+    // Und das Gegenstueck: was nur die einfache Ansicht zeigt.
+    std::vector<QWidget*>      m_simpleOnly;
     bool                       m_simpleView{true};
     ClientEqOutputFader*       m_outFader{nullptr};
     QTimer*                    m_fftTimer{nullptr};

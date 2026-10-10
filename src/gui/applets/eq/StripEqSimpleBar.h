@@ -49,6 +49,8 @@ public:
     struct Slot {
         int         band;     // Index in ClientEq
         const char* name;     // Versalien ueber dem Regler
+        float       freqHz;   // wo der Regler hingehoert
+        float       q;        // wie breit er greift
         const char* what;     // ein Satz, als Hilfetext
     };
     static constexpr int kCount = 7;
@@ -58,6 +60,11 @@ public:
 
     void setEq(ClientEq* eq);
     void setHost(EqHost* host);
+
+    // Alle sieben Griffe auf ihre Frequenz und Breite setzen, die
+    // Pegel behalten. Fuer den Fall, dass in der Profi-Ansicht
+    // verschoben wurde und die Reihe nicht mehr der Reihe nach steht.
+    void tidy();
 
     // Regler und Zahlen aus den Baendern nachziehen. Nach jeder
     // Aenderung von aussen noetig -- Profi-Ansicht, Zuruecksetzen,
