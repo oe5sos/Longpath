@@ -5453,6 +5453,7 @@ longpath_add_test(tst_resync_does_not_click)
 longpath_add_test(tst_eq_reaches_the_monitor)
 longpath_add_test(tst_eq_flat_does_not_mute)
 longpath_add_test(tst_ltas_measures_the_chain)
+longpath_add_test(tst_strip_row_marks_active_stages)
 longpath_add_test(tst_strip_tuner)
 
 # -- The ring behind the EQ picture: oldest-first, newest-kept, and

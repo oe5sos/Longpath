@@ -74,6 +74,11 @@ public:
 
     QSize sizeHint() const override;
 
+    // Welche Stufenseite gerade offen ist, oder -1. Die Kachel bekommt
+    // dann einen hellen Ring. Zwei Fragen, zwei Zeichen: die Farbe
+    // sagt „laeuft", der Ring sagt „das sehe ich gerade an".
+    void setOpenStage(int stageIndex);
+
     // Die Reihe muss nach einem Einschubwechsel neu gelegt werden --
     // sie wird breiter oder schmaler.
     void refreshInserts();
@@ -126,6 +131,7 @@ private:
 
     std::vector<Cell> m_cells;
     int  m_dropPosition{-1};   // -1 = kein Ziehen im Gange
+    int  m_openStage{-1};      // -1 = keine Stufenseite offen
 
     StripChain* m_chain{nullptr};
     std::array<double, StripChain::kStageCount> m_reduction{};

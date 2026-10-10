@@ -23,6 +23,7 @@
 #include <QDropEvent>
 #include <QImage>
 #include <QMimeData>
+#include <QPalette>
 #include <QSignalSpy>
 
 #include "core/strip/AudioPlugin.h"
@@ -182,9 +183,17 @@ private slots:
         c.setInsertPlugin(1, std::make_unique<Dummy>(QStringLiteral("ClipOnly2")));
 
         Probe v;
+        // Sonst malt render() den hellen Standardgrund des Systems in
+        // die Fugen; im Programm liegt die Reihe auf dem Panel.
+        QPalette pal = v.palette();
+        pal.setColor(QPalette::Window, QColor(0x0c, 0x0c, 0x0e));
+        v.setPalette(pal);
+        v.setAutoFillBackground(true);
         v.setChain(&c);
         v.refreshInserts();
         v.resize(v.sizeHint());
+        // Die Seite, die gerade offen waere: ihre Kachel traegt den Ring.
+        v.setOpenStage(0);
 
         const auto shot = [&](const QString& file) {
             QImage img(v.size(), QImage::Format_ARGB32_Premultiplied);

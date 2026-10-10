@@ -808,6 +808,27 @@ void StripWindow::buildUi()
 
     col->addWidget(m_tabs, 1);
 
+    // Die Kachel der aufgeschlagenen Seite bekommt ihren Ring. Ueber
+    // den Reiternamen, nicht ueber die Nummer: die Reiter werden beim
+    // Umbauen neu gesetzt, und die Voice-check-Seite kommt und geht --
+    // eine Nummer waere nach dem ersten Umbau die falsche Kachel.
+    const auto markOpenStage = [this]() {
+        if (m_tabs == nullptr || m_chainView == nullptr) { return; }
+        const QString t = m_tabs->tabText(m_tabs->currentIndex());
+        int found = -1;
+        for (int i = 0; i < StripChain::kStageCount; ++i) {
+            const auto s = static_cast<StripChain::Stage>(i);
+            if (t == QString::fromLatin1(StripChain::stageName(s))) {
+                found = i;
+                break;
+            }
+        }
+        m_chainView->setOpenStage(found);
+    };
+    connect(m_tabs, &QTabWidget::currentChanged,
+            this, [markOpenStage](int) { markOpenStage(); });
+    markOpenStage();
+
     // The enable boxes are created unchecked and the chain may already
     // have stages on from the saved settings. Sync with signals blocked
     // so this does not write the pre-sync state straight back out.

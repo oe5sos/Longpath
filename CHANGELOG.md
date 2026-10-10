@@ -2,6 +2,31 @@
 
 ## [Unreleased]
 
+### Die eingeschaltete Stufe sieht man jetzt
+
+> „wenn ich ein feld aktiviere sollte das feld oben als ganze markiert
+>  sein, andere farbe."
+
+Bis heute wechselte in der Kettenreihe nur der **Rahmen** die Farbe --
+ein Pixel, auf Schwarz. Aus vier Entwuerfen (Blaues Glas, Blaue Kappe,
+Bernstein, Linke Flanke; `docs/design/2026-10-10-kachel-markierung/`)
+hat der Betreiber das **Blaue Glas** gewaehlt: die ganze Kachel in der
+Auswahlfarbe des Hauses.
+
+* Keine neue Farbe. Blau heisst in HAUSSTIL.md ueberall „angefasst,
+  eingeschaltet", Warm heisst „gemessen" -- deshalb bleibt der
+  Arbeitsbalken bernstein und wird auf Blau sogar deutlicher.
+* „Eingeschaltet, aber die Kette laeuft nicht" traegt dieselbe
+  Markierung, geparkt -- **gemischt** aus Palettenfarben statt als
+  Hexwert hingeschrieben, sonst bleibt sie beim Themenwechsel stehen.
+* Dazu ein **weisser Ring** um die Kachel der aufgeschlagenen Seite.
+  Zwei Fragen, zwei Zeichen: Farbe sagt „laeuft", Ring sagt „das sehe
+  ich gerade an". Er folgt dem Reiternamen, nicht der Reiternummer --
+  die Reiter werden umgebaut, und die Voice-check-Seite kommt und geht.
+* `tests/tst_strip_row_marks_active_stages.cpp` misst, was auf der
+  Flaeche ankommt, nicht ob eine Farbe gesetzt wird. **Gegenprobe:**
+  mit der alten Fuellung fallen zwei der drei Faelle durch.
+
 ### Was macht die Kette? Ein Bild, das es misst
 
 Die Frage, die den 2026-10-09 getragen hat, war nie „welche Werte habe

@@ -76,6 +76,18 @@ constexpr int kRemoveBox = 13;
 // kommt der uebergebene Wert unveraendert zurueck.
 QColor c(const char* hex) { return QColor(Style::hexRole(hex)); }
 
+// Eine Zwischenfarbe aus zwei Palettenfarben. Gebraucht fuer die
+// „eingeschaltet, aber die Kette laeuft nicht"-Kachel: sie soll
+// erkennbar dieselbe Markierung tragen, nur geparkt. Gemischt statt
+// als neuer Hexwert hingeschrieben, damit sie beim Themenwechsel
+// mitgeht -- ein Literal wuerde stehenbleiben.
+QColor mix(const QColor& a, const QColor& b, double t)
+{
+    return QColor(int(a.red()   + (b.red()   - a.red())   * t),
+                  int(a.green() + (b.green() - a.green()) * t),
+                  int(a.blue()  + (b.blue()  - a.blue())  * t));
+}
+
 } // namespace
 
 // ── StripChainView ───────────────────────────────────────────────────
@@ -94,6 +106,15 @@ void StripChainView::setChain(StripChain* chain)
 {
     m_chain = chain;
     relayout();
+    update();
+}
+
+void StripChainView::setOpenStage(int stageIndex)
+{
+    if (m_openStage == stageIndex) { return; }
+    m_openStage = stageIndex;
+    // Ganze Reihe, nicht die beiden Kacheln: der Ring liegt AUSSERHALB
+    // des Kachelrechtecks, ein update(rect) wuerde ihn stehenlassen.
     update();
 }
 
@@ -297,21 +318,38 @@ void StripChainView::paintEvent(QPaintEvent*)
         // on and doing nothing because the master is off, and painting
         // that the same as "running" is how an operator concludes the
         // strip is broken.
-        QColor bg, edge, text;
+        //
+        // Bis zum 2026-10-10 wechselte nur der RAHMEN die Farbe. Der
+        // Betreiber vor dem Geraet: „wenn ich ein feld aktiviere sollte
+        // das feld oben als ganze markiert sein". Er hat recht -- eine
+        // Linie von einem Pixel ist aus zwei Metern keine Aussage.
+        // Jetzt die ganze Flaeche, und zwar in der Auswahlfarbe des
+        // Hauses: Blau heisst hier ueberall „angefasst, eingeschaltet",
+        // Warm heisst „gemessen" (HAUSSTIL.md). Deshalb bleibt der
+        // Arbeitsbalken bernstein -- er sagt etwas anderes als die
+        // Flaeche, und auf Blau sagt er es deutlicher als vorher.
+        const QRect box = r.adjusted(0, 0, -1, -1);
+        QColor text;
         if (on && master) {
-            bg = c(Style::kButtonBg); edge = c(Style::kAccent);
-            text = c(Style::kTextPrimary);
+            QLinearGradient g(box.topLeft(), box.bottomLeft());
+            g.setColorAt(0.0, c(Style::kGlassSelTop));
+            g.setColorAt(1.0, c(Style::kGlassSelBot));
+            p.setBrush(g);
+            p.setPen(QPen(c(Style::kGlassSelBorder), 1));
+            text = c(Style::kGlassSelText);
         } else if (on) {
-            bg = c(Style::kInsetBg); edge = c(Style::kBorderSubtle);
+            // Dieselbe Markierung, nur geparkt: eingeschaltet, aber die
+            // Kette laeuft nicht.
+            p.setBrush(mix(c(Style::kInsetBg),  c(Style::kGlassSelBot),    0.30));
+            p.setPen(QPen(mix(c(Style::kInsetBorder),
+                              c(Style::kGlassSelBorder), 0.30), 1));
             text = c(Style::kTextSecondary);
         } else {
-            bg = c(Style::kInsetBg); edge = c(Style::kInsetBorder);
+            p.setBrush(c(Style::kInsetBg));
+            p.setPen(QPen(c(Style::kInsetBorder), 1));
             text = c(Style::kTextInactive);
         }
-
-        p.setPen(QPen(edge, 1));
-        p.setBrush(bg);
-        p.drawRoundedRect(r.adjusted(0, 0, -1, -1), 3, 3);
+        p.drawRoundedRect(box, 3, 3);
 
         // Gain reduction, as a bar growing downward from the top edge.
         // Downward because that is the direction the gain is going, and
@@ -324,7 +362,9 @@ void StripChainView::paintEvent(QPaintEvent*)
             p.setPen(Qt::NoPen);
             // Amber, not red: this is the stage working as intended,
             // not a fault. Red belongs to things that are wrong.
-            p.setBrush(QColor(0xd0, 0x90, 0x20, 150));
+            // Heller als frueher, seit die Kachel darunter blau ist:
+            // das alte #d09020 bei 150 verschwamm auf der Flaeche.
+            p.setBrush(QColor(0xf0, 0xc0, 0x60, 170));
             p.drawRect(bar);
         }
 
@@ -339,10 +379,22 @@ void StripChainView::paintEvent(QPaintEvent*)
             QFont sf = f;
             sf.setPointSizeF(8.0);
             p.setFont(sf);
-            p.setPen(c(Style::kTextSecondary));
+            // Auf der blauen Flaeche war Grau kaum noch zu lesen:
+            // dieselbe Schriftfarbe wie der Name, nur zurueckgenommen.
+            p.setPen(mix(c(Style::kGlassSelText), c(Style::kGlassSelBot), 0.35));
             p.drawText(QRect(r.left(), r.bottom() - 14, r.width(), 13),
                        Qt::AlignCenter,
                        QStringLiteral("-%1 dB").arg(gr, 0, 'f', 1));
+        }
+
+        // Der offene Reiter. Weiss und nur als Ring: er sagt nichts
+        // ueber den Zustand der Stufe, nur darueber, welche Seite
+        // gerade darunter aufgeschlagen ist. Liegt ausserhalb der
+        // Kachel, damit er die Markierung nicht ueberdeckt.
+        if (i == m_openStage) {
+            p.setBrush(Qt::NoBrush);
+            p.setPen(QPen(c(Style::kTextPrimary), 1.4));
+            p.drawRoundedRect(QRectF(r).adjusted(-2.5, -2.5, 1.5, 1.5), 5, 5);
         }
     }
 }
