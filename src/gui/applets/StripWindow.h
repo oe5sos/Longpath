@@ -260,6 +260,9 @@ private:
     bool m_pluginsScanned{false};
     QWidget*     m_catalogue{nullptr};
     QLabel*      m_insertsNote{nullptr};
+    // Die Zeile unter der Liste, die beim Darueberfahren sagt, was
+    // das Plugin tut -- ohne die Wartezeit einer Kurzhilfe.
+    QLabel*      m_pluginSatz{nullptr};
     QLabel*      m_eqMuteWarning{nullptr};
     class StripTransferCurve* m_transfer{nullptr};
     QLabel* m_crestNote{nullptr};

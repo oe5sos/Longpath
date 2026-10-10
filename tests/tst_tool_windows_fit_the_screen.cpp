@@ -35,6 +35,7 @@
 #include "gui/MainWindow.h"
 #include "gui/WindowPlacement.h"
 #include "gui/applets/BroadcastOptimizerPanel.h"
+#include "core/Sprache.h"
 #include "core/strip/StripChain.h"
 #include "gui/applets/StripWindow.h"
 #include "models/RadioModel.h"
@@ -148,7 +149,8 @@ private slots:
         for (int i = 0; i < StripChain::kStageCount; ++i) {
             const auto st = static_cast<StripChain::Stage>(i);
             QCOMPARE(tabs->tabText(i + 1),
-                     QString::fromLatin1(StripChain::stageName(st)));
+                     Sprache::T(
+                         QString::fromLatin1(StripChain::stageName(st))));
         }
     }
 
@@ -176,7 +178,11 @@ private slots:
 
         for (int i = 0; i < StripChain::kStageCount; ++i) {
             const auto st = static_cast<StripChain::Stage>(i);
-            const QString name = QString::fromLatin1(StripChain::stageName(st));
+            // Die Oberfläche ist deutsch (core/Sprache.h) -- verglichen
+            // wird mit dem übersetzten Namen, sonst prüft der Prüfstand
+            // eine Sprache, die niemand sieht.
+            const QString name = Sprache::T(
+                QString::fromLatin1(StripChain::stageName(st)));
             QWidget* page = tabs->widget(i + 1);
             QVERIFY2(page != nullptr, qPrintable(name));
 
@@ -261,7 +267,8 @@ private slots:
 
         int voiceTab = -1;
         for (int i = 0; i < tabs->count(); ++i) {
-            if (tabs->tabText(i) == QLatin1String("Voice check")) {
+            if (tabs->tabText(i)
+                == Sprache::T(QStringLiteral("Voice check"))) {
                 voiceTab = i;
                 break;
             }

@@ -24,6 +24,8 @@
 #include "core/strip/AudioPlugin.h"
 #include "core/strip/PluginPlacement.h"
 #include "core/AppSettings.h"
+#include "core/Sprache.h"
+#include "core/strip/PluginPlacement.h"
 #include "gui/applets/eq/EqHost.h"
 #include "gui/applets/eq/StripEqPanel.h"
 #include "gui/applets/TxVoiceCheckDialog.h"
@@ -196,21 +198,21 @@ StripWindow::StripWindow(RadioModel* radio, QWidget* parent)
 QString StripWindow::noteText() const
 {
     if (!chain()) {
-        return QStringLiteral(
-            "No strip available in this window.");
+        return Sprache::T(QStringLiteral(
+            "No strip available in this window."));
     }
     if (!m_radio || !m_radio->isConnected()) {
-        return QStringLiteral(
+        return Sprache::T(QStringLiteral(
             "No radio connected — set the strip up here anyway. Record "
             "and Play above run your voice through it off the sound "
             "card, so every stage can be heard and judged at the desk. "
-            "The moment a radio comes up, this is what it transmits.");
+            "The moment a radio comes up, this is what it transmits."));
     }
-    return QStringLiteral(
+    return Sprache::T(QStringLiteral(
         "Sits in front of the radio's own processing, on the "
         "microphone before WDSP sees it. Switched off, the audio is "
         "bit-for-bit what it was before this window existed — so "
-        "switching off is a real comparison, not an approximate one.");
+        "switching off is a real comparison, not an approximate one."));
 }
 
 void StripWindow::adoptChainIfArrived()
@@ -300,7 +302,7 @@ void StripWindow::setMonitorRecording(bool on)
 {
     if (!m_monRecordBtn) { return; }
     m_monRecordBtn->setText(on ? QStringLiteral("■ Stop")
-                               : QStringLiteral("● Record"));
+                               : Sprache::T(QStringLiteral("● Record")));
     if (m_monPlayBtn) {
         m_monPlayBtn->setEnabled(!on && m_monHasRecording);
     }
@@ -310,7 +312,7 @@ void StripWindow::setMonitorPlaying(bool on)
 {
     if (!m_monPlayBtn) { return; }
     m_monPlayBtn->setText(on ? QStringLiteral("■ Stop")
-                             : QStringLiteral("▶ Play"));
+                             : Sprache::T(QStringLiteral("▶ Play")));
 }
 
 void StripWindow::setMonitorHasRecording(bool has)
@@ -465,19 +467,19 @@ void StripWindow::updateLiveNote()
     const bool through = m_master && m_master->isChecked();
     QString t;
     if (!through) {
-        t = QStringLiteral(
+        t = Sprache::T(QStringLiteral(
             "Listening to the raw microphone. The strip is switched "
             "off, so nothing you set — EQ curve included — is audible "
             "right now. Tick “Channel strip” at the top left to hear "
-            "it, and untick it again to compare. ");
+            "it, and untick it again to compare. "));
     } else {
-        t = QStringLiteral("Listening through the strip. ");
+        t = Sprache::T(QStringLiteral("Listening through the strip. "));
     }
-    t += QStringLiteral(
+    t += Sprache::T(QStringLiteral(
         "About %1 ms of delay inside Longpath; the sound card adds its "
         "own on each side. Headphones. While this is on, the EQ tab "
         "draws your own voice — speak a few sentences, then press Peak "
-        "Hold there to freeze the shape you are aiming at.")
+        "Hold there to freeze the shape you are aiming at."))
         .arg(m_live->latencyMs(), 0, 'f', 0);
     // Der Zaehler steht jetzt fuer EINZELNE Abtastwerte, nicht mehr
     // fuer Bloecke. Dass er laeuft, ist der Normalfall und kein
@@ -486,11 +488,11 @@ void StripWindow::updateLiveNote()
     // eine Selbstverstaendlichkeit steht.
     const int slipped = m_live->overruns() + m_live->underruns();
     if (slipped > 0) {
-        t += QStringLiteral("  %1 single sample(s) slipped so far, "
+        t += Sprache::T(QStringLiteral("  %1 single sample(s) slipped so far, "
                             "keeping two sound-card clocks together — "
                             "that is normal and inaudible. Crackling is "
                             "something else: then the latency setting is "
-                            "too tight for this computer.")
+                            "too tight for this computer."))
                  .arg(slipped);
     }
     m_liveNote->setText(t);
@@ -537,7 +539,7 @@ void StripWindow::buildUi()
         // auto-plays when it stops), Play replays the last take. The
         // monitor itself lives in MainWindow; this window only hosts
         // the buttons — same division of labour as upstream.
-        m_monRecordBtn = new QPushButton(QStringLiteral("● Record"), this);
+        m_monRecordBtn = new QPushButton(Sprache::T(QStringLiteral("● Record")), this);
         m_monRecordBtn->setStyleSheet(Style::buttonBaseStyle());
         m_monRecordBtn->setToolTip(QStringLiteral(
             "Record your processed voice off the strip (up to 30 s) — "
@@ -548,7 +550,7 @@ void StripWindow::buildUi()
                 this, &StripWindow::monitorRecordClicked);
         row->addWidget(m_monRecordBtn);
 
-        m_monPlayBtn = new QPushButton(QStringLiteral("▶ Play"), this);
+        m_monPlayBtn = new QPushButton(Sprache::T(QStringLiteral("▶ Play")), this);
         m_monPlayBtn->setStyleSheet(Style::buttonBaseStyle());
         m_monPlayBtn->setEnabled(false);
         m_monPlayBtn->setToolTip(QStringLiteral(
@@ -836,8 +838,8 @@ void StripWindow::buildUi()
     connect(m_voiceCheck, &TxVoiceCheckDialog::curveEditRequested,
             this, [this]() {
         if (!m_tabs) { return; }
-        const QString eq = QString::fromLatin1(
-            StripChain::stageName(StripChain::Stage::Eq));
+        const QString eq = Sprache::T(QString::fromLatin1(
+            StripChain::stageName(StripChain::Stage::Eq)));
         for (int i = 0; i < m_tabs->count(); ++i) {
             if (m_tabs->tabText(i) == eq) {
                 m_tabs->setCurrentIndex(i);
@@ -858,12 +860,29 @@ void StripWindow::buildUi()
         int found = -1;
         for (int i = 0; i < StripChain::kStageCount; ++i) {
             const auto s = static_cast<StripChain::Stage>(i);
-            if (t == QString::fromLatin1(StripChain::stageName(s))) {
+            if (t == Sprache::T(
+                    QString::fromLatin1(StripChain::stageName(s)))) {
                 found = i;
                 break;
             }
         }
         m_chainView->setOpenStage(found);
+
+        // ── Von selbst suchen ────────────────────────────────────
+        //
+        // „ich muss auch immer auf look for plugins klicken. diese
+        //  sollten automatisch zur auswahl stehen."
+        //
+        // Der Knopf bleibt -- als „Erneut suchen" --, aber er ist
+        // nicht mehr die Voraussetzung. Der Grund, aus dem beim
+        // Programmstart NICHT gesucht wird, bleibt davon unberührt:
+        // wer die Seite nie aufmacht, lädt nie fremden Code. Das
+        // Aufschlagen des Reiters IST die Zustimmung; ein zweiter
+        // Klick danach war nur eine Hürde.
+        if (!m_pluginsScanned
+            && t == Sprache::T(QStringLiteral("Plugins"))) {
+            scanPlugins();
+        }
     };
     connect(m_tabs, &QTabWidget::currentChanged,
             this, [markOpenStage](int) { markOpenStage(); });
@@ -919,6 +938,14 @@ void StripWindow::buildUi()
     m_meterTimer->start();
 
     setMinimumWidth(560);
+
+    // ── Zum Schluss: alles auf Deutsch ───────────────────────────────
+    //
+    // Ein Durchgang durch den fertigen Baum statt zweihundert
+    // Änderungen an den Aufrufen. Warum so und nicht mit tr(), steht
+    // in core/Sprache.h. Was in der Tabelle fehlt, bleibt englisch --
+    // sichtbar, und damit auffindbar.
+    Sprache::uebersetzeBaum(this);
 }
 
 // ── Gate ─────────────────────────────────────────────────────────────
@@ -1911,7 +1938,7 @@ QWidget* StripWindow::buildPlaceholder(StripChain::Stage s)
 
     const int idx = static_cast<int>(s);
     auto* on = new QCheckBox(
-        QStringLiteral("%1 on")
+        Sprache::T(QStringLiteral("%1 on"))
             .arg(QString::fromLatin1(StripChain::stageName(s))), page);
     m_stageBoxes[static_cast<size_t>(idx)] = on;
     col->addWidget(on);
@@ -2389,6 +2416,9 @@ void StripWindow::reloadControls()
     if (m_transfer != nullptr && m_live != nullptr && m_live->isRunning()) {
         m_transfer->setRings(&m_live->inputRing(), &m_live->outputRing());
     }
+
+    // Die Seiten sind neu und damit wieder englisch.
+    Sprache::uebersetzeBaum(this);
 }
 
 void StripWindow::showVoiceCheckTab()
@@ -2700,9 +2730,16 @@ void StripWindow::refreshChainRow()
 // Stelle gehoert der Kette, nicht der Liste.
 class PluginChip : public QFrame {
 public:
-    PluginChip(const PluginDescriptor& d, QWidget* parent)
-        : QFrame(parent), m_id(d.identifier)
+    PluginChip(const PluginDescriptor& d, QWidget* parent,
+               QLabel* zeile = nullptr)
+        : QFrame(parent), m_id(d.identifier), m_zeile(zeile)
     {
+        // Was es tut, in einem Satz -- siehe PluginPlacement.h. Die
+        // Kurzhilfe braucht eine Sekunde Geduld, die Zeile unter der
+        // Liste nicht: „beim drüber scrollen eine kurze beschreibung"
+        // heisst sofort, nicht nach einer Wartezeit.
+        m_satz = PluginPlacement::beschreibung(d.name, d.vendor);
+        setMouseTracking(true);
         setCursor(Qt::OpenHandCursor);
         setStyleSheet(QStringLiteral(
             "QFrame { background: %1; border: 1px solid %2;"
@@ -2737,12 +2774,20 @@ public:
             row->addWidget(vendor);
         }
 
-        setToolTip(QStringLiteral(
-            "Drag onto the chain at the top of this window and drop it "
-            "where you want it. The gap you are over lights up."));
+        setToolTip(m_satz + QStringLiteral("\n\n")
+                   + Sprache::T(QStringLiteral(
+                       "Drag onto the chain at the top of this window and "
+                       "drop it where you want it. The gap you are over "
+                       "lights up.")));
     }
 
 protected:
+    void enterEvent(QEnterEvent* ev) override
+    {
+        if (m_zeile != nullptr) { m_zeile->setText(m_satz); }
+        QFrame::enterEvent(ev);
+    }
+
     void mousePressEvent(QMouseEvent* ev) override
     {
         if (ev->button() == Qt::LeftButton) { m_from = ev->pos(); }
@@ -2769,6 +2814,8 @@ protected:
 private:
     QString m_id;
     QPoint  m_from;
+    QString m_satz;
+    QLabel* m_zeile{nullptr};
 };
 
 // ── Einschubplaetze: fremde Effekte, als Zusatz ──────────────────────
@@ -2799,7 +2846,7 @@ QWidget* StripWindow::buildInsertsPanel()
     col->addWidget(m_insertsNote);
 
     m_insertScanBtn = new QPushButton(
-        QStringLiteral("Look for plugins on this computer"), page);
+        QStringLiteral("Search again"), page);
     m_insertScanBtn->setStyleSheet(Style::buttonBaseStyle());
     connect(m_insertScanBtn, &QPushButton::clicked,
             this, &StripWindow::scanPlugins);
@@ -2922,6 +2969,22 @@ QWidget* StripWindow::buildInsertsPanel()
     // einbauen koennte.
     m_catalogue = new QWidget(page);
     col->addWidget(m_catalogue);
+
+    // Eine feste Zeile statt einer Kurzhilfe: die Kurzhilfe kommt
+    // erst nach einer Wartezeit, und wer eine Liste durchfährt,
+    // wartet nicht. Siehe PluginChip::enterEvent.
+    m_pluginSatz = new QLabel(page);
+    m_pluginSatz->setWordWrap(true);
+    m_pluginSatz->setMinimumHeight(34);
+    m_pluginSatz->setStyleSheet(QStringLiteral(
+        "QLabel { color: %1; background: %2; border: 1px solid %3;"
+        " border-radius: 4px; padding: 6px 8px; }")
+        .arg(QString::fromLatin1(Style::kTextSecondary),
+             QString::fromLatin1(Style::kInsetBg),
+             QString::fromLatin1(Style::kBorderSubtle)));
+    m_pluginSatz->setText(Sprache::T(QStringLiteral(
+        "Point at a plugin to read what it does.")));
+    col->addWidget(m_pluginSatz);
     rebuildPluginCatalogue();
 
     // Den Hinweistext jetzt erst setzen, wo alles steht. Vorher war
@@ -2970,6 +3033,11 @@ void StripWindow::scanPlugins()
                              ? d.name
                              : QStringLiteral("%1 — %2").arg(d.vendor, d.name),
                          d.identifier);
+            // Auch in der Auswahlliste, nicht nur bei den Kacheln:
+            // dort wird genauso gesucht.
+            box->setItemData(box->count() - 1,
+                             PluginPlacement::beschreibung(d.name, d.vendor),
+                             Qt::ToolTipRole);
         }
     }
     rebuildPluginCatalogue();
@@ -3053,7 +3121,8 @@ void StripWindow::rebuildPluginCatalogue()
         grid->setVerticalSpacing(5);
         int n = 0;
         for (const PluginDescriptor& d : *at) {
-            grid->addWidget(new PluginChip(d, m_catalogue), n / 3, n % 3);
+            grid->addWidget(new PluginChip(d, m_catalogue, m_pluginSatz),
+                            n / 3, n % 3);
             ++n;
         }
         for (int column = 0; column < 3; ++column) {
@@ -3285,7 +3354,7 @@ void StripWindow::refreshInsertCard(int slot)
     }
     if (params.size() > shown) {
         auto* more = new QLabel(
-            QStringLiteral("%1 further parameters are not shown.")
+            Sprache::T(QStringLiteral("%1 further parameters are not shown."))
                 .arg(params.size() - shown), ui.params);
         more->setStyleSheet(dimStyle() + QStringLiteral("QLabel{border:none;}"));
         ui.paramForm->addRow(QString(), more);
@@ -3371,8 +3440,8 @@ void StripWindow::refreshMeters()
     }
 
     if (m_clipMeter) {
-        m_clipMeter->setText(QStringLiteral(
-            "Clipper: %1 dB of peak taken off · crest now %2 dB")
+        m_clipMeter->setText(Sprache::T(QStringLiteral(
+            "Clipper: %1 dB of peak taken off · crest now %2 dB"))
                 .arg(c->clipper().clippedDb(), 0, 'f', 1)
                 .arg(c->outputCrestDb() > 0.0f
                          ? QString::number(double(c->outputCrestDb()),
@@ -3385,27 +3454,27 @@ void StripWindow::refreshMeters()
             !nr.isUsable()
                 ? QStringLiteral("Denoise: not available — needs 48 kHz "
                                  "and the bundled model")
-                : QStringLiteral("Denoise: %1 dB taken out · voice %2 %")
+                : Sprache::T(QStringLiteral("Denoise: %1 dB taken out · voice %2 %"))
                       .arg(nr.reductionDb(), 0, 'f', 1)
                       .arg(int(nr.voiceProbability() * 100.0f + 0.5f)));
     }
     if (m_gateMeter) {
-        m_gateMeter->setText(QStringLiteral(
-            "Gate: %1 · %2 dB of attenuation · in %3 dBFS")
+        m_gateMeter->setText(Sprache::T(QStringLiteral(
+            "Gate: %1 · %2 dB of attenuation · in %3 dBFS"))
                 .arg(c->gate().gateOpen() ? QStringLiteral("open")
                                           : QStringLiteral("shut"))
                 .arg(c->gate().gainReductionDb(), 0, 'f', 1)
                 .arg(c->gate().inputPeakDb(), 0, 'f', 1));
     }
     if (m_deEssMeter) {
-        m_deEssMeter->setText(QStringLiteral(
-            "De-esser: %1 dB off the sibilance · sidechain %2 dBFS")
+        m_deEssMeter->setText(Sprache::T(QStringLiteral(
+            "De-esser: %1 dB off the sibilance · sidechain %2 dBFS"))
                 .arg(c->deEss().gainReductionDb(), 0, 'f', 1)
                 .arg(c->deEss().sidechainPeakDb(), 0, 'f', 1));
     }
     if (m_compMeter) {
-        m_compMeter->setText(QStringLiteral(
-            "Compressor: %1 dB of reduction · in %2 dBFS · out %3 dBFS")
+        m_compMeter->setText(Sprache::T(QStringLiteral(
+            "Compressor: %1 dB of reduction · in %2 dBFS · out %3 dBFS"))
                 .arg(c->comp().gainReductionDb(), 0, 'f', 1)
                 .arg(c->comp().inputPeakDb(), 0, 'f', 1)
                 .arg(c->comp().outputPeakDb(), 0, 'f', 1));

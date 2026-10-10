@@ -172,4 +172,113 @@ Group guess(const QString& name, const QString& vendor)
     return Group::Unknown;
 }
 
+
+// ── Was das Ding tut, in einem Satz ──────────────────────────────────
+//
+// Die Tabelle deckt Apples eigene Audio Units (die auf jedem Mac
+// liegen und sonst die halbe Liste füllen) und die Stücke ab, die
+// hier ausgesucht und geprüft wurden. Alles andere bekommt die
+// Gruppenauskunft -- und die sagt dazu, dass sie geraten ist.
+//
+// Die Sätze nennen auch, was NICHT taugt. „AURogerBeep: ein Scherz
+// aus der Funk-Ecke" ist eine nützlichere Auskunft als Schweigen,
+// und „AUNetSend schickt Ton über das Netz, kein Effekt" bewahrt
+// davor, es auszuprobieren.
+namespace {
+
+struct Bekannt { const char* teil; const char* satz; };
+
+constexpr Bekannt kBekannt[] = {
+    { "AUBandpass",
+      "Apples Bandpass: lässt nur einen Bereich durch. Im Sendeweg selten nützlich — unser Kanalfilter oben macht das schon, und steiler." },
+    { "AUDelay",
+      "Apples Echo. Gehört nicht in einen Sendeweg: ein Echo auf der Stimme kostet Verständlichkeit und sonst nichts." },
+    { "AUDistortion",
+      "Apples Verzerrer. Als Effekt gedacht, nicht als Sättigung — unsere Röhre macht das Gewollte, das hier macht es hörbar kaputt." },
+    { "AUDynamicsProcessor",
+      "Apples Kompressor mit Expander. Brauchbar, aber unser Kompressor und unser Gate sind für Sprache eingerichtet und zeigen, was sie tun." },
+    { "AUFilter",
+      "Apples Mehrzweckfilter (Hoch-, Tief-, Glocke). Kann alles ein bisschen; für die Stimme ist der Entzerrer oben genauer." },
+    { "AUGraphicEQ",
+      "Apples Grafik-Entzerrer, 10 oder 31 feste Bänder. Dasselbe Prinzip wie unsere einfache Ansicht, ohne die Namen darüber." },
+    { "AUHighShelfFilter",
+      "Apples Höhenregler (Kuhschwanz). Hebt oder senkt alles oberhalb einer Frequenz." },
+    { "AUHipass",
+      "Apples Hochpass: nimmt die Tiefen weg. Gegen Rumpeln und Trittschall — aber unser Gate und der Kanal tun das schon." },
+    { "AULowpass",
+      "Apples Tiefpass: nimmt die Höhen weg." },
+    { "AULowShelfFilter",
+      "Apples Tiefenregler (Kuhschwanz). Hebt oder senkt alles unterhalb einer Frequenz." },
+    { "AUMatrixReverb",
+      "Apples Hall. Auf Sendung füllt Hall die Lücken zwischen den Wörtern — genau die braucht die Gegenseite, um dich vom Rauschen zu trennen." },
+    { "AUMultibandCompressor",
+      "Apples Mehrband-Kompressor: komprimiert Tiefen, Mitten und Höhen getrennt. Das kann etwas, was unsere Kette nicht hat — kräftig und schwer einzustellen." },
+    { "AUNBandEQ",
+      "Apples parametrischer Entzerrer mit frei wählbarer Bandzahl. Sauber gerechnet; die Oberfläche ist eine Zahlentabelle." },
+    { "AUNetSend",
+      "Schickt Ton über das Netz an einen anderen Rechner. Kein Effekt — in einem Sendeweg hat das nichts verloren." },
+    { "AUNewPitch",
+      "Verschiebt die Tonhöhe, ohne das Tempo zu ändern. Als Werkzeug interessant, auf Sendung eine Verfälschung deiner Stimme." },
+    { "AUParametricEQ",
+      "Apples einzelne parametrische Glocke. Für eine gezielte Korrektur brauchbar, für eine Kurve zu wenig." },
+    { "AUPeakLimiter",
+      "Apples Spitzenbegrenzer. Unser Begrenzer am Ende der Kette tut dasselbe und zeigt dabei, wieviel er arbeitet." },
+    { "AUPitch",
+      "Ältere Tonhöhenverschiebung von Apple. Siehe AUNewPitch — nichts für den Sendeweg." },
+    { "AUReverb2",
+      "Apples zweiter Hall. Dieselbe Warnung wie beim Hall oben: Lücken füllen kostet Lesbarkeit." },
+    { "AURogerBeep",
+      "Setzt einen Piepton ans Ende jeder Sprechpause. Ein Scherz aus der Funk-Ecke; technisch harmlos, auf dem Band eine Zumutung." },
+    { "AURoundTripAAC",
+      "Schickt den Ton durch eine AAC-Kodierung und zurück — zum Hören, was eine Kompression anrichtet. Ein Prüfwerkzeug, kein Effekt." },
+    { "AUSampleDelay",
+      "Verzögert um einzelne Abtastwerte. Für das Ausrichten zweier Wege gedacht, nicht für eine Stimme." },
+    { "AUSoundIsolation",
+      "Apples Stimmentrennung: trennt Sprache vom Rest. Dasselbe Ziel wie unsere Entrausch-Stufe — einen Vergleich wert." },
+    { "TDR Nova",
+      "Dynamischer Entzerrer: ein Band, das nur dann greift, wenn es zu laut wird. Genau das kann unsere Kette nicht — als De-Esser, der nur bei S-Lauten arbeitet, ist er hier das stärkste Stück." },
+    { "TDR Kotelnikov",
+      "Studio-Kompressor, sehr sauber und sehr durchsichtig. Kein Ersatz für unseren, sondern ein Maßstab zum Danebenhalten." },
+    { "TDR VOS SlickEQ",
+      "Entzerrer mit drei Bändern im Stil alter Mischpulte. Klingt angenehm, ist aber grob — für die gezielte Korrektur zu wenig Bänder." },
+    { "Bertom Denoiser",
+      "Entrauschen, spektral. Dieselbe Aufgabe wie unsere Entrausch-Stufe; der Vergleich der beiden sagt mehr als jedes Datenblatt." },
+    { "ColourEQ",
+      "Entzerrer von DDMF. Viele Bänder, eigene Oberfläche — eine ernsthafte Alternative zu unserem, wenn du sie kennst." },
+    { "ZL Equalizer",
+      "Entzerrer mit dynamischen Bändern und Gegenhören. Mächtig; die Einarbeitung ist kein Nachmittag." },
+};
+
+const Bekannt* finde(const QString& name)
+{
+    for (const Bekannt& b : kBekannt) {
+        if (name.contains(QLatin1String(b.teil), Qt::CaseInsensitive)) {
+            return &b;
+        }
+    }
+    return nullptr;
+}
+
+} // namespace
+
+bool istBekannt(const QString& name) { return finde(name) != nullptr; }
+
+QString beschreibung(const QString& name, const QString& vendor)
+{
+    if (const Bekannt* b = finde(name)) {
+        return QString::fromUtf8(b->satz);
+    }
+    // Kein erfundener Werbetext. Was wir haben, ist die geratene
+    // Gruppe -- und dass sie geraten ist, steht dabei.
+    const Group g = guess(name, vendor);
+    if (g == Group::Unknown) {
+        return QStringLiteral(
+            "Unbekannt. Weder Name noch Hersteller verraten, was es tut "
+            "— ausprobieren, und zwar mit dem Mithörer, nicht auf Sendung.");
+    }
+    return QStringLiteral("Vermutlich: %1. %2 (Die Zuordnung ist aus dem "
+                          "Namen geraten.)")
+        .arg(groupName(g), groupHint(g));
+}
+
 } // namespace Longpath::PluginPlacement

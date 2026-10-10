@@ -69,4 +69,28 @@ int suggestedPosition(Group g);
 // Raten, mit Netz. Name und Hersteller, wie der Wirt sie meldet.
 Group guess(const QString& name, const QString& vendor);
 
+// ── Was das Ding eigentlich tut ──────────────────────────────────────
+//
+// „ggf auch beim drüber scrollen eine kurze beschreibung, um was es
+//  bei dem plugin geht und was es verbessert."
+//
+// Eine Audio Unit sagt ihren Zweck nicht; sie nennt Hersteller, Namen
+// und ihre Parameter, mehr nicht. Also zwei Quellen, in dieser
+// Reihenfolge:
+//
+//   1. Eine Tabelle der Stücke, die wir WIRKLICH kennen -- Apples
+//      eigene (die auf jedem Mac liegen) und die, die hier
+//      ausgesucht und geprüft wurden. Da steht ein echter Satz.
+//   2. Sonst die Gruppe und was sie im Sendeweg tut.
+//
+// Was nicht in der Tabelle steht, bekommt KEINE erfundene
+// Beschreibung. „Vermutlich ein Entzerrer -- die Zuordnung ist
+// geraten" ist eine ehrliche Auskunft; ein ausgedachter Werbetext
+// wäre keine.
+QString beschreibung(const QString& name, const QString& vendor);
+
+// Ob zu diesem Namen ein echter Satz vorliegt (und nicht nur die
+// Gruppenauskunft). Für die Oberfläche, die das unterscheiden will.
+bool istBekannt(const QString& name);
+
 } // namespace Longpath::PluginPlacement

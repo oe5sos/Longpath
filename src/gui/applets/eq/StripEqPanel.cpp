@@ -42,6 +42,7 @@
 #include "gui/applets/eq/ClientEqParamRow.h"
 #include "gui/applets/eq/StripEqSimpleBar.h"
 #include "core/AppSettings.h"
+#include "core/Sprache.h"
 #include "gui/applets/eq/EqHost.h"
 #include "core/strip/ClientEq.h"
 #include "core/strip/EqBandLayout.h"
@@ -654,6 +655,7 @@ StripEqPanel::StripEqPanel(EqHost* engine, QWidget* parent)
     // Einfach ist der Standard -- auch fuer den, der die Seite zum
     // ersten Mal oeffnet. Die Profi-Ansicht ist einen Knopf weit weg
     // und bleibt, wenn sie einmal gewaehlt wurde.
+    Sprache::uebersetzeBaum(this);
     setSimpleView(AppSettings::instance()
                       .value("StripEqSimpleView", "True")
                       .toString() != QLatin1String("False"));
