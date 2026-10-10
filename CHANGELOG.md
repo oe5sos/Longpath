@@ -2,6 +2,54 @@
 
 ## [Unreleased]
 
+### Der Hochpass stand auf dem Grundton — und der A/B-Vergleich war unfair
+
+> „also roh, volle bandbreite — auf dem signal sollte man aufbauen …
+>  aber die abstriche sind leider viel zu groß."
+
+Bis hierher wurde gemessen, was die Kette **bringt**. Diese Runde misst
+das Gegenteil, und zwar am ehrlichen Maßstab: bei **gleicher Lautheit**
+gegen das rohe Signal — welche Bänder fehlen?
+
+| Band | vorher | ohne Entzerrer | jetzt |
+| --- | --- | --- | --- |
+| 63 Hz | −6,7 dB | −1,5 | **−2,4** |
+| 80 Hz | **−8,0 dB** | −0,4 | **−1,9** |
+| 100 Hz | −4,9 dB | −0,2 | **−1,3** |
+| 125 Hz | −1,7 dB | +0,4 | −0,6 |
+| 630 Hz | −1,5 dB | −0,2 | −0,3 |
+
+**Acht Dezibel bei 80 Hz.** Der Hochpass stand auf 110 Hz mit 24 dB je
+Oktave — und der Grundton einer Männerstimme liegt bei 100 bis 125 Hz.
+Das Profil nahm der Stimme ihr Fundament und gab dafür nichts. Ohne den
+Entzerrer war die Kette unter 1 kHz durchsichtig; mit ihm war sie genau
+das, was man hört, wenn man roh dagegenhält.
+
+Jetzt 60 Hz mit 12 dB je Oktave — bei 110 Hz praktisch nichts mehr, bei
+30 Hz zwölf Dezibel weniger Rumpeln. Dazu zwei weitere Abstriche
+gestrichen: das Tiefenregal (−1,5 dB unter 200 Hz) und der MULM-Griff
+(−2 dB bei 650 Hz) stehen auf null und bleiben als Griffe stehen.
+
+**Und die Dichte stieg dabei:** 8,9 → **9,3 dB** mehr Druck,
+Scheitelfaktor 8,2 → **7,8 dB**. Was man vorne nicht wegnimmt, kann der
+Clipper hinten verdichten.
+
+#### Der Vergleich selbst war der Fehler
+
+Beim Umschalten auf „roh" fiel die Laufzeit der Kette weg: 30 ms für das
+Entrauschen gegen null. Beim Mithören der **eigenen Stimme** ist das
+kein Nichts — man hört sich mit Nachschlag, und das klingt immer
+schlechter, unabhängig davon, was die Kette mit dem Klang macht.
+
+```
+vorher   durch die Kette 1452 Abtastwerte · roh 0
+jetzt    durch die Kette 1452 Abtastwerte · roh 1452   (30,3 ms, beide)
+```
+
+Der überbrückte Weg wartet jetzt genauso lange. Der Vergleich wird
+dadurch nicht besser oder schlechter — er wird ehrlich. Bis heute hat er
+mitentschieden, und niemand hat es gewusst.
+
 ### Der Eingangsregler stand bei jedem Öffnen auf Null
 
 Ein Bildschirmabzug vom Gerät hat es gezeigt: **Eingang −39,6 dBFS ·

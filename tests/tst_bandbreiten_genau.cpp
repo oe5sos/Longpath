@@ -42,6 +42,7 @@
 #include "core/strip/ClientEq.h"
 #include "core/Loudness.h"
 #include "core/strip/ClientFinalLimiter.h"
+#include "core/strip/StripLiveMonitor.h"
 #include "core/strip/StripChain.h"
 #include "core/strip/StripSettings.h"
 
@@ -2189,6 +2190,155 @@ private slots:
                        .arg(spitze(y), 6, 'f', 1).arg(druck(y), 6, 'f', 1)
                        .arg(double(c.effectiveInputGainDb()), 5, 'f', 1);
         }
+    }
+
+    // ── Was die Kette WEGNIMMT, Band für Band ───────────────────────
+    //
+    // „also roh, volle bandbreite — auf dem signal sollte man
+    //  aufbauen … aber die abstriche sind leider viel zu groß."
+    //
+    // Bis hierher wurde gemessen, was die Kette BRINGT: Dichte,
+    // Störabstand, Scheitelfaktor. Diese Reihe fragt das Gegenteil
+    // und misst es am selben Maßstab: bei gleicher Lautheit, welche
+    // Bänder fehlen gegenüber dem rohen Signal?
+    //
+    // Gleiche Lautheit, nicht gleiche Spitze: wer vergleichen will,
+    // was eine Kette WEGNIMMT, darf nicht gegen ihre Verstärkung
+    // messen.
+    void whatTheChainTakesAway()
+    {
+        QString warum;
+        const auto sauber = echteRede(&warum);
+        if (sauber.empty()) { QSKIP(qPrintable(warum)); }
+        const Rede rede = redeMitRauschen(sauber, -48.0);
+
+        // Auf gleiche Lautheit bringen, dann Spektrum vergleichen.
+        const auto aufLautheit = [](const std::vector<float>& v,
+                                    double zielLufs) {
+            const double ist = Loudness::measure(v.data(), int(v.size()),
+                                                 int(kRate)).integratedLufs;
+            std::vector<float> n = v;
+            const float g = float(std::pow(10.0, (zielLufs - ist) / 20.0));
+            for (float& x : n) { x *= g; }
+            return n;
+        };
+        const double zielLufs =
+            Loudness::measure(rede.signal.data(), int(rede.signal.size()),
+                              int(kRate)).integratedLufs;
+
+        struct Band { const char* name; double von; double bis; };
+        const Band baender[] = {
+            {  "63 Hz",  56.0,   71.0 },
+            {  "80 Hz",  71.0,   89.0 },
+            { "100 Hz",  89.0,  112.0 },
+            { "125 Hz", 112.0,  141.0 },
+            { "160 Hz", 141.0,  178.0 },
+            { "200 Hz", 178.0,  224.0 },
+            { "250 Hz", 224.0,  282.0 },
+            { "315 Hz", 282.0,  355.0 },
+            { "400 Hz", 355.0,  447.0 },
+            { "630 Hz", 562.0,  708.0 },
+            {  "1 kHz", 891.0, 1122.0 },
+            {  "2 kHz",1778.0, 2239.0 },
+            {  "4 kHz",3548.0, 4467.0 },
+            {"6,3 kHz",5623.0, 7079.0 },
+        };
+
+        const auto pRoh = spektrum(rede.signal);
+
+        StripChain ganz;
+        empfehlung(ganz);
+        const auto pKette = spektrum(aufLautheit(durch(ganz, rede.signal),
+                                                 zielLufs));
+
+        // Und dieselbe Kette OHNE den Entzerrer, damit man sieht,
+        // was davon der Entzerrer ist und was der Rest.
+        StripChain ohneEq;
+        empfehlung(ohneEq);
+        ohneEq.setStageEnabled(StripChain::Stage::Eq, false);
+        const auto pOhneEq = spektrum(aufLautheit(durch(ohneEq, rede.signal),
+                                                  zielLufs));
+
+        qInfo().noquote() << QStringLiteral(
+            "   Band     Kette   ohne Entzerrer   (dB gegen roh, bei "
+            "gleicher Lautheit)");
+        double schlimmste = 0.0;
+        QString woBand;
+        for (const Band& b : baender) {
+            const double r = bandDb(pRoh, b.von, b.bis);
+            const double k = bandDb(pKette, b.von, b.bis) - r;
+            const double o = bandDb(pOhneEq, b.von, b.bis) - r;
+            if (k < schlimmste) { schlimmste = k; woBand = QString::fromLatin1(b.name); }
+            qInfo().noquote()
+                << QStringLiteral("  %1   %2   %3")
+                       .arg(QString::fromLatin1(b.name), -8)
+                       .arg(k, 7, 'f', 1).arg(o, 10, 'f', 1);
+        }
+        qInfo().noquote()
+            << QStringLiteral("Größter Abstrich: %1 dB bei %2")
+                   .arg(schlimmste, 0, 'f', 1).arg(woBand);
+    }
+
+    // ── Roh und Kette müssen gleich lange brauchen ──────────────────
+    //
+    // Der Vergleich, mit dem der Betreiber drei Tage lang geurteilt
+    // hat, war nicht fair: beim Umschalten auf „roh" fiel die
+    // Laufzeit der Kette weg. 30 ms sind beim Mithören der eigenen
+    // Stimme kein Nichts -- man hört sich selbst mit Nachschlag, und
+    // das klingt IMMER schlechter, unabhängig davon, was die Kette
+    // mit dem Klang macht.
+    //
+    // Geprüft wird deshalb die Laufzeit beider Wege, nicht die
+    // Anwesenheit einer Verzögerungsleitung.
+    void theBypassedPathWaitsJustAsLong()
+    {
+        StripLiveMonitor m;
+        StripChain* c = m.chain();
+        QVERIFY(c != nullptr);
+        c->prepare(kRate);
+        c->setEnabled(true);
+        for (int i = 0; i < StripChain::kStageCount; ++i) {
+            c->setStageEnabled(static_cast<StripChain::Stage>(i), false);
+        }
+        // Nur das Entrauschen, und auf 0 gemischt: dann ist der
+        // Ausgang der Eingang, nur später -- der saubere Maßstab.
+        c->nr().setAmount(0.0f);
+        c->setStageEnabled(StripChain::Stage::Denoise, true);
+        if (c->nr().latencySamples() <= 0) { QSKIP("kein rnnoise-Modell"); }
+
+        const auto laufzeit = [&m](bool roh) {
+            m.setStripBypassed(roh);
+            const int n = int(kRate / 2);
+            std::vector<float> x(size_t(n), 0.0f);
+            for (int i = 0; i < 480; ++i) {
+                x[size_t(4800 + i)] =
+                    float(0.5 * std::sin(2.0 * M_PI * 1000.0 * i / kRate));
+            }
+            for (size_t at = 0; at + 960 <= x.size(); at += 960) {
+                m.applyStrip(x.data() + at, 960);
+            }
+            size_t wo = 0;
+            double p = 0.0;
+            for (size_t i = 0; i < x.size(); ++i) {
+                if (std::fabs(double(x[i])) > p) {
+                    p = std::fabs(double(x[i])); wo = i;
+                }
+            }
+            return double(wo) - 4800.0;
+        };
+
+        const double durchKette = laufzeit(false);
+        const double rohWeg     = laufzeit(true);
+        qInfo().noquote()
+            << QStringLiteral("Laufzeit: durch die Kette %1 Abtastwerte "
+                              "(%2 ms) · roh %3 (%4 ms)")
+                   .arg(durchKette).arg(durchKette * 1000.0 / kRate, 0, 'f', 1)
+                   .arg(rohWeg).arg(rohWeg * 1000.0 / kRate, 0, 'f', 1);
+
+        QVERIFY2(std::fabs(durchKette - rohWeg) < 48.0,
+                 qPrintable(QStringLiteral("der Vergleich ist unfair: "
+                                           "Kette %1, roh %2 Abtastwerte")
+                                .arg(durchKette).arg(rohWeg)));
     }
 
     // ── Die eigene Verzögerung ──────────────────────────────────────

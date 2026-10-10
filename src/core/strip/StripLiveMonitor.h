@@ -261,6 +261,25 @@ private:
     // Begrenzer der Kette selbst, und ein zweiter waere eine Stufe
     // ohne Aufgabe.
     ClientFinalLimiter m_kanalBegrenzer;
+
+    // ── Der rohe Weg wartet genauso lange ────────────────────────
+    //
+    // Beim Umschalten auf „roh" sprang bisher die Verzögerung weg:
+    // die Kette braucht 30 ms (das Entrauschen), der ueberbrueckte
+    // Weg keine. Wer so vergleicht, vergleicht nicht die Kette gegen
+    // roh, sondern 30 ms verzoegerte eigene Stimme gegen
+    // unverzoegerte -- und die verzoegerte klingt IMMER schlechter,
+    // weil man sich selbst mit Nachhall hoert. Das ist kein
+    // Klangunterschied, das ist ein Messfehler im Vergleich, und er
+    // hat drei Tage lang jedes Urteil mitentschieden.
+    //
+    // Also wartet der rohe Weg genauso lange. Der Vergleich wird
+    // dadurch nicht besser oder schlechter -- er wird ehrlich.
+    static constexpr int kMaxVerzug = 1440;   // drei Rahmen
+    std::vector<float> m_rohVerzug;
+    int m_rohPos{0};
+    int m_rohLaenge{0};
+    void verzoegereRoh(float* samples, int frames) noexcept;
     std::unique_ptr<MicSpectrum> m_inRing;
     std::unique_ptr<MicSpectrum> m_outRing;
     const StripChain* m_mirror{nullptr};   // nicht besessen

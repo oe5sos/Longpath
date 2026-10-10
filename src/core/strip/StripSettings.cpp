@@ -730,13 +730,43 @@ bool applyBuiltIn(const QString& name, StripChain& c)
         c.gate().setReturnDb(5.0f);
         c.setStageEnabled(StripChain::Stage::Gate, true);
 
-        // Hochpass, drei Kerben aus (wie bei den anderen Profilen),
-        // Tiefenregal neutral, und die geformten Bänder klein.
-        band(0, ClientEq::FilterType::HighPass, 110.0f, 0.0f, 0.707f, true, 24);
+        // ── Nichts wegnehmen, was nicht weg muss ────────────────
+        //
+        // „also roh, volle bandbreite — auf dem signal sollte man
+        //  aufbauen … aber die abstriche sind leider viel zu groß."
+        //
+        // Hier stand ein Hochpass bei 110 Hz mit 24 dB je Oktave.
+        // Gemessen an echter Sprache, bei GLEICHER LAUTHEIT gegen
+        // das rohe Signal (tst_bandbreiten_genau::whatTheChainTakesAway):
+        //
+        //   Band      mit Entzerrer   ohne Entzerrer
+        //    63 Hz        -6,7 dB         -1,5 dB
+        //    80 Hz        -8,0 dB         -0,4 dB
+        //   100 Hz        -4,9 dB         -0,2 dB
+        //   125 Hz        -1,7 dB         +0,4 dB
+        //   630 Hz        -1,5 dB         -0,2 dB
+        //
+        // Acht Dezibel bei 80 Hz. Der Grundton einer Männerstimme
+        // liegt bei 100 bis 125 Hz -- der Hochpass stand also auf
+        // dem Grundton und hat ihm das Fundament genommen. Ohne den
+        // Entzerrer ist die Kette unter 1 kHz durchsichtig; mit ihm
+        // war sie das Gegenteil dessen, was der Betreiber hört, wenn
+        // er roh vergleicht.
+        //
+        // 60 Hz mit 12 dB je Oktave: bei 110 Hz praktisch nichts
+        // mehr (-0,5 dB), bei 30 Hz zwölf Dezibel weniger Rumpeln.
+        // Ein Hochpass hat eine Aufgabe -- Trittschall, Griffgeräusch
+        // und der Tiefenanteil eines Plosivs fressen Aussteuerung,
+        // die der Clipper braucht --, aber sie liegt UNTER der
+        // Stimme und nicht in ihr.
+        band(0, ClientEq::FilterType::HighPass, 60.0f, 0.0f, 0.707f, true, 12);
         band(1, ClientEq::FilterType::Peak,  50.0f, -18.0f, 8.0f, false, 12);
         band(2, ClientEq::FilterType::Peak, 100.0f, -12.0f, 8.0f, false, 12);
         band(3, ClientEq::FilterType::Peak, 150.0f,  -9.0f, 8.0f, false, 12);
-        band(4, ClientEq::FilterType::LowShelf,   200.0f, -1.5f, 0.707f, true, 12);
+        // Das Tiefenregal nahm 1,5 dB unter 200 Hz -- derselbe
+        // Abstrich am selben Ende, nur sanfter. Steht jetzt auf
+        // null und bleibt als Griff stehen, für den, der es will.
+        band(4, ClientEq::FilterType::LowShelf,   200.0f,  0.0f, 0.707f, true, 12);
         band(5, ClientEq::FilterType::Peak,      2000.0f,  2.0f, 1.2f,   true, 12);
         band(6, ClientEq::FilterType::HighShelf, 3000.0f,  0.0f, 0.707f, true, 12);
         // Die sieben freien Griffe: zwei davon benutzt, der Rest
@@ -747,13 +777,15 @@ bool applyBuiltIn(const QString& name, StripChain& c)
             c.eq().setBand(i, EqBandLayout::spare(i - EqBandLayout::kFirstSpare));
         }
         {
-            // MULM 650 Hz leicht zurück, PRÄSENZ 2,5 kHz leicht vor.
-            ClientEq::BandParams mulm = EqBandLayout::spare(2);
-            mulm.gainDb = -2.0f; mulm.q = 2.0f; mulm.enabled = true;
-            c.eq().setBand(EqBandLayout::kFirstSpare + 2, mulm);
-            ClientEq::BandParams prae = EqBandLayout::spare(5);
-            prae.gainDb = 2.5f; prae.q = 2.0f; prae.enabled = true;
-            c.eq().setBand(EqBandLayout::kFirstSpare + 5, prae);
+            // PRÄSENZ 2,5 kHz leicht vor -- und MULM 650 Hz NICHT
+            // mehr zurück. Gemessen kostete der Griff 1,5 dB bei
+            // 630 Hz, und dort sitzt bei einer Männerstimme der
+            // Körper. Wer ihn dumpf findet, zieht den Griff selbst
+            // herunter; ein Vorgabewert, der etwas wegnimmt, gehört
+            // nicht in ein Profil, auf dem man aufbauen soll.
+            ClientEq::BandParams prae0 = EqBandLayout::spare(5);
+            prae0.gainDb = 2.5f; prae0.q = 2.0f; prae0.enabled = true;
+            c.eq().setBand(EqBandLayout::kFirstSpare + 5, prae0);
         }
         c.eq().setActiveBandCount(EqBandLayout::kBandCount);
         c.setStageEnabled(StripChain::Stage::Eq, true);

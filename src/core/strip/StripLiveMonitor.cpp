@@ -389,10 +389,33 @@ int StripLiveMonitor::monitorChannel() const
     return m_band.channel();
 }
 
+// Siehe m_rohVerzug im Header: der ueberbrueckte Weg muss genauso
+// lange brauchen wie die Kette, sonst vergleicht das Ohr Laufzeiten
+// statt Klang.
+void StripLiveMonitor::verzoegereRoh(float* samples, int frames) noexcept
+{
+    const int soll = std::clamp(m_chain->nr().latencySamples(), 0, kMaxVerzug);
+    if (soll <= 0) { return; }
+    if (soll != m_rohLaenge) {
+        m_rohVerzug.assign(static_cast<size_t>(kMaxVerzug), 0.0f);
+        m_rohLaenge = soll;
+        m_rohPos = 0;
+    }
+    for (int i = 0; i < frames; ++i) {
+        const float alt = m_rohVerzug[static_cast<size_t>(m_rohPos)];
+        m_rohVerzug[static_cast<size_t>(m_rohPos)] = samples[i];
+        samples[i] = alt;
+        if (++m_rohPos >= m_rohLaenge) { m_rohPos = 0; }
+    }
+}
+
 void StripLiveMonitor::applyStrip(float* samples, int frames) noexcept
 {
     if (samples == nullptr || frames <= 0) { return; }
-    if (m_bypass.load(std::memory_order_acquire)) { return; }
+    if (m_bypass.load(std::memory_order_acquire)) {
+        verzoegereRoh(samples, frames);
+        return;
+    }
     for (int at = 0; at + kChainBlock <= frames; at += kChainBlock) {
         m_chain->processMono(samples + at, kChainBlock);
     }
