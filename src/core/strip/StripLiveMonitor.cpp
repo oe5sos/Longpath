@@ -268,6 +268,14 @@ void StripLiveMonitor::doStart()
     // einem Ring dazwischen; dann waeren auch die Zahlen der Geraete
     // selbst (kAudioDevicePropertyLatency, SafetyOffset) abzulesen,
     // statt sie als „kommt noch dazu" zu umschreiben.
+    // ── Und die Kette zaehlt mit ─────────────────────────────────
+    //
+    // Hier stand nur der eigene Puffer: ein Eingangsblock plus der
+    // Vorrat am Ausgang. Das Entrauschen bringt aber 1440
+    // Abtastwerte mit, also 30 ms -- mehr als das Dreifache. Die
+    // Zeile im Fenster meldete „rund 11 ms" und es waren 41. Wer
+    // sich selbst hoert und die Verzoegerung als unangenehm
+    // empfindet, sucht sie dann an der falschen Stelle.
     const double perBlockMs = 1000.0 * m_blockFrames / double(m_inRate);
     m_latencyMs.store(perBlockMs * (1 + kTargetBlocks),
                       std::memory_order_release);
@@ -392,6 +400,20 @@ void StripLiveMonitor::setStripBypassed(bool bypassed)
     qCInfo(lcAudio) << "strip live monitor:"
                     << (bypassed ? "bypassed (raw microphone)"
                                  : "through the strip");
+}
+
+double StripLiveMonitor::latencyMs() const
+{
+    // Der eigene Puffer PLUS die Stufen mit Verzoegerungsleitung.
+    // Hier stand nur der Puffer, und die Zeile im Fenster meldete
+    // „rund 11 ms", waehrend es mit eingeschaltetem Entrauschen 41
+    // waren. Wer sich selbst hoert und die Verzoegerung unangenehm
+    // findet, sucht sie dann an der falschen Stelle.
+    const double eigen = m_latencyMs.load(std::memory_order_acquire);
+    const int rate = m_inRate > 0 ? m_inRate : 48000;
+    const double kette = m_chain
+        ? 1000.0 * m_chain->nr().latencySamples() / double(rate) : 0.0;
+    return eigen + kette;
 }
 
 void StripLiveMonitor::setInputDeviceId(const QByteArray& id)

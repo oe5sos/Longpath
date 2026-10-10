@@ -40,7 +40,10 @@
 // Ueber die Latenz wird hier nicht geschwindelt. Was dieses Modul
 // kennt, ist der eigene Puffer auf beiden Seiten; was die Soundkarte
 // und CoreAudio darunter noch dazulegen, sieht es nicht. latencyMs()
-// sagt deshalb ausdruecklich nur den eigenen Anteil.
+// sagt deshalb ausdruecklich nur den Anteil, den Longpath kennt --
+// den eigenen Puffer UND die Verzoegerungsleitung des Entrauschens,
+// die mit 1440 Abtastwerten mehr als das Dreifache des Puffers
+// ausmacht.
 //
 // =================================================================
 // Modification history (Longpath):
@@ -123,7 +126,12 @@ public:
     // Der eigene Anteil an der Verzoegerung, in Millisekunden.
     // Soundkarte und Treiber kommen oben drauf und sind von hier aus
     // nicht messbar.
-    double latencyMs() const { return m_latencyMs.load(std::memory_order_acquire); }
+    // Eigener Puffer plus die Stufen, die eine Verzoegerung
+    // mitbringen -- derzeit nur das Entrauschen. Live gerechnet und
+    // nicht beim Start gemerkt: der Schalter des Entrauschens kann
+    // sich jederzeit aendern, und eine Zahl, die dann stehenbleibt,
+    // ist falscher als keine.
+    double latencyMs() const;
 
     Latency latencyPreset() const { return m_preset; }
     // Im Lauf umschaltbar: haelt an, stellt um, laeuft wieder an.
