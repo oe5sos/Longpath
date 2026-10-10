@@ -1213,6 +1213,7 @@ set(GUI_SOURCES
 # Betreiber, repeatedly reported. See MacFloatingWindowBehavior.h.
 if(APPLE)
     list(APPEND GUI_SOURCES src/gui/MacFloatingWindowBehavior.mm)
+    list(APPEND GUI_SOURCES src/gui/MacVollflaeche.mm)
     list(APPEND GUI_SOURCES src/gui/MacFloatingWindowBehavior.h)
 endif()
 
@@ -1967,6 +1968,8 @@ if(APPLE)
     set_source_files_properties(src/core/MacMicPermission.mm
         PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
     set_source_files_properties(src/gui/MacFloatingWindowBehavior.mm
+        PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
+    set_source_files_properties(src/gui/MacVollflaeche.mm
         PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 endif()
 if(LONGPATH_USE_PCH)

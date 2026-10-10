@@ -113,6 +113,52 @@ private slots:
                                            "um %1 dB").arg(w, 0, 'f', 2)));
     }
 
+    // Der ganze Durchlauf, Punkt für Punkt -- weil am Gerät der
+    // Verdacht aufkam, die Breiten stimmten nicht („4k hört sich
+    // eher an wie 2700"). Die Eckfrequenz MUSS auf 0,1 dB genau auf
+    // -3 dB liegen, sonst heisst die Beschriftung etwas anderes als
+    // das Filter tut.
+    void everyChannelIsExactlyWhereItSaysItIs()
+    {
+        for (int ch = 0; ch < BandLimit::kChannelCount; ++ch) {
+            BandLimit b;
+            b.prepare(kRate);
+            b.setChannel(ch);
+            const auto& k = BandLimit::channels()[size_t(ch)];
+
+            const double unten = gainDb(b, double(k.lowHz));
+            const double oben  = gainDb(b, double(k.highHz));
+            const double mitte = gainDb(b, 1000.0);
+
+            qInfo() << k.name << ": unten" << unten << "· 1 kHz" << mitte
+                    << "· oben" << oben << "dB";
+
+            QVERIFY2(std::fabs(unten + 3.01) < 0.15,
+                     qPrintable(QStringLiteral("%1 Hz liegt bei %2 dB statt -3")
+                                    .arg(k.lowHz).arg(unten, 0, 'f', 2)));
+            QVERIFY2(std::fabs(oben + 3.01) < 0.15,
+                     qPrintable(QStringLiteral("%1 Hz liegt bei %2 dB statt -3")
+                                    .arg(k.highHz).arg(oben, 0, 'f', 2)));
+            QVERIFY2(std::fabs(mitte) < 0.1,
+                     qPrintable(QStringLiteral("die Mitte ist um %1 dB daneben")
+                                    .arg(mitte, 0, 'f', 2)));
+        }
+    }
+
+    // Und der weite Kanal muss bei 3,5 kHz wirklich offen sein --
+    // genau dort sass der Verdacht.
+    void theWideChannelIsStillOpenAt3500()
+    {
+        BandLimit b;
+        b.prepare(kRate);
+        b.setChannel(3);                 // 50 - 4050
+        const double d = gainDb(b, 3500.0);
+        qInfo() << "50-4050 bei 3,5 kHz:" << d << "dB";
+        QVERIFY2(d > -1.0,
+                 qPrintable(QStringLiteral("3,5 kHz kommt nur mit %1 dB durch")
+                                .arg(d, 0, 'f', 2)));
+    }
+
     // Roh heisst roh: Bit für Bit unverändert.
     void rawIsBitIdentical()
     {

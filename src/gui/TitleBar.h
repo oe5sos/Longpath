@@ -242,6 +242,10 @@ public:
     enum class AktualisierungsStand { Unbekannt, Aktuell, Neuer };
     void setUpdateState(const QString& text, AktualisierungsStand art);
 
+    // Platz links, damit die drei Fensterknoepfe von macOS nicht auf
+    // der Menuezeile liegen. Siehe gui/MacVollflaeche.h.
+    void setLinkerRand(int punkte);
+
     explicit TitleBar(AudioEngine* audio, QWidget* parent = nullptr);
 
     // Re-style `mb` and insert it at position 0 of the hbox layout.

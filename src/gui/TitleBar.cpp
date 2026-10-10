@@ -704,6 +704,13 @@ TitleBar::TitleBar(AudioEngine* audio, QWidget* parent)
     m_hbox->addWidget(m_featureBtn);
 }
 
+void TitleBar::setLinkerRand(int punkte)
+{
+    if (m_hbox == nullptr) { return; }
+    const QMargins m = m_hbox->contentsMargins();
+    m_hbox->setContentsMargins(punkte, m.top(), m.right(), m.bottom());
+}
+
 void TitleBar::setUpdateState(const QString& text,
                               AktualisierungsStand art)
 {

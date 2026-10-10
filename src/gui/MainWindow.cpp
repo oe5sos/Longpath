@@ -241,6 +241,9 @@ warren@wpratt.com
 //============================================================================================//
 
 #include "MainWindow.h"
+#ifdef Q_OS_MAC
+#include "gui/MacVollflaeche.h"
+#endif
 #include "gui/DxccSpotColours.h"
 #include "gui/ScopedChildWidget.h"
 #include "gui/styles/ThemeQss.h"
@@ -2046,6 +2049,41 @@ void MainWindow::enterBorderlessFullSize()
     // existiert laengst -- die Applet-/Meter-Fenster brauchen es schon
     // vorher) erst nach einem erneuten show() ankommt, auf macOS
     // zuverlaessig nur mit einem hide() davor.
+    // ── Volle Flaeche MIT den drei Punkten ──────────────────────────
+    //
+    // „ich meine eigentlich das hauptfenster!" -- die drei farbigen
+    // Knoepfe links oben fehlten hier, und damit auch das Zuklappen
+    // ins Dock.
+    //
+    // Der Grund war Qt::FramelessWindowHint: das ergibt auf macOS ein
+    // Fenster mit NSWindowStyleMaskBorderless, und so eines hat
+    // keinen Titelbalken -- also keine Knoepfe, und AppKit laesst es
+    // auch nicht zuklappen.
+    //
+    // Auf dem Mac geht es ohne randloses Fenster: Titelbalken
+    // durchsichtig, Inhalt darunter durchgezogen. Optisch dasselbe,
+    // aber die echten Knoepfe liegen darueber und der gelbe tut, was
+    // er soll. Kein eigener Space -- die Begruendung oben gilt
+    // weiter. Siehe gui/MacVollflaeche.h.
+    //
+    // Nur wenn das nicht geht (andere Plattform), bleibt es beim
+    // randlosen Fenster.
+    if (MacVollflaeche::verfuegbar()
+        && MacVollflaeche::setzeVollflaeche(this, true)) {
+        if (QScreen* scr = this->screen()) {
+            setGeometry(scr->availableGeometry());
+        }
+        // Links oben Platz fuer die Knoepfe, sonst liegt die halbe
+        // Menuezeile unter ihnen und ist nicht anklickbar.
+        if (m_titleBar) {
+            m_titleBar->setLinkerRand(MacVollflaeche::kKnopfBreite);
+        }
+        show();
+        raise();
+        activateWindow();
+        return;
+    }
+
     const bool wasVisible = isVisible();
     if (wasVisible) { hide(); }
     setWindowFlag(Qt::FramelessWindowHint, true);
@@ -2064,6 +2102,15 @@ void MainWindow::exitBorderlessFullSize()
     if (m_fullScreenAction && m_fullScreenAction->isChecked()) {
         const QSignalBlocker blocker(m_fullScreenAction);
         m_fullScreenAction->setChecked(false);
+    }
+    if (m_titleBar) { m_titleBar->setLinkerRand(0); }
+    if (MacVollflaeche::verfuegbar()
+        && !windowFlags().testFlag(Qt::FramelessWindowHint)) {
+        MacVollflaeche::setzeVollflaeche(this, false);
+        show();
+        raise();
+        activateWindow();
+        return;
     }
     if (isVisible()) { hide(); }
     setWindowFlag(Qt::FramelessWindowHint, false);
