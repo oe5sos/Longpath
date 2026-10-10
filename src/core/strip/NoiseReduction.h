@@ -34,9 +34,11 @@
 //
 // ── Der Preis, und er ist nicht klein ────────────────────────────────
 //
-// rnnoise arbeitet in Blöcken von 480 Abtastwerten bei 48 kHz. Das
-// sind **10 ms Laufzeit**, fest, nicht verhandelbar -- und beim
-// Mithören hört man 10 ms. Deshalb:
+// rnnoise arbeitet in Blöcken von 480 Abtastwerten bei 48 kHz, und
+// sein Ausgang liegt zwei Blöcke hinter seinem Eingang -- am Gerät
+// gemessen: ein Ton kommt 1440 Abtastwerte später heraus. Das sind
+// **30 ms Laufzeit**, fest, nicht verhandelbar, und beim Mithören
+// hört man sie. Deshalb:
 //
 //   * die Stufe ist AUS, bis sie jemand einschaltet,
 //   * latencySamples() sagt, was sie kostet, und die Oberfläche
@@ -46,13 +48,32 @@
 //     ungefragt umzutasten hiesse, ein Netz mit etwas zu füttern, auf
 //     das es nicht trainiert ist.
 //
-// ── Mischung statt Schalter ──────────────────────────────────────────
+// ── Mischung statt Schalter, und warum sie dreimal verzögert ─────────
 //
-// amount() mischt trocken und entrauscht. Ganz aufgedreht klingt
-// rnnoise auf Sprache gelegentlich künstlich; bei 60-80 % ist das
-// Geräusch weg und die Stimme noch ganz. Der trockene Anteil läuft
-// durch dieselbe Verzögerung, sonst löschen sich die beiden
-// gegenseitig aus.
+// amount() mischt trocken und entrauscht. Damit das überhaupt eine
+// Mischung ist, müssen beide auf DERSELBEN Zeit liegen -- und genau
+// das war bis zum 2026-10-10 nicht so.
+//
+// Die erste Fassung hielt den trockenen Block um EINEN Rahmen
+// zurück, weil rnnoise seinen Ausgang beim Rahmenwechsel liefert.
+// Gemessen (tests/tst_bandbreiten_genau, Kreuzkorrelation über drei
+// Sekunden echter Sprache):
+//
+//   trockener Weg allein   480 Abtastwerte Verzögerung
+//   entrauschter Weg allein 1440 Abtastwerte Verzögerung
+//   Korrelation der beiden  0,991 bei Versatz 960
+//                          -0,011 bei Versatz 0  <- dort wurde gemischt
+//
+// Die beiden Wege waren also 20 ms auseinander, und bei Versatz 0
+// miteinander überhaupt nicht verwandt. Jede Zwischenstellung des
+// Reglers mischte zwei verschiedene Zeitpunkte: ein Kamm mit 50 Hz
+// Abstand, und hörbar als Doppelstimme. In Zahlen kostete das bei
+// Anteil 0,35 ganze 2,8 dB Sprache, während Anteil 1,00 -- wo nicht
+// gemischt wird -- nur 0,1 dB kostete.
+//
+// Jetzt läuft der trockene Anteil durch DREI Rahmen, genau so viele
+// wie der entrauschte. Die Mischung ist damit eine Mischung, und
+// latencySamples() sagt 1440 statt 480.
 //
 // =================================================================
 // Modification history (Longpath):
@@ -122,9 +143,18 @@ private:
 
     // 480 bei 48 kHz, von rnnoise vorgegeben.
     int m_frame{480};
+    // Wieviele Rahmen der Ausgang hinter dem Eingang liegt -- einer
+    // fuer unseren eigenen Puffer, zwei fuer rnnoises Fensterung.
+    // Am Gerät gemessen, nicht aus der Quelle gelesen: 1440
+    // Abtastwerte bei 480 je Rahmen.
+    static constexpr int kFramesOfDelay = 3;
     std::vector<float> m_in;      // füllt sich
     std::vector<float> m_wet;     // fertig entrauscht, wird ausgelesen
-    std::vector<float> m_dry;     // derselbe Block unbehandelt
+    // Der trockene Weg als Ring aus kFramesOfDelay Rahmen. m_drySlot
+    // zeigt auf den ÄLTESTEN -- der gehört zu dem, was rnnoise
+    // gerade ausgegeben hat.
+    std::vector<float> m_dryRing;
+    int m_drySlot{0};
     int m_pos{0};
 };
 

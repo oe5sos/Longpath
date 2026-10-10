@@ -385,13 +385,30 @@ void TstStripChain::the_limiter_is_last()
     // not a brickwall, and every stage above it can add gain.
     QCOMPARE(static_cast<int>(StripChain::Stage::Limiter),
              StripChain::kStageCount - 1);
-    // And the order above it is AetherSDR's defaultChain().
-    QCOMPARE(static_cast<int>(StripChain::Stage::Gate),  0);
-    QCOMPARE(static_cast<int>(StripChain::Stage::Eq),    1);
-    QCOMPARE(static_cast<int>(StripChain::Stage::DeEss), 2);
-    QCOMPARE(static_cast<int>(StripChain::Stage::Comp),  3);
-    QCOMPARE(static_cast<int>(StripChain::Stage::Tube),  4);
-    QCOMPARE(static_cast<int>(StripChain::Stage::Pudu),  5);
+    // Die Reihenfolge, Stand 2026-10-10. Sie war einmal die
+    // defaultChain() von AetherSDR; seither sind zwei Stufen
+    // dazugekommen, und BEIDE an einer Stelle, die eine Entscheidung
+    // ist und kein Zufall:
+    //
+    //   Entrauschen ganz nach vorne, damit alles danach eine saubere
+    //   Stimme bekommt -- ein Kompressor mit Anhebung macht aus
+    //   einem leisen Luefter ein Rauschen, das mitsendet.
+    //
+    //   Clipper direkt VOR den Begrenzer: er holt die
+    //   Sprechleistung, der Begrenzer faengt, was er stehen laesst.
+    //
+    // Diese Prüfung stand bis heute auf der alten Reihenfolge und
+    // war seit dem Einbau des Entrauschens rot, ohne dass es jemand
+    // gesehen hat.
+    QCOMPARE(static_cast<int>(StripChain::Stage::Denoise), 0);
+    QCOMPARE(static_cast<int>(StripChain::Stage::Gate),    1);
+    QCOMPARE(static_cast<int>(StripChain::Stage::Eq),      2);
+    QCOMPARE(static_cast<int>(StripChain::Stage::DeEss),   3);
+    QCOMPARE(static_cast<int>(StripChain::Stage::Comp),    4);
+    QCOMPARE(static_cast<int>(StripChain::Stage::Tube),    5);
+    QCOMPARE(static_cast<int>(StripChain::Stage::Pudu),    6);
+    QCOMPARE(static_cast<int>(StripChain::Stage::Reverb),  7);
+    QCOMPARE(static_cast<int>(StripChain::Stage::Clip),    8);
 }
 
 void TstStripChain::every_preset_leaves_the_master_alone()

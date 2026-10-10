@@ -581,8 +581,9 @@ QVector<Preset> builtInPresets()
          QStringLiteral("What I would set, and why each part is there. "
                         "Denoise first so the compressor never lifts the "
                         "room; a gentle gate behind it; a small, honest "
-                        "EQ; 3:1 compression; 3 dB of clipping for the "
-                        "talk power, and a brickwall above it. Tube, "
+                        "EQ; 3:1 compression; 12 dB of clipping for the "
+                        "talk power, and a brickwall above it. Every "
+                        "number here was measured, not guessed. Tube, "
                         "exciter and reverb stay OFF — they colour, and "
                         "on SSB colour costs bandwidth you do not have. "
                         "A starting point like any other: adjust from it.")},
@@ -627,7 +628,8 @@ bool applyBuiltIn(const QString& name, StripChain& c)
     //   * 3:1 ist die Alltagseinstellung: hörbar ruhiger und immer
     //     noch erkennbar eine Stimme.
     //   * Der Clipper bringt die Sprechleistung, nicht der
-    //     Kompressor. 3 dB sind der vorsichtige Anfang.
+    //     Kompressor. Unter 12 dB Drive tut er nachweislich gar
+    //     nichts -- seine Kante liegt bei Vollaussteuerung.
     //   * Röhre, Exciter und Hall AUS. Sie färben, und auf SSB kostet
     //     Farbe Bandbreite, die man nicht hat. Wer sie will, schaltet
     //     sie einzeln dazu und hört hin.
@@ -650,16 +652,35 @@ bool applyBuiltIn(const QString& name, StripChain& c)
         //    0,70    -6,7     -7,6    -10,5     -2,4
         //    1,00   -13,1    -23,9    -66,9     -0,1
         //
-        // Oberhalb von 0,5 explodiert der Preis: 0,70 kostet SIEBEN
-        // Dezibel Hoehen fuer zehn Dezibel weniger Rauschen. Genau
-        // das war der Grund, aus dem „das rohe audiosignal besser
-        // ist als alles andere" -- die Stimme wurde stumpf, und das
-        // hoert man sofort, waehrend man das fehlende Rauschen erst
-        // vermisst, wenn man darauf achtet.
+        // ── Und am Abend war sie ungueltig ──────────────────────
         //
-        // 0,35 ist der Punkt, an dem das Verhaeltnis noch stimmt:
-        // 3,7 dB weniger Rauschen fuer 0,7 dB Hoehen.
-        c.nr().setAmount(0.35f);
+        // Die Zahlen oben sind echt und messen die falsche Sache:
+        // gemessen wurde an einer NACHGEBAUTEN Stimme, und rnnoise
+        // hat die mit einer Wahrscheinlichkeit von 0,13 fuer Sprache
+        // gehalten. Was dort steht, ist also, wie stark ein
+        // Sprachnetz etwas wegdrueckt, das es nicht als Sprache
+        // erkennt -- nicht der Preis des Entrauschens.
+        //
+        // Neu gemessen an wirklich gesprochener Sprache
+        // (tst_bandbreiten_genau, Sprachwahrscheinlichkeit 0,98),
+        // und erst nachdem ein Versatz von 20 ms zwischen trockenem
+        // und entrauschtem Weg behoben war:
+        //
+        //   Anteil   2 kHz   4 kHz   Sprache   Pausen   Stoerabstand
+        //    0,20    -0,1    -0,1     -0,1      -2,0       +1,9
+        //    0,35    -0,1    -0,2     -0,1      -3,8       +3,7
+        //    0,50    -0,2    -0,2     -0,1      -6,0       +5,9
+        //    0,70    -0,2    -0,3     -0,1     -10,4      +10,3
+        //    1,00    -0,2    -0,4     -0,1     -28,8      +28,7
+        //
+        // Die Stufe kostet an JEDER Stellung ein Zehntel Dezibel
+        // Sprache. Es gibt also keinen Grund, niedrig zu bleiben.
+        // Der Grund, sie nicht ganz aufzudrehen, ist ein anderer:
+        // voll aufgedreht steht kein trockenes Signal mehr daneben,
+        // das einen Kunstlaut des Netzes verdecken koennte. 0,70
+        // bringt den Raum vierzig Dezibel unter die Stimme -- auf
+        // SSB unhoerbar -- und laesst 30 % echtes Signal als Anker.
+        c.nr().setAmount(0.70f);
         c.setStageEnabled(StripChain::Stage::Denoise, true);
 
         // Gemessen: bei einem Grundgeräusch von -48 dBFS EFFEKTIV
@@ -712,8 +733,33 @@ bool applyBuiltIn(const QString& name, StripChain& c)
         c.eq().setActiveBandCount(EqBandLayout::kBandCount);
         c.setStageEnabled(StripChain::Stage::Eq, true);
 
+        // ── Die Schwelle gilt fuer den SEITENWEG ────────────────
+        //
+        // -28 stand hier und hat nie gegriffen, nicht ein einziges
+        // Mal. Gemessen an gesprochener Sprache mit -12 dBFS
+        // Spitze: der Seitenweg -- ein Bandpass mit 24 dB je Oktave
+        // um 6 kHz -- erreicht hoechstens -25,3 dBFS, und die
+        // geglaettete Huellkurve liegt noch darunter. Eine Schwelle
+        // fuer einen De-Esser gehoert deshalb rund 13 dB unter die,
+        // die man im Vollband waehlen wuerde.
+        //
+        //   Schwelle   5..8 kHz   1..3 kHz   Minderung
+        //     -28        0,00       0,00       0,00
+        //     -34       -0,00       0,00      -2,40
+        //     -40       -0,43       0,00      -6,00
+        //     -46       -1,27       0,01      -6,00
+        //
+        // -36 ist der Anfang der Wirkung. Die Mitte bleibt dabei
+        // unberuehrt (0,00 dB in 1..3 kHz): die Stufe senkt nur ihr
+        // eigenes Band, nicht das ganze Signal.
+        //
+        // Wichtig fuer die Kanalwahl: bei 6 kHz bewacht diese Stufe
+        // eine Stelle, die der Sender im DX-Kanal um 63,9 dB
+        // abschneidet und im 2700er um 58,5 dB. Sie lohnt sich nur
+        // im 4-kHz-Kanal; in den schmalen kann man sie abschalten,
+        // ohne etwas zu verlieren.
         c.deEss().setFrequencyHz(6000.0f);
-        c.deEss().setThresholdDb(-28.0f);
+        c.deEss().setThresholdDb(-36.0f);
         c.setStageEnabled(StripChain::Stage::DeEss, true);
 
         c.comp().setThresholdDb(-22.0f);
@@ -744,7 +790,26 @@ bool applyBuiltIn(const QString& name, StripChain& c)
         c.clipper().setLevelMatch(false);
         c.setStageEnabled(StripChain::Stage::Clip, true);
 
-        c.limiter().setCeilingDb(-1.0f);
+        // ── -2, nicht -1 ────────────────────────────────────────
+        //
+        // Gemessen an echter Sprache durch diese Kette: der
+        // Begrenzer selbst laesst 0,52 dB ueber seine Decke (keine
+        // Vorausschau, siehe ClientFinalLimiter.h), und das
+        // Kanalfilter des Senders hebt die Spitzen danach noch
+        // einmal um bis zu 0,69 dB -- bei -1,0 dB Decke stand nach
+        // dem DX-Kanal +0,21 dBFS, also ueber Vollaussteuerung.
+        //
+        //   Kanal            Spitze bei Decke -1,0   Ueberschwinger
+        //   200-2500            +0,21 dBFS              0,69 dB
+        //   150-2700            -0,05 dBFS              0,43 dB
+        //   100-3200            -0,13 dBFS              0,35 dB
+        //    50-4050            +0,07 dBFS              0,55 dB
+        //
+        // 1,2 dB Luft decken den schlimmsten Fall. Wer die Kette
+        // ohne Kanalfilter hoert, verliert damit ein Dezibel
+        // Lautstaerke; wer sie sendet, verliert nichts und schneidet
+        // nicht ab.
+        c.limiter().setCeilingDb(-2.0f);
         c.setStageEnabled(StripChain::Stage::Limiter, true);
 
         // Röhre, PUDU und Hall bleiben aus -- allOff() hat sie

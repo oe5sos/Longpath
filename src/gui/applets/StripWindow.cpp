@@ -1347,7 +1347,18 @@ QWidget* StripWindow::buildDeEssPanel()
         "and 6 kHz is only a place to start.\n\n"
         "Amount is a limit, not a setting — it is the most the de-esser "
         "may take off. Too much of it turns an s into a th, which is "
-        "harder to listen to than the sibilance was."), page);
+        "harder to listen to than the sibilance was.\n\n"
+        "Threshold is read on the SIDECHAIN, not on the whole signal — "
+        "and the sidechain runs about 13 dB quieter, because it is one "
+        "narrow band out of the voice. Measured on speech peaking at "
+        "\u221212 dBFS, the sidechain reaches \u221225 dBFS: a threshold of "
+        "\u221228 never fires at all, and \u221236 is where it starts to "
+        "work. If this stage shows no reduction, the threshold is too "
+        "high, not the voice too clean.\n\n"
+        "And watch the channel: at 6 kHz the 200\u20132500 Hz channel cuts "
+        "64 dB and the 2700 one 58 dB, so there the transmitter throws "
+        "away everything this stage is guarding. It earns its place in "
+        "the 4 kHz channel."), page);
     help->setWordWrap(true);
     help->setStyleSheet(dimStyle());
     form->addRow(help);
@@ -1499,7 +1510,14 @@ QWidget* StripWindow::buildCompPanel()
 //
 // Die neunte Stufe, und die einzige mit einer Laufzeit, die man
 // hoert. Deshalb steht der Preis auf der Seite und nicht in einer
-// Anleitung: 10 ms, solange sie an ist.
+// Anleitung: 30 ms, solange sie an ist.
+//
+// Hier stand 10 ms, weil rnnoise in Bloecken von 480 Abtastwerten
+// rechnet. Am Geraet gemessen (tst_bandbreiten_genau) kommt ein Ton
+// aber 1440 Abtastwerte spaeter heraus: rnnoise liefert seinen
+// Ausgang zwei Rahmen hinter seinem Eingang, und der trockene Anteil
+// laeuft seit dem 2026-10-10 genauso lange mit, damit die Mischung
+// nicht kaemmt.
 
 QWidget* StripWindow::buildDenoisePanel()
 {
@@ -1526,16 +1544,23 @@ QWidget* StripWindow::buildDenoisePanel()
             "cannot do: the gate only ducks the gaps between words.\n\n"
             "It runs first in the chain, so everything after it sees a "
             "clean voice. That matters most for the compressor: 10 dB of "
-            "make-up on a quiet fan is a fan on the air."),
+            "make-up on a quiet fan is a fan on the air.\n\n"
+            "Measured on real speech: at every setting of the dial the "
+            "voice itself loses 0.1 dB, and the room drops by 2 dB at "
+            "0.20, 6 dB at 0.50, 10 dB at 0.70 and 29 dB wide open. "
+            "There is no setting at which this stage dulls the voice — "
+            "if it sounds dull, it is not this stage."),
         page);
     what->setWordWrap(true);
     what->setStyleSheet(dimStyle());
     form->addRow(what);
 
     auto* cost = new QLabel(
-        QStringLiteral("Costs 10 ms of delay while it is on — audible when "
-                       "you listen to yourself, and the only stage in the "
-                       "strip that costs any."),
+        QStringLiteral("Costs 30 ms of delay while it is on — measured, "
+                       "not calculated — audible when you listen to "
+                       "yourself, and the only stage in the strip that "
+                       "costs any. Switch it off while you adjust the EQ "
+                       "by ear."),
         page);
     cost->setWordWrap(true);
     cost->setStyleSheet(QStringLiteral("QLabel { color: %1; }")

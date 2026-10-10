@@ -76,11 +76,29 @@ private slots:
 
         QVERIFY(std::abs(c.nr().amount() - 0.70f) < 0.01f);
         QVERIFY(std::abs(c.comp().ratio() - 3.0f) < 0.01f);
-        QVERIFY(std::abs(c.clipper().driveDb() - 3.0f) < 0.01f);
+        // 12, nicht 3. Gemessen (tst_kanalzug_messlauf): bei
+        // Sprachspitzen von -12 dBFS und einer Kante bei
+        // Vollaussteuerung schneidet der Clipper unter 12 dB Drive
+        // nachweislich NICHTS ab -- er war nur eine Verstaerkung.
+        QVERIFY2(std::abs(c.clipper().driveDb() - 12.0f) < 0.01f,
+                 qPrintable(QStringLiteral("Drive %1 statt 12 dB")
+                                .arg(double(c.clipper().driveDb()))));
+        // Und die Schwelle des De-Essers gilt fuer den SEITENWEG,
+        // der rund 13 dB unter dem Vollband liegt. -28 hat deshalb
+        // nie gegriffen; -36 ist der Anfang der Wirkung
+        // (tst_bandbreiten_genau).
+        QVERIFY2(std::abs(c.deEss().thresholdDb() + 36.0f) < 0.01f,
+                 qPrintable(QStringLiteral("De-Esser-Schwelle %1 statt -36")
+                                .arg(double(c.deEss().thresholdDb()))));
         QVERIFY2(!c.clipper().levelMatch(),
                  "der Lautstärkeabgleich ist an — damit verschenkt der "
                  "Clipper genau die Leistung, die er gewinnt");
-        QVERIFY(std::abs(c.limiter().ceilingDb() + 1.0f) < 0.01f);
+        // -2, nicht -1: der Begrenzer laesst 0,5 dB durch und das
+        // Kanalfilter des Senders hebt danach um 0,7 dB. Gemessen
+        // in tst_bandbreiten_genau.
+        QVERIFY2(std::abs(c.limiter().ceilingDb() + 2.0f) < 0.01f,
+                 qPrintable(QStringLiteral("Decke %1 statt -2 dB")
+                                .arg(double(c.limiter().ceilingDb()))));
     }
 
     // Und das Ganze überlebt den Weg durch die Einstellungen: was

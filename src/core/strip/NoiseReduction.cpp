@@ -88,7 +88,8 @@ void NoiseReduction::prepare(double sampleRate)
     if (m_frame <= 0) { m_frame = 480; }
     m_in.assign(static_cast<size_t>(m_frame), 0.0f);
     m_wet.assign(static_cast<size_t>(m_frame), 0.0f);
-    m_dry.assign(static_cast<size_t>(m_frame), 0.0f);
+    m_dryRing.assign(static_cast<size_t>(m_frame) * kFramesOfDelay, 0.0f);
+    m_drySlot = 0;
     m_pos = 0;
     m_usable = true;
 }
@@ -115,7 +116,11 @@ float NoiseReduction::amount() const noexcept
 
 int NoiseReduction::latencySamples() const noexcept
 {
-    return (m_usable && isEnabled()) ? m_frame : 0;
+    // Drei Rahmen, nicht einer. Siehe die Messreihe im Kopf des
+    // Headers: der entrauschte Weg liegt 1440 Abtastwerte hinter
+    // dem Eingang, und der trockene laeuft seit dem 2026-10-10
+    // genauso lange mit, damit die Mischung nicht kaemmt.
+    return (m_usable && isEnabled()) ? m_frame * kFramesOfDelay : 0;
 }
 
 float NoiseReduction::voiceProbability() const noexcept
@@ -132,7 +137,8 @@ void NoiseReduction::reset() noexcept
 {
     std::fill(m_in.begin(),  m_in.end(),  0.0f);
     std::fill(m_wet.begin(), m_wet.end(), 0.0f);
-    std::fill(m_dry.begin(), m_dry.end(), 0.0f);
+    std::fill(m_dryRing.begin(), m_dryRing.end(), 0.0f);
+    m_drySlot = 0;
     m_pos = 0;
     m_voiceProb.store(0.0f, std::memory_order_relaxed);
     m_reductionDb.store(0.0f, std::memory_order_relaxed);
@@ -140,23 +146,35 @@ void NoiseReduction::reset() noexcept
 
 void NoiseReduction::runFrame() noexcept
 {
-    // Der trockene Block ist der, der gerade hereingekommen ist --
-    // nicht der, der gerade ausgegeben wird. Beide verlassen die
-    // Stufe im selben Durchgang, sonst ist die Mischung eine
-    // Mischung aus zwei verschiedenen Zeitpunkten und löscht sich
-    // stellenweise aus.
-    std::copy(m_in.begin(), m_in.end(), m_dry.begin());
+    // ── Drei Rahmen, nicht einer ─────────────────────────────────
+    //
+    // Der hereingekommene Block wandert in den Ring, und gezeigt
+    // wird anschliessend auf den AELTESTEN -- der gehoert zeitlich
+    // zu dem, was rnnoise gleich ausgibt. Die erste Fassung nahm
+    // den gerade hereingekommenen und behauptete im Kommentar,
+    // beide verliessen die Stufe im selben Durchgang. Am Gerät
+    // gemessen lagen sie 960 Abtastwerte auseinander und waren bei
+    // Versatz 0 miteinander gar nicht verwandt (Korrelation
+    // -0,011). Die Begruendung mit allen Zahlen steht im Kopf des
+    // Headers.
+    std::copy(m_in.begin(), m_in.end(),
+              m_dryRing.begin() + qsizetype(m_drySlot) * m_frame);
+    m_drySlot = (m_drySlot + 1) % kFramesOfDelay;
+    const float* dryOut = m_dryRing.data()
+                          + size_t(m_drySlot) * size_t(m_frame);
 
     const float p = rnnoise_process_frame(m_state, m_wet.data(), m_in.data());
     m_voiceProb.store(p, std::memory_order_relaxed);
 
     // Was weggenommen wurde, gemessen: Effektivwert vorher gegen
     // nachher. Eine gerechnete Zahl waere eine Behauptung über ein
-    // neuronales Netz, und die hat hier niemand.
+    // neuronales Netz, und die hat hier niemand. Verglichen wird
+    // gegen den zeitlich PASSENDEN trockenen Rahmen -- sonst meldet
+    // die Anzeige den Pegelunterschied zweier Silben.
     double sumIn = 0.0;
     double sumOut = 0.0;
     for (int i = 0; i < m_frame; ++i) {
-        sumIn  += double(m_dry[size_t(i)]) * double(m_dry[size_t(i)]);
+        sumIn  += double(dryOut[size_t(i)]) * double(dryOut[size_t(i)]);
         sumOut += double(m_wet[size_t(i)]) * double(m_wet[size_t(i)]);
     }
     if (sumIn > 1e-9) {
@@ -185,7 +203,9 @@ void NoiseReduction::process(float* samples, int frames, int channels) noexcept
         // m_frame Abtastwerte Verzögerung -- die 10 ms aus dem Kopf
         // des Headers. Der trockene Anteil kommt aus demselben Block
         // wie der entrauschte, also sind beide gleich alt.
-        samples[i] = (m_dry[k] * dry + m_wet[k] * wet) * kInvScale;
+        samples[i] = (m_dryRing[size_t(m_drySlot) * size_t(m_frame) + k]
+                          * dry
+                      + m_wet[k] * wet) * kInvScale;
 
         m_in[k] = x * kScale;
 

@@ -38,9 +38,27 @@ namespace Longpath {
 // Final-stage brickwall limiter for the TX audio chain — sits at the
 // very tail of the chain, after every user-configurable stage (Gate,
 // EQ, Comp, DeEss, Tube, PUDU, Reverb) AND after the PC mic gain
-// scaling.  Its job is to ensure no sample escapes louder than the
-// configured ceiling, regardless of what the upstream chain does (a
-// reverb tail spike, an over-driven PUDU, or a mic-gain user error).
+// scaling.  Its job is to catch what the upstream chain throws at it
+// (a reverb tail spike, an over-driven PUDU, or a mic-gain user
+// error) and hold the output at the configured ceiling.
+//
+// ── Was es NICHT ist: eine Garantie ─────────────────────────────────
+//
+// Hier stand „no sample escapes louder than the configured ceiling".
+// Am Gerät gemessen (2026-10-10, tst_bandbreiten_genau, echte
+// Sprache durch die Empfehlung): Decke -1,0 dB, groesste Spitze
+// -0,48 dBFS. Es laesst also ein halbes Dezibel durch, und das ist
+// kein Fehler, sondern die Bauform -- ein Hueller OHNE Vorausschau
+// kann den ersten Abtastwerten einer Flanke nicht zuvorkommen.
+//
+// Dazu kommt, was danach passiert: ein Bandfilter hinter diesem
+// Begrenzer (im Sender steht immer eines) laesst die Spitzen wieder
+// steigen, gemessen um bis zu 0,69 dB, weil es dem abgeflachten
+// Verlauf gerade die Energie nimmt, die ihn flach gehalten hat.
+//
+// Zusammen rund 1,2 dB. Deshalb steht die Decke in der Empfehlung
+// auf -2,0 dB und nicht auf -1,0: so bleibt die Spitze durch JEDEN
+// der vier Kanaele unter Vollaussteuerung.
 //
 // Topology: feed-forward peak limiter with a per-block smoothed
 // envelope (fast attack, moderately fast release) applied as a single

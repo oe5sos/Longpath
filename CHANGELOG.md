@@ -2,6 +2,115 @@
 
 ## [Unreleased]
 
+### Noch einmal ganz genau — und das Prüfsignal war der Fehler
+
+> „teste bitte nochmals ganz genau"
+
+`tests/tst_bandbreiten_genau.cpp`. Zwei Messgeräte, beide im
+Prüfstand selbst gebaut, damit keines mit dem Gerät dieselbe Formel
+teilt: reine Töne mit Effektivwertmessung für die Filter, eine eigene
+Fourier-Zerlegung für die Bandenergien.
+
+**Die Bandbreiten stimmen — alle vier, auf ein Zehntelprozent.**
+
+| Kanal | untere Ecke | obere Ecke | Welligkeit | Flanke |
+| --- | --- | --- | --- | --- |
+| 200–2500 | 200,0 Hz | 2500,0 Hz | −0,01 dB | −48,2 / −50,1 dB je Oktave |
+| 150–2700 | 149,9 Hz | 2700,0 Hz | −0,00 dB | −48,2 / −50,4 dB |
+| 100–3200 | 100,0 Hz | 3200,0 Hz | −0,01 dB | −48,2 / −51,4 dB |
+| 50–4050 | 50,0 Hz | 4050,0 Hz | −0,02 dB | −48,2 / −53,5 dB |
+
+„4 k klingt wie 2700" liegt also nicht am Filter. Was wirklich dahinter
+steckt, haben **fünf** Befunde gezeigt — und der erste trifft den
+Messlauf von heute Vormittag selbst.
+
+**1. Die Entrausch-Tabelle von heute Vormittag war ungültig.** Nicht
+falsch gerechnet, sondern über die falsche Sache: gemessen wurde an
+einer *nachgebauten* Stimme, und rnnoise hat die mit einer
+Sprachwahrscheinlichkeit von **0,13** nicht als Sprache erkannt. Die
+„sieben Dezibel Höhenverlust" waren, wie stark ein Sprachnetz etwas
+wegdrückt, das es nicht kennt. Ein neuronales Netz kann man nicht mit
+Synthetik prüfen. Der Prüfstand holt sich jetzt echte Sprache von der
+Sprachausgabe des Systems (Wahrscheinlichkeit 0,98) und überspringt
+den Fall, wo es die nicht gibt.
+
+**2. Trocken und entrauscht lagen 20 ms auseinander.** Der eigentliche
+Fund des Tages. Die Mischung `dry·(1−a) + wet·a` setzt voraus, dass
+beide Wege gleich alt sind; der Quelltext behauptete das auch. Die
+Kreuzkorrelation über drei Sekunden echter Sprache sagt:
+
+```
+trockener Weg allein      480 Abtastwerte Verzögerung
+entrauschter Weg allein  1440 Abtastwerte Verzögerung
+Korrelation der beiden   0,991 bei Versatz 960
+                        −0,011 bei Versatz 0   ← dort wurde gemischt
+```
+
+rnnoise liefert seinen Ausgang **zwei Rahmen** hinter seinem Eingang.
+Jede Zwischenstellung des Reglers mischte also zwei verschiedene
+Zeitpunkte: ein Kamm mit 50 Hz Abstand. Die Vorgabe des Reglers war
+0,8 — wer das Entrauschen einschaltete und nichts weiter tat, bekam
+diesen Kamm. Der trockene Anteil läuft jetzt durch drei Rahmen.
+`latencySamples()` sagt 1440 statt 480, die Seite sagt 30 ms statt 10.
+
+Vorher und nachher, an echter Sprache:
+
+| Anteil | Sprache vorher | Sprache nachher | Störabstand nachher |
+| --- | --- | --- | --- |
+| 0,20 | −1,8 dB | **−0,1 dB** | +1,9 dB |
+| 0,35 | −2,8 dB | **−0,1 dB** | +3,7 dB |
+| 0,50 | −3,3 dB | **−0,1 dB** | +5,9 dB |
+| 0,70 | −2,6 dB | **−0,1 dB** | +10,3 dB |
+| 1,00 | −0,1 dB | −0,1 dB | +28,7 dB |
+
+Die Stufe kostet an *jeder* Stellung ein Zehntel Dezibel. Es gibt
+keine Stellung, bei der sie die Stimme stumpf macht. Die Empfehlung
+steht jetzt auf **0,70** (vorher 0,35, begründet mit der ungültigen
+Tabelle).
+
+**3. Der De-Esser hat nie gegriffen.** Die Schwelle gilt für den
+**Seitenweg**, und der liegt rund 13 dB unter dem Vollband, weil er
+ein schmales Band aus der Stimme ist. Bei Sprache mit −12 dBFS Spitze
+erreicht er −25,3 dBFS; die eingestellte Schwelle war −28. Gemessen:
+−34 → −2,4 dB Minderung, −40 → −6,0 dB. Die Empfehlung steht jetzt
+auf **−36**, die Mitte bleibt dabei unberührt (0,00 dB in 1–3 kHz).
+Dazu auf der Seite die Zahl, die man braucht, um das selbst zu sehen.
+
+Und: bei 6 kHz bewacht diese Stufe eine Stelle, die der Sender im
+DX-Kanal um 63,9 dB abschneidet. Sie lohnt sich nur im 4-kHz-Kanal.
+
+**4. Der Begrenzer hielt seine Decke nicht.** Der Kopf von
+`ClientFinalLimiter.h` sicherte zu, „no sample escapes louder than the
+configured ceiling". Gemessen: Decke −1,0 dB, größte Spitze −0,48 dBFS
+— ein halbes Dezibel darüber, und bei Decke −2,0 waren es 1,28 dB,
+weil der Clipper die Flanken noch steiler macht. Ein Hüllkurvenfolger
+ohne Vorausschau kann den ersten Abtastwerten einer Flanke nicht
+zuvorkommen. Jetzt wird abgeschnitten, was er stehen lässt; die Decke
+hält auf 0,01 dB.
+
+**5. Das Kanalfilter hebt die Spitzen wieder.** Hinter dem Begrenzer
+steht im Sender immer ein Bandfilter, und es nimmt dem abgeflachten
+Verlauf gerade die Energie, die ihn flach gehalten hat. Gemessen bis
+**1,89 dB** Überschwinger. Bei Decke −1,0 dB stand nach dem DX-Kanal
++0,21 dBFS — über Vollaussteuerung. Die Empfehlung lässt jetzt 2 dB
+Luft.
+
+Der naheliegende Ausweg wurde geprüft und ist keiner: ein Tiefpass im
+Entzerrer, also **vor** dem Clipper, senkt den Überschwinger nur von
+1,89 auf 1,70 dB. Die Oberwellen entstehen *im* Clipper, hinter dem
+Tiefpass — er kann sie unmöglich begrenzen. Steht als Widerlegung im
+Prüfstand, damit es niemand ein zweites Mal versucht.
+
+**Dazu zwei Prüfstände, die seit heute Vormittag rot waren** und es
+niemand gesehen hat: `tst_empfehlung_profil` prüfte noch 3 dB
+Clipper-Drive, `tst_strip_chain::the_limiter_is_last` noch die
+Stufenreihenfolge ohne das Entrauschen.
+
+**Die Kette an echter Sprache, nach allem:** Spitze −12,0 → −2,0 dBFS,
+Sprache −28,8 → −14,9 dB, Scheitelfaktor **16,8 → 12,9 dB**,
+Störabstand **30,4 → 54,0 dB**. Durch den DX-Kanal bleibt die Spitze
+bei −0,7 dBFS, durch den 4-kHz-Kanal bei −0,1.
+
 ### Der Kanalzug, Stufe für Stufe nachgemessen
 
 > „bitte teste nun unseren kanalzug ganz genau. mit den ergebnissen

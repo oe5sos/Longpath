@@ -103,9 +103,26 @@ private slots:
                                 .arg(double(nr.reductionDb()), 0, 'f', 1)));
     }
 
-    // Mischung 0: derselbe Ton, nur um einen Rahmen später. Das ist
-    // der Beweis, dass trocken und entrauscht gleich alt sind.
-    void dryPathIsIntactAndDelayedByOneFrame()
+    // ── Mischung 0: derselbe Ton, nur spaeter ───────────────────────
+    //
+    // Hier stand: „Das ist der Beweis, dass trocken und entrauscht
+    // gleich alt sind." Das war er nicht, und der Satz hat einen
+    // Fehler ein Vierteljahr lang gedeckt: dieser Fall fasst den
+    // entrauschten Weg GAR NICHT an (Mischung 0 ist trocken allein).
+    // Er zeigt, dass der trockene Weg unbeschaedigt durchkommt und
+    // um genau so viel verzoegert, wie die Stufe meldet -- nicht
+    // mehr.
+    //
+    // Dass die beiden Wege gleich alt sind, zeigt allein eine
+    // Kreuzkorrelation zwischen ihnen. Die steht in
+    // tests/tst_bandbreiten_genau (doTheDryAndTheDenoisedPathLineUp)
+    // und hat am 2026-10-10 einen Versatz von 960 Abtastwerten
+    // gefunden.
+    //
+    // Drei Rahmen, nicht einer: rnnoise liefert seinen Ausgang zwei
+    // Rahmen hinter seinem Eingang, und der trockene Anteil laeuft
+    // seitdem genauso lange mit.
+    void dryPathIsIntactAndDelayedByThreeFrames()
     {
         NoiseReduction nr;
         nr.prepare(kRate);
@@ -114,12 +131,12 @@ private slots:
         nr.setAmount(0.0f);
 
         const int frame = nr.latencySamples();
-        QCOMPARE(frame, 480);
+        QCOMPARE(frame, 480 * 3);
 
         const auto in  = whiteNoise(kRate / 2, 0.2f);
         const auto out = run(nr, in);
 
-        // Um genau einen Rahmen verschoben, und zwar exakt: 32768 ist
+        // Um genau drei Rahmen verschoben, und zwar exakt: 32768 ist
         // eine Zweierpotenz, mal und geteilt ist in float verlustfrei.
         int checked = 0;
         for (int i = frame; i + frame < int(in.size()) - kBlock; ++i) {
