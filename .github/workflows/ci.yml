@@ -686,6 +686,25 @@ jobs:
           echo "── Fussabdruck ──"
           du -sh build 2>/dev/null || true
           du -sh build/tests 2>/dev/null || true
+          # Vorwarnung statt Nachruf. Gemessen am 2026-10-10 nach dem
+          # Umstieg auf -gsplit-dwarf, je Scherbe: 103 G frei vorher,
+          # danach 34 G (2/4, die dickste -- 69 G allein in build/tests),
+          # 40 G (1/4), 44 G (3/4), 43 G (4/4). Reicht, ist aber kein
+          # weiter Abstand: jedes Pruefprogramm bindet LongpathObjs
+          # statisch ein und kostet darum ein halbes Gigabyte. Faellt der
+          # Rest unter 15 G, soll das AUFFALLEN, solange der Lauf noch
+          # gruen ist -- und nicht erst, wenn der Laeufer sein eigenes
+          # Protokoll nicht mehr schreiben kann.
+          FREI_KB=$(df -k --output=avail / | tail -1)
+          FREI_GB=$((FREI_KB / 1024 / 1024))
+          echo "Rest: ${FREI_GB} G"
+          if [ "$FREI_GB" -lt 15 ]; then
+            echo "::warning title=Platte wird knapp::Nach dem Bau der" \
+                 "Pruefprogramme sind nur noch ${FREI_GB} G frei" \
+                 "(Warnschwelle 15 G). Naechster Hebel: Scherbenzahl" \
+                 "erhoehen, oder LongpathObjs als gemeinsame Bibliothek" \
+                 "statt in jedes Pruefprogramm hinein."
+          fi
 
       - name: Build test executables (macOS)
         if: runner.os == 'macOS'
