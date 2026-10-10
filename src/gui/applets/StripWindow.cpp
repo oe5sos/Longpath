@@ -3084,6 +3084,10 @@ QWidget* StripWindow::buildInsertsPanel()
     m_pluginSatz->setText(Sprache::T(QStringLiteral(
         "Point at a plugin to read what it does.")));
     col->addWidget(m_pluginSatz);
+
+    // Die Auswahllisten aus dem, was schon gefunden wurde. Ohne das
+    // steht nach jedem Profilwechsel „— leer —" und sonst nichts.
+    refillInsertCombos();
     rebuildPluginCatalogue();
 
     // Den Hinweistext jetzt erst setzen, wo alles steht. Vorher war
@@ -3100,9 +3104,9 @@ QWidget* StripWindow::buildInsertsPanel()
 QString StripWindow::insertPositionName(int at)
 {
     if (at >= StripChain::kStageCount) {
-        return QStringLiteral("after the limiter");
+        return Sprache::T(QStringLiteral("after the limiter"));
     }
-    return QStringLiteral("before %1").arg(
+    return Sprache::T(QStringLiteral("before %1")).arg(
         QString::fromLatin1(
             StripChain::stageName(static_cast<StripChain::Stage>(at))));
 }
@@ -3121,12 +3125,33 @@ void StripWindow::scanPlugins()
     m_plugins = PluginHost::scan();
     m_pluginsScanned = true;
 
+    refillInsertCombos();
+    rebuildPluginCatalogue();
+    refreshInsertCards();
+}
+
+// ── Die beiden Auswahllisten fuellen ────────────────────────────────
+//
+// „kann keine auswählen."
+//
+// Das Fuellen stand bis hierher IN scanPlugins(), und scanPlugins()
+// laeuft nur einmal (m_pluginsScanned). Beim Umbau der Reiter -- und
+// der passiert bei jedem Profilwechsel -- wird die Einschubseite neu
+// gebaut, also stehen dort zwei FRISCHE, leere Auswahlfelder. Der
+// Kachelkatalog wurde aus m_plugins neu gefuellt, die Listen nicht:
+// unten standen alle Plugins, und oben war nichts auszuwaehlen.
+//
+// Jetzt fuellt diese Funktion aus dem, was bereits gefunden wurde,
+// und sie wird von BEIDEN Stellen gerufen: vom Suchlauf und vom
+// Aufbau der Seite.
+void StripWindow::refillInsertCombos()
+{
     for (int slot = 0; slot < StripChain::kInsertCount; ++slot) {
         QComboBox* box = m_insertUi[static_cast<size_t>(slot)].plugin;
         if (!box) { continue; }
         const QSignalBlocker block(box);
         box->clear();
-        box->addItem(QStringLiteral("— empty —"), QString());
+        box->addItem(Sprache::T(QStringLiteral("— empty —")), QString());
         for (const PluginDescriptor& d : m_plugins) {
             box->addItem(d.vendor.isEmpty()
                              ? d.name
@@ -3139,8 +3164,6 @@ void StripWindow::scanPlugins()
                              Qt::ToolTipRole);
         }
     }
-    rebuildPluginCatalogue();
-    refreshInsertCards();
 }
 
 // Der Katalog: nach Gruppen, und jede Gruppe sagt, wohin sie gehoert.
@@ -3380,7 +3403,7 @@ void StripWindow::refreshInsertCard(int slot)
 
     if (p == nullptr) {
         ui.note->setText(m_pluginsScanned
-            ? QStringLiteral("Empty. Pick one above.")
+            ? Sprache::T(QStringLiteral("Empty. Pick one above."))
             : QStringLiteral("Empty."));
         return;
     }

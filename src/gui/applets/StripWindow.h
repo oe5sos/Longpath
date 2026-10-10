@@ -238,6 +238,21 @@ private:
     // erst auf Knopfdruck.
     QWidget* buildInsertsPanel();
     void scanPlugins();
+
+public:
+    // Nur fuer Prueftaende: den Suchlauf und den Umbau der Reiter von
+    // aussen anstossen. Beides sind sonst innere Wege -- aber genau
+    // ihre REIHENFOLGE war der Fehler („kann keine auswählen"), und
+    // ein Prueftand, der sie nicht nachstellen kann, haette ihn nicht
+    // gefunden.
+    void scanPluginsForTest()   { scanPlugins(); }
+    void rebuildTabsForTest()   { reloadControls(); }
+
+private:
+    // Die beiden Einschub-Auswahllisten aus m_plugins fuellen.
+    // Gerufen vom Suchlauf UND vom Aufbau der Seite -- siehe die
+    // Begruendung an der Umsetzung.
+    void refillInsertCombos();
     void chooseInsertPlugin(int slot);
     void refreshInsertCard(int slot);
     void refreshInsertCards();

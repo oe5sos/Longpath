@@ -13,6 +13,8 @@
 
 #include "core/strip/PluginPlacement.h"
 
+#include "core/Sprache.h"
+
 namespace Longpath::PluginPlacement {
 
 namespace {
@@ -99,14 +101,14 @@ constexpr Rule kRules[] = {
 QString groupName(Group g)
 {
     switch (g) {
-    case Group::Clean:    return QStringLiteral("CLEAN UP");
-    case Group::Eq:       return QStringLiteral("SHAPE");
-    case Group::DeEss:    return QStringLiteral("SIBILANCE");
-    case Group::Compress: return QStringLiteral("LEVEL");
-    case Group::Colour:   return QStringLiteral("COLOUR");
-    case Group::Final:    return QStringLiteral("LAST IN LINE");
-    case Group::Measure:  return QStringLiteral("MEASURE ONLY");
-    default:              return QStringLiteral("NOT SORTED YET");
+    case Group::Clean:    return Sprache::T(QStringLiteral("CLEAN UP"));
+    case Group::Eq:       return Sprache::T(QStringLiteral("SHAPE"));
+    case Group::DeEss:    return Sprache::T(QStringLiteral("SIBILANCE"));
+    case Group::Compress: return Sprache::T(QStringLiteral("LEVEL"));
+    case Group::Colour:   return Sprache::T(QStringLiteral("COLOUR"));
+    case Group::Final:    return Sprache::T(QStringLiteral("LAST IN LINE"));
+    case Group::Measure:  return Sprache::T(QStringLiteral("MEASURE ONLY"));
+    default:              return Sprache::T(QStringLiteral("NOT SORTED YET"));
     }
 }
 
@@ -114,30 +116,30 @@ QString groupHint(Group g)
 {
     switch (g) {
     case Group::Clean:
-        return QStringLiteral(
+        return Sprache::T(QStringLiteral(
             "Noise and room, before anything else sees them. Drop these "
-            "in front of the Gate.");
+            "in front of the Gate."));
     case Group::Eq:
-        return QStringLiteral(
+        return Sprache::T(QStringLiteral(
             "Shaping the voice. After the Gate, before the compressor — "
-            "so the compressor reacts to the voice you shaped.");
+            "so the compressor reacts to the voice you shaped."));
     case Group::DeEss:
-        return QStringLiteral(
+        return Sprache::T(QStringLiteral(
             "Sibilance. After the EQ, because lifting the top is what "
-            "usually creates it in the first place.");
+            "usually creates it in the first place."));
     case Group::Compress:
-        return QStringLiteral(
+        return Sprache::T(QStringLiteral(
             "Evening out the level. After the de-esser, so it is not "
-            "pumping on an S.");
+            "pumping on an S."));
     case Group::Colour:
-        return QStringLiteral(
+        return Sprache::T(QStringLiteral(
             "Saturation and harmonics. After the compressor, which is "
-            "where it stays controlled.");
+            "where it stays controlled."));
     case Group::Final:
-        return QStringLiteral(
+        return Sprache::T(QStringLiteral(
             "Clippers and limiters. After the strip's own limiter — but "
             "be aware anything that adds level there undoes the ceiling "
-            "it just set.");
+            "it just set."));
     case Group::Measure:
         return QStringLiteral(
             "These only look. Position does not matter much; put them "

@@ -5464,6 +5464,7 @@ longpath_add_test(tst_sprache_deutsch)
 longpath_add_test(tst_fensterknoepfe)
 longpath_add_test(tst_empfehlung_profil)
 longpath_add_test(tst_eingangspegel)
+longpath_add_test(tst_plugin_auswahl_bleibt)
 longpath_add_test(tst_strip_tuner)
 
 # -- The ring behind the EQ picture: oldest-first, newest-kept, and
