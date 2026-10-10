@@ -136,12 +136,48 @@ private slots:
         QVERIFY2(brightness(parked) < brightness(running) - 20,
                  qPrintable(QStringLiteral("geparkt wie laufend: %1 vs %2")
                                 .arg(parked.name(), running.name())));
-        QVERIFY2(brightness(parked) > 8,
+        // Die Schwelle kommt von einem Befund am Geraet: mit der
+        // ersten Mischung (0,30) war die geparkte Kachel fast Schwarz
+        // -- und genau so steht das Fenster da, solange kein Funkgeraet
+        // haengt. „funktioniert grafisch leider nicht, nur die font
+        // wird dicker oder andersfaerbig." Sie muss ein blaues Feld
+        // sein, nicht eine Ahnung davon.
+        QVERIFY2(brightness(parked) > 30,
                  qPrintable(QStringLiteral("geparkt wie aus: %1")
                                 .arg(parked.name())));
-        QVERIFY2(blueLead(parked) > 8,
+        QVERIFY2(blueLead(parked) > 30,
                  qPrintable(QStringLiteral("geparkt ohne Blau: %1")
                                 .arg(parked.name())));
+    }
+
+    // Und so sieht es aus -- beide Zustaende auf ein Blatt, wirkliche
+    // Groesse. Beurteilt wird Gestaltung am Bild, nicht an der
+    // Beschreibung.
+    void bothStatesOnFile()
+    {
+        const QByteArray dir = qgetenv("LONGPATH_RENDER_DIR");
+        if (dir.isEmpty()) { QSKIP("kein LONGPATH_RENDER_DIR"); }
+
+        const auto shot = [&](bool master, const QString& file) {
+            StripChain c;
+            c.prepare(48000.0);
+            c.setEnabled(master);
+            for (int i = 0; i < StripChain::kStageCount; ++i) {
+                c.setStageEnabled(static_cast<StripChain::Stage>(i),
+                                  i % 2 == 0);
+            }
+            StripChainView v;
+            darkBackground(v);
+            v.setChain(&c);
+            v.resize(v.sizeHint());
+            v.setOpenStage(0);
+            QImage img(v.size(), QImage::Format_ARGB32_Premultiplied);
+            img.fill(QColor(0x0c, 0x0c, 0x0e));
+            v.render(&img);
+            QVERIFY(img.save(QString::fromUtf8(dir) + QLatin1Char('/') + file));
+        };
+        shot(true,  QStringLiteral("reihe-kette-an.png"));
+        shot(false, QStringLiteral("reihe-kette-aus.png"));
     }
 
     // Der Ring um die offene Seite. Er liegt ausserhalb der Kachel,

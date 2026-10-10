@@ -339,10 +339,17 @@ void StripChainView::paintEvent(QPaintEvent*)
             text = c(Style::kGlassSelText);
         } else if (on) {
             // Dieselbe Markierung, nur geparkt: eingeschaltet, aber die
-            // Kette laeuft nicht.
-            p.setBrush(mix(c(Style::kInsetBg),  c(Style::kGlassSelBot),    0.30));
+            // Kette laeuft nicht. Zuerst mit 0,30 gemischt -- das war
+            // fast Schwarz und hat die Markierung in genau dem Zustand
+            // verschluckt, in dem das Fenster ohne Funkgeraet steht.
+            // Sie muss auch hier als blaues Feld zu sehen sein, nur
+            // schwaecher als „arbeitet".
+            QLinearGradient g(box.topLeft(), box.bottomLeft());
+            g.setColorAt(0.0, mix(c(Style::kInsetBg), c(Style::kGlassSelTop), 0.55));
+            g.setColorAt(1.0, mix(c(Style::kInsetBg), c(Style::kGlassSelBot), 0.55));
+            p.setBrush(g);
             p.setPen(QPen(mix(c(Style::kInsetBorder),
-                              c(Style::kGlassSelBorder), 0.30), 1));
+                              c(Style::kGlassSelBorder), 0.55), 1));
             text = c(Style::kTextSecondary);
         } else {
             p.setBrush(c(Style::kInsetBg));
