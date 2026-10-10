@@ -217,11 +217,15 @@ StripEqPanel::StripEqPanel(EqHost* engine, QWidget* parent)
     {
         auto* row = new QHBoxLayout;
         row->setSpacing(8);
+        // Eine Geste, eine Groesse -- und das muss dastehen, sonst
+        // ist es keine Regel, sondern ein Geheimnis. Siehe
+        // ClientEqEditorCanvas::mouseMoveEvent.
         auto* hint = new QLabel(
-            "Drag peak/shelf = freq + gain · "
-            "drag HP/LP = freq + Q · Shift + drag for Q · "
-            "double-click a point to change its filter type · "
-            "right-click for the full menu");
+            "Ziehen = lauter/leiser · "
+            "⌥ + ziehen = Frequenz · "
+            "⇧ + ziehen = Breite · "
+            "Doppelklick = Filterart · "
+            "Rechtsklick = ganzes Menü");
         applyThemed(hint, "QLabel { color: {{color.background.3}}; font-size: 11px; }");
         row->addWidget(hint, 1);
 

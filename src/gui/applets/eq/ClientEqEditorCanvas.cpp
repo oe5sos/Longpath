@@ -137,16 +137,13 @@ void ClientEqEditorCanvas::mousePressEvent(QMouseEvent* ev)
 
     setSelectedBand(idx);
 
-    auto bp = m_eq->band(idx);
-    // Auto-enable on interaction: the 8 default slots start disabled so
-    // the EQ is audibly transparent until the user grabs a handle.
-    if (!bp.enabled) {
-        bp.enabled = true;
-        m_eq->setBand(idx, bp);
-        emit bandsChanged();
-    }
+    const auto bp = m_eq->band(idx);
+    // Frueher wurde ein Band hier eingeschaltet -- beim Druecken, vor
+    // jeder Bewegung. Zehn Griffe liegen auf der Nulllinie, also war
+    // jeder Klick auf die Linie schon ein Eingriff in den Ton. Jetzt
+    // schaltet erst das wirkliche Ziehen ein (mouseMoveEvent).
     m_draggingBand = idx;
-    m_dragShift    = (ev->modifiers() & Qt::ShiftModifier) != 0;
+    m_dragMoved    = false;
     m_dragStart    = ev->position();
     m_dragStartFreqHz = bp.freqHz;
     m_dragStartGainDb = bp.gainDb;
@@ -188,33 +185,71 @@ void ClientEqEditorCanvas::mouseMoveEvent(QMouseEvent* ev)
         QWidget::mouseMoveEvent(ev); return;
     }
 
+    // ── Eine Geste, eine Groesse ─────────────────────────────────────
+    //
+    // „das klicken der linie bewegt teilweise die komplette kurve, was
+    //  ich oft nicht will."
+    //
+    // Er hat zweimal recht. Die zehn Griffe stehen ab Werk alle auf der
+    // Nulllinie -- die Linie IST die Griffreihe, jeder Klick darauf
+    // fasst einen an. Und ein Zug aenderte bis hierher Frequenz UND
+    // Pegel zugleich, also rutschte das Band beim Anheben nebenbei zur
+    // Seite. Bei Q = 0,707 ist ein Band rund zwei Oktaven breit, und
+    // so sieht das aus wie „die ganze Kurve bewegt sich".
+    //
+    // Ab jetzt aendert ein Zug genau eine Groesse:
+    //   ziehen        -- Pegel (bei Hoch-/Tiefpass: Grenzfrequenz,
+    //                    die haben keinen Pegel)
+    //   ⌥ + ziehen    -- Frequenz
+    //   ⇧ + ziehen    -- Breite
+    //
+    // Und relativ zum Griffpunkt, nicht absolut zum Zeiger: wer den
+    // Griff um drei Pixel verfehlt, soll das Band nicht um drei Pixel
+    // springen sehen.
     const auto bp = m_eq->band(m_draggingBand);
     ClientEq::BandParams next = bp;
     const bool isSlope = (bp.type == ClientEq::FilterType::LowPass
                        || bp.type == ClientEq::FilterType::HighPass);
 
-    if (m_dragShift) {
+    if (!m_dragMoved) {
+        const QPointF d = ev->position() - m_dragStart;
+        if (d.manhattanLength() < 3.0) { ev->accept(); return; }
+        m_dragMoved = true;
+        // Jetzt, nicht beim Druecken: ein Band wird eingeschaltet,
+        // weil daran gezogen wird.
+        if (!bp.enabled) {
+            next.enabled = true;
+        }
+    }
+
+    // Verschiebung gegenueber dem Griffpunkt, in den Einheiten der
+    // Achsen.
+    const float dDb = yToDb(static_cast<float>(ev->position().y()))
+                    - yToDb(static_cast<float>(m_dragStart.y()));
+    const float fRatio =
+        xToFreq(static_cast<float>(ev->position().x()))
+        / std::max(1.0f, xToFreq(static_cast<float>(m_dragStart.x())));
+
+    // Die Umschalttasten werden LAUFEND gelesen, nicht beim Druecken
+    // festgehalten: wer mitten im Zug merkt, dass er doch die
+    // Frequenz meint, soll ⌥ druecken koennen, statt loszulassen und
+    // neu anzusetzen.
+    const bool wantQ    = (ev->modifiers() & Qt::ShiftModifier) != 0;
+    const bool wantFreq = (ev->modifiers() & Qt::AltModifier) != 0;
+
+    if (wantQ) {
         // Shift-drag = vertical Q control. Map vertical delta to
         // exponential Q change so a full-height drag spans ~2 decades.
         const float dy = static_cast<float>(m_dragStart.y() - ev->position().y());
         const float hOver2 = std::max(1.0f, static_cast<float>(height()) * 0.5f);
         const float factor = std::pow(10.0f, dy / hOver2);
         next.q = std::clamp(m_dragStartQ * factor, 0.1f, 18.0f);
+    } else if (wantFreq || isSlope) {
+        // Hoch- und Tiefpass haben keinen Pegel: bei ihnen IST die
+        // waagrechte Bewegung die Sache, auch ohne ⌥.
+        next.freqHz = std::clamp(m_dragStartFreqHz * fRatio, 20.0f, 20000.0f);
     } else {
-        // Freq is always horizontal. Gain is vertical for peak/shelf.
-        // HP/LP have no gain, so their vertical drag controls Q instead
-        // — each handle keeps two degrees of freedom, no shift needed.
-        next.freqHz = std::clamp(xToFreq(static_cast<float>(ev->position().x())),
-                                 20.0f, 20000.0f);
-        if (isSlope) {
-            const float dy = static_cast<float>(m_dragStart.y() - ev->position().y());
-            const float hOver2 = std::max(1.0f, static_cast<float>(height()) * 0.5f);
-            const float factor = std::pow(10.0f, dy / hOver2);
-            next.q = std::clamp(m_dragStartQ * factor, 0.1f, 18.0f);
-        } else {
-            next.gainDb = std::clamp(yToDb(static_cast<float>(ev->position().y())),
-                                     -18.0f, 18.0f);
-        }
+        next.gainDb = std::clamp(m_dragStartGainDb + dDb, -18.0f, 18.0f);
     }
     m_eq->setBand(m_draggingBand, next);
     emit bandsChanged();
@@ -232,7 +267,7 @@ void ClientEqEditorCanvas::mouseReleaseEvent(QMouseEvent* ev)
     }
     if (m_draggingBand < 0) { QWidget::mouseReleaseEvent(ev); return; }
     m_draggingBand = -1;
-    m_dragShift = false;
+    m_dragMoved = false;
     setCursor(Qt::CrossCursor);
     persist();
     ev->accept();
@@ -259,7 +294,7 @@ void ClientEqEditorCanvas::mouseDoubleClickEvent(QMouseEvent* ev)
     // a platform that delivers the events in another order would
     // otherwise leave the band stuck to the cursor.
     m_draggingBand = -1;
-    m_dragShift    = false;
+    m_dragMoved    = false;
     setCursor(Qt::CrossCursor);
 
     setSelectedBand(idx);

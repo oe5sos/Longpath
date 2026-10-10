@@ -99,7 +99,11 @@ private:
 
     EqHost* m_audio{nullptr};
     int  m_draggingBand{-1};
-    bool m_dragShift{false};
+    // Erst wenn wirklich gezogen wurde, wird ein Band eingeschaltet
+    // und veraendert. Ein Klick allein aendert nichts am Ton. Welche
+    // Groesse der Zug meint, entscheiden ⇧ und ⌥ -- laufend gelesen,
+    // nicht beim Druecken festgehalten.
+    bool m_dragMoved{false};
     QPointF m_dragStart;
     float   m_dragStartFreqHz{0};
     float   m_dragStartGainDb{0};

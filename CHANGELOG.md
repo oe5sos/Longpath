@@ -2,6 +2,31 @@
 
 ## [Unreleased]
 
+### Entzerrer: ein Zug, eine Größe
+
+> „das klicken der linie bewegt teilweise die komplette kurve, was ich
+>  oft nicht will."
+
+Zwei Ursachen, beide behoben:
+
+* Ein Zug änderte **Frequenz und Pegel zugleich**. Wer anheben wollte,
+  verschob das Band nebenbei zur Seite -- bei Q = 0,707 über rund zwei
+  Oktaven, und das sieht aus wie „die ganze Kurve bewegt sich". Jetzt:
+  **ziehen = lauter/leiser**, **⌥ + ziehen = Frequenz**, **⇧ + ziehen
+  = Breite**. Hoch- und Tiefpass haben keinen Pegel, bei ihnen bleibt
+  Ziehen die Grenzfrequenz.
+* Schon das **Drücken** schaltete ein Band ein. Die zehn Griffe liegen
+  ab Werk alle auf der Nulllinie -- die Linie IST die Griffreihe, also
+  war jeder Klick darauf ein Eingriff in den Ton. Jetzt schaltet erst
+  das wirkliche Ziehen ein (ab 3 px).
+
+Dazu rechnet der Zug **relativ zum Griffpunkt**: wer den Griff um ein
+paar Pixel verfehlt, sieht das Band nicht mehr dorthin springen. Die
+Zeile über der Kurve nennt die drei Gesten.
+
+`tests/tst_eq_one_drag_one_parameter.cpp`, **Gegenprobe gefahren:**
+alle vier Fälle fallen mit der alten Fassung durch.
+
 ### Die eingeschaltete Stufe sieht man jetzt
 
 > „wenn ich ein feld aktiviere sollte das feld oben als ganze markiert
