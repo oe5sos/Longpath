@@ -695,8 +695,14 @@ jobs:
           # Rest unter 15 G, soll das AUFFALLEN, solange der Lauf noch
           # gruen ist -- und nicht erst, wenn der Laeufer sein eigenes
           # Protokoll nicht mehr schreiben kann.
-          FREI_KB=$(df -k --output=avail / | tail -1)
-          FREI_GB=$((FREI_KB / 1024 / 1024))
+          # Vorsichtig gelesen: liefert df nichts (anderes Dateisystem,
+          # anderes coreutils), darf die Rechnung den Schritt NICHT
+          # umbringen -- $(( / 1024 )) mit leerer Zahl ist ein
+          # Syntaxfehler, und der Schritt laeuft unter `bash -e`. Keine
+          # Zahl heisst "keine Aussage", nicht "kein Platz".
+          FREI_KB=$(df -k --output=avail / 2>/dev/null | tail -1 | tr -dc '0-9')
+          FREI_GB=$(( ${FREI_KB:-0} / 1024 / 1024 ))
+          if [ -z "$FREI_KB" ]; then FREI_GB=99; echo "df lieferte nichts -- keine Aussage"; fi
           echo "Rest: ${FREI_GB} G"
           if [ "$FREI_GB" -lt 15 ]; then
             echo "::warning title=Platte wird knapp::Nach dem Bau der" \
