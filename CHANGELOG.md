@@ -2,6 +2,70 @@
 
 ## [Unreleased]
 
+### Der 4-kHz-Kanal klang massiv schlechter — zwei Ursachen
+
+> „volle bandbreite läuft perfekt über apollo und longpath, sobald
+>  4000k eingeschalten ist wird die qualität massiv anders und
+>  schlechter … longpath hat ja mit dem apollo keine filter, ich habe
+>  bewusst alles ausgeschalten."
+
+Genau das war der Befund: mit allem aus tat Longpath beim Kanalwechsel
+trotzdem zwei Dinge.
+
+**Erstens ein Begrenzer, den niemand bestellt hatte.** Der Mithörweg
+legt seit heute einen Brickwall hinter das Kanalfilter — richtig
+gemessen, solange die Kette läuft. Die Bedingung lautete aber nur „ein
+Kanal ist gewählt" und nicht „die Kette ist eingeschaltet". Wer den
+Kanalzug ausschaltete, um sein unbearbeitetes Signal zu hören, bekam
+auf ein Studiosignal mit −1,5 dBFS Spitze:
+
+```
+nur Kanalfilter   Spitze -2,8 dBFS
+mit Begrenzer     Spitze -3,0 dBFS · Fremdanteil -19,7 dB
+```
+
+Rund **zehn Prozent** Fremdanteil — und nur bei gewähltem Kanal. Er
+läuft jetzt nur noch, wenn die Kette im Weg steht.
+
+**Zweitens: das Filter stimmte im Pegel und nicht in der Zeit.** Der
+Pegelgang ist seit heute Vormittag nachgemessen und tadellos. Die
+Gruppenlaufzeit war nie gemessen worden:
+
+| Kanal | 60 Hz | 100 Hz | 200 Hz | 1 kHz | 4 kHz |
+| --- | --- | --- | --- | --- | --- |
+| 50–4050 · ESSB (vorher) | **16,8 ms** | 4,9 | 1,2 | 0,2 | 0,4 |
+| 50–4050 · ESSB (jetzt) | **3,6 ms** | 1,6 | 0,5 | 0,2 | 0,4 |
+| 100–3200 (vorher → jetzt) | 11,8 → **2,9** | 13,0 → 2,5 | | | |
+
+Acht Pole bei 50 Hz stehen sehr dicht am Einheitskreis: der Boden der
+Stimme kam **16,6 ms nach** ihrer Mitte heraus. Das hört man nicht als
+Klangfarbe, sondern als Verschmieren — und bei voller Bandbreite läuft
+gar kein Filter, darum ist die perfekt.
+
+Die untere Flanke hängt jetzt an der Ecke: **unter 150 Hz zweite
+Ordnung, ab 150 Hz achte.** Gemessen, warum:
+
+| Hochpass | 60 Hz | 100 Hz | Pegel 30 Hz | 20 Hz |
+| --- | --- | --- | --- | --- |
+| 12 dB/Okt | 3,6 ms | 1,6 | −9,4 dB | −16,0 |
+| 24 dB/Okt | 8,1 ms | 2,7 | −17,8 | −31,8 |
+| 48 dB/Okt | 16,8 ms | 4,9 | −35,5 | −63,7 |
+
+Unterhalb von 150 Hz liegt keine Stimme mehr: Steilheit bringt dort
+nichts und kostet am meisten Zeit. Im DX-Kanal dagegen sitzt die Ecke
+bei 200 Hz **mitten** in der Stimme — dort bleibt es bei 48 dB je
+Oktave, sonst käme 100 Hz mit −12 dB durch, was ein DX-Filter nie tut.
+Die Prüfstände haben genau das sofort gezeigt, als die flache Flanke
+versehentlich für alle galt.
+
+Oben bleibt es überall bei 48 dB je Oktave: dort kostet die Steilheit
+0,2 bis 0,4 ms, und diese Kante ist der Grund, warum man einen Kanal
+überhaupt wählt.
+
+Ehrlich bleibt dabei: ein Sender filtert mit **linearer Phase** (FIR),
+verschmiert also gar nicht. Jede IIR-Nachbildung ist darin falsch —
+diese ist nur weniger falsch als die vorige.
+
 ### Jede Durchsage begann mit 30 ms der vorigen
 
 `StripChain::reset()` traf acht der zehn Stufen. Es fehlten genau die

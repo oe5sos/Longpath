@@ -550,7 +550,21 @@ void StripLiveMonitor::pump()
     // Und erst jetzt begrenzen -- siehe die Messreihe am
     // m_kanalBegrenzer im Header. Die Decke kommt aus der Kette
     // selbst, damit nicht zwei Zahlen gepflegt werden muessen.
-    if (m_band.channel() >= 0) {
+    //
+    // NUR wenn die Kette ueberhaupt laeuft. Die Bedingung lautete
+    // zuerst allein „ein Kanal ist gewaehlt", und das war ein
+    // Fehler mit Ansage: wer den Kanalzug ausschaltet, um sein
+    // unbearbeitetes Signal zu hoeren, bekam trotzdem einen
+    // Brickwall bei -2 dBFS auf ein Signal, das schon aus einem
+    // Studiovorverstaerker kam. Gemessen an echter Sprache mit
+    // -1,5 dBFS Spitze: 19,7 dB Fremdanteil, also rund zehn
+    // Prozent, auf einem Signal, das niemand bearbeiten wollte --
+    // und nur dann, wenn ein Kanal gewaehlt war. Genau der
+    // Unterschied, den der Betreiber als „sobald 4000k
+    // eingeschaltet ist, wird die Qualitaet massiv schlechter"
+    // gemeldet hat.
+    if (m_band.channel() >= 0
+        && !m_bypass.load(std::memory_order_acquire)) {
         m_kanalBegrenzer.setCeilingDb(m_chain->limiter().ceilingDb());
         m_kanalBegrenzer.process(m_mono.data(), int(m_mono.size()), 1);
     }

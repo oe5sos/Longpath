@@ -686,7 +686,14 @@ private slots:
             const auto& k = BandLimit::channels()[size_t(ch)];
             double schlimmste = 0.0;
             double woHz = 0.0;
-            const double von = k.lowHz * 1.6;
+            // Ab wo „Durchlass" anfaengt, haengt an der Flanke. Eine
+            // achte Ordnung ist beim 1,6-fachen der Ecke laengst
+            // flach; eine zweite ist dort noch 0,6 dB darunter --
+            // das ist keine Welligkeit, das ist die Flanke selbst.
+            // Kanaele mit flacher unterer Flanke (Ecke unter
+            // 150 Hz, siehe BandLimit::hochpassOrdnungFuer) werden
+            // deshalb ab dem Dreifachen gemessen.
+            const double von = k.lowHz * (k.lowHz < 150 ? 3.0 : 1.6);
             const double bis = k.highHz * 0.65;
             for (int i = 0; i <= 24; ++i) {
                 const double hz = von * std::pow(bis / von, i / 24.0);
@@ -728,16 +735,34 @@ private slots:
                        .arg(k.lowHz).arg(unterUnten, 6, 'f', 1)
                        .arg(k.highHz).arg(ueberOben, 6, 'f', 1);
 
-            // Achte Ordnung gibt theoretisch -48,2 dB. Die untere
-            // Flanke trifft das genau; die obere wird bei 4050 Hz von
-            // der Vorverzerrung der bilinearen Abbildung noch steiler
-            // gemacht, nie flacher. Geprüft wird deshalb nur die
-            // Untergrenze.
-            QVERIFY2(unterUnten < -40.0,
-                     qPrintable(QStringLiteral("%1: untere Flanke nur %2 dB "
-                                               "je Oktave")
-                                    .arg(QString::fromUtf8(k.name))
-                                    .arg(unterUnten)));
+            // ── Unten 12, oben 48 ───────────────────────────────
+            //
+            // Hier stand einmal für beide Flanken dieselbe
+            // Erwartung. Die untere ist seit dem 2026-10-10
+            // absichtlich flacher: acht Pole bei 50 Hz kosteten
+            // 16,8 ms Laufzeit und brachten dafür nur Dämpfung
+            // unterhalb dessen, was eine Stimme enthält. Siehe die
+            // Messreihe in BandLimit.h.
+            //
+            // 12 dB je Oktave heißt eine Oktave tiefer rund -12 dB;
+            // geprüft wird, dass es überhaupt dämpft und nicht
+            // heimlich wieder steil geworden ist.
+            // Unter 150 Hz zweite Ordnung (rund -12 dB je Oktave),
+            // ab 150 achte (rund -48). Siehe hochpassOrdnungFuer()
+            // in BandLimit.h samt Messreihe.
+            if (k.lowHz < 150) {
+                QVERIFY2(unterUnten < -9.0 && unterUnten > -20.0,
+                         qPrintable(QStringLiteral("%1: untere Flanke %2 dB "
+                                                   "-- erwartet rund -12")
+                                        .arg(QString::fromUtf8(k.name))
+                                        .arg(unterUnten)));
+            } else {
+                QVERIFY2(unterUnten < -40.0,
+                         qPrintable(QStringLiteral("%1: untere Flanke nur "
+                                                   "%2 dB je Oktave")
+                                        .arg(QString::fromUtf8(k.name))
+                                        .arg(unterUnten)));
+            }
             QVERIFY2(ueberOben < -40.0,
                      qPrintable(QStringLiteral("%1: obere Flanke nur %2 dB "
                                                "je Oktave")
@@ -2479,6 +2504,251 @@ private slots:
                  qPrintable(QStringLiteral("%1 dBFS laufen nach -- eine "
                                            "Stufe hält ihren Zustand")
                                 .arg(dB(p), 0, 'f', 1)));
+    }
+
+    // ── Ein Begrenzer auf einem Signal, das keiner bestellt hat ─────
+    //
+    // „volle bandbreite läuft perfekt über apollo und longpath,
+    //  sobald 4000k eingeschalten ist wird die qualität massiv
+    //  anders und schlechter."
+    //
+    // Der Mithörweg legt seit heute einen Begrenzer HINTER das
+    // Kanalfilter -- richtig gemessen und richtig begründet, solange
+    // die Kette läuft. Die Bedingung dafür lautete aber nur „ein
+    // Kanal ist gewählt" und nicht „die Kette ist eingeschaltet".
+    //
+    // Folge: wer den Kanalzug ausschaltet, um sein unbearbeitetes
+    // Signal zu hören, und dabei einen Kanal wählt, bekommt einen
+    // Brickwall bei -2 dBFS mit harter Kappung auf ein Signal, das
+    // schon aus einem Studiovorverstärker kommt und entsprechend
+    // laut ist. Bei „roh (volle Bandbreite)" läuft er nicht -- genau
+    // der Unterschied, den der Betreiber beschreibt.
+    void aBypassedStripMustNotAddALimiter()
+    {
+        QString warum;
+        const auto sauber = echteRede(&warum);
+        if (sauber.empty()) { QSKIP(qPrintable(warum)); }
+        Rede rede = redeMitRauschen(sauber, -60.0);
+
+        // So laut, wie es aus einem Apollo mit LA-2 und 610 kommt:
+        // Spitzen knapp unter Vollaussteuerung.
+        double p0 = 0.0;
+        for (float x : rede.signal) { p0 = std::max(p0, double(std::fabs(x))); }
+        const float heiss = float(std::pow(10.0, -1.5 / 20.0) / p0);
+        for (float& x : rede.signal) { x *= heiss; }
+
+        const auto klirrVon = [](const std::vector<float>& v,
+                                 const std::vector<float>& ref) {
+            // Wieviel Energie ist dazugekommen, die im Original nicht
+            // war -- der Rest nach Abzug des besten Pegelabgleichs.
+            double zaehler = 0.0;
+            double nenner = 0.0;
+            for (size_t i = 0; i < v.size(); ++i) {
+                zaehler += double(v[i]) * double(ref[i]);
+                nenner  += double(ref[i]) * double(ref[i]);
+            }
+            const double a = zaehler / std::max(nenner, 1e-20);
+            double rest = 0.0;
+            double sig = 0.0;
+            for (size_t i = 0; i < v.size(); ++i) {
+                const double d = double(v[i]) - a * double(ref[i]);
+                rest += d * d;
+                sig  += double(v[i]) * double(v[i]);
+            }
+            return 10.0 * std::log10(std::max(rest, 1e-20)
+                                     / std::max(sig, 1e-20));
+        };
+
+        // A: nur das Kanalfilter -- so, wie es sein soll.
+        const auto nurKanal = durchKanal(3, rede.signal);
+
+        // B: Kanalfilter plus der Begrenzer, wie er heute läuft.
+        auto mitBegrenzer = nurKanal;
+        {
+            ClientFinalLimiter lim;
+            lim.prepare(kRate);
+            lim.setEnabled(true);
+            lim.setCeilingDb(-2.0f);
+            for (size_t at = 0; at + 240 <= mitBegrenzer.size(); at += 240) {
+                lim.process(mitBegrenzer.data() + at, 240, 1);
+            }
+        }
+
+        const auto spitze = [](const std::vector<float>& v) {
+            double p = 0.0;
+            for (float x : v) { p = std::max(p, double(std::fabs(x))); }
+            return dB(p);
+        };
+        const double schaden = klirrVon(mitBegrenzer, nurKanal);
+        qInfo().noquote()
+            << QStringLiteral("Apollo-Signal, Spitze %1 dBFS · nur Kanal: "
+                              "%2 dBFS · mit Begrenzer: %3 dBFS · "
+                              "Fremdanteil %4 dB")
+                   .arg(spitze(rede.signal), 0, 'f', 1)
+                   .arg(spitze(nurKanal), 0, 'f', 1)
+                   .arg(spitze(mitBegrenzer), 0, 'f', 1)
+                   .arg(schaden, 0, 'f', 1);
+
+        // Gemessen wurde hier, WAS der Begrenzer auf einem solchen
+        // Signal anrichtet -- 19,7 dB Fremdanteil, also rund zehn
+        // Prozent. Die Behebung ist nicht, ihn zu zaehmen, sondern
+        // ihn bei ueberbrueckter Kette gar nicht erst laufen zu
+        // lassen (StripLiveMonitor::pump). Diese Zahl bleibt als
+        // Begruendung stehen, und die Pruefung dazu steht in
+        // theBypassedPathAddsNothingAtAll().
+        qInfo().noquote() << QStringLiteral(
+            "   (deshalb laeuft er bei ueberbrueckter Kette nicht mehr)");
+        QVERIFY2(schaden < -10.0,
+                 qPrintable(QStringLiteral("der Begrenzer legt %1 dB "
+                                           "Fremdanteil auf ein Signal, "
+                                           "das niemand bearbeiten wollte")
+                                .arg(schaden, 0, 'f', 1)));
+    }
+
+    // ── Was das Kanalfilter mit der ZEIT macht ──────────────────────
+    //
+    // „4k sollte ähnlich sein wie volle bandbreite, ist es aber
+    //  nicht." -- und das schon mit dem alten USB-Mikrofon, also
+    //  lange vor allem, was heute gebaut wurde.
+    //
+    // Der Pegelgang ist nachgemessen und tadellos: Ecken auf ein
+    // Zehntelprozent, Durchlass flach auf 0,02 dB. Ein Filter hat
+    // aber zwei Seiten, und die zweite wurde nie angesehen: die
+    // Gruppenlaufzeit. Acht Pole bei 50 Hz stehen sehr dicht am
+    // Einheitskreis, und was dort an Phase passiert, hoert man als
+    // Verschmieren -- nicht als Klangfarbe, sondern als „anders".
+    //
+    // Gemessen wird sie direkt: ein kurzer Ton je Frequenz, und der
+    // Schwerpunkt seiner Huellkurve sagt, wann er herauskommt.
+    void theGroupDelayOfEachChannel()
+    {
+        const auto laufzeitMs = [](int ch, double hz) {
+            // Ein Wellenpaket: Ton unter einer Hann-Glocke.
+            const int n = int(kRate * 1.2);
+            const int laenge = int(kRate * 0.06);
+            const int start = int(kRate * 0.3);
+            std::vector<float> x(size_t(n), 0.0f);
+            for (int i = 0; i < laenge; ++i) {
+                const double w = 0.5 - 0.5 * std::cos(2.0 * M_PI * i
+                                                      / (laenge - 1));
+                x[size_t(start + i)] =
+                    float(w * std::sin(2.0 * M_PI * hz * i / kRate));
+            }
+            const auto schwerpunkt = [](const std::vector<float>& v) {
+                double s = 0.0;
+                double sw = 0.0;
+                for (size_t i = 0; i < v.size(); ++i) {
+                    const double e = double(v[i]) * double(v[i]);
+                    s += e; sw += e * double(i);
+                }
+                return s > 1e-20 ? sw / s : 0.0;
+            };
+            const double vorher = schwerpunkt(x);
+            auto y = durchKanal(ch, x);
+            const double nachher = schwerpunkt(y);
+            return (nachher - vorher) * 1000.0 / kRate;
+        };
+
+        qInfo().noquote() << QStringLiteral(
+            "   Kanal                      60 Hz   100 Hz   200 Hz   "
+            "1 kHz   3 kHz   4 kHz");
+        for (int ch = 0; ch < BandLimit::kChannelCount; ++ch) {
+            const auto& k = BandLimit::channels()[size_t(ch)];
+            qInfo().noquote()
+                << QStringLiteral("  %1  %2  %3  %4  %5  %6  %7")
+                       .arg(QString::fromUtf8(k.name), -24)
+                       .arg(laufzeitMs(ch, 60.0), 6, 'f', 1)
+                       .arg(laufzeitMs(ch, 100.0), 7, 'f', 1)
+                       .arg(laufzeitMs(ch, 200.0), 7, 'f', 1)
+                       .arg(laufzeitMs(ch, 1000.0), 6, 'f', 1)
+                       .arg(laufzeitMs(ch, 3000.0), 6, 'f', 1)
+                       .arg(laufzeitMs(ch, 4000.0), 6, 'f', 1);
+        }
+        qInfo().noquote() << QStringLiteral(
+            "   (Millisekunden. Was zwischen zwei Frequenzen stark "
+            "auseinanderläuft, hört man als Verschmieren.)");
+    }
+
+    // ── Steilheit gegen Laufzeit, abgewogen ─────────────────────────
+    //
+    // Die Flanke von 48 dB je Oktave kostet 16,8 ms bei 60 Hz. Die
+    // Frage ist, was sie dafür bringt -- und ob eine flachere Flanke
+    // dasselbe leistet, ohne die Stimme zu verschmieren.
+    //
+    // Gemessen wird beides am selben Kanal (50-4050 ESSB) und mit
+    // denselben Werkzeugen: Laufzeit über ein Wellenpaket,
+    // Dämpfung über reine Töne.
+    void steepnessAgainstSmear()
+    {
+        const auto laufzeitMs = [](BandLimit& b, double hz) {
+            const int n = int(kRate * 1.2);
+            const int laenge = int(kRate * 0.06);
+            const int start = int(kRate * 0.3);
+            std::vector<float> x(size_t(n), 0.0f);
+            for (int i = 0; i < laenge; ++i) {
+                const double w = 0.5 - 0.5 * std::cos(2.0 * M_PI * i
+                                                      / (laenge - 1));
+                x[size_t(start + i)] =
+                    float(w * std::sin(2.0 * M_PI * hz * i / kRate));
+            }
+            const auto schwerpunkt = [](const std::vector<float>& v) {
+                double s = 0.0;
+                double sw = 0.0;
+                for (size_t i = 0; i < v.size(); ++i) {
+                    const double e = double(v[i]) * double(v[i]);
+                    s += e; sw += e * double(i);
+                }
+                return s > 1e-20 ? sw / s : 0.0;
+            };
+            const double vorher = schwerpunkt(x);
+            b.reset();
+            for (size_t at = 0; at + 240 <= x.size(); at += 240) {
+                b.process(x.data() + at, 240);
+            }
+            return (schwerpunkt(x) - vorher) * 1000.0 / kRate;
+        };
+        const auto pegelDb = [](BandLimit& b, double hz) {
+            const int perioden = std::max(8, int(0.40 * hz));
+            const int mess = int(std::lround(perioden * kRate / hz));
+            const int ruhe = int(kRate * 0.8);
+            std::vector<float> x(size_t(ruhe + mess));
+            for (size_t i = 0; i < x.size(); ++i) {
+                x[i] = float(std::sin(2.0 * M_PI * hz * double(i) / kRate));
+            }
+            b.reset();
+            for (size_t at = 0; at + 240 <= x.size(); at += 240) {
+                b.process(x.data() + at, 240);
+            }
+            double s = 0.0;
+            for (int i = 0; i < mess; ++i) {
+                const double v = double(x[size_t(ruhe + i)]);
+                s += v * v;
+            }
+            return 10.0 * std::log10(std::max(s / mess, 1e-14) / 0.5);
+        };
+
+        qInfo().noquote() << QStringLiteral(
+            "  Hochpass   Laufzeit 60 Hz   100 Hz   200 Hz   "
+            "Pegel 50 Hz   30 Hz   20 Hz");
+        for (int ordnung : { 2, 4, 6, 8 }) {
+            BandLimit b;
+            b.prepare(kRate);
+            b.setOrders(ordnung, 8);
+            b.setChannel(3);                    // 50 - 4050 Hz
+            qInfo().noquote()
+                << QStringLiteral("  %1 dB/Okt   %2 ms   %3 ms   %4 ms   "
+                                  "%5 dB   %6 dB   %7 dB")
+                       .arg(ordnung * 6, 2)
+                       .arg(laufzeitMs(b, 60.0), 10, 'f', 1)
+                       .arg(laufzeitMs(b, 100.0), 6, 'f', 1)
+                       .arg(laufzeitMs(b, 200.0), 6, 'f', 1)
+                       .arg(pegelDb(b, 50.0), 8, 'f', 1)
+                       .arg(pegelDb(b, 30.0), 6, 'f', 1)
+                       .arg(pegelDb(b, 20.0), 6, 'f', 1);
+        }
+        qInfo().noquote() << QStringLiteral(
+            "   (ein Sender braucht unten keine 48 dB je Oktave -- er "
+            "braucht Ruhe unterhalb der Stimme)");
     }
 
     // ── Die eigene Verzögerung ──────────────────────────────────────

@@ -10,6 +10,7 @@
 
 #include "core/strip/BandLimit.h"
 
+#include <algorithm>
 #include <cmath>
 
 namespace Longpath {
@@ -69,15 +70,31 @@ void BandLimit::reset() noexcept
     for (Biquad& b : m_lp) { b.clear(); }
 }
 
+void BandLimit::setOrders(int hochpass, int tiefpass)
+{
+    const auto gerade = [](int n) {
+        if (n <= 0) { return 0; }        // 0 = nach der Regel
+        return std::clamp((n / 2) * 2, 2, kMaxSections * 2);
+    };
+    m_hpOrder = gerade(hochpass);
+    m_lpOrder = gerade(tiefpass);
+    m_designed = -2;            // erzwingt Neurechnung
+}
+
 void BandLimit::design(int lowHz, int highHz)
 {
     const double nyq = m_rate * 0.5;
+    const int hpSek = (m_hpOrder > 0 ? m_hpOrder
+                                     : hochpassOrdnungFuer(lowHz)) / 2;
+    const int lpSek = m_lpOrder / 2;
 
-    for (int k = 0; k < kSections; ++k) {
-        const double q = butterworthQ(k, kSections * 2);
+    for (Biquad& b : m_hp) { b = Biquad{}; }
+    for (Biquad& b : m_lp) { b = Biquad{}; }
 
+    for (int k = 0; k < kMaxSections; ++k) {
         // Hochpass
-        {
+        if (k < hpSek) {
+            const double q = butterworthQ(k, hpSek * 2);
             const double f = std::min(double(lowHz), nyq * 0.45);
             const double w = 2.0 * kPi * f / m_rate;
             const double cw = std::cos(w);
@@ -91,7 +108,8 @@ void BandLimit::design(int lowHz, int highHz)
             b.a2 = (1.0 - alpha)     / a0;
         }
         // Tiefpass
-        {
+        if (k < lpSek) {
+            const double q = butterworthQ(k, lpSek * 2);
             const double f = std::min(double(highHz), nyq * 0.90);
             const double w = 2.0 * kPi * f / m_rate;
             const double cw = std::cos(w);
