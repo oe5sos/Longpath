@@ -61,6 +61,7 @@
 #include <QString>
 
 #include <functional>
+#include <optional>
 
 class QTcpServer;
 class QTcpSocket;
@@ -90,10 +91,18 @@ public:
     explicit CatServer(QObject* parent = nullptr);
     ~CatServer() override;
 
-    /// Der Zustandsgeber wird VOR jedem Befehl gefragt. Ohne ihn
-    /// antwortet der Server auf alles mit `?;` -- lieber eine klare
-    /// Ablehnung als eine erfundene Frequenz.
-    void setzeZustandsgeber(std::function<CatProtocol::Zustand()> geber);
+    /// Der Zustandsgeber wird VOR jedem Befehl gefragt.
+    ///
+    /// Er gibt `std::nullopt`, wenn es gerade nichts zu melden gibt --
+    /// kein Empfaenger angelegt, keine Verbindung zum Geraet. Dann
+    /// antwortet der Server mit `?;`, und zwar aus demselben Grund, aus
+    /// dem er es ohne Geber tut: eine gemeldete 0 Hz ist eine erfundene
+    /// Frequenz, und ein Fremdprogramm glaubt sie.
+    ///
+    /// Am 2026-10-11 im Prueffall am echten Fenster gefunden: ein frisch
+    /// gebautes MainWindow hat noch keinen aktiven Slice, und der erste
+    /// Entwurf dieses Gebers meldete dafuer brav "FA00000000000;".
+    void setzeZustandsgeber(std::function<std::optional<CatProtocol::Zustand>()> geber);
     /// Die Haken gehen unveraendert an die Protokollschicht.
     void setzeHaken(const CatProtocol::Haken& haken);
 
@@ -133,7 +142,7 @@ private:
     Kanal m_k[kKanaele];
 
     CatProtocol m_protokoll;
-    std::function<CatProtocol::Zustand()> m_geber;
+    std::function<std::optional<CatProtocol::Zustand>()> m_geber;
 
     /// From Thetis CAT/TCPIPcatServer.cs:295 [v2.10.3.15]:
     ///   if (m_oneLineBuf.Length > 255) m_oneLineBuf.Clear();

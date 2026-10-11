@@ -366,6 +366,8 @@ warren@wpratt.com
 #include "core/TwoToneController.h"
 #include "applets/PhoneCwApplet.h"
 #include "applets/RadeApplet.h"
+#include "core/CatModeMap.h"
+#include "core/CatServer.h"
 #include "applets/EqApplet.h"
 #include "applets/VaxApplet.h"
 #include "applets/DigitalApplet.h"
@@ -600,6 +602,79 @@ MainWindow::MainWindow(QWidget* parent)
                 });
     }
 #endif
+
+    // ── CAT-Server (2026-10-11) ──────────────────────────────────────────────
+    //
+    // Longpath war fuer Fremdprogramme stumm: rotctld fuer den Rotor, ein
+    // TCI-Server -- aber nichts, womit WSJT-X, fldigi, N1MM oder das
+    // Contestprogramm das Geraet als Kenwood ansprechen koennten.
+    //
+    // Hier, VOR buildUI, aus demselben Grund wie der TCI-Server oben: das
+    // CatApplet wird von populateDefaultMeter() gebaut und braucht den
+    // Server schon.
+    //
+    // Der Zustandsgeber wird bei JEDEM Befehl gefragt, nicht gepuffert --
+    // ein Server, der nach dem Abstimmen die alte Frequenz meldet, laesst
+    // das Fremdprogramm dort senden.
+    {
+        m_catServer = new CatServer(this);
+
+        m_catServer->setzeZustandsgeber(
+            [this]() -> std::optional<CatProtocol::Zustand> {
+            SliceModel* sl = m_radioModel ? m_radioModel->activeSlice() : nullptr;
+            if (!sl) {
+                // Kein Empfaenger angelegt: nichts zu melden. NICHT
+                // Nullen schicken -- "FA00000000000;" ist eine Frequenz,
+                // und ein Fremdprogramm glaubt sie. Am 2026-10-11 im
+                // Prueffall am echten Fenster aufgefallen, das vor dem
+                // ersten Verbinden genau in diesem Zustand ist.
+                return std::nullopt;
+            }
+            CatProtocol::Zustand z;
+            {
+                z.vfoAHz = static_cast<quint64>(sl->frequency());
+                z.modeK  = catKenwoodZahl(sl->dspMode());
+                z.stepHz = sl->stepHz();
+                z.ritOn  = sl->ritEnabled();
+                z.xitOn  = sl->xitEnabled();
+                // Welcher Wert ins IT-Feld gehoert, entscheidet die
+                // Protokollschicht (RIT vor XIT, wie Thetis) -- hier wird
+                // nur der passende mitgegeben.
+                z.itHz   = sl->ritEnabled() ? sl->ritHz()
+                                            : (sl->xitEnabled() ? sl->xitHz() : 0);
+            }
+            z.mox = m_radioModel ? m_radioModel->mox() : false;
+            // Split meldet Longpath als AUS, und das ist keine Luecke,
+            // sondern der Stand: RadioModel::split() gibt bewusst immer
+            // false (Phase-3F-Entwurf §3 -- statt Split gibt es XIT oder
+            // einen zweiten Slice). Dieselbe Antwort gibt der TCI-Server
+            // schon, damit WSJT-X und N1MM auf "Split: None/Fake It"
+            // bleiben.
+            z.split = false;
+            return z;
+        });
+
+        CatProtocol::Haken haken;
+        haken.setzeVfoA = [this](quint64 hz) {
+            if (SliceModel* sl = m_radioModel ? m_radioModel->activeSlice() : nullptr) {
+                sl->setFrequency(static_cast<double>(hz));
+            }
+        };
+        haken.setzeModeK = [this](int k) {
+            if (SliceModel* sl = m_radioModel ? m_radioModel->activeSlice() : nullptr) {
+                sl->setDspMode(catModusAusKenwoodZahl(k));
+            }
+        };
+        haken.setzeMox = [this](bool on) {
+            if (m_radioModel) { m_radioModel->setMox(on); }
+        };
+        // setzeVfoB und setzeSplit bleiben ABSICHTLICH leer. Longpath hat
+        // kein VFO B und keinen Split; die Protokollschicht lehnt einen
+        // Befehl ohne Haken mit "?;" ab, statt ihn zu quittieren und
+        // nichts zu tun. Ein quittiertes FB, das nichts bewegt, laesst ein
+        // Fremdprogramm glauben, es haette den zweiten VFO gesetzt.
+        m_catServer->setzeHaken(haken);
+    }
 
     buildUI();
     buildMenuBar();
@@ -6915,6 +6990,12 @@ void MainWindow::populateDefaultMeter()
     m_eqApplet = new EqApplet(m_radioModel, nullptr);
     panel->addApplet(m_eqApplet);
 
+    // CatApplet — CAT ueber TCP (2026-10-11). Vorbehalt: siehe die Notiz
+    // bei den Konstruktoren weiter unten.
+    m_catApplet = new CatApplet(m_radioModel, nullptr);
+    m_catApplet->setzeCatServer(m_catServer);
+    panel->addApplet(m_catApplet);
+
     // Geister-Applets — verborgen nach
     // docs/superpowers/plans/2026-05-01-ui-polish-right-panel.md §Task 6.
     // Sie sind bis heute reine Attrappen (kein Bedienelement verdrahtet).
@@ -7426,6 +7507,7 @@ void MainWindow::populateDefaultMeter()
     m_appletsById[QStringLiteral("RttyDecoder")] = m_rttyDecoderApplet;
     m_appletsById[QStringLiteral("CwDecoder")] = m_cwDecoderApplet;
     m_appletsById[QStringLiteral("Eq")]         = m_eqApplet;
+    m_appletsById[QStringLiteral("Cat")]        = m_catApplet;
     m_appletsById[QStringLiteral("Vax")]        = m_vaxApplet;
     m_appletsById[QStringLiteral("Dvk")]        = m_dvkApplet;
     m_appletsById[QStringLiteral("QsoRec")]     = m_qsoRecorderApplet;
@@ -7503,6 +7585,12 @@ void MainWindow::populateDefaultMeter()
     // Notiz bei "Die vier vom 2026-08-23".
     m_appletVis->registerApplet(QStringLiteral("Eq"),
                                 QStringLiteral("Equalizer"),    true);
+    // CAT: NICHT sichtbar ab Werk. Wer kein Fremdprogramm anbindet,
+    // braucht das Feld nie, und zwei seiner vier Reihen sind noch
+    // Attrappen -- es soll gefunden werden, wenn man es sucht, und nicht
+    // im Weg stehen, wenn nicht.
+    m_appletVis->registerApplet(QStringLiteral("Cat"),
+                                QStringLiteral("CAT"),          false);
     m_appletVis->registerApplet(QStringLiteral("Vax"),
                                 QStringLiteral("VAX"),          true);
     // Sprachspeicher (2026-08-19). Sichtbar ab Werk: er ist auch ohne
@@ -8895,7 +8983,15 @@ void MainWindow::populateDefaultMeter()
     // m_digitalApplet    = new DigitalApplet(m_radioModel, nullptr);    // TODO 3-VAX
     // m_diversityApplet  = new DiversityApplet(m_radioModel, nullptr);  // TODO 3F (multi-RX)
     // m_cwxApplet        = new CwxApplet(m_radioModel, nullptr);        // TODO 3M-2 (CW TX)
-    // m_catApplet        = new CatApplet(m_radioModel, nullptr);        // TODO 3J/3K/3-VAX
+    // CatApplet ist seit 2026-10-11 eingehaengt (weiter oben), mit
+    // Vorbehalt: erfuellt ist von "3J/3K/3-VAX" nur 3K und davon die
+    // TCP-Haelfte -- der Schalter startet die vier CAT-Kanaele. PTY
+    // (braucht Pseudoterminals), VAX und IQ bleiben Attrappen und
+    // BEHALTEN ihre NyiOverlay-Marke.
+    //
+    // Eingehaengt trotzdem, weil es sonst keinen Weg gibt, den
+    // CAT-Server einzuschalten -- ein fertiger Server, den niemand
+    // starten kann, ist so gut wie nicht gebaut.
 
     c0->setContent(panel);
     qCDebug(lcMeter) << "Installed default meter layout: S-Meter + Power/SWR + ALC";

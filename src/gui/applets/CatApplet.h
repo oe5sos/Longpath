@@ -48,6 +48,10 @@ public:
     explicit CatApplet(RadioModel* model, QWidget* parent = nullptr);
 
     QString appletId()    const override { return QStringLiteral("cat"); }
+
+    /// Den CAT-Server anhaengen (2026-10-11). Ohne ihn bleibt der
+    /// TCP-Schalter gesperrt statt zu luegen.
+    void setzeCatServer(class CatServer* srv);
     QString appletTitle() const override { return QStringLiteral("CAT"); }
     void    syncFromModel() override;
 
@@ -69,6 +73,14 @@ private:
     // Control 5 — VAX IQ: enable button + rate combo
     QPushButton* m_iqBtn         = nullptr;
     QComboBox*   m_iqRateCombo   = nullptr;
+
+    // Verdrahtung 2026-10-11
+    class CatServer* m_cat = nullptr;
+    void zeigeKanaele();
+    /// From Thetis CAT/TCPIPcatServer.cs:442 [v2.10.3.15] --
+    /// `public static int DEFAULT_PORT = 31001;`
+    /// Die vier Kanaele liegen darauf aufsteigend.
+    static constexpr quint16 kErsterPort = 31001;
 };
 
 } // namespace Longpath

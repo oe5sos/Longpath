@@ -18,6 +18,8 @@
 #include <QtTest/QtTest>
 #include <QCoreApplication>
 #include <QTcpServer>
+
+#include <optional>
 #include <QTcpSocket>
 
 #include "core/CatServer.h"
@@ -30,7 +32,13 @@ namespace {
 struct Geber {
     CatProtocol::Zustand z;
     int rufe{0};
-    CatProtocol::Zustand operator()() { ++rufe; return z; }
+    bool stumm{false};   // nullopt melden, wie ein Fenster ohne Slice
+    std::optional<CatProtocol::Zustand> operator()()
+    {
+        ++rufe;
+        if (stumm) { return std::nullopt; }
+        return z;
+    }
 };
 
 } // namespace
@@ -353,7 +361,8 @@ private slots:
         // ein Abbau, der in halb abgebaute Mitglieder greift. Hier mit
         // OFFENER Verbindung abbauen.
         auto* eigener = new CatServer();
-        eigener->setzeZustandsgeber([this]() { return geber.z; });
+        eigener->setzeZustandsgeber(
+            [this]() -> std::optional<CatProtocol::Zustand> { return geber.z; });
         QVERIFY(eigener->starte(0, 0));
         auto* s = new QTcpSocket();
         s->connectToHost(QHostAddress::LocalHost, eigener->port(0));
@@ -435,6 +444,27 @@ private slots:
     }
 
     // ── Ohne Zustandsgeber ──────────────────────────────────────────────────
+
+    void einStummerGeberWirdAbgelehntStattMitNullenBeantwortet()
+    {
+        // Der Geber meldet nullopt, wenn es nichts zu melden gibt (kein
+        // Empfaenger angelegt, keine Verbindung). Dann darf KEINE
+        // Frequenz hinausgehen: "FA00000000000;" ist eine Angabe, und
+        // ein Fremdprogramm glaubt sie.
+        //
+        // Am 2026-10-11 am echten Fenster aufgefallen -- ein frisch
+        // gebautes MainWindow hat noch keinen aktiven Slice, und der
+        // erste Entwurf meldete dafuer brav Nullen.
+        QVERIFY(srv->starte(0, 0));
+        QTcpSocket* s = verbinde(0);
+        QVERIFY(s);
+        QCOMPARE(frage(s, "FA;"), QStringLiteral("FA00014225000;"));
+        geber.stumm = true;
+        QCOMPARE(frage(s, "FA;"), QStringLiteral("?;"));
+        QCOMPARE(frage(s, "IF;"), QStringLiteral("?;"));
+        geber.stumm = false;
+        QCOMPARE(frage(s, "FA;"), QStringLiteral("FA00014225000;"));
+    }
 
     void ohneZustandsgeberWirdAbgelehntStattErfunden()
     {

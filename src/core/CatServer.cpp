@@ -30,7 +30,8 @@ CatServer::~CatServer()
     for (int k = 0; k < kKanaele; ++k) { beende(k); }
 }
 
-void CatServer::setzeZustandsgeber(std::function<CatProtocol::Zustand()> geber)
+void CatServer::setzeZustandsgeber(
+    std::function<std::optional<CatProtocol::Zustand>()> geber)
 {
     m_geber = std::move(geber);
 }
@@ -238,7 +239,13 @@ QString CatServer::verarbeiteFuerTest(const QString& befehl)
         // nicht".
         return CatProtocol::abgelehnt();
     }
-    m_protokoll.setzeZustand(m_geber());
+    const std::optional<CatProtocol::Zustand> z = m_geber();
+    if (!z) {
+        // Der Geber sagt: gerade nichts zu melden (kein Empfaenger
+        // angelegt, keine Verbindung). Dieselbe Antwort wie ohne Geber.
+        return CatProtocol::abgelehnt();
+    }
+    m_protokoll.setzeZustand(*z);
     return m_protokoll.antwortAuf(befehl);
 }
 

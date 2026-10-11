@@ -26,6 +26,7 @@
 
 #include "CatApplet.h"
 #include "gui/styles/ThemeQss.h"
+#include "core/CatServer.h"
 #include "NyiOverlay.h"
 #include "gui/ComboStyle.h"
 #include "gui/StyleConstants.h"
@@ -105,7 +106,6 @@ void CatApplet::buildUI()
         row->addStretch();
 
         vbox->addLayout(row);
-        NyiOverlay::markNyi(m_tcpBtn, QStringLiteral("3K"));
     }
 
     // --- Control 2: CAT PTY enable + 4 path labels ---
@@ -175,6 +175,83 @@ void CatApplet::buildUI()
 
     vbox->addStretch();
     root->addWidget(body);
+}
+
+// ── Verdrahtung des TCP-Schalters (2026-10-11) ───────────────────────────────
+//
+// Longpath war fuer Fremdprogramme stumm. Der Schalter hier startet die
+// vier CAT-Kanaele auf 31001..31004 (Thetis' Vorgabeport aufsteigend) --
+// nur auf 127.0.0.1, weil CAT den Sender tasten kann.
+//
+// PTY, VAX und IQ bleiben Attrappen und behalten ihre NyiOverlay-Marke:
+// PTY braucht Pseudoterminals (eigener Gang), VAX und IQ gehoeren in den
+// Tonbereich und haben mit CAT nichts zu tun.
+
+void CatApplet::setzeCatServer(CatServer* srv)
+{
+    m_cat = srv;
+    if (!m_tcpBtn) { return; }
+
+    // Ohne Server bleibt der Schalter GESPERRT, nicht bloss wirkungslos.
+    // Ein Schalter, der sich druecken laesst und nichts tut, ist genau
+    // die Art Oberflaeche, die dieses Feld bis heute war.
+    m_tcpBtn->setEnabled(srv != nullptr);
+    if (!srv) {
+        m_tcpBtn->setToolTip(QStringLiteral("Kein CAT-Server vorhanden"));
+        return;
+    }
+
+    m_tcpBtn->setToolTip(
+        QStringLiteral("CAT ueber TCP auf 127.0.0.1:%1..%2 (vier Kanaele)")
+            .arg(kErsterPort).arg(kErsterPort + CatServer::kKanaele - 1));
+
+    connect(m_tcpBtn, &QPushButton::toggled, this, [this](bool an) {
+        if (!m_cat) { return; }
+        if (an) {
+            int gestartet = 0;
+            for (int k = 0; k < CatServer::kKanaele; ++k) {
+                if (m_cat->starte(k, static_cast<quint16>(kErsterPort + k))) {
+                    ++gestartet;
+                }
+            }
+            if (gestartet == 0) {
+                // Alle vier Ports belegt: den Schalter zuruecknehmen,
+                // statt "an" zu zeigen, waehrend niemand horcht.
+                QSignalBlocker b(m_tcpBtn);
+                m_tcpBtn->setChecked(false);
+            }
+        } else {
+            for (int k = 0; k < CatServer::kKanaele; ++k) { m_cat->beende(k); }
+        }
+        zeigeKanaele();
+    });
+
+    connect(srv, &CatServer::verbindungenGeaendert,
+            this, [this](int, int) { zeigeKanaele(); });
+
+    zeigeKanaele();
+}
+
+void CatApplet::zeigeKanaele()
+{
+    for (int k = 0; k < 4; ++k) {
+        QLabel* led = m_tcpLed[k];
+        if (!led) { continue; }
+        const bool laeuft = m_cat && m_cat->laeuft(k);
+        const int  n      = m_cat ? m_cat->verbindungen(k) : 0;
+        // Die Beschriftung bleibt A/B/C/D; die Anzahl der Verbindungen
+        // kommt als Zusatz dazu, damit man sieht, WER haengt und nicht
+        // nur, dass der Kanal offen ist.
+        led->setText(n > 0 ? QStringLiteral("%1:%2")
+                                 .arg(QChar(QLatin1Char('A' + k))).arg(n)
+                           : QString(QChar(QLatin1Char('A' + k))));
+        led->setEnabled(laeuft);
+        led->setToolTip(laeuft
+            ? QStringLiteral("Kanal %1 horcht auf Port %2, %3 Verbindung(en)")
+                  .arg(QChar(QLatin1Char('A' + k))).arg(m_cat->port(k)).arg(n)
+            : QStringLiteral("Kanal %1 ist aus")
+                  .arg(QChar(QLatin1Char('A' + k))));
+    }
 }
 
 void CatApplet::syncFromModel()
