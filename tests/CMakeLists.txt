@@ -5703,7 +5703,7 @@ longpath_add_test(tst_tci_init_burst_typo_divergence TestMockRadioModel.cpp)
 # Strict-protocol prefixes (protocol: trx_count: channels_count:
 # modulations_list: receive_only: ready;) are compared byte-for-byte.
 # Radio-identifying fields (device: vfo: dds: if: tx_frequency:
-# tx_frequency_thetis:) are compared loosely (prefix-only).
+# tx_frequency_ex:) are compared loosely (prefix-only).
 longpath_add_test(tst_tci_init_burst_golden TestMockRadioModel.cpp)
 target_compile_definitions(tst_tci_init_burst_golden PRIVATE
     LONGPATH_TEST_DATA_DIR="${CMAKE_SOURCE_DIR}/tests/data")

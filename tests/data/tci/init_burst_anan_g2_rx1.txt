@@ -43,7 +43,7 @@ vfo:0,1,0;
 vfo:1,0,0;
 vfo:1,1,0;
 tx_frequency:0;
-tx_frequency_thetis:0,GEN,false,false;
+tx_frequency_ex:0,GEN,false,false;
 modulation:0,;
 modulation:1,;
 rx_filter_band:0,200,2900;

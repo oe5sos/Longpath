@@ -19,7 +19,7 @@
 #include "LogCategories.h"
 #include "TciVolume.h"
 #include "TciVfoCoalescer.h"
-#include "models/Band.h"  // bandFromFrequency + bandLabel for tx_frequency_thetis
+#include "models/Band.h"  // bandFromFrequency + bandLabel for tx_frequency_ex
 
 namespace Longpath {
 
@@ -177,7 +177,7 @@ void TciProtocol::enqueueLocalBroadcastVfo(int rxIndex, qint64 hz, bool isTxBoun
 
 // Split out of enqueueLocalBroadcastVfo, Codex review round 6, PR #293.
 //
-// tx_frequency and tx_frequency_thetis carry no receiver index, so they are
+// tx_frequency and tx_frequency_ex carry no receiver index, so they are
 // legal to send for ANY slice that has the transmitter, including Slice C or
 // beyond, which are internal and never appear as a trx:N. The vfo: and dds:
 // frames above are the opposite: they are tagged, and must not name a
@@ -186,32 +186,38 @@ void TciProtocol::enqueueLocalBroadcastVfo(int rxIndex, qint64 hz, bool isTxBoun
 // transmit frequency without also announcing a receiver that does not exist
 // on the wire.
 //
-// From Thetis sendTXFrequencyChanged at TCIServer.cs:2246-2259 [v2.10.3.13].
+// From Thetis sendTXFrequencyChanged at TCIServer.cs:2318-2326 [v2.10.3.15].
+// NAME CHANGE: Thetis renamed this frame tx_frequency_thetis ->
+// tx_frequency_ex in v2.10.3.14 (TCIServer.cs:279 carries the note, the
+// coalesce key at TCIServer.cs:1672 and the emitter at TCIServer.cs:2325
+// both use the new name).  Clients built against the old name -- HF AUTO
+// Controller among them -- need their own update; we follow Thetis and
+// emit the new name only, as Thetis does.
 void TciProtocol::enqueueLocalBroadcastTxFrequency(qint64 hz)
 {
     const QString txKey   = QStringLiteral("tx_frequency");
     const QString txFrame = QStringLiteral("tx_frequency:%1;").arg(hz);
     m_vfoCoalescer.update(txKey, txFrame);
-    // bespoke tx_frequency_thetis -- read the SAME rx2Enabled state used
+    // bespoke tx_frequency_ex -- read the SAME rx2Enabled state used
     // by buildInitialRadioStateLines so the live broadcast doesn't flip
     // RX2 from true to false between init and the first VFO move (review
     // P2 #3, 2026-05-22).  VFOBTX still hardcoded false until Phase 3F
     // multi-pan lands the full TXFreq logic per console.cs:11345-11369
     // [v2.10.3.15].  Format from sendTXFrequencyChanged at
-    // TCIServer.cs:2249-2254 [v2.10.3.15]: tx_frequency_thetis:hz,band,
+    // TCIServer.cs:2320-2325 [v2.10.3.15]: tx_frequency_ex:hz,band,
     // rx2en,txvfob.
     bool rx2en = false;
     QMetaObject::invokeMethod(m_radio, "rx2Enabled",
                               Qt::DirectConnection,
                               Q_RETURN_ARG(bool, rx2en));
     const QString band = bandLabel(bandFromFrequency(static_cast<double>(hz)));
-    const QString txThetisKey = QStringLiteral("tx_frequency_thetis");
-    const QString txThetisFrame =
-        QStringLiteral("tx_frequency_thetis:%1,%2,%3,false;")
+    const QString txExKey = QStringLiteral("tx_frequency_ex");
+    const QString txExFrame =
+        QStringLiteral("tx_frequency_ex:%1,%2,%3,false;")
             .arg(hz)
             .arg(band)
             .arg(rx2en ? QStringLiteral("true") : QStringLiteral("false"));
-    m_vfoCoalescer.update(txThetisKey, txThetisFrame);
+    m_vfoCoalescer.update(txExKey, txExFrame);
 }
 
 // From Thetis TCIServer.cs:2512-2552 [v2.10.3.13] — sendInitialisationData
@@ -383,7 +389,7 @@ QStringList TciProtocol::buildInitialRadioStateLines() const
     // consoleThreadSafe.TXBand directly; Longpath derives via
     // Band::bandFromFrequency (IARU Region 2 lookup) + bandLabel ("20m"
     // lowercase format), matching the golden capture format
-    // (tx_frequency_thetis:14250000,20m,false,false;).
+    // (tx_frequency_ex:14250000,20m,false,false;).
     const QString txBand    = bandLabel(bandFromFrequency(static_cast<double>(txFreqHz)));
 
     // Per-rx mode reader -- From Thetis TCIServer.cs:2508-2509 [v2.10.3.15] --
@@ -777,7 +783,7 @@ QStringList TciProtocol::buildInitialRadioStateLines() const
 
         //bespoke
         lines << buildTxFrequencyLine(txFreqHz);
-        lines << buildTxFrequencyThetisLine(txFreqHz, txBand, bRX2Enabled, false);
+        lines << buildTxFrequencyExLine(txFreqHz, txBand, bRX2Enabled, false);
     }
 
     // From Thetis TCIServer.cs:2385-2389 [v2.10.3.13]
@@ -944,20 +950,21 @@ QString TciProtocol::buildVfoLine(int rx, int chan, qint64 hz)
     return QStringLiteral("vfo:%1,%2,%3;").arg(rx).arg(chan).arg(hz);
 }
 
-// From Thetis TCIServer.cs:2246-2259 [v2.10.3.13] — sendTXFrequencyChanged.
-// Emits two frames: tx_frequency (lower-cased) and the bespoke tx_frequency_thetis.
+// From Thetis TCIServer.cs:2318-2326 [v2.10.3.15] — sendTXFrequencyChanged.
+// Emits two frames: tx_frequency (lower-cased) and the bespoke tx_frequency_ex
+// (named tx_frequency_thetis before Thetis v2.10.3.14).
 // bespoke TCI command for anan to make life easier determining active TX frequency
-// format is : tx_frequency_thetis:3700000,b80m,false,false;
+// format is : tx_frequency_ex:3700000,b80m,false,false;
 // arg1 freq (long) / arg2 band b80m, b40m etc / arg3 rx2 enabled / arg4 tx on vfoB
 QString TciProtocol::buildTxFrequencyLine(qint64 hz)
 {
     return QStringLiteral("tx_frequency:%1;").arg(hz);
 }
 
-QString TciProtocol::buildTxFrequencyThetisLine(qint64 hz, const QString& band,
+QString TciProtocol::buildTxFrequencyExLine(qint64 hz, const QString& band,
                                                  bool rx2en, bool txvfob)
 {
-    return QStringLiteral("tx_frequency_thetis:%1,%2,%3,%4;")
+    return QStringLiteral("tx_frequency_ex:%1,%2,%3,%4;")
         .arg(hz)
         .arg(band)
         .arg(rx2en ? QStringLiteral("true") : QStringLiteral("false"))

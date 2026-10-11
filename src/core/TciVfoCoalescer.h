@@ -43,7 +43,7 @@ namespace Longpath {
 //
 // From Thetis TCIServer.cs:1722-1727 [v2.10.3.13] — outbound-coalesced map:
 //   coalesced commands: vfo, if, dds, rx_filter_band, rx_balance, agc_gain,
-//   drive, tune_drive, tune, tx_frequency, tx_frequency_thetis, volume.
+//   drive, tune_drive, tune, tx_frequency, tx_frequency_ex, volume.
 // Phase 15 routes only vfo: through this coalescer; other keys are added as
 // their handlers are ported.
 class TciVfoCoalescer {

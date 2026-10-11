@@ -11,7 +11,7 @@
 // a parity violation and a release-blocker.
 //
 // Radio-identifying fields are compared loosely (prefix-only):
-//   device:    vfo:    dds:    if:    tx_frequency:    tx_frequency_thetis:
+//   device:    vfo:    dds:    if:    tx_frequency:    tx_frequency_ex:
 // These vary across radios + slice positions and are not byte-stable across
 // captures from different hardware.
 

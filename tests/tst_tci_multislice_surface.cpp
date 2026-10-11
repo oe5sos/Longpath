@@ -144,7 +144,7 @@ private slots:
         QVERIFY2(!anyStartsWith(frames, u"tx_frequency:"_s),
             "receiver 0 no longer owns the transmitter by default; tuning it "
             "must not claim to move the transmit frequency");
-        QVERIFY2(!anyStartsWith(frames, u"tx_frequency_thetis:"_s),
+        QVERIFY2(!anyStartsWith(frames, u"tx_frequency_ex:"_s),
             "the bespoke Thetis variant must follow the same rule");
 
         // Its own tagged frames still go out; this gates TX only.

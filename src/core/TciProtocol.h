@@ -504,7 +504,7 @@ private:
     static QString buildVfoLine(int rx, int chan, qint64 hz);
     // From Thetis TCIServer.cs:2246-2259 [v2.10.3.13] — sendTXFrequencyChanged.
     static QString buildTxFrequencyLine(qint64 hz);
-    static QString buildTxFrequencyThetisLine(qint64 hz, const QString& band,
+    static QString buildTxFrequencyExLine(qint64 hz, const QString& band,
                                               bool rx2en, bool txvfob);
 
     // ── Mode / filter helpers ─────────────────────────────────────────────────

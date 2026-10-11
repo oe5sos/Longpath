@@ -137,9 +137,9 @@ void TestTciInitBurstLiveState::vfo_hz_drives_dds_and_vfo_lines()
     // VFOBTX split-TX state lands, mirrors RX1's VFO A.
     QVERIFY2(burst.contains(QStringLiteral("tx_frequency:7150000;")),
              "tx_frequency should mirror RX1 VFO until VFOBTX state lands");
-    // tx_frequency_thetis carries the derived band label ("40m" lowercase).
-    QVERIFY2(burst.contains(QStringLiteral("tx_frequency_thetis:7150000,40m,false,false;")),
-             "tx_frequency_thetis band label should derive from txFreqHz");
+    // tx_frequency_ex carries the derived band label ("40m" lowercase).
+    QVERIFY2(burst.contains(QStringLiteral("tx_frequency_ex:7150000,40m,false,false;")),
+             "tx_frequency_ex band label should derive from txFreqHz");
 }
 
 void TestTciInitBurstLiveState::mode_drives_modulation_lines()
@@ -628,7 +628,7 @@ void TestTciInitBurstLiveState::distinct_state_yields_distinct_burst()
 }
 
 // PR #279 review P3 (2026-05-22): enqueueLocalBroadcastVfo previously
-// hard-coded ,false,false in the tx_frequency_thetis live frame for
+// hard-coded ,false,false in the tx_frequency_ex live frame for
 // every VFO move.  Init burst read the real rx2Enabled, so after the
 // first VFO tune, real TCI clients saw RX2 flip from true (init) to
 // false (live) inside the same connection.  Fix in 9ae5f135: read
@@ -656,14 +656,14 @@ void TestTciInitBurstLiveState::live_vfo_broadcast_reads_rx2_enabled_live()
             frames << p.takePendingNotification();
         }
 
-        // tx_frequency_thetis format from sendTXFrequencyChanged
+        // tx_frequency_ex format from sendTXFrequencyChanged
         // (TCIServer.cs:2249-2254 [v2.10.3.15]):
-        //   tx_frequency_thetis:<hz>,<band>,<rx2en>,<txvfob>;
+        //   tx_frequency_ex:<hz>,<band>,<rx2en>,<txvfob>;
         // Expect rx2en=true for this case.  VFOBTX stays false until
         // 3F multi-pan lands the full TXFreq logic.
         bool found = false;
         for (const QString& f : frames) {
-            if (f.startsWith(QStringLiteral("tx_frequency_thetis:"))) {
+            if (f.startsWith(QStringLiteral("tx_frequency_ex:"))) {
                 QVERIFY2(f.contains(QStringLiteral(",true,false;")),
                     qPrintable(QString("rx2_enabled=true must produce "
                         "rx2en=true in live frame; got: %1").arg(f)));
@@ -671,7 +671,7 @@ void TestTciInitBurstLiveState::live_vfo_broadcast_reads_rx2_enabled_live()
                 break;
             }
         }
-        QVERIFY2(found, "no tx_frequency_thetis frame in drained queue");
+        QVERIFY2(found, "no tx_frequency_ex frame in drained queue");
     }
 
     // RX2 disabled: live frame must carry rx2en=false (matches init).
@@ -689,7 +689,7 @@ void TestTciInitBurstLiveState::live_vfo_broadcast_reads_rx2_enabled_live()
 
         bool found = false;
         for (const QString& f : frames) {
-            if (f.startsWith(QStringLiteral("tx_frequency_thetis:"))) {
+            if (f.startsWith(QStringLiteral("tx_frequency_ex:"))) {
                 QVERIFY2(f.contains(QStringLiteral(",false,false;")),
                     qPrintable(QString("rx2_enabled=false must produce "
                         "rx2en=false in live frame; got: %1").arg(f)));
@@ -697,7 +697,7 @@ void TestTciInitBurstLiveState::live_vfo_broadcast_reads_rx2_enabled_live()
                 break;
             }
         }
-        QVERIFY2(found, "no tx_frequency_thetis frame in drained queue");
+        QVERIFY2(found, "no tx_frequency_ex frame in drained queue");
     }
 }
 
