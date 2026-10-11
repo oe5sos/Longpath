@@ -927,14 +927,21 @@ void CatTcpIpPage::buildUI()
         emit rigctldPttAllowedToggled(on);
     });
 
-    contentLayout()->addWidget(group);
+    // SetupPage legt im Konstruktor schon einen Stretch ans Ende des
+    // contentLayout, und addSection() haengt Gruppen DAVOR ein
+    // (SetupPage.cpp:87 + :123). Ein schlichtes addWidget haengt dagegen
+    // HINTER den Stretch -- dann steht der Dehnraum oben und der ganze
+    // Inhalt klebt am unteren Rand. Genau so sah diese Seite aus, seit
+    // sie angelegt wurde; mit zwei Gruppen faellt es auf. Gesehen im
+    // gerenderten Blatt am 2026-10-11 (tst_cat_page_render legt es ab).
+    contentLayout()->insertWidget(contentLayout()->count() - 1, group);
 
     // ── Gruppe 2: Kenwood-CAT über TCP ──────────────────────────────────────
     // Zweiter Weg auf derselben Seite, weil beide dasselbe tun (ein
     // Programm steuert das Gerät) und sich nur im Dialekt unterscheiden:
     // rigctld sprechen N1MM, DXLog und WSJT-X; Kenwood-CAT sprechen die
     // älteren und die Thetis-gewohnten Programme.
-    auto* catGroup = new QGroupBox(QStringLiteral("CAT (Kenwood-Dialekt)"), this);
+    auto* catGroup = new QGroupBox(QStringLiteral("CAT (Kenwood dialect)"), this);
     catGroup->setStyleSheet(QString::fromLatin1(Style::kGroupBoxStyle));
 
     auto* catGrid = new QGridLayout(catGroup);
@@ -1024,8 +1031,7 @@ void CatTcpIpPage::buildUI()
         emit catTxAllowedToggled(on);
     });
 
-    contentLayout()->addWidget(catGroup);
-    contentLayout()->addStretch();
+    contentLayout()->insertWidget(contentLayout()->count() - 1, catGroup);
 }
 
 void CatTcpIpPage::setCatStatus(bool running, quint16 port, int clients)

@@ -2811,6 +2811,14 @@ longpath_add_test(tst_rigctld_server TestMockRadioModel.cpp)
 # Socket fuer die ';'-Zerlegung, inklusive eines ueber zwei Pakete
 # geteilten Befehls.
 longpath_add_test(tst_cat_server TestMockRadioModel.cpp)
+
+# Die Setup-Seite CAT > TCP/IP CAT war vier abgeschaltete Felder mit
+# "NYI"-Hinweisen; jetzt fuehrt sie zwei Server. Dieser Lauf baut die
+# Seite, prueft dass nichts mehr abgeschaltet ist, dass beide Sendetore
+# zu beginnen und dass die Statuszeilen melden was ihnen gesagt wird --
+# und legt die gerenderte PNG ab, damit die Gestaltung einmal gesehen
+# werden kann, ohne die ganze Anwendung zu starten.
+longpath_add_test(tst_cat_page_render)
 target_link_libraries(tst_rigctld_server PRIVATE Qt6::Network)
 
 # ── Phase 3J-1 closeout Item 4 (2026-05-12): per-(band, mode) filter ────────
