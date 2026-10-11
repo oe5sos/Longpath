@@ -66,6 +66,8 @@ LogManager::LogManager()
           QStringLiteral("TCI WebSocket server, command dispatch, client lifecycle"), false },
         { QStringLiteral("longpath.spots"),    QStringLiteral("Spots"),
           QStringLiteral("DX spot ingest (cluster, RBN, SpotCollector, WSJT-X)"), false },
+        { QStringLiteral("longpath.rotor"),    QStringLiteral("Rotor"),
+          QStringLiteral("Rotor panel status line, controller state, rotctld lifecycle"), false },
         { QStringLiteral("longpath.automation"), QStringLiteral("Automation"),
           QStringLiteral("Dev automation bridge (LONGPATH_AUTOMATION) -- widget-tree dump, screen capture"), false },
     };

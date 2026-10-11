@@ -5101,6 +5101,10 @@ longpath_add_test(tst_real_rotor_window)
 # Verbindung. Sechs Abstuerze beim Beenden (2026-10-10/11), seit der
 # Rotor wieder im Netz haengt; die fuenfte Stelle derselben Fehlerform.
 longpath_add_test(tst_rotor_panel_abbau)
+
+# tst_rotor_status_ins_protokoll: der Rotor schreibt jeden Wechsel seines
+# Zustandes ins Protokoll -- einmal, nicht bei jedem Abfragedurchgang.
+longpath_add_test(tst_rotor_status_ins_protokoll)
 longpath_add_test(tst_real_status_bar_chain_indicators)
 longpath_add_test(tst_app_settings_autosave)
 longpath_add_test(tst_whisper_server_launcher)
