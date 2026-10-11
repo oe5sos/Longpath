@@ -86,6 +86,12 @@ public:
     /// [v2.10.3.15-5-g852bf0e] -- the 4-character step code IF carries.
     static QString stepCodeFromHz(int stepHz);
 
+    /// Kenwood S-meter reading (0..30) from a dBm signal level.
+    /// From Thetis SM at CATCommands.cs:896-931 [v2.10.3.15-5-g852bf0e],
+    /// including its clamps (-140..-10 dBm) and the two-piece scale:
+    /// below S9 it is sx * 1.6667, above it 15 + (dBm + 73).
+    static int kenwoodSMeterFromDbm(double dbm);
+
 private:
     QString handleId();
     QString handleIf();
@@ -96,6 +102,11 @@ private:
     QString handleRxVfo(const QString& suffix);
     QString handleTxVfo(const QString& suffix);
     QString handleKey(bool on);
+    QString handleSignalMeter(const QString& suffix);
+    QString handleRitEnable(const QString& suffix);
+    QString handleXitEnable(const QString& suffix);
+    QString handleClearIt();
+    QString handleStepIt(int direction);
 
     QObject* m_radio{nullptr};
     bool     m_pttAllowed{false};

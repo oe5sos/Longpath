@@ -450,6 +450,19 @@ QString RigctldServer::handleGetLevel(const QStringList& args)
     if (level == QStringLiteral("KEYSPD")) {
         return QStringLiteral("0\n");
     }
+    // STRENGTH is dB relative to S9 in Hamlib, which is where the S
+    // scale's reference sits at -73 dBm.
+    if (level == QStringLiteral("STRENGTH")) {
+        double dbm = -200.0;
+        QMetaObject::invokeMethod(m_radio, "rxSignalDbm", Qt::DirectConnection,
+                                  Q_RETURN_ARG(double, dbm), Q_ARG(int, 0));
+        if (dbm <= -199.0) {
+            // No WDSP channel yet: there is no reading to report, and a
+            // made-up -127 would show up as a real (very weak) signal.
+            return kRprtNotImpl;
+        }
+        return QStringLiteral("%1\n").arg(qRound(dbm + 73.0));
+    }
     return kRprtNotImpl;
 }
 

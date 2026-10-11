@@ -68,14 +68,39 @@ zu. `TX;` antwortet dann `?;`, `RX;` geht immer. `stop()` sperrt wieder.
 Auch der Weg über TCI (`run_cat_ex:TX;`) bleibt gesperrt: der CAT-Parser
 in TciProtocol hat sein eigenes Tor, das nie geöffnet wird.
 
+## Nachtrag am selben Tag: S-Meter und RIT/XIT
+
+Dazugekommen sind `SM` (Kenwood-Skala 0..30 aus dBm, Thetis' zweiteilige
+Formel samt Klemmen), `RT`/`XT` (RIT/XIT ein und aus), `RC` (Ablage
+löschen) und `RU`/`RD` (Ablage schrittweise verstellen) — die
+Feinabstimmung ist bei uns der dokumentierte Ersatz für Split, also
+gehört sie an die Fernsteuerung. Auf der rigctld-Seite liefert
+`l STRENGTH` jetzt dB über S9.
+
+Live, ohne Funkgerät:
+
+```
+gesendet : SM0;RT;RT1;RT;RU;RU;IF;RC;SM1;
+empfangen: SM00000;RT0;  (RT1 still)  RT0;?;?;IF...;?;?;
+```
+
+Daraus kam der nächste Befund derselben Art: **`RT1;` antwortete still,
+obwohl der Schalter nicht umgelegt wurde** — ohne Slice gibt es kein
+RIT. Ein Contestprogramm hätte geglaubt, seine Ablage sei an. `RT` und
+`XT` lesen jetzt ebenso zurück und antworten `?;`, wenn es nicht
+gegriffen hat (Prüffall `rit_switch_that_cannot_take_is_refused`,
+gegen ein echtes RadioModel mit und ohne Slice). `SM0;` → `SM00000;`
+und `l STRENGTH` → `RPRT -11` sind in diesem Zustand die richtigen
+Antworten: es gibt keinen Messwert, und eine erfundene Zahl sähe wie
+ein schwaches Signal aus.
+
 ## Was offen ist
 
 - Am Funkgerät ist nichts davon gefahren. Mit Slice müssen Setzen von
   Frequenz und Modus, die IF-Zeile unter Last und das Tasten über CAT
   noch geprüft werden.
-- Nicht portiert: der ganze `ZZ`-Satz, `SM` (S-Meter — es gibt noch
-  keinen Messwert-Shim), Filterbreiten (`FL`, `SH`, `SL`), RIT/XIT
-  setzen, Speicherplätze. Alles davon antwortet `?;`.
+- Nicht portiert: der ganze `ZZ`-Satz, Filterbreiten (`FL`, `SH`,
+  `SL`), Speicherplätze, Squelch (`SQ`). Alles davon antwortet `?;`.
 - `AI1` (unaufgeforderte Meldungen) fehlt bewusst; ein Client, der `?;`
   bekommt, fragt ab — das funktioniert.
 - Noch nicht gegen N1MM oder DXLog selbst geprüft, nur gegen den

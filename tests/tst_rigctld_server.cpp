@@ -220,6 +220,24 @@ private slots:
         RigctldServer s(&mock);
         QCOMPARE(s.handleLine(QStringLiteral("\\dump_caps")), QStringLiteral("RPRT -11\n"));
         QCOMPARE(s.handleLine(QStringLiteral("w ZZZZ")), QStringLiteral("RPRT -11\n"));
+        QCOMPARE(s.handleLine(QStringLiteral("l RFPOWER")), QStringLiteral("RPRT -11\n"));
+    }
+
+    void strength_is_db_relative_to_s9()
+    {
+        TestMockRadioModel mock;
+        RigctldServer s(&mock);
+
+        // Hamlib's STRENGTH is dB relative to S9, and S9 is -73 dBm.
+        mock.setRxSignalDbmForTest(0, -73.0);
+        QCOMPARE(s.handleLine(QStringLiteral("l STRENGTH")), QStringLiteral("0\n"));
+        mock.setRxSignalDbmForTest(0, -53.0);
+        QCOMPARE(s.handleLine(QStringLiteral("l STRENGTH")), QStringLiteral("20\n"));
+        mock.setRxSignalDbmForTest(0, -93.0);
+        QCOMPARE(s.handleLine(QStringLiteral("l STRENGTH")), QStringLiteral("-20\n"));
+
+        // No WDSP channel: no reading, rather than a made-up weak signal.
+        mock.setRxSignalDbmForTest(0, -200.0);
         QCOMPARE(s.handleLine(QStringLiteral("l STRENGTH")), QStringLiteral("RPRT -11\n"));
     }
 

@@ -2324,6 +2324,16 @@ public slots:
     /// (Thetis CATCommands.cs:10386 [v2.10.3.15-5-g852bf0e]).
     Q_INVOKABLE int tuneStepHz(int rx) const;
 
+    /// Signal strength in dBm for receiver `rx`, calibration included --
+    /// WDSP's averaged S meter (RxMeterType::SignalAvg) plus
+    /// rxMeterOffsetDb(), which is our counterpart to Thetis's
+    /// RX1MeterCalOffset + PreampOffset.
+    ///
+    /// Returns -200.0 when there is no WDSP channel yet (pre-connect), a
+    /// value every caller clamps away rather than mistaking for signal.
+    /// Added for the CAT SM command and rigctld's STRENGTH level.
+    Q_INVOKABLE double rxSignalDbm(int rx) const;
+
     // ── Phase 3R Task I5: RadeChannel signal-graph slots ────────────────────
     //
     // Public slots so Qt's auto-connection queues them correctly when the

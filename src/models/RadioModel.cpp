@@ -14120,6 +14120,21 @@ int RadioModel::tuneStepHz(int rx) const
     return 0;
 }
 
+// Signal strength for the CAT SM command and rigctld's STRENGTH level.
+// SignalAvg is the averaged S meter (RXA_S_AV), the same source the
+// analog S-Meter widget's "Signal Average" mode uses, and
+// rxMeterOffsetDb() carries the per-model calibration plus the preamp
+// offset -- Thetis adds RX1MeterCalOffset + PreampOffset at the same
+// point (CATCommands.cs:905 [v2.10.3.15-5-g852bf0e]).
+double RadioModel::rxSignalDbm(int rx) const
+{
+    RxChannel* const ch = rxChannelForSlice(rx);
+    if (!ch) {
+        return -200.0;
+    }
+    return ch->getMeter(RxMeterType::SignalAvg) + rxMeterOffsetDb();
+}
+
 // ---------------------------------------------------------------------------
 // completeTuneOff — Thetis-faithful TUN-off completion (issue #177).
 //

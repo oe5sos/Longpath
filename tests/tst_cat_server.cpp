@@ -17,6 +17,7 @@
 
 #include "core/CatParser.h"
 #include "core/CatServer.h"
+#include "models/RadioModel.h"
 #include "TestMockRadioModel.h"
 
 using namespace Longpath;
@@ -226,6 +227,113 @@ private slots:
         QCOMPARE(p.handleCommand(QStringLiteral("XY;")), QStringLiteral("?;"));
         QCOMPARE(p.handleCommand(QStringLiteral("K;")), QStringLiteral("?;"));
         QCOMPARE(p.handleCommand(QStringLiteral(";")), QStringLiteral("?;"));
+    }
+
+    // ── S meter ─────────────────────────────────────────────────────────────
+
+    void s_meter_follows_the_thetis_scale()
+    {
+        // Spot values through Thetis's own two-piece scale: below S9 it is
+        // (dBm+127)/6 * 1.6667, above S9 it is 15 + (dBm+73).
+        QCOMPARE(CatParser::kenwoodSMeterFromDbm(-140.0), 0);    // clamped floor
+        QCOMPARE(CatParser::kenwoodSMeterFromDbm(-127.0), 0);    // S0
+        QCOMPARE(CatParser::kenwoodSMeterFromDbm(-73.0),  15);   // S9
+        QCOMPARE(CatParser::kenwoodSMeterFromDbm(-63.0),  25);   // S9+10
+        QCOMPARE(CatParser::kenwoodSMeterFromDbm(-10.0),  30);   // clamped ceiling
+        QCOMPARE(CatParser::kenwoodSMeterFromDbm(-200.0), 0);    // no reading
+    }
+
+    void sm_answers_five_digits_for_the_main_receiver()
+    {
+        TestMockRadioModel mock;
+        CatParser p(&mock);
+        mock.setRxSignalDbmForTest(0, -73.0);
+
+        // Thetis pads to five digits -- wider than a TS-2000 sends, but it
+        // is what programs set up for Thetis expect (CATCommands.cs:925).
+        QCOMPARE(p.handleCommand(QStringLiteral("SM0;")), QStringLiteral("SM00015;"));
+        QCOMPARE(p.handleCommand(QStringLiteral("SM2;")), QStringLiteral("SM00015;"));
+        // Any other argument is an error, same as upstream.
+        QCOMPARE(p.handleCommand(QStringLiteral("SM1;")), QStringLiteral("?;"));
+        QCOMPARE(p.handleCommand(QStringLiteral("SM;")),  QStringLiteral("?;"));
+    }
+
+    // ── RIT and XIT: the documented stand-in for split ──────────────────────
+
+    void rit_and_xit_can_be_switched_and_read()
+    {
+        TestMockRadioModel mock;
+        CatParser p(&mock);
+
+        QCOMPARE(p.handleCommand(QStringLiteral("RT;")), QStringLiteral("RT0;"));
+        QCOMPARE(p.handleCommand(QStringLiteral("RT1;")), QString());
+        QCOMPARE(p.handleCommand(QStringLiteral("RT;")), QStringLiteral("RT1;"));
+        QCOMPARE(p.handleCommand(QStringLiteral("RT2;")), QStringLiteral("?;"));
+
+        QCOMPARE(p.handleCommand(QStringLiteral("XT;")), QStringLiteral("XT0;"));
+        QCOMPARE(p.handleCommand(QStringLiteral("XT1;")), QString());
+        QCOMPARE(p.handleCommand(QStringLiteral("XT;")), QStringLiteral("XT1;"));
+    }
+
+    void rit_switch_that_cannot_take_is_refused()
+    {
+        // Against a real RadioModel with no slice: RT1 must not answer
+        // silently, or a contest program believes its RIT is on. Found at
+        // the wire on 2026-10-11.
+        RadioModel radio;
+        CatParser p(&radio);
+        QCOMPARE(p.handleCommand(QStringLiteral("RT1;")), QStringLiteral("?;"));
+        QCOMPARE(p.handleCommand(QStringLiteral("RT;")), QStringLiteral("RT0;"));
+        QCOMPARE(p.handleCommand(QStringLiteral("XT1;")), QStringLiteral("?;"));
+
+        // With a slice it takes.
+        radio.addSlice();
+        QCOMPARE(p.handleCommand(QStringLiteral("RT1;")), QString());
+        QCOMPARE(p.handleCommand(QStringLiteral("RT;")), QStringLiteral("RT1;"));
+    }
+
+    void ru_and_rd_step_the_active_offset()
+    {
+        TestMockRadioModel mock;
+        CatParser p(&mock);
+        mock.setTuneStepHzForTest(0, 100);
+
+        // Nothing on yet: there is no offset to step.
+        QCOMPARE(p.handleCommand(QStringLiteral("RU;")), QStringLiteral("?;"));
+
+        p.handleCommand(QStringLiteral("RT1;"));
+        QCOMPARE(p.handleCommand(QStringLiteral("RU;")), QString());
+        QCOMPARE(p.handleCommand(QStringLiteral("RU;")), QString());
+        QCOMPARE(mock.ritOffset(), 200);
+        QCOMPARE(p.handleCommand(QStringLiteral("RD;")), QString());
+        QCOMPARE(mock.ritOffset(), 100);
+
+        // The IF frame must show it.
+        const QString payload = p.handleCommand(QStringLiteral("IF;")).mid(2, 35);
+        QCOMPARE(payload.mid(15, 6), QStringLiteral("+00100"));
+        QCOMPARE(payload.mid(21, 1), QStringLiteral("1"));
+    }
+
+    void rc_clears_whichever_offset_is_active()
+    {
+        TestMockRadioModel mock;
+        CatParser p(&mock);
+
+        // Neither on: nothing to clear, and saying "done" would be a lie.
+        QCOMPARE(p.handleCommand(QStringLiteral("RC;")), QStringLiteral("?;"));
+
+        p.handleCommand(QStringLiteral("XT1;"));
+        QMetaObject::invokeMethod(&mock, "setXitOffset", Q_ARG(int, 1500));
+        QCOMPARE(p.handleCommand(QStringLiteral("RC;")), QString());
+        QCOMPARE(mock.xitOffset(), 0);
+
+        // RIT takes precedence when both are on, same as in the IF frame.
+        p.handleCommand(QStringLiteral("RT1;"));
+        QMetaObject::invokeMethod(&mock, "setRitOffset", Q_ARG(int, 800));
+        QMetaObject::invokeMethod(&mock, "setXitOffset", Q_ARG(int, 900));
+        QCOMPARE(p.handleCommand(QStringLiteral("RC;")), QString());
+        QCOMPARE(mock.ritOffset(), 0);
+        QCOMPARE(mock.xitOffset(), 900);
     }
 
     // ── The transmit gate ───────────────────────────────────────────────────

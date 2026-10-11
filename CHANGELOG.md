@@ -18,6 +18,10 @@
   vorher wurde er abgewiesen -- behaelt aber sein Tor dauerhaft zu:
   `TX;` in eine TCI-Nachricht zu wickeln ist kein Weg um die
   CAT-Freigabe herum.
+  Dazu `SM` (S-Meter auf der Kenwood-Skala 0..30, Thetis' zweiteilige
+  Formel), `RT`/`XT`/`RC`/`RU`/`RD` fuer die Feinabstimmung -- die ist
+  bei uns der dokumentierte Ersatz fuer Split, also gehoert sie an die
+  Fernsteuerung -- und auf der rigctld-Seite `l STRENGTH` in dB ueber S9.
   Belegt mit einem Rohclient und mit hamlibs echtem TS-2000-Treiber
   ueber TCP (`rigctl -m 2014`), der Frequenz, Modus mit
   Durchlassbreite, PTT und VFO fehlerfrei liest. Protokoll in
@@ -54,7 +58,8 @@
   dem Cache zurueckliest. Im unverbundenen Zustand (kein Slice) sagte
   `rigctl` 18100000, waehrend dieselbe App ueber die CAT-Bruecke im
   selben Moment 0 meldete. Beide Bruecken lesen jetzt nach dem Setzen
-  zurueck und weisen ab, wenn es nicht gegriffen hat.
+  zurueck und weisen ab, wenn es nicht gegriffen hat -- Frequenz, Modus
+  und (nach demselben Befund am Draht) auch die RIT/XIT-Schalter.
 
 - **Der Tuner Genius XL waere nach dem Firmware-Update 1.2.44
   verschwunden.** Die Geraeteankuendigung wurde mit einem Regex

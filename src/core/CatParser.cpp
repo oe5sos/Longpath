@@ -52,6 +52,7 @@ You may contact the author via email at: k5kdn@arrl.net
 #include <QtCore/QMetaObject>
 #include <QtCore/QStringList>
 
+#include <algorithm>
 #include <cmath>
 
 namespace Longpath {
@@ -202,6 +203,27 @@ QString CatParser::handleCommand(const QString& command)
     }
     if (name == QStringLiteral("AI")) {
         return handleAutoInformation(suffix);
+    }
+    if (name == QStringLiteral("SM")) {
+        return handleSignalMeter(suffix);
+    }
+    // RIT / XIT family. Longpath has no split, and the documented
+    // substitute is XIT (RadioModel.h on split()), so a contest program
+    // reaching for split finds something that works here.
+    if (name == QStringLiteral("RT")) {
+        return handleRitEnable(suffix);
+    }
+    if (name == QStringLiteral("XT")) {
+        return handleXitEnable(suffix);
+    }
+    if (name == QStringLiteral("RC")) {
+        return suffix.isEmpty() ? handleClearIt() : kError;
+    }
+    if (name == QStringLiteral("RU")) {
+        return handleStepIt(+1);
+    }
+    if (name == QStringLiteral("RD")) {
+        return handleStepIt(-1);
     }
     // From Thetis TX at CATCommands.cs:970-975 and RX at :822-827
     // [v2.10.3.15-5-g852bf0e]: both ignore their argument entirely and
@@ -443,6 +465,151 @@ QString CatParser::handleKey(bool on)
     }
     QMetaObject::invokeMethod(m_radio, "setMox", Qt::DirectConnection,
                               Q_ARG(bool, on));
+    return QString();
+}
+
+// From Thetis SM at CATCommands.cs:896-931 [v2.10.3.15-5-g852bf0e].
+// Kept verbatim, clamps and the two-piece scale included: below S9 the
+// reading is sx * 1.6667 where sx = (dBm + 127) / 6, above S9 it is
+// 15 + (dBm + 73). The result is 0..30.
+int CatParser::kenwoodSMeterFromDbm(double dbm)
+{
+    double num = std::max(-140.0, std::min(-10.0, dbm));
+
+    double sx = (num + 127.0) / 6.0;
+    if (sx < 0.0) {
+        sx = 0.0;
+    }
+
+    int sm = 0;
+    if (sx <= 9.0) {
+        sm = std::abs(static_cast<int>(sx * 1.6667));
+    } else {
+        const double overS9 = num + 73.0;
+        sm = 15 + static_cast<int>(overS9);
+    }
+    return std::max(0, std::min(30, sm));
+}
+
+// From Thetis SM at CATCommands.cs:896 [v2.10.3.15-5-g852bf0e]: the
+// argument must be "0" or "2" (main receiver), anything else is an
+// error, and the answer is the reading padded to FIVE digits -- wider
+// than a TS-2000 sends, but it is what Thetis does and what programs
+// talking to Thetis expect.
+QString CatParser::handleSignalMeter(const QString& suffix)
+{
+    if (suffix != QStringLiteral("0") && suffix != QStringLiteral("2")) {
+        return kError;
+    }
+    double dbm = -200.0;
+    QMetaObject::invokeMethod(m_radio, "rxSignalDbm", Qt::DirectConnection,
+                              Q_RETURN_ARG(double, dbm), Q_ARG(int, 0));
+    const int sm = kenwoodSMeterFromDbm(dbm);
+    return QStringLiteral("SM%1;").arg(sm, 5, 10, QLatin1Char('0'));
+}
+
+// RIT on/off. Kenwood RT; Thetis routes it through ZZRT.
+QString CatParser::handleRitEnable(const QString& suffix)
+{
+    if (suffix.isEmpty()) {
+        bool on = false;
+        QMetaObject::invokeMethod(m_radio, "ritEnable", Qt::DirectConnection,
+                                  Q_RETURN_ARG(bool, on));
+        return QStringLiteral("RT%1;").arg(on ? 1 : 0);
+    }
+    if (suffix != QStringLiteral("0") && suffix != QStringLiteral("1")) {
+        return kError;
+    }
+    const bool want = suffix == QStringLiteral("1");
+    QMetaObject::invokeMethod(m_radio, "setRitEnable", Qt::DirectConnection,
+                              Q_ARG(bool, want));
+    // Read back, like every other setter here: with no slice the switch
+    // does not move, and a silent "done" would have a contest program
+    // believe its RIT is on. Seen at the wire 2026-10-11, where RT1
+    // answered silently and the following RT still said RT0.
+    bool applied = false;
+    QMetaObject::invokeMethod(m_radio, "ritEnable", Qt::DirectConnection,
+                              Q_RETURN_ARG(bool, applied));
+    return applied == want ? QString() : kError;
+}
+
+// XIT on/off. Kenwood XT.
+QString CatParser::handleXitEnable(const QString& suffix)
+{
+    if (suffix.isEmpty()) {
+        bool on = false;
+        QMetaObject::invokeMethod(m_radio, "xitEnable", Qt::DirectConnection,
+                                  Q_RETURN_ARG(bool, on));
+        return QStringLiteral("XT%1;").arg(on ? 1 : 0);
+    }
+    if (suffix != QStringLiteral("0") && suffix != QStringLiteral("1")) {
+        return kError;
+    }
+    const bool want = suffix == QStringLiteral("1");
+    QMetaObject::invokeMethod(m_radio, "setXitEnable", Qt::DirectConnection,
+                              Q_ARG(bool, want));
+    bool applied = false;
+    QMetaObject::invokeMethod(m_radio, "xitEnable", Qt::DirectConnection,
+                              Q_RETURN_ARG(bool, applied));
+    return applied == want ? QString() : kError;
+}
+
+// Kenwood RC clears the incremental-tuning offset. Whichever of RIT/XIT
+// is on is the one that gets cleared -- the same precedence IF uses
+// (CATCommands.cs:333-338 [v2.10.3.15-5-g852bf0e]).
+QString CatParser::handleClearIt()
+{
+    bool ritOn = false;
+    QMetaObject::invokeMethod(m_radio, "ritEnable", Qt::DirectConnection,
+                              Q_RETURN_ARG(bool, ritOn));
+    if (ritOn) {
+        QMetaObject::invokeMethod(m_radio, "setRitOffset", Qt::DirectConnection,
+                                  Q_ARG(int, 0));
+        return QString();
+    }
+    bool xitOn = false;
+    QMetaObject::invokeMethod(m_radio, "xitEnable", Qt::DirectConnection,
+                              Q_RETURN_ARG(bool, xitOn));
+    if (xitOn) {
+        QMetaObject::invokeMethod(m_radio, "setXitOffset", Qt::DirectConnection,
+                                  Q_ARG(int, 0));
+        return QString();
+    }
+    // Neither is on: nothing to clear, and silently "succeeding" would
+    // tell a contest program its offset is gone when there was none.
+    return kError;
+}
+
+// Kenwood RU / RD step the incremental tuning up and down. The argument
+// is the step in Hz, five digits, and an empty argument means one step
+// of the console's own tuning step -- which is what a logger's RIT
+// buttons send.
+QString CatParser::handleStepIt(int direction)
+{
+    int stepHz = 0;
+    QMetaObject::invokeMethod(m_radio, "tuneStepHz", Qt::DirectConnection,
+                              Q_RETURN_ARG(int, stepHz), Q_ARG(int, 0));
+    if (stepHz <= 0) {
+        stepHz = 10;   // Kenwood's own default RIT step
+    }
+
+    bool ritOn = false;
+    QMetaObject::invokeMethod(m_radio, "ritEnable", Qt::DirectConnection,
+                              Q_RETURN_ARG(bool, ritOn));
+    bool xitOn = false;
+    QMetaObject::invokeMethod(m_radio, "xitEnable", Qt::DirectConnection,
+                              Q_RETURN_ARG(bool, xitOn));
+    if (!ritOn && !xitOn) {
+        return kError;
+    }
+
+    const char* getter = ritOn ? "ritOffset" : "xitOffset";
+    const char* setter = ritOn ? "setRitOffset" : "setXitOffset";
+    int offset = 0;
+    QMetaObject::invokeMethod(m_radio, getter, Qt::DirectConnection,
+                              Q_RETURN_ARG(int, offset));
+    QMetaObject::invokeMethod(m_radio, setter, Qt::DirectConnection,
+                              Q_ARG(int, offset + direction * stepHz));
     return QString();
 }
 
