@@ -6903,13 +6903,24 @@ void MainWindow::populateDefaultMeter()
     panel->addApplet(m_cwDecoderApplet);
     m_cwDecoderApplet->setVisible(false);
 
-    // Ghost applets — hidden per docs/superpowers/plans/2026-05-01-ui-polish-right-panel.md §Task 6.
-    // These applets are entirely placeholder-only today (no wired controls).
-    // Showing them is misleading — users click e.g. "Equalizer" and nothing happens.
-    // Uncomment each when its feature phase ships (one-line re-enable).
+    // EqApplet — Equalizer, Empfang und Senden (eingehaengt 2026-10-11).
     //
-    // m_eqApplet = new EqApplet(m_radioModel, nullptr);           // TODO 3I-3: TX/RX EQ wiring
-    // panel->addApplet(m_eqApplet);
+    // Es stand hier als Geister-Applet mit der Bedingung "TODO 3I-3: TX/RX
+    // EQ wiring". Die ist erfuellt: beide Haelften sind verdrahtet. Die
+    // Sendeseite ging auf TransmitModel::txEq* (seit 3M-3a-i da, der grosse
+    // Editor dazu ist TxEqDialog); die Empfangsseite gab es ueberhaupt
+    // nicht und ist am 2026-10-11 gebaut -- SliceModel::rxEq* ->
+    // RxChannel::setRxEqGraph10 -> WDSPs eqp im RXA-Durchlauf (RXA.c:673).
+    // Prueffaelle: tests/tst_rx_equalizer.cpp.
+    m_eqApplet = new EqApplet(m_radioModel, nullptr);
+    panel->addApplet(m_eqApplet);
+
+    // Geister-Applets — verborgen nach
+    // docs/superpowers/plans/2026-05-01-ui-polish-right-panel.md §Task 6.
+    // Sie sind bis heute reine Attrappen (kein Bedienelement verdrahtet).
+    // Sie zu zeigen fuehrt in die Irre — der Betreiber klickt und nichts
+    // geschieht. Jedes wird eingehaengt, wenn seine Funktion kommt; die
+    // uebrigen stehen weiter unten bei den Konstruktoren.
 
     // VaxApplet — per-VAX-channel gain + mute + level meters
     // (Phase 3O Sub-Phase 9 Task 9.2b).
@@ -7414,6 +7425,7 @@ void MainWindow::populateDefaultMeter()
     m_appletsById[QStringLiteral("Rade")]       = m_radeApplet;
     m_appletsById[QStringLiteral("RttyDecoder")] = m_rttyDecoderApplet;
     m_appletsById[QStringLiteral("CwDecoder")] = m_cwDecoderApplet;
+    m_appletsById[QStringLiteral("Eq")]         = m_eqApplet;
     m_appletsById[QStringLiteral("Vax")]        = m_vaxApplet;
     m_appletsById[QStringLiteral("Dvk")]        = m_dvkApplet;
     m_appletsById[QStringLiteral("QsoRec")]     = m_qsoRecorderApplet;
@@ -7481,6 +7493,16 @@ void MainWindow::populateDefaultMeter()
     // CW: same shape -- defaultVisible=true, gated on CWL/CWU below.
     m_appletVis->registerApplet(QStringLiteral("CwDecoder"),
                                 QStringLiteral("CW Decoder"), true);
+    // Equalizer (eingehaengt 2026-10-11). Sichtbar ab Werk: beide Haelften
+    // sind jetzt verdrahtet, und der Empfangs-Equalizer ist neu -- ein
+    // Merkmal, das man erst in einem Menue suchen muss, findet niemand
+    // (dieselbe Begruendung wie beim Sprachspeicher darunter).
+    //
+    // Der Eintrag in m_appletsById oben ist dabei genauso Pflicht wie
+    // dieser: ohne ihn kennt der Auswaehler das Applet nicht. Siehe die
+    // Notiz bei "Die vier vom 2026-08-23".
+    m_appletVis->registerApplet(QStringLiteral("Eq"),
+                                QStringLiteral("Equalizer"),    true);
     m_appletVis->registerApplet(QStringLiteral("Vax"),
                                 QStringLiteral("VAX"),          true);
     // Sprachspeicher (2026-08-19). Sichtbar ab Werk: er ist auch ohne

@@ -24,12 +24,18 @@
 
 #include "AppletWidget.h"
 
+#include <QPointer>
+
+#include <array>
+
 class QPushButton;
 class QSlider;
 class QComboBox;
 class QLabel;
 
 namespace Longpath {
+
+class SliceModel;
 
 // EqApplet — 10-band graphic equalizer panel (NYI until Phase 3I-3).
 //
@@ -52,8 +58,23 @@ public:
     QString appletTitle() const override { return QStringLiteral("Equalizer"); }
     void syncFromModel() override;
 
+    /// Welche Seite die Schieber gerade bedienen.
+    enum class Seite { Empfang, Senden };
+    Seite seiteFuerTest() const { return m_seite; }
+
 private:
     void buildUI();
+    /// Verdrahtet die Bedienelemente auf die Modelle (2026-10-11).
+    void wireControls();
+    /// Haengt die Schieber und den ON-Knopf an den aktiven Slice um.
+    void bindSlice(SliceModel* s);
+    /// Wechselt zwischen Empfangs- und Sendekurve.
+    void setSeite(Seite seite);
+    /// Schreibt den Zustand der gewaehlten Seite in die Bedienelemente.
+    void syncSeite();
+    /// Setzt alle zehn Baender und die Vorverstaerkung der gewaehlten Seite
+    /// auf die uebergebene Kurve ([0] Vorverstaerkung, [1..10] Baender).
+    void kurveSetzen(const std::array<int, 11>& kurve);
 
     // Control row (controls 1–4)
     QPushButton* m_onBtn    = nullptr;   // control 1: ON — green checkable 36×22
@@ -66,7 +87,11 @@ private:
     QLabel*  m_valueLabels[10] = {};  // current dB text under each slider
 
     // Preset combo (control 17)
-    QComboBox* m_presetCombo = nullptr;  // Flat/Voice/Music/Custom
+    QComboBox* m_presetCombo = nullptr;  // Flat / Voice / Custom
+
+    // Verdrahtung 2026-10-11
+    Seite m_seite = Seite::Senden;          // TX war schon vorbelegt
+    QPointer<SliceModel> m_slice;           // der Slice, an dem die RX-Kurve haengt
 };
 
 } // namespace Longpath
