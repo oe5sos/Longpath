@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Der Tuner Genius XL waere nach dem Firmware-Update 1.2.44
+  verschwunden.** Die Geraeteankuendigung wurde mit einem Regex
+  geprueft, der auf `nickname=...$` endete -- ein einziges zusaetzliches
+  Feld, und das Datagramm fiel durch, der Tuner erschien nie. Genau das
+  ist dem Upstream mit Firmware 1.2.44 passiert und dort nach 2026.10.0
+  behoben worden; wir hatten denselben Regex und damit denselben Fehler.
+  Die Ankuendigung wird jetzt feldweise gelesen: neue Felder an jeder
+  Stelle werden durchgelassen, die Reihenfolge ist frei, und streng
+  bleibt nur, was das Geraet identifiziert (Modellwort, `ip=` als
+  Punktquadrupel, `serial=`). Mit der alten Fassung sind die zwei neuen
+  Pruefaelle rot -- Gegenprobe gefahren.
+
 ### Added
 
 - **TCI zieht auf Thetis 2.10.3.14/.15 nach: neun neue `*_ex`-Befehle,
