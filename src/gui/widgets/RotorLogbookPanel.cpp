@@ -29,6 +29,8 @@
 // =================================================================
 
 #include "RotorLogbookPanel.h"
+
+#include <QLoggingCategory>
 #include "gui/ScopedChildWidget.h"
 #include "GlobeWidget.h"
 #include "WorldTexture.h"
@@ -111,6 +113,14 @@ namespace {
 const QString kMyGridKey    = QStringLiteral("StationGridSquare");
 const QString kWorldImgKey  = QStringLiteral("GlobeWorldImagePath");
 const QString kShowPhotoKey = QStringLiteral("RotorLogShowQrzPhoto");
+// Der Rotor hat bis zum 2026-10-11 nie ins Protokoll geschrieben: ob
+// er verbunden war, liess sich nur am Statusschild im Fenster ablesen
+// -- an dem Tag musste ich den Widget-Baum der laufenden Instanz ueber
+// die Automatisierungsbruecke abfragen, um "Rotator connected" zu
+// sehen. In einem Protokoll, das sonst jede Verbindung mitschreibt,
+// fehlte genau die eine Zeile, die man beim Nachsehen braucht.
+Q_LOGGING_CATEGORY(lcRotor, "longpath.rotor")
+
 const QString kRotorHostKey = QStringLiteral("RotorRotctldHost");
 const QString kRotorPortKey = QStringLiteral("RotorRotctldPort");
 // Teachable presets + park (2026-08-11). %1 is the slot number 1..4.
@@ -2595,6 +2605,14 @@ void RotorLogbookPanel::raiseLogbookIfOpen()
 
 void RotorLogbookPanel::setStatus(const QString& text, bool warn)
 {
+    // Nur echte Wechsel, sonst schreibt die wiederholte Meldung das
+    // Protokoll voll (der Zustand wird bei jedem Abfragedurchgang
+    // gesetzt, nicht nur wenn er sich aendert).
+    if (text != m_letzterStatus) {
+        m_letzterStatus = text;
+        if (warn) { qCWarning(lcRotor).noquote() << "Rotor:" << text; }
+        else      { qCInfo(lcRotor).noquote()    << "Rotor:" << text; }
+    }
     m_status->setText(text);
     m_status->setStyleSheet(QStringLiteral(
         "QLabel { color: %1; font-size: 11px; }"
