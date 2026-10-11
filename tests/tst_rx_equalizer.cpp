@@ -25,6 +25,8 @@
 
 #include "core/AppSettings.h"
 #include "core/RxChannel.h"
+#include "gui/MainWindow.h"
+#include "gui/applets/AppletPanelWidget.h"
 #include "gui/applets/EqApplet.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
@@ -464,6 +466,59 @@ private slots:
         }
         QCOMPARE(s->rxEqPreampDb(), 0);
         QCOMPARE(combo->currentIndex(), 0);
+    }
+
+    // ── Erreichbarkeit ──────────────────────────────────────────────────────
+
+    void dasFeldHaengtWirklichImEchtenFenster()
+    {
+        // Der entscheidende Fall, und der einzige, der ein ECHTES
+        // MainWindow braucht. tst_every_applet_is_reachable vergleicht die
+        // beiden Anmeldelisten gegeneinander und ist gruen, sobald die
+        // Namen zusammenpassen -- ob das Applet im Panel haengt, sagt es
+        // nicht. Genau diese Luecke hat am 2026-08-23 dreimal zugeschlagen
+        // ("wo ist die applet mitschrift"): gebaut, eingehaengt, unsichtbar.
+        //
+        // Beim ersten Versuch, das hier am laufenden Programm nachzusehen,
+        // hat die Textsuche im Widget-Baum NICHTS gefunden -- auch nicht
+        // die Applets, die seit Monaten haengen. Die Abwesenheit war also
+        // keine Aussage, sondern ein untaugliches Messmittel. Dieser Fall
+        // misst stattdessen am Objekt.
+        auto* mw = new MainWindow();
+        mw->resize(1200, 800);
+        mw->show();
+        QVERIFY(QTest::qWaitForWindowExposed(mw, 20000));
+
+        const QList<EqApplet*> gefunden = mw->findChildren<EqApplet*>();
+        QCOMPARE(gefunden.size(), 1);
+        QVERIFY(gefunden.first() != nullptr);
+        QCOMPARE(gefunden.first()->appletId(), QStringLiteral("EQ"));
+        QCOMPARE(gefunden.first()->appletTitle(), QStringLiteral("Equalizer"));
+
+        // Und es steht in der Liste des PANELS.
+        //
+        // WAS DIESER FALL NICHT BEWACHT -- nachgemessen, nicht vermutet:
+        // die Gegenprobe hat BEIDE Anmeldewege einzeln entfernt
+        // (`panel->addApplet(m_eqApplet)` und den Eintrag in
+        // m_appletsById), und dieser Fall blieb jedes Mal gruen. Das
+        // Applet kommt auf dem jeweils anderen Weg trotzdem ins Panel
+        // (MainWindow.cpp:1346/1523/1810 docken aus m_appletsById an).
+        //
+        // Den Waechter dafuer gibt es schon: tests/tst_every_applet_is_
+        // reachable.cpp vergleicht die beiden Anmeldelisten gegeneinander
+        // und FAELLT bei entferntem m_appletsById-Eintrag mit genau der
+        // richtigen Meldung -- "Diese Applets sind gebaut, aber ueber den
+        // Auswaehler nicht erreichbar: Equalizer (EQ)". Gegengeprobt am
+        // 2026-10-11.
+        //
+        // Dieser Fall hier belegt also nur: es gibt genau EIN Equalizer-
+        // Feld, es traegt Kennung und Titel, und es steht im Panel. Das
+        // ist weniger, als die erste Fassung behauptet hat.
+        auto* panel = mw->findChild<AppletPanelWidget*>();
+        QVERIFY(panel);
+        QVERIFY(panel->applets().contains(gefunden.first()));
+
+        delete mw;
     }
 };
 
