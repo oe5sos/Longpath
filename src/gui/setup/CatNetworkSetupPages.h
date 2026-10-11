@@ -160,8 +160,16 @@ private:
 
 // ---------------------------------------------------------------------------
 // CAT > TCP/IP CAT
-// Enable toggle, bind IP, port spinner, status label.
-// All controls are NYI / disabled.
+//
+// Phase 3K, first step (2026-10-11): live, not NYI. The controls drive
+// the rigctld bridge (RigctldServer) -- enable, bind address, port, and
+// the transmit gate -- and the status line reports what the server is
+// actually doing.
+//
+// The transmit checkbox is its own control on purpose: the operator can
+// let a logger read and tune without letting it key the radio, which is
+// how most contest setups want it (PTT by foot switch, frequency by
+// program).
 // ---------------------------------------------------------------------------
 class CatTcpIpPage : public SetupPage {
     Q_OBJECT
@@ -169,10 +177,27 @@ class CatTcpIpPage : public SetupPage {
 public:
     explicit CatTcpIpPage(QWidget* parent = nullptr);
 
+    /// Live status from MainWindow. Idempotent.
+    void setRigctldStatus(bool running, quint16 port, int clients);
+
+signals:
+    /// Operator toggled the enable checkbox. `port` is the value shown
+    /// in the spinbox, already persisted.
+    void rigctldEnableToggled(bool on, quint16 port);
+
+    /// Bind address or port changed. MainWindow restarts a running
+    /// server in place; when stopped, the values just wait in
+    /// AppSettings for the next start.
+    void rigctldBindOrPortChanged(const QString& bindAddress, quint16 port);
+
+    /// Operator opened or closed the transmit gate.
+    void rigctldPttAllowedToggled(bool allowed);
+
 private:
     QCheckBox* m_enableCheck{nullptr};
     QLineEdit* m_bindIpEdit{nullptr};
     QSpinBox*  m_portSpin{nullptr};
+    QCheckBox* m_pttCheck{nullptr};
     QLabel*    m_statusLabel{nullptr};
 
     void buildUI();

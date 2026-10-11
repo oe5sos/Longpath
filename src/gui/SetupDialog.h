@@ -30,6 +30,7 @@ struct BoardCapabilities;
 struct RadioInfo;
 class TciServer;
 class CatTciServerPage;
+class CatTcpIpPage;        // Phase 3K: rigctld bridge page
 
 // Main settings dialog with tree-based navigation.
 // Left pane: QTreeWidget with top-level category items.
@@ -55,6 +56,11 @@ public:
     // is safe across server lifecycle changes.
     void setTciServer(class Longpath::TciServer* server);
 
+    /// Phase 3K, erster Schritt (2026-10-11): Status der rigctld-Bruecke.
+    /// Darf gerufen werden, bevor die Seite je offen war -- die Werte
+    /// werden gemerkt und beim Bau nachgespielt (wie m_pendingTciServer).
+    void setRigctldStatus(bool running, quint16 port, int clients);
+
 signals:
     // Phase 3M-3a-ii Batch 6 (Task 3): forwarded from CfcSetupPage's
     // [Configure CFC bands…] button.  MainWindow connects this to the
@@ -79,6 +85,14 @@ signals:
     // and connects it to TciServer::messageLogged so the window outlives this
     // dialog closing.
     void tciShowLogRequested();
+
+    // Phase 3K, erster Schritt (2026-10-11): aus CatTcpIpPage weitergeleitet.
+    // Dieselbe Bauart wie die drei TCI-Signale darueber: die Seite schreibt
+    // den Wert in AppSettings, MainWindow startet/stoppt den rigctld-Server
+    // sofort, damit kein Neustart noetig ist.
+    void rigctldEnableToggled(bool on, quint16 port);
+    void rigctldBindOrPortChanged(const QString& bindAddress, quint16 port);
+    void rigctldPttAllowedToggled(bool allowed);
 
     // Task 3.6: forwarded from GeneralOptionsPage — CPU meter rate spinbox.
     // MainWindow::setCpuTimerIntervalHz() is the handler.
@@ -163,6 +177,14 @@ private:
     // non-WebSocket builds. Safe: MainWindow parents its single TciServer to
     // itself and never destroys it independently, so it outlives this dialog.
     TciServer* m_pendingTciServer = nullptr;
+
+    // Phase 3K (2026-10-11): same two-part trick for the TCP/IP CAT page --
+    // the page pointer once it is realized, and the last status MainWindow
+    // reported so a first visit shows the truth instead of "stopped".
+    CatTcpIpPage* m_rigctldPage = nullptr;
+    bool    m_rigctldRunning = false;
+    quint16 m_rigctldPort    = 0;
+    int     m_rigctldClients = 0;
 
     // Phase 8 of #167: PA category nav-tree root + 3 child items, plus
     // the page widgets themselves so applyPaVisibility() can toggle each.

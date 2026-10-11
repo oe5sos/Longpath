@@ -144,6 +144,7 @@ class QsoUploader;
 // namespace — TciServer only exists when HAVE_WEBSOCKETS is defined but we
 // forward-declare unconditionally; m_tciServer is nullptr in non-WebSocket builds).
 class TciServer;
+class RigctldServer;   // Phase 3K: Hamlib-rigctld-Bruecke
 class TciApplet;
 class ClientChainApplet;
 // 2026-08-24: TciClient — Longpath als TCI-CLIENT auf ExpertSDR2/SunSDR2 QRP
@@ -1598,6 +1599,11 @@ private:
     // Phase 23: TCI server + applets.
     // m_tciServer is nullptr in non-WebSocket builds (HAVE_WEBSOCKETS not defined).
     TciServer*         m_tciServer{nullptr};
+
+    // Phase 3K, erster Schritt (2026-10-11): rigctld-Bruecke. Anders als
+    // der TCI-Server haengt sie an keinem #ifdef -- sie braucht nur
+    // Qt6::Network, das immer da ist.
+    RigctldServer*     m_rigctldServer{nullptr};
     TciApplet*         m_tciApplet{nullptr};
     ClientChainApplet* m_clientChainApplet{nullptr};
 

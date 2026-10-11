@@ -2797,6 +2797,15 @@ longpath_add_test(tst_tci_radio_model_shims)
 # that vfo_sync_ex:false really detaches the follower again.
 longpath_add_test(tst_tci_ex_long_tail)
 
+# ── Phase 3K, erster Schritt (2026-10-11): rigctld-Bruecke ──────────────────
+# Protokoll gegen TestMockRadioModel (jeder Befehl, den ein echter
+# Hamlib-Client beim Verbinden schickt, plus die Abweisungen) und der
+# Socketweg gegen einen laufenden Server. Das Sendetor hat die meisten
+# Faelle: standardmaessig zu, Entkeyen immer erlaubt, stop() schliesst es.
+# TestMockRadioModel.cpp liefert die moc-vtable des Mock-Objekts.
+longpath_add_test(tst_rigctld_server TestMockRadioModel.cpp)
+target_link_libraries(tst_rigctld_server PRIVATE Qt6::Network)
+
 # ── Phase 3J-1 closeout Item 4 (2026-05-12): per-(band, mode) filter ────────
 # Pins the contract that SliceModel::setDspMode saves the current filter
 # under (currentBand, OLD mode) and restores from (currentBand, NEW mode)

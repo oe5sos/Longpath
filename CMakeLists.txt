@@ -497,6 +497,7 @@ endif()
 # --------------------------------------------------------------------------
 set(CORE_SOURCES
     src/core/AntennaLabels.cpp
+    src/core/RigctldServer.cpp
     src/core/antenna/AmateurBands.cpp
     src/core/antenna/Touchstone.cpp
     src/core/antenna/Feedline.cpp

@@ -23,6 +23,7 @@ Q_LOGGING_CATEGORY(lcContainer,  "longpath.container")
 Q_LOGGING_CATEGORY(lcMeter,      "longpath.meter")
 Q_LOGGING_CATEGORY(lcMmio,       "longpath.mmio")
 Q_LOGGING_CATEGORY(lcTci,        "longpath.tci")
+Q_LOGGING_CATEGORY(lcRigctld,    "longpath.rigctld")
 Q_LOGGING_CATEGORY(lcSpots,      "longpath.spots")
 Q_LOGGING_CATEGORY(lcAutomation, "longpath.automation")
 
@@ -65,6 +66,8 @@ LogManager::LogManager()
           QStringLiteral("DX spot ingest (cluster, RBN, SpotCollector, WSJT-X)"), false },
         { QStringLiteral("longpath.automation"), QStringLiteral("Automation"),
           QStringLiteral("Dev automation bridge (LONGPATH_AUTOMATION) -- widget-tree dump, screen capture"), false },
+        { QStringLiteral("longpath.rigctld"), QStringLiteral("rigctld"),
+          QStringLiteral("Hamlib rigctld bridge -- clients, commands, refused PTT"), false },
     };
 }
 

@@ -2,6 +2,31 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Longpath spricht jetzt rigctld: Logbuch-, Contest- und
+  Digimode-Programme koennen das Geraet steuern.** Erster Schritt der
+  Phase 3K. Setup > CAT & Network > TCP/IP CAT ist keine Attrappe mehr:
+  Einschalten, Bindeadresse, Port (4532 wie bei Hamlib ueblich) und ein
+  eigener Schalter fuer das Senden. Bedient werden Frequenz lesen und
+  setzen, Modus mit Durchlassbreite, VFO, PTT, Sperre, Splitabfrage und
+  `dump_state`; in N1MM, DXLog und WSJT-X ist das die Geraeteauswahl
+  "Hamlib NET rigctl".
+  **Das Senden ist standardmaessig gesperrt** -- ein Programm darf lesen
+  und abstimmen, aber nicht tasten; mit Freigabe nimmt die Anforderung
+  denselben Weg wie jede andere Sendequelle, Bandplan-Waechter davor.
+  Entkeyen geht immer, auch bei gesperrtem Tor, und das Abschalten des
+  Servers sperrt wieder.
+  Das Protokoll ist nicht geraten: die Befehlsfolge eines echten
+  Hamlib-Clients wurde durch einen mitlesenden Proxy aufgezeichnet, aus
+  Longpath heraus nachgefahren und gegen Hamlibs eigenes Dummy-Geraet
+  verglichen. Drei Befunde kamen dabei heraus (zu enges
+  `targetable_vfo`, die VFO-Maske in den Frequenzbereichen, und lange
+  Getter brauchen Wert **und** Statuszeile -- sonst steht der Client
+  20 Sekunden), alle behoben und als Prueffaelle festgehalten; Protokoll
+  in `docs/architecture/2026-10-11-rigctld-verification/`. Der
+  Kenwood-CAT-Befehlssatz folgt als naechster Schritt.
+
 ### Fixed
 
 - **Der Tuner Genius XL waere nach dem Firmware-Update 1.2.44

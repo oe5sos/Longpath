@@ -292,6 +292,7 @@ warren@wpratt.com
 #include "core/TxChannel.h"  // H.2: setTxChannel wiring
 #include "core/ReceiverManager.h"
 #include "core/AppSettings.h"
+#include "core/RigctldServer.h"
 #include "core/BuildIdentity.h"
 #include "core/PaTempUnit.h"
 #include "core/RadioStatus.h"
@@ -971,6 +972,34 @@ MainWindow::MainWindow(QWidget* parent)
         }
     }
 #endif
+
+    // ── Phase 3K, erster Schritt (2026-10-11): rigctld-Bruecke ──────────────
+    // Gleiche Bauart wie der TCI-Autostart darueber: Einstellung lesen,
+    // Adresse pruefen, starten. Das Sendetor wird NUR gesetzt, wenn es
+    // ausdruecklich eingeschaltet ist; RigctldServer::start laesst es
+    // ohnehin geschlossen, der Aufruf hier ist die bewusste Freigabe.
+    {
+        auto& s = AppSettings::instance();
+        m_rigctldServer = new RigctldServer(m_radioModel, this);
+
+        const bool enabled = s.value(QStringLiteral("RigctldEnabled"),
+                                     QStringLiteral("False")).toString()
+                             == QStringLiteral("True");
+        const quint16 port = static_cast<quint16>(
+            s.value(QStringLiteral("RigctldPort"),
+                    QStringLiteral("4532")).toString().toUShort());
+        const QString bindStr = s.value(QStringLiteral("RigctldBindAddress"),
+                                        QStringLiteral("127.0.0.1")).toString();
+        QHostAddress bindAddr;
+        if (!bindAddr.setAddress(bindStr)) {
+            bindAddr = QHostAddress(QHostAddress::LocalHost);
+        }
+        if (enabled && m_rigctldServer->start(bindAddr, port)) {
+            m_rigctldServer->setPttAllowed(
+                s.value(QStringLiteral("RigctldAllowPtt"),
+                        QStringLiteral("False")).toString() == QStringLiteral("True"));
+        }
+    }
 
     // Defensive save on aboutToQuit. closeEvent is fine for ⌘Q but
     // does NOT run when the process is signaled (SIGTERM from pkill,
@@ -11762,6 +11791,68 @@ void MainWindow::wireSetupDialog(SetupDialog* dialog)
         dialog->setTciServer(m_tciServer);
     }
 #endif // HAVE_WEBSOCKETS
+
+    // ── Phase 3K, erster Schritt (2026-10-11): rigctld-Bruecke ──────────────
+    // Dieselbe Bauart wie der TCI-Block darueber: Einschalten startet und
+    // stoppt sofort, Adress-/Portwechsel startet einen laufenden Server neu,
+    // und der Status geht zurueck in den Dialog.
+    if (m_rigctldServer) {
+        connect(dialog, &SetupDialog::rigctldEnableToggled,
+                this, [this](bool on, quint16 port) {
+                    if (!on) {
+                        m_rigctldServer->stop();
+                        return;
+                    }
+                    auto& s = AppSettings::instance();
+                    const QString bindStr = s.value(
+                        QStringLiteral("RigctldBindAddress"),
+                        QStringLiteral("127.0.0.1")).toString();
+                    QHostAddress bindAddr;
+                    if (!bindAddr.setAddress(bindStr)) {
+                        bindAddr = QHostAddress(QHostAddress::LocalHost);
+                    }
+                    if (m_rigctldServer->start(bindAddr, port)) {
+                        // stop() closes the transmit gate; re-apply the
+                        // operator's own setting after a successful start.
+                        m_rigctldServer->setPttAllowed(
+                            s.value(QStringLiteral("RigctldAllowPtt"),
+                                    QStringLiteral("False")).toString()
+                            == QStringLiteral("True"));
+                    }
+                });
+        connect(dialog, &SetupDialog::rigctldBindOrPortChanged,
+                this, [this](const QString& bindStr, quint16 port) {
+                    if (!m_rigctldServer->isListening()) {
+                        return;
+                    }
+                    QHostAddress bindAddr;
+                    if (!bindAddr.setAddress(bindStr)) {
+                        bindAddr = QHostAddress(QHostAddress::LocalHost);
+                    }
+                    const bool ptt = m_rigctldServer->pttAllowed();
+                    m_rigctldServer->stop();
+                    if (m_rigctldServer->start(bindAddr, port)) {
+                        m_rigctldServer->setPttAllowed(ptt);
+                    }
+                });
+        connect(dialog, &SetupDialog::rigctldPttAllowedToggled,
+                this, [this](bool allowed) {
+                    m_rigctldServer->setPttAllowed(allowed);
+                });
+
+        // Status in beide Richtungen: beim Oeffnen einmal, danach bei jeder
+        // Aenderung, solange der Dialog lebt.
+        const auto pushStatus = [this, dialog]() {
+            dialog->setRigctldStatus(m_rigctldServer->isListening(),
+                                     m_rigctldServer->port(),
+                                     m_rigctldServer->clientCount());
+        };
+        pushStatus();
+        connect(m_rigctldServer, &RigctldServer::listeningChanged,
+                dialog, [pushStatus](bool) { pushStatus(); });
+        connect(m_rigctldServer, &RigctldServer::clientCountChanged,
+                dialog, [pushStatus](int) { pushStatus(); });
+    }
 }
 
 #ifdef HAVE_WEBSOCKETS
