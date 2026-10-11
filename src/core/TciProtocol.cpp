@@ -21,6 +21,9 @@
 #include "TciVfoCoalescer.h"
 #include "models/Band.h"  // bandFromFrequency + bandLabel for tx_frequency_ex
 
+#include <algorithm>  // std::max, std::swap -- normalizeTxFilterBand
+#include <cstdlib>    // std::abs -- rx_step_att_ex / tx_filter_band_ex
+
 namespace Longpath {
 
 // From Thetis TCIServer.cs:2260-2279 [v2.10.3.15] -- agcModeToTciMode.
@@ -1425,6 +1428,19 @@ QString TciProtocol::handleSetCommand(const QString& name, const QStringList& ar
     if (name == QStringLiteral("rx_nr_enable"))    { return handleRxNrEnableCommand(args); }
     // From Thetis TCIServer.cs:5100 [v2.10.3.13] — rx_nr_enable_ex case in set switch.
     if (name == QStringLiteral("rx_nr_enable_ex")) { return handleRxNrEnableExCommand(args); }
+
+    // ── Thetis v2.10.3.14 bespoke _ex long tail ─────────────────────────────
+    // From Thetis TCIServer.cs:5474-5527 [v2.10.3.15] — the eleven cases
+    // v2.10.3.14 added to the set switch.
+    if (name == QStringLiteral("rx_nb_enable_ex"))        { return handleRxNbEnableExCommand(args); }
+    if (name == QStringLiteral("rx_step_att_enabled_ex")) { return handleRxStepAttEnabledExCommand(args); }
+    if (name == QStringLiteral("rx_step_att_ex"))         { return handleRxStepAttExCommand(args); }
+    if (name == QStringLiteral("rx_preamp_att_ex"))       { return handleRxPreampAttExCommand(args); }
+    if (name == QStringLiteral("agc_auto_ex"))            { return handleAgcAutoExCommand(args); }
+    if (name == QStringLiteral("vfo_sync_ex"))            { return handleVfoSyncExCommand(args); }
+    if (name == QStringLiteral("tx_filter_band_ex"))      { return handleTxFilterBandExCommand(args); }
+    if (name == QStringLiteral("fm_deviation_ex"))        { return handleFmDeviationExCommand(args); }
+    if (name == QStringLiteral("run_cat_ex"))             { return handleRunCatExCommand(args); }
     // From Thetis TCIServer.cs:5112 [v2.10.3.13] — agc_mode case in set switch.
     if (name == QStringLiteral("agc_mode"))        { return handleAgcModeCommand(args); }
     // From Thetis TCIServer.cs:5115 [v2.10.3.13] — agc_gain case in set switch.
@@ -1550,6 +1566,21 @@ QString TciProtocol::handleQueryCommand(const QString& name)
     // From Thetis TCIServer.cs:5190 [v2.10.3.13] — shutdown_ex case in 1-arg query switch.
     if (name == QStringLiteral("shutdown_ex")) {
         return handleShutdownExCommand();
+    }
+
+    // ── Thetis v2.10.3.14 bespoke _ex long tail ─────────────────────────────
+    // From Thetis TCIServer.cs:5538-5551 [v2.10.3.15] — the three _ex cases
+    // in the no-argument switch.  tx_filter_band_ex and vfo_sync_ex share
+    // their handler with the set path (Thetis passes null there);
+    // vfo_swap_ex exists only in this form.
+    if (name == QStringLiteral("tx_filter_band_ex")) {
+        return handleTxFilterBandExCommand({});
+    }
+    if (name == QStringLiteral("vfo_sync_ex")) {
+        return handleVfoSyncExCommand({});
+    }
+    if (name == QStringLiteral("vfo_swap_ex")) {
+        return handleVfoSwapExCommand();
     }
 
     return {};
@@ -3134,6 +3165,329 @@ QString TciProtocol::handleShutdownExCommand()
 {
     qCWarning(lcTci) << "TCI client requested shutdown_ex; ignored — Phase 13 stub (maintainer-policy decision)";
     return {};
+}
+
+// ── Thetis v2.10.3.14 bespoke _ex long tail (2026-10-11) ────────────────────
+//
+// Thetis v2.10.3.14 added eleven *_ex commands.  Nine land here; the two
+// that cannot be answered honestly (fm_deviation_ex, run_cat_ex) say so
+// instead of reporting a made-up state.  Argument validation follows each
+// Thetis handler exactly, including the range checks -- a client that sends
+// rx=2 or a positive preamp value gets the same silence from us as from
+// Thetis.
+// ───────────────────────────────────────────────────────────────────────────
+
+// From Thetis normalizeTXFilterBandForSet at TCIServer.cs:2422-2436
+// [v2.10.3.15].
+void TciProtocol::normalizeTxFilterBand(int* lowHz, int* highHz)
+{
+    if (!lowHz || !highHz) {
+        return;
+    }
+    *lowHz  = std::max(0, *lowHz);
+    *highHz = std::max(0, *highHz);
+    if (*lowHz > *highHz) {
+        std::swap(*lowHz, *highHz);
+    }
+    if (*highHz < *lowHz + 100) {
+        *highHz = *lowHz + 100;
+    }
+}
+
+// From Thetis handleRxStepAttEnabledEx at TCIServer.cs:4883-4904
+// [v2.10.3.15].  Query returns the latch; set writes it.
+QString TciProtocol::handleRxStepAttEnabledExCommand(const QStringList& args)
+{
+    if (args.size() < 1 || args.size() > 2) { return {}; }
+    bool ok = false;
+    const int rx = args.at(0).trimmed().toInt(&ok);
+    if (!ok || rx < 0 || rx > 1) { return {}; }
+
+    if (args.size() == 1) {
+        bool enabled = false;
+        QMetaObject::invokeMethod(m_radio, "rxStepAttEnabled", Qt::DirectConnection,
+                                  Q_RETURN_ARG(bool, enabled), Q_ARG(int, rx));
+        return QStringLiteral("rx_step_att_enabled_ex:%1,%2;")
+            .arg(rx)
+            .arg(enabled ? QStringLiteral("true") : QStringLiteral("false"));
+    }
+
+    const bool enabled = args.at(1).trimmed().toLower() == QStringLiteral("true");
+    QMetaObject::invokeMethod(m_radio, "setRxStepAttEnabled", Qt::DirectConnection,
+                              Q_ARG(int, rx), Q_ARG(bool, enabled));
+    // Report what the radio now holds, not what was asked for.  Bench run
+    // 2026-10-11 against the live server showed why: with no slice and no
+    // step-attenuator controller yet (TCI client connected before the radio
+    // is), the set is a no-op and an echo of the request would tell the
+    // client a state that does not exist.
+    bool applied = false;
+    QMetaObject::invokeMethod(m_radio, "rxStepAttEnabled", Qt::DirectConnection,
+                              Q_RETURN_ARG(bool, applied), Q_ARG(int, rx));
+    m_pendingNotifications << QStringLiteral("rx_step_att_enabled_ex:%1,%2;")
+        .arg(rx)
+        .arg(applied ? QStringLiteral("true") : QStringLiteral("false"));
+    return {};
+}
+
+// From Thetis handleRxStepAttEx at TCIServer.cs:4905-4926 [v2.10.3.15].
+// sendRxStepAttEx (:2230) reports Math.Abs(attenuation); the set path
+// refuses a negative value outright ("attenuation is always a +ve value,
+// -ve attenuation would be gain !", :4921).
+QString TciProtocol::handleRxStepAttExCommand(const QStringList& args)
+{
+    if (args.size() < 1 || args.size() > 2) { return {}; }
+    bool ok = false;
+    const int rx = args.at(0).trimmed().toInt(&ok);
+    if (!ok || rx < 0 || rx > 1) { return {}; }
+
+    if (args.size() == 1) {
+        int dB = 0;
+        QMetaObject::invokeMethod(m_radio, "rxStepAttDb", Qt::DirectConnection,
+                                  Q_RETURN_ARG(int, dB), Q_ARG(int, rx));
+        return QStringLiteral("rx_step_att_ex:%1,%2;").arg(rx).arg(std::abs(dB));
+    }
+
+    bool ok2 = false;
+    const int dB = args.at(1).trimmed().toInt(&ok2);
+    if (!ok2 || dB < 0) { return {}; }
+    QMetaObject::invokeMethod(m_radio, "setRxStepAttDb", Qt::DirectConnection,
+                              Q_ARG(int, rx), Q_ARG(int, dB));
+    int applied = 0;
+    QMetaObject::invokeMethod(m_radio, "rxStepAttDb", Qt::DirectConnection,
+                              Q_RETURN_ARG(int, applied), Q_ARG(int, rx));
+    m_pendingNotifications << QStringLiteral("rx_step_att_ex:%1,%2;")
+        .arg(rx).arg(std::abs(applied));
+    return {};
+}
+
+// From Thetis handleRxPreampAttEx at TCIServer.cs:4927-4944 [v2.10.3.15].
+// Negative on the wire in both directions: the query answers
+// -preampModeToAttenuation(mode) (:2235) and the set path refuses a
+// positive argument (:4942).
+QString TciProtocol::handleRxPreampAttExCommand(const QStringList& args)
+{
+    if (args.size() < 1 || args.size() > 2) { return {}; }
+    bool ok = false;
+    const int rx = args.at(0).trimmed().toInt(&ok);
+    if (!ok || rx < 0 || rx > 1) { return {}; }
+
+    if (args.size() == 1) {
+        int dB = 0;
+        QMetaObject::invokeMethod(m_radio, "rxPreampAttDb", Qt::DirectConnection,
+                                  Q_RETURN_ARG(int, dB), Q_ARG(int, rx));
+        return QStringLiteral("rx_preamp_att_ex:%1,%2;").arg(rx).arg(dB);
+    }
+
+    bool ok2 = false;
+    const int dB = args.at(1).trimmed().toInt(&ok2);
+    if (!ok2 || dB > 0) { return {}; }
+    QMetaObject::invokeMethod(m_radio, "setRxPreampAttDb", Qt::DirectConnection,
+                              Q_ARG(int, rx), Q_ARG(int, dB));
+    int applied = 0;
+    QMetaObject::invokeMethod(m_radio, "rxPreampAttDb", Qt::DirectConnection,
+                              Q_RETURN_ARG(int, applied), Q_ARG(int, rx));
+    m_pendingNotifications << QStringLiteral("rx_preamp_att_ex:%1,%2;").arg(rx).arg(applied);
+    return {};
+}
+
+// From Thetis handleRxNBEnable(args, is_extended=true) at
+// TCIServer.cs:4707-4739 [v2.10.3.15].  The query emits both forms, exactly
+// as the NR family does (sendNBEnable twice at :4718-4719); we answer with
+// the extended form and queue the basic one, matching
+// handleRxNrEnableExCommand above.  nb range 0..2 checked at :4730.
+QString TciProtocol::handleRxNbEnableExCommand(const QStringList& args)
+{
+    if (args.size() < 1) { return {}; }
+    bool ok = false;
+    const int rx = args.at(0).trimmed().toInt(&ok);
+    if (!ok || rx < 0 || rx > 1) { return {}; }
+
+    if (args.size() == 1) {
+        int nbIndex = 0;
+        QMetaObject::invokeMethod(m_radio, "rxNbIndex", Qt::DirectConnection,
+                                  Q_RETURN_ARG(int, nbIndex), Q_ARG(int, rx));
+        const bool enabled = nbIndex > 0;
+        const QString enStr = enabled ? QStringLiteral("true") : QStringLiteral("false");
+        m_pendingNotifications << QStringLiteral("rx_nb_enable:%1,%2;").arg(rx).arg(enStr);
+        return QStringLiteral("rx_nb_enable_ex:%1,%2,%3;").arg(rx).arg(enStr).arg(nbIndex);
+    }
+
+    if (args.size() < 3) { return {}; }
+    const bool enabled = args.at(1).trimmed().toLower() == QStringLiteral("true");
+    bool ok2 = false;
+    const int nbIndex = args.at(2).trimmed().toInt(&ok2);
+    if (!ok2 || nbIndex < 0 || nbIndex > 2) { return {}; }
+    QMetaObject::invokeMethod(m_radio, "setRxNbIndexed", Qt::DirectConnection,
+                              Q_ARG(int, rx), Q_ARG(bool, enabled), Q_ARG(int, nbIndex));
+    int applied = 0;
+    QMetaObject::invokeMethod(m_radio, "rxNbIndex", Qt::DirectConnection,
+                              Q_RETURN_ARG(int, applied), Q_ARG(int, rx));
+    m_pendingNotifications << QStringLiteral("rx_nb_enable_ex:%1,%2,%3;")
+        .arg(rx)
+        .arg(applied > 0 ? QStringLiteral("true") : QStringLiteral("false"))
+        .arg(applied);
+    return {};
+}
+
+// From Thetis handleAgcAutoEx at TCIServer.cs:4980-4997 [v2.10.3.15].
+QString TciProtocol::handleAgcAutoExCommand(const QStringList& args)
+{
+    if (args.size() < 1 || args.size() > 2) { return {}; }
+    bool ok = false;
+    const int rx = args.at(0).trimmed().toInt(&ok);
+    if (!ok || rx < 0 || rx > 1) { return {}; }
+
+    if (args.size() == 1) {
+        bool enabled = false;
+        QMetaObject::invokeMethod(m_radio, "rxAgcAuto", Qt::DirectConnection,
+                                  Q_RETURN_ARG(bool, enabled), Q_ARG(int, rx));
+        return QStringLiteral("agc_auto_ex:%1,%2;")
+            .arg(rx)
+            .arg(enabled ? QStringLiteral("true") : QStringLiteral("false"));
+    }
+
+    const bool enabled = args.at(1).trimmed().toLower() == QStringLiteral("true");
+    QMetaObject::invokeMethod(m_radio, "setRxAgcAuto", Qt::DirectConnection,
+                              Q_ARG(int, rx), Q_ARG(bool, enabled));
+    bool applied = false;
+    QMetaObject::invokeMethod(m_radio, "rxAgcAuto", Qt::DirectConnection,
+                              Q_RETURN_ARG(bool, applied), Q_ARG(int, rx));
+    m_pendingNotifications << QStringLiteral("agc_auto_ex:%1,%2;")
+        .arg(rx)
+        .arg(applied ? QStringLiteral("true") : QStringLiteral("false"));
+    return {};
+}
+
+// From Thetis handleVfoSyncEx at TCIServer.cs:4945-4957 [v2.10.3.15].
+// No receiver index: Thetis VFO sync is radio-global (chkVFOSync).  The
+// no-argument form arrives through handleQueryCommand.
+QString TciProtocol::handleVfoSyncExCommand(const QStringList& args)
+{
+    if (args.isEmpty()) {
+        bool enabled = false;
+        QMetaObject::invokeMethod(m_radio, "vfoSync", Qt::DirectConnection,
+                                  Q_RETURN_ARG(bool, enabled));
+        return QStringLiteral("vfo_sync_ex:%1;")
+            .arg(enabled ? QStringLiteral("true") : QStringLiteral("false"));
+    }
+    if (args.size() != 1) { return {}; }
+
+    const QString raw = args.at(0).trimmed().toLower();
+    if (raw != QStringLiteral("true") && raw != QStringLiteral("false")) {
+        // Thetis bool.TryParse fails → return without touching the state.
+        return {};
+    }
+    const bool enabled = raw == QStringLiteral("true");
+    QMetaObject::invokeMethod(m_radio, "setVfoSync", Qt::DirectConnection,
+                              Q_ARG(bool, enabled));
+    m_pendingNotifications << QStringLiteral("vfo_sync_ex:%1;")
+        .arg(enabled ? QStringLiteral("true") : QStringLiteral("false"));
+    return {};
+}
+
+// From Thetis handleVfoSwapEx at TCIServer.cs:4958-4961 [v2.10.3.15] --
+// console.VFOSwap(), no arguments, no reply.  The frequency changes it
+// causes are announced by the ordinary VFO broadcast path.
+QString TciProtocol::handleVfoSwapExCommand()
+{
+    QMetaObject::invokeMethod(m_radio, "vfoSwap", Qt::DirectConnection);
+    return {};
+}
+
+// From Thetis handleTXFilterBandEx at TCIServer.cs:4576-4594 [v2.10.3.15].
+// Thetis accepts zero or two arguments and silently drops anything else
+// (:4579).  Query goes through sendTXFilterBandEx (:2443), which takes the
+// absolute value before normalising.
+QString TciProtocol::handleTxFilterBandExCommand(const QStringList& args)
+{
+    if (!args.isEmpty() && args.size() != 2) { return {}; }
+
+    if (args.isEmpty()) {
+        int low = 0;
+        int high = 0;
+        QMetaObject::invokeMethod(m_radio, "txFilterLowHz", Qt::DirectConnection,
+                                  Q_RETURN_ARG(int, low));
+        QMetaObject::invokeMethod(m_radio, "txFilterHighHz", Qt::DirectConnection,
+                                  Q_RETURN_ARG(int, high));
+        low  = std::abs(low);
+        high = std::abs(high);
+        normalizeTxFilterBand(&low, &high);
+        return QStringLiteral("tx_filter_band_ex:%1,%2;").arg(low).arg(high);
+    }
+
+    bool okLow = false;
+    bool okHigh = false;
+    int low  = args.at(0).trimmed().toInt(&okLow);
+    int high = args.at(1).trimmed().toInt(&okHigh);
+    if (!okLow || !okHigh) { return {}; }
+
+    normalizeTxFilterBand(&low, &high);
+    QMetaObject::invokeMethod(m_radio, "setTxFilterBand", Qt::DirectConnection,
+                              Q_ARG(int, low), Q_ARG(int, high));
+    // TransmitModel has its own swap-on-commit guard, so read back rather
+    // than echoing: the model is allowed to disagree with us.
+    int appliedLow = 0;
+    int appliedHigh = 0;
+    QMetaObject::invokeMethod(m_radio, "txFilterLowHz", Qt::DirectConnection,
+                              Q_RETURN_ARG(int, appliedLow));
+    QMetaObject::invokeMethod(m_radio, "txFilterHighHz", Qt::DirectConnection,
+                              Q_RETURN_ARG(int, appliedHigh));
+    m_pendingNotifications << QStringLiteral("tx_filter_band_ex:%1,%2;")
+        .arg(appliedLow).arg(appliedHigh);
+    return {};
+}
+
+// From Thetis handleFMDeviationEx at TCIServer.cs:4962-4979 [v2.10.3.15] --
+// console.FMDeviation_Hz, 2500 or 5000 only.
+//
+// REFUSED, not stubbed with a plausible number: Longpath has no FM
+// deviation state anywhere.  The FM setup page's deviation combo is inert
+// (DspSetupPages.cpp FmSetupPage ends in disableGroup) and the only FM
+// WDSP calls we make are the squelch pair (RxChannel.cpp:1497-1516).
+// Answering "5000" here would tell a client it can rely on a setting that
+// does not exist, and accepting a set would drop it on the floor.
+QString TciProtocol::handleFmDeviationExCommand(const QStringList& args)
+{
+    Q_UNUSED(args);
+    qCInfo(lcTci) << "TCI fm_deviation_ex refused — Longpath has no FM deviation state "
+                     "(FM setup page inert, only FM squelch is wired)";
+    return {};
+}
+
+// From Thetis handleRunCatCommand at TCIServer.cs:5122-5150 [v2.10.3.15] --
+// hands the text after the first colon to ThreadSafeCatParse and returns
+// "run_cat_ex:<command>,<result>;", or "run_cat_ex:<command>,?;" when the
+// parse throws.
+//
+// Longpath has no CAT parser yet (phase 3K in docs/MASTER-PLAN.md), so
+// every call takes Thetis's own failure branch.  That is a deliberate
+// choice over returning nothing: a client that asked us to run a CAT
+// command learns that the command arrived and could not be answered,
+// which is true, instead of waiting out a timeout.
+QString TciProtocol::handleRunCatExCommand(const QStringList& args)
+{
+    if (args.isEmpty()) { return {}; }
+    // Thetis takes the raw remainder of the message.  Our dispatcher has
+    // already split on commas; CAT commands carry none, so rejoining is
+    // lossless for every command a client can legally send here.
+    QString catCommand = args.join(QLatin1Char(',')).trimmed();
+    while (catCommand.endsWith(QLatin1Char(';'))) {
+        catCommand.chop(1);
+    }
+    if (catCommand.isEmpty()) { return {}; }
+
+    // DOCUMENTED DIVERGENCE from Thetis, found at the wire on 2026-10-11.
+    // Thetis re-adds the terminator the parser stripped (:5133) and then
+    // appends ",<result>;", so its frame carries a semicolon in the middle:
+    //   run_cat_ex:PS;,PS0;
+    // A conforming client splits text frames on ';', so that one frame
+    // arrives as two -- "run_cat_ex:PS" and ",PS0".  Confirmed with
+    // tools/tci_probe against our own server before this was changed.  We
+    // name the command without its terminator, which keeps the frame
+    // well-formed and still tells the client which command was refused.
+    qCInfo(lcTci) << "TCI run_cat_ex" << catCommand
+                  << "— no CAT parser in Longpath yet (phase 3K); answering Thetis's '?' form";
+    return QStringLiteral("run_cat_ex:%1,?;").arg(catCommand);
 }
 
 // ── Phase 12: Spot + CW command stubs ──────────────────────────────────────

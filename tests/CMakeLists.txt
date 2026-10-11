@@ -2788,6 +2788,15 @@ longpath_add_test(tst_app_settings_arbitrary_key_persistence)
 # tst_tci_matrix_runner -- this file pins the PRODUCTION-side wiring.
 longpath_add_test(tst_tci_radio_model_shims)
 
+# ── Thetis v2.10.3.14 bespoke _ex long tail (2026-10-11) ────────────────────
+# Production-side counterpart to the 23 matrix rows added for the eleven
+# *_ex commands Thetis gained in v2.10.3.14: each shim is invoked through
+# QMetaObject::invokeMethod against a real RadioModel +
+# StepAttenuatorController, so a missing Q_INVOKABLE or a wrong sign fails
+# here instead of against a live TCI client.  Includes the counter-check
+# that vfo_sync_ex:false really detaches the follower again.
+longpath_add_test(tst_tci_ex_long_tail)
+
 # ── Phase 3J-1 closeout Item 4 (2026-05-12): per-(band, mode) filter ────────
 # Pins the contract that SliceModel::setDspMode saves the current filter
 # under (currentBand, OLD mode) and restores from (currentBand, NEW mode)

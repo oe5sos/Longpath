@@ -374,6 +374,46 @@ private:
     //   (maintainer-policy decision: TCI client must not be able to close the app).
     QString handleShutdownExCommand();
 
+    // ── Thetis v2.10.3.14 bespoke _ex long tail (2026-10-11) ────────────────
+    //
+    // Eleven commands arrived with Thetis v2.10.3.14 (set switch at
+    // TCIServer.cs:5486-5527, one-arg switch at :5538-5551 [v2.10.3.15]).
+    // Nine are ported here.  The two that are not:
+    //   fm_deviation_ex  -- Longpath has no FM deviation state at all (only
+    //                       FM squelch, RxChannel.cpp:1497); handled by
+    //                       handleFmDeviationExCommand, which refuses rather
+    //                       than inventing a value.
+    //   run_cat_ex       -- needs the Kenwood CAT parser Longpath does not
+    //                       have yet (phase 3K); handleRunCatExCommand
+    //                       answers in Thetis's own failure form.
+
+    // From Thetis handleRxStepAttEnabledEx at TCIServer.cs:4883 [v2.10.3.15].
+    QString handleRxStepAttEnabledExCommand(const QStringList& args);
+    // From Thetis handleRxStepAttEx at TCIServer.cs:4905 [v2.10.3.15].
+    QString handleRxStepAttExCommand(const QStringList& args);
+    // From Thetis handleRxPreampAttEx at TCIServer.cs:4927 [v2.10.3.15].
+    QString handleRxPreampAttExCommand(const QStringList& args);
+    // From Thetis handleRxNBEnable(args, true) at TCIServer.cs:4707
+    // [v2.10.3.15] -- the extended form, three args on set.
+    QString handleRxNbEnableExCommand(const QStringList& args);
+    // From Thetis handleAgcAutoEx at TCIServer.cs:4980 [v2.10.3.15].
+    QString handleAgcAutoExCommand(const QStringList& args);
+    // From Thetis handleVfoSyncEx at TCIServer.cs:4945 [v2.10.3.15].
+    QString handleVfoSyncExCommand(const QStringList& args);
+    // From Thetis handleVfoSwapEx at TCIServer.cs:4958 [v2.10.3.15].
+    QString handleVfoSwapExCommand();
+    // From Thetis handleTXFilterBandEx at TCIServer.cs:4576 [v2.10.3.15].
+    QString handleTxFilterBandExCommand(const QStringList& args);
+    // Refusal paths, see the note above.
+    QString handleFmDeviationExCommand(const QStringList& args);
+    QString handleRunCatExCommand(const QStringList& args);
+
+    // From Thetis normalizeTXFilterBandForSet at TCIServer.cs:2422-2436
+    // [v2.10.3.15]: clamp both edges at zero, swap when inverted, then keep
+    // at least 100 Hz of width.  normalizeTXFilterBandForSend (:2437) only
+    // adds the absolute value, which the caller does before calling in.
+    static void normalizeTxFilterBand(int* lowHz, int* highHz);
+
     // ── Phase 12: Spot + CW stubs ────────────────────────────────────────────
     // All return empty + log at lcTci info; real handlers in Phase 3J-2/3M-2.
     // From Thetis TCIServer.cs:5049 [v2.10.3.13] — spot case in set switch.

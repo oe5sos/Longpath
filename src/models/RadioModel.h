@@ -2238,6 +2238,87 @@ public slots:
     /// (m_diguOffsetHz, default 0 Hz per SliceModel.h:929).
     Q_INVOKABLE int diguOffset() const;
 
+    // ── Thetis v2.10.3.14 bespoke _ex long tail (2026-10-11) ────────────────
+    //
+    // Thetis v2.10.3.14 added eleven new bespoke *_ex TCI commands
+    // (TCIServer.cs:5486-5527 set switch, :5538-5551 one-arg switch
+    // [v2.10.3.15]).  These shims back the eight of them whose state
+    // Longpath actually holds; fm_deviation_ex and run_cat_ex have no
+    // Longpath equivalent yet and are refused in TciProtocol instead of
+    // being faked here.
+    //
+    // RX index semantics follow the rest of this block: 0/1 on the wire,
+    // sliceById(rx) on our side.
+
+    /// Step attenuator on/off.  Thetis keeps SetupForm.RX1EnableAtt /
+    /// RX2EnableAtt (TCIServer.cs:4899-4903 [v2.10.3.15]); Longpath has one
+    /// StepAttenuatorController per radio, so both receivers read and write
+    /// the same latch.  Documented divergence, not an oversight: the
+    /// attenuator is a per-ADC hardware stage and our controller owns it
+    /// radio-wide (StepAttenuatorController.h:196).
+    Q_INVOKABLE void setRxStepAttEnabled(int rx, bool on);
+    Q_INVOKABLE bool rxStepAttEnabled(int rx) const;
+
+    /// Step attenuator value in dB, always positive.  Thetis
+    /// RX1AttenuatorData / RX2AttenuatorData (TCIServer.cs:4914-4926
+    /// [v2.10.3.15]).  The per-rx argument does reach the hardware here --
+    /// StepAttenuatorController::setAttenuation(dB, rx).
+    Q_INVOKABLE void setRxStepAttDb(int rx, int dB);
+    Q_INVOKABLE int  rxStepAttDb(int rx) const;
+
+    /// Preamp attenuation in dB, reported NEGATIVE on the wire (Thetis
+    /// sendRxPreampAttEx at TCIServer.cs:2235 emits
+    /// -preampModeToAttenuation(mode); handleRxPreampAttEx at :4927 refuses
+    /// a positive argument).  Longpath maps the dB value onto
+    /// PreampMode: 0 -> On, 10/20/30/40/50 -> Minus10..Minus50.  We have no
+    /// SA_* preamp modes, so Thetis's SA_MINUS20 sign slip
+    /// (preampModeToAttenuation returns -20 where every sibling returns a
+    /// positive magnitude) has no counterpart to reproduce.
+    Q_INVOKABLE void setRxPreampAttDb(int rx, int dB);
+    Q_INVOKABLE int  rxPreampAttDb(int rx) const;
+
+    /// Noise blanker with an explicit index: 0 = off, 1 = NB, 2 = NB2.
+    /// Thetis GetSelectedNB / SetSelectedNB via handleRxNBEnable at
+    /// TCIServer.cs:4707 [v2.10.3.15]; range 0..2 checked at :4730.
+    /// Longpath's NbMode enum (Off/NB/NB2, NbFamily.cpp:184-187) is the same
+    /// three-state ladder, so the mapping is one-to-one.
+    Q_INVOKABLE void setRxNbIndexed(int rx, bool on, int nbIndex);
+    Q_INVOKABLE int  rxNbIndex(int rx) const;
+
+    /// AGC auto on/off.  Thetis AutoAGCRX1 / AutoAGCRX2 through
+    /// GetAGCAuto / SetAGCAuto at console.cs:52385-52410 [v2.10.3.15];
+    /// Longpath holds it per slice (SliceModel::autoAgcEnabled, itself
+    /// ported from console.cs:45926 m_bAutoAGCRX1).
+    Q_INVOKABLE void setRxAgcAuto(int rx, bool on);
+    Q_INVOKABLE bool rxAgcAuto(int rx) const;
+
+    /// VFO sync -- VFO B follows VFO A.  Thetis chkVFOSync
+    /// (console.cs:12481 [v2.10.3.15]) is radio-global and ties VFO B of the
+    /// one receiver pair.  Longpath has no second VFO per slice (setVfoHz
+    /// ignores chan != 0); VFO B is the second slice.  Sync therefore means
+    /// "slice 1 follows slice 0": turning it on pulls slice 1 to slice 0's
+    /// frequency at once and keeps it there until it is turned off.
+    Q_INVOKABLE void setVfoSync(bool on);
+    Q_INVOKABLE bool vfoSync() const;
+
+    /// Swap VFO A and VFO B.  Thetis VFOSwap at console.cs:35485
+    /// [v2.10.3.15] -> btnVFOSwap_Click: with RX2 enabled it swaps
+    /// frequency, mode and filter between the two receivers.  Longpath does
+    /// the same between slice 0 and slice 1; with only one slice present
+    /// there is nothing to swap and the call is a no-op (Thetis's
+    /// !rx2_enabled branch swaps against its per-receiver VFO B, which we do
+    /// not have).
+    Q_INVOKABLE void vfoSwap();
+
+    /// TX filter band, audio Hz.  Thetis TXFilterLow / TXFilterHigh through
+    /// handleTXFilterBandEx at TCIServer.cs:4576-4594 [v2.10.3.15]; the
+    /// normalisation (absolute value, swap when low > high, keep at least
+    /// 100 Hz of width) lives in TciProtocol so the query path can share it,
+    /// mirroring Thetis normalizeTXFilterBandForSet at TCIServer.cs:2422.
+    Q_INVOKABLE void setTxFilterBand(int lowHz, int highHz);
+    Q_INVOKABLE int  txFilterLowHz() const;
+    Q_INVOKABLE int  txFilterHighHz() const;
+
     // ── Phase 3R Task I5: RadeChannel signal-graph slots ────────────────────
     //
     // Public slots so Qt's auto-connection queues them correctly when the
@@ -3325,6 +3406,13 @@ private:
     class FFTEngine*          m_fftEngine{nullptr};
     class ClarityController*  m_clarityController{nullptr};
     class StepAttenuatorController* m_stepAttController{nullptr};
+
+    // vfo_sync_ex state (Thetis chkVFOSync, console.cs:12481 [v2.10.3.15]).
+    // The connection is held so turning sync off detaches the follower
+    // again; it is re-made on every setVfoSync(true) because slice 0 can be
+    // removed and recreated under us.
+    bool m_vfoSync{false};
+    QMetaObject::Connection m_vfoSyncConn;
 
     // 2026-05-22 spectrum-calibration fix: cache of the last rxMeterOffsetDb
     // value we emitted via rxMeterOffsetChanged. NaN sentinel forces the

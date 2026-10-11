@@ -299,6 +299,82 @@ public:
         return (slice >= 0 && slice < 2) ? m_rxNrIndex[slice] : 1;
     }
 
+    // ── Thetis v2.10.3.14 bespoke _ex long tail (2026-10-11) ────────────────
+    // Mirrors the RadioModel shims one for one so the matrix runner drives
+    // the same wire surface as production.  Where production folds two
+    // receivers onto one radio-wide value (step attenuator, preamp), the
+    // mock keeps both indices separate on purpose: the protocol handler is
+    // what is under test here, not the controller's own fan-out.
+
+    // NB with an explicit index: 0 = off, 1 = NB, 2 = NB2.
+    // From Thetis TCIServer.cs:4707-4739 [v2.10.3.15] — handleRxNBEnable.
+    Q_INVOKABLE void setRxNbIndexed(int slice, bool on, int nbIndex)
+    {
+        if (slice >= 0 && slice < 2) {
+            m_rxNb[slice]      = on;
+            m_rxNbIndex[slice] = on ? nbIndex : 0;
+        }
+    }
+    Q_INVOKABLE int rxNbIndex(int slice) const
+    {
+        return (slice >= 0 && slice < 2) ? m_rxNbIndex[slice] : 0;
+    }
+
+    // Step attenuator latch + value, and preamp attenuation (negative).
+    // From Thetis TCIServer.cs:4883-4944 [v2.10.3.15].
+    Q_INVOKABLE void setRxStepAttEnabled(int slice, bool on)
+    {
+        if (slice >= 0 && slice < 2) { m_rxStepAttEnabled[slice] = on; }
+    }
+    Q_INVOKABLE bool rxStepAttEnabled(int slice) const
+    {
+        return (slice >= 0 && slice < 2) ? m_rxStepAttEnabled[slice] : false;
+    }
+    Q_INVOKABLE void setRxStepAttDb(int slice, int dB)
+    {
+        if (slice >= 0 && slice < 2) { m_rxStepAttDb[slice] = dB; }
+    }
+    Q_INVOKABLE int rxStepAttDb(int slice) const
+    {
+        return (slice >= 0 && slice < 2) ? m_rxStepAttDb[slice] : 0;
+    }
+    Q_INVOKABLE void setRxPreampAttDb(int slice, int dB)
+    {
+        if (slice >= 0 && slice < 2) { m_rxPreampAttDb[slice] = dB; }
+    }
+    Q_INVOKABLE int rxPreampAttDb(int slice) const
+    {
+        return (slice >= 0 && slice < 2) ? m_rxPreampAttDb[slice] : 0;
+    }
+
+    // AGC auto per slice.
+    // From Thetis console.cs:52385-52410 [v2.10.3.15] — Get/SetAGCAuto.
+    Q_INVOKABLE void setRxAgcAuto(int slice, bool on)
+    {
+        if (slice >= 0 && slice < 2) { m_rxAgcAuto[slice] = on; }
+    }
+    Q_INVOKABLE bool rxAgcAuto(int slice) const
+    {
+        return (slice >= 0 && slice < 2) ? m_rxAgcAuto[slice] : false;
+    }
+
+    // VFO sync + swap, radio-global.
+    // From Thetis console.cs:12481 (VFOSync) + :35485 (VFOSwap) [v2.10.3.15].
+    Q_INVOKABLE void setVfoSync(bool on) { m_vfoSync = on; }
+    Q_INVOKABLE bool vfoSync() const     { return m_vfoSync; }
+    Q_INVOKABLE void vfoSwap()           { ++m_vfoSwapCount; }
+    int vfoSwapCount() const             { return m_vfoSwapCount; }
+
+    // TX filter band, audio Hz.
+    // From Thetis TCIServer.cs:4576-4594 [v2.10.3.15].
+    Q_INVOKABLE void setTxFilterBand(int lowHz, int highHz)
+    {
+        m_txFilterLowHz  = lowHz;
+        m_txFilterHighHz = highHz;
+    }
+    Q_INVOKABLE int txFilterLowHz() const  { return m_txFilterLowHz; }
+    Q_INVOKABLE int txFilterHighHz() const { return m_txFilterHighHz; }
+
     // AGC mode string per slice. Canonical values: "off","long","slow","fast","custom","normal".
     // From Thetis TCIServer.cs:4658-4671 [v2.10.3.13] — handleAgcMode.
     Q_INVOKABLE void setAgcMode(int slice, const QString& mode)
@@ -588,6 +664,16 @@ public:
         m_rxAnf = {};
         m_rxNr = {};
         m_rxNrIndex = { 1, 1 };
+        // Thetis v2.10.3.14 _ex long tail.
+        m_rxNbIndex = {};
+        m_rxStepAttEnabled = {};
+        m_rxStepAttDb = {};
+        m_rxPreampAttDb = {};
+        m_rxAgcAuto = {};
+        m_vfoSync = false;
+        m_vfoSwapCount = 0;
+        m_txFilterLowHz = 100;
+        m_txFilterHighHz = 2900;
         m_agcMode = { QStringLiteral("normal"), QStringLiteral("normal") };
         m_agcGain = {};
         m_sqlEnable = {};
@@ -646,6 +732,16 @@ private:
     std::array<bool, 2> m_rxAnf{};
     std::array<bool, 2> m_rxNr{};
     std::array<int, 2>  m_rxNrIndex{1, 1};
+    // Thetis v2.10.3.14 _ex long tail state.
+    std::array<int, 2>  m_rxNbIndex{};
+    std::array<bool, 2> m_rxStepAttEnabled{};
+    std::array<int, 2>  m_rxStepAttDb{};
+    std::array<int, 2>  m_rxPreampAttDb{};
+    std::array<bool, 2> m_rxAgcAuto{};
+    bool m_vfoSync{false};
+    int  m_vfoSwapCount{0};
+    int  m_txFilterLowHz{100};
+    int  m_txFilterHighHz{2900};
     std::array<QString, 2> m_agcMode{QStringLiteral("normal"), QStringLiteral("normal")};
     std::array<int, 2> m_agcGain{};
     std::array<bool, 2> m_sqlEnable{};

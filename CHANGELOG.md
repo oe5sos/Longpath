@@ -4,6 +4,30 @@
 
 ### Added
 
+- **TCI zieht auf Thetis 2.10.3.14/.15 nach: neun neue `*_ex`-Befehle,
+  einer umbenannt.** Thetis hat in 2.10.3.14 elf eigene Befehle
+  dazugenommen und dabei `tx_frequency_thetis` in `tx_frequency_ex`
+  umbenannt (TCIServer.cs:279 traegt die Notiz). Wir sendeten weiter den
+  alten Namen -- jeder Client, der gegen die neue Fassung gebaut ist,
+  erkannte unsere Sendefrequenz nicht mehr. Jetzt neu bedienbar:
+  Schrittdaempfung ein/aus und in dB (`rx_step_att_enabled_ex`,
+  `rx_step_att_ex`), Vorverstaerker-Daempfung (`rx_preamp_att_ex`,
+  negativ auf dem Draht wie bei Thetis), Stoerblanker mit Kennzahl
+  (`rx_nb_enable_ex`, 0/1/2 auf unser Off/NB/NB2), AGC-Automatik
+  (`agc_auto_ex`), VFO-Gleichlauf und -Tausch (`vfo_sync_ex`,
+  `vfo_swap_ex`) und das Sendefilter (`tx_filter_band_ex`, mit Thetis'
+  Normalisierung: Betrag, tauschen wenn verdreht, mindestens 100 Hz
+  Breite). `fm_deviation_ex` und `run_cat_ex` werden abgewiesen statt
+  erfunden: fuer FM-Hub haben wir ueberhaupt keinen Zustand (die
+  FM-Seite im Setup ist taub, nur die FM-Rauschsperre ist verdrahtet),
+  und `run_cat_ex` braucht die CAT-Maschine, die uns noch ganz fehlt --
+  dort antworten wir in Thetis' eigener Fehlerform `run_cat_ex:<cmd>,?;`,
+  damit ein Client nicht in die Zeitueberschreitung laeuft.
+  Belegt durch 23 neue Zeilen der TCI-Matrix plus einen eigenen
+  Pruefstand auf der Produktionsseite (`tst_tci_ex_long_tail`), darunter
+  die Gegenprobe, dass `vfo_sync_ex:false` den Gleichlauf wirklich
+  wieder loest.
+
 - **⤢ in jeder schwebenden Titelleiste: volle Groesse und zurueck.**
   Betreiber 2026-09-17: "man sollte auch immer das fenster auf die
   volle größe anpassen können, geht aber so nicht." Ein Klick fuellt

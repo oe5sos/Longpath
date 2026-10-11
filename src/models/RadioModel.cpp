@@ -13865,6 +13865,251 @@ int RadioModel::diguOffset() const
 }
 
 // ---------------------------------------------------------------------------
+// Thetis v2.10.3.14 bespoke _ex long tail (2026-10-11).
+//
+// Eight shims backing the TCI commands Thetis added in v2.10.3.14.  Each
+// one is a thin wrapper over state Longpath already owns; where Thetis
+// splits a value per receiver and we do not (or the other way round), the
+// divergence is named at the declaration in RadioModel.h and repeated here
+// only where the code would otherwise read as a bug.
+// ---------------------------------------------------------------------------
+
+// From Thetis handleRxStepAttEnabledEx at TCIServer.cs:4883-4904
+// [v2.10.3.15] -- SetupForm.RX1EnableAtt / RX2EnableAtt.
+void RadioModel::setRxStepAttEnabled(int rx, bool on)
+{
+    if (rx < 0 || rx > 1) {
+        return;
+    }
+    if (!m_stepAttController) {
+        return;
+    }
+    // One controller per radio: both wire indices drive the same latch.
+    m_stepAttController->setStepAttEnabled(on);
+}
+
+bool RadioModel::rxStepAttEnabled(int rx) const
+{
+    if (rx < 0 || rx > 1) {
+        return false;
+    }
+    if (!m_stepAttController) {
+        return false;
+    }
+    return m_stepAttController->stepAttEnabled();
+}
+
+// From Thetis handleRxStepAttEx at TCIServer.cs:4905-4926 [v2.10.3.15] --
+// RX1AttenuatorData / RX2AttenuatorData.  Thetis refuses a negative value
+// ("attenuation is always a +ve value, -ve attenuation would be gain !",
+// TCIServer.cs:4921); TciProtocol applies that check before calling here.
+void RadioModel::setRxStepAttDb(int rx, int dB)
+{
+    if (rx < 0 || rx > 1) {
+        return;
+    }
+    if (!m_stepAttController) {
+        return;
+    }
+    m_stepAttController->setAttenuation(dB, rx);
+}
+
+int RadioModel::rxStepAttDb(int rx) const
+{
+    if (rx < 0 || rx > 1) {
+        return 0;
+    }
+    if (!m_stepAttController) {
+        return 0;
+    }
+    return m_stepAttController->attenuatorDb();
+}
+
+// From Thetis handleRxPreampAttEx at TCIServer.cs:4927-4944 [v2.10.3.15] --
+// SetATT(rx + 1, |att|, SetAttMode.PREAMP_MODE).
+void RadioModel::setRxPreampAttDb(int rx, int dB)
+{
+    if (rx < 0 || rx > 1) {
+        return;
+    }
+    if (!m_stepAttController) {
+        return;
+    }
+    const int magnitude = std::abs(dB);
+    Longpath::PreampMode mode = Longpath::PreampMode::On;
+    switch (magnitude) {
+        case 0:  mode = Longpath::PreampMode::On;      break;
+        case 10: mode = Longpath::PreampMode::Minus10; break;
+        case 20: mode = Longpath::PreampMode::Minus20; break;
+        case 30: mode = Longpath::PreampMode::Minus30; break;
+        case 40: mode = Longpath::PreampMode::Minus40; break;
+        case 50: mode = Longpath::PreampMode::Minus50; break;
+        default:
+            // Thetis hands the magnitude to SetATT, which clamps against the
+            // board's own preamp item list.  We have no such ladder here, so
+            // an off-step value is refused rather than silently rounded to a
+            // neighbouring gain setting.
+            return;
+    }
+    m_stepAttController->setPreampMode(mode);
+}
+
+// Reported negative, per Thetis sendRxPreampAttEx at TCIServer.cs:2235
+// [v2.10.3.15] (it emits -preampModeToAttenuation(mode)).
+int RadioModel::rxPreampAttDb(int rx) const
+{
+    if (rx < 0 || rx > 1) {
+        return 0;
+    }
+    if (!m_stepAttController) {
+        return 0;
+    }
+    // From Thetis preampModeToAttenuation at TCIServer.cs:2457-2484
+    // [v2.10.3.15].  HPSDR_OFF reports 20 dB there, same as HPSDR_MINUS20 --
+    // the preamp being off IS the 20 dB pad on HPSDR boards.
+    int magnitude = 0;
+    switch (m_stepAttController->preampMode()) {
+        case Longpath::PreampMode::Off:      magnitude = 20; break;
+        case Longpath::PreampMode::On:       magnitude = 0;  break;
+        case Longpath::PreampMode::Minus10:  magnitude = 10; break;
+        case Longpath::PreampMode::Minus20:  magnitude = 20; break;
+        case Longpath::PreampMode::Minus30:  magnitude = 30; break;
+        case Longpath::PreampMode::Minus40:  magnitude = 40; break;
+        case Longpath::PreampMode::Minus50:  magnitude = 50; break;
+    }
+    return -magnitude;
+}
+
+// From Thetis handleRxNBEnable at TCIServer.cs:4707-4739 [v2.10.3.15] --
+// GetSelectedNB / SetSelectedNB, nb range 0..2.
+void RadioModel::setRxNbIndexed(int rx, bool on, int nbIndex)
+{
+    SliceModel* const slice = sliceById(rx);
+    if (!slice) {
+        return;
+    }
+    if (!on) {
+        slice->setNbMode(Longpath::NbMode::Off);
+        return;
+    }
+    slice->setNbMode(nbIndex == 2 ? Longpath::NbMode::NB2
+                                  : Longpath::NbMode::NB);
+}
+
+int RadioModel::rxNbIndex(int rx) const
+{
+    const SliceModel* const slice = sliceById(rx);
+    if (!slice) {
+        return 0;
+    }
+    switch (slice->nbMode()) {
+        case Longpath::NbMode::Off: return 0;
+        case Longpath::NbMode::NB:  return 1;
+        case Longpath::NbMode::NB2: return 2;
+    }
+    return 0;
+}
+
+// From Thetis SetAGCAuto / GetAGCAuto at console.cs:52385-52410
+// [v2.10.3.15] -- AutoAGCRX1 / AutoAGCRX2.
+void RadioModel::setRxAgcAuto(int rx, bool on)
+{
+    if (SliceModel* const slice = sliceById(rx)) {
+        slice->setAutoAgcEnabled(on);
+    }
+}
+
+bool RadioModel::rxAgcAuto(int rx) const
+{
+    if (const SliceModel* const slice = sliceById(rx)) {
+        return slice->autoAgcEnabled();
+    }
+    return false;
+}
+
+// From Thetis VFOSync at console.cs:12481 [v2.10.3.15].  See the
+// declaration for why "VFO B" is slice 1 here.
+void RadioModel::setVfoSync(bool on)
+{
+    if (m_vfoSync == on) {
+        return;
+    }
+    m_vfoSync = on;
+
+    if (m_vfoSyncConn) {
+        disconnect(m_vfoSyncConn);
+        m_vfoSyncConn = QMetaObject::Connection();
+    }
+    if (!on) {
+        return;
+    }
+
+    SliceModel* const a = sliceById(0);
+    if (!a) {
+        // Sync is remembered even with no slice to follow yet; the next
+        // setVfoSync(true) (or a reconnect that re-runs it) re-attaches.
+        return;
+    }
+    if (SliceModel* const b = sliceById(1)) {
+        b->setFrequency(a->frequency());
+    }
+    m_vfoSyncConn = connect(a, &SliceModel::frequencyChanged, this,
+                            [this](double freq) {
+        if (!m_vfoSync) {
+            return;
+        }
+        if (SliceModel* const follower = sliceById(1)) {
+            follower->setFrequency(freq);
+        }
+    });
+}
+
+bool RadioModel::vfoSync() const
+{
+    return m_vfoSync;
+}
+
+// From Thetis VFOSwap at console.cs:35485 -> btnVFOSwap_Click at
+// console.cs:35489-35552 [v2.10.3.15].  We take the rx2_enabled branch:
+// frequency and mode change places between the two receivers.  Thetis also
+// swaps the filter there; Longpath's filter edges live per slice and per
+// mode, so the mode swap carries each slice's own filter with it.
+void RadioModel::vfoSwap()
+{
+    SliceModel* const a = sliceById(0);
+    SliceModel* const b = sliceById(1);
+    if (!a || !b) {
+        return;
+    }
+    const double          aFreq = a->frequency();
+    const Longpath::DSPMode aMode = a->dspMode();
+
+    a->setFrequency(b->frequency());
+    a->setDspMode(b->dspMode());
+    b->setFrequency(aFreq);
+    b->setDspMode(aMode);
+}
+
+// From Thetis handleTXFilterBandEx at TCIServer.cs:4576-4594 [v2.10.3.15].
+// The values arrive already normalised (TciProtocol runs the port of
+// normalizeTXFilterBandForSet at TCIServer.cs:2422).
+void RadioModel::setTxFilterBand(int lowHz, int highHz)
+{
+    m_transmitModel.setFilterLow(lowHz);
+    m_transmitModel.setFilterHigh(highHz);
+}
+
+int RadioModel::txFilterLowHz() const
+{
+    return m_transmitModel.filterLow();
+}
+
+int RadioModel::txFilterHighHz() const
+{
+    return m_transmitModel.filterHigh();
+}
+
+// ---------------------------------------------------------------------------
 // completeTuneOff — Thetis-faithful TUN-off completion (issue #177).
 //
 // Invoked from a QTimer::singleShot(m_tuneOffSettleMs) chained off

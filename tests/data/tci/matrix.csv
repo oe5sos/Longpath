@@ -86,3 +86,26 @@ tx_profile_ex_query,tx_profile_ex;,tx_profile_ex:Default;,,TCIServer.cs:5193 [v2
 tx_profiles_ex_query,tx_profiles_ex;,tx_profiles_ex:Default;,,TCIServer.cs:5187 [v2.10.3.13],1-arg query in query switch returns CSV of available profiles; handleTXProfiles at TCIServer.cs:4748 [v2.10.3.13]
 calibration_ex_rx0,calibration_ex:0;,,calibration_ex:0\,0.000000\,0.000000\,0.000000\,0.000000\,0.000000;,TCIServer.cs:5124 [v2.10.3.13],1-arg set (rx only); handleCalibration at TCIServer.cs:4776 [v2.10.3.13]; CalibrationChanged queries 5 floats at TCIServer.cs:1152 [v2.10.3.13]; F6 C-locale per sendCalibration at TCIServer.cs:4766 [v2.10.3.13]
 shutdown_ex_stub,shutdown_ex;,,,TCIServer.cs:5190 [v2.10.3.13],STUB; logs warning + returns empty (does NOT actually shut down server); handleShutdown at TCIServer.cs:4752 [v2.10.3.13]; maintainer-policy decision deferred to Phase 24+
+rx_step_att_enabled_ex_set_rx0,rx_step_att_enabled_ex:0\,true;,,rx_step_att_enabled_ex:0\,true;,TCIServer.cs:5486 [v2.10.3.15],set step-att latch on rx0; handleRxStepAttEnabledEx at TCIServer.cs:4883 [v2.10.3.15]
+rx_step_att_enabled_ex_query_after_set,rx_step_att_enabled_ex:0\,true;;rx_step_att_enabled_ex:0;,rx_step_att_enabled_ex:0\,true;,,TCIServer.cs:4890 [v2.10.3.15],1-arg query path inside the set handler; sendRxStepAttEnabledEx at TCIServer.cs:2240
+rx_step_att_ex_set_rx0_12db,rx_step_att_ex:0\,12;,,rx_step_att_ex:0\,12;,TCIServer.cs:5489 [v2.10.3.15],set attenuator to 12 dB; handleRxStepAttEx at TCIServer.cs:4905
+rx_step_att_ex_query_after_set,rx_step_att_ex:0\,12;;rx_step_att_ex:0;,rx_step_att_ex:0\,12;,,TCIServer.cs:2230 [v2.10.3.15],sendRxStepAttEx reports Math.Abs(attenuation)
+rx_step_att_ex_negative_refused,rx_step_att_ex:0\,-3;,,,TCIServer.cs:4921 [v2.10.3.15],"attenuation is always a +ve value" -- refused\, no state change\, no frame
+rx_preamp_att_ex_set_rx0_minus20,rx_preamp_att_ex:0\,-20;,,rx_preamp_att_ex:0\,-20;,TCIServer.cs:5492 [v2.10.3.15],set 20 dB preamp pad; handleRxPreampAttEx at TCIServer.cs:4927 takes Math.Abs
+rx_preamp_att_ex_query_after_set,rx_preamp_att_ex:0\,-20;;rx_preamp_att_ex:0;,rx_preamp_att_ex:0\,-20;,,TCIServer.cs:2235 [v2.10.3.15],sendRxPreampAttEx emits the negated magnitude
+rx_preamp_att_ex_positive_refused,rx_preamp_att_ex:0\,10;,,,TCIServer.cs:4942 [v2.10.3.15],positive argument would be gain\, not attenuation -- refused
+rx_nb_enable_ex_set_rx0_nb2,rx_nb_enable_ex:0\,true\,2;,,rx_nb_enable_ex:0\,true\,2;,TCIServer.cs:5477 [v2.10.3.15],NB2 selected on rx0; handleRxNBEnable(args\,true) at TCIServer.cs:4707
+rx_nb_enable_ex_query_after_set,rx_nb_enable_ex:0\,true\,2;;rx_nb_enable_ex:0;,rx_nb_enable_ex:0\,true\,2;,rx_nb_enable:0\,true;,TCIServer.cs:4718 [v2.10.3.15],query emits both forms (sendNBEnable twice)\, like the NR family
+rx_nb_enable_ex_index_out_of_range,rx_nb_enable_ex:0\,true\,3;,,,TCIServer.cs:4730 [v2.10.3.15],nb range is 0..2; 3 is refused
+agc_auto_ex_set_rx1,agc_auto_ex:1\,true;,,agc_auto_ex:1\,true;,TCIServer.cs:5501 [v2.10.3.15],handleAgcAutoEx at TCIServer.cs:4980 -> SetAGCAuto(rx+1\,state)
+agc_auto_ex_query_after_set,agc_auto_ex:1\,true;;agc_auto_ex:1;,agc_auto_ex:1\,true;,,TCIServer.cs:2255 [v2.10.3.15],sendAgcAutoEx
+vfo_sync_ex_set_true,vfo_sync_ex:true;,,vfo_sync_ex:true;,TCIServer.cs:5495 [v2.10.3.15],radio-global\, no rx index; handleVfoSyncEx at TCIServer.cs:4945
+vfo_sync_ex_query_no_args,vfo_sync_ex:true;;vfo_sync_ex;,vfo_sync_ex:true;,,TCIServer.cs:5547 [v2.10.3.15],no-argument case in the 1-arg switch passes null -> query
+vfo_swap_ex_no_args,vfo_swap_ex;,,,TCIServer.cs:5550 [v2.10.3.15],console.VFOSwap()\, no reply; the swap itself is covered by tst_tci_ex_long_tail
+tx_filter_band_ex_set,tx_filter_band_ex:300\,2700;,,tx_filter_band_ex:300\,2700;,TCIServer.cs:5453 [v2.10.3.15],handleTXFilterBandEx at TCIServer.cs:4576
+tx_filter_band_ex_normalises_inverted,tx_filter_band_ex:2700\,300;,,tx_filter_band_ex:300\,2700;,TCIServer.cs:2422 [v2.10.3.15],normalizeTXFilterBandForSet swaps low>high
+tx_filter_band_ex_minimum_width,tx_filter_band_ex:300\,320;,,tx_filter_band_ex:300\,400;,TCIServer.cs:2434 [v2.10.3.15],"if (high < low + 100) high = low + 100"
+tx_filter_band_ex_query_no_args,tx_filter_band_ex:300\,2700;;tx_filter_band_ex;,tx_filter_band_ex:300\,2700;,,TCIServer.cs:5538 [v2.10.3.15],no-argument query -> sendTXFilterBandEx at TCIServer.cs:2443
+tx_filter_band_ex_one_arg_refused,tx_filter_band_ex:300;,,,TCIServer.cs:4579 [v2.10.3.15],"args.Length != 0 && args.Length != 2" -> dropped
+fm_deviation_ex_refused,fm_deviation_ex:0\,5000;,,,TCIServer.cs:5498 [v2.10.3.15],Longpath has no FM deviation state (FM setup page inert\, only FM squelch wired) -- refused rather than faked
+run_cat_ex_no_cat_parser_yet,run_cat_ex:PS;,run_cat_ex:PS\,?;,,TCIServer.cs:5146 [v2.10.3.15],Thetis' own catch branch; Longpath has no CAT parser until phase 3K. DIVERGENCE: Thetis keeps the command's ';' ("run_cat_ex:PS;\,?;")\, which splits into two frames at any conforming client -- confirmed at the wire 2026-10-11\; we drop it
