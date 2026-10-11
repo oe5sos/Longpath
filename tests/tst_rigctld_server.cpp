@@ -343,6 +343,21 @@ private slots:
         QCOMPARE(slice->dspMode(), DSPMode::LSB);
     }
 
+    void a_set_that_cannot_take_is_refused()
+    {
+        // No slice at all -- a client that connected before the radio.
+        // RPRT 0 here would be invisible to the client: Hamlib answers
+        // its own `f` from its frequency cache and would report the value
+        // it asked for. Measured against the running app on 2026-10-11:
+        // rigctl said 18100000 while the radio still held 0.
+        RadioModel radio;
+        RigctldServer s(&radio);
+
+        QCOMPARE(s.handleLine(QStringLiteral("F 14250000")), QStringLiteral("RPRT -1\n"));
+        QCOMPARE(s.handleLine(QStringLiteral("f")), QStringLiteral("0\n"));
+        QCOMPARE(s.handleLine(QStringLiteral("M CW 500")), QStringLiteral("RPRT -1\n"));
+    }
+
     void a_taken_port_fails_cleanly()
     {
         TestMockRadioModel mock;

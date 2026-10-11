@@ -24,6 +24,7 @@ Q_LOGGING_CATEGORY(lcMeter,      "longpath.meter")
 Q_LOGGING_CATEGORY(lcMmio,       "longpath.mmio")
 Q_LOGGING_CATEGORY(lcTci,        "longpath.tci")
 Q_LOGGING_CATEGORY(lcRigctld,    "longpath.rigctld")
+Q_LOGGING_CATEGORY(lcCat,        "longpath.cat")
 Q_LOGGING_CATEGORY(lcSpots,      "longpath.spots")
 Q_LOGGING_CATEGORY(lcAutomation, "longpath.automation")
 
@@ -68,6 +69,8 @@ LogManager::LogManager()
           QStringLiteral("Dev automation bridge (LONGPATH_AUTOMATION) -- widget-tree dump, screen capture"), false },
         { QStringLiteral("longpath.rigctld"), QStringLiteral("rigctld"),
           QStringLiteral("Hamlib rigctld bridge -- clients, commands, refused PTT"), false },
+        { QStringLiteral("longpath.cat"), QStringLiteral("CAT"),
+          QStringLiteral("Kenwood-style CAT server -- clients, commands, refused TX"), false },
     };
 }
 

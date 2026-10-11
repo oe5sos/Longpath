@@ -24,6 +24,7 @@
 #include <QStringList>
 
 #include "TciVfoCoalescer.h"
+#include "CatParser.h"
 
 namespace Longpath {
 
@@ -404,8 +405,12 @@ private:
     QString handleVfoSwapExCommand();
     // From Thetis handleTXFilterBandEx at TCIServer.cs:4576 [v2.10.3.15].
     QString handleTxFilterBandExCommand(const QStringList& args);
-    // Refusal paths, see the note above.
+    // Refusal path, see the note above.
     QString handleFmDeviationExCommand(const QStringList& args);
+    // run_cat_ex runs ONE Kenwood CAT command through CatParser (phase 3K
+    // landed it on 2026-10-11). The parser instance here keeps its
+    // transmit gate SHUT and nothing opens it: a TCI client must not gain
+    // a second way to key the radio by wrapping `TX;` in run_cat_ex.
     QString handleRunCatExCommand(const QStringList& args);
 
     // From Thetis normalizeTXFilterBandForSet at TCIServer.cs:2422-2436
@@ -711,6 +716,11 @@ private:
     // throttle at TCIServer.cs:1722-1727 [v2.10.3.13]). Layers 1+2 subsumed
     // by Qt event loop + 5ms TciServer drain timer.
     TciVfoCoalescer m_vfoCoalescer;
+
+    // One CAT parser for run_cat_ex, built on the same radio pointer.
+    // Its transmit gate stays shut for the life of this object -- see the
+    // note on handleRunCatExCommand.
+    CatParser m_catParser;
     int m_setDispatchCount{0};
     int m_queryDispatchCount{0};
 };

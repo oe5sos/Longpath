@@ -61,6 +61,9 @@ public:
     /// werden gemerkt und beim Bau nachgespielt (wie m_pendingTciServer).
     void setRigctldStatus(bool running, quint16 port, int clients);
 
+    /// Phase 3K: dasselbe fuer den Kenwood-CAT-Server.
+    void setCatStatus(bool running, quint16 port, int clients);
+
 signals:
     // Phase 3M-3a-ii Batch 6 (Task 3): forwarded from CfcSetupPage's
     // [Configure CFC bands…] button.  MainWindow connects this to the
@@ -93,6 +96,12 @@ signals:
     void rigctldEnableToggled(bool on, quint16 port);
     void rigctldBindOrPortChanged(const QString& bindAddress, quint16 port);
     void rigctldPttAllowedToggled(bool allowed);
+
+    // Phase 3K, zweiter Schritt (2026-10-11): derselbe Satz fuer den
+    // Kenwood-CAT-Server.
+    void catEnableToggled(bool on, quint16 port);
+    void catBindOrPortChanged(const QString& bindAddress, quint16 port);
+    void catTxAllowedToggled(bool allowed);
 
     // Task 3.6: forwarded from GeneralOptionsPage — CPU meter rate spinbox.
     // MainWindow::setCpuTimerIntervalHz() is the handler.
@@ -185,6 +194,9 @@ private:
     bool    m_rigctldRunning = false;
     quint16 m_rigctldPort    = 0;
     int     m_rigctldClients = 0;
+    bool    m_catRunning = false;
+    quint16 m_catPort    = 0;
+    int     m_catClients = 0;
 
     // Phase 8 of #167: PA category nav-tree root + 3 child items, plus
     // the page widgets themselves so applyPaVisibility() can toggle each.

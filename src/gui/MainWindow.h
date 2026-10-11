@@ -145,6 +145,7 @@ class QsoUploader;
 // forward-declare unconditionally; m_tciServer is nullptr in non-WebSocket builds).
 class TciServer;
 class RigctldServer;   // Phase 3K: Hamlib-rigctld-Bruecke
+class CatServer;       // Phase 3K: Kenwood-CAT ueber TCP
 class TciApplet;
 class ClientChainApplet;
 // 2026-08-24: TciClient — Longpath als TCI-CLIENT auf ExpertSDR2/SunSDR2 QRP
@@ -1604,6 +1605,7 @@ private:
     // der TCI-Server haengt sie an keinem #ifdef -- sie braucht nur
     // Qt6::Network, das immer da ist.
     RigctldServer*     m_rigctldServer{nullptr};
+    CatServer*         m_catServer{nullptr};
     TciApplet*         m_tciApplet{nullptr};
     ClientChainApplet* m_clientChainApplet{nullptr};
 

@@ -293,6 +293,7 @@ warren@wpratt.com
 #include "core/ReceiverManager.h"
 #include "core/AppSettings.h"
 #include "core/RigctldServer.h"
+#include "core/CatServer.h"
 #include "core/BuildIdentity.h"
 #include "core/PaTempUnit.h"
 #include "core/RadioStatus.h"
@@ -997,6 +998,34 @@ MainWindow::MainWindow(QWidget* parent)
         if (enabled && m_rigctldServer->start(bindAddr, port)) {
             m_rigctldServer->setPttAllowed(
                 s.value(QStringLiteral("RigctldAllowPtt"),
+                        QStringLiteral("False")).toString() == QStringLiteral("True"));
+        }
+    }
+
+    // ── Phase 3K, zweiter Schritt: Kenwood-CAT ueber TCP ────────────────────
+    // Gleiche Bauart, eigener Port und eigenes Sendetor. 13013 ist der
+    // Port, den Thetis fuer seinen TCP-CAT-Server nimmt (setup.cs:22396
+    // [v2.10.3.15-5-g852bf0e]), damit Thetis-gewohnte Programme uns ohne
+    // Umstellung finden.
+    {
+        auto& s = AppSettings::instance();
+        m_catServer = new CatServer(m_radioModel, this);
+
+        const bool enabled = s.value(QStringLiteral("CatServerEnabled"),
+                                     QStringLiteral("False")).toString()
+                             == QStringLiteral("True");
+        const quint16 port = static_cast<quint16>(
+            s.value(QStringLiteral("CatServerPort"),
+                    QStringLiteral("13013")).toString().toUShort());
+        const QString bindStr = s.value(QStringLiteral("CatServerBindAddress"),
+                                        QStringLiteral("127.0.0.1")).toString();
+        QHostAddress bindAddr;
+        if (!bindAddr.setAddress(bindStr)) {
+            bindAddr = QHostAddress(QHostAddress::LocalHost);
+        }
+        if (enabled && m_catServer->start(bindAddr, port)) {
+            m_catServer->setPttAllowed(
+                s.value(QStringLiteral("CatServerAllowTx"),
                         QStringLiteral("False")).toString() == QStringLiteral("True"));
         }
     }
@@ -11852,6 +11881,61 @@ void MainWindow::wireSetupDialog(SetupDialog* dialog)
                 dialog, [pushStatus](bool) { pushStatus(); });
         connect(m_rigctldServer, &RigctldServer::clientCountChanged,
                 dialog, [pushStatus](int) { pushStatus(); });
+    }
+
+    // ── Phase 3K, zweiter Schritt: Kenwood-CAT ──────────────────────────────
+    if (m_catServer) {
+        connect(dialog, &SetupDialog::catEnableToggled,
+                this, [this](bool on, quint16 port) {
+                    if (!on) {
+                        m_catServer->stop();
+                        return;
+                    }
+                    auto& s = AppSettings::instance();
+                    const QString bindStr = s.value(
+                        QStringLiteral("CatServerBindAddress"),
+                        QStringLiteral("127.0.0.1")).toString();
+                    QHostAddress bindAddr;
+                    if (!bindAddr.setAddress(bindStr)) {
+                        bindAddr = QHostAddress(QHostAddress::LocalHost);
+                    }
+                    if (m_catServer->start(bindAddr, port)) {
+                        m_catServer->setPttAllowed(
+                            s.value(QStringLiteral("CatServerAllowTx"),
+                                    QStringLiteral("False")).toString()
+                            == QStringLiteral("True"));
+                    }
+                });
+        connect(dialog, &SetupDialog::catBindOrPortChanged,
+                this, [this](const QString& bindStr, quint16 port) {
+                    if (!m_catServer->isListening()) {
+                        return;
+                    }
+                    QHostAddress bindAddr;
+                    if (!bindAddr.setAddress(bindStr)) {
+                        bindAddr = QHostAddress(QHostAddress::LocalHost);
+                    }
+                    const bool tx = m_catServer->pttAllowed();
+                    m_catServer->stop();
+                    if (m_catServer->start(bindAddr, port)) {
+                        m_catServer->setPttAllowed(tx);
+                    }
+                });
+        connect(dialog, &SetupDialog::catTxAllowedToggled,
+                this, [this](bool allowed) {
+                    m_catServer->setPttAllowed(allowed);
+                });
+
+        const auto pushCatStatus = [this, dialog]() {
+            dialog->setCatStatus(m_catServer->isListening(),
+                                 m_catServer->port(),
+                                 m_catServer->clientCount());
+        };
+        pushCatStatus();
+        connect(m_catServer, &CatServer::listeningChanged,
+                dialog, [pushCatStatus](bool) { pushCatStatus(); });
+        connect(m_catServer, &CatServer::clientCountChanged,
+                dialog, [pushCatStatus](int) { pushCatStatus(); });
     }
 }
 

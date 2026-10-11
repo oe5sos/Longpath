@@ -180,6 +180,9 @@ public:
     /// Live status from MainWindow. Idempotent.
     void setRigctldStatus(bool running, quint16 port, int clients);
 
+    /// Live status of the Kenwood CAT server. Idempotent.
+    void setCatStatus(bool running, quint16 port, int clients);
+
 signals:
     /// Operator toggled the enable checkbox. `port` is the value shown
     /// in the spinbox, already persisted.
@@ -193,12 +196,25 @@ signals:
     /// Operator opened or closed the transmit gate.
     void rigctldPttAllowedToggled(bool allowed);
 
+    // Phase 3K, zweiter Schritt (2026-10-11): derselbe Satz Signale fuer
+    // den Kenwood-CAT-Server, der neben rigctld auf der Seite sitzt.
+    void catEnableToggled(bool on, quint16 port);
+    void catBindOrPortChanged(const QString& bindAddress, quint16 port);
+    void catTxAllowedToggled(bool allowed);
+
 private:
     QCheckBox* m_enableCheck{nullptr};
     QLineEdit* m_bindIpEdit{nullptr};
     QSpinBox*  m_portSpin{nullptr};
     QCheckBox* m_pttCheck{nullptr};
     QLabel*    m_statusLabel{nullptr};
+
+    // Kenwood-CAT-Gruppe
+    QCheckBox* m_catEnableCheck{nullptr};
+    QLineEdit* m_catBindIpEdit{nullptr};
+    QSpinBox*  m_catPortSpin{nullptr};
+    QCheckBox* m_catTxCheck{nullptr};
+    QLabel*    m_catStatusLabel{nullptr};
 
     void buildUI();
 };

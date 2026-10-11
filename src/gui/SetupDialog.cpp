@@ -811,7 +811,14 @@ void SetupDialog::buildTree()
                 this, &SetupDialog::rigctldBindOrPortChanged);
         connect(page, &CatTcpIpPage::rigctldPttAllowedToggled,
                 this, &SetupDialog::rigctldPttAllowedToggled);
+        connect(page, &CatTcpIpPage::catEnableToggled,
+                this, &SetupDialog::catEnableToggled);
+        connect(page, &CatTcpIpPage::catBindOrPortChanged,
+                this, &SetupDialog::catBindOrPortChanged);
+        connect(page, &CatTcpIpPage::catTxAllowedToggled,
+                this, &SetupDialog::catTxAllowedToggled);
         page->setRigctldStatus(m_rigctldRunning, m_rigctldPort, m_rigctldClients);
+        page->setCatStatus(m_catRunning, m_catPort, m_catClients);
         return page;
     });
     registerPage(cat, "MIDI Control", [] { return new CatMidiControlPage;  });
@@ -933,6 +940,17 @@ void SetupDialog::setRigctldStatus(bool running, quint16 port, int clients)
     m_rigctldClients = clients;
     if (m_rigctldPage) {
         m_rigctldPage->setRigctldStatus(running, port, clients);
+    }
+}
+
+// Phase 3K, zweiter Schritt (2026-10-11): Status des Kenwood-CAT-Servers.
+void SetupDialog::setCatStatus(bool running, quint16 port, int clients)
+{
+    m_catRunning = running;
+    m_catPort    = port;
+    m_catClients = clients;
+    if (m_rigctldPage) {
+        m_rigctldPage->setCatStatus(running, port, clients);
     }
 }
 

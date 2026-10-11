@@ -76,6 +76,22 @@ Und im Protokoll der App, mit geschlossenem Tor:
 WRN: RigctldServer: refused PTT — transmit over rigctld is turned off
 ```
 
+## Richtigstellung vom selben Tag (CAT-Lauf)
+
+Der Lauf oben liest sich so, als seien Frequenz und Modus gesetzt
+worden. Für die **Frequenz** stimmt das im unverbundenen Zustand
+**nicht**: `f` kam aus **hamlibs eigenem Frequenzcache**. Gegenprobe
+über die CAT-Brücke, gleiche App, gleicher Moment: `F 18100000` über
+rigctld, `f` antwortet 18100000 — `FA;` über CAT antwortet
+`FA00000000000;`. Ohne Funkgerät gibt es keinen Slice, und das Setzen
+ging ins Leere.
+
+Behoben: die rigctld-Brücke liest nach jedem Setzen zurück und
+antwortet `RPRT -1`, wenn es nicht gegriffen hat (Prüffall
+`a_set_that_cannot_take_is_refused`). Der Modus war davon nicht
+betroffen — dort wurde ohne Cache gefragt, und der Prüfstand gegen ein
+echtes RadioModel **mit** Slice zeigt, dass beides wirkt.
+
 ## Das Sendetor
 
 - Standard: **zu**. Lesen und Abstimmen geht, Tasten nicht.

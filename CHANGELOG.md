@@ -4,6 +4,25 @@
 
 ### Added
 
+- **CAT im Kenwood-Dialekt, neben rigctld.** Zweiter Schritt der Phase
+  3K und der Weg fuer alles, was nicht Hamlib spricht: Setup > CAT &
+  Network > TCP/IP CAT hat jetzt zwei Gruppen, rigctld und CAT. Portiert
+  sind ID, IF (die 35-Byte-Statuszeile, Feldbreiten verbatim aus
+  Thetis), FA, FB, FR, FT, MD, PS, AI, TX und RX; alles andere antwortet
+  `?;`, genau wie Thetis bei einem Befehl, den es nicht kennt. Port
+  13013 wie bei Thetis, damit dort eingerichtete Programme uns ohne
+  Umstellung finden.
+  Auch hier ist **das Senden standardmaessig gesperrt**, mit eigenem
+  Schalter neben dem von rigctld; `RX;` (entkeyen) geht immer. Der Weg
+  ueber TCI (`run_cat_ex`) fuehrt jetzt wirklich CAT-Befehle aus --
+  vorher wurde er abgewiesen -- behaelt aber sein Tor dauerhaft zu:
+  `TX;` in eine TCI-Nachricht zu wickeln ist kein Weg um die
+  CAT-Freigabe herum.
+  Belegt mit einem Rohclient und mit hamlibs echtem TS-2000-Treiber
+  ueber TCP (`rigctl -m 2014`), der Frequenz, Modus mit
+  Durchlassbreite, PTT und VFO fehlerfrei liest. Protokoll in
+  `docs/architecture/2026-10-11-cat-verification/`.
+
 - **Longpath spricht jetzt rigctld: Logbuch-, Contest- und
   Digimode-Programme koennen das Geraet steuern.** Erster Schritt der
   Phase 3K. Setup > CAT & Network > TCP/IP CAT ist keine Attrappe mehr:
@@ -28,6 +47,14 @@
   Kenwood-CAT-Befehlssatz folgt als naechster Schritt.
 
 ### Fixed
+
+- **rigctld meldete Erfolg, wo nichts ankam.** Das Setzen von Frequenz
+  und Modus wurde quittiert, ohne zu pruefen, ob es gewirkt hat -- und
+  ein Hamlib-Client merkt das nicht, weil er seine eigene Frequenz aus
+  dem Cache zurueckliest. Im unverbundenen Zustand (kein Slice) sagte
+  `rigctl` 18100000, waehrend dieselbe App ueber die CAT-Bruecke im
+  selben Moment 0 meldete. Beide Bruecken lesen jetzt nach dem Setzen
+  zurueck und weisen ab, wenn es nicht gegriffen hat.
 
 - **Der Tuner Genius XL waere nach dem Firmware-Update 1.2.44
   verschwunden.** Die Geraeteankuendigung wurde mit einem Regex

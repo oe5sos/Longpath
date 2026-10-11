@@ -30,6 +30,7 @@ Q_DECLARE_LOGGING_CATEGORY(lcTci)
 Q_DECLARE_LOGGING_CATEGORY(lcSpots)
 Q_DECLARE_LOGGING_CATEGORY(lcAutomation)
 Q_DECLARE_LOGGING_CATEGORY(lcRigctld)
+Q_DECLARE_LOGGING_CATEGORY(lcCat)
 
 // Runtime-manageable logging category metadata.
 struct LogCategoryInfo {

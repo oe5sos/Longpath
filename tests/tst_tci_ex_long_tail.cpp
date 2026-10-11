@@ -350,17 +350,28 @@ private slots:
         QCOMPARE(p.handleCommand(QStringLiteral("fm_deviation_ex:0,5000;")), QString());
         QCOMPARE(p.handleCommand(QStringLiteral("fm_deviation_ex:0;")), QString());
 
-        // No CAT parser yet: Thetis's own failure form, so a client is told
-        // the command arrived and could not be answered.  The command is
-        // named WITHOUT its terminator -- Thetis keeps it (":PS;,?;") and
-        // the resulting frame splits in two at any conforming client, which
-        // tools/tci_probe showed at the wire on 2026-10-11.
+        // run_cat_ex now really runs the command through CatParser
+        // (phase 3K, same day). The command and the result are named
+        // WITHOUT their terminators -- Thetis keeps them (":PS;,PS1;")
+        // and the frame then splits in two at any conforming client,
+        // which tools/tci_probe showed at the wire on 2026-10-11.
+        // ID is the same whatever the radio is doing, so it pins the frame
+        // shape; PS answers the real state (PS0 here -- this RadioModel is
+        // not connected to anything), which is the point of running the
+        // command instead of faking an answer.
+        QCOMPARE(p.handleCommand(QStringLiteral("run_cat_ex:ID;")),
+                 QStringLiteral("run_cat_ex:ID,ID019;"));
         QCOMPARE(p.handleCommand(QStringLiteral("run_cat_ex:PS;")),
-                 QStringLiteral("run_cat_ex:PS,?;"));
-        QVERIFY(!p.handleCommand(QStringLiteral("run_cat_ex:PS;"))
+                 QStringLiteral("run_cat_ex:PS,PS0;"));
+        QVERIFY(!p.handleCommand(QStringLiteral("run_cat_ex:ID;"))
                      .mid(QStringLiteral("run_cat_ex:").size())
                      .chopped(1)
                      .contains(QLatin1Char(';')));
+
+        // And the transmit gate of that parser is never opened: keying
+        // through a TCI message is not a way around the CAT setting.
+        QCOMPARE(p.handleCommand(QStringLiteral("run_cat_ex:TX;")),
+                 QStringLiteral("run_cat_ex:TX,?;"));
     }
 };
 

@@ -2319,6 +2319,11 @@ public slots:
     Q_INVOKABLE int  txFilterLowHz() const;
     Q_INVOKABLE int  txFilterHighHz() const;
 
+    /// Tuning step in Hz for receiver `rx` -- SliceModel::stepHz.
+    /// Added for the CAT IF frame, which carries a 4-character step code
+    /// (Thetis CATCommands.cs:10386 [v2.10.3.15-5-g852bf0e]).
+    Q_INVOKABLE int tuneStepHz(int rx) const;
+
     // ── Phase 3R Task I5: RadeChannel signal-graph slots ────────────────────
     //
     // Public slots so Qt's auto-connection queues them correctly when the

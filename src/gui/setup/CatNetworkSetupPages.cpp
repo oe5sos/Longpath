@@ -928,7 +928,121 @@ void CatTcpIpPage::buildUI()
     });
 
     contentLayout()->addWidget(group);
+
+    // ── Gruppe 2: Kenwood-CAT über TCP ──────────────────────────────────────
+    // Zweiter Weg auf derselben Seite, weil beide dasselbe tun (ein
+    // Programm steuert das Gerät) und sich nur im Dialekt unterscheiden:
+    // rigctld sprechen N1MM, DXLog und WSJT-X; Kenwood-CAT sprechen die
+    // älteren und die Thetis-gewohnten Programme.
+    auto* catGroup = new QGroupBox(QStringLiteral("CAT (Kenwood-Dialekt)"), this);
+    catGroup->setStyleSheet(QString::fromLatin1(Style::kGroupBoxStyle));
+
+    auto* catGrid = new QGridLayout(catGroup);
+    catGrid->setSpacing(6);
+
+    m_catEnableCheck = new QCheckBox(QStringLiteral("Enable CAT server"), catGroup);
+    m_catEnableCheck->setStyleSheet(QString::fromLatin1(Style::kCheckBoxStyle));
+    m_catEnableCheck->setChecked(
+        settings.value(QStringLiteral("CatServerEnabled"),
+                       QStringLiteral("False")).toString() == QStringLiteral("True"));
+    m_catEnableCheck->setToolTip(QStringLiteral(
+        "Kenwood-style CAT over TCP: ID, IF, FA, FB, FR, FT, MD, PS, AI, "
+        "TX and RX. Everything else answers \"?;\", the same as Thetis "
+        "does for a command it does not know."));
+    catGrid->addWidget(m_catEnableCheck, 0, 0, 1, 2);
+
+    auto* catIpLabel = new QLabel(QStringLiteral("Bind IP:"), catGroup);
+    catIpLabel->setStyleSheet(QString::fromLatin1(Style::kSecondaryLabelStyle));
+    catGrid->addWidget(catIpLabel, 1, 0);
+
+    m_catBindIpEdit = new QLineEdit(
+        settings.value(QStringLiteral("CatServerBindAddress"),
+                       QStringLiteral("127.0.0.1")).toString(), catGroup);
+    m_catBindIpEdit->setStyleSheet(Style::lineEditStyle());
+    m_catBindIpEdit->setToolTip(QStringLiteral(
+        "Same caution as above: 0.0.0.0 lets anything on the network tune "
+        "the radio."));
+    catGrid->addWidget(m_catBindIpEdit, 1, 1);
+
+    auto* catPortLabel = new QLabel(QStringLiteral("Port:"), catGroup);
+    catPortLabel->setStyleSheet(QString::fromLatin1(Style::kSecondaryLabelStyle));
+    catGrid->addWidget(catPortLabel, 2, 0);
+
+    m_catPortSpin = new QSpinBox(catGroup);
+    m_catPortSpin->setStyleSheet(Style::spinBoxStyle());
+    m_catPortSpin->setRange(1024, 65535);
+    m_catPortSpin->setValue(settings.value(QStringLiteral("CatServerPort"),
+                                           QStringLiteral("13013")).toInt());
+    m_catPortSpin->setToolTip(QStringLiteral(
+        "13013 is the port Thetis uses for its own TCP CAT server, so "
+        "programs set up for Thetis find us without being changed."));
+    catGrid->addWidget(m_catPortSpin, 2, 1);
+
+    m_catTxCheck = new QCheckBox(QStringLiteral("Allow transmit (TX) over CAT"),
+                                 catGroup);
+    m_catTxCheck->setStyleSheet(QString::fromLatin1(Style::kCheckBoxStyle));
+    m_catTxCheck->setChecked(
+        settings.value(QStringLiteral("CatServerAllowTx"),
+                       QStringLiteral("False")).toString() == QStringLiteral("True"));
+    m_catTxCheck->setToolTip(QStringLiteral(
+        "Its own gate, separate from the rigctld one: off means a CAT "
+        "client may read and tune but its TX; is refused. Unkeying (RX;) "
+        "always works. Off again after every stop of the server."));
+    catGrid->addWidget(m_catTxCheck, 3, 0, 1, 2);
+
+    m_catStatusLabel = new QLabel(QStringLiteral("Status: stopped"), catGroup);
+    m_catStatusLabel->setStyleSheet(QString::fromLatin1(Style::kSecondaryLabelStyle));
+    catGrid->addWidget(m_catStatusLabel, 4, 0, 1, 2);
+
+    connect(m_catEnableCheck, &QCheckBox::toggled, this, [this](bool on) {
+        AppSettings::instance().setValue(
+            QStringLiteral("CatServerEnabled"),
+            on ? QStringLiteral("True") : QStringLiteral("False"));
+        emit catEnableToggled(on, quint16(m_catPortSpin->value()));
+    });
+    connect(m_catBindIpEdit, &QLineEdit::editingFinished, this, [this]() {
+        const QString addr = m_catBindIpEdit->text().trimmed();
+        QHostAddress parsed;
+        if (!parsed.setAddress(addr)) {
+            m_catBindIpEdit->setText(
+                AppSettings::instance().value(QStringLiteral("CatServerBindAddress"),
+                                              QStringLiteral("127.0.0.1")).toString());
+            return;
+        }
+        AppSettings::instance().setValue(QStringLiteral("CatServerBindAddress"), addr);
+        emit catBindOrPortChanged(addr, quint16(m_catPortSpin->value()));
+    });
+    connect(m_catPortSpin, &QSpinBox::valueChanged, this, [this](int v) {
+        AppSettings::instance().setValue(QStringLiteral("CatServerPort"),
+                                         QString::number(v));
+        emit catBindOrPortChanged(m_catBindIpEdit->text().trimmed(), quint16(v));
+    });
+    connect(m_catTxCheck, &QCheckBox::toggled, this, [this](bool on) {
+        AppSettings::instance().setValue(
+            QStringLiteral("CatServerAllowTx"),
+            on ? QStringLiteral("True") : QStringLiteral("False"));
+        emit catTxAllowedToggled(on);
+    });
+
+    contentLayout()->addWidget(catGroup);
     contentLayout()->addStretch();
+}
+
+void CatTcpIpPage::setCatStatus(bool running, quint16 port, int clients)
+{
+    if (!m_catStatusLabel) {
+        return;
+    }
+    if (!running) {
+        m_catStatusLabel->setText(QStringLiteral("Status: stopped"));
+        return;
+    }
+    m_catStatusLabel->setText(
+        clients == 0
+            ? QStringLiteral("Status: listening on port %1, no client").arg(port)
+            : QStringLiteral("Status: listening on port %1, %2 client%3")
+                  .arg(port).arg(clients).arg(clients == 1 ? QString()
+                                                           : QStringLiteral("s")));
 }
 
 void CatTcpIpPage::setRigctldStatus(bool running, quint16 port, int clients)

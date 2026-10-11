@@ -14109,6 +14109,17 @@ int RadioModel::txFilterHighHz() const
     return m_transmitModel.filterHigh();
 }
 
+// Tuning step for the CAT IF frame. Falls back to 0 (which the step
+// encoder maps to the 1 Hz code) when there is no slice yet, the same
+// pre-connect behaviour as the other query shims.
+int RadioModel::tuneStepHz(int rx) const
+{
+    if (const SliceModel* const slice = sliceById(rx)) {
+        return slice->stepHz();
+    }
+    return 0;
+}
+
 // ---------------------------------------------------------------------------
 // completeTuneOff — Thetis-faithful TUN-off completion (issue #177).
 //

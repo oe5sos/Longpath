@@ -2804,6 +2804,13 @@ longpath_add_test(tst_tci_ex_long_tail)
 # Faelle: standardmaessig zu, Entkeyen immer erlaubt, stop() schliesst es.
 # TestMockRadioModel.cpp liefert die moc-vtable des Mock-Objekts.
 longpath_add_test(tst_rigctld_server TestMockRadioModel.cpp)
+
+# ── Phase 3K, zweiter Schritt (2026-10-11): Kenwood-CAT ─────────────────────
+# CatParser gegen den Mock (Feldbreiten der IF-Zeile vor allem -- ein Byte
+# verrutscht und alles danach ist falsch) plus CatServer ueber einen echten
+# Socket fuer die ';'-Zerlegung, inklusive eines ueber zwei Pakete
+# geteilten Befehls.
+longpath_add_test(tst_cat_server TestMockRadioModel.cpp)
 target_link_libraries(tst_rigctld_server PRIVATE Qt6::Network)
 
 # ── Phase 3J-1 closeout Item 4 (2026-05-12): per-(band, mode) filter ────────

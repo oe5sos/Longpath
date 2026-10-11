@@ -375,6 +375,16 @@ public:
     Q_INVOKABLE int txFilterLowHz() const  { return m_txFilterLowHz; }
     Q_INVOKABLE int txFilterHighHz() const { return m_txFilterHighHz; }
 
+    // Tuning step per slice, for the CAT IF frame's 4-character step code.
+    Q_INVOKABLE int tuneStepHz(int slice) const
+    {
+        return (slice >= 0 && slice < 2) ? m_tuneStepHz[slice] : 0;
+    }
+    void setTuneStepHzForTest(int slice, int hz)
+    {
+        if (slice >= 0 && slice < 2) { m_tuneStepHz[slice] = hz; }
+    }
+
     // AGC mode string per slice. Canonical values: "off","long","slow","fast","custom","normal".
     // From Thetis TCIServer.cs:4658-4671 [v2.10.3.13] — handleAgcMode.
     Q_INVOKABLE void setAgcMode(int slice, const QString& mode)
@@ -674,6 +684,7 @@ public:
         m_vfoSwapCount = 0;
         m_txFilterLowHz = 100;
         m_txFilterHighHz = 2900;
+        m_tuneStepHz = { 100, 100 };
         m_agcMode = { QStringLiteral("normal"), QStringLiteral("normal") };
         m_agcGain = {};
         m_sqlEnable = {};
@@ -742,6 +753,7 @@ private:
     int  m_vfoSwapCount{0};
     int  m_txFilterLowHz{100};
     int  m_txFilterHighHz{2900};
+    std::array<int, 2> m_tuneStepHz{100, 100};
     std::array<QString, 2> m_agcMode{QStringLiteral("normal"), QStringLiteral("normal")};
     std::array<int, 2> m_agcGain{};
     std::array<bool, 2> m_sqlEnable{};

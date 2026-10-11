@@ -53,6 +53,7 @@ QString TciProtocol::tciAgcModeForWire(const QString& enumName)
 TciProtocol::TciProtocol(QObject* radio, QObject* parent)
     : QObject(parent)
     , m_radio(radio)
+    , m_catParser(radio)
 {
     (void)m_radio;  // dereferenced in Phase 6+ via QMetaObject::invokeMethod for setters.
 }
@@ -3476,18 +3477,31 @@ QString TciProtocol::handleRunCatExCommand(const QStringList& args)
     }
     if (catCommand.isEmpty()) { return {}; }
 
-    // DOCUMENTED DIVERGENCE from Thetis, found at the wire on 2026-10-11.
-    // Thetis re-adds the terminator the parser stripped (:5133) and then
-    // appends ",<result>;", so its frame carries a semicolon in the middle:
-    //   run_cat_ex:PS;,PS0;
-    // A conforming client splits text frames on ';', so that one frame
-    // arrives as two -- "run_cat_ex:PS" and ",PS0".  Confirmed with
-    // tools/tci_probe against our own server before this was changed.  We
-    // name the command without its terminator, which keeps the frame
-    // well-formed and still tells the client which command was refused.
-    qCInfo(lcTci) << "TCI run_cat_ex" << catCommand
-                  << "— no CAT parser in Longpath yet (phase 3K); answering Thetis's '?' form";
-    return QStringLiteral("run_cat_ex:%1,?;").arg(catCommand);
+    // From Thetis handleRunCatCommand at TCIServer.cs:5122-5150
+    // [v2.10.3.15]: hand the command to the CAT parser and answer
+    // "run_cat_ex:<command>,<result>;".
+    //
+    // m_catParser's transmit gate is never opened, so `TX;` through this
+    // path answers "?;" like any refused command. That is deliberate: the
+    // CAT server has its own gate on its own setting, and wrapping TX in
+    // a TCI message must not be a way around it.
+    const QString result = m_catParser.handleCommand(catCommand);
+    QString payload = result;
+    while (payload.endsWith(QLatin1Char(';'))) {
+        payload.chop(1);
+    }
+    if (payload.isEmpty()) {
+        // A silent setter. Thetis sends nothing in that case
+        // (TCIServer.cs:5138 only answers when ret is non-empty).
+        return {};
+    }
+
+    // DOCUMENTED DIVERGENCE, found at the wire 2026-10-11: Thetis keeps
+    // the command's own ';' and so sends a frame with a semicolon in the
+    // middle (run_cat_ex:PS;,PS1;), which a conforming client splits into
+    // two frames. We name the command and the result without their
+    // terminators and terminate the frame once.
+    return QStringLiteral("run_cat_ex:%1,%2;").arg(catCommand, payload);
 }
 
 // ── Phase 12: Spot + CW command stubs ──────────────────────────────────────

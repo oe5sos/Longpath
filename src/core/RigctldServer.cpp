@@ -295,7 +295,18 @@ QString RigctldServer::handleSetFreq(const QStringList& args)
     }
     QMetaObject::invokeMethod(m_radio, "setVfoHz", Qt::DirectConnection,
                               Q_ARG(int, 0), Q_ARG(int, 0), Q_ARG(qint64, hz));
-    return kRprtOk;
+
+    // Read back and refuse when it did not take. Without a slice -- a
+    // client connected before the radio -- the set goes nowhere, and
+    // RPRT 0 would be a lie the client cannot see through: Hamlib
+    // answers its own `f` from its frequency cache, so it would report
+    // the frequency it asked for and never notice. Measured on
+    // 2026-10-11: rigctl said 18100000 while the radio still held 0.
+    qint64 applied = 0;
+    QMetaObject::invokeMethod(m_radio, "vfoHz", Qt::DirectConnection,
+                              Q_RETURN_ARG(qint64, applied),
+                              Q_ARG(int, 0), Q_ARG(int, 0));
+    return applied == hz ? kRprtOk : kRprtRefused;
 }
 
 QString RigctldServer::handleGetMode()
@@ -327,6 +338,12 @@ QString RigctldServer::handleSetMode(const QStringList& args)
     }
     QMetaObject::invokeMethod(m_radio, "setMode", Qt::DirectConnection,
                               Q_ARG(int, 0), Q_ARG(QString, longpathMode));
+    QString appliedMode;
+    QMetaObject::invokeMethod(m_radio, "mode", Qt::DirectConnection,
+                              Q_RETURN_ARG(QString, appliedMode), Q_ARG(int, 0));
+    if (appliedMode != longpathMode) {
+        return kRprtRefused;   // no slice to put the mode on
+    }
 
     // A width of 0 means "keep the current passband" in rigctl.
     if (args.size() >= 2) {
