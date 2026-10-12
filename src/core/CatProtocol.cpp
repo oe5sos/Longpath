@@ -223,8 +223,26 @@ QString CatProtocol::antwortAuf(const QString& befehl)
             if (a) { m_z.vfoAHz = hz; } else { m_z.vfoBHz = hz; }
             return QString();      // Setzen wird nicht quittiert
         }
-        if (istAbfragen) { daten = mitNullen(a ? m_z.vfoAHz : m_z.vfoBHz, 11); }
-        else { return abgelehnt(); }
+        if (istAbfragen) {
+            // Der Haken ist das Kennzeichen dafuer, dass es diesen VFO
+            // GIBT -- und er entscheidet darum auch die Abfrage, nicht
+            // nur das Setzen.
+            //
+            // Ohne diese Pruefung meldete FA;/FB; den Vorgabewert des
+            // Zustands, und der ist 0. Live am 2026-10-11 so gesehen:
+            // Longpath antwortete auf FB; mit "FB00000000000;" -- eine
+            // Frequenz fuer ein VFO B, das es hier nicht gibt (siehe
+            // MainWindow: setzeVfoB bleibt absichtlich leer, weil
+            // RadioModel keinen zweiten VFO kennt). Ein Fremdprogramm
+            // liest das als "VFO B steht auf 0 Hz" und zeigt es an.
+            //
+            // Kein Prueffall hatte es gesehen: die unteren beiden
+            // Schichten setzen in ihren Faellen immer beide Haken, und
+            // der Verdrahtungsfall prueft nur das SETZEN von FB.
+            const auto& haken = a ? m_h.setzeVfoA : m_h.setzeVfoB;
+            if (!haken) { return abgelehnt(); }
+            daten = mitNullen(a ? m_z.vfoAHz : m_z.vfoBHz, 11);
+        } else { return abgelehnt(); }
 
     } else if (praefix == QLatin1String("MD")) {
         if (istSetzen) {

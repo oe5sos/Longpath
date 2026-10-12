@@ -159,6 +159,36 @@ private slots:
         QCOMPARE(gesetztA, Q_UINT64_C(0));
     }
 
+    void ohneHakenWirdAuchDasABFRAGENAbgelehnt()
+    {
+        // Nachgetragen am 2026-10-11, nachdem der LIVE-Lauf es zeigte:
+        // Longpath antwortete auf FB; mit "FB00000000000;" -- eine
+        // Frequenz fuer ein VFO B, das es nicht gibt. Der Haken ist das
+        // Kennzeichen dafuer, dass ein VFO existiert, und muss darum
+        // auch die Abfrage entscheiden.
+        //
+        // Warum kein Prueffall es gesehen hat: init() haengt hier IMMER
+        // beide Haken an, und der Fall darunter prueft nur das SETZEN.
+        // Erst am laufenden Programm, wo setzeVfoB absichtlich fehlt,
+        // kam es heraus.
+        CatProtocol::Zustand z;
+        z.vfoAHz = 14225000;
+        z.vfoBHz = 7100000;
+        p.setzeZustand(z);
+
+        CatProtocol::Haken nurA;
+        nurA.setzeVfoA = [](quint64) {};
+        p.setzeHaken(nurA);
+
+        QCOMPARE(p.antwortAuf(QStringLiteral("FA;")),
+                 QStringLiteral("FA00014225000;"));
+        QCOMPARE(p.antwortAuf(QStringLiteral("FB;")), QStringLiteral("?;"));
+        // Auch nicht mit einem Wert im Zustand -- der zaehlt nicht, wenn
+        // der VFO nicht existiert.
+        QCOMPARE(p.antwortAuf(QStringLiteral("FB00007100000;")),
+                 QStringLiteral("?;"));
+    }
+
     void ohneHakenWirdAbgelehntStattStillGeschluckt()
     {
         // Der wichtigste Fall dieser Datei. Ein Setzen, das quittiert
