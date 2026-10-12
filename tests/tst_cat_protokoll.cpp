@@ -46,6 +46,25 @@ private:
     }
 
 private slots:
+    void initTestCase()
+    {
+        // PFLICHT, und zwar aus zwei Gruenden.
+        //
+        // 1. Ohne Testmodus liest und SCHREIBT AppSettings die echte
+        //    Einstellungsdatei des Betreibers (~1,9 MB, 9531 Eintraege,
+        //    sein Layoutprofil, seine Container). Ein Prueffall, der
+        //    dort hineinschreibt, kann einen Arbeitsplatz verstellen.
+        // 2. Dieser Prueffall baut MEHRERE MainWindow hintereinander.
+        //    Mit der echten Datei beendete der zweite Aufbau den
+        //    Prozess mit SIGTRAP (rc=133) -- die Fallbeschreibungen
+        //    waren gruen bis dahin, es gab keine Fehlermeldung, nur
+        //    einen stillen Abbruch nach dem vierten Fall.
+        //
+        // tst_rx_equalizer.cpp hat die Zeile von Anfang an; diese drei
+        // CAT-Prueffaelle nicht, und das ist am 2026-10-11 aufgefallen.
+        QStandardPaths::setTestModeEnabled(true);
+    }
+
     void init()
     {
         p = CatProtocol();

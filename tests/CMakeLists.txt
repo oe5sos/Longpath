@@ -1796,6 +1796,7 @@ longpath_add_test(tst_rx_equalizer)
 longpath_add_test(tst_cat_protokoll)
 longpath_add_test(tst_cat_server)
 longpath_add_test(tst_cat_verdrahtung)
+longpath_add_test(tst_mehrere_fenster)
 longpath_add_test(tst_fm_applet_wiring)
 
 # ── Phase 3F Sub-Epic B Task 17: AlexController event-matrix coverage ─────────

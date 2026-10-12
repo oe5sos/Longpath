@@ -4,6 +4,23 @@
 //
 // CAT, dritter Gang: die Verdrahtung (2026-10-11).
 //
+// NUR EIN MainWindow JE PROZESS -- und das ist keine Stilfrage.
+//
+// Zwei MainWindow hintereinander in einem Prozess beenden Longpath mit
+// SIGTRAP: "BUG IN CLIENT OF LIBMALLOC: memory corruption of free block",
+// Absturz im Qt-Stylesheet-Parser (QCss::Parser::parseExpr, aus
+// QStyleSheetStyle::polish beim Aufbau des ZWEITEN Fensters). Am
+// 2026-10-11 mit einem Wegwerf-Prueffall nachgemessen, der NUR drei
+// MainWindow baut und sonst nichts tut -- ohne eine Zeile CAT: erstes
+// Fenster gruen, zweites toetet den Prozess. Der Fehler ist also
+// vorbestehend und gehoert nicht hierher; er ist als eigene Aufgabe
+// vorgemerkt.
+//
+// Folge fuer diese Datei: alle Faelle, die ein Fenster brauchen, teilen
+// EINES. Wer hier einen zweiten Aufbau einbaut, bekommt einen stillen
+// Abbruch ohne Fehlermeldung -- die Fallbeschreibungen sind bis dahin
+// gruen, und danach kommt nichts mehr.
+//
 // Geprueft wird am ECHTEN MainWindow mit ECHTEN TCP-Verbindungen. Die
 // Protokollschicht (tst_cat_protokoll) und der Transport
 // (tst_cat_server) sind fuer sich gruen -- was hier schiefgehen kann,
@@ -20,6 +37,7 @@
 
 #include <optional>
 
+#include "core/AppSettings.h"
 #include "core/CatModeMap.h"
 #include "core/CatServer.h"
 #include "gui/MainWindow.h"
@@ -48,6 +66,25 @@ private:
     }
 
 private slots:
+    void initTestCase()
+    {
+        // PFLICHT, und zwar aus zwei Gruenden.
+        //
+        // 1. Ohne Testmodus liest und SCHREIBT AppSettings die echte
+        //    Einstellungsdatei des Betreibers (~1,9 MB, 9531 Eintraege,
+        //    sein Layoutprofil, seine Container). Ein Prueffall, der
+        //    dort hineinschreibt, kann einen Arbeitsplatz verstellen.
+        // 2. Dieser Prueffall baut MEHRERE MainWindow hintereinander.
+        //    Mit der echten Datei beendete der zweite Aufbau den
+        //    Prozess mit SIGTRAP (rc=133) -- die Fallbeschreibungen
+        //    waren gruen bis dahin, es gab keine Fehlermeldung, nur
+        //    einen stillen Abbruch nach dem vierten Fall.
+        //
+        // tst_rx_equalizer.cpp hat die Zeile von Anfang an; diese drei
+        // CAT-Prueffaelle nicht, und das ist am 2026-10-11 aufgefallen.
+        QStandardPaths::setTestModeEnabled(true);
+    }
+
     // ── Die Modustabellen ───────────────────────────────────────────────────
 
     void dieModusumrechnungGehtInBeideRichtungen()
@@ -84,64 +121,54 @@ private slots:
 
     // ── Am echten Fenster ───────────────────────────────────────────────────
 
-    void dasFensterBautServerUndFeldUndVerbindetSie()
+    void amEchtenFenster()
     {
+        // Ein Fenster, vier Fragen -- siehe die Notiz im Kopf: ein
+        // zweiter Aufbau toetet den Prozess (vorbestehender Fehler).
         auto* mw = new MainWindow();
         mw->resize(1200, 800);
         mw->show();
         QVERIFY(QTest::qWaitForWindowExposed(mw, 20000));
 
-        // Beides da, und genau einmal.
+        // ── 1. Server und Feld sind da und verbunden ─────────────────────
         const QList<CatServer*> server = mw->findChildren<CatServer*>();
         QCOMPARE(server.size(), 1);
         const QList<CatApplet*> felder = mw->findChildren<CatApplet*>();
         QCOMPARE(felder.size(), 1);
+        CatServer* srv = server.first();
+        CatApplet* feld = felder.first();
 
-        // Der TCP-Schalter ist BEDIENBAR -- ohne angehaengten Server
-        // sperrt setzeCatServer ihn, und genau das waere der Fall, wenn
-        // die Verdrahtung in MainWindow fehlte.
-        QPushButton* tcp = nullptr;
-        for (QPushButton* b : felder.first()->findChildren<QPushButton*>()) {
-            if (b->text() == QStringLiteral("TCP")) { tcp = b; break; }
-        }
-        QVERIFY(tcp);
-        QVERIFY2(tcp->isEnabled(),
-                 "Der TCP-Schalter ist gesperrt -- der Server haengt nicht am Feld.");
-        delete mw;
-    }
-
-    void derSchalterStartetDieKanaeleUndEinProgrammKannAbstimmen()
-    {
-        auto* mw = new MainWindow();
-        mw->resize(1200, 800);
-        mw->show();
-        QVERIFY(QTest::qWaitForWindowExposed(mw, 20000));
-
-        auto* srv = mw->findChild<CatServer*>();
-        auto* feld = mw->findChild<CatApplet*>();
-        QVERIFY(srv);
-        QVERIFY(feld);
         QPushButton* tcp = nullptr;
         for (QPushButton* b : feld->findChildren<QPushButton*>()) {
             if (b->text() == QStringLiteral("TCP")) { tcp = b; break; }
         }
         QVERIFY(tcp);
+        // Ohne angehaengten Server sperrt setzeCatServer den Schalter --
+        // genau das waere der Fall, wenn die Verdrahtung in MainWindow
+        // fehlte.
+        QVERIFY2(tcp->isEnabled(),
+                 "Der TCP-Schalter ist gesperrt -- der Server haengt nicht am Feld.");
 
+        // ── 2. Ohne Empfaenger meldet CAT KEINE Frequenz ─────────────────
+        RadioModel* rm = mw->radioModelForTest();
+        QVERIFY(rm);
+        if (!rm->activeSlice()) {
+            // "FA00000000000;" waere eine Angabe, und ein Fremdprogramm
+            // glaubt sie. Der Zustandsgeber gibt dafuer std::nullopt.
+            QCOMPARE(srv->verarbeiteFuerTest(QStringLiteral("FA;")),
+                     QStringLiteral("?;"));
+            QCOMPARE(srv->verarbeiteFuerTest(QStringLiteral("IF;")),
+                     QStringLiteral("?;"));
+        }
+
+        // ── 3. Der Schalter startet die Kanaele ──────────────────────────
+        //
+        // Die Ports VORHER pruefen, nicht hinterher. Hier stand ein QSKIP
+        // fuer "Ports belegt, laeuft Longpath schon?" -- die Gegenprobe hat
+        // daraufhin die Startzeile im Applet stillgelegt, und der Fall
+        // wurde UEBERSPRUNGEN statt zu fallen. Ein echter Fehler als
+        // Umgebungsproblem verkleidet.
         QVERIFY(!srv->laeuft(0));
-
-        // Die Ports VORHER pruefen, nicht hinterher.
-        //
-        // Hier stand ein QSKIP fuer den Fall, dass kein Kanal hochkommt
-        // ("Ports belegt, laeuft Longpath schon?"). Die Gegenprobe am
-        // 2026-10-11 hat daraufhin die Startzeile im Applet stillgelegt
-        // -- und der Fall wurde UEBERSPRUNGEN statt zu fallen. Ein
-        // echter Fehler als Umgebungsproblem verkleidet; genau die
-        // Form, die hier schon oefter Zeit gekostet hat.
-        //
-        // Jetzt wird zuerst gemessen, ob die vier Ports ueberhaupt zu
-        // haben sind. Sind sie es nicht, ist das die Umgebung und der
-        // Fall wird uebersprungen. Sind sie es, MUSS der Klick sie
-        // starten -- ohne Ausweg.
         bool portsFrei = true;
         {
             QList<QTcpServer*> probe;
@@ -156,9 +183,9 @@ private slots:
             qDeleteAll(probe);
         }
         if (!portsFrei) {
-            QSKIP("Die Ports 31001..31004 sind auf dieser Maschine belegt "
-                  "(laeuft Longpath schon?) -- das ist die Umgebung, nicht "
-                  "der Code.");
+            delete mw;
+            QSKIP("Die Ports 31001..31004 sind belegt (laeuft Longpath "
+                  "schon?) -- das ist die Umgebung, nicht der Code.");
         }
 
         tcp->click();
@@ -170,14 +197,16 @@ private slots:
                                                "sein Port frei war").arg(k)));
         }
         QVERIFY(tcp->isChecked());
+        // Und der Schalterzustand steht in den Einstellungen -- sonst
+        // muesste der Betreiber nach jedem Start neu klicken, bevor
+        // WSJT-X das Geraet findet.
+        QCOMPARE(AppSettings::instance()
+                     .value(QStringLiteral("CatTcpEnabled")).toString(),
+                 QStringLiteral("True"));
 
-        RadioModel* rm = mw->radioModelForTest();
-        QVERIFY(rm);
+        // ── 4. Ein Fremdprogramm stimmt ab ───────────────────────────────
         SliceModel* sl = rm->activeSlice();
         if (!sl) {
-            // Ein frisch gebautes Fenster hat noch keinen Empfaenger --
-            // genau der Zustand, in dem CAT nichts melden DARF (eigener
-            // Fall unten). Fuer die Abstimmprobe wird einer angelegt.
             rm->configureStreamPool(5, 5, 192000);
             const int id = rm->addSlice();
             sl = rm->sliceById(id);
@@ -190,54 +219,32 @@ private slots:
         s->connectToHost(QHostAddress::LocalHost, srv->port(0));
         QVERIFY(s->waitForConnected(5000));
 
-        // Lesen: was das Fenster zeigt, muss ueber CAT herauskommen.
+        // Lesen: was das Fenster zeigt, kommt ueber CAT heraus.
         QCOMPARE(frage(s, "FA;"), QStringLiteral("FA00014225000;"));
         QCOMPARE(frage(s, "MD;"), QStringLiteral("MD2;"));
 
-        // Schreiben: ein Fremdprogramm stimmt ab -- und der Slice folgt.
+        // Schreiben: das Fremdprogramm stimmt ab, der Slice folgt.
         s->write("FA00021300000;");
         QTRY_COMPARE(static_cast<quint64>(sl->frequency()), Q_UINT64_C(21300000));
         s->write("MD1;");
         QTRY_COMPARE(sl->dspMode(), DSPMode::LSB);
-        // Und zurueckgelesen stimmt es auch -- der Zustandsgeber liest
-        // frisch, nicht aus einer Kopie.
+        // Zurueckgelesen stimmt es auch -- der Zustandsgeber liest frisch,
+        // nicht aus einer Kopie.
         QCOMPARE(frage(s, "FA;"), QStringLiteral("FA00021300000;"));
         QCOMPARE(frage(s, "MD;"), QStringLiteral("MD1;"));
 
-        // Der Statussatz traegt dieselbe Frequenz.
         const QString iff = frage(s, "IF;");
         QCOMPARE(iff.size(), 2 + 35 + 1);
         QCOMPARE(iff.mid(2, 11), QStringLiteral("00021300000"));
         QCOMPARE(iff.mid(2 + 27, 1), QStringLiteral("1"));   // LSB
 
-        // Aus: danach horcht niemand mehr.
+        // Aus: danach horcht niemand mehr, und die Einstellung zieht mit.
         tcp->click();
         for (int k = 0; k < CatServer::kKanaele; ++k) { QVERIFY(!srv->laeuft(k)); }
-        delete mw;
-    }
+        QCOMPARE(AppSettings::instance()
+                     .value(QStringLiteral("CatTcpEnabled")).toString(),
+                 QStringLiteral("False"));
 
-    void ohneEmpfaengerMeldetCatKeineFrequenz()
-    {
-        // Ein frisch gebautes Fenster hat keinen aktiven Slice. Dann
-        // darf CAT KEINE Frequenz melden -- "FA00000000000;" ist eine
-        // Angabe, und ein Fremdprogramm glaubt sie. Der Zustandsgeber in
-        // MainWindow gibt dafuer std::nullopt.
-        auto* mw = new MainWindow();
-        mw->resize(1200, 800);
-        mw->show();
-        QVERIFY(QTest::qWaitForWindowExposed(mw, 20000));
-        auto* srv = mw->findChild<CatServer*>();
-        QVERIFY(srv);
-        RadioModel* rm = mw->radioModelForTest();
-        QVERIFY(rm);
-        if (rm->activeSlice()) {
-            QSKIP("Dieses Fenster hat schon einen Empfaenger -- der Fall "
-                  "prueft gerade den Zustand davor.");
-        }
-        QCOMPARE(srv->verarbeiteFuerTest(QStringLiteral("FA;")),
-                 QStringLiteral("?;"));
-        QCOMPARE(srv->verarbeiteFuerTest(QStringLiteral("IF;")),
-                 QStringLiteral("?;"));
         delete mw;
     }
 

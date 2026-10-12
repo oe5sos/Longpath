@@ -26,6 +26,7 @@
 
 #include "CatApplet.h"
 #include "gui/styles/ThemeQss.h"
+#include "core/AppSettings.h"
 #include "core/CatServer.h"
 #include "NyiOverlay.h"
 #include "gui/ComboStyle.h"
@@ -229,7 +230,39 @@ void CatApplet::setzeCatServer(CatServer* srv)
     connect(srv, &CatServer::verbindungenGeaendert,
             this, [this](int, int) { zeigeKanaele(); });
 
+    // Den Schalterzustand MERKEN -- das Wiederherstellen macht
+    // stelleZustandWiederHer(), und zwar erst, wenn das Fenster steht.
+    //
+    // Hier im Aufbau ein setChecked() zu rufen, hat beim ersten Versuch
+    // den naechsten Fensteraufbau mit SIGTRAP beendet: der Aufbau eines
+    // Applets soll keine Nebenwirkungen haben, die Kanaele binden und
+    // Einstellungen schreiben, waehrend MainWindow noch nicht fertig ist.
+    connect(m_tcpBtn, &QPushButton::toggled, this, [](bool an) {
+        AppSettings::instance().setValue(
+            QStringLiteral("CatTcpEnabled"),
+            an ? QStringLiteral("True") : QStringLiteral("False"));
+    });
+
     zeigeKanaele();
+}
+
+void CatApplet::stelleZustandWiederHer()
+{
+    if (!m_tcpBtn || !m_cat) { return; }
+    // Ohne das muesste der Betreiber nach jedem Start klicken, bevor
+    // WSJT-X oder fldigi das Geraet finden -- und waehrend er das sucht,
+    // sieht es aus wie ein Programm, das die Anbindung verloren hat.
+    //
+    // Der Schluessel liegt NICHT per Geraet (hardware/<mac>/): CAT ist
+    // eine Eigenschaft des Arbeitsplatzes, nicht des Funkgeraets.
+    const bool an = AppSettings::instance()
+                        .value(QStringLiteral("CatTcpEnabled"),
+                               QStringLiteral("False"))
+                        .toString() == QStringLiteral("True");
+    if (!an || m_tcpBtn->isChecked()) { return; }
+    // setChecked loest das toggled-Signal aus, das die Kanaele startet --
+    // und sich selbst zuruecknimmt, wenn kein Port zu haben ist.
+    m_tcpBtn->setChecked(true);
 }
 
 void CatApplet::zeigeKanaele()

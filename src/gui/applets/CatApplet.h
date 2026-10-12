@@ -52,6 +52,13 @@ public:
     /// Den CAT-Server anhaengen (2026-10-11). Ohne ihn bleibt der
     /// TCP-Schalter gesperrt statt zu luegen.
     void setzeCatServer(class CatServer* srv);
+
+    /// Den gespeicherten Schalterzustand anwenden (2026-10-11).
+    /// Getrennt von setzeCatServer, weil das Binden von Ports und das
+    /// Schreiben von Einstellungen nicht in den Aufbau eines Applets
+    /// gehoeren -- der erste Versuch beendete damit den naechsten
+    /// Fensteraufbau mit SIGTRAP.
+    void stelleZustandWiederHer();
     QString appletTitle() const override { return QStringLiteral("CAT"); }
     void    syncFromModel() override;
 

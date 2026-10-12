@@ -679,6 +679,10 @@ MainWindow::MainWindow(QWidget* parent)
     buildUI();
     buildMenuBar();
 
+    // Den gespeicherten CAT-Schalterzustand erst jetzt anwenden: das
+    // Binden von Ports gehoert nicht in den Aufbau eines Applets.
+    if (m_catApplet) { m_catApplet->stelleZustandWiederHer(); }
+
     // Phase 3O Sub-Phase 10 Task 10c — host the menu bar + master-output
     // controls in a custom TitleBar strip. Must run AFTER buildMenuBar()
     // so the menu is fully populated with actions before we re-parent it.
@@ -1195,6 +1199,29 @@ MainWindow::MainWindow(QWidget* parent)
 
 MainWindow::~MainWindow()
 {
+    // Zweites Sicherheitsnetz derselben Art, 2026-10-11: den
+    // Abbau-Waechter JETZT setzen, als erstes.
+    //
+    // m_shuttingDown wird an vier Stellen gesetzt (Signalabbau,
+    // closeAllWindows, Beenden-Menue, closeEvent) -- an keiner, wenn ein
+    // MainWindow ohne closeEvent() zerstoert wird. Genau der Pfad, den
+    // die Notiz darunter fuer den FFT-Faden schon abfaengt.
+    //
+    // Was dann passiert, ist belegt: ~MainWindow -> ~QWidget ->
+    // deleteChildren -> ~ConnectionPanel -> QObject::destroyed ->
+    // restoreFloatingWindowsHiddenBehindConnectMask(). Deren erste Zeile
+    // ist `if (m_shuttingDown) { return; }` -- der Waechter ist da, er
+    // stand nur auf false. Der Slot lief also auf einem halb abgebauten
+    // Fenster und griff in Mitglieder, deren Kinder schon weg waren:
+    // SIGSEGV an Adresse 0x5, Absturzbericht vom 2026-10-11
+    // (EXC_BAD_ACCESS, Kette genau wie oben).
+    //
+    // Dieselbe Fehlerform wie bei PGXL/TGXL und bei
+    // wireSunSdr/TciClient::stateChanged -- Abbau greift in tote
+    // Mitglieder. Dies ist die fuenfte Stelle; die vier anderen haben
+    // ihren Waechter, hier fehlte nur das Setzen.
+    m_shuttingDown = true;
+
     // Sicherheitsnetz, 2026-09-03: regulaer haelt closeEvent() den
     // SpectrumThread an, lange bevor es hierher kommt. Wird ein
     // MainWindow aber OHNE closeEvent() zerstoert (Ausnahmepfad, Test-
