@@ -560,6 +560,23 @@ public slots:
     // disconnect/reconnect (a fresh TxChannel needs to be re-primed).
     void primeWdspState();
 
+    /// Forget that the anti-VOX run flag and detector tau were ever sent,
+    /// so the next setAntiVoxRun / setAntiVoxTau emits again even when the
+    /// value has not changed.
+    ///
+    /// Needed because this controller outlives the transmit worker: it is
+    /// created once with the RadioModel, while TxWorkerThread is rebuilt on
+    /// every connect. The idempotency guards below then swallow the
+    /// re-push, and the REPLACEMENT worker never learns the anti-VOX state
+    /// -- the cancellation feed stays off until the operator happens to
+    /// toggle the setting. Upstream NereusSDR fixed the same thing after
+    /// 2026.10.0 ("Replay saved anti-VOX state to replacement transmit
+    /// workers", #334).
+    ///
+    /// primeWdspState() deliberately does NOT cover these two (see its
+    /// comment); this is their counterpart.
+    void forgetAntiVoxEmissions();
+
     // ── H.4: PTT-source dispatch slots ───────────────────────────────────────
     //
     // Each slot routes an external PTT event through the MoxController state

@@ -1132,6 +1132,13 @@ void MoxController::setAntiVoxRun(bool run)
 // (RadioModel.cpp:5025/5051) and the explicit re-push there
 // (RadioModel.cpp:5043/5070) already lands after TxWorkerThread is wired.
 // ---------------------------------------------------------------------------
+// forgetAntiVoxEmissions — see the header for why this exists.
+void MoxController::forgetAntiVoxEmissions()
+{
+    m_antiVoxRunInitialized = false;
+    m_lastAntiVoxTauEmitted = std::numeric_limits<double>::quiet_NaN();
+}
+
 void MoxController::primeWdspState()
 {
     m_lastVoxThresholdEmitted = std::numeric_limits<double>::quiet_NaN();

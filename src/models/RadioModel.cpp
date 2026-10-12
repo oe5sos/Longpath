@@ -9189,6 +9189,15 @@ void RadioModel::wireConnectionSignals(int wdspInSize)
         m_txWorker->setAntiVoxBlockGeometry(m_dspWorker->outSize(),
                                             m_dspWorker->sampleRate());
 
+        // The controller outlives the transmit worker -- it belongs to this
+        // RadioModel, while m_txWorker is rebuilt on every connect. Its
+        // idempotency guards would swallow both re-pushes below on the
+        // SECOND connect, and the replacement worker would never learn the
+        // anti-VOX state: the cancellation feed would stay off until the
+        // operator happened to toggle the setting. Forget the emissions
+        // first, then push. (#334 upstream.)
+        m_moxController->forgetAntiVoxEmissions();
+
         // 3M-3a-iv: TransmitModel::antiVoxTauMsChanged → MoxController::setAntiVoxTau.
         //
         // Both objects live on main thread; direct connection.

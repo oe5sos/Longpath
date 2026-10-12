@@ -2843,6 +2843,14 @@ longpath_add_test(tst_socket_bind_failure)
 # Aenderung im Setup zeigte sie an der falschen Stelle. Upstream hat
 # denselben Mangel nach 2026.10.0 behoben (#332).
 longpath_add_test(tst_dexp_threshold_marker)
+
+# ── Upstream-Abgleich 2026-10-12: Anti-VOX an den Ersatz-Worker ────────────
+# Der MoxController lebt laenger als der Sende-Worker: er gehoert dem
+# RadioModel, der Worker wird bei jedem Verbinden neu gebaut. Die
+# Idempotenz-Waechter schluckten den Nachpush beim ZWEITEN Verbinden, und
+# der neue Worker erfuhr den Anti-VOX-Zustand nie. Upstream hat denselben
+# Fehler nach 2026.10.0 behoben (#334).
+longpath_add_test(tst_anti_vox_replay)
 target_link_libraries(tst_socket_bind_failure PRIVATE Qt6::Network)
 target_link_libraries(tst_rigctld_server PRIVATE Qt6::Network)
 
