@@ -2835,6 +2835,14 @@ longpath_add_test(tst_mic_ptt_session_gate)
 # Der Pruefstand leitet beide Verbindungsklassen ab und laesst den Bind
 # scheitern; ohne die Behebung stuerzt er ab statt rot zu werden.
 longpath_add_test(tst_socket_bind_failure)
+
+# ── Upstream-Abgleich 2026-10-12: DEXP-Schwellenmarke ──────────────────────
+# Die Marke auf dem DEXP-Pegelmesser kam vom Reglerbauwert (-50 dB) und
+# wusste vom echten Schwellwert (TransmitModel::voxThresholdDb, im
+# Mikrofonprofil gespeichert) nichts -- nach jedem Start und nach jeder
+# Aenderung im Setup zeigte sie an der falschen Stelle. Upstream hat
+# denselben Mangel nach 2026.10.0 behoben (#332).
+longpath_add_test(tst_dexp_threshold_marker)
 target_link_libraries(tst_socket_bind_failure PRIVATE Qt6::Network)
 target_link_libraries(tst_rigctld_server PRIVATE Qt6::Network)
 
