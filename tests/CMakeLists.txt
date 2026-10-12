@@ -5726,6 +5726,11 @@ longpath_add_test(tst_sunsdr_messlauf)
 # Antenne am Geraet nachgemessen; dieser Stand haelt den Befund fest.
 longpath_add_test(tst_sunsdr_ein_steller)
 
+# tst_sunsdr_netzlage: ob das Geraet ueberhaupt in einem Netz dieses
+# Rechners liegt -- die Frage, die in der Nacht zum 2026-10-12 fuenf
+# Suchversuche lang unbeantwortet blieb.
+longpath_add_test(tst_sunsdr_netzlage)
+
 # -- Die QRP muss mit IHRER Abtastrate gefahren werden, nicht mit Atlas'
 #    (2026-09-23: sie steht in keiner HPSDRModel-Liste, darum fiel die
 #    Aufloesung still auf Atlas und mit ihr auf 192 kHz). --
