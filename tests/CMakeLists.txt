@@ -5716,6 +5716,11 @@ longpath_add_test(tst_sunsdr_sim_workbench)
 # (sonst QSKIP) -- siehe Kopf der Datei.
 longpath_add_test(tst_sunsdr_messlauf)
 
+# tst_sunsdr_ein_steller: Vorverstaerker und Daempfung sind an der QRP
+# EIN Steller (Opcode 0x04, Stufenindex an Byte 18). Am 2026-10-11 mit
+# Antenne am Geraet nachgemessen; dieser Stand haelt den Befund fest.
+longpath_add_test(tst_sunsdr_ein_steller)
+
 # -- Die QRP muss mit IHRER Abtastrate gefahren werden, nicht mit Atlas'
 #    (2026-09-23: sie steht in keiner HPSDRModel-Liste, darum fiel die
 #    Aufloesung still auf Atlas und mit ihr auf 192 kHz). --

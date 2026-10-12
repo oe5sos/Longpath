@@ -1019,6 +1019,56 @@ QByteArray SunSdrRadioConnection::preampFrameFor(int preampModeIdx)
     return SunSdr::withControlFrameCrc(frame);
 }
 
+// ── Vorverstaerker und Daempfung sind an der QRP EIN Steller ───────────
+//
+// Beide schreiben Opcode 0x04 mit demselben Stufenindex an derselben
+// Stelle (Byte 18): 00/01/02/03 = -20/-10/0/+10 dB. Wer eines von beiden
+// bewegt, verstellt damit das andere -- still, und die Oberflaeche merkt
+// es nicht.
+//
+// Am 2026-10-11 am Geraet mit Antenne auf 14,200 MHz nachgemessen, am
+// Rauschflur im I/Q (vor dem Pegelabgleich des Profils):
+//
+//   Vorverstaerker -20 dB   -102,9 dBFS      Daempfung   0 dB    -83,6
+//   Vorverstaerker -10 dB    -92,4 dBFS      Daempfung -20 dB   -103,3
+//   Vorverstaerker   0 dB    -81,9 dBFS
+//   Vorverstaerker +10 dB    -68,0 dBFS
+//
+// "Daempfung 0 dB" liegt auf dem Pegel von "Vorverstaerker 0 dB" und
+// "Daempfung -20 dB" auf dem von "Vorverstaerker -20 dB": nach einem
+// Vorverstaerker +10 dB fiel der Pegel durch setAttenuator(0) von -68,0
+// auf -83,6 dBFS. Das ist die Messung zu dem, was der Rahmenbauer
+// weiter unten schon sagt.
+//
+// Hier wird nur MITGESCHRIEBEN, nicht entschieden: ob daraus in der
+// Oberflaeche ein Steller statt zwei wird, gehoert dem Betreiber.
+void SunSdrRadioConnection::merkeStufe04(const QByteArray& frame,
+                                         const QString& weg)
+{
+    if (frame.size() < 19) { return; }
+    const int stufe = int(quint8(frame.at(18)));
+    if (stufe == m_stufe04) { return; }
+    const int vorher = m_stufe04;
+    m_stufe04 = stufe;
+    static const char* kDb[4] = { "-20 dB", "-10 dB", "0 dB", "+10 dB" };
+    const auto text = [](int st) {
+        return (st >= 0 && st < 4) ? QString::fromLatin1(kDb[st])
+                                   : QStringLiteral("unbekannt");
+    };
+    if (vorher < 0) {
+        qCInfo(lcSunSdr).noquote()
+            << QStringLiteral("SunSdr: Stufe 0x04 steht auf %1 (gesetzt ueber "
+                              "%2) -- Vorverstaerker und Daempfung teilen "
+                              "diese eine Stufe.").arg(text(stufe), weg);
+        return;
+    }
+    qCInfo(lcSunSdr).noquote()
+        << QStringLiteral("SunSdr: Stufe 0x04 %1 -> %2 (ueber %3) -- es ist "
+                          "DIESELBE Stufe fuer Vorverstaerker und Daempfung, "
+                          "die jeweils andere Anzeige stimmt danach nicht "
+                          "mehr.").arg(text(vorher), text(stufe), weg);
+}
+
 void SunSdrRadioConnection::setPreampModeIndex(int preampModeIdx)
 {
     if (!m_controlSocket || !m_profile || m_radioAddr.isNull()) {
@@ -1039,6 +1089,7 @@ void SunSdrRadioConnection::setPreampModeIndex(int preampModeIdx)
     qCInfo(lcSunSdr).noquote() << "SunSdr: preamp step ->"
                                << frame.mid(18, 1).toHex() << "(mode index"
                                << preampModeIdx << ")";
+    merkeStufe04(frame, QStringLiteral("Vorverstaerker"));
 }
 
 void SunSdrRadioConnection::setAttenuator(int dB)
@@ -1110,6 +1161,7 @@ void SunSdrRadioConnection::setAttenuator(int dB)
     }
 
     sendeSteuerrahmen(frame, "Daempfung 0x04");
+    merkeStufe04(frame, QStringLiteral("Daempfung"));
     qCInfo(lcSunSdr) << "SunSdr: setAttenuator() ->" << dB << "dB";
 }
 
