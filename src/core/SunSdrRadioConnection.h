@@ -196,6 +196,22 @@ public:
     void setSingleChannelHoldMsForTest(int ms) { m_singleChannelHoldMs = ms; }
     // Der Rahmen, den setAttenuator(dB) schicken wuerde; leer fuer
     // Werte, die die QRP nicht hat.
+    // ── Netzlage zum Geraet ────────────────────────────────────────
+    //
+    // Ein Netzeintrag dieses Rechners, so viel wie fuer die Frage
+    // "liegt das Geraet in diesem Netz?" gebraucht wird. Eigene
+    // Struktur, damit ein Pruefstand Netze vorgeben kann, ohne echte
+    // Schnittstellen zu haben.
+    struct NetzEintrag {
+        QString      name;
+        QHostAddress adresse;
+        int          praefix{0};
+    };
+    // Ein Satz dazu, ob das Geraet ueberhaupt in einem der Netze liegt.
+    static QString netzlage(const QHostAddress& ziel,
+                            const QVector<NetzEintrag>& netze);
+    // Die echten Netze dieses Rechners (ohne Rueckschleife, nur IPv4).
+    static QVector<NetzEintrag> eigeneNetze();
     static QByteArray attenuatorFrameFor(int dB);
     // Schreibt mit, welche Stufe Opcode 0x04 gerade traegt, und sagt im
     // Protokoll, wenn der andere Steller sie verstellt hat.
