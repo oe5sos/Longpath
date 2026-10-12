@@ -2819,6 +2819,23 @@ longpath_add_test(tst_cat_server TestMockRadioModel.cpp)
 # und legt die gerenderte PNG ab, damit die Gestaltung einmal gesehen
 # werden kann, ohne die ganze Anwendung zu starten.
 longpath_add_test(tst_cat_page_render)
+
+# ── Upstream-Abgleich 2026-10-12: Tastweg einer toten Sitzung ───────────────
+# Der Mikrofon-PTT des Funkgeraets kommt als QUEUED-Aufruf ueber die
+# Threadgrenze, und Qt stellt einen bereits abgeschickten Aufruf auch dann
+# noch zu, wenn die Verbindung dahinter schon getrennt ist. Ohne Tor tastet
+# ein mic_ptt=1 der sterbenden Sitzung die naechste. Upstream hat denselben
+# Fehler nach 2026.10.0 behoben (#335); wir hatten die Verdrahtung geerbt.
+longpath_add_test(tst_mic_ptt_session_gate)
+
+# ── Upstream-Abgleich 2026-10-12: Absturz nach fehlgeschlagenem Bind ────────
+# init() legte die Timer erst NACH dem Bind an und kehrte bei einem
+# Bindfehler vorher zurueck -- der naechste Verbindungsversuch lief dann in
+# einen Nullzeiger. Upstream hat denselben Fehler nach 2026.10.0 behoben.
+# Der Pruefstand leitet beide Verbindungsklassen ab und laesst den Bind
+# scheitern; ohne die Behebung stuerzt er ab statt rot zu werden.
+longpath_add_test(tst_socket_bind_failure)
+target_link_libraries(tst_socket_bind_failure PRIVATE Qt6::Network)
 target_link_libraries(tst_rigctld_server PRIVATE Qt6::Network)
 
 # ── Phase 3J-1 closeout Item 4 (2026-05-12): per-(band, mode) filter ────────

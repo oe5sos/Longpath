@@ -2334,6 +2334,31 @@ public slots:
     /// Added for the CAT SM command and rigctld's STRENGTH level.
     Q_INVOKABLE double rxSignalDbm(int rx) const;
 
+    /// Gate for the radio's own mic-PTT bit. `session` is the radio
+    /// session the report belongs to; anything from an older session is
+    /// dropped instead of reaching MoxController.
+    ///
+    /// The report crosses threads as a QUEUED call, and Qt delivers a
+    /// call that was already posted even after the connection behind it
+    /// was disconnected or destroyed. Without this gate a mic_ptt=1 from
+    /// the dying session lands in the replacement session and keys it --
+    /// upstream NereusSDR fixed the same thing after 2026.10.0
+    /// ("Prevent a callback from an old radio session from keying a
+    /// replacement session", #335).
+    ///
+    /// Q_INVOKABLE so the test can deliver a report from a stale session
+    /// the way Qt would.
+    Q_INVOKABLE void handleMicPttFromRadio(quint64 session, bool pressed);
+
+    /// The session number a mic-PTT report must carry to be acted on.
+    /// Incremented on every connect and on every teardown.
+    quint64 radioSession() const { return m_radioSession; }
+
+    /// Retire the current radio session, so anything still in flight from
+    /// it is dropped by handleMicPttFromRadio. Called from the teardown
+    /// path; Q_INVOKABLE so the test can retire a session the same way.
+    Q_INVOKABLE void retireRadioSession() { ++m_radioSession; }
+
     // ── Phase 3R Task I5: RadeChannel signal-graph slots ────────────────────
     //
     // Public slots so Qt's auto-connection queues them correctly when the
@@ -3428,6 +3453,11 @@ private:
     // removed and recreated under us.
     bool m_vfoSync{false};
     QMetaObject::Connection m_vfoSyncConn;
+
+    // Radio-session counter for handleMicPttFromRadio. Starts at 1 so a
+    // report carrying the default 0 is never mistaken for the live
+    // session.
+    quint64 m_radioSession{1};
 
     // 2026-05-22 spectrum-calibration fix: cache of the last rxMeterOffsetDb
     // value we emitted via rxMeterOffsetChanged. NaN sentinel forces the

@@ -311,6 +311,12 @@ private slots:
     // arrives. Emits connectFailed(Timeout, ...) — Phase 3Q Task 3.
     void onConnectTimeout();
 
+protected:
+    // Bind the UDP socket. Virtual so a test can make it fail -- a bind
+    // on port 0 cannot be made to fail from the outside, and the failure
+    // path is exactly what used to crash (see init()).
+    virtual bool bindSocket();
+
 private:
     // ── The announced receiver count has two inputs ──────────────────────
     //
@@ -453,6 +459,10 @@ private:
     void checkFirmwareMinimum(int fw);
 
     // --- State ---
+    // False until the socket is bound. connectToRadio() retries the bind
+    // and refuses the connection instead of walking into null timers.
+    bool m_socketBound{false};
+
     QUdpSocket* m_socket{nullptr};
     QTimer*     m_watchdogTimer{nullptr};
     QTimer*       m_ep2PacerTimer{nullptr};
