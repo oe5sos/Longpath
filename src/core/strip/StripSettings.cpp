@@ -203,6 +203,21 @@ void saveTo(const QString& prefix, const StripChain& chain)
         putV(b + QStringLiteral("Slope"),   p.slopeDbPerOct);
     }
 
+    // ── Die Reihenfolge der Stufen ──────────────────────────────
+    //
+    // Als Liste von Woertern, nicht als Zahlen: eine Datei, die
+    // „4,5,6" sagt, ist beim naechsten Umbau des Aufzaehlungstyps
+    // eine andere Kette, ohne dass jemand etwas merkt. Fehlt der
+    // Schluessel, gilt die Vorgabe -- jede Datei von vor dem
+    // 2026-10-13 ist damit richtig gelesen.
+    {
+        QStringList folge;
+        for (const StripChain::Stage st : c.stageOrder()) {
+            folge << QString::fromLatin1(StripChain::stageToken(st));
+        }
+        putV(key(prefix, "StageOrder"), folge.join(QLatin1Char(',')));
+    }
+
     putF(prefix, "LimiterCeilingDb",    c.limiter().ceilingDb());
     putF(prefix, "LimiterOutputTrimDb", c.limiter().outputTrimDb());
     putV(key(prefix, "LimiterDcBlock"), c.limiter().dcBlockEnabled());
@@ -260,6 +275,33 @@ void saveTo(const QString& prefix, const StripChain& chain)
 
 void restoreFrom(const QString& prefix, StripChain& c)
 {
+    // Zuerst die Reihenfolge: sie entscheidet, in welcher Folge die
+    // Stufen laufen, nicht welche Werte sie tragen -- aber wer unten
+    // beim Lesen eines Wertes stolpert, soll wenigstens die richtige
+    // Kette vor sich haben.
+    {
+        const QString roh = getV(key(prefix, "StageOrder")).toString();
+        if (!roh.isEmpty()) {
+            const QStringList teile = roh.split(QLatin1Char(','),
+                                                Qt::SkipEmptyParts);
+            StripChain::Order folge{};
+            int n = 0;
+            for (const QString& t : teile) {
+                StripChain::Stage st{};
+                if (n < StripChain::kStageCount
+                    && StripChain::stageFromToken(t.trimmed().toLatin1()
+                                                      .constData(), st)) {
+                    folge[size_t(n)] = st;
+                    ++n;
+                }
+            }
+            // setStageOrder() nimmt nur eine Permutation an; eine
+            // unvollstaendige oder verdorbene Liste laesst die Vorgabe
+            // stehen, statt eine halbe Kette zu bauen.
+            if (n == StripChain::kStageCount) { c.setStageOrder(folge); }
+        }
+    }
+
 
     c.gate().setThresholdDb(getF(prefix, "GateThresholdDb", c.gate().thresholdDb()));
     c.gate().setRatio      (getF(prefix, "GateRatio",       c.gate().ratio()));

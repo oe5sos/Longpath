@@ -135,6 +135,18 @@ public:
     bool setStageOrder(const Order& order) noexcept;
     Order stageOrder() const noexcept;
 
+    // Ein kurzes, UNVERAENDERLICHES Wort je Stufe -- fuer die
+    // Einstellungsdatei und fuer Aethers Profile, die ihre Kette als
+    // Liste solcher Woerter tragen. Bewusst NICHT stageName(): das ist
+    // die Beschriftung, die darf sich aendern und wird uebersetzt.
+    // Eine Reihenfolge, die an Beschriftungen haengt, kippt beim
+    // naechsten Umbenennen.
+    static const char* stageToken(Stage s) noexcept;
+
+    // Nimmt auch Aethers Namen an: "Enh" ist dort der Anreicherer, bei
+    // uns heisst dieselbe Stufe "Pudu". Unbekanntes meldet false.
+    static bool stageFromToken(const char* token, Stage& out) noexcept;
+
     // ── Einschubplaetze fuer fremde Effekte ──────────────────────────
     //
     // ZUSATZ, nicht Weg. Beide Plaetze sind leer, solange sie niemand

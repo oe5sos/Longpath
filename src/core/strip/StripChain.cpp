@@ -14,6 +14,8 @@
 
 #include "core/strip/StripChain.h"
 
+#include <cstring>
+
 #include <algorithm>
 #include <cmath>
 #include <thread>
@@ -100,6 +102,38 @@ bool StripChain::setStageOrder(const Order& order) noexcept
 StripChain::Order StripChain::stageOrder() const noexcept
 {
     return unpackOrder(m_order.load(std::memory_order_acquire));
+}
+
+const char* StripChain::stageToken(Stage s) noexcept
+{
+    switch (s) {
+    case Stage::Denoise: return "Denoise";
+    case Stage::Gate:    return "Gate";
+    case Stage::Eq:      return "Eq";
+    case Stage::DeEss:   return "DeEss";
+    case Stage::Comp:    return "Comp";
+    case Stage::Tube:    return "Tube";
+    case Stage::Pudu:    return "Pudu";
+    case Stage::Reverb:  return "Reverb";
+    case Stage::Clip:    return "Clip";
+    case Stage::Limiter: return "Limiter";
+    case Stage::Count:   break;
+    }
+    return "";
+}
+
+bool StripChain::stageFromToken(const char* token, Stage& out) noexcept
+{
+    if (token == nullptr) { return false; }
+    for (int i = 0; i < kStageCount; ++i) {
+        const auto s = static_cast<Stage>(i);
+        if (std::strcmp(token, stageToken(s)) == 0) { out = s; return true; }
+    }
+    // Aethers Name fuer dieselbe Stufe. Steht hier und nicht beim
+    // Einlesen des Profils, weil jede Stelle, die eine Kette aus
+    // Woertern liest, ihn verstehen soll.
+    if (std::strcmp(token, "Enh") == 0) { out = Stage::Pudu; return true; }
+    return false;
 }
 
 void StripChain::runStageAt(Stage which, float* samples, int frames) noexcept
