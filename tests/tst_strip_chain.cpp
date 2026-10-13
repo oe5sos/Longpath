@@ -14,7 +14,11 @@
 
 #include <QtTest/QtTest>
 
+#include <QFile>
+#include <QXmlStreamReader>
+
 #include "core/strip/StripChain.h"
+#include "core/AppSettings.h"
 #include "core/strip/StripSettings.h"
 
 #include <cmath>
@@ -79,6 +83,8 @@ private slots:
     void every_preset_names_itself_and_applies();
     void a_user_preset_round_trips();
     void a_bad_preset_name_is_refused();
+    void two_user_presets_both_survive_the_file();
+    void a_preset_name_with_a_dash_keeps_the_file_readable();
     void the_default_order_is_the_one_the_header_promises();
     void an_order_that_is_not_a_permutation_is_refused();
     void the_tube_in_front_is_a_different_device();
@@ -676,6 +682,114 @@ void TstStripChain::the_tube_in_front_is_a_different_device()
     qInfo("Kompressor->Roehre RMS %.4f | Roehre->Kompressor RMS %.4f "
           "(%.2f dB Unterschied)", rmsA, rmsB,
           20.0 * std::log10(std::max(rmsB, 1e-9) / std::max(rmsA, 1e-9)));
+}
+
+// ── Zwei eigene Ketten, nicht nur eine ───────────────────────────────
+//
+// Die Liste der eigenen Ketten steht als QStringList in den
+// Einstellungen, und AppSettings legt jeden Wert als val.toString() ab
+// (AppSettings.cpp:871-909). QVariant::toString() liefert bei einer
+// Liste mit EINEM Eintrag diesen Eintrag -- und bei zweien eine LEERE
+// Zeichenkette. Die zweite abgelegte Kette nimmt also beim Speichern
+// die erste mit ins Grab, und nach dem Neustart ist die Liste leer,
+// obwohl alle Werte noch auf der Platte stehen.
+//
+// Geprueft wird deshalb die DATEI, nicht der Hauptspeicher: im
+// Hauptspeicher ist die Liste in Ordnung, und genau daran ist das
+// bisher nicht aufgefallen.
+void TstStripChain::two_user_presets_both_survive_the_file()
+{
+    StripChain c;
+    c.prepare(kRate);
+    c.comp().setMakeupDb(4.0f);
+    QVERIFY(StripSettings::saveUserPreset(QStringLiteral("Eins"), c));
+    c.comp().setMakeupDb(5.0f);
+    QVERIFY(StripSettings::saveUserPreset(QStringLiteral("Zwei"), c));
+
+    QStringList namen = StripSettings::userPresetNames();
+    QVERIFY2(namen.contains(QStringLiteral("Eins"))
+                 && namen.contains(QStringLiteral("Zwei")),
+             qPrintable(QStringLiteral("im Speicher fehlt schon eine: %1")
+                            .arg(namen.join(QLatin1Char(',')))));
+
+    AppSettings::instance().save();
+    QFile f(AppSettings::instance().filePath());
+    QVERIFY(f.open(QIODevice::ReadOnly));
+    const QString inhalt = QString::fromUtf8(f.readAll());
+
+    // In der Datei stehen die Namen base64-kodiert, einer je Eintrag:
+    // ein Trennzeichen kann so in keinem Namen vorkommen. Geprueft wird
+    // deshalb der entschluesselte Inhalt, nicht der Rohtext.
+    const int at = inhalt.indexOf(QStringLiteral("UserPresets"));
+    QVERIFY2(at >= 0, "der Schluessel steht gar nicht in der Datei");
+    const int von = inhalt.indexOf(QLatin1Char('>'), at) + 1;
+    const int bis = inhalt.indexOf(QLatin1Char('<'), von);
+    const QString roh = inhalt.mid(von, bis - von);
+    QVERIFY2(!roh.trimmed().isEmpty(),
+             "die Liste steht leer in der Datei -- die zweite Kette hat "
+             "die erste mitgenommen");
+
+    QStringList ausDerDatei;
+    if (roh.startsWith(QStringLiteral("@StringList("))) {
+        const QString inner = roh.mid(12, roh.size() - 13);
+        for (const QString& e : inner.split(QLatin1Char(','),
+                                            Qt::SkipEmptyParts)) {
+            ausDerDatei << QString::fromUtf8(
+                QByteArray::fromBase64(e.toLatin1()));
+        }
+    } else {
+        ausDerDatei << roh;
+    }
+    QVERIFY2(ausDerDatei.contains(QStringLiteral("Eins"))
+                 && ausDerDatei.contains(QStringLiteral("Zwei")),
+             qPrintable(QStringLiteral("in der Datei stehen: %1")
+                            .arg(ausDerDatei.join(QLatin1Char(',')))));
+
+    QVERIFY(StripSettings::removeUserPreset(QStringLiteral("Eins")));
+    QVERIFY(StripSettings::removeUserPreset(QStringLiteral("Zwei")));
+}
+
+// ── Ein Gedankenstrich im Namen ──────────────────────────────────────
+//
+// „SSB_30.07.2026 — Glanz im Band": der Gedankenstrich U+2014 ist in
+// einem XML-Elementnamen NICHT erlaubt. Bis zum 2026-10-13 wanderte er
+// ungeprüft in den Namen des Schlüssels, und die Einstellungsdatei war
+// damit unlesbar -- beim nächsten Start lief die Wiederherstellung aus
+// der Sicherung an und die Arbeit seither war weg. Am Gerät des
+// Betreibers ist genau das einmal passiert (Longpath.settings.corrupt-
+// 20261013-214358).
+void TstStripChain::a_preset_name_with_a_dash_keeps_the_file_readable()
+{
+    StripChain c;
+    c.prepare(kRate);
+    c.tube().setDriveDb(7.0f);
+
+    const QString name = QStringLiteral("Probe \u2014 Glanz im Band");
+    QVERIFY(StripSettings::saveUserPreset(name, c));
+    AppSettings::instance().save();
+
+    // Die Datei muss ein Leser noch öffnen können.
+    QFile f(AppSettings::instance().filePath());
+    QVERIFY(f.open(QIODevice::ReadOnly));
+    const QByteArray roh = f.readAll();
+    QXmlStreamReader xml(roh);
+    while (!xml.atEnd()) { xml.readNext(); }
+    QVERIFY2(!xml.hasError(),
+             qPrintable(QStringLiteral("die Datei ist kein gültiges XML "
+                                       "mehr: %1").arg(xml.errorString())));
+
+    // Und der Name muss zurückkommen, wie er hineinging.
+    QVERIFY2(StripSettings::userPresetNames().contains(name),
+             qPrintable(QStringLiteral("Liste: %1")
+                            .arg(StripSettings::userPresetNames()
+                                     .join(QLatin1Char(',')))));
+
+    StripChain z;
+    z.prepare(kRate);
+    QVERIFY(StripSettings::applyUserPreset(name, z));
+    QVERIFY(qFuzzyCompare(z.tube().driveDb(), 7.0f));
+
+    QVERIFY(StripSettings::removeUserPreset(name));
 }
 
 QTEST_APPLESS_MAIN(TstStripChain)

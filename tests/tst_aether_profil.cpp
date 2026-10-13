@@ -280,6 +280,58 @@ private slots:
         qInfo("eingetragen: %s", qPrintable(e.name));
     }
 
+    // ── Werkzeug: dieselbe Kette, der Glanz im Band ─────────────────
+    //
+    // Martins Aether-Entzerrer hebt mit einem Kuhschwanz bei 4982 Hz
+    // um 2,63 dB an -- und der Kanal macht bei 4050 Schluss. Roh hoert
+    // er den Glanz, die Gegenseite nie. Diese Fassung schiebt NUR
+    // dieses eine Band nach unten, damit die Anhebung innerhalb der
+    // Bandbreite liegt; alles andere bleibt, wie es ist. Ein Zug
+    // ändert eine Größe, sonst ist der Vergleich nicht lesbar.
+    //
+    // Wird als EIGENE Kette abgelegt. Sein Grundstock bleibt
+    // unangetastet -- „das ist die basis".
+    void legt_eine_variante_mit_glanz_im_band_ab()
+    {
+        if (qgetenv("LONGPATH_AETHER_APPLY") != QByteArray("1")) {
+            QSKIP("LONGPATH_AETHER_APPLY nicht gesetzt");
+        }
+        const QString pfad = qEnvironmentVariable("LONGPATH_AETHER_FILE",
+                                                  profilPfad());
+        const float neueEcke = qEnvironmentVariable(
+            "LONGPATH_AETHER_SHELF", QStringLiteral("3400")).toFloat();
+
+        StripChain c;
+        c.prepare(kRate);
+        const auto e = AetherPreset::applyFile(pfad, c);
+        QVERIFY2(e.ok, qPrintable(e.fehler));
+
+        int verschoben = -1;
+        for (int i = 0; i < c.eq().activeBandCount(); ++i) {
+            ClientEq::BandParams b = c.eq().band(i);
+            if (b.type != ClientEq::FilterType::HighShelf || !b.enabled) {
+                continue;
+            }
+            if (b.freqHz <= 4050.0f) { continue; }   // liegt schon im Band
+            const float alt = b.freqHz;
+            b.freqHz = neueEcke;
+            c.eq().setBand(i, b);
+            verschoben = i;
+            qInfo("Kuhschwanz Band %d: %.0f Hz -> %.0f Hz (%+.2f dB)",
+                  i, double(alt), double(neueEcke), double(b.gainDb));
+            break;
+        }
+        QVERIFY2(verschoben >= 0, "kein Kuhschwanz über der Kanalgrenze");
+
+        const QString name = (e.name.isEmpty() ? QStringLiteral("Aether")
+                                               : e.name)
+                             + QStringLiteral(" — Glanz im Band");
+        QVERIFY(StripSettings::saveUserPreset(name, c));
+        AppSettings::instance().save();
+        qInfo("abgelegt als: %s", qPrintable(name));
+        qInfo("Datei: %s", qPrintable(AppSettings::instance().filePath()));
+    }
+
     // ── Was keine Kanalzugdatei ist, kommt nicht hinein ──────────────
     void ein_fremdes_json_wird_abgelehnt()
     {
