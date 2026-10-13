@@ -272,6 +272,7 @@ warren@wpratt.com
 #include "gui/LayoutProfiles.h"
 #include "gui/widgets/WorldTexture.h"
 #include "applets/StripWindow.h"
+#include "core/strip/BandLimit.h"
 #include "UpdateDialog.h"
 #include "core/UpdateChecker.h"
 #include "widgets/RotorLogbookPanel.h"
@@ -14987,6 +14988,42 @@ void MainWindow::finishPuduTake()
             constexpr int kBlock = 64;
             for (int at = 0; at + kBlock <= inFrames; at += kBlock) {
                 offline.processMono(mono.data() + at, kBlock);
+            }
+        }
+
+        // ── Und durch den Sendekanal ────────────────────────────────
+        //
+        // Bis zum 2026-10-13 fehlte das hier: „Aufnehmen" und
+        // „Abspielen" liessen die Stimme in voller Bandbreite hoeren,
+        // also in einer Fassung, die auf der Gegenseite nie ankommt.
+        // Der Mithoerer hat die Kanalwahl seit dem 2026-10-10 --
+        // dieselbe Einstellung, dieselbe Nummer, nur hier nicht
+        // benutzt.
+        //
+        // Der Kanal gehoert dem SENDER, nicht der Kette: er laeuft
+        // deshalb auch dann, wenn der Hauptschalter aus ist. Genau so
+        // macht es der Mithoerer, und genau darum ist das rohe
+        // Mikrofon durch den Kanal die ehrliche Seite A des
+        // Vergleichs.
+        {
+            const int kanal = AppSettings::instance()
+                                  .value(QStringLiteral("StripMonitorChannel"),
+                                         -1).toInt();
+            if (kanal >= 0 && kanal < BandLimit::kChannelCount) {
+                BandLimit band;
+                band.prepare(48000.0);
+                band.setChannel(kanal);
+                // Bis zum letzten Abtastwert, nicht bis zum letzten
+                // vollen Block: ein ungefilterter Rest am Ende waere
+                // genau die Stelle, an der ein Vergleich kippt.
+                constexpr int kBlock = 240;
+                int at = 0;
+                for (; at + kBlock <= inFrames; at += kBlock) {
+                    band.process(mono.data() + at, kBlock);
+                }
+                if (at < inFrames) {
+                    band.process(mono.data() + at, inFrames - at);
+                }
             }
         }
 

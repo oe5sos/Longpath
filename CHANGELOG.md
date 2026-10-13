@@ -2,6 +2,39 @@
 
 ## [Unreleased]
 
+### „Aufnehmen" und „Abspielen" gehen jetzt durch den Sendekanal
+
+Die beiden Knöpfe liessen die Stimme in voller Bandbreite hören — also
+in einer Fassung, die auf der Gegenseite nie ankommt. Der Mithörer hat
+die Kanalwahl seit dem 2026-10-10; dieselbe Einstellung, dieselbe
+Nummer, nur hier nicht benutzt. Die Aufnahme läuft jetzt nach der Kette
+durch denselben Kanal, bis zum letzten Abtastwert (ein ungefilterter
+Rest am Ende wäre genau die Stelle, an der ein Vergleich kippt).
+
+Der Kanal gehört dem Sender, nicht der Kette: er läuft deshalb auch
+dann, wenn der Hauptschalter aus ist — das rohe Mikrofon durch den
+Kanal ist die ehrliche Seite A des Vergleichs.
+
+### Ein Griff in die Profilliste vernichtet keine Arbeit mehr
+
+Eine Voreinstellung ersetzt JEDE Stufe. Der bestehende Stand wandert
+vorher unter „Zuletzt bearbeitet" und steht gleich danach in derselben
+Liste — ohne Rückfrage, ohne Fenster. Die Sicherung sichert sich beim
+Zurückkehren nicht selbst über.
+
+### Eine kaputte Einstellungsdatei wird repariert statt aufgegeben
+
+Der Schreiber kannte die echte XML-Regel seit heute Abend; der Leser
+hat eine zweite Stelle mit derselben Lücke — die Reparaturstufe, die
+beim Laden über die Datei läuft. Beide prüfen jetzt `istNameChar()`.
+Nachgerechnet an der Datei, die am 2026-10-13 um 21:43 anfiel:
+
+```
+Elementnamen mit verbotenem Zeichen   326
+nach der Reparatur                    gültiges XML, 9860 Einträge
+ohne Reparatur                        Fehler in Zeile 9701, Spalte 51
+```
+
 ### Aethers Kanalzug ist die Grundlage — sein Profil, Wert für Wert
 
 > „mein headset funktioniert mit windows und dem aether channel strip,
