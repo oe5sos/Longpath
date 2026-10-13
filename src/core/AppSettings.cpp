@@ -513,7 +513,21 @@ static QString sanitizeXmlForLoad(const QString& text)
                 case '~':  out += QLatin1String("__tilde__"); break;
                 case '`':  out += QLatin1String("__bt__");    break;
                 case '\\': out += QLatin1String("__bs__");    break;
-                default:   out += nc;                         break;
+                default:
+                    // Wie beim Schreiben: die echte XML-Regel, nicht
+                    // eine Liste von Verdaechtigen. Damit laesst sich
+                    // eine Datei RETTEN, die eine aeltere Fassung mit
+                    // einem Gedankenstrich im Schluessel geschrieben
+                    // hat -- vorher war sie nur noch ein Fall fuer die
+                    // Sicherung.
+                    if (istNameChar(nc.unicode())) {
+                        out += nc;
+                    } else {
+                        out += QStringLiteral("__u%1__")
+                                   .arg(uint(nc.unicode()), 4, 16,
+                                        QLatin1Char('0'));
+                    }
+                    break;
             }
             i++;
         }

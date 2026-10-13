@@ -2750,6 +2750,111 @@ private slots:
                                 .arg(groessteAbweichung)));
     }
 
+    // ── Wieviel von SEINEM Zischdämpfer überlebt den Kanal? ─────────
+    //
+    // Sein Aether-Profil fasst die Zischlaute bei 3836 Hz mit Güte 5
+    // an und senkt dort um 15,1 dB. Der ESSB-Kanal macht bei 4050 Hz
+    // Schluss, und die Flanke beginnt davor. Die Frage ist dieselbe
+    // wie beim Kuhschwanz bei 4982 Hz: stellt er etwas ein, das die
+    // Gegenseite gar nicht mehr hört?
+    //
+    // Gemessen wird an echter Sprache, Terz für Terz, mit und ohne
+    // Zischdämpfer -- jeweils DURCH den Kanal.
+    void howMuchOfHisDeEsserSurvivesTheChannel()
+    {
+        QString warum;
+        const auto sauber = echteRede(&warum);
+        if (sauber.empty()) { QSKIP(qPrintable(warum)); }
+
+        const Rede r = redeMitRauschen(sauber, -60.0);
+
+        const auto durchDeEss = [&](bool an) {
+            ClientDeEss d;
+            d.prepare(kRate);
+            d.setEnabled(an);
+            // Seine Werte, aus SSB_30.07.2026.
+            d.setFrequencyHz(3836.18f);
+            d.setQ(5.0f);
+            d.setThresholdDb(-34.5f);
+            d.setAmountDb(-15.12f);
+            d.setAttackMs(1.0f);
+            d.setReleaseMs(65.03f);
+            std::vector<float> x = r.signal;
+            for (size_t at = 0; at + 240 <= x.size(); at += 240) {
+                d.process(x.data() + at, 240, 1);
+            }
+            return x;
+        };
+
+        const auto ohne = durchDeEss(false);
+        const auto mit  = durchDeEss(true);
+
+        // ── Gegenprobe am Werkzeug ──────────────────────────────────
+        //
+        // Misst die Reihe unten lauter Nullen, kann das zweierlei
+        // heissen: der Daempfer ruehrt sich nicht, oder der Prueftand
+        // ruft ihn falsch. Also einmal mit einer Schwelle, bei der er
+        // sich ruehren MUSS.
+        {
+            ClientDeEss d;
+            d.prepare(kRate);
+            d.setEnabled(true);
+            d.setFrequencyHz(3836.18f);
+            d.setQ(5.0f);
+            d.setThresholdDb(-70.0f);
+            d.setAmountDb(-15.12f);
+            std::vector<float> x = r.signal;
+            for (size_t at = 0; at + 240 <= x.size(); at += 240) {
+                d.process(x.data() + at, 240, 1);
+            }
+            // Schmal messen, nicht in Terzen: eine Güte von 5 greift
+            // 767 Hz breit, eine Terz ist fast 1000 Hz breit -- der
+            // Schnitt verschwindet im Mittelwert.
+            const double o = bandDb(spektrum(r.signal), 3700, 4000);
+            const double m = bandDb(spektrum(x), 3700, 4000);
+            qInfo().noquote() << QStringLiteral(
+                "   Gegenprobe (Schwelle -70 dB): 3,7–4,0 k %1 → %2 dB (%3)")
+                .arg(o, 0, 'f', 1).arg(m, 0, 'f', 1).arg(o - m, 0, 'f', 2);
+            QVERIFY2(o - m > 0.5,
+                     "der Prüfstand ruft den Dämpfer falsch -- er rührt "
+                     "sich auch bei -70 dB Schwelle nicht");
+        }
+
+        struct B { const char* name; double von; double bis; };
+        static const B kB[] = {
+            { "2 kHz",      1778, 2239 }, { "3,15 k",     2818, 3548 },
+            { "3,7–4,0 k",  3700, 4000 },   // dort arbeitet SEIN Dämpfer
+            { "4,0–4,4 k",  4000, 4400 }, { "5 kHz",      4467, 5623 },
+            { "6,3 k",      5623, 7079 },
+        };
+
+        qInfo().noquote() << QStringLiteral(
+            "   Band     ohne Kanal: ohne/mit Dämpfer    "
+            "durch 50–4050: ohne/mit");
+        double groessteRoh = 0.0;
+        double groessteImKanal = 0.0;
+        for (const B& b : kB) {
+            const double o = bandDb(spektrum(ohne), b.von, b.bis);
+            const double m = bandDb(spektrum(mit),  b.von, b.bis);
+            const double ok = bandDb(spektrum(durchKanal(3, ohne)), b.von, b.bis);
+            const double mk = bandDb(spektrum(durchKanal(3, mit)),  b.von, b.bis);
+            groessteRoh = std::max(groessteRoh, o - m);
+            groessteImKanal = std::max(groessteImKanal, ok - mk);
+            qInfo().noquote()
+                << QStringLiteral("  %1  %2 → %3 (%4 dB)   %5 → %6 (%7 dB)")
+                       .arg(QString::fromUtf8(b.name), -7)
+                       .arg(o, 6, 'f', 1).arg(m, 6, 'f', 1).arg(o - m, 5, 'f', 2)
+                       .arg(ok, 6, 'f', 1).arg(mk, 6, 'f', 1)
+                       .arg(ok - mk, 5, 'f', 2);
+        }
+        qInfo().noquote() << QStringLiteral(
+            "   stärkste Absenkung: roh %1 dB · durch den Kanal %2 dB")
+            .arg(groessteRoh, 0, 'f', 2).arg(groessteImKanal, 0, 'f', 2);
+        qInfo().noquote() << QStringLiteral(
+            "   (Je weiter die zweite Zahl unter der ersten liegt, desto "
+            "mehr stellt er etwas ein, das die Gegenseite nicht hört.)");
+    }
+
     void theGroupDelayOfEachChannel()
     {
         const auto laufzeitMs = [](int ch, double hz) {

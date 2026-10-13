@@ -21,6 +21,8 @@
 
 #include <QtTest/QtTest>
 #include <QTemporaryDir>
+#include <QXmlStreamReader>
+#include <QFile>
 
 #include "core/AppSettings.h"
 
@@ -29,6 +31,137 @@ using namespace Longpath;
 class TstAppSettingsArbitraryKeyPersistence : public QObject {
     Q_OBJECT
 private slots:
+    // ── Zeichen, die XML in einem Elementnamen nicht erlaubt ────────
+    //
+    // Der Name einer eigenen Kette wird Teil des SCHLÜSSELS, und der
+    // Schlüssel wird ein Elementname. Bis zum 2026-10-13 fing die
+    // Tabelle nur ASCII-Sonderzeichen ab; ein Gedankenstrich (U+2014,
+    // im gesperrten Bereich #x2000–#x206F) machte die Datei unlesbar.
+    // Am Gerät des Betreibers ist das einmal passiert.
+    //
+    // Umlaute SIND in XML-Namen erlaubt und müssen unverändert
+    // stehenbleiben -- sonst zeigen alte Einstellungsdateien plötzlich
+    // auf Schlüssel, die es nicht mehr gibt.
+    void keys_with_awkward_characters_keep_the_file_readable() {
+        QTemporaryDir tmp;
+        QVERIFY(tmp.isValid());
+        const QString path = tmp.filePath(QStringLiteral("probe.settings"));
+
+        const QStringList schluessel{
+            QStringLiteral("Kette/SSB \u2014 Glanz im Band/TubeDriveDb"),
+            QStringLiteral("Kette/Grüße & Umlaute/Wert"),
+            QStringLiteral("Kette/Pfeil \u2192 Ziel/Wert"),
+            QStringLiteral("Kette/Smiley \U0001F600/Wert"),
+        };
+        {
+            AppSettings s(path);
+            for (int i = 0; i < schluessel.size(); ++i) {
+                s.setValue(schluessel.at(i), QString::number(i + 1));
+            }
+            s.save();
+        }
+
+        // Ein fremder Leser muss die Datei öffnen können.
+        QFile f(path);
+        QVERIFY(f.open(QIODevice::ReadOnly));
+        const QByteArray roh = f.readAll();
+        QXmlStreamReader xml(roh);
+        while (!xml.atEnd()) { xml.readNext(); }
+        QVERIFY2(!xml.hasError(),
+                 qPrintable(QStringLiteral("kein gültiges XML: %1")
+                                .arg(xml.errorString())));
+
+        // Umlaute bleiben, wie sie waren -- sonst finden alte Dateien
+        // ihre eigenen Schlüssel nicht mehr.
+        QVERIFY2(QString::fromUtf8(roh).contains(QStringLiteral("Grüße")),
+                 "der Umlaut wurde unnötig umgeschrieben");
+
+        // Und jeder Wert kommt unter seinem Namen zurück.
+        {
+            AppSettings s(path);
+            s.load();   // der Prüf-Konstruktor lädt NICHT von selbst
+            for (int i = 0; i < schluessel.size(); ++i) {
+                QCOMPARE(s.value(schluessel.at(i)).toString(),
+                         QString::number(i + 1));
+            }
+        }
+    }
+
+    // Eine Liste mit MEHR als einem Eintrag überlebte val.toString()
+    // nicht: QVariant liefert dort eine leere Zeichenkette, und die
+    // Liste war weg, noch bevor sie auf der Platte stand.
+    void a_string_list_with_several_entries_survives() {
+        QTemporaryDir tmp;
+        QVERIFY(tmp.isValid());
+        const QString path = tmp.filePath(QStringLiteral("probe.settings"));
+
+        const QStringList liste{ QStringLiteral("Eins"),
+                                 QStringLiteral("Zwei, mit Komma"),
+                                 QStringLiteral("Drei = mit Gleich"),
+                                 QStringLiteral("Vier \u2014 mit Strich") };
+        {
+            AppSettings s(path);
+            s.setValue(QStringLiteral("Kette/Liste"), liste);
+            s.save();
+        }
+        {
+            AppSettings s(path);
+            s.load();
+            QCOMPARE(s.value(QStringLiteral("Kette/Liste")).toStringList(),
+                     liste);
+        }
+
+        // Und eine Datei von FRÜHER, die denselben Schlüssel als
+        // schlichten Text trägt, ergibt weiterhin einen Eintrag.
+        const QString alt = tmp.filePath(QStringLiteral("alt.settings"));
+        {
+            QFile f(alt);
+            QVERIFY(f.open(QIODevice::WriteOnly));
+            f.write("<?xml version=\"1.0\"?>\n<Longpath>\n"
+                    "  <Kette__s__Liste>NurEiner</Kette__s__Liste>\n"
+                    "</Longpath>\n");
+        }
+        AppSettings s(alt);
+        s.load();
+        QCOMPARE(s.value(QStringLiteral("Kette/Liste")).toStringList(),
+                 QStringList{ QStringLiteral("NurEiner") });
+    }
+
+    // Eine Datei, die eine ÄLTERE Fassung mit einem Gedankenstrich im
+    // Schlüssel geschrieben hat, ist für jeden XML-Leser kaputt. Sie
+    // wird jetzt beim Laden repariert, statt als verloren zu gelten --
+    // genau diese Datei liegt am Gerät des Betreibers als
+    // Longpath.settings.corrupt-20261013-214358.
+    void an_old_file_with_a_dash_in_a_key_is_repaired_on_load() {
+        QTemporaryDir tmp;
+        QVERIFY(tmp.isValid());
+        const QString path = tmp.filePath(QStringLiteral("alt.settings"));
+        {
+            QFile f(path);
+            QVERIFY(f.open(QIODevice::WriteOnly));
+            f.write(QStringLiteral(
+                        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+                        "<Longpath>\n"
+                        "  <Kette__s__SSB__sp__\u2014__sp__Glanz__s__Wert>42"
+                        "</Kette__s__SSB__sp__\u2014__sp__Glanz__s__Wert>\n"
+                        "  <Harmlos>7</Harmlos>\n"
+                        "</Longpath>\n").toUtf8());
+        }
+
+        AppSettings s(path);
+        s.load();
+        // Der harmlose Schlüssel darf durch die Reparatur nicht
+        // verlorengehen -- vorher war die GANZE Datei unlesbar.
+        QCOMPARE(s.value(QStringLiteral("Harmlos")).toString(),
+                 QStringLiteral("7"));
+        QVERIFY2(!s.allKeys().isEmpty(), "nichts geladen");
+        // Und der Schlüssel mit dem Gedankenstrich kommt unter seinem
+        // richtigen Namen zurück.
+        QCOMPARE(s.value(QStringLiteral("Kette/SSB \u2014 Glanz/Wert"))
+                     .toString(),
+                 QStringLiteral("42"));
+    }
+
     void arbitrary_top_level_key_round_trips() {
         QTemporaryDir tmp;
         QVERIFY(tmp.isValid());
