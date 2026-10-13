@@ -79,6 +79,9 @@ private slots:
     void every_preset_names_itself_and_applies();
     void a_user_preset_round_trips();
     void a_bad_preset_name_is_refused();
+    void the_default_order_is_the_one_the_header_promises();
+    void an_order_that_is_not_a_permutation_is_refused();
+    void the_tube_in_front_is_a_different_device();
 };
 
 void TstStripChain::a_fresh_chain_is_off_and_every_stage_with_it()
@@ -561,6 +564,118 @@ void TstStripChain::a_bad_preset_name_is_refused()
     QVERIFY(!StripSettings::saveUserPreset(QStringLiteral("   "), c));
     QVERIFY(!StripSettings::saveUserPreset(QStringLiteral("a/b"), c));
     QVERIFY(!StripSettings::removeUserPreset(QStringLiteral("never existed")));
+}
+
+// ── Die Reihenfolge der Stufen ───────────────────────────────────────
+//
+// Seit dem 2026-10-13 ist sie einstellbar. Anlass: Martins Aether-
+// Profil (SSB_30.07.2026, unter Windows mit dem Teufel-Headset als gut
+// befunden) traegt die Kette als Liste und stellt die Roehre VOR das
+// Tor -- Tube, Gate, Eq, Comp, DeEss, Enh, Reverb.
+
+void TstStripChain::the_default_order_is_the_one_the_header_promises()
+{
+    StripChain c;
+    c.prepare(kRate);
+    const StripChain::Order ist = c.stageOrder();
+    const StripChain::Order soll = StripChain::defaultOrder();
+    for (int i = 0; i < StripChain::kStageCount; ++i) {
+        QCOMPARE(static_cast<int>(ist[size_t(i)]),
+                 static_cast<int>(soll[size_t(i)]));
+        // Und sie ist dieselbe wie die Reihenfolge des
+        // Aufzaehlungstyps, solange niemand sie umstellt -- sonst
+        // zeigte die Oberflaeche eine andere Kette als die, die laeuft.
+        QCOMPARE(static_cast<int>(soll[size_t(i)]), i);
+    }
+}
+
+void TstStripChain::an_order_that_is_not_a_permutation_is_refused()
+{
+    StripChain c;
+    c.prepare(kRate);
+
+    StripChain::Order doppelt = StripChain::defaultOrder();
+    doppelt[0] = StripChain::Stage::Comp;   // Comp steht jetzt zweimal
+    QVERIFY2(!c.setStageOrder(doppelt),
+             "eine Kette mit einer Stufe zweimal ist kein Kanalzug");
+
+    // Eine abgelehnte Umstellung darf nichts halb umgestellt
+    // hinterlassen.
+    const StripChain::Order ist = c.stageOrder();
+    for (int i = 0; i < StripChain::kStageCount; ++i) {
+        QCOMPARE(static_cast<int>(ist[size_t(i)]), i);
+    }
+
+    StripChain::Order aether = { StripChain::Stage::Tube,
+                                 StripChain::Stage::Gate,
+                                 StripChain::Stage::Eq,
+                                 StripChain::Stage::Comp,
+                                 StripChain::Stage::DeEss,
+                                 StripChain::Stage::Pudu,
+                                 StripChain::Stage::Reverb,
+                                 StripChain::Stage::Denoise,
+                                 StripChain::Stage::Clip,
+                                 StripChain::Stage::Limiter };
+    QVERIFY(c.setStageOrder(aether));
+    QCOMPARE(static_cast<int>(c.stageOrder()[0]),
+             static_cast<int>(StripChain::Stage::Tube));
+}
+
+void TstStripChain::the_tube_in_front_is_a_different_device()
+{
+    // Der Beweis, dass die Umstellung im AUDIOWEG ankommt und nicht
+    // nur in einer Zahl: dieselben zwei Stufen, dieselben Werte,
+    // dasselbe Signal -- einmal Kompressor vor Roehre, einmal
+    // umgekehrt. Kaeme dasselbe heraus, waere die Reihenfolge Schmuck.
+    const auto fahre = [](bool roehreVorn, std::vector<float> x) {
+        StripChain c;
+        c.prepare(kRate);
+        c.setEnabled(true);
+        c.setStageEnabled(StripChain::Stage::Comp, true);
+        c.setStageEnabled(StripChain::Stage::Tube, true);
+
+        c.comp().setThresholdDb(-24.0f);
+        c.comp().setRatio(4.0f);
+        c.comp().setMakeupDb(6.0f);
+        c.tube().setDriveDb(16.0f);
+
+        StripChain::Order o = StripChain::defaultOrder();
+        if (roehreVorn) {
+            o = { StripChain::Stage::Tube,   StripChain::Stage::Denoise,
+                  StripChain::Stage::Gate,   StripChain::Stage::Eq,
+                  StripChain::Stage::DeEss,  StripChain::Stage::Comp,
+                  StripChain::Stage::Pudu,   StripChain::Stage::Reverb,
+                  StripChain::Stage::Clip,   StripChain::Stage::Limiter };
+        }
+        if (!c.setStageOrder(o)) { return std::vector<float>{}; }
+
+        // Mehrere Bloecke, damit die Huellkurven beider Stufen
+        // eingeschwungen sind.
+        for (int b = 0; b < 8; ++b) { c.processMono(x.data(), int(x.size())); }
+        return x;
+    };
+
+    const std::vector<float> ein = voiceish(kFrames, 0.5f);
+    const std::vector<float> a = fahre(false, ein);
+    const std::vector<float> b = fahre(true,  ein);
+
+    QVERIFY(!a.empty() && !b.empty());
+    QVERIFY(allFinite(a) && allFinite(b));
+    QVERIFY2(!identical(a, b),
+             "Roehre vor dem Kompressor klingt wie Roehre dahinter -- "
+             "dann kommt die Reihenfolge im Audioweg nicht an");
+
+    double sa = 0.0;
+    double sb = 0.0;
+    for (size_t i = 0; i < a.size(); ++i) {
+        sa += double(a[i]) * double(a[i]);
+        sb += double(b[i]) * double(b[i]);
+    }
+    const double rmsA = std::sqrt(sa / double(a.size()));
+    const double rmsB = std::sqrt(sb / double(b.size()));
+    qInfo("Kompressor->Roehre RMS %.4f | Roehre->Kompressor RMS %.4f "
+          "(%.2f dB Unterschied)", rmsA, rmsB,
+          20.0 * std::log10(std::max(rmsB, 1e-9) / std::max(rmsA, 1e-9)));
 }
 
 QTEST_APPLESS_MAIN(TstStripChain)

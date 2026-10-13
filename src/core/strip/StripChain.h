@@ -108,6 +108,33 @@ public:
 
     static const char* stageName(Stage s) noexcept;
 
+    // ── Die Reihenfolge der Stufen ───────────────────────────────────
+    //
+    // Bis zum 2026-10-13 stand sie als Folge von Aufrufen im
+    // Rumpf von processMono(). AetherSDR traegt sie dagegen als LISTE
+    // im Profil ("chain": ["Tube","Gate","Eq",...]) -- und Martins
+    // Profil, das er unter Windows als gut befunden hat, stellt die
+    // Roehre VOR das Tor. Das ist kein Geschmack, sondern ein anderes
+    // Geraet: vorne saettigt sie das rohe Mikrofon, hinten das schon
+    // komprimierte Signal.
+    //
+    // Gehalten wird die Reihenfolge in EINER atomaren Zahl: zehn
+    // Stufen zu je vier Bit. Der Audiofaden liest sie einmal je Block,
+    // der Hauptfaden schreibt sie in einem Zug -- kein halb
+    // umgestellter Zustand, kein Schloss im Audiofaden.
+    using Order = std::array<Stage, kStageCount>;
+
+    // Longpaths eigene Reihenfolge: Entrauschen vorn, Clipper und
+    // Begrenzer hinten. Siehe die Begruendung am Aufzaehlungstyp.
+    static Order defaultOrder() noexcept;
+
+    // Nimmt NUR eine Permutation an: jede Stufe genau einmal. Alles
+    // andere laesst die bisherige Reihenfolge stehen und meldet false
+    // -- eine Kette, in der eine Stufe zweimal oder gar nicht
+    // vorkommt, ist kein Kanalzug mehr.
+    bool setStageOrder(const Order& order) noexcept;
+    Order stageOrder() const noexcept;
+
     // ── Einschubplaetze fuer fremde Effekte ──────────────────────────
     //
     // ZUSATZ, nicht Weg. Beide Plaetze sind leer, solange sie niemand
@@ -396,6 +423,15 @@ private:
     // instantiation lives there.
     template <typename S>
     void runStage(Stage which, S& stage, float* samples, int frames) noexcept;
+
+    // Der Verteiler: aus einer Stufennummer das zugehoerige Mitglied.
+    // Nur hier steht, welche Stufe welches Objekt ist.
+    void runStageAt(Stage which, float* samples, int frames) noexcept;
+
+    // Zehn Stufen zu vier Bit, Stufe 0 in den untersten vier.
+    static uint64_t packOrder(const Order& order) noexcept;
+    static Order unpackOrder(uint64_t packed) noexcept;
+    std::atomic<uint64_t> m_order;
 
     // The block as it was before the stage that is running now. Fixed
     // size and part of the object, so the audio thread never allocates

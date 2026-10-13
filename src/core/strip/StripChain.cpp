@@ -48,6 +48,75 @@ StripChain::StripChain()
 {
     for (auto& f : m_stageOn) { f.store(false, std::memory_order_relaxed); }
     for (auto& c : m_nonFiniteBlocks) { c.store(0, std::memory_order_relaxed); }
+    m_order.store(packOrder(defaultOrder()), std::memory_order_relaxed);
+}
+
+// ── Die Reihenfolge der Stufen ───────────────────────────────────────
+
+StripChain::Order StripChain::defaultOrder() noexcept
+{
+    // Entrauschen zuerst, damit alles danach eine saubere Stimme
+    // bekommt. Clipper direkt vor dem Begrenzer: das Abschneiden nimmt
+    // die Spitze weg, der Begrenzer faengt, was danach noch darueber
+    // liegt. Begrenzer zuletzt -- eine Ziegelmauer, hinter der noch
+    // etwas laeuft, ist keine Ziegelmauer.
+    return { Stage::Denoise, Stage::Gate,   Stage::Eq,     Stage::DeEss,
+             Stage::Comp,    Stage::Tube,   Stage::Pudu,   Stage::Reverb,
+             Stage::Clip,    Stage::Limiter };
+}
+
+uint64_t StripChain::packOrder(const Order& order) noexcept
+{
+    uint64_t packed = 0;
+    for (int i = 0; i < kStageCount; ++i) {
+        const uint64_t v = static_cast<uint64_t>(order[size_t(i)]) & 0xF;
+        packed |= v << (4 * i);
+    }
+    return packed;
+}
+
+StripChain::Order StripChain::unpackOrder(uint64_t packed) noexcept
+{
+    Order order{};
+    for (int i = 0; i < kStageCount; ++i) {
+        order[size_t(i)] = static_cast<Stage>((packed >> (4 * i)) & 0xF);
+    }
+    return order;
+}
+
+bool StripChain::setStageOrder(const Order& order) noexcept
+{
+    // Jede Stufe genau einmal, sonst bleibt die bisherige stehen.
+    std::array<int, kStageCount> gesehen{};
+    for (const Stage s : order) {
+        const int i = static_cast<int>(s);
+        if (i < 0 || i >= kStageCount) { return false; }
+        if (++gesehen[size_t(i)] > 1) { return false; }
+    }
+    m_order.store(packOrder(order), std::memory_order_release);
+    return true;
+}
+
+StripChain::Order StripChain::stageOrder() const noexcept
+{
+    return unpackOrder(m_order.load(std::memory_order_acquire));
+}
+
+void StripChain::runStageAt(Stage which, float* samples, int frames) noexcept
+{
+    switch (which) {
+    case Stage::Denoise: runStage(which, m_nr,      samples, frames); break;
+    case Stage::Gate:    runStage(which, m_gate,    samples, frames); break;
+    case Stage::Eq:      runStage(which, m_eq,      samples, frames); break;
+    case Stage::DeEss:   runStage(which, m_deEss,   samples, frames); break;
+    case Stage::Comp:    runStage(which, m_comp,    samples, frames); break;
+    case Stage::Tube:    runStage(which, m_tube,    samples, frames); break;
+    case Stage::Pudu:    runStage(which, m_pudu,    samples, frames); break;
+    case Stage::Reverb:  runStage(which, m_reverb,  samples, frames); break;
+    case Stage::Clip:    runStage(which, m_clip,    samples, frames); break;
+    case Stage::Limiter: runStage(which, m_limiter, samples, frames); break;
+    case Stage::Count:   break;
+    }
 }
 
 void StripChain::prepare(double sampleRate)
@@ -362,39 +431,26 @@ void StripChain::processMono(float* samples, int frames) noexcept
     // anyway would rest the guarantee on eight separate bypasses being
     // bit-exact rather than on not calling them. runStage() does the
     // skip, and wraps each call in the non-finite guard.
-    runInserts(0, samples, frames);
-    // Zuerst, damit alles danach eine saubere Stimme bekommt -- siehe
-    // die Begruendung am Stage-Aufzaehlungstyp.
-    runStage(Stage::Denoise, m_nr,    samples, frames);
-    runInserts(1, samples, frames);
-    runStage(Stage::Gate,   m_gate,   samples, frames);
-    runInserts(2, samples, frames);
-    runStage(Stage::Eq,     m_eq,     samples, frames);
-    runInserts(3, samples, frames);
-    runStage(Stage::DeEss,  m_deEss,  samples, frames);
-    runInserts(4, samples, frames);
-    runStage(Stage::Comp,   m_comp,   samples, frames);
-    runInserts(5, samples, frames);
-    runStage(Stage::Tube,   m_tube,   samples, frames);
-    runInserts(6, samples, frames);
-    runStage(Stage::Pudu,   m_pudu,   samples, frames);
-    runInserts(7, samples, frames);
-    runStage(Stage::Reverb, m_reverb, samples, frames);
-    runInserts(8, samples, frames);
-    // Direkt vor dem Begrenzer: das Abschneiden nimmt die Spitze
-    // weg, der Begrenzer faengt, was danach noch darueber liegt.
-    // Umgekehrt waere der Begrenzer schon am Arbeiten, bevor die
-    // Spitze ueberhaupt kleiner geworden ist.
-    runStage(Stage::Clip,   m_clip,   samples, frames);
-    runInserts(9, samples, frames);
-    // Last, and for a reason: a brickwall that anything runs after is
-    // not a brickwall. Everything above can add gain — the tube, the
-    // exciter, the compressor's make-up — and this is what stops the
-    // sum reaching the modulator hotter than it should.
-    runStage(Stage::Limiter, m_limiter, samples, frames);
-    // Hinter dem Begrenzer. Erlaubt, aber mit Ansage: was hier noch
-    // Pegel addiert, hebt die Deckelung auf, die eine Zeile darueber
-    // gerade gesetzt wurde.
+    // Die Reihenfolge kommt aus EINER atomaren Zahl: einmal je Block
+    // gelesen, nicht zehnmal. Welche Stufe an welcher Stelle steht,
+    // entscheidet setStageOrder() -- die Vorgabe ist defaultOrder(),
+    // und ein Aether-Profil kann sie umstellen (Martins Kette stellt
+    // die Roehre vor das Tor).
+    //
+    // Einschubplatz i heisst weiterhin „vor der Stufe an Stelle i",
+    // nicht „vor einer bestimmten Stufe" -- wer die Reihenfolge
+    // umstellt, stellt damit auch um, wo sein Einschub sitzt. Das ist
+    // Absicht: der Platz ist eine Stelle in der Kette, kein Anhaengsel
+    // einer Stufe.
+    const Order reihenfolge =
+        unpackOrder(m_order.load(std::memory_order_acquire));
+    for (int i = 0; i < kStageCount; ++i) {
+        runInserts(i, samples, frames);
+        runStageAt(reihenfolge[size_t(i)], samples, frames);
+    }
+    // Hinter der letzten Stufe. Erlaubt, aber mit Ansage: was hier
+    // noch Pegel addiert, hebt die Deckelung auf, die der Begrenzer
+    // gerade gesetzt hat.
     runInserts(kStageCount, samples, frames);
 
     m_outPeakDb.store(peakDb(samples, frames), std::memory_order_relaxed);
