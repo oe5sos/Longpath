@@ -5913,6 +5913,15 @@ void MainWindow::buildUI()
         // 2026-09-13 code review fix: same bug class, same fix shape --
         // see rebindTunerAppletBand()'s own doc comment.
         rebindTunerAppletBand(slice);
+        // Und dieselbe Fehlerform noch einmal: die Rasterung des
+        // Panadapters blieb beim Wechsel der Scheibe auf dem Wert der
+        // vorigen stehen. Jede Scheibe traegt ihre eigene Schrittweite
+        // (SliceModel::stepHz) -- wer umschaltet, muss sie mitbekommen.
+        if (slice) {
+            if (auto* sw = activeSpectrumWidget()) {
+                sw->setStepSize(slice->stepHz());
+            }
+        }
         if (!slice) { return; }
         // Phase 3F Sub-Epic J Task 11: RadioModel::rxChannelForSlice()
         // replaces the direct wdspEngine()->rxChannel() reach.
@@ -12054,6 +12063,28 @@ void MainWindow::wireSliceToSpectrum()
     activeSpectrumWidget()->setVfoFrequency(freq);
     activeSpectrumWidget()->setFilterOffset(slice->filterLow(), slice->filterHigh());
     activeSpectrumWidget()->setStepSize(slice->stepHz());
+
+    // ── Die Schrittweite muss der Scheibe FOLGEN ─────────────────────
+    //
+    // Bis hierher wurde sie genau einmal gesetzt, beim Anlegen der
+    // Scheibe. SliceModel::stepHzChanged hatte im ganzen Baum keinen
+    // einzigen Zuhoerer. Wer also im RX-Applet die Schrittweite
+    // umstellte, drehte danach im Panadapter weiter in der alten: das
+    // Rad, das Ziehen und das Klicken rasten alle auf
+    // SpectrumWidget::m_stepHz (SpectrumWidget.cpp:9309, :9757, :10011).
+    //
+    // Upstream NereusSDR hat denselben Mangel nach 2026.10.0 behoben
+    // ("Keep each pan's displayed and wheel-tuning STEP bound to its
+    // selected receiver, including selection changes and replacement
+    // receivers").
+    //
+    // Nur die aktive Scheibe schreibt: das Panadapter zeigt eine, und
+    // eine still im Hintergrund verstellte zweite darf ihr nicht in die
+    // Rasterung greifen.
+    connect(slice, &SliceModel::stepHzChanged, this, [this, slice](int hz) {
+        if (!m_radioModel || slice != m_radioModel->activeSlice()) { return; }
+        if (auto* sw = activeSpectrumWidget()) { sw->setStepSize(hz); }
+    });
 
     // Hier entstand bis 2026-08-18 die schwebende VFO-Flagge. Sie ist
     // geloescht; siehe die Notiz an der Stelle, wo createSliceFlag

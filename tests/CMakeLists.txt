@@ -2851,6 +2851,15 @@ longpath_add_test(tst_dexp_threshold_marker)
 # der neue Worker erfuhr den Anti-VOX-Zustand nie. Upstream hat denselben
 # Fehler nach 2026.10.0 behoben (#334).
 longpath_add_test(tst_anti_vox_replay)
+
+# ── Upstream-Abgleich 2026-10-13: Schrittweite folgt der Scheibe ───────────
+# SliceModel::stepHzChanged hatte keinen Zuhoerer: die Rasterung des
+# Panadapters (Rad, Ziehen, Klicken) blieb auf dem Wert vom Anlegen der
+# Scheibe stehen. Upstream hat denselben Mangel nach 2026.10.0 behoben.
+# Geprueft wird die Regel an echten SliceModel/SpectrumWidget-Objekten --
+# MainWindow selbst ist in diesem Rahmen nicht konstruierbar, siehe den
+# Dateikopf.
+longpath_add_test(tst_step_follows_slice)
 target_link_libraries(tst_socket_bind_failure PRIVATE Qt6::Network)
 target_link_libraries(tst_rigctld_server PRIVATE Qt6::Network)
 
