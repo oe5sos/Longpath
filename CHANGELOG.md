@@ -2,6 +2,107 @@
 
 ## [Unreleased]
 
+### Aethers Kanalzug ist die Grundlage — sein Profil, Wert für Wert
+
+> „mein headset funktioniert mit windows und dem aether channel strip,
+>  also die einstellungen bei eather perfekt! wir müssen unsere grafik
+>  verwenden, aber alle einstellungen usw. von aether verwenden."
+
+`core/strip/AetherPreset` liest „AetherSDR ChannelStripPreset v1" in
+unsere Kette. Das geht nur, weil unsere Stufen aus AetherSDR portiert
+sind und zeilengleich rechnen; von rund sechzig Werten sind alle 1:1
+übernehmbar außer sieben. Die sieben stehen im Importeur und melden
+sich auch im Fenster:
+
+* **masterGain ist LINEAR** (1,653). Als dB gelesen wäre die ganze
+  Kette 2,7 dB zu leise.
+* **Auto-Makeup** gibt es nur bei uns und hätte seine 6,66 dB still auf
+  8,04 gehoben. Aus, ebenso Kompressor-Drive und Phasendreher: Werte,
+  die seine Datei nicht trägt, dürfen nicht aus dem geerbt werden, was
+  vorher in der Kette stand.
+* **gate.mode vor ratio/floor** — sonst überschreibt „Expander" seine
+  3,215 mit 2,0.
+* **deess.slopeStages** kennt Aether nicht → ausdrücklich auf 2.
+* **Entrauschen** (sein `rn2` ist false), **Clipper** und die
+  **Eingangsautomatik** sind aus: die kennt Aether nicht.
+* Der Entzerrer bekommt **erst die Bänder, dann die Anzahl**; seine
+  zehn werden auf unsere vierzehn Griffe aufgefüllt, mit flachen,
+  abgeschalteten Bändern.
+* Der **rx-Block** wird überlesen — empfangsseitig haben wir keinen
+  Kanalzug.
+
+### Die Reihenfolge der Stufen ist einstellbar
+
+Seine Kette lautet `Tube, Gate, Eq, Comp, DeEss, Enh, Reverb` — die
+Röhre steht **vorne**, vor dem Tor. Bei uns stand sie hinter dem
+Kompressor, und die Reihenfolge war eine feste Folge von Aufrufen.
+Dieselben zwei Stufen, dieselben Werte, nur getauscht:
+
+```
+Kompressor → Röhre    RMS 0,9138
+Röhre → Kompressor    RMS 0,2373      (−11,7 dB)
+```
+
+Gehalten wird sie in EINER atomaren Zahl: zehn Stufen zu je vier Bit.
+Der Audiofaden liest sie einmal je Block, der Hauptfaden schreibt sie
+in einem Zug. `setStageOrder()` nimmt nur eine vollständige Permutation
+an. Gespeichert wird sie als Liste von Wörtern, nicht als Zahlen — eine
+Datei, die „4,5,6" sagt, ist nach dem nächsten Umbau des
+Aufzählungstyps eine andere Kette.
+
+### „bei 4000 klingt das nicht besonders" — gemessen gegen ein perfektes Filter
+
+Echte Sprache, dreimal: roh, durch unseren IIR-Kanal, durch einen
+idealen linearphasigen Kanal (2047 Koeffizienten, dieselben Ecken).
+
+| Band | roh | unser Kanal | ideal | wir gegen ideal |
+| --- | --- | --- | --- | --- |
+| 500 Hz | 73,2 | 73,2 | 73,2 | 0,00 |
+| 1 kHz | 69,3 | 69,3 | 69,3 | 0,00 |
+| 2 kHz | 62,6 | 62,6 | 62,6 | 0,00 |
+| 3,15 k | 58,4 | 58,3 | 58,4 | −0,08 |
+| 4 kHz | 56,7 | 53,9 | 53,9 | −0,05 |
+| 5 kHz | 59,4 | 44,3 | −56,9 | |
+| 8 kHz | 59,3 | 8,4 | −80,2 | |
+
+Im Durchlassbereich ist unser Kanal von einem perfekten nicht zu
+unterscheiden (höchste Abweichung 0,84 dB, und die sitzt bei 63 Hz am
+Hochpass). Der Unterschied, den man hört, ist die Bandbreite — und ein
+Teil davon ist hausgemacht: sein Kuhschwanz sitzt bei 4982 Hz, also
+über der Kanalgrenze. Deshalb liegt neben seiner Kette eine zweite mit
+genau diesem einen Zug anders (3400 Hz).
+
+### Zwei eigene Ketten löschten die Liste — und ein Gedankenstrich die Datei
+
+> „sehe aber keine speicherung der profile"
+
+Der Knopf war da und hieß „Speichern unter…"; er heißt jetzt „Profil
+speichern…". Dahinter lagen zwei Fehler im Unterbau:
+
+**Eine Liste mit zwei Einträgen wurde zu einer leeren Zeichenkette.**
+`AppSettings` legt jeden Wert als `val.toString()` ab, und
+`QVariant::toString()` liefert bei einer QStringList mit EINEM Eintrag
+diesen Eintrag — bei zweien nichts. Die zweite abgelegte Kette nahm die
+erste mit, sofort, im laufenden Programm. Listen werden jetzt als
+`@StringList(<base64>,…)` abgelegt.
+
+**Ein Gedankenstrich im Namen machte die Einstellungsdatei unlesbar.**
+Der Name wird Teil des Schlüssels und der Schlüssel ein
+XML-Elementname; U+2014 ist dort verboten. Am Gerät des Betreibers ist
+genau das passiert (`Longpath.settings.corrupt-20261013-214358`, danach
+Wiederherstellung aus der Sicherung). `encodeXmlKey()` prüft jetzt die
+echte Regel aus XML 1.0 statt einer Liste von Verdächtigen; was erlaubt
+ist, bleibt Zeichen für Zeichen stehen, alles andere wird `__uXXXX__`.
+
+### „das live hören nicht mehr zu sehen" — zwei Ursachen
+
+Die erste lag nicht im Programm: in `/Applications` stand eine Fassung
+aus einem fremden Zweig, die den Mithörer gar nicht kennt (116 Symbole
+`StripLiveMonitor` hier, null dort). Die zweite gehört uns — die
+Mithörreihe war über sechs Bedienteile gewachsen und verlangte 1312 px
+Mindestbreite, bei einem Fenster, das 980 px breit öffnet. Sie steht
+jetzt in einer eigenen Zeile; Mindestbreite 864 px.
+
 ### Der 4-kHz-Kanal klang massiv schlechter — zwei Ursachen
 
 > „volle bandbreite läuft perfekt über apollo und longpath, sobald
