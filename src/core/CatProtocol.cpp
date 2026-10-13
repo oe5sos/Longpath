@@ -9,6 +9,7 @@
 #include <QChar>
 #include <QLatin1String>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 
@@ -45,6 +46,22 @@ Laengen laengenFuer(QStringView praefix)
     if (praefix == QLatin1String("MD")) { return { 1,  0,  1}; }
     if (praefix == QLatin1String("RX")) { return { 0, -1,  1}; }
     if (praefix == QLatin1String("TX")) { return { 0, -1,  1}; }
+    // Die sechs aus der zweiten Fassung (2026-10-13). Laengen aus
+    // Thetis CAT/CATStructs.xml:
+    //   PS: set=1 get=0 ans=1   power on/off
+    //   SM: set=1 get=-1 ans=5  s-meter (set traegt den Kanal 0 oder 2)
+    //   RT: set=1 get=0 ans=1   rit on/off
+    //   XT: set=1 get=0 ans=1   xit on/off
+    //   RC: set=0 get=-1 ans=-1 clear rit/xit  (quittiert NICHT)
+    //   RU: set=0 get=-1 ans=-1 rit/xit up
+    //   RD: set=0 get=-1 ans=-1 rit/xit down
+    if (praefix == QLatin1String("PS")) { return { 1,  0,  1}; }
+    if (praefix == QLatin1String("SM")) { return { 1, -1,  5}; }
+    if (praefix == QLatin1String("RT")) { return { 1,  0,  1}; }
+    if (praefix == QLatin1String("XT")) { return { 1,  0,  1}; }
+    if (praefix == QLatin1String("RC")) { return { 0, -1, -1}; }
+    if (praefix == QLatin1String("RU")) { return { 0, -1, -1}; }
+    if (praefix == QLatin1String("RD")) { return { 0, -1, -1}; }
     return {-2, -2, -2};   // unbekannt
 }
 
@@ -134,6 +151,30 @@ QString CatProtocol::itFeld(int hz)
            + QStringLiteral("%1").arg(gedeckelt, 5, 10, QLatin1Char('0'));
 }
 
+int CatProtocol::sMeterAusDbm(double dbm)
+{
+    // From Thetis CAT/CATCommands.cs:896-931 [v2.10.3.15] -- SM.
+    // Verbatim uebernommen aus der zweiten CAT-Fassung dieses Projekts
+    // (Zweig fix/discovery-quietpolls-thetis-parity), die sie gegen
+    // hamlibs TS-2000-Treiber gefahren hat.
+    //
+    // Der Knick bei S9 ist der Punkt: darunter eine Gerade durch
+    // (dBm+127)/6, darueber 15 + (dBm+73). Wer das durch eine einzige
+    // Gerade ersetzt, trifft genau in dem Bereich daneben, in dem ein
+    // Contestprogramm Rapporte bildet.
+    const double num = std::max(-140.0, std::min(-10.0, dbm));
+    double sx = (num + 127.0) / 6.0;
+    if (sx < 0.0) { sx = 0.0; }
+    int sm = 0;
+    if (sx <= 9.0) {
+        sm = std::abs(static_cast<int>(sx * 1.6667));
+    } else {
+        const double overS9 = num + 73.0;
+        sm = 15 + static_cast<int>(overS9);
+    }
+    return std::max(0, std::min(30, sm));
+}
+
 QString CatProtocol::statussatz() const
 {
     // From Thetis CAT/CATCommands.cs IF() [v2.10.3.15] -- Reihenfolge und
@@ -167,6 +208,19 @@ QString CatProtocol::statussatz() const
     s += m_z.split ? QStringLiteral("1") : QStringLiteral("0");
     s += QStringLiteral("0000");                                 // Balance (blind)
     return s;
+}
+
+bool CatProtocol::hatGewirkt(const std::function<bool(const Zustand&)>& pruefung)
+{
+    if (!m_nachleser) {
+        // Kein Nachleser angehaengt: wie vorher blind quittieren. Das
+        // ist dann die Entscheidung des Aufrufers (und die Pruefstaende
+        // der Protokollschicht tun es absichtlich, weil sie keinen
+        // Zustand hinter sich haben).
+        return true;
+    }
+    m_z = m_nachleser();
+    return pruefung(m_z);
 }
 
 QString CatProtocol::antwortAuf(const QString& befehl)
@@ -221,7 +275,15 @@ QString CatProtocol::antwortAuf(const QString& befehl)
             if (!haken) { return abgelehnt(); }
             haken(hz);
             if (a) { m_z.vfoAHz = hz; } else { m_z.vfoBHz = hz; }
-            return QString();      // Setzen wird nicht quittiert
+            // Nachlesen, nicht blind quittieren: ohne gebundene Scheibe
+            // laeuft der Haken ins Leere, und ein Fremdprogramm sendete
+            // auf der alten Frequenz weiter. Siehe setzeNachleser().
+            if (!hatGewirkt([a, hz](const Zustand& z) {
+                    return (a ? z.vfoAHz : z.vfoBHz) == hz;
+                })) {
+                return abgelehnt();
+            }
+            return QString();      // gewirkt; Kenwood quittiert nicht
         }
         if (istAbfragen) {
             // Der Haken ist das Kennzeichen dafuer, dass es diesen VFO
@@ -254,6 +316,9 @@ QString CatProtocol::antwortAuf(const QString& befehl)
             if (!m_h.setzeModeK) { return abgelehnt(); }
             m_h.setzeModeK(k);
             m_z.modeK = k;
+            if (!hatGewirkt([k](const Zustand& z) { return z.modeK == k; })) {
+                return abgelehnt();
+            }
             return QString();
         }
         if (istAbfragen) { daten = QString::number(m_z.modeK); }
@@ -303,6 +368,9 @@ QString CatProtocol::antwortAuf(const QString& befehl)
             if (!m_h.setzeSplit) { return abgelehnt(); }
             m_h.setzeSplit(v == 1);
             m_z.split = (v == 1);
+            if (!hatGewirkt([v](const Zustand& z) { return z.split == (v == 1); })) {
+                return abgelehnt();
+            }
             return QString();
         }
         if (istAbfragen) {
@@ -316,9 +384,95 @@ QString CatProtocol::antwortAuf(const QString& befehl)
         if (!m_h.setzeMox) { return abgelehnt(); }
         m_h.setzeMox(senden);
         m_z.mox = senden;
+        // Beim Tasten ist das Nachlesen am wichtigsten: ein TX;, das
+        // quittiert wird, ohne dass der Sender angeht, laesst ein
+        // Contestprogramm ins Leere rufen -- und beim RX; waere der
+        // umgekehrte Fall gefaehrlich (Sender bleibt an, Programm
+        // glaubt, er sei aus).
+        if (!hatGewirkt([senden](const Zustand& z) { return z.mox == senden; })) {
+            return abgelehnt();
+        }
         // From Thetis CAT/CATStructs.xml: TX und RX haben nAns=1 --
         // sie quittieren mit dem eigenen Praefix und einer "0".
         daten = QStringLiteral("0");
+
+    } else if (praefix == QLatin1String("PS")) {
+        if (istAbfragen) {
+            daten = m_z.eingeschaltet ? QStringLiteral("1") : QStringLiteral("0");
+        } else if (istSetzen) {
+            // PS1 ist ein No-Op (laeuft schon). PS0 wird ABGELEHNT: ein
+            // CAT-Anrufer darf diese Station nicht abschalten.
+            // Uebernommen aus der zweiten Fassung, mit ihrer Begruendung
+            // -- "a CAT client does not get to power this station down".
+            if (suffix == QStringLiteral("1")) { return QString(); }
+            return abgelehnt();
+        } else { return abgelehnt(); }
+
+    } else if (praefix == QLatin1String("SM")) {
+        // SM0; und SM2; fragen den Pegel (0 = Hauptempfaenger, 2 =
+        // Zweitempfaenger bei Kenwood). Alles andere ist kein SM.
+        if (!(suffix == QStringLiteral("0") || suffix == QStringLiteral("2"))) {
+            return abgelehnt();
+        }
+        daten = mitNullen(static_cast<quint64>(sMeterAusDbm(m_z.signalDbm)), 5);
+
+    } else if (praefix == QLatin1String("RT") || praefix == QLatin1String("XT")) {
+        // RIT und XIT. Longpath hat keinen Split, und der dokumentierte
+        // Ersatz ist XIT (Phase-3F-Entwurf §3) -- ein Contestprogramm,
+        // das nach Split greift, findet hier etwas, das wirkt.
+        const bool rit = (praefix == QLatin1String("RT"));
+        if (istAbfragen) {
+            const bool an = rit ? m_z.ritOn : m_z.xitOn;
+            daten = an ? QStringLiteral("1") : QStringLiteral("0");
+        } else if (istSetzen) {
+            if (suffix != QStringLiteral("0") && suffix != QStringLiteral("1")) {
+                return abgelehnt();
+            }
+            const bool wunsch = (suffix == QStringLiteral("1"));
+            auto& haken = rit ? m_h.setzeRit : m_h.setzeXit;
+            if (!haken) { return abgelehnt(); }
+            haken(wunsch);
+            if (rit) { m_z.ritOn = wunsch; } else { m_z.xitOn = wunsch; }
+            // Nachlesen -- genau hier hat die zweite Fassung am Draht
+            // gesehen, dass RT1 still quittierte und das folgende RT
+            // weiter RT0 sagte.
+            if (!hatGewirkt([rit, wunsch](const Zustand& z) {
+                    return (rit ? z.ritOn : z.xitOn) == wunsch;
+                })) {
+                return abgelehnt();
+            }
+            return QString();
+        } else { return abgelehnt(); }
+
+    } else if (praefix == QLatin1String("RC")) {
+        // Ablage auf null. Ist keine der beiden an, gibt es nichts zu
+        // loeschen -- und ein stilles "erledigt" sagte dem Programm, die
+        // Ablage sei weg, wo keine war.
+        if (!istTat) { return abgelehnt(); }
+        if (!m_z.ritOn && !m_z.xitOn) { return abgelehnt(); }
+        if (!m_h.setzeItHz) { return abgelehnt(); }
+        m_h.setzeItHz(0);
+        m_z.itHz = 0;
+        if (!hatGewirkt([](const Zustand& z) { return z.itHz == 0; })) {
+            return abgelehnt();
+        }
+        return QString();
+
+    } else if (praefix == QLatin1String("RU") || praefix == QLatin1String("RD")) {
+        // Ablage um einen Abstimmschritt hoch oder runter.
+        if (!istTat) { return abgelehnt(); }
+        if (!m_z.ritOn && !m_z.xitOn) { return abgelehnt(); }
+        if (!m_h.setzeItHz) { return abgelehnt(); }
+        // Kenwoods eigene Vorgabe, wenn der Schritt unbekannt ist.
+        const int schritt = (m_z.stepHz > 0) ? m_z.stepHz : 10;
+        const int ziel = m_z.itHz
+                         + ((praefix == QLatin1String("RU")) ? schritt : -schritt);
+        m_h.setzeItHz(ziel);
+        m_z.itHz = ziel;
+        if (!hatGewirkt([ziel](const Zustand& z) { return z.itHz == ziel; })) {
+            return abgelehnt();
+        }
+        return QString();
 
     } else {
         return abgelehnt();

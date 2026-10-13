@@ -111,6 +111,14 @@ public:
         /// Antwort auf ID;. Thetis waehlt sie nach CATRigType
         /// (CATCommands.cs:291-...); 900 = SDR-1000.
         int  rigId{900};
+
+        // ── Die Felder fuer die sechs Befehle aus der zweiten Fassung
+        //    (uebernommen 2026-10-13, siehe
+        //    docs/architecture/2026-10-12-cat-zwei-fassungen.md) ──────────
+        /// Laeuft das Geraet? Antwort auf PS;.
+        bool eingeschaltet{true};
+        /// Empfangspegel in dBm fuer SM;. -200 heisst "weiss ich nicht".
+        double signalDbm{-200.0};
     };
 
     /// Was ein Befehl aendern darf. Nicht gesetzte Haken heissen: dieser
@@ -123,11 +131,36 @@ public:
         std::function<void(int)>     setzeModeK;
         std::function<void(bool)>    setzeMox;
         std::function<void(bool)>    setzeSplit;
+        // ── fuer die RIT/XIT-Familie (2026-10-13) ──────────────────────
+        std::function<void(bool)>    setzeRit;
+        std::function<void(bool)>    setzeXit;
+        /// Den Ablagewert setzen (Hz, negativ erlaubt). Welcher von
+        /// beiden gilt, entscheidet ritOn/xitOn -- wie im Statussatz.
+        std::function<void(int)>     setzeItHz;
     };
 
     CatProtocol() = default;
 
     void setzeZustand(const Zustand& z) { m_z = z; }
+
+    /// Der NACHLESER: holt den frischen Zustand, nachdem ein Setzen
+    /// durch den Haken gegangen ist.
+    ///
+    /// Ohne ihn quittiert ein Setzen blind. Das ist keine theoretische
+    /// Sorge -- die zweite CAT-Fassung dieses Projekts hat es am
+    /// 2026-10-11 am Draht gemessen: "RT1 answered silently and the
+    /// following RT still said RT0". Der Haken war da, er lief, und die
+    /// Scheibe dahinter fehlte; ein Contestprogramm glaubte, seine RIT
+    /// sei an.
+    ///
+    /// Mit Nachleser prueft jedes Setzen, ob es gewirkt hat, und
+    /// antwortet sonst mit `?;`. Ohne Nachleser bleibt es beim alten
+    /// Verhalten (blind quittieren) -- dann ist es die Entscheidung des
+    /// Aufrufers, nicht ein Versehen.
+    void setzeNachleser(std::function<Zustand()> leser)
+    {
+        m_nachleser = std::move(leser);
+    }
     const Zustand& zustand() const { return m_z; }
     void setzeHaken(const Haken& h) { m_h = h; }
 
@@ -155,13 +188,27 @@ public:
     /// From Thetis CAT/CATCommands.cs IF() -- incr.
     static QString itFeld(int hz);
 
+    /// Der Kenwood-S-Meter-Wert 0..30 aus einem Pegel in dBm.
+    ///
+    /// From Thetis CAT/CATCommands.cs:896-931 [v2.10.3.15] -- SM. Die
+    /// Kennlinie hat einen Knick bei S9: darunter rechnet sie
+    /// (dBm+127)/6 * 1.6667, darueber 15 + (dBm+73). Uebernommen aus der
+    /// zweiten CAT-Fassung dieses Projekts, die sie gegen hamlibs
+    /// TS-2000-Treiber gefahren hat.
+    static int sMeterAusDbm(double dbm);
+
     /// Hat ein Anrufer AI1; gesetzt? Die Schicht merkt es sich; das
     /// Senden von selbst gehoert in den Transport (eigener Gang).
     bool selbstmeldung() const { return m_selbstmeldung; }
 
 private:
+    /// Nach einem Setzen: frisch nachlesen und pruefen, ob der Wunsch
+    /// angekommen ist. Ohne Nachleser immer true (altes Verhalten).
+    bool hatGewirkt(const std::function<bool(const Zustand&)>& pruefung);
+
     Zustand m_z;
     Haken   m_h;
+    std::function<Zustand()> m_nachleser;
     bool    m_selbstmeldung{false};
 };
 

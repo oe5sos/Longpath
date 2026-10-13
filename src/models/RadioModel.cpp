@@ -14690,6 +14690,20 @@ bool RadioModel::tune() const
 // powerOn -- From Thetis PowerOn at console.cs:19799-19803 [v2.10.3.15].
 // Architectural divergence: Longpath has no separate Power button, so
 // connection IS power.  TCI clients see powerOn = isConnected().
+double RadioModel::rxSignalDbm(int rx) const
+{
+    // Uebernommen aus der zweiten CAT-Fassung (Zweig
+    // fix/discovery-quietpolls-thetis-parity) -- dort fuer SM und
+    // rigctlds STRENGTH gebaut. Der Pegel ist der gemittelte, nicht der
+    // Spitzenwert: ein S-Meter-Rapport soll nicht bei jeder Silbe
+    // springen.
+    RxChannel* const ch = rxChannelForSlice(rx);
+    if (!ch) {
+        return -200.0;   // kein Kanal -- jeder Aufrufer klammert das weg
+    }
+    return ch->getMeter(RxMeterType::SignalAvg) + rxMeterOffsetDb();
+}
+
 bool RadioModel::powerOn() const
 {
     return isConnected();

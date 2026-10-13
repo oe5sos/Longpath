@@ -462,6 +462,37 @@ private slots:
         QCOMPARE(frage(gut, "ID;"), QStringLiteral("ID900;"));
     }
 
+    // ── Der Nachleser geht durch den Server ─────────────────────────────────
+
+    void einWirkungslosesSetzenWirdUeberDenServerAbgelehnt()
+    {
+        // Nachgezogen am 2026-10-13. Die Gegenprobe hat im Server die
+        // Zeile stillgelegt, die den Zustandsgeber ALS NACHLESER an die
+        // Protokollschicht haengt -- und kein Fall fiel. Die
+        // Protokollschicht hat ihren eigenen Prueffall dafuer
+        // (mitNachleserWirdEinWIRKUNGSLOSESSetzenAbgelehnt), aber ob der
+        // Server ihn anhaengt, prueft nur dieser hier.
+        //
+        // Der Unterschied ist der, der live zaehlt: ohne Nachleser
+        // quittiert ein Setzen blind, und ein Contestprogramm sendet auf
+        // der alten Frequenz weiter.
+        QVERIFY(srv->starte(0, 0));
+        QTcpSocket* s = verbinde(0);
+        QVERIFY(s);
+
+        // Den Frequenz-Haken taub machen: er wird gerufen, bewegt aber
+        // nichts (genau der Fall "kein gebundener Slice").
+        CatProtocol::Haken taub;
+        taub.setzeVfoA = [](quint64) { };
+        srv->setzeHaken(taub);
+
+        QCOMPARE(frage(s, "FA;"), QStringLiteral("FA00014225000;"));
+        // Ohne Nachleser kaeme hier eine leere Antwort ("erledigt").
+        QCOMPARE(frage(s, "FA00021300000;"), QStringLiteral("?;"));
+        // Und die Frequenz steht noch, wo sie war.
+        QCOMPARE(frage(s, "FA;"), QStringLiteral("FA00014225000;"));
+    }
+
     // ── Ohne Zustandsgeber ──────────────────────────────────────────────────
 
     void einStummerGeberWirdAbgelehntStattMitNullenBeantwortet()

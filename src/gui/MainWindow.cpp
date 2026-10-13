@@ -644,6 +644,10 @@ MainWindow::MainWindow(QWidget* parent)
                                             : (sl->xitEnabled() ? sl->xitHz() : 0);
             }
             z.mox = m_radioModel ? m_radioModel->mox() : false;
+            // Fuer PS; und SM; (2026-10-13, aus der zweiten CAT-Fassung
+            // uebernommen).
+            z.eingeschaltet = m_radioModel ? m_radioModel->powerOn() : false;
+            z.signalDbm = m_radioModel ? m_radioModel->rxSignalDbm(0) : -200.0;
             // Split meldet Longpath als AUS, und das ist keine Luecke,
             // sondern der Stand: RadioModel::split() gibt bewusst immer
             // false (Phase-3F-Entwurf §3 -- statt Split gibt es XIT oder
@@ -668,6 +672,31 @@ MainWindow::MainWindow(QWidget* parent)
         haken.setzeMox = [this](bool on) {
             if (m_radioModel) { m_radioModel->setMox(on); }
         };
+        // ── RIT / XIT (2026-10-13) ───────────────────────────────────
+        //
+        // Longpath hat keinen Split, und der dokumentierte Ersatz ist
+        // XIT (Phase-3F-Entwurf §3). Ein Contestprogramm, das nach
+        // Split greift, findet hier also etwas, das wirkt -- das war
+        // die Begruendung der zweiten CAT-Fassung, und sie gilt.
+        haken.setzeRit = [this](bool an) {
+            if (SliceModel* sl = m_radioModel ? m_radioModel->activeSlice() : nullptr) {
+                sl->setRitEnabled(an);
+            }
+        };
+        haken.setzeXit = [this](bool an) {
+            if (SliceModel* sl = m_radioModel ? m_radioModel->activeSlice() : nullptr) {
+                sl->setXitEnabled(an);
+            }
+        };
+        haken.setzeItHz = [this](int hz) {
+            SliceModel* sl = m_radioModel ? m_radioModel->activeSlice() : nullptr;
+            if (!sl) { return; }
+            // Welcher von beiden gilt, entscheidet die Flagge -- wie im
+            // Statussatz (RIT vor XIT, Thetis' Reihenfolge).
+            if (sl->ritEnabled())      { sl->setRitHz(hz); }
+            else if (sl->xitEnabled()) { sl->setXitHz(hz); }
+        };
+
         // setzeVfoB und setzeSplit bleiben ABSICHTLICH leer. Longpath hat
         // kein VFO B und keinen Split; die Protokollschicht lehnt einen
         // Befehl ohne Haken mit "?;" ab, statt ihn zu quittieren und

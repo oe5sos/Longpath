@@ -238,6 +238,58 @@ private slots:
         QCOMPARE(iff.mid(2, 11), QStringLiteral("00021300000"));
         QCOMPARE(iff.mid(2 + 27, 1), QStringLiteral("1"));   // LSB
 
+        // ── 5. Die sechs Befehle aus der zweiten Fassung (2026-10-13) ────
+        //
+        // RIT/XIT sind in Longpath der Ersatz fuer den Split, den es
+        // nicht gibt -- ein Contestprogramm, das nach Split greift,
+        // findet hier etwas, das wirkt.
+        // PS; meldet den ECHTEN Zustand. Ohne verbundenes Geraet ist das
+        // "PS0;" -- und das ist richtig, nicht ein Mangel: hier laeuft
+        // kein Geraet. Der erste Versuch erwartete PS1 und fiel darum.
+        //
+        // Die zweite CAT-Fassung gibt hier uebrigens 1 vor, wenn die
+        // Abfrage am Modell scheitert (`bool on = true;` vor dem
+        // invokeMethod). Das ist die unguenstigere Richtung: ein
+        // Contestprogramm, das PS1 liest, haelt die Station fuer
+        // betriebsbereit.
+        QCOMPARE(frage(s, "PS;"),
+                 rm->powerOn() ? QStringLiteral("PS1;") : QStringLiteral("PS0;"));
+        QCOMPARE(frage(s, "PS0;"), QStringLiteral("?;"));   // nicht abschalten
+
+        // SM antwortet mit fuenf Stellen; ohne Kanal ist der Pegel -200,
+        // also 0 -- geprueft wird die FORM, nicht der Wert.
+        const QString sm = frage(s, "SM0;");
+        QVERIFY2(sm.startsWith(QStringLiteral("SM")) && sm.size() == 2 + 5 + 1,
+                 qPrintable(QStringLiteral("SM-Antwort hat die falsche Form: %1").arg(sm)));
+
+        QCOMPARE(frage(s, "RT;"), QStringLiteral("RT0;"));
+        s->write("RT1;");
+        QTRY_VERIFY(sl->ritEnabled());
+        QCOMPARE(frage(s, "RT;"), QStringLiteral("RT1;"));
+
+        // Jetzt die Ablage schieben -- und zwar MIT Nachlesen: der
+        // Server prueft nach jedem Setzen, ob es gewirkt hat.
+        sl->setStepHz(10);
+        const int vorher = sl->ritHz();
+        s->write("RU;");
+        QTRY_COMPARE(sl->ritHz(), vorher + 10);
+        s->write("RD;");
+        QTRY_COMPARE(sl->ritHz(), vorher);
+        s->write("RC;");
+        QTRY_COMPARE(sl->ritHz(), 0);
+
+        // XIT genauso.
+        s->write("XT1;");
+        QTRY_VERIFY(sl->xitEnabled());
+        QCOMPARE(frage(s, "XT;"), QStringLiteral("XT1;"));
+
+        // RIT und XIT aus: dann gibt es nichts zu schieben, und ein
+        // stilles "erledigt" sagte dem Programm, die Ablage sei gesetzt.
+        sl->setRitEnabled(false);
+        sl->setXitEnabled(false);
+        QCOMPARE(frage(s, "RU;"), QStringLiteral("?;"));
+        QCOMPARE(frage(s, "RC;"), QStringLiteral("?;"));
+
         // Aus: danach horcht niemand mehr, und die Einstellung zieht mit.
         tcp->click();
         for (int k = 0; k < CatServer::kKanaele; ++k) { QVERIFY(!srv->laeuft(k)); }
