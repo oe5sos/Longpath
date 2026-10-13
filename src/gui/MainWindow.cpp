@@ -541,6 +541,39 @@ QVector<DetectedCable> detectedForFirstRun()
 }
 } // namespace
 
+namespace {
+
+// Die Rauschsperre, die zur eingestellten Betriebsart gehoert.
+//
+// From Thetis CAT/CATCommands.cs ZZSO [v2.10.3.15] -- dort ist
+// `console.CATSquelch` EIN Wert; Thetis fuehrt die Sperre intern
+// ebenfalls je Betriebsart (radio.cs:1164/1274) und waehlt beim Setzen
+// nach RX1DSPMode. Longpath hat die drei Schalter getrennt an der
+// Scheibe (SliceModel.h:264-268), also wird hier dasselbe gewaehlt.
+bool catSperreAn(const Longpath::SliceModel* sl)
+{
+    using Longpath::DSPMode;
+    switch (sl->dspMode()) {
+    case DSPMode::FM:  return sl->fmsqEnabled();
+    case DSPMode::AM:
+    case DSPMode::SAM: return sl->amsqEnabled();
+    default:           return sl->ssqlEnabled();
+    }
+}
+
+void catSetzeSperre(Longpath::SliceModel* sl, bool an)
+{
+    using Longpath::DSPMode;
+    switch (sl->dspMode()) {
+    case DSPMode::FM:  sl->setFmsqEnabled(an); break;
+    case DSPMode::AM:
+    case DSPMode::SAM: sl->setAmsqEnabled(an); break;
+    default:           sl->setSsqlEnabled(an); break;
+    }
+}
+
+} // namespace
+
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
     , m_radioModel(new RadioModel(this))
@@ -637,12 +670,40 @@ MainWindow::MainWindow(QWidget* parent)
                 z.stepHz = sl->stepHz();
                 z.ritOn  = sl->ritEnabled();
                 z.xitOn  = sl->xitEnabled();
-                // Welcher Wert ins IT-Feld gehoert, entscheidet die
-                // Protokollschicht (RIT vor XIT, wie Thetis) -- hier wird
-                // nur der passende mitgegeben.
-                z.itHz   = sl->ritEnabled() ? sl->ritHz()
-                                            : (sl->xitEnabled() ? sl->xitHz() : 0);
+                // BEIDE Ablagen, getrennt. Bis zum 2026-10-13 stand hier
+                // nur die aktive -- die Vorauswahl gehoert aber in die
+                // Protokollschicht (die den Statussatz fuellt), und der
+                // ZZ-Satz braucht ohnehin beide: ZZXF stellt die
+                // XIT-Ablage, auch wenn RIT an ist.
+                z.ritHz  = sl->ritHz();
+                z.xitHz  = sl->xitHz();
+                // ── Die Felder fuer den ZZ-Satz (2026-10-13) ──────────
+                z.modeZZ = catZzZahl(sl->dspMode());
+                z.filterLowHz  = sl->filterLow();
+                z.filterHighHz = sl->filterHigh();
+                // Rauschsperre. Longpath hat DREI Schalter, einen je
+                // Betriebsartfamilie (ssql fuer SSB/CW/Digi, amsq fuer
+                // AM/SAM, fmsq fuer FM -- SliceModel.h:264-268), Thetis
+                // und CAT haben einen. Gemeldet und gesetzt wird darum
+                // der, der zur gerade eingestellten Betriebsart gehoert.
+                //
+                // NEBENBEI GEFUNDEN, hier NICHT behoben:
+                // `RadioModel::setSqlEnable()` (RadioModel.cpp, der
+                // Einstiegspunkt, den auch der TCI-Server nimmt) greift
+                // ausschliesslich auf `ssqlEnabled`. In FM schaltet er
+                // damit nichts -- die FM-Sperre haengt an `fmsqEnabled`.
+                // Das zu aendern beruehrt TCI mit und gehoert nicht in
+                // einen CAT-Commit.
+                z.squelch = catSperreAn(sl) ? 1 : 0;
             }
+            // Gerätebezeichnung und Fassung fuer ZZZM; / ZZZV;. Beides
+            // feste Angaben ueber UNS, nicht ueber die angeschlossene
+            // Hardware -- ein Programm, das hier ein ANAN-Modell liest,
+            // wuerde Thetis-eigene Befehle erwarten, die wir nicht haben.
+            z.modell  = QStringLiteral("LONGPATH");
+            z.fassung = QCoreApplication::applicationVersion().isEmpty()
+                            ? QStringLiteral("0.0.0")
+                            : QCoreApplication::applicationVersion();
             z.mox = m_radioModel ? m_radioModel->mox() : false;
             // Fuer PS; und SM; (2026-10-13, aus der zweiten CAT-Fassung
             // uebernommen).
@@ -688,13 +749,46 @@ MainWindow::MainWindow(QWidget* parent)
                 sl->setXitEnabled(an);
             }
         };
-        haken.setzeItHz = [this](int hz) {
-            SliceModel* sl = m_radioModel ? m_radioModel->activeSlice() : nullptr;
-            if (!sl) { return; }
-            // Welcher von beiden gilt, entscheidet die Flagge -- wie im
-            // Statussatz (RIT vor XIT, Thetis' Reihenfolge).
-            if (sl->ritEnabled())      { sl->setRitHz(hz); }
-            else if (sl->xitEnabled()) { sl->setXitHz(hz); }
+        // Die beiden Ablagen getrennt. Ein Haken "setze die aktive"
+        // gab es bis zum 2026-10-13; die Auswahl steht jetzt in der
+        // Protokollschicht, wo der Befehl sie trifft.
+        haken.setzeRitHz = [this](int hz) {
+            if (SliceModel* sl = m_radioModel ? m_radioModel->activeSlice() : nullptr) {
+                sl->setRitHz(hz);
+            }
+        };
+        haken.setzeXitHz = [this](int hz) {
+            if (SliceModel* sl = m_radioModel ? m_radioModel->activeSlice() : nullptr) {
+                sl->setXitHz(hz);
+            }
+        };
+
+        // ── Die Haken des ZZ-Satzes (2026-10-13) ─────────────────────
+        haken.setzeModeZZ = [this](int z) {
+            if (SliceModel* sl = m_radioModel ? m_radioModel->activeSlice() : nullptr) {
+                sl->setDspMode(catModusAusZzZahl(z));
+            }
+        };
+        haken.setzeFilterLow = [this](int hz) {
+            if (SliceModel* sl = m_radioModel ? m_radioModel->activeSlice() : nullptr) {
+                sl->setFilterLow(hz);
+            }
+        };
+        haken.setzeFilterHigh = [this](int hz) {
+            if (SliceModel* sl = m_radioModel ? m_radioModel->activeSlice() : nullptr) {
+                sl->setFilterHigh(hz);
+            }
+        };
+        haken.setzeSquelch = [this](int w) {
+            if (SliceModel* sl = m_radioModel ? m_radioModel->activeSlice() : nullptr) {
+                // Nur aus und an. Thetis' 2 (Stimmsperre) laesst die
+                // Protokollschicht durch; sie wird hier als "an"
+                // gesetzt, der Nachleser liest 1 zurueck und lehnt mit
+                // `?;` ab. Genau richtig: eine Stimmsperre gibt es
+                // nicht, und ein stilles "erledigt" liesse ein
+                // Fremdprogramm glauben, sie laufe.
+                catSetzeSperre(sl, w != 0);
+            }
         };
 
         // setzeVfoB und setzeSplit bleiben ABSICHTLICH leer. Longpath hat

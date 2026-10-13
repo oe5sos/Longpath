@@ -329,6 +329,108 @@ private slots:
         delete mw;
     }
 
+    void derZzSatzHaengtAmEchtenFenster()
+    {
+        // Eigener Fall OHNE Netz, und das ist der Punkt.
+        //
+        // Der Fall `amEchtenFenster()` oben klickt den TCP-Schalter und
+        // wird uebersprungen, wenn die Ports 31001..31004 belegt sind --
+        // was sie sind, sobald eine Longpath-Instanz laeuft. Die
+        // Verdrahtung des ZZ-Satzes waere damit genau dann ungeprueft,
+        // wenn der Rechner in Betrieb ist. Also hier ohne Horchen:
+        // echtes Fenster, echte Scheibe, und die Befehle ueber
+        // `verarbeiteFuerTest()` statt ueber einen Socket. Der Transport
+        // ist in tst_cat_server geprueft, hier geht es um die Haken.
+        auto* mw = new MainWindow();
+        mw->resize(1200, 800);
+        mw->show();
+        QVERIFY(QTest::qWaitForWindowExposed(mw, 20000));
+
+        const QList<CatServer*> server = mw->findChildren<CatServer*>();
+        QCOMPARE(server.size(), 1);
+        CatServer* srv = server.first();
+        RadioModel* rm = mw->radioModelForTest();
+        QVERIFY(rm);
+
+        SliceModel* sl = rm->activeSlice();
+        if (!sl) {
+            rm->configureStreamPool(5, 5, 192000);
+            const int id = rm->addSlice();
+            sl = rm->sliceById(id);
+        }
+        QVERIFY(sl);
+
+        auto frageDirekt = [srv](const char* befehl) {
+            return srv->verarbeiteFuerTest(QString::fromLatin1(befehl));
+        };
+
+        //
+        // Die Protokollschicht ist in tst_cat_zz vollstaendig geprueft;
+        // hier geht es um die VERDRAHTUNG -- ob die neuen Felder und
+        // Haken wirklich an der Scheibe haengen. Genau das hat am
+        // 2026-10-11 gefehlt: `FB;` antwortete "FB00000000000;", und
+        // alle drei Prueffaelle der Schicht liessen es durch, weil ihre
+        // init() immer BEIDE Haken anhaengt.
+        sl->setFrequency(28'400'000.0);
+        sl->setDspMode(DSPMode::CWL);
+        QCOMPARE(frageDirekt("ZZFA;"), QStringLiteral("ZZFA00028400000;"));
+        QCOMPARE(frageDirekt("ZZMD;"), QStringLiteral("ZZMD03;"));
+
+        // Der erweiterte Statussatz: 36 Zeichen, Modus zweistellig an
+        // Stelle 27.
+        const QString zzif = frageDirekt("ZZIF;");
+        QCOMPARE(zzif.size(), 4 + 36 + 1);
+        QVERIFY(zzif.startsWith(QStringLiteral("ZZIF")));
+        QCOMPARE(zzif.mid(4, 11), QStringLiteral("00028400000"));
+        QCOMPARE(zzif.mid(4 + 27, 2), QStringLiteral("03"));
+
+        // Setzen wirkt an der Scheibe.
+        QCOMPARE(frageDirekt("ZZFA00028450000;"), QString());
+        QCOMPARE(sl->frequency(), 28'450'000.0);
+        QCOMPARE(frageDirekt("ZZMD01;"), QString());
+        QCOMPARE(sl->dspMode(), DSPMode::USB);
+
+        // Die Filterkanten.
+        sl->setFilter(150, 2850);
+        QCOMPARE(frageDirekt("ZZFL;"), QStringLiteral("ZZFL+0150;"));
+        QCOMPARE(frageDirekt("ZZFH;"), QStringLiteral("ZZFH+2850;"));
+        QCOMPARE(frageDirekt("ZZFL+0300;"), QString());
+        QCOMPARE(sl->filterLow(), 300);
+
+        // Die Erkennung, die DXLab Commander und N1MM+ beim Verbinden
+        // schicken. ZZID bleibt stumm, ZZZM/ZZZV antworten.
+        QCOMPARE(frageDirekt("ZZID;"), QString());
+        QCOMPARE(frageDirekt("ZZZM;"), QStringLiteral("ZZZMLONGPATH;"));
+        QVERIFY(frageDirekt("ZZZV;").startsWith(QStringLiteral("ZZZV")));
+
+        // ── Die Rauschsperre haengt an der BETRIEBSART ──────────────
+        //
+        // Longpath hat drei Schalter (ssql fuer SSB/CW/Digi, amsq fuer
+        // AM/SAM, fmsq fuer FM), CAT hat einen. Dieser Fall belegt, dass
+        // der richtige getroffen wird -- in FM also fmsq und NICHT ssql.
+        // `RadioModel::setSqlEnable()`, der Weg des TCI-Servers, greift
+        // immer nur auf ssql und schaltet in FM nichts.
+        sl->setDspMode(DSPMode::FM);
+        sl->setFmsqEnabled(false);
+        sl->setSsqlEnabled(false);
+        QCOMPARE(frageDirekt("ZZSO1;"), QString());
+        QVERIFY(sl->fmsqEnabled());
+        QVERIFY(!sl->ssqlEnabled());          // der SSB-Schalter bleibt aus
+        QCOMPARE(frageDirekt("ZZSO;"), QStringLiteral("ZZSO1;"));
+
+        // Und in SSB trifft es ssql.
+        sl->setDspMode(DSPMode::USB);
+        QCOMPARE(frageDirekt("ZZSO;"), QStringLiteral("ZZSO0;"));   // ssql ist aus
+        QCOMPARE(frageDirekt("ZZSO1;"), QString());
+        QVERIFY(sl->ssqlEnabled());
+
+        // Thetis' 2 (Stimmsperre) gibt es nicht. Der Haken setzt "an",
+        // der Nachleser liest 1 und lehnt ab -- kein stilles
+        // "erledigt" fuer etwas, das nicht laeuft.
+        QCOMPARE(frageDirekt("ZZSO2;"), QStringLiteral("?;"));
+        delete mw;
+    }
+
     void wasLongpathNichtKannWirdAbgelehntNichtQuittiert()
     {
         // Longpath hat kein VFO B und keinen Split -- RadioModel::split()
@@ -352,9 +454,23 @@ private slots:
                  QStringLiteral("?;"));
         QCOMPARE(srv.verarbeiteFuerTest(QStringLiteral("FT1;")),
                  QStringLiteral("?;"));
+        // Dasselbe im ZZ-Satz. ZZFT ist dabei die Sendefrequenz (elf
+        // Stellen), nicht die VFO-Wahl wie Kenwoods FT -- lesbar, aber
+        // nicht setzbar, weil es keinen Split gibt.
+        QCOMPARE(srv.verarbeiteFuerTest(QStringLiteral("ZZFB00007100000;")),
+                 QStringLiteral("?;"));
+        QCOMPARE(srv.verarbeiteFuerTest(QStringLiteral("ZZSP;")),
+                 QStringLiteral("?;"));
+        QCOMPARE(srv.verarbeiteFuerTest(QStringLiteral("ZZFT00014100000;")),
+                 QStringLiteral("?;"));
+        QCOMPARE(srv.verarbeiteFuerTest(QStringLiteral("ZZFT;")),
+                 QStringLiteral("ZZFT00014225000;"));
+
         // Was es kann, geht weiter.
         QCOMPARE(srv.verarbeiteFuerTest(QStringLiteral("FA;")),
                  QStringLiteral("FA00014225000;"));
+        QCOMPARE(srv.verarbeiteFuerTest(QStringLiteral("ZZFA;")),
+                 QStringLiteral("ZZFA00014225000;"));
     }
 };
 

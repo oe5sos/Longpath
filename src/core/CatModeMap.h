@@ -100,4 +100,83 @@ constexpr DSPMode catModusAusKenwoodZahl(int k) noexcept
     }
 }
 
+// ── Die ZZ-Zahl (zwei Stellen) ────────────────────────────────────────
+//
+// From Thetis CAT/CATCommands.cs:9901-9945 [v2.10.3.15] -- Mode2String,
+// und :3949-3969 -- ZZMD (Bereichspruefung 0..11).
+//
+// **Die ZZ-Zahl IST der DSPMode-Wert.** Thetis' Mode2String zaehlt
+// LSB=00, USB=01, DSB=02, CWL=03, CWU=04, FM=05, AM=06, DIGU=07,
+// SPEC=08, DIGL=09, SAM=10, DRM=11 -- genau die Reihenfolge von
+// `enum class DSPMode` in WdspTypes.h, weil dieses enum aus Thetis
+// stammt. Trotzdem steht hier eine ausgeschriebene Tabelle und kein
+// `static_cast<int>`:
+//
+//   * Longpath hat zwei Modi MEHR (RADE_U=12, RADE_L=13, Phase 3R).
+//     Thetis kennt sie nicht. Ein Cast schickte einem Logbuchprogramm
+//     eine "12", die in keiner seiner Tabellen steht.
+//   * Wuerde jemand DSPMode spaeter umsortieren oder einen Wert
+//     dazwischen einfuegen, waere ein Cast still falsch. Die Tabelle
+//     bricht dann im Prueffall.
+//
+// Der ZZ-Satz und der Kenwood-Satz sind NICHT voneinander ableitbar,
+// und sie sind auch keine Doppelung: beide sind verlustbehaftete
+// Abbildungen DESSELBEN Modus, jede auf andere Weise. Kenwood kennt
+// weder DSB noch SAM noch DRM und hat fuer CW nur EINE Zahl (3), also
+// verliert ZZ->Kenwood die Seitenbandwahl; Kenwood->ZZ muesste sie
+// erraten. Darum fuehrt die Verdrahtung BEIDE Zahlen aus dem einen
+// Longpath-Modus, statt eine aus der anderen zu rechnen.
+constexpr int catZzZahl(DSPMode m) noexcept
+{
+    switch (m) {
+    case DSPMode::LSB:  return 0;
+    case DSPMode::USB:  return 1;
+    case DSPMode::DSB:  return 2;
+    case DSPMode::CWL:  return 3;
+    case DSPMode::CWU:  return 4;
+    case DSPMode::FM:   return 5;
+    case DSPMode::AM:   return 6;
+    case DSPMode::DIGU: return 7;
+    case DSPMode::SPEC: return 8;
+    case DSPMode::DIGL: return 9;
+    case DSPMode::SAM:  return 10;
+    case DSPMode::DRM:  return 11;
+    // RADE hat in Thetis keine Entsprechung. Gemeldet wird das
+    // SEITENBAND, nicht "unbekannt": ein Logbuchprogramm traegt damit
+    // USB bzw. LSB ins Log, was fuer den Rapport stimmt. Thetis gibt in
+    // seinem default "?;" zurueck -- das waere hier schaedlich, weil
+    // dieselbe Funktion das Modusfeld MITTEN im 36-Zeichen-Statussatz
+    // fuellt (ZZIF): ein "?;" darin zerschiesst jedes Feld dahinter.
+    case DSPMode::RADE_U: return 1;
+    case DSPMode::RADE_L: return 0;
+    }
+    return 1;   // wie Thetis' default-Zweig: USB
+}
+
+/// Rueckweg. Ein Wert ausserhalb 0..11 wird NICHT auf USB geschoben,
+/// sondern ist ungueltig -- Thetis' ZZMD lehnt ihn mit `?;` ab
+/// (CATCommands.cs:3953), und ein Logbuchprogramm, dem ein Tippfehler
+/// stillschweigend USB einstellt, sendet im falschen Seitenband.
+/// Der Aufrufer prueft darum zuerst `catZzZahlGueltig()`.
+constexpr bool catZzZahlGueltig(int z) noexcept { return z >= 0 && z <= 11; }
+
+constexpr DSPMode catModusAusZzZahl(int z) noexcept
+{
+    switch (z) {
+    case 0:  return DSPMode::LSB;
+    case 1:  return DSPMode::USB;
+    case 2:  return DSPMode::DSB;
+    case 3:  return DSPMode::CWL;
+    case 4:  return DSPMode::CWU;
+    case 5:  return DSPMode::FM;
+    case 6:  return DSPMode::AM;
+    case 7:  return DSPMode::DIGU;
+    case 8:  return DSPMode::SPEC;
+    case 9:  return DSPMode::DIGL;
+    case 10: return DSPMode::SAM;
+    case 11: return DSPMode::DRM;
+    default: return DSPMode::USB;
+    }
+}
+
 } // namespace Longpath

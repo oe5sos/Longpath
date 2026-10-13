@@ -35,7 +35,8 @@ private:
     bool    splitZuletzt{false};
     bool    ritAn{false};
     bool    xitAn{false};
-    int     itHz{0};
+    int     ritHz{0};
+    int     xitHz{0};
     int     itRufe{0};
 
     void hakenAnhaengen()
@@ -48,7 +49,8 @@ private:
         h.setzeSplit  = [this](bool on)    { ++splitRufe; splitZuletzt = on; };
         h.setzeRit    = [this](bool on)    { ritAn = on; };
         h.setzeXit    = [this](bool on)    { xitAn = on; };
-        h.setzeItHz   = [this](int hz)     { itHz = hz; ++itRufe; };
+        h.setzeRitHz  = [this](int hz)     { ritHz = hz; ++itRufe; };
+        h.setzeXitHz  = [this](int hz)     { xitHz = hz; ++itRufe; };
         p.setzeHaken(h);
     }
 
@@ -80,7 +82,7 @@ private slots:
         moxRufe = splitRufe = 0;
         moxZuletzt = splitZuletzt = false;
         ritAn = xitAn = false;
-        itHz = itRufe = 0;
+        ritHz = xitHz = itRufe = 0;
         hakenAnhaengen();
     }
 
@@ -262,7 +264,7 @@ private slots:
         CatProtocol::Zustand z;
         z.vfoAHz = 14225000;
         z.stepHz = 100;
-        z.itHz   = 0;
+        z.ritHz  = 0;
         z.modeK  = 2;
         p.setzeZustand(z);
         const QString s = p.statussatz();
@@ -300,10 +302,18 @@ private slots:
         // xit="1";` -- bei BEIDEN an meldet Thetis nur RIT. Nachgebaut, nicht
         // geglaettet: ein Programm, das beide Flaggen sieht, weiss nicht,
         // welchen Wert das IT-Feld traegt.
+        //
+        // Seit dem 2026-10-13 fuehrt der Zustand BEIDE Ablagen getrennt
+        // (wie SliceModel). Darum stehen hier absichtlich zwei
+        // VERSCHIEDENE Werte: der Fall belegt jetzt nicht nur, dass die
+        // XIT-Flagge verschwindet, sondern auch, dass der RIT-WERT
+        // gezeigt wird und nicht der XIT-Wert. Mit einem gemeinsamen
+        // itHz war das nicht pruefbar.
         CatProtocol::Zustand z;
         z.ritOn = true;
         z.xitOn = true;
-        z.itHz  = -250;
+        z.ritHz = -250;
+        z.xitHz = 999;
         p.setzeZustand(z);
         const QString s = p.statussatz();
         QCOMPARE(s.mid(15, 6), QStringLiteral("-00250"));
@@ -315,7 +325,8 @@ private slots:
     {
         CatProtocol::Zustand z;
         z.xitOn = true;
-        z.itHz  = 1234;
+        z.ritHz = -7;          // darf NICHT gezeigt werden
+        z.xitHz = 1234;
         p.setzeZustand(z);
         const QString s = p.statussatz();
         QCOMPARE(s.mid(15, 6), QStringLiteral("+01234"));
@@ -325,11 +336,12 @@ private slots:
 
     void ohneRitUndXitIstDerWertNull()
     {
-        // Auch wenn itHz etwas anderes sagt: ist keine der beiden Flaggen
-        // gesetzt, gehoert eine 0 ins Feld, sonst meldet das Geraet eine
-        // Ablage, die nicht wirkt.
+        // Auch wenn beide Ablagen etwas anderes sagen: ist keine der
+        // Flaggen gesetzt, gehoert eine 0 ins Feld, sonst meldet das
+        // Geraet eine Ablage, die nicht wirkt.
         CatProtocol::Zustand z;
-        z.itHz = 500;
+        z.ritHz = 500;
+        z.xitHz = -500;
         p.setzeZustand(z);
         QCOMPARE(p.statussatz().mid(15, 6), QStringLiteral("+00000"));
     }
@@ -635,13 +647,13 @@ private slots:
         z.stepHz = 10;
         p.setzeZustand(z);
         QCOMPARE(p.antwortAuf(QStringLiteral("RU;")), QString());
-        QCOMPARE(itHz, 10);
+        QCOMPARE(ritHz, 10);
         QCOMPARE(p.antwortAuf(QStringLiteral("RU;")), QString());
-        QCOMPARE(itHz, 20);
+        QCOMPARE(ritHz, 20);
         QCOMPARE(p.antwortAuf(QStringLiteral("RD;")), QString());
-        QCOMPARE(itHz, 10);
+        QCOMPARE(ritHz, 10);
         QCOMPARE(p.antwortAuf(QStringLiteral("RC;")), QString());
-        QCOMPARE(itHz, 0);
+        QCOMPARE(ritHz, 0);
         // Mit Nutzdaten sind RU/RD/RC keine Befehle.
         QCOMPARE(p.antwortAuf(QStringLiteral("RU1;")), QStringLiteral("?;"));
     }
@@ -654,7 +666,7 @@ private slots:
         z.stepHz = 0;
         p.setzeZustand(z);
         QCOMPARE(p.antwortAuf(QStringLiteral("RU;")), QString());
-        QCOMPARE(itHz, 10);
+        QCOMPARE(ritHz, 10);
     }
 };
 
