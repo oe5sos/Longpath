@@ -58,7 +58,18 @@ private:
         QByteArray a;
         QElapsedTimer uhr;
         uhr.start();
-        while (a.count(';') < mindestens && uhr.elapsed() < msec) {
+        if (mindestens == 0) {
+            // Die Schleife ein paar Mal drehen, damit der Server
+            // arbeitet, und dann nachsehen, dass nichts kam.
+            while (uhr.elapsed() < msec) {
+                QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
+                if (s->bytesAvailable() > 0) { a += s->readAll(); }
+            }
+            return QString::fromLatin1(a);
+        }
+        // mindestens == 0 heisst: KEINE Antwort erwartet -- dann wird die
+        // Schleife einmal gedreht und geprueft, dass nichts kam.
+        while (a.count(';') <= mindestens - 1 && uhr.elapsed() < msec) {
             QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
             if (s->bytesAvailable() > 0) { a += s->readAll(); }
         }
@@ -263,7 +274,25 @@ private slots:
                  qPrintable(QStringLiteral("SM-Antwort hat die falsche Form: %1").arg(sm)));
 
         QCOMPARE(frage(s, "RT;"), QStringLiteral("RT0;"));
-        s->write("RT1;");
+        // Die ANTWORT abholen, auch wenn keine erwartet wird.
+        //
+        // Der erste Versuch stand hier als blankes `s->write("RT1;")`
+        // mit einem QTRY_VERIFY darauf -- und war rot: ritEnabled()
+        // blieb falsch, und der Lauf brauchte 18 s statt 3,5.
+        // Mit dieser Zeile ist er gruen und schnell.
+        //
+        // WARUM genau, habe ich nicht festgestellt. QTRY_VERIFY dreht
+        // die Ereignisschleife auch, es muesste also reichen. Was diese
+        // Form zusaetzlich tut: sie dreht 300 ms lang ohne Abbruch und
+        // liest dabei ab, was der Socket hergibt. Die Vermutung ist ein
+        // Zusammenspiel mit den Antworten der Befehle davor; belegt ist
+        // sie nicht.
+        //
+        // Festgehalten statt weggeraeumt, weil die naechste Person sonst
+        // dieselbe halbe Stunde verliert -- und weil ein Prueffall, der
+        // die Antwort abholt, ohnehin der richtigere ist: ein Setzen
+        // kann abgelehnt werden, und dann steht ein "?;" im Socket.
+        QCOMPARE(frage(s, "RT1;", 0, 300), QString());
         QTRY_VERIFY(sl->ritEnabled());
         QCOMPARE(frage(s, "RT;"), QStringLiteral("RT1;"));
 
