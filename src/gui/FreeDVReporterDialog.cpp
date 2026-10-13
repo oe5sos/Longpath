@@ -73,6 +73,7 @@
 //                                    ::onStationRemoved entry point.
 
 #include "FreeDVReporterDialog.h"
+#include "gui/Zahlentext.h"
 
 #include "core/AppSettings.h"
 #include "core/FreeDVReporterClient.h"
@@ -415,10 +416,10 @@ private:
             == "True";
         if (asKhz) {
             const double khz = static_cast<double>(frequencyHz) / 1.0e3;
-            return QLocale::system().toString(khz, 'f', 1);
+            return anzeigeZahl(khz, 1);
         }
         const double mhz = static_cast<double>(frequencyHz) / 1.0e6;
-        return QLocale::system().toString(mhz, 'f', 4);
+        return anzeigeZahl(mhz, 4);
     }
 
     // SNR rendering. Longpath-architectural divergence from upstream:
