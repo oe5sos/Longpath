@@ -2397,6 +2397,11 @@ void StripWindow::importAetherPreset()
             .arg(Sprache::T(QStringLiteral("All files"))));
     if (pfad.isEmpty()) { return; }
 
+    // Dieselbe Sicherung wie beim Wechsel einer Voreinstellung: ein
+    // Import ersetzt die ganze Kette, und auch davor soll der
+    // bestehende Stand abrufbar bleiben.
+    StripSettings::saveUserPreset(kLetzterStand(), *c);
+
     const AetherPreset::Ergebnis e = AetherPreset::applyFile(pfad, *c);
     if (!e.ok) {
         m_presetNote->setText(e.fehler);
