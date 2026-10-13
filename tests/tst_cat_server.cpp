@@ -491,9 +491,9 @@ private slots:
         // Kein Geber angehaengt: der Server weiss nichts ueber das
         // Geraet. Eine Vorgabe zu melden (0 Hz, USB) waere eine
         // erfundene Frequenz -- und das Fremdprogramm wuerde sie glauben.
-        QCOMPARE(blank.verarbeiteFuerTest(QStringLiteral("FA;")),
+        QCOMPARE(blank.antwortAuf(QStringLiteral("FA;")),
                  QStringLiteral("?;"));
-        QCOMPARE(blank.verarbeiteFuerTest(QStringLiteral("IF;")),
+        QCOMPARE(blank.antwortAuf(QStringLiteral("IF;")),
                  QStringLiteral("?;"));
     }
 };

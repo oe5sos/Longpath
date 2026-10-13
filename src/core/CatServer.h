@@ -55,6 +55,7 @@
 #pragma once
 
 #include "CatProtocol.h"
+#include "CatPuffer.h"
 
 #include <QHash>
 #include <QObject>
@@ -116,9 +117,25 @@ public:
     /// Wie viele Fremdprogramme an diesem Kanal haengen.
     int verbindungen(int k) const;
 
-    /// Fuer Prueffaelle: einen Befehl so verarbeiten, wie er aus dem
-    /// Netz kaeme, ohne Netz. Gibt die Antwort.
-    QString verarbeiteFuerTest(const QString& befehl);
+    /// Einen fertigen Befehl beantworten, ohne Netz. Gibt die Antwort
+    /// ("" = nichts zu senden, "?;" = abgelehnt).
+    ///
+    /// Oeffentlich, weil nicht nur Prueffaelle das brauchen: der
+    /// PTY-Weg (CatPtyServer) hat keine eigene Protokollschicht, sondern
+    /// fragt HIER. Genau einen Zustandsgeber, genau einen Satz Haken,
+    /// genau eine AI-Flagge -- wer je Transport eine eigene
+    /// Protokollschicht baut, hat zwei Stellen, an denen ein Haken
+    /// fehlen kann, und merkt es am zweiten nie (am 2026-10-11 hat ein
+    /// fehlender Haken in EINER Schicht drei gruene Pruefstaende
+    /// ueberlebt).
+    ///
+    /// Thetis macht es umgekehrt: jeder Horcher (TCPIPcatServer,
+    /// SIOListenerII bis SIO4ListenerII) baut sich seinen eigenen
+    /// `new CATParser(console)`. Das geht dort auf, weil der Zustand
+    /// nicht im Parser liegt, sondern in `console` -- also in genau
+    /// einem Objekt. Longpath hat kein solches Allobjekt; hier ist die
+    /// eine Protokollschicht die Entsprechung.
+    QString antwortAuf(const QString& befehl);
 
 signals:
     /// Ein Fremdprogramm hat sich verbunden oder getrennt (Kanal 0..3).
@@ -130,26 +147,20 @@ private:
     void nimmVerbindung(int k);
     void lies(int k, QTcpSocket* s);
     void raeumeAuf(int k, QTcpSocket* s);
-    /// Zerlegt den Strom in Befehle. From Thetis
-    /// CAT/TCPIPcatServer.cs:275-296 [v2.10.3.15] -- ParseReceiveBuffer.
-    void verarbeitePuffer(int k, QTcpSocket* s);
+    /// Beantwortet die Befehle, die der Puffer herausgegeben hat. Die
+    /// Zerlegung selbst steht in CatPuffer (der PTY-Weg braucht sie
+    /// genauso).
+    void verarbeiteBefehle(int k, QTcpSocket* s, const QStringList& befehle);
 
     struct Kanal {
         QTcpServer* server{nullptr};
         quint16     port{0};
-        QHash<QTcpSocket*, QString> puffer;   // je Verbindung ein Puffer
+        QHash<QTcpSocket*, CatPuffer> puffer;   // je Verbindung ein Puffer
     };
     Kanal m_k[kKanaele];
 
     CatProtocol m_protokoll;
     std::function<std::optional<CatProtocol::Zustand>()> m_geber;
-
-    /// From Thetis CAT/TCPIPcatServer.cs:295 [v2.10.3.15]:
-    ///   if (m_oneLineBuf.Length > 255) m_oneLineBuf.Clear();
-    ///   // not likely to be a cat message if it got this long
-    /// Ohne diesen Deckel haelt ein Programm, das nie ein ';' schickt,
-    /// den Puffer offen, bis der Speicher ausgeht.
-    static constexpr int kPufferDeckel = 255;
 };
 
 } // namespace Longpath

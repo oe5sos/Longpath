@@ -22,11 +22,15 @@
 //                 All controls NYI — wired in later phase.
 //   2026-05-10 — Phase 24 (Task 24.1): stripped TCI button row; TCI
 //                 controls now live in TciApplet (Phase 21, 0b615a7).
+//   2026-10-11 — TCP-Schalter verdrahtet (CatServer).
+//   2026-10-12 — PTY-Schalter verdrahtet (CatPtyServer); die vier
+//                 Pfadbeschriftungen zeigen die echten Geraetepfade.
 // =================================================================
 
 #include "CatApplet.h"
 #include "gui/styles/ThemeQss.h"
 #include "core/AppSettings.h"
+#include "core/CatPtyServer.h"
 #include "core/CatServer.h"
 #include "NyiOverlay.h"
 #include "gui/ComboStyle.h"
@@ -64,6 +68,10 @@ static QLabel* makePathLabel(const QString& text, QWidget* parent)
     auto* lbl = new QLabel(text, parent);
     lbl->setStyleSheet(QStringLiteral(
         "QLabel { color: %1; font-size: 9px; }").arg(Style::kTextSecondary));
+    // Auswaehlbar (2026-10-12): in diesen Beschriftungen steht ein Pfad,
+    // den der Betreiber in WSJT-X oder fldigi EINTRAGEN muss. Etwas, das
+    // man abtippen soll, soll man kopieren koennen.
+    lbl->setTextInteractionFlags(Qt::TextSelectableByMouse);
     return lbl;
 }
 
@@ -119,14 +127,17 @@ void CatApplet::buildUI()
         row->addWidget(m_ptyBtn);
 
         for (int i = 0; i < 4; ++i) {
-            m_ptyPath[i] = makePathLabel(
-                QStringLiteral("/dev/ptyp%1").arg(i), this);
+            // Vorgabetext: ein Strich, KEIN erfundener Pfad.
+            // Hier stand bis 2026-10-12 "/dev/ptyp0".."/dev/ptyp3" --
+            // BSD-Altnamen, die es auf macOS und Linux nicht gibt. Ein
+            // Pfad, den niemand oeffnen kann, ist schlimmer als kein
+            // Pfad: man sucht den Fehler im Fremdprogramm.
+            m_ptyPath[i] = makePathLabel(QStringLiteral("—"), this);
             row->addWidget(m_ptyPath[i]);
         }
         row->addStretch();
 
         vbox->addLayout(row);
-        NyiOverlay::markNyi(m_ptyBtn, QStringLiteral("3K"));
     }
 
     vbox->addWidget(divider());
@@ -184,9 +195,13 @@ void CatApplet::buildUI()
 // vier CAT-Kanaele auf 31001..31004 (Thetis' Vorgabeport aufsteigend) --
 // nur auf 127.0.0.1, weil CAT den Sender tasten kann.
 //
-// PTY, VAX und IQ bleiben Attrappen und behalten ihre NyiOverlay-Marke:
-// PTY braucht Pseudoterminals (eigener Gang), VAX und IQ gehoeren in den
-// Tonbereich und haben mit CAT nichts zu tun.
+// PTY ist seit 2026-10-12 verdrahtet (vierter Gang, CatPtyServer): vier
+// Pseudoterminals, die sich wie serielle Schnittstellen verhalten, mit
+// einer festen Verknuepfung je Kanal, damit der Pfad einen Neustart
+// ueberlebt.
+//
+// VAX und IQ bleiben Attrappen und behalten ihre NyiOverlay-Marke: die
+// gehoeren in den Tonbereich und haben mit CAT nichts zu tun.
 
 void CatApplet::setzeCatServer(CatServer* srv)
 {
@@ -246,8 +261,138 @@ void CatApplet::setzeCatServer(CatServer* srv)
     zeigeKanaele();
 }
 
+void CatApplet::setzeCatPtyServer(CatPtyServer* srv)
+{
+    m_catPty = srv;
+    if (!m_ptyBtn) { return; }
+
+    // Gesperrt, nicht bloss wirkungslos -- und mit dem GRUND im
+    // Hinweistext. Ein Schalter, der sich druecken laesst und nichts
+    // tut, ist genau die Art Oberflaeche, die dieses Feld bis gestern
+    // war.
+    const bool geht = srv && CatPtyServer::verfuegbar();
+    m_ptyBtn->setEnabled(geht);
+    if (!geht) {
+        m_ptyBtn->setToolTip(srv
+            ? QStringLiteral(
+                  "Pseudoterminals gibt es auf dieser Plattform nicht. "
+                  "WSJT-X, fldigi und hamlib koennen stattdessen den "
+                  "TCP-Weg (Schalter darueber).")
+            : QStringLiteral("Kein PTY-Server vorhanden"));
+        zeigePfade();
+        return;
+    }
+
+    m_ptyBtn->setToolTip(QStringLiteral(
+        "CAT als serielle Schnittstelle: vier Pseudoterminals.\n"
+        "Einzutragen ist die feste Verknuepfung %1 .. %2 -- die bleibt "
+        "ueber Neustarts gleich.\nDer Geraetepfad darunter (/dev/tty...) "
+        "wechselt bei jedem Start.")
+            .arg(CatPtyServer::festerPfad(0),
+                 CatPtyServer::festerPfad(CatPtyServer::kKanaele - 1)));
+
+    connect(m_ptyBtn, &QPushButton::toggled, this, [this](bool an) {
+        if (!m_catPty) { return; }
+        if (an) {
+            int gestartet = 0;
+            for (int k = 0; k < CatPtyServer::kKanaele; ++k) {
+                if (m_catPty->starte(k)) { ++gestartet; }
+            }
+            if (gestartet == 0) {
+                // Kein einziges Pseudoterminal zu haben: den Schalter
+                // zuruecknehmen, statt "an" zu zeigen, waehrend es
+                // nichts gibt, was ein Fremdprogramm oeffnen koennte.
+                QSignalBlocker b(m_ptyBtn);
+                m_ptyBtn->setChecked(false);
+            }
+        } else {
+            for (int k = 0; k < CatPtyServer::kKanaele; ++k) {
+                m_catPty->beende(k);
+            }
+        }
+        zeigePfade();
+    });
+
+    connect(srv, &CatPtyServer::pfadeGeaendert, this, [this]() { zeigePfade(); });
+    connect(srv, &CatPtyServer::kanalAusgefallen, this, [this](int, QString) {
+        zeigePfade();
+        // Faellt der LETZTE Kanal aus, soll der Schalter nicht "an"
+        // bleiben: sonst sieht es aus, als liefe die Anbindung.
+        bool nochEiner = false;
+        for (int k = 0; k < CatPtyServer::kKanaele; ++k) {
+            if (m_catPty && m_catPty->laeuft(k)) { nochEiner = true; break; }
+        }
+        if (!nochEiner && m_ptyBtn && m_ptyBtn->isChecked()) {
+            QSignalBlocker b(m_ptyBtn);
+            m_ptyBtn->setChecked(false);
+        }
+    });
+
+    // Den Schalterzustand MERKEN. Das Wiederherstellen macht
+    // stelleZustandWiederHer(), erst wenn das Fenster steht -- siehe die
+    // Notiz beim TCP-Schalter: der Aufbau eines Applets darf keine
+    // Nebenwirkungen haben, die Geraete anlegen und Einstellungen
+    // schreiben.
+    connect(m_ptyBtn, &QPushButton::toggled, this, [](bool an) {
+        AppSettings::instance().setValue(
+            QStringLiteral("CatPtyEnabled"),
+            an ? QStringLiteral("True") : QStringLiteral("False"));
+    });
+
+    zeigePfade();
+}
+
+void CatApplet::zeigePfade()
+{
+    for (int k = 0; k < 4; ++k) {
+        QLabel* lbl = m_ptyPath[k];
+        if (!lbl) { continue; }
+        const bool laeuft = m_catPty && m_catPty->laeuft(k);
+        if (!laeuft) {
+            lbl->setText(QStringLiteral("—"));
+            const QString grund = m_catPty ? m_catPty->grund(k) : QString();
+            lbl->setToolTip(grund.isEmpty()
+                ? QStringLiteral("Kanal %1 ist aus")
+                      .arg(QChar(QLatin1Char('A' + k)))
+                // Den Grund ANZEIGEN, nicht nur ins Protokoll schreiben.
+                // Wer den Schalter drueckt und einen Strich sieht, hat
+                // sonst keinen Anhaltspunkt.
+                : QStringLiteral("Kanal %1: %2")
+                      .arg(QChar(QLatin1Char('A' + k)), grund));
+            continue;
+        }
+
+        const QString pfad = m_catPty->pfad(k);
+        // In der Zeile steht nur der kurze Geraetename: vier ganze Pfade
+        // nebeneinander passen in die Breite eines Applets nicht, und
+        // der Platzhalter vorher war mit "/dev/ptyp0" sogar laenger.
+        // Alles Lange steht im Hinweistext, und der Text ist auswaehlbar.
+        lbl->setText(pfad.section(QLatin1Char('/'), -1));
+        lbl->setToolTip(QStringLiteral(
+            "Kanal %1\nGeraet jetzt: %2\nFest eintragen: %3\n\n"
+            "Der Geraetepfad wechselt bei jedem Start von Longpath. In "
+            "WSJT-X, fldigi oder im Logbuch die FESTE Zeile eintragen -- "
+            "die zeigt immer auf das aktuelle Geraet.")
+                .arg(QChar(QLatin1Char('A' + k)), pfad,
+                     CatPtyServer::festerPfad(k)));
+    }
+}
+
 void CatApplet::stelleZustandWiederHer()
 {
+    // Der PTY-Schalter zuerst, und UNABHAENGIG: die beiden Wege haengen
+    // nicht aneinander, und ein fehlender TCP-Server darf nicht dazu
+    // fuehren, dass die serielle Haelfte stumm bleibt. (Der erste
+    // Entwurf hatte beides hinter einem gemeinsamen `return`.)
+    if (m_ptyBtn && m_catPty && m_ptyBtn->isEnabled()
+        && !m_ptyBtn->isChecked()
+        && AppSettings::instance()
+               .value(QStringLiteral("CatPtyEnabled"),
+                      QStringLiteral("False"))
+               .toString() == QStringLiteral("True")) {
+        m_ptyBtn->setChecked(true);
+    }
+
     if (!m_tcpBtn || !m_cat) { return; }
     // Ohne das muesste der Betreiber nach jedem Start klicken, bevor
     // WSJT-X oder fldigi das Geraet finden -- und waehrend er das sucht,

@@ -1,7 +1,73 @@
 // =================================================================
 // src/core/CatProtocol.cpp  (Longpath)
 // =================================================================
-// Lizenzkoepfe, Herkunft und Aenderungsgeschichte: CatProtocol.h.
+//
+// Ported from Thetis sources:
+//   Project Files/Source/Console/CAT/CATParser.cs   [v2.10.3.15]
+//   Project Files/Source/Console/CAT/CATCommands.cs [v2.10.3.15]
+//   Project Files/Source/Console/CAT/CATStructs.xml [v2.10.3.15]
+// Original licences from the Thetis sources are included below.
+//
+// =================================================================
+// Modification history (Longpath):
+//   2026-10-11 — Reimplemented in C++20/Qt6 for Longpath, AI-assisted
+//                 via Anthropic Claude Code. Erster Gang: die zehn
+//                 Befehle, die Fremdprogramme tatsaechlich sprechen
+//                 (FA FB MD IF ID AI TX RX FR FT). Thetis' CAT ist
+//                 18.081 Zeilen, davon 10.591 in CATCommands.cs mit
+//                 dem vollen Kenwood-Satz plus allen ZZ-Erweiterungen;
+//                 der Rest folgt in eigenen Gaengen.
+// =================================================================
+//
+// --- From CATParser.cs ---
+//=================================================================
+// CATParser.cs
+//=================================================================
+// Copyright (C) 2012  Bob Tracy
+//
+// This program is free software; you can redistribute it and/or
+// modify it under the terms of the GNU General Public License
+// as published by the Free Software Foundation; either version 2
+// of the License, or (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program; if not, write to the Free Software
+// Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+//
+// You may contact the author via email at: k5kdn@arrl.net
+//=================================================================
+//
+// --- From CATCommands.cs ---
+//=================================================================
+// CATCommands.cs
+//=================================================================
+// Copyright (C) 2005  Bob Tracy
+// This program is free software; you can redistribute it and/or
+// modify it under the terms of the GNU General Public License
+// as published by the Free Software Foundation; either version 2
+// of the License, or (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program; if not, write to the Free Software
+// Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+//
+// You may contact the author via email at: k5kdn@arrl.net
+//=================================================================
+// Continual modifications Copyright (C) 2019-2026 Richard Samphire (MW0LGE)
+//=================================================================
+
+// =================================================================
+// Der Kopf spiegelt CatProtocol.h.
 // =================================================================
 
 #include "CatProtocol.h"

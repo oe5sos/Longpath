@@ -367,6 +367,7 @@ warren@wpratt.com
 #include "applets/PhoneCwApplet.h"
 #include "applets/RadeApplet.h"
 #include "core/CatModeMap.h"
+#include "core/CatPtyServer.h"
 #include "core/CatServer.h"
 #include "applets/EqApplet.h"
 #include "applets/VaxApplet.h"
@@ -674,6 +675,28 @@ MainWindow::MainWindow(QWidget* parent)
         // nichts zu tun. Ein quittiertes FB, das nichts bewegt, laesst ein
         // Fremdprogramm glauben, es haette den zweiten VFO gesetzt.
         m_catServer->setzeHaken(haken);
+
+        // ── Die serielle Haelfte (2026-10-12) ────────────────────────
+        //
+        // Viele Programme koennen CAT nur ueber eine serielle
+        // Schnittstelle: fldigi fragt nach einem Geraetepfad, Logbuecher
+        // und aeltere Contestprogramme ebenso. Auf macOS und Linux ist
+        // die Entsprechung ein Pseudoterminal.
+        //
+        // KEINE zweite Protokollschicht. Der Antwortgeber zeigt auf
+        // denselben CatServer, den auch der TCP-Weg fragt -- genau ein
+        // Zustandsgeber, genau ein Satz Haken, genau eine AI-Flagge. Wer
+        // je Transport eine eigene Schicht baut, hat zwei Stellen, an
+        // denen ein Haken fehlen kann, und merkt es an der zweiten nie:
+        // am 2026-10-11 hat ein fehlender VFO-B-Haken in EINER Schicht
+        // drei gruene Pruefstaende ueberlebt und erst der Livelauf hat
+        // ihn gezeigt.
+        m_catPtyServer = new CatPtyServer(this);
+        m_catPtyServer->setzeAntwortgeber(
+            [this](const QString& befehl) -> QString {
+                if (!m_catServer) { return {}; }
+                return m_catServer->antwortAuf(befehl);
+            });
     }
 
     buildUI();
@@ -7021,6 +7044,7 @@ void MainWindow::populateDefaultMeter()
     // bei den Konstruktoren weiter unten.
     m_catApplet = new CatApplet(m_radioModel, nullptr);
     m_catApplet->setzeCatServer(m_catServer);
+    m_catApplet->setzeCatPtyServer(m_catPtyServer);
     panel->addApplet(m_catApplet);
 
     // Geister-Applets — verborgen nach
