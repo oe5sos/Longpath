@@ -106,7 +106,13 @@ private slots:
         // + 2 line_in_gain/user_dig_out (P1 full-parity Task 2.4)
         // + 11 DEXP envelope/ratios/look-ahead/SCF (3M-3a-iii Tasks 7-10)
         // = 106 keys.
-        QCOMPARE(defs.size(), 106);
+
+        // + 1 AM_Carrier_Level (2026-10-13: Thetis fuehrt den
+        //   AM-Traegerpegel seit immer im Profil, Longpath nicht --
+        //   aufgefallen beim Einlesen von Thetis-Profilen)
+        //   = 107.
+        QVERIFY(defs.contains(QStringLiteral("AM_Carrier_Level")));
+        QCOMPARE(defs.size(), 107);
     }
 
     // =========================================================================

@@ -97,7 +97,13 @@ private slots:
         // Total bundle was 95 (CFC round-trip baseline — was 96, dropped
         // AntiVox_Source_VAX in 3M-3a-iv Option A refactor);
         // adding 11 DEXP keys brings it to 106.
-        QCOMPARE(defs.size(), 106);
+
+        // + 1 AM_Carrier_Level (2026-10-13: Thetis fuehrt den
+        //   AM-Traegerpegel seit immer im Profil, Longpath nicht --
+        //   aufgefallen beim Einlesen von Thetis-Profilen)
+        //   = 107.
+        QVERIFY(defs.contains(QStringLiteral("AM_Carrier_Level")));
+        QCOMPARE(defs.size(), 107);
     }
 
     // =========================================================================

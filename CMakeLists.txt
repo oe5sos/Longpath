@@ -528,6 +528,7 @@ set(CORE_SOURCES
     src/core/BeamHeading.cpp
     src/core/BoardCapabilities.cpp
     src/core/CatProtocol.cpp
+    src/core/ThetisProfilImport.cpp
     src/core/CatServer.cpp
     src/core/CallsignCache.cpp
     src/core/CouplerZero.cpp
