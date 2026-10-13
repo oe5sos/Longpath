@@ -30,6 +30,7 @@
 
 #include <QtTest/QtTest>
 
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 
@@ -330,6 +331,95 @@ private slots:
         AppSettings::instance().save();
         qInfo("abgelegt als: %s", qPrintable(name));
         qInfo("Datei: %s", qPrintable(AppSettings::instance().filePath()));
+    }
+
+    // ── Was eine fremde Datei alles anrichten könnte ────────────────
+    //
+    // Ein Profil kommt aus einem anderen Programm, womöglich aus einer
+    // neueren Fassung davon. Die Fälle hier sind nicht erfunden: sie
+    // sind die Stellen, an denen ein Importeur still etwas Falsches
+    // tut, statt zu sagen, dass er nicht kann.
+    void eine_kette_aus_lauter_unbekannten_namen_wird_abgelehnt()
+    {
+        StripChain c;
+        c.prepare(kRate);
+        for (int i = 0; i < StripChain::kStageCount; ++i) {
+            c.setStageEnabled(static_cast<StripChain::Stage>(i), true);
+        }
+
+        const QJsonObject fremd{
+            { QStringLiteral("schema"), QLatin1String(AetherPreset::kSchema) },
+            { QStringLiteral("chain"), QJsonArray{ QStringLiteral("Vocoder"),
+                                                   QStringLiteral("Exciter9") } } };
+        const auto e = AetherPreset::apply(fremd, c);
+        QVERIFY2(!e.ok, "eine Kette aus lauter Unbekanntem wurde angenommen");
+        QVERIFY(e.fehler.contains(QStringLiteral("Vocoder")));
+
+        // Und die Kette steht unangetastet da -- nicht lautlos leer.
+        for (int i = 0; i < StripChain::kStageCount; ++i) {
+            QVERIFY2(c.stageEnabled(static_cast<StripChain::Stage>(i)),
+                     qPrintable(QStringLiteral("Stufe %1 wurde abgeschaltet")
+                                    .arg(i)));
+        }
+    }
+
+    void ein_entzerrer_ohne_baender_laesst_die_kurve_stehen()
+    {
+        StripChain c;
+        c.prepare(kRate);
+        c.eq().setActiveBandCount(6);
+        ClientEq::BandParams merk = c.eq().band(0);
+        merk.freqHz = 123.0f;
+        merk.gainDb = 4.5f;
+        c.eq().setBand(0, merk);
+
+        const QJsonObject profil{
+            { QStringLiteral("schema"), QLatin1String(AetherPreset::kSchema) },
+            { QStringLiteral("chain"), QJsonArray{ QStringLiteral("Eq") } },
+            { QStringLiteral("eq"), QJsonObject{
+                  { QStringLiteral("enabled"), true },
+                  { QStringLiteral("activeBandCount"), 10 },
+                  { QStringLiteral("bands"), QJsonArray{} } } } };
+        const auto e = AetherPreset::apply(profil, c);
+        QVERIFY2(e.ok, qPrintable(e.fehler));
+
+        // Die Anzahl darf NICHT auf 10 springen: hinter den Plätzen
+        // 6..9 stünden Werte aus einer ganz anderen Einstellung.
+        QCOMPARE(c.eq().activeBandCount(), 6);
+        QVERIFY(qFuzzyCompare(c.eq().band(0).freqHz, 123.0f));
+        bool gesagt = false;
+        for (const QString& h : e.hinweise) {
+            if (h.contains(QStringLiteral("keine Bänder"))) { gesagt = true; }
+        }
+        QVERIFY2(gesagt, "der Importeur schweigt darüber");
+    }
+
+    void ein_name_zweimal_in_der_kette_zaehlt_einmal()
+    {
+        StripChain c;
+        c.prepare(kRate);
+        const QJsonObject profil{
+            { QStringLiteral("schema"), QLatin1String(AetherPreset::kSchema) },
+            { QStringLiteral("chain"), QJsonArray{ QStringLiteral("Tube"),
+                                                   QStringLiteral("Gate"),
+                                                   QStringLiteral("Tube") } },
+            { QStringLiteral("tube"), QJsonObject{
+                  { QStringLiteral("enabled"), true },
+                  { QStringLiteral("driveDb"), 9.0 } } },
+            { QStringLiteral("gate"), QJsonObject{
+                  { QStringLiteral("enabled"), true } } } };
+        const auto e = AetherPreset::apply(profil, c);
+        QVERIFY2(e.ok, qPrintable(e.fehler));
+
+        // Jede Stufe genau einmal, sonst hätte setStageOrder abgelehnt.
+        std::array<int, StripChain::kStageCount> zaehler{};
+        for (const StripChain::Stage st : c.stageOrder()) {
+            ++zaehler[size_t(st)];
+        }
+        for (int n : zaehler) { QCOMPARE(n, 1); }
+        QCOMPARE(static_cast<int>(c.stageOrder()[1]),
+                 static_cast<int>(StripChain::Stage::Tube));
+        QVERIFY(qFuzzyCompare(c.tube().driveDb(), 9.0f));
     }
 
     // ── Was keine Kanalzugdatei ist, kommt nicht hinein ──────────────

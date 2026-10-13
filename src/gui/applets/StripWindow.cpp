@@ -842,6 +842,7 @@ void StripWindow::buildUi()
         auto* row = new QHBoxLayout;
         row->addWidget(new QLabel(QStringLiteral("Preset:"), this));
         m_presetBox = new QComboBox(this);
+        m_presetBox->setObjectName(QStringLiteral("stripPresetBox"));
         m_presetBox->setMinimumWidth(200);
         row->addWidget(m_presetBox);
 
@@ -2316,10 +2317,31 @@ void StripWindow::deleteUserPreset()
     m_presetNote->clear();
 }
 
+QString StripWindow::kLetzterStand()
+{
+    return Sprache::T(QStringLiteral("Previously edited"));
+}
+
 void StripWindow::applyPreset(const QString& name)
 {
     StripChain* c = chain();
     if (!c) { return; }
+
+    // ── Erst wegschreiben, dann überschreiben ───────────────────────
+    //
+    // Eine Voreinstellung ersetzt JEDE Stufe. Wer eine Stunde von Hand
+    // eingestellt hat und dann in die Liste greift -- aus Neugier, was
+    // „Clean voice" wäre --, hat seine Stunde verloren, ohne dass
+    // irgendwo etwas stand. Genau das ist am 2026-10-13 um 21:05 am
+    // Gerät des Betreibers passiert; seine Frage danach lautete, wo
+    // man Profile speichert.
+    //
+    // Keine Rückfrage, kein Fenster: der bestehende Stand wandert
+    // vorher unter einen festen Namen, und der steht gleich danach in
+    // derselben Liste. Ein Klick zurück, und alles ist wieder da.
+    if (name != kLetzterStand()) {
+        StripSettings::saveUserPreset(kLetzterStand(), *c);
+    }
 
     // A user preset of the same name wins: it is the one the operator
     // made, and shadowing a built-in with your own version of it is a
@@ -2340,6 +2362,19 @@ void StripWindow::applyPreset(const QString& name)
     reloadControls();
     refreshChainRow();
     persist();
+
+    // Die Liste neu aufbauen, damit „Zuletzt bearbeitet" darin steht --
+    // mit der eben gewählten Voreinstellung als Auswahl, nicht mit dem
+    // Sicherungsstand.
+    if (name != kLetzterStand()) {
+        rebuildPresetBox(name);
+        if (m_presetNote && !m_presetNote->text().isEmpty()) {
+            m_presetNote->setText(
+                m_presetNote->text() + QStringLiteral(" · Dein vorheriger "
+                                                      "Stand liegt als „%1\".")
+                                           .arg(kLetzterStand()));
+        }
+    }
 }
 
 // ── Ein Profil aus AetherSDR ─────────────────────────────────────────

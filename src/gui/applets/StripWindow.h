@@ -80,6 +80,13 @@ class TxVoiceCheckDialog;
 class StripWindow : public QDialog {
     Q_OBJECT
 public:
+    // Der Name, unter dem der Stand VOR einem Voreinstellungswechsel
+    // landet. Eine Funktion und keine Konstante, damit die Übersetzung
+    // greift, sobald die Sprache steht. Öffentlich, weil der Prüfstand
+    // nach genau diesem Eintrag sucht -- ein Prüfstand, der den Namen
+    // selbst hinschreibt, prüft seine eigene Schreibweise.
+    static QString kLetzterStand();
+
     explicit StripWindow(RadioModel* radio, QWidget* parent = nullptr);
     ~StripWindow() override;
 

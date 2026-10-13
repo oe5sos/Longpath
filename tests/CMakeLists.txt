@@ -5442,6 +5442,11 @@ longpath_add_test(tst_strip_chain)
 #    (Roehre vorne), samt der Zusage, dass nichts mitlaeuft, das er in
 #    Aether nie hatte --
 longpath_add_test(tst_aether_profil)
+
+# -- Eine Voreinstellung ersetzt jede Stufe: der Stand davor muss
+#    abrufbar bleiben, sonst vernichtet ein Griff in die Liste eine
+#    Stunde Handarbeit (am 2026-10-13 um 21:05 genau so passiert) --
+longpath_add_test(tst_kanalzug_voreinstellung_schuetzt)
 target_compile_definitions(tst_aether_profil PRIVATE
     LONGPATH_TEST_DATA_DIR="${CMAKE_SOURCE_DIR}/tests/data")
 

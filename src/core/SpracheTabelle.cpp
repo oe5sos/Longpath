@@ -60,6 +60,8 @@ const QHash<QString, QString>& tabelle()
           QStringLiteral("Speichern unter…") },
         { QStringLiteral("Save profile…"),
           QStringLiteral("Profil speichern…") },
+        { QStringLiteral("Previously edited"),
+          QStringLiteral("Zuletzt bearbeitet") },
         { QStringLiteral("Open AetherSDR channel strip profile"),
           QStringLiteral("AetherSDR-Kanalzugprofil öffnen") },
         { QStringLiteral("From AetherSDR: %1"),

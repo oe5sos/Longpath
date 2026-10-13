@@ -102,8 +102,10 @@ bool filterfamilie(const QString& wort, ClientEq::FilterFamily& aus)
 //   Clipper                (kennt Aether nicht, bleibt aus)
 //   Begrenzer ganz hinten  (Aethers finalLimiter laeuft immer, zuletzt)
 StripChain::Order reihenfolgeAus(const QJsonArray& liste,
-                                 std::array<bool, StripChain::kStageCount>& gelistet)
+                                 std::array<bool, StripChain::kStageCount>& gelistet,
+                                 int& verstanden)
 {
+    verstanden = 0;
     gelistet.fill(false);
 
     StripChain::Order folge{};
@@ -125,6 +127,7 @@ StripChain::Order reihenfolgeAus(const QJsonArray& liste,
         }
         if (gelistet[size_t(s)]) { continue; }   // zweimal genannt
         gelistet[size_t(s)] = true;
+        ++verstanden;
         anhaengen(s);
     }
 
@@ -177,7 +180,20 @@ Ergebnis apply(const QJsonObject& wurzel, StripChain& c)
         e.fehler = QStringLiteral("Das Profil trägt keine Kette („chain\").");
         return e;
     }
-    if (!c.setStageOrder(reihenfolgeAus(liste, gelistet))) {
+    int verstanden = 0;
+    const StripChain::Order folge = reihenfolgeAus(liste, gelistet, verstanden);
+    if (verstanden == 0) {
+        // Jeder Name der Liste war unbekannt. Ohne diese Schranke käme
+        // eine Kette heraus, in der JEDE Stufe aus ist -- lautlos, ohne
+        // Fehler, und niemand wüsste warum.
+        QStringList namen;
+        for (const QJsonValue& v : liste) { namen << v.toString(); }
+        e.fehler = QStringLiteral("Keiner der Stufennamen in „chain\" ist "
+                                  "hier bekannt: %1")
+                       .arg(namen.join(QStringLiteral(", ")));
+        return e;
+    }
+    if (!c.setStageOrder(folge)) {
         e.fehler = QStringLiteral("Die Kette des Profils ergibt keine "
                                   "gültige Reihenfolge.");
         return e;
@@ -251,8 +267,18 @@ Ergebnis apply(const QJsonObject& wurzel, StripChain& c)
             c.eq().setBand(gesetzt, p);
             ++gesetzt;
         }
-        c.eq().setActiveBandCount(qBound(1, anzahl, gesetzt > 0 ? gesetzt
-                                                                : anzahl));
+        // Ohne ein einziges Band bleibt die Anzahl, wie sie war: eine
+        // Zahl zu setzen, hinter der keine Werte stehen, erklärt
+        // vorhandene Bänder für aktiv, die aus einer ganz anderen
+        // Einstellung stammen.
+        if (gesetzt > 0) {
+            c.eq().setActiveBandCount(qBound(1, anzahl, gesetzt));
+            EqBandLayout::ensureSeeded(c.eq());
+        } else {
+            e.hinweise << QStringLiteral(
+                "Der Entzerrer des Profils trägt keine Bänder — die "
+                "bestehende Kurve bleibt stehen.");
+        }
         // Unsere Oberflaeche arbeitet mit vierzehn Griffen; Aethers
         // Datei traegt zehn aktive. Der Rest wird hier aufgefuellt --
         // mit FLACHEN, ABGESCHALTETEN Baendern (EqBandLayout.h:84-110),
@@ -261,7 +287,6 @@ Ergebnis apply(const QJsonObject& wurzel, StripChain& c)
         // ohnehin auf (StripSettings.cpp:374), und zwei verschiedene
         // Zustaende fuer dieselbe Datei sind genau die Sorte
         // Unterschied, die man spaeter dem Klang zuschreibt.
-        EqBandLayout::ensureSeeded(c.eq());
         c.setStageEnabled(Stage::Eq,
                           gelistet[size_t(Stage::Eq)]
                               && flagge(eq, "enabled", false));

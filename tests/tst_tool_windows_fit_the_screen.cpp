@@ -24,6 +24,7 @@
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
 // =================================================================
 #include <QtTest>
+#include <QGuiApplication>
 #include <QAction>
 #include <QScrollArea>
 #include <QCheckBox>
@@ -346,6 +347,29 @@ private slots:
 
     void theMainWindowAlwaysFillsTheScreen()
     {
+        // ── Dieser Fall kann auf dem Schirmlosen nicht laufen ────────
+        //
+        // Gemessen am 2026-10-13: das Hauptfenster traegt einen
+        // QRhiWidget (den Zeigerkranz), und sobald der beim Einhaengen
+        // in seinen Behaelter umgehaengt wird, meldet die schirmlose
+        // Qt-Anbindung „This plugin does not support setParent!" und
+        // greift danach in einen Zeiger 0x1 (EXC_BAD_ACCESS in
+        // objc_msgSend). Das ist eine Grenze der Anbindung, nicht
+        // unsere: der Absturz liegt in Cocoa-Code, den es nur auf dem
+        // Mac gibt.
+        //
+        // Ueberspringen statt rot stehen lassen -- und mit Grund, denn
+        // ein roter Prueftand, den niemand ausfuehren kann, ist ein
+        // kaputtes Werkzeug. Auf einem echten Schirm laeuft der Fall;
+        // Prueflaeufe mit Fenstern gehoeren hier aber nicht hin (der
+        // Betreiber hielt am 2026-09-30 eine Sonde fuer Longpath
+        // selbst).
+#ifdef Q_OS_MAC
+        if (QGuiApplication::platformName() == QLatin1String("offscreen")) {
+            QSKIP("QRhiWidget + setParent stuerzt in der schirmlosen "
+                  "Qt-Anbindung des Macs ab");
+        }
+#endif
         auto* mw = new MainWindow();        // bewusst nicht abgeraeumt
         QVERIFY2(mw->windowFlags().testFlag(Qt::FramelessWindowHint),
                  "nach dem Start formatfuellend (randlos)");
