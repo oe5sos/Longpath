@@ -716,3 +716,70 @@ Oberwellen nur bis 1,5 kHz hat nichts zwischen 1 und 3 kHz — genau
 dort, wogegen der Brummwert gemessen wird. Das ist der Grund, warum
 ein Prüfstand mit synthetischem Material einen eigenen Durchgang
 Misstrauen verdient.
+
+---
+
+## Nachtrag 2026-10-13: Aethers Kanalzug wird die Grundlage
+
+> „mein headset funktioniert mit windows und dem aether channel strip,
+>  also die einstellungen bei eather perfekt! wir müssen unsere grafik
+>  verwenden, aber alle einstellungen usw. von aether verwenden."
+
+Damit ändert sich die Richtung dieses Blattes an einer Stelle: die
+Werte kommen nicht mehr aus eigener Herleitung, sondern aus einer
+Datei, die der Betreiber unter Windows an seinem Teufel-Headset fertig
+eingestellt hat. Unsere Aufgabe ist, sie **unverfälscht** zu
+übernehmen — und zu sagen, wo das nicht geht.
+
+### Warum das überhaupt möglich ist
+
+Die acht Stufen sind aus AetherSDR portiert und rechnen Zeile für
+Zeile dasselbe. Sechs Leser haben beide Quellen Parameter für
+Parameter verglichen (AetherSDR `d58e2b8a` gegen unseren Baum); von
+rund sechzig Werten sind alle 1:1 übernehmbar außer sieben, und die
+sieben stehen als Kommentar an genau der Stelle im Importeur, an der
+der Unterschied gemacht wird (`core/strip/AetherPreset.cpp`).
+
+### Die eine Änderung am Unterbau: die Reihenfolge
+
+Aether trägt die Kette als **Liste** (`"chain"`), und die Liste ist
+zugleich Reihenfolge und Tor: was nicht darin steht, läuft gar nicht
+(`AudioEngine.h:482-483`). Longpath hatte die Reihenfolge als feste
+Folge von Aufrufen in `processMono()`.
+
+Martins Kette stellt die Röhre **vor** das Tor. Das ist kein
+Geschmack, sondern ein anderes Gerät — gemessen, dieselben zwei
+Stufen, dieselben Werte, nur getauscht:
+
+| | RMS |
+| --- | --- |
+| Kompressor → Röhre | 0,9138 |
+| Röhre → Kompressor | 0,2373 (−11,7 dB) |
+
+`StripChain` hält die Reihenfolge seither in **einer atomaren Zahl**
+(zehn Stufen zu je vier Bit). Der Audiofaden liest sie einmal je
+Block; der Hauptfaden schreibt sie in einem Zug. `setStageOrder()`
+nimmt nur eine vollständige Permutation an. Gespeichert wird sie als
+Liste von Wörtern, nicht als Zahlen.
+
+Die Einschubplätze bedeuten weiterhin „vor der Stufe an Stelle i",
+nicht „vor einer bestimmten Stufe" — ein Platz ist eine Stelle in der
+Kette, kein Anhängsel einer Stufe.
+
+### Was der Vergleich mit einem perfekten Filter ergeben hat
+
+„bei 4000 hört sich das alles nicht besonders an, bei roh ist das eine
+ganz andere liga." Gemessen gegen einen idealen linearphasigen Kanal
+(2047 Koeffizienten, dieselben Ecken) ist unser IIR-Kanal im
+Durchlassbereich **nicht unterscheidbar** (höchste Abweichung 0,84 dB,
+und die sitzt bei 63 Hz am Hochpass; von 125 Hz bis 4 kHz sind es
+Hundertstel). Der Unterschied gehört der Bandbreite.
+
+Damit ist auch entschieden, was NICHT gebaut wird: ein linearphasiges
+FIR-Filter für den Kanal würde 21 ms feste Laufzeit kosten und im Band
+nichts verbessern.
+
+Ein Teil des Unterschieds ist allerdings hausgemacht und liegt im
+Profil: sein Kuhschwanz sitzt bei 4982 Hz, also über der Kanalgrenze.
+Deshalb liegt neben seiner Kette eine zweite mit genau diesem einen
+Zug anders (3400 Hz) — zum Hören, nicht als Behauptung.
