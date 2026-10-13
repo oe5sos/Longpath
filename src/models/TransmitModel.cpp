@@ -2508,7 +2508,14 @@ void TransmitModel::toggleVaxSource(bool on)
 
 void TransmitModel::setMicSourceLocked(bool lock)
 {
+    const bool vorher = m_micSourceLocked;
     m_micSourceLocked = lock;
+    if (vorher != lock) {
+        // 2026-10-12: gemeldet, damit eine Oberflaeche den Eintrag
+        // "Radio" ausgrauen kann. Vor dem Setzen von m_micSource, damit
+        // ein Empfaenger des Signals die Sperre schon sieht.
+        emit micSourceLockedChanged(lock);
+    }
 
     // If we are engaging the lock while micSource is Radio, coerce to Pc now.
     // This handles the case where loadFromSettings already ran and set Radio
@@ -2915,6 +2922,25 @@ void TransmitModel::setCpdrOn(bool on)
     persistOne(QStringLiteral("cpdr/on"),
                on ? QStringLiteral("True") : QStringLiteral("False"));
     emit cpdrOnChanged(on);
+}
+
+double TransmitModel::amCarrierDspFromPercent(int percent)
+{
+    // From Thetis Console/setup.cs:9709 [v2.10.3.15]:
+    //   TXAMCarrierLevel = Math.Sqrt(0.01 * udTXAMCarrierLevel.Value) * 0.5
+    // Geklammert, bevor gewurzelt wird -- ein negativer Reglerwert gaebe
+    // sonst NaN, und das ginge ungebremst in WDSP.
+    const int p = std::clamp(percent, kAmCarrierPercentMin, kAmCarrierPercentMax);
+    return std::sqrt(0.01 * static_cast<double>(p)) * 0.5;
+}
+
+void TransmitModel::setAmCarrierPercent(int percent)
+{
+    const int clamped =
+        std::clamp(percent, kAmCarrierPercentMin, kAmCarrierPercentMax);
+    if (clamped == m_amCarrierPercent) { return; }
+    m_amCarrierPercent = clamped;
+    emit amCarrierPercentChanged(clamped);
 }
 
 void TransmitModel::setCpdrLevelDb(int dB)

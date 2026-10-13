@@ -4970,6 +4970,28 @@ void TxChannel::setCtcssFreq(double hz)
 #endif
 }
 
+void TxChannel::setAmCarrierLevel(double level)
+{
+    m_amCarrierLevel = level;
+#ifdef HAVE_WDSP
+    if (txa[m_channelId].rsmpin.p == nullptr) { return; }
+    // From Thetis Console/radio.cs:2944-2959 [v2.10.3.15] --
+    // TXAMCarrierLevel -> SetTXAAMCarrierLevel.
+    // third_party/wdsp/src/ammod.c:104-110, csDSP-geschuetzt.
+    SetTXAAMCarrierLevel(m_channelId, level);
+#endif
+}
+
+double TxChannel::amCarrierLevelInWdsp() const
+{
+#ifdef HAVE_WDSP
+    if (m_channelId < 0 || txa[m_channelId].ammod.p == nullptr) { return -1; }
+    return txa[m_channelId].ammod.p->c_level;
+#else
+    return -1;
+#endif
+}
+
 void TxChannel::setFmDeviation(double hz)
 {
     m_fmDeviationHz = hz;

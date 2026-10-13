@@ -8090,6 +8090,23 @@ void RadioModel::connectToRadio(const RadioInfo& info)
                 m_txChannel->setTxCpdrGainDb(static_cast<double>(dB));
             });
 
+            // AM-Traegerpegel (2026-10-12). Der Regler haelt Prozent,
+            // WDSP will den DSP-Wert -- die Wurzelkennlinie steht in
+            // TransmitModel::amCarrierDspFromPercent und NUR dort, damit
+            // sie nicht an zwei Stellen auseinanderlaeuft.
+            connect(&m_transmitModel, &TransmitModel::amCarrierPercentChanged,
+                    m_txChannel, [this](int percent) {
+                m_txChannel->setAmCarrierLevel(
+                    TransmitModel::amCarrierDspFromPercent(percent));
+            });
+            // Den gespeicherten Wert beim Anlegen des Sendekanals
+            // hinausschieben -- ohne das laeuft ammod auf seiner
+            // Anlegevorgabe, waehrend das Feld den Wert des Betreibers
+            // zeigt. Dieselbe Form wie beim Empfangs-Equalizer.
+            m_txChannel->setAmCarrierLevel(
+                TransmitModel::amCarrierDspFromPercent(
+                    m_transmitModel.amCarrierPercent()));
+
             // 27. cessbOnChanged → setTxCessbOn.
             connect(&m_transmitModel, &TransmitModel::cessbOnChanged,
                     m_txChannel, [this](bool on) {

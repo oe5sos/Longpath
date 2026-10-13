@@ -880,9 +880,30 @@ void MicProfileManager::load()
         // profiles are present but not selected, so existing-user
         // first-run behaviour is unchanged.
         writeActiveKey(QStringLiteral("Default"));
-        emit profileListChanged();
     }
-    // No emit on subsequent loads — the manifest already exists.
+
+    // IMMER melden, nicht nur beim Saeen (2026-10-12).
+    //
+    // Hier stand "No emit on subsequent loads — the manifest already
+    // exists". Das stimmt fuer das Manifest, aber nicht fuer die
+    // Empfaenger: jede Oberflaeche, die ihre Liste auf
+    // profileListChanged aufbaut, bleibt beim ZWEITEN Start mit demselben
+    // Geraet LEER.
+    //
+    // Die Reihenfolge im Betrieb ist naemlich:
+    //   1. Fensteraufbau: setMicProfileManager() -> Liste einmal fuellen,
+    //      aber es gibt noch keine MAC, also ist sie leer
+    //   2. Verbinden: setMacAddress() + load()
+    //
+    // Beim ersten Mal je Geraet wird gesaet und gemeldet, die Liste
+    // kommt. Danach nie wieder -- und der Betreiber sieht eine leere
+    // Profilauswahl, obwohl 22 Werksprofile daliegen.
+    //
+    // Betrifft TxApplet::rebuildProfileCombo (haengt allein an diesem
+    // Signal), PhoneCwApplet::fuelleProfilCombo und RadeApplet. Ein
+    // ueberfluessiges Signal beim ersten Mal ist harmlos: alle drei
+    // bauen ihre Liste neu auf, das ist idempotent.
+    emit profileListChanged();
 }
 
 QStringList MicProfileManager::profileNames() const

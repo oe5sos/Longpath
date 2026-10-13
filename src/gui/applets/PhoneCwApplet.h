@@ -127,6 +127,10 @@ public:
     QString appletTitle() const override { return QStringLiteral("Phone / CW"); }
     void syncFromModel() override;
 
+    /// Den Profilverwalter anhaengen (2026-10-12). Ohne ihn bleibt die
+    /// Profil-Combo GESPERRT, statt eine erfundene Liste zu zeigen.
+    void setMicProfileManager(class MicProfileManager* mgr);
+
     // Switch the stacked widget page: 0=Phone, 1=CW, 2=FM
     void showPage(int index);
 
@@ -157,6 +161,10 @@ private:
     // FM page controls follow the active slice (2026-09-27).
     void bindFmSlice(SliceModel* s);
     void syncFmSliceControls();
+
+    // ── 2026-10-12: vier Attrappen verdrahtet ────────────────────────────
+    void fuelleProfilCombo();
+    void zeigeMicQuelle();
     void fillFmMemories();   // FM page memory combo from the memory list
     QPointer<SliceModel> m_fmSlice;
     // ── Shared ───────────────────────────────────────────────────────────────
@@ -246,6 +254,7 @@ private:
 
     // ── FM page (8 controls) ─────────────────────────────────────────────────
     // #1  FM MIC slider (0-100) + inset value
+    class MicProfileManager* m_micProfileMgr{nullptr};
     QSlider*     m_fmMicSlider{nullptr};
     QLabel*      m_fmMicLabel{nullptr};
     // #2  Deviation buttons 5.0k / 2.5k (blue toggle)

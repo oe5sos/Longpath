@@ -6980,6 +6980,21 @@ void MainWindow::populateDefaultMeter()
 
     // PhoneCwApplet — Phone + CW pages, NYI
     m_phoneCwApplet = new PhoneCwApplet(m_radioModel, nullptr);
+    // Den Profilverwalter JETZT anhaengen, nicht weiter oben (2026-10-12).
+    //
+    // Der erste Versuch stand bei txApplet->setMicProfileManager(), rund
+    // 90 Zeilen vor dieser Stelle -- mit einem `if (m_phoneCwApplet)`
+    // davor. Der Zeiger war dort noch null, das `if` hat den Aufruf still
+    // verschluckt, und die Profil-Combo blieb leer. Vom Prueffall
+    // gefangen (tst_phone_felder: "Microphone profile" count=0, waehrend
+    // der Verwalter 22 Profile kannte).
+    //
+    // Darum hier und OHNE Pruefung auf den Zeiger: er ist die Zeile
+    // darueber entstanden. Ein `if` wuerde denselben Ausfall wieder
+    // verstecken.
+    m_phoneCwApplet->setMicProfileManager(m_radioModel
+                                              ? m_radioModel->micProfileManager()
+                                              : nullptr);
     panel->addApplet(m_phoneCwApplet);
 
     // RadeApplet — Phase 3R L2.  Sits alongside PhoneCwApplet but is

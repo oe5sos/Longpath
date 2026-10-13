@@ -1560,6 +1560,35 @@ public:
     bool cpdrOn() const noexcept       { return m_cpdrOn; }
     int  cpdrLevelDb() const noexcept  { return m_cpdrLevelDb; }
 
+    // ── AM-Traegerpegel (2026-10-12) ─────────────────────────────────────
+    //
+    // Der Regler im Phone-Feld war eine Attrappe, und den Pegel gab es in
+    // Longpath nirgends -- WDSPs ammod lief auf seiner Anlegevorgabe.
+    //
+    // Gehalten wird der REGLERWERT in Prozent (0..125, Thetis
+    // setup.designer.cs udTXAMCarrierLevel), nicht der DSP-Wert. Die
+    // Umrechnung ist eine WURZELKENNLINIE und steht darum als eigene
+    // Funktion hier, nicht verstreut in den Aufrufern:
+    //
+    //   From Thetis Console/setup.cs:9709 [v2.10.3.15]:
+    //     TXAMCarrierLevel = Math.Sqrt(0.01 * udTXAMCarrierLevel.Value) * 0.5
+    //
+    // Regler 100 gibt damit 0.5, Regler 125 gibt 0.559, Regler 0 gibt 0.
+    // Wer das fuer linear haelt (0.01 * Wert, oder Wert/200), liegt bei
+    // jedem Zwischenwert daneben -- bei Regler 25 um den Faktor zwei.
+    int  amCarrierPercent() const noexcept { return m_amCarrierPercent; }
+    void setAmCarrierPercent(int percent);
+
+    /// Reglerwert in Prozent -> DSP-Wert fuer SetTXAAMCarrierLevel.
+    /// From Thetis Console/setup.cs:9709 [v2.10.3.15].
+    static double amCarrierDspFromPercent(int percent);
+
+    // Thetis setup.designer.cs: udTXAMCarrierLevel Minimum 0,
+    // Maximum 125, Value 100.
+    static constexpr int kAmCarrierPercentMin     = 0;
+    static constexpr int kAmCarrierPercentMax     = 125;
+    static constexpr int kAmCarrierPercentDefault = 100;
+
     // ── CESSB getters ─────────────────────────────────────────────────────
     bool cessbOn() const noexcept      { return m_cessbOn; }
 
@@ -1831,6 +1860,7 @@ signals:
     // ── CPDR signals (3M-3a-ii Batch 2) ───────────────────────────────────
     void cpdrOnChanged(bool on);
     void cpdrLevelDbChanged(int dB);
+    void amCarrierPercentChanged(int percent);
 
     // ── CESSB signals (3M-3a-ii Batch 2) ──────────────────────────────────
     void cessbOnChanged(bool on);
@@ -2097,6 +2127,11 @@ signals:
     // ── Mic source signals (3M-1b I.1) ────────────────────────────────────────
     /// Emitted when micSource changes. Not emitted on idempotent calls.
     void micSourceChanged(MicSource source);
+    /// Die Mikrofonbuchse des Geraets ist verfuegbar oder nicht
+    /// (2026-10-12). Ohne dieses Signal bleibt jede Oberflaeche, die den
+    /// Eintrag "Radio" ausgraut, nach dem Verbinden auf dem alten Stand --
+    /// und laesst eine Buchse waehlen, die es an diesem Geraet nicht gibt.
+    void micSourceLockedChanged(bool locked);
 
     // ── PC Mic session-state signals (3M-1b I.2) ─────────────────────────────
     /// Emitted when pcMicHostApiIndex changes. Not emitted on idempotent calls.
@@ -2466,6 +2501,7 @@ private:
     // CPDR level: database.cs:4339 + 4580 [v2.10.3.13]:
     //   dr["CompanderLevel"] = 2;
     int  m_cpdrLevelDb = 2;
+    int  m_amCarrierPercent = kAmCarrierPercentDefault;
 
     // CESSB.  database.cs:4689 [v2.10.3.13]:
     //   dr["CESSB_On"] = false;

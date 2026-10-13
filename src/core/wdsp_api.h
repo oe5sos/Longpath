@@ -1092,6 +1092,12 @@ void SetTXAPHROTReverse(int channel, int reverse);
 // From Thetis wdsp/amsq.c:246-252 [v2.10.3.13] and amsq.h:83.
 void SetTXAAMSQRun(int channel, int run);
 
+// ammod (stage 8): AM-Traegerpegel.
+// third_party/wdsp/src/ammod.c:104-110 (Deklaration ammod.h:58).
+// Der Wert ist KEIN Prozentsatz: Thetis rechnet den Reglerwert ueber
+// eine Wurzelkennlinie um, siehe TransmitModel::amCarrierDspFromPercent.
+void SetTXAAMCarrierLevel(int channel, double c_level);
+
 // eqp (stage 6): TX parametric EQ.
 // From Thetis wdsp/eq.c:742-747 [v2.10.3.13].
 void SetTXAEQRun(int channel, int run);
