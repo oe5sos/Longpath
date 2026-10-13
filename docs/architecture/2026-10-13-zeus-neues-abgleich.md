@@ -28,18 +28,27 @@ zuerst.
   | TX-Filterkanten | `QSpinBox` auf `valueChanged` (`TxApplet.cpp:1276`) |
   | Phasendreher | `QSpinBox` auf `valueChanged` (`DspSetupPages.cpp:2248`) |
   | CFC Pre-Comp | `QSpinBox`, gleiche Form |
-  | FM-Relaisablage | **gar kein Eingabefeld** (`shiftOffsetHz` ist im Modell, in `src/gui` kommt es nicht vor) |
+  | FM-Relaisablage | `QSpinBox` in kHz auf `valueChanged` (`VfoModeContainers.cpp:273`) **und** ein Schieber im Phone/CW-Feld (`PhoneCwApplet.cpp:1054`) |
 
   Unsere Felder wirken also **bei jedem Tastendruck**, nicht erst beim
   Verlassen — Zeus' Problem gibt es hier nicht. Es ist nur anders
   gelöst: beim Tippen von „1500" gehen 1, 15, 150 und 1500 durch die
   DSP. Bei einer Filterkante oder einer Phasendreherfrequenz ist das
-  harmlos. **Offen bleibt ein anderer Punkt:** die FM-Relaisablage hat
-  gar keine Bedienung, obwohl der Unterbau steht.
+  harmlos.
 
-  Lehre, zum zweiten Mal in dieser Woche:
-  [[feedback-abwesenheit-ist-keine-aussage]] gilt auch umgekehrt — ein
-  leeres `grep` nach einer LÖSUNG heißt nicht, dass das PROBLEM da ist.
+  **Zwei eigene Fehlschlüsse in diesem einen Eintrag**, beide beim
+  Nachsehen aufgefallen:
+
+  1. Ich hatte nach einem Nachlauf gesucht, keinen gefunden und auf
+     „fehlt" geschlossen. **Ein leeres `grep` nach einer LÖSUNG heißt
+     nicht, dass das PROBLEM da ist** —
+     [[feedback-abwesenheit-ist-keine-aussage]] gilt auch umgekehrt.
+  2. Dann schrieb ich, die FM-Relaisablage habe gar keine Bedienung —
+     **und hatte das falsche Symbol gegrept.** `shiftOffsetHz` ist die
+     Platzierung einer Scheibe im Abtaststrom (DDC), nicht die
+     Relaisablage; die heißt `fmOffsetHz` und hat sowohl ein Zahlenfeld
+     in den VFO-Behältern als auch einen Schieber im Phone/CW-Feld.
+     [[feedback-verneinung-gilt-nur-am-ort]], wieder.
 * **Squelch AN/AUS je Band gemerkt** (und je Transverter). Bei uns hängt
   die Schwelle am Slice (`m_amsqThresh`, `m_fmsqThresh`), der Schalter an
   nichts Bandbezogenem. „SQL für 2 m FM" folgt also auf 20 m mit.
