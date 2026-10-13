@@ -23,6 +23,56 @@
 //   2026-05-10 — Phase 24 (Task 24.1): stripped TCI button row; TCI
 //                 controls now live in TciApplet (Phase 21, 0b615a7).
 // =================================================================
+//
+// --- From CAT/TCPIPcatServer.cs (Thetis) ---------------------------
+//
+// Ported from Thetis sources:
+//   Project Files/Source/Console/CAT/TCPIPcatServer.cs [v2.10.3.15]
+//     — line 442: `public static int DEFAULT_PORT = 31001;`
+//
+// Das ist ALLES, was aus Thetis in diese Datei kommt: eine Portnummer.
+// Die vier CAT-Kanaele liegen darauf aufsteigend (kErsterPort). Das Feld
+// selbst ist von AetherSDR abgeleitet, siehe den Kopf darueber.
+//
+// Der Lizenzkopf steht hier trotzdem vollstaendig: TCPIPcatServer.cs ist
+// von Richard Samphire (MW0LGE) und traegt darum die
+// Doppellizenzklausel. Eine Portnummer ist eine Tatsache und kein Werk
+// -- die Herkunftszeile in THETIS-PROVENANCE.md fuehrt sie als
+// `reference`, nicht als `port`. Der Kopf bleibt, weil
+// verify-thetis-headers.py JEDE gelistete Datei prueft, und weil die
+// Spur mehr wert ist als die gesparten Zeilen.
+//
+//=================================================================
+// TCPIPcatServer.cs
+//=================================================================
+// Copyright (C) 2019-2026 Richard Samphire (MW0LGE)
+//
+// This program is free software; you can redistribute it and/or
+// modify it under the terms of the GNU General Public License
+// as published by the Free Software Foundation; either version 2
+// of the License, or (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program; if not, write to the Free Software
+// Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+//
+//============================================================================================//
+// Dual-Licensing Statement (Applies Only to Author's Contributions, Richard Samphire MW0LGE) //
+// ------------------------------------------------------------------------------------------ //
+// For any code originally written by Richard Samphire MW0LGE, or for any modifications       //
+// made by him, the copyright holder for those portions (Richard Samphire) reserves the       //
+// right to use, license, and distribute such code under different terms, including           //
+// closed-source and proprietary licences, in addition to the GNU General Public License      //
+// granted above. Nothing in this statement restricts any rights granted to recipients under  //
+// the GNU GPL. Code contributed by others (not Richard Samphire) remains licensed under      //
+// its original terms and is not affected by this dual-licensing statement in any way.        //
+// Richard Samphire can be reached by email at :  mw0lge@grange-lane.co.uk                    //
+//============================================================================================//
 
 #include "CatApplet.h"
 #include "gui/styles/ThemeQss.h"

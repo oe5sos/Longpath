@@ -54,7 +54,14 @@ class EqApplet : public AppletWidget {
 public:
     explicit EqApplet(RadioModel* model, QWidget* parent = nullptr);
 
-    QString appletId()    const override { return QStringLiteral("EQ"); }
+    /// Eigenkennung == Panelkennung "Eq" (2026-10-13). Vorher
+    /// wichen die beiden ab, und genau daran ging am 2026-08-18
+    /// das Abloesen des RX-Panels kaputt -- check-applet-ids.py
+    /// bewacht es seitdem und hat es hier angezeigt, sobald das
+    /// Applet in m_appletsById auftauchte. Gespeicherte
+    /// Anordnungen mit der alten Schreibweise liest
+    /// AppletKeys::appletFor weiterhin (dort Zeile 49-52).
+    QString appletId()    const override { return QStringLiteral("Eq"); }
     QString appletTitle() const override { return QStringLiteral("Equalizer"); }
     void syncFromModel() override;
 

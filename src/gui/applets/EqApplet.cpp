@@ -1,3 +1,11 @@
+// no-port-check: Die drei Verweise auf RXA.c in dieser Datei meinen
+// WDSP (TAPR), nicht Thetis -- third_party/wdsp/src/RXA.c:260/261/673,
+// die Vorgabekurve default_G und der eqp-Einstiegspunkt. Der Pruefer
+// erkennt den Dateinamen, nicht den Baum: RXA.c steht in Thetis'
+// mitgeliefertem wdsp-Ordner genauso. Eine Zeile in
+// THETIS-PROVENANCE.md waere hier falsch und wuerde die Spur
+// verfaelschen; WDSP hat seine eigene Herkunft und seinen eigenen
+// Pruefer (audit-wdsp-headers.py, gruen).
 // src/gui/applets/EqApplet.cpp
 //
 // Layout from AetherSDR EqApplet.cpp (ten9876/AetherSDR).
