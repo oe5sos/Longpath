@@ -18,6 +18,7 @@
 
 #include "gui/StyleConstants.h"
 #include "core/strip/EqBandLayout.h"
+#include "core/strip/AetherPreset.h"
 #include "core/strip/StripSettings.h"
 #include "core/strip/BandLimit.h"
 #include "core/strip/StripLiveMonitor.h"
@@ -38,6 +39,7 @@
 
 #include <QInputDialog>
 #include <QFileDialog>
+#include <QStandardPaths>
 #include <QScrollArea>
 #include <QSizePolicy>
 #include <QMessageBox>
@@ -849,6 +851,25 @@ void StripWindow::buildUi()
         m_presetDelete = new QPushButton(QStringLiteral("Delete"), this);
         m_presetDelete->setStyleSheet(Style::buttonBaseStyle());
         row->addWidget(m_presetDelete);
+
+        // ── Aether-Profil ───────────────────────────────────────────
+        //
+        // „die einstellungen bei aether perfekt! wir müssen unsere
+        //  grafik verwenden, aber alle einstellungen usw. von aether
+        //  verwenden." (2026-10-13)
+        //
+        // Geht nur, weil unsere Stufen aus AetherSDR portiert sind und
+        // Zeile fuer Zeile dasselbe rechnen. Was NICHT uebernommen
+        // werden kann, sagt der Importeur selbst und steht danach im
+        // Hinweis unter der Zeile.
+        m_aetherImport = new QPushButton(
+            Sprache::T(QStringLiteral("Aether profile…")), this);
+        m_aetherImport->setStyleSheet(Style::buttonBaseStyle());
+        m_aetherImport->setToolTip(QStringLiteral(
+            "Lädt ein Kanalzugprofil aus AetherSDR (.json) — mit "
+            "Reihenfolge der Stufen, allen Werten und der Zusage, dass "
+            "nichts mitläuft, was es in Aether nicht gab."));
+        row->addWidget(m_aetherImport);
         row->addStretch(1);
 
         // A/B. Held down, not toggled: a comparison you have to keep
@@ -881,6 +902,8 @@ void StripWindow::buildUi()
                 this, &StripWindow::saveUserPreset);
         connect(m_presetDelete, &QPushButton::clicked,
                 this, &StripWindow::deleteUserPreset);
+        connect(m_aetherImport, &QPushButton::clicked,
+                this, &StripWindow::importAetherPreset);
 
         connect(m_compareBtn, &QPushButton::pressed, this, [this]() {
             if (StripChain* c = chain()) {
@@ -2302,6 +2325,53 @@ void StripWindow::applyPreset(const QString& name)
     // window. Rebuilding the panels is the only version of "refresh"
     // that cannot drift: each control reads its own value from the
     // chain when it is built, so there is no second copy to forget.
+    reloadControls();
+    refreshChainRow();
+    persist();
+}
+
+// ── Ein Profil aus AetherSDR ─────────────────────────────────────────
+//
+// Die Datei kommt von einem anderen Programm, und die Werte darin
+// koennen aus einer neueren Fassung stammen als der, gegen die der
+// Importeur geschrieben wurde. Deshalb wird nicht stumm uebernommen:
+// was nicht abgebildet werden konnte, steht hinterher im Hinweis --
+// lieber eine Zeile zu viel als eine Stufe, die heimlich anders
+// eingestellt ist als in der Datei.
+void StripWindow::importAetherPreset()
+{
+    StripChain* c = chain();
+    if (!c) { return; }
+
+    const QString pfad = QFileDialog::getOpenFileName(
+        this, Sprache::T(QStringLiteral("Open AetherSDR channel strip profile")),
+        QStandardPaths::writableLocation(QStandardPaths::DesktopLocation),
+        QStringLiteral("AetherSDR (*.json);;%1 (*)")
+            .arg(Sprache::T(QStringLiteral("All files"))));
+    if (pfad.isEmpty()) { return; }
+
+    const AetherPreset::Ergebnis e = AetherPreset::applyFile(pfad, *c);
+    if (!e.ok) {
+        m_presetNote->setText(e.fehler);
+        return;
+    }
+
+    // Unter dem Namen des Profils ablegen, damit er nach dem naechsten
+    // Start in derselben Liste steht wie alles andere -- ein Import,
+    // den man nur einmal hat, ist kein Grundstock.
+    if (!e.name.isEmpty()) {
+        StripSettings::saveUserPreset(e.name, *c);
+        rebuildPresetBox();
+        const int at = m_presetBox->findData(e.name);
+        if (at >= 0) { QSignalBlocker b(m_presetBox); m_presetBox->setCurrentIndex(at); }
+    }
+
+    QString text = Sprache::T(QStringLiteral("From AetherSDR: %1")).arg(e.name);
+    if (!e.hinweise.isEmpty()) {
+        text += QStringLiteral(" — ") + e.hinweise.join(QStringLiteral(" "));
+    }
+    m_presetNote->setText(text);
+
     reloadControls();
     refreshChainRow();
     persist();

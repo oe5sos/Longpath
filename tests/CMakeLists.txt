@@ -5437,6 +5437,14 @@ longpath_add_test(tst_strip_dsp)
 #    the non-finite guard: whatever goes in, numbers come out --
 longpath_add_test(tst_strip_chain)
 
+# -- Martins Aether-Profil, Wert fuer Wert: seine eigene Datei vom
+#    2026-10-13 durch den Importeur in unsere Kette, samt Reihenfolge
+#    (Roehre vorne), samt der Zusage, dass nichts mitlaeuft, das er in
+#    Aether nie hatte --
+longpath_add_test(tst_aether_profil)
+target_compile_definitions(tst_aether_profil PRIVATE
+    LONGPATH_TEST_DATA_DIR="${CMAKE_SOURCE_DIR}/tests/data")
+
 # -- One voice measurement into a whole chain: the refusals, the four
 #    decisions as pure functions, and the rule that it explains itself --
 longpath_add_test(tst_broadcast_optimizer)

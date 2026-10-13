@@ -191,6 +191,10 @@ private:
     StripChain* chain() const;
 
     void applyPreset(const QString& name);
+
+    // Ein Kanalzugprofil aus AetherSDR. Unsere Grafik, seine
+    // Einstellungen -- siehe core/strip/AetherPreset.h.
+    void importAetherPreset();
     void rebuildPresetBox(const QString& select = QString());
     void saveUserPreset();
     void deleteUserPreset();
@@ -354,6 +358,7 @@ private:
     QComboBox*      m_presetBox{nullptr};
     QPushButton*    m_presetSave{nullptr};
     QPushButton*    m_presetDelete{nullptr};
+    QPushButton*    m_aetherImport{nullptr};
     QPushButton*    m_compareBtn{nullptr};
 
     // PUDU monitor buttons — state painted by the three setters above.

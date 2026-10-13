@@ -1146,6 +1146,7 @@ set(GUI_SOURCES
     src/core/strip/LtasSpectrum.cpp
     src/core/strip/StripLiveMonitor.cpp
     src/core/strip/StripSettings.cpp
+    src/core/strip/AetherPreset.cpp
     src/core/strip/BroadcastOptimizer.cpp
     src/core/strip/StripTuner.cpp
     src/core/strip/EqLoudness.cpp

@@ -243,6 +243,11 @@ void saveTo(const QString& prefix, const StripChain& chain)
     putF(prefix, "ReverbPreDelayMs", c.reverb().preDelayMs());
     putF(prefix, "ReverbMix",        c.reverb().mix());
 
+    // Die Betriebsart fehlte hier bis zum 2026-10-13: Aphex oder
+    // Behringer ueberlebte keinen Neustart und fiel stumm auf Aphex
+    // zurueck. Aufgefallen beim Abgleich mit Aethers Profilformat,
+    // das sie als "mode" mitfuehrt.
+    putV(key(prefix, "PuduMode"), int(c.pudu().mode()));
     putF(prefix, "PuduPooDriveDb",     c.pudu().pooDriveDb());
     putF(prefix, "PuduPooTuneHz",      c.pudu().pooTuneHz());
     putF(prefix, "PuduPooMix",         c.pudu().pooMix());
@@ -435,6 +440,8 @@ void restoreFrom(const QString& prefix, StripChain& c)
     c.reverb().setPreDelayMs(getF(prefix, "ReverbPreDelayMs", c.reverb().preDelayMs()));
     c.reverb().setMix       (getF(prefix, "ReverbMix",        c.reverb().mix()));
 
+    c.pudu().setMode(static_cast<ClientPudu::Mode>(
+        getI(prefix, "PuduMode", int(c.pudu().mode()))));
     c.pudu().setPooDriveDb    (getF(prefix, "PuduPooDriveDb",     c.pudu().pooDriveDb()));
     c.pudu().setPooTuneHz     (getF(prefix, "PuduPooTuneHz",      c.pudu().pooTuneHz()));
     c.pudu().setPooMix        (getF(prefix, "PuduPooMix",         c.pudu().pooMix()));
