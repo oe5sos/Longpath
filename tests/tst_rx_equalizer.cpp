@@ -492,7 +492,7 @@ private slots:
         const QList<EqApplet*> gefunden = mw->findChildren<EqApplet*>();
         QCOMPARE(gefunden.size(), 1);
         QVERIFY(gefunden.first() != nullptr);
-        QCOMPARE(gefunden.first()->appletId(), QStringLiteral("EQ"));
+        QCOMPARE(gefunden.first()->appletId(), QStringLiteral("Eq"));
         QCOMPARE(gefunden.first()->appletTitle(), QStringLiteral("Equalizer"));
 
         // Und es steht in der Liste des PANELS.

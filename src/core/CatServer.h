@@ -58,6 +58,7 @@
 #include "CatPuffer.h"
 
 #include <QHash>
+#include <QHostAddress>
 #include <QObject>
 #include <QString>
 
@@ -114,6 +115,16 @@ public:
     void beende(int k);
     bool laeuft(int k) const;
     quint16 port(int k) const;
+    /// Die Adresse, auf die Kanal `k` tatsaechlich gebunden ist.
+    /// Ungueltig, wenn der Kanal aus ist.
+    ///
+    /// Gibt es, weil die sicherheitsrelevante Eigenschaft dieser Klasse
+    /// -- nur die eigene Maschine -- DIREKT gelesen werden muss. Der
+    /// erste Prueffall hat sie erschlossen (gelingt eine zweite Bindung
+    /// auf 0.0.0.0 desselben Ports?), und dieser Rueckschluss kippt je
+    /// Plattform: am 2026-10-13 ist er in der Linux-CI falsch
+    /// ALARM gefahren, waehrend die Bindung richtig war.
+    QHostAddress bindAdresse(int k) const;
     /// Wie viele Fremdprogramme an diesem Kanal haengen.
     int verbindungen(int k) const;
 

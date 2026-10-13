@@ -163,6 +163,12 @@ quint16 CatServer::port(int k) const
     return (k >= 0 && k < kKanaele) ? m_k[k].port : 0;
 }
 
+QHostAddress CatServer::bindAdresse(int k) const
+{
+    if (k < 0 || k >= kKanaele || !m_k[k].server) { return {}; }
+    return m_k[k].server->serverAddress();
+}
+
 int CatServer::verbindungen(int k) const
 {
     return (k >= 0 && k < kKanaele) ? static_cast<int>(m_k[k].puffer.size()) : 0;

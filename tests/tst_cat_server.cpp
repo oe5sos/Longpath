@@ -406,20 +406,41 @@ private slots:
         // QHostAddress::LocalHost gegen ::Any getauscht, und ALLE zwanzig
         // Faelle blieben gruen. Eine Eigenschaft, die keine Pruefung
         // bewacht, haelt nur so lange, wie niemand die Zeile anfasst.
-        QVERIFY(srv->starte(0, 0));
-        QTcpServer probe;
-        // Wenn der CAT-Server auf 0.0.0.0 haengt, ist derselbe Port auf
-        // einer anderen Adresse NICHT mehr zu haben. Haengt er nur auf
-        // 127.0.0.1, laesst sich eine zweite Bindung auf eine andere
-        // Adresse desselben Ports noch anlegen.
         //
-        // Das ist der Weg, der ohne fremde Netzkarte auskommt: er misst
-        // die Bindung, nicht die Erreichbarkeit.
-        const bool nurLokal = probe.listen(QHostAddress::AnyIPv4, srv->port(0));
-        probe.close();
-        QVERIFY2(nurLokal,
-                 "Der CAT-Server haengt an allen Schnittstellen -- jeder im "
-                 "Netz kann damit TX; schicken.");
+        // WIE hier gemessen wird, ist am 2026-10-13 umgebaut worden, und
+        // der Grund gehoert aufgeschrieben:
+        //
+        // Vorher wurde die Eigenschaft ERSCHLOSSEN -- "gelingt eine
+        // zweite Bindung auf 0.0.0.0 desselben Ports, dann haengt der
+        // Server nur auf 127.0.0.1". Auf macOS geht dieser Rueckschluss
+        // auf. In der Linux-CI ist er FALSCH ALARM gefahren: dort
+        // scheiterte die Probe-Bindung, der Fall meldete "haengt an allen
+        // Schnittstellen", und die Bindung war die ganze Zeit richtig.
+        // Linux laesst eine Platzhalter-Bindung nicht zu, solange eine
+        // konkrete Adresse denselben Port haelt -- das Scheitern der
+        // Probe sagt also ueber den CAT-Server nichts.
+        //
+        // Jetzt wird die Eigenschaft GELESEN, nicht erschlossen:
+        // QTcpServer::serverAddress() gibt die Adresse, auf der die
+        // Bindung tatsaechlich sitzt. Das hat auf keiner Plattform einen
+        // Zwischenschritt, der kippen kann.
+        //
+        // Wer hier wieder auf eine Probe-Bindung umbaut, baut den
+        // Fehlalarm wieder ein.
+        QVERIFY(srv->starte(0, 0));
+        const QHostAddress gebunden = srv->bindAdresse(0);
+        QVERIFY2(!gebunden.isNull(),
+                 "Der Kanal laeuft, meldet aber keine Bindeadresse.");
+        QVERIFY2(gebunden.isLoopback(),
+                 qPrintable(QStringLiteral(
+                     "Der CAT-Server haengt auf %1 statt auf der "
+                     "Rueckschleife -- jeder im Netz kann damit TX; "
+                     "schicken.").arg(gebunden.toString())));
+        // Und ausdruecklich: NICHT der Platzhalter. isLoopback() allein
+        // genuegt, aber ein Fehlgriff auf ::Any soll mit Namen fallen.
+        QVERIFY(gebunden != QHostAddress(QHostAddress::Any));
+        QVERIFY(gebunden != QHostAddress(QHostAddress::AnyIPv4));
+        QVERIFY(gebunden != QHostAddress(QHostAddress::AnyIPv6));
     }
 
     void einZweiterServerAufDemselbenPortBekommtKeineBefehle()
