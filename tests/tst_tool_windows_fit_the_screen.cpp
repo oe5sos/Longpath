@@ -174,9 +174,11 @@ private slots:
 
         RadioModel radio;
         StripWindow w(&radio);
-        w.resize(1180, 900);
-        w.grab().save(QString::fromUtf8(dir)
-                      + QStringLiteral("/kanalzug-eine-flaeche.png"));
+        for (const int breite : { 1180, 980, 880 }) {
+            w.resize(breite, 900);
+            w.grab().save(QString::fromUtf8(dir)
+                          + QStringLiteral("/kanalzug-%1.png").arg(breite));
+        }
     }
 
     // Ein Klick auf eine Kachel der Kette oeffnet DIESE Stufe.

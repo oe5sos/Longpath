@@ -845,7 +845,19 @@ void StripWindow::buildUi()
         m_presetBox->setMinimumWidth(200);
         row->addWidget(m_presetBox);
 
-        m_presetSave = new QPushButton(QStringLiteral("Save as…"), this);
+        // „sehe aber keine speicherung der profile" (2026-10-13). Der
+        // Knopf war da und hiess „Speichern unter…" -- wer nach einem
+        // PROFIL sucht, liest darueber hinweg. Die Zeile heisst
+        // „Profil:", also heisst der Knopf jetzt auch so.
+        m_presetSave = new QPushButton(
+            Sprache::T(QStringLiteral("Save profile…")), this);
+        m_presetSave->setToolTip(QStringLiteral(
+            "Legt die KOMPLETTE Kette unter einem Namen ab — alle "
+            "Stufen, ihre Werte, welche an sind und in welcher "
+            "Reihenfolge sie laufen. Deine Änderungen sind auch ohne "
+            "das nicht verloren: der Stand wird laufend gespeichert "
+            "und kommt beim nächsten Start zurück. Ein Profil "
+            "brauchst du, um ZWISCHEN Einstellungen zu wechseln."));
         m_presetSave->setStyleSheet(Style::buttonBaseStyle());
         row->addWidget(m_presetSave);
         m_presetDelete = new QPushButton(QStringLiteral("Delete"), this);

@@ -564,7 +564,8 @@ void StripLiveMonitor::pump()
     // eingeschaltet ist, wird die Qualitaet massiv schlechter"
     // gemeldet hat.
     if (m_band.channel() >= 0
-        && !m_bypass.load(std::memory_order_acquire)) {
+        && !m_bypass.load(std::memory_order_acquire)
+        && m_chain->isEnabled()) {
         m_kanalBegrenzer.setCeilingDb(m_chain->limiter().ceilingDb());
         m_kanalBegrenzer.process(m_mono.data(), int(m_mono.size()), 1);
     }

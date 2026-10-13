@@ -544,6 +544,48 @@ std::vector<float> durch(StripChain& c, const std::vector<float>& in)
     return out;
 }
 
+// ── Ein IDEALER Kanal, zum Vergleich ────────────────────────────────
+//
+// Fensterfunktion mal sinc, 2047 Koeffizienten, Hann: senkrechte
+// Flanken, kein Welligkeit, und vor allem LINEARE PHASE -- alle
+// Frequenzen kommen gleich spaet heraus. So filtert ein Sender im
+// Zwischenfrequenzweg. Der Preis steht im Namen der Zahl: 1023
+// Abtastwerte, 21 ms feste Verzoegerung, die ein Mithoerer nicht
+// bezahlen will.
+//
+// Das ist kein Vorschlag, sondern ein MASSSTAB: was unser IIR-Kanal
+// gegen diesen verliert, ist der Teil des Unterschieds, der UNS
+// gehoert. Was beide gleich machen, ist schlicht die Bandbreite.
+std::vector<float> durchIdealenKanal(const std::vector<float>& in,
+                                     double vonHz, double bisHz)
+{
+    constexpr int kN = 2047;
+    std::vector<double> h(size_t(kN), 0.0);
+    const double f1 = vonHz / kRate;
+    const double f2 = bisHz / kRate;
+    for (int n = 0; n < kN; ++n) {
+        const int m = n - kN / 2;
+        const double s2 = (m == 0) ? 2.0 * f2
+                                   : std::sin(2.0 * M_PI * f2 * m) / (M_PI * m);
+        const double s1 = (m == 0) ? 2.0 * f1
+                                   : std::sin(2.0 * M_PI * f1 * m) / (M_PI * m);
+        const double w = 0.5 - 0.5 * std::cos(2.0 * M_PI * n / (kN - 1));
+        h[size_t(n)] = (s2 - s1) * w;
+    }
+    std::vector<float> out(in.size(), 0.0f);
+    const int mitte = kN / 2;
+    for (int i = 0; i < int(in.size()); ++i) {
+        double acc = 0.0;
+        const int von = std::max(0, i + mitte - (kN - 1));
+        const int bis = std::min(int(in.size()) - 1, i + mitte);
+        for (int j = von; j <= bis; ++j) {
+            acc += double(in[size_t(j)]) * h[size_t(i + mitte - j)];
+        }
+        out[size_t(i)] = float(acc);   // schon um mitte zurueckgeschoben
+    }
+    return out;
+}
+
 std::vector<float> durchKanal(int kanal, const std::vector<float>& in)
 {
     BandLimit b;
@@ -2620,6 +2662,94 @@ private slots:
     //
     // Gemessen wird sie direkt: ein kurzer Ton je Frequenz, und der
     // Schwerpunkt seiner Huellkurve sagt, wann er herauskommt.
+    // ── „bei 4000 klingt das nicht besonders, roh ist eine ganz
+    //    andere Liga" (2026-10-13) ─────────────────────────────────
+    //
+    // Die Frage dahinter ist nicht Geschmack, sondern Zustaendigkeit:
+    // liegt der Unterschied an der BANDBREITE (dann gehoert er dem
+    // Sender und niemand kann ihn wegnehmen) oder an UNSEREM FILTER
+    // (dann gehoert er uns)?
+    //
+    // Gemessen an echter Sprache, drei Fassungen desselben Signals:
+    //   roh          -- nichts getan
+    //   unser Kanal  -- BandLimit, IIR, 50-4050
+    //   idealer Kanal-- linearphasige Faltung, dieselben Ecken
+    //
+    // Der Abstand zwischen den letzten beiden ist unser Anteil.
+    void whatOurChannelCostsAgainstAPerfectOne()
+    {
+        QString warum;
+        const auto sauber = echteRede(&warum);
+        if (sauber.empty()) { QSKIP(qPrintable(warum)); }
+
+        const auto& k = BandLimit::channels()[3];       // 50 - 4050, ESSB
+        const auto unser = durchKanal(3, sauber);
+        const auto ideal = durchIdealenKanal(sauber, double(k.lowHz),
+                                             double(k.highHz));
+
+        const auto pRoh   = spektrum(sauber);
+        const auto pUnser = spektrum(unser);
+        const auto pIdeal = spektrum(ideal);
+
+        struct B { const char* name; double von; double bis; };
+        static const B kB[] = {
+            { "63 Hz",   56,   71   }, { "125 Hz",  112,  141  },
+            { "250 Hz",  224,  282  }, { "500 Hz",  447,  562  },
+            { "1 kHz",   891,  1122 }, { "2 kHz",   1778, 2239 },
+            { "3,15 k",  2818, 3548 }, { "4 kHz",   3548, 4467 },
+            { "5 kHz",   4467, 5623 }, { "8 kHz",   7079, 8913 },
+        };
+        qInfo().noquote() << QStringLiteral(
+            "   Band      roh      unser Kanal   idealer Kanal   "
+            "wir gegen ideal");
+        double groessteAbweichung = 0.0;
+        for (const B& b : kB) {
+            const double r = bandDb(pRoh,   b.von, b.bis);
+            const double u = bandDb(pUnser, b.von, b.bis);
+            const double i = bandDb(pIdeal, b.von, b.bis);
+            if (b.bis <= double(k.highHz) && b.von >= double(k.lowHz)) {
+                groessteAbweichung = std::max(groessteAbweichung,
+                                              std::fabs(u - i));
+            }
+            qInfo().noquote()
+                << QStringLiteral("  %1  %2  %3  %4  %5")
+                       .arg(QString::fromUtf8(b.name), -8)
+                       .arg(r, 8, 'f', 1).arg(u, 12, 'f', 1)
+                       .arg(i, 14, 'f', 1).arg(u - i, 14, 'f', 2);
+        }
+
+        // Und der Rest, der nach dem Abziehen des idealen Kanals
+        // uebrig bleibt -- Phasenfehler zeigen sich hier, auch wenn
+        // die Pegel oben stimmen. Der ideale Kanal ist um nichts
+        // verzoegert (die Faltung schiebt schon zurueck), unserer um
+        // weniger als eine halbe Millisekunde: der Rest ist also
+        // ehrlich vergleichbar.
+        double eU = 0.0;
+        double eD = 0.0;
+        const size_t n = std::min(unser.size(), ideal.size());
+        for (size_t i = 0; i < n; ++i) {
+            const double d = double(unser[i]) - double(ideal[i]);
+            eU += double(ideal[i]) * double(ideal[i]);
+            eD += d * d;
+        }
+        const double restDb = 10.0 * std::log10(std::max(eD, 1e-30)
+                                                / std::max(eU, 1e-30));
+        qInfo().noquote() << QStringLiteral(
+            "   grösste Abweichung IM Band: %1 dB · Rest nach Abzug "
+            "des idealen Kanals: %2 dB")
+            .arg(groessteAbweichung, 0, 'f', 2).arg(restDb, 0, 'f', 1);
+        qInfo().noquote() << QStringLiteral(
+            "   (Liegt der Rest tief und die Abweichung bei null, "
+            "gehört der ganze Unterschied zu „roh\" der Bandbreite "
+            "— nicht dem Filter.)");
+
+        QVERIFY2(groessteAbweichung < 1.5,
+                 qPrintable(QStringLiteral("unser Kanal weicht im "
+                                           "Durchlassbereich um %1 dB vom "
+                                           "idealen ab")
+                                .arg(groessteAbweichung)));
+    }
+
     void theGroupDelayOfEachChannel()
     {
         const auto laufzeitMs = [](int ch, double hz) {
