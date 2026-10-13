@@ -58,8 +58,30 @@ class TstNrBackendsProcessAudio : public QObject {
     Q_OBJECT
 
 private:
-    static constexpr int kChunk      = 238;     // ein P2-Paket
-    static constexpr int kIterations = 300;     // ~1,5 s bei 48 kHz
+    // ── Die Blockgroesse, die WDSP wirklich bekommt ──────────────────
+    //
+    // Hier stand 238 -- ein P2-Paket. So kommt es vom Funkgeraet, aber
+    // SO geht es nie in WDSP: RxDspWorker sammelt die Pakete und
+    // uebergibt Bloecke nach WDSPs eigener Regel,
+    // bufferSizeForRate(rate) = 64 * rate / 48000
+    // (SampleRateCatalog.h:130, aus cmsetup.c:104-111). Bei 48 kHz sind
+    // das 64 Abtastwerte, nicht 238.
+    //
+    // Mit 238 schreibt fexchange2 ueber die Kante des Ausgangspuffers.
+    // Der Lauf unter Guard-Malloc (DYLD_INSERT_LIBRARIES=libgmalloc)
+    // haelt genau dort an -- EXC_BAD_ACCESS in fexchange2, gerufen aus
+    // RxChannel::processIq -- und ohne Guard-Malloc stuerzt der
+    // Pruefstand ab, nachdem NR2 (EMNR) ab Block 52 NaN geliefert hat.
+    // Der Absturz war also kein Fehler in der Minderung, sondern eine
+    // Blockgroesse, die es im Betrieb nicht gibt.
+    //
+    // 2026-10-13: auf die produktive Groesse umgestellt.
+    static constexpr int kChunk      = 64;      // bufferSizeForRate(48000)
+    // Bei 64 Abtastwerten je Block braucht dieselbe Hoerdauer mehr
+    // Durchlaeufe: 1,5 s * 48000 / 64 = 1125. Die Dauer zaehlt, nicht die
+    // Zahl der Bloecke -- die Minderungen brauchen Einschwingzeit, und
+    // genau in dieser Zeit traten die NaN-Werte auf.
+    static constexpr int kIterations = 1125;    // ~1,5 s bei 48 kHz
     static constexpr int kChannelId  = 0;
 
     // ── Im Takt der Abtastrate, nicht so schnell wie moeglich ────────
@@ -74,7 +96,7 @@ private:
     // (ctest -j4) ab Block ~290 NaN zurueck — in NR1 UND NR2, also
     // nicht die Minderung, sondern der ueberholte Ring. Im Betrieb
     // taktet das Funkgeraet den Aufrufer auf 48 kHz; genau das tut die
-    // Pause hier: 238 Abtastwerte sind 4,96 ms.
+    // Pause hier: 64 Abtastwerte sind 1,33 ms.
     static constexpr int kBlockPeriodUs = 1000000 * kChunk / 48000;
 
     // Modelle aus dem Quellbaum, unabhaengig davon, wo das Testprogramm
