@@ -116,6 +116,55 @@ private slots:
                  "die Stufenflaeche steht vorn");
     }
 
+    // „im channel strip das live hören nicht mehr zu sehen!"
+    //
+    // Martin, 2026-10-12 morgens. Die Ursache lag an jenem Morgen
+    // NICHT im Fenster: in /Applications stand eine Fassung aus einem
+    // fremden Zweig (feat/fm-relaisbetrieb@203cdc35, 03:14 Uhr), die
+    // den Mithoerer gar nicht enthaelt -- 116 StripLiveMonitor-
+    // Symbole in dieser Fassung, null in jener. Das kann kein
+    // Prueftand finden.
+    //
+    // Was er finden kann, ist die zweite Haelfte derselben Gefahr:
+    // die Mithoerreihe ist auf sechs Bedienteile gewachsen (Haekchen,
+    // Latenz, Kanal, Eingang, Ausgang, Lautstaerke), und zwei davon
+    // tragen Geraetenamen -- so lang, wie die Soundkarte heisst. Wird
+    // die Reihe breiter als das Fenster, muss das Fenster mitwachsen,
+    // und auf einem MacBook Air ragt es dann ueber den Schirm: die
+    // hinteren Teile der Reihe sind „nicht mehr zu sehen", mit genau
+    // derselben Meldung aus einem ganz anderen Grund.
+    void theLiveMonitorRowStaysInTheWindow()
+    {
+        RadioModel radio;
+        StripWindow w(&radio);
+
+        const QStringList teile{ QStringLiteral("stripLiveBtn"),
+                                 QStringLiteral("stripLiveLatency"),
+                                 QStringLiteral("stripLiveChannel"),
+                                 QStringLiteral("stripLiveIn"),
+                                 QStringLiteral("stripLiveOut"),
+                                 QStringLiteral("stripLiveVol") };
+        int reihe = 0;
+        for (const QString& n : teile) {
+            auto* teil = w.findChild<QWidget*>(n);
+            QVERIFY2(teil != nullptr, qPrintable(n));
+            reihe += teil->minimumSizeHint().width();
+            qInfo() << n << "min" << teil->minimumSizeHint().width()
+                    << "hint" << teil->sizeHint().width();
+        }
+        qInfo() << "Reihe (nur Mithoerer) min" << reihe
+                << "| Fenster min" << w.minimumSizeHint().width()
+                << "| Fenster hint" << w.sizeHint().width();
+
+        // Das Fenster oeffnet 980 px breit. Verlangt sein Inhalt mehr,
+        // waechst es darueber hinaus und laeuft auf einem 1470er
+        // Schirm an den Rand.
+        QVERIFY2(w.minimumSizeHint().width() <= 980,
+                 qPrintable(QStringLiteral("Mindestbreite %1 px -- die "
+                                           "Mithoerreihe sprengt das Fenster")
+                                .arg(w.minimumSizeHint().width())));
+    }
+
     // Ein Bild der Stufenflaeche, zur Durchsicht. Nur mit
     // LONGPATH_RENDER_DIR; im CI also nicht.
     void rendersTheStripSurface()

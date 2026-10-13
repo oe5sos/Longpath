@@ -612,6 +612,7 @@ void StripWindow::buildUi()
         // Mikrofon und Lautsprecher im selben Raum pfeifen, und zwar
         // laut.
         m_liveBtn = new QCheckBox(QStringLiteral("Hear myself"), this);
+        m_liveBtn->setObjectName(QStringLiteral("stripLiveBtn"));
         m_liveBtn->setToolTip(QStringLiteral(
             "Runs the microphone through the strip and straight back "
             "out of this computer's sound output, so every change is "
@@ -622,11 +623,29 @@ void StripWindow::buildUi()
                 this, &StripWindow::toggleLiveMonitor);
         row->addWidget(m_liveBtn);
 
+        // ── Die Mithoerreihe steht in ihrer EIGENEN Zeile ────────────
+        //
+        // Gemessen am 2026-10-12 (tst_tool_windows_fit_the_screen):
+        // in einer Zeile mit Kette/Aufnahme/Abspielen verlangte das
+        // Fenster 1312 px Mindestbreite -- Latenz 116, Kanal 205,
+        // Eingang 199, Ausgang 199, dazu die Knoepfe. Es oeffnet 980
+        // und der Schirm des Betreibers hat 1470: die hinteren Teile
+        // der Reihe lagen ueber dem Rand, und was ueber dem Rand
+        // liegt, ist nicht da. „im channel strip das live hoeren
+        // nicht mehr zu sehen!"
+        auto* mithoer = new QHBoxLayout;
+        {
+            auto* lbl = new QLabel(Sprache::T(QStringLiteral("Monitor:")), this);
+            lbl->setStyleSheet(dimStyle());
+            mithoer->addWidget(lbl);
+        }
+
         // Wie knapp es laufen darf, waehlt der Rechner nicht und ich
         // auch nicht -- es waehlt, wer es hoert. Vorgabe ist die
         // sichere Stufe; die knappen stehen daneben, und der Zaehler
         // unter dem Haekchen sagt sofort, ob die Maschine sie traegt.
         m_liveLatency = new QComboBox(this);
+        m_liveLatency->setObjectName(QStringLiteral("stripLiveLatency"));
         m_liveLatency->addItem(QStringLiteral("Safe"),
                                int(StripLiveMonitor::Latency::Safe));
         m_liveLatency->addItem(QStringLiteral("Low"),
@@ -653,7 +672,7 @@ void StripWindow::buildUi()
             const int at = m_liveLatency->findData(saved);
             if (at >= 0) { m_liveLatency->setCurrentIndex(at); }
         }
-        row->addWidget(m_liveLatency);
+        mithoer->addWidget(m_liveLatency);
 
         // ── Durch welchen Kanal gehoert wird ─────────────────────
         //
@@ -665,6 +684,10 @@ void StripWindow::buildUi()
         // wegwirft -- jedes einzelne Urteil richtig, nur ueber das
         // falsche Signal.
         m_liveChannel = new QComboBox(this);
+        m_liveChannel->setSizeAdjustPolicy(
+            QComboBox::AdjustToMinimumContentsLengthWithIcon);
+        m_liveChannel->setMinimumContentsLength(16);
+        m_liveChannel->setObjectName(QStringLiteral("stripLiveChannel"));
         m_liveChannel->addItem(QStringLiteral("roh (volle Bandbreite)"), -1);
         for (int i = 0; i < BandLimit::kChannelCount; ++i) {
             m_liveChannel->addItem(
@@ -688,7 +711,7 @@ void StripWindow::buildUi()
             const int at = m_liveChannel->findData(saved);
             if (at >= 0) { m_liveChannel->setCurrentIndex(at); }
         }
-        row->addWidget(m_liveChannel);
+        mithoer->addWidget(m_liveChannel);
 
         // ── Geraetewahl ──────────────────────────────────────────
         //
@@ -709,21 +732,29 @@ void StripWindow::buildUi()
         };
 
         m_liveIn = new QComboBox(this);
+        m_liveIn->setSizeAdjustPolicy(
+            QComboBox::AdjustToMinimumContentsLengthWithIcon);
+        m_liveIn->setMinimumContentsLength(14);
+        m_liveIn->setObjectName(QStringLiteral("stripLiveIn"));
         baueGeraete(m_liveIn, true);
         m_liveIn->setToolTip(Sprache::T(QStringLiteral(
             "Which microphone the strip listens to. Without this it "
             "takes whatever macOS has as the default — plug in an "
             "interface and forget to make it the default, and you "
             "judge the chain through the wrong microphone.")));
-        row->addWidget(m_liveIn);
+        mithoer->addWidget(m_liveIn);
 
         m_liveOut = new QComboBox(this);
+        m_liveOut->setSizeAdjustPolicy(
+            QComboBox::AdjustToMinimumContentsLengthWithIcon);
+        m_liveOut->setMinimumContentsLength(14);
+        m_liveOut->setObjectName(QStringLiteral("stripLiveOut"));
         baueGeraete(m_liveOut, false);
         m_liveOut->setToolTip(Sprache::T(QStringLiteral(
             "Where you hear it. Use the headphone output of the same "
             "interface: a different device means a second clock, and "
             "speakers mean the microphone hears itself.")));
-        row->addWidget(m_liveOut);
+        mithoer->addWidget(m_liveOut);
 
         {
             auto& st = AppSettings::instance();
@@ -765,6 +796,7 @@ void StripWindow::buildUi()
                 [wechsle](int) { wechsle(); });
 
         m_liveVol = new QSlider(Qt::Horizontal, this);
+        m_liveVol->setObjectName(QStringLiteral("stripLiveVol"));
         // 0..200 statt 0..100: die obere Haelfte ist Verstaerkung bis
         // +6 dB. Bisher endete der Regler bei „so laut wie die Kette"
         // und stand ab Werk 3 dB darunter -- wer dann sagte, die
@@ -779,10 +811,12 @@ void StripWindow::buildUi()
         connect(m_liveVol, &QSlider::valueChanged, this, [this](int v) {
             if (m_live) { m_live->setVolume(v / 100.0); }
         });
-        row->addWidget(m_liveVol);
+        mithoer->addWidget(m_liveVol);
 
         row->addStretch(1);
         col->addLayout(row);
+        mithoer->addStretch(1);
+        col->addLayout(mithoer);
 
         m_liveNote = new QLabel(this);
         m_liveNote->setWordWrap(true);
