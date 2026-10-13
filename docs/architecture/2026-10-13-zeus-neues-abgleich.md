@@ -9,23 +9,60 @@ nicht über `src/core` allein (die Falle vom 2026-10-11, siehe
 
 | Zeus | Longpath | Aufwand |
 | --- | --- | --- |
-| **CAT antwortet auf die Thetis-ZZ-Befehle**; N1MM+ (TCP, Flex5000) und DXLab Commander (Gerätetyp Thetis) hängen sich damit direkt an | **fehlt.** Der CAT-Server von gestern spricht die 16 Kenwood-Befehle, keinen einzigen ZZ. Thetis hat ~10.500 Zeilen `CATCommands.cs`, davon ist der ZZ-Satz der größere Teil | mittel, in Gängen |
-| **Thetis-TX-Profile einlesen** (XML-Export oder ganze Thetis-Datenbank, selbst erkannt; je Profil ein Profil, nichts wird überschrieben; Mic-Gain, TX-Filter, Leveler, ALC, Kompressor, CESSB, CFC, Phasendreher, DEXP, FM-Sendeton, AM-Träger; EQ auf den 10-Band-EQ umgerechnet; Hinweis je angepassten Wert) | **fehlt.** `MicProfileManager` hat 22 Werksprofile und kein Einlesen. Longpath IST ein Thetis-Port: die Felder stehen 1:1 gegenüber, der AM-Träger seit heute Nacht, der TX-EQ seit 3M | mittel |
+| ✔ **GEBAUT 2026-10-13** (`e0158ab2`) — **CAT antwortet auf die Thetis-ZZ-Befehle**; N1MM+ (TCP, Flex5000) und DXLab Commander (Gerätetyp Thetis) hängen sich damit direkt an | **fehlt.** Der CAT-Server von gestern spricht die 16 Kenwood-Befehle, keinen einzigen ZZ. Thetis hat ~10.500 Zeilen `CATCommands.cs`, davon ist der ZZ-Satz der größere Teil | mittel, in Gängen |
+| ✔ **GEBAUT 2026-10-13** (`ac95cd54`) — **Thetis-TX-Profile einlesen** (XML-Export oder ganze Thetis-Datenbank, selbst erkannt; je Profil ein Profil, nichts wird überschrieben; Mic-Gain, TX-Filter, Leveler, ALC, Kompressor, CESSB, CFC, Phasendreher, DEXP, FM-Sendeton, AM-Träger; EQ auf den 10-Band-EQ umgerechnet; Hinweis je angepassten Wert) | **fehlt.** `MicProfileManager` hat 22 Werksprofile und kein Einlesen. Longpath IST ein Thetis-Port: die Felder stehen 1:1 gegenüber, der AM-Träger seit heute Nacht, der TX-EQ seit 3M | mittel |
 
 Beide liegen auf Arbeiten, die diese Woche fertig geworden sind — darum
 zuerst.
 
 ## 2. Klein und lohnend
 
-* **Zahlenfelder werden von selbst wirksam**, kurz nachdem man zu tippen
-  aufhört (Zeus: TX-Filterkanten, CFC Pre-Comp, Phasendreher,
-  FM-Relaisablage). Bei uns gibt es nirgends einen solchen Nachlauf
-  (`grep` auf `QTimer` + `editingFinished`/`debounce` leer) — überall
-  muss Eingabe oder Fokuswechsel kommen. Eine Hilfsklasse, dann je Feld
-  eine Zeile.
+* ~~**Zahlenfelder werden von selbst wirksam**~~ — **KEIN Baubedarf,
+  nachgesehen am 2026-10-13.** Mein erster Eintrag hier war zu schnell:
+  ich hatte nach einem Nachlauf (`QTimer` + `editingFinished`) gesucht,
+  keinen gefunden und auf „fehlt" geschlossen. Nachgesehen, welche
+  Felder Zeus nennt, und wie sie bei uns aussehen:
+
+  | Zeus' Feld | bei uns |
+  | --- | --- |
+  | TX-Filterkanten | `QSpinBox` auf `valueChanged` (`TxApplet.cpp:1276`) |
+  | Phasendreher | `QSpinBox` auf `valueChanged` (`DspSetupPages.cpp:2248`) |
+  | CFC Pre-Comp | `QSpinBox`, gleiche Form |
+  | FM-Relaisablage | **gar kein Eingabefeld** (`shiftOffsetHz` ist im Modell, in `src/gui` kommt es nicht vor) |
+
+  Unsere Felder wirken also **bei jedem Tastendruck**, nicht erst beim
+  Verlassen — Zeus' Problem gibt es hier nicht. Es ist nur anders
+  gelöst: beim Tippen von „1500" gehen 1, 15, 150 und 1500 durch die
+  DSP. Bei einer Filterkante oder einer Phasendreherfrequenz ist das
+  harmlos. **Offen bleibt ein anderer Punkt:** die FM-Relaisablage hat
+  gar keine Bedienung, obwohl der Unterbau steht.
+
+  Lehre, zum zweiten Mal in dieser Woche:
+  [[feedback-abwesenheit-ist-keine-aussage]] gilt auch umgekehrt — ein
+  leeres `grep` nach einer LÖSUNG heißt nicht, dass das PROBLEM da ist.
 * **Squelch AN/AUS je Band gemerkt** (und je Transverter). Bei uns hängt
   die Schwelle am Slice (`m_amsqThresh`, `m_fmsqThresh`), der Schalter an
   nichts Bandbezogenem. „SQL für 2 m FM" folgt also auf 20 m mit.
+
+  **Nachgesehen am 2026-10-13: größer als es klingt.** Longpath hat
+  keinen allgemeinen Weg, eine Scheiben-Einstellung je Band zu merken —
+  bandbezogen sind nur das Panadapter-Gitter
+  (`PanadapterModel::m_perBandGrid`) und die Anlege-Vorgaben
+  (`BandDefaults`). Das zu bauen heißt, einen neuen Speicherweg an
+  `SliceModel` zu hängen, und der ist die Stelle, an der auch
+  Band/Modus/Filter beim Wechsel wiederhergestellt werden. Also nicht
+  „eine Zeile", sondern ein eigener Gang — und einer, bei dem ein Fehler
+  den Bandwechsel trifft.
+
+  **Dazu kommt ein echter Fund**, der beim ZZ-Satz nebenbei anfiel:
+  `RadioModel::setSqlEnable()` — der Weg, den auch der TCI-Server nimmt
+  — greift ausschließlich auf `ssqlEnabled`. **In FM schaltet er nichts**,
+  denn die FM-Sperre hängt an `fmsqEnabled`. Longpath hat drei Schalter
+  (ssql für SSB/CW/Digi, amsq für AM/SAM, fmsq für FM), CAT und TCI
+  haben einen. Für CAT ist das jetzt modusrichtig verdrahtet
+  (`MainWindow.cpp`, eigene Helfer, Prüffall in `tst_cat_verdrahtung`);
+  an `setSqlEnable()` selbst ist **nichts geändert**, weil es TCI
+  mitbetrifft.
 * **Transverterbänder merken den letzten Modus** — gleiche Ecke.
 
 ## 3. Schon vorhanden — nicht nachbauen
@@ -40,13 +77,25 @@ zuerst.
 * **Beschädigte Einstellungsdatei wird beiseitegelegt** — der ganze
   Wiederherstellungsweg steht in `AppSettings.cpp:498-642` (#241/#244).
 
-## 4. Zu prüfen, könnte derselbe Fehler sein
+## 4. Gemessen — ✔ erledigt am 2026-10-13
 
-* **Multi-RX springt lauter.** Zeus hat behoben, dass mitlaufende
-  Empfänger ihre Pegel aufaddieren statt den Lautsprecherpegel zu teilen
-  (stumme zählen nicht mit). Bei uns ist nichts in der Art zu finden
-  (`sharedSpeakerLevel`/`normalizeAf` leer) — **also messen, nicht
-  annehmen**: zwei Slices anlegen und den Ausgangspegel vergleichen.
+* **Multi-RX springt lauter: ja, Faktor genau 2,000.** Gemessen, nicht
+  gelesen (`tests/tst_multi_rx_pegel.cpp`):
+
+  ```
+  ein Empfänger   0,500 hinein -> 0,500 hinaus
+  zwei Empfänger  0,500 je     -> 1,000 hinaus    == Faktor 2,000
+  drei, einer stumm            -> 1,000 hinaus    == stumme zählen nicht
+  ```
+
+  Die zweite Hälfte von Zeus' Meldung (stumme zählen nicht mit) stimmt
+  bei uns schon. **Nicht geändert**, und das ist eine Entscheidung:
+  WDSPs `aamix.c` summiert genauso glatt — Zeus weicht hier von der
+  Vorlage ab, nicht wir — und es ist eine Frage des Hörpegels, die
+  Martin gehört ([[feedback-messung-schlaegt-nicht-das-geraet]]). Eine
+  Teilung macht den einen Empfänger nicht leiser, aber jeden weiteren.
+  Der Prüffall nagelt das heutige Verhalten fest, damit eine Änderung
+  später eine Entscheidung ist und kein Versehen.
 
 ## 5. Wert, aber groß
 
