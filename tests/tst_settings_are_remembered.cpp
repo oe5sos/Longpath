@@ -15,6 +15,7 @@
 // Merken vergessen wurde.
 
 #include <QtTest>
+#include "HeadlessMacGuard.h"
 #include <QComboBox>
 #include <QPushButton>
 #include <QSlider>
@@ -60,6 +61,7 @@ private slots:
     // bevor das Panel existiert, und niemand sagte es dem Combo.
     void dreiDAnsichtUeberlebtDenNeustart()
     {
+        LONGPATH_SKIP_IF_HEADLESS_MAC_GUI();
         {
             auto* mw = new MainWindow();
             mw->show();
@@ -98,6 +100,7 @@ private slots:
     // SpectrumWidget schon geladen hatte.
     void wfGainUeberlebtDenNeustart()
     {
+        LONGPATH_SKIP_IF_HEADLESS_MAC_GUI();
         {
             auto* mw = new MainWindow();
             mw->show();
@@ -135,6 +138,7 @@ private slots:
     // Test faellt sichtbar durch, statt zufaellig grün zu bleiben.
     void blackLvlUeberlebtDenNeustart()
     {
+        LONGPATH_SKIP_IF_HEADLESS_MAC_GUI();
         {
             auto* mw = new MainWindow();
             mw->show();
@@ -173,6 +177,7 @@ private slots:
     // nicht und der Test faellt beim Setzen schon durch.
     void farbschemaUeberlebtDenNeustart()
     {
+        LONGPATH_SKIP_IF_HEADLESS_MAC_GUI();
         {
             auto* mw = new MainWindow();
             mw->show();
@@ -211,6 +216,7 @@ private slots:
     // toggle()), damit der ganze Signalweg mitgeprueft ist.
     void flyoutAufZuUeberlebtDenNeustart()
     {
+        LONGPATH_SKIP_IF_HEADLESS_MAC_GUI();
         {
             auto* mw = new MainWindow();
             mw->show();
@@ -255,6 +261,7 @@ private slots:
 
     void balkenformUeberlebtDenNeustart()
     {
+        LONGPATH_SKIP_IF_HEADLESS_MAC_GUI();
         {
             auto* mw = new MainWindow();
             mw->show();
@@ -283,6 +290,7 @@ private slots:
 
     void zusatzzeilenUeberlebenDenNeustart()
     {
+        LONGPATH_SKIP_IF_HEADLESS_MAC_GUI();
         {
             auto* mw = new MainWindow();
             mw->show();
@@ -310,6 +318,7 @@ private slots:
 
     void dieAnzeigequelleDesPanadaptersUeberlebt()
     {
+        LONGPATH_SKIP_IF_HEADLESS_MAC_GUI();
         // ── Erst aufraeumen ─────────────────────────────────────────
         //
         // Ohne das besteht diese Pruefung aus einem VORIGEN Lauf

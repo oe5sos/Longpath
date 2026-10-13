@@ -17,6 +17,7 @@
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
 // =================================================================
 #include <QtTest>
+#include "HeadlessMacGuard.h"
 #include "gui/MainWindow.h"
 #include "gui/applets/AppletVisibilityController.h"
 
@@ -28,6 +29,7 @@ class TestWindowWidgets : public QObject
 private slots:
     void theOwnWindowsAreInThePicker()
     {
+        LONGPATH_SKIP_IF_HEADLESS_MAC_GUI();
         auto* mwp = new MainWindow();      // bewusst nicht abgeraeumt
         mwp->resize(1280, 800);
         mwp->show();
@@ -53,6 +55,7 @@ private slots:
     // Sie duerfen beim ersten Start nicht von selbst aufgehen.
     void theyStayShutUntilAsked()
     {
+        LONGPATH_SKIP_IF_HEADLESS_MAC_GUI();
         auto* mwp = new MainWindow();
         mwp->resize(1280, 800);
         mwp->show();
@@ -74,6 +77,7 @@ private slots:
     // Und ein Haken MUSS wirken.
     void tickingOneOpensTheWindow()
     {
+        LONGPATH_SKIP_IF_HEADLESS_MAC_GUI();
         auto* mwp = new MainWindow();
         mwp->resize(1280, 800);
         mwp->show();

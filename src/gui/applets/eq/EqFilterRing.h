@@ -103,6 +103,7 @@ inline const char* name(ClientEq::FilterType t)
 inline void applyTo(ClientEq& eq, int bandIdx, ClientEq::FilterType t)
 {
     ClientEq::BandParams p = eq.band(bandIdx);
+    const ClientEq::FilterType vorher = p.type;
     p.type    = t;
     p.enabled = true;
     // Die Güte zähmen -- aber nicht bei den Arten, deren ganzer Sinn
@@ -118,6 +119,21 @@ inline void applyTo(ClientEq& eq, int bandIdx, ClientEq::FilterType t)
     // Und eine frische Kerbe soll eine sein.
     if (t == ClientEq::FilterType::Notch && p.q < 4.0f) {
         p.q = 8.0f;
+    }
+    // ── Und wieder heraus ───────────────────────────────────────────
+    //
+    // Seit Kerbe und Bandpass im Ring stehen (2026-10-10), fuehrt eine
+    // volle Runde durch eine Art, die die Guete auf 8 hebt -- und
+    // zurueck bei der Glocke blieb sie dort stehen. Wer mit dem Rad
+    // durch die Arten geht, um sie zu probieren, hatte danach statt
+    // seiner Glocke einen Nadelstich, ohne eine Zahl angefasst zu
+    // haben. Aufgefallen am 2026-10-13, als tst_eq_filter_ring zum
+    // ersten Mal seit dem Umbau wirklich gebaut wurde.
+    if (t == ClientEq::FilterType::Peak
+        && (vorher == ClientEq::FilterType::Notch
+            || vorher == ClientEq::FilterType::BandPass)
+        && p.q >= 4.0f) {
+        p.q = 0.707f;
     }
     eq.setBand(bandIdx, p);
 }

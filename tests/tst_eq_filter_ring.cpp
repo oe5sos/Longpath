@@ -83,7 +83,12 @@ private slots:
         const FT t = Ring::prev(FT::Peak);
         QVERIFY(static_cast<int>(t) >= 0);
         QVERIFY(static_cast<int>(t) < Ring::kTypeCount);
-        QVERIFY(t == FT::HighPass);
+        // Seit dem 2026-10-10 stehen Kerbe und Bandpass am Ende des
+        // Rings; rueckwaerts aus der Glocke landet man also dort, nicht
+        // mehr beim Hochpass. Diese Zeile stand seither falsch -- und
+        // ist nie aufgefallen, weil der Prüfstand nicht neu gebaut
+        // wurde.
+        QVERIFY(t == FT::BandPass);
     }
 
     void a_direction_larger_than_the_ring_still_lands_on_the_ring()
@@ -202,8 +207,11 @@ private slots:
         QCOMPARE(double(after.gainDb), -4.5);
         QCOMPARE(double(after.freqHz), 1750.0);
         // Q is the one thing a lap is allowed to change, because the lap
-        // passes through four types that cannot hold a sharp one.
-        QCOMPARE(after.q, 0.8f);  // float compare — see above
+        // passes through types that cannot hold a sharp one -- und seit
+        // 2026-10-10 auch durch zwei, die eine HOHE Guete brauchen.
+        // Entscheidend ist, dass die Runde nicht mit einem Nadelstich
+        // endet: zurueck bei der Glocke steht wieder eine Glocke.
+        QCOMPARE(after.q, 0.707f);
     }
 };
 

@@ -12,6 +12,7 @@
 // Merkervariablen im MainWindow.
 
 #include <QtTest>
+#include "HeadlessMacGuard.h"
 
 #include "core/AudioEngine.h"
 #include "gui/MainWindow.h"
@@ -54,6 +55,7 @@ class TstKiwiTxMute : public QObject
 private slots:
     void beimSendenIstDerKiwiStumm()
     {
+        LONGPATH_SKIP_IF_HEADLESS_MAC_GUI();
         auto* mw = new MainWindow();
         mw->show();
         QVERIFY(QTest::qWaitForWindowExposed(mw, 15000));
@@ -98,6 +100,7 @@ private slots:
 
     void tuneZaehltAuch()
     {
+        LONGPATH_SKIP_IF_HEADLESS_MAC_GUI();
         // Beim Abstimmen wird gesendet — ein Dauertraeger sogar. Wer
         // das vergisst, hoert sich beim Tunen selbst.
         auto* mw = new MainWindow();
