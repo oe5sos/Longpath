@@ -1324,6 +1324,14 @@ public:
     quint64 rahmenOhneQuittungForTest() const { return m_rahmenOhneQuittung; }
     quint64 anschlagProbenForTest() const { return m_anschlagProben; }
     quint64 anschlagMeldungenForTest() const { return m_anschlagMeldungen; }
+    // Die Uebersteuerungspruefung von aussen fahren, mit Proben, die der
+    // Pruefstand selbst baut. Ohne das war nur belegt, dass sie am echten
+    // Geraet NICHT falsch alarmiert (0 Proben am Anschlag ueber Stunden,
+    // zuletzt 2026-10-11 mit Antenne) -- dass sie ueberhaupt anschlaegt,
+    // war es nicht: dafuer braeuchte es ein Signal, das den Wandler
+    // wirklich an den Anschlag treibt, und das kann man nicht bestellen.
+    void pruefeAnschlagForTest(const QVector<float>& samples)
+    { pruefeAnschlag(samples); }
     bool geraetSendetForTest() const { return m_geraetSendet; }
     quint64 mikrofonPttFlankenForTest() const { return m_mikrofonPttFlanken; }
     quint64 kanalPaketeForTest(int k) const
