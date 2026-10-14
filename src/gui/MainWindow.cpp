@@ -7754,16 +7754,31 @@ void MainWindow::populateDefaultMeter()
     // CW: same shape -- defaultVisible=true, gated on CWL/CWU below.
     m_appletVis->registerApplet(QStringLiteral("CwDecoder"),
                                 QStringLiteral("CW Decoder"), true);
-    // Equalizer (eingehaengt 2026-10-11). Sichtbar ab Werk: beide Haelften
-    // sind jetzt verdrahtet, und der Empfangs-Equalizer ist neu -- ein
-    // Merkmal, das man erst in einem Menue suchen muss, findet niemand
-    // (dieselbe Begruendung wie beim Sprachspeicher darunter).
+    // Equalizer (eingehaengt 2026-10-11). **NICHT sichtbar ab Werk**
+    // (geaendert 2026-10-14).
     //
-    // Der Eintrag in m_appletsById oben ist dabei genauso Pflicht wie
-    // dieser: ohne ihn kennt der Auswaehler das Applet nicht. Siehe die
-    // Notiz bei "Die vier vom 2026-08-23".
+    // Hier stand `true` mit der Begruendung, ein neues Merkmal finde
+    // niemand, wenn es in einem Menue versteckt sei. Das war falsch
+    // gedacht, und der Betreiber hat es als Erstes gesehen: bei ihm
+    // stand der Equalizer nach dem Start allein im sonst leeren Bild,
+    // VOR dem Verbinden, obwohl er ihn nie eingeschaltet hatte.
+    //
+    // Warum gerade bei ihm: sein Layoutprofil traegt eine Liste der
+    // sichtbaren Felder, und fuer einen Schluessel, den es dort NICHT
+    // gibt, greift diese Vorgabe. Ein neues Applet mit `true` schaltet
+    // sich also in JEDES bestehende Profil selbst hinein -- es kann gar
+    // nicht anders, denn das Profil kennt es noch nicht.
+    //
+    // **Ein neues Feld schaltet sich nicht selbst in eine fertige
+    // Anordnung.** Genau so steht es bei CAT darunter, und so war es
+    // richtig. Gefunden wird der Equalizer ueber den Auswaehler, wie
+    // jedes andere auch.
+    //
+    // Der Eintrag in m_appletsById oben bleibt Pflicht: ohne ihn kennt
+    // der Auswaehler das Applet nicht. Siehe die Notiz bei "Die vier vom
+    // 2026-08-23".
     m_appletVis->registerApplet(QStringLiteral("Eq"),
-                                QStringLiteral("Equalizer"),    true);
+                                QStringLiteral("Equalizer"),    false);
     // CAT: NICHT sichtbar ab Werk. Wer kein Fremdprogramm anbindet,
     // braucht das Feld nie, und zwei seiner vier Reihen sind noch
     // Attrappen -- es soll gefunden werden, wenn man es sucht, und nicht
