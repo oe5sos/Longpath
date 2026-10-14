@@ -5457,6 +5457,7 @@ longpath_add_test(tst_strip_dsp)
 #    that "off" is bit-exact even with all eight stages set up, and
 #    the non-finite guard: whatever goes in, numbers come out --
 longpath_add_test(tst_strip_chain)
+longpath_add_test(tst_gleich_laut)
 
 # -- Martins Aether-Profil, Wert fuer Wert: seine eigene Datei vom
 #    2026-10-13 durch den Importeur in unsere Kette, samt Reihenfolge

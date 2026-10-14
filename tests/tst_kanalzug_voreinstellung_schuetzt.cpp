@@ -212,8 +212,23 @@ private slots:
         QVERIFY2(!haken->isChecked(),
                  "der Hauptschalter ist beim Wechsel an geblieben");
 
-        // Aufräumen: beide Schlüssel wieder weg.
-        for (int i = 0; i < 2; ++i) {
+        // Und ein Gerät, zu dem nichts gespeichert ist, bekommt KEINE
+        // Kette -- es darf nicht den Stand des vorigen mitschleppen.
+        if (ein->count() > 2) {
+            ein->setCurrentIndex(0);
+            emit ein->activated(0);          // A: Kette an
+            QVERIFY(haken->isChecked());
+            AppSettings::instance().remove(StripWindow::kettenSchluessel(
+                ein->itemData(2).toByteArray()));
+            ein->setCurrentIndex(2);
+            emit ein->activated(2);
+            QVERIFY2(!haken->isChecked(),
+                     "ein unbekanntes Mikrofon hat die Kette des vorigen "
+                     "geerbt");
+        }
+
+        // Aufräumen: alle Schlüssel wieder weg.
+        for (int i = 0; i < ein->count(); ++i) {
             AppSettings::instance().remove(StripWindow::kettenSchluessel(
                 ein->itemData(i).toByteArray()));
         }

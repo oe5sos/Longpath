@@ -324,6 +324,8 @@ private:
     QCheckBox*  m_liveBtn{nullptr};
     QLabel*     m_liveNote{nullptr};
     QSlider*    m_liveVol{nullptr};
+    /// „gleich laut" -- siehe core/strip/LoudnessMatch.h.
+    QCheckBox*  m_liveGleich{nullptr};
     QComboBox*  m_liveLatency{nullptr};
     // Durch welchen Sendekanal gehoert wird; -1 = roh.
     QComboBox*  m_liveChannel{nullptr};

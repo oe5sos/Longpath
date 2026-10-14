@@ -42,6 +42,20 @@ const QHash<QString, QString>& tabelle()
           QStringLiteral("Die letzte Aufnahme noch einmal.") },
         { QStringLiteral("Hear myself"),
           QStringLiteral("Mich hören") },
+        { QStringLiteral("same loudness"),
+          QStringLiteral("gleich laut") },
+        { QStringLiteral("Holds the strip down to the loudness of the raw "
+                         "microphone, in the headphones only — never on the "
+                         "air. Without it every preset jumps 20 to 40 dB, and "
+                         "the louder one always sounds better, whatever it "
+                         "does."),
+          QStringLiteral("Hält die Kette im Kopfhörer auf der Lautstärke des "
+                         "rohen Mikrofons — nur dort, nie auf dem Band. Ohne "
+                         "das springt jede Voreinstellung um zwanzig bis "
+                         "vierzig Dezibel, und das Lautere klingt immer "
+                         "besser, egal was es tut.") },
+        { QStringLiteral("Input: strip is off — nothing being measured"),
+          QStringLiteral("Eingang: Kette aus — nichts zu messen") },
         { QStringLiteral("Runs the microphone through the strip and straight back out of this computer's sound output, so every change is heard while it is made. Headphones — a loudspeaker here feeds back. The radio is not touched and nothing is transmitted."),
           QStringLiteral("Schickt das Mikrofon durch die Kette und direkt wieder aus der Tonausgabe dieses Rechners heraus, damit jede Änderung sofort zu hören ist. Kopfhörer — ein Lautsprecher koppelt hier zurück. Das Funkgerät wird nicht angefasst, gesendet wird nichts.") },
         { QStringLiteral("Safe"),

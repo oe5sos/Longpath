@@ -156,6 +156,20 @@ void StripChain::runStageAt(Stage which, float* samples, int frames) noexcept
 void StripChain::prepare(double sampleRate)
 {
     m_sampleRate = sampleRate;
+
+    // ── Was gehoert wurde, gehoerte zum alten Mikrofon ───────────
+    //
+    // speechPeakDb() ueberlebte bisher jeden Geraetewechsel. Am
+    // 2026-10-14 hiess das: das Headset an der Klinke misst -28 dBFS,
+    // danach haengt ein Apollo dran, und der Knopf „Uebernehmen"
+    // rechnet weiter mit der Zahl des Headsets -- fuer ein Mikrofon,
+    // das es in dieser Sitzung nie gehoert hat. Eine Messung gilt
+    // fuer das Geraet, an dem sie entstanden ist.
+    m_speechPeakDb.store(-120.0f, std::memory_order_relaxed);
+    m_rawInPeakDb.store(-120.0f, std::memory_order_relaxed);
+    m_autoPeak   = 0.0f;
+    m_autoFrames = 0;
+    m_autoSumSq  = 0.0;
     m_nr.prepare(sampleRate);
     m_clip.prepare(sampleRate);
     m_gate.prepare(sampleRate);

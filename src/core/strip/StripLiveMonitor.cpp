@@ -209,9 +209,15 @@ void StripLiveMonitor::doStart()
     m_inRing->setSampleRate(m_inRate);
     m_outRing->setSampleRate(m_inRate);
     m_band.prepare(m_inRate);
+    m_gleichLaut.prepare(double(m_inRate));
     m_kanalBegrenzer.prepare(m_inRate);
     m_kanalBegrenzer.setEnabled(true);
     m_inChannels = std::max(1, inFmt.channelCount());
+    // Ein neues Geraet, eine neue Suche. Sonst zeigt die Wahl von der
+    // vorigen Soundkarte auf einen Kanal, den diese nicht hat.
+    m_autoPick = 0;
+    m_stilleSek = 0;
+    m_kanalSpitze.assign(size_t(m_inChannels), 0.0f);
     m_inFormat   = int(inFmt.sampleFormat());
     m_outChannels = std::max(1, outFmt.channelCount());
     m_outFormat   = int(outFmt.sampleFormat());
@@ -311,8 +317,13 @@ void StripLiveMonitor::doStart()
                     << "rate" << m_inRate
                     << "block" << m_blockFrames
                     << "channels" << m_inChannels
-                    << "pick" << (m_inChannels > 2 && m_inPick < 0
-                                      ? 0 : m_inPick)
+                    << "pick" << (m_inChannels > 2
+                                      ? (m_inPick.load(
+                                             std::memory_order_relaxed) >= 0
+                                             ? m_inPick.load(
+                                                 std::memory_order_relaxed) + 1
+                                             : m_autoPick + 1)
+                                      : 0)
                     << "own latency ~" << m_latencyMs.load() << "ms";
     emit started();
 }
@@ -469,12 +480,27 @@ int StripLiveMonitor::monitorChannel() const
 // statt Klang.
 void StripLiveMonitor::setInputPick(int index) noexcept
 {
-    m_inPick = index;
+    m_inPick.store(index, std::memory_order_relaxed);
+}
+
+void StripLiveMonitor::setLoudnessMatch(bool on) noexcept
+{
+    m_gleichLaut.setEnabled(on);
+}
+
+bool StripLiveMonitor::loudnessMatch() const noexcept
+{
+    return m_gleichLaut.isEnabled();
+}
+
+float StripLiveMonitor::loudnessMatchDb() const noexcept
+{
+    return m_gleichLaut.gainDb();
 }
 
 int StripLiveMonitor::inputPick() const noexcept
 {
-    return m_inPick;
+    return m_inPick.load(std::memory_order_relaxed);
 }
 
 void StripLiveMonitor::verzoegereRoh(float* samples, int frames) noexcept
@@ -527,12 +553,19 @@ void StripLiveMonitor::pump()
     // Siehe m_inPick im Header. Bei einem oder zwei Kanälen werden
     // sie zusammengelegt; bei mehr wird EINER genommen, sonst
     // dividiert ein Mehrkanalwandler die Stimme in Grund und Boden.
-    const int pick = (m_inPick >= 0 && m_inPick < m_inChannels)
-                   ? m_inPick
-                   : (m_inChannels > 2 ? m_autoPick : -1);
     if (int(m_kanalSpitze.size()) != m_inChannels) {
         m_kanalSpitze.assign(size_t(m_inChannels), 0.0f);
     }
+    // Erst binden, dann rechnen: ein Wechsel von sechzehn Eingaengen
+    // auf vier liesse m_autoPick sonst auf zehn stehen -- und damit
+    // zeigt die Wahl auf einen Kanal, den es nicht gibt. Das Ohr
+    // bekaeme Stille (kein c trifft je auf pick), und die Zeile im
+    // Protokoll läse neben dem Feld.
+    if (m_autoPick >= m_inChannels || m_autoPick < 0) { m_autoPick = 0; }
+    const int gewuenscht = m_inPick.load(std::memory_order_relaxed);
+    const int pick = (gewuenscht >= 0 && gewuenscht < m_inChannels)
+                   ? gewuenscht
+                   : (m_inChannels > 2 ? m_autoPick : -1);
 
     const char* raw = chunk.constData();
     for (int f = 0; f < frames; ++f) {
@@ -591,10 +624,19 @@ void StripLiveMonitor::pump()
     // Am 2026-10-14 standen deshalb „-50 dBFS" in der einen Zeile
     // und „Kanal 1: -1,3 dBFS" in der naechsten -- dieselbe Sekunde,
     // dasselbe Signal, zwei Zahlen, fuenfzig Dezibel auseinander.
+    float blockSpitzeIn = 0.0f;
     for (float v : m_mono) {
-        m_sekSpitzeIn = std::max(m_sekSpitzeIn, std::fabs(v));
+        blockSpitzeIn = std::max(blockSpitzeIn, std::fabs(v));
     }
+    m_sekSpitzeIn = std::max(m_sekSpitzeIn, blockSpitzeIn);
     const float peakIn = m_sekSpitzeIn;
+
+    // ── Gleich laut vergleichen ─────────────────────────────────
+    //
+    // Siehe LoudnessMatch.h. Der Effektivwert VOR der Kette ist die
+    // Bezugsgroesse; angewendet wird der Ausgleich ganz am Ende, am
+    // Mithoerweg allein.
+    m_gleichLaut.feedInput(m_mono.data(), int(m_mono.size()));
 
     applyStrip(m_mono.data(), int(m_mono.size()));
 
@@ -639,6 +681,23 @@ void StripLiveMonitor::pump()
     //
     // Siehe StripLiveMonitor.h. Zuerst die Einblendung: der erste
     // Block nach dem Start kommt nicht mit vollem Pegel.
+    // ── Erst angleichen, dann einblenden ────────────────────────
+    //
+    // Der Ausgleich steht NACH Kanal und Kanalbegrenzer: die beiden
+    // bilden den Sender nach und sollen den echten Pegel sehen.
+    // Angeglichen wird nur, was ins Ohr geht.
+    //
+    // Und nur, wenn die Kette wirklich lief -- das rohe Signal ist
+    // der Massstab und wird nicht gegen sich selbst geregelt.
+    //
+    // Beim Umschalten auf roh wird NICHT zurueckgesetzt: der
+    // erarbeitete Wert soll beim Zurueckschalten sofort wieder da
+    // sein. Ein Ausgleich, der jedes Mal bei null anfaengt, laesst
+    // die erste Sekunde jeder Kette voll durch.
+    if (!m_bypass.load(std::memory_order_acquire) && m_chain->isEnabled()) {
+        m_gleichLaut.applyOutput(m_mono.data(), int(m_mono.size()));
+    }
+
     if (m_fade < 1.0f) {
         const float schritt = 1.0f / float(std::max(1, m_inRate / 4));
         for (float& v : m_mono) {
@@ -671,7 +730,15 @@ void StripLiveMonitor::pump()
     {
         const double blockMs = 1000.0 * double(m_mono.size())
                                / double(std::max(1, m_inRate));
-        if (peakIn > 0.0316f) {        // -30 dBFS
+        // ── Und zwar die Spitze DIESES Haeppchens ───────────────
+        //
+        // Hier stand peakIn, und das war seit 12:12 die ueber die
+        // ganze Sekunde gehaltene Spitze. Damit faellt die Wache um:
+        // sie sucht die PAUSE, die gehaltene Zahl kennt aber keine --
+        // eine einzige laute Silbe macht die restliche Sekunde heiss,
+        // und nach drei Sekunden Sprechen stuende der
+        // Rueckkopplungsverdacht da, wo nur jemand geredet hat.
+        if (blockSpitzeIn > 0.0316f) {        // -30 dBFS
             m_hotBlocks += int(std::lround(blockMs));
         } else {
             m_hotBlocks = 0;
@@ -701,7 +768,8 @@ void StripLiveMonitor::pump()
                         << "queued" << (m_sink->bufferSize()
                                         - m_sink->bytesFree())
                         << "of" << m_sink->bufferSize()
-                        << "ratio" << m_ratio;
+                        << "ratio" << m_ratio
+                        << "gleich-laut" << m_gleichLaut.gainDb() << "dB";
         // ── Und je Kanal, wenn das Geraet mehrere hat ────────────
         //
         // Damit „der falsche Kanal" von „der Vorverstaerker steht zu
@@ -724,7 +792,7 @@ void StripLiveMonitor::pump()
             // Nur wenn kein Kanal vorgegeben ist. Drei Sekunden
             // Stille auf dem gehoerten Eingang, waehrend anderswo
             // etwas ist: dann liegt das Mikrofon dort.
-            if (m_inPick < 0) {
+            if (m_inPick.load(std::memory_order_relaxed) < 0) {
                 int laut = m_autoPick;
                 for (int c = 0; c < m_inChannels; ++c) {
                     if (m_kanalSpitze[size_t(c)]

@@ -427,6 +427,8 @@ void StripWindow::toggleLiveMonitor(bool on)
         m_live->setInputPick(
             AppSettings::instance()
                 .value(QStringLiteral("StripMonitorInChannel"), -1).toInt());
+        m_live->setLoudnessMatch(
+            m_liveGleich ? m_liveGleich->isChecked() : true);
         // ── Und die Geraete, VOR dem Start ───────────────────────
         //
         // Der Mithoerer wird hier erst erzeugt. Die
@@ -568,6 +570,11 @@ StripChain* StripWindow::chain() const
 // Geschrieben wird immer in chain(). Die beiden Namen stehen bewusst
 // nebeneinander: wer hier versehentlich den falschen nimmt, soll es
 // beim Lesen sehen.
+StripChain* StripWindow::displayChain() const
+{
+    return m_displayChain != nullptr ? m_displayChain : chain();
+}
+
 // ── Die Kette gehoert zum Mikrofon ───────────────────────────────
 //
 // Siehe die Begruendung am Geraetewechsel. Der Schluessel haengt an
@@ -595,18 +602,20 @@ QString StripWindow::kettenSchluessel(const QByteArray& geraeteId)
 
 void StripWindow::wendeKettenStandAn(const QByteArray& geraeteId)
 {
-    const QString k = kettenSchluessel(geraeteId);
-    if (k.isEmpty() || m_master == nullptr) { return; }
-    const QString gespeichert =
-        AppSettings::instance().value(k, QString()).toString();
-    if (gespeichert.isEmpty()) { return; }   // nichts bekannt, nichts aendern
+    if (m_master == nullptr) { return; }
+    const QString gespeichert = AppSettings::instance()
+        .value(kettenSchluessel(geraeteId), QString()).toString();
+    // ── Ein unbekanntes Mikrofon bekommt KEINE Kette ────────────
+    //
+    // Hier stand zuerst „nichts bekannt, nichts aendern". Das trug
+    // den Stand des vorigen Geraets mit: vom Headset an der Klinke
+    // (Kette an) auf irgendeinen dritten Eingang gewechselt, und die
+    // Kette lief dort weiter -- unter Umstaenden als zweite
+    // Bearbeitung hinter einer, die das Geraet schon macht. Die
+    // sichere Richtung ist aus; wer sie dort will, schaltet sie
+    // einmal ein, und ab dann merkt sie sich das.
     const bool soll = (gespeichert == QLatin1String("True"));
     if (m_master->isChecked() != soll) { m_master->setChecked(soll); }
-}
-
-StripChain* StripWindow::displayChain() const
-{
-    return m_displayChain != nullptr ? m_displayChain : chain();
 }
 
 void StripWindow::buildUi()
@@ -919,6 +928,39 @@ void StripWindow::buildUi()
             if (m_live) { m_live->setVolume(v / 100.0); }
         });
         mithoer->addWidget(m_liveVol);
+
+        // ── Gleich laut ─────────────────────────────────────────
+        //
+        // Siehe core/strip/LoudnessMatch.h. Ohne das springt beim
+        // Umschalten auf eine Voreinstellung die Lautstärke um
+        // zwanzig bis vierzig Dezibel -- jede Kette endet an der
+        // Decke des Begrenzers, das rohe Mikrofon liegt weit
+        // darunter. Am 2026-10-14 ist der Betreiber deshalb viermal
+        // an den Kopfhörer gegangen, zuletzt mit „muss sofort
+        // abdrehen und longpath zu machen".
+        //
+        // Ab Werk an, und zwar nicht nur zum Schutz: lauter klingt
+        // immer besser. Solange die Kette lauter ist als das rohe
+        // Signal, beurteilt das Ohr die Lautstärke statt der Arbeit.
+        m_liveGleich = new QCheckBox(QStringLiteral("same loudness"), this);
+        m_liveGleich->setObjectName(QStringLiteral("stripLiveGleichLaut"));
+        m_liveGleich->setChecked(
+            AppSettings::instance()
+                .value(QStringLiteral("StripMonitorLoudnessMatch"),
+                       QStringLiteral("True")).toString()
+            != QLatin1String("False"));
+        m_liveGleich->setToolTip(QStringLiteral(
+            "Holds the strip down to the loudness of the raw "
+            "microphone, in the headphones only — never on the air. "
+            "Without it every preset jumps 20 to 40 dB, and the "
+            "louder one always sounds better, whatever it does."));
+        connect(m_liveGleich, &QCheckBox::toggled, this, [this](bool on) {
+            AppSettings::instance().setValue(
+                QStringLiteral("StripMonitorLoudnessMatch"),
+                on ? QStringLiteral("True") : QStringLiteral("False"));
+            if (m_live) { m_live->setLoudnessMatch(on); }
+        });
+        mithoer->addWidget(m_liveGleich);
 
         row->addStretch(1);
         col->addLayout(row);
@@ -1237,12 +1279,9 @@ void StripWindow::buildUi()
         // Und merken, zu welchem Mikrofon dieser Stand gehoert --
         // siehe wendeKettenStandAn().
         if (m_liveIn) {
-            const QString k = kettenSchluessel(
-                m_liveIn->currentData().toByteArray());
-            if (!k.isEmpty()) {
-                AppSettings::instance().setValue(
-                    k, on ? QStringLiteral("True") : QStringLiteral("False"));
-            }
+            AppSettings::instance().setValue(
+                kettenSchluessel(m_liveIn->currentData().toByteArray()),
+                on ? QStringLiteral("True") : QStringLiteral("False"));
         }
         persist();
     });

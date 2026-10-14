@@ -54,6 +54,7 @@
 #include <QAudioDevice>
 #include <QAudioFormat>
 #include "core/strip/BandLimit.h"
+#include "core/strip/LoudnessMatch.h"
 #include "core/strip/ClientFinalLimiter.h"
 
 #include <QObject>
@@ -291,6 +292,11 @@ private:
     QByteArray m_wunschOut;
 
     BandLimit m_band;
+
+    // ── Gleich laut vergleichen ──────────────────────────────────
+    //
+    // Siehe LoudnessMatch.h. Nur der Mithoerweg, nie der Sendeton.
+    LoudnessMatch m_gleichLaut;
     // ── Der Begrenzer HINTER dem Kanal ───────────────────────────
     //
     // Clippen erzeugt Energie weit ausserhalb des Kanals, und das
@@ -340,6 +346,14 @@ public:
     void setInputPick(int index) noexcept;
     int  inputPick() const noexcept;
 
+    /// Den Mithoerweg auf die Lautstaerke des rohen Signals
+    /// angleichen. Siehe LoudnessMatch.h -- ohne das springt jede
+    /// Voreinstellung um zwanzig bis vierzig Dezibel nach oben.
+    void setLoudnessMatch(bool on) noexcept;
+    bool loudnessMatch() const noexcept;
+    /// Was der Ausgleich gerade abzieht, in dB.
+    float loudnessMatchDb() const noexcept;
+
 private:
     std::unique_ptr<MicSpectrum> m_inRing;
     std::unique_ptr<MicSpectrum> m_outRing;
@@ -371,7 +385,11 @@ private:
     // -1 heisst „zusammenlegen" (richtig fuer ein- und zweikanalige
     // Geraete), sonst der Index des einen Kanals. Steht hinter
     // StripMonitorInChannel.
-    int m_inPick{-1};
+    // Aus dem Bedienfaden geschrieben, im Tonfaden gelesen -- also
+    // atomar, wie BandLimit::m_channel daneben. Ein einfacher int
+    // waere hier ein Wettlauf nach Hausregel (CLAUDE.md: „Atomic
+    // parameters for cross-thread DSP").
+    std::atomic<int> m_inPick{-1};
 
     // Der tatsaechlich gehoerte Kanal, wenn keiner vorgegeben ist.
     // Faengt bei null an und wandert einmal weiter, wenn dort drei
