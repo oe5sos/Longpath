@@ -90,6 +90,19 @@ public:
 
 signals:
     void stageClicked(int stageIndex);
+    // ── Nur diese Stufe hoeren ───────────────────────────────────
+    //
+    // „hier sollten wir morgen jedes einzelne probieren"
+    // (2026-10-14). Mit der Hand hiesse das: neun Stufen ausschalten,
+    // hoeren, neun wieder einschalten, und beim naechsten Mal von
+    // vorn -- und nach dem dritten Durchgang weiss niemand mehr, was
+    // vorher an war.
+    //
+    // Deshalb eine eigene Geste und nicht der einfache Klick: der
+    // oeffnet weiter nur die Seite. Ein Klick, der den Ton aendert,
+    // ist ein Klick, der aus Versehen passiert -- mit Wahltaste
+    // passiert er nicht.
+    void stageSoloRequested(int stageIndex);
     // Ein Plugin wurde auf die Reihe gezogen und an dieser Stelle
     // fallen gelassen (0 = vor dem Gate, kStageCount = hinter dem
     // Begrenzer).

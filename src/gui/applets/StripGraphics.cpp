@@ -501,6 +501,11 @@ void StripChainView::mousePressEvent(QMouseEvent* ev)
         return;
     }
     if (cell->kind == Cell::Kind::Stage) {
+        // Mit Wahltaste: nur diese Stufe. Siehe stageSoloRequested().
+        if (ev->modifiers().testFlag(Qt::AltModifier)) {
+            emit stageSoloRequested(cell->index);
+            return;
+        }
         // Opens the stage. Deliberately not a bypass toggle: the
         // row is the thing an operator's eye rests on while
         // speaking, and a click that changes the audio is a click

@@ -326,6 +326,15 @@ private:
     QSlider*    m_liveVol{nullptr};
     /// „gleich laut" -- siehe core/strip/LoudnessMatch.h.
     QCheckBox*  m_liveGleich{nullptr};
+
+    // ── „Nur diese Stufe" ────────────────────────────────────────
+    //
+    // Welche Stufe gerade allein laeuft (-1 = keine), und der Stand,
+    // der vorher galt. Siehe die Begruendung am Signal
+    // stageSoloRequested().
+    int  m_soloStufe{-1};
+    bool m_soloMasterVorher{false};
+    std::array<bool, StripChain::kStageCount> m_soloVorher{};
     QComboBox*  m_liveLatency{nullptr};
     // Durch welchen Sendekanal gehoert wird; -1 = roh.
     QComboBox*  m_liveChannel{nullptr};

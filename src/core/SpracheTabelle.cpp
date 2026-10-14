@@ -70,6 +70,18 @@ const QHash<QString, QString>& tabelle()
                          "— darin behält das Gate, was es gerade tat; der "
                          "Ball liegt deshalb auf dem gestrichelten offenen "
                          "Ast oder auf der Kennlinie, nie dazwischen<br>") },
+        { QStringLiteral("⌥-click a tile in the row to hear that stage on "
+                         "its own; ⌥-click it again and everything comes "
+                         "back exactly as it was."),
+          QStringLiteral("Mit ⌥ auf eine Kachel der Reihe hörst du diese "
+                         "Stufe allein; nochmal ⌥ und alles steht wieder "
+                         "genau so wie vorher.") },
+        { QStringLiteral("Right now you are hearing ONE stage on its own — "
+                         "⌥-click that tile again to put the others back as "
+                         "they were."),
+          QStringLiteral("Gerade hörst du EINE Stufe allein — nochmal ⌥ auf "
+                         "diese Kachel, und die anderen stehen wieder wie "
+                         "zuvor.") },
         { QStringLiteral("same loudness"),
           QStringLiteral("gleich laut") },
         { QStringLiteral("Holds the strip down to the loudness of the raw "

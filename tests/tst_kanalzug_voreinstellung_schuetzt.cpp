@@ -42,6 +42,7 @@
 #include "core/Sprache.h"
 #include "core/strip/StripChain.h"
 #include "core/strip/StripSettings.h"
+#include "gui/applets/StripGraphics.h"
 #include "gui/applets/StripWindow.h"
 #include "models/RadioModel.h"
 
@@ -299,6 +300,58 @@ private slots:
         QVERIFY2(!knopf->isEnabled(),
                  "„Übernehmen\" ist an, obwohl nichts gemessen wurde — "
                  "genau so sind am 2026-10-14 +36 dB gesetzt worden");
+    }
+
+    // ── Eine Stufe allein hören, und zurück ─────────────────────
+    //
+    // „hier sollten wir morgen jedes einzelne probieren"
+    // (2026-10-14). Geprüft wird die Geste über das Signal, das die
+    // Kettenreihe sendet, und vor allem das Zurück: wer vier Stufen
+    // bewusst aus hatte, darf sie nicht ungefragt zurückbekommen.
+    void eine_stufe_allein_hoeren_und_zurueck()
+    {
+        RadioModel radio;
+        StripWindow w(&radio);
+        StripChain* c = radio.stripChain();
+        QVERIFY(c != nullptr);
+        auto* reihe = w.findChild<StripChainView*>();
+        QVERIFY2(reihe != nullptr, "die Kettenreihe ist nicht zu finden");
+
+        // Ein Ausgangsstand mit Löchern: nicht alles an.
+        const bool stand[StripChain::kStageCount] = {
+            true, false, true, true, false, true, false, true, false, true };
+        for (int i = 0; i < StripChain::kStageCount; ++i) {
+            c->setStageEnabled(static_cast<StripChain::Stage>(i), stand[i]);
+        }
+        auto* haken = w.findChild<QCheckBox*>(QStringLiteral("stripMaster"));
+        QVERIFY(haken != nullptr);
+        haken->setChecked(false);
+
+        const int ziel = int(StripChain::Stage::Comp);
+        emit reihe->stageSoloRequested(ziel);
+
+        for (int i = 0; i < StripChain::kStageCount; ++i) {
+            QVERIFY2(c->stageEnabled(static_cast<StripChain::Stage>(i))
+                         == (i == ziel),
+                     qPrintable(QStringLiteral("Stufe %1 steht falsch, "
+                                               "während eine allein laufen "
+                                               "soll").arg(i)));
+        }
+        QVERIFY2(haken->isChecked(),
+                 "der Hauptschalter blieb aus — dann hört man nichts, und "
+                 "genau solche stillen Nichtwirkungen kosten einen Abend");
+
+        // Und zurück: GENAU der alte Stand, nicht „alles an".
+        emit reihe->stageSoloRequested(ziel);
+        for (int i = 0; i < StripChain::kStageCount; ++i) {
+            QVERIFY2(c->stageEnabled(static_cast<StripChain::Stage>(i))
+                         == stand[i],
+                     qPrintable(QStringLiteral("Stufe %1 kam nicht so "
+                                               "zurück, wie sie war")
+                                    .arg(i)));
+        }
+        QVERIFY2(!haken->isChecked(),
+                 "der Hauptschalter blieb an, obwohl er vorher aus war");
     }
 
     // Die Sicherung darf sich nicht selbst überschreiben: wer sie

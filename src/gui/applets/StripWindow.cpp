@@ -518,6 +518,19 @@ void StripWindow::updateLiveNote()
         "Hold there to freeze the shape you are aiming at."))
         .arg(m_live->latencyMs(), 0, 'f', 0);
 
+    // ── Und dass man eine Stufe allein hoeren kann ──────────────────
+    //
+    // Eine Geste, die niemand findet, gibt es nicht. Sie steht
+    // deshalb dort, wo er beim Vergleichen ohnehin liest.
+    t += QStringLiteral(" ") + (m_soloStufe >= 0
+        ? Sprache::T(QStringLiteral(
+              "Right now you are hearing ONE stage on its own — ⌥-click "
+              "that tile again to put the others back as they were."))
+        : Sprache::T(QStringLiteral(
+              "⌥-click a tile in the row to hear that stage on its own; "
+              "⌥-click it again and everything comes back exactly as it "
+              "was.")));
+
     // ── Welche Geraete, und mit welcher Rate ────────────────────────
     //
     // Der Mithoerer nimmt die SYSTEMVORGABE und hat keine eigene
@@ -1147,6 +1160,57 @@ void StripWindow::buildUi()
         // +1: vorne steht jetzt der Uebersichtsreiter.
         if (m_tabs) { m_tabs->setCurrentIndex(i + 1); }
     });
+    // ── Nur diese Stufe hoeren, und zurueck ──────────────────────
+    //
+    // „hier sollten wir morgen jedes einzelne probieren"
+    // (2026-10-14). Die Wahltaste auf einer Kachel laesst genau diese
+    // Stufe laufen und legt alle anderen schlafen; dieselbe Geste
+    // noch einmal stellt den Stand von vorher wieder her -- und zwar
+    // den GANZEN Stand, nicht „alles an". Wer vier Stufen bewusst aus
+    // hatte, bekommt sie nicht ungefragt zurueck.
+    //
+    // Der Hauptschalter wird dabei EINGESCHALTET, wenn er aus war:
+    // „nur das Gate hoeren" bei abgeschalteter Kette waere ein Griff
+    // ins Leere, und genau solche stillen Nichtwirkungen haben den
+    // 2026-10-14 so lang gemacht.
+    connect(m_chainView, &StripChainView::stageSoloRequested,
+            this, [this](int i) {
+        StripChain* c = chain();
+        if (c == nullptr || i < 0 || i >= StripChain::kStageCount) { return; }
+        const auto stufe = static_cast<StripChain::Stage>(i);
+        if (m_soloStufe == i) {
+            for (int k = 0; k < StripChain::kStageCount; ++k) {
+                c->setStageEnabled(static_cast<StripChain::Stage>(k),
+                                   m_soloVorher[size_t(k)]);
+            }
+            if (m_master && m_soloMasterVorher != m_master->isChecked()) {
+                m_master->setChecked(m_soloMasterVorher);
+            }
+            m_soloStufe = -1;
+        } else {
+            if (m_soloStufe < 0) {
+                for (int k = 0; k < StripChain::kStageCount; ++k) {
+                    m_soloVorher[size_t(k)] = c->stageEnabled(
+                        static_cast<StripChain::Stage>(k));
+                }
+                m_soloMasterVorher = m_master && m_master->isChecked();
+            }
+            for (int k = 0; k < StripChain::kStageCount; ++k) {
+                c->setStageEnabled(static_cast<StripChain::Stage>(k),
+                                   k == i);
+            }
+            if (m_master && !m_master->isChecked()) {
+                m_master->setChecked(true);
+            }
+            m_soloStufe = i;
+            if (m_tabs) { m_tabs->setCurrentIndex(i + 1); }
+        }
+        refreshChainRow();
+        updateLiveNote();
+        persist();
+        Q_UNUSED(stufe);
+    });
+
     connect(m_chainView, &StripChainView::pluginDropped,
             this, &StripWindow::dropPluginAt);
     connect(m_chainView, &StripChainView::insertRemoveRequested,
