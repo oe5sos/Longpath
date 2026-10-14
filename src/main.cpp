@@ -118,8 +118,21 @@ static void messageHandler(QtMsgType type, const QMessageLogContext& ctx, const 
     // so the context carries no caller. When it fires, append a native
     // backtrace so the call site identifies itself in the log; costs
     // nothing on every other message. Remove once the caller is found.
-    if (type == QtWarningMsg
-        && msg.contains(QLatin1String("Cannot add a null widget"))) {
+    // 2026-10-14: dieselbe Not mit einer zweiten Warnung. Im Protokoll
+    // des Betreibers stand 82-mal "QFormLayout::takeAt: Invalid index 0",
+    // in Schueben zu viert, etwa einmal je Minute -- irgendwo wird ein
+    // Formular geleert, das schon leer ist. Aus einem kalten Start auf
+    // main ist sie in 100 s nicht gekommen; sie haengt an einem Zustand
+    // oder einer Bedienung. Also muss sie sich selbst verraten, wenn sie
+    // das naechste Mal auftritt.
+    //
+    // LONGPATH_TRACE_WARNING setzt denselben Haken auf einen beliebigen
+    // Text, ohne dass man dafuer neu bauen muss.
+    static const QString traceNeedle = qEnvironmentVariable("LONGPATH_TRACE_WARNING");
+    const bool wanted = msg.contains(QLatin1String("Cannot add a null widget"))
+                        || msg.contains(QLatin1String("QFormLayout::takeAt"))
+                        || (!traceNeedle.isEmpty() && msg.contains(traceNeedle));
+    if (type == QtWarningMsg && wanted) {
         void* frames[32];
         const int n = backtrace(frames, 32);
         if (char** syms = backtrace_symbols(frames, n)) {
