@@ -584,9 +584,17 @@ void StripLiveMonitor::pump()
     }
     m_inRing->feed(m_mono.data(), int(m_mono.size()));
 
-    // Was hereinkommt, vor der Kette.
-    float peakIn = 0.0f;
-    for (float v : m_mono) { peakIn = std::max(peakIn, std::fabs(v)); }
+    // Was hereinkommt, vor der Kette. Ueber die ganze Sekunde
+    // gehalten, nicht nur ueber diesen Haeppchen: das Protokoll
+    // erschien bisher einmal je Sekunde, zeigte aber die Spitze des
+    // Bloecks, der gerade zufaellig die Sekundengrenze ueberschritt.
+    // Am 2026-10-14 standen deshalb „-50 dBFS" in der einen Zeile
+    // und „Kanal 1: -1,3 dBFS" in der naechsten -- dieselbe Sekunde,
+    // dasselbe Signal, zwei Zahlen, fuenfzig Dezibel auseinander.
+    for (float v : m_mono) {
+        m_sekSpitzeIn = std::max(m_sekSpitzeIn, std::fabs(v));
+    }
+    const float peakIn = m_sekSpitzeIn;
 
     applyStrip(m_mono.data(), int(m_mono.size()));
 
@@ -639,8 +647,10 @@ void StripLiveMonitor::pump()
         }
     }
 
-    float peakOut = 0.0f;
-    for (float v : m_mono) { peakOut = std::max(peakOut, std::fabs(v)); }
+    for (float v : m_mono) {
+        m_sekSpitzeOut = std::max(m_sekSpitzeOut, std::fabs(v));
+    }
+    const float peakOut = m_sekSpitzeOut;
 
     // ── Die Wache WARNT nur noch ────────────────────────────────────
     //
@@ -737,6 +747,8 @@ void StripLiveMonitor::pump()
             }
         }
         std::fill(m_kanalSpitze.begin(), m_kanalSpitze.end(), 0.0f);
+        m_sekSpitzeIn  = 0.0f;
+        m_sekSpitzeOut = 0.0f;
     }
 
     // ── Hinaus ───────────────────────────────────────────────────────

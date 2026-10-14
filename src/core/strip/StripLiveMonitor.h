@@ -384,6 +384,11 @@ private:
     // Ohne diese Zeile ist „der falsche Kanal" von „der Vorverstaerker
     // steht zu leise" nicht zu unterscheiden.
     std::vector<float> m_kanalSpitze;
+
+    // Die Spitze der laufenden Sekunde, ein- und ausgangsseitig.
+    // Siehe die Begruendung an der Messstelle in der .cpp.
+    float m_sekSpitzeIn{0.0f};
+    float m_sekSpitzeOut{0.0f};
     int m_inFormat{0};          // QAudioFormat::SampleFormat
     int m_outChannels{2};
     int m_outFormat{0};
