@@ -2,6 +2,53 @@
 
 ## [Unreleased]
 
+### Der Updater kommt auch ohne api.github.com weiter
+
+Auf dem Mac mini des Betreibers stand 0.6.5, waehrend das MacBook
+laengst weiter war — und „Check for Updates" half dort nicht. Die
+Ursache lag nicht im Programm: `api.github.com` liegt inzwischen in
+Azure (20.250.119.72), und von diesem Rechner aus baut sich die
+TCP-Verbindung dorthin zwar auf, der TLS-Handshake bleibt aber stehen,
+bis die Zeit ablaeuft. `github.com` selbst (140.82.121.3) antwortet
+einwandfrei. Am MacBook war derselbe Fehler vorher mit zwei festen
+Zeilen in `/etc/hosts` ueberdeckt worden.
+
+Betreiber dazu: **„macht der enduser auch nicht alles."** Eine Abhilfe,
+die in `/etc/hosts` steht, ist keine. Also kann der Updater es jetzt
+selbst: scheitert die API — stumm, ohne DNS, mit Ratelimit oder mit
+einer Antwort, die kein Release ist — wird die Veroeffentlichung von der
+Webseite abgeleitet. `github.com/.../releases/latest` leitet auf
+`/releases/tag/<tag>` weiter; das Tag genuegt, denn jede Datei liegt
+unter `/releases/download/<tag>/<name>` und die Namen schreibt
+`release.yml` nach fester Regel. Ein HEAD auf das Paket dieser Maschine
+beantwortet in einem Zug, ob es existiert und wie gross es ist — statt
+es zu behaupten. Fehlt es (Windows seit 0.6.7), sagt der Dialog das
+weiter wie bisher und bietet die Seite an.
+
+Was dabei fehlt, wird benannt statt verschwiegen: die Notizen stehen nur
+in der API, also steht an ihrer Stelle, warum sie fehlen, und die
+Statuszeile sagt „read from github.com — api.github.com did not answer".
+Der Hinweis haengt an der Veroeffentlichung, nicht am Abfrager: die
+stille Startpruefung benutzt einen eigenen `UpdateChecker` und reicht
+nur das Objekt weiter — haengte er am Abfrager, waere er auf genau
+diesem Weg verlorengegangen (beim Bauen gesehen und behoben).
+
+Dazu zwei Kleinigkeiten, die dieselbe Suche gekostet haben:
+
+* Die stille Startpruefung meldet ihr Scheitern jetzt ins Protokoll.
+  Vorher hing an `checkFailed` nur `deleteLater` — auf dem Mac mini lief
+  sie bei jedem Start in den haengenden Handshake, und es war nichts
+  davon zu sehen. Der Bediener bekommt weiterhin keinen Dialog.
+* Die Paketgroesse wird nur gezeigt, wenn sie bekannt ist, statt als
+  „0.0 MB" dazustehen.
+
+`LONGPATH_UPDATE_API_URL` zeigt die API fuer Pruefstaende auf eine
+andere Adresse (etwa einen geschlossenen Port) — nur so laesst sich der
+zweite Weg belegen statt behaupten. Der Prueflauf dazu ist mit
+`LONGPATH_NET_TESTS=1` scharf; die Gegenprobe mit abgeschaltetem
+Rueckfall faellt, wie sie soll.
+
+
 ## [0.6.8] - 2026-10-08
 
 Zwei Commits seit 0.6.7, einen Tag. Thema: **die Oberflaeche, nicht die

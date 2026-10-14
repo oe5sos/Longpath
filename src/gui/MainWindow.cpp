@@ -15047,7 +15047,16 @@ void MainWindow::scheduleStartupUpdateCheck()
             m_updateDialog->show();
             m_updateDialog->raise();
         });
-        connect(checker, &UpdateChecker::checkFailed, checker, &QObject::deleteLater);
+        // Stillschweigen heisst nicht: unsichtbar. Am 2026-10-14 stand auf
+        // dem Mac mini des Betreibers 0.6.5, waehrend die Pruefung bei
+        // jedem Start in einen haengenden TLS-Handshake lief -- und das
+        // Protokoll sagte darueber nichts, weil hier nur deleteLater
+        // hing. Der Bediener bekommt weiter keinen Dialog zu sehen.
+        connect(checker, &UpdateChecker::checkFailed, this,
+                [checker](const QString& why) {
+            qWarning() << "Startup update check failed:" << why;
+            checker->deleteLater();
+        });
         checker->checkLatest();
     });
 }
