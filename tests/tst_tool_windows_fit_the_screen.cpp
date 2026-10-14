@@ -24,6 +24,7 @@
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
 // =================================================================
 #include <QtTest>
+#include <QFile>
 #include <QGuiApplication>
 #include <QAction>
 #include <QScrollArea>
@@ -37,6 +38,7 @@
 #include "gui/WindowPlacement.h"
 #include "gui/applets/BroadcastOptimizerPanel.h"
 #include "core/Sprache.h"
+#include "core/strip/AetherPreset.h"
 #include "core/strip/StripChain.h"
 #include "gui/applets/StripWindow.h"
 #include "models/RadioModel.h"
@@ -175,6 +177,18 @@ private slots:
 
         RadioModel radio;
         StripWindow w(&radio);
+
+        // Mit Martins Kette im Bild, nicht mit den Vorgaben: die Reihe
+        // oben soll zeigen, dass die Röhre vorne steht.
+        if (StripChain* c = radio.stripChain()) {
+            const QString profil = QString::fromLatin1(LONGPATH_TEST_DATA_DIR)
+                                   + QStringLiteral("/aether-ssb-30-07-2026.json");
+            if (QFile::exists(profil)) {
+                AetherPreset::applyFile(profil, *c);
+                c->setEnabled(true);
+            }
+        }
+
         for (const int breite : { 1180, 980, 880 }) {
             w.resize(breite, 900);
             w.grab().save(QString::fromUtf8(dir)

@@ -188,11 +188,27 @@ void StripChainView::relayout()
         }
     };
 
+    // ── Die Reihe zeigt die KETTE, nicht die Aufzählung ─────────────
+    //
+    // Seit dem 2026-10-13 ist die Reihenfolge der Stufen einstellbar,
+    // und Martins Aether-Profil stellt die Röhre nach vorn. Die Reihe
+    // zeichnete trotzdem weiter die Reihenfolge des Aufzählungstyps —
+    // „sehe das noch nicht" (2026-10-14), und zwar zu Recht: sie zeigte
+    // eine Kette, die so nicht läuft.
+    //
+    // `index` bleibt die STUFE (Name, Farbe, Absenkung, Klickziel),
+    // `position` bleibt die STELLE in der Reihe (dort hängen die
+    // Einschübe). Beide waren bisher dieselbe Zahl; das war der
+    // Kurzschluss.
+    const StripChain::Order folge =
+        m_chain != nullptr ? m_chain->stageOrder()
+                           : StripChain::defaultOrder();
+
     for (int i = 0; i < StripChain::kStageCount; ++i) {
         addGapOrInserts(i);
         Cell c;
         c.kind = Cell::Kind::Stage;
-        c.index = i;
+        c.index = static_cast<int>(folge[static_cast<size_t>(i)]);
         c.position = i;
         c.rect = QRect(x, 4, kTileW, kTileH);
         m_cells.push_back(c);

@@ -5114,6 +5114,8 @@ longpath_add_test(tst_real_menus_hang_on_the_window)
 # -- Formatfuellend + Werkzeugfenster passen auf den Schirm (2026-09-27):
 #    Kanalzug 980x1000 auf 849 px Hoehe, unten hinter dem Dock. --
 longpath_add_test(tst_tool_windows_fit_the_screen)
+target_compile_definitions(tst_tool_windows_fit_the_screen PRIVATE
+    LONGPATH_TEST_DATA_DIR="${CMAKE_SOURCE_DIR}/tests/data")
 
 # -- ScopedChildWidget (2026-09-22): ein Kontextmenue auf dem Haufen statt
 #    auf dem Stapel -- normales Aufraeumen, und Aufraeumen nachdem das
