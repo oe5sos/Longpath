@@ -5735,6 +5735,11 @@ longpath_add_test(tst_sunsdr_ein_steller)
 # Suchversuche lang unbeantwortet blieb.
 longpath_add_test(tst_sunsdr_netzlage)
 
+# tst_sunsdr_uebersteuerung: schlaegt die Uebersteuerungserkennung
+# ueberhaupt an? Am Geraet war nur belegt, dass sie nicht falsch
+# alarmiert -- ein Signal am Anschlag kann man nicht bestellen.
+longpath_add_test(tst_sunsdr_uebersteuerung)
+
 # -- Die QRP muss mit IHRER Abtastrate gefahren werden, nicht mit Atlas'
 #    (2026-09-23: sie steht in keiner HPSDRModel-Liste, darum fiel die
 #    Aufloesung still auf Atlas und mit ihr auf 192 kHz). --
