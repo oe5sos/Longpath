@@ -5267,6 +5267,12 @@ longpath_add_test(tst_color_picker_not_native)
 # 2026-09-21: Help > Check for Updates... -- Release-JSON, Version, Paket,
 # SHA256SUMS, Startpruefung, Zielpfad, Neustart-Helfer, DMG-Einspielen (macOS).
 longpath_add_test(tst_update_checker)
+# 2026-10-14: "englisch durchgehend, aber deutsch als option" -- die
+# Kette .ts -> .qm -> :/i18n/ -> QTranslator. LONGPATH_QM_FILE zeigt auf
+# die Datei, die qt_add_translations gerade gebaut hat.
+longpath_add_test(tst_sprache_umschaltbar)
+target_compile_definitions(tst_sprache_umschaltbar PRIVATE
+    LONGPATH_QM_FILE="${CMAKE_BINARY_DIR}/longpath_de.qm")
 # 2026-09-21: Schluesselbund-Dienstname "Longpath: <key>" mit Umzug vom
 # alten Namen -- live nur mit LONGPATH_KEYCHAIN_LIVE=1 (echter Schluesselbund).
 longpath_add_test(tst_credential_store_migration)
