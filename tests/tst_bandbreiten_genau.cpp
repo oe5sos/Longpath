@@ -2988,6 +2988,112 @@ private slots:
             "Dichte: Lautheit bei gleicher Spitze.)");
     }
 
+    // ── „alle profile sehr laut mit starkem brummen" (2026-10-14) ───
+    //
+    // Brummen kann die Kette nicht erfinden — aber sie kann es
+    // ANHEBEN, und sein Profil tut dazu zweierlei an derselben Stelle:
+    //
+    //   Hochpass 62,7 Hz mit Güte 2,531. Eine Güte über 0,707 ist bei
+    //     einem Hochpass kein Schnitt mehr, sondern eine Spitze AUF
+    //     der Ecke.
+    //   dazu eine Glocke bei 68,95 Hz mit +5,71 dB.
+    //
+    // Beides sitzt genau dort, wo die zweite Harmonische des Netzes
+    // liegt (100 Hz) und wo 50 Hz noch nicht weit weg ist. Auf einem
+    // Kopfhörer am ruhigen Rechner ist das Wärme; mit Netzbrummen auf
+    // der Leitung ist es ein Verstärker dafür.
+    //
+    // Gemessen mit echter Sprache PLUS 50 Hz Brumm bei -40 dBFS.
+    void howMuchHisProfileLiftsMainsHum()
+    {
+        QString warum;
+        const auto sauber = echteRede(&warum);
+        if (sauber.empty()) { QSKIP(qPrintable(warum)); }
+        const QString profil = QString::fromLatin1(LONGPATH_TEST_DATA_DIR)
+                               + QStringLiteral("/aether-ssb-30-07-2026.json");
+        if (!QFile::exists(profil)) { QSKIP("Martins Profil fehlt"); }
+
+        // Sprache auf -12 dBFS Spitze, Brumm 28 dB darunter: 50 Hz und
+        // die 100-Hz-Oberwelle, wie ein Netzteil sie macht.
+        std::vector<float> x = sauber;
+        double spitze = 0.0;
+        for (float v : x) { spitze = std::max(spitze, double(std::fabs(v))); }
+        const double g = std::pow(10.0, -12.0 / 20.0) / std::max(spitze, 1e-9);
+        for (float& v : x) { v = float(v * g); }
+        const double brumm = std::pow(10.0, -40.0 / 20.0);
+        for (size_t i = 0; i < x.size(); ++i) {
+            const double t = double(i) / kRate;
+            x[i] += float(brumm * (std::sin(2.0 * M_PI * 50.0 * t)
+                                   + 0.5 * std::sin(2.0 * M_PI * 100.0 * t)));
+        }
+
+        const auto durch = [&](bool zahm) {
+            StripChain c;
+            c.prepare(kRate);
+            const auto e = AetherPreset::applyFile(profil, c);
+            if (!e.ok) { return std::vector<float>{}; }
+            c.setEnabled(true);
+            if (zahm) {
+                for (int i = 0; i < c.eq().activeBandCount(); ++i) {
+                    ClientEq::BandParams b = c.eq().band(i);
+                    if (b.type == ClientEq::FilterType::HighPass && b.enabled) {
+                        b.q = 0.707f;          // keine Spitze auf der Ecke
+                        b.freqHz = 100.0f;     // über die 50 und die 100
+                        c.eq().setBand(i, b);
+                    } else if (b.type == ClientEq::FilterType::Peak && b.enabled
+                               && b.freqHz < 150.0f && b.gainDb > 0.5f) {
+                        b.gainDb = 0.0f;       // die Anhebung im Brummband
+                        c.eq().setBand(i, b);
+                    }
+                }
+            }
+            std::vector<float> y = x;
+            constexpr int kBlock = 64;
+            for (size_t at = 0; at + kBlock <= y.size(); at += kBlock) {
+                c.processMono(y.data() + at, kBlock);
+            }
+            return y;
+        };
+
+        const auto wie = durch(false);
+        const auto zahm = durch(true);
+        QVERIFY(!wie.empty() && !zahm.empty());
+
+        const auto pEin  = spektrum(x);
+        const auto pWie  = spektrum(wie);
+        const auto pZahm = spektrum(zahm);
+
+        struct B { const char* name; double von; double bis; };
+        static const B kB[] = {
+            { "50 Hz",  47,  53 }, { "100 Hz",  95, 105 },
+            { "69 Hz",  65,  73 }, { "200 Hz", 190, 210 },
+            { "1 kHz", 950, 1050 },
+        };
+        qInfo().noquote() << QStringLiteral(
+            "   Band      Eingang   sein Profil   gezähmt   "
+            "(Profil minus Eingang)");
+        for (const B& b : kB) {
+            const double e = bandDb(pEin,  b.von, b.bis);
+            const double w = bandDb(pWie,  b.von, b.bis);
+            const double z = bandDb(pZahm, b.von, b.bis);
+            qInfo().noquote()
+                << QStringLiteral("  %1  %2  %3  %4   %5 dB")
+                       .arg(QString::fromUtf8(b.name), -8)
+                       .arg(e, 8, 'f', 1).arg(w, 12, 'f', 1)
+                       .arg(z, 9, 'f', 1).arg(w - e, 7, 'f', 1);
+        }
+
+        const auto spitzeDb = [](const std::vector<float>& v) {
+            double p = 0.0;
+            for (float s : v) { p = std::max(p, double(std::fabs(s))); }
+            return 20.0 * std::log10(std::max(p, 1e-9));
+        };
+        qInfo().noquote() << QStringLiteral(
+            "   Spitze: Eingang %1 dBFS · sein Profil %2 · gezähmt %3")
+            .arg(spitzeDb(x), 0, 'f', 1).arg(spitzeDb(wie), 0, 'f', 1)
+            .arg(spitzeDb(zahm), 0, 'f', 1);
+    }
+
     void theGroupDelayOfEachChannel()
     {
         const auto laufzeitMs = [](int ch, double hz) {

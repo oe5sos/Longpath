@@ -414,7 +414,7 @@ void StripWindow::toggleLiveMonitor(bool on)
         m_live->setLatencyPreset(static_cast<StripLiveMonitor::Latency>(
             AppSettings::instance()
                 .value(QStringLiteral("StripMonitorLatency"), 0).toInt()));
-        m_live->setVolume(m_liveVol ? m_liveVol->value() / 100.0 : 0.7);
+        m_live->setVolume(m_liveVol ? m_liveVol->value() / 100.0 : 0.5);
         m_live->setMonitorChannel(
             m_liveChannel ? m_liveChannel->currentData().toInt() : -1);
         // ── Und die Geraete, VOR dem Start ───────────────────────
@@ -828,12 +828,28 @@ void StripWindow::buildUi()
         // Kette habe zu wenig Kraft, hatte recht und meinte diesen
         // Regler.
         m_liveVol->setRange(0, 200);
-        m_liveVol->setValue(100);
+        // ── Die Lautstärke wird gemerkt, und sie startet leise ──────
+        //
+        // „musste sofort den kopfhörer abnehmen" (2026-10-14). Der
+        // Regler stand bei JEDEM Öffnen auf 100 — voller Pegel, und
+        // die Kette drückt ihre Spitzen bis an die Decke des
+        // Begrenzers. Mit Kopfhörern ist das kein Fehler, sondern eine
+        // Gefahr.
+        //
+        // Jetzt: gemerkt wie jede andere Einstellung, und ohne
+        // gespeicherten Wert auf 50 — hörbar, aber mit Abstand nach
+        // oben. Lauter machen kann man in einer Sekunde; was in den
+        // Ohren war, bekommt man nicht zurück.
+        m_liveVol->setValue(AppSettings::instance()
+                                .value(QStringLiteral("StripMonitorVolume"), 50)
+                                .toInt());
         m_liveVol->setFixedWidth(110);
         m_liveVol->setToolTip(QStringLiteral(
             "Monitor level. Above the middle it amplifies — up to "
             "+6 dB. It changes what you hear, never what is sent."));
         connect(m_liveVol, &QSlider::valueChanged, this, [this](int v) {
+            AppSettings::instance().setValue(
+                QStringLiteral("StripMonitorVolume"), v);
             if (m_live) { m_live->setVolume(v / 100.0); }
         });
         mithoer->addWidget(m_liveVol);

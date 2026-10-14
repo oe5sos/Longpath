@@ -386,6 +386,63 @@ private slots:
         qInfo("abgelegt als: %s", qPrintable(name));
     }
 
+    // ── Werkzeug: die ruhige Fassung ────────────────────────────────
+    //
+    // „alle profile sehr laut mit starken brummen" (2026-10-14).
+    //
+    // Die Kette kann Brummen nicht erfinden, aber sein Profil hebt es
+    // an — zweimal an derselben Stelle: Hochpass 62,7 Hz mit Güte
+    // 2,531 (eine Güte über 0,707 ist bei einem Hochpass kein Schnitt,
+    // sondern eine Spitze AUF der Ecke) und dazu eine Glocke bei
+    // 68,95 Hz mit +5,71 dB. Gemessen
+    // (tst_bandbreiten_genau::howMuchHisProfileLiftsMainsHum):
+    //
+    //     50 Hz   +23,3 dB      1 kHz   +7,4 dB
+    //
+    // Also sechzehn Dezibel Brumm MEHR als Stimme. Diese Fassung
+    // setzt den Hochpass auf 100 Hz mit Güte 0,707 und die Anhebung
+    // auf null; alles andere bleibt seins.
+    void legt_die_ruhige_fassung_ab()
+    {
+        if (qgetenv("LONGPATH_AETHER_APPLY") != QByteArray("1")) {
+            QSKIP("LONGPATH_AETHER_APPLY nicht gesetzt");
+        }
+        const QString pfad = qEnvironmentVariable("LONGPATH_AETHER_FILE",
+                                                  profilPfad());
+        StripChain c;
+        c.prepare(kRate);
+        const auto e = AetherPreset::applyFile(pfad, c);
+        QVERIFY2(e.ok, qPrintable(e.fehler));
+
+        int geaendert = 0;
+        for (int i = 0; i < c.eq().activeBandCount(); ++i) {
+            ClientEq::BandParams b = c.eq().band(i);
+            if (b.type == ClientEq::FilterType::HighPass && b.enabled) {
+                qInfo("Hochpass Band %d: %.1f Hz Güte %.3f -> 100 Hz Güte "
+                      "0,707", i, double(b.freqHz), double(b.q));
+                b.freqHz = 100.0f;
+                b.q = 0.707f;
+                c.eq().setBand(i, b);
+                ++geaendert;
+            } else if (b.type == ClientEq::FilterType::Peak && b.enabled
+                       && b.freqHz < 150.0f && b.gainDb > 0.5f) {
+                qInfo("Glocke Band %d: %.1f Hz %+.2f dB -> 0 dB",
+                      i, double(b.freqHz), double(b.gainDb));
+                b.gainDb = 0.0f;
+                c.eq().setBand(i, b);
+                ++geaendert;
+            }
+        }
+        QVERIFY2(geaendert >= 1, "nichts im Brummband gefunden");
+
+        const QString name = (e.name.isEmpty() ? QStringLiteral("Aether")
+                                               : e.name)
+                             + QStringLiteral(" — ruhig");
+        QVERIFY(StripSettings::saveUserPreset(name, c));
+        AppSettings::instance().save();
+        qInfo("abgelegt als: %s", qPrintable(name));
+    }
+
     // ── Was eine fremde Datei alles anrichten könnte ────────────────
     //
     // Ein Profil kommt aus einem anderen Programm, womöglich aus einer
