@@ -58,6 +58,18 @@ const QHash<QString, QString>& tabelle()
                          "zurücknehmen") },
         { QStringLiteral("Input: %1 dBFS  ·  strip off, chain not measured"),
           QStringLiteral("Eingang: %1 dBFS  ·  Kette aus, nicht gemessen") },
+        { QStringLiteral("<span style='color:#c2924f'>○</span> the threshold "
+                         "on the curve — a ring, not the ball<br>"),
+          QStringLiteral("<span style='color:#c2924f'>○</span> die Schwelle "
+                         "auf der Kennlinie — ein Ring, nicht der Ball<br>") },
+        { QStringLiteral("<span style='color:#4a7ba8'>▬</span> the sticky "
+                         "zone — inside it the gate keeps whatever it was "
+                         "doing, so the ball sits on the dashed open branch "
+                         "or on the curve, never between them<br>"),
+          QStringLiteral("<span style='color:#4a7ba8'>▬</span> die Haltezone "
+                         "— darin behält das Gate, was es gerade tat; der "
+                         "Ball liegt deshalb auf dem gestrichelten offenen "
+                         "Ast oder auf der Kennlinie, nie dazwischen<br>") },
         { QStringLiteral("same loudness"),
           QStringLiteral("gleich laut") },
         { QStringLiteral("Holds the strip down to the loudness of the raw "

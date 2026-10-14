@@ -1084,15 +1084,23 @@ QString StripDynamicsCurve::legend() const
     if (m_stage == Stage::Gate) {
         band = Sprache::T(QStringLiteral(
             "<span style='color:#4a7ba8'>▬</span> the sticky zone — inside "
-            "it the gate keeps its current state<br>"));
+            "it the gate keeps whatever it was doing, so the ball sits "
+            "on the dashed open branch or on the curve, never between "
+            "them<br>"));
+    }
+    QString ring;
+    if (m_stage == Stage::Gate) {
+        ring = Sprache::T(QStringLiteral(
+            "<span style='color:#c2924f'>○</span> the threshold on the "
+            "curve — a ring, not the ball<br>"));
     }
     return Sprache::T(QStringLiteral(
         "<span style='color:#c4c4c9'>●</span> your signal: across is what "
         "goes in, up is what comes out<br>"
         "<span style='color:#2c2c31'>╱</span> dashed: where nothing "
-        "happens<br>%1"
+        "happens<br>%1%2"
         "<span style='color:#c2924f'>┊</span> the threshold you set"))
-        .arg(band);
+        .arg(ring, band);
 }
 
 double StripDynamicsCurve::xFor(double db, const QRect& r) const
@@ -1239,12 +1247,51 @@ void StripDynamicsCurve::paintEvent(QPaintEvent*)
     p.setPen(curvePen);
     p.drawPath(path);
 
-    // A dot where the threshold meets the curve, so the eye finds the
-    // knee without tracing the dashed line down to the axis.
+    // ── Der zweite Ast: das Gate hat ZWEI Kennlinien ────────────────
+    //
+    // „ich gehe davon aus, dass der punkt genau in dem strahl sein
+    // soll ... also komplett daneben" (2026-10-14). Er hatte recht
+    // hinzusehen, und das Bild war schuld, nicht seine Einstellung.
+    //
+    // Ein Gate mit Hysterese hat in der Haltezone keinen Wert,
+    // sondern zwei: offen geblieben heisst „Draht", geschlossen
+    // geblieben heisst „Kennlinie". Gezeichnet war nur der zweite.
+    // Seine Stimme lag bei -57 dBFS noch offen auf dem Draht,
+    // waehrend die Kurve dort schon siebzehn Dezibel tiefer lief --
+    // der Ball stand also richtig und trotzdem neben der Linie.
+    //
+    // Also wird der offene Ast mitgezeichnet, gestrichelt, nur
+    // innerhalb der Haltezone. Dann ist zu sehen, was wirklich gilt:
+    // dort entscheidet nicht der Pegel, sondern die Vorgeschichte.
+    if (m_stage == Stage::Gate) {
+        const double ret = double(m_chain->gate().returnDb());
+        if (ret > 0.05) {
+            const double xR = xFor(thr, r);
+            const double xL = xFor(thr - ret, r);
+            if (xR > xL) {
+                QPen offen(curveCol, 1.6, Qt::DashLine);
+                offen.setDashPattern({ 4.0, 3.0 });
+                p.setPen(offen);
+                p.setBrush(Qt::NoBrush);
+                p.drawLine(QPointF(xL, yFor(thr - ret, r)),
+                           QPointF(xR, yFor(thr, r)));
+            }
+        }
+    }
+
+    // Eine RINGMARKE, wo die Schwelle auf die Kennlinie trifft.
+    //
+    // Hier stand ein gefuellter Punkt in derselben Farbe und
+    // derselben Groesse wie der Signalball -- und die Legende kennt
+    // nur einen Punkt („dein Signal"). Zwei gleich aussehende Punkte
+    // mit einer Beschriftung: der Betreiber hat die Schwellenmarke
+    // fuer sein Signal gehalten und sich gewundert, warum sie sich
+    // nicht bewegt. Ein Ring ist auf einen Blick etwas anderes als
+    // eine leuchtende Kugel.
     {
-        p.setPen(Qt::NoPen);
-        p.setBrush(curveCol);
-        p.drawEllipse(QPointF(xFor(thr, r), yFor(outputDb(thr), r)), 3.0, 3.0);
+        p.setPen(QPen(curveCol, 1.6));
+        p.setBrush(Qt::NoBrush);
+        p.drawEllipse(QPointF(xFor(thr, r), yFor(outputDb(thr), r)), 3.6, 3.6);
     }
 
     // ── Where the signal is, right now ───────────────────────────────
