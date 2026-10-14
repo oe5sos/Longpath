@@ -1996,7 +1996,6 @@ private:
     // entfernten Flaeche haengen bleiben (Qt trennt dann automatisch,
     // die Leiste folgt danach ueberhaupt keiner Flaeche mehr). Wird jetzt
     // bei jedem PanadapterStack::activePanChanged neu gezogen.
-    QMetaObject::Connection m_zoomBarSyncConn;
 
     AppletVisibilityController* m_appletVis{nullptr};
     QHash<QString, AppletWidget*> m_appletsById;
