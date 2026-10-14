@@ -87,6 +87,11 @@ public:
     // selbst hinschreibt, prüft seine eigene Schreibweise.
     static QString kLetzterStand();
 
+    /// Der Schluessel, unter dem der Hauptschalter JE SOUNDKARTE
+    /// liegt -- am Apollo gehoert keine Kette dazu, am Headset an der
+    /// Klinke schon. Leer, wenn die Kennung leer ist.
+    static QString kettenSchluessel(const QByteArray& geraeteId);
+
     explicit StripWindow(RadioModel* radio, QWidget* parent = nullptr);
     ~StripWindow() override;
 
@@ -241,6 +246,11 @@ private:
     void toggleLiveMonitor(bool on);
     void useChainForDisplay(StripChain* c);
     StripChain* displayChain() const;
+
+
+    /// Den gespeicherten Stand dieses Geraets auf den Hauptschalter
+    /// legen. Ist nichts gespeichert, bleibt alles, wie es ist.
+    void wendeKettenStandAn(const QByteArray& geraeteId);
     StripChain* m_displayChain{nullptr};   // nicht besessen
     void updateLiveNote();
 

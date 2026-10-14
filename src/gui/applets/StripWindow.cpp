@@ -568,6 +568,42 @@ StripChain* StripWindow::chain() const
 // Geschrieben wird immer in chain(). Die beiden Namen stehen bewusst
 // nebeneinander: wer hier versehentlich den falschen nimmt, soll es
 // beim Lesen sehen.
+// ── Die Kette gehoert zum Mikrofon ───────────────────────────────
+//
+// Siehe die Begruendung am Geraetewechsel. Der Schluessel haengt an
+// der Kennung der Soundkarte; alles, was kein Buchstabe und keine
+// Ziffer ist, wird zu einem Strich, damit daraus ein gueltiger
+// XML-Name wird.
+QString StripWindow::kettenSchluessel(const QByteArray& geraeteId)
+{
+    // Der erste Eintrag der Liste heisst „Systemvorgabe" und traegt
+    // keine Kennung -- er ist trotzdem eine Wahl des Betreibers und
+    // bekommt deshalb seinen eigenen Platz. Ohne das merkt sich der
+    // Schalter ausgerechnet fuer den Eintrag nichts, der ab Werk
+    // ausgewaehlt ist.
+    if (geraeteId.isEmpty()) {
+        return QStringLiteral("StripMasterFor/Systemvorgabe");
+    }
+    QString sauber;
+    sauber.reserve(geraeteId.size());
+    for (char c : geraeteId) {
+        const QChar q = QLatin1Char(c);
+        sauber += (q.isLetterOrNumber() ? q : QLatin1Char('_'));
+    }
+    return QStringLiteral("StripMasterFor/") + sauber;
+}
+
+void StripWindow::wendeKettenStandAn(const QByteArray& geraeteId)
+{
+    const QString k = kettenSchluessel(geraeteId);
+    if (k.isEmpty() || m_master == nullptr) { return; }
+    const QString gespeichert =
+        AppSettings::instance().value(k, QString()).toString();
+    if (gespeichert.isEmpty()) { return; }   // nichts bekannt, nichts aendern
+    const bool soll = (gespeichert == QLatin1String("True"));
+    if (m_master->isChecked() != soll) { m_master->setChecked(soll); }
+}
+
 StripChain* StripWindow::displayChain() const
 {
     return m_displayChain != nullptr ? m_displayChain : chain();
@@ -583,6 +619,7 @@ void StripWindow::buildUi()
     {
         auto* row = new QHBoxLayout;
         m_master = new QCheckBox(QStringLiteral("Channel strip"), this);
+        m_master->setObjectName(QStringLiteral("stripMaster"));
         m_master->setChecked(chain() && chain()->isEnabled());
         row->addWidget(m_master);
 
@@ -805,6 +842,10 @@ void StripWindow::buildUi()
                 m_live->setInputDeviceId(inId);
                 m_live->setOutputDeviceId(outId);
             }
+            // Und der Hauptschalter so, wie er zu DIESEM Mikrofon
+            // gehoert -- siehe wendeKettenStandAn(). Ohne diese Zeile
+            // gilt die Zuordnung erst ab dem ersten Wechsel von Hand.
+            wendeKettenStandAn(inId);
         }
 
         // Ein Geraetewechsel im Lauf: anhalten, umstellen, anlaufen.
@@ -817,6 +858,21 @@ void StripWindow::buildUi()
                 QStringLiteral("StripMonitorInput"), QString::fromLatin1(inId));
             AppSettings::instance().setValue(
                 QStringLiteral("StripMonitorOutput"), QString::fromLatin1(outId));
+            // ── Die Kette gehoert zum Mikrofon ───────────────────
+            //
+            // „wenn ich mit longpath arbeite, dann soll keine kette
+            // erfolgen. wenn externes mikrofon, sprich teufel, dann
+            // kette" (2026-10-14). Am Apollo steht die Bearbeitung
+            // schon in der Console -- eine zweite Kette danach macht
+            // sie zweimal. Am Headset an der Klinke ist Longpath die
+            // einzige, die es gibt.
+            //
+            // Also merkt sich der Hauptschalter seinen Stand JE
+            // GERAET und stellt sich beim Wechsel selbst. Ein Geraet,
+            // zu dem noch nichts gespeichert ist, aendert nichts --
+            // die alte Zusicherung „laedt jedes Mal aus" gilt dort
+            // weiter.
+            wendeKettenStandAn(inId);
             if (!m_live) { return; }
             const bool lief = m_live->isRunning();
             if (lief) { m_live->stop(); }
@@ -1178,6 +1234,16 @@ void StripWindow::buildUi()
         // dann glaubt man dem Schalter nicht mehr.
         updateLiveNote();
         refreshChainRow();
+        // Und merken, zu welchem Mikrofon dieser Stand gehoert --
+        // siehe wendeKettenStandAn().
+        if (m_liveIn) {
+            const QString k = kettenSchluessel(
+                m_liveIn->currentData().toByteArray());
+            if (!k.isEmpty()) {
+                AppSettings::instance().setValue(
+                    k, on ? QStringLiteral("True") : QStringLiteral("False"));
+            }
+        }
         persist();
     });
 

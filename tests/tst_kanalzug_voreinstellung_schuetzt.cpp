@@ -30,10 +30,12 @@
 
 #include <QtTest/QtTest>
 
+#include <QCheckBox>
 #include <QComboBox>
 #include <QLabel>
 #include <QPushButton>
 
+#include "core/AppSettings.h"
 #include "core/Sprache.h"
 #include "core/strip/StripChain.h"
 #include "core/strip/StripSettings.h"
@@ -161,6 +163,60 @@ private slots:
                  "das Löschen der einen hat die andere mitgenommen");
 
         StripSettings::removeUserPreset(QStringLiteral("Bleibt"));
+    }
+
+    // ── Die Kette gehoert zum Mikrofon ──────────────────────────
+    //
+    // „wenn ich mit longpath arbeite, dann soll keine kette erfolgen.
+    // wenn externes mikrofon, sprich teufel, dann kette"
+    // (2026-10-14). Am Apollo steht die Bearbeitung schon in der
+    // Console; eine zweite Kette danach macht sie zweimal.
+    //
+    // Geprüft wird über die BEDIENUNG: Gerät wählen, Haken setzen,
+    // anderes Gerät wählen, zurückwechseln.
+    void der_hauptschalter_gehoert_zum_mikrofon()
+    {
+        RadioModel radio;
+        StripWindow w(&radio);
+        auto* ein = w.findChild<QComboBox*>(QStringLiteral("stripLiveIn"));
+        QVERIFY2(ein != nullptr, "das Eingangsfeld hat keinen Namen");
+        auto* haken = w.findChild<QCheckBox*>(QStringLiteral("stripMaster"));
+        QVERIFY2(haken != nullptr, "der Hauptschalter hat keinen Namen");
+        if (ein->count() < 2) {
+            QSKIP("diese Maschine hat nur eine Aufnahmequelle");
+        }
+
+        // Gerät A: Kette an.
+        ein->setCurrentIndex(0);
+        emit ein->activated(0);
+        haken->setChecked(true);
+        QVERIFY(radio.stripChain()->isEnabled());
+
+        // Gerät B: Kette aus.
+        ein->setCurrentIndex(1);
+        emit ein->activated(1);
+        haken->setChecked(false);
+        QVERIFY(!radio.stripChain()->isEnabled());
+
+        // Zurück auf A -- die Kette muss von selbst wiederkommen.
+        ein->setCurrentIndex(0);
+        emit ein->activated(0);
+        QVERIFY2(haken->isChecked(),
+                 "der Hauptschalter ist beim Zurückwechseln aus geblieben");
+        QVERIFY2(radio.stripChain()->isEnabled(),
+                 "die Kette läuft nicht, obwohl der Haken sitzt");
+
+        // Und wieder B -- aus, ohne dass jemand etwas anfasst.
+        ein->setCurrentIndex(1);
+        emit ein->activated(1);
+        QVERIFY2(!haken->isChecked(),
+                 "der Hauptschalter ist beim Wechsel an geblieben");
+
+        // Aufräumen: beide Schlüssel wieder weg.
+        for (int i = 0; i < 2; ++i) {
+            AppSettings::instance().remove(StripWindow::kettenSchluessel(
+                ein->itemData(i).toByteArray()));
+        }
     }
 
     // Die Sicherung darf sich nicht selbst überschreiben: wer sie
