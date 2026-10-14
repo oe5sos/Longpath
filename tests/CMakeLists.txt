@@ -5096,6 +5096,11 @@ longpath_add_test(tst_applet_window_size)
 longpath_add_test(tst_real_mainwindow_detach)
 longpath_add_test(tst_real_pan_float)
 longpath_add_test(tst_real_rotor_window)
+
+# tst_rotor_panel_abbau: der Abbau des Rotor-Feldes bei stehender
+# Verbindung. Sechs Abstuerze beim Beenden (2026-10-10/11), seit der
+# Rotor wieder im Netz haengt; die fuenfte Stelle derselben Fehlerform.
+longpath_add_test(tst_rotor_panel_abbau)
 longpath_add_test(tst_real_status_bar_chain_indicators)
 longpath_add_test(tst_app_settings_autosave)
 longpath_add_test(tst_whisper_server_launcher)
