@@ -108,6 +108,9 @@ public:
 signals:
     void monitorRecordClicked();
     void monitorPlayClicked();
+    // „ein speichern sollte auch möglich sein, sodass ich die aufnahme
+    //  am desktop speichern kann." (2026-10-14)
+    void monitorSaveClicked();
 
 private:
     void buildUi();
@@ -371,6 +374,7 @@ private:
     // PUDU monitor buttons — state painted by the three setters above.
     QPushButton*    m_monRecordBtn{nullptr};
     QPushButton*    m_monPlayBtn{nullptr};
+    QPushButton*    m_monSaveBtn{nullptr};
     bool            m_monHasRecording{false};
     // Measure, then shape. See the note at the button's construction
     // for why a take with a start and a stop replaced the rolling

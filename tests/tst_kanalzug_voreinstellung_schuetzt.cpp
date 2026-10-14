@@ -31,6 +31,7 @@
 #include <QtTest/QtTest>
 
 #include <QComboBox>
+#include <QPushButton>
 
 #include "core/Sprache.h"
 #include "core/strip/StripChain.h"
@@ -105,6 +106,47 @@ private slots:
         QCOMPARE(box->currentData().toString(), name);
 
         StripSettings::removeUserPreset(sicherung);
+    }
+
+    // „kann ich die audioprofile nicht löschen" (2026-10-14).
+    // Geprüft wird die Bedienung: Eintrag wählen, Knopf ansehen,
+    // löschen, Liste ansehen.
+    void eine_eigene_kette_laesst_sich_loeschen()
+    {
+        {
+            StripChain vorbereiten;
+            vorbereiten.prepare(48000.0);
+            QVERIFY(StripSettings::saveUserPreset(QStringLiteral("Weg damit"),
+                                                  vorbereiten));
+            QVERIFY(StripSettings::saveUserPreset(QStringLiteral("Bleibt"),
+                                                  vorbereiten));
+        }
+
+        RadioModel radio;
+        StripWindow w(&radio);
+        auto* box = w.findChild<QComboBox*>(QStringLiteral("stripPresetBox"));
+        QVERIFY(box != nullptr);
+        auto* knopf = w.findChild<QPushButton*>(
+            QStringLiteral("stripPresetDelete"));
+        QVERIFY2(knopf != nullptr, "der Löschknopf hat keinen Namen");
+
+        const int at = box->findData(QStringLiteral("Weg damit"));
+        QVERIFY2(at >= 0, "die eigene Kette steht nicht in der Liste");
+        box->setCurrentIndex(at);
+        QVERIFY2(knopf->isEnabled(),
+                 "der Löschknopf ist aus, obwohl eine EIGENE Kette "
+                 "gewählt ist");
+
+        // Löschen ohne Rückfrage-Fenster: der Prüfstand kann keinen
+        // Knopf in einem modalen Dialog drücken.
+        QVERIFY(StripSettings::removeUserPreset(QStringLiteral("Weg damit")));
+        QVERIFY(!StripSettings::userPresetNames()
+                     .contains(QStringLiteral("Weg damit")));
+        QVERIFY2(StripSettings::userPresetNames()
+                     .contains(QStringLiteral("Bleibt")),
+                 "das Löschen der einen hat die andere mitgenommen");
+
+        StripSettings::removeUserPreset(QStringLiteral("Bleibt"));
     }
 
     // Die Sicherung darf sich nicht selbst überschreiben: wer sie

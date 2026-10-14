@@ -326,6 +326,7 @@ void StripWindow::setMonitorHasRecording(bool has)
 {
     m_monHasRecording = has;
     if (m_monPlayBtn) { m_monPlayBtn->setEnabled(has); }
+    if (m_monSaveBtn) { m_monSaveBtn->setEnabled(has); }
 }
 
 void StripWindow::persist()
@@ -605,6 +606,28 @@ void StripWindow::buildUi()
                 this, &StripWindow::monitorPlayClicked);
         row->addWidget(m_monPlayBtn);
 
+        // ── Die Aufnahme sichern ────────────────────────────────────
+        //
+        // „ein speichern sollte auch möglich sein, sodass ich die
+        //  aufnahme am desktop speichern kann."
+        //
+        // Gespeichert wird, was „Abspielen" hören lässt: die Stimme
+        // durch die Kette UND durch den gewählten Sendekanal. Eine
+        // Datei, die anders klingt als das, was man eben gehört hat,
+        // taugt zu keinem Vergleich.
+        m_monSaveBtn = new QPushButton(
+            Sprache::T(QStringLiteral("Save take…")), this);
+        m_monSaveBtn->setObjectName(QStringLiteral("stripMonSave"));
+        m_monSaveBtn->setStyleSheet(Style::buttonBaseStyle());
+        m_monSaveBtn->setEnabled(false);
+        m_monSaveBtn->setToolTip(QStringLiteral(
+            "Legt die letzte Aufnahme als WAV ab (48 kHz, mono) — so, "
+            "wie sie gerade klingt: mit der eingestellten Kette und "
+            "durch den gewählten Kanal."));
+        connect(m_monSaveBtn, &QPushButton::clicked,
+                this, &StripWindow::monitorSaveClicked);
+        row->addWidget(m_monSaveBtn);
+
         // ── Mithoeren ───────────────────────────────────────────────
         //
         // Das Haekchen, das am 2026-08-11 hinausflog, in einer
@@ -862,6 +885,7 @@ void StripWindow::buildUi()
         m_presetSave->setStyleSheet(Style::buttonBaseStyle());
         row->addWidget(m_presetSave);
         m_presetDelete = new QPushButton(QStringLiteral("Delete"), this);
+        m_presetDelete->setObjectName(QStringLiteral("stripPresetDelete"));
         m_presetDelete->setStyleSheet(Style::buttonBaseStyle());
         row->addWidget(m_presetDelete);
 
@@ -908,8 +932,11 @@ void StripWindow::buildUi()
                 [this](int) {
             const QString n = m_presetBox->currentData().toString();
             if (!n.isEmpty()) { applyPreset(n); }
-            m_presetDelete->setEnabled(
-                m_presetBox->currentData(Qt::UserRole + 1).toBool());
+            // Der Löschknopf bleibt bedienbar, auch wenn gerade nichts
+            // Löschbares gewählt ist: ein ausgegrauter Knopf
+            // beantwortet die Frage „warum kann ich das nicht
+            // löschen" nicht, er stellt sie. Die Antwort steht nach
+            // dem Druck in der Zeile darunter.
         });
         connect(m_presetSave, &QPushButton::clicked,
                 this, &StripWindow::saveUserPreset);
@@ -2269,10 +2296,8 @@ void StripWindow::rebuildPresetBox(const QString& select)
         const int i = m_presetBox->findData(select);
         if (i >= 0) { m_presetBox->setCurrentIndex(i); }
     }
-    if (m_presetDelete) {
-        m_presetDelete->setEnabled(
-            m_presetBox->currentData(Qt::UserRole + 1).toBool());
-    }
+    // Siehe die Begründung beim Auswahlfeld: der Löschknopf bleibt
+    // bedienbar und erklärt sich beim Druck.
 }
 
 void StripWindow::saveUserPreset()
@@ -2302,8 +2327,26 @@ void StripWindow::deleteUserPreset()
 {
     const QString name = m_presetBox
         ? m_presetBox->currentData().toString() : QString();
-    if (name.isEmpty()) { return; }
-    if (!m_presetBox->currentData(Qt::UserRole + 1).toBool()) { return; }
+    // „kann ich die audioprofile nicht löschen." (2026-10-14) Der Knopf
+    // war aus, und ein ausgegrauter Knopf sagt nicht, was fehlt.
+    if (name.isEmpty()) {
+        if (m_presetNote) {
+            m_presetNote->setText(Sprache::T(QStringLiteral(
+                "Wähle zuerst eine eigene Kette in der Liste — "
+                "gelöscht werden kann nur, was du selbst abgelegt "
+                "hast.")));
+        }
+        return;
+    }
+    if (!m_presetBox->currentData(Qt::UserRole + 1).toBool()) {
+        if (m_presetNote) {
+            m_presetNote->setText(Sprache::T(QStringLiteral(
+                "„%1\" ist ein mitgeliefertes Ausgangsprofil und bleibt "
+                "— eigene Ketten stehen in der Liste darunter."))
+                .arg(name));
+        }
+        return;
+    }
 
     if (QMessageBox::question(this, QStringLiteral("Delete preset"),
             QStringLiteral("Delete \u201c%1\u201d? The settings in use now "
@@ -2312,9 +2355,16 @@ void StripWindow::deleteUserPreset()
         != QMessageBox::Yes) {
         return;
     }
-    StripSettings::removeUserPreset(name);
+    const bool weg = StripSettings::removeUserPreset(name);
     rebuildPresetBox();
-    m_presetNote->clear();
+    if (m_presetNote) {
+        m_presetNote->setText(weg
+            ? Sprache::T(QStringLiteral("„%1\" gelöscht. Die Kette, die "
+                                        "gerade läuft, bleibt wie sie ist."))
+                  .arg(name)
+            : Sprache::T(QStringLiteral("„%1\" stand gar nicht in der "
+                                        "Liste.")).arg(name));
+    }
 }
 
 QString StripWindow::kLetzterStand()
