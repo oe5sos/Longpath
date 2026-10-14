@@ -783,3 +783,65 @@ Ein Teil des Unterschieds ist allerdings hausgemacht und liegt im
 Profil: sein Kuhschwanz sitzt bei 4982 Hz, also über der Kanalgrenze.
 Deshalb liegt neben seiner Kette eine zweite mit genau diesem einen
 Zug anders (3400 Hz) — zum Hören, nicht als Behauptung.
+
+---
+
+## Nachtrag 2026-10-14 — der Tag, an dem vier Messgeräte gelogen haben
+
+Ein ganzer Tag am Gerät, mit dem Betreiber am Kopfhörer. Er hat
+viermal den Kopfhörer abreißen müssen, zuletzt um 21 Uhr („muss
+sofort abdrehen und longpath zu machen"). Keiner dieser Vorfälle war
+eine kaputte Einstellung. Alle vier waren Instrumente, die etwas
+anderes anzeigten als das, was geschah — und die Behebungen stehen
+deshalb unter einer gemeinsamen Überschrift.
+
+### Was gemessen wurde, und was dabei herauskam
+
+| Fund | Zahl |
+| --- | --- |
+| „Übernehmen" rechnete mit der Spitze des letzten Blocks | in einer Sprechpause −48 dBFS → **+36 dB** gesetzt |
+| CoreAudio legt einen Mehrkanalwandler selbst zusammen | 16 Eingänge → **−24 dB** auf die Stimme |
+| Apollo-Eingang 3/4 trägt Longpaths **eigenen Ausgang** | −13,7 / −13,7 dBFS, auf die Nachkommastelle |
+| Mithörprotokoll zeigte die Spitze eines Häppchens | „−50 dBFS" neben „Kanal 1: −1,3 dBFS", dieselbe Sekunde |
+| Eingangszeile behielt den Zeigerstand bei ausgeschalteter Kette | „0,0 dBFS · 12 dB zu viel", während −55 ankamen |
+| Jede Voreinstellung endet am Begrenzer, roh liegt weit darunter | **20 bis 40 dB** Sprung beim Umschalten |
+| Clipper, Zweitonversuch | 6 dB → −45,1 dB IMD, **9 dB → −22,6 dB** |
+| Clipper, Dichte bei gleicher Lautheit | 12 dB kauft 3,1 dB — und kostet 16 % Fremdanteil |
+| Welche Stufe Wörter abhackt | **nur das Gate**: 68 Löcher, alle anderen 0 |
+| Gate: welcher Griff hilft | Schwelle −37 → **−45 dBFS**: 72 → 5 Löcher |
+
+### Was daraus gebaut wurde
+
+* **`StripChain::speechPeakDb()`** — die über zwei Sekunden gemessene,
+  scheitelfaktor-geprüfte Spitze. Zeile und Knopf rechnen damit;
+  ohne gehörte Sprache ist der Knopf aus.
+* **`LoudnessMatch`** (neu) — gleicht den Mithörweg auf die Lautheit
+  des rohen Signals an, K-gewichtet nach BS.1770 aus `core/Loudness.h`.
+  Nur der Mithörweg, nie der Sendeton. Messung 20 ms auf / 400 ms ab,
+  Ausgleich 50 ms ab / 1,5 s auf, über 6 dB sofort. Die erste Fassung
+  (symmetrisch, 400 ms) ließ 23,4 dB in den ersten hundert
+  Millisekunden stehen.
+* **Mehrkanalwandler** werden in ihrer eigenen Kanalzahl geöffnet und
+  ein Eingang wird gewählt (`StripMonitorInChannel`); liegt auf dem
+  gewählten drei Sekunden nichts an, wandert die Wahl einmal weiter.
+  Dasselbe in der Stimmprobe, mit demselben Schlüssel.
+* **Der Hauptschalter gehört zum Mikrofon** (`StripMasterFor/<id>`):
+  am Apollo keine Kette (die Console macht es schon), am Headset an
+  der Klinke schon. Ein unbekanntes Gerät bekommt keine.
+* **Die Gate-Kennlinie zeigt beide Äste.** Ein Gate mit Hysterese hat
+  in der Haltezone zwei Werte; gezeichnet war einer, und der Signalball
+  lag deshalb sichtbar neben der Linie. Dazu ein Ring statt eines
+  zweiten gefüllten Punktes für die Schwelle — zwei gleich aussehende
+  Punkte mit einer Legende waren die eigentliche Ursache der Frage.
+* **Wahltaste auf eine Kachel = nur diese Stufe**, nochmal zurück auf
+  den ganzen vorherigen Stand.
+
+### Die Lehre, die über diesen Tag hinausgeht
+
+Lauter klingt immer besser. Jeder Hörvergleich dieses Tages stand vor
+dem Lautheitsausgleich unter diesem Vorzeichen und sagt wenig — auch
+die eigenen. Und: eine Empfehlung, die zählt, was gewonnen wird, ohne
+zu zählen, was es kostet, ist keine Empfehlung. Die 12 dB Clipper
+waren messbar richtig und trotzdem falsch; das Ohr des Betreibers hat
+die Kante ohne Messgerät gefunden, die Messung hat sie hinterher
+bestätigt.
