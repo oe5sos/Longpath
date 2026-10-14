@@ -64,7 +64,7 @@ QString receiverRowStyle()
 {
     return QStringLiteral(
         "QWidget#kiwiReceiverRow { background: %1; "
-        "border: 1px solid %2; border-radius: 3px; }")
+        "border: 1px solid %2; border-radius: 6px; }")
         .arg(panel(), border());
 }
 
@@ -134,12 +134,12 @@ QString sliceBadgeStyle(int colorIdx, bool assigned)
     if (assigned) {
         return QStringLiteral(
             "QLabel { background: %1; color: %2; border: 1px solid %1; "
-            "border-radius: 3px; font-weight: bold; font-size: 9px; padding: 0; }")
+            "border-radius: 6px; font-weight: bold; font-size: 9px; padding: 0; }")
             .arg(color);
     }
     return QStringLiteral(
         "QLabel { background: %2; color: %1; border: 1px solid %1; "
-        "border-radius: 3px; font-weight: bold; font-size: 9px; padding: 0; }")
+        "border-radius: 6px; font-weight: bold; font-size: 9px; padding: 0; }")
         .arg(color, QLatin1String(Style::kButtonHover));
 }
 
