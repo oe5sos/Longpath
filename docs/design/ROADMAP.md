@@ -120,6 +120,25 @@ Bandfilter mit Kurve, TX-Feld beim Senden, Fußleiste mit zwei Ketten —
 das Foto, das kein Prüfstand ersetzt. Danach die 0.6.3 (Website
 nachziehen, siehe Notiz vom 05.09.).
 
+### I · Fernsteuerung: ans Gerät, dann zusammenführen  *(14.10.)*
+Zwei Brücken stehen und sind gegen echte Clients geprüft, aber **noch
+nie an einem Funkgerät**: rigctld auf 4532, Kenwood-CAT auf 13013
+(`RigctldServer`, `CatServer`/`CatParser`). Inbetriebnahme Schritt für
+Schritt in [`../fernsteuerung-in-betrieb-nehmen.md`](../fernsteuerung-in-betrieb-nehmen.md).
+
+Davor liegt Räumarbeit, keine Technik:
+
+1. **`main` nachziehen.** `fix/discovery-quietpolls-thetis-parity` ist
+   gepusht (`b901ba58`), liegt aber **554 Commits hinter `main`**. Eine
+   PR von diesem Stand hat keinen Sinn.
+2. **CAT zusammenführen.** Es gibt **zwei** Fassungen aus zwei Sitzungen,
+   und **keine** ist in `main` (die andere trägt zusätzlich
+   Pseudoterminal-Kanäle). Eine wird die Grundlage, die andere liefert
+   nach.
+3. **Dann erst ans Gerät** — mit TCI, DEXP-Marke, Anti-VOX und
+   Schrittweite im selben Durchgang, das sind dieselben Baustellen.
+
+
 ---
 
 ## Was vom Betreiber gebraucht wird
@@ -132,3 +151,7 @@ nachziehen, siehe Notiz vom 05.09.).
 - **HAL-Plug-in** (B8): nur, wenn du VAX-Geräte willst — Befehl oben,
   braucht das Passwort.
 - **Ein Foto mit Funkgerät** (H), sobald das ANVELINA wieder da ist.
+- **Die vier offenen Dateien der zweiten Sitzung committen** (I-1):
+  `ConnectionPanel.cpp/.h`, `StatusToast.cpp`, `nnet.c`. Solange sie
+  unfertig im Arbeitsbaum liegen, wird `main` nicht nachgezogen — ein
+  Merge würde darüberfahren.
