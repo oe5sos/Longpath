@@ -1043,7 +1043,7 @@ void CatTciServerPage::refreshTciStatusDisplay()
             // "measured #c2924f -> #d8a55f" (StyleConstants.h). Die
             // Drift-Ratsche hat ihn zu Recht angehalten.
             m_statusLabel->setText(
-                tr("<span style='color:%1'>●</span> Wartet auf %2")
+                tr("<span style='color:%1'>●</span> Waiting for %2")
                     .arg(QString::fromLatin1(Style::kAmberText),
                          m_tciBindWartet.toHtmlEscaped()));
         } else {

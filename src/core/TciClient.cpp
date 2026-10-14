@@ -97,7 +97,7 @@ void TciClient::connectToEndpoint(const QString& host, quint16 port)
 
     const QString trimmedHost = host.trimmed();
     if (trimmedHost.isEmpty()) {
-        setState(State::Error, tr("Keine Adresse angegeben."));
+        setState(State::Error, tr("No address given."));
         return;
     }
 
@@ -109,7 +109,7 @@ void TciClient::connectToEndpoint(const QString& host, quint16 port)
         // "ready;" als Abschluss. Vor diesem Punkt sind die Raten aus
         // dem Textkanal noch nicht bekannt — Stroeme anzufordern waere
         // verfrueht (siehe startIqStream/startAudioStream).
-        setState(State::Connecting, tr("verbunden, warte auf Selbstauskunft"));
+        setState(State::Connecting, tr("connected, waiting for the device to identify itself"));
     });
     connect(m_socket, &QWebSocket::textMessageReceived,
             this, &TciClient::handleTextMessage);
