@@ -34,6 +34,8 @@
 #include <vector>
 
 #include <QCheckBox>
+#include <QMouseEvent>
+#include <QSignalSpy>
 #include <QComboBox>
 #include <QLabel>
 #include <QPushButton>
@@ -352,6 +354,51 @@ private slots:
         }
         QVERIFY2(!haken->isChecked(),
                  "der Hauptschalter blieb an, obwohl er vorher aus war");
+    }
+
+    // ── Und die GESTE selbst, nicht nur ihre Wirkung ────────────
+    //
+    // Der Fall darüber sendet das Signal von Hand. Dass die
+    // Wahltaste es auslöst und der einfache Klick NICHT, steht damit
+    // nicht fest — und genau dort sitzt der Fehler, den niemand
+    // bemerkt: ein Klick, der den Ton ändert, soll aus Versehen nicht
+    // passieren können.
+    //
+    // Gefahren wird ein echtes Mausereignis über sendEvent; ein
+    // QTest::mouseClick verpufft auf einem Fenster, das nie gezeigt
+    // wurde.
+    void die_wahltaste_loest_aus_der_einfache_klick_nicht()
+    {
+        RadioModel radio;
+        StripWindow w(&radio);
+        auto* reihe = w.findChild<StripChainView*>();
+        QVERIFY(reihe != nullptr);
+        reihe->resize(900, 60);
+
+        QSignalSpy allein(reihe, &StripChainView::stageSoloRequested);
+        QSignalSpy geoeffnet(reihe, &StripChainView::stageClicked);
+
+        const QPoint auf(40, 30);          // die erste Kachel
+        {
+            QMouseEvent ev(QEvent::MouseButtonPress, auf,
+                           reihe->mapToGlobal(auf), Qt::LeftButton,
+                           Qt::LeftButton, Qt::NoModifier);
+            QCoreApplication::sendEvent(reihe, &ev);
+        }
+        QCOMPARE(allein.count(), 0);
+        QVERIFY2(geoeffnet.count() == 1,
+                 "der einfache Klick öffnet die Seite nicht mehr");
+
+        {
+            QMouseEvent ev(QEvent::MouseButtonPress, auf,
+                           reihe->mapToGlobal(auf), Qt::LeftButton,
+                           Qt::LeftButton, Qt::AltModifier);
+            QCoreApplication::sendEvent(reihe, &ev);
+        }
+        QVERIFY2(allein.count() == 1,
+                 "die Wahltaste löst „nur diese Stufe\" nicht aus");
+        QVERIFY2(geoeffnet.count() == 1,
+                 "die Wahltaste hat zusätzlich die Seite geöffnet");
     }
 
     // Die Sicherung darf sich nicht selbst überschreiben: wer sie
