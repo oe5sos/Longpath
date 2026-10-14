@@ -167,6 +167,58 @@ private slots:
                                 .arg(double(mehrDb), 0, 'f', 1)));
     }
 
+    // ── Der Ausgleich darf nicht je Silbe pumpen ────────────────
+    //
+    // „weiters höre ich mich öfters immer ein bisschen abgehackt"
+    // (2026-10-14). Bevor dafür fremde Einstellungen verdächtigt
+    // werden, prüft dieser Fall den eigenen neuen Code: ein
+    // Ausgleich, der in 50 ms fällt und bei mehr als 6 dB sofort
+    // setzt, könnte Silbenanfänge ducken -- und das klingt genau so.
+    //
+    // Gemessen wird der Ausschlag der Verstärkung INNERHALB einer
+    // halben Sekunde. Über Minuten darf sie wandern, das ist ihre
+    // Aufgabe; was innerhalb eines Wortes passiert, hört man.
+    void der_ausgleich_pumpt_nicht_je_silbe()
+    {
+        const auto roh = rede(int(kRate * 8), 0.05f);
+        LoudnessMatch m;
+        m.prepare(kRate);
+        m.setEnabled(true);
+
+        // Eine Kette mit fester Verstärkung: was der Ausgleich hier
+        // noch bewegt, bewegt er aus eigenem Antrieb.
+        const float g = std::pow(10.0f, 20.0f / 20.0f);
+        constexpr int kBlock = 128;
+        std::vector<float> spur;              // gainDb je Block
+        std::vector<float> aus = roh;
+        for (size_t at = 0; at + kBlock <= roh.size(); at += kBlock) {
+            m.feedInput(roh.data() + at, kBlock);
+            for (int i = 0; i < kBlock; ++i) { aus[at + size_t(i)] *= g; }
+            m.applyOutput(aus.data() + at, kBlock);
+            spur.push_back(m.gainDb());
+        }
+
+        // Die ersten zwei Sekunden sind das Einschwingen.
+        const size_t ab = size_t(2.0 * kRate / kBlock);
+        const size_t fenster = size_t(0.5 * kRate / kBlock);
+        float groessterHub = 0.0f;
+        for (size_t i = ab; i + fenster < spur.size(); ++i) {
+            float lo = spur[i], hi = spur[i];
+            for (size_t k = i; k < i + fenster; ++k) {
+                lo = std::min(lo, spur[k]);
+                hi = std::max(hi, spur[k]);
+            }
+            groessterHub = std::max(groessterHub, hi - lo);
+        }
+        QVERIFY2(groessterHub < 1.5f,
+                 qPrintable(QStringLiteral("der Ausgleich bewegt sich um "
+                                           "%1 dB innerhalb einer halben "
+                                           "Sekunde -- das pumpt hörbar")
+                                .arg(double(groessterHub), 0, 'f', 2)));
+        qInfo().noquote() << QStringLiteral("   größter Hub in 0,5 s: %1 dB")
+            .arg(double(groessterHub), 0, 'f', 2);
+    }
+
     // Ausgeschaltet heisst ausgeschaltet.
     void ausgeschaltet_wird_nichts_angefasst()
     {

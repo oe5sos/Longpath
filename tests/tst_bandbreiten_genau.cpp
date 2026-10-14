@@ -2914,6 +2914,179 @@ private slots:
     // dritter Ordnung (2f1-f2 = -300 -> 300 Hz und 2f2-f1 = 2700 Hz)
     // ebenfalls im Band landen. Genau die kann kein Filter danach
     // noch entfernen.
+    // ── Welche Stufe hackt? ─────────────────────────────────────
+    //
+    // „weiters höre ich mich öfters immer ein bisschen abgehackt"
+    // (2026-10-14).
+    //
+    // Statt zu raten, welche Stufe das ist, wird jede EINZELN über
+    // seine eigene Stimme gefahren und gemessen, wie oft sie ein Loch
+    // macht: der Verlauf aus Ausgang durch Eingang, in Rahmen von
+    // 10 ms, und gezählt werden die Rahmen, die mehr als 6 dB unter
+    // dem Mittelwert der letzten Sekunde liegen. Das ist genau das,
+    // was als „abgehackt" ankommt -- ein Wort, dessen Ende wegfällt.
+    void whichStageChopsTheWords()
+    {
+        QString warum;
+        const auto sauber = echteRede(&warum);
+        if (sauber.empty()) { QSKIP(qPrintable(warum)); }
+        const Rede rede = redeMitRauschen(sauber, -60.0);
+
+        const QString profil = QString::fromLatin1(LONGPATH_TEST_DATA_DIR)
+                               + QStringLiteral("/aether-ssb-30-07-2026.json");
+        if (!QFile::exists(profil)) { QSKIP("Martins Profil fehlt"); }
+
+        // Sein gemessener Arbeitspunkt am Klinken-Headset: Spitzen um
+        // -12 dBFS. Die Stimme wird dorthin gelegt, sonst misst man
+        // die Schwellen an einem Pegel, den er nie hat.
+        std::vector<float> ein = rede.signal;
+        {
+            double pk = 0.0;
+            for (float x : ein) { pk = std::max(pk, double(std::fabs(x))); }
+            const double g = std::pow(10.0, -12.0 / 20.0) / std::max(pk, 1e-9);
+            for (float& x : ein) { x = float(x * g); }
+        }
+
+        // ── Löcher zählen, und zwar so, dass eine Stufe ohne
+        //    Wirkung auch null ergibt ──────────────────────────────
+        //
+        // Der erste Versuch verglich den Verlauf mit seinem eigenen
+        // gleitenden Mittel. Das zählte die Sprache selbst und gab
+        // für jede Stufe dieselbe Zahl -- ein Messgerät, das immer
+        // dasselbe anzeigt, misst nichts. Jetzt: die Verstärkung je
+        // Rahmen gegen den MITTLEREN Wert aller Sprachrahmen, und
+        // gezählt wird, was mehr als 6 dB darunter liegt. Eine reine
+        // Verstärkung ergibt damit null, und die Nullprobe unten
+        // prüft genau das.
+        const auto loecher = [&](const std::vector<float>& aus) {
+            const int rahmen = int(kRate * 0.01);
+            std::vector<double> gDb;
+            for (size_t at = 0; at + size_t(rahmen) <= aus.size();
+                 at += size_t(rahmen)) {
+                double a = 0.0, e = 0.0;
+                for (int i = 0; i < rahmen; ++i) {
+                    a += double(aus[at + size_t(i)]) * aus[at + size_t(i)];
+                    e += double(ein[at + size_t(i)]) * ein[at + size_t(i)];
+                }
+                const double rmsE = std::sqrt(e / rahmen);
+                const double rmsA = std::sqrt(a / rahmen);
+                // Nur echte Sprache: -45 dBFS effektiv und darüber.
+                if (rmsE < 0.0056) { continue; }
+                gDb.push_back(20.0 * std::log10(std::max(rmsA, 1e-12)
+                                                / rmsE));
+            }
+            if (gDb.size() < 20) { return -1; }
+            std::vector<double> sortiert = gDb;
+            std::sort(sortiert.begin(), sortiert.end());
+            const double mitte = sortiert[sortiert.size() / 2];
+            int zahl = 0;
+            for (double g : gDb) { if (g < mitte - 6.0) { ++zahl; } }
+            return zahl;
+        };
+
+        // ── Und welcher Griff am Gate die Löcher wegnimmt ───────
+        //
+        // Vier Stellschrauben, einzeln gedreht, damit die Antwort
+        // ein Handgriff ist und keine Liste.
+        const auto gateProbe = [&](const char* name, float schwelle,
+                                   float nachlauf, float verhaeltnis,
+                                   float boden) {
+            StripChain c;
+            c.prepare(kRate);
+            const auto e = AetherPreset::applyFile(profil, c);
+            if (!e.ok) { return; }
+            for (int i = 0; i < StripChain::kStageCount; ++i) {
+                c.setStageEnabled(static_cast<StripChain::Stage>(i), false);
+            }
+            c.setStageEnabled(StripChain::Stage::Gate, true);
+            if (schwelle    < 0.0f) { c.gate().setThresholdDb(schwelle); }
+            if (nachlauf    > 0.0f) { c.gate().setReleaseMs(nachlauf); }
+            if (verhaeltnis > 0.0f) { c.gate().setRatio(verhaeltnis); }
+            if (boden       < 0.0f) { c.gate().setFloorDb(boden); }
+            c.setEnabled(true);
+            std::vector<float> x = ein;
+            constexpr int kBlock = 64;
+            for (size_t at = 0; at + kBlock <= x.size(); at += kBlock) {
+                c.processMono(x.data() + at, kBlock);
+            }
+            qInfo().noquote() << QStringLiteral("  %1 %2")
+                .arg(QString::fromUtf8(name), -34).arg(loecher(x), 6);
+        };
+
+        qInfo().noquote() << QStringLiteral(
+            "   nur das Gate, je ein Griff geändert        Löcher");
+        gateProbe("wie im Profil",                0.0f,   0.0f, 0.0f,  0.0f);
+        gateProbe("Schwelle -50 dBFS",          -50.0f,   0.0f, 0.0f,  0.0f);
+        gateProbe("Nachlauf 200 ms",              0.0f, 200.0f, 0.0f,  0.0f);
+        gateProbe("Verhältnis 1,5",               0.0f,   0.0f, 1.5f,  0.0f);
+        gateProbe("Boden nur -6 dB",              0.0f,   0.0f, 0.0f, -6.0f);
+        gateProbe("Nachlauf 200 + Boden -6",      0.0f, 200.0f, 0.0f, -6.0f);
+        // Sein Grundgeräusch am Klinken-Headset liegt laut Protokoll
+        // bei rund -50 dBFS. Eine Schwelle DORT macht das Gate
+        // wirkungslos und holt den Raum mit. Also die Mitte suchen.
+        gateProbe("Schwelle -45",               -45.0f,   0.0f, 0.0f,  0.0f);
+        gateProbe("Schwelle -45 + Nachlauf 200", -45.0f, 200.0f, 0.0f,  0.0f);
+        gateProbe("Schwelle -45 + Boden -8",    -45.0f,   0.0f, 0.0f, -8.0f);
+        gateProbe("-45 + 200 ms + Boden -8",    -45.0f, 200.0f, 0.0f, -8.0f);
+
+        struct S { const char* name; StripChain::Stage stufe; };
+        static const S kS[] = {
+            { "Gate",       StripChain::Stage::Gate  },
+            { "Entzerrer",  StripChain::Stage::Eq    },
+            { "Kompressor", StripChain::Stage::Comp  },
+            { "De-Esser",   StripChain::Stage::DeEss },
+            { "Röhre",      StripChain::Stage::Tube  },
+            { "PUDU",       StripChain::Stage::Pudu  },
+            { "Begrenzer",  StripChain::Stage::Limiter },
+        };
+
+        qInfo().noquote() << QStringLiteral(
+            "   seine Kette bei -12 dBFS Spitze, je Stufe EINZELN"
+            "      Löcher über 6 dB");
+        {
+            // Nullprobe: alles aus. Ohne sie weiss niemand, ob die
+            // Zahlen darunter die Stufen messen oder die Stimme.
+            StripChain c;
+            c.prepare(kRate);
+            const auto e = AetherPreset::applyFile(profil, c);
+            QVERIFY2(e.ok, "das Profil liess sich nicht einlesen");
+            for (int i = 0; i < StripChain::kStageCount; ++i) {
+                c.setStageEnabled(static_cast<StripChain::Stage>(i), false);
+            }
+            c.setEnabled(true);
+            std::vector<float> x = ein;
+            constexpr int kBlock = 64;
+            for (size_t at = 0; at + kBlock <= x.size(); at += kBlock) {
+                c.processMono(x.data() + at, kBlock);
+            }
+            const int null = loecher(x);
+            qInfo().noquote() << QStringLiteral("  %1 %2")
+                .arg(QStringLiteral("(alles aus)"), -14).arg(null, 6);
+            QVERIFY2(null == 0,
+                     qPrintable(QStringLiteral("die Nullprobe zählt %1 "
+                                               "Löcher -- dann misst das "
+                                               "Verfahren die Stimme")
+                                    .arg(null)));
+        }
+        for (const S& st : kS) {
+            StripChain c;
+            c.prepare(kRate);
+            const auto e = AetherPreset::applyFile(profil, c);
+            QVERIFY2(e.ok, "das Profil liess sich nicht einlesen");
+            for (const S& aus : kS) {
+                c.setStageEnabled(aus.stufe, aus.stufe == st.stufe);
+            }
+            c.setEnabled(true);
+            std::vector<float> x = ein;
+            constexpr int kBlock = 64;
+            for (size_t at = 0; at + kBlock <= x.size(); at += kBlock) {
+                c.processMono(x.data() + at, kBlock);
+            }
+            qInfo().noquote() << QStringLiteral("  %1 %2")
+                .arg(QString::fromUtf8(st.name), -14).arg(loecher(x), 6);
+        }
+    }
+
     void howFastTheClipperGetsUgly()
     {
         const int n = int(kRate * 2.0);
