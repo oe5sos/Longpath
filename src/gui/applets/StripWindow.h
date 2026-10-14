@@ -369,6 +369,9 @@ private:
     QPushButton*    m_presetSave{nullptr};
     QPushButton*    m_presetDelete{nullptr};
     QPushButton*    m_aetherImport{nullptr};
+    // Welche eigene Kette beim nächsten Druck auf „Löschen" wirklich
+    // gelöscht wird. Leer heißt: der nächste Druck fragt erst.
+    QString         m_presetDeleteArmed;
     QPushButton*    m_compareBtn{nullptr};
 
     // PUDU monitor buttons — state painted by the three setters above.

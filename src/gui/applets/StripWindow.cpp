@@ -922,6 +922,7 @@ void StripWindow::buildUi()
         col->addLayout(row);
 
         m_presetNote = new QLabel(this);
+        m_presetNote->setObjectName(QStringLiteral("stripPresetNote"));
         m_presetNote->setWordWrap(true);
         m_presetNote->setStyleSheet(dimStyle());
         col->addWidget(m_presetNote);
@@ -931,6 +932,9 @@ void StripWindow::buildUi()
         connect(m_presetBox, &QComboBox::currentIndexChanged, this,
                 [this](int) {
             const QString n = m_presetBox->currentData().toString();
+            // Eine andere Kette gewählt: die Scharfstellung des
+            // Löschknopfs gilt nicht mehr.
+            m_presetDeleteArmed.clear();
             if (!n.isEmpty()) { applyPreset(n); }
             // Der Löschknopf bleibt bedienbar, auch wenn gerade nichts
             // Löschbares gewählt ist: ein ausgegrauter Knopf
@@ -2348,13 +2352,30 @@ void StripWindow::deleteUserPreset()
         return;
     }
 
-    if (QMessageBox::question(this, QStringLiteral("Delete preset"),
-            QStringLiteral("Delete \u201c%1\u201d? The settings in use now "
-                           "stay as they are.").arg(name),
-            QMessageBox::Yes | QMessageBox::No, QMessageBox::No)
-        != QMessageBox::Yes) {
+    // ── Zweimal drücken statt Fenster ───────────────────────────────
+    //
+    // „löschen kann ich die profile aber immer noch nicht."
+    // (2026-10-14, nach dem Knopf, der sich erklärt.) Dazwischen stand
+    // ein modales Rückfragefenster — und ein Fenster, das aus welchem
+    // Grund auch immer nicht ankommt, lässt den Knopf tot aussehen.
+    //
+    // Dieselbe Lehre steht schon im Empfangsprofil-Blatt: dort wurde
+    // die Rückfrage aus genau diesem Grund in die Fläche geholt.
+    // Also: erster Druck fragt in der Zeile darunter, zweiter Druck
+    // löscht. Nichts kann sich davorlegen, und ein Prüfstand kann es
+    // fahren.
+    if (m_presetDeleteArmed != name) {
+        m_presetDeleteArmed = name;
+        if (m_presetNote) {
+            m_presetNote->setText(
+                Sprache::T(QStringLiteral("„%1\" löschen? Noch einmal auf "
+                                          "Löschen drücken. (Die Kette, die "
+                                          "gerade läuft, bleibt.)"))
+                    .arg(name));
+        }
         return;
     }
+    m_presetDeleteArmed.clear();
     const bool weg = StripSettings::removeUserPreset(name);
     rebuildPresetBox();
     if (m_presetNote) {

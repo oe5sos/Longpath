@@ -31,6 +31,7 @@
 #include <QtTest/QtTest>
 
 #include <QComboBox>
+#include <QLabel>
 #include <QPushButton>
 
 #include "core/Sprache.h"
@@ -137,11 +138,24 @@ private slots:
                  "der Löschknopf ist aus, obwohl eine EIGENE Kette "
                  "gewählt ist");
 
-        // Löschen ohne Rückfrage-Fenster: der Prüfstand kann keinen
-        // Knopf in einem modalen Dialog drücken.
-        QVERIFY(StripSettings::removeUserPreset(QStringLiteral("Weg damit")));
-        QVERIFY(!StripSettings::userPresetNames()
-                     .contains(QStringLiteral("Weg damit")));
+        // Jetzt die Bedienung selbst: erster Druck fragt, zweiter
+        // löscht. Seit dem 2026-10-14 steht kein modales Fenster mehr
+        // dazwischen — eines, das nicht ankommt, lässt den Knopf tot
+        // aussehen, und genau so war es am Gerät.
+        knopf->click();
+        QVERIFY2(StripSettings::userPresetNames()
+                     .contains(QStringLiteral("Weg damit")),
+                 "der erste Druck hat schon gelöscht — ohne Rückfrage");
+        auto* zeile = w.findChild<QLabel*>(QStringLiteral("stripPresetNote"));
+        QVERIFY2(zeile != nullptr, "die Hinweiszeile hat keinen Namen");
+        QVERIFY2(zeile->text().contains(QStringLiteral("Weg damit")),
+                 qPrintable(QStringLiteral("die Zeile sagt nichts: %1")
+                                .arg(zeile->text())));
+
+        knopf->click();
+        QVERIFY2(!StripSettings::userPresetNames()
+                      .contains(QStringLiteral("Weg damit")),
+                 "der zweite Druck hat nicht gelöscht");
         QVERIFY2(StripSettings::userPresetNames()
                      .contains(QStringLiteral("Bleibt")),
                  "das Löschen der einen hat die andere mitgenommen");
