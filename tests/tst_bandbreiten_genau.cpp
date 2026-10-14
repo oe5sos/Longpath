@@ -2895,6 +2895,92 @@ private slots:
     // Lautstaerke weniger Spitze gebraucht wird -- und die Spitze
     // ist es, die die Endstufe begrenzt. Der Gewinn fuer die
     // Gegenseite ist deshalb genau die Differenz der Scheitelwerte.
+    // ── „wird schnell sehr schlecht" -- nachgemessen ────────────
+    //
+    // Der Betreiber haelt den Clipper bewusst niedrig: „ich muss den
+    // bewusst so niedrig halten weil sonst das signal sehr schlecht
+    // wird", „wird schnell sehr schlecht" (2026-10-14).
+    //
+    // Sein Ohr entscheidet. Aber bei einem ordentlich gebauten
+    // Clipper darf 6 dB nicht „sehr schlecht" sein, und ob die
+    // Grenze bei uns oder in der Physik liegt, ist messbar: der
+    // Zweitonversuch ist dafuer das Mass der Funkerei. Zwei gleich
+    // grosse Toene hinein, und was NICHT hineingegangen ist, kommt
+    // als Intermodulation heraus -- bei SSB genau das, was die
+    // Gegenseite als „matschig" hoert und was die Nachbarkanaele
+    // bekommt.
+    //
+    // 700 und 1700 Hz, beide im Sprachband, damit die Produkte
+    // dritter Ordnung (2f1-f2 = -300 -> 300 Hz und 2f2-f1 = 2700 Hz)
+    // ebenfalls im Band landen. Genau die kann kein Filter danach
+    // noch entfernen.
+    void howFastTheClipperGetsUgly()
+    {
+        const int n = int(kRate * 2.0);
+        const auto zweiton = [&](double a) {
+            std::vector<float> v(size_t(n), 0.0f);
+            for (int i = 0; i < n; ++i) {
+                const double t = double(i) / kRate;
+                v[size_t(i)] = float(a * (std::sin(2.0 * M_PI * 700.0 * t)
+                                        + std::sin(2.0 * M_PI * 1700.0 * t)));
+            }
+            return v;
+        };
+
+        // Die Spitze des Zweitons liegt bei 2a; auf -6 dBFS bringen.
+        const double amp = std::pow(10.0, -6.0 / 20.0) / 2.0;
+
+        const auto imdDb = [&](float driveDb) {
+            ClientClipper cl;
+            cl.prepare(kRate);
+            cl.setEnabled(true);
+            cl.setDriveDb(driveDb);
+            cl.setKnee(0.2f);
+            cl.setLevelMatch(false);
+            std::vector<float> x = zweiton(amp);
+            constexpr int kBlock = 64;
+            for (size_t at = 0; at + kBlock <= x.size(); at += kBlock) {
+                cl.process(x.data() + at, kBlock, 1);
+            }
+            const auto p = spektrum(x);
+            // Die Toene selbst, und die groessten Produkte dritter
+            // und fuenfter Ordnung.
+            const double ton = std::max(bandDb(p, 690.0, 710.0),
+                                        bandDb(p, 1690.0, 1710.0));
+            double schlimmstes = -200.0;
+            const double produkte[] = { 300.0, 2700.0,     // 3. Ordnung
+                                        1100.0, 2300.0,    // weitere
+                                        3700.0, 100.0 };   // 5. Ordnung
+            for (double f : produkte) {
+                schlimmstes = std::max(schlimmstes,
+                                       bandDb(p, f - 10.0, f + 10.0));
+            }
+            return schlimmstes - ton;        // dB unter einem Ton
+        };
+
+        qInfo().noquote() << QStringLiteral(
+            "   Zweiton 700 + 1700 Hz, Spitze -6 dBFS"
+            "          groesstes IMD-Produkt");
+        for (float d : { 0.0f, 3.0f, 6.0f, 9.0f, 12.0f, 18.0f }) {
+            qInfo().noquote() << QStringLiteral("  Clipper %1 dB %2 dB")
+                .arg(double(d), 5, 'f', 0)
+                .arg(imdDb(d), 28, 'f', 1);
+        }
+
+        // Die Messlatte: bei 6 dB Anhebung darf das groesste Produkt
+        // nicht ueber -25 dB unter dem Ton liegen. Guter Rundfunk
+        // arbeitet bei -30 und mehr; -25 ist die Grenze, ab der ein
+        // geuebtes Ohr es als Rauhigkeit hoert.
+        const double bei6 = imdDb(6.0f);
+        qInfo().noquote() << QStringLiteral("   bei 6 dB: %1 dB unter dem Ton")
+            .arg(bei6, 0, 'f', 1);
+        QVERIFY2(bei6 < -25.0,
+                 qPrintable(QStringLiteral("schon bei 6 dB stehen die "
+                                           "Intermodulationsprodukte bei "
+                                           "%1 dB -- das hoert man")
+                                .arg(bei6, 0, 'f', 1)));
+    }
+
     void whereThePunchComesFrom()
     {
         QString warum;
