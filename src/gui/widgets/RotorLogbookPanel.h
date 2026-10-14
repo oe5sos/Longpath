@@ -314,6 +314,9 @@ private:
     // The rotator link, and the timer that stands in for one. Exactly
     // one of the two drives the needle at any moment.
     RotctldClient* m_rotor{nullptr};
+    // Der zuletzt protokollierte Status -- damit nur WECHSEL ins
+    // Protokoll gehen, nicht jede Wiederholung (siehe setStatus()).
+    QString        m_letzterStatus;
     // rotctld started by us, when the controller is on this computer.
     // Owned so it is stopped on the way out rather than left holding
     // the serial port.
