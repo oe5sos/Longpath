@@ -411,13 +411,34 @@ void StripChain::processMono(float* samples, int frames) noexcept
     if (m_inputAuto.load(std::memory_order_relaxed)) {
         for (int i = 0; i < frames; ++i) {
             m_autoPeak = std::max(m_autoPeak, std::fabs(samples[i]));
+            m_autoSumSq += double(samples[i]) * double(samples[i]);
         }
         m_autoFrames += frames;
         const int fenster = int(m_sampleRate * 2.0);
         if (m_autoFrames >= fenster && fenster > 0) {
             const float spitzeDb = m_autoPeak > 1e-7f
                 ? 20.0f * std::log10(m_autoPeak) : -120.0f;
-            if (spitzeDb > kSpracheAbDbFs) {
+            // ── „nach Sprache aussehen" heisst nicht „laut genug" ──
+            //
+            // Bis zum 2026-10-14 reichte eine Spitze über -45 dBFS.
+            // Am Gerät des Betreibers hing ein Headset an der
+            // Klinkenbuchse, dessen Brummen genau das erfüllte: die
+            // Automatik hob einen Störteppich von -48 dBFS um 35 dB
+            // auf das Ziel, die Kette presste ihn an die Decke des
+            // Begrenzers, und im Kopfhörer stand Dauerpegel. Er hat
+            // dreimal den Kopfhörer abreissen müssen; beim dritten Mal
+            // hat er sich nicht mehr getraut, ihn aufzusetzen.
+            //
+            // Sprache hat einen SCHEITELFAKTOR: die Spitzen liegen
+            // weit über dem Effektivwert, weil zwischen den Silben
+            // nichts ist. Brummen und Rauschen haben ihn nicht. Also
+            // wird er geprüft, nicht nur der Pegel.
+            const double effektiv = m_autoFrames > 0
+                ? std::sqrt(m_autoSumSq / double(m_autoFrames)) : 0.0;
+            const float effektivDb = effektiv > 1e-7
+                ? 20.0f * float(std::log10(effektiv)) : -120.0f;
+            const float scheitel = spitzeDb - effektivDb;
+            if (spitzeDb > kSpracheAbDbFs && scheitel > kScheitelAbDb) {
                 // Gemessen wird hier die ROHE Spitze -- die
                 // Verstaerkung kommt erst danach. Die gesuchte Zahl
                 // ist deshalb schlicht der Abstand zum Ziel, und
@@ -435,6 +456,7 @@ void StripChain::processMono(float* samples, int frames) noexcept
             }
             m_autoPeak = 0.0f;
             m_autoFrames = 0;
+            m_autoSumSq = 0.0;
         }
     }
 

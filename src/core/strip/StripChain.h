@@ -262,6 +262,13 @@ public:
     static constexpr float kZielSpitzeDbFs = -12.0f;
     // Unter diesem Pegel gilt ein Zeitfenster als Pause.
     static constexpr float kSpracheAbDbFs  = -45.0f;
+
+    // Der Scheitelfaktor, ab dem ein Fenster als Sprache gilt.
+    // Gemessen: echte Sprache liegt bei 12-18 dB, Brummen und
+    // Rauschen bei 3-6 dB. 9 dB trennt beides mit Abstand nach beiden
+    // Seiten. Siehe die Begründung in StripChain.cpp — ohne diese
+    // Schranke hebt die Automatik einen Störteppich auf Sprachpegel.
+    static constexpr float kScheitelAbDb   = 9.0f;
     void  setInputAuto(bool on) noexcept;
     bool  inputAuto() const noexcept;
     // Was gerade WIRKLICH verstärkt wird -- von Hand oder gefunden.
@@ -423,7 +430,8 @@ private:
     // kopiert wird nur, was der Betreiber eingestellt hat.
     std::atomic<bool>  m_inputAuto{false};
     std::atomic<float> m_autoGainDb{0.0f};
-    float m_autoPeak{0.0f};        // Spitze im laufenden Zeitfenster
+    float m_autoPeak{0.0f};
+    double m_autoSumSq{0.0};        // Spitze im laufenden Zeitfenster
     int   m_autoFrames{0};
     std::atomic<float> m_rawInPeakDb{-120.0f};
     std::atomic<float> m_inPeakDb{-120.0f};

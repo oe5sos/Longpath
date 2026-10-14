@@ -3094,6 +3094,70 @@ private slots:
             .arg(spitzeDb(zahm), 0, 'f', 1);
     }
 
+    // ── Die Eingangsautomatik darf Brummen NICHT auf Sprachpegel
+    //    heben (2026-10-14) ───────────────────────────────────────
+    //
+    // Am Gerät des Betreibers hing ein Headset an der Klinkenbuchse,
+    // dessen Störteppich bei etwa −48 dBFS lag. Die Automatik hob ihn
+    // um 35 dB auf das Ziel, die Kette presste ihn an die Decke des
+    // Begrenzers, und im Kopfhörer stand Dauerpegel. „ich traue mir
+    // nicht mehr die kopfhörer aufzusetzen."
+    //
+    // Geprüft werden beide Richtungen — eine Schranke, die Brummen
+    // aussperrt, aber auch Sprache, wäre nur ein anderer Fehler.
+    void theInputAutomaticIgnoresHumButFindsSpeech()
+    {
+        QString warum;
+        const auto sauber = echteRede(&warum);
+        if (sauber.empty()) { QSKIP(qPrintable(warum)); }
+
+        const auto fahre = [](const std::vector<float>& x) {
+            StripChain c;
+            c.prepare(kRate);
+            c.setEnabled(true);
+            c.setInputAuto(true);
+            std::vector<float> y = x;
+            constexpr int kBlock = 64;
+            for (size_t at = 0; at + kBlock <= y.size(); at += kBlock) {
+                c.processMono(y.data() + at, kBlock);
+            }
+            return c.effectiveInputGainDb();
+        };
+
+        // 1. Nur Brummen, so wie es an seiner Buchse steht: 50 und
+        //    100 Hz, Spitze −40 dBFS, zehn Sekunden.
+        std::vector<float> brumm(size_t(kRate * 10), 0.0f);
+        for (size_t i = 0; i < brumm.size(); ++i) {
+            const double t = double(i) / kRate;
+            brumm[i] = float(0.01 * (std::sin(2.0 * M_PI * 50.0 * t)
+                                     + 0.5 * std::sin(2.0 * M_PI * 100.0 * t)));
+        }
+        const float beiBrumm = fahre(brumm);
+
+        // 2. Dieselbe Länge echte Sprache, ebenfalls leise (Spitze
+        //    −40 dBFS) — die MUSS gefunden werden.
+        std::vector<float> rede = sauber;
+        double spitze = 0.0;
+        for (float v : rede) { spitze = std::max(spitze, double(std::fabs(v))); }
+        const double g = std::pow(10.0, -40.0 / 20.0) / std::max(spitze, 1e-9);
+        for (float& v : rede) { v = float(v * g); }
+        const float beiSprache = fahre(rede);
+
+        qInfo().noquote() << QStringLiteral(
+            "   Verstärkung der Automatik: bei Brummen %1 dB · bei "
+            "leiser Sprache %2 dB")
+            .arg(double(beiBrumm), 0, 'f', 1).arg(double(beiSprache), 0, 'f', 1);
+
+        QVERIFY2(beiBrumm < 1.0f,
+                 qPrintable(QStringLiteral("die Automatik hebt reines "
+                                           "Brummen um %1 dB")
+                                .arg(double(beiBrumm))));
+        QVERIFY2(beiSprache > 10.0f,
+                 qPrintable(QStringLiteral("die Automatik findet leise "
+                                           "Sprache nicht mehr (%1 dB)")
+                                .arg(double(beiSprache))));
+    }
+
     void theGroupDelayOfEachChannel()
     {
         const auto laufzeitMs = [](int ch, double hz) {
