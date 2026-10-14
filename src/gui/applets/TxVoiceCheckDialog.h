@@ -314,6 +314,9 @@ private:
     QIODevice*    m_micIo{nullptr};
     int           m_micSourceRate{48000};
     int           m_micSourceChannels{1};
+    /// Welcher Eingang des Geräts die Stimme trägt; -1 legt alle
+    /// zusammen. Siehe die Begründung an der Formatwahl.
+    int           m_micPick{-1};
     int           m_micSourceFormat{0};   // QAudioFormat::SampleFormat
 
     QVector<QLabel*> m_stepChips;

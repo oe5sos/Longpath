@@ -44,6 +44,8 @@
 #include <QTimer>
 #include <QVBoxLayout>
 
+#include "core/AppSettings.h"
+
 #include <algorithm>
 #include <cmath>
 #include <vector>
@@ -752,8 +754,27 @@ bool TxVoiceCheckDialog::openDirectMic()
     fmt.setSampleRate(kMicRateHz);
     fmt.setChannelCount(1);
     fmt.setSampleFormat(QAudioFormat::Float);
+    // ── Einen Mehrkanalwandler nicht zusammenlegen lassen ────────
+    //
+    // Dieselbe Falle wie im Mithörweg, gemessen am 2026-10-14 an
+    // einem Apollo Twin: die Bitte um EINEN Kanal wird angenommen,
+    // und CoreAudio legt die sechzehn Eingänge selbst zusammen.
+    // Fünfzehn stille davon kosten 20·log10(16) = 24 dB, und diese
+    // Stimmprobe misst dann einen Pegel, den das Mikrofon nie hatte
+    // — sie sagt „viel zu leise" über ein sauber ausgesteuertes
+    // Signal. Also in der eigenen Kanalzahl öffnen und EINEN Kanal
+    // nehmen, denselben wie der Mithörweg.
+    const int nativ = dev.maximumChannelCount();
+    if (nativ > 2) { fmt.setChannelCount(nativ); }
     if (!dev.isFormatSupported(fmt)) {
         fmt.setSampleFormat(QAudioFormat::Int16);
+    }
+    if (!dev.isFormatSupported(fmt)) {
+        fmt.setSampleFormat(QAudioFormat::Float);
+        fmt.setChannelCount(1);
+        if (!dev.isFormatSupported(fmt)) {
+            fmt.setSampleFormat(QAudioFormat::Int16);
+        }
     }
     if (!dev.isFormatSupported(fmt)) {
         fmt = dev.preferredFormat();
@@ -761,6 +782,17 @@ bool TxVoiceCheckDialog::openDirectMic()
 
     m_micSourceRate     = fmt.sampleRate();
     m_micSourceChannels = std::max(1, fmt.channelCount());
+    // Welcher Eingang die Stimme trägt. Bei einem oder zwei Kanälen
+    // werden sie zusammengelegt (-1), sonst der gewählte, sonst der
+    // erste -- gelesen aus demselben Schlüssel wie im Kanalzug,
+    // damit die beiden Messgeräte nicht verschiedene Mikrofone
+    // messen.
+    m_micPick = (m_micSourceChannels > 2)
+        ? std::clamp(AppSettings::instance()
+                         .value(QStringLiteral("StripMonitorInChannel"), 0)
+                         .toInt(),
+                     0, m_micSourceChannels - 1)
+        : -1;
     m_micSourceFormat   = int(fmt.sampleFormat());
 
     m_micSource = new QAudioSource(dev, fmt, this);
@@ -812,6 +844,10 @@ void TxVoiceCheckDialog::pullDirectMic()
         const int frames = int(chunk.size() / sizeof(float)) / channels;
         mono.resize(static_cast<size_t>(std::max(0, frames)));
         for (int i = 0; i < frames; ++i) {
+            if (m_micPick >= 0) {
+                mono[static_cast<size_t>(i)] = in[i * channels + m_micPick];
+                continue;
+            }
             double acc = 0.0;
             for (int c = 0; c < channels; ++c) {
                 acc += in[i * channels + c];
@@ -823,6 +859,11 @@ void TxVoiceCheckDialog::pullDirectMic()
         const int frames = int(chunk.size() / sizeof(qint16)) / channels;
         mono.resize(static_cast<size_t>(std::max(0, frames)));
         for (int i = 0; i < frames; ++i) {
+            if (m_micPick >= 0) {
+                mono[static_cast<size_t>(i)] =
+                    float(double(in[i * channels + m_micPick]) / 32768.0);
+                continue;
+            }
             double acc = 0.0;
             for (int c = 0; c < channels; ++c) {
                 acc += double(in[i * channels + c]) / 32768.0;
