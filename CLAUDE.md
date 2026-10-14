@@ -24,11 +24,19 @@
 > | Herkunftsangaben: „Fork von NereusSDR", Copyright J.J. Boyd (KG4VCF), Upstream-Links `boydsoftprez/NereusSDR`, Credits im Über-Dialog | GPL: Copyright- und Herkunftsvermerke dürfen nicht entfernt werden; das ist Geschichte, kein Name des Programms |
 > | Datierte Historien-Zeilen („2026-04-22 — Ported … for NereusSDR by …") | berichten von damals; nur die Überschrift des Blocks heißt jetzt Longpath |
 > | Übergangs-Erkennungen: `NereusSDR.settings` + Ordner `<config>/NereusSDR` (einmaliger Umzug), Schlüsselbund `NereusSDR: …` (Umzug beim ersten Lesen), Gerätename `NereusSDR VAX n` (altes Plug-in), Log-Dateien `nereussdr-*.log` (Aufräumen/Support-Bündel), XML-Wurzel `<NereusSDR>` | vorhandene Daten müssen weiter gefunden werden — Übergang, kein Nebeneinander auf Dauer |
-> | Repo-Ordnername `~/Longpath/NereusSDR` | Bau- und Startbefehl, Worktrees, Launch-Agents und eine zweite Session hängen daran; wird als eigener Schritt mit neuem Befehl umbenannt (ROADMAP B7) |
 > | Dokumente unter `docs/architecture/`, `docs/superpowers/`, `CHANGELOG.md`, `MASTER-PLAN.md` | datierte Entwurfs- und Verlaufsdokumente von damals |
 >
 > Ein neuer Verweis auf „Nereus" gehört in keine dieser Spalten und ist
 > ein Fehler.
+>
+> **Stand 2026-10-14 — der Ordner heißt jetzt auch so.** Betreiber:
+> „bitte nereus weg, longpath ist unser name." `~/Longpath/NereusSDR`
+> wurde nach `~/Longpath/Longpath` umbenannt, alle 36 Worktrees mit
+> `git worktree repair` nachgezogen (danach geprüft: keiner defekt, die
+> ungesicherten Änderungen im Hauptbaum unberührt). Der Bau- und
+> Startbefehl lautet ab jetzt `cd ~/Longpath/Longpath && ./build.sh &&
+> ./run.sh`. Damit ist ROADMAP B7 erledigt; von „Nereus" bleibt nur noch,
+> was in der Tabelle darüber steht.
 
 ## Project Goal
 

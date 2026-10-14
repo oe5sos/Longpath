@@ -93,20 +93,20 @@ gemischte Betriebsart.
 Der Ablauf im Überblick, und welche Rahmen Longpath nie schickt:
 
 ```bash
-python3 ~/Longpath/NereusSDR/tools/sunsdr_handshake_diff.py ~/Desktop/expert-A.pcap
+python3 ~/Longpath/Longpath/tools/sunsdr_handshake_diff.py ~/Desktop/expert-A.pcap
 ```
 
 **Der RX2-Einschalter** — der Rahmen, der sich zwischen A und B
 unterscheidet, ist er:
 
 ```bash
-python3 ~/Longpath/NereusSDR/tools/sunsdr_handshake_diff.py ~/Desktop/expert-A.pcap --vergleich ~/Desktop/expert-B.pcap
+python3 ~/Longpath/Longpath/tools/sunsdr_handshake_diff.py ~/Desktop/expert-A.pcap --vergleich ~/Desktop/expert-B.pcap
 ```
 
 **Die Abtastrate** — dasselbe mit C:
 
 ```bash
-python3 ~/Longpath/NereusSDR/tools/sunsdr_handshake_diff.py ~/Desktop/expert-A.pcap --vergleich ~/Desktop/expert-C.pcap
+python3 ~/Longpath/Longpath/tools/sunsdr_handshake_diff.py ~/Desktop/expert-A.pcap --vergleich ~/Desktop/expert-C.pcap
 ```
 
 Beide Befehle geben am Ende fertige `LONGPATH_SUNSDR_PRE`/`_EXTRA`-Zeilen
@@ -115,7 +115,7 @@ aus, mit denen sich derselbe Ablauf **ohne Neubau** ausprobieren lässt.
 **Die Wiederholungen** — Frage 2, mit Durchgang D:
 
 ```bash
-python3 ~/Longpath/NereusSDR/tools/sunsdr_handshake_diff.py --wiederholungen ~/Desktop/expert-96k.pcap
+python3 ~/Longpath/Longpath/tools/sunsdr_handshake_diff.py --wiederholungen ~/Desktop/expert-96k.pcap
 ```
 
 Dieser Befehl nennt zuerst die Abtastrate **je Kanal** und sagt dann
@@ -143,7 +143,7 @@ dieselbe Frage, ohne etwas zu schicken.
 ## Prüfen, dass die Auswertung funktioniert, ohne Mitschnitt
 
 ```bash
-python3 ~/Longpath/NereusSDR/tools/sunsdr_handshake_diff.py --selftest
+python3 ~/Longpath/Longpath/tools/sunsdr_handshake_diff.py --selftest
 ```
 
 Baut sich ein eigenes pcap und wertet es aus.

@@ -21,7 +21,7 @@ ist die einzige Gelegenheit, das nachzumessen.
 starten, verbinden — und das Protokoll mitlaufen lassen:
 
 ```bash
-cd ~/Longpath/NereusSDR && ./build.sh && ./run.sh
+cd ~/Longpath/Longpath && ./build.sh && ./run.sh
 ```
 
 Interessant sind drei Zahlen, die das Messgeraet auch liefert:
