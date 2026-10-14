@@ -155,7 +155,28 @@ void StripLiveMonitor::doStart()
     inFmt.setSampleRate(kRateHz);
     inFmt.setChannelCount(1);
     inFmt.setSampleFormat(QAudioFormat::Float);
+    // ── Einen Mehrkanalwandler NICHT zusammenlegen lassen ────────
+    //
+    // Gemessen am 2026-10-14: am Apollo Twin (sechzehn Eingaenge)
+    // nahm Qt die Bitte um einen Kanal an, und CoreAudio legte die
+    // sechzehn selbst zusammen -- Protokoll „channels 1". In Longpath
+    // kamen dabei -50 dBFS an, waehrend der Vorverstaerker sauber
+    // ausgesteuert war. Fuenfzehn stille Eingaenge in einer Mittelung
+    // kosten 20*log10(16) = 24 dB, und wer sie zieht, ist gleichgueltig.
+    //
+    // Also holt sich der Mithoerer das Geraet in seiner eigenen
+    // Kanalzahl und sucht sich den Eingang selbst aus. Zwei Kanaele
+    // bleiben wie bisher: ein Stereomikrofon gehoert zusammengelegt.
+    const int nativ = in.maximumChannelCount();
+    if (nativ > 2) { inFmt.setChannelCount(nativ); }
     if (!in.isFormatSupported(inFmt)) { inFmt.setSampleFormat(QAudioFormat::Int16); }
+    if (!in.isFormatSupported(inFmt)) {
+        inFmt.setSampleFormat(QAudioFormat::Float);
+        inFmt.setChannelCount(1);
+        if (!in.isFormatSupported(inFmt)) {
+            inFmt.setSampleFormat(QAudioFormat::Int16);
+        }
+    }
     if (!in.isFormatSupported(inFmt)) { inFmt = in.preferredFormat(); }
 
     QAudioFormat outFmt;
@@ -506,10 +527,9 @@ void StripLiveMonitor::pump()
     // Siehe m_inPick im Header. Bei einem oder zwei Kanälen werden
     // sie zusammengelegt; bei mehr wird EINER genommen, sonst
     // dividiert ein Mehrkanalwandler die Stimme in Grund und Boden.
-    const int pick = (m_inChannels > 2 && m_inPick < 0)
-                   ? 0
-                   : (m_inPick >= 0 && m_inPick < m_inChannels ? m_inPick
-                                                               : -1);
+    const int pick = (m_inPick >= 0 && m_inPick < m_inChannels)
+                   ? m_inPick
+                   : (m_inChannels > 2 ? m_autoPick : -1);
     if (int(m_kanalSpitze.size()) != m_inChannels) {
         m_kanalSpitze.assign(size_t(m_inChannels), 0.0f);
     }
@@ -688,6 +708,33 @@ void StripLiveMonitor::pump()
             qCInfo(lcAudio).noquote()
                 << "strip live monitor: je Kanal dBFS"
                 << je.join(QLatin1Char(' '));
+
+            // ── Den stillen Platz einmal verlassen ───────────────
+            //
+            // Nur wenn kein Kanal vorgegeben ist. Drei Sekunden
+            // Stille auf dem gehoerten Eingang, waehrend anderswo
+            // etwas ist: dann liegt das Mikrofon dort.
+            if (m_inPick < 0) {
+                int laut = m_autoPick;
+                for (int c = 0; c < m_inChannels; ++c) {
+                    if (m_kanalSpitze[size_t(c)]
+                        > m_kanalSpitze[size_t(laut)]) { laut = c; }
+                }
+                const bool stillHier =
+                    dB(m_kanalSpitze[size_t(m_autoPick)]) < -65.0f;
+                const bool lautDort = dB(m_kanalSpitze[size_t(laut)]) > -55.0f;
+                if (stillHier && lautDort && laut != m_autoPick) {
+                    if (++m_stilleSek >= 3) {
+                        qCInfo(lcAudio)
+                            << "strip live monitor: Eingang" << (m_autoPick + 1)
+                            << "ist still, wechsle auf" << (laut + 1);
+                        m_autoPick = laut;
+                        m_stilleSek = 0;
+                    }
+                } else {
+                    m_stilleSek = 0;
+                }
+            }
         }
         std::fill(m_kanalSpitze.begin(), m_kanalSpitze.end(), 0.0f);
     }

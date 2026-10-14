@@ -373,6 +373,13 @@ private:
     // StripMonitorInChannel.
     int m_inPick{-1};
 
+    // Der tatsaechlich gehoerte Kanal, wenn keiner vorgegeben ist.
+    // Faengt bei null an und wandert einmal weiter, wenn dort drei
+    // Sekunden lang nichts war und anderswo schon -- sonst sitzt man
+    // vor einem stillen Kopfhoerer und sucht den Fehler in der Kette.
+    int m_autoPick{0};
+    int m_stilleSek{0};
+
     // Je Kanal die Spitze der letzten Sekunde, fuer das Protokoll.
     // Ohne diese Zeile ist „der falsche Kanal" von „der Vorverstaerker
     // steht zu leise" nicht zu unterscheiden.
