@@ -2877,6 +2877,100 @@ private slots:
     // (Energie 2-4 kHz gegen 0,3-1 kHz) und Dichte (LUFS bei gleicher
     // Spitze). Die Reihe sagt, welcher Griff wieviel bringt -- und ob
     // überhaupt.
+    // ── Woher der „Druck" kommt, den er vermisst ────────────────
+    //
+    // „mir geht einfach dieser druck in der stimme ab, mehr power"
+    // (2026-10-14).
+    //
+    // Verdacht, und er steht im Quelltext: AetherPreset.cpp:419
+    // schaltet beim Einlesen den Clipper AUS -- Aether kennt die
+    // Stufe nicht, also wird sie nicht geraten, sondern neutral
+    // gestellt. Das ist beim Einlesen richtig. Nur traegt genau diese
+    // Stufe den groessten Teil der Dichte (frueher gemessen: 6,3 von
+    // 8,9 dB), und damit kommt sein Lieblingsprofil ohne das herein,
+    // wofuer er es waehlt.
+    //
+    // Gemessen wird bei GLEICHER LAUTHEIT, nicht bei gleicher
+    // Spitze: „Druck" heisst, dass bei derselben gehoerten
+    // Lautstaerke weniger Spitze gebraucht wird -- und die Spitze
+    // ist es, die die Endstufe begrenzt. Der Gewinn fuer die
+    // Gegenseite ist deshalb genau die Differenz der Scheitelwerte.
+    void whereThePunchComesFrom()
+    {
+        QString warum;
+        const auto sauber = echteRede(&warum);
+        if (sauber.empty()) { QSKIP(qPrintable(warum)); }
+        const Rede rede = redeMitRauschen(sauber, -60.0);
+
+        const QString profil = QString::fromLatin1(LONGPATH_TEST_DATA_DIR)
+                               + QStringLiteral("/aether-ssb-30-07-2026.json");
+        if (!QFile::exists(profil)) { QSKIP("Martins Profil fehlt"); }
+
+        const auto fahre = [&](float clipDb) {
+            StripChain c;
+            c.prepare(kRate);
+            const auto e = AetherPreset::applyFile(profil, c);
+            if (!e.ok) { return std::vector<float>{}; }
+            c.setEnabled(true);
+            if (clipDb > 0.0f) {
+                c.setStageEnabled(StripChain::Stage::Clip, true);
+                c.clipper().setDriveDb(clipDb);
+                c.clipper().setKnee(0.2f);
+                c.clipper().setLevelMatch(false);
+            }
+            std::vector<float> x = rede.signal;
+            constexpr int kBlock = 64;
+            for (size_t at = 0; at + kBlock <= x.size(); at += kBlock) {
+                c.processMono(x.data() + at, kBlock);
+            }
+            return durchKanal(3, x);          // 50 - 4050, sein Kanal
+        };
+
+        // Auf gleiche LAUTHEIT bringen, dann die Spitze ablesen.
+        const auto beiGleicherLautheit = [](std::vector<float> v) {
+            const auto m = Loudness::measure(v.data(), int(v.size()),
+                                             int(kRate));
+            const double g = std::pow(10.0, (-20.0 - m.integratedLufs) / 20.0);
+            double pk = 0.0;
+            for (float& x : v) { x = float(x * g);
+                                 pk = std::max(pk, double(std::fabs(x))); }
+            return pk > 1e-9 ? 20.0 * std::log10(pk) : -120.0;
+        };
+
+        struct V { const char* name; float clip; };
+        static const V kV[] = {
+            { "wie eingelesen (ohne Clipper)",  0.0f },
+            { "Clipper  6 dB",                  6.0f },
+            { "Clipper 12 dB",                 12.0f },
+            { "Clipper 18 dB",                 18.0f },
+        };
+
+        qInfo().noquote() << QStringLiteral(
+            "   durch 50–4050 Hz, alles auf −20 LUFS gebracht"
+            "        Spitze    Gewinn gegen „ohne\"");
+        double ohne = 0.0;
+        bool erste = true;
+        for (const V& v : kV) {
+            const auto aus = fahre(v.clip);
+            QVERIFY2(!aus.empty(), "das Profil liess sich nicht einlesen");
+            const double spitze = beiGleicherLautheit(aus);
+            if (erste) { ohne = spitze; erste = false; }
+            qInfo().noquote() << QStringLiteral("  %1 %2 dBFS   %3 dB")
+                .arg(QString::fromLatin1(v.name), -34)
+                .arg(spitze, 6, 'f', 1)
+                .arg(ohne - spitze, 5, 'f', 1);
+        }
+
+        // Die Aussage, die bleiben soll: der Clipper kauft Druck, und
+        // zwar messbar. Faellt das hier auf null, ist entweder die
+        // Stufe kaputt oder das Profil begrenzt schon vorher.
+        const double mit12 = beiGleicherLautheit(fahre(12.0f));
+        QVERIFY2(ohne - mit12 > 2.0,
+                 qPrintable(QStringLiteral("der Clipper bringt nur %1 dB -- "
+                                           "dann stimmt etwas nicht")
+                                .arg(ohne - mit12, 0, 'f', 1)));
+    }
+
     void whatHelpsInsideTheFourKilohertz()
     {
         QString warum;

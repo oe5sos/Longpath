@@ -426,9 +426,29 @@ Ergebnis apply(const QJsonObject& wurzel, StripChain& c)
             "überlesen — Longpath hat auf der Empfangsseite keinen "
             "Kanalzug.");
     }
+    // ── Und was das KOSTET, nicht nur dass es so ist ────────────
+    //
+    // „mir geht einfach dieser druck in der stimme ab, mehr power"
+    // (2026-10-14). Der Satz stand schon hier, aber als technische
+    // Mitteilung: drei Stufen sind aus, weil Aether sie nicht kennt.
+    // Richtig -- geraten wird nicht. Nur ist eine davon diejenige,
+    // die den Druck macht, und das stand nirgends.
+    //
+    // Gemessen an seiner Stimme durch seinen eigenen Kanal
+    // (50-4050 Hz), alles auf -20 LUFS gebracht, also bei GLEICHER
+    // Lautheit verglichen: ohne Clipper -3,6 dBFS Spitze, mit 12 dB
+    // Anhebung -6,7 dBFS. Das sind 3,1 dB weniger Spitze bei
+    // gleichem Gehoer -- auf dem Band also 3 dB mehr Mittelwert bei
+    // derselben Spitzenleistung. Der Pruefstand dazu:
+    // tests/tst_bandbreiten_genau.cpp, whereThePunchComesFrom.
     e.hinweise << QStringLiteral(
         "Entrauschen, Clipper und die Eingangsautomatik sind aus: die "
-        "kennt Aether nicht.");
+        "kennt Aether nicht. Der Clipper ist dabei die Stufe, die die "
+        "Dichte macht — an deiner Stimme durch 50–4050 Hz gemessen "
+        "bringt er mit 12 dB Anhebung 3,1 dB weniger Spitze bei "
+        "gleicher Lautheit, also 3 dB mehr Mittelwert bei derselben "
+        "Spitzenleistung. Wenn dir \u201eDruck\u201c fehlt: dort "
+        "liegt er.");
 
     e.ok = true;
     return e;
