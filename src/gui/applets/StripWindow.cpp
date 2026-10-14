@@ -417,6 +417,16 @@ void StripWindow::toggleLiveMonitor(bool on)
         m_live->setVolume(m_liveVol ? m_liveVol->value() / 100.0 : 0.5);
         m_live->setMonitorChannel(
             m_liveChannel ? m_liveChannel->currentData().toInt() : -1);
+        // ── Welcher EINGANG des Geraets ──────────────────────────
+        //
+        // Nicht zu verwechseln mit der Zeile darueber: die waehlt die
+        // Bandgrenze des Senders, diese den Kanal des Wandlers. An
+        // einem Apollo Twin mit sechzehn Eingaengen liegt die Stimme
+        // auf einem davon. -1 legt alle zusammen (richtig fuer ein
+        // Mikrofon), sonst der Index ab null.
+        m_live->setInputPick(
+            AppSettings::instance()
+                .value(QStringLiteral("StripMonitorInChannel"), -1).toInt());
         // ── Und die Geraete, VOR dem Start ───────────────────────
         //
         // Der Mithoerer wird hier erst erzeugt. Die
@@ -4136,7 +4146,21 @@ void StripWindow::refreshMeters()
     if (m_eingangNote && m_zielTick == 0) {
         // Dieselbe Zahl, mit der der Knopf rechnet -- sonst zeigt die
         // Zeile das eine und der Druck tut das andere.
-        const double roh = double(c->speechPeakDb());
+        //
+        // Und: steht der Hauptschalter aus, misst die Kette NICHT --
+        // processMono() kehrt vorher um. Die Zahl von vorhin stehen
+        // zu lassen hat am 2026-10-14 eine Stunde gekostet: die Zeile
+        // sagte „0,0 dBFS, 12 dB zu viel", waehrend am Apollo in
+        // Wahrheit -55 dBFS ankamen. Ein Messgeraet, das bei
+        // abgeschaltetem Messwerk den letzten Zeigerstand behaelt,
+        // ist schlimmer als keines.
+        const bool laeuft = c->isEnabled();
+        const double roh = laeuft ? double(c->speechPeakDb()) : -120.0;
+        if (!laeuft) {
+            m_eingangNote->setText(Sprache::T(QStringLiteral(
+                "Input: strip is off — nothing being measured")));
+            if (m_eingangBtn) { m_eingangBtn->setEnabled(false); }
+        } else {
         if (m_eingangBtn && m_eingangAuto) {
             m_eingangBtn->setEnabled(!m_eingangAuto->isChecked()
                                      && roh >= -90.0);
@@ -4157,6 +4181,7 @@ void StripWindow::refreshMeters()
                           .arg(std::fabs(fehlt), 0, 'f', 0)
                           .arg(fehlt > 0 ? Sprache::T(QStringLiteral("missing"))
                                          : Sprache::T(QStringLiteral("too hot"))));
+        }
         }
     }
     if (m_crestNote && m_zielTick == 0) {

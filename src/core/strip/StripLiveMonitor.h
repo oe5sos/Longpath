@@ -332,6 +332,15 @@ private:
     int m_rohPos{0};
     int m_rohLaenge{0};
     void verzoegereRoh(float* samples, int frames) noexcept;
+
+public:
+    /// Welcher Eingang des Geraets gehoert wird. -1 legt alle
+    /// zusammen -- richtig bei einem Mikrofon, falsch bei einem
+    /// Mehrkanalwandler. Siehe m_inPick.
+    void setInputPick(int index) noexcept;
+    int  inputPick() const noexcept;
+
+private:
     std::unique_ptr<MicSpectrum> m_inRing;
     std::unique_ptr<MicSpectrum> m_outRing;
     const StripChain* m_mirror{nullptr};   // nicht besessen
@@ -348,6 +357,26 @@ private:
     int m_blockFrames{256};
     int m_inRate{48000};
     int m_inChannels{1};
+
+    // ── Welcher Eingang die Stimme traegt ────────────────────────
+    //
+    // Bis zum 2026-10-14 wurden ALLE Kanäle des Geräts gemittelt.
+    // Bei einem Headset an der Klinke (ein Kanal) faellt das nicht
+    // auf. An einem Apollo Twin mit sechzehn Eingaengen schon: das
+    // Mikrofon liegt auf einem davon, die anderen fuenfzehn sind
+    // still -- und die Division durch sechzehn nimmt der Stimme
+    // 24 dB. Gemessen hat Longpath danach -55 dBFS, wo der
+    // Vorverstaerker sauber ausgesteuert war.
+    //
+    // -1 heisst „zusammenlegen" (richtig fuer ein- und zweikanalige
+    // Geraete), sonst der Index des einen Kanals. Steht hinter
+    // StripMonitorInChannel.
+    int m_inPick{-1};
+
+    // Je Kanal die Spitze der letzten Sekunde, fuer das Protokoll.
+    // Ohne diese Zeile ist „der falsche Kanal" von „der Vorverstaerker
+    // steht zu leise" nicht zu unterscheiden.
+    std::vector<float> m_kanalSpitze;
     int m_inFormat{0};          // QAudioFormat::SampleFormat
     int m_outChannels{2};
     int m_outFormat{0};

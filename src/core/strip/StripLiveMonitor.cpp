@@ -23,6 +23,7 @@
 #include <QAudioSource>
 #include <QIODevice>
 #include <QMediaDevices>
+#include <QStringList>
 #include <QThread>
 
 #include <algorithm>
@@ -288,6 +289,9 @@ void StripLiveMonitor::doStart()
                     << "->" << out.description()
                     << "rate" << m_inRate
                     << "block" << m_blockFrames
+                    << "channels" << m_inChannels
+                    << "pick" << (m_inChannels > 2 && m_inPick < 0
+                                      ? 0 : m_inPick)
                     << "own latency ~" << m_latencyMs.load() << "ms";
     emit started();
 }
@@ -442,6 +446,16 @@ int StripLiveMonitor::monitorChannel() const
 // Siehe m_rohVerzug im Header: der ueberbrueckte Weg muss genauso
 // lange brauchen wie die Kette, sonst vergleicht das Ohr Laufzeiten
 // statt Klang.
+void StripLiveMonitor::setInputPick(int index) noexcept
+{
+    m_inPick = index;
+}
+
+int StripLiveMonitor::inputPick() const noexcept
+{
+    return m_inPick;
+}
+
 void StripLiveMonitor::verzoegereRoh(float* samples, int frames) noexcept
 {
     const int soll = std::clamp(m_chain->nr().latencySamples(), 0, kMaxVerzug);
@@ -487,29 +501,49 @@ void StripLiveMonitor::pump()
     m_carry.clear();
     m_mono.reserve(m_mono.size() + size_t(frames));
 
+    // ── Welcher Eingang gehoert wird ────────────────────────────
+    //
+    // Siehe m_inPick im Header. Bei einem oder zwei Kanälen werden
+    // sie zusammengelegt; bei mehr wird EINER genommen, sonst
+    // dividiert ein Mehrkanalwandler die Stimme in Grund und Boden.
+    const int pick = (m_inChannels > 2 && m_inPick < 0)
+                   ? 0
+                   : (m_inPick >= 0 && m_inPick < m_inChannels ? m_inPick
+                                                               : -1);
+    if (int(m_kanalSpitze.size()) != m_inChannels) {
+        m_kanalSpitze.assign(size_t(m_inChannels), 0.0f);
+    }
+
     const char* raw = chunk.constData();
     for (int f = 0; f < frames; ++f) {
         double sum = 0.0;
+        double gewaehlt = 0.0;
         for (int c = 0; c < m_inChannels; ++c) {
             const char* at = raw + size_t(f * m_inChannels + c) * size_t(inBps);
+            double v = 0.0;
             switch (inFmt) {
             case QAudioFormat::Float: {
-                float v; std::memcpy(&v, at, sizeof(v)); sum += double(v); break;
+                float x; std::memcpy(&x, at, sizeof(x)); v = double(x); break;
             }
             case QAudioFormat::Int16: {
-                qint16 v; std::memcpy(&v, at, sizeof(v)); sum += v / 32768.0; break;
+                qint16 x; std::memcpy(&x, at, sizeof(x)); v = x / 32768.0; break;
             }
             case QAudioFormat::Int32: {
-                qint32 v; std::memcpy(&v, at, sizeof(v));
-                sum += v / 2147483648.0; break;
+                qint32 x; std::memcpy(&x, at, sizeof(x));
+                v = x / 2147483648.0; break;
             }
             case QAudioFormat::UInt8: {
-                sum += (double(quint8(*at)) - 128.0) / 128.0; break;
+                v = (double(quint8(*at)) - 128.0) / 128.0; break;
             }
             default: break;
             }
+            sum += v;
+            if (c == pick) { gewaehlt = v; }
+            m_kanalSpitze[size_t(c)] =
+                std::max(m_kanalSpitze[size_t(c)], float(std::fabs(v)));
         }
-        m_mono.push_back(float(sum / m_inChannels));
+        m_mono.push_back(pick >= 0 ? float(gewaehlt)
+                                   : float(sum / m_inChannels));
     }
 
     // Nur ganze Kettenbloecke rechnen; der Rest wartet auf den
@@ -638,6 +672,24 @@ void StripLiveMonitor::pump()
                                         - m_sink->bytesFree())
                         << "of" << m_sink->bufferSize()
                         << "ratio" << m_ratio;
+        // ── Und je Kanal, wenn das Geraet mehrere hat ────────────
+        //
+        // Damit „der falsche Kanal" von „der Vorverstaerker steht zu
+        // leise" zu unterscheiden ist. Am 2026-10-14 war genau das
+        // die offene Frage am Apollo Twin.
+        if (m_inChannels > 2) {
+            QStringList je;
+            for (int c = 0; c < m_inChannels; ++c) {
+                je << QStringLiteral("%1:%2")
+                          .arg(c + 1)
+                          .arg(double(dB(m_kanalSpitze[size_t(c)])),
+                               0, 'f', 1);
+            }
+            qCInfo(lcAudio).noquote()
+                << "strip live monitor: je Kanal dBFS"
+                << je.join(QLatin1Char(' '));
+        }
+        std::fill(m_kanalSpitze.begin(), m_kanalSpitze.end(), 0.0f);
     }
 
     // ── Hinaus ───────────────────────────────────────────────────────
