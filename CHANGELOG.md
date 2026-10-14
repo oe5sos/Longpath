@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+## [0.6.9] - 2026-10-14
+
+Neun Commits seit 0.6.8. Thema: **was im Protokoll steht — und was dort
+fehlte.** Sieben der neun Stuecke beginnen damit, dass eine Frage am
+laufenden Geraet nicht zu beantworten war, weil nichts aufgeschrieben
+wurde: ob der Rotor verbunden ist, ob der Vorverstaerker und die
+Daempfung derselbe Steller sind, ob die Suche im richtigen Netz sucht,
+ob die Uebersteuerungserkennung ueberhaupt anschlaegt, ob die
+Update-Pruefung durchkam.
+
+Der Anlass fuer diese Fassung ist der letzte Punkt. Auf dem zweiten
+Rechner des Betreibers (Mac mini) stand 0.6.5 und blieb dort: der
+Updater kennt nur `api.github.com`, und dieser Rechner erreicht die
+Adresse nicht. **Ohne diese Veroeffentlichung kommt die Abhilfe bei
+niemandem an**, denn die ausgelieferte 0.6.8 traegt sie noch nicht.
+
 ### Der Updater kommt auch ohne api.github.com weiter
 
 Auf dem Mac mini des Betreibers stand 0.6.5, waehrend das MacBook
@@ -48,6 +64,59 @@ zweite Weg belegen statt behaupten. Der Prueflauf dazu ist mit
 `LONGPATH_NET_TESTS=1` scharf; die Gegenprobe mit abgeschaltetem
 Rueckfall faellt, wie sie soll.
 
+
+### Der Rotor stuerzte beim Beenden ab (#217)
+
+Seit der Rotor am 2026-10-10 wieder am Netz haengt, stuerzte Longpath
+beim Beenden ab — sechs Berichte in `~/Library/Logs/DiagnosticReports`,
+alle denselben Weg. Behoben.
+
+### Der Rotorzustand steht jetzt im Protokoll (#224)
+
+Am 2026-10-11 stand in den Protokollen keine einzige Zeile darueber, ob
+der Rotor verbunden war; „Rotator connected" liess sich nur am
+Statusschild im Fenster ablesen — der Widget-Baum der laufenden Instanz
+musste ueber die Automatisierungsbruecke abgefragt werden, um es zu
+sehen. Jetzt: eine Zeile je Wechsel, nicht mehr.
+
+### QRP: Vorverstaerker und Daempfung sind EIN Steller (#219)
+
+Beide Setter schreiben Opcode 0x04 mit demselben Stufenindex an
+derselben Stelle (Byte 18): 00/01/02/03 = -20/-10/0/+10 dB. Wer eines
+bewegt, verstellt das andere mit, und die Anzeige des anderen stimmt
+danach nicht mehr. Der Befund ist festgehalten, nicht geraten.
+
+### QRP: die Suche sagt, ob das Geraet im eigenen Netz liegt (#225)
+
+Ein Messlauf lief fuenf Suchversuche — 90 Sekunden — ins Leere und
+meldete „keine Antwort", also dieselbe Meldung wie bei einem gesperrten
+Geraet. Die Ursache stand nirgends: der Rechner hing in einem anderen
+Netz als die eingetragene Adresse. Das sagt der erste Fehlversuch jetzt.
+
+### QRP: Pruefstand fuer die Uebersteuerungserkennung (#223)
+
+Die QRP meldet Uebersteuerung nicht selbst; Longpath liest sie aus dem
+Signal, indem es Proben am Anschlag zaehlt. Belegt war bisher nur die
+eine Haelfte — dass sie nicht falsch anschlaegt. Jetzt auch die andere.
+
+### QRP: vier tote Rahmen, zwei Temperaturen, zwei Behauptungen weniger (#212)
+
+Aufraeumen in der Paritaetsliste: zwei Punkte standen dort als offen,
+die laengst gebaut waren.
+
+### MaxBin: der Haltewert klebte nach einem starken Signal oben (#215)
+
+In der Vorlage als „the BIN meter no longer sticks near the top of the
+scale after a very strong signal" beschrieben — bei uns an zwei Stellen
+bestaetigt und behoben.
+
+### App am Telefon: Panadapter und Wasserfall 1:1 wie Longpath (#214)
+
+Betreiber: „ich wuerde gerne die grafik vom longpath software 1:1 auf
+das app in bezug auf farben und hintergrund verwenden". Wert fuer Wert
+gegen `StyleConstants.h` nachgemessen.
+
+Keine Windows-Pakete — unveraendert seit 0.6.7.
 
 ## [0.6.8] - 2026-10-08
 
