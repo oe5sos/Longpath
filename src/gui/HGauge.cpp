@@ -1,5 +1,6 @@
 // src/gui/HGauge.cpp
 #include "gui/styles/ThemeQss.h"
+#include "gui/Zahlentext.h"
 #include "HGauge.h"
 #include "StyleConstants.h"
 #include <QPainter>
@@ -66,7 +67,11 @@ static QString readoutText(double v, double min, int decimals,
                            const QString& unit)
 {
     if (v <= min) { return QStringLiteral("\u2014"); }
-    QString s = QLocale::system().toString(v, 'f', decimals);
+    // Ueber anzeigeZahl, nicht direkt ueber QLocale: so gibt es EINE
+    // Stelle, die entscheidet, wie eine gelesene Zahl aussieht -- und
+    // die Tausendergruppierung ist dort abgeschaltet (bei QLocale ist
+    // sie an, was aus 1296 MHz "1.296,000000" machen wuerde).
+    QString s = anzeigeZahl(v, decimals);
     if (!unit.isEmpty()) { s += QLatin1Char(' ') + unit; }
     return s;
 }

@@ -13,6 +13,7 @@
 // eigener Zuschnitt, Aether hat fuer dieses Applet keinen.
 
 #include <QtTest>
+#include <QLocale>
 #include <QLabel>
 #include <QListWidget>
 
@@ -117,7 +118,19 @@ private slots:
 
         QString txt = allText(&applet);
         qInfo().noquote() << "Mit Scheibe:" << txt;
-        QVERIFY2(txt.contains(QStringLiteral("7.100000")), qPrintable(txt));
+        // Das Dezimaltrennzeichen ist seit 2026-10-13 das des Systems
+        // (src/gui/Zahlentext.h, anzeigeZahl()). Hier stand bis dahin
+        // "7.100000" festgenagelt -- auf einem deutschen Rechner also
+        // rot, und genau so ist dieser Fall aufgefallen: beim
+        // Gesamtlauf, NACH dem Commit, der die Umstellung brachte.
+        //
+        // Erwartet wird darum, was QLocale::system() schreibt, nicht ein
+        // bestimmtes Zeichen -- sonst faellt der Fall auf einem
+        // englischen Rechner und in der CI.
+        QLocale lok = QLocale::system();
+        lok.setNumberOptions(QLocale::OmitGroupSeparator);
+        const QString erwartet = lok.toString(7.1, 'f', 6);
+        QVERIFY2(txt.contains(erwartet), qPrintable(txt + " | erwartet: " + erwartet));
         QVERIFY2(!txt.contains(QStringLiteral("Nicht zugeordnet")),
                  qPrintable(txt));
 
@@ -132,8 +145,13 @@ private slots:
         slice.setFrequency(14'074'000.0);
         txt = allText(&applet);
         qInfo().noquote() << "Nach dem Abstimmen:" << txt;
-        QVERIFY2(txt.contains(QStringLiteral("14.074000")), qPrintable(txt));
-        QVERIFY2(!txt.contains(QStringLiteral("7.100000")), qPrintable(txt));
+        // Wieder die Locale, nicht das Zeichen -- siehe oben.
+        const QString erwartetNeu = lok.toString(14.074, 'f', 6);
+        const QString erwartetAlt = lok.toString(7.1, 'f', 6);
+        QVERIFY2(txt.contains(erwartetNeu),
+                 qPrintable(txt + " | erwartet: " + erwartetNeu));
+        QVERIFY2(!txt.contains(erwartetAlt),
+                 qPrintable(txt + " | nicht erwartet: " + erwartetAlt));
     }
 };
 

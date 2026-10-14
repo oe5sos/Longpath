@@ -18,6 +18,7 @@
 // =================================================================
 
 #include "AmpApplet.h"
+#include "gui/Zahlentext.h"
 #include "gui/styles/ThemeQss.h"
 #include "gui/HGauge.h"
 
@@ -187,7 +188,7 @@ void AmpApplet::updatePowerLabel()
     m_powerLabel->setText(
         QStringLiteral("Volts: %1V  Amps: %2A")
             .arg(m_mainsVolts)
-            .arg(static_cast<double>(m_drainAmps), 0, 'f', 1));
+            .arg(anzeigeZahl(static_cast<double>(m_drainAmps), 1)));
     m_powerLabel->show();
 }
 

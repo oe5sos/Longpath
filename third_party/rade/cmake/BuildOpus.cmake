@@ -17,7 +17,16 @@
 #      OPUS_DRED and OPUS_OSCE options, so the Windows path uses CMake
 #      to bypass autotools entirely. Linux + non-universal macOS keep
 #      the autotools chain.
-# All four are noted at their site as well. See Task A2 of
+#   5. OPUS_URL_SHA256 + URL_HASH an allen vier ExternalProject_Add.
+#      Ohne URL_HASH loescht CMake eine bereits vorhandene Archivdatei
+#      und laedt sie neu -- es sagt das in seinem eigenen Protokoll:
+#      "File already exists but no hash specified (use URL_HASH): Old
+#      file will be removed and new file downloaded from URL."
+#      Folge: JEDER frische Arbeitsbaum ist netzabhaengig, auch wenn das
+#      Archiv daneben liegt, und niemand prueft, ob das Geholte das
+#      Gemeinte ist. Am 2026-10-11 hat das einen ganzen Build blockiert,
+#      weil GitHub nicht erreichbar war.
+# All five are noted at their site as well. See Task A2 of
 # docs/architecture/phase3j2-3r-spots-and-rade-design.md.
 
 message(STATUS "Will build opus with FARGAN")
@@ -32,6 +41,37 @@ if (NOT DEFINED OPUS_URL)
 set(OPUS_URL https://github.com/xiph/opus/archive/940d4e5af64351ca8ba8390df3f555484c567fbb.zip)
 endif (NOT DEFINED OPUS_URL)
 message(STATUS "Using Opus from ${OPUS_URL}")
+
+# NereusSDR vendored patch (5): Pruefsumme des Archivs.
+#
+# Sie tut ZWEI Dinge. Erstens darf CMake eine vorhandene Datei dann
+# behalten -- ohne URL_HASH loescht es sie und laedt neu, bei jedem
+# frischen Arbeitsbaum, auch wenn das Archiv daneben liegt. Zweitens
+# wird ueberhaupt geprueft, was da geholt wurde.
+#
+# Der Wert ist die Summe des Archivs, mit dem dieser Baum seit dem
+# 2026-08-30 gebaut wird und am Geraet laeuft. Gemessen, nicht von der
+# Projektseite abgeschrieben:
+#   shasum -a 256 build/third_party/rade/build_opus-prefix/src/940d4e5a*.zip
+#
+# ACHTUNG, wenn das hier je rot wird: GitHub garantiert fuer
+# `archive/<sha>.zip` KEINE byteweise gleiche Auslieferung -- aendert es
+# seine Kompression, aendert sich die Summe, ohne dass am Inhalt etwas
+# faul ist. Dann die neue Summe gegen den entpackten Inhalt pruefen
+# (der Commit ist festgenagelt) und hier eintragen; NICHT einfach
+# URL_HASH wieder entfernen, sonst ist der Netzzwang zurueck. Wer ein
+# eigenes OPUS_URL setzt, setzt auch ein eigenes OPUS_URL_SHA256 --
+# oder leer, dann wird wie vorher nicht geprueft.
+if (NOT DEFINED OPUS_URL_SHA256)
+set(OPUS_URL_SHA256 20e37f9079ac2b80e3235cd8ce2547829e147bf44a2f5dd28a888fa3e9c24341)
+endif (NOT DEFINED OPUS_URL_SHA256)
+
+if (OPUS_URL_SHA256)
+set(OPUS_URL_HASH_ARG URL_HASH SHA256=${OPUS_URL_SHA256})
+else (OPUS_URL_SHA256)
+set(OPUS_URL_HASH_ARG "")
+message(STATUS "Opus-Archiv wird NICHT geprueft (OPUS_URL_SHA256 leer)")
+endif (OPUS_URL_SHA256)
 
 include(ExternalProject)
 if(APPLE AND BUILD_OSX_UNIVERSAL)
@@ -50,6 +90,7 @@ ExternalProject_Add(build_opus_x86
     # of phase3j2-3r-spots-and-rade-design.md.
     INSTALL_COMMAND ""
     URL ${OPUS_URL}
+    ${OPUS_URL_HASH_ARG}
 )
 ExternalProject_Add(build_opus_arm
     DOWNLOAD_EXTRACT_TIMESTAMP NO
@@ -64,6 +105,7 @@ ExternalProject_Add(build_opus_arm
     # of phase3j2-3r-spots-and-rade-design.md.
     INSTALL_COMMAND ""
     URL ${OPUS_URL}
+    ${OPUS_URL_HASH_ARG}
 )
 
 ExternalProject_Get_Property(build_opus_arm BINARY_DIR)
@@ -146,6 +188,7 @@ ExternalProject_Add(build_opus
     BUILD_BYPRODUCTS ${_opus_static_lib}
     INSTALL_COMMAND ""
     URL ${OPUS_URL}
+    ${OPUS_URL_HASH_ARG}
 )
 
 ExternalProject_Get_Property(build_opus BINARY_DIR)
@@ -193,6 +236,7 @@ set(_opus_static_lib ${_opus_binary_dir}/${CMAKE_STATIC_LIBRARY_PREFIX}opus${CMA
 ExternalProject_Add(build_opus
     DOWNLOAD_EXTRACT_TIMESTAMP NO
     URL ${OPUS_URL}
+    ${OPUS_URL_HASH_ARG}
     # Two-step patch: (1) fetch DRED/OSCE model tarball + extract into
     # dnn/ via the upstream Windows-native script; (2) apply the
     # NereusSDR opus-nnet.h.diff that adds RADE_EXPORT visibility tags
@@ -260,6 +304,7 @@ ExternalProject_Add(build_opus
     BUILD_BYPRODUCTS ${_opus_static_lib}
     INSTALL_COMMAND ""
     URL ${OPUS_URL}
+    ${OPUS_URL_HASH_ARG}
 )
 
 ExternalProject_Get_Property(build_opus BINARY_DIR)

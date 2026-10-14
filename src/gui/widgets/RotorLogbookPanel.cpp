@@ -239,6 +239,37 @@ RotorLogbookPanel::RotorLogbookPanel(RadioModel* radio, QrzClient* qrz,
     solarTick->start();
 }
 
+// ── Abbau ──────────────────────────────────────────────────────────────
+//
+// Diese zwei Zeilen sind die ERSTEN im Abbau, und das ist der ganze
+// Punkt. Der Weg, den der Betreiber sechs Mal gesehen hat (Berichte vom
+// 2026-10-10 16:05/16:06/16:10/16:13, 21:34 und 2026-10-11 11:08, alle
+// SIGSEGV):
+//
+//   ~RotorLogbookPanel -> ~QWidget -> deleteChildren()
+//     -> ~RotctldClient -> ~QAbstractSocket -> disconnectFromHost()
+//     -> stateChanged(Disconnected) -> das Lambda aus ensureRotor()
+//     -> setStatus() -> m_status->setText()   == toter Zeiger
+//
+// Die Kinder werden in der Reihenfolge geloescht, in der sie angelegt
+// wurden: das Statusschild baut buildUi() zuerst, den Rotctld-Client
+// legt ensureRotor() spaeter an. Wenn also der Socket im Abbau noch
+// einmal meldet, ist das Schild schon weg -- und die QObject-Basis des
+// Feldes lebt noch, weshalb die Verbindung noch traegt.
+//
+// Dieselbe Fehlerform steckte in diesem Programm schon in
+// SpeConnection, MainWindow, PgxlConnection und TgxlConnection; behoben
+// wird sie an der Ursache (Verbindung trennen), nicht mit einer
+// Abbau-Fahne und Waechtern in jedem Zweig.
+//
+// m_rotorProc ist ein MITGLIED und wird noch vor den Kindern abgebaut;
+// sein exited()-Rueckruf fasst dasselbe Schild an, also geht er mit.
+RotorLogbookPanel::~RotorLogbookPanel()
+{
+    if (m_rotor) { m_rotor->disconnect(this); }
+    m_rotorProc.disconnect(this);
+}
+
 QString RotorLogbookPanel::logbookPath()
 {
     // Eine Stelle fuer alle: seit dem QSO-Eintrag vom Telefon (TCI

@@ -1792,6 +1792,20 @@ longpath_add_test(tst_tx_frequency_follows_tx_slice)
 # FM-Relais: Ablage, Reverse, 49 Toene, Speichern (2026-09-27).
 longpath_add_test(tst_fm_repeater_wiring)
 longpath_add_test(tst_fm_deviation)
+longpath_add_test(tst_rx_equalizer)
+longpath_add_test(tst_cat_protokoll)
+longpath_add_test(tst_cat_server)
+longpath_add_test(tst_cat_zz)
+longpath_add_test(tst_schutzrahmen)
+longpath_add_test(tst_neues_feld_schaltet_sich_nicht_ein)
+longpath_add_test(tst_schwarzer_hintergrund)
+longpath_add_test(tst_multi_rx_pegel)
+longpath_add_test(tst_thetis_profil_import)
+longpath_add_test(tst_cat_verdrahtung)
+longpath_add_test(tst_mehrere_fenster)
+longpath_add_test(tst_phone_felder)
+longpath_add_test(tst_rufzeichen_locator)
+longpath_add_test(tst_zahlentext)
 longpath_add_test(tst_fm_applet_wiring)
 
 # ── Phase 3F Sub-Epic B Task 17: AlexController event-matrix coverage ─────────
@@ -5096,6 +5110,11 @@ longpath_add_test(tst_applet_window_size)
 longpath_add_test(tst_real_mainwindow_detach)
 longpath_add_test(tst_real_pan_float)
 longpath_add_test(tst_real_rotor_window)
+
+# tst_rotor_panel_abbau: der Abbau des Rotor-Feldes bei stehender
+# Verbindung. Sechs Abstuerze beim Beenden (2026-10-10/11), seit der
+# Rotor wieder im Netz haengt; die fuenfte Stelle derselben Fehlerform.
+longpath_add_test(tst_rotor_panel_abbau)
 longpath_add_test(tst_real_status_bar_chain_indicators)
 longpath_add_test(tst_app_settings_autosave)
 longpath_add_test(tst_whisper_server_launcher)

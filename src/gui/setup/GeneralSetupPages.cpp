@@ -1,5 +1,11 @@
 #include "GeneralSetupPages.h"
 
+#include "core/AppSettings.h"
+#include "core/Maidenhead.h"
+#include "gui/StyleConstants.h"
+
+#include <QLineEdit>
+
 namespace Longpath {
 
 // ---------------------------------------------------------------------------
@@ -15,13 +21,84 @@ StartupPrefsPage::StartupPrefsPage(RadioModel* model, QWidget* parent)
     auto* restoreFreq = addLabeledToggle(QStringLiteral("Restore last frequency on connect"));
     markNyi(restoreFreq, QStringLiteral("Phase 3E"));
 
+    // ── Rufzeichen und Locator (verdrahtet 2026-10-13) ───────────────────────
+    //
+    // Diese zwei Felder waren Attrappen ("future"), und das hatte Folgen,
+    // die niemandem auffielen, weil nichts eine Fehlermeldung gab:
+    //
+    //   * Der FlexRadio-Broadcaster sendet das Rufzeichen ins Netz, wo
+    //     SmartSDR und der PGXL es sehen. Ohne Eintrag sendete er
+    //     "LONGPATH" (RadioModel.cpp:8952-8954, Vorgabewert).
+    //   * Der KiwiSDR schickt es dem Betreiber des Empfaengers als
+    //     Kennung -- bisher leer (MainWindow_KiwiSdr.cpp:616-620).
+    //   * Die QSO-Karte zeigt die eigene Station nur mit Rufzeichen; ohne
+    //     endet sie "beim Punkt" (QsoMapWindow.cpp:625-633).
+    //   * Der Satellitendienst rechnet Ueberfluege vom Locator aus. Ohne
+    //     gueltigen Locator gibt inView() IMMER eine leere Liste zurueck
+    //     (SatelliteService.cpp:52-65) -- ein stiller Totalausfall.
+    //
+    // Die Schluessel sind die, die diese vier LESEN: `StationCallsign`
+    // und `StationGridSquare`. Das Feld hier hiess vorher "Callsign" und
+    // haette, waere es je verdrahtet worden, unter einem fuenften,
+    // ungelesenen Namen gespeichert.
     auto* callsign = addLabeledEdit(QStringLiteral("Callsign"),
-                                    QStringLiteral("e.g. KG4VCF"));
-    markNyi(callsign, QStringLiteral("future"));
+                                    QStringLiteral("z. B. OE5SOS"));
+    callsign->setToolTip(QStringLiteral(
+        "Das eigene Rufzeichen. Geht an die QSO-Karte, den KiwiSDR, den "
+        "FlexRadio-Rundruf im Netz und ins Logbuch."));
+    {
+        auto& st = AppSettings::instance();
+        callsign->setText(st.value(QStringLiteral("StationCallsign"), QString{})
+                              .toString());
+        // Beim Verlassen des Felds, nicht bei jedem Tastendruck: ein
+        // halb getipptes Rufzeichen soll nicht in den Rundruf gehen.
+        QObject::connect(callsign, &QLineEdit::editingFinished, callsign, [callsign]() {
+            const QString wert = callsign->text().trimmed().toUpper();
+            // Gross geschrieben, weil alle vier Leser es so erwarten --
+            // QsoMapWindow ruft selbst toUpper(), die anderen drei nicht.
+            if (callsign->text() != wert) { callsign->setText(wert); }
+            AppSettings::instance().setValue(QStringLiteral("StationCallsign"), wert);
+        });
+    }
 
     auto* gridSquare = addLabeledEdit(QStringLiteral("Grid Square"),
-                                      QStringLiteral("e.g. EM73"));
-    markNyi(gridSquare, QStringLiteral("future"));
+                                      QStringLiteral("z. B. JN78"));
+    gridSquare->setToolTip(QStringLiteral(
+        "Der eigene Locator. Der Satellitendienst rechnet Ueberfluege "
+        "daraus -- ohne gueltigen Locator findet er nichts."));
+    {
+        auto& st = AppSettings::instance();
+        gridSquare->setText(st.value(QStringLiteral("StationGridSquare"), QString{})
+                                .toString());
+        QObject::connect(gridSquare, &QLineEdit::editingFinished, gridSquare, [gridSquare]() {
+            const QString wert = gridSquare->text().trimmed().toUpper();
+            if (gridSquare->text() != wert) { gridSquare->setText(wert); }
+            // Ein UNGUELTIGER Locator wird NICHT gespeichert, und das Feld
+            // sagt es. Sonst stuende Unsinn in den Einstellungen, der
+            // Satellitendienst faende weiter nichts, und niemand wuesste,
+            // warum. Leeren ist erlaubt (dann ist eben keiner gesetzt).
+            if (wert.isEmpty()) {
+                AppSettings::instance().setValue(QStringLiteral("StationGridSquare"),
+                                                 QString{});
+                gridSquare->setStyleSheet(QString{});
+                return;
+            }
+            if (!isValidGridSquare(wert)) {
+                gridSquare->setStyleSheet(
+                    QStringLiteral("QLineEdit { border: 1px solid %1; }")
+                        .arg(Style::kRedBorder));
+                gridSquare->setToolTip(
+                    QStringLiteral("\"%1\" ist kein gueltiger Locator "
+                                   "(erwartet z. B. JN78 oder JN78dc)").arg(wert));
+                return;
+            }
+            gridSquare->setStyleSheet(QString{});
+            gridSquare->setToolTip(QStringLiteral(
+                "Der eigene Locator. Der Satellitendienst rechnet "
+                "Ueberfluege daraus."));
+            AppSettings::instance().setValue(QStringLiteral("StationGridSquare"), wert);
+        });
+    }
 
     // Section: Application
     addSection(QStringLiteral("Application"));

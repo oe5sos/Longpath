@@ -1084,6 +1084,74 @@ saehe im Fenster voellig plausibel aus.
 Entwurfsblatt: [`docs/architecture/2026-10-09-sendeton-optimierer.md`](docs/architecture/2026-10-09-sendeton-optimierer.md)
 — dort auch, was bewusst **nicht** gebaut wurde (Airwindows `ClipOnly2`
 als letzter Clipper, ein echter Mehrbaender) und warum.
+### Der Empfangs-Equalizer — neu (2026-10-11)
+
+Longpath hatte keinen. WDSPs `eqp` laeuft im RXA-Durchlauf
+(`third_party/wdsp/src/RXA.c:673`) und ist beim Anlegen aus und flach,
+aber **kein einziger `SetRXAEQ*`-Ruf war in `src/core/wdsp_api.h`
+deklariert** — die Stufe lief also leer mit, und niemand konnte sie
+anfassen. Thetis hat sie seit immer (`Console/radio.cs:827-843` RXEQOn,
+`:800-824` RXEQ10, Bedienung in `eqform.cs`).
+
+Gebaut ist die ganze Kette:
+
+* `wdsp_api.h` — sieben Deklarationen. Die Signaturen folgen dem
+  **vendorten** TAPR v1.29, nicht Thetis' neuerem `eq.c`: dort nimmt
+  `SetRXAEQProfile` einen vierten Parameter `double* Q` fuer die
+  parametrische Form (Thetis `wdsp/eq.c:623`), den unsere Fassung nicht
+  kennt. Verhalten von Thetis, Signatur vom vendorten Header.
+* `RxChannel` — sieben Wrapper, Spiegel der `setTxEq*`-Familie. Jeder
+  prueft `wdspChannelInRange()`: Pruefstaende bauen den Kanal mit der
+  Nummer 99, und ein WDSP-Ruf darauf schreibt ueber das Feldende hinaus.
+  `rxEqRunningInWdsp()` liest zurueck, was WDSP selbst haelt — dieselbe
+  Vorsicht, die beim Sende-CTCSS einen echten Fehler gefunden hat.
+* `SliceModel` — Zustand je Slice, persistiert slice-weit (nicht per
+  Band: eine Klangeinstellung soll beim Bandwechsel nicht umspringen).
+  **Abweichung von Thetis, bewusst:** dort ist der Equalizer global und
+  wird auf `id(0,0)` und `id(0,1)` zugleich gelegt (`eqform.cs:3027`).
+  Hier haengt er am Slice wie jede andere Empfangs-DSP-Einstellung —
+  zwei Empfaenger duerfen verschieden klingen. Geklammert wird im
+  Setter, nicht in der Oberflaeche: ein Wert aus der Einstellungsdatei
+  oder aus einem Frequenzspeicher hat kein Feld davor, das ihn abfaengt.
+  Grenzen `-12..+15` dB, aus Thetis `eqform.cs:1871-1872` (Baender) und
+  `:1946-1947` (Vorverstaerkung) — gemessen, nicht geschaetzt.
+* `RadioModel` — Verdrahtung. Ein geaenderter Bandwert schiebt immer die
+  **ganze** Kurve hinaus, weil `SetRXAGrphEQ10` nichts anderes anbietet
+  (Thetis macht es genauso). Die Kurve geht auch hinaus, wenn der
+  Equalizer aus ist, damit beim Einschalten sofort das Richtige
+  dasteht; WDSPs `run`-Flag entscheidet allein, ob gerechnet wird. Beim
+  Verbinden wird die gespeicherte Kurve nachgeschoben — ohne das lief
+  der Kanal flach, waehrend das Modell die Werte des Betreibers meldete,
+  genau die Form, die bei NB/SNB schon einmal zugeschlagen hat.
+
+### Das Equalizer-Feld haengt jetzt im Panel
+
+`EqApplet` stand seit der Skelettphase als Geister-Applet in
+`MainWindow.cpp` auskommentiert, mit der Bedingung
+`// TODO 3I-3: TX/RX EQ wiring`. Die ist erfuellt, also haengt es:
+
+* Die RX/TX-Umschaltung waehlt, welche Kurve die zehn Schieber bedienen.
+  Die Sendeseite ging auf `TransmitModel::txEq*` (seit 3M-3a-i da, der
+  grosse Editor dazu bleibt `TxEqDialog`), die Empfangsseite auf das
+  Neue oben. Beide Haelften waren vorher Attrappen — alle sechs
+  Bedienelemente trugen `NyiOverlay`.
+* **„Music" ist aus der Vorwahl-Liste entfernt.** Es gab dafuer keine
+  Quelle: Thetis kennt ueberhaupt keine EQ-Vorwahlen (`eqform.cs`),
+  AetherSDR auch nicht (`EqApplet.cpp:277` hat nur die Schieber). Die
+  beiden, die bleiben, sind belegt — „Flach" ist WDSPs Vorgabe beim
+  Anlegen, „Sprache" die Kurve, die in WDSPs Quelltext direkt darueber
+  auskommentiert steht (`RXA.c:260`). Eigene DSP-Kurven zu erfinden
+  verbietet `CLAUDE.md` ausdruecklich.
+* Der Eintrag in `m_appletsById` ist Pflicht neben `registerApplet` —
+  ohne ihn kennt der Auswaehler das Applet nicht, und es waere wieder
+  gebaut und unerreichbar.
+
+Die Schieber gehen `-10..+10`, die DSP-Grenzen bis `-12..+15`. Der
+Bereich bleibt, wie die Vorlage ihn hatte; ihn zu weiten ist eine Sache
+der Gestaltung. Das Modell klammert, es kann also nichts Falsches
+hinausgehen.
+
+Prueffaelle: `tests/tst_rx_equalizer.cpp`.
 
 
 ## [0.6.8] - 2026-10-08
