@@ -3984,24 +3984,20 @@ void StripWindow::refreshMeters()
     // Die Wache sitzt im Audiofaden (StripLiveMonitor.h); hier wird
     // nur sichtbar gemacht, was sie getan hat — und das Häkchen geht
     // aus, damit das Einschalten wieder eine bewusste Handlung ist.
-    if (m_live && m_live->feedbackCut()) {
-        m_live->clearFeedbackCut();
-        if (m_liveBtn && m_liveBtn->isChecked()) {
-            QSignalBlocker b(m_liveBtn);
-            m_liveBtn->setChecked(false);
-        }
-        m_live->stop();
-        if (m_liveNote) {
-            m_liveNote->setText(QStringLiteral(
-                "Mithören abgeschaltet: der Ausgang stand länger als "
-                "anderthalb Sekunden über −6 dBFS. Das ist keine Stimme "
-                "mehr, das ist eine Schleife — Mikrofon und Hörer hängen "
-                "vermutlich am selben Gerät (hier: %1 → %2). Wähle in den "
-                "beiden Feldern oben getrennte Geräte, dreh die "
-                "Lautstärke herunter und schalte dann wieder ein.")
-                .arg(m_live->inputName(), m_live->outputName()));
-        }
+    // Rückkopplungsverdacht: NUR melden. Zweimal heute hat ein
+    // automatischer Eingriff (stummschalten, leise drehen) das
+    // Mithören unbrauchbar gemacht — der Regler gehört dem, der ihn
+    // hört.
+    if (m_live && m_liveNote && m_live->feedbackCut()
+        && !m_liveNote->text().startsWith(QStringLiteral("Verdacht"))) {
+        m_liveNote->setText(QStringLiteral(
+            "Verdacht auf Rückkopplung: der Eingang steht seit drei "
+            "Sekunden ohne Pause über −30 dBFS (%1 → %2). Wer spricht, "
+            "macht Pausen — das hier macht keine. Dreh den Regler "
+            "herunter oder nimm getrennte Geräte.")
+            .arg(m_live->inputName(), m_live->outputName()));
     }
+
 
     adoptChainIfArrived();
 

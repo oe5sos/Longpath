@@ -588,28 +588,42 @@ void StripLiveMonitor::pump()
     float peakOut = 0.0f;
     for (float v : m_mono) { peakOut = std::max(peakOut, std::fabs(v)); }
 
-    // Dann die Wache. 0,5 ist -6 dBFS.
-    if (!m_feedbackCut.load(std::memory_order_acquire)) {
+    // ── Die Wache WARNT nur noch ────────────────────────────────────
+    //
+    // Zwei Fassungen, beide falsch, beide am Betreiber ausgegangen:
+    // erst stummschalten und das Häkchen ausknipsen („ton kann ich
+    // nicht einschalten"), dann leise drehen („das funktioniert
+    // nicht"). Der Denkfehler war derselbe: gemessen wurde der
+    // AUSGANG — und der steht hinter einem Begrenzer, der ihn
+    // absichtlich dauerhaft an die Decke legt. Eine Wache, die auf
+    // „laut und dauerhaft" anschlägt, schlägt damit bei jeder
+    // ordentlich eingestellten Kette an.
+    //
+    // Eine Schleife erkennt man nicht am Pegel, sondern an der
+    // fehlenden PAUSE: wer spricht, hört zwischendurch auf. Also:
+    // bleibt der EINGANG drei Sekunden lang ohne jede Lücke über
+    // -30 dBFS, ist das keine Sprache mehr. Gemeldet wird es, mehr
+    // nicht — der Regler gehört dem, der ihn hört.
+    {
         const double blockMs = 1000.0 * double(m_mono.size())
                                / double(std::max(1, m_inRate));
-        if (peakOut > 0.5f) {
+        if (peakIn > 0.0316f) {        // -30 dBFS
             m_hotBlocks += int(std::lround(blockMs));
         } else {
             m_hotBlocks = 0;
         }
-        if (m_hotBlocks >= 1500) {
-            m_feedbackCut.store(true, std::memory_order_release);
-            std::fill(m_mono.begin(), m_mono.end(), 0.0f);
-            qCWarning(lcAudio)
-                << "strip live monitor: Dauerpegel ueber -6 dBFS laenger "
-                   "als 1,5 s — stumm geschaltet (Rueckkopplungsverdacht)."
-                << "Eingang" << m_inName << "Ausgang" << m_outName;
+        const bool verdacht = m_hotBlocks >= 3000;
+        if (verdacht != m_feedbackCut.load(std::memory_order_acquire)) {
+            m_feedbackCut.store(verdacht, std::memory_order_release);
+            if (verdacht) {
+                qCWarning(lcAudio)
+                    << "strip live monitor: Eingang seit 3 s ohne Pause über"
+                    << "-30 dBFS — Rückkopplungsverdacht."
+                    << m_inName << "->" << m_outName;
+            }
         }
     }
-    if (m_feedbackCut.load(std::memory_order_acquire)) {
-        std::fill(m_mono.begin(), m_mono.end(), 0.0f);
-        peakOut = 0.0f;
-    }
+
     m_logFrames += int(m_mono.size());
     if (m_logFrames >= m_inRate) {
         m_logFrames = 0;
