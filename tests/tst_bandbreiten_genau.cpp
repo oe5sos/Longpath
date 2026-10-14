@@ -37,6 +37,7 @@
 #include <QStandardPaths>
 #include <QTemporaryDir>
 
+#include "core/strip/AetherPreset.h"
 #include "core/strip/BandLimit.h"
 #include "core/strip/ClientDeEss.h"
 #include "core/strip/ClientEq.h"
@@ -2853,6 +2854,138 @@ private slots:
         qInfo().noquote() << QStringLiteral(
             "   (Je weiter die zweite Zahl unter der ersten liegt, desto "
             "mehr stellt er etwas ein, das die Gegenseite nicht hört.)");
+    }
+
+    // ── „wie groß der unterschied zwischen 4k und volle bandbreite
+    //    ist. hast du vorschläge um das zu verbessern" ──────────────
+    //
+    // Das Filter ist es nicht (siehe
+    // whatOurChannelCostsAgainstAPerfectOne: im Band nicht von einem
+    // perfekten zu unterscheiden). Was bleibt, ist die Frage, wie man
+    // die 4 kHz, die man HAT, besser nutzt.
+    //
+    // Drei Griffe aus seinem eigenen Profil, die heute über der
+    // Kanalgrenze arbeiten und dort nichts mehr ausrichten:
+    //
+    //   Kuhschwanz 4982 Hz (+2,63 dB) -- die Anhebung liegt fast ganz
+    //     über 4050 Hz.
+    //   PUDUs „doo" bei 3972 Hz -- der Anreicherer erzeugt Oberwellen
+    //     ÜBER seiner Einstellfrequenz, also durchweg draußen.
+    //   Zischdämpfer bei 3836 Hz -- arbeitet an der Flanke.
+    //
+    // Gemessen wird an echter Sprache durch den ESSB-Kanal: Glanz
+    // (Energie 2-4 kHz gegen 0,3-1 kHz) und Dichte (LUFS bei gleicher
+    // Spitze). Die Reihe sagt, welcher Griff wieviel bringt -- und ob
+    // überhaupt.
+    void whatHelpsInsideTheFourKilohertz()
+    {
+        QString warum;
+        const auto sauber = echteRede(&warum);
+        if (sauber.empty()) { QSKIP(qPrintable(warum)); }
+        const Rede rede = redeMitRauschen(sauber, -60.0);
+
+        const QString profil = QString::fromLatin1(LONGPATH_TEST_DATA_DIR)
+                               + QStringLiteral("/aether-ssb-30-07-2026.json");
+        if (!QFile::exists(profil)) { QSKIP("Martins Profil fehlt"); }
+
+        // Eine Kette mit seinem Profil, mit genau EINEM Griff anders.
+        // bassAb: die Anhebung unter 150 Hz zurücknehmen. Sein Profil
+        // hebt bei 69 Hz um 5,71 dB an und setzt den Hochpass mit Güte
+        // 2,53 auf 62,7 Hz -- also noch eine Spitze obendrauf. Auf
+        // voller Bandbreite trägt das; in einem 4-kHz-Kanal frisst es
+        // Aussteuerung, die oben fehlt.
+        const auto fahre = [&](int kuhschwanzHz, int dooHz, int zischHz,
+                               bool bassAb = false) {
+            StripChain c;
+            c.prepare(kRate);
+            const auto e = AetherPreset::applyFile(profil, c);
+            if (!e.ok) { return std::vector<float>{}; }
+            c.setEnabled(true);
+            if (kuhschwanzHz > 0) {
+                for (int i = 0; i < c.eq().activeBandCount(); ++i) {
+                    ClientEq::BandParams b = c.eq().band(i);
+                    if (b.type == ClientEq::FilterType::HighShelf
+                        && b.enabled && b.freqHz > 4050.0f) {
+                        b.freqHz = float(kuhschwanzHz);
+                        c.eq().setBand(i, b);
+                        break;
+                    }
+                }
+            }
+            if (bassAb) {
+                for (int i = 0; i < c.eq().activeBandCount(); ++i) {
+                    ClientEq::BandParams b = c.eq().band(i);
+                    if (b.type == ClientEq::FilterType::Peak && b.enabled
+                        && b.freqHz < 150.0f && b.gainDb > 0.5f) {
+                        b.gainDb = 0.0f;
+                        c.eq().setBand(i, b);
+                    }
+                    if (b.type == ClientEq::FilterType::HighPass && b.enabled
+                        && b.q > 1.0f) {
+                        b.q = 0.707f;          // keine Spitze an der Ecke
+                        c.eq().setBand(i, b);
+                    }
+                }
+            }
+            if (dooHz > 0)   { c.pudu().setDooTuneHz(float(dooHz)); }
+            if (zischHz > 0) { c.deEss().setFrequencyHz(float(zischHz)); }
+
+            std::vector<float> x = rede.signal;
+            constexpr int kBlock = 64;
+            for (size_t at = 0; at + kBlock <= x.size(); at += kBlock) {
+                c.processMono(x.data() + at, kBlock);
+            }
+            return durchKanal(3, x);      // 50 - 4050, sein Kanal
+        };
+
+        const auto glanz = [](const std::vector<float>& v) {
+            const auto p = spektrum(v);
+            return bandDb(p, 2000.0, 4000.0) - bandDb(p, 300.0, 1000.0);
+        };
+        const auto dichte = [](const std::vector<float>& v) {
+            double pk = 0.0;
+            for (float x : v) { pk = std::max(pk, double(std::fabs(x))); }
+            std::vector<float> n = v;
+            if (pk > 1e-9) {
+                const float g = float(std::pow(10.0, -2.0 / 20.0) / pk);
+                for (float& x : n) { x *= g; }
+            }
+            return Loudness::measure(n.data(), int(n.size()), int(kRate)).integratedLufs;
+        };
+
+        struct V { const char* name; int shelf; int doo; int zisch; bool bass; };
+        static const V kV[] = {
+            { "wie im Profil",          0,    0,    0, false },
+            { "Kuhschwanz 3400",     3400,    0,    0, false },
+            { "PUDU doo 2800",          0, 2800,    0, false },
+            { "Zischen 3000",           0,    0, 3000, false },
+            { "Bass unter 150 flach",   0,    0,    0, true  },
+            { "Bass flach + doo 2800",  0, 2800,    0, true  },
+            { "alles zusammen",      3400, 2800,    0, true  },
+        };
+
+        qInfo().noquote() << QStringLiteral(
+            "   durch 50–4050 Hz          Glanz (2–4k gegen 0,3–1k)   "
+            "Dichte bei gleicher Spitze");
+        double basisGlanz = 0.0;
+        double basisDichte = 0.0;
+        for (const V& v : kV) {
+            const auto y = fahre(v.shelf, v.doo, v.zisch, v.bass);
+            if (y.empty()) { QFAIL("das Profil ließ sich nicht anwenden"); }
+            const double g = glanz(y);
+            const double d = dichte(y);
+            if (basisGlanz == 0.0) { basisGlanz = g; basisDichte = d; }
+            qInfo().noquote()
+                << QStringLiteral("  %1  %2 dB (%3)   %4 LUFS (%5)")
+                       .arg(QString::fromUtf8(v.name), -22)
+                       .arg(g, 7, 'f', 2)
+                       .arg(g - basisGlanz, 5, 'f', 2)
+                       .arg(d, 7, 'f', 1)
+                       .arg(d - basisDichte, 5, 'f', 2);
+        }
+        qInfo().noquote() << QStringLiteral(
+            "   (Glanz: wieviel Energie oben gegen unten steht. "
+            "Dichte: Lautheit bei gleicher Spitze.)");
     }
 
     void theGroupDelayOfEachChannel()

@@ -56,7 +56,7 @@ public:
         int lowHz;
         int highHz;
     };
-    static constexpr int kChannelCount = 4;
+    static constexpr int kChannelCount = 5;
     static const std::array<Channel, kChannelCount>& channels();
 
     BandLimit() = default;

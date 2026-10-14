@@ -42,6 +42,22 @@ BandLimit::channels()
         { "150 – 2700 Hz · schmal",       150, 2700 },
         { "100 – 3200 Hz · mittel",       100, 3200 },
         { "50 – 4050 Hz · ESSB",           50, 4050 },
+        // ── Eine Stufe darüber, seit 2026-10-14 ──────────────────
+        //
+        // „ich bin immer verwundert, wie groß der unterschied
+        //  zwischen 4k und volle bandbreite ist."
+        //
+        // Der Sprung von 4 kHz auf die volle Bandbreite der
+        // Soundkarte ist kein Vergleich, sondern ein Abgrund: oben
+        // liegen noch 16 kHz, die kein Sender je überträgt. Diese
+        // Stufe steht dazwischen und beantwortet die Frage, die
+        // dahintersteckt -- wieviel davon käme zurück, wenn der
+        // Sender breiter dürfte.
+        //
+        // Auf der Luft ist das eine Frage des Geräts und der
+        // Rücksicht auf die Nachbarn, nicht unsere; hier ist es eine
+        // Frage ans Ohr.
+        { "50 – 6000 Hz · breit",          50, 6000 },
     }};
     return kList;
 }
