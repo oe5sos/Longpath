@@ -3,6 +3,7 @@
 #include "gui/styles/AppTheme.h"
 #include "gui/styles/Theme.h"
 #include "core/AppSettings.h"
+#include "core/CrashReportDigest.h"
 #include "core/SettingsBackup.h"
 #include "core/AudioDeviceConfig.h"
 #include "core/BuildIdentity.h"
@@ -392,6 +393,37 @@ int main(int argc, char* argv[])
 
     // Load XML settings
     Longpath::AppSettings::instance().load();
+
+    // ── Was seit dem letzten Lauf abgestuerzt ist (2026-10-14) ───────
+    //
+    // Ein Programm, das abstuerzt, schreibt seinen letzten Satz nicht
+    // mehr selbst. macOS legt ihn aber ab, und beim naechsten Start
+    // laesst er sich nachholen. Am 2026-10-14 lagen sieben Berichte zu
+    // Longpath herum -- drei SIGSEGV vom Vorabend mit immer demselben
+    // Weg -- und gefunden wurden sie erst, weil jemand danach fragte.
+    //
+    // Kein Dialog, kein Versenden, keine Nachfrage: eine Zeile je
+    // Bericht im eigenen Protokoll, dort wo bei der Fehlersuche
+    // ohnehin zuerst gelesen wird. Im Pruefstands-Sandkasten still
+    // (isTestModeEnabled), damit kein Lauf fremde Berichte liest.
+    if (!QStandardPaths::isTestModeEnabled()) {
+        auto& s = Longpath::AppSettings::instance();
+        const QDateTime seit = QDateTime::fromString(
+            s.value(Longpath::CrashReportDigest::lastScanKey(), QString()).toString(),
+            Qt::ISODate);
+        const QStringList zeilen = Longpath::CrashReportDigest::summarise(
+            Longpath::CrashReportDigest::reportDir(), seit);
+        if (!zeilen.isEmpty()) {
+            qWarning().noquote()
+                << QStringLiteral("Seit dem letzten Lauf abgestuerzt: %1 Bericht(e)")
+                       .arg(zeilen.size());
+            for (const QString& z : zeilen) {
+                qWarning().noquote() << QStringLiteral("  Absturz: ") + z;
+            }
+        }
+        s.setValue(Longpath::CrashReportDigest::lastScanKey(),
+                   QDateTime::currentDateTimeUtc().toString(Qt::ISODate));
+    }
 
     // ── Sprache (2026-10-14) ──────────────────────────────────────────
     //

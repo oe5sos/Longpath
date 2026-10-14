@@ -5267,6 +5267,9 @@ longpath_add_test(tst_color_picker_not_native)
 # 2026-09-21: Help > Check for Updates... -- Release-JSON, Version, Paket,
 # SHA256SUMS, Startpruefung, Zielpfad, Neustart-Helfer, DMG-Einspielen (macOS).
 longpath_add_test(tst_update_checker)
+# 2026-10-14: sieben Absturzberichte lagen herum, keiner stand im
+# Protokoll. CrashReportDigest holt sie beim naechsten Start nach.
+longpath_add_test(tst_absturzberichte)
 # 2026-10-14: "englisch durchgehend, aber deutsch als option" -- die
 # Kette .ts -> .qm -> :/i18n/ -> QTranslator. LONGPATH_QM_FILE zeigt auf
 # die Datei, die qt_add_translations gerade gebaut hat.
