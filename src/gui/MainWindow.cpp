@@ -799,6 +799,42 @@ MainWindow::MainWindow(QWidget* parent)
         m_catServer->setzeHaken(haken);
     }
 
+    // ── Den Zugmelder einhaengen (2026-10-14) ────────────────────────
+    //
+    // Ein schwebendes Fenster meldet aus seinem moveEvent hierher, und
+    // das Hauptfenster zeigt dann seinen Schutzrahmen. Kein globaler
+    // Ereignisfilter -- siehe setzeZugmelder() in WindowPlacement.h.
+    //
+    // QPointer, weil der Melder statisch liegt und dieses Fenster
+    // ueberleben wuerde: nach einem `delete mw` (Prueffaelle bauen
+    // mehrere nacheinander) zeigte der Melder sonst auf einen toten
+    // Zeiger -- dieselbe Fehlerform, die in diesem Programm schon
+    // sechsmal steckte.
+    {
+        QPointer<MainWindow> wir(this);
+        setzeZugmelder([wir](QWidget* bewegtes) {
+            if (!wir || !bewegtes) { return; }
+            // Nur die eigenen Schwebefenster.
+            const QWidget* e = bewegtes->parentWidget();
+            if (!e || e->window() != wir) { return; }
+            // Und nur, wenn es den Rahmen WIRKLICH BERUEHRT.
+            //
+            // Ohne diese Bedingung stand der Hinweis schon beim Start da
+            // (der Prueffall hat es gefangen): waehrend des Aufbaus
+            // bewegen sich Fenster, ohne dass jemand zieht. Die
+            // Bedingung ist aber nicht nur eine Wache, sie ist der
+            // bessere Zeitpunkt -- der Rahmen soll auftauchen, wenn man
+            // IHM NAHE KOMMT, und nicht bei jeder Bewegung blinken.
+            bool beruehrt = false;
+            const QRect wo = bewegtes->frameGeometry();
+            for (const QRect& sp : wir->schutzrahmen()) {
+                if (sp.intersects(wo)) { beruehrt = true; break; }
+            }
+            if (!beruehrt) { return; }
+            wir->zeigeSchutzrahmenKurz();
+        });
+    }
+
     buildUI();
     buildMenuBar();
 
@@ -1936,6 +1972,13 @@ void MainWindow::detachApplet(AppletWidget* applet, int dockIndex,
                 const int x = qBound(avail.x(), rect.x(), avail.right() - rect.width());
                 const int y = qBound(avail.y(), rect.y(), avail.bottom() - rect.height());
                 clamped.moveTopLeft(QPoint(x, y));
+                // ── Schutzrahmen (2026-10-14) ────────────────────────
+                // Bis hierher wurde NUR gegen den Bildschirm geklemmt.
+                // Ein Profil, das im Vollbild gespeichert wurde, setzt
+                // seine Fenster damit genau dorthin, wo ohne Vollbild
+                // die Kommandoleiste liegt.
+                clamped = ausSperrstreifenSchieben(clamped, schutzrahmen(),
+                                                   avail);
             }
             win->setGeometry(clamped);
             trustedRectApplied = true;
@@ -8243,10 +8286,7 @@ void MainWindow::populateDefaultMeter()
                     if (!w) { continue; }
                     const QRect g = w->geometry();
                     QVariantMap one;
-                    one.insert(QStringLiteral("x"), g.x());
-                    one.insert(QStringLiteral("y"), g.y());
-                    one.insert(QStringLiteral("w"), g.width());
-                    one.insert(QStringLiteral("h"), g.height());
+                    merkeLage(one, g);
                     one.insert(QStringLiteral("screen"), screenKeyFor(w));
                     one.insert(QStringLiteral("dockIndex"), w->dockIndex());
                     floating.insert(it.key(), one);
@@ -8310,10 +8350,7 @@ void MainWindow::populateDefaultMeter()
                         if (!pf) { continue; }
                         const QRect g = pf->geometry();
                         QVariantMap one;
-                        one.insert(QStringLiteral("x"), g.x());
-                        one.insert(QStringLiteral("y"), g.y());
-                        one.insert(QStringLiteral("w"), g.width());
-                        one.insert(QStringLiteral("h"), g.height());
+                        merkeLage(one, g);
                         one.insert(QStringLiteral("screen"),
                                    screenKeyFor(pf));
                         fpans.insert(panId, one);
@@ -8342,10 +8379,7 @@ void MainWindow::populateDefaultMeter()
                         rotor.insert(QStringLiteral("form"),
                                      QStringLiteral("floating"));
                         const QRect g = m_rotorWindow->geometry();
-                        rotor.insert(QStringLiteral("x"), g.x());
-                        rotor.insert(QStringLiteral("y"), g.y());
-                        rotor.insert(QStringLiteral("w"), g.width());
-                        rotor.insert(QStringLiteral("h"), g.height());
+                        merkeLage(rotor, g);
                     } else if (AppSettings::instance()
                                    .value(QStringLiteral("RotorPanelBelow"),
                                           QStringLiteral("False"))
@@ -8554,10 +8588,9 @@ void MainWindow::populateDefaultMeter()
                 for (auto it = floating.constBegin();
                      it != floating.constEnd(); ++it) {
                     const QVariantMap one = it.value().toMap();
-                    const QRect rect(one.value(QStringLiteral("x")).toInt(),
-                                     one.value(QStringLiteral("y")).toInt(),
-                                     one.value(QStringLiteral("w")).toInt(),
-                                     one.value(QStringLiteral("h")).toInt());
+                    // Relativ zum Hauptfenster, wenn das Profil es
+                    // hergibt (2026-10-14) -- sonst absolut wie frueher.
+                    const QRect rect = lageAusProfil(one);
                     const QString screen =
                         one.value(QStringLiteral("screen")).toString();
                     const int dockIndex =
@@ -8611,7 +8644,16 @@ void MainWindow::populateDefaultMeter()
                                 .removeAll(w);
                         }
                         w->setDockIndex(dockIndex);
-                        if (rect.isValid()) { w->setGeometry(rect); }
+                        if (rect.isValid()) {
+                            // Schutzrahmen auch beim Nachfuehren eines
+                            // schon abgeloesten Fensters (2026-10-14).
+                            QRect platz;
+                            if (QScreen* scr = w->screen()) {
+                                platz = scr->availableGeometry();
+                            }
+                            w->setGeometry(ausSperrstreifenSchieben(
+                                rect, schutzrahmen(), platz));
+                        }
                         ensureOnVisibleScreen(w, this,
                                               QSize(Style::kAppletPanelW, 120));
                     } else if (auto* a = appletForKey(it.key())) {
@@ -8672,11 +8714,8 @@ void MainWindow::populateDefaultMeter()
                         }
                         if (auto* pf = m_panStack
                                 ->floatingWindowForTest(panId)) {
-                            const QRect r(
-                                one.value(QStringLiteral("x")).toInt(),
-                                one.value(QStringLiteral("y")).toInt(),
-                                one.value(QStringLiteral("w")).toInt(),
-                                one.value(QStringLiteral("h")).toInt());
+                            // Relativ zum Hauptfenster (2026-10-14).
+                            const QRect r = lageAusProfil(one);
                             // Untergrenzen -- ein kaputter Eintrag
                             // soll kein 0x0-Fenster erzeugen. Der
                             // mitgesicherte "screen"-Schluessel wird
@@ -8750,11 +8789,8 @@ void MainWindow::populateDefaultMeter()
                             // nachreicht. QPointer schuetzt gegen ein
                             // zwischenzeitliches dockRotorPanel()
                             // (Andocken/Profilwechsel/Beenden).
-                            const QRect r(
-                                rotor.value(QStringLiteral("x")).toInt(),
-                                rotor.value(QStringLiteral("y")).toInt(),
-                                rotor.value(QStringLiteral("w")).toInt(),
-                                rotor.value(QStringLiteral("h")).toInt());
+                            // Relativ zum Hauptfenster (2026-10-14).
+                            const QRect r = lageAusProfil(rotor);
                             QPointer<ToolWindow> guard(m_rotorWindow);
                             QTimer::singleShot(0, this, [this, guard, r]() {
                                 if (!guard) { return; }
@@ -8921,6 +8957,26 @@ void MainWindow::populateDefaultMeter()
                             });
                     }
                 }
+                // ── Der Fenstermodus wird NICHT angewandt ────────────
+                //
+                // Hier stand fuer eine halbe Stunde ein frisch gebauter
+                // "fehlender Leser": das Profil SCHREIBT seit dem
+                // 2026-09-01 `mainWindow.fullScreen` und `maximized`,
+                // und eine Suche ueber den ganzen Baum findet genau EINE
+                // Fundstelle -- das Schreiben. Das sah nach einer
+                // stillen Attrappe aus (wie Rufzeichen und Locator), und
+                // ich habe den Leser gebaut.
+                //
+                // **Es ist keine Attrappe, es ist eine Entscheidung des
+                // Betreibers**, und sie ist festgenagelt:
+                // `tests/tst_tool_windows_fit_the_screen.cpp` prueft
+                // ausdruecklich "ein Profil schaltet das Vollbild nicht
+                // ab", und sein Kopf zitiert die Ansage vom 2026-09-27:
+                // „longpath sollte immer formatfuellend sein."
+                //
+                // Der Leger ist darum wieder draussen. Der Schluessel
+                // bleibt im Profil -- er kostet nichts und beschreibt
+                // den Zustand beim Aufnehmen.
                 qWarning() << "[ProfileApply:Step] 6/6 fertig";
             });
 
@@ -13388,16 +13444,229 @@ double MainWindow::readSystemCpuPercent()
 // liegt auf dem Raster, sonst stuenden die schwebenden Fenster sauber
 // untereinander, aber neben ihm versetzt. Maximiert/Vollbild bleibt
 // unberuehrt (WindowPlacement).
+// ── Der Schutzrahmen (2026-10-14) ──────────────────────────────────────
+//
+// Siehe die Begruendung bei `ausSperrstreifenSchieben()` in
+// WindowPlacement.h. Kurz: schwebende Fenster wurden bis heute nur gegen
+// den BILDSCHIRM geklemmt, nie gegen das Hauptfenster -- darum lagen sie
+// nach dem Verlassen des Vollbilds ueber der eigenen Kommandoleiste, und
+// der Betreiber musste zurueck ins Vollbild, um die Knoepfe zu sehen.
+// ── Der sichtbare Schutzrahmen (2026-10-14) ────────────────────────────
+//
+// Ein Rahmen, den man erst merkt, wenn das Fenster zurueckspringt, ist
+// eine Ueberraschung; einer, den man beim Ziehen SIEHT, ist eine Regel.
+//
+// Eine eigene kleine Klasse, weil Qt zum Malen eine braucht. Sie liegt
+// als Kind IM Hauptfenster und ist durchlaessig fuer die Maus -- sie
+// soll zeigen, nicht fangen. Dass ein gezogenes Fenster (ein eigenes
+// Top-Level) sie teilweise verdeckt, ist richtig so: man sieht die
+// Sperre DANEBEN, und genau dorthin soll der Blick.
+class SchutzrahmenHinweis : public QWidget {
+public:
+    explicit SchutzrahmenHinweis(QWidget* eltern) : QWidget(eltern)
+    {
+        setAttribute(Qt::WA_TransparentForMouseEvents);
+        setAttribute(Qt::WA_NoSystemBackground);
+        setAttribute(Qt::WA_TranslucentBackground);
+        setFocusPolicy(Qt::NoFocus);
+    }
+    void setzeStreifen(const QList<QRect>& global)
+    {
+        m_streifen.clear();
+        for (const QRect& g : global) {
+            m_streifen << QRect(mapFromGlobal(g.topLeft()), g.size());
+        }
+        update();
+    }
+protected:
+    void paintEvent(QPaintEvent*) override
+    {
+        QPainter p(this);
+        p.setRenderHint(QPainter::Antialiasing, false);
+        // Die Akzentfarbe des Hauses, sehr leise. KEIN kraeftiges Rot --
+        // Rot bleibt der Warnung (Hausregel).
+        QColor fuellung(QString::fromLatin1(Style::kAccent));
+        fuellung.setAlpha(46);
+        QColor kante(QString::fromLatin1(Style::kAccent));
+        kante.setAlpha(140);
+        for (const QRect& r : m_streifen) {
+            p.fillRect(r, fuellung);
+            p.setPen(QPen(kante, 1));
+            p.drawLine(r.topLeft(), r.topRight());
+            p.drawLine(r.bottomLeft(), r.bottomRight());
+        }
+    }
+private:
+    QList<QRect> m_streifen;
+};
+
+void MainWindow::zeigeSchutzrahmenKurz()
+{
+    if (m_shuttingDown) { return; }
+    const QList<QRect> sperren = schutzrahmen();
+    if (sperren.isEmpty()) { return; }
+
+    if (!m_rahmenHinweis) {
+        m_rahmenHinweis = new SchutzrahmenHinweis(this);
+    }
+    m_rahmenHinweis->setGeometry(rect());
+    m_rahmenHinweis->setzeStreifen(sperren);
+    m_rahmenHinweis->raise();
+    m_rahmenHinweis->show();
+
+    if (!m_rahmenHinweisTimer) {
+        m_rahmenHinweisTimer = new QTimer(this);
+        m_rahmenHinweisTimer->setSingleShot(true);
+        m_rahmenHinweisTimer->setInterval(600);
+        connect(m_rahmenHinweisTimer, &QTimer::timeout, this, [this]() {
+            if (m_rahmenHinweis) { m_rahmenHinweis->hide(); }
+        });
+    }
+    m_rahmenHinweisTimer->start();
+}
+
+bool MainWindow::schutzrahmenHinweisSichtbarFuerTest() const
+{
+    return m_rahmenHinweis && m_rahmenHinweis->isVisible();
+}
+
+void MainWindow::merkeLage(QVariantMap& ziel, const QRect& g) const
+{
+    ziel.insert(QStringLiteral("x"), g.x());
+    ziel.insert(QStringLiteral("y"), g.y());
+    ziel.insert(QStringLiteral("w"), g.width());
+    ziel.insert(QStringLiteral("h"), g.height());
+    // Relativ zur linken oberen Ecke des HAUPTFENSTERRAHMENS. Nicht zum
+    // Inhaltsbereich: der aendert sich mit der Titelleiste, und genau
+    // deren Hoehe ist der Unterschied zwischen Vollbild und nicht.
+    const QPoint ecke = frameGeometry().topLeft();
+    ziel.insert(QStringLiteral("dx"), g.x() - ecke.x());
+    ziel.insert(QStringLiteral("dy"), g.y() - ecke.y());
+}
+
+QRect MainWindow::lageAusProfil(const QVariantMap& quelle) const
+{
+    const int w = quelle.value(QStringLiteral("w")).toInt();
+    const int h = quelle.value(QStringLiteral("h")).toInt();
+    if (quelle.contains(QStringLiteral("dx"))
+        && quelle.contains(QStringLiteral("dy"))) {
+        const QPoint ecke = frameGeometry().topLeft();
+        return QRect(ecke.x() + quelle.value(QStringLiteral("dx")).toInt(),
+                     ecke.y() + quelle.value(QStringLiteral("dy")).toInt(),
+                     w, h);
+    }
+    // Ein Profil von vor dem 2026-10-14. Absolut, wie frueher -- der
+    // Schutzrahmen faengt danach ab, was auf einer Bedienleiste laege.
+    return QRect(quelle.value(QStringLiteral("x")).toInt(),
+                 quelle.value(QStringLiteral("y")).toInt(), w, h);
+}
+
+QList<QRect> MainWindow::schutzrahmen() const
+{
+    QList<QRect> sperren;
+
+    // Hier stand zuerst `if (!isVisible()) return {};` als Wache gegen
+    // noch nicht gesetzte Leisten. Die ist WIRKUNGSLOS und darum weg:
+    // **MainWindow ist schon im Konstruktor sichtbar**, lange bevor der
+    // Aufrufer `show()` ruft (nachgemessen im Prueffall, `isVisible()`
+    // ist true an einem frisch gebauten Fenster). Wer sich hier auf
+    // `isVisible()` verlaesst, prueft nichts.
+    //
+    // Was wirklich schuetzt, steht in `streifen()`: eine Leiste ohne
+    // Hoehe oder eine versteckte ergibt KEINEN Streifen. Die Statuszeile
+    // laesst sich abschalten (ChromeStatusBar im Auswaehler), dann gibt
+    // es nur den oberen.
+    const auto streifen = [this](const QWidget* w) -> QRect {
+        if (!w || !w->isVisible() || w->height() <= 0) { return {}; }
+        // Ueber die GANZE Fensterbreite, nicht nur ueber die Breite der
+        // Leiste: die Leiste endet rechts vor dem Rand, aber ein Fenster,
+        // das dort halb darueberliegt, verdeckt sie trotzdem.
+        const QPoint linksOben = w->mapToGlobal(QPoint(0, 0));
+        return QRect(mapToGlobal(QPoint(0, 0)).x(), linksOben.y(),
+                     width(), w->height());
+    };
+
+    const QRect oben = streifen(m_commandBar);
+    if (oben.isValid()) { sperren << oben; }
+    if (QStatusBar* sb = const_cast<MainWindow*>(this)->statusBar()) {
+        const QRect unten = streifen(sb);
+        if (unten.isValid()) { sperren << unten; }
+    }
+    return sperren;
+}
+
+void MainWindow::schutzrahmenNachziehen()
+{
+    if (m_shuttingDown) { return; }
+    if (!m_schutzrahmenTimer) {
+        m_schutzrahmenTimer = new QTimer(this);
+        m_schutzrahmenTimer->setSingleShot(true);
+        m_schutzrahmenTimer->setInterval(250);
+        connect(m_schutzrahmenTimer, &QTimer::timeout, this, [this]() {
+            schwebendeAusDemSchutzrahmenHolen();
+        });
+    }
+    m_schutzrahmenTimer->start();
+}
+
+int MainWindow::schwebendeAusDemSchutzrahmenHolen()
+{
+    if (m_shuttingDown) { return 0; }
+    const QList<QRect> sperren = schutzrahmen();
+    if (sperren.isEmpty()) { return 0; }
+
+    int verschoben = 0;
+    for (QWidget* w : QApplication::topLevelWidgets()) {
+        if (!w || w == this || !w->isVisible()) { continue; }
+        // Nur die eigenen Schwebefenster. Ein Dialog wird NICHT
+        // verschoben: der steht, wo das System ihn hinstellt, und ein
+        // Einstellungsfenster ueber der Statuszeile ist kein Problem --
+        // es geht wieder zu.
+        if (w->isModal() || qobject_cast<QDialog*>(w)) { continue; }
+        const QWidget* eltern = w->parentWidget();
+        if (!eltern || eltern->window() != this) { continue; }
+
+        const QRect alt = w->frameGeometry();
+        QRect platz;
+        if (QScreen* scr = w->screen()) { platz = scr->availableGeometry(); }
+        const QRect neu = ausSperrstreifenSchieben(alt, sperren, platz);
+        if (neu != alt) {
+            // move(), nicht setGeometry(): die GROESSE gehoert dem
+            // Betreiber. Und auf den Rahmenversatz achten -- move()
+            // setzt die Ecke des RAHMENS, frameGeometry() liest ihn
+            // ebenfalls, also stimmt es ohne Umrechnung.
+            w->move(neu.topLeft());
+            ++verschoben;
+        }
+    }
+    if (verschoben > 0) {
+        qCInfo(lcContainer) << "Schutzrahmen:" << verschoben
+                     << "schwebende Fenster lagen auf einer Bedienleiste"
+                        " und wurden heruntergeschoben";
+    }
+    return verschoben;
+}
+
 void MainWindow::moveEvent(QMoveEvent* event)
 {
     QMainWindow::moveEvent(event);
-    if (!m_shuttingDown) { snapToGridAfterSettle(this); }
+    if (!m_shuttingDown) {
+        snapToGridAfterSettle(this);
+        schutzrahmenNachziehen();
+    }
 }
 
 void MainWindow::resizeEvent(QResizeEvent* event)
 {
     QMainWindow::resizeEvent(event);
-    if (!m_shuttingDown) { snapToGridAfterSettle(this); }
+    if (!m_shuttingDown) {
+        snapToGridAfterSettle(this);
+        // Hier faellt der Vollbildwechsel an: das Fenster wird kuerzer,
+        // die schwebenden bleiben stehen -- genau der Fall, um den es
+        // geht. Mit Nachlauf, damit ein Groessenzug nicht bei jedem
+        // Pixel Fenster schiebt.
+        schutzrahmenNachziehen();
+    }
 
     // Das schwebende Plus hat keine Anordnung, die es mitzieht.
     positionAddWidgetButton();

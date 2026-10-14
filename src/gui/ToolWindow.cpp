@@ -188,6 +188,10 @@ void ToolWindow::moveEvent(QMoveEvent* ev)
     // fluchten. Gedaempft (siehe WindowPlacement.h) -- ein direktes
     // Runden hier wuerde gegen das native Ziehen kaempfen.
     snapToGridAfterSettle(this);
+    // Den Schutzrahmen zeigen, solange gezogen wird
+    // (2026-10-14). Siehe setzeZugmelder() in WindowPlacement.h --
+    // ein Melder statt eines globalen Ereignisfilters.
+    meldeZug(this);
 }
 
 void ToolWindow::resizeEvent(QResizeEvent* ev)
@@ -197,6 +201,10 @@ void ToolWindow::resizeEvent(QResizeEvent* ev)
     // Raster auch fuer die Groesse (2026-09-26): alle vier Kanten, siehe
     // WindowPlacement.h snappedFrameRect.
     snapToGridAfterSettle(this);
+    // Den Schutzrahmen zeigen, solange gezogen wird
+    // (2026-10-14). Siehe setzeZugmelder() in WindowPlacement.h --
+    // ein Melder statt eines globalen Ereignisfilters.
+    meldeZug(this);
 }
 
 void ToolWindow::paintEvent(QPaintEvent*)
