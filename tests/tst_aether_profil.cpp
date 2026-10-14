@@ -333,6 +333,59 @@ private slots:
         qInfo("Datei: %s", qPrintable(AppSettings::instance().filePath()));
     }
 
+    // ── Werkzeug: die 4-kHz-Fassung ─────────────────────────────────
+    //
+    // Zwei Griffe aus seinem Profil arbeiten über der Kanalgrenze und
+    // richten dort nichts aus. Gemessen an echter Sprache durch
+    // 50–4050 (tst_bandbreiten_genau::whatHelpsInsideTheFourKilohertz):
+    //
+    //     PUDU „doo" 3972 → 2800 Hz   +1,05 dB Glanz
+    //     Kuhschwanz 4982 → 3400 Hz   +0,30 dB
+    //
+    // Der Anreicherer erzeugt seine Oberwellen OBERHALB der
+    // Einstellfrequenz; bei 3972 Hz liegen sie durchweg draußen.
+    //
+    // Wird als EIGENE Kette abgelegt, sein Grundstock bleibt
+    // unangetastet.
+    void legt_die_vierkilohertz_fassung_ab()
+    {
+        if (qgetenv("LONGPATH_AETHER_APPLY") != QByteArray("1")) {
+            QSKIP("LONGPATH_AETHER_APPLY nicht gesetzt");
+        }
+        const QString pfad = qEnvironmentVariable("LONGPATH_AETHER_FILE",
+                                                  profilPfad());
+        StripChain c;
+        c.prepare(kRate);
+        const auto e = AetherPreset::applyFile(pfad, c);
+        QVERIFY2(e.ok, qPrintable(e.fehler));
+
+        bool shelf = false;
+        for (int i = 0; i < c.eq().activeBandCount(); ++i) {
+            ClientEq::BandParams b = c.eq().band(i);
+            if (b.type != ClientEq::FilterType::HighShelf || !b.enabled) {
+                continue;
+            }
+            if (b.freqHz <= 4050.0f) { continue; }
+            qInfo("Kuhschwanz Band %d: %.0f -> 3400 Hz (%+.2f dB)",
+                  i, double(b.freqHz), double(b.gainDb));
+            b.freqHz = 3400.0f;
+            c.eq().setBand(i, b);
+            shelf = true;
+            break;
+        }
+        QVERIFY2(shelf, "kein Kuhschwanz über der Kanalgrenze");
+
+        qInfo("PUDU doo: %.0f -> 2800 Hz", double(c.pudu().dooTuneHz()));
+        c.pudu().setDooTuneHz(2800.0f);
+
+        const QString name = (e.name.isEmpty() ? QStringLiteral("Aether")
+                                               : e.name)
+                             + QStringLiteral(" — 4 kHz");
+        QVERIFY(StripSettings::saveUserPreset(name, c));
+        AppSettings::instance().save();
+        qInfo("abgelegt als: %s", qPrintable(name));
+    }
+
     // ── Was eine fremde Datei alles anrichten könnte ────────────────
     //
     // Ein Profil kommt aus einem anderen Programm, womöglich aus einer
