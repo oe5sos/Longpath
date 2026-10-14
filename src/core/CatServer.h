@@ -63,6 +63,8 @@
 #include <functional>
 #include <optional>
 
+#include <QHostAddress>
+
 class QTcpServer;
 class QTcpSocket;
 
@@ -113,6 +115,23 @@ public:
     void beende(int k);
     bool laeuft(int k) const;
     quint16 port(int k) const;
+
+    /// Die Adresse, an der Kanal `k` wirklich haengt.
+    ///
+    /// Nicht Bequemlichkeit, sondern die EINZIGE direkte Messung der
+    /// sicherheitsrelevanten Eigenschaft dieser Datei: CAT kann den
+    /// Sender tasten, also darf der Server nur auf der eigenen Maschine
+    /// horchen. Der Prueffall hat das bis zum 2026-10-14 MITTELBAR
+    /// gemessen -- er band eine Sonde auf 0.0.0.0 denselben Port und
+    /// schloss aus dem Erfolg auf eine lokale Bindung. Das gilt auf
+    /// macOS und **nicht auf Linux**: dort verbietet der Kern eine
+    /// Platzhalterbindung auf einen Port, der schon lokal gebunden ist,
+    /// also schlug die Sonde fehl und der Fall war rot, obwohl der Code
+    /// stimmte (CI Linux x64 2/4, PR #222).
+    ///
+    /// Gibt eine ungueltige Adresse, wenn der Kanal nicht horcht.
+    QHostAddress adresse(int k) const;
+
     /// Wie viele Fremdprogramme an diesem Kanal haengen.
     int verbindungen(int k) const;
 

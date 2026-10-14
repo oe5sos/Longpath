@@ -17,6 +17,7 @@
 
 #include <QtTest/QtTest>
 #include <QCoreApplication>
+#include <QHostAddress>
 #include <QTcpServer>
 
 #include <optional>
@@ -406,20 +407,41 @@ private slots:
         // QHostAddress::LocalHost gegen ::Any getauscht, und ALLE zwanzig
         // Faelle blieben gruen. Eine Eigenschaft, die keine Pruefung
         // bewacht, haelt nur so lange, wie niemand die Zeile anfasst.
-        QVERIFY(srv->starte(0, 0));
-        QTcpServer probe;
-        // Wenn der CAT-Server auf 0.0.0.0 haengt, ist derselbe Port auf
-        // einer anderen Adresse NICHT mehr zu haben. Haengt er nur auf
-        // 127.0.0.1, laesst sich eine zweite Bindung auf eine andere
-        // Adresse desselben Ports noch anlegen.
+        // ── Wie gemessen wird, und warum nicht mehr anders ──────────────
         //
-        // Das ist der Weg, der ohne fremde Netzkarte auskommt: er misst
-        // die Bindung, nicht die Erreichbarkeit.
-        const bool nurLokal = probe.listen(QHostAddress::AnyIPv4, srv->port(0));
-        probe.close();
-        QVERIFY2(nurLokal,
-                 "Der CAT-Server haengt an allen Schnittstellen -- jeder im "
-                 "Netz kann damit TX; schicken.");
+        // Bis zum 2026-10-14 band dieser Fall eine SONDE auf 0.0.0.0
+        // denselben Port und schloss aus dem Erfolg auf eine lokale
+        // Bindung. Das war falsch gedacht, und zwar
+        // PLATTFORMABHAENGIG falsch:
+        //
+        //   macOS/BSD  erlaubt die Platzhalterbindung neben einer
+        //              lokalen auf demselben Port -> Sonde gelingt
+        //              -> gruen.
+        //   Linux      verbietet sie -> Sonde schlaegt fehl -> ROT,
+        //              obwohl der Code stimmt.
+        //
+        // Aufgefallen in der CI von PR #222 (Build Linux x64 2/4): hier
+        // auf dem Mac 25 von 25 gruen, dort rot. **Ein Prueffall, der
+        // eine Eigenschaft nur MITTELBAR messen kann, misst in
+        // Wirklichkeit das Betriebssystem.**
+        //
+        // Jetzt direkt: `QTcpServer::serverAddress()` ueber
+        // `CatServer::adresse()`. Das ist die Adresse, an der der Kanal
+        // wirklich haengt -- keine Schlussfolgerung, eine Ablesung.
+        QVERIFY(srv->starte(0, 0));
+        const QHostAddress wo = srv->adresse(0);
+        QVERIFY2(!wo.isNull(),
+                 "Kanal 0 horcht nicht -- dann sagt dieser Fall nichts.");
+        QVERIFY2(wo.isLoopback(),
+                 qPrintable(QStringLiteral(
+                     "Der CAT-Server haengt an %1 statt an der eigenen "
+                     "Maschine -- jeder im Netz kann damit TX; schicken.")
+                     .arg(wo.toString())));
+        // Und ausdruecklich NICHT der Platzhalter: `isLoopback()` allein
+        // wuerde bei 0.0.0.0 ohnehin false geben, aber die Absicht soll
+        // dastehen.
+        QVERIFY(wo != QHostAddress(QHostAddress::Any));
+        QVERIFY(wo != QHostAddress(QHostAddress::AnyIPv4));
     }
 
     void einZweiterServerAufDemselbenPortBekommtKeineBefehle()
