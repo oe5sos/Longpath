@@ -19,6 +19,19 @@
 // gegen einen verstuemmelten Download; die Echtheit haengt an GitHubs
 // TLS. Wer mehr will, prueft SHA256SUMS.txt.asc von Hand (README).
 //
+// Zweiter Weg ohne API (2026-10-14). api.github.com liegt inzwischen in
+// Azure (20.250.x). Auf dem Mac mini des Betreibers baut sich die
+// TCP-Verbindung dorthin auf, das Client Hello geht hinaus -- und der
+// Handshake bleibt stehen, bis die Zeit ablaeuft, waehrend github.com
+// selbst (140.82.x) einwandfrei antwortet. Dort stand die Fassung 0.6.5
+// und konnte sich nie selbst holen. Betreiber dazu: "macht der enduser
+// auch nicht alles" -- also darf die Loesung nicht in /etc/hosts stehen,
+// sondern muss im Programm sein: scheitert die API, wird die
+// Veroeffentlichung von der Webseite abgeleitet. /releases/latest leitet
+// auf /releases/tag/<tag> weiter, und jede Datei liegt unter
+// /releases/download/<tag>/<name>. Das reicht fuer alles, was der
+// Updater braucht: Version, Paket, SHA256SUMS.txt.
+//
 // Reine Funktionen (parse*, compareVersions, assetNameFor) sind statisch
 // und ohne Netz pruefbar; der Netzteil laeuft ueber QNetworkAccessManager
 // mit Weiterleitungen (GitHub-Pakete liegen hinter einem Redirect).
@@ -26,6 +39,9 @@
 // =================================================================
 // Modification history (Longpath):
 //   2026-09-21 -- Created for Longpath by Martin Fischer (OE5SOS),
+//                 AI-assisted via Anthropic Claude.
+//   2026-10-14 -- Zweiter Weg ueber github.com, wenn api.github.com
+//                 nicht antwortet, by Martin Fischer (OE5SOS),
 //                 AI-assisted via Anthropic Claude.
 // =================================================================
 
@@ -60,6 +76,12 @@ struct ReleaseInfo {
     QDateTime publishedAt;
     QUrl      htmlUrl;
     QVector<ReleaseAsset> assets;
+    // Ueber den zweiten Weg (github.com) abgeleitet statt aus der API
+    // gelesen: dann fehlen die Notizen, und der Dialog sagt dem Bediener
+    // warum. Gehoert an die Veroeffentlichung, nicht an den Abfrager --
+    // die Startpruefung benutzt einen eigenen UpdateChecker und reicht
+    // nur dieses Objekt an den Dialog weiter.
+    bool viaWebsiteFallback{false};
 
     std::optional<ReleaseAsset> asset(const QString& name) const;
 };
@@ -91,6 +113,19 @@ public:
     static QHash<QString, QString> parseSha256Sums(const QByteArray& text);
     static QString sha256Of(const QString& filePath);
 
+    // -- Zweiter Weg ohne api.github.com (siehe Kopf) --------------------
+    // https://github.com/oe5sos/Longpath/releases/latest -- antwortet mit
+    // einer Weiterleitung auf das Tag, ohne JSON und ohne API-Host.
+    static QUrl latestReleaseWebUrl();
+    // ".../releases/tag/v0.6.8" -> "v0.6.8"; alles andere -> leer.
+    static QString tagFromReleaseUrl(const QUrl& url);
+    // ".../releases/download/<tag>/<name>" -- die Namensregel aus
+    // release.yml, dieselbe, die assetNameFor() schon kennt.
+    static QUrl assetDownloadUrl(const QString& tag, const QString& assetName);
+    // Was sich allein aus dem Tag ableiten laesst: Version, Seite,
+    // SHA256SUMS.txt. Ohne Notizen -- die stehen nur in der API.
+    static ReleaseInfo releaseFromTag(const QString& tag);
+
     // -- Netz ------------------------------------------------------------
     void checkLatest();
     // Laedt das Paket nach <targetDir>/<asset.name>; danach wird
@@ -99,6 +134,8 @@ public:
                            const QString& targetDir);
     void cancel();
 
+    // Im Betrieb api.github.com; mit LONGPATH_UPDATE_API_URL gesetzt die
+    // dort genannte Adresse (nur fuer Pruefstaende, siehe .cpp).
     static QUrl latestReleaseApiUrl();
     static QByteArray userAgent();
 
@@ -112,6 +149,8 @@ signals:
 
 private:
     void fetchSumsAndVerify(const ReleaseInfo& release, const QString& filePath);
+    void checkLatestViaWebsite(const QString& apiError);
+    void probeAssetAndFinish(const ReleaseInfo& release, const QString& apiError);
 
     QString m_runningVersion;
     QNetworkAccessManager* m_net{nullptr};
