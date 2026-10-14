@@ -219,6 +219,9 @@ void StripLiveMonitor::doStart()
     m_sink = new QAudioSink(out, outFmt, this);
     // Grosszuegig, damit write() nie abschneidet -- siehe kSinkBlocks.
     m_sink->setBufferSize(m_blockFrames * m_outBytesPerFrame * kSinkBlocks);
+    m_fade = 0.0f;                 // jeder Start blendet ein
+    m_hotBlocks = 0;
+    m_feedbackCut.store(false, std::memory_order_release);
     m_sink->setVolume(float(m_volume));
 
     m_sinkIo = m_sink->start();            // Schiebebetrieb: wir fuettern
@@ -570,8 +573,43 @@ void StripLiveMonitor::pump()
         m_kanalBegrenzer.process(m_mono.data(), int(m_mono.size()), 1);
     }
 
+    // ── Einblenden und die Rückkopplungswache ───────────────────────
+    //
+    // Siehe StripLiveMonitor.h. Zuerst die Einblendung: der erste
+    // Block nach dem Start kommt nicht mit vollem Pegel.
+    if (m_fade < 1.0f) {
+        const float schritt = 1.0f / float(std::max(1, m_inRate / 4));
+        for (float& v : m_mono) {
+            m_fade = std::min(1.0f, m_fade + schritt);
+            v *= m_fade;
+        }
+    }
+
     float peakOut = 0.0f;
     for (float v : m_mono) { peakOut = std::max(peakOut, std::fabs(v)); }
+
+    // Dann die Wache. 0,5 ist -6 dBFS.
+    if (!m_feedbackCut.load(std::memory_order_acquire)) {
+        const double blockMs = 1000.0 * double(m_mono.size())
+                               / double(std::max(1, m_inRate));
+        if (peakOut > 0.5f) {
+            m_hotBlocks += int(std::lround(blockMs));
+        } else {
+            m_hotBlocks = 0;
+        }
+        if (m_hotBlocks >= 1500) {
+            m_feedbackCut.store(true, std::memory_order_release);
+            std::fill(m_mono.begin(), m_mono.end(), 0.0f);
+            qCWarning(lcAudio)
+                << "strip live monitor: Dauerpegel ueber -6 dBFS laenger "
+                   "als 1,5 s — stumm geschaltet (Rueckkopplungsverdacht)."
+                << "Eingang" << m_inName << "Ausgang" << m_outName;
+        }
+    }
+    if (m_feedbackCut.load(std::memory_order_acquire)) {
+        std::fill(m_mono.begin(), m_mono.end(), 0.0f);
+        peakOut = 0.0f;
+    }
     m_logFrames += int(m_mono.size());
     if (m_logFrames >= m_inRate) {
         m_logFrames = 0;

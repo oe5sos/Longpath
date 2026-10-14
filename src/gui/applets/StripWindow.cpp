@@ -3979,6 +3979,30 @@ void StripWindow::refreshInsertCard(int slot)
 
 void StripWindow::refreshMeters()
 {
+    // ── Hat sich der Mithörer selbst stumm geschaltet? ───────────────
+    //
+    // Die Wache sitzt im Audiofaden (StripLiveMonitor.h); hier wird
+    // nur sichtbar gemacht, was sie getan hat — und das Häkchen geht
+    // aus, damit das Einschalten wieder eine bewusste Handlung ist.
+    if (m_live && m_live->feedbackCut()) {
+        m_live->clearFeedbackCut();
+        if (m_liveBtn && m_liveBtn->isChecked()) {
+            QSignalBlocker b(m_liveBtn);
+            m_liveBtn->setChecked(false);
+        }
+        m_live->stop();
+        if (m_liveNote) {
+            m_liveNote->setText(QStringLiteral(
+                "Mithören abgeschaltet: der Ausgang stand länger als "
+                "anderthalb Sekunden über −6 dBFS. Das ist keine Stimme "
+                "mehr, das ist eine Schleife — Mikrofon und Hörer hängen "
+                "vermutlich am selben Gerät (hier: %1 → %2). Wähle in den "
+                "beiden Feldern oben getrennte Geräte, dreh die "
+                "Lautstärke herunter und schalte dann wieder ein.")
+                .arg(m_live->inputName(), m_live->outputName()));
+        }
+    }
+
     adoptChainIfArrived();
 
     // Der Hinweistext haengt jetzt an der Verbindung, nicht mehr am

@@ -196,6 +196,24 @@ public:
     void stop();
     void resync();
     void setVolume(double v);
+
+    // ── Rückkopplungswache ──────────────────────────────────────────
+    //
+    // Am 2026-10-14 hat der Betreiber dreimal den Kopfhörer abreissen
+    // müssen. Im Protokoll stand, warum: Eingang „Externes Mikrofon",
+    // Ausgang „Externe Kopfhörer" -- beides dieselbe 3,5-mm-Buchse,
+    // und die Kette legt +12 dB dazwischen. Das ist eine Schleife, und
+    // eine Schleife wird lauter, bis etwas sie beendet. Bis dahin war
+    // dieses Etwas sein Ohr.
+    //
+    // Also: bleibt der Ausgang laenger als anderthalb Sekunden ueber
+    // -6 dBFS, schaltet der Mithoerer sich selbst stumm. Sprache
+    // kommt dort in Spitzen hin, aber nicht dauerhaft -- eine
+    // Schleife schon, und genau das ist der Unterschied.
+    bool feedbackCut() const noexcept
+    { return m_feedbackCut.load(std::memory_order_acquire); }
+    void clearFeedbackCut() noexcept
+    { m_feedbackCut.store(false, std::memory_order_release); m_hotBlocks = 0; }
     void setStripBypassed(bool bypassed);
 
     // ── Durch den Kanal hoeren ───────────────────────────────────────
@@ -340,6 +358,13 @@ private:
     std::vector<float> m_carry;     // Rest unter einer Blockgroesse
 
     double m_volume{0.7};
+
+    // Wache und Einblendung. m_fade läuft nach jedem Start von 0 auf 1
+    // -- ein Pegel, der im ersten Block voll da ist, ist ein Schlag
+    // auf das Ohr, auch wenn er danach richtig wäre.
+    std::atomic<bool> m_feedbackCut{false};
+    int   m_hotBlocks{0};
+    float m_fade{0.0f};
     std::atomic<bool> m_bypass{false};
     std::atomic<bool> m_running{false};
     std::atomic<double> m_latencyMs{0.0};
