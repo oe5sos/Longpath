@@ -276,8 +276,28 @@ public:
     float effectiveInputGainDb() const noexcept;
 
     // Was AM EINGANG ankommt, vor der Verstärkung -- also das, was
-    // das Mikrofon liefert. Die Empfehlung rechnet damit.
+    // das Mikrofon liefert. Ein Augenblickswert: die Spitze des
+    // letzten Blocks, rund zehn Millisekunden. Zum ANSEHEN gut, zum
+    // RECHNEN nicht -- siehe speechPeakDb().
     float rawInputPeakDb() const noexcept;
+
+    // ── Der Pegel, mit dem gerechnet werden darf ─────────────────
+    //
+    // Dieselbe Messung, aus der die Automatik ihren Schritt zieht:
+    // die Spitze eines Zwei-Sekunden-Fensters, aber nur aus einem
+    // Fenster, das den Scheitelfaktor-Test bestanden hat. Also der
+    // Pegel seiner STIMME, nicht der des Raums zwischen zwei Wörtern.
+    //
+    // Warum es die Zahl gibt: am 2026-10-14 rechnete die Empfehlung
+    // („x dB fehlen") und der Knopf daneben beide mit
+    // rawInputPeakDb(). Der Knopf wurde in einer Sprechpause
+    // gedrückt, traf den Störteppich bei -48 dBFS, setzte die vollen
+    // +36 dB -- und der Kopfhörer stand an der Decke des Begrenzers.
+    // Es war das dritte Mal an diesem Tag.
+    //
+    // -120 heisst „noch nichts gehört": dann rechnet niemand, und
+    // der Knopf bleibt aus.
+    float speechPeakDb() const noexcept;
 
     float inputPeakDb() const noexcept;
 
@@ -430,6 +450,7 @@ private:
     // kopiert wird nur, was der Betreiber eingestellt hat.
     std::atomic<bool>  m_inputAuto{false};
     std::atomic<float> m_autoGainDb{0.0f};
+    std::atomic<float> m_speechPeakDb{-120.0f};
     float m_autoPeak{0.0f};
     double m_autoSumSq{0.0};        // Spitze im laufenden Zeitfenster
     int   m_autoFrames{0};

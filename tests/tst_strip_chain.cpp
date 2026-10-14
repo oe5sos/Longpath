@@ -88,6 +88,7 @@ private slots:
     void the_default_order_is_the_one_the_header_promises();
     void an_order_that_is_not_a_permutation_is_refused();
     void the_tube_in_front_is_a_different_device();
+    void a_pause_between_words_never_becomes_the_recommendation();
 };
 
 void TstStripChain::a_fresh_chain_is_off_and_every_stage_with_it()
@@ -790,6 +791,76 @@ void TstStripChain::a_preset_name_with_a_dash_keeps_the_file_readable()
     QVERIFY(qFuzzyCompare(z.tube().driveDb(), 7.0f));
 
     QVERIFY(StripSettings::removeUserPreset(name));
+}
+
+
+// ── Die Pause zwischen zwei Wörtern ist keine Messung ───────────────
+//
+// Am 2026-10-14 hat der Betreiber dreimal den Kopfhörer abreissen
+// müssen. Der dritte Vorfall ging so: die Zeile über dem Schieber
+// sagte „23 dB fehlen", der Knopf daneben wurde gedrückt -- und setzte
+// +36 dB, den Anschlag. Beide rechneten mit rawInputPeakDb(), der
+// Spitze des letzten Blocks. Die Zeile hatte eine Silbe erwischt, der
+// Knopf die Atempause danach.
+//
+// Geprüft wird deshalb genau diese Reihenfolge: sprechen, dann
+// schweigen, dann rechnen. Der Augenblickswert MUSS dabei in den
+// Störteppich fallen -- sonst prüft der Fall nichts -- und die Zahl,
+// mit der gerechnet wird, muss oben bleiben.
+void TstStripChain::a_pause_between_words_never_becomes_the_recommendation()
+{
+    StripChain c;
+    c.prepare(kRate);
+    c.setEnabled(true);
+
+    // Zwei Sekunden Sprache: Silben mit Pausen dazwischen. Das ist der
+    // Scheitelfaktor, an dem die Kette Sprache erkennt.
+    const int fenster = int(kRate * 2.0) + kFrames;
+    for (int n = 0; n < fenster; n += kFrames) {
+        std::vector<float> blk(static_cast<size_t>(kFrames), 0.0f);
+        if ((n / kFrames) % 10 == 0) {
+            blk = voiceish(kFrames, 0.45f);
+        }
+        c.processMono(blk.data(), kFrames);
+    }
+    const float gesprochen = c.speechPeakDb();
+    QVERIFY2(gesprochen > -20.0f,
+             qPrintable(QStringLiteral("Sprache nicht erkannt: %1 dBFS")
+                            .arg(double(gesprochen))));
+
+    // Jetzt die Atempause: ein Störteppich, wie ihn die Klinkenbuchse
+    // liefert. Zwei volle Fenster lang, damit die Automatik ihn
+    // mindestens einmal zu sehen bekommt.
+    const float brumm = std::pow(10.0f, -48.0f / 20.0f);
+    for (int n = 0; n < 2 * fenster; n += kFrames) {
+        std::vector<float> blk(static_cast<size_t>(kFrames), 0.0f);
+        for (int i = 0; i < kFrames; ++i) {
+            const double t = double(n + i) / kRate;
+            blk[static_cast<size_t>(i)] =
+                brumm * float(std::sin(2.0 * M_PI * 50.0 * t));
+        }
+        c.processMono(blk.data(), kFrames);
+    }
+
+    // Die Gegenprobe: der Augenblickswert IST jetzt der Störteppich.
+    // Ohne diese Zeile belegt der Fall nichts -- genau mit dieser Zahl
+    // hat der Knopf gerechnet.
+    const float augenblick = c.rawInputPeakDb();
+    QVERIFY2(augenblick < -40.0f,
+             qPrintable(QStringLiteral("die Pause ist nicht leise genug: "
+                                       "%1 dBFS")
+                            .arg(double(augenblick))));
+    QVERIFY2(-12.0f - augenblick > 30.0f,
+             "die alte Rechnung haette hier keine 30 dB gefordert — "
+             "dann prueft dieser Fall den Vorfall nicht nach");
+
+    // Und die Zahl, mit der gerechnet werden darf, steht noch oben.
+    QCOMPARE(c.speechPeakDb(), gesprochen);
+    const float empfehlung = -12.0f - c.speechPeakDb();
+    QVERIFY2(empfehlung < 15.0f,
+             qPrintable(QStringLiteral("die Empfehlung ist wieder "
+                                       "davongelaufen: %1 dB")
+                            .arg(double(empfehlung))));
 }
 
 QTEST_APPLESS_MAIN(TstStripChain)

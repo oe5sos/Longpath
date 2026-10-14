@@ -2630,13 +2630,21 @@ QWidget* StripWindow::buildAllStagesSurface()
                 d->setInputAuto(v);
             }
             if (m_eingangSlider) { m_eingangSlider->setEnabled(!v); }
-            if (m_eingangBtn)    { m_eingangBtn->setEnabled(!v); }
+            if (m_eingangBtn) {
+                m_eingangBtn->setEnabled(
+                    !v && chain() != nullptr
+                    && chain()->speechPeakDb() >= -90.0f);
+            }
             persist();
         });
         if (m_eingangSlider) {
             m_eingangSlider->setEnabled(!m_eingangAuto->isChecked());
         }
-        m_eingangBtn->setEnabled(!m_eingangAuto->isChecked());
+        // Aus, bis wirklich etwas gehört wurde -- ein Druck ins
+        // Leere hat am 2026-10-14 +36 dB gesetzt.
+        m_eingangBtn->setEnabled(
+            !m_eingangAuto->isChecked()
+            && chain() != nullptr && chain()->speechPeakDb() >= -90.0f);
 
         z->addLayout(row);
         col->addWidget(box);
@@ -2654,8 +2662,16 @@ QWidget* StripWindow::buildAllStagesSurface()
         connect(m_eingangBtn, &QPushButton::clicked, this, [this]() {
             StripChain* c = displayChain();
             if (c == nullptr || m_eingangSlider == nullptr) { return; }
-            const double roh = double(c->rawInputPeakDb());
-            if (roh < -90.0) { return; }           // nichts gemessen
+            // ── Die Spitze seiner STIMME, nicht die des Augenblicks ──
+            //
+            // Hier stand rawInputPeakDb() -- die Spitze des letzten
+            // Blocks, rund zehn Millisekunden. Am 2026-10-14 fiel ein
+            // Druck auf diesen Knopf in eine Sprechpause: gemessen
+            // wurde der Störteppich bei -48 dBFS, gesetzt wurden die
+            // vollen +36 dB, und der Kopfhörer stand an der Decke des
+            // Begrenzers. Dritter Vorfall desselben Tages.
+            const double roh = double(c->speechPeakDb());
+            if (roh < -90.0) { return; }           // nichts gehört
             const double soll = -12.0;
             const int v = int(std::lround(
                 std::clamp(soll - roh, -12.0, 36.0) * 10.0));
@@ -4118,7 +4134,13 @@ void StripWindow::refreshMeters()
     // Zweimal je Sekunde reicht fuer einen Pegel, und es ist ruhiger
     // anzusehen als zehnmal. Derselbe Takt wie die Zielanzeige.
     if (m_eingangNote && m_zielTick == 0) {
-        const double roh = double(c->rawInputPeakDb());
+        // Dieselbe Zahl, mit der der Knopf rechnet -- sonst zeigt die
+        // Zeile das eine und der Druck tut das andere.
+        const double roh = double(c->speechPeakDb());
+        if (m_eingangBtn && m_eingangAuto) {
+            m_eingangBtn->setEnabled(!m_eingangAuto->isChecked()
+                                     && roh >= -90.0);
+        }
         if (roh < -90.0) {
             m_eingangNote->setText(Sprache::T(QStringLiteral(
                 "Input: ——  ·  target −12 dBFS  ·  speak")));

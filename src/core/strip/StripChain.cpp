@@ -408,7 +408,14 @@ void StripChain::processMono(float* samples, int frames) noexcept
     // Fehlers, gedeckelt auf 4 dB -- aus zwanzig Dezibel daneben
     // wird so in gut einer Viertelminute null, ohne dass man eine
     // Regelung hört.
-    if (m_inputAuto.load(std::memory_order_relaxed)) {
+    //
+    // Gemessen wird IMMER, auch mit abgeschaltetem Haken: aus
+    // derselben Zahl rechnet die Empfehlung in der Oberfläche und
+    // der Knopf daneben. Vor dem 2026-10-14 nahmen die beiden
+    // stattdessen die Spitze des letzten Blocks -- ein Wert, der
+    // zwischen zwei Wörtern auf den Störteppich fällt. Der Knopf
+    // traf genau so eine Pause und setzte die vollen +36 dB.
+    {
         for (int i = 0; i < frames; ++i) {
             m_autoPeak = std::max(m_autoPeak, std::fabs(samples[i]));
             m_autoSumSq += double(samples[i]) * double(samples[i]);
@@ -439,6 +446,14 @@ void StripChain::processMono(float* samples, int frames) noexcept
                 ? 20.0f * float(std::log10(effektiv)) : -120.0f;
             const float scheitel = spitzeDb - effektivDb;
             if (spitzeDb > kSpracheAbDbFs && scheitel > kScheitelAbDb) {
+                // Das Fenster sah nach Sprache aus. Erst hier wird
+                // die Zahl festgehalten, mit der ausserhalb gerechnet
+                // werden darf.
+                m_speechPeakDb.store(spitzeDb, std::memory_order_relaxed);
+            }
+            if (m_inputAuto.load(std::memory_order_relaxed)
+                && spitzeDb > kSpracheAbDbFs
+                && scheitel > kScheitelAbDb) {
                 // Gemessen wird hier die ROHE Spitze -- die
                 // Verstaerkung kommt erst danach. Die gesuchte Zahl
                 // ist deshalb schlicht der Abstand zum Ziel, und
@@ -633,6 +648,11 @@ float StripChain::effectiveInputGainDb() const noexcept
 float StripChain::rawInputPeakDb() const noexcept
 {
     return m_rawInPeakDb.load(std::memory_order_relaxed);
+}
+
+float StripChain::speechPeakDb() const noexcept
+{
+    return m_speechPeakDb.load(std::memory_order_relaxed);
 }
 
 float StripChain::inputPeakDb() const noexcept
