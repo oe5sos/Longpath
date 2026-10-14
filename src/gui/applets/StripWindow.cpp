@@ -529,6 +529,41 @@ void StripWindow::updateLiveNote()
         .arg(m_live->inputName(), m_live->outputName())
         .arg(m_live->inputRate());
 
+    // ── Und WELCHER Eingang, wenn das Geraet mehrere hat ────────────
+    //
+    // Ein Apollo Twin liefert sechzehn. Auf einem davon liegt das
+    // Mikrofon, auf anderen liegt unter Umstaenden der eigene
+    // Ausgang, den die Console zurueckschickt (am 2026-10-14
+    // gemessen: Eingang 3 und 4 waren auf die Nachkommastelle
+    // Longpaths eigenes Signal). Ohne diese Angabe sucht man den
+    // Fehler in der Kette.
+    if (m_live->inputChannels() > 2) {
+        const int k = m_live->activeInputChannel();
+        t += QStringLiteral(" ") + Sprache::T(QStringLiteral(
+            "This interface has %1 inputs; heard is number %2."))
+            .arg(m_live->inputChannels()).arg(k >= 0 ? k + 1 : 1);
+    }
+
+    // ── Der Kanal filtert auch bei abgeschaltetem Hauptschalter ─────
+    //
+    // Er bildet den SENDER nach und haengt deshalb absichtlich nicht
+    // am Kanalzug. Nur stand das nirgends: am 2026-10-14 hat der
+    // Betreiber bei ausgeschalteter Kette gegen seinen Apollo
+    // verglichen, waehrend der Mithoerweg weiter bei 4050 Hz zumachte
+    // -- und beides klang verschieden, zu Recht, aus einem Grund, den
+    // die Oberflaeche verschwieg.
+    if (m_liveChannel) {
+        const int kanal = m_liveChannel->currentData().toInt();
+        if (kanal >= 0) {
+            t += QStringLiteral(" ") + Sprache::T(QStringLiteral(
+                "The channel “%1” is in the monitor path as well — it "
+                "stands for the transmitter and is deliberately not "
+                "tied to the strip switch. Pick “raw” to compare "
+                "against something unfiltered."))
+                .arg(m_liveChannel->currentText());
+        }
+    }
+
     // Und die eine Rate, an der eine ganze Stufe haengt. rnnoise ist
     // auf 48 kHz trainiert; bei jeder anderen reicht das Entrauschen
     // unveraendert durch -- die Kachel steht auf „an" und die Stufe
@@ -847,6 +882,19 @@ void StripWindow::buildUi()
             const int ao = m_liveOut->findData(outId);
             if (ai >= 0) { m_liveIn->setCurrentIndex(ai); }
             if (ao >= 0) { m_liveOut->setCurrentIndex(ao); }
+            // ── Ein abgestecktes Geraet ist nicht mehr das Geraet ──
+            //
+            // Gemerkt wird die Kennung, auch wenn der Wandler gerade
+            // nicht da ist -- beim naechsten Anstecken soll die Wahl
+            // wieder stimmen. Gehoert wird dann aber die
+            // Systemvorgabe, und die Kette muss zu DIESER gehoeren.
+            // Am 2026-10-14 war der Apollo abgesteckt und das Headset
+            // wieder an der Klinke, waehrend die Einstellung noch auf
+            // den Apollo zeigte: ohne diese Zeile haette der
+            // Hauptschalter den Stand eines Geraets uebernommen, das
+            // gar nicht angeschlossen ist.
+            const QByteArray wirklich = (ai >= 0)
+                ? inId : m_liveIn->currentData().toByteArray();
             if (m_live) {
                 m_live->setInputDeviceId(inId);
                 m_live->setOutputDeviceId(outId);
@@ -854,7 +902,7 @@ void StripWindow::buildUi()
             // Und der Hauptschalter so, wie er zu DIESEM Mikrofon
             // gehoert -- siehe wendeKettenStandAn(). Ohne diese Zeile
             // gilt die Zuordnung erst ab dem ersten Wechsel von Hand.
-            wendeKettenStandAn(inId);
+            wendeKettenStandAn(wirklich);
         }
 
         // Ein Geraetewechsel im Lauf: anhalten, umstellen, anlaufen.
@@ -2678,6 +2726,7 @@ QWidget* StripWindow::buildAllStagesSurface()
         // die Höhe wird festgenagelt, damit auch ein längerer Satz
         // nichts verschiebt.
         m_eingangNote = new QLabel(box);
+        m_eingangNote->setObjectName(QStringLiteral("stripEingangNote"));
         m_eingangNote->setStyleSheet(dimStyle());
         lebendeZeile(m_eingangNote);
         z->addWidget(m_eingangNote);
@@ -2717,6 +2766,7 @@ QWidget* StripWindow::buildAllStagesSurface()
         row->addWidget(m_eingangWert);
 
         m_eingangBtn = new QPushButton(QStringLiteral("Set it"), box);
+        m_eingangBtn->setObjectName(QStringLiteral("stripEingangBtn"));
         m_eingangBtn->setStyleSheet(Style::buttonBaseStyle());
         m_eingangBtn->setToolTip(QStringLiteral(
             "Sets the gain so your speech peaks land near -12 dBFS — "
@@ -4262,8 +4312,31 @@ void StripWindow::refreshMeters()
         const bool laeuft = c->isEnabled();
         const double roh = laeuft ? double(c->speechPeakDb()) : -120.0;
         if (!laeuft) {
-            m_eingangNote->setText(Sprache::T(QStringLiteral(
-                "Input: strip is off — nothing being measured")));
+            // ── Aber der Mithörer misst weiter ──────────────────
+            //
+            // „Kette aus — nichts zu messen" war ehrlich, aber taub.
+            // Am 2026-10-14 hat genau dieser blinde Fleck den halben
+            // Abend gekostet: am Apollo kamen erst -50 dBFS an und
+            // später 0,0, und an der Stelle, an der man hinsieht,
+            // stand beide Male nichts. Der Mithörer misst unabhängig
+            // vom Hauptschalter — also zeigt die Zeile seine Zahl.
+            const double mit = (m_live && m_live->isRunning())
+                ? double(m_live->inputPeakDbFs()) : -120.0;
+            if (mit > -119.0) {
+                m_eingangNote->setText(
+                    mit >= -1.0
+                        ? Sprache::T(QStringLiteral(
+                              "Input: %1 dBFS  ·  ⚠ clipping — turn the "
+                              "interface gain down"))
+                              .arg(mit, 0, 'f', 1)
+                        : Sprache::T(QStringLiteral(
+                              "Input: %1 dBFS  ·  strip off, chain not "
+                              "measured"))
+                              .arg(mit, 0, 'f', 1));
+            } else {
+                m_eingangNote->setText(Sprache::T(QStringLiteral(
+                    "Input: strip is off — nothing being measured")));
+            }
             if (m_eingangBtn) { m_eingangBtn->setEnabled(false); }
         } else {
         if (m_eingangBtn && m_eingangAuto) {
@@ -4275,6 +4348,17 @@ void StripWindow::refreshMeters()
                 "Input: ——  ·  target −12 dBFS  ·  speak")));
         } else {
             const double fehlt = -12.0 - roh;
+            // Übersteuerung schlägt jede Empfehlung: unter einer
+            // abgeschnittenen Spitze ist keine Einstellung zu
+            // beurteilen, und der Satz „4 dB fehlen" waere dort
+            // schlicht falsch.
+            const double mit = (m_live && m_live->isRunning())
+                ? double(m_live->inputPeakDbFs()) : -120.0;
+            if (mit >= -1.0) {
+                m_eingangNote->setText(Sprache::T(QStringLiteral(
+                    "Input: %1 dBFS  ·  ⚠ clipping — turn the interface "
+                    "gain down")).arg(mit, 0, 'f', 1));
+            } else
             m_eingangNote->setText(
                 std::fabs(fehlt) < 4.0
                     ? Sprache::T(QStringLiteral(

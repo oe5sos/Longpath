@@ -42,6 +42,22 @@ const QHash<QString, QString>& tabelle()
           QStringLiteral("Die letzte Aufnahme noch einmal.") },
         { QStringLiteral("Hear myself"),
           QStringLiteral("Mich hören") },
+        { QStringLiteral("This interface has %1 inputs; heard is number %2."),
+          QStringLiteral("Dieses Gerät hat %1 Eingänge; gehört wird Nummer %2.") },
+        { QStringLiteral("The channel “%1” is in the monitor path as well — it "
+                         "stands for the transmitter and is deliberately not "
+                         "tied to the strip switch. Pick “raw” to compare "
+                         "against something unfiltered."),
+          QStringLiteral("Der Kanal „%1“ liegt auch im Mithörweg — er steht "
+                         "für den Sender und hängt mit Absicht nicht am "
+                         "Hauptschalter. Für einen ungefilterten Vergleich "
+                         "„roh“ wählen.") },
+        { QStringLiteral("Input: %1 dBFS  ·  ⚠ clipping — turn the interface "
+                         "gain down"),
+          QStringLiteral("Eingang: %1 dBFS  ·  ⚠ übersteuert — am Wandler "
+                         "zurücknehmen") },
+        { QStringLiteral("Input: %1 dBFS  ·  strip off, chain not measured"),
+          QStringLiteral("Eingang: %1 dBFS  ·  Kette aus, nicht gemessen") },
         { QStringLiteral("same loudness"),
           QStringLiteral("gleich laut") },
         { QStringLiteral("Holds the strip down to the loudness of the raw "

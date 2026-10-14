@@ -498,6 +498,21 @@ float StripLiveMonitor::loudnessMatchDb() const noexcept
     return m_gleichLaut.gainDb();
 }
 
+float StripLiveMonitor::inputPeakDbFs() const noexcept
+{
+    return m_letzteSekundeIn.load(std::memory_order_relaxed);
+}
+
+int StripLiveMonitor::inputChannels() const noexcept
+{
+    return m_inChannels;
+}
+
+int StripLiveMonitor::activeInputChannel() const noexcept
+{
+    return m_aktiverKanal.load(std::memory_order_relaxed);
+}
+
 int StripLiveMonitor::inputPick() const noexcept
 {
     return m_inPick.load(std::memory_order_relaxed);
@@ -566,6 +581,7 @@ void StripLiveMonitor::pump()
     const int pick = (gewuenscht >= 0 && gewuenscht < m_inChannels)
                    ? gewuenscht
                    : (m_inChannels > 2 ? m_autoPick : -1);
+    m_aktiverKanal.store(pick, std::memory_order_relaxed);
 
     const char* raw = chunk.constData();
     for (int f = 0; f < frames; ++f) {
@@ -815,6 +831,8 @@ void StripLiveMonitor::pump()
             }
         }
         std::fill(m_kanalSpitze.begin(), m_kanalSpitze.end(), 0.0f);
+        m_letzteSekundeIn.store(dB(m_sekSpitzeIn),
+                                std::memory_order_relaxed);
         m_sekSpitzeIn  = 0.0f;
         m_sekSpitzeOut = 0.0f;
     }

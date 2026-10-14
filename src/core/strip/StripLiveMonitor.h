@@ -354,6 +354,20 @@ public:
     /// Was der Ausgleich gerade abzieht, in dB.
     float loudnessMatchDb() const noexcept;
 
+    // ── Was am Eingang wirklich ankommt ──────────────────────────
+    //
+    // Die Spitze der zuletzt vollendeten Sekunde, VOR der Kette und
+    // nach der Kanalwahl. Vorhanden, damit die Oberfläche einen
+    // Pegel zeigen kann, auch wenn der Kanalzug aus ist -- am
+    // 2026-10-14 stand dort stundenlang eine veraltete Zahl aus
+    // einer anderen Sitzung, während in Wahrheit erst -50 dBFS und
+    // später 0,0 dBFS ankamen. -120 heißt „noch keine Sekunde um".
+    float inputPeakDbFs() const noexcept;
+    /// Wie viele Kanäle das Gerät liefert, und welcher davon gehört
+    /// wird (0-basiert; -1 heißt „alle zusammengelegt").
+    int   inputChannels() const noexcept;
+    int   activeInputChannel() const noexcept;
+
 private:
     std::unique_ptr<MicSpectrum> m_inRing;
     std::unique_ptr<MicSpectrum> m_outRing;
@@ -407,6 +421,11 @@ private:
     // Siehe die Begruendung an der Messstelle in der .cpp.
     float m_sekSpitzeIn{0.0f};
     float m_sekSpitzeOut{0.0f};
+    // Die letzte VOLLENDETE Sekunde, für die Oberfläche. Der
+    // laufende Wert taugt dafür nicht: er faellt einmal je Sekunde
+    // auf null zurueck, und wer zufaellig dann hinsieht, liest -120.
+    std::atomic<float> m_letzteSekundeIn{-120.0f};
+    std::atomic<int>   m_aktiverKanal{-1};
     int m_inFormat{0};          // QAudioFormat::SampleFormat
     int m_outChannels{2};
     int m_outFormat{0};

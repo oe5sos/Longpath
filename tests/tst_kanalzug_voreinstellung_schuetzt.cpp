@@ -30,6 +30,9 @@
 
 #include <QtTest/QtTest>
 
+#include <cmath>
+#include <vector>
+
 #include <QCheckBox>
 #include <QComboBox>
 #include <QLabel>
@@ -232,6 +235,70 @@ private slots:
             AppSettings::instance().remove(StripWindow::kettenSchluessel(
                 ein->itemData(i).toByteArray()));
         }
+    }
+
+    // ── Die Eingangszeile lügt nicht mehr ───────────────────────
+    //
+    // Am 2026-10-14 stand dort „0,0 dBFS · 12 dB zu viel", während am
+    // Gerät in Wahrheit -55 dBFS ankamen: bei abgeschaltetem
+    // Hauptschalter misst die Kette nicht, und die Zeile behielt den
+    // Zeigerstand aus einer früheren Sitzung mit einem anderen
+    // Mikrofon. Das hat einen halben Abend gekostet.
+    //
+    // Geprüft wird über den echten Takt des Fensters, nicht durch
+    // einen Aufruf von Hand: die Zeile wird von einem Zeitgeber
+    // nachgezogen, und genau der soll laufen.
+    void die_eingangszeile_behaelt_keinen_alten_zeigerstand()
+    {
+        RadioModel radio;
+        StripChain* c = radio.stripChain();
+        QVERIFY(c != nullptr);
+
+        // ── Erst einen Zeigerstand erzeugen ─────────────────────
+        //
+        // Ohne diesen Schritt prüft der Fall nichts: in einem frischen
+        // Vorgang steht die Zahl ohnehin auf „nichts gemessen", und
+        // auch die ALTE Fassung hätte einen Strich gezeigt. Der
+        // Fehler bestand darin, einen EINMAL gemessenen Wert über das
+        // Abschalten hinaus stehen zu lassen.
+        c->prepare(48000.0);
+        c->setEnabled(true);
+        constexpr int kBlock = 64;
+        const int fenster = 48000 * 2 + kBlock;
+        for (int n = 0; n < fenster; n += kBlock) {
+            std::vector<float> blk(kBlock, 0.0f);
+            if ((n / kBlock) % 10 == 0) {
+                for (int i = 0; i < kBlock; ++i) {
+                    const double t = double(n + i) / 48000.0;
+                    blk[size_t(i)] = 0.45f * float(
+                        std::sin(2.0 * M_PI * 220.0 * t));
+                }
+            }
+            c->processMono(blk.data(), kBlock);
+        }
+        QVERIFY2(c->speechPeakDb() > -20.0f,
+                 "der Prüfstand hat selbst keinen Pegel erzeugt");
+
+        // Und jetzt aus -- ab hier misst nichts mehr.
+        c->setEnabled(false);
+
+        StripWindow w(&radio);
+        auto* zeile = w.findChild<QLabel*>(QStringLiteral("stripEingangNote"));
+        QVERIFY2(zeile != nullptr, "die Eingangszeile hat keinen Namen");
+
+        QTest::qWait(700);        // zwei Takte der Anzeige
+        QVERIFY2(!zeile->text().contains(QStringLiteral("dBFS"))
+                     || zeile->text().contains(QStringLiteral("—")),
+                 qPrintable(QStringLiteral("die Zeile behauptet einen Pegel, "
+                                           "obwohl nichts misst: %1")
+                                .arg(zeile->text())));
+
+        auto* knopf = w.findChild<QPushButton*>(
+            QStringLiteral("stripEingangBtn"));
+        QVERIFY2(knopf != nullptr, "der Übernehmen-Knopf hat keinen Namen");
+        QVERIFY2(!knopf->isEnabled(),
+                 "„Übernehmen\" ist an, obwohl nichts gemessen wurde — "
+                 "genau so sind am 2026-10-14 +36 dB gesetzt worden");
     }
 
     // Die Sicherung darf sich nicht selbst überschreiben: wer sie
