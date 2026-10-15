@@ -1317,15 +1317,21 @@ endif()
 # gleichnamige mitgelieferte ueberschreiben duerfen (siehe
 # Theme::available()).
 add_custom_command(TARGET Longpath POST_BUILD
+    # Erst leeren, dann fuellen (2026-10-14). copy_if_different raeumt
+    # NICHT auf: eine Palette, die aus dem Quellbaum verschwindet,
+    # bleibt im Paket liegen und steht weiter zur Auswahl. Genau das
+    # passiert gerade mit kreide.json, die dieser Commit entfernt --
+    # ohne diese Zeile haette der Betreiber sie nach dem naechsten Bau
+    # immer noch im Menue.
+    COMMAND ${CMAKE_COMMAND} -E rm -rf "${_longpath_theme_dest}"
     COMMAND ${CMAKE_COMMAND} -E make_directory
             "${_longpath_theme_dest}"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${CMAKE_SOURCE_DIR}/resources/themes/kreide.json"
             "${CMAKE_SOURCE_DIR}/resources/themes/flach.json"
             "${CMAKE_SOURCE_DIR}/resources/themes/tief.json"
             "${CMAKE_SOURCE_DIR}/resources/themes/moos.json"
             "${_longpath_theme_dest}/"
-    COMMENT "Farbpaletten mitliefern")
+    COMMENT "Paletten mitliefern")
 if(LONGPATH_LTO_AVAILABLE)
     # Main app + its OBJECT-lib link both get LTO when enabled.  The
     # IPO property on the executable arranges -flto on the link line;

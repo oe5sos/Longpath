@@ -1500,7 +1500,6 @@ private:
     QActionGroup* m_agcGroup = nullptr;
 
     // Dark theme checkable action (Task 12)
-    QAction* m_darkThemeAction = nullptr;
 
     // Radio menu state-aware actions (3Q-9; trimmed in 3Q polish — Discover Now
     // dropped because Manage Radios already exposes a ↻ Scan button).
