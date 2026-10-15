@@ -339,11 +339,13 @@ private slots:
     {
         static const QString kTargetId = QStringLiteral("BwFilter");
         static const QString kTargetLabel = QStringLiteral("Bandwidth Filter");
+        // Dieselbe tr()-Rolle wie im Programm (2026-10-15 englisch).
         static const QString kFreeCanvasLabel =
-            QStringLiteral("Neue Fenster gleich ablösen");
+            MainWindow::tr("Detach new windows right away");
 
         QAction* freeCanvasAction = findActionByExactText(m_mw, kFreeCanvasLabel);
-        QVERIFY2(freeCanvasAction, "Schalter 'Neue Fenster gleich ablösen' nicht gefunden");
+        QVERIFY2(freeCanvasAction,
+                 "Schalter fuer 'neue Fenster gleich abloesen' nicht gefunden");
         const bool freeCanvasWasOn = freeCanvasAction->isChecked();
         if (!freeCanvasWasOn) { freeCanvasAction->trigger(); }
         QVERIFY(freeCanvasAction->isChecked());
