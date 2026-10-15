@@ -5279,6 +5279,10 @@ longpath_add_test(tst_palette_im_menue)
 # Abstand ... dann sieht es besser aus und gleich." Dieser Lauf misst
 # die Luecken am echten Hauptfenster.
 longpath_add_test(tst_abstand_zwischen_feldern)
+# 2026-10-15: „er soll mal technisch funktionieren ... nur eine
+# option, die man ein und ausblenden kann." Der schwebende Panadapter
+# hatte im Menue nur eine Einbahn ohne Haken.
+longpath_add_test(tst_panadapter_schalter)
 # 2026-10-14: HAUSSTIL.md sagt „Nie Radius 3" -- elf standen trotzdem im
 # Quelltext. Dieser Lauf liest die Quellen und haelt die Regel nach;
 # QSlider::groove ist die eine begruendete Ausnahme.

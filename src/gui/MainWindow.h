@@ -1444,6 +1444,14 @@ private:
     // nicht aus dem Takt bringt.
     QAction* m_fullScreenAction{nullptr};
 
+    /// Der EINE Schalter fuer den schwebenden Panadapter (2026-10-15,
+    /// Betreiber: „das sollte nur eine option sein, die man ein und
+    /// ausblenden kann"). Ankreuzbar und beidseitig: an loest ab, aus
+    /// dockt an. Vorher war es „Float active pan…" -- eine Handlung in
+    /// EINE Richtung, ohne Haken, also ohne Weg zurueck und ohne
+    /// Auskunft darueber, ob gerade etwas schwebt.
+    QAction* m_floatPanAction{nullptr};
+
     // Container infrastructure (Phase 3G-1)
     ContainerManager* m_containerManager{nullptr};
     QSplitter* m_mainSplitter{nullptr};
@@ -1802,6 +1810,10 @@ private:
     /// QStandardPaths::isTestModeEnabled() kehrt die Methode sofort
     /// zurueck: ein Pruefstand darf an keinem modalen Fenster haengen
     /// bleiben (dieselbe Regel wie showAudioDiagnoseDialog()).
+    /// Den Haken des Panadapter-Schalters auf den wirklichen Zustand
+    /// setzen, ohne dabei sein eigenes toggled() auszuloesen.
+    void syncFloatPanAction();
+
     void offerPaletteRestart(const QString& paletteName);
 
     /// Beendet dieses Programm und laesst es wieder oeffnen. Nutzt den

@@ -1123,6 +1123,14 @@ MainWindow::MainWindow(QWidget* parent)
 
 MainWindow::~MainWindow()
 {
+    // Ab hier wird abgebaut — und zwar auch dann, wenn niemand
+    // closeEvent() gefahren hat (Ausnahmepfad, Pruefstand). Jede
+    // Rueckrufstelle, die waehrend des Abbaus noch feuert, fragt
+    // diese Fahne; der Rumpf hier laeuft VOR dem Abbau der Kinder,
+    // also ist das der letzte Ort, an dem sie noch rechtzeitig kommt.
+    // Siehe die Wache in showConnectionPanel() (2026-10-15).
+    m_shuttingDown = true;
+
     // Sicherheitsnetz, 2026-09-03: regulaer haelt closeEvent() den
     // SpectrumThread an, lange bevor es hierher kommt. Wird ein
     // MainWindow aber OHNE closeEvent() zerstoert (Ausnahmepfad, Test-
@@ -3980,10 +3988,14 @@ void MainWindow::buildUI()
     // dasselbe Bild wie beim Rotor vor dem heutigen RotorFloating-Fix, nur
     // dass hier noch nie ueberhaupt ein Schluessel dafuer existierte.
     connect(m_panStack, &PanadapterStack::panFloatStateChanged,
-            this, [](const QString& panId, bool floating) {
+            this, [this](const QString& panId, bool floating) {
         AppSettings::instance().setValue(
             QStringLiteral("PanFloating_%1").arg(panId),
             floating ? QStringLiteral("True") : QStringLiteral("False"));
+        // Der Haken im View-Menue zeigt den wirklichen Zustand, egal
+        // ueber welchen der drei Wege (↗, Rechtsklick, Menue) er
+        // zustande kam.
+        syncFloatPanAction();
     });
 
     SpectrumWidget* const initialSpectrum = activeSpectrumWidget();
@@ -4149,20 +4161,10 @@ void MainWindow::buildUI()
         m_panStack->applyLayout(restoredLayout, panIdsForLayout(restoredLayout));
         m_panStack->restoreSplitterState();
 
-        // Betreiber 2026-08-31: "Panadapter ändert sich immer!" -- siehe
-        // die ausfuehrliche Begruendung beim panFloatStateChanged-Anschluss
-        // oben. applyLayout() hat gerade eben jeden Panadapter angedockt
-        // (sein allererster Schritt, dockAllFloatingPans(), unbedingt);
-        // hier wird direkt danach nachgeholt, was zuletzt tatsaechlich
-        // schwebte. PanFloatingWindow::restoreGeometryState() (in dessen
-        // eigenem Konstruktor) liest die dazugehoerige Lage gleich mit.
-        for (const QString& panId : panIdsForLayout(restoredLayout)) {
-            if (s.value(QStringLiteral("PanFloating_%1").arg(panId),
-                        QStringLiteral("False")).toString()
-                    == QStringLiteral("True")) {
-                m_panStack->floatPanadapter(panId);
-            }
-        }
+        // Was zuletzt schwebte, wird NACH dem Layoutprofil
+        // wiederhergestellt — siehe [PanFloatRestore] weiter unten.
+        // Bis zum 2026-10-15 stand der Block hier, also VOR dem Profil,
+        // und das Profil dockte 82 ms spaeter wieder an.
 
         // ...and finish the job once there IS a radio. Skipping the slice
         // add-loop above is right, but nothing used to pick it up afterwards,
@@ -8692,6 +8694,50 @@ void MainWindow::populateDefaultMeter()
             // löst m_apply ohne diese Wache aus. Bug + Fix 2026-08-28.
             m_layoutProfiles->applyCurrent();
         }
+
+        // ── Was zuletzt schwebte, NACH dem Profil ────────────────────
+        //
+        // Betreiber, 2026-10-15: „er soll mal technisch
+        // funktionieren!"
+        //
+        // Gemessen am selben Tag in einer Sandkiste: der globale
+        // Schluessel PanFloating_<id> liess pan-0 schweben, und 82 ms
+        // spaeter stand „[PanDockRequested] pan-0" im Protokoll — das
+        // Layoutprofil kam danach und dockte ihn wieder an. Zwei
+        // Hoheiten ueber denselben Zustand, und die zweite gewinnt
+        // immer. Ein abgeloester Panadapter ueberlebte so keinen
+        // Neustart.
+        //
+        // Das Profil ist die richtige Hoheit: es haelt je Profil,
+        // WELCHE Panadapter schweben und WO (snapshot["floatingPans"],
+        // angewandt in runApply). Sagt es etwas dazu, hat es das letzte
+        // Wort. Sagt es nichts — erster Start, oder ein Profil aus einer
+        // Fassung vor diesem Schluessel — zaehlt der globale Schluessel.
+        if (m_panStack) {
+            const bool profilEntscheidet =
+                !m_layoutProfiles->current().isEmpty()
+                && m_layoutProfiles->snapshot(m_layoutProfiles->current())
+                       .contains(QStringLiteral("floatingPans"));
+            int wiederhergestellt = 0;
+            if (!profilEntscheidet) {
+                AppSettings& ps = AppSettings::instance();
+                for (const QString& panId : m_panStack->panIdsForTesting()) {
+                    if (ps.value(QStringLiteral("PanFloating_%1").arg(panId),
+                                 QStringLiteral("False")).toString()
+                            != QStringLiteral("True")) {
+                        continue;
+                    }
+                    if (m_panStack->isPanFloating(panId)) { continue; }
+                    m_panStack->floatPanadapter(panId);
+                    ++wiederhergestellt;
+                }
+            }
+            qWarning() << "[PanFloatRestore] profilEntscheidet="
+                       << profilEntscheidet
+                       << "wiederhergestellt=" << wiederhergestellt;
+            syncFloatPanAction();
+        }
+
         // Auch ohne ein Profil, das angewandt wird (allererster Start):
         // formatfuellend (Betreiber 2026-09-27, siehe die Profil-
         // Anwendung oben). Nach applyCurrent() ist das schon geschehen.
@@ -9303,15 +9349,39 @@ void MainWindow::buildMenuBar()
         });
     }
 
+    // ── Der schwebende Panadapter: EIN Schalter ──────────────────────
+    //
+    // Betreiber, 2026-10-15: „er soll mal technisch funktionieren!
+    // ... das sollte nur eine option sein, die man ein und ausblenden
+    // kann."
+    //
+    // Hier stand „Float active pan…" -- eine Handlung in EINE
+    // Richtung. Sie loeste ab und konnte nie wieder andocken; ob
+    // gerade etwas schwebte, sagte das Menue nicht. Zurueck ging es
+    // nur ueber den ↙ im Kopf des Schwebefensters, also nur, wenn man
+    // das Fenster schon gefunden hatte.
+    //
+    // Jetzt ein Haken: an loest ab, aus dockt an, und der Haken zeigt
+    // den WIRKLICHEN Zustand -- nachgefuehrt ueber
+    // panFloatStateChanged, damit ↗, Rechtsklick und dieser Schalter
+    // nicht auseinanderlaufen.
     {
-        QAction* floatAct = viewMenu->addAction(
-            QStringLiteral("&Float active pan…"));
-        floatAct->setToolTip(QStringLiteral(
-            "Detach the active panadapter into its own floating window"));
-        connect(floatAct, &QAction::triggered, this, [this]() {
-            if (m_panStack) {
-                m_panStack->floatPanadapter(m_panStack->activePanId());
-            }
+        m_floatPanAction = viewMenu->addAction(tr("Floating &Panadapter"));
+        m_floatPanAction->setCheckable(true);
+        m_floatPanAction->setToolTip(
+            tr("Show the active panadapter in its own window — freely "
+               "movable and resizable, also on a second screen. Switch it "
+               "off to dock it back."));
+        connect(m_floatPanAction, &QAction::toggled, this, [this](bool on) {
+            if (!m_panStack) { return; }
+            const QString panId = m_panStack->activePanId();
+            if (panId.isEmpty()) { return; }
+            if (on == m_panStack->isPanFloating(panId)) { return; }
+            if (on) { m_panStack->floatPanadapter(panId); }
+            else    { m_panStack->dockPanadapter(panId); }
+        });
+        connect(viewMenu, &QMenu::aboutToShow, this, [this]() {
+            syncFloatPanAction();
         });
     }
 
@@ -11924,6 +11994,19 @@ void MainWindow::buildStatusBar()
 // steht als fertige Zahl in Stylesheets, die beim Bauen des Fensters
 // entstanden sind, und kommt erst beim naechsten Start nach.
 
+void MainWindow::syncFloatPanAction()
+{
+    if (!m_floatPanAction) { return; }
+    const bool schwebt =
+        m_panStack && !m_panStack->activePanId().isEmpty()
+        && m_panStack->isPanFloating(m_panStack->activePanId());
+    if (m_floatPanAction->isChecked() == schwebt) { return; }
+    // Sperre: ohne sie loest das Setzen des Hakens genau die Handlung
+    // aus, die ihn gerade gesetzt hat.
+    QSignalBlocker blocker(m_floatPanAction);
+    m_floatPanAction->setChecked(schwebt);
+}
+
 void MainWindow::offerPaletteRestart(const QString& paletteName)
 {
     // Ein Pruefstand darf nicht an einem modalen Fenster haengen
@@ -13754,6 +13837,28 @@ void MainWindow::showConnectionPanel()
         m_connectionPanel->setAttribute(Qt::WA_DeleteOnClose);
         connect(m_connectionPanel, &QObject::destroyed, this, [this]() {
             m_connectionPanel = nullptr;
+            // ── Nicht mehr waehrend des Abbaus (2026-10-15) ─────────
+            //
+            // Die Maske ist ein KIND dieses Fensters. Beim Beenden
+            // raeumt ~QWidget seine Kinder ab, BEVOR ~QObject die
+            // Verbindungen loest — dieser Rumpf lief also mit einem
+            // MainWindow, dessen Rumpf schon durch war, und griff in
+            // m_floatingContainersHiddenPreConnect. Ergebnis:
+            // EXC_BAD_ACCESS bei 0x5, im Absturzbericht sauber
+            // lesbar als
+            //   ~MainWindow -> ~ConnectionPanel -> destroyed()
+            //   -> restoreFloatingWindowsHiddenBehindConnectMask()
+            //   -> QPointer<QWidget>::operator bool()
+            //
+            // Ausgeloest nur, wenn die Liste NICHT leer ist, also genau
+            // dann, wenn etwas hinter der Maske versteckt wurde — zum
+            // Beispiel ein schwebender Panadapter ohne Funkgeraet.
+            // Gefunden am 2026-10-15 von tst_panadapter_schalter.
+            //
+            // Dieselbe Wache wie beim TCI-Abbau-Absturz vom 2026-08-29
+            // (siehe CLAUDE.md): beim Beenden gibt es nichts mehr
+            // wiederherzustellen.
+            if (m_shuttingDown) { return; }
             // Betreiber 2026-09-01: "panadapter kann ich nicht finden
             // ... profil 01 ist leer" -- die Maske ist zu, aber ohne
             // Verbindung blieb ALLES dauerhaft versteckt und der
