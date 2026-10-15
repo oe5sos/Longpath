@@ -369,43 +369,43 @@ Please ensure you understand the implications of including the BPFs when transmi
     </message>
     <message>
         <location filename="../src/gui/applets/AsrApplet.cpp" line="77" />
-        <source>aus</source>
-        <translation type="unfinished" />
+        <source>off</source>
+        <translation>aus</translation>
     </message>
     <message>
         <location filename="../src/gui/applets/AsrApplet.cpp" line="88" />
-        <source>Dienst startet …</source>
-        <translation type="unfinished" />
+        <source>service starting …</source>
+        <translation>Dienst startet …</translation>
     </message>
     <message>
         <location filename="../src/gui/applets/AsrApplet.cpp" line="91" />
-        <source>Dienst läuft</source>
-        <translation type="unfinished" />
+        <source>service running</source>
+        <translation>Dienst läuft</translation>
     </message>
     <message>
         <location filename="../src/gui/applets/AsrApplet.cpp" line="94" />
-        <source>Dienst läuft (extern)</source>
-        <translation type="unfinished" />
+        <source>service running (external)</source>
+        <translation>Dienst läuft (extern)</translation>
     </message>
     <message>
         <location filename="../src/gui/applets/AsrApplet.cpp" line="97" />
-        <source>Dienst: Fehler</source>
-        <translation type="unfinished" />
+        <source>service: error</source>
+        <translation>Dienst: Fehler</translation>
     </message>
     <message>
         <location filename="../src/gui/applets/AsrApplet.cpp" line="98" />
-        <source>— Dienst: %1</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
-        <location filename="../src/gui/applets/AsrApplet.cpp" line="119" />
-        <source>hört</source>
-        <translation type="unfinished" />
+        <source>— service: %1</source>
+        <translation>— Dienst: %1</translation>
     </message>
     <message>
         <location filename="../src/gui/applets/AsrApplet.cpp" line="119" />
         <source>wartet</source>
         <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../src/gui/applets/AsrApplet.cpp" line="119" />
+        <source>listening</source>
+        <translation>hört</translation>
     </message>
     <message>
         <location filename="../src/gui/applets/AsrApplet.cpp" line="124" />
@@ -426,23 +426,8 @@ Please ensure you understand the implications of including the BPFs when transmi
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/setup/AsrPage.cpp" line="89" />
-        <source>Adresse des Whisper-Dienstes. Voreinstellung ist der eigene Rechner (127.0.0.1) -- damit verlaesst kein Ton die Maschine.</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
         <location filename="../src/gui/setup/AsrPage.cpp" line="94" />
         <source>Adresse:</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
-        <location filename="../src/gui/setup/AsrPage.cpp" line="100" />
-        <source>leer lassen beim eigenen Dienst</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
-        <location filename="../src/gui/setup/AsrPage.cpp" line="102" />
-        <source>Nur noetig, wenn der Dienst einen Schluessel verlangt. Ein lokaler whisper-server braucht keinen.</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -461,118 +446,133 @@ Please ensure you understand the implications of including the BPFs when transmi
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/setup/AsrPage.cpp" line="145" />
-        <source>Sprachkuerzel, etwa de, en, it. "auto" laesst den Dienst raten -- das kostet Genauigkeit, wenn man weiss, was kommt.</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
-        <location filename="../src/gui/setup/AsrPage.cpp" line="150" />
-        <source>Sprache:</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
-        <location filename="../src/gui/setup/AsrPage.cpp" line="157" />
-        <source>Modellname. Der lokale whisper-server ignoriert dieses Feld -- er nimmt das Modell, mit dem er gestartet wurde.</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
-        <location filename="../src/gui/setup/AsrPage.cpp" line="162" />
-        <source>Modell:</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
-        <location filename="../src/gui/setup/AsrPage.cpp" line="180" />
-        <source>Dienst auf diesem Rechner</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
-        <location filename="../src/gui/setup/AsrPage.cpp" line="192" />
-        <source>whisper-server nicht gefunden — brew install whisper-cpp</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
-        <location filename="../src/gui/setup/AsrPage.cpp" line="194" />
-        <source>Pfad zu whisper-server. Leer: die Homebrew-Vorgabe.</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
-        <location filename="../src/gui/setup/AsrPage.cpp" line="198" />
+        <location filename="../src/gui/setup/AsrPage.cpp" line="199" />
         <source>Programm:</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/setup/AsrPage.cpp" line="204" />
-        <source>kein ggml-*.bin in ~/whisper</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
-        <location filename="../src/gui/setup/AsrPage.cpp" line="206" />
-        <source>Die Modelldatei (ggml-*.bin). Leer: die erste in ~/whisper. "small" ist schnell, "medium" versteht deutlich mehr.</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
-        <location filename="../src/gui/setup/AsrPage.cpp" line="211" />
+        <location filename="../src/gui/setup/AsrPage.cpp" line="213" />
         <source>Modelldatei:</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/setup/AsrPage.cpp" line="213" />
-        <source>beim Einschalten der Mitschrift selbst starten</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
-        <location filename="../src/gui/setup/AsrPage.cpp" line="227" />
+        <location filename="../src/gui/setup/AsrPage.cpp" line="229" />
         <source>Starten</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/setup/AsrPage.cpp" line="235" />
+        <location filename="../src/gui/setup/AsrPage.cpp" line="237" />
         <source>Stoppen</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/setup/AsrPage.cpp" line="253" />
-        <source>aus</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
-        <location filename="../src/gui/setup/AsrPage.cpp" line="254" />
-        <source>startet … (das Modell laedt einige Sekunden)</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
-        <location filename="../src/gui/setup/AsrPage.cpp" line="255" />
+        <location filename="../src/gui/setup/AsrPage.cpp" line="257" />
         <source>laeuft</source>
         <translation type="unfinished" />
     </message>
     <message>
+        <location filename="../src/gui/setup/AsrPage.cpp" line="89" />
+        <source>Address of the Whisper service. The default is this machine (127.0.0.1), so no audio ever leaves it.</source>
+        <translation>Adresse des Whisper-Dienstes. Voreinstellung ist der eigene Rechner (127.0.0.1) -- damit verlaesst kein Ton die Maschine.</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/setup/AsrPage.cpp" line="100" />
+        <source>leave empty for your own service</source>
+        <translation>leer lassen beim eigenen Dienst</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/setup/AsrPage.cpp" line="102" />
+        <source>Only needed if the service asks for a key. A local whisper-server does not.</source>
+        <translation>Nur noetig, wenn der Dienst einen Schluessel verlangt. Ein lokaler whisper-server braucht keinen.</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/setup/AsrPage.cpp" line="145" />
+        <source>Language code, e.g. de, en, it. "auto" lets the service guess, which costs accuracy when you already know what is coming.</source>
+        <translation>Sprachkuerzel, etwa de, en, it. "auto" laesst den Dienst raten -- das kostet Genauigkeit, wenn man weiss, was kommt.</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/setup/AsrPage.cpp" line="151" />
+        <source>Language:</source>
+        <translation>Sprache:</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/setup/AsrPage.cpp" line="158" />
+        <source>Model name. The local whisper-server ignores this field: it uses the model it was started with.</source>
+        <translation>Modellname. Der lokale whisper-server ignoriert dieses Feld -- er nimmt das Modell, mit dem er gestartet wurde.</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/setup/AsrPage.cpp" line="163" />
+        <source>Model:</source>
+        <translation>Modell:</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/setup/AsrPage.cpp" line="181" />
+        <source>Service on this machine</source>
+        <translation>Dienst auf diesem Rechner</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/setup/AsrPage.cpp" line="193" />
+        <source>whisper-server not found — brew install whisper-cpp</source>
+        <translation>whisper-server nicht gefunden — brew install whisper-cpp</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/setup/AsrPage.cpp" line="195" />
+        <source>Path to whisper-server. Empty: the Homebrew default.</source>
+        <translation>Pfad zu whisper-server. Leer: die Homebrew-Vorgabe.</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/setup/AsrPage.cpp" line="205" />
+        <source>no ggml-*.bin in ~/whisper</source>
+        <translation>kein ggml-*.bin in ~/whisper</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/setup/AsrPage.cpp" line="207" />
+        <source>The model file (ggml-*.bin). Empty: the first one in ~/whisper. "small" is fast, "medium" understands considerably more.</source>
+        <translation>Die Modelldatei (ggml-*.bin). Leer: die erste in ~/whisper. "small" ist schnell, "medium" versteht deutlich mehr.</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/setup/AsrPage.cpp" line="215" />
+        <source>start it automatically when transcription is switched on</source>
+        <translation>beim Einschalten der Mitschrift selbst starten</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/setup/AsrPage.cpp" line="255" />
+        <source>off</source>
+        <translation>aus</translation>
+    </message>
+    <message>
         <location filename="../src/gui/setup/AsrPage.cpp" line="256" />
-        <source>laeuft ausserhalb von Longpath (%1)</source>
-        <translation type="unfinished" />
+        <source>starting … (the model takes a few seconds to load)</source>
+        <translation>startet … (das Modell laedt einige Sekunden)</translation>
     </message>
     <message>
         <location filename="../src/gui/setup/AsrPage.cpp" line="258" />
+        <source>running outside Longpath (%1)</source>
+        <translation>laeuft offserhalb von Longpath (%1)</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/setup/AsrPage.cpp" line="316" />
+        <source>service responding</source>
+        <translation>Dienst antwortet</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/setup/AsrPage.cpp" line="260" />
         <source>Fehler: %1</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/setup/AsrPage.cpp" line="285" />
+        <location filename="../src/gui/setup/AsrPage.cpp" line="287" />
         <source>Adresse unlesbar</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/setup/AsrPage.cpp" line="291" />
+        <location filename="../src/gui/setup/AsrPage.cpp" line="293" />
         <source>frage nach ...</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/setup/AsrPage.cpp" line="310" />
+        <location filename="../src/gui/setup/AsrPage.cpp" line="312" />
         <source>niemand horcht dort</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
-        <location filename="../src/gui/setup/AsrPage.cpp" line="314" />
-        <source>Dienst antwortet</source>
         <translation type="unfinished" />
     </message>
 </context>
@@ -580,8 +580,8 @@ Please ensure you understand the implications of including the BPFs when transmi
     <name>Longpath::AsrService</name>
     <message>
         <location filename="../src/asr/AsrService.cpp" line="116" />
-        <source>Der Erkennungsdienst liess sich nicht öffnen.</source>
-        <translation type="unfinished" />
+        <source>The recognition service could not be opened.</source>
+        <translation>Der Erkennungsdienst liess sich nicht öffnen.</translation>
     </message>
 </context>
 <context>
@@ -841,7 +841,7 @@ Calibration logic deferred — emits calFreqStartRequested.</source>
         <location filename="../src/gui/setup/hardware/CalibrationTab.cpp" line="292" />
         <location filename="../src/gui/setup/hardware/CalibrationTab.cpp" line="313" />
         <source>Reset</source>
-        <translation type="unfinished" />
+        <translation>Zurücksetzen</translation>
     </message>
     <message>
         <location filename="../src/gui/setup/hardware/CalibrationTab.cpp" line="268" />
@@ -1391,7 +1391,7 @@ At the other end is a mast with cables on it, and it keeps turning for minutes a
     </message>
     <message>
         <location filename="../src/gui/setup/CatNetworkSetupPages.cpp" line="1046" />
-        <source>&lt;span style='color:%1'&gt;●&lt;/span&gt; Wartet auf %2</source>
+        <source>&lt;span style='color:%1'&gt;●&lt;/span&gt; Waiting for %2</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -1418,13 +1418,13 @@ At the other end is a mast with cables on it, and it keeps turning for minutes a
     <message>
         <location filename="../src/gui/widgets/CommandBar.cpp" line="921" />
         <location filename="../src/gui/widgets/CommandBar.cpp" line="961" />
-        <source>Nicht verbunden</source>
-        <translation type="unfinished" />
+        <source>Not connected</source>
+        <translation>Nicht verbunden</translation>
     </message>
     <message>
         <location filename="../src/gui/widgets/CommandBar.cpp" line="979" />
-        <source>Der Empfangskanal läuft mit %1, es kommen aber %2 an — so klingt es falsch.</source>
-        <translation type="unfinished" />
+        <source>The receive channel runs at %1 but %2 is arriving — that is why it sounds wrong.</source>
+        <translation>Der Empfangskanal läuft mit %1, es kommen aber %2 an — so klingt es falsch.</translation>
     </message>
     <message>
         <location filename="../src/gui/widgets/CommandBar.cpp" line="983" />
@@ -1807,18 +1807,18 @@ Higher = smoother but slower to react to changing noise.</source>
     <name>Longpath::FrequencyApplet</name>
     <message>
         <location filename="../src/gui/applets/FrequencyApplet.cpp" line="244" />
-        <source>Empfängerkacheln anzeigen</source>
-        <translation type="unfinished" />
+        <source>Show receiver tiles</source>
+        <translation>Empfängerkacheln anzeigen</translation>
     </message>
     <message>
         <location filename="../src/gui/applets/FrequencyApplet.cpp" line="253" />
-        <source>A/B-Zeile anzeigen</source>
-        <translation type="unfinished" />
+        <source>Show A/B row</source>
+        <translation>A/B-Zeile anzeigen</translation>
     </message>
     <message>
         <location filename="../src/gui/applets/FrequencyApplet.cpp" line="269" />
-        <source>Leistung anzeigen</source>
-        <translation type="unfinished" />
+        <source>Show power</source>
+        <translation>Leistung anzeigen</translation>
     </message>
     <message>
         <location filename="../src/gui/applets/FrequencyApplet.cpp" line="279" />
@@ -2324,8 +2324,8 @@ Disable for manual OC pin control.&lt;/i&gt;</source>
     </message>
     <message>
         <location filename="../src/gui/applets/InstrumentApplet.cpp" line="299" />
-        <source>keine</source>
-        <translation type="unfinished" />
+        <source>none</source>
+        <translation>keine</translation>
     </message>
     <message>
         <location filename="../src/gui/applets/InstrumentApplet.cpp" line="320" />
@@ -2390,13 +2390,13 @@ Disable for manual OC pin control.&lt;/i&gt;</source>
     </message>
     <message>
         <location filename="../src/gui/applets/InstrumentApplet.cpp" line="409" />
-        <source>Zurücksetzen</source>
-        <translation type="unfinished" />
+        <source>Reset</source>
+        <translation>Zurücksetzen</translation>
     </message>
     <message>
         <location filename="../src/gui/applets/InstrumentApplet.cpp" line="421" />
-        <source>Frequenz anzeigen</source>
-        <translation type="unfinished" />
+        <source>Show frequency</source>
+        <translation>Frequenz anzeigen</translation>
     </message>
 </context>
 <context>
@@ -2502,29 +2502,39 @@ Disable for manual OC pin control.&lt;/i&gt;</source>
     <name>Longpath::KiwiSdrApplet</name>
     <message>
         <location filename="../src/gui/applets/KiwiSdrApplet.cpp" line="190" />
-        <source>Keine KiwiSDR-Empfangsantenne eingerichtet</source>
-        <translation type="unfinished" />
+        <source>No KiwiSDR receive antenna configured</source>
+        <translation>Keine KiwiSDR-Empfangsantenne eingerichtet</translation>
     </message>
     <message>
         <location filename="../src/gui/applets/KiwiSdrApplet.cpp" line="191" />
         <location filename="../src/gui/applets/KiwiSdrApplet.cpp" line="197" />
-        <source>Zustand der KiwiSDR-Empfaenger</source>
-        <translation type="unfinished" />
+        <source>KiwiSDR receiver status</source>
+        <translation>Zustand der KiwiSDR-Empfaenger</translation>
     </message>
     <message>
         <location filename="../src/gui/applets/KiwiSdrApplet.cpp" line="199" />
-        <source>Zeigt die eingerichteten KiwiSDR-Empfangsantennen, ihren Verbindungszustand und die zugeordnete Scheibe.</source>
-        <translation type="unfinished" />
+        <source>Shows the configured KiwiSDR receive antennas, their connection state and the slice they are assigned to.</source>
+        <translation>Zeigt die eingerichteten KiwiSDR-Empfangsantennen, ihren Verbindungszustand und die zugeordnete Scheibe.</translation>
     </message>
     <message>
         <location filename="../src/gui/applets/KiwiSdrApplet.cpp" line="284" />
-        <source>Name des KiwiSDR-Empfaengers</source>
-        <translation type="unfinished" />
+        <source>Name of the KiwiSDR receiver</source>
+        <translation>Name des KiwiSDR-Empfaengers</translation>
     </message>
     <message>
         <location filename="../src/gui/applets/KiwiSdrApplet.cpp" line="292" />
-        <source>Zustand des KiwiSDR-Empfaengers</source>
-        <translation type="unfinished" />
+        <source>State of the KiwiSDR receiver</source>
+        <translation>Zustand des KiwiSDR-Empfaengers</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/KiwiSdrApplet.cpp" line="303" />
+        <source>Waterfall preview for %1</source>
+        <translation>Wasserfall-Vorschau fuer %1</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/KiwiSdrApplet.cpp" line="352" />
+        <source>Not assigned</source>
+        <translation>Nicht zugeordnet</translation>
     </message>
     <message>
         <location filename="../src/gui/applets/KiwiSdrApplet.cpp" line="300" />
@@ -2532,19 +2542,9 @@ Disable for manual OC pin control.&lt;/i&gt;</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/applets/KiwiSdrApplet.cpp" line="303" />
-        <source>Wasserfall-Vorschau fuer %1</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
         <location filename="../src/gui/applets/KiwiSdrApplet.cpp" line="333" />
-        <source>Einzelheiten zum KiwiSDR-Empfaenger</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
-        <location filename="../src/gui/applets/KiwiSdrApplet.cpp" line="352" />
-        <source>Nicht zugeordnet</source>
-        <translation type="unfinished" />
+        <source>KiwiSDR receiver details</source>
+        <translation>Einzelheiten zum KiwiSDR-Empfaenger</translation>
     </message>
 </context>
 <context>
@@ -2926,8 +2926,8 @@ Disable for manual OC pin control.&lt;/i&gt;</source>
     <name>Longpath::KiwiWaterfallPanel</name>
     <message>
         <location filename="../src/gui/KiwiWaterfallPanel.cpp" line="34" />
-        <source>Kein Wasserfall eingeschaltet — im KiwiSDR-Panel je Empfänger einschalten.</source>
-        <translation type="unfinished" />
+        <source>No waterfall switched on — switch one on per receiver in the KiwiSDR panel.</source>
+        <translation>Kein Wasserfall eingeschaltet — im KiwiSDR-Panel je Empfänger einschalten.</translation>
     </message>
 </context>
 <context>
@@ -3006,31 +3006,24 @@ Disable for manual OC pin control.&lt;/i&gt;</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="3001" />
-        <source>Alle %1 Notch-Filter entfernen?
-
-Das laesst sich nicht rueckgaengig machen.</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
         <location filename="../src/gui/MainWindow.cpp" line="3263" />
-        <source>Die Frequenz dieser Scheibe ist gesperrt — das Schloss in der VFO-Leiste gibt sie frei.</source>
-        <translation type="unfinished" />
+        <source>This slice's frequency is locked — the padlock in the VFO bar releases it.</source>
+        <translation>Die Frequenz dieser Scheibe ist gesperrt — das Schloss in der VFO-Leiste gibt sie frei.</translation>
     </message>
     <message>
         <location filename="../src/gui/MainWindow.cpp" line="3664" />
-        <source>Grundfarbe des Panadapters</source>
-        <translation type="unfinished" />
+        <source>Panadapter base colour</source>
+        <translation>Grundfarbe des Panadapters</translation>
     </message>
     <message>
         <location filename="../src/gui/MainWindow.cpp" line="9283" />
-        <source>Der letzte Empfänger bleibt — sonst gäbe es nichts mehr zu hören.</source>
-        <translation type="unfinished" />
+        <source>The last receiver stays — otherwise there would be nothing left to listen to.</source>
+        <translation>Der letzte Empfänger bleibt — sonst gäbe es nichts mehr zu hören.</translation>
     </message>
     <message>
         <location filename="../src/gui/MainWindow.cpp" line="9292" />
-        <source>Empfänger %1 geschlossen.</source>
-        <translation type="unfinished" />
+        <source>Receiver %1 closed.</source>
+        <translation>Empfänger %1 geschlossen.</translation>
     </message>
     <message>
         <location filename="../src/gui/MainWindow.cpp" line="10588" />
@@ -3092,9 +3085,9 @@ Das laesst sich nicht rueckgaengig machen.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="13280" />
-        <source>Keine Notch-Filter</source>
-        <translation type="unfinished" />
+        <location filename="../src/gui/MainWindow.cpp" line="13340" />
+        <source>Remove all %1…</source>
+        <translation>Alle %1 entfernen…</translation>
     </message>
     <message numerus="yes">
         <location filename="../src/gui/MainWindow.cpp" line="13281" />
@@ -3111,13 +3104,32 @@ Das laesst sich nicht rueckgaengig machen.</source>
     </message>
     <message>
         <location filename="../src/gui/MainWindow.cpp" line="13287" />
-        <source>Alle Notch-Filter auf einmal stumm schalten, ohne sie zu verlieren. Dasselbe wie ein Linksklick auf TNF.</source>
-        <translation type="unfinished" />
+        <source>Mute all notch filters at once without losing them. Same as a left-click on TNF.</source>
+        <translation>Alle Notch-Filter auf einmal stumm schalten, ohne sie zu verlieren. Dasselbe wie ein Linksklick auf TNF.</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/MainWindow.cpp" line="13331" />
+        <source>Delete</source>
+        <translation>Löschen</translation>
     </message>
     <message>
         <location filename="../src/gui/MainWindow.cpp" line="13297" />
         <source>Anlegen: Cmd-Klick ins Spektrum</source>
         <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../src/gui/MainWindow.cpp" line="3001" />
+        <source>Remove all %1 notch filters?
+
+This cannot be undone.</source>
+        <translation>Alle %1 Notch-Filter entfernen?
+
+Das laesst sich nicht rueckgaengig machen.</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/MainWindow.cpp" line="13280" />
+        <source>No notch filters</source>
+        <translation>Keine Notch-Filter</translation>
     </message>
     <message>
         <location filename="../src/gui/MainWindow.cpp" line="13310" />
@@ -3132,16 +3144,6 @@ Das laesst sich nicht rueckgaengig machen.</source>
     <message>
         <location filename="../src/gui/MainWindow.cpp" line="13323" />
         <source>Aktiv</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
-        <location filename="../src/gui/MainWindow.cpp" line="13331" />
-        <source>Löschen</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
-        <location filename="../src/gui/MainWindow.cpp" line="13340" />
-        <source>Alle %1 entfernen…</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -3670,19 +3672,19 @@ covers SSB + AM comfortably.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/widgets/NotchEditPopup.cpp" line="58" />
-        <source>Mittenfrequenz des Notch-Filters.</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
-        <location filename="../src/gui/widgets/NotchEditPopup.cpp" line="62" />
-        <source>Breite</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
         <location filename="../src/gui/widgets/NotchEditPopup.cpp" line="67" />
-        <source>Breite des Notch-Filters. Sehr schmale Werte setzt die Signalverarbeitung selbst herauf — dann steht hier danach die Zahl, die wirklich gilt.</source>
-        <translation type="unfinished" />
+        <source>Width of the notch filter. The DSP raises very narrow values by itself — the number shown afterwards is the one that actually applies.</source>
+        <translation>Breite des Notch-Filters. Sehr schmale Werte setzt die Signalverarbeitung selbst herauf — dann steht hier danach die Zahl, die wirklich gilt.</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/widgets/NotchEditPopup.cpp" line="75" />
+        <source>Switched off, the filter stays but has no effect — handy for comparing without throwing it away.</source>
+        <translation>Ausgeschaltet bleibt der Filter liegen und wirkt nicht — praktisch zum Vergleichen, ohne ihn wegzuwerfen.</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/widgets/NotchEditPopup.cpp" line="80" />
+        <source>Delete</source>
+        <translation>Löschen</translation>
     </message>
     <message>
         <location filename="../src/gui/widgets/NotchEditPopup.cpp" line="74" />
@@ -3690,14 +3692,14 @@ covers SSB + AM comfortably.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/widgets/NotchEditPopup.cpp" line="75" />
-        <source>Ausgeschaltet bleibt der Filter liegen und wirkt nicht — praktisch zum Vergleichen, ohne ihn wegzuwerfen.</source>
-        <translation type="unfinished" />
+        <location filename="../src/gui/widgets/NotchEditPopup.cpp" line="58" />
+        <source>Centre frequency of the notch filter.</source>
+        <translation>Mittenfrequenz des Notch-Filters.</translation>
     </message>
     <message>
-        <location filename="../src/gui/widgets/NotchEditPopup.cpp" line="80" />
-        <source>Löschen</source>
-        <translation type="unfinished" />
+        <location filename="../src/gui/widgets/NotchEditPopup.cpp" line="62" />
+        <source>Width</source>
+        <translation>Breite</translation>
     </message>
     <message>
         <location filename="../src/gui/widgets/NotchEditPopup.cpp" line="81" />
@@ -3899,182 +3901,182 @@ covers SSB + AM comfortably.</source>
 <context>
     <name>Longpath::OcOutputsHfTab</name>
     <message>
-        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="155" />
+        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="154" />
         <source>Penny Ext Control enabled</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="156" />
-        <source>Enable the Penelope/Hermes open-collector external control outputs
-
-Hinweis: wird gespeichert, aber noch nicht an das Gerät gesendet.</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
-        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="162" />
+        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="160" />
         <source>N2ADR Filter (HL2): Hardware → HL2 I/O Board</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="166" />
+        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="164" />
         <source>On Hermes Lite 2, N2ADR filter board control is configured on the HL2 I/O Board tab.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="171" />
+        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="169" />
         <source>Allow hot switching</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="172" />
-        <source>Allow OC output lines to switch while transmitting
+        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="155" />
+        <source>Enable the Penelope/Hermes open-collector external control outputs
 
-Hinweis: wird gespeichert, aber noch nicht an das Gerät gesendet.</source>
+Note: stored, but not sent to the radio yet.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="179" />
-        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="665" />
+        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="170" />
+        <source>Allow OC output lines to switch while transmitting
+
+Note: stored, but not sent to the radio yet.</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="176" />
+        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="662" />
         <source>Reset OC defaults</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="180" />
+        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="177" />
         <source>Reset all OC matrix pin assignments and pin actions to Thetis defaults</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="192" />
+        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="189" />
         <source>RX OC Pins per Band</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="199" />
+        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="196" />
         <source>TX OC Pins per Band</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="219" />
+        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="216" />
         <source>TX Pin Action mapping</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="226" />
+        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="223" />
         <source>Pin</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="239" />
+        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="236" />
         <source>Pin %1</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="244" />
+        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="241" />
         <source>Pin %1: %2</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="274" />
+        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="271" />
         <source>USB BCD output</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="294" />
+        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="291" />
         <source>Enable BCD</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="298" />
+        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="295" />
         <source>Format:</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="303" />
+        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="300" />
         <source>4-bit binary</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="304" />
+        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="301" />
         <source>BCD</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="308" />
+        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="305" />
         <source>Invert</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="337" />
+        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="334" />
         <source>External PA control</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="347" />
+        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="344" />
         <source>PA model:</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="352" />
+        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="349" />
         <source>None</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="358" />
+        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="355" />
         <source>Bias delay (ms):</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="362" />
+        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="359" />
         <source> ms</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="389" />
+        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="386" />
         <source>Live OC pin state</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="402" />
+        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="399" />
         <source>OC pin %1 — reflects last C&amp;C OC byte sent to radio</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="405" />
+        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="402" />
         <source>%1</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="411" />
+        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="408" />
         <source>&lt;i&gt;Reflects the last C&amp;amp;C OC byte sent to the radio&lt;/i&gt;</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="498" />
+        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="495" />
         <source>Band</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="502" />
+        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="499" />
         <source>P%1</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="531" />
+        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="528" />
         <source>%1 OC pin %2, band %3</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="532" />
+        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="529" />
         <source>TX</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="532" />
+        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="529" />
         <source>RX</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="666" />
+        <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="663" />
         <source>Reset all OC pin assignments and TX pin actions to Thetis defaults?
 
 All custom band/pin mappings will be cleared.</source>
@@ -4363,23 +4365,8 @@ All custom band/pin mappings will be cleared.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/PanadapterApplet.cpp" line="529" />
-        <source>Anzeige vom KiwiSDR</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
-        <location filename="../src/gui/PanadapterApplet.cpp" line="533" />
-        <source>Zeigt statt des Geraets den Wasserfall des KiwiSDR, der dieser Scheibe zugeordnet ist.</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
         <location filename="../src/gui/PanadapterApplet.cpp" line="550" />
         <source>Extended view (wideband wings)</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
-        <location filename="../src/gui/PanadapterApplet.cpp" line="566" />
-        <source>Hintergrundbild wählen…</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -4394,10 +4381,26 @@ All custom band/pin mappings will be cleared.</source>
         <translation type="unfinished" />
     </message>
     <message>
+        <location filename="../src/gui/PanadapterApplet.cpp" line="529" />
+        <source>Display from the KiwiSDR</source>
+        <translation>Anzeige vom KiwiSDR</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/PanadapterApplet.cpp" line="533" />
+        <source>Shows the waterfall of the KiwiSDR assigned to this slice instead of the radio's.</source>
+        <translation>Zeigt statt des Geraets den Wasserfall des KiwiSDR, der dieser Scheibe zugeordnet ist.</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/PanadapterApplet.cpp" line="566" />
+        <source>Choose background image…</source>
+        <translation>Hintergrundbild wählen…</translation>
+    </message>
+    <message>
         <location filename="../src/gui/PanadapterApplet.cpp" line="592" />
-        <source>Diese Datei laesst sich nicht als Bild lesen:
+        <source>This file cannot be read as an image:
 %1</source>
-        <translation type="unfinished" />
+        <translation>Diese Datei laesst sich nicht als Bild lesen:
+%1</translation>
     </message>
     <message>
         <location filename="../src/gui/PanadapterApplet.cpp" line="610" />
@@ -4416,23 +4419,23 @@ All custom band/pin mappings will be cleared.</source>
     </message>
     <message>
         <location filename="../src/gui/PanadapterApplet.cpp" line="647" />
-        <source>Grundfarbe zurücksetzen</source>
-        <translation type="unfinished" />
+        <source>Reset base colour</source>
+        <translation>Grundfarbe zurücksetzen</translation>
     </message>
     <message>
         <location filename="../src/gui/PanadapterApplet.cpp" line="648" />
-        <source>Vergisst die selbst gewählte Grundfarbe. Danach folgt der Panadapter wieder dem Thema — im dunklen Thema das Blaugrau.</source>
-        <translation type="unfinished" />
+        <source>Forgets the base colour you picked. The panadapter then follows the theme again — blue-grey in the dark theme.</source>
+        <translation>Vergisst die selbst gewählte Grundfarbe. Danach folgt der Panadapter wieder dem Thema — im dunklen Thema das Blaugrau.</translation>
     </message>
     <message>
         <location filename="../src/gui/PanadapterApplet.cpp" line="657" />
-        <source>Alle Anzeige-Einstellungen…</source>
-        <translation type="unfinished" />
+        <source>All display settings…</source>
+        <translation>Alle Anzeige-Einstellungen…</translation>
     </message>
     <message>
         <location filename="../src/gui/PanadapterApplet.cpp" line="679" />
-        <source>In ein eigenes Fenster ablösen — frei beweglich und frei skalierbar. Der Pfeil im Fenster holt es zurück.</source>
-        <translation type="unfinished" />
+        <source>Detach into its own window — freely movable and resizable. The arrow in that window brings it back.</source>
+        <translation>In ein eigenes Fenster ablösen — frei beweglich und frei skalierbar. Der Pfeil im Fenster holt es zurück.</translation>
     </message>
 </context>
 <context>
@@ -5312,17 +5315,17 @@ All custom band/pin mappings will be cleared.</source>
     </message>
     <message>
         <location filename="../src/gui/widgets/RotorDialWidget.cpp" line="143" />
-        <source>Ganze Windrose, Norden oben. Zeigt auch, was hinter der Antenne liegt.</source>
-        <translation type="unfinished" />
+        <source>Full compass rose, north up. Also shows what lies behind the antenna.</source>
+        <translation>Ganze Windrose, Norden oben. Zeigt auch, was hinter der Antenne liegt.</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/widgets/RotorDialWidget.cpp" line="146" />
+        <source>A strip around the antenna instead of a circle. Uses the full width, at the cost of the all-round view.</source>
+        <translation>Ein Band um die Antenne statt eines Kreises. Nutzt die volle Breite — dafuer fehlt das Rundherum.</translation>
     </message>
     <message>
         <location filename="../src/gui/widgets/RotorDialWidget.cpp" line="145" />
         <source>Peilband</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
-        <location filename="../src/gui/widgets/RotorDialWidget.cpp" line="146" />
-        <source>Ein Band um die Antenne statt eines Kreises. Nutzt die volle Breite — dafuer fehlt das Rundherum.</source>
         <translation type="unfinished" />
     </message>
 </context>
@@ -5339,11 +5342,6 @@ All custom band/pin mappings will be cleared.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/widgets/RotorLogbookPanel.cpp" line="979" />
-        <source>Ziel %1 (leer)</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
         <location filename="../src/gui/widgets/RotorLogbookPanel.cpp" line="983" />
         <source>Hierhin zielen</source>
         <translation type="unfinished" />
@@ -5355,13 +5353,23 @@ All custom band/pin mappings will be cleared.</source>
     </message>
     <message>
         <location filename="../src/gui/widgets/RotorLogbookPanel.cpp" line="1000" />
-        <source>Park (nicht gelernt)</source>
-        <translation type="unfinished" />
+        <source>Park (not taught)</source>
+        <translation>Park (nicht gelernt)</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/widgets/RotorLogbookPanel.cpp" line="1016" />
+        <source>Turns the BEARING to the long path. Aim first, then reverse course, then Rotate.</source>
+        <translation>Dreht die PEILUNG auf den langen Weg. Erst zielen, dann Gegenkurs, dann Rotate.</translation>
     </message>
     <message>
         <location filename="../src/gui/widgets/RotorLogbookPanel.cpp" line="1001" />
         <source>Park · %1°</source>
         <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../src/gui/widgets/RotorLogbookPanel.cpp" line="979" />
+        <source>Target %1 (empty)</source>
+        <translation>Ziel %1 (leer)</translation>
     </message>
     <message>
         <location filename="../src/gui/widgets/RotorLogbookPanel.cpp" line="1002" />
@@ -5376,11 +5384,6 @@ All custom band/pin mappings will be cleared.</source>
     <message>
         <location filename="../src/gui/widgets/RotorLogbookPanel.cpp" line="1014" />
         <source>Gegenkurs (±180°)</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
-        <location filename="../src/gui/widgets/RotorLogbookPanel.cpp" line="1016" />
-        <source>Dreht die PEILUNG auf den langen Weg. Erst zielen, dann Gegenkurs, dann Rotate.</source>
         <translation type="unfinished" />
     </message>
     <message>
@@ -5474,15 +5477,17 @@ All custom band/pin mappings will be cleared.</source>
     <name>Longpath::SystemTile</name>
     <message>
         <location filename="../src/gui/widgets/SystemTile.cpp" line="89" />
-        <source>CPU der GANZEN Maschine, nicht nur von Longpath.
-Rechtsklick, um auf „nur diese Anwendung“ umzustellen.</source>
-        <translation type="unfinished" />
+        <source>CPU of the WHOLE machine, not just Longpath.
+Right-click to switch to "this application only".</source>
+        <translation>CPU der GANZEN Maschine, nicht nur von Longpath.
+Rechtsklick, um auf „nur diese Anwendung“ umzustellen.</translation>
     </message>
     <message>
         <location filename="../src/gui/widgets/SystemTile.cpp" line="91" />
-        <source>CPU nur dieser Anwendung.
-Rechtsklick, um auf „ganze Maschine“ umzustellen.</source>
-        <translation type="unfinished" />
+        <source>CPU of this application only.
+Right-click to switch to "the whole machine".</source>
+        <translation>CPU nur dieser Anwendung.
+Rechtsklick, um auf „ganze Maschine“ umzustellen.</translation>
     </message>
     <message>
         <location filename="../src/gui/widgets/SystemTile.cpp" line="140" />
@@ -5494,13 +5499,13 @@ Rechtsklick, um auf „ganze Maschine“ umzustellen.</source>
     <name>Longpath::TciClient</name>
     <message>
         <location filename="../src/core/TciClient.cpp" line="100" />
-        <source>Keine Adresse angegeben.</source>
-        <translation type="unfinished" />
+        <source>No address given.</source>
+        <translation>Keine Adresse angegeben.</translation>
     </message>
     <message>
         <location filename="../src/core/TciClient.cpp" line="112" />
-        <source>verbunden, warte auf Selbstauskunft</source>
-        <translation type="unfinished" />
+        <source>connected, waiting for the device to identify itself</source>
+        <translation>verbunden, warte auf Selbstauskunft</translation>
     </message>
     <message>
         <location filename="../src/core/TciClient.cpp" line="123" />
@@ -5970,7 +5975,7 @@ by W1AEX</source>
     <message>
         <location filename="../src/gui/applets/TxEqDialog.cpp" line="645" />
         <source>Reset</source>
-        <translation type="unfinished" />
+        <translation>Zurücksetzen</translation>
     </message>
     <message>
         <location filename="../src/gui/applets/TxEqDialog.cpp" line="647" />
@@ -6402,8 +6407,8 @@ Save before switching?</source>
     </message>
     <message>
         <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="120" />
-        <source>Wird gespeichert, aber noch nicht an das Gerät gesendet — diese Einstellung hat derzeit keine Wirkung.</source>
-        <translation type="unfinished" />
+        <source>Stored, but not sent to the radio yet — this setting currently has no effect.</source>
+        <translation>Wird gespeichert, aber noch nicht an das Gerät gesendet — diese Einstellung hat derzeit keine Wirkung.</translation>
     </message>
 </context>
 </TS>

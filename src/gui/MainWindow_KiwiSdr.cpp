@@ -51,6 +51,8 @@
 #include "core/KiwiSdrManager.h"
 #include "gui/KiwiWaterfallPanel.h"
 #include "gui/applets/AppletPanelWidget.h"
+#include "gui/applets/AppletVisibilityController.h"
+#include "gui/widgets/StatusToast.h"
 #include "gui/SpectrumWidget.h"
 #include "gui/applets/KiwiSdrApplet.h"
 #include "models/RadioModel.h"
@@ -386,6 +388,16 @@ void MainWindow::syncKiwiSdrTransmitMute()
 //
 // Die Zuordnung geht an die AKTIVE Scheibe. Das ist die einzige, bei
 // der man sagen kann, was der Betreiber gemeint hat.
+bool MainWindow::appletVisibleForTest(const QString& id) const
+{
+    return m_appletVis && m_appletVis->isVisible(id);
+}
+
+void MainWindow::setAppletVisibleForTest(const QString& id, bool visible)
+{
+    if (m_appletVis) { m_appletVis->setVisible(id, visible); }
+}
+
 void MainWindow::addKiwiSdrReceiver(const QString& name,
                                     const QString& endpoint)
 {
@@ -492,6 +504,35 @@ void MainWindow::addKiwiSdrReceiver(const QString& name,
 
     m_kiwiSdrManager->connectProfile(id);
     refreshKiwiSdrAppletReceivers();
+
+    // ── Sag dem Bediener, dass etwas passiert ist (2026-10-14) ───────
+    //
+    // Betreiber: "auswaehlen kann ich, aber wo und wie dann weiter
+    // geht ??!?" -- und er hatte recht, ohne dass die Technik schuld
+    // war. Bis hierher ist naemlich schon ALLES geschehen: Profil
+    // angelegt, notfalls eine Scheibe dafuer erzeugt, zugeordnet,
+    // verbunden. Nur sieht man nichts davon. refreshKiwiSdrApplet
+    // Receivers() fuellt ein Panel, das in aller Regel gar nicht
+    // eingeschaltet ist, und sonst meldet sich niemand.
+    //
+    // Also beides: das Panel aufmachen, damit es einen Ort gibt, an dem
+    // es weitergeht -- und eine Zeile, die sagt, was gerade geschah und
+    // wo der Ton landet. Die Scheibennummer gehoert dazu: ohne sie ist
+    // "verbunden" eine Behauptung, mit ihr eine Adresse.
+    if (m_appletVis) {
+        m_appletVis->setVisible(QStringLiteral("KiwiSdr"), true);
+    }
+    if (slice) {
+        showToast(tr("KiwiSDR \"%1\" added — audio goes to slice %2.")
+                      .arg(label).arg(slice->sliceIndex()),
+                  ToastSeverity::Info, 6000);
+    } else {
+        // Der Fall, in dem der Ton keinen Weg hat. Er steht seit jeher
+        // im Protokoll; dort liest ihn niemand.
+        showToast(tr("KiwiSDR \"%1\" added, but no slice could take its "
+                     "audio — it stays silent.").arg(label),
+                  ToastSeverity::Warning, 8000);
+    }
 
     qCInfo(lcKiwiSdr).nospace()
         << "KiwiSDR aufgenommen: " << label << " (" << endpoint << ")"

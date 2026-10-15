@@ -2998,8 +2998,8 @@ void MainWindow::onNotchRemoveAll()
 
     if (QMessageBox::question(
             this, tr("Notch-Filter"),
-            tr("Alle %1 Notch-Filter entfernen?\n\n"
-               "Das laesst sich nicht rueckgaengig machen.").arg(n),
+            tr("Remove all %1 notch filters?\n\n"
+               "This cannot be undone.").arg(n),
             QMessageBox::Yes | QMessageBox::No, QMessageBox::No)
         != QMessageBox::Yes) {
         return;
@@ -3260,8 +3260,8 @@ void MainWindow::wireSpectrumSliceControls(SpectrumWidget* sw,
         // schon Stunden gekostet — und wenn es nicht die Ursache ist,
         // erscheint der Hinweis nie und wir haben sie ausgeschlossen.
         if (s->locked()) {
-            showToast(tr("Die Frequenz dieser Scheibe ist gesperrt — "
-                         "das Schloss in der VFO-Leiste gibt sie frei."),
+            showToast(tr("This slice's frequency is locked — the padlock in the VFO bar "
+                          "releases it."),
                       ToastSeverity::Info, 5000);
             return;
         }
@@ -3661,7 +3661,7 @@ void MainWindow::onPanBackgroundColour()
     // Mit Alphakanal: die Grundflaeche darf durchscheinen, wenn ein
     // Hintergrundbild darunter liegt.
     const QColor c = QColorDialog::getColor(
-        w->backgroundFillColor(), this, tr("Grundfarbe des Panadapters"),
+        w->backgroundFillColor(), this, tr("Panadapter base colour"),
         QColorDialog::ShowAlphaChannel | QColorDialog::DontUseNativeDialog);
     if (c.isValid()) { w->setBackgroundFillColor(c); }
 }
@@ -9280,8 +9280,8 @@ void MainWindow::buildMenuBar()
             if (!m_radioModel) { return; }
             const QList<SliceModel*> list = m_radioModel->slices();
             if (list.size() <= 1) {
-                showToast(tr("Der letzte Empfänger bleibt — sonst gäbe es "
-                             "nichts mehr zu hören."),
+                showToast(tr("The last receiver stays — otherwise there would be nothing "
+                              "left to listen to."),
                           ToastSeverity::Info, 4000);
                 return;
             }
@@ -9289,7 +9289,7 @@ void MainWindow::buildMenuBar()
             if (!s) { return; }
             const QString letter = QString(s->sliceLetter());
             m_radioModel->removeSlice(s->sliceIndex());
-            showToast(tr("Empfänger %1 geschlossen.").arg(letter),
+            showToast(tr("Receiver %1 closed.").arg(letter),
                       ToastSeverity::Info, 3000);
         });
     }
@@ -13284,7 +13284,7 @@ void MainWindow::showNotchBarMenu(const QPoint& globalPos)
 
     QAction* head = menu->addAction(
         list.isEmpty()
-            ? tr("Keine Notch-Filter")
+            ? tr("No notch filters")
             : tr("%n Notch-Filter", "", static_cast<int>(list.size())));
     head->setEnabled(false);
 
@@ -13292,8 +13292,8 @@ void MainWindow::showNotchBarMenu(const QPoint& globalPos)
     global->setCheckable(true);
     global->setChecked(notches->globalEnabled());
     global->setToolTip(tr(
-        "Alle Notch-Filter auf einmal stumm schalten, ohne sie zu "
-        "verlieren. Dasselbe wie ein Linksklick auf TNF."));
+        "Mute all notch filters at once without losing them. Same as a "
+         "left-click on TNF."));
     connect(global, &QAction::toggled, this, [notches](bool on) {
         notches->setGlobalEnabled(on);
     });
@@ -13335,7 +13335,7 @@ void MainWindow::showNotchBarMenu(const QPoint& globalPos)
         });
 
         sub->addSeparator();
-        QAction* del = sub->addAction(tr("Löschen"));
+        QAction* del = sub->addAction(tr("Delete"));
         connect(del, &QAction::triggered, this, [notches, id]() {
             notches->removeNotch(id);
         });
@@ -13344,7 +13344,7 @@ void MainWindow::showNotchBarMenu(const QPoint& globalPos)
     if (list.size() > 1) {
         menu->addSeparator();
         QAction* all = menu->addAction(
-            tr("Alle %1 entfernen…").arg(list.size()));
+            tr("Remove all %1…").arg(list.size()));
         connect(all, &QAction::triggered,
                 this, &MainWindow::onNotchRemoveAll);
     }
