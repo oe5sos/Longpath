@@ -23,6 +23,8 @@
 
 #include <cmath>
 
+#include "MenueFaenger.h"
+
 #include "gui/widgets/CommandBar.h"
 #include "core/AppSettings.h"
 #include "models/FilterPresetStore.h"
@@ -781,15 +783,12 @@ private slots:
         int opened = 0;
         for (QPushButton* more : bar->findChildren<QPushButton*>()) {
             if (more->text() != QStringLiteral("…")) { continue; }
-            QWidget* parentSeen = nullptr;
-            QTimer::singleShot(150, qApp, [&parentSeen]() {
-                if (auto* m = qobject_cast<QMenu*>(QApplication::activePopupWidget())) {
-                    parentSeen = m->parentWidget();
-                    m->close();
-                }
-            });
-            more->click();
-            QCOMPARE(parentSeen, static_cast<QWidget*>(&top));
+            // Frueher ein eigener QTimer auf activePopupWidget(): der
+            // las unter Last den Stand von vorher, und dieser Lauf fiel
+            // nur im -j6-Durchgang um. Siehe tests/MenueFaenger.h.
+            const auto fund = Test::oeffneMenue([&]() { more->click(); });
+            QVERIFY2(fund.seen, "kein Ueberlaufmenue erschienen");
+            QCOMPARE(fund.parent, static_cast<QWidget*>(&top));
             ++opened;
         }
         QCOMPARE(opened, 5);   // Modus, Band, Filter, Schritt, NR
