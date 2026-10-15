@@ -117,9 +117,8 @@ static bool bandIsGrey(int bandIdx)
 static QLabel* notYetWired(QWidget* parent)
 {
     auto* l = new QLabel(
-        QObject::tr("Wird gespeichert, aber noch nicht an das Gerät "
-                    "gesendet — diese Einstellung hat derzeit keine "
-                    "Wirkung."), parent);
+        QObject::tr("Stored, but not sent to the radio yet — this setting currently "
+                     "has no effect."), parent);
     l->setWordWrap(true);
     l->setStyleSheet(QStringLiteral(
         "QLabel { color: %1; font-style: italic; font-size: 11px; }")
@@ -154,8 +153,7 @@ OcOutputsHfTab::OcOutputsHfTab(RadioModel* model, OcMatrix* ocMatrix,
 
         m_pennyExtCtrl = new QCheckBox(tr("Penny Ext Control enabled"), this);
         m_pennyExtCtrl->setToolTip(tr("Enable the Penelope/Hermes open-collector external control outputs"
-                                      "\n\nHinweis: wird gespeichert, aber noch nicht an das "
-                                      "Gerät gesendet."));
+                                      "\n\nNote: stored, but not sent to the radio yet."));
         row->addWidget(m_pennyExtCtrl);
 
         auto* n2adrHint = new QLabel(
@@ -170,8 +168,7 @@ OcOutputsHfTab::OcOutputsHfTab(RadioModel* model, OcMatrix* ocMatrix,
 
         m_allowHotSwitching = new QCheckBox(tr("Allow hot switching"), this);
         m_allowHotSwitching->setToolTip(tr("Allow OC output lines to switch while transmitting"
-                                           "\n\nHinweis: wird gespeichert, aber noch nicht an das "
-                                           "Gerät gesendet."));
+                                           "\n\nNote: stored, but not sent to the radio yet."));
         row->addWidget(m_allowHotSwitching);
 
         row->addStretch();

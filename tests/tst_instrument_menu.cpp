@@ -121,7 +121,8 @@ private slots:
         QMenu* menu = applet.buildContextMenu(nullptr);
         QMenu* second = subMenu(menu, "Zweite Anzeige");
         QVERIFY(second);
-        QVERIFY2(entry(second, "keine"),
+        // Dieselbe tr()-Rolle wie im Programm (2026-10-14).
+        QVERIFY2(entry(second, InstrumentApplet::tr("none")),
                  "ohne Aus-Eintrag ist die zweite Anzeige eine Einbahn");
         delete menu;
     }

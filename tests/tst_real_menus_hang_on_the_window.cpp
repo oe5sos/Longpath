@@ -335,7 +335,12 @@ private slots:
         auto* freq = m_mw->findChild<FrequencyApplet*>();
         QVERIFY(freq);
         o = openMenu([&]() { contextAt(freq, QPoint(10, 10)); });
-        QVERIFY(o.entries.contains(QStringLiteral("A/B-Zeile anzeigen")));
+        // Nicht der Wortlaut, sondern dieselbe tr()-Rolle wie im
+        // Programm (2026-10-14): seit Englisch die Quellsprache ist,
+        // ist ein Menuetext uebersetzbar und taugt nicht als
+        // Bezeichner. Mit der deutschen Fassung waere ein fester Text
+        // ein zweites Mal gefallen.
+        QVERIFY(o.entries.contains(FrequencyApplet::tr("Show A/B row")));
         QCOMPARE(o.parent, freq->window());
 
         auto* instr = m_mw->findChild<InstrumentApplet*>();
