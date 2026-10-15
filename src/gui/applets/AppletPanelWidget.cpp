@@ -544,6 +544,27 @@ bool AppletPanelWidget::eventFilter(QObject* watched, QEvent* event)
         showTitleBarMenu(bar, ce->globalPos());
         return true;
     }
+    case QEvent::MouseButtonDblClick: {
+        // ── Doppelklick loest ab (2026-10-14) ────────────────────────
+        //
+        // Betreiber: "wenn doppelklick dann vielleicht eigenes frei
+        // fliegendes windows mit wasserfall, welches man vergroessern
+        // kann". Den Weg gibt es seit dem 20.08. als ↗ im Kopf und im
+        // Rechtsklick-Menue -- der Doppelklick ist der dritte Zugang
+        // zu derselben Sache, und der, nach dem er von selbst gegriffen
+        // hat. Genau so steht es schon im Kopf dieser Datei: ein Weg,
+        // den man nicht sieht, ist kein Weg.
+        //
+        // Der Druck davor hat bereits einen Zug angemeldet; der wird
+        // hier zurueckgenommen, sonst bleibt nach dem Ablösen ein
+        // halber Zugzustand stehen.
+        auto* me = static_cast<QMouseEvent*>(event);
+        if (me->button() != Qt::LeftButton || !applet) { break; }
+        m_dragApplet = nullptr;
+        m_dragging = false;
+        emit appletDetachRequested(applet, appletPosition(applet));
+        return true;
+    }
     case QEvent::MouseButtonPress: {
         auto* me = static_cast<QMouseEvent*>(event);
         if (me->button() != Qt::LeftButton || !applet) { break; }
