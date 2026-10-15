@@ -1292,7 +1292,7 @@ void MainWindow::showTileTabMenu(const QString& tileId)
     ScopedChildWidget<QMenu> menuOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
     QMenu& menu = *menuOwner.get();
     menu.setStyleSheet(QString::fromLatin1(kPopupMenu));
-    menu.addSection(QStringLiteral("Fenster hierher holen"));
+    menu.addSection(tr("Bring a window here"));
 
     QHash<QAction*, QString> byAction;
     for (auto it = m_canvasApplets.constBegin();
@@ -1304,7 +1304,7 @@ void MainWindow::showTileTabMenu(const QString& tileId)
 
     if (byAction.isEmpty()) {
         QAction* none = menu.addAction(
-            QStringLiteral("keine anderen freien Fenster"));
+            tr("no other free windows"));
         none->setEnabled(false);
     }
 
@@ -2208,7 +2208,7 @@ void MainWindow::setzeProfilschiene(Qt::Orientation richtung)
     if (richtung == Qt::Horizontal) {
         m_profileRail = new ProfileRail(m_layoutProfiles, Qt::Horizontal,
                                         m_commandBar);
-        m_commandBar->addGroupWidget(QStringLiteral("Profil"), m_profileRail);
+        m_commandBar->addGroupWidget(tr("Profile"), m_profileRail);
     } else {
         m_profileRail = new ProfileRail(m_layoutProfiles, Qt::Vertical,
                                         m_profileRailHome);
@@ -2238,23 +2238,22 @@ void MainWindow::wireProfileRail()
                    -> QString {
         bool ok = false;
         const QString name = QInputDialog::getText(
-            this, title, QStringLiteral("Name:"), QLineEdit::Normal,
+            this, title, tr("Name:"), QLineEdit::Normal,
             preset, &ok).trimmed();
         return ok ? name : QString();
     };
 
     auto complain = [this](const QString& name) {
         QMessageBox::warning(
-            this, QStringLiteral("Profil"),
+            this, tr("Profile"),
             name.isEmpty()
-                ? QStringLiteral("Ein Profil braucht einen Namen.")
-                : QStringLiteral("„%1“ gibt es schon.").arg(name));
+                ? tr("A profile needs a name.")
+                : tr("“%1” already exists.").arg(name));
     };
 
     connect(m_profileRail, &ProfileRail::newProfileRequested, this,
             [this, askName, complain]() {
-        const QString name = askName(QStringLiteral("Neues Profil"),
-                                     QStringLiteral("Neu"));
+        const QString name = askName(tr("New profile"), tr("New"));
         if (name.isNull()) { return; }
         // ── Leer, nicht als Kopie ────────────────────────────────────
         //
@@ -2308,16 +2307,15 @@ void MainWindow::wireProfileRail()
                      QDateTime::currentDateTime()
                          .toString(QStringLiteral("yyyy-MM-dd_HHmm")));
         const QString path = QFileDialog::getSaveFileName(
-            this, QStringLiteral("Layout-Profil auf Schreibtisch sichern"),
+            this, tr("Save layout profile to the Desktop"),
             suggested, QStringLiteral("JSON (*.json)"));
         if (path.isEmpty()) { return; }
 
         QFile f(path);
         if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
             QMessageBox::warning(
-                this, QStringLiteral("Profil"),
-                QStringLiteral("„%1“ konnte nicht geschrieben werden.")
-                    .arg(path));
+                this, tr("Profile"),
+                tr("“%1” could not be written.").arg(path));
             return;
         }
         f.write(json);
@@ -2338,13 +2336,13 @@ void MainWindow::wireProfileRail()
         const QString suggested =
             QStandardPaths::writableLocation(QStandardPaths::DesktopLocation);
         const QString path = QFileDialog::getOpenFileName(
-            this, QStringLiteral("Layout-Profil vom Schreibtisch laden"),
+            this, tr("Load layout profile from the Desktop"),
             suggested, QStringLiteral("JSON (*.json)"));
         if (path.isEmpty()) { return; }
 
         const auto answer = QMessageBox::question(
-            this, QStringLiteral("Profil"),
-            QStringLiteral("„%1“ mit dem Inhalt der Datei ersetzen?")
+            this, tr("Profile"),
+            tr("Replace “%1” with the contents of the file?")
                 .arg(name),
             QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
         if (answer != QMessageBox::Yes) { return; }
@@ -2352,8 +2350,8 @@ void MainWindow::wireProfileRail()
         QFile f(path);
         if (!f.open(QIODevice::ReadOnly)) {
             QMessageBox::warning(
-                this, QStringLiteral("Profil"),
-                QStringLiteral("„%1“ konnte nicht gelesen werden.").arg(path));
+                this, tr("Profile"),
+                tr("“%1” could not be read.").arg(path));
             return;
         }
         const QByteArray json = f.readAll();
@@ -2361,9 +2359,9 @@ void MainWindow::wireProfileRail()
         QString error;
         if (!m_layoutProfiles->importFromJson(name, json, &error)) {
             QMessageBox::warning(
-                this, QStringLiteral("Profil"),
+                this, tr("Profile"),
                 error.isEmpty()
-                    ? QStringLiteral("„%1“ liess sich nicht als Profil lesen.")
+                    ? tr("“%1” could not be read as a profile.")
                           .arg(path)
                     : error);
         }
@@ -2371,7 +2369,7 @@ void MainWindow::wireProfileRail()
 
     connect(m_profileRail, &ProfileRail::renameRequested, this,
             [this, askName, complain](const QString& old) {
-        const QString name = askName(QStringLiteral("Profil umbenennen"), old);
+        const QString name = askName(tr("Rename profile"), old);
         if (name.isNull() || name == old) { return; }
         if (!m_layoutProfiles->rename(old, name)) { complain(name); return; }
         m_layoutProfiles->save();
@@ -2379,8 +2377,8 @@ void MainWindow::wireProfileRail()
 
     connect(m_profileRail, &ProfileRail::duplicateRequested, this,
             [this, askName, complain](const QString& from) {
-        const QString name = askName(QStringLiteral("Profil duplizieren"),
-                                     from + QStringLiteral(" Kopie"));
+        const QString name = askName(tr("Duplicate profile"),
+                                     from + tr(" copy"));
         if (name.isNull()) { return; }
         if (!m_layoutProfiles->duplicate(from, name)) {
             complain(name);
@@ -2394,9 +2392,8 @@ void MainWindow::wireProfileRail()
         // Nachfragen, weil es kein Rückgängig gibt. In so einem Profil
         // steckt eine halbe Stunde Einrichten.
         const auto answer = QMessageBox::question(
-            this, QStringLiteral("Profil löschen"),
-            QStringLiteral("„%1“ mit seinem ganzen Aufbau löschen?")
-                .arg(name),
+            this, tr("Delete profile"),
+            tr("Delete “%1” with its whole layout?").arg(name),
             QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
         if (answer != QMessageBox::Yes) { return; }
         m_layoutProfiles->remove(name);
@@ -3939,7 +3936,7 @@ void MainWindow::buildUI()
     // Ein Wort im Fenstertitel kostet nichts und beantwortet alle drei
     // Fragen, bevor sie entstehen.
     if (!qEnvironmentVariable("LONGPATH_CONFIG_DIR").trimmed().isEmpty()) {
-        title += QStringLiteral(" — PRÜFLAUF (eigener Einstellungsordner)");
+        title += QStringLiteral(" — TEST RUN (own settings folder)");
     }
 
     setWindowTitle(title);
@@ -7517,9 +7514,9 @@ void MainWindow::populateDefaultMeter()
     // Zweck dieses Schritts. Wer sie nicht will, blendet sie über das
     // Plus aus wie jedes andere Widget.
     m_appletVis->registerApplet(QStringLiteral("Frequency"),
-                                QStringLiteral("Frequenz"),     true);
+                                tr("Frequency"),                true);
     m_appletVis->registerApplet(QStringLiteral("SwrInstrument"),
-                                QStringLiteral("Stehwelle"),    true);
+                                tr("SWR"),                      true);
     m_appletVis->registerApplet(QStringLiteral("SignalInstrument"),
                                 QStringLiteral("S-Meter"),      true);
     m_appletVis->registerApplet(QStringLiteral("KiwiSdr"),
@@ -7529,9 +7526,9 @@ void MainWindow::populateDefaultMeter()
     // nutzen, waere Ballast. Ueber das "+" wie jedes andere Widget
     // einblendbar, sobald man will.
     m_appletVis->registerApplet(QStringLiteral("KiwiWaterfalls"),
-                                QStringLiteral("KIWI-WASSERFÄLLE"), false);
+                                tr("KIWI WATERFALLS"), false);
     m_appletVis->registerApplet(QStringLiteral("Asr"),
-                                QStringLiteral("Mitschrift"),   true);
+                                tr("Transcript"),               true);
 
     // ── Kategorie und Schlagwoerter ──────────────────────────────────
     //
@@ -7581,37 +7578,52 @@ void MainWindow::populateDefaultMeter()
     // jemand sie sucht. Die Schlagwörter sind das, wonach man tippt:
     // wer „swr" oder „zeiger" eingibt, soll sie finden, ohne den
     // Applet-Namen zu kennen.
+    //
+    // Die Schlagwoerter bleiben ZWEISPRACHIG (2026-10-15). Die
+    // Oberflaeche ist englisch, der Betreiber denkt deutsch — wer
+    // „leistung" tippt, soll das Sendefeld finden, und wer „power"
+    // tippt, auch. Sie stehen nicht in tr(): eine Uebersetzung wuerde
+    // die deutschen Wege abschalten, sobald die Oberflaeche englisch
+    // ist, also genau dann, wenn er sie braucht.
     m_appletVis->describeApplet(QStringLiteral("Frequency"),
-        QStringLiteral("Abstimmen"),
-        {QStringLiteral("frequenz"), QStringLiteral("vfo"),
+        tr("Tuning"),
+        {QStringLiteral("frequenz"), QStringLiteral("frequency"),
+         QStringLiteral("vfo"),
          QStringLiteral("qrg"), QStringLiteral("band"),
-         QStringLiteral("abstimmen"), QStringLiteral("split"),
-         QStringLiteral("mhz")});
+         QStringLiteral("abstimmen"), QStringLiteral("tuning"),
+         QStringLiteral("split"), QStringLiteral("mhz")});
     m_appletVis->describeApplet(QStringLiteral("SwrInstrument"),
-        QStringLiteral("Messanzeigen"),
+        tr("Meters"),
         {QStringLiteral("swr"), QStringLiteral("stehwelle"),
-         QStringLiteral("anpassung"), QStringLiteral("zeiger"),
-         QStringLiteral("instrument"), QStringLiteral("balken")});
+         QStringLiteral("anpassung"), QStringLiteral("match"),
+         QStringLiteral("zeiger"), QStringLiteral("needle"),
+         QStringLiteral("instrument"), QStringLiteral("meter"),
+         QStringLiteral("balken"), QStringLiteral("bar")});
     m_appletVis->describeApplet(QStringLiteral("SignalInstrument"),
-        QStringLiteral("Messanzeigen"),
+        tr("Meters"),
         {QStringLiteral("s-meter"), QStringLiteral("smeter"),
          QStringLiteral("signal"), QStringLiteral("pegel"),
-         QStringLiteral("zeiger"), QStringLiteral("instrument"),
-         QStringLiteral("balken")});
+         QStringLiteral("level"), QStringLiteral("zeiger"),
+         QStringLiteral("needle"), QStringLiteral("instrument"),
+         QStringLiteral("meter"), QStringLiteral("balken"),
+         QStringLiteral("bar")});
 
     m_appletVis->describeApplet(QStringLiteral("Rx"),
-        QStringLiteral("Empfang"),
+        tr("Receive"),
         {QStringLiteral("rx"), QStringLiteral("empfang"),
-         QStringLiteral("filter"), QStringLiteral("agc"),
-         QStringLiteral("squelch"), QStringLiteral("daempfung")});
+         QStringLiteral("receive"), QStringLiteral("filter"),
+         QStringLiteral("agc"), QStringLiteral("squelch"),
+         QStringLiteral("daempfung"), QStringLiteral("attenuator")});
     m_appletVis->describeApplet(QStringLiteral("Tx"),
-        QStringLiteral("Senden"),
+        tr("Transmit"),
         {QStringLiteral("tx"), QStringLiteral("senden"),
-         QStringLiteral("leistung"), QStringLiteral("mox"),
+         QStringLiteral("transmit"), QStringLiteral("leistung"),
+         QStringLiteral("power"), QStringLiteral("mox"),
          QStringLiteral("vox"), QStringLiteral("tune"),
-         QStringLiteral("swr"), QStringLiteral("mikrofon")});
+         QStringLiteral("swr"), QStringLiteral("mikrofon"),
+         QStringLiteral("mic")});
     m_appletVis->describeApplet(QStringLiteral("PhoneCw"),
-        QStringLiteral("Betriebsart"),
+        tr("Mode"),
         {QStringLiteral("cw"), QStringLiteral("morse"),
          QStringLiteral("keyer"), QStringLiteral("phone"),
          QStringLiteral("wpm"), QStringLiteral("paddle")});
@@ -7715,7 +7727,7 @@ void MainWindow::populateDefaultMeter()
                                 QStringLiteral("Knopfleiste am Spektrum"),
                                 true);
     m_appletVis->describeApplet(QString::fromLatin1(kChromeOverlayId),
-        QStringLiteral("Empfang"),
+        tr("Receive"),
         {QStringLiteral("knoepfe"), QStringLiteral("band"),
          QStringLiteral("antenne"), QStringLiteral("tnf"),
          QStringLiteral("rx"), QStringLiteral("display"),
@@ -7724,7 +7736,7 @@ void MainWindow::populateDefaultMeter()
     m_appletVis->registerApplet(QString::fromLatin1(kChromeStatusId),
                                 QStringLiteral("Statuszeile"), true);
     m_appletVis->describeApplet(QString::fromLatin1(kChromeStatusId),
-        QStringLiteral("Fenster"),
+        tr("Windows"),
         {QStringLiteral("status"), QStringLiteral("cat"),
          QStringLiteral("tci"), QStringLiteral("pa"),
          QStringLiteral("cpu"), QStringLiteral("spannung"),
@@ -9119,7 +9131,7 @@ void MainWindow::buildMenuBar()
     {
         QMenu* kiwiMenu = radioMenu->addMenu(QStringLiteral("&KiwiSDR"));
 
-        kiwiMenu->addAction(QStringLiteral("Öffentliche Empfänger…"),
+        kiwiMenu->addAction(tr("Public receivers…"),
             this, [this]() {
                 auto* picker = new KiwiPublicReceiverPicker(this);
                 picker->setAttribute(Qt::WA_DeleteOnClose);
@@ -9130,16 +9142,16 @@ void MainWindow::buildMenuBar()
                 picker->show();
             });
 
-        kiwiMenu->addAction(QStringLiteral("Empfänger von Hand hinzufügen…"),
+        kiwiMenu->addAction(tr("Add a receiver by hand…"),
             this, [this]() {
                 // Fuer den eigenen Kiwi im Heimnetz. Er steht in keinem
                 // oeffentlichen Verzeichnis, und genau der ist fuer
                 // einen Funker der interessanteste.
                 bool ok = false;
                 const QString ep = QInputDialog::getText(
-                    this, QStringLiteral("KiwiSDR hinzufügen"),
-                    QStringLiteral("Adresse (Rechnername oder IP, "
-                                   "wahlweise mit :Port):"),
+                    this, tr("Add a KiwiSDR"),
+                    tr("Address (host name or IP, optionally with "
+                       ":port):"),
                     QLineEdit::Normal, QStringLiteral("kiwisdr.local:8073"),
                     &ok);
                 if (!ok || ep.trimmed().isEmpty()) { return; }
@@ -10197,13 +10209,13 @@ void MainWindow::buildMenuBar()
     // Hand zu warten.
     if (m_appletPanel) {
         m_freeCanvasAction = containersMenu->addAction(
-            QStringLiteral("Neue Fenster gleich ablösen"));
+            tr("Detach new windows right away"));
         m_freeCanvasAction->setCheckable(true);
         m_freeCanvasAction->setChecked(m_freeCanvasMode);
-        m_freeCanvasAction->setToolTip(QStringLiteral(
-            "Jedes Fenster bekommt eine eigene Lage auf der Flaeche — "
-            "ziehen an der Titelleiste, Groesse an der Ecke, Schloss im "
-            "Kopf. Neue Fenster kommen gleich so."));
+        m_freeCanvasAction->setToolTip(tr(
+            "Every window gets its own place on the canvas — drag by the "
+            "title bar, resize at the corner, lock in the header. New "
+            "windows arrive that way."));
         connect(m_freeCanvasAction, &QAction::toggled, this, [this](bool on) {
             setFreeCanvasMode(on);
             if (on) { moveAllAppletsToCanvas(); }
@@ -10242,11 +10254,11 @@ void MainWindow::buildMenuBar()
     // im Kopf.
     if (m_appletPanel) {
         QAction* freeAll = containersMenu->addAction(
-            QStringLiteral("Alle Fenster als eigene Fenster ablösen"));
-        freeAll->setToolTip(QStringLiteral(
-            "Jedes Fenster wird ein eigenes Betriebssystem-Fenster: "
-            "ueberall hinschiebbar, in der Groesse aenderbar, auch auf "
-            "einen zweiten Schirm. Zurueck ueber das ✕ am Fenster."));
+            tr("Detach every window into its own window"));
+        freeAll->setToolTip(tr(
+            "Each one becomes its own operating-system window: movable "
+            "anywhere, resizable, also onto a second screen. Back via the "
+            "✕ on the window."));
         connect(freeAll, &QAction::triggered,
                 this, &MainWindow::moveAllAppletsToCanvas);
     }
@@ -10261,10 +10273,10 @@ void MainWindow::buildMenuBar()
     // Umkehrbar: das Plus unten rechts holt jedes Fenster zurueck.
     if (m_appletVis) {
         QAction* clearAll = containersMenu->addAction(
-            QStringLiteral("Alle Fenster ausblenden"));
-        clearAll->setToolTip(QStringLiteral(
-            "Leere Flaeche. Mit dem + unten rechts holst du jedes "
-            "Fenster einzeln zurueck."));
+            tr("Hide every window"));
+        clearAll->setToolTip(tr(
+            "An empty canvas. The + at the bottom right brings each window "
+            "back one at a time."));
         connect(clearAll, &QAction::triggered, this, [this]() {
             for (const QString& id : m_appletVis->registeredIds()) {
                 // Rahmen bleibt: Knopfleiste und Statuszeile sind keine

@@ -563,12 +563,12 @@ void SwrSweepPanel::refreshTunePowerLabel()
         if (m_backend.rawAdc) {
             const auto raw = m_backend.rawAdc();
             QString text =
-                QStringLiteral("   Koppler-ADC:  VOR %1  ·  RÜCK %2")
+                tr("   Coupler ADC:  FWD %1  ·  REV %2")
                     .arg(raw.first, 4).arg(raw.second, 4);
             if (m_backend.couplerProfile) {
                 const QString prof = m_backend.couplerProfile();
                 if (!prof.isEmpty()) {
-                    text += QStringLiteral("  ·  Profil %1").arg(prof);
+                    text += tr("  ·  profile %1").arg(prof);
                 }
             }
             m_couplerLabel->setText(text);
@@ -630,7 +630,7 @@ void SwrSweepPanel::refreshTunePowerLabel()
     // mehrere Bänder. Der Sweep bleibt jetzt in einem Band, und in einem
     // Band gilt eine Tune-Leistung — der Hinweis ist mit der Sache
     // weggefallen, für die er galt.
-    m_powerLabel->setText(QStringLiteral("Tune-Leistung: %1 W (%2)%3")
+    m_powerLabel->setText(tr("Tune power: %1 W (%2)%3")
                               .arg(watts).arg(drive.sourceLabel)
                               .arg(note));
 
@@ -679,8 +679,8 @@ void SwrSweepPanel::exportCsv()
     }
     QFile f(path);
     if (!f.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        QMessageBox::warning(this, QStringLiteral("Export"),
-                             QStringLiteral("Datei nicht schreibbar."));
+        QMessageBox::warning(this, tr("Export"),
+                             tr("The file cannot be written."));
         return;
     }
     QTextStream out(&f);

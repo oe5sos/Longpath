@@ -274,7 +274,7 @@ void SpectrumOverlayMenu::buildUI()
     // Nur der Weg dorthin, nicht die Regler selbst: ein Datei-Auswaehler
     // und drei Regler in einem Menue, das ueber dem Wasserfall
     // aufklappt, waere die falsche Flaeche.
-    auto* bgButton = new QPushButton(QStringLiteral("Hintergrund…"), this);
+    auto* bgButton = new QPushButton(tr("Background…"), this);
     bgButton->setToolTip(QStringLiteral(
         "Bild, Fuellfarbe und Deckkraft des Panadapters — oeffnet "
         "Setup → Display → Spectrum Defaults"));

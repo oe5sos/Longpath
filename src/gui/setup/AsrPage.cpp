@@ -257,7 +257,7 @@ void AsrPage::buildHintGroup()
         case S::Running:  text = tr("laeuft"); colour = QString::fromLatin1(Style::kGreenText); break;
         case S::External: text = tr("running outside Longpath (%1)").arg(reason);
                           colour = QString::fromLatin1(Style::kGreenText); break;
-        case S::Failed:   text = tr("Fehler: %1").arg(reason);
+        case S::Failed:   text = tr("Error: %1").arg(reason);
                           colour = QString::fromLatin1(Style::kRedBorder); break;
         }
         m_serverState->setText(text);

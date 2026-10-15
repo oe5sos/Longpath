@@ -272,7 +272,7 @@ void SwrChartWidget::paintEvent(QPaintEvent* /*ev*/)
     if (!span(lo, hi)) {
         p.setPen(QColor(0x80, 0x90, 0xa0));
         p.drawText(plot, Qt::AlignCenter,
-                   QStringLiteral("Kein Sweep — Band wählen und Start drücken"));
+                   tr("No sweep — pick a band and press Start"));
         return;
     }
 

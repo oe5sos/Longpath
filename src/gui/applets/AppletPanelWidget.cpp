@@ -605,7 +605,7 @@ QMenu* AppletPanelWidget::buildTitleBarMenuForTesting(AppletWidget* applet)
     // hängt AN DER AKTION, nicht am Rückgabewert von exec() — nur so
     // prüft ein Test denselben Weg, den der Bediener nimmt, statt einen
     // nachgebauten daneben.
-    QAction* detach = menu->addAction(QStringLiteral("Als Fenster ablösen"));
+    QAction* detach = menu->addAction(tr("Detach as a window"));
     connect(detach, &QAction::triggered, this,
             [this, applet]() {
         emit appletDetachRequested(applet, appletPosition(applet));

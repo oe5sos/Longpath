@@ -263,7 +263,7 @@ bool Theme::loadFile(const QString& path, QString* error)
                         .arg(pe.errorString()));
     }
     if (!doc.isObject()) {
-        return fail(QStringLiteral("%1: die Datei enthält kein Objekt")
+        return fail(QStringLiteral("%1: the file holds no object")
                         .arg(QFileInfo(path).fileName()));
     }
 

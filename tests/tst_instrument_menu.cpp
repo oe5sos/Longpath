@@ -119,7 +119,9 @@ private slots:
         InstrumentApplet applet(QStringLiteral("Test"),
                                 QStringLiteral("Test"), nullptr);
         QMenu* menu = applet.buildContextMenu(nullptr);
-        QMenu* second = subMenu(menu, "Zweite Anzeige");
+        // Dieselbe tr()-Rolle wie im Programm (2026-10-15 englisch).
+        QMenu* second = subMenu(
+            menu, InstrumentApplet::tr("Second reading").toUtf8().constData());
         QVERIFY(second);
         // Dieselbe tr()-Rolle wie im Programm (2026-10-14).
         QVERIFY2(entry(second, InstrumentApplet::tr("none")),

@@ -885,7 +885,7 @@ void AntennaWindow::choosePinned()
     if (ref.points.isEmpty()) {
         QMessageBox::warning(this, QStringLiteral("VNA-Referenz"),
             ref.note.isEmpty()
-                ? QStringLiteral("Die Datei enthält keine Punkte.")
+                ? tr("The file holds no points.")
                 : ref.note);
         return;
     }
@@ -1165,7 +1165,7 @@ void AntennaWindow::refreshBandTable()
                 bestSwr > limit ? QColor(Style::kRedBorder)
                                 : ink(Style::kGreenText));
         } else {
-            put(4, QStringLiteral("nicht gemessen"),
+            put(4, tr("not measured"),
                 QColor(Style::kTextInactive));
         }
 

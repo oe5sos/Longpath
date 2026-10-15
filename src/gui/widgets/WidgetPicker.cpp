@@ -254,8 +254,7 @@ void WidgetPicker::rebuild()
 
         const QString sub = avail
             ? m_vis->keywords(id).join(QStringLiteral(" · "))
-            : QStringLiteral("Die zugehörige Hardware oder Hauptschaltung "
-                             "ist aus.");
+            : tr("The hardware or master switch behind it is off.");
         auto* keys = new QLabel(sub, frame);
         {
             QFont f = keys->font();
@@ -401,7 +400,7 @@ AddWidgetButton::AddWidgetButton(AppletVisibilityController* vis,
     auto* plus = new QPushButton(QStringLiteral("+"), this);
     plus->setFixedSize(kSide, kSide);
     plus->setCursor(Qt::PointingHandCursor);
-    plus->setToolTip(QStringLiteral("Widget hinzufügen oder entfernen"));
+    plus->setToolTip(tr("Add or remove a widget"));
     // Gestrichelt wie in der Vorlage: der Rand sagt „hier ist noch
     // nichts, hier kann etwas hin". Ein durchgezogener Rahmen sähe aus
     // wie ein Knopf, der schon etwas ist.
@@ -443,7 +442,7 @@ void AddWidgetButton::openPicker()
         // bleibt offen, bleibt über dem Hauptfenster.
         m_picker = new WidgetPicker(m_vis, this);
         m_picker->setWindowFlags(Qt::Tool);
-        m_picker->setWindowTitle(QStringLiteral("Widget hinzufügen"));
+        m_picker->setWindowTitle(tr("Add a widget"));
         connect(m_picker, &WidgetPicker::toggled,
                 this, &AddWidgetButton::toggled);
     }

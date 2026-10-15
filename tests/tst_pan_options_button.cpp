@@ -78,7 +78,7 @@ private slots:
             return false;
         };
 
-        QVERIFY2(fire(QStringLiteral("Hintergrundbild entfernen")),
+        QVERIFY2(fire(PanadapterApplet::tr("Remove background image")),
                  "der Eintrag zum Entfernen MUSS im Menue stehen");
         QCOMPARE(imgSpy.count(), 1);
         QVERIFY2(imgSpy.at(0).at(0).toString().isEmpty(),

@@ -122,7 +122,7 @@ WindowTitleBar::WindowTitleBar(const QString& title, QWidget* parent)
 
     auto* dock = new QPushButton(QStringLiteral("↙"), this);
     dock->setFixedSize(16, 16);
-    dock->setToolTip(QStringLiteral("Zurueck in die Spalte"));
+    dock->setToolTip(tr("Back into the column"));
     dock->setCursor(Qt::ArrowCursor);
     dock->setStyleSheet(
         QStringLiteral("QPushButton { color: %1; background: transparent;"
@@ -199,11 +199,10 @@ void WindowTitleBar::applyLockVisuals()
     m_lockBtn->setText(m_locked ? QStringLiteral("🔒")
                                 : QStringLiteral("🔓"));
     m_lockBtn->setToolTip(m_locked
-        ? QStringLiteral("Festgestellt — Klicken zum Loesen. "
-                         "Das Fenster laesst sich weder schieben noch "
-                         "in der Groesse aendern.")
-        : QStringLiteral("Feststellen — dann bleibt das Fenster, wo es "
-                         "steht, und behaelt seine Groesse."));
+        ? tr("Locked — click to unlock. The window can neither be "
+               "moved nor resized.")
+        : tr("Lock it — then the window stays where it is and keeps "
+             "its size."));
     m_lockBtn->setStyleSheet(
         QStringLiteral("QPushButton { background: transparent; border: none;"
                        " font-size: 9px; padding: 0; }"
@@ -266,9 +265,9 @@ void WindowTitleBar::toggleZoom()
     if (m_zoomBtn) {
         m_zoomBtn->setText(m_zoomed ? QStringLiteral("⤡") : QStringLiteral("⤢"));
         m_zoomBtn->setToolTip(m_zoomed
-            ? QStringLiteral("Vorige Groesse wiederherstellen")
-            : QStringLiteral("Volle Groesse — noch einmal klicken stellt "
-                             "die vorige Groesse wieder her"));
+            ? tr("Restore the previous size")
+            : tr("Full size — click again to restore the previous "
+                 "size"));
     }
 }
 
@@ -338,8 +337,8 @@ void ResizeGrip::setLocked(bool on)
     if (m_locked == on) { return; }
     m_locked = on;
     setCursor(on ? Qt::ArrowCursor : Qt::SizeFDiagCursor);
-    setToolTip(on ? QStringLiteral("Fenster ist festgestellt")
-                  : QStringLiteral("Groesse ziehen"));
+    setToolTip(on ? tr("Window is locked")
+                  : tr("Drag to resize"));
     update();   // blass zeichnen
 }
 

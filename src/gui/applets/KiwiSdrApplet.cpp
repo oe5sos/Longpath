@@ -115,7 +115,7 @@ QString stateText(KiwiSdrClient::State state)
     case KiwiSdrClient::State::CampDisconnected:
         return QObject::tr("Beobachtung beendet");
     case KiwiSdrClient::State::Error:
-        return QObject::tr("Fehler");
+        return QObject::tr("Error");
     }
     return QObject::tr("Getrennt");
 }

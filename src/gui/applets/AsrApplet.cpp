@@ -121,7 +121,7 @@ void AsrApplet::setService(AsrService* svc)
                      : Style::role("text-scale", Style::kTextScale));
     });
     connect(svc, &AsrService::failed, this, [this](const QString& reason) {
-        setStatus(tr("Fehler"), QString::fromLatin1(Style::kTxRed));
+        setStatus(tr("Error"), QString::fromLatin1(Style::kTxRed));
         // Der Grund gehoert in den Text, nicht nur in eine Farbe. Wer
         // "Fehler" liest und nicht weiss, welchen, ist nicht besser
         // dran als vorher.

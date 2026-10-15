@@ -332,7 +332,7 @@ void AudioAdvancedPage::buildFeatureFlagsSection()
                     QStringLiteral("False")).toString() == QStringLiteral("True");
         m_rxDriftCheck->setChecked(on);
         auto* note = new QLabel(
-            QStringLiteral("(Ziel 50 ms · wirkt beim nächsten Start der Tonausgabe)"),
+            tr("(target 50 ms · takes effect the next time audio starts)"),
             box);
         note->setStyleSheet(QLatin1String(kNoteStyle));
         row->addWidget(m_rxDriftCheck);

@@ -1074,7 +1074,7 @@ void QsoMapWindow::reloadBackgroundList()
 
     QSignalBlocker block(m_background);
     m_background->clear();
-    m_background->addItem(QStringLiteral("\u2014 kein Bild \u2014"), QString{});
+    m_background->addItem(tr("\u2014 no image \u2014"), QString{});
 
     const auto list = WorldMapCatalog::entries();
     for (const auto& e : list) {

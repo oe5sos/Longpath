@@ -292,7 +292,7 @@ QMenu* InstrumentApplet::buildContextMenu(QWidget* parent)
     }
 
     // ── Zweite Anzeige ───────────────────────────────────────────────
-    auto* secondMenu = menu->addMenu(tr("Zweite Anzeige"));
+    auto* secondMenu = menu->addMenu(tr("Second reading"));
     auto* secondGroup = new QActionGroup(menu);
     secondGroup->setExclusive(true);
     {

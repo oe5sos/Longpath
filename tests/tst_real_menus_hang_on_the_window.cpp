@@ -273,7 +273,12 @@ private slots:
         QVERIFY(tabs && tabs->count() >= 2);
         const QPoint onTab = tabs->tabRect(0).center();
         o = openMenu([&]() { emit tabs->customContextMenuRequested(onTab); });
-        QVERIFY(!o.entries.isEmpty() && o.entries.first().endsWith(QStringLiteral("als eigenes Fenster")));
+        // Nur der feste Teil hinter dem %1 — der Wortlaut folgt der
+        // tr()-Rolle, seit die Oberflaeche englisch ist.
+        QVERIFY(!o.entries.isEmpty()
+                && o.entries.first().endsWith(
+                       ContainerWidget::tr("%1 as its own window")
+                           .section(QLatin1Char(' '), 1)));
         QCOMPARE(o.parent, cont->window());
 
         auto* master = m_mw->findChild<MasterOutputWidget*>();
@@ -329,7 +334,7 @@ private slots:
         auto* cell = qobject_cast<GridCellWidget*>(rx->parentWidget());
         QVERIFY(cell && cell->titleBar());
         Opened o = openMenu([&]() { contextAt(cell->titleBar(), QPoint(10, 5)); });
-        QVERIFY(o.entries.contains(QStringLiteral("Als Fenster ablösen")));
+        QVERIFY(o.entries.contains(AppletPanelWidget::tr("Detach as a window")));
         QCOMPARE(o.parent, rx->window());
 
         auto* freq = m_mw->findChild<FrequencyApplet*>();

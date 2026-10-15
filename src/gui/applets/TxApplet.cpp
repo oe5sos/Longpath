@@ -567,7 +567,7 @@ void TxApplet::buildFinePopup()
     // Gefuellt aus dem MicProfileManager ueber setMicProfileManager().
     // Rechtsklick meldet txProfileMenuRequested (wie Thetis
     // comboTXProfile_MouseDown, console.cs:44519-44522 [v2.10.3.13]).
-    grid->addWidget(beschriftung(QStringLiteral("TX-Profil")), z, 0);
+    grid->addWidget(beschriftung(tr("TX profile")), z, 0);
     m_profileCombo = new QComboBox(m_finePopup);
     m_profileCombo->addItem(QStringLiteral("Default"));
     m_profileCombo->setFixedHeight(22);
@@ -656,7 +656,7 @@ void TxApplet::buildFinePopup()
     // ── Mithoerlautstaerke ──────────────────────────────────────────────────
     // 0..100 ganzzahlig -> monitorVolume 0,0..1,0. Voreinstellung 50
     // (Modellvorgabe 0.5f, Thetis audio.cs:417).
-    grid->addWidget(beschriftung(QStringLiteral("Mithören")), z, 0);
+    grid->addWidget(beschriftung(tr("Monitor")), z, 0);
     m_monitorVolumeSlider = new QSlider(Qt::Horizontal, m_finePopup);
     m_monitorVolumeSlider->setRange(0, 100);
     m_monitorVolumeSlider->setValue(50);

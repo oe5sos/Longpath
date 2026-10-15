@@ -213,7 +213,7 @@ SideAreaWindow::SideAreaWindow(QWidget* parent)
     m_railLayout->setSpacing(6);
     m_railLayout->addStretch(1);
     m_addButton = new SideRailButton(SideRailButton::Kind::Plus, QString(), m_rail);
-    m_addButton->setToolTip(QStringLiteral("Fenster in den Seitenbereich legen"));
+    m_addButton->setToolTip(tr("Put a window into the side area"));
     connect(m_addButton, &QAbstractButton::clicked, this, [this]() {
         emit addRequested(m_addButton->mapToGlobal(QPoint(0, m_addButton->height())));
     });
@@ -273,7 +273,7 @@ void SideAreaWindow::addPage(const QString& id, const QString& title, QWidget* c
         // 2026-08-30 genau so einen Absturz gebracht (ProfileRail).
         auto* menu = new QMenu(this);
         menu->setAttribute(Qt::WA_DeleteOnClose, true);
-        menu->addAction(QStringLiteral("Aus dem Seitenbereich nehmen"),
+        menu->addAction(tr("Take it out of the side area"),
                         this, [this, id]() { emit removeRequested(id); });
         menu->popup(QCursor::pos());
     };

@@ -8810,7 +8810,7 @@ void SpectrumWidget::buildNotchContextMenu(int id, QMenu& menu)
     // waere der Eintrag dasselbe wie „Remove Notch" und damit eine
     // Falle.
     if (m_notchMarkers.size() > 1) {
-        menu.addAction(QStringLiteral("Alle %1 Notch-Filter entfernen…")
+        menu.addAction(tr("Remove all %1 notch filters…")
                            .arg(m_notchMarkers.size()),
                        this, [this]() { emit notchRemoveAllRequested(); });
     }
