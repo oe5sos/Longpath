@@ -5267,6 +5267,9 @@ longpath_add_test(tst_color_picker_not_native)
 # 2026-09-21: Help > Check for Updates... -- Release-JSON, Version, Paket,
 # SHA256SUMS, Startpruefung, Zielpfad, Neustart-Helfer, DMG-Einspielen (macOS).
 longpath_add_test(tst_update_checker)
+# 2026-10-14: sieben Absturzberichte lagen herum, keiner stand im
+# Protokoll. CrashReportDigest holt sie beim naechsten Start nach.
+longpath_add_test(tst_absturzberichte)
 # 2026-10-14: 680 Wiederanlaeufe im Protokoll des Betreibers, alle 14 s.
 # Die Treppe stieg nicht, weil onConnected() den Zaehler zuruecksetzte --
 # ein offener Socket ist aber noch keine brauchbare Sitzung.
