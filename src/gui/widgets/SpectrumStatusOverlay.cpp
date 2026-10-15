@@ -134,7 +134,7 @@ void SpectrumStatusOverlay::setKiwiActive(bool active)
     if (m_kiwiActive == active) { return; }
     m_kiwiActive = active;
     setToolTip(active
-        ? QStringLiteral("Zeigt den KiwiSDR statt des Geraets -- klicken zum Zurueckschalten.")
+        ? tr("Shows the KiwiSDR instead of the radio — click to switch back.")
         : QString());
     update();
 }

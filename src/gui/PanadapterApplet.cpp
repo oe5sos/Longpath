@@ -607,7 +607,7 @@ QMenu* PanadapterApplet::buildDisplayMenu(QObject* parent)
             emit backgroundOpacityRequested(m_bgOpacityPct);
         }
     });
-    menu->addAction(tr("Hintergrundbild entfernen"), this, [this]() {
+    menu->addAction(tr("Remove background image"), this, [this]() {
         emit backgroundImageRequested(QString());
     });
 
@@ -624,7 +624,7 @@ QMenu* PanadapterApplet::buildDisplayMenu(QObject* parent)
     // keins mehr.
     //
     // Das Menue spricht jetzt vom BILD und rechnet selbst um.
-    auto* opa = menu->addMenu(tr("Bild sichtbar"));
+    auto* opa = menu->addMenu(tr("Image opacity"));
     for (int pct : {0, 25, 50, 75, 100}) {
         QAction* a = opa->addAction(QStringLiteral("%1 %").arg(pct));
         a->setCheckable(true);

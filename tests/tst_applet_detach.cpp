@@ -156,8 +156,11 @@ private slots:
         QMenu* menu = panel.buildTitleBarMenuForTesting(rx);
         QVERIFY2(menu, "kein Kontextmenue fuer ein Applet der Spalte");
         QCOMPARE(menu->actions().size(), 1);
+        // Dieselbe tr()-Rolle wie im Programm (2026-10-15 englisch),
+        // nicht der Wortlaut — sonst faellt der Lauf bei der naechsten
+        // Umstellung wieder.
         QCOMPARE(menu->actions().first()->text(),
-                 QStringLiteral("Als Fenster ablösen"));
+                 AppletPanelWidget::tr("Detach as a window"));
 
         QSignalSpy spy(&panel, &AppletPanelWidget::appletDetachRequested);
         menu->actions().first()->trigger();

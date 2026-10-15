@@ -929,6 +929,7 @@ set(GUI_SOURCES
     src/gui/KiwiWaterfallPanel.cpp
     src/gui/applets/AsrApplet.cpp
     src/gui/widgets/VfoTileRow.cpp
+    src/gui/widgets/SliceFlag.cpp
     src/asr/AsrSegmenter.cpp
     src/asr/AsrService.cpp
     src/asr/RemoteAsrBackend.cpp

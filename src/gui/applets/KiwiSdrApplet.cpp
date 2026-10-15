@@ -113,9 +113,9 @@ QString stateText(KiwiSdrClient::State state)
     case KiwiSdrClient::State::Camping:
         return QObject::tr("Beobachtet");
     case KiwiSdrClient::State::CampDisconnected:
-        return QObject::tr("Beobachtung beendet");
+        return QObject::tr("Watching stopped");
     case KiwiSdrClient::State::Error:
-        return QObject::tr("Fehler");
+        return QObject::tr("Error");
     }
     return QObject::tr("Getrennt");
 }
@@ -168,10 +168,10 @@ QString receiverAccessibleText(const KiwiSdrReceiverStatus& receiver)
         parts << receiver.protocolSummary.trimmed();
     }
     if (receiver.assignedSlice) {
-        parts << QObject::tr("Scheibe %1 zugeordnet")
+        parts << QObject::tr("assigned to slice %1")
                      .arg(sliceLetterOf(receiver.assignedSlice.data()));
     } else {
-        parts << QObject::tr("Keiner Scheibe zugeordnet");
+        parts << QObject::tr("not assigned to a slice");
     }
     return parts.join(QStringLiteral(", "));
 }

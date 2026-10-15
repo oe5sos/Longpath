@@ -78,7 +78,7 @@ void NotchEditPopup::buildUi()
     grid->addWidget(m_active, 2, 0, 1, 2);
 
     auto* del = new QPushButton(tr("Delete"), this);
-    del->setToolTip(tr("Diesen Notch-Filter entfernen."));
+    del->setToolTip(tr("Remove this notch filter."));
     del->setStyleSheet(Style::redCheckedStyle());
     grid->addWidget(del, 3, 0, 1, 2);
 

@@ -71,11 +71,14 @@ private slots:
                  "Nicht alle vier Zielplaetze im Menue");
         QVERIFY2(all.contains(QStringLiteral("Park")),
                  "Park fehlt — die gelernte Parkstellung waere unerreichbar");
-        QVERIFY2(all.contains(QStringLiteral("Lernen")),
+        QVERIFY2(all.contains(
+                     RotorLogbookPanel::tr("Teach, rename\u2026")),
                  "Ohne 'Lernen' kann man nie wieder ein Ziel speichern");
-        QVERIFY2(all.contains(QStringLiteral("Gegenkurs")),
+        QVERIFY2(all.contains(
+                     RotorLogbookPanel::tr("Long path (\u00b1180\u00b0)")),
                  "Der lange Weg fehlt");
-        QVERIFY2(all.contains(QStringLiteral("Rotor-Einstellungen")),
+        QVERIFY2(all.contains(
+                     RotorLogbookPanel::tr("Rotor settings\u2026")),
                  "Der Weg in die Rotor-Einstellungen fehlt");
     }
 

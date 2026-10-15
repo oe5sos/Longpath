@@ -5274,6 +5274,43 @@ longpath_add_test(tst_absturzberichte)
 # Die Treppe stieg nicht, weil onConnected() den Zaehler zuruecksetzte --
 # ein offener Socket ist aber noch keine brauchbare Sitzung.
 longpath_add_test(tst_dxcluster_wiederanlauf)
+# 2026-10-15: „theme wechsel funktioniert nicht" -- im Menue stand ein
+# toter Schalter, die echte Auswahl lag acht Klicks tief, und die Wahl
+# wirkt erst beim Start. Dieser Lauf haelt beides nach.
+longpath_add_test(tst_palette_im_menue)
+# 2026-10-15: „zwischen windows ... ein minimaler automatischer
+# Abstand ... dann sieht es besser aus und gleich." Dieser Lauf misst
+# die Luecken am echten Hauptfenster.
+longpath_add_test(tst_abstand_zwischen_feldern)
+# 2026-10-15: „er soll mal technisch funktionieren ... nur eine
+# option, die man ein und ausblenden kann." Der schwebende Panadapter
+# hatte im Menue nur eine Einbahn ohne Haken.
+longpath_add_test(tst_panadapter_schalter)
+# 2026-10-15: „englisch durchgehend" — ich habe zweimal „0 deutsche
+# Quelltexte" gemeldet und lag zweimal falsch. Jetzt zaehlt es ein Lauf.
+longpath_add_test(tst_oberflaeche_englisch)
+# 2026-10-15: das breite rosa Band im Bildschirmfoto — ein umgedrehter
+# HGauge war IMMER in der Gefahrenfarbe, ohne jede Schwelle.
+longpath_add_test(tst_kompressionsbalken_nicht_rot)
+# 2026-10-15: „-40dB" las sich als „0dB", „+10" als „+1" — die erste
+# und die letzte Zahl der Skala standen ausserhalb des Widgets.
+longpath_add_test(tst_skala_enden_lesbar)
+# 2026-10-15: ein Eintrag fuer das Feldbetrieb-Bild — und der Nachweis,
+# dass er in ein EIGENES Profil schreibt.
+longpath_add_test(tst_feldbetrieb)
+# 2026-10-15: zwei Abstuerze beim Beenden in zwei Stunden, beide
+# „Kind meldet sein Ende, Rumpf greift ins halb abgebaute Fenster".
+longpath_add_test(tst_abbau_ueberlebt)
+# 2026-10-15: moos.json nannte zwei Rollen, die es im Programm nicht
+# gibt — still uebergangen, also seit dem ersten Tag wirkungslos.
+longpath_add_test(tst_palette_ohne_tote_rollen)
+# 2026-10-15: die Scheibenflagge ueber dem Panadapter, als Option —
+# dritter Anlauf um dieselbe Sache, siehe den Kopf der Datei.
+longpath_add_test(tst_scheibenflagge)
+target_compile_definitions(tst_palette_ohne_tote_rollen PRIVATE
+    LONGPATH_SRC_DIR="${CMAKE_SOURCE_DIR}")
+target_compile_definitions(tst_oberflaeche_englisch PRIVATE
+    LONGPATH_SRC_DIR="${CMAKE_SOURCE_DIR}")
 # 2026-10-14: HAUSSTIL.md sagt „Nie Radius 3" -- elf standen trotzdem im
 # Quelltext. Dieser Lauf liest die Quellen und haelt die Regel nach;
 # QSlider::groove ist die eine begruendete Ausnahme.

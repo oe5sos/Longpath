@@ -358,6 +358,50 @@ CommandBar::Group& CommandBar::addGroup(const QString& caption,
     return *g;
 }
 
+namespace {
+
+// ── Die Pille darf nie schmaler sein als ihre Schrift ────────────────
+//
+// „advance + 20" stand hier seit dem 2026-08-23 und war damals
+// richtig. Seit „Glas & Tiefe" (2026-09-17) tragen die Pillen aber
+// Rand und Polsterung aus dem Stylesheet, und die zwanzig Punkte
+// decken das nicht mehr. Gemessen am laufenden Programm (2026-10-15,
+// Fenster 796 px): JEDE Pille stand genau auf ihrer gesetzten
+// Mindestbreite, und die lag durchweg VIER Punkte unter dem, was Qt
+// selbst als minimumSizeHint ausrechnet. Darum las sich „40m" als
+// „40", „LSB" als „LSI" und „NR1" als „NR" — derselbe Fehler wie
+// damals, nur vier Punkte statt vieler.
+//
+// Also nicht mehr selbst rechnen, sondern das Groessere von beidem
+// nehmen: die eigene Schaetzung UND Qts Bedarf, der Rand und
+// Polsterung des Stylesheets kennt. ensurePolished() davor, sonst
+// antwortet der Hinweis noch ohne Stylesheet.
+void setzeMindestbreite(QPushButton* b, const QString& label)
+{
+    if (!b) { return; }
+    b->ensurePolished();
+
+    // Mit DER Schrift rechnen, die das Stylesheet setzt, nicht mit der
+    // des Widgets: pillStyle() sagt font-size: 11px und font-weight:
+    // 600. b->fontMetrics() antwortet dagegen fuer die geerbte Schrift
+    // und kommt zu klein heraus — der zweite Grund, warum die Pillen
+    // zu schmal blieben.
+    QFont schrift = b->font();
+    schrift.setPixelSize(11);
+    schrift.setWeight(QFont::DemiBold);
+
+    // Und mit DEM Beiwerk, das dasselbe Stylesheet verlangt:
+    // padding 0 11px auf beiden Seiten, dazu 1px Rand. Macht 24 statt
+    // der alten 20. Zwei Punkte Luft obendrauf, damit Kantenglaettung
+    // und Sperrung nicht an der Kante kratzen.
+    const int ausDerSchrift =
+        QFontMetrics(schrift).horizontalAdvance(label) + 24 + 2;
+    const int ausDemStil = b->minimumSizeHint().width();
+    b->setMinimumWidth(qMax(ausDerSchrift, ausDemStil));
+}
+
+} // namespace
+
 QPushButton* CommandBar::addPill(Group& g, const QString& label)
 {
     auto* b = new QPushButton(label, this);
@@ -367,7 +411,7 @@ QPushButton* CommandBar::addPill(Group& g, const QString& label)
 
     // ── Keine Pille schmaler als ihre Schrift ───────────────────────
     //
-    // Am 2026-08-23 live gesehen, nachdem die BAND-Gruppe dazukam:
+// Am 2026-08-23 live gesehen, nachdem die BAND-Gruppe dazukam:
     // aus "10 Hz" wurde "I0 Hz", aus "100 Hz" wurde "00 H". Die
     // Anordnung hatte keinen Platz mehr und hat die Pillen unter ihre
     // eigene Schrift gequetscht — eine halb gelesene Schrittweite ist
@@ -376,7 +420,7 @@ QPushButton* CommandBar::addPill(Group& g, const QString& label)
     // Mindestbreite aus der Schriftmetrik plus Innenabstand: darunter
     // darf die Anordnung nicht. Wird es zu eng, muss sich etwas
     // anderes ruehren (die Leiste rollt), nicht die Beschriftung.
-    b->setMinimumWidth(b->fontMetrics().horizontalAdvance(label) + 20);
+    setzeMindestbreite(b, label);
     g.pills.append(b);
     if (g.row) { g.row->addWidget(b); }
     return b;
@@ -546,7 +590,7 @@ void CommandBar::addOverflow(Group& g, const QVector<Entry>& all, Apply apply)
     auto* more = new QPushButton(QStringLiteral("…"), this);
     more->setStyleSheet(pillStyle());
     more->setCursor(Qt::PointingHandCursor);
-    more->setToolTip(QStringLiteral("Alle %1 anzeigen").arg(all.size()));
+    more->setToolTip(tr("Show all %1").arg(all.size()));
     g.overflow = more;
     if (g.row) { g.row->addWidget(more); }
 
@@ -653,7 +697,7 @@ void CommandBar::buildFilterGroup(QHBoxLayout* row)
                     [this, low, high]() { pushFilterToModel(low, high); });
         }
         m.addSeparator();
-        QAction* own = m.addAction(QStringLiteral("Eigene Breite…"));
+        QAction* own = m.addAction(tr("Own width…"));
         connect(own, &QAction::triggered, this,
                 [this]() { askForCustomFilter(); });
         m.exec(QCursor::pos());
@@ -780,7 +824,7 @@ void CommandBar::relabelFilterPills()
             // 2026-08-23-Kommentar in addPill() fuer BAND schon einmal
             // beschreibt ("aus '10 Hz' wurde 'I0 Hz'"), nur an der
             // Stelle, wo die Beschriftung sich NACH dem Anlegen aendert.
-            b->setMinimumWidth(b->fontMetrics().horizontalAdvance(label) + 20);
+            setzeMindestbreite(b, label);
             b->setProperty("loHz", e.first);
             b->setProperty("hiHz", e.second);
             b->setEnabled(true);
@@ -818,7 +862,7 @@ void CommandBar::askForCustomFilter()
     bool ok = false;
     const int w = QInputDialog::getInt(
         this, QStringLiteral("Filterbreite"),
-        QStringLiteral("Breite in Hz:"), cur, 50, 20000, 50, &ok);
+        tr("Width in Hz:"), cur, 50, 20000, 50, &ok);
     if (!ok) { return; }
 
     pushFilterToModel(qRound(centre - w / 2.0), qRound(centre + w / 2.0));
@@ -1153,8 +1197,7 @@ void CommandBar::pullFromModel()
             // Neuberechnung bleibt sie auf der alten Mindestbreite
             // haengen und die neue, breitere Beschriftung wird an
             // beiden Raendern abgeschnitten.
-            last->setMinimumWidth(
-                last->fontMetrics().horizontalAdvance(label) + 20);
+            setzeMindestbreite(last, label);
             last->setProperty("loHz", lo);
             last->setProperty("hiHz", hi);
             last->setEnabled(true);

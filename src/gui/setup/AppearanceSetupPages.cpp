@@ -62,11 +62,32 @@ void ColorsThemePage::buildUI()
     // viel licht nutzen kann", und man solle „bei themes wechseln"
     // koennen.
     //
-    // Sofort wirksam, ohne Neustart: der ThemeFilter haengt an der
-    // Anwendung und faerbt jedes Widget bei QEvent::Polish um. Was
-    // schon steht, bekommt unten den Anstoss.
+    // ── Wirkt beim Start, nicht im Betrieb (berichtigt 2026-10-15) ──
+    //
+    // Hier stand: „Sofort wirksam, ohne Neustart: der ThemeFilter
+    // haengt an der Anwendung und faerbt jedes Widget bei
+    // QEvent::Polish um." Das war falsch, und der Betreiber hat es
+    // gemeldet („theme wechsel funktioniert nicht").
+    //
+    // Der Filter kann es nicht leisten, und auch die Anstoss-Schleife
+    // konnte es nicht: themed() ersetzt in EINE Richtung. Hat die
+    // laufende Palette #00b4d8 schon durch ihren Ton ersetzt, steht im
+    // Stylesheet des Widgets kein #00b4d8 mehr, das die naechste
+    // Palette finden koennte. Dazu 319 Stellen in 78 Dateien, die
+    // themed() beim Bauen ihres Stylesheets selbst aufrufen -- die
+    // laufen nur ein Mal, im Konstruktor.
+    //
+    // Die Schleife faerbte also nichts um, bewegte aber den Zaehler
+    // der Palette: alles, was DANACH entstand, kam in der neuen
+    // Palette. Halb alt, halb neu ist schlechter als unveraendert.
+    //
+    // Behoben, nicht umgangen: ThemeQss merkt sich zu jedem Ergebnis
+    // seine Vorlage, ThemeFilter::reapplyAll() rechnet von der aus.
+    // Damit wechselt die Farbe hier auf Knopfdruck. Was bleibt, ist die
+    // FORM — Eckenradius, Polsterung, Relief stehen als fertige Zahlen
+    // in den Stylesheets und kommen erst beim naechsten Start nach.
     {
-        auto* themeGroup = new QGroupBox(QStringLiteral("Palette"), this);
+        auto* themeGroup = new QGroupBox(tr("Palette"), this);
         auto* themeForm  = new QFormLayout(themeGroup);
         themeForm->setSpacing(6);
 
@@ -80,51 +101,51 @@ void ColorsThemePage::buildUI()
                                    : Style::Theme::builtInName();
         const int idx = m_themeCombo->findText(active);
         m_themeCombo->setCurrentIndex(idx >= 0 ? idx : 0);
-        m_themeCombo->setToolTip(QStringLiteral(
-            "Farbpalette des ganzen Programms. Tageslicht und Werkbank "
-            "sind fuer helles Umgebungslicht gemacht: dort sind "
-            "Bernstein und Gruen dunkler, weil die hellen Toene der "
-            "Nachtpalette auf weissem Grund nicht mehr lesbar waeren.\n\n"
-            "Eigene Dateien liegen neben den Einstellungen und "
-            "ueberschreiben eine gleichnamige mitgelieferte."));
+        // Der Wortlaut des Hinweises stand bis 2026-10-15 auf
+        // „Tageslicht und Werkbank" -- zwei Paletten, die es nicht mehr
+        // gibt (Weiss wurde am 2026-10-14 verworfen). Jetzt nennt er,
+        // was wirklich mitkommt, und sagt, wann die Wahl greift.
+        m_themeCombo->setToolTip(tr(
+            "Palette for the whole program. A palette is put on while "
+            "Longpath starts up, so a change here shows after a "
+            "restart.\n\n"
+            "Your own files live next to the settings and win over a "
+            "shipped palette of the same name."));
 
         connect(m_themeCombo, &QComboBox::currentTextChanged, this,
                 [this](const QString& name) {
+            const QString key =
+                (name == Style::Theme::builtInName()) ? QString() : name;
+            const QHash<QString, int> formVorher =
+                Style::Theme::instance().formOverrides();
+
             QString err;
-            if (!Style::Theme::instance().activate(name, &err)) {
+            if (!Style::Theme::instance().activate(key, &err)) {
                 if (m_themeHint) {
-                    m_themeHint->setText(
-                        QStringLiteral("Konnte nicht laden: %1").arg(err));
+                    m_themeHint->setText(tr("Could not load: %1").arg(err));
                 }
                 return;
             }
-            if (m_themeHint) {
+            const quint64 umgefaerbt = Style::ThemeFilter::reapplyAll();
+            if (!m_themeHint) { return; }
+            if (Style::Theme::instance().formOverrides() != formVorher) {
                 m_themeHint->setText(
-                    Style::Theme::instance().isActive()
-                        ? QStringLiteral("Aus %1")
-                              .arg(Style::Theme::instance().loadedFrom())
-                        : QStringLiteral("Eingebaute Palette"));
-            }
-            // QPalette und Grund-Stylesheet kennen keinen Filter: neu
-            // setzen, sonst bleiben Menueleiste und Fenstergrund in der
-            // alten Palette (2026-09-21).
-            applyDarkPalette(*qApp);
-            applyAppBaselineQss(*qApp);
-            // Was schon gezeichnet ist, bekommt kein Polish mehr. Den
-            // Anstoss geben: Stylesheet neu setzen loest den Filter aus.
-            for (QWidget* w : QApplication::allWidgets()) {
-                if (w && !w->styleSheet().isEmpty()) {
-                    w->setStyleSheet(w->styleSheet());
-                }
-                if (w) { w->update(); }
+                    tr("%1 — colours are on; corners and padding need a "
+                       "restart.")
+                        .arg(name));
+            } else {
+                m_themeHint->setText(
+                    tr("%1 — on now (%2 panels recoloured).")
+                        .arg(name)
+                        .arg(umgefaerbt));
             }
         });
-        themeForm->addRow(QStringLiteral("Farben:"), m_themeCombo);
+        themeForm->addRow(tr("Colours:"), m_themeCombo);
 
         m_themeHint = new QLabel(
             Style::Theme::instance().isActive()
-                ? QStringLiteral("Aus %1").arg(Style::Theme::instance().loadedFrom())
-                : QStringLiteral("Eingebaute Palette"), themeGroup);
+                ? tr("From %1").arg(Style::Theme::instance().loadedFrom())
+                : tr("Built-in palette"), themeGroup);
         m_themeHint->setWordWrap(true);
         m_themeHint->setStyleSheet(
             QStringLiteral("color: %1; font-size: 11px;")

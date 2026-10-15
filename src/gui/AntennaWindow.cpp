@@ -876,7 +876,7 @@ void AntennaWindow::choosePinned()
     AppSettings& s = AppSettings::instance();
     const QString start = s.value(kDirKey, QString{}).toString();
     const QString path = QFileDialog::getOpenFileName(
-        this, QStringLiteral("VNA-Sweep als Referenz"), start,
+        this, tr("VNA sweep as reference"), start,
         QStringLiteral("Touchstone one-port (*.s1p *.S1P);;All files (*)"));
     if (path.isEmpty()) { return; }
     s.setValue(kDirKey, QFileInfo(path).absolutePath());
@@ -885,7 +885,7 @@ void AntennaWindow::choosePinned()
     if (ref.points.isEmpty()) {
         QMessageBox::warning(this, QStringLiteral("VNA-Referenz"),
             ref.note.isEmpty()
-                ? QStringLiteral("Die Datei enthält keine Punkte.")
+                ? tr("The file holds no points.")
                 : ref.note);
         return;
     }
@@ -1165,7 +1165,7 @@ void AntennaWindow::refreshBandTable()
                 bestSwr > limit ? QColor(Style::kRedBorder)
                                 : ink(Style::kGreenText));
         } else {
-            put(4, QStringLiteral("nicht gemessen"),
+            put(4, tr("not measured"),
                 QColor(Style::kTextInactive));
         }
 

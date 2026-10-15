@@ -277,7 +277,7 @@ QMenu* InstrumentApplet::buildContextMenu(QWidget* parent)
     // hinzufügt, fügt sie in ReadingSource hinzu und findet sie hier
     // ohne weiteres Zutun — und ein Instrument bietet nie etwas an,
     // wofür es nonen verantworteten Bereich gibt.
-    auto* sourceMenu = menu->addMenu(tr("Quelle"));
+    auto* sourceMenu = menu->addMenu(tr("Source"));
     auto* sourceGroup = new QActionGroup(menu);
     sourceGroup->setExclusive(true);
     for (const ReadingDescriptor* d : readingsWithScale()) {
@@ -292,7 +292,7 @@ QMenu* InstrumentApplet::buildContextMenu(QWidget* parent)
     }
 
     // ── Zweite Anzeige ───────────────────────────────────────────────
-    auto* secondMenu = menu->addMenu(tr("Zweite Anzeige"));
+    auto* secondMenu = menu->addMenu(tr("Second reading"));
     auto* secondGroup = new QActionGroup(menu);
     secondGroup->setExclusive(true);
     {
@@ -317,7 +317,7 @@ QMenu* InstrumentApplet::buildContextMenu(QWidget* parent)
     }
 
     // ── Form ─────────────────────────────────────────────────────────
-    auto* formMenu = menu->addMenu(tr("Form"));
+    auto* formMenu = menu->addMenu(tr("Shape"));
     auto* formGroup = new QActionGroup(menu);
     formGroup->setExclusive(true);
     const struct { const char* label; Form form; } kForms[] = {
@@ -376,9 +376,9 @@ QMenu* InstrumentApplet::buildContextMenu(QWidget* parent)
     }
 
     // ── Spitzenhaltung ───────────────────────────────────────────────
-    auto* peakMenu = menu->addMenu(tr("Spitzenhaltung"));
+    auto* peakMenu = menu->addMenu(tr("Peak hold"));
     {
-        QAction* on = peakMenu->addAction(tr("Anzeigen"));
+        QAction* on = peakMenu->addAction(tr("Show"));
         on->setCheckable(true);
         on->setChecked(m_needle->peakHold().enabled());
         connect(on, &QAction::triggered, this, [this](bool checked) {
@@ -386,7 +386,7 @@ QMenu* InstrumentApplet::buildContextMenu(QWidget* parent)
             update();
         });
     }
-    auto* holdMenu = peakMenu->addMenu(tr("Halten"));
+    auto* holdMenu = peakMenu->addMenu(tr("Hold"));
     auto* holdGroup = new QActionGroup(menu);
     holdGroup->setExclusive(true);
     const struct { const char* label; int ms; } kHolds[] = {

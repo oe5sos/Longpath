@@ -987,7 +987,7 @@ void RotorLogbookPanel::buildAimMenu(QMenu& menu, const QPoint& g)
                 m_dial->setTargetBearing(deg.toDouble());
             }
         });
-        QAction* teach = sub->addAction(tr("Lernen, umbenennen…"));
+        QAction* teach = sub->addAction(tr("Teach, rename…"));
         connect(teach, &QAction::triggered, this, [this, i, g]() {
             userPresetMenu(i, g);
         });
@@ -1011,7 +1011,7 @@ void RotorLogbookPanel::buildAimMenu(QMenu& menu, const QPoint& g)
         parkMenu(g);
     });
 
-    QAction* lp = menu.addAction(tr("Gegenkurs (±180°)"));
+    QAction* lp = menu.addAction(tr("Long path (±180°)"));
     lp->setEnabled(m_dial && m_dial->hasTarget());
     lp->setToolTip(tr(
         "Turns the BEARING to the long path. Aim first, then reverse "
@@ -1023,7 +1023,7 @@ void RotorLogbookPanel::buildAimMenu(QMenu& menu, const QPoint& g)
     });
 
     menu.addSeparator();
-    QAction* setup = menu.addAction(tr("Rotor-Einstellungen…"));
+    QAction* setup = menu.addAction(tr("Rotor settings…"));
     connect(setup, &QAction::triggered,
             this, &RotorLogbookPanel::openRotorSetupDialog);
 

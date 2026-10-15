@@ -282,7 +282,10 @@ void TxApplet::buildUI()
     // Bench #167: ein HL2 mit 1-5 W auf einer 0-120-W-Skala war ein kaum
     // sichtbarer Span.
     auto* fwdGauge = new HGauge(this);
-    fwdGauge->setTitle(QStringLiteral("VORLAUF"));
+    // Englisch seit 2026-10-15 („englisch durchgehend"); die
+// Breitenrechnung im Kommentar darunter galt dem laengeren
+// Wortlaut „VORLAUF" und bleibt damit auf der sicheren Seite.
+    fwdGauge->setTitle(tr("FWD"));
     // 62, nicht 52: die Versalzeile mit Laufweite (Glas & Tiefe,
     // 2026-09-17) braucht fuer "VORLAUF" rund 58 Punkte — bei 52 stand
     // "VORLAUI" auf dem Blatt. Dieselbe Breite wie die Reglerzeilen
@@ -319,7 +322,7 @@ void TxApplet::buildUI()
         m_rfPowerSlider->setObjectName(QStringLiteral("TxRfPowerSlider"));
 
         m_rfPowerValue = new QLabel(QStringLiteral("100"), this);
-        auto* row = sliderRow(QStringLiteral("Leistung"), m_rfPowerSlider,
+        auto* row = sliderRow(tr("Power"), m_rfPowerSlider,
                               m_rfPowerValue, kTxLabelW);
         // Auf dem HL2 steht hier „-7.5 dB" statt einer nackten Zahl —
         // die 36 Punkt aus sliderRow() schneiden das ab.
@@ -564,7 +567,7 @@ void TxApplet::buildFinePopup()
     // Gefuellt aus dem MicProfileManager ueber setMicProfileManager().
     // Rechtsklick meldet txProfileMenuRequested (wie Thetis
     // comboTXProfile_MouseDown, console.cs:44519-44522 [v2.10.3.13]).
-    grid->addWidget(beschriftung(QStringLiteral("TX-Profil")), z, 0);
+    grid->addWidget(beschriftung(tr("TX profile")), z, 0);
     m_profileCombo = new QComboBox(m_finePopup);
     m_profileCombo->addItem(QStringLiteral("Default"));
     m_profileCombo->setFixedHeight(22);
@@ -603,7 +606,7 @@ void TxApplet::buildFinePopup()
     // ── VOX-Schwelle mit dem lebenden Pegelstreifen darunter ────────────────
     // Bereich -80..0 dB wie Thetis ptbVOX (console.Designer.cs:6018-6019
     // [v2.10.3.13]); Voreinstellung -20 wie ptbVOX.Value.
-    grid->addWidget(beschriftung(QStringLiteral("VOX-Schwelle")), z, 0);
+    grid->addWidget(beschriftung(tr("VOX threshold")), z, 0);
     auto* voxStack = new QWidget(m_finePopup);
     auto* voxStackVbox = new QVBoxLayout(voxStack);
     voxStackVbox->setContentsMargins(0, 0, 0, 0);
@@ -653,7 +656,7 @@ void TxApplet::buildFinePopup()
     // ── Mithoerlautstaerke ──────────────────────────────────────────────────
     // 0..100 ganzzahlig -> monitorVolume 0,0..1,0. Voreinstellung 50
     // (Modellvorgabe 0.5f, Thetis audio.cs:417).
-    grid->addWidget(beschriftung(QStringLiteral("Mithören")), z, 0);
+    grid->addWidget(beschriftung(tr("Monitor")), z, 0);
     m_monitorVolumeSlider = new QSlider(Qt::Horizontal, m_finePopup);
     m_monitorVolumeSlider->setRange(0, 100);
     m_monitorVolumeSlider->setValue(50);

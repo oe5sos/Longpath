@@ -583,7 +583,7 @@ void RotorDialWidget::paintTape(QPainter& p)
                    travelDegrees() >= 0 ? QStringLiteral("CW ")
                                         : QStringLiteral("CCW "))
               .arg(qRound(std::abs(travelDegrees())))
-        : QStringLiteral("kein Ziel");
+        : tr("no target");
     p.drawText(QPointF(bx + QFontMetrics(big).horizontalAdvance("000°") + 14.0,
                        h - 12.0), line2);
 }
