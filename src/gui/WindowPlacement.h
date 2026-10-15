@@ -55,7 +55,15 @@ namespace Longpath {
 // eine weitere, dann bereits treffende Runde aus, kein Endlosdreh.
 //
 // Reiner Punkt-Helfer, keine Fensteroperation selbst.
-constexpr int kSnapGridPx = 8;
+// Betreiber 2026-10-15: „der pixelabstand automatisch zu allen
+// fenstern ist nicht da." Gemessen lagen zwischen allen sieben
+// schwebenden Fenstern exakt 8 Punkte, in beiden Achsen -- genau eine
+// Rasterzelle. Sein Wunsch vom selben Tag war „ein minimaler
+// automatischer Abstand, vielleicht 2 pixel. x und y". Das Raster IST
+// dieser Abstand, sobald zwei Fenster aneinander rasten, also faellt
+// es auf denselben Wert wie kPanelGapPx. Die Linie zwischen den
+// Fenstern bleibt erhalten -- nur feiner.
+constexpr int kSnapGridPx = 2;
 QPoint snappedTopLeft(const QPoint& pos, int grid = kSnapGridPx);
 
 // ── Kanten statt Ecke (2026-09-26) ────────────────────────────────────
