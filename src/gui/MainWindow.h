@@ -281,6 +281,12 @@ public:
     /// Fuer tst_every_applet_is_reachable. Gebaut und nicht erreichbar
     /// ist so gut wie nicht gebaut, und genau das ist am 2026-08-23
     /// dreimal passiert.
+    /// Ob ein Panel laut Bedienerwunsch sichtbar ist. Gebraucht fuer
+    /// die Pruefung, dass das Hinzufuegen eines KiwiSDR sein Panel
+    /// aufmacht -- vorher war das Ergebnis des Hinzufuegens unsichtbar.
+    bool appletVisibleForTest(const QString& id) const;
+    void setAppletVisibleForTest(const QString& id, bool visible);
+
     bool appletIsRegisteredForTest(const class AppletWidget* a) const
     {
         for (auto it = m_appletsById.cbegin(); it != m_appletsById.cend(); ++it) {

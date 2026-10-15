@@ -918,7 +918,7 @@ void CommandBar::buildRateGroup(QHBoxLayout* row)
     Group& g = addGroup(QStringLiteral("Rate"), row);
     m_rateLabel = new QLabel(QStringLiteral("—"), this);
     m_rateLabel->setAlignment(Qt::AlignCenter);
-    m_rateLabel->setToolTip(tr("Nicht verbunden"));
+    m_rateLabel->setToolTip(tr("Not connected"));
     if (g.row) { g.row->addWidget(m_rateLabel); }
     applyRateStyle(false);
 }
@@ -958,7 +958,7 @@ void CommandBar::setRateReadout(int channelRateHz, int measuredRateHz)
     if (!m_rateLabel) { return; }
     if (channelRateHz <= 0) {
         m_rateLabel->setText(QStringLiteral("—"));
-        m_rateLabel->setToolTip(tr("Nicht verbunden"));
+        m_rateLabel->setToolTip(tr("Not connected"));
         m_rateMismatchSeconds = 0;
         m_rateWarn = false;
         applyRateStyle(false);
@@ -976,8 +976,8 @@ void CommandBar::setRateReadout(int channelRateHz, int measuredRateHz)
 
     if (warn) {
         m_rateLabel->setToolTip(
-            tr("Der Empfangskanal läuft mit %1, es kommen aber %2 an — "
-               "so klingt es falsch.")
+            tr("The receive channel runs at %1 but %2 is arriving — that is "
+                "why it sounds wrong.")
                 .arg(rateText(channelRateHz), rateText(measuredRateHz)));
     } else if (measuredRateHz > 0) {
         m_rateLabel->setToolTip(tr("Empfangskanal %1 · gemessen %2")

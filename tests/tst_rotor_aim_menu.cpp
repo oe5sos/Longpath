@@ -57,9 +57,17 @@ private slots:
         }
 
         // Die vier gelernten Ziele, Park, Gegenkurs, Einstellungen
-        QVERIFY2(all.contains(QStringLiteral("Ziel 1")),
+        // Dieselbe tr()-Rolle wie im Programm (2026-10-14), und nur
+        // der feste Teil davor: der Text lautet "Target %1 (empty)"
+        // bzw. uebersetzt "Ziel %1 (leer)" -- ein fester Wortlaut
+        // waere mit der deutschen Fassung ein zweites Mal gefallen.
+        QVERIFY2(all.contains(
+                     RotorLogbookPanel::tr("Target %1 (empty)").arg(1).section(
+                         QLatin1Char(' '), 0, 1)),
                  qPrintable(QStringLiteral("Gelernte Ziele fehlen: %1").arg(all)));
-        QVERIFY2(all.contains(QStringLiteral("Ziel 4")),
+        QVERIFY2(all.contains(
+                     RotorLogbookPanel::tr("Target %1 (empty)").arg(4).section(
+                         QLatin1Char(' '), 0, 1)),
                  "Nicht alle vier Zielplaetze im Menue");
         QVERIFY2(all.contains(QStringLiteral("Park")),
                  "Park fehlt — die gelernte Parkstellung waere unerreichbar");

@@ -526,12 +526,12 @@ QMenu* PanadapterApplet::buildContextMenu(QObject* parent)
     // ("da kommt nichts"); wer einen ausgegrauten Punkt sieht, hat
     // keine.
     if (SpectrumWidget* sw = spectrumWidget()) {
-        QAction* kiwiAct = menu->addAction(tr("Anzeige vom KiwiSDR"));
+        QAction* kiwiAct = menu->addAction(tr("Display from the KiwiSDR"));
         kiwiAct->setCheckable(true);
         kiwiAct->setChecked(sw->kiwiDisplaySource());
         kiwiAct->setToolTip(
-            tr("Zeigt statt des Geraets den Wasserfall des KiwiSDR, "
-               "der dieser Scheibe zugeordnet ist."));
+            tr("Shows the waterfall of the KiwiSDR assigned to this slice "
+                "instead of the radio's."));
         connect(kiwiAct, &QAction::triggered, this, [this](bool on) {
             if (SpectrumWidget* w = spectrumWidget()) {
                 // Kein Speichern hier: das erledigt SpectrumWidget
@@ -563,7 +563,7 @@ QMenu* PanadapterApplet::buildDisplayMenu(QObject* parent)
 {
     auto* menu = new QMenu(qobject_cast<QWidget*>(parent));
 
-    menu->addAction(tr("Hintergrundbild wählen…"), this, [this]() {
+    menu->addAction(tr("Choose background image…"), this, [this]() {
         // ── Der Dialog gehoert dem FENSTER, nicht dem Applet ─────
         //
         // Mit `this` als Elternteil haengt er an einem Widget, das in
@@ -589,7 +589,7 @@ QMenu* PanadapterApplet::buildDisplayMenu(QObject* parent)
         if (QImage(f).isNull()) {
             QMessageBox::warning(
                 dlgParent, tr("Hintergrundbild"),
-                tr("Diese Datei laesst sich nicht als Bild lesen:\n%1")
+                tr("This file cannot be read as an image:\n%1")
                     .arg(f));
             return;
         }
@@ -644,17 +644,17 @@ QMenu* PanadapterApplet::buildDisplayMenu(QObject* parent)
     // den eingebauten Wert UND gegen jedes Thema. Beim Betreiber war
     // das deckendes Schwarz, und der blaugraue Standard kam nie mehr
     // durch (2026-08-21: „bitte setze ihn als standard").
-    QAction* reset = menu->addAction(tr("Grundfarbe zurücksetzen"));
+    QAction* reset = menu->addAction(tr("Reset base colour"));
     reset->setToolTip(tr(
-        "Vergisst die selbst gewählte Grundfarbe. Danach folgt der "
-        "Panadapter wieder dem Thema — im dunklen Thema das Blaugrau."));
+        "Forgets the base colour you picked. The panadapter then "
+         "follows the theme again — blue-grey in the dark theme."));
     connect(reset, &QAction::triggered, this, [this]() {
         emit backgroundColourResetRequested();
     });
 
     menu->addSeparator();
 
-    menu->addAction(tr("Alle Anzeige-Einstellungen…"), this, [this]() {
+    menu->addAction(tr("All display settings…"), this, [this]() {
         emit displaySetupRequested();
     });
     return menu;
@@ -676,8 +676,8 @@ QMenu* PanadapterApplet::buildDisplayMenu(QObject* parent)
 // Normalzustand.
 QString PanadapterApplet::floatLockReason()
 {
-    return tr("In ein eigenes Fenster ablösen — frei beweglich und "
-              "frei skalierbar. Der Pfeil im Fenster holt es zurück.");
+    return tr("Detach into its own window — freely movable and resizable. The "
+               "arrow in that window brings it back.");
 }
 
 void PanadapterApplet::setFloatingIndicator(bool floating)

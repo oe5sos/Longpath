@@ -99,7 +99,10 @@ private slots:
         QVERIFY2(fire(QStringLiteral("Grundfarbe…")), "Grundfarbe fehlt");
         QCOMPARE(colSpy.count(), 1);
 
-        QVERIFY2(fire(QStringLiteral("Alle Anzeige-Einstellungen…")),
+        // Dieselbe tr()-Rolle wie im Programm (2026-10-14): seit
+        // Englisch die Quellsprache ist, ist ein Menuetext
+        // uebersetzbar und taugt nicht als Bezeichner.
+        QVERIFY2(fire(PanadapterApplet::tr("All display settings…")),
                  "der Weg in den Setup-Dialog MUSS bleiben — ein Menue, "
                  "das alles kann, waere wieder der Dialog, nur schlechter");
         QCOMPARE(setSpy.count(), 1);
