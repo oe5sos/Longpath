@@ -91,6 +91,11 @@ public:
     bool isLoginPromptForTest(const QString& line) const {
         return isLoginPrompt(line);
     }
+    // Wie weit die Treppe des Wiederanlaufs gestiegen ist. Ohne diesen
+    // Blick laesst sich nicht pruefen, ob sie ueberhaupt steigt -- und
+    // genau das tat sie bis zum 2026-10-14 nicht.
+    int reconnectAttemptsForTest() const { return m_reconnectAttempts; }
+    void markLoggedInForTest() { markLoggedIn(); }
     void stripTelnetIACForTest(QByteArray& buf) const {
         stripTelnetIACBuffer(buf);
     }
@@ -110,6 +115,9 @@ private slots:
     void onReconnectTimer();
 
 private:
+    // Die Anmeldung ist durch -- erst hier faellt der Wiederanlauf-Zaehler.
+    void markLoggedIn();
+
     bool parseDxSpotLine(const QString& line, DxSpot& spot) const;
     bool isLoginPrompt(const QString& line) const;
     void handleLine(const QString& line);
@@ -133,6 +141,10 @@ private:
     QString m_callsign;
     std::atomic<bool> m_connected{false};
     bool    m_loggedIn{false};
+    // Wiederholte Fehlschlaege zusammenfassen statt jeden zu schreiben.
+    QString m_lastFailureMsg;
+    qint64  m_lastFailureLogMs{0};
+    int     m_quietFailures{0};
     bool    m_intentionalDisconnect{false};
     int     m_reconnectAttempts{0};
 

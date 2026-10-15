@@ -5267,6 +5267,10 @@ longpath_add_test(tst_color_picker_not_native)
 # 2026-09-21: Help > Check for Updates... -- Release-JSON, Version, Paket,
 # SHA256SUMS, Startpruefung, Zielpfad, Neustart-Helfer, DMG-Einspielen (macOS).
 longpath_add_test(tst_update_checker)
+# 2026-10-14: 680 Wiederanlaeufe im Protokoll des Betreibers, alle 14 s.
+# Die Treppe stieg nicht, weil onConnected() den Zaehler zuruecksetzte --
+# ein offener Socket ist aber noch keine brauchbare Sitzung.
+longpath_add_test(tst_dxcluster_wiederanlauf)
 # 2026-10-14: HAUSSTIL.md sagt „Nie Radius 3" -- elf standen trotzdem im
 # Quelltext. Dieser Lauf liest die Quellen und haelt die Regel nach;
 # QSlider::groove ist die eine begruendete Ausnahme.
