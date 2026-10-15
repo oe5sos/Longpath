@@ -21,6 +21,8 @@
 
 #include <QtTest>
 
+#include <cmath>
+
 #include "gui/widgets/CommandBar.h"
 #include "core/AppSettings.h"
 #include "models/FilterPresetStore.h"
@@ -79,13 +81,29 @@ private slots:
         }
         QVERIFY2(kaesten.size() >= 2, "weniger als zwei Gruppen in der Leiste");
 
+        // ── Bildpunkte sind nicht Layoutpunkte (2026-10-15) ─────────
+        //
+        // `grab()` liefert auf einem Retina-Schirm ein Bild mit der
+        // doppelten Kantenlaenge (hier gemessen: Leiste 1400x70,
+        // Bild 2800x152), die Kaesten aus dem Layout zaehlen aber in
+        // Layoutpunkten. Ohne Umrechnung sucht dieser Lauf an den
+        // falschen Stellen: er fand 2 von 5 Strichen und fiel auf
+        // JEDEM Mac um, waehrend er in der CI (1x-Schirm) gruen war.
+        const qreal dpr = bild.devicePixelRatio();
+        const auto zuBild = [dpr](int v) {
+            return static_cast<int>(std::lround(v * dpr));
+        };
+
         const QRgb grund = bild.pixel(2, 2);
         int striche = 0;
+        int luecken = 0;
         for (int i = 0; i + 1 < kaesten.size(); ++i) {
             // Nur die Luecke absuchen, nicht die Gruppen selbst.
-            const int von  = kaesten.at(i).right() + 2;
-            const int bis  = kaesten.at(i + 1).left() - 2;
-            const int mitteY = kaesten.at(i).center().y();
+            const int von  = zuBild(kaesten.at(i).right() + 2);
+            const int bis  = zuBild(kaesten.at(i + 1).left() - 2);
+            if (von > bis) { continue; }        // kein Platz, kein Strich
+            ++luecken;
+            const int mitteY = zuBild(kaesten.at(i).center().y());
             bool gefunden = false;
             for (int x = von; x <= bis && x < bild.width(); ++x) {
                 if (x < 0) { continue; }
@@ -93,7 +111,8 @@ private slots:
             }
             if (gefunden) { ++striche; }
         }
-        QCOMPARE(striche, kaesten.size() - 1);
+        QVERIFY2(luecken >= 2, "weniger als zwei Luecken zwischen den Gruppen");
+        QCOMPARE(striche, luecken);
     }
 
     /// B — hinter jeder Gruppe steht eine Dehnung, solange noch etwas

@@ -127,13 +127,34 @@ private slots:
         SideAreaWindow* area = m_mw->sideAreaForTest();
         QVERIFY(area);
         area->setActive(QStringLiteral("Rx"));
+
+        // ── Keine feste Liste (2026-10-15) ───────────────────────────
+        //
+        // Hier stand die Erwartung {WinRotorLog, Rx} woertlich. Wie
+        // viele Seiten beim Einschalten uebernommen werden, haengt aber
+        // davon ab, welche Applets gerade als „in der Spalte verdeckt"
+        // gelten (MainWindow::appletHiddenInColumn zaehlt, was zu mehr
+        // als einem Viertel von anderen FENSTERN ueberdeckt ist) — und
+        // das wiederum von Bildschirmgroesse und Fensterlage. Auf
+        // diesem Mac kam „Tx" dazu und der Lauf fiel um, in der CI
+        // (anderer Schirm) nicht.
+        //
+        // Dieser Lauf will ohnehin etwas anderes wissen: ueberlebt der
+        // Bereich den Weg durchs Profil UNVERAENDERT? Also wird
+        // verglichen, was vorher drin war — nicht, was einmal drin
+        // war.
+        const QStringList vorher = area->pageIds();
+        QVERIFY2(vorher.contains(QStringLiteral("WinRotorLog")),
+                 qPrintable(vorher.join(QLatin1Char(','))));
+        QVERIFY2(vorher.contains(QStringLiteral("Rx")),
+                 qPrintable(vorher.join(QLatin1Char(','))));
+
         profiles()->captureIntoCurrent();
         profiles()->save();
 
         const QVariantMap s = reloadedProfileState();
         const QVariantMap side = s.value(QStringLiteral("sideArea")).toMap();
-        QCOMPARE(side.value(QStringLiteral("pages")).toStringList(),
-                 (QStringList{QStringLiteral("WinRotorLog"), QStringLiteral("Rx")}));
+        QCOMPARE(side.value(QStringLiteral("pages")).toStringList(), vorher);
         QCOMPARE(side.value(QStringLiteral("active")).toString(), QStringLiteral("Rx"));
         QCOMPARE(s.value(QStringLiteral("rotor")).toMap()
                      .value(QStringLiteral("form")).toString(),
@@ -144,8 +165,7 @@ private slots:
         QCoreApplication::processEvents();
         SideAreaWindow* again = m_mw->sideAreaForTest();
         QVERIFY(again);
-        QCOMPARE(again->pageIds(),
-                 (QStringList{QStringLiteral("WinRotorLog"), QStringLiteral("Rx")}));
+        QCOMPARE(again->pageIds(), vorher);
         QCOMPARE(again->activeId(), QStringLiteral("Rx"));
         AppletWidget* rx = m_mw->appletForKeyForTest(QStringLiteral("Rx"));
         QVERIFY(rx);
