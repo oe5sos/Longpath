@@ -2080,6 +2080,24 @@ void MainWindow::exitBorderlessFullSize()
     }
     if (isVisible()) { hide(); }
     setWindowFlag(Qt::FramelessWindowHint, false);
+    // ── Die Knoepfe ausdruecklich zurueckholen ───────────────────────
+    //
+    // Betreiber 2026-10-15: „auf vollformat kann ich nicht stellen."
+    // Gemessen am laufenden Programm: das Hauptfenster meldete sich
+    // als AXDialog mit NULL Titelleisten-Knoepfen (Schliessen 0,
+    // Minimieren 0, Zoom 0), waehrend der Verbindungsdialog daneben
+    // seinen Zoomknopf hatte. FramelessWindowHint abzuschalten
+    // genuegt dafuer nicht: Qt setzt beim Rahmenwechsel die
+    // Fenster-Hints neu, und die Knopf-Hints kommen dabei nicht von
+    // selbst wieder. Ohne WindowMaximizeButtonHint gibt es keinen
+    // gruenen Knopf -- und ueber das Menue fuehrt der einzige Weg
+    // zurueck ins rahmenlose Vollbild, das genau diese Knoepfe
+    // wieder mitnimmt. Also hier gesetzt, wo sie verloren gehen.
+    setWindowFlag(Qt::WindowTitleHint, true);
+    setWindowFlag(Qt::WindowSystemMenuHint, true);
+    setWindowFlag(Qt::WindowMinimizeButtonHint, true);
+    setWindowFlag(Qt::WindowMaximizeButtonHint, true);
+    setWindowFlag(Qt::WindowCloseButtonHint, true);
     show();
     raise();
     activateWindow();
