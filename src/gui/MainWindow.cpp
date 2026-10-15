@@ -4337,61 +4337,32 @@ void MainWindow::buildUI()
         });
     }
 
-    // Zoom slider bar below spectrum
-    auto* zoomBar = new QSlider(Qt::Horizontal, spectrumPane);
-    zoomBar->setRange(1, 768);
-    zoomBar->setValue(768);
-    zoomBar->setFixedHeight(20);
-    zoomBar->setToolTip(QStringLiteral("Zoom: drag to adjust spectrum bandwidth"));
-    zoomBar->setStyleSheet(Style::themed(QStringLiteral(
-        "QSlider { background: #0a0a14; }"
-        "QSlider::groove:horizontal { background: #1a2a3a; height: 6px; border-radius: 3px; }"
-        "QSlider::handle:horizontal { background: #4a7ba8; width: 14px; margin: -4px 0; border-radius: 7px; }")));
-    layout->addWidget(zoomBar);
-    connect(zoomBar, &QSlider::valueChanged, this, [this](int val) {
-        double bwHz = val * 1000.0;
-        activeSpectrumWidget()->setFrequencyRange(activeSpectrumWidget()->centerFrequency(), bwHz);
-        emit activeSpectrumWidget()->bandwidthChangeRequested(bwHz);
-    });
-    // Bench-gefunden 2026-09-03: zoomBar->setValue(768) oben ist nur der
-    // Startwert -- nichts hielt den Regler danach synchron, wenn sich die
-    // Bandbreite auf einem ANDEREN Weg aendert (Scroll-Zoom, Frequenzskalen-
-    // Ziehen am Panadapter, oder ein wiederhergestelltes Profil mit
-    // gespeicherter Zoom-Stufe, Phase 3G-12 persistiert genau das). Der
-    // Regler zeigte danach dauerhaft die Stellung vom Start, auch wenn der
-    // Panadapter laengst enger oder weiter gezoomt war — funktional
-    // folgenlos (Ziehen am Regler setzt weiterhin korrekt), aber
-    // irrefuehrend fuer den Bedienenden, der dem Regler nicht mehr
-    // ansehen kann, wo der Panadapter tatsaechlich steht.
-    // frequencyRangeChanged() feuert am Ende JEDER setFrequencyRange()
-    // unabhaengig von der Ursache (SpectrumWidget.cpp), ein einziger
-    // Anschluss deckt also alle Wege ab. QSignalBlocker verhindert die
-    // Rueckkopplung in den Connect-Handler oben (der seinerseits
-    // setFrequencyRange() aufriefe).
-    // Codereview 2026-09-03 (gefunden, nicht gemeldet): wirePane-artige
-    // Neuverdrahtung, siehe m_zoomBarSyncConn in MainWindow.h. Ein Lambda
-    // statt einer einzelnen connect()-Zeile, weil dieselbe Verdrahtung
-    // jetzt an zwei Stellen laufen muss: hier beim Bau und unten bei
-    // jedem PanadapterStack::activePanChanged.
-    auto wireZoomBarSync = [this, zoomBar](SpectrumWidget* sw) {
-        disconnect(m_zoomBarSyncConn);
-        if (!sw) { return; }
-        m_zoomBarSyncConn = connect(sw, &SpectrumWidget::frequencyRangeChanged,
-                this, [zoomBar](double /*centerHz*/, double bandwidthHz) {
-            const int kHz = qBound(zoomBar->minimum(),
-                                    qRound(bandwidthHz / 1000.0),
-                                    zoomBar->maximum());
-            if (kHz != zoomBar->value()) {
-                const QSignalBlocker blocker(zoomBar);
-                zoomBar->setValue(kHz);
-            }
-        });
-    };
-    wireZoomBarSync(activeSpectrumWidget());
-    connect(m_panStack, &PanadapterStack::activePanChanged, this,
-            [this, wireZoomBarSync](const QString& panId) {
-        if (m_panStack) { wireZoomBarSync(m_panStack->spectrum(panId)); }
-    });
+    // ── KEIN Zoom-Schieber mehr unter dem Spektrum (2026-10-14) ──────
+    //
+    // Der Betreiber, mit einem Bild: „in Longpath unter Click to Connect
+    // ganz unten ist nach wie vor dieser blaue Punkt und diese vertikale
+    // und horizontale Linie, die gehoert auf jeden Fall entfernt. Ich
+    // moechte im Hintergrund keine Linien haben, das muss ein schwarzer
+    // Bildschirm sein."
+    //
+    // Der blaue Punkt war der GRIFF dieses Schiebers (`#4a7ba8`, rund,
+    // 14 px), die waagerechte Linie seine RINNE (`#1a2a3a`, 6 px hoch
+    // ueber die ganze Breite). Nachgemessen in seinem Bild, nicht
+    // geraten: der Punkt liegt bei x 1105..1135, y 1133..1160, und seine
+    // Farbe ist (53,119,163) -- das ist kAccent durch die
+    // Bildkompression.
+    //
+    // ENTFERNT, nicht versteckt. Die Zoomstufe bleibt auf zwei Wegen
+    // erreichbar, beide gepruefte Bedienung:
+    //   * Cmd/Ctrl + Mausrad ueber dem Panadapter
+    //     (SpectrumWidget::wheelEvent, "zoom bandwidth in/out")
+    //   * das Ziehen an der Frequenzskala unter dem Spektrum
+    //     (SpectrumWidget.cpp:9235, "zoom bandwidth left/right")
+    // Der Schieber war die dritte Fassung derselben Sache und die
+    // einzige, die eine Linie quer durchs Bild zog.
+    //
+    // Mit ihm geht `m_zoomBarSyncConn`: das Feld hielt die Verbindung,
+    // die den Schieber nachfuehrte, und hatte sonst keinen Zweck.
 
     m_mainSplitter->addWidget(spectrumPane);
 
