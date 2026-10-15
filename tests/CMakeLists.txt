@@ -5271,6 +5271,10 @@ longpath_add_test(tst_update_checker)
 # Die Treppe stieg nicht, weil onConnected() den Zaehler zuruecksetzte --
 # ein offener Socket ist aber noch keine brauchbare Sitzung.
 longpath_add_test(tst_dxcluster_wiederanlauf)
+# 2026-10-15: „theme wechsel funktioniert nicht" -- im Menue stand ein
+# toter Schalter, die echte Auswahl lag acht Klicks tief, und die Wahl
+# wirkt erst beim Start. Dieser Lauf haelt beides nach.
+longpath_add_test(tst_palette_im_menue)
 # 2026-10-14: HAUSSTIL.md sagt „Nie Radius 3" -- elf standen trotzdem im
 # Quelltext. Dieser Lauf liest die Quellen und haelt die Regel nach;
 # QSlider::groove ist die eine begruendete Ausnahme.

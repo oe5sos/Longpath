@@ -20,6 +20,7 @@
 #include "gui/styles/Theme.h"
 
 #include <QHash>
+#include <QReadWriteLock>
 
 namespace Longpath::Style {
 namespace {
@@ -309,6 +310,57 @@ int formInt(const char* name, int fallback)
     return Theme::instance().forForm(QString::fromLatin1(name), fallback);
 }
 
+// ── Das Vorbild-Register (2026-10-15) ────────────────────────────────
+//
+// themed() ersetzt in EINE Richtung. Hat eine Palette #00b4d8 schon
+// durch ihren Ton ersetzt, findet die naechste das #00b4d8 nicht mehr
+// -- genau deshalb bewirkte ein Palettenwechsel im Betrieb nichts
+// („theme wechsel funktioniert nicht", Betreiber, 2026-10-15).
+//
+// Der Ausweg kostet eine Tabelle: zu jedem ERGEBNIS wird die Vorlage
+// gemerkt, aus der es entstand. Beim Umschalten rechnet
+// ThemeFilter::reapplyAll() dann nicht vom Ergebnis, sondern von der
+// Vorlage aus -- und trifft dieselben Stellen, die beim Start getroffen
+// wurden, in jede Richtung und beliebig oft.
+//
+// Zwei Dinge dazu, ehrlich gesagt:
+//
+//   * Das Register waechst mit der Zahl VERSCHIEDENER Stylesheets, nicht
+//     mit der Zahl der Widgets -- im Programm einige hundert Zeichen-
+//     ketten, nicht hunderttausende.
+//   * Wenn zwei verschiedene Vorlagen unter einer Palette dasselbe
+//     Ergebnis haben, bleibt nur die zuletzt gemerkte. Dann faellt ein
+//     Widget beim Zurueckschalten auf die Farbe des anderen. Dafuer
+//     muessten zwei vollstaendige Stylesheets Zeichen fuer Zeichen
+//     gleich werden; wo das je auffaellt, hilft ein Neustart.
+//
+// Gelesen wird aus dem GUI-Faden, geschrieben auch -- die Sperre ist
+// Vorsicht, kein Beleg fuer Nebenlaeufigkeit.
+namespace {
+QReadWriteLock& vorbildSperre()
+{
+    static QReadWriteLock l;
+    return l;
+}
+QHash<QString, QString>& vorbildRegister()
+{
+    static QHash<QString, QString> h;
+    return h;
+}
+} // namespace
+
+QString sourceOf(const QString& qss)
+{
+    QReadLocker lock(&vorbildSperre());
+    return vorbildRegister().value(qss, qss);
+}
+
+void forgetSources()
+{
+    QWriteLocker lock(&vorbildSperre());
+    vorbildRegister().clear();
+}
+
 QString themed(QString qss)
 {
     if (qss.isEmpty()) { return qss; }
@@ -342,6 +394,14 @@ QString themed(QString qss)
         }
         out += qss.at(i);
         ++i;
+    }
+    if (out != qss) {
+        QWriteLocker lock(&vorbildSperre());
+        // Eine Vorlage, die selbst schon ein Ergebnis war, wird bis zum
+        // Ursprung aufgeloest: sonst kaeme man beim zweiten Wechsel nur
+        // eine Palette weit zurueck.
+        const QString urspruenglich = vorbildRegister().value(qss, qss);
+        vorbildRegister().insert(out, urspruenglich);
     }
     return out;
 }

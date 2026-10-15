@@ -1797,6 +1797,18 @@ private:
                            ToastSeverity severity,
                            int timeoutMs);
 
+    /// Die gemerkte Palette gilt erst beim naechsten Start -- fragen,
+    /// ob jetzt neu gestartet werden soll. Unter
+    /// QStandardPaths::isTestModeEnabled() kehrt die Methode sofort
+    /// zurueck: ein Pruefstand darf an keinem modalen Fenster haengen
+    /// bleiben (dieselbe Regel wie showAudioDiagnoseDialog()).
+    void offerPaletteRestart(const QString& paletteName);
+
+    /// Beendet dieses Programm und laesst es wieder oeffnen. Nutzt den
+    /// abgekoppelten Helfer der Aktualisierung, damit derselbe Weg
+    /// (und dieselben Argumente, „--profile" eingeschlossen) gilt.
+    void restartNow();
+
     /// The suspended-streams notice, kept so it can be taken down the
     /// moment the streams come back instead of aging out.
     QPointer<class StatusToast> m_suspendToast;

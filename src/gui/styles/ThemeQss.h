@@ -94,6 +94,16 @@ const QVector<ThemeEntry>& themeTable();
 /// gets wrapped twice by mistake is harmless.
 QString themed(QString qss);
 
+/// Die Vorlage, aus der dieses Stylesheet entstand -- oder es selbst,
+/// wenn themed() daran nie etwas geaendert hat. Siehe das
+/// Vorbild-Register in ThemeQss.cpp: ohne diesen Rueckweg wirkt ein
+/// Palettenwechsel im laufenden Programm nicht.
+QString sourceOf(const QString& qss);
+
+/// Register leeren. Nur fuer Pruefstaende, die mehrere Paletten
+/// hintereinander fahren und sauber anfangen wollen.
+void forgetSources();
+
 // ── Eine einzelne Farbe durch die Palette ───────────────────────────
 //
 // themed() arbeitet auf Stylesheets. Malcode hat keine Stylesheets, und

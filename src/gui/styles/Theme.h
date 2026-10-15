@@ -165,6 +165,14 @@ public:
     //   mulde    versenkt: Tiefe                 0..40   (10)
     int forForm(const QString& name, int fallback) const;
 
+    /// Die Formwerte dieser Palette (radius, luft-v, luft-h, relief,
+    /// mulde). Zum Vergleichen vor und nach einem Wechsel: Farben
+    /// lassen sich im Betrieb austauschen, Formen nicht -- die stehen
+    /// als fertige Zahlen in den Stylesheets, die beim Bauen des
+    /// Fensters entstanden sind. Unterscheiden sich die Formwerte,
+    /// fehlt nach dem Wechsel noch ein Neustart, und nur dann.
+    const QHash<QString, int>& formOverrides() const { return m_byForm; }
+
     /// What this theme wants in place of a source-code colour, or empty.
     QString forHex(const QString& legacyHex) const;
 
@@ -220,6 +228,20 @@ public:
     /// und für die Diagnoseseite; ein Filter, der eingehängt ist und
     /// nie zuschlägt, sieht sonst genauso aus wie einer, der wirkt.
     static quint64 appliedCount();
+
+    /// Jedes bestehende Widget auf die GERADE geladene Palette
+    /// umstellen -- der Knopfdruck, nach dem der Betreiber am
+    /// 2026-10-15 gefragt hat („das theme sollte man danach auch per
+    /// knopfdruck ändern können").
+    ///
+    /// Rechnet NICHT vom aktuellen Stylesheet, sondern von der Vorlage
+    /// (Style::sourceOf). Das ist der ganze Trick: das aktuelle
+    /// Stylesheet traegt die Farben der ALTEN Palette, und die kennt
+    /// die neue nicht. Nimmt ausserdem QPalette und Grund-Stylesheet
+    /// mit, die keinen Filter kennen.
+    ///
+    /// Gibt zurueck, wie viele Widgets wirklich anders aussehen.
+    static quint64 reapplyAll();
 };
 
 } // namespace Longpath::Style

@@ -462,12 +462,15 @@ warren@wpratt.com
 #include <QProgressDialog>
 #include <QInputDialog>
 #include <QMessageBox>
+#include "core/UpdateInstaller.h"
+#include "gui/styles/Theme.h"
 #include <QDialog>
 #include <QDir>
 #include <QDockWidget>
 #include <QFileDialog>
 #include <QFormLayout>
 #include <QLineEdit>
+#include <QProcess>
 #include <QStandardPaths>
 #include <QTextStream>
 #include <QTimer>
@@ -9438,6 +9441,109 @@ void MainWindow::buildMenuBar()
         }
     }
 
+    // ── Palette (2026-10-15) ─────────────────────────────────────────
+    //
+    // Der Betreiber: „theme wechsel funktioniert nicht." Zwei Gruende,
+    // beide echt, beide hier behoben:
+    //
+    //   1. Im Menue stand bis zum 2026-10-14 „Dark Theme" -- ein
+    //      Eintrag, der nur `qDebug("Dark Theme toggle NYI")` schrieb.
+    //      Wer das Menue benutzte, hat NIE etwas umgestellt. Der
+    //      Eintrag ist gefallen; dieses Untermenue nimmt seinen Platz
+    //      ein und fuehrt die Paletten wirklich. Die einzige echte
+    //      Auswahl lag bis heute in Setup > Appearance > Palette --
+    //      acht Klicks tief, und in seinen Einstellungen stand nach
+    //      Wochen kein einziges ActiveTheme.
+    //
+    //   2. Eine Umstellung wirkte NICHT im laufenden Programm.
+    //      themed() ersetzt Quelltextfarben in EINE Richtung: hat eine
+    //      Palette #00b4d8 schon durch ihren Ton ersetzt, findet die
+    //      naechste das #00b4d8 nicht mehr. Dagegen merkt sich
+    //      ThemeQss jetzt zu jedem Ergebnis seine Vorlage, und
+    //      ThemeFilter::reapplyAll() rechnet von DER aus — damit
+    //      wechselt die Farbe auf Knopfdruck, in jede Richtung
+    //      (Betreiber, 2026-10-15: „das theme sollte man danach auch
+    //      per knopfdruck ändern können").
+    //
+    //      Nicht auf Knopfdruck geht die FORM: Eckenradius, Polsterung
+    //      und Relief stehen als fertige Zahlen in Stylesheets, die
+    //      beim Bauen des Fensters entstanden sind. Nur wenn eine
+    //      Palette die Form anders will, fragt das Programm nach einem
+    //      Neustart — „Flach" und „Tief" tragen absichtlich nur Form.
+    {
+        QMenu* paletteMenu = viewMenu->addMenu(QStringLiteral("&Palette"));
+        auto* paletteGroup = new QActionGroup(this);
+        paletteGroup->setExclusive(true);
+
+        const QString stored =
+            AppSettings::instance().value("ActiveTheme", QString()).toString();
+
+        auto addPalette = [this, paletteMenu, paletteGroup, stored](
+                              const QString& label, const QString& key) {
+            QAction* a = paletteMenu->addAction(label);
+            a->setCheckable(true);
+            a->setChecked(stored == key);
+            paletteGroup->addAction(a);
+            connect(a, &QAction::triggered, this, [this, key, label]() {
+                // Formwerte vorher merken: Farben koennen sofort
+                // wechseln, Formen nicht (siehe unten).
+                const QHash<QString, int> formVorher =
+                    Style::Theme::instance().formOverrides();
+
+                QString err;
+                if (!Style::Theme::instance().activate(key, &err)) {
+                    showToast(QStringLiteral("Palette %1: %2").arg(label, err),
+                              ToastSeverity::Warning, 6000);
+                    return;
+                }
+
+                // Der Knopfdruck, um den es geht (Betreiber,
+                // 2026-10-15: „das theme sollte man danach auch per
+                // knopfdruck ändern können").
+                const quint64 umgefaerbt = Style::ThemeFilter::reapplyAll();
+
+                // Nur wenn die Palette auch die FORM anders will, fehlt
+                // noch etwas: Eckenradius, Polsterung und Relief stehen
+                // als fertige Zahlen in Stylesheets, die beim Bauen des
+                // Fensters entstanden sind — die kann kein Umfaerben
+                // nachtragen. „Flach" und „Tief" tragen absichtlich nur
+                // Form und keine Farbe; fuer sie ist dieser Zweig der
+                // Normalfall.
+                if (Style::Theme::instance().formOverrides() != formVorher) {
+                    offerPaletteRestart(label);
+                    return;
+                }
+                showToast(tr("Palette “%1” — %2 panels recoloured.")
+                              .arg(label)
+                              .arg(umgefaerbt),
+                          ToastSeverity::Info, 4000);
+            });
+        };
+
+        addPalette(Style::Theme::builtInName(), QString());
+        for (const Style::Theme::Entry& e : Style::Theme::available()) {
+            addPalette(e.name, e.name);
+        }
+
+        // Zwei Wege zur selben Sache driften auseinander: wer die
+        // Palette in Setup > Appearance umstellt, faende hier sonst
+        // weiter den alten Haken. Beim Aufklappen nachziehen — dieselbe
+        // Lehre wie bei „View > Network Applets" (Phase 23), nur hier
+        // billiger zu haben.
+        connect(paletteMenu, &QMenu::aboutToShow, this, [paletteMenu]() {
+            const QString jetzt = AppSettings::instance()
+                                      .value("ActiveTheme", QString())
+                                      .toString();
+            for (QAction* a : paletteMenu->actions()) {
+                const QString key = (a->text() == Style::Theme::builtInName())
+                                        ? QString()
+                                        : a->text();
+                QSignalBlocker blocker(a);
+                a->setChecked(key == jetzt);
+            }
+        });
+    }
+
     // Phase 23 "View > Network Applets" submenu removed: TCI Server and
     // TCI Clients are now driven by AppletVisibilityController, accessible
     // via Containers > Applets and the panel's ☰ banner menu. Two
@@ -11805,6 +11911,71 @@ void MainWindow::buildStatusBar()
 // moved to TitleBar, Task A7), all at once, mid-transmit.
 //
 // The notices themselves are worth keeping. They move here instead.
+// ── Neustart fuer eine Palette (2026-10-15) ──────────────────────────
+//
+// Die FARBEN sind beim Aufruf schon umgestellt (reapplyAll). Diese
+// Frage kommt nur, wenn die Palette auch die FORM anders will — die
+// steht als fertige Zahl in Stylesheets, die beim Bauen des Fensters
+// entstanden sind, und kommt erst beim naechsten Start nach.
+
+void MainWindow::offerPaletteRestart(const QString& paletteName)
+{
+    // Ein Pruefstand darf nicht an einem modalen Fenster haengen
+    // bleiben. Dieselbe Regel wie showAudioDiagnoseDialog(): nur
+    // Pruefbinaerdateien setzen diese Fahne.
+    if (QStandardPaths::isTestModeEnabled()) { return; }
+
+    QMessageBox box(this);
+    box.setWindowTitle(tr("Palette"));
+    box.setIcon(QMessageBox::Question);
+    box.setText(tr("“%1” is now the chosen palette.").arg(paletteName));
+    // Die Farben sind an dieser Stelle schon umgestellt. Was fehlt, ist
+    // die FORM: Eckenradius, Polsterung und Relief stehen als fertige
+    // Zahlen in Stylesheets, die beim Bauen des Fensters entstanden
+    // sind. Der Text sagt genau das — „startet neu, sonst passiert
+    // nichts" waere nach dem sichtbaren Farbwechsel schlicht falsch.
+    box.setInformativeText(
+        tr("The colours are on already. This palette also changes corners, "
+           "padding and depth, and those are set while the window is "
+           "built — they need a restart. Restart now?"));
+    QPushButton* now = box.addButton(tr("Restart now"), QMessageBox::AcceptRole);
+    box.addButton(tr("Later"), QMessageBox::RejectRole);
+    box.setDefaultButton(now);
+    box.exec();
+    if (box.clickedButton() != now) { return; }
+
+    restartNow();
+}
+
+void MainWindow::restartNow()
+{
+    QStringList args = QCoreApplication::arguments();
+    if (!args.isEmpty()) { args.removeFirst(); }
+
+#if defined(Q_OS_WIN)
+    // relaunchScript() ist eine Argumentliste fuer /bin/sh -- auf
+    // Windows startet die Binaerdatei direkt. Das Warten auf die eigene
+    // PID entfaellt dort: die Datei wird nicht ersetzt, nur erneut
+    // geoeffnet.
+    QProcess::startDetached(QCoreApplication::applicationFilePath(), args);
+#else
+    const QString bundle =
+        UpdateInstaller::runningBundlePath(QCoreApplication::applicationDirPath());
+    const bool viaOpen = !bundle.isEmpty();
+    const QString target =
+        viaOpen ? bundle : QCoreApplication::applicationFilePath();
+    QProcess::startDetached(
+        QStringLiteral("/bin/sh"),
+        UpdateInstaller::relaunchScript(QCoreApplication::applicationPid(),
+                                        target, viaOpen, args));
+#endif
+
+    // Der Helfer wartet, bis diese PID weg ist. Der normale Weg hinaus
+    // speichert die Einstellungen -- also hier KEIN exit(), sondern
+    // quit().
+    qApp->quit();
+}
+
 StatusToast* MainWindow::showToast(const QString& message,
                                    ToastSeverity severity,
                                    int timeoutMs)
