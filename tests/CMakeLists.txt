@@ -5298,6 +5298,11 @@ longpath_add_test(tst_feldbetrieb)
 # 2026-10-15: zwei Abstuerze beim Beenden in zwei Stunden, beide
 # „Kind meldet sein Ende, Rumpf greift ins halb abgebaute Fenster".
 longpath_add_test(tst_abbau_ueberlebt)
+# 2026-10-15: moos.json nannte zwei Rollen, die es im Programm nicht
+# gibt — still uebergangen, also seit dem ersten Tag wirkungslos.
+longpath_add_test(tst_palette_ohne_tote_rollen)
+target_compile_definitions(tst_palette_ohne_tote_rollen PRIVATE
+    LONGPATH_SRC_DIR="${CMAKE_SOURCE_DIR}")
 target_compile_definitions(tst_oberflaeche_englisch PRIVATE
     LONGPATH_SRC_DIR="${CMAKE_SOURCE_DIR}")
 # 2026-10-14: HAUSSTIL.md sagt „Nie Radius 3" -- elf standen trotzdem im
