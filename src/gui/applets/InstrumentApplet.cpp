@@ -41,10 +41,10 @@ InstrumentApplet::InstrumentApplet(const QString& id, const QString& title,
 
     // applyForm, NICHT setForm: setForm() ruft saveState(), und das
     // schriebe hier -- noch vor dem restoreState() des Aufrufers -- die
-    // Vorgaben (Zeiger, kein Segment, keine Roehre) in die Ablage und
+    // Vorgaben (Zeiger, kein Segment, none Roehre) in die Ablage und
     // ueberschriebe damit genau die Werte, die restoreState() gleich
     // lesen soll. So hat die Roehre seit ihrer Einfuehrung (2026-08-23)
-    // keinen Neustart ueberlebt; gefunden 2026-09-03 ueber
+    // nonen Neustart ueberlebt; gefunden 2026-09-03 ueber
     // tst_settings_are_remembered.
     applyForm(Form::Needle);
 
@@ -67,7 +67,7 @@ InstrumentApplet::InstrumentApplet(const QString& id, const QString& title,
 bool InstrumentApplet::setPrimary(int bindingId)
 {
     // Beide Formen bekommen dieselbe Grösse. Das && ist kein Tippfehler
-    // und keine Kurzschluss-Falle: setPrimary hat keine Nebenwirkung,
+    // und none Kurzschluss-Falle: setPrimary hat none Nebenwirkung,
     // die eine der beiden auslassen dürfte, deshalb erst beide rufen
     // und dann verknüpfen.
     const bool a = m_needle->setPrimary(bindingId);
@@ -258,7 +258,7 @@ void InstrumentApplet::contextMenuEvent(QContextMenuEvent* ev)
     menu->deleteLater();
 }
 
-// Der geteilte ⚙-Knopf (GridCellWidget) traegt keine Klick-Koordinate,
+// Der geteilte ⚙-Knopf (GridCellWidget) traegt none Klick-Koordinate,
 // daher an der Mitte des Widgets verankert statt am Klickpunkt.
 void InstrumentApplet::openExtendedSettings()
 {
@@ -276,7 +276,7 @@ QMenu* InstrumentApplet::buildContextMenu(QWidget* parent)
     // readingsWithScale(), nicht eine eigene Liste. Wer eine Grösse
     // hinzufügt, fügt sie in ReadingSource hinzu und findet sie hier
     // ohne weiteres Zutun — und ein Instrument bietet nie etwas an,
-    // wofür es keinen verantworteten Bereich gibt.
+    // wofür es nonen verantworteten Bereich gibt.
     auto* sourceMenu = menu->addMenu(tr("Quelle"));
     auto* sourceGroup = new QActionGroup(menu);
     sourceGroup->setExclusive(true);
@@ -296,7 +296,7 @@ QMenu* InstrumentApplet::buildContextMenu(QWidget* parent)
     auto* secondGroup = new QActionGroup(menu);
     secondGroup->setExclusive(true);
     {
-        QAction* none = secondMenu->addAction(tr("keine"));
+        QAction* none = secondMenu->addAction(tr("none"));
         none->setCheckable(true);
         none->setChecked(m_needle->secondary() < 0);
         secondGroup->addAction(none);
@@ -406,7 +406,7 @@ QMenu* InstrumentApplet::buildContextMenu(QWidget* parent)
         });
     }
     peakMenu->addSeparator();
-    connect(peakMenu->addAction(tr("Zurücksetzen")), &QAction::triggered,
+    connect(peakMenu->addAction(tr("Reset")), &QAction::triggered,
             this, [this]() {
         m_needle->resetPeak();
         m_bar->resetPeak();
@@ -418,7 +418,7 @@ QMenu* InstrumentApplet::buildContextMenu(QWidget* parent)
     // Bildschirmen vielleicht ein Fenster erspart" -- Frequenz mit im
     // S-Meter/Stehwelle statt in einem eigenen Frequenz-Fenster.
     menu->addSeparator();
-    QAction* showFreq = menu->addAction(tr("Frequenz anzeigen"));
+    QAction* showFreq = menu->addAction(tr("Show frequency"));
     showFreq->setCheckable(true);
     showFreq->setChecked(showFrequency());
     connect(showFreq, &QAction::triggered, this, [this](bool checked) {

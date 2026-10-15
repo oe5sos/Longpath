@@ -35,7 +35,7 @@ const QString kDefaultUrl = QStringLiteral("http://127.0.0.1:8080/inference");
 // Fehler, den man nicht von "Dienst laeuft nicht" unterscheiden koennte.
 // Der Wurzelpfad dagegen liefert bei whisper-server eine Seite -- und
 // wenn niemand horcht, kommt ConnectionRefusedError. Genau diese beiden
-// Faelle wollen wir auseinanderhalten.
+// Faelle wollen wir offeinanderhalten.
 QUrl probeUrlFor(const QString& endpoint)
 {
     QUrl u(endpoint.trimmed());
@@ -86,8 +86,8 @@ void AsrPage::buildServerGroup()
     m_urlEdit->setStyleSheet(kEditStyle());
     m_urlEdit->setText(s.value(QStringLiteral("AsrEndpointUrl"), kDefaultUrl).toString());
     m_urlEdit->setToolTip(
-        tr("Adresse des Whisper-Dienstes. Voreinstellung ist der eigene Rechner "
-           "(127.0.0.1) -- damit verlaesst kein Ton die Maschine."));
+        tr("Address of the Whisper service. The default is this machine "
+            "(127.0.0.1), so no audio ever leaves it."));
     connect(m_urlEdit, &QLineEdit::editingFinished, this, [this] {
         storeTrimmed(QStringLiteral("AsrEndpointUrl"), m_urlEdit->text());
     });
@@ -97,10 +97,10 @@ void AsrPage::buildServerGroup()
     m_keyEdit->setStyleSheet(kEditStyle());
     m_keyEdit->setEchoMode(QLineEdit::Password);
     m_keyEdit->setText(s.value(QStringLiteral("AsrApiKey"), QString()).toString());
-    m_keyEdit->setPlaceholderText(tr("leer lassen beim eigenen Dienst"));
+    m_keyEdit->setPlaceholderText(tr("leave empty for your own service"));
     m_keyEdit->setToolTip(
-        tr("Nur noetig, wenn der Dienst einen Schluessel verlangt. Ein lokaler "
-           "whisper-server braucht keinen."));
+        tr("Only needed if the service asks for a key. A local "
+            "whisper-server does not."));
     connect(m_keyEdit, &QLineEdit::editingFinished, this, [this] {
         storeTrimmed(QStringLiteral("AsrApiKey"), m_keyEdit->text());
     });
@@ -142,24 +142,25 @@ void AsrPage::buildRecognitionGroup()
     m_languageEdit->setText(
         s.value(QStringLiteral("AsrLanguage"), QStringLiteral("de")).toString());
     m_languageEdit->setToolTip(
-        tr("Sprachkuerzel, etwa de, en, it. \"auto\" laesst den Dienst raten -- "
-           "das kostet Genauigkeit, wenn man weiss, was kommt."));
+        tr("Language code, e.g. de, en, it. \"auto\" lets the service "
+            "guess, which costs accuracy when you already know what is "
+            "coming."));
     connect(m_languageEdit, &QLineEdit::editingFinished, this, [this] {
         storeTrimmed(QStringLiteral("AsrLanguage"), m_languageEdit->text());
     });
-    form->addRow(tr("Sprache:"), m_languageEdit);
+    form->addRow(tr("Language:"), m_languageEdit);
 
     m_modelEdit = new QLineEdit(group);
     m_modelEdit->setStyleSheet(kEditStyle());
     m_modelEdit->setText(
         s.value(QStringLiteral("AsrModel"), QStringLiteral("whisper-1")).toString());
     m_modelEdit->setToolTip(
-        tr("Modellname. Der lokale whisper-server ignoriert dieses Feld -- er "
-           "nimmt das Modell, mit dem er gestartet wurde."));
+        tr("Model name. The local whisper-server ignores this field: it "
+            "uses the model it was started with."));
     connect(m_modelEdit, &QLineEdit::editingFinished, this, [this] {
         storeTrimmed(QStringLiteral("AsrModel"), m_modelEdit->text());
     });
-    form->addRow(tr("Modell:"), m_modelEdit);
+    form->addRow(tr("Model:"), m_modelEdit);
 
     contentLayout()->addWidget(group);
 }
@@ -169,15 +170,15 @@ void AsrPage::buildRecognitionGroup()
 // ---------------------------------------------------------------------------
 void AsrPage::buildHintGroup()
 {
-    // ── Der Dienst aus Longpath heraus (2026-09-17) ──────────────────
+    // ── Der Dienst off Longpath heroff (2026-09-17) ──────────────────
     //
     // Hier stand ein Hinweis mit einer Terminalzeile. Betreiber: "ein
-    // Startknopf fuer den Dienst aus Longpath heraus, damit du das
+    // Startknopf fuer den Dienst off Longpath heroff, damit du das
     // Terminal nicht brauchst" — "ja bitte". Jetzt: Programm und
     // Modell (mit Vorgaben, wo Homebrew und ~/whisper sie hinlegen),
     // ein Haken fuer den Automatikstart beim Einschalten der Mitschrift,
     // Starten/Stoppen von Hand, und der Zustand mit Grund.
-    auto* group = new QGroupBox(tr("Dienst auf diesem Rechner"), this);
+    auto* group = new QGroupBox(tr("Service on this machine"), this);
     group->setStyleSheet(QString::fromLatin1(Style::kGroupBoxStyle));
     auto* form = new QFormLayout(group);
     form->setSpacing(6);
@@ -189,9 +190,9 @@ void AsrPage::buildHintGroup()
     m_binaryEdit->setStyleSheet(kEditStyle());
     m_binaryEdit->setText(s.value(QStringLiteral("AsrServerBinary"), QString()).toString());
     m_binaryEdit->setPlaceholderText(cfg.binary.isEmpty()
-        ? tr("whisper-server nicht gefunden — brew install whisper-cpp")
+        ? tr("whisper-server not found — brew install whisper-cpp")
         : cfg.binary);
-    m_binaryEdit->setToolTip(tr("Pfad zu whisper-server. Leer: die Homebrew-Vorgabe."));
+    m_binaryEdit->setToolTip(tr("Path to whisper-server. Empty: the Homebrew default."));
     connect(m_binaryEdit, &QLineEdit::editingFinished, this, [this] {
         storeTrimmed(QStringLiteral("AsrServerBinary"), m_binaryEdit->text());
     });
@@ -201,16 +202,17 @@ void AsrPage::buildHintGroup()
     m_modelPathEdit->setStyleSheet(kEditStyle());
     m_modelPathEdit->setText(s.value(QStringLiteral("AsrModelPath"), QString()).toString());
     m_modelPathEdit->setPlaceholderText(cfg.model.isEmpty()
-        ? tr("kein ggml-*.bin in ~/whisper")
+        ? tr("no ggml-*.bin in ~/whisper")
         : cfg.model);
-    m_modelPathEdit->setToolTip(tr("Die Modelldatei (ggml-*.bin). Leer: die erste in ~/whisper. "
-                                   "\"small\" ist schnell, \"medium\" versteht deutlich mehr."));
+    m_modelPathEdit->setToolTip(tr("The model file (ggml-*.bin). Empty: the first one in "
+                                    "~/whisper. \"small\" is fast, \"medium\" understands "
+                                    "considerably more."));
     connect(m_modelPathEdit, &QLineEdit::editingFinished, this, [this] {
         storeTrimmed(QStringLiteral("AsrModelPath"), m_modelPathEdit->text());
     });
     form->addRow(tr("Modelldatei:"), m_modelPathEdit);
 
-    m_autoStart = new QCheckBox(tr("beim Einschalten der Mitschrift selbst starten"), group);
+    m_autoStart = new QCheckBox(tr("start it automatically when transcription is switched on"), group);
     m_autoStart->setStyleSheet(QString::fromLatin1(Style::kCheckBoxStyle));
     m_autoStart->setChecked(s.value(QStringLiteral("AsrAutoStartServer"),
                                     QStringLiteral("True")).toString()
@@ -250,10 +252,10 @@ void AsrPage::buildHintGroup()
         QString text;
         QString colour = QString::fromLatin1(Style::kTextSecondary);
         switch (st) {
-        case S::Stopped:  text = tr("aus"); break;
-        case S::Starting: text = tr("startet … (das Modell laedt einige Sekunden)"); break;
+        case S::Stopped:  text = tr("off"); break;
+        case S::Starting: text = tr("starting … (the model takes a few seconds to load)"); break;
         case S::Running:  text = tr("laeuft"); colour = QString::fromLatin1(Style::kGreenText); break;
-        case S::External: text = tr("laeuft ausserhalb von Longpath (%1)").arg(reason);
+        case S::External: text = tr("running outside Longpath (%1)").arg(reason);
                           colour = QString::fromLatin1(Style::kGreenText); break;
         case S::Failed:   text = tr("Fehler: %1").arg(reason);
                           colour = QString::fromLatin1(Style::kRedBorder); break;
@@ -277,7 +279,7 @@ void AsrPage::probeEndpoint()
     if (m_probe) { return; }   // eine Probe zur Zeit genuegt
 
     // Der Knopf speichert mit: wer die Adresse tippt und sofort prueft,
-    // hat editingFinished noch nicht ausgeloest.
+    // hat editingFinished noch nicht offgeloest.
     storeTrimmed(QStringLiteral("AsrEndpointUrl"), m_urlEdit->text());
 
     const QUrl url = probeUrlFor(m_urlEdit->text());
@@ -311,7 +313,7 @@ void AsrPage::probeEndpoint()
             return;
         }
         // Jede HTTP-Antwort -- auch 404 -- beweist, dass ein Dienst da ist.
-        showProbeResult(tr("Dienst antwortet"), QString::fromLatin1(Style::kGreenText));
+        showProbeResult(tr("service responding"), QString::fromLatin1(Style::kGreenText));
     });
 }
 

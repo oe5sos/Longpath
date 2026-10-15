@@ -145,6 +145,7 @@ find_package(Qt6 REQUIRED COMPONENTS
     Multimedia
     Svg
     WebSockets
+    LinguistTools
 )
 
 # WebSockets is REQUIRED (not optional) because both the TCI server and the
@@ -155,6 +156,15 @@ find_package(Qt6 REQUIRED COMPONENTS
 # only a warning in the log. Mirroring the v0.1.1 LONGPATH_GPU_SPECTRUM lesson
 # (see release.yml Configure step): if a feature is mandatory, the build
 # system has to refuse to configure without it.
+#
+# LinguistTools (2026-10-14) steht aus demselben Grund in derselben Liste.
+# Betreiber: "englisch durchgehend, aber deutsch als option". Eine Sprache,
+# die man waehlen kann, ist eine Zusage an den Bediener -- kein Extra, das
+# bei einem Laeufer ohne qttools stillschweigend wegfallen darf. Wer das
+# QUIET macht, baut genau die Fassung, die im Menue eine Sprache anbietet
+# und dann englisch bleibt. An den Pipelines war dafuer nichts zu tun:
+# ab Qt 6.8 steckt qttools in qtbase und ist nicht einmal als -m Modul
+# auflistbar (so steht es in release.yml an der aqt-Zeile).
 
 # Optional Qt components
 find_package(Qt6 QUIET COMPONENTS SerialPort)
@@ -1330,6 +1340,24 @@ if(LONGPATH_LTO_AVAILABLE)
 else()
     target_link_libraries(Longpath PRIVATE LongpathObjs)
 endif()
+
+# ── Sprachen (2026-10-14) ────────────────────────────────────────────
+#
+# Betreiber: "englisch durchgehend, aber deutsch als option". Englisch
+# ist die Quellsprache -- im Quelltext steht englischer Text, die
+# Uebersetzung liegt daneben. qt_add_translations baut die .qm aus der
+# .ts und legt sie unter :/i18n/ in die Binaerdatei, es gibt also keine
+# Datei, die beim Ausliefern vergessen werden kann (genau das ist
+# v0.5.0 mit rade.dll passiert).
+#
+# Gepflegt wird die .ts mit `cmake --build build --target update_translations`
+# (ruft lupdate ueber alle Quellen) und danach dem Qt Linguist. Der
+# Bau selbst ruft nur lrelease -- ein Lauf ohne lupdate bleibt
+# reproduzierbar.
+qt_add_translations(Longpath
+    TS_FILES translations/longpath_de.ts
+    RESOURCE_PREFIX "/i18n"
+)
 
 # LSMinimumSystemVersion im Info.plist (2026-09-29). Ohne den Schluessel
 # startete ein zu altes macOS die App und dyld brach dann beim Laden der

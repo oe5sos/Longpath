@@ -27,6 +27,7 @@
 #include "LongpathBuildTag.h"
 
 #include <QApplication>
+#include <QTranslator>
 #include <QCommandLineOption>
 #include <QMetaObject>
 #include <csignal>
@@ -404,6 +405,36 @@ int main(int argc, char* argv[])
 
     // Load XML settings
     Longpath::AppSettings::instance().load();
+
+    // ── Sprache (2026-10-14) ──────────────────────────────────────────
+    //
+    // Betreiber: "englisch durchgehend, aber deutsch als option".
+    // Englisch ist die Quellsprache und steht im Quelltext; eine andere
+    // Sprache kommt aus der eingebauten .qm (:/i18n/, siehe
+    // CMakeLists.txt). Hier, direkt nach load() und lange vor dem ersten
+    // Fenster: ein spaeter eingesetzter Uebersetzer erreicht Texte
+    // nicht mehr, die schon gebaut sind.
+    //
+    // Absichtlich NICHT nach der Systemsprache gegriffen: wer Longpath
+    // auf einem deutschen macOS startet, hat deshalb noch lange keine
+    // deutsche Oberflaeche bestellt. Vorgabe ist Englisch, alles andere
+    // ist eine Wahl (Setup -> General -> Language).
+    static QTranslator s_uiTranslator;
+    const QString uiLang = Longpath::AppSettings::instance()
+                               .value(QStringLiteral("UiLanguage"), QStringLiteral("en"))
+                               .toString();
+    if (uiLang != QStringLiteral("en")) {
+        if (s_uiTranslator.load(QStringLiteral(":/i18n/longpath_") + uiLang)) {
+            app.installTranslator(&s_uiTranslator);
+            qInfo() << "UI language:" << uiLang;
+        } else {
+            // Kein stilles Zurueckfallen: wer Deutsch gewaehlt hat und
+            // Englisch sieht, soll im Protokoll finden, warum.
+            qWarning() << "UI language" << uiLang
+                       << "was chosen but :/i18n/longpath_" + uiLang
+                       << "did not load -- staying with English";
+        }
+    }
 
     // Automatic start-up copy of the settings file (File > Settings
     // Backups, "Backup on start-up"; off unless switched on). After

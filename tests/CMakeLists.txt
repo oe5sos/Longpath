@@ -5271,6 +5271,23 @@ longpath_add_test(tst_update_checker)
 # Die Treppe stieg nicht, weil onConnected() den Zaehler zuruecksetzte --
 # ein offener Socket ist aber noch keine brauchbare Sitzung.
 longpath_add_test(tst_dxcluster_wiederanlauf)
+# 2026-10-14: HAUSSTIL.md sagt „Nie Radius 3" -- elf standen trotzdem im
+# Quelltext. Dieser Lauf liest die Quellen und haelt die Regel nach;
+# QSlider::groove ist die eine begruendete Ausnahme.
+longpath_add_test(tst_hausstil_radius)
+# 2026-10-14: Sperrklinke gegen namenlose Farben. 128 am Tag des
+# Einbaus; die Zahl darf sinken, nie steigen.
+longpath_add_test(tst_hausstil_farben)
+target_compile_definitions(tst_hausstil_farben PRIVATE
+    LONGPATH_SRC_DIR="${CMAKE_SOURCE_DIR}")
+target_compile_definitions(tst_hausstil_radius PRIVATE
+    LONGPATH_SRC_DIR="${CMAKE_SOURCE_DIR}")
+# 2026-10-14: "englisch durchgehend, aber deutsch als option" -- die
+# Kette .ts -> .qm -> :/i18n/ -> QTranslator. LONGPATH_QM_FILE zeigt auf
+# die Datei, die qt_add_translations gerade gebaut hat.
+longpath_add_test(tst_sprache_umschaltbar)
+target_compile_definitions(tst_sprache_umschaltbar PRIVATE
+    LONGPATH_QM_FILE="${CMAKE_BINARY_DIR}/longpath_de.qm")
 # 2026-09-21: Schluesselbund-Dienstname "Longpath: <key>" mit Umzug vom
 # alten Namen -- live nur mit LONGPATH_KEYCHAIN_LIVE=1 (echter Schluesselbund).
 longpath_add_test(tst_credential_store_migration)

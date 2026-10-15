@@ -976,7 +976,7 @@ void RotorLogbookPanel::buildAimMenu(QMenu& menu, const QPoint& g)
             st.value(kPresetLabelKey.arg(i + 1), QString{}).toString();
 
         QMenu* sub = menu.addMenu(
-            label.isEmpty() ? tr("Ziel %1 (leer)").arg(i + 1)
+            label.isEmpty() ? tr("Target %1 (empty)").arg(i + 1)
                             : QStringLiteral("%1 · %2°")
                                   .arg(label, deg.isEmpty() ? QStringLiteral("—")
                                                             : deg));
@@ -997,7 +997,7 @@ void RotorLogbookPanel::buildAimMenu(QMenu& menu, const QPoint& g)
 
     const QString park = st.value(kParkDegKey, QString{}).toString();
     QMenu* parkSub = menu.addMenu(
-        park.isEmpty() ? tr("Park (nicht gelernt)")
+        park.isEmpty() ? tr("Park (not taught)")
                        : tr("Park · %1°").arg(park));
     QAction* parkAim = parkSub->addAction(tr("Park anzielen"));
     parkAim->setEnabled(!park.isEmpty());
@@ -1014,8 +1014,8 @@ void RotorLogbookPanel::buildAimMenu(QMenu& menu, const QPoint& g)
     QAction* lp = menu.addAction(tr("Gegenkurs (±180°)"));
     lp->setEnabled(m_dial && m_dial->hasTarget());
     lp->setToolTip(tr(
-        "Dreht die PEILUNG auf den langen Weg. Erst zielen, dann "
-        "Gegenkurs, dann Rotate."));
+        "Turns the BEARING to the long path. Aim first, then reverse "
+         "course, then Rotate."));
     connect(lp, &QAction::triggered, this, [this]() {
         if (!m_dial || !m_dial->hasTarget()) { return; }
         m_dial->setTargetBearing(
