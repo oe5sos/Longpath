@@ -535,6 +535,8 @@ set(CORE_SOURCES
     src/core/SettingsBackup.cpp
     src/core/RxProfileManager.cpp
     src/core/CwDecoder.cpp
+    src/core/Ft8Decoder.cpp
+    src/core/Ft8Stream.cpp
     src/core/BeamHeading.cpp
     src/core/BoardCapabilities.cpp
     src/core/CallsignCache.cpp
@@ -1676,6 +1678,35 @@ target_link_libraries(LongpathObjs PUBLIC sgp4)
 # --------------------------------------------------------------------------
 add_subdirectory(third_party/ggmorse)
 target_link_libraries(LongpathObjs PUBLIC ggmorse)
+
+# ── ft8_lib (FT8/FT4, MIT) ──────────────────────────────────────────
+#
+# Der Kern von Kārlis Gobas ft8_lib, Byte fuer Byte uebernommen; siehe
+# third_party/ft8_lib/FT8LIB-PROVENANCE.md fuer Herkunft, Umfang und
+# die Begruendung. Eigene statische Bibliothek, damit Longpaths
+# Warnungseinstellungen nicht auf fremden Quelltext losgehen.
+add_library(ft8_static STATIC
+    third_party/ft8_lib/ft8/constants.c
+    third_party/ft8_lib/ft8/crc.c
+    third_party/ft8_lib/ft8/decode.c
+    third_party/ft8_lib/ft8/encode.c
+    third_party/ft8_lib/ft8/ldpc.c
+    third_party/ft8_lib/ft8/message.c
+    third_party/ft8_lib/ft8/text.c
+    third_party/ft8_lib/common/monitor.c
+    third_party/ft8_lib/common/gfsk.c
+    third_party/ft8_lib/fft/kiss_fft.c
+    third_party/ft8_lib/fft/kiss_fftr.c)
+target_include_directories(ft8_static PUBLIC third_party/ft8_lib)
+set_target_properties(ft8_static PROPERTIES POSITION_INDEPENDENT_CODE ON)
+# Fremder Quelltext: keine Warnungen, keine Warnungen-als-Fehler.
+if(NOT MSVC)
+    target_compile_options(ft8_static PRIVATE -w)
+else()
+    target_compile_options(ft8_static PRIVATE /w)
+endif()
+
+target_link_libraries(LongpathObjs PUBLIC ft8_static)
 
 # --------------------------------------------------------------------------
 # DeepFilterNet3 DFNR — pre-built neural noise reduction library (MIT/Apache-2.0)
