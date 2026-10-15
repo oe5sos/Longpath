@@ -174,6 +174,42 @@ private slots:
                  static_cast<AppletWidget*>(rx));
     }
 
+    // ── Doppelklick auf den Kopf loest ab (2026-10-14) ──────────────
+    //
+    // Betreiber: "wenn doppelklick dann vielleicht eigenes frei
+    // fliegendes windows mit wasserfall". Der Weg gab es schon zweimal
+    // (↗ im Kopf, Rechtsklick-Menue) -- der Doppelklick ist der dritte,
+    // und der, nach dem er von selbst gegriffen hat. Die andere Haelfte
+    // der Geste gab es laengst: WindowTitleBar::mouseDoubleClickEvent
+    // dockt ein freies Fenster wieder an.
+    void aDoubleClickOnTheTitleBarDetaches()
+    {
+        RadioModel model;
+        model.addSlice();
+        auto* rx = new RxApplet(model.slices().value(0), &model);
+
+        AppletPanelWidget panel;
+        panel.addApplet(rx);
+        panel.resize(280, 600);
+        panel.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&panel));
+
+        QSignalSpy spy(&panel, &AppletPanelWidget::appletDetachRequested);
+
+        auto* cell = panel.findChild<GridCellWidget*>();
+        QVERIFY(cell);
+        // Nicht auf einen Knopf, sondern auf die freie Flaeche der
+        // Leiste -- dort, wo man hinfaehrt, wenn man ein Fenster
+        // herausziehen will.
+        QTest::mouseDClick(cell->titleBar(), Qt::LeftButton, Qt::NoModifier,
+                           QPoint(cell->titleBar()->width() / 2,
+                                  cell->titleBar()->height() / 2));
+
+        QCOMPARE(spy.count(), 1);
+        QCOMPARE(spy.at(0).at(0).value<AppletWidget*>(),
+                 static_cast<AppletWidget*>(rx));
+    }
+
     // Dasselbe fuer das Ausblenden.
     void theHideButtonIsReachableToo()
     {
