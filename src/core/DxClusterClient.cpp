@@ -110,7 +110,11 @@ void DxClusterClient::connectToCluster(const QString& host, quint16 port, const 
     // Connection timeout
     QTimer::singleShot(ConnectTimeoutMs, this, [this] {
         if (!m_connected && m_socket->state() != QAbstractSocket::ConnectedState) {
-            qCWarning(lcSpots) << "DxClusterClient: connection timeout";
+            // Dieselbe Zurueckhaltung wie bei onSocketError: die Zeile
+            // stand 952-mal im Protokoll vom 14.10.
+            if (m_quietFailures == 0) {
+                qCWarning(lcSpots) << "DxClusterClient: connection timeout";
+            }
             m_socket->abort();
             emit connectionError(QStringLiteral("Connection timeout"));
         }
@@ -150,7 +154,20 @@ void DxClusterClient::onConnected()
 {
     qCInfo(lcSpots) << "DxClusterClient: TCP connected to" << m_host;
     m_connected = true;
-    m_reconnectAttempts = 0;
+    // Den Wiederanlauf-Zaehler NICHT hier zuruecksetzen (2026-10-14).
+    //
+    // Gemessen am Betreiber-Rechner: zwischen 14:30 und 17:10 sind 680
+    // Versuche gelaufen, alle 14 s einer, und die Treppe hat nie die
+    // zweite Stufe erreicht. Der Grund stand hier: ein Cluster NIMMT die
+    // TCP-Verbindung an und wirft erst beim Anmelden hinaus ("The remote
+    // host closed the connection"). Jeder Zyklus lief also
+    // connectToCluster -> onConnected (Zaehler = 0) -> onDisconnected
+    // (Verzoegerung = 1<<0 = 5 s) -> wieder von vorn. 4730 Protokollzeilen
+    // in zweidreiviertel Stunden, mehr als die Haelfte des ganzen Logs.
+    //
+    // Ein offener Socket ist noch keine brauchbare Sitzung. Der Zaehler
+    // faellt deshalb erst, wenn die Anmeldung durch ist -- siehe
+    // markLoggedIn().
 
     // Open log file (truncate on each new connection)
     m_logFile.close();
@@ -165,6 +182,16 @@ void DxClusterClient::onConnected()
     }
 
     emit connected();
+}
+
+// Die Anmeldung ist durch: erst jetzt gilt die Verbindung als brauchbar,
+// und erst jetzt faengt die Treppe des Wiederanlaufs wieder unten an.
+void DxClusterClient::markLoggedIn()
+{
+    m_loggedIn = true;
+    m_reconnectAttempts = 0;
+    m_quietFailures = 0;
+    m_lastFailureMsg.clear();
 }
 
 // From AetherSDR src/core/DxClusterClient.cpp:114-131 [@0cd4559]
@@ -188,6 +215,15 @@ void DxClusterClient::onDisconnected()
         const int shiftBits = std::min(m_reconnectAttempts, 30);
         int delay = std::min(InitialReconnectDelayMs * (1 << shiftBits),
                              MaxReconnectDelayMs);
+        if (delay >= MaxReconnectDelayMs && m_reconnectAttempts > 0
+            && (m_reconnectAttempts & (m_reconnectAttempts - 1)) == 0) {
+            // Nur bei 1, 2, 4, 8, ... Versuchen -- aber sichtbar: der
+            // Bediener soll erfahren, dass der Cluster ihn dauerhaft
+            // abweist, statt es nur im Debug-Kanal zu verstecken.
+            qCWarning(lcSpots) << "DxClusterClient:" << m_reconnectAttempts
+                               << "Versuche ohne Anmeldung -- naechster in"
+                               << delay / 1000 << "s";
+        }
         qCDebug(lcSpots) << "DxClusterClient: reconnecting in" << delay << "ms";
         m_reconnectTimer->start(delay);
         m_reconnectAttempts++;
@@ -198,7 +234,25 @@ void DxClusterClient::onDisconnected()
 void DxClusterClient::onSocketError(QAbstractSocket::SocketError /*err*/)
 {
     QString msg = m_socket->errorString();
-    qCWarning(lcSpots) << "DxClusterClient: socket error:" << msg;
+    // Dieselbe Meldung nicht hundertfach: einmal beim ersten Mal, danach
+    // hoechstens alle 60 s -- dann aber mit der Zahl der Versuche, damit
+    // im Protokoll steht, wie lange es schon so geht. Eine NEUE Meldung
+    // kommt immer durch; sie ist der Hinweis, dass sich etwas geaendert
+    // hat.
+    const qint64 jetzt = QDateTime::currentMSecsSinceEpoch();
+    if (msg != m_lastFailureMsg || jetzt - m_lastFailureLogMs >= 60000) {
+        if (m_quietFailures > 0) {
+            qCWarning(lcSpots) << "DxClusterClient: socket error:" << msg
+                               << "(" << m_quietFailures + 1 << "mal seit der letzten Zeile)";
+        } else {
+            qCWarning(lcSpots) << "DxClusterClient: socket error:" << msg;
+        }
+        m_lastFailureMsg = msg;
+        m_lastFailureLogMs = jetzt;
+        m_quietFailures = 0;
+    } else {
+        ++m_quietFailures;
+    }
     emit connectionError(msg);
 }
 
@@ -258,7 +312,7 @@ void DxClusterClient::onReadyRead()
                     qCInfo(lcSpots) << "DxClusterClient: login prompt detected (no newline):" << partial;
                     m_readBuffer.clear();
                     m_socket->write((m_callsign + "\r\n").toLatin1());
-                    m_loggedIn = true;
+                    markLoggedIn();
                     qCInfo(lcSpots) << "DxClusterClient: sent callsign" << m_callsign;
                 }
             }
@@ -290,7 +344,7 @@ void DxClusterClient::handleLine(const QString& line)
     if (!m_loggedIn && isLoginPrompt(line)) {
         qCInfo(lcSpots) << "DxClusterClient: login prompt (line):" << line;
         m_socket->write((m_callsign + "\r\n").toLatin1());
-        m_loggedIn = true;
+        markLoggedIn();
         qCInfo(lcSpots) << "DxClusterClient: sent callsign" << m_callsign;
         return;
     }

@@ -9473,13 +9473,20 @@ void MainWindow::buildMenuBar()
 
     viewMenu->addSeparator();
 
-    m_darkThemeAction = viewMenu->addAction(QStringLiteral("&Dark Theme"));
-    m_darkThemeAction->setCheckable(true);
-    m_darkThemeAction->setChecked(true);
-    m_darkThemeAction->setToolTip(QStringLiteral("Toggle dark theme (NYI — Phase X)"));
-    connect(m_darkThemeAction, &QAction::toggled, this, [](bool /*on*/) {
-        qCDebug(lcConnection) << "Dark Theme toggle NYI";
-    });
+    // View > Dark Theme ist am 2026-10-14 entfernt worden.
+    //
+    // Der Eintrag war ankreuzbar, stand auf „an" und schrieb beim
+    // Umschalten "Dark Theme toggle NYI" ins Protokoll -- sonst nichts.
+    // Sein eigener Tooltip sagte "(NYI — Phase X)", was niemand sieht,
+    // der nicht stehenbleibt. Der Betreiber hat ihn zweimal betaetigt
+    // (21:03:30 und 21:03:41 in seinem Protokoll) und daraus geschlossen,
+    // die Palettenumschaltung sei kaputt.
+    //
+    // Sie ist es nicht: Setup > Appearance schaltet, und zwar sichtbar
+    // (nachgemessen ueber drei Starts mit demselben Fensterausschnitt --
+    // die Formpalette "Tief" aendert 37,6 % aller Bildpunkte). Ein
+    // Schalter, der nichts tut, ist schlimmer als keiner: er laesst den
+    // Bediener am Richtigen zweifeln.
 
     {
         QAction* minimalAction = viewMenu->addAction(QStringLiteral("&Minimal Mode"));
