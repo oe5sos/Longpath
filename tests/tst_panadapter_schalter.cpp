@@ -93,6 +93,47 @@ private slots:
         delete mw;
     }
 
+    /// Fuenf Mal hin und her. Der Panadapter traegt ein QRhiWidget,
+    /// dessen Zeichenkontext am FENSTER haengt; beim Umhaengen muss er
+    /// abgebaut und neu gebunden werden (siehe die lange Begruendung in
+    /// PanadapterStack::floatPanadapter). Ein Weg, der beim ersten Mal
+    /// geht und beim dritten haengt, ist nicht „technisch
+    /// funktionsfaehig" — also wird er mehrfach gefahren.
+    void fuenfMalHinUndHer()
+    {
+        auto* mw = new MainWindow();
+        mw->resize(1700, 1000);
+        mw->show();
+        QVERIFY(QTest::qWaitForWindowExposed(mw));
+        for (int i = 0; i < 10; ++i) { QCoreApplication::processEvents(); }
+
+        auto* stack = mw->findChild<PanadapterStack*>();
+        QVERIFY(stack);
+        const QString pan = stack->activePanId();
+        QVERIFY(!pan.isEmpty());
+
+        for (int runde = 1; runde <= 5; ++runde) {
+            stack->floatPanadapter(pan);
+            for (int i = 0; i < 10; ++i) { QCoreApplication::processEvents(); }
+            QVERIFY2(stack->isPanFloating(pan),
+                     qPrintable(QStringLiteral("Runde %1: nicht abgeloest")
+                                    .arg(runde)));
+
+            stack->dockPanadapter(pan);
+            for (int i = 0; i < 10; ++i) { QCoreApplication::processEvents(); }
+            QVERIFY2(!stack->isPanFloating(pan),
+                     qPrintable(QStringLiteral("Runde %1: nicht angedockt")
+                                    .arg(runde)));
+        }
+
+        // Und danach ist der Panadapter noch da — nicht nur „nicht
+        // schwebend", sondern wirklich im Fenster.
+        QVERIFY2(stack->panadapter(pan),
+                 "der Panadapter ist beim Hin und Her verlorengegangen");
+
+        delete mw;
+    }
+
     /// Und der Haken folgt dem ANDEREN Weg: wer den ↗ im Panelkopf
     /// nimmt, soll das Menue nicht luegen sehen.
     void derHakenFolgtAuchDemAnderenWeg()
