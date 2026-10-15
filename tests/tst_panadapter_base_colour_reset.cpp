@@ -82,21 +82,25 @@ private slots:
 
         QSignalSpy spy(&applet,
                        &PanadapterApplet::backgroundColourResetRequested);
+        // Der Eintrag wird NICHT ueber seinen Wortlaut gesucht
+        // (2026-10-14). Vorher stand hier „zurücksetzen", und mit der
+        // Umstellung auf Englisch als Quellsprache fiel dieser Lauf in
+        // der CI — zu Recht: ein Text ist ab jetzt uebersetzbar, also
+        // kein Bezeichner. Dieselbe tr()-Rolle wie im Programm liefert
+        // genau den Text, der gerade gilt: englisch ohne Uebersetzer,
+        // deutsch mit. Ein Prueflauf, der auf einen Wortlaut zeigt,
+        // waere mit der deutschen Fassung ein zweites Mal gefallen.
+        const QString gesucht = PanadapterApplet::tr("Reset base colour");
         bool fired = false;
         for (QAction* a : m->actions()) {
-            // QStringLiteral, nicht QLatin1String: das „ue" steht in
-            // dieser Datei als UTF-8 (zwei Byte), und QLatin1String
-            // liest jedes Byte einzeln — daraus wird Buchstabensalat,
-            // der nie passt. Der erste Anlauf dieses Tests ist genau
-            // daran gescheitert und meldete einen fehlenden Eintrag,
-            // den es laengst gab.
-            if (a->text().contains(QStringLiteral("zurücksetzen"))) {
+            if (a->text().contains(gesucht)) {
                 a->trigger();
                 fired = true;
                 break;
             }
         }
-        QVERIFY2(fired, "Kein 'Grundfarbe zurücksetzen' im Zahnrad");
+        QVERIFY2(fired, qPrintable(QStringLiteral(
+                     "Kein '%1' im Zahnrad").arg(gesucht)));
         QCOMPARE(spy.count(), 1);
     }
 };

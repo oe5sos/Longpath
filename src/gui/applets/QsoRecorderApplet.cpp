@@ -227,7 +227,7 @@ void QsoRecorderApplet::buildUI()
             auto* box = new QWidget(body);
             box->setStyleSheet(QStringLiteral(
                 "QWidget { background: %1; border: 1px solid %2;"
-                " border-radius: 3px; }")
+                " border-radius: 6px; }")
                 .arg(QLatin1String(Style::kInsetBg),
                      QLatin1String(Style::kBorderSubtle)));
             auto* col = new QVBoxLayout(box);
@@ -300,7 +300,7 @@ void QsoRecorderApplet::buildUI()
     m_list->setMaximumHeight(96);
     m_list->setStyleSheet(QStringLiteral(
         "QListWidget { background: %1; border: 1px solid %2;"
-        " border-radius: 3px; color: %3; font-size: 11px; }"
+        " border-radius: 6px; color: %3; font-size: 11px; }"
         "QListWidget::item { padding: 1px 4px; }"
         "QListWidget::item:selected { background: %4; color: %5; }")
         .arg(QLatin1String(Style::kInsetBg),
