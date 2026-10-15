@@ -7673,7 +7673,7 @@ void MainWindow::populateDefaultMeter()
          QStringLiteral("low cut"), QStringLiteral("high cut"),
          QStringLiteral("shift")});
     m_appletVis->describeApplet(QStringLiteral("PureSignal"),
-        QStringLiteral("Linearisierung"),
+        tr("Linearisation"),
         {QStringLiteral("puresignal"), QStringLiteral("ps"),
          QStringLiteral("linearisierung"), QStringLiteral("vorverzerrung"),
          QStringLiteral("zweiton")});
@@ -7769,28 +7769,36 @@ void MainWindow::populateDefaultMeter()
         const char* category;
         std::initializer_list<const char*> keywords;
     };
+    // Beschriftung und Kategorie englisch (2026-10-15), die
+    // Schlagwoerter zweisprachig — wie bei den Applets darueber: die
+    // Oberflaeche ist englisch, der Betreiber denkt deutsch.
     static const WindowEntry kWindows[] = {
-        {"WinLogbook", "Logbuch", "Aufnahme",
-         {"logbuch", "log", "qso", "adif", "kontakte", "eintraege"}},
-        {"WinRotorLog", "Rotor / Log", "Abstimmen",
-         {"rotor", "antenne", "richtung", "peilung", "drehen", "azimut",
-          "grad", "kompass"}},
-        {"WinChannelStrip", "Kanalzug", "Senden",
-         {"kanalzug", "strip", "channel", "eq", "kompressor", "leveler",
-          "mikrofon", "sprache"}},
-        {"WinAntenna", "Antenne", "Tuner",
-         {"antenne", "swr", "stehwelle", "sweep", "wobbeln", "analyzer",
-          "resonanz", "laenge"}},
-        {"WinSpotHub", "Spot-Zentrale", "Netzwerk",
-         {"spots", "cluster", "dx", "rbn", "wsjt", "pota", "meldungen"}},
+        {"WinLogbook", QT_TR_NOOP("Logbook"), QT_TR_NOOP("Recording"),
+         {"logbuch", "logbook", "log", "qso", "adif", "kontakte",
+          "contacts", "eintraege"}},
+        {"WinRotorLog", QT_TR_NOOP("Rotor / Log"), QT_TR_NOOP("Tuning"),
+         {"rotor", "antenne", "antenna", "richtung", "heading", "peilung",
+          "bearing", "drehen", "azimut", "azimuth", "grad", "kompass",
+          "compass"}},
+        {"WinChannelStrip", QT_TR_NOOP("Channel strip"),
+         QT_TR_NOOP("Transmit"),
+         {"kanalzug", "strip", "channel", "eq", "kompressor",
+          "compressor", "leveler", "mikrofon", "mic", "sprache",
+          "speech"}},
+        {"WinAntenna", QT_TR_NOOP("Antenna"), QT_TR_NOOP("Tuner"),
+         {"antenne", "antenna", "swr", "stehwelle", "sweep", "wobbeln",
+          "analyzer", "resonanz", "resonance", "laenge", "length"}},
+        {"WinSpotHub", QT_TR_NOOP("Spot hub"), QT_TR_NOOP("Network"),
+         {"spots", "cluster", "dx", "rbn", "wsjt", "pota", "meldungen",
+          "reports"}},
     };
     for (const WindowEntry& w : kWindows) {
         const QString id = QString::fromLatin1(w.id);
-        m_appletVis->registerApplet(id, QString::fromLatin1(w.label),
+        m_appletVis->registerApplet(id, tr(w.label),
                                     /*defaultVisible=*/false);
         QStringList kw;
         for (const char* k : w.keywords) { kw << QString::fromLatin1(k); }
-        m_appletVis->describeApplet(id, QString::fromLatin1(w.category), kw);
+        m_appletVis->describeApplet(id, tr(w.category), kw);
     }
 
     // ── DAS PLUS ─────────────────────────────────────────────────────

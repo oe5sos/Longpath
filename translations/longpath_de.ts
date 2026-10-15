@@ -376,6 +376,11 @@ Please ensure you understand the implications of including the BPFs when transmi
 <context>
     <name>Longpath::AntennaWindow</name>
     <message>
+        <location filename="../src/gui/AntennaWindow.cpp" line="879" />
+        <source>VNA sweep as reference</source>
+        <translation>VNA-Sweep als Referenz</translation>
+    </message>
+    <message>
         <location filename="../src/gui/AntennaWindow.cpp" line="888" />
         <source>The file holds no points.</source>
         <translation>Die Datei enthält keine Punkte.</translation>
@@ -400,8 +405,8 @@ Please ensure you understand the implications of including the BPFs when transmi
     <name>Longpath::AsrApplet</name>
     <message>
         <location filename="../src/gui/applets/AsrApplet.cpp" line="42" />
-        <source>Mitschreiben</source>
-        <translation type="unfinished" />
+        <source>Transcribe</source>
+        <translation>Mitschreiben</translation>
     </message>
     <message>
         <location filename="../src/gui/applets/AsrApplet.cpp" line="77" />
@@ -467,21 +472,6 @@ Please ensure you understand the implications of including the BPFs when transmi
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/setup/AsrPage.cpp" line="107" />
-        <source>Schluessel:</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
-        <location filename="../src/gui/setup/AsrPage.cpp" line="114" />
-        <source>Erreichbarkeit pruefen</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
-        <location filename="../src/gui/setup/AsrPage.cpp" line="133" />
-        <source>Erkennung</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
         <location filename="../src/gui/setup/AsrPage.cpp" line="199" />
         <source>Programm:</source>
         <translation type="unfinished" />
@@ -512,6 +502,11 @@ Please ensure you understand the implications of including the BPFs when transmi
         <translation>Adresse des Whisper-Dienstes. Voreinstellung ist der eigene Rechner (127.0.0.1) -- damit verlaesst kein Ton die Maschine.</translation>
     </message>
     <message>
+        <location filename="../src/gui/setup/AsrPage.cpp" line="57" />
+        <source>Speech recognition</source>
+        <translation>Spracherkennung</translation>
+    </message>
+    <message>
         <location filename="../src/gui/setup/AsrPage.cpp" line="100" />
         <source>leave empty for your own service</source>
         <translation>leer lassen beim eigenen Dienst</translation>
@@ -520,6 +515,21 @@ Please ensure you understand the implications of including the BPFs when transmi
         <location filename="../src/gui/setup/AsrPage.cpp" line="102" />
         <source>Only needed if the service asks for a key. A local whisper-server does not.</source>
         <translation>Nur noetig, wenn der Dienst einen Schluessel verlangt. Ein lokaler whisper-server braucht keinen.</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/setup/AsrPage.cpp" line="107" />
+        <source>Key:</source>
+        <translation>Schlüssel:</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/setup/AsrPage.cpp" line="114" />
+        <source>Check reachability</source>
+        <translation>Erreichbarkeit prüfen</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/setup/AsrPage.cpp" line="133" />
+        <source>Recognition</source>
+        <translation>Erkennung</translation>
     </message>
     <message>
         <location filename="../src/gui/setup/AsrPage.cpp" line="145" />
@@ -622,6 +632,11 @@ Please ensure you understand the implications of including the BPFs when transmi
 </context>
 <context>
     <name>Longpath::AudioAdvancedPage</name>
+    <message>
+        <location filename="../src/gui/setup/AudioAdvancedPage.cpp" line="329" />
+        <source>Compensate clock drift on the receive audio</source>
+        <translation>Uhrendrift am Empfangston ausgleichen</translation>
+    </message>
     <message>
         <location filename="../src/gui/setup/AudioAdvancedPage.cpp" line="335" />
         <source>(target 50 ms · takes effect the next time audio starts)</source>
@@ -2444,26 +2459,36 @@ Disable for manual OC pin control.&lt;/i&gt;</source>
 <context>
     <name>Longpath::InstrumentApplet</name>
     <message>
-        <location filename="../src/gui/applets/InstrumentApplet.cpp" line="280" />
-        <source>Quelle</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
-        <location filename="../tests/tst_instrument_menu.cpp" line="124" />
+        <location filename="../tests/tst_instrument_menu.cpp" line="125" />
         <location filename="../src/gui/applets/InstrumentApplet.cpp" line="295" />
         <source>Second reading</source>
         <translation>Zweite Anzeige</translation>
     </message>
     <message>
-        <location filename="../tests/tst_instrument_menu.cpp" line="127" />
+        <location filename="../tests/tst_instrument_menu.cpp" line="128" />
         <location filename="../src/gui/applets/InstrumentApplet.cpp" line="299" />
         <source>none</source>
         <translation>keine</translation>
     </message>
     <message>
+        <location filename="../tests/tst_instrument_menu.cpp" line="145" />
         <location filename="../src/gui/applets/InstrumentApplet.cpp" line="320" />
-        <source>Form</source>
-        <translation type="unfinished" />
+        <source>Shape</source>
+        <translation>Form</translation>
+    </message>
+    <message>
+        <location filename="../tests/tst_instrument_menu.cpp" line="161" />
+        <location filename="../tests/tst_instrument_menu.cpp" line="193" />
+        <location filename="../src/gui/applets/InstrumentApplet.cpp" line="379" />
+        <source>Peak hold</source>
+        <translation>Spitzenhaltung</translation>
+    </message>
+    <message>
+        <location filename="../tests/tst_instrument_menu.cpp" line="176" />
+        <location filename="../tests/tst_instrument_menu.cpp" line="196" />
+        <location filename="../src/gui/applets/InstrumentApplet.cpp" line="389" />
+        <source>Hold</source>
+        <translation>Halten</translation>
     </message>
     <message>
         <location filename="../src/gui/applets/InstrumentApplet.cpp" line="324" />
@@ -2492,19 +2517,10 @@ Disable for manual OC pin control.&lt;/i&gt;</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/applets/InstrumentApplet.cpp" line="379" />
-        <source>Spitzenhaltung</source>
-        <translation type="unfinished" />
-    </message>
-    <message>
+        <location filename="../tests/tst_instrument_menu.cpp" line="165" />
         <location filename="../src/gui/applets/InstrumentApplet.cpp" line="381" />
         <source>Show</source>
         <translation>Anzeigen</translation>
-    </message>
-    <message>
-        <location filename="../src/gui/applets/InstrumentApplet.cpp" line="389" />
-        <source>Halten</source>
-        <translation type="unfinished" />
     </message>
     <message>
         <location filename="../src/gui/applets/InstrumentApplet.cpp" line="393" />
@@ -2530,6 +2546,14 @@ Disable for manual OC pin control.&lt;/i&gt;</source>
         <location filename="../src/gui/applets/InstrumentApplet.cpp" line="421" />
         <source>Show frequency</source>
         <translation>Frequenz anzeigen</translation>
+    </message>
+    <message>
+        <location filename="../tests/tst_real_menus_hang_on_the_window.cpp" line="354" />
+        <location filename="../tests/tst_real_menus_hang_on_the_window.cpp" line="357" />
+        <location filename="../tests/tst_instrument_menu.cpp" line="89" />
+        <location filename="../src/gui/applets/InstrumentApplet.cpp" line="280" />
+        <source>Source</source>
+        <translation>Quelle</translation>
     </message>
 </context>
 <context>
@@ -3173,147 +3197,173 @@ Disable for manual OC pin control.&lt;/i&gt;</source>
         <translation>Grundfarbe des Panadapters</translation>
     </message>
     <message>
+        <location filename="../tests/tst_real_layout_profile_roundtrip.cpp" line="435" />
+        <location filename="../src/gui/MainWindow.cpp" line="7776" />
+        <source>Logbook</source>
+        <translation>Logbuch</translation>
+    </message>
+    <message>
+        <location filename="../tests/tst_real_layout_profile_roundtrip.cpp" line="452" />
+        <location filename="../src/gui/MainWindow.cpp" line="7783" />
+        <source>Channel strip</source>
+        <translation>Kanalzug</translation>
+    </message>
+    <message>
+        <location filename="../tests/tst_real_layout_profile_roundtrip.cpp" line="463" />
+        <location filename="../src/gui/MainWindow.cpp" line="7791" />
+        <source>Spot hub</source>
+        <translation>Spot-Zentrale</translation>
+    </message>
+    <message>
+        <location filename="../tests/tst_real_layout_profile_roundtrip.cpp" line="466" />
         <location filename="../src/gui/MainWindow.cpp" line="7735" />
         <source>Button strip on the spectrum</source>
         <translation>Knopfleiste am Spektrum</translation>
     </message>
     <message>
+        <location filename="../tests/tst_real_layout_profile_roundtrip.cpp" line="469" />
         <location filename="../src/gui/MainWindow.cpp" line="7745" />
         <source>Status line</source>
         <translation>Statuszeile</translation>
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="9170" />
+        <location filename="../tests/tst_real_layout_profile_roundtrip.cpp" line="509" />
+        <location filename="../src/gui/MainWindow.cpp" line="7788" />
+        <source>Antenna</source>
+        <translation>Antenne</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/MainWindow.cpp" line="9178" />
         <source>Disconnect all</source>
         <translation>Alle trennen</translation>
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="9187" />
+        <location filename="../src/gui/MainWindow.cpp" line="9195" />
         <source>&amp;Connect…</source>
         <translation>&amp;Verbinden…</translation>
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="9204" />
+        <location filename="../src/gui/MainWindow.cpp" line="9212" />
         <source>Address of ExpertSDR2 (IP or host name, optionally with :port — default 40001).
 Usually 127.0.0.1 when ExpertSDR2 runs on this machine — NOT the address of the SunSDR hardware itself.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="9214" />
+        <location filename="../src/gui/MainWindow.cpp" line="9222" />
         <source>&amp;Disconnect</source>
         <translation>&amp;Trennen</translation>
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="9358" />
+        <location filename="../src/gui/MainWindow.cpp" line="9366" />
         <source>The last receiver stays — otherwise there would be nothing left to listen to.</source>
         <translation>Der letzte Empfänger bleibt — sonst gäbe es nichts mehr zu hören.</translation>
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="9367" />
+        <location filename="../src/gui/MainWindow.cpp" line="9375" />
         <source>Receiver %1 closed.</source>
         <translation>Empfänger %1 geschlossen.</translation>
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="10242" />
+        <location filename="../src/gui/MainWindow.cpp" line="10250" />
         <source>Side area on the right</source>
         <translation>Seitenbereich rechts</translation>
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="10321" />
+        <location filename="../src/gui/MainWindow.cpp" line="10329" />
         <source>&amp;Field layout</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="10322" />
+        <location filename="../src/gui/MainWindow.cpp" line="10330" />
         <source>For a small screen in the field: frequency, mode, filter and the S-meter stay, everything else steps aside so the waterfall gets the room. Goes into its own profile — your own arrangement is one click away in the profile rail.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="10830" />
+        <location filename="../src/gui/MainWindow.cpp" line="10838" />
         <source>Change panadapter layout</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="10831" />
+        <location filename="../src/gui/MainWindow.cpp" line="10839" />
         <source>Connect a radio to change pan layout</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="11009" />
+        <location filename="../src/gui/MainWindow.cpp" line="11017" />
         <source>Add panadapter</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="11648" />
-        <location filename="../src/gui/MainWindow.cpp" line="12290" />
+        <location filename="../src/gui/MainWindow.cpp" line="11656" />
+        <location filename="../src/gui/MainWindow.cpp" line="12298" />
         <source>PA Status — OK</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="11751" />
-        <location filename="../src/gui/MainWindow.cpp" line="11800" />
-        <location filename="../src/gui/MainWindow.cpp" line="12339" />
+        <location filename="../src/gui/MainWindow.cpp" line="11759" />
+        <location filename="../src/gui/MainWindow.cpp" line="11808" />
+        <location filename="../src/gui/MainWindow.cpp" line="12347" />
         <source>Receive (MOX off)</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="11799" />
-        <location filename="../src/gui/MainWindow.cpp" line="12338" />
+        <location filename="../src/gui/MainWindow.cpp" line="11807" />
+        <location filename="../src/gui/MainWindow.cpp" line="12346" />
         <source>Transmitting (MOX engaged)</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="12135" />
+        <location filename="../src/gui/MainWindow.cpp" line="12143" />
         <source>Field layout — %1 panels stay, the rest steps aside. Your own arrangement is in the profile rail.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="12287" />
+        <location filename="../src/gui/MainWindow.cpp" line="12295" />
         <source>PA Status — FAULT (PA tripped, MOX dropped)</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="12314" />
+        <location filename="../src/gui/MainWindow.cpp" line="12322" />
         <source>Transmit blocked by an external TX Inhibit signal.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="12322" />
+        <location filename="../src/gui/MainWindow.cpp" line="12330" />
         <source>Transmit blocked: external TX Inhibit asserted.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="13342" />
+        <location filename="../src/gui/MainWindow.cpp" line="13350" />
         <source>System</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="13345" />
+        <location filename="../src/gui/MainWindow.cpp" line="13353" />
         <source>App (Longpath)</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="13725" />
+        <location filename="../src/gui/MainWindow.cpp" line="13733" />
         <source>To add one: Cmd-click on the spectrum</source>
         <translation>Anlegen: Cmd-Klick ins Spektrum</translation>
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="13744" />
+        <location filename="../src/gui/MainWindow.cpp" line="13752" />
         <source>Edit…</source>
         <translation>Bearbeiten…</translation>
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="13768" />
+        <location filename="../src/gui/MainWindow.cpp" line="13776" />
         <source>Remove all %1…</source>
         <translation>Alle %1 entfernen…</translation>
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="15161" />
+        <location filename="../src/gui/MainWindow.cpp" line="15169" />
         <source>a fixed value in Setup</source>
         <translation>festen Wert im Setup</translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/gui/MainWindow.cpp" line="13709" />
+        <location filename="../src/gui/MainWindow.cpp" line="13717" />
         <source>%n Notch-Filter</source>
         <translation type="unfinished">
             <numerusform />
@@ -3321,17 +3371,37 @@ Usually 127.0.0.1 when ExpertSDR2 runs on this machine — NOT the address of th
         </translation>
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="13712" />
+        <location filename="../src/gui/MainWindow.cpp" line="7776" />
+        <source>Recording</source>
+        <translation>Aufnahme</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/MainWindow.cpp" line="7779" />
+        <source>Rotor / Log</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../src/gui/MainWindow.cpp" line="7788" />
+        <source>Tuner</source>
+        <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../src/gui/MainWindow.cpp" line="7791" />
+        <source>Network</source>
+        <translation>Netzwerk</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/MainWindow.cpp" line="13720" />
         <source>TNF aktiv</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="13715" />
+        <location filename="../src/gui/MainWindow.cpp" line="13723" />
         <source>Mute all notch filters at once without losing them. Same as a left-click on TNF.</source>
         <translation>Alle Notch-Filter auf einmal stumm schalten, ohne sie zu verlieren. Dasselbe wie ein Linksklick auf TNF.</translation>
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="13759" />
+        <location filename="../src/gui/MainWindow.cpp" line="13767" />
         <source>Delete</source>
         <translation>Löschen</translation>
     </message>
@@ -3467,6 +3537,7 @@ Das laesst sich nicht rueckgaengig machen.</translation>
     </message>
     <message>
         <location filename="../src/gui/MainWindow.cpp" line="7597" />
+        <location filename="../src/gui/MainWindow.cpp" line="7779" />
         <source>Tuning</source>
         <translation>Abstimmen</translation>
     </message>
@@ -3484,6 +3555,7 @@ Das laesst sich nicht rueckgaengig machen.</translation>
     </message>
     <message>
         <location filename="../src/gui/MainWindow.cpp" line="7626" />
+        <location filename="../src/gui/MainWindow.cpp" line="7784" />
         <source>Transmit</source>
         <translation>Senden</translation>
     </message>
@@ -3493,151 +3565,156 @@ Das laesst sich nicht rueckgaengig machen.</translation>
         <translation>Betriebsart</translation>
     </message>
     <message>
+        <location filename="../src/gui/MainWindow.cpp" line="7676" />
+        <source>Linearisation</source>
+        <translation>Linearisierung</translation>
+    </message>
+    <message>
         <location filename="../src/gui/MainWindow.cpp" line="7747" />
         <source>Windows</source>
         <translation>Fenster</translation>
     </message>
     <message>
         <location filename="../tests/tst_kiwi_is_reachable.cpp" line="85" />
-        <location filename="../src/gui/MainWindow.cpp" line="9142" />
+        <location filename="../src/gui/MainWindow.cpp" line="9150" />
         <source>Public receivers…</source>
         <translation>Öffentliche Empfänger…</translation>
     </message>
     <message>
         <location filename="../tests/tst_kiwi_is_reachable.cpp" line="87" />
-        <location filename="../src/gui/MainWindow.cpp" line="9153" />
+        <location filename="../src/gui/MainWindow.cpp" line="9161" />
         <source>Add a receiver by hand…</source>
         <translation>Empfänger von Hand hinzufügen…</translation>
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="9160" />
+        <location filename="../src/gui/MainWindow.cpp" line="9168" />
         <source>Add a KiwiSDR</source>
         <translation>KiwiSDR hinzufügen</translation>
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="9161" />
+        <location filename="../src/gui/MainWindow.cpp" line="9169" />
         <source>Address (host name or IP, optionally with :port):</source>
         <translation>Adresse (Rechnername oder IP, wahlweise mit :Port):</translation>
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="9389" />
+        <location filename="../src/gui/MainWindow.cpp" line="9397" />
         <source>Floating &amp;Panadapter</source>
         <translation>Schwebender &amp;Panadapter</translation>
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="9392" />
+        <location filename="../src/gui/MainWindow.cpp" line="9400" />
         <source>Show the active panadapter in its own window — freely movable and resizable, also on a second screen. Switch it off to dock it back.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="9612" />
+        <location filename="../src/gui/MainWindow.cpp" line="9620" />
         <source>Palette “%1” — %2 panels recoloured.</source>
         <translation type="unfinished" />
     </message>
     <message>
         <location filename="../tests/tst_real_layout_profile_roundtrip.cpp" line="344" />
-        <location filename="../src/gui/MainWindow.cpp" line="10220" />
+        <location filename="../src/gui/MainWindow.cpp" line="10228" />
         <source>Detach new windows right away</source>
         <translation>Neue Fenster gleich ablösen</translation>
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="10223" />
+        <location filename="../src/gui/MainWindow.cpp" line="10231" />
         <source>Every window gets its own place on the canvas — drag by the title bar, resize at the corner, lock in the header. New windows arrive that way.</source>
         <translation>Jedes Fenster bekommt eine eigene Lage auf der Fläche — ziehen an der Titelleiste, Größe an der Ecke, Schloss im Kopf. Neue Fenster kommen gleich so.</translation>
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="10265" />
+        <location filename="../src/gui/MainWindow.cpp" line="10273" />
         <source>Detach every window into its own window</source>
         <translation>Alle Fenster als eigene Fenster ablösen</translation>
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="10266" />
+        <location filename="../src/gui/MainWindow.cpp" line="10274" />
         <source>Each one becomes its own operating-system window: movable anywhere, resizable, also onto a second screen. Back via the ✕ on the window.</source>
         <translation>Jedes Fenster wird ein eigenes Betriebssystem-Fenster: überall hinschiebbar, in der Größe änderbar, auch auf einen zweiten Schirm. Zurück über das ✕ am Fenster.</translation>
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="10284" />
+        <location filename="../src/gui/MainWindow.cpp" line="10292" />
         <source>Hide every window</source>
         <translation>Alle Fenster ausblenden</translation>
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="10285" />
+        <location filename="../src/gui/MainWindow.cpp" line="10293" />
         <source>An empty canvas. The + at the bottom right brings each window back one at a time.</source>
         <translation>Leere Fläche. Mit dem + unten rechts holst du jedes Fenster einzeln zurück.</translation>
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="12162" />
+        <location filename="../src/gui/MainWindow.cpp" line="12170" />
         <source>Palette</source>
         <translation>Palette</translation>
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="12164" />
+        <location filename="../src/gui/MainWindow.cpp" line="12172" />
         <source>“%1” is now the chosen palette.</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="12171" />
+        <location filename="../src/gui/MainWindow.cpp" line="12179" />
         <source>The colours are on already. This palette also changes corners, padding and depth, and those are set while the window is built — they need a restart. Restart now?</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="12174" />
+        <location filename="../src/gui/MainWindow.cpp" line="12182" />
         <source>Restart now</source>
         <translation>Jetzt neu starten</translation>
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="12175" />
+        <location filename="../src/gui/MainWindow.cpp" line="12183" />
         <source>Later</source>
         <translation>Später</translation>
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="13708" />
+        <location filename="../src/gui/MainWindow.cpp" line="13716" />
         <source>No notch filters</source>
         <translation>Keine Notch-Filter</translation>
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="13738" />
+        <location filename="../src/gui/MainWindow.cpp" line="13746" />
         <source>%1 MHz · %2 Hz</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="13751" />
+        <location filename="../src/gui/MainWindow.cpp" line="13759" />
         <source>Aktiv</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="14056" />
-        <location filename="../src/gui/MainWindow.cpp" line="14094" />
+        <location filename="../src/gui/MainWindow.cpp" line="14064" />
+        <location filename="../src/gui/MainWindow.cpp" line="14102" />
         <source>Disconnect</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="14059" />
+        <location filename="../src/gui/MainWindow.cpp" line="14067" />
         <source>Connect to other radio…</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="14063" />
+        <location filename="../src/gui/MainWindow.cpp" line="14071" />
         <source>Network diagnostics…</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="14070" />
+        <location filename="../src/gui/MainWindow.cpp" line="14078" />
         <source>Copy IP address</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="14073" />
+        <location filename="../src/gui/MainWindow.cpp" line="14081" />
         <source>Copy MAC address</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="14101" />
+        <location filename="../src/gui/MainWindow.cpp" line="14109" />
         <source>Edit radio…</source>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="14114" />
+        <location filename="../src/gui/MainWindow.cpp" line="14122" />
         <source>Forget radio</source>
         <translation type="unfinished" />
     </message>
@@ -3652,7 +3729,7 @@ Das laesst sich nicht rueckgaengig machen.</translation>
         <translation type="unfinished" />
     </message>
     <message>
-        <location filename="../src/gui/MainWindow.cpp" line="9203" />
+        <location filename="../src/gui/MainWindow.cpp" line="9211" />
         <location filename="../src/gui/MainWindow_SunSdr.cpp" line="213" />
         <location filename="../src/gui/MainWindow_SunSdr.cpp" line="284" />
         <source>Connect SunSDR</source>
@@ -4009,7 +4086,7 @@ covers SSB + AM comfortably.</source>
     <message>
         <location filename="../src/gui/NetworkDiagnosticsDialog.cpp" line="160" />
         <source>Network</source>
-        <translation type="unfinished" />
+        <translation>Netzwerk</translation>
     </message>
     <message>
         <location filename="../src/gui/NetworkDiagnosticsDialog.cpp" line="169" />
@@ -5188,7 +5265,7 @@ All custom band/pin mappings will be cleared.</source>
     <message>
         <location filename="../src/gui/PsForm.cpp" line="199" />
         <source>OFF</source>
-        <translation type="unfinished" />
+        <translation>ABGESCHALTET</translation>
     </message>
     <message>
         <location filename="../src/gui/PsForm.cpp" line="222" />
@@ -6150,13 +6227,28 @@ All custom band/pin mappings will be cleared.</source>
         <translation>Bild aufhellen (%)</translation>
     </message>
     <message>
+        <location filename="../src/gui/setup/DisplaySetupPages.cpp" line="1527" />
+        <source>Choose a background image</source>
+        <translation>Hintergrundbild wählen</translation>
+    </message>
+    <message>
         <location filename="../src/gui/setup/DisplaySetupPages.cpp" line="1590" />
         <source>Show band segments on the spectrum</source>
         <translation>Bandsegmente im Spektrum zeigen</translation>
     </message>
+    <message>
+        <location filename="../src/gui/setup/DisplaySetupPages.cpp" line="1607" />
+        <source>Labels</source>
+        <translation>Beschriftung</translation>
+    </message>
 </context>
 <context>
     <name>Longpath::SpectrumOverlayMenu</name>
+    <message>
+        <location filename="../src/gui/SpectrumOverlayMenu.cpp" line="182" />
+        <source>Rendering</source>
+        <translation>Darstellung</translation>
+    </message>
     <message>
         <location filename="../src/gui/SpectrumOverlayMenu.cpp" line="185" />
         <source>2D waterfall</source>
@@ -6244,6 +6336,11 @@ All custom band/pin mappings will be cleared.</source>
         <location filename="../src/gui/widgets/SwrSweepPanel.cpp" line="376" />
         <source>Done, but without a usable minimum.</source>
         <translation>Fertig, aber ohne verwertbares Minimum.</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/widgets/SwrSweepPanel.cpp" line="423" />
+        <source>Aborted: %1</source>
+        <translation>Abgebrochen: %1</translation>
     </message>
     <message>
         <location filename="../src/gui/widgets/SwrSweepPanel.cpp" line="566" />
@@ -6414,6 +6511,11 @@ Rechtsklick, um auf „ganze Maschine“ umzustellen.</translation>
         <location filename="../src/gui/applets/TxApplet.cpp" line="570" />
         <source>TX profile</source>
         <translation>TX-Profil</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/TxApplet.cpp" line="609" />
+        <source>VOX threshold</source>
+        <translation>VOX-Schwelle</translation>
     </message>
     <message>
         <location filename="../src/gui/applets/TxApplet.cpp" line="659" />
@@ -7037,6 +7139,16 @@ Save before switching?</source>
         <translation>Alle</translation>
     </message>
     <message>
+        <location filename="../src/gui/widgets/WidgetPicker.cpp" line="165" />
+        <source>Search widgets…</source>
+        <translation>Widgets durchsuchen…</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/widgets/WidgetPicker.cpp" line="242" />
+        <source>OFF</source>
+        <translation>ABGESCHALTET</translation>
+    </message>
+    <message>
         <location filename="../src/gui/widgets/WidgetPicker.cpp" line="257" />
         <source>The hardware or master switch behind it is off.</source>
         <translation>Die zugehörige Hardware oder Hauptschaltung ist aus.</translation>
@@ -7163,8 +7275,8 @@ Save before switching?</source>
     </message>
     <message>
         <location filename="../src/gui/applets/KiwiSdrApplet.cpp" line="116" />
-        <source>Beobachtung beendet</source>
-        <translation type="unfinished" />
+        <source>Watching stopped</source>
+        <translation>Beobachtung beendet</translation>
     </message>
     <message>
         <location filename="../src/gui/applets/KiwiSdrApplet.cpp" line="118" />

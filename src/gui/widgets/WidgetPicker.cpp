@@ -162,7 +162,7 @@ WidgetPicker::WidgetPicker(AppletVisibilityController* vis, QWidget* parent)
     body->addLayout(right, 1);
 
     m_search = new QLineEdit(this);
-    m_search->setPlaceholderText(QStringLiteral("Widgets durchsuchen…"));
+    m_search->setPlaceholderText(tr("Search widgets…"));
     m_search->setStyleSheet(QStringLiteral(
         "QLineEdit { background: %1; border: 1px solid %2;"
         "  border-radius: 6px; color: %3; padding: 7px 11px;"
@@ -239,7 +239,7 @@ void WidgetPicker::rebuild()
             // Die Vorlage schreibt DISABLED neben den Namen und den
             // Grund darunter. Sagen, wo man es einschaltet, ist der
             // Unterschied zwischen einer Auskunft und einem grauen Feld.
-            auto* badge = new QLabel(QStringLiteral("ABGESCHALTET"), frame);
+            auto* badge = new QLabel(tr("OFF"), frame);
             QFont bf = badge->font();
             bf.setPixelSize(9);
             bf.setBold(true);

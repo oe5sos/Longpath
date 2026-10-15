@@ -257,7 +257,7 @@ bool Theme::loadFile(const QString& path, QString* error)
     QJsonParseError pe{};
     const QJsonDocument doc = QJsonDocument::fromJson(f.readAll(), &pe);
     if (pe.error != QJsonParseError::NoError) {
-        return fail(QStringLiteral("%1, Zeichen %2: %3")
+        return fail(QStringLiteral("%1, character %2: %3")
                         .arg(QFileInfo(path).fileName())
                         .arg(pe.offset)
                         .arg(pe.errorString()));

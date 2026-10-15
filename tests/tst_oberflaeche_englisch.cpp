@@ -40,72 +40,45 @@
 
 namespace {
 
-/// Konservativ: nur Woerter, die im Englischen nicht vorkommen. Ein
-/// falscher Treffer kostet eine Uebersetzung, die niemand braucht;
-/// lieber ein paar durchlassen als die Liste unbrauchbar machen.
-const QStringList& deutscheWoerter()
+/// ── Muster statt Wortliste (2026-10-15, zweiter Anlauf) ────────────
+///
+/// Der erste Anlauf fuehrte eine Liste deutscher Woerter. Sie meldete
+/// „noch 4", und der vollstaendige ctest-Lauf brachte danach 35
+/// weitere zutage, die sie nicht kannte — „Seitenbereich",
+/// „Statuszeile", „Spitzenhaltung", „Quelle", „Halten". Eine Liste
+/// faengt nur, was jemand hineingeschrieben hat.
+///
+/// Diese Muster faengt mehr: Umlaute, und Buchstabenfolgen, die im
+/// Englischen praktisch nicht vorkommen — -ung, -keit, -heit, -lich,
+/// -isch, -chen, sch-, dazu die haeufigsten kurzen Woerter. Ein
+/// Fehlalarm kostet eine Uebersetzung, die niemand braucht; ein
+/// Durchrutscher kostet eine falsche Meldung an den Betreiber.
+const QRegularExpression& deutschesMuster()
 {
-    static const QStringList w = {
-        QStringLiteral("der"),    QStringLiteral("die"),
-        QStringLiteral("das"),    QStringLiteral("und"),
-        QStringLiteral("nicht"),  QStringLiteral("kein"),
-        QStringLiteral("keine"),  QStringLiteral("eine"),
-        QStringLiteral("einen"),  QStringLiteral("ist"),
-        QStringLiteral("sind"),   QStringLiteral("wird"),
-        QStringLiteral("werden"), QStringLiteral("schon"),
-        QStringLiteral("noch"),   QStringLiteral("beim"),
-        QStringLiteral("Fenster"),      QStringLiteral("Hintergrund"),
-        QStringLiteral("Einstellungen"),QStringLiteral("Abbrechen"),
-        QStringLiteral("Speichern"),    QStringLiteral("Sichern"),
-        QStringLiteral("Entfernen"),    QStringLiteral("Umbenennen"),
-        QStringLiteral("Duplizieren"),  QStringLiteral("Leistung"),
-        QStringLiteral("Senden"),       QStringLiteral("Empfang"),
-        QStringLiteral("Frequenz"),     QStringLiteral("Anzeige"),
-        QStringLiteral("Auswahl"),      QStringLiteral("Fehler"),
-        QStringLiteral("Profil"),       QStringLiteral("Datei"),
-        QStringLiteral("Bild"),         QStringLiteral("Farbe"),
-        // Nachgetragen am 2026-10-15, nachdem der vollstaendige
-        // ctest-Lauf 31 weitere Texte zutage brachte, die diese Liste
-        // nicht kannte — siehe die Warnung im Kopf.
-        QStringLiteral("bearbeiten"),   QStringLiteral("trennen"),
-        QStringLiteral("verbinden"),    QStringLiteral("Verbindung"),
-        QStringLiteral("Seitenbereich"),QStringLiteral("Knopfleiste"),
-        QStringLiteral("Statuszeile"),  QStringLiteral("Logbuch"),
-        QStringLiteral("Kanalzug"),     QStringLiteral("Zentrale"),
-        QStringLiteral("Scheibe"),      QStringLiteral("Schiene"),
-        QStringLiteral("Breite"),       QStringLiteral("Hoehe"),
-        QStringLiteral("Groesse"),      QStringLiteral("Wert"),
-        QStringLiteral("Eintrag"),      QStringLiteral("Leiste"),
-        QStringLiteral("Zeile"),        QStringLiteral("Spektrum"),
-        QStringLiteral("Wasserfall"),   QStringLiteral("Stehwelle"),
-        QStringLiteral("Mitschrift"),   QStringLiteral("Abstimmen"),
-        QStringLiteral("Betriebsart"),  QStringLiteral("Messanzeigen"),
-        QStringLiteral("anzeigen"),     QStringLiteral("zeigen"),
-        QStringLiteral("Alle"),         QStringLiteral("Fertig"),
-        QStringLiteral("festen"),       QStringLiteral("Anlegen"),
-    };
-    return w;
+    static const QRegularExpression re(
+        // „sch" und „\\bam\\b" standen hier zuerst und fingen vor allem
+        // Englisch: scheme, schematic, AM. Raus damit — ein Netz, das
+        // zu oft falsch anschlaegt, wird nicht gelesen.
+        QStringLiteral("(ung\\b|keit\\b|heit\\b|lich\\b|isch\\b|chen\\b|"
+                       "zeit\\b|zahl\\b|\\bzu\\b|\\bein\\b|\\bder\\b|\\bdie\\b|"
+                       "\\bdas\\b|\\bund\\b|\\bmit\\b|\\bvon\\b|\\bnicht\\b|"
+                       "\\bkein|\\balle\\b|\\bnur\\b|\\bauf\\b|\\bim\\b|"
+                       "\\bals\\b|\\bwie\\b|\\bist\\b|\\bzum\\b|\\bzur\\b|"
+                       "Zeichen|Deutsch)"),
+        QRegularExpression::CaseInsensitiveOption);
+    return re;
 }
 
 bool riechtDeutsch(const QString& t)
 {
     for (const QChar c : t) {
-        if (c == QChar(u'ä') || c == QChar(u'ö') || c == QChar(u'ü')
-            || c == QChar(u'Ä') || c == QChar(u'Ö') || c == QChar(u'Ü')
-            || c == QChar(u'ß')) {
+        if (c == QChar(u'\u00e4') || c == QChar(u'\u00f6') || c == QChar(u'\u00fc')
+            || c == QChar(u'\u00c4') || c == QChar(u'\u00d6') || c == QChar(u'\u00dc')
+            || c == QChar(u'\u00df')) {
             return true;
         }
     }
-    static const QRegularExpression wortgrenze(
-        QStringLiteral("[^A-Za-zÄÖÜäöüß]"));
-    const QStringList teile =
-        t.split(wortgrenze, Qt::SkipEmptyParts);
-    for (const QString& teil : teile) {
-        for (const QString& w : deutscheWoerter()) {
-            if (teil.compare(w, Qt::CaseInsensitive) == 0) { return true; }
-        }
-    }
-    return false;
+    return deutschesMuster().match(t).hasMatch();
 }
 
 } // namespace
@@ -181,16 +154,17 @@ private slots:
 
         // Stand nach dem Durchgang vom 2026-10-15: von 96 auf 4.
         //
-        // Die sechs, die bleiben, sind SCHLAGWOERTER der Widget-Suche
-        // („frequenz", „abstimmen", „stehwelle", „empfang", „senden",
-        // „leistung") und bleiben mit
+        // Die neun, die bleiben, sind acht SCHLAGWOERTER der
+        // Widget-Suche (anpassung, daempfung, leistung, linearisierung,
+        // vorverzerrung, fernsteuerung, spannung) und der Name der
+        // deutschen Sprache in der Sprachwahl. Alle bleiben mit
         // Absicht deutsch: die Oberflaeche ist englisch, der Betreiber
         // denkt deutsch, und beide Wege sollen ins Ziel fuehren. Sie
         // stehen neben ihren englischen Entsprechungen.
         //
         // Jede weitere Uebersetzung senkt die Zahl; wer eine neue
         // deutsche Beschriftung einbaut, laeuft auf.
-        constexpr int kDecke = 6;
+        constexpr int kDecke = 9;
         QVERIFY2(funde.size() <= kDecke,
                  qPrintable(QStringLiteral(
                      "%1 deutsche Texte in src/gui — die Decke steht bei "

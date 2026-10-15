@@ -351,10 +351,10 @@ private slots:
         auto* instr = m_mw->findChild<InstrumentApplet*>();
         QVERIFY(instr);
         o = openMenu([&]() { contextAt(instr, QPoint(10, 10)); });
-        QVERIFY(o.entries.contains(QStringLiteral("Quelle")));
+        QVERIFY(o.entries.contains(InstrumentApplet::tr("Source")));
         QCOMPARE(o.parent, instr->window());
         o = openMenu([&]() { instr->openExtendedSettings(); });
-        QVERIFY(o.entries.contains(QStringLiteral("Quelle")));
+        QVERIFY(o.entries.contains(InstrumentApplet::tr("Source")));
         QCOMPARE(o.parent, instr->window());
 
         // Ohne Geraet ausgeblendet, das Menue geht trotzdem auf.

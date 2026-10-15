@@ -606,7 +606,7 @@ void TxApplet::buildFinePopup()
     // ── VOX-Schwelle mit dem lebenden Pegelstreifen darunter ────────────────
     // Bereich -80..0 dB wie Thetis ptbVOX (console.Designer.cs:6018-6019
     // [v2.10.3.13]); Voreinstellung -20 wie ptbVOX.Value.
-    grid->addWidget(beschriftung(QStringLiteral("VOX-Schwelle")), z, 0);
+    grid->addWidget(beschriftung(tr("VOX threshold")), z, 0);
     auto* voxStack = new QWidget(m_finePopup);
     auto* voxStackVbox = new QVBoxLayout(voxStack);
     voxStackVbox->setContentsMargins(0, 0, 0, 0);

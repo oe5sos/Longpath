@@ -85,7 +85,8 @@ private slots:
         InstrumentApplet applet(QStringLiteral("Test"),
                                 QStringLiteral("Test"), nullptr);
         QMenu* menu = applet.buildContextMenu(nullptr);
-        const QStringList shown = entryLabels(subMenu(menu, "Quelle"));
+        const QStringList shown = entryLabels(subMenu(
+            menu, InstrumentApplet::tr("Source").toUtf8().constData()));
 
         QStringList expected;
         for (const ReadingDescriptor* d : readingsWithScale()) {
@@ -140,7 +141,8 @@ private slots:
         InstrumentApplet applet(QStringLiteral("Test"),
                                 QStringLiteral("Test"), nullptr);
         QMenu* menu = applet.buildContextMenu(nullptr);
-        QMenu* form = subMenu(menu, "Form");
+        QMenu* form = subMenu(
+            menu, InstrumentApplet::tr("Shape").toUtf8().constData());
         QVERIFY(form);
         QCOMPARE(entryLabels(form), QStringList({"Zeiger", "Balken"}));
 
@@ -155,10 +157,12 @@ private slots:
         InstrumentApplet applet(QStringLiteral("Test"),
                                 QStringLiteral("Test"), nullptr);
         QMenu* menu = applet.buildContextMenu(nullptr);
-        QMenu* peak = subMenu(menu, "Spitzenhaltung");
+        QMenu* peak = subMenu(
+            menu, InstrumentApplet::tr("Peak hold").toUtf8().constData());
         QVERIFY(peak);
 
-        QAction* show = entry(peak, "Anzeigen");
+        QAction* show = entry(
+            peak, InstrumentApplet::tr("Show").toUtf8().constData());
         QVERIFY(show);
         QVERIFY(show->isChecked());
         show->trigger();   // aus
@@ -168,7 +172,8 @@ private slots:
         QVERIFY(!applet.peakHold(InstrumentApplet::Form::Bar).enabled());
 
         // Und die Haltezeit ebenso.
-        QMenu* hold = subMenu(peak, "Halten");
+        QMenu* hold = subMenu(
+            peak, InstrumentApplet::tr("Hold").toUtf8().constData());
         QVERIFY(hold);
         hold->actions().first()->trigger();          // kurz
         QCOMPARE(applet.peakHold(InstrumentApplet::Form::Needle).holdMs(),
@@ -184,7 +189,11 @@ private slots:
         InstrumentApplet applet(QStringLiteral("Test"),
                                 QStringLiteral("Test"), nullptr);
         QMenu* menu = applet.buildContextMenu(nullptr);
-        QMenu* hold = subMenu(subMenu(menu, "Spitzenhaltung"), "Halten");
+        QMenu* peakMenu = subMenu(
+            menu, InstrumentApplet::tr("Peak hold").toUtf8().constData());
+        QVERIFY2(peakMenu, "kein Spitzenhaltungs-Untermenue");
+        QMenu* hold = subMenu(
+            peakMenu, InstrumentApplet::tr("Hold").toUtf8().constData());
         QVERIFY(hold);
         QCOMPARE(hold->actions().size(), 3);
 

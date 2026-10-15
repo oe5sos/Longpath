@@ -326,7 +326,7 @@ void AudioAdvancedPage::buildFeatureFlagsSection()
     {
         auto* row = new QHBoxLayout;
         m_rxDriftCheck = new QCheckBox(
-            QStringLiteral("Uhrendrift am Empfangston ausgleichen"), box);
+            tr("Compensate clock drift on the receive audio"), box);
         const bool on =
             s.value(QStringLiteral("RxDriftAusgleich"),
                     QStringLiteral("False")).toString() == QStringLiteral("True");

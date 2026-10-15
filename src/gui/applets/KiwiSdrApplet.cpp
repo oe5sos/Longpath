@@ -113,7 +113,7 @@ QString stateText(KiwiSdrClient::State state)
     case KiwiSdrClient::State::Camping:
         return QObject::tr("Beobachtet");
     case KiwiSdrClient::State::CampDisconnected:
-        return QObject::tr("Beobachtung beendet");
+        return QObject::tr("Watching stopped");
     case KiwiSdrClient::State::Error:
         return QObject::tr("Error");
     }

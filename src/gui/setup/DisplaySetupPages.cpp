@@ -1524,7 +1524,7 @@ void SpectrumDefaultsPage::buildUI()
     };
     connect(bgPick, &QPushButton::clicked, this, [this, spectrum, refreshBgLabel] {
         const QString p = QFileDialog::getOpenFileName(
-            this, QStringLiteral("Hintergrundbild waehlen"), QString(),
+            this, tr("Choose a background image"), QString(),
             QStringLiteral("Bilder (*.png *.jpg *.jpeg *.bmp *.webp)"));
         if (p.isEmpty()) { return; }
         if (auto* w = spectrum()) { w->setBackgroundImage(p); }
@@ -1604,7 +1604,7 @@ void SpectrumDefaultsPage::buildUI()
     m_bandPlanSize->setSuffix(QStringLiteral(" pt"));
     m_bandPlanSize->setToolTip(QStringLiteral(
         "Schriftgroesse der Segmentbeschriftung."));
-    bpForm->addRow(QStringLiteral("Beschriftung"), m_bandPlanSize);
+    bpForm->addRow(tr("Labels"), m_bandPlanSize);
 
     auto spec2 = [this]() -> SpectrumWidget* {
         return model() ? model()->spectrumWidget() : nullptr;

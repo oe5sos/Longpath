@@ -54,7 +54,7 @@ void storeTrimmed(const QString& key, const QString& value)
 } // namespace
 
 AsrPage::AsrPage(RadioModel* model, QWidget* parent)
-    : SetupPage(QStringLiteral("Spracherkennung"), model, parent)
+    : SetupPage(tr("Speech recognition"), model, parent)
 {
     buildUI();
 }
@@ -104,14 +104,14 @@ void AsrPage::buildServerGroup()
     connect(m_keyEdit, &QLineEdit::editingFinished, this, [this] {
         storeTrimmed(QStringLiteral("AsrApiKey"), m_keyEdit->text());
     });
-    form->addRow(tr("Schluessel:"), m_keyEdit);
+    form->addRow(tr("Key:"), m_keyEdit);
 
     auto* row = new QWidget(group);
     auto* rowLayout = new QHBoxLayout(row);
     rowLayout->setContentsMargins(0, 0, 0, 0);
     rowLayout->setSpacing(8);
 
-    m_probeButton = new QPushButton(tr("Erreichbarkeit pruefen"), row);
+    m_probeButton = new QPushButton(tr("Check reachability"), row);
     m_probeButton->setStyleSheet(QString::fromLatin1(Style::kButtonStyle));
     connect(m_probeButton, &QPushButton::clicked, this, &AsrPage::probeEndpoint);
     rowLayout->addWidget(m_probeButton);
@@ -130,7 +130,7 @@ void AsrPage::buildServerGroup()
 // ---------------------------------------------------------------------------
 void AsrPage::buildRecognitionGroup()
 {
-    auto* group = new QGroupBox(tr("Erkennung"), this);
+    auto* group = new QGroupBox(tr("Recognition"), this);
     group->setStyleSheet(QString::fromLatin1(Style::kGroupBoxStyle));
     auto* form = new QFormLayout(group);
     form->setSpacing(6);

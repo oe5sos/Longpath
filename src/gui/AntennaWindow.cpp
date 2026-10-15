@@ -876,7 +876,7 @@ void AntennaWindow::choosePinned()
     AppSettings& s = AppSettings::instance();
     const QString start = s.value(kDirKey, QString{}).toString();
     const QString path = QFileDialog::getOpenFileName(
-        this, QStringLiteral("VNA-Sweep als Referenz"), start,
+        this, tr("VNA sweep as reference"), start,
         QStringLiteral("Touchstone one-port (*.s1p *.S1P);;All files (*)"));
     if (path.isEmpty()) { return; }
     s.setValue(kDirKey, QFileInfo(path).absolutePath());

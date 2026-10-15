@@ -420,7 +420,7 @@ void SwrSweepPanel::setBackend(const Backend& backend)
                       .arg(result.maxFwdW, 0, 'f', 2)
                       .arg(SwrSweepController::kMinFwdW, 0, 'f', 1));
         } else {
-            m_status->setText(QStringLiteral("Abgebrochen: %1")
+            m_status->setText(tr("Aborted: %1")
                                   .arg(result.abortReason));
         }
     });

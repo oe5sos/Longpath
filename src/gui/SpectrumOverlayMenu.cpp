@@ -179,7 +179,7 @@ void SpectrumOverlayMenu::buildUI()
     // Dieselbe Reihenfolge wie drueben (0 = 2D, 1 = 3D), damit der Wert
     // ueber beide Wege derselbe bleibt.
     auto* modeRow = new QHBoxLayout;
-    modeRow->addWidget(new QLabel(QStringLiteral("Darstellung"), this));
+    modeRow->addWidget(new QLabel(tr("Rendering"), this));
     m_renderModeCombo = new QComboBox(this);
     m_renderModeCombo->setObjectName(QStringLiteral("overlayMenuRenderModeCombo"));
     m_renderModeCombo->addItems({tr("2D waterfall"),
