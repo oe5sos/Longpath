@@ -5307,6 +5307,11 @@ longpath_add_test(tst_palette_ohne_tote_rollen)
 # 2026-10-15: die Scheibenflagge ueber dem Panadapter, als Option —
 # dritter Anlauf um dieselbe Sache, siehe den Kopf der Datei.
 longpath_add_test(tst_scheibenflagge)
+# 2026-10-15: FT8/FT4 nativ — Nachricht hin, Nachricht zurueck, ohne
+# Tondatei und ohne Funkgeraet.
+longpath_add_test(tst_ft8_dekodiert)
+# 2026-10-15: FT8 am laufenden Ton — die Fenstergrenze ist der Punkt.
+longpath_add_test(tst_ft8_am_ton)
 target_compile_definitions(tst_palette_ohne_tote_rollen PRIVATE
     LONGPATH_SRC_DIR="${CMAKE_SOURCE_DIR}")
 target_compile_definitions(tst_oberflaeche_englisch PRIVATE
