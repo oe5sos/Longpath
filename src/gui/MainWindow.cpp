@@ -12099,6 +12099,37 @@ void MainWindow::applyFieldLayout()
     m_rotorDockWantedVisible = false;
     if (m_rotorDock) { m_rotorDock->setVisible(false); }
 
+    // Und der Panadapter bekommt die Breite, die frei geworden ist.
+    //
+    // Ohne diese Zeilen behaelt der Splitter seine bisherige Teilung:
+    // die Spalte wird nicht schmaler, sondern nur leerer, und der
+    // Wasserfall gewinnt nichts. Gemessen am Blatt vom 2026-10-15:
+    // die Spalte stand nach dem Aufraeumen auf 470 Punkten, mit vier
+    // Feldern darin.
+    //
+    // Ein Fuenftel fuer die Spalte, vier Fuenftel fuer den Panadapter.
+    //
+    // Nachgemessen, damit hier keine Erwartung steht, die nicht
+    // eintritt: WEITER als bis zur Mindestbreite der Spalte kommt das
+    // nicht. AppletPanelWidget leitet seine Mindestbreite vom
+    // breitesten Feld darin ab (PHONE/CW mit seinen Reglerzeilen,
+    // rund 465 Punkte bei dieser Schrift) — der Splitter kann sie
+    // nicht unterschreiten, auch wenn er hier weniger verlangt. Bei
+    // 1700 Punkten Fensterbreite bekommt der Panadapter damit 1220,
+    // also rund 72 Prozent.
+    //
+    // Wirksam ist die Zeile trotzdem: wer die Spalte vorher auf 700
+    // gezogen hatte, bekommt sie hier auf das Noetige zurueck. Der
+    // Betreiber kann den Griff danach ziehen wie immer; das ist ein
+    // Ausgangspunkt, keine Fessel.
+    if (m_mainSplitter && m_mainSplitter->count() >= 2) {
+        const int gesamt = m_mainSplitter->width();
+        if (gesamt > 600) {
+            const int spalte = qMax(300, gesamt / 5);
+            m_mainSplitter->setSizes({gesamt - spalte, spalte});
+        }
+    }
+
     m_layoutProfiles->save();
 
     showToast(tr("Field layout — %1 panels stay, the rest steps aside. "
