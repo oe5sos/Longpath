@@ -51,6 +51,17 @@ int Ft8Stream::slotMs() const
     return m_protocol == Ft8Decoder::Protocol::Ft4 ? 7500 : 15000;
 }
 
+void Ft8Stream::poll()
+{
+    // Vor dem ersten Ton gibt es kein Fenster — dann faengt feedAudio
+    // an der naechsten Grenze an, nicht hier.
+    if (m_fensterBeginnMs < 0) { return; }
+
+    const qint64 fenster = slotMs();
+    const qint64 beginn = (m_uhr() / fenster) * fenster;
+    if (beginn != m_fensterBeginnMs) { schliesseFenster(beginn); }
+}
+
 void Ft8Stream::feedAudio(const float* interleavedStereo, int frames)
 {
     if (!interleavedStereo || frames <= 0) { return; }
@@ -101,7 +112,9 @@ void Ft8Stream::schliesseFenster(qint64 neuerBeginnMs)
         const auto funde = Ft8Decoder::decodeBlock(m_fenster.constData(),
                                                    m_fenster.size(),
                                                    m_protocol);
-        if (!funde.isEmpty()) { emit decoded(funde, beginn); }
+        // Auch leer melden: ein stilles Fenster ist eine Aussage, ein
+        // ausbleibendes Fenster ein Fehler. Siehe Ft8Stream.h.
+        emit decoded(funde, beginn);
     }
 
     m_fenster.clear();

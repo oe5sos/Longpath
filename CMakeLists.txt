@@ -1193,6 +1193,7 @@ set(GUI_SOURCES
     src/gui/applets/DvkApplet.cpp
     src/gui/applets/RttyDecoderApplet.cpp
     src/gui/applets/CwDecoderApplet.cpp
+    src/gui/applets/Ft8Applet.cpp
     src/gui/applets/QsoRecorderApplet.cpp
     src/gui/applets/BandwidthFilterApplet.cpp
     src/gui/applets/CatApplet.cpp
@@ -1705,6 +1706,30 @@ if(NOT MSVC)
     target_compile_options(ft8_static PRIVATE -w)
 else()
     target_compile_options(ft8_static PRIVATE /w)
+endif()
+
+# Und keine drei Zeilen nach stderr bei JEDEM Fenster.
+#
+# common/monitor.c:4 setzt `#define LOG_LEVEL LOG_INFO` fest und
+# schreibt beim Aufbau des Wasserfalls „Block size = …", „Subblock
+# size = …", „N_FFT = …". Ft8Stream baut den Wasserfall einmal je
+# Fenster — alle 15 s drei Zeilen, rund 720 in der Stunde, in
+# derselben Datei, in der Fehler stehen sollen.
+#
+# Die Quelle bleibt byte-gleich (FT8LIB-PROVENANCE.md): ft8/debug.h
+# definiert LOG_PRINTF nur, WENN es noch nicht definiert ist. Hier
+# wird es leer definiert, die Zeilen entfallen beim Uebersetzen.
+#
+# Als OPTION, nicht als DEFINITION: CMake laesst Makros mit Argumenten
+# durch target_compile_definitions() nicht durch („CMake is dropping a
+# preprocessor definition: LOG_PRINTF(...)=", gesehen 2026-10-15) und
+# haette die Zeile stillschweigend verschluckt. Als Uebersetzungsoption
+# geht sie woertlich an den Uebersetzer.
+#
+# MSVC kennt keine Makros mit Argumenten auf der Befehlszeile; dort
+# bleiben die Zeilen stehen.
+if(NOT MSVC)
+    target_compile_options(ft8_static PRIVATE "-DLOG_PRINTF(...)=")
 endif()
 
 target_link_libraries(LongpathObjs PUBLIC ft8_static)
