@@ -397,6 +397,21 @@ QString themed(QString qss)
     }
     if (out != qss) {
         QWriteLocker lock(&vorbildSperre());
+        // ── Gedeckelt, damit es nicht wachsen kann ──────────────────
+        //
+        // Das Register haelt eine Zeile je VERSCHIEDENEM Stylesheet.
+        // Die allermeisten sind fest verdrahtet, aber 45 Stellen bauen
+        // ihres mit .arg() zusammen — faende sich darunter eine, die
+        // einen Messwert einsetzt, wuechse die Tabelle mit jeder
+        // Aenderung. Beobachtet ist das nicht; eine Decke kostet aber
+        // nichts und macht aus einem moeglichen Dauerwachsen einen
+        // harmlosen Neuanfang: ueber der Decke wird geleert, und die
+        // naechste Umfaerbung baut nur die Zeilen wieder auf, die
+        // wirklich auf dem Schirm sind.
+        constexpr int kDecke = 4096;
+        if (vorbildRegister().size() >= kDecke) {
+            vorbildRegister().clear();
+        }
         // Eine Vorlage, die selbst schon ein Ergebnis war, wird bis zum
         // Ursprung aufgeloest: sonst kaeme man beim zweiten Wechsel nur
         // eine Palette weit zurueck.
