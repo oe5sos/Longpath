@@ -1481,8 +1481,8 @@ void SpectrumDefaultsPage::buildUI()
     m_bgPathLabel->setToolTip(QStringLiteral(
         "Bild hinter Raster und Spur. Wird auf die Flaeche vergroessert "
         "und mittig beschnitten, das Seitenverhaeltnis bleibt."));
-    auto* bgPick  = new QPushButton(QStringLiteral("Waehlen…"), bgRow);
-    auto* bgClear = new QPushButton(QStringLiteral("Entfernen"), bgRow);
+    auto* bgPick  = new QPushButton(tr("Choose…"), bgRow);
+    auto* bgClear = new QPushButton(tr("Remove"), bgRow);
     bgRowL->addWidget(m_bgPathLabel, 1);
     bgRowL->addWidget(bgPick);
     bgRowL->addWidget(bgClear);

@@ -282,7 +282,10 @@ void TxApplet::buildUI()
     // Bench #167: ein HL2 mit 1-5 W auf einer 0-120-W-Skala war ein kaum
     // sichtbarer Span.
     auto* fwdGauge = new HGauge(this);
-    fwdGauge->setTitle(QStringLiteral("VORLAUF"));
+    // Englisch seit 2026-10-15 („englisch durchgehend"); die
+// Breitenrechnung im Kommentar darunter galt dem laengeren
+// Wortlaut „VORLAUF" und bleibt damit auf der sicheren Seite.
+    fwdGauge->setTitle(tr("FWD"));
     // 62, nicht 52: die Versalzeile mit Laufweite (Glas & Tiefe,
     // 2026-09-17) braucht fuer "VORLAUF" rund 58 Punkte — bei 52 stand
     // "VORLAUI" auf dem Blatt. Dieselbe Breite wie die Reglerzeilen
@@ -319,7 +322,7 @@ void TxApplet::buildUI()
         m_rfPowerSlider->setObjectName(QStringLiteral("TxRfPowerSlider"));
 
         m_rfPowerValue = new QLabel(QStringLiteral("100"), this);
-        auto* row = sliderRow(QStringLiteral("Leistung"), m_rfPowerSlider,
+        auto* row = sliderRow(tr("Power"), m_rfPowerSlider,
                               m_rfPowerValue, kTxLabelW);
         // Auf dem HL2 steht hier „-7.5 dB" statt einer nackten Zahl —
         // die 36 Punkt aus sliderRow() schneiden das ab.

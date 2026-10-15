@@ -291,7 +291,7 @@ void ProfileRail::rebuild()
             // (siehe setzeMasse), darum an der tatsaechlichen Breite
             // ausrichten -- sonst saesse das Kreuz mitten im Buchstaben.
             x->move(b->sizeHint().width() - 15, 1);
-            x->setToolTip(QStringLiteral("Profil „%1\u201C loeschen").arg(name));
+            x->setToolTip(tr("Delete profile “%1”").arg(name));
             x->setStyleSheet(QStringLiteral(
                 // `padding: 0` auch hier: 14 Pixel Kantenlaenge minus
                 // der app-weite Innenabstand von 2x12 waere negativ --
@@ -357,19 +357,19 @@ void ProfileRail::showMenuFor(const QString& name, const QPoint& globalPos)
     title->setEnabled(false);
     menu.addSeparator();
 
-    QAction* save = menu.addAction(QStringLiteral("Jetzt sichern"));
+    QAction* save = menu.addAction(tr("Save now"));
     // captureIntoCurrent() sichert immer das AKTIVE Profil, gleich, auf
     // welches Abzeichen man rechtsklickt -- der Menuepunkt darf also nur
     // dort erscheinen, sonst waere "Jetzt sichern" auf einem anderen
     // Abzeichen ein Versprechen, das der Aufruf gar nicht einloest.
     save->setEnabled(m_profiles && m_profiles->current() == name);
-    QAction* exportToDesktop = menu.addAction(QStringLiteral("Auf Schreibtisch sichern…"));
-    QAction* importFromDesktop = menu.addAction(QStringLiteral("Vom Schreibtisch laden…"));
+    QAction* exportToDesktop = menu.addAction(tr("Save to Desktop…"));
+    QAction* importFromDesktop = menu.addAction(tr("Load from Desktop…"));
     menu.addSeparator();
-    QAction* ren = menu.addAction(QStringLiteral("Umbenennen…"));
-    QAction* dup = menu.addAction(QStringLiteral("Duplizieren…"));
+    QAction* ren = menu.addAction(tr("Rename…"));
+    QAction* dup = menu.addAction(tr("Duplicate…"));
     menu.addSeparator();
-    QAction* del = menu.addAction(QStringLiteral("Löschen"));
+    QAction* del = menu.addAction(tr("Delete"));
     // Das letzte Profil lässt sich nicht löschen. Ohne Profil gehört
     // das Fenster keinem, und die nächste Umgestaltung landete nirgends.
     del->setEnabled(m_profiles && m_profiles->names().size() > 1);
@@ -384,8 +384,8 @@ void ProfileRail::showMenuFor(const QString& name, const QPoint& globalPos)
     menu.addSeparator();
     QAction* verschieben = menu.addAction(
         m_richtung == Qt::Horizontal
-            ? QStringLiteral("Schiene an den linken Rand")
-            : QStringLiteral("Schiene in die Leiste oben"));
+            ? tr("Rail to the left edge")
+            : tr("Rail into the top bar"));
 
     QAction* chosen = menu.exec(globalPos);
     // Das Elternteil kann waehrend exec() gestorben sein — dann ist

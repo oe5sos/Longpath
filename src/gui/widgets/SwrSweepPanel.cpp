@@ -175,7 +175,7 @@ void SwrSweepPanel::buildUi()
     row3->addWidget(m_traceList, 1);
 
     auto* btnCol = new QVBoxLayout;
-    m_removeTraceBtn = new QPushButton(QStringLiteral("Entfernen"), this);
+    m_removeTraceBtn = new QPushButton(tr("Remove"), this);
     m_removeTraceBtn->setStyleSheet(Style::buttonBaseStyle());
     connect(m_removeTraceBtn, &QPushButton::clicked, this, [this]() {
         const int idx = m_traceList->currentRow();
