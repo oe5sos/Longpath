@@ -169,71 +169,6 @@ QRect snappedFrameRect(const QRect& frame, const QSize& minSize, int grid)
     return QRect(left, top, right - left, bottom - top);
 }
 
-// ── Zu nah heisst: auf den Mindestabstand ────────────────────────────
-//
-// Betreiber 2026-10-15: „wenn ich jedoch ein fenster zu nah dran
-// schiebe sollte es automatisch den mindestabstand automatisch
-// setzen." Das Raster allein tut das nicht -- es rundet jede Kante
-// fuer sich, und zwei Fenster duerfen danach bundig aneinander oder
-// ein Stueck uebereinander liegen.
-//
-// Nur echte Nachbarn zaehlen: zwei Fenster, die sich in der ANDEREN
-// Achse ueberlappen, stehen wirklich nebeneinander. Ein Fenster weit
-// oben rechts ist kein Nachbar des Fensters unten links, auch wenn
-// ihre x-Bereiche sich beruehren.
-//
-// Korrigiert wird nur der schmale Bereich um die Beruehrung herum
-// (Spalt kleiner als der Mindestabstand, Ueberlappung hoechstens eine
-// Fensterbreite weit): ein Fenster, das der Bediener absichtlich MITTEN
-// ueber ein anderes legt, bleibt liegen, wo er es hinlegt.
-static QRect withMinimumGap(const QWidget* self, QRect target, int gap)
-{
-    if (gap <= 0 || !target.isValid()) { return target; }
-
-    const auto ueberlappt = [](int a1, int a2, int b1, int b2) {
-        return a1 < b2 && b1 < a2;
-    };
-
-    for (const QWidget* other : QApplication::topLevelWidgets()) {
-        if (other == self || !other->isVisible() || other->isMinimized()) {
-            continue;
-        }
-        const QRect o = other->frameGeometry();
-        if (!o.isValid() || o.isEmpty()) { continue; }
-
-        // Waagerechte Nachbarschaft: die Fenster ueberlappen senkrecht.
-        if (ueberlappt(target.top(), target.bottom(), o.top(), o.bottom())) {
-            if (target.left() >= o.left()) {
-                const int spalt = target.left() - o.right() - 1;
-                if (spalt < gap && spalt > -target.width()) {
-                    target.moveLeft(o.right() + 1 + gap);
-                }
-            } else {
-                const int spalt = o.left() - target.right() - 1;
-                if (spalt < gap && spalt > -target.width()) {
-                    target.moveLeft(o.left() - gap - target.width());
-                }
-            }
-        }
-
-        // Senkrechte Nachbarschaft: die Fenster ueberlappen waagerecht.
-        if (ueberlappt(target.left(), target.right(), o.left(), o.right())) {
-            if (target.top() >= o.top()) {
-                const int spalt = target.top() - o.bottom() - 1;
-                if (spalt < gap && spalt > -target.height()) {
-                    target.moveTop(o.bottom() + 1 + gap);
-                }
-            } else {
-                const int spalt = o.top() - target.bottom() - 1;
-                if (spalt < gap && spalt > -target.height()) {
-                    target.moveTop(o.top() - gap - target.height());
-                }
-            }
-        }
-    }
-    return target;
-}
-
 void snapToGridAfterSettle(QWidget* w, int grid, int delayMs, bool snapSize)
 {
     if (!w) { return; }
@@ -290,8 +225,6 @@ void snapToGridAfterSettle(QWidget* w, int grid, int delayMs, bool snapSize)
             const QRect frame = w->frameGeometry();
             const QSize deco = frame.size() - w->size();
             QRect target = snappedFrameRect(frame, w->minimumSize() + deco, grid);
-            // Zu nah an einem Nachbarn? Auf den Mindestabstand ruecken.
-            target = withMinimumGap(w, target, Style::kPanelGapPx);
             // Nie ueber die nutzbare Flaeche hinaus nach oben/links: das
             // Hauptfenster liegt z. B. bei y = 33 direkt unter der
             // Menueleiste; gerundet auf 32 schoebe macOS es zurueck, und
