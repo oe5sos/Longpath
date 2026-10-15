@@ -123,7 +123,14 @@ AppletPanelWidget::AppletPanelWidget(QWidget* parent)
     // 8 px matches the QScrollBar:vertical width in the stylesheet above;
     // Qt::ScrollBarAsNeeded means the gutter is wasted when the bar hides,
     // but 8 px is negligible and avoids a layout reflow on bar show/hide.
-    m_grid->setContentsMargins(0, 0, 8, 0);
+    //
+    // Links, oben und unten gilt seit 2026-10-15 derselbe Abstand wie
+    // zwischen zwei Feldern (Style::kPanelGapPx). Rechts bleiben die
+    // 8 px: das ist die Rinne fuer den Rollbalken, kein Abstand
+    // zwischen Feldern — ohne sie liegt der Balken auf der rechten
+    // Kante der Platten.
+    m_grid->setContentsMargins(Style::kPanelGapPx, Style::kPanelGapPx, 8,
+                               Style::kPanelGapPx);
 
     m_scrollArea->setWidget(m_grid);
     m_rootLayout->addWidget(m_scrollArea);

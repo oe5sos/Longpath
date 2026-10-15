@@ -4439,9 +4439,15 @@ void MainWindow::buildUI()
     m_profileRailHome = centre;
     setzeProfilschiene(profilschienenRichtungAusEinstellung());
 
+    // Rand und Abstand aus EINEM Wert (2026-10-15, Betreiber: „ein
+    // minimaler automatischer Abstand ... x und y, dann sieht es
+    // besser aus und gleich"). Vorher 6/6/6/0 und Abstand 6 — gemessen
+    // am laufenden Programm war der Rand damit 6 px links, 8 px rechts
+    // (Rollbalkenrinne) und 6 px zwischen den Feldern.
     auto* centreCol = new QVBoxLayout;
-    centreCol->setContentsMargins(6, 6, 6, 0);
-    centreCol->setSpacing(6);
+    centreCol->setContentsMargins(Style::kPanelGapPx, Style::kPanelGapPx,
+                                  Style::kPanelGapPx, 0);
+    centreCol->setSpacing(Style::kPanelGapPx);
     centreCol->addWidget(m_commandBar, 0);
 
     // ── Panadapter in BEIDE Richtungen veraenderbar (2026-08-19) ──────

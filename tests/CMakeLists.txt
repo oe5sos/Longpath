@@ -5275,6 +5275,10 @@ longpath_add_test(tst_dxcluster_wiederanlauf)
 # toter Schalter, die echte Auswahl lag acht Klicks tief, und die Wahl
 # wirkt erst beim Start. Dieser Lauf haelt beides nach.
 longpath_add_test(tst_palette_im_menue)
+# 2026-10-15: „zwischen windows ... ein minimaler automatischer
+# Abstand ... dann sieht es besser aus und gleich." Dieser Lauf misst
+# die Luecken am echten Hauptfenster.
+longpath_add_test(tst_abstand_zwischen_feldern)
 # 2026-10-14: HAUSSTIL.md sagt „Nie Radius 3" -- elf standen trotzdem im
 # Quelltext. Dieser Lauf liest die Quellen und haelt die Regel nach;
 # QSlider::groove ist die eine begruendete Ausnahme.
