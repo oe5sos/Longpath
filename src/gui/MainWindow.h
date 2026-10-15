@@ -160,6 +160,18 @@ class MainWindow : public QMainWindow {
     Q_OBJECT
 
 public:
+
+    /// Das Feldbetrieb-Bild herstellen: ein eigenes Profil „Field",
+    /// darin nur die Felder, die am Berg zaehlen. Der Pruefstand geht
+    /// ueber den Menueeintrag — dann ist mitgeprueft, dass man
+    /// hinkommt.
+    void applyFieldLayout();
+
+    /// Die Kennungen, die im Feldbetrieb SICHTBAR bleiben. Alles
+    /// andere tritt zurueck. Statisch, damit der Pruefstand dieselbe
+    /// Liste liest und nicht eine zweite fuehrt.
+    static QStringList fieldLayoutKeepIds();
+
     explicit MainWindow(QWidget* parent = nullptr);
     ~MainWindow() override;
 

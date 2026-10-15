@@ -10288,6 +10288,39 @@ void MainWindow::buildMenuBar()
         });
     }
 
+    // ── Feldbetrieb (2026-10-15) ─────────────────────────────────────
+    //
+    // Betreiber, 2026-10-14: „wenn man wenig platz hat und sota macht
+    // waere es besser um mehr am wasserfall sehen zu koennen ... sonst
+    // ist alles sehr eng ... dann koennte man den wasserfall groesser
+    // machen und auch das logbuch, die unwichtigen dinge wuerden dann
+    // weg bleiben."
+    //
+    // Was bleibt und was geht, steht so im Vorschlagsblatt vom
+    // 2026-10-14, das er gelesen hat: Frequenz, Band, Mode und Filter
+    // bleiben, dazu das kleine S-Meter. Weg gehen die Sendewerkstatt
+    // (TX, PureSignal, CFC/EQ), das Zubehoer (Verstaerker, Tuner,
+    // RF2K-S), die Netzfenster (TCI, Ketten, KiwiSDR) und was man am
+    // Berg nicht aufsetzt (VAX, DVK, Mitschrift, Decoder).
+    //
+    // WICHTIG: ueber ein eigenes Profil, nicht ueber das laufende.
+    // LayoutProfiles::activate() sichert das bisherige Profil, BEVOR
+    // es wechselt — seine Einrichtung ist also nicht weg, sondern
+    // einen Klick in der Profilschiene entfernt. Ein „Feldbetrieb",
+    // der die Arbeit von Wochen ueberschreibt, waere das Gegenteil
+    // von hilfreich.
+    if (m_appletPanel && m_layoutProfiles) {
+        QAction* feld = containersMenu->addAction(tr("&Field layout"));
+        feld->setToolTip(tr(
+            "For a small screen in the field: frequency, mode, filter and "
+            "the S-meter stay, everything else steps aside so the "
+            "waterfall gets the room. Goes into its own profile — your "
+            "own arrangement is one click away in the profile rail."));
+        connect(feld, &QAction::triggered, this, [this]() {
+            applyFieldLayout();
+        });
+    }
+
     containersMenu->addSeparator();
 
     // ── Containers > Applets section ─────────────────────────────────────
@@ -12006,6 +12039,54 @@ void MainWindow::buildStatusBar()
 // steht als fertige Zahl in Stylesheets, die beim Bauen des Fensters
 // entstanden sind, und kommt erst beim naechsten Start nach.
 
+QStringList MainWindow::fieldLayoutKeepIds()
+{
+    // Die Liste aus dem Vorschlagsblatt vom 2026-10-14, Spalte
+    // „Bleibt". Panadapter und Wasserfall stehen nicht darin, weil sie
+    // keine Applets sind — sie bekommen genau den Platz, den die
+    // anderen raeumen.
+    return {
+        QStringLiteral("Frequency"),         // Band, Mode, Abstimmen
+        QStringLiteral("Rx"),                // Filter, AGC, Rauschen
+        QStringLiteral("BwFilter"),          // die Durchlassflaeche
+        QStringLiteral("PhoneCw"),           // Betriebsart und Mikrofon
+        QStringLiteral("SignalInstrument"),  // das kleine S-Meter
+    };
+}
+
+void MainWindow::applyFieldLayout()
+{
+    if (!m_appletVis || !m_layoutProfiles) { return; }
+
+    // Erst das Profil, dann die Sichtbarkeit. activate() sichert das
+    // bisherige Profil, bevor es wechselt — ohne diesen Schritt
+    // schriebe der Feldbetrieb in SEIN Profil und die Einrichtung von
+    // Wochen waere weg.
+    const QString name = QStringLiteral("Field");
+    if (!m_layoutProfiles->exists(name)) {
+        m_layoutProfiles->create(name);
+    }
+    if (m_layoutProfiles->current() != name) {
+        m_layoutProfiles->activate(name);
+    }
+
+    const QStringList bleiben = fieldLayoutKeepIds();
+    for (const QString& id : m_appletVis->registeredIds()) {
+        // Der Rahmen ist kein Feld: Knopfleiste und Statuszeile legt
+        // niemand dazu und niemand weg.
+        if (id == QLatin1String(kChromeOverlayId)) { continue; }
+        if (id == QLatin1String(kChromeStatusId))  { continue; }
+        m_appletVis->setVisible(id, bleiben.contains(id));
+    }
+
+    m_layoutProfiles->save();
+
+    showToast(tr("Field layout — %1 panels stay, the rest steps aside. "
+                 "Your own arrangement is in the profile rail.")
+                  .arg(bleiben.size()),
+              ToastSeverity::Info, 5000);
+}
+
 void MainWindow::syncFloatPanAction()
 {
     if (!m_floatPanAction) { return; }
@@ -12100,6 +12181,23 @@ StatusToast* MainWindow::showToast(const QString& message,
 
     auto* toast = new StatusToast(message, severity, timeoutMs, this);
     connect(toast, &QObject::destroyed, this, [this]() {
+        // ── Nicht mehr waehrend des Abbaus (2026-10-15) ─────────────
+        //
+        // Dieselbe Falle wie bei der Verbindungsmaske, nur eine Stunde
+        // spaeter gefunden: der Hinweis ist ein KIND dieses Fensters.
+        // Beim Beenden raeumt ~QWidget die Kinder ab, BEVOR ~QObject
+        // die Verbindungen loest — dieser Rumpf lief also mit einem
+        // MainWindow, dessen Rumpf schon durch war, und ging ueber
+        // m_toasts. Ergebnis: EXC_BAD_ACCESS bei 0x5, im
+        // Absturzbericht lesbar als
+        //   ~MainWindow -> ~StatusToast -> destroyed()
+        //   -> QPointer<StatusToast>::isNull()
+        //
+        // Ausgeloest, sobald beim Beenden noch ein Hinweis auf dem
+        // Schirm steht — also in jedem Lauf, der kurz vorher etwas
+        // gemeldet hat. Gefunden von tst_feldbetrieb, dessen
+        // Menueeintrag genau das tut.
+        if (m_shuttingDown) { return; }
         m_toasts.removeIf([](const QPointer<StatusToast>& t) { return t.isNull(); });
         restackToasts();
     });
