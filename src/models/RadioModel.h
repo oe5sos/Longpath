@@ -1110,6 +1110,22 @@ public:
     SpotTableModel*       spotTableModel()      const { return m_spotTableModel.get(); }
     FreeDVStationModel*   freeDvStationModel()  const { return m_freeDvStationModel.get(); }
     RxDecodeModel*        rxDecodeModel()       const { return m_rxDecodeModel.get(); }
+
+    /// Ein Fund des EIGENEN FT8/FT4-Dekoders (Ft8Applet, 2026-10-15).
+    ///
+    /// Derselbe Weg wie bei WSJT-X — SpotModel mit Entdopplung,
+    /// RxDecodeModel, PSK Reporter —, nur mit eigener Quelle
+    /// („Longpath"), damit sich die beiden in der Liste nicht
+    /// vermischen. Ohne das blieben die eigenen Funde in einem
+    /// Textfeld und erreichten die Panadapter-Ueberlagerung nie.
+    ///
+    /// OEFFENTLICH, anders als die Adapter-Schlitze der
+    /// Netz-Quellen weiter unten: die haengen an einem Client, der
+    /// sich selbst verbindet. Hier ruft das Applet herein, und ein
+    /// `connect` auf einen privaten Schlitz geht in der
+    /// Zeiger-Schreibweise nicht.
+    void onNativeFt8Decode(const Longpath::DxSpot& spot);
+
     DxccColorProvider*    dxccColorProvider()   const { return m_dxccColorProvider.get(); }
     DxClusterClient*      dxCluster()           const { return m_dxCluster.get(); }
     DxClusterClient*      rbn()                 const { return m_rbn.get(); }
