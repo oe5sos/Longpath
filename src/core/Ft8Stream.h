@@ -65,6 +65,15 @@ public:
     /// 12 kHz gebracht.
     void feedAudio(const float* interleavedStereo, int frames);
 
+    /// Nur nach der Uhr sehen, ohne neue Proben.
+    ///
+    /// Ohne das haengt der Grenzuebertritt am naechsten Tonblock: steht
+    /// der Ton (stumm, Verbindung weg, Scheibe gewechselt), wird das
+    /// letzte Fenster nie geschlossen und die Anzeige friert auf dem
+    /// vorletzten Stand ein. Wer ruft: der Taktgeber im Applet, neben
+    /// dem Leeren des Rings.
+    void poll();
+
     /// Wie viele 12-kHz-Proben im laufenden Fenster liegen.
     int bufferedSamples() const { return m_fenster.size(); }
 
@@ -75,6 +84,12 @@ signals:
     /// Ein Fenster ist zu Ende und ausgewertet. periodStart ist seine
     /// UTC-Anfangszeit — ohne die laesst sich ein Decode nicht
     /// eintragen.
+    ///
+    /// Wird AUCH mit leerer Liste gemeldet (2026-10-15): ein Fenster
+    /// ohne Fund und ein toter Dekoder sehen sonst gleich aus, und
+    /// genau diese Verwechslung hat hier schon Stunden gekostet. Ein
+    /// angebrochenes Fenster (weniger als die halbe Laenge an Proben)
+    /// wird weiter verschwiegen — das ist keine Messung.
     void decoded(const QVector<Longpath::Ft8Decode>& funde,
                  const QDateTime& periodStart);
 

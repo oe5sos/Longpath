@@ -375,6 +375,7 @@ warren@wpratt.com
 #include "applets/DvkApplet.h"
 #include "applets/RttyDecoderApplet.h"
 #include "applets/CwDecoderApplet.h"
+#include "applets/Ft8Applet.h"
 #include "applets/QsoRecorderApplet.h"
 #include "applets/KiwiSdrApplet.h"
 #include "KiwiWaterfallPanel.h"
@@ -6920,6 +6921,12 @@ void MainWindow::populateDefaultMeter()
     panel->addApplet(m_cwDecoderApplet);
     m_cwDecoderApplet->setVisible(false);
 
+    // Ft8Applet (2026-10-15) -- der native FT8/FT4-Dekoder, sichtbar in
+    // den Datenmodi (DIGU/DIGL). Gleiche Verdrahtung wie CW und RTTY.
+    m_ft8Applet = new Ft8Applet(m_radioModel, nullptr);
+    panel->addApplet(m_ft8Applet);
+    m_ft8Applet->setVisible(false);
+
     // Ghost applets — hidden per docs/superpowers/plans/2026-05-01-ui-polish-right-panel.md §Task 6.
     // These applets are entirely placeholder-only today (no wired controls).
     // Showing them is misleading — users click e.g. "Equalizer" and nothing happens.
@@ -7431,6 +7438,7 @@ void MainWindow::populateDefaultMeter()
     m_appletsById[QStringLiteral("Rade")]       = m_radeApplet;
     m_appletsById[QStringLiteral("RttyDecoder")] = m_rttyDecoderApplet;
     m_appletsById[QStringLiteral("CwDecoder")] = m_cwDecoderApplet;
+    m_appletsById[QStringLiteral("Ft8Decoder")] = m_ft8Applet;
     m_appletsById[QStringLiteral("Vax")]        = m_vaxApplet;
     m_appletsById[QStringLiteral("Dvk")]        = m_dvkApplet;
     m_appletsById[QStringLiteral("QsoRec")]     = m_qsoRecorderApplet;
@@ -7498,6 +7506,9 @@ void MainWindow::populateDefaultMeter()
     // CW: same shape -- defaultVisible=true, gated on CWL/CWU below.
     m_appletVis->registerApplet(QStringLiteral("CwDecoder"),
                                 QStringLiteral("CW Decoder"), true);
+    // FT8/FT4: dieselbe Form, gehaengt an die Datenmodi (2026-10-15).
+    m_appletVis->registerApplet(QStringLiteral("Ft8Decoder"),
+                                QStringLiteral("FT8 Decoder"), true);
     m_appletVis->registerApplet(QStringLiteral("Vax"),
                                 QStringLiteral("VAX"),          true);
     // Sprachspeicher (2026-08-19). Sichtbar ab Werk: er ist auch ohne
@@ -7650,6 +7661,11 @@ void MainWindow::populateDefaultMeter()
         QStringLiteral("Digital"),
         {QStringLiteral("cw"), QStringLiteral("morse"), QStringLiteral("decoder"),
          QStringLiteral("telegrafie"), QStringLiteral("cwl"), QStringLiteral("cwu")});
+    m_appletVis->describeApplet(QStringLiteral("Ft8Decoder"),
+        QStringLiteral("Digital"),
+        {QStringLiteral("ft8"), QStringLiteral("ft4"), QStringLiteral("digital"),
+         QStringLiteral("decoder"), QStringLiteral("wsjt"),
+         QStringLiteral("digu"), QStringLiteral("digl")});
     m_appletVis->describeApplet(QStringLiteral("Vax"),
         QStringLiteral("Audio"),
         {QStringLiteral("vax"), QStringLiteral("audio"),
@@ -7848,6 +7864,7 @@ void MainWindow::populateDefaultMeter()
     m_appletVis->setAvailable(QStringLiteral("Rade"),  false);
     m_appletVis->setAvailable(QStringLiteral("RttyDecoder"), false);
     m_appletVis->setAvailable(QStringLiteral("CwDecoder"), false);
+    m_appletVis->setAvailable(QStringLiteral("Ft8Decoder"), false);
 
     // RF-Kit RF2K-S: available only when the master toggle is enabled.
     // Default OFF; live-updated via rfKitEnabledChanged below.
@@ -12908,6 +12925,9 @@ void MainWindow::rebindRttyRadeAvailability(SliceModel* slice)
     if (m_cwDecoderApplet) {
         m_cwDecoderApplet->setSlice(slice);
     }
+    if (m_ft8Applet) {
+        m_ft8Applet->setSlice(slice);
+    }
 
     if (!m_appletVis) { return; }
 
@@ -12915,6 +12935,7 @@ void MainWindow::rebindRttyRadeAvailability(SliceModel* slice)
         m_appletVis->setAvailable(QStringLiteral("Rade"), false);
         m_appletVis->setAvailable(QStringLiteral("RttyDecoder"), false);
         m_appletVis->setAvailable(QStringLiteral("CwDecoder"), false);
+        m_appletVis->setAvailable(QStringLiteral("Ft8Decoder"), false);
         return;
     }
 
@@ -12934,6 +12955,11 @@ void MainWindow::rebindRttyRadeAvailability(SliceModel* slice)
         // CW decoder: the two CW modes, nothing else (2026-09-21).
         m_appletVis->setAvailable(QStringLiteral("CwDecoder"),
                                   mode == DSPMode::CWL || mode == DSPMode::CWU);
+        // FT8/FT4 liegen in den Datenmodi -- beiden, nicht nur DIGL:
+        // FT8 wird ueblicherweise in USB/DIGU gehoert, und wer DIGL
+        // stellt, soll den Dekoder nicht verlieren.
+        m_appletVis->setAvailable(QStringLiteral("Ft8Decoder"),
+                                  mode == DSPMode::DIGU || mode == DSPMode::DIGL);
     };
     applyForMode(slice->dspMode());
 

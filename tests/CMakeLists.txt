@@ -5312,6 +5312,13 @@ longpath_add_test(tst_scheibenflagge)
 longpath_add_test(tst_ft8_dekodiert)
 # 2026-10-15: FT8 am laufenden Ton — die Fenstergrenze ist der Punkt.
 longpath_add_test(tst_ft8_am_ton)
+# 2026-10-15: FT8 im PROGRAMM — Abgriff, Flaeche, Eintrag. Dekoder und
+# Uhr waren gruen und trotzdem unerreichbar; dieser Lauf prueft die
+# Verdrahtung, nicht die Rechnung.
+longpath_add_test(tst_ft8_flaeche)
+# 2026-10-15: und wie lange ein ganzes Fenster rechnet — die Zahl
+# entscheidet, ob das im Faden der Oberflaeche laufen darf.
+longpath_add_test(tst_ft8_rechenzeit)
 target_compile_definitions(tst_palette_ohne_tote_rollen PRIVATE
     LONGPATH_SRC_DIR="${CMAKE_SOURCE_DIR}")
 target_compile_definitions(tst_oberflaeche_englisch PRIVATE

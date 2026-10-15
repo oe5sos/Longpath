@@ -96,10 +96,20 @@ private slots:
     ///     Fenster plus Luft hinten       ->  0 Funde
     ///
     /// FT8 hat dieses Verhalten NICHT — dort wird mit Stille gefunden.
-    /// Die Ursache ist nicht aufgeklaert; es sieht nach einem
-    /// Suchfenster aus, das bei FT4 anders liegt. Bis sie es ist, steht
-    /// FT4 hier mit dem, was nachweislich gilt, statt mit einer
-    /// Behauptung.
+    ///
+    /// Ursache gefunden (2026-10-15, spaeter am Tag):
+    /// `third_party/ft8_lib/ft8/decode.c:205` sucht den Zeitversatz in
+    /// einem FESTEN Bereich von -10 bis +19 SYMBOLEN. Mal die
+    /// Symboldauer gerechnet:
+    ///
+    ///     FT8: 19 x 0,160 s = 3,04 s   Stille im Block 1,18 s  -> gefunden
+    ///     FT4: 19 x 0,048 s = 0,91 s   Stille im Block 1,23 s  -> nicht
+    ///
+    /// Kein Fehler im eigenen Code, sondern die Reichweite der Suche.
+    /// Im Betrieb beginnt eine FT4-Sendung rund 0,5 s nach der
+    /// Fenstergrenze und liegt damit INNERHALB der 0,91 s — aber
+    /// knapp. Ausfuehrlich in
+    /// docs/architecture/2026-10-15-ft8-nativ.md.
     void ft4FindetSichOhneStilleDavor()
     {
         const QString text = QStringLiteral("CQ OE5SOS JN78");

@@ -221,6 +221,9 @@ public:
     // Der Abgriff fuer den nativen CW-Decoder (2026-09-21), wie der RTTY-Abgriff.
     std::atomic<AudioTapRing*> m_cwTap{nullptr};
     std::atomic<int>           m_cwTapSlice{-1};
+    // Sechster Abgriff, fuer den nativen FT8/FT4-Dekoder (2026-10-15).
+    std::atomic<AudioTapRing*> m_ft8Tap{nullptr};
+    std::atomic<int>           m_ft8TapSlice{-1};
 
     // Non-owning back-pointer so rxBlockReady can look up the active
     // SliceModel to read mute / VAX-channel state. Null is safe (unit
@@ -476,6 +479,11 @@ public:
     /// Dasselbe fuer den CW-Decoder (CwDecoderApplet, 2026-09-21): ein
     /// eigener Ring, damit RTTY und CW sich beim Lesen nie stoeren.
     void setCwTap(AudioTapRing* ring, int sliceId);
+    /// Und dasselbe fuer den nativen FT8/FT4-Dekoder (Ft8Applet,
+    /// 2026-10-15). Wieder ein EIGENER Ring: FT8 liest in langen
+    /// Fenstern (15 s), CW und RTTY in kurzen Haeppchen — ein
+    /// geteilter Ring haette einen Leser zu wenig.
+    void setFt8Tap(AudioTapRing* ring, int sliceId);
 
     void rxBlockReady(int sliceId, const float* samples, int frames);
 
@@ -1066,6 +1074,7 @@ private:
     std::atomic<unsigned> m_wavRecordTapBusy{0};
     std::atomic<unsigned> m_rttyTapBusy{0};
     std::atomic<unsigned> m_cwTapBusy{0};
+    std::atomic<unsigned> m_ft8TapBusy{0};
 
     // Test-only seam for the four counters above (2026-09-06). Fires on
     // the audio thread from inside writeToTapIfCurrent (AudioEngine.cpp),
