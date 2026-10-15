@@ -5286,6 +5286,9 @@ longpath_add_test(tst_panadapter_schalter)
 # 2026-10-15: „englisch durchgehend" — ich habe zweimal „0 deutsche
 # Quelltexte" gemeldet und lag zweimal falsch. Jetzt zaehlt es ein Lauf.
 longpath_add_test(tst_oberflaeche_englisch)
+# 2026-10-15: das breite rosa Band im Bildschirmfoto — ein umgedrehter
+# HGauge war IMMER in der Gefahrenfarbe, ohne jede Schwelle.
+longpath_add_test(tst_kompressionsbalken_nicht_rot)
 target_compile_definitions(tst_oberflaeche_englisch PRIVATE
     LONGPATH_SRC_DIR="${CMAKE_SOURCE_DIR}")
 # 2026-10-14: HAUSSTIL.md sagt „Nie Radius 3" -- elf standen trotzdem im
