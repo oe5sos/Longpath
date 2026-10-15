@@ -116,6 +116,40 @@ private slots:
                  "zugeordnet");
     }
 
+    // ── Das Hinzufuegen muss sichtbar sein (2026-10-14) ─────────────
+    //
+    // Betreiber: "auswaehlen kann ich, aber wo und wie dann weiter
+    // geht ??!?" Bis dahin lief beim Hinzufuegen alles richtig --
+    // Profil, Scheibe, Zuordnung, Verbindung -- und NICHTS davon war zu
+    // sehen: das Panel, das die Empfaenger zeigt, ist in der Regel gar
+    // nicht eingeschaltet, und sonst meldete sich niemand.
+    void dasHinzufuegenMachtDasPanelAuf()
+    {
+        auto* mw = new MainWindow();
+        mw->show();
+        QVERIFY(QTest::qWaitForWindowExposed(mw, 15000));
+        auto closeGuard = qScopeGuard([&]{ mw->close(); });
+
+        KiwiSdrManager* mgr = mw->kiwiSdrManagerForTest();
+        QVERIFY(mgr);
+        clearProfiles(mgr);
+
+        // Erst ausblenden -- genau der Zustand, in dem der Betreiber
+        // steht: sein Layoutprofil traegt das Panel nicht. Von Haus aus
+        // ist es sichtbar, und ohne diesen Schritt pruefte der Lauf
+        // nichts (einmal gemacht und gemerkt: die Gegenprobe fiel nicht).
+        mw->setAppletVisibleForTest(QStringLiteral("KiwiSdr"), false);
+        QVERIFY(!mw->appletVisibleForTest(QStringLiteral("KiwiSdr")));
+
+        mw->addKiwiSdrReceiverForTest(QStringLiteral("Gmunden"),
+                                      QStringLiteral("kiwi.example.at:8073"));
+
+        QVERIFY2(mw->appletVisibleForTest(QStringLiteral("KiwiSdr")),
+                 "nach dem Hinzufuegen eines KiwiSDR muss sein Panel "
+                 "sichtbar sein -- sonst ist das Ergebnis des Klicks "
+                 "nirgends zu sehen");
+    }
+
     void zugeordneteScheibeWirdBeiEchterDdcBindungSpaeterFreigegeben()
     {
         auto* mw = new MainWindow();
