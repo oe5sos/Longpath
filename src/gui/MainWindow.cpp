@@ -2642,6 +2642,14 @@ FFTEngine* MainWindow::createFftEngineForStream(int streamIndex)
     // sich damit immer korrekt selbst auf, bevor ein zweiter Aufruf mit
     // demselben Index eine Chance hat, den alten Zeiger noch zu sehen.
     connect(engine, &QObject::destroyed, this, [this, streamIndex]() {
+        // Beim Abbau NICHT mehr in m_fftEngines greifen: die Maschine
+        // ist ein Kind dieses Fensters, und ~QWidget raeumt die Kinder
+        // ab, BEVOR ~QObject die Verbindungen loest. Dieselbe Wache wie
+        // bei der Verbindungsmaske und beim Hinweiszettel (beide am
+        // 2026-10-15 als EXC_BAD_ACCESS @ 0x5 gefunden); hier ist noch
+        // kein Absturz beobachtet, aber es ist dieselbe Stelle im
+        // selben Ablauf.
+        if (m_shuttingDown) { return; }
         m_fftEngines.remove(streamIndex);
     });
 
@@ -12079,6 +12087,18 @@ void MainWindow::applyFieldLayout()
         m_appletVis->setVisible(id, bleiben.contains(id));
     }
 
+    // Rotor und Logbuch sind KEIN Applet, sondern ein eigener Dock —
+    // die Schleife oben trifft sie nicht. Im Vorschlagsblatt stehen
+    // sie unter „Bleibt" mit der Einschraenkung „nur, wenn
+    // verbunden"; am Berg mit einer Drahtantenne ist kein Rotor
+    // angeschlossen, und ein Kompass auf 000° ohne Ziel ist genau die
+    // Flaeche, die der Wasserfall haben soll.
+    //
+    // Der Wunsch wird mitgeschrieben, nicht nur das Fenster versteckt:
+    // sonst holt ihn die naechste Profilanwendung zurueck.
+    m_rotorDockWantedVisible = false;
+    if (m_rotorDock) { m_rotorDock->setVisible(false); }
+
     m_layoutProfiles->save();
 
     showToast(tr("Field layout — %1 panels stay, the rest steps aside. "
@@ -14083,6 +14103,10 @@ void MainWindow::showSupportDialog()
         m_supportDialog = new SupportDialog(m_radioModel, this);
         m_supportDialog->setAttribute(Qt::WA_DeleteOnClose);
         connect(m_supportDialog, &QObject::destroyed, this, [this]() {
+            // Siehe die Wache beim Hinweiszettel: beim Abbau schreibt
+            // dieser Rumpf in ein Fenster, dessen Destruktor schon
+            // durch ist.
+            if (m_shuttingDown) { return; }
             m_supportDialog = nullptr;
         });
     }

@@ -5295,6 +5295,9 @@ longpath_add_test(tst_skala_enden_lesbar)
 # 2026-10-15: ein Eintrag fuer das Feldbetrieb-Bild — und der Nachweis,
 # dass er in ein EIGENES Profil schreibt.
 longpath_add_test(tst_feldbetrieb)
+# 2026-10-15: zwei Abstuerze beim Beenden in zwei Stunden, beide
+# „Kind meldet sein Ende, Rumpf greift ins halb abgebaute Fenster".
+longpath_add_test(tst_abbau_ueberlebt)
 target_compile_definitions(tst_oberflaeche_englisch PRIVATE
     LONGPATH_SRC_DIR="${CMAKE_SOURCE_DIR}")
 # 2026-10-14: HAUSSTIL.md sagt „Nie Radius 3" -- elf standen trotzdem im
