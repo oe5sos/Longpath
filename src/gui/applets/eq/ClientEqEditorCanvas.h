@@ -124,6 +124,9 @@ private:
     float   m_dragStartFreqHz{0};
     float   m_dragStartGainDb{0};
     float   m_dragStartQ{0};
+    /// Mit welcher Filterart das Ziehen begann -- siehe die Kerbe,
+    /// die beim Ziehen ueber null zur Nadel wird und zurueck.
+    ClientEq::FilterType m_dragStartType{ClientEq::FilterType::Peak};
 
     CutoffEdge m_draggingCutoff{CutoffEdge::None};
 };

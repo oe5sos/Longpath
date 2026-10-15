@@ -666,6 +666,28 @@ void ClientEqCurveWidget::drawResponse(QPainter& p, const QRect& r,
             if (!bp.enabled) {
                 continue;
             }
+            // ── Nur das Band fuellen, das gewaehlt ist ───────────
+            //
+            // „alles markiert ist und nichts damit anzufangen"
+            // (2026-10-15, zu einem Bild, auf dem die Flaeche von
+            // 20 Hz bis 10 kHz braun zugelaufen war).
+            //
+            // Jede Flaeche reicht von der Null-Linie bis zur Kurve
+            // des Bandes. Ein Hochpass oder ein breiter Kuhschwanz
+            // liegt ueber die ganze Breite weit von null entfernt --
+            // seine Flaeche ist damit das halbe Bild. Mehrere davon
+            // uebereinander, jede mit 22 Prozent Deckung, ergeben
+            // eine undurchsichtige Wand, hinter der weder die
+            // Summenkurve noch der Analysator noch die Griffe zu
+            // sehen sind.
+            //
+            // Also traegt nur noch das gewaehlte Band seine Flaeche.
+            // Die anderen bleiben als duenne Linie stehen -- man
+            // sieht sie, sie decken aber nichts zu. Und die Auswahl
+            // bekommt damit erst einen Sinn: sie zeigt EIN Band.
+            if (i != key.selectedBand) {
+                continue;
+            }
             QColor fill = bandColor(i);
             fill.setAlphaF(eqOn ? 0.22f : 0.07f);
             p.setPen(Qt::NoPen);

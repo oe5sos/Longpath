@@ -187,6 +187,7 @@ void ClientEqEditorCanvas::mousePressEvent(QMouseEvent* ev)
     m_dragStart    = ev->position();
     m_dragStartFreqHz = bp.freqHz;
     m_dragStartGainDb = bp.gainDb;
+    m_dragStartType   = bp.type;
     m_dragStartQ      = bp.q;
     setCursor(Qt::ClosedHandCursor);
     ev->accept();
@@ -315,6 +316,29 @@ void ClientEqEditorCanvas::mouseMoveEvent(QMouseEvent* ev)
         next.freqHz = std::clamp(m_dragStartFreqHz * fRatio, 20.0f, 20000.0f);
     } else {
         next.gainDb = std::clamp(m_dragStartGainDb + dDb, -18.0f, 18.0f);
+        // ── Eine Kerbe nach oben ist eine Nadel ─────────────────
+        //
+        // „diese form sollte auch nach oben gehen, nicht nur nach
+        // unten" (2026-10-15).
+        //
+        // Die Kerbe ist eine eigene Filterart mit fester Form: sie
+        // loescht ihre Frequenz, und ihr Pegel wird gar nicht
+        // gelesen. Nach oben ziehen hat deshalb nichts getan.
+        //
+        // Das Gegenstueck zu einer schmalen Kerbe ist keine zweite
+        // Filterart, sondern eine Glocke mit derselben hohen Guete
+        // und umgekehrtem Vorzeichen. Also wird beim Ziehen ueber
+        // null daraus genau das -- dieselbe Breite, dieselbe
+        // Frequenz, nur nach oben. Wer wieder unter null zieht,
+        // bekommt seine Kerbe zurueck.
+        if (next.type == ClientEq::FilterType::Notch
+            && next.gainDb > 0.5f) {
+            next.type = ClientEq::FilterType::Peak;
+        } else if (m_dragStartType == ClientEq::FilterType::Notch
+                   && next.type == ClientEq::FilterType::Peak
+                   && next.gainDb <= 0.5f) {
+            next.type = ClientEq::FilterType::Notch;
+        }
     }
     m_eq->setBand(m_draggingBand, next);
     emit bandsChanged();

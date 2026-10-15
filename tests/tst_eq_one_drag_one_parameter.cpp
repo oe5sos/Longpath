@@ -261,7 +261,67 @@ private slots:
                  qPrintable(QStringLiteral("gesprungen auf %1 dB")
                                 .arg(double(g))));
     }
+
+    // ── Eine Kerbe nach oben ist eine Nadel ─────────────────────
+    //
+    // „diese form sollte auch nach oben gehen, nicht nur nach unten"
+    // (2026-10-15). Die Kerbe ist eine eigene Filterart mit fester
+    // Form; ihr Pegel wird nicht gelesen, nach oben ziehen tat also
+    // nichts. Das Gegenstück ist keine zweite Art, sondern dieselbe
+    // Güte mit umgekehrtem Vorzeichen.
+    void eine_kerbe_wird_beim_ziehen_nach_oben_zur_nadel()
+    {
+        Probe v;
+        build(v);
+        ClientEq::BandParams b = m_eq.band(kBand);
+        b.type    = ClientEq::FilterType::Notch;
+        b.q       = 8.0f;
+        b.gainDb  = 0.0f;
+        b.enabled = true;
+        m_eq.setBand(kBand, b);
+
+        const QPointF griff = handleOf(v, kBand);
+        press(v, griff);
+        move(v, QPointF(griff.x(), griff.y() - 60.0));   // nach oben
+        release(v, QPointF(griff.x(), griff.y() - 60.0));
+
+        const ClientEq::BandParams nach = m_eq.band(kBand);
+        QVERIFY2(nach.type == ClientEq::FilterType::Peak,
+                 "die Kerbe ist beim Ziehen nach oben eine Kerbe geblieben");
+        QVERIFY2(nach.gainDb > 0.5f,
+                 qPrintable(QStringLiteral("kein Pegel nach oben: %1 dB")
+                                .arg(double(nach.gainDb))));
+        QVERIFY2(qFuzzyCompare(nach.q, 8.0f),
+                 qPrintable(QStringLiteral("die Güte hat sich geändert: %1")
+                                .arg(double(nach.q))));
+        QVERIFY2(qFuzzyCompare(nach.freqHz, b.freqHz),
+                 "die Frequenz ist mitgewandert");
+    }
+
+    // Und zurück: wer wieder unter null zieht, bekommt seine Kerbe.
+    void und_wieder_unter_null_ist_es_wieder_eine_kerbe()
+    {
+        Probe v;
+        build(v);
+        ClientEq::BandParams b = m_eq.band(kBand);
+        b.type    = ClientEq::FilterType::Notch;
+        b.q       = 8.0f;
+        b.gainDb  = 0.0f;
+        b.enabled = true;
+        m_eq.setBand(kBand, b);
+
+        const QPointF griff = handleOf(v, kBand);
+        press(v, griff);
+        move(v, QPointF(griff.x(), griff.y() - 60.0));
+        QCOMPARE(m_eq.band(kBand).type, ClientEq::FilterType::Peak);
+        move(v, QPointF(griff.x(), griff.y() + 60.0));   // wieder hinunter
+        release(v, QPointF(griff.x(), griff.y() + 60.0));
+
+        QVERIFY2(m_eq.band(kBand).type == ClientEq::FilterType::Notch,
+                 "die Kerbe kam beim Zurückziehen nicht wieder");
+    }
 };
+
 
 QTEST_MAIN(TstEqOneDragOneParameter)
 #include "tst_eq_one_drag_one_parameter.moc"
