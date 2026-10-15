@@ -7104,7 +7104,7 @@ void MainWindow::populateDefaultMeter()
     });
 
     m_swrInstrument = new InstrumentApplet(QStringLiteral("SwrInstrument"),
-                                           QStringLiteral("Stehwelle"),
+                                           tr("SWR"),
                                            m_radioModel, nullptr);
     m_swrInstrument->setPrimary(MeterBinding::TxSwr);
     m_swrInstrument->restoreState();
@@ -7732,7 +7732,7 @@ void MainWindow::populateDefaultMeter()
     // dorthin, die Statuszeile ist die Statuszeile. In der Vorlage ist es
     // genauso. Ein- und Ausblenden ist hier die ganze Bedienung.
     m_appletVis->registerApplet(QString::fromLatin1(kChromeOverlayId),
-                                QStringLiteral("Knopfleiste am Spektrum"),
+                                tr("Button strip on the spectrum"),
                                 true);
     m_appletVis->describeApplet(QString::fromLatin1(kChromeOverlayId),
         tr("Receive"),
@@ -7742,7 +7742,7 @@ void MainWindow::populateDefaultMeter()
          QStringLiteral("vax"), QStringLiteral("overlay")});
 
     m_appletVis->registerApplet(QString::fromLatin1(kChromeStatusId),
-                                QStringLiteral("Statuszeile"), true);
+                                tr("Status line"), true);
     m_appletVis->describeApplet(QString::fromLatin1(kChromeStatusId),
         tr("Windows"),
         {QStringLiteral("status"), QStringLiteral("cat"),
@@ -9167,7 +9167,7 @@ void MainWindow::buildMenuBar()
             });
 
         kiwiMenu->addSeparator();
-        kiwiMenu->addAction(QStringLiteral("Alle trennen"), this, [this]() {
+        kiwiMenu->addAction(tr("Disconnect all"), this, [this]() {
             if (m_kiwiSdrManager) { m_kiwiSdrManager->disconnectAll(); }
         });
     }
@@ -9184,7 +9184,7 @@ void MainWindow::buildMenuBar()
     {
         QMenu* sunSdrMenu = radioMenu->addMenu(QStringLiteral("&SunSDR (TCI)"));
 
-        sunSdrMenu->addAction(QStringLiteral("&Verbinden…"), this, [this]() {
+        sunSdrMenu->addAction(tr("&Connect…"), this, [this]() {
             auto& s = AppSettings::instance();
             // Vorschlag 127.0.0.1, NICHT die Adresse der SunSDR-Hardware:
             // TCI ist ein Dienst von ExpertSDR2 (der Software), die in
@@ -9200,18 +9200,18 @@ void MainWindow::buildMenuBar()
                 QStringLiteral("127.0.0.1:40001")).toString();
             bool ok = false;
             const QString ep = QInputDialog::getText(
-                this, QStringLiteral("SunSDR verbinden"),
-                QStringLiteral("Adresse von ExpertSDR2 (IP oder Rechnername, "
-                               "wahlweise mit :Port -- Voreinstellung 40001).\n"
-                               "Meist 127.0.0.1, wenn ExpertSDR2 auf diesem "
-                               "Rechner laeuft -- NICHT die Adresse der "
-                               "SunSDR-Hardware selbst."),
+                this, tr("Connect SunSDR"),
+                tr("Address of ExpertSDR2 (IP or host name, optionally with "
+                   ":port \u2014 default 40001).\n"
+                   "Usually 127.0.0.1 when ExpertSDR2 runs on this "
+                   "machine \u2014 NOT the address of the SunSDR hardware "
+                   "itself."),
                 QLineEdit::Normal, lastEndpoint, &ok);
             if (!ok || ep.trimmed().isEmpty()) { return; }
             connectSunSdr(ep.trimmed());
         });
 
-        sunSdrMenu->addAction(QStringLiteral("&Trennen"), this, [this]() {
+        sunSdrMenu->addAction(tr("&Disconnect"), this, [this]() {
             disconnectSunSdr();
         });
     }
@@ -10239,7 +10239,7 @@ void MainWindow::buildMenuBar()
     // Buchfuehrung.
     {
         QAction* sideAct = containersMenu->addAction(
-            QStringLiteral("Seitenbereich rechts"));
+            tr("Side area on the right"));
         sideAct->setCheckable(true);
         sideAct->setToolTip(QStringLiteral(
             "Rotor/Log und Applets in einem Bereich am rechten Rand, "
@@ -13722,7 +13722,7 @@ void MainWindow::showNotchBarMenu(const QPoint& globalPos)
     if (list.isEmpty()) {
         menu->addSeparator();
         QAction* hint = menu->addAction(
-            tr("Anlegen: Cmd-Klick ins Spektrum"));
+            tr("To add one: Cmd-click on the spectrum"));
         hint->setEnabled(false);
         menu->popup(globalPos);
         return;
@@ -13741,7 +13741,7 @@ void MainWindow::showNotchBarMenu(const QPoint& globalPos)
 
         const int id = n.id;
 
-        QAction* edit = sub->addAction(tr("Bearbeiten…"));
+        QAction* edit = sub->addAction(tr("Edit…"));
         connect(edit, &QAction::triggered, this, [this, id, globalPos]() {
             SpectrumWidget* w =
                 m_radioModel ? m_radioModel->spectrumWidget() : nullptr;
@@ -15158,7 +15158,7 @@ void MainWindow::openAntennaWindow()
                              QStringLiteral("Tune-Pwr-Regler") };
                 case DrivePowerSource::Fixed:
                     return { cap(tx.tunePower()),
-                             QStringLiteral("festen Wert im Setup") };
+                             tr("a fixed value in Setup") };
                 case DrivePowerSource::DriveSlider:
                     break;
                 }

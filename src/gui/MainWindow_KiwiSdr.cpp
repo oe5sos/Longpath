@@ -536,9 +536,9 @@ void MainWindow::addKiwiSdrReceiver(const QString& name,
 
     qCInfo(lcKiwiSdr).nospace()
         << "KiwiSDR aufgenommen: " << label << " (" << endpoint << ")"
-        << (slice ? QStringLiteral(" -> Scheibe %1").arg(slice->sliceIndex())
-                  : QStringLiteral(" OHNE SCHEIBE — sein Ton hat keinen "
-                                   "Weg in die Mischung"));
+        << (slice ? QStringLiteral(" -> slice %1").arg(slice->sliceIndex())
+                  : QStringLiteral(" WITHOUT A SLICE - its audio has no "
+                                   "way into the mix"));
 }
 
 // ── Stufe 3b: der Kiwi folgt der Scheibe ────────────────────────────

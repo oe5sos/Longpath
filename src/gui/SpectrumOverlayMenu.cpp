@@ -182,7 +182,7 @@ void SpectrumOverlayMenu::buildUI()
     modeRow->addWidget(new QLabel(QStringLiteral("Darstellung"), this));
     m_renderModeCombo = new QComboBox(this);
     m_renderModeCombo->setObjectName(QStringLiteral("overlayMenuRenderModeCombo"));
-    m_renderModeCombo->addItems({QStringLiteral("2D Wasserfall"),
+    m_renderModeCombo->addItems({tr("2D waterfall"),
                                  QStringLiteral("3D gestapelte Trassen")});
     m_renderModeCombo->setToolTip(QStringLiteral(
         "2D: Trasse plus Wasserfall.\n"

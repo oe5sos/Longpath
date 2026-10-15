@@ -8789,7 +8789,7 @@ void SpectrumWidget::buildNotchContextMenu(int id, QMenu& menu)
     // notchfilter klickt und dann diese bearbeite kann und auch
     // loeschen." Die Liste fester Breiten oben deckt den haeufigen
     // Fall; hier stehen Mitte und Breite frei.
-    menu.addAction(QStringLiteral("Notch bearbeiten…"), this,
+    menu.addAction(tr("Edit notch…"), this,
                    [this, id]() { openNotchEditor(id, QCursor::pos()); });
 
     menu.addSeparator();

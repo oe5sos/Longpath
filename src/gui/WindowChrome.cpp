@@ -288,7 +288,7 @@ ResizeGrip::ResizeGrip(QWidget* parent)
 {
     setFixedSize(kGripSize, kGripSize);
     setCursor(Qt::SizeFDiagCursor);
-    setToolTip(QStringLiteral("Groesse ziehen"));
+    setToolTip(tr("Drag to resize"));
     // Der Anfasser sitzt UEBER dem Inhalt, nicht daneben. Ein Applet,
     // das bis in die Ecke reicht, faengt sonst den Druck ab, und der
     // Anfasser waere zwar zu sehen, aber nicht zu benutzen.

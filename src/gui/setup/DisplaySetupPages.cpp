@@ -1587,7 +1587,7 @@ void SpectrumDefaultsPage::buildUI()
     bpForm->setSpacing(6);
 
     m_bandPlanShow = new QCheckBox(
-        QStringLiteral("Bandsegmente im Spektrum zeigen"), bpGroup);
+        tr("Show band segments on the spectrum"), bpGroup);
     m_bandPlanShow->setToolTip(QStringLiteral(
         "Faerbt die Bandsegmente des gewaehlten Plans am unteren Rand "
         "des Spektrums ein — CW, SSB, Digimodes, Baken."));

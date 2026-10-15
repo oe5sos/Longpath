@@ -378,7 +378,7 @@ QMenu* InstrumentApplet::buildContextMenu(QWidget* parent)
     // ── Spitzenhaltung ───────────────────────────────────────────────
     auto* peakMenu = menu->addMenu(tr("Spitzenhaltung"));
     {
-        QAction* on = peakMenu->addAction(tr("Anzeigen"));
+        QAction* on = peakMenu->addAction(tr("Show"));
         on->setCheckable(true);
         on->setChecked(m_needle->peakHold().enabled());
         connect(on, &QAction::triggered, this, [this](bool checked) {

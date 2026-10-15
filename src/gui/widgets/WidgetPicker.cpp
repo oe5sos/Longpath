@@ -101,7 +101,7 @@ private:
 
 } // namespace
 
-QString WidgetPicker::allCategory() { return QStringLiteral("Alle"); }
+QString WidgetPicker::allCategory() { return tr("All"); }
 
 WidgetPicker::WidgetPicker(AppletVisibilityController* vis, QWidget* parent)
     : QWidget(parent), m_vis(vis), m_category(allCategory())

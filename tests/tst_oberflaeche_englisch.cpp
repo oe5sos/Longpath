@@ -20,6 +20,16 @@
 // Was er NICHT prueft: Kommentare (deutsch, mit Absicht), Protokoll-
 // und Fehlertexte unter src/core (die liest der Betreiber, nicht der
 // Benutzer), und Stylesheets.
+//
+// ── Und was diese Zahl NICHT ist ────────────────────────────────────
+//
+// Sie ist „deutsche Texte, die DIESE Liste erkennt" — nicht „deutsche
+// Texte". Am 2026-10-15 habe ich dem Betreiber „noch 4" gemeldet; der
+// vollstaendige ctest-Lauf brachte danach 31 weitere zutage, die die
+// Liste schlicht nicht kannte („Seitenbereich", „Statuszeile",
+// „Notch bearbeiten…", „Alle trennen" …). Die Liste ist ein NETZ,
+// kein Beweis. Wer hier eine Zahl meldet, sagt dazu, womit sie
+// gemessen wurde.
 
 #include <QtTest>
 #include <QDir>
@@ -54,6 +64,25 @@ const QStringList& deutscheWoerter()
         QStringLiteral("Auswahl"),      QStringLiteral("Fehler"),
         QStringLiteral("Profil"),       QStringLiteral("Datei"),
         QStringLiteral("Bild"),         QStringLiteral("Farbe"),
+        // Nachgetragen am 2026-10-15, nachdem der vollstaendige
+        // ctest-Lauf 31 weitere Texte zutage brachte, die diese Liste
+        // nicht kannte — siehe die Warnung im Kopf.
+        QStringLiteral("bearbeiten"),   QStringLiteral("trennen"),
+        QStringLiteral("verbinden"),    QStringLiteral("Verbindung"),
+        QStringLiteral("Seitenbereich"),QStringLiteral("Knopfleiste"),
+        QStringLiteral("Statuszeile"),  QStringLiteral("Logbuch"),
+        QStringLiteral("Kanalzug"),     QStringLiteral("Zentrale"),
+        QStringLiteral("Scheibe"),      QStringLiteral("Schiene"),
+        QStringLiteral("Breite"),       QStringLiteral("Hoehe"),
+        QStringLiteral("Groesse"),      QStringLiteral("Wert"),
+        QStringLiteral("Eintrag"),      QStringLiteral("Leiste"),
+        QStringLiteral("Zeile"),        QStringLiteral("Spektrum"),
+        QStringLiteral("Wasserfall"),   QStringLiteral("Stehwelle"),
+        QStringLiteral("Mitschrift"),   QStringLiteral("Abstimmen"),
+        QStringLiteral("Betriebsart"),  QStringLiteral("Messanzeigen"),
+        QStringLiteral("anzeigen"),     QStringLiteral("zeigen"),
+        QStringLiteral("Alle"),         QStringLiteral("Fertig"),
+        QStringLiteral("festen"),       QStringLiteral("Anlegen"),
     };
     return w;
 }
@@ -116,6 +145,16 @@ private slots:
                     || roh.startsWith(QLatin1Char('*'))) {
                     continue;
                 }
+                // Protokollzeilen auch. Die liest der Betreiber, nicht
+                // der Benutzer — dieselbe Regel wie fuer src/core, nur
+                // dass sie hier mitten in einer GUI-Datei stehen.
+                if (roh.startsWith(QLatin1String("qC"))
+                    || roh.startsWith(QLatin1String("qDebug"))
+                    || roh.startsWith(QLatin1String("qInfo"))
+                    || roh.startsWith(QLatin1String("qWarning"))
+                    || roh.startsWith(QLatin1String("<<"))) {
+                    continue;
+                }
                 auto m = sichtbar.globalMatch(z);
                 while (m.hasNext()) {
                     const QString t = m.next().captured(1);
@@ -142,15 +181,16 @@ private slots:
 
         // Stand nach dem Durchgang vom 2026-10-15: von 96 auf 4.
         //
-        // Die vier, die bleiben, sind SCHLAGWOERTER der Widget-Suche
-        // („frequenz", „empfang", „senden", „leistung") und bleiben mit
+        // Die sechs, die bleiben, sind SCHLAGWOERTER der Widget-Suche
+        // („frequenz", „abstimmen", „stehwelle", „empfang", „senden",
+        // „leistung") und bleiben mit
         // Absicht deutsch: die Oberflaeche ist englisch, der Betreiber
         // denkt deutsch, und beide Wege sollen ins Ziel fuehren. Sie
         // stehen neben ihren englischen Entsprechungen.
         //
         // Jede weitere Uebersetzung senkt die Zahl; wer eine neue
         // deutsche Beschriftung einbaut, laeuft auf.
-        constexpr int kDecke = 4;
+        constexpr int kDecke = 6;
         QVERIFY2(funde.size() <= kDecke,
                  qPrintable(QStringLiteral(
                      "%1 deutsche Texte in src/gui — die Decke steht bei "

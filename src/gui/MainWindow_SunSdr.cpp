@@ -210,7 +210,7 @@ void MainWindow::connectSunSdr(const QString& endpoint)
     quint16 port = 0;
     if (!parseSunSdrEndpoint(endpoint, &host, &port)) {
         showSunSdrNotice(
-            this, QMessageBox::Warning, QStringLiteral("SunSDR verbinden"),
+            this, QMessageBox::Warning, tr("Connect SunSDR"),
             QStringLiteral("Adresse unlesbar: „%1“\n\n"
                            "Erwartet wird eine IP-Adresse oder ein "
                            "Rechnername, wahlweise mit :Port.")
@@ -686,7 +686,7 @@ void MainWindow::wireSunSdr()
             // -- derselbe Fund/derselbe Fix wie bei disconnectSunSdr().
             releaseSunSdrSlice(state == TciClient::State::Error
                                     ? QStringLiteral("Verbindungsfehler")
-                                    : QStringLiteral("Verbindung getrennt"));
+                                    : tr("Disconnected"));
         }
     });
 

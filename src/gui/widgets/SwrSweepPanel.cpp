@@ -367,13 +367,13 @@ void SwrSweepPanel::setBackend(const Backend& backend)
         } else if (result.completed && result.validPoints() > 0) {
             const quint64 res = result.resonanceHz();
             m_status->setText(res > 0
-                ? QStringLiteral("Fertig. Resonanz bei %1 MHz, SWR %2 "
+                ? tr("Done. Resonance at %1 MHz, SWR %2 "
                                  "(%3 von %4 Punkten gemessen).")
                       .arg(static_cast<double>(res) / 1e6, 0, 'f', 3)
                       .arg(result.minSwr(), 0, 'f', 2)
                       .arg(result.validPoints())
                       .arg(result.points.size())
-                : QStringLiteral("Fertig, aber ohne verwertbares Minimum."));
+                : tr("Done, but without a usable minimum."));
         } else if (result.completed) {
             // Completed and measured nothing. Say the watts — "zu
             // niedrig?" was a guess, and the numbers were there all

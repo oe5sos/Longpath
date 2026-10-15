@@ -168,10 +168,10 @@ QString receiverAccessibleText(const KiwiSdrReceiverStatus& receiver)
         parts << receiver.protocolSummary.trimmed();
     }
     if (receiver.assignedSlice) {
-        parts << QObject::tr("Scheibe %1 zugeordnet")
+        parts << QObject::tr("assigned to slice %1")
                      .arg(sliceLetterOf(receiver.assignedSlice.data()));
     } else {
-        parts << QObject::tr("Keiner Scheibe zugeordnet");
+        parts << QObject::tr("not assigned to a slice");
     }
     return parts.join(QStringLiteral(", "));
 }

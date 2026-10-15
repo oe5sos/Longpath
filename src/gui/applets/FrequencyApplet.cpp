@@ -276,7 +276,7 @@ void FrequencyApplet::contextMenuEvent(QContextMenuEvent* ev)
     // "SWR" und "Stehwelle" sind dasselbe Wort (siehe Begruendung oben
     // bei "Show power"); die Beschriftung traegt seither beide,
     // damit niemand mehr danach sucht, ohne es zu finden.
-    QAction* swr = menu.addAction(tr("SWR / Stehwelle anzeigen"));
+    QAction* swr = menu.addAction(tr("Show SWR"));
     swr->setCheckable(true);
     swr->setChecked(m_showSwr);
     connect(swr, &QAction::triggered, this,
@@ -284,7 +284,7 @@ void FrequencyApplet::contextMenuEvent(QContextMenuEvent* ev)
 
     // Betreiber 2026-08-30: "S-Meter bitte noch bei Frequenz
     // hinzufügen" -- dieselbe Zusatzzeile wie Leistung/SWR.
-    QAction* sig = menu.addAction(tr("S-Meter anzeigen"));
+    QAction* sig = menu.addAction(tr("Show S-meter"));
     sig->setCheckable(true);
     sig->setChecked(m_showSignal);
     connect(sig, &QAction::triggered, this,

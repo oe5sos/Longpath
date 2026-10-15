@@ -291,7 +291,7 @@ void LogbookWindow::buildUi()
     aussen->setContentsMargins(0, 0, 0, 0);
     aussen->setSpacing(0);
 
-    m_titleBar = new WindowTitleBar(QStringLiteral("Logbuch"), this);
+    m_titleBar = new WindowTitleBar(tr("Logbook"), this);
     // Das Logbuch gehoert in kein Dock -- das × schliesst, und der
     // Andockwunsch (Doppelklick auf die Leiste) tut dasselbe, statt ins
     // Leere zu laufen.

@@ -81,9 +81,10 @@ private slots:
 
         // Und die beiden Wege hinein. Ein Menue, das nur den Namen
         // traegt, ist dieselbe Sackgasse wie gar keines.
-        QVERIFY2(all.contains(QStringLiteral("Öffentliche Empfänger")),
+        // Dieselbe tr()-Rolle wie im Programm, nicht der Wortlaut.
+        QVERIFY2(all.contains(MainWindow::tr("Public receivers\u2026")),
                  qPrintable(all));
-        QVERIFY2(all.contains(QStringLiteral("von Hand hinzufügen")),
+        QVERIFY2(all.contains(MainWindow::tr("Add a receiver by hand\u2026")),
                  qPrintable(all));
         qInfo().noquote() << "gefunden:"
                           << entries.filter(QStringLiteral("Kiwi")).join(", ")

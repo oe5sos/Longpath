@@ -590,7 +590,7 @@ void CommandBar::addOverflow(Group& g, const QVector<Entry>& all, Apply apply)
     auto* more = new QPushButton(QStringLiteral("…"), this);
     more->setStyleSheet(pillStyle());
     more->setCursor(Qt::PointingHandCursor);
-    more->setToolTip(QStringLiteral("Alle %1 anzeigen").arg(all.size()));
+    more->setToolTip(tr("Show all %1").arg(all.size()));
     g.overflow = more;
     if (g.row) { g.row->addWidget(more); }
 
@@ -697,7 +697,7 @@ void CommandBar::buildFilterGroup(QHBoxLayout* row)
                     [this, low, high]() { pushFilterToModel(low, high); });
         }
         m.addSeparator();
-        QAction* own = m.addAction(QStringLiteral("Eigene Breite…"));
+        QAction* own = m.addAction(tr("Own width…"));
         connect(own, &QAction::triggered, this,
                 [this]() { askForCustomFilter(); });
         m.exec(QCursor::pos());
@@ -862,7 +862,7 @@ void CommandBar::askForCustomFilter()
     bool ok = false;
     const int w = QInputDialog::getInt(
         this, QStringLiteral("Filterbreite"),
-        QStringLiteral("Breite in Hz:"), cur, 50, 20000, 50, &ok);
+        tr("Width in Hz:"), cur, 50, 20000, 50, &ok);
     if (!ok) { return; }
 
     pushFilterToModel(qRound(centre - w / 2.0), qRound(centre + w / 2.0));
