@@ -5289,6 +5289,9 @@ longpath_add_test(tst_oberflaeche_englisch)
 # 2026-10-15: das breite rosa Band im Bildschirmfoto — ein umgedrehter
 # HGauge war IMMER in der Gefahrenfarbe, ohne jede Schwelle.
 longpath_add_test(tst_kompressionsbalken_nicht_rot)
+# 2026-10-15: „-40dB" las sich als „0dB", „+10" als „+1" — die erste
+# und die letzte Zahl der Skala standen ausserhalb des Widgets.
+longpath_add_test(tst_skala_enden_lesbar)
 target_compile_definitions(tst_oberflaeche_englisch PRIVATE
     LONGPATH_SRC_DIR="${CMAKE_SOURCE_DIR}")
 # 2026-10-14: HAUSSTIL.md sagt „Nie Radius 3" -- elf standen trotzdem im

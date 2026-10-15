@@ -223,8 +223,29 @@ void HGauge::paintEvent(QPaintEvent*)
                 col = QColor(Style::role("danger", Style::kGaugeDanger));
             }
             p.setPen(col);
-            p.drawText(QRect(x - 20, barY + barH + 1, 40, 10),
-                       Qt::AlignHCenter | Qt::AlignTop, m_tickLabels[i]);
+            // ── Die erste und die letzte Zahl passen ins Feld ───────
+            //
+            // Vorher stand hier EIN Rechteck von 40 Punkten, mittig um
+            // den Strich. Beim ersten Strich beginnt es also bei
+            // barX - 20 = -18, beim letzten endet es 20 Punkte hinter
+            // der rechten Kante — beide Male ausserhalb des Widgets,
+            // und Qt schneidet ab. Im Bildschirmfoto des Betreibers
+            // vom 2026-10-15 las sich „-30dB" als „0dB" und „+10" als
+            // „+1". Eine Skala, deren Enden fehlen, ist keine Skala.
+            //
+            // Die Enden ziehen sich also nach innen und richten sich
+            // nach aussen aus; die Zahl bleibt am Strich, nur nicht
+            // mehr mittig darueber.
+            QRect kasten(x - 20, barY + barH + 1, 40, 10);
+            int ausrichtung = Qt::AlignHCenter | Qt::AlignTop;
+            if (i == 0) {
+                kasten.moveLeft(barX);
+                ausrichtung = Qt::AlignLeft | Qt::AlignTop;
+            } else if (i == n - 1) {
+                kasten.moveRight(barX + barW);
+                ausrichtung = Qt::AlignRight | Qt::AlignTop;
+            }
+            p.drawText(kasten, ausrichtung, m_tickLabels[i]);
         }
     }
 }
