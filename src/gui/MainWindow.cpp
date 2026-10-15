@@ -12361,10 +12361,28 @@ void MainWindow::offerPaletteRestart(const QString& paletteName)
     // Zahlen in Stylesheets, die beim Bauen des Fensters entstanden
     // sind. Der Text sagt genau das — „startet neu, sonst passiert
     // nichts" waere nach dem sichtbaren Farbwechsel schlicht falsch.
-    box.setInformativeText(
-        tr("The colours are on already. This palette also changes corners, "
-           "padding and depth, and those are set while the window is "
-           "built — they need a restart. Restart now?"));
+    // Nur sagen, was wahr ist (2026-10-15).
+    //
+    // Hier stand unbedingt „The colours are on already". Bei den
+    // Paletten „Flach" und „Tief" ist das FALSCH: die tragen null
+    // Farben (nachgesehen in resources/themes/flach.json und
+    // tief.json — Schluessel `formen`, keine `colors`). Wer eine
+    // davon waehlt, sieht nichts, liest „die Farben sind schon an"
+    // und schliesst daraus, dass die Umstellung nicht geht. Genau
+    // diese Rueckmeldung kam am 2026-10-15: „theme funktioniert auch
+    // noch nicht."
+    if (Style::Theme::instance().hasColours()) {
+        box.setInformativeText(
+            tr("The colours are on already. This palette also changes "
+               "corners, padding and depth, and those are set while the "
+               "window is built — they need a restart. Restart now?"));
+    } else {
+        box.setInformativeText(
+            tr("This palette carries no colours at all — it only changes "
+               "corners, padding and depth. Those are set while the window "
+               "is built, so nothing looks different until a restart. "
+               "Restart now?"));
+    }
     QPushButton* now = box.addButton(tr("Restart now"), QMessageBox::AcceptRole);
     box.addButton(tr("Later"), QMessageBox::RejectRole);
     box.setDefaultButton(now);

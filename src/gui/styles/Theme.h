@@ -136,6 +136,19 @@ public:
                || !m_byForm.isEmpty();
     }
 
+    /// Traegt diese Palette ueberhaupt FARBEN?
+    ///
+    /// „Flach" und „Tief" tragen absichtlich nur Form (Ecken,
+    /// Polsterung, Tiefe) und keine einzige Farbe. Wer eine davon
+    /// waehlt, sieht im laufenden Programm nichts — und die
+    /// Neustartfrage sagte ihm bis zum 2026-10-15 trotzdem „die
+    /// Farben sind schon an". Das ist genau die Erfahrung, die der
+    /// Betreiber mit „theme funktioniert nicht" beschrieb.
+    bool hasColours() const
+    {
+        return !m_byRole.isEmpty() || !m_byHex.isEmpty();
+    }
+
     /// What this theme wants for a role, or an empty string when it has
     /// no opinion.
     QString forRole(const QString& role) const;

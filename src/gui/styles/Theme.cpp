@@ -97,7 +97,16 @@ QStringList Theme::searchPaths()
     //    und beim Entwickeln ist „Datei danebenlegen und neu starten" der
     //    kürzeste Weg — kein Umweg über die Bibliothek. Steht in
     //    .gitignore, gehört also nicht in den Quellbaum.
-    out << QDir::currentPath() + QStringLiteral("/themes");
+    //
+    //    Nicht, wenn das Arbeitsverzeichnis die WURZEL ist (2026-10-15):
+    //    aus dem Finder gestartet steht dort „/", und der Pfad wird
+    //    „//themes". Der Ordner gibt es nie, aber er steht in der
+    //    Meldung „Kein Theme gefunden. Gesucht in: …" und sieht dort
+    //    aus wie ein Fehler — beim Suchen nach „warum greift meine
+    //    Palette nicht" ist das ein falscher Anhaltspunkt.
+    if (QDir::currentPath() != QStringLiteral("/")) {
+        out << QDir::currentPath() + QStringLiteral("/themes");
+    }
 
     // 4. Neben der Binärdatei, für ein Theme, das mit einem Build kommt.
     out << QCoreApplication::applicationDirPath() + QStringLiteral("/themes");
