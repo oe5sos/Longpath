@@ -83,18 +83,64 @@ durchs Profil unverändert?
 
 Gegenprobe: eine künstlich verfälschte Erwartung lässt ihn umfallen.
 
-## Was offen bleibt
+## Zweite Runde — die restlichen fünf
 
-| Lauf | Befund |
-| --- | --- |
-| `tst_logbook_opens_at_its_size` | `aShrinkInTheFirstSecondStays`: erwartet 900×720 (`minimumSizeHint`), bekommt 900×700. Wieder Geometrie — Schriftgröße/Dichte |
-| `tst_logbook_durchgang` | zwei Fälle, noch nicht untersucht |
-| `tst_tci_remote_auth`, `tst_menus_of_native_fields`, `tst_command_bar` | fallen **nur im `-j6`-Lauf** um, einzeln grün — Parallel-Artefakte (Ports, Fensterfokus, Überdeckung) |
+Nach der ersten Runde blieben fünf Läufe. Alle fünf gehören zur
+selben Familie, alle fünf sind jetzt behoben.
 
-Ob die beiden Logbuch-Läufe vor dem Löschen des Sandkastens
-(`~/.qttest/.../Longpath.settings`) schon umfielen, lässt sich nicht
-mehr sagen — das Löschen geschah mitten in der Untersuchung. Sie hängen
-erkennbar an gespeichertem Zustand.
+### `tst_logbook_opens_at_its_size` — zu früh gemessen
+
+`aShrinkInTheFirstSecondStays` nahm die Mindestgröße **10 ms nach
+`show()`**. In 50-ms-Schritten gemessen:
+
+```
+  0 ms: minimumSizeHint 561x720   Fenster 1000x780
+ 50 ms: minimumSizeHint 561x617   Fenster 1000x780
+150 ms: minimumSizeHint 561x617   Fenster 1000x700
+```
+
+Der frühe Wert (720, Werkzeugleiste noch umgebrochen) ging in
+`smaller` ein — der Lauf verlangte am Ende eine **Vergrößerung** von
+700 auf 720 und prüfte das Gegenteil dessen, was in seinem Namen
+steht. Auf den CI-Läufern schwingt es schneller ein.
+
+**Behoben:** erst auf das Einschwingen warten
+(`QTRY_VERIFY_WITH_TIMEOUT(minimumSizeHint().height() <= 650, 1000)`),
+dann `smaller` bilden. Und die Vorbedingung mit **UND** statt ODER:
+ist eine Kante nicht wirklich kleiner, bezeugt der Lauf sie auch
+nicht.
+
+### `tst_logbook_durchgang` — unstet, 2 von 3
+
+`editingChangesOnlyThatField` und `editingAFieldStillTidiesIt` fielen
+in zwei von drei Läufen um: es wurde schlicht nichts bearbeitet. Der
+Auto-Antworter für modale Dialoge hing an einem 50-ms-Taktgeber — in
+der Cocoa-Schleife eines modalen `exec()` kommt der mal an und mal
+nicht.
+
+**Behoben:** `ModalAnswerer`, ein Ereignisfilter auf `QEvent::Show`,
+der die Antwort postet. Viermal hintereinander grün (vorher 2 von 3
+rot).
+
+### Drei Läufe, die nur parallel umfielen
+
+`tst_tci_remote_auth`, `tst_menus_of_native_fields`, `tst_command_bar`
+— einzeln grün, im `-j6`-Durchgang rot.
+
+Zwei davon trugen je eine **eigene Abschrift** desselben brüchigen
+Menü-Helfers und lasen `parentSeen` sofort nach dem Klick: unter Last
+stand da noch der Wert von vorher („Compared QObject pointers are not
+the same"). Die Technik liegt jetzt einmal in `tests/MenueFaenger.h`,
+und alle drei Menü-Läufe benutzen sie — auch der aus der ersten Runde,
+damit es nur eine Fassung gibt.
+
+Beim dritten wartete `loopback_bekommt_den_init_burst_ohne_anmeldung`
+2000 ms auf den Init-Burst (rund 98 Rahmen). Sechs gleichzeitig
+gestartete Läufe holten den Fehlschlag reproduzierbar zurück (1 von
+6); mit 15 000 ms sind es 0 von 6. Großzügig warten kostet nichts —
+die Zeit läuft nur im Fehlerfall ab.
+
+Gegenprobe unter Last: 16 von 16 parallelen Läufen grün.
 
 ## Die Regel daraus
 

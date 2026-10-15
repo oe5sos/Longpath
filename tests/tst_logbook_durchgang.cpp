@@ -21,6 +21,7 @@
 #include <QComboBox>
 #include <QDateEdit>
 #include <QDialog>
+#include <QPointer>
 #include <QFileDialog>
 #include <QDialogButtonBox>
 #include <QFormLayout>
@@ -142,27 +143,69 @@ QByteArray syntheticLog(int n)
     return out;
 }
 
+// ── Dialoge beantworten, ohne Taktgeber (2026-10-15) ───────────────
+//
+// Hier standen zwei QTimer, die im 40/50-ms-Takt nach
+// `QApplication::activeModalWidget()` sahen. Das lief meistens — und
+// manchmal nicht: `editingChangesOnlyThatField` und
+// `editingAFieldStillTidiesIt` fielen in zwei von drei Laeufen um
+// (gemessen am 2026-10-15), weil gar nichts bearbeitet wurde.
+//
+// Grund ist derselbe wie beim Menue-Prueflauf (siehe
+// docs/architecture/2026-10-15-pruefstaende-und-der-schirm.md): ein
+// modales `exec()` dreht auf macOS eine Cocoa-Schleife, in der
+// Qt-Taktgeber nicht zuverlaessig bedient werden. Mal kam der Takt an,
+// mal nicht.
+//
+// Ein Ereignisfilter auf `QEvent::Show` laeuft dagegen SYNCHRON in
+// `sendEvent`, also noch waehrend der Dialog sich zeigt und bevor
+// `exec()` in die Schleife geht. Die Antwort selbst wird von dort
+// GEPOSTET: beim Eintritt in die Schleife arbeitet Qt die eigene
+// Warteschlange ab, der Dialog steht dann fertig da.
+class ModalAnswerer : public QObject {
+public:
+    ModalAnswerer(QObject* ctx, std::function<void(QWidget*)> act, bool einmal)
+        : QObject(ctx), m_act(std::move(act)), m_einmal(einmal)
+    {
+        qApp->installEventFilter(this);
+    }
+
+    ~ModalAnswerer() override
+    {
+        if (qApp) { qApp->removeEventFilter(this); }
+    }
+
+    bool eventFilter(QObject* obj, QEvent* ev) override
+    {
+        if (ev->type() == QEvent::Show && !m_fertig) {
+            if (auto* dlg = qobject_cast<QDialog*>(obj)) {
+                QPointer<QDialog> ziel(dlg);
+                QMetaObject::invokeMethod(dlg, [this, ziel]() {
+                    if (m_fertig || !ziel) { return; }
+                    if (m_einmal) { m_fertig = true; }
+                    m_act(ziel);
+                }, Qt::QueuedConnection);
+            }
+        }
+        return QObject::eventFilter(obj, ev);
+    }
+
+private:
+    std::function<void(QWidget*)> m_act;
+    bool m_einmal{true};
+    bool m_fertig{false};
+};
+
 void autoAnswerModals(QObject* ctx, const std::function<void(QWidget*)>& act)
 {
-    auto* t = new QTimer(ctx);
-    t->setInterval(50);
-    QObject::connect(t, &QTimer::timeout, ctx, [t, act]() {
-        if (QWidget* m = QApplication::activeModalWidget()) { act(m); t->deleteLater(); }
-    });
-    t->start();
+    new ModalAnswerer(ctx, act, true);
 }
 
 // Beantwortet Dialoge, solange er lebt (fuer Ablaeufe mit mehreren
 // Fenstern nacheinander: Dateidialog, dann Meldung).
-QTimer* answerModals(QObject* ctx, const std::function<void(QWidget*)>& act)
+ModalAnswerer* answerModals(QObject* ctx, const std::function<void(QWidget*)>& act)
 {
-    auto* t = new QTimer(ctx);
-    t->setInterval(40);
-    QObject::connect(t, &QTimer::timeout, ctx, [act]() {
-        if (QWidget* m = QApplication::activeModalWidget()) { act(m); }
-    });
-    t->start();
-    return t;
+    return new ModalAnswerer(ctx, act, false);
 }
 
 void grab(QWidget* w, const QString& name)
@@ -762,7 +805,7 @@ private slots:
         auto exportTo = [&](const QString& button, const QString& file) {
             const QString wanted = m_dir.filePath(file);
             auto chosen = std::make_shared<QString>();
-            QTimer* t = answerModals(this, [&told, wanted, chosen](QWidget* m) {
+            ModalAnswerer* t = answerModals(this, [&told, wanted, chosen](QWidget* m) {
                 if (auto* fd = qobject_cast<QFileDialog*>(m)) {
                     fd->selectFile(wanted);
                     // Der Qt-Dialog setzt damit den Ordner; den Namen
@@ -905,7 +948,7 @@ private slots:
             gone.insert(t->item(r, 0)->text() + t->item(r, 1)->text() + t->item(r, 2)->text());
         }
         QString asked;
-        QTimer* timer = answerModals(this, [&asked](QWidget* m) {
+        ModalAnswerer* timer = answerModals(this, [&asked](QWidget* m) {
             if (auto* box = qobject_cast<QMessageBox*>(m)) { asked = box->text(); box->button(QMessageBox::Yes)->click(); }
         });
         buttonWith(&w, QStringLiteral("Delete"))->click();
@@ -1131,7 +1174,7 @@ private slots:
         logCall(QStringLiteral("OE5VVM"));
         QCOMPARE(count(QStringLiteral("OE5VVM")), 1);
 
-        QTimer* t = answer(QMessageBox::No);
+        ModalAnswerer* t = answer(QMessageBox::No);
         logCall(QStringLiteral("OE5VVM"));
         delete t;
         QCOMPARE(asked, QStringList{QStringLiteral("Duplicate")});

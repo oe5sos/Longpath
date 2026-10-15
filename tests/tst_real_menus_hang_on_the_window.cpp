@@ -40,6 +40,8 @@
 
 #include <functional>
 
+#include "MenueFaenger.h"
+
 #include "core/BoardCapabilities.h"
 #include "core/HpsdrModel.h"
 #include "gui/MainWindow.h"
@@ -71,72 +73,15 @@ QRegularExpression notTopLevel()
     return QRegularExpression(QStringLiteral("must be a top level window"));
 }
 
-struct Opened {
-    QWidget*    parent{nullptr};
-    QStringList entries;
-    bool        seen{false};
-};
+// Die Technik (Ereignisfilter statt Taktgeber, gepostetes Schliessen)
+// liegt jetzt einmal in tests/MenueFaenger.h — sie wurde hier am
+// 2026-10-15 gebaut und von zwei weiteren Laeufen gebraucht. Warum
+// kein QTimer: siehe dort.
+using Opened = Longpath::Test::MenueFund;
 
-// Oeffnet ueber `trigger` ein Menue -- exec() oder popup() -- und schliesst
-// es, sobald es offen ist.
-// Faengt das Menue an seinem Show-Ereignis ab, noch bevor exec() in
-// die Ereignisschleife geht.
-//
-// ── Warum nicht mit einem Taktgeber (2026-10-15) ────────────────────
-//
-// Hier stand `QTimer::singleShot(200, ...)` auf
-// `QApplication::activePopupWidget()`. Das trug 19 der 21 Menues und
-// liess zwei haengen: der Lauf lief auf macOS in CTests
-// 120-Sekunden-Grenze und kam seit Wochen nie bis zum Ende. In der CI
-// faellt es nicht auf, dort ist er gruen (Linux UND macOS) — es
-// braucht einen echten Schirm.
-//
-// Zwei Gruende, beide mit `sample` am haengenden Prozess gemessen:
-//   1. `QMenu::exec()` dreht auf macOS eine COCOA-Schleife
-//      (`-[NSApplication run]`); Qt-Taktgeber und gepostete Ereignisse
-//      kommen darin nicht zuverlaessig an (beides ausprobiert).
-//   2. Zwei dieser Menues bekommen im Lauf die Hoehe NULL
-//      („QRect(1299,1556 166x0) outside any known screen") — sie
-//      werden nie sichtbar und damit nie `activePopupWidget()`. Auch
-//      ein funktionierender Taktgeber haette sie nicht gefunden.
-//
-// Ein Ereignisfilter laeuft dagegen SYNCHRON in `sendEvent`, also
-// waehrend `exec()` das Menue zeigt und BEVOR es in die Schleife
-// eintritt. Das Schliessen wird von dort gepostet: beim Eintritt in
-// die Schleife arbeitet Qt die eigene Warteschlange ab, und das Menue
-// geht wieder zu, ohne dass jemand klicken muss.
-class MenuCatcher : public QObject {
-public:
-    explicit MenuCatcher(Opened* out) : m_out(out) {}
-
-    bool eventFilter(QObject* obj, QEvent* ev) override
-    {
-        if (ev->type() == QEvent::Show && !m_out->seen) {
-            if (auto* m = qobject_cast<QMenu*>(obj)) {
-                m_out->parent = m->parentWidget();
-                for (QAction* a : m->actions()) { m_out->entries << a->text(); }
-                m_out->seen = true;
-                QMetaObject::invokeMethod(m, &QMenu::close,
-                                          Qt::QueuedConnection);
-            }
-        }
-        return QObject::eventFilter(obj, ev);
-    }
-
-private:
-    Opened* m_out;
-};
-
-Opened openMenu(const std::function<void()>& trigger)
+inline Opened openMenu(const std::function<void()>& trigger)
 {
-    Opened o;
-    MenuCatcher faenger(&o);
-    qApp->installEventFilter(&faenger);
-    trigger();
-    QTest::qWaitFor([&o]() { return o.seen; }, 2000);
-    QTest::qWait(50);
-    qApp->removeEventFilter(&faenger);
-    return o;
+    return Longpath::Test::oeffneMenue(trigger);
 }
 
 void contextAt(QWidget* w, const QPoint& p)

@@ -32,6 +32,19 @@
 
 using namespace Longpath;
 
+// ── Wartezeiten (2026-10-15) ───────────────────────────────────────
+//
+// Hier standen 2000 ms. Das reicht auf einem ruhigen Rechner und nicht
+// mehr unter Last: im `ctest -j6`-Durchgang fiel
+// `loopback_bekommt_den_init_burst_ohne_anmeldung` um, weil der
+// Init-Burst (rund 98 Rahmen) nicht rechtzeitig durch war. Sechs
+// gleichzeitig gestartete Laeufe holten den Fehlschlag reproduzierbar
+// zurueck (1 von 6).
+//
+// Grosszuegig warten kostet nichts: die Zeit laeuft nur im
+// Fehlerfall ab.
+constexpr int kWartenMs = 15000;
+
 class TestTciRemoteAuth : public QObject {
     Q_OBJECT
 
@@ -71,10 +84,10 @@ private slots:
         QSignalSpy verbunden(&client, &QWebSocket::connected);
         QSignalSpy text(&client, &QWebSocket::textMessageReceived);
         client.open(QUrl(QStringLiteral("ws://127.0.0.1:%1").arg(server.port())));
-        QVERIFY(verbunden.wait(2000));
+        QVERIFY(verbunden.wait(kWartenMs));
 
         // … muss ein Client von Loopback sofort den Init-Burst bekommen.
-        QVERIFY2(text.wait(2000),
+        QVERIFY2(text.wait(kWartenMs),
                  "Loopback darf keine Anmeldung brauchen — sonst steht jeder "
                  "Logger und jedes Digimode-Programm still");
         bool sahReady = false;
@@ -211,7 +224,7 @@ private slots:
         QSignalSpy text(&client, &QWebSocket::textMessageReceived);
         client.open(QUrl(QStringLiteral("ws://%1:%2")
                              .arg(lan.toString()).arg(server.port())));
-        QVERIFY(verbunden.wait(2000));
+        QVERIFY(verbunden.wait(kWartenMs));
 
         // Vor der Anmeldung: Stille. Auch auf eine ganz gewöhnliche Abfrage.
         client.sendTextMessage(QStringLiteral("vfo:0,0;"));
@@ -225,7 +238,7 @@ private slots:
 
         // Richtiges Token: auth:ok; und danach der Init-Burst.
         client.sendTextMessage(QStringLiteral("auth:%1;").arg(token));
-        QVERIFY(text.wait(2000));
+        QVERIFY(text.wait(kWartenMs));
         bool sahOk = false, sahReady = false;
         for (int runde = 0; runde < 25 && !sahReady; ++runde) {
             for (const auto& a : text) {

@@ -86,10 +86,30 @@ private slots:
         w.show();
         QVERIFY(QTest::qWaitForWindowExposed(&w));
         QTest::qWait(10);
+
+        // ── Erst einschwingen lassen (2026-10-15) ────────────────────
+        //
+        // Hier wurde die Mindestgroesse 10 ms nach show() genommen. Zu
+        // frueh: auf diesem Mac meldet das Fenster da noch 561x720
+        // (die Werkzeugleiste ist noch umgebrochen) und erst beim
+        // naechsten Takt die wirklichen 561x617 — gemessen in
+        // 50-ms-Schritten.
+        //
+        // Aus dem fruehen Wert wurde `smaller` mit der HOEHE 720
+        // gebildet. Damit verlangte der Lauf am Ende eine
+        // VERGROESSERUNG von 700 auf 720 und prueste das Gegenteil
+        // dessen, was in seinem Namen steht. Auf den CI-Laeufern
+        // schwingt es schneller ein, darum fiel es dort nie auf.
+        QTRY_VERIFY_WITH_TIMEOUT(w.minimumSizeHint().height() <= 650, 1000);
         const QSize min = w.minimumSizeHint();
         const QSize smaller(qMax(min.width(), 900), qMax(min.height(), 650));
-        QVERIFY2(smaller.width() < 1000 || smaller.height() < 700,
-                 "Inhalt braucht die ganze vorgesehene Groesse");
+        // UND, nicht ODER: ist eine der beiden Kanten nicht wirklich
+        // kleiner, verkleinert dieser Lauf in dieser Richtung nichts
+        // und bezeugt sie auch nicht.
+        QVERIFY2(smaller.width() < 1000 && smaller.height() < 700,
+                 qPrintable(QStringLiteral("Inhalt braucht die ganze "
+                                           "vorgesehene Groesse: %1x%2")
+                                .arg(smaller.width()).arg(smaller.height())));
         // Erst verkleinern, wenn die wirkliche Mindestgroesse es zulaesst:
         // unter Last auf cocoa war sie nach 10 ms noch 698 hoch, und Qt
         // klemmte das resize sofort ab (der Wunsch kam nie als Ereignis
