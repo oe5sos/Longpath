@@ -161,6 +161,12 @@ class MainWindow : public QMainWindow {
 
 public:
 
+    /// Die Scheibenflaggen ein- oder ausschalten (View > Slice
+    /// flags). Aus ist der Zustand von August bis heute; an ist der
+    /// dritte Entwurf vom 2026-10-15. Oeffentlich fuer den Pruefstand.
+    void setSliceFlagsEnabled(bool on);
+    bool sliceFlagsEnabled() const { return m_sliceFlagsOn; }
+
     /// Das Feldbetrieb-Bild herstellen: ein eigenes Profil „Field",
     /// darin nur die Felder, die am Berg zaehlen. Der Pruefstand geht
     /// ueber den Menueeintrag — dann ist mitgeprueft, dass man
@@ -1464,6 +1470,12 @@ private:
     /// Auskunft darueber, ob gerade etwas schwebt.
     QAction* m_floatPanAction{nullptr};
 
+    /// Je Scheibe eine Flagge auf dem Panadapter, nach Scheibenkennung.
+    /// Leer, solange der Schalter aus ist.
+    QHash<int, class SliceFlag*> m_sliceFlags;
+    bool     m_sliceFlagsOn{false};
+    QAction* m_sliceFlagAction{nullptr};
+
     // Container infrastructure (Phase 3G-1)
     ContainerManager* m_containerManager{nullptr};
     QSplitter* m_mainSplitter{nullptr};
@@ -1825,6 +1837,13 @@ private:
     /// Den Haken des Panadapter-Schalters auf den wirklichen Zustand
     /// setzen, ohne dabei sein eigenes toggled() auszuloesen.
     void syncFloatPanAction();
+
+    /// Flaggen anlegen, abraeumen und an ihre Traeger legen. Drei
+    /// Schritte, drei Stellen — rebuildSliceFlags() beim Kommen und
+    /// Gehen einer Scheibe, refreshSliceFlags() bei Frequenz, Mode und
+    /// Groessenaenderung.
+    void rebuildSliceFlags();
+    void refreshSliceFlags();
 
     void offerPaletteRestart(const QString& paletteName);
 

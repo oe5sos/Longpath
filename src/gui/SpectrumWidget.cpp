@@ -12322,6 +12322,16 @@ void SpectrumWidget::setCtunEnabled(bool enabled)
 // wieder nach oben, sonst ueberdeckte die naechste Positionsrunde sie.
 // Die Flaggen sind am 2026-08-18 geloescht; die vorderste Scheibe wird
 // weiter gefuehrt, weil das Malen sie braucht.
+int SpectrumWidget::xForHz(double hz) const
+{
+    const QRect r = spectrumRect();
+    if (r.width() <= 0) { return -1; }
+    const int x = hzToX(hz, r);
+    // Ausserhalb: die Flagge soll sich dann gar nicht erst setzen.
+    if (x < r.left() || x > r.right()) { return -1; }
+    return x;
+}
+
 void SpectrumWidget::setFrontSliceIndex(int sliceIndex)
 {
     m_frontSliceIndex = sliceIndex;

@@ -5301,6 +5301,9 @@ longpath_add_test(tst_abbau_ueberlebt)
 # 2026-10-15: moos.json nannte zwei Rollen, die es im Programm nicht
 # gibt — still uebergangen, also seit dem ersten Tag wirkungslos.
 longpath_add_test(tst_palette_ohne_tote_rollen)
+# 2026-10-15: die Scheibenflagge ueber dem Panadapter, als Option —
+# dritter Anlauf um dieselbe Sache, siehe den Kopf der Datei.
+longpath_add_test(tst_scheibenflagge)
 target_compile_definitions(tst_palette_ohne_tote_rollen PRIVATE
     LONGPATH_SRC_DIR="${CMAKE_SOURCE_DIR}")
 target_compile_definitions(tst_oberflaeche_englisch PRIVATE

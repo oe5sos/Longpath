@@ -464,6 +464,7 @@ warren@wpratt.com
 #include <QMessageBox>
 #include "core/UpdateInstaller.h"
 #include "gui/styles/Theme.h"
+#include "gui/widgets/SliceFlag.h"
 #include <QDialog>
 #include <QDir>
 #include <QDockWidget>
@@ -8904,6 +8905,27 @@ void MainWindow::populateDefaultMeter()
     // wieder hineingelegt.
     restoreCanvasLayout();
 
+    // Die Scheibenflaggen aus den Einstellungen. NACH der Flaeche, weil
+    // sie am Panadapter haengen und der erst hier steht. Vorgabe AUS —
+    // das ist der Zustand, den der Betreiber seit August kennt.
+    m_sliceFlagsOn = AppSettings::instance()
+                         .value(QStringLiteral("SliceFlagsVisible"),
+                                QStringLiteral("False"))
+                         .toString() == QLatin1String("True");
+    if (m_sliceFlagAction) {
+        QSignalBlocker b(m_sliceFlagAction);
+        m_sliceFlagAction->setChecked(m_sliceFlagsOn);
+    }
+    rebuildSliceFlags();
+
+    // Kommt oder geht eine Scheibe, kommt oder geht ihre Flagge.
+    if (m_radioModel) {
+        connect(m_radioModel, &RadioModel::sliceAdded, this,
+                [this](int) { rebuildSliceFlags(); });
+        connect(m_radioModel, &RadioModel::sliceRemoved, this,
+                [this](int) { rebuildSliceFlags(); });
+    }
+
     // Pump future EFFECTIVE-visibility changes from the controller into
     // the panel. effectiveVisibilityChanged fires when either the user
     // toggle or the availability gate flips the net visibility, so we
@@ -9410,6 +9432,29 @@ void MainWindow::buildMenuBar()
         });
         connect(viewMenu, &QMenu::aboutToShow, this, [this]() {
             syncFloatPanAction();
+        });
+    }
+
+    // ── Die Scheibenflagge, als Option ───────────────────────────────
+    //
+    // Betreiber, 2026-10-15: „würde 1 nehmen und dies als eine option
+    // verwenden. sprich wenn ich sota mache stelle ich mir ein anderes
+    // profil zusammen, als ich zu hause bin und dadurch andere
+    // prioritäten. da wäre die vfo flagge besser geeignet."
+    //
+    // Also ein Haken wie jeder andere — und weil Layoutprofile die
+    // Sichtbarkeiten mitnehmen, kann zu Hause die Spalte stehen und am
+    // Berg die Flagge, ohne dass eines das andere ausschliesst.
+    {
+        m_sliceFlagAction = viewMenu->addAction(tr("&Slice flag"));
+        m_sliceFlagAction->setCheckable(true);
+        m_sliceFlagAction->setChecked(m_sliceFlagsOn);
+        m_sliceFlagAction->setToolTip(
+            tr("A flag per slice, right on the panadapter: frequency, "
+               "band, mode. Drag it where you want it — the line keeps "
+               "pointing at its own carrier."));
+        connect(m_sliceFlagAction, &QAction::toggled, this, [this](bool on) {
+            setSliceFlagsEnabled(on);
         });
     }
 
@@ -12064,10 +12109,13 @@ QStringList MainWindow::fieldLayoutKeepIds()
     return {
         QStringLiteral("Frequency"),         // Band, Mode, Abstimmen
         QStringLiteral("Rx"),                // Filter, AGC, Rauschen
-        QStringLiteral("BwFilter"),          // die Durchlassflaeche
         QStringLiteral("PhoneCw"),           // Betriebsart und Mikrofon
         QStringLiteral("SignalInstrument"),  // das kleine S-Meter
     };
+    // „bandfilter waere da zb uninteressant" (Betreiber, 2026-10-15):
+    // die Durchlassflaeche stand bis dahin in dieser Liste. Am Berg
+    // zaehlt sie nicht — dort stellt man den Filter einmal und sieht
+    // danach auf den Wasserfall.
 }
 
 void MainWindow::applyFieldLayout()
@@ -12107,6 +12155,12 @@ void MainWindow::applyFieldLayout()
     m_rotorDockWantedVisible = false;
     if (m_rotorDock) { m_rotorDock->setVisible(false); }
 
+    // Und die Scheibenflagge AN: „da waere die vfo flagge besser
+    // geeignet" (Betreiber, 2026-10-15). Am Berg ersetzt sie die
+    // Spalte; zu Hause bleibt sie aus, und das Layoutprofil haelt
+    // beides auseinander.
+    setSliceFlagsEnabled(true);
+
     // Und der Panadapter bekommt die Breite, die frei geworden ist.
     //
     // Ohne diese Zeilen behaelt der Splitter seine bisherige Teilung:
@@ -12144,6 +12198,121 @@ void MainWindow::applyFieldLayout()
                  "Your own arrangement is in the profile rail.")
                   .arg(bleiben.size()),
               ToastSeverity::Info, 5000);
+}
+
+// ── Die Scheibenflaggen (2026-10-15) ────────────────────────────────
+//
+// Siehe SliceFlag.h fuer die Herkunft: die alte VFO-Flagge fiel am
+// 2026-08-18 auf Ansage des Betreibers, und am 2026-10-15 wollte er
+// sie zurueck — schmal, je Scheibe eine, mit Leitlinie zum eigenen
+// Traeger (Entwurf 3 von dreien).
+//
+// Die Flaggen haengen am AKTIVEN Panadapter, nicht am Fenster: sie
+// sind Kinder seines SpectrumWidget und verschwinden mit ihm. Der
+// Schalter steht in View; aus ist der Zustand, den der Betreiber seit
+// August kannte, und er bleibt die Vorgabe.
+
+void MainWindow::setSliceFlagsEnabled(bool on)
+{
+    if (m_sliceFlagsOn == on) { return; }
+    m_sliceFlagsOn = on;
+    AppSettings::instance().setValue(
+        QStringLiteral("SliceFlagsVisible"),
+        on ? QStringLiteral("True") : QStringLiteral("False"));
+    rebuildSliceFlags();
+    if (m_sliceFlagAction && m_sliceFlagAction->isChecked() != on) {
+        QSignalBlocker b(m_sliceFlagAction);
+        m_sliceFlagAction->setChecked(on);
+    }
+}
+
+void MainWindow::rebuildSliceFlags()
+{
+    // Erst abraeumen — auch beim Ausschalten, und auch dann, wenn eine
+    // Scheibe verschwunden ist. qDeleteAll waere falsch: die Flaggen
+    // sind Kinder des Panadapters und koennten mit ihm schon weg sein.
+    for (auto it = m_sliceFlags.begin(); it != m_sliceFlags.end(); ++it) {
+        if (it.value()) { it.value()->deleteLater(); }
+    }
+    m_sliceFlags.clear();
+    if (!m_sliceFlagsOn || m_shuttingDown || !m_radioModel) { return; }
+
+    SpectrumWidget* sw = activeSpectrumWidget();
+    if (!sw) { return; }
+
+    for (SliceModel* slice : m_radioModel->slices()) {
+        if (!slice) { continue; }
+        const int idx = slice->sliceIndex();
+        auto* flagge = new SliceFlag(idx, sw);
+        m_sliceFlags.insert(idx, flagge);
+
+        // Von Hand verschobene Lage wiederherstellen.
+        const QString key = QStringLiteral("SliceFlagOffset_%1").arg(idx);
+        const QString roh = AppSettings::instance()
+                                .value(key, QString{}).toString();
+        const QStringList teile = roh.split(QLatin1Char(','));
+        if (teile.size() == 2) {
+            flagge->setManualOffset(QPoint(teile.at(0).toInt(),
+                                           teile.at(1).toInt()));
+        }
+
+        connect(flagge, &SliceFlag::moved, this,
+                [](int i, const QPoint& o) {
+            AppSettings::instance().setValue(
+                QStringLiteral("SliceFlagOffset_%1").arg(i),
+                QStringLiteral("%1,%2").arg(o.x()).arg(o.y()));
+        });
+        // Das Kreuz schliesst die FLAGGE, nicht die Scheibe. Eine
+        // Scheibe schliesst man dort, wo man sie angelegt hat — ein
+        // Kreuz an einer Beschriftung darf kein Funkgeraet umbauen.
+        connect(flagge, &SliceFlag::closeRequested, this, [this](int i) {
+            if (SliceFlag* f = m_sliceFlags.take(i)) { f->deleteLater(); }
+        });
+        connect(flagge, &SliceFlag::picked, this, [this](int i) {
+            if (m_radioModel) { m_radioModel->setActiveSlice(i); }
+            refreshSliceFlags();
+        });
+
+        // Der Inhalt folgt der Scheibe.
+        connect(slice, &SliceModel::frequencyChanged, flagge,
+                [this](double) { refreshSliceFlags(); });
+        connect(slice, &SliceModel::dspModeChanged, flagge,
+                [this](DSPMode) { refreshSliceFlags(); });
+        flagge->show();
+    }
+    refreshSliceFlags();
+}
+
+void MainWindow::refreshSliceFlags()
+{
+    if (m_sliceFlags.isEmpty() || m_shuttingDown || !m_radioModel) { return; }
+    SpectrumWidget* sw = activeSpectrumWidget();
+    if (!sw) { return; }
+
+    const QRect flaeche = sw->spectrumRect();
+    const int aktiv = m_radioModel->activeSlice()
+                          ? m_radioModel->activeSlice()->sliceIndex() : -1;
+
+    for (SliceModel* slice : m_radioModel->slices()) {
+        if (!slice) { continue; }
+        SliceFlag* flagge = m_sliceFlags.value(slice->sliceIndex(), nullptr);
+        if (!flagge) { continue; }
+
+        flagge->setFrequency(slice->frequency());
+        flagge->setBand(bandLabel(bandFromFrequency(slice->frequency())));
+        flagge->setMode(SliceModel::modeName(slice->dspMode()));
+        flagge->setFront(slice->sliceIndex() == aktiv);
+
+        const int x = sw->xForHz(slice->frequency());
+        if (x < 0) {
+            // Ausserhalb des Ausschnitts: nicht am Rand kleben lassen,
+            // sondern weg. Eine Flagge, die auf nichts zeigt, luegt.
+            flagge->hide();
+            continue;
+        }
+        flagge->show();
+        flagge->anchorTo(x, flaeche.top(), flaeche.bottom());
+    }
 }
 
 void MainWindow::syncFloatPanAction()
