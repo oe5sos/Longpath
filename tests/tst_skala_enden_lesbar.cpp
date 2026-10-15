@@ -70,50 +70,85 @@ private:
 private slots:
     void beideEndenStehenGanzDa()
     {
-        const QStringList zahlen = {
-            QStringLiteral("-40dB"), QStringLiteral("-30"),
+        // ── Der Vergleich ist font-unabhaengig ──────────────────────
+        //
+        // Ein erster Entwurf verglich die Tinte des ERSTEN Schildes
+        // („-40dB", fuenf Zeichen) mit der eines mittleren („-20",
+        // drei Zeichen) und setzte die Schwelle auf das Doppelte. Das
+        // haelt auf macOS, haengt aber an der Schrift: auf einem Linux-
+        // Laeufer mit anderer Schrift kann dasselbe Verhaeltnis
+        // darunter liegen, und der Lauf faellt, ohne dass etwas kaputt
+        // ist.
+        //
+        // Jetzt wird DIESELBE Zeichenkette zweimal gezeichnet: einmal
+        // am Ende der Skala, einmal mittendrin. Steht sie ganz da,
+        // sind beide Male gleich viele Bildpunkte Tinte — egal, welche
+        // Schrift der Laeufer hat.
+        const QString lang = QStringLiteral("-40dB");
+
+        // Am ENDE: Platz 0 von sieben.
+        const QStringList amEnde = {
+            lang,                    QStringLiteral("-30"),
             QStringLiteral("-20"),   QStringLiteral("-10"),
             QStringLiteral("0"),     QStringLiteral("+5"),
             QStringLiteral("+10")};
+        // MITTENDRIN: dieselbe Zeichenkette auf Platz 3 von sieben.
+        const QStringList mittig = {
+            QStringLiteral("-30"),   QStringLiteral("-20"),
+            QStringLiteral("-10"),   lang,
+            QStringLiteral("0"),     QStringLiteral("+5"),
+            QStringLiteral("+10")};
 
-        const QImage mit  = male(zahlen);
-        const QImage ohne = male({});
-        QCOMPARE(mit.size(), ohne.size());
+        const QImage mitEnde   = male(amEnde);
+        const QImage mitMitte  = male(mittig);
+        const QImage ohne      = male({});
+        QCOMPARE(mitEnde.size(), ohne.size());
 
         const int barH = 12;
-        const int barY = (mit.height() - barH) / 2;
+        const int barY = (ohne.height() - barH) / 2;
         const int oben = barY + barH + 1;
+        const int barX = 2;
+        const int barW = ohne.width() - 4;
 
-        // Die Enden: 44 Punkte breit (Kasten 40 plus Rand).
-        const int links  = unterschied(mit, ohne, QRect(0, oben, 44, 10));
-        const int rechts = unterschied(
-            mit, ohne, QRect(mit.width() - 44, oben, 44, 10));
-        // Eine Zahl in der Mitte als Mass fuer „ganz da": sie war nie
-        // abgeschnitten.
-        const int mitte = unterschied(
-            mit, ohne, QRect(mit.width() / 2 - 22, oben, 44, 10));
+        // Fenster um Platz 0 und um Platz 3.
+        const QRect fensterEnde(0, oben, 44, 10);
+        const int xMitte = barX + (3 * barW) / 6;
+        const QRect fensterMitte(xMitte - 22, oben, 44, 10);
 
-        qInfo() << "Tinte links" << links << "rechts" << rechts
-                << "Mitte (Vergleich)" << mitte;
+        const int tinteEnde  = unterschied(mitEnde,  ohne, fensterEnde);
+        const int tinteMitte = unterschied(mitMitte, ohne, fensterMitte);
 
-        QVERIFY2(mitte > 10,
-                 "schon in der Mitte steht keine Zahl — dann prueft das "
-                 "hier nichts");
+        qInfo() << "\"-40dB\" am Ende" << tinteEnde
+                << "— dieselbe Zeichenkette mittendrin" << tinteMitte;
 
-        // „-40dB" hat FUENF Zeichen, die Mitte („-20") drei. Wer die
-        // Enden abschneidet, bleibt deutlich darunter.
-        // Gemessen: ganz 93, abgeschnitten 56, Mitte 37. Die Schwelle
-        // liegt dazwischen.
-        QVERIFY2(links >= mitte * 2,
+        QVERIFY2(tinteMitte > 20,
+                 "mittendrin steht nichts — dann prueft das hier nichts");
+
+        // Gleich, bis auf ein paar Punkte Kantenglaettung durch die
+        // andere Lage im Raster.
+        QVERIFY2(tinteEnde * 10 >= tinteMitte * 9,
                  qPrintable(QStringLiteral(
-                     "die erste Zahl ist abgeschnitten: %1 Bildpunkte "
-                     "Tinte gegen %2 in der Mitte")
-                                .arg(links).arg(mitte)));
-        QVERIFY2(rechts * 3 >= mitte * 2,
+                     "die erste Zahl ist abgeschnitten: %1 Bildpunkte am "
+                     "Ende gegen %2 fuer dieselbe Zahl mittendrin")
+                                .arg(tinteEnde).arg(tinteMitte)));
+
+        // Und dasselbe fuer das rechte Ende.
+        const QStringList rechtsLang = {
+            QStringLiteral("-30"),   QStringLiteral("-20"),
+            QStringLiteral("-10"),   QStringLiteral("0"),
+            QStringLiteral("+5"),    QStringLiteral("+10"),
+            lang};
+        const QImage mitRechts = male(rechtsLang);
+        const QRect fensterRechts(ohne.width() - 44, oben, 44, 10);
+        const int tinteRechts =
+            unterschied(mitRechts, ohne, fensterRechts);
+        qInfo() << "\"-40dB\" am rechten Ende" << tinteRechts;
+
+        QVERIFY2(tinteRechts * 10 >= tinteMitte * 9,
                  qPrintable(QStringLiteral(
                      "die letzte Zahl ist abgeschnitten: %1 Bildpunkte "
-                     "Tinte gegen %2 in der Mitte")
-                                .arg(rechts).arg(mitte)));
+                     "gegen %2 mittendrin")
+                                .arg(tinteRechts).arg(tinteMitte)));
     }
 };
 
