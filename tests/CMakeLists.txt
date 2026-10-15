@@ -5270,6 +5270,10 @@ longpath_add_test(tst_update_checker)
 # 2026-10-14: sieben Absturzberichte lagen herum, keiner stand im
 # Protokoll. CrashReportDigest holt sie beim naechsten Start nach.
 longpath_add_test(tst_absturzberichte)
+# 2026-10-14: 680 Wiederanlaeufe im Protokoll des Betreibers, alle 14 s.
+# Die Treppe stieg nicht, weil onConnected() den Zaehler zuruecksetzte --
+# ein offener Socket ist aber noch keine brauchbare Sitzung.
+longpath_add_test(tst_dxcluster_wiederanlauf)
 # 2026-10-14: HAUSSTIL.md sagt „Nie Radius 3" -- elf standen trotzdem im
 # Quelltext. Dieser Lauf liest die Quellen und haelt die Regel nach;
 # QSlider::groove ist die eine begruendete Ausnahme.
