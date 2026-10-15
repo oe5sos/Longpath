@@ -75,6 +75,11 @@ void CompositeTxMicRouter::setVaxSource(VaxTxMicSource* source)
     m_vaxSource.store(source, std::memory_order_release);
 }
 
+void CompositeTxMicRouter::setFt8Source(TxMicRouter* source)
+{
+    m_ft8Source.store(source, std::memory_order_release);
+}
+
 int CompositeTxMicRouter::pullSamples(float* dst, int n)
 {
     if (dst == nullptr || n <= 0) {
@@ -85,6 +90,14 @@ int CompositeTxMicRouter::pullSamples(float* dst, int n)
 
     if (source == MicSource::Radio && m_radioSource != nullptr) {
         return m_radioSource->pullSamples(dst, n);
+    }
+
+    if (source == MicSource::Ft8) {
+        TxMicRouter* ft8 = m_ft8Source.load(std::memory_order_acquire);
+        if (ft8 != nullptr) {
+            return ft8->pullSamples(dst, n);
+        }
+        // Wie bei VAX: lieber das Mikrofon als Totenstille.
     }
 
     if (source == MicSource::Vax) {

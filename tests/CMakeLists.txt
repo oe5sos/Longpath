@@ -5312,6 +5312,9 @@ longpath_add_test(tst_scheibenflagge)
 longpath_add_test(tst_ft8_dekodiert)
 # 2026-10-15: FT8 am laufenden Ton — die Fenstergrenze ist der Punkt.
 longpath_add_test(tst_ft8_am_ton)
+# 2026-10-15: die Sendeseite, geschlossene Schleife — Text hinein,
+# Tonproben am Sendeweg abgeholt, wieder dekodiert.
+longpath_add_test(tst_ft8_senden)
 # 2026-10-15: FT8 im PROGRAMM — Abgriff, Flaeche, Eintrag. Dekoder und
 # Uhr waren gruen und trotzdem unerreichbar; dieser Lauf prueft die
 # Verdrahtung, nicht die Rechnung.

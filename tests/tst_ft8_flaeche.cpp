@@ -29,6 +29,7 @@
 #include <QtTest/QtTest>
 #include <QLabel>
 #include <QPlainTextEdit>
+#include <QLineEdit>
 #include <QPushButton>
 #include <QTimeZone>
 
@@ -301,6 +302,49 @@ private slots:
         // nur mit seiner Tonlage da, nicht mit einer falschen
         // Bandfrequenz.
         QVERIFY2(mhz < 0.01, qPrintable(QString::number(mhz, 'f', 6)));
+    }
+
+    // ── Senden ──────────────────────────────────────────────────────
+
+    /// Ein Druck auf „Send" bereitet die Nachricht vor und wartet auf
+    /// das eigene Fenster — er tastet NICHT sofort.
+    ///
+    /// Das ist der Punkt, an dem ein Fehler teuer wird: wer hier
+    /// sofort tastet, sendet mitten in die Empfangsperiode.
+    void derSendeknopfTastetNichtSofort()
+    {
+        RadioModel radio;
+        Ft8Applet applet(&radio);
+        QVERIFY(applet.cqButtonForTest());
+        QVERIFY(applet.stopButtonForTest());
+        QVERIFY(applet.textFeldForTest());
+
+        // Ohne Text passiert nichts — und zwar ohne Absturz.
+        applet.cqButtonForTest()->click();
+        QVERIFY(!applet.sendetGerade());
+
+        applet.textFeldForTest()->setText(QStringLiteral("CQ OE5SOS JN78"));
+        applet.cqButtonForTest()->click();
+
+        // Ohne Funkgeraet gibt es keinen Sendeweg: das Applet sagt es
+        // und faengt NICHT an.
+        if (!radio.ft8TxSource()) {
+            QVERIFY2(!applet.sendetGerade(),
+                     "ohne Sendeweg darf nichts anlaufen");
+            qInfo() << "kein Sendeweg (nicht verbunden) —"
+                    << applet.statusForTest()->text();
+            return;
+        }
+
+        QVERIFY(applet.sendetGerade());
+        QVERIFY2(!applet.cqButtonForTest()->isEnabled(),
+                 "waehrend des Wartens darf man nicht zweimal druecken");
+        QVERIFY(applet.stopButtonForTest()->isEnabled());
+
+        applet.abbrechen();
+        QVERIFY(!applet.sendetGerade());
+        QVERIFY(applet.cqButtonForTest()->isEnabled());
+        QVERIFY(!applet.stopButtonForTest()->isEnabled());
     }
 
     void dieFlaecheLaesstSichAbbilden()

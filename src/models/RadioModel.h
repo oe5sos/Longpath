@@ -202,6 +202,7 @@ class DxccColorProvider;
 class SpotModel;
 class SpotTableModel;
 class FreeDVStationModel;
+class Ft8TxSource;
 class RxDecodeModel;
 // TNF (design section 5): the canonical notch store, owned by RadioModel
 // alongside SpotModel. One list shared by every slice (design D1) because
@@ -1110,6 +1111,17 @@ public:
     SpotTableModel*       spotTableModel()      const { return m_spotTableModel.get(); }
     FreeDVStationModel*   freeDvStationModel()  const { return m_freeDvStationModel.get(); }
     RxDecodeModel*        rxDecodeModel()       const { return m_rxDecodeModel.get(); }
+
+    /// Der eigene FT8/FT4-Sender, oder null vor dem Verbinden
+    /// (2026-10-15). Siehe core/Ft8Tx.h.
+    Ft8TxSource* ft8TxSource() const { return m_ft8TxSource.get(); }
+
+    /// Der Mikrofon-Umschalter, oder null vor dem Verbinden. Ueber ihn
+    /// laeuft das Umlegen auf die FT8-Quelle beim Senden.
+    CompositeTxMicRouter* micRouter() const
+    {
+        return m_compositeMicRouter.get();
+    }
     DxccColorProvider*    dxccColorProvider()   const { return m_dxccColorProvider.get(); }
     DxClusterClient*      dxCluster()           const { return m_dxCluster.get(); }
     DxClusterClient*      rbn()                 const { return m_rbn.get(); }
@@ -3776,6 +3788,9 @@ private:
     // Reset before m_compositeMicRouter on teardown — see notes
     // around teardownConnection().
     std::unique_ptr<VaxTxMicSource>        m_vaxTxMicSource;
+    /// Der eigene FT8/FT4-Sender (2026-10-15). Am Router angemeldet,
+    /// liefert Stille, bis ihn jemand startet. Siehe core/Ft8Tx.h.
+    std::unique_ptr<Ft8TxSource> m_ft8TxSource;
     std::unique_ptr<CompositeTxMicRouter>  m_compositeMicRouter;
 
     // ── 3M-1c Phase L: cross-cutting ownership ──────────────────────────────
