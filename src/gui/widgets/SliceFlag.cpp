@@ -157,8 +157,11 @@ void SliceFlag::paintEvent(QPaintEvent*)
         p.fillRect(6 + i * 5, 5, 2, 2,
                    rolle("text-scale", Style::kTextScale));
     }
+    // Schriftgroessen von der Hausleiter, nicht frei gewaehlt:
+    // verify-style-drift zaehlt jede Stufe daneben, und zu Recht —
+    // eine eigene Groesse folgt keinem Palettenwechsel.
     QFont klein = font();
-    klein.setPixelSize(8);
+    klein.setPixelSize(Style::kFontMicro);
     p.setFont(klein);
     p.drawText(QRect(26, 1, 120, kKopfHoch), Qt::AlignVCenter,
                tr("SLICE %1").arg(QChar('A' + m_sliceIndex)));
@@ -167,7 +170,7 @@ void SliceFlag::paintEvent(QPaintEvent*)
 
     // Die Frequenz — der Grund, warum es die Flagge gibt.
     QFont gross = font();
-    gross.setPixelSize(21);
+    gross.setPixelSize(Style::kFontReading);
     p.setFont(gross);
     p.setPen(text);
     p.drawText(QRect(kRand, kKopfHoch - 2, kWidth - 2 * kRand, 24),
@@ -175,7 +178,7 @@ void SliceFlag::paintEvent(QPaintEvent*)
 
     // Band und Betriebsart als zwei Pillen.
     QFont pille = font();
-    pille.setPixelSize(9);
+    pille.setPixelSize(Style::kFontCaption);
     p.setFont(pille);
     int px = kRand;
     for (int i = 0; i < 2; ++i) {
