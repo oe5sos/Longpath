@@ -458,6 +458,7 @@ warren@wpratt.com
 #include <QVBoxLayout>
 #include <QSplitter>
 #include <QDateTime>
+#include <QElapsedTimer>
 #include <QPainter>
 #include <QPixmap>
 #include <QProgressDialog>
@@ -8204,6 +8205,8 @@ void MainWindow::populateDefaultMeter()
                 // Schritt die letzte Zeile steht -- ohne das war der
                 // gesamte ~450-zeilige Block ein einziger, blinder
                 // synchroner Aufruf.
+                QElapsedTimer profilUhr;
+                profilUhr.start();
                 qWarning() << "[ProfileApply:Step] 1/6 Vollbild";
                 // Vollbild MERKEN, bevor irgendein Schritt unten es
                 // kippen kann -- am Ende wird es wieder durchgesetzt
@@ -8287,7 +8290,13 @@ void MainWindow::populateDefaultMeter()
                     }
                 }
 
-                qWarning() << "[ProfileApply:Step] 2/6 Sichtbarkeits-Map";
+                // Messpunkt (2026-10-16): zwischen Schritt 1 und 2
+                // lagen in Martins Protokoll 2231 ms. Schritt 1 ist
+                // der Vollbild-Uebergang, und macOS animiert den —
+                // diese Zeile sagt, ob es wirklich das ist.
+                qWarning() << "[ProfileApply:Step] 2/6 Sichtbarkeits-Map"
+                           << "(Schritt 1 brauchte"
+                           << profilUhr.elapsed() << "ms)";
                 const QVariantMap vis =
                     s.value(QStringLiteral("visible")).toMap();
                 for (auto it = vis.constBegin(); it != vis.constEnd(); ++it) {
@@ -8397,7 +8406,24 @@ void MainWindow::populateDefaultMeter()
                         ensureOnVisibleScreen(w, this,
                                               QSize(Style::kAppletPanelW, 120));
                     } else if (auto* a = appletForKey(it.key())) {
+                        // Messpunkt (2026-10-16): wohin die Startzeit
+                        // geht.
+                        //
+                        // Gemessen an Martins Protokoll vom 15.10.:
+                        // „Profil anwenden" braucht 6,5 s, davon 3,5 s
+                        // allein in diesem Schritt. Er ruft
+                        // detachApplet() je schwebendem Applet — bei
+                        // ihm sechs. Ob sich die 3,5 s gleichmaessig
+                        // verteilen oder an EINEM haengen, sagt erst
+                        // diese Zeile.
+                        QElapsedTimer loeseUhr;
+                        loeseUhr.start();
                         detachApplet(a, dockIndex, rect, screen);
+                        const qint64 gebraucht = loeseUhr.elapsed();
+                        if (gebraucht >= 100) {
+                            qWarning() << "[ProfileApply:Step3] abgeloest"
+                                       << it.key() << "in" << gebraucht << "ms";
+                        }
                     }
                     // Eine Kennung ohne Applet dahinter wird
                     // übergangen: eine Aufnahme von vor einem Update
