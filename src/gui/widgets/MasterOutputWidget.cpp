@@ -16,6 +16,7 @@
 // =================================================================
 
 #include "MasterOutputWidget.h"
+#include "core/LogCategories.h"
 #include "gui/ScopedChildWidget.h"
 
 #include "core/AppSettings.h"
@@ -108,6 +109,24 @@ MasterOutputWidget::MasterOutputWidget(AudioEngine* audio, QWidget* parent)
     const QString savedDevice = s.value(QStringLiteral("audio/Speakers/DeviceName"),
                                         QString()).toString();
     m_currentDeviceName = savedDevice;
+
+    // Ins Protokoll, wenn das Programm STUMM startet (2026-10-15).
+    //
+    // Am 2026-10-15 kostete „kein Ton" eine Stunde: hier stand `True`,
+    // der Lautsprecherknopf sass stumm da, und sonst sagte es nichts —
+    // weder das Protokoll noch eine Meldung. Alles andere war in
+    // Ordnung (Geraet offen, WDSP bereit, I/Q lief), also suchte man
+    // ueberall sonst.
+    //
+    // Der Knopf bleibt wie er ist; nur steht der Zustand jetzt auch
+    // dort, wo man bei Stille zuerst nachsieht.
+    if (savedMuted) {
+        qCWarning(lcAudio).noquote()
+            << QStringLiteral("Hauptausgang startet STUMM "
+                              "(audio/Master/Muted=True) — der "
+                              "Lautsprecherknopf in der Hauptausgabe "
+                              "loest ihn.");
+    }
 
     // ── Speaker button ─────────────────────────────────────────────────────
     m_speakerBtn = new QPushButton(this);

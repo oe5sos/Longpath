@@ -23,6 +23,7 @@
 // =================================================================
 
 #include <QtTest/QtTest>
+#include <QRegularExpression>
 #include <QSignalSpy>
 #include <QPushButton>
 #include <QSlider>
@@ -213,6 +214,18 @@ private slots:
                    QStringLiteral("True"));
 
         AudioEngine engine;
+
+        // Der stumme Start gehoert ins Protokoll (2026-10-15).
+        //
+        // Am 2026-10-15 kostete „kein Ton" eine Stunde: hier stand
+        // True, der Lautsprecherknopf sass stumm da, und sonst sagte
+        // es nichts. Alles andere war in Ordnung — Geraet offen, WDSP
+        // bereit, I/Q lief —, also suchte man ueberall sonst. Ohne
+        // diese Zeile faellt der Hinweis beim naechsten Umbau still
+        // wieder heraus.
+        QTest::ignoreMessage(QtWarningMsg,
+            QRegularExpression(QStringLiteral("Hauptausgang startet STUMM")));
+
         MasterOutputWidget w(&engine);
 
         auto* slider = w.findChild<QSlider*>("masterSlider");
