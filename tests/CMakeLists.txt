@@ -6027,6 +6027,10 @@ longpath_add_test(tst_b8_overlay_signals)
 # activating a profile pushes filter values into TransmitModel (filterChanged),
 # isActiveProfileModified detects drift and clears after saveActiveProfile.
 # Per docs/superpowers/plans/2026-05-01-tx-bandwidth.md §Task 2.
+# ── Wer die Station ist (2026-10-16) ─────────────────────────────────
+# Vier Stellen lasen nur StationCallsign — und den schreibt niemand.
+longpath_add_test(tst_stationsrufzeichen)
+
 longpath_add_test(tst_tx_bandwidth_persistence)
 
 # ── Plan 4 Task 6 (D8): TX filter debounce + per-mode IQ-space mapping ────────
