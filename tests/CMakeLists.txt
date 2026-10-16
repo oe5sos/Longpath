@@ -3045,6 +3045,17 @@ target_link_libraries(tst_radio_discovery_probe PRIVATE Qt6::Network)
 longpath_add_test(tst_radio_discovery_scan_bound)
 target_link_libraries(tst_radio_discovery_scan_bound PRIVATE Qt6::Network)
 
+# ── Die Geraetesuche darf die Oberflaeche nicht anhalten ──────────────
+# Messlehre zu dem Befund vom 2026-10-16: scanAllNics() laeuft ohne
+# Faden in startDiscovery() und wartet je Netzkarte attemptsPerNic ×
+# quietPollsBeforeResend × pollTimeoutMs (SafeDefault: 1800 ms). Auf
+# einer Maschine mit zwei Karten hielt das jedes Fenster, das dabei
+# aufging, 3,6 s lang an — die Ursache der 18 Laeufe, die mit
+# „qWaitForWindowExposed returned FALSE" umfielen. Gemessen wird die
+# Dauer des AUFRUFS, nicht die der Suche.
+longpath_add_test(tst_suche_blockiert_den_start)
+target_link_libraries(tst_suche_blockiert_den_start PRIVATE Qt6::Network)
+
 # ── Phase 3Q Task 4: AddCustomRadioDialog — SKU model picker + action buttons ──
 # 4 tests: Auto-detect at index 0, all 16 SKUs present in modelCombo,
 # saveOfflineButton + probeButton objectNames accessible via findChild.
