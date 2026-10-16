@@ -652,7 +652,42 @@ jobs:
       # fail with "No rule to make target".
       - name: Build test executables (Linux)
         if: runner.os == 'Linux'
-        run: cmake --build build -j$(nproc) --target all_tests
+        # ── Beim LINKEN sparsamer sein (2026-10-16) ─────────────────
+        #
+        # Linux-Shard 2/4 faellt seit dem 2026-10-15 in jedem Lauf um
+        # (#238, #239, #244, #245), und immer derselbe. Was gemessen
+        # ist:
+        #
+        #   * Der Abbruch passiert in GENAU diesem Schritt: „Build
+        #     (Linux/macOS)" ist success, dieser und alle folgenden
+        #     haben gar kein Ergebnis.
+        #   * Es gibt KEIN Log („BlobNotFound" ueber die API) — der
+        #     Runner-Agent selbst stirbt, er meldet keinen Fehler.
+        #   * Platte ist es nicht: im gruenen Shard gemessen, 107 GB
+        #     frei nach dem Freiraeumen.
+        #   * Shard 2/4 ist der GROESSTE: 262 Testbinaerdateien gegen
+        #     243 / 224 / 231 in den anderen (Namens-MD5 modulo 4,
+        #     nachgerechnet).
+        #
+        # Das Muster passt auf einen OOM-Kill beim Linken: vier
+        # gleichzeitige Linker auf einem 16-GB-Laeufer, und der
+        # groesste Stapel kippt zuerst. Bewiesen ist es nicht — darum
+        # steht die Messung unten, die es beim naechsten Lauf zeigt.
+        #
+        # -j2 statt -j$(nproc) kostet Zeit und spart Speicher. Der
+        # Shard lag bei 25 Minuten, die anderen bei 29 — Luft ist da.
+        run: cmake --build build -j2 --target all_tests
+
+      - name: Speicher und Platte nach dem Testbau (Linux)
+        if: runner.os == 'Linux' && always()
+        # Die Messung zur These oben. Beim naechsten roten Lauf steht
+        # hier, wie nah es war — und wenn der Shard gruen bleibt,
+        # steht hier, wieviel Luft -j2 gebracht hat.
+        run: |
+          free -m || true
+          df -h / || true
+          echo "--- groesste Testbinaerdateien ---"
+          ls -S build/tests/tst_* 2>/dev/null | head -5 | xargs -r du -h 2>/dev/null || true
 
       - name: Build test executables (macOS)
         if: runner.os == 'macOS'
