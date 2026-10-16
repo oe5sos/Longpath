@@ -12,6 +12,9 @@
 
 #include "core/AudioEngine.h"
 #include "core/Ft8Stream.h"
+#include "core/Ft8Tx.h"
+#include "core/MoxController.h"
+#include "core/audio/CompositeTxMicRouter.h"
 #include "core/audio/AudioTapRing.h"
 #include "gui/StyleConstants.h"
 #include "models/RadioModel.h"
@@ -21,6 +24,7 @@
 
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QLineEdit>
 #include <QPlainTextEdit>
 #include <QProgressBar>
 #include <QPushButton>
@@ -49,6 +53,10 @@ constexpr int kPumpIntervalMs = 200;
 // leicht zwanzig Funde — 400 Zeilen sind also etwa die letzten zehn
 // Minuten.
 constexpr int kMaxLines = 400;
+
+// Die Tonlage, auf der gesendet wird. 1500 Hz ist die Mitte des
+// Durchlassbereichs und das, was WSJT-X ab Werk nimmt.
+constexpr float kSendeTonHz = 1500.0f;
 
 } // namespace
 
@@ -170,6 +178,34 @@ void Ft8Applet::buildUI()
     root->addWidget(m_list, 1);
 
     // ── Fusszeile ───────────────────────────────────────────────────
+    // ── Senden ──────────────────────────────────────────────────────
+    //
+    // Eine Zeile: was gesendet wird, und zwei Knoepfe. Kein
+    // Folgeschalter, keine Automatik — siehe Ft8Applet.h.
+    auto* sendRow = new QHBoxLayout();
+    m_textFeld = new QLineEdit(this);
+    m_textFeld->setFont(Style::monoFont(font(), Style::kFontSmall));
+    m_textFeld->setPlaceholderText(tr("CQ <call> <grid>"));
+    m_textFeld->setStyleSheet(QStringLiteral(
+        "QLineEdit { background: %1; color: %2; border: 1px solid %3;"
+        " padding: 2px 4px; }")
+        .arg(Style::kInsetBg, Style::kTextPrimary, Style::kInsetBorder));
+    sendRow->addWidget(m_textFeld, 1);
+
+    m_cqBtn = styledButton(tr("Send"), 56);
+    m_cqBtn->setToolTip(tr("Send this message once, in the next own "
+                           "period. No auto-sequencing."));
+    connect(m_cqBtn, &QPushButton::clicked, this, [this]() {
+        sendeNachricht(m_textFeld ? m_textFeld->text() : QString());
+    });
+    sendRow->addWidget(m_cqBtn);
+
+    m_stopBtn = styledButton(tr("Stop"), 48);
+    m_stopBtn->setEnabled(false);
+    connect(m_stopBtn, &QPushButton::clicked, this, [this]() { abbrechen(); });
+    sendRow->addWidget(m_stopBtn);
+    root->addLayout(sendRow);
+
     auto* foot = new QHBoxLayout();
     m_lastLabel = new QLabel(tr("last period: —"), this);
     m_lastLabel->setFont(Style::monoFont(font(), Style::kFontCaption));
@@ -221,6 +257,102 @@ void Ft8Applet::updateAudioTap()
 void Ft8Applet::syncFromModel()
 {
     setSlice(m_model ? m_model->activeSlice() : nullptr);
+}
+
+// ── Senden ──────────────────────────────────────────────────────────
+//
+// Der ganze Ablauf an einer Stelle, damit man ihn lesen kann, ohne zu
+// springen: vorbereiten, warten bis das eigene Fenster beginnt,
+// Mikrofonweg umlegen, tasten, Fenster laufen lassen, alles
+// zuruecknehmen.
+//
+// Was absichtlich fehlt: jede Automatik. Ein Druck = EIN Fenster.
+void Ft8Applet::sendeNachricht(const QString& text)
+{
+    if (m_sendet) { return; }
+    const QString sauber = text.trimmed().toUpper();
+    if (sauber.isEmpty()) {
+        if (m_status) { m_status->setText(tr("nothing to send")); }
+        return;
+    }
+    if (!m_model || !m_model->ft8TxSource() || !m_model->micRouter()) {
+        if (m_status) { m_status->setText(tr("no transmit path")); }
+        return;
+    }
+
+    Ft8TxSource* quelle = m_model->ft8TxSource();
+    if (!quelle->vorbereiten(sauber, kSendeTonHz, protocol())) {
+        if (m_status) {
+            m_status->setText(tr("cannot encode “%1”").arg(sauber));
+        }
+        return;
+    }
+
+    // Wann faengt mein naechstes Fenster an? Die Gegenperiode zu der,
+    // in der gehoert wird — wer in derselben sendet, hoert sich selbst
+    // und niemand sonst.
+    const qint64 jetzt = QDateTime::currentMSecsSinceEpoch();
+    const qint64 wartet = Ft8Tx::bisZumNaechsten(jetzt, protocol(),
+                                                 m_periode);
+    m_sendet = true;
+    if (m_cqBtn)   { m_cqBtn->setEnabled(false); }
+    if (m_stopBtn) { m_stopBtn->setEnabled(true); }
+    if (m_status) {
+        m_status->setText(tr("sending in %1 s")
+                              .arg(wartet / 1000.0, 0, 'f', 1));
+    }
+
+    if (!m_sendeTimer) {
+        m_sendeTimer = new QTimer(this);
+        m_sendeTimer->setSingleShot(true);
+    }
+    m_sendeTimer->disconnect();
+    connect(m_sendeTimer, &QTimer::timeout, this, [this]() {
+        if (!m_sendet || !m_model) { return; }
+        Ft8TxSource* q = m_model->ft8TxSource();
+        auto* router = m_model->micRouter();
+        if (!q || !router) { abbrechen(); return; }
+
+        // Erst den Weg legen, dann tasten: andersherum ginge der
+        // Sender mit dem Mikrofon auf, nicht mit dem Ton.
+        m_quelleVorher = static_cast<int>(router->activeSource());
+        router->setActiveSource(MicSource::Ft8);
+        q->starten();
+        if (m_model->moxController()) {
+            m_model->moxController()->setMox(true);
+        }
+        if (m_status) { m_status->setText(tr("transmitting")); }
+
+        // Das Fenster laeuft; danach alles zurueck. Ein Zuschlag von
+        // 300 ms, damit der letzte Ton draussen ist, bevor der Sender
+        // abschaltet.
+        QTimer::singleShot(Ft8Tx::fensterMs(protocol()) + 300, this,
+                           [this]() { abbrechen(); });
+    });
+    m_sendeTimer->start(static_cast<int>(wartet));
+}
+
+void Ft8Applet::abbrechen()
+{
+    if (m_sendeTimer) { m_sendeTimer->stop(); }
+
+    // Erst den Sender aus, dann den Weg zurueck — in dieser
+    // Reihenfolge ist zu keinem Zeitpunkt das Mikrofon auf Sendung.
+    if (m_model && m_model->moxController()) {
+        m_model->moxController()->setMox(false);
+    }
+    if (m_model && m_model->ft8TxSource()) {
+        m_model->ft8TxSource()->abbrechen();
+    }
+    if (m_model && m_model->micRouter() && m_quelleVorher >= 0) {
+        m_model->micRouter()->setActiveSource(
+            static_cast<MicSource>(m_quelleVorher));
+    }
+    m_quelleVorher = -1;
+    m_sendet = false;
+    if (m_cqBtn)   { m_cqBtn->setEnabled(true); }
+    if (m_stopBtn) { m_stopBtn->setEnabled(false); }
+    updateStatus();
 }
 
 void Ft8Applet::updateStatus()

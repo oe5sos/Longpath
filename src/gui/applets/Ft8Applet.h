@@ -36,6 +36,7 @@
 #include "AppletWidget.h"
 
 #include "core/Ft8Decoder.h"
+#include "core/Ft8Tx.h"
 
 #include <QDateTime>
 #include <QPointer>
@@ -46,6 +47,7 @@
 class QLabel;
 class QPlainTextEdit;
 class QProgressBar;
+class QLineEdit;
 class QPushButton;
 class QTimer;
 
@@ -78,6 +80,30 @@ public:
 
     void setProtocol(Ft8Decoder::Protocol p);
     Ft8Decoder::Protocol protocol() const;
+
+    // ── Senden (2026-10-15) ─────────────────────────────────────────
+    //
+    // Betreiber: „ft4-ft8 fertig machen."
+    //
+    // Was hier NICHT eingebaut ist: eine Folgeschaltung. Kein
+    // automatisches Antworten, kein CQ in Schleife, kein Senden nach
+    // einem Fund. Der Betreiber drueckt, das Programm sendet EIN
+    // Fenster, dann ist Schluss. Ein Dekoder, der von selbst sendet,
+    // ist ein anderes Ding — und einer, der es im Hintergrund tut,
+    // ein gefaehrliches.
+    //
+    // Der Ablauf: Knopf -> die Nachricht wird auf den Ton gelegt ->
+    // beim naechsten eigenen Fenster schaltet das Applet den
+    // Mikrofonweg auf die FT8-Quelle, tastet, laesst das Fenster
+    // laufen und nimmt beides wieder zurueck.
+    void sendeNachricht(const QString& text);
+    void abbrechen();
+    bool sendetGerade() const { return m_sendet; }
+
+    // Fuer den Pruefstand.
+    QPushButton* cqButtonForTest()  const { return m_cqBtn; }
+    QPushButton* stopButtonForTest() const { return m_stopBtn; }
+    QLineEdit*   textFeldForTest()  const { return m_textFeld; }
 
     // Fuer den Pruefstand.
     Ft8Stream*      streamForTest() const { return m_stream; }
@@ -115,6 +141,17 @@ private:
     QPushButton*    m_ft8Btn{nullptr};
     QPushButton*    m_ft4Btn{nullptr};
     QPushButton*    m_clearBtn{nullptr};
+
+    // Senden
+    QLineEdit*   m_textFeld{nullptr};
+    QPushButton* m_cqBtn{nullptr};
+    QPushButton* m_stopBtn{nullptr};
+    QTimer*      m_sendeTimer{nullptr};
+    /// In welcher Haelfte der Minute diese Station sendet. „Gerade"
+    /// ist die Vorgabe und entspricht WSJT-X' „Tx even/1st".
+    Ft8Periode   m_periode{Ft8Periode::Gerade};
+    bool         m_sendet{false};
+    int          m_quelleVorher{-1};   ///< MicSource, zum Zuruecknehmen
 };
 
 } // namespace Longpath
