@@ -1603,6 +1603,19 @@ void MainWindow::detachApplet(AppletWidget* applet, int dockIndex,
     const QString id = panelIdFor(applet);
     if (id.isEmpty() || m_floatingApplets.contains(id)) { return; }
 
+    // ── Teilzeiten (2026-10-16) ──────────────────────────────────────
+    //
+    // Der Messpunkt im Profil-Schritt 3 sagt, WELCHES Applet 600 ms
+    // braucht; diese Zahlen sagen, WELCHER TEIL davon. Die drei
+    // Verdaechtigen stehen weiter unten: das Erzeugen des Fensters, das
+    // show() (auf macOS das erste Mal, dass ein NSWindow wirklich
+    // entsteht) und applyDefaultSize(), das die Anordnung nach ihrer
+    // Mindestgroesse fragt. Alle drei sind billig zu messen und wurden
+    // noch nie gemessen.
+    QElapsedTimer loeseTeile;
+    loeseTeile.start();
+    qint64 tFenster = 0, tGeometrie = 0, tShow = 0, tGroesse = 0;
+
     // ── Der Grund, warum es nur EINEN Weg hierher gibt ───────────────
     //
     // Dieses setParent() geht über eine Top-Level-Grenze, und genau da
@@ -1674,6 +1687,7 @@ void MainWindow::detachApplet(AppletWidget* applet, int dockIndex,
     m_appletPanel->removeApplet(applet);
     auto* win = new AppletFloatingWindow(applet, id, dockIndex, this);
     m_floatingApplets.insert(id, win);
+    tFenster = loeseTeile.elapsed();
 
     // Kommt eine Geometrie aus dem Profil, gilt sie — und der
     // Bildschirm, auf dem sie stand, entscheidet mit. Steht das Fenster
@@ -1748,6 +1762,7 @@ void MainWindow::detachApplet(AppletWidget* applet, int dockIndex,
         ensureOnVisibleScreen(win, this,
                               QSize(Style::kAppletPanelW, 120));
     }
+    tGeometrie = loeseTeile.elapsed();
 
     connect(win, &AppletFloatingWindow::dockRequested,
             this, &MainWindow::dockAppletBack);
@@ -1768,6 +1783,7 @@ void MainWindow::detachApplet(AppletWidget* applet, int dockIndex,
     // stillschweigend rückgängig gemacht.
     if (!m_appletVis || m_appletVis->isEffectivelyVisible(id)) {
         win->show();
+        tShow = loeseTeile.elapsed();
         // Erst JETZT die Groesse: vor dem Anzeigen verlangt die
         // Anordnung fast nichts, danach ihre echte Untergrenze — und
         // die zieht das Fenster bildschirmfuellend auf. Nur wenn das
@@ -1775,6 +1791,7 @@ void MainWindow::detachApplet(AppletWidget* applet, int dockIndex,
         // Betreiber.
         if (!rect.isValid()) {
             win->applyDefaultSize();
+            tGroesse = loeseTeile.elapsed();
             // Und dann dorthin, wo es hergekommen ist. Die Groesse
             // bleibt die eben berechnete — die Lage des Feldes waere
             // meist zu schmal fuer ein Fenster mit eigener Leiste.
@@ -1785,6 +1802,18 @@ void MainWindow::detachApplet(AppletWidget* applet, int dockIndex,
             }
         }
         win->raise();
+    }
+
+    // Nur wenn es wirklich etwas gekostet hat — sonst ist die Zeile
+    // Rauschen in einem Protokoll, das ohnehin lang ist.
+    if (loeseTeile.elapsed() >= 100) {
+        qWarning().nospace()
+            << "[Detach:Teile] " << id
+            << ": Fenster erzeugen " << tFenster
+            << " ms, Geometrie " << (tGeometrie - tFenster)
+            << " ms, show() " << (tShow > 0 ? tShow - tGeometrie : 0)
+            << " ms, Vorgabegroesse " << (tGroesse > 0 ? tGroesse - tShow : 0)
+            << " ms, zusammen " << loeseTeile.elapsed() << " ms";
     }
 }
 
