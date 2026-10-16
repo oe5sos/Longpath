@@ -5629,7 +5629,31 @@ longpath_add_test(tst_logbook_beam_bearing)
 # Logbuch: Eingabezeile "NEW QSO" (2026-09-26).
 longpath_add_test(tst_logbook_entry_row)
 # Logbuch-Durchgangstest (Nacht 2026-09-26): Neuschreiben verliert nichts, alle Ablaeufe.
+#
+# ── RUN_SERIAL, weil darin eine LEISTUNG gemessen wird ───────────────
+#
+# typingStaysFast() tippt sechs Zeichen in das Suchfeld eines Logbuchs
+# mit 1500 QSOs und verlangt unter 400 ms je Taste. Allein gefahren
+# sind es 18 ms (Mittel 10). Unter "ctest -j8" wurden am 2026-10-16
+# daraus 462 ms, und der Lauf fiel um — Faktor 25 zwischen ruhiger und
+# besetzter Maschine.
+#
+# Aufgefallen ist das erst, als die Geraetesuche nicht mehr blockierte
+# (PR #251): vorher schliefen die Oberflaechentests je Fenster 4,6 s in
+# poll() und gaben dabei die Rechenzeit ab, die diese Messung brauchte.
+# Jetzt arbeiten sie wirklich. Die Messung war also nicht gruen, weil
+# sie stimmte, sondern weil die anderen warteten — dieselbe Klasse wie
+# bei tst_notch_removable_offline weiter oben.
+#
+# Eine Leistungsschranke gegen eine feste Millisekundenzahl ist nur auf
+# einer ruhigen Maschine eine Messung. RUN_SERIAL nimmt ihm die
+# Gegner; der ganze Lauf braucht allein 3,1 s, das kostet den
+# Durchgang also fast nichts. Die Schranke bleibt bei 400 ms, damit
+# sie weiter etwas aussagt.
 longpath_add_test(tst_logbook_durchgang)
+if(TEST tst_logbook_durchgang)
+    set_tests_properties(tst_logbook_durchgang PROPERTIES RUN_SERIAL TRUE)
+endif()
 longpath_add_test(tst_qso_map_flyto_window)
 # -- Satelliten ueber dem Horizont auf der Karte + Stempel im Detailpaneel --
 longpath_add_test(tst_qso_map_satellites)
