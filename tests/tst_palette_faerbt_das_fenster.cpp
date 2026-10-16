@@ -43,6 +43,13 @@
 #include "gui/styles/Theme.h"
 #include "gui/styles/ThemeQss.h"
 
+// Ein MainWindow braucht hier allein rund 5 s, bis es auf dem Schirm
+// steht — genau die Vorgabefrist von QTest::qWaitForWindowExposed.
+// Im vollen Durchgang vom 2026-10-16 fielen 18 Laeufe darueber, dieser
+// mit. PR #250 stellt den ganzen Pruefstand auf tests/FensterFrist.h
+// um; bis der drin ist, steht die Zahl hier.
+static constexpr int kFensterFrist = 20000;
+
 using namespace Longpath;
 
 namespace {
@@ -128,7 +135,7 @@ private slots:
         MainWindow mw;
         mw.resize(1470, 900);
         mw.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&mw));
+        QVERIFY(QTest::qWaitForWindowExposed(&mw, kFensterFrist));
         QTest::qWait(600);           // Layout und erstes Zeichnen
 
         // ── Grundrauschen: zwei Bilder OHNE Wechsel ─────────────────
@@ -206,7 +213,7 @@ private slots:
         MainWindow mw;
         mw.resize(1470, 900);
         mw.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&mw));
+        QVERIFY(QTest::qWaitForWindowExposed(&mw, kFensterFrist));
         QTest::qWait(600);
 
         const QImage vorher = mw.grab().toImage();
@@ -257,7 +264,7 @@ private slots:
         MainWindow mw;
         mw.resize(1470, 900);
         mw.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&mw));
+        QVERIFY(QTest::qWaitForWindowExposed(&mw, kFensterFrist));
         QTest::qWait(600);
 
         // Das Menue so suchen wie tst_palette_im_menue: NICHT ueber
