@@ -2456,6 +2456,20 @@ QMap<QString, QString> kvsFromSpot(const Longpath::DxSpot& spot,
     return kvs;
 }
 
+/// Die Farbe der FT8-Funde — EINMAL, fuer beide Quellen.
+///
+/// WSJT-X und der eigene Dekoder zeigen dieselbe Sorte Fund, also
+/// dieselbe Farbe; nur der Einstellungsschluessel ist ein anderer.
+/// Ein zweites „#6fa384" im Quelltext haette die Drift-Bremse
+/// ausgeloest (scripts/verify-style-drift.py, colour_literals) — zu
+/// Recht: zwei Abschriften derselben Farbe laufen beim naechsten
+/// Palettenwechsel auseinander.
+QString ft8SpotFarbe(const QString& schluessel)
+{
+    return Longpath::AppSettings::instance()
+        .value(schluessel, QStringLiteral("#6fa384")).toString();
+}
+
 }  // namespace
 
 void RadioModel::onClusterSpotReceived(const DxSpot& spot)
@@ -2495,8 +2509,7 @@ void RadioModel::onWsjtxSpotReceived(const DxSpot& spot)
     // the dialog's UI, so reuse that here.
     const int lifetime = s.value(QStringLiteral("WsjtxSpotLifetimeSec"),
                                  120).toInt();
-    const QString color = s.value(QStringLiteral("WsjtxSpotColor"),
-                                  QStringLiteral("#6fa384")).toString();
+    const QString color = ft8SpotFarbe(QStringLiteral("WsjtxSpotColor"));
     const int idx = m_spotModel->dedupIndexFor(spot.dxCall, spot.freqMhz);
     m_spotModel->applySpotStatus(idx, kvsFromSpot(spot, lifetime, color));
 
@@ -2529,6 +2542,64 @@ void RadioModel::onWsjtxSpotReceived(const DxSpot& spot)
         && !spot.dxCall.isEmpty()) {
         const QString mode =
             SpotTableModel::extractMode(spot.comment);
+        m_pskReporter->reportDecode(
+            spot.dxCall,
+            mode.isEmpty() ? QStringLiteral("FT8") : mode,
+            spot.freqMhz,
+            spot.snr);
+    }
+}
+
+void RadioModel::onNativeFt8Decode(const DxSpot& spot)
+{
+    // Der eigene Dekoder (2026-10-15). Gebaut wie
+    // onWsjtxSpotReceived — es ist dieselbe Sorte Fund, nur aus dem
+    // eigenen Haus statt aus einem zweiten Programm.
+    //
+    // Lebensdauer und Farbe stehen auf denselben Werten wie bei
+    // WSJT-X: 120 s (ein FT8-Fenster ist 15 s, nach zwei Minuten ist
+    // der Fund kalt) und dasselbe Gruen. Das ist mit Absicht KEINE
+    // neue Farbwahl — es ist dieselbe Sache, und wer die beiden
+    // auseinanderhalten will, liest die Quellenspalte. Beides laesst
+    // sich in den Einstellungen aendern.
+    auto& s = AppSettings::instance();
+    const int lifetime = s.value(QStringLiteral("NativeFt8SpotLifetimeSec"),
+                                 120).toInt();
+    const QString color = ft8SpotFarbe(QStringLiteral("NativeFt8SpotColor"));
+
+    if (m_spotModel) {
+        const int idx = m_spotModel->dedupIndexFor(spot.dxCall, spot.freqMhz);
+        m_spotModel->applySpotStatus(idx, kvsFromSpot(spot, lifetime, color));
+    }
+
+    // Und in den Sammler „was mein Geraet gerade gehoert hat".
+    if (m_rxDecodeModel) {
+        RxDecode dec;
+        dec.callsign = spot.dxCall;
+        dec.freqMhz  = spot.freqMhz;
+        dec.snr      = spot.snr;
+        dec.mode     = SpotTableModel::extractMode(spot.comment);
+        if (dec.mode.isEmpty()) { dec.mode = QStringLiteral("FT8"); }
+        dec.source   = spot.source;
+        // Die Zeit des FENSTERS, nicht die von jetzt: ein Fund gehoert
+        // in die Periode, in der er gehoert wurde, sonst stimmt er im
+        // Logbuch um bis zu fuenfzehn Sekunden nicht. DxSpot traegt
+        // nur die Uhrzeit; das Datum kommt von heute (ein Fenster
+        // liegt Sekunden zurueck, nicht Tage).
+        const QDateTime jetzt = QDateTime::currentDateTimeUtc();
+        dec.utcTime  = spot.utcTime.isValid()
+            ? QDateTime(jetzt.date(), spot.utcTime, QTimeZone::UTC)
+            : jetzt;
+        dec.payload  = spot.comment;
+        m_rxDecodeModel->addDecode(dec);
+    }
+
+    // Weitermelden, unter denselben Bedingungen wie der WSJT-X-Weg:
+    // nur wenn die Selbstmeldung ueberhaupt laeuft und ein Rufzeichen
+    // dasteht.
+    if (m_pskReporter && m_pskReporter->isAutoSendActive()
+        && !spot.dxCall.isEmpty()) {
+        const QString mode = SpotTableModel::extractMode(spot.comment);
         m_pskReporter->reportDecode(
             spot.dxCall,
             mode.isEmpty() ? QStringLiteral("FT8") : mode,

@@ -18,6 +18,7 @@
 #include "core/audio/AudioTapRing.h"
 #include "gui/StyleConstants.h"
 #include "models/RadioModel.h"
+#include "core/DxSpot.h"
 #include "models/RxDecodeModel.h"
 #include "models/SliceModel.h"
 
@@ -457,20 +458,29 @@ void Ft8Applet::onDecoded(const QVector<Longpath::Ft8Decode>& funde,
         m_list->appendPlainText(zeile);
         ++m_lineCount;
 
-        if (m_model && m_model->rxDecodeModel()) {
-            RxDecode eintrag;
-            eintrag.callsign = senderCallsign(d.text);
-            eintrag.freqMhz  = (wahlHz + (unteresSeitenband ? -d.freqHz
-                                                             : d.freqHz))
-                               / 1.0e6;
-            eintrag.snr      = static_cast<int>(std::lround(d.snrDb));
-            eintrag.mode     = modus;
-            // Nicht „WSJT-X": das ist eine andere Quelle und wuerde
-            // die beiden in der Liste vermischen.
-            eintrag.source   = QStringLiteral("Longpath");
-            eintrag.utcTime  = periodStart.toUTC();
-            eintrag.payload  = d.text;
-            m_model->rxDecodeModel()->addDecode(eintrag);
+        // Der Fund geht an EINE Stelle: RadioModel verteilt ihn weiter
+        // (Panadapter-Ueberlagerung ueber SpotModel, der Sammler
+        // RxDecodeModel, und PSK Reporter, wenn er laeuft) — genau wie
+        // beim WSJT-X-Weg. Vorher schrieb dieses Applet selbst ins
+        // RxDecodeModel und erreichte die Ueberlagerung nie
+        // (2026-10-15).
+        const QString ruf = senderCallsign(d.text);
+        if (m_model && !ruf.isEmpty()) {
+            DxSpot spot;
+            spot.dxCall   = ruf;
+            spot.freqMhz  = (wahlHz + (unteresSeitenband ? -d.freqHz
+                                                          : d.freqHz))
+                            / 1.0e6;
+            spot.snr      = static_cast<int>(std::lround(d.snrDb));
+            // Der Modus steht im Kommentar: SpotTableModel::extractMode
+            // liest ihn dort heraus, so wie bei den WSJT-X-Funden.
+            spot.comment  = QStringLiteral("%1  %2").arg(modus, d.text);
+            // Nicht „WSJT-X": das ist eine andere Quelle und wuerde die
+            // beiden in der Liste vermischen.
+            spot.source   = QStringLiteral("Longpath");
+            spot.spotterCall = QStringLiteral("Longpath");
+            spot.utcTime  = periodStart.toUTC().time();
+            m_model->onNativeFt8Decode(spot);
         }
     }
 

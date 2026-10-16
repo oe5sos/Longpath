@@ -39,6 +39,7 @@
 #include "gui/applets/Ft8Applet.h"
 #include "models/RadioModel.h"
 #include "models/RxDecodeModel.h"
+#include "models/SpotModel.h"
 #include "models/SliceModel.h"
 
 using namespace Longpath;
@@ -111,13 +112,39 @@ private slots:
         QCOMPARE(e.callsign, QStringLiteral("OE5SOS"));
         QCOMPARE(e.mode, QStringLiteral("FT8"));
         QCOMPARE(e.snr, -12);
-        QCOMPARE(e.payload, QStringLiteral("CQ OE5SOS JN78"));
-        QCOMPARE(e.utcTime, fenster);
+        // Der Nutztext traegt den Modus vorn — dasselbe Muster wie bei
+        // den WSJT-X-Funden, aus denen SpotTableModel::extractMode den
+        // Modus liest.
+        QVERIFY2(e.payload.endsWith(QStringLiteral("CQ OE5SOS JN78")),
+                 qPrintable(e.payload));
+        QVERIFY2(e.payload.startsWith(QStringLiteral("FT8")),
+                 qPrintable(e.payload));
+        // Die UHRZEIT des Fensters, nicht die von jetzt. Nur die
+        // Uhrzeit: DxSpot traegt kein Datum (QTime), das Datum kommt
+        // auf dem Weg von heute — im Betrieb ist ein Fenster Sekunden
+        // alt, nicht Tage.
+        QCOMPARE(e.utcTime.time(), fenster.time());
         // Wahlfrequenz PLUS Tonlage: 14 074 000 + 1234 Hz.
         QVERIFY2(qAbs(e.freqMhz - 14.075234) < 1e-6,
                  qPrintable(QString::number(e.freqMhz, 'f', 6)));
         // Nicht „WSJT-X": das ist eine andere Quelle.
         QVERIFY2(e.source != QStringLiteral("WSJT-X"), qPrintable(e.source));
+
+        // 3. Und der Spot — ohne den erreicht der Fund die
+        //    Ueberlagerung am Panadapter nie. Genau das war bis heute
+        //    der Fall: der Dekoder schrieb nur ins RxDecodeModel, und
+        //    die Ueberlagerung liest aus SpotModel.
+        QVERIFY(radio.spotModel());
+        bool gefunden = false;
+        for (const SpotData& sp : radio.spotModel()->spots()) {
+            if (sp.callsign != QStringLiteral("OE5SOS")) { continue; }
+            gefunden = true;
+            qInfo() << "Spot:" << sp.callsign << sp.rxFreqMhz << sp.source;
+            QVERIFY2(qAbs(sp.rxFreqMhz - 14.075234) < 1e-4,
+                     qPrintable(QString::number(sp.rxFreqMhz, 'f', 6)));
+            QCOMPARE(sp.source, QStringLiteral("Longpath"));
+        }
+        QVERIFY2(gefunden, "der Fund steht nicht im SpotModel");
     }
 
     // ── Das Seitenband entscheidet das Vorzeichen ───────────────────
