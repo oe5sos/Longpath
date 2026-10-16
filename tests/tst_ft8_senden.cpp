@@ -276,12 +276,42 @@ private slots:
         QVERIFY2(mox, "ohne MoxController hat dieser Lauf keinen Gegenstand");
 
         // Eine Pruefung, die immer ablehnt — wie der Bandplan an einer
-        // Stelle, an der nicht gesendet werden darf.
-        // MoxCheckFn nimmt nichts entgegen und wird nur vor dem
-        // EINschalten gefragt — siehe MoxController::setMoxCheck.
+        // Stelle, an der nicht gesendet werden darf. MoxCheckFn nimmt
+        // nichts entgegen und wird nur vor dem EINschalten gefragt —
+        // siehe MoxController::setMoxCheck.
+        //
+        // ── Und der Grund im Augenblick der Ablehnung ───────────────
+        //
+        // Nicht nach dem Warten unten: Ft8Applet haengt an einem Takt
+        // von 200 ms, und updateStatus() schreibt bei jedem Takt den
+        // Fensterstand („0.0 / 7.5 s") ueber die Zeile. Wer den Grund
+        // danach liest, liest den Takt — am 2026-10-16 genau so
+        // gemessen, erst mit einer gereihten Zustellung (die dem
+        // ueberfaelligen Taktgeber nicht zuverlaessig zuvorkommt) und
+        // dann ohne.
+        //
+        // Der eine Augenblick, der sicher traegt, ist die Pruefung
+        // selbst: MoxController::setMox() ruft m_moxCheck() auf und
+        // sendet moxRejected ERST danach aus (MoxController.cpp:501),
+        // und das Applet hat seinen Handler da schon angemeldet (es
+        // verbindet unmittelbar vor setMox(true)). Eine Verbindung,
+        // die hier entsteht, steht also HINTER der des Applets und
+        // laeuft im selben Aufruf direkt nach ihr — vor jedem Takt.
         int gefragt = 0;
-        mox->setMoxCheck([&gefragt]() {
+        QString grundInDerZeile;
+        QMetaObject::Connection beobachter;
+        mox->setMoxCheck([&]() {
             ++gefragt;
+            if (!beobachter) {
+                beobachter = QObject::connect(
+                    mox, &MoxController::moxRejected, &applet,
+                    [&applet, &grundInDerZeile](const QString&) {
+                        if (auto* l = applet.statusForTest()) {
+                            grundInDerZeile = l->text();
+                        }
+                    },
+                    Qt::DirectConnection);
+            }
             return safety::BandPlanGuard::MoxCheckResult{
                 false, QStringLiteral("ausserhalb des Bandes")};
         });
@@ -316,10 +346,39 @@ private slots:
                      "stehenbleiben");
         }
 
+        // ── Nicht auf „transmitting" pruefen (2026-10-16) ───────────
+        //
+        // Hier stand !zeile.contains("transmitting"). Das war gruen,
+        // solange der Ablehnungstext deutsch war („sendet nicht: %1");
+        // seit die Zeile englisch spricht, steht dort „NOT
+        // transmitting: ausserhalb des Bandes" — und die enthaelt das
+        // gesuchte Wort. Der Lauf fiel also um, WEIL das Programm sich
+        // richtig verhielt.
+        //
+        // Ein Teilwort trennt die beiden Zustaende nicht. Geprueft
+        // wird darum der oben abgegriffene Stand genau: er ist nicht
+        // der Sendezustand (tr("transmitting") / tr("sending in %1 s")),
+        // und er nennt den Grund der Ablehnung.
+        QVERIFY2(grundInDerZeile != QStringLiteral("transmitting")
+                     && !grundInDerZeile.startsWith(
+                            QStringLiteral("sending in")),
+                 qPrintable(QStringLiteral("die Zeile behauptet zu senden: %1")
+                                .arg(grundInDerZeile)));
+        QVERIFY2(grundInDerZeile.contains(
+                     QStringLiteral("ausserhalb des Bandes")),
+                 qPrintable(QStringLiteral(
+                     "die Zeile nannte den Grund der Ablehnung nie: %1")
+                                .arg(grundInDerZeile)));
+
+        // Und zuletzt der Stand, den der Betreiber wirklich sieht:
+        // nach dem Abbruch laeuft wieder die Fensteranzeige des
+        // Takts, nicht eine eingefrorene Sendemeldung.
         const QString zeile = applet.statusForTest()
                                   ? applet.statusForTest()->text() : QString();
-        QVERIFY2(!zeile.contains(QStringLiteral("transmitting")),
-                 qPrintable(QStringLiteral("die Zeile behauptet zu senden: %1")
+        QVERIFY2(zeile != QStringLiteral("transmitting"),
+                 qPrintable(QStringLiteral(
+                     "die Zeile ist auf der Sendemeldung "
+                     "stehengeblieben: %1")
                                 .arg(zeile)));
     }
 
