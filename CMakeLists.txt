@@ -556,6 +556,7 @@ set(CORE_SOURCES
     src/core/LogCategories.cpp
     src/core/DevAutomationServer.cpp
     src/core/RttyDecoder.cpp
+    src/core/RttyTx.cpp
     src/core/SupportBundle.cpp
     src/core/RadioDiscovery.cpp
     src/core/RadioConnection.cpp
