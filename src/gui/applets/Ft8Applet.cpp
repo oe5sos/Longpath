@@ -13,6 +13,7 @@
 #include "core/AudioEngine.h"
 #include "core/Ft8Stream.h"
 #include "core/Ft8Tx.h"
+#include "core/AppSettings.h"
 #include "core/MoxController.h"
 #include "core/audio/CompositeTxMicRouter.h"
 #include "core/audio/AudioTapRing.h"
@@ -26,6 +27,8 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QPlainTextEdit>
+#include <QTextCursor>
+#include <QMouseEvent>
 #include <QProgressBar>
 #include <QPushButton>
 #include <QTimer>
@@ -169,6 +172,11 @@ void Ft8Applet::buildUI()
     // ── Die Liste ───────────────────────────────────────────────────
     m_list = new QPlainTextEdit(this);
     m_list->setReadOnly(true);
+    // Doppelklick auf eine Zeile legt den Standardanruf ins
+    // Eingabefeld (siehe antwortAuf). Am viewport, nicht am Widget:
+    // die Mausereignisse einer Textflaeche kommen dort an.
+    m_list->viewport()->installEventFilter(this);
+    m_list->setToolTip(tr("Double-click a line to answer that station."));
     m_list->setFont(Style::monoFont(font(), Style::kFontSmall));
     m_list->setMinimumHeight(120);
     m_list->setLineWrapMode(QPlainTextEdit::NoWrap);
@@ -267,6 +275,98 @@ void Ft8Applet::syncFromModel()
 // zuruecknehmen.
 //
 // Was absichtlich fehlt: jede Automatik. Ein Druck = EIN Fenster.
+// ── Auf eine gehoerte Station antworten ──────────────────────────────
+//
+// Ein Doppelklick in die Fundliste legt den Standardanruf ins
+// Eingabefeld: „<sein Ruf> <mein Ruf> <mein Locator>". Gesendet wird
+// dadurch nichts — der Druck auf den Knopf bleibt beim Betreiber.
+//
+// Die Regel steht hier als statische Funktion, nicht im
+// Mausereignis: so laesst sie sich ohne Fenster und ohne Maus
+// pruefen, und der Doppelklick ist nur der Ausloeser.
+QString Ft8Applet::antwortAuf(const QString& zeile,
+                              const QString& meinRuf,
+                              const QString& meinLocator)
+{
+    if (meinRuf.trimmed().isEmpty()) { return {}; }
+
+    // Spalten wie in onDecoded(): HHMMSS dB DT Freq Nachricht. Die
+    // Zahlen sind mit arg(..., breite) auf feste Breite gebracht, also
+    // mit FUEHRENDEN Leerzeichen — simplified() macht daraus einfache
+    // Trenner, danach ist die Nachricht alles ab dem fuenften Feld.
+    const QString sauber = zeile.simplified();
+    const QString nachricht = sauber.section(QLatin1Char(' '), 4);
+    if (nachricht.isEmpty()) { return {}; }
+
+    const QString seinRuf = senderCallsign(nachricht);
+    if (seinRuf.isEmpty()) { return {}; }
+
+    // Sich selbst anzurufen ergibt keinen Sinn — und waere der
+    // haeufigste Fehlgriff, weil das eigene Rufzeichen in jeder
+    // Antwort auf einen selbst vorkommt.
+    if (seinRuf.compare(meinRuf.trimmed(), Qt::CaseInsensitive) == 0) {
+        return {};
+    }
+
+    // Der Locator ist das vierstellige Feld (JN67VV -> JN67): mehr
+    // passt nicht in eine FT8-Nachricht vom Standardtyp.
+    const QString locator = meinLocator.trimmed().left(4).toUpper();
+    if (locator.isEmpty()) {
+        return QStringLiteral("%1 %2").arg(seinRuf, meinRuf.trimmed().toUpper());
+    }
+    return QStringLiteral("%1 %2 %3")
+        .arg(seinRuf, meinRuf.trimmed().toUpper(), locator);
+}
+
+// `User/Callsign` ist der kanonische Schluessel — SpotHubDialog
+// schreibt ihn („Writes canonical keys: User/Callsign,
+// User/GridSquare"). `StationCallsign` wird dagegen von NIEMANDEM
+// geschrieben und nur gelesen (SotaClient, MainWindow_KiwiSdr,
+// QsoMapWindow); er steht hier als Rueckfall, damit eine von Hand
+// gesetzte Fassung nicht ins Leere laeuft.
+QString Ft8Applet::eigenesRufzeichen()
+{
+    auto& s = AppSettings::instance();
+    QString ruf = s.value(QStringLiteral("User/Callsign")).toString().trimmed();
+    if (ruf.isEmpty()) {
+        ruf = s.value(QStringLiteral("StationCallsign")).toString().trimmed();
+    }
+    return ruf.toUpper();
+}
+
+QString Ft8Applet::eigenerLocator()
+{
+    auto& s = AppSettings::instance();
+    QString loc = s.value(QStringLiteral("User/GridSquare")).toString().trimmed();
+    if (loc.isEmpty()) {
+        loc = s.value(QStringLiteral("StationGridSquare")).toString().trimmed();
+    }
+    return loc.toUpper();
+}
+
+bool Ft8Applet::eventFilter(QObject* obj, QEvent* ev)
+{
+    if (m_list && obj == m_list->viewport()
+        && ev->type() == QEvent::MouseButtonDblClick) {
+        auto* me = static_cast<QMouseEvent*>(ev);
+        QTextCursor c = m_list->cursorForPosition(me->pos());
+        c.select(QTextCursor::LineUnderCursor);
+        const QString antwort = antwortAuf(c.selectedText(),
+                                           eigenesRufzeichen(),
+                                           eigenerLocator());
+        if (antwort.isEmpty()) {
+            if (m_status && eigenesRufzeichen().isEmpty()) {
+                m_status->setText(tr("set your callsign first"));
+            }
+        } else if (m_textFeld) {
+            m_textFeld->setText(antwort);
+            m_textFeld->setFocus();
+        }
+        return true;
+    }
+    return AppletWidget::eventFilter(obj, ev);
+}
+
 void Ft8Applet::sendeNachricht(const QString& text)
 {
     if (m_sendet) { return; }

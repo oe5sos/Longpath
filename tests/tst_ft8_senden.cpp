@@ -304,6 +304,71 @@ private slots:
                                 .arg(zeile)));
     }
 
+    // ── Auf eine gehoerte Station antworten ─────────────────────────
+    //
+    // Ein Doppelklick in die Fundliste soll den Standardanruf ins
+    // Eingabefeld legen. Geprueft wird die REGEL, nicht die Maus:
+    // antwortAuf() ist statisch und braucht weder Fenster noch
+    // Zeigegeraet.
+    void einKlickAufEineZeileWirdZurAntwort_data()
+    {
+        QTest::addColumn<QString>("zeile");
+        QTest::addColumn<QString>("erwartet");
+
+        // So, wie onDecoded() die Zeile baut: HHMMSS, dB auf 4,
+        // DT auf 5, Hz auf 5, dann zwei Leerzeichen und die Nachricht.
+        QTest::newRow("CQ mit Locator")
+            << QStringLiteral("120000   -8   0.2  1500  CQ DL1ABC JO31")
+            << QStringLiteral("DL1ABC OE5SOS JN67");
+        QTest::newRow("CQ DX")
+            << QStringLiteral("120000  -14  -0.3   780  CQ DX VK3ABC QF22")
+            << QStringLiteral("VK3ABC OE5SOS JN67");
+        // Ein laufendes QSO zweier anderer: geantwortet wird dem, der
+        // sendet — senderCallsign() liest das zweite Rufzeichen.
+        QTest::newRow("fremdes QSO")
+            << QStringLiteral("120000   -3   0.0  2100  OE1XYZ DL1ABC -12")
+            << QStringLiteral("DL1ABC OE5SOS JN67");
+        // Sich selbst anrufen ergibt nichts.
+        QTest::newRow("das bin ich")
+            << QStringLiteral("120000   -3   0.0  2100  DL1ABC OE5SOS -12")
+            << QString();
+        // Kein Rufzeichen in der Zeile.
+        QTest::newRow("nur Grusswort")
+            << QStringLiteral("120000   -3   0.0  2100  73")
+            << QString();
+        // Eine Zeile ohne Nachrichtenspalte.
+        QTest::newRow("abgeschnitten")
+            << QStringLiteral("120000   -3")
+            << QString();
+    }
+
+    void einKlickAufEineZeileWirdZurAntwort()
+    {
+        QFETCH(QString, zeile);
+        QFETCH(QString, erwartet);
+        QCOMPARE(Ft8Applet::antwortAuf(zeile, QStringLiteral("OE5SOS"),
+                                       QStringLiteral("JN67VV")),
+                 erwartet);
+    }
+
+    // Ohne eigenes Rufzeichen gibt es keine Antwort — sonst stuende
+    // eine halbe Nachricht im Feld, die beim Senden nicht packbar ist.
+    void ohneEigenesRufzeichenKeineAntwort()
+    {
+        const QString zeile =
+            QStringLiteral("120000   -8   0.2  1500  CQ DL1ABC JO31");
+        QVERIFY(Ft8Applet::antwortAuf(zeile, QString(),
+                                      QStringLiteral("JN67VV")).isEmpty());
+        QVERIFY(Ft8Applet::antwortAuf(zeile, QStringLiteral("   "),
+                                      QStringLiteral("JN67VV")).isEmpty());
+
+        // Ohne Locator aber schon: der ist in einer FT8-Antwort
+        // ueblich, aber nicht zwingend.
+        QCOMPARE(Ft8Applet::antwortAuf(zeile, QStringLiteral("OE5SOS"),
+                                       QString()),
+                 QStringLiteral("DL1ABC OE5SOS"));
+    }
+
     void derRouterLiefertDieFt8QuelleDurch()
     {
         PcMicSource* keinPc = nullptr;

@@ -96,6 +96,28 @@ public:
     // beim naechsten eigenen Fenster schaltet das Applet den
     // Mikrofonweg auf die FT8-Quelle, tastet, laesst das Fenster
     // laufen und nimmt beides wieder zurueck.
+    /// Die Antwort auf eine Zeile der Fundliste, oder leer.
+    ///
+    /// `zeile` ist eine Zeile im Format der Liste (Spalten wie in
+    /// WSJT-X „Band Activity": HHMMSS dB DT Freq Nachricht). Heraus
+    /// kommt der Standardanruf „<sein Ruf> <mein Ruf> <mein Locator>"
+    /// — das, was man auf ein CQ hin sendet.
+    ///
+    /// Leer, wenn die Zeile kein Rufzeichen hergibt, wenn das eigene
+    /// Rufzeichen fehlt, oder wenn man sich selbst anklickt.
+    ///
+    /// Statisch und ohne Zustand, damit die Regel ohne Fenster und
+    /// ohne Maus zu pruefen ist — der Doppelklick ist nur der Ausloeser.
+    static QString antwortAuf(const QString& zeile,
+                              const QString& meinRuf,
+                              const QString& meinLocator);
+
+    /// Das eigene Rufzeichen aus den Einstellungen. `User/Callsign`
+    /// ist der kanonische Schluessel (SpotHubDialog schreibt ihn);
+    /// `StationCallsign` ist der Rueckfall.
+    static QString eigenesRufzeichen();
+    static QString eigenerLocator();
+
     void sendeNachricht(const QString& text);
     void abbrechen();
     bool sendetGerade() const { return m_sendet; }
@@ -117,6 +139,12 @@ public:
     /// Der Rufzeichen-Absender aus einer FT8-Nachricht, oder leer.
     /// Oeffentlich, weil er sonst nicht einzeln pruefbar waere.
     static QString senderCallsign(const QString& message);
+
+protected:
+    /// Doppelklick in die Fundliste: die Zeile wird zur Antwort im
+    /// Eingabefeld. Gesendet wird dadurch NICHTS — der Druck auf den
+    /// Knopf bleibt beim Betreiber.
+    bool eventFilter(QObject* obj, QEvent* ev) override;
 
 private slots:
     void onDecoded(const QVector<Longpath::Ft8Decode>& funde,
