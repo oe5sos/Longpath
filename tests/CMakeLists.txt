@@ -6027,6 +6027,12 @@ longpath_add_test(tst_b8_overlay_signals)
 # activating a profile pushes filter values into TransmitModel (filterChanged),
 # isActiveProfileModified detects drift and clears after saveActiveProfile.
 # Per docs/superpowers/plans/2026-05-01-tx-bandwidth.md §Task 2.
+# ── Die Sendebandbreite zum Durchklicken (2026-10-16) ────────────────
+# Betreiber: „nur das ich anklicken kann die unterschiedlichen
+# bandbreiten durchklicken kann". Prueft die Stufenregel ohne Fenster
+# und den Knopf mit.
+longpath_add_test(tst_tx_bandbreiten_klickbar)
+
 # ── Wer die Station ist (2026-10-16) ─────────────────────────────────
 # Vier Stellen lasen nur StationCallsign — und den schreibt niemand.
 longpath_add_test(tst_stationsrufzeichen)
