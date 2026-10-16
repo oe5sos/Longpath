@@ -19,6 +19,7 @@
 #include "gui/applets/AppletFloatingWindow.h"
 #include "gui/applets/BandwidthFilterApplet.h"
 #include "models/RadioModel.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -32,7 +33,7 @@ private slots:
         RadioModel model;
         BandwidthFilterApplet applet(&model);
         applet.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&applet));
+        QVERIFY(QTest::qWaitForWindowExposed(&applet, kFensterFrist));
 
         const int floorW = applet.minimumSizeHint().width();
         qInfo() << "Untergrenze der Breite:" << floorW;
@@ -57,7 +58,7 @@ private slots:
         auto* applet = new BandwidthFilterApplet(&model);
         AppletFloatingWindow win(applet, QStringLiteral("test"), 0);
         win.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&win));
+        QVERIFY(QTest::qWaitForWindowExposed(&win, kFensterFrist));
         for (int i = 0; i < 6; ++i) { QCoreApplication::processEvents(); }
 
         win.resize(340, 240);
@@ -87,7 +88,7 @@ private slots:
         BandwidthFilterApplet applet(&model);
         applet.resize(800, 260);
         applet.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&applet));
+        QVERIFY(QTest::qWaitForWindowExposed(&applet, kFensterFrist));
         for (int i = 0; i < 4; ++i) { QCoreApplication::processEvents(); }
 
         auto lowLabel = [&]() -> QLabel* {

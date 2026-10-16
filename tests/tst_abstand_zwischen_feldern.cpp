@@ -27,6 +27,7 @@
 #include "gui/StyleConstants.h"
 #include "gui/applets/AppletPanelWidget.h"
 #include "gui/applets/GridCellWidget.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -42,7 +43,7 @@ private slots:
         // man misst Zufall (am 2026-10-14 genau so einmal passiert).
         mw->resize(1700, 1000);
         mw->show();
-        QVERIFY(QTest::qWaitForWindowExposed(mw));
+        QVERIFY(QTest::qWaitForWindowExposed(mw, kFensterFrist));
         for (int i = 0; i < 10; ++i) { QCoreApplication::processEvents(); }
         QTest::qWait(250);
 

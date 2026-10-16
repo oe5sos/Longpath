@@ -15,6 +15,7 @@
 
 #ifdef LONGPATH_GPU_SPECTRUM
 #include <QRhiWidget>
+#include "FensterFrist.h"
 #endif
 
 using namespace Longpath;
@@ -33,7 +34,7 @@ private slots:
         w.setFrequencyRange(14'100'000.0, 48'000.0);
         w.setShowFps(true);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
 
         QVector<float> bins(4096, static_cast<float>(std::pow(10.0, -13.0)));
         // Wie viele Bilder wirklich abgeschickt werden, haengt vom System

@@ -30,6 +30,7 @@
 #include "gui/applets/CwDecoderApplet.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -172,7 +173,7 @@ private slots:
         CwDecoderApplet applet(&radio);
         applet.resize(380, 260);
         applet.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&applet));
+        QVERIFY(QTest::qWaitForWindowExposed(&applet, kFensterFrist));
         QMetaObject::invokeMethod(&applet, "onStatsUpdated", Qt::DirectConnection,
                                   Q_ARG(float, 700.0f), Q_ARG(float, 24.0f));
         QMetaObject::invokeMethod(&applet, "onTextDecoded", Qt::DirectConnection,

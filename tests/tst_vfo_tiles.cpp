@@ -18,6 +18,7 @@
 #include "gui/widgets/VfoTileRow.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -51,7 +52,7 @@ private slots:
         VfoTileRow row(&model);
         row.resize(600, 40);
         row.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&row));
+        QVERIFY(QTest::qWaitForWindowExposed(&row, kFensterFrist));
 
         const QString txt = allText(&row);
         qInfo().noquote() << "Kacheln:" << txt;
@@ -68,7 +69,7 @@ private slots:
         model.addSlice();
         VfoTileRow row(&model);
         row.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&row));
+        QVERIFY(QTest::qWaitForWindowExposed(&row, kFensterFrist));
 
         const QList<SliceModel*> slices = model.slices();
         QVERIFY2(!slices.isEmpty(), "addSlice hat keine Scheibe angelegt");
@@ -86,7 +87,7 @@ private slots:
         RadioModel model;
         VfoTileRow row(&model);
         row.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&row));
+        QVERIFY(QTest::qWaitForWindowExposed(&row, kFensterFrist));
 
         QSignalSpy spy(&row, &VfoTileRow::kiwiToggleRequested);
 
@@ -119,7 +120,7 @@ private slots:
         VfoTileRow row(&model);
         row.resize(520, 34);
         row.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&row));
+        QVERIFY(QTest::qWaitForWindowExposed(&row, kFensterFrist));
         const QList<SliceModel*> slices = model.slices();
         if (!slices.isEmpty()) { slices.first()->setFrequency(7'131'300.0); }
         row.refresh();

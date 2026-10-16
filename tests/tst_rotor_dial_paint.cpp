@@ -33,6 +33,7 @@
 #include "gui/widgets/RotorDialWidget.h"
 #include "core/AppSettings.h"
 #include <QSignalSpy>
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -78,7 +79,7 @@ private slots:
         w->setActualBearing(45);
         w->setState(RotorDialWidget::State::Idle);
         w->show();
-        QVERIFY(QTest::qWaitForWindowExposed(w));
+        QVERIFY(QTest::qWaitForWindowExposed(w, kFensterFrist));
         QTest::qWait(80);
 
         const QImage img = renderDial(w);
@@ -108,7 +109,7 @@ private slots:
         w->setTargetBearing(90);
         w->setState(RotorDialWidget::State::OnTarget);
         w->show();
-        QVERIFY(QTest::qWaitForWindowExposed(w));
+        QVERIFY(QTest::qWaitForWindowExposed(w, kFensterFrist));
         QTest::qWait(80);
 
         const QImage img = renderDial(w);
@@ -161,7 +162,7 @@ private slots:
         w->resize(600, 200);
         w->setActualBearing(90);
         w->show();
-        QVERIFY(QTest::qWaitForWindowExposed(w));
+        QVERIFY(QTest::qWaitForWindowExposed(w, kFensterFrist));
 
         QSignalSpy spy(w, &RotorDialWidget::targetPicked);
 
@@ -211,7 +212,7 @@ private slots:
             // ein QImage zurueckgibt, und QVERIFY kehrt mit `return;`
             // zurueck. Das liesse sich hier gar nicht uebersetzen -- und
             // genau deshalb stand hier vorher nichts.
-            if (!QTest::qWaitForWindowExposed(w)) {
+            if (!QTest::qWaitForWindowExposed(w, kFensterFrist)) {
                 qFatal("Fenster wurde nie gezeigt — das Bild darunter waere leer");
             }
             QTest::qWait(60);
@@ -257,7 +258,7 @@ private slots:
         col->addWidget(dial, 1);
         host.resize(320, 420);
         host.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&host));
+        QVERIFY(QTest::qWaitForWindowExposed(&host, kFensterFrist));
         QCoreApplication::processEvents();
 
         const QSize before = dial->size();
@@ -300,7 +301,7 @@ private slots:
         col->addWidget(dial, 1);
         host.resize(320, 420);
         host.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&host));
+        QVERIFY(QTest::qWaitForWindowExposed(&host, kFensterFrist));
 
         const QImage img = dial->renderTransparent(240);
         QVERIFY(!img.isNull());

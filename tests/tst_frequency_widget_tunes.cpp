@@ -22,6 +22,7 @@
 #include "gui/instruments/FrequencyInstrument.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -42,7 +43,7 @@ private slots:
         applet.bindSlice(&slice);
         applet.resize(360, 90);
         applet.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&applet));
+        QVERIFY(QTest::qWaitForWindowExposed(&applet, kFensterFrist));
         for (int i = 0; i < 4; ++i) { QCoreApplication::processEvents(); }
 
         auto* inst = applet.findChild<FrequencyInstrument*>();
@@ -95,7 +96,7 @@ private slots:
         FrequencyApplet applet(&model);
         applet.bindSlice(&slice);
         applet.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&applet));
+        QVERIFY(QTest::qWaitForWindowExposed(&applet, kFensterFrist));
         for (int i = 0; i < 4; ++i) { QCoreApplication::processEvents(); }
 
         auto* inst = applet.findChild<FrequencyInstrument*>();

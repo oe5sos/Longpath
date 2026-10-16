@@ -31,6 +31,7 @@
 #include <QWidget>
 
 #include "gui/SpectrumWidget.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -93,7 +94,7 @@ private slots:
         col->addWidget(m_pan, 1);
         m_host.resize(1200, 700);
         m_host.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&m_host));
+        QVERIFY(QTest::qWaitForWindowExposed(&m_host, kFensterFrist));
 
         m_pan->setFrequencyRange(7'131'200.0, 200'000.0);
 

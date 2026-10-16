@@ -34,6 +34,7 @@
 #include "gui/WindowPlacement.h"
 #include "gui/applets/StripWindow.h"
 #include "models/RadioModel.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -107,7 +108,7 @@ private slots:
         QVERIFY2(mw->windowFlags().testFlag(Qt::FramelessWindowHint),
                  "nach dem Start formatfuellend (randlos)");
         mw->show();
-        QVERIFY(QTest::qWaitForWindowExposed(mw));
+        QVERIFY(QTest::qWaitForWindowExposed(mw, kFensterFrist));
         if (QTest::qWaitFor([mw]() { return mw->findChild<ConnectionPanel*>() != nullptr; },
                             15000)) {
             mw->findChild<ConnectionPanel*>()->close();

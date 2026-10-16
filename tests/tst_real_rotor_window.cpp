@@ -23,6 +23,7 @@
 #include "gui/ToolWindow.h"
 #include "gui/WindowChrome.h"
 #include "gui/widgets/RotorLogbookPanel.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -35,7 +36,7 @@ private slots:
         auto* mwp = new MainWindow();      // bewusst nicht abgeraeumt
         mwp->resize(1280, 800);
         mwp->show();
-        QVERIFY(QTest::qWaitForWindowExposed(mwp));
+        QVERIFY(QTest::qWaitForWindowExposed(mwp, kFensterFrist));
         QTest::qWait(500);
 
         // Unter den Panadapter holen — der Ort, an dem der Betreiber

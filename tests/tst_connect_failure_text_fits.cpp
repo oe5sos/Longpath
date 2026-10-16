@@ -21,6 +21,7 @@
 
 #include <QLabel>
 #include <QLayout>
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -40,7 +41,7 @@ private slots:
         ConnectionPanel panel(&model);
         panel.resize(1000, 700);
         panel.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&panel));
+        QVERIFY(QTest::qWaitForWindowExposed(&panel, kFensterFrist));
 
         QLabel* strip  = panel.stripInfoLabelForTest();
         QLabel* detail = panel.failureDetailLabelForTest();
@@ -68,7 +69,7 @@ private slots:
     {
         StatusToast toast(kDetail, ToastSeverity::Warning, 5000);
         toast.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&toast));
+        QVERIFY(QTest::qWaitForWindowExposed(&toast, kFensterFrist));
         QLabel* lbl = toast.findChild<QLabel*>();
         QVERIFY(lbl);
         const int need = toast.layout()->totalHeightForWidth(toast.width());
