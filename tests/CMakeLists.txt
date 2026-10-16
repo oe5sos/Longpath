@@ -5314,6 +5314,12 @@ longpath_add_test(tst_ft8_dekodiert)
 longpath_add_test(tst_ft8_am_ton)
 # 2026-10-15: die Sendeseite, geschlossene Schleife — Text hinein,
 # Tonproben am Sendeweg abgeholt, wieder dekodiert.
+# ── Der FT8-QSO-Ablauf, Zustand fuer Zustand ─────────────────────────
+# Ft8Ablauf sendet nicht, tastet nicht und kennt keine Uhr — darum
+# laeuft dieser Pruefstand ohne Fenster, ohne Funkgeraet und ohne zu
+# warten (QTEST_APPLESS_MAIN).
+longpath_add_test(tst_ft8_ablauf)
+
 longpath_add_test(tst_ft8_senden)
 # 2026-10-15: FT8 im PROGRAMM — Abgriff, Flaeche, Eintrag. Dekoder und
 # Uhr waren gruen und trotzdem unerreichbar; dieser Lauf prueft die
