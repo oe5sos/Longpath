@@ -1658,6 +1658,17 @@ public:
     // tst_radio_model_mic_ptt_wire can verify the signal/slot bind + prime
     // path without spinning up the full wireConnectionSignals pipeline.
     void wireMicPttDisabledForTest() { connectMicPttDisabledSignal(); }
+
+    /// Nur fuer Prueflaeufe: den Sendeweg so weit aufsetzen, dass
+    /// Ft8Applet wirklich senden kann — ohne Funkverbindung.
+    ///
+    /// ft8TxSource() und micRouter() entstehen sonst erst beim
+    /// Verbinden (siehe dort), und ohne sie bricht
+    /// Ft8Applet::sendeNachricht() mit „no transmit path" ab, bevor
+    /// irgendetwas geprueft werden kann. Setzt nur die beiden
+    /// Bausteine, nichts vom Rest der Kette: ein Pruefstand, der
+    /// senden WILL, soll nicht nebenbei eine Tonausgabe aufmachen.
+    void installFt8TxForTest();
     void wireMicInputsForTest() { connectMicInputSignals(); }
     void setLastBandForTest(Longpath::Band b) {
         const bool cross = (b != m_lastBand);

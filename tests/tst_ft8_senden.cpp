@@ -28,6 +28,10 @@
 
 #include "core/Ft8Decoder.h"
 #include "core/Ft8Tx.h"
+#include "core/MoxController.h"
+#include "core/safety/BandPlanGuard.h"
+#include "models/RadioModel.h"
+#include "gui/applets/Ft8Applet.h"
 #include "core/Resampler.h"
 #include "core/audio/CompositeTxMicRouter.h"
 #include "core/audio/PcMicSource.h"
@@ -228,6 +232,78 @@ private slots:
     /// Das ist die Stelle, an der FT8 bisher endete: gebaut, aber
     /// nirgends angeschlossen. Der Sprachspeicher steht bis heute so
     /// da (WavTxSource, niemand ruft es).
+    // ── Sagt der Bandplan nein, wird nicht gesendet ─────────────────
+    //
+    // MoxController::setMox(true) darf abgelehnt werden (falsche
+    // Betriebsart, Frequenz ausserhalb des Bandes, Cross-Band-TX). Die
+    // Ablehnung kommt NUR als moxRejected(reason) — setMox() gibt
+    // nichts zurueck.
+    //
+    // Bis zum 2026-10-16 hoerte im Ft8Applet niemand darauf: der Ton
+    // lief danach das ganze Fenster weiter, der Sendeweg blieb auf
+    // FT8 (das Mikrofon also abgeklemmt), und in der Zeile stand
+    // „transmitting", waehrend nichts hinausging.
+    //
+    // FT4 statt FT8, damit der Lauf hoechstens ein 7,5-s-Fenster
+    // abwartet statt eines von 15 s.
+    void einAbgelehntesTastenBrichtDasSendenAb()
+    {
+        RadioModel radio;
+        radio.installFt8TxForTest();   // sonst: „no transmit path"
+        Ft8Applet applet(&radio);
+        applet.setProtocol(Ft8Decoder::Protocol::Ft4);
+
+        auto* mox = radio.moxController();
+        QVERIFY2(mox, "ohne MoxController hat dieser Lauf keinen Gegenstand");
+
+        // Eine Pruefung, die immer ablehnt — wie der Bandplan an einer
+        // Stelle, an der nicht gesendet werden darf.
+        // MoxCheckFn nimmt nichts entgegen und wird nur vor dem
+        // EINschalten gefragt — siehe MoxController::setMoxCheck.
+        int gefragt = 0;
+        mox->setMoxCheck([&gefragt]() {
+            ++gefragt;
+            return safety::BandPlanGuard::MoxCheckResult{
+                false, QStringLiteral("ausserhalb des Bandes")};
+        });
+
+        applet.sendeNachricht(QStringLiteral("CQ OE5SOS JN78"));
+        QVERIFY2(applet.sendetGerade(),
+                 "der Versuch muss erst einmal anlaufen — er wartet auf "
+                 "sein Fenster");
+
+        // Sobald das Fenster beginnt, wird getastet, abgelehnt und
+        // abgebrochen.
+        //
+        // Die Frist nicht raten, sondern rechnen: gesendet wird in der
+        // GEGENperiode, die kommt nur jedes zweite Fenster. Die
+        // Wartezeit ist also bis zu 2 x fensterMs — bei FT4 bis zu
+        // 15 s, nicht 7,5. Mit geschaetzten 12 s fielen am 2026-10-16
+        // zwei von drei Laeufen um (13100 und 13150 ms haetten
+        // gereicht), waehrend der erste gruen war: genau die Art
+        // Wette, die dieser Pruefstand heute an vier Stellen
+        // losgeworden ist.
+        const int maxWarten = 2 * Ft8Tx::fensterMs(Ft8Decoder::Protocol::Ft4);
+        QTRY_VERIFY_WITH_TIMEOUT(!applet.sendetGerade(), maxWarten + 5000);
+
+        QVERIFY2(gefragt > 0, "es wurde nie zu tasten versucht");
+        QVERIFY2(!mox->isMox(), "abgelehnt heisst: der Sender bleibt aus");
+
+        // Und der Sendeweg liegt wieder, wo er war — sonst waere das
+        // Mikrofon nach einem abgelehnten Versuch stumm.
+        if (auto* router = radio.micRouter()) {
+            QVERIFY2(router->activeSource() != MicSource::Ft8,
+                     "nach dem Abbruch darf der Sendeweg nicht auf FT8 "
+                     "stehenbleiben");
+        }
+
+        const QString zeile = applet.statusForTest()
+                                  ? applet.statusForTest()->text() : QString();
+        QVERIFY2(!zeile.contains(QStringLiteral("transmitting")),
+                 qPrintable(QStringLiteral("die Zeile behauptet zu senden: %1")
+                                .arg(zeile)));
+    }
+
     void derRouterLiefertDieFt8QuelleDurch()
     {
         PcMicSource* keinPc = nullptr;

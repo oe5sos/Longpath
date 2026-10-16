@@ -2550,6 +2550,20 @@ void RadioModel::onWsjtxSpotReceived(const DxSpot& spot)
     }
 }
 
+void RadioModel::installFt8TxForTest()
+{
+    if (!m_compositeMicRouter) {
+        // Weder PC- noch Funkmikrofon, keine Mikrofonbuchse: der
+        // Router liefert dann Stille, und genau das soll er hier.
+        m_compositeMicRouter = std::make_unique<CompositeTxMicRouter>(
+            nullptr, nullptr, false);
+    }
+    if (!m_ft8TxSource) {
+        m_ft8TxSource = std::make_unique<Ft8TxSource>(48000);
+        m_compositeMicRouter->setFt8Source(m_ft8TxSource.get());
+    }
+}
+
 void RadioModel::onNativeFt8Decode(const DxSpot& spot)
 {
     // Der eigene Dekoder (2026-10-15). Gebaut wie

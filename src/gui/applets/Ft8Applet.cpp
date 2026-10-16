@@ -318,8 +318,40 @@ void Ft8Applet::sendeNachricht(const QString& text)
         m_quelleVorher = static_cast<int>(router->activeSource());
         router->setActiveSource(MicSource::Ft8);
         q->starten();
-        if (m_model->moxController()) {
-            m_model->moxController()->setMox(true);
+
+        // ── Wenn der Bandplan nein sagt, nicht weitermachen ──────────
+        //
+        // MoxController::setMox(true) darf abgelehnt werden: falsche
+        // Betriebsart, Frequenz ausserhalb des Bandes, Cross-Band-TX.
+        // Die Ablehnung kommt als moxRejected(reason) und sonst gar
+        // nicht — setMox() gibt nichts zurueck.
+        //
+        // Ohne diese Verbindung lief der Ton danach volle 12,6 s
+        // weiter, der Sendeweg blieb auf FT8 (also das Mikrofon
+        // abgeklemmt), und in der Zeile stand „transmitting", waehrend
+        // nichts hinausging. Jetzt bricht der Versuch sofort ab und
+        // sagt, woran es lag.
+        bool abgelehnt = false;
+        if (auto* mox = m_model->moxController()) {
+            QMetaObject::Connection c = connect(
+                mox, &MoxController::moxRejected, this,
+                [this, &abgelehnt](const QString& grund) {
+                    abgelehnt = true;
+                    if (m_status) {
+                        m_status->setText(tr("not transmitting: %1").arg(grund));
+                    }
+                });
+            mox->setMox(true);
+            disconnect(c);
+        }
+        if (abgelehnt) {
+            // abbrechen() setzt den Sendeweg zurueck und macht die
+            // Knoepfe wieder frei; die Zeile oben bleibt stehen, weil
+            // updateStatus() sie erst beim naechsten Takt ersetzt.
+            const QString grund = m_status ? m_status->text() : QString();
+            abbrechen();
+            if (m_status && !grund.isEmpty()) { m_status->setText(grund); }
+            return;
         }
         if (m_status) { m_status->setText(tr("transmitting")); }
 
