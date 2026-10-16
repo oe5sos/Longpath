@@ -86,10 +86,10 @@ void SystemTile::setCpuSource(bool wholeMachine)
 {
     m_cpuRow->setToolTip(
         wholeMachine
-            ? tr("CPU der GANZEN Maschine, nicht nur von Longpath.\n"
-                 "Rechtsklick, um auf „nur diese Anwendung“ umzustellen.")
-            : tr("CPU nur dieser Anwendung.\n"
-                 "Rechtsklick, um auf „ganze Maschine“ umzustellen."));
+            ? tr("CPU of the WHOLE machine, not just Longpath.\n"
+                 "Right-click to switch to \"this application only\".")
+            : tr("CPU of this application only.\n"
+                 "Right-click to switch to \"the whole machine\"."));
 }
 
 void SystemTile::setPaLabel(const QString& label)

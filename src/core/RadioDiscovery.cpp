@@ -288,11 +288,19 @@ QString RadioDiscovery::macToString(const char* bytes)
 RadioDiscovery::RadioDiscovery(QObject* parent)
     : QObject(parent)
 {
-    // Stale-sweep timer only. The continuous NIC walker that a 3I-4 subagent
-    // added was blocking the main thread for 15-20s every 5s — removed. Scans
-    // are now one-shot, user-triggered via ConnectionPanel. Async rewrite is
-    // a follow-up.
+    // Stale-sweep timer. The continuous NIC walker that a 3I-4 subagent
+    // added was blocking the main thread for 15-20s every 5s — removed.
+    // Scans are one-shot, user-triggered via ConnectionPanel.
     connect(&m_staleTimer, &QTimer::timeout, this, &RadioDiscovery::onStaleCheck);
+
+    // Der Takt des Suchlaufs. Die als "follow-up" angekuendigte
+    // asynchrone Fassung ist seit dem 2026-10-16 da: dieser Zeitgeber
+    // liefert die Wartezeit, die vorher waitForReadyRead() im
+    // Hauptfaden absass (siehe scanAllNics()). PreciseTimer, weil seine
+    // Schlaege die dokumentierte Schranke attemptsPerNic ×
+    // quietPollsBeforeResend × pollTimeoutMs ausmessen.
+    m_scanPollTimer.setTimerType(Qt::PreciseTimer);
+    connect(&m_scanPollTimer, &QTimer::timeout, this, &RadioDiscovery::onScanPoll);
 }
 
 RadioDiscovery::~RadioDiscovery()
@@ -364,13 +372,19 @@ void RadioDiscovery::startDiscovery()
     // does its own setsockopt(SO_BROADCAST) per NIC.
     m_stopRequested.store(false, std::memory_order_release);
     emit discoveryStarted();
-    scanAllNics();                              // one-shot NIC walk
-    if (!m_staleTimer.isActive()) {
-        // Sweep interval matches the discovered-only timeout so the first sweep
-        // fires no earlier than a radio can be considered stale (design §7.4).
-        m_staleTimer.start(kDiscoveredOnlyTimeoutMs);
-    }
-    emit discoveryFinished();
+
+    // Startet den Lauf und kehrt zurueck — der Lauf selbst geht ueber
+    // die Ereignisschleife weiter. discoveryFinished und der
+    // Stale-Zeitgeber kommen aus finishScan(), nicht mehr von hier:
+    // bis zum 2026-10-16 standen beide Signale im selben Takt, weil
+    // scanAllNics() die ganze Suche durchgearbeitet hatte, bevor es
+    // zurueckkam. ConnectionPanel setzt bei discoveryStarted
+    // "Searching for radios..." und schaltet den Suchknopf ab — das
+    // konnte niemand sehen.
+    //
+    // Gibt es gar keine brauchbare Netzkarte, meldet finishScan() noch
+    // in diesem Aufruf; dann ist die Suche wirklich fertig.
+    scanAllNics();
 }
 
 void RadioDiscovery::stopDiscovery()
@@ -384,6 +398,15 @@ void RadioDiscovery::stopDiscovery()
     // after the close path returns to the event loop.
     m_stopRequested.store(true, std::memory_order_release);
     m_staleTimer.stop();
+
+    // Laeuft ein Suchlauf, raeumt finishScan() ihn ab (Zeitgeber aus,
+    // Socket zu) und meldet das Ende genau einmal. Ohne diesen Zweig
+    // kaeme discoveryFinished zweimal: hier und noch einmal, wenn der
+    // Automat das Abbruch-Flag im naechsten Poll-Fenster sieht.
+    if (m_scanRunning) {
+        finishScan();
+        return;
+    }
     emit discoveryFinished();
 }
 
@@ -673,72 +696,114 @@ RadioDiscovery::QuietPollOutcome RadioDiscovery::quietPollAttempt(
     return QuietPollOutcome::Quiet;
 }
 
+// ── Der Suchlauf: ein Zustandsautomat, kein Durchmarsch ──────────────
+//
+// Bis zum 2026-10-16 stand hier eine Schleife, die je Netzkarte
+// attemptsPerNic × quietPollsBeforeResend × pollTimeoutMs in
+// QAbstractSocket::waitForReadyRead() wartete — auf SafeDefault
+// 3 × 5 × 150 = 2250 ms je Karte, im Hauptfaden, ohne Faden dahinter.
+// Der Konstruktor dieser Klasse kuendigte den Umbau an ("Async rewrite
+// is a follow-up"); hier ist er.
+//
+// Gemessen am 2026-10-16 mit `sample` an einem haengenden Prueflauf:
+// 682 von 683 Mustern standen in genau diesem poll(), erreicht ueber
+// MainWindow::showConnectionPanel -> ConnectionPanel::ConnectionPanel
+// -> startDiscovery -> scanAllNics -> quietPollAttempt. Auf einer
+// Maschine mit zwei Karten waren das 4656 ms, in denen kein Fenster
+// erschien und kein Zeitgeber feuerte.
+//
+// Die Aufteilung: scanAllNics() nimmt die Kandidaten auf und startet
+// die erste Karte. beginNextNic() bindet den Socket, beginAttempt()
+// sendet die Proben und startet den Takt, onScanPoll() schliesst je
+// Takt ein Poll-Fenster ab, onScanReadyRead() nimmt Antworten an,
+// finishScan() raeumt auf und meldet das Ende.
 void RadioDiscovery::scanAllNics()
 {
+    // Ein Lauf genuegt. Zwei gleichzeitige Laeufe auf derselben Karte
+    // wuerden sich die Antworten wegnehmen; vorher war das durch die
+    // blockierende Schleife von selbst ausgeschlossen.
+    if (m_scanRunning) {
+        return;
+    }
+
     // From Thetis clsRadioDiscovery.cs buildDiscoveryPacketP1()
-    QByteArray p1Packet = buildP1DiscoveryProbe();
+    m_scanP1 = buildP1DiscoveryProbe();
 
     // From Thetis clsRadioDiscovery.cs buildDiscoveryPacketP2()
-    QByteArray p2Packet(60, 0);
-    p2Packet[4] = static_cast<char>(0x02);
+    m_scanP2 = QByteArray(60, 0);
+    m_scanP2[4] = static_cast<char>(0x02);
 
-    const DiscoveryTiming timing = timingFor(m_profile);
-    const int attempts        = qMax(1, timing.attemptsPerNic);
-    const int quietBeforeStop = qMax(1, timing.quietPollsBeforeResend);
-    const int pollMs          = qMax(10, timing.pollTimeoutMs);
-
-    const qint64 now = QDateTime::currentMSecsSinceEpoch();
+    m_scanTiming = timingFor(m_profile);
+    m_scanNowMs  = QDateTime::currentMSecsSinceEpoch();
 
     // Global MAC de-duplication across all NICs for this scan cycle
-    QSet<QString> seenThisScan;
+    m_scanSeen.clear();
 
+    // Die Kandidaten EINMAL am Anfang aufnehmen. Vorher las die
+    // Schleife QNetworkInterface::allInterfaces() ebenfalls nur einmal
+    // — eine Karte, die mitten im Lauf dazukommt, kam auch da erst im
+    // naechsten Lauf mit.
+    //
+    // From Thetis isNicCandidate(): Up/Running, not loopback, und die
+    // erste IPv4-Adresse der Karte.
+    m_scanNics.clear();
     const auto interfaces = QNetworkInterface::allInterfaces();
     for (const QNetworkInterface& iface : interfaces) {
-        // Cooperative cancel — see stopDiscovery(). Bail before touching
-        // a new NIC if a shutdown was requested. (Inner loop also checks.)
-        if (m_stopRequested.load(std::memory_order_acquire)) {
-            return;
-        }
-
-        // From Thetis isNicCandidate(): Up/Running, not loopback
         if (!(iface.flags() & QNetworkInterface::IsUp)
             || !(iface.flags() & QNetworkInterface::IsRunning)
             || (iface.flags() & QNetworkInterface::IsLoopBack)) {
             continue;
         }
-
-        // Find the first IPv4 address on this NIC
-        QHostAddress nicIpv4;
-        QHostAddress nicBroadcast;
         const auto entries = iface.addressEntries();
         for (const QNetworkAddressEntry& entry : entries) {
             if (entry.ip().protocol() != QAbstractSocket::IPv4Protocol) {
                 continue;
             }
-            nicIpv4 = entry.ip();
-            nicBroadcast = entry.broadcast();
+            m_scanNics.append({iface.name(), entry.ip(), entry.broadcast()});
             break;
         }
+    }
 
-        if (nicIpv4.isNull()) {
-            continue;
-        }
+    m_scanRunning  = true;
+    m_scanNicIndex = -1;
+    beginNextNic();
+}
+
+void RadioDiscovery::beginNextNic()
+{
+    // Die vorige Karte zumachen, bevor die naechste bindet.
+    if (m_scanSock) {
+        m_scanSock->close();
+        m_scanSock->deleteLater();
+        m_scanSock = nullptr;
+    }
+
+    // Cooperative cancel — see stopDiscovery(). Vor der naechsten Karte
+    // greifen, wie die alte Schleife es am Kopf ihres NIC-Durchlaufs tat.
+    if (m_stopRequested.load(std::memory_order_acquire)) {
+        finishScan();
+        return;
+    }
+
+    ++m_scanNicIndex;
+    while (m_scanNicIndex < m_scanNics.size()) {
+        const NicCandidate& nic = m_scanNics.at(m_scanNicIndex);
 
         // From Thetis discoverOnNic(): bind to local IPv4 on ephemeral port
-        QUdpSocket sock;
-        sock.setSocketOption(QAbstractSocket::MulticastLoopbackOption, 0);
-        if (!sock.bind(nicIpv4, 0)) {
-            qCWarning(lcDiscovery) << "Failed to bind to" << nicIpv4.toString()
-                                   << "on" << iface.name() << "— skipping";
+        auto* sock = new QUdpSocket(this);
+        sock->setSocketOption(QAbstractSocket::MulticastLoopbackOption, 0);
+        if (!sock->bind(nic.ipv4, 0)) {
+            qCWarning(lcDiscovery) << "Failed to bind to" << nic.ipv4.toString()
+                                   << "on" << nic.name << "— skipping";
+            sock->deleteLater();
+            ++m_scanNicIndex;
             continue;
         }
 
         // Enable SO_BROADCAST. Windows setsockopt takes optval as
         // `const char*`; POSIX takes `const void*`. Casting to `const char*`
-        // is valid on both (main's fix b3c2961 for the legacy startDiscovery
-        // path — Phase 3I's scanAllNics added a second call site that needs
-        // the same treatment for Windows CI to build).
-        const auto fd = sock.socketDescriptor();
+        // is valid on both (main's fix b3c2961).
+        const auto fd = sock->socketDescriptor();
         if (fd >= 0) {
             int broadcastEnable = 1;
             ::setsockopt(static_cast<int>(fd), SOL_SOCKET, SO_BROADCAST,
@@ -746,84 +811,197 @@ void RadioDiscovery::scanAllNics()
                          sizeof(broadcastEnable));
         }
 
-        qCDebug(lcDiscovery) << "Scanning NIC" << iface.name()
-                             << nicIpv4.toString() << "profile" << static_cast<int>(m_profile);
+        connect(sock, &QUdpSocket::readyRead,
+                this, &RadioDiscovery::onScanReadyRead);
+        m_scanSock = sock;
 
-        // From Thetis discoverOnNic(): attempts × (send + quiet-poll loop)
-        for (int attempt = 0; attempt < attempts; attempt++) {
-            // Send P1 and P2 probes to directed subnet broadcast and 255.255.255.255
-            if (!nicBroadcast.isNull()) {
-                sock.writeDatagram(p1Packet, nicBroadcast, kDiscoveryPort);
-                sock.writeDatagram(p2Packet, nicBroadcast, kDiscoveryPort);
-            }
-            sock.writeDatagram(p1Packet, QHostAddress::Broadcast, kDiscoveryPort);
-            sock.writeDatagram(p2Packet, QHostAddress::Broadcast, kDiscoveryPort);
+        qCDebug(lcDiscovery) << "Scanning NIC" << nic.name
+                             << nic.ipv4.toString() << "profile"
+                             << static_cast<int>(m_profile);
 
-            // Safety-net bound for quietPollAttempt() below — one extra
-            // pollMs of slack so the ordinary "never went quiet" exit keeps
-            // deciding the normal case; the deadline exists only to catch a
-            // sustained readable-but-empty condition that would otherwise
-            // hold this attempt open forever (2026-09-09 CI investigation,
-            // docs/architecture/2026-09-09-ci-discovery-hang-investigation.md).
-            const QDeadlineTimer attemptDeadline(qint64(quietBeforeStop + 1) * pollMs,
-                                                  Qt::CoarseTimer);
-            const QuietPollOutcome outcome = quietPollAttempt(
-                sock, quietBeforeStop, pollMs, attemptDeadline,
-                [&](const QByteArray& data, const QHostAddress& senderAddr, quint16 /*senderPort*/) {
-                    if (data.size() < 11) {
-                        return;
-                    }
-
-                    RadioInfo info;
-                    bool parsed = false;
-
-                    const quint8 firstByte = static_cast<quint8>(data[0]);
-                    if (firstByte == 0xEF) {
-                        parsed = parseP1Reply(data, senderAddr, info);
-                    } else if (firstByte == 0x00) {
-                        parsed = parseP2Reply(data, senderAddr, info);
-                    }
-
-                    if (!parsed) {
-                        return;
-                    }
-
-                    // From Thetis: MAC-based de-duplication (seen set)
-                    if (info.macAddress.isEmpty()
-                        || info.macAddress == "00:00:00:00:00:00") {
-                        return;
-                    }
-
-                    if (seenThisScan.contains(info.macAddress)) {
-                        return;
-                    }
-                    seenThisScan.insert(info.macAddress);
-
-                    m_lastSeen[info.macAddress] = now;
-
-                    if (!m_radios.contains(info.macAddress)) {
-                        m_radios.insert(info.macAddress, info);
-                        qCDebug(lcDiscovery) << "Discovered:" << info.displayName()
-                                             << "P" << static_cast<int>(info.protocol)
-                                             << "at" << info.address.toString();
-                        emit radioDiscovered(info);
-                    } else {
-                        m_radios[info.macAddress] = info;
-                        emit radioUpdated(info);
-                    }
-                });
-
-            if (outcome == QuietPollOutcome::Cancelled) {
-                sock.close();
-                return;
-            }
-            // DeadlineExceeded: treat exactly like a normal Quiet exit and
-            // move on to the next attempt/NIC — see quietPollAttempt() for
-            // why this can happen and why it is safe to just continue.
-        }
-
-        sock.close();
+        m_scanAttempt = 0;
+        beginAttempt();
+        return;
     }
+
+    finishScan();
+}
+
+// From Thetis discoverOnNic(): attempts × (send + quiet-poll loop).
+// Hier der SEND-Teil eines Versuchs; den Poll-Teil erledigt onScanPoll().
+void RadioDiscovery::beginAttempt()
+{
+    if (!m_scanSock || m_scanNicIndex < 0
+        || m_scanNicIndex >= m_scanNics.size()) {
+        finishScan();
+        return;
+    }
+    const NicCandidate& nic = m_scanNics.at(m_scanNicIndex);
+
+    // Send P1 and P2 probes to directed subnet broadcast and 255.255.255.255
+    if (!nic.broadcast.isNull()) {
+        m_scanSock->writeDatagram(m_scanP1, nic.broadcast, kDiscoveryPort);
+        m_scanSock->writeDatagram(m_scanP2, nic.broadcast, kDiscoveryPort);
+    }
+    m_scanSock->writeDatagram(m_scanP1, QHostAddress::Broadcast, kDiscoveryPort);
+    m_scanSock->writeDatagram(m_scanP2, QHostAddress::Broadcast, kDiscoveryPort);
+
+    const int quietBeforeStop = qMax(1, m_scanTiming.quietPollsBeforeResend);
+    const int pollMs          = qMax(10, m_scanTiming.pollTimeoutMs);
+
+    m_scanQuietPolls  = 0;
+    m_scanSawDatagram = false;
+
+    // Safety-net bound, wortgleich zur alten Schleife: ein pollMs
+    // Zuschlag, damit der gewoehnliche "nie still geworden"-Ausgang den
+    // Normalfall entscheidet. Die Frist faengt nur den Fall, dass
+    // dauernd etwas ankommt und der Stille-Zaehler nie steigt
+    // (2026-09-09, docs/architecture/2026-09-09-ci-discovery-hang-
+    // investigation.md).
+    m_scanAttemptDeadline = QDeadlineTimer(
+        qint64(quietBeforeStop + 1) * pollMs, Qt::CoarseTimer);
+
+    m_scanPollTimer.start(pollMs);
+}
+
+// Ein Poll-Fenster ist um. Das ist die Stelle, an der die alte Schleife
+// aus waitForReadyRead() zurueckkam.
+void RadioDiscovery::onScanPoll()
+{
+    if (!m_scanRunning) {
+        m_scanPollTimer.stop();
+        return;
+    }
+
+    // Cooperative cancel — same cadence the old loop had: einmal je
+    // Poll-Fenster, also hoechstens ein pollTimeoutMs Verzug beim
+    // Beenden.
+    if (m_stopRequested.load(std::memory_order_acquire)) {
+        finishScan();
+        return;
+    }
+
+    const bool fristAbgelaufen = m_scanAttemptDeadline.hasExpired();
+
+    // From Thetis clsRadioDiscovery.cs:964-976 [@852bf0e]: nur das
+    // NICHT-lesbare Fenster zaehlt hoch. Ein Fenster mit Antwort laesst
+    // den Zaehler stehen, statt ihn auf 0 zurueckzusetzen — damit
+    // schiebt eine schubweise Antwort den Aufgabepunkt um hoechstens
+    // ein Fenster hinaus, nicht um einen ganzen Satz.
+    if (!m_scanSawDatagram) {
+        ++m_scanQuietPolls;
+    }
+    m_scanSawDatagram = false;
+
+    const int quietBeforeStop = qMax(1, m_scanTiming.quietPollsBeforeResend);
+    if (m_scanQuietPolls < quietBeforeStop && !fristAbgelaufen) {
+        return;     // weiter horchen
+    }
+
+    // Dieser Versuch ist durch. DeadlineExceeded wird genau wie ein
+    // gewoehnliches Stillwerden behandelt — siehe die Begruendung in
+    // beginAttempt().
+    m_scanPollTimer.stop();
+    ++m_scanAttempt;
+    if (m_scanAttempt < qMax(1, m_scanTiming.attemptsPerNic)) {
+        beginAttempt();
+    } else {
+        beginNextNic();
+    }
+}
+
+void RadioDiscovery::onScanReadyRead()
+{
+    if (!m_scanSock) {
+        return;
+    }
+    // Das Gegenstueck zu "readable" in der alten Schleife: der Zaehler
+    // bleibt stehen, bis das naechste Fenster still bleibt.
+    m_scanSawDatagram = true;
+
+    while (m_scanSock->hasPendingDatagrams()) {
+        QHostAddress senderAddr;
+        quint16 senderPort = 0;
+        QByteArray data;
+        data.resize(static_cast<int>(m_scanSock->pendingDatagramSize()));
+        m_scanSock->readDatagram(data.data(), data.size(), &senderAddr, &senderPort);
+        handleDatagram(data, senderAddr);
+    }
+}
+
+// Der Rumpf der alten onDatagram-Lambda, Zeile fuer Zeile.
+void RadioDiscovery::handleDatagram(const QByteArray& data,
+                                    const QHostAddress& senderAddr)
+{
+    if (data.size() < 11) {
+        return;
+    }
+
+    RadioInfo info;
+    bool parsed = false;
+
+    const quint8 firstByte = static_cast<quint8>(data[0]);
+    if (firstByte == 0xEF) {
+        parsed = parseP1Reply(data, senderAddr, info);
+    } else if (firstByte == 0x00) {
+        parsed = parseP2Reply(data, senderAddr, info);
+    }
+
+    if (!parsed) {
+        return;
+    }
+
+    // From Thetis: MAC-based de-duplication (seen set)
+    if (info.macAddress.isEmpty()
+        || info.macAddress == "00:00:00:00:00:00") {
+        return;
+    }
+
+    if (m_scanSeen.contains(info.macAddress)) {
+        return;
+    }
+    m_scanSeen.insert(info.macAddress);
+
+    m_lastSeen[info.macAddress] = m_scanNowMs;
+
+    if (!m_radios.contains(info.macAddress)) {
+        m_radios.insert(info.macAddress, info);
+        qCDebug(lcDiscovery) << "Discovered:" << info.displayName()
+                             << "P" << static_cast<int>(info.protocol)
+                             << "at" << info.address.toString();
+        emit radioDiscovered(info);
+    } else {
+        m_radios[info.macAddress] = info;
+        emit radioUpdated(info);
+    }
+}
+
+void RadioDiscovery::finishScan()
+{
+    m_scanPollTimer.stop();
+    if (m_scanSock) {
+        m_scanSock->close();
+        m_scanSock->deleteLater();
+        m_scanSock = nullptr;
+    }
+    m_scanNics.clear();
+    m_scanNicIndex = -1;
+
+    const bool liefNoch = m_scanRunning;
+    m_scanRunning = false;
+    if (!liefNoch) {
+        return;     // schon gemeldet
+    }
+
+    // Sweep interval matches the discovered-only timeout so the first sweep
+    // fires no earlier than a radio can be considered stale (design §7.4).
+    // Nach einem Abbruch nicht: stopDiscovery() hat ihn eben angehalten.
+    if (!m_stopRequested.load(std::memory_order_acquire)
+        && !m_staleTimer.isActive()) {
+        m_staleTimer.start(kDiscoveredOnlyTimeoutMs);
+    }
+
+    emit discoveryFinished();
 }
 
 void RadioDiscovery::onStaleCheck()

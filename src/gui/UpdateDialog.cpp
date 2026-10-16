@@ -8,6 +8,9 @@
 // Modification history (Longpath):
 //   2026-09-21 -- Created for Longpath by Martin Fischer (OE5SOS),
 //                 AI-assisted via Anthropic Claude.
+//   2026-10-14 -- Groesse nur zeigen, wenn sie bekannt ist; sagen, wenn
+//                 die Auskunft vom zweiten Weg kam, by Martin Fischer
+//                 (OE5SOS), AI-assisted via Anthropic Claude.
 // =================================================================
 
 #include "UpdateDialog.h"
@@ -209,8 +212,16 @@ void UpdateDialog::onLatestKnown(const ReleaseInfo& release, bool newer)
         m_action->setEnabled(true);
         return;
     }
-    m_status->setText(QStringLiteral("Version %1 is available (%2, %3). One click downloads, verifies and installs it, then restarts Longpath.")
-                          .arg(release.version, m_asset->name, megabytes(m_asset->size)));
+    // Ueber den zweiten Weg (github.com) steht die Groesse im HEAD; fehlt
+    // sie, wird sie weggelassen statt als "0.0 MB" gelogen.
+    const QString what = m_asset->size > 0
+        ? QStringLiteral("%1, %2").arg(m_asset->name, megabytes(m_asset->size))
+        : m_asset->name;
+    const QString how = release.viaWebsiteFallback
+        ? QStringLiteral(" (read from github.com -- api.github.com did not answer)")
+        : QString();
+    m_status->setText(QStringLiteral("Version %1 is available (%2).%3 One click downloads, verifies and installs it, then restarts Longpath.")
+                          .arg(release.version, what, how));
     m_action->setText(QStringLiteral("Download and install"));
     m_mode = Action::Download;
     m_action->setEnabled(true);

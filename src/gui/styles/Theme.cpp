@@ -16,6 +16,9 @@
 #include <QSet>
 
 #include "gui/styles/ThemeQss.h"
+#include "gui/styles/AppTheme.h"
+
+#include <QApplication>
 
 #include <QCoreApplication>
 #include <QDir>
@@ -94,7 +97,16 @@ QStringList Theme::searchPaths()
     //    und beim Entwickeln ist „Datei danebenlegen und neu starten" der
     //    kürzeste Weg — kein Umweg über die Bibliothek. Steht in
     //    .gitignore, gehört also nicht in den Quellbaum.
-    out << QDir::currentPath() + QStringLiteral("/themes");
+    //
+    //    Nicht, wenn das Arbeitsverzeichnis die WURZEL ist (2026-10-15):
+    //    aus dem Finder gestartet steht dort „/", und der Pfad wird
+    //    „//themes". Der Ordner gibt es nie, aber er steht in der
+    //    Meldung „Kein Theme gefunden. Gesucht in: …" und sieht dort
+    //    aus wie ein Fehler — beim Suchen nach „warum greift meine
+    //    Palette nicht" ist das ein falscher Anhaltspunkt.
+    if (QDir::currentPath() != QStringLiteral("/")) {
+        out << QDir::currentPath() + QStringLiteral("/themes");
+    }
 
     // 4. Neben der Binärdatei, für ein Theme, das mit einem Build kommt.
     out << QCoreApplication::applicationDirPath() + QStringLiteral("/themes");
@@ -154,7 +166,11 @@ bool Theme::loadUserTheme()
 
 QString Theme::builtInName()
 {
-    return QStringLiteral("Nacht (eingebaut)");
+    // Englisch seit 2026-10-15 („englisch durchgehend"). Der Name ist
+    // nur eine Anzeige: gemerkt wird fuer die eingebaute Palette ein
+    // LEERER ActiveTheme-Wert, also bricht das Umbenennen keine
+    // bestehende Einstellung.
+    return QStringLiteral("Night (built-in)");
 }
 
 QVector<Theme::Entry> Theme::available()
@@ -250,13 +266,13 @@ bool Theme::loadFile(const QString& path, QString* error)
     QJsonParseError pe{};
     const QJsonDocument doc = QJsonDocument::fromJson(f.readAll(), &pe);
     if (pe.error != QJsonParseError::NoError) {
-        return fail(QStringLiteral("%1, Zeichen %2: %3")
+        return fail(QStringLiteral("%1, character %2: %3")
                         .arg(QFileInfo(path).fileName())
                         .arg(pe.offset)
                         .arg(pe.errorString()));
     }
     if (!doc.isObject()) {
-        return fail(QStringLiteral("%1: die Datei enthält kein Objekt")
+        return fail(QStringLiteral("%1: the file holds no object")
                         .arg(QFileInfo(path).fileName()));
     }
 
@@ -371,6 +387,40 @@ QString Theme::forHex(const QString& legacyHex) const
 quint64 ThemeFilter::appliedCount()
 {
     return g_applied.load(std::memory_order_relaxed);
+}
+
+quint64 ThemeFilter::reapplyAll()
+{
+    // QPalette und Grund-Stylesheet kennen keinen Filter: ohne diese
+    // zwei bleiben Menueleiste und Fenstergrund in der alten Palette
+    // stehen (2026-09-21 schon einmal aufgefallen).
+    if (qApp) {
+        applyDarkPalette(*qApp);
+        applyAppBaselineQss(*qApp);
+    }
+
+    quint64 geaendert = 0;
+    for (QWidget* w : QApplication::allWidgets()) {
+        if (!w) { continue; }
+        const QString jetzt = w->styleSheet();
+        if (jetzt.isEmpty()) {
+            w->update();
+            continue;
+        }
+        // Von der VORLAGE aus rechnen, nicht vom Ergebnis der letzten
+        // Palette -- sonst sucht die neue Palette Farben, die im Text
+        // laengst ersetzt sind.
+        const QString neu = themed(sourceOf(jetzt));
+        if (neu != jetzt) {
+            w->setProperty(kBusy, true);
+            w->setStyleSheet(neu);
+            w->setProperty(kBusy, false);
+            g_applied.fetch_add(1, std::memory_order_relaxed);
+            ++geaendert;
+        }
+        w->update();
+    }
+    return geaendert;
 }
 
 bool ThemeFilter::eventFilter(QObject* watched, QEvent* event)

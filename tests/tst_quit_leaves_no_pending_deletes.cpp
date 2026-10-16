@@ -30,6 +30,7 @@
 #include "gui/applets/AppletFloatingWindow.h"
 #include "gui/applets/AppletWidget.h"
 #include "gui/WindowChrome.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -43,7 +44,7 @@ private slots:
         auto* mw = new MainWindow();
         mw->resize(1400, 900);
         mw->show();
-        QVERIFY(QTest::qWaitForWindowExposed(mw));
+        QVERIFY(QTest::qWaitForWindowExposed(mw, kFensterFrist));
         for (int i = 0; i < 6; ++i) { QCoreApplication::processEvents(); }
 
         // Ein Applet herausloesen — derselbe Weg wie ueber den Pfeil
@@ -106,7 +107,7 @@ private slots:
         auto* mw = new MainWindow();
         mw->resize(1200, 800);
         mw->show();
-        QVERIFY(QTest::qWaitForWindowExposed(mw));
+        QVERIFY(QTest::qWaitForWindowExposed(mw, kFensterFrist));
         for (int i = 0; i < 6; ++i) { QCoreApplication::processEvents(); }
 
         // Einen modelosen Dialog aufmachen, wie es das Programm tut.

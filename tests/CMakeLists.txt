@@ -5109,6 +5109,15 @@ longpath_add_test(tst_applet_window_size)
 longpath_add_test(tst_real_mainwindow_detach)
 longpath_add_test(tst_real_pan_float)
 longpath_add_test(tst_real_rotor_window)
+
+# tst_rotor_panel_abbau: der Abbau des Rotor-Feldes bei stehender
+# Verbindung. Sechs Abstuerze beim Beenden (2026-10-10/11), seit der
+# Rotor wieder im Netz haengt; die fuenfte Stelle derselben Fehlerform.
+longpath_add_test(tst_rotor_panel_abbau)
+
+# tst_rotor_status_ins_protokoll: der Rotor schreibt jeden Wechsel seines
+# Zustandes ins Protokoll -- einmal, nicht bei jedem Abfragedurchgang.
+longpath_add_test(tst_rotor_status_ins_protokoll)
 longpath_add_test(tst_real_status_bar_chain_indicators)
 longpath_add_test(tst_app_settings_autosave)
 longpath_add_test(tst_whisper_server_launcher)
@@ -5271,6 +5280,88 @@ longpath_add_test(tst_color_picker_not_native)
 # 2026-09-21: Help > Check for Updates... -- Release-JSON, Version, Paket,
 # SHA256SUMS, Startpruefung, Zielpfad, Neustart-Helfer, DMG-Einspielen (macOS).
 longpath_add_test(tst_update_checker)
+# 2026-10-14: sieben Absturzberichte lagen herum, keiner stand im
+# Protokoll. CrashReportDigest holt sie beim naechsten Start nach.
+longpath_add_test(tst_absturzberichte)
+# 2026-10-14: 680 Wiederanlaeufe im Protokoll des Betreibers, alle 14 s.
+# Die Treppe stieg nicht, weil onConnected() den Zaehler zuruecksetzte --
+# ein offener Socket ist aber noch keine brauchbare Sitzung.
+longpath_add_test(tst_dxcluster_wiederanlauf)
+# 2026-10-15: „theme wechsel funktioniert nicht" -- im Menue stand ein
+# toter Schalter, die echte Auswahl lag acht Klicks tief, und die Wahl
+# wirkt erst beim Start. Dieser Lauf haelt beides nach.
+longpath_add_test(tst_palette_im_menue)
+# 2026-10-15: „zwischen windows ... ein minimaler automatischer
+# Abstand ... dann sieht es besser aus und gleich." Dieser Lauf misst
+# die Luecken am echten Hauptfenster.
+longpath_add_test(tst_abstand_zwischen_feldern)
+# 2026-10-15: „er soll mal technisch funktionieren ... nur eine
+# option, die man ein und ausblenden kann." Der schwebende Panadapter
+# hatte im Menue nur eine Einbahn ohne Haken.
+longpath_add_test(tst_panadapter_schalter)
+# 2026-10-15: „englisch durchgehend" — ich habe zweimal „0 deutsche
+# Quelltexte" gemeldet und lag zweimal falsch. Jetzt zaehlt es ein Lauf.
+longpath_add_test(tst_oberflaeche_englisch)
+# 2026-10-15: das breite rosa Band im Bildschirmfoto — ein umgedrehter
+# HGauge war IMMER in der Gefahrenfarbe, ohne jede Schwelle.
+longpath_add_test(tst_kompressionsbalken_nicht_rot)
+# 2026-10-15: „-40dB" las sich als „0dB", „+10" als „+1" — die erste
+# und die letzte Zahl der Skala standen ausserhalb des Widgets.
+longpath_add_test(tst_skala_enden_lesbar)
+# 2026-10-15: ein Eintrag fuer das Feldbetrieb-Bild — und der Nachweis,
+# dass er in ein EIGENES Profil schreibt.
+longpath_add_test(tst_feldbetrieb)
+# 2026-10-15: zwei Abstuerze beim Beenden in zwei Stunden, beide
+# „Kind meldet sein Ende, Rumpf greift ins halb abgebaute Fenster".
+longpath_add_test(tst_abbau_ueberlebt)
+# 2026-10-15: moos.json nannte zwei Rollen, die es im Programm nicht
+# gibt — still uebergangen, also seit dem ersten Tag wirkungslos.
+longpath_add_test(tst_palette_ohne_tote_rollen)
+# 2026-10-15: die Scheibenflagge ueber dem Panadapter, als Option —
+# dritter Anlauf um dieselbe Sache, siehe den Kopf der Datei.
+longpath_add_test(tst_scheibenflagge)
+# 2026-10-15: FT8/FT4 nativ — Nachricht hin, Nachricht zurueck, ohne
+# Tondatei und ohne Funkgeraet.
+longpath_add_test(tst_ft8_dekodiert)
+# 2026-10-15: FT8 am laufenden Ton — die Fenstergrenze ist der Punkt.
+longpath_add_test(tst_ft8_am_ton)
+# 2026-10-15: die Sendeseite, geschlossene Schleife — Text hinein,
+# Tonproben am Sendeweg abgeholt, wieder dekodiert.
+# ── Der FT8-QSO-Ablauf, Zustand fuer Zustand ─────────────────────────
+# Ft8Ablauf sendet nicht, tastet nicht und kennt keine Uhr — darum
+# laeuft dieser Pruefstand ohne Fenster, ohne Funkgeraet und ohne zu
+# warten (QTEST_APPLESS_MAIN).
+longpath_add_test(tst_ft8_ablauf)
+
+longpath_add_test(tst_ft8_senden)
+# 2026-10-15: FT8 im PROGRAMM — Abgriff, Flaeche, Eintrag. Dekoder und
+# Uhr waren gruen und trotzdem unerreichbar; dieser Lauf prueft die
+# Verdrahtung, nicht die Rechnung.
+longpath_add_test(tst_ft8_flaeche)
+# 2026-10-15: und wie lange ein ganzes Fenster rechnet — die Zahl
+# entscheidet, ob das im Faden der Oberflaeche laufen darf.
+longpath_add_test(tst_ft8_rechenzeit)
+target_compile_definitions(tst_palette_ohne_tote_rollen PRIVATE
+    LONGPATH_SRC_DIR="${CMAKE_SOURCE_DIR}")
+target_compile_definitions(tst_oberflaeche_englisch PRIVATE
+    LONGPATH_SRC_DIR="${CMAKE_SOURCE_DIR}")
+# 2026-10-14: HAUSSTIL.md sagt „Nie Radius 3" -- elf standen trotzdem im
+# Quelltext. Dieser Lauf liest die Quellen und haelt die Regel nach;
+# QSlider::groove ist die eine begruendete Ausnahme.
+longpath_add_test(tst_hausstil_radius)
+# 2026-10-14: Sperrklinke gegen namenlose Farben. 128 am Tag des
+# Einbaus; die Zahl darf sinken, nie steigen.
+longpath_add_test(tst_hausstil_farben)
+target_compile_definitions(tst_hausstil_farben PRIVATE
+    LONGPATH_SRC_DIR="${CMAKE_SOURCE_DIR}")
+target_compile_definitions(tst_hausstil_radius PRIVATE
+    LONGPATH_SRC_DIR="${CMAKE_SOURCE_DIR}")
+# 2026-10-14: "englisch durchgehend, aber deutsch als option" -- die
+# Kette .ts -> .qm -> :/i18n/ -> QTranslator. LONGPATH_QM_FILE zeigt auf
+# die Datei, die qt_add_translations gerade gebaut hat.
+longpath_add_test(tst_sprache_umschaltbar)
+target_compile_definitions(tst_sprache_umschaltbar PRIVATE
+    LONGPATH_QM_FILE="${CMAKE_BINARY_DIR}/longpath_de.qm")
 # 2026-09-21: Schluesselbund-Dienstname "Longpath: <key>" mit Umzug vom
 # alten Namen -- live nur mit LONGPATH_KEYCHAIN_LIVE=1 (echter Schluesselbund).
 longpath_add_test(tst_credential_store_migration)
@@ -5728,6 +5819,21 @@ longpath_add_test(tst_sunsdr_sim_workbench)
 # Messlauf am echten Geraet, laeuft nur mit LONGPATH_SUNSDR_MESSLAUF
 # (sonst QSKIP) -- siehe Kopf der Datei.
 longpath_add_test(tst_sunsdr_messlauf)
+
+# tst_sunsdr_ein_steller: Vorverstaerker und Daempfung sind an der QRP
+# EIN Steller (Opcode 0x04, Stufenindex an Byte 18). Am 2026-10-11 mit
+# Antenne am Geraet nachgemessen; dieser Stand haelt den Befund fest.
+longpath_add_test(tst_sunsdr_ein_steller)
+
+# tst_sunsdr_netzlage: ob das Geraet ueberhaupt in einem Netz dieses
+# Rechners liegt -- die Frage, die in der Nacht zum 2026-10-12 fuenf
+# Suchversuche lang unbeantwortet blieb.
+longpath_add_test(tst_sunsdr_netzlage)
+
+# tst_sunsdr_uebersteuerung: schlaegt die Uebersteuerungserkennung
+# ueberhaupt an? Am Geraet war nur belegt, dass sie nicht falsch
+# alarmiert -- ein Signal am Anschlag kann man nicht bestellen.
+longpath_add_test(tst_sunsdr_uebersteuerung)
 
 # -- Die QRP muss mit IHRER Abtastrate gefahren werden, nicht mit Atlas'
 #    (2026-09-23: sie steht in keiner HPSDRModel-Liste, darum fiel die

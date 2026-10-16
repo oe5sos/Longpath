@@ -624,9 +624,7 @@ void QsoMapWindow::setHomeGrid(const QString& grid)
 // hinterlegt: alle drei enden beim Punkt.
 void QsoMapWindow::applyStationMarker()
 {
-    const QString call = AppSettings::instance()
-                             .value(QStringLiteral("StationCallsign"), QString{})
-                             .toString().trimmed().toUpper();
+    const QString call = AppSettings::stationCallsign().toUpper();
     if (call.isEmpty()) {
         m_flat->setStationMarker(QString{}, QImage{});
         return;
@@ -1074,7 +1072,7 @@ void QsoMapWindow::reloadBackgroundList()
 
     QSignalBlocker block(m_background);
     m_background->clear();
-    m_background->addItem(QStringLiteral("\u2014 kein Bild \u2014"), QString{});
+    m_background->addItem(tr("\u2014 no image \u2014"), QString{});
 
     const auto list = WorldMapCatalog::entries();
     for (const auto& e : list) {

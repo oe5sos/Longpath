@@ -1469,7 +1469,7 @@ void SpectrumDefaultsPage::buildUI()
     // bleibt im Code (Vergleichbarkeit der Baeume), aber die
     // Beschriftung sagt, was der Regler tut — sonst dreht ihn jeder
     // falsch herum.
-    auto* bgGroup = new QGroupBox(QStringLiteral("Hintergrund"), this);
+    auto* bgGroup = new QGroupBox(tr("Background"), this);
     auto* bgForm  = new QFormLayout(bgGroup);
     bgForm->setSpacing(6);
 
@@ -1477,16 +1477,16 @@ void SpectrumDefaultsPage::buildUI()
     auto* bgRowL  = new QHBoxLayout(bgRow);
     bgRowL->setContentsMargins(0, 0, 0, 0);
     bgRowL->setSpacing(6);
-    m_bgPathLabel = new QLabel(QStringLiteral("— kein Bild —"), bgRow);
+    m_bgPathLabel = new QLabel(tr("— no image —"), bgRow);
     m_bgPathLabel->setToolTip(QStringLiteral(
         "Bild hinter Raster und Spur. Wird auf die Flaeche vergroessert "
         "und mittig beschnitten, das Seitenverhaeltnis bleibt."));
-    auto* bgPick  = new QPushButton(QStringLiteral("Waehlen…"), bgRow);
-    auto* bgClear = new QPushButton(QStringLiteral("Entfernen"), bgRow);
+    auto* bgPick  = new QPushButton(tr("Choose…"), bgRow);
+    auto* bgClear = new QPushButton(tr("Remove"), bgRow);
     bgRowL->addWidget(m_bgPathLabel, 1);
     bgRowL->addWidget(bgPick);
     bgRowL->addWidget(bgClear);
-    bgForm->addRow(QStringLiteral("Bild"), bgRow);
+    bgForm->addRow(tr("Image"), bgRow);
 
     m_bgOpacitySlider = new QSlider(Qt::Horizontal, bgGroup);
     m_bgOpacitySlider->setRange(0, 100);
@@ -1505,7 +1505,7 @@ void SpectrumDefaultsPage::buildUI()
         "Hellt das Bild auf. 100 = unveraendert. Aufgehellt wird "
         "additiv: dunkle Stellen kommen hoch, helle brennen nicht aus. "
         "Abdunkeln geht ueber die Fuellfarbe darueber."));
-    bgForm->addRow(QStringLiteral("Bild aufhellen (%)"), m_bgBrightSlider);
+    bgForm->addRow(tr("Brighten image (%)"), m_bgBrightSlider);
 
     m_bgFillButton = new ColorSwatchButton(
         QColor(Style::kPanadapterBg), bgGroup);
@@ -1519,12 +1519,12 @@ void SpectrumDefaultsPage::buildUI()
     auto refreshBgLabel = [this, spectrum] {
         auto* w = spectrum();
         const QString p = w ? w->backgroundImagePath() : QString();
-        m_bgPathLabel->setText(p.isEmpty() ? QStringLiteral("— kein Bild —")
+        m_bgPathLabel->setText(p.isEmpty() ? tr("— no image —")
                                            : QFileInfo(p).fileName());
     };
     connect(bgPick, &QPushButton::clicked, this, [this, spectrum, refreshBgLabel] {
         const QString p = QFileDialog::getOpenFileName(
-            this, QStringLiteral("Hintergrundbild waehlen"), QString(),
+            this, tr("Choose a background image"), QString(),
             QStringLiteral("Bilder (*.png *.jpg *.jpeg *.bmp *.webp)"));
         if (p.isEmpty()) { return; }
         if (auto* w = spectrum()) { w->setBackgroundImage(p); }
@@ -1587,7 +1587,7 @@ void SpectrumDefaultsPage::buildUI()
     bpForm->setSpacing(6);
 
     m_bandPlanShow = new QCheckBox(
-        QStringLiteral("Bandsegmente im Spektrum zeigen"), bpGroup);
+        tr("Show band segments on the spectrum"), bpGroup);
     m_bandPlanShow->setToolTip(QStringLiteral(
         "Faerbt die Bandsegmente des gewaehlten Plans am unteren Rand "
         "des Spektrums ein — CW, SSB, Digimodes, Baken."));
@@ -1604,7 +1604,7 @@ void SpectrumDefaultsPage::buildUI()
     m_bandPlanSize->setSuffix(QStringLiteral(" pt"));
     m_bandPlanSize->setToolTip(QStringLiteral(
         "Schriftgroesse der Segmentbeschriftung."));
-    bpForm->addRow(QStringLiteral("Beschriftung"), m_bandPlanSize);
+    bpForm->addRow(tr("Labels"), m_bandPlanSize);
 
     auto spec2 = [this]() -> SpectrumWidget* {
         return model() ? model()->spectrumWidget() : nullptr;
@@ -2089,7 +2089,7 @@ void WaterfallDefaultsPage::buildUI()
         // Die Reihenfolge muss WfColorScheme entsprechen — der Index
         // dieser Liste IST der gespeicherte Wert. Anhängen, nie
         // einfügen.
-        QStringLiteral("Gedämpft")       // 2026-08-15, folgt dem Theme
+        tr("Muted")                      // 2026-08-15, folgt dem Theme
     });
     // Thetis: setup.designer.cs:34110 (comboColorPalette) — rewritten
     // Thetis original: "Sets the color scheme"

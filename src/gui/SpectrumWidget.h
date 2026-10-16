@@ -802,6 +802,13 @@ public:
     /// fuer Zeichnen und Treffen.
     QRect spectrumRect() const;
 
+    /// Wo auf dem Schirm steht diese Frequenz? Oeffentlich seit
+    /// 2026-10-15 fuer die Scheibenflaggen (SliceFlag): die rechnen
+    /// dieselbe Umrechnung wie das Malen, und zwei Rechnungen fuer
+    /// dieselbe Sache laufen frueher oder spaeter auseinander.
+    /// Gibt -1, wenn die Frequenz gerade nicht im Ausschnitt liegt.
+    int xForHz(double hz) const;
+
     void setBackgroundImage(const QString& path);
     QString backgroundImagePath() const { return m_bgImagePath; }
     void setBackgroundOpacity(int pct);

@@ -348,6 +348,47 @@ void GeneralOptionsPage::buildOptionsGroup()
     auto* vbox = new QVBoxLayout(group);
     vbox->setSpacing(6);
 
+    // ── Sprache (2026-10-14) ──────────────────────────────────────────
+    //
+    // Betreiber: "englisch durchgehend, aber deutsch als option".
+    // Longpath-original, in Thetis gibt es dazu nichts.
+    //
+    // Die Sprachnamen stehen in ihrer eigenen Sprache und laufen NICHT
+    // durch tr(): wer die Oberflaeche nicht versteht, findet "Deutsch"
+    // auch dann, wenn alles andere englisch ist -- uebersetzte
+    // Sprachnamen ("German") helfen genau dem nicht, der sie braucht.
+    //
+    // Ein Wechsel wirkt erst beim naechsten Start. Qt kann zwar
+    // nachtraeglich umhaengen (LanguageChange-Ereignis), dafuer muesste
+    // aber jedes Fenster seine Texte neu setzen koennen -- das waere
+    // eine zweite Baustelle in jeder Klasse. Statt es halb zu koennen,
+    // steht es daneben.
+    {
+        auto* row = new QHBoxLayout();
+        row->setSpacing(8);
+        auto* label = new QLabel(tr("Language"), group);
+        auto* combo = new QComboBox(group);
+        combo->setObjectName(QStringLiteral("cmbUiLanguage"));
+        combo->addItem(QStringLiteral("English"), QStringLiteral("en"));
+        combo->addItem(QStringLiteral("Deutsch"), QStringLiteral("de"));
+        const QString current = AppSettings::instance()
+                                   .value(QStringLiteral("UiLanguage"), QStringLiteral("en"))
+                                   .toString();
+        const int idx = combo->findData(current);
+        combo->setCurrentIndex(idx >= 0 ? idx : 0);
+        auto* hint = new QLabel(tr("takes effect after a restart"), group);
+        hint->setEnabled(false);
+        connect(combo, &QComboBox::currentIndexChanged, this, [combo](int i) {
+            AppSettings::instance().setValue(QStringLiteral("UiLanguage"),
+                                             combo->itemData(i).toString());
+        });
+        row->addWidget(label);
+        row->addWidget(combo);
+        row->addWidget(hint);
+        row->addStretch(1);
+        vbox->addLayout(row);
+    }
+
     // From Thetis setup.designer.cs:9050-9059 [v2.10.3.13]
     // Note: tooltip is Longpath-original — Thetis has no tooltip on this control.
     m_chkPreventTXonDifferentBandToRX = new QCheckBox(

@@ -33,7 +33,7 @@ public:
     explicit KiwiWaterfallPanel(RadioModel* model, QWidget* parent = nullptr);
 
     QString appletId()    const override { return QStringLiteral("kiwiWaterfalls"); }
-    QString appletTitle() const override { return QStringLiteral("KIWI-WASSERFÄLLE"); }
+    QString appletTitle() const override { return tr("KIWI WATERFALLS"); }
     // Der Inhalt kommt vom KiwiSdrManager, nicht aus dem RadioModel.
     void syncFromModel() override {}
 

@@ -36,6 +36,7 @@
 
 #include <QApplication>
 #include <QStyleFactory>
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -60,7 +61,7 @@ private slots:
         auto* panel = new SpectrumOverlayPanel(&host);
         Q_UNUSED(panel);
         host.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&host));
+        QVERIFY(QTest::qWaitForWindowExposed(&host, kFensterFrist));
 
         const QStringList names = {
             QStringLiteral("panZoomSegBtn"), QStringLiteral("panZoomBandBtn"),

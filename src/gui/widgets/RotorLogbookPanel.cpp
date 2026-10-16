@@ -29,6 +29,8 @@
 // =================================================================
 
 #include "RotorLogbookPanel.h"
+
+#include <QLoggingCategory>
 #include "gui/ScopedChildWidget.h"
 #include "GlobeWidget.h"
 #include "WorldTexture.h"
@@ -111,6 +113,14 @@ namespace {
 const QString kMyGridKey    = QStringLiteral("StationGridSquare");
 const QString kWorldImgKey  = QStringLiteral("GlobeWorldImagePath");
 const QString kShowPhotoKey = QStringLiteral("RotorLogShowQrzPhoto");
+// Der Rotor hat bis zum 2026-10-11 nie ins Protokoll geschrieben: ob
+// er verbunden war, liess sich nur am Statusschild im Fenster ablesen
+// -- an dem Tag musste ich den Widget-Baum der laufenden Instanz ueber
+// die Automatisierungsbruecke abfragen, um "Rotator connected" zu
+// sehen. In einem Protokoll, das sonst jede Verbindung mitschreibt,
+// fehlte genau die eine Zeile, die man beim Nachsehen braucht.
+Q_LOGGING_CATEGORY(lcRotor, "longpath.rotor")
+
 const QString kRotorHostKey = QStringLiteral("RotorRotctldHost");
 const QString kRotorPortKey = QStringLiteral("RotorRotctldPort");
 // Teachable presets + park (2026-08-11). %1 is the slot number 1..4.
@@ -237,6 +247,37 @@ RotorLogbookPanel::RotorLogbookPanel(RadioModel* radio, QrzClient* qrz,
     connect(solarTick, &QTimer::timeout,
             this, &RotorLogbookPanel::updateSolarLine);
     solarTick->start();
+}
+
+// ── Abbau ──────────────────────────────────────────────────────────────
+//
+// Diese zwei Zeilen sind die ERSTEN im Abbau, und das ist der ganze
+// Punkt. Der Weg, den der Betreiber sechs Mal gesehen hat (Berichte vom
+// 2026-10-10 16:05/16:06/16:10/16:13, 21:34 und 2026-10-11 11:08, alle
+// SIGSEGV):
+//
+//   ~RotorLogbookPanel -> ~QWidget -> deleteChildren()
+//     -> ~RotctldClient -> ~QAbstractSocket -> disconnectFromHost()
+//     -> stateChanged(Disconnected) -> das Lambda aus ensureRotor()
+//     -> setStatus() -> m_status->setText()   == toter Zeiger
+//
+// Die Kinder werden in der Reihenfolge geloescht, in der sie angelegt
+// wurden: das Statusschild baut buildUi() zuerst, den Rotctld-Client
+// legt ensureRotor() spaeter an. Wenn also der Socket im Abbau noch
+// einmal meldet, ist das Schild schon weg -- und die QObject-Basis des
+// Feldes lebt noch, weshalb die Verbindung noch traegt.
+//
+// Dieselbe Fehlerform steckte in diesem Programm schon in
+// SpeConnection, MainWindow, PgxlConnection und TgxlConnection; behoben
+// wird sie an der Ursache (Verbindung trennen), nicht mit einer
+// Abbau-Fahne und Waechtern in jedem Zweig.
+//
+// m_rotorProc ist ein MITGLIED und wird noch vor den Kindern abgebaut;
+// sein exited()-Rueckruf fasst dasselbe Schild an, also geht er mit.
+RotorLogbookPanel::~RotorLogbookPanel()
+{
+    if (m_rotor) { m_rotor->disconnect(this); }
+    m_rotorProc.disconnect(this);
 }
 
 QString RotorLogbookPanel::logbookPath()
@@ -935,7 +976,7 @@ void RotorLogbookPanel::buildAimMenu(QMenu& menu, const QPoint& g)
             st.value(kPresetLabelKey.arg(i + 1), QString{}).toString();
 
         QMenu* sub = menu.addMenu(
-            label.isEmpty() ? tr("Ziel %1 (leer)").arg(i + 1)
+            label.isEmpty() ? tr("Target %1 (empty)").arg(i + 1)
                             : QStringLiteral("%1 · %2°")
                                   .arg(label, deg.isEmpty() ? QStringLiteral("—")
                                                             : deg));
@@ -946,7 +987,7 @@ void RotorLogbookPanel::buildAimMenu(QMenu& menu, const QPoint& g)
                 m_dial->setTargetBearing(deg.toDouble());
             }
         });
-        QAction* teach = sub->addAction(tr("Lernen, umbenennen…"));
+        QAction* teach = sub->addAction(tr("Teach, rename…"));
         connect(teach, &QAction::triggered, this, [this, i, g]() {
             userPresetMenu(i, g);
         });
@@ -956,7 +997,7 @@ void RotorLogbookPanel::buildAimMenu(QMenu& menu, const QPoint& g)
 
     const QString park = st.value(kParkDegKey, QString{}).toString();
     QMenu* parkSub = menu.addMenu(
-        park.isEmpty() ? tr("Park (nicht gelernt)")
+        park.isEmpty() ? tr("Park (not taught)")
                        : tr("Park · %1°").arg(park));
     QAction* parkAim = parkSub->addAction(tr("Park anzielen"));
     parkAim->setEnabled(!park.isEmpty());
@@ -970,11 +1011,11 @@ void RotorLogbookPanel::buildAimMenu(QMenu& menu, const QPoint& g)
         parkMenu(g);
     });
 
-    QAction* lp = menu.addAction(tr("Gegenkurs (±180°)"));
+    QAction* lp = menu.addAction(tr("Long path (±180°)"));
     lp->setEnabled(m_dial && m_dial->hasTarget());
     lp->setToolTip(tr(
-        "Dreht die PEILUNG auf den langen Weg. Erst zielen, dann "
-        "Gegenkurs, dann Rotate."));
+        "Turns the BEARING to the long path. Aim first, then reverse "
+         "course, then Rotate."));
     connect(lp, &QAction::triggered, this, [this]() {
         if (!m_dial || !m_dial->hasTarget()) { return; }
         m_dial->setTargetBearing(
@@ -982,7 +1023,7 @@ void RotorLogbookPanel::buildAimMenu(QMenu& menu, const QPoint& g)
     });
 
     menu.addSeparator();
-    QAction* setup = menu.addAction(tr("Rotor-Einstellungen…"));
+    QAction* setup = menu.addAction(tr("Rotor settings…"));
     connect(setup, &QAction::triggered,
             this, &RotorLogbookPanel::openRotorSetupDialog);
 
@@ -2564,6 +2605,14 @@ void RotorLogbookPanel::raiseLogbookIfOpen()
 
 void RotorLogbookPanel::setStatus(const QString& text, bool warn)
 {
+    // Nur echte Wechsel, sonst schreibt die wiederholte Meldung das
+    // Protokoll voll (der Zustand wird bei jedem Abfragedurchgang
+    // gesetzt, nicht nur wenn er sich aendert).
+    if (text != m_letzterStatus) {
+        m_letzterStatus = text;
+        if (warn) { qCWarning(lcRotor).noquote() << "Rotor:" << text; }
+        else      { qCInfo(lcRotor).noquote()    << "Rotor:" << text; }
+    }
     m_status->setText(text);
     m_status->setStyleSheet(QStringLiteral(
         "QLabel { color: %1; font-size: 11px; }"

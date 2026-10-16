@@ -8789,7 +8789,7 @@ void SpectrumWidget::buildNotchContextMenu(int id, QMenu& menu)
     // notchfilter klickt und dann diese bearbeite kann und auch
     // loeschen." Die Liste fester Breiten oben deckt den haeufigen
     // Fall; hier stehen Mitte und Breite frei.
-    menu.addAction(QStringLiteral("Notch bearbeiten…"), this,
+    menu.addAction(tr("Edit notch…"), this,
                    [this, id]() { openNotchEditor(id, QCursor::pos()); });
 
     menu.addSeparator();
@@ -8810,7 +8810,7 @@ void SpectrumWidget::buildNotchContextMenu(int id, QMenu& menu)
     // waere der Eintrag dasselbe wie „Remove Notch" und damit eine
     // Falle.
     if (m_notchMarkers.size() > 1) {
-        menu.addAction(QStringLiteral("Alle %1 Notch-Filter entfernen…")
+        menu.addAction(tr("Remove all %1 notch filters…")
                            .arg(m_notchMarkers.size()),
                        this, [this]() { emit notchRemoveAllRequested(); });
     }
@@ -12322,6 +12322,16 @@ void SpectrumWidget::setCtunEnabled(bool enabled)
 // wieder nach oben, sonst ueberdeckte die naechste Positionsrunde sie.
 // Die Flaggen sind am 2026-08-18 geloescht; die vorderste Scheibe wird
 // weiter gefuehrt, weil das Malen sie braucht.
+int SpectrumWidget::xForHz(double hz) const
+{
+    const QRect r = spectrumRect();
+    if (r.width() <= 0) { return -1; }
+    const int x = hzToX(hz, r);
+    // Ausserhalb: die Flagge soll sich dann gar nicht erst setzen.
+    if (x < r.left() || x > r.right()) { return -1; }
+    return x;
+}
+
 void SpectrumWidget::setFrontSliceIndex(int sliceIndex)
 {
     m_frontSliceIndex = sliceIndex;

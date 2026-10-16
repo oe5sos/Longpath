@@ -82,6 +82,26 @@ namespace Longpath {
 // Empty string (default) preserves legacy single-profile behavior.
 static QString s_profileOverride;
 
+QString AppSettings::stationCallsign()
+{
+    auto& s = instance();
+    QString v = s.value(QStringLiteral("StationCallsign")).toString().trimmed();
+    if (v.isEmpty()) {
+        v = s.value(QStringLiteral("User/Callsign")).toString().trimmed();
+    }
+    return v;
+}
+
+QString AppSettings::stationGridSquare()
+{
+    auto& s = instance();
+    QString v = s.value(QStringLiteral("StationGridSquare")).toString().trimmed();
+    if (v.isEmpty()) {
+        v = s.value(QStringLiteral("User/GridSquare")).toString().trimmed();
+    }
+    return v;
+}
+
 void AppSettings::setProfileOverride(const QString& profile)
 {
     s_profileOverride = profile;

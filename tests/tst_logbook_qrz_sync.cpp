@@ -19,6 +19,7 @@
 #include <QDir>
 #include <QFile>
 #include <QTemporaryDir>
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -74,7 +75,7 @@ private slots:
         if (!grabDir.isEmpty()) {
             w.resize(1400, 700);
             w.show();
-            QVERIFY(QTest::qWaitForWindowExposed(&w));
+            QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
             QTest::qWait(300);
             const QString out = grabDir + QStringLiteral("/longpath-grab-LogbookWindow-syncqrz.png");
             QVERIFY(w.grab().save(out));

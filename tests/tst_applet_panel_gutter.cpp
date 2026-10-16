@@ -1,4 +1,6 @@
-// Verify A1: AppletPanelWidget reserves an 8 px scrollbar gutter on the right.
+// Verify A1: AppletPanelWidget reserves an 8 px scrollbar gutter on the
+// right -- und seit 2026-10-15 den Hausstil-Abstand auf den drei
+// anderen Seiten.
 // Per docs/architecture/ui-audit-polish-plan.md §A1.
 //
 // 2026-08-18: zwei Faelle zum ☰-Knopf standen hier
@@ -12,6 +14,7 @@
 #include <QApplication>
 #include <QtTest/QtTest>
 #include "gui/applets/AppletPanelWidget.h"
+#include "gui/StyleConstants.h"
 #include <QVBoxLayout>
 #include <QScrollArea>
 #include <QMenu>
@@ -42,11 +45,21 @@ void TstAppletPanelGutter::stackLayoutReservesEightPxRightMargin()
     auto* stackWidget = scroll->widget();
     QVERIFY(stackWidget != nullptr);
 
+    // 2026-10-15: links, oben und unten stand hier NULL. Der Betreiber
+    // am selben Tag: „es sollte auch immer automatisch zwischen windows
+    // und windows ein minimaler automatischer abstand sein, vielleicht
+    // 2 pixel. x und y, dann sieht es besser aus und gleich." Damit
+    // gilt rundum derselbe Hausstil-Abstand wie zwischen zwei Feldern.
+    //
+    // Rechts bleiben es acht: das ist die Rinne fuer den Rollbalken,
+    // kein Abstand zwischen Feldern. Ohne sie liegt der Balken auf der
+    // rechten Kante der Platten — die urspruengliche Zusicherung
+    // dieses Laufs, und sie gilt unveraendert weiter.
     QMargins m = stackWidget->contentsMargins();
     QCOMPARE(m.right(), 8);  // 8 px reserved for the scrollbar
-    QCOMPARE(m.left(), 0);
-    QCOMPARE(m.top(), 0);
-    QCOMPARE(m.bottom(), 0);
+    QCOMPARE(m.left(), Longpath::Style::kPanelGapPx);
+    QCOMPARE(m.top(), Longpath::Style::kPanelGapPx);
+    QCOMPARE(m.bottom(), Longpath::Style::kPanelGapPx);
 }
 
 

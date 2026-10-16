@@ -20,6 +20,7 @@
 #include <QMenu>
 
 #include "gui/AuxiliaryWindowLeveler.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -34,7 +35,7 @@ private slots:
 
         QWidget main;
         main.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&main));
+        QVERIFY(QTest::qWaitForWindowExposed(&main, kFensterFrist));
         // Das Hauptfenster selbst hat kein Elternteil -- nicht angefasst.
         QVERIFY(!AuxiliaryWindowLeveler::isAuxiliaryWindow(&main));
         QVERIFY(!leveler.trackedForTest().contains(&main));
@@ -43,14 +44,14 @@ private slots:
         // Channel Strip / Logbuch / Setup.
         QDialog dialog(&main);
         dialog.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&dialog));
+        QVERIFY(QTest::qWaitForWindowExposed(&dialog, kFensterFrist));
         QVERIFY(AuxiliaryWindowLeveler::isAuxiliaryWindow(&dialog));
         QVERIFY(leveler.trackedForTest().contains(&dialog));
 
         // Ein gewoehnliches Qt::Window mit Elternteil ebenso.
         QWidget window(&main, Qt::Window);
         window.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&window));
+        QVERIFY(QTest::qWaitForWindowExposed(&window, kFensterFrist));
         QVERIFY(leveler.trackedForTest().contains(&window));
 
         // Ein QMessageBox mit Elternteil auch -- der "eingefrorene"
@@ -65,7 +66,7 @@ private slots:
         box.setOption(QMessageBox::Option::DontUseNativeDialog);
 #endif
         box.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&box));
+        QVERIFY(QTest::qWaitForWindowExposed(&box, kFensterFrist));
         QVERIFY(leveler.trackedForTest().contains(&box));
 
         qApp->removeEventFilter(&leveler);
@@ -78,7 +79,7 @@ private slots:
 
         QWidget main;
         main.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&main));
+        QVERIFY(QTest::qWaitForWindowExposed(&main, kFensterFrist));
 
         // Die Paletten selbst (Qt::Tool) liegen schon auf der Ebene.
         QWidget tool(&main, Qt::Tool);
@@ -114,10 +115,10 @@ private slots:
         qApp->installEventFilter(&leveler);
         QWidget main;
         main.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&main));
+        QVERIFY(QTest::qWaitForWindowExposed(&main, kFensterFrist));
         auto* dialog = new QDialog(&main);
         dialog->show();
-        QVERIFY(QTest::qWaitForWindowExposed(dialog));
+        QVERIFY(QTest::qWaitForWindowExposed(dialog, kFensterFrist));
         QVERIFY(leveler.trackedForTest().contains(dialog));
         delete dialog;
         QVERIFY(leveler.trackedForTest().isEmpty());
@@ -135,14 +136,14 @@ private slots:
         qApp->installEventFilter(&leveler);
         QWidget main;
         main.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&main));
+        QVERIFY(QTest::qWaitForWindowExposed(&main, kFensterFrist));
         auto* logbook = new QDialog(&main);
         auto* child = new QWidget(logbook);
         logbook->show();
-        QVERIFY(QTest::qWaitForWindowExposed(logbook));
+        QVERIFY(QTest::qWaitForWindowExposed(logbook, kFensterFrist));
         auto* palette = new QWidget(&main, Qt::Tool);
         palette->show();
-        QVERIFY(QTest::qWaitForWindowExposed(palette));
+        QVERIFY(QTest::qWaitForWindowExposed(palette, kFensterFrist));
         // Zuletzt gezeigt: die Palette vorne.
         QCOMPARE(leveler.recentOrderForTest().value(0), palette);
 
@@ -164,7 +165,7 @@ private slots:
         QWidget popup(&main, Qt::Popup);
         popup.resize(40, 40);
         popup.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&popup));
+        QVERIFY(QTest::qWaitForWindowExposed(&popup, kFensterFrist));
         QVERIFY(!leveler.recentOrderForTest().contains(&popup));
         QCOMPARE(leveler.recentOrderForTest().value(0), palette);
         popup.hide();

@@ -26,6 +26,7 @@
 
 #include "gui/LogbookWindow.h"
 #include "core/AdifLog.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -208,7 +209,7 @@ private slots:
         LogbookWindow w(QDir(tmp.path()).filePath(QStringLiteral("l.adi")));
         w.resize(1100, 700);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
 
         QPushButton* imp = nullptr;
         for (QPushButton* b : w.findChildren<QPushButton*>()) {

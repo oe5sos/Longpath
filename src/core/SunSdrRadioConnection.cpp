@@ -425,6 +425,63 @@ void SunSdrRadioConnection::connectToRadio(const RadioInfo& info)
     }
 }
 
+// ── Liegt das Geraet ueberhaupt in einem Netz dieses Rechners? ────────
+//
+// In der Nacht zum 2026-10-12 lief ein Messlauf fuenf Suchversuche lang
+// ins Leere und meldete nur "keine Antwort". Die Ursache war trivial und
+// stand nirgends: der Rechner hing in einem ANDEREN Netz
+// (192.168.78.153/24), die QRP war unter 192.168.16.200 eingetragen --
+// das Kabel, ueber das sie erreichbar war, gab es nicht mehr. Fuenf
+// Versuche, 90 Sekunden, und am Ende dieselbe Meldung wie bei einem
+// gesperrten Geraet.
+//
+// Darum diese Zeile. Sie entscheidet nichts, sie sagt nur, was sich in
+// einer Sekunde feststellen laesst: ob die eingetragene Adresse in einem
+// der eigenen Netze liegt.
+QString SunSdrRadioConnection::netzlage(const QHostAddress& ziel,
+                                        const QVector<NetzEintrag>& netze)
+{
+    if (ziel.isNull()) {
+        return QStringLiteral("kein Geraet im Eintrag -- nur Rundruf");
+    }
+    QStringList vorhanden;
+    for (const NetzEintrag& n : netze) {
+        if (n.adresse.protocol() != QAbstractSocket::IPv4Protocol) { continue; }
+        vorhanden << QStringLiteral("%1 %2/%3")
+                         .arg(n.name, n.adresse.toString())
+                         .arg(n.praefix);
+        if (ziel.isInSubnet(n.adresse, n.praefix)) {
+            return QStringLiteral("%1 liegt im Netz von %2 (%3/%4)")
+                .arg(ziel.toString(), n.name, n.adresse.toString())
+                .arg(n.praefix);
+        }
+    }
+    if (vorhanden.isEmpty()) {
+        return QStringLiteral("%1 -- dieser Rechner hat gar kein IPv4-Netz")
+            .arg(ziel.toString());
+    }
+    return QStringLiteral(
+               "%1 liegt in KEINEM Netz dieses Rechners (vorhanden: %2) -- "
+               "Netzwechsel, Kabel ab, oder die Adresse im Eintrag ist alt")
+        .arg(ziel.toString(), vorhanden.join(QStringLiteral(", ")));
+}
+
+QVector<SunSdrRadioConnection::NetzEintrag> SunSdrRadioConnection::eigeneNetze()
+{
+    QVector<NetzEintrag> netze;
+    for (const QNetworkInterface& iface : QNetworkInterface::allInterfaces()) {
+        if (!(iface.flags() & QNetworkInterface::IsUp)) { continue; }
+        if (iface.flags() & QNetworkInterface::IsLoopBack) { continue; }
+        for (const QNetworkAddressEntry& entry : iface.addressEntries()) {
+            if (entry.ip().protocol() != QAbstractSocket::IPv4Protocol) {
+                continue;
+            }
+            netze.append({iface.name(), entry.ip(), entry.prefixLength()});
+        }
+    }
+    return netze;
+}
+
 void SunSdrRadioConnection::sendDiscoveryBroadcast()
 {
     if (!m_controlSocket) { return; }
@@ -552,6 +609,20 @@ void SunSdrRadioConnection::onConnectTimeout()
     // Schleife.
     if (m_sucheWiederholung && !gotBeacon && m_sucheVersuch < kSucheVersuche) {
         ++m_sucheVersuch;
+        // Einmal, beim ersten Fehlversuch: liegt das Geraet ueberhaupt in
+        // einem unserer Netze? Fuenf Versuche a 18 s sind teuer, wenn die
+        // Antwort "nein" ist (siehe netzlage()).
+        //
+        // Gefragt wird die Adresse aus dem EINTRAG, nicht m_radioAddr:
+        // die wird erst gesetzt, wenn ein Beacon angekommen ist -- also
+        // genau dann, wenn es nichts mehr zu erklaeren gibt. Beim ersten
+        // Anlauf war sie leer, und der Satz lautete "kein Geraet im
+        // Eintrag", obwohl im Eintrag 192.168.16.200 stand.
+        if (m_sucheVersuch == 1) {
+            qCWarning(lcSunSdr).noquote()
+                << QStringLiteral("SunSdr: %1")
+                       .arg(netzlage(m_radioInfo.address, eigeneNetze()));
+        }
         qCInfo(lcSunSdr).noquote()
             << QStringLiteral(
                    "SunSdr: keine Antwort -- Versuch %1 von %2. Das Geraet "
@@ -1019,6 +1090,56 @@ QByteArray SunSdrRadioConnection::preampFrameFor(int preampModeIdx)
     return SunSdr::withControlFrameCrc(frame);
 }
 
+// ── Vorverstaerker und Daempfung sind an der QRP EIN Steller ───────────
+//
+// Beide schreiben Opcode 0x04 mit demselben Stufenindex an derselben
+// Stelle (Byte 18): 00/01/02/03 = -20/-10/0/+10 dB. Wer eines von beiden
+// bewegt, verstellt damit das andere -- still, und die Oberflaeche merkt
+// es nicht.
+//
+// Am 2026-10-11 am Geraet mit Antenne auf 14,200 MHz nachgemessen, am
+// Rauschflur im I/Q (vor dem Pegelabgleich des Profils):
+//
+//   Vorverstaerker -20 dB   -102,9 dBFS      Daempfung   0 dB    -83,6
+//   Vorverstaerker -10 dB    -92,4 dBFS      Daempfung -20 dB   -103,3
+//   Vorverstaerker   0 dB    -81,9 dBFS
+//   Vorverstaerker +10 dB    -68,0 dBFS
+//
+// "Daempfung 0 dB" liegt auf dem Pegel von "Vorverstaerker 0 dB" und
+// "Daempfung -20 dB" auf dem von "Vorverstaerker -20 dB": nach einem
+// Vorverstaerker +10 dB fiel der Pegel durch setAttenuator(0) von -68,0
+// auf -83,6 dBFS. Das ist die Messung zu dem, was der Rahmenbauer
+// weiter unten schon sagt.
+//
+// Hier wird nur MITGESCHRIEBEN, nicht entschieden: ob daraus in der
+// Oberflaeche ein Steller statt zwei wird, gehoert dem Betreiber.
+void SunSdrRadioConnection::merkeStufe04(const QByteArray& frame,
+                                         const QString& weg)
+{
+    if (frame.size() < 19) { return; }
+    const int stufe = int(quint8(frame.at(18)));
+    if (stufe == m_stufe04) { return; }
+    const int vorher = m_stufe04;
+    m_stufe04 = stufe;
+    static const char* kDb[4] = { "-20 dB", "-10 dB", "0 dB", "+10 dB" };
+    const auto text = [](int st) {
+        return (st >= 0 && st < 4) ? QString::fromLatin1(kDb[st])
+                                   : QStringLiteral("unbekannt");
+    };
+    if (vorher < 0) {
+        qCInfo(lcSunSdr).noquote()
+            << QStringLiteral("SunSdr: Stufe 0x04 steht auf %1 (gesetzt ueber "
+                              "%2) -- Vorverstaerker und Daempfung teilen "
+                              "diese eine Stufe.").arg(text(stufe), weg);
+        return;
+    }
+    qCInfo(lcSunSdr).noquote()
+        << QStringLiteral("SunSdr: Stufe 0x04 %1 -> %2 (ueber %3) -- es ist "
+                          "DIESELBE Stufe fuer Vorverstaerker und Daempfung, "
+                          "die jeweils andere Anzeige stimmt danach nicht "
+                          "mehr.").arg(text(vorher), text(stufe), weg);
+}
+
 void SunSdrRadioConnection::setPreampModeIndex(int preampModeIdx)
 {
     if (!m_controlSocket || !m_profile || m_radioAddr.isNull()) {
@@ -1039,6 +1160,7 @@ void SunSdrRadioConnection::setPreampModeIndex(int preampModeIdx)
     qCInfo(lcSunSdr).noquote() << "SunSdr: preamp step ->"
                                << frame.mid(18, 1).toHex() << "(mode index"
                                << preampModeIdx << ")";
+    merkeStufe04(frame, QStringLiteral("Vorverstaerker"));
 }
 
 void SunSdrRadioConnection::setAttenuator(int dB)
@@ -1110,6 +1232,7 @@ void SunSdrRadioConnection::setAttenuator(int dB)
     }
 
     sendeSteuerrahmen(frame, "Daempfung 0x04");
+    merkeStufe04(frame, QStringLiteral("Daempfung"));
     qCInfo(lcSunSdr) << "SunSdr: setAttenuator() ->" << dB << "dB";
 }
 

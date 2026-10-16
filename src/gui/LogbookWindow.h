@@ -41,6 +41,8 @@
 #include "models/LogEntry.h"
 
 #include <QDialog>
+#include <QTimer>
+#include <QElapsedTimer>
 #include <QList>
 #include <QMetaObject>
 #include <QPointer>
@@ -123,6 +125,35 @@ private:
     // das neue Ziel, eine Vergroesserung nie.
     bool  m_settling{false};
     QSize m_settleTarget;
+
+    // ── Das Einschwingen laeuft, bis es wirklich eingeschwungen ist ──
+    //
+    // Bis zum 2026-10-16 standen hier drei feste Takte (50, 300,
+    // 1000 ms). Jeder nahm zurueck bis
+    // m_settleTarget.expandedTo(minimumSizeHint()) — und wenn die
+    // Mindesthoehe beim LETZTEN davon noch nicht eingeschwungen war,
+    // war diese Grenze selbst der aufgezogene Wert. Dann unterblieb
+    // die Korrektur, und danach lief kein Takt mehr: das Fenster blieb
+    // aufgezogen. Im Durchgang vom 2026-10-16 stand es unter -j8-Last
+    // auf 780 statt 700 (einzeln gruen).
+    //
+    // Jetzt ein laufender Takt: er korrigiert alle kSettleTickMs und
+    // hoert erst auf, wenn die Mindestgroesse zwei Messungen lang
+    // gleich geblieben ist UND nichts mehr zurueckzunehmen war —
+    // fruehestens aber nach kSettleMinMs, weil die erste Sekunde dem
+    // Betreiber gehoert (wer in ihr kleiner zieht, behaelt es), und
+    // spaetestens nach kSettleMaxMs, damit ein Fenster nicht ewig
+    // gefangen bleibt.
+    static constexpr int kSettleTickMs = 50;    // wie oft nachgesehen wird
+    static constexpr int kSettleMinMs  = 1000;  // so lange gehoert die Zeit dem Betreiber
+    static constexpr int kSettleMaxMs  = 3000;  // und dann ist Schluss
+    QTimer*        m_settleTimer{nullptr};
+    QElapsedTimer  m_settleUhr;
+    QSize          m_settleLastHint;
+    QRect          m_settleIntended;
+    bool           m_settleWithPosition{false};
+    void onSettleTick();
+    void stopSettling();
 
 private:
     void showRowMenu(const QPoint& pos);

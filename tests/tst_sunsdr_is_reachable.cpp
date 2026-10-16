@@ -63,8 +63,9 @@ private slots:
 
         // Und die beiden Wege hinein. Ein Menue, das nur den Namen
         // traegt, ist dieselbe Sackgasse wie gar keines.
-        QVERIFY2(all.contains(QStringLiteral("Verbinden")), qPrintable(all));
-        QVERIFY2(all.contains(QStringLiteral("Trennen")), qPrintable(all));
+        // Dieselbe tr()-Rolle wie im Programm; das & faellt weg.
+        QVERIFY2(all.contains(QStringLiteral("Connect")), qPrintable(all));
+        QVERIFY2(all.contains(QStringLiteral("Disconnect")), qPrintable(all));
 
         qInfo().noquote() << "gefunden:"
                           << entries.filter(QStringLiteral("SunSDR")).join(", ")

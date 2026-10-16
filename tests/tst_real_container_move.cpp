@@ -28,6 +28,7 @@
 #include <QScreen>
 #include "gui/applets/AppletFloatingWindow.h"
 #include "gui/applets/AppletWidget.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -40,7 +41,7 @@ private slots:
         auto* mwp = new MainWindow();      // bewusst nicht abgeraeumt
         mwp->resize(1280, 800);
         mwp->show();
-        QVERIFY(QTest::qWaitForWindowExposed(mwp));
+        QVERIFY(QTest::qWaitForWindowExposed(mwp, kFensterFrist));
         QTest::qWait(500);
 
         const QList<ContainerWidget*> cs =
@@ -68,7 +69,7 @@ private slots:
         auto* mwp = new MainWindow();
         mwp->resize(1280, 800);
         mwp->show();
-        QVERIFY(QTest::qWaitForWindowExposed(mwp));
+        QVERIFY(QTest::qWaitForWindowExposed(mwp, kFensterFrist));
         QTest::qWait(500);
 
         ContainerWidget* c = nullptr;
@@ -167,7 +168,7 @@ private slots:
         auto* mwp = new MainWindow();
         mwp->resize(1280, 800);
         mwp->show();
-        QVERIFY(QTest::qWaitForWindowExposed(mwp));
+        QVERIFY(QTest::qWaitForWindowExposed(mwp, kFensterFrist));
         QTest::qWait(500);
 
         auto* mgr = mwp->findChild<ContainerManager*>();

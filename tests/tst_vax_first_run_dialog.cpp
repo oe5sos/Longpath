@@ -27,6 +27,7 @@
 
 #include "core/audio/VirtualCableDetector.h"
 #include "gui/VaxFirstRunDialog.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -226,7 +227,7 @@ private slots:
         VaxFirstRunDialog dlg(FirstRunScenario::WindowsCablesFound,
                               windowsCablesPayload());
         dlg.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&dlg));
+        QVERIFY(QTest::qWaitForWindowExposed(&dlg, kFensterFrist));
 
         QSignalSpy applySpy(&dlg, &VaxFirstRunDialog::applySuggested);
         QSignalSpy openSetupSpy(&dlg,
