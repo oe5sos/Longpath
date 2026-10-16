@@ -263,12 +263,12 @@ void CatApplet::setzeCatServer(CatServer* srv)
     // die Art Oberflaeche, die dieses Feld bis heute war.
     m_tcpBtn->setEnabled(srv != nullptr);
     if (!srv) {
-        m_tcpBtn->setToolTip(QStringLiteral("Kein CAT-Server vorhanden"));
+        m_tcpBtn->setToolTip(tr("No CAT server available"));
         return;
     }
 
     m_tcpBtn->setToolTip(
-        QStringLiteral("CAT ueber TCP auf 127.0.0.1:%1..%2 (vier Kanaele)")
+        tr("CAT over TCP on 127.0.0.1:%1..%2 (four channels)")
             .arg(kErsterPort).arg(kErsterPort + CatServer::kKanaele - 1));
 
     connect(m_tcpBtn, &QPushButton::toggled, this, [this](bool an) {
@@ -324,20 +324,19 @@ void CatApplet::setzeCatPtyServer(CatPtyServer* srv)
     m_ptyBtn->setEnabled(geht);
     if (!geht) {
         m_ptyBtn->setToolTip(srv
-            ? QStringLiteral(
-                  "Pseudoterminals gibt es auf dieser Plattform nicht. "
-                  "WSJT-X, fldigi und hamlib koennen stattdessen den "
-                  "TCP-Weg (Schalter darueber).")
-            : QStringLiteral("Kein PTY-Server vorhanden"));
+            ? tr("This platform has no pseudo-terminals. WSJT-X, fldigi "
+                 "and hamlib can take the TCP route instead (switch "
+                 "above).")
+            : tr("No PTY server available"));
         zeigePfade();
         return;
     }
 
-    m_ptyBtn->setToolTip(QStringLiteral(
-        "CAT als serielle Schnittstelle: vier Pseudoterminals.\n"
-        "Einzutragen ist die feste Verknuepfung %1 .. %2 -- die bleibt "
-        "ueber Neustarts gleich.\nDer Geraetepfad darunter (/dev/tty...) "
-        "wechselt bei jedem Start.")
+    m_ptyBtn->setToolTip(tr(
+        "CAT as a serial port: four pseudo-terminals.\n"
+        "Enter the stable link %1 .. %2 -- that one stays the same "
+        "across restarts.\nThe device path below it (/dev/tty...) "
+        "changes on every start.")
             .arg(CatPtyServer::festerPfad(0),
                  CatPtyServer::festerPfad(CatPtyServer::kKanaele - 1)));
 
@@ -402,12 +401,12 @@ void CatApplet::zeigePfade()
             lbl->setText(QStringLiteral("—"));
             const QString grund = m_catPty ? m_catPty->grund(k) : QString();
             lbl->setToolTip(grund.isEmpty()
-                ? QStringLiteral("Kanal %1 ist aus")
+                ? tr("Channel %1 is off")
                       .arg(QChar(QLatin1Char('A' + k)))
                 // Den Grund ANZEIGEN, nicht nur ins Protokoll schreiben.
                 // Wer den Schalter drueckt und einen Strich sieht, hat
                 // sonst keinen Anhaltspunkt.
-                : QStringLiteral("Kanal %1: %2")
+                : tr("Channel %1: %2")
                       .arg(QChar(QLatin1Char('A' + k)), grund));
             continue;
         }
@@ -418,11 +417,11 @@ void CatApplet::zeigePfade()
         // der Platzhalter vorher war mit "/dev/ptyp0" sogar laenger.
         // Alles Lange steht im Hinweistext, und der Text ist auswaehlbar.
         lbl->setText(pfad.section(QLatin1Char('/'), -1));
-        lbl->setToolTip(QStringLiteral(
-            "Kanal %1\nGeraet jetzt: %2\nFest eintragen: %3\n\n"
-            "Der Geraetepfad wechselt bei jedem Start von Longpath. In "
-            "WSJT-X, fldigi oder im Logbuch die FESTE Zeile eintragen -- "
-            "die zeigt immer auf das aktuelle Geraet.")
+        lbl->setToolTip(tr(
+            "Channel %1\nDevice right now: %2\nEnter this one: %3\n\n"
+            "The device path changes on every start of Longpath. In "
+            "WSJT-X, fldigi or the logbook enter the STABLE line -- it "
+            "always points at the current device.")
                 .arg(QChar(QLatin1Char('A' + k)), pfad,
                      CatPtyServer::festerPfad(k)));
     }
@@ -475,9 +474,9 @@ void CatApplet::zeigeKanaele()
                            : QString(QChar(QLatin1Char('A' + k))));
         led->setEnabled(laeuft);
         led->setToolTip(laeuft
-            ? QStringLiteral("Kanal %1 horcht auf Port %2, %3 Verbindung(en)")
+            ? tr("Channel %1 listening on port %2, %3 connection(s)")
                   .arg(QChar(QLatin1Char('A' + k))).arg(m_cat->port(k)).arg(n)
-            : QStringLiteral("Kanal %1 ist aus")
+            : tr("Channel %1 is off")
                   .arg(QChar(QLatin1Char('A' + k))));
     }
 }
