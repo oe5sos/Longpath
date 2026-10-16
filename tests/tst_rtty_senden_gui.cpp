@@ -196,7 +196,7 @@ private slots:
         mox->setMoxCheck([&gefragt]() {
             ++gefragt;
             return safety::BandPlanGuard::MoxCheckResult{
-                false, QStringLiteral("ausserhalb des Bandes")};
+                false, QStringLiteral("out of band")};
         });
 
         applet.textFeldForTest()->setText(QStringLiteral("CQ DE OE5SOS"));
@@ -212,7 +212,7 @@ private slots:
                  "der Mikrofonweg blieb auf RTTY — genau der Zustand, in "
                  "dem das Mikrofon abgeklemmt ist und nichts hinausgeht");
         QVERIFY2(applet.sendeStatusForTest()->text().contains(
-                     QStringLiteral("ausserhalb des Bandes")),
+                     QStringLiteral("out of band")),
                  qPrintable(QStringLiteral("die Zeile nennt den Grund nicht: ")
                             + applet.sendeStatusForTest()->text()));
         QVERIFY(applet.sendButtonForTest()->isEnabled());

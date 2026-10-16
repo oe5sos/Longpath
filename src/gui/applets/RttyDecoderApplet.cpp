@@ -241,22 +241,22 @@ void RttyDecoderApplet::buildUI()
 
     auto* sendRow = new QHBoxLayout();
     m_textFeld = new QLineEdit(this);
-    m_textFeld->setPlaceholderText(QStringLiteral("Text zum Senden"));
-    m_textFeld->setToolTip(QStringLiteral(
-        "Baudot kennt keine Kleinbuchstaben und keine Umlaute. Was es "
-        "nicht kennt, faellt weg, statt den Text zu verfaelschen."));
+    m_textFeld->setPlaceholderText(tr("Text to send"));
+    m_textFeld->setToolTip(tr(
+        "Baudot has no lower case and no accented letters. Anything it "
+        "does not know is dropped rather than altering the text."));
     connect(m_textFeld, &QLineEdit::returnPressed, this, [this]() {
         sendeText(m_textFeld->text());
     });
     sendRow->addWidget(m_textFeld, 1);
 
-    m_sendBtn = styledButton(QStringLiteral("Senden"), 64);
+    m_sendBtn = styledButton(tr("Send"), 64);
     connect(m_sendBtn, &QPushButton::clicked, this, [this]() {
         sendeText(m_textFeld ? m_textFeld->text() : QString());
     });
     sendRow->addWidget(m_sendBtn);
 
-    m_stopBtn = styledButton(QStringLiteral("Stop"), 48);
+    m_stopBtn = styledButton(tr("Stop"), 48);
     m_stopBtn->setEnabled(false);
     connect(m_stopBtn, &QPushButton::clicked, this, [this]() { abbrechen(); });
     sendRow->addWidget(m_stopBtn);
@@ -284,11 +284,11 @@ void RttyDecoderApplet::sendeText(const QString& text)
 
     const QString sauber = text.trimmed();
     if (sauber.isEmpty()) {
-        if (m_sendeStatus) { m_sendeStatus->setText(tr("nichts zu senden")); }
+        if (m_sendeStatus) { m_sendeStatus->setText(tr("nothing to send")); }
         return;
     }
     if (!m_model || !m_model->rttyTxSource() || !m_model->micRouter()) {
-        if (m_sendeStatus) { m_sendeStatus->setText(tr("kein Sendeweg")); }
+        if (m_sendeStatus) { m_sendeStatus->setText(tr("no transmit path")); }
         return;
     }
 
@@ -305,8 +305,7 @@ void RttyDecoderApplet::sendeText(const QString& text)
     RttyTxSource* quelle = m_model->rttyTxSource();
     if (!quelle->vorbereiten(sauber, markHz, shiftHz, baud)) {
         if (m_sendeStatus) {
-            m_sendeStatus->setText(tr("„%1“ laesst sich nicht senden")
-                                       .arg(sauber));
+            m_sendeStatus->setText(tr("cannot send “%1”").arg(sauber));
         }
         return;
     }
@@ -331,7 +330,7 @@ void RttyDecoderApplet::sendeText(const QString& text)
             [this, &abgelehnt](const QString& grund) {
                 abgelehnt = true;
                 if (m_sendeStatus) {
-                    m_sendeStatus->setText(tr("sendet nicht: %1").arg(grund));
+                    m_sendeStatus->setText(tr("not transmitting: %1").arg(grund));
                 }
             });
         mox->setMox(true);
@@ -357,7 +356,7 @@ void RttyDecoderApplet::sendeText(const QString& text)
                             ? (quelle->proben() * 1000) / 48000
                             : 0;
     if (m_sendeStatus) {
-        m_sendeStatus->setText(tr("sendet (%1 s)")
+        m_sendeStatus->setText(tr("sending (%1 s)")
                                    .arg(dauerMs / 1000.0, 0, 'f', 1));
     }
 
@@ -374,7 +373,7 @@ void RttyDecoderApplet::sendeEnde()
 {
     if (!m_sendet) { return; }
     abbrechen();
-    if (m_sendeStatus) { m_sendeStatus->setText(tr("gesendet")); }
+    if (m_sendeStatus) { m_sendeStatus->setText(tr("sent")); }
 }
 
 void RttyDecoderApplet::abbrechen()

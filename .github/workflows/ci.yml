@@ -573,8 +573,28 @@ jobs:
         # only the slice of tests whose name-MD5 modulo SHARDS matches
         # SHARD.  See tests/CMakeLists.txt for the dispatch rules.
         run: |
+          # ── Debug-Info auf -g1 (2026-10-16, Abend) ──────────────
+          #
+          # RelWithDebInfo bedeutet -g2: volle Debug-Information in
+          # jeder der rund 250 Testbinaerdateien. Genau die muss der
+          # Linker im Speicher halten, und daran ist der Runner-Agent
+          # dreimal gestorben (siehe „Build test executables" unten).
+          # Erst -j2, dann -j1 — beide haben nicht gereicht, also ist
+          # es nicht die Parallelitaet, sondern ein EINZELNER
+          # Linkvorgang.
+          #
+          # -g1 behaelt, was die Fehlersuche hier wirklich braucht:
+          # Funktionsnamen und Zeilennummern, also brauchbare
+          # Stack-Traces fuer gdb und die hang-diagnostics. Weg faellt,
+          # was im Speicher am meisten wiegt und was hier noch nie
+          # jemand gebraucht hat: Typen und lokale Variablen.
+          #
+          # Nur der Linux-CI-Bau ist betroffen. Was ausgeliefert wird,
+          # baut „Ship build" getrennt.
           cmake -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DCMAKE_C_FLAGS_RELWITHDEBINFO="-O2 -g1 -DNDEBUG" \
+            -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="-O2 -g1 -DNDEBUG" \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_EXE_LINKER_FLAGS_INIT=-fuse-ld=mold \
