@@ -458,6 +458,7 @@ warren@wpratt.com
 #include <QVBoxLayout>
 #include <QSplitter>
 #include <QDateTime>
+#include <QElapsedTimer>
 #include <QPainter>
 #include <QPixmap>
 #include <QProgressDialog>
@@ -1602,6 +1603,19 @@ void MainWindow::detachApplet(AppletWidget* applet, int dockIndex,
     const QString id = panelIdFor(applet);
     if (id.isEmpty() || m_floatingApplets.contains(id)) { return; }
 
+    // ── Teilzeiten (2026-10-16) ──────────────────────────────────────
+    //
+    // Der Messpunkt im Profil-Schritt 3 sagt, WELCHES Applet 600 ms
+    // braucht; diese Zahlen sagen, WELCHER TEIL davon. Die drei
+    // Verdaechtigen stehen weiter unten: das Erzeugen des Fensters, das
+    // show() (auf macOS das erste Mal, dass ein NSWindow wirklich
+    // entsteht) und applyDefaultSize(), das die Anordnung nach ihrer
+    // Mindestgroesse fragt. Alle drei sind billig zu messen und wurden
+    // noch nie gemessen.
+    QElapsedTimer loeseTeile;
+    loeseTeile.start();
+    qint64 tFenster = 0, tGeometrie = 0, tShow = 0, tGroesse = 0;
+
     // ── Der Grund, warum es nur EINEN Weg hierher gibt ───────────────
     //
     // Dieses setParent() geht über eine Top-Level-Grenze, und genau da
@@ -1673,6 +1687,7 @@ void MainWindow::detachApplet(AppletWidget* applet, int dockIndex,
     m_appletPanel->removeApplet(applet);
     auto* win = new AppletFloatingWindow(applet, id, dockIndex, this);
     m_floatingApplets.insert(id, win);
+    tFenster = loeseTeile.elapsed();
 
     // Kommt eine Geometrie aus dem Profil, gilt sie — und der
     // Bildschirm, auf dem sie stand, entscheidet mit. Steht das Fenster
@@ -1747,6 +1762,7 @@ void MainWindow::detachApplet(AppletWidget* applet, int dockIndex,
         ensureOnVisibleScreen(win, this,
                               QSize(Style::kAppletPanelW, 120));
     }
+    tGeometrie = loeseTeile.elapsed();
 
     connect(win, &AppletFloatingWindow::dockRequested,
             this, &MainWindow::dockAppletBack);
@@ -1767,6 +1783,7 @@ void MainWindow::detachApplet(AppletWidget* applet, int dockIndex,
     // stillschweigend rückgängig gemacht.
     if (!m_appletVis || m_appletVis->isEffectivelyVisible(id)) {
         win->show();
+        tShow = loeseTeile.elapsed();
         // Erst JETZT die Groesse: vor dem Anzeigen verlangt die
         // Anordnung fast nichts, danach ihre echte Untergrenze — und
         // die zieht das Fenster bildschirmfuellend auf. Nur wenn das
@@ -1774,6 +1791,7 @@ void MainWindow::detachApplet(AppletWidget* applet, int dockIndex,
         // Betreiber.
         if (!rect.isValid()) {
             win->applyDefaultSize();
+            tGroesse = loeseTeile.elapsed();
             // Und dann dorthin, wo es hergekommen ist. Die Groesse
             // bleibt die eben berechnete — die Lage des Feldes waere
             // meist zu schmal fuer ein Fenster mit eigener Leiste.
@@ -1784,6 +1802,18 @@ void MainWindow::detachApplet(AppletWidget* applet, int dockIndex,
             }
         }
         win->raise();
+    }
+
+    // Nur wenn es wirklich etwas gekostet hat — sonst ist die Zeile
+    // Rauschen in einem Protokoll, das ohnehin lang ist.
+    if (loeseTeile.elapsed() >= 100) {
+        qWarning().nospace()
+            << "[Detach:Teile] " << id
+            << ": Fenster erzeugen " << tFenster
+            << " ms, Geometrie " << (tGeometrie - tFenster)
+            << " ms, show() " << (tShow > 0 ? tShow - tGeometrie : 0)
+            << " ms, Vorgabegroesse " << (tGroesse > 0 ? tGroesse - tShow : 0)
+            << " ms, zusammen " << loeseTeile.elapsed() << " ms";
     }
 }
 
@@ -8217,6 +8247,8 @@ void MainWindow::populateDefaultMeter()
                 // Schritt die letzte Zeile steht -- ohne das war der
                 // gesamte ~450-zeilige Block ein einziger, blinder
                 // synchroner Aufruf.
+                QElapsedTimer profilUhr;
+                profilUhr.start();
                 qWarning() << "[ProfileApply:Step] 1/6 Vollbild";
                 // Vollbild MERKEN, bevor irgendein Schritt unten es
                 // kippen kann -- am Ende wird es wieder durchgesetzt
@@ -8300,7 +8332,13 @@ void MainWindow::populateDefaultMeter()
                     }
                 }
 
-                qWarning() << "[ProfileApply:Step] 2/6 Sichtbarkeits-Map";
+                // Messpunkt (2026-10-16): zwischen Schritt 1 und 2
+                // lagen in Martins Protokoll 2231 ms. Schritt 1 ist
+                // der Vollbild-Uebergang, und macOS animiert den —
+                // diese Zeile sagt, ob es wirklich das ist.
+                qWarning() << "[ProfileApply:Step] 2/6 Sichtbarkeits-Map"
+                           << "(Schritt 1 brauchte"
+                           << profilUhr.elapsed() << "ms)";
                 const QVariantMap vis =
                     s.value(QStringLiteral("visible")).toMap();
                 for (auto it = vis.constBegin(); it != vis.constEnd(); ++it) {
@@ -8410,7 +8448,24 @@ void MainWindow::populateDefaultMeter()
                         ensureOnVisibleScreen(w, this,
                                               QSize(Style::kAppletPanelW, 120));
                     } else if (auto* a = appletForKey(it.key())) {
+                        // Messpunkt (2026-10-16): wohin die Startzeit
+                        // geht.
+                        //
+                        // Gemessen an Martins Protokoll vom 15.10.:
+                        // „Profil anwenden" braucht 6,5 s, davon 3,5 s
+                        // allein in diesem Schritt. Er ruft
+                        // detachApplet() je schwebendem Applet — bei
+                        // ihm sechs. Ob sich die 3,5 s gleichmaessig
+                        // verteilen oder an EINEM haengen, sagt erst
+                        // diese Zeile.
+                        QElapsedTimer loeseUhr;
+                        loeseUhr.start();
                         detachApplet(a, dockIndex, rect, screen);
+                        const qint64 gebraucht = loeseUhr.elapsed();
+                        if (gebraucht >= 100) {
+                            qWarning() << "[ProfileApply:Step3] abgeloest"
+                                       << it.key() << "in" << gebraucht << "ms";
+                        }
                     }
                     // Eine Kennung ohne Applet dahinter wird
                     // übergangen: eine Aufnahme von vor einem Update
@@ -12374,10 +12429,28 @@ void MainWindow::offerPaletteRestart(const QString& paletteName)
     // Zahlen in Stylesheets, die beim Bauen des Fensters entstanden
     // sind. Der Text sagt genau das — „startet neu, sonst passiert
     // nichts" waere nach dem sichtbaren Farbwechsel schlicht falsch.
-    box.setInformativeText(
-        tr("The colours are on already. This palette also changes corners, "
-           "padding and depth, and those are set while the window is "
-           "built — they need a restart. Restart now?"));
+    // Nur sagen, was wahr ist (2026-10-15).
+    //
+    // Hier stand unbedingt „The colours are on already". Bei den
+    // Paletten „Flach" und „Tief" ist das FALSCH: die tragen null
+    // Farben (nachgesehen in resources/themes/flach.json und
+    // tief.json — Schluessel `formen`, keine `colors`). Wer eine
+    // davon waehlt, sieht nichts, liest „die Farben sind schon an"
+    // und schliesst daraus, dass die Umstellung nicht geht. Genau
+    // diese Rueckmeldung kam am 2026-10-15: „theme funktioniert auch
+    // noch nicht."
+    if (Style::Theme::instance().hasColours()) {
+        box.setInformativeText(
+            tr("The colours are on already. This palette also changes "
+               "corners, padding and depth, and those are set while the "
+               "window is built — they need a restart. Restart now?"));
+    } else {
+        box.setInformativeText(
+            tr("This palette carries no colours at all — it only changes "
+               "corners, padding and depth. Those are set while the window "
+               "is built, so nothing looks different until a restart. "
+               "Restart now?"));
+    }
     QPushButton* now = box.addButton(tr("Restart now"), QMessageBox::AcceptRole);
     box.addButton(tr("Later"), QMessageBox::RejectRole);
     box.setDefaultButton(now);

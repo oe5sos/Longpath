@@ -30,6 +30,7 @@
 #include "gui/QsoMapWindow.h"
 #include "gui/widgets/DxRadarWidget.h"
 #include "gui/widgets/RotorLogbookPanel.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -63,7 +64,7 @@ private slots:
         QTemporaryDir dir;
         LogbookWindow w(writeAdif(QDir(dir.path())));
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         QLineEdit* call = w.entryCallForTest();
         QVERIFY(call);
         call->setFocus();
@@ -78,7 +79,7 @@ private slots:
         QTemporaryDir dir;
         LogbookWindow w(writeAdif(QDir(dir.path())));
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         QSignalSpy spy(&w, &LogbookWindow::logQsoRequested);
         QTest::keyClicks(w.entryCallForTest(), QStringLiteral("OE3AA"));
         QTest::keyClicks(w.entryCommentForTest(), QStringLiteral("Stuhleck"));
@@ -99,7 +100,7 @@ private slots:
         QTemporaryDir dir;
         LogbookWindow w(writeAdif(QDir(dir.path())));
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         QTest::keyClicks(w.entryCallForTest(), QStringLiteral("OE3AA"));
         QTest::keyClicks(w.entryCommentForTest(), QStringLiteral("x"));
         QTest::keyClick(w.entryCommentForTest(), Qt::Key_Escape);
@@ -120,7 +121,7 @@ private slots:
         auto* sc = new QShortcut(QKeySequence(Qt::Key_Escape), &w);
         QSignalSpy fired(sc, &QShortcut::activated);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         w.activateWindow();
         QTest::keyClicks(w.entryCallForTest(), QStringLiteral("OE3AA"));
         // Wie QApplication: vor der Abfrage "nicht angenommen".
@@ -165,7 +166,7 @@ private slots:
         LogbookWindow w(writeAdif(QDir(dir.path())));
         w.resize(1600, 900);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         QsoMapWindow* map = w.mapPanelForTest();
         QVERIFY(map);
         // Wie beim Betreiber: die Karte breit (Teiler Tabelle | Karte | Karteikarte).
@@ -221,7 +222,7 @@ private slots:
         panel.showLogbook();
         LogbookWindow* w = panel.findChild<LogbookWindow*>();
         QVERIFY(w);
-        QVERIFY(QTest::qWaitForWindowExposed(w));
+        QVERIFY(QTest::qWaitForWindowExposed(w, kFensterFrist));
         QTest::keyClicks(w->entryCallForTest(), QStringLiteral("OE5VVM"));
         QTest::keyClicks(w->entryCommentForTest(), QStringLiteral("6m Es"));
         QTest::keyClick(w->entryCallForTest(), Qt::Key_Return);

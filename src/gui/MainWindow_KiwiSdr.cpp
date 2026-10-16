@@ -649,15 +649,14 @@ void MainWindow::wireKiwiSdr()
         return;
     }
 
-    // Aether holt das Rufzeichen vom RadioModel. Bei uns steht es nicht
-    // dort, sondern seit jeher unter StationCallsign in den
-    // Einstellungen — QsoMapWindow und RadioModel lesen es von genau
-    // dort. Der KiwiSDR schickt es dem Betreiber des Empfaengers als
-    // Kennung; leer ist zulaessig.
+    // Aether holt das Rufzeichen vom RadioModel. Bei uns steht es in
+    // den Einstellungen — und zwar NICHT nur unter StationCallsign:
+    // den schreibt niemand, kanonisch ist User/Callsign (siehe
+    // AppSettings::stationCallsign, 2026-10-16). Bis dahin stand hier
+    // nur der alte Schluessel, und der war leer. Der KiwiSDR schickt
+    // die Kennung dem Betreiber des Empfaengers; leer ist zulaessig.
     m_kiwiSdrManager->setOperatorCallsign(
-        AppSettings::instance()
-            .value(QStringLiteral("StationCallsign"), QString{})
-            .toString());
+        AppSettings::stationCallsign());
 
     connect(m_kiwiSdrManager, &KiwiSdrManager::profilesChanged,
             this, &MainWindow::refreshKiwiSdrAppletReceivers);

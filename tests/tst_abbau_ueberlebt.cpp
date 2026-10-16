@@ -33,6 +33,7 @@
 #include <QMenuBar>
 
 #include "gui/MainWindow.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -64,7 +65,7 @@ private slots:
         auto* mw = new MainWindow();
         mw->resize(1700, 1000);
         mw->show();
-        QVERIFY(QTest::qWaitForWindowExposed(mw));
+        QVERIFY(QTest::qWaitForWindowExposed(mw, kFensterFrist));
         for (int i = 0; i < 10; ++i) { QCoreApplication::processEvents(); }
 
         // Die Verbindungsmaske: sie steht beim ersten Start ohnehin,

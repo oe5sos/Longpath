@@ -39,6 +39,7 @@
 #include "gui/widgets/RotorLogbookPanel.h"
 
 #include "MenueFaenger.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -83,7 +84,7 @@ private slots:
         rail->setAttribute(Qt::WA_NativeWindow);   // wie neben dem Panadapter
         rail->setGeometry(0, 0, 60, 300);
         top.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&top));
+        QVERIFY(QTest::qWaitForWindowExposed(&top, kFensterFrist));
         QVERIFY(rail->windowHandle());
 
         QPushButton* badge = nullptr;
@@ -108,7 +109,7 @@ private slots:
         panel->setAttribute(Qt::WA_NativeWindow);
         panel->setGeometry(0, 0, 500, 600);
         top.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&top));
+        QVERIFY(QTest::qWaitForWindowExposed(&top, kFensterFrist));
         QVERIFY(panel->windowHandle());
 
         const auto fund = Test::oeffneMenue([&]() {

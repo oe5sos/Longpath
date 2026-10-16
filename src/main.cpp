@@ -42,6 +42,8 @@
 #include <QDir>
 #include <QFile>
 #include <QDateTime>
+#include <QElapsedTimer>
+#include <QTimer>
 #include <QStandardPaths>
 #include <QRegularExpression>
 #include <QStringList>
@@ -586,8 +588,39 @@ int main(int argc, char* argv[])
     // Absturz beim Beenden sonst nur die Stelle wechselt.
     int rc = 0;
     {
+        // ── Messpunkte (2026-10-16): wo die Startzeit wirklich liegt ──
+        //
+        // Martins Protokoll vom 15.10. zeigt zwischen „TciServer
+        // listening" (21:47:03.900) und dem ersten Lebenszeichen des
+        // Verbinden-Fensters (21:47:10.065) eine Luecke von 6,2 s ohne
+        // eine einzige Zeile — der groesste einzelne Posten seines
+        // 17-Sekunden-Starts und der einzige voellig unvermessene.
+        //
+        // Derselbe Weg mit demselben Profil, aber offscreen, braucht
+        // bis dorthin 2,1 s. Die Zeit haengt also an der echten
+        // Darstellung und nicht am Profil — und genau die kann eine
+        // Sonde nicht nachstellen. Diese drei Zahlen koennen es: der
+        // Konstruktor, das show(), und die erste Runde der
+        // Ereignisschleife danach.
+        //
+        // Statisch, damit die Uhr das Lambda ueberlebt, das sie liest.
+        static QElapsedTimer startUhr;
+        startUhr.start();
+
         Longpath::MainWindow window;
+        const qint64 nachKonstruktor = startUhr.elapsed();
+
         window.show();
+        const qint64 nachShow = startUhr.elapsed();
+
+        // Erst nach der ersten Runde ist das Fenster wirklich da.
+        QTimer::singleShot(0, &window, [nachKonstruktor, nachShow]() {
+            qWarning().nospace()
+                << "[Startzeit] MainWindow-Konstruktor " << nachKonstruktor
+                << " ms, show() " << (nachShow - nachKonstruktor)
+                << " ms, erste Runde der Schleife bei " << startUhr.elapsed()
+                << " ms";
+        });
 
         // Dev automation bridge (Phase 0: dumpTree + grab + get, read-only) --
         // off unless explicitly requested, so a normal launch is unaffected.

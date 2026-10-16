@@ -9030,9 +9030,13 @@ void RadioModel::connectToRadio(const RadioInfo& info)
         m_flexBroadcaster->setMacAddress(mac);
         m_flexBroadcaster->setSerial(derivedFlexSerial(mac));
         m_flexBroadcaster->setVersion(QStringLiteral(LONGPATH_VERSION));
+        // Dieselbe Rueckfallkette wie ueberall sonst: StationCallsign
+        // schreibt niemand, das Rufzeichen steht kanonisch unter
+        // User/Callsign (siehe AppSettings::stationCallsign). Ohne sie
+        // rief sich die Station im Netz „LONGPATH".
+        const QString rufzeichen = AppSettings::stationCallsign();
         m_flexBroadcaster->setCallsign(
-            as.value(QStringLiteral("StationCallsign"),
-                     QStringLiteral("LONGPATH")).toString());
+            rufzeichen.isEmpty() ? QStringLiteral("LONGPATH") : rufzeichen);
         m_flexBroadcaster->setNickname(
             as.value(QStringLiteral("PGXL_BroadcastNickname"),
                      QStringLiteral("Longpath")).toString());

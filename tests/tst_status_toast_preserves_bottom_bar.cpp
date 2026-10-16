@@ -33,6 +33,7 @@
 #include <QStatusBar>
 
 #include "gui/widgets/StatusToast.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 using namespace Qt::StringLiterals;
@@ -148,7 +149,7 @@ private slots:
             new StatusToast(u"TX interlock blocked: SWR 3.1"_s,
                             ToastSeverity::Error, 60000));
         toast->show();
-        QVERIFY(QTest::qWaitForWindowExposed(toast));
+        QVERIFY(QTest::qWaitForWindowExposed(toast, kFensterFrist));
 
         QMouseEvent press(QEvent::MouseButtonPress,
                           QPointF(10, 10), QPointF(10, 10),

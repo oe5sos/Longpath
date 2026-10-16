@@ -48,6 +48,7 @@
 #include "gui/applets/RxApplet.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -161,7 +162,7 @@ private slots:
         win.resize(420, 300);
         win.move(300, 300);
         win.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&win));
+        QVERIFY(QTest::qWaitForWindowExposed(&win, kFensterFrist));
 
         auto* bar = win.findChild<WindowTitleBar*>();
         QVERIFY(bar);
@@ -201,7 +202,7 @@ private slots:
         if (rx) { rx->setMinimumSize(0, 0); }
         win.resize(600, 400);
         win.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&win));
+        QVERIFY(QTest::qWaitForWindowExposed(&win, kFensterFrist));
 
         auto* grip = win.findChild<ResizeGrip*>();
         QVERIFY2(grip, "ohne sichtbaren Anfasser unten rechts muss man die "
@@ -253,7 +254,7 @@ private slots:
         win.move(120, 90);
         win.resize(600, 400);
         win.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&win));
+        QVERIFY(QTest::qWaitForWindowExposed(&win, kFensterFrist));
 
         auto* bar = win.findChild<WindowTitleBar*>();
         QVERIFY(bar);
@@ -296,7 +297,7 @@ private slots:
         auto* rx = new RxApplet(model.slices().value(0), &model);
         AppletFloatingWindow win(rx, QStringLiteral("Rx"), 0, nullptr);
         win.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&win));
+        QVERIFY(QTest::qWaitForWindowExposed(&win, kFensterFrist));
 
         QSignalSpy docks(&win, &AppletFloatingWindow::dockRequested);
         QCloseEvent ev;

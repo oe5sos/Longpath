@@ -26,6 +26,7 @@
 #include "gui/widgets/SliceFlag.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -39,7 +40,7 @@ private:
         auto* mw = new MainWindow();
         mw->resize(1700, 1000);
         mw->show();
-        if (!QTest::qWaitForWindowExposed(mw)) { return mw; }
+        if (!QTest::qWaitForWindowExposed(mw, kFensterFrist)) { return mw; }
         for (int i = 0; i < 10; ++i) { QCoreApplication::processEvents(); }
         return mw;
     }

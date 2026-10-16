@@ -3117,14 +3117,83 @@ private slots:
         handshake(conn);
 
         QSignalSpy gap(&conn, &RadioConnection::iqSequenceGap);
+        QElapsedTimer uhr;
+        uhr.start();
         quint16 n = 1000;
         for (int i = 0; i < 20; ++i) {
             conn.feedStreamDatagramForTest(qrpBlockSeq(n));
             n = quint16(n + 3);  // je zwei Nummern fehlen
         }
+        const qint64 gebraucht = uhr.elapsed();
 
-        QCOMPARE(gap.count(), 1);
+        // ── Die Schranke aus der gemessenen Dauer, nicht geraten ─────
+        //
+        // Die Drossel laesst eine Meldung je 20-ms-Fenster durch
+        // (SunSdrRadioConnection.cpp: `now - m_lastGapSignalMs >= 20`).
+        // Wie viele Fenster diese Schleife beruehrt, haengt an der
+        // Maschine und nicht am Programm: allein gefahren braucht sie
+        // unter einer Millisekunde, im `ctest -j8`-Durchgang vom
+        // 2026-10-16 brauchte sie mehr als 20 ms — und die feste
+        // Erwartung „genau eine" fiel um:
+        //
+        //     Actual   (gap.count()): 2
+        //     Expected (1)          : 1
+        //
+        // In den drei Durchgaengen davor war derselbe Lauf gruen. Eine
+        // Erwartung, die von der Auslastung des Rechners abhaengt, ist
+        // keine Zusage ueber das Programm.
+        //
+        // Darum: so viele Meldungen, wie wirklich vergangene Fenster
+        // erlauben. Auf einer ruhigen Maschine ist das wieder genau
+        // eine — die Pruefung verliert dort nichts.
+        const int erlaubt = int(gebraucht / 20) + 1;
+        qInfo() << "20 Luecken in" << gebraucht << "ms ->" << gap.count()
+                << "Meldungen, erlaubt" << erlaubt;
+
+        QVERIFY2(gap.count() >= 1,
+                 "gedrosselt heisst nicht verschluckt: die erste Luecke "
+                 "einer Verbindung muss gemeldet werden");
+        QVERIFY2(gap.count() <= erlaubt,
+                 qPrintable(QStringLiteral(
+                     "%1 Meldungen fuer 19 Luecken in %2 ms — die Drossel "
+                     "laesst eine je 20 ms durch, also hoechstens %3")
+                     .arg(gap.count()).arg(gebraucht).arg(erlaubt)));
         QCOMPARE(conn.seqLostForTest(), quint64(38));  // 19 Luecken x 2
+    }
+
+    // Die ANDERE Seite der Drossel, und die Gegenprobe zur Rechnung
+    // oben: Luecken mit genug Abstand werden einzeln gemeldet. Ohne
+    // diesen Fall waere die Schranke oben auch mit einer Drossel gruen,
+    // die nach der ersten Meldung fuer immer schweigt — und genau das
+    // war der Fehler, den der Startwert -1 einmal hatte (die erste
+    // Luecke verschwand still, siehe m_lastGapSignalMs).
+    //
+    // Lastrobust von sich aus: qWait wartet unter Last LAENGER, und
+    // laenger heisst mehr Fenster, nicht weniger Meldungen.
+    void lueckenMitAbstandMeldenEinzeln()
+    {
+        SunSdrRadioConnection conn;
+        conn.setFixedPortBindingEnabledForTest(false);
+        conn.init();
+        conn.setDiscoveryBroadcastEnabledForTest(false);
+        conn.connectToRadio(someQrpInfo());
+        handshake(conn);
+
+        // VIER Bloecke ergeben DREI Luecken: die erste Nummer setzt nur
+        // den Anfang, eine Luecke braucht immer einen Vorgaenger. (So
+        // auch oben: 20 Bloecke, 19 Luecken, 38 verlorene Nummern.)
+        QSignalSpy gap(&conn, &RadioConnection::iqSequenceGap);
+        quint16 n = 2000;
+        for (int i = 0; i < 4; ++i) {
+            conn.feedStreamDatagramForTest(qrpBlockSeq(n));
+            n = quint16(n + 3);      // je zwei Nummern fehlen
+            QTest::qWait(30);        // mehr als die 20 ms der Drossel
+        }
+
+        qInfo() << "3 Luecken mit je 30 ms Abstand ->" << gap.count()
+                << "Meldungen";
+        QCOMPARE(gap.count(), 3);
+        QCOMPARE(conn.seqLostForTest(), quint64(6));   // 3 Luecken x 2
     }
 
     void umlaufDerSechzehnBitIstKeineLuecke()

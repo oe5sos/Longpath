@@ -183,7 +183,7 @@ void SotaClient::fetchSpots()
 {
     QNetworkRequest req{QUrl{QString::fromLatin1(SpotsUrl)}};
     const QString callsign =
-        AppSettings::instance().value("StationCallsign", QString()).toString();
+        AppSettings::stationCallsign();
     req.setHeader(QNetworkRequest::UserAgentHeader,
                   callsign.isEmpty() ? QStringLiteral("Longpath")
                                      : QStringLiteral("Longpath (%1)").arg(callsign));
@@ -235,7 +235,7 @@ void SotaClient::onPollTimer()
     // fetch every time.
     QNetworkRequest req{QUrl{QString::fromLatin1(EpochUrl)}};
     const QString callsign =
-        AppSettings::instance().value("StationCallsign", QString()).toString();
+        AppSettings::stationCallsign();
     req.setHeader(QNetworkRequest::UserAgentHeader,
                   callsign.isEmpty() ? QStringLiteral("Longpath")
                                      : QStringLiteral("Longpath (%1)").arg(callsign));
