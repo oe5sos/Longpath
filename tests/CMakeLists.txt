@@ -983,6 +983,12 @@ longpath_add_test(tst_radio_model_band_click)
 longpath_add_test(tst_about_dialog)
 longpath_add_test(tst_support_dialog)
 longpath_add_test(tst_dev_automation_server)
+# ── RTTY senden (2026-10-16) ─────────────────────────────────────────
+# Der staerkste Pruefstand fuer einen Sender ist der Empfaenger, den es
+# schon gibt: der Lauf schickt seine Toene durch RttyDecoder zurueck.
+longpath_add_test(tst_rtty_senden)
+target_link_libraries(tst_rtty_senden PRIVATE Qt6::Multimedia)
+
 longpath_add_test(tst_rtty_decoder)
 longpath_add_test(tst_rtty_decoder_sensitivity)
 longpath_add_test(tst_rtty_decoder_applet)
