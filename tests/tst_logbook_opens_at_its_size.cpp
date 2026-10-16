@@ -19,6 +19,7 @@
 
 #include "core/AppSettings.h"
 #include "gui/LogbookWindow.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -64,7 +65,7 @@ private slots:
         LogbookWindow w(m_log);
         w.resize(1000, 700);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         QTest::qWait(1300);
         qInfo() << "Mindestgroesse" << w.minimumSizeHint() << "Groesse" << w.size();
         // Voraussetzung: der Inhalt passt wirklich in 700 px Hoehe.
@@ -84,7 +85,7 @@ private slots:
         LogbookWindow w(m_log);
         w.resize(1000, 700);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         QTest::qWait(10);
 
         // ── Erst einschwingen lassen (2026-10-15) ────────────────────
@@ -129,7 +130,7 @@ private slots:
         LogbookWindow w(m_log);
         w.resize(1000, 700);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         // Eine echte Verkleinerung (700 -> 650), sobald die wirkliche
         // Mindestgroesse sie zulaesst; minimumSizeHint() springt beim
         // Einschwingen (offscreen kurz 820) und taugt hier nicht.
@@ -154,7 +155,7 @@ private slots:
         LogbookWindow w(m_log);
         w.resize(1000, 200);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         QTest::qWait(1300);
         QVERIFY(w.height() >= w.minimumSizeHint().height());
     }

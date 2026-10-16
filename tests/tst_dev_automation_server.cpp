@@ -22,6 +22,7 @@
 #include "core/DevAutomationServer.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -134,7 +135,7 @@ private slots:
         probe->setObjectName(QStringLiteral("automationProbeButton"));
         probe->resize(120, 30);
         probe->show();
-        QVERIFY(QTest::qWaitForWindowExposed(probe));
+        QVERIFY(QTest::qWaitForWindowExposed(probe, kFensterFrist));
 
         const QJsonObject pong = sendCommand(socketName, QStringLiteral("ping"));
         QVERIFY2(pong.value(QStringLiteral("ok")).toBool(),
@@ -202,13 +203,13 @@ private slots:
         auto* classNameOnlyWidget = new QLineEdit();
         classNameOnlyWidget->resize(30, 16);
         classNameOnlyWidget->show();
-        QVERIFY(QTest::qWaitForWindowExposed(classNameOnlyWidget));
+        QVERIFY(QTest::qWaitForWindowExposed(classNameOnlyWidget, kFensterFrist));
 
         auto* objectNameMatchWidget = new QLineEdit();
         objectNameMatchWidget->setObjectName(QStringLiteral("QLineEdit"));
         objectNameMatchWidget->resize(400, 200);
         objectNameMatchWidget->show();
-        QVERIFY(QTest::qWaitForWindowExposed(objectNameMatchWidget));
+        QVERIFY(QTest::qWaitForWindowExposed(objectNameMatchWidget, kFensterFrist));
 
         const QJsonObject grabbed = sendCommand(socketName, QStringLiteral("grab QLineEdit"));
         QVERIFY2(grabbed.value(QStringLiteral("ok")).toBool(),

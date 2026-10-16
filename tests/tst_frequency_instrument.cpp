@@ -26,6 +26,7 @@
 #include <QWheelEvent>
 
 #include "gui/instruments/FrequencyInstrument.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -139,7 +140,7 @@ private slots:
         FrequencyInstrument w;
         w.resize(520, 140);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
 
         const QList<QLabel*> d = digitsOf(w);
         QCOMPARE(d.size(), 8);

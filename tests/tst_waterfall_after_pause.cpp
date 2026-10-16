@@ -21,6 +21,7 @@
 #include <cmath>
 
 #include "gui/SpectrumWidget.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -84,7 +85,7 @@ private slots:
         w.setVfoFrequency(kCenterHz + 20'000.0);   // Filter weit rechts
         w.setWfUpdatePeriodMs(10);                 // schnell viele Zeilen
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
 
         const double fA = kCenterHz - 12'000.0;
         const double fB = kCenterHz + 4'000.0;
@@ -97,7 +98,7 @@ private slots:
         feedFor(w, frameWithCarrierAt(fB), 3000);
 
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         feedFor(w, frameWithCarrierAt(fB), 150);
 
         const QImage img = w.grabFramebuffer();

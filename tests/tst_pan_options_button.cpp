@@ -24,6 +24,7 @@
 #include <QSignalSpy>
 
 #include "gui/PanadapterApplet.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -36,7 +37,7 @@ private slots:
         PanadapterApplet applet(QStringLiteral("A"));
         applet.resize(800, 400);
         applet.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&applet));
+        QVERIFY(QTest::qWaitForWindowExposed(&applet, kFensterFrist));
 
         QPushButton* gear = nullptr;
         for (QPushButton* b : applet.findChildren<QPushButton*>()) {

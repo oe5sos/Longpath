@@ -28,6 +28,7 @@
 #include "gui/MainWindow.h"
 #include "gui/PanadapterStack.h"
 #include "gui/PanFloatingWindow.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -88,7 +89,7 @@ private slots:
         auto* mw = new MainWindow();
         mw->resize(1200, 800);
         mw->show();
-        QVERIFY(QTest::qWaitForWindowExposed(mw));
+        QVERIFY(QTest::qWaitForWindowExposed(mw, kFensterFrist));
 
         PanadapterStack* stack = mw->findChild<PanadapterStack*>();
         QVERIFY2(stack, "Kein Panadapter-Stapel im Hauptfenster");
@@ -135,7 +136,7 @@ private slots:
         auto* mw = new MainWindow();
         mw->resize(1200, 800);
         mw->show();
-        QVERIFY(QTest::qWaitForWindowExposed(mw));
+        QVERIFY(QTest::qWaitForWindowExposed(mw, kFensterFrist));
 
         // ── Die Connect-Maske erst zumachen ─────────────────────────
         //
@@ -186,7 +187,7 @@ private slots:
         auto* stack = new PanadapterStack;
         stack->resize(900, 600);
         stack->show();
-        QVERIFY(QTest::qWaitForWindowExposed(stack));
+        QVERIFY(QTest::qWaitForWindowExposed(stack, kFensterFrist));
 
         stack->addPanadapter(QStringLiteral("pan-0"));
         stack->applyLayout(QStringLiteral("1"), {QStringLiteral("pan-0")});

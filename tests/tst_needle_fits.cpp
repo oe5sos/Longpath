@@ -23,6 +23,7 @@
 #include "gui/applets/InstrumentApplet.h"
 #include "models/RadioModel.h"
 #include "gui/meters/MeterPoller.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -51,7 +52,7 @@ private slots:
         for (const QSize& sz : sizes) {
             inst->resize(sz);
             inst->show();
-            QVERIFY(QTest::qWaitForWindowExposed(inst));
+            QVERIFY(QTest::qWaitForWindowExposed(inst, kFensterFrist));
             QTest::qWait(60);
 
             QImage img(sz, QImage::Format_ARGB32);
@@ -121,7 +122,7 @@ private slots:
             inst->onReading(MeterBinding::SignalPeak, -80.0);
             inst->resize(sz);
             inst->show();
-            QVERIFY(QTest::qWaitForWindowExposed(inst));
+            QVERIFY(QTest::qWaitForWindowExposed(inst, kFensterFrist));
             QTest::qWait(120);
 
             QImage img(sz, QImage::Format_ARGB32);

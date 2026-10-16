@@ -11,6 +11,7 @@
 #include <QWidget>
 
 #include "gui/WindowPlacement.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -59,7 +60,7 @@ private slots:
         QWidget w(nullptr, Qt::Tool | Qt::FramelessWindowHint);
         w.setGeometry(101, 99, 301, 203);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         w.setGeometry(101, 99, 301, 203);
         snapToGridAfterSettle(&w);
         QTRY_VERIFY_WITH_TIMEOUT(w.frameGeometry().x() % kSnapGridPx == 0

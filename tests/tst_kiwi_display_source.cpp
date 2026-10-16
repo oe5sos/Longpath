@@ -23,6 +23,7 @@
 #include <QtTest>
 
 #include "gui/SpectrumWidget.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -58,7 +59,7 @@ private slots:
         SpectrumWidget sw;
         sw.resize(600, 300);
         sw.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&sw));
+        QVERIFY(QTest::qWaitForWindowExposed(&sw, kFensterFrist));
 
         QVERIFY(!sw.kiwiDisplaySource());
         // Der Kiwi schickt, aber es steht nicht auf ihm: nichts darf
@@ -80,7 +81,7 @@ private slots:
         SpectrumWidget sw;
         sw.resize(600, 300);
         sw.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&sw));
+        QVERIFY(QTest::qWaitForWindowExposed(&sw, kFensterFrist));
 
         sw.setKiwiDisplaySource(true);
         QVERIFY(sw.kiwiDisplaySource());
@@ -108,7 +109,7 @@ private slots:
         SpectrumWidget sw;
         sw.resize(600, 300);
         sw.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&sw));
+        QVERIFY(QTest::qWaitForWindowExposed(&sw, kFensterFrist));
 
         sw.setKiwiDisplaySource(true);
         sw.setFrequencyRange(14.100e6, 200000.0);
@@ -146,7 +147,7 @@ private slots:
         SpectrumWidget sw;
         sw.resize(600, 300);
         sw.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&sw));
+        QVERIFY(QTest::qWaitForWindowExposed(&sw, kFensterFrist));
 
         sw.setKiwiDisplaySource(true);
         sw.setKiwiDisplaySource(false);
