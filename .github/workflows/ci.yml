@@ -676,7 +676,33 @@ jobs:
         #
         # -j2 statt -j$(nproc) kostet Zeit und spart Speicher. Der
         # Shard lag bei 25 Minuten, die anderen bei 29 — Luft ist da.
-        run: cmake --build build -j2 --target all_tests
+        #
+        # ── In vier Teilen, mit Messung dazwischen (2026-10-16) ─────
+        #
+        # -j2 allein hat es NICHT behoben: Shard 2/4 faellt weiter um,
+        # und zwar so hart, dass der nachfolgende always()-Schritt gar
+        # nicht mehr laeuft — der Runner-Agent stirbt mitsamt dem Job.
+        # Damit kommt auch keine Messung an, und ohne Messung ist jede
+        # weitere These geraten.
+        #
+        # Darum der Bau in vier Teilen entlang der Label-Ziele, die
+        # tests/CMakeLists.txt ohnehin anlegt. Jeder Teil schreibt
+        # vorher seinen Stand ins Log. Stirbt der Runner, steht dort
+        # schwarz auf weiss, WELCHER Teil ihn umgebracht hat und wie
+        # viel Speicher und Platte davor noch da waren — das ist die
+        # erste belastbare Zahl zu diesem Fehler ueberhaupt.
+        run: |
+          set -x
+          for ziel in tests_core tests_models tests_gui tests_unclassified; do
+            echo "=== vor $ziel ==="
+            free -m || true
+            df -h / || true
+            du -sh build/tests 2>/dev/null || true
+            cmake --build build -j2 --target "$ziel"
+          done
+          echo "=== nach allen vier ==="
+          free -m || true
+          df -h / || true
 
       - name: Speicher und Platte nach dem Testbau (Linux)
         if: runner.os == 'Linux' && always()
