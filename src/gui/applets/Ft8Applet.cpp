@@ -13,6 +13,9 @@
 #include "core/AudioEngine.h"
 #include "core/Ft8Stream.h"
 #include "core/Ft8Tx.h"
+#include "models/Band.h"
+#include <QDateTime>
+#include "core/AppSettings.h"
 #include "core/MoxController.h"
 #include "core/audio/CompositeTxMicRouter.h"
 #include "core/audio/AudioTapRing.h"
@@ -26,6 +29,8 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QPlainTextEdit>
+#include <QTextCursor>
+#include <QMouseEvent>
 #include <QProgressBar>
 #include <QPushButton>
 #include <QTimer>
@@ -169,6 +174,11 @@ void Ft8Applet::buildUI()
     // ── Die Liste ───────────────────────────────────────────────────
     m_list = new QPlainTextEdit(this);
     m_list->setReadOnly(true);
+    // Doppelklick auf eine Zeile legt den Standardanruf ins
+    // Eingabefeld (siehe antwortAuf). Am viewport, nicht am Widget:
+    // die Mausereignisse einer Textflaeche kommen dort an.
+    m_list->viewport()->installEventFilter(this);
+    m_list->setToolTip(tr("Double-click a line to answer that station."));
     m_list->setFont(Style::monoFont(font(), Style::kFontSmall));
     m_list->setMinimumHeight(120);
     m_list->setLineWrapMode(QPlainTextEdit::NoWrap);
@@ -204,6 +214,20 @@ void Ft8Applet::buildUI()
     m_stopBtn->setEnabled(false);
     connect(m_stopBtn, &QPushButton::clicked, this, [this]() { abbrechen(); });
     sendRow->addWidget(m_stopBtn);
+
+    // Der Schalter fuer den Ablauf. Steht aus, und das ist Absicht:
+    // eingeschaltet sendet das Programm ohne weiteren Druck, bis das
+    // QSO fertig ist oder aufgegeben wird.
+    m_autoBtn = styledButton(tr("Auto"), 48);
+    m_autoBtn->setCheckable(true);
+    m_autoBtn->setChecked(false);
+    m_autoBtn->setToolTip(tr(
+        "Run the QSO sequence by itself after a double-click on a "
+        "decode.\nOff: a double-click only fills the message box."));
+    connect(m_autoBtn, &QPushButton::toggled, this, [this](bool an) {
+        if (!an) { m_ablauf.abbrechen(); zeigeAblauf(); }
+    });
+    sendRow->addWidget(m_autoBtn);
     root->addLayout(sendRow);
 
     auto* foot = new QHBoxLayout();
@@ -267,6 +291,218 @@ void Ft8Applet::syncFromModel()
 // zuruecknehmen.
 //
 // Was absichtlich fehlt: jede Automatik. Ein Druck = EIN Fenster.
+// ── Ein Fenster ist hinaus ───────────────────────────────────────────
+//
+// Ohne laufenden Ablauf ist danach Schluss, wie bisher. Mit Ablauf
+// zaehlt das Fenster als „gesendet, keine Antwort" — und der naechste
+// Schritt folgt, sobald ein Fund ihn weiterbringt oder die
+// Wiederholung faellig ist.
+void Ft8Applet::fensterZuEnde()
+{
+    abbrechen();
+    if (!m_ablauf.laeuft()) { zeigeAblauf(); return; }
+    m_ablauf.fensterVerstrichen();
+    if (m_ablauf.laeuft()) {
+        ablaufSchritt();
+    } else {
+        zeigeAblauf();
+    }
+}
+
+// Den naechsten Zug des Ablaufs senden. Es ist derselbe Weg wie bei
+// einem Druck auf „Send": Bandplan und Tasten inbegriffen.
+void Ft8Applet::ablaufSchritt()
+{
+    const QString was = m_ablauf.naechsteNachricht();
+    zeigeAblauf();
+    if (was.isEmpty() || m_sendet) { return; }
+    if (m_textFeld) { m_textFeld->setText(was); }
+    sendeNachricht(was);
+}
+
+// ── Ein fertiges QSO ins Logbuch ─────────────────────────────────────
+//
+// Nicht selbst schreiben: dasselbe Signal wie bei einem QSO aus
+// WSJT-X, und MainWindow haengt es an RotorLogbookPanel::
+// logExternalQso. Dort sitzt die Doppelt-Regel, das Anhaengen an die
+// Datei und das Hochladen — alles einmal, nicht zweimal.
+LogEntry Ft8Applet::logEintrag(const Ft8Ablauf& ablauf,
+                               double wahlHz,
+                               bool unteresSeitenband,
+                               Ft8Decoder::Protocol p,
+                               const QString& meinLocator)
+{
+    LogEntry e;
+    e.call   = ablauf.partner();
+    e.timeOn = QDateTime::currentDateTimeUtc();
+
+    // Dieselbe Rechnung wie fuer die Funde: die Wahlfrequenz der
+    // Scheibe plus die Tonlage, und das Vorzeichen haengt am
+    // Seitenband. Gesendet wird auf kSendeTonHz.
+    const double hz = wahlHz + (unteresSeitenband ? -kSendeTonHz : kSendeTonHz);
+    e.freqMHz = hz / 1.0e6;
+    e.band    = bandLabel(bandFromFrequency(hz));
+
+    // ADIF kennt FT8 und FT4 als eigene Betriebsarten — kein SUBMODE.
+    e.mode = p == Ft8Decoder::Protocol::Ft4
+                 ? QStringLiteral("FT4") : QStringLiteral("FT8");
+
+    // In FT8 ist der Rapport die Signalstaerke in dB, nicht RST. So
+    // schreibt WSJT-X ihn auch: „-12", „+03".
+    const auto alsText = [](int r) {
+        return r == Ft8Ablauf::kKeinReport
+                   ? QString()
+                   : QStringLiteral("%1%2")
+                         .arg(r < 0 ? QLatin1Char('-') : QLatin1Char('+'))
+                         .arg(qAbs(r), 2, 10, QLatin1Char('0'));
+    };
+    e.rstSent = alsText(ablauf.gesendeterReport());
+    e.rstRcvd = alsText(ablauf.empfangenerReport());
+
+    e.gridSquare   = ablauf.partnerLocator();   // leer, wenn nie einer kam
+    e.myGridSquare = meinLocator;
+    return e;
+}
+
+void Ft8Applet::fundForTest(const Ft8Decode& d)
+{
+    onDecoded({d}, QDateTime::currentDateTimeUtc());
+}
+
+void Ft8Applet::meldeFertigesQso()
+{
+    if (m_qsoGemeldet || m_ablauf.partner().isEmpty()) { return; }
+    m_qsoGemeldet = true;
+    emit qsoFertig(logEintrag(m_ablauf,
+                              m_slice ? m_slice->frequency() : 0.0,
+                              m_slice && m_slice->dspMode() == DSPMode::DIGL,
+                              protocol(), eigenerLocator()));
+}
+
+void Ft8Applet::zeigeAblauf()
+{
+    if (!m_status) { return; }
+    switch (m_ablauf.zustand()) {
+        case Ft8Ablauf::Zustand::Fertig:
+            m_status->setText(tr("QSO with %1 complete").arg(m_ablauf.partner()));
+            meldeFertigesQso();
+            break;
+        case Ft8Ablauf::Zustand::Abgebrochen:
+            m_status->setText(m_ablauf.partner().isEmpty()
+                ? tr("sequence stopped")
+                : tr("gave up calling %1").arg(m_ablauf.partner()));
+            break;
+        default:
+            break;      // die laufende Anzeige macht updateStatus()
+    }
+}
+
+// ── Auf eine gehoerte Station antworten ──────────────────────────────
+//
+// Ein Doppelklick in die Fundliste legt den Standardanruf ins
+// Eingabefeld: „<sein Ruf> <mein Ruf> <mein Locator>". Gesendet wird
+// dadurch nichts — der Druck auf den Knopf bleibt beim Betreiber.
+//
+// Die Regel steht hier als statische Funktion, nicht im
+// Mausereignis: so laesst sie sich ohne Fenster und ohne Maus
+// pruefen, und der Doppelklick ist nur der Ausloeser.
+QString Ft8Applet::antwortAuf(const QString& zeile,
+                              const QString& meinRuf,
+                              const QString& meinLocator)
+{
+    if (meinRuf.trimmed().isEmpty()) { return {}; }
+
+    // Spalten wie in onDecoded(): HHMMSS dB DT Freq Nachricht. Die
+    // Zahlen sind mit arg(..., breite) auf feste Breite gebracht, also
+    // mit FUEHRENDEN Leerzeichen — simplified() macht daraus einfache
+    // Trenner, danach ist die Nachricht alles ab dem fuenften Feld.
+    const QString sauber = zeile.simplified();
+    const QString nachricht = sauber.section(QLatin1Char(' '), 4);
+    if (nachricht.isEmpty()) { return {}; }
+
+    const QString seinRuf = senderCallsign(nachricht);
+    if (seinRuf.isEmpty()) { return {}; }
+
+    // Sich selbst anzurufen ergibt keinen Sinn — und waere der
+    // haeufigste Fehlgriff, weil das eigene Rufzeichen in jeder
+    // Antwort auf einen selbst vorkommt.
+    if (seinRuf.compare(meinRuf.trimmed(), Qt::CaseInsensitive) == 0) {
+        return {};
+    }
+
+    // Der Locator ist das vierstellige Feld (JN67VV -> JN67): mehr
+    // passt nicht in eine FT8-Nachricht vom Standardtyp.
+    const QString locator = meinLocator.trimmed().left(4).toUpper();
+    if (locator.isEmpty()) {
+        return QStringLiteral("%1 %2").arg(seinRuf, meinRuf.trimmed().toUpper());
+    }
+    return QStringLiteral("%1 %2 %3")
+        .arg(seinRuf, meinRuf.trimmed().toUpper(), locator);
+}
+
+// `User/Callsign` ist der kanonische Schluessel — SpotHubDialog
+// schreibt ihn („Writes canonical keys: User/Callsign,
+// User/GridSquare"). `StationCallsign` wird dagegen von NIEMANDEM
+// geschrieben und nur gelesen (SotaClient, MainWindow_KiwiSdr,
+// QsoMapWindow); er steht hier als Rueckfall, damit eine von Hand
+// gesetzte Fassung nicht ins Leere laeuft.
+QString Ft8Applet::eigenesRufzeichen()
+{
+    auto& s = AppSettings::instance();
+    QString ruf = s.value(QStringLiteral("User/Callsign")).toString().trimmed();
+    if (ruf.isEmpty()) {
+        ruf = s.value(QStringLiteral("StationCallsign")).toString().trimmed();
+    }
+    return ruf.toUpper();
+}
+
+QString Ft8Applet::eigenerLocator()
+{
+    auto& s = AppSettings::instance();
+    QString loc = s.value(QStringLiteral("User/GridSquare")).toString().trimmed();
+    if (loc.isEmpty()) {
+        loc = s.value(QStringLiteral("StationGridSquare")).toString().trimmed();
+    }
+    return loc.toUpper();
+}
+
+bool Ft8Applet::eventFilter(QObject* obj, QEvent* ev)
+{
+    if (m_list && obj == m_list->viewport()
+        && ev->type() == QEvent::MouseButtonDblClick) {
+        auto* me = static_cast<QMouseEvent*>(ev);
+        QTextCursor c = m_list->cursorForPosition(me->pos());
+        c.select(QTextCursor::LineUnderCursor);
+        const QString antwort = antwortAuf(c.selectedText(),
+                                           eigenesRufzeichen(),
+                                           eigenerLocator());
+        if (antwort.isEmpty()) {
+            if (m_status && eigenesRufzeichen().isEmpty()) {
+                m_status->setText(tr("set your callsign first"));
+            }
+        } else if (m_textFeld) {
+            m_textFeld->setText(antwort);
+            m_textFeld->setFocus();
+
+            // Mit Auto faengt hier der Ablauf an: dieselbe Antwort,
+            // aber danach macht er von selbst weiter.
+            if (m_autoBtn && m_autoBtn->isChecked() && !m_sendet) {
+                const QString sauber = c.selectedText().simplified();
+                const QString nachricht = sauber.section(QLatin1Char(' '), 4);
+                const int snr = sauber.section(QLatin1Char(' '), 1, 1).toInt();
+                m_qsoGemeldet = false;
+                const QString seinLoc = sauber.section(QLatin1Char(' '), -1);
+                m_ablauf.starteAlsAntworter(senderCallsign(nachricht),
+                                            eigenesRufzeichen(),
+                                            eigenerLocator(), snr, seinLoc);
+                ablaufSchritt();
+            }
+        }
+        return true;
+    }
+    return AppletWidget::eventFilter(obj, ev);
+}
+
 void Ft8Applet::sendeNachricht(const QString& text)
 {
     if (m_sendet) { return; }
@@ -318,8 +554,40 @@ void Ft8Applet::sendeNachricht(const QString& text)
         m_quelleVorher = static_cast<int>(router->activeSource());
         router->setActiveSource(MicSource::Ft8);
         q->starten();
-        if (m_model->moxController()) {
-            m_model->moxController()->setMox(true);
+
+        // ── Wenn der Bandplan nein sagt, nicht weitermachen ──────────
+        //
+        // MoxController::setMox(true) darf abgelehnt werden: falsche
+        // Betriebsart, Frequenz ausserhalb des Bandes, Cross-Band-TX.
+        // Die Ablehnung kommt als moxRejected(reason) und sonst gar
+        // nicht — setMox() gibt nichts zurueck.
+        //
+        // Ohne diese Verbindung lief der Ton danach volle 12,6 s
+        // weiter, der Sendeweg blieb auf FT8 (also das Mikrofon
+        // abgeklemmt), und in der Zeile stand „transmitting", waehrend
+        // nichts hinausging. Jetzt bricht der Versuch sofort ab und
+        // sagt, woran es lag.
+        bool abgelehnt = false;
+        if (auto* mox = m_model->moxController()) {
+            QMetaObject::Connection c = connect(
+                mox, &MoxController::moxRejected, this,
+                [this, &abgelehnt](const QString& grund) {
+                    abgelehnt = true;
+                    if (m_status) {
+                        m_status->setText(tr("not transmitting: %1").arg(grund));
+                    }
+                });
+            mox->setMox(true);
+            disconnect(c);
+        }
+        if (abgelehnt) {
+            // abbrechen() setzt den Sendeweg zurueck und macht die
+            // Knoepfe wieder frei; die Zeile oben bleibt stehen, weil
+            // updateStatus() sie erst beim naechsten Takt ersetzt.
+            const QString grund = m_status ? m_status->text() : QString();
+            abbrechen();
+            if (m_status && !grund.isEmpty()) { m_status->setText(grund); }
+            return;
         }
         if (m_status) { m_status->setText(tr("transmitting")); }
 
@@ -327,7 +595,7 @@ void Ft8Applet::sendeNachricht(const QString& text)
         // 300 ms, damit der letzte Ton draussen ist, bevor der Sender
         // abschaltet.
         QTimer::singleShot(Ft8Tx::fensterMs(protocol()) + 300, this,
-                           [this]() { abbrechen(); });
+                           [this]() { fensterZuEnde(); });
     });
     m_sendeTimer->start(static_cast<int>(wartet));
 }
@@ -464,6 +732,14 @@ void Ft8Applet::onDecoded(const QVector<Longpath::Ft8Decode>& funde,
         // beim WSJT-X-Weg. Vorher schrieb dieses Applet selbst ins
         // RxDecodeModel und erreichte die Ueberlagerung nie
         // (2026-10-15).
+        // Bringt der Fund den Ablauf weiter, ist der naechste Zug
+        // faellig — das ist der einzige Weg, auf dem er vorankommt.
+        if (m_ablauf.laeuft()
+            && m_ablauf.verarbeite(d.text,
+                                   static_cast<int>(std::lround(d.snrDb)))) {
+            ablaufSchritt();
+        }
+
         const QString ruf = senderCallsign(d.text);
         if (m_model && !ruf.isEmpty()) {
             DxSpot spot;

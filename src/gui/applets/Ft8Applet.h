@@ -36,6 +36,8 @@
 #include "AppletWidget.h"
 
 #include "core/Ft8Decoder.h"
+#include "core/Ft8Ablauf.h"
+#include "models/LogEntry.h"
 #include "core/Ft8Tx.h"
 
 #include <QDateTime>
@@ -96,6 +98,37 @@ public:
     // beim naechsten eigenen Fenster schaltet das Applet den
     // Mikrofonweg auf die FT8-Quelle, tastet, laesst das Fenster
     // laufen und nimmt beides wieder zurueck.
+    /// Die Antwort auf eine Zeile der Fundliste, oder leer.
+    ///
+    /// `zeile` ist eine Zeile im Format der Liste (Spalten wie in
+    /// WSJT-X „Band Activity": HHMMSS dB DT Freq Nachricht). Heraus
+    /// kommt der Standardanruf „<sein Ruf> <mein Ruf> <mein Locator>"
+    /// — das, was man auf ein CQ hin sendet.
+    ///
+    /// Leer, wenn die Zeile kein Rufzeichen hergibt, wenn das eigene
+    /// Rufzeichen fehlt, oder wenn man sich selbst anklickt.
+    ///
+    /// Statisch und ohne Zustand, damit die Regel ohne Fenster und
+    /// ohne Maus zu pruefen ist — der Doppelklick ist nur der Ausloeser.
+    static QString antwortAuf(const QString& zeile,
+                              const QString& meinRuf,
+                              const QString& meinLocator);
+
+    /// Das eigene Rufzeichen aus den Einstellungen. `User/Callsign`
+    /// ist der kanonische Schluessel (SpotHubDialog schreibt ihn);
+    /// `StationCallsign` ist der Rueckfall.
+    /// Der Logbucheintrag zu einem fertigen Ablauf. Statisch und ohne
+    /// Zustand, damit die Felder ohne Fenster zu pruefen sind — das
+    /// Signal ist nur die Zustellung.
+    static Longpath::LogEntry logEintrag(const Ft8Ablauf& ablauf,
+                                         double wahlHz,
+                                         bool unteresSeitenband,
+                                         Ft8Decoder::Protocol p,
+                                         const QString& meinLocator);
+
+    static QString eigenesRufzeichen();
+    static QString eigenerLocator();
+
     void sendeNachricht(const QString& text);
     void abbrechen();
     bool sendetGerade() const { return m_sendet; }
@@ -103,6 +136,16 @@ public:
     // Fuer den Pruefstand.
     QPushButton* cqButtonForTest()  const { return m_cqBtn; }
     QPushButton* stopButtonForTest() const { return m_stopBtn; }
+    QPushButton* autoButtonForTest() const { return m_autoBtn; }
+    const Ft8Ablauf& ablaufForTest() const { return m_ablauf; }
+    /// Einen Fund einspeisen, als waere er dekodiert worden — der
+    /// einzige Weg, auf dem der Ablauf vorankommt, also auch der
+    /// einzige, auf dem er sich pruefen laesst.
+    void fundForTest(const Longpath::Ft8Decode& d);
+    /// Ein gesendetes Fenster ist um. Im Betrieb kommt das von einem
+    /// Zeitgeber nach bis zu 15 s — im Prueflauf waere das eine
+    /// Viertelminute Warten je Zug.
+    void fensterZuEndeForTest() { fensterZuEnde(); }
     QLineEdit*   textFeldForTest()  const { return m_textFeld; }
 
     // Fuer den Pruefstand.
@@ -117,6 +160,18 @@ public:
     /// Der Rufzeichen-Absender aus einer FT8-Nachricht, oder leer.
     /// Oeffentlich, weil er sonst nicht einzeln pruefbar waere.
     static QString senderCallsign(const QString& message);
+
+signals:
+    /// Ein QSO ist vollstaendig. Es geht denselben Weg wie eines aus
+    /// WSJT-X (MainWindow -> RotorLogbookPanel::logExternalQso): eine
+    /// Datei, eine Doppelt-Regel, ein Hochladen.
+    void qsoFertig(const Longpath::LogEntry& eintrag);
+
+protected:
+    /// Doppelklick in die Fundliste: die Zeile wird zur Antwort im
+    /// Eingabefeld. Gesendet wird dadurch NICHTS — der Druck auf den
+    /// Knopf bleibt beim Betreiber.
+    bool eventFilter(QObject* obj, QEvent* ev) override;
 
 private slots:
     void onDecoded(const QVector<Longpath::Ft8Decode>& funde,
@@ -151,6 +206,27 @@ private:
     /// ist die Vorgabe und entspricht WSJT-X' „Tx even/1st".
     Ft8Periode   m_periode{Ft8Periode::Gerade};
     bool         m_sendet{false};
+
+    // ── Der QSO-Ablauf (2026-10-16) ──────────────────────────────────
+    //
+    // Ft8Ablauf rechnet nur: er sagt, was im naechsten Fenster zu
+    // senden WAERE. Gesendet wird hier — mit Bandplanpruefung und
+    // Tasten, wie bei jedem anderen Druck auf „Send" auch.
+    //
+    // m_autoBtn ist der Schalter dafuer und steht aus. Ohne ihn legt
+    // ein Doppelklick die Antwort nur ins Feld (siehe antwortAuf);
+    // mit ihm faengt der Ablauf an und sendet, bis er fertig ist,
+    // aufgibt oder angehalten wird.
+    Ft8Ablauf    m_ablauf;
+    /// Ein QSO wird genau EINMAL gemeldet. zeigeAblauf() laeuft bei
+    /// jedem Schritt, und der Zustand bleibt auf Fertig stehen — ohne
+    /// diese Wache stuende dasselbe QSO mehrfach im Logbuch.
+    bool         m_qsoGemeldet{false};
+    QPushButton* m_autoBtn{nullptr};
+    void fensterZuEnde();
+    void meldeFertigesQso();
+    void ablaufSchritt();
+    void zeigeAblauf();
     int          m_quelleVorher{-1};   ///< MicSource, zum Zuruecknehmen
 };
 

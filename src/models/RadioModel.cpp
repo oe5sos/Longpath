@@ -2550,6 +2550,29 @@ void RadioModel::onWsjtxSpotReceived(const DxSpot& spot)
     }
 }
 
+// Nur im Testbau — genau wie die Deklaration in RadioModel.h, die
+// im #ifdef LONGPATH_BUILD_TESTS-Block steht. Ohne denselben Waechter
+// hier sucht der Compiler im Release-Bau eine Deklaration, die es dort
+// nicht gibt: „no declaration matches
+// 'void Longpath::RadioModel::installFt8TxForTest()'" — auf Windows
+// und Linux rot, lokal gruen, weil dort mit Tests gebaut wird
+// (2026-10-16).
+#ifdef LONGPATH_BUILD_TESTS
+void RadioModel::installFt8TxForTest()
+{
+    if (!m_compositeMicRouter) {
+        // Weder PC- noch Funkmikrofon, keine Mikrofonbuchse: der
+        // Router liefert dann Stille, und genau das soll er hier.
+        m_compositeMicRouter = std::make_unique<CompositeTxMicRouter>(
+            nullptr, nullptr, false);
+    }
+    if (!m_ft8TxSource) {
+        m_ft8TxSource = std::make_unique<Ft8TxSource>(48000);
+        m_compositeMicRouter->setFt8Source(m_ft8TxSource.get());
+    }
+}
+#endif  // LONGPATH_BUILD_TESTS
+
 void RadioModel::onNativeFt8Decode(const DxSpot& spot)
 {
     // Der eigene Dekoder (2026-10-15). Gebaut wie

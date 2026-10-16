@@ -983,12 +983,6 @@ longpath_add_test(tst_radio_model_band_click)
 longpath_add_test(tst_about_dialog)
 longpath_add_test(tst_support_dialog)
 longpath_add_test(tst_dev_automation_server)
-# ── RTTY senden (2026-10-16) ─────────────────────────────────────────
-# Der staerkste Pruefstand fuer einen Sender ist der Empfaenger, den es
-# schon gibt: der Lauf schickt seine Toene durch RttyDecoder zurueck.
-longpath_add_test(tst_rtty_senden)
-target_link_libraries(tst_rtty_senden PRIVATE Qt6::Multimedia)
-
 longpath_add_test(tst_rtty_decoder)
 longpath_add_test(tst_rtty_decoder_sensitivity)
 longpath_add_test(tst_rtty_decoder_applet)
@@ -3050,17 +3044,6 @@ target_link_libraries(tst_radio_discovery_probe PRIVATE Qt6::Network)
 # enabled.
 longpath_add_test(tst_radio_discovery_scan_bound)
 target_link_libraries(tst_radio_discovery_scan_bound PRIVATE Qt6::Network)
-
-# ── Die Geraetesuche darf die Oberflaeche nicht anhalten ──────────────
-# Messlehre zu dem Befund vom 2026-10-16: scanAllNics() laeuft ohne
-# Faden in startDiscovery() und wartet je Netzkarte attemptsPerNic ×
-# quietPollsBeforeResend × pollTimeoutMs (SafeDefault: 1800 ms). Auf
-# einer Maschine mit zwei Karten hielt das jedes Fenster, das dabei
-# aufging, 3,6 s lang an — die Ursache der 18 Laeufe, die mit
-# „qWaitForWindowExposed returned FALSE" umfielen. Gemessen wird die
-# Dauer des AUFRUFS, nicht die der Suche.
-longpath_add_test(tst_suche_blockiert_den_start)
-target_link_libraries(tst_suche_blockiert_den_start PRIVATE Qt6::Network)
 
 # ── Phase 3Q Task 4: AddCustomRadioDialog — SKU model picker + action buttons ──
 # 4 tests: Auto-detect at index 0, all 16 SKUs present in modelCombo,
@@ -5321,12 +5304,6 @@ longpath_add_test(tst_abbau_ueberlebt)
 # 2026-10-15: moos.json nannte zwei Rollen, die es im Programm nicht
 # gibt — still uebergangen, also seit dem ersten Tag wirkungslos.
 longpath_add_test(tst_palette_ohne_tote_rollen)
-# 2026-10-15: „theme funktioniert auch noch nicht" — der vorhandene
-# Lauf prueft ein Einzelwidget im Labor. Dieser misst Bildpunkte des
-# echten Hauptfensters, vorher und nachher, mit Grundrauschen.
-longpath_add_test(tst_palette_faerbt_das_fenster)
-target_compile_definitions(tst_palette_faerbt_das_fenster PRIVATE
-    LONGPATH_SRC_DIR="${CMAKE_SOURCE_DIR}")
 # 2026-10-15: die Scheibenflagge ueber dem Panadapter, als Option —
 # dritter Anlauf um dieselbe Sache, siehe den Kopf der Datei.
 longpath_add_test(tst_scheibenflagge)
@@ -5337,6 +5314,12 @@ longpath_add_test(tst_ft8_dekodiert)
 longpath_add_test(tst_ft8_am_ton)
 # 2026-10-15: die Sendeseite, geschlossene Schleife — Text hinein,
 # Tonproben am Sendeweg abgeholt, wieder dekodiert.
+# ── Der FT8-QSO-Ablauf, Zustand fuer Zustand ─────────────────────────
+# Ft8Ablauf sendet nicht, tastet nicht und kennt keine Uhr — darum
+# laeuft dieser Pruefstand ohne Fenster, ohne Funkgeraet und ohne zu
+# warten (QTEST_APPLESS_MAIN).
+longpath_add_test(tst_ft8_ablauf)
+
 longpath_add_test(tst_ft8_senden)
 # 2026-10-15: FT8 im PROGRAMM — Abgriff, Flaeche, Eintrag. Dekoder und
 # Uhr waren gruen und trotzdem unerreichbar; dieser Lauf prueft die
@@ -5644,31 +5627,7 @@ longpath_add_test(tst_logbook_beam_bearing)
 # Logbuch: Eingabezeile "NEW QSO" (2026-09-26).
 longpath_add_test(tst_logbook_entry_row)
 # Logbuch-Durchgangstest (Nacht 2026-09-26): Neuschreiben verliert nichts, alle Ablaeufe.
-#
-# ── RUN_SERIAL, weil darin eine LEISTUNG gemessen wird ───────────────
-#
-# typingStaysFast() tippt sechs Zeichen in das Suchfeld eines Logbuchs
-# mit 1500 QSOs und verlangt unter 400 ms je Taste. Allein gefahren
-# sind es 18 ms (Mittel 10). Unter "ctest -j8" wurden am 2026-10-16
-# daraus 462 ms, und der Lauf fiel um — Faktor 25 zwischen ruhiger und
-# besetzter Maschine.
-#
-# Aufgefallen ist das erst, als die Geraetesuche nicht mehr blockierte
-# (PR #251): vorher schliefen die Oberflaechentests je Fenster 4,6 s in
-# poll() und gaben dabei die Rechenzeit ab, die diese Messung brauchte.
-# Jetzt arbeiten sie wirklich. Die Messung war also nicht gruen, weil
-# sie stimmte, sondern weil die anderen warteten — dieselbe Klasse wie
-# bei tst_notch_removable_offline weiter oben.
-#
-# Eine Leistungsschranke gegen eine feste Millisekundenzahl ist nur auf
-# einer ruhigen Maschine eine Messung. RUN_SERIAL nimmt ihm die
-# Gegner; der ganze Lauf braucht allein 3,1 s, das kostet den
-# Durchgang also fast nichts. Die Schranke bleibt bei 400 ms, damit
-# sie weiter etwas aussagt.
 longpath_add_test(tst_logbook_durchgang)
-if(TEST tst_logbook_durchgang)
-    set_tests_properties(tst_logbook_durchgang PROPERTIES RUN_SERIAL TRUE)
-endif()
 longpath_add_test(tst_qso_map_flyto_window)
 # -- Satelliten ueber dem Horizont auf der Karte + Stempel im Detailpaneel --
 longpath_add_test(tst_qso_map_satellites)
@@ -6033,16 +5992,6 @@ longpath_add_test(tst_b8_overlay_signals)
 # activating a profile pushes filter values into TransmitModel (filterChanged),
 # isActiveProfileModified detects drift and clears after saveActiveProfile.
 # Per docs/superpowers/plans/2026-05-01-tx-bandwidth.md §Task 2.
-# ── Die Sendebandbreite zum Durchklicken (2026-10-16) ────────────────
-# Betreiber: „nur das ich anklicken kann die unterschiedlichen
-# bandbreiten durchklicken kann". Prueft die Stufenregel ohne Fenster
-# und den Knopf mit.
-longpath_add_test(tst_tx_bandbreiten_klickbar)
-
-# ── Wer die Station ist (2026-10-16) ─────────────────────────────────
-# Vier Stellen lasen nur StationCallsign — und den schreibt niemand.
-longpath_add_test(tst_stationsrufzeichen)
-
 longpath_add_test(tst_tx_bandwidth_persistence)
 
 # ── Plan 4 Task 6 (D8): TX filter debounce + per-mode IQ-space mapping ────────

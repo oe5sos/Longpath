@@ -537,6 +537,7 @@ set(CORE_SOURCES
     src/core/RxProfileManager.cpp
     src/core/CwDecoder.cpp
     src/core/Ft8Decoder.cpp
+    src/core/Ft8Ablauf.cpp
     src/core/Ft8Stream.cpp
     src/core/Ft8Tx.cpp
     src/core/BeamHeading.cpp
