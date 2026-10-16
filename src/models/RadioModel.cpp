@@ -342,6 +342,7 @@ warren@wpratt.com
 // TxWorkerThread is already included above (line 268) for the existing
 // TX pump wiring; K-bench reuses that include for setRadeChannel +
 // the radeMicBlockReady signal.
+#include "core/Ft8Tx.h"
 #include "core/Resampler.h"
 
 // FlexRadio UDP 4992 discovery beacon. Owned by RadioModel; configured
@@ -7126,6 +7127,17 @@ void RadioModel::connectToRadio(const RadioInfo& info)
                 m_pcMicSource.get(), m_radioMicSource.get(), hasMicJack);
             m_compositeMicRouter->setVaxSource(m_vaxTxMicSource.get());
 
+            // Der eigene FT8/FT4-Sender (2026-10-15). Eine
+            // Mikrofonquelle wie die anderen drei — sie liefert
+            // Stille, solange niemand sie startet.
+            //
+            // ANMELDEN heisst nicht SENDEN: der Router liefert sie
+            // nur, wenn jemand MicSource::Ft8 waehlt, und auch dann
+            // nur das, was die Quelle hergibt. Das Tasten entscheidet
+            // der MoxController, nicht diese Zeile.
+            m_ft8TxSource = std::make_unique<Ft8TxSource>(48000);
+            m_compositeMicRouter->setFt8Source(m_ft8TxSource.get());
+
             // Replace the 3M-1a NullMicSource stub with the composite router.
             m_txChannel->setMicRouter(m_compositeMicRouter.get());
 
@@ -8995,9 +9007,13 @@ void RadioModel::connectToRadio(const RadioInfo& info)
         m_flexBroadcaster->setMacAddress(mac);
         m_flexBroadcaster->setSerial(derivedFlexSerial(mac));
         m_flexBroadcaster->setVersion(QStringLiteral(LONGPATH_VERSION));
+        // Dieselbe Rueckfallkette wie ueberall sonst: StationCallsign
+        // schreibt niemand, das Rufzeichen steht kanonisch unter
+        // User/Callsign (siehe AppSettings::stationCallsign). Ohne sie
+        // rief sich die Station im Netz „LONGPATH".
+        const QString rufzeichen = AppSettings::stationCallsign();
         m_flexBroadcaster->setCallsign(
-            as.value(QStringLiteral("StationCallsign"),
-                     QStringLiteral("LONGPATH")).toString());
+            rufzeichen.isEmpty() ? QStringLiteral("LONGPATH") : rufzeichen);
         m_flexBroadcaster->setNickname(
             as.value(QStringLiteral("PGXL_BroadcastNickname"),
                      QStringLiteral("Longpath")).toString());

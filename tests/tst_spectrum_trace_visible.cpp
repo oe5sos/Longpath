@@ -26,6 +26,7 @@
 #include <QtTest>
 #include <QImage>
 #include "gui/SpectrumWidget.h"
+#include "FensterFrist.h"
 using namespace Longpath;
 class TstSpectrumTraceVisible : public QObject { Q_OBJECT
 private slots:
@@ -47,7 +48,7 @@ private slots:
         w.setSampleRate(192'000.0);
         w.setFrequencyRange(7'100'000.0, 192'000.0);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         for (int i=0;i<6;++i) QCoreApplication::processEvents();
 
         // Kuenstliches Spektrum: Rauschflur mit drei kraeftigen Traegern.

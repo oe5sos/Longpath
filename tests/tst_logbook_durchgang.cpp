@@ -45,6 +45,7 @@
 #include "gui/widgets/DxRadarWidget.h"
 #include "gui/widgets/QsoDetailPane.h"
 #include "core/AppSettings.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -385,7 +386,7 @@ private slots:
         LogbookWindow w(m_log);
         w.resize(1600, 950);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         qInfo().noquote() << "Oeffnen + Zeigen:" << t.elapsed() << "ms";
         QTableWidget* table = logTable(&w);
         QVERIFY(table);
@@ -401,7 +402,7 @@ private slots:
         LogbookWindow w(m_log);
         w.resize(1600, 950);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         QTableWidget* table = logTable(&w);
 
         // Suchbegriff: ein Rufzeichen, das im Log vorkommt.
@@ -516,7 +517,7 @@ private slots:
         LogbookWindow w(m_log);
         w.resize(1600, 950);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         const QString call = QStringLiteral("OE5VVM");
         qint64 worst = 0, sum = 0;
         for (int i = 1; i <= call.size(); ++i) {
@@ -541,7 +542,7 @@ private slots:
         LogbookWindow w(m_log);
         w.resize(1600, 950);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         QTableWidget* table = logTable(&w);
         const int rows = table->rowCount();
         for (int c = 0; c < table->columnCount(); ++c) {
@@ -563,7 +564,7 @@ private slots:
         LogbookWindow w(m_log);
         w.resize(1600, 950);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         QTableWidget* table = logTable(&w);
         QVERIFY(table->rowCount() > 10);
         // Scheitert das Oeffnen, kommt ein leerer Puffer zurueck und die
@@ -674,7 +675,7 @@ private slots:
         LogbookWindow w(m_log);
         w.resize(1600, 950);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         QTableWidget* table = logTable(&w);
         table->setCurrentCell(4, 2);
         const QString call = table->item(4, 2)->text();
@@ -704,7 +705,7 @@ private slots:
         LogbookWindow w(m_log);
         w.resize(1600, 950);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         QTableWidget* table = logTable(&w);
         const int before = w.entryCountForTesting();
         table->setCurrentCell(5, 2);
@@ -734,7 +735,7 @@ private slots:
         f.close();
         LogbookWindow w(m_log);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         const int before = w.entryCountForTesting();
         QString told;
         w.setOperatorHooks([](const QString&) { return true; },
@@ -757,7 +758,7 @@ private slots:
         LogbookWindow w(m_log);
         w.resize(1600, 950);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         QVERIFY(w.mapPanelForTest());
         QVERIFY(w.mapPanelForTest()->isVisible());
         QVERIFY(w.statsSectionForTest()->isVisible());
@@ -793,7 +794,7 @@ private slots:
         LogbookWindow w(m_log);
         w.resize(1600, 950);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         QTableWidget* table = logTable(&w);
         QComboBox* band = comboWith(&w, QStringLiteral("20m"));
         QVERIFY(band);
@@ -902,7 +903,7 @@ private slots:
         LogbookWindow w(m_log);
         w.resize(1600, 950);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         QTableWidget* t = logTable(&w);
         QHeaderView* h = t->horizontalHeader();
         auto colText = [t](int row, int col) { QTableWidgetItem* it = t->item(row, col); return it ? it->text() : QString(); };
@@ -937,7 +938,7 @@ private slots:
         LogbookWindow w(m_log);
         w.resize(1600, 950);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         QTableWidget* t = logTable(&w);
         const int before = w.entryCountForTesting();
         QSet<QString> gone;
@@ -986,7 +987,7 @@ private slots:
         panel.showLogbook();
         LogbookWindow* w = panel.findChild<LogbookWindow*>();
         QVERIFY(w);
-        QVERIFY(QTest::qWaitForWindowExposed(w));
+        QVERIFY(QTest::qWaitForWindowExposed(w, kFensterFrist));
         QCOMPARE(w->entryCountForTesting(), 2);
 
         LogEntry ft8;
@@ -1075,7 +1076,7 @@ private slots:
             RotorLogbookPanel panel(nullptr, nullptr, nullptr);
             panel.showLogbook();
             LogbookWindow* w = panel.findChild<LogbookWindow*>();
-            QVERIFY(QTest::qWaitForWindowExposed(w));
+            QVERIFY(QTest::qWaitForWindowExposed(w, kFensterFrist));
             QTableWidget* t = logTable(w);
             t->setCurrentCell(rowOf(t, QStringLiteral("G4ABC")), 2);
             RotorLogbookPanel* pp = &panel;
@@ -1109,7 +1110,7 @@ private slots:
             RotorLogbookPanel panel(nullptr, nullptr, nullptr);
             panel.showLogbook();
             LogbookWindow* w = panel.findChild<LogbookWindow*>();
-            QVERIFY(QTest::qWaitForWindowExposed(w));
+            QVERIFY(QTest::qWaitForWindowExposed(w, kFensterFrist));
             QTableWidget* t = logTable(w);
             t->clearSelection();
             t->selectRow(rowOf(t, QStringLiteral("G4ABC")));
@@ -1145,7 +1146,7 @@ private slots:
         RotorLogbookPanel panel(nullptr, nullptr, nullptr);
         panel.showLogbook();
         LogbookWindow* w = panel.findChild<LogbookWindow*>();
-        QVERIFY(QTest::qWaitForWindowExposed(w));
+        QVERIFY(QTest::qWaitForWindowExposed(w, kFensterFrist));
         auto logCall = [w](const QString& call) {
             w->entryCallForTest()->setFocus();
             // Nach "Not logged" bleibt das Rufzeichen stehen (zum
@@ -1216,7 +1217,7 @@ private slots:
         LogbookWindow w(m_log);
         w.resize(1600, 950);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         QsoMapWindow* map = w.mapPanelForTest();
         QVERIFY(map && map->isVisible());
         auto box = [map](const QString& t) -> QCheckBox* {
@@ -1304,7 +1305,7 @@ private slots:
             QsoMapWindow* big = nullptr;
             for (QsoMapWindow* m : w.findChildren<QsoMapWindow*>()) { if (m != map && m->isWindow() && m->isVisible()) { big = m; } }
             QVERIFY2(big, "kein eigenes Kartenfenster");
-            QVERIFY(QTest::qWaitForWindowExposed(big));
+            QVERIFY(QTest::qWaitForWindowExposed(big, kFensterFrist));
             big->close();
             QCoreApplication::processEvents();
         }

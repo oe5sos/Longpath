@@ -46,6 +46,7 @@
 #include "gui/applets/RxApplet.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -82,7 +83,7 @@ private slots:
         panel.addApplet(rx);
         panel.resize(280, 600);
         panel.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&panel));
+        QVERIFY(QTest::qWaitForWindowExposed(&panel, kFensterFrist));
 
         auto* cell = panel.findChild<GridCellWidget*>();
         QVERIFY2(cell, "das Applet muss in einem Rasterfeld liegen");
@@ -115,7 +116,7 @@ private slots:
         panel.addApplet(rx);
         panel.resize(710, 600);          // die Breite des Betreibers
         panel.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&panel));
+        QVERIFY(QTest::qWaitForWindowExposed(&panel, kFensterFrist));
 
         auto* cell = panel.findChild<GridCellWidget*>();
         QVERIFY(cell);
@@ -155,7 +156,7 @@ private slots:
         panel.addApplet(rx);
         panel.resize(280, 600);
         panel.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&panel));
+        QVERIFY(QTest::qWaitForWindowExposed(&panel, kFensterFrist));
 
         QSignalSpy spy(&panel, &AppletPanelWidget::appletDetachRequested);
 
@@ -192,7 +193,7 @@ private slots:
         panel.addApplet(rx);
         panel.resize(280, 600);
         panel.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&panel));
+        QVERIFY(QTest::qWaitForWindowExposed(&panel, kFensterFrist));
 
         QSignalSpy spy(&panel, &AppletPanelWidget::appletDetachRequested);
 
@@ -221,7 +222,7 @@ private slots:
         panel.addApplet(rx);
         panel.resize(280, 600);
         panel.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&panel));
+        QVERIFY(QTest::qWaitForWindowExposed(&panel, kFensterFrist));
 
         QSignalSpy spy(&panel, &AppletPanelWidget::appletHideRequested);
 

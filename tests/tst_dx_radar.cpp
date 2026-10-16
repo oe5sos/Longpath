@@ -22,6 +22,7 @@
 #include <QStackedWidget>
 
 #include <cmath>
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -41,7 +42,7 @@ private slots:
         DxRadarWidget r;
         r.resize(400, 400);
         r.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&r));
+        QVERIFY(QTest::qWaitForWindowExposed(&r, kFensterFrist));
         const QPointF c(200.0, 200.0);
         const QPointF n = r.pointAt(0.0, 20000.0);
         const QPointF e = r.pointAt(90.0, 20000.0);
@@ -64,7 +65,7 @@ private slots:
             << MapPoint{48.2, 16.4, QStringLiteral("OE1AA"), false, true};    // Wien: ~78°, ~200 km
         r.setPoints(pts);
         r.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&r));
+        QVERIFY(QTest::qWaitForWindowExposed(&r, kFensterFrist));
         r.grab();
         QCOMPARE(r.pointsPainted(), 3);
 
@@ -93,7 +94,7 @@ private slots:
         log << e;
         w.setEntries(log);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
 
         auto* stack = w.findChild<QStackedWidget*>();
         QVERIFY(stack);
