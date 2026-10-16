@@ -41,6 +41,7 @@
 #include "gui/MainWindow.h"
 #include "gui/styles/Theme.h"
 #include "gui/styles/ThemeQss.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -198,7 +199,7 @@ private slots:
         auto* w = new QWidget;
         w->setStyleSheet(QStringLiteral("QWidget { color: #c8d8e8; }"));
         w->show();
-        QVERIFY(QTest::qWaitForWindowExposed(w));
+        QVERIFY(QTest::qWaitForWindowExposed(w, kFensterFrist));
 
         QString err;
         QVERIFY2(Style::Theme::instance().activate(

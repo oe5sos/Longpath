@@ -23,6 +23,7 @@
 #include <cmath>
 
 #include "gui/SpectrumWidget.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -113,7 +114,7 @@ private slots:
         w.setSampleRate(192'000.0);
         w.setFrequencyRange(7'100'000.0, 192'000.0);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         for (int i = 0; i < 6; ++i) { QCoreApplication::processEvents(); }
         feed(w, 20);
 

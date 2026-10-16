@@ -512,7 +512,51 @@ private:
     // "±2900 Hz · 5.8k BW" depending on whether the active slice mode is
     // symmetric.  Orange tint (#ffaa70) matches the future Style::kTxFilterOverlayLabel
     // constant (Cluster E will add it to StyleConstants.h).
-    QLabel*      m_txFilterStatusLabel{nullptr};
+    // ── Die Sendebandbreite zum Durchklicken (2026-10-16) ────────────
+    //
+    // Betreiber: „nur das ich anklicken kann die unterschiedlichen
+    // bandbreiten durchklicken kann". Bis dahin stand sie hier nur als
+    // Zustand — der Kommentar in buildUI sagte es ausdruecklich.
+    //
+    // Ein flacher Knopf statt einer Reihe von Knoepfen: die
+    // Applet-Spalte ist schmal, und sechs Stufen nebeneinander waeren
+    // abgeschnitten. Linksklick geht zur naechsten Stufe und laeuft
+    // um, Rechtsklick oeffnet die ganze Liste.
+
+
+    QPushButton* m_txFilterStatusBtn{nullptr};
+
+public:
+    struct TxBandbreite {
+        const char* name;   ///< „2.8k"
+        int lowHz;
+        int highHz;
+    };
+
+    /// Die Stufen, schmal nach breit. 3.6k ist die Breite aus Martins
+    /// ESSB-Profil, 5.0k die von Zeus („eSSB Wide": lowCutHz 40,
+    /// highCutHz 5000), 8.0k die gewuenschte breiteste — darueber
+    /// hinaus laesst der Feinblatt-Spinner ohnehin nichts zu
+    /// (setRange(200, 10000)).
+    static const TxBandbreite kTxBandbreiten[6];
+
+    /// Welche Stufe passt zu low/high? -1, wenn keine — dann ist eine
+    /// Breite von Hand gesetzt, und der naechste Klick geht auf die
+    /// naechstgroessere Stufe, statt sie stillschweigend zu verwerfen.
+    ///
+    /// Oeffentlich und statisch, weil die Regel ohne Fenster zu
+    /// pruefen sein soll; der Knopf ist nur der Ausloeser.
+    static int stufeFuer(int lowHz, int highHz);
+    static int naechsteStufe(int lowHz, int highHz);
+
+    /// Fuer den Pruefstand: der Knopf, der die Bandbreite zeigt und
+    /// durchschaltet.
+    QPushButton* txFilterButtonForTest() const { return m_txFilterStatusBtn; }
+
+private:
+    void setzeBandbreite(int index);
+    void zeigeBandbreitenMenue(const QPoint& pos);
+
     // Live connections to whichever slice is currently active, re-made by
     // rebindActiveSlice() on every RadioModel::activeSliceChanged so they
     // never point at a stale slice (2026-09-13 code review fix).

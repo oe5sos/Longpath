@@ -22,6 +22,7 @@
 #include "models/RadioModel.h"
 #include "core/BoardCapabilities.h"
 #include "gui/chrome/ChromeBarController.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -56,7 +57,7 @@ private slots:
         auto* mw = new MainWindow();      // bewusst nicht abgeraeumt
         mw->resize(width, 859);
         mw->show();
-        QVERIFY(QTest::qWaitForWindowExposed(mw));
+        QVERIFY(QTest::qWaitForWindowExposed(mw, kFensterFrist));
         QTest::qWait(400);
 
         QWidget* c0 = chainWidget(mw, 0);

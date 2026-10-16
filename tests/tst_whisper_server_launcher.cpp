@@ -100,8 +100,18 @@ private slots:
         c.endpoint = QStringLiteral("http://127.0.0.1:%1/inference").arg(port);
         c.language = QStringLiteral("de");
         l.start(c);
-        QVERIFY(QTest::qWaitFor([&] { return l.state() == S::Running; }, 5000));
-        QVERIFY(QTest::qWaitFor([&] { return !l.recentOutput().isEmpty(); }, 5000));
+        // ── Grosszuegig warten (2026-10-16) ─────────────────────
+        //
+        // Hier standen 5000 ms. Unter Last reicht das nicht: im
+        // `ctest -j6`-Durchgang vom 2026-10-15 fiel die zweite Zeile
+        // um — in fuenf Sekunden war von einem ECHTEN Prozess noch
+        // keine Ausgabe da. Einzeln ist das nicht nachzustellen (zwoelf
+        // Laeufe parallel, alle gruen), die Frist ist aber der einzige
+        // Kandidat, und eine grosszuegige kostet nur im Fehlerfall
+        // Zeit.
+        constexpr int kFrist = 20000;
+        QVERIFY(QTest::qWaitFor([&] { return l.state() == S::Running; }, kFrist));
+        QVERIFY(QTest::qWaitFor([&] { return !l.recentOutput().isEmpty(); }, kFrist));
         QVERIFY(l.recentOutput().first().startsWith(QStringLiteral("fake -m")));
 
         l.start(c);   // ein zweites start() waehrend es laeuft tut nichts

@@ -41,6 +41,7 @@
 #include <QRegularExpression>
 #include <QSlider>
 #include <QTimer>
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -67,7 +68,7 @@ private slots:
         CommandBar bar;
         bar.resize(1400, 70);
         bar.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&bar));
+        QVERIFY(QTest::qWaitForWindowExposed(&bar, kFensterFrist));
         for (int i = 0; i < 4; ++i) { QCoreApplication::processEvents(); }
 
         const QImage bild = bar.grab().toImage();
@@ -197,7 +198,7 @@ private slots:
         CommandBar bar;
         bar.resize(700, 60);          // absichtlich eng
         bar.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&bar));
+        QVERIFY(QTest::qWaitForWindowExposed(&bar, kFensterFrist));
         for (int i = 0; i < 4; ++i) { QCoreApplication::processEvents(); }
 
         for (QPushButton* b : bar.findChildren<QPushButton*>()) {
@@ -777,7 +778,7 @@ private slots:
         bar->setGeometry(0, 0, 1200, 120);
         bar->attach(&slice);
         top.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&top));
+        QVERIFY(QTest::qWaitForWindowExposed(&top, kFensterFrist));
         QCOMPARE(bar->windowHandle() != nullptr, barItselfNative);
 
         int opened = 0;

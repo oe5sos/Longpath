@@ -37,6 +37,7 @@
 
 #include <QFile>
 #include <QXmlStreamReader>
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -275,7 +276,7 @@ private slots:
             const bool hidden = hiddenMode != 0;
             if (!hidden || hiddenMode == 2) {
                 w.show();
-                QVERIFY(QTest::qWaitForWindowExposed(&w));
+                QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
             }
             if (hiddenMode == 2) {
                 QTest::qWait(300);
@@ -299,7 +300,7 @@ private slots:
             }
             if (hidden) {
                 w.show();
-                QVERIFY(QTest::qWaitForWindowExposed(&w));
+                QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
                 QTest::qWait(300);
             }
             const QImage img = grabSpectrum(w);

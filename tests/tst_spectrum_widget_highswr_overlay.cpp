@@ -8,6 +8,7 @@
 #include <QtTest/QtTest>
 
 #include "gui/SpectrumWidget.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -57,7 +58,7 @@ void TestSpectrumWidgetHighSwrOverlay::setHighSwrOverlay_triggersUpdate()
     SpectrumWidget w;
     w.resize(800, 600);
     w.show();
-    QTest::qWaitForWindowExposed(&w);
+    QTest::qWaitForWindowExposed(&w, kFensterFrist);
 
     // Calling setHighSwrOverlay when state changes must succeed and leave
     // the widget with correct state (the internal update() schedules a

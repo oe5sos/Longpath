@@ -43,6 +43,7 @@
 #include "gui/applets/VaxApplet.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -71,7 +72,7 @@ private slots:
         for (auto& c : cases) {
             auto* win = new AppletFloatingWindow(c.second, c.first, 0, nullptr);
             win->show();
-            QVERIFY(QTest::qWaitForWindowExposed(win));
+            QVERIFY(QTest::qWaitForWindowExposed(win, kFensterFrist));
             win->applyDefaultSize();
 
             const QSize avail = win->screen() ? win->screen()->availableSize()

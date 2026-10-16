@@ -32,6 +32,7 @@
 #include <QMouseEvent>
 #include <QKeyEvent>
 #include <QSignalSpy>
+#include "FensterFrist.h"
 
 namespace {
 
@@ -69,7 +70,7 @@ private:
         // OHNE DIESE ZEILE PRUEFT DER TEST NICHTS. Siehe Kopf.
         w.setConnectionState(ConnectionState::Connected);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         for (int i = 0; i < 4; ++i) { QCoreApplication::processEvents(); }
     }
 
@@ -153,7 +154,7 @@ private slots:
         w.setVfoFrequency(7'500'000.0);
         w.setConnectionState(ConnectionState::Connected);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         for (int i = 0; i < 4; ++i) { QCoreApplication::processEvents(); }
 
         // Bildpunkt fuer 7,2 MHz aus der Abbildung des Widgets holen,
@@ -328,7 +329,7 @@ private slots:
         w.setStepSize(100);
         w.setConnectionState(ConnectionState::Disconnected);   // <-- Kern
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         for (int i = 0; i < 4; ++i) { QCoreApplication::processEvents(); }
 
         // Klick abseits des DISCONNECTED-Schilds (das liegt mittig).

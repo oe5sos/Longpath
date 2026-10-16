@@ -538,6 +538,7 @@ set(CORE_SOURCES
     src/core/CwDecoder.cpp
     src/core/Ft8Decoder.cpp
     src/core/Ft8Stream.cpp
+    src/core/Ft8Tx.cpp
     src/core/BeamHeading.cpp
     src/core/BoardCapabilities.cpp
     src/core/CallsignCache.cpp
