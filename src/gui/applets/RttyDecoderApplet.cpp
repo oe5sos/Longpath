@@ -22,8 +22,13 @@
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
 
+#include "core/MoxController.h"
+#include "core/RttyTx.h"
+#include "core/audio/CompositeTxMicRouter.h"
+
 #include <QComboBox>
 #include <QLabel>
+#include <QLineEdit>
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QSlider>
@@ -224,7 +229,175 @@ void RttyDecoderApplet::buildUI()
     ctrlRow->addWidget(m_clearBtn);
 
     root->addLayout(ctrlRow);
+
+    // ── Zeile 5: senden (2026-10-16) ─────────────────────────────────
+    //
+    // Der Sender (core/RttyTx.h) stand seit PR #257 fertig im Baum und
+    // war von hier aus nicht erreichbar. Die Zeile ist absichtlich
+    // schmal gehalten: ein Feld, zwei Knoepfe, eine Zeile Auskunft —
+    // dasselbe Mass wie bei Ft8Applet, und kein Schalter, der von
+    // selbst sendet.
+    root->addWidget(divider());
+
+    auto* sendRow = new QHBoxLayout();
+    m_textFeld = new QLineEdit(this);
+    m_textFeld->setPlaceholderText(QStringLiteral("Text zum Senden"));
+    m_textFeld->setToolTip(QStringLiteral(
+        "Baudot kennt keine Kleinbuchstaben und keine Umlaute. Was es "
+        "nicht kennt, faellt weg, statt den Text zu verfaelschen."));
+    connect(m_textFeld, &QLineEdit::returnPressed, this, [this]() {
+        sendeText(m_textFeld->text());
+    });
+    sendRow->addWidget(m_textFeld, 1);
+
+    m_sendBtn = styledButton(QStringLiteral("Senden"), 64);
+    connect(m_sendBtn, &QPushButton::clicked, this, [this]() {
+        sendeText(m_textFeld ? m_textFeld->text() : QString());
+    });
+    sendRow->addWidget(m_sendBtn);
+
+    m_stopBtn = styledButton(QStringLiteral("Stop"), 48);
+    m_stopBtn->setEnabled(false);
+    connect(m_stopBtn, &QPushButton::clicked, this, [this]() { abbrechen(); });
+    sendRow->addWidget(m_stopBtn);
+
+    root->addLayout(sendRow);
+
+    m_sendeStatus = new QLabel(QString(), this);
+    m_sendeStatus->setStyleSheet(
+        QStringLiteral("color: %1;").arg(Style::kTextSecondary));
+    m_sendeStatus->setFont(Style::capsFont(font(), Style::kFontCaption));
+    root->addWidget(m_sendeStatus);
+
     root->addStretch(1);
+}
+
+// ── Senden ───────────────────────────────────────────────────────────
+//
+// Die Reihenfolge ist dieselbe wie in Ft8Applet::sendeNachricht() und
+// aus demselben Grund so herum: erst den Sendeweg legen, dann tasten.
+// Andersherum ginge der Sender fuer einen Augenblick mit dem Mikrofon
+// auf, nicht mit dem Ton.
+void RttyDecoderApplet::sendeText(const QString& text)
+{
+    if (m_sendet) { return; }
+
+    const QString sauber = text.trimmed();
+    if (sauber.isEmpty()) {
+        if (m_sendeStatus) { m_sendeStatus->setText(tr("nichts zu senden")); }
+        return;
+    }
+    if (!m_model || !m_model->rttyTxSource() || !m_model->micRouter()) {
+        if (m_sendeStatus) { m_sendeStatus->setText(tr("kein Sendeweg")); }
+        return;
+    }
+
+    // Mark und Shift kommen von der Scheibe, nicht aus einer zweiten
+    // Einstellung — derselbe Grund, aus dem die Anzeige oben sie nur
+    // liest: es gibt genau einen Ort, an dem sie stehen.
+    const int markHz = m_slice ? m_slice->rttyMarkHz() : 2295;
+    const int shiftHz = m_slice ? m_slice->rttyShiftHz() : 170;
+    const float baud = m_baudCombo && m_baudCombo->currentIndex() >= 0
+                           ? static_cast<float>(
+                                 kBaudRates[m_baudCombo->currentIndex()])
+                           : 45.45f;
+
+    RttyTxSource* quelle = m_model->rttyTxSource();
+    if (!quelle->vorbereiten(sauber, markHz, shiftHz, baud)) {
+        if (m_sendeStatus) {
+            m_sendeStatus->setText(tr("„%1“ laesst sich nicht senden")
+                                       .arg(sauber));
+        }
+        return;
+    }
+
+    auto* router = m_model->micRouter();
+    m_quelleVorher = static_cast<int>(router->activeSource());
+    router->setActiveSource(MicSource::Rtty);
+    quelle->starten();
+
+    // ── Wenn der Bandplan nein sagt, nicht weitermachen ──────────────
+    //
+    // Wortgleich zu Ft8Applet: setMox(true) darf abgelehnt werden
+    // (falsche Betriebsart, Frequenz ausserhalb des Bandes), und die
+    // Ablehnung kommt ausschliesslich als moxRejected(grund) —
+    // setMox() selbst gibt nichts zurueck. Ohne diese Verbindung
+    // liefe der Ton die volle Laenge des Textes weiter, waehrend
+    // nichts hinausgeht.
+    bool abgelehnt = false;
+    if (auto* mox = m_model->moxController()) {
+        QMetaObject::Connection c = connect(
+            mox, &MoxController::moxRejected, this,
+            [this, &abgelehnt](const QString& grund) {
+                abgelehnt = true;
+                if (m_sendeStatus) {
+                    m_sendeStatus->setText(tr("sendet nicht: %1").arg(grund));
+                }
+            });
+        mox->setMox(true);
+        disconnect(c);
+    }
+    if (abgelehnt) {
+        const QString grund = m_sendeStatus ? m_sendeStatus->text() : QString();
+        abbrechen();
+        if (m_sendeStatus && !grund.isEmpty()) { m_sendeStatus->setText(grund); }
+        return;
+    }
+
+    m_sendet = true;
+    if (m_sendBtn)  { m_sendBtn->setEnabled(false); }
+    if (m_stopBtn)  { m_stopBtn->setEnabled(true); }
+    if (m_textFeld) { m_textFeld->setEnabled(false); }
+
+    // Wie lange der Text dauert, weiss die Quelle selbst: sie hat ihn
+    // schon auf Proben gelegt. Ein Zuschlag von 300 ms, damit der
+    // letzte Ton draussen ist, bevor der Sender abschaltet — dieselben
+    // 300 ms wie bei FT8.
+    const int dauerMs = quelle->proben() > 0
+                            ? (quelle->proben() * 1000) / 48000
+                            : 0;
+    if (m_sendeStatus) {
+        m_sendeStatus->setText(tr("sendet (%1 s)")
+                                   .arg(dauerMs / 1000.0, 0, 'f', 1));
+    }
+
+    if (!m_sendeEndeTimer) {
+        m_sendeEndeTimer = new QTimer(this);
+        m_sendeEndeTimer->setSingleShot(true);
+        connect(m_sendeEndeTimer, &QTimer::timeout, this,
+                [this]() { sendeEnde(); });
+    }
+    m_sendeEndeTimer->start(dauerMs + 300);
+}
+
+void RttyDecoderApplet::sendeEnde()
+{
+    if (!m_sendet) { return; }
+    abbrechen();
+    if (m_sendeStatus) { m_sendeStatus->setText(tr("gesendet")); }
+}
+
+void RttyDecoderApplet::abbrechen()
+{
+    if (m_sendeEndeTimer) { m_sendeEndeTimer->stop(); }
+
+    // Erst den Sender aus, dann den Weg zurueck — in dieser
+    // Reihenfolge ist zu keinem Zeitpunkt das Mikrofon auf Sendung.
+    if (m_model && m_model->moxController()) {
+        m_model->moxController()->setMox(false);
+    }
+    if (m_model && m_model->rttyTxSource()) {
+        m_model->rttyTxSource()->abbrechen();
+    }
+    if (m_model && m_model->micRouter() && m_quelleVorher >= 0) {
+        m_model->micRouter()->setActiveSource(
+            static_cast<MicSource>(m_quelleVorher));
+    }
+    m_quelleVorher = -1;
+    m_sendet = false;
+    if (m_sendBtn)  { m_sendBtn->setEnabled(true); }
+    if (m_stopBtn)  { m_stopBtn->setEnabled(false); }
+    if (m_textFeld) { m_textFeld->setEnabled(true); }
 }
 
 void RttyDecoderApplet::loadSettings()
