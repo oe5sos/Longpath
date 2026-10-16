@@ -2,6 +2,78 @@
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-16
+
+29 Commits seit 0.6.9. Zwei Themen: **zwei Betriebsarten koennen jetzt
+senden** — und **was auf eine Uhr gewettet hatte, wettet nicht mehr.**
+
+### FT8 und FT4 senden
+
+Longpath dekodiert FT8/FT4 seit 0.6.9 selbst. Jetzt sendet es auch:
+ein Druck auf „Send" legt eine Nachricht auf einen Ton und gibt sie im
+naechsten eigenen Fenster hinaus, mit Bandplanpruefung und Tasten ueber
+den MoxController. Lehnt der Bandplan ab, bricht der Versuch sofort ab
+und nennt den Grund — vorher lief der Ton das ganze Fenster weiter,
+das Mikrofon blieb abgeklemmt, und in der Zeile stand „transmitting",
+waehrend nichts hinausging.
+
+Ein Doppelklick auf eine Zeile der Fundliste legt den Standardanruf
+ins Eingabefeld. Mit dem Schalter „Auto" — der AUS voreingestellt ist
+— laeuft daraus der ganze QSO-Ablauf (CQ → Antwort → Rapport → RR73),
+und ein vollstaendiges QSO geht denselben Weg ins Logbuch wie eines
+aus WSJT-X. Der Ablauf kommt ausschliesslich durch gehoerte Funde
+voran; es gibt keinen Zeitgeber, der von sich aus eine Nachricht
+nachschiebt, und nach fuenf Fenstern ohne Antwort gibt er auf.
+
+### RTTY senden
+
+Dazu das Gegenstueck zum vorhandenen RTTY-Dekoder: Baudot/ITA2,
+Mark 2295 Hz, Shift 170 Hz, 45,45 Baud. Geprueft als Rundlauf — was
+der Sender schreibt, liest der eigene Dekoder wieder ein. Die
+Anbindung ans Fenster folgt.
+
+### Die Geraetesuche hielt die Oberflaeche an
+
+4656 ms, im Hauptfaden, bei jedem Oeffnen des Verbinden-Fensters:
+scanAllNics() wartete je Netzkarte attemptsPerNic ×
+quietPollsBeforeResend × pollTimeoutMs in waitForReadyRead ab. Jetzt
+ein Zustandsautomat mit Zeitgeber — der Aufruf kehrt nach 1 ms
+zurueck, die Suche laeuft im Hintergrund weiter. Damit wird auch die
+Anzeige ehrlich: „Searching for radios…" war bisher nie zu sehen, weil
+Start und Ende im selben Takt kamen.
+
+### Was auf eine Uhr gewettet hatte
+
+Dieselbe Fehlerklasse an sechs Stellen, jedes Mal eine feste
+Millisekundenzahl, die auf einer besetzten Maschine reisst:
+
+  * 205 Stellen im Pruefstand nahmen stillschweigend die 5000 ms von
+    qWaitForWindowExposed — ein MainWindow braucht allein rund 5 s.
+  * Das Logbuchfenster korrigierte seine Groesse an drei festen
+    Punkten (50/300/1000 ms) und blieb aufgezogen, wenn die
+    Mindesthoehe beim letzten noch nicht stand.
+  * Die Luecken-Drossel verlangte „genau eine Meldung" und meinte
+    „hoechstens eine je 20-ms-Fenster".
+  * Dazu zwei knappe Fristen, ein drain(), das blind 200 ms absass,
+    und ein Signal-Spion, der auf das naechste statt auf das
+    vorhandene Signal wartete.
+
+Voller Durchgang auf diesem Stand: 978 von 978 gruen.
+
+### Kleineres
+
+  * Die Sendebandbreite in der TX-Fussleiste ist jetzt ein
+    Bedienelement: Linksklick geht zur naechsten Stufe (2.8k, 3.0k,
+    3.3k, 3.6k, 5.0k, 8.0k), Rechtsklick oeffnet die Liste.
+  * Vier Stellen lasen das Stationsrufzeichen nur unter
+    `StationCallsign` — und den schreibt niemand. Die eigene Station
+    fehlte dadurch auf der QSO-Karte, und im FlexRadio-Rundruf hiess
+    sie „LONGPATH".
+  * Messpunkte fuer die Startzeit: der MainWindow-Konstruktor, show()
+    und die erste freie Runde der Ereignisschleife, dazu fuenf
+    Teilzeiten je abgeloestem Fenster.
+
+
 ## [0.6.9] - 2026-10-14
 
 Neun Commits seit 0.6.8. Thema: **was im Protokoll steht — und was dort
