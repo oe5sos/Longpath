@@ -32,6 +32,7 @@
 #include <QPushButton>
 
 #include <cmath>
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -97,7 +98,7 @@ private slots:
         w.imagery()->setNetworkEnabled(false);
         w.setSatellites(&svc);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
 
         FlatMapWidget* flat = w.flatMapForTest();
         QVERIFY(flat);
@@ -176,7 +177,7 @@ private slots:
         QsoDetailPane pane;
         pane.resize(420, 600);
         pane.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&pane));
+        QVERIFY(QTest::qWaitForWindowExposed(&pane, kFensterFrist));
         LogEntry e;
         e.call = QStringLiteral("OE3AA");
         e.timeOn = QDateTime(QDate(2026, 9, 21), QTime(12, 0), QTimeZone::UTC);

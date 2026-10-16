@@ -35,6 +35,7 @@
 #include "gui/LogbookWindow.h"
 #include "gui/widgets/LogbookStatsWidget.h"
 #include "models/LogEntry.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -110,7 +111,7 @@ private slots:
         // Renders without a crash at a small size too.
         w.resize(400, 300);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         w.grab();
     }
 
@@ -180,7 +181,7 @@ private slots:
         w.setStats(s);
         w.resize(900, 560);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         const QPixmap pm = w.grab();
         QVERIFY(!pm.isNull());
         const QString grabDir = qEnvironmentVariable("LONGPATH_GRAB_DIR");

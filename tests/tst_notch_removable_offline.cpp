@@ -25,6 +25,7 @@
 
 #include <QCheckBox>
 #include <QSpinBox>
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -81,7 +82,7 @@ private slots:
         w.setConnectionState(ConnectionState::Disconnected);
         w.setFrequencyRange(7'131'200.0, 200'000.0);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
 
         QVector<SpectrumWidget::NotchMarker> notches;
         SpectrumWidget::NotchMarker n;
@@ -156,7 +157,7 @@ private slots:
         w.setConnectionState(ConnectionState::Disconnected);
         w.setFrequencyRange(7'131'200.0, 200'000.0);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
 
         QVector<SpectrumWidget::NotchMarker> notches;
         SpectrumWidget::NotchMarker n;
@@ -197,7 +198,7 @@ private slots:
         w.resize(1200, 700);
         w.setFrequencyRange(7'131'200.0, 200'000.0);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
 
         QVector<SpectrumWidget::NotchMarker> notches;
         SpectrumWidget::NotchMarker n;
@@ -251,7 +252,7 @@ private slots:
         w.resize(1200, 700);
         w.setFrequencyRange(7'131'200.0, 200'000.0);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
 
         QVector<SpectrumWidget::NotchMarker> notches;
         SpectrumWidget::NotchMarker n;

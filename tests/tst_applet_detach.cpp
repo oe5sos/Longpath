@@ -55,6 +55,7 @@
 #include "gui/applets/AppletPanelWidget.h"
 #include "gui/applets/AppletVisibilityController.h"
 #include "gui/applets/AppletWidget.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -367,7 +368,7 @@ private slots:
         panel.addApplet(rx);
         panel.addApplet(tx);
         panel.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&panel));
+        QVERIFY(QTest::qWaitForWindowExposed(&panel, kFensterFrist));
 
         const AppletMap map{{QStringLiteral("Rx"), rx},
                             {QStringLiteral("Tx"), tx}};

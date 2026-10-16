@@ -37,6 +37,7 @@
 #include <QSignalSpy>
 #include <QTest>
 #include <QWheelEvent>
+#include "FensterFrist.h"
 
 // Tester shim: friended in ParametricEqWidget.h so this subclass can
 // reach private state for hand-computed expecteds.  We keep public
@@ -139,7 +140,7 @@ void TestParametricEqInteraction::leftClickOnBandSelectsIt() {
     ParametricEqInteractionTester w;
     w.resize(460, 320);
     w.show();
-    QVERIFY(QTest::qWaitForWindowExposed(&w));
+    QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
 
     // The default reset gives 10 bands, all gain=0.  Pick band index 5
     // (mid-range) so it's safely interior.
@@ -187,7 +188,7 @@ void TestParametricEqInteraction::leftDragMovesBandFreqAndGain() {
     ParametricEqInteractionTester w;
     w.resize(460, 320);
     w.show();
-    QVERIFY(QTest::qWaitForWindowExposed(&w));
+    QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
 
     // Start with 2 bands so any selected interior band is impossible
     // (only endpoints exist).  Use a 3-band setup where we can drag
@@ -249,7 +250,7 @@ void TestParametricEqInteraction::leftDragOnEndpointMovesGainOnly() {
     ParametricEqInteractionTester w;
     w.resize(460, 320);
     w.show();
-    QVERIFY(QTest::qWaitForWindowExposed(&w));
+    QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
 
     int idx = 0;  // first point, locked endpoint
     const double pinnedF = w.pointsConst().at(idx).frequencyHz;
@@ -282,7 +283,7 @@ void TestParametricEqInteraction::rightClickIsIgnored() {
     ParametricEqInteractionTester w;
     w.resize(460, 320);
     w.show();
-    QVERIFY(QTest::qWaitForWindowExposed(&w));
+    QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
 
     QSignalSpy spySel  (&w, &Longpath::ParametricEqWidget::pointSelected);
     QSignalSpy spyUnsel(&w, &Longpath::ParametricEqWidget::pointUnselected);
@@ -308,7 +309,7 @@ void TestParametricEqInteraction::wheelNoModifierMultipliesQ() {
     ParametricEqInteractionTester w;
     w.resize(460, 320);
     w.show();
-    QVERIFY(QTest::qWaitForWindowExposed(&w));
+    QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
 
     int idx = 4;  // interior band, q=4.0 from default reset
     QCOMPARE(w.pointsConst().at(idx).q, 4.0);
@@ -343,7 +344,7 @@ void TestParametricEqInteraction::wheelShiftAdjustsGainOnly() {
     ParametricEqInteractionTester w;
     w.resize(460, 320);
     w.show();
-    QVERIFY(QTest::qWaitForWindowExposed(&w));
+    QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
 
     int idx = 4;
     w.setSelectedIndex(idx);
@@ -376,7 +377,7 @@ void TestParametricEqInteraction::wheelCtrlAdjustsFrequencyOnly() {
     ParametricEqInteractionTester w;
     w.resize(460, 320);
     w.show();
-    QVERIFY(QTest::qWaitForWindowExposed(&w));
+    QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
 
     int idx = 4;  // interior, NOT locked
     w.setSelectedIndex(idx);
@@ -417,7 +418,7 @@ void TestParametricEqInteraction::clickOnGlobalGainHandleStartsDrag() {
     ParametricEqInteractionTester w;
     w.resize(460, 320);
     w.show();
-    QVERIFY(QTest::qWaitForWindowExposed(&w));
+    QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
 
     QRect plot = w.computePlotRect();
 
@@ -456,7 +457,7 @@ void TestParametricEqInteraction::releaseFiresFinalNonDraggingSignal() {
     ParametricEqInteractionTester w;
     w.resize(460, 320);
     w.show();
-    QVERIFY(QTest::qWaitForWindowExposed(&w));
+    QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
 
     int idx = 4;  // interior
     QRect plot = w.computePlotRect();
@@ -523,7 +524,7 @@ void TestParametricEqInteraction::clickOnEmptyAreaDeselects() {
     ParametricEqInteractionTester w;
     w.resize(460, 320);
     w.show();
-    QVERIFY(QTest::qWaitForWindowExposed(&w));
+    QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
 
     int idx = 4;
     w.setSelectedIndex(idx);

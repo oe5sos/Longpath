@@ -21,6 +21,7 @@
 #include "gui/applets/AppletPanelWidget.h"
 #include "gui/applets/AppletVisibilityController.h"
 #include "gui/applets/AppletWidget.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -68,7 +69,7 @@ private slots:
         m_mw = new MainWindow();
         m_mw->resize(1280, 800);
         m_mw->show();
-        QVERIFY(QTest::qWaitForWindowExposed(m_mw));
+        QVERIFY(QTest::qWaitForWindowExposed(m_mw, kFensterFrist));
         QTest::qWait(300);
         QVERIFY(panel());
         QVERIFY(vis());

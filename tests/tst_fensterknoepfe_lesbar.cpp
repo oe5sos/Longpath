@@ -35,6 +35,7 @@
 #include <QPushButton>
 #include <QStyle>
 #include <QStyleOptionButton>
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -55,7 +56,7 @@ private slots:
     {
         WindowTitleBar leiste(QStringLiteral("Prueffenster"));
         leiste.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&leiste));
+        QVERIFY(QTest::qWaitForWindowExposed(&leiste, kFensterFrist));
         for (int i = 0; i < 4; ++i) { QCoreApplication::processEvents(); }
 
         int geprueft = 0;

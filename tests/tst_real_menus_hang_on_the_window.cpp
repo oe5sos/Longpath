@@ -63,6 +63,7 @@
 #include "gui/widgets/MasterOutputWidget.h"
 #include "models/NotchModel.h"
 #include "models/RadioModel.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -129,7 +130,7 @@ private slots:
         m_mw = new MainWindow();
         m_mw->resize(1800, 1100);
         m_mw->show();
-        QVERIFY(QTest::qWaitForWindowExposed(m_mw));
+        QVERIFY(QTest::qWaitForWindowExposed(m_mw, kFensterFrist));
         for (int i = 0; i < 10; ++i) { QCoreApplication::processEvents(); }
         QTest::qWait(400);
     }

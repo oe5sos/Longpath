@@ -25,6 +25,7 @@
 
 #include "gui/SpectrumWidget.h"
 #include "models/BandPlanManager.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -126,7 +127,7 @@ private slots:
         w.setDispNormalize(normalize);
         w.setDbmCalOffset(calDb);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
 
         // Flach auf -120 dBm; im Kalibrier-Fall um die Verschiebung
         // vorgehalten, so dass die kalibrierte Ablesung -120 waere.

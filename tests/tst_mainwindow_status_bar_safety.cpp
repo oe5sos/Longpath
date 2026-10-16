@@ -49,6 +49,7 @@
 #include "gui/widgets/StatusBadge.h"
 #include "gui/widgets/AdcOverloadBadge.h"
 #include "gui/chrome/ChromeBarItems.h"
+#include "FensterFrist.h"
 
 using namespace Qt::StringLiterals;
 using namespace Longpath;
@@ -246,7 +247,7 @@ private slots:
 
         host.resize(400, 60);
         host.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&host));
+        QVERIFY(QTest::qWaitForWindowExposed(&host, kFensterFrist));
 
         const QPoint before = tx->mapTo(&host, QPoint(0, 0));
 

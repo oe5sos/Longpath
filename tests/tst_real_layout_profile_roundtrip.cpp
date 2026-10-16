@@ -108,6 +108,7 @@
 #include "gui/applets/AppletPanelWidget.h"
 #include "gui/applets/AppletWidget.h"
 #include "gui/applets/GridCellWidget.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -208,7 +209,7 @@ private slots:
         m_mw = new MainWindow();
         m_mw->resize(1280, 800);
         m_mw->show();
-        QVERIFY2(QTest::qWaitForWindowExposed(m_mw),
+        QVERIFY2(QTest::qWaitForWindowExposed(m_mw, kFensterFrist),
                  "das Hauptfenster muss ueberhaupt erscheinen");
         QTest::qWait(300);   // Applets bauen sich beim Anzeigen auf
 

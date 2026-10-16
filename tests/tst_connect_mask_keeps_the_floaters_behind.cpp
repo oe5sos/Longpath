@@ -34,6 +34,7 @@
 
 #include "gui/ConnectionPanel.h"
 #include "gui/MainWindow.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -46,7 +47,7 @@ private slots:
         auto* mw = new MainWindow();
         mw->resize(1280, 800);
         mw->show();
-        QVERIFY(QTest::qWaitForWindowExposed(mw));
+        QVERIFY(QTest::qWaitForWindowExposed(mw, kFensterFrist));
 
         // Der Kaltstart oeffnet die Maske per singleShot(0); ihr
         // Konstruktor allein braucht gut zwei Sekunden (NIC-Suche),
@@ -68,7 +69,7 @@ private slots:
         floater->setAttribute(Qt::WA_DeleteOnClose, false);
         floater->resize(200, 120);
         floater->show();
-        QVERIFY(QTest::qWaitForWindowExposed(floater));
+        QVERIFY(QTest::qWaitForWindowExposed(floater, kFensterFrist));
         mw->rememberFloatingWindowBehindConnectMaskForTest(floater);
         QCOMPARE(mw->floatingWindowsWaitingForConnectMaskForTest(), before + 1);
         QVERIFY(!floater->isVisible());

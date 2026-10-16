@@ -11,6 +11,7 @@
 #include "gui/PanFloatingWindow.h"
 #include "gui/WindowChrome.h"
 #include "gui/PanadapterApplet.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -40,7 +41,7 @@ private slots:
         auto* w = new PanFloatingWindow(applet, nullptr);
         QSignalSpy dockSpy(w, &PanFloatingWindow::dockRequested);
         w->show();
-        QVERIFY(QTest::qWaitForWindowExposed(w));
+        QVERIFY(QTest::qWaitForWindowExposed(w, kFensterFrist));
 
         QApplication::closeAllWindows();
 

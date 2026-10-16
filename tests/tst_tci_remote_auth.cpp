@@ -87,9 +87,24 @@ private slots:
         QVERIFY(verbunden.wait(kWartenMs));
 
         // … muss ein Client von Loopback sofort den Init-Burst bekommen.
-        QVERIFY2(text.wait(kWartenMs),
+        //
+        // ── Nicht `wait()`, sondern WARTEN BIS (2026-10-16) ─────────
+        //
+        // QSignalSpy::wait() wartet auf das NAECHSTE Signal. Der
+        // Init-Burst kommt aber oft schon waehrend des `verbunden
+        // .wait()` eine Zeile hoeher an — dann hat der Spion ihn
+        // laengst gezaehlt, und `text.wait()` wartet auf einen
+        // zweiten, der nie kommt.
+        //
+        // Gemessen am 2026-10-16: 2 von 10 Laeufen fielen so um, und
+        // zwar nicht unter Last, sondern wenn der Server SCHNELL war.
+        // Im Protokoll stand „client connected" und danach nichts —
+        // das sah aus wie ein Programmfehler und war einer im
+        // Pruefstand. Die Frist von 15 s machte es nur teurer: jeder
+        // Fehlschlag kostete 18 Sekunden.
+        QTRY_VERIFY2_WITH_TIMEOUT(!text.isEmpty(),
                  "Loopback darf keine Anmeldung brauchen — sonst steht jeder "
-                 "Logger und jedes Digimode-Programm still");
+                 "Logger und jedes Digimode-Programm still", kWartenMs);
         bool sahReady = false;
         for (const auto& a : text) {
             if (a.at(0).toString().contains(QStringLiteral("ready"))) { sahReady = true; }
