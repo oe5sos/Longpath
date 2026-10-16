@@ -700,9 +700,19 @@ jobs:
             du -sh build/tests 2>/dev/null || true
             cmake --build build -j2 --target "$ziel"
           done
-          echo "=== nach allen vier ==="
+          # Die vier Label-Ziele decken nicht alles ab: Laeufe, die
+          # nicht ueber longpath_add_test() angelegt werden (etwa
+          # kiwi_sdr_protocol_test), haengen an keinem davon. Ohne
+          # diesen Abschluss faellt spaeter der Test-Schritt um mit
+          # „Could not find executable … /build/tests/kiwi_sdr_protocol_test".
+          echo "=== Rest (all_tests) ==="
           free -m || true
           df -h / || true
+          cmake --build build -j2 --target all_tests
+          echo "=== nach allen ==="
+          free -m || true
+          df -h / || true
+          du -sh build/tests 2>/dev/null || true
 
       - name: Speicher und Platte nach dem Testbau (Linux)
         if: runner.os == 'Linux' && always()
