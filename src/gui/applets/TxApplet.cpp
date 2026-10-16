@@ -185,6 +185,7 @@
 #include <QGridLayout>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QMenu>
 #include <QPushButton>
 #include <QSignalBlocker>
 #include <QSlider>
@@ -209,6 +210,87 @@ TxApplet::TxApplet(RadioModel* model, QWidget* parent)
 {
     buildUI();
     wireControls();
+}
+
+// ── Die Sendebandbreiten zum Durchklicken ────────────────────────────
+//
+// Betreiber, 2026-10-16: „nur das ich anklicken kann die
+// unterschiedlichen bandbreiten durchklicken kann" — und „5k kannst du
+// auch bauen".
+//
+// Die unteren Grenzen: 100 Hz fuer die schmalen (so steht es in den
+// mitgelieferten Profilen), 50 Hz fuer 3.6k (die Breite aus Martins
+// ESSB-Profil) und 40 Hz fuer die beiden breiten. Die 40 kommen von
+// Zeus, dessen „eSSB Wide" auf lowCutHz 40 / highCutHz 5000 steht —
+// das ist dort die breiteste Stufe ueberhaupt. 8k gibt es nirgends
+// zum Abschreiben; der Feinblatt-Spinner laesst bis 10000 zu, und
+// 40..8000 ist die naheliegende Fortsetzung der Reihe.
+const TxApplet::TxBandbreite TxApplet::kTxBandbreiten[6] = {
+    { "2.8k", 100, 2900 },
+    { "3.0k", 100, 3100 },
+    { "3.3k", 100, 3400 },
+    { "3.6k",  50, 3650 },
+    { "5.0k",  40, 5000 },
+    { "8.0k",  40, 8000 },
+};
+
+int TxApplet::stufeFuer(int lowHz, int highHz)
+{
+    for (int i = 0; i < 6; ++i) {
+        if (kTxBandbreiten[i].lowHz == lowHz
+            && kTxBandbreiten[i].highHz == highHz) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+// Steht eine Breite auf keiner Stufe (im Feinblatt von Hand gesetzt
+// oder aus einem fremden Profil), geht der naechste Klick auf die
+// naechstGROESSERE Stufe — und nicht zurueck auf die schmalste, was
+// mitten im Betrieb die Bandbreite zusammenziehen wuerde.
+int TxApplet::naechsteStufe(int lowHz, int highHz)
+{
+    const int genau = stufeFuer(lowHz, highHz);
+    if (genau >= 0) { return (genau + 1) % 6; }
+
+    const int breite = highHz - lowHz;
+    for (int i = 0; i < 6; ++i) {
+        if (kTxBandbreiten[i].highHz - kTxBandbreiten[i].lowHz > breite) {
+            return i;
+        }
+    }
+    return 0;   // breiter als alle Stufen: wieder von vorn
+}
+
+void TxApplet::setzeBandbreite(int index)
+{
+    if (!m_model || index < 0 || index >= 6) { return; }
+    TransmitModel& tx = m_model->transmitModel();
+    // BEIDE Grenzen setzen: nur die obere zu aendern liesse den
+    // Hochpass der vorigen Stufe stehen, und 40 Hz unten klingen
+    // anders als 100.
+    tx.setFilterLow(kTxBandbreiten[index].lowHz);
+    tx.setFilterHigh(kTxBandbreiten[index].highHz);
+}
+
+void TxApplet::zeigeBandbreitenMenue(const QPoint& pos)
+{
+    if (!m_model) { return; }
+    const TransmitModel& tx = m_model->transmitModel();
+    const int jetzt = stufeFuer(tx.filterLow(), tx.filterHigh());
+
+    QMenu menue(this);
+    for (int i = 0; i < 6; ++i) {
+        QAction* a = menue.addAction(QStringLiteral("%1   %2–%3 Hz")
+            .arg(QLatin1String(kTxBandbreiten[i].name))
+            .arg(kTxBandbreiten[i].lowHz)
+            .arg(kTxBandbreiten[i].highHz));
+        a->setCheckable(true);
+        a->setChecked(i == jetzt);
+        connect(a, &QAction::triggered, this, [this, i]() { setzeBandbreite(i); });
+    }
+    menue.exec(pos);
 }
 
 void TxApplet::buildUI()
@@ -505,13 +587,34 @@ void TxApplet::buildUI()
         fuss->addWidget(trenner());
 
         // Zeigt z.B. „100-2900 Hz · 2.8k BW"; nachgezogen von
-        // filterChanged + dspModeChanged.
-        m_txFilterStatusLabel = new QLabel(this);
-        m_txFilterStatusLabel->setStyleSheet(QStringLiteral(
-            "QLabel { color: %1; font-size: %2px; }")
+        // filterChanged + dspModeChanged. Seit dem 2026-10-16 ist das
+        // kein blosser Zustand mehr, sondern ein Knopf: Linksklick
+        // geht zur naechsten Stufe, Rechtsklick oeffnet die Liste.
+        // Flach und in derselben Schrift wie vorher, damit die
+        // Fussleiste nicht lauter wird.
+        m_txFilterStatusBtn = new QPushButton(this);
+        m_txFilterStatusBtn->setFlat(true);
+        m_txFilterStatusBtn->setCursor(Qt::PointingHandCursor);
+        m_txFilterStatusBtn->setStyleSheet(QStringLiteral(
+            "QPushButton { color: %1; font-size: %2px; border: none; "
+            "background: transparent; padding: 0px; text-align: left; } "
+            "QPushButton:hover { text-decoration: underline; }")
             .arg(QLatin1String(Style::kTxFilterOverlayLabel)).arg(Style::kFontCaption));
-        m_txFilterStatusLabel->setAccessibleName(QStringLiteral("TX filter status"));
-        fuss->addWidget(m_txFilterStatusLabel);
+        m_txFilterStatusBtn->setAccessibleName(QStringLiteral("TX filter status"));
+        m_txFilterStatusBtn->setToolTip(tr(
+            "Transmit bandwidth. Click for the next step, right-click "
+            "for the list."));
+        m_txFilterStatusBtn->setContextMenuPolicy(Qt::CustomContextMenu);
+        connect(m_txFilterStatusBtn, &QPushButton::clicked, this, [this]() {
+            if (!m_model) { return; }
+            const TransmitModel& tx = m_model->transmitModel();
+            setzeBandbreite(naechsteStufe(tx.filterLow(), tx.filterHigh()));
+        });
+        connect(m_txFilterStatusBtn, &QWidget::customContextMenuRequested,
+                this, [this](const QPoint& p) {
+            zeigeBandbreitenMenue(m_txFilterStatusBtn->mapToGlobal(p));
+        });
+        fuss->addWidget(m_txFilterStatusBtn);
 
         fuss->addStretch();
 
@@ -1410,10 +1513,10 @@ void TxApplet::rebindActiveSlice()
 // the active slice's dspModeChanged via rebindActiveSlice()).
 void TxApplet::refreshTxFilterStatusLabel()
 {
-    if (!m_txFilterStatusLabel || !m_model) { return; }
+    if (!m_txFilterStatusBtn || !m_model) { return; }
     SliceModel* slice = m_model->activeSlice();
     const DSPMode mode = slice ? slice->dspMode() : DSPMode::USB;
-    m_txFilterStatusLabel->setText(
+    m_txFilterStatusBtn->setText(
         m_model->transmitModel().filterDisplayText(mode));
 }
 
@@ -1515,10 +1618,10 @@ void TxApplet::syncFromModel()
         QSignalBlocker bHi(m_txFilterHighSpin);
         m_txFilterHighSpin->setValue(tx.filterHigh());
     }
-    if (m_txFilterStatusLabel) {
+    if (m_txFilterStatusBtn) {
         SliceModel* slice = m_model->activeSlice();
         const DSPMode mode = slice ? slice->dspMode() : DSPMode::USB;
-        m_txFilterStatusLabel->setText(tx.filterDisplayText(mode));
+        m_txFilterStatusBtn->setText(tx.filterDisplayText(mode));
     }
 
     // Mic-source badge (J.3 Phase 3M-1b; extended to 3-way in Phase 3M-VAX-toggle)
