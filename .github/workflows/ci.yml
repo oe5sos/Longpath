@@ -680,13 +680,23 @@ jobs:
 
       - name: Speicher und Platte nach dem Testbau (Linux)
         if: runner.os == 'Linux' && always()
-        # Die Messung zur These oben. Beim naechsten roten Lauf steht
-        # hier, wie nah es war — und wenn der Shard gruen bleibt,
-        # steht hier, wieviel Luft -j2 gebracht hat.
+        # Die Messung hat die These oben WIDERLEGT (2026-10-16, PR #259):
+        # der Speicher lag durchgehend bei rund 1 GB von 16 GB, die
+        # Platte dagegen nach `tests_core` bei 107 von 145 GB — und
+        # danach folgen noch drei Label-Bloecke.  Es ist die Platte.
+        #
+        # Seit dem split-dwarf-Hebel (CMakeLists.txt) ist die Gesamt-
+        # groesse die Zahl, auf die es ankommt: vorher 65 GB fuer
+        # `tests_core` allein, bei 267 MB je Binaerdatei.  Darum steht
+        # `du -sh build/tests` hier als erstes.
         run: |
+          echo "--- build/tests gesamt (vor split-dwarf: 65 G) ---"
+          du -sh build/tests 2>/dev/null || true
+          echo "--- davon .dwo (gibt es erst mit split-dwarf) ---"
+          find build -name '*.dwo' -print0 2>/dev/null | du -ch --files0-from=- 2>/dev/null | tail -1 || true
           free -m || true
           df -h / || true
-          echo "--- groesste Testbinaerdateien ---"
+          echo "--- groesste Testbinaerdateien (vorher je ~267 M) ---"
           ls -S build/tests/tst_* 2>/dev/null | head -5 | xargs -r du -h 2>/dev/null || true
 
       - name: Build test executables (macOS)

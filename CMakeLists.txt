@@ -115,6 +115,64 @@ if(LONGPATH_AGGRESSIVE_OPT)
     endif()
 endif()
 
+# --------------------------------------------------------------------------
+# Debug-Info getrennt ablegen (2026-10-17, nach der CI-Plattenmessung)
+# --------------------------------------------------------------------------
+# Vier Wochen lang fiel Linux-Shard 2/4 in jedem CI-Lauf ohne Log um
+# („BlobNotFound" -- der Runner-Agent stirbt mitsamt dem Job, auch ein
+# always()-Schritt laeuft dann nicht mehr).  Am 2026-10-16 gemessen,
+# indem der Testbau in vier Teile entlang der Label-Ziele zerlegt wurde:
+#
+#   Shard 1/4 (243 Tests), 145 GB Platte
+#   vor tests_core      43 G benutzt, 103 G frei, build/tests 120 M
+#   vor tests_models   107 G benutzt,  38 G frei, build/tests  65 G
+#
+# `tests_core` allein erzeugt 65 GB, und danach folgen noch drei
+# Label-Bloecke.  Shard 2/4 hat 262 Tests statt 243 -- acht Prozent mehr
+# auf einer Platte, die schon bei 243 zu drei Vierteln voll ist.  Deshalb
+# stirbt immer DERSELBE Shard.  Der Speicher ist es ausdruecklich nicht:
+# durchgehend rund 1 GB von 16 GB in Gebrauch.  (Die OOM-These aus #247
+# und das -j2, das daraus folgte, waren falsch.)
+#
+# Die Ursache der Groesse: eine Testbinaerdatei ist auf macOS 28 MB, auf
+# Linux ~267 MB -- derselbe RelWithDebInfo.  Auf macOS bleibt die
+# Debug-Information in separaten .dSYM-Buendeln, auf Linux wird sie in
+# JEDE Binaerdatei hineinkopiert.  LongpathObjs ist eine OBJECT-
+# Bibliothek, also bekommt jede Testbinaerdatei den vollen Objektsatz:
+# 243 x 267 MB = genau die gemessenen 65 GB.
+#
+# -gsplit-dwarf legt die Debug-Info in eigene .dwo-Dateien NEBEN der
+# Objektdatei.  Die Objektdateien gibt es einmal (OBJECT-Bibliothek),
+# also auch die .dwo einmal; in die Binaerdateien wandert nur noch ein
+# Skeleton.  Debuggen bleibt moeglich -- gdb und lldb lesen die .dwo,
+# solange der Bauordner steht.
+#
+# Nur auf Linux, und nur wenn der Compiler die Flagge wirklich kennt:
+# auf macOS erzeugt clang keine .dwo (Mach-O nutzt .dSYM), und auf
+# Windows gilt das Format gar nicht.
+#
+# Die Wirkung ist auf einem Mac NICHT messbar.  Gemessen wird sie an den
+# df/du-Punkten im CI-Testbau; was dort herauskommt, gehoert in diesen
+# Kommentar.
+option(LONGPATH_SPLIT_DWARF
+       "Linux: Debug-Info in .dwo-Dateien statt in jede Binaerdatei" ON)
+
+if(LONGPATH_SPLIT_DWARF AND CMAKE_SYSTEM_NAME STREQUAL "Linux"
+   AND NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
+    include(CheckCXXCompilerFlag)
+    set(CMAKE_REQUIRED_FLAGS "-gsplit-dwarf")
+    check_cxx_compiler_flag("-gsplit-dwarf" LONGPATH_HAS_SPLIT_DWARF)
+    unset(CMAKE_REQUIRED_FLAGS)
+    if(LONGPATH_HAS_SPLIT_DWARF)
+        add_compile_options($<$<COMPILE_LANGUAGE:CXX,C>:-gsplit-dwarf>)
+        message(STATUS "Longpath: -gsplit-dwarf aktiv "
+                       "(Debug-Info in .dwo, nicht je Binaerdatei)")
+    else()
+        message(STATUS "Longpath: -gsplit-dwarf nicht unterstuetzt -- "
+                       "Debug-Info bleibt in den Binaerdateien")
+    endif()
+endif()
+
 if(LONGPATH_ENABLE_LTO)
     include(CheckIPOSupported)
     check_ipo_supported(RESULT _lto_ok OUTPUT _lto_err)
