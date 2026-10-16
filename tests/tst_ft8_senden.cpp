@@ -316,9 +316,21 @@ private slots:
                      "stehenbleiben");
         }
 
+        // Die Zeile darf nicht BEHAUPTEN zu senden — aber sie darf
+        // (und soll) „not transmitting: <grund>" sagen. Ein
+        // `contains("transmitting")` trifft genau diesen richtigen
+        // Fall mit: im Durchgang vom 2026-10-16 fiel der Lauf damit
+        // um, und zwar unstet, weil updateStatus() die Zeile mal
+        // rechtzeitig ueberschreibt und mal nicht. Das ist dieselbe
+        // Wette aufs Timing, die dieser Pruefstand an vier anderen
+        // Stellen losgeworden ist.
+        //
+        // Geprueft wird darum, was wirklich zaehlt: die Zeile faengt
+        // nicht mit „transmitting" an, und wenn der Grund noch steht,
+        // nennt sie ihn.
         const QString zeile = applet.statusForTest()
                                   ? applet.statusForTest()->text() : QString();
-        QVERIFY2(!zeile.contains(QStringLiteral("transmitting")),
+        QVERIFY2(!zeile.startsWith(QStringLiteral("transmitting")),
                  qPrintable(QStringLiteral("die Zeile behauptet zu senden: %1")
                                 .arg(zeile)));
     }
