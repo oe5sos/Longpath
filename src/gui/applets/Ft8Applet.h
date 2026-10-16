@@ -36,6 +36,7 @@
 #include "AppletWidget.h"
 
 #include "core/Ft8Decoder.h"
+#include "core/Ft8Ablauf.h"
 #include "core/Ft8Tx.h"
 
 #include <QDateTime>
@@ -125,6 +126,8 @@ public:
     // Fuer den Pruefstand.
     QPushButton* cqButtonForTest()  const { return m_cqBtn; }
     QPushButton* stopButtonForTest() const { return m_stopBtn; }
+    QPushButton* autoButtonForTest() const { return m_autoBtn; }
+    const Ft8Ablauf& ablaufForTest() const { return m_ablauf; }
     QLineEdit*   textFeldForTest()  const { return m_textFeld; }
 
     // Fuer den Pruefstand.
@@ -179,6 +182,22 @@ private:
     /// ist die Vorgabe und entspricht WSJT-X' „Tx even/1st".
     Ft8Periode   m_periode{Ft8Periode::Gerade};
     bool         m_sendet{false};
+
+    // ── Der QSO-Ablauf (2026-10-16) ──────────────────────────────────
+    //
+    // Ft8Ablauf rechnet nur: er sagt, was im naechsten Fenster zu
+    // senden WAERE. Gesendet wird hier — mit Bandplanpruefung und
+    // Tasten, wie bei jedem anderen Druck auf „Send" auch.
+    //
+    // m_autoBtn ist der Schalter dafuer und steht aus. Ohne ihn legt
+    // ein Doppelklick die Antwort nur ins Feld (siehe antwortAuf);
+    // mit ihm faengt der Ablauf an und sendet, bis er fertig ist,
+    // aufgibt oder angehalten wird.
+    Ft8Ablauf    m_ablauf;
+    QPushButton* m_autoBtn{nullptr};
+    void fensterZuEnde();
+    void ablaufSchritt();
+    void zeigeAblauf();
     int          m_quelleVorher{-1};   ///< MicSource, zum Zuruecknehmen
 };
 

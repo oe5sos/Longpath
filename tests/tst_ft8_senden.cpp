@@ -28,6 +28,12 @@
 
 #include "core/Ft8Decoder.h"
 #include "core/Ft8Tx.h"
+#include "core/Ft8Ablauf.h"
+#include "core/AppSettings.h"
+#include <QPushButton>
+#include <QLineEdit>
+#include <QPlainTextEdit>
+#include <QMouseEvent>
 #include "core/MoxController.h"
 #include "core/safety/BandPlanGuard.h"
 #include "models/RadioModel.h"
@@ -57,6 +63,18 @@ private:
             if (!quelle.laeuft()) { break; }
         }
         return alles;
+    }
+
+private:
+    /// Ein Doppelklick auf die erste Zeile der Fundliste. Per
+    /// sendEvent, weil QTest-Mausklicks ohne Schirm verpuffen.
+    static void doppelklickInDieListe(Ft8Applet& applet)
+    {
+        auto* vp = applet.listForTest()->viewport();
+        QMouseEvent ev(QEvent::MouseButtonDblClick, QPointF(10, 5),
+                       vp->mapToGlobal(QPointF(10, 5)),
+                       Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+        QCoreApplication::sendEvent(vp, &ev);
     }
 
 private slots:
@@ -367,6 +385,76 @@ private slots:
         QCOMPARE(Ft8Applet::antwortAuf(zeile, QStringLiteral("OE5SOS"),
                                        QString()),
                  QStringLiteral("DL1ABC OE5SOS"));
+    }
+
+    // ── Der Schalter „Auto" entscheidet, ob von selbst gesendet wird ─
+    //
+    // Ohne ihn legt ein Doppelklick die Antwort nur ins Feld. Mit ihm
+    // faengt der Ablauf an. Das ist die Grenze zwischen „das Programm
+    // schlaegt vor" und „das Programm sendet", und sie wird hier
+    // beidseitig festgehalten.
+    //
+    // Der Doppelklick geht per sendEvent an den viewport: QTest-Klicks
+    // verpuffen ohne Schirm, und dieser Lauf hat keinen.
+    void ohneAutoFuelltDerDoppelklickNurDasFeld()
+    {
+        RadioModel radio;
+        radio.installFt8TxForTest();
+        Ft8Applet applet(&radio);
+        AppSettings::instance().setValue(QStringLiteral("User/Callsign"),
+                                         QStringLiteral("OE5SOS"));
+        AppSettings::instance().setValue(QStringLiteral("User/GridSquare"),
+                                         QStringLiteral("JN67VV"));
+
+        auto* liste = applet.listForTest();
+        QVERIFY(liste);
+        liste->setPlainText(
+            QStringLiteral("120000   -8   0.2  1500  CQ DL1ABC JO31"));
+
+        QVERIFY2(applet.autoButtonForTest()
+                     && !applet.autoButtonForTest()->isChecked(),
+                 "Auto muss AUS voreingestellt sein");
+
+        doppelklickInDieListe(applet);
+
+        QCOMPARE(applet.textFeldForTest()->text(),
+                 QStringLiteral("DL1ABC OE5SOS JN67"));
+        QVERIFY2(!applet.ablaufForTest().laeuft(),
+                 "ohne Auto darf kein Ablauf anlaufen");
+        QVERIFY2(!applet.sendetGerade(),
+                 "ohne Auto darf nichts gesendet werden");
+    }
+
+    void mitAutoFaengtDerAblaufAn()
+    {
+        RadioModel radio;
+        radio.installFt8TxForTest();
+        Ft8Applet applet(&radio);
+        applet.setProtocol(Ft8Decoder::Protocol::Ft4);
+        AppSettings::instance().setValue(QStringLiteral("User/Callsign"),
+                                         QStringLiteral("OE5SOS"));
+        AppSettings::instance().setValue(QStringLiteral("User/GridSquare"),
+                                         QStringLiteral("JN67VV"));
+
+        applet.listForTest()->setPlainText(
+            QStringLiteral("120000   -8   0.2  1500  CQ DL1ABC JO31"));
+        applet.autoButtonForTest()->setChecked(true);
+
+        doppelklickInDieListe(applet);
+
+        QVERIFY2(applet.ablaufForTest().laeuft(),
+                 "mit Auto muss der Ablauf anlaufen");
+        QCOMPARE(applet.ablaufForTest().partner(), QStringLiteral("DL1ABC"));
+        QCOMPARE(applet.ablaufForTest().zustand(),
+                 Ft8Ablauf::Zustand::RufeAn);
+        QVERIFY2(applet.sendetGerade(),
+                 "der erste Zug muss auf sein Fenster warten");
+
+        // Und der Schalter haelt ihn auch wieder an — sonst gaebe es
+        // keinen Weg zurueck ausser dem Stop-Knopf.
+        applet.autoButtonForTest()->setChecked(false);
+        QVERIFY(!applet.ablaufForTest().laeuft());
+        applet.abbrechen();
     }
 
     void derRouterLiefertDieFt8QuelleDurch()

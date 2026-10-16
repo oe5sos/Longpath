@@ -212,6 +212,20 @@ void Ft8Applet::buildUI()
     m_stopBtn->setEnabled(false);
     connect(m_stopBtn, &QPushButton::clicked, this, [this]() { abbrechen(); });
     sendRow->addWidget(m_stopBtn);
+
+    // Der Schalter fuer den Ablauf. Steht aus, und das ist Absicht:
+    // eingeschaltet sendet das Programm ohne weiteren Druck, bis das
+    // QSO fertig ist oder aufgegeben wird.
+    m_autoBtn = styledButton(tr("Auto"), 48);
+    m_autoBtn->setCheckable(true);
+    m_autoBtn->setChecked(false);
+    m_autoBtn->setToolTip(tr(
+        "Run the QSO sequence by itself after a double-click on a "
+        "decode.\nOff: a double-click only fills the message box."));
+    connect(m_autoBtn, &QPushButton::toggled, this, [this](bool an) {
+        if (!an) { m_ablauf.abbrechen(); zeigeAblauf(); }
+    });
+    sendRow->addWidget(m_autoBtn);
     root->addLayout(sendRow);
 
     auto* foot = new QHBoxLayout();
@@ -275,6 +289,52 @@ void Ft8Applet::syncFromModel()
 // zuruecknehmen.
 //
 // Was absichtlich fehlt: jede Automatik. Ein Druck = EIN Fenster.
+// ── Ein Fenster ist hinaus ───────────────────────────────────────────
+//
+// Ohne laufenden Ablauf ist danach Schluss, wie bisher. Mit Ablauf
+// zaehlt das Fenster als „gesendet, keine Antwort" — und der naechste
+// Schritt folgt, sobald ein Fund ihn weiterbringt oder die
+// Wiederholung faellig ist.
+void Ft8Applet::fensterZuEnde()
+{
+    abbrechen();
+    if (!m_ablauf.laeuft()) { zeigeAblauf(); return; }
+    m_ablauf.fensterVerstrichen();
+    if (m_ablauf.laeuft()) {
+        ablaufSchritt();
+    } else {
+        zeigeAblauf();
+    }
+}
+
+// Den naechsten Zug des Ablaufs senden. Es ist derselbe Weg wie bei
+// einem Druck auf „Send": Bandplan und Tasten inbegriffen.
+void Ft8Applet::ablaufSchritt()
+{
+    const QString was = m_ablauf.naechsteNachricht();
+    zeigeAblauf();
+    if (was.isEmpty() || m_sendet) { return; }
+    if (m_textFeld) { m_textFeld->setText(was); }
+    sendeNachricht(was);
+}
+
+void Ft8Applet::zeigeAblauf()
+{
+    if (!m_status) { return; }
+    switch (m_ablauf.zustand()) {
+        case Ft8Ablauf::Zustand::Fertig:
+            m_status->setText(tr("QSO with %1 complete").arg(m_ablauf.partner()));
+            break;
+        case Ft8Ablauf::Zustand::Abgebrochen:
+            m_status->setText(m_ablauf.partner().isEmpty()
+                ? tr("sequence stopped")
+                : tr("gave up calling %1").arg(m_ablauf.partner()));
+            break;
+        default:
+            break;      // die laufende Anzeige macht updateStatus()
+    }
+}
+
 // ── Auf eine gehoerte Station antworten ──────────────────────────────
 //
 // Ein Doppelklick in die Fundliste legt den Standardanruf ins
@@ -361,6 +421,18 @@ bool Ft8Applet::eventFilter(QObject* obj, QEvent* ev)
         } else if (m_textFeld) {
             m_textFeld->setText(antwort);
             m_textFeld->setFocus();
+
+            // Mit Auto faengt hier der Ablauf an: dieselbe Antwort,
+            // aber danach macht er von selbst weiter.
+            if (m_autoBtn && m_autoBtn->isChecked() && !m_sendet) {
+                const QString sauber = c.selectedText().simplified();
+                const QString nachricht = sauber.section(QLatin1Char(' '), 4);
+                const int snr = sauber.section(QLatin1Char(' '), 1, 1).toInt();
+                m_ablauf.starteAlsAntworter(senderCallsign(nachricht),
+                                            eigenesRufzeichen(),
+                                            eigenerLocator(), snr);
+                ablaufSchritt();
+            }
         }
         return true;
     }
@@ -459,7 +531,7 @@ void Ft8Applet::sendeNachricht(const QString& text)
         // 300 ms, damit der letzte Ton draussen ist, bevor der Sender
         // abschaltet.
         QTimer::singleShot(Ft8Tx::fensterMs(protocol()) + 300, this,
-                           [this]() { abbrechen(); });
+                           [this]() { fensterZuEnde(); });
     });
     m_sendeTimer->start(static_cast<int>(wartet));
 }
@@ -596,6 +668,14 @@ void Ft8Applet::onDecoded(const QVector<Longpath::Ft8Decode>& funde,
         // beim WSJT-X-Weg. Vorher schrieb dieses Applet selbst ins
         // RxDecodeModel und erreichte die Ueberlagerung nie
         // (2026-10-15).
+        // Bringt der Fund den Ablauf weiter, ist der naechste Zug
+        // faellig — das ist der einzige Weg, auf dem er vorankommt.
+        if (m_ablauf.laeuft()
+            && m_ablauf.verarbeite(d.text,
+                                   static_cast<int>(std::lround(d.snrDb)))) {
+            ablaufSchritt();
+        }
+
         const QString ruf = senderCallsign(d.text);
         if (m_model && !ruf.isEmpty()) {
             DxSpot spot;
