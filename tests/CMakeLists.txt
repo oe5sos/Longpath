@@ -983,6 +983,23 @@ longpath_add_test(tst_radio_model_band_click)
 longpath_add_test(tst_about_dialog)
 longpath_add_test(tst_support_dialog)
 longpath_add_test(tst_dev_automation_server)
+# ── RTTY senden (2026-10-16) ─────────────────────────────────────────
+# Der staerkste Pruefstand fuer einen Sender ist der Empfaenger, den es
+# schon gibt: der Lauf schickt seine Toene durch RttyDecoder zurueck.
+#
+# Dieser Eintrag kam mit #257 und ist beim Merge von #254 wieder
+# verschwunden: dort war ein Squash-Konflikt in dieser Datei mit
+# `git checkout --ours` geloest, und die eigene Zweigseite kannte
+# #257 noch nicht. Der Pruefstand war danach gebaut, aber nicht mehr
+# angemeldet — ctest kannte ihn nicht. Wiederhergestellt am 2026-10-16.
+longpath_add_test(tst_rtty_senden)
+target_link_libraries(tst_rtty_senden PRIVATE Qt6::Multimedia)
+
+# ── Die Bedienung zum RTTY-Senden (2026-10-16) ───────────────────────
+# Sendeweg umlegen, tasten, und beides in der richtigen Reihenfolge
+# wieder zurueck — der Sender selbst steht in tst_rtty_senden.
+longpath_add_test(tst_rtty_senden_flaeche)
+
 longpath_add_test(tst_rtty_decoder)
 longpath_add_test(tst_rtty_decoder_sensitivity)
 longpath_add_test(tst_rtty_decoder_applet)

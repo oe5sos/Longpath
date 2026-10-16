@@ -343,6 +343,7 @@ warren@wpratt.com
 // TX pump wiring; K-bench reuses that include for setRadeChannel +
 // the radeMicBlockReady signal.
 #include "core/Ft8Tx.h"
+#include "core/RttyTx.h"
 #include "core/Resampler.h"
 
 // FlexRadio UDP 4992 discovery beacon. Owned by RadioModel; configured
@@ -2569,6 +2570,18 @@ void RadioModel::installFt8TxForTest()
     if (!m_ft8TxSource) {
         m_ft8TxSource = std::make_unique<Ft8TxSource>(48000);
         m_compositeMicRouter->setFt8Source(m_ft8TxSource.get());
+    }
+}
+
+void RadioModel::installRttyTxForTest()
+{
+    if (!m_compositeMicRouter) {
+        m_compositeMicRouter = std::make_unique<CompositeTxMicRouter>(
+            nullptr, nullptr, false);
+    }
+    if (!m_rttyTxSource) {
+        m_rttyTxSource = std::make_unique<RttyTxSource>(48000);
+        m_compositeMicRouter->setRttySource(m_rttyTxSource.get());
     }
 }
 #endif  // LONGPATH_BUILD_TESTS
@@ -7160,6 +7173,12 @@ void RadioModel::connectToRadio(const RadioInfo& info)
             // der MoxController, nicht diese Zeile.
             m_ft8TxSource = std::make_unique<Ft8TxSource>(48000);
             m_compositeMicRouter->setFt8Source(m_ft8TxSource.get());
+
+            // Und derselbe Weg fuer RTTY (2026-10-16). Eine
+            // Mikrofonquelle wie die anderen — sie liefert Stille,
+            // solange niemand sie startet.
+            m_rttyTxSource = std::make_unique<RttyTxSource>(48000);
+            m_compositeMicRouter->setRttySource(m_rttyTxSource.get());
 
             // Replace the 3M-1a NullMicSource stub with the composite router.
             m_txChannel->setMicRouter(m_compositeMicRouter.get());

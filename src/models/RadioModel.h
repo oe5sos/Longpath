@@ -164,6 +164,7 @@ class VaxTxMicSource;  // VAX TX consumer (added 2026-05-06).
 class CompositeTxMicRouter;
 // 3M-1c L.1 / L.2: forward declarations for the MicProfileManager bank
 // (chunk F) + the TwoToneController activation orchestrator (chunk I).
+class RttyTxSource;
 class MicProfileManager;
 class RxProfileManager;
 class TwoToneController;
@@ -1131,6 +1132,10 @@ public:
     /// (2026-10-15). Siehe core/Ft8Tx.h.
     Ft8TxSource* ft8TxSource() const { return m_ft8TxSource.get(); }
 
+    /// Der eigene RTTY-Sender, oder null vor dem Verbinden
+    /// (2026-10-16). Siehe core/RttyTx.h.
+    RttyTxSource* rttyTxSource() const { return m_rttyTxSource.get(); }
+
     /// Der Mikrofon-Umschalter, oder null vor dem Verbinden. Ueber ihn
     /// laeuft das Umlegen auf die FT8-Quelle beim Senden.
     CompositeTxMicRouter* micRouter() const
@@ -1669,6 +1674,9 @@ public:
     /// Bausteine, nichts vom Rest der Kette: ein Pruefstand, der
     /// senden WILL, soll nicht nebenbei eine Tonausgabe aufmachen.
     void installFt8TxForTest();
+
+    /// Dasselbe fuer RTTY: Sendeweg und Quelle ohne Funkverbindung.
+    void installRttyTxForTest();
     void wireMicInputsForTest() { connectMicInputSignals(); }
     void setLastBandForTest(Longpath::Band b) {
         const bool cross = (b != m_lastBand);
@@ -3818,6 +3826,7 @@ private:
     /// Der eigene FT8/FT4-Sender (2026-10-15). Am Router angemeldet,
     /// liefert Stille, bis ihn jemand startet. Siehe core/Ft8Tx.h.
     std::unique_ptr<Ft8TxSource> m_ft8TxSource;
+    std::unique_ptr<RttyTxSource> m_rttyTxSource;
     std::unique_ptr<CompositeTxMicRouter>  m_compositeMicRouter;
 
     // ── 3M-1c Phase L: cross-cutting ownership ──────────────────────────────

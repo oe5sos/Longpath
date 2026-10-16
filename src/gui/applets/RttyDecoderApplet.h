@@ -43,6 +43,7 @@ class QLabel;
 class QComboBox;
 class QSlider;
 class QPlainTextEdit;
+class QLineEdit;
 class QPushButton;
 
 namespace Longpath {
@@ -120,6 +121,34 @@ private:
     QSlider*     m_sensitivitySlider{nullptr};
     QLabel*      m_sensitivityValue{nullptr};
     QPushButton* m_clearBtn{nullptr};
+
+    // ── Zeile 5: senden (2026-10-16) ─────────────────────────────────
+    //
+    // Derselbe Weg wie bei FT8: der Text geht an RttyTxSource, der
+    // Sendeweg wird auf MicSource::Rtty gelegt, und getastet wird
+    // ueber den MoxController — mit Bandplanpruefung. Lehnt der ab,
+    // bricht der Versuch sofort ab und nennt den Grund.
+    //
+    // Anders als FT8 kennt RTTY keine Fenster: gesendet wird sofort
+    // und so lange, wie der Text dauert.
+    QLineEdit*   m_sendeFeld{nullptr};
+    QPushButton* m_sendeBtn{nullptr};
+    QPushButton* m_stopBtn{nullptr};
+    QLabel*      m_sendeStatus{nullptr};
+    bool         m_sendet{false};
+    int          m_quelleVorher{-1};
+    class QTimer* m_sendeEndeTimer{nullptr};
+
+public:
+    /// Den Text senden. Oeffentlich, damit der Pruefstand ihn ohne
+    /// Tastendruck ausloesen kann.
+    void sendeText(const QString& text);
+    void sendenAbbrechen();
+    bool sendetGerade() const { return m_sendet; }
+
+    QLineEdit*   sendeFeldForTest()   const { return m_sendeFeld; }
+    QPushButton* sendeButtonForTest() const { return m_sendeBtn; }
+    QLabel*      sendeStatusForTest() const { return m_sendeStatus; }
 };
 
 } // namespace Longpath

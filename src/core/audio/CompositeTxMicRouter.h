@@ -68,6 +68,7 @@ enum class MicSource : int {
     Radio = 1,  ///< Radio mic-jack input via P1/P2 mic-frame stream
     Vax   = 2,  ///< VAX TX virtual device (3rd-party app → /nereussdr-vax-tx)
     Ft8   = 3,  ///< der eigene FT8/FT4-Sender (core/Ft8Tx.h), 2026-10-15
+    Rtty  = 4,  ///< der eigene RTTY-Sender (core/RttyTx.h), 2026-10-16
 };
 
 /// CompositeTxMicRouter — selector that holds PcMicSource + RadioMicSource
@@ -178,7 +179,17 @@ public:
     /// Stille.
     void setFt8Source(TxMicRouter* source);
 
+    /// Den RTTY-Sender anmelden. Wie bei FT8: ANMELDEN heisst nicht
+    /// SENDEN — geliefert wird er nur, wenn jemand MicSource::Rtty
+    /// waehlt, und auch dann nur das, was die Quelle hergibt.
+    void setRttySource(TxMicRouter* source);
+
     /// Angemeldete FT8-Quelle (kann null sein). Fuer Prueflaeufe.
+    TxMicRouter* rttySource() const
+    {
+        return m_rttySource.load(std::memory_order_acquire);
+    }
+
     TxMicRouter* ft8Source() const
     {
         return m_ft8Source.load(std::memory_order_acquire);
@@ -211,6 +222,7 @@ private:
     std::atomic<bool>      m_hasPendingSwitch {false};
     std::atomic<bool>      m_moxActive {false};
     std::atomic<TxMicRouter*> m_ft8Source{nullptr};
+    std::atomic<TxMicRouter*> m_rttySource{nullptr};
     std::atomic<VaxTxMicSource*> m_vaxSource {nullptr};  // non-owning; registered post-ctor
 };
 
