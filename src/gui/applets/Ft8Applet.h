@@ -37,6 +37,7 @@
 
 #include "core/Ft8Decoder.h"
 #include "core/Ft8Ablauf.h"
+#include "models/LogEntry.h"
 #include "core/Ft8Tx.h"
 
 #include <QDateTime>
@@ -116,6 +117,15 @@ public:
     /// Das eigene Rufzeichen aus den Einstellungen. `User/Callsign`
     /// ist der kanonische Schluessel (SpotHubDialog schreibt ihn);
     /// `StationCallsign` ist der Rueckfall.
+    /// Der Logbucheintrag zu einem fertigen Ablauf. Statisch und ohne
+    /// Zustand, damit die Felder ohne Fenster zu pruefen sind — das
+    /// Signal ist nur die Zustellung.
+    static Longpath::LogEntry logEintrag(const Ft8Ablauf& ablauf,
+                                         double wahlHz,
+                                         bool unteresSeitenband,
+                                         Ft8Decoder::Protocol p,
+                                         const QString& meinLocator);
+
     static QString eigenesRufzeichen();
     static QString eigenerLocator();
 
@@ -128,6 +138,14 @@ public:
     QPushButton* stopButtonForTest() const { return m_stopBtn; }
     QPushButton* autoButtonForTest() const { return m_autoBtn; }
     const Ft8Ablauf& ablaufForTest() const { return m_ablauf; }
+    /// Einen Fund einspeisen, als waere er dekodiert worden — der
+    /// einzige Weg, auf dem der Ablauf vorankommt, also auch der
+    /// einzige, auf dem er sich pruefen laesst.
+    void fundForTest(const Longpath::Ft8Decode& d);
+    /// Ein gesendetes Fenster ist um. Im Betrieb kommt das von einem
+    /// Zeitgeber nach bis zu 15 s — im Prueflauf waere das eine
+    /// Viertelminute Warten je Zug.
+    void fensterZuEndeForTest() { fensterZuEnde(); }
     QLineEdit*   textFeldForTest()  const { return m_textFeld; }
 
     // Fuer den Pruefstand.
@@ -142,6 +160,12 @@ public:
     /// Der Rufzeichen-Absender aus einer FT8-Nachricht, oder leer.
     /// Oeffentlich, weil er sonst nicht einzeln pruefbar waere.
     static QString senderCallsign(const QString& message);
+
+signals:
+    /// Ein QSO ist vollstaendig. Es geht denselben Weg wie eines aus
+    /// WSJT-X (MainWindow -> RotorLogbookPanel::logExternalQso): eine
+    /// Datei, eine Doppelt-Regel, ein Hochladen.
+    void qsoFertig(const Longpath::LogEntry& eintrag);
 
 protected:
     /// Doppelklick in die Fundliste: die Zeile wird zur Antwort im
@@ -194,8 +218,13 @@ private:
     // mit ihm faengt der Ablauf an und sendet, bis er fertig ist,
     // aufgibt oder angehalten wird.
     Ft8Ablauf    m_ablauf;
+    /// Ein QSO wird genau EINMAL gemeldet. zeigeAblauf() laeuft bei
+    /// jedem Schritt, und der Zustand bleibt auf Fertig stehen — ohne
+    /// diese Wache stuende dasselbe QSO mehrfach im Logbuch.
+    bool         m_qsoGemeldet{false};
     QPushButton* m_autoBtn{nullptr};
     void fensterZuEnde();
+    void meldeFertigesQso();
     void ablaufSchritt();
     void zeigeAblauf();
     int          m_quelleVorher{-1};   ///< MicSource, zum Zuruecknehmen

@@ -13,6 +13,8 @@
 #include "core/AudioEngine.h"
 #include "core/Ft8Stream.h"
 #include "core/Ft8Tx.h"
+#include "models/Band.h"
+#include <QDateTime>
 #include "core/AppSettings.h"
 #include "core/MoxController.h"
 #include "core/audio/CompositeTxMicRouter.h"
@@ -318,12 +320,72 @@ void Ft8Applet::ablaufSchritt()
     sendeNachricht(was);
 }
 
+// ── Ein fertiges QSO ins Logbuch ─────────────────────────────────────
+//
+// Nicht selbst schreiben: dasselbe Signal wie bei einem QSO aus
+// WSJT-X, und MainWindow haengt es an RotorLogbookPanel::
+// logExternalQso. Dort sitzt die Doppelt-Regel, das Anhaengen an die
+// Datei und das Hochladen — alles einmal, nicht zweimal.
+LogEntry Ft8Applet::logEintrag(const Ft8Ablauf& ablauf,
+                               double wahlHz,
+                               bool unteresSeitenband,
+                               Ft8Decoder::Protocol p,
+                               const QString& meinLocator)
+{
+    LogEntry e;
+    e.call   = ablauf.partner();
+    e.timeOn = QDateTime::currentDateTimeUtc();
+
+    // Dieselbe Rechnung wie fuer die Funde: die Wahlfrequenz der
+    // Scheibe plus die Tonlage, und das Vorzeichen haengt am
+    // Seitenband. Gesendet wird auf kSendeTonHz.
+    const double hz = wahlHz + (unteresSeitenband ? -kSendeTonHz : kSendeTonHz);
+    e.freqMHz = hz / 1.0e6;
+    e.band    = bandLabel(bandFromFrequency(hz));
+
+    // ADIF kennt FT8 und FT4 als eigene Betriebsarten — kein SUBMODE.
+    e.mode = p == Ft8Decoder::Protocol::Ft4
+                 ? QStringLiteral("FT4") : QStringLiteral("FT8");
+
+    // In FT8 ist der Rapport die Signalstaerke in dB, nicht RST. So
+    // schreibt WSJT-X ihn auch: „-12", „+03".
+    const auto alsText = [](int r) {
+        return r == Ft8Ablauf::kKeinReport
+                   ? QString()
+                   : QStringLiteral("%1%2")
+                         .arg(r < 0 ? QLatin1Char('-') : QLatin1Char('+'))
+                         .arg(qAbs(r), 2, 10, QLatin1Char('0'));
+    };
+    e.rstSent = alsText(ablauf.gesendeterReport());
+    e.rstRcvd = alsText(ablauf.empfangenerReport());
+
+    e.gridSquare   = ablauf.partnerLocator();   // leer, wenn nie einer kam
+    e.myGridSquare = meinLocator;
+    return e;
+}
+
+void Ft8Applet::fundForTest(const Ft8Decode& d)
+{
+    onDecoded({d}, QDateTime::currentDateTimeUtc());
+}
+
+void Ft8Applet::meldeFertigesQso()
+{
+    if (m_qsoGemeldet || m_ablauf.partner().isEmpty()) { return; }
+    m_qsoGemeldet = true;
+    emit qsoFertig(logEintrag(m_ablauf,
+                              m_slice ? m_slice->frequency() : 0.0,
+                              m_slice && m_slice->dspMode() == DSPMode::DIGL,
+                              protocol(), eigenerLocator()));
+}
+
 void Ft8Applet::zeigeAblauf()
 {
     if (!m_status) { return; }
     switch (m_ablauf.zustand()) {
         case Ft8Ablauf::Zustand::Fertig:
             m_status->setText(tr("QSO with %1 complete").arg(m_ablauf.partner()));
+            meldeFertigesQso();
             break;
         case Ft8Ablauf::Zustand::Abgebrochen:
             m_status->setText(m_ablauf.partner().isEmpty()
@@ -428,9 +490,11 @@ bool Ft8Applet::eventFilter(QObject* obj, QEvent* ev)
                 const QString sauber = c.selectedText().simplified();
                 const QString nachricht = sauber.section(QLatin1Char(' '), 4);
                 const int snr = sauber.section(QLatin1Char(' '), 1, 1).toInt();
+                m_qsoGemeldet = false;
+                const QString seinLoc = sauber.section(QLatin1Char(' '), -1);
                 m_ablauf.starteAlsAntworter(senderCallsign(nachricht),
                                             eigenesRufzeichen(),
-                                            eigenerLocator(), snr);
+                                            eigenerLocator(), snr, seinLoc);
                 ablaufSchritt();
             }
         }

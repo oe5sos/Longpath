@@ -62,11 +62,39 @@ QString rapportText(int snr)
 
 } // namespace
 
+bool Ft8Ablauf::wieLocator(const QString& feld)
+{
+    // ── „RR73" ist KEIN Feldkenner ───────────────────────────────────
+    //
+    // Formal ist es einer: Feld RR, Quadrat 73 — ein Punkt mitten im
+    // Pazifik, und die Maidenhead-Regel unten laesst ihn durch. Im
+    // FT8-Protokoll steht RR73 aber an genau der Stelle, an der sonst
+    // der Feldkenner steht, und bedeutet dort „verstanden, Ende".
+    //
+    // Ohne diese Zeile landete bei jedem zweiten QSO „RR73" als
+    // GRIDSQUARE im Logbuch. Der Pruefstand hat es beim ersten Lauf
+    // gefangen (2026-10-16).
+    if (feld.compare(QStringLiteral("RR73"), Qt::CaseInsensitive) == 0) {
+        return false;
+    }
+
+    // Zwei Buchstaben, zwei Ziffern, wahlweise zwei weitere
+    // Buchstaben: JN67 oder JN67VV. Mehr Stellen gibt es in einer
+    // FT8-Nachricht vom Standardtyp nicht.
+    static const QRegularExpression re(
+        QStringLiteral("^[A-R]{2}[0-9]{2}([A-X]{2})?$"),
+        QRegularExpression::CaseInsensitiveOption);
+    return re.match(feld).hasMatch();
+}
+
 void Ft8Ablauf::starteAlsAntworter(const QString& partner,
                                    const QString& meinRuf,
                                    const QString& meinLocator,
-                                   int snr)
+                                   int snr,
+                                   const QString& seinLocator)
 {
+    m_partnerLocator = wieLocator(seinLocator.trimmed())
+                           ? seinLocator.trimmed().toUpper() : QString();
     m_rolle           = Rolle::Antworter;
     m_partner         = partner.trimmed().toUpper();
     m_meinRuf         = meinRuf.trimmed().toUpper();
@@ -83,6 +111,7 @@ void Ft8Ablauf::starteAlsAnrufer(const QString& meinRuf,
 {
     m_rolle           = Rolle::Anrufer;
     m_partner.clear();
+    m_partnerLocator.clear();
     m_meinRuf         = meinRuf.trimmed().toUpper();
     m_meinLocator     = meinLocator.trimmed().left(4).toUpper();
     m_reportGesendet  = kKeinReport;
@@ -162,6 +191,7 @@ bool Ft8Ablauf::verarbeite(const QString& nachricht, int snr)
         case Zustand::RufeCq: {
             // Jemand antwortet auf mein CQ — mit Locator oder blank.
             m_partner        = vonWem;
+            if (wieLocator(letztes)) { m_partnerLocator = letztes; }
             m_reportGesendet = snr;
             m_wiederholungen = 0;
             m_zustand        = Zustand::SendeReport;

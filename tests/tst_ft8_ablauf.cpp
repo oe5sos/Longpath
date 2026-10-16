@@ -102,6 +102,61 @@ private slots:
         QCOMPARE(a.naechsteNachricht(), QStringLiteral("DL1ABC OE5SOS +03"));
     }
 
+    // ── Sein Feldkenner, fuer das Logbuch ───────────────────────────
+    void derLocatorDesPartnersWirdGemerkt()
+    {
+        // Als Anrufer: er steht in der Antwort auf mein CQ.
+        Ft8Ablauf a;
+        a.starteAlsAnrufer(QStringLiteral("OE5SOS"), QStringLiteral("JN67"));
+        QVERIFY(a.partnerLocator().isEmpty());
+        QVERIFY(a.verarbeite(QStringLiteral("OE5SOS DL1ABC JO31"), -7));
+        QCOMPARE(a.partnerLocator(), QStringLiteral("JO31"));
+
+        // Als Antworter: er kommt aus der angeklickten CQ-Zeile.
+        Ft8Ablauf b;
+        b.starteAlsAntworter(QStringLiteral("DL1ABC"),
+                             QStringLiteral("OE5SOS"),
+                             QStringLiteral("JN67"), -12,
+                             QStringLiteral("JO31"));
+        QCOMPARE(b.partnerLocator(), QStringLiteral("JO31"));
+    }
+
+    // Nicht jedes dritte Feld ist ein Feldkenner — „-12", „R-09",
+    // „RR73" und „73" stehen an derselben Stelle. Ein geratener
+    // Locator stuende sonst im Logbuch.
+    void nurEchteFeldkennerZaehlen_data()
+    {
+        QTest::addColumn<QString>("feld");
+        QTest::addColumn<bool>("gilt");
+        QTest::newRow("JN67")   << QStringLiteral("JN67")   << true;
+        QTest::newRow("JN67VV") << QStringLiteral("JN67VV") << true;
+        QTest::newRow("jo31")   << QStringLiteral("jo31")   << true;
+        QTest::newRow("-12")    << QStringLiteral("-12")    << false;
+        QTest::newRow("R-09")   << QStringLiteral("R-09")   << false;
+        QTest::newRow("RR73")   << QStringLiteral("RR73")   << false;
+        QTest::newRow("73")     << QStringLiteral("73")     << false;
+        QTest::newRow("Ruf")    << QStringLiteral("DL1ABC") << false;
+        QTest::newRow("leer")   << QString()                << false;
+    }
+
+    void nurEchteFeldkennerZaehlen()
+    {
+        QFETCH(QString, feld);
+        QFETCH(bool, gilt);
+        QCOMPARE(Ft8Ablauf::wieLocator(feld), gilt);
+    }
+
+    // Ein Anrufer ohne Locator (es gibt CQ-Rufe ohne) darf keinen
+    // erfinden.
+    void ohneLocatorBleibtDasFeldLeer()
+    {
+        Ft8Ablauf a;
+        a.starteAlsAnrufer(QStringLiteral("OE5SOS"), QStringLiteral("JN67"));
+        QVERIFY(a.verarbeite(QStringLiteral("OE5SOS DL1ABC"), -7));
+        QVERIFY2(a.partnerLocator().isEmpty(),
+                 "ohne Feldkenner darf keiner im Logbuch stehen");
+    }
+
     // ── Was den Ablauf NICHT weiterbringen darf ─────────────────────
 
     void eineNachrichtAnJemandAnderenZaehltNicht()

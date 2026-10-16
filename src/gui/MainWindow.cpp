@@ -6927,6 +6927,19 @@ void MainWindow::populateDefaultMeter()
     panel->addApplet(m_ft8Applet);
     m_ft8Applet->setVisible(false);
 
+    // Ein fertiges QSO aus dem FT8-Ablauf geht denselben Weg wie eines
+    // aus WSJT-X (siehe die Verdrahtung von WsjtxClient::qsoLogged
+    // weiter oben): das Panel entscheidet ueber Doppelt-Regel, Datei
+    // und Hochladen. Hier wird nichts selbst geschrieben — sonst
+    // stuende dasselbe QSO zweimal im Logbuch und nur einmal auf dem
+    // Server.
+    connect(m_ft8Applet, &Ft8Applet::qsoFertig, this,
+            [this](const LogEntry& e) {
+        if (RotorLogbookPanel* p = ensureRotorPanel()) {
+            p->logExternalQso(e);
+        }
+    });
+
     // Ghost applets — hidden per docs/superpowers/plans/2026-05-01-ui-polish-right-panel.md §Task 6.
     // These applets are entirely placeholder-only today (no wired controls).
     // Showing them is misleading — users click e.g. "Equalizer" and nothing happens.

@@ -84,7 +84,8 @@ public:
     void starteAlsAntworter(const QString& partner,
                             const QString& meinRuf,
                             const QString& meinLocator,
-                            int snr);
+                            int snr,
+                            const QString& seinLocator = QString());
 
     /// Ich rufe CQ. Der Partner ergibt sich aus der ersten Antwort.
     void starteAlsAnrufer(const QString& meinRuf,
@@ -116,6 +117,17 @@ public:
     int gesendeterReport() const { return m_reportGesendet; }
     int empfangenerReport() const { return m_reportEmpfangen; }
 
+    /// Sein Feldkenner, soweit er in einer Nachricht stand. Beim
+    /// Antworter kommt er aus der angeklickten CQ-Zeile, beim Anrufer
+    /// aus der Antwort auf das CQ. Leer, wenn nie einer kam — dann
+    /// bleibt GRIDSQUARE im Logbuch leer, statt zu raten.
+    QString partnerLocator() const { return m_partnerLocator; }
+
+    /// Sieht das Feld aus wie ein Feldkenner (JN67, JN67VV)? Nicht
+    /// jedes dritte Feld ist einer: „-12", „R-09", „RR73" und „73"
+    /// stehen an derselben Stelle.
+    static bool wieLocator(const QString& feld);
+
     /// Nur fuer Prueflaeufe und Anzeige: eine lesbare Form.
     static QString zustandName(Zustand z);
 
@@ -129,6 +141,7 @@ private:
     QString m_partner;
     QString m_meinRuf;
     QString m_meinLocator;
+    QString m_partnerLocator;
     int     m_reportGesendet{kKeinReport};
     int     m_reportEmpfangen{kKeinReport};
     int     m_wiederholungen{0};
