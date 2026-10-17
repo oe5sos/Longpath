@@ -831,12 +831,54 @@ MainWindow::MainWindow(QWidget* parent)
             // Bedingung ist aber nicht nur eine Wache, sie ist der
             // bessere Zeitpunkt -- der Rahmen soll auftauchen, wenn man
             // IHM NAHE KOMMT, und nicht bei jeder Bewegung blinken.
-            bool beruehrt = false;
             const QRect wo = bewegtes->frameGeometry();
+            // ── Platzieren ist kein Ziehen (2026-10-17) ─────────────
+            //
+            // Die Beruehrungsbedingung darueber reicht nicht. Gemessen
+            // (offscreen, wie die CI): beim Aufbau meldet ein
+            // ToolWindow ZWEIMAL mit identischer Geometrie
+            // (248,296 536x504) -- das ist die Wiederherstellung seiner
+            // Profilposition, und die liegt im Sperrstreifen. Der
+            // Hinweis stand damit schon da, bevor jemand zog; in der
+            // CI faellt deswegen `beimZiehenWirdDerRahmenSICHTBAR`,
+            // lokal auf einem echten Schirm nicht (dort landet das
+            // Fenster anders).
+            //
+            // Unterschieden wird am Verlauf, nicht an der Maustaste:
+            // beim nativen Ziehen auf macOS sieht Qt den Knopf nicht
+            // zuverlaessig, und der Prueflauf meldet ohnehin direkt.
+            // Zwei Bedingungen zusammen:
+            //
+            //   1. die ERSTE Meldung eines Fensters zaehlt nicht -- beim
+            //      Erscheinen hat es keine Vorgeschichte;
+            //   2. danach nur, wenn sich die Lage WIRKLICH geaendert hat.
+            //
+            // Beim echten Ziehen kommen Dutzende Bewegungen, der
+            // Hinweis erscheint also sofort mit der zweiten.
+            //
+            // OB der Hinweis stattdessen an der gedrueckten Maustaste
+            // haengen soll, ist eine Entwurfsfrage -- die gehoert dem
+            // Betreiber, nicht diesem Merge.
+            static QHash<QWidget*, QRect> letzteLage;
+            const auto vorher = letzteLage.constFind(bewegtes);
+            const bool kannteEsSchon = vorher != letzteLage.constEnd();
+            const bool verschoben = kannteEsSchon && *vorher != wo;
+            letzteLage.insert(bewegtes, wo);
+            // Der Eintrag haelt nur ein QRect, nie einen Zugriff auf das
+            // Fenster -- ein toter Schluessel ist darum harmlos. Beim
+            // Schliessen raeumen wir ihn trotzdem weg, damit die Tabelle
+            // nicht mitwaechst.
+            connect(bewegtes, &QObject::destroyed, bewegtes,
+                    [bewegtes]() { letzteLage.remove(bewegtes); });
+            if (!verschoben) { return; }
+
+            bool beruehrt = false;
             for (const QRect& sp : wir->schutzrahmen()) {
                 if (sp.intersects(wo)) { beruehrt = true; break; }
             }
             if (!beruehrt) { return; }
+
+
             wir->zeigeSchutzrahmenKurz();
         });
     }
