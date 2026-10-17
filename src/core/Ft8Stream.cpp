@@ -109,8 +109,17 @@ void Ft8Stream::schliesseFenster(qint64 neuerBeginnMs)
     // dem Einschalten etwa. Nichts melden, nur weiterzaehlen.
     const int nötig = Ft8Decoder::kSampleRate * (slotMs() / 2) / 1000;
     if (m_fenster.size() >= nötig) {
-        const auto funde = Ft8Decoder::decodeBlock(m_fenster.constData(),
-                                                   m_fenster.size(),
+        // Bei FT4 beginnt der Block spaeter als das Fenster — siehe
+        // Ft8Stream.h, kFt4BlockVersatzMs, mit der Messung dazu. Die
+        // Laengenpruefung oben zaehlt weiter das GANZE Fenster: ob
+        // genug Ton da ist, hat mit dem Suchband nichts zu tun.
+        int versatz = 0;
+        if (m_protocol == Ft8Decoder::Protocol::Ft4) {
+            versatz = qMin(Ft8Decoder::kSampleRate * kFt4BlockVersatzMs / 1000,
+                           m_fenster.size());
+        }
+        const auto funde = Ft8Decoder::decodeBlock(m_fenster.constData() + versatz,
+                                                   m_fenster.size() - versatz,
                                                    m_protocol);
         // Auch leer melden: ein stilles Fenster ist eine Aussage, ein
         // ausbleibendes Fenster ein Fehler. Siehe Ft8Stream.h.
