@@ -47,6 +47,8 @@
 #include "core/AppSettings.h"
 #include "core/CatModeMap.h"
 #include "core/CatPtyServer.h"
+#include "core/AppSettings.h"
+#include "core/CatModeMap.h"
 #include "core/CatServer.h"
 #include "gui/MainWindow.h"
 #include "gui/applets/CatApplet.h"
@@ -86,7 +88,6 @@ private:
         return a;
     }
 #endif
-
     QString frage(QTcpSocket* s, const QByteArray& befehl,
                   int mindestens = 1, int msec = 5000)
     {
@@ -274,6 +275,75 @@ private slots:
         QCOMPARE(iff.mid(2, 11), QStringLiteral("00021300000"));
         QCOMPARE(iff.mid(2 + 27, 1), QStringLiteral("1"));   // LSB
 
+        // ── 5. Die sechs Befehle aus der zweiten Fassung (2026-10-13) ────
+        //
+        // RIT/XIT sind in Longpath der Ersatz fuer den Split, den es
+        // nicht gibt -- ein Contestprogramm, das nach Split greift,
+        // findet hier etwas, das wirkt.
+        // PS; meldet den ECHTEN Zustand. Ohne verbundenes Geraet ist das
+        // "PS0;" -- und das ist richtig, nicht ein Mangel: hier laeuft
+        // kein Geraet. Der erste Versuch erwartete PS1 und fiel darum.
+        //
+        // Die zweite CAT-Fassung gibt hier uebrigens 1 vor, wenn die
+        // Abfrage am Modell scheitert (`bool on = true;` vor dem
+        // invokeMethod). Das ist die unguenstigere Richtung: ein
+        // Contestprogramm, das PS1 liest, haelt die Station fuer
+        // betriebsbereit.
+        QCOMPARE(frage(s, "PS;"),
+                 rm->powerOn() ? QStringLiteral("PS1;") : QStringLiteral("PS0;"));
+        QCOMPARE(frage(s, "PS0;"), QStringLiteral("?;"));   // nicht abschalten
+
+        // SM antwortet mit fuenf Stellen; ohne Kanal ist der Pegel -200,
+        // also 0 -- geprueft wird die FORM, nicht der Wert.
+        const QString sm = frage(s, "SM0;");
+        QVERIFY2(sm.startsWith(QStringLiteral("SM")) && sm.size() == 2 + 5 + 1,
+                 qPrintable(QStringLiteral("SM-Antwort hat die falsche Form: %1").arg(sm)));
+
+        QCOMPARE(frage(s, "RT;"), QStringLiteral("RT0;"));
+        // Die ANTWORT abholen, auch wenn keine erwartet wird.
+        //
+        // Der erste Versuch stand hier als blankes `s->write("RT1;")`
+        // mit einem QTRY_VERIFY darauf -- und war rot: ritEnabled()
+        // blieb falsch, und der Lauf brauchte 18 s statt 3,5.
+        // Mit dieser Zeile ist er gruen und schnell.
+        //
+        // WARUM genau, habe ich nicht festgestellt. QTRY_VERIFY dreht
+        // die Ereignisschleife auch, es muesste also reichen. Was diese
+        // Form zusaetzlich tut: sie dreht 300 ms lang ohne Abbruch und
+        // liest dabei ab, was der Socket hergibt. Die Vermutung ist ein
+        // Zusammenspiel mit den Antworten der Befehle davor; belegt ist
+        // sie nicht.
+        //
+        // Festgehalten statt weggeraeumt, weil die naechste Person sonst
+        // dieselbe halbe Stunde verliert -- und weil ein Prueffall, der
+        // die Antwort abholt, ohnehin der richtigere ist: ein Setzen
+        // kann abgelehnt werden, und dann steht ein "?;" im Socket.
+        QCOMPARE(frage(s, "RT1;", 0, 300), QString());
+        QTRY_VERIFY(sl->ritEnabled());
+        QCOMPARE(frage(s, "RT;"), QStringLiteral("RT1;"));
+
+        // Jetzt die Ablage schieben -- und zwar MIT Nachlesen: der
+        // Server prueft nach jedem Setzen, ob es gewirkt hat.
+        sl->setStepHz(10);
+        const int vorher = sl->ritHz();
+        s->write("RU;");
+        QTRY_COMPARE(sl->ritHz(), vorher + 10);
+        s->write("RD;");
+        QTRY_COMPARE(sl->ritHz(), vorher);
+        s->write("RC;");
+        QTRY_COMPARE(sl->ritHz(), 0);
+
+        // XIT genauso.
+        s->write("XT1;");
+        QTRY_VERIFY(sl->xitEnabled());
+        QCOMPARE(frage(s, "XT;"), QStringLiteral("XT1;"));
+
+        // RIT und XIT aus: dann gibt es nichts zu schieben, und ein
+        // stilles "erledigt" sagte dem Programm, die Ablage sei gesetzt.
+        sl->setRitEnabled(false);
+        sl->setXitEnabled(false);
+        QCOMPARE(frage(s, "RU;"), QStringLiteral("?;"));
+        QCOMPARE(frage(s, "RC;"), QStringLiteral("?;"));
         // Aus: danach horcht niemand mehr, und die Einstellung zieht mit.
         tcp->click();
         for (int k = 0; k < CatServer::kKanaele; ++k) { QVERIFY(!srv->laeuft(k)); }
@@ -418,7 +488,108 @@ private slots:
         QVERIFY(!ptyBtn->isEnabled());
         QVERIFY(!ptyBtn->toolTip().isEmpty());
 #endif
+        delete mw;
+    }
 
+    void derZzSatzHaengtAmEchtenFenster()
+    {
+        // Eigener Fall OHNE Netz, und das ist der Punkt.
+        //
+        // Der Fall `amEchtenFenster()` oben klickt den TCP-Schalter und
+        // wird uebersprungen, wenn die Ports 31001..31004 belegt sind --
+        // was sie sind, sobald eine Longpath-Instanz laeuft. Die
+        // Verdrahtung des ZZ-Satzes waere damit genau dann ungeprueft,
+        // wenn der Rechner in Betrieb ist. Also hier ohne Horchen:
+        // echtes Fenster, echte Scheibe, und die Befehle ueber
+        // `antwortAuf()` statt ueber einen Socket. Der Transport
+        // ist in tst_cat_server geprueft, hier geht es um die Haken.
+        auto* mw = new MainWindow();
+        mw->resize(1200, 800);
+        mw->show();
+        QVERIFY(QTest::qWaitForWindowExposed(mw, 20000));
+
+        const QList<CatServer*> server = mw->findChildren<CatServer*>();
+        QCOMPARE(server.size(), 1);
+        CatServer* srv = server.first();
+        RadioModel* rm = mw->radioModelForTest();
+        QVERIFY(rm);
+
+        SliceModel* sl = rm->activeSlice();
+        if (!sl) {
+            rm->configureStreamPool(5, 5, 192000);
+            const int id = rm->addSlice();
+            sl = rm->sliceById(id);
+        }
+        QVERIFY(sl);
+
+        auto frageDirekt = [srv](const char* befehl) {
+            return srv->antwortAuf(QString::fromLatin1(befehl));
+        };
+
+        //
+        // Die Protokollschicht ist in tst_cat_zz vollstaendig geprueft;
+        // hier geht es um die VERDRAHTUNG -- ob die neuen Felder und
+        // Haken wirklich an der Scheibe haengen. Genau das hat am
+        // 2026-10-11 gefehlt: `FB;` antwortete "FB00000000000;", und
+        // alle drei Prueffaelle der Schicht liessen es durch, weil ihre
+        // init() immer BEIDE Haken anhaengt.
+        sl->setFrequency(28'400'000.0);
+        sl->setDspMode(DSPMode::CWL);
+        QCOMPARE(frageDirekt("ZZFA;"), QStringLiteral("ZZFA00028400000;"));
+        QCOMPARE(frageDirekt("ZZMD;"), QStringLiteral("ZZMD03;"));
+
+        // Der erweiterte Statussatz: 36 Zeichen, Modus zweistellig an
+        // Stelle 27.
+        const QString zzif = frageDirekt("ZZIF;");
+        QCOMPARE(zzif.size(), 4 + 36 + 1);
+        QVERIFY(zzif.startsWith(QStringLiteral("ZZIF")));
+        QCOMPARE(zzif.mid(4, 11), QStringLiteral("00028400000"));
+        QCOMPARE(zzif.mid(4 + 27, 2), QStringLiteral("03"));
+
+        // Setzen wirkt an der Scheibe.
+        QCOMPARE(frageDirekt("ZZFA00028450000;"), QString());
+        QCOMPARE(sl->frequency(), 28'450'000.0);
+        QCOMPARE(frageDirekt("ZZMD01;"), QString());
+        QCOMPARE(sl->dspMode(), DSPMode::USB);
+
+        // Die Filterkanten.
+        sl->setFilter(150, 2850);
+        QCOMPARE(frageDirekt("ZZFL;"), QStringLiteral("ZZFL+0150;"));
+        QCOMPARE(frageDirekt("ZZFH;"), QStringLiteral("ZZFH+2850;"));
+        QCOMPARE(frageDirekt("ZZFL+0300;"), QString());
+        QCOMPARE(sl->filterLow(), 300);
+
+        // Die Erkennung, die DXLab Commander und N1MM+ beim Verbinden
+        // schicken. ZZID bleibt stumm, ZZZM/ZZZV antworten.
+        QCOMPARE(frageDirekt("ZZID;"), QString());
+        QCOMPARE(frageDirekt("ZZZM;"), QStringLiteral("ZZZMLONGPATH;"));
+        QVERIFY(frageDirekt("ZZZV;").startsWith(QStringLiteral("ZZZV")));
+
+        // ── Die Rauschsperre haengt an der BETRIEBSART ──────────────
+        //
+        // Longpath hat drei Schalter (ssql fuer SSB/CW/Digi, amsq fuer
+        // AM/SAM, fmsq fuer FM), CAT hat einen. Dieser Fall belegt, dass
+        // der richtige getroffen wird -- in FM also fmsq und NICHT ssql.
+        // `RadioModel::setSqlEnable()`, der Weg des TCI-Servers, greift
+        // immer nur auf ssql und schaltet in FM nichts.
+        sl->setDspMode(DSPMode::FM);
+        sl->setFmsqEnabled(false);
+        sl->setSsqlEnabled(false);
+        QCOMPARE(frageDirekt("ZZSO1;"), QString());
+        QVERIFY(sl->fmsqEnabled());
+        QVERIFY(!sl->ssqlEnabled());          // der SSB-Schalter bleibt aus
+        QCOMPARE(frageDirekt("ZZSO;"), QStringLiteral("ZZSO1;"));
+
+        // Und in SSB trifft es ssql.
+        sl->setDspMode(DSPMode::USB);
+        QCOMPARE(frageDirekt("ZZSO;"), QStringLiteral("ZZSO0;"));   // ssql ist aus
+        QCOMPARE(frageDirekt("ZZSO1;"), QString());
+        QVERIFY(sl->ssqlEnabled());
+
+        // Thetis' 2 (Stimmsperre) gibt es nicht. Der Haken setzt "an",
+        // der Nachleser liest 1 und lehnt ab -- kein stilles
+        // "erledigt" fuer etwas, das nicht laeuft.
+        QCOMPARE(frageDirekt("ZZSO2;"), QStringLiteral("?;"));
         delete mw;
     }
 
@@ -448,6 +619,27 @@ private slots:
         // Was es kann, geht weiter.
         QCOMPARE(srv.antwortAuf(QStringLiteral("FA;")),
                  QStringLiteral("FA00014225000;"));
+        QCOMPARE(srv.antwortAuf(QStringLiteral("FB00007100000;")),
+                 QStringLiteral("?;"));
+        QCOMPARE(srv.antwortAuf(QStringLiteral("FT1;")),
+                 QStringLiteral("?;"));
+        // Dasselbe im ZZ-Satz. ZZFT ist dabei die Sendefrequenz (elf
+        // Stellen), nicht die VFO-Wahl wie Kenwoods FT -- lesbar, aber
+        // nicht setzbar, weil es keinen Split gibt.
+        QCOMPARE(srv.antwortAuf(QStringLiteral("ZZFB00007100000;")),
+                 QStringLiteral("?;"));
+        QCOMPARE(srv.antwortAuf(QStringLiteral("ZZSP;")),
+                 QStringLiteral("?;"));
+        QCOMPARE(srv.antwortAuf(QStringLiteral("ZZFT00014100000;")),
+                 QStringLiteral("?;"));
+        QCOMPARE(srv.antwortAuf(QStringLiteral("ZZFT;")),
+                 QStringLiteral("ZZFT00014225000;"));
+
+        // Was es kann, geht weiter.
+        QCOMPARE(srv.antwortAuf(QStringLiteral("FA;")),
+                 QStringLiteral("FA00014225000;"));
+        QCOMPARE(srv.antwortAuf(QStringLiteral("ZZFA;")),
+                 QStringLiteral("ZZFA00014225000;"));
     }
 };
 

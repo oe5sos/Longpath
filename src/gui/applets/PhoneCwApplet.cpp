@@ -148,6 +148,7 @@
 #include "core/AudioEngine.h"
 #include "core/MoxController.h"
 #include "core/TxChannel.h"
+#include "core/MicProfileManager.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
 #include "models/MemoryList.h"
@@ -335,8 +336,11 @@ void PhoneCwApplet::buildPhonePage(QWidget* page)
     // ── Control 3: Mic profile combo ─────────────────────────────────────────
     m_micProfileCombo = new QComboBox(page);
     m_micProfileCombo->setFixedHeight(22);
-    m_micProfileCombo->addItems({QStringLiteral("Default"), QStringLiteral("DX"),
-                                 QStringLiteral("Contest"), QStringLiteral("Custom")});
+    // KEINE Namen hier: der MicProfileManager fuellt die Liste (22
+    // Werksprofile plus die eigenen des Betreibers), siehe
+    // fuelleProfilCombo(). Hier standen "Default"/"DX"/... -- erfundene
+    // Namen, die mit den echten Profilen nichts zu tun hatten; wer eines
+    // waehlte, waehlte nichts.
     m_micProfileCombo->setAccessibleName(QStringLiteral("Microphone profile"));
     applyComboStyle(m_micProfileCombo);
     vbox->addWidget(m_micProfileCombo);
@@ -348,11 +352,27 @@ void PhoneCwApplet::buildPhonePage(QWidget* page)
 
         // Control 4: Mic source combo (fixedWidth 55, fixedHeight 22)
         m_micSourceCombo = new QComboBox(page);
-        m_micSourceCombo->setFixedWidth(55);
+        // Breiter als 55 px: "Radio" passt sonst nicht.
+        m_micSourceCombo->setFixedWidth(68);
         m_micSourceCombo->setFixedHeight(22);
-        m_micSourceCombo->addItems({QStringLiteral("MIC"), QStringLiteral("BAL"),
-                                    QStringLiteral("LINE"), QStringLiteral("ACC"),
-                                    QStringLiteral("PC")});
+        // Longpaths drei Quellen, nicht Thetis' fuenf Hardware-Eingaenge.
+        //
+        // Hier standen MIC / BAL / LINE / ACC / PC -- die Eingangswahl am
+        // ANAN, die Thetis als `Mic_Source` in Hardware-Register schreibt.
+        // Longpath hat diesen Begriff nicht: `MicSource`
+        // (CompositeTxMicRouter.h:66) kennt Pc, Radio und Vax -- also
+        // WOHER das Sendeaudio kommt, nicht welche Buchse am Geraet.
+        //
+        // Fuenf Eintraege, von denen vier nichts bezeichnen, sind
+        // schlechter als drei, die es tun. Wer die Buchsenwahl braucht,
+        // braucht dafuer Hardware-Register (eigener Gang); dieser
+        // Auswaehler waere dann der falsche Ort.
+        m_micSourceCombo->addItem(QStringLiteral("PC"),
+                                  static_cast<int>(MicSource::Pc));
+        m_micSourceCombo->addItem(QStringLiteral("Radio"),
+                                  static_cast<int>(MicSource::Radio));
+        m_micSourceCombo->addItem(QStringLiteral("VAX"),
+                                  static_cast<int>(MicSource::Vax));
         m_micSourceCombo->setAccessibleName(QStringLiteral("Microphone source"));
         applyComboStyle(m_micSourceCombo);
         row->addWidget(m_micSourceCombo);
@@ -475,11 +495,14 @@ void PhoneCwApplet::buildPhonePage(QWidget* page)
         m_monSlider->setAccessibleName(QStringLiteral("Monitor level"));
         row->addWidget(m_monSlider, 1);
 
-        auto* monLabel = new QLabel(QStringLiteral("50"), page);
-        monLabel->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }").arg(Longpath::Style::kTextPrimary));
-        monLabel->setMinimumWidth(22);
-        monLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
-        row->addWidget(monLabel);
+        // Das MITGLIED, nicht eine lokale Variable: m_monLabel ist seit
+        // dem Aufbau dieses Felds deklariert und blieb null, weil hier
+        // ein `auto*` stand. Die Verdrahtung braucht es.
+        m_monLabel = new QLabel(QStringLiteral("50"), page);
+        m_monLabel->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }").arg(Longpath::Style::kTextPrimary));
+        m_monLabel->setMinimumWidth(22);
+        m_monLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+        row->addWidget(m_monLabel);
 
         vbox->addLayout(row);
     }
@@ -562,7 +585,13 @@ void PhoneCwApplet::buildPhonePage(QWidget* page)
         row->addWidget(lbl);
 
         m_amCarSlider = new QSlider(Qt::Horizontal, page);
-        m_amCarSlider->setRange(0, 100);
+        // 0..125, nicht 0..100: das ist Thetis' Bereich
+        // (setup.designer.cs udTXAMCarrierLevel Minimum 0, Maximum 125,
+        // Value 100). Mit 0..100 waere die Vorgabe am oberen Anschlag und
+        // das obere Viertel des DSP-Bereichs nie erreichbar.
+        m_amCarSlider->setRange(TransmitModel::kAmCarrierPercentMin,
+                                TransmitModel::kAmCarrierPercentMax);
+        m_amCarSlider->setValue(TransmitModel::kAmCarrierPercentDefault);
         m_amCarSlider->setValue(25);
         m_amCarSlider->setStyleSheet(Longpath::Style::sliderHStyle());
         m_amCarSlider->setAccessibleName(QStringLiteral("AM carrier level"));
@@ -586,13 +615,8 @@ void PhoneCwApplet::buildPhonePage(QWidget* page)
     // #11 m_dexpBtn / m_dexpSlider — wired (Phase 3M-3a-iii Task 15;
     //     m_dexpSlider is decorative-only per Thetis quirk, see wireControls())
     NyiOverlay::markNyi(m_compGauge,        kNyiProc);    // #2 — Phase 3I-3
-    NyiOverlay::markNyi(m_micProfileCombo,  kNyiPhone);   // #3
-    NyiOverlay::markNyi(m_micSourceCombo,   kNyiPhone);   // #4
     NyiOverlay::markNyi(m_accBtn,           kNyiPhone);   // #6
     // #8 m_vaxBtn: wired (Phase 3M-VAX-toggle)
-    NyiOverlay::markNyi(m_monBtn,           kNyiPhone);   // #9
-    NyiOverlay::markNyi(m_monSlider,        kNyiPhone);   // #9 slider
-    NyiOverlay::markNyi(m_amCarSlider,      kNyiProc);    // #13 — Phase 3I-3
 }
 
 // ── CW page — placeholder until Phase 3M-2 ───────────────────────────────────
@@ -854,6 +878,104 @@ void PhoneCwApplet::buildFmPage(QWidget* page)
     NyiOverlay::markNyi(m_fmProfileCombo,  kNyiFm);
 }
 
+// ── Vier Attrappen verdrahtet (2026-10-12) ──────────────────────────────────
+//
+// Mithoeren (Knopf + Regler), Mikrofonquelle, Mikrofonprofil und
+// AM-Traegerpegel trugen NyiOverlay. Der Unterbau war fuer drei davon
+// schon da -- man konnte ihn nur nicht erreichen:
+//
+//   Mithoeren  -> TransmitModel::setMonEnabled/setMonitorVolume ->
+//                 AudioEngine (RadioModel.cpp:7096-7118), fertig seit E.3
+//   Quelle     -> TransmitModel::setMicSource; der VAX-Knopf daneben
+//                 bedient sie schon, und sein Kommentar sagt wortwoertlich
+//                 "future combo wiring"
+//   Profil     -> MicProfileManager, 22 Werksprofile
+//   AM-Traeger -> gab es NICHT; neu gebaut (TxChannel::setAmCarrierLevel,
+//                 TransmitModel::amCarrierPercent mit der Wurzelkennlinie
+//                 aus Thetis setup.cs:9709)
+//
+// Nicht verdrahtet und mit Marke BEHALTEN, mit Grund:
+//   ACC-Knopf    -> gehoert zur Buchsenwahl am Geraet (Thetis Mic_Source,
+//                   Hardware-Register). Longpath hat diesen Begriff nicht.
+//   Komp-Anzeige -> der Messwert ist zurueckgestellt (TxChannel.h:1287,
+//                   getCompMeter gibt 0.0f). Eine Anzeige, die 0 zeigt,
+//                   waere eine Luege, kein Fortschritt.
+
+void PhoneCwApplet::setMicProfileManager(MicProfileManager* mgr)
+{
+    m_micProfileMgr = mgr;
+    if (!m_micProfileCombo) { return; }
+    // Ohne Verwalter bleibt die Combo GESPERRT, statt leer zu stehen und
+    // sich bedienen zu lassen.
+    m_micProfileCombo->setEnabled(mgr != nullptr);
+    if (!mgr) {
+        m_micProfileCombo->setToolTip(
+            tr("No profile manager available"));
+        return;
+    }
+    connect(mgr, &MicProfileManager::profileListChanged,
+            this, [this]() { fuelleProfilCombo(); });
+    connect(mgr, &MicProfileManager::activeProfileChanged,
+            this, [this](const QString&) { fuelleProfilCombo(); });
+    connect(m_micProfileCombo, &QComboBox::currentTextChanged,
+            this, [this](const QString& name) {
+        if (m_updatingFromModel || !m_micProfileMgr || !m_model) { return; }
+        if (name.isEmpty()) { return; }
+        m_micProfileMgr->setActiveProfile(name, &m_model->transmitModel());
+    });
+    fuelleProfilCombo();
+}
+
+void PhoneCwApplet::fuelleProfilCombo()
+{
+    if (!m_micProfileCombo || !m_micProfileMgr) { return; }
+    const QStringList namen = m_micProfileMgr->profileNames();
+    const QString aktiv = m_micProfileMgr->activeProfileName();
+    m_updatingFromModel = true;
+    {
+        QSignalBlocker b(m_micProfileCombo);
+        m_micProfileCombo->clear();
+        m_micProfileCombo->addItems(namen);
+        const int i = namen.indexOf(aktiv);
+        if (i >= 0) { m_micProfileCombo->setCurrentIndex(i); }
+    }
+    m_updatingFromModel = false;
+}
+
+void PhoneCwApplet::zeigeMicQuelle()
+{
+    if (!m_micSourceCombo || !m_model) { return; }
+    const TransmitModel& tx = m_model->transmitModel();
+    m_updatingFromModel = true;
+    {
+        QSignalBlocker b(m_micSourceCombo);
+        const int i = m_micSourceCombo->findData(static_cast<int>(tx.micSource()));
+        if (i >= 0) { m_micSourceCombo->setCurrentIndex(i); }
+    }
+    // Die Mikrofonbuchse des Geraets ist bei Baugruppen ohne sie gesperrt
+    // (RadioModel ruft setMicSourceLocked(!caps.hasMicJack) beim
+    // Verbinden). Den Eintrag dann AUSGRAUEN, nicht stillschweigend
+    // ignorieren: sonst waehlt der Betreiber "Radio", es geschieht nichts,
+    // und die Combo springt von selbst zurueck -- das sieht nach einem
+    // kaputten Programm aus, nicht nach einer fehlenden Buchse.
+    const int iRadio =
+        m_micSourceCombo->findData(static_cast<int>(MicSource::Radio));
+    if (iRadio >= 0) {
+        const bool gesperrt = tx.isMicSourceLocked();
+        auto* mdl = m_micSourceCombo->model();
+        mdl->setData(mdl->index(iRadio, 0),
+                     gesperrt ? QVariant(Qt::NoItemFlags)
+                              : QVariant(Qt::ItemIsSelectable | Qt::ItemIsEnabled),
+                     Qt::UserRole - 1);
+        m_micSourceCombo->setToolTip(
+            gesperrt
+                ? tr("This radio has no microphone jack "
+                      "-- \"Radio\" is disabled")
+                : tr("Where the transmit audio comes from"));
+    }
+    m_updatingFromModel = false;
+}
+
 // ── wireControls — Phase 3M-1b mic gain slider + mic level gauge ─────────────
 //
 // Wires the two now-active Phone page controls:
@@ -1067,6 +1189,102 @@ void PhoneCwApplet::wireControls()
             }
             m_updatingFromModel = false;
         });
+    }
+
+    // ── Mithoeren: Knopf + Regler (2026-10-12) ──────────────────────────────
+    //
+    // Die ganze Kette stand seit E.3: TransmitModel::monEnabled/
+    // monitorVolume -> AudioEngine::setTxMonitorEnabled/Volume
+    // (RadioModel.cpp:7096-7118), mit eigenen Prueffaellen. Es fehlte nur
+    // der Knopf -- und der daneben im TX-Feld bedient dieselben zwei
+    // Eigenschaften, beide bleiben also von selbst gleich.
+    if (m_monBtn && m_monSlider && m_monLabel) {
+        m_monBtn->setToolTip(QStringLiteral(
+            "Mithoeren: das eigene Sendesignal ueber die Lautsprecher"));
+        {
+            QSignalBlocker bb(m_monBtn);
+            QSignalBlocker bs(m_monSlider);
+            m_monBtn->setChecked(tx.monEnabled());
+            // Das Modell haelt 0..1, der Regler 0..100.
+            m_monSlider->setValue(qRound(tx.monitorVolume() * 100.0f));
+            m_monLabel->setText(QString::number(
+                qRound(tx.monitorVolume() * 100.0f)));
+        }
+        connect(m_monBtn, &QPushButton::toggled, this, [this, &tx](bool on) {
+            if (m_updatingFromModel) { return; }
+            tx.setMonEnabled(on);
+        });
+        connect(m_monSlider, &QSlider::valueChanged, this, [this, &tx](int v) {
+            if (m_updatingFromModel) { return; }
+            m_monLabel->setText(QString::number(v));
+            tx.setMonitorVolume(static_cast<float>(v) / 100.0f);
+        });
+        // Modell -> Oberflaeche: das TX-Feld, ein Mikrofonprofil oder TCI
+        // koennen dasselbe stellen.
+        connect(&tx, &TransmitModel::monEnabledChanged, this, [this](bool on) {
+            m_updatingFromModel = true;
+            { QSignalBlocker b(m_monBtn); m_monBtn->setChecked(on); }
+            m_updatingFromModel = false;
+        });
+        connect(&tx, &TransmitModel::monitorVolumeChanged,
+                this, [this](float vol) {
+            m_updatingFromModel = true;
+            const int v = qRound(vol * 100.0f);
+            { QSignalBlocker b(m_monSlider); m_monSlider->setValue(v); }
+            m_monLabel->setText(QString::number(v));
+            m_updatingFromModel = false;
+        });
+    }
+
+    // ── AM-Traegerpegel (2026-10-12) ────────────────────────────────────────
+    //
+    // Den gab es in Longpath nicht; WDSPs ammod lief auf seiner
+    // Anlegevorgabe. Der Regler haelt PROZENT (0..125, Thetis-Bereich),
+    // die Wurzelkennlinie steckt in TransmitModel::amCarrierDspFromPercent.
+    if (m_amCarSlider && m_amCarLabel) {
+        m_amCarSlider->setToolTip(QStringLiteral(
+            "AM-Traegerpegel in Prozent (Vorgabe 100)"));
+        {
+            QSignalBlocker b(m_amCarSlider);
+            m_amCarSlider->setValue(tx.amCarrierPercent());
+            m_amCarLabel->setText(QString::number(tx.amCarrierPercent()));
+        }
+        connect(m_amCarSlider, &QSlider::valueChanged, this, [this, &tx](int v) {
+            if (m_updatingFromModel) { return; }
+            m_amCarLabel->setText(QString::number(v));
+            tx.setAmCarrierPercent(v);
+        });
+        connect(&tx, &TransmitModel::amCarrierPercentChanged,
+                this, [this](int v) {
+            m_updatingFromModel = true;
+            { QSignalBlocker b(m_amCarSlider); m_amCarSlider->setValue(v); }
+            m_amCarLabel->setText(QString::number(v));
+            m_updatingFromModel = false;
+        });
+    }
+
+    // ── Mikrofonquelle: die Combo (2026-10-12) ──────────────────────────────
+    //
+    // Der VAX-Knopf daneben schaltet schon zwischen VAX und der vorherigen
+    // Quelle; sein eigener Kommentar nennt diese Combo "future combo
+    // wiring". Jetzt ist sie da -- und sie kann, was der Knopf nicht kann:
+    // ausdruecklich auf die Mikrofonbuchse des Geraets umstellen.
+    if (m_micSourceCombo) {
+        connect(m_micSourceCombo, &QComboBox::currentIndexChanged,
+                this, [this, &tx](int i) {
+            if (m_updatingFromModel || i < 0) { return; }
+            const QVariant d = m_micSourceCombo->itemData(i);
+            if (!d.isValid()) { return; }
+            tx.setMicSource(static_cast<MicSource>(d.toInt()));
+        });
+        connect(&tx, &TransmitModel::micSourceChanged,
+                this, [this](MicSource) { zeigeMicQuelle(); });
+        // Die Sperre kommt beim Verbinden (caps.hasMicJack), also auch
+        // darauf horchen -- sonst bleibt "Radio" waehlbar an einem Geraet
+        // ohne Buchse.
+        connect(&tx, &TransmitModel::micSourceLockedChanged,
+                this, [this](bool) { zeigeMicQuelle(); });
+        zeigeMicQuelle();
     }
 
     // ── #8 VAX button bidirectional with TransmitModel::toggleVaxSource ────

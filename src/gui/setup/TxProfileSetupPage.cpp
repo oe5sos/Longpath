@@ -16,8 +16,13 @@
 #include "TxProfileSetupPage.h"
 
 #include "core/MicProfileManager.h"
+#include "core/ThetisProfilImport.h"
 #include "models/RadioModel.h"
 #include "gui/StyleConstants.h"
+
+#include <QFile>
+#include <QFileDialog>
+#include <QMessageBox>
 #include "models/TransmitModel.h"
 
 #include <QComboBox>
@@ -97,8 +102,23 @@ void TxProfileSetupPage::buildUi()
     m_deleteBtn = new QPushButton(QStringLiteral("Delete"), group);
     m_deleteBtn->setToolTip(QStringLiteral(
         "Delete the currently-selected profile."));
+    // Thetis-Profile einlesen (2026-10-13). Zeus-Punkt aus 2.0.50:
+    // "Use the Import button on the TX Audio Profile bar to load either
+    // a Thetis XML profile export or a full Thetis database backup."
+    //
+    // Hier und nicht im TxApplet: an dieser Stelle liegen Auswahl,
+    // Speichern und Loeschen schon beieinander, und ein Einlesen ist
+    // dasselbe Geschaeft. Im Applet waere es eine vierte Taste neben
+    // einem Auswahlfeld in einem Streifen, der ohnehin eng ist.
+    m_importBtn = new QPushButton(tr("Import Thetis profiles…"),
+                                  group);
+    m_importBtn->setToolTip(QStringLiteral(
+        "Eine Thetis-Profilausfuhr oder eine ganze Thetis-Datenbank "
+        "einlesen. Es wird nichts angewandt und nichts ueberschrieben."));
+
     btnRow->addWidget(m_saveBtn);
     btnRow->addWidget(m_deleteBtn);
+    btnRow->addWidget(m_importBtn);
     btnRow->addStretch(1);
     form->addRow(QString(), btnRow);
 
@@ -112,6 +132,8 @@ void TxProfileSetupPage::buildUi()
             this, &TxProfileSetupPage::onSaveClicked);
     connect(m_deleteBtn, &QPushButton::clicked,
             this, &TxProfileSetupPage::onDeleteClicked);
+    connect(m_importBtn, &QPushButton::clicked,
+            this, &TxProfileSetupPage::onImportClicked);
 
     // ── Plan 4 Cluster C (Task 5 / D6): TX Filter group ──────────────────────
     // Low/High cutoff spinboxes for the TX bandpass filter.  Bidirectional with
@@ -472,6 +494,124 @@ void TxProfileSetupPage::setRejectionMessageHook(RejectionMessageHook hook)
 void TxProfileSetupPage::setUnsavedPromptHook(UnsavedPromptHook hook)
 {
     m_unsavedPromptHook = std::move(hook);
+}
+
+
+// ── Thetis-Profile einlesen (2026-10-13) ───────────────────────────────
+//
+// Dritter Gang. Der LESER steht in src/core/ThetisProfilImport.{h,cpp}
+// (kennt AppSettings nicht), das ANLEGEN in
+// MicProfileManager::einleseThetisProfile. Hier ist nur der Weg vom
+// Dateidialog zum Bericht.
+//
+// Geteilt in zwei Methoden, und das ist Absicht: `onImportClicked()`
+// holt die Datei, `einleseThetisDateiFuerTest()` tut die Arbeit. Ein
+// Prueffall kann die zweite fahren, ohne einen Dateidialog aufzumachen
+// -- ein modaler Dialog in einem Prueflauf haengt, bis die Zeit ablaeuft
+// (auf diesem Baum schon erlebt).
+void TxProfileSetupPage::onImportClicked()
+{
+    const QString pfad = QFileDialog::getOpenFileName(
+        this,
+        tr("Import Thetis profiles"),
+        QString(),
+        // Keine Endungsfilterung auf etwas Enges: Zeus erkennt die Datei
+        // selbst, "even if it has been renamed", und bei uns macht das
+        // der Leser am INHALT. Ein Filter, der nur *.xml zeigt, versteckt
+        // genau die umbenannte Datei, um die es dabei geht.
+        tr("Thetis files (*.xml *.XML);;All files (*)"));
+    if (pfad.isEmpty()) { return; }
+
+    QFile f(pfad);
+    if (!f.open(QIODevice::ReadOnly)) {
+        QMessageBox::warning(
+            this, tr("Import failed"),
+            tr("The file could not be opened:\n%1\n\n%2")
+                .arg(pfad, f.errorString()));
+        return;
+    }
+    const QByteArray inhalt = f.readAll();
+    f.close();
+
+    const QString bericht = einleseThetisDateiFuerTest(inhalt);
+    // Ein Bericht und kein stilles "fertig": was eingelesen wurde, was
+    // umbenannt werden musste und was liegengeblieben ist, entscheidet
+    // der Betreiber -- aber nur, wenn er es sieht.
+    QMessageBox k(this);
+    k.setWindowTitle(tr("Import Thetis profiles"));
+    k.setIcon(QMessageBox::Information);
+    k.setText(bericht.section(QLatin1Char('\n'), 0, 0));
+    k.setDetailedText(bericht);
+    k.exec();
+}
+
+QString TxProfileSetupPage::einleseThetisDateiFuerTest(const QByteArray& inhalt)
+{
+    const ThetisProfilImport::Ergebnis gelesen =
+        ThetisProfilImport::lies(inhalt);
+
+    QStringList z;
+    if (!gelesen.fehler.isEmpty()) {
+        z << tr("Nothing imported.");
+        for (const QString& f : gelesen.fehler) { z << QStringLiteral("  ") + f; }
+        return z.join(QLatin1Char('\n'));
+    }
+
+    switch (gelesen.art) {
+    case ThetisProfilImport::Art::Profilausfuhr:
+        z << tr("Recognised: a Thetis profile export.");
+        break;
+    case ThetisProfilImport::Art::Datenbanksicherung:
+        z << tr("Recognised: a whole Thetis database.");
+        break;
+    case ThetisProfilImport::Art::Unbekannt:
+        z << tr("Nothing imported.");
+        return z.join(QLatin1Char('\n'));
+    }
+
+    if (!m_profileMgr) {
+        z << tr("There is no profile manager here "
+               "-- nothing created.");
+        return z.join(QLatin1Char('\n'));
+    }
+
+    const MicProfileManager::ThetisEinleseErgebnis erg =
+        m_profileMgr->einleseThetisProfile(gelesen.profile);
+
+    z[0] = tr("%1 profile(s) created, nothing applied and "
+             "nothing overwritten.").arg(erg.anzahl());
+    z << QString();
+    switch (gelesen.art) {
+    case ThetisProfilImport::Art::Profilausfuhr:
+        z << tr("File: a Thetis profile export."); break;
+    case ThetisProfilImport::Art::Datenbanksicherung:
+        z << tr("File: a whole Thetis database."); break;
+    default: break;
+    }
+
+    for (auto it = erg.angelegt.constBegin(); it != erg.angelegt.constEnd(); ++it) {
+        if (it.key() == it.value()) {
+            z << tr("  created: %1").arg(it.value());
+        } else {
+            z << tr("  created: %1  (in the file: %2)")
+                     .arg(it.value(), it.key());
+        }
+        for (const QString& h : erg.hinweise.value(it.value())) {
+            z << QStringLiteral("      ") + h;
+        }
+    }
+    for (auto it = erg.ausgelassen.constBegin();
+         it != erg.ausgelassen.constEnd(); ++it) {
+        z << tr("  NOT created: %1 -- %2")
+                 .arg(it.key(), it.value());
+    }
+    if (!gelesen.hinweise.isEmpty()) {
+        z << QString() << tr("About the file:");
+        for (const QString& h : gelesen.hinweise) {
+            z << QStringLiteral("  ") + h;
+        }
+    }
+    return z.join(QLatin1Char('\n'));
 }
 
 } // namespace Longpath

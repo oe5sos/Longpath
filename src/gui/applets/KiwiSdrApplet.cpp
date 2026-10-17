@@ -8,6 +8,7 @@
 //                Begruendung stehen in der Kopfdatei.
 
 #include "gui/applets/KiwiSdrApplet.h"
+#include "gui/Zahlentext.h"
 
 #include "core/KiwiSdrManager.h"
 #include "gui/StyleConstants.h"
@@ -386,7 +387,7 @@ QString KiwiSdrApplet::sliceText(SliceModel* slice) const
     // DSPMode am Modell, und SliceModel::modeName macht daraus den
     // Namen, der auch sonst ueberall in der Oberflaeche steht.
     return QStringLiteral("%1 MHz  %2  %3")
-        .arg(slice->frequency() / 1.0e6, 0, 'f', 6)
+        .arg(anzeigeZahl(slice->frequency() / 1.0e6, 6))
         .arg(SliceModel::modeName(slice->dspMode()))
         .arg(filter);
 }

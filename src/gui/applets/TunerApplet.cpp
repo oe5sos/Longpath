@@ -30,6 +30,7 @@
 // =================================================================
 
 #include "TunerApplet.h"
+#include "gui/Zahlentext.h"
 #include "gui/StyleConstants.h"
 #include "gui/styles/ThemeQss.h"
 #include "core/AppSettings.h"
@@ -69,7 +70,7 @@ TunerApplet::TunerApplet(RadioModel* model, TunerModel* tunerModel, QWidget* par
     connect(m_postTuneTimer, &QTimer::timeout, this, [this]() {
         m_postTuneCapture = false;
         float result = (m_tuneSwr < 900.0f) ? m_tuneSwr : m_swr;
-        m_tuneBtn->setText(QString("SWR %1").arg(result, 0, 'f', 2));
+        m_tuneBtn->setText(QStringLiteral("SWR %1").arg(anzeigeZahl(result, 2)));
         QTimer::singleShot(2500, this, [this]() {
             m_tuneBtn->setText(QStringLiteral("TUNE"));
         });
@@ -625,7 +626,7 @@ void TunerApplet::updateMeters(float fwdPower, float swr)
     // From AetherSDR src/gui/TunerApplet.cpp:updateMeters post-tune capture [@0cd4559]
     if (m_postTuneCapture && swr > 1.01f) {
         m_tuneSwr = swr;
-        m_tuneBtn->setText(QString("SWR %1").arg(swr, 0, 'f', 2));
+        m_tuneBtn->setText(QStringLiteral("SWR %1").arg(anzeigeZahl(swr, 2)));
     }
 }
 

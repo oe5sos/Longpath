@@ -8262,6 +8262,23 @@ void RadioModel::connectToRadio(const RadioInfo& info)
                 m_txChannel->setTxCpdrGainDb(static_cast<double>(dB));
             });
 
+            // AM-Traegerpegel (2026-10-12). Der Regler haelt Prozent,
+            // WDSP will den DSP-Wert -- die Wurzelkennlinie steht in
+            // TransmitModel::amCarrierDspFromPercent und NUR dort, damit
+            // sie nicht an zwei Stellen auseinanderlaeuft.
+            connect(&m_transmitModel, &TransmitModel::amCarrierPercentChanged,
+                    m_txChannel, [this](int percent) {
+                m_txChannel->setAmCarrierLevel(
+                    TransmitModel::amCarrierDspFromPercent(percent));
+            });
+            // Den gespeicherten Wert beim Anlegen des Sendekanals
+            // hinausschieben -- ohne das laeuft ammod auf seiner
+            // Anlegevorgabe, waehrend das Feld den Wert des Betreibers
+            // zeigt. Dieselbe Form wie beim Empfangs-Equalizer.
+            m_txChannel->setAmCarrierLevel(
+                TransmitModel::amCarrierDspFromPercent(
+                    m_transmitModel.amCarrierPercent()));
+
             // 27. cessbOnChanged → setTxCessbOn.
             connect(&m_transmitModel, &TransmitModel::cessbOnChanged,
                     m_txChannel, [this](bool on) {
@@ -14849,6 +14866,20 @@ bool RadioModel::tune() const
 // powerOn -- From Thetis PowerOn at console.cs:19799-19803 [v2.10.3.15].
 // Architectural divergence: Longpath has no separate Power button, so
 // connection IS power.  TCI clients see powerOn = isConnected().
+double RadioModel::rxSignalDbm(int rx) const
+{
+    // Uebernommen aus der zweiten CAT-Fassung (Zweig
+    // fix/discovery-quietpolls-thetis-parity) -- dort fuer SM und
+    // rigctlds STRENGTH gebaut. Der Pegel ist der gemittelte, nicht der
+    // Spitzenwert: ein S-Meter-Rapport soll nicht bei jeder Silbe
+    // springen.
+    RxChannel* const ch = rxChannelForSlice(rx);
+    if (!ch) {
+        return -200.0;   // kein Kanal -- jeder Aufrufer klammert das weg
+    }
+    return ch->getMeter(RxMeterType::SignalAvg) + rxMeterOffsetDb();
+}
+
 bool RadioModel::powerOn() const
 {
     return isConnected();

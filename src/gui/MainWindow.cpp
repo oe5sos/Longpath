@@ -548,6 +548,39 @@ QVector<DetectedCable> detectedForFirstRun()
 }
 } // namespace
 
+namespace {
+
+// Die Rauschsperre, die zur eingestellten Betriebsart gehoert.
+//
+// From Thetis CAT/CATCommands.cs ZZSO [v2.10.3.15] -- dort ist
+// `console.CATSquelch` EIN Wert; Thetis fuehrt die Sperre intern
+// ebenfalls je Betriebsart (radio.cs:1164/1274) und waehlt beim Setzen
+// nach RX1DSPMode. Longpath hat die drei Schalter getrennt an der
+// Scheibe (SliceModel.h:264-268), also wird hier dasselbe gewaehlt.
+bool catSperreAn(const Longpath::SliceModel* sl)
+{
+    using Longpath::DSPMode;
+    switch (sl->dspMode()) {
+    case DSPMode::FM:  return sl->fmsqEnabled();
+    case DSPMode::AM:
+    case DSPMode::SAM: return sl->amsqEnabled();
+    default:           return sl->ssqlEnabled();
+    }
+}
+
+void catSetzeSperre(Longpath::SliceModel* sl, bool an)
+{
+    using Longpath::DSPMode;
+    switch (sl->dspMode()) {
+    case DSPMode::FM:  sl->setFmsqEnabled(an); break;
+    case DSPMode::AM:
+    case DSPMode::SAM: sl->setAmsqEnabled(an); break;
+    default:           sl->setSsqlEnabled(an); break;
+    }
+}
+
+} // namespace
+
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
     , m_radioModel(new RadioModel(this))
@@ -644,13 +677,45 @@ MainWindow::MainWindow(QWidget* parent)
                 z.stepHz = sl->stepHz();
                 z.ritOn  = sl->ritEnabled();
                 z.xitOn  = sl->xitEnabled();
-                // Welcher Wert ins IT-Feld gehoert, entscheidet die
-                // Protokollschicht (RIT vor XIT, wie Thetis) -- hier wird
-                // nur der passende mitgegeben.
-                z.itHz   = sl->ritEnabled() ? sl->ritHz()
-                                            : (sl->xitEnabled() ? sl->xitHz() : 0);
+                // BEIDE Ablagen, getrennt. Bis zum 2026-10-13 stand hier
+                // nur die aktive -- die Vorauswahl gehoert aber in die
+                // Protokollschicht (die den Statussatz fuellt), und der
+                // ZZ-Satz braucht ohnehin beide: ZZXF stellt die
+                // XIT-Ablage, auch wenn RIT an ist.
+                z.ritHz  = sl->ritHz();
+                z.xitHz  = sl->xitHz();
+                // ── Die Felder fuer den ZZ-Satz (2026-10-13) ──────────
+                z.modeZZ = catZzZahl(sl->dspMode());
+                z.filterLowHz  = sl->filterLow();
+                z.filterHighHz = sl->filterHigh();
+                // Rauschsperre. Longpath hat DREI Schalter, einen je
+                // Betriebsartfamilie (ssql fuer SSB/CW/Digi, amsq fuer
+                // AM/SAM, fmsq fuer FM -- SliceModel.h:264-268), Thetis
+                // und CAT haben einen. Gemeldet und gesetzt wird darum
+                // der, der zur gerade eingestellten Betriebsart gehoert.
+                //
+                // NEBENBEI GEFUNDEN, hier NICHT behoben:
+                // `RadioModel::setSqlEnable()` (RadioModel.cpp, der
+                // Einstiegspunkt, den auch der TCI-Server nimmt) greift
+                // ausschliesslich auf `ssqlEnabled`. In FM schaltet er
+                // damit nichts -- die FM-Sperre haengt an `fmsqEnabled`.
+                // Das zu aendern beruehrt TCI mit und gehoert nicht in
+                // einen CAT-Commit.
+                z.squelch = catSperreAn(sl) ? 1 : 0;
             }
+            // Gerätebezeichnung und Fassung fuer ZZZM; / ZZZV;. Beides
+            // feste Angaben ueber UNS, nicht ueber die angeschlossene
+            // Hardware -- ein Programm, das hier ein ANAN-Modell liest,
+            // wuerde Thetis-eigene Befehle erwarten, die wir nicht haben.
+            z.modell  = QStringLiteral("LONGPATH");
+            z.fassung = QCoreApplication::applicationVersion().isEmpty()
+                            ? QStringLiteral("0.0.0")
+                            : QCoreApplication::applicationVersion();
             z.mox = m_radioModel ? m_radioModel->mox() : false;
+            // Fuer PS; und SM; (2026-10-13, aus der zweiten CAT-Fassung
+            // uebernommen).
+            z.eingeschaltet = m_radioModel ? m_radioModel->powerOn() : false;
+            z.signalDbm = m_radioModel ? m_radioModel->rxSignalDbm(0) : -200.0;
             // Split meldet Longpath als AUS, und das ist keine Luecke,
             // sondern der Stand: RadioModel::split() gibt bewusst immer
             // false (Phase-3F-Entwurf §3 -- statt Split gibt es XIT oder
@@ -675,12 +740,147 @@ MainWindow::MainWindow(QWidget* parent)
         haken.setzeMox = [this](bool on) {
             if (m_radioModel) { m_radioModel->setMox(on); }
         };
+        // ── RIT / XIT (2026-10-13) ───────────────────────────────────
+        //
+        // Longpath hat keinen Split, und der dokumentierte Ersatz ist
+        // XIT (Phase-3F-Entwurf §3). Ein Contestprogramm, das nach
+        // Split greift, findet hier also etwas, das wirkt -- das war
+        // die Begruendung der zweiten CAT-Fassung, und sie gilt.
+        haken.setzeRit = [this](bool an) {
+            if (SliceModel* sl = m_radioModel ? m_radioModel->activeSlice() : nullptr) {
+                sl->setRitEnabled(an);
+            }
+        };
+        haken.setzeXit = [this](bool an) {
+            if (SliceModel* sl = m_radioModel ? m_radioModel->activeSlice() : nullptr) {
+                sl->setXitEnabled(an);
+            }
+        };
+        // Die beiden Ablagen getrennt. Ein Haken "setze die aktive"
+        // gab es bis zum 2026-10-13; die Auswahl steht jetzt in der
+        // Protokollschicht, wo der Befehl sie trifft.
+        haken.setzeRitHz = [this](int hz) {
+            if (SliceModel* sl = m_radioModel ? m_radioModel->activeSlice() : nullptr) {
+                sl->setRitHz(hz);
+            }
+        };
+        haken.setzeXitHz = [this](int hz) {
+            if (SliceModel* sl = m_radioModel ? m_radioModel->activeSlice() : nullptr) {
+                sl->setXitHz(hz);
+            }
+        };
+
+        // ── Die Haken des ZZ-Satzes (2026-10-13) ─────────────────────
+        haken.setzeModeZZ = [this](int z) {
+            if (SliceModel* sl = m_radioModel ? m_radioModel->activeSlice() : nullptr) {
+                sl->setDspMode(catModusAusZzZahl(z));
+            }
+        };
+        haken.setzeFilterLow = [this](int hz) {
+            if (SliceModel* sl = m_radioModel ? m_radioModel->activeSlice() : nullptr) {
+                sl->setFilterLow(hz);
+            }
+        };
+        haken.setzeFilterHigh = [this](int hz) {
+            if (SliceModel* sl = m_radioModel ? m_radioModel->activeSlice() : nullptr) {
+                sl->setFilterHigh(hz);
+            }
+        };
+        haken.setzeSquelch = [this](int w) {
+            if (SliceModel* sl = m_radioModel ? m_radioModel->activeSlice() : nullptr) {
+                // Nur aus und an. Thetis' 2 (Stimmsperre) laesst die
+                // Protokollschicht durch; sie wird hier als "an"
+                // gesetzt, der Nachleser liest 1 zurueck und lehnt mit
+                // `?;` ab. Genau richtig: eine Stimmsperre gibt es
+                // nicht, und ein stilles "erledigt" liesse ein
+                // Fremdprogramm glauben, sie laufe.
+                catSetzeSperre(sl, w != 0);
+            }
+        };
         // setzeVfoB und setzeSplit bleiben ABSICHTLICH leer. Longpath hat
         // kein VFO B und keinen Split; die Protokollschicht lehnt einen
         // Befehl ohne Haken mit "?;" ab, statt ihn zu quittieren und
         // nichts zu tun. Ein quittiertes FB, das nichts bewegt, laesst ein
         // Fremdprogramm glauben, es haette den zweiten VFO gesetzt.
         m_catServer->setzeHaken(haken);
+    }
+
+    // ── Den Zugmelder einhaengen (2026-10-14) ────────────────────────
+    //
+    // Ein schwebendes Fenster meldet aus seinem moveEvent hierher, und
+    // das Hauptfenster zeigt dann seinen Schutzrahmen. Kein globaler
+    // Ereignisfilter -- siehe setzeZugmelder() in WindowPlacement.h.
+    //
+    // QPointer, weil der Melder statisch liegt und dieses Fenster
+    // ueberleben wuerde: nach einem `delete mw` (Prueffaelle bauen
+    // mehrere nacheinander) zeigte der Melder sonst auf einen toten
+    // Zeiger -- dieselbe Fehlerform, die in diesem Programm schon
+    // sechsmal steckte.
+    {
+        QPointer<MainWindow> wir(this);
+        setzeZugmelder([wir](QWidget* bewegtes) {
+            if (!wir || !bewegtes) { return; }
+            // Nur die eigenen Schwebefenster.
+            const QWidget* e = bewegtes->parentWidget();
+            if (!e || e->window() != wir) { return; }
+            // Und nur, wenn es den Rahmen WIRKLICH BERUEHRT.
+            //
+            // Ohne diese Bedingung stand der Hinweis schon beim Start da
+            // (der Prueffall hat es gefangen): waehrend des Aufbaus
+            // bewegen sich Fenster, ohne dass jemand zieht. Die
+            // Bedingung ist aber nicht nur eine Wache, sie ist der
+            // bessere Zeitpunkt -- der Rahmen soll auftauchen, wenn man
+            // IHM NAHE KOMMT, und nicht bei jeder Bewegung blinken.
+            const QRect wo = bewegtes->frameGeometry();
+            // ── Platzieren ist kein Ziehen (2026-10-17) ─────────────
+            //
+            // Die Beruehrungsbedingung darueber reicht nicht. Gemessen
+            // (offscreen, wie die CI): beim Aufbau meldet ein
+            // ToolWindow ZWEIMAL mit identischer Geometrie
+            // (248,296 536x504) -- das ist die Wiederherstellung seiner
+            // Profilposition, und die liegt im Sperrstreifen. Der
+            // Hinweis stand damit schon da, bevor jemand zog; in der
+            // CI faellt deswegen `beimZiehenWirdDerRahmenSICHTBAR`,
+            // lokal auf einem echten Schirm nicht (dort landet das
+            // Fenster anders).
+            //
+            // Unterschieden wird am Verlauf, nicht an der Maustaste:
+            // beim nativen Ziehen auf macOS sieht Qt den Knopf nicht
+            // zuverlaessig, und der Prueflauf meldet ohnehin direkt.
+            // Zwei Bedingungen zusammen:
+            //
+            //   1. die ERSTE Meldung eines Fensters zaehlt nicht -- beim
+            //      Erscheinen hat es keine Vorgeschichte;
+            //   2. danach nur, wenn sich die Lage WIRKLICH geaendert hat.
+            //
+            // Beim echten Ziehen kommen Dutzende Bewegungen, der
+            // Hinweis erscheint also sofort mit der zweiten.
+            //
+            // OB der Hinweis stattdessen an der gedrueckten Maustaste
+            // haengen soll, ist eine Entwurfsfrage -- die gehoert dem
+            // Betreiber, nicht diesem Merge.
+            static QHash<QWidget*, QRect> letzteLage;
+            const auto vorher = letzteLage.constFind(bewegtes);
+            const bool kannteEsSchon = vorher != letzteLage.constEnd();
+            const bool verschoben = kannteEsSchon && *vorher != wo;
+            letzteLage.insert(bewegtes, wo);
+            // Der Eintrag haelt nur ein QRect, nie einen Zugriff auf das
+            // Fenster -- ein toter Schluessel ist darum harmlos. Beim
+            // Schliessen raeumen wir ihn trotzdem weg, damit die Tabelle
+            // nicht mitwaechst.
+            connect(bewegtes, &QObject::destroyed, bewegtes,
+                    [bewegtes]() { letzteLage.remove(bewegtes); });
+            if (!verschoben) { return; }
+
+            bool beruehrt = false;
+            for (const QRect& sp : wir->schutzrahmen()) {
+                if (sp.intersects(wo)) { beruehrt = true; break; }
+            }
+            if (!beruehrt) { return; }
+
+
+            wir->zeigeSchutzrahmenKurz();
+        });
 
         // ── Die serielle Haelfte (2026-10-12) ────────────────────────
         //
@@ -1228,23 +1428,31 @@ MainWindow::MainWindow(QWidget* parent)
 
 MainWindow::~MainWindow()
 {
-    // Ab hier wird abgebaut — und zwar auch dann, wenn niemand
-    // closeEvent() gefahren hat (Ausnahmepfad, Pruefstand). Jede
-    // Rueckrufstelle, die waehrend des Abbaus noch feuert, fragt
-    // diese Fahne; der Rumpf hier laeuft VOR dem Abbau der Kinder,
-    // also ist das der letzte Ort, an dem sie noch rechtzeitig kommt.
-    // Siehe die Wache in showConnectionPanel() (2026-10-15).
+    // Zweites Sicherheitsnetz derselben Art, 2026-10-11: den
+    // Abbau-Waechter JETZT setzen, als erstes.
     //
-    // Derselbe Befund war am 2026-10-11 schon einmal belegt, mit
-    // Absturzbericht: ~MainWindow -> ~QWidget -> deleteChildren ->
-    // ~ConnectionPanel -> QObject::destroyed ->
-    // restoreFloatingWindowsHiddenBehindConnectMask(). Deren erste
-    // Zeile ist `if (m_shuttingDown) { return; }` — der Waechter war
-    // da, er stand nur auf false. Der Slot lief auf einem halb
-    // abgebauten Fenster und griff in Mitglieder, deren Kinder schon
-    // weg waren: SIGSEGV an Adresse 0x5 (EXC_BAD_ACCESS). Dieselbe
-    // Fehlerform wie bei PGXL/TGXL und wireSunSdr/
-    // TciClient::stateChanged.
+    // m_shuttingDown wird an vier Stellen gesetzt (Signalabbau,
+    // closeAllWindows, Beenden-Menue, closeEvent) -- an keiner, wenn ein
+    // MainWindow ohne closeEvent() zerstoert wird. Genau der Pfad, den
+    // die Notiz darunter fuer den FFT-Faden schon abfaengt.
+    //
+    // Was dann passiert, ist belegt: ~MainWindow -> ~QWidget ->
+    // deleteChildren -> ~ConnectionPanel -> QObject::destroyed ->
+    // restoreFloatingWindowsHiddenBehindConnectMask(). Deren erste Zeile
+    // ist `if (m_shuttingDown) { return; }` -- der Waechter ist da, er
+    // stand nur auf false. Der Slot lief also auf einem halb abgebauten
+    // Fenster und griff in Mitglieder, deren Kinder schon weg waren:
+    // SIGSEGV an Adresse 0x5, Absturzbericht vom 2026-10-11
+    // (EXC_BAD_ACCESS, Kette genau wie oben).
+    //
+    // Dieselbe Fehlerform wie bei PGXL/TGXL und bei
+    // wireSunSdr/TciClient::stateChanged -- Abbau greift in tote
+    // Mitglieder. Dies ist die fuenfte Stelle; die vier anderen haben
+    // ihren Waechter, hier fehlte nur das Setzen.
+    //
+    // Dieselbe Stelle hat main am 2026-10-15 unabhaengig erreicht;
+    // von dort der Verweis: siehe auch die Wache in
+    // showConnectionPanel().
     m_shuttingDown = true;
 
     // Sicherheitsnetz, 2026-09-03: regulaer haelt closeEvent() den
@@ -1852,6 +2060,13 @@ void MainWindow::detachApplet(AppletWidget* applet, int dockIndex,
                 const int x = qBound(avail.x(), rect.x(), avail.right() - rect.width());
                 const int y = qBound(avail.y(), rect.y(), avail.bottom() - rect.height());
                 clamped.moveTopLeft(QPoint(x, y));
+                // ── Schutzrahmen (2026-10-14) ────────────────────────
+                // Bis hierher wurde NUR gegen den Bildschirm geklemmt.
+                // Ein Profil, das im Vollbild gespeichert wurde, setzt
+                // seine Fenster damit genau dorthin, wo ohne Vollbild
+                // die Kommandoleiste liegt.
+                clamped = ausSperrstreifenSchieben(clamped, schutzrahmen(),
+                                                   avail);
             }
             win->setGeometry(clamped);
             trustedRectApplied = true;
@@ -4462,61 +4677,32 @@ void MainWindow::buildUI()
         });
     }
 
-    // Zoom slider bar below spectrum
-    auto* zoomBar = new QSlider(Qt::Horizontal, spectrumPane);
-    zoomBar->setRange(1, 768);
-    zoomBar->setValue(768);
-    zoomBar->setFixedHeight(20);
-    zoomBar->setToolTip(QStringLiteral("Zoom: drag to adjust spectrum bandwidth"));
-    zoomBar->setStyleSheet(Style::themed(QStringLiteral(
-        "QSlider { background: #0a0a14; }"
-        "QSlider::groove:horizontal { background: #1a2a3a; height: 6px; border-radius: 3px; }"
-        "QSlider::handle:horizontal { background: #4a7ba8; width: 14px; margin: -4px 0; border-radius: 7px; }")));
-    layout->addWidget(zoomBar);
-    connect(zoomBar, &QSlider::valueChanged, this, [this](int val) {
-        double bwHz = val * 1000.0;
-        activeSpectrumWidget()->setFrequencyRange(activeSpectrumWidget()->centerFrequency(), bwHz);
-        emit activeSpectrumWidget()->bandwidthChangeRequested(bwHz);
-    });
-    // Bench-gefunden 2026-09-03: zoomBar->setValue(768) oben ist nur der
-    // Startwert -- nichts hielt den Regler danach synchron, wenn sich die
-    // Bandbreite auf einem ANDEREN Weg aendert (Scroll-Zoom, Frequenzskalen-
-    // Ziehen am Panadapter, oder ein wiederhergestelltes Profil mit
-    // gespeicherter Zoom-Stufe, Phase 3G-12 persistiert genau das). Der
-    // Regler zeigte danach dauerhaft die Stellung vom Start, auch wenn der
-    // Panadapter laengst enger oder weiter gezoomt war — funktional
-    // folgenlos (Ziehen am Regler setzt weiterhin korrekt), aber
-    // irrefuehrend fuer den Bedienenden, der dem Regler nicht mehr
-    // ansehen kann, wo der Panadapter tatsaechlich steht.
-    // frequencyRangeChanged() feuert am Ende JEDER setFrequencyRange()
-    // unabhaengig von der Ursache (SpectrumWidget.cpp), ein einziger
-    // Anschluss deckt also alle Wege ab. QSignalBlocker verhindert die
-    // Rueckkopplung in den Connect-Handler oben (der seinerseits
-    // setFrequencyRange() aufriefe).
-    // Codereview 2026-09-03 (gefunden, nicht gemeldet): wirePane-artige
-    // Neuverdrahtung, siehe m_zoomBarSyncConn in MainWindow.h. Ein Lambda
-    // statt einer einzelnen connect()-Zeile, weil dieselbe Verdrahtung
-    // jetzt an zwei Stellen laufen muss: hier beim Bau und unten bei
-    // jedem PanadapterStack::activePanChanged.
-    auto wireZoomBarSync = [this, zoomBar](SpectrumWidget* sw) {
-        disconnect(m_zoomBarSyncConn);
-        if (!sw) { return; }
-        m_zoomBarSyncConn = connect(sw, &SpectrumWidget::frequencyRangeChanged,
-                this, [zoomBar](double /*centerHz*/, double bandwidthHz) {
-            const int kHz = qBound(zoomBar->minimum(),
-                                    qRound(bandwidthHz / 1000.0),
-                                    zoomBar->maximum());
-            if (kHz != zoomBar->value()) {
-                const QSignalBlocker blocker(zoomBar);
-                zoomBar->setValue(kHz);
-            }
-        });
-    };
-    wireZoomBarSync(activeSpectrumWidget());
-    connect(m_panStack, &PanadapterStack::activePanChanged, this,
-            [this, wireZoomBarSync](const QString& panId) {
-        if (m_panStack) { wireZoomBarSync(m_panStack->spectrum(panId)); }
-    });
+    // ── KEIN Zoom-Schieber mehr unter dem Spektrum (2026-10-14) ──────
+    //
+    // Der Betreiber, mit einem Bild: „in Longpath unter Click to Connect
+    // ganz unten ist nach wie vor dieser blaue Punkt und diese vertikale
+    // und horizontale Linie, die gehoert auf jeden Fall entfernt. Ich
+    // moechte im Hintergrund keine Linien haben, das muss ein schwarzer
+    // Bildschirm sein."
+    //
+    // Der blaue Punkt war der GRIFF dieses Schiebers (`#4a7ba8`, rund,
+    // 14 px), die waagerechte Linie seine RINNE (`#1a2a3a`, 6 px hoch
+    // ueber die ganze Breite). Nachgemessen in seinem Bild, nicht
+    // geraten: der Punkt liegt bei x 1105..1135, y 1133..1160, und seine
+    // Farbe ist (53,119,163) -- das ist kAccent durch die
+    // Bildkompression.
+    //
+    // ENTFERNT, nicht versteckt. Die Zoomstufe bleibt auf zwei Wegen
+    // erreichbar, beide gepruefte Bedienung:
+    //   * Cmd/Ctrl + Mausrad ueber dem Panadapter
+    //     (SpectrumWidget::wheelEvent, "zoom bandwidth in/out")
+    //   * das Ziehen an der Frequenzskala unter dem Spektrum
+    //     (SpectrumWidget.cpp:9235, "zoom bandwidth left/right")
+    // Der Schieber war die dritte Fassung derselben Sache und die
+    // einzige, die eine Linie quer durchs Bild zog.
+    //
+    // Mit ihm geht `m_zoomBarSyncConn`: das Feld hielt die Verbindung,
+    // die den Schieber nachfuehrte, und hatte sonst keinen Zweck.
 
     m_mainSplitter->addWidget(spectrumPane);
 
@@ -7039,6 +7225,21 @@ void MainWindow::populateDefaultMeter()
 
     // PhoneCwApplet — Phone + CW pages, NYI
     m_phoneCwApplet = new PhoneCwApplet(m_radioModel, nullptr);
+    // Den Profilverwalter JETZT anhaengen, nicht weiter oben (2026-10-12).
+    //
+    // Der erste Versuch stand bei txApplet->setMicProfileManager(), rund
+    // 90 Zeilen vor dieser Stelle -- mit einem `if (m_phoneCwApplet)`
+    // davor. Der Zeiger war dort noch null, das `if` hat den Aufruf still
+    // verschluckt, und die Profil-Combo blieb leer. Vom Prueffall
+    // gefangen (tst_phone_felder: "Microphone profile" count=0, waehrend
+    // der Verwalter 22 Profile kannte).
+    //
+    // Darum hier und OHNE Pruefung auf den Zeiger: er ist die Zeile
+    // darueber entstanden. Ein `if` wuerde denselben Ausfall wieder
+    // verstecken.
+    m_phoneCwApplet->setMicProfileManager(m_radioModel
+                                              ? m_radioModel->micProfileManager()
+                                              : nullptr);
     panel->addApplet(m_phoneCwApplet);
 
     // RadeApplet — Phase 3R L2.  Sits alongside PhoneCwApplet but is
@@ -7084,10 +7285,7 @@ void MainWindow::populateDefaultMeter()
         }
     });
 
-    // Ghost applets — hidden per docs/superpowers/plans/2026-05-01-ui-polish-right-panel.md §Task 6.
-    // These applets are entirely placeholder-only today (no wired controls).
-    // Showing them is misleading — users click e.g. "Equalizer" and nothing happens.
-    // Uncomment each when its feature phase ships (one-line re-enable).
+    // EqApplet — Equalizer, Empfang und Senden (eingehaengt 2026-10-11).
     //
     // Es stand hier als Geister-Applet mit der Bedingung "TODO 3I-3: TX/RX
     // EQ wiring". Die ist erfuellt: beide Haelften sind verdrahtet. Die
@@ -7619,6 +7817,8 @@ void MainWindow::populateDefaultMeter()
     m_appletsById[QStringLiteral("Eq")]         = m_eqApplet;
     m_appletsById[QStringLiteral("Cat")]        = m_catApplet;
     m_appletsById[QStringLiteral("Ft8Decoder")] = m_ft8Applet;
+    m_appletsById[QStringLiteral("Eq")]         = m_eqApplet;
+    m_appletsById[QStringLiteral("Cat")]        = m_catApplet;
     m_appletsById[QStringLiteral("Vax")]        = m_vaxApplet;
     m_appletsById[QStringLiteral("Dvk")]        = m_dvkApplet;
     m_appletsById[QStringLiteral("QsoRec")]     = m_qsoRecorderApplet;
@@ -7705,6 +7905,37 @@ void MainWindow::populateDefaultMeter()
     // FT8/FT4: dieselbe Form, gehaengt an die Datenmodi (2026-10-15).
     m_appletVis->registerApplet(QStringLiteral("Ft8Decoder"),
                                 QStringLiteral("FT8 Decoder"), true);
+    // Equalizer (eingehaengt 2026-10-11). **NICHT sichtbar ab Werk**
+    // (geaendert 2026-10-14).
+    //
+    // Hier stand `true` mit der Begruendung, ein neues Merkmal finde
+    // niemand, wenn es in einem Menue versteckt sei. Das war falsch
+    // gedacht, und der Betreiber hat es als Erstes gesehen: bei ihm
+    // stand der Equalizer nach dem Start allein im sonst leeren Bild,
+    // VOR dem Verbinden, obwohl er ihn nie eingeschaltet hatte.
+    //
+    // Warum gerade bei ihm: sein Layoutprofil traegt eine Liste der
+    // sichtbaren Felder, und fuer einen Schluessel, den es dort NICHT
+    // gibt, greift diese Vorgabe. Ein neues Applet mit `true` schaltet
+    // sich also in JEDES bestehende Profil selbst hinein -- es kann gar
+    // nicht anders, denn das Profil kennt es noch nicht.
+    //
+    // **Ein neues Feld schaltet sich nicht selbst in eine fertige
+    // Anordnung.** Genau so steht es bei CAT darunter, und so war es
+    // richtig. Gefunden wird der Equalizer ueber den Auswaehler, wie
+    // jedes andere auch.
+    //
+    // Der Eintrag in m_appletsById oben bleibt Pflicht: ohne ihn kennt
+    // der Auswaehler das Applet nicht. Siehe die Notiz bei "Die vier vom
+    // 2026-08-23".
+    m_appletVis->registerApplet(QStringLiteral("Eq"),
+                                QStringLiteral("Equalizer"),    false);
+    // CAT: NICHT sichtbar ab Werk. Wer kein Fremdprogramm anbindet,
+    // braucht das Feld nie, und zwei seiner vier Reihen sind noch
+    // Attrappen -- es soll gefunden werden, wenn man es sucht, und nicht
+    // im Weg stehen, wenn nicht.
+    m_appletVis->registerApplet(QStringLiteral("Cat"),
+                                QStringLiteral("CAT"),          false);
     m_appletVis->registerApplet(QStringLiteral("Vax"),
                                 QStringLiteral("VAX"),          true);
     // Sprachspeicher (2026-08-19). Sichtbar ab Werk: er ist auch ohne
@@ -8221,10 +8452,7 @@ void MainWindow::populateDefaultMeter()
                     if (!w) { continue; }
                     const QRect g = w->geometry();
                     QVariantMap one;
-                    one.insert(QStringLiteral("x"), g.x());
-                    one.insert(QStringLiteral("y"), g.y());
-                    one.insert(QStringLiteral("w"), g.width());
-                    one.insert(QStringLiteral("h"), g.height());
+                    merkeLage(one, g);
                     one.insert(QStringLiteral("screen"), screenKeyFor(w));
                     one.insert(QStringLiteral("dockIndex"), w->dockIndex());
                     floating.insert(it.key(), one);
@@ -8288,10 +8516,7 @@ void MainWindow::populateDefaultMeter()
                         if (!pf) { continue; }
                         const QRect g = pf->geometry();
                         QVariantMap one;
-                        one.insert(QStringLiteral("x"), g.x());
-                        one.insert(QStringLiteral("y"), g.y());
-                        one.insert(QStringLiteral("w"), g.width());
-                        one.insert(QStringLiteral("h"), g.height());
+                        merkeLage(one, g);
                         one.insert(QStringLiteral("screen"),
                                    screenKeyFor(pf));
                         fpans.insert(panId, one);
@@ -8320,10 +8545,7 @@ void MainWindow::populateDefaultMeter()
                         rotor.insert(QStringLiteral("form"),
                                      QStringLiteral("floating"));
                         const QRect g = m_rotorWindow->geometry();
-                        rotor.insert(QStringLiteral("x"), g.x());
-                        rotor.insert(QStringLiteral("y"), g.y());
-                        rotor.insert(QStringLiteral("w"), g.width());
-                        rotor.insert(QStringLiteral("h"), g.height());
+                        merkeLage(rotor, g);
                     } else if (AppSettings::instance()
                                    .value(QStringLiteral("RotorPanelBelow"),
                                           QStringLiteral("False"))
@@ -8540,10 +8762,9 @@ void MainWindow::populateDefaultMeter()
                 for (auto it = floating.constBegin();
                      it != floating.constEnd(); ++it) {
                     const QVariantMap one = it.value().toMap();
-                    const QRect rect(one.value(QStringLiteral("x")).toInt(),
-                                     one.value(QStringLiteral("y")).toInt(),
-                                     one.value(QStringLiteral("w")).toInt(),
-                                     one.value(QStringLiteral("h")).toInt());
+                    // Relativ zum Hauptfenster, wenn das Profil es
+                    // hergibt (2026-10-14) -- sonst absolut wie frueher.
+                    const QRect rect = lageAusProfil(one);
                     const QString screen =
                         one.value(QStringLiteral("screen")).toString();
                     const int dockIndex =
@@ -8597,7 +8818,16 @@ void MainWindow::populateDefaultMeter()
                                 .removeAll(w);
                         }
                         w->setDockIndex(dockIndex);
-                        if (rect.isValid()) { w->setGeometry(rect); }
+                        if (rect.isValid()) {
+                            // Schutzrahmen auch beim Nachfuehren eines
+                            // schon abgeloesten Fensters (2026-10-14).
+                            QRect platz;
+                            if (QScreen* scr = w->screen()) {
+                                platz = scr->availableGeometry();
+                            }
+                            w->setGeometry(ausSperrstreifenSchieben(
+                                rect, schutzrahmen(), platz));
+                        }
                         ensureOnVisibleScreen(w, this,
                                               QSize(Style::kAppletPanelW, 120));
                     } else if (auto* a = appletForKey(it.key())) {
@@ -8675,11 +8905,8 @@ void MainWindow::populateDefaultMeter()
                         }
                         if (auto* pf = m_panStack
                                 ->floatingWindowForTest(panId)) {
-                            const QRect r(
-                                one.value(QStringLiteral("x")).toInt(),
-                                one.value(QStringLiteral("y")).toInt(),
-                                one.value(QStringLiteral("w")).toInt(),
-                                one.value(QStringLiteral("h")).toInt());
+                            // Relativ zum Hauptfenster (2026-10-14).
+                            const QRect r = lageAusProfil(one);
                             // Untergrenzen -- ein kaputter Eintrag
                             // soll kein 0x0-Fenster erzeugen. Der
                             // mitgesicherte "screen"-Schluessel wird
@@ -8753,11 +8980,8 @@ void MainWindow::populateDefaultMeter()
                             // nachreicht. QPointer schuetzt gegen ein
                             // zwischenzeitliches dockRotorPanel()
                             // (Andocken/Profilwechsel/Beenden).
-                            const QRect r(
-                                rotor.value(QStringLiteral("x")).toInt(),
-                                rotor.value(QStringLiteral("y")).toInt(),
-                                rotor.value(QStringLiteral("w")).toInt(),
-                                rotor.value(QStringLiteral("h")).toInt());
+                            // Relativ zum Hauptfenster (2026-10-14).
+                            const QRect r = lageAusProfil(rotor);
                             QPointer<ToolWindow> guard(m_rotorWindow);
                             QTimer::singleShot(0, this, [this, guard, r]() {
                                 if (!guard) { return; }
@@ -8924,6 +9148,26 @@ void MainWindow::populateDefaultMeter()
                             });
                     }
                 }
+                // ── Der Fenstermodus wird NICHT angewandt ────────────
+                //
+                // Hier stand fuer eine halbe Stunde ein frisch gebauter
+                // "fehlender Leser": das Profil SCHREIBT seit dem
+                // 2026-09-01 `mainWindow.fullScreen` und `maximized`,
+                // und eine Suche ueber den ganzen Baum findet genau EINE
+                // Fundstelle -- das Schreiben. Das sah nach einer
+                // stillen Attrappe aus (wie Rufzeichen und Locator), und
+                // ich habe den Leser gebaut.
+                //
+                // **Es ist keine Attrappe, es ist eine Entscheidung des
+                // Betreibers**, und sie ist festgenagelt:
+                // `tests/tst_tool_windows_fit_the_screen.cpp` prueft
+                // ausdruecklich "ein Profil schaltet das Vollbild nicht
+                // ab", und sein Kopf zitiert die Ansage vom 2026-09-27:
+                // „longpath sollte immer formatfuellend sein."
+                //
+                // Der Leger ist darum wieder draussen. Der Schluessel
+                // bleibt im Profil -- er kostet nichts und beschreibt
+                // den Zustand beim Aufnehmen.
                 qWarning() << "[ProfileApply:Step] 6/6 fertig";
             });
 
@@ -13983,16 +14227,229 @@ double MainWindow::readSystemCpuPercent()
 // liegt auf dem Raster, sonst stuenden die schwebenden Fenster sauber
 // untereinander, aber neben ihm versetzt. Maximiert/Vollbild bleibt
 // unberuehrt (WindowPlacement).
+// ── Der Schutzrahmen (2026-10-14) ──────────────────────────────────────
+//
+// Siehe die Begruendung bei `ausSperrstreifenSchieben()` in
+// WindowPlacement.h. Kurz: schwebende Fenster wurden bis heute nur gegen
+// den BILDSCHIRM geklemmt, nie gegen das Hauptfenster -- darum lagen sie
+// nach dem Verlassen des Vollbilds ueber der eigenen Kommandoleiste, und
+// der Betreiber musste zurueck ins Vollbild, um die Knoepfe zu sehen.
+// ── Der sichtbare Schutzrahmen (2026-10-14) ────────────────────────────
+//
+// Ein Rahmen, den man erst merkt, wenn das Fenster zurueckspringt, ist
+// eine Ueberraschung; einer, den man beim Ziehen SIEHT, ist eine Regel.
+//
+// Eine eigene kleine Klasse, weil Qt zum Malen eine braucht. Sie liegt
+// als Kind IM Hauptfenster und ist durchlaessig fuer die Maus -- sie
+// soll zeigen, nicht fangen. Dass ein gezogenes Fenster (ein eigenes
+// Top-Level) sie teilweise verdeckt, ist richtig so: man sieht die
+// Sperre DANEBEN, und genau dorthin soll der Blick.
+class SchutzrahmenHinweis : public QWidget {
+public:
+    explicit SchutzrahmenHinweis(QWidget* eltern) : QWidget(eltern)
+    {
+        setAttribute(Qt::WA_TransparentForMouseEvents);
+        setAttribute(Qt::WA_NoSystemBackground);
+        setAttribute(Qt::WA_TranslucentBackground);
+        setFocusPolicy(Qt::NoFocus);
+    }
+    void setzeStreifen(const QList<QRect>& global)
+    {
+        m_streifen.clear();
+        for (const QRect& g : global) {
+            m_streifen << QRect(mapFromGlobal(g.topLeft()), g.size());
+        }
+        update();
+    }
+protected:
+    void paintEvent(QPaintEvent*) override
+    {
+        QPainter p(this);
+        p.setRenderHint(QPainter::Antialiasing, false);
+        // Die Akzentfarbe des Hauses, sehr leise. KEIN kraeftiges Rot --
+        // Rot bleibt der Warnung (Hausregel).
+        QColor fuellung(QString::fromLatin1(Style::kAccent));
+        fuellung.setAlpha(46);
+        QColor kante(QString::fromLatin1(Style::kAccent));
+        kante.setAlpha(140);
+        for (const QRect& r : m_streifen) {
+            p.fillRect(r, fuellung);
+            p.setPen(QPen(kante, 1));
+            p.drawLine(r.topLeft(), r.topRight());
+            p.drawLine(r.bottomLeft(), r.bottomRight());
+        }
+    }
+private:
+    QList<QRect> m_streifen;
+};
+
+void MainWindow::zeigeSchutzrahmenKurz()
+{
+    if (m_shuttingDown) { return; }
+    const QList<QRect> sperren = schutzrahmen();
+    if (sperren.isEmpty()) { return; }
+
+    if (!m_rahmenHinweis) {
+        m_rahmenHinweis = new SchutzrahmenHinweis(this);
+    }
+    m_rahmenHinweis->setGeometry(rect());
+    m_rahmenHinweis->setzeStreifen(sperren);
+    m_rahmenHinweis->raise();
+    m_rahmenHinweis->show();
+
+    if (!m_rahmenHinweisTimer) {
+        m_rahmenHinweisTimer = new QTimer(this);
+        m_rahmenHinweisTimer->setSingleShot(true);
+        m_rahmenHinweisTimer->setInterval(600);
+        connect(m_rahmenHinweisTimer, &QTimer::timeout, this, [this]() {
+            if (m_rahmenHinweis) { m_rahmenHinweis->hide(); }
+        });
+    }
+    m_rahmenHinweisTimer->start();
+}
+
+bool MainWindow::schutzrahmenHinweisSichtbarFuerTest() const
+{
+    return m_rahmenHinweis && m_rahmenHinweis->isVisible();
+}
+
+void MainWindow::merkeLage(QVariantMap& ziel, const QRect& g) const
+{
+    ziel.insert(QStringLiteral("x"), g.x());
+    ziel.insert(QStringLiteral("y"), g.y());
+    ziel.insert(QStringLiteral("w"), g.width());
+    ziel.insert(QStringLiteral("h"), g.height());
+    // Relativ zur linken oberen Ecke des HAUPTFENSTERRAHMENS. Nicht zum
+    // Inhaltsbereich: der aendert sich mit der Titelleiste, und genau
+    // deren Hoehe ist der Unterschied zwischen Vollbild und nicht.
+    const QPoint ecke = frameGeometry().topLeft();
+    ziel.insert(QStringLiteral("dx"), g.x() - ecke.x());
+    ziel.insert(QStringLiteral("dy"), g.y() - ecke.y());
+}
+
+QRect MainWindow::lageAusProfil(const QVariantMap& quelle) const
+{
+    const int w = quelle.value(QStringLiteral("w")).toInt();
+    const int h = quelle.value(QStringLiteral("h")).toInt();
+    if (quelle.contains(QStringLiteral("dx"))
+        && quelle.contains(QStringLiteral("dy"))) {
+        const QPoint ecke = frameGeometry().topLeft();
+        return QRect(ecke.x() + quelle.value(QStringLiteral("dx")).toInt(),
+                     ecke.y() + quelle.value(QStringLiteral("dy")).toInt(),
+                     w, h);
+    }
+    // Ein Profil von vor dem 2026-10-14. Absolut, wie frueher -- der
+    // Schutzrahmen faengt danach ab, was auf einer Bedienleiste laege.
+    return QRect(quelle.value(QStringLiteral("x")).toInt(),
+                 quelle.value(QStringLiteral("y")).toInt(), w, h);
+}
+
+QList<QRect> MainWindow::schutzrahmen() const
+{
+    QList<QRect> sperren;
+
+    // Hier stand zuerst `if (!isVisible()) return {};` als Wache gegen
+    // noch nicht gesetzte Leisten. Die ist WIRKUNGSLOS und darum weg:
+    // **MainWindow ist schon im Konstruktor sichtbar**, lange bevor der
+    // Aufrufer `show()` ruft (nachgemessen im Prueffall, `isVisible()`
+    // ist true an einem frisch gebauten Fenster). Wer sich hier auf
+    // `isVisible()` verlaesst, prueft nichts.
+    //
+    // Was wirklich schuetzt, steht in `streifen()`: eine Leiste ohne
+    // Hoehe oder eine versteckte ergibt KEINEN Streifen. Die Statuszeile
+    // laesst sich abschalten (ChromeStatusBar im Auswaehler), dann gibt
+    // es nur den oberen.
+    const auto streifen = [this](const QWidget* w) -> QRect {
+        if (!w || !w->isVisible() || w->height() <= 0) { return {}; }
+        // Ueber die GANZE Fensterbreite, nicht nur ueber die Breite der
+        // Leiste: die Leiste endet rechts vor dem Rand, aber ein Fenster,
+        // das dort halb darueberliegt, verdeckt sie trotzdem.
+        const QPoint linksOben = w->mapToGlobal(QPoint(0, 0));
+        return QRect(mapToGlobal(QPoint(0, 0)).x(), linksOben.y(),
+                     width(), w->height());
+    };
+
+    const QRect oben = streifen(m_commandBar);
+    if (oben.isValid()) { sperren << oben; }
+    if (QStatusBar* sb = const_cast<MainWindow*>(this)->statusBar()) {
+        const QRect unten = streifen(sb);
+        if (unten.isValid()) { sperren << unten; }
+    }
+    return sperren;
+}
+
+void MainWindow::schutzrahmenNachziehen()
+{
+    if (m_shuttingDown) { return; }
+    if (!m_schutzrahmenTimer) {
+        m_schutzrahmenTimer = new QTimer(this);
+        m_schutzrahmenTimer->setSingleShot(true);
+        m_schutzrahmenTimer->setInterval(250);
+        connect(m_schutzrahmenTimer, &QTimer::timeout, this, [this]() {
+            schwebendeAusDemSchutzrahmenHolen();
+        });
+    }
+    m_schutzrahmenTimer->start();
+}
+
+int MainWindow::schwebendeAusDemSchutzrahmenHolen()
+{
+    if (m_shuttingDown) { return 0; }
+    const QList<QRect> sperren = schutzrahmen();
+    if (sperren.isEmpty()) { return 0; }
+
+    int verschoben = 0;
+    for (QWidget* w : QApplication::topLevelWidgets()) {
+        if (!w || w == this || !w->isVisible()) { continue; }
+        // Nur die eigenen Schwebefenster. Ein Dialog wird NICHT
+        // verschoben: der steht, wo das System ihn hinstellt, und ein
+        // Einstellungsfenster ueber der Statuszeile ist kein Problem --
+        // es geht wieder zu.
+        if (w->isModal() || qobject_cast<QDialog*>(w)) { continue; }
+        const QWidget* eltern = w->parentWidget();
+        if (!eltern || eltern->window() != this) { continue; }
+
+        const QRect alt = w->frameGeometry();
+        QRect platz;
+        if (QScreen* scr = w->screen()) { platz = scr->availableGeometry(); }
+        const QRect neu = ausSperrstreifenSchieben(alt, sperren, platz);
+        if (neu != alt) {
+            // move(), nicht setGeometry(): die GROESSE gehoert dem
+            // Betreiber. Und auf den Rahmenversatz achten -- move()
+            // setzt die Ecke des RAHMENS, frameGeometry() liest ihn
+            // ebenfalls, also stimmt es ohne Umrechnung.
+            w->move(neu.topLeft());
+            ++verschoben;
+        }
+    }
+    if (verschoben > 0) {
+        qCInfo(lcContainer) << "Schutzrahmen:" << verschoben
+                     << "schwebende Fenster lagen auf einer Bedienleiste"
+                        " und wurden heruntergeschoben";
+    }
+    return verschoben;
+}
+
 void MainWindow::moveEvent(QMoveEvent* event)
 {
     QMainWindow::moveEvent(event);
-    if (!m_shuttingDown) { snapToGridAfterSettle(this); }
+    if (!m_shuttingDown) {
+        snapToGridAfterSettle(this);
+        schutzrahmenNachziehen();
+    }
 }
 
 void MainWindow::resizeEvent(QResizeEvent* event)
 {
     QMainWindow::resizeEvent(event);
-    if (!m_shuttingDown) { snapToGridAfterSettle(this); }
+    if (!m_shuttingDown) {
+        snapToGridAfterSettle(this);
+        // Hier faellt der Vollbildwechsel an: das Fenster wird kuerzer,
+        // die schwebenden bleiben stehen -- genau der Fall, um den es
+        // geht. Mit Nachlauf, damit ein Groessenzug nicht bei jedem
+        // Pixel Fenster schiebt.
+        schutzrahmenNachziehen();
+    }
 
     // Das schwebende Plus hat keine Anordnung, die es mitzieht.
     positionAddWidgetButton();

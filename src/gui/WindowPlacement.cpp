@@ -167,6 +167,88 @@ QRect snappedFrameRect(const QRect& frame, const QSize& minSize, int grid)
     return QRect(left, top, right - left, bottom - top);
 }
 
+namespace {
+std::function<void(QWidget*)> s_zugmelder;
+}
+
+void setzeZugmelder(std::function<void(QWidget*)> melder)
+{
+    s_zugmelder = std::move(melder);
+}
+
+void meldeZug(QWidget* bewegtes)
+{
+    if (s_zugmelder && bewegtes) { s_zugmelder(bewegtes); }
+}
+
+QRect ausSperrstreifenSchieben(const QRect& wunsch,
+                               const QList<QRect>& sperren,
+                               const QRect& platz)
+{
+    if (!wunsch.isValid() || sperren.isEmpty()) { return wunsch; }
+
+    // Nur die Streifen zaehlen, die das Fenster UEBERHAUPT treffen.
+    // Einer auf einem anderen Schirm geht uns nichts an.
+    QList<QRect> treffer;
+    for (const QRect& sp : sperren) {
+        if (sp.isValid() && sp.intersects(wunsch)) { treffer << sp; }
+    }
+    if (treffer.isEmpty()) { return wunsch; }
+
+    // ── Ueber die LUECKEN, nicht ueber Ausweichschritte ─────────────────
+    //
+    // Der erste Entwurf schob das Fenster aus dem getroffenen Streifen
+    // heraus und sah dann noch einmal nach. Das PENDELT: bei zwei nahen
+    // Streifen weicht es aus dem oberen nach unten in den unteren aus,
+    // aus dem unteren nach oben in den oberen, und nach vier Durchgaengen
+    // kommt es auf einem Streifen zu liegen. Der eigene Prueffall
+    // `mehrereStreifenNacheinander` hat genau das gefunden.
+    //
+    // Jetzt umgekehrt gedacht: die freien Baender zwischen den Streifen
+    // aufzaehlen, das naechstgelegene nehmen, in das die Hoehe passt.
+    // Das endet immer und kann nicht auf einem Streifen landen.
+    QList<QRect> alle = sperren;
+    std::sort(alle.begin(), alle.end(),
+              [](const QRect& a, const QRect& b) { return a.top() < b.top(); });
+
+    const QRect flaeche = platz.isValid()
+        ? platz
+        : QRect(wunsch.left(), -100000, wunsch.width(), 200000);
+
+    QList<QPair<int, int>> luecken;    // (oben, unten), jeweils einschliesslich
+    int kante = flaeche.top();
+    for (const QRect& sp : alle) {
+        if (!sp.isValid()) { continue; }
+        if (sp.top() - 1 >= kante) { luecken << qMakePair(kante, sp.top() - 1); }
+        kante = qMax(kante, sp.bottom() + 1);
+    }
+    if (flaeche.bottom() >= kante) { luecken << qMakePair(kante, flaeche.bottom()); }
+
+    const int h = wunsch.height();
+    int besterOben = 0;
+    int besteEntfernung = -1;
+    for (const auto& l : luecken) {
+        if (l.second - l.first + 1 < h) { continue; }   // zu schmal
+        // In diesem Band so wenig wie moeglich verschieben.
+        const int oben = qBound(l.first, wunsch.top(), l.second - h + 1);
+        const int weg = qAbs(oben - wunsch.top());
+        if (besteEntfernung < 0 || weg < besteEntfernung) {
+            besteEntfernung = weg;
+            besterOben = oben;
+        }
+    }
+    if (besteEntfernung < 0) {
+        // Nirgends mehr hin. Unveraendert zurueck: lieber verdeckt als
+        // halb vom Schirm geschoben -- ein Fenster, dessen Titelleiste
+        // ausserhalb liegt, laesst sich nicht mehr fassen.
+        return wunsch;
+    }
+
+    QRect r = wunsch;
+    r.moveTop(besterOben);
+    return r;
+}
+
 void snapToGridAfterSettle(QWidget* w, int grid, int delayMs, bool snapSize)
 {
     if (!w) { return; }

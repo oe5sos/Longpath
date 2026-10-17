@@ -61,6 +61,7 @@
 #pragma once
 
 #include <QHash>
+#include <QList>
 #include <QObject>
 #include <QString>
 #include <QStringList>
@@ -139,6 +140,46 @@ public:
     /// Longpath omits the are-you-sure confirmation dialog — UI layer
     /// (Phase J.3) handles that before calling into this method.
     bool deleteProfile(const QString& name);
+
+    // ── Thetis-Profile einlesen (2026-10-13) ────────────────────────────
+    //
+    // Zweiter Gang des Zeus-Punkts aus 2.0.50. Der LESER steht in
+    // src/core/ThetisProfilImport.{h,cpp} und kennt AppSettings nicht;
+    // hier wird geschrieben.
+
+    /// Was beim Einlesen geschehen ist -- je Profil, in Worten.
+    struct ThetisEinleseErgebnis {
+        /// Angelegte Profile: Thetis-Name -> Name, unter dem es hier
+        /// steht. Die beiden koennen sich unterscheiden, siehe unten.
+        QHash<QString, QString> angelegt;
+        /// Profile, die gar nicht angelegt wurden, mit Grund.
+        QHash<QString, QString> ausgelassen;
+        /// Die Hinweise des Lesers, weitergetragen plus eigene.
+        QHash<QString, QStringList> hinweise;
+        int anzahl() const { return angelegt.size(); }
+    };
+
+    /// Eingelesene Thetis-Profile als eigene Profile anlegen.
+    ///
+    /// Drei Zusagen, und alle drei stehen so auch bei Zeus ("Nothing is
+    /// applied and none of your existing profiles are overwritten"):
+    ///
+    ///   1. NICHTS WIRD ANGEWANDT. Kein Ruf nach setActiveProfile, der
+    ///      Sendeton bleibt genau, wie er war. Ein Einlesen, das sofort
+    ///      umschaltet, verstellt den Ton waehrend eines Gespraechs.
+    ///   2. NICHTS WIRD UEBERSCHRIEBEN. Ein Name, den es schon gibt,
+    ///      bekommt " (Thetis)" dahinter, bei Bedarf mit Zahl. Nicht
+    ///      ausgelassen: dann waere die Arbeit des Betreibers verloren,
+    ///      und er muesste sein Profil in Thetis umbenennen.
+    ///   3. UNVOLLSTAENDIGE WERTE WERDEN AUFGEFUELLT, und zwar aus
+    ///      defaultProfileValues() -- genau wie Thetis es beim eigenen
+    ///      Einlesen tut (database.cs:11263-11292,
+    ///      ExpandOldTxProfileTable: fehlende Spalten aus "Default").
+    ///      Ohne das traegt ein Profil aus einer aelteren
+    ///      Thetis-Fassung Luecken, und was dort fehlt, stuende beim
+    ///      Umschalten auf dem Wert des VORIGEN Profils.
+    ThetisEinleseErgebnis
+    einleseThetisProfile(const QList<struct ThetisProfil>& profile);
 
     /// Returns the live-field default values (the "Default" profile values
     /// used by F.5 on first launch).  Static helper exposed for tests and

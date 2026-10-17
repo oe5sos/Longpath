@@ -86,6 +86,31 @@ void CatServer::setzeZustandsgeber(
     std::function<std::optional<CatProtocol::Zustand>()> geber)
 {
     m_geber = std::move(geber);
+
+    // Derselbe Geber ist auch der NACHLESER (2026-10-13, aus dem
+    // ZZ-Zweig hereingeholt): nach einem Setzen fragt die
+    // Protokollschicht damit nach, ob der Wunsch angekommen ist, und
+    // antwortet sonst mit "?;".
+    //
+    // Warum das wichtig ist: ohne Nachleser quittiert ein Setzen blind.
+    // Die zweite CAT-Fassung dieses Projekts hat es am 2026-10-11 am
+    // Draht gemessen -- "RT1 answered silently and the following RT
+    // still said RT0": der Haken lief, die Scheibe dahinter fehlte, und
+    // ein Contestprogramm glaubte, seine RIT sei an.
+    //
+    // Meldet der Geber std::nullopt (kein Empfaenger), gilt der letzte
+    // bekannte Stand als Nachlese-Ergebnis. Der Befehl selbst wird dann
+    // ohnehin schon in antwortAuf() abgelehnt, bevor er hierher kommt --
+    // das ist nur die Absicherung fuer den Fall, dass der Empfaenger
+    // MITTEN im Befehl wegfaellt.
+    if (m_geber) {
+        m_protokoll.setzeNachleser([this]() {
+            const std::optional<CatProtocol::Zustand> z = m_geber();
+            return z ? *z : m_protokoll.zustand();
+        });
+    } else {
+        m_protokoll.setzeNachleser(nullptr);
+    }
 }
 
 void CatServer::setzeHaken(const CatProtocol::Haken& haken)

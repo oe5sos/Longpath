@@ -33,6 +33,11 @@ private:
     bool    moxZuletzt{false};
     int     splitRufe{0};
     bool    splitZuletzt{false};
+    bool    ritAn{false};
+    bool    xitAn{false};
+    int     ritHz{0};
+    int     xitHz{0};
+    int     itRufe{0};
 
     void hakenAnhaengen()
     {
@@ -42,6 +47,10 @@ private:
         h.setzeModeK  = [this](int k)      { gesetztModeK = k; };
         h.setzeMox    = [this](bool on)    { ++moxRufe; moxZuletzt = on; };
         h.setzeSplit  = [this](bool on)    { ++splitRufe; splitZuletzt = on; };
+        h.setzeRit    = [this](bool on)    { ritAn = on; };
+        h.setzeXit    = [this](bool on)    { xitAn = on; };
+        h.setzeRitHz  = [this](int hz)     { ritHz = hz; ++itRufe; };
+        h.setzeXitHz  = [this](int hz)     { xitHz = hz; ++itRufe; };
         p.setzeHaken(h);
     }
 
@@ -72,6 +81,8 @@ private slots:
         gesetztModeK = 0;
         moxRufe = splitRufe = 0;
         moxZuletzt = splitZuletzt = false;
+        ritAn = xitAn = false;
+        ritHz = xitHz = itRufe = 0;
         hakenAnhaengen();
     }
 
@@ -253,7 +264,7 @@ private slots:
         CatProtocol::Zustand z;
         z.vfoAHz = 14225000;
         z.stepHz = 100;
-        z.itHz   = 0;
+        z.ritHz  = 0;
         z.modeK  = 2;
         p.setzeZustand(z);
         const QString s = p.statussatz();
@@ -291,10 +302,18 @@ private slots:
         // xit="1";` -- bei BEIDEN an meldet Thetis nur RIT. Nachgebaut, nicht
         // geglaettet: ein Programm, das beide Flaggen sieht, weiss nicht,
         // welchen Wert das IT-Feld traegt.
+        //
+        // Seit dem 2026-10-13 fuehrt der Zustand BEIDE Ablagen getrennt
+        // (wie SliceModel). Darum stehen hier absichtlich zwei
+        // VERSCHIEDENE Werte: der Fall belegt jetzt nicht nur, dass die
+        // XIT-Flagge verschwindet, sondern auch, dass der RIT-WERT
+        // gezeigt wird und nicht der XIT-Wert. Mit einem gemeinsamen
+        // itHz war das nicht pruefbar.
         CatProtocol::Zustand z;
         z.ritOn = true;
         z.xitOn = true;
-        z.itHz  = -250;
+        z.ritHz = -250;
+        z.xitHz = 999;
         p.setzeZustand(z);
         const QString s = p.statussatz();
         QCOMPARE(s.mid(15, 6), QStringLiteral("-00250"));
@@ -306,7 +325,8 @@ private slots:
     {
         CatProtocol::Zustand z;
         z.xitOn = true;
-        z.itHz  = 1234;
+        z.ritHz = -7;          // darf NICHT gezeigt werden
+        z.xitHz = 1234;
         p.setzeZustand(z);
         const QString s = p.statussatz();
         QCOMPARE(s.mid(15, 6), QStringLiteral("+01234"));
@@ -316,11 +336,12 @@ private slots:
 
     void ohneRitUndXitIstDerWertNull()
     {
-        // Auch wenn itHz etwas anderes sagt: ist keine der beiden Flaggen
-        // gesetzt, gehoert eine 0 ins Feld, sonst meldet das Geraet eine
-        // Ablage, die nicht wirkt.
+        // Auch wenn beide Ablagen etwas anderes sagen: ist keine der
+        // Flaggen gesetzt, gehoert eine 0 ins Feld, sonst meldet das
+        // Geraet eine Ablage, die nicht wirkt.
         CatProtocol::Zustand z;
-        z.itHz = 500;
+        z.ritHz = 500;
+        z.xitHz = -500;
         p.setzeZustand(z);
         QCOMPARE(p.statussatz().mid(15, 6), QStringLiteral("+00000"));
     }
@@ -482,6 +503,170 @@ private slots:
         // IF und ID haben nSet=-1: es gibt sie nur als Frage.
         QCOMPARE(p.antwortAuf(QStringLiteral("IF1;")), QStringLiteral("?;"));
         QCOMPARE(p.antwortAuf(QStringLiteral("ID900;")), QStringLiteral("?;"));
+    }
+
+    // ── Der Nachleser (2026-10-13) ──────────────────────────────────────────
+
+    void ohneNachleserWirdBlindQuittiert()
+    {
+        // Das alte Verhalten, ausdruecklich festgehalten: ohne
+        // angehaengten Nachleser prueft die Schicht nicht, ob ein Setzen
+        // gewirkt hat. Die Faelle oben in dieser Datei verlassen sich
+        // darauf (sie haben keinen Zustand hinter sich).
+        QCOMPARE(p.antwortAuf(QStringLiteral("FA00014250000;")), QString());
+        QCOMPARE(gesetztA, Q_UINT64_C(14250000));
+    }
+
+    void mitNachleserWirdEinWIRKUNGSLOSESSetzenAbgelehnt()
+    {
+        // DER Fall. Uebernommen aus der zweiten CAT-Fassung dieses
+        // Projekts, die es am 2026-10-11 am Draht gemessen hat: "RT1
+        // answered silently and the following RT still said RT0" -- der
+        // Haken lief, die Scheibe dahinter fehlte, und ein
+        // Contestprogramm glaubte, seine RIT sei an.
+        //
+        // Hier derselbe Fall kuenstlich: ein Haken, der nichts bewegt,
+        // und ein Nachleser, der die Wahrheit sagt.
+        CatProtocol q;
+        CatProtocol::Zustand z;
+        z.vfoAHz = 14225000;
+        q.setzeZustand(z);
+        CatProtocol::Haken taub;
+        taub.setzeVfoA  = [](quint64) { /* bewegt nichts */ };
+        taub.setzeModeK = [](int)     { };
+        taub.setzeMox   = [](bool)    { };
+        taub.setzeRit   = [](bool)    { };
+        q.setzeHaken(taub);
+        q.setzeNachleser([z]() { return z; });     // immer der alte Stand
+
+        QCOMPARE(q.antwortAuf(QStringLiteral("FA00021300000;")),
+                 QStringLiteral("?;"));
+        QCOMPARE(q.antwortAuf(QStringLiteral("MD1;")), QStringLiteral("?;"));
+        QCOMPARE(q.antwortAuf(QStringLiteral("TX;")),  QStringLiteral("?;"));
+        QCOMPARE(q.antwortAuf(QStringLiteral("RT1;")), QStringLiteral("?;"));
+        // Abfragen gehen weiter -- nur das Setzen wird geprueft.
+        QCOMPARE(q.antwortAuf(QStringLiteral("FA;")),
+                 QStringLiteral("FA00014225000;"));
+    }
+
+    void mitNachleserGehtEinWIRKSAMESSetzenDurch()
+    {
+        // Gegenstueck: wirkt der Haken, bleibt die Antwort leer (Kenwood
+        // quittiert ein Setzen nicht).
+        CatProtocol q;
+        CatProtocol::Zustand z;
+        z.vfoAHz = 14225000;
+        q.setzeZustand(z);
+        auto stand = std::make_shared<CatProtocol::Zustand>(z);
+        CatProtocol::Haken h;
+        h.setzeVfoA = [stand](quint64 hz) { stand->vfoAHz = hz; };
+        q.setzeHaken(h);
+        q.setzeNachleser([stand]() { return *stand; });
+
+        QCOMPARE(q.antwortAuf(QStringLiteral("FA00021300000;")), QString());
+        QCOMPARE(q.antwortAuf(QStringLiteral("FA;")),
+                 QStringLiteral("FA00021300000;"));
+    }
+
+    // ── Die sechs Befehle aus der zweiten Fassung ───────────────────────────
+
+    void psMeldetDenZustandAberSchaltetNichtAb()
+    {
+        // PS0 wird ABGELEHNT: ein CAT-Anrufer darf diese Station nicht
+        // abschalten. Begruendung aus der zweiten Fassung uebernommen.
+        QCOMPARE(p.antwortAuf(QStringLiteral("PS;")), QStringLiteral("PS1;"));
+        QCOMPARE(p.antwortAuf(QStringLiteral("PS1;")), QString());   // No-Op
+        QCOMPARE(p.antwortAuf(QStringLiteral("PS0;")), QStringLiteral("?;"));
+        CatProtocol::Zustand z;
+        z.eingeschaltet = false;
+        p.setzeZustand(z);
+        QCOMPARE(p.antwortAuf(QStringLiteral("PS;")), QStringLiteral("PS0;"));
+    }
+
+    void dasSMeterHatSeinenKnickBeiS9()
+    {
+        // From Thetis CAT/CATCommands.cs:896-931 [v2.10.3.15]. Der Knick
+        // ist der Punkt: unter S9 eine Gerade durch (dBm+127)/6 * 1.6667,
+        // darueber 15 + (dBm+73). Wer das durch EINE Gerade ersetzt,
+        // trifft genau dort daneben, wo ein Contestprogramm Rapporte
+        // bildet.
+        QCOMPARE(CatProtocol::sMeterAusDbm(-127.0), 0);     // S0
+        QCOMPARE(CatProtocol::sMeterAusDbm(-73.0), 15);     // S9 = 15
+        // Oberhalb S9 zaehlt jedes dB einen Punkt.
+        QCOMPARE(CatProtocol::sMeterAusDbm(-63.0), 25);     // S9+10
+        // Gedeckelt bei 0 und 30 -- ein Ueberlauf verschoebe die
+        // 5-Zeichen-Antwort.
+        QCOMPARE(CatProtocol::sMeterAusDbm(-200.0), 0);
+        QCOMPARE(CatProtocol::sMeterAusDbm(0.0), 30);
+        QCOMPARE(CatProtocol::sMeterAusDbm(-10.0), 30);
+        // Und die Kennlinie steigt monoton.
+        int vorher = -1;
+        for (double d = -140.0; d <= -10.0; d += 1.0) {
+            const int sm = CatProtocol::sMeterAusDbm(d);
+            QVERIFY2(sm >= vorher,
+                     qPrintable(QStringLiteral("bei %1 dBm faellt der Wert").arg(d)));
+            vorher = sm;
+        }
+    }
+
+    void dasSMeterAntwortetMitFuenfStellen()
+    {
+        CatProtocol::Zustand z;
+        z.signalDbm = -73.0;
+        p.setzeZustand(z);
+        QCOMPARE(p.antwortAuf(QStringLiteral("SM0;")), QStringLiteral("SM00015;"));
+        QCOMPARE(p.antwortAuf(QStringLiteral("SM2;")), QStringLiteral("SM00015;"));
+        // SM ohne Kanal oder mit einem anderen ist kein SM.
+        QCOMPARE(p.antwortAuf(QStringLiteral("SM;")),  QStringLiteral("?;"));
+        QCOMPARE(p.antwortAuf(QStringLiteral("SM1;")), QStringLiteral("?;"));
+    }
+
+    void ritUndXitLassenSichSchaltenUndLesen()
+    {
+        QCOMPARE(p.antwortAuf(QStringLiteral("RT;")), QStringLiteral("RT0;"));
+        QCOMPARE(p.antwortAuf(QStringLiteral("RT1;")), QString());
+        QVERIFY(ritAn);
+        QCOMPARE(p.antwortAuf(QStringLiteral("RT;")), QStringLiteral("RT1;"));
+        QCOMPARE(p.antwortAuf(QStringLiteral("XT1;")), QString());
+        QVERIFY(xitAn);
+        // Werte ausserhalb 0/1 sind kein RT.
+        QCOMPARE(p.antwortAuf(QStringLiteral("RT2;")), QStringLiteral("?;"));
+    }
+
+    void dieAblageLaesstSichSchiebenUndLoeschen()
+    {
+        // Ohne RIT oder XIT gibt es nichts zu schieben -- und ein
+        // stilles "erledigt" sagte dem Programm, die Ablage sei
+        // gesetzt/weg, wo keine war.
+        QCOMPARE(p.antwortAuf(QStringLiteral("RU;")), QStringLiteral("?;"));
+        QCOMPARE(p.antwortAuf(QStringLiteral("RC;")), QStringLiteral("?;"));
+        QCOMPARE(itRufe, 0);
+
+        CatProtocol::Zustand z;
+        z.ritOn  = true;
+        z.stepHz = 10;
+        p.setzeZustand(z);
+        QCOMPARE(p.antwortAuf(QStringLiteral("RU;")), QString());
+        QCOMPARE(ritHz, 10);
+        QCOMPARE(p.antwortAuf(QStringLiteral("RU;")), QString());
+        QCOMPARE(ritHz, 20);
+        QCOMPARE(p.antwortAuf(QStringLiteral("RD;")), QString());
+        QCOMPARE(ritHz, 10);
+        QCOMPARE(p.antwortAuf(QStringLiteral("RC;")), QString());
+        QCOMPARE(ritHz, 0);
+        // Mit Nutzdaten sind RU/RD/RC keine Befehle.
+        QCOMPARE(p.antwortAuf(QStringLiteral("RU1;")), QStringLiteral("?;"));
+    }
+
+    void ohneSchrittweiteNimmtDieAblageZehnHertz()
+    {
+        // Kenwoods eigene Vorgabe, aus der zweiten Fassung uebernommen.
+        CatProtocol::Zustand z;
+        z.ritOn  = true;
+        z.stepHz = 0;
+        p.setzeZustand(z);
+        QCOMPARE(p.antwortAuf(QStringLiteral("RU;")), QString());
+        QCOMPARE(ritHz, 10);
     }
 };
 

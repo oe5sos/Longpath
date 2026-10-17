@@ -492,6 +492,16 @@ private slots:
         const QList<EqApplet*> gefunden = mw->findChildren<EqApplet*>();
         QCOMPARE(gefunden.size(), 1);
         QVERIFY(gefunden.first() != nullptr);
+        // Die Kennung ist seit dem 2026-10-13 "Eq", nicht "EQ": sie muss
+        // mit der Panelkennung in m_appletsById uebereinstimmen, sonst
+        // meldet check-applet-ids.py zu Recht Namensdrift. Dass das
+        // abwaertssicher ist, ist NACHGEMESSEN und nicht geglaubt:
+        // Longpath speichert eine Anordnung ueber panelIdFor()
+        // (MainWindow.cpp:8048/8082/8128), also ohnehin die
+        // Panelkennung -- appletId() landet nie in einer
+        // Einstellungsdatei. Geprueft wurde auch in allen 48 Profilen
+        // auf diesem Rechner: dort steht "EQ" nur in Mikrofonprofilnamen
+        // ("D-104+EQ"), nie als Appletkennung.
         QCOMPARE(gefunden.first()->appletId(), QStringLiteral("Eq"));
         QCOMPARE(gefunden.first()->appletTitle(), QStringLiteral("Equalizer"));
 

@@ -71,6 +71,7 @@
 #include <QString>
 
 #include <functional>
+#include <optional>
 
 namespace Longpath {
 
@@ -100,10 +101,18 @@ public:
         bool split{false};
         bool ritOn{false};
         bool xitOn{false};
-        /// RIT- bzw. XIT-Wert in Hz (negativ erlaubt). Welcher von
-        /// beiden gilt, entscheidet ritOn/xitOn -- wie Thetis
-        /// (CATCommands.cs IF(): erst RIT, sonst XIT).
-        int  itHz{0};
+        /// RIT- und XIT-Ablage in Hz, GETRENNT (negativ erlaubt).
+        ///
+        /// Bis zum 2026-10-13 stand hier ein einziges `itHz` mit der
+        /// Begruendung "welcher gilt, entscheidet ritOn/xitOn". Das war
+        /// fuer den Kenwood-Satz richtig (dessen Statussatz zeigt nur
+        /// EINEN Wert, und RU/RD/RC wirken auf den aktiven), aber es war
+        /// **ein falsches Bild des Geraets**: `SliceModel` fuehrt
+        /// `ritHz` und `xitHz` seit immer getrennt (SliceModel.h:281-283).
+        /// Der ZZ-Satz braucht die Trennung: ZZXF stellt die XIT-Ablage,
+        /// auch wenn RIT an ist, und ZZRF umgekehrt.
+        int  ritHz{0};
+        int  xitHz{0};
         /// Abstimmschritt in Hz. Thetis sendet einen Index-abhaengigen
         /// 4-Byte-Code (Step2String); wir senden den Schritt selbst,
         /// siehe die Notiz bei schrittFeld().
@@ -111,6 +120,38 @@ public:
         /// Antwort auf ID;. Thetis waehlt sie nach CATRigType
         /// (CATCommands.cs:291-...); 900 = SDR-1000.
         int  rigId{900};
+
+        // ── Die Felder fuer die sechs Befehle aus der zweiten Fassung
+        //    (uebernommen 2026-10-13, siehe
+        //    docs/architecture/2026-10-12-cat-zwei-fassungen.md) ──────────
+        /// Laeuft das Geraet? Antwort auf PS;.
+        bool eingeschaltet{true};
+        /// Empfangspegel in dBm fuer SM;. -200 heisst "weiss ich nicht".
+        double signalDbm{-200.0};
+
+        // ── Die Felder fuer den ZZ-Satz (2026-10-13) ───────────────────
+        //
+        // Warum modeZZ NEBEN modeK steht und nicht daraus gerechnet
+        // wird: die beiden sind zwei verlustbehaftete Abbildungen
+        // DESSELBEN Modus. Kenwood kennt kein DSB/SAM/DRM und hat fuer
+        // CW nur eine Zahl -- modeK -> modeZZ muesste das Seitenband
+        // erraten. Beide kommen darum aus dem einen Longpath-Modus,
+        // siehe CatModeMap.h.
+        /// Modus als ZZ-Zahl 0..11 (= Thetis' Mode2String). 1 = USB.
+        int  modeZZ{1};
+        /// Die Filterkanten der empfangenden Scheibe in Hz, negativ
+        /// erlaubt (LSB). Fuer ZZFL/ZZFH.
+        int  filterLowHz{150};
+        int  filterHighHz{2850};
+        /// Rauschsperre: 0 = aus, 1 = an, 2 = Stimmsperre.
+        /// From Thetis CAT/CATCommands.cs ZZSO -- "[2.10.3.5]MW0LGE 2 is
+        /// vsql".
+        int  squelch{0};
+        /// Antwort auf ZZZM; -- die Gerätebezeichnung, veraenderliche
+        /// Laenge. Thetis gibt HardwareSpecific.Model.ToString().
+        QString modell{QStringLiteral("LONGPATH")};
+        /// Antwort auf ZZZV; -- die Fassung ohne Firmware-Teil.
+        QString fassung{QStringLiteral("0.0.0")};
     };
 
     /// Was ein Befehl aendern darf. Nicht gesetzte Haken heissen: dieser
@@ -123,11 +164,49 @@ public:
         std::function<void(int)>     setzeModeK;
         std::function<void(bool)>    setzeMox;
         std::function<void(bool)>    setzeSplit;
+        // ── fuer die RIT/XIT-Familie (2026-10-13) ──────────────────────
+        std::function<void(bool)>    setzeRit;
+        std::function<void(bool)>    setzeXit;
+        /// Die beiden Ablagen setzen (Hz, negativ erlaubt). GETRENNT --
+        /// einen Haken "setze die aktive Ablage" gibt es bewusst nicht
+        /// mehr: welcher der beiden gemeint ist, entscheidet der
+        /// BEFEHL (ZZRF gegen ZZXF), und bei Kenwoods RU/RD/RC die
+        /// Flagge. Ein Haken, der "die aktive" meint, verschob die
+        /// Entscheidung in die Verdrahtung, wo sie niemand sieht.
+        std::function<void(int)>     setzeRitHz;
+        std::function<void(int)>     setzeXitHz;
+        // ── fuer den ZZ-Satz (2026-10-13) ──────────────────────────────
+        /// Modus als ZZ-Zahl 0..11. Eigener Haken und nicht setzeModeK,
+        /// weil der Aufrufer sonst ZZ -> Kenwood rechnen muesste und
+        /// dabei DSB, SAM und DRM verloren gingen.
+        std::function<void(int)>     setzeModeZZ;
+        std::function<void(int)>     setzeFilterLow;
+        std::function<void(int)>     setzeFilterHigh;
+        std::function<void(int)>     setzeSquelch;
     };
 
     CatProtocol() = default;
 
     void setzeZustand(const Zustand& z) { m_z = z; }
+
+    /// Der NACHLESER: holt den frischen Zustand, nachdem ein Setzen
+    /// durch den Haken gegangen ist.
+    ///
+    /// Ohne ihn quittiert ein Setzen blind. Das ist keine theoretische
+    /// Sorge -- die zweite CAT-Fassung dieses Projekts hat es am
+    /// 2026-10-11 am Draht gemessen: "RT1 answered silently and the
+    /// following RT still said RT0". Der Haken war da, er lief, und die
+    /// Scheibe dahinter fehlte; ein Contestprogramm glaubte, seine RIT
+    /// sei an.
+    ///
+    /// Mit Nachleser prueft jedes Setzen, ob es gewirkt hat, und
+    /// antwortet sonst mit `?;`. Ohne Nachleser bleibt es beim alten
+    /// Verhalten (blind quittieren) -- dann ist es die Entscheidung des
+    /// Aufrufers, nicht ein Versehen.
+    void setzeNachleser(std::function<Zustand()> leser)
+    {
+        m_nachleser = std::move(leser);
+    }
     const Zustand& zustand() const { return m_z; }
     void setzeHaken(const Haken& h) { m_h = h; }
 
@@ -144,6 +223,29 @@ public:
     /// From Thetis CAT/CATCommands.cs IF() [v2.10.3.15].
     QString statussatz() const;
 
+    /// Der ERWEITERTE Statussatz, den ZZIF; liefert: 36 Zeichen.
+    ///
+    /// From Thetis CAT/CATCommands.cs:3386-3441 [v2.10.3.15] -- ZZIF().
+    /// Das zusaetzliche Zeichen gegenueber IF; ist das Modusfeld: ZZ
+    /// fuehrt den Modus zweistellig (Mode2String), Kenwood einstellig.
+    /// Alles andere liegt feldweise gleich.
+    QString zzStatussatz() const;
+
+    /// Das 5-Zeichen-Feld Vorzeichen + 4 Stellen, wie ZZRF, ZZFL, ZZFH
+    /// und ZZXF es fuehren.
+    ///
+    /// From Thetis CAT/CATCommands.cs:5904-5940 (ZZRF) -- dort
+    /// `sign + AddLeadingZeros(|x|).Substring(1)`.
+    ///
+    /// ABWEICHUNG, mit Absicht: Thetis klammert beim SETZEN auf
+    /// +-99999 (ZZRF) bzw. +-10000 (ZZFL), kann in der Antwort aber nur
+    /// vier Stellen fuehren -- aus 12000 wird dort stillschweigend
+    /// "+2000", aus 10000 "+0000". Longpath klammert auf +-9999, also
+    /// auf das, was das Feld tragen kann. Ein geklammerter Wert, den der
+    /// Nachleser danach als Abweichung erkennt und mit `?;` meldet, ist
+    /// besser als eine Zahl, die etwas anderes behauptet.
+    static QString vorzeichenFeld4(int hz);
+
     /// Fehlerantwort. From Thetis CAT/CATParser.cs:56 -- Error1 = "?;".
     static QString abgelehnt() { return QStringLiteral("?;"); }
 
@@ -151,17 +253,57 @@ public:
     static QString mitNullen(quint64 wert, int stellen);
     /// Das 4-Zeichen-Schrittfeld des Statussatzes.
     static QString schrittFeld(int stepHz);
+    /// Die Ablage, die der Statussatz zeigt: erst RIT, sonst XIT,
+    /// sonst 0 -- wie Thetis (CATCommands.cs IF(): `if(RITOn) ... else
+    /// if(XITOn)`). Nicht beide zugleich.
+    static int aktiveAblage(const Zustand& z);
+
     /// Das 6-Zeichen-Feld fuer RIT/XIT: Vorzeichen + 5 Stellen.
     /// From Thetis CAT/CATCommands.cs IF() -- incr.
     static QString itFeld(int hz);
+
+    /// Der Kenwood-S-Meter-Wert 0..30 aus einem Pegel in dBm.
+    ///
+    /// From Thetis CAT/CATCommands.cs:896-931 [v2.10.3.15] -- SM. Die
+    /// Kennlinie hat einen Knick bei S9: darunter rechnet sie
+    /// (dBm+127)/6 * 1.6667, darueber 15 + (dBm+73). Uebernommen aus der
+    /// zweiten CAT-Fassung dieses Projekts, die sie gegen hamlibs
+    /// TS-2000-Treiber gefahren hat.
+    static int sMeterAusDbm(double dbm);
 
     /// Hat ein Anrufer AI1; gesetzt? Die Schicht merkt es sich; das
     /// Senden von selbst gehoert in den Transport (eigener Gang).
     bool selbstmeldung() const { return m_selbstmeldung; }
 
+    /// Welche Form ein Befehlswort hat. Die drei Fragen werden EINMAL
+    /// in antwortAuf() entschieden und weitergegeben, damit die
+    /// ZZ-Haelfte sie nicht nachrechnet und dabei abdriftet.
+    struct Form {
+        bool setzen{false};
+        bool abfragen{false};
+        /// Der Befehl SELBST ist die Tat, ohne Nutzdaten (nSet == 0).
+        bool tat{false};
+        /// Erwartete Laenge der Antwortdaten. VERAENDERLICH, weil
+        /// ZZZM; und ZZZV; eine Antwort tragen, deren Laenge erst beim
+        /// Antworten feststeht.
+        int  nAns{-1};
+    };
+
 private:
+    /// Die ZZ-Haelfte des Verteilers. Gibt die Antwortdaten zurueck;
+    /// `std::nullopt` heisst abgelehnt (`?;`), eine leere Zeichenkette
+    /// heisst "nichts zu senden".
+    std::optional<QString> zzDaten(const QString& praefix,
+                                   const QString& suffix,
+                                   Form& f);
+
+    /// Nach einem Setzen: frisch nachlesen und pruefen, ob der Wunsch
+    /// angekommen ist. Ohne Nachleser immer true (altes Verhalten).
+    bool hatGewirkt(const std::function<bool(const Zustand&)>& pruefung);
+
     Zustand m_z;
     Haken   m_h;
+    std::function<Zustand()> m_nachleser;
     bool    m_selbstmeldung{false};
 };
 

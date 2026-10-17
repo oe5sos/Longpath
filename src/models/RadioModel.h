@@ -2394,6 +2394,18 @@ public slots:
     /// while connected, false while disconnected (no "soft off" state).
     Q_INVOKABLE bool powerOn() const;
 
+    /// Der Empfangspegel in dBm fuer den CAT-Befehl SM; (2026-10-13).
+    ///
+    /// Gibt -200.0, wenn es noch keinen WDSP-Kanal gibt (vor dem
+    /// Verbinden) -- ein Wert, den jeder Aufrufer wegklammert, statt ihn
+    /// fuer ein Signal zu halten.
+    ///
+    /// Uebernommen aus der zweiten CAT-Fassung dieses Projekts (Zweig
+    /// fix/discovery-quietpolls-thetis-parity), die ihn fuer SM und fuer
+    /// rigctlds STRENGTH gebaut hat. Siehe
+    /// docs/architecture/2026-10-12-cat-zwei-fassungen.md.
+    Q_INVOKABLE double rxSignalDbm(int rx) const;
+
     /// DIGL click-tune offset -- active slice's diglOffsetHz.
     ///
     /// Architectural divergence from Thetis console.cs:14693-14749

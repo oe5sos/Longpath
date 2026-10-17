@@ -1814,7 +1814,17 @@ longpath_add_test(tst_fm_deviation)
 longpath_add_test(tst_rx_equalizer)
 longpath_add_test(tst_cat_protokoll)
 longpath_add_test(tst_cat_server)
+longpath_add_test(tst_cat_zz)
+longpath_add_test(tst_schutzrahmen)
+longpath_add_test(tst_neues_feld_schaltet_sich_nicht_ein)
+longpath_add_test(tst_schwarzer_hintergrund)
+longpath_add_test(tst_multi_rx_pegel)
+longpath_add_test(tst_thetis_profil_import)
 longpath_add_test(tst_cat_verdrahtung)
+longpath_add_test(tst_mehrere_fenster)
+longpath_add_test(tst_phone_felder)
+longpath_add_test(tst_rufzeichen_locator)
+longpath_add_test(tst_zahlentext)
 # Die serielle Haelfte (2026-10-12). Nur auf UNIX: der Prueffall legt
 # echte Pseudoterminals an (posix_openpt), und die gibt es auf Windows
 # nicht. Dort meldet CatPtyServer::verfuegbar() false und der Schalter
@@ -1823,7 +1833,6 @@ longpath_add_test(tst_cat_verdrahtung)
 if(UNIX)
     longpath_add_test(tst_cat_pty)
 endif()
-longpath_add_test(tst_mehrere_fenster)
 longpath_add_test(tst_fm_applet_wiring)
 
 # ── Phase 3F Sub-Epic B Task 17: AlexController event-matrix coverage ─────────
