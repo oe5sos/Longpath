@@ -100,9 +100,10 @@ void SwrSweepPanel::buildUi()
     m_pointsBox = new QSpinBox(this);
     m_pointsBox->setRange(SwrSweepPlan::kMinPoints, SwrSweepPlan::kMaxPoints);
     m_pointsBox->setValue(51);
-    m_pointsBox->setToolTip(QStringLiteral(
-        "Messpunkte über das Band. 51 ≈ 17 s Sweep; mehr Punkte = "
-        "feinere Kurve, längere Sendezeit."));
+    m_pointsBox->setToolTip(tr("Measurement points across the "
+                                           "band. 51 ≈ 17 s sweep; more "
+                                           "points = finer curve, longer "
+                                           "transmission."));
     row->addWidget(m_pointsBox);
 
     m_powerLabel = new QLabel(this);
@@ -118,12 +119,15 @@ void SwrSweepPanel::buildUi()
     // Values page in Setup — which has shown these numbers all along
     // and which nobody found in a day of looking.
     m_couplerLabel = new QLabel(this);
-    m_couplerLabel->setToolTip(QStringLiteral(
-        "Die Rohwerte des Richtkopplers, 0…4095, ungerechnet. Beim "
-        "Tasten müssen beide steigen: der Vorlauf deutlich, der "
-        "Rücklauf je nach Anpassung wenig bis deutlich. Bleibt einer "
-        "stehen, meldet das Gerät ihn nicht — und dann kann daraus "
-        "auch kein SWR entstehen."));
+    m_couplerLabel->setToolTip(tr("The directional coupler's raw "
+                                              "values, 0…4095, unconverted. "
+                                              "Both must rise while keying: "
+                                              "forward clearly, reflected "
+                                              "anywhere from a little to a "
+                                              "lot depending on the match. If "
+                                              "one stays put, the radio is "
+                                              "not reporting it -- and no SWR "
+                                              "can come out of that."));
     row->addWidget(m_couplerLabel);
 
     row->addStretch(1);
@@ -148,10 +152,10 @@ void SwrSweepPanel::buildUi()
     row2->addWidget(m_progress, 1);
     col->addLayout(row2);
 
-    m_status = new QLabel(QStringLiteral(
-        "Kein Funkgerät verbunden — der Sweep braucht die laufende "
-        "Verbindung. Während des Sweeps sendet das Gerät mit "
-        "Tune-Leistung; nicht am VFO drehen."), this);
+    m_status = new QLabel(tr("No radio connected -- the sweep "
+                                         "needs a live connection. During the "
+                                         "sweep the radio transmits at tune "
+                                         "power; do not turn the VFO."), this);
     m_status->setWordWrap(true);
     m_status->setStyleSheet(Style::themed(QStringLiteral("color:#8090a0;")));
     col->addWidget(m_status);
@@ -164,8 +168,8 @@ void SwrSweepPanel::buildUi()
     auto* row3 = new QHBoxLayout;
     m_traceList = new QListWidget(this);
     m_traceList->setMaximumHeight(84);
-    m_traceList->setToolTip(QStringLiteral(
-        "Ein Eintrag pro Sweep. Haken = sichtbar. Doppelklick benennt um."));
+    m_traceList->setToolTip(tr("One entry per sweep. Tick = "
+                                           "visible. Double-click renames."));
     connect(m_traceList, &QListWidget::itemChanged, this,
             [this](QListWidgetItem* item) {
         const int idx = m_traceList->row(item);
@@ -270,11 +274,12 @@ void SwrSweepPanel::setBackend(const Backend& backend)
         return;
     }
 
-    m_status->setText(QStringLiteral(
-        "Bereit. Der Sweep sendet mit Tune-Leistung innerhalb der "
-        "Bandgrenzen; nicht am VFO drehen, solange er läuft. Die "
-        "Tune-Leistung muss hoch genug sein, dass der Richtkoppler "
-        "etwas anzeigt — siehe die Zahl links."));
+    m_status->setText(tr("Ready. The sweep transmits at tune "
+                                     "power within the band edges; do not "
+                                     "turn the VFO while it runs. Tune power "
+                                     "must be high enough for the directional "
+                                     "coupler to read something -- see the "
+                                     "figure on the left."));
 
     connect(m_startBtn, &QPushButton::clicked,
             this, &SwrSweepPanel::startClicked);
@@ -294,8 +299,7 @@ void SwrSweepPanel::setBackend(const Backend& backend)
                  QDateTime::currentDateTime().toString(
                      QStringLiteral("HH:mm")));
         m_chart->beginLiveTrace(name, plan.startHz, plan.stopHz);
-        m_status->setText(QStringLiteral(
-            "Sweep läuft — %1, %2 Punkte …")
+        m_status->setText(tr("Sweep running -- %1, %2 points …")
                 .arg(bandLabel(plan.band)).arg(plan.points));
 
         // Tell the analysis half that the band under the needle has
@@ -353,22 +357,25 @@ void SwrSweepPanel::setBackend(const Backend& backend)
             // only failure in the feature an operator would act on —
             // by leaving an antenna alone that needs work — so it is
             // said plainly rather than shown as a result.
-            m_status->setText(QStringLiteral(
-                "Vorlauf gemessen, Rücklauf nicht: rückwärtiger ADC "
-                "ruhend %1, beim Senden höchstens %2 — er hat sich "
-                "nicht bewegt.\n\n"
-                "Damit ist jedes SWR hier rechnerisch 1,00 und keines "
-                "gemessen. Die flache Linie bedeutet NICHT, dass die "
-                "Antenne perfekt ist. Entweder liegt am Rücklaufzweig "
-                "des Kopplers nichts an, oder das Gerät meldet ihn "
-                "nicht.")
+            m_status->setText(tr("Forward measured, reflected "
+                                             "not: reverse ADC %1 at rest, at "
+                                             "most %2 while transmitting -- "
+                                             "it never moved.\n\nEvery SWR "
+                                             "here is therefore 1.00 by "
+                                             "arithmetic and none of them "
+                                             "measured. The flat line does "
+                                             "NOT mean the antenna is "
+                                             "perfect. Either nothing reaches "
+                                             "the coupler's reflected branch, "
+                                             "or the radio is not reporting "
+                                             "it.")
                     .arg(result.baselineRevRaw)
                     .arg(result.maxRevRaw));
         } else if (result.completed && result.validPoints() > 0) {
             const quint64 res = result.resonanceHz();
             m_status->setText(res > 0
-                ? tr("Done. Resonance at %1 MHz, SWR %2 "
-                                 "(%3 von %4 Punkten gemessen).")
+                ? tr("Done. Resonance at %1 MHz, SWR %2 (%3 of %4 points "
+                     "measured).")
                       .arg(static_cast<double>(res) / 1e6, 0, 'f', 3)
                       .arg(result.minSwr(), 0, 'f', 2)
                       .arg(result.validPoints())
@@ -396,27 +403,25 @@ void SwrSweepPanel::setBackend(const Backend& backend)
                     : (result.maxFwdW < SwrSweepController::kSilentBridgeW);
             m_status->setText(
                 adcAsleep
-                ? QStringLiteral(
-                      "Der Richtkoppler hat nicht reagiert. ADC ruhend "
-                      "%1, beim Senden höchstens %2 — der Wert ist "
-                      "beim Tasten nicht gestiegen.\n\n"
-                      "Die Ruhezahl kommt von deinem Gerät, kurz vor "
-                      "dem Sweep, mit ausgeschaltetem Sender. Es geht "
-                      "also nicht um zu wenig Leistung, sondern darum, "
-                      "dass sich beim Tasten nichts geändert hat: "
-                      "entweder entsteht keine HF, oder der Koppler "
-                      "meldet sie nicht.\n\n"
-                      "Ohne Senden messen geht über den Reiter "
-                      "„Datei (VNA)“ — ein NanoVNA misst mit "
-                      "Mikrowatt, weil er einen Empfänger benutzt "
-                      "statt einer Diode.")
+                ? tr("The directional coupler did not respond. "
+                                 "ADC %1 at rest, at most %2 while "
+                                 "transmitting -- the value never rose while "
+                                 "keying.\n\nThe resting figure comes from "
+                                 "your own radio, taken just before the sweep "
+                                 "with the transmitter off. So this is not "
+                                 "about too little power, but about nothing "
+                                 "changing when keyed: either no RF is "
+                                 "produced, or the coupler is not reporting "
+                                 "it.\n\nTo measure without transmitting, use "
+                                 "the „File (VNA)“ tab -- a NanoVNA measures "
+                                 "with microwatts because it uses a receiver "
+                                 "instead of a diode.")
                       .arg(result.baselineRaw)
                       .arg(result.maxFwdRaw)
-                : QStringLiteral(
-                      "Kein einziger Punkt gemessen. Der Richtkoppler "
-                      "meldete höchstens %1 W Vorlauf; ab %2 W ist die "
-                      "Anzeige eine Messung. Tune-Leistung höher "
-                      "stellen.")
+                : tr("Not a single point measured. The "
+                                 "directional coupler reported at most %1 W "
+                                 "forward; from %2 W upwards the reading is a "
+                                 "measurement. Raise the tune power.")
                       .arg(result.maxFwdW, 0, 'f', 2)
                       .arg(SwrSweepController::kMinFwdW, 0, 'f', 1));
         } else {
@@ -464,9 +469,8 @@ void SwrSweepPanel::startClicked()
 
     if (!plan.isValid()
         || !plan.clipToGuard(*m_backend.guard, region, mode)) {
-        m_status->setText(QStringLiteral(
-            "Band %1 ist mit dem aktuellen Bandplan/Modus nicht "
-            "sweepbar.").arg(bandLabel(band)));
+        m_status->setText(tr("Band %1 cannot be swept with the "
+                                         "current band plan and mode.").arg(bandLabel(band)));
         return;
     }
 
@@ -477,8 +481,8 @@ void SwrSweepPanel::startClicked()
     {
         const double seconds =
             plan.points * (plan.settleMs + plan.dwellMs) / 1000.0;
-        m_status->setText(QStringLiteral(
-            "%1 bis %2 MHz, %3 Punkte, etwa %4 s Sendezeit.")
+        m_status->setText(tr("%1 to %2 MHz, %3 points, about %4 s "
+                                         "of transmission.")
                 .arg(plan.startHz / 1e6, 0, 'f', 3)
                 .arg(plan.stopHz  / 1e6, 0, 'f', 3)
                 .arg(plan.points)
@@ -488,10 +492,10 @@ void SwrSweepPanel::startClicked()
     // Say which plan trimmed it, and say when nobody told us. Silence
     // here is what let a US-clipped sweep look normal for weeks.
     if (!choice.configured) {
-        m_status->setText(QStringLiteral(
-            "Keine Region eingestellt (Einstellungen → General → "
-            "Region). Der Sweep bleibt vorsichtshalber in dem Bereich, "
-            "den JEDER Bandplan erlaubt: %1–%2 MHz.")
+        m_status->setText(tr("No region set (Settings → General → "
+                                         "Region). To be safe the sweep stays "
+                                         "within the range EVERY band plan "
+                                         "allows: %1–%2 MHz.")
                 .arg(plan.startHz / 1e6, 0, 'f', 3)
                 .arg(plan.stopHz  / 1e6, 0, 'f', 3));
     }
@@ -521,10 +525,11 @@ void SwrSweepPanel::startClicked()
     if (m_backend.tuneDrive) {
         const TuneDrive drive = m_backend.tuneDrive(band);
         if (drive.watts < SwrSweepController::kMinUsefulTuneW) {
-            m_status->setText(QStringLiteral(
-                "Läuft mit %1 W aus dem %2. Wenig für einen "
-                "Richtkoppler — wenn nichts herauskommt, steht der "
-                "Grund gleich hier.")
+            m_status->setText(tr("Running at %1 W from the %2. "
+                                             "Little for a directional "
+                                             "coupler -- if nothing comes "
+                                             "out, the reason will appear "
+                                             "right here.")
                     .arg(drive.watts).arg(drive.sourceLabel));
         }
     }
@@ -614,8 +619,8 @@ void SwrSweepPanel::refreshTunePowerLabel()
     QString note;
     QString colour = QString::fromLatin1(Style::kTextPrimary);
     if (watts < SwrSweepController::kMinUsefulTuneW) {
-        note   = QStringLiteral("  ⚠ wenig — falls nichts herauskommt, "
-                                "steht der Grund unten");
+        note   = tr("⚠ little -- if nothing comes out, the reason "
+                                "appears below");
         colour = QString::fromLatin1(Style::kAmberText);
     } else if (watts > 10) {
         note   = QStringLiteral("  ⚠ >10 W");
@@ -634,19 +639,25 @@ void SwrSweepPanel::refreshTunePowerLabel()
                               .arg(watts).arg(drive.sourceLabel)
                               .arg(note));
 
-    m_powerLabel->setToolTip(QStringLiteral(
-        "Die Leistung, mit der der Sweep sendet — dieselbe, die TUNE "
-        "benutzt.\n\n"
-        "Welcher Regler das ist, steht in Klammern: Longpath kennt "
-        "drei Quellen für die Tune-Leistung (RF-Power-Regler, "
-        "Tune-Pwr-Regler, fester Wert aus dem Setup), und in der "
-        "Voreinstellung ist es der RF-Power-Regler — der Tune-Pwr-"
-        "Regler tut dann gar nichts.\n\n"
-        "Der Richtkoppler ist ein Dämpfungsglied vor einer Diode und "
-        "hat unten eine Schwelle: unter %1 W Vorlauf ist die Anzeige "
-        "Rauschen und der Punkt wird verworfen. Mehr als nötig bringt "
-        "nichts — SWR ist ein Verhältnis und ändert sich mit der "
-        "Leistung nicht.")
+    m_powerLabel->setToolTip(tr("The power the sweep transmits "
+                                            "with -- the same one TUNE "
+                                            "uses.\n\nWhich control that is "
+                                            "appears in brackets: Longpath "
+                                            "knows three sources for tune "
+                                            "power (RF power control, tune "
+                                            "power control, fixed value from "
+                                            "the setup), and by default it is "
+                                            "the RF power control -- the tune "
+                                            "power control then does nothing "
+                                            "at all.\n\nThe directional "
+                                            "coupler is an attenuator in "
+                                            "front of a diode and has a "
+                                            "threshold at the bottom: below "
+                                            "%1 W forward the reading is "
+                                            "noise and the point is "
+                                            "discarded. More than needed "
+                                            "gains nothing -- SWR is a ratio "
+                                            "and does not change with power.")
             .arg(SwrSweepController::kMinFwdW, 0, 'f', 1));
 }
 

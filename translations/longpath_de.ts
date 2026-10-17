@@ -2,6 +2,43 @@
 <!DOCTYPE TS>
 <TS version="2.1" language="de_DE">
 <context>
+    <name>AntennaWindow</name>
+    <message>
+        <source>Loads a bundled 40 m dipole sweep with a known result: resonant at 7.183 MHz, 55 Ω, SWR 1.10. If the window shows something else, the window is at fault -- if it shows this, the display works and the measurement is at fault.</source>
+        <translation>Lädt einen mitgelieferten 40-m-Dipol-Sweep mit bekanntem Ergebnis: resonant bei 7.183 MHz, 55 Ω, SWR 1.10. Zeigt das Fenster etwas anderes, liegt es am Fenster — zeigt es das, funktioniert die Darstellung und es liegt an der Messung.</translation>
+    </message>
+    <message>
+        <source>Place an .s1p from the VNA behind it as a continuous reference curve. It stays there when you measure with the radio afterwards.
+
+The radio cannot measure the whole range: between the bands it must not transmit, and the sweep transmits. The VNA may -- it is an instrument working with microwatts.</source>
+        <translation>Eine .s1p vom VNA als durchgehende Vergleichskurve dahinter legen. Sie bleibt liegen, wenn du danach mit dem Funkgerät misst.
+
+Das Funkgerät kann den ganzen Bereich nicht messen: zwischen den Bändern darf es nicht senden, und der Durchlauf sendet. Der VNA darf — er ist ein Messgerät mit Mikrowatt.</translation>
+    </message>
+    <message>
+        <source>The example file was not found. It lives in the source tree at
+
+    %1
+
+and can be opened from there with „Open sweep…“.</source>
+        <translation>Die Beispieldatei wurde nicht gefunden. Sie liegt im Quellbaum unter
+
+    %1
+
+und lässt sich mit „Open sweep…“ von dort öffnen.</translation>
+    </message>
+    <message>
+        <source>best match point · SWR %1 -- measured by the radio.
+This measurement cannot say where exactly the antenna is resonant or how many centimetres of wire are missing: the directional coupler only measures how much comes back, not with what phase. That needs a sweep with phase (.s1p).</source>
+        <translation>bester Anpassungspunkt · SWR %1 — gemessen vom Funkgerät.
+Wo genau die Antenne resonant ist und wie viele Zentimeter Draht fehlen, kann diese Messung nicht sagen: der Richtkoppler misst nur, wie viel zurückkommt, nicht mit welcher Phase. Dafür braucht es einen Sweep mit Phase (.s1p).</translation>
+    </message>
+    <message>
+        <source>No usable points in this measurement.</source>
+        <translation>Keine verwertbaren Punkte in dieser Messung.</translation>
+    </message>
+</context>
+<context>
     <name>ChromeBar</name>
     <message>
         <location filename="../src/gui/chrome/ChromeBarItems.cpp" line="74" />
@@ -37,6 +74,24 @@
         <location filename="../src/gui/chrome/ChromeBarItems.cpp" line="137" />
         <source>TNF</source>
         <translation type="unfinished" />
+    </message>
+</context>
+<context>
+    <name>CommandBar</name>
+    <message>
+        <source>All widths for this mode -- and one of your own to type in.</source>
+        <translation>Alle Breiten dieses Modus — und eine eigene zum Eintippen.</translation>
+    </message>
+</context>
+<context>
+    <name>GridCellWidget</name>
+    <message>
+        <source>Detach as its own window -- then freely movable and resizable by its corner.</source>
+        <translation>Als eigenes Fenster ablösen — dann frei verschiebbar und in der Ecke ziehbar.</translation>
+    </message>
+    <message>
+        <source>Hide. The + at the bottom right brings it back.</source>
+        <translation>Ausblenden. Mit dem + unten rechts kommt es zurück.</translation>
     </message>
 </context>
 <context>
@@ -399,6 +454,14 @@ Please ensure you understand the implications of including the BPFs when transmi
         <location filename="../src/gui/applets/AppletPanelWidget.cpp" line="608" />
         <source>Detach as a window</source>
         <translation>Als Fenster ablösen</translation>
+    </message>
+    <message>
+        <source>Detach as its own window -- then freely movable.</source>
+        <translation>Als eigenes Fenster ablösen — dann frei verschiebbar.</translation>
+    </message>
+    <message>
+        <source>Hide. The + at the bottom right brings it back.</source>
+        <translation>Ausblenden. Mit dem + unten rechts kommt es zurück.</translation>
     </message>
 </context>
 <context>
@@ -774,6 +837,17 @@ Please ensure you understand the implications of including the BPFs when transmi
         <location filename="../src/gui/setup/AudioTciPage.cpp" line="264" />
         <source>TCI audio streams are independent of the main audio output mute. Use the Slice A/B gain sliders in the TCI Applet to attenuate TCI output without affecting the main speaker output.</source>
         <translation type="unfinished" />
+    </message>
+</context>
+<context>
+    <name>Longpath::BandwidthFilterApplet</name>
+    <message>
+        <source>VAR %1: %2 Hz … %3 Hz -- click recalls it, right-click overwrites it.</source>
+        <translation>VAR %1: %2 Hz … %3 Hz — Klick holt zurück, Rechtsklick überschreibt.</translation>
+    </message>
+    <message>
+        <source>Still empty. VAR 1 fills itself as soon as you drag the filter; right-click stores the current setting.</source>
+        <translation>Noch leer. VAR 1 füllt sich von selbst, sobald du am Filter ziehst; Rechtsklick legt die jetzige Einstellung ab.</translation>
     </message>
 </context>
 <context>
@@ -1629,6 +1703,17 @@ Your own files live next to the settings and win over a shipped palette of the s
         <location filename="../src/gui/containers/ContainerWidget.cpp" line="434" />
         <source>%1 as its own window</source>
         <translation>%1 als eigenes Fenster</translation>
+    </message>
+</context>
+<context>
+    <name>Longpath::CwDecoderApplet</name>
+    <message>
+        <source>Hold the pitch at the detected value instead of following it further</source>
+        <translation>Tonhoehe auf dem erkannten Wert festhalten, statt ihr weiter zu folgen</translation>
+    </message>
+    <message>
+        <source>Hold the speed at the detected value instead of following it further</source>
+        <translation>Tempo auf dem erkannten Wert festhalten, statt ihm weiter zu folgen</translation>
     </message>
 </context>
 <context>
@@ -3838,6 +3923,18 @@ Audio arrives as soon as the receiver is running in ExpertSDR2.</source>
         <source>Everything is here already</source>
         <translation>Alles liegt schon hier</translation>
     </message>
+    <message>
+        <source>Add or remove windows</source>
+        <translation>Fenster hinzufügen oder entfernen</translation>
+    </message>
+    <message>
+        <source>Connect first: how many panadapters are possible is up to the radio (its DDC count).</source>
+        <translation>Erst verbinden: wie viele Panadapter moeglich sind, sagt das Geraet (DDC-Anzahl).</translation>
+    </message>
+    <message>
+        <source>Rotator/log and applets in one area along the right edge, switched by a toolbar; clicking the active icon folds it away.</source>
+        <translation>Rotor/Log und Applets in einem Bereich am rechten Rand, umschaltbar über eine Symbolleiste; Klick auf das aktive Symbol klappt ihn zu.</translation>
+    </message>
 </context>
 <context>
     <name>Longpath::MultimeterPage</name>
@@ -5162,6 +5259,10 @@ All custom band/pin mappings will be cleared.</source>
         <source>Where the transmit audio comes from</source>
         <translation>Woher das Sendeaudio kommt</translation>
     </message>
+    <message>
+        <source>Monitor: your own transmit signal through the speakers</source>
+        <translation>Mithoeren: das eigene Sendesignal ueber die Lautsprecher</translation>
+    </message>
 </context>
 <context>
     <name>Longpath::PowerPage</name>
@@ -6320,6 +6421,34 @@ All custom band/pin mappings will be cleared.</source>
         <source>Labels</source>
         <translation>Beschriftung</translation>
     </message>
+    <message>
+        <source>Image behind grid and trace. Scaled up to the area and cropped centrally; the aspect ratio is kept.</source>
+        <translation>Bild hinter Raster und Spur. Wird auf die Flaeche vergroessert und mittig beschnitten, das Seitenverhaeltnis bleibt.</translation>
+    </message>
+    <message>
+        <source>How strongly the fill colour comes through the image. 100 = fill colour only, 0 = image only.</source>
+        <translation>Wie stark die Fuellfarbe durch das Bild kommt. 100 = nur Fuellfarbe, 0 = nur Bild.</translation>
+    </message>
+    <message>
+        <source>Brightens the image. 100 = unchanged. Brightening is additive: dark areas come up, bright ones do not burn out. To darken, use the fill colour above.</source>
+        <translation>Hellt das Bild auf. 100 = unveraendert. Aufgehellt wird additiv: dunkle Stellen kommen hoch, helle brennen nicht aus. Abdunkeln geht ueber die Fuellfarbe darueber.</translation>
+    </message>
+    <message>
+        <source>The area beneath the image. Without an image it is the background.</source>
+        <translation>Die Flaeche unter dem Bild. Ohne Bild ist sie der Hintergrund.</translation>
+    </message>
+    <message>
+        <source>Colours the band segments of the chosen plan along the bottom of the spectrum -- CW, SSB, digital modes, beacons.</source>
+        <translation>Faerbt die Bandsegmente des gewaehlten Plans am unteren Rand des Spektrums ein — CW, SSB, Digimodes, Baken.</translation>
+    </message>
+    <message>
+        <source>Which band plan applies. Segment edges differ by region.</source>
+        <translation>Welcher Bandplan gilt. Die Segmentgrenzen sind je Region verschieden.</translation>
+    </message>
+    <message>
+        <source>Font size of the segment labels.</source>
+        <translation>Schriftgroesse der Segmentbeschriftung.</translation>
+    </message>
 </context>
 <context>
     <name>Longpath::SpectrumOverlayMenu</name>
@@ -6337,6 +6466,16 @@ All custom band/pin mappings will be cleared.</source>
         <location filename="../src/gui/SpectrumOverlayMenu.cpp" line="277" />
         <source>Background…</source>
         <translation>Hintergrund…</translation>
+    </message>
+    <message>
+        <source>2D: trace plus waterfall.
+3D: traces stacked in perspective.</source>
+        <translation>2D: Trasse plus Wasserfall.
+3D: perspektivisch gestapelte Trassen.</translation>
+    </message>
+    <message>
+        <source>Image, fill colour and opacity of the panadapter -- opens Setup → Display → Spectrum Defaults</source>
+        <translation>Bild, Fuellfarbe und Deckkraft des Panadapters — oeffnet Setup → Display → Spectrum Defaults</translation>
     </message>
 </context>
 <context>
@@ -6379,6 +6518,18 @@ All custom band/pin mappings will be cleared.</source>
         <location filename="../src/gui/setup/GeneralSetupPages.cpp" line="91" />
         <source>&quot;%1&quot; is not a valid grid square (expected e.g. JN78 or JN78dc)</source>
         <translation>„%1“ ist kein gültiger Locator (erwartet z. B. JN78 oder JN78dc)</translation>
+    </message>
+    <message>
+        <source>Your own callsign. Goes to the QSO map, the KiwiSDR, the FlexRadio broadcast on the network, and into the logbook.</source>
+        <translation>Das eigene Rufzeichen. Geht an die QSO-Karte, den KiwiSDR, den FlexRadio-Rundruf im Netz und ins Logbuch.</translation>
+    </message>
+    <message>
+        <source>Your own grid square. The satellite service computes passes from it -- without a valid one it finds nothing.</source>
+        <translation>Der eigene Locator. Der Satellitendienst rechnet Ueberfluege daraus -- ohne gueltigen Locator findet er nichts.</translation>
+    </message>
+    <message>
+        <source>Your own grid square. The satellite service computes passes from it.</source>
+        <translation>Der eigene Locator. Der Satellitendienst rechnet Ueberfluege daraus.</translation>
     </message>
 </context>
 <context>
@@ -6453,6 +6604,90 @@ All custom band/pin mappings will be cleared.</source>
         <location filename="../src/gui/widgets/SwrSweepPanel.cpp" line="683" />
         <source>The file cannot be written.</source>
         <translation>Datei nicht schreibbar.</translation>
+    </message>
+    <message>
+        <source>Measurement points across the band. 51 ≈ 17 s sweep; more points = finer curve, longer transmission.</source>
+        <translation>Messpunkte über das Band. 51 ≈ 17 s Sweep; mehr Punkte = feinere Kurve, längere Sendezeit.</translation>
+    </message>
+    <message>
+        <source>The directional coupler's raw values, 0…4095, unconverted. Both must rise while keying: forward clearly, reflected anywhere from a little to a lot depending on the match. If one stays put, the radio is not reporting it -- and no SWR can come out of that.</source>
+        <translation>Die Rohwerte des Richtkopplers, 0…4095, ungerechnet. Beim Tasten müssen beide steigen: der Vorlauf deutlich, der Rücklauf je nach Anpassung wenig bis deutlich. Bleibt einer stehen, meldet das Gerät ihn nicht — und dann kann daraus auch kein SWR entstehen.</translation>
+    </message>
+    <message>
+        <source>No radio connected -- the sweep needs a live connection. During the sweep the radio transmits at tune power; do not turn the VFO.</source>
+        <translation>Kein Funkgerät verbunden — der Sweep braucht die laufende Verbindung. Während des Sweeps sendet das Gerät mit Tune-Leistung; nicht am VFO drehen.</translation>
+    </message>
+    <message>
+        <source>One entry per sweep. Tick = visible. Double-click renames.</source>
+        <translation>Ein Eintrag pro Sweep. Haken = sichtbar. Doppelklick benennt um.</translation>
+    </message>
+    <message>
+        <source>Ready. The sweep transmits at tune power within the band edges; do not turn the VFO while it runs. Tune power must be high enough for the directional coupler to read something -- see the figure on the left.</source>
+        <translation>Bereit. Der Sweep sendet mit Tune-Leistung innerhalb der Bandgrenzen; nicht am VFO drehen, solange er läuft. Die Tune-Leistung muss hoch genug sein, dass der Richtkoppler etwas anzeigt — siehe die Zahl links.</translation>
+    </message>
+    <message>
+        <source>Sweep running -- %1, %2 points …</source>
+        <translation>Sweep läuft — %1, %2 Punkte …</translation>
+    </message>
+    <message>
+        <source>Forward measured, reflected not: reverse ADC %1 at rest, at most %2 while transmitting -- it never moved.
+
+Every SWR here is therefore 1.00 by arithmetic and none of them measured. The flat line does NOT mean the antenna is perfect. Either nothing reaches the coupler's reflected branch, or the radio is not reporting it.</source>
+        <translation>Vorlauf gemessen, Rücklauf nicht: rückwärtiger ADC ruhend %1, beim Senden höchstens %2 — er hat sich nicht bewegt.
+
+Damit ist jedes SWR hier rechnerisch 1,00 und keines gemessen. Die flache Linie bedeutet NICHT, dass die Antenne perfekt ist. Entweder liegt am Rücklaufzweig des Kopplers nichts an, oder das Gerät meldet ihn nicht.</translation>
+    </message>
+    <message>
+        <source>Done. Resonance at %1 MHz, SWR %2 (%3 of %4 points measured).</source>
+        <translation>Done. Resonance at %1 MHz, SWR %2 (%3 von %4 Punkten gemessen).</translation>
+    </message>
+    <message>
+        <source>The directional coupler did not respond. ADC %1 at rest, at most %2 while transmitting -- the value never rose while keying.
+
+The resting figure comes from your own radio, taken just before the sweep with the transmitter off. So this is not about too little power, but about nothing changing when keyed: either no RF is produced, or the coupler is not reporting it.
+
+To measure without transmitting, use the „File (VNA)“ tab -- a NanoVNA measures with microwatts because it uses a receiver instead of a diode.</source>
+        <translation>Der Richtkoppler hat nicht reagiert. ADC ruhend %1, beim Senden höchstens %2 — der Wert ist beim Tasten nicht gestiegen.
+
+Die Ruhezahl kommt von deinem Gerät, kurz vor dem Sweep, mit ausgeschaltetem Sender. Es geht also nicht um zu wenig Leistung, sondern darum, dass sich beim Tasten nichts geändert hat: entweder entsteht keine HF, oder der Koppler meldet sie nicht.
+
+Ohne Senden messen geht über den Reiter „Datei (VNA)“ — ein NanoVNA misst mit Mikrowatt, weil er einen Empfänger benutzt statt einer Diode.</translation>
+    </message>
+    <message>
+        <source>Not a single point measured. The directional coupler reported at most %1 W forward; from %2 W upwards the reading is a measurement. Raise the tune power.</source>
+        <translation>Kein einziger Punkt gemessen. Der Richtkoppler meldete höchstens %1 W Vorlauf; ab %2 W ist die Anzeige eine Messung. Tune-Leistung höher stellen.</translation>
+    </message>
+    <message>
+        <source>Band %1 cannot be swept with the current band plan and mode.</source>
+        <translation>Band %1 ist mit dem aktuellen Bandplan/Modus nicht sweepbar.</translation>
+    </message>
+    <message>
+        <source>%1 to %2 MHz, %3 points, about %4 s of transmission.</source>
+        <translation>%1 bis %2 MHz, %3 Punkte, etwa %4 s Sendezeit.</translation>
+    </message>
+    <message>
+        <source>No region set (Settings → General → Region). To be safe the sweep stays within the range EVERY band plan allows: %1–%2 MHz.</source>
+        <translation>Keine Region eingestellt (Einstellungen → General → Region). Der Sweep bleibt vorsichtshalber in dem Bereich, den JEDER Bandplan erlaubt: %1–%2 MHz.</translation>
+    </message>
+    <message>
+        <source>Running at %1 W from the %2. Little for a directional coupler -- if nothing comes out, the reason will appear right here.</source>
+        <translation>Läuft mit %1 W aus dem %2. Wenig für einen Richtkoppler — wenn nichts herauskommt, steht der Grund gleich hier.</translation>
+    </message>
+    <message>
+        <source>The power the sweep transmits with -- the same one TUNE uses.
+
+Which control that is appears in brackets: Longpath knows three sources for tune power (RF power control, tune power control, fixed value from the setup), and by default it is the RF power control -- the tune power control then does nothing at all.
+
+The directional coupler is an attenuator in front of a diode and has a threshold at the bottom: below %1 W forward the reading is noise and the point is discarded. More than needed gains nothing -- SWR is a ratio and does not change with power.</source>
+        <translation>Die Leistung, mit der der Sweep sendet — dieselbe, die TUNE benutzt.
+
+Welcher Regler das ist, steht in Klammern: Longpath kennt drei Quellen für die Tune-Leistung (RF-Power-Regler, Tune-Pwr-Regler, fester Wert aus dem Setup), und in der Voreinstellung ist es der RF-Power-Regler — der Tune-Pwr-Regler tut dann gar nichts.
+
+Der Richtkoppler ist ein Dämpfungsglied vor einer Diode und hat unten eine Schwelle: unter %1 W Vorlauf ist die Anzeige Rauschen und der Punkt wird verworfen. Mehr als nötig bringt nichts — SWR ist ein Verhältnis und ändert sich mit der Leistung nicht.</translation>
+    </message>
+    <message>
+        <source>  ⚠ little -- if nothing comes out, the reason appears below</source>
+        <translation>  ⚠ wenig — falls nichts herauskommt, steht der Grund unten</translation>
     </message>
 </context>
 <context>
@@ -6608,6 +6843,10 @@ Rechtsklick, um auf „ganze Maschine“ umzustellen.</translation>
         <location filename="../src/gui/applets/TxApplet.cpp" line="659" />
         <source>Monitor</source>
         <translation>Mithören</translation>
+    </message>
+    <message>
+        <source>Fine tuning: TX profile, TX bandwidth, VOX threshold and monitor level.</source>
+        <translation>Feineinstellung: TX-Profil, TX-Bandbreite, VOX-Schwelle und Mithoerlautstaerke.</translation>
     </message>
 </context>
 <context>
@@ -7220,6 +7459,10 @@ Save before switching?</source>
         <source>About the file:</source>
         <translation>Zur Datei:</translation>
     </message>
+    <message>
+        <source>Import a Thetis profile export or a whole Thetis database. Nothing is applied and nothing is overwritten.</source>
+        <translation>Eine Thetis-Profilausfuhr oder eine ganze Thetis-Datenbank einlesen. Es wird nichts angewandt und nichts ueberschrieben.</translation>
+    </message>
 </context>
 <context>
     <name>Longpath::VaxChannelCard</name>
@@ -7417,6 +7660,32 @@ Save before switching?</source>
     </message>
 </context>
 <context>
+    <name>MainWindow</name>
+    <message>
+        <source>Address not readable: „%1“
+
+Expected is an IP address or a host name, optionally with :port.</source>
+        <translation>Adresse unlesbar: „%1“
+
+Erwartet wird eine IP-Adresse oder ein Rechnername, wahlweise mit :Port.</translation>
+    </message>
+    <message>
+        <source>a real radio has taken it over in the meantime</source>
+        <translation>ein echtes Funkgeraet hat sie inzwischen uebernommen</translation>
+    </message>
+</context>
+<context>
+    <name>ProfileRail</name>
+    <message>
+        <source>New profile from the current arrangement.
+
+The existing one keeps its layout -- like „Save as“.</source>
+        <translation>Neues Profil aus der jetzigen Anordnung.
+
+Das bisherige behält seinen Aufbau — wie „Speichern unter“.</translation>
+    </message>
+</context>
+<context>
     <name>QObject</name>
     <message>
         <location filename="../src/gui/applets/KiwiSdrApplet.cpp" line="104" />
@@ -7523,6 +7792,21 @@ Save before switching?</source>
         <location filename="../src/gui/setup/hardware/OcOutputsHfTab.cpp" line="120" />
         <source>Stored, but not sent to the radio yet — this setting currently has no effect.</source>
         <translation>Wird gespeichert, aber noch nicht an das Gerät gesendet — diese Einstellung hat derzeit keine Wirkung.</translation>
+    </message>
+    <message>
+        <source>%1: &quot;%2&quot; is not a colour value of the form #rrggbb</source>
+        <translation>%1: &quot;%2&quot; ist kein Farbwert der Form #rrggbb</translation>
+    </message>
+    <message>
+        <source>%1 is neither a role nor a colour value</source>
+        <translation>%1 ist weder eine Rolle noch ein Farbwert</translation>
+    </message>
+</context>
+<context>
+    <name>WindowTitleBar</name>
+    <message>
+        <source>Full size -- clicking again restores the previous size</source>
+        <translation>Volle Groesse — noch einmal klicken stellt die vorige Groesse wieder her</translation>
     </message>
 </context>
 </TS>

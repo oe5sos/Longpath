@@ -98,9 +98,8 @@ WindowTitleBar::WindowTitleBar(const QString& title, QWidget* parent)
     // Volle Groesse / zurueck — Begruendung am toggleZoom() im Header.
     m_zoomBtn = new QPushButton(QStringLiteral("⤢"), this);
     m_zoomBtn->setFixedSize(16, 16);
-    m_zoomBtn->setToolTip(QStringLiteral(
-        "Volle Groesse — noch einmal klicken stellt die vorige "
-        "Groesse wieder her"));
+    m_zoomBtn->setToolTip(tr("Full size -- clicking again "
+                                         "restores the previous size"));
     m_zoomBtn->setCursor(Qt::ArrowCursor);
     // ── `padding: 0` an allen drei Knoepfen (2026-10-07) ────────────
     //

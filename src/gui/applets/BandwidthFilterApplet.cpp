@@ -655,16 +655,16 @@ void BandwidthFilterApplet::refreshVarButtons()
             b->setText(bw >= 1000
                 ? QStringLiteral("%1k").arg(bw / 1000.0, 0, 'f', 1)
                 : QStringLiteral("%1").arg(bw));
-            b->setToolTip(QStringLiteral(
-                "VAR %1: %2 Hz … %3 Hz — Klick holt zurück, "
-                "Rechtsklick überschreibt.").arg(i + 1)
+            b->setToolTip(tr("VAR %1: %2 Hz … %3 Hz -- click "
+                                         "recalls it, right-click overwrites "
+                                         "it.").arg(i + 1)
                 .arg(v.first).arg(v.second));
         } else {
             b->setText(QStringLiteral("VAR %1").arg(i + 1));
-            b->setToolTip(QStringLiteral(
-                "Noch leer. VAR 1 füllt sich von selbst, sobald du am "
-                "Filter ziehst; Rechtsklick legt die jetzige "
-                "Einstellung ab."));
+            b->setToolTip(tr("Still empty. VAR 1 fills itself as "
+                                         "soon as you drag the filter; "
+                                         "right-click stores the current "
+                                         "setting."));
         }
         b->setEnabled(true);
         b->setProperty("varFilled", filled);

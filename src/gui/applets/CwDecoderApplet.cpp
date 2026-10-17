@@ -161,8 +161,9 @@ void CwDecoderApplet::buildUI()
     auto* ctrlRow = new QHBoxLayout();
     m_lockPitchBtn = blueToggle(QStringLiteral("LOCK Hz"), 86);
     m_lockPitchBtn->setCheckable(true);
-    m_lockPitchBtn->setToolTip(QStringLiteral(
-        "Tonhoehe auf dem erkannten Wert festhalten, statt ihr weiter zu folgen"));
+    m_lockPitchBtn->setToolTip(tr("Hold the pitch at the detected "
+                                              "value instead of following it "
+                                              "further"));
     connect(m_lockPitchBtn, &QPushButton::toggled, this, [this](bool on) {
         if (m_decoder) { m_decoder->lockPitch(on); }
         onStatsUpdated(m_decoder ? m_decoder->estimatedPitch() : 0.0f,
@@ -172,8 +173,9 @@ void CwDecoderApplet::buildUI()
 
     m_lockSpeedBtn = blueToggle(QStringLiteral("LOCK WPM"), 96);
     m_lockSpeedBtn->setCheckable(true);
-    m_lockSpeedBtn->setToolTip(QStringLiteral(
-        "Tempo auf dem erkannten Wert festhalten, statt ihm weiter zu folgen"));
+    m_lockSpeedBtn->setToolTip(tr("Hold the speed at the detected "
+                                              "value instead of following it "
+                                              "further"));
     connect(m_lockSpeedBtn, &QPushButton::toggled, this, [this](bool on) {
         if (m_decoder) { m_decoder->lockSpeed(on); }
         onStatsUpdated(m_decoder ? m_decoder->estimatedPitch() : 0.0f,

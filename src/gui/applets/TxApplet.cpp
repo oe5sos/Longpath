@@ -540,9 +540,9 @@ void TxApplet::buildUI()
         m_moreBtn->setStyleSheet(Style::buttonBaseStyle()
             + QStringLiteral("QPushButton { padding: 1px 3px; }"));
         m_moreBtn->setAccessibleName(QStringLiteral("More TX settings"));
-        m_moreBtn->setToolTip(QStringLiteral(
-            "Feineinstellung: TX-Profil, TX-Bandbreite, VOX-Schwelle "
-            "und Mithoerlautstaerke."));
+        m_moreBtn->setToolTip(tr("Fine tuning: TX profile, TX "
+                                             "bandwidth, VOX threshold and "
+                                             "monitor level."));
         reihe->addWidget(m_moreBtn);
 
         vbox->addLayout(reihe);

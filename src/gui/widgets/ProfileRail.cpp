@@ -127,9 +127,9 @@ ProfileRail::ProfileRail(LayoutProfiles* profiles,
     m_plus = new QPushButton(QStringLiteral("+"), this);
     setzeMasse(m_plus);
     m_plus->setCursor(Qt::PointingHandCursor);
-    m_plus->setToolTip(QStringLiteral(
-        "Neues Profil aus der jetzigen Anordnung.\n\n"
-        "Das bisherige behält seinen Aufbau — wie „Speichern unter“."));
+    m_plus->setToolTip(tr("New profile from the current "
+                                      "arrangement.\n\nThe existing one keeps "
+                                      "its layout -- like „Save as“."));
     // Gestrichelt bleibt es an beiden Plaetzen -- das ist die Zusage
     // „hier kommt noch etwas hin" und gilt unabhaengig von der Form.
     // Nur die Rundung folgt dem Platz: Scheibe am Rand, Pillenradius
