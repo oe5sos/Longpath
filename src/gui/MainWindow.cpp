@@ -7554,7 +7554,7 @@ void MainWindow::populateDefaultMeter()
                 const QString warnung = Spe::warningText(s.warning);
                 m_speApplet->setFaultText(
                     warnung.isEmpty() ? QString()
-                                      : tr("Warnung: %1").arg(warnung), false);
+                                      : tr("Warning: %1").arg(warnung), false);
             }
         });
 
@@ -7717,10 +7717,10 @@ void MainWindow::populateDefaultMeter()
             // „auto-scaled" heisst aus der beobachteten Leistung
             // geschlossen.
             m_acomApplet->setDiagnosticTooltip(
-                tr("Leistungsklasse %1 (%2). Nennleistung %3 W, Skalenende "
-                   "%4 W.\n\nDie Beschreibung des Herstellers dokumentiert nur "
-                   "einen Typcode, darum wird die Klasse aus der beobachteten "
-                   "Leistung geschlossen, wenn das Gerät sie nicht bestätigt.")
+                tr("Power class %1 (%2). Rated %3 W, scale end %4 "
+                   "W.\n\nThe manufacturer's documentation lists only a "
+                   "type code, so the class is inferred from the observed "
+                   "power when the unit does not confirm it.")
                     .arg(name, grund)
                     .arg(spec.nominalForwardW, 0, 'f', 0)
                     .arg(spec.maxForwardW, 0, 'f', 0));
@@ -10051,7 +10051,8 @@ void MainWindow::buildMenuBar()
         // Die Stufen: 75 bis 200 wie bisher vorgesehen, dazu 115 und 130
         // als feine Zwischenstufen -- von 100 auf 125 ist ein grosser
         // Sprung, und genau dort liegt der Bedarf.
-        QMenu* uiScaleMenu = viewMenu->addMenu(QStringLiteral("&Darstellungsgröße"));
+        QMenu* uiScaleMenu = viewMenu->addMenu(tr("&Display "
+                                                              "size"));
         QActionGroup* scaleGroup = new QActionGroup(this);
         scaleGroup->setExclusive(true);
 
@@ -10065,7 +10066,7 @@ void MainWindow::buildMenuBar()
             connect(a, &QAction::triggered, this, [this, pct]() {
                 if (!UiScale::store(pct)) { return; }
                 QMessageBox::information(this,
-                                         QStringLiteral("Darstellungsgröße"),
+                                         tr("Display size"),
                                          UiScale::restartHint(pct));
             });
         }

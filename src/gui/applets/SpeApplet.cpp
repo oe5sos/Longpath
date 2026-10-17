@@ -148,7 +148,7 @@ SpeApplet::SpeApplet(RadioModel* model, QWidget* parent)
     m_pwrGauge->setTitle(QStringLiteral("PWR"));
     m_pwrGauge->setTickLabels(gleichmaessigeStriche(1600.0f));
     m_pwrGauge->setReadout(true, 0, QStringLiteral("W"));
-    m_pwrGauge->setAccessibleName(tr("Ausgangsleistung"));
+    m_pwrGauge->setAccessibleName(tr("Output power"));
     vbox->addWidget(m_pwrGauge);
 
     // Die Stehwellen-Achsen sind geraeteunabhaengig 1,0..3,0 -- ein
@@ -168,7 +168,7 @@ SpeApplet::SpeApplet(RadioModel* model, QWidget* parent)
         return g;
     };
     m_swrAntGauge = macheSwrStreifen(QStringLiteral("SWR"),
-                                     tr("Stehwelle an der Antenne"));
+                                     tr("SWR at the antenna"));
     vbox->addWidget(m_swrAntGauge);
     m_swrAtuGauge = macheSwrStreifen(QStringLiteral("ATU"),
                                      tr("Stehwelle vor dem Anpassgeraet"));
@@ -184,8 +184,8 @@ SpeApplet::SpeApplet(RadioModel* model, QWidget* parent)
     // Der Verstaerker meldet Grad in der Einheit, auf die sein EIGENES
     // Display eingestellt ist, und sagt auf der Leitung nicht welche
     // (Anleitung §5) -- darum ein nacktes Gradzeichen und kein C/F-Schalter.
-    m_tempLabel->setToolTip(tr("Kühlkörpertemperatur, in der Einheit, auf die "
-                               "das Display des Verstärkers eingestellt ist"));
+    m_tempLabel->setToolTip(tr("Heatsink temperature, in whichever unit "
+                               "the amplifier's own display is set to"));
     m_voltLabel = new QLabel(QStringLiteral("V  — V"), this);
     m_voltLabel->setStyleSheet(Style::themed(zahlenStil));
     m_currLabel = new QLabel(QStringLiteral("I  — A"), this);
@@ -235,35 +235,35 @@ SpeApplet::SpeApplet(RadioModel* model, QWidget* parent)
     m_onBtn = new QPushButton(QStringLiteral("ON"), this);
     m_onBtn->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
     m_onBtn->setStyleSheet(Style::themed(operateAktivStil()));
-    m_onBtn->setToolTip(tr("Verstärker einschalten — ein Impuls auf den "
-                           "Steuerleitungen. Über Netz braucht das einen "
-                           "ser2net-Anschluss mit rfc2217; siehe den Hinweis "
-                           "in den Einstellungen."));
+    m_onBtn->setToolTip(tr("Switch the amplifier on -- a pulse on the "
+                           "control lines. Over the network this needs a "
+                           "ser2net port with rfc2217; see the note in the "
+                           "settings."));
     connect(m_onBtn, &QPushButton::clicked, this, &SpeApplet::powerOnClicked);
     // "OPER"/"STBY" statt der ganzen Woerter -- in der Reihe stehen fuenf
     // Knoepfe, und die langen Beschriftungen schneiden bei der normalen
     // Feldbreite ab (bei AetherSDR am Geraet gemessen).
     m_operateBtn = macheTaste(QStringLiteral("OPER"));
-    m_operateBtn->setToolTip(tr("Zwischen STANDBY und OPERATE umschalten "
-                                "(OPERATE-Taste am Gerät)"));
+    m_operateBtn->setToolTip(tr("Toggle between STANDBY and OPERATE "
+                                "(OPERATE key on the unit)"));
     connect(m_operateBtn, &QPushButton::clicked, this, &SpeApplet::operateClicked);
     // Die Beschriftung IST die aktuelle Stufe (LOW/MID/HIGH), sobald sie
     // bekannt ist -- ein Druck schaltet zur naechsten, wie die
     // POWER-Taste am Geraet.
     m_pwrLevelBtn = macheTaste(QStringLiteral("PWR"));
-    m_pwrLevelBtn->setToolTip(tr("Leistungsstufe — ein Druck schaltet "
-                                 "LOW / MID / HIGH weiter"));
+    m_pwrLevelBtn->setToolTip(tr("Power level -- one press steps LOW / MID "
+                                 "/ HIGH"));
     connect(m_pwrLevelBtn, &QPushButton::clicked, this, &SpeApplet::powerLevelClicked);
     m_tuneBtn = macheTaste(QStringLiteral("TUNE"));
     // AetherSDR markiert diesen Knopf als sendetastend (TxKeyingMarker);
     // das Gegenstueck gibt es hier nicht, also steht es im Hinweistext.
-    m_tuneBtn->setToolTip(tr("Anpassgerät abstimmen (TUNE-Taste am Gerät). "
-                             "SENDET: die Abstimmung läuft mit Vorlauf."));
+    m_tuneBtn->setToolTip(tr("Tune the ATU (TUNE key on the unit). "
+                             "TRANSMITS: tuning runs with drive."));
     connect(m_tuneBtn, &QPushButton::clicked, this, &SpeApplet::tuneClicked);
     m_offBtn = macheTaste(QStringLiteral("OFF"));
-    m_offBtn->setToolTip(tr("Verstärker ausschalten. Mit ON wieder hoch "
-                            "(über Netz braucht das einen ser2net-Anschluss "
-                            "mit rfc2217)."));
+    m_offBtn->setToolTip(tr("Switch the amplifier off. ON brings it back "
+                            "up (over the network this needs a ser2net "
+                            "port with rfc2217)."));
     connect(m_offBtn, &QPushButton::clicked, this, &SpeApplet::offClicked);
     reihe1->addStretch();
     reihe1->addWidget(m_onBtn);
@@ -279,7 +279,8 @@ SpeApplet::SpeApplet(RadioModel* model, QWidget* parent)
     m_inputBtn->setToolTip(tr("Eingang 1 / 2 umschalten"));
     connect(m_inputBtn, &QPushButton::clicked, this, &SpeApplet::inputClicked);
     m_antBtn = macheTaste(QStringLiteral("ANT"));
-    m_antBtn->setToolTip(tr("Sendeantenne für das aktuelle Band weiterschalten"));
+    m_antBtn->setToolTip(tr("Step the transmit antenna for the current "
+                            "band"));
     connect(m_antBtn, &QPushButton::clicked, this, &SpeApplet::antennaClicked);
     // Die Pfeiltasten des Expert stellen die Vorlaufleistung ein, die der
     // Verstaerker vom Funkgeraet ueber CAT anfordert. Bandtasten gibt es
@@ -288,16 +289,15 @@ SpeApplet::SpeApplet(RadioModel* model, QWidget* parent)
     // Das Zeichen IST die ganze Beschriftung -- ohne eigenen Namen liest
     // eine Vorlesehilfe das Pfeilzeichen vor. Hinweistexte erreichen sie
     // nur auf Anfrage und ersetzen den Namen darum nicht.
-    m_driveDownBtn->setAccessibleName(tr("Angeforderte Vorlaufleistung senken"));
-    m_driveDownBtn->setToolTip(tr("Die Vorlaufleistung senken, die der "
-                                  "Verstärker vom Funkgerät anfordert "
-                                  "(Pfeiltaste am Gerät)"));
+    m_driveDownBtn->setAccessibleName(tr("Lower the requested drive power"));
+    m_driveDownBtn->setToolTip(tr("Lower the drive power the amplifier "
+                                  "asks of the radio (arrow key on the "
+                                  "unit)"));
     connect(m_driveDownBtn, &QPushButton::clicked, this, &SpeApplet::driveDownClicked);
     m_driveUpBtn = macheTaste(QStringLiteral("▲"));
-    m_driveUpBtn->setAccessibleName(tr("Angeforderte Vorlaufleistung erhöhen"));
-    m_driveUpBtn->setToolTip(tr("Die Vorlaufleistung erhöhen, die der "
-                                "Verstärker vom Funkgerät anfordert "
-                                "(Pfeiltaste am Gerät)"));
+    m_driveUpBtn->setAccessibleName(tr("Raise the requested drive power"));
+    m_driveUpBtn->setToolTip(tr("Raise the drive power the amplifier asks "
+                                "of the radio (arrow key on the unit)"));
     connect(m_driveUpBtn, &QPushButton::clicked, this, &SpeApplet::driveUpClicked);
     reihe2->addStretch();
     reihe2->addWidget(m_inputBtn);

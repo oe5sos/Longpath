@@ -446,8 +446,9 @@ void FmOptContainer::syncFromSlice()
                 : QStringLiteral("CTCSS-Subton %1 Hz")
                       .arg(QString::number(m_slice->fmCtcssValueHz(), 'f', 1));
             m_toneLamp->setToolTip(tonDa
-                ? QStringLiteral("Der %1 liegt an").arg(was)
-                : QStringLiteral("Warten auf den %1 -- er fehlt, der Kanal ist stumm")
+                ? tr("The %1 is present").arg(was)
+                : tr("Waiting for the %1 -- it is missing, the "
+                                 "channel is muted")
                       .arg(was));
         }
     }

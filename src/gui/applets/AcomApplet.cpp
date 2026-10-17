@@ -99,14 +99,14 @@ AcomApplet::AcomApplet(RadioModel* model, QWidget* parent)
     m_pwrGauge = new HGauge(this);
     m_pwrGauge->setTitle(QStringLiteral("PWR"));
     m_pwrGauge->setReadout(true, 0, QStringLiteral("W"));
-    m_pwrGauge->setAccessibleName(tr("Ausgangsleistung"));
+    m_pwrGauge->setAccessibleName(tr("Output power"));
     setPowerRange(s600.nominalForwardW, s600.maxForwardW);
     vbox->addWidget(m_pwrGauge);
 
     m_reflGauge = new HGauge(this);
     m_reflGauge->setTitle(QStringLiteral("REFL"));
     m_reflGauge->setReadout(true, 0, QStringLiteral("W"));
-    m_reflGauge->setAccessibleName(tr("Rücklaufleistung"));
+    m_reflGauge->setAccessibleName(tr("Reflected power"));
     setReflectedRange(s600.nominalReflectedW, s600.maxReflectedW);
     vbox->addWidget(m_reflGauge);
 
@@ -122,7 +122,7 @@ AcomApplet::AcomApplet(RadioModel* model, QWidget* parent)
                                QStringLiteral("3")});
     m_swrGauge->setReadout(true, 1, QString());
     m_swrGauge->setValue(1.0);
-    m_swrGauge->setAccessibleName(tr("Stehwellenverhältnis"));
+    m_swrGauge->setAccessibleName(tr("Standing wave ratio"));
     vbox->addWidget(m_swrGauge);
 
     // ── Zahlenfeld: Temp / HV / Id, dann Band / Betrieb ──────────────
@@ -138,12 +138,12 @@ AcomApplet::AcomApplet(RadioModel* model, QWidget* parent)
     m_hvLabel     = macheZahl(QStringLiteral("HV  — V"));
     m_idLabel     = macheZahl(QStringLiteral("Id  — A"));
     m_bandLabel   = macheZahl(QStringLiteral("BAND  —"));
-    m_uptimeLabel = macheZahl(QStringLiteral("BETRIEB  —"));
+    m_uptimeLabel = macheZahl(tr("UPTIME  —"));
     // „BETRIEB", nicht „an seit": das Feld zaehlt die GESAMTE
     // Betriebszeit und wird beim Ausschalten nicht zurueckgesetzt (am
     // echten 600S bestaetigt).
-    m_uptimeLabel->setToolTip(tr("Gesamte Betriebszeit des Verstärkers — "
-                                 "wird beim Ausschalten nicht zurückgesetzt"));
+    m_uptimeLabel->setToolTip(tr("Total run time of the amplifier -- not "
+                                 "reset when it is switched off"));
 
     auto* gitter = new QGridLayout;
     gitter->setHorizontalSpacing(12);
@@ -178,16 +178,16 @@ AcomApplet::AcomApplet(RadioModel* model, QWidget* parent)
         btn->setStyleSheet(Style::themed(mitAusgrauung(Style::kAmpNeutralBtnStyle)));
         return btn;
     };
-    m_clearBtn = macheTaste(QStringLiteral("FEHLER LÖSCHEN"));
-    m_clearBtn->setToolTip(tr("Anliegende weiche Fehler löschen"));
+    m_clearBtn = macheTaste(tr("CLEAR FAULT"));
+    m_clearBtn->setToolTip(tr("Clear pending soft faults"));
     connect(m_clearBtn, &QPushButton::clicked, this, &AcomApplet::clearFaultClicked);
 
     m_standbyBtn = macheTaste(QStringLiteral("STANDBY"));
     connect(m_standbyBtn, &QPushButton::clicked, this, &AcomApplet::standbyClicked);
     m_operateBtn = macheTaste(QStringLiteral("OPERATE"));
     connect(m_operateBtn, &QPushButton::clicked, this, &AcomApplet::operateClicked);
-    m_offBtn = macheTaste(QStringLiteral("AUS"));
-    m_offBtn->setToolTip(tr("Verstärker ausschalten"));
+    m_offBtn = macheTaste(tr("OFF"));
+    m_offBtn->setToolTip(tr("Switch the amplifier off"));
     connect(m_offBtn, &QPushButton::clicked, this, &AcomApplet::offClicked);
 
     // Der Loeschknopf bekommt eine EIGENE Zeile. Zu viert in einer
@@ -293,7 +293,7 @@ void AcomApplet::setBand(const QString& band)
 
 void AcomApplet::setUptime(quint32 totalSeconds)
 {
-    m_uptimeLabel->setText(QStringLiteral("BETRIEB  %1").arg(betriebszeit(totalSeconds)));
+    m_uptimeLabel->setText(tr("UPTIME  %1").arg(betriebszeit(totalSeconds)));
 }
 
 void AcomApplet::setSource(const QString& text)
@@ -411,7 +411,7 @@ void AcomApplet::clearTelemetry()
     m_hvLabel->setText(QStringLiteral("HV  — V"));
     m_idLabel->setText(QStringLiteral("Id  — A"));
     m_bandLabel->setText(QStringLiteral("BAND  —"));
-    m_uptimeLabel->setText(QStringLiteral("BETRIEB  —"));
+    m_uptimeLabel->setText(tr("UPTIME  —"));
     m_mode = Acom::Mode::Unknown;
     setFaultText(QString());
     m_clearBtn->setEnabled(false);

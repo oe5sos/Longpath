@@ -201,7 +201,7 @@ QWidget* AppletWidget::receiverChoiceWidget(QWidget* parent)
     vbox->setContentsMargins(0, 0, 0, 0);
     vbox->setSpacing(4);
 
-    auto* titel = new QLabel(QStringLiteral("Empfänger"), box);
+    auto* titel = new QLabel(tr("Receiver"), box);
     // Schriftstufen aus der Leiter in StyleConstants.h -- eine eigene
     // Groesse dazwischen faellt in scripts/verify-style-drift.py.
     titel->setStyleSheet(QStringLiteral(
@@ -239,8 +239,8 @@ QWidget* AppletWidget::receiverChoiceWidget(QWidget* parent)
     vbox->addWidget(waehler);
 
     auto* hinweis = new QLabel(
-        QStringLiteral("Fest gewählt bleibt dieses Fenster an seinem "
-                       "Empfänger, auch wenn woanders gearbeitet wird."), box);
+        tr("Pinned keeps this window on its receiver, even "
+                       "while work happens elsewhere."), box);
     hinweis->setWordWrap(true);
     hinweis->setStyleSheet(QStringLiteral(
         "QLabel { color: %1; font-size: %2px; }")

@@ -264,7 +264,8 @@ void TstKpa500Anbindung::derBootZustandMachtDenEinschaltknopfSinnvoll()
     QVERIFY2(!m_applet->commandsEnabledForTesting(),
              "Im Boot-Zustand nimmt er keine regulaeren Befehle -- die Tasten "
              "muessen grau sein");
-    QVERIFY2(m_applet->statusPillTextForTesting().contains(QStringLiteral("AUS")),
+    QVERIFY2(m_applet->statusPillTextForTesting()
+                 .contains(Kpa500Applet::tr("OFF · on the wire")),
              qPrintable(QStringLiteral("Die Pille sagt nicht, dass er aus ist: "
                                        "%1").arg(m_applet->statusPillTextForTesting())));
     // Und die Messwerte sind geleert, nicht eingefroren.
@@ -299,7 +300,14 @@ void TstKpa500Anbindung::einFehlerKommtAlsZahlUndLaesstSichLoeschen()
     QVERIFY2(band.contains(QStringLiteral("03")),
              qPrintable(QStringLiteral("Die Nummer fehlt: %1").arg(band)));
     // KEIN erfundener Name. Das Dokument gibt die Zuordnung nicht her.
-    QVERIFY2(band.contains(QStringLiteral("nicht in Elecrafts")),
+    // Der Vergleich geht ueber tr(): der Quelltext ist seit dem
+    // Englisch-Durchgang englisch, die deutsche Fassung liegt in
+    // translations/longpath_de.ts. Ein festgenagelter Text faellt auf
+    // dem jeweils anderen Rechner.
+    QVERIFY2(band.contains(Kpa500Applet::tr(
+                 "FAULT %1 -- its meaning is not in Elecraft's "
+                 "documentation; the unit shows it on the front panel.")
+                 .arg(3, 2, 10, QLatin1Char('0'))),
              qPrintable(QStringLiteral("Der Hinweis, dass die Bedeutung nicht "
                                        "dokumentiert ist, fehlt: %1").arg(band)));
     QVERIFY2(m_applet->faultClearVisibleForTesting(),

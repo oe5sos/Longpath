@@ -98,7 +98,7 @@ Kpa500Applet::Kpa500Applet(RadioModel* model, QWidget* parent)
                                QStringLiteral("300"), QStringLiteral("450"),
                                QStringLiteral("600")});
     m_pwrGauge->setReadout(true, 0, QStringLiteral("W"));
-    m_pwrGauge->setAccessibleName(tr("Ausgangsleistung"));
+    m_pwrGauge->setAccessibleName(tr("Output power"));
     vbox->addWidget(m_pwrGauge);
 
     m_swrGauge = new HGauge(this);
@@ -111,7 +111,7 @@ Kpa500Applet::Kpa500Applet(RadioModel* model, QWidget* parent)
                                QStringLiteral("3")});
     m_swrGauge->setReadout(true, 1, QString());
     m_swrGauge->setValue(1.0);
-    m_swrGauge->setAccessibleName(tr("Stehwellenverhältnis"));
+    m_swrGauge->setAccessibleName(tr("Standing wave ratio"));
     vbox->addWidget(m_swrGauge);
 
     // Temperatur als STREIFEN -- hier gibt das Dokument einen Bereich
@@ -126,7 +126,7 @@ Kpa500Applet::Kpa500Applet(RadioModel* model, QWidget* parent)
                                 QStringLiteral("75"), QStringLiteral("110"),
                                 QStringLiteral("150")});
     m_tempGauge->setReadout(true, 0, QStringLiteral("°C"));
-    m_tempGauge->setAccessibleName(tr("Kühlkörpertemperatur"));
+    m_tempGauge->setAccessibleName(tr("Heatsink temperature"));
     vbox->addWidget(m_tempGauge);
 
     // ── Zahlenfeld ───────────────────────────────────────────────────
@@ -175,26 +175,27 @@ Kpa500Applet::Kpa500Applet(RadioModel* model, QWidget* parent)
     m_onBtn->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
     m_onBtn->setStyleSheet(
         Style::themed(mitAusgrauung(Style::kAmpOperateActiveBtnStyle)));
-    m_onBtn->setToolTip(tr("Verstärker einschalten. Elecrafts Befehl 'P' des "
-                           "Boot-Laders — nur sinnvoll, solange der Verstärker "
-                           "aus, aber am Draht erreichbar ist."));
+    m_onBtn->setToolTip(tr("Switch the amplifier on. Elecraft's boot "
+                           "loader command 'P' -- only useful while the "
+                           "amplifier is off but still reachable on the "
+                           "wire."));
     connect(m_onBtn, &QPushButton::clicked, this, &Kpa500Applet::powerOnClicked);
 
     m_operateBtn = macheTaste(QStringLiteral("OPER"));
-    m_operateBtn->setToolTip(tr("Zwischen STANDBY und OPERATE umschalten"));
+    m_operateBtn->setToolTip(tr("Toggle between STANDBY and OPERATE"));
     connect(m_operateBtn, &QPushButton::clicked, this, &Kpa500Applet::operateClicked);
 
     m_offBtn = macheTaste(QStringLiteral("OFF"));
-    m_offBtn->setToolTip(tr("Verstärker ausschalten. Danach bleibt er am Draht "
-                            "erreichbar und lässt sich mit ON wieder "
-                            "einschalten."));
+    m_offBtn->setToolTip(tr("Switch the amplifier off. It stays reachable "
+                            "on the wire afterwards, and ON brings it "
+                            "back."));
     connect(m_offBtn, &QPushButton::clicked, this, &Kpa500Applet::offClicked);
 
     // Den gibt es beim SPE nicht: der KPA500 kann einen anliegenden
     // Fehler auf Befehl loeschen (^FLC;). Sichtbar nur, wenn einer
     // anliegt -- ein Knopf ohne Anlass ist eine Einladung zum Druecken.
-    m_clearFaultBtn = macheTaste(QStringLiteral("FEHLER LÖSCHEN"));
-    m_clearFaultBtn->setToolTip(tr("Den anliegenden Fehler löschen (^FLC;)"));
+    m_clearFaultBtn = macheTaste(tr("CLEAR FAULT"));
+    m_clearFaultBtn->setToolTip(tr("Clear the pending fault (^FLC;)"));
     m_clearFaultBtn->hide();
     connect(m_clearFaultBtn, &QPushButton::clicked,
             this, &Kpa500Applet::clearFaultClicked);
@@ -276,9 +277,9 @@ void Kpa500Applet::setFault(int code)
     }
     // KEIN Name. Das Dokument gibt die Zuordnung nicht her -- siehe
     // core/Kpa500Protocol.h, parseFault().
-    m_faultLabel->setText(tr("FEHLER %1 — die Bedeutung steht nicht in "
-                             "Elecrafts Beschreibung; das Gerät zeigt sie "
-                             "an der Front.")
+    m_faultLabel->setText(tr("FAULT %1 -- its meaning is not in Elecraft's "
+                             "documentation; the unit shows it on the "
+                             "front panel.")
                               .arg(code, 2, 10, QLatin1Char('0')));
     m_faultLabel->show();
     m_clearFaultBtn->show();
@@ -325,13 +326,13 @@ void Kpa500Applet::applyPill()
                 // Die Auskunft, die der SPE nicht geben kann: aus, aber
                 // erreichbar. Bernstein, nicht Rot -- das ist kein
                 // Fehler, sondern ein Zustand.
-                text = QStringLiteral("AUS · am Draht");
+                text = tr("OFF · on the wire");
                 hg = QLatin1String(Style::kBadgeWarnBg);
                 schrift = QLatin1String(Style::kAmberText);
                 rand = QLatin1String(Style::kAmberText);
                 break;
             case Kpa500Connection::Liveness::Silent:
-                text = QStringLiteral("keine Antwort");
+                text = tr("no reply");
                 hg = QLatin1String(Style::kBadgeOffBg);
                 schrift = QLatin1String(Style::kTextTertiary);
                 rand = QLatin1String(Style::kTextInactive);
