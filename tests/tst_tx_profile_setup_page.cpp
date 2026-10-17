@@ -544,12 +544,18 @@ private slots:
             "</Data>\n";
 
         const QString bericht = page.einleseThetisDateiFuerTest(datei);
-        QVERIFY2(bericht.contains(QStringLiteral("1 Profil(e) angelegt")),
+        // Ueber tr(): der Quelltext ist seit dem 2026-10-15 englisch,
+        // die deutsche Fassung liegt in translations/longpath_de.ts.
+        QVERIFY2(bericht.contains(
+                     TxProfileSetupPage::tr(
+                         "%1 profile(s) created, nothing applied and "
+                         "nothing overwritten.").arg(1)),
                  qPrintable(bericht));
         QVERIFY2(bericht.contains(QStringLiteral("Martins ESSB")),
                  qPrintable(bericht));
         // Die Art der Datei steht dabei.
-        QVERIFY2(bericht.contains(QStringLiteral("Profilausfuhr")),
+        QVERIFY2(bericht.contains(
+                     TxProfileSetupPage::tr("File: a Thetis profile export.")),
                  qPrintable(bericht));
         // Und was liegengeblieben ist, auch -- sonst sieht der Betreiber
         // einen Profilnamen und weiss nicht, dass die Leistung draussen
@@ -575,7 +581,7 @@ private slots:
 
         const QString bericht = page.einleseThetisDateiFuerTest(
             QByteArray("<?xml version=\"1.0\"?>\n<Irgendwas/>\n"));
-        QVERIFY2(bericht.contains(QStringLiteral("Nichts eingelesen")),
+        QVERIFY2(bericht.contains(TxProfileSetupPage::tr("Nothing imported.")),
                  qPrintable(bericht));
         QVERIFY2(bericht.contains(QStringLiteral("Irgendwas")),
                  qPrintable(bericht));
