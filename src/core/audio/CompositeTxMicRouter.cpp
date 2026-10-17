@@ -80,6 +80,11 @@ void CompositeTxMicRouter::setFt8Source(TxMicRouter* source)
     m_ft8Source.store(source, std::memory_order_release);
 }
 
+void CompositeTxMicRouter::setRttySource(TxMicRouter* source)
+{
+    m_rttySource.store(source, std::memory_order_release);
+}
+
 int CompositeTxMicRouter::pullSamples(float* dst, int n)
 {
     if (dst == nullptr || n <= 0) {
@@ -98,6 +103,14 @@ int CompositeTxMicRouter::pullSamples(float* dst, int n)
             return ft8->pullSamples(dst, n);
         }
         // Wie bei VAX: lieber das Mikrofon als Totenstille.
+    }
+
+    if (source == MicSource::Rtty) {
+        TxMicRouter* rtty = m_rttySource.load(std::memory_order_acquire);
+        if (rtty != nullptr) {
+            return rtty->pullSamples(dst, n);
+        }
+        // Wie bei FT8 und VAX: lieber das Mikrofon als Totenstille.
     }
 
     if (source == MicSource::Vax) {
