@@ -23,6 +23,7 @@
 #include "gui/MainWindow.h"
 #include "gui/SpectrumOverlayPanel.h"
 #include "gui/SpectrumWidget.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -35,7 +36,7 @@ private slots:
         auto* mwp = new MainWindow();
         mwp->resize(1280, 800);
         mwp->show();
-        QVERIFY(QTest::qWaitForWindowExposed(mwp));
+        QVERIFY(QTest::qWaitForWindowExposed(mwp, kFensterFrist));
         QTest::qWait(500);
 
         auto* spec = mwp->findChild<SpectrumWidget*>();

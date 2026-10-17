@@ -22,6 +22,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QSignalSpy>
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -39,7 +40,7 @@ private slots:
         });
         w.imagery()->setNetworkEnabled(false);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
 
         auto* edit = w.findChild<QLineEdit*>();
         QVERIFY(edit);

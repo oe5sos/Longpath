@@ -302,8 +302,8 @@ python3 tools/colour_audit.py
   geglobbt.
 - `./tools/syntax_check.sh <datei>…` laufen lassen.
 - Bauen und Starten kann nur der Betreiber:
-  `cd ~/Longpath/NereusSDR && ./build.sh && ./run.sh`
-  Tests: `cd ~/Longpath/NereusSDR && ./tools/run_tests.sh`
+  `cd ~/Longpath/Longpath && ./build.sh && ./run.sh`
+  Tests: `cd ~/Longpath/Longpath && ./tools/run_tests.sh`
 
 ## Die Grenze, die kein Design überschreibt
 

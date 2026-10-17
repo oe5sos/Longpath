@@ -26,6 +26,7 @@
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
 #include "gui/SpectrumOverlayPanel.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -44,7 +45,7 @@ private slots:
         m_mw = new MainWindow();
         m_mw->resize(1200, 800);
         m_mw->show();
-        QVERIFY(QTest::qWaitForWindowExposed(m_mw));
+        QVERIFY(QTest::qWaitForWindowExposed(m_mw, kFensterFrist));
         for (int i = 0; i < 8; ++i) { QCoreApplication::processEvents(); }
 
         m_sw = m_mw->findChild<SpectrumWidget*>();

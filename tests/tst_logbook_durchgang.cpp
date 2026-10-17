@@ -21,6 +21,7 @@
 #include <QComboBox>
 #include <QDateEdit>
 #include <QDialog>
+#include <QPointer>
 #include <QFileDialog>
 #include <QDialogButtonBox>
 #include <QFormLayout>
@@ -44,6 +45,7 @@
 #include "gui/widgets/DxRadarWidget.h"
 #include "gui/widgets/QsoDetailPane.h"
 #include "core/AppSettings.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -142,27 +144,69 @@ QByteArray syntheticLog(int n)
     return out;
 }
 
+// ── Dialoge beantworten, ohne Taktgeber (2026-10-15) ───────────────
+//
+// Hier standen zwei QTimer, die im 40/50-ms-Takt nach
+// `QApplication::activeModalWidget()` sahen. Das lief meistens — und
+// manchmal nicht: `editingChangesOnlyThatField` und
+// `editingAFieldStillTidiesIt` fielen in zwei von drei Laeufen um
+// (gemessen am 2026-10-15), weil gar nichts bearbeitet wurde.
+//
+// Grund ist derselbe wie beim Menue-Prueflauf (siehe
+// docs/architecture/2026-10-15-pruefstaende-und-der-schirm.md): ein
+// modales `exec()` dreht auf macOS eine Cocoa-Schleife, in der
+// Qt-Taktgeber nicht zuverlaessig bedient werden. Mal kam der Takt an,
+// mal nicht.
+//
+// Ein Ereignisfilter auf `QEvent::Show` laeuft dagegen SYNCHRON in
+// `sendEvent`, also noch waehrend der Dialog sich zeigt und bevor
+// `exec()` in die Schleife geht. Die Antwort selbst wird von dort
+// GEPOSTET: beim Eintritt in die Schleife arbeitet Qt die eigene
+// Warteschlange ab, der Dialog steht dann fertig da.
+class ModalAnswerer : public QObject {
+public:
+    ModalAnswerer(QObject* ctx, std::function<void(QWidget*)> act, bool einmal)
+        : QObject(ctx), m_act(std::move(act)), m_einmal(einmal)
+    {
+        qApp->installEventFilter(this);
+    }
+
+    ~ModalAnswerer() override
+    {
+        if (qApp) { qApp->removeEventFilter(this); }
+    }
+
+    bool eventFilter(QObject* obj, QEvent* ev) override
+    {
+        if (ev->type() == QEvent::Show && !m_fertig) {
+            if (auto* dlg = qobject_cast<QDialog*>(obj)) {
+                QPointer<QDialog> ziel(dlg);
+                QMetaObject::invokeMethod(dlg, [this, ziel]() {
+                    if (m_fertig || !ziel) { return; }
+                    if (m_einmal) { m_fertig = true; }
+                    m_act(ziel);
+                }, Qt::QueuedConnection);
+            }
+        }
+        return QObject::eventFilter(obj, ev);
+    }
+
+private:
+    std::function<void(QWidget*)> m_act;
+    bool m_einmal{true};
+    bool m_fertig{false};
+};
+
 void autoAnswerModals(QObject* ctx, const std::function<void(QWidget*)>& act)
 {
-    auto* t = new QTimer(ctx);
-    t->setInterval(50);
-    QObject::connect(t, &QTimer::timeout, ctx, [t, act]() {
-        if (QWidget* m = QApplication::activeModalWidget()) { act(m); t->deleteLater(); }
-    });
-    t->start();
+    new ModalAnswerer(ctx, act, true);
 }
 
 // Beantwortet Dialoge, solange er lebt (fuer Ablaeufe mit mehreren
 // Fenstern nacheinander: Dateidialog, dann Meldung).
-QTimer* answerModals(QObject* ctx, const std::function<void(QWidget*)>& act)
+ModalAnswerer* answerModals(QObject* ctx, const std::function<void(QWidget*)>& act)
 {
-    auto* t = new QTimer(ctx);
-    t->setInterval(40);
-    QObject::connect(t, &QTimer::timeout, ctx, [act]() {
-        if (QWidget* m = QApplication::activeModalWidget()) { act(m); }
-    });
-    t->start();
-    return t;
+    return new ModalAnswerer(ctx, act, false);
 }
 
 void grab(QWidget* w, const QString& name)
@@ -342,7 +386,7 @@ private slots:
         LogbookWindow w(m_log);
         w.resize(1600, 950);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         qInfo().noquote() << "Oeffnen + Zeigen:" << t.elapsed() << "ms";
         QTableWidget* table = logTable(&w);
         QVERIFY(table);
@@ -358,7 +402,7 @@ private slots:
         LogbookWindow w(m_log);
         w.resize(1600, 950);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         QTableWidget* table = logTable(&w);
 
         // Suchbegriff: ein Rufzeichen, das im Log vorkommt.
@@ -473,7 +517,7 @@ private slots:
         LogbookWindow w(m_log);
         w.resize(1600, 950);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         const QString call = QStringLiteral("OE5VVM");
         qint64 worst = 0, sum = 0;
         for (int i = 1; i <= call.size(); ++i) {
@@ -498,7 +542,7 @@ private slots:
         LogbookWindow w(m_log);
         w.resize(1600, 950);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         QTableWidget* table = logTable(&w);
         const int rows = table->rowCount();
         for (int c = 0; c < table->columnCount(); ++c) {
@@ -520,7 +564,7 @@ private slots:
         LogbookWindow w(m_log);
         w.resize(1600, 950);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         QTableWidget* table = logTable(&w);
         QVERIFY(table->rowCount() > 10);
         // Scheitert das Oeffnen, kommt ein leerer Puffer zurueck und die
@@ -631,7 +675,7 @@ private slots:
         LogbookWindow w(m_log);
         w.resize(1600, 950);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         QTableWidget* table = logTable(&w);
         table->setCurrentCell(4, 2);
         const QString call = table->item(4, 2)->text();
@@ -661,7 +705,7 @@ private slots:
         LogbookWindow w(m_log);
         w.resize(1600, 950);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         QTableWidget* table = logTable(&w);
         const int before = w.entryCountForTesting();
         table->setCurrentCell(5, 2);
@@ -691,7 +735,7 @@ private slots:
         f.close();
         LogbookWindow w(m_log);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         const int before = w.entryCountForTesting();
         QString told;
         w.setOperatorHooks([](const QString&) { return true; },
@@ -714,7 +758,7 @@ private slots:
         LogbookWindow w(m_log);
         w.resize(1600, 950);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         QVERIFY(w.mapPanelForTest());
         QVERIFY(w.mapPanelForTest()->isVisible());
         QVERIFY(w.statsSectionForTest()->isVisible());
@@ -750,7 +794,7 @@ private slots:
         LogbookWindow w(m_log);
         w.resize(1600, 950);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         QTableWidget* table = logTable(&w);
         QComboBox* band = comboWith(&w, QStringLiteral("20m"));
         QVERIFY(band);
@@ -762,7 +806,7 @@ private slots:
         auto exportTo = [&](const QString& button, const QString& file) {
             const QString wanted = m_dir.filePath(file);
             auto chosen = std::make_shared<QString>();
-            QTimer* t = answerModals(this, [&told, wanted, chosen](QWidget* m) {
+            ModalAnswerer* t = answerModals(this, [&told, wanted, chosen](QWidget* m) {
                 if (auto* fd = qobject_cast<QFileDialog*>(m)) {
                     fd->selectFile(wanted);
                     // Der Qt-Dialog setzt damit den Ordner; den Namen
@@ -859,7 +903,7 @@ private slots:
         LogbookWindow w(m_log);
         w.resize(1600, 950);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         QTableWidget* t = logTable(&w);
         QHeaderView* h = t->horizontalHeader();
         auto colText = [t](int row, int col) { QTableWidgetItem* it = t->item(row, col); return it ? it->text() : QString(); };
@@ -894,7 +938,7 @@ private slots:
         LogbookWindow w(m_log);
         w.resize(1600, 950);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         QTableWidget* t = logTable(&w);
         const int before = w.entryCountForTesting();
         QSet<QString> gone;
@@ -905,7 +949,7 @@ private slots:
             gone.insert(t->item(r, 0)->text() + t->item(r, 1)->text() + t->item(r, 2)->text());
         }
         QString asked;
-        QTimer* timer = answerModals(this, [&asked](QWidget* m) {
+        ModalAnswerer* timer = answerModals(this, [&asked](QWidget* m) {
             if (auto* box = qobject_cast<QMessageBox*>(m)) { asked = box->text(); box->button(QMessageBox::Yes)->click(); }
         });
         buttonWith(&w, QStringLiteral("Delete"))->click();
@@ -943,7 +987,7 @@ private slots:
         panel.showLogbook();
         LogbookWindow* w = panel.findChild<LogbookWindow*>();
         QVERIFY(w);
-        QVERIFY(QTest::qWaitForWindowExposed(w));
+        QVERIFY(QTest::qWaitForWindowExposed(w, kFensterFrist));
         QCOMPARE(w->entryCountForTesting(), 2);
 
         LogEntry ft8;
@@ -1032,7 +1076,7 @@ private slots:
             RotorLogbookPanel panel(nullptr, nullptr, nullptr);
             panel.showLogbook();
             LogbookWindow* w = panel.findChild<LogbookWindow*>();
-            QVERIFY(QTest::qWaitForWindowExposed(w));
+            QVERIFY(QTest::qWaitForWindowExposed(w, kFensterFrist));
             QTableWidget* t = logTable(w);
             t->setCurrentCell(rowOf(t, QStringLiteral("G4ABC")), 2);
             RotorLogbookPanel* pp = &panel;
@@ -1066,7 +1110,7 @@ private slots:
             RotorLogbookPanel panel(nullptr, nullptr, nullptr);
             panel.showLogbook();
             LogbookWindow* w = panel.findChild<LogbookWindow*>();
-            QVERIFY(QTest::qWaitForWindowExposed(w));
+            QVERIFY(QTest::qWaitForWindowExposed(w, kFensterFrist));
             QTableWidget* t = logTable(w);
             t->clearSelection();
             t->selectRow(rowOf(t, QStringLiteral("G4ABC")));
@@ -1102,7 +1146,7 @@ private slots:
         RotorLogbookPanel panel(nullptr, nullptr, nullptr);
         panel.showLogbook();
         LogbookWindow* w = panel.findChild<LogbookWindow*>();
-        QVERIFY(QTest::qWaitForWindowExposed(w));
+        QVERIFY(QTest::qWaitForWindowExposed(w, kFensterFrist));
         auto logCall = [w](const QString& call) {
             w->entryCallForTest()->setFocus();
             // Nach "Not logged" bleibt das Rufzeichen stehen (zum
@@ -1131,7 +1175,7 @@ private slots:
         logCall(QStringLiteral("OE5VVM"));
         QCOMPARE(count(QStringLiteral("OE5VVM")), 1);
 
-        QTimer* t = answer(QMessageBox::No);
+        ModalAnswerer* t = answer(QMessageBox::No);
         logCall(QStringLiteral("OE5VVM"));
         delete t;
         QCOMPARE(asked, QStringList{QStringLiteral("Duplicate")});
@@ -1173,7 +1217,7 @@ private slots:
         LogbookWindow w(m_log);
         w.resize(1600, 950);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         QsoMapWindow* map = w.mapPanelForTest();
         QVERIFY(map && map->isVisible());
         auto box = [map](const QString& t) -> QCheckBox* {
@@ -1261,7 +1305,7 @@ private slots:
             QsoMapWindow* big = nullptr;
             for (QsoMapWindow* m : w.findChildren<QsoMapWindow*>()) { if (m != map && m->isWindow() && m->isVisible()) { big = m; } }
             QVERIFY2(big, "kein eigenes Kartenfenster");
-            QVERIFY(QTest::qWaitForWindowExposed(big));
+            QVERIFY(QTest::qWaitForWindowExposed(big, kFensterFrist));
             big->close();
             QCoreApplication::processEvents();
         }

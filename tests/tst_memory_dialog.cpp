@@ -123,6 +123,7 @@
 #include "models/SliceModel.h"
 
 #include <memory>
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -316,7 +317,7 @@ private slots:
         MemoryDialog dlg(rig.radio.get());
         dlg.resize(1100, 380);
         dlg.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&dlg));
+        QVERIFY(QTest::qWaitForWindowExposed(&dlg, kFensterFrist));
         dlg.tableForTest()->selectRow(2);
         const QPixmap pm = dlg.grab();
         QVERIFY(!pm.isNull());

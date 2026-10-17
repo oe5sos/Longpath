@@ -108,6 +108,7 @@
 #include "gui/applets/AppletPanelWidget.h"
 #include "gui/applets/AppletWidget.h"
 #include "gui/applets/GridCellWidget.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -208,7 +209,7 @@ private slots:
         m_mw = new MainWindow();
         m_mw->resize(1280, 800);
         m_mw->show();
-        QVERIFY2(QTest::qWaitForWindowExposed(m_mw),
+        QVERIFY2(QTest::qWaitForWindowExposed(m_mw, kFensterFrist),
                  "das Hauptfenster muss ueberhaupt erscheinen");
         QTest::qWait(300);   // Applets bauen sich beim Anzeigen auf
 
@@ -339,11 +340,13 @@ private slots:
     {
         static const QString kTargetId = QStringLiteral("BwFilter");
         static const QString kTargetLabel = QStringLiteral("Bandwidth Filter");
+        // Dieselbe tr()-Rolle wie im Programm (2026-10-15 englisch).
         static const QString kFreeCanvasLabel =
-            QStringLiteral("Neue Fenster gleich ablösen");
+            MainWindow::tr("Detach new windows right away");
 
         QAction* freeCanvasAction = findActionByExactText(m_mw, kFreeCanvasLabel);
-        QVERIFY2(freeCanvasAction, "Schalter 'Neue Fenster gleich ablösen' nicht gefunden");
+        QVERIFY2(freeCanvasAction,
+                 "Schalter fuer 'neue Fenster gleich abloesen' nicht gefunden");
         const bool freeCanvasWasOn = freeCanvasAction->isChecked();
         if (!freeCanvasWasOn) { freeCanvasAction->trigger(); }
         QVERIFY(freeCanvasAction->isChecked());
@@ -430,7 +433,7 @@ private slots:
         // registerApplet()-Aufrufe fuer kChromeOverlayId/kChromeStatusId
         // (~6738-6755).
         QTest::newRow("WinLogbook")     << QStringLiteral("WinLogbook")
-                                         << QStringLiteral("Logbuch");
+                                         << MainWindow::tr("Logbook");
         // WinRotorLog bewusst NICHT hier: bench-bestaetigt (2026-08-30,
         // OE5SOS) faellt es als einziges der fuenf Fenster durch diese
         // Pruefung durch, selbst nachdem der fehlende captureIntoCurrent()+
@@ -447,7 +450,7 @@ private slots:
         // stiller Verlust wie beim Bandwidth Filter: rotorDockVisible
         // deckt den echten Zustand bereits ab.
         QTest::newRow("WinChannelStrip") << QStringLiteral("WinChannelStrip")
-                                         << QStringLiteral("Kanalzug");
+                                         << MainWindow::tr("Channel strip");
         // WinAntenna bewusst NICHT hier: seit 2026-09-05 sperrt MainWindow
         // diesen Menueintrag (setEnabled(false)), solange kein Funkgeraet
         // verbunden ist -- action->trigger() unten wirkt auf ein
@@ -458,13 +461,13 @@ private slots:
         // Eine Pruefung der Haken-Persistenz UEBER einen echten
         // Connect/Restart-Zyklus waere ein eigener, groesserer Test.
         QTest::newRow("WinSpotHub")     << QStringLiteral("WinSpotHub")
-                                         << QStringLiteral("Spot-Zentrale");
+                                         << MainWindow::tr("Spot hub");
         QTest::newRow("ChromeSpectrumButtons")
             << QStringLiteral("ChromeSpectrumButtons")
-            << QStringLiteral("Knopfleiste am Spektrum");
+            << MainWindow::tr("Button strip on the spectrum");
         QTest::newRow("ChromeStatusBar")
             << QStringLiteral("ChromeStatusBar")
-            << QStringLiteral("Statuszeile");
+            << MainWindow::tr("Status line");
     }
 
     void windowAndChromeVisibilitySurviveRestart()
@@ -504,7 +507,7 @@ private slots:
     // der Haken-Zustand (die Absicht) bleibt unangetastet.
     void winAntennaMenuEntryGreysOutWhenDisconnected()
     {
-        QAction* action = findActionByExactText(m_mw, QStringLiteral("Antenne"));
+        QAction* action = findActionByExactText(m_mw, MainWindow::tr("Antenna"));
         QVERIFY2(action, "Menueintrag 'Antenne' nicht gefunden");
 
         RadioModel* radio = m_mw->findChild<RadioModel*>();

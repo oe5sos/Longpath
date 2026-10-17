@@ -628,6 +628,31 @@ public slots:
     // ~12-17 dB below the spectrum's displayed pixel value because the
     // detector pipeline reconstructs window-spread integrated power that
     // a single bin can't show on its own.
+    // Ein Takt des MaxBin-Haltewerts: steigt sofort auf einen staerkeren
+    // Messwert, faellt sonst mit der Zeitkonstante des Detektors.
+    //
+    // Longpath-eigen seit 2026-10-09, und zwar als Fehlerbehebung.
+    // Thetis rechnet (wdsp/analyzer.c:815-818 [@501e3f5], bei uns bis
+    // heute Zeile fuer Zeile uebernommen):
+    //
+    //     held -= fabs((1 - decay) * held);
+    //
+    // Der Abzug ist also proportional zum BETRAG des Haltewerts. Unter
+    // 0 dBm geht das gut -- der Betrag ist dort der Abstand zu 0, und
+    // der Wert laeuft nach unten. Oberhalb 0 dBm schrumpft der Abzug
+    // mit dem Wert selbst: der Haltewert naehert sich 0 dBm und
+    // unterschreitet sie nie. Ein einziges sehr starkes Signal nagelt
+    // die Anzeige damit dauerhaft fest (im Thetis-Fehlerverzeichnis
+    // als #2681 gemeldet; die Vorlage hat denselben Fehler im Oktober
+    // 2026 behoben, mit einer anderen Formel als dieser hier).
+    //
+    // Hier bekommt derselbe Abzug einen Mindestbezug von 20 dB: im
+    // ganzen Arbeitsbereich dieses Instruments (unterhalb -20 dBm)
+    // rechnet er Zeile fuer Zeile wie bisher, oberhalb faellt der
+    // Haltewert endlich. Zwanzig dB sind gut drei S-Stufen je
+    // Zeitkonstante -- siehe die Begruendung an der Umsetzung.
+    static double maxBinHoldNextDbm(double heldDbm, double liveDbm, double decay);
+
     void onSpectrumBinsForMaxBin(int receiverId, const QVector<float>& binsDbm);
 
     // 2026-05-22 bench fix: direct override of the MaxBin detector's

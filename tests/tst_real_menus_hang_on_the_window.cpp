@@ -40,6 +40,8 @@
 
 #include <functional>
 
+#include "MenueFaenger.h"
+
 #include "core/BoardCapabilities.h"
 #include "core/HpsdrModel.h"
 #include "gui/MainWindow.h"
@@ -61,6 +63,7 @@
 #include "gui/widgets/MasterOutputWidget.h"
 #include "models/NotchModel.h"
 #include "models/RadioModel.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -71,29 +74,15 @@ QRegularExpression notTopLevel()
     return QRegularExpression(QStringLiteral("must be a top level window"));
 }
 
-struct Opened {
-    QWidget*    parent{nullptr};
-    QStringList entries;
-    bool        seen{false};
-};
+// Die Technik (Ereignisfilter statt Taktgeber, gepostetes Schliessen)
+// liegt jetzt einmal in tests/MenueFaenger.h — sie wurde hier am
+// 2026-10-15 gebaut und von zwei weiteren Laeufen gebraucht. Warum
+// kein QTimer: siehe dort.
+using Opened = Longpath::Test::MenueFund;
 
-// Oeffnet ueber `trigger` ein Menue -- exec() oder popup() -- und schliesst
-// es, sobald es offen ist.
-Opened openMenu(const std::function<void()>& trigger)
+inline Opened openMenu(const std::function<void()>& trigger)
 {
-    Opened o;
-    QTimer::singleShot(200, qApp, [&o]() {
-        if (auto* m = qobject_cast<QMenu*>(QApplication::activePopupWidget())) {
-            o.parent = m->parentWidget();
-            for (QAction* a : m->actions()) { o.entries << a->text(); }
-            o.seen = true;
-            m->close();
-        }
-    });
-    trigger();
-    QTest::qWaitFor([&o]() { return o.seen; }, 2000);
-    QTest::qWait(50);
-    return o;
+    return Longpath::Test::oeffneMenue(trigger);
 }
 
 void contextAt(QWidget* w, const QPoint& p)
@@ -141,7 +130,7 @@ private slots:
         m_mw = new MainWindow();
         m_mw->resize(1800, 1100);
         m_mw->show();
-        QVERIFY(QTest::qWaitForWindowExposed(m_mw));
+        QVERIFY(QTest::qWaitForWindowExposed(m_mw, kFensterFrist));
         for (int i = 0; i < 10; ++i) { QCoreApplication::processEvents(); }
         QTest::qWait(400);
     }
@@ -273,7 +262,12 @@ private slots:
         QVERIFY(tabs && tabs->count() >= 2);
         const QPoint onTab = tabs->tabRect(0).center();
         o = openMenu([&]() { emit tabs->customContextMenuRequested(onTab); });
-        QVERIFY(!o.entries.isEmpty() && o.entries.first().endsWith(QStringLiteral("als eigenes Fenster")));
+        // Nur der feste Teil hinter dem %1 — der Wortlaut folgt der
+        // tr()-Rolle, seit die Oberflaeche englisch ist.
+        QVERIFY(!o.entries.isEmpty()
+                && o.entries.first().endsWith(
+                       ContainerWidget::tr("%1 as its own window")
+                           .section(QLatin1Char(' '), 1)));
         QCOMPARE(o.parent, cont->window());
 
         auto* master = m_mw->findChild<MasterOutputWidget*>();
@@ -329,22 +323,27 @@ private slots:
         auto* cell = qobject_cast<GridCellWidget*>(rx->parentWidget());
         QVERIFY(cell && cell->titleBar());
         Opened o = openMenu([&]() { contextAt(cell->titleBar(), QPoint(10, 5)); });
-        QVERIFY(o.entries.contains(QStringLiteral("Als Fenster ablösen")));
+        QVERIFY(o.entries.contains(AppletPanelWidget::tr("Detach as a window")));
         QCOMPARE(o.parent, rx->window());
 
         auto* freq = m_mw->findChild<FrequencyApplet*>();
         QVERIFY(freq);
         o = openMenu([&]() { contextAt(freq, QPoint(10, 10)); });
-        QVERIFY(o.entries.contains(QStringLiteral("A/B-Zeile anzeigen")));
+        // Nicht der Wortlaut, sondern dieselbe tr()-Rolle wie im
+        // Programm (2026-10-14): seit Englisch die Quellsprache ist,
+        // ist ein Menuetext uebersetzbar und taugt nicht als
+        // Bezeichner. Mit der deutschen Fassung waere ein fester Text
+        // ein zweites Mal gefallen.
+        QVERIFY(o.entries.contains(FrequencyApplet::tr("Show A/B row")));
         QCOMPARE(o.parent, freq->window());
 
         auto* instr = m_mw->findChild<InstrumentApplet*>();
         QVERIFY(instr);
         o = openMenu([&]() { contextAt(instr, QPoint(10, 10)); });
-        QVERIFY(o.entries.contains(QStringLiteral("Quelle")));
+        QVERIFY(o.entries.contains(InstrumentApplet::tr("Source")));
         QCOMPARE(o.parent, instr->window());
         o = openMenu([&]() { instr->openExtendedSettings(); });
-        QVERIFY(o.entries.contains(QStringLiteral("Quelle")));
+        QVERIFY(o.entries.contains(InstrumentApplet::tr("Source")));
         QCOMPARE(o.parent, instr->window());
 
         // Ohne Geraet ausgeblendet, das Menue geht trotzdem auf.

@@ -123,7 +123,14 @@ AppletPanelWidget::AppletPanelWidget(QWidget* parent)
     // 8 px matches the QScrollBar:vertical width in the stylesheet above;
     // Qt::ScrollBarAsNeeded means the gutter is wasted when the bar hides,
     // but 8 px is negligible and avoids a layout reflow on bar show/hide.
-    m_grid->setContentsMargins(0, 0, 8, 0);
+    //
+    // Links, oben und unten gilt seit 2026-10-15 derselbe Abstand wie
+    // zwischen zwei Feldern (Style::kPanelGapPx). Rechts bleiben die
+    // 8 px: das ist die Rinne fuer den Rollbalken, kein Abstand
+    // zwischen Feldern — ohne sie liegt der Balken auf der rechten
+    // Kante der Platten.
+    m_grid->setContentsMargins(Style::kPanelGapPx, Style::kPanelGapPx, 8,
+                               Style::kPanelGapPx);
 
     m_scrollArea->setWidget(m_grid);
     m_rootLayout->addWidget(m_scrollArea);
@@ -537,6 +544,27 @@ bool AppletPanelWidget::eventFilter(QObject* watched, QEvent* event)
         showTitleBarMenu(bar, ce->globalPos());
         return true;
     }
+    case QEvent::MouseButtonDblClick: {
+        // ── Doppelklick loest ab (2026-10-14) ────────────────────────
+        //
+        // Betreiber: "wenn doppelklick dann vielleicht eigenes frei
+        // fliegendes windows mit wasserfall, welches man vergroessern
+        // kann". Den Weg gibt es seit dem 20.08. als ↗ im Kopf und im
+        // Rechtsklick-Menue -- der Doppelklick ist der dritte Zugang
+        // zu derselben Sache, und der, nach dem er von selbst gegriffen
+        // hat. Genau so steht es schon im Kopf dieser Datei: ein Weg,
+        // den man nicht sieht, ist kein Weg.
+        //
+        // Der Druck davor hat bereits einen Zug angemeldet; der wird
+        // hier zurueckgenommen, sonst bleibt nach dem Ablösen ein
+        // halber Zugzustand stehen.
+        auto* me = static_cast<QMouseEvent*>(event);
+        if (me->button() != Qt::LeftButton || !applet) { break; }
+        m_dragApplet = nullptr;
+        m_dragging = false;
+        emit appletDetachRequested(applet, appletPosition(applet));
+        return true;
+    }
     case QEvent::MouseButtonPress: {
         auto* me = static_cast<QMouseEvent*>(event);
         if (me->button() != Qt::LeftButton || !applet) { break; }
@@ -598,7 +626,7 @@ QMenu* AppletPanelWidget::buildTitleBarMenuForTesting(AppletWidget* applet)
     // hängt AN DER AKTION, nicht am Rückgabewert von exec() — nur so
     // prüft ein Test denselben Weg, den der Bediener nimmt, statt einen
     // nachgebauten daneben.
-    QAction* detach = menu->addAction(QStringLiteral("Als Fenster ablösen"));
+    QAction* detach = menu->addAction(tr("Detach as a window"));
     connect(detach, &QAction::triggered, this,
             [this, applet]() {
         emit appletDetachRequested(applet, appletPosition(applet));

@@ -12,9 +12,13 @@
 // Modification history (Longpath):
 //   2026-09-21 -- Created for Longpath by Martin Fischer (OE5SOS),
 //                 AI-assisted via Anthropic Claude.
+//   2026-10-14 -- Zweiter Weg ueber github.com, wenn api.github.com
+//                 nicht antwortet, by Martin Fischer (OE5SOS),
+//                 AI-assisted via Anthropic Claude.
 // =================================================================
 
 #include <QtTest/QtTest>
+#include <QSignalSpy>
 #include <QLabel>
 #include <QProcess>
 #include <QPushButton>
@@ -176,6 +180,108 @@ private slots:
         dlg.showRelease(*r, false);
         QVERIFY(!dlg.actionForTest()->isEnabled());
         QVERIFY(dlg.statusForTest()->text().contains(QStringLiteral("up to date")));
+    }
+
+    // ── Zweiter Weg ohne api.github.com (2026-10-14) ──────────────────
+    //
+    // Der Mac mini des Betreibers stand auf 0.6.5 und kam nie weiter:
+    // TCP zu api.github.com (Azure) steht, der TLS-Handshake bleibt
+    // haengen. github.com selbst antwortet. Diese reinen Funktionen sind
+    // der Unterbau dafuer.
+
+    void readsTheTagFromAReleaseUrl()
+    {
+        QCOMPARE(UpdateChecker::tagFromReleaseUrl(
+                     QUrl(QStringLiteral("https://github.com/oe5sos/Longpath/releases/tag/v0.6.8"))),
+                 QStringLiteral("v0.6.8"));
+        // Vorab-Anhang bleibt am Tag.
+        QCOMPARE(UpdateChecker::tagFromReleaseUrl(
+                     QUrl(QStringLiteral("https://github.com/oe5sos/Longpath/releases/tag/v0.7.0-rc2"))),
+                 QStringLiteral("v0.7.0-rc2"));
+        // Alles, was nicht auf ein Tag zeigt, gilt nicht: die
+        // Anmeldeseite (privates Repo), die Uebersicht, ein leerer Pfad.
+        QVERIFY(UpdateChecker::tagFromReleaseUrl(
+                    QUrl(QStringLiteral("https://github.com/login?return_to=%2Foe5sos"))).isEmpty());
+        QVERIFY(UpdateChecker::tagFromReleaseUrl(
+                    QUrl(QStringLiteral("https://github.com/oe5sos/Longpath/releases"))).isEmpty());
+        QVERIFY(UpdateChecker::tagFromReleaseUrl(QUrl()).isEmpty());
+        // Ein Tag ohne Ziffern ist keines von uns.
+        QVERIFY(UpdateChecker::tagFromReleaseUrl(
+                    QUrl(QStringLiteral("https://github.com/oe5sos/Longpath/releases/tag/latest"))).isEmpty());
+    }
+
+    void buildsTheReleaseFromTheTagAlone()
+    {
+        const ReleaseInfo r = UpdateChecker::releaseFromTag(QStringLiteral("v0.6.8"));
+        QCOMPARE(r.tag, QStringLiteral("v0.6.8"));
+        QCOMPARE(r.version, QStringLiteral("0.6.8"));
+        QCOMPARE(r.htmlUrl.toString(),
+                 QStringLiteral("https://github.com/oe5sos/Longpath/releases/tag/v0.6.8"));
+        // SHA256SUMS.txt muss dabei sein, sonst bricht downloadAndVerify
+        // mit "release carries no SHA256SUMS.txt" ab.
+        const auto sums = r.asset(QStringLiteral("SHA256SUMS.txt"));
+        QVERIFY(sums.has_value());
+        QCOMPARE(sums->url.toString(),
+                 QStringLiteral("https://github.com/oe5sos/Longpath/releases/download/v0.6.8/SHA256SUMS.txt"));
+        // Die fehlenden Notizen werden benannt, nicht verschwiegen.
+        QVERIFY(r.notes.contains(QStringLiteral("api.github.com")));
+        QVERIFY(r.viaWebsiteFallback);
+    }
+
+    void buildsDownloadUrlsLikeReleaseYml()
+    {
+        QCOMPARE(UpdateChecker::assetDownloadUrl(QStringLiteral("v0.6.8"),
+                     UpdateChecker::assetNameFor(QStringLiteral("0.6.8"),
+                                                 QStringLiteral("macos"),
+                                                 QStringLiteral("x86_64"))).toString(),
+                 QStringLiteral("https://github.com/oe5sos/Longpath/releases/download/"
+                                "v0.6.8/Longpath-0.6.8-macOS-intel.dmg"));
+        QCOMPARE(UpdateChecker::assetDownloadUrl(QStringLiteral("v0.6.8"),
+                     UpdateChecker::assetNameFor(QStringLiteral("0.6.8"),
+                                                 QStringLiteral("linux"),
+                                                 // QSysInfo meldet "arm64"; "aarch64" ist nur
+                                                 // der Dateiname in release.yml.
+                                                 QStringLiteral("arm64"))).toString(),
+                 QStringLiteral("https://github.com/oe5sos/Longpath/releases/download/"
+                                "v0.6.8/Longpath-0.6.8-aarch64.AppImage"));
+    }
+
+    void apiUrlIsOverridableForTestsOnly()
+    {
+        QCOMPARE(UpdateChecker::latestReleaseApiUrl().host(), QStringLiteral("api.github.com"));
+        qputenv("LONGPATH_UPDATE_API_URL", "https://127.0.0.1:9/nope");
+        QCOMPARE(UpdateChecker::latestReleaseApiUrl().host(), QStringLiteral("127.0.0.1"));
+        qunsetenv("LONGPATH_UPDATE_API_URL");
+        QCOMPARE(UpdateChecker::latestReleaseApiUrl().host(), QStringLiteral("api.github.com"));
+    }
+
+    // Der Weg selbst, am echten GitHub -- nur mit LONGPATH_NET_TESTS=1,
+    // weil CI-Laeufer und ein Rechner ohne Netz sonst rot waeren. Die API
+    // zeigt dabei auf einen geschlossenen Port: genau der Zustand des
+    // Mac mini, nur ohne Warten.
+    void fallsBackToGithubComWhenTheApiIsDead()
+    {
+        if (qEnvironmentVariable("LONGPATH_NET_TESTS") != QStringLiteral("1")) {
+            QSKIP("set LONGPATH_NET_TESTS=1 to run the live github.com fallback");
+        }
+        qputenv("LONGPATH_UPDATE_API_URL", "https://127.0.0.1:9/dead");
+        UpdateChecker checker(QStringLiteral("0.0.1"));
+        QSignalSpy known(&checker, &UpdateChecker::latestKnown);
+        QSignalSpy failed(&checker, &UpdateChecker::checkFailed);
+        checker.checkLatest();
+        QVERIFY2(known.wait(60000), "github.com fallback produced no release");
+        QCOMPARE(failed.count(), 0);
+
+        const auto release = known.at(0).at(0).value<ReleaseInfo>();
+        QVERIFY(release.viaWebsiteFallback);
+        QVERIFY(!release.version.isEmpty());
+        QCOMPARE(known.at(0).at(1).toBool(), true);   // 0.0.1 ist aelter
+        // Das Paket fuer diese Maschine muss per HEAD gefunden und mit
+        // seiner echten Groesse eingetragen worden sein.
+        const auto mine = release.asset(UpdateChecker::assetNameForThisMachine(release.version));
+        QVERIFY2(mine.has_value(), "no package for this machine in the fallback release");
+        QVERIFY(mine->size > 1000000);
+        qunsetenv("LONGPATH_UPDATE_API_URL");
     }
 
     void installsFromADiskImageOnMac()

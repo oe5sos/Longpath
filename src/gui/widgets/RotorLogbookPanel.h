@@ -70,6 +70,13 @@ public:
     RotorLogbookPanel(RadioModel* radio, QrzClient* qrz,
                       QrzLogbookUploader* uploader,
                       QWidget* parent = nullptr);
+    // Eigener Destruktor, weil der Abbau sonst in schon abgeraeumte
+    // Kinder greift: ~QWidget loescht den Rotctld-Client, dessen
+    // Socket meldet beim Abbau noch disconnected(), und der Rueckruf
+    // schreibt ins Statusschild, das als frueheres Kind bereits weg
+    // ist. Sechs Abstuerze beim Beenden, 2026-10-10/11. Siehe
+    // tests/tst_rotor_panel_abbau.cpp.
+    ~RotorLogbookPanel() override;
 
     // Where the ADIF log is written.
     static QString logbookPath();
@@ -307,6 +314,9 @@ private:
     // The rotator link, and the timer that stands in for one. Exactly
     // one of the two drives the needle at any moment.
     RotctldClient* m_rotor{nullptr};
+    // Der zuletzt protokollierte Status -- damit nur WECHSEL ins
+    // Protokoll gehen, nicht jede Wiederholung (siehe setStatus()).
+    QString        m_letzterStatus;
     // rotctld started by us, when the controller is on this computer.
     // Owned so it is stopped on the way out rather than left holding
     // the serial port.

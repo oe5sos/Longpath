@@ -133,7 +133,7 @@ QList<ReadingDescriptor> buildTable()
     {
         ReadingDescriptor d;
         d.bindingId = MeterBinding::NoiseFloor;
-        d.label     = QStringLiteral("RX: Rauschflur");
+        d.label     = QStringLiteral("RX: noise floor");
         d.unit      = QStringLiteral("dBm");
         d.hasScale  = true;
         d.min       = -140.0;

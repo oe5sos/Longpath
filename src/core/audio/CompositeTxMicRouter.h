@@ -67,6 +67,7 @@ enum class MicSource : int {
     Pc    = 0,  ///< PC microphone (host audio device)
     Radio = 1,  ///< Radio mic-jack input via P1/P2 mic-frame stream
     Vax   = 2,  ///< VAX TX virtual device (3rd-party app → /nereussdr-vax-tx)
+    Ft8   = 3,  ///< der eigene FT8/FT4-Sender (core/Ft8Tx.h), 2026-10-15
 };
 
 /// CompositeTxMicRouter — selector that holds PcMicSource + RadioMicSource
@@ -163,6 +164,26 @@ public:
     /// is safe.
     void setVaxSource(VaxTxMicSource* source);
 
+    /// Die eigene FT8/FT4-Tonquelle anmelden (2026-10-15).
+    ///
+    /// Gebaut wie setVaxSource(): nicht besitzend, der Tonfaden liest
+    /// den Zeiger ueber std::atomic. Ist beim Umschalten auf
+    /// MicSource::Ft8 keine Quelle angemeldet, faellt der Router auf
+    /// Pc zurueck — dieselbe Regel wie bei VAX, aus demselben Grund:
+    /// eine falsch eingerichtete Kette soll hoerbar sein, nicht
+    /// still.
+    ///
+    /// Der Router entscheidet NICHT, wann gesendet wird. Er liefert
+    /// nur, was die Quelle hergibt; ohne laufende Quelle ist das
+    /// Stille.
+    void setFt8Source(TxMicRouter* source);
+
+    /// Angemeldete FT8-Quelle (kann null sein). Fuer Prueflaeufe.
+    TxMicRouter* ft8Source() const
+    {
+        return m_ft8Source.load(std::memory_order_acquire);
+    }
+
     /// Currently registered VAX TX source pointer (may be null).
     /// Audio-thread accessor for tests.
     VaxTxMicSource* vaxSource() const
@@ -189,6 +210,7 @@ private:
     std::atomic<MicSource> m_pendingSource;    // queued switch (when MOX-locked)
     std::atomic<bool>      m_hasPendingSwitch {false};
     std::atomic<bool>      m_moxActive {false};
+    std::atomic<TxMicRouter*> m_ft8Source{nullptr};
     std::atomic<VaxTxMicSource*> m_vaxSource {nullptr};  // non-owning; registered post-ctor
 };
 

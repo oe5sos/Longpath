@@ -18,6 +18,7 @@
 #include "gui/StyleConstants.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -32,7 +33,7 @@ private slots:
         BandwidthFilterApplet applet(&model);
         applet.resize(600, 260);
         applet.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&applet));
+        QVERIFY(QTest::qWaitForWindowExposed(&applet, kFensterFrist));
         for (int i = 0; i < 4; ++i) { QCoreApplication::processEvents(); }
 
         // Ohne Geraet legt das Modell keine Scheibe an — hier eine
@@ -77,7 +78,7 @@ private slots:
         BandwidthFilterApplet applet(&model);
         applet.resize(600, 260);
         applet.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&applet));
+        QVERIFY(QTest::qWaitForWindowExposed(&applet, kFensterFrist));
         if (model.slices().isEmpty()) { model.addSlice(); }
         for (int i = 0; i < 6; ++i) { QCoreApplication::processEvents(); }
         SliceModel* s = model.slices().first();
@@ -335,7 +336,7 @@ private slots:
         BandwidthFilterApplet applet(&model);
         applet.resize(600, 260);
         applet.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&applet));
+        QVERIFY(QTest::qWaitForWindowExposed(&applet, kFensterFrist));
         if (model.slices().isEmpty()) { model.addSlice(); }
         for (int i = 0; i < 6; ++i) { QCoreApplication::processEvents(); }
         model.slices().first()->setFrequency(7'100'000.0);
@@ -400,7 +401,7 @@ private slots:
         RxApplet applet(s, &model);
         applet.resize(420, 700);
         applet.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&applet));
+        QVERIFY(QTest::qWaitForWindowExposed(&applet, kFensterFrist));
         for (int i = 0; i < 4; ++i) { QCoreApplication::processEvents(); }
 
         auto paneFreq = [&]() -> double {

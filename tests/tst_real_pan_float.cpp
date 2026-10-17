@@ -22,6 +22,7 @@
 #include "gui/PanadapterApplet.h"
 #include "gui/WindowChrome.h"
 #include <QPushButton>
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -57,7 +58,7 @@ private slots:
         // — und wirkt dort bildschirmfuellend, egal welche Groesse
         // Qt meldet.
         mwp->showFullScreen();
-        QVERIFY(QTest::qWaitForWindowExposed(mwp));
+        QVERIFY(QTest::qWaitForWindowExposed(mwp, kFensterFrist));
         QTest::qWait(400);
 
         auto* stack = mwp->findChild<PanadapterStack*>();
@@ -124,7 +125,7 @@ private slots:
         auto* mwp = new MainWindow();
         mwp->resize(1280, 800);
         mwp->show();
-        QVERIFY(QTest::qWaitForWindowExposed(mwp));
+        QVERIFY(QTest::qWaitForWindowExposed(mwp, kFensterFrist));
         QTest::qWait(400);
 
         // ── Erst die Connect-Maske abwarten und schliessen ──────────

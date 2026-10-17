@@ -326,13 +326,13 @@ void AudioAdvancedPage::buildFeatureFlagsSection()
     {
         auto* row = new QHBoxLayout;
         m_rxDriftCheck = new QCheckBox(
-            QStringLiteral("Uhrendrift am Empfangston ausgleichen"), box);
+            tr("Compensate clock drift on the receive audio"), box);
         const bool on =
             s.value(QStringLiteral("RxDriftAusgleich"),
                     QStringLiteral("False")).toString() == QStringLiteral("True");
         m_rxDriftCheck->setChecked(on);
         auto* note = new QLabel(
-            QStringLiteral("(Ziel 50 ms · wirkt beim nächsten Start der Tonausgabe)"),
+            tr("(target 50 ms · takes effect the next time audio starts)"),
             box);
         note->setStyleSheet(QLatin1String(kNoteStyle));
         row->addWidget(m_rxDriftCheck);

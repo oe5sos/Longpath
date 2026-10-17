@@ -672,34 +672,50 @@ jobs:
       # fail with "No rule to make target".
       - name: Build test executables (Linux)
         if: runner.os == 'Linux'
-        # Der Platz wird VOR und NACH diesem Schritt gemeldet. Ohne das
-        # war am 2026-10-10 nicht ablesbar, wie knapp es wirklich ist --
-        # nur, dass es nicht reichte, und das auch nur aus einer
-        # Ausnahme des Laeufers selbst. Faellt es wieder, steht die Zahl
-        # da, statt geschaetzt werden zu muessen.
+        # ── Beim LINKEN sparsamer sein (2026-10-16) ─────────────────
+        #
+        # Linux-Shard 2/4 faellt seit dem 2026-10-15 in jedem Lauf um
+        # (#238, #239, #244, #245), und immer derselbe. Was gemessen
+        # ist:
+        #
+        #   * Der Abbruch passiert in GENAU diesem Schritt: „Build
+        #     (Linux/macOS)" ist success, dieser und alle folgenden
+        #     haben gar kein Ergebnis.
+        #   * Es gibt KEIN Log („BlobNotFound" ueber die API) — der
+        #     Runner-Agent selbst stirbt, er meldet keinen Fehler.
+        #   * Platte ist es nicht: im gruenen Shard gemessen, 107 GB
+        #     frei nach dem Freiraeumen.
+        #   * Shard 2/4 ist der GROESSTE: 262 Testbinaerdateien gegen
+        #     243 / 224 / 231 in den anderen (Namens-MD5 modulo 4,
+        #     nachgerechnet).
+        #
+        # Das Muster passt auf einen OOM-Kill beim Linken: vier
+        # gleichzeitige Linker auf einem 16-GB-Laeufer, und der
+        # groesste Stapel kippt zuerst. Bewiesen ist es nicht — darum
+        # steht die Messung unten, die es beim naechsten Lauf zeigt.
+        #
+        # -j2 statt -j$(nproc) kostet Zeit und spart Speicher. Der
+        # Shard lag bei 25 Minuten, die anderen bei 29 — Luft ist da.
+        run: cmake --build build -j2 --target all_tests
+
+      - name: Speicher und Platte nach dem Testbau (Linux)
+        if: runner.os == 'Linux' && always()
+        # Die Messung zur These oben. Beim naechsten roten Lauf steht
+        # hier, wie nah es war — und wenn der Shard gruen bleibt,
+        # steht hier, wieviel Luft -j2 gebracht hat.
         run: |
-          echo "── Platz vor dem Bau der Pruefprogramme ──"
-          df -h /
-          cmake --build build -j$(nproc) --target all_tests
-          echo "── Platz danach ──"
-          df -h /
-          echo "── Fussabdruck ──"
-          du -sh build 2>/dev/null || true
-          du -sh build/tests 2>/dev/null || true
-          # Vorwarnung statt Nachruf. Gemessen am 2026-10-10 nach dem
-          # Umstieg auf -gsplit-dwarf, je Scherbe: 103 G frei vorher,
-          # danach 34 G (2/4, die dickste -- 69 G allein in build/tests),
-          # 40 G (1/4), 44 G (3/4), 43 G (4/4). Reicht, ist aber kein
-          # weiter Abstand: jedes Pruefprogramm bindet LongpathObjs
-          # statisch ein und kostet darum ein halbes Gigabyte. Faellt der
-          # Rest unter 15 G, soll das AUFFALLEN, solange der Lauf noch
-          # gruen ist -- und nicht erst, wenn der Laeufer sein eigenes
-          # Protokoll nicht mehr schreiben kann.
-          # Vorsichtig gelesen: liefert df nichts (anderes Dateisystem,
-          # anderes coreutils), darf die Rechnung den Schritt NICHT
-          # umbringen -- $(( / 1024 )) mit leerer Zahl ist ein
-          # Syntaxfehler, und der Schritt laeuft unter `bash -e`. Keine
-          # Zahl heisst "keine Aussage", nicht "kein Platz".
+          free -m || true
+          df -h / || true
+          echo "--- groesste Testbinaerdateien ---"
+          ls -S build/tests/tst_* 2>/dev/null | head -5 | xargs -r du -h 2>/dev/null || true
+          # ── Vorwarnung statt Nachruf (vom Zweig, 2026-10-10) ───────
+          # Faellt der Rest unter 15 G, soll das AUFFALLEN, solange der
+          # Lauf noch gruen ist -- und nicht erst, wenn der Laeufer sein
+          # eigenes Protokoll nicht mehr schreiben kann.
+          # Vorsichtig gelesen: liefert df nichts, darf die Rechnung den
+          # Schritt NICHT umbringen -- $(( / 1024 )) mit leerer Zahl ist
+          # ein Syntaxfehler, und der Schritt laeuft unter `bash -e`.
+          # Keine Zahl heisst "keine Aussage", nicht "kein Platz".
           FREI_KB=$(df -k --output=avail / 2>/dev/null | tail -1 | tr -dc '0-9')
           FREI_GB=$(( ${FREI_KB:-0} / 1024 / 1024 ))
           if [ -z "$FREI_KB" ]; then FREI_GB=99; echo "df lieferte nichts -- keine Aussage"; fi
@@ -707,10 +723,9 @@ jobs:
           if [ "$FREI_GB" -lt 15 ]; then
             echo "::warning title=Platte wird knapp::Nach dem Bau der" \
                  "Pruefprogramme sind nur noch ${FREI_GB} G frei" \
-                 "(Warnschwelle 15 G). Naechster Hebel: Scherbenzahl" \
-                 "erhoehen, oder LongpathObjs als gemeinsame Bibliothek" \
-                 "statt in jedes Pruefprogramm hinein."
+                 "(Warnschwelle 15 G)."
           fi
+
 
       - name: Build test executables (macOS)
         if: runner.os == 'macOS'

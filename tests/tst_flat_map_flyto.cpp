@@ -17,6 +17,7 @@
 #include "gui/widgets/GibsTileLayer.h"
 
 #include <QSignalSpy>
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -27,7 +28,7 @@ private slots:
         FlatMapWidget w;
         w.resize(900, 450);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
 
         QSignalSpy done(&w, &FlatMapWidget::flightFinished);
         w.flyTo(48.3, 14.3, 8.0, /*durationMs*/ 0);
@@ -49,7 +50,7 @@ private slots:
         FlatMapWidget w;
         w.resize(700, 450);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         w.flyTo(40.9, -73.3, 8.0, /*durationMs*/ 0);
 
         for (const QSize s : {QSize(1100, 700), QSize(500, 300), QSize(1300, 450)}) {
@@ -86,7 +87,7 @@ private slots:
         FlatMapWidget w;
         w.resize(900, 450);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
 
         QSignalSpy done(&w, &FlatMapWidget::flightFinished);
         w.flyTo(-33.9, 151.2, 6.0, 120);
@@ -132,7 +133,7 @@ private slots:
         w.resize(900, 450);
         w.setHome(48.3, 14.3);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
 
         // Ohne Zielstation: wo spaeter der Ring sitzt, ist Hintergrund.
         w.flyTo(40.0, -74.0, 1.0, 0);   // Weltansicht
@@ -166,7 +167,7 @@ private slots:
         w.setShowImagery(true);
         w.setShowTerminator(false);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
 
         // Bei 64x auf Linz braucht die Karte Stufe 8; eine knallrote
         // Kachel dort muss im Bild auftauchen.

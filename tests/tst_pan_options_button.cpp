@@ -24,6 +24,7 @@
 #include <QSignalSpy>
 
 #include "gui/PanadapterApplet.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -36,7 +37,7 @@ private slots:
         PanadapterApplet applet(QStringLiteral("A"));
         applet.resize(800, 400);
         applet.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&applet));
+        QVERIFY(QTest::qWaitForWindowExposed(&applet, kFensterFrist));
 
         QPushButton* gear = nullptr;
         for (QPushButton* b : applet.findChildren<QPushButton*>()) {
@@ -78,7 +79,7 @@ private slots:
             return false;
         };
 
-        QVERIFY2(fire(QStringLiteral("Hintergrundbild entfernen")),
+        QVERIFY2(fire(PanadapterApplet::tr("Remove background image")),
                  "der Eintrag zum Entfernen MUSS im Menue stehen");
         QCOMPARE(imgSpy.count(), 1);
         QVERIFY2(imgSpy.at(0).at(0).toString().isEmpty(),
@@ -99,7 +100,10 @@ private slots:
         QVERIFY2(fire(QStringLiteral("Grundfarbe…")), "Grundfarbe fehlt");
         QCOMPARE(colSpy.count(), 1);
 
-        QVERIFY2(fire(QStringLiteral("Alle Anzeige-Einstellungen…")),
+        // Dieselbe tr()-Rolle wie im Programm (2026-10-14): seit
+        // Englisch die Quellsprache ist, ist ein Menuetext
+        // uebersetzbar und taugt nicht als Bezeichner.
+        QVERIFY2(fire(PanadapterApplet::tr("All display settings…")),
                  "der Weg in den Setup-Dialog MUSS bleiben — ein Menue, "
                  "das alles kann, waere wieder der Dialog, nur schlechter");
         QCOMPARE(setSpy.count(), 1);

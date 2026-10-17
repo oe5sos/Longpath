@@ -19,6 +19,7 @@
 #include <QLabel>
 
 #include "gui/containers/ContainerWidget.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -34,7 +35,7 @@ private slots:
         c.setContent(content);
         c.resize(320, 240);
         c.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&c));
+        QVERIFY(QTest::qWaitForWindowExposed(&c, kFensterFrist));
         for (int i = 0; i < 4; ++i) { QCoreApplication::processEvents(); }
 
         const QPoint before = content->mapTo(&c, QPoint(0, 0));

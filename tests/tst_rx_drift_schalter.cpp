@@ -33,7 +33,12 @@ QCheckBox* findeHaken(QWidget* seite)
 {
     const auto haken = seite->findChildren<QCheckBox*>();
     for (QCheckBox* h : haken) {
-        if (h->text().contains(QStringLiteral("Uhrendrift"))) { return h; }
+        // Dieselbe tr()-Rolle wie im Programm (2026-10-15 englisch),
+        // nur der kennzeichnende Teil davon.
+        if (h->text().contains(QStringLiteral("clock drift"),
+                               Qt::CaseInsensitive)) {
+            return h;
+        }
     }
     return nullptr;
 }
@@ -58,7 +63,7 @@ void TstRxDriftSchalter::derHakenIstDa()
     RadioModel modell;
     AudioAdvancedPage seite(&modell);
     QCheckBox* h = findeHaken(&seite);
-    QVERIFY2(h, "Kein Haekchen mit 'Uhrendrift' auf der Seite Audio -> Advanced");
+    QVERIFY2(h, "Kein Haekchen fuer die Uhrendrift auf Audio -> Advanced");
     // Der Hinweis auf die Wirkung gehoert daneben: der Regler greift erst
     // beim naechsten Start der Tonausgabe, und wer das nicht weiss, hoert
     // vergeblich hin.

@@ -113,7 +113,7 @@ void AsrService::start()
     QString error;
     if (!m_backend->load(QString(), &error)) {
         emit failed(error.isEmpty()
-                        ? tr("Der Erkennungsdienst liess sich nicht öffnen.")
+                        ? tr("The recognition service could not be opened.")
                         : error);
         return;
     }

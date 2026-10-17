@@ -39,7 +39,7 @@ AsrApplet::AsrApplet(RadioModel* model, QWidget* parent)
 
     // Ein Schalter, kein Haekchen (Glas & Tiefe, 2026-09-17): dieselbe
     // leise einrastende Bauform wie die Zustandsschalter im TX-Feld.
-    m_enable = styledButton(tr("Mitschreiben"), 110, 26);
+    m_enable = styledButton(tr("Transcribe"), 110, 26);
     m_enable->setStyleSheet(m_enable->styleSheet() + Style::quietCheckedStyle());
     connect(m_enable, &QPushButton::toggled, this, &AsrApplet::enableRequested);
     head->addWidget(m_enable);
@@ -74,7 +74,7 @@ AsrApplet::AsrApplet(RadioModel* model, QWidget* parent)
     m_text->setMinimumHeight(90);
     root->addWidget(m_text, 1);
 
-    setStatus(tr("aus"), Style::role("text-scale", Style::kTextScale));
+    setStatus(tr("off"), Style::role("text-scale", Style::kTextScale));
 
     // Der Dienst, den Longpath selbst startet: sein Zustand steht hier
     // mit, weil der Bediener sonst nur "Fehler" saehe und nicht, dass
@@ -85,17 +85,17 @@ AsrApplet::AsrApplet(RadioModel* model, QWidget* parent)
         using S = WhisperServerLauncher::State;
         switch (st) {
         case S::Starting:
-            setStatus(tr("Dienst startet …"), Style::role("text-scale", Style::kTextScale));
+            setStatus(tr("service starting …"), Style::role("text-scale", Style::kTextScale));
             break;
         case S::Running:
-            setStatus(tr("Dienst läuft"), QString::fromLatin1(Style::kGreenText));
+            setStatus(tr("service running"), QString::fromLatin1(Style::kGreenText));
             break;
         case S::External:
-            setStatus(tr("Dienst läuft (extern)"), QString::fromLatin1(Style::kGreenText));
+            setStatus(tr("service running (external)"), QString::fromLatin1(Style::kGreenText));
             break;
         case S::Failed:
-            setStatus(tr("Dienst: Fehler"), QString::fromLatin1(Style::kTxRed));
-            if (m_text) { m_text->appendPlainText(tr("— Dienst: %1").arg(reason)); }
+            setStatus(tr("service: error"), QString::fromLatin1(Style::kTxRed));
+            if (m_text) { m_text->appendPlainText(tr("— service: %1").arg(reason)); }
             break;
         case S::Stopped:
             break;
@@ -114,14 +114,14 @@ void AsrApplet::setService(AsrService* svc)
         if (!m_service || !m_service->isRunning()) { return; }
         // Gruen, solange gesprochen wird. Das ist die einzige
         // Rueckmeldung, die zeigt, dass der Abgriff wirklich Ton sieht
-        // — ohne sie wuesste der Betreiber bei ausbleibendem Text
+        // — ohne sie wuesste der Betreiber bei offbleibendem Text
         // nicht, ob niemand spricht oder nichts ankommt.
-        setStatus(on ? tr("hört") : tr("wartet"),
+        setStatus(on ? tr("listening") : tr("wartet"),
                   on ? Style::role("live", Style::kLiveGreen)
                      : Style::role("text-scale", Style::kTextScale));
     });
     connect(svc, &AsrService::failed, this, [this](const QString& reason) {
-        setStatus(tr("Fehler"), QString::fromLatin1(Style::kTxRed));
+        setStatus(tr("Error"), QString::fromLatin1(Style::kTxRed));
         // Der Grund gehoert in den Text, nicht nur in eine Farbe. Wer
         // "Fehler" liest und nicht weiss, welchen, ist nicht besser
         // dran als vorher.

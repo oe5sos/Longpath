@@ -31,6 +31,7 @@
 #include "gui/applets/RxApplet.h"
 #include "gui/widgets/RxProfilePopup.h"
 #include "models/SliceModel.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -139,7 +140,7 @@ private slots:
         QVERIFY(rig.manager.saveProfile(QStringLiteral("Old"), &rig.slice));
         RxProfilePopup popup(&rig.manager, &rig.slice);
         popup.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&popup));
+        QVERIFY(QTest::qWaitForWindowExposed(&popup, kFensterFrist));
         popup.listForTest()->setCurrentRow(0);
 
         popup.deleteSelected();
@@ -183,7 +184,7 @@ private slots:
 
         RxProfilePopup popup(&rig.manager, &rig.slice);
         popup.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&popup));
+        QVERIFY(QTest::qWaitForWindowExposed(&popup, kFensterFrist));
         popup.adjustSize();
         const QPixmap pm = popup.grab();
         QVERIFY(!pm.isNull());

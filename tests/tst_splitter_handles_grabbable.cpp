@@ -22,6 +22,7 @@
 
 #include "gui/MainWindow.h"
 #include "gui/StyleConstants.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -35,7 +36,7 @@ private slots:
         auto* mw = new MainWindow();
         mw->resize(1700, 1000);
         mw->show();
-        QVERIFY(QTest::qWaitForWindowExposed(mw));
+        QVERIFY(QTest::qWaitForWindowExposed(mw, kFensterFrist));
         for (int i = 0; i < 10; ++i) { QCoreApplication::processEvents(); }
         QTest::qWait(250);
 

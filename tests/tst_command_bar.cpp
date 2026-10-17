@@ -21,6 +21,10 @@
 
 #include <QtTest>
 
+#include <cmath>
+
+#include "MenueFaenger.h"
+
 #include "gui/widgets/CommandBar.h"
 #include "core/AppSettings.h"
 #include "models/FilterPresetStore.h"
@@ -37,6 +41,7 @@
 #include <QRegularExpression>
 #include <QSlider>
 #include <QTimer>
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -63,7 +68,7 @@ private slots:
         CommandBar bar;
         bar.resize(1400, 70);
         bar.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&bar));
+        QVERIFY(QTest::qWaitForWindowExposed(&bar, kFensterFrist));
         for (int i = 0; i < 4; ++i) { QCoreApplication::processEvents(); }
 
         const QImage bild = bar.grab().toImage();
@@ -79,13 +84,29 @@ private slots:
         }
         QVERIFY2(kaesten.size() >= 2, "weniger als zwei Gruppen in der Leiste");
 
+        // ── Bildpunkte sind nicht Layoutpunkte (2026-10-15) ─────────
+        //
+        // `grab()` liefert auf einem Retina-Schirm ein Bild mit der
+        // doppelten Kantenlaenge (hier gemessen: Leiste 1400x70,
+        // Bild 2800x152), die Kaesten aus dem Layout zaehlen aber in
+        // Layoutpunkten. Ohne Umrechnung sucht dieser Lauf an den
+        // falschen Stellen: er fand 2 von 5 Strichen und fiel auf
+        // JEDEM Mac um, waehrend er in der CI (1x-Schirm) gruen war.
+        const qreal dpr = bild.devicePixelRatio();
+        const auto zuBild = [dpr](int v) {
+            return static_cast<int>(std::lround(v * dpr));
+        };
+
         const QRgb grund = bild.pixel(2, 2);
         int striche = 0;
+        int luecken = 0;
         for (int i = 0; i + 1 < kaesten.size(); ++i) {
             // Nur die Luecke absuchen, nicht die Gruppen selbst.
-            const int von  = kaesten.at(i).right() + 2;
-            const int bis  = kaesten.at(i + 1).left() - 2;
-            const int mitteY = kaesten.at(i).center().y();
+            const int von  = zuBild(kaesten.at(i).right() + 2);
+            const int bis  = zuBild(kaesten.at(i + 1).left() - 2);
+            if (von > bis) { continue; }        // kein Platz, kein Strich
+            ++luecken;
+            const int mitteY = zuBild(kaesten.at(i).center().y());
             bool gefunden = false;
             for (int x = von; x <= bis && x < bild.width(); ++x) {
                 if (x < 0) { continue; }
@@ -93,7 +114,8 @@ private slots:
             }
             if (gefunden) { ++striche; }
         }
-        QCOMPARE(striche, kaesten.size() - 1);
+        QVERIFY2(luecken >= 2, "weniger als zwei Luecken zwischen den Gruppen");
+        QCOMPARE(striche, luecken);
     }
 
     /// B — hinter jeder Gruppe steht eine Dehnung, solange noch etwas
@@ -176,7 +198,7 @@ private slots:
         CommandBar bar;
         bar.resize(700, 60);          // absichtlich eng
         bar.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&bar));
+        QVERIFY(QTest::qWaitForWindowExposed(&bar, kFensterFrist));
         for (int i = 0; i < 4; ++i) { QCoreApplication::processEvents(); }
 
         for (QPushButton* b : bar.findChildren<QPushButton*>()) {
@@ -756,21 +778,18 @@ private slots:
         bar->setGeometry(0, 0, 1200, 120);
         bar->attach(&slice);
         top.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&top));
+        QVERIFY(QTest::qWaitForWindowExposed(&top, kFensterFrist));
         QCOMPARE(bar->windowHandle() != nullptr, barItselfNative);
 
         int opened = 0;
         for (QPushButton* more : bar->findChildren<QPushButton*>()) {
             if (more->text() != QStringLiteral("…")) { continue; }
-            QWidget* parentSeen = nullptr;
-            QTimer::singleShot(150, qApp, [&parentSeen]() {
-                if (auto* m = qobject_cast<QMenu*>(QApplication::activePopupWidget())) {
-                    parentSeen = m->parentWidget();
-                    m->close();
-                }
-            });
-            more->click();
-            QCOMPARE(parentSeen, static_cast<QWidget*>(&top));
+            // Frueher ein eigener QTimer auf activePopupWidget(): der
+            // las unter Last den Stand von vorher, und dieser Lauf fiel
+            // nur im -j6-Durchgang um. Siehe tests/MenueFaenger.h.
+            const auto fund = Test::oeffneMenue([&]() { more->click(); });
+            QVERIFY2(fund.seen, "kein Ueberlaufmenue erschienen");
+            QCOMPARE(fund.parent, static_cast<QWidget*>(&top));
             ++opened;
         }
         QCOMPARE(opened, 5);   // Modus, Band, Filter, Schritt, NR

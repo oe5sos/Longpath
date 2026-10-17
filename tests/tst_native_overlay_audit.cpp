@@ -24,6 +24,7 @@
 // =================================================================
 #include <QtTest>
 #include "gui/MainWindow.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -36,7 +37,7 @@ private slots:
         auto* mwp = new MainWindow();      // bewusst nicht abgeraeumt
         mwp->resize(1280, 800);
         mwp->show();
-        QVERIFY(QTest::qWaitForWindowExposed(mwp));
+        QVERIFY(QTest::qWaitForWindowExposed(mwp, kFensterFrist));
         QTest::qWait(600);
 
         // ── Das richtige Kriterium ───────────────────────────────────

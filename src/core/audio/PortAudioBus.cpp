@@ -194,6 +194,23 @@ PaDeviceIndex resolveDevice(const PortAudioConfig& inCfg,
         if (crossApiSub    != paNoDevice) { return crossApiSub; }
         // Named device not found: fall through to defaults rather than
         // erroring out — better silent fallback than no audio at all.
+        //
+        // Aber NICHT lautlos (2026-10-15). Am 2026-10-15 kostete „kein
+        // Ton" eine Stunde: in den Einstellungen stand ein Headset, das
+        // nicht angesteckt war, und Longpath wich still auf die
+        // eingebauten Lautsprecher aus. Im Protokoll stand danach nur
+        // das Ist-Geraet — wer das Soll nicht daneben hat, sucht beim
+        // Funkgeraet.
+        //
+        // Der Rueckfall bleibt, wie er ist; nur sagt er es jetzt.
+        qCWarning(lcAudio).noquote()
+            << QStringLiteral("Audiogeraet \"%1\" (%2) nicht gefunden — "
+                              "es wird das Standardgeraet genommen. "
+                              "Steht im Protokoll gleich darunter als "
+                              "\"%2 via …\".")
+                   .arg(wanted,
+                        wantOutput ? QStringLiteral("output")
+                                   : QStringLiteral("input"));
     }
 
     // 2. Host-API default.
