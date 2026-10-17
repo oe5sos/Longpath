@@ -30,6 +30,32 @@
 // „Notch bearbeiten…", „Alle trennen" …). Die Liste ist ein NETZ,
 // kein Beweis. Wer hier eine Zahl meldet, sagt dazu, womit sie
 // gemessen wurde.
+//
+// ── Das Loch ist inzwischen BENANNT und GEMESSEN (2026-10-17) ───────
+//
+// Dieser Lauf liest ZEILENWEISE. In einer einzelnen Zeile faengt `\s`
+// keinen Zeilenumbruch, also sieht er nichts, wenn die Klammer am
+// Zeilenende steht und das Anfuehrungszeichen erst darunter:
+//
+//     m_bgPathLabel->setToolTip(QStringLiteral(
+//         "Bild hinter Raster und Spur. Wird auf die Flaeche "
+//         "vergroessert und mittig beschnitten."));
+//
+// Genau so werden lange Hinweistexte geschrieben -- es trifft also
+// bevorzugt die laengsten. Am 2026-10-17 nachgezaehlt: zu den 9 hier
+// gemeldeten kommen **47 weitere** in src/gui, die durchrutschen.
+// Schwerpunkte: SwrSweepPanel.cpp (14), DisplaySetupPages.cpp (7),
+// AntennaWindow.cpp (5).
+//
+// Behoben wird es NICHT durch Heben der Decke, sondern indem der Lauf
+// die Datei als Ganzes liest und die "..."-Stuecke eines Rufs
+// zusammensetzt -- und indem die 47 uebersetzt werden. Beides gehoert
+// in einen eigenen Durchgang, NACH dem Mergen von #216/#221/#222:
+// alle drei fassen MainWindow.cpp an, und ein weiterer main-Zweig
+// darauf macht aus drei geloesten Konflikten drei neue.
+//
+// Bis dahin heisst die Zahl hier: „deutsche Texte, die dieses Netz
+// mit diesem Loch erkennt". Nicht „deutsche Texte".
 
 #include <QtTest>
 #include <QDir>
