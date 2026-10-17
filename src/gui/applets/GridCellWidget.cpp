@@ -189,7 +189,7 @@ void GridCellWidget::buildCellButtons()
     m_btnOptions = new QPushButton(QStringLiteral("⚙"), m_titleBar);
     m_btnOptions->setFixedSize(16, 14);
     m_btnOptions->setCursor(Qt::PointingHandCursor);
-    m_btnOptions->setToolTip(QStringLiteral("Weitere Einstellungen"));
+    m_btnOptions->setToolTip(tr("More settings"));
     m_btnOptions->setStyleSheet(btnCss);
     m_btnOptions->setVisible(false);
     connect(m_btnOptions, &QPushButton::clicked, this, [this]() {

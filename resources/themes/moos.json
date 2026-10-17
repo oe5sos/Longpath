@@ -56,8 +56,6 @@
     "measured-dim": "#6e5a2e",
     "live": "#5aa27c",
     "busy": "#ba8827",
-    "tile-active": "#23292e",
-    "inset-bg-top": "#1c2126",
     "sel-text": "#eef2f3",
     "map-ocean": "#1e2a2f",
     "map-graticule": "#dfe5e6",

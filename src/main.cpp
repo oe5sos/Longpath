@@ -3,6 +3,7 @@
 #include "gui/styles/AppTheme.h"
 #include "gui/styles/Theme.h"
 #include "core/AppSettings.h"
+#include "core/CrashReportDigest.h"
 #include "core/SettingsBackup.h"
 #include "core/AudioDeviceConfig.h"
 #include "core/BuildIdentity.h"
@@ -27,6 +28,7 @@
 #include "LongpathBuildTag.h"
 
 #include <QApplication>
+#include <QTranslator>
 #include <QCommandLineOption>
 #include <QMetaObject>
 #include <csignal>
@@ -40,6 +42,8 @@
 #include <QDir>
 #include <QFile>
 #include <QDateTime>
+#include <QElapsedTimer>
+#include <QTimer>
 #include <QStandardPaths>
 #include <QRegularExpression>
 #include <QStringList>
@@ -118,8 +122,21 @@ static void messageHandler(QtMsgType type, const QMessageLogContext& ctx, const 
     // so the context carries no caller. When it fires, append a native
     // backtrace so the call site identifies itself in the log; costs
     // nothing on every other message. Remove once the caller is found.
-    if (type == QtWarningMsg
-        && msg.contains(QLatin1String("Cannot add a null widget"))) {
+    // 2026-10-14: dieselbe Not mit einer zweiten Warnung. Im Protokoll
+    // des Betreibers stand 82-mal "QFormLayout::takeAt: Invalid index 0",
+    // in Schueben zu viert, etwa einmal je Minute -- irgendwo wird ein
+    // Formular geleert, das schon leer ist. Aus einem kalten Start auf
+    // main ist sie in 100 s nicht gekommen; sie haengt an einem Zustand
+    // oder einer Bedienung. Also muss sie sich selbst verraten, wenn sie
+    // das naechste Mal auftritt.
+    //
+    // LONGPATH_TRACE_WARNING setzt denselben Haken auf einen beliebigen
+    // Text, ohne dass man dafuer neu bauen muss.
+    static const QString traceNeedle = qEnvironmentVariable("LONGPATH_TRACE_WARNING");
+    const bool wanted = msg.contains(QLatin1String("Cannot add a null widget"))
+                        || msg.contains(QLatin1String("QFormLayout::takeAt"))
+                        || (!traceNeedle.isEmpty() && msg.contains(traceNeedle));
+    if (type == QtWarningMsg && wanted) {
         void* frames[32];
         const int n = backtrace(frames, 32);
         if (char** syms = backtrace_symbols(frames, n)) {
@@ -392,6 +409,67 @@ int main(int argc, char* argv[])
     // Load XML settings
     Longpath::AppSettings::instance().load();
 
+    // ── Was seit dem letzten Lauf abgestuerzt ist (2026-10-14) ───────
+    //
+    // Ein Programm, das abstuerzt, schreibt seinen letzten Satz nicht
+    // mehr selbst. macOS legt ihn aber ab, und beim naechsten Start
+    // laesst er sich nachholen. Am 2026-10-14 lagen sieben Berichte zu
+    // Longpath herum -- drei SIGSEGV vom Vorabend mit immer demselben
+    // Weg -- und gefunden wurden sie erst, weil jemand danach fragte.
+    //
+    // Kein Dialog, kein Versenden, keine Nachfrage: eine Zeile je
+    // Bericht im eigenen Protokoll, dort wo bei der Fehlersuche
+    // ohnehin zuerst gelesen wird. Im Pruefstands-Sandkasten still
+    // (isTestModeEnabled), damit kein Lauf fremde Berichte liest.
+    if (!QStandardPaths::isTestModeEnabled()) {
+        auto& s = Longpath::AppSettings::instance();
+        const QDateTime seit = QDateTime::fromString(
+            s.value(Longpath::CrashReportDigest::lastScanKey(), QString()).toString(),
+            Qt::ISODate);
+        const QStringList zeilen = Longpath::CrashReportDigest::summarise(
+            Longpath::CrashReportDigest::reportDir(), seit);
+        if (!zeilen.isEmpty()) {
+            qWarning().noquote()
+                << QStringLiteral("Seit dem letzten Lauf abgestuerzt: %1 Bericht(e)")
+                       .arg(zeilen.size());
+            for (const QString& z : zeilen) {
+                qWarning().noquote() << QStringLiteral("  Absturz: ") + z;
+            }
+        }
+        s.setValue(Longpath::CrashReportDigest::lastScanKey(),
+                   QDateTime::currentDateTimeUtc().toString(Qt::ISODate));
+    }
+
+    // ── Sprache (2026-10-14) ──────────────────────────────────────────
+    //
+    // Betreiber: "englisch durchgehend, aber deutsch als option".
+    // Englisch ist die Quellsprache und steht im Quelltext; eine andere
+    // Sprache kommt aus der eingebauten .qm (:/i18n/, siehe
+    // CMakeLists.txt). Hier, direkt nach load() und lange vor dem ersten
+    // Fenster: ein spaeter eingesetzter Uebersetzer erreicht Texte
+    // nicht mehr, die schon gebaut sind.
+    //
+    // Absichtlich NICHT nach der Systemsprache gegriffen: wer Longpath
+    // auf einem deutschen macOS startet, hat deshalb noch lange keine
+    // deutsche Oberflaeche bestellt. Vorgabe ist Englisch, alles andere
+    // ist eine Wahl (Setup -> General -> Language).
+    static QTranslator s_uiTranslator;
+    const QString uiLang = Longpath::AppSettings::instance()
+                               .value(QStringLiteral("UiLanguage"), QStringLiteral("en"))
+                               .toString();
+    if (uiLang != QStringLiteral("en")) {
+        if (s_uiTranslator.load(QStringLiteral(":/i18n/longpath_") + uiLang)) {
+            app.installTranslator(&s_uiTranslator);
+            qInfo() << "UI language:" << uiLang;
+        } else {
+            // Kein stilles Zurueckfallen: wer Deutsch gewaehlt hat und
+            // Englisch sieht, soll im Protokoll finden, warum.
+            qWarning() << "UI language" << uiLang
+                       << "was chosen but :/i18n/longpath_" + uiLang
+                       << "did not load -- staying with English";
+        }
+    }
+
     // Automatic start-up copy of the settings file (File > Settings
     // Backups, "Backup on start-up"; off unless switched on). After
     // load() so the switch is known, before the migrations below so the
@@ -510,8 +588,39 @@ int main(int argc, char* argv[])
     // Absturz beim Beenden sonst nur die Stelle wechselt.
     int rc = 0;
     {
+        // ── Messpunkte (2026-10-16): wo die Startzeit wirklich liegt ──
+        //
+        // Martins Protokoll vom 15.10. zeigt zwischen „TciServer
+        // listening" (21:47:03.900) und dem ersten Lebenszeichen des
+        // Verbinden-Fensters (21:47:10.065) eine Luecke von 6,2 s ohne
+        // eine einzige Zeile — der groesste einzelne Posten seines
+        // 17-Sekunden-Starts und der einzige voellig unvermessene.
+        //
+        // Derselbe Weg mit demselben Profil, aber offscreen, braucht
+        // bis dorthin 2,1 s. Die Zeit haengt also an der echten
+        // Darstellung und nicht am Profil — und genau die kann eine
+        // Sonde nicht nachstellen. Diese drei Zahlen koennen es: der
+        // Konstruktor, das show(), und die erste Runde der
+        // Ereignisschleife danach.
+        //
+        // Statisch, damit die Uhr das Lambda ueberlebt, das sie liest.
+        static QElapsedTimer startUhr;
+        startUhr.start();
+
         Longpath::MainWindow window;
+        const qint64 nachKonstruktor = startUhr.elapsed();
+
         window.show();
+        const qint64 nachShow = startUhr.elapsed();
+
+        // Erst nach der ersten Runde ist das Fenster wirklich da.
+        QTimer::singleShot(0, &window, [nachKonstruktor, nachShow]() {
+            qWarning().nospace()
+                << "[Startzeit] MainWindow-Konstruktor " << nachKonstruktor
+                << " ms, show() " << (nachShow - nachKonstruktor)
+                << " ms, erste Runde der Schleife bei " << startUhr.elapsed()
+                << " ms";
+        });
 
         // Dev automation bridge (Phase 0: dumpTree + grab + get, read-only) --
         // off unless explicitly requested, so a normal launch is unaffected.

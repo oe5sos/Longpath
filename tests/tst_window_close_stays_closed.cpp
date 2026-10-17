@@ -40,12 +40,39 @@ namespace {
 // Das Hauptfenster wie im echten Start, dann die Verbinden-Maske zu:
 // sie versteckt sonst jedes schwebende Fenster (Muster aus
 // tst_closing_takes_the_float_along.cpp).
+// Das zuletzt gebaute Fenster — cleanup() raeumt es nach jedem Fall ab.
+//
+// ── Warum das noetig wurde (2026-10-16) ─────────────────────────────
+//
+// Hier stand „bewusst nicht abgeraeumt", und jeder der sieben Faelle
+// liess sein MainWindow offen stehen. Gemessen: jedes braucht rund
+// 5 Sekunden bis `qWaitForWindowExposed`, und mit jedem weiteren
+// offenen Fenster (Ton, Taktgeber, Suche, Netz) wird es langsamer.
+// Beim FUENFTEN riss die Vorgabefrist von 5000 ms:
+//
+//     Fenster 1: exposed 4983 ms
+//     Fenster 2: exposed 4951 ms
+//     Fenster 3: exposed 5016 ms
+//     Fenster 4: exposed 5431 ms
+//     Fenster 5: exposed scheiterte nach 5078 ms
+//
+// Der Lauf fiel darum in 5 von 6 Durchgaengen um, an wechselnden
+// Stellen, und brauchte 30 Sekunden. Beides hat dieselbe Ursache.
+//
+// Abgeraeumt werden kann seit dem 2026-10-15: die vier Wachen gegen
+// die Abstuerze beim Beenden stehen (siehe
+// docs/architecture/… bzw. tst_abbau_ueberlebt).
+MainWindow* g_zuletzt = nullptr;
+
 MainWindow* startMainWindow()
 {
-    auto* mw = new MainWindow();        // bewusst nicht abgeraeumt
+    auto* mw = new MainWindow();
+    g_zuletzt = mw;
     mw->resize(1280, 800);
     mw->show();
-    if (!QTest::qWaitForWindowExposed(mw)) { return nullptr; }
+    // Grosszuegiger als die Vorgabe (5 s): unter Last braucht das
+    // Fenster laenger, und die Frist laeuft nur im Fehlerfall ab.
+    if (!QTest::qWaitForWindowExposed(mw, 20000)) { return nullptr; }
     if (!QTest::qWaitFor([mw]() { return mw->findChild<ConnectionPanel*>() != nullptr; },
                          15000)) {
         return nullptr;
@@ -78,6 +105,19 @@ class TstWindowCloseStaysClosed : public QObject
 {
     Q_OBJECT
 private slots:
+    /// Nach JEDEM Fall das Fenster abraeumen — sonst stapeln sich
+    /// sieben davon und der naechste Fall wartet auf einen Schirm,
+    /// den sechs andere blockieren.
+    void cleanup()
+    {
+        if (!g_zuletzt) { return; }
+        g_zuletzt->close();
+        g_zuletzt->deleteLater();
+        g_zuletzt = nullptr;
+        QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+        QTest::qWait(50);
+    }
+
     void initTestCase()
     {
         // Das Logbuch liest RotorLogbookPanel::logbookPath(). Eine gesetzte

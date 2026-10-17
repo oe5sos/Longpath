@@ -25,6 +25,7 @@
 
 #include <QCheckBox>
 #include <QSpinBox>
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -81,7 +82,7 @@ private slots:
         w.setConnectionState(ConnectionState::Disconnected);
         w.setFrequencyRange(7'131'200.0, 200'000.0);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
 
         QVector<SpectrumWidget::NotchMarker> notches;
         SpectrumWidget::NotchMarker n;
@@ -156,7 +157,7 @@ private slots:
         w.setConnectionState(ConnectionState::Disconnected);
         w.setFrequencyRange(7'131'200.0, 200'000.0);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
 
         QVector<SpectrumWidget::NotchMarker> notches;
         SpectrumWidget::NotchMarker n;
@@ -197,7 +198,7 @@ private slots:
         w.resize(1200, 700);
         w.setFrequencyRange(7'131'200.0, 200'000.0);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
 
         QVector<SpectrumWidget::NotchMarker> notches;
         SpectrumWidget::NotchMarker n;
@@ -251,7 +252,7 @@ private slots:
         w.resize(1200, 700);
         w.setFrequencyRange(7'131'200.0, 200'000.0);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
 
         QVector<SpectrumWidget::NotchMarker> notches;
         SpectrumWidget::NotchMarker n;
@@ -303,9 +304,12 @@ private slots:
         one.append(b);
         w.setNotchMarkers(one);
         const QString all = entries(1).join(QLatin1Char('|'));
-        QVERIFY2(all.contains(QLatin1String("Alle 2")),
+        // Nur der feste Teil des tr()-Wortlauts (2026-10-15
+        // englisch), nicht der ganze Satz.
+        QVERIFY2(all.contains(QLatin1String("all 2")),
                  qPrintable(QStringLiteral("Kein Sammel-Eintrag: %1").arg(all)));
-        QVERIFY2(all.contains(QLatin1String("bearbeiten")),
+        // Fester Teil des tr()-Wortlauts (2026-10-15 englisch).
+        QVERIFY2(all.contains(QLatin1String("Edit notch")),
                  qPrintable(QStringLiteral("Kein 'bearbeiten': %1").arg(all)));
     }
 };

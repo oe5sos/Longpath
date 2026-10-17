@@ -196,11 +196,37 @@ public:
     void setSingleChannelHoldMsForTest(int ms) { m_singleChannelHoldMs = ms; }
     // Der Rahmen, den setAttenuator(dB) schicken wuerde; leer fuer
     // Werte, die die QRP nicht hat.
+    // ── Netzlage zum Geraet ────────────────────────────────────────
+    //
+    // Ein Netzeintrag dieses Rechners, so viel wie fuer die Frage
+    // "liegt das Geraet in diesem Netz?" gebraucht wird. Eigene
+    // Struktur, damit ein Pruefstand Netze vorgeben kann, ohne echte
+    // Schnittstellen zu haben.
+    struct NetzEintrag {
+        QString      name;
+        QHostAddress adresse;
+        int          praefix{0};
+    };
+    // Ein Satz dazu, ob das Geraet ueberhaupt in einem der Netze liegt.
+    static QString netzlage(const QHostAddress& ziel,
+                            const QVector<NetzEintrag>& netze);
+    // Die echten Netze dieses Rechners (ohne Rueckschleife, nur IPv4).
+    static QVector<NetzEintrag> eigeneNetze();
     static QByteArray attenuatorFrameFor(int dB);
+    // Schreibt mit, welche Stufe Opcode 0x04 gerade traegt, und sagt im
+    // Protokoll, wenn der andere Steller sie verstellt hat.
+    void merkeStufe04(const QByteArray& frame, const QString& weg);
     // Der Rahmen, den setPreampModeIndex(i) schicken wuerde (Opcode 0x04,
     // Nutzlast 03/02/01/00 = +10/0/-10/-20 dB); leer fuer Stufen, die die
     // QRP nicht hat. i ist ein PreampMode-Index (StepAttenuatorController.h).
     static QByteArray preampFrameFor(int preampModeIdx);
+    // Die Stufe, die zuletzt ueber Opcode 0x04 gesetzt wurde (0..3 =
+    // -20/-10/0/+10 dB), -1 wenn noch keine. Fuer Pruefstaende.
+    int stufe04ForTest() const { return m_stufe04; }
+    // Nur fuer Pruefstaende: den Mitschrieb der Stufe von aussen fahren,
+    // ohne Socket und ohne Geraet.
+    void merkeStufe04ForTest(const QByteArray& frame, const QString& weg)
+    { merkeStufe04(frame, weg); }
     // Der DDC-Frequenzrahmen (Opcode 0x07) fuer Unterempfaenger 0 (RX1)
     // oder 1 (RX2) -- der Rahmen, der die QRP auf echtes I/Q schaltet.
     static QByteArray ddcFrequencyFrame(int subReceiver, quint64 frequencyHz);
@@ -961,6 +987,9 @@ private:
     // Einmal je Sitzung melden, dass die Leistung nicht gestellt wird.
     bool m_txDriveGemeldet{false};
     bool m_preampSchalterGemeldet{false};
+    // Die Stufe, die zuletzt mit Opcode 0x04 hinausging -- Vorverstaerker
+    // UND Daempfung schreiben sie (siehe merkeStufe04()). -1 = unbekannt.
+    int  m_stufe04{-1};
     /// Hat das Geraet uns in DIESER Sitzung je geantwortet?
     ///
     /// m_awaitingBeacon taugt dafuer nicht: bei abgeschalteter Suche
@@ -1295,6 +1324,14 @@ public:
     quint64 rahmenOhneQuittungForTest() const { return m_rahmenOhneQuittung; }
     quint64 anschlagProbenForTest() const { return m_anschlagProben; }
     quint64 anschlagMeldungenForTest() const { return m_anschlagMeldungen; }
+    // Die Uebersteuerungspruefung von aussen fahren, mit Proben, die der
+    // Pruefstand selbst baut. Ohne das war nur belegt, dass sie am echten
+    // Geraet NICHT falsch alarmiert (0 Proben am Anschlag ueber Stunden,
+    // zuletzt 2026-10-11 mit Antenne) -- dass sie ueberhaupt anschlaegt,
+    // war es nicht: dafuer braeuchte es ein Signal, das den Wandler
+    // wirklich an den Anschlag treibt, und das kann man nicht bestellen.
+    void pruefeAnschlagForTest(const QVector<float>& samples)
+    { pruefeAnschlag(samples); }
     bool geraetSendetForTest() const { return m_geraetSendet; }
     quint64 mikrofonPttFlankenForTest() const { return m_mikrofonPttFlanken; }
     quint64 kanalPaketeForTest(int k) const

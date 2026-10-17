@@ -144,7 +144,7 @@ void RttyDecoderApplet::buildUI()
     statusRow->addWidget(m_snrValue);
 
     // Zustand als umrandete Kapsel, HAUSSTIL.md Regel 5.
-    m_lockCapsule = new QLabel(QStringLiteral("KEIN LOCK"), this);
+    m_lockCapsule = new QLabel(tr("NO LOCK"), this);
     m_lockCapsule->setAlignment(Qt::AlignCenter);
     m_lockCapsule->setFixedHeight(20);
     // Schrift per setFont auf der Leiter (9 px versal), nicht als
@@ -349,7 +349,7 @@ void RttyDecoderApplet::onStatsUpdated(float markLevel, float spaceLevel, float 
             " border-radius: 10px; padding: 0 10px; }")
             .arg(Style::kGreenBg, Style::kGreenText, Style::kGreenBorder));
     } else {
-        m_lockCapsule->setText(QStringLiteral("KEIN LOCK"));
+        m_lockCapsule->setText(tr("NO LOCK"));
         m_lockCapsule->setStyleSheet(QStringLiteral(
             "QLabel { background: %1; color: %2; border: 1px solid %3;"
             " border-radius: 10px; padding: 0 10px; }")

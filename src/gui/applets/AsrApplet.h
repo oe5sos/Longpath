@@ -46,7 +46,7 @@ public:
     explicit AsrApplet(RadioModel* model, QWidget* parent = nullptr);
 
     QString appletId()    const override { return QStringLiteral("Asr"); }
-    QString appletTitle() const override { return QStringLiteral("MITSCHRIFT"); }
+    QString appletTitle() const override { return tr("TRANSCRIPT"); }
     void    syncFromModel() override {}
 
     /// Der Dienst, dessen Text hier landet. Nicht im Besitz.

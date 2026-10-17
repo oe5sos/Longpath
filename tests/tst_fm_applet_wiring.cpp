@@ -23,6 +23,7 @@
 #include "models/MemoryRecord.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -117,7 +118,7 @@ private slots:
             s->setFmReverse(true);
             applet.resize(300, 520);
             applet.show();
-            QVERIFY(QTest::qWaitForWindowExposed(&applet));
+            QVERIFY(QTest::qWaitForWindowExposed(&applet, kFensterFrist));
             applet.grab().save(grabDir + QStringLiteral("/fm-seite.png"));
         }
     }
@@ -178,7 +179,7 @@ private slots:
             applet.showPage(2);
             applet.resize(300, 520);
             applet.show();
-            QVERIFY(QTest::qWaitForWindowExposed(&applet));
+            QVERIFY(QTest::qWaitForWindowExposed(&applet, kFensterFrist));
             applet.grab().save(grabDir + QStringLiteral("/fm-speicher.png"));
             mem->clear();
         }

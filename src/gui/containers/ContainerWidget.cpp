@@ -431,7 +431,7 @@ void ContainerWidget::addTab(QWidget* widget, const QString& title)
             QMenu& menu = *menuOwner.get();
             menu.setStyleSheet(QString::fromLatin1(kPopupMenu));
             QAction* out = menu.addAction(
-                QStringLiteral("%1 als eigenes Fenster")
+                tr("%1 as its own window")
                     .arg(m_tabBar->tabText(i)));
             const QAction* chosen = menu.exec(m_tabBar->mapToGlobal(p));
             // Das Elternteil kann waehrend exec() gestorben sein — dann ist

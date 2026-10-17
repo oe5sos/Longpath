@@ -140,11 +140,11 @@ void RotorDialWidget::contextMenuEvent(QContextMenuEvent* ev)
 
     const struct { const char* label; Shape shape; const char* tip; } kForms[] = {
         {QT_TR_NOOP("Vollkreis"), Shape::Rose,
-         QT_TR_NOOP("Ganze Windrose, Norden oben. Zeigt auch, was hinter "
-                    "der Antenne liegt.")},
+         QT_TR_NOOP("Full compass rose, north up. Also shows what lies behind the "
+                     "antenna.")},
         {QT_TR_NOOP("Peilband"), Shape::Tape,
-         QT_TR_NOOP("Ein Band um die Antenne statt eines Kreises. Nutzt "
-                    "die volle Breite — dafuer fehlt das Rundherum.")},
+         QT_TR_NOOP("A strip around the antenna instead of a circle. Uses the full "
+                     "width, at the cost of the all-round view.")},
     };
     for (const auto& f : kForms) {
         QAction* a = menu.addAction(tr(f.label));
@@ -583,7 +583,7 @@ void RotorDialWidget::paintTape(QPainter& p)
                    travelDegrees() >= 0 ? QStringLiteral("CW ")
                                         : QStringLiteral("CCW "))
               .arg(qRound(std::abs(travelDegrees())))
-        : QStringLiteral("kein Ziel");
+        : tr("no target");
     p.drawText(QPointF(bx + QFontMetrics(big).horizontalAdvance("000°") + 14.0,
                        h - 12.0), line2);
 }

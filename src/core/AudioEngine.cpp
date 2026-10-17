@@ -1354,6 +1354,19 @@ void AudioEngine::setCwTap(AudioTapRing* ring, int sliceId)
     }
 }
 
+void AudioEngine::setFt8Tap(AudioTapRing* ring, int sliceId)
+{
+    // Reihenfolge wie bei den anderen Abgriffen (siehe setRttyTap).
+    if (ring) {
+        m_ft8TapSlice.store(sliceId, std::memory_order_release);
+        m_ft8Tap.store(ring, std::memory_order_release);
+    } else {
+        m_ft8Tap.store(nullptr, std::memory_order_seq_cst);
+        m_ft8TapSlice.store(-1, std::memory_order_release);
+        waitForTapQuiescence(m_ft8TapBusy);
+    }
+}
+
 void AudioEngine::rxBlockReady(int sliceId, const float* samples, int frames)
 {
     if (m_mixAdmissionClosed.load(std::memory_order_acquire)) {
@@ -1582,6 +1595,11 @@ void AudioEngine::rxBlockReady(int sliceId, const float* samples, int frames)
     // Der Abgriff fuer den nativen CW-Decoder (2026-09-21): eigener Ring,
     // derselbe Grund. Design doc: 2026-09-21-cw-decoder.md.
     writeToTapIfCurrent(m_cwTap, m_cwTapSlice, m_cwTapBusy, sliceId,
+                        samples, frames, m_tapWriteDelayHookForTest);
+
+    // Der Abgriff fuer den nativen FT8/FT4-Dekoder (2026-10-15): eigener
+    // Ring, derselbe Grund. Siehe Ft8Stream.h.
+    writeToTapIfCurrent(m_ft8Tap, m_ft8TapSlice, m_ft8TapBusy, sliceId,
                         samples, frames, m_tapWriteDelayHookForTest);
 
     // Flush synchronously on the DSP thread. thread_local scratch so the

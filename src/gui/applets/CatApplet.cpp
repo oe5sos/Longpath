@@ -248,12 +248,12 @@ void CatApplet::setzeCatServer(CatServer* srv)
     // die Art Oberflaeche, die dieses Feld bis heute war.
     m_tcpBtn->setEnabled(srv != nullptr);
     if (!srv) {
-        m_tcpBtn->setToolTip(QStringLiteral("Kein CAT-Server vorhanden"));
+        m_tcpBtn->setToolTip(tr("No CAT server available"));
         return;
     }
 
     m_tcpBtn->setToolTip(
-        QStringLiteral("CAT ueber TCP auf 127.0.0.1:%1..%2 (vier Kanaele)")
+        tr("CAT over TCP on 127.0.0.1:%1..%2 (four channels)")
             .arg(kErsterPort).arg(kErsterPort + CatServer::kKanaele - 1));
 
     connect(m_tcpBtn, &QPushButton::toggled, this, [this](bool an) {
@@ -330,9 +330,9 @@ void CatApplet::zeigeKanaele()
                            : QString(QChar(QLatin1Char('A' + k))));
         led->setEnabled(laeuft);
         led->setToolTip(laeuft
-            ? QStringLiteral("Kanal %1 horcht auf Port %2, %3 Verbindung(en)")
+            ? tr("Channel %1 listening on port %2, %3 connection(s)")
                   .arg(QChar(QLatin1Char('A' + k))).arg(m_cat->port(k)).arg(n)
-            : QStringLiteral("Kanal %1 ist aus")
+            : tr("Channel %1 is off")
                   .arg(QChar(QLatin1Char('A' + k))));
     }
 }

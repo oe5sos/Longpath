@@ -179,7 +179,7 @@ SideAreaWindow::SideAreaWindow(QWidget* parent)
     // schwebenden Fenstern.
     : QWidget(parent, Qt::Tool)
 {
-    setWindowTitle(QStringLiteral("Seitenbereich"));
+    setWindowTitle(tr("Side area"));
     setObjectName(QStringLiteral("sideAreaWindow"));
 
     auto* outer = new QHBoxLayout(this);
@@ -191,7 +191,7 @@ SideAreaWindow::SideAreaWindow(QWidget* parent)
     auto* bodyLay = new QVBoxLayout(m_body);
     bodyLay->setContentsMargins(0, 0, 0, 0);
     bodyLay->setSpacing(0);
-    m_titleBar = new WindowTitleBar(QStringLiteral("Seitenbereich"), m_body);
+    m_titleBar = new WindowTitleBar(tr("Side area"), m_body);
     m_titleBar->setLockKey(QStringLiteral("SideArea"));
     // × und Doppelklick/↙ heißen hier „zuklappen": ein Seitenbereich
     // hat keine Spalte, in die er zurückkönnte, und schließen soll ihn
@@ -213,7 +213,7 @@ SideAreaWindow::SideAreaWindow(QWidget* parent)
     m_railLayout->setSpacing(6);
     m_railLayout->addStretch(1);
     m_addButton = new SideRailButton(SideRailButton::Kind::Plus, QString(), m_rail);
-    m_addButton->setToolTip(QStringLiteral("Fenster in den Seitenbereich legen"));
+    m_addButton->setToolTip(tr("Put a window into the side area"));
     connect(m_addButton, &QAbstractButton::clicked, this, [this]() {
         emit addRequested(m_addButton->mapToGlobal(QPoint(0, m_addButton->height())));
     });
@@ -273,7 +273,7 @@ void SideAreaWindow::addPage(const QString& id, const QString& title, QWidget* c
         // 2026-08-30 genau so einen Absturz gebracht (ProfileRail).
         auto* menu = new QMenu(this);
         menu->setAttribute(Qt::WA_DeleteOnClose, true);
-        menu->addAction(QStringLiteral("Aus dem Seitenbereich nehmen"),
+        menu->addAction(tr("Take it out of the side area"),
                         this, [this, id]() { emit removeRequested(id); });
         menu->popup(QCursor::pos());
     };
@@ -322,7 +322,7 @@ QWidget* SideAreaWindow::takePage(const QString& id)
         if (!m_order.isEmpty()) {
             setActive(m_order.at(qBound(0, idx, int(m_order.size()) - 1)));
         } else {
-            m_titleBar->setTitle(QStringLiteral("Seitenbereich"));
+            m_titleBar->setTitle(tr("Side area"));
             emit activeChanged(QString());
         }
     }

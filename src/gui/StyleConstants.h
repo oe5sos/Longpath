@@ -755,6 +755,27 @@ inline QString sunkenFill(const char* baseHex, int deepen = -1, int lift = -1)
 // sagt, DASS man ziehen kann. Ohne den weiss es niemand.
 constexpr int kSplitterHandlePx = 6;
 
+// ── Der eine Abstand zwischen zwei Feldern (2026-10-15) ─────────────
+//
+// Der Betreiber: „es sollte auch immer automatisch zwischen windows
+// und windows ein minimaler automatischer Abstand sein, vielleicht
+// 2 pixel. x und y, dann sieht es besser aus und gleich."
+//
+// „Gleich" ist das Stichwort. Gemessen am laufenden Programm stand
+// zwischen zwei Applet-Feldern 6 px, links vom Fensterrand 6 px,
+// rechts 8 px (Rinne fuer den Rollbalken) und oben 6 px — vier Werte
+// fuer dieselbe Sache. Im ganzen Quelltext sind es fuenfzehn
+// verschiedene setSpacing-Werte (0,1,2,3,4,5,6,7,8,9,10,12,14,16,22).
+//
+// Dieser eine Wert gilt ab jetzt fuer jeden Abstand ZWISCHEN Feldern,
+// in beiden Achsen, und fuer den Rand des Fensters.
+//
+// NICHT fuer kSplitterHandlePx darueber: ein Ziehgriff ist kein
+// Abstand, sondern ein Bedienteil. Der Betreiber hat am 2026-08-21
+// selbst gemeldet, dass drei Pixel nicht zu treffen sind; sechs
+// bleiben sechs.
+constexpr int kPanelGapPx = 2;
+
 // ── Der Griff ist UNSICHTBAR, bis man ihn beruehrt (2026-10-14) ──────
 //
 // Der Betreiber, mit einem Bild: „Ich moechte im Hintergrund keine

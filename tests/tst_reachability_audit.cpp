@@ -40,6 +40,7 @@ using namespace Longpath;
 #include <QFile>
 #include <QDirIterator>
 #include <QRegularExpression>
+#include "FensterFrist.h"
 
 class TstReachabilityAudit : public QObject
 {
@@ -221,7 +222,7 @@ private slots:
         auto* mw = new MainWindow();
         mw->resize(1800, 1100);
         mw->show();
-        QVERIFY(QTest::qWaitForWindowExposed(mw));
+        QVERIFY(QTest::qWaitForWindowExposed(mw, kFensterFrist));
         for (int i = 0; i < 12; ++i) { QCoreApplication::processEvents(); }
         QTest::qWait(350);
 

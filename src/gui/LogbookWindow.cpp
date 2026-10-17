@@ -240,18 +240,79 @@ void LogbookWindow::setVisible(bool visible)
     QDialog::setVisible(visible);
     if (!first) { return; }
     m_shownOnce = true;
-    const bool withPosition = m_geometryRestored;
-    for (int ms : {50, 300, 1000}) {
-        QTimer::singleShot(ms, this, [this, intended, withPosition, ms]() {
-            if (ms == 1000) { m_settling = false; }
-            if (!isVisible() || isMaximized() || isFullScreen()) { return; }
-            const QSize bound = m_settleTarget.expandedTo(minimumSizeHint());
-            const QSize size = this->size().boundedTo(bound);
-            if (size == this->size()) { return; }   // nichts aufgezogen
-            setGeometry(withPosition ? QRect(intended.topLeft(), size)
-                                     : QRect(pos(), size));
-        });
+
+    // ── Laufend statt an drei Punkten (2026-10-16) ───────────────────
+    //
+    // Hier standen drei feste Takte: 50, 300, 1000 ms. Jeder nahm
+    // zurueck bis m_settleTarget.expandedTo(minimumSizeHint()) — und
+    // war die Mindesthoehe beim LETZTEN noch nicht eingeschwungen, war
+    // diese Grenze selbst der aufgezogene Wert. Dann unterblieb die
+    // Korrektur, und danach lief kein Takt mehr. Im vollen Durchgang
+    // vom 2026-10-16 stand das Fenster unter -j8-Last auf 780 statt
+    // 700; allein gefahren war derselbe Lauf gruen.
+    //
+    // Der Kommentar oben sagt es selbst: „im laufenden Programm
+    // (Karte, Karteikarte, Kennzahlen) spaeter — live nach 50 ms noch
+    // 776 statt 637". Drei Zeitpunkte zu raten, an denen das vorbei
+    // ist, geht auf einer besetzten Maschine schief.
+    m_settleIntended     = intended;
+    m_settleWithPosition = m_geometryRestored;
+    m_settleLastHint     = QSize();
+    m_settleUhr.start();
+    if (!m_settleTimer) {
+        m_settleTimer = new QTimer(this);
+        connect(m_settleTimer, &QTimer::timeout,
+                this, &LogbookWindow::onSettleTick);
     }
+    m_settleTimer->start(kSettleTickMs);
+}
+
+void LogbookWindow::onSettleTick()
+{
+    if (!isVisible() || isMaximized() || isFullScreen()) {
+        stopSettling();
+        return;
+    }
+
+    const QSize hint = minimumSizeHint();
+    const bool eingeschwungen = (hint == m_settleLastHint);
+    m_settleLastHint = hint;
+
+    // Nur zuruecknehmen, was aufgezogen wurde — nie vergroessern. Ziel
+    // ist die kleinste Groesse, die das Fenster in dieser Zeit hatte
+    // (m_settleTarget, gefuehrt in resizeEvent), nie kleiner als der
+    // Inhalt jetzt braucht.
+    const QSize bound = m_settleTarget.expandedTo(hint);
+    const QSize jetzt = size();
+    const QSize soll  = jetzt.boundedTo(bound);
+    const bool nichtsZurueckzunehmen = (soll == jetzt);
+    if (!nichtsZurueckzunehmen) {
+        setGeometry(m_settleWithPosition
+                        ? QRect(m_settleIntended.topLeft(), soll)
+                        : QRect(pos(), soll));
+    }
+
+    const qint64 seit = m_settleUhr.elapsed();
+
+    // Die erste Sekunde gehoert dem Betreiber: wer in ihr kleiner
+    // zieht, behaelt es, und dafuer muss der Takt noch laufen. Erst
+    // danach darf Ruhe einkehren — und auch dann nur, wenn die
+    // Mindestgroesse wirklich steht und nichts mehr aufgezogen war.
+    if (seit >= kSettleMinMs && eingeschwungen && nichtsZurueckzunehmen) {
+        stopSettling();
+        return;
+    }
+    // Und irgendwann ist Schluss, damit ein Fenster, dessen
+    // Mindestgroesse nie zur Ruhe kommt, nicht ewig gefangen bleibt.
+    if (seit >= kSettleMaxMs) {
+        stopSettling();
+    }
+}
+
+void LogbookWindow::stopSettling()
+{
+    if (m_settleTimer) { m_settleTimer->stop(); }
+    m_settling = false;
 }
 
 void LogbookWindow::restoreSplitState()
@@ -291,7 +352,7 @@ void LogbookWindow::buildUi()
     aussen->setContentsMargins(0, 0, 0, 0);
     aussen->setSpacing(0);
 
-    m_titleBar = new WindowTitleBar(QStringLiteral("Logbuch"), this);
+    m_titleBar = new WindowTitleBar(tr("Logbook"), this);
     // Das Logbuch gehoert in kein Dock -- das × schliesst, und der
     // Andockwunsch (Doppelklick auf die Leiste) tut dasselbe, statt ins
     // Leere zu laufen.

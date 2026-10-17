@@ -88,8 +88,8 @@ StartupPrefsPage::StartupPrefsPage(RadioModel* model, QWidget* parent)
                     QStringLiteral("QLineEdit { border: 1px solid %1; }")
                         .arg(Style::kRedBorder));
                 gridSquare->setToolTip(
-                    QStringLiteral("\"%1\" ist kein gueltiger Locator "
-                                   "(erwartet z. B. JN78 oder JN78dc)").arg(wert));
+                    tr("\"%1\" is not a valid grid square "
+                      "(expected e.g. JN78 or JN78dc)").arg(wert));
                 return;
             }
             gridSquare->setStyleSheet(QString{});

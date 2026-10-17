@@ -59,23 +59,16 @@ N0CALL, Cluster-Automatik aus>` und `LONGPATH_AUTOMATION=1` (`dumpTree`,
 
 Erledigt in drei Commits (Tabelle 14–16). Was noch aussteht:
 
-7. **Ordnername** `~/Longpath/NereusSDR` → `~/Longpath/Longpath`. Nicht
-   nachts gemacht: Bau- und Startbefehl, der Worktree
-   (`.git/worktrees/…` mit absoluten Pfaden), Launch-Agents und die
-   zweite Session hängen daran. Wenn du es willst, in einem Zug:
-
-   ```bash
-   cd ~/Longpath && mv NereusSDR Longpath && cd Longpath && git worktree repair && git worktree list
-   ```
-
-   Danach `rm -rf build` (der Cache trägt den alten absoluten Pfad;
-   der nächste Bau ist ein voller, ~10 min) und der Befehl lautet
-   `cd ~/Longpath/Longpath && ./build.sh && ./run.sh`. Vorher Longpath
-   beenden. Launch-Agents hängen nicht am Pfad (geprüft 18.09.).
+7. **Ordnername** — *erledigt am 2026-10-14.* `~/Longpath/NereusSDR`
+   heißt jetzt `~/Longpath/Longpath`; die 36 Worktrees wurden mit
+   `git worktree repair` nachgezogen und einzeln geprüft (keiner defekt,
+   ungesicherte Arbeit im Hauptbaum unberührt). Bau- und Startbefehl:
+   `cd ~/Longpath/Longpath && ./build.sh && ./run.sh`. Ein Bauordner lag
+   im Hauptbaum nicht, es war also keiner wegzuräumen.
 8. **HAL-Plug-in (VAX)**: auf diesem Rechner ist keines installiert, es
    gibt also nichts zu ersetzen. Wenn VAX-Geräte gewünscht sind:
    ```bash
-   cd ~/Longpath/NereusSDR && cmake -S hal-plugin -B build-hal -DCMAKE_BUILD_TYPE=RelWithDebInfo && cmake --build build-hal && sudo cmake --install build-hal && sudo killall coreaudiod
+   cd ~/Longpath/Longpath && cmake -S hal-plugin -B build-hal -DCMAKE_BUILD_TYPE=RelWithDebInfo && cmake --build build-hal && sudo cmake --install build-hal && sudo killall coreaudiod
    ```
 
    (braucht das Passwort) — die Geräte heißen dann „Longpath VAX 1–4"
@@ -124,11 +117,12 @@ nachziehen, siehe Notiz vom 05.09.).
 
 ## Was vom Betreiber gebraucht wird
 
-- **Sprache** (E): Englisch oder Deutsch.
+- ~~**Sprache** (E)~~ — entschieden am 2026-10-14: **Englisch
+  durchgehend, Deutsch als Option.** Damit wird aus der Durchsicht eine
+  Übersetzung: alle sichtbaren Texte durch `tr()`, Englisch als Quelle,
+  eine deutsche Übersetzung dazu und eine Umschaltung in den
+  Einstellungen.
 - **ConnectionPanel committen** (D).
-- **Ordnername** (B7): willst du `~/Longpath/Longpath`? Befehl steht
-  oben; ich mache es nicht ungefragt, weil dein Terminal und die zweite
-  Session daran hängen.
 - **HAL-Plug-in** (B8): nur, wenn du VAX-Geräte willst — Befehl oben,
   braucht das Passwort.
 - **Ein Foto mit Funkgerät** (H), sobald das ANVELINA wieder da ist.
