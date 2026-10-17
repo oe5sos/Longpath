@@ -318,7 +318,7 @@ void TstAcomVerbindung::derWachtaktSchaltetDieTelemetrieWiederEin()
     QTRY_VERIFY_WITH_TIMEOUT(m_amp->schiebtGerade(), 2000);
 
     QSignalSpy tele(m_verb, &AcomConnection::telemetryUpdated);
-    QVERIFY2(tele.wait(2000), "Es kam zunaechst keine Telemetrie");
+    QTRY_VERIFY_WITH_TIMEOUT(!tele.isEmpty(), 2000);
     const int einschaltenVorher = m_amp->einschaltbefehle();
 
     // Der Verstaerker vergisst es -- ohne ein Wort darueber.
@@ -331,14 +331,30 @@ void TstAcomVerbindung::derWachtaktSchaltetDieTelemetrieWiederEin()
     QTRY_VERIFY_WITH_TIMEOUT(m_amp->schiebtGerade(), 3000);
 
     QSignalSpy wieder(m_verb, &AcomConnection::telemetryUpdated);
-    QVERIFY2(wieder.wait(2000),
-             "Nach dem Wiedereinschalten kam keine Telemetrie -- der Wachtakt "
-             "hat die Leitung nicht wiederbelebt");
+    // QTRY_VERIFY statt wait(): letzteres wartet auf ein WEITERES
+    // Signal und sieht nicht, dass schon eines da ist.
+    QTRY_VERIFY_WITH_TIMEOUT(!wieder.isEmpty(), 2000);
 
     // Und solange Rahmen kommen, wird NICHT dauernd nachgeschaltet --
     // der Wachtakt soll die Leitung nicht mit 0x92 zupflastern.
     const int ruhigVorher = m_amp->einschaltbefehle();
-    QTest::qWait(300);
+
+    // An die RAHMEN gebunden, nicht an die Uhr (2026-10-18).
+    //
+    // Hier stand `QTest::qWait(300)`. Der Wachtakt laeuft im Prueflauf
+    // mit 30 ms (init()), also zehn Takte in diesen 300 ms. Unter Last
+    // -- im Gesamtlauf mit -j4 -- kamen die geschobenen Rahmen nicht
+    // schnell genug, der Wachtakt hielt die Leitung fuer still und
+    // schaltete nach. Das ist RICHTIGES Verhalten, der Fall fiel
+    // trotzdem: gemessen vier von sechs Laeufen rot, einzeln gefahren
+    // immer gruen.
+    //
+    // Die Aussage lautet „solange Rahmen KOMMEN, wird nicht
+    // nachgeschaltet". Also wird genau das abgewartet: fuenf
+    // eingegangene Telemetrie-Rahmen. Damit ist die Bedingung erfuellt,
+    // die der Satz voraussetzt, und die Uhr spielt keine Rolle mehr.
+    QSignalSpy fluss(m_verb, &AcomConnection::telemetryUpdated);
+    QTRY_VERIFY_WITH_TIMEOUT(fluss.count() >= 5, 5000);
     QCOMPARE(m_amp->einschaltbefehle(), ruhigVorher);
 }
 
