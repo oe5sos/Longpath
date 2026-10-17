@@ -655,8 +655,18 @@ static QByteArray buildP1DiscoveryProbe()
 
 RadioDiscovery::QuietPollOutcome RadioDiscovery::quietPollAttempt(
     QUdpSocket& sock, int quietBeforeStop, int pollMs, const QDeadlineTimer& deadline,
-    const std::function<void(const QByteArray&, const QHostAddress&, quint16)>& onDatagram)
+    const std::function<void(const QByteArray&, const QHostAddress&, quint16)>& onDatagram,
+    int* quietPollsUsed)
 {
+    // Der gemeldete Zaehler laeuft NEBEN quietPolls, nicht an seiner
+    // Stelle: quietPolls steht am Ausgang immer auf quietBeforeStop, in
+    // der festen Fassung wie im Rueckfall — er unterscheidet die beiden
+    // also gerade nicht. Was sie unterscheidet, ist, wie viele stille
+    // Fenster INSGESAMT verbraucht wurden; beim Rueckfall zaehlt die
+    // Schleife die vor der Antwort verbrauchten noch einmal.
+    if (quietPollsUsed != nullptr) {
+        *quietPollsUsed = 0;
+    }
     int quietPolls = 0;
     while (quietPolls < quietBeforeStop) {
         // Cooperative cancel — see stopDiscovery(). Checked after each
@@ -675,6 +685,9 @@ RadioDiscovery::QuietPollOutcome RadioDiscovery::quietPollAttempt(
         bool readable = sock.waitForReadyRead(pollMs);
         if (!readable) {
             quietPolls++;
+            if (quietPollsUsed != nullptr) {
+                (*quietPollsUsed)++;
+            }
             continue;
         }
         // From Thetis clsRadioDiscovery.cs:964-976 [@852bf0e]: the

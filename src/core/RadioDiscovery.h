@@ -259,10 +259,29 @@ public:
     // socket: scanAllNics() itself always skips loopback interfaces (see its
     // isNicCandidate check), so the loop is otherwise unreachable without a
     // real non-loopback NIC and a live radio on it.
+    // What the loop DID, as counts instead of milliseconds — see
+    // quietPollAttempt()'s `quietPollsUsed` for why. `datagrams` is counted
+    // here in the forwarding callback, so a test can tell "the reply never
+    // arrived" (loopback loss, a thread that did not get scheduled) apart
+    // from "the reply arrived and the counter stayed frozen" — without it,
+    // a lost datagram would make the regression test pass for the wrong
+    // reason.
+    struct QuietPollMetrics {
+        int quietPolls = 0;
+        int datagrams = 0;
+    };
+
     QuietPollOutcome quietPollAttemptForTest(QUdpSocket& sock, int quietBeforeStop, int pollMs,
-                                              const QDeadlineTimer& deadline) {
-        return quietPollAttempt(sock, quietBeforeStop, pollMs, deadline,
-                                 [](const QByteArray&, const QHostAddress&, quint16) {});
+                                              const QDeadlineTimer& deadline,
+                                              QuietPollMetrics* metrics = nullptr) {
+        return quietPollAttempt(
+            sock, quietBeforeStop, pollMs, deadline,
+            [metrics](const QByteArray&, const QHostAddress&, quint16) {
+                if (metrics != nullptr) {
+                    metrics->datagrams++;
+                }
+            },
+            metrics != nullptr ? &metrics->quietPolls : nullptr);
     }
 #endif
 
@@ -344,10 +363,28 @@ private:
     // not merely a slow path. Returns Cancelled if stopDiscovery() fires
     // mid-poll (checked once per poll, same cadence scanAllNics() always
     // had).
+    //
+    // `quietPollsUsed` (optional, 2026-10-17) reports how many NOT-readable
+    // polls the loop consumed IN TOTAL — which is not the same as the
+    // internal counter's final value: that one always ends at
+    // quietBeforeStop, in the fixed behaviour and in the regression alike,
+    // so it tells the two apart not at all. The total does: the
+    // reset-on-readable regression spends the polls it had already made
+    // before the reply a second time. It exists because the test that
+    // guards the frozen counter above had to measure wall-clock time to
+    // see it, and that is a bet on the runner's scheduling: the fixed
+    // behaviour needs quietBeforeStop polls (6 x 30 ms = 180 ms in that
+    // test), the reset-on-readable regression needs three more (270 ms),
+    // and on 2026-10-17 a loaded macOS runner took 257 ms for the FIXED
+    // path — inside the regression's band, with the test failing although
+    // the code was right. The count is the quantity that actually carries
+    // the invariant, and it is the same number on a fast machine and a
+    // slow one.
     QuietPollOutcome quietPollAttempt(
         QUdpSocket& sock, int quietBeforeStop, int pollMs, const QDeadlineTimer& deadline,
         const std::function<void(const QByteArray& datagram, const QHostAddress& sender,
-                                  quint16 senderPort)>& onDatagram);
+                                  quint16 senderPort)>& onDatagram,
+        int* quietPollsUsed = nullptr);
 
     // ── Der Suchlauf als Zustandsautomat (2026-10-16) ────────────────
     //
