@@ -2598,10 +2598,55 @@ void RadioModel::onNativeFt8Decode(const DxSpot& spot)
     // neue Farbwahl — es ist dieselbe Sache, und wer die beiden
     // auseinanderhalten will, liest die Quellenspalte. Beides laesst
     // sich in den Einstellungen aendern.
+    meldeEigenenFund(spot,
+                     QStringLiteral("NativeFt8SpotLifetimeSec"), 120,
+                     QStringLiteral("NativeFt8SpotColor"),
+                     QStringLiteral("FT8"));
+}
+
+void RadioModel::onNativeRttyDecode(const DxSpot& spot)
+{
+    // Der eigene RTTY-Dekoder (2026-10-17). Derselbe Weg wie bei FT8:
+    // Fund in die Spotliste (und damit auf den Panadapter), in den
+    // Sammler „was mein Geraet gehoert hat", und weiter an PSK
+    // Reporter. Bis heute endete RTTY im Textfeld des Applets und
+    // nirgends sonst — der Fund war da, aber unerreichbar.
+    //
+    // Lebensdauer 900 s, und das ist eine Wahl mit Grund: ein
+    // FT8-Fenster ist 15 s lang, darum sind dort 120 s richtig. Ein
+    // RTTY-Anruf laeuft Minuten, und die Station bleibt auf ihrer
+    // Frequenz — das ist naeher an einem Cluster-Spot (1800 s) als an
+    // einem FT8-Fenster. 900 s liegt dazwischen: lang genug, um die
+    // Station wiederzufinden, kurz genug, dass die Liste nicht mit
+    // Stationen voll steht, die langst weg sind. Aenderbar.
+    //
+    // Die FARBE ist mit Absicht dieselbe wie bei den eigenen
+    // FT8-Funden: es ist dieselbe Quelle („Longpath"), und wer die
+    // Betriebsart sehen will, liest die Modusspalte. Eine zweite
+    // Farbe waere eine Gestaltungsentscheidung, und die faellt nicht
+    // hier.
+    meldeEigenenFund(spot,
+                     QStringLiteral("NativeRttySpotLifetimeSec"), 900,
+                     QStringLiteral("NativeRttySpotColor"),
+                     QStringLiteral("RTTY"));
+}
+
+// ── Ein eigener Fund, dreifach weitergereicht ───────────────────────
+//
+// Einmal geschrieben fuer FT8 und RTTY (2026-10-17). Vorher stand der
+// Rumpf nur in onNativeFt8Decode; als RTTY dazukam, waere die zweite
+// Abschrift die Stelle gewesen, an der die beiden beim naechsten
+// Eingriff auseinanderlaufen.
+void RadioModel::meldeEigenenFund(const DxSpot& spot,
+                                  const QString& lebensdauerSchluessel,
+                                  int lebensdauerVorgabeSek,
+                                  const QString& farbSchluessel,
+                                  const QString& modusVorgabe)
+{
     auto& s = AppSettings::instance();
-    const int lifetime = s.value(QStringLiteral("NativeFt8SpotLifetimeSec"),
-                                 120).toInt();
-    const QString color = ft8SpotFarbe(QStringLiteral("NativeFt8SpotColor"));
+    const int lifetime = s.value(lebensdauerSchluessel,
+                                 lebensdauerVorgabeSek).toInt();
+    const QString color = ft8SpotFarbe(farbSchluessel);
 
     if (m_spotModel) {
         const int idx = m_spotModel->dedupIndexFor(spot.dxCall, spot.freqMhz);
@@ -2615,7 +2660,7 @@ void RadioModel::onNativeFt8Decode(const DxSpot& spot)
         dec.freqMhz  = spot.freqMhz;
         dec.snr      = spot.snr;
         dec.mode     = SpotTableModel::extractMode(spot.comment);
-        if (dec.mode.isEmpty()) { dec.mode = QStringLiteral("FT8"); }
+        if (dec.mode.isEmpty()) { dec.mode = modusVorgabe; }
         dec.source   = spot.source;
         // Die Zeit des FENSTERS, nicht die von jetzt: ein Fund gehoert
         // in die Periode, in der er gehoert wurde, sonst stimmt er im
@@ -2638,7 +2683,7 @@ void RadioModel::onNativeFt8Decode(const DxSpot& spot)
         const QString mode = SpotTableModel::extractMode(spot.comment);
         m_pskReporter->reportDecode(
             spot.dxCall,
-            mode.isEmpty() ? QStringLiteral("FT8") : mode,
+            mode.isEmpty() ? modusVorgabe : mode,
             spot.freqMhz,
             spot.snr);
     }

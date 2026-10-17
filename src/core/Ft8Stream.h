@@ -80,6 +80,37 @@ public:
     /// Laenge eines Fensters in Millisekunden.
     int slotMs() const;
 
+    /// ── Warum der FT4-Block spaeter beginnt (2026-10-17) ───────────
+    ///
+    /// ft8_lib sucht den Zeitversatz in einem FESTEN Bereich von -10
+    /// bis +19 SYMBOLEN (`third_party/ft8_lib/ft8/decode.c:205`). Mal
+    /// der Symboldauer ergibt das bei FT4 (0,048 s) ein Suchband von
+    /// -0,48 s bis +0,91 s, bei FT8 (0,160 s) eines von -1,6 s bis
+    /// +3,04 s. Gemessen am 2026-10-17, Nachricht an verschobenen
+    /// Stellen in ein leeres 7,5-s-Fenster gelegt:
+    ///
+    ///     -600 ms  nein     850 ms  JA
+    ///     -500 ms  JA       900 ms  JA
+    ///      ...              925 ms  nein
+    ///
+    /// Also -500 bis +900 ms, 1,40 s breit — die Theorie auf 10 ms
+    /// genau. Eine FT4-Sendung beginnt rund 0,5 s nach der
+    /// Fenstergrenze. Sie liegt damit im Band, aber nur 0,4 s vom
+    /// oberen Rand entfernt, waehrend unten 1,0 s frei bleiben. Jede
+    /// Laufzeit im Tonweg (WDSP, Umtaster, Ring) frisst von genau
+    /// diesen 0,4 s.
+    ///
+    /// Darum faengt der Block, den FT4 zu sehen bekommt, 300 ms nach
+    /// der Fenstergrenze an. Das ist nicht gerundet, sondern die
+    /// Mitte: (-500 + 900) / 2 = +200, und 500 - 200 = 300. Danach
+    /// liegt das Band bei -200 bis +1200 ms, und die Soll-Sendezeit
+    /// von +500 ms steht mit 700 ms Luft nach beiden Seiten darin.
+    ///
+    /// Nicht an ft8_lib geschraubt: der Bereich dort gilt fuer FT8
+    /// mit, wo er reichlich ist, und ein veraenderter Fremdcode
+    /// kostet bei jedem Abgleich wieder Arbeit.
+    static constexpr int kFt4BlockVersatzMs = 300;
+
 signals:
     /// Ein Fenster ist zu Ende und ausgewertet. periodStart ist seine
     /// UTC-Anfangszeit — ohne die laesst sich ein Decode nicht
